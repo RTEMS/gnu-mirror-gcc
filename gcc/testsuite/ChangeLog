@@ -1,3 +1,92 @@
+Fri Feb 13 00:36:07 1998  Jeffrey A Law  (law@cygnus.com)
+
+	* gcc.dg/ifelse-1.c: New test.
+
+Mon Feb  9 02:08:47 1998  H.J. Lu  (hjl@gnu.org)
+
+	* lib/g77.exp (g77_target_compile): Fix multilibs for libf2c.
+
+        * lib/old-dejagnu.exp (old-dejagnu): Added the
+        "execution test - XFAIL *-*-*" handling in the spirit of
+        "excess errors test -". Changed the "execution test fails"
+        handling to be like "excess errors test fails".
+        * Update various tests accordingly.
+
+Sun Jan 18 01:33:59 1998  Jeffrey A Law  (law@cygnus.com)
+
+	* lib/c-torture.exp: Look for .x files instead of .cexp files.
+	* lib/f-torture.exp: Similarly.
+	* gcc.c-torture: Rename all .cexp files to .x files.
+
+Tue Nov 25 16:18:51 1997  Kate Hedstrom  (kate@ahab.rutgers.edu)
+
+        * lib/f-torture.exp: Improve error and loop detection.
+
+Fri Sep 26 10:50:53 1997  Bob Manson  <manson@charmed.cygnus.com>
+
+	* lib/c-torture.exp(c-torture-execute): Fix typo.
+
+	* lib/old-dejagnu.exp(old-dejagnu): Use a name derived from the
+	testcase as the executable name. Keep the executable around if
+	the test fails.
+
+Fri Sep 19 17:19:53 1997  Bob Manson  <manson@charmed.cygnus.com>
+
+	* lib/c-torture.exp (TORTURE_OPTIONS): Removed unnecessary
+ 	changes.  Only test one -g option, and move it to the end of the
+ 	list of options to test.
+
+Fri Sep 19 17:58:00 1997  Michael Meissner  <meissner@cygnus.com>
+
+	* lib/c-torture.exp (TORTURE_OPTIONS): Check for the environment
+	variable GCC_TORTURE_OPTIONS to supply default switches separated
+	by colons.  If no environment variable, run tests with -O0 -g, -O1
+	-g, and -O2 -g as well.
+
+Wed Sep 17 10:12:26 1997  Bob Manson  <manson@charmed.cygnus.com>
+
+	* lib/plumhall.exp: Don't set PHSRC in this file. Add a few
+	explanatory comments. Fix indentation.
+
+Mon Sep 15 00:36:53 1997  Jeffrey A Law  (law@cygnus.com)
+
+	* lib/g++.exp (g++_init): Look for xgcc in $basedir too.
+
+Thu Sep 11 13:54:47 1997  Jeffrey A Law  (law@cygnus.com)
+
+	* g++.old-deja/g++.brendan/scope4.C: No longer expected to fail.
+	* g++.old-deja/g++.mike/p7325.C: Likewise.
+	* g++.old-deja/g++.mike/eh51.C: No longer expected to fail on the PA.
+
+Thu Sep 11 10:00:03 1997  Alexandre Oliva  (oliva@dcc.unicamp.br)
+
+	* g++.old-deja/g++.brendan/crash20.C: Rework to avoid libg++.
+	* g++.old-deja/g++.brendan/crash30.C: Likewise.
+	* g++.old-deja/g++.brendan/crash39.C: Likewise.
+	* g++.old-deja/g++.law/operators4.C: Likewise.
+
+Thu Sep 11 09:53:40 1997  Joe Buck  (jbuck@synopsys.com)
+
+	* g++.old-deja/g++.mike/p658.C: eliminate <bool.h> use.
+	* g++.old-deja/g++.mike/p784.C: Ditto.
+	* g++.old-deja/g++.mike/p785.C: Ditto.
+
+Fri Sep  5 00:21:42 1997  Jeffrey A Law  (law@cygnus.com)
+
+        * gcc.c-torture/execute/cbrt.c: Tweak to work on more targets.
+
+Wed Sep  3 17:15:00 1997  Bob Manson  <manson@charmed.cygnus.com>
+
+	* lib/c-torture.exp(c-torture-execute): If the previous and the
+ 	current executables being tested are identical, we don't need to
+ 	run the executable again. Try to make the executable names
+ 	unique. Add an optional argument for passing additional compiler
+ 	flags.
+
+Tue Sep  2 16:34:31 1997  Doug Evans  <dje@canuck.cygnus.com>
+
+	* lib/gcc-dg.exp (gcc-dg-test): Fix typos setting compile_type.
+
 Thu Jul 31 12:17:24 1997  Jeffrey A Law  (law@cygnus.com)
 
 	* gcc.c-torture/execute/920501-9.c: Fix to work on targets with
