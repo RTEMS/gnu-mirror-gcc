@@ -191,7 +191,7 @@ read_name (char *str, FILE *infile)
 	  struct md_constant tmp_def;
 
 	  tmp_def.name = p;
-	  def = htab_find (md_constants, &tmp_def);
+	  def = (struct md_constant *) htab_find (md_constants, &tmp_def);
 	  if (def)
 	    p = def->value;
 	} while (def);
@@ -277,7 +277,7 @@ read_quoted_string (struct obstack *ob, FILE *infile)
     }
 
   obstack_1grow (ob, 0);
-  return obstack_finish (ob);
+  return (char *) obstack_finish (ob);
 }
 
 /* Read a braced string (a la Tcl) onto the obstack.  Caller has
@@ -315,7 +315,7 @@ read_braced_string (struct obstack *ob, FILE *infile)
     }
 
   obstack_1grow (ob, 0);
-  return obstack_finish (ob);
+  return (char *) obstack_finish (ob);
 }
 
 /* Read some kind of string constant.  This is the high-level routine
@@ -439,10 +439,10 @@ read_constants (FILE *infile, char *tmp_char)
 
       if (c != '(')
 	fatal_expected_char (infile, '(', c);
-      def = xmalloc (sizeof (struct md_constant));
+      def = XNEW (struct md_constant);
       def->name = tmp_char;
       read_name (tmp_char, infile);
-      entry_ptr = htab_find_slot (defs, def, TRUE);
+      entry_ptr = htab_find_slot (defs, def, INSERT);
       if (! *entry_ptr)
 	def->name = xstrdup (tmp_char);
       c = read_skip_spaces (infile);
@@ -455,7 +455,7 @@ read_constants (FILE *infile, char *tmp_char)
 	}
       else
 	{
-	  def = *entry_ptr;
+	  def = (struct md_constant *) *entry_ptr;
 	  if (strcmp (def->value, tmp_char))
 	    fatal_with_file_and_line (infile,
 				      "redefinition of %s, was %s, now %s",
@@ -545,12 +545,6 @@ again:
   read_name (tmp_char, infile);
 
   tmp_code = UNKNOWN;
-
-  if (! strcmp (tmp_char, "define_constants"))
-    {
-      read_constants (infile, tmp_char);
-      goto again;
-    }
   for (i = 0; i < NUM_RTX_CODE; i++)
     if (! strcmp (tmp_char, GET_RTX_NAME (i)))
       {
@@ -559,16 +553,24 @@ again:
       }
 
   if (tmp_code == UNKNOWN)
-    fatal_with_file_and_line (infile, "unknown rtx code `%s'", tmp_char);
-
-  /* (NIL) stands for an expression that isn't there.  */
-  if (tmp_code == NIL)
     {
-      /* Discard the closeparen.  */
-      while ((c = getc (infile)) && c != ')')
-	;
-
-      return 0;
+      /* (nil) stands for an expression that isn't there.  */
+      if (! strcmp (tmp_char, "nil"))
+	{
+	  /* Discard the closeparen.  */
+	  c = read_skip_spaces (infile);
+	  if (c != ')')
+	    fatal_expected_char (infile, ')', c);
+	  return 0;
+	}
+      /* (define_constants ...) has special syntax.  */
+      else if (! strcmp (tmp_char, "define_constants"))
+	{
+	  read_constants (infile, tmp_char);
+	  goto again;
+	}
+      else 
+	fatal_with_file_and_line (infile, "unknown rtx code `%s'", tmp_char);
     }
 
   /* If we end up with an insn expression then we free this space below.  */
@@ -651,26 +653,28 @@ again:
 	break;
 
       case 'S':
-	/* 'S' is an optional string: if a closeparen follows,
-	   just store NULL for this element.  */
-	c = read_skip_spaces (infile);
-	ungetc (c, infile);
-	if (c == ')')
-	  {
-	    XSTR (return_rtx, i) = 0;
-	    break;
-	  }
-
       case 'T':
       case 's':
 	{
 	  char *stringbuf;
+	  int star_if_braced;
+
+	  c = read_skip_spaces (infile);
+	  ungetc (c, infile);
+	  if (c == ')')
+	    {
+	      /* 'S' fields are optional and should be NULL if no string
+		 was given.  Also allow normal 's' and 'T' strings to be
+		 omitted, treating them in the same way as empty strings.  */
+	      XSTR (return_rtx, i) = (format_ptr[-1] == 'S' ? NULL : "");
+	      break;
+	    }
 
 	  /* The output template slot of a DEFINE_INSN,
 	     DEFINE_INSN_AND_SPLIT, or DEFINE_PEEPHOLE automatically
 	     gets a star inserted as its first character, if it is
 	     written with a brace block instead of a string constant.  */
-	  int star_if_braced = (format_ptr[-1] == 'T');
+	  star_if_braced = (format_ptr[-1] == 'T');
 
 	  stringbuf = read_string (&rtl_obstack, infile, star_if_braced);
 

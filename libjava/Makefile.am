@@ -1,9 +1,68 @@
 ## Process this file with automake to produce Makefile.in.
 
-AUTOMAKE_OPTIONS = foreign
+AUTOMAKE_OPTIONS = foreign subdir-objects
 
 ACLOCAL_AMFLAGS = -I .
 
+## Garbage collector conditionals.
+if USING_BOEHMGC
+BOEHMGC_SRC = boehm.cc
+else
+BOEHMGC_SRC =
+endif
+
+if USING_NOGC
+NOGC_SRC = nogc.cc
+else
+NOGC_SRC =
+endif
+
+## Broken backtrace conditional.
+if SUPPLY_BACKTRACE
+BACKTRACE_SRC = sysdep/dwarf2-backtrace.cc
+else
+BACKTRACE_SRC =
+endif
+
+## Conditionals for platform-specific helper functions.
+if USING_POSIX_PLATFORM
+POSIX_PLATFORM_SRC = posix.cc
+else
+POSIX_PLATFORM_SRC =
+endif
+
+if USING_WIN32_PLATFORM
+WIN32_PLATFORM_SRC = win32.cc
+else
+WIN32_PLATFORM_SRC =
+endif
+
+if USING_ECOS_PLATFORM
+ECOS_PLATFORM_SRC = posix.cc
+else
+ECOS_PLATFORM_SRC =
+endif
+
+## Conditionals for platform-specific thread support.
+if USING_POSIX_THREADS
+POSIX_THREAD_SRC = posix-threads.cc
+else
+POSIX_THREAD_SRC =
+endif
+
+if USING_WIN32_THREADS
+WIN32_THREAD_SRC = win32-threads.cc
+else
+WIN32_THREAD_SRC =
+endif
+
+if USING_NO_THREADS
+NO_THREAD_SRC = no-threads.cc
+else
+NO_THREAD_SRC =
+endif
+
+## Testsuite conditional.
 if TESTSUBDIR
 SUBDIRS = $(DIRLTDL) testsuite gcj include
 else
@@ -21,16 +80,19 @@ write_entries_to_file = $(shell rm -f $(2) || :) $(shell touch $(2)) $(foreach o
 
 ## ################################################################
 
+# autoconf2.13's target_alias
+target_noncanonical = @target_noncanonical@
+
 ##
 ## What gets installed, and where.
 ##
 
 if XLIB_AWT
-cond_x_ltlibrary = lib-gnu-awt-xlib.la
+cond_xlib_ltlibrary = lib-gnu-awt-xlib.la
 ## We require libstdc++-v3 to be in the same build tree.
-xlib_includes = -I../libstdc++-v3/include -I../libstdc++-v3/include/$(target_alias) -I$(srcdir)/../libstdc++-v3/libsupc++
+xlib_includes = -I../libstdc++-v3/include -I../libstdc++-v3/include/$(target_noncanonical) -I$(srcdir)/../libstdc++-v3/libsupc++
 else
-cond_x_ltlibrary =
+cond_xlib_ltlibrary =
 xlib_includes =
 endif
 
@@ -40,8 +102,8 @@ else
 cond_gtk_ltlibrary =
 endif
 
-toolexeclib_LTLIBRARIES = libgcj.la lib-org-xml-sax.la lib-org-w3c-dom.la \
-    $(cond_gtk_ltlibrary) $(cond_x_ltlibrary)
+toolexeclib_LTLIBRARIES = libgcj.la libgij.la lib-org-xml-sax.la lib-org-w3c-dom.la \
+    $(cond_gtk_ltlibrary) $(cond_xlib_ltlibrary)
 toolexecmainlib_DATA = libgcj.spec
 
 pkgconfigdir = $(libdir)/pkgconfig
@@ -57,7 +119,7 @@ propdir = $(libdir)
 
 ## For now, only on native systems.  FIXME.
 if NATIVE
-bin_PROGRAMS = jv-convert gij rmic rmiregistry
+bin_PROGRAMS = jv-convert gij grmic grmiregistry
 endif
 
 bin_SCRIPTS = addr2name.awk
@@ -68,22 +130,8 @@ bin_SCRIPTS = addr2name.awk
 ## Compilers and compilation flags.
 ##
 
-## CANADIAN is a misnomer.  Really we check to see if we must pick up
-## the tools from the path.
-if CANADIAN
-if NULL_TARGET
-## In this case, gcj is found outside the build tree.  However, zip is
-## found in the build tree.
-ZIP = $(MULTIBUILDTOP)../$(COMPPATH)/fastjar/jar
-GCJH = gcjh
-else
-ZIP = jar
-GCJH = $(target_alias)-gcjh
-endif
-else # CANADIAN
-GCJH = $(MULTIBUILDTOP)../$(COMPPATH)/gcc/gcjh
-ZIP = $(MULTIBUILDTOP)../$(COMPPATH)/fastjar/jar
-endif # CANADIAN
+GCJH = @GCJH@
+ZIP = @ZIP@
 
 ## The compiler with whatever flags we want for both -c and -C
 ## compiles.
@@ -93,32 +141,45 @@ GCJCOMPILE = $(LIBTOOL) --tag=GCJ --mode=compile $(GCJ_WITH_FLAGS) -fclasspath= 
 GCJLINK = $(LIBTOOL) --tag=GCJ --mode=link $(GCJ) -L$(here) $(JC1FLAGS) $(LDFLAGS) -o $@
 LIBLINK = $(LIBTOOL) --tag=CXX --mode=link $(CXX) -L$(here) $(JC1FLAGS) $(LDFLAGS) -o $@
 
-## We define this because otherwise libtool can be run with different
-## values of `CXX' and will then get confused and fail to work.  So,
-## we use --tag explicitly.  Someday automake will be changed to do
-## this automatically.
-LTCXXCOMPILE = $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
-
 JAVAC = $(GCJ_WITH_FLAGS) -C
 
 GCC_UNWIND_INCLUDE = @GCC_UNWIND_INCLUDE@
 
-WARNINGS = -W -Wall
-## We need _GNU_SOURCE defined for some Linux builds.  It doesn't hurt
-## to always define it.
-AM_CXXFLAGS = -fno-rtti -fnon-call-exceptions $(THREADCXXFLAGS) \
-## Some systems don't allow `$' in identifiers by default, so we force it.
+WARNINGS = -Wextra -Wall
+## Some systems don't allow `$' in identifiers by default, so we force
+## it with -fdollars-in-identifiers.  -Wswitch-enum detects bugs in
+## the verifier implementation, and maybe other places.  We need
+## _GNU_SOURCE defined for some Linux builds.  It doesn't hurt to
+## always define it.  Some systems, including Linux, need
+## -D_FILE_OFFSET_BITS=64 to enable > 2GB file support.
+AM_CXXFLAGS = \
+	-fno-rtti \
+	-fnon-call-exceptions \
+	$(THREADCXXFLAGS) \
 	-fdollars-in-identifiers \
-## Detect bugs in the verifier implementation, and maybe other places.
 	-Wswitch-enum \
-	@LIBGCJ_CXXFLAGS@ @X_CFLAGS@ $(WARNINGS) -D_GNU_SOURCE \
-	-DPREFIX="\"$(prefix)\"" -DLIBDIR="\"$(libdir)\"" \
-	-DBOOT_CLASS_PATH="\"$(jardir)/$(jar_DATA)\""
+	-D_FILE_OFFSET_BITS=64 \
+	@LIBGCJ_CXXFLAGS@ \
+	@X_CFLAGS@ \
+	$(WARNINGS) \
+	-D_GNU_SOURCE \
+	-DPREFIX="\"$(prefix)\"" \
+	-DLIBDIR="\"$(libdir)\"" \
+	-DBOOT_CLASS_PATH="\"$(jardir)/$(jar_DATA)\"" \
+	-DJAVA_EXT_DIRS="\"$(jardir)/ext\""
+
+AM_GCJFLAGS = \
+	--encoding=UTF-8 \
+	-Wno-deprecated
+
 if USING_GCC
 AM_CFLAGS = @LIBGCJ_CFLAGS@ $(WARNINGS)
 else
 AM_CFLAGS = @LIBGCJ_CFLAGS@
 endif
+
+## Extra CFLAGS used for JNI C sources shared with GNU Classpath.
+PEDANTIC_CFLAGS = -ansi -pedantic -Wall -Wno-long-long
 
 JCFLAGS = -g
 JC1FLAGS = @LIBGCJ_JAVAFLAGS@ $(GCJFLAGS)
@@ -135,37 +196,29 @@ INCLUDES = -I$(top_srcdir) -Iinclude -I$(top_srcdir)/include \
 ## How to build libgcj.a and libgcj.jar
 ##
 
-## Objects from C++ sources in subdirs.
-nat_files = $(nat_source_files:.cc=.lo)
-x_nat_files = $(x_nat_source_files:.cc=.lo)
-## Objects from C sources in subdirs.
-c_files = $(c_source_files:.c=.lo)
-extra_cc_files = $(extra_cc_source_files:.cc=.lo)
-## Objects from gtk-related C sources in subdirs.
-gtk_c_files = $(gtk_c_source_files:.c=.lo)
-## Objects from Java sources in subdirs.
-javao_files = $(java_source_files:.java=.lo) \
-	$(built_java_source_files:.java=.lo)
-x_javao_files = $(x_java_source_files:.java=.lo)
+libgij_la_SOURCES = gij.cc
+libgij_la_LIBADD = libgcj.la
+libgij_la_DEPENDENCIES = libgcj.la libgcj.spec
 
 libgcj_la_SOURCES = prims.cc jni.cc exception.cc \
 	resolve.cc defineclass.cc interpret.cc verify.cc \
-	$(nat_source_files)
-EXTRA_libgcj_la_SOURCES = boehm.cc nogc.cc posix-threads.cc no-threads.cc \
-	win32-threads.cc posix.cc win32.cc $(c_source_files) \
-	$(extra_cc_source_files) $(java_source_files) $(built_java_source_files)
-libgcj_la_DEPENDENCIES = libgcj-@gcc_version@.jar $(javao_files) \
-	$(c_files) $(extra_cc_files) $(GCOBJS) $(THREADOBJS) \
-       $(PLATFORMOBJS) $(LIBLTDL) $(LIBFFI) $(ZLIBS) $(GCLIBS)
+	$(nat_source_files) $(math_c_source_files) $(java_source_files) \
+	$(built_java_source_files) \
+	$(BOEHMGC_SRC) $(NOGC_SRC) \
+	$(BACKTRACE_SRC) \
+	$(POSIX_PLATFORM_SRC) $(WIN32_PLATFORM_SRC) $(ECOS_PLATFORM_SRC) \
+	$(POSIX_THREAD_SRC) $(WIN32_THREAD_SRC) $(NO_THREAD_SRC)
+libgcj_la_DEPENDENCIES = libgcj-@gcc_version@.jar \
+	java/lang/fdlibm.h java/lang/ieeefp.h java/lang/mprec.h \
+	$(LIBLTDL) $(LIBFFI) $(ZLIBS) $(GCLIBS) $(propertyo_files)
 
-libgcj_la_LIBADD = $(javao_files) $(c_files) $(extra_cc_files) $(GCOBJS) \
-	$(THREADOBJS) $(PLATFORMOBJS)
 # Include THREADLIBS here to ensure that the correct version of
 # certain linuxthread functions get linked:
+## The mysterious backslash in the grep pattern is consumed by make.
 libgcj_la_LDFLAGS = -rpath $(toolexeclibdir) $(THREADLDFLAGS) $(THREADLIBS) \
 	$(LIBLTDL) $(SYS_ZLIBS) \
-## The mysterious backslash is consumed by make.
 	-version-info `grep -v '^\#' $(srcdir)/libtool-version`
+libgcj_la_LIBADD = $(LIBFFI) $(ZLIBS) $(GCLIBS) $(propertyo_files)
 libgcj_la_LINK = $(LIBLINK)
 
 # Gtk/Cairo JNI sources.
@@ -187,6 +240,7 @@ jni/gtk-peer/gnu_java_awt_peer_gtk_GdkGraphics.c \
 jni/gtk-peer/gnu_java_awt_peer_gtk_GdkPixbufDecoder.c \
 jni/gtk-peer/gnu_java_awt_peer_gtk_GtkButtonPeer.c \
 jni/gtk-peer/gnu_java_awt_peer_gtk_GtkCanvasPeer.c \
+jni/gtk-peer/gnu_java_awt_peer_gtk_GtkCheckboxGroupPeer.c \
 jni/gtk-peer/gnu_java_awt_peer_gtk_GtkCheckboxMenuItemPeer.c \
 jni/gtk-peer/gnu_java_awt_peer_gtk_GtkCheckboxPeer.c \
 jni/gtk-peer/gnu_java_awt_peer_gtk_GtkChoicePeer.c \
@@ -195,6 +249,7 @@ jni/gtk-peer/gnu_java_awt_peer_gtk_GtkComponentPeer.c \
 jni/gtk-peer/gnu_java_awt_peer_gtk_GtkEmbeddedWindowPeer.c \
 jni/gtk-peer/gnu_java_awt_peer_gtk_GtkEvents.c \
 jni/gtk-peer/gnu_java_awt_peer_gtk_GtkFileDialogPeer.c \
+jni/gtk-peer/gnu_java_awt_peer_gtk_GtkGenericPeer.c \
 jni/gtk-peer/gnu_java_awt_peer_gtk_GtkImagePainter.c \
 jni/gtk-peer/gnu_java_awt_peer_gtk_GtkLabelPeer.c \
 jni/gtk-peer/gnu_java_awt_peer_gtk_GtkListPeer.c \
@@ -226,6 +281,7 @@ gnu/java/awt/peer/gtk/GdkFontMetrics.java \
 gnu/java/awt/peer/gtk/GdkGlyphVector.java \
 gnu/java/awt/peer/gtk/GdkGraphics.java \
 gnu/java/awt/peer/gtk/GdkGraphics2D.java \
+gnu/java/awt/peer/gtk/GdkGraphicsEnvironment.java \
 gnu/java/awt/peer/gtk/GdkPixbufDecoder.java \
 gnu/java/awt/peer/gtk/GtkArg.java \
 gnu/java/awt/peer/gtk/GtkArgList.java \
@@ -264,12 +320,16 @@ gnu/java/awt/peer/gtk/GtkTextFieldPeer.java \
 gnu/java/awt/peer/gtk/GtkToolkit.java \
 gnu/java/awt/peer/gtk/GtkWindowPeer.java
 
-gtk_c_headers = $(patsubst %.java,jniinclude/%.h,$(subst /,_,$(gtk_awt_peer_sources)))
+gtk_jni_headers = $(patsubst %.java,jniinclude/%.h,$(subst /,_,$(gtk_awt_peer_sources)))
 
-$(gtk_c_headers): $(gtk_awt_peer_sources)
+$(gtk_jni_headers): $(gtk_awt_peer_sources)
 	@input=`echo $@ | sed -e 's,jniinclude/,,' -e 's,_,.,g' -e 's,.h$$,,'`; \
 	echo "$(GCJH) -jni -d jniinclude -classpath '' -bootclasspath $(top_builddir) $$input"; \
 	$(GCJH) -jni -d jniinclude -classpath '' -bootclasspath $(top_builddir) $$input
+
+## For the peer library, DEPENDENCIES need to come before OBJECTS so
+## that JNI headers are built before JNI C files.
+$(lib_gnu_java_awt_peer_gtk_la_OBJECTS): $(lib_gnu_java_awt_peer_gtk_la_DEPENDENCIES)
 
 lib_gnu_java_awt_peer_gtk_la_SOURCES = \
 $(gtk_awt_peer_sources) \
@@ -281,10 +341,16 @@ jni/classpath/jnilink.h	\
 jni/classpath/native_state.h \
 jni/classpath/primlib.h
 
+lib_gnu_java_awt_peer_gtk_la_CFLAGS = \
+	-Ijniinclude -I$(srcdir)/jni/classpath \
+	-I$(srcdir)/jni/gtk-peer $(GTK_CFLAGS) $(LIBART_CFLAGS)
+lib_gnu_java_awt_peer_gtk_la_GCJFLAGS = $(AM_GCJFLAGS) -fjni
 lib_gnu_java_awt_peer_gtk_la_LIBADD = $(GTK_LIBS) $(GLIB_LIBS) $(LIBART_LIBS) $(CAIRO_LIBS) $(PANGOFT2_LIBS)
+lib_gnu_java_awt_peer_gtk_la_DEPENDENCIES = $(gtk_jni_headers) libgcj-@gcc_version@.jar libgcj.la libgcj.spec
+## The mysterious backslash in the grep pattern is consumed by make.
 lib_gnu_java_awt_peer_gtk_la_LDFLAGS = \
-## The mysterious backslash is consumed by make.
         -version-info `grep -v '^\#' $(srcdir)/libtool-version`
+lib_gnu_java_awt_peer_gtk_la_LINK = $(LIBLINK)
 
 lib_org_w3c_dom_la_SOURCES = org/w3c/dom/Attr.java \
 org/w3c/dom/CDATASection.java \
@@ -313,8 +379,8 @@ org/w3c/dom/traversal/NodeIterator.java \
 org/w3c/dom/traversal/TreeWalker.java
 ## See jv_convert_LDADD.
 lib_org_w3c_dom_la_LIBADD = -L$(here)/.libs libgcj.la
+## The mysterious backslash in the grep pattern is consumed by make.
 lib_org_w3c_dom_la_LDFLAGS = -rpath $(toolexeclibdir) \
-## The mysterious backslash is consumed by make.
         -version-info `grep -v '^\#' $(srcdir)/libtool-version`
 
 lib_org_xml_sax_la_SOURCES = org/xml/sax/ext/DeclHandler.java \
@@ -349,18 +415,19 @@ org/xml/sax/XMLFilter.java \
 org/xml/sax/XMLReader.java
 ## See jv_convert_LDADD.
 lib_org_xml_sax_la_LIBADD = -L$(here)/.libs libgcj.la
+## The mysterious backslash in the grep pattern is consumed by make.
 lib_org_xml_sax_la_LDFLAGS = -rpath $(toolexeclibdir) \
-## The mysterious backslash is consumed by make.
         -version-info `grep -v '^\#' $(srcdir)/libtool-version`
 
-lib_gnu_awt_xlib_la_SOURCES = $(x_nat_source_files)
-EXTRA_lib_gnu_awt_xlib_la_SOURCES = $(x_java_source_files)
-lib_gnu_awt_xlib_la_DEPENDENCIES = libgcj-@gcc_version@.jar $(x_javao_files)
-lib_gnu_awt_xlib_la_LIBADD = $(x_javao_files)
+lib_gnu_awt_xlib_la_SOURCES = \
+	$(xlib_java_source_files) \
+	$(xlib_nat_source_files)
+lib_gnu_awt_xlib_la_DEPENDENCIES = libgcj-@gcc_version@.jar libgcj.la libgcj.spec
+lib_gnu_awt_xlib_la_LIBADD = $(xlib_javao_files)
+## The mysterious backslash in the grep pattern is consumed by make.
 lib_gnu_awt_xlib_la_LDFLAGS = ../libstdc++-v3/src/libstdc++.la \
 	@X_PRE_LIBS@ @X_LIBS@ -lX11 @X_EXTRA_LIBS@ \
         -rpath $(toolexeclibdir) \
-## The mysterious backslash is consumed by make.
         -version-info `grep -v '^\#' $(srcdir)/libtool-version`
 lib_gnu_awt_xlib_la_LINK = $(LIBLINK)
 
@@ -370,9 +437,19 @@ all_java_source_files = \
     $(lib_org_xml_sax_la_SOURCES) \
     $(lib_org_w3c_dom_la_SOURCES) \
     $(gtk_awt_peer_sources) \
-    $(x_java_source_files)
+    $(xlib_java_source_files)
 
 all_java_class_files = $(all_java_source_files:.java=.class)
+
+## Build property files into the library.
+property_files = \
+gnu/regexp/MessagesBundle.properties \
+gnu/regexp/MessagesBundle_fr.properties 
+
+propertyo_files = $(property_files:.properties=.properties.lo) 
+
+%.properties.lo: %.properties
+	$(GCJCOMPILE) -o $@ -c $< -Wc,--resource,`echo $@ | sed "s/\.lo$$//"`
 
 if ONESTEP
 
@@ -413,7 +490,7 @@ endif
 
 # Note: The libtool objects are removed by mostlyclean-local
 # because of command-line-length issues.
-MOSTLYCLEANFILES = $(nat_headers) $(x_nat_headers)
+MOSTLYCLEANFILES = $(nat_headers) $(xlib_nat_headers)
 
 CLEANFILES = libgcj-@gcc_version@.jar
 
@@ -431,45 +508,13 @@ distclean-local:
 
 # Just remove the objects from C++ sources, for testing the C++ compiler.
 clean-nat:
-	rm -f $(nat_files) $(x_nat_files)
+	rm -f $(nat_files) $(xlib_nat_files)
 
-SUFFIXES = .class .java .h
-
-.class.lo:
-	$(GCJCOMPILE) -o $@ $<
-
-.java.lo:
-	$(GCJCOMPILE) -o $@ $<
-
-## FIXME: For the .o files in subdirs, use a special rule.  The
-## standard automake rule can't be overridden (this is a bug in
-## automake), and it also won't put the .o files into subdirs.
-$(nat_files) $(x_nat_files): %.lo: %.cc
-	@echo '$(LTCXXCOMPILE) -MD -MT $@ -MF $(@:.lo=.pp) -c -o $@ $<'; \
-	$(LTCXXCOMPILE) -MD -MT $@ -MF $(@:.lo=.pp) -c -o $@ $<
-	@-mv $(@:.lo=.pp) $(@:.lo=.d)
-
-## FIXME: see above
-$(c_files): %.lo: %.c
-	$(LTCOMPILE) -c -o $@ $<
-
-$(extra_cc_files): %.lo: %.cc
-	$(LTCXXCOMPILE) -c -o $@ $<
-
-$(c_files): java/lang/fdlibm.h java/lang/ieeefp.h java/lang/mprec.h
-
-## FIXME: see above
-$(gtk_c_files): %.lo: %.c
-	$(LTCOMPILE) -c -Ijniinclude -I$(srcdir)/jni/classpath -I$(srcdir)/jni/gtk-peer \
-	$(GTK_CFLAGS) $(LIBART_CFLAGS) $(CAIRO_LIBS) $(PANGOFT2_LIBS) -o $@ $<
-
-$(gtk_c_files): $(gtk_c_headers)
-
-## FIXME: see above.
+SUFFIXES = .class .java .h .properties
 
 ## Note: we omit StackTrace here, since it has an explicit rule a bit
 ## later, and GNU make will warn in this case.
-$(filter-out gnu/gcj/runtime/StackTrace.lo, $(javao_files)) $(x_javao_files) $(lib_org_w3c_dom_la_OBJECTS) $(lib_org_xml_sax_la_OBJECTS): %.lo: %.java
+$(filter-out gnu/gcj/runtime/StackTrace.lo, $(javao_files)) $(xlib_javao_files) $(lib_org_w3c_dom_la_OBJECTS) $(lib_org_xml_sax_la_OBJECTS): %.lo: %.java
 	$(GCJCOMPILE) -o $@ $<
 
 $(gtk_awt_peer_sources:.java=.lo): %.lo: %.java
@@ -480,15 +525,6 @@ $(gtk_awt_peer_sources:.java=.lo): %.lo: %.java
 ## number.
 gnu/gcj/runtime/StackTrace.lo: gnu/gcj/runtime/StackTrace.java
 	$(GCJCOMPILE) -fno-optimize-sibling-calls -o $@ $<
-
-## Pass the list of object files to libtool in a temporary file to 
-## avoid tripping platform command line length limits.
-libgcj.la: $(libgcj_la_OBJECTS) $(libgcj_la_DEPENDENCIES)
-	@echo Creating list of files to link...
-	@: $(call write_entries_to_file,$(libgcj_la_OBJECTS) $(libgcj_la_LIBADD),libgcj.objectlist)
-	$(libgcj_la_LINK) -objectlist libgcj.objectlist \
-	@GCLIBS@ @LIBFFI@ @ZLIBS@ \
-	-rpath $(toolexeclibdir) $(libgcj_la_LDFLAGS) $(LIBS)
 
 lib-gnu-awt-xlib.la: $(lib_gnu_awt_xlib_la_OBJECTS) $(lib_gnu_awt_xlib_la_DEPENDENCIES)
 	@echo Creating list of files to link...
@@ -518,14 +554,15 @@ inner_nat_headers = java/io/ObjectOutputStream$$PutField.h \
 	gnu/java/net/PlainSocketImpl$$SocketInputStream.h \
 	gnu/java/net/PlainSocketImpl$$SocketOutputStream.h \
 	gnu/java/nio/PipeImpl$$SinkChannelImpl.h \
-	gnu/java/nio/PipeImpl$$SourceChannelImpl.h
+	gnu/java/nio/PipeImpl$$SourceChannelImpl.h \
+	$(PLATFORM_INNER_NAT_HDRS)
 
 nat_headers = $(ordinary_nat_headers) $(inner_nat_headers)
 nat_headers_install = $(ordinary_nat_headers)
 
-x_nat_headers = $(x_java_source_files:.java=.h)
+xlib_nat_headers = $(xlib_java_source_files:.java=.h)
 
-$(ordinary_nat_headers) $(x_nat_headers): %.h: %.class
+$(ordinary_nat_headers) $(xlib_nat_headers): %.h: %.class
 
 java/lang/ClassLoader.h: java/lang/ClassLoader.class
 	$(GCJH) -classpath '' -bootclasspath $(top_builddir) \
@@ -628,6 +665,11 @@ gnu/java/nio/PipeImpl$$SourceChannelImpl.h: gnu/java/nio/PipeImpl.class
 	$(GCJH) -classpath '' -bootclasspath $(top_builddir) \
 	'gnu/java/nio/PipeImpl$$SourceChannelImpl'
 
+## Only used by PosixProcess.java
+java/lang/ConcreteProcess$$ProcessManager.h: java/lang/ConcreteProcess.class
+	$(GCJH) -classpath '' -bootclasspath $(top_builddir) \
+	'java/lang/ConcreteProcess$$ProcessManager'
+
 ## Headers we maintain by hand and which we want to install.
 extra_headers = java/lang/Object.h java/lang/Class.h
 
@@ -726,13 +768,63 @@ write-entries-to-file-check:
 if NATIVE
 if MAINTAINER_MODE
 noinst_PROGRAMS = gen-from-JIS
+
+gen_from_JIS_SOURCES = \
+	gnu/gcj/convert/gen-from-JIS.c \
+	gnu/gcj/convert/make-trie.c
+
+gen_from_JIS_DEPENDENCIES = \
+	gnu/gcj/convert/JIS0201.h \
+	gnu/gcj/convert/JIS0208.h \
+	gnu/gcj/convert/JIS0212.h
+
+$(srcdir)/gnu/gcj/convert/JIS0208_to_Unicode.cc: ./gen-from-JIS$(EXEEXT)
+	 ./gen-from-JIS JIS0208 >$(srcdir)/gnu/gcj/convert/JIS0208_to_Unicode.cc
+
+$(srcdir)/gnu/gcj/convert/JIS0212_to_Unicode.cc: ./gen-from-JIS$(EXEEXT)
+	 ./gen-from-JIS JIS0212 >$(srcdir)/gnu/gcj/convert/JIS0212_to_Unicode.cc
+
+$(srcdir)/gnu/gcj/convert/Unicode_to_JIS.cc: ./gen-from-JIS$(EXEEXT)
+	 ./gen-from-JIS toJIS >$(srcdir)/gnu/gcj/convert/Unicode_to_JIS.cc
+
+# The Unicode consortium does not permit re-distributing the file JIS0201.TXT.
+# You can get it from
+# ftp://ftp.unicode.org/Public/MAPPINGS/OBSOLETE/EASTASIA/JIS/
+
+$(srcdir)/gnu/gcj/convert/JIS0201.h: # gnu/gcj/convert/JIS0201.TXT
+	echo '/* This file is automatically generated from Unicode tables */' > tmp-0201; \
+	tr  -d '\r' <$(srcdir)/gnu/gcj/convert/JIS0201.TXT \
+	| sed -n -e 's|\(0x..\).*\(0x....\).*#\(.*\)$$|MAP(0x00, \1, \2)  /*\3 */|p' \
+	>> tmp-0201; \
+	mv tmp-0201 $(srcdir)/gnu/gcj/convert/JIS0201.h
+
+# The Unicode consortium does not permit re-distributing the file JIS0208.TXT.
+# You can get it from
+# ftp://ftp.unicode.org/Public/MAPPINGS/OBSOLETE/EASTASIA/JIS/
+
+$(srcdir)/gnu/gcj/convert/JIS0208.h: # gnu/gcj/convert/JIS0208.TXT
+	echo '/* This file is automatically generated from Unicode tables */' > tmp-0208; \
+	tr  -d '\r' <$(srcdir)/gnu/gcj/convert/JIS0208.TXT \
+	| sed -n -e 's|\(0x....\).*0x\(..\)\(..\).*\(0x....\).*#\(.*\)$$|MAP(0x\2, 0x\3, \4)  /*\5 */|p' \
+	>> tmp-0208; \
+	mv tmp-0208 $(srcdir)/gnu/gcj/convert/JIS0208.h
+
+# The Unicode consortium does not permit re-distributing the file JIS0212.TXT.
+# You can get it from
+# ftp://ftp.unicode.org/Public/MAPPINGS/OBSOLETE/EASTASIA/JIS/
+
+$(srcdir)/gnu/gcj/convert/JIS0212.h: # gnu/gcj/convert/JIS0212.TXT
+	echo '/* This file is automatically generated from Unicode tables */' > tmp-0212; \
+	tr  -d '\r' <$(srcdir)/gnu/gcj/convert/JIS0212.TXT \
+	| sed -n -e 's|0x\(..\)\(..\).*\(0x....\).*#\(.*\)$$|MAP(0x\1, 0x\2, \3)  /*\4 */|p' \
+	>> tmp-0212; \
+	mv tmp-0212 $(srcdir)/gnu/gcj/convert/JIS0212.h
+
 endif
 endif 
 
-CONVERT_DIR = gnu/gcj/convert
 
 jv_convert_SOURCES =
-EXTRA_jv_convert_SOURCES = $(convert_source_files)
 ## We need -nodefaultlibs because we want to avoid gcj's `-lgcj'.  We
 ## need this because we are explicitly using libtool to link using the
 ## `.la' file.
@@ -749,112 +841,41 @@ jv_convert_LINK = $(GCJLINK)
 jv_convert_LDADD = -L$(here)/.libs libgcj.la
 ## Depend on the spec file to make sure it is up to date before
 ## linking this program.
-jv_convert_DEPENDENCIES = $(convert_source_files:.java=.lo) \
-	libgcj.la libgcj.spec
+jv_convert_DEPENDENCIES = libgcj.la libgcj.spec
 
-gij_SOURCES = gij.cc
+gij_SOURCES = 
 ## We need -nodefaultlibs because we want to avoid gcj's `-lgcj'.  We
 ## need this because we are explicitly using libtool to link using the
 ## `.la' file.
 gij_LDFLAGS = -rpath $(toolexeclibdir) -shared-libgcc $(THREADLDFLAGS)
 gij_LINK = $(GCJLINK)
 ## See jv_convert_LDADD.
-gij_LDADD = -L$(here)/.libs libgcj.la
+gij_LDADD = -L$(here)/.libs libgij.la
 ## Depend on the spec file to make sure it is up to date before
 ## linking this program.
-gij_DEPENDENCIES = libgcj.la libgcj.spec
+gij_DEPENDENCIES = libgij.la
 
-rmic_SOURCES =
 ## This is a dummy definition.
-EXTRA_rmic_SOURCES = $(rmi_java_source_files)
-rmic_LDFLAGS = --main=gnu.java.rmi.rmic.RMIC \
+grmic_SOURCES =
+grmic_LDFLAGS = --main=gnu.java.rmi.rmic.RMIC \
 	-rpath $(toolexeclibdir) -shared-libgcc $(THREADLDFLAGS)
-rmic_LINK = $(GCJLINK)
+grmic_LINK = $(GCJLINK)
 ## See jv_convert_LDADD.
-rmic_LDADD = -L$(here)/.libs libgcj.la
+grmic_LDADD = -L$(here)/.libs libgcj.la
 ## Depend on the spec file to make sure it is up to date before
 ## linking this program.
-rmic_DEPENDENCIES = libgcj.la libgcj.spec
+grmic_DEPENDENCIES = libgcj.la libgcj.spec
 
-rmiregistry_SOURCES =
 ## This is a dummy definition.
-EXTRA_rmiregistry_SOURCES = $(rmi_java_source_files)
-rmiregistry_LDFLAGS = --main=gnu.java.rmi.registry.RegistryImpl \
+grmiregistry_SOURCES =
+grmiregistry_LDFLAGS = --main=gnu.java.rmi.registry.RegistryImpl \
 	-rpath $(toolexeclibdir) -shared-libgcc $(THREADLDFLAGS)
-rmiregistry_LINK = $(GCJLINK)
+grmiregistry_LINK = $(GCJLINK)
 ## See jv_convert_LDADD.
-rmiregistry_LDADD = -L$(here)/.libs libgcj.la
+grmiregistry_LDADD = -L$(here)/.libs libgcj.la
 ## Depend on the spec file to make sure it is up to date before
 ## linking this program.
-rmiregistry_DEPENDENCIES = libgcj.la libgcj.spec
-
-# The Unicode consortium does not permit re-distributing the file JIS0201.TXT.
-# You can get it from ftp://ftp.unicode.org/Public/MAPPINGS/EASTASIA/JIS/.
-
-$(srcdir)/$(CONVERT_DIR)/JIS0201.h:  # $(CONVERT_DIR)/JIS0201.TXT
-	echo '/* This file is automatically generated from Unicode tables */' > tmp-0201; \
-	tr  -d '\r' <$(CONVERT_DIR)/JIS0201.TXT \
-	| sed -n -e 's|\(0x..\).*\(0x....\).*#\(.*\)$$|MAP(0x00, \1, \2)  /*\3 */|p' \
-	>> tmp-0201; \
-	mv tmp-0201 $(srcdir)/$(CONVERT_DIR)/JIS0201.h
-
-# The Unicode consortium does not permit re-distributing the file JIS0208.TXT.
-# You can get it from ftp://ftp.unicode.org/Public/MAPPINGS/EASTASIA/JIS/.
-
-$(srcdir)/$(CONVERT_DIR)/JIS0208.h:  # $(CONVERT_DIR)/JIS0208.TXT
-	echo '/* This file is automatically generated from Unicode tables */' > tmp-0208; \
-	tr  -d '\r' <$(CONVERT_DIR)/JIS0208.TXT \
-	| sed -n -e 's|\(0x....\).*0x\(..\)\(..\).*\(0x....\).*#\(.*\)$$|MAP(0x\2, 0x\3, \4)  /*\5 */|p' \
-	>> tmp-0208; \
-	mv tmp-0208 $(srcdir)/$(CONVERT_DIR)/JIS0208.h
-
-# The Unicode consortium does not permit re-distributing the file JIS0212.TXT.
-# You can get it from ftp://ftp.unicode.org/Public/MAPPINGS/EASTASIA/JIS/.
-
-$(srcdir)/$(CONVERT_DIR)/JIS0212.h:  # $(CONVERT_DIR)/JIS0212.TXT
-	echo '/* This file is automatically generated from Unicode tables */' > tmp-0212; \
-	tr  -d '\r' <$(CONVERT_DIR)/JIS0212.TXT \
-	| sed -n -e 's|0x\(..\)\(..\).*\(0x....\).*#\(.*\)$$|MAP(0x\1, 0x\2, \3)  /*\4 */|p' \
-	>> tmp-0212; \
-	mv tmp-0212 $(srcdir)/$(CONVERT_DIR)/JIS0212.h
-
-
-gen_from_JIS_SOURCES =
-EXTRA_gen_from_JIS_SOURCES = $(srcdir)/$(CONVERT_DIR)/gen-from-JIS.c \
-		$(srcdir)/$(CONVERT_DIR)/make-trie.c \
-		$(srcdir)/$(CONVERT_DIR)/JIS0201.h \
-		$(srcdir)/$(CONVERT_DIR)/JIS0208.h \
-		$(srcdir)/$(CONVERT_DIR)/JIS0212.h
-gen_from_JIS_LDADD = $(CONVERT_DIR)/gen-from-JIS.o $(CONVERT_DIR)/make-trie.o
-gen_from_JIS_DEPENDENCIES = $(CONVERT_DIR)/gen-from-JIS.o \
-		$(CONVERT_DIR)/make-trie.o
-
-$(CONVERT_DIR)/gen-from-JIS.o: $(srcdir)/$(CONVERT_DIR)/gen-from-JIS.c \
-		$(srcdir)/$(CONVERT_DIR)/JIS0201.h \
-		$(srcdir)/$(CONVERT_DIR)/JIS0208.h \
-		$(srcdir)/$(CONVERT_DIR)/JIS0212.h
-	$(COMPILE) -c -o $(CONVERT_DIR)/gen-from-JIS.o \
-		$(srcdir)/$(CONVERT_DIR)/gen-from-JIS.c
-
-$(CONVERT_DIR)/make-trie.o: $(srcdir)/$(CONVERT_DIR)/make-trie.c
-	$(COMPILE) -c -o $(CONVERT_DIR)/make-trie.o \
-		$(srcdir)/$(CONVERT_DIR)/make-trie.c
-
-if NATIVE
-if MAINTAINER_MODE
-
-$(srcdir)/$(CONVERT_DIR)/JIS0208_to_Unicode.cc: ./gen-from-JIS$(EXEEXT)
-	 ./gen-from-JIS JIS0208>$(srcdir)/$(CONVERT_DIR)/JIS0208_to_Unicode.cc
-
-$(srcdir)/$(CONVERT_DIR)/JIS0212_to_Unicode.cc: ./gen-from-JIS$(EXEEXT)
-	 ./gen-from-JIS JIS0212>$(srcdir)/$(CONVERT_DIR)/JIS0212_to_Unicode.cc
-
-$(srcdir)/$(CONVERT_DIR)/Unicode_to_JIS.cc: ./gen-from-JIS$(EXEEXT)
-	 ./gen-from-JIS toJIS>$(srcdir)/$(CONVERT_DIR)/Unicode_to_JIS.cc
-
-endif # MAINTAINER_MODE
-endif # NATIVE
-
+grmiregistry_DEPENDENCIES = libgcj.la libgcj.spec
 
 ## ################################################################
 
@@ -870,6 +891,8 @@ gnu/gcj/convert/Input_ASCII.java \
 gnu/gcj/convert/Input_EUCJIS.java \
 gnu/gcj/convert/Input_JavaSrc.java \
 gnu/gcj/convert/Input_SJIS.java \
+gnu/gcj/convert/Input_UnicodeBig.java \
+gnu/gcj/convert/Input_UnicodeLittle.java \
 gnu/gcj/convert/Input_UTF8.java	\
 gnu/gcj/convert/Input_iconv.java \
 gnu/gcj/convert/IOConverter.java \
@@ -921,13 +944,6 @@ gnu/java/beans/BeanInfoEmbryo.java \
 gnu/java/beans/EmptyBeanInfo.java \
 gnu/java/beans/ExplicitBeanInfo.java \
 gnu/java/beans/IntrospectionIncubator.java \
-gnu/javax/rmi/CORBA/DelegateFactory.java \
-gnu/javax/rmi/CORBA/GetDelegateInstanceException.java \
-gnu/javax/rmi/CORBA/PortableRemoteObjectDelegateImpl.java \
-gnu/javax/rmi/CORBA/StubDelegateImpl.java \
-gnu/javax/rmi/CORBA/UtilDelegateImpl.java \
-gnu/javax/rmi/CORBA/ValueHandlerImpl.java \
-gnu/javax/rmi/PortableServer.java \
 java/applet/Applet.java \
 java/applet/AppletStub.java \
 java/applet/AppletContext.java \
@@ -1092,23 +1108,32 @@ java/awt/geom/CubicCurve2D.java \
 java/awt/geom/FlatteningPathIterator.java \
 java/awt/geom/GeneralPath.java \
 java/awt/geom/QuadCurve2D.java \
+java/awt/image/AffineTransformOp.java \
 java/awt/image/BufferedImage.java \
+java/awt/image/ByteLookupTable.java \
 java/awt/image/ColorModel.java \
 java/awt/image/ComponentColorModel.java \
 java/awt/image/ComponentSampleModel.java \
 java/awt/image/DataBuffer.java \
 java/awt/image/DataBufferByte.java \
+java/awt/image/DataBufferDouble.java \
+java/awt/image/DataBufferFloat.java \
 java/awt/image/DataBufferInt.java \
+java/awt/image/DataBufferShort.java \
 java/awt/image/DataBufferUShort.java \
 java/awt/image/DirectColorModel.java \
 java/awt/image/ImageConsumer.java \
 java/awt/image/ImageObserver.java \
 java/awt/image/ImageProducer.java \
 java/awt/image/IndexColorModel.java \
+java/awt/image/Kernel.java \
+java/awt/image/LookupTable.java \
 java/awt/image/PackedColorModel.java \
+java/awt/image/PixelInterleavedSampleModel.java \
 java/awt/image/Raster.java \
 java/awt/image/RasterOp.java \
 java/awt/image/SampleModel.java \
+java/awt/image/ShortLookupTable.java \
 java/awt/image/SinglePixelPackedSampleModel.java \
 java/awt/image/WritableRaster.java \
 java/awt/image/AreaAveragingScaleFilter.java \
@@ -1262,8 +1287,10 @@ java/beans/BeanInfo.java \
 java/beans/Beans.java \
 java/beans/Customizer.java \
 java/beans/DesignMode.java \
+java/beans/EventHandler.java \
 java/beans/EventSetDescriptor.java \
 java/beans/ExceptionListener.java \
+java/beans/Expression.java \
 java/beans/FeatureDescriptor.java \
 java/beans/IndexedPropertyDescriptor.java \
 java/beans/IntrospectionException.java \
@@ -1279,25 +1306,13 @@ java/beans/PropertyEditor.java \
 java/beans/PropertyEditorManager.java \
 java/beans/PropertyEditorSupport.java \
 java/beans/PropertyVetoException.java \
+java/beans/Statement.java \
 java/beans/SimpleBeanInfo.java \
 java/beans/VetoableChangeListener.java \
 java/beans/VetoableChangeListenerProxy.java \
 java/beans/VetoableChangeSupport.java \
 java/beans/Visibility.java \
 java/beans/AppletInitializer.java \
-javax/rmi/BAD_OPERATION.java \
-javax/rmi/ORB.java \
-javax/rmi/PortableRemoteObject.java \
-javax/rmi/CORBA/ClassDesc.java \
-javax/rmi/CORBA/ObjectImpl.java	\
-javax/rmi/CORBA/PortableRemoteObjectDelegate.java \
-javax/rmi/CORBA/StubDelegate.java \
-javax/rmi/CORBA/Stub.java \
-javax/rmi/CORBA/SystemException.java \
-javax/rmi/CORBA/Tie.java \
-javax/rmi/CORBA/UtilDelegate.java \
-javax/rmi/CORBA/Util.java \
-javax/rmi/CORBA/ValueHandler.java \
 javax/swing/border/AbstractBorder.java \
 javax/swing/border/BevelBorder.java \
 javax/swing/border/Border.java \
@@ -1311,22 +1326,41 @@ javax/swing/border/TitledBorder.java \
 javax/swing/GrayFilter.java \
 javax/swing/AbstractAction.java \
 javax/swing/AbstractButton.java \
+javax/swing/plaf/basic/BasicArrowButton.java \
 javax/swing/plaf/basic/BasicButtonListener.java \
 javax/swing/plaf/basic/BasicButtonUI.java \
 javax/swing/plaf/basic/BasicCheckBoxUI.java \
+javax/swing/plaf/basic/BasicDesktopIconUI.java \
+javax/swing/plaf/basic/BasicDesktopPaneUI.java \
 javax/swing/plaf/basic/BasicGraphicsUtils.java \
+javax/swing/plaf/basic/BasicInternalFrameTitlePane.java \
+javax/swing/plaf/basic/BasicInternalFrameUI.java \
 javax/swing/plaf/basic/BasicLabelUI.java \
 javax/swing/plaf/basic/BasicListUI.java \
+javax/swing/plaf/basic/BasicMenuUI.java \
+javax/swing/plaf/basic/BasicMenuBarUI.java \
+javax/swing/plaf/basic/BasicMenuItemUI.java \
 javax/swing/plaf/basic/BasicOptionPaneUI.java \
 javax/swing/plaf/basic/BasicPanelUI.java \
+javax/swing/plaf/basic/BasicPopupMenuUI.java \
+javax/swing/plaf/basic/BasicPopupMenuSeparatorUI.java \
+javax/swing/plaf/basic/BasicProgressBarUI.java \
 javax/swing/plaf/basic/BasicRootPaneUI.java \
 javax/swing/plaf/basic/BasicRadioButtonUI.java \
+javax/swing/plaf/basic/BasicRadioButtonMenuItemUI.java \
+javax/swing/plaf/basic/BasicCheckBoxMenuItemUI.java \
+javax/swing/plaf/basic/BasicScrollBarUI.java \
 javax/swing/plaf/basic/BasicScrollPaneUI.java \
+javax/swing/plaf/basic/BasicSeparatorUI.java \
+javax/swing/plaf/basic/BasicSliderUI.java \
 javax/swing/plaf/basic/BasicSplitPaneDivider.java \
 javax/swing/plaf/basic/BasicSplitPaneUI.java \
 javax/swing/plaf/basic/BasicTabbedPaneUI.java \
+javax/swing/plaf/basic/BasicTextFieldUI.java \
 javax/swing/plaf/basic/BasicTextUI.java \
 javax/swing/plaf/basic/BasicToggleButtonUI.java \
+javax/swing/plaf/basic/BasicToolBarSeparatorUI.java \
+javax/swing/plaf/basic/BasicToolBarUI.java \
 javax/swing/plaf/basic/BasicTreeUI.java \
 javax/swing/plaf/basic/BasicViewportUI.java \
 javax/swing/plaf/basic/BasicLookAndFeel.java \
@@ -1426,6 +1460,7 @@ javax/swing/JRootPane.java \
 javax/swing/JScrollBar.java \
 javax/swing/JScrollPane.java \
 javax/swing/JTabbedPane.java \
+javax/swing/JTextArea.java \
 javax/swing/JTextField.java \
 javax/swing/JToggleButton.java \
 javax/swing/JToolTip.java \
@@ -1438,6 +1473,8 @@ javax/swing/ListModel.java \
 javax/swing/ListSelectionModel.java \
 javax/swing/LookAndFeel.java \
 javax/swing/Scrollable.java \
+javax/swing/Spring.java \
+javax/swing/SpringLayout.java \
 javax/swing/SwingConstants.java \
 javax/swing/SwingUtilities.java \
 javax/swing/Timer.java \
@@ -1492,29 +1529,34 @@ javax/swing/text/AbstractDocument.java \
 javax/swing/text/AttributeSet.java \
 javax/swing/text/BadLocationException.java \
 javax/swing/text/Caret.java \
-javax/swing/text/CharacterIterator.java \
 javax/swing/text/ComponentView.java \
 javax/swing/text/DefaultCaret.java \
 javax/swing/text/DefaultEditorKit.java \
+javax/swing/text/DefaultHighlighter.java \
 javax/swing/text/Document.java \
 javax/swing/text/DocumentFilter.java \
 javax/swing/text/EditorKit.java \
 javax/swing/text/Element.java \
+javax/swing/text/FieldView.java \
 javax/swing/text/GapContent.java \
+javax/swing/text/Highlighter.java \
 javax/swing/text/JTextComponent.java \
 javax/swing/text/Keymap.java \
+javax/swing/text/LayeredHighlighter.java \
+javax/swing/text/MutableAttributeSet.java \
+javax/swing/text/NavigationFilter.java \
 javax/swing/text/PlainDocument.java \
-javax/swing/text/PlainEditorKit.java \
+javax/swing/text/PlainView.java \
 javax/swing/text/Position.java \
 javax/swing/text/Segment.java \
 javax/swing/text/Style.java \
-javax/swing/text/View.java \
-javax/swing/text/ViewFactory.java \
-javax/swing/text/MutableAttributeSet.java \
-javax/swing/text/NavigationFilter.java \
 javax/swing/text/StyledDocument.java \
 javax/swing/text/StyledEditorKit.java \
+javax/swing/text/TabExpander.java \
+javax/swing/text/TabableView.java \
 javax/swing/text/TextAction.java \
+javax/swing/text/View.java \
+javax/swing/text/ViewFactory.java \
 javax/swing/text/html/HTML.java \
 javax/swing/text/html/parser/ParserDelegator.java \
 javax/swing/tree/TreeNode.java \
@@ -1685,6 +1727,7 @@ gnu/java/rmi/server/ConnectionRunnerPool.java \
 gnu/java/rmi/server/ProtocolConstants.java \
 gnu/java/rmi/server/RMIDefaultSocketFactory.java \
 gnu/java/rmi/server/RMIHashes.java \
+gnu/java/rmi/server/RMIIncomingThread.java \
 gnu/java/rmi/server/RMIObjectInputStream.java \
 gnu/java/rmi/server/RMIObjectOutputStream.java \
 gnu/java/rmi/server/RMIVoidValue.java \
@@ -1720,6 +1763,25 @@ javax/accessibility/AccessibleTable.java \
 javax/accessibility/AccessibleTableModelChange.java \
 javax/accessibility/AccessibleText.java \
 javax/accessibility/AccessibleValue.java \
+javax/imageio/IIOException.java \
+javax/imageio/ImageReader.java \
+javax/imageio/ImageTranscoder.java \
+javax/imageio/ImageWriter.java \
+javax/imageio/event/IIOReadProgressListener.java \
+javax/imageio/event/IIOReadUpdateListener.java \
+javax/imageio/event/IIOReadWarningListener.java \
+javax/imageio/event/IIOWriteProgressListener.java \
+javax/imageio/event/IIOWriteWarningListener.java \
+javax/imageio/spi/IIOServiceProvider.java \
+javax/imageio/spi/ImageInputStreamSpi.java \
+javax/imageio/spi/ImageOutputStreamSpi.java \
+javax/imageio/spi/ImageReaderWriterSpi.java \
+javax/imageio/spi/ImageTranscoderSpi.java \
+javax/imageio/spi/RegisterableService.java \
+javax/imageio/spi/ServiceRegistry.java \
+javax/imageio/stream/IIOByteBuffer.java \
+javax/imageio/stream/ImageInputStream.java \
+javax/imageio/stream/ImageOutputStream.java \
 javax/naming/directory/Attribute.java \
 javax/naming/directory/AttributeInUseException.java \
 javax/naming/directory/AttributeModificationException.java \
@@ -1808,6 +1870,21 @@ javax/naming/ldap/UnsolicitedNotification.java \
 javax/naming/ldap/UnsolicitedNotificationEvent.java \
 javax/naming/ldap/UnsolicitedNotificationListener.java \
 javax/naming/OperationNotSupportedException.java \
+javax/print/AttributeException.java \
+javax/print/CancelablePrintJob.java \
+javax/print/Doc.java \
+javax/print/DocFlavor.java \
+javax/print/DocPrintJob.java \
+javax/print/FlavorException.java \
+javax/print/MultiDoc.java \
+javax/print/MultiDocPrintJob.java \
+javax/print/MultiDocPrintService.java \
+javax/print/PrintException.java \
+javax/print/PrintService.java \
+javax/print/PrintServiceLookup.java \
+javax/print/ServiceUIFactory.java \
+javax/print/StreamPrintService.java \
+javax/print/URIException.java \
 javax/print/attribute/Attribute.java \
 javax/print/attribute/AttributeSet.java \
 javax/print/attribute/AttributeSetUtilities.java \
@@ -1834,36 +1911,77 @@ javax/print/attribute/SupportedValuesAttribute.java \
 javax/print/attribute/TextSyntax.java \
 javax/print/attribute/UnmodifiableSetException.java \
 javax/print/attribute/URISyntax.java \
+javax/print/attribute/standard/ColorSupported.java \
+javax/print/attribute/standard/Compression.java \
 javax/print/attribute/standard/Copies.java \
+javax/print/attribute/standard/CopiesSupported.java \
 javax/print/attribute/standard/DateTimeAtCompleted.java \
 javax/print/attribute/standard/DateTimeAtCreation.java \
 javax/print/attribute/standard/DateTimeAtProcessing.java \
 javax/print/attribute/standard/DocumentName.java \
+javax/print/attribute/standard/Fidelity.java \
+javax/print/attribute/standard/Finishings.java \
 javax/print/attribute/standard/JobHoldUntil.java \
 javax/print/attribute/standard/JobImpressions.java \
 javax/print/attribute/standard/JobImpressionsCompleted.java \
+javax/print/attribute/standard/JobImpressionsSupported.java \
 javax/print/attribute/standard/JobKOctets.java \
 javax/print/attribute/standard/JobKOctetsProcessed.java \
+javax/print/attribute/standard/JobKOctetsSupported.java \
 javax/print/attribute/standard/JobMediaSheets.java \
 javax/print/attribute/standard/JobMediaSheetsCompleted.java \
+javax/print/attribute/standard/JobMediaSheetsSupported.java \
 javax/print/attribute/standard/JobMessageFromOperator.java \
 javax/print/attribute/standard/JobName.java \
 javax/print/attribute/standard/JobOriginatingUserName.java \
 javax/print/attribute/standard/JobPriority.java \
 javax/print/attribute/standard/JobPrioritySupported.java \
+javax/print/attribute/standard/JobSheets.java \
+javax/print/attribute/standard/JobState.java \
+javax/print/attribute/standard/JobStateReason.java \
+javax/print/attribute/standard/JobStateReasons.java \
+javax/print/attribute/standard/Media.java \
+javax/print/attribute/standard/MediaSizeName.java \
+javax/print/attribute/standard/MultipleDocumentHandling.java \
 javax/print/attribute/standard/NumberOfDocuments.java \
 javax/print/attribute/standard/NumberOfInterveningJobs.java \
 javax/print/attribute/standard/NumberUp.java \
+javax/print/attribute/standard/NumberUpSupported.java \
+javax/print/attribute/standard/OrientationRequested.java \
 javax/print/attribute/standard/OutputDeviceAssigned.java \
+javax/print/attribute/standard/PDLOverrideSupported.java \
+javax/print/attribute/standard/PageRanges.java \
 javax/print/attribute/standard/PagesPerMinute.java \
 javax/print/attribute/standard/PagesPerMinuteColor.java \
+javax/print/attribute/standard/PresentationDirection.java \
+javax/print/attribute/standard/PrintQuality.java \
 javax/print/attribute/standard/PrinterInfo.java \
+javax/print/attribute/standard/PrinterIsAcceptingJobs.java \
 javax/print/attribute/standard/PrinterLocation.java \
 javax/print/attribute/standard/PrinterMakeAndModel.java \
 javax/print/attribute/standard/PrinterMessageFromOperator.java \
+javax/print/attribute/standard/PrinterMoreInfo.java \
+javax/print/attribute/standard/PrinterMoreInfoManufacturer.java \
 javax/print/attribute/standard/PrinterName.java \
+javax/print/attribute/standard/PrinterResolution.java \
+javax/print/attribute/standard/PrinterState.java \
+javax/print/attribute/standard/PrinterStateReason.java \
+javax/print/attribute/standard/PrinterStateReasons.java \
+javax/print/attribute/standard/PrinterURI.java \
 javax/print/attribute/standard/QueuedJobCount.java \
+javax/print/attribute/standard/ReferenceUriSchemesSupported.java \
 javax/print/attribute/standard/RequestingUserName.java \
+javax/print/attribute/standard/Severity.java \
+javax/print/attribute/standard/SheetCollate.java \
+javax/print/attribute/standard/Sides.java \
+javax/print/event/PrintEvent.java \
+javax/print/event/PrintJobAdapter.java \
+javax/print/event/PrintJobAttributeEvent.java \
+javax/print/event/PrintJobAttributeListener.java \
+javax/print/event/PrintJobEvent.java \
+javax/print/event/PrintJobListener.java \
+javax/print/event/PrintServiceAttributeEvent.java \
+javax/print/event/PrintServiceAttributeListener.java \
 javax/security/auth/x500/X500Principal.java \
 javax/sql/ConnectionEvent.java \
 javax/sql/ConnectionEventListener.java \
@@ -2159,14 +2277,16 @@ java/util/regex/PatternSyntaxException.java
 ## awt_java_source_files.  If the .java file has a hand-maintained
 ## header, please list it in special_java_source_files.
 ordinary_java_source_files = $(core_java_source_files) \
+gnu/classpath/ServiceFactory.java \
+gnu/classpath/ServiceProviderLoadingAction.java \
 gnu/gcj/Core.java \
 gnu/gcj/RawData.java \
+gnu/gcj/RawDataManaged.java \
 gnu/gcj/io/DefaultMimeTypes.java \
 gnu/gcj/io/MimeTypes.java \
 gnu/gcj/io/SimpleSHSStream.java	\
 gnu/gcj/runtime/FileDeleter.java \
 gnu/gcj/runtime/FinalizerThread.java \
-gnu/gcj/runtime/FirstThread.java \
 gnu/gcj/runtime/JNIWeakRef.java \
 gnu/gcj/runtime/MethodRef.java \
 gnu/gcj/runtime/NameFinder.java \
@@ -2182,7 +2302,7 @@ gnu/java/io/NullOutputStream.java \
 gnu/java/io/ObjectIdentityWrapper.java \
 gnu/java/lang/ArrayHelper.java \
 gnu/java/lang/ClassHelper.java \
-gnu/java/lang/CharData.java \
+gnu/java/lang/MainThread.java \
 gnu/java/lang/reflect/TypeSignature.java \
 gnu/java/locale/Calendar.java \
 gnu/java/locale/Calendar_de.java \
@@ -2324,6 +2444,7 @@ gnu/java/locale/LocaleInformation_zh_HK.java \
 gnu/java/locale/LocaleInformation_zh_SG.java \
 gnu/java/locale/LocaleInformation_zh_TW.java \
 gnu/java/math/MPN.java \
+gnu/java/net/DefaultContentHandlerFactory.java \
 gnu/java/net/HeaderFieldHelper.java \
 gnu/java/net/PlainDatagramSocketImpl.java \
 gnu/java/net/PlainSocketImpl.java \
@@ -2368,6 +2489,30 @@ gnu/java/nio/charset/UTF_16Decoder.java \
 gnu/java/nio/charset/UTF_16Encoder.java \
 gnu/java/nio/charset/UTF_16LE.java \
 gnu/java/nio/charset/UTF_8.java \
+gnu/regexp/CharIndexed.java \
+gnu/regexp/CharIndexedCharArray.java \
+gnu/regexp/CharIndexedInputStream.java \
+gnu/regexp/CharIndexedString.java \
+gnu/regexp/CharIndexedStringBuffer.java \
+gnu/regexp/RE.java \
+gnu/regexp/REException.java \
+gnu/regexp/REFilterInputStream.java \
+gnu/regexp/REMatch.java \
+gnu/regexp/REMatchEnumeration.java \
+gnu/regexp/RESyntax.java \
+gnu/regexp/REToken.java \
+gnu/regexp/RETokenAny.java \
+gnu/regexp/RETokenBackRef.java \
+gnu/regexp/RETokenChar.java \
+gnu/regexp/RETokenEnd.java \
+gnu/regexp/RETokenEndSub.java \
+gnu/regexp/RETokenOneOf.java \
+gnu/regexp/RETokenPOSIX.java \
+gnu/regexp/RETokenRange.java \
+gnu/regexp/RETokenRepeated.java \
+gnu/regexp/RETokenStart.java \
+gnu/regexp/RETokenWordBoundary.java \
+gnu/regexp/UncheckedRE.java \
 gnu/java/security/Engine.java \
 gnu/java/security/OID.java \
 gnu/java/security/der/BitString.java \
@@ -2376,6 +2521,8 @@ gnu/java/security/der/DEREncodingException.java \
 gnu/java/security/der/DERReader.java \
 gnu/java/security/der/DERValue.java \
 gnu/java/security/der/DERWriter.java \
+gnu/java/security/action/GetPropertyAction.java \
+gnu/java/security/action/SetAccessibleAction.java \
 gnu/java/security/provider/DefaultPolicy.java \
 gnu/java/security/provider/DSAKeyFactory.java \
 gnu/java/security/provider/DSAKeyPairGenerator.java \
@@ -2394,10 +2541,14 @@ gnu/java/security/x509/X500DistinguishedName.java \
 gnu/java/security/x509/X509Certificate.java \
 gnu/java/security/x509/X509CRLEntry.java \
 gnu/java/security/x509/X509CRL.java \
+gnu/java/text/AttributedFormatBuffer.java \
 gnu/java/text/BaseBreakIterator.java \
 gnu/java/text/CharacterBreakIterator.java \
+gnu/java/text/FormatBuffer.java \
+gnu/java/text/FormatCharacterIterator.java \
 gnu/java/text/LineBreakIterator.java \
 gnu/java/text/SentenceBreakIterator.java \
+gnu/java/text/StringFormatBuffer.java \
 gnu/java/text/WordBreakIterator.java \
 gnu/java/util/DoubleEnumeration.java \
 gnu/java/util/EmptyEnumeration.java \
@@ -2737,7 +2888,6 @@ java/text/DecimalFormat.java \
 java/text/DecimalFormatSymbols.java \
 java/text/FieldPosition.java \
 java/text/Format.java \
-java/text/FormatCharacterIterator.java \
 java/text/MessageFormat.java \
 java/text/NumberFormat.java \
 java/text/ParseException.java \
@@ -2779,7 +2929,7 @@ $(javax_source_files)
 java_source_files = $(special_java_source_files) $(ordinary_java_source_files)
 
 ## Math library: C, not C++
-c_source_files = \
+math_c_source_files = \
   java/lang/dtoa.c        java/lang/k_rem_pio2.c  java/lang/s_tan.c       \
   java/lang/e_acos.c      java/lang/k_sin.c       java/lang/strtod.c      \
   java/lang/e_asin.c      java/lang/k_tan.c       java/lang/w_acos.c      \
@@ -2794,9 +2944,6 @@ c_source_files = \
   java/lang/e_sqrt.c      java/lang/s_scalbn.c    java/lang/sf_rint.c     \
   java/lang/k_cos.c       java/lang/s_sin.c       java/lang/sf_fabs.c
 
-extra_cc_source_files = $(EXTRA_CC_FILES)
-
-#java/awt/natToolkit.cc
 
 ## This lists all the C++ source files in subdirectories.
 nat_source_files = \
@@ -2812,13 +2959,12 @@ gnu/gcj/convert/natOutput_SJIS.cc \
 gnu/gcj/io/natSimpleSHSStream.cc \
 gnu/gcj/io/shs.cc \
 gnu/gcj/runtime/natFinalizerThread.cc \
-gnu/gcj/runtime/natFirstThread.cc \
 gnu/gcj/runtime/natNameFinder.cc \
 gnu/gcj/runtime/natSharedLibLoader.cc \
 gnu/gcj/runtime/natStackTrace.cc \
 gnu/gcj/runtime/natStringBuffer.cc \
 gnu/gcj/runtime/natVMClassLoader.cc \
-gnu/java/awt/natEmbeddedWindow.cc \
+gnu/java/lang/natMainThread.cc \
 gnu/java/net/natPlainDatagramSocketImpl.cc \
 gnu/java/net/natPlainSocketImpl.cc \
 gnu/java/net/protocol/core/natCoreInputStream.cc \
@@ -2860,7 +3006,7 @@ java/util/natTimeZone.cc \
 java/util/zip/natDeflater.cc \
 java/util/zip/natInflater.cc
 
-x_java_source_files = \
+xlib_java_source_files = \
 gnu/gcj/xlib/Clip.java \
 gnu/gcj/xlib/Colormap.java \
 gnu/gcj/xlib/Display.java \
@@ -2896,7 +3042,7 @@ gnu/awt/xlib/XPanelPeer.java \
 gnu/awt/xlib/XFontPeer.java \
 gnu/awt/xlib/XToolkit.java
 
-x_nat_source_files = \
+xlib_nat_source_files = \
 gnu/gcj/xlib/natClip.cc \
 gnu/gcj/xlib/natColormap.cc \
 gnu/gcj/xlib/natDisplay.cc \
@@ -2971,7 +3117,7 @@ texinfo: TexinfoDoclet.class
 ## the C++ code whenever any .java file is touched.
 ## Also force all the class files to build first. This makes them build in
 ## the right order to improve performance.
-all-recursive: libgcj-@gcc_version@.jar $(nat_headers) $(x_nat_headers)
+all-recursive: libgcj-@gcc_version@.jar $(nat_headers) $(xlib_nat_headers)
 
 ## ################################################################
 

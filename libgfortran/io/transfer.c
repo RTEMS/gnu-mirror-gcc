@@ -24,6 +24,7 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include <string.h>
+#include <assert.h>
 #include "libgfortran.h"
 #include "io.h"
 
@@ -54,8 +55,7 @@ Boston, MA 02111-1307, USA.  */
  *  transferred.
  */
 
-unit_t *current_unit;
-
+gfc_unit *current_unit;
 static int sf_seen_eor = 0;
 
 char scratch[SCRATCH_SIZE];
@@ -609,14 +609,18 @@ formatted_transfer (bt type, void *p, int len)
 
 	  break;
 
-        case FMT_T:
-           pos = f->u.n ;
-           pos= current_unit->recl - current_unit->bytes_left - pos;
-                         /* fall through */
-
         case FMT_TL:
-           consume_data_flag = 0 ;
-           pos = f->u.n ;
+        case FMT_T:
+           if (f->format==FMT_TL)
+             {
+                pos = f->u.n ;
+                pos= current_unit->recl - current_unit->bytes_left - pos;
+             }
+           else // FMT==T
+             {
+                consume_data_flag = 0 ;
+                pos = f->u.n - 1; 
+             }
 
            if (pos < 0 || pos >= current_unit->recl )
            {
@@ -793,13 +797,13 @@ transfer_complex (void *p, int kind)
 static void
 us_read (void)
 {
-  offset_t *p;
+  gfc_offset *p;
   int n;
 
-  n = sizeof (offset_t);
-  p = (offset_t *) salloc_r (current_unit->s, &n);
+  n = sizeof (gfc_offset);
+  p = (gfc_offset *) salloc_r (current_unit->s, &n);
 
-  if (p == NULL || n != sizeof (offset_t))
+  if (p == NULL || n != sizeof (gfc_offset))
     {
       generate_error (ERROR_BAD_US, NULL);
       return;
@@ -816,11 +820,11 @@ us_read (void)
 static void
 us_write (void)
 {
-  offset_t *p;
+  gfc_offset *p;
   int length;
 
-  length = sizeof (offset_t);
-  p = (offset_t *) salloc_w (current_unit->s, &length);
+  length = sizeof (gfc_offset);
+  p = (gfc_offset *) salloc_w (current_unit->s, &length);
 
   if (p == NULL)
     {
@@ -831,6 +835,11 @@ us_write (void)
   *p = 0;			/* Bogus value for now */
   if (sfree (current_unit->s) == FAILURE)
     generate_error (ERROR_OS, NULL);
+
+  /* for sequential unformatted, we write until we have more bytes than
+      can fit in the record markers. if disk space runs out first it will
+      error on the write */
+  current_unit->recl = g.max_offset;
 
   current_unit->bytes_left = current_unit->recl;
 }
@@ -874,6 +883,7 @@ pre_position (void)
 static void
 data_transfer_init (int read_flag)
 {
+  unit_flags u_flags;  /* used for creating a unit if needed */
 
   g.mode = read_flag ? READING : WRITING;
 
@@ -882,10 +892,32 @@ data_transfer_init (int read_flag)
 
   current_unit = get_unit (read_flag);
   if (current_unit == NULL)
+  {  /* open the unit with some default flags */
+     memset (&u_flags, '\0', sizeof (u_flags));
+     u_flags.access = ACCESS_SEQUENTIAL;
+     u_flags.action = ACTION_READWRITE;
+     /* is it unformatted ?*/
+     if (ioparm.format == NULL && !ioparm.list_format)
+       u_flags.form = FORM_UNFORMATTED;
+     else
+       u_flags.form = FORM_UNSPECIFIED;
+     u_flags.delim = DELIM_UNSPECIFIED;
+     u_flags.blank = BLANK_UNSPECIFIED;
+     u_flags.pad = PAD_UNSPECIFIED;
+     u_flags.status = STATUS_UNKNOWN;
+     new_unit(&u_flags);
+     current_unit = get_unit (read_flag);
+  }
+
+  if (current_unit == NULL)
     return;
 
-  if (is_internal_unit() && g.mode==WRITING)
-    empty_internal_buffer (current_unit->s);
+  if (is_internal_unit())
+    {
+      current_unit->recl = file_length(current_unit->s);
+      if (g.mode==WRITING)
+        empty_internal_buffer (current_unit->s);
+    }
 
   /* Check the action */
 
@@ -930,14 +962,14 @@ data_transfer_init (int read_flag)
 
   /* Check the record number */
 
-  if (current_unit->flags.access == ACCESS_DIRECT && ioparm.rec == NULL)
+  if (current_unit->flags.access == ACCESS_DIRECT && ioparm.rec == 0)
     {
       generate_error (ERROR_MISSING_OPTION,
 		      "Direct access data transfer requires record number");
       return;
     }
 
-  if (current_unit->flags.access == ACCESS_SEQUENTIAL && ioparm.rec != NULL)
+  if (current_unit->flags.access == ACCESS_SEQUENTIAL && ioparm.rec != 0)
     {
       generate_error (ERROR_OPTION_CONFLICT,
 		      "Record number not allowed for sequential access data transfer");
@@ -999,15 +1031,15 @@ data_transfer_init (int read_flag)
 
   /* Sanity checks on the record number */
 
-  if (ioparm.rec != NULL)
+  if (ioparm.rec)
     {
-      if (*ioparm.rec <= 0)
+      if (ioparm.rec <= 0)
 	{
 	  generate_error (ERROR_BAD_OPTION, "Record number must be positive");
 	  return;
 	}
 
-      if (*ioparm.rec >= current_unit->maxrec)
+      if (ioparm.rec >= current_unit->maxrec)
 	{
 	  generate_error (ERROR_BAD_OPTION, "Record number too large");
 	  return;
@@ -1016,7 +1048,7 @@ data_transfer_init (int read_flag)
       /* Position the file */
 
       if (sseek (current_unit->s,
-		 (*ioparm.rec - 1) * current_unit->recl) == FAILURE)
+               (ioparm.rec - 1) * current_unit->recl) == FAILURE)
 	generate_error (ERROR_OS, NULL);
     }
 
@@ -1097,13 +1129,13 @@ static void
 next_record_r (int done)
 {
   int rlength, length;
-  offset_t new;
+  gfc_offset new;
   char *p;
 
   switch (current_mode ())
     {
     case UNFORMATTED_SEQUENTIAL:
-      current_unit->bytes_left += sizeof (offset_t);	/* Skip over tail */
+      current_unit->bytes_left += sizeof (gfc_offset);	/* Skip over tail */
 
       /* Fall through */
 
@@ -1144,7 +1176,7 @@ next_record_r (int done)
 
     case FORMATTED_SEQUENTIAL:
       length = 1;
-      if ((!done) || (sf_seen_eor && done))
+      if (sf_seen_eor && done)
          break;
 
       do
@@ -1184,34 +1216,37 @@ next_record_r (int done)
 static void
 next_record_w (int done)
 {
-  offset_t c, m;
+  gfc_offset c, m;
   int length;
   char *p;
 
   switch (current_mode ())
     {
     case FORMATTED_DIRECT:
-    case UNFORMATTED_DIRECT:
       if (current_unit->bytes_left == 0)
 	break;
 
       length = current_unit->bytes_left;
-
       p = salloc_w (current_unit->s, &length);
+
       if (p == NULL)
 	goto io_error;
 
       memset (p, ' ', current_unit->bytes_left);
       if (sfree (current_unit->s) == FAILURE)
 	goto io_error;
+      break;
 
+    case UNFORMATTED_DIRECT:
+      if (sfree (current_unit->s) == FAILURE)
+        goto io_error;
       break;
 
     case UNFORMATTED_SEQUENTIAL:
       m = current_unit->recl - current_unit->bytes_left; /* Bytes written */
       c = file_position (current_unit->s);
 
-      length = sizeof (offset_t);
+      length = sizeof (gfc_offset);
 
       /* Write the length tail */
 
@@ -1219,7 +1254,7 @@ next_record_w (int done)
       if (p == NULL)
 	goto io_error;
 
-      *((offset_t *) p) = m;
+      *((gfc_offset *) p) = m;
       if (sfree (current_unit->s) == FAILURE)
 	goto io_error;
 
@@ -1229,13 +1264,13 @@ next_record_w (int done)
       if (p == NULL)
 	generate_error (ERROR_OS, NULL);
 
-      *((offset_t *) p) = m;
+      *((gfc_offset *) p) = m;
       if (sfree (current_unit->s) == FAILURE)
 	goto io_error;
 
       /* Seek past the end of the current record */
 
-      if (sseek (current_unit->s, c + sizeof (offset_t)) == FAILURE)
+      if (sseek (current_unit->s, c + sizeof (gfc_offset)) == FAILURE)
 	goto io_error;
 
       break;
@@ -1244,13 +1279,13 @@ next_record_w (int done)
       length = 1;
       p = salloc_w (current_unit->s, &length);
 
-      if (!(is_internal_unit()) && p == NULL)
+      if (!is_internal_unit())
         {
-           goto io_error;
+          if (p)
+            *p = '\n'; /* no CR for internal writes */
+          else
+            goto io_error;
         }
-
-      if (p != NULL)
-         *p = '\n';
 
       if (sfree (current_unit->s) == FAILURE)
  	goto io_error;
@@ -1272,6 +1307,7 @@ next_record_w (int done)
 void
 next_record (int done)
 {
+  gfc_offset fp; /* file position */
 
   current_unit->read_bad = 0;
 
@@ -1281,7 +1317,15 @@ next_record (int done)
     next_record_w (done);
 
   current_unit->current_record = 0;
-  current_unit->last_record++;
+  if (current_unit->flags.access == ACCESS_DIRECT)
+   {
+    fp = file_position (current_unit->s);
+    /* Calculate next record, rounding up partial records.  */
+    current_unit->last_record = (fp + current_unit->recl - 1)
+				/ current_unit->recl;
+   }
+  else
+    current_unit->last_record++;
 
   if (!done)
     pre_position ();
@@ -1294,6 +1338,13 @@ next_record (int done)
 static void
 finalize_transfer (void)
 {
+
+  if (setjmp (g.eof_jump))
+    {
+       generate_error (ERROR_END, NULL);
+       return;
+    }
+
   if ((ionml != NULL) && (ioparm.namelist_name != NULL))
     {
        if (ioparm.namelist_read_mode)
@@ -1313,12 +1364,69 @@ finalize_transfer (void)
       free_fnodes ();
 
       if (advance_status == ADVANCE_NO)
-	return;
+	{
+	  /* Most systems buffer lines, so force the partial record
+	     to be written out.  */
+	  flush (current_unit->s);
+	  return;
+	}
+
       next_record (1);
       current_unit->current_record = 0;
     }
 
   sfree (current_unit->s);
+}
+
+
+/* Transfer function for IOLENGTH. It doesn't actually do any
+   data transfer, it just updates the length counter.  */
+
+static void
+iolength_transfer (bt type, void *dest, int len)
+{
+  if (ioparm.iolength != NULL)
+    *ioparm.iolength += len;
+}
+
+
+/* Initialize the IOLENGTH data transfer. This function is in essence
+   a very much simplified version of data_transfer_init(), because it
+   doesn't have to deal with units at all.  */
+
+static void
+iolength_transfer_init (void)
+{
+
+  if (ioparm.iolength != NULL)
+    *ioparm.iolength = 0;
+
+  g.item_count = 0;
+
+  /* Set up the subroutine that will handle the transfers.  */
+
+  transfer = iolength_transfer;
+
+}
+
+
+/* Library entry point for the IOLENGTH form of the INQUIRE
+   statement. The IOLENGTH form requires no I/O to be performed, but
+   it must still be a runtime library call so that we can determine
+   the iolength for dynamic arrays and such.  */
+
+void
+st_iolength (void)
+{
+  library_start ();
+
+  iolength_transfer_init ();
+}
+
+void
+st_iolength_done (void)
+{
+  library_end ();
 }
 
 
@@ -1408,17 +1516,28 @@ st_write_done (void)
 
 static void
 st_set_nml_var (void * var_addr, char * var_name, int var_name_len,
-                int kind, bt type)
+                int kind, bt type, int string_length)
 {
   namelist_info *t1 = NULL, *t2 = NULL;
   namelist_info *nml = (namelist_info *) get_mem (sizeof(
                                                     namelist_info ));
   nml->mem_pos = var_addr;
-  nml->var_name = (char*) get_mem (var_name_len+1);
-  strncpy (nml->var_name,var_name,var_name_len);
-  nml->var_name[var_name_len] = 0;
+  if (var_name)
+    {
+      assert (var_name_len > 0);
+      nml->var_name = (char*) get_mem (var_name_len+1);
+      strncpy (nml->var_name, var_name, var_name_len);
+      nml->var_name[var_name_len] = 0;
+    }
+  else
+    {
+      assert (var_name_len == 0);
+      nml->var_name = NULL;
+    }
+
   nml->len = kind;
   nml->type = type;
+  nml->string_length = string_length;
 
   nml->next = NULL;
 
@@ -1440,34 +1559,35 @@ void
 st_set_nml_var_int (void * var_addr, char * var_name, int var_name_len,
                 int kind)
 {
-   st_set_nml_var (var_addr, var_name, var_name_len, kind, BT_INTEGER);
+   st_set_nml_var (var_addr, var_name, var_name_len, kind, BT_INTEGER, 0);
 }
 
 void
 st_set_nml_var_float (void * var_addr, char * var_name, int var_name_len,
                 int kind)
 {
-   st_set_nml_var (var_addr, var_name, var_name_len, kind, BT_REAL);
+   st_set_nml_var (var_addr, var_name, var_name_len, kind, BT_REAL, 0);
 }
 
 void
 st_set_nml_var_char (void * var_addr, char * var_name, int var_name_len,
-                int kind)
+                int kind, gfc_strlen_type string_length)
 {
-   st_set_nml_var (var_addr, var_name, var_name_len, kind, BT_CHARACTER);
+   st_set_nml_var (var_addr, var_name, var_name_len, kind, BT_CHARACTER,
+                   string_length);
 }
 
 void
 st_set_nml_var_complex (void * var_addr, char * var_name, int var_name_len,
                 int kind)
 {
-   st_set_nml_var (var_addr, var_name, var_name_len, kind, BT_COMPLEX);
+   st_set_nml_var (var_addr, var_name, var_name_len, kind, BT_COMPLEX, 0);
 }
 
 void
 st_set_nml_var_log (void * var_addr, char * var_name, int var_name_len,
                 int kind)
 {
-   st_set_nml_var (var_addr, var_name, var_name_len, kind, BT_LOGICAL);
+   st_set_nml_var (var_addr, var_name, var_name_len, kind, BT_LOGICAL, 0);
 }
 

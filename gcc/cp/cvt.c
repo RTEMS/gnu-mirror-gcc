@@ -261,14 +261,16 @@ cp_convert_to_pointer (tree type, tree expr, bool force)
 	return build_ptrmemfunc (TYPE_PTRMEMFUNC_FN_TYPE (type), expr, 0);
 
       if (TYPE_PTRMEM_P (type))
-	/* A NULL pointer-to-member is represented by -1, not by
-	   zero.  */
-	expr = build_int_2 (-1, -1);
+	{
+	  /* A NULL pointer-to-member is represented by -1, not by
+	     zero.  */
+	  expr = build_int_cst (type, -1, -1);
+	  /* Fix up the representation of -1 if appropriate.  */
+	  expr = force_fit_type (expr, 0, false, false);
+	}
       else
-	expr = build_int_2 (0, 0);
-      TREE_TYPE (expr) = type;
-      /* Fix up the representation of -1 if appropriate.  */
-      force_fit_type (expr, 0);
+	expr = build_int_cst (type, 0, 0);
+      
       return expr;
     }
   else if (TYPE_PTR_TO_MEMBER_P (type) && INTEGRAL_CODE_P (form))
@@ -748,7 +750,7 @@ ocp_convert (tree type, tree expr, int convtype, int flags)
 	ctor = build_special_member_call (NULL_TREE, 
 					  complete_ctor_identifier,
 					  build_tree_list (NULL_TREE, ctor),
-					  TYPE_BINFO (type), flags);
+					  type, flags);
       if (ctor)
 	return build_cplus_new (type, ctor);
     }
@@ -784,6 +786,8 @@ convert_to_void (tree expr, const char *implicit)
     return error_mark_node;
   if (!TREE_TYPE (expr))
     return expr;
+  if (invalid_nonstatic_memfn_p (expr))
+    return error_mark_node;
   if (VOID_TYPE_P (TREE_TYPE (expr)))
     return expr;
   switch (TREE_CODE (expr))
@@ -800,8 +804,8 @@ convert_to_void (tree expr, const char *implicit)
 	  (op2, (implicit && !TREE_SIDE_EFFECTS (op1)
 		 ? "third operand of conditional" : NULL));
         
-	expr = build (COND_EXPR, TREE_TYPE (new_op1),
-		      TREE_OPERAND (expr, 0), new_op1, new_op2);
+	expr = build3 (COND_EXPR, TREE_TYPE (new_op1),
+		       TREE_OPERAND (expr, 0), new_op1, new_op2);
         break;
       }
     
@@ -815,8 +819,8 @@ convert_to_void (tree expr, const char *implicit)
         
         if (new_op1 != op1)
 	  {
-	    tree t = build (COMPOUND_EXPR, TREE_TYPE (new_op1),
-			    TREE_OPERAND (expr, 0), new_op1);
+	    tree t = build2 (COMPOUND_EXPR, TREE_TYPE (new_op1),
+			     TREE_OPERAND (expr, 0), new_op1);
 	    expr = t;
 	  }
 
@@ -1117,7 +1121,7 @@ type_promotes_to (tree type)
       int precision = MAX (TYPE_PRECISION (type),
 			   TYPE_PRECISION (integer_type_node));
       tree totype = c_common_type_for_size (precision, 0);
-      if (TREE_UNSIGNED (type)
+      if (TYPE_UNSIGNED (type)
 	  && ! int_fits_type_p (TYPE_MAX_VALUE (type), totype))
 	type = c_common_type_for_size (precision, 1);
       else
@@ -1126,7 +1130,7 @@ type_promotes_to (tree type)
   else if (c_promoting_integer_type_p (type))
     {
       /* Retain unsignedness if really not getting bigger.  */
-      if (TREE_UNSIGNED (type)
+      if (TYPE_UNSIGNED (type)
 	  && TYPE_PRECISION (type) == TYPE_PRECISION (integer_type_node))
 	type = unsigned_type_node;
       else

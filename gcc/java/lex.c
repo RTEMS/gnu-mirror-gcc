@@ -228,6 +228,7 @@ java_new_lexer (FILE *finput, const char *encoding)
   lex->bs_count = 0;
   lex->unget_value = 0;
   lex->hit_eof = 0;
+  lex->encoding = encoding;
 
 #ifdef HAVE_ICONV
   lex->handle = iconv_open ("UCS-2", encoding);
@@ -263,7 +264,7 @@ java_new_lexer (FILE *finput, const char *encoding)
 	      in[1] = 0xbb;
 	      in[2] = 0xbf;
 
-	      inp = in;
+	      inp = (char *) in;
 	      inc = 3;
 	      outp = (char *) &result;
 	      outc = 2;
@@ -295,7 +296,10 @@ java_new_lexer (FILE *finput, const char *encoding)
 	enc_error = 1;
 #ifdef HAVE_ICONV
       else
-	lex->use_fallback = 1;
+        {
+	  lex->use_fallback = 1;
+	  lex->encoding = "UTF-8";
+	}
 #endif /* HAVE_ICONV */
     }
 
@@ -373,7 +377,7 @@ java_read_char (java_lexer *lex)
 	      in_save = inbytesleft;
 	      out_save = out_count;
 	      inp = &lex->buffer[lex->first];
-	      outp = &lex->out_buffer[lex->out_last];
+	      outp = (char *) &lex->out_buffer[lex->out_last];
 	      ir = iconv (lex->handle, (ICONV_CONST char **) &inp,
 			  &inbytesleft, &outp, &out_count);
 
@@ -430,8 +434,11 @@ java_read_char (java_lexer *lex)
 		  else
 		    {
 		      /* A more serious error.  */
-		      java_lex_error ("unrecognized character in input stream",
-				      0);
+		      char buffer[128];
+		      sprintf (buffer,
+			       "Unrecognized character for encoding '%s'", 
+		               lex->encoding);
+		      java_lex_error (buffer, 0);
 		      return UEOF;
 		    }
 		}
@@ -932,7 +939,7 @@ java_perform_atof (YYSTYPE *java_lval, char *literal_token, int fflag,
 	}
     }
 
-  SET_LVAL_NODE_TYPE (build_real (type, value), type);
+  SET_LVAL_NODE (build_real (type, value));
 }
 #endif
 
@@ -1269,11 +1276,11 @@ do_java_lex (YYSTYPE *java_lval)
 
 #ifndef JC1_LITE
       /* Range checking.  */
-      value = build_int_2 (low, high);
       /* Temporarily set type to unsigned.  */
-      SET_LVAL_NODE_TYPE (value, (long_suffix
-				  ? unsigned_long_type_node
-				  : unsigned_int_type_node));
+      value = build_int_cst (long_suffix
+			     ? unsigned_long_type_node
+			     : unsigned_int_type_node, low, high);
+      SET_LVAL_NODE (value);
 
       /* For base 10 numbers, only values up to the highest value
 	 (plus one) can be written.  For instance, only ints up to
@@ -1293,12 +1300,17 @@ do_java_lex (YYSTYPE *java_lval)
 	}
 
       /* Sign extend the value.  */
-      SET_LVAL_NODE_TYPE (value, (long_suffix ? long_type_node : int_type_node));
-      force_fit_type (value, 0);
-      JAVA_RADIX10_FLAG (value) = radix == 10;
-#else
-      SET_LVAL_NODE_TYPE (build_int_2 (low, high),
-			  long_suffix ? long_type_node : int_type_node);
+      value = build_int_cst (long_suffix ? long_type_node : int_type_node,
+			     low, high);
+      value = force_fit_type (value, 0, false, false);
+
+      if (radix != 10)
+	{
+	  value = copy_node (value);
+	  JAVA_NOT_RADIX10_FLAG (value) = 1;
+	}
+      
+      SET_LVAL_NODE (value);
 #endif
       return INT_LIT_TK;
     }
@@ -1307,6 +1319,7 @@ do_java_lex (YYSTYPE *java_lval)
   if (c == '\'')
     {
       int char_lit;
+      
       if ((c = java_get_unicode ()) == '\\')
 	char_lit = java_parse_escape_sequence ();
       else
@@ -1327,7 +1340,7 @@ do_java_lex (YYSTYPE *java_lval)
         char_lit = 0;		/* We silently convert it to zero.  */
 
       JAVA_LEX_CHAR_LIT (char_lit);
-      SET_LVAL_NODE_TYPE (build_int_2 (char_lit, 0), char_type_node);
+      SET_LVAL_NODE (build_int_cst (char_type_node, char_lit, 0));
       return CHAR_LIT_TK;
     }
 
@@ -1725,7 +1738,7 @@ static void
 error_if_numeric_overflow (tree value)
 {
   if (TREE_CODE (value) == INTEGER_CST
-      && JAVA_RADIX10_FLAG (value)
+      && !JAVA_NOT_RADIX10_FLAG (value)
       && tree_int_cst_sgn (value) < 0)
     {
       if (TREE_TYPE (value) == long_type_node)
@@ -2024,7 +2037,7 @@ cxx_keyword_p (const char *name, int length)
     {
       int kwl = strlen (cxx_keywords[mid]);
       int min_length = kwl > length ? length : kwl;
-      int r = utf8_cmp (name, min_length, cxx_keywords[mid]);
+      int r = utf8_cmp ((const unsigned char *) name, min_length, cxx_keywords[mid]);
 
       if (r == 0)
 	{

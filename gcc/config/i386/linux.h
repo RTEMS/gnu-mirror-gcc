@@ -83,11 +83,7 @@ Boston, MA 02111-1307, USA.  */
   while (0)
 
 #undef CPP_SPEC
-#ifdef USE_GNULIBC_1
-#define CPP_SPEC "%{posix:-D_POSIX_SOURCE}"
-#else
 #define CPP_SPEC "%{posix:-D_POSIX_SOURCE} %{pthread:-D_REENTRANT}"
-#endif
 
 #undef CC1_SPEC
 #define CC1_SPEC "%(cc1_cpu) %{profile:-p}"
@@ -108,24 +104,22 @@ Boston, MA 02111-1307, USA.  */
 
 /* If ELF is the default format, we should not use /lib/elf.  */
 
+#define LINK_EMULATION "elf_i386"
+#define DYNAMIC_LINKER "/lib/ld-linux.so.2"
+
+#undef  SUBTARGET_EXTRA_SPECS
+#define SUBTARGET_EXTRA_SPECS \
+  { "link_emulation", LINK_EMULATION },\
+  { "dynamic_linker", DYNAMIC_LINKER }
+
 #undef	LINK_SPEC
-#ifdef USE_GNULIBC_1
-#define LINK_SPEC "-m elf_i386 %{shared:-shared} \
+#define LINK_SPEC "-m %(link_emulation) %{shared:-shared} \
   %{!shared: \
     %{!ibcs: \
       %{!static: \
 	%{rdynamic:-export-dynamic} \
-	%{!dynamic-linker:-dynamic-linker /lib/ld-linux.so.1}} \
+	%{!dynamic-linker:-dynamic-linker %(dynamic_linker)}} \
 	%{static:-static}}}"
-#else
-#define LINK_SPEC "-m elf_i386 %{shared:-shared} \
-  %{!shared: \
-    %{!ibcs: \
-      %{!static: \
-	%{rdynamic:-export-dynamic} \
-	%{!dynamic-linker:-dynamic-linker /lib/ld-linux.so.2}} \
-	%{static:-static}}}"
-#endif
 
 /* A C statement (sans semicolon) to output to the stdio stream
    FILE the assembler definition of uninitialized global DECL named
@@ -149,24 +143,6 @@ Boston, MA 02111-1307, USA.  */
       else fprintf ((FILE), "\t.p2align %d,,%d\n", (LOG), (MAX_SKIP));	\
     }									\
   } while (0)
-#endif
-
-#if defined(__PIC__) && defined (USE_GNULIBC_1)
-/* This is a kludge. The i386 GNU/Linux dynamic linker needs ___brk_addr,
-   __environ and atexit.  We have to make sure they are in the .dynsym
-   section.  We do this by forcing the assembler to create undefined 
-   references to these symbols in the object file.  */
-#undef CRT_CALL_STATIC_FUNCTION
-#define CRT_CALL_STATIC_FUNCTION(SECTION_OP, FUNC)	\
-   asm (SECTION_OP "\n\t"				\
-	"call " USER_LABEL_PREFIX #FUNC "\n"		\
-	TEXT_SECTION_ASM_OP "\n\t"			\
-	".extern ___brk_addr\n\t"			\
-	".type ___brk_addr,@object\n\t"			\
-	".extern __environ\n\t"				\
-	".type __environ,@object\n\t"			\
-	".extern atexit\n\t"				\
-	".type atexit,@function");
 #endif
 
 /* Handle special EH pointer encodings.  Absolute, pc-relative, and
@@ -209,13 +185,15 @@ Boston, MA 02111-1307, USA.  */
    state data appropriately.  See unwind-dw2.c for the structs.  */
 
 #ifdef IN_LIBGCC2
-/* There's no sys/ucontext.h for some (all?) libc1, so no
+/* There's no sys/ucontext.h for glibc 2.0, so no
    signal-turned-exceptions for them.  There's also no configure-run for
    the target, so we can't check on (e.g.) HAVE_SYS_UCONTEXT_H.  Using the
-   target libc1 macro should be enough.  */
-#if !(defined (USE_GNULIBC_1) || (__GLIBC__ == 2 && __GLIBC_MINOR__ == 0))
+   target libc version macro should be enough.  */
+#if !(__GLIBC__ == 2 && __GLIBC_MINOR__ == 0)
 #include <signal.h>
 #include <sys/ucontext.h>
+
+#define REG_NAME(reg) reg
 
 #define MD_FALLBACK_FRAME_STATE_FOR(CONTEXT, FS, SUCCESS)		\
   do {									\
@@ -245,30 +223,30 @@ Boston, MA 02111-1307, USA.  */
     else								\
       break;								\
 									\
-    new_cfa_ = sc_->esp;						\
+    new_cfa_ = sc_->REG_NAME(esp);						\
     (FS)->cfa_how = CFA_REG_OFFSET;					\
     (FS)->cfa_reg = 4;							\
     (FS)->cfa_offset = new_cfa_ - (long) (CONTEXT)->cfa;		\
 									\
     /* The SVR4 register numbering macros aren't usable in libgcc.  */	\
     (FS)->regs.reg[0].how = REG_SAVED_OFFSET;				\
-    (FS)->regs.reg[0].loc.offset = (long)&sc_->eax - new_cfa_;		\
+    (FS)->regs.reg[0].loc.offset = (long)&sc_->REG_NAME(eax) - new_cfa_;	\
     (FS)->regs.reg[3].how = REG_SAVED_OFFSET;				\
-    (FS)->regs.reg[3].loc.offset = (long)&sc_->ebx - new_cfa_;		\
+    (FS)->regs.reg[3].loc.offset = (long)&sc_->REG_NAME(ebx) - new_cfa_;	\
     (FS)->regs.reg[1].how = REG_SAVED_OFFSET;				\
-    (FS)->regs.reg[1].loc.offset = (long)&sc_->ecx - new_cfa_;		\
+    (FS)->regs.reg[1].loc.offset = (long)&sc_->REG_NAME(ecx) - new_cfa_;	\
     (FS)->regs.reg[2].how = REG_SAVED_OFFSET;				\
-    (FS)->regs.reg[2].loc.offset = (long)&sc_->edx - new_cfa_;		\
+    (FS)->regs.reg[2].loc.offset = (long)&sc_->REG_NAME(edx) - new_cfa_;	\
     (FS)->regs.reg[6].how = REG_SAVED_OFFSET;				\
-    (FS)->regs.reg[6].loc.offset = (long)&sc_->esi - new_cfa_;		\
+    (FS)->regs.reg[6].loc.offset = (long)&sc_->REG_NAME(esi) - new_cfa_;	\
     (FS)->regs.reg[7].how = REG_SAVED_OFFSET;				\
-    (FS)->regs.reg[7].loc.offset = (long)&sc_->edi - new_cfa_;		\
+    (FS)->regs.reg[7].loc.offset = (long)&sc_->REG_NAME(edi) - new_cfa_;	\
     (FS)->regs.reg[5].how = REG_SAVED_OFFSET;				\
-    (FS)->regs.reg[5].loc.offset = (long)&sc_->ebp - new_cfa_;		\
+    (FS)->regs.reg[5].loc.offset = (long)&sc_->REG_NAME(ebp) - new_cfa_;	\
     (FS)->regs.reg[8].how = REG_SAVED_OFFSET;				\
-    (FS)->regs.reg[8].loc.offset = (long)&sc_->eip - new_cfa_;		\
+    (FS)->regs.reg[8].loc.offset = (long)&sc_->REG_NAME(eip) - new_cfa_;	\
     (FS)->retaddr_column = 8;						\
     goto SUCCESS;							\
   } while (0)
-#endif /* not USE_GNULIBC_1 */
+#endif /* not glibc 2.0 */
 #endif /* IN_LIBGCC2 */
