@@ -22,6 +22,7 @@ Boston, MA 02111-1307, USA.  */
 #include "config.h"
 #include "system.h"
 #include "rtl.h"
+#include "tree.h"
 #include "regs.h"
 #include "hard-reg-set.h"
 #include "real.h"
@@ -30,7 +31,6 @@ Boston, MA 02111-1307, USA.  */
 #include "function.h"
 #include "output.h"
 #include "insn-attr.h"
-#include "tree.h"
 #include "recog.h"
 #include "expr.h"
 #include "flags.h"
@@ -66,6 +66,18 @@ static void vms_globalize_label PARAMS ((FILE *, const char *));
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
+/* Set global variables as needed for the options enabled.  */
+
+void
+override_options ()
+{
+  /* We're VAX floating point, not IEEE floating point.  */
+  memset (real_format_for_mode, 0, sizeof real_format_for_mode);
+  real_format_for_mode[SFmode - QFmode] = &vax_f_format;
+  real_format_for_mode[DFmode - QFmode]
+    = (TARGET_G_FLOAT ? &vax_g_format : &vax_d_format);
+}
+
 /* Generate the assembly code for function entry.  FILE is a stdio
    stream to output the code to.  SIZE is an int: how many units of
    temporary storage to allocate.
@@ -318,7 +330,7 @@ print_operand_address (file, addr)
       else
 	abort ();
 
-      /* If REG1 is non-zero, figure out if it is a base or index register.  */
+      /* If REG1 is nonzero, figure out if it is a base or index register.  */
       if (reg1)
 	{
 	  if (breg != 0 || (offset && GET_CODE (offset) == MEM))
@@ -695,75 +707,6 @@ vax_rtx_cost (x)
 	}
     }
   return c;
-}
-
-/* Check a `double' value for validity for a particular machine mode.  */
-
-static const char *const float_strings[] =
-{
-   "1.70141173319264430e+38", /* 2^127 (2^24 - 1) / 2^24 */
-  "-1.70141173319264430e+38",
-   "2.93873587705571877e-39", /* 2^-128 */
-  "-2.93873587705571877e-39"
-};
-
-static REAL_VALUE_TYPE float_values[4];
-
-static int inited_float_values = 0;
-
-
-int
-check_float_value (mode, d, overflow)
-     enum machine_mode mode;
-     REAL_VALUE_TYPE *d;
-     int overflow;
-{
-  if (inited_float_values == 0)
-    {
-      int i;
-      for (i = 0; i < 4; i++)
-	{
-	  float_values[i] = REAL_VALUE_ATOF (float_strings[i], DFmode);
-	}
-
-      inited_float_values = 1;
-    }
-
-  if (overflow)
-    {
-      memcpy (d, &float_values[0], sizeof (REAL_VALUE_TYPE));
-      return 1;
-    }
-
-  if ((mode) == SFmode)
-    {
-      REAL_VALUE_TYPE r;
-      memcpy (&r, d, sizeof (REAL_VALUE_TYPE));
-      if (REAL_VALUES_LESS (float_values[0], r))
-	{
-	  memcpy (d, &float_values[0], sizeof (REAL_VALUE_TYPE));
-	  return 1;
-	}
-      else if (REAL_VALUES_LESS (r, float_values[1]))
-	{
-	  memcpy (d, &float_values[1], sizeof (REAL_VALUE_TYPE));
-	  return 1;
-	}
-      else if (REAL_VALUES_LESS (dconst0, r)
-		&& REAL_VALUES_LESS (r, float_values[2]))
-	{
-	  memcpy (d, &dconst0, sizeof (REAL_VALUE_TYPE));
-	  return 1;
-	}
-      else if (REAL_VALUES_LESS (r, dconst0)
-		&& REAL_VALUES_LESS (float_values[3], r))
-	{
-	  memcpy (d, &dconst0, sizeof (REAL_VALUE_TYPE));
-	  return 1;
-	}
-    }
-
-  return 0;
 }
 
 #if VMS_TARGET
