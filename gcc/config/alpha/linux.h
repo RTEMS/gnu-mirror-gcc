@@ -1,6 +1,6 @@
-/* Definitions of target machine for GNU compiler, for Alpha Linux,
-   using ECOFF.
-   Copyright (C) 1996 Free Software Foundation, Inc.
+/* Definitions of target machine for GNU compiler, for Alpha Linux-based GNU
+   systems using ECOFF.
+   Copyright (C) 1996, 1997 Free Software Foundation, Inc.
    Contributed by Bob Manson.
 
 This file is part of GNU CC.
@@ -23,7 +23,7 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
 #define TARGET_DEFAULT (3 | MASK_GAS)
 
 #undef TARGET_VERSION
-#define TARGET_VERSION fprintf (stderr, " (Linux/Alpha)");
+#define TARGET_VERSION fprintf (stderr, " (GNU/Linux/Alpha)");
 
 #undef CPP_PREDEFINES
 #define CPP_PREDEFINES "\
@@ -65,6 +65,9 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
 /* Show that we need a GP when profiling.  */
 #define TARGET_PROFILING_NEEDS_GP
 
+/* We support #pragma.  */
+#define HANDLE_SYSV_PRAGMA
+
 #undef ASM_FINAL_SPEC
 
 /* Emit RTL insns to initialize the variable parts of a trampoline.
@@ -77,8 +80,7 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
    range and so the target is in range of something on the stack. 
    Omitting the hint saves a bogus branch-prediction cache line load.
 
-   Linux always has an executable stack -- no need for a system call.
- */
+   GNU/Linux always has an executable stack -- no need for a system call. */
 
 #undef INITIALIZE_TRAMPOLINE
 #define INITIALIZE_TRAMPOLINE(TRAMP, FNADDR, CXT)                       \

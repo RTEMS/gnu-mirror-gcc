@@ -32,6 +32,25 @@ Boston, MA 02111-1307, USA.  */
 #include <varargs.h>
 #endif
 
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+
+#ifdef NEED_DECLARATION_FREE
+extern void free	PROTO((void *));
+#endif
+
+extern void compiler_error ();
+
+static tree get_identifier_list PROTO((tree));
+static tree bot_manip PROTO((tree));
+static tree perm_manip PROTO((tree));
+static tree build_cplus_array_type_1 PROTO((tree, tree));
+static void list_hash_add PROTO((int, tree));
+static int list_hash PROTO((tree, tree, tree));
+static tree list_hash_lookup PROTO((int, int, int, int, tree, tree,
+				    tree));
+
 #define CEIL(x,y) (((x) + (y) - 1) / (y))
 
 /* Return nonzero if REF is an lvalue valid for this language.
@@ -59,6 +78,9 @@ real_lvalue_p (ref)
     case PREDECREMENT_EXPR:
     case COMPONENT_REF:
     case SAVE_EXPR:
+    case UNSAVE_EXPR:
+    case TRY_CATCH_EXPR:
+    case WITH_CLEANUP_EXPR:
       return real_lvalue_p (TREE_OPERAND (ref, 0));
 
     case STRING_CST:
@@ -133,6 +155,9 @@ lvalue_p (ref)
     case IMAGPART_EXPR:
     case COMPONENT_REF:
     case SAVE_EXPR:
+    case UNSAVE_EXPR:
+    case TRY_CATCH_EXPR:
+    case WITH_CLEANUP_EXPR:
       return lvalue_p (TREE_OPERAND (ref, 0));
 
     case STRING_CST:
@@ -219,7 +244,7 @@ build_cplus_new (type, init)
   tree slot;
   tree rval;
 
-  if (TREE_CODE (init) == TARGET_EXPR || init == error_mark_node)
+  if (TREE_CODE (init) != CALL_EXPR && TREE_CODE (init) != NEW_EXPR)
     return init;
 
   slot = build (VAR_DECL, type);
@@ -227,10 +252,8 @@ build_cplus_new (type, init)
   rval = build (NEW_EXPR, type,
 		TREE_OPERAND (init, 0), TREE_OPERAND (init, 1), slot);
   TREE_SIDE_EFFECTS (rval) = 1;
-  TREE_ADDRESSABLE (rval) = 1;
   rval = build (TARGET_EXPR, type, slot, rval, NULL_TREE, NULL_TREE);
   TREE_SIDE_EFFECTS (rval) = 1;
-  TREE_ADDRESSABLE (rval) = 1;
 
   return rval;
 }
@@ -1253,6 +1276,9 @@ is_overloaded_fn (x)
   if (TREE_CODE (x) == FUNCTION_DECL)
     return 1;
 
+  if (TREE_CODE (x) == TEMPLATE_ID_EXPR)
+    return 1;
+
   if (TREE_CODE (x) == TREE_LIST
       && (TREE_CODE (TREE_VALUE (x)) == FUNCTION_DECL
 	  || TREE_CODE (TREE_VALUE (x)) == TEMPLATE_DECL))
@@ -1265,9 +1291,12 @@ int
 really_overloaded_fn (x)
      tree x;
 {     
+  if (TREE_CODE (x) == TEMPLATE_ID_EXPR)
+    return 1;
+
   if (TREE_CODE (x) == TREE_LIST
       && (TREE_CODE (TREE_VALUE (x)) == FUNCTION_DECL
-	  || TREE_CODE (TREE_VALUE (x)) == TEMPLATE_DECL))
+	  || DECL_FUNCTION_TEMPLATE_P (TREE_VALUE (x))))
     return 1;
 
   return 0;
@@ -1277,7 +1306,9 @@ tree
 get_first_fn (from)
      tree from;
 {
-  if (TREE_CODE (from) == FUNCTION_DECL)
+  if (TREE_CODE (from) == FUNCTION_DECL
+      || TREE_CODE (from) == TEMPLATE_ID_EXPR
+      || DECL_FUNCTION_TEMPLATE_P (from))
     return from;
 
   my_friendly_assert (TREE_CODE (from) == TREE_LIST, 9);
@@ -1292,25 +1323,6 @@ is_aggr_type_2 (t1, t2)
   if (TREE_CODE (t1) != TREE_CODE (t2))
     return 0;
   return IS_AGGR_TYPE (t1) && IS_AGGR_TYPE (t2);
-}
-
-/* Give message using types TYPE1 and TYPE2 as arguments.
-   PFN is the function which will print the message;
-   S is the format string for PFN to use.  */
-
-void
-message_2_types (pfn, s, type1, type2)
-     void (*pfn) ();
-     char *s;
-     tree type1, type2;
-{
-  tree name1 = TYPE_NAME (type1);
-  tree name2 = TYPE_NAME (type2);
-  if (TREE_CODE (name1) == TYPE_DECL)
-    name1 = DECL_NAME (name1);
-  if (TREE_CODE (name2) == TYPE_DECL)
-    name2 = DECL_NAME (name2);
-  (*pfn) (s, IDENTIFIER_POINTER (name1), IDENTIFIER_POINTER (name2));
 }
 
 #define PRINT_RING_SIZE 4
@@ -1408,7 +1420,7 @@ build_exception_variant (type, raises)
 tree
 mapcar (t, func)
      tree t;
-     tree (*func)();
+     tree (*func) PROTO((tree));
 {
   tree tmp;
 
@@ -1650,11 +1662,9 @@ extern int depth_reached;
 void
 print_lang_statistics ()
 {
-  extern struct obstack maybepermanent_obstack, decl_obstack;
+  extern struct obstack decl_obstack;
   print_obstack_statistics ("class_obstack", &class_obstack);
   print_obstack_statistics ("decl_obstack", &decl_obstack);
-  print_obstack_statistics ("permanent_obstack", &permanent_obstack);
-  print_obstack_statistics ("maybepermanent_obstack", &maybepermanent_obstack);
   print_search_statistics ();
   print_class_statistics ();
 #ifdef GATHER_STATISTICS
@@ -1757,8 +1767,6 @@ break_out_target_exprs (t)
 /* Obstack used for allocating nodes in template function and variable
    definitions.  */
 
-extern struct obstack *expression_obstack;
-
 /* Similar to `build_nt', except we build
    on the permanent_obstack, regardless.  */
 
@@ -1858,8 +1866,6 @@ tree
 get_type_decl (t)
      tree t;
 {
-  if (TREE_CODE (t) == IDENTIFIER_NODE)
-    return identifier_typedecl_value (t);
   if (TREE_CODE (t) == TYPE_DECL)
     return t;
   if (TREE_CODE_CLASS (TREE_CODE (t)) == 't')
@@ -2015,7 +2021,8 @@ cp_tree_equal (t1, t2)
       return 0;
 
     case TEMPLATE_CONST_PARM:
-      return TEMPLATE_CONST_IDX (t1) == TEMPLATE_CONST_IDX (t2);
+      return TEMPLATE_CONST_IDX (t1) == TEMPLATE_CONST_IDX (t2)
+	&& TEMPLATE_CONST_LEVEL (t1) == TEMPLATE_CONST_LEVEL (t2);
 
     case SIZEOF_EXPR:
       if (TREE_CODE (TREE_OPERAND (t1, 0)) != TREE_CODE (TREE_OPERAND (t2, 0)))
@@ -2054,11 +2061,18 @@ make_temp_vec (len)
      int len;
 {
   register tree node;
-  push_obstacks_nochange ();
-  resume_temporary_allocation ();
+  register struct obstack *ambient_obstack = current_obstack;
+  current_obstack = expression_obstack;
   node = make_tree_vec (len);
-  pop_obstacks ();
+  current_obstack = ambient_obstack;
   return node;
+}
+
+void
+push_expression_obstack ()
+{
+  push_obstacks_nochange ();
+  current_obstack = expression_obstack;
 }
 
 /* The type of ARG when used as an lvalue.  */

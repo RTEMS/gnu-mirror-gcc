@@ -1,6 +1,6 @@
 /* Operating system specific defines to be used when targeting GCC for some
    generic System V Release 4 system.
-   Copyright (C) 1996 Free Software Foundation, Inc.
+   Copyright (C) 1996, 1997 Free Software Foundation, Inc.
    Contributed by Ron Guilmette (rfg@monkeys.com).
    Renamed and changed to suit Dynix/ptx v4 and later.
    Modified by Tim Wright (timw@sequent.com).
@@ -123,7 +123,7 @@ Boston, MA 02111-1307, USA.
    support here for as many of the other svr4 linker options as seems
    reasonable, given that some of them conflict with options for other
    svr4 tools (e.g. the assembler).  In particular, we do support the
-   -h*, -z*, -V, -b, -t, -Qy, -Qn, and -YP* options here, and the -e*,
+   -z*, -V, -b, -t, -Qy, -Qn, and -YP* options here, and the -e*,
    -l*, -o*, -r, -s, -u*, and -L* options are directly supported
    by gcc.c itself.  We don't directly support the -m (generate load
    map) option because that conflicts with the -m (run m4) option of
@@ -143,8 +143,8 @@ Boston, MA 02111-1307, USA.
 #define LINK_SPEC "%{h*} %{v:-V} \
 		   %{b} %{Wl,*:%*} \
 		   %{static:-dn -Bstatic} \
-		   %{shared:-G -dy -z text %{!h*:%{o*:-h %*}}} \
-		   %{symbolic:-Bsymbolic -G -dy -z text %{!h*:%{o*:-h %*}}} \
+		   %{shared:-G -dy -z text} \
+		   %{symbolic:-Bsymbolic -G -dy -z text} \
 		   %{G:-G} \
 		   %{YP,*} \
 		   %{!YP,*:%{p:-Y P,/lib/libp:/usr/lib/libp:/lib:/usr/lib} \
@@ -333,7 +333,7 @@ while (0)
 #define ASM_OUTPUT_SKIP(FILE,SIZE) \
   fprintf (FILE, "\t%s\t%u\n", SKIP_ASM_OP, (SIZE))
 
-/* The prefix to add to user-visible assembler symbols. */
+/* The prefix to add to user-visible assembler symbols.
 
    For System V Release 4 the convention is *not* to prepend a leading
    underscore onto user-level symbol names.  */

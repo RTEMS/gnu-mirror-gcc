@@ -1,7 +1,6 @@
 /* obstack.c - subroutines used implicitly by object stack macros
    Copyright (C) 1988,89,90,91,92,93,94,96,97 Free Software Foundation, Inc.
 
-   the C library, however.  The master source lives in /gd/gnu/lib.
 
    NOTE: The canonical source of this file is maintained with the GNU C Library.
    Bugs can be reported to bug-glibc@prep.ai.mit.edu.
@@ -164,7 +163,7 @@ _obstack_begin (h, size, alignment, chunkfun, freefun)
   register struct _obstack_chunk *chunk; /* points to new chunk */
 
   if (alignment == 0)
-    alignment = DEFAULT_ALIGNMENT;
+    alignment = (int) DEFAULT_ALIGNMENT;
   if (size == 0)
     /* Default size is what GNU malloc can fit in a 4096-byte block.  */
     {
@@ -223,7 +222,7 @@ _obstack_begin_1 (h, size, alignment, chunkfun, freefun, arg)
   register struct _obstack_chunk *chunk; /* points to new chunk */
 
   if (alignment == 0)
-    alignment = DEFAULT_ALIGNMENT;
+    alignment = (int) DEFAULT_ALIGNMENT;
   if (size == 0)
     /* Default size is what GNU malloc can fit in a 4096-byte block.  */
     {
@@ -280,9 +279,9 @@ _obstack_newchunk (h, length)
   register struct _obstack_chunk *old_chunk = h->chunk;
   register struct _obstack_chunk *new_chunk;
   register long	new_size;
-  register int obj_size = h->next_free - h->object_base;
-  register int i;
-  int already;
+  register long obj_size = h->next_free - h->object_base;
+  register long i;
+  long already;
 
   /* Compute size for new chunk.  */
   new_size = (obj_size + length) + (obj_size >> 3) + 100;
