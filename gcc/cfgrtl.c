@@ -682,7 +682,7 @@ try_redirect_by_replacing_jump (e, target)
 
   if (tmp || !onlyjump_p (insn))
     return false;
-  if (reload_completed && JUMP_LABEL (insn)
+  if (flow2_completed && JUMP_LABEL (insn)
       && (table = NEXT_INSN (JUMP_LABEL (insn))) != NULL_RTX
       && GET_CODE (table) == JUMP_INSN
       && (GET_CODE (PATTERN (table)) == ADDR_VEC
@@ -737,7 +737,7 @@ try_redirect_by_replacing_jump (e, target)
   else
     {
       rtx target_label = block_label (target);
-      rtx barrier, tmp;
+      rtx barrier;
 
       emit_jump_insn_after (gen_jump (target_label), insn);
       JUMP_LABEL (src->end) = target_label;
@@ -746,20 +746,14 @@ try_redirect_by_replacing_jump (e, target)
 	fprintf (rtl_dump_file, "Replacing insn %i by jump %i\n",
 		 INSN_UID (insn), INSN_UID (src->end));
 
-
+      /* Remove the original jump.  If INSN is a tablejump, the jump
+	 table will be removed later, if it is no longer needed.  */
       delete_insn_chain (kill_from, insn);
 
-      /* Recognize a tablejump that we are converting to a
-	 simple jump and remove its associated CODE_LABEL
-	 and ADDR_VEC or ADDR_DIFF_VEC.  */
-      if ((tmp = JUMP_LABEL (insn)) != NULL_RTX
-	  && (tmp = NEXT_INSN (tmp)) != NULL_RTX
-	  && GET_CODE (tmp) == JUMP_INSN
-	  && (GET_CODE (PATTERN (tmp)) == ADDR_VEC
-	      || GET_CODE (PATTERN (tmp)) == ADDR_DIFF_VEC))
-	{
-	  delete_insn_chain (JUMP_LABEL (insn), tmp);
-	}
+      if (tablejump_p (insn))
+	create_basic_block (JUMP_LABEL (insn),
+			    NEXT_INSN (JUMP_LABEL (insn)),
+			    src);
 
       barrier = next_nonnote_insn (src->end);
       if (!barrier || GET_CODE (barrier) != BARRIER)
@@ -937,6 +931,37 @@ force_nonfallthru_and_redirect (e, target)
   rtx note;
   edge new_edge;
   int abnormal_edge_flags = 0;
+
+  /* In the case the last instruction is conditional jump to the next
+     instruction, first redirect the jump itself and then continue
+     by creating an basic block afterwards to redirect fallthru edge.  */
+  if (e->src != ENTRY_BLOCK_PTR && e->dest != EXIT_BLOCK_PTR
+      && any_condjump_p (e->src->end)
+      /* When called from cfglayout, fallthru edges do not
+         neccessarily go to the next block.  */
+      && e->src->next_bb == e->dest
+      && JUMP_LABEL (e->src->end) == e->dest->head)
+    {
+      rtx note;
+      edge b = unchecked_make_edge (e->src, target, 0);
+
+      if (!redirect_jump (e->src->end, block_label (target), 0))
+	abort ();
+      note = find_reg_note (e->src->end, REG_BR_PROB, NULL_RTX);
+      if (note)
+	{
+	  int prob = INTVAL (XEXP (note, 0));
+
+	  b->probability = prob;
+	  b->count = e->count * prob / REG_BR_PROB_BASE;
+	  e->probability -= e->probability;
+	  e->count -= b->count;
+	  if (e->probability < 0)
+	    e->probability = 0;
+	  if (e->count < 0)
+	    e->count = 0;
+	}
+    }
 
   if (e->flags & EDGE_ABNORMAL)
     {
@@ -1448,7 +1473,8 @@ commit_one_edge_insertion (e, watch_calls)
   else if (GET_CODE (last) == JUMP_INSN)
     abort ();
 
-  find_sub_basic_blocks (bb);
+  /* Mark the basic block for find_sub_basic_blocks.  */
+  bb->aux = &bb->aux;
 }
 
 /* Update the CFG for all queued instructions.  */
@@ -1457,6 +1483,8 @@ void
 commit_edge_insertions ()
 {
   basic_block bb;
+  sbitmap blocks;
+  bool changed = false;
 
 #ifdef ENABLE_CHECKING
   verify_flow_info ();
@@ -1470,9 +1498,26 @@ commit_edge_insertions ()
 	{
 	  next = e->succ_next;
 	  if (e->insns)
-	    commit_one_edge_insertion (e, false);
+	    {
+	      changed = true;
+	      commit_one_edge_insertion (e, false);
+	    }
 	}
     }
+
+  if (!changed)
+    return;
+
+  blocks = sbitmap_alloc (last_basic_block);
+  sbitmap_zero (blocks);
+  FOR_EACH_BB (bb)
+    if (bb->aux)
+      {
+        SET_BIT (blocks, bb->index);
+	bb->aux = NULL;
+      }
+  find_many_sub_basic_blocks (blocks);
+  sbitmap_free (blocks);
 }
 
 /* Update the CFG for all queued instructions, taking special care of inserting
@@ -1482,6 +1527,8 @@ void
 commit_edge_insertions_watch_calls ()
 {
   basic_block bb;
+  sbitmap blocks;
+  bool changed = false;
 
 #ifdef ENABLE_CHECKING
   verify_flow_info ();
@@ -1495,9 +1542,26 @@ commit_edge_insertions_watch_calls ()
 	{
 	  next = e->succ_next;
 	  if (e->insns)
-	    commit_one_edge_insertion (e, true);
+	    {
+	      changed = true;
+	      commit_one_edge_insertion (e, true);
+	    }
 	}
     }
+
+  if (!changed)
+    return;
+
+  blocks = sbitmap_alloc (last_basic_block);
+  sbitmap_zero (blocks);
+  FOR_EACH_BB (bb)
+    if (bb->aux)
+      {
+        SET_BIT (blocks, bb->index);
+	bb->aux = NULL;
+      }
+  find_many_sub_basic_blocks (blocks);
+  sbitmap_free (blocks);
 }
 
 /* Print out one basic block with live information at start and end.  */

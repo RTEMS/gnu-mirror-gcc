@@ -260,7 +260,8 @@ i386_pe_mark_dllimport (decl)
   const char *oldname;
   char  *newname;
   tree idp;
-  rtx rtlname, newrtl;
+  rtx rtlname;
+  rtx new_symbol;
 
   rtlname = XEXP (DECL_RTL (decl), 0);
   if (GET_CODE (rtlname) == SYMBOL_REF)
@@ -322,10 +323,11 @@ i386_pe_mark_dllimport (decl)
      identical.  */
   idp = get_identifier (newname);
 
-  newrtl = gen_rtx (MEM, Pmode,
-		    gen_rtx (SYMBOL_REF, Pmode,
-			     IDENTIFIER_POINTER (idp)));
-  XEXP (DECL_RTL (decl), 0) = newrtl;
+  new_symbol = gen_rtx_SYMBOL_REF (Pmode, IDENTIFIER_POINTER (idp));
+  XEXP (DECL_RTL (decl), 0)
+    = ((GET_CODE (XEXP (DECL_RTL (decl), 0)) == MEM)
+       ? gen_rtx (MEM, Pmode, new_symbol)
+       : new_symbol);
 
   /* Can't treat a pointer to this as a constant address */
   DECL_NON_ADDR_CONST_P (decl) = 1;
