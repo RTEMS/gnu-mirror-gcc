@@ -1,5 +1,5 @@
 /* Define control and data flow tables, and regsets.
-   Copyright (C) 1987, 1997, 1998, 1999, 2000, 2001, 2002
+   Copyright (C) 1987, 1997, 1998, 1999, 2000, 2001, 2002, 2003
    Free Software Foundation, Inc.
 
 This file is part of GCC.
@@ -26,6 +26,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "sbitmap.h"
 #include "varray.h"
 #include "partition.h"
+#include "hard-reg-set.h"
 
 /* Head of register set linked list.  */
 typedef bitmap_head regset_head;
@@ -748,8 +749,10 @@ extern void free_aux_for_edges		PARAMS ((void));
    it being unused.  */
 extern void verify_flow_info		PARAMS ((void));
 extern bool flow_loop_outside_edge_p	PARAMS ((const struct loop *, edge));
-extern bool flow_loop_nested_p PARAMS ((const struct loop *, const struct loop *));
-extern bool flow_bb_inside_loop_p       PARAMS ((const struct loop *, basic_block));
+extern bool flow_loop_nested_p		PARAMS ((const struct loop *,
+						 const struct loop *));
+extern bool flow_bb_inside_loop_p	PARAMS ((const struct loop *,
+						 const basic_block));
 extern basic_block *get_loop_body       PARAMS ((const struct loop *));
 extern int dfs_enumerate_from           PARAMS ((basic_block, int,
 				         bool (*)(basic_block, void *),
@@ -799,6 +802,7 @@ extern void fixup_abnormal_edges	PARAMS ((void));
 extern bool can_hoist_insn_p		PARAMS ((rtx, rtx, regset));
 extern rtx hoist_insn_after		PARAMS ((rtx, rtx, rtx, rtx));
 extern rtx hoist_insn_to_edge		PARAMS ((rtx, edge, rtx, rtx));
+extern bool control_flow_insn_p		PARAMS ((rtx));
 
 /* In dominance.c */
 

@@ -1,6 +1,6 @@
 /* Subroutines used for code generation on the DEC Alpha.
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002 Free Software Foundation, Inc. 
+   2000, 2001, 2002, 2003 Free Software Foundation, Inc. 
    Contributed by Richard Kenner (kenner@vlsi1.ultra.nyu.edu)
 
 This file is part of GNU CC.
@@ -148,7 +148,7 @@ static rtx alpha_expand_builtin
   PARAMS ((tree, rtx, rtx, enum machine_mode, int));
 static void alpha_sa_mask
   PARAMS ((unsigned long *imaskP, unsigned long *fmaskP));
-static int find_lo_sum
+static int find_lo_sum_using_gp
   PARAMS ((rtx *, void *));
 static int alpha_does_function_need_gp
   PARAMS ((void));
@@ -1920,18 +1920,22 @@ alpha_encode_section_info (decl, first)
     {
       char *newstr;
       size_t len;
+      char want_prefix = (is_local ? '@' : '%');
+      char other_prefix = (is_local ? '%' : '@');
 
-      if (symbol_str[0] == (is_local ? '@' : '%'))
+      if (symbol_str[0] == want_prefix)
 	{
 	  if (symbol_str[1] == encoding)
 	    return;
 	  symbol_str += 2;
 	}
+      else if (symbol_str[0] == other_prefix)
+	symbol_str += 2;
 
       len = strlen (symbol_str) + 1;
       newstr = alloca (len + 2);
 
-      newstr[0] = (is_local ? '@' : '%');
+      newstr[0] = want_prefix;
       newstr[1] = encoding;
       memcpy (newstr + 2, symbol_str, len);
 	  
@@ -6890,11 +6894,18 @@ const struct attribute_spec vms_attribute_table[] =
 #endif
 
 static int
-find_lo_sum (px, data)
+find_lo_sum_using_gp (px, data)
      rtx *px;
      void *data ATTRIBUTE_UNUSED;
 {
-  return GET_CODE (*px) == LO_SUM;
+  return GET_CODE (*px) == LO_SUM && XEXP (*px, 0) == pic_offset_table_rtx;
+}
+
+int
+alpha_find_lo_sum_using_gp (insn)
+     rtx insn;
+{
+  return for_each_rtx (&PATTERN (insn), find_lo_sum_using_gp, NULL) > 0;
 }
 
 static int
@@ -6923,15 +6934,9 @@ alpha_does_function_need_gp ()
   for (; insn; insn = NEXT_INSN (insn))
     if (INSN_P (insn)
 	&& GET_CODE (PATTERN (insn)) != USE
-	&& GET_CODE (PATTERN (insn)) != CLOBBER)
-      {
-	enum attr_type type = get_attr_type (insn);
-	if (type == TYPE_LDSYM || type == TYPE_JSR)
-	  return 1;
-	if (TARGET_EXPLICIT_RELOCS
-	    && for_each_rtx (&PATTERN (insn), find_lo_sum, NULL) > 0)
-	  return 1;
-      }
+	&& GET_CODE (PATTERN (insn)) != CLOBBER
+	&& get_attr_usegp (insn))
+      return 1;
 
   return 0;
 }

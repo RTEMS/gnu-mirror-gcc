@@ -125,6 +125,8 @@ static tree add_stmt_to_compound PARAMS ((tree, tree, tree));
 #endif /* INLINER_FOR_JAVA */
 static tree find_alloca_call_1 PARAMS ((tree *, int *, void *));
 static tree find_alloca_call PARAMS ((tree));
+static tree find_builtin_longjmp_call_1 PARAMS ((tree *, int *, void *));
+static tree find_builtin_longjmp_call PARAMS ((tree));
 
 /* The approximate number of instructions per statement.  This number
    need not be particularly accurate; it is used only to make
@@ -871,7 +873,7 @@ tree_inlinable_function_p (fn)
   return inlinable_function_p (fn, NULL);
 }
 
-/* if *TP is possibly call to alloca, return nonzero.  */
+/* If *TP is possibly call to alloca, return nonzero.  */
 static tree
 find_alloca_call_1 (tp, walk_subtrees, data)
      tree *tp;
@@ -883,13 +885,38 @@ find_alloca_call_1 (tp, walk_subtrees, data)
   return NULL;
 }
 
-/* Return subexpression representing possible alloca call,
-   if any.  */
+/* Return subexpression representing possible alloca call, if any.  */
 static tree
 find_alloca_call (exp)
      tree exp;
 {
   return walk_tree (&exp, find_alloca_call_1, NULL, NULL);
+}
+
+static tree
+find_builtin_longjmp_call_1 (tp, walk_subtrees, data)
+     tree *tp;
+     int *walk_subtrees ATTRIBUTE_UNUSED;
+     void *data ATTRIBUTE_UNUSED;
+{
+  tree exp = *tp, decl;
+
+  if (TREE_CODE (exp) == CALL_EXPR
+      && TREE_CODE (TREE_OPERAND (exp, 0)) == ADDR_EXPR
+      && (decl = TREE_OPERAND (TREE_OPERAND (exp, 0), 0),
+	  TREE_CODE (decl) == FUNCTION_DECL)
+      && DECL_BUILT_IN_CLASS (decl) == BUILT_IN_NORMAL
+      && DECL_FUNCTION_CODE (decl) == BUILT_IN_LONGJMP)
+    return decl;
+
+  return NULL;
+}
+
+static tree
+find_builtin_longjmp_call (exp)
+     tree exp;
+{
+  return walk_tree (&exp, find_builtin_longjmp_call_1, NULL, NULL);
 }
 
 /* Returns nonzero if FN is a function that can be inlined into the
@@ -903,6 +930,7 @@ inlinable_function_p (fn, id)
 {
   int inlinable;
   int currfn_insns;
+  int max_inline_insns_single = MAX_INLINE_INSNS_SINGLE;
 
   /* If we've already decided this function shouldn't be inlined,
      there's no need to check again.  */
@@ -911,7 +939,13 @@ inlinable_function_p (fn, id)
 
   /* Assume it is not inlinable.  */
   inlinable = 0;
-
+       
+  /* We may be here either because fn is declared inline or because
+     we use -finline-functions.  For the second case, we are more
+     restrictive.  */
+  if (DID_INLINE_FUNC (fn))
+    max_inline_insns_single = MAX_INLINE_INSNS_AUTO;
+   
   /* The number of instructions (estimated) of current function.  */
   currfn_insns = DECL_NUM_STMTS (fn) * INSNS_PER_STMT;
 
@@ -930,7 +964,15 @@ inlinable_function_p (fn, id)
      function to be of MAX_INLINE_INSNS_SINGLE size.  Make special
      allowance for extern inline functions, though.  */
   else if (! (*lang_hooks.tree_inlining.disregard_inline_limits) (fn)
-	   && currfn_insns > MAX_INLINE_INSNS_SINGLE)
+	   && currfn_insns > max_inline_insns_single)
+    ;
+  /* We can't inline functions that call __builtin_longjmp at all.
+     The non-local goto machenery really requires the destination
+     be in a different function.  If we allow the function calling
+     __builtin_longjmp to be inlined into the function calling
+     __builtin_setjmp, Things will Go Awry.  */
+  /* ??? Need front end help to identify "regular" non-local goto.  */
+  else if (find_builtin_longjmp_call (DECL_SAVED_TREE (fn)))
     ;
   /* Refuse to inline alloca call unless user explicitly forced so as this may
      change program's memory overhead drastically when the function using alloca
@@ -1492,10 +1534,9 @@ walk_tree (tp, func, data, htab_)
 
       /* Don't walk the same tree twice, if the user has requested
          that we avoid doing so.  */
-      if (htab_find (htab, *tp))
-	return NULL_TREE;
-      /* If we haven't already seen this node, add it to the table.  */
       slot = htab_find_slot (htab, *tp, INSERT);
+      if (*slot)
+	return NULL_TREE;
       *slot = *tp;
     }
 
@@ -1617,6 +1658,7 @@ walk_tree (tp, func, data, htab_)
     case ENUMERAL_TYPE:
     case BLOCK:
     case RECORD_TYPE:
+    case CHAR_TYPE:
       /* None of thse have subtrees other than those already walked
          above.  */
       break;
