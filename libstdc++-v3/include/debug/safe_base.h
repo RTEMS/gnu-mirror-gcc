@@ -1,6 +1,6 @@
 // Safe sequence/iterator base implementation  -*- C++ -*-
 
-// Copyright (C) 2003
+// Copyright (C) 2003, 2004
 // Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
@@ -95,6 +95,12 @@ namespace __gnu_debug
     : _M_sequence(0), _M_version(0), _M_prior(0), _M_next(0)
     { this->_M_attach(__x._M_sequence, __constant); }
 
+    _Safe_iterator_base&
+    operator=(const _Safe_iterator_base&);
+
+    explicit 
+    _Safe_iterator_base(const _Safe_iterator_base&);
+
     ~_Safe_iterator_base() { this->_M_detach(); }
 
   public:
@@ -157,6 +163,25 @@ namespace __gnu_debug
     _Safe_sequence_base()
     : _M_iterators(0), _M_const_iterators(0), _M_version(1)
     { }
+
+    explicit
+    _Safe_sequence_base(const _Safe_sequence_base& __seq)
+    : _M_iterators(__seq._M_iterators),
+      _M_const_iterators(__seq._M_const_iterators),
+      _M_version(__seq._M_version)
+    { }
+
+    _Safe_sequence_base&
+    operator=(const _Safe_sequence_base& __seq)
+    {
+      if (&__seq != this)
+	{
+	  _M_iterators = __seq._M_iterators;
+	  _M_const_iterators = __seq._M_const_iterators;
+	  _M_version = __seq._M_version;
+	}
+      return *this;
+    }
 
     /** Notify all iterators that reference this sequence that the
 	sequence is being destroyed. */
