@@ -7355,14 +7355,14 @@ sh_initialize_trampoline (tramp, fnaddr, cxt)
       emit_insn (gen_mshflo_w_x (gen_rtx_SUBREG (V4HImode, quad0, 0),
 				 gen_rtx_SUBREG (V2HImode, fnaddr, 0),
 				 movishori));
-      emit_insn (gen_rotldi3_mextr (quad0, quad0,
+      emit_insn (gen_rotrdi3_mextr (quad0, quad0,
 				    GEN_INT (TARGET_LITTLE_ENDIAN ? 24 : 56)));
       emit_insn (gen_ashldi3_media (quad0, quad0, GEN_INT (2)));
       emit_move_insn (gen_rtx_MEM (DImode, tramp), quad0);
       emit_insn (gen_mshflo_w_x (gen_rtx_SUBREG (V4HImode, cxtload, 0),
 				 gen_rtx_SUBREG (V2HImode, cxt, 0),
 				 movishori));
-      emit_insn (gen_rotldi3_mextr (cxtload, cxtload,
+      emit_insn (gen_rotrdi3_mextr (cxtload, cxtload,
 				    GEN_INT (TARGET_LITTLE_ENDIAN ? 24 : 56)));
       emit_insn (gen_ashldi3_media (cxtload, cxtload, GEN_INT (2)));
       if (TARGET_LITTLE_ENDIAN)
@@ -7740,24 +7740,25 @@ sh_expand_binop_v2sf (code, op0, op1, op2)
 
 /* Return the class of registers for which a mode change from FROM to TO
    is invalid.  */
-enum reg_class 
-sh_cannot_change_mode_class (from, to)
+bool
+sh_cannot_change_mode_class (from, to, class)
      enum machine_mode from, to;
+     enum reg_class class;
 {
   if (GET_MODE_SIZE (from) != GET_MODE_SIZE (to))
     {
        if (TARGET_LITTLE_ENDIAN)
          {
 	   if (GET_MODE_SIZE (to) < 8 || GET_MODE_SIZE (from) < 8)
-	     return DF_REGS;
+	     return reg_classes_intersect_p (DF_REGS, class);
 	 }
        else
 	 {
 	   if (GET_MODE_SIZE (from) < 8)
-	     return DF_HI_REGS;
+	     return reg_classes_intersect_p (DF_HI_REGS, class);
 	 }
     }
-  return NO_REGS;
+  return 0;
 }
 
 
