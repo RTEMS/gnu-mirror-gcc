@@ -47,17 +47,18 @@
 #define CPLUSPLUS_CPP_SPEC "-D_GNU_SOURCE %(cpp)"
 
 /* Now we define the strings used to build the spec file.  */
+#undef  LIB_SPEC
 #define LIB_SPEC \
   "%{pthread:-lpthread} \
    %{shared:-lc} \
    %{!shared:%{profile:-lc_p}%{!profile:-lc}}"
 
-#define LIBGCC_SPEC "%{msoft-float:-lfloat} -lgcc"
+#define LIBGCC_SPEC "%{msoft-float:-lfloat} %{mfloat-abi=soft*:-lfloat} -lgcc"
 
 /* Provide a STARTFILE_SPEC appropriate for GNU/Linux.  Here we add
    the GNU/Linux magical crtbegin.o file (see crtstuff.c) which
    provides part of the support for getting C++ file-scope static
-   object constructed before entering `main'. */
+   object constructed before entering `main'.  */
    
 #undef  STARTFILE_SPEC
 #define STARTFILE_SPEC \
@@ -89,14 +90,7 @@
    %{mbig-endian:-EB}" \
    SUBTARGET_EXTRA_LINK_SPEC
 
-#define TARGET_OS_CPP_BUILTINS()		\
-    do {					\
-	builtin_define_std ("unix");		\
-	builtin_define_std ("linux");		\
-	builtin_define ("__gnu_linux__");	\
-	builtin_assert ("system=unix");		\
-	builtin_assert ("system=posix");	\
-    } while (0)
+#define TARGET_OS_CPP_BUILTINS() LINUX_TARGET_OS_CPP_BUILTINS()
 
 /* This is how we tell the assembler that two symbols have the same value.  */
 #define ASM_OUTPUT_DEF(FILE, NAME1, NAME2) \
