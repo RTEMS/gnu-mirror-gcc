@@ -266,9 +266,6 @@ struct language_function GTY(())
 #undef LANG_HOOKS_CALLGRAPH_EXPAND_FUNCTION
 #define LANG_HOOKS_CALLGRAPH_EXPAND_FUNCTION java_expand_body
 
-#undef LANG_HOOKS_RTL_EXPAND_STMT
-#define LANG_HOOKS_RTL_EXPAND_STMT java_expand_stmt
-
 /* Each front end provides its own.  */
 const struct lang_hooks lang_hooks = LANG_HOOKS_INITIALIZER;
 
@@ -351,6 +348,22 @@ java_handle_option (size_t scode, const char *arg, int value)
 
     case OPT_fassert:
       flag_assert = value;
+      break;
+
+    case OPT_fenable_assertions_:
+      add_enable_assert (arg, value);
+      break;
+
+    case OPT_fenable_assertions:
+      add_enable_assert ("", value);
+      break;
+
+    case OPT_fdisable_assertions_:
+      add_enable_assert (arg, !value);
+      break;
+
+    case OPT_fdisable_assertions:
+      add_enable_assert ("", !value);
       break;
 
     case OPT_fassume_compiled_:
@@ -869,6 +882,48 @@ java_unsafe_for_reeval (tree t)
   return -1;
 }
 
+/* APPLE LOCAL begin AltiVec */
+/* Placeholders to make linking work, remove when altivec support is correct */
+
+int comptypes (tree type1, tree type2);
+
+int
+comptypes (tree type1, tree type2)
+{
+  register tree t1 = type1;
+  register tree t2 = type2;
+  if (t1 == t2 || !t1 || !t2
+      || TREE_CODE (t1) == ERROR_MARK || TREE_CODE (t2) == ERROR_MARK)
+    return 1;
+  return 0;
+}
+
+tree default_conversion (tree exp);
+
+tree
+default_conversion (tree exp)
+{
+  return exp;
+}
+
+tree lang_build_type_variant (tree type, int constp ATTRIBUTE_UNUSED, int volatilep ATTRIBUTE_UNUSED);
+
+tree
+lang_build_type_variant (tree type, int constp ATTRIBUTE_UNUSED, int volatilep ATTRIBUTE_UNUSED)
+{
+  return type;
+}
+/* APPLE LOCAL end AltiVec */
+
+/* APPLE LOCAL begin constant cfstrings */
+enum { blabla } c_language;
+const char *constant_string_class_name = "die die";
+int flag_next_runtime = 1;
+/* APPLE LOCAL end constant cfstrings */
+
+/* APPLE LOCAL disable_typechecking_for_spec_flag */
+int disable_typechecking_for_spec_flag = 0;
+
 /* Every call to a static constructor has an associated boolean
    variable which is in the outermost scope of the calling method.
    This variable is used to avoid multiple calls to the static
@@ -928,7 +983,7 @@ merge_init_test_initialization (void **entry, void *x)
   
   However, what if the method that is suppoed to do the initialization
   is itself inlined in the caller?  When expanding the called method
-  we'll assume that the class initalization has already been done,
+  we'll assume that the class initialization has already been done,
   because the DECL_INITIAL of the init_test_decl is set.
   
   To fix this we remove the DECL_INITIAL (in the caller scope) of all

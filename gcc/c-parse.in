@@ -50,6 +50,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "output.h"
 #include "toplev.h"
 #include "ggc.h"
+/* APPLE LOCAL Objective-C++ */
+#include "langhooks.h"
 
 @@ifobjc
 #include "objc-act.h"
@@ -148,6 +150,14 @@ do {									\
 %token PTR_VALUE PTR_BASE PTR_EXTENT
 %token FUNC_NAME
 
+/* APPLE LOCAL begin CW asm blocks */
+/* This token is a pseudo-storage-class.  */
+%token CW_ASM_KEYWORD
+%type <ttype> CW_ASM_KEYWORD
+/* These tokens indicate beginning and end of each asm line.  */
+%token CW_ASM_BOL CW_ASM_EOL
+/* APPLE LOCAL end CW asm blocks */
+
 /* Add precedence rules to solve dangling else s/r conflict */
 %nonassoc IF
 %nonassoc ELSE
@@ -208,7 +218,7 @@ do {									\
 %type <ttype> any_word
 
 %type <ttype> compstmt compstmt_start compstmt_nostart compstmt_primary_start
-%type <ttype> do_stmt_start poplevel stmt label
+%type <ttype> do_stmt_start pop_scope stmt label
 
 %type <ttype> c99_block_start c99_block_end
 %type <ttype> declarator
@@ -230,6 +240,13 @@ do {									\
 %type <ttype> parmlist parmlist_1 parmlist_2
 %type <ttype> parmlist_or_identifiers parmlist_or_identifiers_1
 %type <ttype> identifiers_or_typenames
+
+/* APPLE LOCAL begin CW asm blocks */
+%type <ttype> cw_asm_expr_no_commas cw_asm_unary_expr cw_asm_primary
+%type <ttype> cw_asm_operands cw_nonnull_asm_operands cw_asm_operand
+%type <ttype> cw_asm_stmt single_cw_asm_stmt
+%type <ttype> cw_asm_compstmt cw_asm_compstmt_start cw_asm_compstmt_nostart
+/* APPLE LOCAL end CW asm blocks */
 
 %type <itype> setspecs setspecs_fp extension
 
@@ -328,8 +345,6 @@ static int objc_need_raw_identifier;
 #define OBJC_NEED_RAW_IDENTIFIER(VAL)	/* nothing */
 @@end_ifc
 
-static bool parsing_iso_function_signature;
-
 /* Tell yyparse how to print a token's value, if yydebug is set.  */
 
 #define YYPRINT(FILE,YYCHAR,YYLVAL) yyprint(FILE,YYCHAR,YYLVAL)
@@ -368,11 +383,6 @@ extdefs:
 	;
 
 extdef:
-	extdef_1
-	{ parsing_iso_function_signature = false; } /* Reset after any external definition.  */
-	;
-
-extdef_1:
 	fndef
 	| datadef
 	| asmdef
@@ -573,21 +583,21 @@ expr_no_commas:
 	| expr_no_commas '^' expr_no_commas
 		{ $$ = parser_build_binary_op ($2, $1, $3); }
 	| expr_no_commas ANDAND
-		{ $1 = (*lang_hooks.truthvalue_conversion)
+		{ $1 = lang_hooks.truthvalue_conversion
 		    (default_conversion ($1));
 		  skip_evaluation += $1 == truthvalue_false_node; }
 	  expr_no_commas
 		{ skip_evaluation -= $1 == truthvalue_false_node;
 		  $$ = parser_build_binary_op (TRUTH_ANDIF_EXPR, $1, $4); }
 	| expr_no_commas OROR
-		{ $1 = (*lang_hooks.truthvalue_conversion)
+		{ $1 = lang_hooks.truthvalue_conversion
 		    (default_conversion ($1));
 		  skip_evaluation += $1 == truthvalue_true_node; }
 	  expr_no_commas
 		{ skip_evaluation -= $1 == truthvalue_true_node;
 		  $$ = parser_build_binary_op (TRUTH_ORIF_EXPR, $1, $4); }
 	| expr_no_commas '?'
-		{ $1 = (*lang_hooks.truthvalue_conversion)
+		{ $1 = lang_hooks.truthvalue_conversion
 		    (default_conversion ($1));
 		  skip_evaluation += $1 == truthvalue_false_node; }
           expr ':'
@@ -601,7 +611,7 @@ expr_no_commas:
 		    pedwarn ("ISO C forbids omitting the middle term of a ?: expression");
 		  /* Make sure first operand is calculated only once.  */
 		  $<ttype>2 = save_expr (default_conversion ($1));
-		  $1 = (*lang_hooks.truthvalue_conversion) ($<ttype>2);
+		  $1 = lang_hooks.truthvalue_conversion ($<ttype>2);
 		  skip_evaluation += $1 == truthvalue_true_node; }
 	  ':' expr_no_commas
 		{ skip_evaluation -= $1 == truthvalue_true_node;
@@ -742,28 +752,8 @@ primary:
 	;
 
 old_style_parm_decls:
-	old_style_parm_decls_1
-	{
-	  parsing_iso_function_signature = false; /* Reset after decls.  */
-	}
-	;
-
-old_style_parm_decls_1:
 	/* empty */
-	{
-	  if (warn_traditional && !in_system_header
-	      && parsing_iso_function_signature)
-	    warning ("traditional C rejects ISO C style function definitions");
-	  if (warn_old_style_definition && !in_system_header
-	      && !parsing_iso_function_signature)
-	    warning ("old-style parameter declaration");
-	  parsing_iso_function_signature = false; /* Reset after warning.  */
-	}
 	| datadecls
-	{
-	  if (warn_old_style_definition && !in_system_header)
-	    warning ("old-style parameter declaration");
-	}
 	;
 
 /* The following are analogous to lineno_decl, decls and decl
@@ -803,7 +793,8 @@ datadecl:
    where statement labels are allowed.  */
 lineno_decl:
 	  save_location decl
-		{ }
+		/* APPLE LOCAL CW asm blocks */
+		{ if (flag_cw_asm_blocks) cw_asm_in_decl = 0; }
 	;
 
 /* records the type and storage class specs to use for processing
@@ -1472,6 +1463,8 @@ any_word:
 
 scspec:
 	  STATIC
+	  /* APPLE LOCAL CW asm blocks */
+	| CW_ASM_KEYWORD
 	| SCSPEC
 	;
 
@@ -1556,7 +1549,6 @@ nested_function:
 		      pop_function_context ();
 		      YYERROR1;
 		    }
-		  parsing_iso_function_signature = false; /* Don't warn about nested functions.  */
 		}
 	   old_style_parm_decls save_location
 		{ tree decl = current_function_decl;
@@ -1587,7 +1579,6 @@ notype_nested_function:
 		      pop_function_context ();
 		      YYERROR1;
 		    }
-		  parsing_iso_function_signature = false; /* Don't warn about nested functions.  */
 		}
 	  old_style_parm_decls save_location
 		{ tree decl = current_function_decl;
@@ -1621,9 +1612,6 @@ after_type_declarator:
 		{ $$ = $2 ? tree_cons ($2, $3, NULL_TREE) : $3; }
 	| after_type_declarator '(' parmlist_or_identifiers  %prec '.'
 		{ $$ = build_nt (CALL_EXPR, $1, $3, NULL_TREE); }
-/*	| after_type_declarator '(' error ')'  %prec '.'
-		{ $$ = build_nt (CALL_EXPR, $1, NULL_TREE, NULL_TREE);
-		  poplevel (0, 0, 0); }  */
 	| after_type_declarator array_declarator  %prec '.'
 		{ $$ = set_array_declarator_type ($2, $1, 0); }
 	| '*' maybe_type_quals_attrs after_type_declarator  %prec UNARY
@@ -1646,9 +1634,6 @@ parm_declarator:
 parm_declarator_starttypename:
 	  parm_declarator_starttypename '(' parmlist_or_identifiers  %prec '.'
 		{ $$ = build_nt (CALL_EXPR, $1, $3, NULL_TREE); }
-/*	| parm_declarator_starttypename '(' error ')'  %prec '.'
-		{ $$ = build_nt (CALL_EXPR, $1, NULL_TREE, NULL_TREE);
-		  poplevel (0, 0, 0); }  */
 	| parm_declarator_starttypename array_declarator  %prec '.'
 		{ $$ = set_array_declarator_type ($2, $1, 0); }
 	| TYPENAME
@@ -1660,9 +1645,6 @@ parm_declarator_starttypename:
 parm_declarator_nostarttypename:
 	  parm_declarator_nostarttypename '(' parmlist_or_identifiers  %prec '.'
 		{ $$ = build_nt (CALL_EXPR, $1, $3, NULL_TREE); }
-/*	| parm_declarator_nostarttypename '(' error ')'  %prec '.'
-		{ $$ = build_nt (CALL_EXPR, $1, NULL_TREE, NULL_TREE);
-		  poplevel (0, 0, 0); }  */
 	| parm_declarator_nostarttypename array_declarator  %prec '.'
 		{ $$ = set_array_declarator_type ($2, $1, 0); }
 	| '*' maybe_type_quals_attrs parm_declarator_starttypename  %prec UNARY
@@ -1679,9 +1661,6 @@ parm_declarator_nostarttypename:
 notype_declarator:
 	  notype_declarator '(' parmlist_or_identifiers  %prec '.'
 		{ $$ = build_nt (CALL_EXPR, $1, $3, NULL_TREE); }
-/*	| notype_declarator '(' error ')'  %prec '.'
-		{ $$ = build_nt (CALL_EXPR, $1, NULL_TREE, NULL_TREE);
-		  poplevel (0, 0, 0); }  */
 	| '(' maybe_attribute notype_declarator ')'
 		{ $$ = $2 ? tree_cons ($2, $3, NULL_TREE) : $3; }
 	| '*' maybe_type_quals_attrs notype_declarator  %prec UNARY
@@ -2038,14 +2017,14 @@ lineno_stmt_decl_or_labels:
 errstmt:  error ';'
 	;
 
-pushlevel:  /* empty */
-		{ pushlevel (0);
+push_scope:  /* empty */
+		{ push_scope ();
 		  clear_last_expr ();
 		  add_scope_stmt (/*begin_p=*/1, /*partial_p=*/0);
 		}
 	;
 
-poplevel:  /* empty */
+pop_scope:  /* empty */
                 {
 @@ifobjc
 		  if (c_dialect_objc ())
@@ -2060,7 +2039,7 @@ c99_block_start: /* empty */
 		{ if (flag_isoc99)
 		    {
 		      $$ = c_begin_compound_stmt ();
-		      pushlevel (0);
+		      push_scope ();
 		      clear_last_expr ();
 		      add_scope_stmt (/*begin_p=*/1, /*partial_p=*/0);
 		    }
@@ -2076,7 +2055,7 @@ c99_block_end: /* empty */
                 { if (flag_isoc99)
 		    {
 		      tree scope_stmt = add_scope_stmt (/*begin_p=*/0, /*partial_p=*/0);
-		      $$ = poplevel (KEEP_MAYBE, 0, 0);
+		      $$ = pop_scope ();
 		      SCOPE_STMT_BLOCK (TREE_PURPOSE (scope_stmt))
 			= SCOPE_STMT_BLOCK (TREE_VALUE (scope_stmt))
 			= $$;
@@ -2125,8 +2104,10 @@ compstmt_start: '{' { compstmt_count++;
 
 compstmt_nostart: '}'
 		{ $$ = convert (void_type_node, integer_zero_node); }
-	| pushlevel maybe_label_decls compstmt_contents_nonempty '}' poplevel
-		{ $$ = poplevel (KEEP_MAYBE, 0, 0);
+	| push_scope maybe_label_decls compstmt_contents_nonempty '}' pop_scope
+		{ $$ = pop_scope ();
+		  /* APPLE LOCAL CW asm blocks */
+		  if (flag_cw_asm_blocks) cw_asm_block = 0;
 		  SCOPE_STMT_BLOCK (TREE_PURPOSE ($5))
 		    = SCOPE_STMT_BLOCK (TREE_VALUE ($5))
 		    = $$; }
@@ -2160,6 +2141,120 @@ compstmt: compstmt_start compstmt_nostart
                   $$ = $1; }
 	;
 
+/* APPLE LOCAL begin CW asm blocks */
+/* A CW-style asm statement is recognized by having a BOL token preceding it.  */
+cw_asm_stmt: CW_ASM_BOL save_location cw_asm_stmt_list CW_ASM_EOL
+{ /*cw_asm_lineno = $2*/; $$ = NULL_TREE; }
+	;
+
+/* A single line may have multiple statements separated by ';'.  */
+cw_asm_stmt_list:
+	  /* empty */
+	| single_cw_asm_stmt
+		{}
+	| cw_asm_stmt_list ';' single_cw_asm_stmt
+	| cw_asm_stmt_list ';'
+	;
+
+/* A single statement consists of one or more labels (identified by a
+   leading '@' and/or a trailing ':'), optionally followed by opcode
+   and operands.  */
+single_cw_asm_stmt:
+	  identifier
+		{ cw_asm_in_operands = 1; }
+	  cw_asm_operands
+		{ $$ = cw_asm_stmt ($1, $3); }
+	| identifier STATIC cw_asm_operand
+		{ $$ = cw_asm_entry ($1, $2, $3); }
+	| identifier SCSPEC cw_asm_operand
+		{ $$ = cw_asm_entry ($1, $2, $3); }
+	| cw_asm_label
+		{}	
+	| cw_asm_label single_cw_asm_stmt
+		{}	
+	;
+
+cw_asm_label:
+	  identifier ':'
+		{ cw_asm_label ($1, 0); }
+	| '@' identifier
+		{ cw_asm_label ($2, 1); }
+	| '@' identifier ':'
+		{ cw_asm_label ($2, 1); }
+	;
+
+cw_asm_stmts:
+	  stmt
+		{}
+	| cw_asm_stmts stmt
+		{}
+	;
+
+/* An asm block within a function is simpler than asm functions; no
+   declarations are possible, so we switch to the block interior state
+   immediately.  */
+cw_asm_compstmt_start: ASM_KEYWORD '{'
+		{
+		  if (flag_cw_asm_blocks)
+		    {
+		      compstmt_count++;
+		      cw_asm_state = cw_asm_asm;
+		      cw_asm_block = 1;
+		      cw_asm_at_bol = 1;
+		      clear_cw_asm_labels ();
+		      $$ = c_begin_compound_stmt ();
+		    }
+		  else
+		    /* This will probably choke badly... */
+		    error ("asm blocks not enabled, use `-fasm-blocks'");
+		}
+        ;
+
+cw_asm_compstmt_nostart:
+	  '}'
+		{ $$ = convert (void_type_node, integer_zero_node); }
+	| push_scope cw_asm_compstmt_contents_nonempty '}' pop_scope
+		{ $$ = pop_scope ();
+		  cw_asm_block = 0;
+		  SCOPE_STMT_BLOCK (TREE_PURPOSE ($4))
+		    = SCOPE_STMT_BLOCK (TREE_VALUE ($4))
+		    = $$; }
+	;
+
+cw_asm_compstmt_contents_nonempty:
+	  cw_asm_stmts
+	| error
+	;
+
+cw_asm_compstmt: cw_asm_compstmt_start cw_asm_compstmt_nostart
+		{ RECHAIN_STMTS ($1, COMPOUND_BODY ($1));
+		  last_expr_type = NULL_TREE;
+                  $$ = $1; }
+	;
+
+cw_asm_operands:
+	  /* empty */
+		{ $$ = NULL_TREE; }
+	| cw_nonnull_asm_operands
+	;
+
+cw_nonnull_asm_operands:
+	  cw_asm_operand
+		{ $$ = build_tree_list (NULL_TREE, $1); }
+	| cw_nonnull_asm_operands ',' cw_asm_operand
+		{ $$ = chainon ($1, build_tree_list (NULL_TREE, $3)); }
+	;
+
+/* Alternatively this could go to the regular expr_no_commas, but then
+   all the semantic actions would need to be tweaked to handle the
+   possibility of CW asm coming through.  For example, "offset(reg)"
+   would be handled by function call code (bleah).  */
+cw_asm_operand:	cw_asm_expr_no_commas
+	| cw_asm_expr_no_commas '(' cw_asm_expr_no_commas ')'
+		{ $$ = cw_asm_build_register_offset ($1, $3); }
+	;
+/* APPLE LOCAL end CW asm blocks */
+
 /* Value is number of statements counted as of the closeparen.  */
 simple_if:
 	  if_prefix c99_block_lineno_labeled_stmt
@@ -2172,7 +2267,7 @@ simple_if:
 
 if_prefix:
 	  /* We must build the IF_STMT node before parsing its
-	     condition so that STMT_LINENO refers to the line
+	     condition so that EXPR_LOCUS refers to the line
 	     containing the "if", and not the line containing
 	     the close-parenthesis.
 
@@ -2182,7 +2277,7 @@ if_prefix:
           IF
                 { $<ttype>$ = c_begin_if_stmt (); }
             '(' expr ')'
-		{ c_expand_start_cond ((*lang_hooks.truthvalue_conversion) ($4),
+		{ c_expand_start_cond (lang_hooks.truthvalue_conversion ($4),
 				       compstmt_count,$<ttype>2);
 		  $<itype>$ = stmt_count;
 		  if_stmt_locus = $<location>-1; }
@@ -2236,12 +2331,8 @@ lineno_stmt:
 	  save_location stmt
 		{ if ($2)
 		    {
-		      STMT_LINENO ($2) = $1.line;
-		      /* ??? We currently have no way of recording
-			 the filename for a statement.  This probably
-			 matters little in practice at the moment,
-			 but I suspect that problems will occur when
-			 doing inlining at the tree level.  */
+		      SET_EXPR_LOCUS ($2, NULL);
+		      annotate_with_locus ($2, $1);
 		    }
 		}
 	;
@@ -2250,7 +2341,8 @@ lineno_label:
 	  save_location label
 		{ if ($2)
 		    {
-		      STMT_LINENO ($2) = $1.line;
+		      SET_EXPR_LOCUS ($2, NULL);
+		      annotate_with_locus ($2, $1);
 		    }
 		}
 	;
@@ -2279,7 +2371,7 @@ select_or_iter_stmt:
 	| simple_if ELSE error
 		{ c_expand_end_cond (); }
        /* We must build the WHILE_STMT node before parsing its
-	  condition so that STMT_LINENO refers to the line
+	  condition so that EXPR_LOCUS refers to the line
 	  containing the "while", and not the line containing
 	  the close-parenthesis.
 
@@ -2291,16 +2383,16 @@ select_or_iter_stmt:
 		  $<ttype>$ = c_begin_while_stmt (); }
 	  '(' expr ')'
                 { c_in_iteration_stmt++;
-		  $4 = (*lang_hooks.truthvalue_conversion) ($4);
+		  $4 = lang_hooks.truthvalue_conversion ($4);
 		  c_finish_while_stmt_cond
-		    ((*lang_hooks.truthvalue_conversion) ($4), $<ttype>2);
+		    (lang_hooks.truthvalue_conversion ($4), $<ttype>2);
 		  $<ttype>$ = add_stmt ($<ttype>2); }
 	  c99_block_lineno_labeled_stmt
                 { c_in_iteration_stmt--;
 		  RECHAIN_STMTS ($<ttype>6, WHILE_BODY ($<ttype>6)); }
 	| do_stmt_start
 	  '(' expr ')' ';'
-                { DO_COND ($1) = (*lang_hooks.truthvalue_conversion) ($3); }
+                { DO_COND ($1) = lang_hooks.truthvalue_conversion ($3); }
 	| do_stmt_start error
 		{ }
 	| FOR
@@ -2313,7 +2405,7 @@ select_or_iter_stmt:
 	  xexpr ';'
                 { if ($6)
 		    FOR_COND ($<ttype>2)
-		      = (*lang_hooks.truthvalue_conversion) ($6); }
+		      = lang_hooks.truthvalue_conversion ($6); }
 	  xexpr ')'
                 { c_in_iteration_stmt++;
 		  FOR_EXPR ($<ttype>2) = $9; }
@@ -2346,6 +2438,12 @@ xexpr:
 stmt:
 	  compstmt
 		{ stmt_count++; $$ = $1; }
+	/* APPLE LOCAL begin CW asm blocks */
+	| cw_asm_compstmt
+		{ stmt_count++; $$ = $1; }
+	| cw_asm_stmt
+		{ stmt_count++; $$ = $1; }
+	/* APPLE LOCAL end CW asm blocks */
 	| expr ';'
 		{ stmt_count++;
 		  $$ = c_expand_expr_stmt ($1); }
@@ -2582,6 +2680,119 @@ start_string_translation:
         { c_lex_string_translate = true; }
         ;
 
+/* APPLE LOCAL begin CW asm blocks */
+cw_asm_expr_no_commas:
+	  cw_asm_unary_expr
+	| cw_asm_expr_no_commas '+' cw_asm_expr_no_commas
+		{ $$ = parser_build_binary_op ($2, $1, $3); }
+	| cw_asm_expr_no_commas '-' cw_asm_expr_no_commas
+		{ $$ = parser_build_binary_op ($2, $1, $3); }
+	| cw_asm_expr_no_commas '*' cw_asm_expr_no_commas
+		{ $$ = parser_build_binary_op ($2, $1, $3); }
+	| cw_asm_expr_no_commas '/' cw_asm_expr_no_commas
+		{ $$ = parser_build_binary_op ($2, $1, $3); }
+	| cw_asm_expr_no_commas '%' cw_asm_expr_no_commas
+		{ $$ = parser_build_binary_op ($2, $1, $3); }
+	| cw_asm_expr_no_commas LSHIFT cw_asm_expr_no_commas
+		{ $$ = parser_build_binary_op ($2, $1, $3); }
+	| cw_asm_expr_no_commas RSHIFT cw_asm_expr_no_commas
+		{ $$ = parser_build_binary_op ($2, $1, $3); }
+	| cw_asm_expr_no_commas ARITHCOMPARE cw_asm_expr_no_commas
+		{ $$ = parser_build_binary_op ($2, $1, $3); }
+	| cw_asm_expr_no_commas EQCOMPARE cw_asm_expr_no_commas
+		{ $$ = parser_build_binary_op ($2, $1, $3); }
+	| cw_asm_expr_no_commas '&' cw_asm_expr_no_commas
+		{ $$ = parser_build_binary_op ($2, $1, $3); }
+	| cw_asm_expr_no_commas '|' cw_asm_expr_no_commas
+		{ $$ = parser_build_binary_op ($2, $1, $3); }
+	| cw_asm_expr_no_commas '^' cw_asm_expr_no_commas
+		{ $$ = parser_build_binary_op ($2, $1, $3); }
+	| cw_asm_expr_no_commas ANDAND
+		{ $1 = c_common_truthvalue_conversion
+		    (default_conversion ($1));
+		  skip_evaluation += $1 == boolean_false_node; }
+	  cw_asm_expr_no_commas
+		{ skip_evaluation -= $1 == boolean_false_node;
+		  $$ = parser_build_binary_op (TRUTH_ANDIF_EXPR, $1, $4); }
+	| cw_asm_expr_no_commas OROR
+		{ $1 = c_common_truthvalue_conversion
+		    (default_conversion ($1));
+		  skip_evaluation += $1 == boolean_true_node; }
+	  cw_asm_expr_no_commas
+		{ skip_evaluation -= $1 == boolean_true_node;
+		  $$ = parser_build_binary_op (TRUTH_ORIF_EXPR, $1, $4); }
+	;
+
+cw_asm_unary_expr:
+	cw_asm_primary
+	| '*' cw_asm_unary_expr   %prec UNARY
+		{ $$ = build_indirect_ref ($2, "unary *"); }
+	| unop cw_asm_unary_expr  %prec UNARY
+		{ 
+		  if (TREE_CODE ($2) == COMPOUND_EXPR)
+		    {
+		      tree neg = build_unary_op ($1, TREE_OPERAND ($2, 0), 0);
+		      tree reg = TREE_OPERAND ($2, 1);
+		      $$ = cw_asm_build_register_offset (neg, reg);
+		    }
+		  else
+		    {
+		      $$ = build_unary_op ($1, $2, 0);
+		      overflow_warning ($$);
+		    }
+		}
+	| sizeof cw_asm_unary_expr  %prec UNARY
+		{ skip_evaluation--;
+		  if (TREE_CODE ($2) == COMPONENT_REF
+		      && DECL_C_BIT_FIELD (TREE_OPERAND ($2, 1)))
+		    error ("`sizeof' applied to a bit-field");
+		  $$ = c_sizeof (TREE_TYPE ($2)); }
+	| sizeof '(' typename ')'  %prec HYPERUNARY
+		{ skip_evaluation--;
+		  $$ = c_sizeof (groktypename ($3)); }
+	| alignof cw_asm_unary_expr  %prec UNARY
+		{ skip_evaluation--;
+		  $$ = c_alignof_expr ($2); }
+	| alignof '(' typename ')'  %prec HYPERUNARY
+		{ skip_evaluation--;
+		  $$ = c_alignof (groktypename ($3)); }
+	;
+
+cw_asm_primary:
+	IDENTIFIER
+		{
+		  if (yychar == YYEMPTY)
+		    yychar = YYLEX;
+		  $$ = build_external_ref ($1, yychar == '(');
+		}
+	| '@' IDENTIFIER
+		{
+		  tree atsignid = get_atsign_identifier ($2);
+		  if (yychar == YYEMPTY)
+		    yychar = YYLEX;
+		  $$ = build_external_ref (atsignid, yychar == '(');
+		}
+	| CONSTANT
+	| STRING
+		{ $$ = fix_string_type ($$); }
+	| '(' cw_asm_expr_no_commas ')'
+		{ char class = TREE_CODE_CLASS (TREE_CODE ($2));
+		  if (IS_EXPR_CODE_CLASS (class))
+		    C_SET_EXP_ORIGINAL_CODE ($2, ERROR_MARK);
+		  $$ = $2; }
+	| '(' error ')'
+		{ $$ = error_mark_node; }
+	| cw_asm_primary '[' cw_asm_expr_no_commas ']'   %prec '.'
+		{ $$ = build_array_ref ($1, $3); }
+	| TYPENAME '.' identifier
+		{ $$ = cw_asm_c_build_component_ref ($1, $3); }
+	| cw_asm_primary '.' identifier
+		{ $$ = cw_asm_c_build_component_ref ($1, $3); }
+	| cw_asm_primary POINTSAT identifier
+		{ tree expr = build_indirect_ref ($1, "->");
+		  $$ = build_component_ref (expr, $3); }
+	;
+/* APPLE LOCAL end CW asm blocks */
 
 /* This is what appears inside the parens in a function declarator.
    Its value is a list of ..._TYPE nodes.  Attributes must appear here
@@ -2590,11 +2801,11 @@ start_string_translation:
    "void bar (int (__attribute__((__mode__(SI))) int foo));".  */
 parmlist:
 	  maybe_attribute
-		{ pushlevel (0);
+		{ push_scope ();
 		  declare_parm_level (); }
 	  parmlist_1
 		{ $$ = $3;
-		  poplevel (0, 0, 0); }
+		  pop_scope (); }
 	;
 
 parmlist_1:
@@ -2607,32 +2818,23 @@ parmlist_1:
 	  parmlist_1
 		{ $$ = $6; }
 	| error ')'
-		{ $$ = tree_cons (NULL_TREE, NULL_TREE, NULL_TREE); }
+		{ $$ = make_node (TREE_LIST); }
 	;
 
 /* This is what appears inside the parens in a function declarator.
    Is value is represented in the format that grokdeclarator expects.  */
 parmlist_2:  /* empty */
-		{ $$ = get_parm_info (0); }
+		{ $$ = make_node (TREE_LIST); }
 	| ELLIPSIS
-		{ $$ = get_parm_info (0);
-		  /* Gcc used to allow this as an extension.  However, it does
-		     not work for all targets, and thus has been disabled.
-		     Also, since func (...) and func () are indistinguishable,
-		     it caused problems with the code in expand_builtin which
-		     tries to verify that BUILT_IN_NEXT_ARG is being used
-		     correctly.  */
+		{ $$ = make_node (TREE_LIST); 
+		  /* Suppress -Wold-style-definition for this case.  */
+		  TREE_CHAIN ($$) = error_mark_node;
 		  error ("ISO C requires a named argument before `...'");
-		  parsing_iso_function_signature = true;
 		}
 	| parms
-		{ $$ = get_parm_info (1);
-		  parsing_iso_function_signature = true;
-		}
+		{ $$ = get_parm_info (/*ellipsis=*/false); }
 	| parms ',' ELLIPSIS
-		{ $$ = get_parm_info (0);
-		  parsing_iso_function_signature = true;
-		}
+		{ $$ = get_parm_info (/*ellipsis=*/true); }
 	;
 
 parms:
@@ -2707,11 +2909,11 @@ setspecs_fp:
    Its value is a list of ..._TYPE nodes or a list of identifiers.  */
 parmlist_or_identifiers:
 	  maybe_attribute
-		{ pushlevel (0);
+		{ push_scope ();
 		  declare_parm_level (); }
 	  parmlist_or_identifiers_1
 		{ $$ = $3;
-		  poplevel (0, 0, 0); }
+		  pop_scope (); }
 	;
 
 parmlist_or_identifiers_1:
@@ -3129,13 +3331,13 @@ optparmlist:
 		}
 	| ','
 		{
-		  pushlevel (0);
+		  push_scope ();
 		}
 	  parmlist_2
 		{
 		  /* returns a tree list node generated by get_parm_info */
 		  $$ = $3;
-		  poplevel (0, 0, 0);
+		  pop_scope ();
 		}
 	;
 
@@ -3339,6 +3541,8 @@ static const struct resword reswords[] =
   { "__inline",		RID_INLINE,	0 },
   { "__inline__",	RID_INLINE,	0 },
   { "__label__",	RID_LABEL,	0 },
+  /* APPLE LOCAL private extern */
+  { "__private_extern__", RID_PRIVATE_EXTERN, 0 },
   { "__ptrbase",	RID_PTRBASE,	0 },
   { "__ptrbase__",	RID_PTRBASE,	0 },
   { "__ptrextent",	RID_PTREXTENT,	0 },
@@ -3426,9 +3630,11 @@ static const struct resword reswords[] =
 };
 #define N_reswords (sizeof reswords / sizeof (struct resword))
 
+/* APPLE LOCAL keep tables in sync comment */
 /* Table mapping from RID_* constants to yacc token numbers.
    Unfortunately we have to have entries for all the keywords in all
-   three languages.  */
+   three languages (AND THEY MUST BE KEPT IN PARALLEL - see also
+   cp/lex.c).  */
 static const short rid_to_yy[RID_MAX] =
 {
   /* RID_STATIC */	STATIC,
@@ -3448,6 +3654,8 @@ static const short rid_to_yy[RID_MAX] =
   /* C extensions */
   /* RID_COMPLEX */	TYPESPEC,
   /* RID_THREAD */	SCSPEC,
+  /* APPLE LOCAL private extern */
+  /* RID_PRIVATE_EXTERN */	SCSPEC,
 
   /* C++ */
   /* RID_FRIEND */	0,
@@ -3569,7 +3777,7 @@ init_reswords (void)
 
   if (!c_dialect_objc ())
      mask |= D_OBJC;
-
+     
   ridpointers = ggc_calloc ((int) RID_MAX, sizeof (tree));
   for (i = 0; i < N_reswords; i++)
     {
@@ -3621,9 +3829,30 @@ yylexname (void)
 	  && (!OBJC_IS_PQ_KEYWORD (rid_code) || objc_pq_context))
 @@end_ifobjc
       {
+	/* APPLE LOCAL begin CW asm blocks */
+	/* Outside of function bodies, "asm" either indicates a CW asm
+	   function, or a GNU asm statement, which must be immediately
+	   followed by '(', so sniff the next token to see which kind
+	   must be meant, and change the CW keyword to a different
+	   token type so we don't have grammar problems.  */
+	int yycode = rid_to_yy[(int) rid_code];
+	if (yycode == ASM_KEYWORD && current_function_decl == NULL)
+	  {
+	    tree next_tok;
+	    /* Take a sneak peek at the next token in the stream.  */
+	    enum cpp_ttype next_tok_type = c_lex (&next_tok);
+	    /* Now put it back.  */
+	    _cpp_backup_tokens (parse_in, 1);
+	    /* Change the code.  No need to change the name though,
+	       won't matter to parser.  */
+	    if (next_tok_type != CPP_OPEN_PAREN)
+	      yycode = CW_ASM_KEYWORD;
+	  }
+	/* APPLE LOCAL end CW asm blocks */
 	/* Return the canonical spelling for this keyword.  */
 	yylval.ttype = ridpointers[(int) rid_code];
-	return rid_to_yy[(int) rid_code];
+	/* APPLE LOCAL CW asm blocks */
+	return yycode;
       }
     }
 
@@ -3713,6 +3942,14 @@ _yylex (void)
     case CPP_CLOSE_PAREN:	OBJC_NEED_RAW_IDENTIFIER (0);	return ')';
     case CPP_SEMICOLON:		OBJC_NEED_RAW_IDENTIFIER (0);	return ';';
 
+      /* APPLE LOCAL begin CW asm blocks */
+    case CPP_ATSIGN:
+      /* If we're doing CW assembly, return this as a regular token
+	 (indicates labels).  */
+      if (cw_asm_state >= cw_asm_decls)
+	return '@';
+      /* APPLE LOCAL end CW asm blocks */
+
     case CPP_EOF:
       return 0;
 
@@ -3731,6 +3968,15 @@ _yylex (void)
     case CPP_STRING:
     case CPP_WSTRING:
       return STRING;
+
+      /* APPLE LOCAL begin CW asm blocks */
+      /* Convert a lexer-returned beginning-of-line token into a
+	 parser token.  */
+    case CPP_BOL:
+      return CW_ASM_BOL;
+    case CPP_EOL:
+      return CW_ASM_EOL;
+      /* APPLE LOCAL end CW asm blocks */
 
     case CPP_OBJC_STRING:
       return OBJC_STRING;
@@ -3800,22 +4046,14 @@ yyprint (FILE *file, int yychar, YYSTYPE yyl)
     }
 }
 
-/* This is not the ideal place to put these, but we have to get them out
-   of c-lex.c because cp/lex.c has its own versions.  */
+/* This is not the ideal place to put this, but we have to get it out
+   of c-lex.c because cp/lex.c has its own version.  */
 
 /* Parse the file.  */
 void
 c_parse_file (void)
 {
   yyparse ();
-  /* In case there were missing closebraces, get us back to the global
-     binding level.  */
-  while (! global_bindings_p ())
-    poplevel (0, 0, 0);
-  /* __FUNCTION__ is defined at file scope ("").  This
-     call may not be necessary as my tests indicate it
-     still works without it.  */
-  finish_fname_decls ();
 
   if (malloced_yyss)
     {

@@ -154,6 +154,7 @@ enum dump_file_index
   DFI_combine,
   DFI_ce2,
   DFI_regmove,
+  DFI_sms,
   DFI_sched,
   DFI_lreg,
   DFI_greg,
@@ -178,7 +179,7 @@ enum dump_file_index
 
    Remaining -d letters:
 
-	"   e        m   q         "
+	"   e            q         "
 	"          K   O Q     WXY "
 */
 
@@ -207,6 +208,7 @@ static struct dump_file_info dump_file_tbl[DFI_MAX] =
   { "combine",	'c', 1, 0, 0 },
   { "ce2",	'C', 1, 0, 0 },
   { "regmove",	'N', 1, 0, 0 },
+  { "sms",      'm', 0, 0, 0 },
   { "sched",	'S', 1, 0, 0 },
   { "lreg",	'l', 1, 0, 0 },
   { "greg",	'g', 1, 0, 0 },
@@ -270,7 +272,7 @@ open_dump_file (enum dump_file_index index, tree decl)
 
   if (decl)
     fprintf (dump_file, "\n;; Function %s%s\n\n",
-	     (*lang_hooks.decl_printable_name) (decl, 2),
+	     lang_hooks.decl_printable_name (decl, 2),
 	     cfun->function_frequency == FUNCTION_FREQUENCY_HOT
 	     ? " (hot)"
 	     : cfun->function_frequency == FUNCTION_FREQUENCY_UNLIKELY_EXECUTED
@@ -466,7 +468,7 @@ rest_of_handle_final (tree decl, rtx insns)
       fflush (asm_out_file);
 
     /* Release all memory allocated by flow.  */
-    free_basic_block_vars (0);
+    free_basic_block_vars ();
 
     /* Release all memory held by regsets now.  */
     regset_release_memory ();
@@ -519,11 +521,11 @@ rest_of_handle_stack_regs (tree decl, rtx insns)
   timevar_push (TV_REG_STACK);
   open_dump_file (DFI_stack, decl);
 
-  if (reg_to_stack (insns, dump_file) && optimize)
+  if (reg_to_stack (dump_file) && optimize)
     {
       if (cleanup_cfg (CLEANUP_EXPENSIVE | CLEANUP_POST_REGSTACK
 		       | (flag_crossjumping ? CLEANUP_CROSSJUMP : 0))
-	  && flag_reorder_blocks)
+	  && (flag_reorder_blocks || flag_reorder_blocks_and_partition))
 	{
 	  reorder_basic_blocks ();
 	  cleanup_cfg (CLEANUP_EXPENSIVE | CLEANUP_POST_REGSTACK);
@@ -557,7 +559,7 @@ rest_of_handle_machine_reorg (tree decl, rtx insns)
   timevar_push (TV_MACH_DEP);
   open_dump_file (DFI_mach, decl);
 
-  (*targetm.machine_dependent_reorg) ();
+  targetm.machine_dependent_reorg ();
 
   close_dump_file (DFI_mach, print_rtl, insns);
   timevar_pop (TV_MACH_DEP);
@@ -624,7 +626,8 @@ rest_of_handle_old_regalloc (tree decl, rtx insns)
   allocate_reg_info (max_regno, FALSE, TRUE);
 
   /* And the reg_equiv_memory_loc array.  */
-  reg_equiv_memory_loc = xcalloc (max_regno, sizeof (rtx));
+  VARRAY_GROW (reg_equiv_memory_loc_varray, max_regno);
+  reg_equiv_memory_loc = &VARRAY_RTX (reg_equiv_memory_loc_varray, 0);
 
   allocate_initial_values (reg_equiv_memory_loc);
 
@@ -719,9 +722,9 @@ rest_of_handle_reorder_blocks (tree decl, rtx insns)
 
   if (flag_sched2_use_traces && flag_schedule_insns_after_reload)
     tracer ();
-  if (flag_reorder_blocks)
+  if (flag_reorder_blocks || flag_reorder_blocks_and_partition)
     reorder_basic_blocks ();
-  if (flag_reorder_blocks
+  if (flag_reorder_blocks || flag_reorder_blocks_and_partition
       || (flag_sched2_use_traces && flag_schedule_insns_after_reload))
     changed |= cleanup_cfg (CLEANUP_EXPENSIVE
 			    | (!HAVE_conditional_execution
@@ -741,6 +744,29 @@ rest_of_handle_reorder_blocks (tree decl, rtx insns)
 static void
 rest_of_handle_sched (tree decl, rtx insns)
 {
+  timevar_push (TV_SMS);
+  if (optimize > 0 && flag_modulo_sched)
+    {
+
+      /* Perform SMS module scheduling.  */
+      open_dump_file (DFI_sms, decl);
+
+      /* We want to be able to create new pseudos.  */
+      no_new_pseudos = 0;
+      sms_schedule (dump_file);
+      close_dump_file (DFI_sms, print_rtl, get_insns ());
+
+
+      /* Update the life information, becuase we add pseudos.  */
+      max_regno = max_reg_num ();
+      allocate_reg_info (max_regno, FALSE, FALSE);
+      update_life_info_in_dirty_blocks (UPDATE_LIFE_GLOBAL_RM_NOTES,
+					(PROP_DEATH_NOTES
+					 | PROP_KILL_DEAD_CODE
+					 | PROP_SCAN_DEAD_CODE));
+      no_new_pseudos = 1;
+    }
+  timevar_pop (TV_SMS);
   timevar_push (TV_SCHED);
 
   /* Print function header into sched dump now
@@ -1004,20 +1030,6 @@ rest_of_handle_jump_bypass (tree decl, rtx insns)
 #endif
 }
 
-/* Try to identify useless null pointer tests and delete them.  */
-static void
-rest_of_handle_null_pointer (tree decl, rtx insns)
-{
-  open_dump_file (DFI_null, decl);
-  if (dump_file)
-    dump_flow_info (dump_file);
-
-  if (delete_null_pointer_checks (insns))
-    cleanup_cfg (CLEANUP_EXPENSIVE | CLEANUP_PRE_LOOP);
-
-  close_dump_file (DFI_null, print_rtl_with_bb, insns);
-}
-
 /* Try combining insns through substitution.  */
 static void
 rest_of_handle_combine (tree decl, rtx insns)
@@ -1058,7 +1070,7 @@ rest_of_handle_life (tree decl, rtx insns)
 #ifdef ENABLE_CHECKING
   verify_flow_info ();
 #endif
-  life_analysis (insns, dump_file, PROP_FINAL);
+  life_analysis (dump_file, PROP_FINAL);
   if (optimize)
     cleanup_cfg ((optimize ? CLEANUP_EXPENSIVE : 0) | CLEANUP_UPDATE_LIFE
 		 | CLEANUP_LOG_LINKS
@@ -1120,19 +1132,6 @@ rest_of_handle_cse (tree decl, rtx insns)
 
   if (tem || optimize > 1)
     cleanup_cfg (CLEANUP_EXPENSIVE | CLEANUP_PRE_LOOP);
-  /* Try to identify useless null pointer tests and delete them.  */
-  if (flag_delete_null_pointer_checks)
-    {
-      timevar_push (TV_JUMP);
-
-      if (delete_null_pointer_checks (insns))
-	cleanup_cfg (CLEANUP_EXPENSIVE | CLEANUP_PRE_LOOP);
-      timevar_pop (TV_JUMP);
-    }
-
-  /* The second pass of jump optimization is likely to have
-     removed a bunch more instructions.  */
-  renumber_insns (dump_file);
 
   timevar_pop (TV_CSE);
   close_dump_file (DFI_cse, print_rtl_with_bb, insns);
@@ -1250,10 +1249,7 @@ rest_of_handle_loop_optimize (tree decl, rtx insns)
   /* CFG is no longer maintained up-to-date.  */
   free_bb_for_insn ();
 
-  if (flag_unroll_loops)
-    do_unroll = LOOP_AUTO_UNROLL;	/* Having two unrollers is useless.  */
-  else
-    do_unroll = flag_old_unroll_loops ? LOOP_UNROLL : LOOP_AUTO_UNROLL;
+  do_unroll = flag_unroll_loops ? LOOP_UNROLL : LOOP_AUTO_UNROLL;
   do_prefetch = flag_prefetch_loop_arrays ? LOOP_PREFETCH : 0;
 
   if (flag_rerun_loop_opt)
@@ -1275,7 +1271,7 @@ rest_of_handle_loop_optimize (tree decl, rtx insns)
       reg_scan (insns, max_reg_num (), 1);
     }
   cleanup_barriers ();
-  loop_optimize (insns, dump_file, do_unroll | LOOP_BCT | do_prefetch);
+  loop_optimize (insns, dump_file, do_unroll | do_prefetch);
 
   /* Loop can create trivially dead instructions.  */
   delete_trivially_dead_insns (insns, max_reg_num ());
@@ -1289,11 +1285,18 @@ rest_of_handle_loop_optimize (tree decl, rtx insns)
 /* Perform loop optimizations.  It might be better to do them a bit
    sooner, but we want the profile feedback to work more
    efficiently.  */
+
 static void
 rest_of_handle_loop2 (tree decl, rtx insns)
 {
   struct loops *loops;
   basic_block bb;
+
+  if (!flag_unswitch_loops
+      && !flag_peel_loops
+      && !flag_unroll_loops
+      && !flag_branch_on_count_reg)
+    return;
 
   timevar_push (TV_LOOP);
   open_dump_file (DFI_loop2, decl);
@@ -1308,6 +1311,8 @@ rest_of_handle_loop2 (tree decl, rtx insns)
   if (loops)
     {
       /* The optimizations:  */
+      move_loop_invariants (loops);
+
       if (flag_unswitch_loops)
 	unswitch_loops (loops);
 
@@ -1316,6 +1321,11 @@ rest_of_handle_loop2 (tree decl, rtx insns)
 			       (flag_peel_loops ? UAP_PEEL : 0) |
 			       (flag_unroll_loops ? UAP_UNROLL : 0) |
 			       (flag_unroll_all_loops ? UAP_UNROLL_ALL : 0));
+
+#ifdef HAVE_doloop_end
+      if (flag_branch_on_count_reg && HAVE_doloop_end)
+	doloop_optimize_loops (loops);
+#endif /* HAVE_doloop_end */
 
       loop_optimizer_finalize (loops, dump_file);
     }
@@ -1376,6 +1386,10 @@ rest_of_compilation (tree decl)
     finalize_block_changes ();
 
   init_flow ();
+
+  /* Dump the rtl code if we are dumping rtl.  */
+  if (open_dump_file (DFI_rtl, decl))
+    close_dump_file (DFI_rtl, print_rtl, get_insns ());
 
   /* Convert from NOTE_INSN_EH_REGION style notes, and do other
      sorts of eh initialization.  Delay this until after the
@@ -1485,7 +1499,7 @@ rest_of_compilation (tree decl)
 
 #ifdef SETJMP_VIA_SAVE_AREA
   /* This must be performed before virtual register instantiation.
-     Please be aware the everything in the compiler that can look
+     Please be aware that everything in the compiler that can look
      at the RTL up to this point must understand that REG_SAVE_AREA
      is just like a use of the REG contained inside.  */
   if (current_function_calls_alloca)
@@ -1531,9 +1545,6 @@ rest_of_compilation (tree decl)
 
   if (optimize)
     cleanup_cfg (CLEANUP_EXPENSIVE | CLEANUP_PRE_LOOP);
-
-  if (flag_delete_null_pointer_checks)
-    rest_of_handle_null_pointer (decl, insns);
 
   /* Jump optimization, and the removal of NULL pointer checks, may
      have reduced the number of instructions substantially.  CSE, and
@@ -1595,9 +1606,7 @@ rest_of_compilation (tree decl)
     rest_of_handle_tracer (decl, insns);
 
   if (optimize > 0
-      && (flag_unswitch_loops
-	  || flag_peel_loops
-	  || flag_unroll_loops))
+      && flag_loop_optimize2)
     rest_of_handle_loop2 (decl, insns);
 
   if (flag_web)
@@ -1615,6 +1624,22 @@ rest_of_compilation (tree decl)
 
   if (flag_if_conversion)
     rest_of_handle_if_after_combine (decl, insns);
+
+  /* The optimization to partition hot/cold basic blocks into separate
+     sections of the .o file does not work well with exception handling.
+     Don't call it if there are exceptions. */
+
+  /* APPLE LOCAL begin hot/cold partitioning --ctice */
+  if (flag_reorder_blocks_and_partition)
+  /* APPLE LOCAL end hot/cold partitioning --ctice */
+    {
+      no_new_pseudos = 0;
+      partition_hot_cold_basic_blocks ();
+      allocate_reg_life_data ();
+      update_life_info (NULL, UPDATE_LIFE_GLOBAL_RM_NOTES, 
+			PROP_LOG_LINKS | PROP_REG_INFO | PROP_DEATH_NOTES);
+      no_new_pseudos = 1;
+    }
 
   if (optimize > 0 && (flag_regmove || flag_expensive_optimizations))
     rest_of_handle_regmove (decl, insns);
@@ -1700,7 +1725,7 @@ rest_of_compilation (tree decl)
       {
 	open_dump_file (DFI_branch_target_load, decl);
 
-	branch_target_load_optimize (insns, false);
+	branch_target_load_optimize (/*after_prologue_epilogue_gen=*/false);
 
 	close_dump_file (DFI_branch_target_load, print_rtl_with_bb, insns);
 
@@ -1719,7 +1744,7 @@ rest_of_compilation (tree decl)
 
   if (optimize)
     {
-      life_analysis (insns, dump_file, PROP_POSTRELOAD);
+      life_analysis (dump_file, PROP_POSTRELOAD);
       cleanup_cfg (CLEANUP_EXPENSIVE | CLEANUP_UPDATE_LIFE
 		   | (flag_crossjumping ? CLEANUP_CROSSJUMP : 0));
 
@@ -1789,7 +1814,7 @@ rest_of_compilation (tree decl)
 
       open_dump_file (DFI_branch_target_load, decl);
 
-      branch_target_load_optimize (insns, true);
+      branch_target_load_optimize (/*after_prologue_epilogue_gen=*/true);
 
       close_dump_file (DFI_branch_target_load, print_rtl_with_bb, insns);
 
@@ -1891,12 +1916,12 @@ rest_of_compilation (tree decl)
   /* Show no temporary slots allocated.  */
   init_temp_slots ();
 
-  free_basic_block_vars (0);
+  free_basic_block_vars ();
   free_bb_for_insn ();
 
   timevar_pop (TV_FINAL);
 
-  if ((*targetm.binds_local_p) (current_function_decl))
+  if (targetm.binds_local_p (current_function_decl))
     {
       int pref = cfun->preferred_stack_boundary;
       if (cfun->recursive_call_emit
@@ -1920,18 +1945,17 @@ rest_of_compilation (tree decl)
   /* We're done with this function.  Free up memory if we can.  */
   free_after_parsing (cfun);
 
+  ggc_collect ();
+
   timevar_pop (TV_REST_OF_COMPILATION);
 }
 
 void
 init_optimization_passes (void)
 {
-  if (flag_unit_at_a_time)
-    {
-      open_dump_file (DFI_cgraph, NULL);
-      cgraph_dump_file = dump_file;
-      dump_file = NULL;
-    }
+  open_dump_file (DFI_cgraph, NULL);
+  cgraph_dump_file = dump_file;
+  dump_file = NULL;
 }
 
 void
@@ -1956,12 +1980,9 @@ finish_optimization_passes (void)
       timevar_pop (TV_DUMP);
     }
 
-  if (flag_unit_at_a_time)
-    {
-      dump_file = cgraph_dump_file;
-      cgraph_dump_file = NULL;
-      close_dump_file (DFI_cgraph, NULL, NULL_RTX);
-    }
+  dump_file = cgraph_dump_file;
+  cgraph_dump_file = NULL;
+  close_dump_file (DFI_cgraph, NULL, NULL_RTX);
 
   /* Do whatever is necessary to finish printing the graphs.  */
   if (graph_dump_format != no_graph)

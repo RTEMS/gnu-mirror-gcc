@@ -38,6 +38,14 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "output.h"
 #include "toplev.h"
 
+/* APPLE LOCAL begin rewrite weight computation */
+/* The rewritten weight computation works fine on Darwin, but causes
+   bootstrap compares to fail on Linux.  */
+#ifdef CONFIG_DARWIN_H
+#define REWRITE_WEIGHT_COMPUTATION
+#endif
+/* APPLE LOCAL end rewrite weight computation */
+
 /* This pass of the compiler performs global register allocation.
    It assigns hard register numbers to all the pseudo registers
    that were not handled in local_alloc.  Assignments are recorded
@@ -226,6 +234,18 @@ static HARD_REG_SET regs_used_so_far;
 
 static int local_reg_n_refs[FIRST_PSEUDO_REGISTER];
 
+/* APPLE LOCAL begin rewrite weight computation */
+#ifdef REWRITE_WEIGHT_COMPUTATION
+/* Overall weight of each hard reg, as used by local alloc.
+   This was formerly computed once as 
+   SUM(REG_FREQ(i))/SUM(REG_LIVE_LENGTH(i)) where the sums
+   are computed over all uses.  But that computation produces very
+   wrong answers when a reg is used both inside and outside a loop.
+   Now it is computed as
+   SUM (REG_FREQ(i)/REG_LIVE_LENGTH(i)) over all uses. */
+
+static double local_reg_weight[FIRST_PSEUDO_REGISTER];
+#else
 /* Frequency of uses of given hard reg.  */
 static int local_reg_freq[FIRST_PSEUDO_REGISTER];
 
@@ -233,6 +253,8 @@ static int local_reg_freq[FIRST_PSEUDO_REGISTER];
    This is actually the sum of the live lengths of the specific regs.  */
 
 static int local_reg_live_length[FIRST_PSEUDO_REGISTER];
+#endif /* REWRITE_WEIGHT_COMPUTATION */
+/* APPLE LOCAL end rewrite weight computation */
 
 /* Set to 1 a bit in a vector TABLE of HARD_REG_SETs, for vector
    element I, and hard register number J.  */
@@ -306,7 +328,18 @@ static void set_preference (rtx, rtx);
 static void dump_conflicts (FILE *);
 static void reg_becomes_live (rtx, rtx, void *);
 static void reg_dies (int, enum machine_mode, struct insn_chain *);
+
+static void allocate_bb_info (void);
+static void free_bb_info (void);
+static void calculate_local_reg_bb_info (void);
+static void set_up_bb_rts_numbers (void);
+static int rpost_cmp (const void *, const void *);
+static bool modify_bb_reg_pav (basic_block, basic_block, bool);
+static void calculate_reg_pav (void);
+static void make_accurate_live_analysis (void);
+
 
+
 /* Perform allocation of pseudo-registers not allocated by local_alloc.
    FILE is a file to output debugging information on,
    or zero if such output is not desired.
@@ -328,6 +361,8 @@ global_alloc (FILE *file)
 
   size_t i;
   rtx x;
+
+  make_accurate_live_analysis ();
 
   max_allocno = 0;
 
@@ -478,9 +513,17 @@ global_alloc (FILE *file)
   /* Calculate amount of usage of each hard reg by pseudos
      allocated by local-alloc.  This is to see if we want to
      override it.  */
+  /* APPLE LOCAL begin rewrite weight computation */
+#ifndef REWRITE_WEIGHT_COMPUTATION
   memset (local_reg_live_length, 0, sizeof local_reg_live_length);
+#endif /* REWRITE_WEIGHT_COMPUTATION */
   memset (local_reg_n_refs, 0, sizeof local_reg_n_refs);
+#ifdef REWRITE_WEIGHT_COMPUTATION
+  memset (local_reg_weight, 0, sizeof local_reg_weight);
+#else
   memset (local_reg_freq, 0, sizeof local_reg_freq);
+#endif /* REWRITE_WEIGHT_COMPUTATION */
+  /* APPLE LOCAL end rewrite weight computation */
   for (i = FIRST_PSEUDO_REGISTER; i < (size_t) max_regno; i++)
     if (reg_renumber[i] >= 0)
       {
@@ -491,15 +534,29 @@ global_alloc (FILE *file)
 	for (j = regno; j < endregno; j++)
 	  {
 	    local_reg_n_refs[j] += REG_N_REFS (i);
+	    /* APPLE LOCAL begin rewrite weight computation */
+#ifdef REWRITE_WEIGHT_COMPUTATION
+	    if ( REG_LIVE_LENGTH (i) > 0 )
+	      local_reg_weight[j] += (double)REG_FREQ (i) 
+				    / (double) REG_LIVE_LENGTH (i);
+#else
 	    local_reg_freq[j] += REG_FREQ (i);
 	    local_reg_live_length[j] += REG_LIVE_LENGTH (i);
+#endif /* REWRITE_WEIGHT_COMPUTATION */
+	    /* APPLE LOCAL end rewrite weight computation */
 	  }
       }
 
   /* We can't override local-alloc for a reg used not just by local-alloc.  */
   for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
     if (regs_ever_live[i])
+      /* APPLE LOCAL begin rewrite weight computation */
+#ifdef REWRITE_WEIGHT_COMPUTATION
+      local_reg_n_refs[i] = 0;
+#else
       local_reg_n_refs[i] = 0, local_reg_freq[i] = 0;
+#endif /* REWRITE_WEIGHT_COMPUTATION */
+      /* APPLE LOCAL end rewrite weight computation */
 
   allocno_row_words = (max_allocno + INT_BITS - 1) / INT_BITS;
 
@@ -1249,6 +1306,15 @@ find_reg (int num, HARD_REG_SET losers, int alt_regs_p, int accept_call_clobbere
 #endif
 	      )
 	    {
+	      /* APPLE LOCAL begin rewrite weight computation */
+#ifdef REWRITE_WEIGHT_COMPUTATION
+	      /* We explicitly evaluate the divide result into a temporary
+		 variable so as to avoid excess precision problems that occur
+		 on an i386-unknown-sysv4.2 (unixware) host.  */
+	      double tmp = ((double) allocno[num].freq
+			    / allocno[num].live_length);
+#else
+	    /* APPLE LOCAL end rewrite weight computation */
 	      /* We explicitly evaluate the divide results into temporary
 		 variables so as to avoid excess precision problems that occur
 		 on an i386-unknown-sysv4.2 (unixware) host.  */
@@ -1257,8 +1323,15 @@ find_reg (int num, HARD_REG_SET losers, int alt_regs_p, int accept_call_clobbere
 			    / local_reg_live_length[regno]);
 	      double tmp2 = ((double) allocno[num].freq
 			     / allocno[num].live_length);
+	      /* APPLE LOCAL begin rewrite weight computation */
+#endif /* REWRITE_WEIGHT_COMPUTATION */
 
+#ifdef REWRITE_WEIGHT_COMPUTATION
+	      if (local_reg_weight[regno] < tmp)
+#else
 	      if (tmp1 < tmp2)
+#endif /* REWRITE_WEIGHT_COMPUTATION */
+		/* APPLE LOCAL end rewrite weight computation */
 		{
 		  /* Hard reg REGNO was used less in total by local regs
 		     than it would be used by this one allocno!  */
@@ -1305,7 +1378,11 @@ find_reg (int num, HARD_REG_SET losers, int alt_regs_p, int accept_call_clobbere
 	  SET_HARD_REG_BIT (regs_used_so_far, j);
 	  /* This is no longer a reg used just by local regs.  */
 	  local_reg_n_refs[j] = 0;
+	  /* APPLE LOCAL begin rewrite weight computation */
+#ifndef REWRITE_WEIGHT_COMPUTATION
 	  local_reg_freq[j] = 0;
+#endif /* REWRITE_WEIGHT_COMPUTATION */
+	  /* APPLE LOCAL end rewrite weight computation */
 	}
       /* For each other pseudo-reg conflicting with this one,
 	 mark it as conflicting with the hard regs this one occupies.  */
@@ -1377,18 +1454,7 @@ record_one_conflict (int regno)
 
       IOR_HARD_REG_SET (allocno[ialloc].hard_reg_conflicts, hard_regs_live);
       for (j = allocno_row_words - 1; j >= 0; j--)
-	{
-#if 0
-	  int k;
-	  for (k = 0; k < n_no_conflict_pairs; k++)
-	    if (! ((j == no_conflict_pairs[k].allocno1
-		    && ialloc == no_conflict_pairs[k].allocno2)
-		   ||
-		   (j == no_conflict_pairs[k].allocno2
-		    && ialloc == no_conflict_pairs[k].allocno1)))
-#endif /* 0 */
-	      conflicts[ialloc_prod + j] |= allocnos_live[j];
-	}
+	conflicts[ialloc_prod + j] |= allocnos_live[j];
     }
 }
 
@@ -1503,7 +1569,7 @@ mark_reg_store (rtx reg, rtx setter, void *data ATTRIBUTE_UNUSED)
 /* Like mark_reg_set except notice just CLOBBERs; ignore SETs.  */
 
 static void
-mark_reg_clobber (rtx reg, rtx setter, void *data ATTRIBUTE_UNUSED)
+mark_reg_clobber (rtx reg, rtx setter, void *data)
 {
   if (GET_CODE (setter) == CLOBBER)
     mark_reg_store (reg, setter, data);
@@ -1972,4 +2038,265 @@ dump_global_regs (FILE *file)
     if (regs_ever_live[i])
       fprintf (file, " %d", i);
   fprintf (file, "\n\n");
+}
+
+
+
+/* This page contains code to make live information more accurate.
+   The accurate register liveness at program point P means:
+     o there is a path from P to usage of the register and the
+       register is not redefined or killed on the path.
+     o register at P is partially available, i.e. there is a path from
+       a register definition to the point P and the register is not
+       killed (clobbered) on the path
+
+   The standard GCC live information means only the first condition.
+   Without the partial availability, there will be more register
+   conflicts and as a consequence worse register allocation.  The
+   typical example where the information can be different is a
+   register initialized in the loop at the basic block preceding the
+   loop in CFG. */
+
+/* The following structure contains basic block data flow information
+   used to calculate partial availability of registers.  */
+
+struct bb_info
+{
+  /* The basic block reverse post-order number.  */
+  int rts_number;
+  /* Registers correspondingly killed (clobbered) and defined but not
+     killed afterward in the basic block.  */
+  bitmap killed, avloc;
+  /* Registers partially available correspondingly at the start and
+     end of the basic block.  */
+  bitmap pavin, pavout;
+};
+
+/* Macros for accessing data flow information of basic blocks.  */
+
+#define BB_INFO(BB) ((struct bb_info *) (BB)->aux)
+#define BB_INFO_BY_INDEX(N) BB_INFO (BASIC_BLOCK(N))
+
+/* The function allocates the info structures of each basic block.  It
+   also initialized PAVIN and PAVOUT as if all hard registers were
+   partially available.  */
+
+static void
+allocate_bb_info (void)
+{
+  int i;
+  basic_block bb;
+  struct bb_info *bb_info;
+  bitmap init;
+
+  alloc_aux_for_blocks (sizeof (struct bb_info));
+  init = BITMAP_XMALLOC ();
+  for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+    bitmap_set_bit (init, i);
+  FOR_EACH_BB (bb)
+    {
+      bb_info = bb->aux;
+      bb_info->avloc = BITMAP_XMALLOC ();
+      bb_info->killed = BITMAP_XMALLOC ();
+      bb_info->pavin = BITMAP_XMALLOC ();
+      bb_info->pavout = BITMAP_XMALLOC ();
+      bitmap_copy (bb_info->pavin, init);
+      bitmap_copy (bb_info->pavout, init);
+    }
+  BITMAP_XFREE (init);
+}
+
+/* The function frees the allocated info of all basic blocks.  */
+
+static void
+free_bb_info (void)
+{
+  basic_block bb;
+  struct bb_info *bb_info;
+
+  FOR_EACH_BB (bb)
+    {
+      bb_info = BB_INFO (bb);
+      BITMAP_XFREE (bb_info->pavout);
+      BITMAP_XFREE (bb_info->pavin);
+      BITMAP_XFREE (bb_info->killed);
+      BITMAP_XFREE (bb_info->avloc);
+    }
+  free_aux_for_blocks ();
+}
+
+/* The function modifies local info for register REG being changed in
+   SETTER.  DATA is used to pass the current basic block info.  */
+
+static void
+mark_reg_change (rtx reg, rtx setter, void *data)
+{
+  int regno;
+  basic_block bb = data;
+  struct bb_info *bb_info = BB_INFO (bb);
+
+  if (GET_CODE (reg) == SUBREG)
+    reg = SUBREG_REG (reg);
+
+  if (GET_CODE (reg) != REG)
+    return;
+
+  regno = REGNO (reg);
+  bitmap_set_bit (bb_info->killed, regno);
+  
+  if (GET_CODE (setter) != CLOBBER)
+    bitmap_set_bit (bb_info->avloc, regno);
+  else
+    bitmap_clear_bit (bb_info->avloc, regno);
+}
+
+/* The function calculates local info for each basic block.  */
+
+static void
+calculate_local_reg_bb_info (void)
+{
+  basic_block bb;
+  rtx insn, bound;
+
+  FOR_EACH_BB (bb)
+    {
+      bound = NEXT_INSN (BB_END (bb));
+      for (insn = BB_HEAD (bb); insn != bound; insn = NEXT_INSN (insn))
+	if (INSN_P (insn))
+	  note_stores (PATTERN (insn), mark_reg_change, bb);
+    }
+}
+
+/* The function sets up reverse post-order number of each basic
+   block.  */
+
+static void
+set_up_bb_rts_numbers (void)
+{
+  int i;
+  int *rts_order;
+  
+  rts_order = xmalloc (sizeof (int) * n_basic_blocks);
+  flow_reverse_top_sort_order_compute (rts_order);
+  for (i = 0; i < n_basic_blocks; i++)
+    BB_INFO_BY_INDEX (rts_order [i])->rts_number = i;
+  free (rts_order);
+}
+
+/* Compare function for sorting blocks in reverse postorder.  */
+
+static int
+rpost_cmp (const void *bb1, const void *bb2)
+{
+  basic_block b1 = *(basic_block *) bb1, b2 = *(basic_block *) bb2;
+
+  return BB_INFO (b2)->rts_number - BB_INFO (b1)->rts_number;
+}
+
+/* The function calculates partial availability of registers.  The
+   function calculates partial availability at the end of basic block
+   BB by propagating partial availability at end of predecessor basic
+   block PRED.  The function returns true if the partial availability
+   at the end of BB has been changed or if CHANGED_P.  We have the
+   following equations:
+
+     bb.pavin = empty for entry block | union (pavout of predecessors)
+     bb.pavout = union (bb.pavin - b.killed, bb.avloc)  */
+
+static bool
+modify_bb_reg_pav (basic_block bb, basic_block pred, bool changed_p)
+{
+  struct bb_info *bb_info;
+  bitmap bb_pavin, bb_pavout;
+
+  bb_info = BB_INFO (bb);
+  bb_pavin = bb_info->pavin;
+  bb_pavout = bb_info->pavout;
+  if (pred->index != ENTRY_BLOCK)
+    bitmap_a_or_b (bb_pavin, bb_pavin, BB_INFO (pred)->pavout);
+  changed_p |= bitmap_union_of_diff (bb_pavout, bb_info->avloc,
+				     bb_pavin, bb_info->killed);
+  return changed_p;
+}
+
+/* The function calculates partial register availability.  */
+
+static void
+calculate_reg_pav (void)
+{
+  basic_block bb, succ;
+  edge e;
+  bool changed_p;
+  int i, nel;
+  varray_type bbs, new_bbs, temp;
+  basic_block *bb_array;
+  sbitmap wset;
+
+  VARRAY_BB_INIT (bbs, n_basic_blocks, "basic blocks");
+  VARRAY_BB_INIT (new_bbs, n_basic_blocks, "basic blocks for the next iter.");
+  FOR_EACH_BB (bb)
+    {
+      VARRAY_PUSH_BB (bbs, bb);
+    }
+  wset = sbitmap_alloc (n_basic_blocks + 1);
+  while (VARRAY_ACTIVE_SIZE (bbs))
+    {
+      bb_array = &VARRAY_BB (bbs, 0);
+      nel = VARRAY_ACTIVE_SIZE (bbs);
+      qsort (bb_array, nel, sizeof (basic_block), rpost_cmp);
+      sbitmap_zero (wset);
+      for (i = 0; i < nel; i++)
+	{
+	  bb = bb_array [i];
+	  changed_p = 0;
+	  for (e = bb->pred; e; e = e->pred_next)
+	    changed_p = modify_bb_reg_pav (bb, e->src, changed_p);
+	  if (changed_p)
+	    for (e = bb->succ; e; e = e->succ_next)
+	      {
+		succ = e->dest;
+		if (succ->index != EXIT_BLOCK && !TEST_BIT (wset, succ->index))
+		  {
+		    SET_BIT (wset, succ->index);
+		    VARRAY_PUSH_BB (new_bbs, succ);
+		  }
+	      }
+	}
+      temp = bbs;
+      bbs = new_bbs;
+      new_bbs = temp;
+      VARRAY_POP_ALL (new_bbs);
+    }
+  sbitmap_free (wset);
+}
+
+/* The following function makes live information more accurate by
+   modifying global_live_at_start and global_live_at_end of basic
+   blocks.  After the function call a register lives at a program
+   point only if it is initialized on a path from CFG entry to the
+   program point.  The standard GCC life analysis permits registers to
+   live uninitialized. */
+
+static void
+make_accurate_live_analysis (void)
+{
+  basic_block bb;
+  struct bb_info *bb_info;
+
+  max_regno = max_reg_num ();
+  compact_blocks ();
+  allocate_bb_info ();
+  calculate_local_reg_bb_info ();
+  set_up_bb_rts_numbers ();
+  calculate_reg_pav ();
+  FOR_EACH_BB (bb)
+    {
+      bb_info = BB_INFO (bb);
+      
+      bitmap_a_and_b (bb->global_live_at_start, bb->global_live_at_start,
+		      bb_info->pavin);
+      bitmap_a_and_b (bb->global_live_at_end, bb->global_live_at_end,
+		      bb_info->pavout);
+    }
+  free_bb_info ();
 }

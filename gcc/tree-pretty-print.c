@@ -30,6 +30,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "hashtab.h"
 #include "tree-flow.h"
 #include "langhooks.h"
+#include "tree-fold-const.h"
+#include "tree-chrec.h"
 #include "tree-iterator.h"
 
 /* Local functions, macros and variables.  */
@@ -42,7 +44,7 @@ static void maybe_init_pretty_print (FILE *);
 static void print_declaration (pretty_printer *, tree, int, int);
 static void print_struct_decl (pretty_printer *, tree, int, int);
 static void do_niy (pretty_printer *, tree);
-static void dump_vops (pretty_printer *, tree, int);
+static void dump_vops (pretty_printer *, tree, int, int);
 static void dump_generic_bb_buff (pretty_printer *, basic_block, int, int);
 
 #define INDENT(SPACE) do { \
@@ -52,8 +54,8 @@ static void dump_generic_bb_buff (pretty_printer *, basic_block, int, int);
 
 #define PRINT_FUNCTION_NAME(NODE)  pp_printf             \
   (buffer, "%s", TREE_CODE (NODE) == NOP_EXPR ?              \
-   (*lang_hooks.decl_printable_name) (TREE_OPERAND (NODE, 0), 1) : \
-   (*lang_hooks.decl_printable_name) (NODE, 1))
+   lang_hooks.decl_printable_name (TREE_OPERAND (NODE, 0), 1) : \
+   lang_hooks.decl_printable_name (NODE, 1))
 
 #define MASK_POINTER(P)	((unsigned)((unsigned long)(P) & 0xffff))
 
@@ -193,11 +195,11 @@ dump_generic_node (pretty_printer *buffer, tree node, int spc, int flags,
       && is_gimple_stmt (node)
       && (flags & TDF_VOPS)
       && stmt_ann (node))
-    dump_vops (buffer, node, spc);
+    dump_vops (buffer, node, spc, flags);
 
   if (dumping_stmts
       && (flags & TDF_LINENO)
-      && EXPR_LOCUS (node))
+      && EXPR_HAS_LOCATION (node))
     {
       pp_character (buffer, '[');
       if (EXPR_FILENAME (node))
@@ -868,10 +870,6 @@ dump_generic_node (pretty_printer *buffer, tree node, int spc, int flags,
       NIY;
       break;
 
-    case WITH_RECORD_EXPR:
-      NIY;
-      break;
-
       /* Binary arithmetic and logic expressions.  */
     case MULT_EXPR:
     case PLUS_EXPR:
@@ -1472,6 +1470,54 @@ dump_generic_node (pretty_printer *buffer, tree node, int spc, int flags,
       pp_decimal_int (buffer, SSA_NAME_VERSION (node));
       break;
 
+    case POLYNOMIAL_CHREC:
+      pp_string (buffer, "{");
+      dump_generic_node (buffer, CHREC_LEFT (node), spc, flags, false);
+      pp_string (buffer, ", +, ");
+      dump_generic_node (buffer, CHREC_RIGHT (node), spc, flags, false);
+      pp_string (buffer, "}_");
+      dump_generic_node (buffer, CHREC_VAR (node), spc, flags, false);
+      is_stmt = false;
+      break;
+
+    case EXPONENTIAL_CHREC:
+      pp_string (buffer, "{");
+      dump_generic_node (buffer, CHREC_LEFT (node), spc, flags, false);
+      pp_string (buffer, ", *, ");
+      dump_generic_node (buffer, CHREC_RIGHT (node), spc, flags, false);
+      pp_string (buffer, "}_");
+      dump_generic_node (buffer, CHREC_VAR (node), spc, flags, false);
+      is_stmt = false;
+      break;
+      
+    case PEELED_CHREC:
+      pp_string (buffer, "(");
+      dump_generic_node (buffer, CHREC_LEFT (node), spc, flags, false);
+      pp_string (buffer, ", ");
+      dump_generic_node (buffer, CHREC_RIGHT (node), spc, flags, false);
+      pp_string (buffer, ")_");
+      dump_generic_node (buffer, CHREC_VAR (node), spc, flags, false);
+      is_stmt = false;
+      break;
+
+    case INTERVAL_CHREC:
+      if (node == chrec_top)
+	pp_string (buffer, "[-oo, +oo]");
+      else if (node == chrec_bot)
+	pp_string (buffer, "[+oo, -oo]");
+      else if (node == chrec_not_analyzed_yet)
+	pp_string (buffer, "not_analyzed_yet");
+      else
+	{
+	  pp_string (buffer, "[");
+	  dump_generic_node (buffer, CHREC_LOW (node), spc, flags, false);
+	  pp_string (buffer, ", ");
+	  dump_generic_node (buffer, CHREC_UP (node), spc, flags, false);
+	  pp_string (buffer, "]");
+	}
+      is_stmt = false;
+      break;
+      
     default:
       NIY;
     }
@@ -2045,7 +2091,7 @@ newline_and_indent (pretty_printer *buffer, int spc)
 }
 
 static void
-dump_vops (pretty_printer *buffer, tree stmt, int spc)
+dump_vops (pretty_printer *buffer, tree stmt, int spc, int flags)
 {
   size_t i;
   stmt_ann_t ann = stmt_ann (stmt);
@@ -2055,9 +2101,9 @@ dump_vops (pretty_printer *buffer, tree stmt, int spc)
   for (i = 0; i < NUM_VDEFS (vdefs); i++)
     {
       pp_string (buffer, "#   ");
-      dump_generic_node (buffer, VDEF_RESULT (vdefs, i), spc + 2, 0, false);
+      dump_generic_node (buffer, VDEF_RESULT (vdefs, i), spc + 2, flags, false);
       pp_string (buffer, " = VDEF <");
-      dump_generic_node (buffer, VDEF_OP (vdefs, i), spc + 2, 0, false);
+      dump_generic_node (buffer, VDEF_OP (vdefs, i), spc + 2, flags, false);
       pp_string (buffer, ">;");
       newline_and_indent (buffer, spc);
     }
@@ -2066,7 +2112,7 @@ dump_vops (pretty_printer *buffer, tree stmt, int spc)
     {
       tree vuse = VUSE_OP (vuses, i);
       pp_string (buffer, "#   VUSE <");
-      dump_generic_node (buffer, vuse, spc + 2, 0, false);
+      dump_generic_node (buffer, vuse, spc + 2, flags, false);
       pp_string (buffer, ">;");
       newline_and_indent (buffer, spc);
     }

@@ -26,6 +26,27 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "cpplib.h"
 #include "ggc.h"
 
+/* APPLE LOCAL begin CW asm blocks */
+/* We use a small state machine to inform the lexer when to start
+   returning tokens marking the beginning of each asm line.  */
+enum cw_asm_states {
+  /* Normal code.  */
+  cw_asm_none,
+  /* '{' of asm block seen, decls may appear.  */
+  cw_asm_decls,
+  /* No more decls, in asm block proper, '}' not seen yet.  */
+  cw_asm_asm
+};
+
+extern enum cw_asm_states cw_asm_state;
+extern int cw_asm_in_decl;
+extern int cw_asm_block;
+extern int cw_asm_at_bol;
+extern int cw_asm_in_operands;
+extern int cw_asm_labelno;
+extern int cw_asm_lineno;
+/* APPLE LOCAL end CW asm blocks */
+
 /* Usage of TREE_LANG_FLAG_?:
    0: COMPOUND_STMT_NO_SCOPE (in COMPOUND_STMT).
       TREE_NEGATED_INT (in INTEGER_CST).
@@ -37,7 +58,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
       STMT_EXPR_NO_SCOPE (in STMT_EXPR)
    1: C_DECLARED_LABEL_FLAG (in LABEL_DECL)
       STMT_IS_FULL_EXPR_P (in _STMT)
-   2: STMT_LINENO_FOR_FN_P (in _STMT)
+   2: unused
    3: SCOPE_NO_CLEANUPS_P (in SCOPE_STMT)
       COMPOUND_STMT_BODY_BLOCK (in COMPOUND_STMT)
    4: SCOPE_PARTIAL_P (in SCOPE_STMT)
@@ -60,6 +81,9 @@ enum rid
 
   /* C extensions */
   RID_COMPLEX, RID_THREAD,
+
+  /* APPLE LOCAL private extern */
+  RID_PRIVATE_EXTERN,
 
   /* C++ */
   RID_FRIEND, RID_VIRTUAL, RID_EXPLICIT, RID_EXPORT, RID_MUTABLE,
@@ -144,6 +168,8 @@ enum c_tree_index
     CTI_WIDEST_UINT_LIT_TYPE,
 
     CTI_CHAR_ARRAY_TYPE,
+    /* APPLE LOCAL Pascal strings 2001-07-05 --zll */
+    CTI_PASCAL_STRING_TYPE,    /* for Pascal strings */
     CTI_WCHAR_ARRAY_TYPE,
     CTI_INT_ARRAY_TYPE,
     CTI_STRING_TYPE,
@@ -155,11 +181,6 @@ enum c_tree_index
     CTI_TRUTHVALUE_FALSE,
 
     CTI_DEFAULT_FUNCTION_TYPE,
-
-    CTI_G77_INTEGER_TYPE,
-    CTI_G77_UINTEGER_TYPE,
-    CTI_G77_LONGINT_TYPE,
-    CTI_G77_ULONGINT_TYPE,
 
     /* These are not types, but we have to look them up all the time.  */
     CTI_FUNCTION_NAME_DECL,
@@ -198,18 +219,14 @@ struct c_common_identifier GTY(())
 #define truthvalue_false_node		c_global_trees[CTI_TRUTHVALUE_FALSE]
 
 #define char_array_type_node		c_global_trees[CTI_CHAR_ARRAY_TYPE]
+/* APPLE LOCAL pascal strings */
+#define pascal_string_type_node 	c_global_trees[CTI_PASCAL_STRING_TYPE]
 #define wchar_array_type_node		c_global_trees[CTI_WCHAR_ARRAY_TYPE]
 #define int_array_type_node		c_global_trees[CTI_INT_ARRAY_TYPE]
 #define string_type_node		c_global_trees[CTI_STRING_TYPE]
 #define const_string_type_node		c_global_trees[CTI_CONST_STRING_TYPE]
 
 #define default_function_type		c_global_trees[CTI_DEFAULT_FUNCTION_TYPE]
-
-/* g77 integer types, which must be kept in sync with f/com.h */
-#define g77_integer_type_node		c_global_trees[CTI_G77_INTEGER_TYPE]
-#define g77_uinteger_type_node		c_global_trees[CTI_G77_UINTEGER_TYPE]
-#define g77_longint_type_node		c_global_trees[CTI_G77_LONGINT_TYPE]
-#define g77_ulongint_type_node		c_global_trees[CTI_G77_ULONGINT_TYPE]
 
 #define function_name_decl_node		c_global_trees[CTI_FUNCTION_NAME_DECL]
 #define pretty_function_name_decl_node	c_global_trees[CTI_PRETTY_FUNCTION_NAME_DECL]
@@ -327,6 +344,8 @@ extern void (*lang_expand_function_end) (void);
    noreturn attribute.  */
 extern int (*lang_missing_noreturn_ok_p) (tree);
 
+extern void push_file_scope (void);
+extern void pop_file_scope (void);
 extern int yyparse (void);
 extern stmt_tree current_stmt_tree (void);
 extern tree *current_scope_stmt_stack (void);
@@ -338,7 +357,6 @@ extern void finish_stmt_tree (tree *);
 
 extern tree walk_stmt_tree (tree *, walk_tree_fn, void *);
 extern void prep_stmt (tree);
-extern void expand_stmt_toplev (tree);
 extern tree c_begin_if_stmt (void);
 extern tree c_begin_while_stmt (void);
 extern void c_finish_while_stmt_cond (tree, tree);
@@ -373,6 +391,13 @@ extern int flag_zero_link;
 extern int flag_replace_objc_classes;
 
 /* Nonzero means don't output line number information.  */
+
+/* APPLE LOCAL begin Symbol Separation */
+/* The directory name where separate debug repository and context
+   available. NULL if Symbol Separation is not used.  */
+extern const char *dbg_dir;
+
+/* APPLE LOCAL end Symbol Separation */
 
 extern char flag_no_line_commands;
 
@@ -428,6 +453,9 @@ extern int flag_ms_extensions;
 /* Nonzero means don't recognize the keyword `asm'.  */
 
 extern int flag_no_asm;
+
+/* APPLE LOCAL CW asm blocks */
+extern int flag_cw_asm_blocks;
 
 /* Nonzero means give string constants the type `const char *', as mandated
    by the standard.  */
@@ -526,6 +554,13 @@ extern int warn_format_nonliteral;
 
 extern int warn_format_security;
 
+
+/* BEGIN APPLE LOCAL disable_typechecking_for_spec_flag */
+/* This makes type conflicts a warning, instead of an error,
+   to work around some problems with SPEC.  */
+
+extern int disable_typechecking_for_spec_flag;
+/* END APPLE LOCAL disable_typechecking_for_spec_flag */
 
 /* C/ObjC language option variables.  */
 
@@ -758,6 +793,68 @@ extern int flag_permissive;
 
 extern int flag_enforce_eh_specs;
 
+/*  The version of the C++ ABI in use.  The following values are
+    allowed:
+
+    APPLE LOCAL begin 10.2 C++ abi compat --mrs
+    -2: 2.95.2  Apple uses for kernel extensions.
+
+    -1: gcc 3.1 20020420.  Apple uses for gcc3 compatible 10.2.
+
+    APPLE LOCAL end 10.2 C++ abi compat --mrs
+    0: The version of the ABI believed most conformant with the 
+       C++ ABI specification.  This ABI may change as bugs are
+       discovered and fixed.  Therefore, 0 will not necessarily
+       indicate the same ABI in different versions of G++.
+
+    1: The version of the ABI first used in G++ 3.2.
+
+    Additional positive integers will be assigned as new versions of
+    the ABI become the default version of the ABI.  */
+
+extern int flag_abi_version;
+
+/* APPLE LOCAL begin -findirect-virtual-calls 2001-10-30 --sts */
+/* Nonzero if all calls to virtual functions should cause indirection
+   through a vtable.  */
+
+extern int flag_indirect_virtual_calls;
+/* APPLE LOCAL end -findirect-virtual-calls 2001-10-30 --sts */
+
+/* APPLE LOCAL begin -fterminated-vtables */
+/* Nonzero to terminate vtables with a unique value, currently zero.
+   Used by the darwin kernel to find ends of vtables for patching
+   when loading drivers dynamically.  */
+
+extern int flag_terminated_vtables;
+/* APPLE LOCAL end -fterminated-vtables */
+
+/* APPLE LOCAL begin 2.95-compatibility stuff --turly */
+/* Nonzero if we're compiling in a gcc2.95-compatibility mode.
+   Implies -fterminated-vtables and -findirect-virtual-calls,
+   only-deleting-destructor support, 2.95 ptmfs, vptr initialisation,
+   constructors-returning-this...  */
+ 
+extern int flag_apple_kext;
+/* APPLE LOCAL end 2.95-compatibility stuff --turly */
+
+/* APPLE LOCAL begin structor thunks */
+/* Nonzero if we prefer to clone con/de/structors.
+   Alternative is to gen multiple tiny thunk-esque things that
+   call/jump to a unified con/de/structor.  This is a classic
+   size/speed tradeoff.  */
+extern int flag_clone_structors;
+/* APPLE LOCAL end structor thunks */
+
+/* APPLE LOCAL begin private extern  Radar 2872481 --ilr */
+/* Nonzero if -fpreprocessed specified.  This is needed by init_reswords()
+   so that it can make __private_extern__ have the same rid code as extern
+   when -fpreprocessed is specified.  Normally there is a -D on the command
+   line for this.  But if -fpreprocessed was specified then macros aren't
+   expanded.  So we fake the token value out using the rid code.  */
+extern int flag_preprocessed;
+/* APPLE LOCAL end private extern  Radar 2872481 --ilr */
+
 /* Nonzero means warn about things that will change when compiling
    with an ABI-compliant compiler.  */
 
@@ -948,6 +1045,10 @@ extern int self_promoting_args_p (tree);
 extern tree strip_array_types (tree);
 extern tree strip_pointer_operator (tree);
 
+/* APPLE LOCAL begin IMA built-in decl merging fix (radar 3645899) */
+extern bool builtin_function_disabled_p (const char *);
+/* APPLE LOCAL end */
+
 /* This function resets the parsers' state in preparation for parsing
    a new file.  */
 extern void c_reset_state (void);
@@ -1075,23 +1176,6 @@ extern void finish_file	(void);
 #define CLEANUP_EXPR(NODE) \
   TREE_OPERAND (CLEANUP_STMT_CHECK (NODE), 1)
 
-/* The filename we are changing to as of this FILE_STMT.  */
-#define FILE_STMT_FILENAME_NODE(NODE) \
-  (TREE_OPERAND (FILE_STMT_CHECK (NODE), 0))
-#define FILE_STMT_FILENAME(NODE) \
-  (IDENTIFIER_POINTER (FILE_STMT_FILENAME_NODE (NODE)))
-
-/* The line-number at which a statement began.  But if
-   STMT_LINENO_FOR_FN_P does holds, then this macro gives the
-   line number for the end of the current function instead.  */
-#define STMT_LINENO(NODE)			\
-  (TREE_COMPLEXITY ((NODE)))
-
-/* If nonzero, the STMT_LINENO for NODE is the line at which the
-   function ended.  */
-#define STMT_LINENO_FOR_FN_P(NODE)		\
-  (TREE_LANG_FLAG_2 ((NODE)))
-
 /* Nonzero if we want the new ISO rules for pushing a new scope for `for'
    initialization variables.  */
 #define NEW_FOR_SCOPE_P(NODE) (TREE_LANG_FLAG_0 (NODE))
@@ -1112,7 +1196,7 @@ enum c_tree_code {
    WHILE_STMT,		DO_STMT,	RETURN_STMT,	\
    BREAK_STMT,		CONTINUE_STMT,	SCOPE_STMT,	\
    SWITCH_STMT,		GOTO_STMT,	LABEL_STMT,	\
-   ASM_STMT,		FILE_STMT,	CASE_LABEL
+   ASM_STMT,		CASE_LABEL
 
 /* TRUE if a code represents a statement.  The front end init
    langhook should take care of initialization of this array.  */
@@ -1199,6 +1283,8 @@ extern tree finish_label_address_expr (tree);
    different implementations.  Used in c-common.c.  */
 extern tree lookup_label (tree);
 
+extern int vector_types_convertible_p (tree t1, tree t2);
+
 extern rtx c_expand_expr (tree, rtx, enum machine_mode, int, rtx *);
 
 extern int c_safe_from_p (rtx, tree);
@@ -1213,7 +1299,7 @@ extern void c_cpp_builtins (cpp_reader *);
 
 /* Positive if an implicit `extern "C"' scope has just been entered;
    negative if such a scope has just been exited.  */
-extern int pending_lang_change;
+extern GTY(()) int pending_lang_change;
 
 /* Information recorded about each file examined during compilation.  */
 
@@ -1228,6 +1314,33 @@ struct c_fileinfo *get_fileinfo (const char *);
 extern void dump_time_statistics (void);
 
 extern bool c_dump_tree (void *, tree);
+
+/* APPLE LOCAL begin Objective-C++  */
+/* The following have been moved here from c-tree.h, since they're needed
+   in the ObjC++ world, too.  */
+extern tree lookup_interface			(tree);
+extern tree is_class_name			(tree);
+extern tree is_id				(tree);
+extern void objc_check_decl			(tree);
+extern int objc_comptypes                 	(tree, tree, int);
+extern tree objc_message_selector		(void);
+extern int recognize_objc_keyword		(void);
+extern tree lookup_objc_ivar			(tree);
+/* APPLE LOCAL end Objective-C++  */
+
+/* APPLE LOCAL begin Symbol Separation */
+extern void dbg_ss_init                         (void);
+extern void c_common_write_context              (void);
+extern void cb_clear_write_symbols              (const char *, unsigned long);
+extern void cb_restore_write_symbols            (void);
+extern void cb_start_symbol_repository          (unsigned int,
+						 const char *,
+						 unsigned long);
+extern void cb_end_symbol_repository            (unsigned int);
+extern int c_valid_cinfo                        (cpp_reader *, 
+						 const char *);
+extern int cb_is_builtin_identifier             (cpp_hashnode *);
+/* APPLE LOCAL end Symbol Separation */
 
 extern int c_gimplify_expr (tree *, tree *, tree *);
 extern tree c_walk_subtrees (tree*, int*, walk_tree_fn, void*, void*);
@@ -1265,10 +1378,29 @@ extern tree lookup_objc_ivar (tree);
 extern void *get_current_scope (void);
 extern void objc_mark_locals_volatile (void *);
 
+/* APPLE LOCAL begin AltiVec */
+/* The following function will convert expressions into
+   vector initializers.  */
+extern tree vector_constructor_from_expr (tree, tree);
+/* APPLE LOCAL end AltiVec */
+
 /* In c-ppoutput.c  */
 extern void init_pp_output (FILE *);
 extern void preprocess_file (cpp_reader *);
 extern void pp_file_change (const struct line_map *);
 extern void pp_dir_change (cpp_reader *, const char *);
+
+/* APPLE LOCAL begin CW asm blocks */
+extern tree cw_asm_stmt (tree, tree);
+extern tree cw_asm_build_register_offset (tree, tree);
+extern tree cw_asm_label (tree, int);
+extern tree get_atsign_identifier (tree);
+extern void clear_cw_asm_labels (void);
+extern tree cw_asm_reg_name (tree);
+extern tree get_cw_asm_label (tree);
+extern tree cw_asm_entry (tree, tree, tree);
+extern int cw_asm_typename_or_reserved (tree);
+extern tree cw_asm_c_build_component_ref (tree, tree);
+/* APPLE LOCAL end CW asm blocks */
 
 #endif /* ! GCC_C_COMMON_H */

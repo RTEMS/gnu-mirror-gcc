@@ -36,7 +36,7 @@ Boston, MA 02111-1307, USA.  */
 #include "function.h"
 #include "diagnostic.h"
 #include "tree-dump.h"
-#include "tree-simple.h"
+#include "tree-gimple.h"
 #include "tree-flow.h"
 #include "tree-inline.h"
 #include "tree-alias-common.h"
@@ -98,7 +98,7 @@ struct alias_info
   /* Array of counters to keep track of how many times each pointer has
      been dereferenced in the program.  This is used by the alias grouping
      heuristic in compute_flow_insensitive_aliasing.  */
-  size_t *num_references;
+  varray_type num_references;
 
   /* Total number of virtual operands that will be needed to represent
      all the aliases of all the pointers found in the program.  */
@@ -369,13 +369,9 @@ init_alias_info (void)
 
   ai = xcalloc (1, sizeof (struct alias_info));
   ai->ssa_names_visited = BITMAP_XMALLOC ();
-  VARRAY_TREE_INIT (ai->processed_ptrs, 20, "processed_ptrs");
+  VARRAY_TREE_INIT (ai->processed_ptrs, 50, "processed_ptrs");
   ai->addresses_needed = BITMAP_XMALLOC ();
-  /* FIXME.  We probably want a hash table here.  This array has to
-     be big enough to hold the existing variables and the memory tags
-     created during alias analysis.  Since we can't create more than 2 tags
-     per pointer, 3 times the number of referenced vars is enough.  */
-  ai->num_references = xcalloc (3 * num_referenced_vars, sizeof (size_t));
+  VARRAY_UINT_INIT (ai->num_references, num_referenced_vars, "num_references");
   ai->written_vars = BITMAP_XMALLOC ();
   ai->dereferenced_ptrs_store = BITMAP_XMALLOC ();
   ai->dereferenced_ptrs_load = BITMAP_XMALLOC ();
@@ -391,9 +387,9 @@ delete_alias_info (struct alias_info *ai)
 {
   size_t i;
 
-  BITMAP_FREE (ai->ssa_names_visited);
+  BITMAP_XFREE (ai->ssa_names_visited);
   ai->processed_ptrs = NULL;
-  BITMAP_FREE (ai->addresses_needed);
+  BITMAP_XFREE (ai->addresses_needed);
 
   for (i = 0; i < ai->num_addressable_vars; i++)
     {
@@ -409,10 +405,10 @@ delete_alias_info (struct alias_info *ai)
     }
   free (ai->pointers);
 
-  free (ai->num_references);
-  BITMAP_FREE (ai->written_vars);
-  BITMAP_FREE (ai->dereferenced_ptrs_store);
-  BITMAP_FREE (ai->dereferenced_ptrs_load);
+  ai->num_references = NULL;
+  BITMAP_XFREE (ai->written_vars);
+  BITMAP_XFREE (ai->dereferenced_ptrs_store);
+  BITMAP_XFREE (ai->dereferenced_ptrs_load);
 
   free (ai);
 }
@@ -587,8 +583,15 @@ compute_points_to_and_addr_escape (struct alias_info *ai)
 	      ssa_name_ann_t ptr_ann;
 	      bool is_store;
 
+	      /* If the operand's variable may be aliased, keep track
+		 of how many times we've referenced it.  This is used
+		 for alias grouping in compute_flow_sensitive_aliasing.
+		 Note that we don't need to grow AI->NUM_REFERENCES
+		 because we are processing regular variables, not
+		 memory tags (the array's initial size is set to
+		 NUM_REFERENCED_VARS).  */
 	      if (may_be_aliased (SSA_NAME_VAR (op)))
-		ai->num_references[v_ann->uid]++;
+		(VARRAY_UINT (ai->num_references, v_ann->uid))++;
 
 	      if (!POINTER_TYPE_P (TREE_TYPE (op)))
 		continue;
@@ -610,8 +613,10 @@ compute_points_to_and_addr_escape (struct alias_info *ai)
 		    ptr_ann->name_mem_tag = get_nmt_for (op);
 
 		  /* Keep track of how many time we've dereferenced each
-		     pointer.  */
-		  ai->num_references[v_ann->uid]++;
+		     pointer.  Again, we don't need to grow
+		     AI->NUM_REFERENCES because we're processing
+		     existing program variables.  */
+		  (VARRAY_UINT (ai->num_references, v_ann->uid))++;
 
 		  /* If this is a store operation, mark OP as being
 		     dereferenced to store, otherwise mark it as being
@@ -648,7 +653,7 @@ compute_points_to_and_addr_escape (struct alias_info *ai)
 	      var_ann_t ann = var_ann (var);
 	      bitmap_set_bit (ai->written_vars, ann->uid);
 	      if (may_be_aliased (var))
-		ai->num_references[ann->uid]++;
+		(VARRAY_UINT (ai->num_references, ann->uid))++;
 	    }
 
 	  /* Mark variables in VDEF operands as being written to.  */
@@ -804,8 +809,10 @@ compute_flow_insensitive_aliasing (struct alias_info *ai)
 	     
 	  if (may_alias_p (p_map->var, p_map->set, var, v_map->set))
 	    {
-	      size_t num_tag_refs = ai->num_references[tag_ann->uid];
-	      size_t num_var_refs = ai->num_references[v_ann->uid];
+	      size_t num_tag_refs, num_var_refs;
+
+	      num_tag_refs = VARRAY_UINT (ai->num_references, tag_ann->uid);
+	      num_var_refs = VARRAY_UINT (ai->num_references, v_ann->uid);
 
 	      /* Add VAR to TAG's may-aliases set.  */
 	      add_may_alias (tag, var);
@@ -870,7 +877,7 @@ group_aliases_into (tree tag, sbitmap tag_aliases, struct alias_info *ai)
 {
   size_t i;
   var_ann_t tag_ann = var_ann (tag);
-  size_t num_tag_refs = ai->num_references[tag_ann->uid];
+  size_t num_tag_refs = VARRAY_UINT (ai->num_references, tag_ann->uid);
 
   EXECUTE_IF_SET_IN_SBITMAP (tag_aliases, 0, i,
     {
@@ -1214,8 +1221,14 @@ setup_pointers_and_addressables (struct alias_info *ai)
 
 	  /* All the dereferences of pointer VAR count as references of
 	     TAG.  Since TAG can be associated with several pointers, add
-	     the dereferences of VAR to the TAG.  */
-	  ai->num_references[t_ann->uid] += ai->num_references[v_ann->uid];
+	     the dereferences of VAR to the TAG.  We may need to grow
+	     AI->NUM_REFERENCES because we have been adding name and
+	     type tags.  */
+	  if (t_ann->uid >= VARRAY_SIZE (ai->num_references))
+	    VARRAY_GROW (ai->num_references, t_ann->uid + 10);
+
+	  VARRAY_UINT (ai->num_references, t_ann->uid)
+	      += VARRAY_UINT (ai->num_references, v_ann->uid);
 	}
     }
 
@@ -1291,7 +1304,25 @@ maybe_create_global_var (struct alias_info *ai)
   n_clobbered = 0;
   EXECUTE_IF_SET_IN_BITMAP (call_clobbered_vars, 0, i, n_clobbered++);
 
-  if (ai->num_calls_found * n_clobbered >= (size_t) GLOBAL_VAR_THRESHOLD)
+  /* Create .GLOBAL_VAR if we have too many call-clobbered variables.
+     We also create .GLOBAL_VAR when there no call-clobbered variables
+     to prevent code motion transformations from re-arranging function
+     calls that may have side effects.  For instance,
+
+     		foo ()
+		{
+		  int a = f ();
+		  g ();
+		  h (a);
+		}
+
+     There are no call-clobbered variables in foo(), so it would be
+     entirely possible for a pass to want to move the call to f()
+     after the call to g().  If f() has side effects, that would be
+     wrong.  Creating .GLOBAL_VAR in this case will insert VDEFs for
+     it and prevent such transformations.  */
+  if (n_clobbered == 0
+      || ai->num_calls_found * n_clobbered >= (size_t) GLOBAL_VAR_THRESHOLD)
     create_global_var ();
 
   /* If the function has calls to clobbering functions and .GLOBAL_VAR has
@@ -1888,7 +1919,7 @@ static void
 dump_alias_stats (FILE *file)
 {
   const char *funcname
-    = (*lang_hooks.decl_printable_name) (current_function_decl, 2);
+    = lang_hooks.decl_printable_name (current_function_decl, 2);
   fprintf (file, "\nAlias statistics for %s\n\n", funcname);
   fprintf (file, "Total alias queries:\t%u\n", alias_stats.alias_queries);
   fprintf (file, "Total alias mayalias results:\t%u\n", 
@@ -1917,7 +1948,7 @@ dump_alias_info (FILE *file)
 {
   size_t i;
   const char *funcname
-    = (*lang_hooks.decl_printable_name) (current_function_decl, 2);
+    = lang_hooks.decl_printable_name (current_function_decl, 2);
 
   fprintf (file, "\nAlias information for %s\n\n", funcname);
 
@@ -2000,7 +2031,7 @@ dump_points_to_info (FILE *file)
   block_stmt_iterator si;
   size_t i;
   const char *fname =
-    (*lang_hooks.decl_printable_name) (current_function_decl, 2);
+    lang_hooks.decl_printable_name (current_function_decl, 2);
 
   fprintf (file, "\n\nPointed-to sets for pointers in %s\n\n", fname);
 
