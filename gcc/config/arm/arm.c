@@ -921,6 +921,10 @@ use_return_insn (iscond)
      consideration.  */
   if (func_type & (ARM_FT_VOLATILE | ARM_FT_NAKED))
     return 0;
+
+  /* So do interrupt functions that use the frame pointer.  */
+  if (IS_INTERRUPT (func_type) && frame_pointer_needed)
+    return 0;
   
   /* As do variadic functions.  */
   if (current_function_pretend_args_size
@@ -5053,7 +5057,14 @@ arm_reload_in_hi (operands)
 	}
     }
 
-  scratch = gen_rtx_REG (SImode, REGNO (operands[2]));
+  /* Operands[2] may overlap operands[0] (though it won't overlap
+     operands[1]), that's why we asked for a DImode reg -- so we can
+     use the bit that does not overlap.  */
+  if (REGNO (operands[2]) == REGNO (operands[0]))
+    scratch = gen_rtx_REG (SImode, REGNO (operands[2]) + 1);
+  else
+    scratch = gen_rtx_REG (SImode, REGNO (operands[2]));
+
   emit_insn (gen_zero_extendqisi2 (scratch,
 				   gen_rtx_MEM (QImode,
 						plus_constant (base,
@@ -7710,7 +7721,7 @@ arm_output_epilogue (really_return)
       if (IS_INTERRUPT (func_type))
 	/* Interrupt handlers will have pushed the
 	   IP onto the stack, so restore it now.  */
-	print_multi_reg (f, "ldmfd\t%r", SP_REGNUM, 1 << IP_REGNUM);
+	print_multi_reg (f, "ldmfd\t%r!", SP_REGNUM, 1 << IP_REGNUM);
     }
   else
     {
@@ -7841,7 +7852,7 @@ arm_output_epilogue (really_return)
 
     default:
       if (frame_pointer_needed)
-	/* If we used the frame pointer then the return adddress
+	/* If we used the frame pointer then the return address
 	   will have been loaded off the stack directly into the
 	   PC, so there is no need to issue a MOV instruction
 	   here.  */
@@ -8149,10 +8160,14 @@ arm_compute_initial_elimination_offset (from, to)
 	  reg_mask = reg_mask & ~ (reg_mask & - reg_mask);
 	}
 
-      if (regs_ever_live[LR_REGNUM]
-	  /* If a stack frame is going to be created, the LR will
-	     be saved as part of that, so we do not need to allow
-	     for it here.  */
+      if ((regs_ever_live[LR_REGNUM]
+	   /* If optimizing for size, then we save the link register if
+	      any other integer register is saved.  This gives a smaller
+	      return sequence.  */
+	   || (optimize_size && call_saved_registers > 0))
+	  /* But if a stack frame is going to be created, the LR will
+	     be saved as part of that, so we do not need to allow for
+	     it here.  */
 	  && ! frame_pointer_needed)
 	call_saved_registers += 4;
 
@@ -8456,18 +8471,19 @@ arm_expand_prologue ()
       RTX_FRAME_RELATED_P (insn) = 1;
     }
 
-  /* If this is an interrupt service routine, and the link register is
-     going to be pushed, subtracting four now will mean that the
-     function return can be done with a single instruction.  */
+  /* If this is an interrupt service routine, and the link register
+     is going to be pushed, and we are not creating a stack frame,
+     (which would involve an extra push of IP and a pop in the epilogue)
+     subtracting four from LR now will mean that the function return
+     can be done with a single instruction.  */
   if ((func_type == ARM_FT_ISR || func_type == ARM_FT_FIQ)
-      && (live_regs_mask & (1 << LR_REGNUM)) != 0)
-    {
-      emit_insn (gen_rtx_SET (SImode, 
-			      gen_rtx_REG (SImode, LR_REGNUM),
-			      gen_rtx_PLUS (SImode,
-				    gen_rtx_REG (SImode, LR_REGNUM),
-				    GEN_INT (-4))));
-    }
+      && (live_regs_mask & (1 << LR_REGNUM)) != 0
+      && ! frame_pointer_needed)
+    emit_insn (gen_rtx_SET (SImode, 
+			    gen_rtx_REG (SImode, LR_REGNUM),
+			    gen_rtx_PLUS (SImode,
+					  gen_rtx_REG (SImode, LR_REGNUM),
+					  GEN_INT (-4))));
 
   if (live_regs_mask)
     {
