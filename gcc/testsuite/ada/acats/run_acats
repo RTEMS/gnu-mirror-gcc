@@ -7,17 +7,41 @@ fi
 
 # Set up environment to use the Ada compiler from the object tree
 
-host_gnatmake=`which gnatmake`
-host_gcc=`which gcc`
-ROOT=`pwd`
-BASE=`cd $ROOT/../../..; pwd`
+host_gnatchop=`type gnatchop | awk '{print $3}'`
+host_gnatmake=`type gnatmake | awk '{print $3}'`
+ROOT=`${PWDCMD-pwd}`
+BASE=`cd $ROOT/../../..; ${PWDCMD-pwd}`
+
 PATH=$BASE:$ROOT:$PATH
 ADA_INCLUDE_PATH=$BASE/ada/rts
 ADA_OBJECTS_PATH=$ADA_INCLUDE_PATH
-export PATH ADA_INCLUDE_PATH ADA_OBJECTS_PATH
 
-echo '#!/bin/sh' > gcc
-echo exec $BASE/xgcc -B$BASE/ '"$@"' >> gcc
+if [ ! -d $ADA_INCLUDE_PATH ]; then
+   echo gnatlib missing, exiting.
+   exit 1
+fi
+
+if [ ! -f $BASE/gnatchop ]; then
+   echo gnattools missing, exiting.
+   exit 1
+fi
+
+if [ ! -f $BASE/gnatmake ]; then
+   echo gnattools missing, exiting.
+   exit 1
+fi
+
+GCC_DRIVER="$BASE/xgcc"
+GCC="$BASE/xgcc -B$BASE/"
+export PATH ADA_INCLUDE_PATH ADA_OBJECTS_PATH GCC_DRIVER GCC
+
+echo '#!/bin/sh' > host_gnatchop
+echo PATH=`dirname $host_gnatchop`:'$PATH' >> host_gnatchop
+echo unset ADA_INCLUDE_PATH ADA_OBJECTS_PATH GCC_EXEC_PREFIX >> host_gnatchop
+echo export PATH >> host_gnatchop
+echo exec $host_gnatchop '"$@"' >> host_gnatchop
+
+chmod +x host_gnatchop
 
 echo '#!/bin/sh' > host_gnatmake
 echo PATH=`dirname $host_gnatmake`:'$PATH' >> host_gnatmake
@@ -25,11 +49,6 @@ echo unset ADA_INCLUDE_PATH ADA_OBJECTS_PATH GCC_EXEC_PREFIX >> host_gnatmake
 echo export PATH >> host_gnatmake
 echo exec $host_gnatmake '"$@"' >> host_gnatmake
 
-echo '#!/bin/sh' > host_gcc
-echo PATH=`dirname $host_gcc`:'$PATH' >> host_gcc
-echo export PATH >> host_gcc
-echo exec $host_gcc '"$@"' >> host_gcc
-
-chmod +x gcc host_gnatmake host_gcc
+chmod +x host_gnatmake
 
 exec $testdir/run_all.sh "$@"
