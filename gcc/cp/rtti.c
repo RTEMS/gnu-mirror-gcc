@@ -120,7 +120,7 @@ init_rtti_processing (void)
   push_namespace (std_identifier);
   type_info_type_node 
     = xref_tag (class_type, get_identifier ("type_info"),
-		/*attributes=*/NULL_TREE, true, false);
+		true, false);
   pop_namespace ();
   const_type_info_type = build_qualified_type (type_info_type_node, 
 					       TYPE_QUAL_CONST);
@@ -635,7 +635,6 @@ build_dynamic_cast_1 (tree type, tree expr)
 	      push_nested_namespace (ns);
 	      tinfo_ptr = xref_tag (class_type,
 				    get_identifier ("__class_type_info"),
-				    /*attributes=*/NULL_TREE,
 				    true, false);
 	      
 	      tinfo_ptr = build_pointer_type
@@ -760,6 +759,15 @@ tinfo_base_init (tree desc, tree target)
     TREE_STATIC (name_decl) = 1;
     DECL_EXTERNAL (name_decl) = 0;
     TREE_PUBLIC (name_decl) = 1;
+    comdat_linkage (name_decl);
+    /* APPLE LOCAL begin coalescing */
+    /* coalesce typeinfo */
+#ifdef MAKE_DECL_COALESCED
+    if (!typeinfo_in_lib_p (target))
+      MAKE_DECL_COALESCED (name_decl);
+#endif /* MAKE_DECL_COALESCED */
+    /* APPLE LOCAL end coalescing */
+
     import_export_tinfo (name_decl, target, typeinfo_in_lib_p (target));
     /* External name of the string containing the type's name has a
        special name.  */
@@ -777,7 +785,7 @@ tinfo_base_init (tree desc, tree target)
   
       push_nested_namespace (abi_node);
       real_type = xref_tag (class_type, TINFO_REAL_NAME (desc),
-			    /*attributes=*/NULL_TREE, true, false);
+			    true, false);
       pop_nested_namespace (abi_node);
   
       if (!COMPLETE_TYPE_P (real_type))
@@ -807,7 +815,6 @@ tinfo_base_init (tree desc, tree target)
   init = tree_cons (NULL_TREE, decay_conversion (name_decl), init);
   
   init = build_constructor (NULL_TREE, nreverse (init));
-  TREE_HAS_CONSTRUCTOR (init) = 1;
   TREE_CONSTANT (init) = 1;
   TREE_INVARIANT (init) = 1;
   TREE_STATIC (init) = 1;
@@ -826,7 +833,6 @@ generic_initializer (tree desc, tree target)
   tree init = tinfo_base_init (desc, target);
   
   init = build_constructor (NULL_TREE, init);
-  TREE_HAS_CONSTRUCTOR (init) = 1;
   TREE_CONSTANT (init) = 1;
   TREE_INVARIANT (init) = 1;
   TREE_STATIC (init) = 1;
@@ -856,7 +862,6 @@ ptr_initializer (tree desc, tree target, bool *non_public_ptr)
                     init);
   
   init = build_constructor (NULL_TREE, nreverse (init));
-  TREE_HAS_CONSTRUCTOR (init) = 1;
   TREE_CONSTANT (init) = 1;
   TREE_INVARIANT (init) = 1;
   TREE_STATIC (init) = 1;
@@ -896,7 +901,6 @@ ptm_initializer (tree desc, tree target, bool *non_public_ptr)
 		    init);  
   
   init = build_constructor (NULL_TREE, nreverse (init));
-  TREE_HAS_CONSTRUCTOR (init) = 1;
   TREE_CONSTANT (init) = 1;
   TREE_INVARIANT (init) = 1;
   TREE_STATIC (init) = 1;
@@ -967,7 +971,6 @@ class_initializer (tree desc, tree target, tree trail)
   
   TREE_CHAIN (init) = trail;
   init = build_constructor (NULL_TREE, init);
-  TREE_HAS_CONSTRUCTOR (init) = 1;
   TREE_CONSTANT (init) = 1;
   TREE_INVARIANT (init) = 1;
   TREE_STATIC (init) = 1;
@@ -1087,11 +1090,9 @@ get_pseudo_ti_init (tree type, tree var_desc, bool *non_public_p)
               base_init = tree_cons (NULL_TREE, offset, base_init);
               base_init = tree_cons (NULL_TREE, tinfo, base_init);
               base_init = build_constructor (NULL_TREE, base_init);
-	      TREE_HAS_CONSTRUCTOR (base_init) = 1;
               base_inits = tree_cons (NULL_TREE, base_init, base_inits);
             }
 	  base_inits = build_constructor (NULL_TREE, base_inits);
-	  TREE_HAS_CONSTRUCTOR (base_inits) = 1;
 	  base_inits = tree_cons (NULL_TREE, base_inits, NULL_TREE);
 	  /* Prepend the number of bases.  */
 	  base_inits = tree_cons (NULL_TREE,
@@ -1261,7 +1262,7 @@ get_pseudo_ti_desc (tree type)
 }
 
 /* Make sure the required builtin types exist for generating the type_info
-   varable definitions.  */
+   variable definitions.  */
 
 static void
 create_tinfo_types (void)
@@ -1387,7 +1388,6 @@ emit_support_tinfos (void)
   push_nested_namespace (abi_node);
   bltn_type = xref_tag (class_type,
 			get_identifier ("__fundamental_type_info"), 
-			/*attributes=*/NULL_TREE,
 			true, false);
   pop_nested_namespace (abi_node);
   if (!COMPLETE_TYPE_P (bltn_type))

@@ -74,6 +74,13 @@ struct gcc_target
     /* Output code that will globalize a label.  */
     void (* globalize_label) (FILE *, const char *);
 
+    /* Output code that will emit a label for unwind info, if this
+       target requires such labels.  Second argument is the decl the
+       unwind info is associated with, third is a boolean: true if
+       this is for exception handling, fourth is a boolean: true if
+       this is only a placeholder for an omitted FDE. */
+    void (* unwind_label) (FILE *, tree, int, int);
+
     /* Output an internal label.  */
     void (* internal_label) (FILE *, const char *, unsigned long);
 
@@ -301,12 +308,32 @@ struct gcc_target
      Microsoft Visual C++ bitfield layout rules.  */
   bool (* ms_bitfield_layout_p) (tree record_type);
 
+  /* Return true if anonymous bitfields affect structure alignment.  */
+  bool (* align_anon_bitfield) (void);
+
   /* Set up target-specific built-in functions.  */
   void (* init_builtins) (void);
 
   /* Expand a target-specific builtin.  */
   rtx (* expand_builtin) (tree exp, rtx target, rtx subtarget,
 			  enum machine_mode mode, int ignore);
+
+  /* APPLE LOCAL begin constant cfstrings */
+  /* Expand a platform-specific (but machine-independent) builtin.  */
+  tree (* expand_tree_builtin) (tree function, tree params,
+				tree coerced_params);
+
+  /* Construct a target-specific Objective-C string object based on the
+     STRING_CST passed in STR, or NULL if the default Objective-C objects
+     (based on NSConstantString or NXConstantString) should be used
+     instead.  */
+  tree (* construct_objc_string) (tree str);
+  /* APPLE LOCAL end constant cfstrings */
+
+  /* For a vendor-specific fundamental TYPE, return a pointer to
+     a statically-allocated string containing the C++ mangling for
+     TYPE.  In all other cases, return NULL.  */
+  const char * (* mangle_fundamental_type) (tree type);
 
   /* Make any adjustments to libfunc names needed for this target.  */
   void (* init_libfuncs) (void);
@@ -429,6 +456,33 @@ struct gcc_target
      the port wishes to automatically clobber for all asms.  */
   tree (* md_asm_clobbers) (tree);
 
+  /* Functions relating to calls - argument passing, returns, etc.  */
+  struct calls {
+    bool (*promote_function_args) (tree fntype);
+    bool (*promote_function_return) (tree fntype);
+    bool (*promote_prototypes) (tree fntype);
+    rtx (*struct_value_rtx) (tree fndecl, int incoming);
+    bool (*return_in_memory) (tree type, tree fndecl);
+    bool (*return_in_msb) (tree type);
+    rtx (*expand_builtin_saveregs) (void);
+    /* Returns pretend_argument_size.  */
+    void (*setup_incoming_varargs) (CUMULATIVE_ARGS *ca, enum machine_mode mode,
+				    tree type, int *pretend_arg_size,
+				    int second_time);
+    bool (*strict_argument_naming) (CUMULATIVE_ARGS *ca);
+    /* Returns true if we should use
+       targetm.calls.setup_incoming_varargs() and/or
+       targetm.calls.strict_argument_naming().  */
+    bool (*pretend_outgoing_varargs_named) (CUMULATIVE_ARGS *ca);
+
+    /* Given a complex type T, return true if a parameter of type T
+       should be passed as two scalars.  */
+    bool (* split_complex_arg) (tree type);
+    /* APPLE LOCAL begin Altivec */
+    bool (*skip_vec_args) (tree, int, int*);
+    /* APPLE LOCAL end Altivec */
+  } calls;
+
   /* Leave the boolean fields at the end.  */
 
   /* True if arbitrary sections are supported.  */
@@ -455,24 +509,18 @@ struct gcc_target
      at the beginning of assembly output.  */
   bool file_start_file_directive;
 
-  /* Functions relating to calls - argument passing, returns, etc.  */
-  struct calls {
-    bool (*promote_function_args) (tree fntype);
-    bool (*promote_function_return) (tree fntype);
-    bool (*promote_prototypes) (tree fntype);
-    rtx (*struct_value_rtx) (tree fndecl, int incoming);
-    bool (*return_in_memory) (tree type, tree fndecl);
-    bool (*return_in_msb) (tree type);
-    rtx (*expand_builtin_saveregs) (void);
-    /* Returns pretend_argument_size.  */
-    void (*setup_incoming_varargs) (CUMULATIVE_ARGS *ca, enum machine_mode mode,
-				    tree type, int *pretend_arg_size, int second_time);
-    bool (*strict_argument_naming) (CUMULATIVE_ARGS *ca);
-    /* Returns true if we should use
-       targetm.calls.setup_incoming_varargs() and/or
-       targetm.calls.strict_argument_naming().  */
-    bool (*pretend_outgoing_varargs_named) (CUMULATIVE_ARGS *ca);
-  } calls;
+  /* APPLE LOCAL begin AltiVec */
+  /* True if it is permissible to use cast expressions as
+     vector initializers, e.g.:
+
+       (vector unsigned int)(3, 4, 5, 6)
+       (vector float)(2.5)
+
+     This is required for the Motorola AltiVec syntax on the PowerPC.  */
+  bool cast_expr_as_vector_init;
+  /* APPLE LOCAL end AltiVec */
+  
+  /* Leave the boolean fields at the end.  */
 };
 
 extern struct gcc_target targetm;

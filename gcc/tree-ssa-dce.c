@@ -59,7 +59,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "tree.h"
 #include "diagnostic.h"
 #include "tree-flow.h"
-#include "tree-simple.h"
+#include "tree-gimple.h"
 #include "tree-dump.h"
 #include "tree-pass.h"
 #include "timevar.h"
@@ -109,7 +109,7 @@ static inline void mark_operand_necessary (tree);
 
 static bool need_to_preserve_store (tree);
 static void mark_stmt_if_obviously_necessary (tree, bool);
-static void find_obviously_necessary_stmts (bool);
+static void find_obviously_necessary_stmts (struct edge_list *);
 
 static void mark_control_dependent_edges_necessary (basic_block, struct edge_list *);
 static void propagate_necessity (struct edge_list *);
@@ -404,14 +404,16 @@ mark_stmt_if_obviously_necessary (tree stmt, bool aggressive)
 /* Find obviously necessary statements.  These are things like most function
    calls, and stores to file level variables.
 
-   If AGGRESSIVE is false, control statements are conservatively marked as
-   necessary.  */
+   If EL is NULL, control statements are conservatively marked as
+   necessary.  Otherwise it contains the list of edges used by control
+   dependence analysis.  */
 
 static void
-find_obviously_necessary_stmts (bool aggressive)
+find_obviously_necessary_stmts (struct edge_list *el)
 {
   basic_block bb;
   block_stmt_iterator i;
+  edge e;
 
   FOR_EACH_BB (bb)
     {
@@ -438,13 +440,25 @@ find_obviously_necessary_stmts (bool aggressive)
 	{
 	  tree stmt = bsi_stmt (i);
 	  NECESSARY (stmt) = 0;
-	  mark_stmt_if_obviously_necessary (stmt, aggressive);
+	  mark_stmt_if_obviously_necessary (stmt, el != NULL);
 	}
 
       /* Mark this basic block as `not visited'.  A block will be marked
 	 visited when the edges that it is control dependent on have been
 	 marked.  */
       bb->flags &= ~BB_VISITED;
+    }
+
+  if (el)
+    {
+      /* Prevent the loops from being removed.  We must keep the infinite loops,
+	 and we currently do not have a means to recognize the finite ones.  */
+      FOR_EACH_BB (bb)
+	{
+	  for (e = bb->succ; e; e = e->succ_next)
+	    if (e->flags & EDGE_DFS_BACK)
+	      mark_control_dependent_edges_necessary (e->dest, el);
+	}
     }
 }
 
@@ -697,6 +711,9 @@ remove_dead_stmt (block_stmt_iterator *i, basic_block bb)
       redirect_edge_and_branch (bb->succ, post_dom_bb);
       PENDING_STMT (bb->succ) = NULL;
 
+      /* Dominators are wrong now.  */
+      free_dominance_info (CDI_DOMINATORS);
+
       /* The edge is no longer associated with a conditional, so it does
 	 not have TRUE/FALSE flags.  */
       bb->succ->flags &= ~(EDGE_TRUE_VALUE | EDGE_FALSE_VALUE);
@@ -743,6 +760,7 @@ print_stats (void)
 	       stats.removed_phis, stats.total_phis, (int) percg);
     }
 }
+
 
 /* Initialization for this pass.  Set up the used data structures.  */
 
@@ -797,6 +815,8 @@ tree_dce_done (bool aggressive)
    In aggressive mode, control dependences are taken into account, which
    results in more dead code elimination, but at the cost of some time.
 
+   If NO_CFG_CHANGES is true, avoid changing cfg.
+
    FIXME: Aggressive mode before PRE doesn't work currently because
 	  the dominance info is not invalidated after DCE1.  This is
 	  not an issue right now because we only run aggressive DCE
@@ -804,9 +824,12 @@ tree_dce_done (bool aggressive)
 	  start experimenting with pass ordering.  */
 
 static void
-perform_tree_ssa_dce (bool aggressive)
+perform_tree_ssa_dce (bool aggressive, bool no_cfg_changes)
 {
   struct edge_list *el = NULL;
+
+  if (no_cfg_changes && aggressive)
+    abort ();
 
   tree_dce_init (aggressive);
 
@@ -818,9 +841,11 @@ perform_tree_ssa_dce (bool aggressive)
       el = create_edge_list ();
       find_all_control_dependences (el);
       timevar_pop (TV_CONTROL_DEPENDENCES);
+
+      mark_dfs_back_edges ();
     }
 
-  find_obviously_necessary_stmts (aggressive);
+  find_obviously_necessary_stmts (el);
 
   propagate_necessity (el);
 
@@ -829,7 +854,8 @@ perform_tree_ssa_dce (bool aggressive)
   if (aggressive)
     free_dominance_info (CDI_POST_DOMINATORS);
 
-  cleanup_tree_cfg ();
+  if (!no_cfg_changes)
+    cleanup_tree_cfg ();
 
   /* Debugging dumps.  */
   if (dump_file)
@@ -839,19 +865,29 @@ perform_tree_ssa_dce (bool aggressive)
     }
 
   tree_dce_done (aggressive);
+
+  free_edge_list (el);
+}
+
+/* Cleanup the dead code, but avoid cfg changes.  */
+
+void
+tree_ssa_dce_no_cfg_changes (void)
+{
+  perform_tree_ssa_dce (false, true);
 }
 
 /* Pass entry points.  */
 static void
 tree_ssa_dce (void)
 {
-  perform_tree_ssa_dce (/*aggressive=*/false);
+  perform_tree_ssa_dce (/*aggressive=*/false, false);
 }
 
 static void
 tree_ssa_cd_dce (void)
 {
-  perform_tree_ssa_dce (/*aggressive=*/optimize >= 2);
+  perform_tree_ssa_dce (/*aggressive=*/optimize >= 2, false);
 }
 
 static bool
@@ -892,4 +928,3 @@ struct tree_opt_pass pass_cd_dce =
   TODO_ggc_collect | TODO_verify_ssa | TODO_verify_flow
 					/* todo_flags_finish */
 };
-
