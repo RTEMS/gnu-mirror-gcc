@@ -150,7 +150,7 @@
 ;; ;    This is done to allow bit field masks to fold together in combine.
 ;; ;    The reload phase will force the immediate into a register at the
 ;; ;    very end.  This helps in some cases, but hurts in others: we'd
-;; ;    really like to cse these immediates.  However, there is an phase
+;; ;    really like to cse these immediates.  However, there is a phase
 ;; ;    ordering problem here.  cse picks up individual masks and cse's
 ;; ;    those, but not folded masks (cse happens before combine).  It's
 ;; ;    not clear what the best solution is because we really want cse
@@ -2881,7 +2881,7 @@
     }
   else if (CONST_OK_FOR_K ((1 << INTVAL (operands[2])) - 1))
     {
-      /* A narrow bitfield (<=5 bits) means we can do a shift to put
+      /* A narrow bit-field (<=5 bits) means we can do a shift to put
          it in place and then use an andi to extract it.
          This is as good as a shiftleft/shiftright. */
 
@@ -3319,7 +3319,7 @@
   ""
 "*
 {
-  int op0 = REGNO (operands[0]);
+  unsigned int op0 = REGNO (operands[0]);
 
   if (GET_CODE (operands[3]) == REG)
     {

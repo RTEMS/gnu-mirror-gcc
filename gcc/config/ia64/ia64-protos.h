@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler for IA-64.
-   Copyright (C) 1999, 2000 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2002 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -27,7 +27,11 @@ extern GTY(()) rtx ia64_compare_op1;
 
 /* Functions defined in ia64.c */
 
+extern int bundling_p;
 #ifdef RTX_CODE
+extern int ia64_st_address_bypass_p PARAMS((rtx, rtx));
+extern int ia64_ld_address_bypass_p PARAMS((rtx, rtx));
+extern int ia64_produce_address_p PARAMS((rtx));
 extern int call_operand PARAMS((rtx, enum machine_mode));
 extern int sdata_symbolic_operand PARAMS((rtx, enum machine_mode));
 extern int got_symbolic_operand PARAMS((rtx, enum machine_mode));
@@ -104,7 +108,6 @@ extern rtx ia64_function_arg PARAMS((CUMULATIVE_ARGS *, enum machine_mode,
 				     tree, int, int));
 extern rtx ia64_expand_builtin PARAMS((tree, rtx, rtx,
 				       enum machine_mode, int));
-extern void ia64_va_start PARAMS((int, tree, rtx));
 extern rtx ia64_va_arg PARAMS((tree, tree));
 extern rtx ia64_function_value PARAMS((tree, tree));
 #endif /* RTX_CODE */
@@ -145,3 +148,6 @@ extern void sbss_section PARAMS ((void));
 /* expr.h defines ARGS_SIZE_RTX and `enum direction'.  */
 extern enum direction ia64_hpux_function_arg_padding PARAMS ((enum machine_mode, tree));
 #endif /* ARGS_SIZE_RTX */
+
+extern void ia64_hpux_handle_builtin_pragma PARAMS ((struct cpp_reader *));
+extern void ia64_hpux_asm_file_end PARAMS ((FILE *));

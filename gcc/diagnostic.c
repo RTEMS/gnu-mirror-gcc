@@ -27,6 +27,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #undef FLOAT /* This is for hpux. They should change hpux.  */
 #undef FFS  /* Some systems define this in param.h.  */
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "tm_p.h"
 #include "flags.h"
@@ -36,17 +38,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "diagnostic.h"
 #include "langhooks.h"
 #include "langhooks-def.h"
-
-#define obstack_chunk_alloc xmalloc
-#define obstack_chunk_free  free
-
-#define output_formatted_integer(BUFFER, FORMAT, INTEGER)	\
-  do								\
-    {								\
-      sprintf ((BUFFER)->digit_buffer, FORMAT, INTEGER);	\
-      output_add_string (BUFFER, (BUFFER)->digit_buffer);	\
-    }								\
-  while (0)
 
 #define output_text_length(BUFFER) (BUFFER)->line_length
 #define is_starting_newline(BUFFER) (output_text_length (BUFFER) == 0)
@@ -312,7 +303,7 @@ output_decimal (buffer, i)
      output_buffer *buffer;
      int i;
 {
-  output_formatted_integer (buffer, "%d", i);
+  output_formatted_scalar (buffer, "%d", i);
 }
 
 static void
@@ -320,7 +311,7 @@ output_long_decimal (buffer, i)
      output_buffer *buffer;
      long int i;
 {
-  output_formatted_integer (buffer, "%ld", i);
+  output_formatted_scalar (buffer, "%ld", i);
 }
 
 static void
@@ -328,7 +319,7 @@ output_unsigned_decimal (buffer, i)
      output_buffer *buffer;
      unsigned int i;
 {
-  output_formatted_integer (buffer, "%u", i);
+  output_formatted_scalar (buffer, "%u", i);
 }
 
 static void
@@ -336,7 +327,7 @@ output_long_unsigned_decimal (buffer, i)
      output_buffer *buffer;
      long unsigned int i;
 {
-  output_formatted_integer (buffer, "%lu", i);
+  output_formatted_scalar (buffer, "%lu", i);
 }
 
 static void
@@ -344,7 +335,7 @@ output_octal (buffer, i)
      output_buffer *buffer;
      unsigned int i;
 {
-  output_formatted_integer (buffer, "%o", i);
+  output_formatted_scalar (buffer, "%o", i);
 }
 
 static void
@@ -352,7 +343,7 @@ output_long_octal (buffer, i)
      output_buffer *buffer;
      unsigned long int i;
 {
-  output_formatted_integer (buffer, "%lo", i);
+  output_formatted_scalar (buffer, "%lo", i);
 }
 
 static void
@@ -360,7 +351,7 @@ output_hexadecimal (buffer, i)
      output_buffer *buffer;
      unsigned int i;
 {
-  output_formatted_integer (buffer, "%x", i);
+  output_formatted_scalar (buffer, "%x", i);
 }
 
 static void
@@ -368,7 +359,7 @@ output_long_hexadecimal (buffer, i)
      output_buffer *buffer;
      unsigned long int i;
 {
-  output_formatted_integer (buffer, "%lx", i);
+  output_formatted_scalar (buffer, "%lx", i);
 }
 
 /* Append to BUFFER a string specified by its STARTING character
@@ -474,6 +465,16 @@ output_add_string (buffer, str)
   maybe_wrap_text (buffer, str, str + (str ? strlen (str) : 0));
 }
 
+/* Append an identifier ID to BUFFER.  */
+void
+output_add_identifier (buffer, id)
+     output_buffer *buffer;
+     tree id;
+{
+  output_append (buffer, IDENTIFIER_POINTER (id),
+		 IDENTIFIER_POINTER (id) + IDENTIFIER_LENGTH (id));
+}
+
 /* Flush the content of BUFFER onto the attached stream,
    and reinitialize.  */
 
@@ -574,6 +575,11 @@ output_format (buffer, text)
               (buffer, va_arg (*text->args_ptr, unsigned int));
 	  break;
 
+	case 'p':
+	  output_long_hexadecimal
+	    (buffer, (unsigned long) va_arg (*text->args_ptr, void *));
+	  break;
+
 	case '%':
 	  output_add_character (buffer, '%');
 	  break;
@@ -643,7 +649,7 @@ build_message_string VPARAMS ((const char *msg, ...))
   return str;
 }
 
-/* Same as diagnsotic_build_prefix, but only the source FILE is given.  */
+/* Same as diagnostic_build_prefix, but only the source FILE is given.  */
 char *
 file_name_as_prefix (f)
      const char *f;
@@ -816,7 +822,7 @@ diagnostic_set_info (diagnostic, msgid, args, file, line, kind)
 {
   diagnostic->message.format_spec = msgid;
   diagnostic->message.args_ptr = args;
-  /* If the diagnostic message doesn't specify a loccation,
+  /* If the diagnostic message doesn't specify a location,
      use FILE and LINE.  */
   if (!text_specifies_location (&diagnostic->message, &diagnostic->location))
     {
@@ -832,7 +838,7 @@ char *
 diagnostic_build_prefix (diagnostic)
      diagnostic_info *diagnostic;
 {
-  static const char *diagnostic_kind_text[] = {
+  static const char *const diagnostic_kind_text[] = {
 #define DEFINE_DIAGNOSTIC_KIND(K, T) (T),
 #include "diagnostic.def"
 #undef DEFINE_DIAGNOSTIC_KIND
@@ -978,7 +984,7 @@ pedwarn_with_decl VPARAMS ((tree decl, const char *msgid, ...))
   VA_FIXEDARG (ap, const char *, msgid);
 
   diagnostic_set_info (&diagnostic, _(msgid), &ap,
-                       DECL_SOURCE_FILE (decl), DECL_SOURCE_LINE (decl),
+                       TREE_FILENAME (decl), TREE_LINENO (decl),
                        pedantic_error_kind ());
 
   /* We don't want -pedantic-errors to cause the compilation to fail from
@@ -1024,7 +1030,6 @@ sorry VPARAMS ((const char *msgid, ...))
 
   output_set_prefix
     (&global_dc->buffer, diagnostic_build_prefix (&diagnostic));
-  output_printf (&global_dc->buffer, "sorry, not implemented: ");
   output_format (&global_dc->buffer, &diagnostic.message);
   output_flush (&global_dc->buffer);
   VA_CLOSE (ap);
@@ -1121,7 +1126,7 @@ error_with_decl VPARAMS ((tree decl, const char *msgid, ...))
   VA_FIXEDARG (ap, const char *, msgid);
 
   diagnostic_set_info (&diagnostic, msgid, &ap,
-                       DECL_SOURCE_FILE (decl), DECL_SOURCE_LINE (decl),
+                       TREE_FILENAME (decl), TREE_LINENO (decl),
                        DK_ERROR);
   diagnostic_for_decl (&diagnostic, decl);
   VA_CLOSE (ap);
@@ -1195,7 +1200,7 @@ internal_error VPARAMS ((const char *msgid, ...))
   fnotice (stderr,
 "Please submit a full bug report,\n\
 with preprocessed source if appropriate.\n\
-See %s for instructions.\n", GCCBUGURL);
+See %s for instructions.\n", bug_report_url);
   exit (FATAL_EXIT_CODE);
 }
 
@@ -1224,7 +1229,7 @@ warning_with_decl VPARAMS ((tree decl, const char *msgid, ...))
   VA_FIXEDARG (ap, const char *, msgid);
 
   diagnostic_set_info (&diagnostic, msgid, &ap,
-                       DECL_SOURCE_FILE (decl), DECL_SOURCE_LINE (decl),
+                       TREE_FILENAME (decl), TREE_LINENO (decl),
                        DK_WARNING);
   diagnostic_for_decl (&diagnostic, decl);
   VA_CLOSE (ap);
@@ -1303,7 +1308,7 @@ error_recursion (context)
   fnotice (stderr,
 "Please submit a full bug report,\n\
 with preprocessed source if appropriate.\n\
-See %s for instructions.\n", GCCBUGURL);
+See %s for instructions.\n", bug_report_url);
   exit (FATAL_EXIT_CODE);
 }
 
@@ -1361,8 +1366,7 @@ fancy_abort (file, line, function)
      int line;
      const char *function;
 {
-  internal_error ("Internal compiler error in %s, at %s:%d",
-		  function, trim_filename (file), line);
+  internal_error ("in %s, at %s:%d", function, trim_filename (file), line);
 }
 
 void
@@ -1410,6 +1414,20 @@ default_diagnostic_finalizer (context, diagnostic)
 }
 
 void
+inform VPARAMS ((const char *msgid, ...))
+{
+  diagnostic_info diagnostic;
+
+  VA_OPEN (ap, msgid);
+  VA_FIXEDARG (ap, const char *, msgid);
+
+  diagnostic_set_info (&diagnostic, msgid, &ap, input_filename, lineno,
+                       DK_NOTE);
+  report_diagnostic (&diagnostic);
+  VA_CLOSE (ap);
+}
+
+void
 warn_deprecated_use (node)
      tree node;
 {
@@ -1419,7 +1437,7 @@ warn_deprecated_use (node)
   if (DECL_P (node))
     warning ("`%s' is deprecated (declared at %s:%d)",
 	     IDENTIFIER_POINTER (DECL_NAME (node)),
-	     DECL_SOURCE_FILE (node), DECL_SOURCE_LINE (node));
+	     TREE_FILENAME (node), TREE_LINENO (node));
   else if (TYPE_P (node))
     {
       const char *what = NULL;
@@ -1435,14 +1453,23 @@ warn_deprecated_use (node)
 	{
 	  if (decl)
 	    warning ("`%s' is deprecated (declared at %s:%d)", what,
-		     DECL_SOURCE_FILE (decl), DECL_SOURCE_LINE (decl));
+		     TREE_FILENAME (decl), TREE_LINENO (decl));
 	  else
 	    warning ("`%s' is deprecated", what);
 	}
       else if (decl)
 	warning ("type is deprecated (declared at %s:%d)",
-		 DECL_SOURCE_FILE (decl), DECL_SOURCE_LINE (decl));
+		 TREE_FILENAME (decl), TREE_LINENO (decl));
       else
 	warning ("type is deprecated");
     }
+}
+
+/* Dump the contents of an output_buffer on stderr.  */
+
+void 
+debug_output_buffer (buffer)
+     output_buffer *buffer;
+{
+  fprintf (stderr, "%s", output_message_text (buffer));
 }

@@ -64,26 +64,35 @@ Boston, MA 02111-1307, USA.  */
 	    builtin_assert ("cpu=ev4");			\
 	  }						\
 	if (TARGET_IEEE || TARGET_IEEE_WITH_INEXACT)	\
-	  builtin_define ("__IEEE_FP");			\
+	  builtin_define ("_IEEE_FP");			\
 	if (TARGET_IEEE_WITH_INEXACT)			\
-	  builtin_define ("__IEEE_FP_INEXACT");		\
+	  builtin_define ("_IEEE_FP_INEXACT");		\
 							\
 	/* Macros dependent on the C dialect.  */	\
-	if (preprocessing_asm_p ())			\
-	  builtin_define_std ("LANGUAGE_ASSEMBLY");	\
-        else if (c_language == clk_c)			\
-	  builtin_define_std ("LANGUAGE_C");		\
-	else if (c_language == clk_cplusplus)		\
-	  {						\
-	    builtin_define ("__LANGUAGE_C_PLUS_PLUS");	\
-	    builtin_define ("__LANGUAGE_C_PLUS_PLUS__");\
-	  }						\
-	else if (c_language == clk_objective_c)		\
-	  {						\
-	    builtin_define ("__LANGUAGE_OBJECTIVE_C");	\
-	    builtin_define ("__LANGUAGE_OBJECTIVE_C__");\
-	  }						\
+	SUBTARGET_LANGUAGE_CPP_BUILTINS();		\
 } while (0)
+
+#ifndef SUBTARGET_LANGUAGE_CPP_BUILTINS
+#define SUBTARGET_LANGUAGE_CPP_BUILTINS()		\
+  do							\
+    {							\
+      if (preprocessing_asm_p ())			\
+	builtin_define_std ("LANGUAGE_ASSEMBLY");	\
+      else if (c_language == clk_c)			\
+	builtin_define_std ("LANGUAGE_C");		\
+      else if (c_language == clk_cplusplus)		\
+	{						\
+	  builtin_define ("__LANGUAGE_C_PLUS_PLUS");	\
+	  builtin_define ("__LANGUAGE_C_PLUS_PLUS__");	\
+	}						\
+      if (flag_objc)					\
+	{						\
+	  builtin_define ("__LANGUAGE_OBJECTIVE_C");	\
+	  builtin_define ("__LANGUAGE_OBJECTIVE_C__");	\
+	}						\
+    }							\
+  while (0)
+#endif
 
 #define CPP_SPEC "%(cpp_subtarget)"
 
@@ -103,9 +112,12 @@ Boston, MA 02111-1307, USA.  */
    mirrors this list, so changes to alpha.md must be made at the same time.  */
 
 enum processor_type
- {PROCESSOR_EV4,			/* 2106[46]{a,} */
+{
+  PROCESSOR_EV4,			/* 2106[46]{a,} */
   PROCESSOR_EV5,			/* 21164{a,pc,} */
-  PROCESSOR_EV6};			/* 21264 */
+  PROCESSOR_EV6,			/* 21264 */
+  PROCESSOR_MAX
+};
 
 extern enum processor_type alpha_cpu;
 
@@ -213,6 +225,10 @@ extern int alpha_tls_size;
 #define MASK_TLS_KERNEL	(1 << 14)
 #define TARGET_TLS_KERNEL (target_flags & MASK_TLS_KERNEL)
 
+/* This means use direct branches to local functions.  */
+#define MASK_SMALL_TEXT (1 << 15)
+#define TARGET_SMALL_TEXT (target_flags & MASK_SMALL_TEXT)
+
 /* This means that the processor is an EV5, EV56, or PCA56.
    Unlike alpha_cpu this is not affected by -mtune= setting.  */
 #define MASK_CPU_EV5	(1 << 28)
@@ -301,6 +317,9 @@ extern int alpha_tls_size;
      N_("Emit 16-bit relocations to the small data areas")},		\
     {"large-data", -MASK_SMALL_DATA,					\
      N_("Emit 32-bit relocations to the small data areas")},		\
+    {"small-text", MASK_SMALL_TEXT,					\
+     N_("Emit direct branches to local functions")},			\
+    {"large-text", -MASK_SMALL_TEXT, ""},				\
     {"tls-kernel", MASK_TLS_KERNEL,					\
      N_("Emit rdval instead of rduniq for thread pointer")},		\
     {"", TARGET_DEFAULT | TARGET_CPU_DEFAULT				\
@@ -402,6 +421,10 @@ extern const char *alpha_tls_size_string; /* For -mtls-size= */
 /* Define the size of `long long'.  The default is the twice the word size.  */
 #define LONG_LONG_TYPE_SIZE 64
 
+/* We're IEEE unless someone says to use VAX.  */
+#define TARGET_FLOAT_FORMAT \
+  (TARGET_FLOAT_VAX ? VAX_FLOAT_FORMAT : IEEE_FLOAT_FORMAT)
+
 /* The two floating-point formats we support are S-floating, which is
    4 bytes, and T-floating, which is 8 bytes.  `float' is S and `double'
    and `long double' are T.  */
@@ -480,7 +503,7 @@ extern const char *alpha_tls_size_string; /* For -mtls-size= */
 /* Every structure's size must be a multiple of this.  */
 #define STRUCTURE_SIZE_BOUNDARY 8
 
-/* A bitfield declared as `int' forces `int' alignment for the struct.  */
+/* A bit-field declared as `int' forces `int' alignment for the struct.  */
 #define PCC_BITFIELD_TYPE_MATTERS 1
 
 /* No data type wants to be aligned rounder than this.  */
@@ -499,14 +522,14 @@ extern const char *alpha_tls_size_string; /* For -mtls-size= */
 #define DATA_ALIGNMENT(EXP, ALIGN) MAX ((ALIGN), BITS_PER_WORD)
 #endif
 
-/* Set this non-zero if move instructions will actually fail to work
+/* Set this nonzero if move instructions will actually fail to work
    when given unaligned data.
 
    Since we get an error message when we do one, call them invalid.  */
 
 #define STRICT_ALIGNMENT 1
 
-/* Set this non-zero if unaligned move instructions are extremely slow.
+/* Set this nonzero if unaligned move instructions are extremely slow.
 
    On the Alpha, they trap.  */
 
@@ -844,15 +867,11 @@ enum reg_class {
 #define CLASS_MAX_NREGS(CLASS, MODE)				\
  ((GET_MODE_SIZE (MODE) + UNITS_PER_WORD - 1) / UNITS_PER_WORD)
 
-/* If defined, gives a class of registers that cannot be used as the
-   operand of a SUBREG that changes the mode of the object illegally.  */
+/* Return the class of registers that cannot change mode from FROM to TO.  */
 
-#define CLASS_CANNOT_CHANGE_MODE	FLOAT_REGS
-
-/* Defines illegal mode changes for CLASS_CANNOT_CHANGE_MODE.  */
-
-#define CLASS_CANNOT_CHANGE_MODE_P(FROM,TO) \
-  (GET_MODE_SIZE (FROM) != GET_MODE_SIZE (TO))
+#define CANNOT_CHANGE_MODE_CLASS(FROM, TO, CLASS)		\
+  (GET_MODE_SIZE (FROM) != GET_MODE_SIZE (TO)			\
+   ? reg_classes_intersect_p (FLOAT_REGS, CLASS) : 0)
 
 /* Define the cost of moving between registers of various classes.  Moving
    between FLOAT_REGS and anything else except float regs is expensive. 
@@ -1156,15 +1175,6 @@ extern int alpha_memory_latency;
     }									\
 }
 
-/* We do not allow indirect calls to be optimized into sibling calls, nor
-   can we allow a call to a function in a different compilation unit to
-   be optimized into a sibcall.  Except if the function is known not to
-   return, in which case our caller doesn't care what the gp is.  */
-#define FUNCTION_OK_FOR_SIBCALL(DECL)			\
-  (DECL							\
-   && ((TREE_ASM_WRITTEN (DECL) && !flag_pic)		\
-       || ! TREE_PUBLIC (DECL)))
-
 /* Try to output insns to set TARGET equal to the constant C if it can be
    done in less than N insns.  Do all computations in MODE.  Returns the place
    where the output has been placed if it can be done and the insns have been
@@ -1203,6 +1213,10 @@ extern struct alpha_compare alpha_compare;
 /* Output any profiling code before the prologue.  */
 
 #define PROFILE_BEFORE_PROLOGUE 1
+
+/* Never use profile counters.  */
+
+#define NO_PROFILE_COUNTERS 1
 
 /* Output assembler code to FILE to increment profiler label # LABELNO
    for profiling a function entry.  Under OSF/1, profiling is enabled
@@ -1277,12 +1291,6 @@ do {						\
 				     current_function_outgoing_args_size))
 
 /* Addressing modes, and classification of registers for them.  */
-
-/* #define HAVE_POST_INCREMENT 0 */
-/* #define HAVE_POST_DECREMENT 0 */
-
-/* #define HAVE_PRE_DECREMENT 0 */
-/* #define HAVE_PRE_INCREMENT 0 */
 
 /* Macros to check register numbers against specific register classes.  */
 
@@ -1409,11 +1417,6 @@ do {									     \
 #define GO_IF_MODE_DEPENDENT_ADDRESS(ADDR,LABEL)  \
 { if (GET_CODE (ADDR) == AND) goto LABEL; }
 
-/* Compute the cost of an address.  For the Alpha, all valid addresses are
-   the same cost.  */
-
-#define ADDRESS_COST(X)  0
-
 /* Machine-dependent reorg pass.  */
 #define MACHINE_DEPENDENT_REORG(X)	alpha_reorg(X)
 
@@ -1460,7 +1463,7 @@ do {									     \
 #define MAX_FIXED_MODE_SIZE	GET_MODE_BITSIZE (TImode)
 
 /* Nonzero if access to memory by bytes is no faster than for words.
-   Also non-zero if doing byte operations (specifically shifts) in registers
+   Also nonzero if doing byte operations (specifically shifts) in registers
    is undesirable. 
 
    On the Alpha, we want to not use the byte operation and instead use
@@ -1539,162 +1542,6 @@ do {									     \
 /* Define this to be nonzero if shift instructions ignore all but the low-order
    few bits.  */
 #define SHIFT_COUNT_TRUNCATED 1
-
-/* Compute the cost of computing a constant rtl expression RTX
-   whose rtx-code is CODE.  The body of this macro is a portion
-   of a switch statement.  If the code is computed here,
-   return it with a return statement.  Otherwise, break from the switch.
-
-   If this is an 8-bit constant, return zero since it can be used
-   nearly anywhere with no cost.  If it is a valid operand for an
-   ADD or AND, likewise return 0 if we know it will be used in that
-   context.  Otherwise, return 2 since it might be used there later.
-   All other constants take at least two insns.  */
-
-#define CONST_COSTS(RTX,CODE,OUTER_CODE) \
-  case CONST_INT:						\
-    if (INTVAL (RTX) >= 0 && INTVAL (RTX) < 256)		\
-      return 0;							\
-  case CONST_DOUBLE:						\
-    if ((RTX) == CONST0_RTX (GET_MODE (RTX)))			\
-      return 0;							\
-    else if (((OUTER_CODE) == PLUS && add_operand (RTX, VOIDmode)) \
-	|| ((OUTER_CODE) == AND && and_operand (RTX, VOIDmode))) \
-      return 0;							\
-    else if (add_operand (RTX, VOIDmode) || and_operand (RTX, VOIDmode)) \
-      return 2;							\
-    else							\
-      return COSTS_N_INSNS (2);					\
-  case CONST:							\
-  case SYMBOL_REF:						\
-  case LABEL_REF:						\
-  switch (alpha_cpu)						\
-    {								\
-    case PROCESSOR_EV4:						\
-      return COSTS_N_INSNS (3);					\
-    case PROCESSOR_EV5:						\
-    case PROCESSOR_EV6:						\
-      return COSTS_N_INSNS (2);					\
-    default: abort();						\
-    }
-    
-/* Provide the costs of a rtl expression.  This is in the body of a
-   switch on CODE.  */
-   
-#define RTX_COSTS(X,CODE,OUTER_CODE)			\
-  case PLUS:  case MINUS:				\
-    if (FLOAT_MODE_P (GET_MODE (X)))			\
-      switch (alpha_cpu)				\
-        {						\
-        case PROCESSOR_EV4:				\
-          return COSTS_N_INSNS (6);			\
-        case PROCESSOR_EV5:				\
-        case PROCESSOR_EV6:				\
-          return COSTS_N_INSNS (4); 			\
-	default: abort();				\
-	}						\
-    else if (GET_CODE (XEXP (X, 0)) == MULT		\
-	     && const48_operand (XEXP (XEXP (X, 0), 1), VOIDmode)) \
-      return (2 + rtx_cost (XEXP (XEXP (X, 0), 0), OUTER_CODE)	\
-	      + rtx_cost (XEXP (X, 1), OUTER_CODE));	\
-    break;						\
-  case MULT:						\
-    switch (alpha_cpu)					\
-      {							\
-      case PROCESSOR_EV4:				\
-        if (FLOAT_MODE_P (GET_MODE (X)))		\
-          return COSTS_N_INSNS (6);			\
-        return COSTS_N_INSNS (23);			\
-      case PROCESSOR_EV5:				\
-        if (FLOAT_MODE_P (GET_MODE (X)))		\
-          return COSTS_N_INSNS (4);			\
-        else if (GET_MODE (X) == DImode)		\
-          return COSTS_N_INSNS (12);			\
-        else						\
-          return COSTS_N_INSNS (8);			\
-      case PROCESSOR_EV6:				\
-	if (FLOAT_MODE_P (GET_MODE (X)))		\
-	  return COSTS_N_INSNS (4);			\
-	else 						\
-	  return COSTS_N_INSNS (7);			\
-      default: abort();					\
-      }							\
-  case ASHIFT:						\
-    if (GET_CODE (XEXP (X, 1)) == CONST_INT		\
-	&& INTVAL (XEXP (X, 1)) <= 3)			\
-      break;						\
-    /* ... fall through ...  */				\
-  case ASHIFTRT:  case LSHIFTRT:			\
-    switch (alpha_cpu)					\
-      {							\
-      case PROCESSOR_EV4:				\
-        return COSTS_N_INSNS (2);			\
-      case PROCESSOR_EV5:				\
-      case PROCESSOR_EV6:				\
-        return COSTS_N_INSNS (1); 			\
-      default: abort();					\
-      }							\
-  case IF_THEN_ELSE:					\
-    switch (alpha_cpu)					\
-      {							\
-      case PROCESSOR_EV4:				\
-      case PROCESSOR_EV6:				\
-        return COSTS_N_INSNS (2);			\
-      case PROCESSOR_EV5:				\
-        return COSTS_N_INSNS (1); 			\
-      default: abort();					\
-      }							\
-  case DIV:  case UDIV:  case MOD:  case UMOD:		\
-    switch (alpha_cpu)					\
-      {							\
-      case PROCESSOR_EV4:				\
-        if (GET_MODE (X) == SFmode)			\
-          return COSTS_N_INSNS (34);			\
-        else if (GET_MODE (X) == DFmode)		\
-          return COSTS_N_INSNS (63);			\
-        else						\
-          return COSTS_N_INSNS (70);			\
-      case PROCESSOR_EV5:				\
-        if (GET_MODE (X) == SFmode)			\
-          return COSTS_N_INSNS (15);			\
-        else if (GET_MODE (X) == DFmode)		\
-          return COSTS_N_INSNS (22);			\
-        else						\
-          return COSTS_N_INSNS (70);	/* ??? */	\
-      case PROCESSOR_EV6:				\
-	if (GET_MODE (X) == SFmode)			\
-	  return COSTS_N_INSNS (12);			\
-        else if (GET_MODE (X) == DFmode)		\
-          return COSTS_N_INSNS (15);			\
-        else						\
-          return COSTS_N_INSNS (70);	/* ??? */	\
-      default: abort();					\
-      }							\
-  case MEM:						\
-    switch (alpha_cpu)					\
-      {							\
-      case PROCESSOR_EV4:				\
-      case PROCESSOR_EV6:				\
-        return COSTS_N_INSNS (3);			\
-      case PROCESSOR_EV5:				\
-        return COSTS_N_INSNS (2); 			\
-      default: abort();					\
-      }							\
-  case NEG:  case ABS:					\
-    if (! FLOAT_MODE_P (GET_MODE (X)))			\
-      break;						\
-    /* ... fall through ...  */				\
-  case FLOAT:  case UNSIGNED_FLOAT:  case FIX:  case UNSIGNED_FIX: \
-  case FLOAT_EXTEND:  case FLOAT_TRUNCATE:		\
-    switch (alpha_cpu)					\
-      {							\
-      case PROCESSOR_EV4:				\
-        return COSTS_N_INSNS (6);			\
-      case PROCESSOR_EV5:				\
-      case PROCESSOR_EV6:				\
-        return COSTS_N_INSNS (4); 			\
-      default: abort();					\
-      }
 
 /* Control the assembler format that we output.  */
 
@@ -1743,34 +1590,19 @@ do {						\
   fputs (name_, STREAM);			\
 } while (0)
 
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME.  */
-
-#define ASM_OUTPUT_LABEL(FILE,NAME)	\
-  do { assemble_name (FILE, NAME); fputs (":\n", FILE); } while (0)
-
-/* This is how to output a command to make the user-level label named NAME
-   defined for reference from other files.  */
-
-#define ASM_GLOBALIZE_LABEL(FILE,NAME)	\
-  do { fputs ("\t.globl ", FILE); assemble_name (FILE, NAME); fputs ("\n", FILE);} while (0)
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP "\t.globl "
 
 /* The prefix to add to user-visible assembler symbols.  */
 
 #define USER_LABEL_PREFIX ""
 
-/* This is how to output an internal numbered label where
-   PREFIX is the class of label and NUM is the number within the class.  */
-
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)	\
-  fprintf (FILE, "$%s%d:\n", PREFIX, NUM)
-
 /* This is how to output a label for a jump table.  Arguments are the same as
-   for ASM_OUTPUT_INTERNAL_LABEL, except the insn for the jump table is
+   for (*targetm.asm_out.internal_label), except the insn for the jump table is
    passed.  */
 
 #define ASM_OUTPUT_CASE_LABEL(FILE,PREFIX,NUM,TABLEINSN)	\
-{ ASM_OUTPUT_ALIGN (FILE, 2); ASM_OUTPUT_INTERNAL_LABEL (FILE, PREFIX, NUM); }
+{ ASM_OUTPUT_ALIGN (FILE, 2); (*targetm.asm_out.internal_label) (FILE, PREFIX, NUM); }
 
 /* This is how to store into the string LABEL
    the symbol_ref name of an internal numbered label where
@@ -1779,11 +1611,6 @@ do {						\
 
 #define ASM_GENERATE_INTERNAL_LABEL(LABEL,PREFIX,NUM)	\
   sprintf ((LABEL), "*$%s%ld", (PREFIX), (long)(NUM))
-
-/* Check a floating-point value for validity for a particular machine mode.  */
-
-#define CHECK_FLOAT_VALUE(MODE, D, OVERFLOW) \
-  ((OVERFLOW) = check_float_value (MODE, &D, OVERFLOW))
 
 /* We use the default ASCII-output routine, except that we don't write more
    than 50 characters since the assembler doesn't support very long lines.  */
@@ -1829,22 +1656,6 @@ do {						\
   }									      \
   while (0)
 
-/* This is how to output an insn to push a register on the stack.
-   It need not be very fast code.  */
-
-#define ASM_OUTPUT_REG_PUSH(FILE,REGNO)					\
- fprintf (FILE, "\tsubq $30,8,$30\n\tst%s $%s%d,0($30)\n",		\
-	  (REGNO) > 32 ? "t" : "q", (REGNO) > 32 ? "f" : "",		\
-	  (REGNO) & 31);
-
-/* This is how to output an insn to pop a register from the stack.
-   It need not be very fast code.  */
-
-#define ASM_OUTPUT_REG_POP(FILE,REGNO)					\
-  fprintf (FILE, "\tld%s $%s%d,0($30)\n\taddq $30,8,$30\n",		\
-	  (REGNO) > 32 ? "t" : "q", (REGNO) > 32 ? "f" : "",		\
-	  (REGNO) & 31);
-
 /* This is how to output an element of a case-vector that is absolute.
    (Alpha does not use such vectors, but we must define this macro anyway.)  */
 
@@ -1884,14 +1695,6 @@ do {						\
 ( fputs ("\t.lcomm ", (FILE)),				\
   assemble_name ((FILE), (NAME)),			\
   fprintf ((FILE), ",%d\n", (SIZE)))
-
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)	\
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),	\
-  sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO)))
 
 
 /* Print operand X (an rtx) in assembler syntax to file FILE.
@@ -1949,7 +1752,7 @@ do {						\
   {"alpha_fp_comparison_operator", {EQ, LE, LT, UNORDERED}},		\
   {"divmod_operator", {DIV, MOD, UDIV, UMOD}},				\
   {"const0_operand", {CONST_INT, CONST_DOUBLE, CONST_VECTOR}},		\
-  {"current_file_function_operand", {SYMBOL_REF}},			\
+  {"samegp_function_operand", {SYMBOL_REF}},				\
   {"direct_call_operand", {SYMBOL_REF}},				\
   {"local_symbolic_operand", {SYMBOL_REF, CONST, LABEL_REF}},		\
   {"small_symbolic_operand", {SYMBOL_REF, CONST}},			\
@@ -1984,8 +1787,8 @@ do {						\
   (VALIST) = alpha_build_va_list ()
 
 /* Implement `va_start' for varargs and stdarg.  */
-#define EXPAND_BUILTIN_VA_START(stdarg, valist, nextarg) \
-  alpha_va_start (stdarg, valist, nextarg)
+#define EXPAND_BUILTIN_VA_START(valist, nextarg) \
+  alpha_va_start (valist, nextarg)
 
 /* Implement `va_arg'.  */
 #define EXPAND_BUILTIN_VA_ARG(valist, type) \
@@ -2000,9 +1803,9 @@ do {						\
 
 /* Definitions for debugging.  */
 
-#define SDB_DEBUGGING_INFO		/* generate info for mips-tfile */
-#define DBX_DEBUGGING_INFO		/* generate embedded stabs */
-#define MIPS_DEBUGGING_INFO		/* MIPS specific debugging info */
+#define SDB_DEBUGGING_INFO 1		/* generate info for mips-tfile */
+#define DBX_DEBUGGING_INFO 1		/* generate embedded stabs */
+#define MIPS_DEBUGGING_INFO 1		/* MIPS specific debugging info */
 
 #ifndef PREFERRED_DEBUGGING_TYPE	/* assume SDB_DEBUGGING_INFO */
 #define PREFERRED_DEBUGGING_TYPE  SDB_DEBUG
@@ -2140,8 +1943,3 @@ do {							\
 
 /* Generate calls to memcpy, etc., not bcopy, etc.  */
 #define TARGET_MEM_FUNCTIONS 1
-
-/* Output code to add DELTA to the first argument, and then jump to FUNCTION.
-   Used for C++ multiple inheritance.  */
-#define ASM_OUTPUT_MI_THUNK(FILE, THUNK_FNDECL, DELTA, FUNCTION) \
-  alpha_output_mi_thunk_osf (FILE, THUNK_FNDECL, DELTA, FUNCTION)

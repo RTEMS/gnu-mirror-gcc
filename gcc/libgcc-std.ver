@@ -175,3 +175,21 @@ GCC_3.0 {
   _Unwind_SjLj_ForcedUnwind
   _Unwind_SjLj_Resume
 }
+
+%inherit GCC_3.3 GCC_3.0
+GCC_3.3 {
+  _Unwind_FindEnclosingFunction
+}
+
+%inherit GCC_3.4 GCC_3.3
+GCC_3.4 {
+  # bit scanning and counting built-ins
+  __clzsi2
+  __clzdi2
+  __ctzsi2
+  __ctzdi2
+  __popcountsi2
+  __popcountdi2
+  __paritysi2  
+  __paritydi2  
+}

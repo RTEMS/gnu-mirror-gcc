@@ -31,6 +31,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 
 #include "rtl.h"
 #include "expr.h"
@@ -48,6 +50,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "basic-block.h"
 #include "output.h"
 #include "ssa.h"
+#include "timevar.h"
 
 /* TODO:
 
@@ -78,7 +81,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
    the same hard register in the same machine mode are in the same
    class.  */
 
-/* If conservative_reg_partition is non-zero, use a conservative
+/* If conservative_reg_partition is nonzero, use a conservative
    register partitioning algorithm (which leaves more regs after
    emerging from SSA) instead of the coalescing one.  This is being
    left in for a limited time only, as a debugging tool until the
@@ -165,7 +168,8 @@ struct rename_context;
 static inline rtx * phi_alternative
   PARAMS ((rtx, int));
 static void compute_dominance_frontiers_1
-  PARAMS ((sbitmap *frontiers, int *idom, int bb, sbitmap done));
+  PARAMS ((sbitmap *frontiers, dominance_info idom, int bb,
+	   sbitmap done, basic_block * cached_idoms));
 static void find_evaluations_1
   PARAMS ((rtx dest, rtx set, void *data));
 static void find_evaluations
@@ -183,9 +187,9 @@ static void apply_delayed_renames
 static int rename_insn_1
   PARAMS ((rtx *ptr, void *data));
 static void rename_block
-  PARAMS ((int b, int *idom));
+  PARAMS ((int b, dominance_info dom));
 static void rename_registers
-  PARAMS ((int nregs, int *idom));
+  PARAMS ((int nregs, dominance_info idom));
 
 static inline int ephi_add_node
   PARAMS ((rtx reg, rtx *nodes, int *n_nodes));
@@ -420,7 +424,7 @@ phi_alternative (set, c)
 }
 
 /* Given the SET of a phi node, remove the alternative for predecessor
-   block C.  Return non-zero on success, or zero if no alternative is
+   block C.  Return nonzero on success, or zero if no alternative is
    found for C.  */
 
 int
@@ -514,59 +518,88 @@ find_evaluations (evals, nregs)
 */
 
 static void
-compute_dominance_frontiers_1 (frontiers, idom, bb, done)
+compute_dominance_frontiers_1 (frontiers, idom, bb, done, cached_idoms)
      sbitmap *frontiers;
-     int *idom;
+     dominance_info idom;
      int bb;
      sbitmap done;
+     basic_block *cached_idoms;
 {
   basic_block b = BASIC_BLOCK (bb);
   edge e;
   basic_block c;
+  int n_dominated, i;
+  basic_block *dominated;
+
+  /* Get a list of all the blocks dominated by B so that we do not
+     have to iterate over all the blocks in the function.  */
+  n_dominated = get_dominated_by (idom, b, &dominated);
 
   SET_BIT (done, bb);
-  sbitmap_zero (frontiers[bb]);
 
   /* Do the frontier of the children first.  Not all children in the
      dominator tree (blocks dominated by this one) are children in the
      CFG, so check all blocks.  */
-  FOR_EACH_BB (c)
-    if (idom[c->index] == bb && ! TEST_BIT (done, c->index))
-      compute_dominance_frontiers_1 (frontiers, idom, c->index, done);
+  for (i = 0; i < n_dominated; i++)
+    {
+      c = dominated[i];
+      if (! TEST_BIT (done, c->index))
+        compute_dominance_frontiers_1 (frontiers, idom, c->index,
+				       done, cached_idoms);
+	
+    }
 
   /* Find blocks conforming to rule (1) above.  */
   for (e = b->succ; e; e = e->succ_next)
     {
       if (e->dest == EXIT_BLOCK_PTR)
 	continue;
-      if (idom[e->dest->index] != bb)
+      if (cached_idoms[e->dest->index]->index != bb)
 	SET_BIT (frontiers[bb], e->dest->index);
     }
 
   /* Find blocks conforming to rule (2).  */
-  FOR_EACH_BB (c)
-    if (idom[c->index] == bb)
+  for (i = 0; i < n_dominated; i++)
+    {
+      c = dominated[i];
       {
 	int x;
 	EXECUTE_IF_SET_IN_SBITMAP (frontiers[c->index], 0, x,
 	  {
-	    if (idom[x] != bb)
+	    if (cached_idoms[BASIC_BLOCK (x)->index]->index != bb)
 	      SET_BIT (frontiers[bb], x);
 	  });
       }
+    }
+
+  /* Release the array of blocks B dominates.  */
+  free (dominated);
 }
 
 void
 compute_dominance_frontiers (frontiers, idom)
      sbitmap *frontiers;
-     int *idom;
+     dominance_info idom;
 {
+  basic_block bb, *cached_idoms;
   sbitmap done = sbitmap_alloc (last_basic_block);
+
+  timevar_push (TV_DOM_FRONTIERS);
+
+  sbitmap_vector_zero (frontiers, last_basic_block);
   sbitmap_zero (done);
 
-  compute_dominance_frontiers_1 (frontiers, idom, 0, done);
+  cached_idoms = xmalloc (n_basic_blocks * sizeof (bb));
 
+  FOR_EACH_BB (bb)
+    cached_idoms[bb->index] = get_immediate_dominator (idom, bb);
+
+  compute_dominance_frontiers_1 (frontiers, idom, 0, done, cached_idoms);
+
+  free (cached_idoms);
   sbitmap_free (done);
+
+  timevar_pop (TV_DOM_FRONTIERS);
 }
 
 /* Computing the Iterated Dominance Frontier:
@@ -703,7 +736,7 @@ insert_phi_nodes (idfs, evals, nregs)
 /* Rename the registers to conform to SSA.
 
    This is essentially the algorithm presented in Figure 7.8 of Morgan,
-   with a few changes to reduce pattern search time in favour of a bit
+   with a few changes to reduce pattern search time in favor of a bit
    more memory usage.  */
 
 /* One of these is created for each set.  It will live in a list local
@@ -923,20 +956,17 @@ rename_insn_1 (ptr, data)
 	{
 	  rtx new_reg = ssa_rename_to_lookup (x);
 
-	  if (new_reg != RENAME_NO_RTX)
+	  if (new_reg != RENAME_NO_RTX && new_reg != NULL_RTX)
 	    {
-	      if (new_reg != NULL_RTX)
-		{
-		  if (GET_MODE (x) != GET_MODE (new_reg))
-		    abort ();
-		  *ptr = new_reg;
-		}
-	      else
-		{
-		  /* Undefined value used, rename it to a new pseudo register so
-		     that it cannot conflict with an existing register */
-		  *ptr = gen_reg_rtx (GET_MODE(x));
-		}
+	      if (GET_MODE (x) != GET_MODE (new_reg))
+		abort ();
+	      *ptr = new_reg;
+	    }
+	  else
+	    {
+	      /* Undefined value used, rename it to a new pseudo register so
+		 that it cannot conflict with an existing register.  */
+	      *ptr = gen_reg_rtx (GET_MODE (x));
 	    }
 	}
       return -1;
@@ -1001,7 +1031,7 @@ gen_sequence ()
 static void
 rename_block (bb, idom)
      int bb;
-     int *idom;
+     dominance_info idom;
 {
   basic_block b = BASIC_BLOCK (bb);
   edge e;
@@ -1111,7 +1141,7 @@ rename_block (bb, idom)
      dominator order.  */
 
   FOR_EACH_BB (c)
-    if (idom[c->index] == bb)
+    if (get_immediate_dominator (idom, c)->index == bb)
       rename_block (c->index, idom);
 
   /* Step Four: Update the sets to refer to their new register,
@@ -1137,7 +1167,7 @@ rename_block (bb, idom)
 static void
 rename_registers (nregs, idom)
      int nregs;
-     int *idom;
+     dominance_info idom;
 {
   VARRAY_RTX_INIT (ssa_definition, nregs * 3, "ssa_definition");
   ssa_rename_from_initialize ();
@@ -1168,7 +1198,7 @@ convert_to_ssa ()
   sbitmap *idfs;
 
   /* Element I is the immediate dominator of block I.  */
-  int *idom;
+  dominance_info idom;
 
   int nregs;
 
@@ -1182,15 +1212,14 @@ convert_to_ssa ()
      dead code.  We'll let the SSA optimizers do that.  */
   life_analysis (get_insns (), NULL, 0);
 
-  idom = (int *) alloca (last_basic_block * sizeof (int));
-  memset ((void *) idom, -1, (size_t) last_basic_block * sizeof (int));
-  calculate_dominance_info (idom, NULL, CDI_DOMINATORS);
+  idom = calculate_dominance_info (CDI_DOMINATORS);
 
   if (rtl_dump_file)
     {
       fputs (";; Immediate Dominators:\n", rtl_dump_file);
       FOR_EACH_BB (bb)
-	fprintf (rtl_dump_file, ";\t%3d = %3d\n", bb->index, idom[bb->index]);
+	fprintf (rtl_dump_file, ";\t%3d = %3d\n", bb->index,
+		 get_immediate_dominator (idom, bb)->index);
       fflush (rtl_dump_file);
     }
 
@@ -1241,6 +1270,7 @@ convert_to_ssa ()
   in_ssa_form = 1;
 
   reg_scan (get_insns (), max_reg_num (), 1);
+  free_dominance_info (idom);
 }
 
 /* REG is the representative temporary of its partition.  Add it to the
@@ -1498,7 +1528,7 @@ out:
      and C is the ith predecessor of B,
      then T0 and Ti must be equivalent.
 
-   Return non-zero iff any such cases were found for which the two
+   Return nonzero iff any such cases were found for which the two
    regs were not already in the same class.  */
 
 static int
@@ -1828,7 +1858,7 @@ struct phi_coalesce_context
 
 /* Callback function for for_each_successor_phi.  If the set
    destination and the phi alternative regs do not conflict, place
-   them in the same paritition class.  DATA is a pointer to a
+   them in the same partition class.  DATA is a pointer to a
    phi_coalesce_context struct.  */
 
 static int
@@ -2254,7 +2284,7 @@ convert_from_ssa ()
    destination, the regno of the phi argument corresponding to BB,
    and DATA.
 
-   If FN ever returns non-zero, stops immediately and returns this
+   If FN ever returns nonzero, stops immediately and returns this
    value.  Otherwise, returns zero.  */
 
 int

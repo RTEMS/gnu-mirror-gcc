@@ -26,6 +26,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 
 typedef struct dsc {unsigned short len, mbz; char *adr; } Descr;
 
@@ -396,8 +398,7 @@ main (argc, argv)
   strncpy (cwdev, cwd, devlen);
   cwdev [devlen] = '\0';
 
-  search_dirs = xmalloc (strlen (system_search_dirs) + 1);
-  strcpy (search_dirs, system_search_dirs);
+  search_dirs = xstrdup (system_search_dirs);
 
   addarg ("link");
 

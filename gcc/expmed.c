@@ -1,7 +1,7 @@
 /* Medium-level subroutines: convert bit-field store and extract
    and shifts, multiplies and divides to rtl instructions.
    Copyright (C) 1987, 1988, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -23,6 +23,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "toplev.h"
 #include "rtl.h"
 #include "tree.h"
@@ -54,7 +56,7 @@ static rtx extract_split_bit_field	PARAMS ((rtx, unsigned HOST_WIDE_INT,
 static void do_cmp_and_jump		PARAMS ((rtx, rtx, enum rtx_code,
 						 enum machine_mode, rtx));
 
-/* Non-zero means divides or modulus operations are relatively cheap for
+/* Nonzero means divides or modulus operations are relatively cheap for
    powers of two, so don't use branches; emit the operation instead.
    Usually, this will mean that the MD file will emit non-branch
    sequences.  */
@@ -534,7 +536,9 @@ store_bit_field (str_rtx, bitsize, bitnum, fieldmode, value, total_size)
      structure fields.  */
   if (GET_MODE_CLASS (GET_MODE (value)) != MODE_INT
       && GET_MODE_CLASS (GET_MODE (value)) != MODE_PARTIAL_INT)
-    value = gen_lowpart (word_mode, value);
+    value = gen_lowpart ((GET_MODE (value) == VOIDmode
+			  ? word_mode : int_mode_for_mode (GET_MODE (value))),
+			 value);
 
   /* Now OFFSET is nonzero only if OP0 is memory
      and is therefore always measured in bytes.  */
@@ -1031,25 +1035,15 @@ extract_bit_field (str_rtx, bitsize, bitnum, unsignedp,
 
   if (tmode == VOIDmode)
     tmode = mode;
+
   while (GET_CODE (op0) == SUBREG)
     {
-      int outer_size = GET_MODE_BITSIZE (GET_MODE (op0));
-      int inner_size = GET_MODE_BITSIZE (GET_MODE (SUBREG_REG (op0)));
-
-      offset += SUBREG_BYTE (op0) / UNITS_PER_WORD;
-
-      inner_size = MIN (inner_size, BITS_PER_WORD);
-
-      if (BYTES_BIG_ENDIAN && (outer_size < inner_size))
+      bitpos += SUBREG_BYTE (op0) * BITS_PER_UNIT;
+      if (bitpos > unit)
 	{
-	  bitpos += inner_size - outer_size;
-	  if (bitpos > unit)
-	    {
-	      offset += (bitpos / unit);
-	      bitpos %= unit;
-	    }
+	  offset += (bitpos / unit);
+	  bitpos %= unit;
 	}
-
       op0 = SUBREG_REG (op0);
     }
 
@@ -1086,9 +1080,13 @@ extract_bit_field (str_rtx, bitsize, bitnum, unsignedp,
       set_mem_expr (op0, 0);
     }
 
-  /* ??? We currently assume TARGET is at least as big as BITSIZE.
-     If that's wrong, the solution is to test for it and set TARGET to 0
-     if needed.  */
+  /* Extraction of a full-word or multi-word value from a structure
+     in a register or aligned memory can be done with just a SUBREG.
+     A subword value in the least significant part of a register
+     can also be extracted with a SUBREG.  For this, we need the
+     byte offset of the value in op0.  */
+
+  byte_offset = bitpos / BITS_PER_UNIT + offset * UNITS_PER_WORD;
 
   /* If OP0 is a register, BITPOS must count within a word.
      But as we have it, it counts within whatever size OP0 now has.
@@ -1098,14 +1096,9 @@ extract_bit_field (str_rtx, bitsize, bitnum, unsignedp,
       && unit > GET_MODE_BITSIZE (GET_MODE (op0)))
     bitpos += unit - GET_MODE_BITSIZE (GET_MODE (op0));
 
-  /* Extracting a full-word or multi-word value
-     from a structure in a register or aligned memory.
-     This can be done with just SUBREG.
-     So too extracting a subword value in
-     the least significant part of the register.  */
-
-  byte_offset = (bitnum % BITS_PER_WORD) / BITS_PER_UNIT
-                + (offset * UNITS_PER_WORD);
+  /* ??? We currently assume TARGET is at least as big as BITSIZE.
+     If that's wrong, the solution is to test for it and set TARGET to 0
+     if needed.  */
 
   mode1  = (VECTOR_MODE_P (tmode)
 	    ? mode
@@ -2931,7 +2924,7 @@ expand_mult_highpart (mode, op0, cnst1, target, unsignedp, max_cost)
    the result is exact for inputs up to 0x1fffffff.
    The input range can be reduced by using cross-sum rules.
    For odd divisors >= 3, the following table gives right shift counts
-   so that if an number is shifted by an integer multiple of the given
+   so that if a number is shifted by an integer multiple of the given
    amount, the remainder stays the same:
    2, 4, 3, 6, 10, 12, 4, 8, 18, 6, 11, 20, 18, 0, 5, 10, 12, 0, 12, 20,
    14, 12, 23, 21, 8, 0, 20, 18, 0, 0, 6, 12, 0, 22, 0, 18, 20, 30, 0, 0,
@@ -3049,9 +3042,12 @@ expand_divmod (rem_flag, code, mode, op0, op1, target, unsignedp)
      not straightforward to generalize this.  Maybe we should make an array
      of possible modes in init_expmed?  Save this for GCC 2.7.  */
 
-  optab1 = (op1_is_pow2 ? (unsignedp ? lshr_optab : ashr_optab)
+  optab1 = ((op1_is_pow2 && op1 != const0_rtx)
+	    ? (unsignedp ? lshr_optab : ashr_optab)
 	    : (unsignedp ? udiv_optab : sdiv_optab));
-  optab2 = (op1_is_pow2 ? optab1 : (unsignedp ? udivmod_optab : sdivmod_optab));
+  optab2 = ((op1_is_pow2 && op1 != const0_rtx)
+	    ? optab1
+	    : (unsignedp ? udivmod_optab : sdivmod_optab));
 
   for (compute_mode = mode; compute_mode != VOIDmode;
        compute_mode = GET_MODE_WIDER_MODE (compute_mode))
@@ -4167,7 +4163,7 @@ make_tree (type, x)
    MODE is the machine mode for the computation.
    X and MULT must have mode MODE.  ADD may have a different mode.
    So can X (defaults to same as MODE).
-   UNSIGNEDP is non-zero to do unsigned multiplication.  */
+   UNSIGNEDP is nonzero to do unsigned multiplication.  */
 
 bool
 const_mult_add_overflow_p (x, mult, add, mode, unsignedp)
@@ -4205,7 +4201,7 @@ const_mult_add_overflow_p (x, mult, add, mode, unsignedp)
    MODE is the machine mode for the computation.
    X and MULT must have mode MODE.  ADD may have a different mode.
    So can X (defaults to same as MODE).
-   UNSIGNEDP is non-zero to do unsigned multiplication.
+   UNSIGNEDP is nonzero to do unsigned multiplication.
    This may emit insns.  */
 
 rtx
@@ -4372,7 +4368,7 @@ emit_store_flag (target, code, op0, op1, mode, unsignedp, normalizep)
       && (normalizep || STORE_FLAG_VALUE == 1
 	  || (GET_MODE_BITSIZE (mode) <= HOST_BITS_PER_WIDE_INT
 	      && ((STORE_FLAG_VALUE & GET_MODE_MASK (mode))
-		  == (HOST_WIDE_INT) 1 << (GET_MODE_BITSIZE (mode) - 1)))))
+		  == (unsigned HOST_WIDE_INT) 1 << (GET_MODE_BITSIZE (mode) - 1)))))
     {
       subtarget = target;
 
@@ -4619,7 +4615,7 @@ emit_store_flag (target, code, op0, op1, mode, unsignedp, normalizep)
   if (code == EQ || code == NE)
     {
       /* For EQ or NE, one way to do the comparison is to apply an operation
-	 that converts the operand into a positive number if it is non-zero
+	 that converts the operand into a positive number if it is nonzero
 	 or zero if it was originally zero.  Then, for EQ, we subtract 1 and
 	 for NE we negate.  This puts the result in the sign bit.  Then we
 	 normalize with a shift, if needed.

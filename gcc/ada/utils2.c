@@ -21,12 +21,14 @@
  * MA 02111-1307, USA.                                                      *
  *                                                                          *
  * GNAT was originally developed  by the GNAT team at  New York University. *
- * It is now maintained by Ada Core Technologies Inc (http://www.gnat.com). *
+ * Extensive contributions were provided by Ada Core Technologies Inc.      *
  *                                                                          *
  ****************************************************************************/
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "flags.h"
 #include "ada.h"
@@ -1273,8 +1275,8 @@ build_unary_op (op_code, result_type, operand)
 	  TREE_READONLY (result) = TREE_READONLY (TREE_TYPE (type));
 	}
 
-      side_effects = flag_volatile 
-	|| (! TYPE_FAT_POINTER_P (type) && TYPE_VOLATILE (TREE_TYPE (type)));
+      side_effects = (! TYPE_FAT_POINTER_P (type)
+		      && TYPE_VOLATILE (TREE_TYPE (type)));
       break;
 
     case NEGATE_EXPR:

@@ -41,7 +41,6 @@ extern GTY(()) rtx dsp16xx_cmphf3_libcall;
 extern GTY(()) rtx dsp16xx_fixhfhi2_libcall;
 extern GTY(()) rtx dsp16xx_floathihf2_libcall;
 extern GTY(()) rtx dsp16xx_neghf2_libcall;
-extern GTY(()) rtx dsp16xx_umulhi3_libcall;
 extern GTY(()) rtx dsp16xx_mulhi3_libcall;
 extern GTY(()) rtx dsp16xx_udivqi3_libcall;
 extern GTY(()) rtx dsp16xx_udivhi3_libcall;
@@ -1289,9 +1288,6 @@ extern struct dsp16xx_frame_info current_frame_info;
 #define HAVE_POST_INCREMENT 1
 #define HAVE_POST_DECREMENT 1
 
-/* #define HAVE_PRE_DECREMENT 0 */
-/* #define HAVE_PRE_INCREMENT 0 */
-
 /* Recognize any constant value that is a valid address.  */
 #define CONSTANT_ADDRESS_P(X)  CONSTANT_P (X)
 
@@ -1435,80 +1431,6 @@ extern struct dsp16xx_frame_info current_frame_info;
 
 /* DESCRIBING RELATIVE COSTS OF OPERATIONS */
 
-/* Compute the cost of computing a constant rtl expression RTX
-   whose rtx-code is CODE.  The body of this macro is a portion
-   of a switch statement.  If the code is computed here,
-   return it with a return statement.  */
-#define CONST_COSTS(RTX,CODE,OUTER_CODE)                                \
-  case CONST_INT:						        \
-    return (unsigned) INTVAL (RTX) < 65536 ? 0 : 2;                     \
-  case LABEL_REF:						        \
-  case SYMBOL_REF:						        \
-  case CONST:								\
-    return COSTS_N_INSNS (1);						\
-                                                                        \
-  case CONST_DOUBLE:						        \
-    return COSTS_N_INSNS (2);
-
-/* Like CONST_COSTS but applies to nonconstant RTL expressions.
-   This can be used, for example to indicate how costly a multiply
-   instruction is.  */
-#define RTX_COSTS(X,CODE,OUTER_CODE)                            \
-  case MEM:                                                     \
-    return GET_MODE (X) == QImode ? COSTS_N_INSNS (2) :         \
-                                    COSTS_N_INSNS (4);          \
-  case DIV:                                                     \
-  case MOD:                                                     \
-    return COSTS_N_INSNS (38);                                  \
-  case MULT:                                                    \
-    if (GET_MODE (X) == QImode)                                 \
-        return COSTS_N_INSNS (2);                               \
-    else                                                        \
-        return COSTS_N_INSNS (38);                              \
-  case PLUS:                                                    \
-  case MINUS:                                                   \
-    if (GET_MODE_CLASS (GET_MODE (X)) == MODE_INT)              \
-        {                                                       \
-          return (1 +                                           \
-                  rtx_cost (XEXP (X, 0), CODE) +                \
-                  rtx_cost (XEXP (X, 1), CODE));                \
-        }                                                       \
-    else                                                        \
-        return COSTS_N_INSNS (38);                              \
-                                                                \
-  case AND: case IOR: case XOR:                                 \
-        return (1 +                                             \
-                rtx_cost (XEXP (X, 0), CODE) +                  \
-                rtx_cost (XEXP (X, 1), CODE));                  \
-                                                                \
-  case NEG: case NOT:                                           \
-    return COSTS_N_INSNS (1);                                   \
-  case ASHIFT:                                                  \
-  case ASHIFTRT:                                                \
-  case LSHIFTRT:                                                \
-    if (GET_CODE (XEXP (X,1)) == CONST_INT)                     \
-      {                                                         \
-        int number = INTVAL(XEXP (X,1));                        \
-        if (number == 1 || number == 4 || number == 8 ||        \
-            number == 16)                                       \
-            return COSTS_N_INSNS (1);                           \
-        else                                                    \
-	{                                                       \
-          if (TARGET_BMU)                                       \
-            return COSTS_N_INSNS (2);                           \
-          else                                                  \
-            return COSTS_N_INSNS (num_1600_core_shifts(number)); \
-	}                                                       \
-      }                                                         \
-    if (TARGET_BMU)                                             \
-      return COSTS_N_INSNS (1);                                 \
-    else                                                        \
-      return COSTS_N_INSNS (15);
-
-/* An expression giving the cost of an addressing mode that contains
-   address.  */
-#define ADDRESS_COST(ADDR)  dsp16xx_address_cost (ADDR)
-
 /* A c expression for the cost of moving data from a register in
    class FROM to one in class TO. The classes are expressed using
    the enumeration values such as GENERAL_REGS. A value of 2 is
@@ -1620,7 +1542,7 @@ extern struct dsp16xx_frame_info current_frame_info;
 	      fprintf (asm_out_file, "%d", c);			              \
 	      /* After an octal-escape, if a digit follows,		      \
 		 terminate one string constant and start another.	      \
-		 The Vax assembler fails to stop reading the escape	      \
+		 The VAX assembler fails to stop reading the escape	      \
 		 after three digits, so this is the only way we		      \
 		 can get it to parse the data properly.  		      \
 	      if (i < thissize - 1 && ISDIGIT (p[i + 1]))		      \
@@ -1643,22 +1565,7 @@ extern struct dsp16xx_frame_info current_frame_info;
   }									      \
   while (0)
 
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable or function
-   named NAME. LABELNO is an integer which is different for
-   each call.  */
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)			\
-  do {									\
-    int len = strlen (NAME);						\
-    char *temp = (char *) alloca (len + 3);				\
-    temp[0] = 'L';							\
-    strcpy (&temp[1], (NAME));						\
-    temp[len + 1] = '_';						\
-    temp[len + 2] = 0;							\
-    (OUTPUT) = (char *) alloca (strlen (NAME) + 11);			\
-    ASM_GENERATE_INTERNAL_LABEL (OUTPUT, temp, LABELNO);		\
-  } while (0)
+#define ASM_PN_FORMAT "*L%s_%lu"
 
 /* OUTPUT OF UNINITIALIZED VARIABLES */
 
@@ -1676,16 +1583,8 @@ extern struct dsp16xx_frame_info current_frame_info;
 
 /* OUTPUT AND GENERATION OF LABELS */
 
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME.  */
-#define ASM_OUTPUT_LABEL(FILE,NAME)	\
-  do { assemble_name (FILE, NAME); fputs (":\n", FILE); } while (0)
-
-/* This is how to output a command to make the user-level label named NAME
-   defined for reference from other files.  */
-
-#define ASM_GLOBALIZE_LABEL(FILE,NAME)	\
-  do { fputs (".global ", FILE); assemble_name (FILE, NAME); fputs ("\n", FILE);} while (0)
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP ".global "
 
 /* A C statement to output to the stdio stream any text necessary
    for declaring the name of an external symbol named name which
@@ -1710,11 +1609,6 @@ extern struct dsp16xx_frame_info current_frame_info;
 /* The prefix to add to user-visible assembler symbols.  */
 
 #define USER_LABEL_PREFIX "_"
-
-/* This is how to output an internal numbered label where
-   PREFIX is the class of label and NUM is the number within the class.  */
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)	\
-  fprintf (FILE, "%s%d:\n", PREFIX, NUM)
 
 /* This is how to store into the string LABEL
    the symbol_ref name of an internal numbered label where

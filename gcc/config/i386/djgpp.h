@@ -20,12 +20,12 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 /* Support generation of DWARF2 debugging info.  */
-#define DWARF2_DEBUGGING_INFO
+#define DWARF2_DEBUGGING_INFO 1
 
 /* Don't assume anything about the header files.  */
 #define NO_IMPLICIT_EXTERN_C
 
-#define HANDLE_SYSV_PRAGMA
+#define HANDLE_SYSV_PRAGMA 1
 
 /* Enable parsing of #pragma pack(push,<n>) and #pragma pack(pop).  */
 #define HANDLE_PRAGMA_PACK_PUSH_POP 1
@@ -63,7 +63,7 @@ Boston, MA 02111-1307, USA.  */
 
 /* Define standard DJGPP installation paths.                             */
 /* We override default /usr or /usr/local part with /dev/env/DJDIR which */
-/* points to actual DJGPP instalation directory.                         */
+/* points to actual DJGPP installation directory.                        */
 
 /* Standard include directory */
 #undef STANDARD_INCLUDE_DIR
@@ -82,13 +82,18 @@ Boston, MA 02111-1307, USA.  */
         (((NAME)[0] == '/') || ((NAME)[0] == '\\') || \
         (((NAME)[0] >= 'A') && ((NAME)[0] <= 'z') && ((NAME)[1] == ':')))
 
-#undef CPP_PREDEFINES
-#define CPP_PREDEFINES "-D__MSDOS__ -D__GO32__ -Asystem=msdos"
+#define TARGET_OS_CPP_BUILTINS()		\
+  do						\
+    {						\
+	builtin_define_std ("MSDOS");		\
+	builtin_define_std ("GO32");		\
+	builtin_assert ("system=msdos");	\
+    }						\
+  while (0)
 
 /* Include <sys/version.h> so __DJGPP__ and __DJGPP_MINOR__ are defined.  */
 #undef CPP_SPEC
 #define CPP_SPEC "-remap %{posix:-D_POSIX_SOURCE} \
-  %{!ansi:%{!std=c*:%{!std=i*:-DMSDOS}}} %{!ansi:%{!std=c*:%{!std=i*:-DGO32}}} \
   -imacros %s../include/sys/version.h"
 
 /* We need to override link_command_spec in gcc.c so support -Tdjgpp.djl.

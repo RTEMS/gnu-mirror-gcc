@@ -1,5 +1,5 @@
 /* Prototypes for alpha.c functions used in the md file & elsewhere.
-   Copyright (C) 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -54,7 +54,7 @@ extern int reg_or_cint_operand PARAMS ((rtx, enum machine_mode));
 extern int some_operand PARAMS ((rtx, enum machine_mode));
 extern int some_ni_operand PARAMS ((rtx, enum machine_mode));
 extern int input_operand PARAMS ((rtx, enum machine_mode));
-extern int current_file_function_operand PARAMS ((rtx, enum machine_mode));
+extern int samegp_function_operand PARAMS ((rtx, enum machine_mode));
 extern int direct_call_operand PARAMS ((rtx, enum machine_mode));
 extern int local_symbolic_operand PARAMS ((rtx, enum machine_mode));
 extern int small_symbolic_operand PARAMS ((rtx, enum machine_mode));
@@ -135,14 +135,14 @@ extern void alpha_initialize_trampoline PARAMS ((rtx, rtx, rtx, int, int, int));
 extern void alpha_reorg PARAMS ((rtx));
 
 extern tree alpha_build_va_list PARAMS ((void));
-extern void alpha_va_start PARAMS ((int, tree, rtx));
+extern void alpha_va_start PARAMS ((tree, rtx));
 extern rtx alpha_va_arg PARAMS ((tree, tree));
 extern rtx function_arg PARAMS ((CUMULATIVE_ARGS, enum machine_mode,
 				 tree, int));
 extern void alpha_start_function PARAMS ((FILE *, const char *, tree));
 extern void alpha_end_function PARAMS ((FILE *, const char *, tree));
-extern void alpha_output_mi_thunk_osf PARAMS ((FILE *, tree,
-					       HOST_WIDE_INT, tree));
+
+extern int alpha_find_lo_sum_using_gp PARAMS ((rtx));
 
 #ifdef REAL_VALUE_TYPE
 extern int check_float_value PARAMS ((enum machine_mode,
@@ -159,13 +159,13 @@ extern void alpha_emit_xfloating_cvt PARAMS ((enum rtx_code, rtx[]));
 #endif
 
 extern rtx alpha_need_linkage PARAMS ((const char *, int));
+extern rtx alpha_use_linkage PARAMS ((rtx, tree, int, int));
 
 #if TARGET_ABI_OPEN_VMS
 #ifdef HAVE_MACHINE_MODES
 extern enum avms_arg_type alpha_arg_type PARAMS ((enum machine_mode));
 #endif
 extern rtx alpha_arg_info_reg_val PARAMS ((CUMULATIVE_ARGS));
-extern void alpha_write_linkage PARAMS ((FILE *));
 #endif /* TARGET_ABI_OPEN_VMS */
 
 extern rtx unicosmk_add_call_info_word PARAMS ((rtx));

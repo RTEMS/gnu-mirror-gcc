@@ -1,6 +1,6 @@
 /* Operating system specific defines to be used when targeting GCC for
    hosting on Windows32, using GNU tools and the Windows32 API Library.
-   This variant uses CRTDLL.DLL insted of MSVCRTDLL.DLL.
+   This variant uses CRTDLL.DLL instead of MSVCRTDLL.DLL.
    Copyright (C) 1998, 1999, 2000 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
@@ -20,10 +20,9 @@ along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
-#undef CPP_PREDEFINES
-#define CPP_PREDEFINES "-D_WIN32 -DWIN32 \
-  -D__MINGW32__=0.2 -DWINNT  -D_X86_=1 \
-  -Asystem=winnt"
+#undef EXTRA_OS_CPP_BUILTINS
+#define EXTRA_OS_CPP_BUILTINS() \
+  do { builtin_define ("__MINGW32__=0.2"); } while (0)
 
 #undef LIBGCC_SPEC
 #define LIBGCC_SPEC \

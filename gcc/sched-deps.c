@@ -24,6 +24,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "toplev.h"
 #include "rtl.h"
 #include "tm_p.h"
@@ -81,14 +83,12 @@ static sbitmap *forward_dependency_cache;
 static int deps_may_trap_p PARAMS ((rtx));
 static void add_dependence_list PARAMS ((rtx, rtx, enum reg_note));
 static void add_dependence_list_and_free PARAMS ((rtx, rtx *, enum reg_note));
-static void remove_dependence PARAMS ((rtx, rtx));
 static void set_sched_group_p PARAMS ((rtx));
 
 static void flush_pending_lists PARAMS ((struct deps *, rtx, int, int));
 static void sched_analyze_1 PARAMS ((struct deps *, rtx, rtx));
 static void sched_analyze_2 PARAMS ((struct deps *, rtx, rtx));
 static void sched_analyze_insn PARAMS ((struct deps *, rtx, rtx, rtx));
-static rtx group_leader PARAMS ((rtx));
 
 static rtx get_condition PARAMS ((rtx));
 static int conditions_mutex_p PARAMS ((rtx, rtx));
@@ -182,7 +182,7 @@ add_dependence (insn, elem, dep_type)
      rtx elem;
      enum reg_note dep_type;
 {
-  rtx link, next;
+  rtx link;
   int present_p;
   rtx cond1, cond2;
 
@@ -214,37 +214,6 @@ add_dependence (insn, elem, dep_type)
 	     instruction if switched.  */
 	  && !modified_in_p (cond2, insn))
 	return;
-    }
-
-  /* If elem is part of a sequence that must be scheduled together, then
-     make the dependence point to the last insn of the sequence.
-     When HAVE_cc0, it is possible for NOTEs to exist between users and
-     setters of the condition codes, so we must skip past notes here.
-     Otherwise, NOTEs are impossible here.  */
-  next = next_nonnote_insn (elem);
-  if (next && INSN_P (next) && SCHED_GROUP_P (next))
-    {
-      /* Notes will never intervene here though, so don't bother checking
-         for them.  */
-      /* Hah!  Wrong.  */
-      /* We must reject CODE_LABELs, so that we don't get confused by one
-         that has LABEL_PRESERVE_P set, which is represented by the same
-         bit in the rtl as SCHED_GROUP_P.  A CODE_LABEL can never be
-         SCHED_GROUP_P.  */
-
-      rtx nnext;
-      while ((nnext = next_nonnote_insn (next)) != NULL
-	     && INSN_P (nnext)
-	     && SCHED_GROUP_P (nnext))
-	next = nnext;
-
-      /* Again, don't depend an insn on itself.  */
-      if (insn == next)
-	return;
-
-      /* Make the dependence to NEXT, the last insn of the group, instead
-         of the original ELEM.  */
-      elem = next;
     }
 
   present_p = 1;
@@ -382,76 +351,6 @@ add_dependence_list_and_free (insn, listp, dep_type)
     }
 }
 
-/* Remove ELEM wrapped in an INSN_LIST from the LOG_LINKS
-   of INSN.  Abort if not found.  */
-
-static void
-remove_dependence (insn, elem)
-     rtx insn;
-     rtx elem;
-{
-  rtx prev, link, next;
-  int found = 0;
-
-  for (prev = 0, link = LOG_LINKS (insn); link; link = next)
-    {
-      next = XEXP (link, 1);
-      if (XEXP (link, 0) == elem)
-	{
-	  if (prev)
-	    XEXP (prev, 1) = next;
-	  else
-	    LOG_LINKS (insn) = next;
-
-#ifdef INSN_SCHEDULING
-	  /* If we are removing a dependency from the LOG_LINKS list,
-	     make sure to remove it from the cache too.  */
-	  if (true_dependency_cache != NULL)
-	    {
-	      if (REG_NOTE_KIND (link) == 0)
-		RESET_BIT (true_dependency_cache[INSN_LUID (insn)],
-			   INSN_LUID (elem));
-	      else if (REG_NOTE_KIND (link) == REG_DEP_ANTI)
-		RESET_BIT (anti_dependency_cache[INSN_LUID (insn)],
-			   INSN_LUID (elem));
-	      else if (REG_NOTE_KIND (link) == REG_DEP_OUTPUT)
-		RESET_BIT (output_dependency_cache[INSN_LUID (insn)],
-			   INSN_LUID (elem));
-	    }
-#endif
-
-	  free_INSN_LIST_node (link);
-
-	  found = 1;
-	}
-      else
-	prev = link;
-    }
-
-  if (!found)
-    abort ();
-  return;
-}
-
-/* Return an insn which represents a SCHED_GROUP, which is
-   the last insn in the group.  */
-
-static rtx
-group_leader (insn)
-     rtx insn;
-{
-  rtx prev;
-
-  do
-    {
-      prev = insn;
-      insn = next_nonnote_insn (insn);
-    }
-  while (insn && INSN_P (insn) && SCHED_GROUP_P (insn));
-
-  return prev;
-}
-
 /* Set SCHED_GROUP_P and care for the rest of the bookkeeping that
    goes along with that.  */
 
@@ -459,25 +358,12 @@ static void
 set_sched_group_p (insn)
      rtx insn;
 {
-  rtx link, prev;
+  rtx prev;
 
   SCHED_GROUP_P (insn) = 1;
 
-  /* There may be a note before this insn now, but all notes will
-     be removed before we actually try to schedule the insns, so
-     it won't cause a problem later.  We must avoid it here though.  */
   prev = prev_nonnote_insn (insn);
-
-  /* Make a copy of all dependencies on the immediately previous insn,
-     and add to this insn.  This is so that all the dependencies will
-     apply to the group.  Remove an explicit dependence on this insn
-     as SCHED_GROUP_P now represents it.  */
-
-  if (find_insn_list (prev, LOG_LINKS (insn)))
-    remove_dependence (insn, prev);
-
-  for (link = LOG_LINKS (prev); link; link = XEXP (link, 1))
-    add_dependence (insn, XEXP (link, 0), REG_NOTE_KIND (link));
+  add_dependence (insn, prev, REG_DEP_ANTI);
 }
 
 /* Process an insn's memory dependencies.  There are four kinds of
@@ -922,7 +808,15 @@ sched_analyze_insn (deps, x, insn, loop_notes)
       code = GET_CODE (x);
     }
   if (code == SET || code == CLOBBER)
-    sched_analyze_1 (deps, x, insn);
+    {
+      sched_analyze_1 (deps, x, insn);
+
+      /* Bare clobber insns are used for letting life analysis, reg-stack
+	 and others know that a value is dead.  Depend on the last call
+	 instruction so that reg-stack won't get confused.  */
+      if (code == CLOBBER)
+	add_dependence_list (insn, deps->last_function_call, REG_DEP_OUTPUT);
+    }
   else if (code == PARALLEL)
     {
       int i;
@@ -973,7 +867,15 @@ sched_analyze_insn (deps, x, insn, loop_notes)
 	  INIT_REG_SET (&tmp);
 
 	  (*current_sched_info->compute_jump_reg_dependencies) (insn, &tmp);
-	  IOR_REG_SET (reg_pending_uses, &tmp);
+	  /* Make latency of jump equal to 0 by using anti-dependence.  */
+	  EXECUTE_IF_SET_IN_REG_SET (&tmp, 0, i,
+	    {
+	      struct deps_reg *reg_last = &deps->reg_last[i];
+	      add_dependence_list (insn, reg_last->sets, REG_DEP_ANTI);
+	      add_dependence_list (insn, reg_last->clobbers, REG_DEP_ANTI);
+	      reg_last->uses_length++;
+	      reg_last->uses = alloc_INSN_LIST (insn, reg_last->uses);
+	    });
 	  CLEAR_REG_SET (&tmp);
 
 	  /* All memory writes and volatile reads must happen before the
@@ -1039,14 +941,16 @@ sched_analyze_insn (deps, x, insn, loop_notes)
   /* Add dependencies if a scheduling barrier was found.  */
   if (reg_pending_barrier)
     {
+      /* In the case of barrier the most added dependencies are not
+         real, so we use anti-dependence here.  */
       if (GET_CODE (PATTERN (insn)) == COND_EXEC)
 	{
 	  EXECUTE_IF_SET_IN_REG_SET (&deps->reg_last_in_use, 0, i,
 	    {
 	      struct deps_reg *reg_last = &deps->reg_last[i];
 	      add_dependence_list (insn, reg_last->uses, REG_DEP_ANTI);
-	      add_dependence_list (insn, reg_last->sets, 0);
-	      add_dependence_list (insn, reg_last->clobbers, 0);
+	      add_dependence_list (insn, reg_last->sets, REG_DEP_ANTI);
+	      add_dependence_list (insn, reg_last->clobbers, REG_DEP_ANTI);
 	    });
 	}
       else
@@ -1056,8 +960,10 @@ sched_analyze_insn (deps, x, insn, loop_notes)
 	      struct deps_reg *reg_last = &deps->reg_last[i];
 	      add_dependence_list_and_free (insn, &reg_last->uses,
 					    REG_DEP_ANTI);
-	      add_dependence_list_and_free (insn, &reg_last->sets, 0);
-	      add_dependence_list_and_free (insn, &reg_last->clobbers, 0);
+	      add_dependence_list_and_free (insn, &reg_last->sets,
+					    REG_DEP_ANTI);
+	      add_dependence_list_and_free (insn, &reg_last->clobbers,
+					    REG_DEP_ANTI);
 	      reg_last->uses_length = 0;
 	      reg_last->clobbers_length = 0;
 	    });
@@ -1117,8 +1023,6 @@ sched_analyze_insn (deps, x, insn, loop_notes)
 	  EXECUTE_IF_SET_IN_REG_SET (reg_pending_clobbers, 0, i,
 	    {
 	      struct deps_reg *reg_last = &deps->reg_last[i];
-	      add_dependence_list (insn, reg_last->sets, REG_DEP_OUTPUT);
-	      add_dependence_list (insn, reg_last->uses, REG_DEP_ANTI);
 	      if (reg_last->uses_length > MAX_PENDING_LIST_LENGTH
 		  || reg_last->clobbers_length > MAX_PENDING_LIST_LENGTH)
 		{
@@ -1128,6 +1032,7 @@ sched_analyze_insn (deps, x, insn, loop_notes)
 						REG_DEP_ANTI);
 		  add_dependence_list_and_free (insn, &reg_last->clobbers,
 						REG_DEP_OUTPUT);
+		  reg_last->sets = alloc_INSN_LIST (insn, reg_last->sets);
 		  reg_last->clobbers_length = 0;
 		  reg_last->uses_length = 0;
 		}
@@ -1280,8 +1185,12 @@ sched_analyze (deps, head, tail)
 		    SET_REGNO_REG_SET (reg_pending_sets, i);
 		    SET_REGNO_REG_SET (reg_pending_uses, i);
 		  }
-		/* Other call-clobbered hard regs may be clobbered.  */
-		else if (TEST_HARD_REG_BIT (regs_invalidated_by_call, i))
+		/* Other call-clobbered hard regs may be clobbered.
+		   Since we only have a choice between 'might be clobbered'
+		   and 'definitely not clobbered', we must include all
+		   partly call-clobbered registers here.  */
+		else if (HARD_REGNO_CALL_PART_CLOBBERED (i, reg_raw_mode[i])
+			 || TEST_HARD_REG_BIT (regs_invalidated_by_call, i))
 		  SET_REGNO_REG_SET (reg_pending_clobbers, i);
 		/* We don't know what set of fixed registers might be used
 		   by the function, but it is certain that the stack pointer
@@ -1419,11 +1328,9 @@ compute_forward_dependences (head, tail)
       if (! INSN_P (insn))
 	continue;
 
-      insn = group_leader (insn);
-
       for (link = LOG_LINKS (insn); link; link = XEXP (link, 1))
 	{
-	  rtx x = group_leader (XEXP (link, 0));
+	  rtx x = XEXP (link, 0);
 	  rtx new_link;
 
 	  if (x != XEXP (link, 0))
@@ -1520,7 +1427,7 @@ free_deps (deps)
 }
 
 /* If it is profitable to use them, initialize caches for tracking
-   dependency informatino.  LUID is the number of insns to be scheduled,
+   dependency information.  LUID is the number of insns to be scheduled,
    it is used in the estimate of profitability.  */
 
 void

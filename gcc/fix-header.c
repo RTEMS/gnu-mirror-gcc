@@ -71,8 +71,10 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
 
    Written by Per Bothner <bothner@cygnus.com>, July 1993.  */
 
-#include "hconfig.h"
+#include "bconfig.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "obstack.h"
 #include "scan.h"
 #include "cpplib.h"
@@ -372,8 +374,6 @@ int seen_errno = 0;
 /* The following are only used when handling stdlib.h */
 int seen_EXIT_FAILURE = 0, seen_EXIT_SUCCESS = 0;
 
-#define obstack_chunk_alloc xmalloc
-#define obstack_chunk_free free
 struct obstack scan_file_obstack;
 
 /* NOTE:  If you edit this, also edit gen-protos.c !! */
@@ -634,7 +634,6 @@ read_scan_file (in_fname, argc, argv)
   i = cpp_handle_options (scan_in, argc, argv);
   if (i < argc)
     cpp_error (scan_in, DL_ERROR, "invalid option `%s'", argv[i]);
-  cpp_post_options (scan_in);
   if (cpp_errors (scan_in))
     exit (FATAL_EXIT_CODE);
 

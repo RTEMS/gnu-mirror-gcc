@@ -1,33 +1,35 @@
 /* Language-level data type conversion for GNU C++.
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
-This file is part of GNU CC.
+This file is part of GCC.
 
-GNU CC is free software; you can redistribute it and/or modify
+GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2, or (at your option)
 any later version.
 
-GNU CC is distributed in the hope that it will be useful,
+GCC is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU CC; see the file COPYING.  If not, write to
+along with GCC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 
-/* This file contains the functions for converting C expressions
+/* This file contains the functions for converting C++ expressions
    to different data types.  The only entry point is `convert'.
    Every language front end must have a `convert' function
    but what kind of conversions it does will depend on the language.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "flags.h"
 #include "cp-tree.h"
@@ -35,10 +37,10 @@ Boston, MA 02111-1307, USA.  */
 #include "toplev.h"
 #include "decl.h"
 
-static tree cp_convert_to_pointer PARAMS ((tree, tree, int));
-static tree convert_to_pointer_force PARAMS ((tree, tree));
-static tree build_up_reference PARAMS ((tree, tree, int, tree));
-static void warn_ref_binding PARAMS ((tree, tree, tree));
+static tree cp_convert_to_pointer (tree, tree, bool);
+static tree convert_to_pointer_force (tree, tree);
+static tree build_up_reference (tree, tree, int, tree);
+static void warn_ref_binding (tree, tree, tree);
 
 /* Change of width--truncation and extension of integers or reals--
    is represented with NOP_EXPR.  Proper functioning of many things
@@ -72,9 +74,7 @@ static void warn_ref_binding PARAMS ((tree, tree, tree));
    but not static_cast).  */
 
 static tree
-cp_convert_to_pointer (type, expr, force)
-     tree type, expr;
-     int force;
+cp_convert_to_pointer (tree type, tree expr, bool force)
 {
   register tree intype = TREE_TYPE (expr);
   register enum tree_code form;
@@ -90,7 +90,7 @@ cp_convert_to_pointer (type, expr, force)
 	  return error_mark_node;
 	}
 
-      rval = build_type_conversion (type, expr, 1);
+      rval = build_type_conversion (type, expr, true);
       if (rval)
 	{
 	  if (rval == error_mark_node)
@@ -149,12 +149,12 @@ cp_convert_to_pointer (type, expr, force)
 	  enum tree_code code = PLUS_EXPR;
 	  tree binfo;
 
-	  /* Try derived to base conversion. */
+	  /* Try derived to base conversion.  */
 	  binfo = lookup_base (TREE_TYPE (intype), TREE_TYPE (type),
 			       ba_check, NULL);
 	  if (!binfo)
 	    {
-	      /* Try base to derived conversion. */
+	      /* Try base to derived conversion.  */
 	      binfo = lookup_base (TREE_TYPE (type), TREE_TYPE (intype),
 				   ba_check, NULL);
 	      code = MINUS_EXPR;
@@ -164,7 +164,7 @@ cp_convert_to_pointer (type, expr, force)
 	  if (binfo)
 	    {
 	      expr = build_base_path (code, expr, binfo, 0);
-	      /* Add any qualifier conversions. */
+	      /* Add any qualifier conversions.  */
 	      if (!same_type_p (TREE_TYPE (TREE_TYPE (expr)),
 				TREE_TYPE (type)))
 		{
@@ -252,7 +252,15 @@ cp_convert_to_pointer (type, expr, force)
       else
 	expr = build_int_2 (0, 0);
       TREE_TYPE (expr) = type;
+      /* Fix up the representation of -1 if appropriate.  */
+      force_fit_type (expr, 0);
       return expr;
+    }
+  else if ((TYPE_PTRMEM_P (type) || TYPE_PTRMEMFUNC_P (type))
+	   && INTEGRAL_CODE_P (form))
+    {
+      error ("invalid conversion from '%T' to '%T'", intype, type);
+      return error_mark_node;
     }
 
   if (INTEGRAL_CODE_P (form))
@@ -282,8 +290,7 @@ cp_convert_to_pointer (type, expr, force)
    (such as conversion from sub-type to private super-type).  */
 
 static tree
-convert_to_pointer_force (type, expr)
-     tree type, expr;
+convert_to_pointer_force (tree type, tree expr)
 {
   register tree intype = TREE_TYPE (expr);
   register enum tree_code form = TREE_CODE (intype);
@@ -314,7 +321,9 @@ convert_to_pointer_force (type, expr)
 	  if (binfo)
 	    {
 	      expr = build_base_path (code, expr, binfo, 0);
-	      /* Add any qualifier conversions. */
+              if (expr == error_mark_node)
+                 return error_mark_node;
+	      /* Add any qualifier conversions.  */
 	      if (!same_type_p (TREE_TYPE (TREE_TYPE (expr)),
 				TREE_TYPE (type)))
 		{
@@ -328,7 +337,7 @@ convert_to_pointer_force (type, expr)
 	}
     }
 
-  return cp_convert_to_pointer (type, expr, 1);
+  return cp_convert_to_pointer (type, expr, true);
 }
 
 /* We are passing something to a function which requires a reference.
@@ -340,9 +349,7 @@ convert_to_pointer_force (type, expr)
      If DIRECT_BIND is set, DECL is the reference we're binding to.  */
 
 static tree
-build_up_reference (type, arg, flags, decl)
-     tree type, arg, decl;
-     int flags;
+build_up_reference (tree type, tree arg, int flags, tree decl)
 {
   tree rval;
   tree argtype = TREE_TYPE (arg);
@@ -374,7 +381,8 @@ build_up_reference (type, arg, flags, decl)
 	{
 	  /* Automatic; make sure we handle the cleanup properly.  */
 	  maybe_push_cleanup_level (argtype);
-	  arg = pushdecl (arg);
+	  /* Don't push unnamed temps.  Do set DECL_CONTEXT, though.  */
+	  DECL_CONTEXT (arg) = current_function_decl;
 	}
 
       /* Process the initializer for the declaration.  */
@@ -429,8 +437,7 @@ build_up_reference (type, arg, flags, decl)
    non-volatile const type.  */
 
 static void
-warn_ref_binding (reftype, intype, decl)
-     tree reftype, intype, decl;
+warn_ref_binding (tree reftype, tree intype, tree decl)
 {
   tree ttl = TREE_TYPE (reftype);
   
@@ -459,27 +466,27 @@ warn_ref_binding (reftype, intype, decl)
    we know it's an initialization.  */
 
 tree
-convert_to_reference (reftype, expr, convtype, flags, decl)
-     tree reftype, expr;
-     int convtype, flags;
-     tree decl;
+convert_to_reference (tree reftype, tree expr, int convtype,
+                      int flags, tree decl)
 {
   register tree type = TYPE_MAIN_VARIANT (TREE_TYPE (reftype));
-  register tree intype = TREE_TYPE (expr);
+  register tree intype;
   tree rval = NULL_TREE;
   tree rval_as_conversion = NULL_TREE;
   int i;
 
-  if (TREE_CODE (type) == FUNCTION_TYPE && intype == unknown_type_node)
-    {
-      expr = instantiate_type (type, expr, 
-			       (flags & LOOKUP_COMPLAIN)
-	                       ? tf_error | tf_warning : tf_none);
-      if (expr == error_mark_node)
-	return error_mark_node;
+  if (TREE_CODE (type) == FUNCTION_TYPE 
+      && TREE_TYPE (expr) == unknown_type_node)
+    expr = instantiate_type (type, expr, 
+			     (flags & LOOKUP_COMPLAIN)
+			     ? tf_error | tf_warning : tf_none);
+  else
+    expr = convert_from_reference (expr);
 
-      intype = TREE_TYPE (expr);
-    }
+  if (expr == error_mark_node)
+    return error_mark_node;
+
+  intype = TREE_TYPE (expr);
 
   my_friendly_assert (TREE_CODE (intype) != REFERENCE_TYPE, 364);
 
@@ -577,8 +584,7 @@ convert_to_reference (reftype, expr, convtype, flags, decl)
    way down to its lowest form.  */
 
 tree
-convert_from_reference (val)
-     tree val;
+convert_from_reference (tree val)
 {
   tree type = TREE_TYPE (val);
 
@@ -593,8 +599,7 @@ convert_from_reference (val)
    preserving cv-qualification.  */
 
 tree
-convert_lvalue (totype, expr)
-     tree totype, expr;
+convert_lvalue (tree totype, tree expr)
 {
   totype = cp_build_qualified_type (totype, TYPE_QUALS (TREE_TYPE (expr)));
   totype = build_reference_type (totype);
@@ -606,8 +611,7 @@ convert_lvalue (totype, expr)
 /* C++ conversions, preference to static cast conversions.  */
 
 tree
-cp_convert (type, expr)
-     tree type, expr;
+cp_convert (tree type, tree expr)
 {
   return ocp_convert (type, expr, CONV_OLD_CONVERT, LOOKUP_NORMAL);
 }
@@ -617,9 +621,7 @@ cp_convert (type, expr)
    FLAGS indicates how we should behave.  */
 
 tree
-ocp_convert (type, expr, convtype, flags)
-     tree type, expr;
-     int convtype, flags;
+ocp_convert (tree type, tree expr, int convtype, int flags)
 {
   register tree e = expr;
   register enum tree_code code = TREE_CODE (type);
@@ -653,6 +655,19 @@ ocp_convert (type, expr, convtype, flags)
          conversion.  */
       else if (TREE_CODE (type) == COMPLEX_TYPE)
         return fold (convert_to_complex (type, e));
+      else if (TREE_CODE (e) == TARGET_EXPR)
+	{
+	  /* Don't build a NOP_EXPR of class type.  Instead, change the
+	     type of the temporary.  Only allow this for cv-qual changes,
+	     though.  */
+	  if (!same_type_p (TYPE_MAIN_VARIANT (TREE_TYPE (e)),
+			    TYPE_MAIN_VARIANT (type)))
+	    abort ();
+	  TREE_TYPE (e) = TREE_TYPE (TARGET_EXPR_SLOT (e)) = type;
+	  return e;
+	}
+      else if (CLASS_TYPE_P (type))
+	abort ();
       else
 	return fold (build1 (NOP_EXPR, type, e));
     }
@@ -718,7 +733,7 @@ ocp_convert (type, expr, convtype, flags)
     }
   if (code == POINTER_TYPE || code == REFERENCE_TYPE
       || TYPE_PTRMEMFUNC_P (type))
-    return fold (cp_convert_to_pointer (type, e, 0));
+    return fold (cp_convert_to_pointer (type, e, false));
   if (code == VECTOR_TYPE)
     return fold (convert_to_vector (type, e));
   if (code == REAL_TYPE || code == COMPLEX_TYPE)
@@ -769,21 +784,13 @@ ocp_convert (type, expr, convtype, flags)
 	   the target with the temp (see [dcl.init]).  */
 	ctor = build_user_type_conversion (type, ctor, flags);
       else
-	ctor = build_method_call (NULL_TREE, 
-				  complete_ctor_identifier,
-				  build_tree_list (NULL_TREE, ctor),
-				  TYPE_BINFO (type), flags);
+	ctor = build_special_member_call (NULL_TREE, 
+					  complete_ctor_identifier,
+					  build_tree_list (NULL_TREE, ctor),
+					  TYPE_BINFO (type), flags);
       if (ctor)
 	return build_cplus_new (type, ctor);
     }
-
-  /* If TYPE or TREE_TYPE (E) is not on the permanent_obstack,
-     then it won't be hashed and hence compare as not equal,
-     even when it is.  */
-  if (code == ARRAY_TYPE
-      && TREE_TYPE (TREE_TYPE (e)) == TREE_TYPE (type)
-      && index_type_equal (TYPE_DOMAIN (TREE_TYPE (e)), TYPE_DOMAIN (type)))
-    return e;
 
   if (flags & LOOKUP_COMPLAIN)
     error ("conversion from `%T' to non-scalar type `%T' requested",
@@ -811,9 +818,7 @@ ocp_convert (type, expr, convtype, flags)
    IMPLICIT is tells us the context of an implicit void conversion.  */
 
 tree
-convert_to_void (expr, implicit)
-     tree expr;
-     const char *implicit;
+convert_to_void (tree expr, const char *implicit)
 {
   if (expr == error_mark_node 
       || TREE_TYPE (expr) == error_mark_node)
@@ -857,7 +862,7 @@ convert_to_void (expr, implicit)
     
     case NON_LVALUE_EXPR:
     case NOP_EXPR:
-      /* These have already decayed to rvalue. */
+      /* These have already decayed to rvalue.  */
       break;
     
     case CALL_EXPR:   /* we have a special meaning for volatile void fn() */
@@ -951,8 +956,7 @@ convert_to_void (expr, implicit)
    do a little bit more work.  */
 
 tree
-convert (type, expr)
-     tree type, expr;
+convert (tree type, tree expr)
 {
   tree intype;
 
@@ -976,10 +980,7 @@ convert (type, expr)
    (such as conversion from sub-type to private super-type).  */
 
 tree
-convert_force (type, expr, convtype)
-     tree type;
-     tree expr;
-     int convtype;
+convert_force (tree type, tree expr, int convtype)
 {
   register tree e = expr;
   register enum tree_code code = TREE_CODE (type);
@@ -1014,7 +1015,7 @@ convert_force (type, expr, convtype)
    allowed (references private members, etc).
    If no conversion exists, NULL_TREE is returned.
 
-   If (FOR_SURE & 1) is non-zero, then we allow this type conversion
+   If (FOR_SURE & 1) is nonzero, then we allow this type conversion
    to take place immediately.  Otherwise, we build a SAVE_EXPR
    which can be evaluated if the results are ever needed.
 
@@ -1026,9 +1027,7 @@ convert_force (type, expr, convtype)
    (jason 8/9/95)  */
 
 tree
-build_type_conversion (xtype, expr, for_sure)
-     tree xtype, expr;
-     int for_sure;
+build_type_conversion (tree xtype, tree expr, int for_sure)
 {
   /* C++: check to see if we can convert this aggregate type
      into the required type.  */
@@ -1038,14 +1037,11 @@ build_type_conversion (xtype, expr, for_sure)
 
 /* Convert the given EXPR to one of a group of types suitable for use in an
    expression.  DESIRES is a combination of various WANT_* flags (q.v.)
-   which indicates which types are suitable.  If COMPLAIN is 1, complain
+   which indicates which types are suitable.  If COMPLAIN is true, complain
    about ambiguity; otherwise, the caller will deal with it.  */
 
 tree
-build_expr_type_conversion (desires, expr, complain)
-     int desires;
-     tree expr;
-     int complain;
+build_expr_type_conversion (int desires, tree expr, bool complain)
 {
   tree basetype = TREE_TYPE (expr);
   tree conv = NULL_TREE;
@@ -1156,8 +1152,7 @@ build_expr_type_conversion (desires, expr, complain)
 /* Implements integral promotion (4.1) and float->double promotion.  */
 
 tree
-type_promotes_to (type)
-     tree type;
+type_promotes_to (tree type)
 {
   int type_quals;
 
@@ -1211,9 +1206,7 @@ type_promotes_to (type)
    the conversion was impossible.  */
 
 tree 
-perform_qualification_conversions (type, expr)
-     tree type;
-     tree expr;
+perform_qualification_conversions (tree type, tree expr)
 {
   if (TREE_CODE (type) == POINTER_TYPE
       && TREE_CODE (TREE_TYPE (expr)) == POINTER_TYPE

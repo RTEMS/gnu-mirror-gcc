@@ -383,20 +383,12 @@ extern int flag_pic;				/* -fpic */
    when given unaligned data.  */
 #define STRICT_ALIGNMENT 1
 
-/* A bitfield declared as `int' forces `int' alignment for the struct.  */
+/* A bit-field declared as `int' forces `int' alignment for the struct.  */
 #define PCC_BITFIELD_TYPE_MATTERS 1
 
 /* Maximum size (in bits) to use for the largest integral type that
    replaces a BLKmode type. */
 /* #define MAX_FIXED_MODE_SIZE 0 */
-
-/* Check a `double' value for validity for a particular machine mode.
-   This is defined to avoid crashes outputting certain constants.
-   Since we output the number in hex, the assembler won't choke on it.  */
-/* #define CHECK_FLOAT_VALUE(MODE,VALUE) */
-
-/* A code distinguishing the floating point format of the target machine.  */
-/* #define TARGET_FLOAT_FORMAT IEEE_FLOAT_FORMAT */
 
 /*** Register Usage ***/
 
@@ -1025,8 +1017,8 @@ enum reg_class { NO_REGS, AP_REG, XRF_REGS, GENERAL_REGS, AGRF_REGS,
   (VALIST) = m88k_build_va_list ()
 
 /* Implement `va_start' for varargs and stdarg.  */
-#define EXPAND_BUILTIN_VA_START(stdarg, valist, nextarg) \
-  m88k_va_start (stdarg, valist, nextarg)
+#define EXPAND_BUILTIN_VA_START(valist, nextarg) \
+  m88k_va_start (valist, nextarg)
 
 /* Implement `va_arg'.  */
 #define EXPAND_BUILTIN_VA_ARG(valist, type) \
@@ -1052,8 +1044,7 @@ enum reg_class { NO_REGS, AP_REG, XRF_REGS, GENERAL_REGS, AGRF_REGS,
    may be accessed via the stack pointer) in functions that seem suitable.
    This is computed in `reload', in reload1.c.  */
 #define FRAME_POINTER_REQUIRED \
-(current_function_varargs 					\
- || (TARGET_OMIT_LEAF_FRAME_POINTER && !leaf_function_p ()) 	\
+((TARGET_OMIT_LEAF_FRAME_POINTER && !leaf_function_p ()) 	\
  || (write_symbols != NO_DEBUG && !TARGET_OCS_FRAME_POSITION))
 
 /* Definitions for register eliminations.
@@ -1113,7 +1104,7 @@ enum reg_class { NO_REGS, AP_REG, XRF_REGS, GENERAL_REGS, AGRF_REGS,
   fprintf (FILE, "\tor\t %s,%s,0\n", reg_names[11], reg_names[1]);	\
   /* Locate this block; transfer to the next instruction.  */		\
   fprintf (FILE, "\tbsr\t %s\n", &buf[1]);					\
-  ASM_OUTPUT_INTERNAL_LABEL (FILE, "LTRMP", labelno);			\
+  (*targetm.asm_out.internal_label) (FILE, "LTRMP", labelno);			\
   /* Save r10; use it as the relative pointer; restore r1.  */		\
   fprintf (FILE, "\tst\t %s,%s,24\n", reg_names[10], reg_names[1]);	\
   fprintf (FILE, "\tor\t %s,%s,0\n", reg_names[10], reg_names[1]);	\
@@ -1163,12 +1154,6 @@ enum reg_class { NO_REGS, AP_REG, XRF_REGS, GENERAL_REGS, AGRF_REGS,
 /*** Addressing Modes ***/
 
 #define SELECT_CC_MODE(OP,X,Y) CCmode
-
-/* #define HAVE_POST_INCREMENT 0 */
-/* #define HAVE_POST_DECREMENT 0 */
-
-/* #define HAVE_PRE_DECREMENT 0 */
-/* #define HAVE_PRE_INCREMENT 0 */
 
 /* Recognize any constant value that is a valid address.
    When PIC, we do not accept an address that would require a scratch reg
@@ -1447,11 +1432,8 @@ enum reg_class { NO_REGS, AP_REG, XRF_REGS, GENERAL_REGS, AGRF_REGS,
 /* The 88open ABI says size_t is unsigned int.  */
 #define SIZE_TYPE "unsigned int"
 
-/* Allow and ignore #sccs directives */
-#define SCCS_DIRECTIVE
-
 /* Handle #pragma pack and sometimes #pragma weak.  */
-#define HANDLE_SYSV_PRAGMA
+#define HANDLE_SYSV_PRAGMA 1
 
 /* Tell when to handle #pragma weak.  This is only done for V.4.  */
 #define SUPPORTS_WEAK TARGET_SVR4
@@ -1522,64 +1504,6 @@ enum reg_class { NO_REGS, AP_REG, XRF_REGS, GENERAL_REGS, AGRF_REGS,
    state with CC_STATUS_INIT for now.  */
 #define CC_STATUS_INIT m88k_volatile_code = '\0'
 
-/* Compute the cost of computing a constant rtl expression RTX
-   whose rtx-code is CODE.  The body of this macro is a portion
-   of a switch statement.  If the code is computed here,
-   return it with a return statement.  Otherwise, break from the switch.
-
-   We assume that any 16 bit integer can easily be recreated, so we
-   indicate 0 cost, in an attempt to get GCC not to optimize things
-   like comparison against a constant.
-
-   The cost of CONST_DOUBLE is zero (if it can be placed in an insn, it
-   is as good as a register; since it can't be placed in any insn, it
-   won't do anything in cse, but it will cause expand_binop to pass the
-   constant to the define_expands).  */
-#define CONST_COSTS(RTX,CODE,OUTER_CODE)		\
-  case CONST_INT:					\
-    if (SMALL_INT (RTX))				\
-      return 0;						\
-    else if (SMALL_INTVAL (- INTVAL (RTX)))		\
-      return 2;						\
-    else if (classify_integer (SImode, INTVAL (RTX)) != m88k_oru_or) \
-      return 4;						\
-    return 7;						\
-  case HIGH:						\
-    return 2;						\
-  case CONST:						\
-  case LABEL_REF:					\
-  case SYMBOL_REF:					\
-    if (flag_pic)					\
-      return (flag_pic == 2) ? 11 : 8;			\
-    return 5;						\
-  case CONST_DOUBLE:					\
-    return 0;
-
-/* Provide the costs of an addressing mode that contains ADDR.
-   If ADDR is not a valid address, its cost is irrelevant.
-   REG+REG is made slightly more expensive because it might keep
-   a register live for longer than we might like.  */
-#define ADDRESS_COST(ADDR)				\
-  (GET_CODE (ADDR) == REG ? 1 :				\
-   GET_CODE (ADDR) == LO_SUM ? 1 :			\
-   GET_CODE (ADDR) == HIGH ? 2 :			\
-   GET_CODE (ADDR) == MULT ? 1 :			\
-   GET_CODE (ADDR) != PLUS ? 4 :			\
-   (REG_P (XEXP (ADDR, 0)) && REG_P (XEXP (ADDR, 1))) ? 2 : 1)
-
-/* Provide the costs of a rtl expression.  This is in the body of a
-   switch on CODE.  */
-#define RTX_COSTS(X,CODE,OUTER_CODE)				\
-  case MEM:						\
-    return COSTS_N_INSNS (2);				\
-  case MULT:						\
-    return COSTS_N_INSNS (3);				\
-  case DIV:						\
-  case UDIV:						\
-  case MOD:						\
-  case UMOD:						\
-    return COSTS_N_INSNS (38);
-
 /* A C expressions returning the cost of moving data of MODE from a register
    to or from memory.  This is more costly than between registers.  */
 #define MEMORY_MOVE_COST(MODE,CLASS,IN) 4
@@ -1636,7 +1560,6 @@ enum reg_class { NO_REGS, AP_REG, XRF_REGS, GENERAL_REGS, AGRF_REGS,
 /* These are pretty much common to all assemblers.  */
 #define IDENT_ASM_OP		"\tident\t"
 #define FILE_ASM_OP		"\tfile\t"
-#define SECTION_ASM_OP		"\tsection\t"
 #define SET_ASM_OP		"\tdef\t"
 #define GLOBAL_ASM_OP		"\tglobal\t"
 #define ALIGN_ASM_OP		"\talign\t"
@@ -1739,7 +1662,7 @@ enum reg_class { NO_REGS, AP_REG, XRF_REGS, GENERAL_REGS, AGRF_REGS,
 
 #define ASM_OUTPUT_SOURCE_FILENAME(FILE, NAME) \
   do {                                         \
-    fprintf (FILE_ASM_OP, FILE);               \
+    fputs (FILE_ASM_OP, FILE);                 \
     output_quoted_string (FILE, NAME);         \
     putc ('\n', FILE);                         \
   } while (0)
@@ -1818,38 +1741,31 @@ enum reg_class { NO_REGS, AP_REG, XRF_REGS, GENERAL_REGS, AGRF_REGS,
 #define ASM_DECLARE_FUNCTION_NAME(FILE, NAME, DECL)			\
   do {									\
     if (DECLARE_ASM_NAME)						\
-      {									\
-	fprintf (FILE, "%s", TYPE_ASM_OP);				\
-	assemble_name (FILE, NAME);					\
-	putc (',', FILE);						\
-	fprintf (FILE, TYPE_OPERAND_FMT, "function");			\
-	putc ('\n', FILE);						\
-      }									\
+      ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "function");		\
     ASM_OUTPUT_LABEL(FILE, NAME);					\
   } while (0)
 
 /* Write the extra assembler code needed to declare an object properly.  */
 #undef	ASM_DECLARE_OBJECT_NAME
-#define ASM_DECLARE_OBJECT_NAME(FILE, NAME, DECL)			    \
-  do {									    \
-    if (DECLARE_ASM_NAME)						    \
-      {									    \
-	fprintf (FILE, "%s", TYPE_ASM_OP);				    \
-	assemble_name (FILE, NAME);					    \
-	putc (',', FILE);						    \
-	fprintf (FILE, TYPE_OPERAND_FMT, "object");			    \
-	putc ('\n', FILE);						    \
-        size_directive_output = 0;					    \
-	if (!flag_inhibit_size_directive && DECL_SIZE (DECL))		    \
-	  {								    \
-            size_directive_output = 1;					    \
-	    fprintf (FILE, "%s", SIZE_ASM_OP);				    \
-	    assemble_name (FILE, NAME);					    \
-	    fprintf (FILE, ",%d\n",  int_size_in_bytes (TREE_TYPE (DECL))); \
-	  }								    \
-      }									    \
-    ASM_OUTPUT_LABEL(FILE, NAME);					    \
-  } while (0)
+#define ASM_DECLARE_OBJECT_NAME(FILE, NAME, DECL)			\
+  do {									\
+    if (DECLARE_ASM_NAME)						\
+      {									\
+	HOST_WIDE_INT size;						\
+									\
+	ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "object");		\
+									\
+	size_directive_output = 0;					\
+	if (!flag_inhibit_size_directive				\
+	    && (DECL) && DECL_SIZE (DECL))				\
+	  {								\
+	    size_directive_output = 1;					\
+	    size = int_size_in_bytes (TREE_TYPE (DECL));		\
+	    ASM_OUTPUT_SIZE_DIRECTIVE (FILE, NAME, size);		\
+	  }								\
+      }									\
+    ASM_OUTPUT_LABEL(FILE, NAME);					\
+  } while (0);
 
 /* Output the size directive for a decl in rest_of_decl_compilation
    in the case where we did not do so before the initializer.
@@ -1861,6 +1777,7 @@ enum reg_class { NO_REGS, AP_REG, XRF_REGS, GENERAL_REGS, AGRF_REGS,
 #define ASM_FINISH_DECLARE_OBJECT(FILE, DECL, TOP_LEVEL, AT_END)	 \
 do {									 \
      const char *name = XSTR (XEXP (DECL_RTL (DECL), 0), 0);		 \
+     HOST_WIDE_INT size;						 \
      if (!flag_inhibit_size_directive && DECL_SIZE (DECL)		 \
 	 && DECLARE_ASM_NAME						 \
          && ! AT_END && TOP_LEVEL					 \
@@ -1868,9 +1785,8 @@ do {									 \
 	 && !size_directive_output)					 \
        {								 \
 	 size_directive_output = 1;					 \
-	 fprintf (FILE, "%s", SIZE_ASM_OP);				 \
-	 assemble_name (FILE, name);					 \
-	 fprintf (FILE, ",%d\n",  int_size_in_bytes (TREE_TYPE (DECL))); \
+	 size = int_size_in_bytes (TREE_TYPE (DECL));			 \
+	 ASM_OUTPUT_SIZE_DIRECTIVE (FILE, name, size);			 \
        }								 \
    } while (0)
 
@@ -1878,36 +1794,8 @@ do {									 \
 #undef	ASM_DECLARE_FUNCTION_SIZE
 #define ASM_DECLARE_FUNCTION_SIZE(FILE, FNAME, DECL)			\
   do {									\
-    if (DECLARE_ASM_NAME)						\
-      {									\
-	if (!flag_inhibit_size_directive)				\
-	  {								\
-	    char label[256];						\
-	    static int labelno = 0;					\
-	    labelno++;							\
-	    ASM_GENERATE_INTERNAL_LABEL (label, "Lfe", labelno);	\
-	    ASM_OUTPUT_INTERNAL_LABEL (FILE, "Lfe", labelno);		\
-	    fprintf (FILE, "%s", SIZE_ASM_OP);				\
-	    assemble_name (FILE, (FNAME));				\
-	    fprintf (FILE, ",%s-", &label[1]);				\
-	    assemble_name (FILE, (FNAME));				\
-	    putc ('\n', FILE);						\
-	  }								\
-      }									\
-  } while (0)
-
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME.  */
-#define ASM_OUTPUT_LABEL(FILE,NAME)	\
-  do { assemble_name (FILE, NAME); fputs (":\n", FILE); } while (0)
-
-/* This is how to output a command to make the user-level label named NAME
-   defined for reference from other files.  */
-#define ASM_GLOBALIZE_LABEL(FILE,NAME)			\
-  do {							\
-    fprintf (FILE, "%s", GLOBAL_ASM_OP);		\
-    assemble_name (FILE, NAME);				\
-    putc ('\n', FILE);					\
+    if (DECLARE_ASM_NAME && !flag_inhibit_size_directive)		\
+      ASM_OUTPUT_MEASURED_SIZE (FILE, FNAME);				\
   } while (0)
 
 /* The prefix to add to user-visible assembler symbols.
@@ -1925,25 +1813,11 @@ do {									 \
     fputs (NAME, FILE);					\
   }
 
-/* This is how to output an internal numbered label where
-   PREFIX is the class of label and NUM is the number within the class.
-   For V.4, labels use `.' rather than `@'.  */
-
-#undef ASM_OUTPUT_INTERNAL_LABEL
-#ifdef AS_BUG_DOT_LABELS /* The assembler requires a declaration of local.  */
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)			\
-  fprintf (FILE, TARGET_SVR4 ? ".%s%d:\n%s.%s%d\n" : "@%s%d:\n", \
-	   PREFIX, NUM, INTERNAL_ASM_OP, PREFIX, NUM)
-#else
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)			\
-  fprintf (FILE, TARGET_SVR4 ? ".%s%d:\n" : "@%s%d:\n", PREFIX, NUM)
-#endif /* AS_BUG_DOT_LABELS */
-
 /* This is how to store into the string LABEL
    the symbol_ref name of an internal numbered label where
    PREFIX is the class of label and NUM is the number within the class.
    This is suitable for output with `assemble_name'.  This must agree
-   with ASM_OUTPUT_INTERNAL_LABEL above, except for being prefixed
+   with (*targetm.asm_out.internal_label) above, except for being prefixed
    with an `*'.  */
 
 #undef ASM_GENERATE_INTERNAL_LABEL
@@ -1965,7 +1839,7 @@ do {									 \
         readonly_data_section ();					\
         ASM_OUTPUT_ALIGN (FILE, 2);					\
       }									\
-    ASM_OUTPUT_INTERNAL_LABEL (FILE, PREFIX, NUM);			\
+    (*targetm.asm_out.internal_label) (FILE, PREFIX, NUM);			\
   } while (0)
 
 /* Epilogue for case labels.  This jump instruction is called by casesi
@@ -2040,13 +1914,6 @@ do {									 \
   assemble_name ((FILE), (NAME)),			\
   fprintf ((FILE), ",%u,%d\n", (SIZE) ? (SIZE) : 1, (SIZE) <= 4 ? 4 : 8))
 
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)	\
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),	\
-  sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO)))
-
 /* This is how to output an insn to push a register on the stack.
    It need not be very fast code.  */
 #define ASM_OUTPUT_REG_PUSH(FILE,REGNO)  \
@@ -2078,10 +1945,10 @@ do {									 \
 #define OCS_END_PREFIX		"Lte"
 
 #define PUT_OCS_FUNCTION_START(FILE) \
-  { ASM_OUTPUT_INTERNAL_LABEL (FILE, OCS_START_PREFIX, m88k_function_number); }
+  { (*targetm.asm_out.internal_label) (FILE, OCS_START_PREFIX, m88k_function_number); }
 
 #define PUT_OCS_FUNCTION_END(FILE) \
-  { ASM_OUTPUT_INTERNAL_LABEL (FILE, OCS_END_PREFIX, m88k_function_number); }
+  { (*targetm.asm_out.internal_label) (FILE, OCS_END_PREFIX, m88k_function_number); }
 
 /* Macros for debug information */
 #define DEBUGGER_AUTO_OFFSET(X) \

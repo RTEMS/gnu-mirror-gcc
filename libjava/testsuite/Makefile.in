@@ -63,7 +63,6 @@ host_alias = @host_alias@
 host_triplet = @host@
 target_alias = @target_alias@
 target_triplet = @target@
-AM_RUNTESTFLAGS = @AM_RUNTESTFLAGS@
 AR = @AR@
 AS = @AS@
 CC = @CC@
@@ -86,9 +85,19 @@ GCLIBS = @GCLIBS@
 GCOBJS = @GCOBJS@
 GCSPEC = @GCSPEC@
 GCTESTSPEC = @GCTESTSPEC@
+GLIB_CFLAGS = @GLIB_CFLAGS@
+GLIB_CONFIG = @GLIB_CONFIG@
+GLIB_LIBS = @GLIB_LIBS@
+GTK_CFLAGS = @GTK_CFLAGS@
+GTK_CONFIG = @GTK_CONFIG@
+GTK_LIBS = @GTK_LIBS@
 HASH_SYNC_SPEC = @HASH_SYNC_SPEC@
 INCLTDL = @INCLTDL@
+INTERPRETER = @INTERPRETER@
 JC1GCSPEC = @JC1GCSPEC@
+LIBART_CFLAGS = @LIBART_CFLAGS@
+LIBART_CONFIG = @LIBART_CONFIG@
+LIBART_LIBS = @LIBART_LIBS@
 LIBFFI = @LIBFFI@
 LIBFFIINCS = @LIBFFIINCS@
 LIBGCJDEBUG = @LIBGCJDEBUG@
@@ -118,6 +127,7 @@ THREADLDFLAGS = @THREADLDFLAGS@
 THREADLIBS = @THREADLIBS@
 THREADOBJS = @THREADOBJS@
 THREADSPEC = @THREADSPEC@
+TOOLKIT = @TOOLKIT@
 VERSION = @VERSION@
 ZINCS = @ZINCS@
 ZLIBS = @ZLIBS@
@@ -129,6 +139,9 @@ here = @here@
 libgcj_basedir = @libgcj_basedir@
 mkinstalldirs = @mkinstalldirs@
 tool_include_dir = @tool_include_dir@
+toolexecdir = @toolexecdir@
+toolexeclibdir = @toolexeclibdir@
+toolexecmainlibdir = @toolexecmainlibdir@
 
 AUTOMAKE_OPTIONS = foreign dejagnu
 
@@ -138,12 +151,12 @@ EXPECT = `if [ -f $(top_builddir)/../expect/expect ] ; then \
           else echo expect ; fi`
 
 
-RUNTEST = `if [ -f $(top_srcdir)/../dejagnu/runtest ] ; then \
+RUNTEST = "`if [ -f $(top_srcdir)/../dejagnu/runtest ] ; then \
 	       echo $(top_srcdir)/../dejagnu/runtest ; \
-	    else echo runtest; fi`
+	    else echo runtest; fi` $(AM_RUNTESTFLAGS)"
 
 
-RUNTESTFLAGS = @AM_RUNTESTFLAGS@
+AM_RUNTESTFLAGS = INTERPRETER=$(INTERPRETER)
 CONFIG_HEADER = ../include/config.h ../gcj/libgcj-config.h
 CONFIG_CLEAN_FILES = 
 DIST_COMMON =  ChangeLog Makefile.am Makefile.in
@@ -186,6 +199,8 @@ distdir: $(DISTFILES)
 	    || cp -p $$d/$$file $(distdir)/$$file || :; \
 	  fi; \
 	done
+
+RUNTESTFLAGS =
 
 DEJATOOL = $(PACKAGE)
 

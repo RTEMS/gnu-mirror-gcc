@@ -86,7 +86,8 @@ extern int inhibit_warnings;
 
 extern int warn_system_headers;
 
-/* Do print extra warnings (such as for uninitialized variables).  -W.  */
+/* Do print extra warnings (such as for uninitialized variables).
+   -W/-Wextra.  */
 
 extern int extra_warnings;
 
@@ -183,6 +184,11 @@ extern int warn_disabled_optimization;
    declarations.  */
 
 extern int warn_deprecated_decl;
+
+/* Nonzero means warn about constructs which might not be strict
+   aliasing safe.  */
+
+extern int warn_strict_aliasing;
 
 /* Nonzero if generating code to do profiling.  */
 
@@ -331,18 +337,6 @@ extern int flag_omit_frame_pointer;
 
 extern int flag_no_peephole;
 
-/* Nonzero means all references through pointers are volatile.  */
-
-extern int flag_volatile;
-
-/* Nonzero means treat all global and extern variables as volatile.  */
-
-extern int flag_volatile_global;
-
-/* Nonzero means treat all static variables as volatile.  */
-
-extern int flag_volatile_static;
-
 /* Nonzero allows GCC to optimize sibling and tail recursive calls.  */
 
 extern int flag_optimize_sibling_calls;
@@ -358,6 +352,10 @@ extern int flag_errno_math;
    (e.g., nonnegative for SQRT).  */
 
 extern int flag_unsafe_math_optimizations;
+
+/* Nonzero means that no NaNs or +-Infs are expected.  */
+
+extern int flag_finite_math_only;
 
 /* Zero means that floating-point math operations cannot generate a
    (user-visible) trap.  This is the case, for example, in nonstop
@@ -422,7 +420,7 @@ extern int flag_schedule_insns_after_reload;
 /* The following flags have effect only for scheduling before register
    allocation:
 
-   flag_schedule_interblock means schedule insns accross basic blocks.
+   flag_schedule_interblock means schedule insns across basic blocks.
    flag_schedule_speculative means allow speculative motion of non-load insns.
    flag_schedule_speculative_load means allow speculative motion of some
    load insns.
@@ -462,17 +460,6 @@ extern int flag_pedantic_errors;
    target-dependent "small" or "large" mode.  */
 
 extern int flag_pic;
-
-/* Set to the default thread-local storage (tls) model to use.  */
-
-enum tls_model {
-  TLS_MODEL_GLOBAL_DYNAMIC = 1,
-  TLS_MODEL_LOCAL_DYNAMIC,
-  TLS_MODEL_INITIAL_EXEC,
-  TLS_MODEL_LOCAL_EXEC
-};
-
-extern enum tls_model flag_tls_default;
 
 /* Nonzero means generate extra code for exception handling and enable
    exception handling.  */
@@ -562,22 +549,13 @@ extern int flag_instrument_function_entry_exit;
 /* Perform a peephole pass before sched2.  */
 extern int flag_peephole2;
 
-/* Try to guess branch probablities.  */
+/* Try to guess branch probabilities.  */
 extern int flag_guess_branch_prob;
 
-/* -fbounded-pointers causes gcc to compile pointers as composite
-   objects occupying three words: the pointer value, the base address
-   of the referent object, and the address immediately beyond the end
-   of the referent object.  The base and extent allow us to perform
-   runtime bounds checking.  -fbounded-pointers implies -fcheck-bounds.  */
-extern int flag_bounded_pointers;
-
 /* -fcheck-bounds causes gcc to generate array bounds checks.
-   For C, C++: defaults to value of flag_bounded_pointers.
-   For ObjC: defaults to off.
+   For C, C++ and ObjC: defaults off.
    For Java: defaults to on.
-   For Fortran: defaults to off.
-   For CHILL: defaults to off.  */
+   For Fortran: defaults to off.  */
 extern int flag_bounds_check;
 
 /* This will attempt to merge constant section constants, if 1 only
@@ -623,6 +601,10 @@ extern int align_labels_max_skip;
 extern int align_functions;
 extern int align_functions_log;
 
+/* Like align_functions_log above, but used by front-ends to force the
+   minimum function alignment.  Zero means no alignment is forced.  */
+extern int force_align_functions_log;
+
 /* Nonzero if we dump in VCG format, not plain text.  */
 extern int dump_for_graph;
 
@@ -640,6 +622,10 @@ extern enum graph_dump_types graph_dump_format;
 
 extern int flag_no_ident;
 
+/* Nonzero means perform global CSE.  */
+
+extern int flag_gcse;
+
 /* Nonzero if we want to perform enhanced load motion during gcse.  */
 
 extern int flag_gcse_lm;
@@ -653,15 +639,42 @@ extern int flag_gcse_sm;
 
 extern int flag_eliminate_dwarf2_dups;
 
-/* Non-zero means to collect statistics which might be expensive
+/* Nonzero means to collect statistics which might be expensive
    and to print them when we are done.  */
 extern int flag_detailed_statistics;
 
 /* Nonzero means enable synchronous exceptions for non-call instructions.  */
 extern int flag_non_call_exceptions;
 
+/* Nonzero means enable mudflap bounds-checking transforms. */
+extern int flag_mudflap;
+
+/* Disable tree simplification.  */
+extern int flag_disable_simple;
+
+/* Disable SSA optimizations on trees.  */
+extern int flag_disable_tree_ssa;
+
+/* Enable SSA-PRE on trees.  */
+extern int flag_tree_pre;
+
+/* Enable SSA-CP on trees. */
+extern int flag_tree_cp;
+
+/* Enable SSA-CCP on trees.  */
+extern int flag_tree_ccp;
+
+/* Enable SSA-DCE on trees.  */
+extern int flag_tree_dce;
+
+/* Enable interprocedural analysis.  */
+extern int flag_ip;
+
 /* Nonzero means put zero initialized data in the bss section.  */
 extern int flag_zero_initialized_in_bss;
+
+/* Nonzero means disable transformations observable by signaling NaNs.  */
+extern int flag_signaling_nans;
 
 /* True if the given mode has a NaN representation and the treatment of
    NaN operands is important.  Certain optimizations, such as folding
@@ -669,15 +682,18 @@ extern int flag_zero_initialized_in_bss;
    disabled for modes with NaNs.  The user can ask for them to be
    done anyway using the -funsafe-math-optimizations switch.  */
 #define HONOR_NANS(MODE) \
-  (MODE_HAS_NANS (MODE) && !flag_unsafe_math_optimizations)
+  (MODE_HAS_NANS (MODE) && !flag_finite_math_only)
+
+/* Like HONOR_NANs, but true if we honor signaling NaNs (or sNaNs).  */
+#define HONOR_SNANS(MODE) (flag_signaling_nans && HONOR_NANS (MODE))
 
 /* As for HONOR_NANS, but true if the mode can represent infinity and
    the treatment of infinite values is important.  */
 #define HONOR_INFINITIES(MODE) \
-  (MODE_HAS_INFINITIES (MODE) && !flag_unsafe_math_optimizations)
+  (MODE_HAS_INFINITIES (MODE) && !flag_finite_math_only)
 
 /* Like HONOR_NANS, but true if the given mode distinguishes between
-   postive and negative zero, and the sign of zero is important.  */
+   positive and negative zero, and the sign of zero is important.  */
 #define HONOR_SIGNED_ZEROS(MODE) \
   (MODE_HAS_SIGNED_ZEROS (MODE) && !flag_unsafe_math_optimizations)
 

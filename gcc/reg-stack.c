@@ -153,6 +153,8 @@
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "rtl.h"
 #include "tm_p.h"
@@ -222,7 +224,7 @@ enum emit_where
 /* The block we're currently working on.  */
 static basic_block current_block;
 
-/* This is the register file for all register after conversion */
+/* This is the register file for all register after conversion.  */
 static rtx
   FP_mode_reg[LAST_STACK_REG+1-FIRST_STACK_REG][(int) MAX_MACHINE_MODE];
 
@@ -268,7 +270,7 @@ static rtx next_flags_user 		PARAMS ((rtx));
 static void record_label_references	PARAMS ((rtx, rtx));
 static bool compensate_edge		PARAMS ((edge, FILE *));
 
-/* Return non-zero if any stack register is mentioned somewhere within PAT.  */
+/* Return nonzero if any stack register is mentioned somewhere within PAT.  */
 
 static int
 stack_regs_mentioned_p (pat)
@@ -353,7 +355,7 @@ next_flags_user (insn)
   return NULL_RTX;
 }
 
-/* Reorganise the stack into ascending numbers,
+/* Reorganize the stack into ascending numbers,
    after this insn.  */
 
 static void
@@ -379,7 +381,7 @@ straighten_stack (insn, regstack)
   change_stack (insn, regstack, &temp_stack, EMIT_AFTER);
 }
 
-/* Pop a register from the stack */
+/* Pop a register from the stack.  */
 
 static void
 pop_stack (regstack, regno)
@@ -390,7 +392,7 @@ pop_stack (regstack, regno)
 
   CLEAR_HARD_REG_BIT (regstack->reg_set, regno);
   regstack->top--;
-  /* If regno was not at the top of stack then adjust stack */
+  /* If regno was not at the top of stack then adjust stack.  */
   if (regstack->reg [top] != regno)
     {
       int i;
@@ -476,7 +478,7 @@ reg_to_stack (first, file)
   /* A QNaN for initializing uninitialized variables.
 
      ??? We can't load from constant memory in PIC mode, because
-     we're insertting these instructions before the prologue and
+     we're inserting these instructions before the prologue and
      the PIC register hasn't been set up.  In that case, fall back
      on zero, which we can get from `ldz'.  */
 
@@ -564,7 +566,7 @@ get_true_reg (pat)
     switch (GET_CODE (*pat))
       {
       case SUBREG:
-	/* Eliminate FP subregister accesses in favour of the
+	/* Eliminate FP subregister accesses in favor of the
 	   actual FP register in use.  */
 	{
 	  rtx subreg;
@@ -744,7 +746,7 @@ check_asm_stack_operands (insn)
       malformed_asm = 1;
     }
 
-  /* Enfore rule #3: If any input operand uses the "f" constraint, all
+  /* Enforce rule #3: If any input operand uses the "f" constraint, all
      output constraints must use the "&" earlyclobber.
 
      ??? Detect this more deterministically by having constrain_asm_operands
@@ -1125,7 +1127,7 @@ move_for_stack_reg (insn, regstack, pat)
 	  return;
 	}
 
-      /* The destination ought to be dead */
+      /* The destination ought to be dead.  */
       if (get_hard_regnum (regstack, dest) >= FIRST_STACK_REG)
 	abort ();
 
@@ -1181,7 +1183,7 @@ move_for_stack_reg (insn, regstack, pat)
 	 stack. The stack mapping is changed to reflect that DEST is
 	 now at top of stack.  */
 
-      /* The destination ought to be dead */
+      /* The destination ought to be dead.  */
       if (get_hard_regnum (regstack, dest) >= FIRST_STACK_REG)
 	abort ();
 
@@ -1687,7 +1689,7 @@ subst_stack_regs_pat (insn, regstack, pat)
 		replace_reg (dest, get_hard_regnum (regstack, *dest));
 	      }
 
-	    /* Keep operand 1 maching with destination.  */
+	    /* Keep operand 1 matching with destination.  */
 	    if (GET_RTX_CLASS (GET_CODE (pat_src)) == 'c'
 		&& REG_P (*src1) && REG_P (*src2)
 		&& REGNO (*src1) != REGNO (*dest))
@@ -2404,7 +2406,7 @@ convert_regs_entry ()
      the push/pop code happy, and to not scrog the register stack, we
      must put something in these registers.  Use a QNaN.
 
-     Note that we are insertting converted code here.  This code is
+     Note that we are inserting converted code here.  This code is
      never seen by the convert_regs pass.  */
 
   for (e = ENTRY_BLOCK_PTR->succ; e ; e = e->succ_next)
@@ -2462,7 +2464,7 @@ convert_regs_exit ()
       output_stack->top = value_reg_high - value_reg_low;
       for (reg = value_reg_low; reg <= value_reg_high; ++reg)
 	{
-	  output_stack->reg[reg - value_reg_low] = reg;
+	  output_stack->reg[value_reg_high - reg] = reg;
 	  SET_HARD_REG_BIT (output_stack->reg_set, reg);
 	}
     }
@@ -2553,7 +2555,11 @@ compensate_edge (e, file)
       abort ();
     eh1:
 
+      /* We are sure that there is st(0) live, otherwise we won't compensate.
+	 For complex return values, we may have st(1) live as well.  */
       SET_HARD_REG_BIT (tmp, FIRST_STACK_REG);
+      if (TEST_HARD_REG_BIT (regstack.reg_set, FIRST_STACK_REG + 1))
+        SET_HARD_REG_BIT (tmp, FIRST_STACK_REG + 1);
       GO_IF_HARD_REG_EQUAL (regstack.reg_set, tmp, eh2);
       abort ();
     eh2:

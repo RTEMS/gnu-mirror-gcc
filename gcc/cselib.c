@@ -21,6 +21,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 
 #include "rtl.h"
 #include "tm_p.h"
@@ -39,7 +41,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "cselib.h"
 
 static int entry_and_rtx_equal_p	PARAMS ((const void *, const void *));
-static unsigned int get_value_hash	PARAMS ((const void *));
+static hashval_t get_value_hash		PARAMS ((const void *));
 static struct elt_list *new_elt_list	PARAMS ((struct elt_list *,
 						 cselib_val *));
 static struct elt_loc_list *new_elt_loc_list PARAMS ((struct elt_loc_list *,
@@ -83,6 +85,7 @@ static GTY((param_is (cselib_val))) htab_t hash_table;
 /* This is a global so we don't have to pass this through every function.
    It is used in new_elt_loc_list to set SETTING_INSN.  */
 static rtx cselib_current_insn;
+static bool cselib_current_insn_in_libcall;
 
 /* Every new unknown value gets a unique number.  */
 static unsigned int next_unknown_value;
@@ -105,7 +108,7 @@ static GTY((deletable (""))) varray_type reg_values_old;
 #define REG_VALUES(I) VARRAY_ELT_LIST (reg_values, (I))
 
 /* The largest number of hard regs used by any entry added to the
-   REG_VALUES table.  Cleared on each clear_table() invocation.   */
+   REG_VALUES table.  Cleared on each clear_table() invocation.  */
 static unsigned int max_value_regs;
 
 /* Here the set of indices I with REG_VALUES(I) != 0 is saved.  This is used
@@ -163,6 +166,7 @@ new_elt_loc_list (next, loc)
   el->next = next;
   el->loc = loc;
   el->setting_insn = cselib_current_insn;
+  el->in_libcall = cselib_current_insn_in_libcall;
   return el;
 }
 
@@ -274,7 +278,7 @@ entry_and_rtx_equal_p (entry, x_arg)
    hash_rtx when adding an element; this function just extracts the hash
    value from a cselib_val structure.  */
 
-static unsigned int
+static hashval_t
 get_value_hash (entry)
      const void *entry;
 {
@@ -581,8 +585,7 @@ hash_rtx (x, mode, create)
 	 the integers representing the constant.  */
       hash += (unsigned) code + (unsigned) GET_MODE (x);
       if (GET_MODE (x) != VOIDmode)
-	for (i = 2; i < GET_RTX_LENGTH (CONST_DOUBLE); i++)
-	  hash += XWINT (x, i);
+	hash += real_hash (CONST_DOUBLE_REAL_VALUE (x));
       else
 	hash += ((unsigned) CONST_DOUBLE_LOW (x)
 		 + (unsigned) CONST_DOUBLE_HIGH (x));
@@ -1309,6 +1312,10 @@ cselib_process_insn (insn)
   int i;
   rtx x;
 
+  if (find_reg_note (insn, REG_LIBCALL, NULL))
+    cselib_current_insn_in_libcall = true;
+  if (find_reg_note (insn, REG_RETVAL, NULL))
+    cselib_current_insn_in_libcall = false;
   cselib_current_insn = insn;
 
   /* Forget everything at a CODE_LABEL, a volatile asm, or a setjmp.  */
@@ -1408,6 +1415,7 @@ cselib_init ()
   hash_table = htab_create_ggc (31, get_value_hash, entry_and_rtx_equal_p, 
 				NULL);
   clear_table (1);
+  cselib_current_insn_in_libcall = false;
 }
 
 /* Called when the current user is done with cselib.  */

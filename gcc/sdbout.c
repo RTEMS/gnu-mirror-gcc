@@ -43,6 +43,8 @@ AT&T C compiler.  From the example below I would conclude the following:
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "debug.h"
 #include "tree.h"
 #include "ggc.h"
@@ -61,6 +63,7 @@ static GTY(()) tree anonymous_types;
 #include "tm_p.h"
 #include "gsyms.h"
 #include "langhooks.h"
+#include "target.h"
 
 /* 1 if PARM is passed to this function in memory.  */
 
@@ -102,12 +105,12 @@ static void sdbout_end_source_file	PARAMS ((unsigned int));
 static void sdbout_begin_block		PARAMS ((unsigned int, unsigned int));
 static void sdbout_end_block		PARAMS ((unsigned int, unsigned int));
 static void sdbout_source_line		PARAMS ((unsigned int, const char *));
-static void sdbout_end_epilogue		PARAMS ((void));
+static void sdbout_end_epilogue		PARAMS ((unsigned int, const char *));
 static void sdbout_global_decl		PARAMS ((tree));
 #ifndef MIPS_DEBUGGING_INFO
 static void sdbout_begin_prologue	PARAMS ((unsigned int, const char *));
 #endif
-static void sdbout_end_prologue		PARAMS ((unsigned int));
+static void sdbout_end_prologue		PARAMS ((unsigned int, const char *));
 static void sdbout_begin_function	PARAMS ((tree));
 static void sdbout_end_function		PARAMS ((unsigned int));
 static void sdbout_toplevel_data	PARAMS ((tree));
@@ -254,7 +257,7 @@ do { fprintf (asm_out_file, "\t.tag\t");	\
 /* Set the sdb tag identifier string for TYPE to NAME.  */
 
 #define SET_KNOWN_TYPE_TAG(TYPE, NAME) \
-  TYPE_SYMTAB_POINTER (TYPE) = (NAME)
+  TYPE_SYMTAB_POINTER (TYPE) = (char *)(NAME)
 
 /* Return the name (a string) of the struct, union or enum tag
    described by the TREE_LIST node LINK.  This is 0 for an anonymous one.  */
@@ -321,7 +324,7 @@ const struct gcc_debug_hooks sdb_debug_hooks =
   sdbout_end_prologue,		/* end_prologue */
 #else
   sdbout_begin_prologue,	/* begin_prologue */
-  debug_nothing_int,		/* end_prologue */
+  debug_nothing_int_charstar,	/* end_prologue */
 #endif
   sdbout_end_epilogue,		/* end_epilogue */
   sdbout_begin_function,	/* begin_function */
@@ -361,8 +364,7 @@ gen_fake_label ()
   char *labelstr;
   SDB_GENERATE_FAKE (label, unnamed_struct_number);
   unnamed_struct_number++;
-  labelstr = (char *) permalloc (strlen (label) + 1);
-  strcpy (labelstr, label);
+  labelstr = xstrdup (label);
   return labelstr;
 }
 
@@ -924,23 +926,6 @@ sdbout_symbol (decl, local)
 	  PUT_SDB_DEF (name);
 	  PUT_SDB_INT_VAL (DEBUGGER_AUTO_OFFSET (XEXP (value, 0)));
 	  PUT_SDB_SCL (C_AUTO);
-	}
-      else if (GET_CODE (value) == MEM && GET_CODE (XEXP (value, 0)) == CONST)
-	{
-	  /* Handle an obscure case which can arise when optimizing and
-	     when there are few available registers.  (This is *always*
-	     the case for i386/i486 targets).  The DECL_RTL looks like
-	     (MEM (CONST ...)) even though this variable is a local `auto'
-	     or a local `register' variable.  In effect, what has happened
-	     is that the reload pass has seen that all assignments and
-	     references for one such a local variable can be replaced by
-	     equivalent assignments and references to some static storage
-	     variable, thereby avoiding the need for a register.  In such
-	     cases we're forced to lie to debuggers and tell them that
-	     this variable was itself `static'.  */
-	  PUT_SDB_DEF (name);
-	  PUT_SDB_VAL (XEXP (XEXP (value, 0), 0));
-	  PUT_SDB_SCL (C_STAT);
 	}
       else
 	{
@@ -1643,13 +1628,14 @@ sdbout_begin_prologue (line, file)
      unsigned int line;
      const char *file ATTRIBUTE_UNUSED;
 {
-  sdbout_end_prologue (line);
+  sdbout_end_prologue (line, file);
 }
 #endif
 
 static void
-sdbout_end_prologue (line)
+sdbout_end_prologue (line, file)
      unsigned int line;
+     const char *file ATTRIBUTE_UNUSED;
 {
   sdb_begin_function_line = line - 1;
   PUT_SDB_FUNCTION_START (line);
@@ -1679,7 +1665,9 @@ sdbout_end_function (line)
    Called after the epilogue is output.  */
 
 static void
-sdbout_end_epilogue ()
+sdbout_end_epilogue (line, file)
+     unsigned int line ATTRIBUTE_UNUSED;
+     const char *file ATTRIBUTE_UNUSED;
 {
   const char *const name ATTRIBUTE_UNUSED
     = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (current_function_decl));

@@ -21,17 +21,13 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 
-#define TARGET_VERSION fprintf (stderr, " (80386, COFF BSD syntax)"); 
+#define TARGET_VERSION fprintf (stderr, " (80386, COFF BSD syntax)");
 
-/* Specify predefined symbols in preprocessor.  */
-
-#undef CPP_PREDEFINES
-#define CPP_PREDEFINES ""
+#define TARGET_OS_CPP_BUILTINS() /* Sweet FA.  */
 
 /* We want to be able to get DBX debugging information via -gstabs.  */
 
-#undef DBX_DEBUGGING_INFO
-#define DBX_DEBUGGING_INFO
+#define DBX_DEBUGGING_INFO 1
 
 #undef PREFERRED_DEBUGGING_TYPE
 #define PREFERRED_DEBUGGING_TYPE SDB_DEBUG
@@ -63,12 +59,5 @@ Boston, MA 02111-1307, USA.  */
 #undef  ASM_GENERATE_INTERNAL_LABEL
 #define ASM_GENERATE_INTERNAL_LABEL(BUF,PREFIX,NUMBER)	\
   sprintf ((BUF), ".%s%ld", (PREFIX), (long)(NUMBER))
-
-/* This is how to output an internal numbered label where
-   PREFIX is the class of label and NUM is the number within the class.  */
-
-#undef  ASM_OUTPUT_INTERNAL_LABEL
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)	\
-  fprintf (FILE, ".%s%d:\n", PREFIX, NUM)
 
 /* end of i386-coff.h */

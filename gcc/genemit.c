@@ -20,8 +20,10 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 02111-1307, USA.  */
 
 
-#include "hconfig.h"
+#include "bconfig.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "errors.h"
 #include "gensupport.h"
@@ -246,7 +248,7 @@ gen_exp (x, subroutine_type, used)
       else
 	{
 	  printf ("GEN_INT (");
-	  printf (HOST_WIDE_INT_PRINT_DEC, INTVAL (x));
+	  printf (HOST_WIDE_INT_PRINT_DEC_C, INTVAL (x));
 	  printf (")");
 	}
       return;
@@ -402,7 +404,7 @@ gen_insn (insn, lineno)
       printf ("operand%d", i);
   printf (")\n");
   for (i = 0; i < operands; i++)
-    printf ("     rtx operand%d;\n", i);
+    printf ("     rtx operand%d ATTRIBUTE_UNUSED;\n", i);
   printf ("{\n");
 
   /* Output code to construct and return the rtl for the instruction body */
@@ -524,8 +526,9 @@ gen_expand (expand)
       rtx next = XVECEXP (expand, 1, i);
       if ((GET_CODE (next) == SET && GET_CODE (SET_DEST (next)) == PC)
 	  || (GET_CODE (next) == PARALLEL
-	      && GET_CODE (XVECEXP (next, 0, 0)) == SET
-	      && GET_CODE (SET_DEST (XVECEXP (next, 0, 0))) == PC)
+	      && ((GET_CODE (XVECEXP (next, 0, 0)) == SET
+		   && GET_CODE (SET_DEST (XVECEXP (next, 0, 0))) == PC)
+		  || GET_CODE (XVECEXP (next, 0, 0)) == RETURN))
 	  || GET_CODE (next) == RETURN)
 	printf ("  emit_jump_insn (");
       else if ((GET_CODE (next) == SET && GET_CODE (SET_SRC (next)) == CALL)
@@ -825,6 +828,8 @@ from the machine description file `md'.  */\n\n");
 
   printf ("#include \"config.h\"\n");
   printf ("#include \"system.h\"\n");
+  printf ("#include \"coretypes.h\"\n");
+  printf ("#include \"tm.h\"\n");
   printf ("#include \"rtl.h\"\n");
   printf ("#include \"tm_p.h\"\n");
   printf ("#include \"function.h\"\n");

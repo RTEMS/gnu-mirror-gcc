@@ -1,5 +1,5 @@
 /* Definitions for GCC.  Part of the machine description for CRIS.
-   Copyright (C) 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2002, 2003 Free Software Foundation, Inc.
    Contributed by Axis Communications.  Written by Hans-Peter Nilsson.
 
 This file is part of GCC.
@@ -173,13 +173,13 @@ Boston, MA 02111-1307, USA.  */
       register const unsigned char *_limited_str =	\
 	(const unsigned char *) (STR);			\
       register unsigned ch;				\
-      							\
+							\
       fprintf ((FILE), "%s\"", STRING_ASM_OP);		\
-      							\
+							\
       for (; (ch = *_limited_str); _limited_str++)	\
         {						\
 	  register int escape;				\
-	  						\
+							\
 	  switch (escape = ESCAPES[ch])			\
 	    {						\
 	    case 0:					\
@@ -194,7 +194,7 @@ Boston, MA 02111-1307, USA.  */
 	      break;					\
 	    }						\
         }						\
-      							\
+							\
       fprintf ((FILE), "\"\n");				\
     }							\
   while (0)
@@ -218,16 +218,16 @@ Boston, MA 02111-1307, USA.  */
       for (; _ascii_bytes < limit; _ascii_bytes++)			\
         {								\
 	  register const unsigned char *p;				\
-      									\
+									\
 	  if (bytes_in_chunk >= 60)					\
 	    {								\
 	      fprintf ((FILE), "\"\n");					\
 	      bytes_in_chunk = 0;					\
 	    }								\
-      									\
+									\
 	  for (p = _ascii_bytes; p < limit && *p != '\0'; p++)		\
 	    continue;							\
-      									\
+									\
 	  if (p < limit && (p - _ascii_bytes) <= (long)STRING_LIMIT)	\
 	    {								\
 	      if (bytes_in_chunk > 0)					\
@@ -235,7 +235,7 @@ Boston, MA 02111-1307, USA.  */
 		  fprintf ((FILE), "\"\n");				\
 		  bytes_in_chunk = 0;					\
 		}							\
-      									\
+									\
 	      ASM_OUTPUT_LIMITED_STRING ((FILE), _ascii_bytes);		\
 	      _ascii_bytes = p;						\
 	    }								\
@@ -243,10 +243,10 @@ Boston, MA 02111-1307, USA.  */
 	    {								\
 	      register int escape;					\
 	      register unsigned ch;					\
-      									\
+									\
 	      if (bytes_in_chunk == 0)					\
 		fprintf ((FILE), "%s\"", ASCII_DATA_ASM_OP);		\
-      									\
+									\
 	      switch (escape = ESCAPES[ch = *_ascii_bytes])		\
 		{							\
 		case 0:							\
@@ -265,7 +265,7 @@ Boston, MA 02111-1307, USA.  */
 		}							\
 	    }								\
 	}								\
-      									\
+									\
       if (bytes_in_chunk > 0)						\
         fprintf ((FILE), "\"\n");					\
     }									\
@@ -277,62 +277,52 @@ Boston, MA 02111-1307, USA.  */
 #define SET_ASM_OP	"\t.set\t"
 
 #define ASM_OUTPUT_EXTERNAL_LIBCALL(FILE, FUN)	\
-  ASM_GLOBALIZE_LABEL (FILE, XSTR (FUN, 0))
+  (*targetm.asm_out.globalize_label) (FILE, XSTR (FUN, 0))
 
-#define ASM_WEAKEN_LABEL(FILE, NAME) 	\
+#define ASM_WEAKEN_LABEL(FILE, NAME)	\
   do					\
     {					\
       fputs ("\t.weak\t", (FILE));	\
-      assemble_name ((FILE), (NAME)); 	\
+      assemble_name ((FILE), (NAME));	\
       fputc ('\n', (FILE));		\
     }					\
   while (0)
 
-#define ASM_DECLARE_FUNCTION_NAME(FILE, NAME, DECL)	\
-  do							\
-    {							\
-      fprintf (FILE, "%s", TYPE_ASM_OP);		\
-      assemble_name (FILE, NAME);			\
-      putc (',', FILE);					\
-      fprintf (FILE, TYPE_OPERAND_FMT, "function");	\
-      putc ('\n', FILE);				\
-      							\
-      ASM_OUTPUT_LABEL(FILE, NAME);			\
-    }							\
+#define ASM_DECLARE_FUNCTION_NAME(FILE, NAME, DECL)		\
+  do								\
+    {								\
+      ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "function");	\
+      ASM_OUTPUT_LABEL(FILE, NAME);				\
+    }								\
   while (0)
 
 #define ASM_DECLARE_OBJECT_NAME(FILE, NAME, DECL)		\
   do								\
     {								\
-      fprintf (FILE, "%s", TYPE_ASM_OP);			\
-      assemble_name (FILE, NAME);				\
-      putc (',', FILE);						\
-      fprintf (FILE, TYPE_OPERAND_FMT, "object");		\
-      putc ('\n', FILE);					\
-      								\
+      HOST_WIDE_INT size;					\
+								\
+      ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "object");		\
+								\
       size_directive_output = 0;				\
-      								\
       if (!flag_inhibit_size_directive				\
 	  && (DECL) && DECL_SIZE (DECL))			\
 	{							\
 	  size_directive_output = 1;				\
-	  fprintf (FILE, "%s", SIZE_ASM_OP);			\
-	  assemble_name (FILE, NAME);				\
-	  putc (',', FILE);					\
-	  fprintf (FILE, HOST_WIDE_INT_PRINT_DEC,		\
-		   int_size_in_bytes (TREE_TYPE (DECL)));	\
-	  fputc ('\n', FILE);					\
+          size = int_size_in_bytes (TREE_TYPE (DECL));		\
+          ASM_OUTPUT_SIZE_DIRECTIVE (FILE, NAME, size);		\
 	}							\
-      								\
+								\
       ASM_OUTPUT_LABEL (FILE, NAME);				\
     }								\
   while (0)
 
+#undef ASM_FINISH_DECLARE_OBJECT
 #define ASM_FINISH_DECLARE_OBJECT(FILE, DECL, TOP_LEVEL, AT_END)\
   do								\
     {								\
       const char *name = XSTR (XEXP (DECL_RTL (DECL), 0), 0);	\
-      								\
+      HOST_WIDE_INT size;					\
+								\
       if (!flag_inhibit_size_directive				\
 	  && DECL_SIZE (DECL)					\
 	  && ! AT_END && TOP_LEVEL				\
@@ -340,12 +330,8 @@ Boston, MA 02111-1307, USA.  */
 	  && !size_directive_output)				\
 	{							\
 	  size_directive_output = 1;				\
-	  fprintf (FILE, "%s", SIZE_ASM_OP);			\
-	  assemble_name (FILE, name);				\
-	  putc (',', FILE);					\
-	  fprintf (FILE, HOST_WIDE_INT_PRINT_DEC,		\
-		   int_size_in_bytes (TREE_TYPE (DECL))); 	\
-	  fputc ('\n', FILE);					\
+	  size = int_size_in_bytes (TREE_TYPE (DECL));		\
+	  ASM_OUTPUT_SIZE_DIRECTIVE (FILE, name, size);		\
 	}							\
     }								\
   while (0)
@@ -354,23 +340,7 @@ Boston, MA 02111-1307, USA.  */
   do								\
     {								\
       if (!flag_inhibit_size_directive)				\
-	{							\
-	  char label[256];					\
-	  static int labelno;					\
-	  							\
-	  labelno++;						\
-	  							\
-	  ASM_GENERATE_INTERNAL_LABEL (label, "Lfe", labelno);	\
-	  ASM_OUTPUT_INTERNAL_LABEL (FILE, "Lfe", labelno);	\
-	  							\
-	  fprintf (FILE, "%s", SIZE_ASM_OP);			\
-	  assemble_name (FILE, (FNAME));			\
-	  fprintf (FILE, ",");					\
-	  assemble_name (FILE, label);				\
-	  fprintf (FILE, "-");					\
-	  assemble_name (FILE, (FNAME));			\
-	  putc ('\n', FILE);					\
-	}							\
+	ASM_OUTPUT_MEASURED_SIZE (FILE, FNAME);			\
     }								\
   while (0)
 
@@ -390,7 +360,7 @@ Boston, MA 02111-1307, USA.  */
 
 /* Node: Misc */
 
-#define HANDLE_SYSV_PRAGMA
+#define HANDLE_SYSV_PRAGMA 1
 
 /* In theory, this one isn't necessary, but over time, external tools have
    been primed on names with "." rather than "$".  */

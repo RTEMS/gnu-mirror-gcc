@@ -1,21 +1,22 @@
 /* Language lexer for the GNU compiler for the Java(TM) language.
-   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003
+   Free Software Foundation, Inc.
    Contributed by Alexandre Petit-Bianco (apbianco@cygnus.com)
 
-This file is part of GNU CC.
+This file is part of GCC.
 
-GNU CC is free software; you can redistribute it and/or modify
+GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2, or (at your option)
 any later version.
 
-GNU CC is distributed in the hope that it will be useful,
+GCC is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU CC; see the file COPYING.  If not, write to
+along with GCC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA. 
 
@@ -39,35 +40,34 @@ The Free Software Foundation is independent of Sun Microsystems, Inc.  */
 #include "chartables.h"
 
 /* Function declarations.  */
-static char *java_sprint_unicode PARAMS ((struct java_line *, int));
-static void java_unicode_2_utf8 PARAMS ((unicode_t));
-static void java_lex_error PARAMS ((const char *, int));
+static char *java_sprint_unicode (struct java_line *, int);
+static void java_unicode_2_utf8 (unicode_t);
+static void java_lex_error (const char *, int);
 #ifndef JC1_LITE
-static int java_is_eol PARAMS ((FILE *, int));
-static tree build_wfl_node PARAMS ((tree));
+static int java_is_eol (FILE *, int);
+static tree build_wfl_node (tree);
 #endif
-static void java_store_unicode PARAMS ((struct java_line *, unicode_t, int));
-static int java_parse_escape_sequence PARAMS ((void));
-static int java_start_char_p PARAMS ((unicode_t));
-static int java_part_char_p PARAMS ((unicode_t));
-static int java_parse_doc_section PARAMS ((int));
-static void java_parse_end_comment PARAMS ((int));
-static int java_get_unicode PARAMS ((void));
-static int java_read_unicode PARAMS ((java_lexer *, int *));
-static int java_read_unicode_collapsing_terminators PARAMS ((java_lexer *,
-							     int *));
-static void java_store_unicode PARAMS ((struct java_line *, unicode_t, int));
-static int java_read_char PARAMS ((java_lexer *));
-static void java_allocate_new_line PARAMS ((void));
-static void java_unget_unicode PARAMS ((void));
-static unicode_t java_sneak_unicode PARAMS ((void));
+static void java_store_unicode (struct java_line *, unicode_t, int);
+static int java_parse_escape_sequence (void);
+static int java_start_char_p (unicode_t);
+static int java_part_char_p (unicode_t);
+static int java_parse_doc_section (int);
+static void java_parse_end_comment (int);
+static int java_get_unicode (void);
+static int java_read_unicode (java_lexer *, int *);
+static int java_read_unicode_collapsing_terminators (java_lexer *, int *);
+static void java_store_unicode (struct java_line *, unicode_t, int);
+static int java_read_char (java_lexer *);
+static void java_allocate_new_line (void);
+static void java_unget_unicode (void);
+static unicode_t java_sneak_unicode (void);
 #ifndef JC1_LITE
-static int utf8_cmp PARAMS ((const unsigned char *, int, const char *));
+static int utf8_cmp (const unsigned char *, int, const char *);
 #endif
 
-java_lexer *java_new_lexer PARAMS ((FILE *, const char *));
+java_lexer *java_new_lexer (FILE *, const char *);
 #ifndef JC1_LITE
-static void error_if_numeric_overflow PARAMS ((tree));
+static void error_if_numeric_overflow (tree);
 #endif
 
 #ifdef HAVE_ICONV
@@ -82,19 +82,13 @@ static int need_byteswap = 0;
 #endif
 
 void
-java_init_lex (finput, encoding)
-     FILE *finput;
-     const char *encoding;
+java_init_lex (FILE *finput, const char *encoding)
 {
 #ifndef JC1_LITE
   int java_lang_imported = 0;
 
   if (!java_lang_id)
     java_lang_id = get_identifier ("java.lang");
-  if (!java_lang_cloneable)
-    java_lang_cloneable = get_identifier ("java.lang.Cloneable");
-  if (!java_io_serializable)
-    java_io_serializable = get_identifier ("java.io.Serializable");
   if (!inst_id)
     inst_id = get_identifier ("inst$");
   if (!wpv_id)
@@ -128,8 +122,8 @@ java_init_lex (finput, encoding)
   CPC_INITIALIZER_LIST (ctxp) = CPC_STATIC_INITIALIZER_LIST (ctxp) =
     CPC_INSTANCE_INITIALIZER_LIST (ctxp) = NULL_TREE;
 
-  memset ((PTR) ctxp->modifier_ctx, 0, 11*sizeof (ctxp->modifier_ctx[0]));
-  memset ((PTR) current_jcf, 0, sizeof (JCF));
+  memset (ctxp->modifier_ctx, 0, sizeof (ctxp->modifier_ctx));
+  current_jcf = ggc_alloc_cleared (sizeof (JCF));
   ctxp->current_parsed_class = NULL;
   ctxp->package = NULL_TREE;
 #endif
@@ -143,9 +137,7 @@ java_init_lex (finput, encoding)
 }
 
 static char *
-java_sprint_unicode (line, i)
-    struct java_line *line;
-    int i;
+java_sprint_unicode (struct java_line *line, int i)
 {
   static char buffer [10];
   if (line->unicode_escape_p [i] || line->line [i] > 128)
@@ -159,13 +151,13 @@ java_sprint_unicode (line, i)
 }
 
 static unicode_t
-java_sneak_unicode ()
+java_sneak_unicode (void)
 {
   return (ctxp->c_line->line [ctxp->c_line->current]);
 }
 
 static void
-java_unget_unicode ()
+java_unget_unicode (void)
 {
   if (!ctxp->c_line->current)
     /* Can't unget unicode.  */
@@ -176,7 +168,7 @@ java_unget_unicode ()
 }
 
 static void
-java_allocate_new_line ()
+java_allocate_new_line (void)
 {
   unicode_t ahead = (ctxp->c_line ? ctxp->c_line->ahead[0] : '\0');
   char ahead_escape_p = (ctxp->c_line ? 
@@ -196,12 +188,11 @@ java_allocate_new_line ()
 
   if (!ctxp->c_line)
     {
-      ctxp->c_line = (struct java_line *)xmalloc (sizeof (struct java_line));
+      ctxp->c_line = xmalloc (sizeof (struct java_line));
       ctxp->c_line->max = JAVA_LINE_MAX;
-      ctxp->c_line->line = (unicode_t *)xmalloc 
-	(sizeof (unicode_t)*ctxp->c_line->max);
+      ctxp->c_line->line = xmalloc (sizeof (unicode_t)*ctxp->c_line->max);
       ctxp->c_line->unicode_escape_p = 
-	  (char *)xmalloc (sizeof (char)*ctxp->c_line->max);
+	xmalloc (sizeof (char)*ctxp->c_line->max);
       ctxp->c_line->white_space_only = 0;
     }
 
@@ -222,11 +213,9 @@ java_allocate_new_line ()
 /* Create a new lexer object.  */
 
 java_lexer *
-java_new_lexer (finput, encoding)
-     FILE *finput;
-     const char *encoding;
+java_new_lexer (FILE *finput, const char *encoding)
 {
-  java_lexer *lex = (java_lexer *) xmalloc (sizeof (java_lexer));
+  java_lexer *lex = xmalloc (sizeof (java_lexer));
   int enc_error = 0;
 
   lex->finput = finput;
@@ -311,8 +300,7 @@ java_new_lexer (finput, encoding)
 }
 
 void
-java_destroy_lexer (lex)
-     java_lexer *lex;
+java_destroy_lexer (java_lexer *lex)
 {
 #ifdef HAVE_ICONV
   if (! lex->use_fallback)
@@ -322,8 +310,7 @@ java_destroy_lexer (lex)
 }
 
 static int
-java_read_char (lex)
-     java_lexer *lex;
+java_read_char (java_lexer *lex)
 {
   if (lex->unget_value)
     {
@@ -494,8 +481,8 @@ java_read_char (lex)
 						 + (c2 & 0x3f));
 		      /* Check for valid 3-byte characters.
 			 Don't allow surrogate, \ufffe or \uffff.  */
-		      if (r >= 0x800 && r <= 0xffff
-			  && ! (r >= 0xd800 && r <= 0xdfff)
+		      if (IN_RANGE (r, 0x800, 0xffff)
+			  && ! IN_RANGE (r, 0xd800, 0xdfff)
 			  && r != 0xfffe && r != 0xffff)
 			return r;
 		    }
@@ -514,26 +501,21 @@ java_read_char (lex)
 }
 
 static void
-java_store_unicode (l, c, unicode_escape_p)
-    struct java_line *l;
-    unicode_t c;
-    int unicode_escape_p;
+java_store_unicode (struct java_line *l, unicode_t c, int unicode_escape_p)
 {
   if (l->size == l->max)
     {
       l->max += JAVA_LINE_MAX;
-      l->line = (unicode_t *) xrealloc (l->line, sizeof (unicode_t)*l->max);
-      l->unicode_escape_p = (char *) xrealloc (l->unicode_escape_p, 
-					       sizeof (char)*l->max);
+      l->line = xrealloc (l->line, sizeof (unicode_t)*l->max);
+      l->unicode_escape_p = xrealloc (l->unicode_escape_p, 
+				      sizeof (char)*l->max);
     }
   l->line [l->size] = c;
   l->unicode_escape_p [l->size++] = unicode_escape_p;
 }
 
 static int
-java_read_unicode (lex, unicode_escape_p)
-     java_lexer *lex;
-     int *unicode_escape_p;
+java_read_unicode (java_lexer *lex, int *unicode_escape_p)
 {
   int c;
 
@@ -560,23 +542,31 @@ java_read_unicode (lex, unicode_escape_p)
 	  while ((c = java_read_char (lex)) == 'u')
 	    ;
 
-	  /* Unget the most recent character as it is not a `u'.  */
-	  if (c == UEOF)
-	    return UEOF;
-	  lex->unget_value = c;
-
-	  /* Next should be 4 hex digits, otherwise it's an error.
-	     The hex value is converted into the unicode, pushed into
-	     the Unicode stream.  */
-	  for (shift = 12; shift >= 0; shift -= 4)
+	  shift = 12;
+	  do
 	    {
-	      if ((c = java_read_char (lex)) == UEOF)
-	        return UEOF;
+	      if (c == UEOF)
+		{
+		  java_lex_error ("prematurely terminated \\u sequence", 0);
+		  return UEOF;
+		}
+
 	      if (hex_p (c))
 		unicode |= (unicode_t)(hex_value (c) << shift);
 	      else
-		java_lex_error ("Non hex digit in Unicode escape sequence", 0);
+		{
+		  java_lex_error ("non-hex digit in \\u sequence", 0);
+		  break;
+		}
+
+	      c = java_read_char (lex);
+	      shift -= 4;
 	    }
+	  while (shift >= 0);
+
+	  if (c != UEOF)
+	    lex->unget_value = c;
+
 	  lex->bs_count = 0;
 	  *unicode_escape_p = 1;
 	  return unicode;
@@ -587,9 +577,8 @@ java_read_unicode (lex, unicode_escape_p)
 }
 
 static int
-java_read_unicode_collapsing_terminators (lex, unicode_escape_p)
-     java_lexer *lex;
-     int *unicode_escape_p;
+java_read_unicode_collapsing_terminators (java_lexer *lex,
+					  int *unicode_escape_p)
 {
   int c = java_read_unicode (lex, unicode_escape_p);
 
@@ -599,7 +588,7 @@ java_read_unicode_collapsing_terminators (lex, unicode_escape_p)
 	 return a single line terminator.  */
       int dummy;
       c = java_read_unicode (lex, &dummy);
-      if (c != '\n')
+      if (c != '\n' && c != UEOF)
 	lex->unget_value = c;
       /* In either case we must return a newline.  */
       c = '\n';
@@ -609,7 +598,7 @@ java_read_unicode_collapsing_terminators (lex, unicode_escape_p)
 }
 
 static int
-java_get_unicode ()
+java_get_unicode (void)
 {
   /* It's time to read a line when...  */
   if (!ctxp->c_line || ctxp->c_line->current == ctxp->c_line->size)
@@ -656,8 +645,7 @@ java_get_unicode ()
 /* Parse the end of a C style comment.
  * C is the first character following the '/' and '*'.  */
 static void
-java_parse_end_comment (c)
-     int c;
+java_parse_end_comment (int c)
 {
   for ( ;; c = java_get_unicode ())
     {
@@ -686,8 +674,7 @@ java_parse_end_comment (c)
    character). Parsed keyword(s): @DEPRECATED.  */
 
 static int
-java_parse_doc_section (c)
-     int c;
+java_parse_doc_section (int c)
 {
   int valid_tag = 0, seen_star = 0;
 
@@ -739,8 +726,7 @@ java_parse_doc_section (c)
    This is only called if C >= 128 -- smaller values are handled
    inline.  However, this function handles all values anyway.  */
 static int
-java_start_char_p (c)
-     unicode_t c;
+java_start_char_p (unicode_t c)
 {
   unsigned int hi = c / 256;
   const char *const page = type_table[hi];
@@ -759,8 +745,7 @@ java_start_char_p (c)
    This is only called if C >= 128 -- smaller values are handled
    inline.  However, this function handles all values anyway.  */
 static int
-java_part_char_p (c)
-     unicode_t c;
+java_part_char_p (unicode_t c)
 {
   unsigned int hi = c / 256;
   const char *const page = type_table[hi];
@@ -776,7 +761,7 @@ java_part_char_p (c)
 }
 
 static int
-java_parse_escape_sequence ()
+java_parse_escape_sequence (void)
 {
   unicode_t char_lit;
   int c;
@@ -834,7 +819,7 @@ java_parse_escape_sequence ()
 }
 
 #ifndef JC1_LITE
-#define IS_ZERO(X) (ereal_cmp (X, dconst0) == 0)
+#define IS_ZERO(X) REAL_VALUES_EQUAL (X, dconst0)
 
 /* Subroutine of java_lex: converts floating-point literals to tree
    nodes.  LITERAL_TOKEN is the input literal, JAVA_LVAL is where to
@@ -842,14 +827,11 @@ java_parse_escape_sequence ()
    with an 'f', indicating it is of type 'float'; NUMBER_BEGINNING
    is the line number on which to report any error.  */
 
-static void java_perform_atof	PARAMS ((YYSTYPE *, char *, int, int));
+static void java_perform_atof (YYSTYPE *, char *, int, int);
 
 static void
-java_perform_atof (java_lval, literal_token, fflag, number_beginning)
-     YYSTYPE *java_lval;
-     char *literal_token;
-     int fflag;
-     int number_beginning;
+java_perform_atof (YYSTYPE *java_lval, char *literal_token, int fflag,
+		   int number_beginning)
 {
   REAL_VALUE_TYPE value;
   tree type = (fflag ? FLOAT_TYPE_NODE : DOUBLE_TYPE_NODE);
@@ -892,15 +874,14 @@ java_perform_atof (java_lval, literal_token, fflag, number_beginning)
 }
 #endif
 
-static int yylex		PARAMS ((YYSTYPE *));
+static int yylex (YYSTYPE *);
 
 static int
 #ifdef JC1_LITE
-yylex (java_lval)
+yylex (YYSTYPE *java_lval)
 #else
-java_lex (java_lval)
+java_lex (YYSTYPE *java_lval)
 #endif
-     YYSTYPE *java_lval;
 {
   int c;
   unicode_t first_unicode;
@@ -1023,9 +1004,10 @@ java_lex (java_lval)
 	    }
 	  else if (JAVA_ASCII_DIGIT (c))
 	    radix = 8;
-	  else if (c == '.')
+	  else if (c == '.' || c == 'e' || c =='E')
 	    {
-	      /* Push the '.' back and prepare for a FP parsing...  */
+	      /* Push the '.', 'e', or 'E' back and prepare for a FP
+		 parsing...  */
 	      java_unget_unicode ();
 	      c = '0';
 	    }
@@ -1217,34 +1199,35 @@ java_lex (java_lval)
 	}
       /* End borrowed section.  */
 
-      /* Range checking.  */
-      if (long_suffix)
-	{
-	  /* 9223372036854775808L is valid if operand of a '-'. Otherwise
-	     9223372036854775807L is the biggest `long' literal that can be
-	     expressed using a 10 radix. For other radices, everything that
-	     fits withing 64 bits is OK.  */
-	  int hb = (high >> 31);
-	  if (overflow || (hb && low && radix == 10)
-	      || (hb && high & 0x7fffffff && radix == 10))
-	    JAVA_INTEGRAL_RANGE_ERROR ("Numeric overflow for `long' literal");
-	}
-      else
-	{
-	  /* 2147483648 is valid if operand of a '-'. Otherwise,
-	     2147483647 is the biggest `int' literal that can be
-	     expressed using a 10 radix. For other radices, everything
-	     that fits within 32 bits is OK.  As all literals are
-	     signed, we sign extend here.  */
-	  int hb = (low >> 31) & 0x1;
-	  if (overflow || high || (hb && low & 0x7fffffff && radix == 10))
-	    JAVA_INTEGRAL_RANGE_ERROR ("Numeric overflow for `int' literal");
-	  high = -hb;
-	}
 #ifndef JC1_LITE
+      /* Range checking.  */
       value = build_int_2 (low, high);
+      /* Temporarily set type to unsigned.  */
+      SET_LVAL_NODE_TYPE (value, (long_suffix
+				  ? unsigned_long_type_node
+				  : unsigned_int_type_node));
+
+      /* For base 10 numbers, only values up to the highest value
+	 (plus one) can be written.  For instance, only ints up to
+	 2147483648 can be written.  The special case of the largest
+	 negative value is handled elsewhere.  For other bases, any
+	 number can be represented.  */
+      if (overflow || (radix == 10
+		       && tree_int_cst_lt (long_suffix
+					   ? decimal_long_max
+					   : decimal_int_max,
+					   value)))
+	{
+	  if (long_suffix)
+	    JAVA_INTEGRAL_RANGE_ERROR ("Numeric overflow for `long' literal");
+	  else
+	    JAVA_INTEGRAL_RANGE_ERROR ("Numeric overflow for `int' literal");
+	}
+
+      /* Sign extend the value.  */
+      SET_LVAL_NODE_TYPE (value, (long_suffix ? long_type_node : int_type_node));
+      force_fit_type (value, 0);
       JAVA_RADIX10_FLAG (value) = radix == 10;
-      SET_LVAL_NODE_TYPE (value, long_suffix ? long_type_node : int_type_node);
 #else
       SET_LVAL_NODE_TYPE (build_int_2 (low, high),
 			  long_suffix ? long_type_node : int_type_node);
@@ -1539,7 +1522,7 @@ java_lex (java_lval)
   
   /* Keyword, boolean literal or null literal.  */
   for (first_unicode = c, all_ascii = 1, ascii_index = 0; 
-       JAVA_PART_CHAR_P (c); c = java_get_unicode ())
+       c != UEOF && JAVA_PART_CHAR_P (c); c = java_get_unicode ())
     {
       java_unicode_2_utf8 (c);
       if (all_ascii && c >= 128)
@@ -1549,7 +1532,8 @@ java_lex (java_lval)
 
   obstack_1grow (&temporary_obstack, '\0');
   string = obstack_finish (&temporary_obstack);
-  java_unget_unicode ();
+  if (c != UEOF)
+    java_unget_unicode ();
 
   /* If we have something all ascii, we consider a keyword, a boolean
      literal, a null literal or an all ASCII identifier.  Otherwise,
@@ -1603,6 +1587,15 @@ java_lex (java_lval)
 	      SET_LVAL_NODE (null_pointer_node);
 	      return NULL_TK;
 
+	    case ASSERT_TK:
+	      if (flag_assert)
+		{
+		  BUILD_OPERATOR (kw->token);
+		  return kw->token;
+		}
+	      else
+		break;
+
 	      /* Some keyword we want to retain information on the location
 		 they where found.  */
 	    case CASE_TK:
@@ -1616,7 +1609,6 @@ java_lex (java_lval)
 	    case CATCH_TK:
 	    case THROW_TK:
 	    case INSTANCEOF_TK:
-	    case ASSERT_TK:
 	      BUILD_OPERATOR (kw->token);
 
 	    default:
@@ -1649,34 +1641,22 @@ java_lex (java_lval)
    case of the largest negative value, and is only called in the case
    where this value is not preceded by `-'.  */
 static void
-error_if_numeric_overflow (value)
-     tree value;
+error_if_numeric_overflow (tree value)
 {
-  if (TREE_CODE (value) == INTEGER_CST && JAVA_RADIX10_FLAG (value))
+  if (TREE_CODE (value) == INTEGER_CST
+      && JAVA_RADIX10_FLAG (value)
+      && tree_int_cst_sgn (value) < 0)
     {
-      unsigned HOST_WIDE_INT lo, hi;
-
-      lo = TREE_INT_CST_LOW (value);
-      hi = TREE_INT_CST_HIGH (value);
       if (TREE_TYPE (value) == long_type_node)
-	{
-	  int hb = (hi >> 31);
-	  if (hb && !(hi & 0x7fffffff))
-	    java_lex_error ("Numeric overflow for `long' literal", 0);
-	}
+	java_lex_error ("Numeric overflow for `long' literal", 0);
       else
-	{
-	  int hb = (lo >> 31) & 0x1;
-	  if (hb && !(lo & 0x7fffffff))
-	    java_lex_error ("Numeric overflow for `int' literal", 0);
-	}
+	java_lex_error ("Numeric overflow for `int' literal", 0);
     }
 }
 #endif /* JC1_LITE */
 
 static void
-java_unicode_2_utf8 (unicode)
-    unicode_t unicode;
+java_unicode_2_utf8 (unicode_t unicode)
 {
   if (RANGE (unicode, 0x01, 0x7f))
     obstack_1grow (&temporary_obstack, (char)unicode);
@@ -1700,8 +1680,7 @@ java_unicode_2_utf8 (unicode)
 
 #ifndef JC1_LITE
 static tree
-build_wfl_node (node)
-     tree node;
+build_wfl_node (tree node)
 {
   node = build_expr_wfl (node, ctxp->filename, ctxp->elc.line, ctxp->elc.col);
   /* Prevent java_complete_lhs from short-circuiting node (if constant).  */
@@ -1711,9 +1690,7 @@ build_wfl_node (node)
 #endif
 
 static void
-java_lex_error (msg, forward)
-     const char *msg ATTRIBUTE_UNUSED;
-     int forward ATTRIBUTE_UNUSED;
+java_lex_error (const char *msg ATTRIBUTE_UNUSED, int forward ATTRIBUTE_UNUSED)
 {
 #ifndef JC1_LITE
   ctxp->elc.line = ctxp->c_line->lineno;
@@ -1728,9 +1705,7 @@ java_lex_error (msg, forward)
 
 #ifndef JC1_LITE
 static int
-java_is_eol (fp, c)
-  FILE *fp;
-  int c;
+java_is_eol (FILE *fp, int c)
 {
   int next;
   switch (c)
@@ -1749,9 +1724,8 @@ java_is_eol (fp, c)
 #endif
 
 char *
-java_get_line_col (filename, line, col)
-     const char *filename ATTRIBUTE_UNUSED;
-     int line ATTRIBUTE_UNUSED, col ATTRIBUTE_UNUSED;
+java_get_line_col (const char *filename ATTRIBUTE_UNUSED,
+		   int line ATTRIBUTE_UNUSED, int col ATTRIBUTE_UNUSED)
 {
 #ifdef JC1_LITE
   return 0;
@@ -1827,10 +1801,7 @@ java_get_line_col (filename, line, col)
 
 #ifndef JC1_LITE
 static int
-utf8_cmp (str, length, name)
-     const unsigned char *str;
-     int length;
-     const char *name;
+utf8_cmp (const unsigned char *str, int length, const char *name)
 {
   const unsigned char *limit = str + length;
   int i;
@@ -1958,9 +1929,7 @@ static const char *const cxx_keywords[] =
 /* Return true if NAME is a C++ keyword.  */
 
 int
-cxx_keyword_p (name, length)
-     const char *name;
-     int length;
+cxx_keyword_p (const char *name, int length)
 {
   int last = ARRAY_SIZE (cxx_keywords);
   int first = 0;

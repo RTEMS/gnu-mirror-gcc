@@ -239,6 +239,12 @@
 #include "pushback.h"
 #include "compress.h"
 
+/* Some systems have mkdir that takes a single argument.  */
+#ifdef MKDIR_TAKES_ONE_ARG
+# define mkdir(a,b) mkdir(a)
+#endif
+
+
 #ifdef WORDS_BIGENDIAN
 
 #define L2BI(l) ((l & 0xff000000) >> 24) | \
@@ -321,7 +327,6 @@ int main(int argc, char **argv){
   int manifest = TRUE;
   int opt;
   
-  int j;
   int jarfd = -1;
   
   /* These are used to collect file names and `-C' options for the
@@ -338,8 +343,6 @@ int main(int argc, char **argv){
   
   if(argc < 2)
     usage(argv[0]);
-  
-  j = strlen(argv[1]);
   
   new_argc = 0;
   new_argv = (char **) malloc (argc * sizeof (char *));
@@ -433,8 +436,7 @@ int main(int argc, char **argv){
   /* create the jarfile */
   if(action == ACTION_CREATE){
     if(jarfile){
-      jarfd = open(jarfile, O_CREAT | O_BINARY | O_WRONLY | O_TRUNC,
-		   S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+      jarfd = open(jarfile, O_CREAT | O_BINARY | O_WRONLY | O_TRUNC, 0666);
 
       if(jarfd < 0){
         fprintf(stderr, "Error opening %s for writing!\n", jarfile);
@@ -838,7 +840,7 @@ int add_to_jar(int fd, const char *new_dir, const char *file){
     }
   }
 
-  if(!strcmp(file, jarfile)){
+  if(jarfile && !strcmp(file, jarfile)){
     if(verbose)
       printf("skipping: %s\n", file);
     return 0;  /* we don't want to add ourselves.. */
@@ -919,7 +921,8 @@ int add_to_jar(int fd, const char *new_dir, const char *file){
     while(!use_explicit_list_only && (de = readdir(dir)) != NULL){
       if(de->d_name[0] == '.')
         continue;
-      if(!strcmp(de->d_name, jarfile)){ /* we don't want to add ourselves.  Believe me */
+      if(jarfile && !strcmp(de->d_name, jarfile)){
+	/* we don't want to add ourselves.  Believe me */
         if(verbose)
           printf("skipping: %s\n", de->d_name);
         continue;
@@ -1115,12 +1118,9 @@ int create_central_header(int fd){
   ub1 end_header[22];
   int start_offset;
   int dir_size;
-  int *iheader;
   int total_in = 0, total_out = 22;
 
   zipentry *ze;
-
-  iheader = (int*)header;
 
   /* magic number */
   header[0] = 'P';
@@ -1449,7 +1449,8 @@ int extract_jar(int fd, char **files, int file_num){
     }
 
     if(f_fd != -1 && handle){
-      f_fd = creat((const char *)filename, 00644);
+      f_fd = open((const char *)filename,
+                  O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, 0644);
 
       if(f_fd < 0){
         fprintf(stderr, "Error extracting JAR archive!\n");
@@ -1464,9 +1465,6 @@ int extract_jar(int fd, char **files, int file_num){
     }
 
     if(method == 8 || flags & 0x0008){
-      if(seekable)
-        lseek(fd, eflen, SEEK_CUR);
-      else
         consume(&pbf, eflen);
       
       inflate_file(&pbf, f_fd, &ze);
@@ -1501,9 +1499,6 @@ int extract_jar(int fd, char **files, int file_num){
 #endif
       }
 
-      if(seekable)
-        lseek(fd, eflen, SEEK_CUR);
-      else
         consume(&pbf, eflen);
     }
 
@@ -1544,7 +1539,6 @@ int extract_jar(int fd, char **files, int file_num){
 }
 
 int list_jar(int fd, char **files, int file_num){
-  int rdamt;
   ub4 signature;
   ub4 csize;
   ub4 usize;
@@ -1564,7 +1558,7 @@ int list_jar(int fd, char **files, int file_num){
   int i, j;
   time_t tdate;
   struct tm *s_tm;
-  char ascii_date[30];
+  char ascii_date[31];
   zipentry ze;
 
 #ifdef DEBUG
@@ -1655,9 +1649,10 @@ int list_jar(int fd, char **files, int file_num){
         tdate = dos2unixtime(mdate);
         s_tm = localtime(&tdate);
         strftime(ascii_date, 30, "%a %b %d %H:%M:%S %Z %Y", s_tm);
+        ascii_date[30] = '\0';
       }
 
-      if(filename_len < fnlen){
+      if(filename_len < fnlen + 1){
         if(filename != NULL)
           free(filename);
       
@@ -1706,7 +1701,7 @@ int list_jar(int fd, char **files, int file_num){
     init_inflation();
 
     for(;;){
-      if((rdamt = pb_read(&pbf, scratch, 4)) != 4){
+      if(pb_read(&pbf, scratch, 4) != 4){
         perror("read");
         break;
       }
@@ -1735,7 +1730,7 @@ int list_jar(int fd, char **files, int file_num){
         break;
       }
       
-      if((rdamt = pb_read(&pbf, (file_header + 4), 26)) != 26){
+      if(pb_read(&pbf, (file_header + 4), 26) != 26){
         perror("read");
         break;
       }
@@ -1776,11 +1771,12 @@ int list_jar(int fd, char **files, int file_num){
         strftime(ascii_date, 30, "%a %b %d %H:%M:%S %Z %Y", s_tm);
       }
 
-      if(filename_len < fnlen){
+      if(filename_len < fnlen + 1){
         if(filename != NULL)
           free(filename);
         
         filename = malloc(sizeof(ub1) * (fnlen + 1));
+        ascii_date[30] = '\0';
         filename_len = fnlen + 1;
       }
       
@@ -1847,6 +1843,14 @@ int consume(pb_file *pbf, int amt){
   printf("Consuming %d bytes\n", amt);
 #endif
 
+  if (seekable){
+    if (amt <= (int)pbf->buff_amt)
+      pb_read(pbf, buff, amt);
+    else {
+      lseek(pbf->fd, amt - pbf->buff_amt, SEEK_CUR);
+      pb_read(pbf, buff, pbf->buff_amt); /* clear pbf */
+    }
+  } else
   while(tc < amt){
     rdamt = pb_read(pbf, buff, ((amt - tc) < RDSZ ? (amt - tc) : RDSZ));
 #ifdef DEBUG
@@ -1856,7 +1860,7 @@ int consume(pb_file *pbf, int amt){
   }
 
 #ifdef DEBUG
-  printf("%d bytes consumed\n", tc);
+  printf("%d bytes consumed\n", amt);
 #endif
 
   return 0;

@@ -122,7 +122,7 @@ extern const char *cris_elinux_stacksize_str;
    someone will fight for us.  This year in the mountains.
    Note that for -melinux and -mlinux, command-line -isystem options are
    emitted both before and after the synthesized one.  We can't remove all
-   of them: a %{<isystem} will only remove the first one and %{<isystem*}
+   of them: a %<isystem will only remove the first one and %<isystem*
    will not do TRT.  Those extra occurrences are harmless anyway.  */
 #define CPP_SPEC \
  "-$ -D__CRIS_ABI_version=2\
@@ -211,7 +211,7 @@ extern const char *cris_elinux_stacksize_str;
 #define CRIS_LINK_SUBTARGET_SPEC \
  "-mcriself\
   %{sim2:%{!T*:-Tdata 0x4000000 -Tbss 0x8000000}}\
-  %{O2|O3: --gc-sections}"
+  %{!r:%{O2|O3: --gc-sections}}"
 
 /* Which library to get.  The only difference from the default is to get
    libsc.a if -sim is given to the driver.  Repeat -lc -lsysX
@@ -1013,10 +1013,6 @@ struct cum_args {int regs;};
 #define ELIGIBLE_FOR_EPILOGUE_DELAY(INSN, N) \
   cris_eligible_for_epilogue_delay (INSN)
 
-#define ASM_OUTPUT_MI_THUNK(FILE, THUNK_FNDECL, DELTA, FUNCTION) \
- cris_asm_output_mi_thunk(FILE, THUNK_FNDECL, DELTA, FUNCTION)
-
-
 /* Node: Profiling */
 
 #define FUNCTION_PROFILER(FILE, LABELNO)  \
@@ -1030,7 +1026,7 @@ struct cum_args {int regs;};
 
 /* We save the register number of the first anonymous argument in
    first_vararg_reg, and take care of this in the function prologue.
-   This behaviour is used by at least one more port (the ARM?), but
+   This behavior is used by at least one more port (the ARM?), but
    may be unsafe when compiling nested functions.  (With varargs? Hairy.)
    Note that nested-functions is a GNU C extension.
 
@@ -1044,8 +1040,7 @@ struct cum_args {int regs;};
       if (TARGET_PDEBUG)						\
 	{								\
 	  fprintf (asm_out_file,					\
-		   "\n; VA:: %s: %d args before, anon @ #%d, %dtime\n",	\
-		   current_function_varargs ? "OLD" : "ANSI",		\
+		   "\n; VA:: ANSI: %d args before, anon @ #%d, %dtime\n", \
 		   (ARGSSF).regs, PRETEND, SECOND);			\
 	}								\
     }									\
@@ -1243,7 +1238,7 @@ struct cum_args {int regs;};
 
 /* For now, don't do anything.  GCC does a good job most often.
 
-    Maybe we could do something about gcc:s misbehaviour when it
+    Maybe we could do something about gcc:s misbehavior when it
    recalculates frame offsets for local variables, from fp+offs to
    sp+offs.  The resulting address expression gets screwed up
    sometimes, but I'm not sure that it may be fixed here, since it is
@@ -1291,13 +1286,13 @@ struct cum_args {int regs;};
 	      something_reloaded = 1;					\
 	    }								\
 									\
-	  if (REG_P (XEXP (XEXP (X, 0), 0))				\
-	      && (REGNO (XEXP (XEXP (X, 0), 0))				\
+	  if (REG_P (XEXP (XEXP (XEXP (X, 0), 0), 0))			\
+	      && (REGNO (XEXP (XEXP (XEXP (X, 0), 0), 0))		\
 		  >= FIRST_PSEUDO_REGISTER))				\
 	    {								\
 	      /* First one is a pseudo - reload that.  */		\
-	      push_reload (XEXP (XEXP (X, 0), 0), NULL_RTX,		\
-			   &XEXP (XEXP (X, 0), 0), NULL, 		\
+	      push_reload (XEXP (XEXP (XEXP (X, 0), 0), 0), NULL_RTX,	\
+			   &XEXP (XEXP (XEXP (X, 0), 0), 0), NULL, 	\
 			   GENERAL_REGS,				\
 			   GET_MODE (X), VOIDmode, 0, 0, OPNUM, TYPE);	\
 	      something_reloaded = 1;					\
@@ -1340,75 +1335,6 @@ struct cum_args {int regs;};
 
 
 /* Node: Costs */
-
-#define CONST_COSTS(RTX, CODE, OUTER_CODE)				\
- case CONST_INT:							\
-   if (INTVAL (RTX) == 0)						\
-     return 0;								\
-   if (INTVAL (RTX) < 32 && INTVAL (RTX) >= -32)			\
-     return 1;								\
-   /* Eight or 16 bits are a word and cycle more expensive.  */		\
-   if (INTVAL (RTX) <= 32767 && INTVAL (RTX) >= -32768)			\
-     return 2;								\
-   /* A 32 bit constant (or very seldom, unsigned 16 bits) costs	\
-      another word.  FIXME: This isn't linear to 16 bits.  */		\
-   return 4;								\
- case LABEL_REF:							\
-   return 6;								\
- case CONST:								\
- case SYMBOL_REF:							\
-   /* For PIC, we need a prefix (if it isn't already there),		\
-      and the PIC register.  For a global PIC symbol, we also need a	\
-      read of the GOT.  */						\
-   return								\
-     flag_pic ? (cris_got_symbol (RTX) ? (2 + 4 + 6) : (2 + 6)) : 6;	\
- case CONST_DOUBLE:							\
-   if (RTX != CONST0_RTX (GET_MODE (RTX) == VOIDmode ? DImode		\
-			  : GET_MODE (RTX)))				\
-     return 12;								\
-   /* Make 0.0 cheap, else test-insns will not be used.  */		\
-   return 0;
-
-#define RTX_COSTS(X, CODE, OUTER_CODE)					\
- case MULT:								\
-   /* Identify values that are no powers of two.  Powers of 2 are	\
-      taken care of already and those values should not be		\
-      changed.  */							\
-   if (GET_CODE (XEXP (X, 1)) != CONST_INT				\
-       || exact_log2 (INTVAL (XEXP (X, 1)) < 0))			\
-     {									\
-	/* If we have a multiply insn, then the cost is between		\
-	   1 and 2 "fast" instructions.  */				\
-	if (TARGET_HAS_MUL_INSNS)					\
-	  return COSTS_N_INSNS (1) + COSTS_N_INSNS (1) /2;		\
-									\
-	/* Estimate as 4 + 4 * #ofbits.  */				\
-	return COSTS_N_INSNS (132);					\
-     }									\
-     break;								\
- case UDIV:								\
- case MOD:								\
- case UMOD:								\
- case DIV:								\
-   if (GET_CODE (XEXP (X, 1)) != CONST_INT				\
-       || exact_log2 (INTVAL (XEXP (X, 1)) < 0))			\
-     /* Estimate this as 4 + 8 * #of bits.  */				\
-     return COSTS_N_INSNS (260);					\
-									\
- case AND:								\
-   if (GET_CODE (XEXP (X, 1)) == CONST_INT				\
-       /* Two constants may actually happen before optimization.  */	\
-       && GET_CODE (XEXP (X, 0)) != CONST_INT				\
-       && !CONST_OK_FOR_LETTER_P (INTVAL (XEXP (X, 1)), 'I'))		\
-     return								\
-       rtx_cost (XEXP (X, 0), OUTER_CODE) + 2				\
-       + 2 * GET_MODE_NUNITS (GET_MODE (XEXP (X, 0)));			\
-									\
- case ZERO_EXTEND: case SIGN_EXTEND:					\
-   /* Same as move. If embedded in other insn, cost is 0.  */		\
-   return rtx_cost (XEXP (X, 0), OUTER_CODE);
-
-#define ADDRESS_COST(X) cris_address_cost (X)
 
 /* FIXME: Need to define REGISTER_MOVE_COST when more register classes are
    introduced.  */
@@ -1575,22 +1501,8 @@ call_ ## FUNC (void)						\
 
 /* Node: Label Output */
 
-#define ASM_OUTPUT_LABEL(FILE, NAME)		\
-  do						\
-    {						\
-      assemble_name (FILE, NAME);		\
-      fputs (":\n", FILE);			\
-    }						\
-  while (0)
-
-#define ASM_GLOBALIZE_LABEL(FILE, NAME)		\
-  do						\
-    {						\
-      fputs ("\t.global ", FILE);		\
-      assemble_name (FILE, NAME);		\
-      fputs ("\n", FILE);			\
-    }						\
-  while (0)
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP "\t.global "
 
 #define SUPPORTS_WEAK 1
 
@@ -1599,27 +1511,10 @@ call_ ## FUNC (void)						\
    handle (to #undef or ignore it) in a.out.  */
 #define HAVE_GAS_HIDDEN 1
 
-#undef  ASM_OUTPUT_INTERNAL_LABEL
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE, PREFIX, NUM)	\
-  do							\
-    {							\
-      asm_fprintf (FILE, "%L%s%d:\n", PREFIX, NUM);	\
-    }							\
-  while (0)
-
 /* Remove any previous definition (elfos.h).  */
 #undef ASM_GENERATE_INTERNAL_LABEL
 #define ASM_GENERATE_INTERNAL_LABEL(LABEL, PREFIX, NUM)	\
   sprintf (LABEL, "*%s%s%ld", LOCAL_LABEL_PREFIX, PREFIX, (long) NUM)
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)		\
-  do								\
-    {								\
-      (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10);	\
-      sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO));		\
-    }								\
-  while (0)
-
 
 /* Node: Initialization */
 /* (no definitions) */

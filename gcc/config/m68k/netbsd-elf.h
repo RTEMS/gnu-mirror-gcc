@@ -11,7 +11,7 @@ This file is part of GNU CC.
 
 GNU CC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 1, or (at your option)
+the Free Software Foundation; either version 2, or (at your option)
 any later version.
 
 GNU CC is distributed in the hope that it will be useful,
@@ -103,9 +103,11 @@ Boston, MA 02111-1307, USA.  */
 
 #undef ASM_SPEC
 #define ASM_SPEC \
-  " %| %(asm_default_spec) \
+  "%(asm_default_spec) \
     %{m68010} %{m68020} %{m68030} %{m68040} %{m68060} \
     %{fpic:-k} %{fPIC:-k -K}"
+
+#define AS_NEEDS_DASH_FOR_PIPED_INPUT
 
 /* Provide a LINK_SPEC appropriate for a NetBSD/m68k ELF target.  */
 
@@ -215,15 +217,18 @@ while (0)
 
 /* Use the default action for outputting the case label.  */
 #undef ASM_OUTPUT_CASE_LABEL
-#define ASM_RETURN_CASE_JUMP						\
-do									\
-  {									\
-    if (TARGET_5200)							\
-      return "ext%.l %0\n\tjmp %%pc@(2,%0:l)";				\
-    else								\
-      return "jmp %%pc@(2,%0:w)";					\
-  }									\
-while (0)
+#define ASM_RETURN_CASE_JUMP				\
+  do {							\
+    if (TARGET_5200)					\
+      {							\
+	if (ADDRESS_REG_P (operands[0]))		\
+	  return "jmp %%pc@(2,%0:l)";			\
+	else						\
+	  return "ext%.l %0\n\tjmp %%pc@(2,%0:l)";	\
+      }							\
+    else						\
+      return "jmp %%pc@(2,%0:w)";			\
+  } while (0)
 
 
 /* This is how to output an assembler line that says to advance the
@@ -271,17 +276,6 @@ while (0)
 ( fputs (".lcomm ", (FILE)),						\
   assemble_name ((FILE), (NAME)),					\
   fprintf ((FILE), ",%u\n", (SIZE)))
-
-
-/* Turn off function cse if we are doing PIC. We always want function
-   call to be done as `bsr foo@PLTPC', so it will force the assembler
-   to create the PLT entry for `foo'.  Doing function cse will cause
-   the address of `foo' to be loaded into a register, which is exactly
-   what we want to avoid when we are doing PIC on svr4 m68k.  */
-
-#undef SUBTARGET_OVERRIDE_OPTIONS
-#define SUBTARGET_OVERRIDE_OPTIONS					\
-  if (flag_pic) flag_no_function_cse = 1;
 
 
 /* XXX
@@ -431,36 +425,6 @@ while (0)
 
 #undef DEFAULT_PCC_STRUCT_RETURN
 #define DEFAULT_PCC_STRUCT_RETURN 1
-
-
-/* Output code to add DELTA to the first argument, and then jump to FUNCTION.
-   Used for C++ multiple inheritance.  */
-
-#define ASM_OUTPUT_MI_THUNK(FILE, THUNK_FNDECL, DELTA, FUNCTION)	\
-do									\
-  {									\
-    if (DELTA > 0 && DELTA <= 8)					\
-      asm_fprintf (FILE, "\taddq.l %I%d,4(%Rsp)\n", DELTA);		\
-    else if (DELTA < 0 && DELTA >= -8)					\
-      asm_fprintf (FILE, "\tsubq.l %I%d,4(%Rsp)\n", -DELTA);		\
-    else								\
-      asm_fprintf (FILE, "\tadd.l %I%d,4(%Rsp)\n", DELTA);		\
-									\
-    if (flag_pic)							\
-      {									\
-	fprintf (FILE, "\tbra.l ");					\
-	assemble_name (FILE, XSTR (XEXP (DECL_RTL (FUNCTION), 0), 0));	\
-	fprintf (FILE, "@PLTPC\n");					\
-      }									\
-    else								\
-      {									\
-	fprintf (FILE, "\tjmp ");					\
-	assemble_name (FILE, XSTR (XEXP (DECL_RTL (FUNCTION), 0), 0));	\
-	fprintf (FILE, "\n");						\
-      }									\
-  }									\
-while (0)
-
 
 /* Output assembler code for a block containing the constant parts
    of a trampoline, leaving space for the variable parts.  */

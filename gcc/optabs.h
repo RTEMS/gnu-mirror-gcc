@@ -1,5 +1,5 @@
 /* Definitions for code generation pass of GNU compiler.
-   Copyright (C) 2001 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2002 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -123,14 +123,28 @@ enum optab_index
   OTI_absv,
   /* Bitwise not */
   OTI_one_cmpl,
-  /* Find first bit set */
+  /* Bit scanning and counting */
   OTI_ffs,
+  OTI_clz,
+  OTI_ctz,
+  OTI_popcount,
+  OTI_parity,
   /* Square root */
   OTI_sqrt,
   /* Sine */
   OTI_sin,
   /* Cosine */
   OTI_cos,
+  /* Exponential */
+  OTI_exp,
+  /* Natural Logarithm */
+  OTI_log,
+  /* Rounding functions */
+  OTI_floor,
+  OTI_ceil,
+  OTI_trunc,
+  OTI_round,
+  OTI_nearbyint,
 
   /* Compare insn; two operands.  */
   OTI_cmp,
@@ -149,6 +163,9 @@ enum optab_index
     
   /* Push instruction.  */
   OTI_push,
+
+  /* Conditional add instruction.  */
+  OTI_addcc,
 
   OTI_MAX
 };
@@ -195,9 +212,20 @@ extern GTY(()) optab optab_table[OTI_MAX];
 #define absv_optab (optab_table[OTI_absv])
 #define one_cmpl_optab (optab_table[OTI_one_cmpl])
 #define ffs_optab (optab_table[OTI_ffs])
+#define clz_optab (optab_table[OTI_clz])
+#define ctz_optab (optab_table[OTI_ctz])
+#define popcount_optab (optab_table[OTI_popcount])
+#define parity_optab (optab_table[OTI_parity])
 #define sqrt_optab (optab_table[OTI_sqrt])
 #define sin_optab (optab_table[OTI_sin])
 #define cos_optab (optab_table[OTI_cos])
+#define exp_optab (optab_table[OTI_exp])
+#define log_optab (optab_table[OTI_log])
+#define floor_optab (optab_table[OTI_floor])
+#define ceil_optab (optab_table[OTI_ceil])
+#define trunc_optab (optab_table[OTI_trunc])
+#define round_optab (optab_table[OTI_round])
+#define nearbyint_optab (optab_table[OTI_nearbyint])
 
 #define cmp_optab (optab_table[OTI_cmp])
 #define ucmp_optab (optab_table[OTI_ucmp])
@@ -209,6 +237,7 @@ extern GTY(()) optab optab_table[OTI_MAX];
 #define cmov_optab (optab_table[OTI_cmov])
 #define cstore_optab (optab_table[OTI_cstore])
 #define push_optab (optab_table[OTI_push])
+#define addcc_optab (optab_table[OTI_addcc])
 
 /* Tables of patterns for extending one integer mode to another.  */
 extern enum insn_code extendtab[MAX_MACHINE_MODE][MAX_MACHINE_MODE][2];
@@ -225,7 +254,7 @@ extern enum insn_code reload_in_optab[NUM_MACHINE_MODES];
 extern enum insn_code reload_out_optab[NUM_MACHINE_MODES];
 
 /* Contains the optab used for each rtx code.  */
-extern optab code_to_optab[NUM_RTX_CODE + 1];
+extern GTY(()) optab code_to_optab[NUM_RTX_CODE + 1];
 
 
 typedef rtx (*rtxfun) PARAMS ((rtx));

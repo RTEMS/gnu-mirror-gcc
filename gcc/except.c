@@ -49,6 +49,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "tree.h"
 #include "flags.h"
@@ -353,7 +355,7 @@ static void sjlj_output_call_site_table		PARAMS ((void));
 
 
 /* Routine to see if exception handling is turned on.
-   DO_WARN is non-zero if we want to inform the user that exception
+   DO_WARN is nonzero if we want to inform the user that exception
    handling is turned off.
 
    This is used to ensure that -fexceptions has been specified if the
@@ -532,6 +534,39 @@ expand_eh_region_end ()
   return cur_region;
 }
 
+/* Expand HANDLER, which is the operand 1 of a TRY_CATCH_EXPR.  Catch
+   blocks and C++ exception-specifications are handled specially.  */
+
+void
+expand_eh_handler (handler)
+     tree handler;
+{
+  tree inner = handler;
+  while (TREE_CODE (inner) == COMPOUND_EXPR)
+    inner = TREE_OPERAND (inner, 0);
+
+  switch (TREE_CODE (inner))
+    {
+    case CATCH_EXPR:
+      expand_start_all_catch ();
+      expand_expr (handler, const0_rtx, VOIDmode, 0);
+      expand_end_all_catch ();
+      break;
+
+    case EH_FILTER_EXPR:
+      if (EH_FILTER_MUST_NOT_THROW (handler))
+	expand_eh_region_end_must_not_throw (EH_FILTER_FAILURE (handler));
+      else
+	expand_eh_region_end_allowed (EH_FILTER_TYPES (handler),
+				      EH_FILTER_FAILURE (handler));
+      break;
+
+    default:
+      expand_eh_region_end_cleanup (handler);
+      break;
+    }
+}
+
 /* End an exception handling region for a cleanup.  HANDLER is an
    expression to expand for the cleanup.  */
 
@@ -569,7 +604,7 @@ expand_eh_region_end_cleanup (handler)
 
   /* In case this cleanup involves an inline destructor with a try block in
      it, we need to save the EH return data registers around it.  */
-  data_save[0] = gen_reg_rtx (Pmode);
+  data_save[0] = gen_reg_rtx (ptr_mode);
   emit_move_insn (data_save[0], get_exception_pointer (cfun));
   data_save[1] = gen_reg_rtx (word_mode);
   emit_move_insn (data_save[1], get_exception_filter (cfun));
@@ -672,12 +707,12 @@ expand_start_catch (type_or_list)
 void
 expand_end_catch ()
 {
-  struct eh_region *try_region, *catch_region;
+  struct eh_region *try_region;
 
   if (! doing_eh (0))
     return;
 
-  catch_region = expand_eh_region_end ();
+  expand_eh_region_end ();
   try_region = cfun->eh->try_region;
 
   emit_jump (try_region->u.try.continue_label);
@@ -829,7 +864,7 @@ get_exception_pointer (fun)
   rtx exc_ptr = fun->eh->exc_ptr;
   if (fun == cfun && ! exc_ptr)
     {
-      exc_ptr = gen_reg_rtx (Pmode);
+      exc_ptr = gen_reg_rtx (ptr_mode);
       fun->eh->exc_ptr = exc_ptr;
     }
   return exc_ptr;
@@ -1791,7 +1826,7 @@ connect_post_landing_pads ()
 	emit_jump (outer->post_landing_pad);
       else
 	emit_library_call (unwind_resume_libfunc, LCT_THROW,
-			   VOIDmode, 1, cfun->eh->exc_ptr, Pmode);
+			   VOIDmode, 1, cfun->eh->exc_ptr, ptr_mode);
 
       seq = get_insns ();
       end_sequence ();
@@ -1864,7 +1899,7 @@ dw2_build_landing_pads ()
 	}
 
       emit_move_insn (cfun->eh->exc_ptr,
-		      gen_rtx_REG (Pmode, EH_RETURN_DATA_REGNO (0)));
+		      gen_rtx_REG (ptr_mode, EH_RETURN_DATA_REGNO (0)));
       emit_move_insn (cfun->eh->filter,
 		      gen_rtx_REG (word_mode, EH_RETURN_DATA_REGNO (1)));
 
@@ -2691,7 +2726,7 @@ reachable_next_level (region, type_thrown, info)
       return RNL_MAYBE_CAUGHT;
 
     case ERT_CATCH:
-      /* Catch regions are handled by their controling try region.  */
+      /* Catch regions are handled by their controlling try region.  */
       return RNL_NOT_CAUGHT;
 
     case ERT_MUST_NOT_THROW:
@@ -2893,25 +2928,50 @@ can_throw_external (insn)
   return true;
 }
 
-/* True if nothing in this function can throw outside this function.  */
+/* Set current_function_nothrow and cfun->all_throwers_are_sibcalls.  */
 
-bool
-nothrow_function_p ()
+void
+set_nothrow_function_flags ()
 {
   rtx insn;
+  
+  current_function_nothrow = 1;
+
+  /* Assume cfun->all_throwers_are_sibcalls until we encounter
+     something that can throw an exception.  We specifically exempt
+     CALL_INSNs that are SIBLING_CALL_P, as these are really jumps,
+     and can't throw.  Most CALL_INSNs are not SIBLING_CALL_P, so this
+     is optimistic.  */
+
+  cfun->all_throwers_are_sibcalls = 1;
 
   if (! flag_exceptions)
-    return true;
-
+    return;
+  
   for (insn = get_insns (); insn; insn = NEXT_INSN (insn))
     if (can_throw_external (insn))
-      return false;
+      {
+	current_function_nothrow = 0;
+
+	if (GET_CODE (insn) != CALL_INSN || !SIBLING_CALL_P (insn))
+	  {
+	    cfun->all_throwers_are_sibcalls = 0;
+	    return;
+	  }
+      }
+
   for (insn = current_function_epilogue_delay_list; insn;
        insn = XEXP (insn, 1))
-    if (can_throw_external (XEXP (insn, 0)))
-      return false;
+    if (can_throw_external (insn))
+      {
+	current_function_nothrow = 0;
 
-  return true;
+	if (GET_CODE (insn) != CALL_INSN || !SIBLING_CALL_P (insn))
+	  {
+	    cfun->all_throwers_are_sibcalls = 0;
+	    return;
+	  }
+      }
 }
 
 
@@ -2967,6 +3027,16 @@ expand_builtin_extract_return_addr (addr_tree)
      tree addr_tree;
 {
   rtx addr = expand_expr (addr_tree, NULL_RTX, Pmode, 0);
+
+  if (GET_MODE (addr) != Pmode
+      && GET_MODE (addr) != VOIDmode)
+    {
+#ifdef POINTERS_EXTEND_UNSIGNED
+      addr = convert_memory_address (Pmode, addr);
+#else
+      addr = convert_to_mode (Pmode, addr, 0);
+#endif
+    }
 
   /* First mask out any unwanted bits.  */
 #ifdef MASK_RETURN_ADDR
@@ -3554,6 +3624,33 @@ sjlj_output_call_site_table ()
   call_site_base += n;
 }
 
+/* Tell assembler to switch to the section for the exception handling
+   table.  */
+
+void
+default_exception_section ()
+{
+  if (targetm.have_named_sections)
+    {
+      int flags;
+#ifdef HAVE_LD_RO_RW_SECTION_MIXING
+      int tt_format = ASM_PREFERRED_EH_DATA_FORMAT (/*code=*/0, /*global=*/1);
+
+      flags = (! flag_pic
+	       || ((tt_format & 0x70) != DW_EH_PE_absptr
+		   && (tt_format & 0x70) != DW_EH_PE_aligned))
+	      ? 0 : SECTION_WRITE;
+#else
+      flags = SECTION_WRITE;
+#endif
+      named_section_flags (".gcc_except_table", flags);
+    }
+  else if (flag_pic)
+    data_section ();
+  else
+    readonly_data_section ();
+}
+
 void
 output_function_exception_table ()
 {
@@ -3600,7 +3697,7 @@ output_function_exception_table ()
       assemble_align (tt_format_size * BITS_PER_UNIT);
     }
 
-  ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "LLSDA",
+  (*targetm.asm_out.internal_label) (asm_out_file, "LLSDA",
 			     current_function_funcdef_no);
 
   /* The LSDA header.  */

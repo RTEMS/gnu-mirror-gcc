@@ -54,25 +54,12 @@
   /* Note it is OK to use GCC extensions such as long long in a compiler front end.
      This is because the GCC front ends are built using GCC. */
 
-/* Standard/OS headers.  */
-
-#include <stdlib.h>
-#include <unistd.h>
-#include "safe-ctype.h"
-#include <errno.h>
-#include <stdarg.h>
-#include <limits.h>
-#include <string.h>
-
-#include <fcntl.h>
-#include <getopt.h>
-#include <stdio.h>
-
 /* GCC headers.  */
 
 #include "config.h"
-#include "ansidecl.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "flags.h"
 #include "output.h"
@@ -89,16 +76,6 @@
 
 extern int option_main;
 extern char **file_names;
-
-/* Flags etc required by c code.  */
-
-int warn_format = 0;
-int warn_format_y2k = 0;
-int warn_format_extra_args = 0;
-int warn_format_nonliteral = 0;
-int warn_format_security = 0;
-int warn_format_zero_length = 0;
-
 
 /* The front end language hooks (addresses of code for this front
    end).  Mostly just use the C routines.  */
@@ -119,6 +96,12 @@ int warn_format_zero_length = 0;
 #define LANG_HOOKS_TYPE_FOR_SIZE c_common_type_for_size
 #undef LANG_HOOKS_PARSE_FILE
 #define LANG_HOOKS_PARSE_FILE treelang_parse_file
+#undef LANG_HOOKS_COMMON_ATTRIBUTE_TABLE
+#define LANG_HOOKS_COMMON_ATTRIBUTE_TABLE c_common_attribute_table
+#undef LANG_HOOKS_FORMAT_ATTRIBUTE_TABLE
+#define LANG_HOOKS_FORMAT_ATTRIBUTE_TABLE c_common_format_attribute_table
+#undef LANG_HOOKS_INSERT_DEFAULT_ATTRIBUTES
+#define LANG_HOOKS_INSERT_DEFAULT_ATTRIBUTES c_insert_default_attributes
 
 /* Hook routines and data unique to treelang.  */
 
@@ -203,7 +186,7 @@ tree_code_if_start (tree exp, unsigned char* filename, int lineno)
                  exp, 
                  build1 (CONVERT_EXPR, TREE_TYPE (exp), integer_zero_node));
   emit_line_note ((const char *)filename, lineno); /* Output the line number information.  */
-  expand_start_cond (cond_exp, /* Exit-able if non zero.  */ 0);
+  expand_start_cond (cond_exp, /* Exit-able if nonzero.  */ 0);
 }
 
 /* Output the code for the else of an if statement.  The else occurred
@@ -253,7 +236,7 @@ tree_code_create_function_prototype (unsigned char* chars,
       type_node = get_type_for_numeric_type (parm->type);
       type_list = tree_cons (NULL_TREE, type_node, type_list);
     }
-  /* Last parm if null indicates fixed length list (as opposed to
+  /* Last parm if void indicates fixed length list (as opposed to
      printf style va_* list).  */
   type_list = tree_cons (NULL_TREE, void_type_node, type_list);
   /* The back end needs them in reverse order.  */
@@ -266,13 +249,7 @@ tree_code_create_function_prototype (unsigned char* chars,
   fn_decl = build_decl (FUNCTION_DECL, id, fn_type);
 
   DECL_CONTEXT (fn_decl) = NULL_TREE; /* Nested functions not supported here.  */
-  DECL_SOURCE_FILE (fn_decl) = (const char *)filename;
- /*  if (lineno > 1000000)
-    ; */ /* Probably the line # is rubbish because someone forgot to set
-    the line number - and unfortunately impossible line #s are used as
-    magic flags at various times. The longest known function for
-    example is about 550,000 lines (it was written in COBOL).  */
-  DECL_SOURCE_LINE (fn_decl) = lineno;
+  annotate_with_file_line (fn_decl, filename, lineno);
 
   TREE_USED (fn_decl) = 1;
 
@@ -346,15 +323,13 @@ tree_code_create_function_initial (tree prev_saved,
   current_function_decl = fn_decl;
   DECL_INITIAL (fn_decl) = error_mark_node;
 
-  DECL_SOURCE_FILE (fn_decl) = (const char *)filename;
-  DECL_SOURCE_LINE (fn_decl) = lineno;
+  annotate_with_file_line_column (fn_decl, filename, lineno, 0);
 
   /* Prepare creation of rtl for a new function.  */
   
   resultdecl = DECL_RESULT (fn_decl) = build_decl (RESULT_DECL, NULL_TREE, TREE_TYPE (TREE_TYPE (fn_decl)));
   DECL_CONTEXT (DECL_RESULT (fn_decl)) = fn_decl;
-  DECL_SOURCE_FILE (resultdecl) = (const char *)filename;
-  DECL_SOURCE_LINE (resultdecl) = lineno;
+  annotate_with_file_line_column (resultdecl, filename, lineno, 0);
   /* Work out the size. ??? is this needed.  */
   layout_decl (DECL_RESULT (fn_decl), 0);
 
@@ -373,8 +348,7 @@ tree_code_create_function_initial (tree prev_saved,
       if (!fn_decl)
         abort ();
       DECL_CONTEXT (parm_decl) = fn_decl;
-      DECL_SOURCE_FILE (parm_decl) = (const char *)filename;
-      DECL_SOURCE_LINE (parm_decl) = lineno;
+      annotate_with_file_line_column (parm_decl, filename, lineno, 0);
       parm_list = chainon (parm_decl, parm_list);
     }
 
@@ -545,8 +519,7 @@ tree_code_create_variable (unsigned int storage_class,
 
   DECL_CONTEXT (var_decl) = current_function_decl;
 
-  DECL_SOURCE_FILE (var_decl) = (const char *)filename;
-  DECL_SOURCE_LINE (var_decl) = lineno;
+  annotate_with_file_line_column (var_decl, filename, lineno, 0);
 
   /* Set the storage mode and whether only visible in the same file.  */
   switch (storage_class)
@@ -844,16 +817,6 @@ tree_ggc_storage_always_used (void * m)
 
 /* Following  from c-lang.c.  */
 
-/* Tell the c code we are not objective C.  */
-
-int
-maybe_objc_comptypes (tree lhs ATTRIBUTE_UNUSED,
-                      tree rhs ATTRIBUTE_UNUSED,
-                      int reflexive ATTRIBUTE_UNUSED)
-{
-  return -1;
-}
-
 /* Used by c-typeck.c (build_external_ref), but only for objc.  */
 
 tree
@@ -863,6 +826,12 @@ lookup_objc_ivar (tree id ATTRIBUTE_UNUSED)
 }
 
 /* Dummy routines called from c code. Save copying c-decl.c, c-common.c etc.  */
+
+tree
+objc_is_id (tree arg ATTRIBUTE_UNUSED)
+{
+  return 0;
+}
 
 void
 check_function_format (int *status ATTRIBUTE_UNUSED,
@@ -874,8 +843,10 @@ check_function_format (int *status ATTRIBUTE_UNUSED,
 
 /* Tell the c code we are not objective C.  */
 
-tree
-maybe_building_objc_message_expr ()
+int
+objc_comptypes (tree lhs ATTRIBUTE_UNUSED, 
+                tree rhs ATTRIBUTE_UNUSED, 
+                int reflexive ATTRIBUTE_UNUSED)
 {
   return 0;
 }
@@ -948,22 +919,6 @@ cpp_create_reader (enum c_lang lang ATTRIBUTE_UNUSED)
 
 /* Should not be called for treelang.   */
 
-void
-cpp_post_options (cpp_reader *pfile ATTRIBUTE_UNUSED)
-{
-  abort ();
-}
-
-/* Should not be called for treelang.   */
-
-void
-cpp_preprocess_file (cpp_reader *pfile ATTRIBUTE_UNUSED)
-{
-  abort ();
-}
-
-/* Should not be called for treelang.   */
-
 const char *
 init_c_lex (const char *filename ATTRIBUTE_UNUSED)
 {
@@ -982,8 +937,8 @@ init_pragma ()
 
 /* Should not be called for treelang.   */
 
-void
-cpp_finish (cpp_reader *pfile ATTRIBUTE_UNUSED)
+int
+cpp_finish (cpp_reader *pfile ATTRIBUTE_UNUSED, FILE *f ATTRIBUTE_UNUSED)
 {
   abort ();
 }
@@ -996,7 +951,7 @@ cpp_errors (cpp_reader *pfile ATTRIBUTE_UNUSED)
   abort ();
 }
 
-/* Should not be called for treelang.   */
+/* Dummy called by C.   */
 
 tree
 handle_format_attribute (tree *node ATTRIBUTE_UNUSED,
@@ -1005,7 +960,7 @@ handle_format_attribute (tree *node ATTRIBUTE_UNUSED,
                          int flags ATTRIBUTE_UNUSED,
                          bool *no_add_attrs ATTRIBUTE_UNUSED)
 {
-  abort ();
+  return NULL_TREE; 
 }
 
 /* Should not be called for treelang.   */
@@ -1047,12 +1002,26 @@ set_Wformat (int setting ATTRIBUTE_UNUSED)
   abort ();
 }
 
-/* Should not be called for treelang.   */
+/* Used for objective C.  */
 
 void
-maybe_objc_check_decl (tree decl ATTRIBUTE_UNUSED)
+objc_check_decl (tree decl ATTRIBUTE_UNUSED);
+
+void
+objc_check_decl (tree decl ATTRIBUTE_UNUSED)
 {
   abort ();
+}
+
+/* Tell the c code we are not objective C.  */
+
+tree
+objc_message_selector (void);
+
+tree
+objc_message_selector ()
+{
+  return 0;
 }
 
 /* Should not be called for treelang.   */
@@ -1161,12 +1130,6 @@ cpp_get_callbacks (cpp_reader * cr ATTRIBUTE_UNUSED)
   /* `unsigned long' is the standard type for sizeof.
      Note that stddef.h uses `unsigned long',
      and this must agree, even if long and int are the same size.  */
-
-/* This variable keeps a table for types for each precision so that we
-   only allocate each of them once.  Signed and unsigned types are
-   kept separate.  */
-
-tree integer_types[itk_none] = { NULL_TREE};
 
 /* The reserved keyword table.  */
 struct resword

@@ -185,7 +185,7 @@ Boston, MA 02111-1307, USA.  */
 
 extern int target_flags;
 
-/* If non-zero, tell the linker to do relaxing.
+/* If nonzero, tell the linker to do relaxing.
    We don't do anything with the option, other than recognize it.
    LINK_SPEC handles passing -relax to the linker.
    This can cause incorrect debugging information as line numbers may
@@ -480,7 +480,7 @@ extern enum m32r_sdata m32r_sdata;
 /* Every structure's size must be a multiple of this.  */
 #define STRUCTURE_SIZE_BOUNDARY 8
 
-/* A bitfield declared as `int' forces `int' alignment for the struct.  */
+/* A bit-field declared as `int' forces `int' alignment for the struct.  */
 #define PCC_BITFIELD_TYPE_MATTERS 1
 
 /* No data type wants to be aligned rounder than this.  */
@@ -972,7 +972,7 @@ M32R_STACK_ALIGN (current_function_outgoing_args_size)
  { ARG_POINTER_REGNUM,	 STACK_POINTER_REGNUM },	\
  { ARG_POINTER_REGNUM,   FRAME_POINTER_REGNUM }}
 
-/* A C expression that returns non-zero if the compiler is allowed to
+/* A C expression that returns nonzero if the compiler is allowed to
    try to replace register number FROM-REG with register number
    TO-REG.  This macro need only be defined if `ELIMINABLE_REGS' is
    defined, and will usually be the constant 1, since most of the
@@ -1074,7 +1074,7 @@ M32R_STACK_ALIGN (current_function_outgoing_args_size)
 #define ROUND_ADVANCE_ARG(MODE, TYPE) \
   ((MODE) == BLKmode				\
    ? ROUND_ADVANCE ((unsigned int) int_size_in_bytes (TYPE))	\
-   : ROUND_ADVANCE (GET_MODE_SIZE (MODE)))
+   : ROUND_ADVANCE ((unsigned int) GET_MODE_SIZE (MODE)))
 
 /* Round CUM up to the necessary point for argument MODE/TYPE.  */
 #define ROUND_ADVANCE_CUM(CUM, MODE, TYPE) (CUM)
@@ -1084,7 +1084,7 @@ M32R_STACK_ALIGN (current_function_outgoing_args_size)
    pointer to them is passed in a reg if one is available (and that is what
    we're given).
    This macro is only used in this file.  */
-#define PASS_IN_REG_P(CUM, MODE, TYPE, NAMED) \
+#define PASS_IN_REG_P(CUM, MODE, TYPE) \
   (ROUND_ADVANCE_CUM ((CUM), (MODE), (TYPE)) < M32R_MAX_PARM_REGS)
 
 /* Determine where to put an argument to a function.
@@ -1102,14 +1102,7 @@ M32R_STACK_ALIGN (current_function_outgoing_args_size)
 /* On the M32R the first M32R_MAX_PARM_REGS args are normally in registers
    and the rest are pushed.  */
 #define FUNCTION_ARG(CUM, MODE, TYPE, NAMED) \
-  (PASS_IN_REG_P ((CUM), (MODE), (TYPE), (NAMED))			\
-   ? gen_rtx_REG ((MODE), ROUND_ADVANCE_CUM ((CUM), (MODE), (TYPE)))	\
-   : 0)
-
-/* ??? Quick hack to try to get varargs working the normal way.  */
-#define FUNCTION_INCOMING_ARG(CUM, MODE, TYPE, NAMED) \
-  (((! current_function_varargs || (NAMED))				\
-    && PASS_IN_REG_P ((CUM), (MODE), (TYPE), (NAMED)))			\
+  (PASS_IN_REG_P ((CUM), (MODE), (TYPE))			\
    ? gen_rtx_REG ((MODE), ROUND_ADVANCE_CUM ((CUM), (MODE), (TYPE)))	\
    : 0)
 
@@ -1421,44 +1414,11 @@ do {									\
 
 /* Condition code usage.  */
 
-/* Return non-zero if SELECT_CC_MODE will never return MODE for a
+/* Return nonzero if SELECT_CC_MODE will never return MODE for a
    floating point inequality comparison.  */
 #define REVERSIBLE_CC_MODE(MODE) 1 /*???*/
 
 /* Costs.  */
-
-/* ??? I'm quite sure I don't understand enough of the subtleties involved
-   in choosing the right numbers to use here, but there doesn't seem to be
-   enough documentation on this.  What I've done is define an insn to cost
-   4 "units" and work from there.  COSTS_N_INSNS (N) is defined as (N) * 4 - 2
-   so that seems reasonable.  Some values are supposed to be defined relative
-   to each other and thus aren't necessarily related to COSTS_N_INSNS.  */
-
-/* Compute the cost of computing a constant rtl expression RTX
-   whose rtx-code is CODE.  The body of this macro is a portion
-   of a switch statement.  If the code is computed here,
-   return it with a return statement.  Otherwise, break from the switch.  */
-/* Small integers are as cheap as registers.  4 byte values can be fetched
-   as immediate constants - let's give that the cost of an extra insn.  */
-#define CONST_COSTS(X, CODE, OUTER_CODE)			\
-  case CONST_INT :						\
-    if (INT16_P (INTVAL (X)))					\
-      return 0;							\
-    /* fall through */						\
-  case CONST :							\
-  case LABEL_REF :						\
-  case SYMBOL_REF :						\
-    return 4;							\
-  case CONST_DOUBLE :						\
-    {								\
-      rtx high, low;						\
-      split_double (X, &high, &low);				\
-      return 4 * (!INT16_P (INTVAL (high))			\
-		  + !INT16_P (INTVAL (low)));			\
-    }
-
-/* Compute the cost of an address.  */
-#define ADDRESS_COST(ADDR) m32r_address_cost (ADDR)
 
 /* Compute extra cost of moving data between one register class
    and another.  */
@@ -1475,21 +1435,6 @@ do {									\
    while (a < N && a).  Branches aren't that expensive on the M32R so
    we define this as 1.  Defining it as 2 had a heavy hit in fp-bit.c.  */
 #define BRANCH_COST ((TARGET_BRANCH_COST) ? 2 : 1)
-
-/* Provide the costs of a rtl expression.  This is in the body of a
-   switch on CODE.  The purpose for the cost of MULT is to encourage
-   `synth_mult' to find a synthetic multiply when reasonable.
-
-   If we need more than 12 insns to do a multiply, then go out-of-line,
-   since the call overhead will be < 10% of the cost of the multiply.  */
-#define RTX_COSTS(X, CODE, OUTER_CODE)	\
-  case MULT :				\
-    return COSTS_N_INSNS (3);		\
-  case DIV :				\
-  case UDIV :				\
-  case MOD :				\
-  case UMOD :				\
-    return COSTS_N_INSNS (10);
 
 /* Nonzero if access to memory by bytes is slow and undesirable.
    For RISC chips, it means that access to memory by bytes is no
@@ -1667,28 +1612,8 @@ sbss_section ()								\
    no longer contain unusual constructs.  */
 #define ASM_APP_OFF ""
 
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME.  */
-/* On the M32R we need to ensure the next instruction starts on a 32 bit
-   boundary [the previous insn must either be 2 16 bit insns or 1 32 bit].  */
-#define ASM_OUTPUT_LABEL(FILE, NAME)	\
-  do					\
-    {					\
-      assemble_name (FILE, NAME);	\
-      fputs (":\n", FILE);		\
-    }					\
-  while (0)
-
-/* This is how to output a command to make the user-level label named NAME
-   defined for reference from other files.  */
-#define ASM_GLOBALIZE_LABEL(FILE, NAME)	\
-  do					\
-    {					\
-      fputs ("\t.global\t", FILE);	\
-      assemble_name (FILE, NAME);	\
-      fputs ("\n", FILE);		\
-    }					\
-  while (0)
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP "\t.global\t"
 
 /* This is how to output a reference to a user-level label named NAME.
    `assemble_name' uses this.  */
@@ -1719,17 +1644,6 @@ sbss_section ()								\
 	       sym_lineno);						\
       sym_lineno += 1;							\
     }									\
-  while (0)
-
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)	\
-  do							\
-    {							\
-      (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10);\
-      sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO));	\
-    }							\
   while (0)
 
 /* How to refer to registers in assembler output.
@@ -1879,7 +1793,7 @@ extern char m32r_punct_chars[256];
 #define ASM_OUTPUT_ALIGNED_BSS(FILE, DECL, NAME, SIZE, ALIGN)	\
   do								\
     {								\
-      ASM_GLOBALIZE_LABEL (FILE, NAME);				\
+      (*targetm.asm_out.globalize_label) (FILE, NAME);		\
       ASM_OUTPUT_ALIGNED_COMMON (FILE, NAME, SIZE, ALIGN);	\
     }								\
   while (0)
@@ -1887,13 +1801,9 @@ extern char m32r_punct_chars[256];
 /* Debugging information.  */
 
 /* Generate DBX and DWARF debugging information.  */
-#undef	DBX_DEBUGGING_INFO
-#undef	DWARF_DEBUGGING_INFO
-#undef	DWARF2_DEBUGGING_INFO
-
-#define DBX_DEBUGGING_INFO
-#define DWARF_DEBUGGING_INFO
-#define DWARF2_DEBUGGING_INFO
+#define DBX_DEBUGGING_INFO 1
+#define DWARF_DEBUGGING_INFO 1
+#define DWARF2_DEBUGGING_INFO 1
 
 /* Prefer STABS (for now).  */
 #undef  PREFERRED_DEBUGGING_TYPE

@@ -1,7 +1,7 @@
 /* Definitions of target machine for GNU compiler.
    Hitachi H8/300 version generating coff
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002 Free Software Foundation, Inc.
+   2000, 2001, 2002, 2003 Free Software Foundation, Inc.
    Contributed by Steve Chamberlain (sac@cygnus.com),
    Jim Wilson (wilson@cygnus.com), and Doug Evans (dje@cygnus.com).
 
@@ -42,19 +42,27 @@ extern const char * const *h8_reg_names;
   do							\
     {							\
       if (TARGET_H8300H)				\
-        {						\
+	{						\
 	  builtin_define ("__H8300H__");		\
 	  builtin_assert ("cpu=h8300h");		\
 	  builtin_assert ("machine=h8300h");		\
+	  if (TARGET_NORMAL_MODE)			\
+	    {						\
+	      builtin_define ("__NORMAL_MODE__");	\
+	    }						\
 	}						\
       else if (TARGET_H8300S)				\
-        {						\
+	{						\
 	  builtin_define ("__H8300S__");		\
 	  builtin_assert ("cpu=h8300s");		\
 	  builtin_assert ("machine=h8300s");		\
+	  if (TARGET_NORMAL_MODE)			\
+	    {						\
+	      builtin_define ("__NORMAL_MODE__");	\
+	    }						\
 	}						\
       else						\
-        {						\
+	{						\
 	  builtin_define ("__H8300__");			\
 	  builtin_assert ("cpu=h8300");			\
 	  builtin_assert ("machine=h8300");		\
@@ -66,6 +74,16 @@ extern const char * const *h8_reg_names;
 
 #define LIB_SPEC "%{mrelax:-relax} %{g:-lg} %{!p:%{!pg:-lc}}%{p:-lc_p}%{pg:-lc_p}"
 
+#define OPTIMIZATION_OPTIONS(LEVEL, SIZE)				 \
+  do									 \
+    {									 \
+      /* Basic block reordering is only beneficial on targets with cache \
+	 and/or variable-cycle branches where (cycle count taken !=	 \
+	 cycle count not taken).  */					 \
+      flag_reorder_blocks = 0;						 \
+    }									 \
+  while (0)
+
 /* Print subsidiary information on the compiler version in use.  */
 
 #define TARGET_VERSION fprintf (stderr, " (Hitachi H8/300)");
@@ -74,39 +92,53 @@ extern const char * const *h8_reg_names;
 
 extern int target_flags;
 
+/* Masks for the -m switches.  */
+#define MASK_H8300S		0x00000001
+#define MASK_MAC		0x00000002
+#define MASK_INT32		0x00000008
+#define MASK_ADDRESSES		0x00000040
+#define MASK_QUICKCALL		0x00000080
+#define MASK_SLOWBYTE		0x00000100
+#define MASK_NORMAL_MODE 	0x00000200
+#define MASK_RELAX		0x00000400
+#define MASK_RTL_DUMP		0x00000800
+#define MASK_H8300H		0x00001000
+#define MASK_ALIGN_300		0x00002000
+
 /* Macros used in the machine description to test the flags.  */
 
 /* Make int's 32 bits.  */
-#define TARGET_INT32 (target_flags & 8)
+#define TARGET_INT32 (target_flags & MASK_INT32)
 
 /* Dump recorded insn lengths into the output file.  This helps debug the
    md file.  */
-#define TARGET_ADDRESSES (target_flags & 64)
+#define TARGET_ADDRESSES (target_flags & MASK_ADDRESSES)
 
 /* Pass the first few arguments in registers.  */
-#define TARGET_QUICKCALL (target_flags & 128)
+#define TARGET_QUICKCALL (target_flags & MASK_QUICKCALL)
 
 /* Pretend byte accesses are slow.  */
-#define TARGET_SLOWBYTE (target_flags & 256)
+#define TARGET_SLOWBYTE (target_flags & MASK_SLOWBYTE)
 
 /* Dump each assembler insn's rtl into the output file.
    This is for debugging the compiler only.  */
-#define TARGET_RTL_DUMP	(target_flags & 2048)
+#define TARGET_RTL_DUMP	(target_flags & MASK_RTL_DUMP)
 
 /* Select between the H8/300 and H8/300H CPUs.  */
 #define TARGET_H8300	(! TARGET_H8300H && ! TARGET_H8300S)
-#define TARGET_H8300H	(target_flags & 4096)
-#define TARGET_H8300S	(target_flags & 1)
+#define TARGET_H8300H	(target_flags & MASK_H8300H)
+#define TARGET_H8300S	(target_flags & MASK_H8300S)
+#define TARGET_NORMAL_MODE (target_flags & MASK_NORMAL_MODE)
 
 /* mac register and relevant instructions are available.  */
-#define TARGET_MAC    (target_flags & 2)
+#define TARGET_MAC    (target_flags & MASK_MAC)
 
 /* Align all values on the H8/300H the same way as the H8/300.  Specifically,
    32 bit and larger values are aligned on 16 bit boundaries.
-   This is all the hardware requires, but the default is 32 bits for the 300H.
+   This is all the hardware requires, but the default is 32 bits for the H8/300H.
    ??? Now watch someone add hardware floating point requiring 32 bit
    alignment.  */
-#define TARGET_ALIGN_300 (target_flags & 8192)
+#define TARGET_ALIGN_300 (target_flags & MASK_ALIGN_300)
 
 /* Macro to define tables used to set the flags.
    This is a list in braces of pairs in braces,
@@ -114,29 +146,31 @@ extern int target_flags;
    where VALUE is the bits to set or minus the bits to clear.
    An empty string NAME is used to identify the default VALUE.  */
 
-#define TARGET_SWITCHES  \
-  { {"s",		1,     N_("Generate H8/S code")},		\
-    {"no-s",		-1,    N_("Do not generate H8/S code")},	\
-    {"s2600",		2,     N_("Generate H8/S2600 code")},           \
-    {"no-s2600",	-2,    N_("Do not generate H8/S2600 code")},    \
-    {"int32",		8,     N_("Make integers 32 bits wide")},	\
-    {"addresses",	64,    NULL},					\
-    {"quickcall",	128,						\
-     N_("Use registers for argument passing")},			\
-    {"no-quickcall",	-128,						\
-     N_("Do not use registers for argument passing")},			\
-    {"slowbyte",	256,						\
-     N_("Consider access to byte sized memory slow")},			\
-    {"relax",		1024,  N_("Enable linker relaxing")},		\
-    {"rtl-dump",	2048,  NULL},					\
-    {"h",		4096,  N_("Generate H8/300H code")},		\
-    {"no-h",		-4096, N_("Do not generate H8/300H code")},	\
-    {"align-300",	8192,  N_("Use H8/300 alignment rules")},	\
-    { "", TARGET_DEFAULT, NULL}}
+#define TARGET_SWITCHES							    \
+{ {"s",			 MASK_H8300S, N_("Generate H8S code")},		    \
+  {"no-s",		-MASK_H8300S, N_("Do not generate H8S code")},	    \
+  {"s2600",		 MASK_MAC, N_("Generate H8S/2600 code")},	    \
+  {"no-s2600",		-MASK_MAC, N_("Do not generate H8S/2600 code")},    \
+  {"int32",		 MASK_INT32, N_("Make integers 32 bits wide")},	    \
+  {"addresses",		 MASK_ADDRESSES, NULL},				    \
+  {"quickcall",		 MASK_QUICKCALL,				    \
+   N_("Use registers for argument passing")},				    \
+  {"no-quickcall",	-MASK_QUICKCALL,				    \
+   N_("Do not use registers for argument passing")},			    \
+  {"slowbyte",		 MASK_SLOWBYTE,					    \
+   N_("Consider access to byte sized memory slow")},			    \
+  {"relax",		 MASK_RELAX, N_("Enable linker relaxing")},	    \
+  {"rtl-dump",		 MASK_RTL_DUMP, NULL},				    \
+  {"h",			 MASK_H8300H, N_("Generate H8/300H code")},	    \
+  {"n",			 MASK_NORMAL_MODE, N_("Enable the normal mode")},   \
+  {"no-h",		-MASK_H8300H, N_("Do not generate H8/300H code")},  \
+  {"align-300",		 MASK_ALIGN_300, N_("Use H8/300 alignment rules")}, \
+  { "",			 TARGET_DEFAULT, NULL}}
 
 #ifdef IN_LIBGCC2
 #undef TARGET_H8300H
 #undef TARGET_H8300S
+#undef TARGET_NORMAL_MODE
 /* If compiling libgcc2, make these compile time constants based on what
    flags are we actually compiling with.  */
 #ifdef __H8300H__
@@ -148,6 +182,11 @@ extern int target_flags;
 #define TARGET_H8300S	1
 #else
 #define TARGET_H8300S	0
+#endif
+#ifdef __NORMAL_MODE__
+#define TARGET_NORMAL_MODE 1
+#else
+#define TARGET_NORMAL_MODE 0
 #endif
 #endif /* !IN_LIBGCC2 */
 
@@ -163,7 +202,7 @@ extern int target_flags;
 /* Default target_flags if no switches specified.  */
 
 #ifndef TARGET_DEFAULT
-#define TARGET_DEFAULT (128)	/* quickcall */
+#define TARGET_DEFAULT (MASK_QUICKCALL)
 #endif
 
 /* Show we can debug even without a frame pointer.  */
@@ -224,11 +263,11 @@ extern int target_flags;
    structure layouts.  */
 #define EMPTY_FIELD_BOUNDARY 16
 
-/* A bitfield declared as `int' forces `int' alignment for the struct.  */
+/* A bit-field declared as `int' forces `int' alignment for the struct.  */
 #define PCC_BITFIELD_TYPE_MATTERS  0
 
 /* No data type wants to be aligned rounder than this.
-   32 bit values are aligned as such on the H8/300H and H8/S for speed.  */
+   32 bit values are aligned as such on the H8/300H and H8S for speed.  */
 #define BIGGEST_ALIGNMENT \
 (((TARGET_H8300H || TARGET_H8300S) && ! TARGET_ALIGN_300) ? 32 : 16)
 
@@ -379,7 +418,7 @@ enum reg_class {
   NO_REGS, GENERAL_REGS, MAC_REGS, ALL_REGS, LIM_REG_CLASSES
 };
 
-#define N_REG_CLASSES (int) LIM_REG_CLASSES
+#define N_REG_CLASSES ((int) LIM_REG_CLASSES)
 
 /* Give names of register classes as strings for dump file.  */
 
@@ -392,8 +431,8 @@ enum reg_class {
 
 #define REG_CLASS_CONTENTS			\
 {      {0},		/* No regs      */	\
-   {0x6ff},		/* GENERAL_REGS */ 	\
-   {0x100},		/* MAC_REGS */ 	\
+   {0x6ff},		/* GENERAL_REGS */	\
+   {0x100},		/* MAC_REGS */	\
    {0x7ff},		/* ALL_REGS	*/	\
 }
 
@@ -422,25 +461,27 @@ enum reg_class {
    Return 1 if VALUE is in the range specified by C.  */
 
 #define CONST_OK_FOR_I(VALUE) ((VALUE) == 0)
-#define CONST_OK_FOR_J(VALUE) ((unsigned HOST_WIDE_INT) (VALUE) < 256)
-#define CONST_OK_FOR_K(VALUE) ((VALUE) == 1 || (VALUE) == 2)
+#define CONST_OK_FOR_J(VALUE) (((VALUE) & 0xff) == 0)
 #define CONST_OK_FOR_L(VALUE)				\
   (TARGET_H8300H || TARGET_H8300S			\
    ? (VALUE) == 1 || (VALUE) == 2 || (VALUE) == 4	\
    : (VALUE) == 1 || (VALUE) == 2)
-#define CONST_OK_FOR_M(VALUE) ((VALUE) == 3 || (VALUE) == 4)
+#define CONST_OK_FOR_M(VALUE)				\
+  ((VALUE) == 1 || (VALUE) == 2)
 #define CONST_OK_FOR_N(VALUE)				\
   (TARGET_H8300H || TARGET_H8300S			\
    ? (VALUE) == -1 || (VALUE) == -2 || (VALUE) == -4	\
    : (VALUE) == -1 || (VALUE) == -2)
+#define CONST_OK_FOR_O(VALUE)				\
+  ((VALUE) == -1 || (VALUE) == -2)
 
 #define CONST_OK_FOR_LETTER_P(VALUE, C)		\
   ((C) == 'I' ? CONST_OK_FOR_I (VALUE) :	\
    (C) == 'J' ? CONST_OK_FOR_J (VALUE) :	\
-   (C) == 'K' ? CONST_OK_FOR_K (VALUE) :	\
    (C) == 'L' ? CONST_OK_FOR_L (VALUE) :	\
    (C) == 'M' ? CONST_OK_FOR_M (VALUE) :	\
    (C) == 'N' ? CONST_OK_FOR_N (VALUE) :	\
+   (C) == 'O' ? CONST_OK_FOR_O (VALUE) :	\
    0)
 
 /* Similar, but for floating constants, and defining letters G and H.
@@ -553,16 +594,13 @@ enum reg_class {
    All other eliminations are valid.  */
 
 #define CAN_ELIMINATE(FROM, TO)					\
- ((((FROM) == ARG_POINTER_REGNUM || (FROM) == RETURN_ADDRESS_POINTER_REGNUM) \
-   && (TO) == STACK_POINTER_REGNUM)				\
-  ? ! frame_pointer_needed					\
-  : 1)
+  ((TO) == STACK_POINTER_REGNUM ? ! frame_pointer_needed : 1)
 
 /* Define the offset between two registers, one to be eliminated, and the other
    its replacement, at the start of a routine.  */
 
-#define INITIAL_ELIMINATION_OFFSET(FROM, TO, OFFSET) \
-  OFFSET = initial_offset (FROM, TO)
+#define INITIAL_ELIMINATION_OFFSET(FROM, TO, OFFSET)		\
+  ((OFFSET) = h8300_initial_elimination_offset ((FROM), (TO)))
 
 /* Define how to find the value returned by a function.
    VALTYPE is the data type of the value (as a tree).
@@ -681,54 +719,58 @@ struct cum_arg
 
 #define EXIT_IGNORE_STACK 0
 
-/* Output assembler code for a block containing the constant parts
-   of a trampoline, leaving space for the variable parts.
+/* We emit the entire trampoline with INITIALIZE_TRAMPOLINE.
+   Depending on the pointer size, we use a different trampoline.
 
-   H8/300
+   Pmode == HImode
 	      vvvv context
-   1 0000 7900xxxx 		mov.w	#0x1234,r3
-   2 0004 5A00xxxx 		jmp	@0x1234
+   1 0000 7903xxxx		mov.w	#0x1234,r3
+   2 0004 5A00xxxx		jmp	@0x1234
 	      ^^^^ function
 
-   H8/300H
+   Pmode == SImode
 	      vvvvvvvv context
-   2 0000 7A00xxxxxxxx 		mov.l	#0x12345678,er3
-   3 0006 5Axxxxxx 		jmp	@0x123456
+   2 0000 7A03xxxxxxxx		mov.l	#0x12345678,er3
+   3 0006 5Axxxxxx		jmp	@0x123456
 	    ^^^^^^ function
 */
 
-#define TRAMPOLINE_TEMPLATE(FILE)				\
-  do								\
-    {								\
-      if (TARGET_H8300)						\
-	{							\
-	  fprintf (FILE, "\tmov.w	#0x1234,r3\n");		\
-	  fprintf (FILE, "\tjmp	@0x1234\n");			\
-	}							\
-      else							\
-	{							\
-	  fprintf (FILE, "\tmov.l	#0x12345678,er3\n");	\
-	  fprintf (FILE, "\tjmp	@0x123456\n");			\
-	}							\
-    }								\
-  while (0)
-
 /* Length in units of the trampoline for entering a nested function.  */
 
-#define TRAMPOLINE_SIZE (TARGET_H8300 ? 8 : 12)
+#define TRAMPOLINE_SIZE ((TARGET_H8300 || TARGET_NORMAL_MODE) ? 8 : 12)
 
-/* Emit RTL insns to initialize the variable parts of a trampoline.
+/* Emit RTL insns to build a trampoline.
    FNADDR is an RTX for the address of the function's pure code.
    CXT is an RTX for the static chain value for the function.  */
 
 #define INITIALIZE_TRAMPOLINE(TRAMP, FNADDR, CXT)			    \
-{									    \
-  emit_move_insn (gen_rtx_MEM (Pmode, plus_constant ((TRAMP), 2)), CXT);    \
-  emit_move_insn (gen_rtx_MEM (Pmode, plus_constant ((TRAMP), 6)), FNADDR); \
-  if (TARGET_H8300H || TARGET_H8300S)					    \
-    emit_move_insn (gen_rtx_MEM (QImode, plus_constant ((TRAMP), 6)),	    \
-		    GEN_INT (0x5A));					    \
-}
+  do									    \
+    {									    \
+      if (Pmode == HImode)						    \
+	{								    \
+	  emit_move_insn (gen_rtx_MEM (HImode, (TRAMP)), GEN_INT (0x7903)); \
+	  emit_move_insn (gen_rtx_MEM (Pmode, plus_constant ((TRAMP), 2)),  \
+			  (CXT));					    \
+	  emit_move_insn (gen_rtx_MEM (Pmode, plus_constant ((TRAMP), 4)),  \
+			  GEN_INT (0x5a00));				    \
+	  emit_move_insn (gen_rtx_MEM (Pmode, plus_constant ((TRAMP), 6)),  \
+			  (FNADDR));					    \
+	}								    \
+      else								    \
+	{								    \
+	  rtx tem = gen_reg_rtx (Pmode);				    \
+									    \
+	  emit_move_insn (gen_rtx_MEM (HImode, (TRAMP)), GEN_INT (0x7a03)); \
+	  emit_move_insn (gen_rtx_MEM (Pmode, plus_constant ((TRAMP), 2)),  \
+			  (CXT));					    \
+	  emit_move_insn (tem, (FNADDR));				    \
+	  emit_insn (gen_andsi3 (tem, tem, GEN_INT (0x00ffffff)));	    \
+	  emit_insn (gen_iorsi3 (tem, tem, GEN_INT (0x5a000000)));	    \
+	  emit_move_insn (gen_rtx_MEM (Pmode, plus_constant ((TRAMP), 6)),  \
+			  tem);						    \
+	}								    \
+    }									    \
+  while (0)
 
 /* Addressing modes, and classification of registers for them.  */
 
@@ -760,8 +802,7 @@ struct cum_arg
        /* We handle signed and unsigned offsets here.  */	\
        && INTVAL (X) > (TARGET_H8300 ? -0x10000 : -0x1000000)	\
        && INTVAL (X) < (TARGET_H8300 ? 0x10000 : 0x1000000))	\
-   || ((GET_CODE (X) == HIGH || GET_CODE (X) == CONST)		\
-       && TARGET_H8300))
+   || (GET_CODE (X) == HIGH || GET_CODE (X) == CONST))
 
 /* Nonzero if the constant value X is a legitimate general operand.
    It is given that X satisfies CONSTANT_P or is a CONST_DOUBLE.  */
@@ -822,40 +863,25 @@ struct cum_arg
    ? !h8300_shift_needs_scratch_p (INTVAL (OP), SImode)	\
    : 0)
 
-/* Nonzero if X is a constant address suitable as an 8-bit absolute on
-   the H8/300H, which is a special case of the 'R' operand.  */
-
-#define EIGHTBIT_CONSTANT_ADDRESS_P(X)			\
-  (GET_CODE (X) == CONST_INT && TARGET_H8300H		\
-   && 0xffff00 <= INTVAL (X) && INTVAL (X) <= 0xffffff)
-
-/* Nonzero if X is a constant address suitable as an 16-bit absolute
-   on the H8/300H.  */
-
-#define TINY_CONSTANT_ADDRESS_P(X)				\
-  (GET_CODE (X) == CONST_INT && TARGET_H8300H			\
-   && ((0xff8000 <= INTVAL (X) && INTVAL (X) <= 0xffffff)	\
-       || (0x000000 <= INTVAL (X) && INTVAL (X) <= 0x007fff)))
-
 /* 'U' if valid for a bset destination;
    i.e. a register, register indirect, or the eightbit memory region
    (a SYMBOL_REF with an SYMBOL_REF_FLAG set).
 
-   On the H8/S 'U' can also be a 16bit or 32bit absolute.  */
+   On the H8S 'U' can also be a 16bit or 32bit absolute.  */
 #define OK_FOR_U(OP)							\
   ((GET_CODE (OP) == REG && REG_OK_FOR_BASE_P (OP))			\
    || (GET_CODE (OP) == MEM && GET_CODE (XEXP (OP, 0)) == REG		\
        && REG_OK_FOR_BASE_P (XEXP (OP, 0)))				\
    || (GET_CODE (OP) == MEM && GET_CODE (XEXP (OP, 0)) == SYMBOL_REF	\
-       && (TARGET_H8300S || SYMBOL_REF_FLAG (XEXP (OP, 0))))		\
-   || ((GET_CODE (OP) == MEM && GET_CODE (XEXP (OP, 0)) == CONST	\
-        && GET_CODE (XEXP (XEXP (OP, 0), 0)) == PLUS			\
-        && GET_CODE (XEXP (XEXP (XEXP (OP, 0), 0), 0)) == SYMBOL_REF	\
-        && GET_CODE (XEXP (XEXP (XEXP (OP, 0), 0), 1)) == CONST_INT)	\
-        && (TARGET_H8300S						\
-	    || SYMBOL_REF_FLAG (XEXP (XEXP (XEXP (OP, 0), 0), 0))))	\
+       && TARGET_H8300S)						\
+   || (GET_CODE (OP) == MEM && GET_CODE (XEXP (OP, 0)) == CONST		\
+       && GET_CODE (XEXP (XEXP (OP, 0), 0)) == PLUS			\
+       && GET_CODE (XEXP (XEXP (XEXP (OP, 0), 0), 0)) == SYMBOL_REF	\
+       && GET_CODE (XEXP (XEXP (XEXP (OP, 0), 0), 1)) == CONST_INT	\
+       && (TARGET_H8300S						\
+	   || SYMBOL_REF_FLAG (XEXP (XEXP (XEXP (OP, 0), 0), 0))))	\
    || (GET_CODE (OP) == MEM						\
-       && EIGHTBIT_CONSTANT_ADDRESS_P (XEXP (OP, 0)))			\
+       && h8300_eightbit_constant_address_p (XEXP (OP, 0)))		\
    || (GET_CODE (OP) == MEM && TARGET_H8300S				\
        && GET_CODE (XEXP (OP, 0)) == CONST_INT))
 
@@ -958,13 +984,19 @@ struct cum_arg
 /* Specify the machine mode that pointers have.
    After generation of rtl, the compiler makes no further distinction
    between pointers and any other objects of this machine mode.  */
-#define Pmode (TARGET_H8300H || TARGET_H8300S ? SImode : HImode)
+#define Pmode								      \
+  ((TARGET_H8300H || TARGET_H8300S) && !TARGET_NORMAL_MODE ? SImode : HImode)
 
 /* ANSI C types.
-   We use longs for the 300H because ints can be 16 or 32.
+   We use longs for the H8/300H and the H8S because ints can be 16 or 32.
    GCC requires SIZE_TYPE to be the same size as pointers.  */
-#define SIZE_TYPE (TARGET_H8300 ? "unsigned int" : "long unsigned int")
-#define PTRDIFF_TYPE (TARGET_H8300 ? "int" : "long int")
+#define SIZE_TYPE								\
+  (TARGET_H8300 || TARGET_NORMAL_MODE ? "unsigned int" : "long unsigned int")
+#define PTRDIFF_TYPE						\
+  (TARGET_H8300 || TARGET_NORMAL_MODE ? "int" : "long int")
+
+#define POINTER_SIZE							\
+  ((TARGET_H8300H || TARGET_H8300S) && !TARGET_NORMAL_MODE ? 32 : 16)
 
 #define WCHAR_TYPE "short unsigned int"
 #define WCHAR_TYPE_SIZE 16
@@ -978,36 +1010,7 @@ struct cum_arg
 #define ADJUST_INSN_LENGTH(INSN, LENGTH) \
   LENGTH += h8300_adjust_insn_length (INSN, LENGTH);
 
-/* Compute the cost of computing a constant rtl expression RTX
-   whose rtx-code is CODE.  The body of this macro is a portion
-   of a switch statement.  If the code is computed here,
-   return it with a return statement.  Otherwise, break from the switch.  */
-
-#define DEFAULT_RTX_COSTS(RTX, CODE, OUTER_CODE) \
-  return (const_costs (RTX, CODE, OUTER_CODE));
-
 #define BRANCH_COST 0
-
-/* We say that MOD and DIV are so cheap because otherwise we'll
-   generate some really horrible code for division of a power of two.  */
-
-/* Provide the costs of a rtl expression.  This is in the body of a
-   switch on CODE.  */
-/* ??? Shifts need to have a *much* higher cost than this.  */
-
-#define RTX_COSTS(RTX, CODE, OUTER_CODE)	\
-  case MOD:					\
-  case DIV:					\
-    return 60;					\
-  case MULT:					\
-    return 20;					\
-  case ASHIFT:					\
-  case ASHIFTRT:				\
-  case LSHIFTRT:				\
-  case ROTATE:					\
-  case ROTATERT:				\
-    if (GET_MODE (RTX) == HImode) return 2;	\
-    return 8;
 
 /* Tell final.c how to eliminate redundant test instructions.  */
 
@@ -1049,10 +1052,11 @@ struct cum_arg
 #define ASM_APP_OFF "; #NO_APP\n"
 
 #define FILE_ASM_OP "\t.file\n"
-#define IDENT_ASM_OP "\t.ident\n"
+#define IDENT_ASM_OP "\t.ident\t"
 
 /* The assembler op to get a word, 2 bytes for the H8/300, 4 for H8/300H.  */
-#define ASM_WORD_OP	(TARGET_H8300 ? "\t.word\t" : "\t.long\t")
+#define ASM_WORD_OP							\
+  (TARGET_H8300 || TARGET_NORMAL_MODE ? "\t.word\t" : "\t.long\t")
 
 #define TEXT_SECTION_ASM_OP "\t.section .text"
 #define DATA_SECTION_ASM_OP "\t.section .data"
@@ -1098,7 +1102,7 @@ struct cum_arg
 { {"er0", 0}, {"er1", 1}, {"er2", 2}, {"er3", 3}, {"er4", 4}, \
   {"er5", 5}, {"er6", 6}, {"er7", 7}, {"r7", 7} }
 
-#define SDB_DEBUGGING_INFO
+#define SDB_DEBUGGING_INFO 1
 #define SDB_DELIM	"\n"
 
 /* Support -gstabs.  */
@@ -1118,33 +1122,13 @@ struct cum_arg
 /* Switch into a generic section.  */
 #define TARGET_ASM_NAMED_SECTION h8300_asm_named_section
 
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME.  */
-
-#define ASM_OUTPUT_LABEL(FILE, NAME)		\
-  do						\
-    {						\
-      assemble_name (FILE, NAME);		\
-      fputs (":\n", FILE);			\
-    }						\
-  while (0)
-
 #define ASM_OUTPUT_LABELREF(FILE, NAME)  \
   asm_fprintf ((FILE), "%U%s", (NAME) + (TINY_DATA_NAME_P (NAME) ? 1 : 0))
 
 #define ASM_OUTPUT_EXTERNAL(FILE, DECL, NAME)
 
-/* This is how to output a command to make the user-level label named NAME
-   defined for reference from other files.  */
-
-#define ASM_GLOBALIZE_LABEL(FILE, NAME)		\
-  do						\
-    {						\
-      fputs ("\t.global ", FILE);		\
-      assemble_name (FILE, NAME);		\
-      fputs ("\n", FILE);			\
-    }						\
-  while (0)
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP "\t.global "
 
 #define ASM_DECLARE_FUNCTION_NAME(FILE, NAME, DECL) \
    ASM_OUTPUT_LABEL (FILE, NAME)
@@ -1153,20 +1137,13 @@ struct cum_arg
 
 #define USER_LABEL_PREFIX "_"
 
-/* This is how to output an internal numbered label where
-   PREFIX is the class of label and NUM is the number within the class.
-
-   N.B.: The h8300.md branch_true and branch_false patterns also know
-   how to generate internal labels.  */
-
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE, PREFIX, NUM)	\
-  fprintf (FILE, ".%s%d:\n", PREFIX, NUM)
-
 /* This is how to store into the string LABEL
    the symbol_ref name of an internal numbered label where
    PREFIX is the class of label and NUM is the number within the class.
-   This is suitable for output with `assemble_name'.  */
+   This is suitable for output with `assemble_name'.  
 
+   N.B.: The h8300.md branch_true and branch_false patterns also know
+   how to generate internal labels.  */
 #define ASM_GENERATE_INTERNAL_LABEL(LABEL, PREFIX, NUM)	\
   sprintf (LABEL, "*.%s%d", PREFIX, NUM)
 
@@ -1185,7 +1162,7 @@ struct cum_arg
 /* This is how to output an element of a case-vector that is absolute.  */
 
 #define ASM_OUTPUT_ADDR_VEC_ELT(FILE, VALUE) \
-  asm_fprintf (FILE, "%s.L%d\n", ASM_WORD_OP, VALUE)
+  fprintf (FILE, "%s.L%d\n", ASM_WORD_OP, VALUE)
 
 /* This is how to output an element of a case-vector that is relative.  */
 
@@ -1232,13 +1209,7 @@ struct cum_arg
   assemble_name ((FILE), (NAME)),			\
   fprintf ((FILE), ",%d\n", (SIZE)))
 
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)	\
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),	\
-  sprintf ((OUTPUT), "%s___%d", (NAME), (LABELNO)))
+#define ASM_PN_FORMAT "%s___%lu"
 
 /* Print an instruction operand X on file FILE.
    Look in h8300.c for details.  */
@@ -1254,12 +1225,12 @@ struct cum_arg
 #define PRINT_OPERAND_ADDRESS(FILE, ADDR) print_operand_address (FILE, ADDR)
 
 /* H8300 specific pragmas.  */
-#define REGISTER_TARGET_PRAGMAS(PFILE)					\
-  do									\
-    {									\
-      cpp_register_pragma (PFILE, 0, "saveall", h8300_pr_saveall);	\
-      cpp_register_pragma (PFILE, 0, "interrupt", h8300_pr_interrupt);	\
-    }									\
+#define REGISTER_TARGET_PRAGMAS()				\
+  do								\
+    {								\
+      c_register_pragma (0, "saveall", h8300_pr_saveall);	\
+      c_register_pragma (0, "interrupt", h8300_pr_interrupt);	\
+    }								\
   while (0)
 
 #define FINAL_PRESCAN_INSN(insn, operand, nop)	\
@@ -1296,5 +1267,32 @@ struct cum_arg
   while (0)
 
 #define MOVE_RATIO 3
+
+/* Define the codes that are matched by predicates in h8300.c.  */
+
+#define PREDICATE_CODES							\
+  {"general_operand_src", {CONST_INT, CONST_DOUBLE, CONST, SYMBOL_REF,	\
+			   LABEL_REF, SUBREG, REG, MEM, ADDRESSOF}},	\
+  {"general_operand_dst", {CONST_INT, CONST_DOUBLE, CONST, SYMBOL_REF,	\
+			   LABEL_REF, SUBREG, REG, MEM, ADDRESSOF}},	\
+  {"single_one_operand", {CONST_INT}},					\
+  {"single_zero_operand", {CONST_INT}},					\
+  {"call_insn_operand", {MEM}},						\
+  {"small_call_insn_operand", {MEM}},					\
+  {"jump_address_operand", {REG, MEM}},					\
+  {"two_insn_adds_subs_operand", {CONST_INT}},				\
+  {"bit_operand", {REG, SUBREG, MEM}},					\
+  {"bit_memory_operand", {MEM}},					\
+  {"stack_pointer_operand", {REG}},					\
+  {"const_int_le_2_operand", {CONST_INT}},				\
+  {"const_int_le_6_operand", {CONST_INT}},				\
+  {"const_int_gt_2_operand", {CONST_INT}},				\
+  {"const_int_ge_8_operand", {CONST_INT}},				\
+  {"const_int_qi_operand", {CONST_INT}},				\
+  {"const_int_hi_operand", {CONST_INT}},				\
+  {"incdec_operand", {CONST_INT}},					\
+  {"bit_operator", {XOR, AND, IOR}},					\
+  {"nshift_operator", {ASHIFTRT, LSHIFTRT, ASHIFT}},			\
+  {"eqne_operator", {EQ, NE}},
 
 #endif /* ! GCC_H8300_H */

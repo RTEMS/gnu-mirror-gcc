@@ -25,6 +25,8 @@ Boston, MA 02111-1307, USA.  */
 /* Some output-actions in c4x.md need these.  */
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "tree.h"
 #include "regs.h"
@@ -46,7 +48,7 @@ Boston, MA 02111-1307, USA.  */
 #include "ggc.h"
 #include "cpplib.h"
 #include "toplev.h"
-#include "c4x-protos.h"
+#include "tm_p.h"
 #include "target.h"
 #include "target-def.h"
 
@@ -163,11 +165,12 @@ tree data_tree = NULL_TREE;
 tree pure_tree = NULL_TREE;
 tree noreturn_tree = NULL_TREE;
 tree interrupt_tree = NULL_TREE;
+tree naked_tree = NULL_TREE;
 
 /* Forward declarations */
 static int c4x_isr_reg_used_p PARAMS ((unsigned int));
 static int c4x_leaf_function_p PARAMS ((void));
-static int c4x_assembler_function_p PARAMS ((void));
+static int c4x_naked_function_p PARAMS ((void));
 static int c4x_immed_float_p PARAMS ((rtx));
 static int c4x_a_register PARAMS ((rtx));
 static int c4x_x_register PARAMS ((rtx));
@@ -193,6 +196,9 @@ static void c4x_insert_attributes PARAMS ((tree, tree *));
 static void c4x_asm_named_section PARAMS ((const char *, unsigned int));
 static int c4x_adjust_cost PARAMS ((rtx, rtx, rtx, int));
 static void c4x_encode_section_info PARAMS ((tree, int));
+static void c4x_globalize_label PARAMS ((FILE *, const char *));
+static bool c4x_rtx_costs PARAMS ((rtx, int, int, int *));
+static int c4x_address_cost PARAMS ((rtx));
 
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_BYTE_OP
@@ -219,6 +225,14 @@ static void c4x_encode_section_info PARAMS ((tree, int));
 
 #undef TARGET_ENCODE_SECTION_INFO
 #define TARGET_ENCODE_SECTION_INFO c4x_encode_section_info
+
+#undef TARGET_ASM_GLOBALIZE_LABEL
+#define TARGET_ASM_GLOBALIZE_LABEL c4x_globalize_label
+
+#undef TARGET_RTX_COSTS
+#define TARGET_RTX_COSTS c4x_rtx_costs
+#undef TARGET_ADDRESS_COST
+#define TARGET_ADDRESS_COST c4x_address_cost
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -290,6 +304,11 @@ c4x_override_options ()
      This provides compatibility with the old -mno-aliases option.  */
   if (! TARGET_ALIASES && ! flag_argument_noalias)
     flag_argument_noalias = 1;
+
+  /* We're C4X floating point, not IEEE floating point.  */
+  memset (real_format_for_mode, 0, sizeof real_format_for_mode);
+  real_format_for_mode[QFmode - QFmode] = &c4x_single_format;
+  real_format_for_mode[HFmode - QFmode] = &c4x_extended_format;
 }
 
 
@@ -432,7 +451,7 @@ c4x_hard_regno_mode_ok (regno, mode)
   return 0;
 }
 
-/* Return non-zero if REGNO1 can be renamed to REGNO2.  */
+/* Return nonzero if REGNO1 can be renamed to REGNO2.  */
 int
 c4x_hard_regno_rename_ok (regno1, regno2)
      unsigned int regno1;
@@ -702,19 +721,6 @@ c4x_function_arg (cum, mode, type, named)
     return NULL_RTX;
 }
 
-
-void
-c4x_va_start (stdarg_p, valist, nextarg)
-     int stdarg_p;
-     tree valist;
-     rtx nextarg;
-{
-  nextarg = plus_constant (nextarg, stdarg_p ? 0 : UNITS_PER_WORD * 2);
-
-  std_expand_builtin_va_start (stdarg_p, valist, nextarg);
-}
-
-
 /* C[34]x arguments grow in weird ways (downwards) that the standard
    varargs stuff can't handle..  */
 rtx
@@ -787,13 +793,12 @@ c4x_leaf_function_p ()
 
 
 static int
-c4x_assembler_function_p ()
+c4x_naked_function_p ()
 {
   tree type;
 
   type = TREE_TYPE (current_function_decl);
-  return (lookup_attribute ("assembler", TYPE_ATTRIBUTES (type)) != NULL)
-    || (lookup_attribute ("naked", TYPE_ATTRIBUTES (type)) != NULL);
+  return lookup_attribute ("naked", TYPE_ATTRIBUTES (type)) != NULL;
 }
 
 
@@ -826,8 +831,8 @@ c4x_expand_prologue ()
      is used so it won't needlessly push the frame pointer.  */
   int dont_push_ar3;
 
-  /* For __assembler__ function don't build a prologue.  */
-  if (c4x_assembler_function_p ())
+  /* For __naked__ function don't build a prologue.  */
+  if (c4x_naked_function_p ())
     {
       return;
     }
@@ -1013,8 +1018,8 @@ c4x_expand_epilogue()
   rtx insn;
   int size = get_frame_size ();
   
-  /* For __assembler__ function build no epilogue.  */
-  if (c4x_assembler_function_p ())
+  /* For __naked__ function build no epilogue.  */
+  if (c4x_naked_function_p ())
     {
       insn = emit_jump_insn (gen_return_from_epilogue ());
       RTX_FRAME_RELATED_P (insn) = 1;
@@ -1209,7 +1214,7 @@ c4x_null_epilogue_p ()
   int regno;
 
   if (reload_completed
-      && ! c4x_assembler_function_p ()
+      && ! c4x_naked_function_p ()
       && ! c4x_interrupt_function_p ()
       && ! current_function_calls_alloca
       && ! current_function_args_size
@@ -1219,10 +1224,10 @@ c4x_null_epilogue_p ()
       for (regno = FIRST_PSEUDO_REGISTER - 1; regno >= 0; regno--)
 	if (regs_ever_live[regno] && ! call_used_regs[regno]
 	    && (regno != AR3_REGNO))
-	  return 0;
-      return 1;
+	  return 1;
+      return 0;
     }
-  return 0;
+  return 1;
 }
 
 
@@ -1478,7 +1483,7 @@ c4x_check_legit_addr (mode, addr, strict)
   switch (code)
     {
       /* Register indirect with auto increment/decrement.  We don't
-	 allow SP here---push_operand should recognise an operand
+	 allow SP here---push_operand should recognize an operand
 	 being pushed on the stack.  */
 
     case PRE_DEC:
@@ -1697,7 +1702,7 @@ c4x_legitimize_address (orig, mode)
    if it is worthwhile storing a common address into a register. 
    Unfortunately, the C4x address cost depends on other operands.  */
 
-int 
+static int 
 c4x_address_cost (addr)
      rtx addr;
 {
@@ -1863,7 +1868,7 @@ c4x_print_operand (file, op, letter)
     {
     case '#':			/* Delayed.  */
       if (final_sequence)
-	asm_fprintf (file, "d");
+	fprintf (file, "d");
       return;
     }
 
@@ -1872,7 +1877,7 @@ c4x_print_operand (file, op, letter)
     {
     case 'A':			/* Direct address.  */
       if (code == CONST_INT || code == SYMBOL_REF || code == CONST)
-	asm_fprintf (file, "@");
+	fprintf (file, "@");
       break;
 
     case 'H':			/* Sethi.  */
@@ -1905,9 +1910,9 @@ c4x_print_operand (file, op, letter)
 	  op1 = XEXP (XEXP (op, 0), 1);
           if (GET_CODE(op1) == CONST_INT || GET_CODE(op1) == SYMBOL_REF)
 	    {
-	      asm_fprintf (file, "\t%s\t@", TARGET_C3X ? "ldp" : "ldpk");
+	      fprintf (file, "\t%s\t@", TARGET_C3X ? "ldp" : "ldpk");
 	      output_address (XEXP (adjust_address (op, VOIDmode, 1), 0));
-	      asm_fprintf (file, "\n");
+	      fprintf (file, "\n");
 	    }
 	}
       return;
@@ -1918,9 +1923,9 @@ c4x_print_operand (file, op, letter)
 	  && (GET_CODE (XEXP (op, 0)) == CONST
 	      || GET_CODE (XEXP (op, 0)) == SYMBOL_REF))
 	{
-	  asm_fprintf (file, "%s\t@", TARGET_C3X ? "ldp" : "ldpk");
+	  fprintf (file, "%s\t@", TARGET_C3X ? "ldp" : "ldpk");
           output_address (XEXP (op, 0));
-	  asm_fprintf (file, "\n\t");
+	  fprintf (file, "\n\t");
 	}
       return;
 
@@ -1940,7 +1945,7 @@ c4x_print_operand (file, op, letter)
 
     case 'U':			/* Call/callu.  */
       if (code != SYMBOL_REF)
-	asm_fprintf (file, "u");
+	fprintf (file, "u");
       return;
 
     default:
@@ -1963,11 +1968,10 @@ c4x_print_operand (file, op, letter)
       
     case CONST_DOUBLE:
       {
-	char str[30];
-	REAL_VALUE_TYPE r;
+	char str[64];
 	
-	REAL_VALUE_FROM_CONST_DOUBLE (r, op);
-	REAL_VALUE_TO_DECIMAL (r, "%20f", str);
+	real_to_decimal (str, CONST_DOUBLE_REAL_VALUE (op),
+			 sizeof (str), 0, 1);
 	fprintf (file, "%s", str);
       }
       break;
@@ -1977,43 +1981,43 @@ c4x_print_operand (file, op, letter)
       break;
       
     case NE:
-      asm_fprintf (file, "ne");
+      fprintf (file, "ne");
       break;
       
     case EQ:
-      asm_fprintf (file, "eq");
+      fprintf (file, "eq");
       break;
       
     case GE:
-      asm_fprintf (file, "ge");
+      fprintf (file, "ge");
       break;
 
     case GT:
-      asm_fprintf (file, "gt");
+      fprintf (file, "gt");
       break;
 
     case LE:
-      asm_fprintf (file, "le");
+      fprintf (file, "le");
       break;
 
     case LT:
-      asm_fprintf (file, "lt");
+      fprintf (file, "lt");
       break;
 
     case GEU:
-      asm_fprintf (file, "hs");
+      fprintf (file, "hs");
       break;
 
     case GTU:
-      asm_fprintf (file, "hi");
+      fprintf (file, "hi");
       break;
 
     case LEU:
-      asm_fprintf (file, "ls");
+      fprintf (file, "ls");
       break;
 
     case LTU:
-      asm_fprintf (file, "lo");
+      fprintf (file, "lo");
       break;
 
     case SYMBOL_REF:
@@ -3375,10 +3379,10 @@ src_operand (op, mode)
       || GET_CODE (op) == CONST)
     return 0;
 
-  /* If TARGET_LOAD_DIRECT_MEMS is non-zero, disallow direct memory
+  /* If TARGET_LOAD_DIRECT_MEMS is nonzero, disallow direct memory
      access to symbolic addresses.  These operands will get forced
      into a register and the movqi expander will generate a
-     HIGH/LO_SUM pair if TARGET_EXPOSE_LDP is non-zero.  */
+     HIGH/LO_SUM pair if TARGET_EXPOSE_LDP is nonzero.  */
   if (GET_CODE (op) == MEM
       && ((GET_CODE (XEXP (op, 0)) == SYMBOL_REF
 	   || GET_CODE (XEXP (op, 0)) == LABEL_REF
@@ -4510,7 +4514,7 @@ c4x_global_label (name)
 	return;
       p = p->next;
     }
-  p = (struct name_list *) permalloc (sizeof *p);
+  p = (struct name_list *) xmalloc (sizeof *p);
   p->next = global_head;
   p->name = name;
   global_head = p;
@@ -4559,7 +4563,7 @@ c4x_external_ref (name)
 	return;
       p = p->next;
     }
-  p = (struct name_list *) permalloc (sizeof *p);
+  p = (struct name_list *) xmalloc (sizeof *p);
   p->next = extern_head;
   p->name = name;
   extern_head = p;
@@ -4611,6 +4615,7 @@ c4x_insert_attributes (decl, attributes)
       c4x_check_attribute ("const", pure_tree, decl, attributes);
       c4x_check_attribute ("noreturn", noreturn_tree, decl, attributes);
       c4x_check_attribute ("interrupt", interrupt_tree, decl, attributes);
+      c4x_check_attribute ("naked", naked_tree, decl, attributes);
       break;
 
     case VAR_DECL:
@@ -4627,9 +4632,7 @@ const struct attribute_spec c4x_attribute_table[] =
 {
   /* { name, min_len, max_len, decl_req, type_req, fn_type_req, handler } */
   { "interrupt",    0, 0, false, true,  true,  c4x_handle_fntype_attribute },
-  /* FIXME: code elsewhere in this file treats "naked" as a synonym of
-     "interrupt"; should it be accepted here?  */
-  { "assembler",    0, 0, false, true,  true,  c4x_handle_fntype_attribute },
+  { "naked",    0, 0, false, true,  true,  c4x_handle_fntype_attribute },
   { "leaf_pretend", 0, 0, false, true,  true,  c4x_handle_fntype_attribute },
   { NULL,           0, 0, false, false, false, NULL }
 };
@@ -4923,12 +4926,12 @@ c4x_init_builtins ()
 		    build_function_type 
 		    (integer_type_node,
 		     tree_cons (NULL_TREE, double_type_node, endlink)),
-		    C4X_BUILTIN_FIX, BUILT_IN_MD, NULL);
+		    C4X_BUILTIN_FIX, BUILT_IN_MD, NULL, NULL_TREE);
   builtin_function ("ansi_ftoi",
 		    build_function_type 
 		    (integer_type_node, 
 		     tree_cons (NULL_TREE, double_type_node, endlink)),
-		    C4X_BUILTIN_FIX_ANSI, BUILT_IN_MD, NULL);
+		    C4X_BUILTIN_FIX_ANSI, BUILT_IN_MD, NULL, NULL_TREE);
   if (TARGET_C3X)
     builtin_function ("fast_imult",
 		      build_function_type
@@ -4936,24 +4939,24 @@ c4x_init_builtins ()
 		       tree_cons (NULL_TREE, integer_type_node,
 				  tree_cons (NULL_TREE,
 					     integer_type_node, endlink))),
-		      C4X_BUILTIN_MPYI, BUILT_IN_MD, NULL);
+		      C4X_BUILTIN_MPYI, BUILT_IN_MD, NULL, NULL_TREE);
   else
     {
       builtin_function ("toieee",
 		        build_function_type 
 			(double_type_node,
 			 tree_cons (NULL_TREE, double_type_node, endlink)),
-		        C4X_BUILTIN_TOIEEE, BUILT_IN_MD, NULL);
+		        C4X_BUILTIN_TOIEEE, BUILT_IN_MD, NULL, NULL_TREE);
       builtin_function ("frieee",
 		        build_function_type
 			(double_type_node, 
 			 tree_cons (NULL_TREE, double_type_node, endlink)),
-		        C4X_BUILTIN_FRIEEE, BUILT_IN_MD, NULL);
+		        C4X_BUILTIN_FRIEEE, BUILT_IN_MD, NULL, NULL_TREE);
       builtin_function ("fast_invf",
 		        build_function_type 
 			(double_type_node, 
 			 tree_cons (NULL_TREE, double_type_node, endlink)),
-		        C4X_BUILTIN_RCPF, BUILT_IN_MD, NULL);
+		        C4X_BUILTIN_RCPF, BUILT_IN_MD, NULL, NULL_TREE);
     }
 }
 
@@ -5058,3 +5061,106 @@ c4x_asm_named_section (name, flags)
   fprintf (asm_out_file, "\t.sect\t\"%s\"\n", name);
 }
 
+static void
+c4x_globalize_label (stream, name)
+     FILE *stream;
+     const char *name;
+{
+  default_globalize_label (stream, name);
+  c4x_global_label (name);
+}
+
+#define SHIFT_CODE_P(C) \
+  ((C) == ASHIFT || (C) == ASHIFTRT || (C) == LSHIFTRT)
+#define LOGICAL_CODE_P(C) \
+  ((C) == NOT || (C) == AND || (C) == IOR || (C) == XOR)
+
+/* Compute a (partial) cost for rtx X.  Return true if the complete
+   cost has been computed, and false if subexpressions should be
+   scanned.  In either case, *TOTAL contains the cost result.  */
+
+static bool
+c4x_rtx_costs (x, code, outer_code, total)
+     rtx x;
+     int code, outer_code;
+     int *total;
+{
+  HOST_WIDE_INT val;
+
+  switch (code)
+    {
+      /* Some small integers are effectively free for the C40.  We should
+         also consider if we are using the small memory model.  With
+         the big memory model we require an extra insn for a constant
+         loaded from memory.  */
+
+    case CONST_INT:
+      val = INTVAL (x);
+      if (c4x_J_constant (x))
+	*total = 0;
+      else if (! TARGET_C3X
+	       && outer_code == AND
+	       && (val == 255 || val == 65535))
+	*total = 0;
+      else if (! TARGET_C3X
+	       && (outer_code == ASHIFTRT || outer_code == LSHIFTRT)
+	       && (val == 16 || val == 24))
+	*total = 0;
+      else if (TARGET_C3X && SHIFT_CODE_P (outer_code))
+	*total = 3;
+      else if (LOGICAL_CODE_P (outer_code)
+               ? c4x_L_constant (x) : c4x_I_constant (x))
+	*total = 2;
+      else
+	*total = 4;
+      return true;
+
+    case CONST:
+    case LABEL_REF:
+    case SYMBOL_REF:
+      *total = 4;
+      return true;
+
+    case CONST_DOUBLE:
+      if (c4x_H_constant (x))
+	*total = 2;
+      else if (GET_MODE (x) == QFmode)
+	*total = 4;
+      else
+	*total = 8;
+      return true;
+
+    /* ??? Note that we return true, rather than false so that rtx_cost
+       doesn't include the constant costs.  Otherwise expand_mult will
+       think that it is cheaper to synthesize a multiply rather than to
+       use a multiply instruction.  I think this is because the algorithm
+       synth_mult doesn't take into account the loading of the operands,
+       whereas the calculation of mult_cost does.  */
+    case PLUS:
+    case MINUS:
+    case AND:
+    case IOR:
+    case XOR:
+    case ASHIFT:
+    case ASHIFTRT:
+    case LSHIFTRT:
+      *total = COSTS_N_INSNS (1);
+      return true;
+
+    case MULT:
+      *total = COSTS_N_INSNS (GET_MODE_CLASS (GET_MODE (x)) == MODE_FLOAT
+			      || TARGET_MPYI ? 1 : 14);
+      return true;
+
+    case DIV:
+    case UDIV:
+    case MOD:
+    case UMOD:
+      *total = COSTS_N_INSNS (GET_MODE_CLASS (GET_MODE (x)) == MODE_FLOAT
+			      ? 15 : 50);
+      return true;
+
+    default:
+      return false;
+    }
+}

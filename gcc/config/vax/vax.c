@@ -21,7 +21,10 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
+#include "tree.h"
 #include "regs.h"
 #include "hard-reg-set.h"
 #include "real.h"
@@ -30,22 +33,22 @@ Boston, MA 02111-1307, USA.  */
 #include "function.h"
 #include "output.h"
 #include "insn-attr.h"
-#include "tree.h"
 #include "recog.h"
 #include "expr.h"
 #include "flags.h"
+#include "debug.h"
 #include "tm_p.h"
 #include "target.h"
 #include "target-def.h"
 
 static int follows_p PARAMS ((rtx, rtx));
 static void vax_output_function_prologue PARAMS ((FILE *, HOST_WIDE_INT));
-#if VMS_TARGET
-static void vms_asm_out_constructor PARAMS ((rtx, int));
-static void vms_asm_out_destructor PARAMS ((rtx, int));
-static void vms_select_section PARAMS ((tree, int, unsigned HOST_WIDE_INT));
-static void vms_encode_section_info PARAMS ((tree, int));
-#endif
+static void vax_output_mi_thunk PARAMS ((FILE *, tree, HOST_WIDE_INT,
+					 HOST_WIDE_INT, tree));
+static int vax_address_cost_1 PARAMS ((rtx));
+static int vax_address_cost PARAMS ((rtx));
+static int vax_rtx_costs_1 PARAMS ((rtx, enum rtx_code, enum rtx_code));
+static bool vax_rtx_costs PARAMS ((rtx, int, int, int *));
 
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_ALIGNED_HI_OP
@@ -54,15 +57,30 @@ static void vms_encode_section_info PARAMS ((tree, int));
 #undef TARGET_ASM_FUNCTION_PROLOGUE
 #define TARGET_ASM_FUNCTION_PROLOGUE vax_output_function_prologue
 
-#if VMS_TARGET
-#undef TARGET_ASM_SELECT_SECTION
-#define TARGET_ASM_SELECT_SECTION vms_select_section
-#undef TARGET_ENCODE_SECTION_INFO
-#define TARGET_ENCODE_SECTION_INFO vms_encode_section_info
-#endif
+#undef TARGET_ASM_OUTPUT_MI_THUNK
+#define TARGET_ASM_OUTPUT_MI_THUNK vax_output_mi_thunk
+#undef TARGET_ASM_CAN_OUTPUT_MI_THUNK
+#define TARGET_ASM_CAN_OUTPUT_MI_THUNK default_can_output_mi_thunk_no_vcall
+
+#undef TARGET_RTX_COSTS
+#define TARGET_RTX_COSTS vax_rtx_costs
+#undef TARGET_ADDRESS_COST
+#define TARGET_ADDRESS_COST vax_address_cost
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
+/* Set global variables as needed for the options enabled.  */
+
+void
+override_options ()
+{
+  /* We're VAX floating point, not IEEE floating point.  */
+  memset (real_format_for_mode, 0, sizeof real_format_for_mode);
+  real_format_for_mode[SFmode - QFmode] = &vax_f_format;
+  real_format_for_mode[DFmode - QFmode]
+    = (TARGET_G_FLOAT ? &vax_g_format : &vax_d_format);
+}
+
 /* Generate the assembly code for function entry.  FILE is a stdio
    stream to output the code to.  SIZE is an int: how many units of
    temporary storage to allocate.
@@ -86,48 +104,26 @@ vax_output_function_prologue (file, size)
 
   fprintf (file, "\t.word 0x%x\n", mask);
 
-  if (VMS_TARGET)
+  if (dwarf2out_do_frame ())
     {
-      /*
-       * This works for both gcc and g++.  It first checks to see if
-       * the current routine is "main", which will only happen for
-       * GCC, and add the jsb if it is.  If is not the case then try
-       * and see if __MAIN_NAME is part of current_function_name,
-       * which will only happen if we are running g++, and add the jsb
-       * if it is.  In gcc there should never be a paren in the
-       * function name, and in g++ there is always a "(" in the
-       * function name, thus there should never be any confusion.
-       *
-       * Adjusting the stack pointer by 4 before calling C$MAIN_ARGS
-       * is required when linking with the VMS POSIX version of the C
-       * run-time library; using `subl2 $4,r0' is adequate but we use
-       * `clrl -(sp)' instead.  The extra 4 bytes could be removed
-       * after the call because STARTING_FRAME_OFFSET's setting of -4
-       * will end up adding them right back again, but don't bother.
-       */
+      const char *label = dwarf2out_cfi_label ();
+      int offset = 0;
 
-      const char *p = current_function_name;
-      int is_main = strcmp ("main", p) == 0;
-#     define __MAIN_NAME " main("
+      for (regno = FIRST_PSEUDO_REGISTER-1; regno >= 0; --regno)
+	if (regs_ever_live[regno] && !call_used_regs[regno])
+	  dwarf2out_reg_save (label, regno, offset -= 4);
 
-      while (!is_main && *p != '\0')
-	{
-	  if (*p == *__MAIN_NAME
-	      && strncmp (p, __MAIN_NAME, sizeof __MAIN_NAME - sizeof "") == 0)
-	    is_main = 1;
-	  else
-	    p++;
-	}
-
-      if (is_main)
-	fprintf (file, "\t%s\n\t%s\n", "clrl -(sp)", "jsb _C$MAIN_ARGS");
+      dwarf2out_reg_save (label, PC_REGNUM, offset -= 4);
+      dwarf2out_reg_save (label, FRAME_POINTER_REGNUM, offset -= 4);
+      dwarf2out_reg_save (label, ARG_POINTER_REGNUM, offset -= 4);
+      dwarf2out_def_cfa (label, FRAME_POINTER_REGNUM, -(offset - 4));
     }
 
-    size -= STARTING_FRAME_OFFSET;
-    if (size >= 64)
-      fprintf (file, "\tmovab %d(sp),sp\n", -size);
-    else if (size)
-      fprintf (file, "\tsubl2 $%d,sp\n", size);
+  size -= STARTING_FRAME_OFFSET;
+  if (size >= 64)
+    asm_fprintf (file, "\tmovab %d(%Rsp),%Rsp\n", -size);
+  else if (size)
+    asm_fprintf (file, "\tsubl2 $%d,%Rsp\n", size);
 }
 
 /* This is like nonimmediate_operand with a restriction on the type of MEM.  */
@@ -313,7 +309,7 @@ print_operand_address (file, addr)
       else
 	abort ();
 
-      /* If REG1 is non-zero, figure out if it is a base or index register.  */
+      /* If REG1 is nonzero, figure out if it is a base or index register.  */
       if (reg1)
 	{
 	  if (breg != 0 || (offset && GET_CODE (offset) == MEM))
@@ -426,8 +422,8 @@ vax_float_literal(c)
    2 - indirect */
 
 
-int
-vax_address_cost (addr)
+static int
+vax_address_cost_1 (addr)
     register rtx addr;
 {
   int reg = 0, indexed = 0, indir = 0, offset = 0, predec = 0;
@@ -495,16 +491,22 @@ vax_address_cost (addr)
   return reg + indexed + indir + offset + predec;
 }
 
+static int
+vax_address_cost (x)
+     rtx x;
+{
+  return (1 + (GET_CODE (x) == REG ? 0 : vax_address_cost_1 (x)));
+}
 
 /* Cost of an expression on a VAX.  This version has costs tuned for the
    CVAX chip (found in the VAX 3 series) with comments for variations on
    other models.  */
 
-int
-vax_rtx_cost (x)
+static int
+vax_rtx_costs_1 (x, code, outer_code)
     register rtx x;
+    enum rtx_code code, outer_code;
 {
-  register enum rtx_code code = GET_CODE (x);
   enum machine_mode mode = GET_MODE (x);
   register int c;
   int i = 0;				/* may be modified in switch */
@@ -512,6 +514,40 @@ vax_rtx_cost (x)
 
   switch (code)
     {
+      /* On a VAX, constants from 0..63 are cheap because they can use the
+         1 byte literal constant format.  compare to -1 should be made cheap
+         so that decrement-and-branch insns can be formed more easily (if
+         the value -1 is copied to a register some decrement-and-branch
+	 patterns will not match).  */
+    case CONST_INT:
+      if (INTVAL (x) == 0)
+	return 0;
+      if (outer_code == AND)
+        return ((unsigned HOST_WIDE_INT) ~INTVAL (x) <= 077) ? 1 : 2;
+      if ((unsigned HOST_WIDE_INT) INTVAL (x) <= 077)
+	return 1;
+      if (outer_code == COMPARE && INTVAL (x) == -1)
+        return 1;
+      if (outer_code == PLUS && (unsigned HOST_WIDE_INT) -INTVAL (x) <= 077)
+        return 1;
+      /* FALLTHRU */
+
+    case CONST:
+    case LABEL_REF:
+    case SYMBOL_REF:
+      return 3;
+
+    case CONST_DOUBLE:
+      if (GET_MODE_CLASS (GET_MODE (x)) == MODE_FLOAT)
+        return vax_float_literal (x) ? 5 : 8;
+      else
+        return (((CONST_DOUBLE_HIGH (x) == 0
+		  && (unsigned HOST_WIDE_INT) CONST_DOUBLE_LOW (x) < 64)
+	         || (outer_code == PLUS
+		     && CONST_DOUBLE_HIGH (x) == -1		\
+		     && (unsigned HOST_WIDE_INT)-CONST_DOUBLE_LOW (x) < 64))
+	        ? 2 : 5);
+ 
     case POST_INC:
       return 2;
     case PRE_DEC:
@@ -624,12 +660,11 @@ vax_rtx_cost (x)
       x = XEXP (x, 0);
       if (GET_CODE (x) == REG || GET_CODE (x) == POST_INC)
 	return c;
-      return c + vax_address_cost (x);
+      return c + vax_address_cost_1 (x);
     default:
       c = 3;
       break;
     }
-
 
   /* Now look inside the expression.  Operands which are not registers or
      short constants add to the cost.
@@ -679,7 +714,7 @@ vax_rtx_cost (x)
 	case MEM:
 	  c += 1;		/* 2 on VAX 2 */
 	  if (GET_CODE (XEXP (op, 0)) != REG)
-	    c += vax_address_cost (XEXP (op, 0));
+	    c += vax_address_cost_1 (XEXP (op, 0));
 	  break;
 	case REG:
 	case SUBREG:
@@ -692,323 +727,16 @@ vax_rtx_cost (x)
   return c;
 }
 
-/* Check a `double' value for validity for a particular machine mode.  */
-
-static const char *const float_strings[] =
+static bool
+vax_rtx_costs (x, code, outer_code, total)
+    rtx x;
+    int code, outer_code;
+    int *total;
 {
-   "1.70141173319264430e+38", /* 2^127 (2^24 - 1) / 2^24 */
-  "-1.70141173319264430e+38",
-   "2.93873587705571877e-39", /* 2^-128 */
-  "-2.93873587705571877e-39"
-};
-
-static REAL_VALUE_TYPE float_values[4];
-
-static int inited_float_values = 0;
-
-
-int
-check_float_value (mode, d, overflow)
-     enum machine_mode mode;
-     REAL_VALUE_TYPE *d;
-     int overflow;
-{
-  if (inited_float_values == 0)
-    {
-      int i;
-      for (i = 0; i < 4; i++)
-	{
-	  float_values[i] = REAL_VALUE_ATOF (float_strings[i], DFmode);
-	}
-
-      inited_float_values = 1;
-    }
-
-  if (overflow)
-    {
-      memcpy (d, &float_values[0], sizeof (REAL_VALUE_TYPE));
-      return 1;
-    }
-
-  if ((mode) == SFmode)
-    {
-      REAL_VALUE_TYPE r;
-      memcpy (&r, d, sizeof (REAL_VALUE_TYPE));
-      if (REAL_VALUES_LESS (float_values[0], r))
-	{
-	  memcpy (d, &float_values[0], sizeof (REAL_VALUE_TYPE));
-	  return 1;
-	}
-      else if (REAL_VALUES_LESS (r, float_values[1]))
-	{
-	  memcpy (d, &float_values[1], sizeof (REAL_VALUE_TYPE));
-	  return 1;
-	}
-      else if (REAL_VALUES_LESS (dconst0, r)
-		&& REAL_VALUES_LESS (r, float_values[2]))
-	{
-	  memcpy (d, &dconst0, sizeof (REAL_VALUE_TYPE));
-	  return 1;
-	}
-      else if (REAL_VALUES_LESS (r, dconst0)
-		&& REAL_VALUES_LESS (float_values[3], r))
-	{
-	  memcpy (d, &dconst0, sizeof (REAL_VALUE_TYPE));
-	  return 1;
-	}
-    }
-
-  return 0;
+  *total = vax_rtx_costs_1 (x, code, outer_code);
+  return true;
 }
 
-#if VMS_TARGET
-/* Additional support code for VMS target.  */
-
-/* Linked list of all externals that are to be emitted when optimizing
-   for the global pointer if they haven't been declared by the end of
-   the program with an appropriate .comm or initialization.  */
-
-static
-struct extern_list {
-  struct extern_list *next;	/* next external */
-  const char *name;		/* name of the external */
-  int size;			/* external's actual size */
-  int in_const;			/* section type flag */
-} *extern_head = 0, *pending_head = 0;
-
-/* Check whether NAME is already on the external definition list.  If not,
-   add it to either that list or the pending definition list.  */
-
-void
-vms_check_external (decl, name, pending)
-     tree decl;
-     const char *name;
-     int pending;
-{
-  register struct extern_list *p, *p0;
-
-  for (p = extern_head; p; p = p->next)
-    if (!strcmp (p->name, name))
-      return;
-
-  for (p = pending_head, p0 = 0; p; p0 = p, p = p->next)
-    if (!strcmp (p->name, name))
-      {
-	if (pending)
-	  return;
-
-	/* Was pending, but has now been defined; move it to other list.  */
-	if (p == pending_head)
-	  pending_head = p->next;
-	else
-	  p0->next = p->next;
-	p->next = extern_head;
-	extern_head = p;
-	return;
-      }
-
-  /* Not previously seen; create a new list entry.  */
-  p = (struct extern_list *)permalloc ((long) sizeof (struct extern_list));
-  p->name = name;
-
-  if (pending)
-    {
-      /* Save the size and section type and link to `pending' list.  */
-      p->size = (DECL_SIZE (decl) == 0) ? 0 :
-	TREE_INT_CST_LOW (size_binop (CEIL_DIV_EXPR, DECL_SIZE (decl),
-				      size_int (BITS_PER_UNIT)));
-      p->in_const = (TREE_READONLY (decl) && ! TREE_THIS_VOLATILE (decl));
-
-      p->next = pending_head;
-      pending_head = p;
-    }
-  else
-    {
-      /* Size and section type don't matter; link to `declared' list.  */
-      p->size = p->in_const = 0;        /* arbitrary init */
-
-      p->next = extern_head;
-      extern_head = p;
-    }
-  return;
-}
-
-void
-vms_flush_pending_externals (file)
-     FILE *file;
-{
-  register struct extern_list *p;
-
-  while (pending_head)
-    {
-      /* Move next pending declaration to the "done" list.  */
-      p = pending_head;
-      pending_head = p->next;
-      p->next = extern_head;
-      extern_head = p;
-
-      /* Now output the actual declaration.  */
-      if (p->in_const)
-	const_section ();
-      else
-	data_section ();
-      fputs (".comm ", file);
-      assemble_name (file, p->name);
-      fprintf (file, ",%d\n", p->size);
-    }
-}
-
-static void
-vms_asm_out_constructor (symbol, priority)
-     rtx symbol;
-     int priority ATTRIBUTE_UNUSED;
-{
-  fprintf (asm_out_file,".globl $$PsectAttributes_NOOVR$$__gxx_init_1\n");
-  data_section();
-  fprintf (asm_out_file,"$$PsectAttributes_NOOVR$$__gxx_init_1:\n\t.long\t");
-  assemble_name (asm_out_file, XSTR (symbol, 0));
-  fputc ('\n', asm_out_file);
-}
-
-static void
-vms_asm_out_destructor (symbol, priority)
-     rtx symbol;
-     int priority ATTRIBUTE_UNUSED;
-{
-  fprintf (asm_out_file,".globl $$PsectAttributes_NOOVR$$__gxx_clean_1\n");
-  data_section();
-  fprintf (asm_out_file,"$$PsectAttributes_NOOVR$$__gxx_clean_1:\n\t.long\t");
-  assemble_name (asm_out_file, XSTR (symbol, 0));
-  fputc ('\n', asm_out_file);
-}
-
-static void
-vms_select_section (exp, reloc, align)
-     tree exp;
-     int reloc ATTRIBUTE_UNUSED;
-     unsigned HOST_WIDE_INT align ATTRIBUTE_UNUSED;
-{
-  if (TREE_CODE (exp) == VAR_DECL)
-    {
-      if (TREE_READONLY (exp) && ! TREE_THIS_VOLATILE (exp)
-	  && DECL_INITIAL (exp)
-	  && (DECL_INITIAL (exp) == error_mark_node
-	      || TREE_CONSTANT (DECL_INITIAL (exp))))
-	{
-	  if (TREE_PUBLIC (exp))
-	    const_section ();
-	  else
-	    text_section ();
-	}
-      else
-	data_section ();
-    }
-  if (TREE_CODE_CLASS (TREE_CODE (exp)) == 'c')
-    {
-      if (TREE_CODE (exp) == STRING_CST && flag_writable_strings)
-	data_section ();
-      else
-	text_section ();
-    }
-}
-
-/* Make sure that external variables are correctly addressed.  Under VMS
-   there is some brain damage in the linker that requires us to do this.  */
-
-static void
-vms_encode_section_info (decl, first)
-     tree decl;
-     int first ATTRIBUTE_UNUSED;
-{
-  if (DECL_EXTERNAL (decl) && TREE_PUBLIC (decl))
-    SYMBOL_REF_FLAG (XEXP (DECL_RTL (decl), 0)) = 1;
-}
-#endif /* VMS_TARGET */
-
-/* Additional support code for VMS host.  */
-/* ??? This should really be in libiberty; vax.c is a target file.  */
-#ifdef QSORT_WORKAROUND
-  /*
-	Do not use VAXCRTL's qsort() due to a severe bug:  once you've
-	sorted something which has a size that's an exact multiple of 4
-	and is longword aligned, you cannot safely sort anything which
-	is either not a multiple of 4 in size or not longword aligned.
-	A static "move-by-longword" optimization flag inside qsort() is
-	never reset.  This is known to affect VMS V4.6 through VMS V5.5-1,
-	and was finally fixed in VMS V5.5-2.
-
-	In this work-around an insertion sort is used for simplicity.
-	The qsort code from glibc should probably be used instead.
-   */
-void
-not_qsort (array, count, size, compare)
-     void *array;
-     unsigned count, size;
-     int (*compare)();
-{
-
-  if (size == sizeof (short))
-    {
-      register int i;
-      register short *next, *prev;
-      short tmp, *base = array;
-
-      for (next = base, i = count - 1; i > 0; i--)
-	{
-	  prev = next++;
-	  if ((*compare)(next, prev) < 0)
-	    {
-	      tmp = *next;
-	      do  *(prev + 1) = *prev;
-		while (--prev >= base ? (*compare)(&tmp, prev) < 0 : 0);
-	      *(prev + 1) = tmp;
-	    }
-	}
-    }
-  else if (size == sizeof (long))
-    {
-      register int i;
-      register long *next, *prev;
-      long tmp, *base = array;
-
-      for (next = base, i = count - 1; i > 0; i--)
-	{
-	  prev = next++;
-	  if ((*compare)(next, prev) < 0)
-	    {
-	      tmp = *next;
-	      do  *(prev + 1) = *prev;
-		while (--prev >= base ? (*compare)(&tmp, prev) < 0 : 0);
-	      *(prev + 1) = tmp;
-	    }
-	}
-    }
-  else  /* arbitrary size */
-    {
-      register int i;
-      register char *next, *prev, *tmp = alloca (size), *base = array;
-
-      for (next = base, i = count - 1; i > 0; i--)
-	{   /* count-1 forward iterations */
-	  prev = next,  next += size;		/* increment front pointer */
-	  if ((*compare)(next, prev) < 0)
-	    {	/* found element out of order; move others up then re-insert */
-	      memcpy (tmp, next, size);		/* save smaller element */
-	      do { memcpy (prev + size, prev, size); /* move larger elem. up */
-		   prev -= size;		/* decrement back pointer */
-		 } while (prev >= base ? (*compare)(tmp, prev) < 0 : 0);
-	      memcpy (prev + size, tmp, size);	/* restore small element */
-	    }
-	}
-#ifdef USE_C_ALLOCA
-      alloca (0);
-#endif
-    }
-
-  return;
-}
-#endif /* QSORT_WORKAROUND */
-
 /* Return 1 if insn A follows B.  */
 
 static int
@@ -1042,4 +770,28 @@ reg_was_0_p (insn, op)
 	  && no_labels_between_p (XEXP (link, 0), insn)
 	  /* Make sure the reg hasn't been clobbered.  */
 	  && ! reg_set_between_p (op, XEXP (link, 0), insn));
+}
+
+/* Output code to add DELTA to the first argument, and then jump to FUNCTION.
+   Used for C++ multiple inheritance.
+	.mask	^m<r2,r3,r4,r5,r6,r7,r8,r9,r10,r11>  #conservative entry mask
+	addl2	$DELTA, 4(ap)	#adjust first argument
+	jmp	FUNCTION+2	#jump beyond FUNCTION's entry mask
+*/
+
+static void
+vax_output_mi_thunk (file, thunk, delta, vcall_offset, function)
+     FILE *file;
+     tree thunk ATTRIBUTE_UNUSED;
+     HOST_WIDE_INT delta;
+     HOST_WIDE_INT vcall_offset ATTRIBUTE_UNUSED;
+     tree function;
+{
+  fprintf (file, "\t.word 0x0ffc\n");					
+  fprintf (file, "\taddl2 $");
+  fprintf (file, HOST_WIDE_INT_PRINT_DEC, delta);
+  asm_fprintf (file, ",4(%Rap)\n");
+  fprintf (file, "\tjmp ");						
+  assemble_name (file,  XSTR (XEXP (DECL_RTL (function), 0), 0));	
+  fprintf (file, "+2\n");						
 }

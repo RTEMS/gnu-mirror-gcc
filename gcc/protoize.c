@@ -21,6 +21,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "intl.h"
 #include "cppdefault.h"
 
@@ -128,10 +130,6 @@ static const char * const standard_exec_prefix = STANDARD_EXEC_PREFIX;
 static const char * const target_machine = DEFAULT_TARGET_MACHINE;
 static const char * const target_version = DEFAULT_TARGET_VERSION;
 
-#ifndef GET_ENV_PATH_LIST
-#define GET_ENV_PATH_LIST(VAR,NAME)	do { (VAR) = getenv (NAME); } while (0)
-#endif
-
 #endif /* !defined (UNPROTOIZE) */
 
 /* Suffix of aux_info files.  */
@@ -142,11 +140,11 @@ static const char * const aux_info_suffix = AUX_INFO_SUFFIX;
 
 static const char * const save_suffix = SAVE_SUFFIX;
 
+#ifndef UNPROTOIZE
+
 /* String to attach to C filenames renamed to C++.  */
 
 static const char * const cplus_suffix = CPLUS_FILE_SUFFIX;
-
-#ifndef UNPROTOIZE
 
 /* File name of the file which contains descriptions of standard system
    routines.  Note that we never actually do anything with this file per se,
@@ -367,7 +365,7 @@ struct def_dec_info_struct {
 
 static const char *pname;
 
-/* Error counter.  Will be non-zero if we should give up at the next convenient
+/* Error counter.  Will be nonzero if we should give up at the next convenient
    stopping point.  */
 
 static int errors = 0;
@@ -673,7 +671,7 @@ is_id_char (ch)
 }
 
 /* Give a message indicating the proper way to invoke this program and then
-   exit with non-zero status.  */
+   exit with nonzero status.  */
 
 static void
 usage ()
@@ -1441,7 +1439,7 @@ find_corresponding_lparen (p)
 /* Given a line from  an aux info file, and a time at which the aux info
    file it came from was created, check to see if the item described in
    the line comes from a file which has been modified since the aux info
-   file was created.  If so, return non-zero, else return zero.  */
+   file was created.  If so, return nonzero, else return zero.  */
 
 static int
 referenced_file_is_newer (l, aux_info_mtime)
@@ -3206,7 +3204,7 @@ edit_fn_declaration (def_dec_p, clean_text_p)
    list that lies to the left of the one it was originally called to work
    on.  Thus, a whole set gets done in right-to-left order.
 
-   This routine returns non-zero if it thinks that it should not be trying
+   This routine returns nonzero if it thinks that it should not be trying
    to convert this particular function definition (because the name of the
    function doesn't match the one expected).  */
 
@@ -3258,7 +3256,7 @@ edit_formals_lists (end_formals, f_list_count, def_dec_p)
 
   /* Check that the function name in the header we are working on is the same
      as the one we would expect to find.  If not, issue a warning and return
-     non-zero.  */
+     nonzero.  */
 
   if (f_list_count == 0)
     {
@@ -4415,7 +4413,7 @@ do_processing ()
     }
   else
     {
-      GET_ENV_PATH_LIST (default_syscalls_dir, "GCC_EXEC_PREFIX");
+      GET_ENVIRONMENT (default_syscalls_dir, "GCC_EXEC_PREFIX");
       if (!default_syscalls_dir)
 	{
 	  default_syscalls_dir = standard_exec_prefix;

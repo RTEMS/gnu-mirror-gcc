@@ -22,6 +22,8 @@ Boston, MA 02111-1307, USA.  */
 /* Some output-actions in dsp1600.md need these.  */
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "regs.h"
 #include "hard-reg-set.h"
@@ -58,7 +60,7 @@ const char *save_chip_name;
 
 rtx dsp16xx_compare_op0;
 rtx dsp16xx_compare_op1;
-rtx (*dsp16xx_compare_gen) PARAMS (());
+bool dsp16xx_compare_gen;
 
 static const char *fp;
 static const char *sp;
@@ -149,8 +151,11 @@ static const char *const lshift_right_asm_first[] =
 static int reg_save_size PARAMS ((void));
 static void dsp16xx_output_function_prologue PARAMS ((FILE *, HOST_WIDE_INT));
 static void dsp16xx_output_function_epilogue PARAMS ((FILE *, HOST_WIDE_INT));
-
+static bool dsp16xx_rtx_costs PARAMS ((rtx, int, int, int *));
+static int dsp16xx_address_cost PARAMS ((rtx));
+
 /* Initialize the GCC target structure.  */
+
 #undef TARGET_ASM_BYTE_OP
 #define TARGET_ASM_BYTE_OP "\tint\t"
 #undef TARGET_ASM_ALIGNED_HI_OP
@@ -162,6 +167,11 @@ static void dsp16xx_output_function_epilogue PARAMS ((FILE *, HOST_WIDE_INT));
 #define TARGET_ASM_FUNCTION_PROLOGUE dsp16xx_output_function_prologue
 #undef TARGET_ASM_FUNCTION_EPILOGUE
 #define TARGET_ASM_FUNCTION_EPILOGUE dsp16xx_output_function_epilogue
+
+#undef TARGET_RTX_COSTS
+#define TARGET_RTX_COSTS dsp16xx_rtx_costs
+#undef TARGET_ADDRESS_COST
+#define TARGET_ADDRESS_COST dsp16xx_address_cost
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -1691,8 +1701,6 @@ double_reg_to_memory (operands)
 void
 override_options ()
 {
-  char *tmp;
-
   if (chip_name == (char *) 0)
     chip_name = DEFAULT_CHIP_NAME;
 
@@ -1710,21 +1718,10 @@ override_options ()
   
   save_chip_name = xstrdup (chip_name);
 
-  rsect_text = tmp = (char *) xmalloc (strlen(".rsect ") + 
-				       strlen(text_seg_name) + 3);
-  sprintf (tmp, ".rsect \"%s\"", text_seg_name);
-
-  rsect_data = tmp = (char *) xmalloc (strlen(".rsect ") + 
-				       strlen(data_seg_name) + 3);
-  sprintf (tmp, ".rsect \"%s\"", data_seg_name);
-
-  rsect_bss = tmp = (char *) xmalloc (strlen(".rsect ") + 
-				      strlen(bss_seg_name) + 3);
-  sprintf (tmp,  ".rsect \"%s\"", bss_seg_name);
-
-  rsect_const = tmp = (char *) xmalloc (strlen(".rsect ") + 
-					strlen(const_seg_name) + 3);
-  sprintf (tmp, ".rsect \"%s\"", const_seg_name);
+  rsect_text = concat (".rsect \"", text_seg_name, "\"", NULL);
+  rsect_data = concat (".rsect \"", data_seg_name, "\"", NULL);
+  rsect_bss = concat (".rsect \"", bss_seg_name, "\"", NULL);
+  rsect_const = concat (".rsect \"", const_seg_name, "\"", NULL);
 }
 
 int
@@ -1854,7 +1851,7 @@ print_operand(file, op, letter)
 	REAL_VALUE_TYPE r;
 	REAL_VALUE_FROM_CONST_DOUBLE (r, op);
 	REAL_VALUE_TO_TARGET_SINGLE (r, l);
-	fprintf (file, "0x%x", l);
+	fprintf (file, "0x%lx", l);
       }
     else if (code == CONST)
       {
@@ -2211,7 +2208,7 @@ asm_output_common(file, name, size, rounded)
      int rounded;
 {
     bss_section ();
-    ASM_GLOBALIZE_LABEL (file, name);
+    (*targetm.asm_out.globalize_label) (file, name);
     assemble_name (file, name);
     fputs (":", file);
     if (rounded > 1)
@@ -2236,7 +2233,7 @@ asm_output_local(file, name, size, rounded)
 	fprintf (file, "int\n");
 }
 
-int
+static int
 dsp16xx_address_cost (addr)
      rtx addr;
 {
@@ -2579,4 +2576,89 @@ signed_comparison_operator (op, mode)
     }
 
   return 0;
+}
+
+static bool
+dsp16xx_rtx_costs (x, code, outer_code, total)
+     rtx x;
+     int code;
+     int outer_code ATTRIBUTE_UNUSED;
+     int *total;
+{
+  switch (code)
+    {
+    case CONST_INT:
+      *total = (unsigned HOST_WIDE_INT) INTVAL (x) < 65536 ? 0 : 2;
+      return true;
+
+    case LABEL_REF:
+    case SYMBOL_REF:
+    case CONST:
+      *total = COSTS_N_INSNS (1);
+      return true;
+
+    case CONST_DOUBLE:
+      *total = COSTS_N_INSNS (2);
+      return true;
+
+    case MEM:
+      *total = COSTS_N_INSNS (GET_MODE (x) == QImode ? 2 : 4);
+      return true;
+
+    case DIV:
+    case MOD:
+      *total = COSTS_N_INSNS (38);
+      return true;
+
+    case MULT:
+      if (GET_MODE (x) == QImode)
+        *total = COSTS_N_INSNS (2);
+      else
+	*total = COSTS_N_INSNS (38);
+      return true;
+
+    case PLUS:
+    case MINUS:
+    case AND:
+    case IOR:
+    case XOR:
+      if (GET_MODE_CLASS (GET_MODE (x)) == MODE_INT)
+	{
+	  *total = 1;
+	  return false;
+	}
+      else
+	{
+          *total = COSTS_N_INSNS (38);
+	  return true;
+	}
+
+    case NEG:
+    case NOT:
+      *total = COSTS_N_INSNS (1);
+      return true;
+
+    case ASHIFT:
+    case ASHIFTRT:
+    case LSHIFTRT:
+      if (GET_CODE (XEXP (x, 1)) == CONST_INT)
+	{
+	  HOST_WIDE_INT number = INTVAL (XEXP (x, 1));
+	  if (number == 1 || number == 4 || number == 8
+	      || number == 16)
+	    *total = COSTS_N_INSNS (1);
+	  else if (TARGET_BMU)
+            *total = COSTS_N_INSNS (2);
+          else
+            *total = COSTS_N_INSNS (num_1600_core_shifts (number));
+	  return true;
+	}
+      break;
+    }
+
+  if (TARGET_BMU)
+    *total = COSTS_N_INSNS (1);
+  else
+    *total = COSTS_N_INSNS (15);
+  return true;
 }

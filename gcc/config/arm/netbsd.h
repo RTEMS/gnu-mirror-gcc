@@ -1,5 +1,5 @@
 /* NetBSD/arm a.out version.
-   Copyright (C) 1993, 1994, 1997, 1998 Free Software Foundation, Inc.
+   Copyright (C) 1993, 1994, 1997, 1998, 2003 Free Software Foundation, Inc.
    Contributed by Mark Brinicombe (amb@physig.ph.kcl.ac.uk)
 
 This file is part of GNU CC.
@@ -54,7 +54,8 @@ Boston, MA 02111-1307, USA.  */
 
 #undef SUBTARGET_EXTRA_SPECS
 #define SUBTARGET_EXTRA_SPECS \
-  { "netbsd_cpp_spec", NETBSD_CPP_SPEC },
+  { "netbsd_cpp_spec",  NETBSD_CPP_SPEC }, \
+  { "netbsd_link_spec", NETBSD_LINK_SPEC_AOUT },
 
 #undef CPP_SPEC
 #define CPP_SPEC "\
@@ -71,10 +72,7 @@ Boston, MA 02111-1307, USA.  */
 
 /* Pass -X to the linker so that it will strip symbols starting with 'L' */
 #undef LINK_SPEC
-#define LINK_SPEC "\
--X %{!shared:%{!nostdlib:%{!r*:%{!e*:-e start}}} -dc -dp %{R*} \
-%{static:-Bstatic}} %{shared} %{assert*} \
-"
+#define LINK_SPEC "-X %(netbsd_link_spec)"
 
 #undef SIZE_TYPE
 #define SIZE_TYPE "unsigned int"
@@ -82,7 +80,7 @@ Boston, MA 02111-1307, USA.  */
 #undef PTRDIFF_TYPE
 #define PTRDIFF_TYPE "int"
 
-#define HANDLE_SYSV_PRAGMA
+#define HANDLE_SYSV_PRAGMA 1
 
 /* We don't have any limit on the length as out debugger is GDB.  */
 #undef DBX_CONTIN_LENGTH
@@ -132,7 +130,7 @@ Boston, MA 02111-1307, USA.  */
    This has several side effects that should be considered.
    1. Structures will only be aligned to the size of the largest member.
       i.e. structures containing only bytes will be byte aligned.
-           structures containing shorts will be half word alinged.
+           structures containing shorts will be half word aligned.
            structures containing ints will be word aligned.
 
       This means structures should be padded to a word boundary if
@@ -147,3 +145,30 @@ Boston, MA 02111-1307, USA.  */
    requirements.  */
 #undef  DEFAULT_STRUCTURE_SIZE_BOUNDARY
 #define DEFAULT_STRUCTURE_SIZE_BOUNDARY 8
+
+/* Emit code to set up a trampoline and synchronize the caches.  */
+#undef  INITIALIZE_TRAMPOLINE
+#define INITIALIZE_TRAMPOLINE(TRAMP, FNADDR, CXT)                      \
+{                                                                      \
+  emit_move_insn (gen_rtx (MEM, SImode, plus_constant ((TRAMP), 8)),   \
+                 (CXT));                                               \
+  emit_move_insn (gen_rtx (MEM, SImode, plus_constant ((TRAMP), 12)),  \
+                 (FNADDR));                                            \
+  emit_library_call (gen_rtx_SYMBOL_REF (Pmode, "__clear_cache"),      \
+                    0, VOIDmode, 2, TRAMP, Pmode,                      \
+                    plus_constant (TRAMP, TRAMPOLINE_SIZE), Pmode);    \
+}
+
+/* Clear the instruction cache from `BEG' to `END'.  This makes a
+   call to the ARM32_SYNC_ICACHE architecture specific syscall.  */
+#define CLEAR_INSN_CACHE(BEG, END)                                     \
+{                                                                      \
+  extern int sysarch(int number, void *args);                          \
+  struct {                                                             \
+    unsigned int  addr;                                                \
+    int           len;                                                 \
+  } s;                                                                 \
+  s.addr = (unsigned int)(BEG);                                        \
+  s.len = (END) - (BEG);                                               \
+  (void)sysarch(0, &s);                                                \
+}

@@ -27,7 +27,7 @@
  * file might be covered by the  GNU Public License.                        *
  *                                                                          *
  * GNAT was originally developed  by the GNAT team at  New York University. *
- * It is now maintained by Ada Core Technologies Inc (http://www.gnat.com). *
+ * Extensive contributions were provided by Ada Core Technologies Inc.      *
  *                                                                          *
  ****************************************************************************/
 
@@ -37,6 +37,8 @@
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "rtl.h"
 #include "errors.h"
@@ -49,6 +51,7 @@
 #include "insn-codes.h"
 #include "insn-flags.h"
 #include "insn-config.h"
+#include "optabs.h"
 #include "recog.h"
 #include "toplev.h"
 #include "output.h"
@@ -206,10 +209,10 @@ gnat_parse_file (set_yydebug)
 
 /* Decode all the language specific options that cannot be decoded by GCC.
    The option decoding phase of GCC calls this routine on the flags that
-   it cannot decode. This routine returns 1 if it is successful, otherwise
-   it returns 0. */
+   it cannot decode.  This routine returns the number of consecutive arguments
+   from ARGV that it successfully decoded; 0 indicates failure.  */
 
-int
+static int
 gnat_decode_option (argc, argv)
      int argc ATTRIBUTE_UNUSED;
      char **argv;
@@ -219,18 +222,35 @@ gnat_decode_option (argc, argv)
 
   if (!strncmp (p, "-I", 2))
     {
-      /* Pass the -I switches as-is. */
-      gnat_argv[gnat_argc] = p;
-      gnat_argc ++;
-      return 1;
+      /* We might get -I foo or -Ifoo.  Canonicalize to the latter.  */
+      if (p[2] == '\0')
+	{
+	  char *q;
+
+	  if (argv[1] == 0)
+	    return 0;
+
+	  q = xmalloc (sizeof("-I") + strlen (argv[1]));
+	  strcpy (q, "-I");
+	  strcat (q, argv[1]);
+
+	  gnat_argv[gnat_argc] = q;
+	  gnat_argc ++;
+	  return 2;  /* consumed argument */
+	}
+      else
+	{
+	  gnat_argv[gnat_argc] = p;
+	  gnat_argc ++;
+	  return 1;
+	}
     }
 
   else if (!strncmp (p, "-gant", 5))
     {
-      char *q = (char *) xmalloc (strlen (p) + 1);
+      char *q = xstrdup (p);
 
       warning ("`-gnat' misspelled as `-gant'");
-      strcpy (q, p);
       q[2] = 'n', q[3] = 'a';
       p = q;
       return 1;
@@ -277,7 +297,7 @@ gnat_decode_option (argc, argv)
 
 /* Initialize for option processing.  */
 
-void
+static void
 gnat_init_options ()
 {
   /* Initialize gnat_argv with save_argv size */
@@ -340,6 +360,10 @@ gnat_init (filename)
   internal_reference_types ();
 
   set_lang_adjust_rli (gnat_adjust_rli);
+
+  if (filename == 0)
+    filename = "";
+
   return filename;
 }
 

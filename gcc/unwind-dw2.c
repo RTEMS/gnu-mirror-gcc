@@ -1,5 +1,5 @@
 /* DWARF2 exception handling and frame unwind runtime interface routines.
-   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002
+   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003
    Free Software Foundation, Inc.
 
    This file is part of GCC.
@@ -21,6 +21,8 @@
 
 #include "tconfig.h"
 #include "tsystem.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "dwarf2.h"
 #include "unwind.h"
 #include "unwind-pe.h"
@@ -200,6 +202,17 @@ _Unwind_Ptr
 _Unwind_GetRegionStart (struct _Unwind_Context *context)
 {
   return (_Unwind_Ptr) context->bases.func;
+}
+
+void *
+_Unwind_FindEnclosingFunction (void *pc)
+{
+  struct dwarf_eh_bases bases;
+  struct dwarf_fde *fde = _Unwind_Find_FDE (pc-1, &bases);
+  if (fde)
+    return bases.func;
+  else
+    return NULL;
 }
 
 #ifndef __ia64__
@@ -771,6 +784,9 @@ execute_cfa_program (const unsigned char *insn_ptr,
 
 	case DW_CFA_undefined:
 	case DW_CFA_same_value:
+	  insn_ptr = read_uleb128 (insn_ptr, &reg);
+	  break;
+
 	case DW_CFA_nop:
 	  break;
 

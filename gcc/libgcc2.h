@@ -27,19 +27,6 @@ extern void __clear_cache (char *, char *);
 extern void __eprintf (const char *, const char *, unsigned int, const char *)
   __attribute__ ((__noreturn__));
 
-struct bb;
-extern void __bb_exit_func (void);
-extern void __bb_init_func (struct bb *);
-extern void __bb_fork_func (void);
-
-#if LONG_TYPE_SIZE == GCOV_TYPE_SIZE
-typedef long gcov_type;
-#else
-typedef long long gcov_type;
-#endif
-
-extern gcov_type *__bb_find_arc_counters (void);
-
 struct exception_descriptor;
 extern short int __get_eh_table_language (struct exception_descriptor *);
 extern short int __get_eh_table_version (struct exception_descriptor *);
@@ -236,7 +223,32 @@ extern DWtype __negdi2 (DWtype);
 extern DWtype __lshrdi3 (DWtype, word_type);
 extern DWtype __ashldi3 (DWtype, word_type);
 extern DWtype __ashrdi3 (DWtype, word_type);
-extern DWtype __ffsdi2 (DWtype);
+extern Wtype __ffsdi2 (DWtype);
+
+/* ??? Ought to get these named properly for DSPs.  */
+#if BITS_PER_UNIT == 8 && MIN_UNITS_PER_WORD >= 4
+extern Wtype __clzsi2 (USItype);
+extern Wtype __ctzsi2 (USItype);
+extern Wtype __popcountsi2 (USItype x);
+extern Wtype __paritysi2 (USItype x);
+#else
+#undef L_clzsi2
+#undef L_ctzsi2
+#undef L_popcountsi2
+#undef L_paritysi2
+#endif
+
+#if BITS_PER_UNIT == 8 && MIN_UNITS_PER_WORD >= 4 && LONG_LONG_TYPE_SIZE > 32
+extern Wtype __clzdi2 (UDItype);
+extern Wtype __ctzdi2 (UDItype);
+extern Wtype __popcountdi2 (UDItype x);
+extern Wtype __paritydi2 (UDItype x);
+#else
+#undef L_clzdi2
+#undef L_ctzdi2
+#undef L_popcountdi2
+#undef L_paritydi2
+#endif
 
 /* __udiv_w_sdiv is static inline when building other libgcc2 portions.  */
 #if (!defined(L_udivdi3) && !defined(L_divdi3) && \

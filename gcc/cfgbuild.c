@@ -1,6 +1,6 @@
 /* Control flow graph building code for GNU compiler.
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -34,6 +34,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "rtl.h"
 #include "hard-reg-set.h"
@@ -45,7 +47,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "except.h"
 #include "toplev.h"
 #include "timevar.h"
-#include "obstack.h"
 
 static int count_basic_blocks		PARAMS ((rtx));
 static void find_basic_blocks_1		PARAMS ((rtx));
@@ -58,7 +59,6 @@ static void make_eh_edge		PARAMS ((sbitmap *, basic_block, rtx));
 static void find_bb_boundaries		PARAMS ((basic_block));
 static void compute_outgoing_frequencies PARAMS ((basic_block));
 static bool inside_basic_block_p	PARAMS ((rtx));
-static bool control_flow_insn_p		PARAMS ((rtx));
 
 /* Return true if insn is something that should be contained inside basic
    block.  */
@@ -96,7 +96,7 @@ inside_basic_block_p (insn)
 /* Return true if INSN may cause control flow transfer, so it should be last in
    the basic block.  */
 
-static bool
+bool
 control_flow_insn_p (insn)
      rtx insn;
 {
@@ -148,7 +148,7 @@ count_basic_blocks (f)
 
   for (insn = f; insn; insn = NEXT_INSN (insn))
     {
-      /* Code labels and barriers causes curent basic block to be
+      /* Code labels and barriers causes current basic block to be
          terminated at previous real insn.  */
       if ((GET_CODE (insn) == CODE_LABEL || GET_CODE (insn) == BARRIER)
 	  && saw_insn)
@@ -293,7 +293,7 @@ make_edges (label_value_list, min, max, update_p)
   /* Heavy use of computed goto in machine-generated code can lead to
      nearly fully-connected CFGs.  In that case we spend a significant
      amount of time searching the edge lists for duplicates.  */
-  if (forced_labels || label_value_list)
+  if (forced_labels || label_value_list || cfun->max_jumptable_ents > 100)
     {
       edge_cache = sbitmap_vector_alloc (last_basic_block, last_basic_block);
       sbitmap_vector_zero (edge_cache, last_basic_block);
@@ -321,7 +321,7 @@ make_edges (label_value_list, min, max, update_p)
       enum rtx_code code;
       int force_fallthru = 0;
 
-      if (GET_CODE (bb->head) == CODE_LABEL && LABEL_ALTERNATE_NAME (bb->head))
+      if (GET_CODE (bb->head) == CODE_LABEL && LABEL_ALT_ENTRY_P (bb->head))
 	cached_make_edge (NULL, ENTRY_BLOCK_PTR, bb, 0);
 
       /* Examine the last instruction of the block, and discover the
@@ -699,7 +699,7 @@ find_bb_boundaries (bb)
 	  bb = fallthru->dest;
 	  remove_edge (fallthru);
 	  flow_transfer_insn = NULL_RTX;
-	  if (LABEL_ALTERNATE_NAME (insn))
+	  if (LABEL_ALT_ENTRY_P (insn))
 	    make_edge (ENTRY_BLOCK_PTR, bb, 0);
 	}
 

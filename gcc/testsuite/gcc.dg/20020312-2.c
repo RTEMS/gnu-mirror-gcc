@@ -8,9 +8,7 @@
 /* { dg-do run } */
 /* { dg-options "-O -fno-pic" } */
 
-#if #cpu(a29k)
-/* No pic register.  */
-#elif defined(__alpha__)
+#if defined(__alpha__)
 /* PIC register is $29, but is used even without -fpic.  */
 #elif defined(__arc__)
 # define PIC_REG  "26"
@@ -18,17 +16,11 @@
 # define PIC_REG  "9"
 #elif defined(AVR)
 /* No pic register.  */
-#elif defined(__clipper__)
-/* No pic register.  */
-#elif defined(__convex__)
-/* No pic register.  */
 #elif defined(__cris__)
 # define PIC_REG  "0"
 #elif defined(__D30V__)
 /* No pic register.  */
 #elif defined(__dsp1600__)
-/* No pic register.  */
-#elif defined(__elxsi__)
 /* No pic register.  */
 #elif defined(__fr30__)
 /* No pic register.  */
@@ -40,8 +32,6 @@
 /* No pic register.  */
 #elif defined(__i386__)
 # define PIC_REG  "ebx"
-#elif defined(__i860__)
-/* No pic register.  */
 #elif defined(__i960__)
 /* No pic register.  */
 #elif defined(__ia64__)
@@ -66,14 +56,12 @@
 /* No pic register.  */
 #elif #cpu(ns32k)
 /* No pic register.  */
-#elif defined(__parisc__)
+#elif defined(__hppa__)
 /* PIC register is %r27 or %r19, but is used even without -fpic.  */
 #elif defined(__pdp11__)
 /* No pic register.  */
-#elif defined(__pj__)
-/* No pic register.  */
-#elif defined(__powerpc__)
-# ifdef __darwin__
+#elif defined(__powerpc__) || defined(__PPC__) || defined(__POWERPC__)
+# ifdef __MACH__
 #  define PIC_REG  "31"
 # else
 #  define PIC_REG  "30"
@@ -88,14 +76,14 @@
 /* No pic register.  */
 #elif defined(__vax__)
 /* No pic register.  */
-#elif defined(__we32000__)
-/* No pic register.  */
 #elif defined(__xstormy16__)
 /* No pic register.  */
 #elif defined(__XTENSA__)
 /* No pic register.  */
 #elif defined(__sh__)
 # define PIC_REG  "r12"
+#elif defined(__x86_64__)
+/* No pic register.  */
 #else
 # error "Modify the test for your target."
 #endif
@@ -142,8 +130,9 @@ main()
 
   /* Additionally test that the prologue/epilogue properly does *not*
      save and restore global registers.  Not possible when the PIC
-     register is in a register window, of course.  */
-#ifndef __sparc__
+     register is in a register window, of course.  On Darwin, you can't
+     call library routines from non-PIC code.  */
+#if !defined (__sparc__) && !(defined(__MACH__) && defined(__POWERPC__))
   if (reg)
     abort ();
 #endif

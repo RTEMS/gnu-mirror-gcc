@@ -1,6 +1,6 @@
 /* Move registers around to reduce number of move instructions needed.
    Copyright (C) 1987, 1988, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -27,6 +27,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h" /* stdio.h must precede rtl.h for FFS.  */
 #include "tm_p.h"
 #include "insn-config.h"
@@ -80,7 +82,7 @@ static int regclass_compatible_p PARAMS ((int, int));
 static int replacement_quality PARAMS ((rtx));
 static int fixup_match_2 PARAMS ((rtx, rtx, rtx, rtx, FILE *));
 
-/* Return non-zero if registers with CLASS1 and CLASS2 can be merged without
+/* Return nonzero if registers with CLASS1 and CLASS2 can be merged without
    causing too much register allocation problems.  */
 static int
 regclass_compatible_p (class0, class1)
@@ -645,7 +647,7 @@ optimize_reg_copy_2 (insn, dest, src)
 }
 /* INSN is a ZERO_EXTEND or SIGN_EXTEND of SRC to DEST.
    Look if SRC dies there, and if it is only set once, by loading
-   it from memory.  If so, try to encorporate the zero/sign extension
+   it from memory.  If so, try to incorporate the zero/sign extension
    into the memory read, change SRC to the mode of DEST, and alter
    the remaining accesses to use the appropriate SUBREG.  This allows
    SRC and DEST to be tied later.  */
@@ -664,6 +666,7 @@ optimize_reg_copy_3 (insn, dest, src)
   if (src_no < FIRST_PSEUDO_REGISTER
       || dst_no < FIRST_PSEUDO_REGISTER
       || ! find_reg_note (insn, REG_DEAD, src_reg)
+      || REG_N_DEATHS (src_no) != 1
       || REG_N_SETS (src_no) != 1)
     return;
   for (p = PREV_INSN (insn); p && ! reg_set_p (src_reg, p); p = PREV_INSN (p))
@@ -683,7 +686,7 @@ optimize_reg_copy_3 (insn, dest, src)
       || SET_DEST (set) != src_reg)
     return;
 
-  /* Be conserative: although this optimization is also valid for
+  /* Be conservative: although this optimization is also valid for
      volatile memory references, that could cause trouble in later passes.  */
   if (MEM_VOLATILE_P (SET_SRC (set)))
     return;
@@ -792,7 +795,7 @@ copy_src_to_dest (insn, src, dest, old_max_uid)
       p_move_notes = &REG_NOTES (move_insn);
       p_insn_notes = &REG_NOTES (insn);
 
-      /* Move any notes mentioning src to the move instruction */
+      /* Move any notes mentioning src to the move instruction.  */
       for (link = REG_NOTES (insn); link != NULL_RTX; link = next)
 	{
 	  next = XEXP (link, 1);
@@ -811,7 +814,7 @@ copy_src_to_dest (insn, src, dest, old_max_uid)
       *p_move_notes = NULL_RTX;
       *p_insn_notes = NULL_RTX;
 
-      /* Is the insn the head of a basic block?  If so extend it */
+      /* Is the insn the head of a basic block?  If so extend it.  */
       insn_uid = INSN_UID (insn);
       move_uid = INSN_UID (move_insn);
       if (insn_uid < old_max_uid)
@@ -922,7 +925,7 @@ reg_is_remote_constant_p (reg, insn, first)
      (set (reg100) (plus reg100 offset2-offset1))  */
 
 /* ??? What does this comment mean?  */
-/* cse disrupts preincrement / postdecrement squences when it finds a
+/* cse disrupts preincrement / postdecrement sequences when it finds a
    hard register as ultimate source, like the frame pointer.  */
 
 static int
@@ -1069,7 +1072,7 @@ regmove_optimize (f, nregs, regmove_dump_file)
     return;
 
   /* Find out where a potential flags register is live, and so that we
-     can supress some optimizations in those zones.  */
+     can suppress some optimizations in those zones.  */
   mark_flags_life_zones (discover_flags_reg ());
 
   regno_src_regno = (int *) xmalloc (sizeof *regno_src_regno * nregs);
@@ -1336,7 +1339,7 @@ regmove_optimize (f, nregs, regmove_dump_file)
 		     it produces worse code, as it eliminates no copy
 		     instructions and the copy emitted will be produced by
 		     reload anyway.  On patterns with multiple alternatives,
-		     there may be better sollution availble.
+		     there may be better solution available.
 
 		     In particular this change produced slower code for numeric
 		     i387 programs.  */
@@ -1496,7 +1499,7 @@ regmove_optimize (f, nregs, regmove_dump_file)
 	    }
 
 	  /* If we weren't able to replace any of the alternatives, try an
-	     alternative appoach of copying the source to the destination.  */
+	     alternative approach of copying the source to the destination.  */
 	  if (!success && copy_src != NULL_RTX)
 	    copy_src_to_dest (insn, copy_src, copy_dst, old_max_uid);
 
@@ -1567,47 +1570,50 @@ find_matches (insn, matchp)
 	if (*p == ',')
 	  i++;
 
-      while ((c = *p++) != '\0' && c != ',')
-	switch (c)
-	  {
-	  case '=':
-	    break;
-	  case '+':
-	    break;
-	  case '&':
-	    matchp->early_clobber[op_no] = 1;
-	    break;
-	  case '%':
-	    matchp->commutative[op_no] = op_no + 1;
-	    matchp->commutative[op_no + 1] = op_no;
-	    break;
-
-	  case '0': case '1': case '2': case '3': case '4':
-	  case '5': case '6': case '7': case '8': case '9':
+      while ((c = *p) != '\0' && c != ',')
+	{
+	  switch (c)
 	    {
-	      char *end;
-	      unsigned long match_ul = strtoul (p - 1, &end, 10);
-	      int match = match_ul;
+	    case '=':
+	      break;
+	    case '+':
+	      break;
+	    case '&':
+	      matchp->early_clobber[op_no] = 1;
+	      break;
+	    case '%':
+	      matchp->commutative[op_no] = op_no + 1;
+	      matchp->commutative[op_no + 1] = op_no;
+	      break;
 
-	      p = end;
+	    case '0': case '1': case '2': case '3': case '4':
+	    case '5': case '6': case '7': case '8': case '9':
+	      {
+		char *end;
+		unsigned long match_ul = strtoul (p, &end, 10);
+		int match = match_ul;
 
-	      if (match < op_no && likely_spilled[match])
-		break;
-	      matchp->with[op_no] = match;
-	      any_matches = 1;
-	      if (matchp->commutative[op_no] >= 0)
-		matchp->with[matchp->commutative[op_no]] = match;
-	    }
-	    break;
+		p = end;
+
+		if (match < op_no && likely_spilled[match])
+		  continue;
+		matchp->with[op_no] = match;
+		any_matches = 1;
+		if (matchp->commutative[op_no] >= 0)
+		  matchp->with[matchp->commutative[op_no]] = match;
+	      }
+	    continue;
 
 	  case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'h':
 	  case 'j': case 'k': case 'l': case 'p': case 'q': case 't': case 'u':
 	  case 'v': case 'w': case 'x': case 'y': case 'z': case 'A': case 'B':
 	  case 'C': case 'D': case 'W': case 'Y': case 'Z':
-	    if (CLASS_LIKELY_SPILLED_P (REG_CLASS_FROM_LETTER ((unsigned char) c)))
+	    if (CLASS_LIKELY_SPILLED_P (REG_CLASS_FROM_CONSTRAINT ((unsigned char) c, p) ))
 	      likely_spilled[op_no] = 1;
 	    break;
 	  }
+	  p += CONSTRAINT_LEN (c, p);
+	}
     }
   return any_matches;
 }
@@ -1670,7 +1676,7 @@ fixup_match_1 (insn, set, src, src_subreg, dst, backward, operand_number,
   int success = 0;
   int num_calls = 0, s_num_calls = 0;
   enum rtx_code code = NOTE;
-  HOST_WIDE_INT insn_const = 0, newconst;
+  HOST_WIDE_INT insn_const = 0, newconst = 0;
   rtx overlap = 0; /* need to move insn ? */
   rtx src_note = find_reg_note (insn, REG_DEAD, src), dst_note = NULL_RTX;
   int length, s_length;
@@ -2312,7 +2318,7 @@ record_stack_memrefs (xp, data)
 
 	 We can't just compare with STACK_POINTER_RTX because the
 	 reference to the stack pointer might be in some other mode.
-	 In particular, an explict clobber in an asm statement will
+	 In particular, an explicit clobber in an asm statement will
 	 result in a QImode clober.  */
       if (REGNO (x) == STACK_POINTER_REGNUM)
 	return 1;
@@ -2371,7 +2377,7 @@ combine_stack_adjustments_for_block (bb)
 		 adjustment is now too large for a constant addition,
 		 we cannot merge the two stack adjustments.
 
-		 Also we need to be carefull to not move stack pointer
+		 Also we need to be careful to not move stack pointer
 		 such that we create stack accesses outside the allocated
 		 area.  We can combine an allocation into the first insn,
 		 or a deallocation into the second insn.  We can not

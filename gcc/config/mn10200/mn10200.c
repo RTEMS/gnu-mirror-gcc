@@ -22,6 +22,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "tree.h"
 #include "regs.h"
@@ -63,6 +65,7 @@ rtx zero_dreg;
 rtx zero_areg;
 
 static void count_tst_insns PARAMS ((int *));
+static bool mn10200_rtx_costs PARAMS ((rtx, int, int, int *));
 
 /* Note whether or not we need an out of line epilogue.  */
 static int out_of_line_epilogue;
@@ -70,6 +73,9 @@ static int out_of_line_epilogue;
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_ALIGNED_HI_OP
 #define TARGET_ASM_ALIGNED_HI_OP "\t.hword\t"
+
+#undef TARGET_RTX_COSTS
+#define TARGET_RTX_COSTS mn10200_rtx_costs
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -690,13 +696,23 @@ expand_prologue ()
     }
 
   /* Now put the static chain back where the rest of the function
-     expects to find it.  */
+     expects to find it. 
+
+     Note that we may eliminate all references to this later, so we
+     mark the static chain as maybe dead.  */
   if (current_function_needs_context)
     {
-      emit_move_insn (gen_rtx_REG (PSImode, STATIC_CHAIN_REGNUM),
-		      gen_rtx (MEM, PSImode,
-			       gen_rtx_PLUS (PSImode, stack_pointer_rtx,
-					     GEN_INT (size))));
+      rtx insn;
+
+      insn = emit_move_insn (gen_rtx_REG (PSImode, STATIC_CHAIN_REGNUM),
+			     gen_rtx (MEM, PSImode,
+				      gen_rtx_PLUS (PSImode,
+						    stack_pointer_rtx,
+						    GEN_INT (size))));
+      REG_NOTES (insn) = gen_rtx_EXPR_LIST (REG_MAYBE_DEAD,
+                                            const0_rtx,
+                                            REG_NOTES (insn));
+  
     }
 }
 
@@ -712,10 +728,8 @@ expand_epilogue ()
   size = total_frame_size ();
 
   if (DECL_RESULT (current_function_decl)
-      && DECL_RTL (DECL_RESULT (current_function_decl))
-      && REG_P (DECL_RTL (DECL_RESULT (current_function_decl))))
-    temp_regno = (REGNO (DECL_RTL (DECL_RESULT (current_function_decl))) == 4
-		  ? 0 : 4);
+      && POINTER_TYPE_P (TREE_TYPE (DECL_RESULT (current_function_decl))))
+    temp_regno = 0;
   else
     temp_regno = 4;
 
@@ -935,7 +949,7 @@ secondary_reload_class (class, mode, in, input)
 
    The basic shift methods:
 
-     * loop shifts -- emit a loop using one (or two on H8/S) bit shifts;
+     * loop shifts -- emit a loop using one (or two on H8S) bit shifts;
      this is the default.  SHIFT_LOOP
 
      * inlined shifts -- emit straight line code for the shift; this is
@@ -1589,4 +1603,60 @@ extendpsi_operand (op, mode)
 	  || (GET_CODE (op) == PLUS
 	      && XEXP (op, 0) == stack_pointer_rtx
 	      && general_operand (XEXP (op, 1), VOIDmode)));
+}
+
+static bool
+mn10200_rtx_costs (x, code, outer_code, total)
+     rtx x;
+     int code, outer_code ATTRIBUTE_UNUSED;
+     int *total;
+{
+  switch (code)
+    {
+    case CONST_INT:
+      /* Zeros are extremely cheap.  */
+      if (INTVAL (x) == 0)
+	*total = 0;
+      /* If it fits in 8 bits, then it's still relatively cheap.  */
+      else if (INT_8_BITS (INTVAL (x)))
+	*total = 1;
+      /* This is the "base" cost, includes constants where either the
+	 upper or lower 16bits are all zeros.  */
+      else if (INT_16_BITS (INTVAL (x))
+	       || (INTVAL (x) & 0xffff) == 0
+	       || (INTVAL (x) & 0xffff0000) == 0)
+	*total = 2;
+      else
+	*total = 4;
+      return true;
+
+    case CONST:
+    case LABEL_REF:
+    case SYMBOL_REF:
+      /* These are more costly than a CONST_INT, but we can relax them,
+	 so they're less costly than a CONST_DOUBLE.  */
+      *total = 6;
+      return true;
+
+    case CONST_DOUBLE:
+      /* We don't optimize CONST_DOUBLEs well nor do we relax them well,
+	 so their cost is very high.  */
+      *total = 8;
+      return true;
+
+   /* ??? This probably needs more work.  The definitions below were first
+      taken from the H8 port, then tweaked slightly to improve code density
+      on various sample codes.  */
+    case MOD:
+    case DIV:
+      *total = 8;
+      return true;
+
+    case MULT:
+      *total = (GET_MODE (x) == SImode ? 20 : 8);
+      return true;
+
+    default:
+      return false;
+    }
 }

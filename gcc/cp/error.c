@@ -2,29 +2,30 @@
    This code is non-reentrant.
    Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2002
    Free Software Foundation, Inc.
-   This file is part of GNU CC.
+   This file is part of GCC.
 
-GNU CC is free software; you can redistribute it and/or modify
+GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2, or (at your option)
 any later version.
 
-GNU CC is distributed in the hope that it will be useful,
+GCC is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU CC; see the file COPYING.  If not, write to
+along with GCC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "cp-tree.h"
 #include "real.h"
-#include "obstack.h"
 #include "toplev.h"
 #include "flags.h"
 #include "diagnostic.h"
@@ -45,11 +46,6 @@ enum pad { none, before, after };
    print_non_consecutive_character ((BUFFER), '<')
 #define print_template_argument_list_end(BUFFER)  \
    print_non_consecutive_character ((BUFFER), '>')
-#define print_whitespace(BUFFER, TFI)        \
-   do {                                      \
-     output_add_space (BUFFER);              \
-     put_whitespace (TFI) = none;            \
-   } while (0)
 #define print_tree_identifier(BUFFER, TID) \
    output_add_string ((BUFFER), IDENTIFIER_POINTER (TID))
 #define print_identifier(BUFFER, ID) output_add_string ((BUFFER), (ID))
@@ -321,8 +317,8 @@ dump_template_bindings (parms, args)
     }
 }
 
-/* Dump into the obstack a human-readable equivalent of TYPE.  FLAGS
-   controls the format.  */
+/* Dump a human-readable equivalent of TYPE.  FLAGS controls the
+   format.  */
 
 static void
 dump_type (t, flags)
@@ -416,7 +412,7 @@ dump_type (t, flags)
       break;
 
     case TEMPLATE_TEMPLATE_PARM:
-      /* For parameters inside template signature. */
+      /* For parameters inside template signature.  */
       if (TYPE_IDENTIFIER (t))
 	print_tree_identifier (scratch_buffer, TYPE_IDENTIFIER (t));
       else
@@ -458,8 +454,8 @@ dump_type (t, flags)
       break;
     }
     case TYPENAME_TYPE:
-      if (!IMPLICIT_TYPENAME_P (t))
-        output_add_string (scratch_buffer, "typename ");
+      dump_qualifiers (t, after);
+      output_add_string (scratch_buffer, "typename ");
       dump_typename (t, flags);
       break;
 
@@ -478,7 +474,7 @@ dump_type (t, flags)
 
     default:
       sorry_for_unsupported_tree (t);
-      /* Fall through to error. */
+      /* Fall through to error.  */
 
     case ERROR_MARK:
       print_identifier (scratch_buffer, "<type error>");
@@ -854,7 +850,7 @@ dump_decl (t, flags)
 	  {
 	    if ((flags & TFF_DECL_SPECIFIERS)
 	        && TREE_CODE (TREE_TYPE (t)) == TEMPLATE_TYPE_PARM)
-	      /* Say `class T' not just `T'. */
+	      /* Say `class T' not just `T'.  */
 	      output_add_string (scratch_buffer, "class ");
 
 	    dump_type (TREE_TYPE (t), flags);
@@ -934,6 +930,25 @@ dump_decl (t, flags)
       break;
 
     case OVERLOAD:
+      if (OVL_CHAIN (t))
+	{
+	  t = OVL_CURRENT (t);
+	  if (DECL_CLASS_SCOPE_P (t))
+	    {
+	      dump_type (DECL_CONTEXT (t), flags);
+	      output_add_string (scratch_buffer, "::");
+	    }
+	  else if (DECL_CONTEXT (t))
+	    {
+	      dump_decl (DECL_CONTEXT (t), flags);
+	      output_add_string (scratch_buffer, "::");
+	    }
+	  dump_decl (DECL_NAME (t), flags);
+	  break;
+	}
+      
+      /* If there's only one function, just treat it like an ordinary
+	 FUNCTION_DECL.  */
       t = OVL_CURRENT (t);
       /* Fall through.  */
 
@@ -996,6 +1011,10 @@ dump_decl (t, flags)
       print_tree_identifier (scratch_buffer, DECL_NAME (t));
       break;
 
+    case BASELINK:
+      dump_decl (BASELINK_FUNCTIONS (t), flags);
+      break;
+
     default:
       sorry_for_unsupported_tree (t);
       /* Fallthrough to error.  */
@@ -1045,7 +1064,7 @@ dump_template_decl (t, flags)
       nreverse(orig_parms);
 
       if (DECL_TEMPLATE_TEMPLATE_PARM_P (t))
-	/* Say `template<arg> class TT' not just `template<arg> TT'. */
+	/* Say `template<arg> class TT' not just `template<arg> TT'.  */
 	output_add_string (scratch_buffer, "class ");
     }
 
@@ -1065,7 +1084,7 @@ dump_template_decl (t, flags)
         dump_function_decl (t, flags | TFF_TEMPLATE_NAME);
         break;
       default:
-        /* This case can occur with some illegal code.  */
+        /* This case can occur with some invalid code.  */
         dump_type (TREE_TYPE (t),
                    (flags & ~TFF_CLASS_KEY_OR_ENUM) | TFF_TEMPLATE_NAME
                    | (flags & TFF_DECL_SPECIFIERS ? TFF_CLASS_KEY_OR_ENUM : 0));
@@ -1075,7 +1094,7 @@ dump_template_decl (t, flags)
 /* Pretty print a function decl. There are several ways we want to print a
    function declaration. The TFF_ bits in FLAGS tells us how to behave.
    As error can only apply the '#' flag once to give 0 and 1 for V, there
-   is %D which doesn't print the throw specs, and %F which does. */
+   is %D which doesn't print the throw specs, and %F which does.  */
 
 static void
 dump_function_decl (t, flags)
@@ -1169,7 +1188,7 @@ dump_function_decl (t, flags)
 
 /* Print a parameter list. If this is for a member function, the
    member object ptr (and any other hidden args) should have
-   already been removed. */
+   already been removed.  */
 
 static void
 dump_parameters (parmtypes, flags)
@@ -1203,7 +1222,7 @@ dump_parameters (parmtypes, flags)
   print_right_paren (scratch_buffer);
 }
 
-/* Print an exception specification. T is the exception specification. */
+/* Print an exception specification. T is the exception specification.  */
 
 static void
 dump_exception_spec (t, flags)
@@ -1235,6 +1254,9 @@ dump_function_name (t, flags)
      int flags;
 {
   tree name = DECL_NAME (t);
+
+  if (TREE_CODE (t) == TEMPLATE_DECL)
+    t = DECL_TEMPLATE_RESULT (t);
 
   /* Don't let the user see __comp_ctor et al.  */
   if (DECL_CONSTRUCTOR_P (t)
@@ -1416,13 +1438,16 @@ dump_expr_list (l, flags)
     }
 }
 
-/* Print out an expression E under control of FLAGS. */
+/* Print out an expression E under control of FLAGS.  */
 
 static void
 dump_expr (t, flags)
      tree t;
      int flags;
 {
+  if (t == 0)
+    return;
+  
   switch (TREE_CODE (t))
     {
     case VAR_DECL:
@@ -1433,6 +1458,7 @@ dump_expr (t, flags)
     case TEMPLATE_DECL:
     case NAMESPACE_DECL:
     case OVERLOAD:
+    case IDENTIFIER_NODE:
       dump_decl (t, flags & ~TFF_DECL_SPECIFIERS);
       break;
 
@@ -1472,7 +1498,11 @@ dump_expr (t, flags)
 	else if (type == char_type_node)
 	  {
 	    output_add_character (scratch_buffer, '\'');
-	    dump_char (tree_low_cst (t, 0));
+	    if (host_integerp (t, TREE_UNSIGNED (type)))
+	      dump_char (tree_low_cst (t, TREE_UNSIGNED (type)));
+	    else
+	      output_printf (scratch_buffer, "\\x%x",
+			     (unsigned int) TREE_INT_CST_LOW (t));
 	    output_add_character (scratch_buffer, '\'');
 	  }
 	else
@@ -1507,13 +1537,8 @@ dump_expr (t, flags)
       break;
 
     case REAL_CST:
-      {
-	const unsigned char *p = (const unsigned char *) &TREE_REAL_CST (t);
-	size_t i;
-	strcpy (digit_buffer, "0x");
-	for (i = 0; i < sizeof TREE_REAL_CST (t); i++)
-	  sprintf (digit_buffer + 2 + 2*i, "%02x", *p++);
-      }
+      real_to_decimal (digit_buffer, &TREE_REAL_CST (t),
+		       sizeof (digit_buffer), 0, 1);
       output_add_string (scratch_buffer, digit_buffer);
       break;
 
@@ -1822,14 +1847,10 @@ dump_expr (t, flags)
       dump_expr (TREE_OPERAND (t, 0), flags);
       break;
 
-    case EXPR_WITH_FILE_LOCATION:
-      dump_expr (EXPR_WFL_NODE (t), flags);
-      break;
-
     case CONSTRUCTOR:
       if (TREE_TYPE (t) && TYPE_PTRMEMFUNC_P (TREE_TYPE (t)))
 	{
-	  tree idx = build_component_ref (t, pfn_identifier, NULL_TREE, 0);
+	  tree idx = build_ptrmemfunc_access_expr (t, pfn_identifier);
 
 	  if (integer_zerop (idx))
 	    {
@@ -1882,7 +1903,8 @@ dump_expr (t, flags)
 	      /* A::f */
 	      dump_expr (t, flags | TFF_EXPR_IN_PARENS);
 	    else if (BASELINK_P (t))
-	      dump_expr (OVL_CURRENT (TREE_VALUE (t)), flags | TFF_EXPR_IN_PARENS);
+	      dump_expr (OVL_CURRENT (BASELINK_FUNCTIONS (t)), 
+			 flags | TFF_EXPR_IN_PARENS);
 	    else
 	      dump_decl (t, flags);
 	  }
@@ -1905,10 +1927,6 @@ dump_expr (t, flags)
 
     case TEMPLATE_PARM_INDEX:
       dump_decl (TEMPLATE_PARM_DECL (t), flags & ~TFF_DECL_SPECIFIERS);
-      break;
-
-    case IDENTIFIER_NODE:
-      print_tree_identifier (scratch_buffer, t);
       break;
 
     case SCOPE_REF:
@@ -2025,12 +2043,10 @@ dump_expr (t, flags)
       output_add_string (scratch_buffer, ") break; ");
       break;
 
-    case TREE_LIST:
-      if (TREE_VALUE (t) && TREE_CODE (TREE_VALUE (t)) == FUNCTION_DECL)
-	{
-	  print_tree_identifier (scratch_buffer, DECL_NAME (TREE_VALUE (t)));
-	  break;
-	}
+    case BASELINK:
+      print_tree_identifier (scratch_buffer, DECL_NAME (get_first_fn (t)));
+      break;
+
       /* else fall through */
 
       /*  This list is incomplete, but should suffice for now.
@@ -2159,13 +2175,13 @@ cp_file_of (t)
      tree t;
 {
   if (TREE_CODE (t) == PARM_DECL && DECL_CONTEXT (t))
-    return DECL_SOURCE_FILE (DECL_CONTEXT (t));
+    return TREE_FILENAME (DECL_CONTEXT (t));
   else if (TYPE_P (t))
-    return DECL_SOURCE_FILE (TYPE_MAIN_DECL (t));
+    return TREE_FILENAME (TYPE_MAIN_DECL (t));
   else if (TREE_CODE (t) == OVERLOAD)
-    return DECL_SOURCE_FILE (OVL_FUNCTION (t));
+    return TREE_FILENAME (OVL_FUNCTION (t));
   else
-    return DECL_SOURCE_FILE (t);
+    return TREE_FILENAME (t);
 }
 
 int
@@ -2174,17 +2190,17 @@ cp_line_of (t)
 {
   int line = 0;
   if (TREE_CODE (t) == PARM_DECL && DECL_CONTEXT (t))
-    line = DECL_SOURCE_LINE (DECL_CONTEXT (t));
+    line = TREE_LINENO (DECL_CONTEXT (t));
   if (TREE_CODE (t) == TYPE_DECL && DECL_ARTIFICIAL (t)
       && TYPE_MAIN_DECL (TREE_TYPE (t)))
     t = TREE_TYPE (t);
 
   if (TYPE_P (t))
-    line = DECL_SOURCE_LINE (TYPE_MAIN_DECL (t));
+    line = TREE_LINENO (TYPE_MAIN_DECL (t));
   else if (TREE_CODE (t) == OVERLOAD)
-    line = DECL_SOURCE_LINE (OVL_FUNCTION (t));
+    line = TREE_LINENO (OVL_FUNCTION (t));
   else
-    line = DECL_SOURCE_LINE (t);
+    line = TREE_LINENO (t);
 
   if (line == 0)
     return lineno;
@@ -2484,8 +2500,8 @@ print_instantiation_full_context (context)
                              decl_as_string (TINST_DECL (p),
                                              TFF_DECL_SPECIFIERS | TFF_RETURN_TYPE));
 
-	  line = TINST_LINE (p);
-	  file = TINST_FILE (p);
+	  line = TREE_LINENO (p);
+	  file = TREE_FILENAME (p);
 	  p = TREE_CHAIN (p);
 	}
     }
@@ -2506,8 +2522,8 @@ print_instantiation_partial_context (context, t, file, line)
       output_verbatim
         (&context->buffer, "%s:%d:   instantiated from `%s'\n", file, line,
          decl_as_string (TINST_DECL (t), TFF_DECL_SPECIFIERS | TFF_RETURN_TYPE));
-      line = TINST_LINE (t);
-      file = TINST_FILE (t);
+      line = TREE_LINENO (t);
+      file = TREE_FILENAME (t);
     }
   output_verbatim (&context->buffer, "%s:%d:   instantiated from here\n", file, line);
 }

@@ -23,6 +23,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "rtl.h"
 #include "regs.h"
@@ -93,6 +95,9 @@ static bool arc_assemble_integer PARAMS ((rtx, unsigned int, int));
 static void arc_output_function_prologue PARAMS ((FILE *, HOST_WIDE_INT));
 static void arc_output_function_epilogue PARAMS ((FILE *, HOST_WIDE_INT));
 static void arc_encode_section_info PARAMS ((tree, int));
+static void arc_internal_label PARAMS ((FILE *, const char *, unsigned long));
+static bool arc_rtx_costs PARAMS ((rtx, int, int, int *));
+static int arc_address_cost PARAMS ((rtx));
 
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_ALIGNED_HI_OP
@@ -110,13 +115,20 @@ static void arc_encode_section_info PARAMS ((tree, int));
 #define TARGET_ATTRIBUTE_TABLE arc_attribute_table
 #undef TARGET_ENCODE_SECTION_INFO
 #define TARGET_ENCODE_SECTION_INFO arc_encode_section_info
+#undef TARGET_ASM_INTERNAL_LABEL
+#define TARGET_ASM_INTERNAL_LABEL arc_internal_label
+
+#undef TARGET_RTX_COSTS
+#define TARGET_RTX_COSTS arc_rtx_costs
+#undef TARGET_ADDRESS_COST
+#define TARGET_ADDRESS_COST arc_address_cost
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 /* Called by OVERRIDE_OPTIONS to initialize various things.  */
 
 void
-arc_init (void)
+arc_init ()
 {
   char *tmp;
   
@@ -802,12 +814,8 @@ arc_setup_incoming_varargs (cum, mode, type, pretend_size, no_rtl)
   if (mode == BLKmode)
     abort ();
 
-  /* We must treat `__builtin_va_alist' as an anonymous arg.  */
-  if (current_function_varargs)
-    first_anon_arg = *cum;
-  else
-    first_anon_arg = *cum + ((GET_MODE_SIZE (mode) + UNITS_PER_WORD - 1)
-			     / UNITS_PER_WORD);
+  first_anon_arg = *cum + ((GET_MODE_SIZE (mode) + UNITS_PER_WORD - 1)
+			   / UNITS_PER_WORD);
 
   if (first_anon_arg < MAX_ARC_PARM_REGS && !no_rtl)
     {
@@ -837,18 +845,75 @@ arc_setup_incoming_varargs (cum, mode, type, pretend_size, no_rtl)
 
 /* Cost functions.  */
 
+/* Compute a (partial) cost for rtx X.  Return true if the complete
+   cost has been computed, and false if subexpressions should be
+   scanned.  In either case, *TOTAL contains the cost result.  */
+
+static bool
+arc_rtx_costs (x, code, outer_code, total)
+     rtx x;
+     int code;
+     int outer_code ATTRIBUTE_UNUSED;
+     int *total;
+{
+  switch (code)
+    {
+      /* Small integers are as cheap as registers.  4 byte values can
+	 be fetched as immediate constants - let's give that the cost
+	 of an extra insn.  */
+    case CONST_INT:
+      if (SMALL_INT (INTVAL (x)))
+	{
+	  *total = 0;
+	  return true;
+	}
+      /* FALLTHRU */
+
+    case CONST:
+    case LABEL_REF:
+    case SYMBOL_REF:
+      *total = COSTS_N_INSNS (1);
+      return true;
+
+    case CONST_DOUBLE:
+      {
+        rtx high, low;
+        split_double (x, &high, &low);
+	*total = COSTS_N_INSNS (!SMALL_INT (INTVAL (high))
+				+ !SMALL_INT (INTVAL (low)));
+	return true;
+      }
+
+    /* Encourage synth_mult to find a synthetic multiply when reasonable.
+       If we need more than 12 insns to do a multiply, then go out-of-line,
+       since the call overhead will be < 10% of the cost of the multiply.  */
+    case ASHIFT:
+    case ASHIFTRT:
+    case LSHIFTRT:
+      if (TARGET_SHIFTER)
+        *total = COSTS_N_INSNS (1);
+      else if (GET_CODE (XEXP (x, 1)) != CONST_INT)
+        *total = COSTS_N_INSNS (16);
+      else
+        *total = COSTS_N_INSNS (INTVAL (XEXP ((x), 1)));
+      return false;
+
+    default:
+      return false;
+    }
+}
+
+
 /* Provide the costs of an addressing mode that contains ADDR.
    If ADDR is not a valid address, its cost is irrelevant.  */
 
-int
+static int
 arc_address_cost (addr)
      rtx addr;
 {
   switch (GET_CODE (addr))
     {
     case REG :
-      /* This is handled in the macro that calls us.
-	 It's here for documentation.  */
       return 1;
 
     case LABEL_REF :
@@ -1557,24 +1622,24 @@ output_shift (operands)
 	      output_asm_insn ("sr %4,[lp_end]", operands);
 	      output_asm_insn ("nop\n\tnop", operands);
 	      if (flag_pic)
-		asm_fprintf (asm_out_file, "\t%s single insn loop\n",
-			     ASM_COMMENT_START);
+		fprintf (asm_out_file, "\t%s single insn loop\n",
+			 ASM_COMMENT_START);
 	      else
-		asm_fprintf (asm_out_file, "1:\t%s single insn loop\n",
-			     ASM_COMMENT_START);
+		fprintf (asm_out_file, "1:\t%s single insn loop\n",
+			 ASM_COMMENT_START);
 	      output_asm_insn (shift_one, operands);
 	    }
 	  else 
 	    {
-	      asm_fprintf (asm_out_file, "1:\t%s begin shift loop\n",
-			   ASM_COMMENT_START);
+	      fprintf (asm_out_file, "1:\t%s begin shift loop\n",
+		       ASM_COMMENT_START);
 	      output_asm_insn ("sub.f %4,%4,1", operands);
 	      output_asm_insn ("nop", operands);
 	      output_asm_insn ("bn.nd 2f", operands);
 	      output_asm_insn (shift_one, operands);
 	      output_asm_insn ("b.nd 1b", operands);
-	      asm_fprintf (asm_out_file, "2:\t%s end shift loop\n",
-			   ASM_COMMENT_START);
+	      fprintf (asm_out_file, "2:\t%s end shift loop\n",
+		       ASM_COMMENT_START);
 	    }
 	}
     }
@@ -1745,14 +1810,13 @@ arc_print_operand (file, x, code)
       return;
     case 'A' :
       {
-	REAL_VALUE_TYPE d;
 	char str[30];
 
 	if (GET_CODE (x) != CONST_DOUBLE
 	    || GET_MODE_CLASS (GET_MODE (x)) != MODE_FLOAT)
 	  abort ();
-	REAL_VALUE_FROM_CONST_DOUBLE (d, x);
-	REAL_VALUE_TO_DECIMAL (d, "%.20e", str);
+
+	real_to_decimal (str, CONST_DOUBLE_REAL_VALUE (x), sizeof (str), 0, 1);
 	fprintf (file, "%s", str);
 	return;
       }
@@ -1927,7 +1991,7 @@ record_cc_ref (insn)
    0 -> 2 final_prescan_insn, if the `target' is an unconditional branch
    1 -> 3 branch patterns, after having not output the conditional branch
    2 -> 4 branch patterns, after having not output the conditional branch
-   3 -> 0 ASM_OUTPUT_INTERNAL_LABEL, if the `target' label is reached
+   3 -> 0 (*targetm.asm_out.internal_label), if the `target' label is reached
           (the target label has CODE_LABEL_NUMBER equal to
 	  arc_ccfsm_target_label).
    4 -> 0 final_prescan_insn, if `target' unconditional branch is reached
@@ -2223,7 +2287,7 @@ arc_final_prescan_insn (insn, opvec, noperands)
 /* Record that we are currently outputting label NUM with prefix PREFIX.
    It it's the label we're looking for, reset the ccfsm machinery.
 
-   Called from ASM_OUTPUT_INTERNAL_LABEL.  */
+   Called from (*targetm.asm_out.internal_label).  */
 
 void
 arc_ccfsm_at_label (prefix, num)
@@ -2265,8 +2329,7 @@ arc_ccfsm_record_branch_deleted ()
 }
 
 void
-arc_va_start (stdarg_p, valist, nextarg)
-     int stdarg_p;
+arc_va_start (valist, nextarg)
      tree valist;
      rtx nextarg;
 {
@@ -2275,7 +2338,7 @@ arc_va_start (stdarg_p, valist, nextarg)
       && (current_function_args_info & 1))
     nextarg = plus_constant (nextarg, UNITS_PER_WORD);
 
-  std_expand_builtin_va_start (stdarg_p, valist, nextarg);
+  std_expand_builtin_va_start (valist, nextarg);
 }
 
 rtx
@@ -2363,4 +2426,17 @@ arc_encode_section_info (decl, first)
 {
   if (TREE_CODE (decl) == FUNCTION_DECL)
     SYMBOL_REF_FLAG (XEXP (DECL_RTL (decl), 0)) = 1;
+}
+
+/* This is how to output a definition of an internal numbered label where
+   PREFIX is the class of label and NUM is the number within the class.  */
+
+static void
+arc_internal_label (stream, prefix, labelno)
+     FILE *stream;
+     const char *prefix;
+     unsigned long labelno;
+{
+  arc_ccfsm_at_label (prefix, labelno);
+  default_internal_label (stream, prefix, labelno);
 }

@@ -22,6 +22,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "real.h"
 #include "ggc.h"
@@ -48,8 +50,7 @@ void
 debug_tree (node)
      tree node;
 {
-  table = (struct bucket **) permalloc (HASH_SIZE * sizeof (struct bucket *));
-  memset ((char *) table, 0, HASH_SIZE * sizeof (struct bucket *));
+  table = (struct bucket **) xcalloc (HASH_SIZE, sizeof (struct bucket *));
   print_node (stderr, "", node, 0);
   table = 0;
   fprintf (stderr, "\n");
@@ -132,9 +133,8 @@ print_node_brief (file, prefix, node, indent)
 	fprintf (file, " Nan");
       else
 	{
-	  char string[100];
-
-	  REAL_VALUE_TO_DECIMAL (d, "%e", string);
+	  char string[60];
+	  real_to_decimal (string, &d, sizeof (string), 0, 1);
 	  fprintf (file, " %s", string);
 	}
     }
@@ -195,7 +195,7 @@ print_node (file, prefix, node, indent)
       return;
     }
 
-  /* It is unsafe to look at any other filds of an ERROR_MARK node.  */
+  /* It is unsafe to look at any other fields of an ERROR_MARK node.  */
   if (TREE_CODE (node) == ERROR_MARK)
     {
       print_node_brief (file, prefix, node, indent);
@@ -213,7 +213,7 @@ print_node (file, prefix, node, indent)
       }
 
   /* Add this node to the table.  */
-  b = (struct bucket *) permalloc (sizeof (struct bucket));
+  b = (struct bucket *) xmalloc (sizeof (struct bucket));
   b->node = node;
   b->next = table[hash];
   table[hash] = b;
@@ -286,6 +286,8 @@ print_node (file, prefix, node, indent)
     fputs (" static", file);
   if (TREE_DEPRECATED (node))
     fputs (" deprecated", file);
+  if (TREE_VISITED (node))
+    fputs (" visited", file);
   if (TREE_LANG_FLAG_0 (node))
     fputs (" tree_0", file);
   if (TREE_LANG_FLAG_1 (node))
@@ -383,7 +385,7 @@ print_node (file, prefix, node, indent)
 
       fprintf (file, " %s", GET_MODE_NAME (mode));
       fprintf (file, " file %s line %d",
-	       DECL_SOURCE_FILE (node), DECL_SOURCE_LINE (node));
+	       TREE_FILENAME (node), TREE_LINENO (node));
 
       print_node (file, "size", DECL_SIZE (node), indent + 4);
       print_node (file, "unit size", DECL_SIZE_UNIT (node), indent + 4);
@@ -509,6 +511,9 @@ print_node (file, prefix, node, indent)
       if (TYPE_PACKED (node))
 	fputs (" packed", file);
 
+      if (TYPE_RESTRICT (node))
+	fputs (" restrict", file);
+
       if (TYPE_LANG_FLAG_0 (node))
 	fputs (" type_0", file);
       if (TYPE_LANG_FLAG_1 (node))
@@ -633,14 +638,6 @@ print_node (file, prefix, node, indent)
 	    }
 	}
 
-      if (TREE_CODE (node) == EXPR_WITH_FILE_LOCATION)
-	{
-	  indent_to (file, indent+4);
-	  fprintf (file, "%s:%d:%d",
-		   (EXPR_WFL_FILENAME_NODE (node ) ?
-		    EXPR_WFL_FILENAME (node) : "(no file info)"),
-		   EXPR_WFL_LINENO (node), EXPR_WFL_COLNO (node));
-	}
       print_node (file, "chain", TREE_CHAIN (node), indent + 4);
       break;
 
@@ -682,9 +679,8 @@ print_node (file, prefix, node, indent)
 	      fprintf (file, " Nan");
 	    else
 	      {
-		char string[100];
-
-		REAL_VALUE_TO_DECIMAL (d, "%e", string);
+		char string[64];
+		real_to_decimal (string, &d, sizeof (string), 0, 1);
 		fprintf (file, " %s", string);
 	      }
 	  }
@@ -712,7 +708,20 @@ print_node (file, prefix, node, indent)
 	  break;
 
 	case STRING_CST:
-	  fprintf (file, " \"%s\"", TREE_STRING_POINTER (node));
+	  {
+	    const char *p = TREE_STRING_POINTER (node);
+	    int i = TREE_STRING_LENGTH (node);
+	    fputs (" \"", file);
+	    while (--i >= 0)
+	      {
+		char ch = *p++;
+		if (ch >= ' ' && ch < 127)
+		  putc (ch, file);
+		else
+		  fprintf(file, "\\%03o", ch & 0xFF);
+	      }
+	    fputc ('\"', file);
+	  }
 	  /* Print the chain at second level.  */
 	  if (indent == 4)
 	    print_node (file, "chain", TREE_CHAIN (node), indent + 4);
@@ -749,6 +758,14 @@ print_node (file, prefix, node, indent)
 	}
 
       break;
+    }
+
+  if (TREE_LOCUS (node) && TREE_FILENAME (node))
+    {
+      indent_to (file, indent+4);
+      fprintf (file, "%s:%d",
+	       TREE_FILENAME (node),
+	       TREE_LINENO (node));
     }
 
   fprintf (file, ">");

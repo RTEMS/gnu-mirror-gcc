@@ -1,6 +1,6 @@
 // 2001-05-21 Benjamin Kosnik  <bkoz@redhat.com>
 
-// Copyright (C) 2001, 2002 Free Software Foundation, Inc.
+// Copyright (C) 2001, 2002, 2003 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -21,6 +21,7 @@
 // 27.8.1.4 Overridden virtual functions
 
 #include <fstream>
+#include <locale>
 #include <testsuite_hooks.h>
 
 // @require@ %-*.tst %-*.txt
@@ -514,53 +515,27 @@ void test06()
   VERIFY( buffer[0] == 'a' );
 }
 
-// test06
-// libstdc++/2020
-// should be able to use custom char_type
-class gnu_char_type
-{
-  unsigned long character;
-public:
-  // operator ==
-  bool
-  operator==(const gnu_char_type& __lhs) 
-  { return character == __lhs.character; }
-
-  // operator <
-  bool
-  operator<(const gnu_char_type& __lhs) 
-  { return character < __lhs.character; }
-
-  // default ctor
-  gnu_char_type() { }
-
-  // to_char_type
-  gnu_char_type(const unsigned long& __l) : character(__l) { } 
-
-  // to_int_type
-  operator unsigned long() const { return character; }
-};
-
+// libstdc++/9322
 void test07()
 {
+  using std::locale;
   bool test = true;
-  typedef std::basic_filebuf<gnu_char_type> gnu_filebuf;
-  
-  try
-    { gnu_filebuf obj; }
-  catch(std::exception& obj)
-    { 
-      test = false; 
-      VERIFY( test );
-    }
-}
 
-#if !__GXX_WEAK__
-// Explicitly instantiate for systems with no COMDAT or weak support.
-template 
-  std::basic_streambuf<gnu_char_type>::int_type
-  std::basic_streambuf<gnu_char_type>::_S_pback_size;
-#endif
+  locale loc;
+  std::filebuf ob;
+  VERIFY( ob.getloc() == loc );
+
+  locale::global(locale("en_US"));
+  VERIFY( ob.getloc() == loc );
+
+  locale loc_de ("de_DE");
+  locale ret = ob.pubimbue(loc_de);
+  VERIFY( ob.getloc() == loc_de );
+  VERIFY( ret == loc );
+
+  locale::global(loc);
+  VERIFY( ob.getloc() == loc_de );
+}
 
 main() 
 {
@@ -571,7 +546,7 @@ main()
   test04();
   test05();
   test06();
-  test07();
 
+  test07();
   return 0;
 }

@@ -1,5 +1,5 @@
 /* Prototypes for exported functions defined in arm.c and pe.c
-   Copyright (C) 1999, 2000, 2001 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
    Contributed by Richard Earnshaw (rearnsha@arm.com)
    Minor hacks by Nick Clifton (nickc@cygnus.com)
 
@@ -31,26 +31,33 @@ extern void   arm_finalize_pic		PARAMS ((int));
 extern int    arm_volatile_func		PARAMS ((void));
 extern const char * arm_output_epilogue	PARAMS ((int));
 extern void   arm_expand_prologue	PARAMS ((void));
+extern HOST_WIDE_INT arm_get_frame_size	PARAMS ((void));
 /* Used in arm.md, but defined in output.c.  */
 extern void   assemble_align		PARAMS ((int)); 
 extern const char * arm_strip_name_encoding	PARAMS ((const char *));
+extern void   arm_asm_output_labelref	PARAMS ((FILE *, const char *));
 extern unsigned long arm_current_func_type	PARAMS ((void));
 extern unsigned int  arm_compute_initial_elimination_offset PARAMS ((unsigned int, unsigned int));
 
 #ifdef TREE_CODE
 extern int    arm_return_in_memory	PARAMS ((tree));
 extern void   arm_encode_call_attribute	PARAMS ((tree, int));
-extern int    arm_function_ok_for_sibcall PARAMS ((tree));
 #endif
 #ifdef RTX_CODE
-extern int    arm_hard_regno_mode_ok	PARAMS ((unsigned int, enum machine_mode));
+extern int    arm_hard_regno_mode_ok	PARAMS ((unsigned int,
+						enum machine_mode));
 extern int    const_ok_for_arm		PARAMS ((HOST_WIDE_INT));
 extern int    arm_split_constant	PARAMS ((RTX_CODE, enum machine_mode,
 						HOST_WIDE_INT, rtx, rtx, int));
 extern RTX_CODE arm_canonicalize_comparison PARAMS ((RTX_CODE, rtx *));
 extern int    legitimate_pic_operand_p	PARAMS ((rtx));
 extern rtx    legitimize_pic_address	PARAMS ((rtx, enum machine_mode, rtx));
-extern int    arm_rtx_costs		PARAMS ((rtx, RTX_CODE, RTX_CODE));
+extern int    arm_legitimate_address_p  PARAMS ((enum machine_mode, rtx, int));
+extern int    thumb_legitimate_address_p PARAMS ((enum machine_mode, rtx,
+						  int));
+extern int    thumb_legitimate_offset_p	PARAMS ((enum machine_mode,
+						 HOST_WIDE_INT));
+extern rtx    arm_legitimize_address	PARAMS ((rtx, rtx, enum machine_mode));
 extern int    const_double_rtx_ok_for_fpu	PARAMS ((rtx));
 extern int    neg_const_double_rtx_ok_for_fpu	PARAMS ((rtx));
 
@@ -106,6 +113,7 @@ extern int    arm_gen_movstrqi		PARAMS ((rtx *));
 extern rtx    arm_gen_rotated_half_load	PARAMS ((rtx));
 extern enum machine_mode arm_select_cc_mode PARAMS ((RTX_CODE, rtx, rtx));
 extern rtx    arm_gen_compare_reg	PARAMS ((RTX_CODE, rtx, rtx));
+extern rtx    arm_gen_return_addr_mask	PARAMS ((void));
 extern void   arm_reload_in_hi		PARAMS ((rtx *));
 extern void   arm_reload_out_hi		PARAMS ((rtx *));
 extern void   arm_reorg			PARAMS ((rtx));
@@ -121,7 +129,8 @@ extern const char * output_move_double	PARAMS ((rtx *));
 extern const char * output_mov_immediate PARAMS ((rtx *));
 extern const char * output_add_immediate PARAMS ((rtx *));
 extern const char * arithmetic_instr	PARAMS ((rtx, int));
-extern void   output_ascii_pseudo_op	PARAMS ((FILE *, const unsigned char *, int));
+extern void   output_ascii_pseudo_op	PARAMS ((FILE *, const unsigned char *,
+						int));
 extern const char * output_return_instruction PARAMS ((rtx, int, int));
 extern void   arm_poke_function_name	PARAMS ((FILE *, const char *));
 extern void   arm_print_operand		PARAMS ((FILE *, rtx, int));
@@ -136,6 +145,11 @@ extern rtx    arm_function_arg		PARAMS ((CUMULATIVE_ARGS *,
 						enum machine_mode, tree, int));
 extern void   arm_init_cumulative_args	PARAMS ((CUMULATIVE_ARGS *, tree, rtx,
 						int));
+extern rtx    arm_va_arg                PARAMS ((tree, tree));
+extern int    arm_function_arg_pass_by_reference PARAMS ((CUMULATIVE_ARGS *,
+							 enum machine_mode,
+						         tree, int));
+
 #endif
 
 #if defined AOF_ASSEMBLER 
@@ -152,10 +166,13 @@ extern void   common_section		PARAMS ((void));
 
 #endif /* RTX_CODE */
 
+extern int    arm_float_words_big_endian PARAMS ((void));
+
 /* Thumb functions.  */
 extern void   arm_init_expanders	PARAMS ((void));
 extern int    thumb_far_jump_used_p	PARAMS ((int));
 extern const char * thumb_unexpanded_epilogue	PARAMS ((void));
+extern HOST_WIDE_INT thumb_get_frame_size PARAMS ((void));
 extern void   thumb_expand_prologue	PARAMS ((void));
 extern void   thumb_expand_epilogue	PARAMS ((void));
 #ifdef TREE_CODE
@@ -198,10 +215,8 @@ extern rtx arm_expand_builtin		PARAMS ((tree, rtx, rtx,
 					       enum machine_mode, int));
 #endif
 
-#ifdef GCC_C_PRAGMA_H  /* included from code that cares about pragmas */
-extern void arm_pr_long_calls		PARAMS ((cpp_reader *));
-extern void arm_pr_no_long_calls	PARAMS ((cpp_reader *));
-extern void arm_pr_long_calls_off	PARAMS ((cpp_reader *));
-#endif
+extern void arm_pr_long_calls		PARAMS ((struct cpp_reader *));
+extern void arm_pr_no_long_calls	PARAMS ((struct cpp_reader *));
+extern void arm_pr_long_calls_off	PARAMS ((struct cpp_reader *));
 
 #endif /* ! GCC_ARM_PROTOS_H */

@@ -20,6 +20,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "flags.h"
 #include "hard-reg-set.h"
@@ -218,17 +220,30 @@ void
 sbitmap_difference (dst, a, b)
      sbitmap dst, a, b;
 {
-  unsigned int i, n = dst->size;
+  unsigned int i, dst_size = dst->size;
+  unsigned int min_size = dst->size;
   sbitmap_ptr dstp = dst->elms;
   sbitmap_ptr ap = a->elms;
   sbitmap_ptr bp = b->elms;
-
-  for (i = 0; i < n; i++)
-    *dstp++ = *ap++ & ~*bp++;
+  
+  /* A should be at least as large as DEST, to have a defined source.  */
+  if (a->size < dst_size)
+    abort ();
+  /* If minuend is smaller, we simply pretend it to be zero bits, i.e.
+     only copy the subtrahend into dest.  */
+  if (b->size < min_size)
+    min_size = b->size;
+  for (i = 0; i < min_size; i++)
+    *dstp++ = *ap++ & (~*bp++);
+  /* Now fill the rest of dest from A, if B was too short.
+     This makes sense only when destination and A differ.  */
+  if (dst != a && i != dst_size)
+    for (; i < dst_size; i++)
+      *dstp++ = *ap++;
 }
 
 /* Set DST to be (A and B).
-   Return non-zero if any change is made.  */
+   Return nonzero if any change is made.  */
 
 bool
 sbitmap_a_and_b_cg (dst, a, b)
@@ -264,7 +279,7 @@ sbitmap_a_and_b (dst, a, b)
 }
 
 /* Set DST to be (A xor B)).
-   Return non-zero if any change is made.  */
+   Return nonzero if any change is made.  */
 
 bool
 sbitmap_a_xor_b_cg (dst, a, b)
@@ -300,7 +315,7 @@ sbitmap_a_xor_b (dst, a, b)
 }
 
 /* Set DST to be (A or B)).
-   Return non-zero if any change is made.  */
+   Return nonzero if any change is made.  */
 
 bool
 sbitmap_a_or_b_cg (dst, a, b)
@@ -335,7 +350,7 @@ sbitmap_a_or_b (dst, a, b)
     *dstp++ = *ap++ | *bp++;
 }
 
-/* Return non-zero if A is a subset of B.  */
+/* Return nonzero if A is a subset of B.  */
 
 bool
 sbitmap_a_subset_b_p (a, b)
@@ -352,7 +367,7 @@ sbitmap_a_subset_b_p (a, b)
 }
 
 /* Set DST to be (A or (B and C)).
-   Return non-zero if any change is made.  */
+   Return nonzero if any change is made.  */
 
 bool
 sbitmap_a_or_b_and_c_cg (dst, a, b, c)
@@ -390,7 +405,7 @@ sbitmap_a_or_b_and_c (dst, a, b, c)
 }
 
 /* Set DST to be (A and (B or C)).
-   Return non-zero if any change is made.  */
+   Return nonzero if any change is made.  */
 
 bool
 sbitmap_a_and_b_or_c_cg (dst, a, b, c)
@@ -658,27 +673,35 @@ dump_sbitmap (file, bmap)
 }
 
 void
-debug_sbitmap (bmap)
+dump_sbitmap_file (file, bmap)
+     FILE *file;
      sbitmap bmap;
 {
   unsigned int i, pos;
 
-  fprintf (stderr, "n_bits = %d, set = {", bmap->n_bits);
+  fprintf (file, "n_bits = %d, set = {", bmap->n_bits);
 
   for (pos = 30, i = 0; i < bmap->n_bits; i++)
     if (TEST_BIT (bmap, i))
       {
 	if (pos > 70)
 	  {
-	    fprintf (stderr, "\n");
+	    fprintf (file, "\n  ");
 	    pos = 0;
 	  }
 
-	fprintf (stderr, "%d ", i);
-	pos += 1 + (i >= 10) + (i >= 100);
+	fprintf (file, "%d ", i);
+	pos += 2 + (i >= 10) + (i >= 100) + (i >= 1000);
       }
 
-  fprintf (stderr, "}\n");
+  fprintf (file, "}\n");
+}
+
+void
+debug_sbitmap (bmap)
+     sbitmap bmap;
+{
+  dump_sbitmap_file (stderr, bmap);
 }
 
 void

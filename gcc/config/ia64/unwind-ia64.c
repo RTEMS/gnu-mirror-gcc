@@ -143,7 +143,7 @@ typedef struct unw_state_record
   unsigned int any_spills : 1;		/* got any register spills? */
   unsigned int in_body : 1;	/* are we inside a body? */
   unsigned int no_reg_stack_frame : 1;	/* Don't adjust bsp for i&l regs */
-  unsigned char *imask;		/* imask of of spill_mask record or NULL */
+  unsigned char *imask;		/* imask of spill_mask record or NULL */
   unsigned long pr_val;		/* predicate values */
   unsigned long pr_mask;	/* predicate mask */
   long spill_offset;		/* psp-relative offset for spill base */
@@ -1465,7 +1465,7 @@ ia64_rse_rnat_addr (unsigned long *slot_addr)
   return (unsigned long *) ((unsigned long) slot_addr | (0x3f << 3));
 }
 
-/* Calcuate the number of registers in the dirty partition starting at
+/* Calculate the number of registers in the dirty partition starting at
    BSPSTORE with a size of DIRTY bytes.  This isn't simply DIRTY
    divided by eight because the 64th slot is used to store ar.rnat.  */
 static inline unsigned long
@@ -1640,6 +1640,12 @@ _Unwind_Ptr
 _Unwind_GetRegionStart (struct _Unwind_Context *context)
 {
   return context->region_start;
+}
+
+void *
+_Unwind_FindEnclosingFunction (void *pc)
+{
+  return NULL;
 }
 
 

@@ -25,18 +25,13 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
 typedef struct ht_identifier ht_identifier;
 struct ht_identifier GTY(())
 {
-  unsigned int len;
   const unsigned char *str;
+  unsigned int len;
 };
 
 #define HT_LEN(NODE) ((NODE)->len)
 #define HT_STR(NODE) ((NODE)->str)
 
-/* We want code outside cpplib, such as the compiler front-ends, to be
-   able to include this header, and to be able to link with
-   cpphashtbl.o without pulling in any other parts of cpplib.  */
-
-struct cpp_reader;
 typedef struct ht hash_table;
 typedef struct ht_identifier *hashnode;
 
@@ -65,7 +60,7 @@ struct ht
 
 extern void gcc_obstack_init PARAMS ((struct obstack *));
 
-/* Initialise the hashtable with 2 ^ order entries.  */
+/* Initialize the hashtable with 2 ^ order entries.  */
 extern hash_table *ht_create PARAMS ((unsigned int order));
 
 /* Frees all memory associated with a hash table.  */

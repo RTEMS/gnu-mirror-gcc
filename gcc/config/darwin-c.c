@@ -22,6 +22,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "cpplib.h"
 #include "tree.h"
 #include "c-pragma.h"
@@ -90,7 +92,7 @@ void
 darwin_pragma_options (pfile)
      cpp_reader *pfile ATTRIBUTE_UNUSED;
 {
-  char *arg;
+  const char *arg;
   tree t, x;
 
   if (c_lex (&t) != CPP_NAME)

@@ -1,6 +1,6 @@
 /* RTL utility routines.
-   Copyright (C) 1987, 1988, 1991, 1994, 1997, 1998, 1999, 2000, 2001, 2002
-   Free Software Foundation, Inc.
+   Copyright (C) 1987, 1988, 1991, 1994, 1997, 1998, 1999, 2000, 2001, 2002,
+   2003 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -21,6 +21,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "real.h"
 #include "ggc.h"
@@ -152,7 +154,7 @@ const enum machine_mode class_narrowest_mode[(int) MAX_MODE_CLASS] = {
     /* MODE_CC */		CCmode,
     /* MODE_COMPLEX_INT */	CQImode,
     /* MODE_COMPLEX_FLOAT */	QCmode,
-    /* MODE_VECTOR_INT */	V2QImode,
+    /* MODE_VECTOR_INT */	V1DImode,
     /* MODE_VECTOR_FLOAT */	V2SFmode
 };
 
@@ -186,6 +188,7 @@ const char * const rtx_format[NUM_RTX_CODE] = {
      "u" a pointer to another insn
          prints the uid of the insn.
      "b" is a pointer to a bitmap header.
+     "B" is a basic block pointer.
      "t" is a tree pointer.  */
 
 #define DEF_RTL_EXPR(ENUM, NAME, FORMAT, CLASS)   FORMAT ,
@@ -386,44 +389,14 @@ rtx
 shallow_copy_rtx (orig)
      rtx orig;
 {
-  int i;
   RTX_CODE code = GET_CODE (orig);
-  rtx copy = rtx_alloc (code);
+  size_t n = GET_RTX_LENGTH (code);
+  rtx copy = ggc_alloc_rtx (n);
 
-  PUT_MODE (copy, GET_MODE (orig));
-  RTX_FLAG (copy, in_struct) = RTX_FLAG (orig, in_struct);
-  RTX_FLAG (copy, volatil) = RTX_FLAG (orig, volatil);
-  RTX_FLAG (copy, unchanging) = RTX_FLAG (orig, unchanging);
-  RTX_FLAG (copy, integrated) = RTX_FLAG (orig, integrated);
-  RTX_FLAG (copy, frame_related) = RTX_FLAG (orig, frame_related);
-
-  for (i = 0; i < GET_RTX_LENGTH (code); i++)
-    copy->fld[i] = orig->fld[i];
+  memcpy (copy, orig,
+	  sizeof (struct rtx_def) + sizeof (rtunion) * (n - 1));
 
   return copy;
-}
-
-/* Return the alignment of MODE. This will be bounded by 1 and
-   BIGGEST_ALIGNMENT.  */
-
-unsigned int
-get_mode_alignment (mode)
-     enum machine_mode mode;
-{
-  unsigned int alignment;
-
-  if (GET_MODE_CLASS (mode) == MODE_COMPLEX_FLOAT
-      || GET_MODE_CLASS (mode) == MODE_COMPLEX_INT)
-    alignment = GET_MODE_UNIT_SIZE (mode);
-  else
-    alignment = GET_MODE_SIZE (mode);
-
-  /* Extract the LSB of the size.  */
-  alignment = alignment & -alignment;
-  alignment *= BITS_PER_UNIT;
-
-  alignment = MIN (BIGGEST_ALIGNMENT, MAX (1, alignment));
-  return alignment;
 }
 
 /* This is 1 until after the rtl generation pass.  */

@@ -1,3 +1,65 @@
+2003-01-26  Daniel Jacobowitz  <drow@mvista.com>
+
+	* hashtab.h (htab_alloc_with_arg, htab_free_with_arg): Add new types.
+	(struct htab): Add alloc_arg, alloc_with_arg_f, free_with_arg_f.
+	(htab_create_alloc_ex): New prototype.
+	(htab_set_functions_ex): New prototype.
+
+2002-07-17  Geoffrey Keating  <geoffk@redhat.com>
+
+	* splay-tree.h (GTY): Define if undefined.
+	(splay_tree_allocate_fn): Return PTR for compatibility, not void *.
+	(struct splay_tree_node_s): Support gengtype.
+	(struct splay_tree_s): Likewise.  Make allocate_data a PTR,
+	not a void *.
+
+2002-11-23  Simon Burge  <simonb@wasabisystems.com>
+
+	* libiberty.h (basename): Add NetBSD to the list.
+
+2002-11-22  Daniel Jacobowitz  <drow@mvista.com>
+
+	* libiberty.h (make_relative_prefix): Add prototype.
+
+2002-10-26  Roger Sayle  <roger@eyesopen.com>
+
+	* partition.h:  Close the extern "C" scope when compiling with C++.
+
+2002-10-26  Roger Sayle  <roger@eyesopen.com>
+	    DJ Delorie <dj@redhat.com>
+
+	PR bootstrap/8351
+	* getopt.h: Avoid prototyping getopt with no arguments in C++.
+
+2002-10-24  Nathan Tallent  <eraxxon@alumni.rice.edu>
+
+	* ansidecl.h (__STDC__): Add (__alpha && __cplusplus) to the
+	list of	platform compilers that may look, smell and act
+	like __STDC__ but that may not define it.
+
+2002-10-11  David O'Brien  <obrien@FreeBSD.org>
+
+	* getopt.h: getopt is in unistd.h (based on SUSv2).
+
+2002-09-19  Alexandre Oliva  <aoliva@redhat.com>
+
+	* libiberty.h (asprintf, vasprintf): Don't declare them if the
+	corresponding HAVE_DECL_ macro is 1.
+
+2002-06-25  Alan Modra  <amodra@bigpond.net.au>
+
+	* demangle.h: #include "ansidecl.h" rather than #include <ansidecl.h>.
+	* fibheap.h: Likewise.
+	* hashtab.h: Likewise.
+	* partition.h: Likewise.
+	* sort.h: Likewise.
+	* splay-tree.h: Likewise.
+
+2002-06-24  Alan Modra  <amodra@bigpond.net.au>
+
+	* libiberty.h (basename): Don't declare if HAVE_DECL_BASENAME.
+	* getopt.h (getopt): Don't declare if HAVE_DECL_GETOPT.
+
 2002-06-06  DJ Delorie  <dj@redhat.com>
 
 	* hashtab.h (htab): Rearrange new members for backward

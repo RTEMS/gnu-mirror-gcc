@@ -1,5 +1,6 @@
 /* Alias analysis for GNU C
-   Copyright (C) 1997, 1998, 1999, 2000, 2001 Free Software Foundation, Inc.
+   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003
+   Free Software Foundation, Inc.
    Contributed by John Carr (jfc@mit.edu).
 
 This file is part of GCC.
@@ -21,6 +22,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "tree.h"
 #include "tm_p.h"
@@ -61,7 +64,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
    To see whether two alias sets can point to the same memory, we must
    see if either alias set is a subset of the other. We need not trace
-   past immediate descendents, however, since we propagate all
+   past immediate descendants, however, since we propagate all
    grandchildren up one level.
 
    Alias set zero is implicitly a superset of all other alias sets.
@@ -74,7 +77,7 @@ typedef struct alias_set_entry
   HOST_WIDE_INT alias_set;
 
   /* The children of the alias set.  These are not just the immediate
-     children, but, in fact, all descendents.  So, if we have:
+     children, but, in fact, all descendants.  So, if we have:
 
        struct T { struct S s; float f; }
 
@@ -116,6 +119,7 @@ static int nonlocal_referenced_p_1      PARAMS ((rtx *, void *));
 static int nonlocal_referenced_p        PARAMS ((rtx));
 static int nonlocal_set_p_1             PARAMS ((rtx *, void *));
 static int nonlocal_set_p               PARAMS ((rtx));
+static void memory_modified_1		PARAMS ((rtx, rtx, void *));
 
 /* Set up all info needed to perform alias analysis on memory references.  */
 
@@ -199,7 +203,7 @@ char *reg_known_equiv_p;
 
 /* True when scanning insns from the start of the rtl to the
    NOTE_INSN_FUNCTION_BEG note.  */
-static int copying_arguments;
+static bool copying_arguments;
 
 /* The splay-tree used to store the various alias set entries.  */
 static splay_tree alias_sets;
@@ -332,8 +336,8 @@ objects_must_conflict_p (t1, t2)
      then they may not conflict.  */
   if ((t1 != 0 && readonly_fields_p (t1))
       || (t2 != 0 && readonly_fields_p (t2))
-      || (t1 != 0 && TYPE_READONLY (t1))
-      || (t2 != 0 && TYPE_READONLY (t2)))
+      || (t1 != 0 && lang_hooks.honor_readonly && TYPE_READONLY (t1))
+      || (t2 != 0 && lang_hooks.honor_readonly && TYPE_READONLY (t2)))
     return 0;
 
   /* If they are the same type, they must conflict.  */
@@ -575,6 +579,14 @@ get_alias_set (t)
      and references to functions, but that's different.)  */
   else if (TREE_CODE (t) == FUNCTION_TYPE)
     set = 0;
+
+  /* Unless the language specifies otherwise, let vector types alias
+     their components.  This avoids some nasty type punning issues in
+     normal usage.  And indeed lets vectors be treated more like an
+     array slice.  */
+  else if (TREE_CODE (t) == VECTOR_TYPE)
+    set = get_alias_set (TREE_TYPE (t));
+
   else
     /* Otherwise make a new alias set for this type.  */
     set = new_alias_set ();
@@ -773,9 +785,17 @@ find_base_value (src)
 	 The test above is not sufficient because the scheduler may move
 	 a copy out of an arg reg past the NOTE_INSN_FUNCTION_BEGIN.  */
       if ((regno >= FIRST_PSEUDO_REGISTER || fixed_regs[regno])
-	  && regno < reg_base_value_size
-	  && reg_base_value[regno])
-	return reg_base_value[regno];
+	  && regno < reg_base_value_size)
+	{
+	  /* If we're inside init_alias_analysis, use new_reg_base_value
+	     to reduce the number of relaxation iterations.  */
+	  if (new_reg_base_value && new_reg_base_value[regno]
+	      && REG_N_SETS (regno) == 1)
+	    return new_reg_base_value[regno];
+
+	  if (reg_base_value[regno])
+	    return reg_base_value[regno];
+	}
 
       return src;
 
@@ -915,6 +935,7 @@ record_set (dest, set, data)
 {
   unsigned regno;
   rtx src;
+  int n;
 
   if (GET_CODE (dest) != REG)
     return;
@@ -923,6 +944,22 @@ record_set (dest, set, data)
 
   if (regno >= reg_base_value_size)
     abort ();
+
+  /* If this spans multiple hard registers, then we must indicate that every
+     register has an unusable value.  */
+  if (regno < FIRST_PSEUDO_REGISTER)
+    n = HARD_REGNO_NREGS (regno, GET_MODE (dest));
+  else
+    n = 1;
+  if (n != 1)
+    {
+      while (--n >= 0)
+	{
+	  reg_seen[regno + n] = 1;
+	  new_reg_base_value[regno + n] = 0;
+	}
+      return;
+    }
 
   if (set)
     {
@@ -1916,7 +1953,7 @@ adjust_offset_for_component_ref (x, offset)
   return GEN_INT (ioffset);
 }
 
-/* Return nonzero if we can deterimine the exprs corresponding to memrefs
+/* Return nonzero if we can determine the exprs corresponding to memrefs
    X and Y and they do not overlap.  */
 
 static int
@@ -1949,6 +1986,14 @@ nonoverlapping_memrefs_p (x, y)
       moffsetx = adjust_offset_for_component_ref (exprx, moffsetx);
       exprx = t;
     }
+  else if (TREE_CODE (exprx) == INDIRECT_REF)
+    {
+      exprx = TREE_OPERAND (exprx, 0);
+      if (flag_argument_noalias < 2
+	  || TREE_CODE (exprx) != PARM_DECL)
+	return 0;
+    }
+
   moffsety = MEM_OFFSET (y);
   if (TREE_CODE (expry) == COMPONENT_REF)
     {
@@ -1957,6 +2002,13 @@ nonoverlapping_memrefs_p (x, y)
 	return 0;
       moffsety = adjust_offset_for_component_ref (expry, moffsety);
       expry = t;
+    }
+  else if (TREE_CODE (expry) == INDIRECT_REF)
+    {
+      expry = TREE_OPERAND (expry, 0);
+      if (flag_argument_noalias < 2
+	  || TREE_CODE (expry) != PARM_DECL)
+	return 0;
     }
 
   if (! DECL_P (exprx) || ! DECL_P (expry))
@@ -2176,8 +2228,8 @@ canon_true_dependence (mem, mem_mode, mem_addr, x, varies)
 					      varies);
 }
 
-/* Returns non-zero if a write to X might alias a previous read from
-   (or, if WRITEP is non-zero, a write to) MEM.  */
+/* Returns nonzero if a write to X might alias a previous read from
+   (or, if WRITEP is nonzero, a write to) MEM.  */
 
 static int
 write_dependence_p (mem, x, writep)
@@ -2366,7 +2418,7 @@ nonlocal_mentioned_p_1 (loc, data)
   return 0;
 }
 
-/* Returns non-zero if X might mention something which is not
+/* Returns nonzero if X might mention something which is not
    local to the function and is not constant.  */
 
 static int
@@ -2464,7 +2516,7 @@ nonlocal_referenced_p_1 (loc, data)
   return 0;
 }
 
-/* Returns non-zero if X might reference something which is not
+/* Returns nonzero if X might reference something which is not
    local to the function and is not constant.  */
 
 static int
@@ -2544,7 +2596,7 @@ nonlocal_set_p_1 (loc, data)
   return 0;
 }
 
-/* Returns non-zero if X might set something which is not
+/* Returns nonzero if X might set something which is not
    local to the function and is not constant.  */
 
 static int
@@ -2652,6 +2704,35 @@ init_alias_once ()
   alias_sets = splay_tree_new (splay_tree_compare_ints, 0, 0);
 }
 
+/* Set MEMORY_MODIFIED when X modifies DATA (that is assumed
+   to be memory reference.  */
+static bool memory_modified;
+static void
+memory_modified_1 (x, pat, data)
+	rtx x, pat ATTRIBUTE_UNUSED;
+	void *data;
+{
+  if (GET_CODE (x) == MEM)
+    {
+      if (anti_dependence (x, (rtx)data) || output_dependence (x, (rtx)data))
+	memory_modified = true;
+    }
+}
+
+
+/* Return true when INSN possibly modify memory contents of MEM
+   (ie address can be modified).  */
+bool
+memory_modified_in_insn_p (mem, insn)
+     rtx mem, insn;
+{
+  if (!INSN_P (insn))
+    return false;
+  memory_modified = false;
+  note_stores (PATTERN (insn), memory_modified_1, mem);
+  return memory_modified;
+}
+
 /* Initialize the aliasing machinery.  Initialize the REG_KNOWN_VALUE
    array.  */
 
@@ -2721,7 +2802,7 @@ init_alias_analysis ()
 
       /* We're at the start of the function each iteration through the
 	 loop, so we're copying arguments.  */
-      copying_arguments = 1;
+      copying_arguments = true;
 
       /* Wipe the potential alias information clean for this pass.  */
       memset ((char *) new_reg_base_value, 0, reg_base_value_size * sizeof (rtx));
@@ -2811,7 +2892,7 @@ init_alias_analysis ()
 	    }
 	  else if (GET_CODE (insn) == NOTE
 		   && NOTE_LINE_NUMBER (insn) == NOTE_INSN_FUNCTION_BEG)
-	    copying_arguments = 0;
+	    copying_arguments = false;
 	}
 
       /* Now propagate values from new_reg_base_value to reg_base_value.  */

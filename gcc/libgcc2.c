@@ -1,7 +1,7 @@
 /* More subroutines needed by GCC output code on some machines.  */
 /* Compile this one with gcc.  */
 /* Copyright (C) 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001  Free Software Foundation, Inc.
+   2000, 2001, 2002  Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -29,24 +29,37 @@ along with GCC; see the file COPYING.  If not, write to the Free
 Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 02111-1307, USA.  */
 
+
+/* We include auto-host.h here to get HAVE_GAS_HIDDEN.  This is
+   supposedly valid even though this is a "target" file.  */
+#include "auto-host.h"
+
 /* It is incorrect to include config.h here, because this file is being
    compiled for the target, and hence definitions concerning only the host
    do not apply.  */
-
 #include "tconfig.h"
 #include "tsystem.h"
+#include "coretypes.h"
+#include "tm.h"
 
 /* Don't use `fancy_abort' here even if config.h says to use it.  */
 #ifdef abort
 #undef abort
 #endif
 
+#ifdef HAVE_GAS_HIDDEN
+#define ATTRIBUTE_HIDDEN  __attribute__ ((__visibility__ ("hidden")))
+#else
+#define ATTRIBUTE_HIDDEN
+#endif
+
 #include "libgcc2.h"
 
-#if defined (L_negdi2) || defined (L_divdi3) || defined (L_moddi3)
-#if defined (L_divdi3) || defined (L_moddi3)
-static inline
+#ifdef DECLARE_LIBRARY_RENAMES
+  DECLARE_LIBRARY_RENAMES
 #endif
+
+#if defined (L_negdi2)
 DWtype
 __negdi2 (DWtype u)
 {
@@ -231,7 +244,7 @@ __mulvdi3 (DWtype u, DWtype v)
 #endif
 
 
-/* Unless shift functions are defined whith full ANSI prototypes,
+/* Unless shift functions are defined with full ANSI prototypes,
    parameter b will be promoted to int if word_type is smaller than an int.  */
 #ifdef L_lshrdi3
 DWtype
@@ -328,7 +341,7 @@ __ashrdi3 (DWtype u, word_type b)
 #endif
 
 #ifdef L_ffsdi2
-DWtype
+Wtype
 __ffsdi2 (DWtype u)
 {
   DWunion uu;
@@ -365,8 +378,19 @@ __muldi3 (DWtype u, DWtype v)
 }
 #endif
 
+#if (defined (L_udivdi3) || defined (L_divdi3) || \
+     defined (L_umoddi3) || defined (L_moddi3))
+#if defined (sdiv_qrnnd)
+#define L_udiv_w_sdiv
+#endif
+#endif
+
 #ifdef L_udiv_w_sdiv
 #if defined (sdiv_qrnnd)
+#if (defined (L_udivdi3) || defined (L_divdi3) || \
+     defined (L_umoddi3) || defined (L_moddi3))
+static inline __attribute__ ((__always_inline__))
+#endif
 UWtype
 __udiv_w_sdiv (UWtype *rp, UWtype a1, UWtype a0, UWtype d)
 {
@@ -494,12 +518,161 @@ const UQItype __clz_tab[] =
   8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
 };
 #endif
+
+#ifdef L_clzsi2
+Wtype
+__clzsi2 (USItype x)
+{
+  UWtype w = x;
+  Wtype ret;
+
+  count_leading_zeros (ret, w);
+  ret -= (sizeof(w) - sizeof(x)) * BITS_PER_UNIT;
+
+  return ret;
+}
+#endif
+
+#ifdef L_clzdi2
+Wtype
+__clzdi2 (UDItype x)
+{
+  UWtype word;
+  Wtype ret, add;
+
+  if (sizeof(x) > sizeof(word))
+    {
+      DWunion uu;
+
+      uu.ll = x;
+      if (uu.s.high)
+	word = uu.s.high, add = 0;
+      else
+	word = uu.s.low, add = W_TYPE_SIZE;
+    }
+  else
+    word = x, add = (Wtype)(sizeof(x) - sizeof(word)) * BITS_PER_UNIT;
+
+  count_leading_zeros (ret, word);
+  return ret + add;
+}
+#endif
+
+#ifdef L_ctzsi2
+Wtype
+__ctzsi2 (USItype x)
+{
+  Wtype ret;
+
+  count_trailing_zeros (ret, x);
+
+  return ret;
+}
+#endif
+
+#ifdef L_ctzdi2
+Wtype
+__ctzdi2 (UDItype x)
+{
+  UWtype word;
+  Wtype ret, add;
+
+  if (sizeof(x) > sizeof(word))
+    {
+      DWunion uu;
+
+      uu.ll = x;
+      if (uu.s.low)
+	word = uu.s.low, add = 0;
+      else
+	word = uu.s.high, add = W_TYPE_SIZE;
+    }
+  else
+    word = x, add = 0;
+
+  count_trailing_zeros (ret, word);
+  return ret + add;
+}
+#endif
+
+#if (defined (L_popcountsi2) || defined (L_popcountdi2)	\
+     || defined (L_popcount_tab))
+extern const UQItype __popcount_tab[] ATTRIBUTE_HIDDEN;
+#endif
+
+#ifdef L_popcount_tab
+const UQItype __popcount_tab[] =
+{
+    0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,
+    1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,
+    1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,
+    2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,
+    1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,
+    2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,
+    2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,
+    3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,4,5,5,6,5,6,6,7,5,6,6,7,6,7,7,8,
+};
+#endif
+
+#ifdef L_popcountsi2
+Wtype
+__popcountsi2 (USItype x)
+{
+  return __popcount_tab[(x >>  0) & 0xff]
+       + __popcount_tab[(x >>  8) & 0xff]
+       + __popcount_tab[(x >> 16) & 0xff]
+       + __popcount_tab[(x >> 24) & 0xff];
+}
+#endif
+
+#ifdef L_popcountdi2
+Wtype
+__popcountdi2 (UDItype x)
+{
+  return __popcount_tab[(x >>  0) & 0xff]
+       + __popcount_tab[(x >>  8) & 0xff]
+       + __popcount_tab[(x >> 16) & 0xff]
+       + __popcount_tab[(x >> 24) & 0xff]
+       + __popcount_tab[(x >> 32) & 0xff]
+       + __popcount_tab[(x >> 40) & 0xff]
+       + __popcount_tab[(x >> 48) & 0xff]
+       + __popcount_tab[(x >> 56) & 0xff];
+}
+#endif
+
+#ifdef L_paritysi2
+Wtype
+__paritysi2 (USItype x)
+{
+  UWtype nx = x;
+  nx ^= nx >> 16;
+  nx ^= nx >> 8;
+  nx ^= nx >> 4;
+  nx ^= nx >> 2;
+  nx ^= nx >> 1;
+  return nx & 1;
+}
+#endif
+
+#ifdef L_paritydi2
+Wtype
+__paritydi2 (UDItype x)
+{
+  UWtype nx = x ^ (x >> 32);
+  nx ^= nx >> 16;
+  nx ^= nx >> 8;
+  nx ^= nx >> 4;
+  nx ^= nx >> 2;
+  nx ^= nx >> 1;
+  return nx & 1;
+}
+#endif
 
 #ifdef L_udivmoddi4
 
 #if (defined (L_udivdi3) || defined (L_divdi3) || \
      defined (L_umoddi3) || defined (L_moddi3))
-static inline
+static inline __attribute__ ((__always_inline__))
 #endif
 UDWtype
 __udivmoddi4 (UDWtype n, UDWtype d, UDWtype *rp)
@@ -732,14 +905,14 @@ __divdi3 (DWtype u, DWtype v)
 
   if (uu.s.high < 0)
     c = ~c,
-    uu.ll = __negdi2 (uu.ll);
+    uu.ll = -uu.ll;
   if (vv.s.high < 0)
     c = ~c,
-    vv.ll = __negdi2 (vv.ll);
+    vv.ll = -vv.ll;
 
   w = __udivmoddi4 (uu.ll, vv.ll, (UDWtype *) 0);
   if (c)
-    w = __negdi2 (w);
+    w = -w;
 
   return w;
 }
@@ -758,13 +931,13 @@ __moddi3 (DWtype u, DWtype v)
 
   if (uu.s.high < 0)
     c = ~c,
-    uu.ll = __negdi2 (uu.ll);
+    uu.ll = -uu.ll;
   if (vv.s.high < 0)
-    vv.ll = __negdi2 (vv.ll);
+    vv.ll = -vv.ll;
 
   (void) __udivmoddi4 (uu.ll, vv.ll, &w);
   if (c)
-    w = __negdi2 (w);
+    w = -w;
 
   return w;
 }
@@ -921,28 +1094,20 @@ __fixxfdi (XFtype a)
 DWtype
 __fixunsdfDI (DFtype a)
 {
-  DFtype b;
-  UDWtype v;
+  UWtype hi, lo;
 
-  if (a < 0)
-    return 0;
+  /* Get high part of result.  The division here will just moves the radix
+     point and will not cause any rounding.  Then the conversion to integral
+     type chops result as desired.  */
+  hi = a / HIGH_WORD_COEFF;
 
-  /* Compute high word of result, as a flonum.  */
-  b = (a / HIGH_WORD_COEFF);
-  /* Convert that to fixed (but not to DWtype!),
-     and shift it into the high word.  */
-  v = (UWtype) b;
-  v <<= WORD_SIZE;
-  /* Remove high part from the DFtype, leaving the low part as flonum.  */
-  a -= (DFtype)v;
-  /* Convert that to fixed (but not to DWtype!) and add it in.
-     Sometimes A comes out negative.  This is significant, since
-     A has more bits than a long int does.  */
-  if (a < 0)
-    v -= (UWtype) (- a);
-  else
-    v += (UWtype) a;
-  return v;
+  /* Get low part of result.  Convert `hi' to floating type and scale it back,
+     then subtract this from the number being converted.  This leaves the low
+     part.  Convert that to integral type.  */
+  lo = (a - ((DFtype) hi) * HIGH_WORD_COEFF);
+
+  /* Assemble result from the two parts.  */
+  return ((UDWtype) hi << WORD_SIZE) | lo;
 }
 #endif
 
@@ -967,28 +1132,20 @@ __fixunssfDI (SFtype original_a)
      to lose any bits.  Some day someone else can write a faster version
      that avoids converting to DFtype, and verify it really works right.  */
   DFtype a = original_a;
-  DFtype b;
-  UDWtype v;
+  UWtype hi, lo;
 
-  if (a < 0)
-    return 0;
+  /* Get high part of result.  The division here will just moves the radix
+     point and will not cause any rounding.  Then the conversion to integral
+     type chops result as desired.  */
+  hi = a / HIGH_WORD_COEFF;
 
-  /* Compute high word of result, as a flonum.  */
-  b = (a / HIGH_WORD_COEFF);
-  /* Convert that to fixed (but not to DWtype!),
-     and shift it into the high word.  */
-  v = (UWtype) b;
-  v <<= WORD_SIZE;
-  /* Remove high part from the DFtype, leaving the low part as flonum.  */
-  a -= (DFtype) v;
-  /* Convert that to fixed (but not to DWtype!) and add it in.
-     Sometimes A comes out negative.  This is significant, since
-     A has more bits than a long int does.  */
-  if (a < 0)
-    v -= (UWtype) (- a);
-  else
-    v += (UWtype) a;
-  return v;
+  /* Get low part of result.  Convert `hi' to floating type and scale it back,
+     then subtract this from the number being converted.  This leaves the low
+     part.  Convert that to integral type.  */
+  lo = (a - ((DFtype) hi) * HIGH_WORD_COEFF);
+
+  /* Assemble result from the two parts.  */
+  return ((UDWtype) hi << WORD_SIZE) | lo;
 }
 #endif
 
@@ -1090,7 +1247,10 @@ __floatdisf (DWtype u)
 	     && u < ((DWtype) 1 << DF_SIZE)))
 	{
 	  if ((UDWtype) u & (REP_BIT - 1))
-	    u |= REP_BIT;
+	    {
+	      u &= ~ (REP_BIT - 1);
+	      u |= REP_BIT;
+	    }
 	}
     }
   f = (Wtype) (u >> WORD_SIZE);
@@ -1234,260 +1394,6 @@ __eprintf (const char *string, const char *expression,
 #endif
 #endif
 
-#ifdef L_bb
-
-struct bb_function_info {
-  long checksum;
-  int arc_count;
-  const char *name;
-};
-
-/* Structure emitted by -a  */
-struct bb
-{
-  long zero_word;
-  const char *filename;
-  gcov_type *counts;
-  long ncounts;
-  struct bb *next;
-
-  /* Older GCC's did not emit these fields.  */
-  long sizeof_bb;
-  struct bb_function_info *function_infos;
-};
-
-#ifndef inhibit_libc
-
-/* Simple minded basic block profiling output dumper for
-   systems that don't provide tcov support.  At present,
-   it requires atexit and stdio.  */
-
-#undef NULL /* Avoid errors if stdio.h and our stddef.h mismatch.  */
-#include <stdio.h>
-
-#include "gbl-ctors.h"
-#include "gcov-io.h"
-#include <string.h>
-#ifdef TARGET_HAS_F_SETLKW
-#include <fcntl.h>
-#include <errno.h>
-#endif
-
-#include <gthr.h>
-
-static struct bb *bb_head;
-
-int __global_counters = 0, __gthreads_active = 0;
-
-void
-__bb_exit_func (void)
-{
-  FILE *da_file;
-  struct bb *ptr;
-  long n_counters_p = 0;
-  gcov_type max_counter_p = 0;
-  gcov_type sum_counters_p = 0;
-
-  if (bb_head == 0)
-    return;
-
-  /* Calculate overall "statistics".  */
-
-  for (ptr = bb_head; ptr != (struct bb *) 0; ptr = ptr->next)
-    {
-      int i;
-
-      n_counters_p += ptr->ncounts;
-
-      for (i = 0; i < ptr->ncounts; i++)
-	{
-	  sum_counters_p += ptr->counts[i];
-
-	  if (ptr->counts[i] > max_counter_p)
-	    max_counter_p = ptr->counts[i];
-	}
-    }
-
-  for (ptr = bb_head; ptr != (struct bb *) 0; ptr = ptr->next)
-    {
-      gcov_type max_counter_o = 0;
-      gcov_type sum_counters_o = 0;
-      int i;
-
-      /* Calculate the per-object statistics.  */
-
-      for (i = 0; i < ptr->ncounts; i++)
-	{
-	  sum_counters_o += ptr->counts[i];
-
-	  if (ptr->counts[i] > max_counter_o)
-	    max_counter_o = ptr->counts[i];
-	}
-
-      /* open the file for appending, creating it if necessary.  */
-      da_file = fopen (ptr->filename, "ab");
-      /* Some old systems might not allow the 'b' mode modifier.
-         Therefore, try to open without it.  This can lead to a race
-         condition so that when you delete and re-create the file, the
-         file might be opened in text mode, but then, you shouldn't
-         delete the file in the first place.  */
-      if (da_file == 0)
-	da_file = fopen (ptr->filename, "a");
-      if (da_file == 0)
-	{
-	  fprintf (stderr, "arc profiling: Can't open output file %s.\n",
-		   ptr->filename);
-	  continue;
-	}
-
-      /* After a fork, another process might try to read and/or write
-         the same file simultanously.  So if we can, lock the file to
-         avoid race conditions.  */
-#if defined (TARGET_HAS_F_SETLKW)
-      {
-	struct flock s_flock;
-
-	s_flock.l_type = F_WRLCK;
-	s_flock.l_whence = SEEK_SET;
-	s_flock.l_start = 0;
-	s_flock.l_len = 1;
-	s_flock.l_pid = getpid ();
-
-	while (fcntl (fileno (da_file), F_SETLKW, &s_flock)
-	       && errno == EINTR);
-      }
-#endif
-
-      if (__write_long (-123, da_file, 4) != 0)	/* magic */
-	{
-	  fprintf (stderr, "arc profiling: Error writing output file %s.\n",
-		   ptr->filename);
-	}
-      else
-	{
-
-	  struct bb_function_info *fn_info;
-	  gcov_type *count_ptr = ptr->counts;
-	  int i;
-	  int count_functions = 0;
-
-	  for (fn_info = ptr->function_infos; fn_info->arc_count != -1;
-	       fn_info++)
-	    count_functions++;
-
-	  /* number of functions in this block.  */
-	  __write_long (count_functions, da_file, 4);
-
-	  /* length of extra data in bytes.  */
-	  __write_long ((4 + 8 + 8) + (4 + 8 + 8), da_file, 4);
-
-	  /* overall statistics.  */
-	  /* number of counters.  */
-	  __write_long (n_counters_p, da_file, 4);
-	  /* sum of counters.  */
-	  __write_gcov_type (sum_counters_p, da_file, 8);
-	  /* maximal counter.  */
-	  __write_gcov_type (max_counter_p, da_file, 8);
-
-	  /* per-object statistics.  */
-	  /* number of counters.  */
-	  __write_long (ptr->ncounts, da_file, 4);
-	  /* sum of counters.  */
-	  __write_gcov_type (sum_counters_o, da_file, 8);
-	  /* maximal counter.  */
-	  __write_gcov_type (max_counter_o, da_file, 8);
-
-	  /* write execution counts for each function.  */
-
-	  for (fn_info = ptr->function_infos; fn_info->arc_count != -1;
-	       fn_info++)
-	    {
-	      /* new function.  */
-	      if (__write_gcov_string
-		  (fn_info->name, strlen (fn_info->name), da_file, -1) != 0)
-		{
-		  fprintf (stderr,
-			   "arc profiling: Error writing output file %s.\n",
-			   ptr->filename);
-		  break;
-		}
-
-	      if (__write_long (fn_info->checksum, da_file, 4) != 0)
-		{
-		  fprintf (stderr,
-			   "arc profiling: Error writing output file %s.\n",
-			   ptr->filename);
-		  break;
-		}
-
-	      if (__write_long (fn_info->arc_count, da_file, 4) != 0)
-		{
-		  fprintf (stderr,
-			   "arc profiling: Error writing output file %s.\n",
-			   ptr->filename);
-		  break;
-		}
-
-	      for (i = fn_info->arc_count; i > 0; i--, count_ptr++)
-		{
-		  if (__write_gcov_type (*count_ptr, da_file, 8) != 0)
-		    break;
-		}
-
-	      if (i)		/* there was an error */
-		{
-		  fprintf (stderr,
-			   "arc profiling: Error writing output file %s.\n",
-			   ptr->filename);
-		  break;
-		}
-	    }
-	}
-
-      if (fclose (da_file) != 0)
-	fprintf (stderr, "arc profiling: Error closing output file %s.\n",
-		 ptr->filename);
-    }
-}
-
-void
-__bb_init_func (struct bb *blocks)
-{
-  /* User is supposed to check whether the first word is non-0,
-     but just in case....  */
-
-  if (blocks->zero_word)
-    return;
-
-  /* Initialize destructor and per-thread data.  */
-  if (!bb_head)
-    atexit (__bb_exit_func);
-
-  /* Set up linked list.  */
-  blocks->zero_word = 1;
-  blocks->next = bb_head;
-  bb_head = blocks;
-}
-
-/* Called before fork or exec - write out profile information gathered so
-   far and reset it to zero.  This avoids duplication or loss of the
-   profile information gathered so far.  */
-void
-__bb_fork_func (void)
-{
-  struct bb *ptr;
-
-  __bb_exit_func ();
-  for (ptr = bb_head; ptr != (struct bb *) 0; ptr = ptr->next)
-    {
-      long i;
-      for (i = ptr->ncounts - 1; i >= 0; i--)
-	ptr->counts[i] = 0;
-    }
-}
-
-#endif /* not inhibit_libc */
-#endif /* L_bb */
 
 #ifdef L_clear_cache
 /* Clear part of an instruction cache.  */
@@ -1654,102 +1560,6 @@ mprotect (char *addr, int len, int prot)
 TRANSFER_FROM_TRAMPOLINE
 #endif
 
-#if defined (NeXT) && defined (__MACH__)
-
-/* Make stack executable so we can call trampolines on stack.
-   This is called from INITIALIZE_TRAMPOLINE in next.h.  */
-#ifdef NeXTStep21
- #include <mach.h>
-#else
- #include <mach/mach.h>
-#endif
-
-void
-__enable_execute_stack (char *addr)
-{
-  kern_return_t r;
-  char *eaddr = addr + TRAMPOLINE_SIZE;
-  vm_address_t a = (vm_address_t) addr;
-
-  /* turn on execute access on stack */
-  r = vm_protect (task_self (), a, TRAMPOLINE_SIZE, FALSE, VM_PROT_ALL);
-  if (r != KERN_SUCCESS)
-    {
-      mach_error("vm_protect VM_PROT_ALL", r);
-      exit(1);
-    }
-
-  /* We inline the i-cache invalidation for speed */
-
-#ifdef CLEAR_INSN_CACHE
-  CLEAR_INSN_CACHE (addr, eaddr);
-#else
-  __clear_cache ((int) addr, (int) eaddr);
-#endif
-}
-
-#endif /* defined (NeXT) && defined (__MACH__) */
-
-#ifdef __convex__
-
-/* Make stack executable so we can call trampolines on stack.
-   This is called from INITIALIZE_TRAMPOLINE in convex.h.  */
-
-#include <sys/mman.h>
-#include <sys/vmparam.h>
-#include <machine/machparam.h>
-
-void
-__enable_execute_stack (void)
-{
-  int fp;
-  static unsigned lowest = USRSTACK;
-  unsigned current = (unsigned) &fp & -NBPG;
-
-  if (lowest > current)
-    {
-      unsigned len = lowest - current;
-      mremap (current, &len, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE);
-      lowest = current;
-    }
-
-  /* Clear instruction cache in case an old trampoline is in it.  */
-  asm ("pich");
-}
-#endif /* __convex__ */
-
-#ifdef __sysV88__
-
-/* Modified from the convex -code above.  */
-
-#include <sys/param.h>
-#include <errno.h>
-#include <sys/m88kbcs.h>
-
-void
-__enable_execute_stack (void)
-{
-  int save_errno;
-  static unsigned long lowest = USRSTACK;
-  unsigned long current = (unsigned long) &save_errno & -NBPC;
-
-  /* Ignore errno being set. memctl sets errno to EINVAL whenever the
-     address is seen as 'negative'. That is the case with the stack.  */
-
-  save_errno=errno;
-  if (lowest > current)
-    {
-      unsigned len=lowest-current;
-      memctl(current,len,MCT_TEXT);
-      lowest = current;
-    }
-  else
-    memctl(current,NBPC,MCT_TEXT);
-  errno=save_errno;
-}
-
-#endif /* __sysV88__ */
-
 #ifdef __sysV68__
 
 #include <sys/signal.h>
@@ -1794,57 +1604,6 @@ __clear_insn_cache (void)
 }
 
 #endif /* __sysV68__ */
-
-#ifdef __pyr__
-
-#undef NULL /* Avoid errors if stdio.h and our stddef.h mismatch.  */
-#include <stdio.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/param.h>
-#include <sys/vmmac.h>
-
-/* Modified from the convex -code above.
-   mremap promises to clear the i-cache.  */
-
-void
-__enable_execute_stack (void)
-{
-  int fp;
-  if (mprotect (((unsigned int)&fp/PAGSIZ)*PAGSIZ, PAGSIZ,
-		PROT_READ|PROT_WRITE|PROT_EXEC))
-    {
-      perror ("mprotect in __enable_execute_stack");
-      fflush (stderr);
-      abort ();
-    }
-}
-#endif /* __pyr__ */
-
-#if defined (sony_news) && defined (SYSTYPE_BSD)
-
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/param.h>
-#include <syscall.h>
-#include <machine/sysnews.h>
-
-/* cacheflush function for NEWS-OS 4.2.
-   This function is called from trampoline-initialize code
-   defined in config/mips/mips.h.  */
-
-void
-cacheflush (char *beg, int size, int flag)
-{
-  if (syscall (SYS_sysnews, NEWS_CACHEFLUSH, beg, size, FLUSH_BCACHE))
-    {
-      perror ("cache_flush");
-      fflush (stderr);
-      abort ();
-    }
-}
-
-#endif /* sony_news */
 #endif /* L_trampoline */
 
 #ifndef __CYGWIN__

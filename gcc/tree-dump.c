@@ -21,8 +21,9 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
-#include "c-tree.h"
 #include "splay-tree.h"
 #include "diagnostic.h"
 #include "toplev.h"
@@ -35,6 +36,7 @@ static void dequeue_and_dump PARAMS ((dump_info_p));
 static void dump_new_line PARAMS ((dump_info_p));
 static void dump_maybe_newline PARAMS ((dump_info_p));
 static void dump_string_field PARAMS ((dump_info_p, const char *, const char *));
+static void dump_enable_all PARAMS ((int));
 
 /* Add T to the end of the queue of nodes to dump.  Returns the index
    assigned to T.  */
@@ -225,26 +227,6 @@ dump_string_field (di, field, string)
     di->column += 14;
 }
 
-/* Dump information common to statements from STMT.  */
-
-void
-dump_stmt (di, t)
-     dump_info_p di;
-     tree t;
-{
-  dump_int (di, "line", STMT_LINENO (t));
-}
-
-/* Dump the next statement after STMT.  */
-
-void
-dump_next_stmt (di, t)
-     dump_info_p di;
-     tree t;
-{
-  dump_child ("next", TREE_CHAIN (t));
-}
-
 /* Dump the next node in the queue.  */
 
 static void
@@ -346,18 +328,18 @@ dequeue_and_dump (di)
       queue_and_dump_type (di, t);
       dump_child ("scpe", DECL_CONTEXT (t));
       /* And a source position.  */
-      if (DECL_SOURCE_FILE (t))
+      if (TREE_FILENAME (t))
 	{
-	  const char *filename = strrchr (DECL_SOURCE_FILE (t), '/');
+	  const char *filename = strrchr (TREE_FILENAME (t), '/');
 	  if (!filename)
-	    filename = DECL_SOURCE_FILE (t);
+	    filename = TREE_FILENAME (t);
 	  else
 	    /* Skip the slash.  */
 	    ++filename;
 
 	  dump_maybe_newline (di);
 	  fprintf (di->stream, "srcp: %s:%-6d ", filename,
-		   DECL_SOURCE_LINE (t));
+		   TREE_LINENO (t));
 	  di->column += 6 + strlen (filename) + 8;
 	}
       /* And any declaration can be compiler-generated.  */
@@ -497,8 +479,6 @@ dequeue_and_dump (di)
 
       if (TREE_CODE (t) == FIELD_DECL)
 	{
-	  if (DECL_C_BIT_FIELD (t))
-	    dump_string (di, "bitfield");
 	  if (DECL_FIELD_OFFSET (t))
 	    dump_child ("bpos", bit_position (t));
 	}
@@ -521,125 +501,6 @@ dequeue_and_dump (di)
 	dump_string (di, "static");
       if (DECL_LANG_SPECIFIC (t) && !dump_flag (di, TDF_SLIM, t))
 	dump_child ("body", DECL_SAVED_TREE (t));
-      break;
-
-    case ASM_STMT:
-      dump_stmt (di, t);
-      if (ASM_VOLATILE_P (t))
-	dump_string (di, "volatile");
-      dump_child ("strg", ASM_STRING (t));
-      dump_child ("outs", ASM_OUTPUTS (t));
-      dump_child ("ins", ASM_INPUTS (t));
-      dump_child ("clbr", ASM_CLOBBERS (t));
-      dump_next_stmt (di, t);
-      break;
-
-    case BREAK_STMT:
-    case CONTINUE_STMT:
-      dump_stmt (di, t);
-      dump_next_stmt (di, t);
-      break;
-
-    case CASE_LABEL:
-      /* Note that a case label is not like other statements; there is
-	 no way to get the line-number of a case label.  */
-      dump_child ("low", CASE_LOW (t));
-      dump_child ("high", CASE_HIGH (t));
-      dump_next_stmt (di, t);
-      break;
-
-    case CLEANUP_STMT:
-      dump_stmt (di, t);
-      dump_child ("decl", CLEANUP_DECL (t));
-      dump_child ("expr", CLEANUP_EXPR (t));
-      dump_next_stmt (di, t);
-      break;
-
-    case COMPOUND_STMT:
-      dump_stmt (di, t);
-      dump_child ("body", COMPOUND_BODY (t));
-      dump_next_stmt (di, t);
-      break;
-
-    case DECL_STMT:
-      dump_stmt (di, t);
-      dump_child ("decl", DECL_STMT_DECL (t));
-      dump_next_stmt (di, t);
-      break;
-
-    case DO_STMT:
-      dump_stmt (di, t);
-      dump_child ("body", DO_BODY (t));
-      dump_child ("cond", DO_COND (t));
-      dump_next_stmt (di, t);
-      break;
-
-    case EXPR_STMT:
-      dump_stmt (di, t);
-      dump_child ("expr", EXPR_STMT_EXPR (t));
-      dump_next_stmt (di, t);
-      break;
-
-    case FOR_STMT:
-      dump_stmt (di, t);
-      dump_child ("init", FOR_INIT_STMT (t));
-      dump_child ("cond", FOR_COND (t));
-      dump_child ("expr", FOR_EXPR (t));
-      dump_child ("body", FOR_BODY (t));
-      dump_next_stmt (di, t);
-      break;
-
-    case GOTO_STMT:
-      dump_stmt (di, t);
-      dump_child ("dest", GOTO_DESTINATION (t));
-      dump_next_stmt (di, t);
-      break;
-
-    case IF_STMT:
-      dump_stmt (di, t);
-      dump_child ("cond", IF_COND (t));
-      dump_child ("then", THEN_CLAUSE (t));
-      dump_child ("else", ELSE_CLAUSE (t));
-      dump_next_stmt (di, t);
-      break;
-
-    case LABEL_STMT:
-      dump_stmt (di, t);
-      dump_child ("labl", LABEL_STMT_LABEL (t));
-      dump_next_stmt (di, t);
-      break;
-
-    case RETURN_STMT:
-      dump_stmt (di, t);
-      dump_child ("expr", RETURN_EXPR (t));
-      dump_next_stmt (di, t);
-      break;
-
-    case SWITCH_STMT:
-      dump_stmt (di, t);
-      dump_child ("cond", SWITCH_COND (t));
-      dump_child ("body", SWITCH_BODY (t));
-      dump_next_stmt (di, t);
-      break;
-
-    case WHILE_STMT:
-      dump_stmt (di, t);
-      dump_child ("cond", WHILE_COND (t));
-      dump_child ("body", WHILE_BODY (t));
-      dump_next_stmt (di, t);
-      break;
-
-    case SCOPE_STMT:
-      dump_stmt (di, t);
-      if (SCOPE_BEGIN_P (t))
-	dump_string (di, "begn");
-      else
-	dump_string (di, "end");
-      if (SCOPE_NULLIFIED_P (t))
-	dump_string (di, "null");
-      if (!SCOPE_NO_CLEANUPS_P (t))
-	dump_string (di, "clnp");
-      dump_next_stmt (di, t);
       break;
 
     case INTEGER_CST:
@@ -693,10 +554,6 @@ dequeue_and_dump (di)
       dump_child ("elts", TREE_OPERAND (t, 1));
       break;
 
-    case STMT_EXPR:
-      dump_child ("stmt", STMT_EXPR_STMT (t));
-      break;
-
     case BIND_EXPR:
       dump_child ("vars", TREE_OPERAND (t, 0));
       dump_child ("body", TREE_OPERAND (t, 1));
@@ -721,10 +578,6 @@ dequeue_and_dump (di)
       dump_child ("init", TREE_OPERAND (t, 3));
       break;
 
-    case EXPR_WITH_FILE_LOCATION:
-      dump_child ("expr", EXPR_WFL_NODE (t));
-      break;
-
     default:
       /* There are no additional fields to print.  */
       break;
@@ -738,7 +591,7 @@ dequeue_and_dump (di)
   fprintf (di->stream, "\n");
 }
 
-/* Return non-zero if FLAG has been specified for the dump, and NODE
+/* Return nonzero if FLAG has been specified for the dump, and NODE
    is not the root node of the dump.  */
 
 int dump_flag (di, flag, node)
@@ -805,8 +658,19 @@ static struct dump_file_info dump_files[TDI_end] =
   {".tu", "dump-translation-unit", 0, 0},
   {".class", "dump-class-hierarchy", 0, 0},
   {".original", "dump-tree-original", 0, 0},
-  {".optimized", "dump-tree-optimized", 0, 0},
+  {".generic", "dump-tree-generic", 0, 0},
   {".inlined", "dump-tree-inlined", 0, 0},
+  {".simple", "dump-tree-simple", 0, 0},
+  {".cfg", "dump-tree-cfg", 0, 0},
+  {".dot", "dump-tree-dot", 0, 0},
+  {".pta", "dump-tree-pta", 0, 0},
+  {".ssa", "dump-tree-ssa", 0, 0},
+  {".ccp", "dump-tree-ccp", 0, 0},
+  {".pre", "dump-tree-pre", 0, 0},
+  {".dce", "dump-tree-dce", 0, 0},
+  {".optimized", "dump-tree-optimized", 0, 0},
+  {".xml", "dump-call-graph", 0, 0},
+  {NULL, "dump-tree-all", 0, 0},
 };
 
 /* Define a name->number mapping for a dump flag value.  */
@@ -822,6 +686,12 @@ static const struct dump_option_value_info dump_options[] =
 {
   {"address", TDF_ADDRESS},
   {"slim", TDF_SLIM},
+  {"raw", TDF_RAW},
+  {"details", TDF_DETAILS},
+  {"stats", TDF_STATS},
+  {"blocks", TDF_BLOCKS},
+  {"alias", TDF_ALIAS},
+  {"vops", TDF_VOPS},
   {"all", ~0},
   {NULL, 0}
 };
@@ -838,14 +708,18 @@ dump_begin (phase, flag_ptr)
 {
   FILE *stream;
   char *name;
+  char dump_id[10];
 
   if (!dump_files[phase].state)
     return NULL;
 
-  name = concat (dump_base_name, dump_files[phase].suffix, NULL);
+  if (snprintf (dump_id, sizeof (dump_id), ".t%02d", phase) < 0)
+    dump_id[0] = '\0';
+
+  name = concat (dump_base_name, dump_id, dump_files[phase].suffix, NULL);
   stream = fopen (name, dump_files[phase].state < 0 ? "w" : "a");
   if (!stream)
-    error ("could not open dump file `%s'", name);
+    error ("could not open dump file `%s': %s", name, strerror (errno));
   else
     dump_files[phase].state = 1;
   free (name);
@@ -855,7 +729,7 @@ dump_begin (phase, flag_ptr)
   return stream;
 }
 
-/* Returns non-zero if tree dump PHASE is enabled.  */
+/* Returns nonzero if tree dump PHASE is enabled.  */
 
 int
 dump_enabled_p (phase)
@@ -884,7 +758,26 @@ dump_end (phase, stream)
   fclose (stream);
 }
 
-/* Parse ARG as a dump switch. Return non-zero if it is, and store the
+/* Enable all tree dumps.  */
+
+static void
+dump_enable_all (flags)
+     int flags;
+{
+  enum tree_dump_index i;
+
+  for (i = TDI_tu; i < TDI_end; i++)
+    {
+      dump_files[i].state = -1;
+      dump_files[i].flags = flags;
+    }
+
+  /* FIXME  -fdump-call-graph is broken.  */
+  dump_files[TDI_xml].state = 0;
+  dump_files[TDI_xml].flags = 0;
+}
+
+/* Parse ARG as a dump switch. Return nonzero if it is, and store the
    relevant details in the dump_files array.  */
 
 int
@@ -893,44 +786,119 @@ dump_switch_p (arg)
 {
   unsigned ix;
   const char *option_value;
-
+  signed best=-1;
+  unsigned bestlen=-1;
+ 
+  /* Use < because the option_value is the remainder of the string,
+     not the prefix it found. Thus, to get the longest string, look
+     for the shortest remainder. */
   for (ix = 0; ix != TDI_end; ix++)
     if ((option_value = skip_leading_substring (arg, dump_files[ix].swtch)))
-      {
-	const char *ptr = option_value;
-	int flags = 0;
+      if (strlen (option_value) < bestlen)
+	{
+	  best = ix;
+	  bestlen = strlen (option_value);
+	}
 
-	while (*ptr)
-	  {
-	    const struct dump_option_value_info *option_ptr;
-	    const char *end_ptr;
-	    unsigned length;
+  if (best >= 0)
+    {
+      if ((option_value = skip_leading_substring (arg, dump_files[best].swtch)))
+	{
+	  const char *ptr = option_value;
+	  int flags = 0;
+	  
+	  while (*ptr)
+	    {
+	      const struct dump_option_value_info *option_ptr;
+	      const char *end_ptr;
+	      unsigned length;
+	      
+	      while (*ptr == '-')
+		ptr++;
+	      end_ptr = strchr (ptr, '-');
+	      if (!end_ptr)
+		end_ptr = ptr + strlen (ptr);
+	      length = end_ptr - ptr;
+	      
+	      for (option_ptr = dump_options; option_ptr->name;
+		   option_ptr++)
+		if (strlen (option_ptr->name) == length
+		    && !memcmp (option_ptr->name, ptr, length))
+		  {
+		    flags |= option_ptr->value;
+		    goto found;
+		  }
+	      warning ("ignoring unknown option `%.*s' in `-f%s'",
+		       length, ptr, dump_files[best].swtch);
+	    found:;
+	      ptr = end_ptr;
+	    }
+	  
+	  dump_files[best].state = -1;
+	  dump_files[best].flags = flags;
 
-	    while (*ptr == '-')
-	      ptr++;
-	    end_ptr = strchr (ptr, '-');
-	    if (!end_ptr)
-	      end_ptr = ptr + strlen (ptr);
-	    length = end_ptr - ptr;
+	  /* Process -fdump-tree-all by enabling all the known dumps.  */
+	  if (dump_files[best].suffix == NULL)
+	    dump_enable_all (dump_files[best].flags);
+	  
+	  return 1;
+	}
+    }
 
-	    for (option_ptr = dump_options; option_ptr->name;
-		 option_ptr++)
-	      if (strlen (option_ptr->name) == length
-		  && !memcmp (option_ptr->name, ptr, length))
-		{
-		  flags |= option_ptr->value;
-		  goto found;
-		}
-	    warning ("ignoring unknown option `%.*s' in `-f%s'",
-		     length, ptr, dump_files[ix].swtch);
-	  found:;
-	    ptr = end_ptr;
-	  }
-
-	dump_files[ix].state = -1;
-	dump_files[ix].flags = flags;
-
-	return 1;
-      }
   return 0;
+}
+
+/* Dump FUNCTION_DECL FN as tree dump PHASE.  */
+
+void
+dump_function (phase, fn)
+     enum tree_dump_index phase;
+     tree fn;
+{
+  FILE *stream;
+  int flags;
+
+  stream = dump_begin (phase, &flags);
+  if (stream)
+    {
+      fprintf (stream, "\n;; Function %s",
+	       (*lang_hooks.decl_printable_name) (fn, 2));
+      fprintf (stream, " (%s)\n",
+	       IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (fn)));
+      fprintf (stream, "\n");
+
+      dump_function_to_file (fn, stream, flags);
+      dump_end (phase, stream);
+    }
+}
+
+
+/* Dump FUNCTION_DECL FN to file STREAM using FLAGS (see TDF_* in tree.h)  */
+
+void
+dump_function_to_file (fn, stream, flags)
+     tree fn;
+     FILE *stream;
+     int flags;
+{
+  tree arg;
+
+  fprintf (stream, "%s (", (*lang_hooks.decl_printable_name) (fn, 2));
+
+  arg = DECL_ARGUMENTS (fn);
+  while (arg)
+    {
+      print_generic_expr (stream, arg, 0);
+      if (TREE_CHAIN (arg))
+	fprintf (stream, ", ");
+      arg = TREE_CHAIN (arg);
+    }
+  fprintf (stream, ")\n");
+
+  if (flags & TDF_RAW)
+    dump_node (fn, TDF_SLIM | flags, stream);
+  else
+    print_generic_stmt (stream, DECL_SAVED_TREE (fn), flags);
+
+  fprintf (stream, "\n\n");
 }

@@ -22,6 +22,8 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "cpplib.h"
 #include "cpphash.h"
 
@@ -112,7 +114,7 @@ handle_newline (pfile)
   cpp_buffer *buffer = pfile->buffer;
 
   /* Handle CR-LF and LF-CR.  Most other implementations (e.g. java)
-     only accept CR-LF; maybe we should fall back to that behaviour?  */
+     only accept CR-LF; maybe we should fall back to that behavior?  */
   if (buffer->cur[-1] + buffer->cur[0] == '\r' + '\n')
     buffer->cur++;
 
@@ -126,7 +128,7 @@ handle_newline (pfile)
    the second '?'.
 
    Warn if necessary, and returns true if the sequence forms a
-   trigraph and the trigraph should be honoured.  */
+   trigraph and the trigraph should be honored.  */
 static bool
 trigraph_p (pfile)
      cpp_reader *pfile;
@@ -252,7 +254,7 @@ get_effective_char (pfile)
 
 /* Skip a C-style block comment.  We find the end of the comment by
    seeing if an asterisk is before every '/' we encounter.  Returns
-   non-zero if comment terminated by EOF, zero otherwise.  */
+   nonzero if comment terminated by EOF, zero otherwise.  */
 static int
 skip_block_comment (pfile)
      cpp_reader *pfile;
@@ -297,7 +299,7 @@ skip_block_comment (pfile)
 }
 
 /* Skip a C++ line comment, leaving buffer->cur pointing to the
-   terminating newline.  Handles escaped newlines.  Returns non-zero
+   terminating newline.  Handles escaped newlines.  Returns nonzero
    if a multiline comment.  */
 static int
 skip_line_comment (pfile)
@@ -561,7 +563,7 @@ parse_slow (pfile, cur, number_p, plen)
 }
 
 /* Parse a number, beginning with character C, skipping embedded
-   backslash-newlines.  LEADING_PERIOD is non-zero if there was a "."
+   backslash-newlines.  LEADING_PERIOD is nonzero if there was a "."
    before C.  Place the result in NUMBER.  */
 static void
 parse_number (pfile, number, leading_period)
@@ -605,7 +607,7 @@ unescaped_terminator_p (pfile, dest)
 {
   const unsigned char *start, *temp;
 
-  /* In #include-style directives, terminators are not escapeable.  */
+  /* In #include-style directives, terminators are not escapable.  */
   if (pfile->state.angled_headers)
     return 1;
 
@@ -1071,7 +1073,7 @@ _cpp_lex_direct (pfile)
       if (result->val.node->flags & NODE_OPERATOR)
 	{
 	  result->flags |= NAMED_OP;
-	  result->type = result->val.node->value.operator;
+	  result->type = result->val.node->directive_index;
 	}
       break;
 
@@ -1100,7 +1102,7 @@ _cpp_lex_direct (pfile)
 	      && ! buffer->warned_cplusplus_comments)
 	    {
 	      cpp_error (pfile, DL_PEDWARN,
-			 "C++ style comments are not allowed in ISO C89");
+			 "C++ style comments are not allowed in ISO C90");
 	      cpp_error (pfile, DL_PEDWARN,
 			 "(this will be reported only once per input file)");
 	      buffer->warned_cplusplus_comments = 1;
@@ -1329,7 +1331,7 @@ _cpp_lex_direct (pfile)
     case '}': result->type = CPP_CLOSE_BRACE; break;
     case ';': result->type = CPP_SEMICOLON; break;
 
-      /* @ is a punctuator in Objective C.  */
+      /* @ is a punctuator in Objective-C.  */
     case '@': result->type = CPP_ATSIGN; break;
 
     case '$':
@@ -1935,7 +1937,7 @@ cpp_interpret_charconst (pfile, token, pchars_seen, unsignedp)
       wchar_t wc;
       int char_len;
 
-      char_len = local_mbtowc (&wc, str, limit - str);
+      char_len = local_mbtowc (&wc, (const char *)str, limit - str);
       if (char_len == -1)
 	{
 	  cpp_error (pfile, DL_WARNING,

@@ -1,6 +1,6 @@
 /* C-compiler utilities for types and variables storage layout
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1996, 1998,
-   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -22,6 +22,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "rtl.h"
 #include "tm_p.h"
@@ -48,7 +50,7 @@ tree sizetype_tab[(int) TYPE_KIND_LAST];
    The value is measured in bits.  */
 unsigned int maximum_field_alignment;
 
-/* If non-zero, the alignment of a bitstring or (power-)set value, in bits.
+/* If nonzero, the alignment of a bitstring or (power-)set value, in bits.
    May be overridden by front-ends.  */
 unsigned int set_alignment = 0;
 
@@ -60,6 +62,14 @@ static int reference_types_internal = 0;
 static void finalize_record_size	PARAMS ((record_layout_info));
 static void finalize_type_size		PARAMS ((tree));
 static void place_union_field		PARAMS ((record_layout_info, tree));
+#if defined (PCC_BITFIELD_TYPE_MATTERS) || defined (BITFIELD_NBYTES_LIMITED)
+static int excess_unit_span		PARAMS ((HOST_WIDE_INT, HOST_WIDE_INT,
+						HOST_WIDE_INT, HOST_WIDE_INT,
+						tree));
+#endif
+static unsigned int update_alignment_for_field
+                                        PARAMS ((record_layout_info, tree, 
+						 unsigned int));
 extern void debug_rli			PARAMS ((record_layout_info));
 
 /* SAVE_EXPRs for sizes of types and decls, waiting to be expanded.  */
@@ -96,7 +106,7 @@ get_pending_sizes ()
   return chain;
 }
 
-/* Return non-zero if EXPR is present on the pending sizes list.  */
+/* Return nonzero if EXPR is present on the pending sizes list.  */
 
 int
 is_pending_size (expr)
@@ -169,6 +179,11 @@ variable_size (size)
   if (TREE_CODE (size) == SAVE_EXPR)
     SAVE_EXPR_PERSISTENT_P (size) = 1;
 
+  if (!immediate_size_expand && cfun && cfun->x_dont_save_pending_sizes_p)
+    /* The front-end doesn't want us to keep a list of the expressions
+       that determine sizes for variable size objects.  Trust it.  */
+    return size;
+
   if ((*lang_hooks.decls.global_bindings_p) ())
     {
       if (TREE_CONSTANT (size))
@@ -184,10 +199,6 @@ variable_size (size)
        Also, we would like to pass const0_rtx here, but don't have it.  */
     expand_expr (size, expand_expr (integer_zero_node, NULL_RTX, VOIDmode, 0),
 		 VOIDmode, 0);
-  else if (cfun != 0 && cfun->x_dont_save_pending_sizes_p)
-    /* The front-end doesn't want us to keep a list of the expressions
-       that determine sizes for variable size objects.  */
-    ;
   else
     put_pending_size (size);
 
@@ -293,6 +304,29 @@ int_mode_for_mode (mode)
     }
 
   return mode;
+}
+
+/* Return the alignment of MODE. This will be bounded by 1 and
+   BIGGEST_ALIGNMENT.  */
+
+unsigned int
+get_mode_alignment (mode)
+     enum machine_mode mode;
+{
+  unsigned int alignment;
+
+  if (GET_MODE_CLASS (mode) == MODE_COMPLEX_FLOAT
+      || GET_MODE_CLASS (mode) == MODE_COMPLEX_INT)
+    alignment = GET_MODE_UNIT_SIZE (mode);
+  else
+    alignment = GET_MODE_SIZE (mode);
+
+  /* Extract the LSB of the size.  */
+  alignment = alignment & -alignment;
+  alignment *= BITS_PER_UNIT;
+
+  alignment = MIN (BIGGEST_ALIGNMENT, MAX (1, alignment));
+  return alignment;
 }
 
 /* Return the value of VALUE, rounded up to a multiple of DIVISOR.
@@ -501,7 +535,7 @@ start_record_layout (t)
 #ifdef STRUCTURE_SIZE_BOUNDARY
   /* Packed structures don't need to have minimum size.  */
   if (! TYPE_PACKED (t))
-    rli->record_align = MAX (rli->record_align, STRUCTURE_SIZE_BOUNDARY);
+    rli->record_align = MAX (rli->record_align, (unsigned) STRUCTURE_SIZE_BOUNDARY);
 #endif
 
   rli->offset = size_zero_node;
@@ -533,25 +567,6 @@ byte_from_pos (offset, bitpos)
 		     convert (sizetype,
 			      size_binop (TRUNC_DIV_EXPR, bitpos,
 					  bitsize_unit_node)));
-}
-
-void
-pos_from_byte (poffset, pbitpos, off_align, pos)
-     tree *poffset, *pbitpos;
-     unsigned int off_align;
-     tree pos;
-{
-  *poffset
-    = size_binop (MULT_EXPR,
-		  convert (sizetype,
-			   size_binop (FLOOR_DIV_EXPR, pos,
-				       bitsize_int (off_align
-						    / BITS_PER_UNIT))),
-		  size_int (off_align / BITS_PER_UNIT));
-  *pbitpos = size_binop (MULT_EXPR,
-			 size_binop (FLOOR_MOD_EXPR, pos,
-				     bitsize_int (off_align / BITS_PER_UNIT)),
-			 bitsize_unit_node);
 }
 
 void
@@ -644,6 +659,141 @@ rli_size_so_far (rli)
   return bit_from_pos (rli->offset, rli->bitpos);
 }
 
+/* FIELD is about to be added to RLI->T.  The alignment (in bits) of
+   the next available location is given by KNOWN_ALIGN.  Update the
+   variable alignment fields in RLI, and return the alignment to give
+   the FIELD.  */
+
+static unsigned int
+update_alignment_for_field (rli, field, known_align)
+     record_layout_info rli;
+     tree field;
+     unsigned int known_align;
+{
+  /* The alignment required for FIELD.  */
+  unsigned int desired_align;
+  /* The type of this field.  */
+  tree type = TREE_TYPE (field);
+  /* True if the field was explicitly aligned by the user.  */
+  bool user_align;
+
+  /* Lay out the field so we know what alignment it needs.  For a
+     packed field, use the alignment as specified, disregarding what
+     the type would want.  */
+  desired_align = DECL_ALIGN (field);
+  user_align = DECL_USER_ALIGN (field);
+  layout_decl (field, known_align);
+  if (! DECL_PACKED (field))
+    {
+      desired_align = DECL_ALIGN (field);
+      user_align = DECL_USER_ALIGN (field);
+    }
+
+  /* Some targets (i.e. i386, VMS) limit struct field alignment
+     to a lower boundary than alignment of variables unless
+     it was overridden by attribute aligned.  */
+#ifdef BIGGEST_FIELD_ALIGNMENT
+  if (!user_align)
+    desired_align
+      = MIN (desired_align, (unsigned) BIGGEST_FIELD_ALIGNMENT);
+#endif
+
+#ifdef ADJUST_FIELD_ALIGN
+  if (!user_align)
+    desired_align = ADJUST_FIELD_ALIGN (field, desired_align);
+#endif
+
+  /* Record must have at least as much alignment as any field.
+     Otherwise, the alignment of the field within the record is
+     meaningless.  */
+  if ((* targetm.ms_bitfield_layout_p) (rli->t)
+      && type != error_mark_node
+      && DECL_BIT_FIELD_TYPE (field)
+      && ! integer_zerop (TYPE_SIZE (type)))
+    {
+      /* Here, the alignment of the underlying type of a bitfield can
+	 affect the alignment of a record; even a zero-sized field
+	 can do this.  The alignment should be to the alignment of
+	 the type, except that for zero-size bitfields this only
+	 applies if there was an immediately prior, nonzero-size
+	 bitfield.  (That's the way it is, experimentally.) */
+      if (! integer_zerop (DECL_SIZE (field))
+ 	  ? ! DECL_PACKED (field)
+ 	  : (rli->prev_field
+ 	     && DECL_BIT_FIELD_TYPE (rli->prev_field)
+ 	     && ! integer_zerop (DECL_SIZE (rli->prev_field))))
+	{
+	  unsigned int type_align = TYPE_ALIGN (type);
+	  type_align = MAX (type_align, desired_align);
+	  if (maximum_field_alignment != 0)
+	    type_align = MIN (type_align, maximum_field_alignment);
+	  rli->record_align = MAX (rli->record_align, type_align);
+	  rli->unpacked_align = MAX (rli->unpacked_align, TYPE_ALIGN (type));
+	  rli->unpadded_align = MAX (rli->unpadded_align, DECL_ALIGN (field));
+	}
+      else
+	desired_align = 1;
+    }
+  else
+#ifdef PCC_BITFIELD_TYPE_MATTERS
+  if (PCC_BITFIELD_TYPE_MATTERS && type != error_mark_node
+      && ! (* targetm.ms_bitfield_layout_p) (rli->t)
+      && DECL_BIT_FIELD_TYPE (field)
+      && ! integer_zerop (TYPE_SIZE (type)))
+    {
+      /* A zero-length bit-field affects the alignment of the next
+	 field.  */
+      if (!DECL_PACKED (field) && integer_zerop (DECL_SIZE (field)))
+	{
+	  desired_align = TYPE_ALIGN (type);
+#ifdef ADJUST_FIELD_ALIGN
+	  desired_align = ADJUST_FIELD_ALIGN (field, desired_align);
+#endif
+	}
+
+      /* Named bit-fields cause the entire structure to have the
+	 alignment implied by their type.  */
+      if (DECL_NAME (field) != 0)
+	{
+	  unsigned int type_align = TYPE_ALIGN (type);
+
+#ifdef ADJUST_FIELD_ALIGN
+	  if (! TYPE_USER_ALIGN (type))
+	    type_align = ADJUST_FIELD_ALIGN (field, type_align);
+#endif
+
+	  if (maximum_field_alignment != 0)
+	    type_align = MIN (type_align, maximum_field_alignment);
+	  else if (DECL_PACKED (field))
+	    type_align = MIN (type_align, BITS_PER_UNIT);
+
+	  /* The alignment of the record is increased to the maximum
+	     of the current alignment, the alignment indicated on the
+	     field (i.e., the alignment specified by an __aligned__
+	     attribute), and the alignment indicated by the type of
+	     the field.  */
+	  rli->record_align = MAX (rli->record_align, desired_align);
+	  rli->record_align = MAX (rli->record_align, type_align);
+
+	  rli->unpadded_align = MAX (rli->unpadded_align, DECL_ALIGN (field));
+	  if (warn_packed)
+	    rli->unpacked_align = MAX (rli->unpacked_align, TYPE_ALIGN (type));
+	  user_align |= TYPE_USER_ALIGN (type);
+	}
+    }
+  else
+#endif
+    {
+      rli->record_align = MAX (rli->record_align, desired_align);
+      rli->unpacked_align = MAX (rli->unpacked_align, TYPE_ALIGN (type));
+      rli->unpadded_align = MAX (rli->unpadded_align, DECL_ALIGN (field));
+    }
+
+  TYPE_USER_ALIGN (rli->t) |= user_align;
+
+  return desired_align;
+}
+
 /* Called from place_field to handle unions.  */
 
 static void
@@ -651,46 +801,11 @@ place_union_field (rli, field)
      record_layout_info rli;
      tree field;
 {
-  unsigned int desired_align;
-
-  layout_decl (field, 0);
+  update_alignment_for_field (rli, field, /*known_align=*/0);
 
   DECL_FIELD_OFFSET (field) = size_zero_node;
   DECL_FIELD_BIT_OFFSET (field) = bitsize_zero_node;
   SET_DECL_OFFSET_ALIGN (field, BIGGEST_ALIGNMENT);
-
-  desired_align = DECL_ALIGN (field);
-
-#ifdef BIGGEST_FIELD_ALIGNMENT
-  /* Some targets (i.e. i386) limit union field alignment
-     to a lower boundary than alignment of variables unless
-     it was overridden by attribute aligned.  */
-  if (! DECL_USER_ALIGN (field))
-    desired_align =
-      MIN (desired_align, (unsigned) BIGGEST_FIELD_ALIGNMENT);
-#endif
-
-#ifdef ADJUST_FIELD_ALIGN
-  desired_align = ADJUST_FIELD_ALIGN (field, desired_align);
-#endif
-
-  TYPE_USER_ALIGN (rli->t) |= DECL_USER_ALIGN (field);
-
-  /* Union must be at least as aligned as any field requires.  */
-  rli->record_align = MAX (rli->record_align, desired_align);
-  rli->unpadded_align = MAX (rli->unpadded_align, desired_align);
-
-#ifdef PCC_BITFIELD_TYPE_MATTERS
-  /* On the m88000, a bit field of declare type `int' forces the
-     entire union to have `int' alignment.  */
-  if (PCC_BITFIELD_TYPE_MATTERS && DECL_BIT_FIELD_TYPE (field))
-    {
-      rli->record_align = MAX (rli->record_align,
-			       TYPE_ALIGN (TREE_TYPE (field)));
-      rli->unpadded_align = MAX (rli->unpadded_align,
-				 TYPE_ALIGN (TREE_TYPE (field)));
-    }
-#endif
 
   /* We assume the union's size will be a multiple of a byte so we don't
      bother with BITPOS.  */
@@ -701,6 +816,26 @@ place_union_field (rli, field)
 			       DECL_QUALIFIER (field),
 			       DECL_SIZE_UNIT (field), rli->offset));
 }
+
+#if defined (PCC_BITFIELD_TYPE_MATTERS) || defined (BITFIELD_NBYTES_LIMITED)
+/* A bitfield of SIZE with a required access alignment of ALIGN is allocated
+   at BYTE_OFFSET / BIT_OFFSET.  Return nonzero if the field would span more
+   units of alignment than the underlying TYPE.  */
+static int
+excess_unit_span (byte_offset, bit_offset, size, align, type)
+     HOST_WIDE_INT byte_offset, bit_offset, size, align;
+     tree type;
+{
+  /* Note that the calculation of OFFSET might overflow; we calculate it so
+     that we still get the right result as long as ALIGN is a power of two.  */
+  unsigned HOST_WIDE_INT offset = byte_offset * BITS_PER_UNIT + bit_offset;
+
+  offset = offset % align;
+  return ((offset + size + align - 1) / align
+	  > ((unsigned HOST_WIDE_INT) tree_low_cst (TYPE_SIZE (type), 1)
+	     / align));
+}
+#endif
 
 /* RLI contains information about the layout of a RECORD_TYPE.  FIELD
    is a FIELD_DECL to be added after those fields already present in
@@ -718,7 +853,6 @@ place_field (rli, field)
      record as it presently stands.  */
   unsigned int known_align;
   unsigned int actual_align;
-  unsigned int user_align;
   /* The type of this field.  */
   tree type = TREE_TYPE (field);
 
@@ -762,91 +896,8 @@ place_field (rli, field)
 		      & - tree_low_cst (rli->offset, 1)));
   else
     known_align = rli->offset_align;
-
-  /* Lay out the field so we know what alignment it needs.  For a
-     packed field, use the alignment as specified, disregarding what
-     the type would want.  */
-  desired_align = DECL_ALIGN (field);
-  user_align = DECL_USER_ALIGN (field);
-  layout_decl (field, known_align);
-  if (! DECL_PACKED (field))
-    {
-      desired_align = DECL_ALIGN (field);
-      user_align = DECL_USER_ALIGN (field);
-    }
-
-  /* Some targets (i.e. i386, VMS) limit struct field alignment
-     to a lower boundary than alignment of variables unless
-     it was overridden by attribute aligned.  */
-#ifdef BIGGEST_FIELD_ALIGNMENT
-  if (! user_align)
-    desired_align
-      = MIN (desired_align, (unsigned) BIGGEST_FIELD_ALIGNMENT);
-#endif
-
-#ifdef ADJUST_FIELD_ALIGN
-  desired_align = ADJUST_FIELD_ALIGN (field, desired_align);
-#endif
-
-  /* Record must have at least as much alignment as any field.
-     Otherwise, the alignment of the field within the record is
-     meaningless.  */
-  if ((* targetm.ms_bitfield_layout_p) (rli->t)
-      && type != error_mark_node
-      && DECL_BIT_FIELD_TYPE (field)
-      && ! integer_zerop (TYPE_SIZE (type))
-      && integer_zerop (DECL_SIZE (field)))
-    {
-      if (rli->prev_field
-	  && DECL_BIT_FIELD_TYPE (rli->prev_field)
-	  && ! integer_zerop (DECL_SIZE (rli->prev_field)))
-	{
-	  rli->record_align = MAX (rli->record_align, desired_align);
-	  rli->unpacked_align = MAX (rli->unpacked_align, TYPE_ALIGN (type));
-	}
-      else
-	desired_align = 1;
-    }
-  else
-#ifdef PCC_BITFIELD_TYPE_MATTERS
-  if (PCC_BITFIELD_TYPE_MATTERS && type != error_mark_node
-      && ! (* targetm.ms_bitfield_layout_p) (rli->t)
-      && DECL_BIT_FIELD_TYPE (field)
-      && ! integer_zerop (TYPE_SIZE (type)))
-    {
-      /* For these machines, a zero-length field does not
-	 affect the alignment of the structure as a whole.
-	 It does, however, affect the alignment of the next field
-	 within the structure.  */
-      if (! integer_zerop (DECL_SIZE (field)))
-	rli->record_align = MAX (rli->record_align, desired_align);
-      else if (! DECL_PACKED (field))
-	desired_align = TYPE_ALIGN (type);
-
-      /* A named bit field of declared type `int'
-	 forces the entire structure to have `int' alignment.  */
-      if (DECL_NAME (field) != 0)
-	{
-	  unsigned int type_align = TYPE_ALIGN (type);
-
-	  if (maximum_field_alignment != 0)
-	    type_align = MIN (type_align, maximum_field_alignment);
-	  else if (DECL_PACKED (field))
-	    type_align = MIN (type_align, BITS_PER_UNIT);
-
-	  rli->record_align = MAX (rli->record_align, type_align);
-	  rli->unpadded_align = MAX (rli->unpadded_align, DECL_ALIGN (field));
-	  if (warn_packed)
-	    rli->unpacked_align = MAX (rli->unpacked_align, TYPE_ALIGN (type));
-	}
-    }
-  else
-#endif
-    {
-      rli->record_align = MAX (rli->record_align, desired_align);
-      rli->unpacked_align = MAX (rli->unpacked_align, TYPE_ALIGN (type));
-      rli->unpadded_align = MAX (rli->unpadded_align, DECL_ALIGN (field));
-    }
+  
+  desired_align = update_alignment_for_field (rli, field, known_align);
 
   if (warn_packed && DECL_PACKED (field))
     {
@@ -917,14 +968,17 @@ place_field (rli, field)
       HOST_WIDE_INT offset = tree_low_cst (rli->offset, 0);
       HOST_WIDE_INT bit_offset = tree_low_cst (rli->bitpos, 0);
 
+#ifdef ADJUST_FIELD_ALIGN
+      if (! TYPE_USER_ALIGN (type))
+	type_align = ADJUST_FIELD_ALIGN (field, type_align);
+#endif
+
       /* A bit field may not span more units of alignment of its type
 	 than its type itself.  Advance to next boundary if necessary.  */
-      if ((((offset * BITS_PER_UNIT + bit_offset + field_size +
-	     type_align - 1)
-	    / type_align)
-	   - (offset * BITS_PER_UNIT + bit_offset) / type_align)
-	  > tree_low_cst (TYPE_SIZE (type), 1) / type_align)
+      if (excess_unit_span (offset, bit_offset, field_size, type_align, type))
 	rli->bitpos = round_up (rli->bitpos, type_align);
+
+      TYPE_USER_ALIGN (rli->t) |= TYPE_USER_ALIGN (type);
     }
 #endif
 
@@ -946,6 +1000,11 @@ place_field (rli, field)
       HOST_WIDE_INT offset = tree_low_cst (rli->offset, 0);
       HOST_WIDE_INT bit_offset = tree_low_cst (rli->bitpos, 0);
 
+#ifdef ADJUST_FIELD_ALIGN
+      if (! TYPE_USER_ALIGN (type))
+	type_align = ADJUST_FIELD_ALIGN (field, type_align);
+#endif
+
       if (maximum_field_alignment != 0)
 	type_align = MIN (type_align, maximum_field_alignment);
       /* ??? This test is opposite the test in the containing if
@@ -955,57 +1014,156 @@ place_field (rli, field)
 
       /* A bit field may not span the unit of alignment of its type.
 	 Advance to next boundary if necessary.  */
-      /* ??? This code should match the code above for the
-	 PCC_BITFIELD_TYPE_MATTERS case.  */
-      if ((offset * BITS_PER_UNIT + bit_offset) / type_align
-	  != ((offset * BITS_PER_UNIT + bit_offset + field_size - 1)
-	      / type_align))
+      if (excess_unit_span (offset, bit_offset, field_size, type_align, type))
 	rli->bitpos = round_up (rli->bitpos, type_align);
+
+      TYPE_USER_ALIGN (rli->t) |= TYPE_USER_ALIGN (type);
     }
 #endif
 
-  /* See the docs for TARGET_MS_BITFIELD_LAYOUT_P for details.  */
+  /* See the docs for TARGET_MS_BITFIELD_LAYOUT_P for details.
+     A subtlety:
+	When a bit field is inserted into a packed record, the whole
+	size of the underlying type is used by one or more same-size
+	adjacent bitfields.  (That is, if its long:3, 32 bits is
+	used in the record, and any additional adjacent long bitfields are
+	packed into the same chunk of 32 bits. However, if the size
+	changes, a new field of that size is allocated.)  In an unpacked
+	record, this is the same as using alignment, but not equivalent
+	when packing.
+
+     Note: for compatibility, we use the type size, not the type alignment
+     to determine alignment, since that matches the documentation */
+
   if ((* targetm.ms_bitfield_layout_p) (rli->t)
-      && TREE_CODE (field) == FIELD_DECL
-      && type != error_mark_node
-      && ! DECL_PACKED (field)
-      && rli->prev_field
-      && DECL_SIZE (field)
-      && host_integerp (DECL_SIZE (field), 1)
-      && DECL_SIZE (rli->prev_field)
-      && host_integerp (DECL_SIZE (rli->prev_field), 1)
-      && host_integerp (rli->offset, 1)
-      && host_integerp (TYPE_SIZE (type), 1)
-      && host_integerp (TYPE_SIZE (TREE_TYPE (rli->prev_field)), 1)
-      && ((DECL_BIT_FIELD_TYPE (rli->prev_field)
-	   && ! integer_zerop (DECL_SIZE (rli->prev_field)))
-	  || (DECL_BIT_FIELD_TYPE (field)
-	      && ! integer_zerop (DECL_SIZE (field))))
-      && (! simple_cst_equal (TYPE_SIZE (type),
-			      TYPE_SIZE (TREE_TYPE (rli->prev_field)))
-	  /* If the previous field was a zero-sized bit-field, either
-	     it was ignored, in which case we must ensure the proper
-	     alignment of this field here, or it already forced the
-	     alignment of this field, in which case forcing the
-	     alignment again is harmless.  So, do it in both cases.  */
-	  || (DECL_BIT_FIELD_TYPE (rli->prev_field)
-	      && integer_zerop (DECL_SIZE (rli->prev_field)))))
+       && ((DECL_BIT_FIELD_TYPE (field) && ! DECL_PACKED (field))
+ 	  || (rli->prev_field && ! DECL_PACKED (rli->prev_field))))
     {
-      unsigned int type_align = TYPE_ALIGN (type);
+      /* At this point, either the prior or current are bitfields,
+	 (possibly both), and we're dealing with MS packing.  */
+      tree prev_saved = rli->prev_field;
 
-      if (rli->prev_field
-	  && DECL_BIT_FIELD_TYPE (rli->prev_field)
-	  /* If the previous bit-field is zero-sized, we've already
-	     accounted for its alignment needs (or ignored it, if
-	     appropriate) while placing it.  */
-	  && ! integer_zerop (DECL_SIZE (rli->prev_field)))
-	type_align = MAX (type_align,
-			  TYPE_ALIGN (TREE_TYPE (rli->prev_field)));
+      /* Is the prior field a bitfield?  If so, handle "runs" of same
+	 type size fields.  */
+      if (rli->prev_field /* necessarily a bitfield if it exists.  */)
+	{
+	  /* If both are bitfields, nonzero, and the same size, this is
+	     the middle of a run.  Zero declared size fields are special
+	     and handled as "end of run". (Note: it's nonzero declared
+	     size, but equal type sizes!) (Since we know that both
+	     the current and previous fields are bitfields by the
+	     time we check it, DECL_SIZE must be present for both.) */
+	  if (DECL_BIT_FIELD_TYPE (field)
+	      && !integer_zerop (DECL_SIZE (field))
+	      && !integer_zerop (DECL_SIZE (rli->prev_field))
+	      && simple_cst_equal (TYPE_SIZE (type),
+		   TYPE_SIZE (TREE_TYPE (rli->prev_field))) )
+	    {
+	      /* We're in the middle of a run of equal type size fields; make
+		 sure we realign if we run out of bits.  (Not decl size,
+		 type size!) */
+	      int bitsize = TREE_INT_CST_LOW (DECL_SIZE (field));
+	      tree type_size = TYPE_SIZE(TREE_TYPE(rli->prev_field));
 
-      if (maximum_field_alignment != 0)
-	type_align = MIN (type_align, maximum_field_alignment);
+	      if (rli->remaining_in_alignment < bitsize)
+		{
+		  /* out of bits; bump up to next 'word'.  */
+		  rli->offset = DECL_FIELD_OFFSET (rli->prev_field);
+		  rli->bitpos = size_binop (PLUS_EXPR,
+				      type_size,
+				      DECL_FIELD_BIT_OFFSET(rli->prev_field));
+		  rli->prev_field = field;
+		  rli->remaining_in_alignment = TREE_INT_CST_LOW (type_size);
+		}
+	      rli->remaining_in_alignment -= bitsize;
+	    }
+	  else
+	    {
+	      /* End of a run: if leaving a run of bitfields of the same type
+		 size, we have to "use up" the rest of the bits of the type
+		 size.
 
-      rli->bitpos = round_up (rli->bitpos, type_align);
+		 Compute the new position as the sum of the size for the prior
+		 type and where we first started working on that type.
+		 Note: since the beginning of the field was aligned then
+		 of course the end will be too.  No round needed.  */
+
+	      if (!integer_zerop (DECL_SIZE (rli->prev_field)))
+		{
+		  tree type_size = TYPE_SIZE(TREE_TYPE(rli->prev_field));
+		  rli->bitpos = size_binop (PLUS_EXPR,
+				      type_size,
+				      DECL_FIELD_BIT_OFFSET(rli->prev_field));
+		}
+	      else
+		{
+		  /* We "use up" size zero fields; the code below should behave
+		     as if the prior field was not a bitfield.  */
+		  prev_saved = NULL;
+		}
+
+	      /* Cause a new bitfield to be captured, either this time (if
+		 currently a bitfield) or next time we see one.  */
+	      if (!DECL_BIT_FIELD_TYPE(field)
+		 || integer_zerop (DECL_SIZE (field)))
+		{
+		  rli->prev_field = NULL;
+		}
+	    }
+	  normalize_rli (rli);
+        }
+
+      /* If we're starting a new run of same size type bitfields
+	 (or a run of non-bitfields), set up the "first of the run"
+	 fields.
+
+	 That is, if the current field is not a bitfield, or if there
+	 was a prior bitfield the type sizes differ, or if there wasn't
+	 a prior bitfield the size of the current field is nonzero.
+
+	 Note: we must be sure to test ONLY the type size if there was
+	 a prior bitfield and ONLY for the current field being zero if
+	 there wasn't.  */
+
+      if (!DECL_BIT_FIELD_TYPE (field)
+	  || ( prev_saved != NULL
+	       ? !simple_cst_equal (TYPE_SIZE (type),
+	              TYPE_SIZE (TREE_TYPE (prev_saved)))
+	       : !integer_zerop (DECL_SIZE (field)) ))
+	{
+	  unsigned int type_align = 8;  /* Never below 8 for compatibility */
+
+	  /* (When not a bitfield), we could be seeing a flex array (with
+	     no DECL_SIZE).  Since we won't be using remaining_in_alignment
+	     until we see a bitfield (and come by here again) we just skip
+	     calculating it.  */
+
+	  if (DECL_SIZE (field) != NULL)
+	      rli->remaining_in_alignment
+		  = TREE_INT_CST_LOW (TYPE_SIZE(TREE_TYPE(field)))
+		    - TREE_INT_CST_LOW (DECL_SIZE (field));
+
+	  /* Now align (conventionally) for the new type.  */
+	  if (!DECL_PACKED(field))
+	      type_align = MAX(TYPE_ALIGN (type), type_align);
+
+	  if (prev_saved
+	      && DECL_BIT_FIELD_TYPE (prev_saved)
+	      /* If the previous bit-field is zero-sized, we've already
+		 accounted for its alignment needs (or ignored it, if
+		 appropriate) while placing it.  */
+	      && ! integer_zerop (DECL_SIZE (prev_saved)))
+	    type_align = MAX (type_align,
+			      TYPE_ALIGN (TREE_TYPE (prev_saved)));
+
+	  if (maximum_field_alignment != 0)
+	    type_align = MIN (type_align, maximum_field_alignment);
+
+	  rli->bitpos = round_up (rli->bitpos, type_align);
+          /* If we really aligned, don't allow subsequent bitfields
+	     to undo that.  */
+	  rli->prev_field = NULL;
+	}
     }
 
   /* Offset so far becomes the position of this field after normalizing.  */
@@ -1013,8 +1171,6 @@ place_field (rli, field)
   DECL_FIELD_OFFSET (field) = rli->offset;
   DECL_FIELD_BIT_OFFSET (field) = rli->bitpos;
   SET_DECL_OFFSET_ALIGN (field, rli->offset_align);
-
-  TYPE_USER_ALIGN (rli->t) |= user_align;
 
   /* If this field ended up more aligned than we thought it would be (we
      approximate this by seeing if its position changed), lay out the field
@@ -1034,7 +1190,9 @@ place_field (rli, field)
   if (known_align != actual_align)
     layout_decl (field, actual_align);
 
-  rli->prev_field = field;
+  /* Only the MS bitfields use this.  */
+  if (rli->prev_field == NULL && DECL_BIT_FIELD_TYPE(field))
+      rli->prev_field = field;
 
   /* Now add size of this field to the size of the record.  If the size is
      not constant, treat the field as being a multiple of bytes and just
@@ -1067,7 +1225,7 @@ place_field (rli, field)
 
 /* Assuming that all the fields have been laid out, this function uses
    RLI to compute the final TYPE_SIZE, TYPE_ALIGN, etc. for the type
-   inidicated by RLI.  */
+   indicated by RLI.  */
 
 static void
 finalize_record_size (rli)
@@ -1097,15 +1255,7 @@ finalize_record_size (rli)
     unpadded_size_unit
       = size_binop (PLUS_EXPR, unpadded_size_unit, size_one_node);
 
-  /* Record the un-rounded size in the binfo node.  But first we check
-     the size of TYPE_BINFO to make sure that BINFO_SIZE is available.  */
-  if (TYPE_BINFO (rli->t) && TREE_VEC_LENGTH (TYPE_BINFO (rli->t)) > 6)
-    {
-      TYPE_BINFO_SIZE (rli->t) = unpadded_size;
-      TYPE_BINFO_SIZE_UNIT (rli->t) = unpadded_size_unit;
-    }
-
-    /* Round the size up to be a multiple of the required alignment */
+  /* Round the size up to be a multiple of the required alignment */
 #ifdef ROUND_TYPE_SIZE
   TYPE_SIZE (rli->t) = ROUND_TYPE_SIZE (rli->t, unpadded_size,
 					TYPE_ALIGN (rli->t));
@@ -1343,11 +1493,14 @@ finalize_type_size (type)
 
 /* Do all of the work required to layout the type indicated by RLI,
    once the fields have been laid out.  This function will call `free'
-   for RLI.  */
+   for RLI, unless FREE_P is false.  Passing a value other than false
+   for FREE_P is bad practice; this option only exists to support the
+   G++ 3.2 ABI.  */
 
 void
-finish_record_layout (rli)
+finish_record_layout (rli, free_p)
      record_layout_info rli;
+     int free_p;
 {
   /* Compute the final size.  */
   finalize_record_size (rli);
@@ -1367,9 +1520,50 @@ finish_record_layout (rli)
     }
 
   /* Clean up.  */
-  free (rli);
+  if (free_p)
+    free (rli);
 }
 
+
+/* Finish processing a builtin RECORD_TYPE type TYPE.  It's name is
+   NAME, its fields are chained in reverse on FIELDS.
+
+   If ALIGN_TYPE is non-null, it is given the same alignment as
+   ALIGN_TYPE.  */
+
+void
+finish_builtin_struct (type, name, fields, align_type)
+     tree type;
+     const char *name;
+     tree fields;
+     tree align_type;
+{
+  tree tail, next;
+
+  for (tail = NULL_TREE; fields; tail = fields, fields = next)
+    {
+      DECL_FIELD_CONTEXT (fields) = type;
+      next = TREE_CHAIN (fields);
+      TREE_CHAIN (fields) = tail;
+    }
+  TYPE_FIELDS (type) = tail;
+
+  if (align_type)
+    {
+      TYPE_ALIGN (type) = TYPE_ALIGN (align_type);
+      TYPE_USER_ALIGN (type) = TYPE_USER_ALIGN (align_type);
+    }
+
+  layout_type (type);
+#if 0 /* not yet, should get fixed properly later */
+  TYPE_NAME (type) = make_type_decl (get_identifier (name), type);
+#else
+  TYPE_NAME (type) = build_decl (TYPE_DECL, get_identifier (name), type);
+#endif
+  TYPE_STUB_DECL (type) = TYPE_NAME (type);
+  layout_decl (TYPE_NAME (type), 0);
+}
+
 /* Calculate the mode, size, and alignment for TYPE.
    For an array type, calculate the element separation as well.
    Record TYPE on the chain of permanent or temporary types
@@ -1470,13 +1664,15 @@ layout_type (type)
     case POINTER_TYPE:
     case REFERENCE_TYPE:
       {
-	int nbits = ((TREE_CODE (type) == REFERENCE_TYPE
-		      && reference_types_internal)
-		     ? GET_MODE_BITSIZE (Pmode) : POINTER_SIZE);
 
-	TYPE_MODE (type) = nbits == POINTER_SIZE ? ptr_mode : Pmode;
+	enum machine_mode mode = ((TREE_CODE (type) == REFERENCE_TYPE
+				   && reference_types_internal)
+				  ? Pmode : TYPE_MODE (type));
+
+	int nbits = GET_MODE_BITSIZE (mode);
+
 	TYPE_SIZE (type) = bitsize_int (nbits);
-	TYPE_SIZE_UNIT (type) = size_int (nbits / BITS_PER_UNIT);
+	TYPE_SIZE_UNIT (type) = size_int (GET_MODE_SIZE (mode));
 	TREE_UNSIGNED (type) = 1;
 	TYPE_PRECISION (type) = nbits;
       }
@@ -1622,7 +1818,7 @@ layout_type (type)
 	  (*lang_adjust_rli) (rli);
 
 	/* Finish laying out the record.  */
-	finish_record_layout (rli);
+	finish_record_layout (rli, /*free_p=*/true);
       }
       break;
 

@@ -108,7 +108,7 @@ EOF
     extract_expsyms_cmds='test -f $output_objdir/impgen.c || \
       sed -e "/^# \/\* impgen\.c starts here \*\//,/^# \/\* impgen.c ends here \*\// { s/^# //; p; }" -e d < $0 > $output_objdir/impgen.c~
       test -f $output_objdir/impgen.exe || (cd $output_objdir && \
-      if test "x$HOST_CC" != "x" ; then $HOST_CC -o impgen impgen.c ; \
+      if test "x$BUILD_CC" != "x" ; then $BUILD_CC -o impgen impgen.c ; \
       else $CC -o impgen impgen.c ; fi)~
       $output_objdir/impgen $dir/$soroot > $output_objdir/$soname-def'
 
@@ -417,23 +417,32 @@ else
     ;;
 
   hpux9* | hpux10* | hpux11*)
-    if test $with_gcc = yes; then
-      case "$host_os" in
-      hpux9*) archive_cmds='$rm $output_objdir/$soname~$CC -shared -fPIC ${wl}+b ${wl}$install_libdir -o $output_objdir/$soname $libobjs $deplibs $compiler_flags~test $output_objdir/$soname = $lib || mv $output_objdir/$soname $lib' ;;
-      *) archive_cmds='$CC -shared -fPIC ${wl}+h ${wl}$soname ${wl}+b ${wl}$install_libdir -o $lib $libobjs $deplibs $compiler_flags' ;;
-      esac
-    else
-      case $host_os in
-      hpux9*) archive_cmds='$rm $output_objdir/$soname~$LD -b +b $install_libdir -o $output_objdir/$soname $libobjs $deplibs $linker_flags~test $output_objdir/$soname = $lib || mv $output_objdir/$soname $lib' ;;
-      *) archive_cmds='$LD -b +h $soname +b $install_libdir -o $lib $libobjs $deplibs $linker_flags' ;;
-      esac
-    fi
-    hardcode_libdir_flag_spec='${wl}+b ${wl}$libdir'
-    hardcode_libdir_separator=:
-    hardcode_direct=yes
-    hardcode_minus_L=yes # Not in the search PATH, but as the default
-			 # location of the library.
+    case "$host_cpu" in
+    ia64*)
+      hardcode_direct=no
+      hardcode_shlibpath_var=no
+      archive_cmds='$LD -b +h $soname -o $lib $libobjs $deplibs $linker_flags'
+      hardcode_libdir_flag_spec='-L$libdir' ;;
+    *)
+      if test $with_gcc = yes; then
+        case "$host_os" in
+        hpux9*) archive_cmds='$rm $output_objdir/$soname~$CC -shared -fPIC ${wl}+b ${wl}$install_libdir -o $output_objdir/$soname $libobjs $deplibs $compiler_flags~test $output_objdir/$soname = $lib || mv $output_objdir/$soname $lib' ;;
+        *) archive_cmds='$CC -shared -fPIC ${wl}+h ${wl}$soname ${wl}+b ${wl}$install_libdir -o $lib $libobjs $deplibs $compiler_flags' ;;
+        esac
+      else
+        case $host_os in
+        hpux9*) archive_cmds='$rm $output_objdir/$soname~$LD -b +b $install_libdir -o $output_objdir/$soname $libobjs $deplibs $linker_flags~test $output_objdir/$soname = $lib || mv $output_objdir/$soname $lib' ;;
+        *) archive_cmds='$LD -b +h $soname +b $install_libdir -o $lib $libobjs $deplibs $linker_flags' ;;
+        esac
+      fi
+      hardcode_libdir_flag_spec='${wl}+b ${wl}$libdir'
+      hardcode_libdir_separator=:
+      hardcode_minus_L=yes # Not in the search PATH, but as the default
+			   # location of the library.
+      ;;
+    esac
     export_dynamic_flag_spec='${wl}-E'
+    hardcode_direct=yes
     ;;
 
   irix5* | irix6*)

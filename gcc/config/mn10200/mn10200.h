@@ -730,54 +730,9 @@ struct cum_arg { int nbytes; };
    addresses generally makes code worse due to register pressure.  */
 #define NO_FUNCTION_CSE
 
-/* Compute the cost of computing a constant rtl expression RTX
-   whose rtx-code is CODE.  The body of this macro is a portion
-   of a switch statement.  If the code is computed here,
-   return it with a return statement.  Otherwise, break from the switch.  */
-
-#define CONST_COSTS(RTX,CODE,OUTER_CODE) \
-  case CONST_INT:							\
-    /* Zeros are extremely cheap.  */					\
-    if (INTVAL (RTX) == 0)						\
-      return 0;								\
-    /* If it fits in 8 bits, then it's still relatively cheap.  */	\
-    if (INT_8_BITS (INTVAL (RTX)))					\
-      return 1;								\
-    /* This is the "base" cost, includes constants where either the	\
-       upper or lower 16bits are all zeros.  */				\
-    if (INT_16_BITS (INTVAL (RTX))					\
-	|| (INTVAL (RTX) & 0xffff) == 0					\
-	|| (INTVAL (RTX) & 0xffff0000) == 0)				\
-      return 2;								\
-    return 4;								\
-  /* These are more costly than a CONST_INT, but we can relax them,	\
-     so they're less costly than a CONST_DOUBLE.  */			\
-  case CONST:								\
-  case LABEL_REF:							\
-  case SYMBOL_REF:							\
-    return 6;								\
-  /* We don't optimize CONST_DOUBLEs well nor do we relax them well,	\
-     so their cost is very high.  */					\
-  case CONST_DOUBLE:							\
-    return 8;
-
 /* Make moves between different classes more expensive than moves
    within the same class.  */
 #define REGISTER_MOVE_COST(MODE, CLASS1, CLASS2)  (CLASS1 != CLASS2 ? 4 : 2)
-
-/* Provide the costs of a rtl expression.  This is in the body of a
-   switch on CODE. 
-
-   ?!? This probably needs more work.  The definitions below were first
-   taken from the H8 port, then tweaked slightly to improve code density
-   on various sample codes.  */
-
-#define RTX_COSTS(RTX,CODE,OUTER_CODE) \
-  case MOD:						\
-  case DIV:						\
-    return 8;						\
-  case MULT:						\
-    return (GET_MODE (RTX) == SImode ? 20 : 8);
 
 /* Nonzero if access to memory by bytes or half words is no faster
    than accessing full words.  */
@@ -814,17 +769,8 @@ struct cum_arg { int nbytes; };
 #define ASM_OUTPUT_ALIGNED_BSS(FILE, DECL, NAME, SIZE, ALIGN) \
   asm_output_aligned_bss ((FILE), (DECL), (NAME), (SIZE), (ALIGN))
 
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME.  */
-
-#define ASM_OUTPUT_LABEL(FILE, NAME)	\
-  do { assemble_name (FILE, NAME); fputs (":\n", FILE); } while (0)
-
-/* This is how to output a command to make the user-level label named NAME
-   defined for reference from other files.  */
-
-#define ASM_GLOBALIZE_LABEL(FILE, NAME)	\
-  do { fputs ("\t.global ", FILE); assemble_name (FILE, NAME); fputs ("\n", FILE);} while (0)
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP "\t.global "
 
 /* This is how to output a reference to a user-level label named NAME.
    `assemble_name' uses this.  */
@@ -833,13 +779,7 @@ struct cum_arg { int nbytes; };
 #define ASM_OUTPUT_LABELREF(FILE, NAME) \
   fprintf (FILE, "_%s", (*targetm.strip_name_encoding) (NAME))
 
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)	\
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),	\
-  sprintf ((OUTPUT), "%s___%d", (NAME), (LABELNO)))
+#define ASM_PN_FORMAT "%s___%lu"
 
 /* This is how we tell the assembler that two symbols have the same value.  */
 
@@ -872,7 +812,7 @@ struct cum_arg { int nbytes; };
 /* This is how to output an element of a case-vector that is absolute.  */
 
 #define ASM_OUTPUT_ADDR_VEC_ELT(FILE, VALUE) \
-  asm_fprintf (FILE, "\t%s .L%d\n", ".long", VALUE)
+  fprintf (FILE, "\t%s .L%d\n", ".long", VALUE)
 
 /* This is how to output an element of a case-vector that is relative.  */
 

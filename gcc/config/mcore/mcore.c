@@ -20,6 +20,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "tree.h"
 #include "tm_p.h"
@@ -139,6 +141,10 @@ static void	  mcore_asm_named_section      PARAMS ((const char *,
 static void       mcore_unique_section	       PARAMS ((tree, int));
 static void mcore_encode_section_info		PARAMS ((tree, int));
 static const char *mcore_strip_name_encoding	PARAMS ((const char *));
+static int        mcore_const_costs            	PARAMS ((rtx, RTX_CODE));
+static int        mcore_and_cost               	PARAMS ((rtx));
+static int        mcore_ior_cost               	PARAMS ((rtx));
+static bool       mcore_rtx_costs		PARAMS ((rtx, int, int, int *));
 
 /* Initialize the GCC target structure.  */
 #ifdef TARGET_DLLIMPORT_DECL_ATTRIBUTES
@@ -161,6 +167,11 @@ static const char *mcore_strip_name_encoding	PARAMS ((const char *));
 #define TARGET_ENCODE_SECTION_INFO mcore_encode_section_info
 #undef TARGET_STRIP_NAME_ENCODING
 #define TARGET_STRIP_NAME_ENCODING mcore_strip_name_encoding
+
+#undef TARGET_RTX_COSTS
+#define TARGET_RTX_COSTS mcore_rtx_costs
+#undef TARGET_ADDRESS_COST
+#define TARGET_ADDRESS_COST hook_int_rtx_0
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -366,7 +377,7 @@ mcore_print_operand (stream, x, code)
 
 /* What does a constant cost ?  */
 
-int
+static int
 mcore_const_costs (exp, code)
      rtx exp;
      enum rtx_code code;
@@ -397,7 +408,7 @@ mcore_const_costs (exp, code)
    have been relaxed.   We want to ensure that cse will cse relaxed immeds
    out.  Otherwise we'll get bad code (multiple reloads of the same const).  */
 
-int
+static int
 mcore_and_cost (x)
      rtx x;
 {
@@ -424,7 +435,7 @@ mcore_and_cost (x)
 
 /* What does an or cost - see and_cost().  */
 
-int
+static int
 mcore_ior_cost (x)
      rtx x;
 {
@@ -447,6 +458,48 @@ mcore_ior_cost (x)
   
   /* Takes a lrw to load.  */
   return 5;
+}
+
+static bool
+mcore_rtx_costs (x, code, outer_code, total)
+     rtx x;
+     int code, outer_code;
+     int *total;
+{
+  switch (code)
+    {
+    case CONST_INT:
+      *total = mcore_const_costs (x, outer_code);
+      return true;
+    case CONST:
+    case LABEL_REF:
+    case SYMBOL_REF:
+      *total = 5;
+      return true;
+    case CONST_DOUBLE:
+      *total = 10;
+      return true;
+
+    case AND:
+      *total = COSTS_N_INSNS (mcore_and_cost (x));
+      return true;
+
+    case IOR:
+      *total = COSTS_N_INSNS (mcore_ior_cost (x));
+      return true;
+
+    case DIV:
+    case UDIV:
+    case MOD:
+    case UMOD:
+    case FLOAT:
+    case FIX:
+      *total = COSTS_N_INSNS (100);
+      return true;
+  
+    default:
+      return false;
+    }
 }
 
 /* Check to see if a comparison against a constant can be made more efficient
@@ -1296,7 +1349,7 @@ mcore_output_inline_const_forced (insn, operands, mode)
 
   /* Now, work our way backwards emitting the constant.  */
 
-  /* Emit the value that remains -- it will be non-zero.  */
+  /* Emit the value that remains -- it will be nonzero.  */
   operands[1] = GEN_INT (value);
   output_asm_insn (output_inline_const (SImode, operands), operands);
  
@@ -1437,7 +1490,7 @@ mcore_output_movedouble (operands, mode)
 
 /* Predicates used by the templates.  */
 
-/* Non zero if OP can be source of a simple move operation.  */
+/* Nonzero if OP can be source of a simple move operation.  */
 
 int
 mcore_general_movsrc_operand (op, mode)
@@ -1451,7 +1504,7 @@ mcore_general_movsrc_operand (op, mode)
   return general_operand (op, mode);
 }
 
-/* Non zero if OP can be destination of a simple move operation. */
+/* Nonzero if OP can be destination of a simple move operation. */
 
 int
 mcore_general_movdst_operand (op, mode)
@@ -1483,7 +1536,7 @@ mcore_arith_reg_operand (op, mode)
   return 1;
 }
 
-/* Non zero if OP should be recognized during reload for an ixh/ixw
+/* Nonzero if OP should be recognized during reload for an ixh/ixw
    operand.  See the ixh/ixw patterns.  */
 
 int
@@ -1729,7 +1782,7 @@ mcore_expand_insv (operands)
       return 1;
     }
 
-  /* Look at some bitfield placements that we aren't interested
+  /* Look at some bit-field placements that we aren't interested
      in handling ourselves, unless specifically directed to do so.  */
   if (! TARGET_W_FIELD)
     return 0;		/* Generally, give up about now.  */
@@ -2341,7 +2394,6 @@ mcore_expand_prolog ()
     {
       /* Emit a symbol for this routine's frame size.  */
       rtx x;
-      int len;
 
       x = DECL_RTL (current_function_decl);
       
@@ -2356,10 +2408,7 @@ mcore_expand_prolog ()
       if (mcore_current_function_name)
 	free (mcore_current_function_name);
       
-      len = strlen (XSTR (x, 0)) + 1;
-      mcore_current_function_name = (char *) xmalloc (len);
-      
-      memcpy (mcore_current_function_name, XSTR (x, 0), len);
+      mcore_current_function_name = xstrdup (XSTR (x, 0));
       
       ASM_OUTPUT_CG_NODE (asm_out_file, mcore_current_function_name, space_allocated);
 
@@ -2622,7 +2671,7 @@ mcore_output_jump_label_table ()
 	{
 	  pool_node * p = pool_vector + i;
 
-	  ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L", CODE_LABEL_NUMBER (p->label));
+	  (*targetm.asm_out.internal_label) (asm_out_file, "L", CODE_LABEL_NUMBER (p->label));
 	  
 	  output_asm_insn (".long	%0", &p->value);
 	}
@@ -3272,7 +3321,7 @@ mcore_function_arg_partial_nregs (cum, mode, type, named)
   return reg;
 }
 
-/* Return non-zero if SYMBOL is marked as being dllexport'd.  */
+/* Return nonzero if SYMBOL is marked as being dllexport'd.  */
 int
 mcore_dllexport_name_p (symbol)
      const char * symbol;
@@ -3280,7 +3329,7 @@ mcore_dllexport_name_p (symbol)
   return symbol[0] == '@' && symbol[1] == 'e' && symbol[2] == '.';
 }
 
-/* Return non-zero if SYMBOL is marked as being dllimport'd.  */
+/* Return nonzero if SYMBOL is marked as being dllimport'd.  */
 int
 mcore_dllimport_name_p (symbol)
      const char * symbol;
@@ -3544,7 +3593,7 @@ mcore_unique_section (decl, reloc)
     prefix = ".text$";
   /* For compatibility with EPOC, we ignore the fact that the
      section might have relocs against it.  */
-  else if (DECL_READONLY_SECTION (decl, 0))
+  else if (decl_readonly_section (decl, 0))
     prefix = ".rdata$";
   else
     prefix = ".data$";

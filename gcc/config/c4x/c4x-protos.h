@@ -59,8 +59,6 @@ extern struct rtx_def *c4x_function_arg PARAMS ((CUMULATIVE_ARGS *,
 #if defined(RTX_CODE) && defined(TREE_CODE)
 extern void c4x_init_cumulative_args PARAMS ((CUMULATIVE_ARGS *c, tree, rtx));
 
-extern void c4x_va_start PARAMS ((int, tree, rtx));
-
 extern struct rtx_def *c4x_va_arg PARAMS ((tree, tree));
 
 extern rtx c4x_expand_builtin PARAMS ((tree, rtx, rtx,
@@ -82,8 +80,6 @@ extern int c4x_hard_regno_rename_ok PARAMS ((unsigned int, unsigned int));
 
 extern struct rtx_def *c4x_legitimize_address PARAMS ((rtx,
 						       enum machine_mode));
-
-extern int c4x_address_cost PARAMS ((rtx));
 
 extern void c4x_print_operand PARAMS ((FILE *, rtx, int));
 
@@ -295,15 +291,13 @@ extern enum machine_mode c4x_caller_save_map[FIRST_PSEUDO_REGISTER];
 extern int c4x_rpts_cycles;	        /* Max cycles for RPTS.  */
 extern int c4x_cpu_version;		/* Cpu version C30/31/32/40/44.  */
 
-#ifdef GCC_C_PRAGMA_H
-extern void c4x_pr_CODE_SECTION		PARAMS ((cpp_reader *));
-extern void c4x_pr_DATA_SECTION		PARAMS ((cpp_reader *));
-extern void c4x_pr_FUNC_IS_PURE		PARAMS ((cpp_reader *));
-extern void c4x_pr_FUNC_NEVER_RETURNS	PARAMS ((cpp_reader *));
-extern void c4x_pr_INTERRUPT		PARAMS ((cpp_reader *));
-extern void c4x_pr_ignored		PARAMS ((cpp_reader *));
+extern void c4x_pr_CODE_SECTION		PARAMS ((struct cpp_reader *));
+extern void c4x_pr_DATA_SECTION		PARAMS ((struct cpp_reader *));
+extern void c4x_pr_FUNC_IS_PURE		PARAMS ((struct cpp_reader *));
+extern void c4x_pr_FUNC_NEVER_RETURNS	PARAMS ((struct cpp_reader *));
+extern void c4x_pr_INTERRUPT		PARAMS ((struct cpp_reader *));
+extern void c4x_pr_ignored		PARAMS ((struct cpp_reader *));
 extern void c4x_init_pragma		PARAMS ((int (*) (tree *)));
-#endif
 
 extern GTY(()) tree code_tree;
 extern GTY(()) tree data_tree;

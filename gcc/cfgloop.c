@@ -20,10 +20,14 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "hard-reg-set.h"
 #include "basic-block.h"
 #include "toplev.h"
+#include "cfgloop.h"
+#include "flags.h"
 
 /* Ratio of frequencies of edges so that one of more latch edges is
    considered to belong to inner loop with same header.  */
@@ -36,7 +40,7 @@ static void flow_loop_exit_edges_find	PARAMS ((struct loop *));
 static int flow_loop_nodes_find		PARAMS ((basic_block, struct loop *));
 static void flow_loop_pre_header_scan	PARAMS ((struct loop *));
 static basic_block flow_loop_pre_header_find PARAMS ((basic_block,
-						      const sbitmap *));
+						      dominance_info));
 static int flow_loop_level_compute	PARAMS ((struct loop *));
 static int flow_loops_level_compute	PARAMS ((struct loops *));
 static basic_block make_forwarder_block PARAMS ((basic_block, int, int,
@@ -90,7 +94,7 @@ flow_loops_cfg_dump (loops, file)
     }
 }
 
-/* Return non-zero if the nodes of LOOP are a subset of OUTER.  */
+/* Return nonzero if the nodes of LOOP are a subset of OUTER.  */
 
 bool
 flow_loop_nested_p (outer, loop)
@@ -112,7 +116,7 @@ flow_loop_dump (loop, file, loop_dump_aux, verbose)
      int verbose;
 {
   basic_block *bbs;
-  int i;
+  unsigned i;
 
   if (! loop || ! loop->header)
     return;
@@ -204,7 +208,7 @@ flow_loops_free (loops)
 {
   if (loops->parray)
     {
-      int i;
+      unsigned i;
 
       if (! loops->num)
 	abort ();
@@ -224,7 +228,7 @@ flow_loops_free (loops)
       loops->parray = NULL;
 
       if (loops->cfg.dom)
-	sbitmap_vector_free (loops->cfg.dom);
+	free_dominance_info (loops->cfg.dom);
 
       if (loops->cfg.dfs_order)
 	free (loops->cfg.dfs_order);
@@ -273,7 +277,7 @@ flow_loop_exit_edges_find (loop)
 {
   edge e;
   basic_block node, *bbs;
-  int num_exits, i;
+  unsigned num_exits, i;
 
   loop->exit_edges = NULL;
   loop->num_exits = 0;
@@ -331,11 +335,9 @@ flow_loop_nodes_find (header, loop)
   basic_block *stack;
   int sp;
   int num_nodes = 1;
-  int findex, lindex;
 
   header->loop_father = loop;
   header->loop_depth = loop->depth;
-  findex = lindex = header->index;
 
   if (loop->latch->loop_father != loop)
     {
@@ -415,7 +417,7 @@ flow_loop_pre_header_scan (loop)
 static basic_block
 flow_loop_pre_header_find (header, dom)
      basic_block header;
-     const sbitmap *dom;
+     dominance_info dom;
 {
   basic_block pre_header;
   edge e;
@@ -428,7 +430,7 @@ flow_loop_pre_header_find (header, dom)
       basic_block node = e->src;
 
       if (node != ENTRY_BLOCK_PTR
-	  && ! TEST_BIT (dom[node->index], header->index))
+	  && ! dominated_by_p (dom, node, header))
 	{
 	  if (pre_header == NULL)
 	    pre_header = node;
@@ -609,6 +611,10 @@ make_forwarder_block (bb, redirect_latch, redirect_nonlatch, except,
 
   insn = PREV_INSN (first_insn_after_basic_block_note (bb));
 
+  /* For empty block split_block will return NULL.  */
+  if (bb->end == insn)
+    emit_note_after (NOTE_INSN_DELETED, insn);
+
   fallthru = split_block (bb, insn);
   dummy = fallthru->src;
   bb = fallthru->dest;
@@ -617,7 +623,7 @@ make_forwarder_block (bb, redirect_latch, redirect_nonlatch, except,
   HEADER_BLOCK (dummy) = 0;
   HEADER_BLOCK (bb) = 1;
 
-  /* Redirect back edges we want to keep. */
+  /* Redirect back edges we want to keep.  */
   for (e = dummy->pred; e; e = next_e)
     {
       next_e = e->pred_next;
@@ -645,13 +651,12 @@ make_forwarder_block (bb, redirect_latch, redirect_nonlatch, except,
 static void
 canonicalize_loop_headers ()
 {
-  sbitmap *dom;
+  dominance_info dom;
   basic_block header;
   edge e;
   
   /* Compute the dominators.  */
-  dom = sbitmap_vector_alloc (last_basic_block, last_basic_block);
-  calculate_dominance_info (NULL, dom, CDI_DOMINATORS);
+  dom = calculate_dominance_info (CDI_DOMINATORS);
 
   alloc_aux_for_blocks (sizeof (int));
   alloc_aux_for_edges (sizeof (int));
@@ -670,7 +675,7 @@ canonicalize_loop_headers ()
 	    have_abnormal_edge = 1;
 
 	  if (latch != ENTRY_BLOCK_PTR
-	      && TEST_BIT (dom[latch->index], header->index))
+	      && dominated_by_p (dom, latch, header))
 	    {
 	      num_latches++;
 	      LATCH_EDGE (e) = 1;
@@ -747,7 +752,7 @@ canonicalize_loop_headers ()
 
   free_aux_for_blocks ();
   free_aux_for_edges ();
-  sbitmap_vector_free (dom);
+  free_dominance_info (dom);
 }
 
 /* Find all the natural loops in the function and save in LOOPS structure and
@@ -765,10 +770,11 @@ flow_loops_find (loops, flags)
   int num_loops;
   edge e;
   sbitmap headers;
-  sbitmap *dom;
+  dominance_info dom;
   int *dfs_order;
   int *rc_order;
-  basic_block header, bb;
+  basic_block header;
+  basic_block bb;
 
   /* This function cannot be repeatedly called with different
      flags to build up the loop information.  The loop tree
@@ -790,8 +796,7 @@ flow_loops_find (loops, flags)
   canonicalize_loop_headers ();
 
   /* Compute the dominators.  */
-  loops->cfg.dom = dom = sbitmap_vector_alloc (last_basic_block, last_basic_block);
-  calculate_dominance_info (NULL, dom, CDI_DOMINATORS);
+  dom = loops->cfg.dom = calculate_dominance_info (CDI_DOMINATORS);
 
   /* Count the number of loop headers.  This should be the
      same as the number of natural loops.  */
@@ -805,27 +810,27 @@ flow_loops_find (loops, flags)
      
       header->loop_depth = 0;
 
+      /* If we have an abnormal predecessor, do not consider the
+	 loop (not worth the problems).  */
+      for (e = header->pred; e; e = e->pred_next)
+	if (e->flags & EDGE_ABNORMAL)
+	  break;
+      if (e)
+	continue;
+
       for (e = header->pred; e; e = e->pred_next)
 	{
 	  basic_block latch = e->src;
 
 	  if (e->flags & EDGE_ABNORMAL)
-	    {
-	      if (more_latches)
-		{
-		  RESET_BIT (headers, header->index);
-		  num_loops--;
-		}
-	      break;
-	    }
+	    abort ();
 
 	  /* Look for back edges where a predecessor is dominated
 	     by this block.  A natural loop has a single entry
 	     node (header) that dominates all the nodes in the
 	     loop.  It also has single back edge to the header
 	     from a latch node.  */
-	  if (latch != ENTRY_BLOCK_PTR && TEST_BIT (dom[latch->index],
-						    header->index))
+	  if (latch != ENTRY_BLOCK_PTR && dominated_by_p (dom, latch, header))
 	    {
 	      /* Shared headers should be eliminated by now.  */
 	      if (more_latches)
@@ -899,7 +904,7 @@ flow_loops_find (loops, flags)
 	      basic_block latch = e->src;
 
 	      if (latch != ENTRY_BLOCK_PTR
-		  && TEST_BIT (dom[latch->index], header->index))
+		  && dominated_by_p (dom, latch, header))
 		{
 		  loop->latch = latch;
 		  break;
@@ -925,11 +930,13 @@ flow_loops_find (loops, flags)
   else
     {
       loops->cfg.dom = NULL;
-      sbitmap_vector_free (dom);
+      free_dominance_info (dom);
     }
+
+  loops->state = 0;
 #ifdef ENABLE_CHECKING
   verify_flow_info ();
-  verify_loop_structure (loops, 0);
+  verify_loop_structure (loops);
 #endif
 
   return loops->num;
@@ -951,7 +958,7 @@ flow_loops_update (loops, flags)
   return flow_loops_find (loops, flags);
 }
 
-/* Return non-zero if basic block BB belongs to LOOP.  */
+/* Return nonzero if basic block BB belongs to LOOP.  */
 bool
 flow_bb_inside_loop_p (loop, bb)
      const struct loop *loop;
@@ -966,7 +973,7 @@ flow_bb_inside_loop_p (loop, bb)
   return loop == source_loop || flow_loop_nested_p (loop, source_loop);
 }
 
-/* Return non-zero if edge E enters header of LOOP from outside of LOOP.  */
+/* Return nonzero if edge E enters header of LOOP from outside of LOOP.  */
 
 bool
 flow_loop_outside_edge_p (loop, e)
@@ -993,7 +1000,7 @@ get_loop_body (loop)
      const struct loop *loop;
 {
   basic_block *tovisit, bb;
-  int tv = 0;
+  unsigned tv = 0;
 
   if (!loop->num_nodes)
     abort ();
@@ -1004,7 +1011,7 @@ get_loop_body (loop)
   if (loop->latch == EXIT_BLOCK_PTR)
     {
       /* There may be blocks unreachable from EXIT_BLOCK.  */
-      if (loop->num_nodes != n_basic_blocks + 2)
+      if (loop->num_nodes != (unsigned) n_basic_blocks + 2)
 	abort ();
       FOR_EACH_BB (bb)
 	tovisit[tv++] = bb;
@@ -1074,18 +1081,57 @@ find_common_loop (loop_s, loop_d)
   return loop_s;
 }
 
+/* Cancels the LOOP; it must be innermost one.  */
+void
+cancel_loop (loops, loop)
+     struct loops *loops;
+     struct loop *loop;
+{
+  basic_block *bbs;
+  unsigned i;
+
+  if (loop->inner)
+    abort ();
+
+  /* Move blocks up one level (they should be removed as soon as possible).  */
+  bbs = get_loop_body (loop);
+  for (i = 0; i < loop->num_nodes; i++)
+    bbs[i]->loop_father = loop->outer;
+
+  /* Remove the loop from structure.  */
+  flow_loop_tree_node_remove (loop);
+
+  /* Remove loop from loops array.  */
+  loops->parray[loop->num] = NULL;
+
+  /* Free loop data.  */
+  flow_loop_free (loop);
+}
+
+/* Cancels LOOP and all its subloops.  */
+void
+cancel_loop_tree (loops, loop)
+     struct loops *loops;
+     struct loop *loop;
+{
+  while (loop->inner)
+    cancel_loop_tree (loops, loop->inner);
+  cancel_loop (loops, loop);
+}
+
 /* Checks that LOOPS are allright:
      -- sizes of loops are allright
      -- results of get_loop_body really belong to the loop
      -- loop header have just single entry edge and single latch edge
      -- loop latches have only single successor that is header of their loop
+     -- irreducible loops are correctly marked
   */
 void
-verify_loop_structure (loops, flags)
+verify_loop_structure (loops)
      struct loops *loops;
-     int flags;
 {
-  int *sizes, i, j;
+  unsigned *sizes, i, j;
+  sbitmap irreds;
   basic_block *bbs, bb;
   struct loop *loop;
   int err = 0;
@@ -1138,14 +1184,14 @@ verify_loop_structure (loops, flags)
       if (!loop)
 	continue;
 
-      if ((flags & VLS_EXPECT_PREHEADERS)
+      if ((loops->state & LOOPS_HAVE_PREHEADERS)
 	  && (!loop->header->pred->pred_next
 	      || loop->header->pred->pred_next->pred_next))
 	{
 	  error ("Loop %d's header does not have exactly 2 entries.", i);
 	  err = 1;
 	}
-      if (flags & VLS_EXPECT_SIMPLE_LATCHES)
+      if (loops->state & LOOPS_HAVE_SIMPLE_LATCHES)
 	{
 	  if (!loop->latch->succ
 	      || loop->latch->succ->succ_next)
@@ -1171,6 +1217,39 @@ verify_loop_structure (loops, flags)
 	}
     }
 
+  /* Check irreducible loops.  */
+  if (loops->state & LOOPS_HAVE_MARKED_IRREDUCIBLE_REGIONS)
+    {
+      /* Record old info.  */
+      irreds = sbitmap_alloc (last_basic_block);
+      FOR_EACH_BB (bb)
+	if (bb->flags & BB_IRREDUCIBLE_LOOP)
+	  SET_BIT (irreds, bb->index);
+	else
+	  RESET_BIT (irreds, bb->index);
+
+      /* Recount it.  */
+      mark_irreducible_loops (loops);
+
+      /* Compare.  */
+      FOR_EACH_BB (bb)
+	{
+	  if ((bb->flags & BB_IRREDUCIBLE_LOOP)
+	      && !TEST_BIT (irreds, bb->index))
+	    {
+	      error ("Basic block %d should be marked irreducible.", bb->index);
+	      err = 1;
+	    }
+	  else if (!(bb->flags & BB_IRREDUCIBLE_LOOP)
+	      && TEST_BIT (irreds, bb->index))
+	    {
+	      error ("Basic block %d should not be marked irreducible.", bb->index);
+	      err = 1;
+	    }
+	}
+      free (irreds);
+    }
+
   if (err)
     abort ();
 }
@@ -1178,7 +1257,7 @@ verify_loop_structure (loops, flags)
 /* Returns latch edge of LOOP.  */
 edge
 loop_latch_edge (loop)
-     struct loop *loop;
+     const struct loop *loop;
 {
   edge e;
 
@@ -1191,7 +1270,7 @@ loop_latch_edge (loop)
 /* Returns preheader edge of LOOP.  */
 edge
 loop_preheader_edge (loop)
-     struct loop *loop;
+     const struct loop *loop;
 {
   edge e;
 

@@ -4,7 +4,7 @@
    Free Software Foundation, Inc.
 
    Written by Gary Funck (gary@intrepid.com) The Ada Joint Program
-   Office (AJPO), Florida State Unviversity and Silicon Graphics Inc.
+   Office (AJPO), Florida State University and Silicon Graphics Inc.
    provided support for this effort -- June 21, 1995.
 
    Derived from the DWARF 1 implementation written by Ron Guilmette
@@ -399,10 +399,12 @@ enum dwarf_location_atom
     DW_OP_push_object_address = 0x97,
     DW_OP_call2 = 0x98,
     DW_OP_call4 = 0x99,
-    DW_OP_calli = 0x9a
+    DW_OP_call_ref = 0x9a,
+    /* GNU extensions.  */
+    DW_OP_GNU_push_tls_address = 0xe0
   };
 
-#define DW_OP_lo_user	0x80	/* Implementation-defined range start.  */
+#define DW_OP_lo_user	0xe0	/* Implementation-defined range start.  */
 #define DW_OP_hi_user	0xff	/* Implementation-defined range end.  */
 
 /* Type encodings.  */

@@ -23,6 +23,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "regs.h"
 #include "hard-reg-set.h"
@@ -37,6 +39,7 @@ Boston, MA 02111-1307, USA.  */
 #include "tree.h"
 #include "function.h"
 #include "expr.h"
+#include "ggc.h"
 #include "toplev.h"
 #include "tm_p.h"
 #include "target.h"
@@ -56,6 +59,8 @@ static void romp_output_function_epilogue PARAMS ((FILE *, HOST_WIDE_INT));
 static void romp_select_rtx_section PARAMS ((enum machine_mode, rtx,
 					     unsigned HOST_WIDE_INT));
 static void romp_encode_section_info PARAMS ((tree, int));
+static bool romp_rtx_costs PARAMS ((rtx, int, int, int *));
+static int romp_address_cost PARAMS ((rtx));
 
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_FUNCTION_PROLOGUE
@@ -66,6 +71,10 @@ static void romp_encode_section_info PARAMS ((tree, int));
 #define TARGET_ASM_SELECT_RTX_SECTION romp_select_rtx_section
 #undef TARGET_ENCODE_SECTION_INFO
 #define TARGET_ENCODE_SECTION_INFO romp_encode_section_info
+#undef TARGET_RTX_COSTS
+#define TARGET_RTX_COSTS romp_rtx_costs
+#undef TARGET_ADDRESS_COST
+#define TARGET_ADDRESS_COST romp_address_cost
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -228,7 +237,7 @@ update_cc (body, insn)
       break;
 
     case CC_TBIT:
-      /* Insn sets T bit if result is non-zero.  Next insn must be branch.  */
+      /* Insn sets T bit if result is nonzero.  Next insn must be branch.  */
       CC_STATUS_INIT;
       cc_status.flags = CC_IN_TB | CC_NOT_NEGATIVE;
       break;
@@ -388,7 +397,7 @@ current_function_operand (op, mode)
 	  && ! strcmp (current_function_name, XSTR (op, 0)));
 }
 
-/* Return non-zero if this function is known to have a null epilogue.  */
+/* Return nonzero if this function is known to have a null epilogue.  */
 
 int
 null_epilogue ()
@@ -785,7 +794,7 @@ print_operand (file, x, code)
       break;
 
     case 'Z':
-      /* Upper or lower half, depending on which is non-zero or not
+      /* Upper or lower half, depending on which is nonzero or not
 	 all ones.  Must be consistent with 'z' above.  */
       if (GET_CODE (x) != CONST_INT)
 	output_operand_lossage ("invalid %%Z value");
@@ -1031,7 +1040,7 @@ romp_sa_size ()
   return size * 4;
 }
 
-/* Return non-zero if this function makes calls or has fp operations
+/* Return nonzero if this function makes calls or has fp operations
    (which are really calls).  */
 
 int
@@ -1058,7 +1067,7 @@ romp_makes_calls ()
   return 0;
 }
 
-/* Return non-zero if this function will use r14 as a pointer to its
+/* Return nonzero if this function will use r14 as a pointer to its
    constant pool.  */
 
 int
@@ -1070,7 +1079,7 @@ romp_using_r14 ()
 	  || get_pool_size () != 0 || romp_makes_calls ());
 }
 
-/* Return non-zero if this function needs to push space on the stack.  */
+/* Return nonzero if this function needs to push space on the stack.  */
 
 int
 romp_pushes_stack ()
@@ -1345,7 +1354,6 @@ rtx
 get_symref (name)
      register const char *name;
 {
-  extern struct obstack permanent_obstack;
   register const char *sp = name;
   unsigned int hash = 0;
   struct symref_hashent *p, **last_p;
@@ -1367,10 +1375,8 @@ get_symref (name)
     {
       /* Ensure SYMBOL_REF will stay around.  */
       p = *last_p = (struct symref_hashent *)
-			permalloc (sizeof (struct symref_hashent));
-      p->symref = gen_rtx_SYMBOL_REF (Pmode,
-				      obstack_copy0 (&permanent_obstack,
-						     name, strlen (name)));
+			xmalloc (sizeof (struct symref_hashent));
+      p->symref = gen_rtx_SYMBOL_REF (Pmode, ggc_strdup (name));
       p->next = 0;
     }
 
@@ -2098,4 +2104,87 @@ romp_encode_section_info (decl, first)
 {
   if (TREE_CODE (TREE_TYPE (decl)) == FUNCTION_TYPE)
     SYMBOL_REF_FLAG (XEXP (DECL_RTL (decl), 0)) = 1;
+}
+
+static bool
+romp_rtx_costs (x, code, outer_code, total)
+     rtx x;
+     int code, outer_code;
+     int *total;
+{
+  switch (x)
+    {
+    case CONST_INT:
+      if ((outer_code == IOR && exact_log2 (INTVAL (x)) >= 0)
+	  || (outer_code == AND && exact_log2 (~INTVAL (x)) >= 0)
+	  || ((outer_code == PLUS || outer_code == MINUS)
+	      && (unsigned HOST_WIDE_INT) (INTVAL (x) + 15) < 31)
+	  || (outer_code == SET && (unsigned HOST_WIDE_INT) INTVAL (x) < 16))
+	*total = 0;
+      else if ((unsigned HOST_WIDE_INT) (INTVAL (x) + 0x8000) < 0x10000
+	       || (INTVAL (x) & 0xffff0000) == 0)
+	*total = 0;
+      else
+	*total = COSTS_N_INSNS (2);
+      return true;
+
+    case CONST:
+    case LABEL_REF:
+    case SYMBOL_REF:
+      if (current_function_operand (x, Pmode))
+	*total = 0;
+      else
+        *total = COSTS_N_INSNS (2);
+      return true;
+
+    case CONST_DOUBLE:
+      if (x == CONST0_RTX (GET_MODE (x)))
+	*total = 2;
+      else if (GET_MODE_CLASS (GET_MODE (x)) == MODE_FLOAT)
+	*total = COSTS_N_INSNS (5)
+      else
+	*total = COSTS_N_INSNS (4);
+      return true;
+
+    case MEM:
+      *total = current_function_operand (x, Pmode) ? 0 : COSTS_N_INSNS (2);
+      return true;
+
+    case MULT:
+      if (TARGET_IN_LINE_MUL && GET_MODE_CLASS (GET_MODE (X)) == MODE_INT)
+	*total = COSTS_N_INSNS (19);
+      else
+	*total = COSTS_N_INSNS (25);
+      return true;
+
+    case DIV:
+    case UDIV:
+    case MOD:
+    case UMOD:
+      *total = COSTS_N_INSNS (45);
+      return true;
+
+    default:
+      return false;
+    }
+}
+
+/* For the ROMP, everything is cost 0 except for addresses involving
+   symbolic constants, which are cost 1.  */
+
+static int
+romp_address_cost (x)
+     rtx x;
+{
+  return 
+  ((GET_CODE (x) == SYMBOL_REF
+    && ! CONSTANT_POOL_ADDRESS_P (x))
+   || GET_CODE (x) == LABEL_REF
+   || (GET_CODE (x) == CONST
+       && ! constant_pool_address_operand (x, Pmode))
+   || (GET_CODE (x) == PLUS
+       && ((GET_CODE (XEXP (x, 1)) == SYMBOL_REF
+	    && ! CONSTANT_POOL_ADDRESS_P (XEXP (x, 0)))
+	   || GET_CODE (XEXP (x, 1)) == LABEL_REF
+	   || GET_CODE (XEXP (x, 1)) == CONST)));
 }

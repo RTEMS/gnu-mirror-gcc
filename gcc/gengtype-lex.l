@@ -20,13 +20,18 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 02111-1307, USA.  */
 
 %{
+#include "bconfig.h"
+#include "coretypes.h"
+#include "system.h"
+
 #define malloc xmalloc
 #define realloc xrealloc
 
-#include "hconfig.h"
-#include "system.h"
 #include "gengtype.h"
 #include "gengtype-yacc.h"
+
+#undef YY_USE_PROTOS
+#define YY_DECL int yylex ()
 
 static void update_lineno PARAMS ((const char *l, size_t len));
 
@@ -45,7 +50,7 @@ update_lineno (l, len)
 
 %}
 
-ID	[[:alpha:]][[:alnum:]_]*
+ID	[[:alpha:]_][[:alnum:]_]*
 WS	[[:space:]]+
 IWORD	short|long|(un)?signed|char|int|HOST_WIDE_INT|bool|size_t
 ITYPE	{IWORD}({WS}{IWORD})*
@@ -200,8 +205,11 @@ ITYPE	{IWORD}({WS}{IWORD})*
 "struct"/[^[:alnum:]_]		{ return STRUCT; }
 "enum"/[^[:alnum:]_]		{ return ENUM; }
 "ptr_alias"/[^[:alnum:]_]	{ return ALIAS; }
-"param_is"/[^[:alnum:]_]	{ return PARAM_IS; }
 [0-9]+				{ return NUM; }
+"param"[0-9]*"_is"/[^[:alnum:]_]		{ 
+  yylval.s = xmemdup (yytext, yyleng, yyleng+1);
+  return PARAM_IS;
+}
 
 {IWORD}({WS}{IWORD})*/[^[:alnum:]_]		|
 "ENUM_BITFIELD"{WS}?"("{WS}?{ID}{WS}?")"	{
@@ -305,7 +313,7 @@ yyerror (s)
 
 void
 parse_file (fname)
-      char *fname;
+      const char *fname;
 {
   yyin = fopen (fname, "r");
   lexer_line.file = fname;

@@ -120,10 +120,11 @@ extern "Java"
       class SyncFailedException;
       class UTFDataFormatException;
       class UnsupportedEncodingException;
+      class VMObjectStreamClass;
       class ValidatorAndPriority;
       class WriteAbortedException;
       class Writer;
-    };
+    }
 
     namespace lang
     {
@@ -134,7 +135,6 @@ extern "Java"
       class AssertionError;
       class Boolean;
       class Byte;
-      class CPlusPlusDemangler;
       class CharSequence;
       class Character;
       class Character$Subset;
@@ -212,6 +212,7 @@ extern "Java"
       class UnsupportedOperationException;
       class VMClassLoader;
       class VMSecurityManager;
+      class VMThrowable;
       class VerifyError;
       class VirtualMachineError;
       class Void;
@@ -222,7 +223,7 @@ extern "Java"
         class ReferenceQueue;
         class SoftReference;
         class WeakReference;
-      };
+      }
 
       namespace reflect
       {
@@ -230,13 +231,20 @@ extern "Java"
         class Array;
         class Constructor;
         class Field;
+        class InvocationHandler;
         class InvocationTargetException;
         class Member;
         class Method;
         class Modifier;
+        class Proxy;
+        class Proxy$ClassFactory;
+        class Proxy$ProxyData;
+        class Proxy$ProxySignature;
+        class Proxy$ProxyType;
         class ReflectPermission;
-      };
-    };
+        class UndeclaredThrowableException;
+      }
+    }
 
     namespace util
     {
@@ -329,7 +337,6 @@ extern "Java"
       class RandomAccess;
       class RandomAccessSubList;
       class ResourceBundle;
-      class ResourceBundle$Security;
       class Set;
       class SimpleTimeZone;
       class SortedMap;
@@ -364,7 +371,14 @@ extern "Java"
         class JarInputStream;
         class JarOutputStream;
         class Manifest;
-      };
+      }
+
+      namespace regex
+      {
+        class Matcher;
+        class Pattern;
+        class PatternSyntaxException;
+      }
 
       namespace zip
       {
@@ -388,10 +402,10 @@ extern "Java"
         class ZipFile$ZipEntryEnumeration;
         class ZipInputStream;
         class ZipOutputStream;
-      };
-    };
-  };
-};
+      }
+    }
+  }
+}
   
 typedef struct java::lang::Object* jobject;
 typedef class java::lang::Class* jclass;

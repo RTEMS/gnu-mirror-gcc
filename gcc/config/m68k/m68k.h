@@ -69,7 +69,7 @@ extern int target_flags;
 #define MASK_68881	2
 #define TARGET_68881 (target_flags & MASK_68881)
 
-/* Compile using 68020 bitfield insns.  */
+/* Compile using 68020 bit-field insns.  */
 #define MASK_BITFIELD	4
 #define TARGET_BITFIELD (target_flags & MASK_BITFIELD)
 
@@ -277,15 +277,7 @@ extern int target_flags;
    Don't use this macro to turn on various extra optimizations for
    `-O'.  That is what `OPTIMIZATION_OPTIONS' is for.  */
 
-#define OVERRIDE_OPTIONS		\
-{					\
-  override_options();			\
-  if (! TARGET_68020 && flag_pic == 2)	\
-    error("-fPIC is not currently supported on the 68000 or 68010\n");	\
-  if (TARGET_PCREL && flag_pic == 0)	\
-    flag_pic = 1;			\
-  SUBTARGET_OVERRIDE_OPTIONS;		\
-}
+#define OVERRIDE_OPTIONS   override_options()
 
 /* These are meant to be redefined in the host dependent files */
 #define SUBTARGET_SWITCHES
@@ -296,6 +288,11 @@ extern int target_flags;
 
 /* Define for XFmode extended real floating point support.  */
 #define LONG_DOUBLE_TYPE_SIZE 96
+
+/* Set the value of FLT_EVAL_METHOD in float.h.  When using 68040 fp
+   instructions, we get proper intermediate rounding, otherwise we 
+   get extended precision results.  */
+#define TARGET_FLT_EVAL_METHOD (TARGET_68040_ONLY ? 0 : 2)
 
 /* Define this if most significant bit is lowest numbered
    in instructions that operate on numbered bit-fields.
@@ -1193,10 +1190,8 @@ __transfer_from_trampoline ()					\
 /* Addressing modes, and classification of registers for them.  */
 
 #define HAVE_POST_INCREMENT 1
-/* #define HAVE_POST_DECREMENT 0 */
 
 #define HAVE_PRE_DECREMENT 1
-/* #define HAVE_PRE_INCREMENT 0 */
 
 /* Macros to check register numbers against specific register classes.  */
 
@@ -1525,96 +1520,6 @@ __transfer_from_trampoline ()					\
    so give the MEM rtx a byte's mode.  */
 #define FUNCTION_MODE QImode
 
-/* Compute the cost of computing a constant rtl expression RTX
-   whose rtx-code is CODE.  The body of this macro is a portion
-   of a switch statement.  If the code is computed here,
-   return it with a return statement.  Otherwise, break from the switch.  */
-
-#define CONST_COSTS(RTX,CODE,OUTER_CODE) \
-  case CONST_INT:						\
-    /* Constant zero is super cheap due to clr instruction.  */	\
-    if (RTX == const0_rtx) return 0;				\
-    /* if ((OUTER_CODE) == SET) */				\
-      return const_int_cost(RTX);				\
-  case CONST:							\
-  case LABEL_REF:						\
-  case SYMBOL_REF:						\
-    return 3;							\
-  case CONST_DOUBLE:						\
-    /* Make 0.0 cheaper than other floating constants to	\
-       encourage creating tstsf and tstdf insns.  */		\
-    if ((OUTER_CODE) == COMPARE					\
-        && ((RTX) == CONST0_RTX (SFmode)			\
-	    || (RTX) == CONST0_RTX (DFmode)))			\
-      return 4;							\
-    return 5;
-
-/* Compute the cost of various arithmetic operations.
-   These are vaguely right for a 68020.  */
-/* The costs for long multiply have been adjusted to
-   work properly in synth_mult on the 68020,
-   relative to an average of the time for add and the time for shift,
-   taking away a little more because sometimes move insns are needed.  */
-/* div?.w is relatively cheaper on 68000 counted in COSTS_N_INSNS terms.  */
-#define MULL_COST (TARGET_68060 ? 2 : TARGET_68040 ? 5 : 13)
-#define MULW_COST (TARGET_68060 ? 2 : TARGET_68040 ? 3 : TARGET_68020 ? 8 : 5)
-#define DIVW_COST (TARGET_68020 ? 27 : 12)
-
-#define RTX_COSTS(X,CODE,OUTER_CODE)				\
-  case PLUS:							\
-    /* An lea costs about three times as much as a simple add.  */  \
-    if (GET_MODE (X) == SImode					\
-	&& GET_CODE (XEXP (X, 1)) == REG			\
-	&& GET_CODE (XEXP (X, 0)) == MULT			\
-	&& GET_CODE (XEXP (XEXP (X, 0), 0)) == REG		\
-	&& GET_CODE (XEXP (XEXP (X, 0), 1)) == CONST_INT	\
-	&& (INTVAL (XEXP (XEXP (X, 0), 1)) == 2			\
-	    || INTVAL (XEXP (XEXP (X, 0), 1)) == 4		\
-	    || INTVAL (XEXP (XEXP (X, 0), 1)) == 8))		\
-      return COSTS_N_INSNS (3);	 /* lea an@(dx:l:i),am */	\
-    break;							\
-  case ASHIFT:							\
-  case ASHIFTRT:						\
-  case LSHIFTRT:						\
-    if (TARGET_68060)						\
-      return COSTS_N_INSNS(1);					\
-    if (! TARGET_68020)							\
-      {									\
-	if (GET_CODE (XEXP (X, 1)) == CONST_INT)			\
-	  {								\
-	    if (INTVAL (XEXP (X, 1)) < 16)				\
-	      return COSTS_N_INSNS (2) + INTVAL (XEXP (X, 1)) / 2;	\
-	    else							\
-	      /* We're using clrw + swap for these cases.  */		\
-	      return COSTS_N_INSNS (4) + (INTVAL (XEXP (X, 1)) - 16) / 2; \
-	  }								\
-	return COSTS_N_INSNS (10); /* worst case */			\
-      }									\
-    /* A shift by a big integer takes an extra instruction.  */ \
-    if (GET_CODE (XEXP (X, 1)) == CONST_INT			\
-	&& (INTVAL (XEXP (X, 1)) == 16))			\
-      return COSTS_N_INSNS (2);	 /* clrw;swap */		\
-    if (GET_CODE (XEXP (X, 1)) == CONST_INT			\
-	&& !(INTVAL (XEXP (X, 1)) > 0				\
-	     && INTVAL (XEXP (X, 1)) <= 8))			\
-      return COSTS_N_INSNS (3);	 /* lsr #i,dn */		\
-    break;							\
-  case MULT:							\
-    if ((GET_CODE (XEXP (X, 0)) == ZERO_EXTEND			\
-	 || GET_CODE (XEXP (X, 0)) == SIGN_EXTEND)		\
-	&& GET_MODE (X) == SImode)				\
-      return COSTS_N_INSNS (MULW_COST);				\
-    if (GET_MODE (X) == QImode || GET_MODE (X) == HImode)	\
-      return COSTS_N_INSNS (MULW_COST);				\
-    else							\
-      return COSTS_N_INSNS (MULL_COST);				\
-  case DIV:							\
-  case UDIV:							\
-  case MOD:							\
-  case UMOD:							\
-    if (GET_MODE (X) == QImode || GET_MODE (X) == HImode)	\
-      return COSTS_N_INSNS (DIVW_COST); /* div.w */		\
-    return COSTS_N_INSNS (43);	 /* div.l */
 
 /* Tell final.c how to eliminate redundant test instructions.  */
 
@@ -1667,6 +1572,8 @@ __transfer_from_trampoline ()					\
 /* Output before writable data.  */
 
 #define DATA_SECTION_ASM_OP "\t.data"
+
+#define GLOBAL_ASM_OP "\t.globl\t"
 
 /* Here are four prefixes that are used by asm_fprintf to
    facilitate customization for alternate assembler syntaxes.
@@ -1735,32 +1642,29 @@ __transfer_from_trampoline ()					\
 /* Before the prologue, the top of the frame is at 4(%sp).  */
 #define INCOMING_FRAME_SP_OFFSET 4
 
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME.  */
+/* Describe how we implement __builtin_eh_return.  */
+#define EH_RETURN_DATA_REGNO(N) \
+  ((N) < 2 ? (N) : INVALID_REGNUM)
+#define EH_RETURN_STACKADJ_RTX	gen_rtx_REG (Pmode, 8)
+#define EH_RETURN_HANDLER_RTX					    \
+  gen_rtx_MEM (Pmode,						    \
+	       gen_rtx_PLUS (Pmode, arg_pointer_rtx,		    \
+			     plus_constant (EH_RETURN_STACKADJ_RTX, \
+					    UNITS_PER_WORD)))
 
-#define ASM_OUTPUT_LABEL(FILE,NAME)	\
-  do { assemble_name (FILE, NAME); fputs (":\n", FILE); } while (0)
-
-/* This is how to output a command to make the user-level label named NAME
-   defined for reference from other files.  */
-
-#define GLOBAL_ASM_OP "\t.globl\t"
-#define ASM_GLOBALIZE_LABEL(FILE,NAME)	\
-  do { fprintf (FILE, "%s", GLOBAL_ASM_OP);		\
-       assemble_name (FILE, NAME);			\
-       fputs ("\n", FILE);} while (0)
+/* Select a format to encode pointers in exception handling data.  CODE
+   is 0 for data, 1 for code labels, 2 for function pointers.  GLOBAL is
+   true if the symbol may be affected by dynamic relocations.  */
+#define ASM_PREFERRED_EH_DATA_FORMAT(CODE, GLOBAL)       		   \
+  (flag_pic								   \
+   ? ((GLOBAL) ? DW_EH_PE_indirect : 0) | DW_EH_PE_pcrel | DW_EH_PE_sdata4 \
+   : DW_EH_PE_absptr)
 
 /* This is how to output a reference to a user-level label named NAME.
    `assemble_name' uses this.  */
 
 #define ASM_OUTPUT_LABELREF(FILE,NAME)	\
   asm_fprintf (FILE, "%0U%s", NAME)
-
-/* This is how to output an internal numbered label where
-   PREFIX is the class of label and NUM is the number within the class.  */
-
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)	\
-  asm_fprintf (FILE, "%0L%s%d:\n", PREFIX, NUM)
 
 /* This is how to store into the string LABEL
    the symbol_ref name of an internal numbered label where
@@ -1823,14 +1727,6 @@ __transfer_from_trampoline ()					\
   assemble_name ((FILE), (NAME)),		\
   fprintf ((FILE), ",%u\n", (ROUNDED)))
 
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)	\
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),	\
-  sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO)))
-
 /* Output a float value (represented as a C double) as an immediate operand.
    This macro is a 68k-specific macro.  */
 
@@ -1839,7 +1735,7 @@ __transfer_from_trampoline ()					\
       if (CODE == 'f')						\
         {							\
           char dstr[30];					\
-          REAL_VALUE_TO_DECIMAL (VALUE, "%.9g", dstr);		\
+      	  real_to_decimal (dstr, &(VALUE), sizeof (dstr), 9, 0); \
           asm_fprintf ((FILE), "%I0r%s", dstr);			\
         }							\
       else							\
@@ -1854,7 +1750,7 @@ __transfer_from_trampoline ()					\
    This macro is a 68k-specific macro.  */
 #define ASM_OUTPUT_DOUBLE_OPERAND(FILE,VALUE)				\
  do { char dstr[30];							\
-      REAL_VALUE_TO_DECIMAL (VALUE, "%.20g", dstr);			\
+      real_to_decimal (dstr, &(VALUE), sizeof (dstr), 0, 1);		\
       asm_fprintf (FILE, "%I0r%s", dstr);				\
     } while (0)
 
@@ -1862,7 +1758,7 @@ __transfer_from_trampoline ()					\
    generated by m68k.md.  */
 #define ASM_OUTPUT_LONG_DOUBLE_OPERAND(FILE,VALUE)			\
  do { char dstr[30];							\
-      REAL_VALUE_TO_DECIMAL (VALUE, "%.20g", dstr);			\
+      real_to_decimal (dstr, &(VALUE), sizeof (dstr), 0, 1);		\
       asm_fprintf (FILE, "%I0r%s", dstr);				\
     } while (0)
 

@@ -83,6 +83,9 @@ extern void expand_eh_region_end_throw		PARAMS ((tree));
    destroying an object twice.  */
 extern void expand_eh_region_end_fixup		PARAMS ((tree));
 
+/* End some sort of EH region, depending on the argument.  */
+extern void expand_eh_handler			PARAMS ((tree));
+
 /* Invokes CALLBACK for every exception handler label.  Only used by old
    loop hackery; should not be used by new code.  */
 extern void for_each_eh_label			PARAMS ((void (*) (rtx)));
@@ -91,8 +94,8 @@ extern void for_each_eh_label			PARAMS ((void (*) (rtx)));
 extern bool can_throw_internal			PARAMS ((rtx));
 extern bool can_throw_external			PARAMS ((rtx));
 
-/* Return nonzero if nothing in this function can throw.  */
-extern bool nothrow_function_p			PARAMS ((void));
+/* Set current_function_nothrow and cfun->all_throwers_are_sibcalls.  */
+extern void set_nothrow_function_flags		PARAMS ((void));
 
 /* After initial rtl generation, call back to finish generating
    exception support code.  */

@@ -28,7 +28,6 @@ Boston, MA 02111-1307, USA.  */
 #define  BAD_ADDR ((void*)-1)
 #endif
 
-#include <signal.h>
 #if ! defined( SIGCHLD ) && defined( SIGCLD )
 #  define SIGCHLD SIGCLD
 #endif
@@ -1356,7 +1355,8 @@ process ()
   process_ct++;
 #endif
   if (VLEVEL( VERB_PROGRESS ) && have_tty)
-    fprintf (stderr, "%6d %-50s   \r", data_map_size, pz_curr_file );
+    fprintf (stderr, "%6lu %-50s   \r",
+	     (unsigned long) data_map_size, pz_curr_file);
 
 # ifndef SEPARATE_FIX_PROC
   process_chain_head = NOPROCESS;

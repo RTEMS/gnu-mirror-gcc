@@ -20,6 +20,7 @@ along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
+#define CONSTANT_POOL_BEFORE_FUNCTION	0
 
 /* check whether load_fpu_reg or not */
 #define LOAD_FPU_REG_P(x) ((x)>=8 && (x)<=11)
@@ -508,7 +509,7 @@ loading is easier into LOAD_FPU_REGS than FPU_REGS! */
 extern int current_first_parm_offset;
 
 /* Offset of first parameter from the argument pointer register value.  
-   For the pdp11, this is non-zero to account for the return address.
+   For the pdp11, this is nonzero to account for the return address.
 	1 - return address
 	2 - frame pointer (always saved, even when not used!!!!)
 		-- chnage some day !!!:q!
@@ -667,10 +668,8 @@ extern int may_call_alloca;
 /* Addressing modes, and classification of registers for them.  */
 
 #define HAVE_POST_INCREMENT 1
-/* #define HAVE_POST_DECREMENT 0 */
 
 #define HAVE_PRE_DECREMENT 1
-/* #define HAVE_PRE_INCREMENT 0 */
 
 /* Macros to check register numbers against specific register classes.  */
 
@@ -702,7 +701,7 @@ extern int may_call_alloca;
 /* Nonzero if the constant value X is a legitimate general operand.
    It is given that X satisfies CONSTANT_P or is a CONST_DOUBLE.  */
 
-#define LEGITIMATE_CONSTANT_P(X) (1)
+#define LEGITIMATE_CONSTANT_P(X) (TARGET_FPU? 1: !(GET_CODE(X) == CONST_DOUBLE))
 
 /* The macros REG_OK_FOR..._P assume that the arg is a REG rtx
    and check its validity for a certain class.
@@ -773,6 +772,29 @@ extern int may_call_alloca;
 	&& GET_CODE (XEXP (operand, 0)) == REG				\
 	&& REG_OK_FOR_BASE_P (XEXP (operand, 0)))			\
       goto ADDR;							\
+									\
+    /* accept -(SP) -- which uses PRE_MODIFY for byte mode */		\
+    if (GET_CODE (operand) == PRE_MODIFY				\
+	&& GET_CODE (XEXP (operand, 0)) == REG				\
+	&& REGNO (XEXP (operand, 0)) == 6        	        	\
+	&& GET_CODE ((xfoob = XEXP (operand, 1))) == PLUS		\
+	&& GET_CODE (XEXP (xfoob, 0)) == REG				\
+	&& REGNO (XEXP (xfoob, 0)) == 6	        	        	\
+	&& CONSTANT_P (XEXP (xfoob, 1))                                 \
+	&& INTVAL (XEXP (xfoob,1)) == -2)      	               		\
+      goto ADDR;							\
+									\
+    /* accept (SP)+ -- which uses POST_MODIFY for byte mode */		\
+    if (GET_CODE (operand) == POST_MODIFY				\
+	&& GET_CODE (XEXP (operand, 0)) == REG				\
+	&& REGNO (XEXP (operand, 0)) == 6        	        	\
+	&& GET_CODE ((xfoob = XEXP (operand, 1))) == PLUS		\
+	&& GET_CODE (XEXP (xfoob, 0)) == REG				\
+	&& REGNO (XEXP (xfoob, 0)) == 6	        	        	\
+	&& CONSTANT_P (XEXP (xfoob, 1))                                 \
+	&& INTVAL (XEXP (xfoob,1)) == 2)      	               		\
+      goto ADDR;							\
+									\
     									\
     /* handle another level of indirection ! */				\
     if (GET_CODE(operand) != MEM)					\
@@ -912,28 +934,6 @@ extern int may_call_alloca;
    but a CALL with constant address is cheap.  */
 /* #define NO_FUNCTION_CSE */
 
-/* Compute the cost of computing a constant rtl expression RTX
-   whose rtx-code is CODE.  The body of this macro is a portion
-   of a switch statement.  If the code is computed here,
-   return it with a return statement.  Otherwise, break from the switch. 
-
-   -1, 0, 1 are cheaper for add, sub ... 
-*/
-
-#define CONST_COSTS(RTX,CODE,OUTER_CODE) \
-  case CONST_INT:						\
-    if (INTVAL(RTX) == 0					\
-	|| INTVAL(RTX) == -1					\
-	|| INTVAL(RTX) == 1)					\
-      return 0;							\
-  case CONST:							\
-  case LABEL_REF:						\
-  case SYMBOL_REF:						\
-    /* twice as expensive as REG */				\
-    return 2;							\
-  case CONST_DOUBLE:						\
-    /* twice (or 4 times) as expensive as 16 bit */		\
-    return 4;
 
 /* cost of moving one register class to another */
 #define REGISTER_MOVE_COST(MODE, CLASS1, CLASS2) \
@@ -1029,27 +1029,12 @@ fprintf (FILE, "$help$: . = .+8 ; space for tmp moves!\n")	\
 {"r0", "r1", "r2", "r3", "r4", "r5", "sp", "pc",     \
  "ac0", "ac1", "ac2", "ac3", "ac4", "ac5" }
 
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME.  */
-
-#define ASM_OUTPUT_LABEL(FILE,NAME)	\
-  do { assemble_name (FILE, NAME); fputs (":\n", FILE); } while (0)
-
-/* This is how to output a command to make the user-level label named NAME
-   defined for reference from other files.  */
-
-#define ASM_GLOBALIZE_LABEL(FILE,NAME)	\
-  do { fputs ("\t.globl ", FILE); assemble_name (FILE, NAME); fputs("\n", FILE); } while (0)
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP "\t.globl "
 
 /* The prefix to add to user-visible assembler symbols. */
 
 #define USER_LABEL_PREFIX "_"
-
-/* This is how to output an internal numbered label where
-   PREFIX is the class of label and NUM is the number within the class.  */
-
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)	\
-  fprintf (FILE, "%s_%d:\n", PREFIX, NUM)
 
 /* This is how to store into the string LABEL
    the symbol_ref name of an internal numbered label where
@@ -1092,7 +1077,7 @@ fprintf (FILE, "$help$: . = .+8 ; space for tmp moves!\n")	\
     }
 
 #define ASM_OUTPUT_SKIP(FILE,SIZE)  \
-  fprintf (FILE, "\t.=.+ %o\n", (SIZE))
+  fprintf (FILE, "\t.=.+ %#ho\n", (unsigned short)(SIZE))
 
 /* This says how to output an assembler line
    to define a global common symbol.  */
@@ -1102,7 +1087,7 @@ fprintf (FILE, "$help$: . = .+8 ; space for tmp moves!\n")	\
   assemble_name ((FILE), (NAME)),		\
   fprintf ((FILE), "\n"),			\
   assemble_name ((FILE), (NAME)),		\
-  fprintf ((FILE), ": .=.+ %o\n", (ROUNDED))		\
+  fprintf ((FILE), ": .=.+ %#ho\n", (unsigned short)(ROUNDED))		\
 )
 
 /* This says how to output an assembler line
@@ -1110,15 +1095,7 @@ fprintf (FILE, "$help$: . = .+8 ; space for tmp moves!\n")	\
 
 #define ASM_OUTPUT_LOCAL(FILE, NAME, SIZE, ROUNDED)  \
 ( assemble_name ((FILE), (NAME)),				\
-  fprintf ((FILE), ":\t.=.+ %o\n", (ROUNDED)))
-
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)	\
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),	\
-  sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO)))
+  fprintf ((FILE), ":\t.=.+ %#ho\n", (unsigned short)(ROUNDED)))
 
 /* Print operand X (an rtx) in assembler syntax to file FILE.
    CODE is a letter or dot (`z' in `%z0') or 0 if no letter was specified.
@@ -1134,11 +1111,9 @@ fprintf (FILE, "$help$: . = .+8 ; space for tmp moves!\n")	\
   else if (GET_CODE (X) == MEM)						\
     output_address (XEXP (X, 0));					\
   else if (GET_CODE (X) == CONST_DOUBLE && GET_MODE (X) != SImode)	\
-    { REAL_VALUE_TYPE r;						\
-      char buf[30];							\
-      REAL_VALUE_FROM_CONST_DOUBLE (r, X);				\
-      REAL_VALUE_TO_DECIMAL (r, "%.20e", buf);				\
-      fprintf (FILE, "#%s", buf); }					\
+    { char buf[30];							\
+      real_to_decimal (buf, CONST_DOUBLE_REAL_VALUE (X), sizeof (buf), 0, 1); \
+      fprintf (FILE, "$0F%s", buf); }					\
   else { putc ('$', FILE); output_addr_const_pdp11 (FILE, X); }}
 
 /* Print a memory address as an operand to reference that memory location.  */
@@ -1214,89 +1189,6 @@ JMP	FUNCTION	0x0058  0x0000 <- FUNCTION
       /* flag_unroll_loops			= 1; */			\
     }									\
 }
-
-
-/* Provide the costs of a rtl expression.  This is in the body of a
-   switch on CODE. 
-
-   we don't say how expensive SImode is - pretty expensive!!!
-
-   there is something wrong in MULT because MULT is not 
-   as cheap as total = 2 even if we can shift!
-
-   if optimizing for size make mult etc cheap, but not 1, so when 
-   in doubt the faster insn is chosen.
-*/
-
-#define RTX_COSTS(X,CODE,OUTER_CODE) \
-  case MULT:								\
-    if (optimize_size)							\
-      total = COSTS_N_INSNS(2);						\
-    else								\
-      total = COSTS_N_INSNS (11);					\
-    break;								\
-  case DIV:								\
-    if (optimize_size)							\
-      total = COSTS_N_INSNS(2);						\
-    else								\
-      total = COSTS_N_INSNS (25);					\
-    break;								\
-  case MOD:								\
-    if (optimize_size)							\
-      total = COSTS_N_INSNS(2);						\
-    else								\
-      total = COSTS_N_INSNS (26);					\
-    break;								\
-  case ABS:								\
-    /* equivalent to length, so same for optimize_size */		\
-    total = COSTS_N_INSNS (3);						\
-    break;								\
-  case ZERO_EXTEND:							\
-    /* only used for: qi->hi */						\
-    total = COSTS_N_INSNS(1);						\
-    break;								\
-  case SIGN_EXTEND:							\
-    if (GET_MODE(X) == HImode)						\
-      	total = COSTS_N_INSNS(1);					\
-    else if (GET_MODE(X) == SImode)					\
-	total = COSTS_N_INSNS(6);					\
-    else								\
-	total = COSTS_N_INSNS(2);					\
-    break;								\
-  /* case LSHIFT: */		       					\
-  case ASHIFT:								\
-  case LSHIFTRT:							\
-  case ASHIFTRT:							\
-    if (optimize_size)							\
-      total = COSTS_N_INSNS(1);						\
-    else if (GET_MODE(X) ==  QImode)					\
-    {									\
-      if (GET_CODE(XEXP (X,1)) != CONST_INT)				\
-   	total = COSTS_N_INSNS(8); /* worst case */ 			\
-      else                                                              \
-	total = COSTS_N_INSNS(INTVAL(XEXP (X,1)));			\
-    }									\
-    else if (GET_MODE(X) == HImode)					\
-    {									\
-      if (GET_CODE(XEXP (X,1)) == CONST_INT)				\
-      {									\
-	if (abs (INTVAL (XEXP (X, 1))) == 1)				\
-          total = COSTS_N_INSNS(1);					\
-        else								\
-	  total = COSTS_N_INSNS(2.5 + 0.5 *INTVAL(XEXP(X,1)));		\
-      }									\
-      else /* worst case */						\
-        total = COSTS_N_INSNS (10);					\
-    }									\
-    else if (GET_MODE(X) == SImode)					\
-    {									\
-      if (GET_CODE(XEXP (X,1)) == CONST_INT)				\
-	  total = COSTS_N_INSNS(2.5 + 0.5 *INTVAL(XEXP(X,1)));		\
-      else /* worst case */						\
-        total = COSTS_N_INSNS(18);					\
-    }									\
-    break;
-
 
 /* there is no point in avoiding branches on a pdp, 
    since branches are really cheap - I just want to find out

@@ -47,6 +47,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "toplev.h"
 #include "rtl.h"
 #include "tm_p.h"
@@ -153,7 +155,7 @@ static int *containing_rgn;
 
 void debug_regions PARAMS ((void));
 static void find_single_block_region PARAMS ((void));
-static void find_rgns PARAMS ((struct edge_list *, sbitmap *));
+static void find_rgns PARAMS ((struct edge_list *, dominance_info));
 static int too_large PARAMS ((int, int *, int *));
 
 extern void debug_live PARAMS ((int, int));
@@ -173,7 +175,6 @@ typedef struct
 bitlst;
 
 static int bitlst_table_last;
-static int bitlst_table_size;
 static int *bitlst_table;
 
 static void extract_bitlst PARAMS ((sbitmap, bitlst *));
@@ -270,16 +271,13 @@ static edgeset *ancestor_edges;
 
 static void compute_dom_prob_ps PARAMS ((int));
 
-#define ABS_VALUE(x) (((x)<0)?(-(x)):(x))
 #define INSN_PROBABILITY(INSN) (SRC_PROB (BLOCK_TO_BB (BLOCK_NUM (INSN))))
 #define IS_SPECULATIVE_INSN(INSN) (IS_SPECULATIVE (BLOCK_TO_BB (BLOCK_NUM (INSN))))
 #define INSN_BB(INSN) (BLOCK_TO_BB (BLOCK_NUM (INSN)))
 
 /* Parameters affecting the decision of rank_for_schedule().
-   ??? Nope.  But MIN_PROBABILITY is used in copmute_trg_info.  */
-#define MIN_DIFF_PRIORITY 2
+   ??? Nope.  But MIN_PROBABILITY is used in compute_trg_info.  */
 #define MIN_PROBABILITY 40
-#define MIN_PROB_DIFF 10
 
 /* Speculative scheduling functions.  */
 static int check_live_1 PARAMS ((int, rtx));
@@ -624,7 +622,7 @@ too_large (block, num_bbs, num_insns)
 static void
 find_rgns (edge_list, dom)
      struct edge_list *edge_list;
-     sbitmap *dom;
+     dominance_info dom;
 {
   int *max_hdr, *dfs_nr, *stack, *degree;
   char no_loops = 1;
@@ -640,7 +638,7 @@ find_rgns (edge_list, dom)
   /* Note if a block is a natural loop header.  */
   sbitmap header;
 
-  /* Note if a block is an natural inner loop header.  */
+  /* Note if a block is a natural inner loop header.  */
   sbitmap inner;
 
   /* Note if a block is in the block queue.  */
@@ -804,7 +802,7 @@ find_rgns (edge_list, dom)
       if (no_loops)
 	SET_BIT (header, 0);
 
-      /* Second travsersal:find reducible inner loops and topologically sort
+      /* Second traversal:find reducible inner loops and topologically sort
 	 block of each region.  */
 
       queue = (int *) xmalloc (n_basic_blocks * sizeof (int));
@@ -837,7 +835,7 @@ find_rgns (edge_list, dom)
 		    {
 		      /* Now verify that the block is dominated by the loop
 			 header.  */
-		      if (!TEST_BIT (dom[jbb->index], bb->index))
+		      if (!dominated_by_p (dom, jbb, bb))
 			break;
 		    }
 		}
@@ -1293,7 +1291,7 @@ debug_candidates (trg)
     debug_candidate (i);
 }
 
-/* Functions for speculative scheduing.  */
+/* Functions for speculative scheduling.  */
 
 /* Return 0 if x is a set of a register alive in the beginning of one
    of the split-blocks of src, otherwise return 1.  */
@@ -1562,14 +1560,14 @@ enum INSN_TRAP_CLASS
 #define WORST_CLASS(class1, class2) \
 ((class1 > class2) ? class1 : class2)
 
-/* Non-zero if block bb_to is equal to, or reachable from block bb_from.  */
+/* Nonzero if block bb_to is equal to, or reachable from block bb_from.  */
 #define IS_REACHABLE(bb_from, bb_to)					\
   (bb_from == bb_to							\
    || IS_RGN_ENTRY (bb_from)						\
    || (TEST_BIT (ancestor_edges[bb_to],					\
 		 EDGE_TO_BIT (IN_EDGES (BB_TO_BLOCK (bb_from))))))
 
-/* Non-zero iff the address is comprised from at most 1 register.  */
+/* Nonzero iff the address is comprised from at most 1 register.  */
 #define CONST_BASED_ADDRESS_P(x)			\
   (GET_CODE (x) == REG					\
    || ((GET_CODE (x) == PLUS || GET_CODE (x) == MINUS	\
@@ -2016,7 +2014,6 @@ init_ready_list (ready)
       bblst_table = (int *) xmalloc (bblst_size * sizeof (int));
 
       bitlst_table_last = 0;
-      bitlst_table_size = rgn_nr_edges;
       bitlst_table = (int *) xmalloc (rgn_nr_edges * sizeof (int));
 
       compute_trg_info (target_bb);
@@ -2026,17 +2023,9 @@ init_ready_list (ready)
      Count number of insns in the target block being scheduled.  */
   for (insn = NEXT_INSN (prev_head); insn != next_tail; insn = NEXT_INSN (insn))
     {
-      rtx next;
-
-      if (! INSN_P (insn))
-	continue;
-      next = NEXT_INSN (insn);
-
-      if (INSN_DEP_COUNT (insn) == 0
-	  && (! INSN_P (next) || SCHED_GROUP_P (next) == 0))
+      if (INSN_DEP_COUNT (insn) == 0)
 	ready_add (ready, insn);
-      if (!(SCHED_GROUP_P (insn)))
-	target_n_insns++;
+      target_n_insns++;
     }
 
   /* Add to ready list all 'ready' insns in valid source blocks.
@@ -2070,19 +2059,8 @@ init_ready_list (ready)
 							     insn, insn) <= 3)))
 			&& check_live (insn, bb_src)
 			&& is_exception_free (insn, bb_src, target_bb))))
-	      {
-		rtx next;
-
-		/* Note that we haven't squirreled away the notes for
-		   blocks other than the current.  So if this is a
-		   speculative insn, NEXT might otherwise be a note.  */
-		next = next_nonnote_insn (insn);
-		if (INSN_DEP_COUNT (insn) == 0
-		    && (! next
-			|| ! INSN_P (next)
-			|| SCHED_GROUP_P (next) == 0))
-		  ready_add (ready, insn);
-	      }
+	      if (INSN_DEP_COUNT (insn) == 0)
+		ready_add (ready, insn);
 	  }
       }
 }
@@ -2100,7 +2078,6 @@ can_schedule_ready_p (insn)
   /* An interblock motion?  */
   if (INSN_BB (insn) != target_bb)
     {
-      rtx temp;
       basic_block b1;
 
       if (IS_SPECULATIVE_INSN (insn))
@@ -2117,18 +2094,9 @@ can_schedule_ready_p (insn)
 	}
       nr_inter++;
 
-      /* Find the beginning of the scheduling group.  */
-      /* ??? Ought to update basic block here, but later bits of
-	 schedule_block assumes the original insn block is
-	 still intact.  */
-
-      temp = insn;
-      while (SCHED_GROUP_P (temp))
-	temp = PREV_INSN (temp);
-
       /* Update source block boundaries.  */
-      b1 = BLOCK_FOR_INSN (temp);
-      if (temp == b1->head && insn == b1->end)
+      b1 = BLOCK_FOR_INSN (insn);
+      if (insn == b1->head && insn == b1->end)
 	{
 	  /* We moved all the insns in the basic block.
 	     Emit a note after the last insn and update the
@@ -2142,9 +2110,9 @@ can_schedule_ready_p (insn)
 	  /* We took insns from the end of the basic block,
 	     so update the end of block boundary so that it
 	     points to the first insn we did not move.  */
-	  b1->end = PREV_INSN (temp);
+	  b1->end = PREV_INSN (insn);
 	}
-      else if (temp == b1->head)
+      else if (insn == b1->head)
 	{
 	  /* We took insns from the start of the basic block,
 	     so update the start of block boundary so that
@@ -2364,17 +2332,6 @@ add_branch_dependences (head, tail)
 	  CANT_MOVE (insn) = 1;
 
 	  last = insn;
-	  /* Skip over insns that are part of a group.
-	     Make each insn explicitly depend on the previous insn.
-	     This ensures that only the group header will ever enter
-	     the ready queue (and, when scheduled, will automatically
-	     schedule the SCHED_GROUP_P block).  */
-	  while (SCHED_GROUP_P (insn))
-	    {
-	      rtx temp = prev_nonnote_insn (insn);
-	      add_dependence (insn, temp, REG_DEP_ANTI);
-	      insn = temp;
-	    }
 	}
 
       /* Don't overrun the bounds of the basic block.  */
@@ -2396,10 +2353,6 @@ add_branch_dependences (head, tail)
 
 	add_dependence (last, insn, REG_DEP_ANTI);
 	INSN_REF_COUNT (insn) = 1;
-
-	/* Skip over insns that are part of a group.  */
-	while (SCHED_GROUP_P (insn))
-	  insn = prev_nonnote_insn (insn);
       }
 }
 
@@ -2534,7 +2487,7 @@ propagate_deps (bb, pred_deps)
 /* Compute backward dependences inside bb.  In a multiple blocks region:
    (1) a bb is analyzed after its predecessors, and (2) the lists in
    effect at the end of bb (after analyzing for bb) are inherited by
-   bb's successrs.
+   bb's successors.
 
    Specifically for reg-reg data dependences, the block insns are
    scanned by sched_analyze () top-to-bottom.  Two lists are
@@ -2715,7 +2668,7 @@ schedule_region (rgn)
 
   init_deps_global ();
 
-  /* Initializations for region data dependence analyisis.  */
+  /* Initializations for region data dependence analysis.  */
   bb_deps = (struct deps *) xmalloc (sizeof (struct deps) * current_nr_blocks);
   for (bb = 0; bb < current_nr_blocks; bb++)
     init_deps (bb_deps + bb);
@@ -2731,6 +2684,10 @@ schedule_region (rgn)
       get_block_head_tail (BB_TO_BLOCK (bb), &head, &tail);
 
       compute_forward_dependences (head, tail);
+
+      if (targetm.sched.dependencies_evaluation_hook)
+	targetm.sched.dependencies_evaluation_hook (head, tail);
+
     }
 
   /* Set priorities.  */
@@ -2909,26 +2866,17 @@ init_regions ()
 	}
       else
 	{
-	  sbitmap *dom;
+	  dominance_info dom;
 	  struct edge_list *edge_list;
 
-	  dom = sbitmap_vector_alloc (last_basic_block, last_basic_block);
-
-	  /* The scheduler runs after flow; therefore, we can't blindly call
-	     back into find_basic_blocks since doing so could invalidate the
-	     info in global_live_at_start.
-
-	     Consider a block consisting entirely of dead stores; after life
-	     analysis it would be a block of NOTE_INSN_DELETED notes.  If
-	     we call find_basic_blocks again, then the block would be removed
-	     entirely and invalidate our the register live information.
-
-	     We could (should?) recompute register live information.  Doing
-	     so may even be beneficial.  */
+	  /* The scheduler runs after estimate_probabilities; therefore, we
+	     can't blindly call back into find_basic_blocks since doing so
+	     could invalidate the branch probability info.  We could,
+	     however, call cleanup_cfg.  */
 	  edge_list = create_edge_list ();
 
 	  /* Compute the dominators and post dominators.  */
-	  calculate_dominance_info (NULL, dom, CDI_DOMINATORS);
+	  dom = calculate_dominance_info (CDI_DOMINATORS);
 
 	  /* build_control_flow will return nonzero if it detects unreachable
 	     blocks or any other irregularity with the cfg which prevents
@@ -2946,7 +2894,7 @@ init_regions ()
 
 	  /* For now.  This will move as more and more of haifa is converted
 	     to using the cfg code in flow.c.  */
-	  free (dom);
+	  free_dominance_info (dom);
 	}
     }
 
@@ -3006,7 +2954,7 @@ schedule_insns (dump_file)
      first so that we can verify that live_at_start didn't change.  Then
      do all other blocks.  */
   /* ??? There is an outside possibility that update_life_info, or more
-     to the point propagate_block, could get called with non-zero flags
+     to the point propagate_block, could get called with nonzero flags
      more than once for one basic block.  This would be kinda bad if it
      were to happen, since REG_INFO would be accumulated twice for the
      block, and we'd have twice the REG_DEAD notes.

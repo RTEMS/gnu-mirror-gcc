@@ -2,25 +2,27 @@
    Copyright 2001, 2002 Free Software Foundation, Inc.
    Contributed by Alexandre Oliva  <aoliva@redhat.com>
 
-This file is part of GNU CC.
+This file is part of GCC.
 
-GNU CC is free software; you can redistribute it and/or modify
+GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2, or (at your option)
 any later version.
 
-GNU CC is distributed in the hope that it will be useful,
+GCC is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU CC; see the file COPYING.  If not, write to
+along with GCC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "cp-tree.h"
 #include "c-common.h"
@@ -28,9 +30,12 @@ Boston, MA 02111-1307, USA.  */
 #include "langhooks.h"
 #include "langhooks-def.h"
 
-static HOST_WIDE_INT cxx_get_alias_set PARAMS ((tree));
-static bool ok_to_generate_alias_set_for_type PARAMS ((tree));
-static bool cxx_warn_unused_global_decl PARAMS ((tree));
+static HOST_WIDE_INT cxx_get_alias_set (tree);
+static bool ok_to_generate_alias_set_for_type (tree);
+static bool cxx_warn_unused_global_decl (tree);
+static tree cp_expr_size (tree);
+static bool cp_var_mod_type_p (tree);
+static int cp_expand_decl (tree);
 
 #undef LANG_HOOKS_NAME
 #define LANG_HOOKS_NAME "GNU C++"
@@ -43,7 +48,7 @@ static bool cxx_warn_unused_global_decl PARAMS ((tree));
 #undef LANG_HOOKS_INIT_OPTIONS
 #define LANG_HOOKS_INIT_OPTIONS cxx_init_options
 #undef LANG_HOOKS_DECODE_OPTION
-#define LANG_HOOKS_DECODE_OPTION cxx_decode_option
+#define LANG_HOOKS_DECODE_OPTION c_common_decode_option
 #undef LANG_HOOKS_POST_OPTIONS
 #define LANG_HOOKS_POST_OPTIONS c_common_post_options
 #undef LANG_HOOKS_GET_ALIAS_SET
@@ -52,14 +57,14 @@ static bool cxx_warn_unused_global_decl PARAMS ((tree));
 #define LANG_HOOKS_EXPAND_CONSTANT cplus_expand_constant
 #undef LANG_HOOKS_EXPAND_EXPR
 #define LANG_HOOKS_EXPAND_EXPR cxx_expand_expr
+#undef LANG_HOOKS_EXPAND_DECL
+#define LANG_HOOKS_EXPAND_DECL cp_expand_decl
 #undef LANG_HOOKS_SAFE_FROM_P
 #define LANG_HOOKS_SAFE_FROM_P c_safe_from_p
 #undef LANG_HOOKS_PARSE_FILE
 #define LANG_HOOKS_PARSE_FILE c_common_parse_file
 #undef LANG_HOOKS_DUP_LANG_SPECIFIC_DECL
 #define LANG_HOOKS_DUP_LANG_SPECIFIC_DECL cxx_dup_lang_specific_decl
-#undef LANG_HOOKS_UNSAVE_EXPR_NOW
-#define LANG_HOOKS_UNSAVE_EXPR_NOW cxx_unsave_expr_now
 #undef LANG_HOOKS_MAYBE_BUILD_CLEANUP
 #define LANG_HOOKS_MAYBE_BUILD_CLEANUP cxx_maybe_build_cleanup
 #undef LANG_HOOKS_TRUTHVALUE_CONVERSION
@@ -113,7 +118,7 @@ static bool cxx_warn_unused_global_decl PARAMS ((tree));
   cp_add_pending_fn_decls
 #undef LANG_HOOKS_TREE_INLINING_TREE_CHAIN_MATTERS_P
 #define LANG_HOOKS_TREE_INLINING_TREE_CHAIN_MATTERS_P \
-  cp_is_overload_p
+  cp_tree_chain_matters_p
 #undef LANG_HOOKS_TREE_INLINING_AUTO_VAR_IN_FN_P
 #define LANG_HOOKS_TREE_INLINING_AUTO_VAR_IN_FN_P \
   cp_auto_var_in_fn_p
@@ -122,6 +127,8 @@ static bool cxx_warn_unused_global_decl PARAMS ((tree));
   cp_copy_res_decl_for_inlining
 #undef LANG_HOOKS_TREE_INLINING_ANON_AGGR_TYPE_P
 #define LANG_HOOKS_TREE_INLINING_ANON_AGGR_TYPE_P anon_aggr_type_p
+#undef LANG_HOOKS_TREE_INLINING_VAR_MOD_TYPE_P
+#define LANG_HOOKS_TREE_INLINING_VAR_MOD_TYPE_P cp_var_mod_type_p
 #undef LANG_HOOKS_TREE_INLINING_START_INLINING
 #define LANG_HOOKS_TREE_INLINING_START_INLINING cp_start_inlining
 #undef LANG_HOOKS_TREE_INLINING_END_INLINING
@@ -130,6 +137,8 @@ static bool cxx_warn_unused_global_decl PARAMS ((tree));
 #define LANG_HOOKS_TREE_DUMP_DUMP_TREE_FN cp_dump_tree
 #undef LANG_HOOKS_TREE_DUMP_TYPE_QUALS_FN
 #define LANG_HOOKS_TREE_DUMP_TYPE_QUALS_FN cp_type_quals
+#undef LANG_HOOKS_EXPR_SIZE
+#define LANG_HOOKS_EXPR_SIZE cp_expr_size
 
 #undef LANG_HOOKS_MAKE_TYPE
 #define LANG_HOOKS_MAKE_TYPE cxx_make_type
@@ -147,11 +156,13 @@ static bool cxx_warn_unused_global_decl PARAMS ((tree));
 #define LANG_HOOKS_INCOMPLETE_TYPE_ERROR cxx_incomplete_type_error
 #undef LANG_HOOKS_TYPE_PROMOTES_TO
 #define LANG_HOOKS_TYPE_PROMOTES_TO cxx_type_promotes_to
+#undef LANG_HOOKS_SIMPLIFY_EXPR
+#define LANG_HOOKS_SIMPLIFY_EXPR cp_simplify_expr
 
 /* Each front end provides its own hooks, for toplev.c.  */
 const struct lang_hooks lang_hooks = LANG_HOOKS_INITIALIZER;
 
-/* Tree code classes. */
+/* Tree code classes.  */
 
 #define DEFTREECODE(SYM, NAME, TYPE, LENGTH) TYPE,
 
@@ -196,8 +207,7 @@ const char *const tree_code_name[] = {
    Return TRUE if T safe for aliasing FALSE otherwise.  */
 
 static bool
-ok_to_generate_alias_set_for_type (t)
-     tree t;
+ok_to_generate_alias_set_for_type (tree t)
 {
   if (TYPE_PTRMEMFUNC_P (t))
     return true;
@@ -250,8 +260,7 @@ ok_to_generate_alias_set_for_type (t)
 /* Special routine to get the alias set for C++.  */
 
 static HOST_WIDE_INT
-cxx_get_alias_set (t)
-     tree t;
+cxx_get_alias_set (tree t)
 {
   /* It's not yet safe to use alias sets for classes in C++.  */
   if (!ok_to_generate_alias_set_for_type(t))
@@ -263,8 +272,7 @@ cxx_get_alias_set (t)
 /* Called from check_global_declarations.  */
 
 static bool
-cxx_warn_unused_global_decl (decl)
-     tree decl;
+cxx_warn_unused_global_decl (tree decl)
 {
   if (TREE_CODE (decl) == FUNCTION_DECL && DECL_DECLARED_INLINE_P (decl))
     return false;
@@ -276,4 +284,81 @@ cxx_warn_unused_global_decl (decl)
     return false;
 
   return true;
+}
+
+/* Langhook for expr_size: Tell the backend that the value of an expression
+   of non-POD class type does not include any tail padding; a derived class
+   might have allocated something there.  */
+
+static tree
+cp_expr_size (tree exp)
+{
+  if (CLASS_TYPE_P (TREE_TYPE (exp)))
+    {
+      /* The backend should not be interested in the size of an expression
+	 of a type with both of these set; all copies of such types must go
+	 through a constructor or assignment op.  */
+      if (TYPE_HAS_COMPLEX_INIT_REF (TREE_TYPE (exp))
+	  && TYPE_HAS_COMPLEX_ASSIGN_REF (TREE_TYPE (exp))
+	  /* But storing a CONSTRUCTOR isn't a copy.  */
+	  && TREE_CODE (exp) != CONSTRUCTOR)
+	abort ();
+      /* This would be wrong for a type with virtual bases, but they are
+	 caught by the abort above.  */
+      return CLASSTYPE_SIZE_UNIT (TREE_TYPE (exp));
+    }
+  else
+    /* Use the default code.  */
+    return lhd_expr_size (exp);
+}
+
+/* Expand DECL if it declares an entity not handled by the
+   common code.  */
+
+static int
+cp_expand_decl (decl)
+     tree decl;
+{
+  if (TREE_CODE (decl) == VAR_DECL && !TREE_STATIC (decl))
+    {
+      /* Let the back-end know about this variable.  */
+      if (!anon_aggr_type_p (TREE_TYPE (decl)))
+	emit_local_var (decl);
+      else
+	expand_anon_union_decl (decl, NULL_TREE, 
+				DECL_ANON_UNION_ELEMS (decl));
+    }
+  else if (TREE_CODE (decl) == VAR_DECL && TREE_STATIC (decl))
+    make_rtl_for_local_static (decl);
+  else if (TREE_CODE (decl) == LABEL_DECL 
+	   && C_DECLARED_LABEL_FLAG (decl))
+    declare_nonlocal_label (decl);
+  else
+    return 0;
+
+  return 1;
+}
+
+int
+cp_tree_chain_matters_p (t)
+     tree t;
+{
+  return cp_is_overload_p (t) || c_tree_chain_matters_p (t);
+}
+
+/* Returns true if T is a variably modified type, in the sense of C99.
+   This routine needs only check cases that cannot be handled by the
+   language-independent logic in tree-inline.c.  */
+
+static bool
+cp_var_mod_type_p (tree type)
+{
+  /* If TYPE is a pointer-to-member, it is variably modified if either
+     the class or the member are variably modified.  */
+  if (TYPE_PTRMEM_P (type) || TYPE_PTRMEMFUNC_P (type))
+    return (variably_modified_type_p (TYPE_PTRMEM_CLASS_TYPE (type))
+	    || variably_modified_type_p (TYPE_PTRMEM_POINTED_TO_TYPE (type)));
+
+  /* All other types are not variably modified.  */
+  return false;
 }

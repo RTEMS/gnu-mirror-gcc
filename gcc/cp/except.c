@@ -1,37 +1,38 @@
 /* Handle exceptional things in C++.
    Copyright (C) 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001  Free Software Foundation, Inc.
+   2000, 2001, 2002, 2003  Free Software Foundation, Inc.
    Contributed by Michael Tiemann <tiemann@cygnus.com>
    Rewritten by Mike Stump <mrs@cygnus.com>, based upon an
    initial re-implementation courtesy Tad Hunt.
 
-This file is part of GNU CC.
+This file is part of GCC.
 
-GNU CC is free software; you can redistribute it and/or modify
+GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2, or (at your option)
 any later version.
 
-GNU CC is distributed in the hope that it will be useful,
+GCC is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU CC; see the file COPYING.  If not, write to
+along with GCC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "rtl.h"
 #include "expr.h"
 #include "libfuncs.h"
 #include "cp-tree.h"
 #include "flags.h"
-#include "obstack.h"
 #include "output.h"
 #include "except.h"
 #include "toplev.h"
@@ -118,7 +119,7 @@ prepare_eh_type (type)
 }
 
 /* Build the address of a typeinfo decl for use in the runtime
-   matching field of the exception model.   */
+   matching field of the exception model.  */
 
 static tree
 build_eh_type_type (type)
@@ -175,17 +176,13 @@ static int
 dtor_nothrow (type)
      tree type;
 {
-  tree fn;
-
   if (type == NULL_TREE)
     return 0;
 
   if (! TYPE_HAS_DESTRUCTOR (type))
     return 1;
 
-  fn = lookup_member (type, dtor_identifier, 0, 0);
-  fn = TREE_VALUE (fn);
-  return TREE_NOTHROW (fn);
+  return TREE_NOTHROW (CLASSTYPE_DESTRUCTORS (type));
 }
 
 /* Build up a call to __cxa_end_catch, to destroy the exception object
@@ -508,7 +505,7 @@ do_allocate_exception (type)
   else
     {
       /* Declare void *__cxa_allocate_exception(size_t).  */
-      tree tmp = tree_cons (NULL_TREE, c_size_type_node, void_list_node);
+      tree tmp = tree_cons (NULL_TREE, size_type_node, void_list_node);
       fn = push_library_fn (fn, build_function_type (ptr_type_node, tmp));
     }
   
@@ -564,7 +561,7 @@ wrap_cleanups_r (tp, walk_subtrees, data)
   cleanup = TARGET_EXPR_CLEANUP (exp);
   if (cleanup)
     {
-      cleanup = build1 (MUST_NOT_THROW_EXPR, TREE_TYPE (cleanup), cleanup);
+      cleanup = build1 (MUST_NOT_THROW_EXPR, void_type_node, cleanup);
       TARGET_EXPR_CLEANUP (exp) = cleanup;
     }
 
@@ -604,12 +601,15 @@ stabilize_throw_expr (exp, initp)
       init_expr = void_zero_node;
       for (; args; args = TREE_CHAIN (args))
 	{
+	  tree arg = TREE_VALUE (args);
 	  tree arg_init_expr;
-	  tree newarg = stabilize_expr (TREE_VALUE (args), &arg_init_expr);
 
-	  if (arg_init_expr != void_zero_node)
-	    init_expr = build (COMPOUND_EXPR, void_type_node, arg_init_expr, init_expr);
-	  *p = tree_cons (NULL_TREE, newarg, NULL_TREE);
+	  arg = stabilize_expr (arg, &arg_init_expr);
+
+	  if (TREE_SIDE_EFFECTS (arg_init_expr))
+	    init_expr = build (COMPOUND_EXPR, void_type_node, init_expr,
+			       arg_init_expr);
+	  *p = tree_cons (NULL_TREE, arg, NULL_TREE);
 	  p = &TREE_CHAIN (*p);
 	}
       TREE_OPERAND (aggr_init, 1) = newargs;
@@ -733,7 +733,7 @@ build_throw (exp)
 	  return error_mark_node;
 	}
 
-      exp = build1 (MUST_NOT_THROW_EXPR, TREE_TYPE (exp), exp);
+      exp = build1 (MUST_NOT_THROW_EXPR, void_type_node, exp);
       /* Prepend the allocation.  */
       exp = build (COMPOUND_EXPR, TREE_TYPE (exp), allocate_expr, exp);
       if (temp_expr != void_zero_node)
@@ -754,7 +754,7 @@ build_throw (exp)
 	{
 	  cleanup = lookup_fnfields (TYPE_BINFO (TREE_TYPE (object)),
 				     complete_dtor_identifier, 0);
-	  cleanup = TREE_VALUE (cleanup);
+	  cleanup = BASELINK_FUNCTIONS (cleanup);
 	  mark_used (cleanup);
 	  cxx_mark_addressable (cleanup);
 	  /* Pretend it's a normal function.  */
@@ -801,7 +801,7 @@ build_throw (exp)
 
 /* Make sure TYPE is complete, pointer to complete, reference to
    complete, or pointer to cv void. Issue diagnostic on failure.
-   Return the zero on failure and non-zero on success. FROM can be
+   Return the zero on failure and nonzero on success. FROM can be
    the expr or decl from whence TYPE came, if available.  */
 
 static int
