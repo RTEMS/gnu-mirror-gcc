@@ -1810,6 +1810,8 @@ build_module_descriptor ()
 
   DECL_ARTIFICIAL (UOBJC_MODULES_decl) = 1;
   DECL_IGNORED_P (UOBJC_MODULES_decl) = 1;
+  DECL_CONTEXT (UOBJC_MODULES_decl) = NULL_TREE;
+
   finish_decl (UOBJC_MODULES_decl,
 	       init_module_descriptor (TREE_TYPE (UOBJC_MODULES_decl)),
 	       NULL_TREE);
@@ -1981,8 +1983,8 @@ generate_static_references ()
 
       type = build_array_type (build_pointer_type (void_type_node), 0);
       decl = build_decl (VAR_DECL, ident, type);
-      make_decl_rtl (decl, 0);
       TREE_USED (decl) = 1;
+      TREE_STATIC (decl) = 1;
       decls
 	= tree_cons (NULL_TREE, build_unary_op (ADDR_EXPR, decl, 1), decls);
     }
@@ -2021,6 +2023,7 @@ generate_strings ()
       decl_specs = tree_cons (NULL_TREE, ridpointers[(int) RID_CHAR], sc_spec);
       expr_decl = build_nt (ARRAY_REF, DECL_NAME (decl), NULL_TREE);
       decl = start_decl (expr_decl, decl_specs, 1, NULL_TREE, NULL_TREE);
+      DECL_CONTEXT (decl) = NULL_TREE;
       string_expr = my_build_string (IDENTIFIER_LENGTH (string) + 1,
 				     IDENTIFIER_POINTER (string));
       finish_decl (decl, string_expr, NULL_TREE);
@@ -2035,6 +2038,7 @@ generate_strings ()
       decl_specs = tree_cons (NULL_TREE, ridpointers[(int) RID_CHAR], sc_spec);
       expr_decl = build_nt (ARRAY_REF, DECL_NAME (decl), NULL_TREE);
       decl = start_decl (expr_decl, decl_specs, 1, NULL_TREE, NULL_TREE);
+      DECL_CONTEXT (decl) = NULL_TREE;
       string_expr = my_build_string (IDENTIFIER_LENGTH (string) + 1,
 				     IDENTIFIER_POINTER (string));
       finish_decl (decl, string_expr, NULL_TREE);
@@ -2049,6 +2053,7 @@ generate_strings ()
       decl_specs = tree_cons (NULL_TREE, ridpointers[(int) RID_CHAR], sc_spec);
       expr_decl = build_nt (ARRAY_REF, DECL_NAME (decl), NULL_TREE);
       decl = start_decl (expr_decl, decl_specs, 1, NULL_TREE, NULL_TREE);
+      DECL_CONTEXT (decl) = NULL_TREE;
       string_expr = my_build_string (IDENTIFIER_LENGTH (string) + 1,
 				IDENTIFIER_POINTER (string));
       finish_decl (decl, string_expr, NULL_TREE);
@@ -2962,7 +2967,8 @@ generate_descriptor_table (type, name, size, list, proto)
   decl_specs = tree_cons (NULL_TREE, type, sc_spec);
 
   decl = start_decl (synth_id_with_class_suffix (name, proto),
-				decl_specs, 1, NULL_TREE, NULL_TREE);
+		     decl_specs, 1, NULL_TREE, NULL_TREE);
+  DECL_CONTEXT (decl) = NULL_TREE;
 
   initlist = build_tree_list (NULL_TREE, build_int_2 (size, 0));
   initlist = tree_cons (NULL_TREE, list, initlist);
@@ -3208,6 +3214,8 @@ generate_protocols ()
 
       decl = start_decl (synth_id_with_class_suffix ("_OBJC_PROTOCOL", p),
 			 decl_specs, 1, NULL_TREE, NULL_TREE);
+
+      DECL_CONTEXT (decl) = NULL_TREE;
 
       protocol_name_expr = add_objc_string (PROTOCOL_NAME (p), class_names);
 
@@ -4242,6 +4250,7 @@ generate_protocol_list (i_or_p)
   expr_decl = build1 (INDIRECT_REF, NULL_TREE, expr_decl);
 
   refs_decl = start_decl (expr_decl, decl_specs, 1, NULL_TREE, NULL_TREE);
+  DECL_CONTEXT (refs_decl) = NULL_TREE;
 
   finish_decl (refs_decl, build_constructor (TREE_TYPE (refs_decl),
 					     nreverse (initlist)),
@@ -6130,7 +6139,10 @@ start_class (code, class_name, super_name, protocol_list)
     {
       {
         static tree implemented_classes = 0;
-        tree chain = implemented_classes;
+        tree chain;
+
+	if (!implemented_classes)
+	  ggc_add_tree_root (&implemented_classes, 1);
         for (chain = implemented_classes; chain; chain = TREE_CHAIN (chain))
            if (TREE_VALUE (chain) == class_name)
 	     {
@@ -8158,6 +8170,9 @@ init_objc ()
   synth_module_prologue ();
 
   /* Change the default error function */
+  save_lang_status = &push_c_function_context;
+  restore_lang_status = &pop_c_function_context;
+  mark_lang_status = &mark_c_function_context;
   decl_printable_name = objc_printable_name;
   lang_expand_expr = c_expand_expr;
   lang_expand_decl_stmt = c_expand_decl_stmt;
@@ -8320,6 +8335,7 @@ generate_classref_translation_entry (chain)
   /* The decl that is returned from start_decl is the one that we
      forward declared in build_class_reference.  */
   decl = start_decl (name, decl_specs, 1, NULL_TREE, NULL_TREE);
+  DECL_CONTEXT (decl) = NULL_TREE;
   finish_decl (decl, expr, NULL_TREE);
   return;
 }
@@ -8587,25 +8603,45 @@ lookup_objc_ivar (id)
     return 0;
 }
 
-/* Parser callbacks.  */
+/* Parser callbacks.
+   Some ObjC keywords are reserved only in a particular context:
+   in out inout bycopy byref oneway.
+   We have to save and restore the IDENTIFIER_NODEs that describe
+   them as keywords, when appropriate.  */
+
+#define N_PQ 6
+static tree saved_pq[N_PQ];
+static tree saved_not_pq[N_PQ];
+static const char *const pq_strings[N_PQ] = {
+  "bycopy", "byref", "in", "inout", "oneway", "out"
+};
+
+void
+save_and_forget_protocol_qualifiers ()
+{
+  int i;
+  for (i = 0; i < N_PQ; i++)
+    saved_pq[i] = set_identifier (pq_strings[i], NULL_TREE);
+
+  ggc_add_tree_root (saved_pq, N_PQ);
+  ggc_add_tree_root (saved_not_pq, N_PQ);
+}
+
 void
 forget_protocol_qualifiers ()
 {
-  C_IS_RESERVED_WORD (ridpointers[(int) RID_IN]) = 0;
-  C_IS_RESERVED_WORD (ridpointers[(int) RID_OUT]) = 0;
-  C_IS_RESERVED_WORD (ridpointers[(int) RID_INOUT]) = 0;
-  C_IS_RESERVED_WORD (ridpointers[(int) RID_BYCOPY]) = 0;
-  C_IS_RESERVED_WORD (ridpointers[(int) RID_BYREF]) = 0;
-  C_IS_RESERVED_WORD (ridpointers[(int) RID_ONEWAY]) = 0;
+  int i;
+  for (i = 0; i < N_PQ; i++)
+    {
+      set_identifier (pq_strings[i], saved_not_pq[i]);
+      saved_not_pq[i] = NULL_TREE;
+    }
 }
 
 void
 remember_protocol_qualifiers ()
 {
-  C_IS_RESERVED_WORD (ridpointers[(int) RID_IN]) = 1;
-  C_IS_RESERVED_WORD (ridpointers[(int) RID_OUT]) = 1;
-  C_IS_RESERVED_WORD (ridpointers[(int) RID_INOUT]) = 1;
-  C_IS_RESERVED_WORD (ridpointers[(int) RID_BYCOPY]) = 1;
-  C_IS_RESERVED_WORD (ridpointers[(int) RID_BYREF]) = 1;
-  C_IS_RESERVED_WORD (ridpointers[(int) RID_ONEWAY]) = 1;
+  int i;
+  for (i = 0; i < N_PQ; i++)
+    saved_not_pq[i] = set_identifier (pq_strings[i], saved_pq[i]);
 }

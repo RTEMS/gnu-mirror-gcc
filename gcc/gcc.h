@@ -25,11 +25,14 @@ Boston, MA 02111-1307, USA.  */
 
 /* These are exported by gcc.c. */
 extern int do_spec PARAMS ((const char *));
+extern void record_temp_file PARAMS ((const char *, int, int));
 extern void fancy_abort PARAMS ((void)) ATTRIBUTE_NORETURN;
 extern const char *input_filename;
 extern size_t input_filename_length;
 extern void fatal PARAMS ((const char *, ...))
      ATTRIBUTE_PRINTF_1 ATTRIBUTE_NORETURN;
+extern void error PARAMS ((const char *, ...)) ATTRIBUTE_PRINTF_1;
+extern void pfatal_with_name PARAMS ((const char *)) ATTRIBUTE_NORETURN;
 
 /* Spec files linked with gcc.c must provide definitions for these. */
 
@@ -39,7 +42,13 @@ extern void lang_specific_driver PARAMS ((int *, const char *const **, int *));
 /* Called before linking.  Returns 0 on success and -1 on failure. */
 extern int lang_specific_pre_link PARAMS ((void));
 
+extern int n_infiles;
+
 /* Number of extra output files that lang_specific_pre_link may generate. */
 extern int lang_specific_extra_outfiles;
+
+/* A vector of corresponding output files is made up later.  */
+
+extern const char **outfiles;
 
 #endif /* ! __GCC_H__ */

@@ -1,3 +1,27 @@
+2001-05-07  Zack Weinberg  <zackw@stanford.edu>
+
+	* demangle.h: Use PARAMS for all prototypes.
+
+2001-05-07  Mark Mitchell  <mark@codesourcery.com>
+
+	* splay-tree.h (splay_tree_max): New function.
+	(splay_tree_min): Likewise.
+
+2001-03-20  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* libiberty.h: Declare lbasename ().
+
+2001-03-20  Jim Blandy  <jimb@redhat.com>
+
+	* demangle.h (enum gnu_v3_constructor_kinds,
+	is_gnu_v3_mangled_ctor, enum gnu_v3_destructor_kinds,
+	is_gnu_v3_mangled_dtor): New declarations.
+
+2001-03-01  John David Anglin  <dave@hiauly1.hia.nrc.ca>
+
+	* safe-ctype.h (_sch_test): Cast enum bit to short int for pcc
+	compatibility.
+
 2000-12-18  Joseph S. Myers  <jsm28@cam.ac.uk>
 
 	* COPYING: Update to current

@@ -452,7 +452,6 @@ c_decode_option (argc, argv)
      char **argv;
 {
   int strings_processed;
-  const char *option_value = NULL;
   char *p = argv[0];
 
   strings_processed = cpp_handle_option (parse_in, argc, argv);
@@ -598,14 +597,8 @@ c_decode_option (argc, argv)
     flag_no_builtin = 0;
   else if (!strcmp (p, "-fno-builtin"))
     flag_no_builtin = 1;
-  else if ((option_value
-	    = skip_leading_substring (p, "-fdump-translation-unit-")))
-    {
-      if (p[22] == '\0')
-	error ("no file specified with -fdump-translation-unit");
-      else
-	flag_dump_translation_unit = option_value;
-    }
+  else if (dump_switch_p (p))
+    ;
   else if (!strcmp (p, "-ansi"))
     goto iso_1990;
   else if (!strcmp (p, "-Werror-implicit-function-declaration"))
@@ -1260,6 +1253,10 @@ set_block (block)
      register tree block;
 {
   current_binding_level->this_block = block;
+  current_binding_level->names = chainon (current_binding_level->names,
+					  BLOCK_VARS (block));
+  current_binding_level->blocks = chainon (current_binding_level->blocks,
+					   BLOCK_SUBBLOCKS (block));
 }
 
 void
@@ -1841,7 +1838,7 @@ duplicate_decls (newdecl, olddecl, different_binding_level)
 	}
 
       /* Keep the old rtl since we can safely use it.  */
-      DECL_RTL (newdecl) = DECL_RTL (olddecl);
+      COPY_DECL_RTL (olddecl, newdecl);
 
       /* Merge the type qualifiers.  */
       if (TREE_CODE (olddecl) == FUNCTION_DECL
@@ -1898,7 +1895,7 @@ duplicate_decls (newdecl, olddecl, different_binding_level)
 
       /* Copy the assembler name.
 	 Currently, it can only be defined in the prototype.  */
-      DECL_ASSEMBLER_NAME (newdecl) = DECL_ASSEMBLER_NAME (olddecl);
+      COPY_DECL_ASSEMBLER_NAME (olddecl, newdecl);
 
       if (TREE_CODE (newdecl) == FUNCTION_DECL)
 	{
@@ -1961,12 +1958,27 @@ duplicate_decls (newdecl, olddecl, different_binding_level)
 
   if (TREE_CODE (newdecl) == FUNCTION_DECL)
     {
-      /* If either decl says `inline', this fn is inline,
-	 unless its definition was passed already.  */
-      if (DECL_INLINE (newdecl) && DECL_INITIAL (olddecl) == 0)
-	DECL_INLINE (olddecl) = 1;
+      /* If we're redefining a function previously defined as extern
+	 inline, make sure we emit debug info for the inline before we
+	 throw it away, in case it was inlined into a function that hasn't
+	 been written out yet.  */
+      if (new_is_definition && DECL_INITIAL (olddecl) && TREE_USED (olddecl))
+	{
+	  note_outlining_of_inline_function (olddecl);
 
-      DECL_INLINE (newdecl) = DECL_INLINE (olddecl);
+	  /* The new defn must not be inline.  */
+	  DECL_INLINE (newdecl) = 0;
+	  DECL_UNINLINABLE (newdecl) = 1;
+	}
+      else
+	{
+	  /* If either decl says `inline', this fn is inline,
+	     unless its definition was passed already.  */
+	  if (DECL_INLINE (newdecl) && DECL_INITIAL (olddecl) == 0)
+	    DECL_INLINE (olddecl) = 1;
+
+	  DECL_INLINE (newdecl) = DECL_INLINE (olddecl);
+	}
 
       if (DECL_BUILT_IN (olddecl))
 	{
@@ -1990,7 +2002,7 @@ duplicate_decls (newdecl, olddecl, different_binding_level)
 	}
       /* Also preserve various other info from the definition.  */
       else if (! new_is_definition)
-	DECL_FRAME_SIZE (newdecl) = DECL_FRAME_SIZE (olddecl);
+	DECL_NUM_STMTS (newdecl) = DECL_NUM_STMTS (olddecl);
       if (! new_is_definition)
 	{
 	  DECL_RESULT (newdecl) = DECL_RESULT (olddecl);
@@ -2353,7 +2365,7 @@ pushdecl (x)
 		      DECL_INITIAL (x) = (current_function_decl == oldglobal
 					  ? 0 : DECL_INITIAL (oldglobal));
 		      DECL_SAVED_INSNS (x) = DECL_SAVED_INSNS (oldglobal);
-		      DECL_FRAME_SIZE (x) = DECL_FRAME_SIZE (oldglobal);
+		      DECL_NUM_STMTS (x) = DECL_NUM_STMTS (oldglobal);
 		      DECL_ARGUMENTS (x) = DECL_ARGUMENTS (oldglobal);
 		      DECL_RESULT (x) = DECL_RESULT (oldglobal);
 		      TREE_ASM_WRITTEN (x) = TREE_ASM_WRITTEN (oldglobal);
@@ -3065,12 +3077,11 @@ init_decl_processing ()
   builtin_function
     ("__builtin_eh_return",
      build_function_type (void_type_node,
-			  tree_cons (NULL_TREE, ptr_type_node,
+			  tree_cons (NULL_TREE,
+				     type_for_mode (ptr_mode, 0),
 				     tree_cons (NULL_TREE,
-						type_for_mode (ptr_mode, 0),
-						tree_cons (NULL_TREE,
-							   ptr_type_node,
-							   endlink)))),
+						ptr_type_node,
+						endlink))),
      BUILT_IN_EH_RETURN, BUILT_IN_NORMAL, NULL_PTR);
 
   pedantic_lvalues = pedantic;
@@ -3167,7 +3178,7 @@ builtin_function (name, type, function_code, class, library_name)
   if (flag_traditional && name[0] != '_')
     DECL_BUILT_IN_NONANSI (decl) = 1;
   if (library_name)
-    DECL_ASSEMBLER_NAME (decl) = get_identifier (library_name);
+    SET_DECL_ASSEMBLER_NAME (decl, get_identifier (library_name));
   make_decl_rtl (decl, NULL_PTR);
   pushdecl (decl);
   DECL_BUILT_IN_CLASS (decl) = class;
@@ -3436,7 +3447,7 @@ start_decl (declarator, declspecs, initialized, attributes, prefix_attributes)
       /* But not if this is a duplicate decl
 	 and we preserved the rtl from the previous one
 	 (which may or may not happen).  */
-      && DECL_RTL (tem) == 0
+      && !DECL_RTL_SET_P (tem)
       && !DECL_CONTEXT (tem))
     {
       if (TREE_TYPE (tem) != error_mark_node
@@ -3579,8 +3590,8 @@ finish_decl (decl, init, asmspec_tree)
   if (TREE_CODE (decl) == FUNCTION_DECL && asmspec)
     {
       DECL_BUILT_IN_CLASS (decl) = NOT_BUILT_IN;
-      DECL_RTL (decl) = 0;
-      DECL_ASSEMBLER_NAME (decl) = get_identifier (asmspec);
+      SET_DECL_RTL (decl, NULL_RTX);
+      SET_DECL_ASSEMBLER_NAME (decl, get_identifier (asmspec));
     }
 
   /* Output the assembler code and/or RTL code for variables and functions,
@@ -3598,11 +3609,30 @@ finish_decl (decl, init, asmspec_tree)
 				   || TREE_ASM_WRITTEN (decl)), 0);
       else
 	{
+	  /* This is a local variable.  If there is an ASMSPEC, the
+	     user has requested that we handle it specially.  */
 	  if (asmspec)
 	    {
-	      DECL_ASSEMBLER_NAME (decl) = get_identifier (asmspec);
-	      DECL_C_HARD_REGISTER (decl) = 1;
+	      /* In conjunction with an ASMSPEC, the `register'
+		 keyword indicates that we should place the variable
+		 in a particular register.  */
+	      if (DECL_REGISTER (decl))
+		DECL_C_HARD_REGISTER (decl) = 1;
+
+	      /* If this is not a static variable, issue a warning.
+		 It doesn't make any sense to give an ASMSPEC for an
+		 ordinary, non-register local variable.  Historically,
+		 GCC has accepted -- but ignored -- the ASMSPEC in
+		 this case.  */
+	      if (TREE_CODE (decl) == VAR_DECL 
+		  && !DECL_REGISTER (decl)
+		  && !TREE_STATIC (decl))
+		warning_with_decl (decl,
+				   "ignoring asm-specifier for non-static local variable `%s'");
+	      else
+		SET_DECL_ASSEMBLER_NAME (decl, get_identifier (asmspec));
 	    }
+
 	  add_decl_stmt (decl);
 	}
 
@@ -3902,9 +3932,9 @@ grokdeclarator (declarator, declspecs, decl_context, initialized)
       if (TREE_CODE (id) == IDENTIFIER_NODE && C_IS_RESERVED_WORD (id))
 	{
 	  enum rid i = C_RID_CODE (id);
-	  if (i <= RID_LAST_MODIFIER)
+	  if ((int) i <= (int) RID_LAST_MODIFIER)
 	    {
-	      if (i == RID_LONG && specbits & (1<<i))
+	      if (i == RID_LONG && (specbits & (1 << (int) i)))
 		{
 		  if (longlong)
 		    error ("`long long long' is too long for GCC");
@@ -3916,9 +3946,9 @@ grokdeclarator (declarator, declspecs, decl_context, initialized)
 		      longlong = 1;
 		    }
 		}
-	      else if (specbits & (1 << i))
+	      else if (specbits & (1 << (int) i))
 		pedwarn ("duplicate `%s'", IDENTIFIER_POINTER (id));
-	      specbits |= 1 << i;
+	      specbits |= 1 << (int) i;
 	      goto found;
 	    }
 	}
@@ -4644,7 +4674,7 @@ grokdeclarator (declarator, declspecs, decl_context, initialized)
 
     if (decl_context == PARM)
       {
-	tree type_as_written = type;
+	tree type_as_written;
 	tree promoted_type;
 
 	/* A parameter declared as an array of T is really a pointer to T.
@@ -4669,6 +4699,10 @@ grokdeclarator (declarator, declspecs, decl_context, initialized)
 	    type = build_pointer_type (type);
 	    type_quals = TYPE_UNQUALIFIED;
 	  }
+	else if (type_quals)
+	  type = c_build_qualified_type (type, type_quals);
+	  
+	type_as_written = type;
 
 	decl = build_decl (PARM_DECL, declarator, type);
 	if (size_varies)
@@ -4795,7 +4829,9 @@ grokdeclarator (declarator, declspecs, decl_context, initialized)
 	    type_quals = TYPE_UNQUALIFIED;
 #endif
 	  }
-
+	else if (type_quals)
+	  type = c_build_qualified_type (type, type_quals);
+	  
 	decl = build_decl (VAR_DECL, declarator, type);
 	if (size_varies)
 	  C_DECL_VARIABLE_SIZE (decl) = 1;
@@ -5035,8 +5071,7 @@ get_parm_info (void_at_end)
 	tree type = TREE_TYPE (decl);
 	DECL_ARG_TYPE (decl) = type;
 	if (PROMOTE_PROTOTYPES
-	    && (TREE_CODE (type) == INTEGER_TYPE
-		|| TREE_CODE (type) == ENUMERAL_TYPE)
+	    && INTEGRAL_TYPE_P (type)
 	    && TYPE_PRECISION (type) < TYPE_PRECISION (integer_type_node))
 	  DECL_ARG_TYPE (decl) = integer_type_node;
 
@@ -5980,7 +6015,7 @@ start_function (declspecs, declarator, prefix_attributes, attributes)
 
   restype = TREE_TYPE (TREE_TYPE (current_function_decl));
   /* Promote the value to int before returning it.  */
-  if (C_PROMOTING_INTEGER_TYPE_P (restype))
+  if (c_promoting_integer_type_p (restype))
     {
       /* It retains unsignedness if traditional
 	 or if not really getting wider.  */
@@ -6045,6 +6080,9 @@ store_parm_decls ()
 
   /* Nonzero if this definition is written with a prototype.  */
   int prototype = 0;
+
+  /* The function containing FNDECL, if any.  */
+  tree context = decl_function_context (fndecl);
 
   if (specparms != 0 && TREE_CODE (specparms) != TREE_LIST)
     {
@@ -6306,9 +6344,11 @@ store_parm_decls ()
 					    "prototype declaration");
 		  break;
 		}
-	      /* Type for passing arg must be consistent
-		 with that declared for the arg.  */
-	      if (! comptypes (DECL_ARG_TYPE (parm), TREE_VALUE (type)))
+	      /* Type for passing arg must be consistent with that
+		 declared for the arg.  ISO C says we take the unqualified
+		 type for parameters declared with qualified type.  */
+	      if (! comptypes (TYPE_MAIN_VARIANT (DECL_ARG_TYPE (parm)),
+			       TYPE_MAIN_VARIANT (TREE_VALUE (type))))
 		{
 		  if (TYPE_MAIN_VARIANT (TREE_TYPE (parm))
 		      == TYPE_MAIN_VARIANT (TREE_VALUE (type)))
@@ -6321,8 +6361,7 @@ store_parm_decls ()
 		      DECL_ARG_TYPE (parm) = TREE_TYPE (parm);
 
 		      if (PROMOTE_PROTOTYPES
-			  && (TREE_CODE (TREE_TYPE (parm)) == INTEGER_TYPE
-			      || TREE_CODE (TREE_TYPE (parm)) == ENUMERAL_TYPE)
+			  && INTEGRAL_TYPE_P (TREE_TYPE (parm))
 			  && TYPE_PRECISION (TREE_TYPE (parm))
 			  < TYPE_PRECISION (integer_type_node))
 			DECL_ARG_TYPE (parm) = integer_type_node;
@@ -6414,13 +6453,27 @@ store_parm_decls ()
   gen_aux_info_record (fndecl, 1, 0, prototype);
 
   /* Initialize the RTL code for the function.  */
-
   init_function_start (fndecl, input_filename, lineno);
 
   /* Begin the statement tree for this function.  */
   DECL_LANG_SPECIFIC (current_function_decl)
-    =((struct lang_decl *) ggc_alloc (sizeof (struct lang_decl)));
+    =((struct lang_decl *) ggc_alloc_cleared (sizeof (struct lang_decl)));
   begin_stmt_tree (&DECL_SAVED_TREE (current_function_decl));
+
+  /* If this is a nested function, save away the sizes of any
+     variable-size types so that we can expand them when generating
+     RTL.  */
+  if (context)
+    {
+      tree t;
+
+      DECL_LANG_SPECIFIC (fndecl)->pending_sizes 
+	= nreverse (get_pending_sizes ());
+      for (t = DECL_LANG_SPECIFIC (fndecl)->pending_sizes;
+	   t;
+	   t = TREE_CHAIN (t))
+	SAVE_EXPR_CONTEXT (TREE_VALUE (t)) = context;
+    }
 
   /* This function is being processed in whole-function mode.  */
   cfun->x_whole_function_mode_p = 1;
@@ -6665,9 +6718,14 @@ c_expand_body (fndecl, nested_p)
   if (flag_syntax_only)
     return;
 
-  /* Squirrel away our current state.  */
   if (nested_p)
-    push_function_context ();
+    {
+      /* Make sure that we will evaluate variable-sized types involved
+	 in our function's type.  */
+      expand_pending_sizes (DECL_LANG_SPECIFIC (fndecl)->pending_sizes);
+      /* Squirrel away our current state.  */
+      push_function_context ();
+    }
 
   /* Initialize the RTL code for the function.  */
   current_function_decl = fndecl;
@@ -6702,7 +6760,7 @@ c_expand_body (fndecl, nested_p)
   /* Allow the body of the function to be garbage collected.  */
   DECL_SAVED_TREE (fndecl) = NULL_TREE;
 
-  /* We hard-wired immediate_size_expand to zero in start_function.
+  /* We hard-wired immediate_size_expand to zero above.
      expand_function_end will decrement this variable.  So, we set the
      variable to one here, so that after the decrement it will remain
      zero.  */
@@ -6795,19 +6853,8 @@ c_expand_body (fndecl, nested_p)
     }
 
   if (nested_p)
-    {
-      /* Return to the enclosing function.  */
-      pop_function_context ();
-      /* If the nested function was inline, write it out if that is
-	 necessary.  */
-      if (!TREE_ASM_WRITTEN (fndecl) && TREE_ADDRESSABLE (fndecl))
-	{
-	  push_function_context ();
-	  output_inline_function (fndecl);
-	  pop_function_context ();
-	}
-    }
-
+    /* Return to the enclosing function.  */
+    pop_function_context ();
 }
 
 /* Check the declarations given in a for-loop for satisfying the C99
@@ -6997,6 +7044,7 @@ lang_mark_tree (t)
     {
       ggc_mark (DECL_LANG_SPECIFIC (t));
       c_mark_lang_decl (&DECL_LANG_SPECIFIC (t)->base);
+      ggc_mark_tree (DECL_LANG_SPECIFIC (t)->pending_sizes);
     }
 }
 

@@ -2,8 +2,8 @@
 @c %**start of header
 @setfilename g77.info
 
-@set last-update 2000-12-21
-@set copyrights-g77 1995,1996,1997,1998,1999,2000
+@set last-update 2001-06-10
+@set copyrights-g77 1995,1996,1997,1998,1999,2000,2001
 
 @include root.texi
 
@@ -97,32 +97,24 @@ Boston, MA 02111-1307 USA
 
 Copyright (C) @value{copyrights-g77} Free Software Foundation, Inc.
 
-Permission is granted to make and distribute verbatim copies of
-this manual provided the copyright notice and this permission notice
-are preserved on all copies.
 
-@ignore
-Permission is granted to process this file through Tex and print the
-results, provided the printed document carries copying permission
-notice identical to this one except for the removal of this paragraph
-(this paragraph not being relevant to the printed manual).
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.1 or
+any later version published by the Free Software Foundation; with the
+Invariant Sections being ``GNU General Public License'', the Front-Cover
+texts being (a) (see below), and with the Back-Cover Texts being (b)
+(see below).  A copy of the license is included in the section entitled
+``GNU Free Documentation License''.
 
-@end ignore
-Permission is granted to copy and distribute modified versions of this
-manual under the conditions for verbatim copying, provided also that the
-sections entitled ``GNU General Public License,'' ``Funding for Free
-Software,'' and ``Protect Your Freedom---Fight `Look And Feel'@w{}'' are
-included exactly as in the original, and provided that the entire
-resulting derived work is distributed under the terms of a permission
-notice identical to this one.
+(a) The FSF's Front-Cover Text is:
 
-Permission is granted to copy and distribute translations of this manual
-into another language, under the above conditions for modified versions,
-except that the sections entitled ``GNU General Public License,''
-``Funding for Free Software,'' and ``Protect Your Freedom---Fight `Look
-And Feel'@w{}'', and this permission notice, may be included in
-translations approved by the Free Software Foundation instead of in the
-original English.
+     A GNU Manual
+
+(b) The FSF's Back-Cover Text is:
+
+     You have freedom to copy and modify this GNU Manual, like GNU
+     software.  Copies published by the Free Software Foundation raise
+     funds for GNU development.
 @end ifinfo
 
 Contributed by James Craig Burley (@email{@value{email-burley}}).
@@ -163,26 +155,26 @@ Boston, MA 02111-1307, USA@*
 @c Printed copies are available for $? each.@*
 @c ISBN ???
 @sp 1
-Permission is granted to make and distribute verbatim copies of
-this manual provided the copyright notice and this permission notice
-are preserved on all copies.
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.1 or
+any later version published by the Free Software Foundation; with the
+Invariant Sections being ``GNU General Public License'', the Front-Cover
+texts being (a) (see below), and with the Back-Cover Texts being (b)
+(see below).  A copy of the license is included in the section entitled
+``GNU Free Documentation License''.
 
-Permission is granted to copy and distribute modified versions of this
-manual under the conditions for verbatim copying, provided also that the
-sections entitled ``GNU General Public License,'' ``Funding for Free
-Software,'' and ``Protect Your Freedom---Fight `Look And Feel'@w{}'' are
-included exactly as in the original, and provided that the entire
-resulting derived work is distributed under the terms of a permission
-notice identical to this one.
+(a) The FSF's Front-Cover Text is:
 
-Permission is granted to copy and distribute translations of this manual
-into another language, under the above conditions for modified versions,
-except that the sections entitled ``GNU General Public License,''
-``Funding for Free Software,'' and ``Protect Your Freedom---Fight `Look
-And Feel'@w{}'', and this permission notice, may be included in
-translations approved by the Free Software Foundation instead of in the
-original English.
+     A GNU Manual
+
+(b) The FSF's Back-Cover Text is:
+
+     You have freedom to copy and modify this GNU Manual, like GNU
+     software.  Copies published by the Free Software Foundation raise
+     funds for GNU development.
 @end titlepage
+@summarycontents
+@contents
 @page
 
 @ifinfo
@@ -234,6 +226,8 @@ most consistent with the @code{g77} product in that version.
 @menu
 * Copying::         GNU General Public License says
                     how you can copy and share GNU Fortran.
+* GNU Free Documentation License::
+		    How you can copy and share this manual.
 * Contributors::    People who have contributed to GNU Fortran.
 * Funding::         How to help assure continued work for free software.
 * Funding GNU Fortran::  How to help assure continued work on GNU Fortran.
@@ -622,7 +616,8 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+Foundation, Inc., 59 Temple Place - Suite 330,
+Boston, MA 02111-1307, USA.
 @end smallexample
 
 Also add information on how to contact you by electronic and paper mail.
@@ -661,6 +656,8 @@ proprietary programs.  If your program is a subroutine library, you may
 consider it more useful to permit linking proprietary applications with the
 library.  If this is what you want to do, use the GNU Library General
 Public License instead of this License.
+
+@include fdl.texi
 
 @node Contributors
 @unnumbered Contributors to GNU Fortran
@@ -826,10 +823,13 @@ without royalty; alteration is not permitted.
 @cindex funding improvements
 @cindex improvements, funding
 
-Work on GNU Fortran is still being done mostly by its author,
-James Craig Burley (@email{@value{email-burley}}), who is a volunteer
-for, not an employee of, the Free Software Foundation (FSF).
+James Craig Burley (@email{@value{email-burley}}), the original author
+of g77, stopped working on it in September 1999
 (He has a web page at @uref{@value{www-burley}}.)
+
+GNU Fortran is currently maintained by Toon Moene
+(@email{toon@@moene.indiv.nluug.nl}), with the help of countless other
+volunteers.
 
 As with other GNU software, funding is important because it can pay for
 needed equipment, personnel, and so on.
@@ -840,36 +840,6 @@ The FSF provides information on the best way to fund ongoing
 development of GNU software (such as GNU Fortran) in documents
 such as the ``GNUS Bulletin''.
 Email @email{gnu@@gnu.org} for information on funding the FSF.
-
-To fund specific GNU Fortran work in particular, the FSF might
-provide a means for that, but the FSF does not provide direct funding
-to the author of GNU Fortran to continue his work.  The FSF has
-employee salary restrictions that can be incompatible with the
-financial needs of some volunteers, who therefore choose to
-remain volunteers and thus be able to be free to do contract work
-and otherwise make their own schedules for doing GNU work.
-
-Still, funding the FSF at least indirectly benefits work
-on specific projects like GNU Fortran because it ensures the
-continuing operation of the FSF offices, their workstations, their
-network connections, and so on, which are invaluable to volunteers.
-(Similarly, hiring Cygnus Support can help a project like GNU
-Fortran---Cygnus has been a long-time donor of equipment usage to the author
-of GNU Fortran, and this too has been invaluable---see @ref{Contributors}.)
-
-Currently, the only way to directly fund the author of GNU Fortran
-in his work on that project is to hire him for the work you want
-him to do, or donate money to him.
-Several people have done this
-already, with the result that he has not needed to immediately find
-contract work on a few occasions.
-If more people did this, he
-would be able to plan on not doing contract work for many months and
-could thus devote that time to work on projects (such as the planned
-changes for 0.6) that require longer timeframes to complete.
-For the latest information on the status of the author, do
-@kbd{finger -l burley@@gnu.org} on a UNIX system
-(or any system with a command like UNIX @code{finger}).
 
 Another important way to support work on GNU Fortran is to volunteer
 to help out.
@@ -1403,7 +1373,8 @@ by type.  Explanations are in the following sections.
 -fintrin-case-lower  -fintrin-case-any
 -fmatch-case-initcap  -fmatch-case-upper
 -fmatch-case-lower  -fmatch-case-any
--fsource-case-upper -fsource-case-lower  -fsource-case-preserve
+-fsource-case-upper  -fsource-case-lower
+-fsource-case-preserve
 -fsymbol-case-initcap  -fsymbol-case-upper
 -fsymbol-case-lower  -fsymbol-case-any
 -fcase-strict-upper  -fcase-strict-lower
@@ -1429,7 +1400,7 @@ by type.  Explanations are in the following sections.
 @xref{Warning Options,,Options to Request or Suppress Warnings}.
 @smallexample
 -fsyntax-only  -pedantic  -pedantic-errors  -fpedantic
--w  -Wno-globals  -Wimplicit -Wunused  -Wuninitialized
+-w  -Wno-globals  -Wimplicit  -Wunused  -Wuninitialized
 -Wall  -Wsurprising
 -Werror  -W
 @end smallexample
@@ -10417,9 +10388,46 @@ that a compile-time option to @code{g77} or @code{f2c} could
 result in generating the appropriate calls to flushing or
 non-flushing library routines.)
 
-@xref{Always Flush Output}, for information on how to modify
-the @code{g77} source tree so that a version of @code{libg2c}
-can be built and installed with the @code{ALWAYS_FLUSH} macro defined.
+Some Fortran programs require output
+(writes) to be flushed to the operating system (under UNIX,
+via the @code{fflush()} library call) so that errors,
+such as disk full, are immediately flagged via the relevant
+@code{ERR=} and @code{IOSTAT=} mechanism, instead of such
+errors being flagged later as subsequent writes occur, forcing
+the previously written data to disk, or when the file is
+closed.
+
+Essentially, the difference can be viewed as synchronous error
+reporting (immediate flagging of errors during writes) versus
+asynchronous, or, more precisely, buffered error reporting
+(detection of errors might be delayed).
+
+@code{libg2c} supports flagging write errors immediately when
+it is built with the @code{ALWAYS_FLUSH} macro defined.
+This results in a @code{libg2c} that runs slower, sometimes
+quite a bit slower, under certain circumstances---for example,
+accessing files via the networked file system NFS---but the
+effect can be more reliable, robust file I/O.
+
+If you know that Fortran programs requiring this level of precision
+of error reporting are to be compiled using the
+version of @code{g77} you are building, you might wish to
+modify the @code{g77} source tree so that the version of
+@code{libg2c} is built with the @code{ALWAYS_FLUSH} macro
+defined, enabling this behavior.
+
+To do this, find this line in @file{@value{path-libf2c}/f2c.h} in
+your @code{g77} source tree:
+
+@example
+/* #define ALWAYS_FLUSH */
+@end example
+
+Remove the leading @samp{/*@w{ }},
+so the line begins with @samp{#define},
+and the trailing @samp{@w{ }*/}.
+
+Then build or rebuild @code{g77} as appropriate.
 
 @node Large File Unit Numbers
 @subsection Large File Unit Numbers
@@ -10443,17 +10451,41 @@ macro named @code{MXUNIT}.
 If you can easily change your program to use unit numbers
 in the range 0 through 99, you should do so.
 
-Otherwise, see @ref{Larger File Unit Numbers}, for information on how
-to change @code{MXUNIT} in @code{libg2c} so you can build and
-install a new version of @code{libg2c} that supports the larger
-unit numbers you need.
+As distributed, whether as part of @code{f2c} or @code{g77},
+@code{libf2c} accepts file unit numbers only in the range
+0 through 99.
+For example, a statement such as @samp{WRITE (UNIT=100)} causes
+a run-time crash in @code{libf2c}, because the unit number,
+100, is out of range.
 
-@emph{Note:} While @code{libg2c} places a limit on the range
-of Fortran file-unit numbers, the underlying library and operating
-system might impose different kinds of limits.
-For example, some systems limit the number of files simultaneously
-open by a running program.
-Information on how to increase these limits should be found
+If you know that Fortran programs at your installation require
+the use of unit numbers higher than 99, you can change the
+value of the @code{MXUNIT} macro, which represents the maximum unit
+number, to an appropriately higher value.
+
+To do this, edit the file @file{@value{path-libf2c}/libI77/fio.h} in your
+@code{g77} source tree, changing the following line:
+
+@example
+#define MXUNIT 100
+@end example
+
+Change the line so that the value of @code{MXUNIT} is defined to be
+at least one @emph{greater} than the maximum unit number used by
+the Fortran programs on your system.
+
+(For example, a program that does @samp{WRITE (UNIT=255)} would require
+@code{MXUNIT} set to at least 256 to avoid crashing.)
+
+Then build or rebuild @code{g77} as appropriate.
+
+@emph{Note:} Changing this macro has @emph{no} effect on other limits
+your system might place on the number of files open at the same time.
+That is, the macro might allow a program to do @samp{WRITE (UNIT=100)},
+but the library and operating system underlying @code{libf2c} might
+disallow it if many other files have already been opened (via @code{OPEN} or
+implicitly via @code{READ}, @code{WRITE}, and so on).
+Information on how to increase these other limits should be found
 in your system's documentation.
 
 @node Floating-point precision
@@ -10823,10 +10855,6 @@ Some of these problems are due to bugs in other software, some are
 missing features that are too much work to add, and some are places
 where people's opinions differ as to what is best.
 
-Information on bugs that show up when configuring, porting, building,
-or installing @code{g77} is not provided here.
-@xref{Problems Installing}.
-
 To find out about major bugs discovered in the current release and
 possible workarounds for them, see
 @uref{ftp://alpha.gnu.org/g77.plan}.
@@ -11090,9 +11118,26 @@ You might be able to work around the problem by compiling with the
 @samp{-fno-automatic} option to reduce stack usage, probably at the
 expense of speed.
 
-@xref{Maximum Stackable Size}, for information on patching
-@code{g77} to use different criteria for placing local
-non-automatic variables and arrays on the stack.
+@code{g77}, on most machines, puts many variables and arrays on the stack
+where possible, and can be configured (by changing
+@code{FFECOM_sizeMAXSTACKITEM} in @file{@value{path-g77}/com.c}) to force
+smaller-sized entities into static storage (saving
+on stack space) or permit larger-sized entities to be put on the
+stack (which can improve run-time performance, as it presents
+more opportunities for the GBE to optimize the generated code).
+
+@emph{Note:} Putting more variables and arrays on the stack
+might cause problems due to system-dependent limits on stack size.
+Also, the value of @code{FFECOM_sizeMAXSTACKITEM} has no
+effect on automatic variables and arrays.
+@xref{But-bugs}, for more information.
+@emph{Note:} While @code{libg2c} places a limit on the range
+of Fortran file-unit numbers, the underlying library and operating
+system might impose different kinds of limits.
+For example, some systems limit the number of files simultaneously
+open by a running program.
+Information on how to increase these limits should be found
+in your system's documentation.
 
 @cindex automatic arrays
 @cindex arrays, automatic
@@ -13729,8 +13774,8 @@ we should be able to reproduce the crash ourselves.
 
 If you would like to write bug fixes or improvements for the GNU Fortran
 compiler, that is very helpful.
-Send suggested fixes to the bug report
-mailing list, @email{@value{email-bugs}}.
+Send suggested fixes to the mailing list for patches,
+@email{@value{email-patch}}.
 
 Please follow these guidelines so we can study your patches efficiently.
 If you don't follow these guidelines, your information might still be
@@ -13855,7 +13900,7 @@ The service directory is found in the file named @file{SERVICE} in the
 GNU CC distribution.
 
 @item
-Send a message to @email{@value{email-general}}.
+Send a message to @email{@value{email-help}}.
 @end itemize
 
 @end ifset
@@ -15051,20 +15096,6 @@ without exhibiting any other outward manifestations of the bugs.
 @section @code{LINKFAIL}
 
 @noindent
-@smallexample
-If the above command failed due to an unresolved reference
-to strtoul, _strtoul, bsearch, _bsearch, or similar, see
-[info -f g77 M LINKFAIL] (a node in the g77 documentation)
-for information on what causes this, how to work around
-the problem by editing $@{srcdir@}/proj.c, and what else to do.
-@end smallexample
-
-@xref{Missing strtoul or bsearch}, for more information on
-this problem,
-which occurs only in releases of @code{g77}
-based on @code{gcc}.
-(It did not occur in @code{egcs}.)
-
 On AIX 4.1, @code{g77} might not build with the native (non-GNU) tools
 due to a linker bug in coping with the @samp{-bbigtoc} option which
 leads to a @samp{Relocation overflow} error.  The GNU linker is not
@@ -15102,6 +15133,4 @@ that is not Year-2000 (Y2K) compliant.
 @unnumbered Index
 
 @printindex cp
-@summarycontents
-@contents
 @bye

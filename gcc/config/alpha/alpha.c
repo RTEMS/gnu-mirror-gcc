@@ -1,6 +1,6 @@
 /* Subroutines used for code generation on the DEC Alpha.
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000 Free Software Foundation, Inc. 
+   2000, 2001 Free Software Foundation, Inc. 
    Contributed by Richard Kenner (kenner@vlsi1.ultra.nyu.edu)
 
 This file is part of GNU CC.
@@ -29,7 +29,6 @@ Boston, MA 02111-1307, USA.  */
 #include "real.h"
 #include "insn-config.h"
 #include "conditions.h"
-#include "insn-flags.h"
 #include "output.h"
 #include "insn-attr.h"
 #include "flags.h"
@@ -342,6 +341,19 @@ override_options ()
   /* Default the definition of "small data" to 8 bytes.  */
   if (!g_switch_set)
     g_switch_value = 8;
+
+  /* Align labels and loops for optimal branching.  */
+  /* ??? Kludge these by not doing anything if we don't optimize and also if
+     we are writing ECOFF symbols to work around a bug in DEC's assembler. */
+  if (optimize > 0 && write_symbols != SDB_DEBUG)
+    {
+      if (align_loops <= 0)
+	align_loops = 16;
+      if (align_jumps <= 0)
+	align_jumps = 16;
+    }
+  if (align_functions <= 0)
+    align_functions = 16;
 
   /* Acquire a unique set number for our register saves and restores.  */
   alpha_sr_alias_set = new_alias_set ();
@@ -3665,8 +3677,8 @@ alpha_mark_machine_status (p)
 
   if (machine)
     {
-      ggc_mark_rtx (machine->eh_epilogue_sp_ofs);
       ggc_mark_rtx (machine->ra_rtx);
+      ggc_mark_rtx (machine->gp_save_rtx);
     }
 }
 
@@ -3700,6 +3712,29 @@ alpha_return_addr (count, frame)
       init = gen_rtx_SET (VOIDmode, reg, gen_rtx_REG (Pmode, REG_RA));
 
       /* Emit the insn to the prologue with the other argument copies.  */
+      push_topmost_sequence ();
+      emit_insn_after (init, get_insns ());
+      pop_topmost_sequence ();
+    }
+
+  return reg;
+}
+
+/* Return or create a pseudo containing the gp value for the current
+   function.  Needed only if TARGET_LD_BUGGY_LDGP.  */
+
+rtx
+alpha_gp_save_rtx ()
+{
+  rtx init, reg;
+
+  reg = cfun->machine->gp_save_rtx;
+  if (reg == NULL)
+    {
+      reg = gen_reg_rtx (DImode);
+      cfun->machine->gp_save_rtx = reg;
+      init = gen_rtx_SET (VOIDmode, reg, gen_rtx_REG (DImode, 29));
+
       push_topmost_sequence ();
       emit_insn_after (init, get_insns ());
       pop_topmost_sequence ();
@@ -4317,6 +4352,7 @@ alpha_va_arg (valist, type)
   tree t;
   tree offset_field, base_field, addr_tree, addend;
   tree wide_type, wide_ofs;
+  int indirect = 0;
 
   if (TARGET_OPEN_VMS)
     return std_expand_builtin_va_arg (valist, type);
@@ -4335,7 +4371,13 @@ alpha_va_arg (valist, type)
   wide_ofs = save_expr (build1 (CONVERT_EXPR, wide_type, offset_field));
 
   addend = wide_ofs;
-  if (FLOAT_TYPE_P (type))
+
+  if (TYPE_MODE (type) == TFmode || TYPE_MODE (type) == TCmode)
+    {
+      indirect = 1;
+      tsize = UNITS_PER_WORD;
+    }
+  else if (FLOAT_TYPE_P (type))
     {
       tree fpaddend, cond;
 
@@ -4360,6 +4402,12 @@ alpha_va_arg (valist, type)
 		    offset_field, build_int_2 (tsize, 0)));
   TREE_SIDE_EFFECTS (t) = 1;
   expand_expr (t, const0_rtx, VOIDmode, EXPAND_NORMAL);
+
+  if (indirect)
+    {
+      addr = force_reg (Pmode, addr);
+      addr = gen_rtx_MEM (Pmode, addr);
+    }
 
   return addr;
 }
@@ -4416,6 +4464,18 @@ alpha_sa_mask (imaskP, fmaskP)
 	    else
 	      fmask |= (1L << (i - 32));
 	  }
+
+      /* We need to restore these for the handler.  */
+      if (current_function_calls_eh_return)
+	{
+	  for (i = 0; ; ++i)
+	    {
+	      unsigned regno = EH_RETURN_DATA_REGNO (i);
+	      if (regno == INVALID_REGNUM)
+		break;
+	      imask |= 1L << regno;
+	    }
+	}
 
       if (imask || fmask || alpha_ra_ever_killed ())
 	imask |= (1L << REG_RA);
@@ -5113,7 +5173,11 @@ alpha_expand_epilogue ()
   fp_offset = 0;
   sa_reg = stack_pointer_rtx;
 
-  eh_ofs = cfun->machine->eh_epilogue_sp_ofs;
+  if (current_function_calls_eh_return)
+    eh_ofs = EH_RETURN_STACKADJ_RTX;
+  else
+    eh_ofs = NULL_RTX;
+
   if (sa_size)
     {
       /* If we have a frame pointer, restore SP from it.  */
@@ -5141,12 +5205,11 @@ alpha_expand_epilogue ()
 	  
       /* Restore registers in order, excepting a true frame pointer. */
 
+      mem = gen_rtx_MEM (DImode, plus_constant (sa_reg, reg_offset));
       if (! eh_ofs)
-	{
-	  mem = gen_rtx_MEM (DImode, plus_constant(sa_reg, reg_offset));
-	  MEM_ALIAS_SET (mem) = alpha_sr_alias_set;
-          FRP (emit_move_insn (gen_rtx_REG (DImode, REG_RA), mem));
-	}
+        MEM_ALIAS_SET (mem) = alpha_sr_alias_set;
+      FRP (emit_move_insn (gen_rtx_REG (DImode, REG_RA), mem));
+
       reg_offset += 8;
       imask &= ~(1L << REG_RA);
 

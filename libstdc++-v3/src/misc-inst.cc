@@ -54,7 +54,8 @@
 #include <bits/ostream.tcc>
 #endif
 
-namespace std {
+namespace std
+{
 
   //
   // streambuf
@@ -242,26 +243,6 @@ namespace std {
 
   template
     void 
-    __sink_unused_warning<char>(char);
-#ifdef _GLIBCPP_USE_WCHAR_T
-  template
-    void 
-    __sink_unused_warning<wchar_t>(wchar_t);
-#endif
-
-  template
-    void
-    __sink_unused_warning<ostreambuf_iterator<char> > 
-    (ostreambuf_iterator<char>);
-#ifdef _GLIBCPP_USE_WCHAR_T
-  template
-    void
-    __sink_unused_warning<ostreambuf_iterator<wchar_t> > 
-    (ostreambuf_iterator<wchar_t>);
-#endif
-
-  template
-    void 
     __pad_char(basic_ios<char>&, char*, const char*,
 		const streamsize, const streamsize);
 #ifdef _GLIBCPP_USE_WCHAR_T
@@ -295,14 +276,12 @@ namespace std {
 
   template
     streamsize
-    __copy_streambufs(basic_ios<char>&, 
-		      basic_streambuf<char>*,
+    __copy_streambufs(basic_ios<char>&, basic_streambuf<char>*,
 		      basic_streambuf<char>*); 
 #ifdef _GLIBCPP_USE_WCHAR_T
   template
-    int
-    __copy_streambufs(basic_ios<wchar_t>&, 
-		      basic_streambuf<wchar_t>*,
+    streamsize
+    __copy_streambufs(basic_ios<wchar_t>&, basic_streambuf<wchar_t>*,
 		      basic_streambuf<wchar_t>*); 
 #endif
 } //std

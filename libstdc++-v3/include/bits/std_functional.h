@@ -13,9 +13,10 @@
  */
 
 #ifndef _CPP_FUNCTIONAL
-#define _CPP_FUNCTIONAL
+#define _CPP_FUNCTIONAL 1
 
-#include <bits/stl_config.h>
+#pragma GCC system_header
+#include <bits/c++config.h>
 #include <bits/std_cstddef.h>
 #include <bits/stl_function.h>
 

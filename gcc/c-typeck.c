@@ -651,7 +651,8 @@ type_lists_compatible_p (args1, args2)
 	  if (simple_type_promotes_to (TREE_VALUE (args1)) != NULL_TREE)
 	    return 0;
 	}
-      else if (! (newval = comptypes (TREE_VALUE (args1), TREE_VALUE (args2))))
+      else if (! (newval = comptypes (TYPE_MAIN_VARIANT (TREE_VALUE (args1)), 
+				      TYPE_MAIN_VARIANT (TREE_VALUE (args2)))))
 	{
 	  /* Allow  wait (union {union wait *u; int *i} *)
 	     and  wait (union wait *)  to be compatible.  */
@@ -954,14 +955,14 @@ default_conversion (exp)
   if (TREE_CODE (exp) == COMPONENT_REF
       && DECL_C_BIT_FIELD (TREE_OPERAND (exp, 1))
       /* If it's thinner than an int, promote it like a
-	 C_PROMOTING_INTEGER_TYPE_P, otherwise leave it alone.  */
+	 c_promoting_integer_type_p, otherwise leave it alone.  */
       && 0 > compare_tree_int (DECL_SIZE (TREE_OPERAND (exp, 1)),
 			       TYPE_PRECISION (integer_type_node)))
     return convert (flag_traditional && TREE_UNSIGNED (type)
 		    ? unsigned_type_node : integer_type_node,
 		    exp);
 
-  if (C_PROMOTING_INTEGER_TYPE_P (type))
+  if (c_promoting_integer_type_p (type))
     {
       /* Traditionally, unsignedness is preserved in default promotions.
          Also preserve unsignedness if not really getting any wider.  */
@@ -972,9 +973,6 @@ default_conversion (exp)
 
       return convert (integer_type_node, exp);
     }
-
-  if (code == BOOLEAN_TYPE)
-    return convert (integer_type_node, exp);
 
   if (flag_traditional && !flag_allow_single_precision
       && TYPE_MAIN_VARIANT (type) == float_type_node)
@@ -1676,19 +1674,25 @@ convert_arguments (typelist, values, name, fundecl)
 	    {
 	      /* Optionally warn about conversions that
 		 differ from the default conversions.  */
-	      if (warn_conversion)
+	      if (warn_conversion || warn_traditional)
 		{
 		  int formal_prec = TYPE_PRECISION (type);
 
 		  if (INTEGRAL_TYPE_P (type)
 		      && TREE_CODE (TREE_TYPE (val)) == REAL_TYPE)
 		    warn_for_assignment ("%s as integer rather than floating due to prototype", (char *) 0, name, parmnum + 1);
+		  if (INTEGRAL_TYPE_P (type)
+		      && TREE_CODE (TREE_TYPE (val)) == COMPLEX_TYPE)
+		    warn_for_assignment ("%s as integer rather than complex due to prototype", (char *) 0, name, parmnum + 1);
 		  else if (TREE_CODE (type) == COMPLEX_TYPE
 			   && TREE_CODE (TREE_TYPE (val)) == REAL_TYPE)
 		    warn_for_assignment ("%s as complex rather than floating due to prototype", (char *) 0, name, parmnum + 1);
 		  else if (TREE_CODE (type) == REAL_TYPE
 			   && INTEGRAL_TYPE_P (TREE_TYPE (val)))
 		    warn_for_assignment ("%s as floating rather than integer due to prototype", (char *) 0, name, parmnum + 1);
+		  else if (TREE_CODE (type) == COMPLEX_TYPE
+			   && INTEGRAL_TYPE_P (TREE_TYPE (val)))
+		    warn_for_assignment ("%s as complex rather than integer due to prototype", (char *) 0, name, parmnum + 1);
 		  else if (TREE_CODE (type) == REAL_TYPE
 			   && TREE_CODE (TREE_TYPE (val)) == COMPLEX_TYPE)
 		    warn_for_assignment ("%s as floating rather than complex due to prototype", (char *) 0, name, parmnum + 1);
@@ -1703,8 +1707,10 @@ convert_arguments (typelist, values, name, fundecl)
 		      if (formal_prec == TYPE_PRECISION (float_type_node))
 			warn_for_assignment ("%s as `float' rather than `double' due to prototype", (char *) 0, name, parmnum + 1);
 		    }
-		  /* Detect integer changing in width or signedness.  */
-		  else if (INTEGRAL_TYPE_P (type)
+		  /* Detect integer changing in width or signedness.
+		     These warnings are only activated with
+		     -Wconversion, not with -Wtraditional.  */
+		  else if (warn_conversion && INTEGRAL_TYPE_P (type)
 			   && INTEGRAL_TYPE_P (TREE_TYPE (val)))
 		    {
 		      tree would_have_been = default_conversion (val);
@@ -1761,9 +1767,7 @@ convert_arguments (typelist, values, name, fundecl)
 						fundecl, name, parmnum + 1);
 	      
 	      if (PROMOTE_PROTOTYPES
-		  && (TREE_CODE (type) == INTEGER_TYPE
-		      || TREE_CODE (type) == ENUMERAL_TYPE
-		      || TREE_CODE (type) == BOOLEAN_TYPE)
+		  && INTEGRAL_TYPE_P (type)
 		  && (TYPE_PRECISION (type) < TYPE_PRECISION (integer_type_node)))
 		parmval = default_conversion (parmval);
 	    }
@@ -4675,6 +4679,8 @@ digest_init (type, init, require_constant, constructor_constant)
   if (TREE_CODE (init) == NON_LVALUE_EXPR)
     inside_init = TREE_OPERAND (init, 0);
 
+  inside_init = fold (inside_init);
+
   /* Initialization of an array of chars from a string constant
      optionally enclosed in braces.  */
 
@@ -4770,14 +4776,21 @@ digest_init (type, init, require_constant, constructor_constant)
 	  if (flag_pedantic_errors)
 	    inside_init = error_mark_node;
 	}
-      else if (require_constant && ! TREE_CONSTANT (inside_init))
+      else if (require_constant 
+	       && (!TREE_CONSTANT (inside_init)
+		   /* This test catches things like `7 / 0' which
+		      result in an expression for which TREE_CONSTANT
+		      is true, but which is not actually something
+		      that is a legal constant.  We really should not
+		      be using this function, because it is a part of
+		      the back-end.  Instead, the expression should
+		      already have been turned into ERROR_MARK_NODE.  */
+		   || !initializer_constant_valid_p (inside_init,
+						     TREE_TYPE (inside_init))))
 	{
 	  error_init ("initializer element is not constant");
 	  inside_init = error_mark_node;
 	}
-      else if (require_constant
-	       && initializer_constant_valid_p (inside_init, TREE_TYPE (inside_init)) == 0)
-	pedwarn ("initializer element is not computable at load time");
 
       return inside_init;
     }

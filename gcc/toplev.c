@@ -45,7 +45,6 @@ Boston, MA 02111-1307, USA.  */
 #include "tm_p.h"
 #include "flags.h"
 #include "insn-attr.h"
-#include "insn-codes.h"
 #include "insn-config.h"
 #include "hard-reg-set.h"
 #include "recog.h"
@@ -63,10 +62,8 @@ Boston, MA 02111-1307, USA.  */
 #include "timevar.h"
 #include "diagnostic.h"
 #include "ssa.h"
-
-#ifndef ACCUMULATE_OUTGOING_ARGS
-#define ACCUMULATE_OUTGOING_ARGS 0
-#endif
+#include "params.h"
+#include "dwarf2asm.h"
 
 #ifdef DWARF_DEBUGGING_INFO
 #include "dwarfout.h"
@@ -163,10 +160,6 @@ static const char *decl_name PARAMS ((tree, int));
 
 static void float_signal PARAMS ((int)) ATTRIBUTE_NORETURN;
 static void crash_signal PARAMS ((int)) ATTRIBUTE_NORETURN;
-#ifdef ASM_IDENTIFY_LANGUAGE
-/* This might or might not be used in ASM_IDENTIFY_LANGUAGE. */
-static void output_lang_identify PARAMS ((FILE *)) ATTRIBUTE_UNUSED;
-#endif
 static void compile_file PARAMS ((const char *));
 static void display_help PARAMS ((void));
 static void display_target_options PARAMS ((void));
@@ -256,6 +249,7 @@ enum dump_file_index
 {
   DFI_rtl,
   DFI_sibling,
+  DFI_eh,
   DFI_jump,
   DFI_cse,
   DFI_addressof,
@@ -293,7 +287,7 @@ enum dump_file_index
 
    Remaining -d letters:
 
-	"       h      o q   u     "
+	"              o q   u     "
 	"       H  K   OPQ  TUVW YZ"
 */
 
@@ -301,6 +295,7 @@ struct dump_file_info dump_file[DFI_MAX] =
 {
   { "rtl",	'r', 0, 0, 0 },
   { "sibling",  'i', 0, 0, 0 },
+  { "eh",	'h', 0, 0, 0 },
   { "jump",	'j', 0, 0, 0 },
   { "cse",	's', 0, 0, 0 },
   { "addressof", 'F', 0, 0, 0 },
@@ -389,6 +384,9 @@ int optimize_size = 0;
 int errorcount = 0;
 int warningcount = 0;
 int sorrycount = 0;
+
+/* Nonzero if we should exit after parsing options.  */
+static int exit_after_options = 0;
 
 /* The FUNCTION_DECL for the function currently being compiled,
    or 0 if between functions.  */
@@ -718,11 +716,6 @@ int flag_pic;
 
 int flag_exceptions;
 
-/* Nonzero means use the new model for exception handling. Replaces
-   -DNEW_EH_MODEL as a compile option.  */
-
-int flag_new_exceptions = 1;
-
 /* Nonzero means generate frame unwind info table when supported.  */
 
 int flag_unwind_tables = 0;
@@ -917,26 +910,26 @@ static struct
 debug_args[] =
 {
   { "",       NO_DEBUG, DEFAULT_GDB_EXTENSIONS,
-    "Generate default debug format output" },
-  { "gdb",    NO_DEBUG, 1, "Generate default extended debug format output" },
+    N_("Generate debugging info in default format") },
+  { "gdb",    NO_DEBUG, 1, N_("Generate debugging info in default extended format") },
 #ifdef DBX_DEBUGGING_INFO
-  { "stabs",  DBX_DEBUG, 0, "Generate STABS format debug output" },
-  { "stabs+", DBX_DEBUG, 1, "Generate extended STABS format debug output" },
+  { "stabs",  DBX_DEBUG, 0, N_("Generate STABS format debug info") },
+  { "stabs+", DBX_DEBUG, 1, N_("Generate extended STABS format debug info") },
 #endif
 #ifdef DWARF_DEBUGGING_INFO
-  { "dwarf",  DWARF_DEBUG, 0, "Generate DWARF-1 format debug output"},
+  { "dwarf",  DWARF_DEBUG, 0, N_("Generate DWARF-1 format debug info") },
   { "dwarf+", DWARF_DEBUG, 1,
-    "Generated extended DWARF-1 format debug output" },
+    N_("Generate extended DWARF-1 format debug info") },
 #endif
 #ifdef DWARF2_DEBUGGING_INFO
-  { "dwarf-2", DWARF2_DEBUG, 0, "Enable DWARF-2 debug output" },
+  { "dwarf-2", DWARF2_DEBUG, 0, N_("Generate DWARF-2 debug info") },
 #endif
 #ifdef XCOFF_DEBUGGING_INFO
-  { "xcoff",  XCOFF_DEBUG, 0, "Generate XCOFF format debug output" },
-  { "xcoff+", XCOFF_DEBUG, 1, "Generate extended XCOFF format debug output" },
+  { "xcoff",  XCOFF_DEBUG, 0, N_("Generate XCOFF format debug info") },
+  { "xcoff+", XCOFF_DEBUG, 1, N_("Generate extended XCOFF format debug info") },
 #endif
 #ifdef SDB_DEBUGGING_INFO
-  { "coff", SDB_DEBUG, 0, "Generate COFF format debug output" },
+  { "coff", SDB_DEBUG, 0, N_("Generate COFF format debug info") },
 #endif
   { 0, 0, 0, 0 }
 };
@@ -958,6 +951,14 @@ int flag_leading_underscore = -1;
 /* The user symbol prefix after having resolved same.  */
 const char *user_label_prefix;
 
+static const param_info lang_independent_params[] = {
+#define DEFPARAM(ENUM, OPTION, HELP, DEFAULT) \
+  { OPTION, DEFAULT, HELP },
+#include "params.def"
+#undef DEFPARAM
+  { NULL, 0, NULL }
+};
+
 /* A default for same.  */
 #ifndef USER_LABEL_PREFIX
 #define USER_LABEL_PREFIX ""
@@ -971,189 +972,179 @@ const char *user_label_prefix;
 
 lang_independent_options f_options[] =
 {
-  {"eliminate-dwarf2-dups", &flag_eliminate_dwarf2_dups, 1,
-   "Perform DWARF2 duplicate elimination"},
   {"float-store", &flag_float_store, 1,
-   "Do not store floats in registers" },
+   N_("Do not store floats in registers") },
   {"volatile", &flag_volatile, 1,
-   "Consider all mem refs through pointers as volatile"},
+   N_("Consider all mem refs through pointers as volatile") },
   {"volatile-global", &flag_volatile_global, 1,
-   "Consider all mem refs to global data to be volatile" },
+   N_("Consider all mem refs to global data to be volatile") },
   {"volatile-static", &flag_volatile_static, 1,
-   "Consider all mem refs to static data to be volatile" },
+   N_("Consider all mem refs to static data to be volatile") },
   {"defer-pop", &flag_defer_pop, 1,
-   "Defer popping functions args from stack until later" },
+   N_("Defer popping functions args from stack until later") },
   {"omit-frame-pointer", &flag_omit_frame_pointer, 1,
-   "When possible do not generate stack frames"},
+   N_("When possible do not generate stack frames") },
   {"optimize-sibling-calls", &flag_optimize_sibling_calls, 1,
-   "Optimize sibling and tail recursive calls" },
+   N_("Optimize sibling and tail recursive calls") },
   {"cse-follow-jumps", &flag_cse_follow_jumps, 1,
-   "When running CSE, follow jumps to their targets" },
+   N_("When running CSE, follow jumps to their targets") },
   {"cse-skip-blocks", &flag_cse_skip_blocks, 1,
-   "When running CSE, follow conditional jumps" },
+   N_("When running CSE, follow conditional jumps") },
   {"expensive-optimizations", &flag_expensive_optimizations, 1,
-   "Perform a number of minor, expensive optimisations" },
+   N_("Perform a number of minor, expensive optimisations") },
   {"thread-jumps", &flag_thread_jumps, 1,
-   "Perform jump threading optimisations"},
+   N_("Perform jump threading optimisations") },
   {"strength-reduce", &flag_strength_reduce, 1,
-   "Perform strength reduction optimisations" },
+   N_("Perform strength reduction optimisations") },
   {"unroll-loops", &flag_unroll_loops, 1,
-   "Perform loop unrolling when iteration count is known" },
+   N_("Perform loop unrolling when iteration count is known") },
   {"unroll-all-loops", &flag_unroll_all_loops, 1,
-   "Perform loop unrolling for all loops" },
+   N_("Perform loop unrolling for all loops") },
   {"move-all-movables", &flag_move_all_movables, 1,
-   "Force all loop invariant computations out of loops" },
+   N_("Force all loop invariant computations out of loops") },
   {"reduce-all-givs", &flag_reduce_all_givs, 1,
-   "Strength reduce all loop general induction variables" },
+   N_("Strength reduce all loop general induction variables") },
   {"writable-strings", &flag_writable_strings, 1,
-   "Store strings in writable data section" },
+   N_("Store strings in writable data section") },
   {"peephole", &flag_no_peephole, 0,
-   "Enable machine specific peephole optimisations" },
+   N_("Enable machine specific peephole optimisations") },
   {"force-mem", &flag_force_mem, 1,
-   "Copy memory operands into registers before using" },
+   N_("Copy memory operands into registers before using") },
   {"force-addr", &flag_force_addr, 1,
-   "Copy memory address constants into regs before using" },
+   N_("Copy memory address constants into regs before using") },
   {"function-cse", &flag_no_function_cse, 0,
-   "Allow function addresses to be held in registers" },
+   N_("Allow function addresses to be held in registers") },
   {"inline-functions", &flag_inline_functions, 1,
-   "Integrate simple functions into their callers" },
+   N_("Integrate simple functions into their callers") },
   {"keep-inline-functions", &flag_keep_inline_functions, 1,
-   "Generate code for funcs even if they are fully inlined" },
+   N_("Generate code for funcs even if they are fully inlined") },
   {"inline", &flag_no_inline, 0,
-   "Pay attention to the 'inline' keyword"},
+   N_("Pay attention to the 'inline' keyword") },
   {"keep-static-consts", &flag_keep_static_consts, 1,
-   "Emit static const variables even if they are not used" },
+   N_("Emit static const variables even if they are not used") },
   {"syntax-only", &flag_syntax_only, 1,
-   "Check for syntax errors, then stop" },
+   N_("Check for syntax errors, then stop") },
   {"shared-data", &flag_shared_data, 1,
-   "Mark data as shared rather than private" },
+   N_("Mark data as shared rather than private") },
   {"caller-saves", &flag_caller_saves, 1,
-   "Enable saving registers around function calls" },
+   N_("Enable saving registers around function calls") },
   {"pcc-struct-return", &flag_pcc_struct_return, 1,
-   "Return 'short' aggregates in memory, not registers" },
+   N_("Return 'short' aggregates in memory, not registers") },
   {"reg-struct-return", &flag_pcc_struct_return, 0,
-   "Return 'short' aggregates in registers" },
+   N_("Return 'short' aggregates in registers") },
   {"delayed-branch", &flag_delayed_branch, 1,
-   "Attempt to fill delay slots of branch instructions" },
+   N_("Attempt to fill delay slots of branch instructions") },
   {"gcse", &flag_gcse, 1,
-   "Perform the global common subexpression elimination" },
+   N_("Perform the global common subexpression elimination") },
   {"rerun-cse-after-loop", &flag_rerun_cse_after_loop, 1,
-   "Run CSE pass after loop optimisations"},
+   N_("Run CSE pass after loop optimisations") },
   {"rerun-loop-opt", &flag_rerun_loop_opt, 1,
-   "Run the loop optimiser twice"},
+   N_("Run the loop optimiser twice") },
   {"delete-null-pointer-checks", &flag_delete_null_pointer_checks, 1,
-   "Delete useless null pointer checks" },
+   N_("Delete useless null pointer checks") },
   {"pretend-float", &flag_pretend_float, 1,
-   "Pretend that host and target use the same FP format"},
+   N_("Pretend that host and target use the same FP format") },
   {"schedule-insns", &flag_schedule_insns, 1,
-   "Reschedule instructions to avoid pipeline stalls"},
+   N_("Reschedule instructions before register allocation") },
   {"schedule-insns2", &flag_schedule_insns_after_reload, 1,
-  "Run two passes of the instruction scheduler"},
+   N_("Reschedule instructions after register allocation") },
   {"sched-interblock",&flag_schedule_interblock, 1,
-   "Enable scheduling across basic blocks" },
+   N_("Enable scheduling across basic blocks") },
   {"sched-spec",&flag_schedule_speculative, 1,
-   "Allow speculative motion of non-loads" },
+   N_("Allow speculative motion of non-loads") },
   {"sched-spec-load",&flag_schedule_speculative_load, 1,
-   "Allow speculative motion of some loads" },
+   N_("Allow speculative motion of some loads") },
   {"sched-spec-load-dangerous",&flag_schedule_speculative_load_dangerous, 1,
-   "Allow speculative motion of more loads" },
+   N_("Allow speculative motion of more loads") },
   {"branch-count-reg",&flag_branch_on_count_reg, 1,
-   "Replace add,compare,branch with branch on count reg"},
+   N_("Replace add,compare,branch with branch on count reg") },
   {"pic", &flag_pic, 1,
-   "Generate position independent code, if possible"},
+   N_("Generate position independent code, if possible") },
   {"PIC", &flag_pic, 2, ""},
   {"exceptions", &flag_exceptions, 1,
-   "Enable exception handling" },
-  {"new-exceptions", &flag_new_exceptions, 1,
-   "Use the new model for exception handling" },
+   N_("Enable exception handling") },
   {"unwind-tables", &flag_unwind_tables, 1,
-    "Just generate unwind tables for exception handling" },
-  {"sjlj-exceptions", &exceptions_via_longjmp, 1,
-   "Use setjmp/longjmp to handle exceptions" },
-  {"asynchronous-exceptions", &asynchronous_exceptions, 1,
-   "Support asynchronous exceptions" },
+   N_("Just generate unwind tables for exception handling") },
+  {"non-call-exceptions", &flag_non_call_exceptions, 1,
+   N_("Support synchronous non-call exceptions") },
   {"profile-arcs", &profile_arc_flag, 1,
-   "Insert arc based program profiling code" },
+   N_("Insert arc based program profiling code") },
   {"test-coverage", &flag_test_coverage, 1,
-   "Create data files needed by gcov" },
+   N_("Create data files needed by gcov") },
   {"branch-probabilities", &flag_branch_probabilities, 1,
-   "Use profiling information for branch probabilities" },
+   N_("Use profiling information for branch probabilities") },
   {"reorder-blocks", &flag_reorder_blocks, 1,
-   "Reorder basic blocks to improve code placement" },
+   N_("Reorder basic blocks to improve code placement") },
   {"rename-registers", &flag_rename_registers, 1,
-   "Do the register renaming optimization pass"},
+   N_("Do the register renaming optimization pass") },
   {"fast-math", &flag_fast_math, 1,
-   "Improve FP speed by violating ANSI & IEEE rules" },
+   N_("Improve FP speed by violating ANSI & IEEE rules") },
   {"common", &flag_no_common, 0,
-   "Do not put unitialised globals in the common section" },
+   N_("Do not put unitialised globals in the common section") },
   {"inhibit-size-directive", &flag_inhibit_size_directive, 1,
-   "Do not generate .size directives" },
+   N_("Do not generate .size directives") },
   {"function-sections", &flag_function_sections, 1,
-   "place each function into its own section" },
+   N_("place each function into its own section") },
   {"data-sections", &flag_data_sections, 1,
-   "place data items into their own section" },
+   N_("place data items into their own section") },
   {"verbose-asm", &flag_verbose_asm, 1,
-   "Add extra commentry to assembler output"},
+   N_("Add extra commentry to assembler output") },
   {"gnu-linker", &flag_gnu_linker, 1,
-   "Output GNU ld formatted global initialisers"},
+   N_("Output GNU ld formatted global initialisers") },
   {"regmove", &flag_regmove, 1,
-   "Enables a register move optimisation"},
+   N_("Enables a register move optimisation") },
   {"optimize-register-move", &flag_regmove, 1,
-   "Do the full regmove optimization pass"},
+   N_("Do the full regmove optimization pass") },
   {"pack-struct", &flag_pack_struct, 1,
-   "Pack structure members together without holes" },
+   N_("Pack structure members together without holes") },
   {"stack-check", &flag_stack_check, 1,
-   "Insert stack checking code into the program" },
+   N_("Insert stack checking code into the program") },
   {"argument-alias", &flag_argument_noalias, 0,
-   "Specify that arguments may alias each other & globals"},
+   N_("Specify that arguments may alias each other & globals") },
   {"argument-noalias", &flag_argument_noalias, 1,
-   "Assume arguments may alias globals but not each other"},
+   N_("Assume arguments may alias globals but not each other") },
   {"argument-noalias-global", &flag_argument_noalias, 2,
-   "Assume arguments do not alias each other or globals" },
+   N_("Assume arguments do not alias each other or globals") },
   {"strict-aliasing", &flag_strict_aliasing, 1,
-   "Assume strict aliasing rules apply" },
+   N_("Assume strict aliasing rules apply") },
   {"align-loops", &align_loops, 0,
-   "Align the start of loops" },
+   N_("Align the start of loops") },
   {"align-jumps", &align_jumps, 0,
-   "Align labels which are only reached by jumping" },
+   N_("Align labels which are only reached by jumping") },
   {"align-labels", &align_labels, 0,
-   "Align all labels" },
+   N_("Align all labels") },
   {"align-functions", &align_functions, 0,
-   "Align the start of functions" },
+   N_("Align the start of functions") },
   {"check-memory-usage", &flag_check_memory_usage, 1,
-   "Generate code to check every memory access" },
+   N_("Generate code to check every memory access") },
   {"prefix-function-name", &flag_prefix_function_name, 1,
-   "Add a prefix to all function names" },
+   N_("Add a prefix to all function names") },
   {"dump-unnumbered", &flag_dump_unnumbered, 1,
-   "Suppress output of instruction numbers and line number notes in debugging dumps"},
+   N_("Suppress output of instruction numbers and line number notes in debugging dumps") },
   {"instrument-functions", &flag_instrument_function_entry_exit, 1,
-   "Instrument function entry/exit with profiling calls"},
+   N_("Instrument function entry/exit with profiling calls") },
   {"ssa", &flag_ssa, 1,
-   "Enable SSA optimizations" },
+   N_("Enable SSA optimizations") },
   {"dce", &flag_dce, 1,
-   "Enable dead code elimination" },
+   N_("Enable dead code elimination") },
   {"leading-underscore", &flag_leading_underscore, 1,
-   "External symbols have a leading underscore" },
+   N_("External symbols have a leading underscore") },
   {"ident", &flag_no_ident, 0,
-   "Process #ident directives"},
+   N_("Process #ident directives") },
   { "peephole2", &flag_peephole2, 1,
-    "Enables an rtl peephole pass run before sched2" },
+    N_("Enables an rtl peephole pass run before sched2") },
   { "guess-branch-probability", &flag_guess_branch_prob, 1,
-    "Enables guessing of branch probabilities" },
+    N_("Enables guessing of branch probabilities") },
   {"math-errno", &flag_errno_math, 1,
-   "Set errno after built-in math functions"},
-  {"bounded-pointers", &flag_bounded_pointers, 1,
-   "Compile pointers as triples: value, base & end" },
-  {"bounds-check", &flag_bounds_check, 1,
-   "Generate code to check bounds before dereferencing pointers and arrays" },
+   N_("Set errno after built-in math functions") },
   {"single-precision-constant", &flag_single_precision_constant, 1,
-   "Convert floating point constant to single precision constant"},
+   N_("Convert floating point constant to single precision constant") },
   {"time-report", &time_report, 1,
-   "Report time taken by each compiler pass at end of run"},
+   N_("Report time taken by each compiler pass at end of run") },
   {"mem-report", &mem_report, 1,
-   "Report on permanent memory allocation at end of run"},
+   N_("Report on permanent memory allocation at end of run") },
   { "trapv", &flag_trapv, 1,
-    "Trap for signed overflow in addition / subtraction / multiplication." },
+   N_("Trap for signed overflow in addition / subtraction / multiplication.") },
 };
 
 /* Table of language-specific options.  */
@@ -1169,129 +1160,167 @@ documented_lang_options[] =
      used here is to only describe those options which are not
      enabled by default.  */
 
-  { "-ansi", "Compile just for ISO C89" },
+  { "-ansi", 
+    N_("Compile just for ISO C89") },
   { "-fallow-single-precision",
-    "Do not promote floats to double if using -traditional" },
-  { "-std= ", "Determine language standard"},
+    N_("Do not promote floats to double if using -traditional") },
+  { "-std= ", 
+    N_("Determine language standard") },
 
   { "-fsigned-bitfields", "" },
-  { "-funsigned-bitfields","Make bitfields by unsigned by default" },
+  { "-funsigned-bitfields",
+    N_("Make bitfields by unsigned by default") },
   { "-fno-signed-bitfields", "" },
   { "-fno-unsigned-bitfields","" },
-  { "-fsigned-char", "Make 'char' be signed by default"},
-  { "-funsigned-char", "Make 'char' be unsigned by default"},
+  { "-fsigned-char", 
+    N_("Make 'char' be signed by default") },
+  { "-funsigned-char", 
+    N_("Make 'char' be unsigned by default") },
   { "-fno-signed-char", "" },
   { "-fno-unsigned-char", "" },
 
   { "-ftraditional", "" },
-  { "-traditional", "Attempt to support traditional K&R style C"},
+  { "-traditional", 
+    N_("Attempt to support traditional K&R style C") },
   { "-fnotraditional", "" },
   { "-fno-traditional", "" },
 
   { "-fasm", "" },
-  { "-fno-asm", "Do not recognise the 'asm' keyword" },
+  { "-fno-asm", 
+    N_("Do not recognise the 'asm' keyword") },
   { "-fbuiltin", "" },
-  { "-fno-builtin", "Do not recognise any built in functions" },
-  { "-fhosted", "Assume normal C execution environment" },
+  { "-fno-builtin", 
+    N_("Do not recognise any built in functions") },
+  { "-fhosted", 
+    N_("Assume normal C execution environment") },
   { "-fno-hosted", "" },
   { "-ffreestanding",
-    "Assume that standard libraries & main might not exist" },
+    N_("Assume that standard libraries & main might not exist") },
   { "-fno-freestanding", "" },
-  { "-fcond-mismatch", "Allow different types as args of ? operator"},
+  { "-fcond-mismatch", 
+    N_("Allow different types as args of ? operator") },
   { "-fno-cond-mismatch", "" },
-  { "-fdollars-in-identifiers", "Allow the use of $ inside identifiers" },
+  { "-fdollars-in-identifiers", 
+    N_("Allow the use of $ inside identifiers") },
   { "-fno-dollars-in-identifiers", "" },
   { "-fpreprocessed", "" },
   { "-fno-preprocessed", "" },
-  { "-fshort-double", "Use the same size for double as for float" },
+  { "-fshort-double", 
+    N_("Use the same size for double as for float") },
   { "-fno-short-double", "" },
-  { "-fshort-enums", "Use the smallest fitting integer to hold enums"},
+  { "-fshort-enums", 
+    N_("Use the smallest fitting integer to hold enums") },
   { "-fno-short-enums", "" },
-  { "-fshort-wchar", "Override the underlying type for wchar_t to `unsigned short'" },
+  { "-fshort-wchar", 
+    N_("Override the underlying type for wchar_t to `unsigned short'") },
   { "-fno-short-wchar", "" },
 
-  { "-Wall", "Enable most warning messages" },
+  { "-Wall", 
+    N_("Enable most warning messages") },
   { "-Wbad-function-cast",
-    "Warn about casting functions to incompatible types" },
+    N_("Warn about casting functions to incompatible types") },
   { "-Wno-bad-function-cast", "" },
   { "-Wno-missing-noreturn", "" },
   { "-Wmissing-format-attribute",
-    "Warn about functions which might be candidates for format attributes" },
+    N_("Warn about functions which might be candidates for format attributes") },
   { "-Wno-missing-format-attribute", "" },
-  { "-Wcast-qual", "Warn about casts which discard qualifiers"},
+  { "-Wcast-qual", 
+    N_("Warn about casts which discard qualifiers") },
   { "-Wno-cast-qual", "" },
-  { "-Wchar-subscripts", "Warn about subscripts whose type is 'char'"},
+  { "-Wchar-subscripts", 
+    N_("Warn about subscripts whose type is 'char'") },
   { "-Wno-char-subscripts", "" },
-  { "-Wcomment", "Warn if nested comments are detected" },
+  { "-Wcomment", 
+    N_("Warn if nested comments are detected") },
   { "-Wno-comment", "" },
-  { "-Wcomments", "Warn if nested comments are detected" },
+  { "-Wcomments", 
+    N_("Warn if nested comments are detected") },
   { "-Wno-comments", "" },
-  { "-Wconversion", "Warn about possibly confusing type conversions" },
+  { "-Wconversion", 
+    N_("Warn about possibly confusing type conversions") },
   { "-Wno-conversion", "" },
-  { "-Wformat", "Warn about printf/scanf/strftime/strfmon format anomalies" },
+  { "-Wformat", 
+    N_("Warn about printf/scanf/strftime/strfmon format anomalies") },
   { "-Wno-format", "" },
   { "-Wformat-y2k", "" },
   { "-Wno-format-y2k",
-    "Don't warn about strftime formats yielding 2 digit years" },
+    N_("Don't warn about strftime formats yielding 2 digit years") },
   { "-Wformat-extra-args", "" },
   { "-Wno-format-extra-args",
-    "Don't warn about too many arguments to format functions" },
-  { "-Wformat-nonliteral", "Warn about non-string-literal format strings" },
+    N_("Don't warn about too many arguments to format functions") },
+  { "-Wformat-nonliteral", 
+    N_("Warn about non-string-literal format strings") },
   { "-Wno-format-nonliteral", "" },
   { "-Wformat-security",
-    "Warn about possible security problems with format functions" },
+    N_("Warn about possible security problems with format functions") },
   { "-Wno-format-security", "" },
   { "-Wimplicit-function-declaration",
-    "Warn about implicit function declarations" },
+    N_("Warn about implicit function declarations") },
   { "-Wno-implicit-function-declaration", "" },
   { "-Werror-implicit-function-declaration", "" },
-  { "-Wimplicit-int", "Warn when a declaration does not specify a type" },
+  { "-Wimplicit-int", 
+    N_("Warn when a declaration does not specify a type") },
   { "-Wno-implicit-int", "" },
   { "-Wimplicit", "" },
   { "-Wno-implicit", "" },
-  { "-Wimport", "Warn about the use of the #import directive" },
+  { "-Wimport", 
+    N_("Warn about the use of the #import directive") },
   { "-Wno-import", "" },
   { "-Wlong-long","" },
-  { "-Wno-long-long", "Do not warn about using 'long long' when -pedantic" },
-  { "-Wmain", "Warn about suspicious declarations of main" },
+  { "-Wno-long-long", 
+    N_("Do not warn about using 'long long' when -pedantic") },
+  { "-Wmain", 
+    N_("Warn about suspicious declarations of main") },
   { "-Wno-main", "" },
   { "-Wmissing-braces",
-    "Warn about possibly missing braces around initialisers" },
+    N_("Warn about possibly missing braces around initialisers") },
   { "-Wno-missing-braces", "" },
   { "-Wmissing-declarations",
-    "Warn about global funcs without previous declarations"},
+    N_("Warn about global funcs without previous declarations") },
   { "-Wno-missing-declarations", "" },
-  { "-Wmissing-prototypes", "Warn about global funcs without prototypes" },
+  { "-Wmissing-prototypes", 
+    N_("Warn about global funcs without prototypes") },
   { "-Wno-missing-prototypes", "" },
-  { "-Wmultichar", "Warn about use of multicharacter literals"},
+  { "-Wmultichar", 
+    N_("Warn about use of multicharacter literals") },
   { "-Wno-multichar", "" },
-  { "-Wnested-externs", "Warn about externs not at file scope level" },
+  { "-Wnested-externs", 
+    N_("Warn about externs not at file scope level") },
   { "-Wno-nested-externs", "" },
-  { "-Wparentheses", "Warn about possible missing parentheses" },
+  { "-Wparentheses", 
+    N_("Warn about possible missing parentheses") },
   { "-Wno-parentheses", "" },
   { "-Wsequence-point",
-    "Warn about possible violations of sequence point rules" },
+    N_("Warn about possible violations of sequence point rules") },
   { "-Wno-sequence-point", "" },
-  { "-Wpointer-arith", "Warn about function pointer arithmetic" },
+  { "-Wpointer-arith", 
+    N_("Warn about function pointer arithmetic") },
   { "-Wno-pointer-arith", "" },
   { "-Wredundant-decls",
-    "Warn about multiple declarations of the same object" },
+    N_("Warn about multiple declarations of the same object") },
   { "-Wno-redundant-decls", "" },
-  { "-Wsign-compare", "Warn about signed/unsigned comparisons" },
+  { "-Wsign-compare", 
+    N_("Warn about signed/unsigned comparisons") },
   { "-Wno-sign-compare", "" },
-  { "-Wfloat-equal", "Warn about testing equality of floating point numbers" },
+  { "-Wfloat-equal", 
+    N_("Warn about testing equality of floating point numbers") },
   { "-Wno-float-equal", "" },
-  { "-Wunknown-pragmas", "Warn about unrecognized pragmas" },
+  { "-Wunknown-pragmas", 
+    N_("Warn about unrecognized pragmas") },
   { "-Wno-unknown-pragmas", "" },
-  { "-Wstrict-prototypes", "Warn about non-prototyped function decls" },
+  { "-Wstrict-prototypes", 
+    N_("Warn about non-prototyped function decls") },
   { "-Wno-strict-prototypes", "" },
-  { "-Wtraditional", "Warn about constructs whose meaning change in ISO C"},
+  { "-Wtraditional", 
+    N_("Warn about constructs whose meaning change in ISO C") },
   { "-Wno-traditional", "" },
-  { "-Wtrigraphs", "Warn when trigraphs are encountered" },
+  { "-Wtrigraphs", 
+    N_("Warn when trigraphs are encountered") },
   { "-Wno-trigraphs", "" },
   { "-Wundef", "" },
   { "-Wno-undef", "" },
-  { "-Wwrite-strings", "Mark strings as 'const char *'"},
+  { "-Wwrite-strings", 
+    N_("Mark strings as 'const char *'") },
   { "-Wno-write-strings", "" },
 
 #define DEFINE_LANG_NAME(NAME) { NULL, NAME },
@@ -1438,34 +1467,42 @@ int warn_missing_noreturn;
 
 lang_independent_options W_options[] =
 {
-  {"unused-function", &warn_unused_function, 1, "Warn when a function is unused" },
-  {"unused-label", &warn_unused_label, 1, "Warn when a label is unused" },
-  {"unused-parameter", &warn_unused_parameter, 1, "Warn when a function parameter is unused" },
-  {"unused-variable", &warn_unused_variable, 1, "Warn when a variable is unused" },
-  {"unused-value", &warn_unused_value, 1, "Warn when an expression value is unused" },
-  {"system-headers", &warn_system_headers, 1, "Do not suppress warnings from system headers"},
-  {"error", &warnings_are_errors, 1, ""},
-  {"shadow", &warn_shadow, 1, "Warn when one local variable shadows another" },
+  {"unused-function", &warn_unused_function, 1,
+   N_("Warn when a function is unused") },
+  {"unused-label", &warn_unused_label, 1,
+   N_("Warn when a label is unused") },
+  {"unused-parameter", &warn_unused_parameter, 1,
+   N_("Warn when a function parameter is unused") },
+  {"unused-variable", &warn_unused_variable, 1,
+   N_("Warn when a variable is unused") },
+  {"unused-value", &warn_unused_value, 1,
+   N_("Warn when an expression value is unused") },
+  {"system-headers", &warn_system_headers, 1,
+   N_("Do not suppress warnings from system headers") },
+  {"error", &warnings_are_errors, 1,
+   N_("Treat all warnings as errors") },
+  {"shadow", &warn_shadow, 1,
+   N_("Warn when one local variable shadows another") },
   {"switch", &warn_switch, 1,
-   "Warn about enumerated switches missing a specific case" },
+   N_("Warn about enumerated switches missing a specific case") },
   {"aggregate-return", &warn_aggregate_return, 1,
-   "Warn about returning structures, unions or arrays" },
+   N_("Warn about returning structures, unions or arrays") },
   {"cast-align", &warn_cast_align, 1,
-   "Warn about pointer casts which increase alignment" },
+   N_("Warn about pointer casts which increase alignment") },
   {"unreachable-code", &warn_notreached, 1,
-   "Warn about code that will never be executed" },
+   N_("Warn about code that will never be executed") },
   {"uninitialized", &warn_uninitialized, 1,
-   "Warn about unitialized automatic variables"},
+   N_("Warn about unitialized automatic variables") },
   {"inline", &warn_inline, 1,
-   "Warn when an inlined function cannot be inlined"},
+   N_("Warn when an inlined function cannot be inlined") },
   {"packed", &warn_packed, 1,
-   "Warn when the packed attribute has no effect on struct layout"},
+   N_("Warn when the packed attribute has no effect on struct layout") },
   {"padded", &warn_padded, 1,
-   "Warn when padding is required to align struct members"},
+   N_("Warn when padding is required to align struct members") },
   {"disabled-optimization", &warn_disabled_optimization, 1,
-   "Warn when an optimization pass is disabled"},
+   N_("Warn when an optimization pass is disabled") },
   {"missing-noreturn", &warn_missing_noreturn, 1,
-   "Warn about functions which might be candidates for attribute noreturn"}
+   N_("Warn about functions which might be candidates for attribute noreturn") }
 };
 
 /* Output files for assembler code (real compiler output)
@@ -1794,21 +1831,6 @@ output_file_directive (asm_file, input_name)
 #endif
 }
 
-#ifdef ASM_IDENTIFY_LANGUAGE
-/* Routine to build language identifier for object file.  */
-
-static void
-output_lang_identify (asm_out_file)
-     FILE *asm_out_file;
-{
-  int len = strlen (lang_identify ()) + sizeof ("__gnu_compiled_") + 1;
-  char *s = (char *) alloca (len);
-
-  sprintf (s, "__gnu_compiled_%s", lang_identify ());
-  ASM_OUTPUT_LABEL (asm_out_file, s);
-}
-#endif
-
 /* Routine to open a dump file.  Return true if the dump file is enabled.  */
 
 static int
@@ -2014,7 +2036,7 @@ check_global_declarations (vec, len)
 	/* Cancel the RTL for this decl so that, if debugging info
 	   output for global variables is still to come,
 	   this one will be omitted.  */
-	DECL_RTL (decl) = NULL;
+	SET_DECL_RTL (decl, NULL_RTX);
 
       /* Warn about any function
 	 declared static but not defined.
@@ -2183,14 +2205,15 @@ compile_file (name)
   init_regs ();
   init_alias_once ();
   init_decl_processing ();
+  init_eh ();
   init_optabs ();
   init_stmt ();
-  init_eh ();
   init_loop ();
   init_reload ();
   init_function_once ();
   init_stor_layout_once ();
   init_varasm_once ();
+  init_EXPR_INSN_LIST_cache ();
 
   /* The following initialization functions need to generate rtl, so
      provide a dummy function context for them.  */
@@ -2281,18 +2304,6 @@ compile_file (name)
 	  fprintf (asm_out_file, "\n");
 	}
 #endif
-
-      /* Output something to inform GDB that this compilation was by GCC.  */
-#ifndef ASM_IDENTIFY_GCC
-      fprintf (asm_out_file, "gcc2_compiled.:\n");
-#else
-      ASM_IDENTIFY_GCC (asm_out_file);
-#endif
-
-  /* Output something to identify which front-end produced this file.  */
-#ifdef ASM_IDENTIFY_LANGUAGE
-      ASM_IDENTIFY_LANGUAGE (asm_out_file);
-#endif
     } /* ! flag_syntax_only  */
 
 #ifndef ASM_OUTPUT_SECTION_NAME
@@ -2319,25 +2330,6 @@ compile_file (name)
   if (flag_function_sections && write_symbols != NO_DEBUG)
     warning ("-ffunction-sections may affect debugging on some targets.");
 #endif
-
-  /* ??? Note: There used to be a conditional here
-      to call assemble_zeros without fail if DBX_DEBUGGING_INFO is defined.
-      This was to guarantee separation between gcc_compiled. and
-      the first function, for the sake of dbx on Suns.
-      However, having the extra zero here confused the Emacs
-      code for unexec, and might confuse other programs too.
-      Therefore, I took out that change.
-      In future versions we should find another way to solve
-      that dbx problem.  -- rms, 23 May 93.  */
-
-  /* Don't let the first function fall at the same address
-     as gcc_compiled., if profiling.  */
-  if (profile_flag || profile_block_flag)
-    {
-      /* It's best if we can write a nop here since some
-	 assemblers don't tolerate zeros in the text section.  */
-      output_asm_insn (get_insn_template (CODE_FOR_nop, NULL), NULL_PTR);
-    }
 
   /* If dbx symbol table desired, initialize writing it
      and output the predefined types.  */
@@ -2422,14 +2414,6 @@ compile_file (name)
        loop above.  */
     output_func_start_profiler ();
 
-    /* Now that all possible functions have been output, we can dump
-       the exception table.  */
-
-#ifndef IA64_UNWIND_INFO
-    output_exception_table ();
-#endif
-    free_exception_table ();
-
     check_global_declarations (vec, len);
 
     /* Clean up.  */
@@ -2465,6 +2449,8 @@ compile_file (name)
 
   /* Output some stuff at end of file if nec.  */
 
+  dw2_output_indirect_constants ();
+
   end_final (dump_base_name);
 
   if (profile_arc_flag || flag_test_coverage || flag_branch_probabilities)
@@ -2480,6 +2466,15 @@ compile_file (name)
 
 #ifdef ASM_FILE_END
   ASM_FILE_END (asm_out_file);
+#endif
+
+  /* Attach a special .ident directive to the end of the file to identify
+     the version of GCC which compiled this code.  The format of the .ident
+     string is patterned after the ones produced by native SVR4 compilers.  */
+#ifdef IDENT_ASM_OP
+  if (!flag_no_ident)
+    fprintf (asm_out_file, "%s\"GCC: (GNU) %s\"\n",
+	     IDENT_ASM_OP, version_string);
 #endif
 
   /* Language-specific end of compilation actions.  */
@@ -2520,7 +2515,7 @@ compile_file (name)
     {
       int i;
 
-      for (i = 0; i < DFI_MAX; ++i)
+      for (i = 0; i < (int) DFI_MAX; ++i)
 	if (dump_file[i].initialized && dump_file[i].graph_dump_p)
 	  {
 	    char seq[16];
@@ -2584,7 +2579,8 @@ rest_of_decl_compilation (decl, asmspec, top_level, at_end)
       || TREE_CODE (decl) == FUNCTION_DECL)
     {
       timevar_push (TV_VARCONST);
-      make_decl_rtl (decl, asmspec);
+      if (asmspec)
+	make_decl_rtl (decl, asmspec);
       /* Initialized extern variable exists to be replaced
 	 with its value, or represents something that will be
 	 output in another file.  */
@@ -2610,14 +2606,15 @@ rest_of_decl_compilation (decl, asmspec, top_level, at_end)
     {
       if (decode_reg_name (asmspec) >= 0)
 	{
-	  DECL_RTL (decl) = 0;
+	  SET_DECL_RTL (decl, NULL_RTX);
 	  make_decl_rtl (decl, asmspec);
 	}
       else
 	{
 	  error ("invalid register name `%s' for register variable", asmspec);
 	  DECL_REGISTER (decl) = 0;
-	  make_decl_rtl (decl, NULL);
+	  if (!top_level)
+	    expand_decl (decl);
 	}
     }
 #if defined (DBX_DEBUGGING_INFO) || defined (XCOFF_DEBUGGING_INFO)
@@ -2684,23 +2681,45 @@ note_deferral_of_defined_inline_function (decl)
   /* Generate the DWARF info for the "abstract" instance of a function
      which we may later generate inlined and/or out-of-line instances
      of.  */
-  if (write_symbols == DWARF_DEBUG && DECL_INLINE (decl))
+  if (write_symbols == DWARF_DEBUG
+      && (DECL_INLINE (decl) || DECL_ABSTRACT (decl))
+      && ! DECL_ABSTRACT_ORIGIN (decl))
     {
       /* The front-end may not have set CURRENT_FUNCTION_DECL, but the
 	 DWARF code expects it to be set in this case.  Intuitively,
 	 DECL is the function we just finished defining, so setting
 	 CURRENT_FUNCTION_DECL is sensible.  */
       tree saved_cfd = current_function_decl;
+      int was_abstract = DECL_ABSTRACT (decl);
       current_function_decl = decl;
 
       /* Let the DWARF code do its work.  */
       set_decl_abstract_flags (decl, 1);
       dwarfout_file_scope_decl (decl, 0);
-      set_decl_abstract_flags (decl, 0);
+      if (! was_abstract)
+	set_decl_abstract_flags (decl, 0);
 
       /* Reset CURRENT_FUNCTION_DECL.  */
       current_function_decl = saved_cfd;
     }
+#endif
+}
+
+/* FNDECL is an inline function which is about to be emitted out of line.
+   Do any preparation, such as emitting abstract debug info for the inline
+   before it gets mangled by optimization.  */
+
+void
+note_outlining_of_inline_function (fndecl)
+     tree fndecl ATTRIBUTE_UNUSED;
+{
+#ifdef DWARF2_DEBUGGING_INFO
+  /* The DWARF 2 backend tries to reduce debugging bloat by not emitting
+     the abstract description of inline functions until something tries to
+     reference them.  Force it out now, before optimizations mangle the
+     block tree.  */
+  if (write_symbols == DWARF2_DEBUG)
+    dwarf2out_abstract_function (fndecl);
 #endif
 }
 
@@ -2771,7 +2790,8 @@ rest_of_compilation (decl)
 	  }
 
       /* If requested, consider whether to make this function inline.  */
-      if (DECL_INLINE (decl) || flag_inline_functions)
+      if ((DECL_INLINE (decl) && !flag_no_inline)
+	  || flag_inline_functions)
 	{
 	  timevar_push (TV_INTEGRATION);
 	  lose = function_cannot_inline_p (decl);
@@ -2808,6 +2828,11 @@ rest_of_compilation (decl)
 	    fprintf (rtl_dump_file, ";; (integrable)\n\n");
 	  close_dump_file (DFI_rtl, print_rtl, insns);
 	}
+
+      /* Convert from NOTE_INSN_EH_REGION style notes, and do other
+	 sorts of eh initialization.  Delay this until after the
+         initial rtl dump so that we can see the original nesting.  */
+      convert_from_eh_region_ranges ();
 
       /* If function is inline, and we don't yet know whether to
 	 compile it by itself, defer decision till end of compilation.
@@ -2868,8 +2893,6 @@ rest_of_compilation (decl)
 	goto exit_rest_of_compilation;
     }
 
-  init_EXPR_INSN_LIST_cache ();
-
   ggc_collect ();
 
   /* Initialize some variables used by the optimizers.  */
@@ -2890,9 +2913,6 @@ rest_of_compilation (decl)
   if ((rtl_dump_and_exit || flag_syntax_only) && !warn_return_type)
     goto exit_rest_of_compilation;
 
-  /* Emit code to get eh context, if needed. */
-  emit_eh_context ();
-
   /* We may have potential sibling or tail recursion sites.  Select one
      (of possibly multiple) methods of performing the call.  */
   if (flag_optimize_sibling_calls)
@@ -2903,6 +2923,19 @@ rest_of_compilation (decl)
       optimize_sibling_and_tail_recursive_calls ();
 
       close_dump_file (DFI_sibling, print_rtl, get_insns ());
+      timevar_pop (TV_JUMP);
+    }
+
+  /* Complete generation of exception handling code.  */
+  find_exception_handler_labels ();
+  if (doing_eh (0))
+    {
+      timevar_push (TV_JUMP);
+      open_dump_file (DFI_eh, decl);
+
+      finish_eh_generation ();
+
+      close_dump_file (DFI_eh, print_rtl, get_insns ());
       timevar_pop (TV_JUMP);
     }
 
@@ -2928,9 +2961,6 @@ rest_of_compilation (decl)
 
   /* Instantiate all virtual registers.  */
   instantiate_virtual_regs (current_function_decl, insns);
-
-  /* Find all the EH handlers.  */
-  find_exception_handler_labels ();
 
   open_dump_file (DFI_jump, decl);
 
@@ -2961,7 +2991,7 @@ rest_of_compilation (decl)
   if (optimize > 0)
     {
       find_basic_blocks (insns, max_reg_num (), rtl_dump_file);
-      cleanup_cfg (insns);
+      cleanup_cfg ();
 
       /* ??? Run if-conversion before delete_null_pointer_checks,
          since the later does not preserve the CFG.  This should
@@ -3031,12 +3061,22 @@ rest_of_compilation (decl)
 	  timevar_push (TV_JUMP);
 	  find_basic_blocks (insns, max_reg_num (), rtl_dump_file);
 
-	  cleanup_cfg (insns);
+	  cleanup_cfg ();
 
 	  delete_null_pointer_checks (insns);
 	  timevar_pop (TV_JUMP);
 	}
 
+      /* It's important to remove dead code before we call
+	 purge_addressof.  Sometimes, the only ADDRESSOFs for a REG
+	 will be dead, and if we don't get rid of them, we will end up
+	 committing ourselves to dumping the REG to the stack
+	 unnecessarily.  */
+      find_basic_blocks (insns, max_reg_num (), rtl_dump_file);
+      cleanup_cfg ();
+      life_analysis (insns, rtl_dump_file, 
+		     PROP_SCAN_DEAD_CODE | PROP_KILL_DEAD_CODE);
+      
       /* The second pass of jump optimization is likely to have
          removed a bunch more instructions.  */
       renumber_insns (rtl_dump_file);
@@ -3062,7 +3102,7 @@ rest_of_compilation (decl)
       open_dump_file (DFI_ssa, decl);
 
       find_basic_blocks (insns, max_reg_num (), rtl_dump_file);
-      cleanup_cfg (insns);
+      cleanup_cfg ();
       convert_to_ssa ();
 
       close_dump_file (DFI_ssa, print_rtl_with_bb, insns);
@@ -3114,7 +3154,7 @@ rest_of_compilation (decl)
       open_dump_file (DFI_gcse, decl);
 
       find_basic_blocks (insns, max_reg_num (), rtl_dump_file);
-      cleanup_cfg (insns);
+      cleanup_cfg ();
       tem = gcse_main (insns, rtl_dump_file);
 
       /* If gcse altered any jumps, rerun jump optimizations to clean
@@ -3186,7 +3226,7 @@ rest_of_compilation (decl)
 	  timevar_push (TV_IFCVT);
 
 	  find_basic_blocks (insns, max_reg_num (), rtl_dump_file);
-	  cleanup_cfg (insns);
+	  cleanup_cfg ();
 	  if_convert (0);
 
 	  timevar_pop(TV_IFCVT);
@@ -3232,7 +3272,7 @@ rest_of_compilation (decl)
   open_dump_file (DFI_cfg, decl);
 
   find_basic_blocks (insns, max_reg_num (), rtl_dump_file);
-  cleanup_cfg (insns);
+  cleanup_cfg ();
   check_function_return_warnings ();
 
   close_dump_file (DFI_cfg, print_rtl_with_bb, insns);
@@ -3307,7 +3347,7 @@ rest_of_compilation (decl)
 
 	  timevar_push (TV_FLOW);
 	  find_basic_blocks (insns, max_reg_num (), rtl_dump_file);
-	  cleanup_cfg (insns);
+	  cleanup_cfg ();
 
 	  /* Blimey.  We've got to have the CFG up to date for the call to
 	     if_convert below.  However, the random deletion of blocks
@@ -3515,7 +3555,7 @@ rest_of_compilation (decl)
 
   if (optimize)
     {
-      cleanup_cfg (insns);
+      cleanup_cfg ();
       life_analysis (insns, rtl_dump_file, PROP_FINAL);
 
       /* This is kind of a heuristic.  We need to run combine_stack_adjustments
@@ -3650,6 +3690,12 @@ rest_of_compilation (decl)
     }
 #endif
 
+#ifndef STACK_REGS
+  /* ??? Do this before shorten branches so that we aren't creating
+     insns too late and fail sanity checks in final. */
+  convert_to_eh_region_ranges ();
+#endif
+
   /* Shorten branches.
 
      Note this must run before reg-stack because of death note (ab)use
@@ -3668,6 +3714,8 @@ rest_of_compilation (decl)
   timevar_pop (TV_REG_STACK);
 
   ggc_collect ();
+
+  convert_to_eh_region_ranges ();
 #endif
 
   current_function_nothrow = nothrow_function_p ();
@@ -3698,7 +3746,20 @@ rest_of_compilation (decl)
     final_start_function (insns, asm_out_file, optimize);
     final (insns, asm_out_file, optimize, 0);
     final_end_function (insns, asm_out_file, optimize);
+
+#ifdef IA64_UNWIND_INFO
+    /* ??? The IA-64 ".handlerdata" directive must be issued before
+       the ".endp" directive that closes the procedure descriptor.  */
+    output_function_exception_table ();
+#endif
+
     assemble_end_function (decl, fnname);
+
+#ifndef IA64_UNWIND_INFO
+    /* Otherwise, it feels unclean to switch sections in the middle.  */
+    output_function_exception_table ();
+#endif
+
     if (! quiet_flag)
       fflush (asm_out_file);
 
@@ -3812,11 +3873,22 @@ display_help ()
 
       if (description != NULL && * description != 0)
 	printf ("  -f%-21s %s\n",
-		f_options[i].string, description);
+		f_options[i].string, _(description));
     }
 
   printf (_("  -O[number]              Set optimisation level to [number]\n"));
   printf (_("  -Os                     Optimise for space rather than speed\n"));
+  for (i = sizeof (compiler_params); i--;)
+    {
+      const char *description = compiler_params[i].help;
+      const int length = 21-strlen(compiler_params[i].option);
+
+      if (description != NULL && * description != 0)
+	printf ("  --param %s=<value>%.*s%s\n",
+		compiler_params[i].option,
+		length > 0 ? length : 1, "                     ",
+		_(description));
+    }
   printf (_("  -pedantic               Issue warnings needed by strict compliance to ISO C\n"));
   printf (_("  -pedantic-errors        Like -pedantic except that errors are produced\n"));
   printf (_("  -w                      Suppress warnings\n"));
@@ -3828,7 +3900,7 @@ display_help ()
 
       if (description != NULL && * description != 0)
 	printf ("  -W%-21s %s\n",
-		W_options[i].string, description);
+		W_options[i].string, _(description));
     }
 
   printf (_("  -Wunused                Enable unused warnings\n"));
@@ -3850,10 +3922,10 @@ display_help ()
     {
       if (debug_args[i].description != NULL)
 	printf ("  -g%-21s %s\n",
-		debug_args[i].arg, debug_args[i].description);
+		debug_args[i].arg, _(debug_args[i].description));
     }
 
-  printf (_("  -aux-info <file>        Emit declaration info into <file>.X\n"));
+  printf (_("  -aux-info <file>        Emit declaration info into <file>\n"));
   printf (_("  -quiet                  Do not display functions compiled or elapsed time\n"));
   printf (_("  -version                Display the compiler's version\n"));
   printf (_("  -d[letters]             Enable dumps from specific passes of the compiler\n"));
@@ -3905,7 +3977,7 @@ display_help ()
 	      lang = description;
 	    }
 	  else
-	    printf ("  %-23.23s %s\n", option, description);
+	    printf ("  %-23.23s %s\n", option, _(description));
 	}
     }
 
@@ -3948,7 +4020,7 @@ display_target_options ()
 		printf (_("  -m%-23.23s [undocumented]\n"), option);
 	    }
 	  else if (* description != 0)
-	    doc += printf ("  -m%-23.23s %s\n", option, description);
+	    doc += printf ("  -m%-23.23s %s\n", option, _(description));
 	}
 
 #ifdef TARGET_OPTIONS
@@ -3967,7 +4039,7 @@ display_target_options ()
 		printf (_("  -m%-23.23s [undocumented]\n"), option);
 	    }
 	  else if (* description != 0)
-	    doc += printf ("  -m%-23.23s %s\n", option, description);
+	    doc += printf ("  -m%-23.23s %s\n", option, _(description));
 	}
 #endif
       if (undoc)
@@ -3992,7 +4064,7 @@ decode_d_option (arg)
     switch (c = *arg++)
       {
       case 'a':
-	for (i = 0; i < DFI_MAX; ++i)
+	for (i = 0; i < (int) DFI_MAX; ++i)
 	  dump_file[i].enabled = 1;
 	break;
       case 'A':
@@ -4023,7 +4095,7 @@ decode_d_option (arg)
 
       default:
 	matched = 0;
-	for (i = 0; i < DFI_MAX; ++i)
+	for (i = 0; i < (int) DFI_MAX; ++i)
 	  if (c == dump_file[i].debug_switch)
 	    {
 	      dump_file[i].enabled = 1;
@@ -4066,8 +4138,12 @@ decode_f_option (arg)
 
   if ((option_value = skip_leading_substring (arg, "inline-limit-"))
       || (option_value = skip_leading_substring (arg, "inline-limit=")))
-    inline_max_insns =
-      read_integral_parameter (option_value, arg - 2, inline_max_insns);
+    {
+      int val =
+      read_integral_parameter (option_value, arg - 2,
+                               MAX_INLINE_INSNS);
+      set_param_value ("max-inline-insns", val);
+    }
 #ifdef INSN_SCHEDULING
   else if ((option_value = skip_leading_substring (arg, "sched-verbose=")))
     fix_sched_param ("verbose", option_value);
@@ -4338,19 +4414,53 @@ independent_decode_option (argc, argv)
   if (!strcmp (arg, "-help"))
     {
       display_help ();
-      exit (0);
+      exit_after_options = 1;
     }
 
   if (!strcmp (arg, "-target-help"))
     {
       display_target_options ();
-      exit (0);
+      exit_after_options = 1;
     }
 
   if (!strcmp (arg, "-version"))
     {
       print_version (stderr, "");
-      exit (0);
+      exit_after_options = 1;
+    }
+
+  /* Handle '--param <name>=<value>'.  */
+  if (strcmp (arg, "-param") == 0)
+    {
+      char *equal;
+
+      if (argc == 1)
+      {
+        error ("-param option missing argument");
+        return 1;
+      }
+
+      /* Get the '<name>=<value>' parameter.  */
+      arg = argv[1];
+      /* Look for the `='.  */
+      equal = strchr (arg, '=');
+      if (!equal)
+      error ("invalid --param option: %s", arg);
+      else
+      {
+        int val;
+
+        /* Zero out the `=' sign so that we get two separate strings.  */
+        *equal = '\0';
+        /* Figure out what value is specified.  */
+        val = read_integral_parameter (equal + 1, NULL, INVALID_PARAM_VAL);
+        if (val != INVALID_PARAM_VAL)
+          set_param_value (arg, val);
+        else
+          error ("invalid parameter value `%s'", equal + 1);
+      }
+
+      return 2;
     }
 
   if (*arg == 'Y')
@@ -4454,17 +4564,22 @@ independent_decode_option (argc, argv)
 	}
       else if (!strncmp (arg, "aux-info", 8))
 	{
-	  flag_gen_aux_info = 1;
 	  if (arg[8] == '\0')
 	    {
 	      if (argc == 1)
 		return 0;
 
 	      aux_info_file_name = argv[1];
+	      flag_gen_aux_info = 1;
 	      return 2;
 	    }
+	  else if (arg[8] == '=')
+	    {
+	      aux_info_file_name = arg + 9;
+	      flag_gen_aux_info = 1;
+	    }
 	  else
-	    aux_info_file_name = arg + 8;
+	    return 0;
 	}
       else
 	return 0;
@@ -4594,6 +4709,9 @@ main (argc, argv)
   /* Initialize the diagnostics reporting machinery.  */
   initialize_diagnostics ();
 
+  /* Register the language-independent parameters.  */
+  add_params (lang_independent_params, LAST_PARAM);
+
   /* Perform language-specific options intialization.  */
   if (lang_hooks.init_options)
     (*lang_hooks.init_options) ();
@@ -4703,16 +4821,22 @@ main (argc, argv)
   /* Perform normal command line switch decoding.  */
   for (i = 1; i < argc;)
     {
-      unsigned int lang_processed;
-      unsigned int indep_processed;
+      int lang_processed;
+      int indep_processed;
 
       /* Give the language a chance to decode the option for itself.  */
       lang_processed = (*lang_hooks.decode_option) (argc - i, argv + i);
 
-      /* Now see if the option also has a language independent meaning.
-	 Some options are both language specific and language independent,
-	 eg --help.  */
-      indep_processed = independent_decode_option (argc - i, argv + i);
+      if (lang_processed >= 0)
+	/* Now see if the option also has a language independent meaning.
+	   Some options are both language specific and language independent,
+	   eg --help.  */
+	indep_processed = independent_decode_option (argc - i, argv + i);
+      else
+	{
+	  lang_processed = -lang_processed;
+	  indep_processed = 0;
+	}
 
       if (lang_processed || indep_processed)
 	i += MAX (lang_processed, indep_processed);
@@ -4763,6 +4887,9 @@ main (argc, argv)
   if (lang_hooks.post_options)
     (*lang_hooks.post_options) ();
 
+  if (exit_after_options)
+    exit (0);
+
   /* Reflect any language-specific diagnostic option setting.  */
   reshape_diagnostic_buffer ();
 
@@ -4784,30 +4911,15 @@ main (argc, argv)
 	warning ("-Wuninitialized is not supported without -O");
     }
 
+  /* We do not currently support sibling-call optimization in the
+     presence of exceptions.  See PR2975 for a test-case that will
+     fail if we try to combine both of these features.  */
+  if (flag_exceptions)
+    flag_optimize_sibling_calls = 0;
+
 #ifdef OVERRIDE_OPTIONS
   /* Some machines may reject certain combinations of options.  */
   OVERRIDE_OPTIONS;
-#endif
-
-  if (exceptions_via_longjmp == 2)
-    {
-#ifdef DWARF2_UNWIND_INFO
-      exceptions_via_longjmp = ! DWARF2_UNWIND_INFO;
-#else
-#ifdef IA64_UNWIND_INFO
-      exceptions_via_longjmp = ! IA64_UNWIND_INFO;
-#else
-      exceptions_via_longjmp = 1;
-#endif
-#endif
-    }
-
-  /* Since each function gets its own handler data, we can't support the
-     new model currently, since it depend on a specific rethrow label
-     which is declared at the front of the table, and we can only
-     have one such symbol in a file.  */
-#ifdef IA64_UNWIND_INFO
-  flag_new_exceptions = 0;
 #endif
 
   /* Set up the align_*_log variables, defaulting them to 1 if they
@@ -4851,6 +4963,16 @@ main (argc, argv)
     warning ("this target machine does not have delayed branches");
 #endif
 
+  /* Some operating systems do not allow profiling without a frame
+     pointer.  */
+  if (!TARGET_ALLOWS_PROFILING_WITHOUT_FRAME_POINTER
+      && profile_flag
+      && flag_omit_frame_pointer)
+    {
+      error ("profiling does not work without a frame pointer");
+      flag_omit_frame_pointer = 0;
+    }
+    
   user_label_prefix = USER_LABEL_PREFIX;
   if (flag_leading_underscore != -1)
     {

@@ -33,7 +33,11 @@ dnl This is here just to satisfy automake.
 ifelse(not,equal,[AC_CONFIG_AUX_DIR(..)])
 
 # Gets and sets build, host, target, *_vendor, *_cpu, *_os, etc.
+# AC 2.50 sets target_alias iff the user specified --target, but we use it
+# everywhere, so we set it here just to be sure.
 AC_CANONICAL_SYSTEM
+target_alias=${target_alias-$target}
+AC_SUBST(target_alias)
 
 # We use these options to decide which functions to include.
 AC_ARG_WITH(target-subdir,
@@ -51,9 +55,9 @@ AM_PROG_LIBTOOL
 AC_SUBST(enable_shared)
 AC_SUBST(enable_static)
 GLIBCPP_CHECK_GNU_MAKE
-  if test "x$_cv_gnu_make_command" = "x"; then
-    AC_MSG_ERROR([GNU make not found. Please install it or correct your path.])
-  fi
+
+
+
 AM_CONFIG_HEADER(config.h)
 
 # Check for c++ or library specific bits that don't require linking.
@@ -64,10 +68,12 @@ GLIBCPP_ENABLE_DEBUG($USE_MAINTAINER_MODE)
 GLIBCPP_ENABLE_CSTDIO
 GLIBCPP_ENABLE_CLOCALE
 GLIBCPP_ENABLE_C_MBCHAR([yes])
-GLIBCPP_ENABLE_LONG_LONG([no])
+GLIBCPP_ENABLE_C99([yes])
+GLIBCPP_ENABLE_LONG_LONG([yes])
 GLIBCPP_ENABLE_CHEADERS([c_std])
 GLIBCPP_ENABLE_THREADS
 GLIBCPP_ENABLE_CXX_FLAGS([none])
+GLIBCPP_ENABLE_SJLJ_EXCEPTIONS
 
 if test -n "$with_cross_host"; then
 
@@ -96,9 +102,7 @@ if test -n "$with_cross_host"; then
 	float.h inttypes.h])
 
 	# GLIBCPP_CHECK_COMPILER_FEATURES
-	WFMT_FLAGS='-fdiagnostics-show-location=once'
 	SECTION_FLAGS='-ffunction-sections -fdata-sections'
-	AC_SUBST(WFMT_FLAGS)
 	AC_SUBST(SECTION_FLAGS)
 	GLIBCPP_CHECK_LINKER_FEATURES
 	# GLIBCPP_CHECK_BUILTIN_MATH_SUPPORT
@@ -169,7 +173,6 @@ if test -n "$with_cross_host"; then
 	  AC_DEFINE(HAVE_TANHL)
 	fi
 	GLIBCPP_CHECK_COMPLEX_MATH_SUPPORT
-	GLIBCPP_CHECK_COMPLEX_MATH_COMPILER_SUPPORT
 	GLIBCPP_CHECK_WCHAR_T_SUPPORT
 	os_include_dir="config/os/gnu-linux"
 	# GLIBCPP_CHECK_STDLIB_SUPPORT
@@ -189,8 +192,6 @@ if test -n "$with_cross_host"; then
 
 	os_include_dir="config/os/newlib"
 
-	AC_DEFINE(_GLIBCPP_BUGGY_FLOAT_COMPLEX)
-	AC_DEFINE(_GLIBCPP_BUGGY_COMPLEX)
 	# need to check for faster f versions of math functions, ie sinf?
 	;;
   esac
@@ -213,7 +214,6 @@ else
   GLIBCPP_CHECK_BUILTIN_MATH_SUPPORT
   GLIBCPP_CHECK_MATH_SUPPORT
   GLIBCPP_CHECK_COMPLEX_MATH_SUPPORT
-  GLIBCPP_CHECK_COMPLEX_MATH_COMPILER_SUPPORT
   GLIBCPP_CHECK_WCHAR_T_SUPPORT
   GLIBCPP_CHECK_STDLIB_SUPPORT
 
@@ -260,6 +260,14 @@ GLIBCPP_EXPORT_INSTALL_INFO
 GLIBCPP_EXPORT_INCLUDES
 GLIBCPP_EXPORT_FLAGS
 
+if ${CONFIG_SHELL-/bin/sh} ./libtool --tag CXX --features |
+   grep "enable shared" > /dev/null; then
+  LIBSUPCXX_PICFLAGS=-prefer-pic
+else
+  LIBSUPCXX_PICFLAGS=
+fi
+AC_SUBST(LIBSUPCXX_PICFLAGS)
+
 # This should be done by mkincludedir, but hack around it now.
 blddir=`pwd`
 echo "checking for $blddir/include"
@@ -273,14 +281,14 @@ fi
 # installed in the correct place. To work around this not being passed
 # down from config-ml.in -> top_srcdir/Makefile.am ->
 # top_srcdir/{src,libsupc++}/Makefile.am, manually append it here.
-AC_OUTPUT(tests_flags mkcheck Makefile src/Makefile libmath/Makefile libio/Makefile libsupc++/Makefile,
+AC_OUTPUT(Makefile src/Makefile libmath/Makefile libio/Makefile libsupc++/Makefile testsuite/Makefile mkcheck testsuite_flags,
 [if test -n "$CONFIG_FILES"; then
   ac_file=Makefile . ${glibcpp_basedir}/../config-ml.in
   grep '^MULTISUBDIR =' Makefile >> src/Makefile
   grep '^MULTISUBDIR =' Makefile >> libsupc++/Makefile
 fi
-chmod +x tests_flags
 chmod +x mkcheck
+chmod +x testsuite_flags
 ],
 srcdir=${srcdir}
 host=${host}
