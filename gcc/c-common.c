@@ -191,11 +191,6 @@ int flag_short_double;
 
 int flag_short_wchar;
 
-/* If non-NULL, dump the tree structure for the entire translation
-   unit to this file.  */
-
-const char *flag_dump_translation_unit;
-
 /* Nonzero means warn about possible violations of sequence point rules.  */
 
 int warn_sequence_point;
@@ -232,6 +227,7 @@ static void add_attribute		PARAMS ((enum attrs, const char *,
 						 int, int, int));
 static void init_attributes		PARAMS ((void));
 static int default_valid_lang_attribute PARAMS ((tree, tree, tree, tree));
+static int constant_fits_type_p		PARAMS ((tree, tree));
 
 /* Keep a stack of if statements.  We record the number of compound
    statements seen up to the if keyword, as well as the line number
@@ -1189,6 +1185,20 @@ unsigned_conversion_warning (result, operand)
     }
 }
 
+/* Nonzero if constant C has a value that is permissible
+   for type TYPE (an INTEGER_TYPE).  */
+
+static int
+constant_fits_type_p (c, type)
+     tree c, type;
+{
+  if (TREE_CODE (c) == INTEGER_CST)
+    return int_fits_type_p (c, type);
+
+  c = convert (type, c);
+  return !TREE_OVERFLOW (c);
+}     
+
 /* Convert EXPR to TYPE, warning about conversion problems with constants.
    Invoke this function on every expression that is converted implicitly,
    i.e. because of language rules and not because of an explicit cast.  */
@@ -1216,7 +1226,7 @@ convert_and_check (type, expr)
 	       don't warn unless pedantic.  */
 	    if ((pedantic
 		 || TREE_UNSIGNED (type)
-		 || ! int_fits_type_p (expr, unsigned_type (type)))
+		 || ! constant_fits_type_p (expr, unsigned_type (type)))
 	        && skip_evaluation == 0)
 	      warning ("overflow in implicit constant conversion");
 	}
@@ -1432,6 +1442,11 @@ verify_tree (x, pbefore_sp, pno_sp, writer)
   struct tlist *tmp_before, *tmp_nosp, *tmp_list2, *tmp_list3;
   enum tree_code code;
   char class;
+
+  /* X may be NULL if it is the operand of an empty statement expression
+     ({ }).  */
+  if (x == NULL)
+    return;
 
  restart:
   code = TREE_CODE (x);
@@ -3131,6 +3146,11 @@ c_common_nodes_and_builtins ()
   builtin_function ("__builtin_frame_address", ptr_ftype_unsigned,
 		    BUILT_IN_FRAME_ADDRESS, BUILT_IN_NORMAL, NULL_PTR);
 
+#ifdef EH_RETURN_DATA_REGNO
+  builtin_function ("__builtin_eh_return_data_regno", int_ftype_int,
+		    BUILT_IN_EH_RETURN_DATA_REGNO, BUILT_IN_NORMAL, NULL_PTR);
+#endif
+
   builtin_function ("__builtin_alloca", ptr_ftype_sizetype,
 		    BUILT_IN_ALLOCA, BUILT_IN_NORMAL, "alloca");
   builtin_function_2 ("__builtin_ffs", "ffs",
@@ -3337,7 +3357,7 @@ c_common_nodes_and_builtins ()
   builtin_function_2 ("__builtin_sqrtf", "sqrtf",
 		      float_ftype_float, float_ftype_float,
 		      BUILT_IN_FSQRT, BUILT_IN_NORMAL, 1, 0, 0);
-  builtin_function_2 ("__builtin_fsqrt", "sqrt",
+  builtin_function_2 ("__builtin_sqrt", "sqrt",
 		      double_ftype_double, double_ftype_double,
 		      BUILT_IN_FSQRT, BUILT_IN_NORMAL, 1, 0, 0);
   builtin_function_2 ("__builtin_sqrtl", "sqrtl",
@@ -3520,6 +3540,36 @@ builtin_function_2 (builtin_name, name, builtin_type, type, function_code,
   return (bdecl != 0 ? bdecl : decl);
 }
 
+/* Nonzero if the type T promotes to int.  This is (nearly) the
+   integral promotions defined in ISO C99 6.3.1.1/2.  */
+
+bool
+c_promoting_integer_type_p (t)
+     tree t;
+{
+  switch (TREE_CODE (t))
+    {
+    case INTEGER_TYPE:
+      return (TYPE_MAIN_VARIANT (t) == char_type_node
+	      || TYPE_MAIN_VARIANT (t) == signed_char_type_node
+	      || TYPE_MAIN_VARIANT (t) == unsigned_char_type_node
+	      || TYPE_MAIN_VARIANT (t) == short_integer_type_node
+	      || TYPE_MAIN_VARIANT (t) == short_unsigned_type_node);
+
+    case ENUMERAL_TYPE:
+      /* ??? Technically all enumerations not larger than an int
+	 promote to an int.  But this is used along code paths
+	 that only want to notice a size change.  */
+      return TYPE_PRECISION (t) < TYPE_PRECISION (integer_type_node);
+
+    case BOOLEAN_TYPE:
+      return 1;
+
+    default:
+      return 0;
+    }
+}
+
 /* Given a type, apply default promotions wrt unnamed function arguments
    and return the new type.  Return NULL_TREE if no change.  */
 /* ??? There is a function of the same name in the C++ front end that
@@ -3534,7 +3584,7 @@ simple_type_promotes_to (type)
   if (TYPE_MAIN_VARIANT (type) == float_type_node)
     return double_type_node;
 
-  if (C_PROMOTING_INTEGER_TYPE_P (type))
+  if (c_promoting_integer_type_p (type))
     {
       /* Traditionally, unsignedness is preserved in default promotions.
          Also preserve unsignedness if not really getting any wider.  */
@@ -3569,7 +3619,7 @@ self_promoting_args_p (parms)
       if (TYPE_MAIN_VARIANT (type) == float_type_node)
 	return 0;
 
-      if (C_PROMOTING_INTEGER_TYPE_P (type))
+      if (c_promoting_integer_type_p (type))
 	return 0;
     }
   return 1;
