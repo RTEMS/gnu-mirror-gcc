@@ -30,8 +30,6 @@ Boston, MA 02111-1307, USA.  */
 #include "hard-reg-set.h"
 #include "except.h"
 #include "function.h"
-#include "insn-flags.h"
-#include "insn-codes.h"
 #include "insn-config.h"
 #include "expr.h"
 #include "recog.h"
@@ -3606,9 +3604,12 @@ expand_builtin (exp, target, subtarget, mode, ignore)
       return expand_builtin_extract_return_addr (TREE_VALUE (arglist));
     case BUILT_IN_EH_RETURN:
       expand_builtin_eh_return (TREE_VALUE (arglist),
-				TREE_VALUE (TREE_CHAIN (arglist)),
-				TREE_VALUE (TREE_CHAIN (TREE_CHAIN (arglist))));
+				TREE_VALUE (TREE_CHAIN (arglist)));
       return const0_rtx;
+#ifdef EH_RETURN_DATA_REGNO
+    case BUILT_IN_EH_RETURN_DATA_REGNO:
+      return expand_builtin_eh_return_data_regno (arglist);
+#endif
     case BUILT_IN_VARARGS_START:
       return expand_builtin_va_start (0, arglist);
     case BUILT_IN_STDARG_START:

@@ -58,16 +58,15 @@ Boston, MA 02111-1307, USA.  */
 #include "auto-host.h"
 #include "tm.h"
 #include "tsystem.h"
-
-#include "frame.h"
+#include "unwind-dw2-fde.h"
 
 #ifndef CRT_CALL_STATIC_FUNCTION
 # define CRT_CALL_STATIC_FUNCTION(func) func ()
 #endif
 
 /* We do not want to add the weak attribute to the declarations of these
-   routines in frame.h because that will cause the definition of these
-   symbols to be weak as well.
+   routines in unwind-dw2-fde.h because that will cause the definition of
+   these symbols to be weak as well.
 
    This exposes a core issue, how to handle creating weak references vs
    how to create weak definitions.  Either we have to have the definition
@@ -413,20 +412,8 @@ init_dummy (void)
   FORCE_INIT_SECTION_ALIGN;
 #endif
   asm (TEXT_SECTION_ASM_OP);
-
-/* This is a kludge. The i386 GNU/Linux dynamic linker needs ___brk_addr,
-   __environ and atexit (). We have to make sure they are in the .dynsym
-   section. We accomplish it by making a dummy call here. This
-   code is never reached.  */
- 
-#if defined(__linux__) && defined(__PIC__) && defined(__i386__)
-  {
-    extern void *___brk_addr;
-    extern char **__environ;
-
-    ___brk_addr = __environ;
-    atexit (0);
-  }
+#ifdef CRT_END_INIT_DUMMY
+  CRT_END_INIT_DUMMY;
 #endif
 }
 
