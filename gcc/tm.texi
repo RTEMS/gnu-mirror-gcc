@@ -138,6 +138,16 @@ This should be defined if @code{WCHAR_TYPE} depends on target dependent flags
 which are not accessible to the preprocessor.  Otherwise, it should not
 be defined.
 
+@findex NO_BUILTIN_WINT_TYPE
+@item NO_BUILTIN_WINT_TYPE
+If this macro is defined, the preprocessor will not define the builtin macro
+@code{__WINT_TYPE__}.  The macro @code{__WINT_TYPE__} must then be
+defined by @code{CPP_SPEC} instead.
+
+This should be defined if @code{WINT_TYPE} depends on target dependent flags
+which are not accessible to the preprocessor.  Otherwise, it should not
+be defined.
+
 @findex SIGNED_CHAR_SPEC
 @item SIGNED_CHAR_SPEC
 A C string constant that tells the GCC driver program options to
@@ -1285,6 +1295,16 @@ characters.  If this is undefined, the default is
 largest value that @code{WCHAR_TYPE_SIZE} can have at run-time.  This is
 used in @code{cpp}.
 
+@findex WINT_TYPE
+@item WINT_TYPE
+A C expression for a string describing the name of the data type to
+use for wide characters passed to @code{printf} and returned from
+@code{getwc}.  The typedef name @code{wint_t} is defined using the
+contents of the string.  See @code{SIZE_TYPE} above for more
+information.
+
+If you don't define this macro, the default is @code{"unsigned int"}.
+
 @findex OBJC_INT_SELECTORS
 @item OBJC_INT_SELECTORS
 Define this macro if the type of Objective C selectors should be
@@ -1468,6 +1488,14 @@ expression returns the register number as seen by the calling function
 corresponding to the register number @var{in} as seen by the called
 function.  Return @var{in} if register number @var{in} is not an inbound
 register.
+
+@findex LOCAL_REGNO
+@item LOCAL_REGNO (@var{regno})
+Define this macro if the target machine has register windows.  This C
+expression returns true if the register is call-saved but is in the
+register window.  Unlike most call-saved registers, such registers
+need not be explicitly restored on function exit or during non-local
+gotos.
 
 @ignore
 @findex PC_REGNUM
@@ -1828,6 +1856,9 @@ When the machine has more than 32 registers, an integer does not suffice.
 Then the integers are replaced by sub-initializers, braced groupings containing
 several integers.  Each sub-initializer must be suitable as an initializer
 for the type @code{HARD_REG_SET} which is defined in @file{hard-reg-set.h}.
+In this situation, the first integer in each sub-initializer corresponds to
+registers 0 through 31, the second integer to registers 32 through 63, and
+so on.
 
 @findex REGNO_REG_CLASS
 @item REGNO_REG_CLASS (@var{regno})
@@ -2883,7 +2914,7 @@ serves both purposes.@refill
 @findex FUNCTION_ARG_PARTIAL_NREGS
 @item FUNCTION_ARG_PARTIAL_NREGS (@var{cum}, @var{mode}, @var{type}, @var{named})
 A C expression for the number of words, at the beginning of an
-argument, must be put in registers.  The value must be zero for
+argument, that must be put in registers.  The value must be zero for
 arguments that are passed entirely in registers or that are entirely
 pushed on the stack.
 
@@ -3502,18 +3533,24 @@ These macros will help you generate code for profiling.
 @item FUNCTION_PROFILER (@var{file}, @var{labelno})
 A C statement or compound statement to output to @var{file} some
 assembler code to call the profiling subroutine @code{mcount}.
-Before calling, the assembler code must load the address of a
-counter variable into a register where @code{mcount} expects to
-find the address.  The name of this variable is @samp{LP} followed
-by the number @var{labelno}, so you would generate the name using
-@samp{LP%d} in a @code{fprintf}.
 
 @findex mcount
-The details of how the address should be passed to @code{mcount} are
-determined by your operating system environment, not by GCC.  To
-figure them out, compile a small program for profiling using the
-system's installed C compiler and look at the assembler code that
-results.
+The details of how @code{mcount} expects to be called are determined by
+your operating system environment, not by GCC.  To figure them out,
+compile a small program for profiling using the system's installed C
+compiler and look at the assembler code that results.
+
+Older implementations of @code{mcount} expect the address of a counter
+variable to be loaded into some register.  The name of this variable is
+@samp{LP} followed by the number @var{labelno}, so you would generate
+the name using @samp{LP%d} in a @code{fprintf}.
+
+@findex NO_PROFILE_COUNTERS
+@item NO_PROFILE_COUNTERS
+Define this macro if the @code{mcount} subroutine on your system does
+not need a counter variable allocated for each function.  This is true
+for almost all modern implementations.  If you define this macro, you
+must not use the @var{labelno} argument to @code{FUNCTION_PROFILER}.
 
 @findex PROFILE_BEFORE_PROLOGUE
 @item PROFILE_BEFORE_PROLOGUE
@@ -4271,17 +4308,31 @@ to the lookup function, which returns a pointer to the method.
 This is about addressing modes.
 
 @table @code
-@findex HAVE_POST_INCREMENT
-@item HAVE_POST_INCREMENT
-A C expression that is nonzero the machine supports post-increment addressing.
-
 @findex HAVE_PRE_INCREMENT
-@findex HAVE_POST_DECREMENT
 @findex HAVE_PRE_DECREMENT
+@findex HAVE_POST_INCREMENT
+@findex HAVE_POST_DECREMENT
 @item HAVE_PRE_INCREMENT
-@itemx HAVE_POST_DECREMENT
 @itemx HAVE_PRE_DECREMENT
-Similar for other kinds of addressing.
+@itemx HAVE_POST_INCREMENT
+@itemx HAVE_POST_DECREMENT
+A C expression that is non-zero if the machine supports pre-increment,
+pre-decrement, post-increment, or post-decrement addressing respectively.
+
+@findex HAVE_POST_MODIFY_DISP
+@findex HAVE_PRE_MODIFY_DISP
+@item HAVE_PRE_MODIFY_DISP
+@itemx HAVE_POST_MODIFY_DISP
+A C expression that is non-zero if the machine supports pre- or
+post-address side-effect generation involving constants other than
+the size of the memory operand.
+
+@findex HAVE_POST_MODIFY_REG
+@findex HAVE_PRE_MODIFY_REG
+@item HAVE_PRE_MODIFY_REG
+@itemx HAVE_POST_MODIFY_REG
+A C expression that is non-zero if the machine supports pre- or
+post-address side-effect generation involving a register displacement.
 
 @findex CONSTANT_ADDRESS_P
 @item CONSTANT_ADDRESS_P (@var{x})
