@@ -146,10 +146,8 @@ java::io::File::performList (java::io::FilenameFilter *filter,
     return NULL;
   char *buf = (char *) __builtin_alloca (JvGetStringUTFLength (canon) + 5);
   jsize total = JvGetStringUTFRegion (canon, 0, canon->length(), buf);
-  if (buf[total-1] == '\\')
-    strcpy (&buf[total], "*.*");
-  else
-    strcpy (&buf[total], "\\*.*");
+  // FIXME?
+  strcpy(&buf[total], "\\*.*");
 
   WIN32_FIND_DATA data;
   HANDLE handle = FindFirstFile (buf, &data);

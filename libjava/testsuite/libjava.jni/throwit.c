@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <throwit.h>
 
-JNIEXPORT void JNICALL
+void
 Java_throwit_throwit (JNIEnv *env, jclass klass, jstring name,
 		      jboolean is_new)
 {

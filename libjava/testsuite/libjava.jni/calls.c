@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <calls.h>
 
-JNIEXPORT jint JNICALL
+jint
 Java_calls_docall (JNIEnv *env, jobject _this)
 {
   jmethodID method;

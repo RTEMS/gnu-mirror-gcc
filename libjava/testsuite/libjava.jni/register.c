@@ -8,7 +8,7 @@ some_random_name (JNIEnv *env, jclass k, jint v)
   return v - 1;
 }
 
-JNIEXPORT jint JNICALL
+jint
 JNI_OnLoad (JavaVM *vm, void *nothing)
 {
   JNIEnv *env;

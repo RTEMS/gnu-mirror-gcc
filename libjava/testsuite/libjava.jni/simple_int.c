@@ -1,6 +1,6 @@
 #include <simple_int.h>
 
-JNIEXPORT jint JNICALL
+jint
 Java_simple_1int_nat (JNIEnv *env, jclass klass, jint val)
 {
   return 2 * val;

@@ -1,29 +1,3 @@
-2003-01-24  Ranjit Mathew  <rmathew@hotmail.com>
-
-	Fixes PR java/9253:
-	* java/io/natFileWin32.cc (performList): Append only "*.*"
-	if the canonical file path already has a "\" at the end.
-
-2003-01-24  Tom Tromey  <tromey@redhat.com>
-
-	* defineclass.cc (handleMethodsEnd): Precompute code for static
-	method.
-	(handleCodeAttribute): Likewise.
-	* resolve.cc (ncode): Use run_class for unsynchronized static
-	methods.
-	* include/java-interp.h (class _Jv_InterpMethod): Declare
-	run_class.
-	* interpret.cc (run_synch_class): Initialize class.
-	(run) [insn_invokestatic]: Don't initialize class.
-	[insn_anewarray]: Likewise.
-	[insn_multianewarray]: Likewise.
-	(run_class): New function.
-
-2003-01-24  Tom Tromey  <tromey@redhat.com>
-
-	* java/lang/ClassLoader.java (findLoadedClass): Removed erroneous
-	comment.
-
 2003-01-22  Andrew Haley  <aph@redhat.com>
 
         * x86_64-signal.h: Add simple handler for x86_64 32-bit mode.

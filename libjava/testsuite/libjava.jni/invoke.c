@@ -1,6 +1,6 @@
 #include <invoke.h>
 
-JNIEXPORT jint JNICALL
+jint
 Java_invoke_val (JNIEnv *env, jclass klass)
 {
   return 23;
