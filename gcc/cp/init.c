@@ -47,7 +47,7 @@ static tree initializing_context PARAMS ((tree));
 static void expand_cleanup_for_base PARAMS ((tree, tree));
 static tree get_temp_regvar PARAMS ((tree, tree));
 static tree dfs_initialize_vtbl_ptrs PARAMS ((tree, void *));
-static tree build_default_init PARAMS ((tree));
+static tree build_default_init PARAMS ((tree, tree));
 static tree build_new_1	PARAMS ((tree));
 static tree get_cookie_size PARAMS ((tree));
 static tree build_dtor_call PARAMS ((tree, special_function_kind, int));
@@ -159,12 +159,14 @@ initialize_vtbl_ptrs (addr)
    that T is a scalar), or a CONSTRUCTOR (in the case that T is an
    aggregate).  In either case, the value can be used as DECL_INITIAL
    for a decl of the indicated TYPE; it is a valid static initializer.
-   If STATIC_STORAGE_P is TRUE, initializers are only generated for
-   entities for which zero-initialization does not simply mean filling
-   the storage with zero bytes.  */
+   If NELTS is non-NULL, and TYPE is an ARRAY_TYPE, NELTS is the
+   number of elements in the array.  If STATIC_STORAGE_P is TRUE,
+   initializers are only generated for entities for which
+   zero-initialization does not simply mean filling the storage with
+   zero bytes.  */
 
 tree
-build_zero_init (tree type, bool static_storage_p)
+build_zero_init (tree type, tree nelts, bool static_storage_p)
 {
   tree init = NULL_TREE;
 
@@ -217,6 +219,7 @@ build_zero_init (tree type, bool static_storage_p)
 	  if (static_storage_p && !zero_init_p (TREE_TYPE (field)))
 	    inits = tree_cons (field, 
 			       build_zero_init (TREE_TYPE (field),
+						/*nelts=*/NULL_TREE,
 						static_storage_p),
 			       inits);
 
@@ -236,11 +239,13 @@ build_zero_init (tree type, bool static_storage_p)
       init = build (CONSTRUCTOR, type, NULL_TREE, NULL_TREE);
       /* Iterate over the array elements, building initializations.  */
       inits = NULL_TREE;
-      for (index = size_zero_node, max_index = array_type_nelts (type);
+      max_index = nelts ? nelts : array_type_nelts (type);
+      for (index = size_zero_node;
 	   !tree_int_cst_lt (max_index, index);
 	   index = size_binop (PLUS_EXPR, index, size_one_node))
 	inits = tree_cons (index,
-			   build_zero_init (TREE_TYPE (type), 
+			   build_zero_init (TREE_TYPE (type),
+					    /*nelts=*/NULL_TREE,
 					    static_storage_p),
 			   inits);
       CONSTRUCTOR_ELTS (init) = nreverse (inits);
@@ -257,14 +262,17 @@ build_zero_init (tree type, bool static_storage_p)
   return init;
 }
 
-/* Build an expression for the default-initialization of an object
-   with type T.  If initialization T requires calling constructors,
-   this function returns NULL_TREE; the caller is responsible for
-   arranging for the constructors to be called.  */
+/* Build an expression for the default-initialization of an object of
+   the indicated TYPE.  If NELTS is non-NULL, and TYPE is an
+   ARRAY_TYPE, NELTS is the number of elements in the array.  If
+   initialization of TYPE requires calling constructors, this function
+   returns NULL_TREE; the caller is responsible for arranging for the
+   constructors to be called.  */
 
 static tree
-build_default_init (type)
+build_default_init (type, nelts)
      tree type;
+     tree nelts;
 {
   /* [dcl.init]:
 
@@ -298,7 +306,7 @@ build_default_init (type)
       
   /* At this point, TYPE is either a POD class type, an array of POD
      classes, or something even more inoccuous.  */
-  return build_zero_init (type, /*static_storage_p=*/false);
+  return build_zero_init (type, nelts, /*static_storage_p=*/false);
 }
 
 /* Initialize MEMBER, a FIELD_DECL, with INIT, a TREE_LIST of
@@ -352,7 +360,8 @@ perform_member_init (tree member, tree init)
 	  && TREE_CODE (TREE_TYPE (TREE_VALUE (init))) == ARRAY_TYPE)
 	{
 	  /* Initialization of one array from another.  */
-	  finish_expr_stmt (build_vec_init (decl, TREE_VALUE (init), 1));
+	  finish_expr_stmt (build_vec_init (decl, NULL_TREE, TREE_VALUE (init),
+					    /* from_array=*/1));
 	}
       else
 	finish_expr_stmt (build_aggr_init (decl, init, 0));
@@ -363,7 +372,7 @@ perform_member_init (tree member, tree init)
 	{
 	  if (explicit)
 	    {
-	      init = build_default_init (type);
+	      init = build_default_init (type, /*nelts=*/NULL_TREE);
 	      if (TREE_CODE (type) == REFERENCE_TYPE)
 		warning
 		  ("default-initialization of `%#D', which has reference type",
@@ -1101,7 +1110,7 @@ build_aggr_init (exp, init, flags)
 	TREE_TYPE (exp) = TYPE_MAIN_VARIANT (type);
       if (itype && cp_type_quals (itype) != TYPE_UNQUALIFIED)
 	TREE_TYPE (init) = TYPE_MAIN_VARIANT (itype);
-      stmt_expr = build_vec_init (exp, init,
+      stmt_expr = build_vec_init (exp, NULL_TREE, init,
 				  init && same_type_p (TREE_TYPE (init),
 						       TREE_TYPE (exp)));
       TREE_READONLY (exp) = was_const;
@@ -2138,6 +2147,7 @@ build_new_1 (exp)
   tree placement, init;
   tree type, true_type, size, rval, t;
   tree full_type;
+  tree outer_nelts = NULL_TREE;
   tree nelts = NULL_TREE;
   tree alloc_call, alloc_expr, alloc_node;
   tree alloc_fn;
@@ -2167,12 +2177,11 @@ build_new_1 (exp)
   if (TREE_CODE (type) == ARRAY_REF)
     {
       has_array = 1;
-      nelts = TREE_OPERAND (type, 1);
+      nelts = outer_nelts = TREE_OPERAND (type, 1);
       type = TREE_OPERAND (type, 0);
 
-      full_type = cp_build_binary_op (MINUS_EXPR, nelts, integer_one_node);
-      full_type = build_index_type (full_type);
-      full_type = build_cplus_array_type (type, full_type);
+      /* Use an incomplete array type to avoid VLA headaches.  */
+      full_type = build_cplus_array_type (type, NULL_TREE);
     }
   else
     full_type = type;
@@ -2357,12 +2366,16 @@ build_new_1 (exp)
       init_expr = build_indirect_ref (alloc_node, NULL);
 
       if (init == void_zero_node)
-	init = build_default_init (full_type);
+	init = build_default_init (full_type, nelts);
       else if (init && pedantic && has_array)
 	pedwarn ("ISO C++ forbids initialization in array new");
 
       if (has_array)
-	init_expr = build_vec_init (init_expr, init, 0);
+	init_expr
+	  = build_vec_init (init_expr,
+			    cp_build_binary_op (MINUS_EXPR, outer_nelts,
+						integer_one_node),
+			    init, /*from_array=*/0);
       else if (TYPE_NEEDS_CONSTRUCTING (type))
 	init_expr = build_special_member_call (init_expr, 
 					       complete_ctor_identifier,
@@ -2686,6 +2699,9 @@ get_temp_regvar (type, init)
    initialization of a vector of aggregate types.
 
    BASE is a reference to the vector, of ARRAY_TYPE.
+   MAXINDEX is the maximum index of the array (one less than the
+     number of elements).  It is only used if
+     TYPE_DOMAIN (TREE_TYPE (BASE)) == NULL_TREE.
    INIT is the (possibly NULL) initializer.
 
    FROM_ARRAY is 0 if we should init everything with INIT
@@ -2696,8 +2712,8 @@ get_temp_regvar (type, init)
    but use assignment instead of initialization.  */
 
 tree
-build_vec_init (base, init, from_array)
-     tree base, init;
+build_vec_init (base, maxindex, init, from_array)
+     tree base, init, maxindex;
      int from_array;
 {
   tree rval;
@@ -2717,9 +2733,11 @@ build_vec_init (base, init, from_array)
   tree try_block = NULL_TREE;
   tree try_body = NULL_TREE;
   int num_initialized_elts = 0;
-  tree maxindex = array_type_nelts (TREE_TYPE (base));
 
-  if (maxindex == error_mark_node)
+  if (TYPE_DOMAIN (atype))
+    maxindex = array_type_nelts (atype);
+
+  if (maxindex == NULL_TREE || maxindex == error_mark_node)
     return error_mark_node;
 
   if (init
@@ -2909,7 +2927,7 @@ build_vec_init (base, init, from_array)
 	    sorry
 	      ("cannot initialize multi-dimensional array with initializer");
 	  elt_init = build_vec_init (build1 (INDIRECT_REF, type, base),
-				     0, 0);
+				     0, 0, 0);
 	}
       else
 	elt_init = build_aggr_init (build1 (INDIRECT_REF, type, base), 
