@@ -61,15 +61,7 @@ Boston, MA 02111-1307, USA.  */
 #endif
 
 /* Define the prefix to use when check_memory_usage_flag is enable.  */
-#ifdef NO_DOLLAR_IN_LABEL
-#ifdef NO_DOT_IN_LABEL
-#define CHKR_PREFIX "chkr_prefix_"
-#else /* !NO_DOT_IN_LABEL */
-#define CHKR_PREFIX "chkr."
-#endif 
-#else /* !NO_DOLLAR_IN_LABEL */
-#define CHKR_PREFIX "chkr$"
-#endif
+#define CHKR_PREFIX "_CHKR_"
 #define CHKR_PREFIX_SIZE (sizeof (CHKR_PREFIX) - 1)
 
 /* File in which assembler code is being written.  */
@@ -565,10 +557,15 @@ decode_reg_name (asmspec)
   return -1;
 }
 
-/* Create the DECL_RTL for a declaration for a static or external variable
-   or static or external function.
-   ASMSPEC, if not 0, is the string which the user specified
-   as the assembler symbol name.
+/* Create the DECL_RTL for a VAR_DECL or FUNCTION_DECL.  DECL should
+   have static storage duration.  In other words, it should not be an
+   automatic variable, including PARM_DECLs.
+
+   There is, however, one exception: this function handles variables
+   explicitly placed in a particular register by the user.
+
+   ASMSPEC, if not 0, is the string which the user specified as the
+   assembler symbol name.
 
    This is never called for PARM_DECL nodes.  */
 
@@ -582,9 +579,24 @@ make_decl_rtl (decl, asmspec)
   const char *new_name = 0;
   int reg_number;
 
+  /* Check that we are not being given an automatic variable.  */
+  /* A weak alias has TREE_PUBLIC set but not the other bits.  */
+  if (TREE_CODE (decl) == PARM_DECL
+      || TREE_CODE (decl) == RESULT_DECL
+      || (TREE_CODE (decl) == VAR_DECL
+	  && !TREE_STATIC (decl)
+	  && !TREE_PUBLIC (decl)
+	  && !DECL_EXTERNAL (decl)
+	  && !DECL_REGISTER (decl)))
+    abort ();
+  /* And that we were not given a type or a label.  */
+  else if (TREE_CODE (decl) == TYPE_DECL 
+	   || TREE_CODE (decl) == LABEL_DECL)
+    abort ();
+
   /* For a duplicate declaration, we can be called twice on the
      same DECL node.  Don't discard the RTL already made.  */
-  if (DECL_RTL (decl) != 0)
+  if (DECL_RTL_SET_P (decl))
     {
       /* If the old RTL had the wrong mode, fix the mode.  */
       if (GET_MODE (DECL_RTL (decl)) != DECL_MODE (decl))
@@ -652,8 +664,9 @@ make_decl_rtl (decl, asmspec)
 	     usage is somewhat suspect, we nevertheless use the following
 	     kludge to avoid setting DECL_RTL to frame_pointer_rtx.  */
 
-	  DECL_RTL (decl)
-	    = gen_rtx_REG (DECL_MODE (decl), FIRST_PSEUDO_REGISTER);
+	  SET_DECL_RTL (decl,
+			gen_rtx_REG (DECL_MODE (decl), 
+				     FIRST_PSEUDO_REGISTER));
 	  REGNO (DECL_RTL (decl)) = reg_number;
 	  REG_USERVAR_P (DECL_RTL (decl)) = 1;
 
@@ -695,7 +708,8 @@ make_decl_rtl (decl, asmspec)
      Concatenate a distinguishing number.  */
   if (!top_level && !TREE_PUBLIC (decl)
       && ! (DECL_CONTEXT (decl) && TYPE_P (DECL_CONTEXT (decl)))
-      && asmspec == 0)
+      && asmspec == 0
+      && name == IDENTIFIER_POINTER (DECL_NAME (decl)))
     {
       char *label;
       ASM_FORMAT_PRIVATE_NAME (label, name, var_labelno);
@@ -719,7 +733,7 @@ make_decl_rtl (decl, asmspec)
 
   if (name != new_name)
     {
-      DECL_ASSEMBLER_NAME (decl) = get_identifier (new_name);
+      SET_DECL_ASSEMBLER_NAME (decl, get_identifier (new_name));
       name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
     }
 
@@ -731,8 +745,9 @@ make_decl_rtl (decl, asmspec)
 	   && (TREE_PUBLIC (decl) || TREE_STATIC (decl)))))
     TREE_SIDE_EFFECTS (decl) = 1;
 
-  DECL_RTL (decl) = gen_rtx_MEM (DECL_MODE (decl),
-				 gen_rtx_SYMBOL_REF (Pmode, name));
+  SET_DECL_RTL (decl, gen_rtx_MEM (DECL_MODE (decl),
+				   gen_rtx_SYMBOL_REF (Pmode, name)));
+  SYMBOL_REF_WEAK (XEXP (DECL_RTL (decl), 0)) = DECL_WEAK (decl);
   if (TREE_CODE (decl) != FUNCTION_DECL)
     set_mem_attributes (DECL_RTL (decl), decl, 1);
 
@@ -1226,7 +1241,7 @@ assemble_variable (decl, top_level, at_end, dont_output_data)
 
   last_assemble_variable_decl = 0;
 
-  if (GET_CODE (DECL_RTL (decl)) == REG)
+  if (DECL_RTL_SET_P (decl) && GET_CODE (DECL_RTL (decl)) == REG)
     {
       /* Do output symbol info for global register variables, but do nothing
 	 else for them.  */
@@ -1610,6 +1625,13 @@ void
 assemble_external (decl)
      tree decl ATTRIBUTE_UNUSED;
 {
+  /* Because most platforms do not define ASM_OUTPUT_EXTERNAL, the
+     main body of this code is only rarely exercised.  To provide some
+     testing, on all platforms, we make sure that the ASM_OUT_FILE is
+     open.  If it's not, we should not be calling this function.  */
+  if (!asm_out_file)
+    abort ();
+
 #ifdef ASM_OUTPUT_EXTERNAL
   if (DECL_P (decl) && DECL_EXTERNAL (decl) && TREE_PUBLIC (decl))
     {
@@ -2431,7 +2453,7 @@ const_hash (exp)
       
     default:
       /* A language specific constant. Just hash the code. */
-      return code % MAX_HASH_TABLE;
+      return (int) code % MAX_HASH_TABLE;
     }
 
   /* Compute hashing function */
@@ -3580,6 +3602,9 @@ force_const_mem (mode, x)
       pool_offset += align - 1;
       pool_offset &= ~ (align - 1);
 
+      if (GET_CODE (x) == LABEL_REF)
+	LABEL_PRESERVE_P (XEXP (x, 0)) = 1;
+
       /* Allocate a pool constant descriptor, fill it in, and chain it in.  */
 
       pool = (struct pool_constant *) ggc_alloc (sizeof (struct pool_constant));
@@ -4229,7 +4254,10 @@ output_constant (exp, size)
      directly.  Give the front-end a chance to convert EXP to a
      language-independent representation.  */
   if (lang_expand_constant)
-    exp = (*lang_expand_constant) (exp);
+    {
+      exp = (*lang_expand_constant) (exp);
+      code = TREE_CODE (TREE_TYPE (exp));
+    }
 
   if (size == 0 || flag_syntax_only)
     return;
@@ -4787,8 +4815,11 @@ assemble_alias (decl, target)
 {
   const char *name;
 
-  make_decl_rtl (decl, (char *) 0);
-  name = XSTR (XEXP (DECL_RTL (decl), 0), 0);
+  /* We must force creation of DECL_RTL for debug info generation, even though
+     we don't use it here.  */
+  make_decl_rtl (decl, NULL_PTR);
+
+  name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
 
 #ifdef ASM_OUTPUT_DEF
   /* Make name accessible from other files, if appropriate.  */

@@ -162,7 +162,8 @@ typedef struct rtx_def
   unsigned int used : 1;
   /* Nonzero if this rtx came from procedure integration.
      In a REG, nonzero means this reg refers to the return value
-     of the current function.  */
+     of the current function.
+     1 in a SYMBOL_REF if the symbol is weak.  */
   unsigned integrated : 1;
   /* 1 in an INSN or a SET if this rtx is related to the call frame,
      either changing how we compute the frame address or saving and
@@ -184,11 +185,11 @@ typedef struct rtx_def
 
 /* Define macros to access the `code' field of the rtx.  */
 
-#define GET_CODE(RTX)		((RTX)->code)
-#define PUT_CODE(RTX, CODE)	((RTX)->code = (CODE))
+#define GET_CODE(RTX)	    ((enum rtx_code) (RTX)->code)
+#define PUT_CODE(RTX, CODE) ((RTX)->code = (ENUM_BITFIELD(rtx_code)) (CODE))
 
-#define GET_MODE(RTX)		((RTX)->mode)
-#define PUT_MODE(RTX, MODE)	((RTX)->mode = (MODE))
+#define GET_MODE(RTX)	    ((enum machine_mode) (RTX)->mode)
+#define PUT_MODE(RTX, MODE) ((RTX)->mode = (ENUM_BITFIELD(machine_mode)) (MODE))
 
 #define RTX_INTEGRATED_P(RTX) ((RTX)->integrated)
 #define RTX_UNCHANGING_P(RTX) ((RTX)->unchanging)
@@ -702,7 +703,7 @@ enum insn_note
 
 extern const char * const note_insn_name[NOTE_INSN_MAX - NOTE_INSN_BIAS];
 #define GET_NOTE_INSN_NAME(NOTE_CODE) \
-  (note_insn_name[(NOTE_CODE) - NOTE_INSN_BIAS])
+  (note_insn_name[(NOTE_CODE) - (int) NOTE_INSN_BIAS])
 
 /* The name of a label, in case it corresponds to an explicit label
    in the input source code.  */
@@ -924,12 +925,11 @@ extern const char * const note_insn_name[NOTE_INSN_MAX - NOTE_INSN_BIAS];
 /* Flag in a SYMBOL_REF for machine-specific purposes.  */
 #define SYMBOL_REF_FLAG(RTX) ((RTX)->volatil)
 
-/* 1 in a SYMBOL_REF if it represents a symbol which might have to change
-   if its inlined or unrolled. */
-#define SYMBOL_REF_NEED_ADJUST(RTX)  ((RTX)->in_struct)
-
 /* 1 means a SYMBOL_REF has been the library function in emit_library_call.  */
 #define SYMBOL_REF_USED(RTX) ((RTX)->used)
+
+/* 1 means a SYMBOL_REF is weak.  */
+#define SYMBOL_REF_WEAK(RTX) ((RTX)->integrated)
 
 /* Define a macro to look for REG_INC notes,
    but save time on machines where they never exist.  */
@@ -1606,6 +1606,9 @@ extern rtx gen_rtx_MEM PARAMS ((enum machine_mode, rtx));
 
 #define LAST_VIRTUAL_REGISTER		((FIRST_VIRTUAL_REGISTER) + 4)
 
+/* REGNUM never really appearing in the INSN stream.  */
+#define INVALID_REGNUM                  (~(unsigned int)0)
+
 extern rtx find_next_ref		PARAMS ((rtx, rtx));
 extern rtx *find_single_use		PARAMS ((rtx, rtx, rtx *));
 
@@ -1947,7 +1950,9 @@ enum libcall_type
   LCT_CONST = 1,
   LCT_PURE = 2,
   LCT_CONST_MAKE_BLOCK = 3,
-  LCT_PURE_MAKE_BLOCK = 4
+  LCT_PURE_MAKE_BLOCK = 4,
+  LCT_NORETURN = 5,
+  LCT_THROW = 6
 };
 
 extern void emit_library_call		PARAMS ((rtx, enum libcall_type,

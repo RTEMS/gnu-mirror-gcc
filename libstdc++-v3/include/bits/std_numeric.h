@@ -27,7 +27,8 @@
 #ifndef _CPP_NUMERIC
 #define _CPP_NUMERIC 1
 
-#include <bits/stl_config.h>
+#pragma GCC system_header
+#include <bits/c++config.h>
 #include <bits/std_cstddef.h>
 #include <bits/std_iterator.h>
 #include <bits/stl_function.h>

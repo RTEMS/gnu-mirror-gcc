@@ -28,8 +28,6 @@ Boston, MA 02111-1307, USA.  */
 #include "tm_p.h"
 #include "obstack.h"
 #include "insn-config.h"
-#include "insn-flags.h"
-#include "insn-codes.h"
 #include "flags.h"
 #include "function.h"
 #include "expr.h"
@@ -456,6 +454,7 @@ static void move2add_note_store		PARAMS ((rtx, rtx, void *));
 #ifdef AUTO_INC_DEC
 static void add_auto_inc_notes		PARAMS ((rtx, rtx));
 #endif
+static void copy_eh_notes		PARAMS ((rtx, rtx));
 static HOST_WIDE_INT sext_for_mode	PARAMS ((enum machine_mode,
 						 HOST_WIDE_INT));
 static void failed_reload		PARAMS ((rtx, int));
@@ -2588,6 +2587,12 @@ eliminate_regs (x, mem_mode, insn)
 	return x;
 
     case USE:
+      /* Handle insn_list USE that a call to a pure function may generate.  */
+      new = eliminate_regs (XEXP (x, 0), 0, insn);
+      if (new != XEXP (x, 0))
+	return gen_rtx_USE (GET_MODE (x), new);
+      return x;
+
     case CLOBBER:
     case ASM_OPERANDS:
     case SET:
@@ -3016,6 +3021,7 @@ eliminate_regs_in_insn (insn, replace)
      currently support: a single set with the source being a PLUS of an
      eliminable register and a constant.  */
   if (old_set
+      && GET_CODE (SET_DEST (old_set)) == REG
       && GET_CODE (SET_SRC (old_set)) == PLUS
       && GET_CODE (XEXP (SET_SRC (old_set), 0)) == REG
       && GET_CODE (XEXP (SET_SRC (old_set), 1)) == CONST_INT
@@ -3873,9 +3879,6 @@ reload_as_needed (live_known)
 			    spill_reg_order);
 	    }
 
-	  if (num_eliminable && chain->need_elim)
-	    update_eliminable_offsets ();
-
 	  if (n_reloads > 0)
 	    {
 	      rtx next = NEXT_INSN (insn);
@@ -3922,6 +3925,10 @@ reload_as_needed (live_known)
 		      NOTE_LINE_NUMBER (p) = NOTE_INSN_DELETED;
 		    }
 	    }
+
+	  if (num_eliminable && chain->need_elim)
+	    update_eliminable_offsets ();
+
 	  /* Any previously reloaded spilled pseudo reg, stored in this insn,
 	     is no longer validly lying around to save a future reload.
 	     Note that this does not detect pseudos that were reloaded
@@ -6568,10 +6575,13 @@ emit_input_reload_insns (chain, rl, old, j)
 		  rl->when_needed);
     }
 
+  if (flag_non_call_exceptions)
+    copy_eh_notes (insn, get_insns ());
+
   /* End this sequence.  */
   *where = get_insns ();
   end_sequence ();
-
+				 
   /* Update reload_override_in so that delete_address_reloads_1
      can see the actual register usage.  */
   if (oldequiv_reg)
@@ -6665,7 +6675,7 @@ emit_output_reload_insns (chain, rl, j)
 
 		  /* Copy primary reload reg to secondary reload reg.
 		     (Note that these have been swapped above, then
-		     secondary reload reg to OLD using our insn.  */
+		     secondary reload reg to OLD using our insn.)  */
 
 		  /* If REAL_OLD is a paradoxical SUBREG, remove it
 		     and try to put the opposite SUBREG on
@@ -6785,6 +6795,9 @@ emit_output_reload_insns (chain, rl, j)
     }
   else
     output_reload_insns[rl->opnum] = get_insns ();
+
+  if (flag_non_call_exceptions)
+    copy_eh_notes (insn, get_insns ());
 
   end_sequence ();
 }
@@ -7589,7 +7602,9 @@ delete_output_reload (insn, j, last_reload_reg)
     }
   n_occurrences = count_occurrences (PATTERN (insn), reg, 0);
   if (substed)
-    n_occurrences += count_occurrences (PATTERN (insn), substed, 0);
+    n_occurrences += count_occurrences (PATTERN (insn),
+					eliminate_regs (substed, 0,
+							NULL_RTX), 0);
   if (n_occurrences > n_inherited)
     return;
 
@@ -8040,7 +8055,15 @@ reload_cse_simplify (insn)
   if (GET_CODE (body) == SET)
     {
       int count = 0;
-      if (reload_cse_noop_set_p (body))
+
+      /* Simplify even if we may think it is a no-op.
+         We may think a memory load of a value smaller than WORD_SIZE
+         is redundant because we haven't taken into account possible
+         implicit extension.  reload_cse_simplify_set() will bring
+         this out, so it's safer to simplify before we delete.  */
+      count += reload_cse_simplify_set (body, insn);
+
+      if (!count && reload_cse_noop_set_p (body))
 	{
 	  rtx value = SET_DEST (body);
 	  if (! REG_FUNCTION_VALUE_P (SET_DEST (body)))
@@ -8048,9 +8071,6 @@ reload_cse_simplify (insn)
 	  reload_cse_delete_noop_set (insn, value);
 	  return;
 	}
-
-      /* It's not a no-op, but we can try to simplify it.  */
-      count += reload_cse_simplify_set (body, insn);
 
       if (count > 0)
 	apply_change_group ();
@@ -8172,6 +8192,9 @@ reload_cse_simplify_set (set, insn)
   int old_cost;
   cselib_val *val;
   struct elt_loc_list *l;
+#ifdef LOAD_EXTEND_OP
+  enum rtx_code extend_op = NIL;
+#endif
 
   dreg = true_regnum (SET_DEST (set));
   if (dreg < 0)
@@ -8182,6 +8205,18 @@ reload_cse_simplify_set (set, insn)
     return 0;
 
   dclass = REGNO_REG_CLASS (dreg);
+
+#ifdef LOAD_EXTEND_OP
+  /* When replacing a memory with a register, we need to honor assumptions
+     that combine made wrt the contents of sign bits.  We'll do this by
+     generating an extend instruction instead of a reg->reg copy.  Thus 
+     the destination must be a register that we can widen.  */
+  if (GET_CODE (src) == MEM
+      && GET_MODE_BITSIZE (GET_MODE (src)) < BITS_PER_WORD
+      && (extend_op = LOAD_EXTEND_OP (GET_MODE (src))) != NIL
+      && GET_CODE (SET_DEST (set)) != REG)
+    return 0;
+#endif
 
   /* If memory loads are cheaper than register copies, don't change them.  */
   if (GET_CODE (src) == MEM)
@@ -8200,23 +8235,76 @@ reload_cse_simplify_set (set, insn)
     return 0;
   for (l = val->locs; l; l = l->next)
     {
+      rtx this_rtx = l->loc;
       int this_cost;
-      if (CONSTANT_P (l->loc) && ! references_value_p (l->loc, 0))
-	this_cost = rtx_cost (l->loc, SET);
-      else if (GET_CODE (l->loc) == REG)
-	this_cost = REGISTER_MOVE_COST (GET_MODE (l->loc),
-					REGNO_REG_CLASS (REGNO (l->loc)),
-					dclass);
+
+      if (CONSTANT_P (this_rtx) && ! references_value_p (this_rtx, 0))
+	{
+#ifdef LOAD_EXTEND_OP
+	  if (extend_op != NIL)
+	    {
+	      HOST_WIDE_INT this_val;
+
+	      /* ??? I'm lazy and don't wish to handle CONST_DOUBLE.  Other
+		 constants, such as SYMBOL_REF, cannot be extended.  */
+	      if (GET_CODE (this_rtx) != CONST_INT)
+		continue;
+
+	      this_val = INTVAL (this_rtx);
+	      switch (extend_op)
+		{
+		case ZERO_EXTEND:
+		  this_val &= GET_MODE_MASK (GET_MODE (src));
+		  break;
+		case SIGN_EXTEND:
+		  /* ??? In theory we're already extended.  */
+		  if (this_val == trunc_int_for_mode (this_val, GET_MODE (src)))
+		    break;
+		default:
+		  abort ();
+		}
+	      this_rtx = GEN_INT (this_val);
+	    }
+#endif
+	  this_cost = rtx_cost (this_rtx, SET);
+	}
+      else if (GET_CODE (this_rtx) == REG)
+	{
+#ifdef LOAD_EXTEND_OP
+	  if (extend_op != NIL)
+	    {
+	      this_rtx = gen_rtx_fmt_e (extend_op, word_mode, this_rtx);
+	      this_cost = rtx_cost (this_rtx, SET);
+	    }
+	  else
+#endif
+	    this_cost = REGISTER_MOVE_COST (GET_MODE (this_rtx),
+					    REGNO_REG_CLASS (REGNO (this_rtx)),
+					    dclass);
+	}
       else
 	continue;
-      /* If equal costs, prefer registers over anything else.  That tends to
-	 lead to smaller instructions on some machines.  */
-      if ((this_cost < old_cost
-	   || (this_cost == old_cost
-	       && GET_CODE (l->loc) == REG
-	       && GET_CODE (SET_SRC (set)) != REG))
-	  && validate_change (insn, &SET_SRC (set), copy_rtx (l->loc), 1))
-	old_cost = this_cost, did_change = 1;
+
+      /* If equal costs, prefer registers over anything else.  That
+	 tends to lead to smaller instructions on some machines.  */
+      if (this_cost < old_cost
+	  || (this_cost == old_cost
+	      && GET_CODE (this_rtx) == REG
+	      && GET_CODE (SET_SRC (set)) != REG))
+	{
+#ifdef LOAD_EXTEND_OP
+	  if (GET_MODE_BITSIZE (GET_MODE (SET_DEST (set))) < BITS_PER_WORD
+	      && extend_op != NIL)
+	    {
+	      rtx wide_dest = gen_rtx_REG (word_mode, REGNO (SET_DEST (set)));
+	      ORIGINAL_REGNO (wide_dest) = ORIGINAL_REGNO (SET_DEST (set));
+	      validate_change (insn, &SET_DEST (set), wide_dest, 1);
+	    }
+#endif
+
+	  validate_change (insn, &SET_SRC (set), copy_rtx (this_rtx), 1);
+	  old_cost = this_cost, did_change = 1;
+	}
     }
 
   return did_change;
@@ -9355,3 +9443,23 @@ add_auto_inc_notes (insn, x)
     }
 }
 #endif
+
+/* Copy EH notes from an insn to its reloads.  */
+static void
+copy_eh_notes (insn, x)
+     rtx insn;
+     rtx x;
+{
+  rtx eh_note = find_reg_note (insn, REG_EH_REGION, NULL_RTX);
+  if (eh_note)
+    {
+      for (; x != 0; x = NEXT_INSN (x))
+	{
+	  if (may_trap_p (PATTERN (x)))
+	    REG_NOTES (x) 
+	      = gen_rtx_EXPR_LIST (REG_EH_REGION, XEXP (eh_note, 0),
+				   REG_NOTES (x));
+	}
+    }
+}
+

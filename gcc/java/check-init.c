@@ -681,6 +681,7 @@ check_init (exp, before)
     case INTEGER_CST:
     case REAL_CST:
     case STRING_CST:
+    case JAVA_EXC_OBJ_EXPR:
       break;
 
     case NEW_CLASS_EXPR:
@@ -694,8 +695,7 @@ check_init (exp, before)
 
 	for ( ;  x != NULL_TREE;  x = TREE_CHAIN (x))
 	  check_init (TREE_VALUE (x), before);
-	if (func == throw_node[0]
-	    || func == throw_node[1])
+	if (func == throw_node)
 	  goto never_continues;
       }
       break;

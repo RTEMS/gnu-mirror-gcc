@@ -42,9 +42,7 @@ Boston, MA 02111-1307, USA.  */
 #include "flags.h"
 #include "except.h"
 #include "function.h"
-#include "insn-flags.h"
 #include "insn-config.h"
-#include "insn-codes.h"
 #include "expr.h"
 #include "hard-reg-set.h"
 #include "obstack.h"
@@ -675,11 +673,12 @@ label_rtx (label)
   if (TREE_CODE (label) != LABEL_DECL)
     abort ();
 
-  if (DECL_RTL (label))
-    return DECL_RTL (label);
+  if (!DECL_RTL_SET_P (label))
+    SET_DECL_RTL (label, gen_label_rtx ());
 
-  return DECL_RTL (label) = gen_label_rtx ();
+  return DECL_RTL (label);
 }
+
 
 /* Add an unconditional jump to LABEL as the next sequential instruction.  */
 
@@ -1329,6 +1328,8 @@ expand_asm_operands (string, outputs, inputs, clobbers, vol, filename, line)
   rtx *real_output_rtx = (rtx *) alloca (noutputs * sizeof (rtx));
   enum machine_mode *inout_mode
     = (enum machine_mode *) alloca (noutputs * sizeof (enum machine_mode));
+  const char **output_constraints
+    = alloca (noutputs * sizeof (const char *));
   /* The insn we have emitted.  */
   rtx insn;
   int old_generating_concat_p = generating_concat_p;
@@ -1427,6 +1428,7 @@ expand_asm_operands (string, outputs, inputs, clobbers, vol, filename, line)
 	 message.  */
 
       constraint = TREE_STRING_POINTER (TREE_PURPOSE (tail));
+      output_constraints[i] = constraint;
       c_len = strlen (constraint);
 
       /* Allow the `=' or `+' to not be at the beginning of the string,
@@ -1456,6 +1458,7 @@ expand_asm_operands (string, outputs, inputs, clobbers, vol, filename, line)
 	    memcpy (buf + 1, constraint, j);
 	  memcpy (buf + 1 + j, p + 1, c_len - j);  /* not -j-1 - copy null */
 	  constraint = ggc_alloc_string (buf, c_len);
+	  output_constraints[i] = constraint;
 
 	  if (j)
 	    warning (
@@ -1824,7 +1827,7 @@ expand_asm_operands (string, outputs, inputs, clobbers, vol, filename, line)
   if (noutputs == 1 && nclobbers == 0)
     {
       ASM_OPERANDS_OUTPUT_CONSTRAINT (body)
-	= TREE_STRING_POINTER (TREE_PURPOSE (outputs));
+	= output_constraints[0];
       insn = emit_insn (gen_rtx_SET (VOIDmode, output_rtx[0], body));
     }
 
@@ -1853,7 +1856,7 @@ expand_asm_operands (string, outputs, inputs, clobbers, vol, filename, line)
 			   gen_rtx_ASM_OPERANDS
 			   (GET_MODE (output_rtx[i]),
 			    TREE_STRING_POINTER (string),
-			    TREE_STRING_POINTER (TREE_PURPOSE (tail)),
+			    output_constraints[i],
 			    i, argvec, constraints,
 			    filename, line));
 
@@ -2920,10 +2923,9 @@ expand_return (retval)
      run destructors on variables that might be used in the subsequent
      computation of the return value.  */
   rtx last_insn = 0;
-  rtx result_rtl = DECL_RTL (DECL_RESULT (current_function_decl));
+  rtx result_rtl;
   register rtx val = 0;
   tree retval_rhs;
-  int cleanups;
 
   /* If function wants no value, give it none.  */
   if (TREE_CODE (TREE_TYPE (TREE_TYPE (current_function_decl))) == VOID_TYPE)
@@ -2934,19 +2936,13 @@ expand_return (retval)
       return;
     }
 
-  /* Are any cleanups needed?  E.g. C++ destructors to be run?  */
-  /* This is not sufficient.  We also need to watch for cleanups of the
-     expression we are about to expand.  Unfortunately, we cannot know
-     if it has cleanups until we expand it, and we want to change how we
-     expand it depending upon if we need cleanups.  We can't win.  */
-#if 0
-  cleanups = any_pending_cleanups (1);
-#else
-  cleanups = 1;
-#endif
-
   if (retval == error_mark_node)
-    retval_rhs = NULL_TREE;
+    {
+      /* Treat this like a return of no value from a function that
+	 returns a value.  */
+      expand_null_return ();
+      return; 
+    }
   else if (TREE_CODE (retval) == RESULT_DECL)
     retval_rhs = retval;
   else if ((TREE_CODE (retval) == MODIFY_EXPR || TREE_CODE (retval) == INIT_EXPR)
@@ -2958,9 +2954,7 @@ expand_return (retval)
   else
     retval_rhs = NULL_TREE;
 
-  /* Only use `last_insn' if there are cleanups which must be run.  */
-  if (cleanups || cleanup_label != 0)
-    last_insn = get_last_insn ();
+  last_insn = get_last_insn ();
 
   /* Distribute return down conditional expr if either of the sides
      may involve tail recursion (see test below).  This enhances the number
@@ -2994,6 +2988,8 @@ expand_return (retval)
       end_cleanup_deferral ();
       return;
     }
+
+  result_rtl = DECL_RTL (DECL_RESULT (current_function_decl));
 
   /* If the result is an aggregate that is being returned in one (or more)
      registers, load the registers here.  The compiler currently can't handle
@@ -3102,11 +3098,10 @@ expand_return (retval)
 
       expand_value_return (result_reg);
     }
-  else if (cleanups
-      && retval_rhs != 0
-      && !VOID_TYPE_P (TREE_TYPE (retval_rhs))
-      && (GET_CODE (result_rtl) == REG
-	  || (GET_CODE (result_rtl) == PARALLEL)))
+  else if (retval_rhs != 0
+	   && !VOID_TYPE_P (TREE_TYPE (retval_rhs))
+	   && (GET_CODE (result_rtl) == REG
+	       || (GET_CODE (result_rtl) == PARALLEL)))
     {
       /* Calculate the return value into a temporary (usually a pseudo
          reg).  */
@@ -3389,28 +3384,6 @@ is_body_block (stmt)
   return 0;
 }
 
-/* Mark top block of block_stack as an implicit binding for an
-   exception region.  This is used to prevent infinite recursion when
-   ending a binding with expand_end_bindings.  It is only ever called
-   by expand_eh_region_start, as that it the only way to create a
-   block stack for a exception region.  */
-
-void
-mark_block_as_eh_region ()
-{
-  block_stack->data.block.exception_region = 1;
-  if (block_stack->next
-      && block_stack->next->data.block.conditional_code)
-    {
-      block_stack->data.block.conditional_code
-	= block_stack->next->data.block.conditional_code;
-      block_stack->data.block.last_unconditional_cleanup
-	= block_stack->next->data.block.last_unconditional_cleanup;
-      block_stack->data.block.cleanup_ptr
-	= block_stack->next->data.block.cleanup_ptr;
-    }
-}
-
 /* True if we are currently emitting insns in an area of output code
    that is controlled by a conditional expression.  This is used by
    the cleanup handling code to generate conditional cleanup actions.  */
@@ -3419,29 +3392,6 @@ int
 conditional_context ()
 {
   return block_stack && block_stack->data.block.conditional_code;
-}
-
-/* Mark top block of block_stack as not for an implicit binding for an
-   exception region.  This is only ever done by expand_eh_region_end
-   to let expand_end_bindings know that it is being called explicitly
-   to end the binding layer for just the binding layer associated with
-   the exception region, otherwise expand_end_bindings would try and
-   end all implicit binding layers for exceptions regions, and then
-   one normal binding layer.  */
-
-void
-mark_block_as_not_eh_region ()
-{
-  block_stack->data.block.exception_region = 0;
-}
-
-/* True if the top block of block_stack was marked as for an exception
-   region by mark_block_as_eh_region.  */
-
-int
-is_eh_region ()
-{
-  return cfun && block_stack && block_stack->data.block.exception_region;
 }
 
 /* Emit a handler label for a nonlocal goto handler.
@@ -3646,26 +3596,7 @@ expand_end_bindings (vars, mark_ends, dont_jump_in)
      int mark_ends;
      int dont_jump_in;
 {
-  register struct nesting *thisblock;
-
-  while (block_stack->data.block.exception_region)
-    {
-      /* Because we don't need or want a new temporary level and
-	 because we didn't create one in expand_eh_region_start,
-	 create a fake one now to avoid removing one in
-	 expand_end_bindings.  */
-      push_temp_slots ();
-
-      block_stack->data.block.exception_region = 0;
-
-      expand_end_bindings (NULL_TREE, 0, 0);
-    }
-
-  /* Since expand_eh_region_start does an expand_start_bindings, we
-     have to first end all the bindings that were created by
-     expand_eh_region_start.  */
-
-  thisblock = block_stack;
+  register struct nesting *thisblock = block_stack;
 
   /* If any of the variables in this scope were not used, warn the
      user.  */
@@ -3833,18 +3764,18 @@ expand_decl (decl)
   /* Create the RTL representation for the variable.  */
 
   if (type == error_mark_node)
-    DECL_RTL (decl) = gen_rtx_MEM (BLKmode, const0_rtx);
+    SET_DECL_RTL (decl, gen_rtx_MEM (BLKmode, const0_rtx));
 
   else if (DECL_SIZE (decl) == 0)
     /* Variable with incomplete type.  */
     {
       if (DECL_INITIAL (decl) == 0)
 	/* Error message was already done; now avoid a crash.  */
-	DECL_RTL (decl) = gen_rtx_MEM (BLKmode, const0_rtx);
+	SET_DECL_RTL (decl, gen_rtx_MEM (BLKmode, const0_rtx));
       else
 	/* An initializer is going to decide the size of this array.
 	   Until we know the size, represent its address with a reg.  */
-	DECL_RTL (decl) = gen_rtx_MEM (BLKmode, gen_reg_rtx (Pmode));
+	SET_DECL_RTL (decl, gen_rtx_MEM (BLKmode, gen_reg_rtx (Pmode)));
 
       set_mem_attributes (DECL_RTL (decl), decl, 1);
     }
@@ -3863,7 +3794,7 @@ expand_decl (decl)
       enum machine_mode reg_mode
 	= promote_mode (type, DECL_MODE (decl), &unsignedp, 0);
 
-      DECL_RTL (decl) = gen_reg_rtx (reg_mode);
+      SET_DECL_RTL (decl, gen_reg_rtx (reg_mode));
       mark_user_reg (DECL_RTL (decl));
 
       if (POINTER_TYPE_P (type))
@@ -3890,7 +3821,7 @@ expand_decl (decl)
 	 whose size was determined by the initializer.
 	 The old address was a register; set that register now
 	 to the proper address.  */
-      if (DECL_RTL (decl) != 0)
+      if (DECL_RTL_SET_P (decl))
 	{
 	  if (GET_CODE (DECL_RTL (decl)) != MEM
 	      || GET_CODE (XEXP (DECL_RTL (decl), 0)) != REG)
@@ -3898,7 +3829,8 @@ expand_decl (decl)
 	  oldaddr = XEXP (DECL_RTL (decl), 0);
 	}
 
-      DECL_RTL (decl) = assign_temp (TREE_TYPE (decl), 1, 1, 1);
+      SET_DECL_RTL (decl,
+		    assign_temp (TREE_TYPE (decl), 1, 1, 1));
 
       /* Set alignment we actually gave this decl.  */
       DECL_ALIGN (decl) = (DECL_MODE (decl) == BLKmode ? BIGGEST_ALIGNMENT
@@ -3940,7 +3872,7 @@ expand_decl (decl)
 					      TYPE_ALIGN (TREE_TYPE (decl)));
 
       /* Reference the variable indirect through that rtx.  */
-      DECL_RTL (decl) = gen_rtx_MEM (DECL_MODE (decl), address);
+      SET_DECL_RTL (decl, gen_rtx_MEM (DECL_MODE (decl), address));
 
       set_mem_attributes (DECL_RTL (decl), decl, 1);
 
@@ -4056,7 +3988,7 @@ expand_decl_cleanup (decl, cleanup)
 	  emit_move_insn (flag, const1_rtx);
 
 	  cond = build_decl (VAR_DECL, NULL_TREE, type_for_mode (word_mode, 1));
-	  DECL_RTL (cond) = flag;
+	  SET_DECL_RTL (cond, flag);
 
 	  /* Conditionalize the cleanup.  */
 	  cleanup = build (COND_EXPR, void_type_node,
@@ -4080,14 +4012,10 @@ expand_decl_cleanup (decl, cleanup)
 	  start_sequence ();
 	}
 
-      /* If this was optimized so that there is no exception region for the
-	 cleanup, then mark the TREE_LIST node, so that we can later tell
-	 if we need to call expand_eh_region_end.  */
-      if (! using_eh_for_cleanups_p
-	  || expand_eh_region_start_tree (decl, cleanup))
+      if (! using_eh_for_cleanups_p)
 	TREE_ADDRESSABLE (t) = 1;
-      /* If that started a new EH region, we're in a new block.  */
-      thisblock = block_stack;
+      else
+	expand_eh_region_start ();
 
       if (cond_context)
 	{
@@ -4112,101 +4040,6 @@ expand_decl_cleanup (decl, cleanup)
 	  thisblock->data.block.cleanup_ptr = &thisblock->data.block.cleanups;
 	}
     }
-  return 1;
-}
-
-/* Like expand_decl_cleanup, but suppress generating an exception handler
-   to perform the cleanup.  */
-
-#if 0
-int
-expand_decl_cleanup_no_eh (decl, cleanup)
-     tree decl, cleanup;
-{
-  int save_eh = using_eh_for_cleanups_p;
-  int result;
-
-  using_eh_for_cleanups_p = 0;
-  result = expand_decl_cleanup (decl, cleanup);
-  using_eh_for_cleanups_p = save_eh;
-
-  return result;
-}
-#endif
-
-/* Arrange for the top element of the dynamic cleanup chain to be
-   popped if we exit the current binding contour.  DECL is the
-   associated declaration, if any, otherwise NULL_TREE.  If the
-   current contour is left via an exception, then __sjthrow will pop
-   the top element off the dynamic cleanup chain.  The code that
-   avoids doing the action we push into the cleanup chain in the
-   exceptional case is contained in expand_cleanups.
-
-   This routine is only used by expand_eh_region_start, and that is
-   the only way in which an exception region should be started.  This
-   routine is only used when using the setjmp/longjmp codegen method
-   for exception handling.  */
-
-int
-expand_dcc_cleanup (decl)
-     tree decl;
-{
-  struct nesting *thisblock;
-  tree cleanup;
-
-  /* Error if we are not in any block.  */
-  if (cfun == 0 || block_stack == 0)
-    return 0;
-  thisblock = block_stack;
-
-  /* Record the cleanup for the dynamic handler chain.  */
-
-  cleanup = make_node (POPDCC_EXPR);
-
-  /* Add the cleanup in a manner similar to expand_decl_cleanup.  */
-  thisblock->data.block.cleanups
-    = tree_cons (decl, cleanup, thisblock->data.block.cleanups);
-
-  /* If this block has a cleanup, it belongs in stack_block_stack.  */
-  stack_block_stack = thisblock;
-  return 1;
-}
-
-/* Arrange for the top element of the dynamic handler chain to be
-   popped if we exit the current binding contour.  DECL is the
-   associated declaration, if any, otherwise NULL_TREE.  If the current
-   contour is left via an exception, then __sjthrow will pop the top
-   element off the dynamic handler chain.  The code that avoids doing
-   the action we push into the handler chain in the exceptional case
-   is contained in expand_cleanups.
-
-   This routine is only used by expand_eh_region_start, and that is
-   the only way in which an exception region should be started.  This
-   routine is only used when using the setjmp/longjmp codegen method
-   for exception handling.  */
-
-int
-expand_dhc_cleanup (decl)
-     tree decl;
-{
-  struct nesting *thisblock;
-  tree cleanup;
-
-  /* Error if we are not in any block.  */
-  if (cfun == 0 || block_stack == 0)
-    return 0;
-  thisblock = block_stack;
-
-  /* Record the cleanup for the dynamic handler chain.  */
-
-  cleanup = make_node (POPDHC_EXPR);
-
-  /* Add the cleanup in a manner similar to expand_decl_cleanup.  */
-  thisblock->data.block.cleanups
-    = tree_cons (decl, cleanup, thisblock->data.block.cleanups);
-
-  /* If this block has a cleanup, it belongs in stack_block_stack.  */
-  stack_block_stack = thisblock;
   return 1;
 }
 
@@ -4257,19 +4090,20 @@ expand_anon_union_decl (decl, cleanup, decl_elts)
       if (GET_CODE (x) == MEM)
 	{
 	  if (mode == GET_MODE (x))
-	    DECL_RTL (decl_elt) = x;
+	    SET_DECL_RTL (decl_elt, x);
 	  else
 	    {
-	      DECL_RTL (decl_elt) = gen_rtx_MEM (mode, copy_rtx (XEXP (x, 0)));
+	      SET_DECL_RTL (decl_elt,
+			    gen_rtx_MEM (mode, copy_rtx (XEXP (x, 0))));
 	      MEM_COPY_ATTRIBUTES (DECL_RTL (decl_elt), x);
 	    }
 	}
       else if (GET_CODE (x) == REG)
 	{
 	  if (mode == GET_MODE (x))
-	    DECL_RTL (decl_elt) = x;
+	    SET_DECL_RTL (decl_elt, x);
 	  else
-	    DECL_RTL (decl_elt) = gen_rtx_SUBREG (mode, x, 0);
+	    SET_DECL_RTL (decl_elt, gen_rtx_SUBREG (mode, x, 0));
 	}
       else
 	abort ();
@@ -4312,20 +4146,8 @@ expand_cleanups (list, dont_do, in_fixup, reachable)
 	  expand_cleanups (TREE_VALUE (tail), dont_do, in_fixup, reachable);
 	else
 	  {
-	    if (! in_fixup)
-	      {
-		tree cleanup = TREE_VALUE (tail);
-
-		/* See expand_d{h,c}c_cleanup for why we avoid this.  */
-		if (TREE_CODE (cleanup) != POPDHC_EXPR
-		    && TREE_CODE (cleanup) != POPDCC_EXPR
-		    /* See expand_eh_region_start_tree for this case.  */
-		    && ! TREE_ADDRESSABLE (tail))
-		  {
-		    cleanup = protect_with_terminate (cleanup);
-		    expand_eh_region_end (cleanup);
-		  }
-	      }
+	    if (! in_fixup && using_eh_for_cleanups_p)
+	      expand_eh_region_end_cleanup (TREE_VALUE (tail));
 
 	    if (reachable)
 	      {
@@ -4338,19 +4160,18 @@ expand_cleanups (list, dont_do, in_fixup, reachable)
 		   times, the control paths are non-overlapping so the
 		   cleanups will not be executed twice.  */
 
-		/* We may need to protect fixups with rethrow regions.  */
-		int protect = (in_fixup && ! TREE_ADDRESSABLE (tail));
+		/* We may need to protect from outer cleanups.  */
+		if (in_fixup && using_eh_for_cleanups_p)
+		  {
+		    expand_eh_region_start ();
 
-		if (protect)
-		  expand_fixup_region_start ();
+		    expand_expr (TREE_VALUE (tail), const0_rtx, VOIDmode, 0);
 
-		/* The cleanup might contain try-blocks, so we have to
-		   preserve our current queue.  */
-		push_ehqueue ();
-		expand_expr (TREE_VALUE (tail), const0_rtx, VOIDmode, 0);
-		pop_ehqueue ();
-		if (protect)
-		  expand_fixup_region_end (TREE_VALUE (tail));
+		    expand_eh_region_end_fixup (TREE_VALUE (tail));
+		  }
+		else
+		  expand_expr (TREE_VALUE (tail), const0_rtx, VOIDmode, 0);
+
 		free_temp_slots ();
 	      }
 	  }

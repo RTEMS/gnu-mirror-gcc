@@ -34,14 +34,16 @@
 #ifndef _CPP_STDEXCEPT
 #define _CPP_STDEXCEPT 	  1
 
+#pragma GCC system_header
+
 #include <exception>
-#include <bits/stringfwd.h>
+#include <string>
 
 namespace std 
 {
   class logic_error : public exception 
   {
-    const string& _M_msg;
+    string _M_msg;
 
   public:
     explicit 
@@ -80,7 +82,7 @@ namespace std
 
   class runtime_error : public exception 
   {
-    const string& _M_msg;
+    string _M_msg;
 
   public:
     explicit 

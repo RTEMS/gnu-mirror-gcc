@@ -28,7 +28,7 @@
 @c NOTE: checks/things to do:
 @c
 @c -have bob do a search in all seven files for "mew" (ideally --mew,
-@c  but i may have forgotten the occasional "--"..).  
+@c  but i may have forgotten the occasional "--"..).
 @c     Just checked... all have `--'!  Bob 22Jul96
 @c     Use this to search:   grep -n '\-\-mew' *.texi
 @c -item/itemx, text after all (sub/sub)section titles, etc..
@@ -122,30 +122,23 @@ Boston, MA 02111-1307 USA
 Copyright (C) 1988, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
 1999, 2000, 2001 Free Software Foundation, Inc.
 @sp 1
-Permission is granted to make and distribute verbatim copies of
-this manual provided the copyright notice and this permission notice
-are preserved on all copies.
-@sp 1
-@ignore
-Permission is granted to process this file through Tex and print the
-results, provided the printed document carries copying permission
-notice identical to this one except for the removal of this paragraph
-(this paragraph not being relevant to the printed manual).
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.1 or
+any later version published by the Free Software Foundation; with the
+Invariant Sections being ``GNU General Public License'' and ``Funding
+Free Software'', the Front-Cover texts being (a) (see below), and with
+the Back-Cover Texts being (b) (see below).  A copy of the license is
+included in the section entitled ``GNU Free Documentation License''.
 
-@end ignore
-Permission is granted to copy and distribute modified versions of this
-manual under the conditions for verbatim copying, provided also that the
-sections entitled ``GNU General Public License'' and ``Funding for Free
-Software'' are included exactly as in the original, and provided that 
-the entire resulting derived work is distributed under the terms of a 
-permission notice identical to this one.
-@sp 1
-Permission is granted to copy and distribute translations of this manual
-into another language, under the above conditions for modified versions,
-except that the sections entitled ``GNU General Public License'' and
-``Funding for Free Software'', and this permission notice, may be 
-included in translations approved by the Free Software Foundation 
-instead of in the original English.
+(a) The FSF's Front-Cover Text is:
+
+     A GNU Manual
+
+(b) The FSF's Back-Cover Text is:
+
+     You have freedom to copy and modify this GNU Manual, like GNU
+     software.  Copies published by the Free Software Foundation raise
+     funds for GNU development.
 @end ifnottex
 
 @setchapternewpage odd
@@ -166,17 +159,17 @@ instead of in the original English.
 @sp 2
 @center Richard M. Stallman
 @sp 3
-@center Last updated 8 February 2001
+@center Last updated 9 May 2001
 @sp 1
 @c The version number appears five times more in this file.
 
-@center for gcc-2.97
+@center for gcc-3.0
 @page
 @vskip 0pt plus 1filll
 Copyright @copyright{} 1988, 1989, 1992, 1993, 1994, 1995, 1996, 1998,
 1999, 2000, 2001  Free Software Foundation, Inc.
 @sp 2
-For GCC Version 2.97@*
+For GCC Version 3.0@*
 @sp 1
 Published by the Free Software Foundation @*
 59 Temple Place - Suite 330@*
@@ -185,23 +178,23 @@ Last printed April, 1998.@*
 Printed copies are available for $50 each.@*
 ISBN 1-882114-37-X
 @sp 1
-Permission is granted to make and distribute verbatim copies of
-this manual provided the copyright notice and this permission notice
-are preserved on all copies.
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.1 or
+any later version published by the Free Software Foundation; with the
+Invariant Sections being ``GNU General Public License'', the Front-Cover
+texts being (a) (see below), and with the Back-Cover Texts being (b)
+(see below).  A copy of the license is included in the section entitled
+``GNU Free Documentation License''.
 
-Permission is granted to copy and distribute modified versions of this
-manual under the conditions for verbatim copying, provided also that the
-sections entitled ``GNU General Public License'' and ``Funding for Free
-Software'' are included exactly as in the original, and provided that 
-the entire resulting derived work is distributed under the terms of a 
-permission notice identical to this one.
+(a) The FSF's Front-Cover Text is:
 
-Permission is granted to copy and distribute translations of this manual
-into another language, under the above conditions for modified versions,
-except that the sections entitled ``GNU General Public License'' and
-``Funding for Free Software'', and this permission notice, may be 
-included in translations approved by the Free Software Foundation 
-instead of in the original English.
+     A GNU Manual
+
+(b) The FSF's Back-Cover Text is:
+
+     You have freedom to copy and modify this GNU Manual, like GNU
+     software.  Copies published by the Free Software Foundation raise
+     funds for GNU development.
 @end titlepage
 @page
 
@@ -213,19 +206,19 @@ instead of in the original English.
 @ifset USING
 This manual documents how to run, install and port the GNU
 compiler, as well as its new features and incompatibilities, and how to
-report bugs.  It corresponds to GCC version 2.97.
+report bugs.  It corresponds to GCC version 3.0.
 @end ifset
 @end ifset
 
 @ifclear INTERNALS
 This manual documents how to run and install the GNU compiler,
 as well as its new features and incompatibilities, and how to report
-bugs.  It corresponds to GCC version 2.97.
+bugs.  It corresponds to GCC version 3.0.
 @end ifclear
 @ifclear USING
 This manual documents how to port the GNU compiler,
 as well as its new features and incompatibilities, and how to report
-bugs.  It corresponds to GCC version 2.97.
+bugs.  It corresponds to GCC version 3.0.
 @end ifclear
 
 @menu
@@ -236,6 +229,7 @@ bugs.  It corresponds to GCC version 2.97.
 * Installation::    How to configure, compile and install GCC.
 * C Extensions::    GNU extensions to the C language family.
 * C++ Extensions::  GNU extensions to the C++ language.
+* Objective C::     GNU Objective-C runtime features.
 * Gcov::	    gcov: a GCC test coverage program.
 * Trouble::         If you have trouble installing GCC.
 * Bugs::            How, why and where to report bugs.
@@ -260,6 +254,7 @@ bugs.  It corresponds to GCC version 2.97.
 
 * Copying::         GNU General Public License says
                      how you can copy and share GCC.
+* GNU Free Documentation License:: How you can copy and share this manual.
 * Contributors::    People who have contributed to GCC.
 
 * Index::	    Index of concepts and symbol names.
@@ -267,13 +262,12 @@ bugs.  It corresponds to GCC version 2.97.
 
 @ifset USING
 @node G++ and GCC
-@chapter Compile C, C++, Objective C, Fortran, Java or CHILL
+@chapter Compile C, C++, Objective C, Fortran, Java
 
 @cindex Objective C
-Several versions of the compiler (C, C++, Objective C, Fortran, Java
-and CHILL) are integrated; this is why we use the name 
+Several versions of the compiler (C, C++, Objective C, Fortran, Java) are integrated; this is why we use the name
 ``GNU Compiler Collection''. GCC can compile programs written in any of these
-languages. The Fortran, CHILL, and Java compilers are described in 
+languages. The Fortran and Java compilers are described in
 separate manuals.
 
 @cindex GCC
@@ -295,7 +289,7 @@ compiler.  For example, we refer to the optimization options as
 affecting the behavior of ``GCC'' or sometimes just ``the compiler''.
 
 Front ends for other languages, such as Ada 95 and Pascal exist but
-have not yet been integrated into GCC. These front-ends, like that for C++, 
+have not yet been integrated into GCC. These front-ends, like that for C++,
 are built in subdirectories of GCC and link to it.  The result is an
 integrated compiler that can compile programs written in C, C++,
 Objective C, or any of the languages for which you have installed front
@@ -397,7 +391,7 @@ as @dfn{AMD1}; the amended standard is sometimes known as @dfn{C94} or
 A new edition of the ISO C standard was published in 1999 as ISO/IEC
 9899:1999, and is commonly known as @dfn{C99}.  GCC has incomplete
 support for this standard version; see
-@uref{http://gcc.gnu.org/c99status.html} for details.  To select this
+@uref{http://gcc.gnu.org/gcc-3.0/c99status.html} for details.  To select this
 standard, use @samp{-std=c99} or @samp{-std=iso9899:1999}.  (While in
 development, drafts of this standard version were referred to as
 @dfn{C9X}.)
@@ -474,14 +468,13 @@ Fortran}, for details of the Fortran language supported by GCC.
 @xref{Compatibility,,Compatibility with the Java Platform, gcj, GNU gcj},
 for details of compatibility between @code{gcj} and the Java Platform.
 
-@xref{References,,Language Definition References, chill, GNU Chill},
-for details of the CHILL standard.
-
 @include invoke.texi
 
 @include install.texi
 
 @include extend.texi
+
+@include objc.texi
 
 @include gcov.texi
 
@@ -540,11 +533,6 @@ prototypes.
 When @samp{-pedantic-errors} is specified, GCC will incorrectly give
 an error message when a function name is specified in an expression
 involving the comma operator.
-
-@item
-Loop unrolling doesn't work properly for certain C++ programs.  This is
-a bug in the C++ front end.  It sometimes emits incorrect debug info, and
-the loop unrolling code is unable to recover from this error.
 @end itemize
 
 @node Installation Problems
@@ -577,17 +565,6 @@ that type mismatches occur, this could be the cause.
 The solution is not to use such a directory for building GCC.
 
 @item
-In previous versions of GCC, the @code{gcc} driver program looked for
-@code{as} and @code{ld} in various places; for example, in files
-beginning with @file{/usr/local/lib/gcc-}.  GCC version 2 looks for
-them in the directory
-@file{/usr/local/lib/gcc-lib/@var{target}/@var{version}}.
-
-Thus, to use a version of @code{as} or @code{ld} that is not the system
-default, for example @code{gas} or GNU @code{ld}, you must put them in
-that directory (or make links to them from that directory).
-
-@item
 Some commands executed when making the compiler may fail (return a
 non-zero status) and be ignored by @code{make}.  These failures, which
 are often due to files that were not found, are expected, and can safely
@@ -605,63 +582,11 @@ the compiler.  In one case, this was traced down to a bug in
 @code{make}.  Either ignore the problem or switch to GNU Make.
 
 @item
-If you have installed a program known as purify, you may find that it
-causes errors while linking @code{enquire}, which is part of building
-GCC.  The fix is to get rid of the file @code{real-ld} which purify
-installs---so that GCC won't try to use it.
-
-@item
 On GNU/Linux SLS 1.01, there is a problem with @file{libc.a}: it does not
 contain the obstack functions.  However, GCC assumes that the obstack
 functions are in @file{libc.a} when it is the GNU C library.  To work
 around this problem, change the @code{__GNU_LIBRARY__} conditional
 around line 31 to @samp{#if 1}.
-
-@item
-On some 386 systems, building the compiler never finishes because
-@code{enquire} hangs due to a hardware problem in the motherboard---it
-reports floating point exceptions to the kernel incorrectly.  You can
-install GCC except for @file{float.h} by patching out the command to
-run @code{enquire}.  You may also be able to fix the problem for real by
-getting a replacement motherboard.  This problem was observed in
-Revision E of the Micronics motherboard, and is fixed in Revision F.
-It has also been observed in the MYLEX MXA-33 motherboard.
-
-If you encounter this problem, you may also want to consider removing
-the FPU from the socket during the compilation.  Alternatively, if you
-are running SCO Unix, you can reboot and force the FPU to be ignored.
-To do this, type @samp{hd(40)unix auto ignorefpu}.
-
-@item
-On some 386 systems, GCC crashes trying to compile @file{enquire.c}.
-This happens on machines that don't have a 387 FPU chip.  On 386
-machines, the system kernel is supposed to emulate the 387 when you
-don't have one.  The crash is due to a bug in the emulator.
-
-One of these systems is the Unix from Interactive Systems: 386/ix.
-On this system, an alternate emulator is provided, and it does work.
-To use it, execute this command as super-user:
-
-@example
-ln /etc/emulator.rel1 /etc/emulator
-@end example
-
-@noindent
-and then reboot the system.  (The default emulator file remains present
-under the name @file{emulator.dflt}.)
-
-Try using @file{/etc/emulator.att}, if you have such a problem on the
-SCO system.
-
-Another system which has this problem is Esix.  We don't know whether it
-has an alternate emulator that works.
-
-On NetBSD 0.8, a similar problem manifests itself as these error messages:
-
-@example
-enquire.c: In function `fprop':
-enquire.c:2328: floating overflow
-@end example
 
 @item
 On SCO systems, when compiling GCC with the system's compiler,
@@ -725,25 +650,6 @@ stop such warnings by installing the GNU linker.
 
 It would be nice to extend GAS to produce the gp tables, but they are
 optional, and there should not be a warning about their absence.
-
-@item
-In Ultrix 4.0 on the MIPS machine, @file{stdio.h} does not work with GNU
-CC at all unless it has been fixed with @code{fixincludes}.  This causes
-problems in building GCC.  Once GCC is installed, the problems go
-away.
-
-To work around this problem, when making the stage 1 compiler, specify
-this option to Make:
-
-@example
-GCC_FOR_TARGET="./xgcc -B./ -I./include"
-@end example
-
-When making stage 2 and stage 3, specify this option:
-
-@example
-CFLAGS="-g -I./include"
-@end example
 
 @item
 Users have reported some problems with version 2.0 of the MIPS
@@ -847,16 +753,6 @@ On HP-UX version 8.05, but not on 8.07 or more recent versions,
 the @code{fixproto} shell script triggers a bug in the system shell.
 If you encounter this problem, upgrade your operating system or
 use BASH (the GNU shell) to run @code{fixproto}.
-
-@item
-Some versions of the Pyramid C compiler are reported to be unable to
-compile GCC.  You must use an older version of GCC for
-bootstrapping.  One indication of this problem is if you get a crash
-when GCC compiles the function @code{muldi3} in file @file{libgcc2.c}.
-
-You may be able to succeed by getting GCC version 1, installing it,
-and using it to compile GCC version 2.  The bug in the Pyramid C
-compiler does not seem to affect GCC version 1.
 
 @item
 There may be similar problems on System V Release 3.1 on 386 systems.
@@ -1377,7 +1273,7 @@ MALLOC=gmalloc.o
 @section Incompatibilities of GCC
 @cindex incompatibilities of GCC
 
-There are several noteworthy incompatibilities between GNU C and K&R 
+There are several noteworthy incompatibilities between GNU C and K&R
 (non-ISO) versions of C.  The @samp{-traditional} option
 eliminates many of these incompatibilities, @emph{but not all}, by
 telling GNU C to behave like a K&R C compiler.
@@ -1896,7 +1792,7 @@ operates on pointers to @code{char}:
 string strfunc ();
 void charfunc (const char *);
 
-void 
+void
 f ()
 @{
   const char *p = strfunc().c_str();
@@ -2106,13 +2002,6 @@ something dangerous about discarding a value.  There are functions that
 return values which some callers may find useful; it makes no sense to
 clutter the program with a cast to @code{void} whenever the value isn't
 useful.
-
-@item
-Assuming (for optimization) that the address of an external symbol is
-never zero.
-
-This assumption is false on certain systems when @samp{#pragma weak} is
-used.
 
 @item
 Making @samp{-fshort-enums} the default.
@@ -2436,7 +2325,7 @@ that is a compiler bug.  However, you should note that your idea of
 for traditional practice''.
 
 @item
-If you are an experienced user of one of the languages GCC supports, your 
+If you are an experienced user of one of the languages GCC supports, your
 suggestions for improvement of GCC are welcome in any case.
 @end itemize
 
@@ -2727,119 +2616,8 @@ of the report. When the you quit the editor, the report is automatically
 send to the bug reporting address.
 
 A number of fields in this bug report form are specific to GCC, and are
-explained here.
+explained at @uref{http://gcc.gnu.org/gnats.html}.
 
-@table @code
-
-@cindex @code{Category} field
-@cindex @code{>Category:}
-@item >Category:
-The category of a GCC problem can be one of the following:
-
-@table @code
-@item c
-A problem with the C compiler proper.
-driver.
-
-@item c++
-A problem with the C++ compiler.
-driver.
-
-@item fortran
-A problem with the Fortran 77.
-
-@item java
-A problem with the Java compiler.
-
-@item objc
-A problem with the Objective C compiler.
-
-@item libstdc++
-A problem with the C++ standard library.
-
-@item libf2c
-A problem with the Fortran 77 library.
-
-@item libobjc
-A problem with the Objective C library.
-
-@item optimization
-The problem occurs only when generating optimized code.
-
-@item debug
-The problem occurs only when generating code for debugging.
-
-@item target
-The problem is specific to the target architecture.
-
-@item middle-end
-The problem is independent from target architecture and programming
-language.
-
-@item other
-It is a problem in some other part of the GCC software.
-
-@item web
-There is a problem with the GCC home page.
-
-@end table
-
-@cindex @code{Class} field
-@cindex @code{>Class:}
-@item >Class:
-The class of a problem can be one of the following:
-
-@table @code
-@cindex @emph{doc-bug} class
-@item doc-bug
-A problem with the documentation.
-
-@cindex @emph{accepts-illegal} class
-@item accepts-illegal
-GCC fails to reject erroneous code.
-
-@cindex @emph{rejects-legal} class
-@item rejects-legal    
-GCC gives an error message for correct code.
-
-@cindex @emph{wrong-code} class
-@item wrong-code       
-The machine code generated by gcc is incorrect.
-
-@cindex @emph{ice-on-legal-code} class
-@item ice-on-legal-code   
-GCC gives an Internal Compiler Error (ICE) for correct code.
-
-@cindex @emph{ice-on-illegal-code} class
-@item ice-on-illegal-code 
-GCC gives an ICE instead of reporting an error
-
-@cindex @emph{pessimizes-code} class
-@item pessimizes-code     
-GCC misses an important optimization opportunity.
-
-@cindex @emph{sw-bug} class
-@item sw-bug
-A general product problem.  (@samp{sw} stands for ``software''.)
-
-@cindex @emph{change-request} class
-@item change-request
-A request for a change in behavior, etc.
-
-@cindex @emph{support} class
-@item support
-A support problem or question.
-
-@cindex @emph{duplicate} class
-@item duplicate (@var{pr-number})
-Duplicate PR.  @var{pr-number} should be the number of the original PR.
-
-@noindent
-The default is @samp{sw-bug}.
-@sp 1
-@end table
-
-@end table
 
 @node Sending Patches,, gccbug, Bugs
 @section Sending Patches for GCC
@@ -3651,11 +3429,11 @@ along with header files
 The source files for parsing C++ are in @file{cp/}.
 They are @file{parse.y},
 @file{class.c},@*
-@file{cvt.c}, @file{decl.c}, @file{decl2.c}, 
+@file{cvt.c}, @file{decl.c}, @file{decl2.c},
 @file{except.c},@*
 @file{expr.c}, @file{init.c}, @file{lex.c},
 @file{method.c}, @file{ptree.c},@*
-@file{search.c}, @file{tree.c}, 
+@file{search.c}, @file{tree.c},
 @file{typeck2.c}, and
 @file{typeck.c}, along with header files @file{cp-tree.def},
 @file{cp-tree.h}, and @file{decl.h}.
@@ -3783,7 +3561,7 @@ the input file name.
 @cindex global common subexpression elimination
 @cindex constant propagation
 @cindex copy propagation
-@item               
+@item
 Global common subexpression elimination.  This pass performs GCSE
 using Morel-Renvoise Partial Redundancy Elimination, with the exception
 that it does not try to move invariants out of loops - that is left to
@@ -3959,11 +3737,11 @@ to the input file name.
 @cindex branch shortening
 @item
 Branch shortening.  On many RISC machines, branch instructions have a
-limited range.  Thus, longer sequences of instructions must be used for 
+limited range.  Thus, longer sequences of instructions must be used for
 long branches.  In this pass, the compiler figures out what how far each
 instruction will be from each other instruction, and therefore whether
 the usual instructions, or the longer sequences, must be used for each
-branch. 
+branch.
 
 @cindex register-to-stack conversion
 @item
@@ -4229,6 +4007,12 @@ Define this macro to be a C string representing the suffix for executable
 files on your machine.  If you do not define this macro, GCC will use
 the null string as the suffix for object files.
 
+@findex NO_AUTO_EXE_SUFFIX
+@item NO_AUTO_EXE_SUFFIX
+Define this macro if executable files on your machine have a suffix, but
+the compiler driver should not automatically append it to the output file
+name, if user hasn't specified one.
+
 @findex HOST_BIT_BUCKET
 @item HOST_BIT_BUCKET
 The name of a file or file-like object on the host system which acts as
@@ -4374,7 +4158,7 @@ procedure will build all combinations of compatible options.
 For example, if you set @code{MULTILIB_OPTIONS} to @samp{m68000/m68020
 msoft-float}, @file{Makefile} will build special versions of
 @file{libgcc.a} using the following sets of options:  @samp{-m68000},
-@samp{-m68020}, @samp{-msoft-float}, @samp{-m68000 -msoft-float}, and 
+@samp{-m68020}, @samp{-msoft-float}, @samp{-m68000 -msoft-float}, and
 @samp{-m68020 -msoft-float}.
 
 @findex MULTILIB_DIRNAMES
@@ -4532,7 +4316,7 @@ already available.
 What they found was no accident---it was the GNU system.  The available
 free software added up to a complete system because the GNU Project
 had been working since 1984 to make one.  The GNU Manifesto
-had set forth the goal of developing a free Unix-like system, called 
+had set forth the goal of developing a free Unix-like system, called
 GNU.  By the time Linux was written, the system was almost finished.
 
 Most free software projects have the goal of developing a particular
@@ -4992,6 +4776,8 @@ proprietary programs.  If your program is a subroutine library, you may
 consider it more useful to permit linking proprietary applications with the
 library.  If this is what you want to do, use the GNU Library General
 Public License instead of this License.
+
+@include fdl.texi
 
 @node Contributors
 @unnumbered Contributors to GCC
