@@ -18,6 +18,12 @@ along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
+/* GCC always defines __STDC__.  HP C++ compilers don't define it.  This
+   causes trouble when sys/stdsyms.h is included.  As a work around,
+   we define __STDC_EXT__.  A similar situation exists with respect to
+   the definition of __cplusplus.  We define _INCLUDE_LONGLONG
+   to prevent nlist.h from defining __STDC_32_MODE__ (no longlong
+   support).  */
 #undef TARGET_OS_CPP_BUILTINS
 #define TARGET_OS_CPP_BUILTINS()				\
   do								\
@@ -34,6 +40,7 @@ Boston, MA 02111-1307, USA.  */
 	  {							\
 	    builtin_define ("_HPUX_SOURCE");			\
 	    builtin_define ("_INCLUDE_LONGLONG");		\
+	    builtin_define ("__STDC_EXT__");			\
 	  }							\
 	else							\
 	  {							\
@@ -67,26 +74,34 @@ Boston, MA 02111-1307, USA.  */
     }								\
   while (0)
 
+#undef CPP_SPEC
+#define CPP_SPEC \
+  "%{mt|pthread:-D_REENTRANT -D_THREAD_SAFE -D_POSIX_C_SOURCE=199506L}"
+/* aCC defines also -DRWSTD_MULTI_THREAD, -DRW_MULTI_THREAD.  These
+   affect only aCC's C++ library (Rogue Wave-derived) which we do not
+   use, and they violate the user's name space.  */
+
 /* We can debug dynamically linked executables on hpux11; we also
    want dereferencing of a NULL pointer to cause a SEGV.  */
 #undef LINK_SPEC
 #if ((TARGET_DEFAULT | TARGET_CPU_DEFAULT) & 1)
 #define LINK_SPEC \
-  "%{!mpa-risc-1-0:%{!shared:-L/lib/pa1.1 -L/usr/lib/pa1.1 }} -z %{mlinker-opt:-O} %{!shared:-u main} %{static:-a archive} %{shared:-b}"
+  "%{!mpa-risc-1-0:%{!shared:-L/lib/pa1.1 -L/usr/lib/pa1.1 }} -z\
+   %{mlinker-opt:-O} %{!shared:-u main -u __gcc_plt_call}\
+   %{static:-a archive} %{shared:-b}"
 #else
 #define LINK_SPEC \
-  "-z %{mlinker-opt:-O} %{!shared:-u main} %{static:-a archive} %{shared:-b}"
+  "-z %{mlinker-opt:-O} %{!shared:-u main -u __gcc_plt_call}\
+   %{static:-a archive} %{shared:-b}"
 #endif
 
-/* Like the default, except no -lg.  */
+/* hpux 11 has posix threads.  */
 #undef LIB_SPEC
 #define LIB_SPEC \
   "%{!shared:\
-     %{!p:%{!pg:\
-       %{!threads:-lc}\
-       %{threads:-lcma -lc_r}}}\
-     %{p: -L/lib/libp/ -lc}\
-     %{pg: -L/lib/libp/ -lc}}"
+     %{mt|pthread:-lpthread}     \
+     %{p|pg:-L/usr/lib/libp} -lc \
+     %{static:%{!nolibdld:-a shared -ldld -a archive -lc}}}"
 
 /* Under hpux11, the normal location of the `ld' and `as' programs is the
    /usr/ccs/bin directory.  */
@@ -117,3 +132,21 @@ Boston, MA 02111-1307, USA.  */
 
 #define SIZE_TYPE "long unsigned int"
 #define PTRDIFF_TYPE "long int"
+
+/* HP-UX 11.0 and above provides initialization and finalization function
+   support from linker command line.  We don't need to invoke __main to run
+   constructors.  We also don't need chatr to determine the dependencies of
+   dynamically linked executables and shared libraries.  */
+#undef LDD_SUFFIX
+#undef PARSE_LDD_OUTPUT
+#undef HAS_INIT_SECTION
+#define HAS_INIT_SECTION 1
+#undef LD_INIT_SWITCH
+#define LD_INIT_SWITCH "+init"
+#undef LD_FINI_SWITCH
+#define LD_FINI_SWITCH "+fini"
+
+/* The HP-UX 11.X SOM linker (ld32) can successfully link shared libraries
+   with secondary definition (weak) symbols.  */
+#undef TARGET_SOM_SDEF
+#define TARGET_SOM_SDEF 1

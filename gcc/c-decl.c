@@ -46,6 +46,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "timevar.h"
 #include "c-common.h"
 #include "c-pragma.h"
+#include "libfuncs.h"
+#include "except.h"
 
 /* In grokdeclarator, distinguish syntactic contexts of declarators.  */
 enum decl_context
@@ -283,6 +285,8 @@ static tree c_make_fname_decl           PARAMS ((tree, int));
 static void c_expand_body               PARAMS ((tree, int, int));
 static void warn_if_shadowing		PARAMS ((tree, tree));
 static bool flexible_array_type_p	PARAMS ((tree));
+static int field_decl_cmp		PARAMS ((const PTR, const PTR));
+static tree set_save_expr_context	PARAMS ((tree *, int *, void *));
 
 /* States indicating how grokdeclarator() should handle declspecs marked
    with __attribute__((deprecated)).  An object declared as
@@ -1138,6 +1142,13 @@ duplicate_decls (newdecl, olddecl, different_binding_level)
 	    }
 	}
       error_with_decl (olddecl, "previous declaration of `%s'");
+
+      /* This is safer because the initializer might contain references
+	 to variables that were declared between olddecl and newdecl. This
+	 will make the initializer invalid for olddecl in case it gets
+	 assigned to olddecl below.  */
+      if (TREE_CODE (newdecl) == VAR_DECL)
+	DECL_INITIAL (newdecl) = 0;
     }
   /* TLS cannot follow non-TLS declaration.  */
   else if (TREE_CODE (olddecl) == VAR_DECL && TREE_CODE (newdecl) == VAR_DECL
@@ -1568,6 +1579,15 @@ duplicate_decls (newdecl, olddecl, different_binding_level)
      Update OLDDECL to be the same.  */
   DECL_ATTRIBUTES (olddecl) = DECL_ATTRIBUTES (newdecl);
 
+ /* If OLDDECL had its DECL_RTL instantiated, re-invoke make_decl_rtl
+     so that encode_section_info has a chance to look at the new decl
+     flags and attributes.  */
+  if (DECL_RTL_SET_P (olddecl)
+      && (TREE_CODE (olddecl) == FUNCTION_DECL
+	  || (TREE_CODE (olddecl) == VAR_DECL
+	      && TREE_STATIC (olddecl))))
+    make_decl_rtl (olddecl, NULL);
+
   return 1;
 }
 
@@ -1992,8 +2012,10 @@ pushdecl (x)
 
 	  while (TREE_CODE (element) == ARRAY_TYPE)
 	    element = TREE_TYPE (element);
-	  if (TREE_CODE (element) == RECORD_TYPE
-	      || TREE_CODE (element) == UNION_TYPE)
+	  if ((TREE_CODE (element) == RECORD_TYPE
+	       || TREE_CODE (element) == UNION_TYPE)
+	      && (TREE_CODE (x) != TYPE_DECL
+		  || TREE_CODE (TREE_TYPE (x)) == ARRAY_TYPE))
 	    b->incomplete_list = tree_cons (NULL_TREE, x, b->incomplete_list);
 	}
     }
@@ -3160,6 +3182,41 @@ finish_decl (decl, init, asmspec_tree)
      computing them in the following function definition.  */
   if (current_binding_level == global_binding_level)
     get_pending_sizes ();
+
+  /* Install a cleanup (aka destructor) if one was given.  */
+  if (TREE_CODE (decl) == VAR_DECL && !TREE_STATIC (decl))
+    {
+      tree attr = lookup_attribute ("cleanup", DECL_ATTRIBUTES (decl));
+      if (attr)
+	{
+	  static bool eh_initialized_p;
+
+	  tree cleanup_id = TREE_VALUE (TREE_VALUE (attr));
+	  tree cleanup_decl = lookup_name (cleanup_id);
+	  tree cleanup;
+
+	  /* Build "cleanup(&decl)" for the destructor.  */
+	  cleanup = build_unary_op (ADDR_EXPR, decl, 0);
+	  cleanup = build_tree_list (NULL_TREE, cleanup);
+	  cleanup = build_function_call (cleanup_decl, cleanup);
+
+	  /* Don't warn about decl unused; the cleanup uses it.  */
+	  TREE_USED (decl) = 1;
+
+	  /* Initialize EH, if we've been told to do so.  */
+	  if (flag_exceptions && !eh_initialized_p)
+	    {
+	      eh_initialized_p = true;
+	      eh_personality_libfunc
+		= init_one_libfunc (USING_SJLJ_EXCEPTIONS
+				    ? "__gcc_personality_sj0"
+				    : "__gcc_personality_v0");
+	      using_eh_for_cleanups ();
+	    }
+
+	  add_stmt (build_stmt (CLEANUP_STMT, decl, cleanup));
+	}
+    }
 }
 
 /* Given a parsed parameter declaration,
@@ -4065,7 +4122,20 @@ grokdeclarator (declarator, declspecs, decl_context, initialized)
 		    }
 
 		  if (size_varies)
-		    itype = variable_size (itype);
+		    {
+		      /* We must be able to distinguish the
+			 SAVE_EXPR_CONTEXT for the variably-sized type
+			 so that we can set it correctly in
+			 set_save_expr_context.  The convention is
+			 that all SAVE_EXPRs that need to be reset
+			 have NULL_TREE for their SAVE_EXPR_CONTEXT.  */
+		      tree cfd = current_function_decl;
+		      if (decl_context == PARM)
+			current_function_decl = NULL_TREE;
+		      itype = variable_size (itype);
+		      if (decl_context == PARM)
+			current_function_decl = cfd;
+		    }
 		  itype = build_index_type (itype);
 		}
 	    }
@@ -4544,6 +4614,8 @@ grokdeclarator (declarator, declspecs, decl_context, initialized)
 	   needed, and let dwarf2 know that the function is inlinable.  */
 	else if (flag_inline_trees == 2 && initialized)
 	  {
+	    if (!DECL_INLINE (decl))
+		DID_INLINE_FUNC (decl) = 1;
 	    DECL_INLINE (decl) = 1;
 	    DECL_DECLARED_INLINE_P (decl) = 0;
 	  }
@@ -5045,6 +5117,28 @@ grokfield (filename, line, declarator, declspecs, width)
   return value;
 }
 
+/* Function to help qsort sort FIELD_DECLs by name order.  */
+
+
+static int
+field_decl_cmp (xp, yp)
+      const PTR xp;
+      const PTR yp;
+{
+  tree *x = (tree *)xp, *y = (tree *)yp;
+  
+  if (DECL_NAME (*x) == DECL_NAME (*y))
+    return 0;
+  if (DECL_NAME (*x) == NULL)
+    return -1;
+  if (DECL_NAME (*y) == NULL)
+    return 1;
+  if (DECL_NAME (*x) < DECL_NAME (*y))
+    return -1;
+  return 1;
+}
+ 
+
 /* Fill in the fields of a RECORD_TYPE or UNION_TYPE node, T.
    FIELDLIST is a chain of FIELD_DECL nodes for the fields.
    ATTRIBUTES are attributes to be applied to the structure.  */
@@ -5217,18 +5311,6 @@ finish_struct (t, fieldlist, attributes)
 	    }
 	}
 
-      else if (TREE_TYPE (x) != error_mark_node)
-	{
-	  unsigned int min_align = (DECL_PACKED (x) ? BITS_PER_UNIT
-				    : TYPE_ALIGN (TREE_TYPE (x)));
-
-	  /* Non-bit-fields are aligned for their type, except packed
-	     fields which require only BITS_PER_UNIT alignment.  */
-	  DECL_ALIGN (x) = MAX (DECL_ALIGN (x), min_align);
-	  if (! DECL_PACKED (x))
-	    DECL_USER_ALIGN (x) |= TYPE_USER_ALIGN (TREE_TYPE (x));
-	}
-
       DECL_INITIAL (x) = 0;
 
       /* Detect flexible array member in an invalid context.  */
@@ -5301,6 +5383,53 @@ finish_struct (t, fieldlist, attributes)
 
   TYPE_FIELDS (t) = fieldlist;
 
+  /* If there are lots of fields, sort so we can look through them fast.
+    We arbitrarily consider 16 or more elts to be "a lot".  */
+
+  {
+    int len = 0;
+
+    for (x = fieldlist; x; x = TREE_CHAIN (x))
+      {
+        if (len > 15 || DECL_NAME (x) == NULL)
+          break;
+        len += 1;
+      }
+
+    if (len > 15)
+      {
+        tree *field_array;
+        char *space;
+        
+        len += list_length (x);
+  
+        /* Use the same allocation policy here that make_node uses, to
+          ensure that this lives as long as the rest of the struct decl.
+          All decls in an inline function need to be saved.  */
+  
+        space = ggc_alloc (sizeof (struct lang_type) + len * sizeof (tree));
+        
+        len = 0;
+	field_array = &(((struct lang_type *) space)->elts[0]);
+        for (x = fieldlist; x; x = TREE_CHAIN (x))
+          {
+            field_array[len++] = x;
+          
+            /* if there is anonymous struct or unoin break out of the loop */
+            if (DECL_NAME (x) == NULL)
+              break;
+          }
+        /* found no anonymous struct/union add the TYPE_LANG_SPECIFIC. */
+        if (x == NULL)
+          {
+            TYPE_LANG_SPECIFIC (t) = (struct lang_type *) space;
+            TYPE_LANG_SPECIFIC (t)->len = len;
+            field_array = &TYPE_LANG_SPECIFIC (t)->elts[0];
+            qsort (field_array, len, sizeof (tree), field_decl_cmp);
+          }
+      }
+  }
+  
   for (x = TYPE_MAIN_VARIANT (t); x; x = TYPE_NEXT_VARIANT (x))
     {
       TYPE_FIELDS (x) = TYPE_FIELDS (t);
@@ -5334,7 +5463,8 @@ finish_struct (t, fieldlist, attributes)
 	      && TREE_CODE (decl) != TYPE_DECL)
 	    {
 	      layout_decl (decl, 0);
-	      /* This is a no-op in c-lang.c or something real in objc-act.c.  */
+	      /* This is a no-op in c-lang.c or something real in
+		 objc-act.c.  */
 	      if (flag_objc)
 		objc_check_decl (decl);
 	      rest_of_decl_compilation (decl, NULL, toplevel, 0);
@@ -5370,7 +5500,11 @@ finish_struct (t, fieldlist, attributes)
 		  else
 		    current_binding_level->incomplete_list = TREE_CHAIN (x);
 		}
+	      else
+		prev = x;
 	    }
+	  else
+	    prev = x;
 	}
     }
 
@@ -6383,6 +6517,13 @@ finish_function (nested, can_defer_p)
       && DECL_INLINE (fndecl))
     warning ("no return statement in function returning non-void");
 
+  /* With just -W, complain only if function returns both with
+     and without a value.  */
+  if (extra_warnings
+      && current_function_returns_value
+      && current_function_returns_null)
+    warning ("this function may return with or without a value");
+
   /* Clear out memory we no longer need.  */
   free_after_parsing (cfun);
   /* Since we never call rest_of_compilation, we never clear
@@ -6417,6 +6558,26 @@ c_expand_deferred_function (fndecl)
     }
 }
 
+/* Called to move the SAVE_EXPRs for parameter declarations in a
+   nested function into the nested function.  DATA is really the
+   nested FUNCTION_DECL.  */
+
+static tree
+set_save_expr_context (tp, walk_subtrees, data)
+     tree *tp;
+     int *walk_subtrees;
+     void *data;
+{
+  if (TREE_CODE (*tp) == SAVE_EXPR && !SAVE_EXPR_CONTEXT (*tp))
+    SAVE_EXPR_CONTEXT (*tp) = (tree) data;
+  /* Do not walk back into the SAVE_EXPR_CONTEXT; that will cause
+     circularity.  */
+  else if (DECL_P (*tp))
+    *walk_subtrees = 0;
+
+  return NULL_TREE;
+}
+
 /* Generate the RTL for the body of FNDECL.  If NESTED_P is nonzero,
    then we are already in the process of generating RTL for another
    function.  If can_defer_p is zero, we won't attempt to defer the
@@ -6428,11 +6589,18 @@ c_expand_body (fndecl, nested_p, can_defer_p)
      int nested_p, can_defer_p;
 {
   int uninlinable = 1;
+  int saved_lineno;
+  const char *saved_input_filename;
 
   /* There's no reason to do any of the work here if we're only doing
      semantic analysis; this code just generates RTL.  */
   if (flag_syntax_only)
     return;
+
+  saved_lineno = lineno;
+  saved_input_filename = input_filename;
+  lineno = DECL_SOURCE_LINE (fndecl);
+  input_filename = DECL_SOURCE_FILE (fndecl);
 
   if (flag_inline_trees)
     {
@@ -6451,6 +6619,8 @@ c_expand_body (fndecl, nested_p, can_defer_p)
 	  /* Let the back-end know that this function exists.  */
 	  (*debug_hooks->deferred_inline_function) (fndecl);
           timevar_pop (TV_INTEGRATION);
+          lineno = saved_lineno;
+          input_filename = saved_input_filename;
 	  return;
 	}
       
@@ -6472,7 +6642,6 @@ c_expand_body (fndecl, nested_p, can_defer_p)
 
   /* Initialize the RTL code for the function.  */
   current_function_decl = fndecl;
-  input_filename = DECL_SOURCE_FILE (fndecl);
   init_function_start (fndecl, input_filename, DECL_SOURCE_LINE (fndecl));
 
   /* This function is being processed in whole-function mode.  */
@@ -6488,6 +6657,15 @@ c_expand_body (fndecl, nested_p, can_defer_p)
   /* Set up parameters and prepare for return, for the function.  */
   expand_function_start (fndecl, 0);
 
+  /* If the function has a variably modified type, there may be
+     SAVE_EXPRs in the parameter types.  Their context must be set to
+     refer to this function; they cannot be expanded in the containing
+     function.  */
+  if (decl_function_context (fndecl)
+      && variably_modified_type_p (TREE_TYPE (fndecl)))
+    walk_tree (&TREE_TYPE (fndecl), set_save_expr_context, fndecl,
+	       NULL);
+	     
   /* If this function is `main', emit a call to `__main'
      to run global initializers, etc.  */
   if (DECL_NAME (fndecl)
@@ -6497,7 +6675,9 @@ c_expand_body (fndecl, nested_p, can_defer_p)
 
   /* Generate the RTL for this function.  */
   expand_stmt (DECL_SAVED_TREE (fndecl));
-  if (uninlinable)
+
+  /* Keep the function body if it's needed for inlining or dumping.  */
+  if (uninlinable && !dump_enabled_p (TDI_all))
     {
       /* Allow the body of the function to be garbage collected.  */
       DECL_SAVED_TREE (fndecl) = NULL_TREE;
@@ -6527,13 +6707,6 @@ c_expand_body (fndecl, nested_p, can_defer_p)
   /* Undo the GC context switch.  */
   if (nested_p)
     ggc_pop_context ();
-
-  /* With just -W, complain only if function returns both with
-     and without a value.  */
-  if (extra_warnings
-      && current_function_returns_value
-      && current_function_returns_null)
-    warning ("this function may return with or without a value");
 
   /* If requested, warn about function definitions where the function will
      return a value (usually of some struct or union type) which itself will
@@ -6598,6 +6771,9 @@ c_expand_body (fndecl, nested_p, can_defer_p)
     /* Return to the enclosing function.  */
     pop_function_context ();
   timevar_pop (TV_EXPAND);
+
+  lineno = saved_lineno;
+  input_filename = saved_input_filename;
 }
 
 /* Check the declarations given in a for-loop for satisfying the C99
