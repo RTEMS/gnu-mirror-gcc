@@ -1,5 +1,5 @@
 /* Definitions for GCC.  Part of the machine description for CRIS.
-   Copyright (C) 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Axis Communications.  Written by Hans-Peter Nilsson.
 
 This file is part of GCC.
@@ -328,6 +328,22 @@ cris_operand_extend_operator (x, mode)
 	  && (code == PLUS || code == MINUS || code == UMIN));
 }
 
+/* Check if MODE is same as mode for X, and X is PLUS or MINUS.  */
+
+int
+cris_additive_operand_extend_operator (x, mode)
+     rtx x;
+     enum machine_mode mode;
+{
+  enum rtx_code code = GET_CODE (x);
+
+  if (mode == VOIDmode)
+    mode = GET_MODE (x);
+
+  return (GET_MODE (x) == mode
+	  && (code == PLUS || code == MINUS));
+}
+
 /* Check to see if MODE is same as mode for X, and X is SIGN_EXTEND or
    ZERO_EXTEND.  */
 
@@ -359,6 +375,19 @@ cris_plus_or_bound_operator (x, mode)
 
   return
     (GET_MODE (x) == mode && (code == UMIN || code == PLUS));
+}
+
+/* Used as an operator to get a handle on a already-known-valid MEM rtx:es
+   (no need to validate the address), where some address expression parts
+   have their own match_operand.  */
+
+int
+cris_mem_op (rtx x, enum machine_mode mode)
+{
+  if (mode == VOIDmode)
+    mode = GET_MODE (x);
+
+  return GET_MODE (x) == mode && GET_CODE (x) == MEM;
 }
 
 /* Since with -fPIC, not all symbols are valid PIC symbols or indeed
@@ -1978,8 +2007,8 @@ cris_notice_update_cc (exp, insn)
 		     value1=rz and value2=[rx] */
 		  cc_status.value1 = XEXP (XVECEXP (exp, 0, 0), 0);
 		  cc_status.value2
-		    = gen_rtx_MEM (GET_MODE (XEXP (XVECEXP (exp, 0, 0), 0)),
-				   XEXP (XVECEXP (exp, 0, 1), 0));
+		    = replace_equiv_address (XEXP (XVECEXP (exp, 0, 0), 1),
+					     XEXP (XVECEXP (exp, 0, 1), 0));
 		  cc_status.flags = 0;
 
 		  /* Huh?  A side-effect cannot change the destination
@@ -2606,10 +2635,24 @@ cris_asm_output_mi_thunk (stream, thunkdecl, delta, vcall_offset, funcdecl)
     {
       const char *name = XSTR (XEXP (DECL_RTL (funcdecl), 0), 0);
 
+      /* We have no other relative (to either PC or GOT) reloc than one
+	 that requests a PLT entry.  Since we don't set up the GOT
+	 register, the jump absolutely must not be redirected through a
+	 PLT entry.  We manage anyway by going through a local symbol.
+	 This depends on the assembler to not short-circuit equalities
+	 set by the ".set" directive (at least not for PIC relocs) and
+	 on the linker to direct R_CRIS_32_PLT_PCREL relocs *directly*
+	 to the symbol for local symbols, instead of through a PLT
+	 entry.  */
       name = (* targetm.strip_name_encoding) (name);
-      fprintf (stream, "add.d ");
+      fprintf (stream, "\tadd.d ");
       assemble_name (stream, name);
-      fprintf (stream, "%s,$pc\n", CRIS_PLT_PCOFFSET_SUFFIX);
+      fprintf (stream, "..xth%s,$pc\n", CRIS_PLT_PCOFFSET_SUFFIX);
+      fprintf (stream, "\t.set ");
+      assemble_name (stream, name);
+      fprintf (stream, "..xth,");
+      assemble_name (stream, name);
+      fprintf (stream, "\n");
     }
   else
     {

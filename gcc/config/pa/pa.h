@@ -206,6 +206,20 @@ extern int target_flags;
    not for external calls.  */
 #define TARGET_LONG_PIC_PCREL_CALL 0
 
+/* Define to a C expression evaluating to true to use SOM secondary
+   definition symbols for weak support.  Linker support for secondary
+   definition symbols is buggy prior to HP-UX 11.X.  */
+#define TARGET_SOM_SDEF 0
+
+/* Define to a C expression evaluating to true to save the entry value
+   of SP in the current frame marker.  This is normally unnecessary.
+   However, the HP-UX unwind library looks at the SAVE_SP callinfo flag.
+   HP compilers don't use this flag but it is supported by the assembler.
+   We set this flag to indicate that register %r3 has been saved at the
+   start of the frame.  Thus, when the HP unwind library is used, we
+   need to generate additional code to save SP into the frame marker.  */
+#define TARGET_HPUX_UNWIND_LIBRARY 0
+
 /* Macro to define tables used to set the flags.  This is a
    list in braces of target switches with each switch being
    { "NAME", VALUE, "HELP_STRING" }.  VALUE is the bits to set,
@@ -456,11 +470,12 @@ do {								\
 /* Boundary (in *bits*) on which stack pointer is always aligned;
    certain optimizations in combine depend on this.
 
-   GCC for the PA always rounds its stacks to a 8 * STACK_BOUNDARY
-   boundary, but that happens late in the compilation process.  */
+   The HP-UX runtime documents mandate 64-byte and 16-byte alignment for
+   the stack on the 32 and 64-bit ports, respectively.  However, we
+   are only guaranteed that the stack is aligned to BIGGEST_ALIGNMENT
+   in main.  Thus, we treat the former as the preferred alignment.  */
 #define STACK_BOUNDARY BIGGEST_ALIGNMENT
-
-#define PREFERRED_STACK_BOUNDARY (8 * STACK_BOUNDARY)
+#define PREFERRED_STACK_BOUNDARY (TARGET_64BIT ? 128 : 512)
 
 /* Allocation boundary (in *bits*) for the code of a function.  */
 #define FUNCTION_BOUNDARY BITS_PER_WORD
@@ -642,10 +657,14 @@ extern struct rtx_def *hppa_pic_save_rtx PARAMS ((void));
     && REGNO (IN) < FIRST_PSEUDO_REGISTER)			\
    ? NO_REGS : secondary_reload_class (CLASS, MODE, IN))
 
+#define MAYBE_FP_REG_CLASS_P(CLASS) \
+  reg_classes_intersect_p ((CLASS), FP_REGS)
+
 /* On the PA it is not possible to directly move data between
    GENERAL_REGS and FP_REGS.  */
-#define SECONDARY_MEMORY_NEEDED(CLASS1, CLASS2, MODE)  \
-  (FP_REG_CLASS_P (CLASS1) != FP_REG_CLASS_P (CLASS2))
+#define SECONDARY_MEMORY_NEEDED(CLASS1, CLASS2, MODE)		\
+  (MAYBE_FP_REG_CLASS_P (CLASS1) != FP_REG_CLASS_P (CLASS2)	\
+   || MAYBE_FP_REG_CLASS_P (CLASS2) != FP_REG_CLASS_P (CLASS1))
 
 /* Return the stack location to use for secondary memory needed reloads.  */
 #define SECONDARY_MEMORY_NEEDED_RTX(MODE) \
@@ -706,9 +725,13 @@ extern struct rtx_def *hppa_pic_save_rtx PARAMS ((void));
 /* The weird HPPA calling conventions require a minimum of 48 bytes on
    the stack: 16 bytes for register saves, and 32 bytes for magic.
    This is the difference between the logical top of stack and the
-   actual sp.  */
+   actual sp.
+
+   On the 64-bit port, the HP C compiler allocates a 48-byte frame
+   marker, although the runtime documentation only describes a 16
+   byte marker.  For compatibility, we allocate 48 bytes.  */
 #define STACK_POINTER_OFFSET \
-  (TARGET_64BIT ? -(current_function_outgoing_args_size + 16): -32)
+  (TARGET_64BIT ? -(current_function_outgoing_args_size + 48): -32)
 
 #define STACK_DYNAMIC_OFFSET(FNDECL)	\
   (TARGET_64BIT				\
@@ -751,12 +774,21 @@ extern struct rtx_def *hppa_pic_save_rtx PARAMS ((void));
    and about the args processed so far, enough to enable macros
    such as FUNCTION_ARG to determine where the next arg should go.
 
-   On the HP-PA, this is a single integer, which is a number of words
+   On the HP-PA, the WORDS field holds the number of words
    of arguments scanned so far (including the invisible argument,
-   if any, which holds the structure-value-address).
-   Thus 4 or more means all following args should go on the stack.  */
+   if any, which holds the structure-value-address).  Thus, 4 or
+   more means all following args should go on the stack.
+   
+   The INCOMING field tracks whether this is an "incoming" or
+   "outgoing" argument.
+   
+   The INDIRECT field indicates whether this is is an indirect
+   call or not.
+   
+   The NARGS_PROTOTYPE field indicates that an argument does not
+   have a prototype when it less than or equal to 0.  */
 
-struct hppa_args {int words, nargs_prototype, indirect; };
+struct hppa_args {int words, nargs_prototype, incoming, indirect; };
 
 #define CUMULATIVE_ARGS struct hppa_args
 
@@ -766,6 +798,7 @@ struct hppa_args {int words, nargs_prototype, indirect; };
 
 #define INIT_CUMULATIVE_ARGS(CUM,FNTYPE,LIBNAME,INDIRECT) \
   (CUM).words = 0, 							\
+  (CUM).incoming = 0,							\
   (CUM).indirect = INDIRECT,						\
   (CUM).nargs_prototype = (FNTYPE && TYPE_ARG_TYPES (FNTYPE)		\
 			   ? (list_length (TYPE_ARG_TYPES (FNTYPE)) - 1	\
@@ -780,6 +813,7 @@ struct hppa_args {int words, nargs_prototype, indirect; };
 
 #define INIT_CUMULATIVE_INCOMING_ARGS(CUM,FNTYPE,IGNORE) \
   (CUM).words = 0,				\
+  (CUM).incoming = 1,				\
   (CUM).indirect = 0,				\
   (CUM).nargs_prototype = 1000
 
@@ -855,16 +889,13 @@ struct hppa_args {int words, nargs_prototype, indirect; };
    tempted to try and simply it, but I worry about breaking something.  */
 
 #define FUNCTION_ARG(CUM, MODE, TYPE, NAMED) \
-  function_arg (&CUM, MODE, TYPE, NAMED, 0)
+  function_arg (&CUM, MODE, TYPE, NAMED)
 
 /* Nonzero if we do not know how to pass TYPE solely in registers.  */
 #define MUST_PASS_IN_STACK(MODE,TYPE) \
   ((TYPE) != 0							\
    && (TREE_CODE (TYPE_SIZE (TYPE)) != INTEGER_CST		\
        || TREE_ADDRESSABLE (TYPE)))
-
-#define FUNCTION_INCOMING_ARG(CUM, MODE, TYPE, NAMED) \
-  function_arg (&CUM, MODE, TYPE, NAMED, 1)
 
 /* For an arg passed partly in registers and partly in memory,
    this is the number of registers used.
@@ -960,7 +991,7 @@ extern int may_call_alloca;
 
 #define TRAMPOLINE_TEMPLATE(FILE) 					\
   {									\
-    if (! TARGET_64BIT)							\
+    if (!TARGET_64BIT)							\
       {									\
 	fputs ("\tldw	36(%r22),%r21\n", FILE);			\
 	fputs ("\tbb,>=,n	%r21,30,.+16\n", FILE);			\
@@ -970,10 +1001,20 @@ extern int may_call_alloca;
 	  fputs ("\tdepwi	0,31,2,%r21\n", FILE);			\
 	fputs ("\tldw	4(%r21),%r19\n", FILE);				\
 	fputs ("\tldw	0(%r21),%r21\n", FILE);				\
-	fputs ("\tldsid	(%r21),%r1\n", FILE);				\
-	fputs ("\tmtsp	%r1,%sr0\n", FILE);				\
-	fputs ("\tbe	0(%sr0,%r21)\n", FILE);				\
-	fputs ("\tldw	40(%r22),%r29\n", FILE);			\
+	if (TARGET_PA_20)						\
+	  {								\
+	    fputs ("\tbve	(%r21)\n", FILE);			\
+	    fputs ("\tldw	40(%r22),%r29\n", FILE);		\
+	    fputs ("\t.word	0\n", FILE);				\
+	    fputs ("\t.word	0\n", FILE);				\
+	  }								\
+	else								\
+	  {								\
+	    fputs ("\tldsid	(%r21),%r1\n", FILE);			\
+	    fputs ("\tmtsp	%r1,%sr0\n", FILE);			\
+	    fputs ("\tbe	0(%sr0,%r21)\n", FILE);			\
+	    fputs ("\tldw	40(%r22),%r29\n", FILE);		\
+	  }								\
 	fputs ("\t.word	0\n", FILE);					\
 	fputs ("\t.word	0\n", FILE);					\
 	fputs ("\t.word	0\n", FILE);					\
@@ -996,16 +1037,21 @@ extern int may_call_alloca;
       }									\
   }
 
-/* Length in units of the trampoline for entering a nested function.
-
-   Flush the cache entries corresponding to the first and last addresses
-   of the trampoline.  This is necessary as the trampoline may cross two
-   cache lines.
-
-   If the code part of the trampoline ever grows to > 32 bytes, then it
-   will become necessary to hack on the cacheflush pattern in pa.md.  */
+/* Length in units of the trampoline for entering a nested function.  */
 
 #define TRAMPOLINE_SIZE (TARGET_64BIT ? 72 : 52)
+
+/* Length in units of the trampoline instruction code.  */
+
+#define TRAMPOLINE_CODE_SIZE (TARGET_64BIT ? 24 : (TARGET_PA_20 ? 32 : 40))
+
+/* Minimum length of a cache line.  A length of 16 will work on all
+   PA-RISC processors.  All PA 1.1 processors have a cache line of
+   32 bytes.  Most but not all PA 2.0 processors have a cache line
+   of 64 bytes.  As cache flushes are expensive and we don't support
+   PA 1.0, we use a minimum length of 32.  */
+
+#define MIN_CACHELINE_SIZE 32
 
 /* Emit RTL insns to initialize the variable parts of a trampoline.
    FNADDR is an RTX for the address of the function's pure code.
@@ -1015,55 +1061,85 @@ extern int may_call_alloca;
    Move the static chain value to trampoline template at offset 40.
    Move the trampoline address to trampoline template at offset 44.
    Move r19 to trampoline template at offset 48.  The latter two
-   words create a plabel for the indirect call to the trampoline.  */
+   words create a plabel for the indirect call to the trampoline.
+
+   A similar sequence is used for the 64-bit port but the plabel is
+   at the beginning of the trampoline.
+
+   Finally, the cache entries for the trampoline code are flushed.
+   This is necessary to ensure that the trampoline instruction sequence
+   is written to memory prior to any attempts at prefetching the code
+   sequence.  */
 
 #define INITIALIZE_TRAMPOLINE(TRAMP, FNADDR, CXT) 			\
 {									\
-  if (! TARGET_64BIT)							\
-    {									\
-      rtx start_addr, end_addr;						\
+  rtx start_addr = gen_reg_rtx (Pmode);					\
+  rtx end_addr = gen_reg_rtx (Pmode);					\
+  rtx line_length = gen_reg_rtx (Pmode);				\
+  rtx tmp;								\
 									\
-      start_addr = memory_address (Pmode, plus_constant ((TRAMP), 36));	\
-      emit_move_insn (gen_rtx_MEM (Pmode, start_addr), (FNADDR));	\
-      start_addr = memory_address (Pmode, plus_constant ((TRAMP), 40));	\
-      emit_move_insn (gen_rtx_MEM (Pmode, start_addr), (CXT));		\
-      start_addr = memory_address (Pmode, plus_constant ((TRAMP), 44));	\
-      emit_move_insn (gen_rtx_MEM (Pmode, start_addr), (TRAMP));	\
-      start_addr = memory_address (Pmode, plus_constant ((TRAMP), 48));	\
-      emit_move_insn (gen_rtx_MEM (Pmode, start_addr),			\
+  if (!TARGET_64BIT)							\
+    {									\
+      tmp = memory_address (Pmode, plus_constant ((TRAMP), 36));	\
+      emit_move_insn (gen_rtx_MEM (Pmode, tmp), (FNADDR));		\
+      tmp = memory_address (Pmode, plus_constant ((TRAMP), 40));	\
+      emit_move_insn (gen_rtx_MEM (Pmode, tmp), (CXT));			\
+									\
+      /* Create a fat pointer for the trampoline.  */			\
+      tmp = memory_address (Pmode, plus_constant ((TRAMP), 44));	\
+      emit_move_insn (gen_rtx_MEM (Pmode, tmp), (TRAMP));		\
+      tmp = memory_address (Pmode, plus_constant ((TRAMP), 48));	\
+      emit_move_insn (gen_rtx_MEM (Pmode, tmp),				\
 		      gen_rtx_REG (Pmode, 19));				\
+									\
       /* fdc and fic only use registers for the address to flush,	\
-	 they do not accept integer displacements.  */ 			\
-      start_addr = force_reg (Pmode, (TRAMP));				\
-      end_addr = force_reg (Pmode, plus_constant ((TRAMP), 32));	\
-      emit_insn (gen_dcacheflush (start_addr, end_addr));		\
-      end_addr = force_reg (Pmode, plus_constant (start_addr, 32));	\
-      emit_insn (gen_icacheflush (start_addr, end_addr, start_addr,	\
-				  gen_reg_rtx (Pmode), gen_reg_rtx (Pmode)));\
+	 they do not accept integer displacements.  We align the	\
+	 start and end addresses to the beginning of their respective	\
+	 cache lines to minimize the number of lines flushed.  */	\
+      tmp = force_reg (Pmode, (TRAMP));					\
+      emit_insn (gen_andsi3 (start_addr, tmp,				\
+			     GEN_INT (-MIN_CACHELINE_SIZE)));		\
+      tmp = force_reg (Pmode,						\
+		       plus_constant (tmp, TRAMPOLINE_CODE_SIZE - 1));	\
+      emit_insn (gen_andsi3 (end_addr, tmp,				\
+			     GEN_INT (-MIN_CACHELINE_SIZE)));		\
+      emit_move_insn (line_length, GEN_INT (MIN_CACHELINE_SIZE));	\
+      emit_insn (gen_dcacheflush (start_addr, end_addr, line_length));	\
+      emit_insn (gen_icacheflush (start_addr, end_addr, line_length,	\
+				  gen_reg_rtx (Pmode),			\
+				  gen_reg_rtx (Pmode)));		\
     }									\
   else									\
     {									\
-      rtx start_addr, end_addr;						\
+      tmp = memory_address (Pmode, plus_constant ((TRAMP), 56));	\
+      emit_move_insn (gen_rtx_MEM (Pmode, tmp), (FNADDR));		\
+      tmp = memory_address (Pmode, plus_constant ((TRAMP), 64));	\
+      emit_move_insn (gen_rtx_MEM (Pmode, tmp), (CXT));			\
 									\
-      start_addr = memory_address (Pmode, plus_constant ((TRAMP), 56));	\
-      emit_move_insn (gen_rtx_MEM (Pmode, start_addr), (FNADDR));	\
-      start_addr = memory_address (Pmode, plus_constant ((TRAMP), 64));	\
-      emit_move_insn (gen_rtx_MEM (Pmode, start_addr), (CXT));		\
       /* Create a fat pointer for the trampoline.  */			\
-      end_addr = force_reg (Pmode, plus_constant ((TRAMP), 32));	\
-      start_addr = memory_address (Pmode, plus_constant ((TRAMP), 16));	\
-      emit_move_insn (gen_rtx_MEM (Pmode, start_addr), end_addr);	\
-      end_addr = gen_rtx_REG (Pmode, 27);				\
-      start_addr = memory_address (Pmode, plus_constant ((TRAMP), 24));	\
-      emit_move_insn (gen_rtx_MEM (Pmode, start_addr), end_addr);	\
+      tmp = memory_address (Pmode, plus_constant ((TRAMP), 16));	\
+      emit_move_insn (gen_rtx_MEM (Pmode, tmp),				\
+		      force_reg (Pmode, plus_constant ((TRAMP), 32)));	\
+      tmp = memory_address (Pmode, plus_constant ((TRAMP), 24));	\
+      emit_move_insn (gen_rtx_MEM (Pmode, tmp),				\
+		      gen_rtx_REG (Pmode, 27));				\
+									\
       /* fdc and fic only use registers for the address to flush,	\
-	 they do not accept integer displacements.  */ 			\
-      start_addr = force_reg (Pmode, (TRAMP));				\
-      end_addr = force_reg (Pmode, plus_constant ((TRAMP), 32));	\
-      emit_insn (gen_dcacheflush (start_addr, end_addr));		\
-      end_addr = force_reg (Pmode, plus_constant (start_addr, 32));	\
-      emit_insn (gen_icacheflush (start_addr, end_addr, start_addr,	\
-				  gen_reg_rtx (Pmode), gen_reg_rtx (Pmode)));\
+	 they do not accept integer displacements.  We align the	\
+	 start and end addresses to the beginning of their respective	\
+	 cache lines to minimize the number of lines flushed.  */	\
+      tmp = force_reg (Pmode, plus_constant ((TRAMP), 32));		\
+      emit_insn (gen_anddi3 (start_addr, tmp,				\
+			     GEN_INT (-MIN_CACHELINE_SIZE)));		\
+      tmp = force_reg (Pmode,						\
+		       plus_constant (tmp, TRAMPOLINE_CODE_SIZE - 1));	\
+      emit_insn (gen_anddi3 (end_addr, tmp,				\
+			     GEN_INT (-MIN_CACHELINE_SIZE)));		\
+      emit_move_insn (line_length, GEN_INT (MIN_CACHELINE_SIZE));	\
+      emit_insn (gen_dcacheflush (start_addr, end_addr, line_length));	\
+      emit_insn (gen_icacheflush (start_addr, end_addr, line_length,	\
+				  gen_reg_rtx (Pmode),			\
+				  gen_reg_rtx (Pmode)));		\
     }									\
 }
 
