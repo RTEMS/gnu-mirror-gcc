@@ -282,6 +282,7 @@ package body ALI is
          loop
             if C = CR or else C = LF then
                Skip_Line;
+               C := Nextc;
 
             elsif C = EOF then
                return;
@@ -788,6 +789,7 @@ package body ALI is
                Fatal_Error;
             else
                Skip_Line;
+               C := Nextc;
             end if;
          else
             Fatal_Error;
@@ -948,6 +950,7 @@ package body ALI is
                Fatal_Error;
             else
                Skip_Line;
+               C := Nextc;
             end if;
          else
             Fatal_Error;
@@ -1170,6 +1173,7 @@ package body ALI is
          Units.Table (Units.Last).First_Arg       := First_Arg;
          Units.Table (Units.Last).Elab_Position   := 0;
          Units.Table (Units.Last).Interface       := ALIs.Table (Id).Interface;
+         Units.Table (Units.Last).Body_Needed_For_SAL := False;
 
          if Debug_Flag_U then
             Write_Str (" ----> reading unit ");
