@@ -50,6 +50,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "output.h"
 #include "toplev.h"
 #include "ggc.h"
+/* APPLE LOCAL Objective-C++ */
+#include "langhooks.h"
 
 @@ifobjc
 #include "objc-act.h"
@@ -3339,6 +3341,8 @@ static const struct resword reswords[] =
   { "__inline",		RID_INLINE,	0 },
   { "__inline__",	RID_INLINE,	0 },
   { "__label__",	RID_LABEL,	0 },
+  /* APPLE LOCAL private extern */
+  { "__private_extern__", RID_PRIVATE_EXTERN, 0 },
   { "__ptrbase",	RID_PTRBASE,	0 },
   { "__ptrbase__",	RID_PTRBASE,	0 },
   { "__ptrextent",	RID_PTREXTENT,	0 },
@@ -3426,9 +3430,11 @@ static const struct resword reswords[] =
 };
 #define N_reswords (sizeof reswords / sizeof (struct resword))
 
+/* APPLE LOCAL keep tables in sync comment */
 /* Table mapping from RID_* constants to yacc token numbers.
    Unfortunately we have to have entries for all the keywords in all
-   three languages.  */
+   three languages (AND THEY MUST BE KEPT IN PARALLEL - see also
+   cp/lex.c).  */
 static const short rid_to_yy[RID_MAX] =
 {
   /* RID_STATIC */	STATIC,
@@ -3448,6 +3454,8 @@ static const short rid_to_yy[RID_MAX] =
   /* C extensions */
   /* RID_COMPLEX */	TYPESPEC,
   /* RID_THREAD */	SCSPEC,
+  /* APPLE LOCAL private extern */
+  /* RID_PRIVATE_EXTERN */	SCSPEC,
 
   /* C++ */
   /* RID_FRIEND */	0,
@@ -3569,7 +3577,7 @@ init_reswords (void)
 
   if (!c_dialect_objc ())
      mask |= D_OBJC;
-
+     
   ridpointers = ggc_calloc ((int) RID_MAX, sizeof (tree));
   for (i = 0; i < N_reswords; i++)
     {
