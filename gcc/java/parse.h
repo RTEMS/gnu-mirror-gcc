@@ -494,7 +494,6 @@ typedef struct _jdep {
 #define JDEP_DECL(J)          ((J)->decl)
 #define JDEP_DECL_WFL(J)      ((J)->decl)
 #define JDEP_KIND(J)          ((J)->kind)
-#define JDEP_SOLV(J)          ((J)->solv)
 #define JDEP_WFL(J)           ((J)->wfl)
 #define JDEP_MISC(J)          ((J)->misc)
 #define JDEP_ENCLOSING(J)     ((J)->enclosing)
@@ -602,10 +601,6 @@ typedef struct _jdeplist {
    declared function or in the current static block being defined. */
 #define GET_CURRENT_BLOCK(F) ((F) ? DECL_FUNCTION_BODY ((F)) :	\
 			     current_static_block)
-
-/* For an artificial BLOCK (created to house a local variable declaration not
-   at the start of an existing block), the parent block;  otherwise NULL. */
-#define BLOCK_EXPR_ORIGIN(NODE) BLOCK_ABSTRACT_ORIGIN(NODE)
 
 /* Merge an other line to the source line number of a decl. Used to
    remember function's end. */
@@ -725,7 +720,7 @@ typedef struct _jdeplist {
 #define CURRENT_OSB(C) (C)->osb_number [(C)->osb_depth]
 
 /* Macro for the xreferencer */
-#define DECL_END_SOURCE_LINE(DECL)       DECL_FRAME_SIZE (DECL)
+#define DECL_END_SOURCE_LINE(DECL)       (DECL_CHECK (DECL)->decl.u1.i)
 #define DECL_INHERITED_SOURCE_LINE(DECL) (DECL_CHECK (DECL)->decl.u2.i)
      
 /* Parser context data structure. */
@@ -779,10 +774,6 @@ struct parser_ctxt {
   int interface_number;		    /* # itfs declared to extend an itf def */
 
   tree package;			    /* Defined package ID */
-
-  /* Those two list are saved accross file traversal */
-  tree  incomplete_class;	    /* List of non-complete classes */
-  tree  gclass_list;		    /* All classes seen from source code */
 
   /* These two lists won't survive file traversal */
   tree  class_list;		    /* List of classes in a CU */
@@ -947,4 +938,7 @@ ATTRIBUTE_NORETURN
 #endif
 ;
 extern void java_expand_classes PARAMS ((void));
+
+extern struct parser_ctxt *ctxp;
+struct parser_ctxt *ctxp_for_generation;
 #endif

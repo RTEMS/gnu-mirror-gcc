@@ -1,3 +1,412 @@
+2001-03-28  Richard Henderson  <rth@redhat.com>
+
+	* config/os/aix/bits/ctype_base.h (mask): Use unsigned int.
+
+2001-03-28  Alexandre Oliva  <aoliva@redhat.com>
+
+	* libsupc++/Makefile.am (CXXLINK): Add --tag disable-shared after
+	--tag CXX.
+	(LIBTOOL): Let automake take care of its definition.
+	* libsupc++/Makefile.in: Rebuilt.
+
+2001-03-27  Alexandre Oliva  <aoliva@redhat.com>
+
+	* libsupc++/Makefile.am (CXXLINK): Use CXX again, and choose
+	CXX tag explicitly.
+	* src/Makefile.am (CXXLINK): Likewise.
+	* libsupc++/Makefile.in, src/Makefile.in: Rebuilt.
+
+2001-03-20  Jason Merrill  <jason@redhat.com>
+
+	* libsupc++/vec.cc (__cxa_vec_cleanup): New fn.
+	(__cxa_vec_ctor, __cxa_vec_cctor, __cxa_vec_dtor): Call it.
+	* libsupc++/cxxabi.h: Declare it.
+
+2001-03-16  Alexandre Oliva  <aoliva@redhat.com>
+
+	* src/gen-num-limits.cc (signal_adapter): Overloaded to match
+	signal_func with an unspecified argument list.
+
+	Add Irix 5.2, 6.3 support.
+	* config/os/irix/bits: Renamed to...
+	* config/os/irix/irix6.5/bits: this.
+	* config/os/irix/irix5.2/bits: New, copied from irix6.5/bits.
+	* config/os/irix/irix5.2/bits/ctype_base.h: Use _U, _L, _N,
+	_X, _S, _P, _C and _B instead of IRIX-6.5 _IS* macros.
+	* config/os/irix/irix5.2/bits/ctype_noninline.h
+	(ctype<char>::ctype): Initialize _M_table with __ctype.
+	* configure.target: Adjust.
+
+2001-03-15  Gabriel Dos Reis  <gdr@codesourcery.com>
+
+	* include/bits/basic_string.tcc (operator): Fix thinko.
+
+2001-03-13  Steve Ellcey  <sje@cup.hp.com>
+
+	* libstdc++-v3/config/os/hpux/bits/ctype_base.h: Make ctype masks
+	match HP-UX ctype.h header file.
+
+2001-03-08  Andreas Schwab  <schwab@suse.de>
+
+	* acinclude.m4 (GLIBCPP_EXPORT_INSTALL_INFO): Fix syntax in test
+	command.
+        * aclocal.m4, configure: Regenerated.
+
+2001-02-21  Phil Edwards  <pme@sources.redhat.com>
+
+	* tests_flags.in:  Remove -n flag from call to echo.
+
+2001-03-05  Laurynas Biveinis  <lauras@softhome.net>
+
+	* config/os/djgpp/ctype_base.h (ctype_base): Fix __to_type
+	definition. Replace enum with static const variables.
+		
+	* config/os/djgpp/ctype_inline.h (ctype<char>::is): Remove
+	throw specification, fix typos, use <static_cast>.
+	(ctype<char>::scan_is): Remove throw specification.
+	(ctype<char>::scan_not): Likewise.
+						
+	* config/os/djgpp/ctype_noninline.h (ctype<char>::ctype): Fix typo.
+	(ctype<char>::do_toupper(char)): Use <static_cast>.
+	(ctype<char>::do_toupper(char *, const char *)): Likewise.
+	(ctype<char>::do_tolower(char)): Likewise.
+	(ctype<char>::do_tolower(char *, const char *)): Likewise.
+											
+2001-02-27  Benjamin Kosnik  <bkoz@redhat.com>
+
+	libstdc++/1886
+	* include/bits/basic_file.h: Include basic_file_model.h.
+	* config/c_io_libio.cc: Move to...
+	* config/basic_file_libio.cc: Here.
+	* config/basic_file_libio.h: New file.
+	* config/c_io_stdio.cc: Move to...
+	* config/basic_file_stdio.cc: Here.
+	* config/basic_file_stdio.h: New file.
+	* config/c_io_libio.h: Tweak.
+	* config/c_io_stdio.h: Tweak.
+	* src/Makefile.am (build_headers): Add basic_file_model.h.
+	(sources): Add basic_file.cc, remove c++io.cc.
+	* src/Makefile.in: Regenerate.
+	* acinclude.m4 (GLIBCPP_ENABLE_CSTDIO): Add support for
+	basic_file_model.h and basic_file.cc.
+	* aclocal.m4: Regenerate.
+	* configure: Regenerate.
+	* testsuite/27_io/filebuf.cc (test05): Add regression.
+
+2001-02-27  Benjamin Kosnik  <bkoz@redhat.com>
+
+	Correct license.
+	* config/cpu/alpha/bits/atomicity.h: Change.
+	* config/cpu/arm/bits/atomicity.h
+	* config/cpu/generic/bits/atomicity.h
+	* config/cpu/i386/bits/atomicity.h
+	* config/cpu/i486/bits/atomicity.h
+	* config/cpu/ia64/bits/atomicity.h
+	* config/cpu/powerpc/bits/atomicity.h
+	* config/cpu/sparc/sparc32/bits/atomicity.h
+	* config/cpu/sparc/sparc64/bits/atomicity.h
+	* config/os/aix/bits/atomicity.h
+	* config/os/irix/bits/atomicity.h
+
+2001-02-27  Benjamin Kosnik  <bkoz@redhat.com>
+
+	* include/bits/std_stdexcept.h (runtime_error): Make string
+	member non-const.
+	(logic_error): Same.
+	* testsuite/19_diagnostics/stdexceptions.cc (test04): Add test.
+	(test03): Fix.
+
+2001-02-26  Benjamin Kosnik  <bkoz@redhat.com>
+
+	libstdc++/1972
+	libstdc++/2089
+	* include/bits/std_stdexcept.h (logic_error::logic_error): Use
+	string object, not reference.
+	(runtime_error::runtime_error): Same.
+	* testsuite/19_diagnostics/stdexceptions.cc: New file.
+
+2001-02-26  Phil Edwards  <pme@sources.redhat.com>
+
+	Fixes libstdc++/2079
+	* include/backward/iomanip.h:  Expose <ios> manipulators to global
+	  namespace.
+	* include/backward/iostream.h:  Also expose std::ws.
+
+2001-02-25  Greg Freemyer <freemyer@NorcrossGroup.com>
+
+	* libmath/mathconf.h (GET_LDOUBLE_MSW64): Fix thinko.
+
+2001-02-23  Alexandre Oliva <aoliva@redhat.com>
+
+        * mknumeric_limits (CC): Use VAR=${VAR=...} form.
+
+2001-02-23  David Edelsohn <dje@watson.ibm.com>
+
+	* mknumeric_limits (CC): Use $BUILD_DIR/../../gcc/xgcc
+
+2001-02-23  Phil Edwards  <pme@sources.redhat.com>
+
+        c++/2052
+        * include/backward/iostream.h:  Expose std::flush in old headers.
+
+2001-02-23  Gabriel Dos Reis  <gdr@merlin.codesourcery.com>
+
+        * mknumeric_limits: Remove special-casing on target.  Use
+        gcc instead of g++ to build gen-num-limits.cc
+	
+2001-02-22  Benjamin Kosnik  <bkoz@redhat.com>
+
+	* tests_flags.in (CXXFLAGS): Add -rpath to gcc build dir.
+
+2001-02-19  Gabriel Dos Reis  <gdr@merlin.codesourcery.com>
+
+	* include/bits/basic_file.h: Add #pragma system_header
+	* include/bits/basic_ios.h: Ditto.
+	* include/bits/basic_string.h: Ditto.
+	* include/bits/char_traits.h: Ditto.
+	* include/bits/codecvt.h: Ditto.
+	* include/bits/cpp_type_traits.h:  Ditto.
+	* include/bits/fpos.h: Ditto.
+	* include/bits/gslice.h: Ditto.
+	* include/bits/gslice_array.h: Ditto.
+	* include/bits/indirect_array.h: Ditto.
+	* include/bits/ios_base.h: Ditto.
+	* include/bits/limits_generic.h: Ditto.
+	* include/bits/locale_facets.h: Ditto.
+	* include/bits/localefwd.h: Ditto.
+	* include/bits/mask_array.h: Ditto.
+	* include/bits/sbuf_iter.h: Ditto.
+	* include/bits/sequence_concepts.h: Ditto.
+	* include/bits/slice.h: Ditto.
+	* include/bits/slice_array.h: Ditto.
+	* include/bits/std_algorithm.h: Likewise.
+	* include/bits/std_bitset.h: Likewise.
+	* include/bits/std_complex.h: Likewise.
+	* include/bits/std_deque.h: Likewise.
+	* include/bits/std_fstream.h: Likewise.
+	* include/bits/std_functional.h: Likewise.
+	* include/bits/std_iomanip.h: Likewise.
+	* include/bits/std_ios.h: Likewise.
+	* include/bits/std_iosfwd.h: Likewise.
+	* include/bits/std_iostream.h: Likewise.
+	* include/bits/std_istream.h: Likewise.
+	* include/bits/std_iterator.h: Likewise.
+	* include/bits/std_list.h: Likewise.
+	* include/bits/std_locale.h: Likewise.
+	* include/bits/std_map.h: Likewise.
+	* include/bits/std_memory.h: Likewise.
+	* include/bits/std_numeric.h: Likewise.
+	* include/bits/std_ostream.h: Likewise.
+	* include/bits/std_queue.h: Likewise.
+	* include/bits/std_set.h: Likewise.
+	* include/bits/std_sstream.h: Likewise.
+	* include/bits/std_stack.h: Likewise.
+	* include/bits/std_stdexcept.h: Likewise.
+	* include/bits/std_streambuf.h: Likewise.
+	* include/bits/std_string.h: Likewise.
+	* include/bits/std_utility.h: Likewise.
+	* include/bits/std_valarray.h: Likewise.
+	* include/bits/std_vector.h: Likewise.
+	* include/bits/stringfwd.h: Likewise.
+	* include/bits/type_traits.h: Likewise.
+	* include/bits/valarray_array.h: Likewise.
+	* include/bits/valarray_meta.h: Likewise.
+
+2001-02-19  Andreas Jaeger  <aj@suse.de>
+
+     	* config/cpu/sparc/sparc64/bits/atomicity.h (__compare_and_swap):
+	Fix typo.
+
+2001-02-16  Greg Bumgardner <bumgard@roguewave.com>
+
+	libstdc++/1734
+        * include/bits/std_ostream.h: Replaced usage of
+        _Traits::_S_eos() with _CharT() as per section 17.2.2.1.3.  
+        * include/bits/char_traits.h: Removed non-standard
+        methods that cannot be used elsewhere.  
+	
+	libstdc++/1885
+        * include/bits/basic_ios.h: Uncommented #include of
+        bits/basic_ios.tcc 
+	
+	libstdc++/1897
+        * include/bits/codecvt.h: See next...
+        * include/bits/fstream.tcc: See next...
+        * include/bits/ostream.tcc: Add __extension__ 
+        to variable-length arrays.  
+	
+	libstdc++/1967
+        * include/bits/localefwd.h: Changed int counter type to size_t.
+
+	libstdc++/1968
+        * include/bits/std_fstream.h: Added typedef for __ctype_type.
+
+2001-02-16  Benjamin Kosnik  <bkoz@redhat.com>
+
+	* testsuite/21_strings/char_traits.cc: Move to ...
+	* testsuite/21_strings/char_traits_requirements.cc: ..here.
+	* testsuite/21_strings/char_traits-int_type.cc: Move to ...
+	* testsuite/21_strings/char_traits_typedefs.cc: ..here.
+
+2001-02-16  Gabriel Dos Reis  <gdr@codesourcery.com>
+
+	* libmath/mathconf.h (FINITE_P, INFINITE_P): Remove macro
+	definitions. 
+
+2001-02-15  Benjamin Kosnik  <bkoz@redhat.com>
+
+	* include/bits/c++config: Revert.
+
+2001-02-15  Mark Mitchell  <mark@codesourcery.com>
+
+	* include/bits/istream.tcc: Use ios_base::iostate in place of
+	iostate throughout.  Insert `typename' keyword where necessary.
+	* include/bits/ostream.tcc: Insert `typename' keyword where
+	necessary.
+	
+2001-02-15  Jeffrey Oldham  <oldham@codesourcery.com>
+
+        * include/bits/c++config (_GLIBCPP_FULLY_COMPLIANT_HEADERS):
+        Define so library is compliant.
+
+2001-02-15  Anthony Green  <green@redhat.com>
+
+        * acinclude.m4 (glibcpp_toolexeclibdir): Fix test for cross
+        compilation.
+        * aclocal.m4: Regenerate.
+        * configure: Regenerate.
+
+2001-02-15  Rodney Brown  <RodneyBrown@mynd.com>
+
+        * acinclude.m4 (GLIBCPP_CHECK_MATH_DECL_1):
+        Include ieeefp.h for fpclass on UnixWare{2,7}.
+	* aclocal.m4: Regenerate.
+	* configure: Regenerate.
+        * mkcheck.in (size_command): Do without GNU-grep when using
+        size from binutils.
+
+2001-02-15  Mark Mitchell  <mark@codesourcery.com>
+
+	Remove old ABI support from libsupc++.
+	* libsupc++/cxxabi.h: Remove conditionally compiled code.
+	* libsupc++/exception_support.cc: Likewise.
+	* libsupc++/pure.cc: Likewise.
+	* libsupc++/tinfo.cc: Likewise.
+	* libsupc++/tinfo.h: Likewise.
+	* libsupc++/tinfo2.cc: Likewise.
+	* libsupc++/typeinfo: Likewise.
+	* libsupc++/vec.cc: Likewise.
+
+2001-02-15  Benjamin Kosnik  <bkoz@redhat.com>
+
+	Add support for -fno-exceptions.
+	* include/bits/exception_support.h: Remove.
+	* include/bits/basic_string.h: Remove exception_support.
+	(string::_M_check): Replace __OUTOFRANGE with __throw_out_of_range.
+	(string::at): Same.
+	(string::substr): Same.
+	* include/bits/basic_string.tcc (string::reserve): Replace
+	__LENGTHERROR with __throw_length_error.
+	(string::_S_create): Same.
+	(string::resize): Same.
+	(string::_M_replace): Same.
+	(string::replace): Same.
+	(string::copy): Replace __OUTOFRANGE with __throw_out_of_range.
+	(string::compare): Same.
+	* include/bits/stl_vector.h: Remove exception_support.
+	* src/Makefile.am (base_headers): Remove here.
+	* src/Makefile.in: Regenerate.
+
+	* include/bits/stl_range_errors.h: Remove.
+	* include/bits/stl_deque.h: Use __throw_range_error.
+	* include/bits/std_deque.h: Include functexcept.h.
+	* include/bits/std_vector.h: Same.
+	* src/Makefile.am (base_headers): Remove here.
+	* src/Makefile.in: Regenerate.
+	* include/ext/stl_bvector.h (class __BVECTOR): Use __throw_range_error.
+	* include/ext/bvector: Remove stl_range_errors.h
+
+	* include/bits/c++config (_GLIBCPP_USE_EXCEPTIONS): Remove.
+
+	* include/bits/functexcept.h: New file.
+	* src/functexcept.cc: New file. Definitions for function-based
+	exception routines.
+	* src/Makefile.am (sources): Add functexcept.cc.
+	* src/Makefile.in: Regenerate.
+
+	* include/bits/stl_config.h (__STL_USE_EXCEPTIONS): Wrap with
+	__EXCEPTIONS.
+
+	* include/bits/localefwd.h: Include functexcept.h.
+	* include/bits/std_iosfwd.h: Same.
+
+	* include/bits/basic_ios.h: Use __throw_ios_failure instead of
+	throw basic_ios::failure.
+	* include/bits/fstream.tcc (filebuf::_M_allocate_buffers):
+	Use __throw_exception_again.
+	(filebuf::_M_filebuf_init): Same.
+	* include/bits/streambuf.tcc (__copy_streambufs): Same.
+	* include/bits/ostream.tcc (ostream::operator<<): Same.
+	* include/bits/istream.tcc (istream::operator>>): Same.
+	* include/bits/basic_string.tcc (string::_M_mutate): Same.
+	(string::_S_construct): Same.
+	(string::_M_clone): Same.
+	* include/bits/locale_facets.tcc (use_facet(const locale&)): Use
+	__throw_bad_cast.
+	(num_put<_CharT, _OutIter>::do_put): Use __throw_exception_again.
+	* src/localename.cc (locale::_Imp::_Imp(const _Impl&, size_t): Use
+	__throw_exception_again.
+	(locale::_Imp::_Imp(string, size_t): Same.
+	(locale::_Imp::_M_replace_facet): Use __throw_runtime_error.
+	* src/locale.cc (locale::_M_coalesce): Use __throw_exception_again.
+	(locale::locale(const char*)): Use __throw_runtime_error.
+	(locale::classic): Use __throw_exception_again.
+	(locale::_S_normalize_category): Use __throw_runtime_error.
+
+	* src/stdexcept.cc: Remove cruft.
+
+	* libsupc++/exception_defines.h: New file.
+	* libsupc++/new_opnt.cc: Include exception_defines.h.
+	* libsupc++/vec.cc: Same.
+	(__cxa_vec_new2): Use __throw_exception_again.
+	(__cxa_vec_new3): Same.
+	(__cxa_vec_ctor): Same.
+	(__cxa_vec_delete3): Same.
+	(__cxa_vec_cctor): Same.
+	(__cxa_vec_delete2): Same.
+	(__cxa_vec_dtor): Same.
+	* libsupc++/exception_support.cc: Include exception_defines.h. Only
+	compile exception-handling bits if __EXCEPTIONS is defined.
+	Remove old ABI support.
+	* libsupc++/new_op.cc (new): Include exception_defines.h. Use
+	std::__throw_bad_alloc() instead of throw bad_alloc.
+	* libsupc++/Makefile.am: Add exception_defines.h.
+	* libsupc++/Makefile.in: Reformat.
+	* libsupc++/*: Format.
+
+2001-02-15  Phil Edwards  <pme@sources.redhat.com>
+
+	* docs/html/configopts.html:  Minor updates and typo fixes.
+	* docs/html/faq/index.html:  Updates of the "not really bugs" list.
+	* docs/html/faq/index.txt:  Regenerated.
+
+2001-02-15  Gabriel Dos Reis  <gdr@codesourcery.com>
+
+	* testsuite/lib/libstdc++.exp: Lift, temporarily, out of
+        dejagnu/dg.exp.  Adapt to log options used to run testcases.
+
+2001-02-13  Gabriel Dos Reis  <gdr@merlin.codesourcery.com>
+
+	* testsuite/lib/libstdc++.exp(dg-test): Lift temporarily from
+	dejagnu/dg.exp.
+
+2001-02-13  Dirk Mueller <dmuell@gmx.net>
+            Phil Edwards  <pme@sources.redhat.com>
+
+	* include/backward/function.h:  Do not use rel_ops for older
+	  headers either.
+	* include/backward/pair.h:  Likewise.
+
 2001-02-12  Mark Mitchell  <mark@codesourcery.com>
 
 	* src/locale.cc: Remove bogus locale::id definitions.

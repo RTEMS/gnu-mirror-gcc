@@ -23,10 +23,10 @@ toolexecdir = $(exec_prefix)/$(target_alias)
 toolexeclibdir = $(toolexecdir)/lib$(MULTISUBDIR)
 endif
 
-if NO_X
-cond_x_ltlibrary =
-else
+if XLIB_AWT
 cond_x_ltlibrary = libgcjx.la
+else
+cond_x_ltlibrary =
 endif
 
 toolexeclib_LTLIBRARIES = libgcj.la $(cond_x_ltlibrary)
@@ -106,7 +106,7 @@ AM_CFLAGS = @LIBGCJ_CFLAGS@
 endif
 
 JCFLAGS = -g
-JC1FLAGS = -g @LIBGCJ_JAVAFLAGS@
+JC1FLAGS = @LIBGCJ_JAVAFLAGS@ $(GCJFLAGS)
 
 LIBFFIINCS = -I$(top_srcdir)/../libffi/include -I$(MULTIBUILDTOP)../libffi/include
 
@@ -132,7 +132,7 @@ javao_files = $(java_source_files:.java=.lo) \
 x_javao_files = $(x_java_source_files:.java=.lo)
 
 ## Extract the libffi object file names.
-libffi_files = `$(AR) t ../libffi/.libs/libffi.a 2>/dev/null | sed 's/\.o/\.lo/g' | sed 's/^/..\/libffi\//g'`
+libffi_files = `find ../libffi/ \-name '*.lo'`
 
 libgcj_la_SOURCES = prims.cc posix.cc jni.cc exception.cc \
 	resolve.cc defineclass.cc interpret.cc name-finder.cc \
@@ -142,12 +142,12 @@ EXTRA_libgcj_la_SOURCES = boehm.cc nogc.cc posix-threads.cc no-threads.cc \
 libgcj_la_DEPENDENCIES = libgcj.jar $(javao_files) \
 	$(c_files) $(GCOBJS) $(THREADOBJS) $(LIBLTDL)
 
+libgcj_la_LIBADD = $(javao_files) $(c_files) $(GCOBJS) \
+	$(THREADOBJS) $(libffi_files)
 # Include THREADLIBS here to ensure that the correct version of
 # certain linuxthread functions get linked:
-libgcj_la_LIBADD = $(javao_files) $(c_files) $(GCOBJS) \
-	$(THREADOBJS) $(THREADLIBS) $(libffi_files) $(LIBLTDL)
 libgcj_la_LDFLAGS = -L$(here)/../libstdc++-v3/libsupc++ -lsupc++ \
-	-rpath $(toolexeclibdir) \
+	-rpath $(toolexeclibdir) $(THREADLIBS) $(LIBLTDL) \
 ## The mysterious backslash is consumed by make.
 	-version-info `grep -v '^\#' $(srcdir)/libtool-version`
 libgcj_la_LINK = $(LIBLINK)
@@ -261,6 +261,19 @@ $(c_files): java/lang/fdlibm.h java/lang/ieeefp.h java/lang/mprec.h
 ## FIXME: GNU make.
 $(javao_files) $(x_javao_files): %.lo: %.java
 	$(GCJCOMPILE) -o $@ $<
+
+## Pass the list of object files to libtool in a temporary file to 
+## avoid tripping platform command line length limits.
+libgcj.la: $(libgcj_la_OBJECTS) $(libgcj_la_DEPENDENCIES)
+	@echo $(libgcj_la_OBJECTS) > libgcj.objectlist;
+	@echo $(libgcj_la_LIBADD) >> libgcj.objectlist;
+	$(libgcj_la_LINK) -objectlist libgcj.objectlist -rpath $(toolexeclibdir) $(libgcj_la_LDFLAGS) $(LIBS)
+
+libgcjx.la: $(libgcjx_la_OBJECTS) $(libgcjx_la_DEPENDENCIES)
+	@echo $(libgcjx_la_OBJECTS) > libgcjx.objectlist;
+	@echo $(libgcjx_la_LIBADD) >> libgcjx.objectlist;
+	$(libgcjx_la_LINK) -objectlist libgcjx.objectlist -rpath $(toolexeclibdir) $(libgcjx_la_LDFLAGS) $(LIBS)
+
 
 ## ################################################################
 
@@ -416,7 +429,7 @@ EXTRA_jv_convert_SOURCES = $(convert_source_files)
 ## need this because we are explicitly using libtool to link using the
 ## `.la' file.
 jv_convert_LDFLAGS = --main=gnu.gcj.convert.Convert \
-	-rpath $(toolexeclibdir)
+	-rpath $(toolexeclibdir) -shared-libgcc
 jv_convert_LINK = $(GCJLINK)
 ## We explicitly link in the libraries we need.  This way we don't
 ## need -nodefaultlibs, so we can still rely on gcj picking up the
@@ -434,7 +447,7 @@ gij_SOURCES = gij.cc
 ## We need -nodefaultlibs because we want to avoid gcj's `-lgcj'.  We
 ## need this because we are explicitly using libtool to link using the
 ## `.la' file.
-gij_LDFLAGS = -rpath $(toolexeclibdir)
+gij_LDFLAGS = -rpath $(toolexeclibdir) -shared-libgcc
 gij_LINK = $(GCJLINK)
 ## We explicitly link in the libraries we need.  This way we don't
 ## need -nodefaultlibs, so we can still rely on gcj picking up the
@@ -857,7 +870,6 @@ java/lang/UnsupportedOperationException.java \
 java/lang/VerifyError.java \
 java/lang/VirtualMachineError.java \
 java/lang/Void.java \
-java/io/BlockDataException.java	\
 java/io/BufferedInputStream.java \
 java/io/BufferedOutputStream.java \
 java/io/BufferedReader.java \
@@ -981,9 +993,11 @@ java/util/StringTokenizer.java \
 java/util/TimeZone.java	\
 java/util/Timer.java \
 java/util/TimerTask.java \
+java/util/TreeMap.java \
+java/util/TreeSet.java \
 java/util/TooManyListenersException.java \
-java/util/Vector.java
-#java/util/WeakHashmap.java
+java/util/Vector.java \
+java/util/WeakHashMap.java
 
 
 ## List of all .java files to be compiled.  Please keep this list
@@ -1205,6 +1219,7 @@ java/util/zip/ZipInputStream.java \
 java/util/zip/ZipOutputStream.java \
 $(awt_java_source_files) \
 $(convert_source_files)
+
 
 java_source_files = $(special_java_source_files) $(ordinary_java_source_files)
 

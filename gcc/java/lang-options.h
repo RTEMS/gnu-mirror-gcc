@@ -33,6 +33,7 @@ DEFINE_LANG_NAME ("Java")
   { "-fno-assume-compiled", "" },
   { "-femit-class-file", "" },
   { "-femit-class-files", "Dump class files to <name>.class" },
+  { "-ffilelist-file", "input file is list of file names to compile" },
   { "-fuse-boehm-gc", "Generate code for Boehm GC" },
   { "-fhash-synchronization", "Don't put synchronization structure in each object" },
   { "-fjni", "Assume native functions are implemented using JNI" },
@@ -48,3 +49,5 @@ DEFINE_LANG_NAME ("Java")
     "Warn if modifiers are specified when not necessary"},
   { "-Wextraneous-semicolon", "Warn if deprecated empty statements are found"},
   { "-Wout-of-date", "Warn if .class files are out of date" },
+  { "-fforce-classes-archive-check", 
+    "Always check for non gcj generated classes archives" },
