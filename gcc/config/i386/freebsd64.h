@@ -23,14 +23,24 @@ Boston, MA 02111-1307, USA.  */
 #undef  TARGET_VERSION
 #define TARGET_VERSION fprintf (stderr, " (FreeBSD/x86-64 ELF)");
 
+#undef  FBSD_TARGET_CPU_CPP_BUILTINS
+#define FBSD_TARGET_CPU_CPP_BUILTINS()			\
+  do							\
+    {							\
+      if (TARGET_64BIT)					\
+      {							\
+	builtin_define ("__LP64__");			\
+      }							\
+    }							\
+  while (0)
+
 /* Provide a LINK_SPEC appropriate for the FreeBSD/x86-64 ELF target.
    This is a copy of LINK_SPEC from <i386/freebsd.h> tweaked for
    the x86-64 target.  */
 
 #undef	LINK_SPEC
 #define LINK_SPEC "\
-  %{!m32:-m elf_x86_64} \
-  %{m32:-m elf_i386} \
+  %{m32:-m elf_i386_fbsd} \
   %{Wl,*:%*} \
   %{v:-V} \
   %{assert*} %{R*} %{rpath*} %{defsym*} \
