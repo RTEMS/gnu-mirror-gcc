@@ -223,8 +223,8 @@ dump_bb (basic_block bb, FILE *outf, int indent)
   edge e;
   char *s_indent;
  
-  s_indent = (char *) alloca ((size_t) indent + 1);
-  memset ((void *) s_indent, ' ', (size_t) indent);
+  s_indent = alloca ((size_t) indent + 1);
+  memset (s_indent, ' ', (size_t) indent);
   s_indent[indent] = '\0';
 
   fprintf (outf, ";;%s basic block %d, loop depth %d, count ",
@@ -303,6 +303,10 @@ edge
 split_block (basic_block bb, void *i)
 {
   basic_block new_bb;
+  /* APPLE LOCAL begin lno */
+  bool irr = (bb->flags & BB_IRREDUCIBLE_LOOP) != 0;
+  int flags = EDGE_FALLTHRU;
+  /* APPLE LOCAL end lno */
 
   if (!cfg_hooks->split_block)
     internal_error ("%s does not support split_block.", cfg_hooks->name);
@@ -314,14 +318,21 @@ split_block (basic_block bb, void *i)
   new_bb->count = bb->count;
   new_bb->frequency = bb->frequency;
   new_bb->loop_depth = bb->loop_depth;
-
+  /* APPLE LOCAL begin lno */
+  if (irr)
+    {
+      new_bb->flags |= BB_IRREDUCIBLE_LOOP;
+      flags |= EDGE_IRREDUCIBLE_LOOP;
+    }
+  /* APPLE LOCAL end lno */
+ 
   if (dom_computed[CDI_DOMINATORS] >= DOM_CONS_OK)
     {
       redirect_immediate_dominators (CDI_DOMINATORS, bb, new_bb);
       set_immediate_dominator (CDI_DOMINATORS, new_bb, bb);
     }
 
-  return make_edge (bb, new_bb, EDGE_FALLTHRU);
+  return make_single_succ_edge (bb, new_bb, EDGE_FALLTHRU);
 }
 
 /* Splits block BB just after labels.  The newly created edge is returned.  */
@@ -386,6 +397,8 @@ split_edge (edge e)
   gcov_type count = e->count;
   int freq = EDGE_FREQUENCY (e);
   edge f;
+  /* APPLE LOCAL lno */
+  bool irr = (e->flags & EDGE_IRREDUCIBLE_LOOP) != 0;
 
   if (!cfg_hooks->split_edge)
     internal_error ("%s does not support split_edge.", cfg_hooks->name);
@@ -427,6 +440,15 @@ split_edge (edge e)
 	    set_immediate_dominator (CDI_DOMINATORS, ret->succ->dest, ret);
 	}
     };
+
+  /* APPLE LOCAL begin lno */
+  if (irr)
+    {
+      ret->flags |= BB_IRREDUCIBLE_LOOP;
+      ret->pred->flags |= EDGE_IRREDUCIBLE_LOOP;
+      ret->succ->flags |= EDGE_IRREDUCIBLE_LOOP;
+    }
+  /* APPLE LOCAL end lno */
 
   return ret;
 }
@@ -544,6 +566,8 @@ make_forwarder_block (basic_block bb, bool (*redirect_edge_p) (edge),
 {
   edge e, next_e, fallthru;
   basic_block dummy, jump;
+  /* APPLE LOCAL lno */
+  bool fst_irr = false;
 
   if (!cfg_hooks->make_forwarder_block)
     internal_error ("%s does not support make_forwarder_block.",
@@ -558,7 +582,11 @@ make_forwarder_block (basic_block bb, bool (*redirect_edge_p) (edge),
     {
       next_e = e->pred_next;
       if (redirect_edge_p (e))
-	continue;
+	{
+	  /* APPLE LOCAL lno */
+	  fst_irr |= (e->flags & EDGE_IRREDUCIBLE_LOOP) != 0;
+          continue;
+	}
 
       dummy->frequency -= EDGE_FREQUENCY (e);
       dummy->count -= e->count;
@@ -566,11 +594,22 @@ make_forwarder_block (basic_block bb, bool (*redirect_edge_p) (edge),
 	dummy->frequency = 0;
       if (dummy->count < 0)
 	dummy->count = 0;
+      fallthru->count -= e->count;
+      if (fallthru->count < 0)
+	fallthru->count = 0;
 
       jump = redirect_edge_and_branch_force (e, bb);
       if (jump)
 	new_bb_cbk (jump);
     }
+
+  /* APPLE LOCAL begin lno */
+  if (!fst_irr)
+    {
+      dummy->flags &= ~BB_IRREDUCIBLE_LOOP;
+      fallthru->flags &= ~EDGE_IRREDUCIBLE_LOOP;
+    }
+  /* APPLE LOCAL end lno */
 
   if (dom_computed[CDI_DOMINATORS] >= DOM_CONS_OK)
     {
@@ -630,7 +669,8 @@ tidy_fallthru_edges (void)
       if ((s = b->succ) != NULL
 	  && ! (s->flags & EDGE_COMPLEX)
 	  && s->succ_next == NULL
-	  && s->dest == c)
+	  && s->dest == c
+	  && !find_reg_note (BB_END (b), REG_CROSSING_JUMP, NULL_RTX))
 	tidy_fallthru_edge (s);
     }
 }
@@ -771,3 +811,4 @@ flow_call_edges_add (sbitmap blocks)
 
   return (cfg_hooks->flow_call_edges_add) (blocks);
 }
+
