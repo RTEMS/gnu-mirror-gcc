@@ -4076,8 +4076,14 @@ cp_pointer_int_sum (resultcode, ptrop, intop)
      enum tree_code resultcode;
      register tree ptrop, intop;
 {
-  if (!complete_type_or_else (TREE_TYPE (ptrop), ptrop))
-    return error_mark_node;
+  tree res_type = TREE_TYPE (ptrop);
+
+  /* pointer_int_sum() uses size_in_bytes() on the TREE_TYPE(res_type)
+     in certain circumstance (when it's valid to do so).  So we need
+     to make sure it's complete.  We don't need to check here, if we
+     can actually complete it at all, as those checks will be done in
+     pointer_int_sum() anyway.  */
+  complete_type (TREE_TYPE (res_type));
 
   return pointer_int_sum (resultcode, ptrop, fold (intop));
 }
@@ -5071,6 +5077,22 @@ build_static_cast (type, expr)
 			  ba_ignore | ba_quiet, &kind)
 	  && kind != bk_via_virtual)
 	ok = 1;
+    }
+  else if (TYPE_PTRMEM_P (type) && TYPE_PTRMEM_P (intype))
+    {
+      /* They're pointers to members. The pointed to objects must be
+	 the same (ignoring CV qualifiers), and the containing classes
+	 must be related non-virtually. */
+      base_kind kind;
+      
+      if (same_type_p
+	  (strip_all_pointer_quals (TREE_TYPE (TREE_TYPE (type))),
+	   strip_all_pointer_quals (TREE_TYPE (TREE_TYPE (intype))))
+ 	  && (lookup_base (TYPE_OFFSET_BASETYPE (TREE_TYPE (intype)),
+			   TYPE_OFFSET_BASETYPE (TREE_TYPE (type)),
+			   ba_ignore | ba_quiet, &kind))
+ 	  && kind != bk_via_virtual)
+  	ok = 1;
     }
   else if (TREE_CODE (intype) != BOOLEAN_TYPE
 	   && TREE_CODE (type) != ARRAY_TYPE

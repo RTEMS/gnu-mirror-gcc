@@ -1,3 +1,58 @@
+2002-03-11  Nathan Sidwell  <nathan@codesourcery.com>
+
+	Revert 2001-03-26  Nathan Sidwell  <nathan@codesourcery.com>,
+	DR209 is now not a defect.
+	* cp-tree.h (skip_type_access_control): Remove.
+	* decl.c (grokdeclarator): Do type access control for friend
+	declarations.
+	* semantics.c (decl_type_access_control): Don't reset
+	current_type_lookups.
+	(save_type_access_control): Always save the lookups.
+	(skip_type_access_control): Remove.
+	(finish_class_definition): Don't change type_lookups.
+
+2002-03-11  Nathan Sidwell  <nathan@codesourcery.com>
+
+	Revert 2000-12-01  Nathan Sidwell  <nathan@codesourcery.com>,
+	It is incorrect.
+	* typeck.c (build_static_cast): Compare non-qualified types
+	with pointer to member conversions.
+
+2002-03-08  Craig Rodrigues  <rodrigc@gcc.gnu.org>
+ 
+	* cp-tree.h (CLEAR_BINFO_MARKED): Make both parts of
+	conditional return void.
+
+2002-03-02  Nathan Sidwell  <nathan@codesourcery.com>
+
+	PR c++/775
+	* decl.c (lookup_tag): Only reject enum/class mismatch, not
+	class/union mismatch.
+	* parse.y (check_class_key): New function.
+	(structsp): Call it.
+
+2002-03-01  Michael Matz  <matz@suse.de>
+
+	* typeck.c (cp_pointer_int_sum): Complete inner type which is
+	used later by size_in_bytes().
+
+2002-03-01  Phil Edwards  <pme@gcc.gnu.org>
+
+	* cp-tree.h (build_init):  Remove prototype.
+
+2002-03-01  Phil Edwards  <pme@gcc.gnu.org>
+
+	* cp-tree.h:  Require __GNUC__ to be #defined.
+	(build_init):  Add missing prototype.
+
+2002-02-28  Jason Merrill  <jason@redhat.com>
+
+	* search.c (lookup_base_r): Don't clear is_non_public just because
+	we found a friendly scope.
+
+	* decl.c (finish_function): Only warn about missing return
+	statement with -Wreturn-type.
+
 2002-02-24 Craig Rodrigues  <rodrigc@gcc.gnu.org> 
 
 	PR c++/4093

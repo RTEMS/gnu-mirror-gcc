@@ -5345,7 +5345,7 @@ lookup_tag (form, name, binding_level, thislevel_only)
 	    if (old && DECL_ORIGINAL_TYPE (TYPE_NAME (old)))
 	      old = NULL_TREE;
 	    if (old && TREE_CODE (old) != form
-		&& !(form != ENUMERAL_TYPE && TREE_CODE (old) == TEMPLATE_DECL))
+		&& (form == ENUMERAL_TYPE || TREE_CODE (old) == ENUMERAL_TYPE))
 	      {
 		error ("`%#D' redeclared as %C", old, form);
 		return NULL_TREE;
@@ -5361,14 +5361,12 @@ lookup_tag (form, name, binding_level, thislevel_only)
 	    if (TREE_PURPOSE (tail) == name)
 	      {
 		enum tree_code code = TREE_CODE (TREE_VALUE (tail));
-		/* Should tighten this up; it'll probably permit
-		   UNION_TYPE and a struct template, for example.  */
+		
 		if (code != form
-		    && !(form != ENUMERAL_TYPE && code == TEMPLATE_DECL))
+		    && (form == ENUMERAL_TYPE || code == ENUMERAL_TYPE))
 		  {
 		    /* Definition isn't the kind we were looking for.  */
-		    error ("`%#D' redeclared as %C", TREE_VALUE (tail),
-			      form);
+		    error ("`%#D' redeclared as %C", TREE_VALUE (tail), form);
 		    return NULL_TREE;
 		  }
 		return TREE_VALUE (tail);
@@ -11295,9 +11293,7 @@ friend declaration requires class-key, i.e. `friend %#T'",
 	  /* Only try to do this stuff if we didn't already give up.  */
 	  if (type != integer_type_node)
 	    {
-	      /* DR 209. The friendly class does not need to be accessible
-                 in the scope of the class granting friendship. */
-	      skip_type_access_control ();
+	      decl_type_access_control (TYPE_NAME (type));
 
 	      /* A friendly class?  */
 	      if (current_class_type)
@@ -11559,33 +11555,32 @@ friend declaration requires class-key, i.e. `friend %#T'",
 	if (friendp)
 	  {
 	    /* Friends are treated specially.  */
-            tree t = NULL_TREE;
-	    
-	    /* DR 209. The friend does not need to be accessible at this
-               point. */
-	    skip_type_access_control ();
-	    
 	    if (ctype == current_class_type)
 	      warning ("member functions are implicitly friends of their class");
-
-            if (decl && DECL_NAME (decl))
-              {
-                if (template_class_depth (current_class_type) == 0)
-                  {
-              	    decl = check_explicit_specialization
-              	            (declarator, decl,
-              	             template_count, 2 * (funcdef_flag != 0) + 4);
-              	    if (decl == error_mark_node)
-              	      return error_mark_node;
-                  }
-              
-                t = do_friend (ctype, declarator, decl,
-              		       last_function_parms, *attrlist, flags, quals,
-              		       funcdef_flag);
-              }
-            if (t && funcdef_flag)
-              return t;
-	    return void_type_node;
+ 	    else
+ 	      {
+ 		tree t = NULL_TREE;
+ 		if (decl && DECL_NAME (decl))
+ 		  {
+ 		    if (template_class_depth (current_class_type) == 0)
+ 		      {
+ 			decl
+ 			  = check_explicit_specialization
+ 			  (declarator, decl,
+ 			   template_count, 2 * (funcdef_flag != 0) + 4);
+ 			if (decl == error_mark_node)
+ 			  return error_mark_node;
+ 		      }
+		    
+ 		    t = do_friend (ctype, declarator, decl,
+ 				   last_function_parms, *attrlist,
+				   flags, quals, funcdef_flag);
+ 		  }
+ 		if (t && funcdef_flag)
+ 		  return t;
+  
+ 		return void_type_node;
+ 	      }
 	  }
 
 	/* Structure field.  It may not be a function, except for C++ */
@@ -14224,15 +14219,16 @@ finish_function (flags)
     DECL_UNINLINABLE (fndecl) = 1;
 
   /* Complain if there's just no return statement.  */
-  if (!processing_template_decl
+  if (warn_return_type
+      && !processing_template_decl
       && TREE_CODE (TREE_TYPE (fntype)) != VOID_TYPE
       && !current_function_returns_value && !current_function_returns_null
-      && !DECL_NAME (DECL_RESULT (fndecl))
       /* Don't complain if we abort or throw.  */
       && !current_function_returns_abnormally
-      /* If we have -Wreturn-type, let flow complain.  Unless we're an
+      && !DECL_NAME (DECL_RESULT (fndecl))
+      /* Normally, with -Wreturn-type, flow will complain.  Unless we're an
 	 inline function, as we might never be compiled separately.  */
-      && (!warn_return_type || DECL_INLINE (fndecl)))
+      && DECL_INLINE (fndecl))
     warning ("no return statement in function returning non-void");
     
   /* Clear out memory we no longer need.  */

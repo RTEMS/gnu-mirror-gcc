@@ -6027,6 +6027,9 @@ make_extraction (mode, inner, pos, pos_rtx, len,
       if (mode == tmode)
 	return new;
 
+      if (GET_CODE (new) == CONST_INT)
+	return GEN_INT (trunc_int_for_mode (INTVAL (new), mode));
+
       /* If we know that no extraneous bits are set, and that the high
 	 bit is not set, convert the extraction to the cheaper of
 	 sign and zero extension, that are equivalent in these cases.  */
@@ -10885,6 +10888,11 @@ simplify_comparison (code, pop0, pop1)
 		  || (floor_log2 (const_op) + INTVAL (XEXP (op0, 1))
 		      < mode_width)))
 	    {
+	      /* If the shift was logical, then we must make the condition
+		 unsigned.  */
+	      if (GET_CODE (op0) == LSHIFTRT)
+		code = unsigned_condition (code);
+
 	      const_op <<= INTVAL (XEXP (op0, 1));
 	      op1 = GEN_INT (const_op);
 	      op0 = XEXP (op0, 0);
