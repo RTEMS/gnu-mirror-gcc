@@ -39,7 +39,6 @@ package java.net;
 
 import java.io.IOException;
 
-
 /**
  * Contrary to what you might think, this does not indicate that the
  * TCP/IP service name specified was invalid.  Instead it indicates that

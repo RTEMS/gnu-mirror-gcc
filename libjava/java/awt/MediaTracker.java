@@ -81,17 +81,12 @@ public class MediaTracker implements java.io.Serializable
         status = ERRORED | COMPLETE;
       else if ((flags & ALLBITS) != 0)
         status = COMPLETE;
-      else if ((flags & SOMEBITS) != 0)
-        status = LOADING;
       else
-        status = 0;
-
-      if ((status & COMPLETE) == COMPLETE)
+        status = LOADING;
+      
+      synchronized (MediaTracker.this)
       {
-        synchronized (MediaTracker.this)
-        {
-          MediaTracker.this.notifyAll();
-        }
+	MediaTracker.this.notifyAll();
       }
       // If status is not COMPLETE then we need more updates.
       return (status & COMPLETE) == 0;
@@ -111,8 +106,7 @@ public class MediaTracker implements java.io.Serializable
     e.next = head;
     head = e;
     // Start tracking image status.
-    int flags = target.checkImage(image, e);
-    e.imageUpdate(image, flags, -1, -1, -1, -1);
+    target.checkImage(image, e);
   }
 
   public void addImage(Image image, int id, int width, int height)
@@ -125,8 +119,7 @@ public class MediaTracker implements java.io.Serializable
     e.height = height;
     head = e;
     // Start tracking image status.
-    int flags = target.checkImage(image, width, height, e);
-    e.imageUpdate(image, flags, -1, -1, width, height);
+    target.checkImage(image, width, height, e);
   }
 
   public boolean checkAll()

@@ -1,5 +1,5 @@
 /* Security.java --- Java base security class implementation
-   Copyright (C) 1999, 2001, 2002, 2003, 2004  Free Software Foundation, Inc.
+   Copyright (C) 1999, 2001, 2002, 2003, Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -59,7 +59,7 @@ import java.util.Vector;
  *
  * @author Mark Benvenuto <ivymccough@worldnet.att.net>
  */
-public final class Security
+public final class Security extends Object
 {
   private static final String ALG_ALIAS = "Alg.Alias.";
 
@@ -150,7 +150,7 @@ public final class Security
 	result = false;
       }
 
-    return result;
+    return false;
   }
 
   /**
@@ -237,7 +237,7 @@ public final class Security
     int max = providers.size ();
     for (int i = 0; i < max; i++)
       {
-	if (((Provider) providers.elementAt(i)).getName().equals(provider.getName()))
+	if (((Provider) providers.elementAt(i)).getName() == provider.getName())
 	  return -1;
       }
 
@@ -312,7 +312,7 @@ public final class Security
     int max = providers.size ();
     for (int i = 0; i < max; i++)
       {
-	if (((Provider) providers.elementAt(i)).getName().equals(name))
+	if (((Provider) providers.elementAt(i)).getName() == name)
 	  {
 	    providers.remove(i);
 	    break;
@@ -349,7 +349,7 @@ public final class Security
     for (int i = 0; i < max; i++)
       {
 	p = (Provider) providers.elementAt(i);
-	if (p.getName().equals(name))
+	if (p.getName() == name)
 	  return p;
       }
     return null;
@@ -670,7 +670,7 @@ public final class Security
     outer: for (int r = 0; r < 3; r++) // guard against circularity
       {
         serviceDotAlgorithm = (svc+"."+String.valueOf(algo)).trim();
-        for (it = p.keySet().iterator(); it.hasNext(); )
+        inner: for (it = p.keySet().iterator(); it.hasNext(); )
           {
             key = (String) it.next();
             if (key.equalsIgnoreCase(serviceDotAlgorithm)) // eureka

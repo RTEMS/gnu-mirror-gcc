@@ -40,7 +40,6 @@ package java.awt;
 
 import java.awt.image.BufferedImage;
 import java.util.Locale;
-import gnu.java.awt.ClasspathToolkit;
 
 /**
  * This descibes the collection of GraphicsDevice and Font objects available
@@ -71,9 +70,7 @@ public abstract class GraphicsEnvironment
    */
   public static GraphicsEnvironment getLocalGraphicsEnvironment()
   {
-    ClasspathToolkit tk;
-    tk = ((ClasspathToolkit) Toolkit.getDefaultToolkit ());
-    return tk.getLocalGraphicsEnvironment ();
+    throw new Error("not implemented");
   }
 
   /**

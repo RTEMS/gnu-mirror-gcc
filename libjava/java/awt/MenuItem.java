@@ -310,10 +310,7 @@ deleteShortcut()
 public String
 getActionCommand()
 {
-  if (actionCommand == null)
-    return label;
-  else
-    return actionCommand;
+  return(actionCommand);
 }
 
 /*************************************************************************/
@@ -424,11 +421,6 @@ dispatchEventImpl(AWTEvent e)
       && (action_listeners != null
 	  || (eventMask & AWTEvent.ACTION_EVENT_MASK) != 0))
     processEvent(e);
-
-  // Send the event to the parent menu if it has not yet been
-  // consumed.
-  if (!e.isConsumed ())
-    ((Menu) getParent ()).processEvent (e);
 }
 
 /**

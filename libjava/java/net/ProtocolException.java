@@ -39,7 +39,6 @@ package java.net;
 
 import java.io.IOException;
 
-
 /**
  * This exception indicates that some sort of low level protocol
  * exception occurred.  Look in the descriptive message (if any) for

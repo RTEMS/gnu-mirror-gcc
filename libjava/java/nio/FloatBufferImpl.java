@@ -52,9 +52,7 @@ final class FloatBufferImpl extends FloatBuffer
   
   FloatBufferImpl (float[] buffer, int offset, int capacity, int limit, int position, int mark, boolean readOnly)
   {
-    super (capacity, limit, position, mark);
-    this.backing_buffer = buffer;
-    this.array_offset = offset;
+    super (buffer, offset, capacity, limit, position, mark);
     this.readOnly = readOnly;
   }
   
@@ -100,7 +98,7 @@ final class FloatBufferImpl extends FloatBuffer
   /**
    * Relative get method. Reads the next <code>float</code> from the buffer.
    */
-  public float get ()
+  final public float get ()
   {
     float result = backing_buffer [position ()];
     position (position () + 1);
@@ -113,7 +111,7 @@ final class FloatBufferImpl extends FloatBuffer
    * 
    * @exception ReadOnlyBufferException If this buffer is read-only.
    */
-  public FloatBuffer put (float value)
+  final public FloatBuffer put (float value)
   {
     if (readOnly)
       throw new ReadOnlyBufferException ();
@@ -130,7 +128,7 @@ final class FloatBufferImpl extends FloatBuffer
    * @exception IndexOutOfBoundsException If index is negative or not smaller
    * than the buffer's limit.
    */
-  public float get (int index)
+  final public float get (int index)
   {
     return backing_buffer [index];
   }
@@ -143,7 +141,7 @@ final class FloatBufferImpl extends FloatBuffer
    * than the buffer's limit.
    * @exception ReadOnlyBufferException If this buffer is read-only.
    */
-  public FloatBuffer put (int index, float value)
+  final public FloatBuffer put (int index, float value)
   {
     if (readOnly)
       throw new ReadOnlyBufferException ();
@@ -152,7 +150,7 @@ final class FloatBufferImpl extends FloatBuffer
     return this;
   }
   
-  public ByteOrder order ()
+  final public ByteOrder order ()
   {
     return ByteOrder.nativeOrder ();
   }

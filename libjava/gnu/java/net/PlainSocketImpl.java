@@ -200,9 +200,9 @@ public final class PlainSocketImpl extends SocketImpl
    */
   public native Object getOption(int optID) throws SocketException;
 
-  public native void shutdownInput() throws IOException;
+  public native void shutdownInput () throws IOException;
 
-  public native void shutdownOutput() throws IOException;
+  public native void shutdownOutput () throws IOException;
 
   /**
    * Creates a new socket that is not bound to any local address/port and
@@ -212,7 +212,7 @@ public final class PlainSocketImpl extends SocketImpl
    *
    * @param stream true for a stream socket, false for a datagram socket
    */
-  protected native void create(boolean stream) throws IOException;
+  protected native void create (boolean stream)  throws IOException;
 
   /**
    * Connects to the remote hostname and port specified as arguments.
@@ -222,9 +222,9 @@ public final class PlainSocketImpl extends SocketImpl
    *
    * @exception IOException If an error occurs
    */
-  protected void connect(String host, int port) throws IOException
+  protected void connect (String host, int port) throws IOException
   {
-    connect(InetAddress.getByName(host), port);
+    connect (new InetSocketAddress (InetAddress.getByName(host), port), 0);
   }
 
   /**
@@ -235,19 +235,13 @@ public final class PlainSocketImpl extends SocketImpl
    *
    * @exception IOException If an error occurs
    */
-  protected void connect(InetAddress host, int port) throws IOException
+  protected void connect (InetAddress host, int port) throws IOException
   {
     connect (new InetSocketAddress (host, port), 0);
   }
 
-  /**
-   * Connects to the remote socket address with a specified timeout.
-   *
-   * @param timeout The timeout to use for this connect, 0 means infinite.
-   *
-   * @exception IOException If an error occurs
-   */
-  protected native void connect(SocketAddress addr, int timeout) throws IOException;
+  protected native void connect (SocketAddress addr, int timeout)
+    throws IOException;
 
   /**
    * Binds to the specified port on the specified addr.  Note that this addr
@@ -258,8 +252,7 @@ public final class PlainSocketImpl extends SocketImpl
    *
    * @exception IOException If an error occurs
    */
-  protected native void bind(InetAddress host, int port)
-    throws IOException;
+  protected native void bind (InetAddress host, int port) throws IOException;
 
   /**
    * Starts listening for connections on a socket. The queuelen parameter
@@ -271,8 +264,9 @@ public final class PlainSocketImpl extends SocketImpl
    * 
    * @exception IOException If an error occurs
    */
-  protected native void listen(int queuelen)
-    throws IOException;
+  protected native void listen (int backlog) throws IOException;
+
+  private native void accept (PlainSocketImpl s) throws IOException;
 
   /**
    * Accepts a new connection on this socket and returns in in the 
@@ -280,14 +274,10 @@ public final class PlainSocketImpl extends SocketImpl
    *
    * @param impl The SocketImpl object to accept this connection.
    */
-  protected void accept(SocketImpl impl)
-    throws IOException
+  protected void accept (SocketImpl s) throws IOException
   {
-    accept((PlainSocketImpl) impl);
+    accept((PlainSocketImpl) s);
   }
-
-  private native void accept(PlainSocketImpl impl)
-    throws IOException;
 
   /**
    * Returns the number of bytes that the caller can read from this socket
@@ -308,9 +298,10 @@ public final class PlainSocketImpl extends SocketImpl
    *
    * @exception IOException If an error occurs
    */
-  protected native void close() throws IOException;
+  protected native void close () throws IOException;
 
-  protected native void sendUrgentData(int data) throws IOException;
+  protected native void sendUrgentData(int data)
+    throws IOException;
 
   /**
    * Returns an InputStream object for reading from this socket.  This will
@@ -345,98 +336,44 @@ public final class PlainSocketImpl extends SocketImpl
   }
 
   /**
-   * This class contains an implementation of <code>InputStream</code> for 
-   * sockets.  It in an internal only class used by <code>PlainSocketImpl</code>.
+   * A stream which reads from the socket implementation.
    *
    * @author Nic Ferrier <nferrier@tapsellferrier.co.uk>
    */
   final class SocketInputStream
     extends InputStream
   {
-    /**
-     * Returns the number of bytes available to be read before blocking
-     */
-    public int available() throws IOException
-    {
-      return PlainSocketImpl.this.available();
-    }
+    public native int read() throws IOException;
 
-    /**
-     * This method not only closes the stream, it closes the underlying socket
-     * (and thus any connection) and invalidates any other Input/Output streams
-     * for the underlying impl object
-     */
-    public void close() throws IOException
+    public native int read(byte[] buffer, int offset, int length)
+      throws IOException;
+
+    public final void close() throws IOException
     {
       PlainSocketImpl.this.close();
     }
 
-    /**
-     * Reads the next byte of data and returns it as an int.  
-     *
-     * @return The byte read (as an int) or -1 if end of stream);
-     *
-     * @exception IOException If an error occurs.
-     */
-    public native int read() throws IOException;
-
-    /**
-     * Reads up to len bytes of data into the caller supplied buffer starting
-     * at offset bytes from the start of the buffer
-     *
-     * @param buf The buffer
-     * @param offset Offset into the buffer to start reading from
-     * @param len The number of bytes to read
-     *
-     * @return The number of bytes actually read or -1 if end of stream
-     *
-     * @exception IOException If an error occurs.
-     */
-    public native int read(byte[] buf, int offset, int len) throws IOException;
+    public final int available() throws IOException
+    {
+      return PlainSocketImpl.this.available();
+    }
   }
 
-  /**
-   * This class is used internally by <code>PlainSocketImpl</code> to be the 
-   * <code>OutputStream</code> subclass returned by its 
-   * <code>getOutputStream method</code>.  It expects only to  be used in that
-   * context.
+  /** A stream which writes to the socket implementation.
    *
    * @author Nic Ferrier  <nferrier@tapsellferrier.co.uk>
    */
   final class SocketOutputStream
     extends OutputStream
   {
-    /**
-     * This method closes the stream and the underlying socket connection. This
-     * action also effectively closes any other InputStream or OutputStream
-     * object associated with the connection.
-     *
-     * @exception IOException If an error occurs
-     */
+    public native void write(int c) throws IOException;
+
+    public native void write(byte[] buffer, int offset, int length)
+      throws IOException;
+
     public void close() throws IOException
     {
       PlainSocketImpl.this.close();
     }
-
-    /**
-     * Writes a byte (passed in as an int) to the given output stream
-     * 
-     * @param b The byte to write
-     *
-     * @exception IOException If an error occurs
-     */
-    public native void write(int b) throws IOException;
-
-    /**
-     * Writes len number of bytes from the array buf to the stream starting
-     * at offset bytes into the buffer.
-     *
-     * @param buf The buffer
-     * @param offset Offset into the buffer to start writing from
-     * @param len The number of bytes to write
-     *
-     * @exception IOException If an error occurs.
-     */
-    public native void write(byte[] buf, int offset, int len) throws IOException;
   }
 }

@@ -1,5 +1,5 @@
 /* AttributedString.java -- Models text with attributes
-   Copyright (C) 1998, 1999, 2004 Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -38,10 +38,9 @@ exception statement from your version. */
 
 package java.text;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Hashtable;
 import java.util.Iterator;
+import java.util.Hashtable;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -219,7 +218,26 @@ AttributedString(AttributedCharacterIterator aci, int begin_index,
   // Get the valid attribute list
   Set all_attribs = aci.getAllAttributeKeys();
   if (attributes != null)
-    all_attribs.retainAll(Arrays.asList(attributes));
+    {
+      Set valid_attribs = new HashSet();
+      Iterator iter = all_attribs.iterator();
+      while (iter.hasNext())
+        {
+          Object obj = iter.next();
+
+          int i;
+          for (i = 0; i < attributes.length; i++)
+            if (obj.equals(attributes[0]))
+              break;
+
+          if (i == attributes.length)
+            continue;
+
+          valid_attribs.add(obj);
+        }
+
+      all_attribs = valid_attribs;
+    } 
 
   // Loop through and extract the attributes
   char c = aci.setIndex(begin_index);
@@ -301,7 +319,7 @@ AttributedString(AttributedCharacterIterator aci, int begin_index,
 public void
 addAttribute(AttributedCharacterIterator.Attribute attrib, Object value)
 {
-  addAttribute(attrib, value, 0, sci.getEndIndex());
+  addAttribute(attrib, value, 0, sci.getEndIndex() - 1);
 }
 
 /*************************************************************************/
@@ -311,7 +329,7 @@ addAttribute(AttributedCharacterIterator.Attribute attrib, Object value)
   * of the string.
   *
   * @param attrib The attribute to add.
-  * @param value The value of the attribute, which may be null.
+  * @param value The value of the attribute.
   * @param begin_index The beginning index of the subrange.
   * @param end_index The ending index of the subrange.
   *
@@ -324,10 +342,10 @@ addAttribute(AttributedCharacterIterator.Attribute attrib, Object value,
   if (attrib == null)
     throw new IllegalArgumentException("null attribute");
 
-  HashMap hm = new HashMap();
-  hm.put(attrib, value);
+  Hashtable ht = new Hashtable();
+  ht.put(attrib, value);
 
-  addAttributes(hm, begin_index, end_index);
+  addAttributes(ht, begin_index, end_index);
 }
 
 /*************************************************************************/
@@ -370,7 +388,8 @@ addAttributes(Map attributes, int begin_index, int end_index)
 public AttributedCharacterIterator
 getIterator()
 {
-  return(new AttributedStringIterator(sci, attribs, 0, sci.getEndIndex(), null));
+  return(new AttributedStringIterator(sci, attribs, 0, sci.getEndIndex() - 1,
+                                      null));
 }
 
 /*************************************************************************/
@@ -389,7 +408,7 @@ getIterator()
 public AttributedCharacterIterator
 getIterator(AttributedCharacterIterator.Attribute[] attributes)
 {
-  return(getIterator(attributes, 0, sci.getEndIndex()));
+  return(getIterator(attributes, 0, sci.getEndIndex() - 1));
 }
 
 /*************************************************************************/

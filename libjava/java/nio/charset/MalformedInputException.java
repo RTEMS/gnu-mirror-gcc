@@ -46,8 +46,6 @@ public class MalformedInputException extends CharacterCodingException
   
   /**
    * Creates the exception
-   *
-   * @param inputLength the position of malformed input in the input stream
    */
   public MalformedInputException (int inputLength)
   {
@@ -56,9 +54,7 @@ public class MalformedInputException extends CharacterCodingException
   }
 
   /**
-   * Retrieves the position of the malformed input in the input stream.
-   *
-   * @return the position
+   * Retrieves the illegal charset name
    */
   public int getInputLength ()
   {
@@ -67,8 +63,6 @@ public class MalformedInputException extends CharacterCodingException
 
   /**
    * Returns the detail message string of this throwable
-   *
-   * @return the message
    */
   public String getMessage ()
   {

@@ -48,12 +48,13 @@ import java.beans.PropertyChangeListener;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.util.Vector;
-
 import javax.accessibility.Accessible;
-import javax.accessibility.AccessibleAction;
 import javax.accessibility.AccessibleContext;
+import javax.accessibility.AccessibleAction;
 import javax.accessibility.AccessibleRole;
 import javax.accessibility.AccessibleSelection;
+import javax.swing.event.MenuEvent;
+import javax.swing.event.MenuListener;
 import javax.swing.event.ListDataEvent;
 import javax.swing.event.ListDataListener;
 import javax.swing.event.PopupMenuListener;
@@ -69,21 +70,39 @@ public class JComboBox extends JComponent
 {
   private static final long serialVersionUID = 5654585963292734470L;
 
-  /**
-   * AccessibleJComboBox
-   */
-  protected class AccessibleJComboBox extends AccessibleJComponent 
-    implements AccessibleAction, AccessibleSelection
-  {
-    private static final long serialVersionUID = 8217828307256675666L;
 
-    /**
-     * Constructor AccessibleJComboBox
-     * @param component TODO
-     */
-    protected AccessibleJComboBox()
-    {
-    }
+	//-------------------------------------------------------------
+	// Classes ----------------------------------------------------
+	//-------------------------------------------------------------
+
+	/**
+	 * AccessibleJComboBox
+	 */
+	protected class AccessibleJComboBox extends AccessibleJComponent 
+			implements AccessibleAction, AccessibleSelection {
+
+		//-------------------------------------------------------------
+		// Variables --------------------------------------------------
+		//-------------------------------------------------------------
+
+
+		//-------------------------------------------------------------
+		// Initialization ---------------------------------------------
+		//-------------------------------------------------------------
+
+		/**
+		 * Constructor AccessibleJComboBox
+		 * @param component TODO
+		 */
+		protected AccessibleJComboBox(JComboBox component) {
+			super(component);
+			// TODO
+		} // AccessibleJComboBox()
+
+
+		//-------------------------------------------------------------
+		// Methods ----------------------------------------------------
+		//-------------------------------------------------------------
 
 		/**
 		 * getAccessibleChildrenCount
@@ -786,18 +805,16 @@ public class JComboBox extends JComponent
 		return null; // TODO
 	} // paramString()
 
-  /**
-   * getAccessibleContext
-   * @returns AccessibleContext
-   */
-  public AccessibleContext getAccessibleContext()
-  {
-    if (accessibleContext == null)
-      accessibleContext = new AccessibleJComboBox();
-
-    return accessibleContext;
-  }
-  
+	/**
+	 * getAccessibleContext
+	 * @returns AccessibleContext
+	 */
+	public AccessibleContext getAccessibleContext() {
+		if (accessibleContext == null) {
+			accessibleContext = new AccessibleJComboBox(this);
+		} // if
+		return accessibleContext;
+	} // getAccessibleContext()
   /**
    * addActionListener
    * @param listener TODO

@@ -1,5 +1,5 @@
 /* AttributedStringIterator.java -- Class to iterate over AttributedString
-   Copyright (C) 1998, 1999, 2004 Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -38,11 +38,11 @@ exception statement from your version. */
 
 package java.text;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Iterator;
 
 /**
   * This class implements the AttributedCharacterIterator interface.  It
@@ -179,12 +179,8 @@ getAllAttributeKeys()
   if (attribs == null)
     return(s);
 
-    for (int i = 0; i < attribs.length; i++)
+  for (int i = 0; i < attribs.length; i++)
     {
-      if (attribs[i].begin_index > getEndIndex()
-	  || attribs[i].end_index <= getBeginIndex())
-	continue;
-
       Set key_set = attribs[i].attribs.keySet();
       Iterator iter = key_set.iterator();
       while (iter.hasNext())
@@ -221,28 +217,39 @@ getRunLimit(AttributedCharacterIterator.Attribute attrib)
 public synchronized int
 getRunLimit(Set attribute_set)
 {
-  boolean hit = false;
-  int runLimit = ci.getEndIndex ();
-  int pos = ci.getIndex ();
+  int orig_index = ci.getIndex();
+  int run_limit;
 
-  for (int i = 0; i < attribs.length; ++i)
+  do  
     {
-      if (pos >= attribs[i].begin_index &&
-          pos <= attribs[i].end_index)
-        {
-          Iterator iter = attribute_set.iterator();
-          while(iter.hasNext()) 
-            if (attribs[i].attribs.containsKey(iter.next()))
-              {
-                hit = true;
-                runLimit = Math.min(runLimit, attribs[i].end_index);
-              }
-        }
+      run_limit = ci.getIndex();
+
+      Map attribute_map = getAttributes();
+
+      boolean found = false;
+      Iterator iter = attribute_set.iterator();
+      while(iter.hasNext()) 
+        if (!attribute_map.containsKey(iter.next()))
+          {
+            found = true;
+            break;
+          }
+
+      if (found)
+        break;
     }
-  if (hit)
-    return runLimit;
-  else
-    return -1;
+  while (ci.next() != CharacterIterator.DONE);
+
+  boolean hit_end = (ci.previous() == CharacterIterator.DONE);
+
+  ci.setIndex(orig_index);
+
+  if (run_limit == orig_index)
+    return(-1); // No characters match the given attributes
+//  else if (!hit_end)
+//    --run_limit;
+
+  return(run_limit); 
 }
 
 /*************************************************************************/
@@ -270,28 +277,35 @@ getRunStart(AttributedCharacterIterator.Attribute attrib)
 public int
 getRunStart(Set attribute_set)
 {
-  boolean hit = false;
-  int runBegin = 0;
-  int pos = ci.getIndex ();
+  int orig_index = ci.getIndex();
+  int run_start;
 
-  for (int i = 0; i < attribs.length; ++i)
+  do  
     {
-      if (pos >= attribs[i].begin_index &&
-          pos <= attribs[i].end_index)
-        {
-          Iterator iter = attribute_set.iterator();
-          while(iter.hasNext()) 
-            if (attribs[i].attribs.containsKey(iter.next()))
-              {
-                hit = true;
-                runBegin = Math.max(runBegin, attribs[i].begin_index);
-              }
-        }
+      run_start = ci.getIndex();
+
+      Map attribute_map = getAttributes();
+
+      Iterator iter = attribute_set.iterator();
+      while(iter.hasNext())
+        if (!attribute_map.containsKey(iter.next()))
+          break;
+
+      if (iter.hasNext())
+        break;
     }
-  if (hit)
-    return runBegin;
-  else
-    return -1;
+  while (ci.previous() != CharacterIterator.DONE);
+
+  boolean hit_beginning = (ci.previous() == CharacterIterator.DONE);
+
+  ci.setIndex(orig_index);
+
+  if (run_start == orig_index)
+    return(-1); // No characters match the given attributes
+  else if (!hit_beginning)
+    ++run_start;
+
+  return(run_start); 
 }
 
 /*************************************************************************/
@@ -313,7 +327,7 @@ getAttribute(AttributedCharacterIterator.Attribute attrib)
           // Check for attribute match and range match
           if (obj.equals(attrib))
             if ((ci.getIndex() >= attribs[i].begin_index) &&
-                (ci.getIndex() < attribs[i].end_index))
+                (ci.getIndex() <= attribs[i].end_index))
               return(attribs[i].attribs.get(obj));
         }
     }
@@ -337,7 +351,7 @@ getAttributes()
   for (int i = 0; i < attribs.length; i++)
     {
        if ((ci.getIndex() >= attribs[i].begin_index) &&
-           (ci.getIndex() < attribs[i].end_index))
+           (ci.getIndex() <= attribs[i].end_index))
          m.putAll(attribs[i].attribs);
     }
 

@@ -63,7 +63,7 @@ public final class ByteOrder
    */
   public static ByteOrder nativeOrder ()
   {
-    return (System.getProperty ("gnu.cpu.endian").equals("big")
+    return (System.getProperty ("gnu.cpu.endian") == "big"
             ? BIG_ENDIAN : LITTLE_ENDIAN);
   }
 

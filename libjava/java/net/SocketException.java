@@ -39,7 +39,6 @@ package java.net;
 
 import java.io.IOException;
 
-
 /**
  * This exception indicates that a generic error occurred related to an
  * operation on a socket.  Check the descriptive message (if any) for

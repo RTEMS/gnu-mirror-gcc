@@ -41,10 +41,6 @@ import java.util.Locale;
 import javax.print.attribute.PrintJobAttribute;
 import javax.print.attribute.TextSyntax;
 
-
-/**
- * @author Michael Koch (konqueror@gmx.de)
- */
 public final class JobMessageFromOperator extends TextSyntax
   implements PrintJobAttribute
 {
@@ -67,7 +63,7 @@ public final class JobMessageFromOperator extends TextSyntax
    *
    * @param obj the object to test
    *
-   * @return true if both objects are equal, false otherwise.
+   * @returns true if both objects are equal, false otherwise.
    */
   public boolean equals(Object obj)
   {

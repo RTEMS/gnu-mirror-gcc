@@ -16,7 +16,6 @@ details.  */
 #include <jvm.h>
 #include <java-threads.h>
 
-#include <gnu/gcj/RawDataManaged.h>
 #include <java/lang/Thread.h>
 #include <java/lang/ThreadGroup.h>
 #include <java/lang/IllegalArgumentException.h>
@@ -60,7 +59,11 @@ java::lang::Thread::initialize_native (void)
 {
   natThread *nt = (natThread *) _Jv_AllocBytes (sizeof (natThread));
   
-  data = (gnu::gcj::RawDataManaged *) nt;
+  // The native thread data is kept in a Object field, not a RawData, so that
+  // the GC allocator can be used and a finalizer run after the thread becomes
+  // unreachable. Note that this relies on the GC's ability to finalize 
+  // non-Java objects. FIXME?
+  data = reinterpret_cast<jobject> (nt);
   
   // Register a finalizer to clean up the native thread resources.
   _Jv_RegisterFinalizer (data, finalize_native);
@@ -93,6 +96,15 @@ java::lang::Thread *
 java::lang::Thread::currentThread (void)
 {
   return _Jv_ThreadCurrent ();
+}
+
+void
+java::lang::Thread::destroy (void)
+{
+  // NOTE: This is marked as unimplemented in the JDK 1.2
+  // documentation.
+  throw new UnsupportedOperationException
+    (JvNewStringLatin1 ("Thread.destroy unimplemented"));
 }
 
 jboolean

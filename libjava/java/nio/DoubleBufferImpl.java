@@ -52,9 +52,7 @@ final class DoubleBufferImpl extends DoubleBuffer
   
   DoubleBufferImpl (double[] buffer, int offset, int capacity, int limit, int position, int mark, boolean readOnly)
   {
-    super (capacity, limit, position, mark);
-    this.backing_buffer = buffer;
-    this.array_offset = offset;
+    super (buffer, offset, capacity, limit, position, mark);
     this.readOnly = readOnly;
   }
   
@@ -100,7 +98,7 @@ final class DoubleBufferImpl extends DoubleBuffer
   /**
    * Relative get method. Reads the next <code>double</code> from the buffer.
    */
-  public double get ()
+  final public double get ()
   {
     double result = backing_buffer [position ()];
     position (position () + 1);
@@ -113,7 +111,7 @@ final class DoubleBufferImpl extends DoubleBuffer
    * 
    * @exception ReadOnlyBufferException If this buffer is read-only.
    */
-  public DoubleBuffer put (double value)
+  final public DoubleBuffer put (double value)
   {
     if (readOnly)
       throw new ReadOnlyBufferException ();
@@ -130,7 +128,7 @@ final class DoubleBufferImpl extends DoubleBuffer
    * @exception IndexOutOfBoundsException If index is negative or not smaller
    * than the buffer's limit.
    */
-  public double get (int index)
+  final public double get (int index)
   {
     return backing_buffer [index];
   }
@@ -143,7 +141,7 @@ final class DoubleBufferImpl extends DoubleBuffer
    * than the buffer's limit.
    * @exception ReadOnlyBufferException If this buffer is read-only.
    */
-  public DoubleBuffer put (int index, double value)
+  final public DoubleBuffer put (int index, double value)
   {
     if (readOnly)
       throw new ReadOnlyBufferException ();
@@ -152,7 +150,7 @@ final class DoubleBufferImpl extends DoubleBuffer
     return this;
   }
   
-  public ByteOrder order ()
+  final public ByteOrder order ()
   {
     return ByteOrder.nativeOrder ();
   }

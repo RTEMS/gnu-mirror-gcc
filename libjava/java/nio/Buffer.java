@@ -45,11 +45,10 @@ public abstract class Buffer
   int pos = 0;
   int mark = -1;
 
-  /**
-   * Creates a new Buffer.
-   *
-   * Should be package private.
-   */
+  // Creates a new Buffer.
+  //
+  // Should be package private.
+  //
   Buffer (int capacity, int limit, int position, int mark)
   {
     if (capacity < 0)
@@ -70,8 +69,6 @@ public abstract class Buffer
   
   /**
    * Retrieves the capacity of the buffer.
-   *
-   * @return the capacity of the buffer
    */
   public final int capacity ()
   {
@@ -80,8 +77,6 @@ public abstract class Buffer
 
   /**
    * Clears the buffer.
-   *
-   * @return this buffer
    */
   public final Buffer clear ()
   {
@@ -93,8 +88,6 @@ public abstract class Buffer
     
   /**
    * Flips the buffer.
-   *
-   * @return this buffer
    */
   public final Buffer flip ()
   {
@@ -106,9 +99,6 @@ public abstract class Buffer
     
   /**
    * Tells whether the buffer has remaining data to read or not.
-   *
-   * @return true if the buffer contains remaining data to read,
-   * false otherwise
    */
   public final boolean hasRemaining ()
   {
@@ -117,15 +107,11 @@ public abstract class Buffer
 
   /**
    * Tells whether this buffer is read only or not.
-   *
-   * @return true if the buffer is read only, false otherwise
    */
   public abstract boolean isReadOnly ();
 
   /**
    * Retrieves the current limit of the buffer.
-   *
-   * @return the limit of the buffer
    */
   public final int limit ()
   {
@@ -138,8 +124,6 @@ public abstract class Buffer
    * @param newLimit The new limit value; must be non-negative and no larger
    * than this buffer's capacity.
    *
-   * @return this buffer
-   *
    * @exception IllegalArgumentException If the preconditions on newLimit
    * do not hold.
    */
@@ -148,11 +132,11 @@ public abstract class Buffer
     if ((newLimit < 0) || (newLimit > cap))
       throw new IllegalArgumentException ();
 
-    if (newLimit < mark)
+    if (newLimit <= mark)
         mark = -1;
 
     if (pos > newLimit)
-        pos = newLimit;
+        pos = newLimit - 1;
 
     limit = newLimit;
     return this;
@@ -160,8 +144,6 @@ public abstract class Buffer
 
   /**
    * Sets this buffer's mark at its position.
-   *
-   * @return this buffer
    */
   public final Buffer mark ()
   {
@@ -171,8 +153,6 @@ public abstract class Buffer
 
   /**
    * Retrieves the current position of this buffer.
-   *
-   * @return the current position of this buffer
    */
   public final int position ()
   {
@@ -185,9 +165,7 @@ public abstract class Buffer
    * 
    * @param newPosition The new position value; must be non-negative and no
    * larger than the current limit.
-   *
-   * @return this buffer
-   *
+   * 
    * @exception IllegalArgumentException If the preconditions on newPosition
    * do not hold
    */
@@ -205,8 +183,6 @@ public abstract class Buffer
 
   /**
    * Returns the number of elements between the current position and the limit.
-   *
-   * @return the number of remaining elements
    */
   public final int remaining()
   {
@@ -215,9 +191,7 @@ public abstract class Buffer
 
   /**
    * Resets this buffer's position to the previously-marked position.
-   *
-   * @return this buffer
-   *
+   * 
    * @exception InvalidMarkException If the mark has not been set.
    */
   public final Buffer reset()
@@ -232,8 +206,6 @@ public abstract class Buffer
   /**
    * Rewinds this buffer. The position is set to zero and the mark
    * is discarded.
-   *
-   * @this buffer
    */
   public final Buffer rewind()
   {

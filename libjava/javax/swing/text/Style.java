@@ -39,26 +39,9 @@ package javax.swing.text;
 
 import javax.swing.event.ChangeListener;
 
-public interface Style extends MutableAttributeSet
+public interface Style
 {
-  /**
-   * Returns the name of the style.
-   *
-   * @return the name
-   */
-  String getName();
-
-  /**
-   * Adds a <code>ChangeListener</code> object to the style.
-   *
-   * @param listener the listener object to add
-   */
-  void addChangeListener(ChangeListener listener);
-
-  /**
-   * Removes a <code>ChangeListener</code> from to the style.
-   *
-   * @param listener the listener object to remove,
-   */
-  void removeChangeListener(ChangeListener listener);
+    void addChangeListener(ChangeListener l);
+    String getName();
+    void removeChangeListener(ChangeListener l);
 }

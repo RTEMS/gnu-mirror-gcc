@@ -46,20 +46,11 @@ class CharViewBufferImpl extends CharBuffer
   private boolean readOnly;
   private ByteOrder endian;
   
-  CharViewBufferImpl (ByteBuffer bb, int capacity)
-  {
-    super (capacity, capacity, 0, -1);
-    this.bb = bb;
-    this.offset = bb.position();
-    this.readOnly = bb.isReadOnly();
-    this.endian = bb.order();
-  }
-  
   public CharViewBufferImpl (ByteBuffer bb, int offset, int capacity,
 			     int limit, int position, int mark,
 			     boolean readOnly, ByteOrder endian)
   {
-    super (capacity, limit, position, mark);
+    super (limit >> 1, limit >> 1, position >> 1, mark >> 1);
     this.bb = bb;
     this.offset = offset;
     this.readOnly = readOnly;

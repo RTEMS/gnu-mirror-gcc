@@ -42,7 +42,6 @@ import java.awt.AWTEvent;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
-import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Insets;
 import java.awt.event.PaintEvent;
@@ -93,21 +92,12 @@ public class GtkContainerPeer extends GtkComponentPeer
     awtComponent.validate ();
   }
 
-  public void setFont(Font f)
-  {
-    super.setFont(f);
-    Component[] components = ((Container) awtComponent).getComponents();
-    for (int i = 0; i < components.length; i++)
-      {
-        GtkComponentPeer peer = (GtkComponentPeer) components[i].getPeer();
-        if (peer != null && ! peer.awtComponent.isFontSet())
-          peer.setFont(f);
-      }
-  }
-
   public Graphics getGraphics ()
   {
-    return super.getGraphics();
+    if (GtkToolkit.useGraphics2D ())
+        return new GdkGraphics2D (this);
+    else
+    return new GdkGraphics (this);
   }
 
   public void beginLayout () { }

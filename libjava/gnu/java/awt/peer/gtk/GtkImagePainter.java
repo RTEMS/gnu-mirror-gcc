@@ -104,7 +104,7 @@ public class GtkImagePainter implements Runnable, ImageConsumer
     s_width = Math.abs (sx2 - sx1);
     s_height = Math.abs (sy2 - sy1);
     clip = new Rectangle (sx1, sy1, s_width, s_height);
-
+    
     new Thread (this).start ();
   }
 
@@ -119,11 +119,6 @@ public class GtkImagePainter implements Runnable, ImageConsumer
   static int[] 
   convertPixels (int[] pixels, ColorModel model)
   {
-    if (pixels == null || model == null)
-    {
-      return null;
-    }
-
     if (model.equals (ColorModel.getRGBdefault ()))
       return pixels;
     
@@ -138,11 +133,6 @@ public class GtkImagePainter implements Runnable, ImageConsumer
   static int[]
   convertPixels (byte[] pixels, ColorModel model)
   {
-    if (pixels == null || model == null)
-    {
-      return null;
-    }
-
     int ret[] = new int[pixels.length];
 
     for (int i = 0; i < pixels.length; i++)
@@ -170,6 +160,8 @@ public class GtkImagePainter implements Runnable, ImageConsumer
 
 	offset += r.y * scansize + r.x;
 
+	r.translate (-Math.abs (clip.x - startX), -Math.abs (clip.y - startY));
+
 	width = r.width;
 	height = r.height;
 	x = r.x;
@@ -186,8 +178,8 @@ public class GtkImagePainter implements Runnable, ImageConsumer
   setPixels (int x, int y, int width, int height, ColorModel model, 
 	     byte[] pixels, int offset, int scansize)
   {
-    setPixels (x, y, width, height, ColorModel.getRGBdefault(),
-	       convertPixels (pixels, model), offset, scansize);
+    setPixels (x, y, width, height, model, convertPixels (pixels, model),
+	       offset, scansize);
   }
 
   public void 

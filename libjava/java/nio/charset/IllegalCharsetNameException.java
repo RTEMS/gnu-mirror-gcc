@@ -48,12 +48,10 @@ public class IllegalCharsetNameException extends IllegalArgumentException
    */
   private static final long serialVersionUID = 1457525358470002989L;
   
-  private String charsetName;
+  String charsetName;
   
   /**
    * Creates the exception
-   *
-   * @param charsetName name of the illegal charset
    */
   public IllegalCharsetNameException (String charsetName)
   {
@@ -63,8 +61,6 @@ public class IllegalCharsetNameException extends IllegalArgumentException
 
   /**
    * Retrieves the illegal charset name
-   *
-   * @return the illegal charset name
    */
   public String getCharsetName ()
   {

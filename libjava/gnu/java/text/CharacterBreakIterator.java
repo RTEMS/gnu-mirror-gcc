@@ -38,6 +38,7 @@ exception statement from your version. */
 
 package gnu.java.text;
 
+import java.text.BreakIterator;
 import java.text.CharacterIterator;
 
 /**
@@ -160,6 +161,7 @@ public class CharacterBreakIterator extends BaseBreakIterator
     if (iter.getIndex() == iter.getBeginIndex())
       return DONE;
 
+    int start = iter.getBeginIndex();
     while (iter.getIndex() >= iter.getBeginIndex())
       {
 	char c = iter.previous();

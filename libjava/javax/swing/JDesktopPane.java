@@ -37,8 +37,6 @@ exception statement from your version. */
 
 package javax.swing;
 
-import java.awt.Component;
-import java.beans.PropertyVetoException;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import javax.accessibility.Accessible;
@@ -46,281 +44,244 @@ import javax.accessibility.AccessibleContext;
 import javax.accessibility.AccessibleRole;
 import javax.swing.plaf.DesktopPaneUI;
 
-
 /**
- * JDesktopPane is a container (usually for JInternalFrames) that simulates a
- * desktop. Typically, the user will create JInternalFrames and place thme in
- * a JDesktopPane. The user can then interact with JInternalFrames like they
- * usually would with JFrames. The actions (minimize, maximize, close, etc)
- * are done by using a DesktopManager that is associated with the
- * JDesktopPane.
+ * JDesktopPane
+ * @author	Andrew Selkirk
+ * @version	1.0
  */
 public class JDesktopPane extends JLayeredPane implements Accessible
 {
-  /** DOCUMENT ME! */
-  private static final long serialVersionUID = 766333777224038726L;
 
-  /**
-   * This specifies that when dragged, a JInternalFrame should be completely
-   * visible.
-   */
-  public static int LIVE_DRAG_MODE = 0;
+	//-------------------------------------------------------------
+	// Classes ----------------------------------------------------
+	//-------------------------------------------------------------
 
-  /**
-   * This specifies that when dragged, a JInternalFrame should only be visible
-   * as an outline.
-   */
-  public static int OUTLINE_DRAG_MODE = 1;
+	/**
+	 * AccessibleJDesktopPane
+	 */
+	protected class AccessibleJDesktopPane extends AccessibleJComponent {
 
-  /** The selected frame in the JDesktopPane. */
-  private transient JInternalFrame selectedFrame;
+		//-------------------------------------------------------------
+		// Initialization ---------------------------------------------
+		//-------------------------------------------------------------
 
-  /** The JDesktopManager to use for acting on JInternalFrames. */
-  transient DesktopManager desktopManager;
+		/**
+		 * Constructor AccessibleJDesktopPane
+		 * @param component TODO
+		 */
+		protected AccessibleJDesktopPane(JDesktopPane component) {
+			super(component);
+			// TODO
+		} // AccessibleJDesktopPane()
 
-  /** The drag mode used by the JDesktopPane. */
-  private transient int dragMode = LIVE_DRAG_MODE;
 
-  /**
-   * AccessibleJDesktopPane
-   */
-  protected class AccessibleJDesktopPane extends AccessibleJComponent
-  {
-    /** DOCUMENT ME! */
-    private static final long serialVersionUID = 6079388927946077570L;
+		//-------------------------------------------------------------
+		// Methods ----------------------------------------------------
+		//-------------------------------------------------------------
 
-    /**
-     * Constructor AccessibleJDesktopPane
-     */
-    protected AccessibleJDesktopPane()
-    {
-    }
+		/**
+		 * getAccessibleRole
+		 * @returns AccessibleRole
+		 */
+		public AccessibleRole getAccessibleRole() {
+			return AccessibleRole.DESKTOP_PANE;
+		} // getAccessibleRole()
 
-    /**
-     * getAccessibleRole
-     *
-     * @return AccessibleRole
-     */
-    public AccessibleRole getAccessibleRole()
-    {
-      return AccessibleRole.DESKTOP_PANE;
-    }
-  }
 
-  /**
-   * Creates a new JDesktopPane object.
-   */
-  public JDesktopPane()
-  {
-    setLayout(null);
-    updateUI();
-  }
+	} // AccessibleJDesktopPane
 
-  /**
-   * This method returns the UI used with the JDesktopPane.
-   *
-   * @return The UI used with the JDesktopPane.
-   */
-  public DesktopPaneUI getUI()
-  {
-    return (DesktopPaneUI) ui;
-  }
 
-  /**
-   * This method sets the UI used with the JDesktopPane.
-   *
-   * @param ui The UI to use with the JDesktopPane.
-   */
-  public void setUI(DesktopPaneUI ui)
-  {
-    super.setUI(ui);
-  }
+	//-------------------------------------------------------------
+	// Constants --------------------------------------------------
+	//-------------------------------------------------------------
+	
+	/**
+	 * LIVE_DRAG_MODE
+	 */
+	public static int LIVE_DRAG_MODE = 0;
 
-  /**
-   * This method sets the drag mode to use with the JDesktopPane.
-   *
-   * @param mode The drag mode to use.
-   *
-   * @throws IllegalArgumentException If the drag mode given is not
-   *         LIVE_DRAG_MODE or OUTLINE_DRAG_MODE.
-   */
-  public void setDragMode(int mode)
-  {
-    if ((mode != LIVE_DRAG_MODE) && (mode != OUTLINE_DRAG_MODE))
-      throw new IllegalArgumentException("Drag mode not valid.");
+	/**
+	 * OUTLINE_DRAG_MODE
+	 */
+	public static int OUTLINE_DRAG_MODE = 1;
 
-    // FIXME: Unsupported mode.
-    if (mode == OUTLINE_DRAG_MODE)
-      throw new IllegalArgumentException("Outline drag modes are unsupported.");
+	/**
+	 * uiClassID
+	 */
+	private static final String uiClassID = "DesktopPaneUI";
 
-    dragMode = mode;
-  }
 
-  /**
-   * This method returns the drag mode used with the JDesktopPane.
-   *
-   * @return The drag mode used with the JDesktopPane.
-   */
-  public int getDragMode()
-  {
-    return dragMode;
-  }
+	//-------------------------------------------------------------
+	// Variables --------------------------------------------------
+	//-------------------------------------------------------------
 
-  /**
-   * This method returns the DesktopManager used with the JDesktopPane.
-   *
-   * @return The DesktopManager to use with the JDesktopPane.
-   */
-  public DesktopManager getDesktopManager()
-  {
-    return desktopManager;
-  }
+	/**
+	 * selectedFrame
+	 */
+	private transient JInternalFrame selectedFrame;
 
-  /**
-   * This method sets the DesktopManager to use with the JDesktopPane.
-   *
-   * @param manager The DesktopManager to use with the JDesktopPane.
-   */
-  public void setDesktopManager(DesktopManager manager)
-  {
-    desktopManager = manager;
-  }
+        /**
+         * desktopManager
+         */
+	private transient DesktopManager desktopManager;
 
-  /**
-   * This method restores the UI used with the JDesktopPane to the default.
-   */
-  public void updateUI()
-  {
-    setUI((DesktopPaneUI) UIManager.getUI(this));
-    invalidate();
-  }
 
-  /**
-   * This method returns a String identifier that allows the UIManager to know
-   * which class will act as JDesktopPane's UI.
-   *
-   * @return A String identifier for the UI class to use.
-   */
-  public String getUIClassID()
-  {
-    return "DesktopPaneUI";
-  }
+	/**
+	 * dragMode
+	 */
+	private int dragMode;
 
-  /**
-   * This method returns all JInternalFrames that are in the JDesktopPane.
-   *
-   * @return All JInternalFrames that are in the JDesktopPane.
-   */
-  public JInternalFrame[] getAllFrames()
-  {
-    return getFramesFromComponents(getComponents());
-  }
 
-  /**
-   * This method returns the currently selected frame in the JDesktopPane.
-   *
-   * @return The currently selected frame in the JDesktopPane.
-   */
-  public JInternalFrame getSelectedFrame()
-  {
-    return selectedFrame;
-  }
+	//-------------------------------------------------------------
+	// Initialization ---------------------------------------------
+	//-------------------------------------------------------------
 
-  /**
-   * This method sets the selected frame in the JDesktopPane.
-   *
-   * @param frame The selected frame in the JDesktopPane.
-   */
-  public void setSelectedFrame(JInternalFrame frame)
-  {
-    if (selectedFrame != null)
-      {
-	try
-	  {
-	    selectedFrame.setSelected(false);
-	  }
-	catch (PropertyVetoException e)
-	  {
-	  }
-      }
-    selectedFrame = null;
+	/**
+	 * Constructor JDesktopPane
+	 */
+	public JDesktopPane() {
+		// TODO
+	} // JDesktopPane()
 
-    try
-      {
-	if (frame != null)
-	  frame.setSelected(true);
 
-	selectedFrame = frame;
-      }
-    catch (PropertyVetoException e)
-      {
-      }
-  }
+	//-------------------------------------------------------------
+	// Methods ----------------------------------------------------
+	//-------------------------------------------------------------
 
-  /**
-   * This method returns all the JInternalFrames in the given layer.
-   *
-   * @param layer The layer to grab frames in.
-   *
-   * @return All JInternalFrames in the given layer.
-   */
-  public JInternalFrame[] getAllFramesInLayer(int layer)
-  {
-    return getFramesFromComponents(getComponentsInLayer(layer));
-  }
+	/**
+	 * writeObject
+	 * @param stream TODO
+	 * @exception IOException TODO
+	 */
+	private void writeObject(ObjectOutputStream stream) throws IOException {
+		// TODO
+	} // writeObject()
 
-  /**
-   * This method always returns true to indicate that it is not transparent.
-   *
-   * @return true.
-   */
-  public boolean isOpaque()
-  {
-    return true;
-  }
+	/**
+	 * getUI
+	 * @returns DesktopPaneUI
+	 */
+	public DesktopPaneUI getUI() {
+		return (DesktopPaneUI) ui;
+	} // getUI()
 
-  /**
-   * This method returns a String that describes the JDesktopPane.
-   *
-   * @return A String that describes the JDesktopPane.
-   */
-  protected String paramString()
-  {
-    return "JDesktopPane";
-  }
+	/**
+	 * setUI
+	 * @param ui TODO
+	 */
+	public void setUI(DesktopPaneUI ui) {
+		super.setUI(ui);
+	} // setUI()
 
-  /**
-   * This method returns all the JInternalFrames in the given Component array.
-   *
-   * @param components An array to search for JInternalFrames in.
-   *
-   * @return An array of JInternalFrames found in the Component array.
-   */
-  private static JInternalFrame[] getFramesFromComponents(Component[] components)
-  {
-    int count = 0;
+	/**
+	 * setDragMode
+	 * @param mode TODO
+	 */
+	public void setDragMode(int mode) {
+		this.dragMode = mode;
+		// TODO
+	} // setDragMode()
 
-    for (int i = 0; i < components.length; i++)
-	if (components[i] instanceof JInternalFrame)
-	  count++;
-	  
-    JInternalFrame[] value = new JInternalFrame[count];
-    for (int i = 0, j = 0; i < components.length && j != count; i++)
-      if (components[i] instanceof JInternalFrame)
-	value[j++] = (JInternalFrame) components[i];
-    return value;
-  }
+	/**
+	 * getDragMode
+	 * @returns int
+	 */
+	public int getDragMode() {
+		return dragMode;
+	} // getDragMode()
 
-  /**
-   * getAccessibleContext
-   *
-   * @return AccessibleContext
-   */
-  public AccessibleContext getAccessibleContext()
-  {
-    if (accessibleContext == null)
-      accessibleContext = new AccessibleJDesktopPane();
+	/**
+	 * getDesktopManager
+	 * @returns DesktopManager
+	 */
+	public DesktopManager getDesktopManager() {
+		return desktopManager;
+	} // getDesktopManager()
 
-    return accessibleContext;
-  }
-}
+	/**
+	 * setDesktopManager
+	 * @param manager TODO
+	 */
+	public void setDesktopManager(DesktopManager manager) {
+		this.desktopManager = manager;
+		// TODO
+	} // setDesktopManager()
+
+	/**
+	 * updateUI
+	 */
+	public void updateUI() {
+		setUI((DesktopPaneUI) UIManager.get(this));
+		invalidate();
+	} // updateUI()
+
+	/**
+	 * getUIClassID
+	 * @returns String
+	 */
+	public String getUIClassID() {
+		return uiClassID;
+	} // getUIClassID()
+
+	/**
+	 * getAllFrames
+	 * @returns JInternalFrame[]
+	 */
+	public JInternalFrame[] getAllFrames() {
+		return null; // TODO
+	} // getAllFrames()
+
+	/**
+	 * getSelectedFrame
+	 * @returns JInternalFrame
+	 */
+	public JInternalFrame getSelectedFrame() {
+		return null; // TODO
+	} // getSelectedFrame()
+
+	/**
+	 * setSelectedFrame
+	 * @param frame TODO
+	 */
+	public void setSelectedFrame(JInternalFrame frame) {
+		// TODO
+	} // setSelectedFrame()
+
+	/**
+	 * getAllFramesInLayer
+	 * @param layer TODO
+	 * @returns JInternalFrame[]
+	 */
+	public JInternalFrame[] getAllFramesInLayer(int layer) {
+		return null; // TODO
+	} // getAllFramesInLayer()
+
+	/**
+	 * isOpaque
+	 * @returns boolean
+	 */
+	public boolean isOpaque() {
+		return true;
+	} // isOpaque()
+
+	/**
+	 * paramString
+	 * @returns String
+	 */
+	protected String paramString() {
+		return null; // TODO
+	} // paramString()
+
+	/**
+	 * getAccessibleContext
+	 * @returns AccessibleContext
+	 */
+	public AccessibleContext getAccessibleContext() {
+		if (accessibleContext == null) {
+			accessibleContext = new AccessibleJDesktopPane(this);
+		} // if
+		return accessibleContext;
+	} // getAccessibleContext()
+
+
+} // JDesktopPane

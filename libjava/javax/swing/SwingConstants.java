@@ -60,15 +60,5 @@ public interface SwingConstants
     
   int LEADING      = 10;
   int TRAILING     = 11;
-
-  /**
-   * @since 1.4
-   */
-  int NEXT         = 12;
-
-  /**
-   * @since 1.4
-   */
-  int PREVIOUS     = 13;
 }
 

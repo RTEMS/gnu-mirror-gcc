@@ -170,9 +170,6 @@ _Jv_PrepareCompiledClass (jclass klass)
     }
 #endif /* INTERPRETER */
 
-  if (klass->isInterface ())
-    _Jv_LayoutInterfaceMethods (klass);
-
   klass->notifyAll ();
 
   _Jv_PushClass (klass);
@@ -422,7 +419,7 @@ jclass
 _Jv_NewClass (_Jv_Utf8Const *name, jclass superclass,
 	      java::lang::ClassLoader *loader)
 {
-  jclass ret = (jclass) _Jv_AllocObject (&java::lang::Class::class$);
+  jclass ret = (jclass) JvAllocObject (&java::lang::Class::class$);
   ret->name = name;
   ret->superclass = superclass;
   ret->loader = loader;

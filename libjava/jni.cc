@@ -1,7 +1,6 @@
 // jni.cc - JNI implementation, including the jump table.
 
-/* Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004
-   Free Software Foundation
+/* Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003  Free Software Foundation
 
    This file is part of libgcj.
 
@@ -28,7 +27,6 @@ details.  */
 #include <java/lang/Throwable.h>
 #include <java/lang/ArrayIndexOutOfBoundsException.h>
 #include <java/lang/StringIndexOutOfBoundsException.h>
-#include <java/lang/StringBuffer.h>
 #include <java/lang/UnsatisfiedLinkError.h>
 #include <java/lang/InstantiationException.h>
 #include <java/lang/NoSuchFieldError.h>
@@ -635,7 +633,7 @@ static jobject
       if (clazz->isInterface() || Modifier::isAbstract(clazz->getModifiers()))
 	env->ex = new java::lang::InstantiationException ();
       else
-	obj = _Jv_AllocObject (clazz);
+	obj = JvAllocObject (clazz);
     }
   catch (jthrowable t)
     {
@@ -707,10 +705,7 @@ static jmethodID
 	  clazz = clazz->getSuperclass ();
 	}
 
-      java::lang::StringBuffer *name_sig =
-        new java::lang::StringBuffer (JvNewStringUTF (name));
-      name_sig->append ((jchar) ' ')->append (JvNewStringUTF (s));
-      env->ex = new java::lang::NoSuchMethodError (name_sig->toString ());
+      env->ex = new java::lang::NoSuchMethodError ();
     }
   catch (jthrowable t)
     {

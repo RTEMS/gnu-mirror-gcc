@@ -1,5 +1,5 @@
 /* jcl.c
-   Copyright (C) 1998, 2004 Free Software Foundation, Inc.
+   Copyright (C) 1998 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -37,17 +37,13 @@ exception statement from your version. */
 
 #include <stdio.h>
 #include <jcl.h>
-#include <stdlib.h>
+#include <malloc.h>
 
 #ifndef __GNUC__
 #define __attribute__(x) /* nothing */
 #endif
 
-/*
- * This way the memory is pre-allocated, so that we do not have to worry
- * if we are out of memory.
- */
-static char errstr[4098];
+static char errstr[4098]; // this way the memory is pre-allocated, so that we do not have to worry if we are out of memory.
 
 JNIEXPORT void JNICALL JCL_ThrowException(JNIEnv * env, char * className, char * errMsg) {
 	jclass excClass;

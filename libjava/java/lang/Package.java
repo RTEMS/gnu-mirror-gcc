@@ -227,10 +227,7 @@ public class Package
    * <code>getSpecificationVersion</code>.
    *
    * @param version the (minimal) desired version of the specification
-   *
-   * @return true if the version is compatible, false otherwise
-   *
-   * @Throws NumberFormatException if either version string is invalid
+   * @throws NumberFormatException if either version string is invalid
    * @throws NullPointerException if either version string is null
    */
   public boolean isCompatibleWith(String version)

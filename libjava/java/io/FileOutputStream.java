@@ -1,5 +1,5 @@
 /* FileOutputStream.java -- Writes to a file on disk.
-   Copyright (C) 1998, 2001, 2003, 2004 Free Software Foundation, Inc.
+   Copyright (C) 1998, 2001, 2003 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -39,7 +39,7 @@ exception statement from your version. */
 package java.io;
 
 import java.nio.channels.FileChannel;
-import gnu.java.nio.channels.FileChannelImpl;
+import java.nio.channels.FileChannelImpl;
 
 /* Written using "Java Class Libraries", 2nd edition, ISBN 0-201-31002-3
  * "The Java Language Specification", ISBN 0-201-63451-1
@@ -57,7 +57,7 @@ public class FileOutputStream extends OutputStream
 {
   private FileDescriptor fd;
 
-  private FileChannelImpl ch;
+  private FileChannel ch; /* cached associated file-channel */
 
   /**
    * This method initializes a <code>FileOutputStream</code> object to write
@@ -81,7 +81,13 @@ public class FileOutputStream extends OutputStream
   public FileOutputStream (String path, boolean append)
     throws SecurityException, FileNotFoundException
   {
-    this (new File(path), append);
+    SecurityManager s = System.getSecurityManager();
+    if (s != null)
+      s.checkWrite(path);
+    fd = new FileDescriptor (path, (append
+				    ? FileDescriptor.WRITE
+				      | FileDescriptor.APPEND
+				    : FileDescriptor.WRITE));
   }
 
   /**
@@ -124,7 +130,7 @@ public class FileOutputStream extends OutputStream
   public FileOutputStream (File file)
     throws SecurityException, FileNotFoundException
   {
-    this (file, false);
+    this (file.getPath(), false);
   }
 
   /**
@@ -150,17 +156,7 @@ public class FileOutputStream extends OutputStream
   public FileOutputStream (File file, boolean append)
     throws FileNotFoundException
   {
-    SecurityManager s = System.getSecurityManager();
-    if (s != null)
-      s.checkWrite(file.getPath());
-
-    if (file.isDirectory())
-      throw new FileNotFoundException(file.getPath() + " is a directory");
-
-   ch = new FileChannelImpl (file.getPath(), (append
-				     ? FileChannelImpl.WRITE
-				     | FileChannelImpl.APPEND
-				     : FileChannelImpl.WRITE));
+    this (file.getPath(), append);
   }
 
   /**
@@ -192,12 +188,6 @@ public class FileOutputStream extends OutputStream
       s.checkWrite(fdObj);
 
     fd = fdObj;
-    ch = (FileChannelImpl) fdObj.channel;
-  }
-
-  FileOutputStream(FileChannelImpl ch)
-  {
-    this.ch = ch;
   }
 
   protected void finalize () throws IOException
@@ -216,12 +206,9 @@ public class FileOutputStream extends OutputStream
    */
   public final FileDescriptor getFD () throws IOException
   {
-    synchronized (this)
-      {
-	if (fd == null)
-	  fd = new FileDescriptor (ch);
-	return fd;
-      }
+    if (! fd.valid())
+      throw new IOException ();
+    return fd;
   }
 
   /**
@@ -233,7 +220,7 @@ public class FileOutputStream extends OutputStream
    */
   public void write (int b) throws IOException
   {
-    ch.write (b);
+    fd.write (b);
   }
 
   /**
@@ -268,7 +255,7 @@ public class FileOutputStream extends OutputStream
         || offset + len > buf.length)
       throw new ArrayIndexOutOfBoundsException ();
     
-    ch.write (buf, offset, len);
+    fd.write (buf, offset, len);
   }
 
   /**
@@ -280,7 +267,8 @@ public class FileOutputStream extends OutputStream
    */
   public void close () throws IOException
   {
-    ch.close();
+    if (fd.valid())
+      fd.close();
   }
 
   /**
@@ -291,6 +279,9 @@ public class FileOutputStream extends OutputStream
    */
   public synchronized FileChannel getChannel() 
   {
+    if (ch == null)
+      ch = new FileChannelImpl (fd, true, this);
+
     return ch;
   }
 

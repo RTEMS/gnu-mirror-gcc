@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 1996, 1997, 1998, 1999, 2004 Free Software Foundation, Inc.
+  Copyright (c) 1996, 1997, 1998, 1999 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -46,7 +46,8 @@ import gnu.java.rmi.RMIMarshalledObjectOutputStream;
 /**
  * FIXME - doc missing
  */
-public final class MarshalledObject implements Serializable 
+public final class MarshalledObject
+  extends Object implements Serializable 
 {
   
   //The following fields are from Java API Documentation "Serialized form"

@@ -218,10 +218,9 @@ public class TableColumn implements Serializable
 	 * @param oldValue TODO
 	 * @param newValue TODO
 	 */
-	private void firePropertyChange(String property, boolean oldValue, boolean newValue)
-	{
+	private void firePropertyChange(String property, boolean oldValue, boolean newValue) {
 		firePropertyChange(property, new Boolean(oldValue), new Boolean(newValue));
-	}
+	} // firePropertyChange()
 
 	/**
 	 * setModelIndex

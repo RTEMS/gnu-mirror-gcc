@@ -38,28 +38,19 @@ exception statement from your version. */
 
 package java.nio;
 
-final class ShortViewBufferImpl extends ShortBuffer
+class ShortViewBufferImpl extends ShortBuffer
 {
   /** Position in bb (i.e. a byte offset) where this buffer starts. */
   private int offset;
   private ByteBuffer bb;
   private boolean readOnly;
   private ByteOrder endian;
-
-  ShortViewBufferImpl (ByteBuffer bb, int capacity)
-  {
-    super (capacity, capacity, 0, -1);
-    this.bb = bb;
-    this.offset = bb.position();
-    this.readOnly = bb.isReadOnly();
-    this.endian = bb.order();
-  }
   
   public ShortViewBufferImpl (ByteBuffer bb, int offset, int capacity,
 			      int limit, int position, int mark,
 			      boolean readOnly, ByteOrder endian)
   {
-    super (capacity, limit, position, mark);
+    super (limit >> 1, limit >> 1, position >> 1, mark >> 1);
     this.bb = bb;
     this.offset = offset;
     this.readOnly = readOnly;

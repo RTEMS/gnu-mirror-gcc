@@ -171,15 +171,13 @@ public final class ComponentOrientation implements Serializable
   }
 
   /**
-   * Gets an orientation from a resource bundle. This tries the following:
-   *
-   * <ul>
+   * Gets an orientation from a resource bundle. This tries the following:<ol>
    * <li>Use the key "Orientation" to find an instance of ComponentOrientation
    * in the bundle.</li>
    * <li>Get the locale of the resource bundle, and get the orientation of
    * that locale.</li>
-   * <li>Give up and get the orientation of the default locale.</li>
-   * </ul>
+   * <li>Give up and get the orientation of the default locale.<li>
+   * <ol>
    *
    * @param bdl the bundle to use
    * @return the orientation

@@ -1,5 +1,5 @@
 /* JWindow.java --
-   Copyright (C) 2002, 2003, 2004  Free Software Foundation, Inc.
+   Copyright (C) 2002, 2003 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -44,11 +44,11 @@ import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.Frame;
 import java.awt.Graphics;
+import java.awt.GraphicsConfiguration;
 import java.awt.LayoutManager;
 import java.awt.Window;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowEvent;
-
 import javax.accessibility.Accessible;
 import javax.accessibility.AccessibleContext;
 
@@ -58,10 +58,8 @@ import javax.accessibility.AccessibleContext;
  *
  * @author Ronald Veldema (rveldema@cs.vu.nl)
  */
-public class JWindow extends Window implements Accessible, RootPaneContainer
+public class JWindow extends Window implements Accessible
 {
-  private static final long serialVersionUID = 5420698392125238833L;
-  
     public final static int HIDE_ON_CLOSE        = 0;
     public final static int EXIT_ON_CLOSE        = 1;
     public final static int DISPOSE_ON_CLOSE     = 2;
@@ -81,8 +79,8 @@ public class JWindow extends Window implements Accessible, RootPaneContainer
      *************/
 
     public JWindow()
-    {      
-     	super(null); // FIXME: This throws an exception.
+    {
+      this(null);
     }
 
     // huuu ?
@@ -116,23 +114,30 @@ public class JWindow extends Window implements Accessible, RootPaneContainer
     return d;
   }
 
+    JMenuBar getJMenuBar()
+    {    return getRootPane().getJMenuBar();   }
+    
+    void setJMenuBar(JMenuBar menubar)
+    {    getRootPane().setJMenuBar(menubar); }
+    
+
   public  void setLayout(LayoutManager manager)
   {    super.setLayout(manager);  }
 
-    public void setLayeredPane(JLayeredPane layeredPane) 
+    void setLayeredPane(JLayeredPane layeredPane) 
     {   getRootPane().setLayeredPane(layeredPane);   }
   
-    public JLayeredPane getLayeredPane()
+    JLayeredPane getLayeredPane()
     {   return getRootPane().getLayeredPane();     }
   
-    public JRootPane getRootPane()
+    JRootPane getRootPane()
     {
 	if (rootPane == null)
 	    setRootPane(createRootPane());
 	return rootPane;          
     }
 
-    public void setRootPane(JRootPane root)
+    void setRootPane(JRootPane root)
     {
 	if (rootPane != null)
 	    remove(rootPane);
@@ -141,19 +146,19 @@ public class JWindow extends Window implements Accessible, RootPaneContainer
 	add(rootPane, BorderLayout.CENTER);
     }
 
-    public JRootPane createRootPane()
+    JRootPane createRootPane()
     {   return new JRootPane();    }
 
-    public Container getContentPane()
+    Container getContentPane()
     {    return getRootPane().getContentPane();     }
 
-    public void setContentPane(Container contentPane)
+    void setContentPane(Container contentPane)
     {    getRootPane().setContentPane(contentPane);    }
   
-    public Component getGlassPane()
+    Component getGlassPane()
     {    return getRootPane().getGlassPane();   }
   
-    public void setGlassPane(Component glassPane)
+    void setGlassPane(Component glassPane)
     {   getRootPane().setGlassPane(glassPane);   }
 
     

@@ -38,6 +38,10 @@ exception statement from your version. */
 
 package javax.swing.plaf.basic;
 
+import java.awt.Dimension;
+import java.awt.Graphics;
+import java.awt.Rectangle;
+import javax.swing.AbstractButton;
 import javax.swing.JComponent;
 import javax.swing.plaf.ComponentUI;
 

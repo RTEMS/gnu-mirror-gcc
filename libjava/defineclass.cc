@@ -96,10 +96,7 @@ struct _Jv_ClassReader {
   unsigned int      *offsets;
 
   // the class to define (see java-interp.h)
-  jclass	   def;
-  
-  // the classes associated interpreter data.
-  _Jv_InterpClass  *def_interp;
+  _Jv_InterpClass   *def;
 
   /* check that the given number of input bytes are available */
   inline void check (int num)
@@ -224,8 +221,7 @@ struct _Jv_ClassReader {
     bytes  = (unsigned char*) (elements (data)+offset);
     len    = length;
     pos    = 0;
-    def    = klass;
-    def_interp = (_Jv_InterpClass *) def->aux_info;
+    def    = (_Jv_InterpClass*) klass;
   }
 
   /** and here goes the parser members defined out-of-line */
@@ -776,9 +772,9 @@ _Jv_ClassReader::prepare_pool_entry (int index, unsigned char this_tag)
 			   name_index, type_index);
 
 	  if (this_tag == JV_CONSTANT_Fieldref)
-	    verify_field_signature (pool_data[type_index].utf8);
+	    _Jv_VerifyFieldSignature (pool_data[type_index].utf8);
 	  else
-	    verify_method_signature (pool_data[type_index].utf8);
+	    _Jv_VerifyMethodSignature (pool_data[type_index].utf8);
 
 	  _Jv_Utf8Const* name = pool_data[name_index].utf8;
 
@@ -1051,10 +1047,10 @@ void _Jv_ClassReader::handleFieldsBegin (int count)
   def->fields = (_Jv_Field*) 
     _Jv_AllocBytes (count * sizeof (_Jv_Field));
   def->field_count = count;
-  def_interp->field_initializers = (_Jv_ushort*)
+  def->field_initializers = (_Jv_ushort*)
     _Jv_AllocBytes (count * sizeof (_Jv_ushort));
   for (int i = 0; i < count; i++)
-    def_interp->field_initializers[i] = (_Jv_ushort) 0;
+    def->field_initializers[i] = (_Jv_ushort) 0;
 }
 
 void _Jv_ClassReader::handleField (int field_no,
@@ -1107,7 +1103,7 @@ void _Jv_ClassReader::handleField (int field_no,
     }
 
   if (verify)
-    verify_field_signature (sig);
+    _Jv_VerifyFieldSignature (sig);
 
   // field->type is really a jclass, but while it is still
   // unresolved we keep an _Jv_Utf8Const* instead.
@@ -1137,7 +1133,7 @@ void _Jv_ClassReader::handleConstantValueAttribute (int field_index,
     throw_class_format_error ("field has multiple ConstantValue attributes");
 
   field->flags |= _Jv_FIELD_CONSTANT_VALUE;
-  def_interp->field_initializers[field_index] = value;
+  def->field_initializers[field_index] = value;
 
   /* type check the initializer */
   
@@ -1157,7 +1153,7 @@ void _Jv_ClassReader::handleFieldsEnd ()
   int low            = 0;
   int high           = def->field_count-1;
   _Jv_Field  *fields = def->fields;
-  _Jv_ushort *inits  = def_interp->field_initializers;
+  _Jv_ushort *inits  = def->field_initializers;
 
   // this is kind of a raw version of quicksort.
   while (low < high)
@@ -1199,13 +1195,13 @@ _Jv_ClassReader::handleMethodsBegin (int count)
 {
   def->methods = (_Jv_Method *) _Jv_AllocBytes (sizeof (_Jv_Method) * count);
 
-  def_interp->interpreted_methods
+  def->interpreted_methods
     = (_Jv_MethodBase **) _Jv_AllocBytes (sizeof (_Jv_MethodBase *)
 					  * count);
 
   for (int i = 0; i < count; i++)
     {
-      def_interp->interpreted_methods[i] = 0;
+      def->interpreted_methods[i] = 0;
       def->methods[i].index = (_Jv_ushort) -1;
     }
 
@@ -1244,7 +1240,7 @@ void _Jv_ClassReader::handleMethod
       else
 	verify_identifier (method->name);
 
-      verify_method_signature (method->signature);
+      _Jv_VerifyMethodSignature (method->signature);
 
       for (int i = 0; i < mth_index; ++i)
 	{
@@ -1288,7 +1284,7 @@ void _Jv_ClassReader::handleCodeAttribute
 	  (void*) (bytes+code_start),
 	  code_length);
 
-  def_interp->interpreted_methods[method_index] = method;
+  def->interpreted_methods[method_index] = method;
 
   if ((method->self->accflags & java::lang::reflect::Modifier::STATIC))
     {
@@ -1305,7 +1301,7 @@ void _Jv_ClassReader::handleExceptionTableEntry
    int start_pc, int end_pc, int handler_pc, int catch_type)
 {
   _Jv_InterpMethod *method = reinterpret_cast<_Jv_InterpMethod *>
-    (def_interp->interpreted_methods[method_index]);
+    (def->interpreted_methods[method_index]);
   _Jv_InterpException *exc = method->exceptions ();
 
   exc[exc_index].start_pc.i     = start_pc;
@@ -1323,7 +1319,7 @@ void _Jv_ClassReader::handleMethodsEnd ()
       _Jv_Method *method = &def->methods[i];
       if ((method->accflags & Modifier::NATIVE) != 0)
 	{
-	  if (def_interp->interpreted_methods[i] != 0)
+	  if (def->interpreted_methods[i] != 0)
 	    throw_class_format_error ("code provided for native method");
 	  else
 	    {
@@ -1332,7 +1328,7 @@ void _Jv_ClassReader::handleMethodsEnd ()
 	      m->defining_class = def;
 	      m->self = method;
 	      m->function = NULL;
-	      def_interp->interpreted_methods[i] = m;
+	      def->interpreted_methods[i] = m;
 	      m->deferred = NULL;
 
 	      if ((method->accflags & Modifier::STATIC))
@@ -1348,12 +1344,12 @@ void _Jv_ClassReader::handleMethodsEnd ()
 	}
       else if ((method->accflags & Modifier::ABSTRACT) != 0)
 	{
-	  if (def_interp->interpreted_methods[i] != 0)
+	  if (def->interpreted_methods[i] != 0)
 	    throw_class_format_error ("code provided for abstract method");
 	}
       else
 	{
-	  if (def_interp->interpreted_methods[i] == 0)
+	  if (def->interpreted_methods[i] == 0)
 	    throw_class_format_error ("method with no code");
 	}
     }

@@ -42,6 +42,7 @@ import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
 import java.io.InputStream;
 import java.io.IOException;
+import gnu.classpath.Configuration;
 
 /**
  * A resource bundle contains locale-specific data. If you need localized
@@ -50,7 +51,7 @@ import java.io.IOException;
  * <code>getObject</code> or <code>getString</code> on that bundle.
  *
  * <p>When a bundle is demanded for a specific locale, the ResourceBundle
- * is searched in following order (<i>def. language</i> stands for the
+ * is searched in following order (<i>def. language<i> stands for the
  * two letter ISO language code of the default locale (see
  * <code>Locale.getDefault()</code>).
  *
@@ -250,22 +251,18 @@ public abstract class ResourceBundle
    *
    * <p>A sequence of candidate bundle names are generated, and tested in
    * this order, where the suffix 1 means the string from the specified
-   * locale, and the suffix 2 means the string from the default locale:</p>
-   *
-   * <ul>
+   * locale, and the suffix 2 means the string from the default locale:<ul>
    * <li>baseName + "_" + language1 + "_" + country1 + "_" + variant1</li>
    * <li>baseName + "_" + language1 + "_" + country1</li>
    * <li>baseName + "_" + language1</li>
    * <li>baseName + "_" + language2 + "_" + country2 + "_" + variant2</li>
    * <li>baseName + "_" + language2 + "_" + country2</li>
-   * <li>baseName + "_" + language2</li>
+   * <li>baseName + "_" + language2<li>
    * <li>baseName</li>
    * </ul>
    *
    * <p>In the sequence, entries with an empty string are ignored. Next,
-   * <code>getBundle</code> tries to instantiate the resource bundle:</p>
-   *
-   * <ul>
+   * <code>getBundle</code> tries to instantiate the resource bundle:<ul>
    * <li>First, an attempt is made to load a class in the specified classloader
    * which is a subclass of ResourceBundle, and which has a public constructor
    * with no arguments, via reflection.</li>
@@ -280,7 +277,7 @@ public abstract class ResourceBundle
    * in the above sequence are tested in a similar manner, and if any results
    * in a resource bundle, it is assigned as the parent of the first bundle
    * using the <code>setParent</code> method (unless the first bundle already
-   * has a parent).</p>
+   * has a parent).
    *
    * <p>For example, suppose the following class and property files are
    * provided: MyResources.class, MyResources_fr_CH.properties,
@@ -289,12 +286,10 @@ public abstract class ResourceBundle
    * all files are valid (that is, public non-abstract subclasses of
    * ResourceBundle with public nullary constructors for the ".class" files,
    * syntactically correct ".properties" files). The default locale is
-   * Locale("en", "UK").</p>
+   * Locale("en", "UK").
    *
    * <p>Calling getBundle with the shown locale argument values instantiates
-   * resource bundles from the following sources:</p>
-   *
-   * <ul>
+   * resource bundles from the following sources:<ul>
    * <li>Locale("fr", "CH"): result MyResources_fr_CH.class, parent
    *   MyResources_fr.properties, parent MyResources.class</li>
    * <li>Locale("fr", "FR"): result MyResources_fr.properties, parent
@@ -306,9 +301,8 @@ public abstract class ResourceBundle
    * <li>Locale("es", "ES"): result MyResources_es_ES.class, parent
    *   MyResources.class</li>
    * </ul>
-   * 
-   * <p>The file MyResources_fr_CH.properties is never used because it is hidden
-   * by MyResources_fr_CH.class.</p>
+   * The file MyResources_fr_CH.properties is never used because it is hidden
+   * by MyResources_fr_CH.class.
    *
    * @param baseName the name of the ResourceBundle
    * @param locale A locale
@@ -344,6 +338,7 @@ public abstract class ResourceBundle
     else if (cache.containsKey(name))
       {
 	Reference ref = (Reference) cache.get(name);
+	ResourceBundle result = null;
 	// If REF is null, that means that we added a `null' value to
 	// the hash map.  That means we failed to find the bundle
 	// previously, and we cached that fact.  The JDK does this, so
@@ -438,6 +433,7 @@ public abstract class ResourceBundle
     if (cache.containsKey(localizedName))
       {
 	Reference ref = (Reference) cache.get(localizedName);
+	ResourceBundle result = null;
 	// If REF is null, that means that we added a `null' value to
 	// the hash map.  That means we failed to find the bundle
 	// previously, and we cached that fact.  The JDK does this, so

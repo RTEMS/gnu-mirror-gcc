@@ -218,19 +218,4 @@ public final class Connection extends JarURLConnection
 
     return jar_file;
   }
-
-  public int getContentLength()
-  {
-    if (!connected)
-      return -1;
-
-    try
-      {
-        return (int) getJarEntry().getSize();
-      }
-    catch (IOException e)
-      {
-	return -1;
-      }
-  }
 }

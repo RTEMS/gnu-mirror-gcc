@@ -87,7 +87,6 @@ public class JButton extends AbstractButton implements Accessible
     protected  void configurePropertiesFromAction(Action a)
     {
 	//Factory method which sets the AbstractButton's properties according to values from the Action instance. 
-	super.configurePropertiesFromAction(a);
     }
     
     public AccessibleContext getAccessibleContext()

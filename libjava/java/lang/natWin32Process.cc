@@ -25,9 +25,6 @@ details.  */
 #include <java/io/FileOutputStream.h>
 #include <java/io/IOException.h>
 #include <java/lang/OutOfMemoryError.h>
-#include <gnu/java/nio/channels/FileChannelImpl.h>
-
-using gnu::java::nio::channels::FileChannelImpl;
 
 void
 java::lang::ConcreteProcess::cleanup (void)
@@ -285,15 +282,12 @@ java::lang::ConcreteProcess::startProcess (jstringArray progarray,
       ChildProcessPipe aChildStdOut(ChildProcessPipe::OUTPUT);
       ChildProcessPipe aChildStdErr(ChildProcessPipe::OUTPUT);
 
-      outputStream = new FileOutputStream (new FileChannelImpl (
-                           (jint) aChildStdIn.getParentHandle (),
-			   FileChannelImpl::WRITE));
-      inputStream = new FileInputStream (new FileChannelImpl (
-                           (jint) aChildStdOut.getParentHandle (),
-			   FileChannelImpl::READ));
-      errorStream = new FileInputStream (new FileChannelImpl (
-                           (jint) aChildStdErr.getParentHandle (),
-			   FileChannelImpl::READ));
+      outputStream = new FileOutputStream (new FileDescriptor (
+                           (jint) aChildStdIn.getParentHandle ()));
+      inputStream = new FileInputStream (new FileDescriptor (
+                           (jint) aChildStdOut.getParentHandle ()));
+      errorStream = new FileInputStream (new FileDescriptor (
+                           (jint) aChildStdErr.getParentHandle ()));
 
       // Now create the child process.
       PROCESS_INFORMATION pi;

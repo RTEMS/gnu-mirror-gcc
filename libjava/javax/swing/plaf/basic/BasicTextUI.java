@@ -35,6 +35,7 @@ this exception to your version of the library, but you are not
 obligated to do so.  If you do not wish to do so, delete this
 exception statement from your version. */
 
+
 package javax.swing.plaf.basic;
 
 import java.awt.Color;
@@ -54,129 +55,133 @@ import javax.swing.text.Position;
 import javax.swing.text.View;
 import javax.swing.text.ViewFactory;
 
-
 public class BasicTextUI extends TextUI
   implements ViewFactory
 {
-  int gap = 3;
-  View view = null; // was: new RootView();
-  Color textColor;
-  Color disabledTextColor;
-  Color normalBackgroundColor;
-  EditorKit kit = new DefaultEditorKit();
+    int gap = 3;
+    View view = null; // was: new RootView();
+    Color textColor, disabledTextColor, normalBackgroundColor;
+    EditorKit kit = new DefaultEditorKit();
+    
+    /* *****************************************************************
+     * This View is way too incomplete to be of any use. To avoid errors
+     * when compiling with the Sun JDK, it has been commented out.
+     *                            -- Sascha Brawer (brawer@dandelis.ch)
+     *
+     * (begin of commented out section)
+    class RootView extends View
+    {
+	RootView()
+	{
+	    super(null);
+	}
+        public void paint(Graphics g, Shape s)
+	{
+	    if (view != null)
+		{
+		    Rectangle r = s.getBounds();
 
-  /* *****************************************************************
-   * This View is way too incomplete to be of any use. To avoid errors
-   * when compiling with the Sun JDK, it has been commented out.
-   *                            -- Sascha Brawer (brawer@dandelis.ch)
-   *
-   * (begin of commented out section)
-  class RootView extends View
-  {
-      RootView()
-      {
-          super(null);
-      }
-      public void paint(Graphics g, Shape s)
-      {
-          if (view != null)
-              {
-                  Rectangle r = s.getBounds();
+		    view.setSize((int)r.getWidth(),
+				 (int)r.getHeight());
+		    view.paint(g, s);
+		}
+        }
+    }
+    * (end of commented out section)
+    *************************************************************** */
 
-                  view.setSize((int)r.getWidth(),
-                               (int)r.getHeight());
-                  view.paint(g, s);
-              }
-      }
-  }
-  * (end of commented out section)
-  *************************************************************** */
-  public BasicTextUI()
-  {
-  }
+    public BasicTextUI()
+    {
+    }
 
-  public static ComponentUI createUI(final JComponent c)
-  {
-    return new BasicTextUI();
-  }
+    public static ComponentUI createUI(final JComponent c) 
+    {
+	return new BasicTextUI();
+    }
 
-  public void installUI(final JComponent c)
-  {
-    super.installUI(c);
+    
+    public void installUI(final JComponent c) 
+    {
+	super.installUI(c);
 
-    textColor = new Color(0, 0, 0);
-    disabledTextColor = new Color(130, 130, 130);
-    normalBackgroundColor = new Color(192, 192, 192);
-  }
+	textColor                = new Color(0,0,0);
+	disabledTextColor        = new Color(130, 130, 130);
+	normalBackgroundColor    = new Color(192,192,192);
+    }
+    
+    public Dimension getPreferredSize(JComponent c) 
+    {
+	JTextComponent b = (JTextComponent) c;
 
-  public Dimension getPreferredSize(JComponent c)
-  {
-    JTextComponent b = (JTextComponent) c;
+	View v = getRootView(b);
 
-    View v = getRootView(b);
+	float w = v.getPreferredSpan(View.X_AXIS);
+	float h = v.getPreferredSpan(View.Y_AXIS);
 
-    float w = v.getPreferredSpan(View.X_AXIS);
-    float h = v.getPreferredSpan(View.Y_AXIS);
+	return new Dimension((int)w, (int) h);
+    }
+    
 
-    return new Dimension((int) w, (int) h);
-  }
+    public void paint(Graphics g, JComponent c)
+    {      
+	//	view.paint(
+    }
 
-  public void paint(Graphics g, JComponent c)
-  {
-    //	view.paint(
-  }
+    public void damageRange(JTextComponent t, int p0, int p1)
+    {
+	damageRange(t, p0, p1, null, null);
+    }    
 
-  public void damageRange(JTextComponent t, int p0, int p1)
-  {
-    damageRange(t, p0, p1, null, null);
-  }
+    public void damageRange(JTextComponent t, 
+		     int p0, int p1, 
+		     Position.Bias firstBias,
+		     Position.Bias secondBias)
+    {
+    }
 
-  public void damageRange(JTextComponent t, int p0, int p1,
-                          Position.Bias firstBias, Position.Bias secondBias)
-  {
-  }
+    public EditorKit getEditorKit(JTextComponent t)
+    {
+	return kit;
+    }
+    
+    public int getNextVisualPositionFrom(JTextComponent t, 
+				  int pos,
+				  Position.Bias b, 
+				  int direction,
+				  Position.Bias[] biasRet)
+        throws BadLocationException
+    {
+	return 0;
+    }
+    
+    public View getRootView(JTextComponent t)
+    {
+	return view;
+    }
+    
+    public Rectangle modelToView(JTextComponent t, int pos)
+      throws BadLocationException
+    {
+	return modelToView(t, pos, null);
+    }
+    
+    public Rectangle modelToView(JTextComponent t, int pos, Position.Bias bias)
+      throws BadLocationException
+    {
+	return null;
+    }
+    
+    public int viewToModel(JTextComponent t, Point pt)
+    {
+	return viewToModel(t, pt, null);
+    }
+    
+    public int viewToModel(JTextComponent t, Point pt, Position.Bias[] biasReturn)
+    {
+	return 0;
+    } 
 
-  public EditorKit getEditorKit(JTextComponent t)
-  {
-    return kit;
-  }
-
-  public int getNextVisualPositionFrom(JTextComponent t, int pos,
-                                       Position.Bias b, int direction,
-                                       Position.Bias[] biasRet)
-    throws BadLocationException
-  {
-    return 0;
-  }
-
-  public View getRootView(JTextComponent t)
-  {
-    return view;
-  }
-
-  public Rectangle modelToView(JTextComponent t, int pos)
-    throws BadLocationException
-  {
-    return modelToView(t, pos, null);
-  }
-
-  public Rectangle modelToView(JTextComponent t, int pos, Position.Bias bias)
-    throws BadLocationException
-  {
-    return null;
-  }
-
-  public int viewToModel(JTextComponent t, Point pt)
-  {
-    return viewToModel(t, pt, null);
-  }
-
-  public int viewToModel(JTextComponent t, Point pt, Position.Bias[] biasReturn)
-  {
-    return 0;
-  }
-
-  public View create(Element elem)
+  public View create (Element elem)
   {
     // subclasses have to implement this to get this functionality
     return null;

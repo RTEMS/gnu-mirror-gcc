@@ -157,10 +157,10 @@ public class Convert
 	UnicodeToBytes outEncoder
 	  = outEncodingName == null ? UnicodeToBytes.getDefaultEncoder()
 	  : UnicodeToBytes.getEncoder(outEncodingName);
-	InputStream inStream = inName.equals("-") ? System.in
+	InputStream inStream = inName == "-" ? System.in
 	  : new FileInputStream(inName);
 	OutputStream outStream;
-	if (outName.equals("-"))
+	if (outName == "-")
 	  outStream = System.out;
 	else
 	  outStream = new FileOutputStream(outName);

@@ -41,10 +41,6 @@ import java.util.Locale;
 import javax.print.attribute.PrintRequestAttribute;
 import javax.print.attribute.TextSyntax;
 
-
-/**
- * @author Michael Koch (konqueror@gmx.de)
- */
 public final class RequestingUserName extends TextSyntax
   implements PrintRequestAttribute
 {
@@ -54,7 +50,6 @@ public final class RequestingUserName extends TextSyntax
    * Creates a <code>RequestingUserName</code> object.
    *
    * @param userName the job name
-   * @param locale the locale of the user, null means default locale
    *
    * @exception NullPointerException if userName is null
    */
@@ -68,7 +63,7 @@ public final class RequestingUserName extends TextSyntax
    *
    * @param obj the object to test
    *
-   * @return true if both objects are equal, false otherwise.
+   * @returns true if both objects are equal, false otherwise.
    */
   public boolean equals(Object obj)
   {
@@ -79,21 +74,21 @@ public final class RequestingUserName extends TextSyntax
   }
 
   /**
-   * Returns category of this attribute.
+   * Returns category of this class.
    *
    * @return the class <code>RequestingUserName</code> itself
    */
-  public Class getCategory()
+  public final Class getCategory()
   {
     return RequestingUserName.class;
   }
 
   /**
-   * Returns name of this attribute.
+   * Returns name of this class.
    *
    * @return the string "requesting-user-name"
    */
-  public String getName()
+  public final String getName()
   {
     return "requesting-user-name";
   }

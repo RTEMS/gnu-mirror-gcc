@@ -1,5 +1,5 @@
 /* UndoableEditListener.java --
-   Copyright (C) 2002, 2004  Free Software Foundation, Inc.
+   Copyright (C) 2002 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -37,20 +37,21 @@ exception statement from your version. */
 
 package javax.swing.event;
 
+// Imports
 import java.util.EventListener;
-
 
 /**
  * UndoableEditListener public interface
  * @author Andrew Selkirk
  * @author Ronald Veldema
  */
-public interface UndoableEditListener extends EventListener
-{
-  /**
-   * Undoable edit has happened
-   *
-   * @param event Undoable Edit Event
-   */
-  void undoableEditHappened(UndoableEditEvent event);
-}
+public interface UndoableEditListener extends EventListener {
+
+	/**
+	 * Undoable edit has happened
+	 * @param event Undoable Edit Event
+	 */
+	void undoableEditHappened(UndoableEditEvent event);
+
+
+} // UndoableEditListener

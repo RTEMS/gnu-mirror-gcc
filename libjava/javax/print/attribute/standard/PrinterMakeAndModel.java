@@ -41,9 +41,6 @@ import java.util.Locale;
 import javax.print.attribute.PrintServiceAttribute;
 import javax.print.attribute.TextSyntax;
 
-/**
- * @author Michael Koch (konqueror@gmx.de)
- */
 public final class PrinterMakeAndModel extends TextSyntax
   implements PrintServiceAttribute
 {
@@ -53,7 +50,6 @@ public final class PrinterMakeAndModel extends TextSyntax
    * Creates a <code>PrinterMakeAndModel</code> object.
    *
    * @param makeAndModel the make and model string
-   * @param locale the locale of the make and model, null means default locale
    *
    * @exception NullPointerException if makeAndModel is null
    */
@@ -67,7 +63,7 @@ public final class PrinterMakeAndModel extends TextSyntax
    *
    * @param obj the object to test
    *
-   * @return true if both objects are equal, false otherwise.
+   * @returns true if both objects are equal, false otherwise.
    */
   public boolean equals(Object obj)
   {
@@ -82,7 +78,7 @@ public final class PrinterMakeAndModel extends TextSyntax
    *
    * @return the class <code>PrinterMakeAndModel</code> itself
    */
-  public Class getCategory()
+  public final Class getCategory()
   {
     return PrinterMakeAndModel.class;
   }
@@ -92,7 +88,7 @@ public final class PrinterMakeAndModel extends TextSyntax
    *
    * @return the string "printer-make-and-model"
    */
-  public String getName()
+  public final String getName()
   {
     return "printer-make-and-model";
   }

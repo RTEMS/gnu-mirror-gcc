@@ -1,5 +1,5 @@
 /* NameFinder.java -- Translates addresses to StackTraceElements.
-   Copyright (C) 2002, 2004 Free Software Foundation, Inc.
+   Copyright (C) 2002 Free Software Foundation, Inc.
 
    This file is part of libgcj.
 
@@ -241,11 +241,8 @@ public class NameFinder
    * Given an Throwable and a native stacktrace returns an array of
    * StackTraceElement containing class, method, file and linenumbers.
    */
-  public StackTraceElement[] lookup(Throwable t, StackTrace trace)
+  public StackTraceElement[] lookup(Throwable t, RawData addrs, int length)
   {
-    RawData addrs = trace.stackTraceAddrs();
-    int length = trace.length();
-
     StackTraceElement[] elements = new StackTraceElement[length];
     for (int i=0; i < length; i++)
       elements[i] = lookup(addrs, i);
@@ -356,16 +353,6 @@ public class NameFinder
   }
 
   /**
-   * Native helper method to create a StackTraceElement. Needed to work
-   * around normal Java access restrictions.
-   */
-  native private StackTraceElement newElement(String fileName,
-                                              int lineNumber,
-                                              String className,
-                                              String methName,
-                                              boolean isNative);
-
-  /**
    * Creates a StackTraceElement given a string and a filename.
    * Splits the given string into the class and method part.
    * The string name will be a demangled to a fully qualified java method
@@ -376,7 +363,7 @@ public class NameFinder
   private StackTraceElement createStackTraceElement(String name, String file)
   {
     if (!demangle)
-      return newElement(file, -1, null, name, false);
+      return new StackTraceElement(file, -1, null, name, false);
 
     String s = demangleName(name);
     String methodName = s;
@@ -422,7 +409,7 @@ public class NameFinder
 	  }
       }
 
-    return newElement(fileName, line, className, methodName, false);
+    return new StackTraceElement(fileName, line, className, methodName, false);
   }
 
   /**

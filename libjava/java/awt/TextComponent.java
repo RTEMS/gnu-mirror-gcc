@@ -41,6 +41,7 @@ package java.awt;
 import java.awt.event.TextEvent;
 import java.awt.event.TextListener;
 import java.awt.peer.TextComponentPeer;
+import java.awt.peer.ComponentPeer;
 import java.io.Serializable;
 import java.util.EventListener;
 
@@ -141,7 +142,6 @@ setText(String text)
   TextComponentPeer tcp = (TextComponentPeer)getPeer();
   if (tcp != null)
     tcp.setText(text);
-  setCaretPosition(0);
 }
 
 /*************************************************************************/
@@ -234,11 +234,11 @@ setSelectionEnd(int selectionEnd)
   * specified start and end positions.  Illegal values for these
   * positions are silently fixed.
   *
-  * @param selectionStart The new start position for the selected text.
-  * @param selectionEnd The new end position for the selected text.
+  * @param startSelection The new start position for the selected text.
+  * @param endSelection The new end position for the selected text.
   */
 public synchronized void
-select(int selectionStart, int selectionEnd)
+select(int selectionStart, int endSelection)
 {
   if (selectionStart < 0)
     selectionStart = 0;

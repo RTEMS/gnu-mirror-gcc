@@ -58,9 +58,7 @@ public abstract class SampleModel
 
   public SampleModel(int dataType, int w, int h, int numBands)
   {
-    if ((w <= 0) || (h <= 0)) 
-      throw new IllegalArgumentException((w <= 0 ? " width<=0" : " width is ok")
-                                         +(h <= 0 ? " height<=0" : " height is ok"));
+    if ((w<=0) || (h<=0)) throw new IllegalArgumentException();
 	
     // FIXME: How can an int be greater than Integer.MAX_VALUE?
     // FIXME: How do we identify an unsupported data type?
@@ -70,7 +68,7 @@ public abstract class SampleModel
     this.height = h;
     this.numBands = numBands;  
   }
-  
+
   public final int getWidth()
   {
     return width;

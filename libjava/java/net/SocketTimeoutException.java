@@ -39,7 +39,6 @@ package java.net;
 
 import java.io.InterruptedIOException;
 
-
 /**
  * This exception signals that a socket read or accept timed out.
  *

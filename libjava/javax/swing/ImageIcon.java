@@ -1,5 +1,5 @@
 /* ImageIcon.java -- 
-   Copyright (C) 2002, 2004  Free Software Foundation, Inc.
+   Copyright (C) 2002 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -35,86 +35,67 @@ this exception to your version of the library, but you are not
 obligated to do so.  If you do not wish to do so, delete this
 exception statement from your version. */
 
+
 package javax.swing;
 
 import java.awt.Component;
 import java.awt.Graphics;
 import java.awt.Image;
+import java.awt.MediaTracker;
 import java.awt.Toolkit;
 import java.io.Serializable;
 import java.net.URL;
+import javax.accessibility.Accessible;
+import javax.accessibility.AccessibleContext;
 
-
-public class ImageIcon
-  implements Icon, Serializable
+public class ImageIcon implements Icon
 {
-  private static final long serialVersionUID = 532615968316031794L;
-  Image image;
-  String file;
-  String descr;
-  Component observer;
+    Image image;
+    String file, descr;
+    Component observer;
 
   public ImageIcon(String s)
-  {
-    // if description is not specified, then file name becomes
-    // desciption for this icon
-    this(s, s);
-  }
+    {
+	this(s, "");
+    }
 
-  public ImageIcon(Image image)
-  {
-  }
+  public ImageIcon(String file,
+	      String descr)
+    {
+        this.file = file;
+        this.descr = descr;
 
-  public ImageIcon(URL url)
-  {
-    image = Toolkit.getDefaultToolkit().getImage(url);
-  }
+        image = Toolkit.getDefaultToolkit().getImage(file);
+        if (image == null) {
+            return;
+        }
+        //loadImage(image);
+    }
 
-  public ImageIcon(String file, String descr)
-  {
-    this.file = file;
-    this.descr = descr;
+    // not in SUN's spec !!!
+    public void setParent(Component p)
+    {
+	observer = p;
+    }
 
-    image = Toolkit.getDefaultToolkit().getImage(file);
-    if (image == null)
-      return;
+    public Image getImage() 
+    {  return image;    }
 
-    //loadImage(image);
-  }
+    public String getDescription() 
+    {  return descr;    }
+    public void setDescription(String description) 
+    {  this.descr = description;    }
 
-  // not in SUN's spec !!!
-  public void setParent(Component p)
-  {
-    observer = p;
-  }
+    public int getIconHeight()
+    {	return image.getHeight(observer);    }
+    public int getIconWidth()
+    {	return image.getWidth(observer);    }
 
-  public Image getImage()
-  {
-    return image;
-  }
-
-  public String getDescription()
-  {
-    return descr;
-  }
-
-  public void setDescription(String description)
-  {
-    this.descr = description;
-  }
-
-  public int getIconHeight()
-  {
-    return image.getHeight(observer);
-  }
-
-  public int getIconWidth()
-  {
-    return image.getWidth(observer);
-  }
-
-  public void paintIcon(Component c, Graphics g, int x, int y)
-  {
-    g.drawImage(image, x, y, observer);
-  }
+    public void paintIcon(Component c, 
+			  Graphics g,
+			  int x, 
+			  int y)
+    {
+	g.drawImage(image, x, y, observer);
+    }
 }

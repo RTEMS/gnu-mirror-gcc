@@ -44,43 +44,20 @@ package java.io;
  */
 
 /**
- * This class accumulates chars written in a buffer instead of immediately
- * writing the data to the underlying output sink. The chars are instead
- * as one large block when the buffer is filled, or when the stream is
- * closed or explicitly flushed. This mode operation can provide a more
- * efficient mechanism for writing versus doing numerous small unbuffered
- * writes.
- *
- * @author Aaron M. Renn (arenn@urbanophile.com)
- * @author Tom Tromey (tromey@cygnus.com)
- * @date September 25, 1998 
- */
+  * This class accumulates chars written in a buffer instead of immediately
+  * writing the data to the underlying output sink. The chars are instead
+  * as one large block when the buffer is filled, or when the stream is
+  * closed or explicitly flushed. This mode operation can provide a more
+  * efficient mechanism for writing versus doing numerous small unbuffered
+  * writes.
+  *
+  * @author Aaron M. Renn (arenn@urbanophile.com)
+  * @author Tom Tromey <tromey@cygnus.com>
+  * @date September 25, 1998 
+  */
+
 public class BufferedWriter extends Writer
 {
-  /**
-   * This is the default buffer size
-   */
-  private static final int DEFAULT_BUFFER_SIZE = 8192;
-
-  /**
-   * This is the underlying <code>Writer</code> to which this object
-   * sends its output.
-   */
-  private Writer out;
-
-  /**
-   * This is the internal char array used for buffering output before
-   * writing it.
-   */
-  char[] buffer;
-
-  /**
-   * This is the number of chars that are currently in the buffer and
-   * are waiting to be written to the underlying stream.  It always points to
-   * the index into the buffer where the next char of data will be stored
-   */
-  int count;
-
   /**
    * This method initializes a new <code>BufferedWriter</code> instance
    * that will write to the specified subordinate <code>Writer</code>
@@ -101,20 +78,18 @@ public class BufferedWriter extends Writer
    * @param out The underlying <code>Writer</code> to write data to
    * @param size The size of the internal buffer
    */
-  public BufferedWriter (Writer out, int size)
+  public BufferedWriter (Writer ox, int size)
   {
-    super(out);
-    this.out = out;
-    this.buffer = new char[size];
-    this.count = 0;
+    super (ox);
+    out = ox;
+    buffer = new char[size];
+    count = 0;
   }
 
   /**
    * This method flushes any remaining buffered chars then closes the 
    * underlying output stream.  Any further attempts to write to this stream
    * may throw an exception
-   *
-   * @exception IOException If an error occurs.
    */
   public void close () throws IOException
   {
@@ -163,7 +138,7 @@ public class BufferedWriter extends Writer
    * is filled as a result of this write request, it will be flushed to the
    * underlying output stream.
    *
-   * @param oneChar The char of data to be written, passed as an int
+   * @param b The char of data to be written, passed as an int
    *
    * @exception IOException If an error occurs
    */
@@ -251,7 +226,7 @@ public class BufferedWriter extends Writer
   }
 
   // This should only be called with the lock held.
-  private void localFlush () throws IOException
+  private final void localFlush () throws IOException
   {
     if (count > 0)
       {
@@ -259,4 +234,28 @@ public class BufferedWriter extends Writer
 	count = 0;
       }
   }
+
+  /**
+   * This is the underlying <code>Writer</code> to which this object
+   * sends its output.
+   */
+  private Writer out;
+
+  /**
+   * This is the internal char array used for buffering output before
+   * writing it.
+   */
+  char[] buffer;
+
+  /**
+   * This is the number of chars that are currently in the buffer and
+   * are waiting to be written to the underlying stream.  It always points to
+   * the index into the buffer where the next char of data will be stored
+   */
+  int count;
+
+  /**
+   * This is the default buffer size
+   */
+  private static final int DEFAULT_BUFFER_SIZE = 8192;
 }

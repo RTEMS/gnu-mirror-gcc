@@ -71,7 +71,7 @@ import gnu.java.security.Engine;
  * parameter specification or parameter encoding.</p>
  *
  * <p>A transparent parameter specification is obtained from an
- * <code>AlgorithmParameters</code> object via a call to
+ * <ocde>AlgorithmParameters</code> object via a call to
  * <code>getParameterSpec()</code>, and a byte encoding of the parameters is
  * obtained via a call to <code>getEncoded()</code>.</p>
  *

@@ -59,7 +59,6 @@ import java.util.Hashtable;
 import java.util.Iterator;
 
 import gnu.java.rmi.server.UnicastConnection;
-import gnu.java.rmi.server.RMIIncomingThread;
 
 public class UnicastConnectionManager
 	implements Runnable, ProtocolConstants {
@@ -174,16 +173,20 @@ private UnicastConnectionManager(String host, int port, RMIClientSocketFactory c
 /**
   * Server UnicastConnectionManager constructor
   */
-private UnicastConnectionManager(int port, RMIServerSocketFactory ssf) throws RemoteException {
-
+private UnicastConnectionManager(int port, RMIServerSocketFactory ssf) {
 	try {
 		ssock = ssf.createServerSocket(port);
 		serverPort = ssock.getLocalPort();
 	}
-	catch (IOException ioex) {
-		ssock = null;
-		serverPort = 0;
-		throw new java.rmi.server.ExportException("can not create Server Socket on port " + port,ioex);
+	catch (IOException _) {
+		try {
+			ssock = ssf.createServerSocket(0);
+			serverPort = ssock.getLocalPort();
+		}
+		catch (IOException __) {
+			ssock = null;
+			serverPort = 0;
+		}
 	}
 	serverName = localhost;
 	serverFactory = ssf;
@@ -227,7 +230,7 @@ public static synchronized UnicastConnectionManager getInstance(String host, int
  * Return a server connection manager which will accept connection on the
  * given port.
  */
-public static synchronized UnicastConnectionManager getInstance(int port, RMIServerSocketFactory ssf) throws RemoteException {
+public static synchronized UnicastConnectionManager getInstance(int port, RMIServerSocketFactory ssf) {
 //System.out.println("getInstance: " + port + "," + ssf);
 	if (ssf == null) {
         ssf = defaultSocketFactory;
@@ -373,17 +376,9 @@ public void run() {
 		try {
 //System.out.println("Waiting for connection on " + serverPort);
 			UnicastConnection conn = getServerConnection();
-
-			// get address of remote host for the RMIIncomingThread object
-			String remoteHost = null;
-			if (conn.sock != null) {
-				remoteHost = conn.sock.getInetAddress().getHostAddress();			
-			}
-
 			// use a thread pool to improve performance
             //ConnectionRunnerPool.dispatchConnection(conn);
-            (new RMIIncomingThread(conn, remoteHost)).start();
-//	   (new Thread(conn)).start();
+            (new Thread(conn)).start();
 		}
 		catch (Exception e) {
             e.printStackTrace();

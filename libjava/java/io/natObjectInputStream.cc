@@ -38,7 +38,7 @@ java::io::ObjectInputStream::allocateObject (jclass klass)
 	obj = NULL;	
       else
 	{
-	  obj = _Jv_AllocObject (klass);
+	  obj = JvAllocObject (klass);
 	}
     }
   catch (jthrowable t)

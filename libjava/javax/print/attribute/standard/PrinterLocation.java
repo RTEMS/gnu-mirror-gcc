@@ -41,9 +41,6 @@ import java.util.Locale;
 import javax.print.attribute.PrintServiceAttribute;
 import javax.print.attribute.TextSyntax;
 
-/**
- * @author Michael Koch (konqueror@gmx.de)
- */
 public final class PrinterLocation extends TextSyntax
   implements PrintServiceAttribute
 {
@@ -53,7 +50,6 @@ public final class PrinterLocation extends TextSyntax
    * Creates a <code>PrinterLocation</code> object.
    *
    * @param printerLocation the printer location
-   * @param locale the locale of the location, null means default locale
    *
    * @exception NullPointerException if printerLocation is null
    */
@@ -67,7 +63,7 @@ public final class PrinterLocation extends TextSyntax
    *
    * @param obj the object to test
    *
-   * @return true if both objects are equal, false otherwise.
+   * @returns true if both objects are equal, false otherwise.
    */
   public boolean equals(Object obj)
   {
@@ -82,7 +78,7 @@ public final class PrinterLocation extends TextSyntax
    *
    * @return the class <code>PrinterLocation</code> itself
    */
-  public Class getCategory()
+  public final Class getCategory()
   {
     return PrinterLocation.class;
   }
@@ -92,7 +88,7 @@ public final class PrinterLocation extends TextSyntax
    *
    * @return the string "printer-location"
    */
-  public String getName()
+  public final String getName()
   {
     return "printer-location";
   }

@@ -54,7 +54,7 @@ public class DefaultTableCellRenderer extends JLabel
 {
   static final long serialVersionUID = 7878911414715528324L;
 
-  protected static Border noFocusBorder = new EmptyBorder(0, 0, 0, 0);
+  protected static Border noFocusBorder;
 
   public static class UIResource extends DefaultTableCellRenderer
     implements javax.swing.plaf.UIResource
@@ -70,6 +70,7 @@ public class DefaultTableCellRenderer extends JLabel
   public DefaultTableCellRenderer()
   {
     super();
+    this.noFocusBorder = new EmptyBorder(0, 0, 0, 0);
   }
 
   /**

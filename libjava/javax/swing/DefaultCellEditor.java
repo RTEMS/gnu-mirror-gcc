@@ -58,34 +58,50 @@ public class DefaultCellEditor
 {
   static final long serialVersionUID = 3564035141373880027L;
 
-  /**
-   * EditorDelegate
-   */
-  protected class EditorDelegate
-    implements ActionListener, ItemListener, Serializable
-  {
-    private static final long serialVersionUID = -1420007406015481933L;
+	//-------------------------------------------------------------
+	// Classes ----------------------------------------------------
+	//-------------------------------------------------------------
 
-    /**
-     * value
-     */
-    protected Object value;
+	/**
+	 * EditorDelegate
+	 */
+	protected class EditorDelegate implements ActionListener, 
+			ItemListener, Serializable {
 
-    /**
-     * Constructor EditorDelegate
-     * @param value0 TODO
-     */
-    protected EditorDelegate()
-    {
-    }
+		//-------------------------------------------------------------
+		// Variables --------------------------------------------------
+		//-------------------------------------------------------------
 
-    /**
-     * setValue
-     * @param event TODO
-     */
-    public void setValue(Object event)
-    {
-    }
+		/**
+		 * value
+		 */
+		protected Object value;
+
+
+		//-------------------------------------------------------------
+		// Initialization ---------------------------------------------
+		//-------------------------------------------------------------
+
+		/**
+		 * Constructor EditorDelegate
+		 * @param value0 TODO
+		 */
+		protected EditorDelegate(DefaultCellEditor editor) {
+			// TODO
+		} // EditorDelegate()
+
+
+		//-------------------------------------------------------------
+		// Methods ----------------------------------------------------
+		//-------------------------------------------------------------
+
+		/**
+		 * setValue
+		 * @param event TODO
+		 */
+		public void setValue(Object event) {
+			// TODO
+		} // setValue()
 
 		/**
 		 * getCellEditorValue
@@ -156,6 +172,11 @@ public class DefaultCellEditor
 
 	} // EditorDelegate
 
+
+	//-------------------------------------------------------------
+	// Variables --------------------------------------------------
+	//-------------------------------------------------------------
+
 	/**
 	 * editorComponent
 	 */
@@ -170,6 +191,11 @@ public class DefaultCellEditor
 	 * clickCountToStart
 	 */
 	protected int clickCountToStart;
+
+
+	//-------------------------------------------------------------
+	// Initialization ---------------------------------------------
+	//-------------------------------------------------------------
 
 	/**
 	 * Constructor DefaultCellEditor
@@ -194,6 +220,11 @@ public class DefaultCellEditor
 	public DefaultCellEditor(JComboBox combobox) {
 		// TODO
 	} // DefaultCellEditor()
+
+
+	//-------------------------------------------------------------
+	// Methods ----------------------------------------------------
+	//-------------------------------------------------------------
 
 	/**
 	 * getComponent
@@ -289,4 +320,6 @@ public class DefaultCellEditor
 			Object value, boolean isSelected, int row, int column) {
 		return null; // TODO
 	} // getTableCellEditorComponent()
-}
+
+
+} // DefaultCellEditor

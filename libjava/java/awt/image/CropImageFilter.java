@@ -39,7 +39,6 @@ exception statement from your version. */
 package java.awt.image;
 
 import java.util.Hashtable;
-import java.awt.Rectangle;
 
 /**
  * <br>
@@ -93,7 +92,7 @@ public class CropImageFilter extends ImageFilter
      */
     public void setProperties(Hashtable props)
     {
-  	props.put("filters", "CropImageFilter");
+//  	props.put("filters", "ReplicateScaleFilter");
 	consumer.setProperties(props);
     }
 
@@ -114,27 +113,7 @@ public class CropImageFilter extends ImageFilter
     public void setPixels(int x, int y, int w, int h, 
 	   ColorModel model, byte[] pixels, int offset, int scansize)
     {
-	Rectangle filterBounds = new Rectangle(this.x, this.y,
-	                                       this.width, this.height);
-	Rectangle pixelBounds = new Rectangle(x, y, w, h);
-
-	if (filterBounds.intersects(pixelBounds))
-	{
-	    Rectangle bounds = filterBounds.intersection(pixelBounds);
-
-	    byte[] cropped = new byte[bounds.width * bounds.height];
-	    for (int i = 0; i < bounds.height; i++)
-	    {
-		int start = (bounds.y - pixelBounds.y + i) * scansize + offset;
-
-		for (int j = 0; j < bounds.width; j++)
-		    cropped[i * bounds.width + j] = pixels[start + bounds.x + j];
-	    }
-	    
-	    consumer.setPixels(bounds.x, bounds.y,
-	                       bounds.width, bounds.height,
-	                       model, cropped, 0, bounds.width);
-	}
+	consumer.setPixels(x, y, w, h, model, pixels, offset, scansize);
     }
 
     /**
@@ -154,27 +133,7 @@ public class CropImageFilter extends ImageFilter
     public void setPixels(int x, int y, int w, int h, 
            ColorModel model, int[] pixels, int offset, int scansize)
     {
-	Rectangle filterBounds = new Rectangle(this.x, this.y,
-	                                       this.width, this.height);
-	Rectangle pixelBounds = new Rectangle(x, y, w, h);
-
-	if (filterBounds.intersects(pixelBounds))
-	{
-	    Rectangle bounds = filterBounds.intersection(pixelBounds);
-
-	    int[] cropped = new int[bounds.width * bounds.height];
-	    for (int i = 0; i < bounds.height; i++)
-	    {
-		int start = (bounds.y - pixelBounds.y + i) * scansize + offset;
-
-		for (int j = 0; j < bounds.width; j++)
-		    cropped[i * bounds.width + j] = pixels[start + bounds.x + j];
-	    }
-	    
-	    consumer.setPixels(bounds.x, bounds.y,
-	                       bounds.width, bounds.height,
-	                       model, cropped, 0, bounds.width);
-	}
+	consumer.setPixels(x, y, w, h, model, pixels, offset, scansize);
     }
 
 }

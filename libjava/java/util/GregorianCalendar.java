@@ -1,6 +1,5 @@
 /* java.util.GregorianCalendar
-   Copyright (C) 1998, 1999, 2001, 2002, 2003, 2004
-   Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999, 2001, 2002, 2003 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -90,8 +89,7 @@ public class GregorianCalendar extends Calendar
    */
   private static ResourceBundle getBundle(Locale locale) 
   {
-    return ResourceBundle.getBundle(bundleName, locale,
-      GregorianCalendar.class.getClassLoader());
+    return ResourceBundle.getBundle(bundleName, locale);
   }
 
   /**
@@ -443,15 +441,8 @@ public class GregorianCalendar extends Calendar
       ? fields[ZONE_OFFSET] : zone.getRawOffset();
 
     int dayOfYear = daysOfYear[0] + daysOfYear[1];
-    // This formula isn't right, so check for month as a quick fix.
-    // It doesn't compensate for leap years and puts day 30 in month 1
-    // instead of month 0.
-    int month = isSet[MONTH]
-	? fields[MONTH] : (dayOfYear * 5 + 3) / (31 + 30 + 31 + 30 + 31);
-    // This formula isn't right, so check for day as a quick fix.  It
-    // doesn't compensate for leap years, either.
-    int day = isSet[DAY_OF_MONTH] ? fields[DAY_OF_MONTH]
-	: (6 + (dayOfYear * 5 + 3) % (31 + 30 + 31 + 30 + 31)) / 5;
+    int month = (dayOfYear * 5 + 3) / (31 + 30 + 31 + 30 + 31);
+    int day = (6 + (dayOfYear * 5 + 3) % (31 + 30 + 31 + 30 + 31)) / 5;
     int weekday = ((int) (time / (24 * 60 * 60 * 1000L)) + THURSDAY) % 7;
     if (weekday <= 0)
       weekday += 7;

@@ -86,7 +86,7 @@ import java.util.PropertyPermission;
  * // now, in worker thread
  * if (sm != null)
  *   sm.checkPermission(permission, context);
- * </pre>
+ * <pre>
  *
  * <p>Permissions fall into these categories: File, Socket, Net, Security,
  * Runtime, Property, AWT, Reflect, and Serializable. Each of these
@@ -174,15 +174,13 @@ public class SecurityManager
    * Find the ClassLoader of the first non-system class on the execution
    * stack. A non-system class is one whose ClassLoader is not equal to
    * {@link ClassLoader#getSystemClassLoader()} or its ancestors. This
-   * will return null in three cases:
-   *
-   * <ul>
+   * will return null in three cases:<br><nl>
    * <li>All methods on the stack are from system classes</li>
    * <li>All methods on the stack up to the first "privileged" caller, as
    *  created by {@link AccessController.doPrivileged(PrivilegedAction)},
    *  are from system classes</li>
    * <li>A check of <code>java.security.AllPermission</code> succeeds.</li>
-   * </ul>
+   * </nl>
    * 
    * @return the most recent non-system ClassLoader on the execution stack
    * @deprecated use {@link #checkPermission(Permission)} instead
@@ -196,15 +194,13 @@ public class SecurityManager
    * Find the first non-system class on the execution stack. A non-system
    * class is one whose ClassLoader is not equal to
    * {@link ClassLoader#getSystemClassLoader()} or its ancestors. This
-   * will return null in three cases:
-   *
-   * <ul>
+   * will return null in three cases:<br><nl>
    * <li>All methods on the stack are from system classes</li>
    * <li>All methods on the stack up to the first "privileged" caller, as
    *  created by {@link AccessController.doPrivileged(PrivilegedAction)},
    *  are from system classes</li>
    * <li>A check of <code>java.security.AllPermission</code> succeeds.</li>
-   * </ul>
+   * </nl>
    * 
    * @return the most recent non-system Class on the execution stack
    * @deprecated use {@link #checkPermission(Permission)} instead
@@ -235,15 +231,13 @@ public class SecurityManager
    * Get the depth on the execution stack of the most recent non-system class.
    * A non-system class is one whose ClassLoader is not equal to
    * {@link ClassLoader#getSystemClassLoader()} or its ancestors. This
-   * will return -1 in three cases:
-   *
-   * <ul>
+   * will return -1 in three cases:<br><nl>
    * <li>All methods on the stack are from system classes</li>
    * <li>All methods on the stack up to the first "privileged" caller, as
    *  created by {@link AccessController.doPrivileged(PrivilegedAction)},
    *  are from system classes</li>
    * <li>A check of <code>java.security.AllPermission</code> succeeds.</li>
-   * </ul>
+   * </nl>
    * 
    * @return the index of the most recent non-system Class on the stack
    * @deprecated use {@link #checkPermission(Permission)} instead
@@ -371,8 +365,8 @@ public class SecurityManager
    * Check if the current thread is allowed to modify another Thread. This is
    * called by Thread.stop(), suspend(), resume(), interrupt(), destroy(),
    * setPriority(), setName(), and setDaemon(). The default implementation
-   * checks <code>RuntimePermission("modifyThread")</code> on system threads
-   * (ie. threads in ThreadGroup with a null parent), and returns silently on
+   * checks <code>RuntimePermission("modifyThread") on system threads (ie.
+   * threads in ThreadGroup with a null parent), and returns silently on
    * other threads.
    *
    * <p>If you override this, you must do two things. First, call
@@ -381,9 +375,9 @@ public class SecurityManager
    * <code>RuntimePermission("modifyThread")</code>, return silently, so that
    * core classes (the Classpath library!) can modify any thread.
    *
-   * @param thread the other Thread to check
+   * @param t the other Thread to check
    * @throws SecurityException if permission is denied
-   * @throws NullPointerException if thread is null
+   * @throws NullPointerException if t is null
    * @see Thread#stop()
    * @see Thread#suspend()
    * @see Thread#resume()
@@ -391,10 +385,9 @@ public class SecurityManager
    * @see Thread#setName(String)
    * @see Thread#setDaemon(boolean)
    */
-  public void checkAccess(Thread thread)
+  public void checkAccess(Thread t)
   {
-    if (thread.getThreadGroup() != null 
-	&& thread.getThreadGroup().getParent() != null)
+    if (t.group != null && t.group.getParent() != null)
       checkPermission(new RuntimePermission("modifyThread"));
   }
 
@@ -404,8 +397,8 @@ public class SecurityManager
    * ThreadGroup.ThreadGroup() (to add this ThreadGroup to a parent),
    * ThreadGroup.stop(), suspend(), resume(), interrupt(), destroy(),
    * setDaemon(), and setMaxPriority(). The default implementation
-   * checks <code>RuntimePermission("modifyThread")</code> on the system group
-   * (ie. the one with a null parent), and returns silently on other groups.
+   * checks <code>RuntimePermission("modifyThread") on the system group (ie.
+   * the one with a null parent), and returns silently on other groups.
    *
    * <p>If you override this, you must do two things. First, call
    * <code>super.checkAccess(t)</code>, to make sure you are not relaxing
@@ -657,15 +650,13 @@ public class SecurityManager
    * @param host the host to connect to
    * @param port the port to connect on
    * @param context the context to determine access for
-   *
    * @throws SecurityException if permission is denied, or if context is
    *         not an AccessControlContext
    * @throws NullPointerException if host is null
-   *
    * @see #getSecurityContext()
    * @see AccessControlContext#checkPermission(Permission)
    */
-  public void checkConnect(String host, int port, Object context)
+  public void checkConnect(String host, int port, Object securityContext)
   {
     // XXX Should be:
     // if (! (context instanceof AccessControlContext))
@@ -784,12 +775,9 @@ public class SecurityManager
    * you override this, call <code>super.checkPropertyAccess</code> rather
    * than throwing an exception.
    *
-   * @param key the key of the property to check
-   *
    * @throws SecurityException if permission is denied
    * @throws NullPointerException if key is null
    * @throws IllegalArgumentException if key is ""
-   *
    * @see System#getProperty(String)
    */
   public void checkPropertyAccess(String key)
@@ -873,7 +861,8 @@ public class SecurityManager
    */
   public void checkAwtEventQueueAccess()
   {
-    checkPermission(new AWTPermission("accessEventQueue"));
+    // Should be: checkPermission(new AWTPermission("accessEventQueue"));
+    throw new SecurityException("Cannot access the AWT event queue.");
   }
 
   /**

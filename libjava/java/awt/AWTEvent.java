@@ -231,23 +231,15 @@ public abstract class AWTEvent extends EventObject
   }
 
   /**
-   * Create a string that represents this event in the format
-   * <code>classname[eventstring] on sourcecomponentname</code>.
+   * Returns a string representation of this event. This is in the format
+   * <code>getClass().getName() + '[' + paramString() + "] on "
+   * + source</code>.
    *
-   * @return a string representing this event
+   * @return a string representation of this event
    */
-  public String toString ()
+  public String toString()
   {
-    String string = null;
-
-    if (source instanceof Component)
-      string = getClass ().getName () + "[" + paramString () + "] on "
-        + ((Component) source).getName ();
-    else if (source instanceof MenuComponent)
-      string = getClass ().getName () + "[" + paramString () + "] on "
-        + ((MenuComponent) source).getName ();
-
-    return string;
+    return getClass().getName() + "[" + paramString() + "] on " + source;
   }
 
   /**

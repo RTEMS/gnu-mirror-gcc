@@ -42,7 +42,6 @@ import java.awt.AWTEvent;
 import java.awt.Button;
 import java.awt.Component;
 import java.awt.Font;
-import java.awt.Point;
 import java.awt.event.MouseEvent;
 import java.awt.event.KeyEvent;
 import java.awt.peer.ButtonPeer;
@@ -54,10 +53,9 @@ public class GtkButtonPeer extends GtkComponentPeer
   public native void connectJObject ();
   public native void connectSignals ();
 
-  native void gtkSetFont (String name, int style, int size);
+  native void gtkSetFont(String name, int style, int size);
   native void gtkSetLabel(String label);
   native void gtkWidgetSetForeground (int red, int green, int blue);
-  native void gtkActivate ();
 
   public GtkButtonPeer (Button b)
   {
@@ -71,15 +69,11 @@ public class GtkButtonPeer extends GtkComponentPeer
 
   public void handleEvent (AWTEvent e)
   {
-    if (e.getID () == MouseEvent.MOUSE_RELEASED && isEnabled ())
+    if (e.getID () == MouseEvent.MOUSE_CLICKED && isEnabled ())
       {
 	MouseEvent me = (MouseEvent) e;
-	Point p = me.getPoint();
-	p.translate(((Component) me.getSource()).getX(),
-	            ((Component) me.getSource()).getY());
 	if (!me.isConsumed ()
-	    && (me.getModifiers () & MouseEvent.BUTTON1_MASK) != 0
-	    && awtComponent.getBounds().contains(p))
+	    && (me.getModifiers () & MouseEvent.BUTTON1_MASK) != 0)
 	  postActionEvent (((Button)awtComponent).getActionCommand (), 
 			   me.getModifiers ());
       }
@@ -88,11 +82,8 @@ public class GtkButtonPeer extends GtkComponentPeer
       {
 	KeyEvent ke = (KeyEvent) e;
 	if (!ke.isConsumed () && ke.getKeyCode () == KeyEvent.VK_SPACE)
-          {
-            postActionEvent (((Button) awtComponent).getActionCommand (),
-                             ke.getModifiers ());
-            gtkActivate ();
-          }
+	  postActionEvent (((Button)awtComponent).getActionCommand (),
+			   ke.getModifiers ());
       }
 
     super.handleEvent (e);
@@ -103,5 +94,10 @@ public class GtkButtonPeer extends GtkComponentPeer
     super.getArgs (component, args);
 
     args.add ("label", ((Button)component).getLabel ());
+  }
+
+  public void setFont (Font f)
+  {
+    gtkSetFont(f.getName(), f.getStyle(), f.getSize());
   }
 }

@@ -1,5 +1,5 @@
 /* JNILINK 1.1: JNI version.
-   Copyright (C) 1998, 2004 Free Software Foundation, Inc.
+   Copyright (C) 1998 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -40,7 +40,7 @@ exception statement from your version. */
 #include <string.h>
 #include <jcl.h>
 
-#include <stdlib.h>
+#include <malloc.h>
 
 #define GETCLASS(c) *(jclass*)(c)
 

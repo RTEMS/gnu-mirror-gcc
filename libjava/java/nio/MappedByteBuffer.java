@@ -44,46 +44,28 @@ package java.nio;
  */
 public abstract class MappedByteBuffer extends ByteBuffer
 {
+  private boolean loaded = false;
+  
   MappedByteBuffer (int capacity, int limit, int position, int mark)
   {
     super (capacity, limit, position, mark);
   }
   
-  void forceImpl()
-  {
-  }
-
   public final MappedByteBuffer force ()
   {
-    forceImpl();
+    // FIXME: Flush to disk here.
     return this;
   }
     
-  boolean isLoadedImpl()
-  {
-    load();
-    return true;
-  }
-
   public final boolean isLoaded ()
   {
-    return isLoadedImpl();
+    return loaded;
   }
     
-  void loadImpl()
-  {
-  }
-
   public final MappedByteBuffer load ()
   {
-    loadImpl();
+    // FIXME: Try to load all pages into memory.
+    loaded = true;
     return this;
   }
-
-  void unmapImpl ()
-  {
-    forceImpl();
-  }
-
-  public void finalize () { unmapImpl(); }
 }

@@ -52,9 +52,7 @@ final class CharBufferImpl extends CharBuffer
   
   CharBufferImpl (char[] buffer, int offset, int capacity, int limit, int position, int mark, boolean readOnly)
   {
-    super (capacity, limit, position, mark);
-    this.backing_buffer = buffer;
-    this.array_offset = offset;
+    super (buffer, offset, capacity, limit, position, mark);
     this.readOnly = readOnly;
   }
   
@@ -104,7 +102,7 @@ final class CharBufferImpl extends CharBuffer
     return false;
   }
 
-  public CharSequence subSequence (int start, int end)
+  final public CharSequence subSequence (int start, int end)
   {
     if (start < 0
         || start > length ()
@@ -118,7 +116,7 @@ final class CharBufferImpl extends CharBuffer
   /**
    * Relative get method. Reads the next <code>char</code> from the buffer.
    */
-  public char get ()
+  final public char get ()
   {
     char result = backing_buffer [position ()];
     position (position () + 1);
@@ -131,7 +129,7 @@ final class CharBufferImpl extends CharBuffer
    * 
    * @exception ReadOnlyBufferException If this buffer is read-only.
    */
-  public CharBuffer put (char value)
+  final public CharBuffer put (char value)
   {
     if (readOnly)
       throw new ReadOnlyBufferException ();
@@ -148,7 +146,7 @@ final class CharBufferImpl extends CharBuffer
    * @exception IndexOutOfBoundsException If index is negative or not smaller
    * than the buffer's limit.
    */
-  public char get (int index)
+  final public char get (int index)
   {
     if (index < 0
         || index >= limit ())
@@ -165,7 +163,7 @@ final class CharBufferImpl extends CharBuffer
    * than the buffer's limit.
    * @exception ReadOnlyBufferException If this buffer is read-only.
    */
-  public CharBuffer put (int index, char value)
+  final public CharBuffer put (int index, char value)
   {
     if (index < 0
         || index >= limit ())
@@ -178,7 +176,7 @@ final class CharBufferImpl extends CharBuffer
     return this;
   }
   
-  public ByteOrder order ()
+  final public ByteOrder order ()
   {
     return ByteOrder.nativeOrder ();
   }

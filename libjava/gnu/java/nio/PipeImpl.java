@@ -1,5 +1,5 @@
 /* PipeImpl.java -- 
-   Copyright (C) 2002, 2003, 2004  Free Software Foundation, Inc.
+   Copyright (C) 2002, 2003 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -44,7 +44,7 @@ import java.nio.channels.spi.SelectorProvider;
 
 class PipeImpl extends Pipe
 {
-  public static final class SourceChannelImpl extends Pipe.SourceChannel
+  public final class SourceChannelImpl extends Pipe.SourceChannel
   {
     private int native_fd;
     
@@ -79,22 +79,10 @@ class PipeImpl extends Pipe
       return read (srcs, 0, srcs.length);
     }
 
-    public synchronized final long read (ByteBuffer[] srcs, int offset, int len)
+    public final long read (ByteBuffer[] srcs, int offset, int len)
       throws IOException
     {
-      if (offset < 0
-	  || offset > srcs.length
-	  || len < 0
-	  || len > srcs.length - offset)
-	throw new IndexOutOfBoundsException();
-
-      long bytesRead = 0;
-      
-      for (int index = 0; index < len; index++)
-	bytesRead += read (srcs [offset + index]);
-
-      return bytesRead;
-
+      throw new Error ("Not implemented");
     }
 
     public final int getNativeFD()
@@ -103,7 +91,7 @@ class PipeImpl extends Pipe
     }
   }
 
-  public static final class SinkChannelImpl extends Pipe.SinkChannel
+  public final class SinkChannelImpl extends Pipe.SinkChannel
   {
     private int native_fd;
     
@@ -132,27 +120,16 @@ class PipeImpl extends Pipe
       throw new Error ("Not implemented");
     }
 
-    public final long write (ByteBuffer[] srcs)
+    public final long write (ByteBuffer[] dsts)
       throws IOException
     {
-      return write (srcs, 0, srcs.length);
+      return write (dsts, 0, dsts.length);
     }
 
-    public synchronized final long write (ByteBuffer[] srcs, int offset, int len)
+    public final long write (ByteBuffer[] dsts, int offset, int len)
       throws IOException
     {
-      if (offset < 0
-	  || offset > srcs.length
-	  || len < 0
-	  || len > srcs.length - offset)
-	throw new IndexOutOfBoundsException();
-
-      long bytesWritten = 0;
-      
-      for (int index = 0; index < len; index++)
-	bytesWritten += write (srcs [offset + index]);
-
-      return bytesWritten;
+      throw new Error ("Not implemented");
     }
 
     public final int getNativeFD()

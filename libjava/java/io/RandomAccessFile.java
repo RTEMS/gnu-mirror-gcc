@@ -1,5 +1,5 @@
 /* RandomAccessFile.java -- Class supporting random file I/O
-   Copyright (C) 1998, 1999, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999, 2001, 2002, 2003 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -39,7 +39,7 @@ exception statement from your version. */
 package java.io;
 
 import java.nio.channels.FileChannel;
-import gnu.java.nio.channels.FileChannelImpl;
+import java.nio.channels.FileChannelImpl;
 
 /* Written using "Java Class Libraries", 2nd edition, ISBN 0-201-31002-3
  * "The Java Language Specification", ISBN 0-201-63451-1
@@ -61,12 +61,12 @@ public class RandomAccessFile implements DataOutput, DataInput
 {
 
   // The underlying file.
-  private FileChannelImpl ch;
   private FileDescriptor fd;
   // The corresponding input and output streams.
   private DataOutputStream out;
   private DataInputStream in;
   
+  private FileChannel ch; /* cached associated file-channel */
   
   /**
    * This method initializes a new instance of <code>RandomAccessFile</code>
@@ -119,18 +119,18 @@ public class RandomAccessFile implements DataOutput, DataInput
   {
     int fdmode;
     if (mode.equals("r"))
-      fdmode = FileChannelImpl.READ;
+      fdmode = FileDescriptor.READ;
     else if (mode.equals("rw"))
-      fdmode = FileChannelImpl.READ | FileChannelImpl.WRITE;
+      fdmode = FileDescriptor.READ | FileDescriptor.WRITE;
     else if (mode.equals("rws"))
       {
-	fdmode = (FileChannelImpl.READ | FileChannelImpl.WRITE
-		  | FileChannelImpl.SYNC);
+	fdmode = (FileDescriptor.READ | FileDescriptor.WRITE
+		  | FileDescriptor.SYNC);
       }
     else if (mode.equals("rwd"))
       {
-	fdmode = (FileChannelImpl.READ | FileChannelImpl.WRITE
-		  | FileChannelImpl.DSYNC);
+	fdmode = (FileDescriptor.READ | FileDescriptor.WRITE
+		  | FileDescriptor.DSYNC);
       }
     else
       throw new IllegalArgumentException ("invalid mode: " + mode);
@@ -141,12 +141,11 @@ public class RandomAccessFile implements DataOutput, DataInput
       {
         s.checkRead(fileName);
 
-        if ((fdmode & FileChannelImpl.WRITE) != 0)
+        if ((fdmode & FileDescriptor.WRITE) != 0)
           s.checkWrite(fileName);
       }
 
-    ch = new FileChannelImpl (fileName, fdmode);
-    fd = new FileDescriptor(ch);
+    fd = new FileDescriptor (fileName, fdmode);
     out = new DataOutputStream (new FileOutputStream (fd));
     in = new DataInputStream (new FileInputStream (fd));
   }
@@ -159,7 +158,8 @@ public class RandomAccessFile implements DataOutput, DataInput
    */
   public void close () throws IOException
   {
-    ch.close();
+    if (fd.valid())
+      fd.close();
   }
 
   /**
@@ -172,12 +172,10 @@ public class RandomAccessFile implements DataOutput, DataInput
    */
   public final FileDescriptor getFD () throws IOException
   {
-    synchronized (this)
-      {
-	if (fd == null)
-	  fd = new FileDescriptor (ch);
-	return fd;
-      }
+    if (! fd.valid())
+      throw new IOException ();
+
+    return fd;
   }
 
   /**
@@ -190,7 +188,7 @@ public class RandomAccessFile implements DataOutput, DataInput
    */
   public long getFilePointer () throws IOException
   {
-    return ch.position();
+    return fd.getFilePointer();
   }
 
   /**
@@ -208,7 +206,7 @@ public class RandomAccessFile implements DataOutput, DataInput
    */
   public void setLength (long newLen) throws IOException
   {
-    ch.truncate (newLen);
+    fd.setLength (newLen);
   }
 
   /**
@@ -220,7 +218,7 @@ public class RandomAccessFile implements DataOutput, DataInput
    */
   public long length () throws IOException
   {
-    return ch.size();
+    return fd.getLength ();
   }
 
   /**
@@ -318,12 +316,12 @@ public class RandomAccessFile implements DataOutput, DataInput
    * significant byte first (i.e., "big endian") regardless of the native
    * host byte ordering. 
    * <p>
-   * As an example, if <code>byte1</code> and <code>byte2</code> represent 
+   * As an example, if <code>byte1</code> and code{byte2</code> represent 
    * the first
    * and second byte read from the stream respectively, they will be
    * transformed to a <code>char</code> in the following manner:
    * <p>
-   * <code>(char)(((byte1 &amp; 0xFF) &lt;&lt; 8) | (byte2 &amp; 0xFF)</code>
+   * <code>(char)(((byte1 & 0xFF) << 8) | (byte2 & 0xFF)</code>
    * <p>
    * This method can read a <code>char</code> written by an object 
    * implementing the
@@ -539,12 +537,12 @@ public class RandomAccessFile implements DataOutput, DataInput
    * significant byte first (i.e., "big endian") regardless of the native
    * host byte ordering. 
    * <p>
-   * As an example, if <code>byte1</code> and <code>byte2</code> 
+   * As an example, if <code>byte1</code> and code{byte2</code> 
    * represent the first
    * and second byte read from the stream respectively, they will be
    * transformed to a <code>short</code> in the following manner:
    * <p>
-   * <code>(short)(((byte1 &amp; 0xFF) &lt;&lt; 8) | (byte2 &amp; 0xFF)</code>
+   * <code>(short)(((byte1 & 0xFF) << 8) | (byte2 & 0xFF)</code>
    * <p>
    * The value returned is in the range of -32768 to 32767.
    * <p>
@@ -704,7 +702,7 @@ public class RandomAccessFile implements DataOutput, DataInput
    */
   public void seek (long pos) throws IOException
   {
-    ch.position(pos);
+    fd.seek (pos, FileDescriptor.SET, false);
   }
 
   /**
@@ -728,13 +726,10 @@ public class RandomAccessFile implements DataOutput, DataInput
     if (numBytes == 0)
       return 0;
     
-    long oldPos = ch.position();
-    long newPos = oldPos + numBytes;
-    long size = ch.size();
-    if (newPos > size)
-      newPos = size;
-    ch.position(newPos);
-    return (int) (ch.position() - oldPos);
+    long curPos = fd.getFilePointer ();
+    long newPos = fd.seek (numBytes, FileDescriptor.CUR, true);
+    
+    return (int) (newPos - curPos);
   }
 
   /**
@@ -967,6 +962,9 @@ public class RandomAccessFile implements DataOutput, DataInput
    */
   public final synchronized FileChannel getChannel ()
   {
+    if (ch == null)
+      ch = new FileChannelImpl (fd, true, this);
+
     return ch;
   }
 

@@ -71,8 +71,7 @@ struct graphics2d
   GdkWindow *win;
   GdkPixbuf *drawbuf;
   char *pattern_pixels;
-  cairo_surface_t *pattern_surface;
-  cairo_pattern_t *pattern;
+  cairo_surface_t *pattern;
   gboolean debug;
 };
 

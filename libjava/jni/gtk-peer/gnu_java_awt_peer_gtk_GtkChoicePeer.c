@@ -249,10 +249,9 @@ static void
 item_activate (GtkItem *item __attribute__((unused)),
 	       struct item_event_hook_info *ie)
 {
-  jstring label;
   gdk_threads_leave ();
 
-  label = (*gdk_env)->NewStringUTF (gdk_env, ie->label);
+  jstring label = (*gdk_env)->NewStringUTF (gdk_env, ie->label);
   (*gdk_env)->CallVoidMethod (gdk_env, ie->peer_obj,
 			      choicePostItemEventID,
 			      label,

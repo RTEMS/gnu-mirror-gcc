@@ -47,7 +47,6 @@ import java.awt.im.InputMethodHighlight;
 import java.awt.image.ColorModel;
 import java.awt.image.ImageObserver;
 import java.awt.image.ImageProducer;
-import java.awt.GraphicsEnvironment;
 import java.awt.peer.*;
 import java.net.URL;
 import java.util.Hashtable;
@@ -129,58 +128,26 @@ public class GtkToolkit extends gnu.java.awt.ClasspathToolkit
 
   public Image createImage (String filename)
   {
-    if (useGraphics2D())
-      return GdkPixbufDecoder.createBufferedImage (filename);
-    else
-      {
-        GdkPixbufDecoder d = new GdkPixbufDecoder (filename);
-        GtkImage image = new GtkImage (d, null);
-        d.startProduction (image);
-        return image;        
-      }
+    return new GtkImage (new GdkPixbufDecoder (filename), null);
   }
 
   public Image createImage (URL url)
   {
-    if (useGraphics2D())
-      return GdkPixbufDecoder.createBufferedImage (url);
-    else
-      {
-        GdkPixbufDecoder d = new GdkPixbufDecoder (url);
-        GtkImage image = new GtkImage (d, null);
-        d.startProduction (image);
-        return image;        
-      }
+    return new GtkImage (new GdkPixbufDecoder (url), null);
   }
 
   public Image createImage (ImageProducer producer) 
   {
-    if (useGraphics2D())
-      return GdkPixbufDecoder.createBufferedImage (producer);
-    else
-      {
-        GtkImage image = new GtkImage (producer, null);
-        producer.startProduction (image);
-        return image;        
-      }
+    return new GtkImage (producer, null);
   }
 
   public Image createImage (byte[] imagedata, int imageoffset,
 			    int imagelength)
   {
-    if (useGraphics2D())
-      return GdkPixbufDecoder.createBufferedImage (imagedata,
-                                                   imageoffset, 
-                                                   imagelength);
-    else
-      {
-        GdkPixbufDecoder d = new GdkPixbufDecoder (imagedata,
-                                                   imageoffset, 
-                                                   imagelength);
-        GtkImage image = new GtkImage (d, null);
-        d.startProduction (image);
-        return image;        
-      }
+    return new GtkImage (new GdkPixbufDecoder (imagedata,
+					       imageoffset,
+					       imagelength),
+			 null);
   }
 
   public ColorModel getColorModel () 
@@ -207,12 +174,18 @@ public class GtkToolkit extends gnu.java.awt.ClasspathToolkit
 
   public Image getImage (String filename) 
   {
-    return createImage (filename);
+    GdkPixbufDecoder d = new GdkPixbufDecoder (filename);
+    GtkImage image = new GtkImage (d, null);
+    d.startProduction (image);
+    return image;
   }
 
   public Image getImage (URL url) 
   {
-    return createImage (url);
+    GdkPixbufDecoder d = new GdkPixbufDecoder (url);
+    GtkImage image = new GtkImage (d, null);
+    d.startProduction (image);
+    return image;
   }
 
   public PrintJob getPrintJob (Frame frame, String jobtitle, Properties props) 
@@ -393,18 +366,14 @@ public class GtkToolkit extends gnu.java.awt.ClasspathToolkit
    * @deprecated part of the older "logical font" system in earlier AWT
    * implementations. Our newer Font class uses getClasspathFontPeer.
    */
-  protected FontPeer getFontPeer (String name, int style) {
-    // All fonts get a default size of 12 if size is not specified.
-    return getFontPeer(name, style, 12);
-  }
-
-  /**
-   * Private method that allows size to be set at initialization time.
-   */
-  private FontPeer getFontPeer (String name, int style, int size) 
+  protected FontPeer getFontPeer (String name, int style) 
   {
-    GtkFontPeer fp = new GtkFontPeer (name, style, size);
-    return fp;
+    try {
+      GtkFontPeer fp = new GtkFontPeer (name, style);
+      return fp;
+    } catch (MissingResourceException ex) {
+      return null;
+    }
   }
 
   /**
@@ -419,11 +388,7 @@ public class GtkToolkit extends gnu.java.awt.ClasspathToolkit
       return new GdkClasspathFontPeer (name, attrs);
     else
       {
-        // Default values
-        int size = 12;
         int style = Font.PLAIN;
-        if (name == null)
-          name = "Default";
 
         if (attrs.containsKey (TextAttribute.WEIGHT))
           {
@@ -439,13 +404,7 @@ public class GtkToolkit extends gnu.java.awt.ClasspathToolkit
               style += Font.ITALIC;
           }
         
-        if (attrs.containsKey (TextAttribute.SIZE))
-          {
-            Float fsize = (Float) attrs.get (TextAttribute.SIZE);
-            size = fsize.intValue();
-          }
- 
-        return (ClasspathFontPeer) this.getFontPeer (name, style, size);
+        return (ClasspathFontPeer) this.getFontPeer (name, style);
       }
   }
 
@@ -454,7 +413,9 @@ public class GtkToolkit extends gnu.java.awt.ClasspathToolkit
     return q;
   }
 
-  protected native void loadSystemColors (int[] systemColors);
+  protected void loadSystemColors (int[] systemColors) 
+  {
+  }
 
   public DragSourceContextPeer createDragSourceContextPeer(DragGestureEvent e)
   {
@@ -470,9 +431,7 @@ public class GtkToolkit extends gnu.java.awt.ClasspathToolkit
 
   public GraphicsEnvironment getLocalGraphicsEnvironment()
   {
-    GraphicsEnvironment ge;
-    ge = new GdkGraphicsEnvironment ();  
-    return ge;
+    throw new java.lang.UnsupportedOperationException ();
   }
 
   public Font createFont(int format, java.io.InputStream stream)

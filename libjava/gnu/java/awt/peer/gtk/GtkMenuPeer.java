@@ -95,5 +95,10 @@ public class GtkMenuPeer extends GtkMenuItemPeer
     addItem (item, key, shiftModifier);
   }
 
+  public void addSeparator ()
+  {
+    addItem (new MenuItem ("-"));
+  }
+
   native public void delItem (int index);
 }

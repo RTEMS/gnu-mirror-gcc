@@ -39,9 +39,7 @@ exception statement from your version. */
 
 package java.io;
 
-import java.nio.channels.ByteChannel;
-import java.nio.channels.FileChannel;
-import gnu.java.nio.channels.FileChannelImpl;
+import gnu.classpath.Configuration;
 
 /**
  * This class represents an opaque file handle as a Java class.  It should
@@ -59,43 +57,82 @@ public final class FileDescriptor
    * stream.  This will usually be accessed through the
    * <code>System.in</code>variable.
    */
-  public static final FileDescriptor in
-  = new FileDescriptor (FileChannelImpl.in);
+  public static final FileDescriptor in = null;
 
   /**
    * A <code>FileDescriptor</code> representing the system standard output
    * stream.  This will usually be accessed through the
    * <code>System.out</code>variable.
    */
-  public static final FileDescriptor out
-  = new FileDescriptor (FileChannelImpl.out);
+  public static final FileDescriptor out = null;
 
   /**
    * A <code>FileDescriptor</code> representing the system standard error
    * stream.  This will usually be accessed through the
    * <code>System.err</code>variable.
    */
-  public static final FileDescriptor err
-  = new FileDescriptor (FileChannelImpl.err);
+  public static final FileDescriptor err = null;
 
-  final ByteChannel channel;
+  private static native void init();
+
+  static
+    {
+      if (Configuration.INIT_LOAD_LIBRARY)
+        {
+          System.loadLibrary("javaio");
+        }
+
+      init();
+    }
+
+  // These are WHENCE values for seek.
+  static final int SET = 0;
+  static final int CUR = 1;
+
+  // These are mode values for open().
+  static final int READ   = 1;
+  static final int WRITE  = 2;
+  static final int APPEND = 4;
+
+  // EXCL is used only when making a temp file.
+  static final int EXCL   = 8;
+  static final int SYNC   = 16;
+  static final int DSYNC  = 32;
+
+  /**
+   * This is the actual native file descriptor value
+   */
+  // System's notion of file descriptor.  It might seem redundant to
+  // initialize this given that it is reassigned in the constructors.
+  // However, this is necessary because if open() throws an exception
+  // we want to make sure this has the value -1.  This is the most
+  // efficient way to accomplish that.
+  private int fd = -1;
+
+  private long position = 0;
 
   /**
    * This method is used to initialize an invalid FileDescriptor object.
    */
   public FileDescriptor()
   {
-    channel = null;
   }
 
-  /**
-   * This method is used to initialize a FileDescriptor object.
-   */
-  FileDescriptor(ByteChannel channel)
+  // Open a file.  MODE is a combination of the above mode flags.
+  FileDescriptor (String path, int mode) throws FileNotFoundException
   {
-    this.channel = channel;
+    fd = open (path, mode);
   }
 
+  // Attach to an already-opened file.  This is not private because we
+  // need access to it from other packages, for instance java.net.
+  // Ordinarily that wouldn't work, either, but in our case we know
+  // the access comes from C++, where "package private" is translated
+  // into "public".  Eww.
+  FileDescriptor (int desc)
+  {
+    fd = desc;
+  }
 
   /**
    * This method forces all data that has not yet been physically written to
@@ -106,23 +143,7 @@ public final class FileDescriptor
    * support this functionality or if an error occurs, then an exception
    * will be thrown.
    */
-  public void sync () throws SyncFailedException
-  {
-    if (channel instanceof FileChannel)
-      {
-	try
-	  {
-	    ((FileChannel) channel).force(true); 
-	  }
-	catch (IOException ex)
-	  {
-	    if (ex instanceof SyncFailedException)
-	      throw (SyncFailedException) ex;
-	    else
-	      throw new SyncFailedException(ex.getMessage());
-	  }
-      }
-  }
+  public native void sync() throws SyncFailedException;
 
   /**
    * This methods tests whether or not this object represents a valid open
@@ -131,8 +152,70 @@ public final class FileDescriptor
    * @return <code>true</code> if this object represents a valid 
    * native file handle, <code>false</code> otherwise
    */
-  public boolean valid ()
+  public native boolean valid();
+
+  /**
+   * Opens the specified file in the specified mode.  This can be done
+   * in one of the specified modes:
+   * <ul>
+   * <li>r - Read Only
+   * <li>rw - Read / Write
+   * <li>ra - Read / Write - append to end of file
+   * <li>rws - Read / Write - synchronous writes of data/metadata
+   * <li>rwd - Read / Write - synchronous writes of data.
+   *
+   * @param path Name of the file to open
+   * @param mode Mode to open
+   *
+   * @exception IOException If an error occurs.
+   */
+  native int open(String path, int mode) throws FileNotFoundException;
+
+  /**
+   * Close the file descriptor.
+   */
+  native void close() throws IOException;
+
+  /**
+   * Write oe byte of data.
+   */
+  native void write(int b) throws IOException;
+
+  /**
+   * Write data.
+   */
+  native void write(byte[] b, int offset, int len)
+    throws IOException, NullPointerException, IndexOutOfBoundsException;
+
+  /**
+   * Read one byte of data.
+   */
+  native int read() throws IOException;
+
+  /**
+   * Read data.
+   */
+  native int read(byte[] bytes, int offset, int len) throws IOException;
+  native int available() throws IOException;
+
+  // EOF_TRUNC is true if a request to seek past the end of file
+  // should actually stop at the end of file.  If false, then a seek
+  // past the end is ok (and if a subsequent write occurs the file
+  // will grow).
+  native int seek(long pos, int whence, boolean eof_trunc) throws IOException;
+
+  native long getFilePointer() throws IOException;
+  native long getLength() throws IOException;
+  native void setLength(long pos) throws IOException;
+
+  native void lock(long pos, int len, boolean shared) throws IOException;
+  native boolean tryLock(long pos, int lent, boolean shared) throws IOException;
+  native void unlock(long pos, int len) throws IOException;
+
+  // When collected, close.
+  protected void finalize() throws Throwable
   {
-    return channel != null && channel.isOpen();
+    if (valid())
+      close();
   }
 }

@@ -87,49 +87,68 @@ public interface DocumentEvent {
 
 	} // ElementChange
 
-  /**
-   * EventType
-   */
-  class EventType
-  {
-    /**
-     * INSERT
-     */
-    public static final EventType INSERT = new EventType("INSERT"); // TODO
+	/**
+	 * EventType
+	 */
+	class EventType {
 
-    /**
-     * REMOVE
-     */
-    public static final EventType REMOVE = new EventType("REMOVE"); // TODO
+		//-------------------------------------------------------------
+		// Variables --------------------------------------------------
+		//-------------------------------------------------------------
 
-    /**
-     * CHANGE
-     */
-    public static final EventType CHANGE = new EventType("CHANGE"); // TODO
+		/**
+		 * INSERT
+		 */
+		EventType INSERT = new EventType("INSERT"); // TODO
 
-    /**
-     * typeString
-     */
-    private String type;
+		/**
+		 * REMOVE
+		 */
+		EventType REMOVE = new EventType("REMOVE"); // TODO
 
-    /**
-     * Constructor EventType
-     * @param type TODO
-     */
-    private EventType(String type)
-    {
-      this.type = type;
-    }
+		/**
+		 * CHANGE
+		 */
+		EventType CHANGE = new EventType("CHANGE"); // TODO
 
-    /**
-     * toString
-     * @returns String
-     */
-    public String toString()
-    {
-      return type;
-    }
-  }
+		/**
+		 * typeString
+		 */
+		private String type;
+
+
+		//-------------------------------------------------------------
+		// Initialization ---------------------------------------------
+		//-------------------------------------------------------------
+
+		/**
+		 * Constructor EventType
+		 * @param type TODO
+		 */
+		private EventType(String type) {
+			this.type = type;
+		} // EventType()
+
+
+		//-------------------------------------------------------------
+		// Methods ----------------------------------------------------
+		//-------------------------------------------------------------
+
+		/**
+		 * toString
+		 * @returns String
+		 */
+		public String toString() {
+			return type; // TODO
+		} // toString()
+
+
+	} // EventType
+
+
+	//-------------------------------------------------------------
+	// Methods ----------------------------------------------------
+	//-------------------------------------------------------------
 
 	/**
 	 * getType

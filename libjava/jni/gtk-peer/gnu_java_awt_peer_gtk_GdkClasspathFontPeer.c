@@ -112,10 +112,9 @@ JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GdkClasspathFontPeer_setFont
   struct peerfont *pfont = NULL;
   PangoFontMap *map = NULL; 
   char const *family_name = NULL;
-  enum java_awt_font_style style;
 
   gdk_threads_enter ();
-  style = (enum java_awt_font_style) style_int;
+  enum java_awt_font_style style = (enum java_awt_font_style) style_int;
 
   g_assert (self != NULL);
   pfont = (struct peerfont *)NSA_GET_FONT_PTR (env, self);
@@ -136,7 +135,7 @@ JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GdkClasspathFontPeer_setFont
   pango_font_description_set_family (pfont->desc, family_name);
   (*env)->ReleaseStringUTFChars(env, family_name_str, family_name);
 
-  pango_font_description_set_size (pfont->desc, size * dpi_conversion_factor);
+  pango_font_description_set_size (pfont->desc, size * PANGO_SCALE);  
 
   if (style & java_awt_font_BOLD)
     pango_font_description_set_weight (pfont->desc, PANGO_WEIGHT_BOLD);

@@ -1,5 +1,5 @@
 /* CharBuffer.java -- 
-   Copyright (C) 2002, 2003, 2004  Free Software Foundation, Inc.
+   Copyright (C) 2002, 2003 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -53,6 +53,13 @@ public abstract class CharBuffer extends Buffer
     array_offset = 0;
   }
 
+  CharBuffer (char[] buffer, int offset, int capacity, int limit, int position, int mark)
+  {
+    super (capacity, limit, position, mark);
+    this.backing_buffer = buffer;
+    this.array_offset = offset;
+  }
+
   /**
    * Allocates a new <code>CharBuffer</code> object with a given capacity.
    */
@@ -65,75 +72,56 @@ public abstract class CharBuffer extends Buffer
    * Wraps a <code>char</code> array into a <code>CharBuffer</code>
    * object.
    *
-   * @param array the array to wrap
-   * @param offset the offset of the region in the array to wrap
-   * @param length the length of the region in the array to wrap
-   *
-   * @return a new <code>CharBuffer</code> object
-   * 
    * @exception IndexOutOfBoundsException If the preconditions on the offset
    * and length parameters do not hold
    */
-  final public static CharBuffer wrap(char[] array, int offset, int length)
+  final public static CharBuffer wrap (char[] array, int offset, int length)
   {
-    return new CharBufferImpl(array, 0, array.length, offset + length, offset, -1, false);
+    return new CharBufferImpl (array, 0, array.length, offset + length, offset, -1, false);
   }
   
   /**
    * Wraps a character sequence into a <code>CharBuffer</code> object.
-   *
-   * @param seq the sequence to wrap
-   *
-   * @return a new <code>CharBuffer</code> object
    */
-  final public static CharBuffer wrap(CharSequence seq)
+  final public static CharBuffer wrap (CharSequence a)
   {
-    return wrap(seq, 0, seq.length());
+    return wrap (a, 0, a.length ());
   }
   
   /**
    * Wraps a character sequence into a <code>CharBuffer</code> object.
    * 
-   * @param seq the sequence to wrap
-   * @param start the index of the first character to wrap
-   * @param end the index of the first character not to wrap
-   *
-   * @return a new <code>CharBuffer</code> object
-   * 
    * @exception IndexOutOfBoundsException If the preconditions on the offset
    * and length parameters do not hold
    */
-  final public static CharBuffer wrap(CharSequence seq, int start, int end)
+  final public static CharBuffer wrap (CharSequence a, int offset, int length)
   {
     // FIXME: implement better handling of java.lang.String.
     // Probably share data with String via reflection.
 	  
-    if ((start < 0)
-        || (start > seq.length())
-        || (end < start)
-        || (end > (seq.length() - start)))
-      throw new IndexOutOfBoundsException();
+    if ((offset < 0)
+        || (offset > a.length ())
+        || (length < 0)
+        || (length > (a.length () - offset)))
+      throw new IndexOutOfBoundsException ();
     
-    int len = end - start;
-    char[] buffer = new char[len];
+    char [] buffer = new char [a.length ()];
     
-    for (int i = 0; i < len; i++)
-      buffer[i] = seq.charAt(i + start);
+    for (int i = offset; i < length; i++)
+      {
+        buffer [i] = a.charAt (i);
+      }
     
-    return wrap(buffer, 0, len).asReadOnlyBuffer();
+    return wrap (buffer, offset, length).asReadOnlyBuffer ();
   }
 
   /**
    * Wraps a <code>char</code> array into a <code>CharBuffer</code>
    * object.
-   *
-   * @param array the array to wrap
-   *
-   * @return a new <code>CharBuffer</code> object
    */
-  final public static CharBuffer wrap(char[] array)
+  final public static CharBuffer wrap (char[] array)
   {
-    return wrap(array, 0, array.length);
+    return wrap (array, 0, array.length);
   }
   
   /**
@@ -329,27 +317,32 @@ public abstract class CharBuffer extends Buffer
    */
   public int compareTo (Object obj)
   {
-    CharBuffer other = (CharBuffer) obj;
+    CharBuffer a = (CharBuffer) obj;
 
-    int num = Math.min(remaining(), other.remaining());
-    int pos_this = position();
-    int pos_other = other.position();
-    
-    for (int count = 0; count < num; count++)
+    if (a.remaining () != remaining ())
+      return 1;
+
+    if (! hasArray () ||
+        ! a.hasArray ())
       {
-	 char a = get(pos_this++);
-	 char b = other.get(pos_other++);
-      	 
-	 if (a == b)
-	   continue;
-      	   
-	 if (a < b)
-	   return -1;
-      	   
-	 return 1;
+        return 1;
       }
-      
-     return remaining() - other.remaining();
+
+    int r = remaining ();
+    int i1 = position ();
+    int i2 = a.position ();
+
+    for (int i = 0; i < r; i++)
+      {
+        int t = (int) (get (i1) - a.get (i2));
+
+        if (t != 0)
+          {
+            return (int) t;
+          }
+      }
+
+    return 0;
   }
 
   /**

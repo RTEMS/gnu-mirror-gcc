@@ -41,10 +41,6 @@ import java.util.Locale;
 import javax.print.attribute.PrintServiceAttribute;
 import javax.print.attribute.TextSyntax;
 
-
-/**
- * @author Michael Koch (konqueror@gmx.de)
- */
 public final class PrinterMessageFromOperator extends TextSyntax
   implements PrintServiceAttribute
 {
@@ -54,7 +50,6 @@ public final class PrinterMessageFromOperator extends TextSyntax
    * Creates a <code>PrinterMessageFromOperator</code> object.
    *
    * @param message the message
-   * @param locale the locale of the message, null means default locale
    *
    * @exception NullPointerException if message is null
    */
@@ -68,7 +63,7 @@ public final class PrinterMessageFromOperator extends TextSyntax
    *
    * @param obj the object to test
    *
-   * @return true if both objects are equal, false otherwise.
+   * @returns true if both objects are equal, false otherwise.
    */
   public boolean equals(Object obj)
   {
@@ -83,7 +78,7 @@ public final class PrinterMessageFromOperator extends TextSyntax
    *
    * @return the class <code>PrinterMessageFromOperator</code> itself
    */
-  public Class getCategory()
+  public final Class getCategory()
   {
     return PrinterMessageFromOperator.class;
   }
@@ -93,7 +88,7 @@ public final class PrinterMessageFromOperator extends TextSyntax
    *
    * @return the string "printer-message-from-operator"
    */
-  public String getName()
+  public final String getName()
   {
     return "printer-message-from-operator";
   }

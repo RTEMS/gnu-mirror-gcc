@@ -37,9 +37,13 @@ exception statement from your version. */
 
 package java.lang;
 
-import java.io.PrintStream;
-import java.io.PrintWriter;
 import java.io.Serializable;
+import java.io.PrintWriter;
+import java.io.PrintStream;
+import java.io.ObjectOutputStream;
+import java.io.ObjectInputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 
 /**
  * Throwable is the superclass of all exceptions that can be raised.
@@ -388,7 +392,7 @@ public class Throwable implements Serializable
    * then a line starting with three spaces and the string "... X more" is
    * printed, where X is the number of remaining stackframes.
    *
-   * @param pw the PrintWriter to write the trace to
+   * @param w the PrintWriter to write the trace to
    * @since 1.1
    */
   public void printStackTrace (PrintWriter pw)

@@ -338,10 +338,10 @@ public class ZipOutputStream extends DeflaterOutputStream implements ZipConstant
     int numEntries = 0;
     int sizeEntries = 0;
     
-    Enumeration e = entries.elements();
-    while (e.hasMoreElements())
+    Enumeration enum = entries.elements();
+    while (enum.hasMoreElements())
       {
-	ZipEntry entry = (ZipEntry) e.nextElement();
+	ZipEntry entry = (ZipEntry) enum.nextElement();
 	
 	int method = entry.getMethod();
 	writeLeInt(CENSIG);

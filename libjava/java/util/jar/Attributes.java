@@ -85,18 +85,17 @@ public class Attributes implements Cloneable, Map
    * attributes, applet attributes, extension identification attributes,
    * package versioning and sealing attributes, file contents attributes,
    * bean objects attribute and signing attributes. See the 
-   * 
-   * <p>The characters of a Name must obey the following restrictions:</p>
-   * 
+   * <p>
+   * The characters of a Name must obey the following restrictions:
    * <ul>
-   * <li>Must contain at least one character</li>
-   * <li>The first character must be alphanumeric (a-z, A-Z, 0-9)</li>
-   * <li>All other characters must be alphanumeric, a '-' or a '_'</li>
+   * <li> Must contain at least one character
+   * <li> The first character must be alphanumeric (a-z, A-Z, 0-9)
+   * <li> All other characters must be alphanumeric, a '-' or a '_'
    * </ul>
-   * 
-   * <p>When comparing Names (with <code>equals</code>) all characters are
+   * <p>
+   * When comparing Names (with <code>equals</code>) all characters are
    * converted to lowercase. But you can get the original case sensitive
-   * string with the <code>toString()</code> method.</p>
+   * string with the <code>toString()</code> method.
    *
    * @since 1.2
    * @author Mark Wielaard (mark@klomp.org)
@@ -146,15 +145,15 @@ public class Attributes implements Cloneable, Map
      * Manifest manifest file with the following Names:
      * <ul>
      * <li> &lt;extension&gt;-Extension-Name:
-     * unique name of the extension</li>
+     * unique name of the extension
      * <li> &lt;extension&gt;-Specification-Version:
-     * minimum specification version</li>
+     * minimum specification version
      * <li> &lt;extension&gt;-Implementation-Version:
-     * minimum implementation version</li>
+     * minimum implementation version
      * <li> &lt;extension&gt;-Implementation-Vendor-Id:
-     * unique id of implementation vendor</li>
+     * unique id of implementation vendor
      * <li> &lt;extension&gt;-Implementation-URL:
-     * where the latest version of the extension library can be found</li>
+     * where the latest version of the extension library can be found
      * </ul>
      */
     public static final Name EXTENSION_LIST = new Name("Extension-List");

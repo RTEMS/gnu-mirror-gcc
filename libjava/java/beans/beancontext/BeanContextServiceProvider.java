@@ -62,12 +62,14 @@ import java.util.Iterator;
 public interface BeanContextServiceProvider {
 	/**
 	 * Get a service.
-	 * Called from <code>BeanContextServices.getService()</code>.
+	 * Called from <code>BeanContextServices.getService().
+	 * <P>
 	 *
-	 * <p>If the requested service class is not available, or if this
+	 * If the requested service class is not available, or if this
 	 * <code>BeanContextServiceProvider</code> chooses not honor the
 	 * request for some reason, then this method will return
-	 * <code>null</code>.</p>
+	 * <code>null</code>.
+	 * <P>
 	 *
 	 * This method may throw unchecked exceptions, so watch out.
 	 *

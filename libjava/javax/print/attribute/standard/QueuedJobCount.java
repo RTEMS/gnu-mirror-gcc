@@ -68,7 +68,7 @@ public final class QueuedJobCount extends IntegerSyntax
    *
    * @param obj the object to test
    *
-   * @return true if both objects are equal, false otherwise.
+   * @returns true if both objects are equal, false otherwise.
    */
   public boolean equals(Object obj)
   {
@@ -83,7 +83,7 @@ public final class QueuedJobCount extends IntegerSyntax
    *
    * @return the class <code>QueuedJobCount</code> itself
    */
-  public Class getCategory()
+  public final Class getCategory()
   {
     return QueuedJobCount.class;
   }
@@ -93,7 +93,7 @@ public final class QueuedJobCount extends IntegerSyntax
    *
    * @return the string "queued-job-count"
    */
-  public String getName()
+  public final String getName()
   {
     return "queued-job-count";
   }

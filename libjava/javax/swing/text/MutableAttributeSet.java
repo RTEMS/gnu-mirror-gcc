@@ -44,42 +44,48 @@ import java.util.Enumeration;
  * @author	Andrew Selkirk
  * @version	1.0
  */
-public interface MutableAttributeSet extends AttributeSet
-{
-  /**
-   * addAttribute
-   * @param name TODO
-   * @param value TODO
-   */
-  void addAttribute(Object name, Object value);
+public interface MutableAttributeSet extends AttributeSet {
 
-  /**
-   * addAttributes
-   * @param attributes TODO
-   */
-  void addAttributes(AttributeSet attributes);
+	//-------------------------------------------------------------
+	// Methods ----------------------------------------------------
+	//-------------------------------------------------------------
 
-  /**
-   * removeAttribute
-   * @param name TODO
-   */
-  void removeAttribute(Object name);
+	/**
+	 * addAttribute
+	 * @param name TODO
+	 * @param value TODO
+	 */
+	void addAttribute(Object name, Object value);
 
-  /**
-   * removeAttributes
-   * @param names TODO
-   */
-  void removeAttributes(Enumeration names);
+	/**
+	 * addAttributes
+	 * @param attributes TODO
+	 */
+	void addAttributes(AttributeSet attributes);
 
-  /**
-   * removeAttributes
-   * @param attributes TODO
-   */
-  void removeAttributes(AttributeSet attributes);
+	/**
+	 * removeAttribute
+	 * @param name TODO
+	 */
+	void removeAttribute(Object name);
 
-  /**
-   * setResolveParent
-   * @param parent TODO
-   */
-  void setResolveParent(AttributeSet parent);
-}
+	/**
+	 * removeAttributes
+	 * @param names TODO
+	 */
+	void removeAttributes(Enumeration names);
+
+	/**
+	 * removeAttributes
+	 * @param attributes TODO
+	 */
+	void removeAttributes(AttributeSet attributes);
+
+	/**
+	 * setResolveParent
+	 * @param parent TODO
+	 */
+	void setResolveParent(AttributeSet parent);
+
+
+} // MutableAttributeSet

@@ -56,30 +56,50 @@ public class CellRendererPane extends Container implements Accessible
 {
   private static final long serialVersionUID = -7642183829532984273L;
 
-  /**
-   * AccessibleCellRendererPane
-   */
-  protected class AccessibleCellRendererPane extends AccessibleAWTContainer
-  {
-    private static final long serialVersionUID = -8981090083147391074L;
+	//-------------------------------------------------------------
+	// Classes ----------------------------------------------------
+	//-------------------------------------------------------------
 
-    /**
-     * Constructor AccessibleCellRendererPane
-     * @param component TODO
-     */
-    protected AccessibleCellRendererPane()
-    {
-    }
+	/**
+	 * AccessibleCellRendererPane
+	 */
+	protected class AccessibleCellRendererPane extends AccessibleAWTContainer {
 
-    /**
-     * getAccessibleRole
-     * @returns AccessibleRole
-     */
-    public AccessibleRole getAccessibleRole()
-    {
-      return AccessibleRole.PANEL;
-    }
-  }
+          private static final long serialVersionUID = 7300340301783504481L;
+
+		//-------------------------------------------------------------
+		// Initialization ---------------------------------------------
+		//-------------------------------------------------------------
+
+		/**
+		 * Constructor AccessibleCellRendererPane
+		 * @param component TODO
+		 */
+		protected AccessibleCellRendererPane(CellRendererPane component) {
+			super();
+			// TODO
+		} // AccessibleCellRendererPane()
+
+
+		//-------------------------------------------------------------
+		// Methods ----------------------------------------------------
+		//-------------------------------------------------------------
+
+		/**
+		 * getAccessibleRole
+		 * @returns AccessibleRole
+		 */
+		public AccessibleRole getAccessibleRole() {
+			return AccessibleRole.PANEL;
+		} // getAccessibleRole()
+
+
+	} // AccessibleCellRendererPane
+
+
+	//-------------------------------------------------------------
+	// Variables --------------------------------------------------
+	//-------------------------------------------------------------
 
 	/**
 	 * accessibleContext
@@ -189,15 +209,16 @@ public class CellRendererPane extends Container implements Accessible
 		// TODO
 	} // paintComponent()
 
-  /**
-   * getAccessibleContext
-   * @return AccessibleContext
-   */
-  public AccessibleContext getAccessibleContext()
-  {
-    if (accessibleContext == null)
-      accessibleContext = new AccessibleCellRendererPane();
+	/**
+	 * getAccessibleContext
+	 * @returns AccessibleContext
+	 */
+	public AccessibleContext getAccessibleContext() {
+		if (accessibleContext == null) {
+			accessibleContext = new AccessibleCellRendererPane(this);
+		} // if
+		return accessibleContext;
+	} // getAccessibleContext()
 
-    return accessibleContext;
-  }
-}
+
+} // CellRendererPane

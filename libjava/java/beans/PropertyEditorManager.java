@@ -60,20 +60,19 @@ import java.awt.Font;
  * already registered; if it is, that property editor is
  * used.  Next it takes the type's classname and appends
  * "Editor" to it, and searches first in the class's
- * package and then in the property editor search path.
+ * package and then in the property editor search path.<P>
  *
- * <p>Default property editors are provided for:</p>
- * 
- * <ol>
- * <li>boolean, byte, short, int, long, float, and double</li>
- * <li>java.lang.String</li>
- * <li>java.awt.Color</li>
- * <li>java.awt.Font</li>
- * </ol>
+ * Default property editors are provided for:<P>
+ * <OL>
+ * <LI>boolean, byte, short, int, long, float, and double</LI>
+ * <LI>java.lang.String</LI>
+ * <LI>java.awt.Color</LI>
+ * <LI>java.awt.Font</LI>
+ * <OL>
  *
- * <p><strong>Spec Suggestion:</strong> Perhaps an editor for
+ * <STRONG>Spec Suggestion:</STRONG> Perhaps an editor for
  * Filename or something like it should be provided.  As well
- * as char.</p>
+ * as char.
  *
  * @author John Keiser
  * @since 1.1

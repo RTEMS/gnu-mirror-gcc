@@ -38,10 +38,11 @@ exception statement from your version. */
 
 package gnu.java.nio;
 
-import gnu.java.nio.channels.FileChannelImpl;
-
+import java.io.FileDescriptor;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import gnu.classpath.Configuration;
 
 /**
  * @author Michael Koch
@@ -49,16 +50,25 @@ import java.nio.channels.FileLock;
  */
 public class FileLockImpl extends FileLock
 {
-  private FileChannelImpl ch;
+  static
+  {
+    // load the shared library needed for native methods.
+    if (Configuration.INIT_LOAD_LIBRARY)
+      {
+        System.loadLibrary ("javanio");
+      }
+  }
   
-  public FileLockImpl (FileChannelImpl channel, long position,
+  private FileDescriptor fd;
+  
+  public FileLockImpl (FileDescriptor fd, FileChannel channel, long position,
                        long size, boolean shared)
   {
     super (channel, position, size, shared);
-    ch = channel;
+    this.fd = fd;
   }
 
-  protected void finalize()
+  public void finalize()
   {
     try
       {
@@ -75,8 +85,10 @@ public class FileLockImpl extends FileLock
     return !channel().isOpen();
   }
 
+  private native void releaseImpl () throws IOException;
+
   public synchronized void release () throws IOException
   {
-    ch.unlock(position(), size());
+    releaseImpl ();
   }
 }

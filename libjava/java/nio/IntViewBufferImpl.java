@@ -38,7 +38,7 @@ exception statement from your version. */
 
 package java.nio;
 
-final class IntViewBufferImpl extends IntBuffer
+class IntViewBufferImpl extends IntBuffer
 {
   /** Position in bb (i.e. a byte offset) where this buffer starts. */
   private int offset;
@@ -46,20 +46,11 @@ final class IntViewBufferImpl extends IntBuffer
   private boolean readOnly;
   private ByteOrder endian;
   
-  IntViewBufferImpl (ByteBuffer bb, int capacity)
-  {
-    super (capacity, capacity, 0, -1);
-    this.bb = bb;
-    this.offset = bb.position();
-    this.readOnly = bb.isReadOnly();
-    this.endian = bb.order();
-  }
-  
   public IntViewBufferImpl (ByteBuffer bb, int offset, int capacity,
 			    int limit, int position, int mark,
 			    boolean readOnly, ByteOrder endian)
   {
-    super (capacity, limit, position, mark);
+    super (limit >> 2, limit >> 2, position >> 2, mark >> 2);
     this.bb = bb;
     this.offset = offset;
     this.readOnly = readOnly;

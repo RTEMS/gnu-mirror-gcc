@@ -38,7 +38,7 @@ exception statement from your version. */
 
 package java.nio;
 
-final class LongViewBufferImpl extends LongBuffer
+class LongViewBufferImpl extends LongBuffer
 {
   /** Position in bb (i.e. a byte offset) where this buffer starts. */
   private int offset;
@@ -46,20 +46,11 @@ final class LongViewBufferImpl extends LongBuffer
   private boolean readOnly;
   private ByteOrder endian;
   
-  LongViewBufferImpl (ByteBuffer bb, int capacity)
-  {
-    super (capacity, capacity, 0, -1);
-    this.bb = bb;
-    this.offset = bb.position();
-    this.readOnly = bb.isReadOnly();
-    this.endian = bb.order();
-  }
-  
   public LongViewBufferImpl (ByteBuffer bb, int offset, int capacity,
 			     int limit, int position, int mark,
 			     boolean readOnly, ByteOrder endian)
   {
-    super (capacity, limit, position, mark);
+    super (limit >> 3, limit >> 3, position >> 3, mark >> 3);
     this.bb = bb;
     this.offset = offset;
     this.readOnly = readOnly;

@@ -39,7 +39,6 @@ package java.net;
 
 import java.io.IOException;
 
-
 /**
  * This exception indicates that a URL passed to an object was not in a
  * valid format.

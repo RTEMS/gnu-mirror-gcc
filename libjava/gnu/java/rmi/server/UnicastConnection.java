@@ -104,7 +104,6 @@ void acceptConnection() throws IOException {
 void makeConnection(int protocol) throws IOException {
     //Use BufferedXXXStream would be more efficient
 	din = new DataInputStream(new BufferedInputStream(sock.getInputStream()));
-
 	dout = new DataOutputStream(new BufferedOutputStream(sock.getOutputStream()));
 
 	// Send header
@@ -140,47 +139,19 @@ DataOutputStream getDataOutputStream() throws IOException {
 	return (dout);
 }
 
-/*
-*
-* get ObjectInputStream for reading more objects
-*
-*/
 ObjectInputStream getObjectInputStream() throws IOException {
 	if (oin == null) {
-		throw new IOException("no ObjectInputtream for reading more objects");
+        oin = new RMIObjectInputStream(din);
 	}
 	return (oin);
 }
 
-/**
-*
-* starts ObjectInputStream.
-*
-*/
-ObjectInputStream startObjectInputStream() throws IOException {
-	return (oin = new RMIObjectInputStream(din));
-}
-
-/**
-*
-* get ObjectOutputStream for sending more objects
-*
-*/
 ObjectOutputStream getObjectOutputStream() throws IOException {
 	if (oout == null) {
-		throw new IOException("no ObjectOutputStream for sending more objects");
-	} 
+		oout = new RMIObjectOutputStream(dout);
+	}
 	return (oout);
 }
-
-/**
-*
-* starts ObjectOutputStream.
-*
-*/
-ObjectOutputStream startObjectOutputStream() throws IOException {
-	return (oout = new RMIObjectOutputStream(dout));
-} 
 
 void disconnect() {
 	try {
@@ -228,6 +199,5 @@ public void run() {
 	}
     }while(true);
 }
-
 
 }

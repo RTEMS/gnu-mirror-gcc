@@ -7,7 +7,7 @@ GNU Classpath is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2, or (at your option)
 any later version.
-
+ 
 GNU Classpath is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
@@ -36,7 +36,6 @@ obligated to do so.  If you do not wish to do so, delete this
 exception statement from your version. */
 
 package java.net;
-
 
 /*
  * Written using on-line Java Platform 1.2 API Specification, as well
@@ -87,7 +86,7 @@ public final class DatagramPacket
    * The maximal length of the buffer.
    */
   int maxlen;
-
+  
   /**
    * The address to which the packet should be sent or from which it
    * was received.
@@ -135,14 +134,14 @@ public final class DatagramPacket
    *
    * @param buf A buffer containing the data to send
    * @param offset The offset into the buffer to start writing from.
-   * @param length The length of the buffer (must be &lt;= buf.length)
-   * @param address The address to send to
+   * @param len The length of the buffer (must be &lt;= buf.length)
+   * @param addr The address to send to
    * @param port The port to send to
    *
    * @since 1.2
    */
   public DatagramPacket(byte[] buf, int offset, int length,
-                        InetAddress address, int port)
+	InetAddress address, int port)
   {
     setData(buf, offset, length);
     setAddress(address);
@@ -178,7 +177,8 @@ public final class DatagramPacket
    * @since 1.4
    */
   public DatagramPacket(byte[] buf, int offset, int length,
-                        SocketAddress address) throws SocketException
+		        SocketAddress address)
+     throws SocketException
   {
     if (! (address instanceof InetSocketAddress))
       throw new IllegalArgumentException("unsupported address type");
@@ -272,16 +272,16 @@ public final class DatagramPacket
   /**
    * This sets the address to which the data packet will be transmitted.
    *
-   * @param address The destination address
+   * @param addr The destination address
    *
    * @since 1.1
    */
-  public synchronized void setAddress(InetAddress address)
+  public synchronized void setAddress(InetAddress iaddr)
   {
-    if (address == null)
+    if (iaddr == null)
       throw new NullPointerException("Null address");
 
-    this.address = address;
+    address = iaddr;
   }
 
   /**
@@ -291,12 +291,12 @@ public final class DatagramPacket
    *
    * @since 1.1
    */
-  public synchronized void setPort(int port)
+  public synchronized void setPort(int iport)
   {
-    if (port < 0 || port > 65535)
-      throw new IllegalArgumentException("Invalid port: " + port);
+    if (iport < 0 || iport > 65535)
+      throw new IllegalArgumentException("Invalid port: " + iport);
 
-    this.port = port;
+    port = iport;
   }
 
   /**
@@ -324,12 +324,12 @@ public final class DatagramPacket
    * will be sent to/is coming from
    *
    * @return The socket address of the remote host
-   *
+   * 
    * @since 1.4
    */
   public SocketAddress getSocketAddress()
   {
-    return new InetSocketAddress(address, port);
+    return new InetSocketAddress (address, port);
   }
 
   /**
@@ -360,6 +360,7 @@ public final class DatagramPacket
   public synchronized void setData(byte[] buf, int offset, int length)
   {
     // This form of setData must be used if offset is to be changed.
+
     if (buf == null)
       throw new NullPointerException("Null buffer");
     if (offset < 0)
@@ -371,7 +372,7 @@ public final class DatagramPacket
   }
 
   /**
-   * Sets the length of the data in the buffer.
+   * Sets the length of the data in the buffer. 
    *
    * @param length The new length.  (Where len &lt;= buf.length)
    *
@@ -386,7 +387,7 @@ public final class DatagramPacket
       throw new IllegalArgumentException("Invalid length: " + length);
     if (offset + length > buffer.length)
       throw new IllegalArgumentException("Potential buffer overflow - offset: "
-                                         + offset + " length: " + length);
+			+ offset + " length: " + length);
 
     this.length = length;
     this.maxlen = length;

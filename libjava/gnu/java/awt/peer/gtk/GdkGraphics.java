@@ -46,7 +46,6 @@ import java.awt.Graphics;
 import java.awt.Image;
 import java.awt.Rectangle;
 import java.awt.Shape;
-import java.awt.SystemColor;
 import java.awt.image.ImageObserver;
 import java.text.AttributedCharacterIterator;
 
@@ -92,7 +91,7 @@ public class GdkGraphics extends Graphics
     this.component = component;
     int rgb[] = initState (component);
     color = new Color (rgb[0], rgb[1], rgb[2]);
-    font = component.awtComponent.getFont();
+    font = new Font ("Dialog", Font.PLAIN, 10);
     Dimension d = component.awtComponent.getSize ();
     clip = new Rectangle (0, 0, d.width, d.height);
   }
@@ -150,10 +149,7 @@ public class GdkGraphics extends Graphics
 	return true;
       }
 
-    if (component != null)
-      return drawImage (img, x, y, component.getBackground (), observer);
-    else
-      return drawImage (img, x, y, SystemColor.window, observer);
+    return drawImage (img, x, y, component.getBackground (), observer);
   }
 
   public boolean drawImage (Image img, int x, int y, int width, int height, 
@@ -172,12 +168,8 @@ public class GdkGraphics extends Graphics
   public boolean drawImage (Image img, int x, int y, int width, int height, 
 			    ImageObserver observer)
   {
-    if (component != null)
-      return drawImage (img, x, y, width, height, component.getBackground (),
-                        observer);
-    else
-      return drawImage (img, x, y, width, height, SystemColor.window,
-                        observer);
+    return drawImage (img, x, y, width, height, component.getBackground (),
+		      observer);
   }
 
   public boolean drawImage (Image img, int dx1, int dy1, int dx2, int dy2, 
@@ -199,12 +191,8 @@ public class GdkGraphics extends Graphics
 			    int sx1, int sy1, int sx2, int sy2, 
 			    ImageObserver observer) 
   {
-    if (component != null)
-      return drawImage (img, dx1, dy1, dx2, dy2, sx1, sy1, sx2, sy2,
-                        component.getBackground (), observer);
-    else
-      return drawImage (img, dx1, dy1, dx2, dy2, sx1, sy1, sx2, sy2,
-                        SystemColor.window, observer);
+    return drawImage (img, dx1, dy1, dx2, dy2, sx1, sy1, sx2, sy2,
+		      component.getBackground (), observer);
   }
 
   native public void drawLine (int x1, int y1, int x2, int y2);
@@ -224,10 +212,10 @@ public class GdkGraphics extends Graphics
   native public void drawRect(int x, int y, int width, int height);
   native public void fillRect (int x, int y, int width, int height);
 
-  native void drawString (String str, int x, int y, String fname, int style, int size);
+  native void drawString (String str, int x, int y, String fname, int size);
   public void drawString (String str, int x, int y)
   {
-    drawString (str, x, y, font.getName(), font.getStyle(), font.getSize());
+    drawString (str, x, y, font.getName(), font.getSize());
   }
 
   public void drawString (AttributedCharacterIterator ci, int x, int y)
@@ -299,10 +287,7 @@ public class GdkGraphics extends Graphics
 
   public void setColor (Color c)
   {
-    if (c == null)
-      color = new Color (0, 0, 0);
-    else
-      color = c;
+    color = c;
 
     if (xorColor == null) /* paint mode */
       setFGColor (color.getRed (), color.getGreen (), color.getBlue ());

@@ -98,7 +98,7 @@ java::lang::Object::clone (void)
 	throw new CloneNotSupportedException;
 
       size = klass->size();
-      r = _Jv_AllocObject (klass);
+      r = JvAllocObject (klass, size);
     }
 
   memcpy ((void *) r, (void *) this, size);
