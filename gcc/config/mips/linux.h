@@ -51,7 +51,7 @@ Boston, MA 02111-1307, USA.  */
 
 /* If we don't set MASK_ABICALLS, we can't default to PIC.  */
 #undef TARGET_DEFAULT
-#define TARGET_DEFAULT (MASK_ABICALLS|MASK_GAS)
+#define TARGET_DEFAULT MASK_ABICALLS
 
 #define TARGET_OS_CPP_BUILTINS()				\
     do {							\
@@ -169,11 +169,6 @@ Boston, MA 02111-1307, USA.  */
    pseudo-ops.  */
 #undef FUNCTION_NAME_ALREADY_DECLARED
 #define FUNCTION_NAME_ALREADY_DECLARED 1
-
-#define ASM_PREFERRED_EH_DATA_FORMAT(CODE, GLOBAL)       		\
-  (flag_pic								\
-    ? ((GLOBAL) ? DW_EH_PE_indirect : 0) | DW_EH_PE_pcrel | DW_EH_PE_sdata4\
-   : DW_EH_PE_absptr)
 
 /* The glibc _mcount stub will save $v0 for us.  Don't mess with saving
    it, since ASM_OUTPUT_REG_PUSH/ASM_OUTPUT_REG_POP do not work in the

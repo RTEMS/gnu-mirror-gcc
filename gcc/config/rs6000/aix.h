@@ -83,19 +83,20 @@
  %{static:%(link_gcc_c_sequence) -lmudflapth}} "
 
 /* Names to predefine in the preprocessor for this target machine.  */
-#define TARGET_OS_CPP_BUILTINS()         \
-  do                                     \
-    {                                    \
-      builtin_define ("_IBMR2");         \
-      builtin_define ("_POWER");         \
-      builtin_define ("_AIX");           \
-      builtin_define ("_AIX32");         \
-      builtin_define ("_LONG_LONG");     \
-      builtin_assert ("system=unix");    \
-      builtin_assert ("system=aix");     \
-      builtin_assert ("cpu=rs6000");     \
-      builtin_assert ("machine=rs6000"); \
-    }                                    \
+#define TARGET_OS_AIX_CPP_BUILTINS()		\
+  do						\
+    {						\
+      builtin_define ("_IBMR2");		\
+      builtin_define ("_POWER");		\
+      builtin_define ("_AIX");			\
+      builtin_define ("_AIX32");		\
+      builtin_define ("_AIX41");		\
+      builtin_define ("_LONG_LONG");		\
+      if (TARGET_LONG_DOUBLE_128)		\
+        builtin_define ("__LONGDOUBLE128");	\
+      builtin_assert ("system=unix");		\
+      builtin_assert ("system=aix");		\
+    }						\
   while (0)
 
 /* Define appropriate architecture macros for preprocessor depending on
@@ -181,13 +182,6 @@
    Setting both of the following defines results in this behavior.  */
 #define AGGREGATE_PADDING_FIXED 1
 #define AGGREGATES_PAD_UPWARD_ALWAYS 1
-
-/* We don't want anything in the reg parm area being passed on the
-   stack.  */
-#define MUST_PASS_IN_STACK(MODE, TYPE)				\
-   ((TYPE) != 0							\
-    && (TREE_CODE (TYPE_SIZE (TYPE)) != INTEGER_CST		\
-	|| TREE_ADDRESSABLE (TYPE)))
 
 /* Specify padding for the last element of a block move between
    registers and memory.  FIRST is nonzero if this is the only
