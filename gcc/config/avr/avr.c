@@ -1,5 +1,6 @@
 /* Subroutines for insn-output.c for ATMEL AVR micro controllers
-   Copyright (C) 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2004, 2005
+   Free Software Foundation, Inc.
    Contributed by Denis Chertykov (denisc@overta.ru)
 
    This file is part of GCC.
@@ -67,7 +68,6 @@ static void avr_file_start (void);
 static void avr_file_end (void);
 static void avr_output_function_prologue (FILE *, HOST_WIDE_INT);
 static void avr_output_function_epilogue (FILE *, HOST_WIDE_INT);
-static void avr_unique_section (tree, int);
 static void avr_insert_attributes (tree, tree *);
 static unsigned int avr_section_type_flags (tree, const char *, int);
 
@@ -229,8 +229,6 @@ int avr_case_values_threshold = 30000;
 #define TARGET_ASM_FUNCTION_EPILOGUE avr_output_function_epilogue
 #undef TARGET_ATTRIBUTE_TABLE
 #define TARGET_ATTRIBUTE_TABLE avr_attribute_table
-#undef TARGET_ASM_UNIQUE_SECTION
-#define TARGET_ASM_UNIQUE_SECTION avr_unique_section
 #undef TARGET_INSERT_ATTRIBUTES
 #define TARGET_INSERT_ATTRIBUTES avr_insert_attributes
 #undef TARGET_SECTION_TYPE_FLAGS
@@ -1210,6 +1208,7 @@ notice_update_cc (rtx body ATTRIBUTE_UNUSED, rtx insn)
 	      rtx x = XEXP (src, 1);
 
 	      if (GET_CODE (x) == CONST_INT
+		  && INTVAL (x) > 0
 		  && INTVAL (x) != 6)
 		{
 		  cc_status.value1 = SET_DEST (set);
@@ -2730,6 +2729,13 @@ out_shift_with_cnt (const char *template, rtx insn, rtx operands[],
       int count = INTVAL (operands[2]);
       int max_len = 10;  /* If larger than this, always use a loop.  */
 
+      if (count <= 0)
+	{
+	  if (len)
+	    *len = 0;
+	  return;
+	}
+
       if (count < 8 && !scratch)
 	use_zero_reg = 1;
 
@@ -2852,6 +2858,9 @@ ashlqi3_out (rtx insn, rtx operands[], int *len)
       switch (INTVAL (operands[2]))
 	{
 	default:
+	  if (INTVAL (operands[2]) < 8)
+	    break;
+
 	  *len = 1;
 	  return AS1 (clr,%0);
 	  
@@ -2948,6 +2957,14 @@ ashlhi3_out (rtx insn, rtx operands[], int *len)
       
       switch (INTVAL (operands[2]))
 	{
+	default:
+	  if (INTVAL (operands[2]) < 16)
+	    break;
+
+	  *len = 2;
+	  return (AS1 (clr,%B0) CR_TAB
+		  AS1 (clr,%A0));
+
 	case 4:
 	  if (optimize_size && scratch)
 	    break;  /* 5 */
@@ -3199,6 +3216,20 @@ ashlsi3_out (rtx insn, rtx operands[], int *len)
       
       switch (INTVAL (operands[2]))
 	{
+	default:
+	  if (INTVAL (operands[2]) < 32)
+	    break;
+
+	  if (AVR_ENHANCED)
+	    return *len = 3, (AS1 (clr,%D0) CR_TAB
+			      AS1 (clr,%C0) CR_TAB
+			      AS2 (movw,%A0,%C0));
+	  *len = 4;
+	  return (AS1 (clr,%D0) CR_TAB
+		  AS1 (clr,%C0) CR_TAB
+		  AS1 (clr,%B0) CR_TAB
+		  AS1 (clr,%A0));
+
 	case 8:
 	  {
 	    int reg0 = true_regnum (operands[0]);
@@ -3337,6 +3368,11 @@ ashrqi3_out (rtx insn, rtx operands[], int *len)
 		  AS2 (bld,%0,0));
 
 	default:
+	  if (INTVAL (operands[2]) < 8)
+	    break;
+
+	  /* fall through */
+
 	case 7:
 	  *len = 2;
 	  return (AS1 (lsl,%0) CR_TAB
@@ -3500,6 +3536,12 @@ ashrhi3_out (rtx insn, rtx operands[], int *len)
 		  AS2 (mov,%B0,%A0) CR_TAB
 		  AS1 (rol,%A0));
 
+	default:
+	  if (INTVAL (operands[2]) < 16)
+	    break;
+
+	  /* fall through */
+
 	case 15:
 	  return *len = 3, (AS1 (lsl,%B0)     CR_TAB
 			    AS2 (sbc,%A0,%A0) CR_TAB
@@ -3607,6 +3649,12 @@ ashrsi3_out (rtx insn, rtx operands[], int *len)
 			      AS2 (mov,%B0,%D0) CR_TAB
 			      AS2 (mov,%C0,%D0));
 
+	default:
+	  if (INTVAL (operands[2]) < 32)
+	    break;
+
+	  /* fall through */
+
 	case 31:
 	  if (AVR_ENHANCED)
 	    return *len = 4, (AS1 (lsl,%D0)     CR_TAB
@@ -3645,6 +3693,9 @@ lshrqi3_out (rtx insn, rtx operands[], int *len)
       switch (INTVAL (operands[2]))
 	{
 	default:
+	  if (INTVAL (operands[2]) < 8)
+	    break;
+
 	  *len = 1;
 	  return AS1 (clr,%0);
 
@@ -3739,6 +3790,14 @@ lshrhi3_out (rtx insn, rtx operands[], int *len)
       
       switch (INTVAL (operands[2]))
 	{
+	default:
+	  if (INTVAL (operands[2]) < 16)
+	    break;
+
+	  *len = 2;
+	  return (AS1 (clr,%B0) CR_TAB
+		  AS1 (clr,%A0));
+
 	case 4:
 	  if (optimize_size && scratch)
 	    break;  /* 5 */
@@ -3989,6 +4048,20 @@ lshrsi3_out (rtx insn, rtx operands[], int *len)
       
       switch (INTVAL (operands[2]))
 	{
+	default:
+	  if (INTVAL (operands[2]) < 32)
+	    break;
+
+	  if (AVR_ENHANCED)
+	    return *len = 3, (AS1 (clr,%D0) CR_TAB
+			      AS1 (clr,%C0) CR_TAB
+			      AS2 (movw,%A0,%C0));
+	  *len = 4;
+	  return (AS1 (clr,%D0) CR_TAB
+		  AS1 (clr,%C0) CR_TAB
+		  AS1 (clr,%B0) CR_TAB
+		  AS1 (clr,%A0));
+
 	case 8:
 	  {
 	    int reg0 = true_regnum (operands[0]);
@@ -4345,38 +4418,6 @@ avr_assemble_integer (rtx x, unsigned int size, int aligned_p)
   return default_assemble_integer (x, size, aligned_p);
 }
 
-/* Sets section name for declaration DECL.  */
-  
-static void
-avr_unique_section (tree decl, int reloc ATTRIBUTE_UNUSED)
-{
-  int len;
-  const char *name, *prefix;
-  char *string;
-
-  name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
-  name = (* targetm.strip_name_encoding) (name);
-
-  if (TREE_CODE (decl) == FUNCTION_DECL)
-    {
-      if (flag_function_sections)
-	prefix = ".text.";
-      else
-	prefix = ".text";
-    }
-  else 
-    abort ();
-
-  if (flag_function_sections)
-    {
-      len = strlen (name) + strlen (prefix);
-      string = alloca (len + 1);
-      sprintf (string, "%s%s", prefix, name);
-      DECL_SECTION_NAME (decl) = build_string (len, string);
-    }
-}
-
-
 /* The routine used to output NUL terminated strings.  We use a special
    version of this for most svr4 targets because doing so makes the
    generated assembly code more compact (and thus faster to assemble)
@@ -4566,7 +4607,7 @@ avr_handle_fndecl_attribute (tree *node, tree name,
    if found return 1, otherwise 0.  */
 
 int
-avr_progmem_p (tree decl)
+avr_progmem_p (tree decl, tree attributes)
 {
   tree a;
 
@@ -4574,7 +4615,7 @@ avr_progmem_p (tree decl)
     return 0;
 
   if (NULL_TREE
-      != lookup_attribute ("progmem", DECL_ATTRIBUTES (decl)))
+      != lookup_attribute ("progmem", attributes))
     return 1;
 
   a=decl;
@@ -4598,7 +4639,7 @@ avr_insert_attributes (tree node, tree *attributes)
 {
   if (TREE_CODE (node) == VAR_DECL
       && (TREE_STATIC (node) || DECL_EXTERNAL (node))
-      && avr_progmem_p (node))
+      && avr_progmem_p (node, *attributes))
     {
       static const char dsec[] = ".progmem.data";
       *attributes = tree_cons (get_identifier ("section"),
