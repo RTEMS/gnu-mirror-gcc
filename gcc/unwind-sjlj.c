@@ -92,15 +92,9 @@ static __gthread_key_t fc_key;
 static int use_fc_key = -1;
 
 static void
-fc_key_dtor (void *ptr)
-{
-  __gthread_key_dtor (fc_key, ptr);
-}
-
-static void
 fc_key_init (void)
 {
-  use_fc_key = __gthread_key_create (&fc_key, fc_key_dtor) == 0;
+  use_fc_key = __gthread_key_create (&fc_key, 0) == 0;
 }
 
 static void
@@ -251,7 +245,7 @@ uw_init_context (struct _Unwind_Context *context)
 }
 
 /* ??? There appear to be bugs in integrate.c wrt __builtin_longjmp and
-   virtual-stack-vars.  An inline version of this segfaults on Sparc.  */
+   virtual-stack-vars.  An inline version of this segfaults on SPARC.  */
 #define uw_install_context(CURRENT, TARGET)		\
   do							\
     {							\
