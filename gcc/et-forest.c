@@ -56,7 +56,7 @@ struct et_occ
 };
 
 static alloc_pool et_nodes;
-static alloc_pool et_occurences;
+static alloc_pool et_occurrences;
 
 /* Changes depth of OCC to D.  */
 
@@ -88,8 +88,7 @@ static inline void
 set_prev (struct et_occ *occ, struct et_occ *t)
 {
 #ifdef DEBUG_ET
-  if (occ == t)
-    abort ();
+  gcc_assert (occ != t);
 #endif
 
   occ->prev = t;
@@ -103,8 +102,7 @@ static inline void
 set_next (struct et_occ *occ, struct et_occ *t)
 {
 #ifdef DEBUG_ET
-  if (occ == t)
-    abort ();
+  gcc_assert (occ != t);
 #endif
 
   occ->next = t;
@@ -137,7 +135,7 @@ et_recomp_min (struct et_occ *occ)
 }
 
 #ifdef DEBUG_ET
-/* Checks whether neighbourhood of OCC seems sane.  */
+/* Checks whether neighborhood of OCC seems sane.  */
 
 static void
 et_check_occ_sanity (struct et_occ *occ)
@@ -145,40 +143,26 @@ et_check_occ_sanity (struct et_occ *occ)
   if (!occ)
     return;
 
-  if (occ->parent == occ)
-    abort ();
-
-  if (occ->prev == occ)
-    abort ();
-
-  if (occ->next == occ)
-    abort ();
-
-  if (occ->next && occ->next == occ->prev)
-    abort ();
+  gcc_assert (occ->parent != occ);
+  gcc_assert (occ->prev != occ);
+  gcc_assert (occ->next != occ);
+  gcc_assert (!occ->next || occ->next != occ->prev);
 
   if (occ->next)
     {
-      if (occ->next == occ->parent)
-	abort ();
-
-      if (occ->next->parent != occ)
-	abort ();
+      gcc_assert (occ->next != occ->parent);
+      gcc_assert (occ->next->parent == occ);
     }
 
   if (occ->prev)
     {
-      if (occ->prev == occ->parent)
-	abort ();
-
-      if (occ->prev->parent != occ)
-	abort ();
+      gcc_assert (occ->prev != occ->parent);
+      gcc_assert (occ->prev->parent == occ);
     }
 
-  if (occ->parent
-      && occ->parent->prev != occ
-      && occ->parent->next != occ)
-    abort ();
+  gcc_assert (!occ->parent
+	      || occ->parent->prev == occ
+	      || occ->parent->next == occ);
 }
 
 /* Checks whether tree rooted at OCC is sane.  */
@@ -233,8 +217,7 @@ record_path_before_1 (struct et_occ *occ, int depth)
 
   fprintf (stderr, "%d (%d); ", ((basic_block) occ->of->data)->index, depth);
 
-  if (len >= MAX_NODES)
-    abort ();
+  gcc_assert (len < MAX_NODES);
 
   depths[len] = depth;
   datas[len] = occ->of;
@@ -247,8 +230,7 @@ record_path_before_1 (struct et_occ *occ, int depth)
 	mn = m;
     }
 
-  if (mn != occ->min + depth - occ->depth)
-    abort ();
+  gcc_assert (mn == occ->min + depth - occ->depth);
 
   return mn;
 }
@@ -285,9 +267,7 @@ check_path_after_1 (struct et_occ *occ, int depth)
     }
 
   len--;
-  if (depths[len] != depth
-      || datas[len] != occ->of)
-    abort ();
+  gcc_assert (depths[len] == depth && datas[len] == occ->of);
 
   if (occ->prev)
     {
@@ -296,8 +276,7 @@ check_path_after_1 (struct et_occ *occ, int depth)
 	mn =  m;
     }
 
-  if (mn != occ->min + depth - occ->depth)
-    abort ();
+  gcc_assert (mn == occ->min + depth - occ->depth);
 
   return mn;
 }
@@ -312,8 +291,7 @@ check_path_after (struct et_occ *occ)
     occ = occ->parent;
 
   check_path_after_1 (occ, 0);
-  if (len != 0)
-    abort ();
+  gcc_assert (!len);
 }
 
 #endif
@@ -467,9 +445,9 @@ et_new_occ (struct et_node *node)
 {
   struct et_occ *nw;
   
-  if (!et_occurences)
-    et_occurences = create_alloc_pool ("et_occ pool", sizeof (struct et_occ), 300);
-  nw = pool_alloc (et_occurences);
+  if (!et_occurrences)
+    et_occurrences = create_alloc_pool ("et_occ pool", sizeof (struct et_occ), 300);
+  nw = pool_alloc (et_occurrences);
 
   nw->of = node;
   nw->parent = NULL;
@@ -517,7 +495,7 @@ et_free_tree (struct et_node *t)
   if (t->father)
     et_split (t);
 
-  pool_free (et_occurences, t->rightmost_occ);
+  pool_free (et_occurrences, t->rightmost_occ);
   pool_free (et_nodes, t);
 }
 
@@ -610,7 +588,7 @@ et_split (struct et_node *t)
   rmost->depth = 0;
   rmost->min = 0;
 
-  pool_free (et_occurences, p_occ);
+  pool_free (et_occurrences, p_occ);
 
   /* Update the tree.  */
   if (father->son == t)

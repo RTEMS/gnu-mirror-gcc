@@ -168,6 +168,12 @@
 (include "ev4.md")
 (include "ev5.md")
 (include "ev6.md")
+
+
+;; Include predicate definitions
+
+(include "predicates.md")
+
 
 ;; First define the arithmetic insns.  Note that the 32-bit forms also
 ;; sign-extend.
@@ -438,9 +444,9 @@
 ;; and if we split before reload, we will require additional instructions.
 
 (define_insn "*adddi_fp_hack"
-  [(set (match_operand:DI 0 "register_operand" "=r")
-        (plus:DI (match_operand:DI 1 "reg_no_subreg_operand" "r")
-		 (match_operand:DI 2 "const_int_operand" "n")))]
+  [(set (match_operand:DI 0 "register_operand" "=r,r,r")
+        (plus:DI (match_operand:DI 1 "reg_no_subreg_operand" "r,r,r")
+		 (match_operand:DI 2 "const_int_operand" "K,L,n")))]
   "NONSTRICT_REG_OK_FP_BASE_P (operands[1])
    && INTVAL (operands[2]) >= 0
    /* This is the largest constant an lda+ldah pair can add, minus
@@ -454,7 +460,10 @@
 			   + max_reg_num () * UNITS_PER_WORD
 			   + current_function_pretend_args_size)
 	      - current_function_pretend_args_size))"
-  "#")
+  "@
+   lda %0,%2(%1)
+   ldah %0,%h2(%1)
+   #")
 
 ;; Don't do this if we are adjusting SP since we don't want to do it
 ;; in two steps.  Don't split FP sources for the reason listed above.
@@ -2403,9 +2412,9 @@
   "&& reload_completed"
   [(set (match_dup 2) (match_op_dup 4 [(float_extend:DF (match_dup 1))]))
    (set (match_dup 3) (unspec:SF [(match_dup 2)] UNSPEC_CVTQL))
-   (set (match_dup 4) (match_dup 3))]
+   (set (match_dup 5) (match_dup 3))]
 {
-  operands[4] = adjust_address (operands[0], SFmode, 0);
+  operands[5] = adjust_address (operands[0], SFmode, 0);
 }
   [(set_attr "type" "fadd")
    (set_attr "trap" "yes")])
@@ -2630,9 +2639,12 @@
    st%- %1,%0"
   [(set_attr "type" "fcpys,fld,fst")])
 
+;; Use register_operand for operand 1 to prevent compress_float_constant
+;; from doing something silly.  When optimizing we'll put things back 
+;; together anyway.
 (define_expand "extendsftf2"
   [(use (match_operand:TF 0 "register_operand" ""))
-   (use (match_operand:SF 1 "general_operand" ""))]
+   (use (match_operand:SF 1 "register_operand" ""))]
   "TARGET_HAS_XFLOATING_LIBS"
 {
   rtx tmp = gen_reg_rtx (DFmode);
@@ -2643,7 +2655,7 @@
 
 (define_expand "extenddftf2"
   [(use (match_operand:TF 0 "register_operand" ""))
-   (use (match_operand:DF 1 "general_operand" ""))]
+   (use (match_operand:DF 1 "register_operand" ""))]
   "TARGET_HAS_XFLOATING_LIBS"
   "alpha_emit_xfloating_cvt (FLOAT_EXTEND, operands); DONE;")
 
@@ -3827,8 +3839,8 @@
 })
 
 (define_expand "cmpdi"
-  [(set (cc0) (compare (match_operand:DI 0 "general_operand" "")
-		       (match_operand:DI 1 "general_operand" "")))]
+  [(set (cc0) (compare (match_operand:DI 0 "some_operand" "")
+		       (match_operand:DI 1 "some_operand" "")))]
   ""
 {
   alpha_compare.op0 = operands[0];
@@ -4158,100 +4170,6 @@
   operands[7] = gen_rtx_SIGN_EXTEND (DImode, tem);
   operands[8] = gen_rtx_fmt_ee (GET_CODE (operands[1]), VOIDmode,
 				operands[6], const0_rtx);
-})
-
-(define_split
-  [(set (pc)
-	(if_then_else
-	 (match_operator 1 "comparison_operator"
-			 [(match_operand:DI 2 "reg_or_0_operand" "")
-			  (match_operand:DI 3 "reg_or_cint_operand" "")])
-	 (label_ref (match_operand 0 "" ""))
-	 (pc)))
-   (clobber (match_operand:DI 4 "register_operand" ""))]
-  "operands[3] != const0_rtx"
-  [(set (match_dup 4) (match_dup 5))
-   (set (pc) (if_then_else (match_dup 6) (label_ref (match_dup 0)) (pc)))]
-{
-  enum rtx_code code = GET_CODE (operands[1]);
-  int unsignedp = (code == GEU || code == LEU || code == GTU || code == LTU);
-
-  if (code == NE || code == EQ
-      || (extended_count (operands[2], DImode, unsignedp) >= 1
-	  && extended_count (operands[3], DImode, unsignedp) >= 1))
-    {
-      if (GET_CODE (operands[3]) == CONST_INT)
-	operands[5] = gen_rtx_PLUS (DImode, operands[2],
-				    GEN_INT (- INTVAL (operands[3])));
-      else
-	operands[5] = gen_rtx_MINUS (DImode, operands[2], operands[3]);
-
-      operands[6] = gen_rtx_fmt_ee (code, VOIDmode, operands[4], const0_rtx);
-    }
-
-  else if (code == EQ || code == LE || code == LT
-	   || code == LEU || code == LTU)
-    {
-      operands[5] = gen_rtx_fmt_ee (code, DImode, operands[2], operands[3]);
-      operands[6] = gen_rtx_NE (VOIDmode, operands[4], const0_rtx);
-    }
-  else
-    {
-      operands[5] = gen_rtx_fmt_ee (reverse_condition (code), DImode,
-				    operands[2], operands[3]);
-      operands[6] = gen_rtx_EQ (VOIDmode, operands[4], const0_rtx);
-    }
-})
-
-(define_split
-  [(set (pc)
-	(if_then_else
-	 (match_operator 1 "comparison_operator"
-			 [(match_operand:SI 2 "reg_or_0_operand" "")
-			  (match_operand:SI 3 "const_int_operand" "")])
-	 (label_ref (match_operand 0 "" ""))
-	 (pc)))
-   (clobber (match_operand:DI 4 "register_operand" ""))]
-  "operands[3] != const0_rtx
-   && (GET_CODE (operands[1]) == EQ || GET_CODE (operands[1]) == NE)"
-  [(set (match_dup 4) (match_dup 5))
-   (set (pc) (if_then_else (match_dup 6) (label_ref (match_dup 0)) (pc)))]
-{
-  rtx tem;
-
-  if (GET_CODE (operands[3]) == CONST_INT)
-    tem = gen_rtx_PLUS (SImode, operands[2],
-			GEN_INT (- INTVAL (operands[3])));
-  else
-    tem = gen_rtx_MINUS (SImode, operands[2], operands[3]);
-
-  operands[5] = gen_rtx_SIGN_EXTEND (DImode, tem);
-  operands[6] = gen_rtx_fmt_ee (GET_CODE (operands[1]), VOIDmode,
-				operands[4], const0_rtx);
-})
-
-;; We can convert such things as "a > 0xffff" to "t = a & ~ 0xffff; t != 0".
-;; This eliminates one, and sometimes two, insns when the AND can be done
-;; with a ZAP.
-(define_split
-  [(set (match_operand:DI 0 "register_operand" "")
-	(match_operator:DI 1 "comparison_operator"
-			[(match_operand:DI 2 "register_operand" "")
-			 (match_operand:DI 3 "const_int_operand" "")]))
-   (clobber (match_operand:DI 4 "register_operand" ""))]
-  "exact_log2 (INTVAL (operands[3]) + 1) >= 0
-   && (GET_CODE (operands[1]) == GTU
-       || GET_CODE (operands[1]) == LEU
-       || ((GET_CODE (operands[1]) == GT || GET_CODE (operands[1]) == LE)
-	   && extended_count (operands[2], DImode, 1) > 0))"
-  [(set (match_dup 4) (and:DI (match_dup 2) (match_dup 5)))
-   (set (match_dup 0) (match_dup 6))]
-{
-  operands[5] = GEN_INT (~ INTVAL (operands[3]));
-  operands[6] = gen_rtx_fmt_ee (((GET_CODE (operands[1]) == GTU
-				  || GET_CODE (operands[1]) == GT)
-				 ? NE : EQ),
-				DImode, operands[4], const0_rtx);
 })
 
 ;; Prefer to use cmp and arithmetic when possible instead of a cmove.
@@ -5430,7 +5348,7 @@
 
 (define_split
   [(match_operand 0 "some_small_symbolic_operand" "")]
-  "TARGET_EXPLICIT_RELOCS && reload_completed"
+  ""
   [(match_dup 0)]
   "operands[0] = split_small_symbolic_operand (operands[0]);")
 
@@ -6522,7 +6440,7 @@
 ;; Argument 2 is the length
 ;; Argument 3 is the alignment
 
-(define_expand "movstrqi"
+(define_expand "movmemqi"
   [(parallel [(set (match_operand:BLK 0 "memory_operand" "")
 		   (match_operand:BLK 1 "memory_operand" ""))
 	      (use (match_operand:DI 2 "immediate_operand" ""))
@@ -6535,7 +6453,7 @@
     FAIL;
 })
 
-(define_expand "movstrdi"
+(define_expand "movmemdi"
   [(parallel [(set (match_operand:BLK 0 "memory_operand" "")
 		   (match_operand:BLK 1 "memory_operand" ""))
 	      (use (match_operand:DI 2 "immediate_operand" ""))
@@ -6555,7 +6473,7 @@
   alpha_need_linkage (XSTR (operands[4], 0), 0);
 })
 
-(define_insn "*movstrdi_1"
+(define_insn "*movmemdi_1"
   [(set (match_operand:BLK 0 "memory_operand" "=m,=m")
 	(match_operand:BLK 1 "memory_operand" "m,m"))
    (use (match_operand:DI 2 "nonmemory_operand" "r,i"))
@@ -6585,7 +6503,7 @@
   [(set_attr "type" "multi")
    (set_attr "length" "28")])
 
-(define_expand "clrstrqi"
+(define_expand "clrmemqi"
   [(parallel [(set (match_operand:BLK 0 "memory_operand" "")
 		   (const_int 0))
 	      (use (match_operand:DI 1 "immediate_operand" ""))
@@ -6598,7 +6516,7 @@
     FAIL;
 })
 
-(define_expand "clrstrdi"
+(define_expand "clrmemdi"
   [(parallel [(set (match_operand:BLK 0 "memory_operand" "")
 		   (const_int 0))
 	      (use (match_operand:DI 1 "immediate_operand" ""))
@@ -6615,7 +6533,7 @@
   alpha_need_linkage (XSTR (operands[3], 0), 0);
 })
 
-(define_insn "*clrstrdi_1"
+(define_insn "*clrmemdi_1"
   [(set (match_operand:BLK 0 "memory_operand" "=m,=m")
 		   (const_int 0))
    (use (match_operand:DI 1 "nonmemory_operand" "r,i"))
@@ -7276,7 +7194,7 @@
 
 (define_expand "builtin_insbl"
   [(match_operand:DI 0 "register_operand" "")
-   (match_operand:DI 1 "reg_or_0_operand" "")
+   (match_operand:DI 1 "register_operand" "")
    (match_operand:DI 2 "reg_or_8bit_operand" "")]
   ""
 {
@@ -7292,7 +7210,7 @@
 
 (define_expand "builtin_inswl"
   [(match_operand:DI 0 "register_operand" "")
-   (match_operand:DI 1 "reg_or_0_operand" "")
+   (match_operand:DI 1 "register_operand" "")
    (match_operand:DI 2 "reg_or_8bit_operand" "")]
   ""
 {
@@ -7308,7 +7226,7 @@
 
 (define_expand "builtin_insll"
   [(match_operand:DI 0 "register_operand" "")
-   (match_operand:DI 1 "reg_or_0_operand" "")
+   (match_operand:DI 1 "register_operand" "")
    (match_operand:DI 2 "reg_or_8bit_operand" "")]
   ""
 {
@@ -7469,9 +7387,9 @@
 (define_expand "builtin_zap"
   [(set (match_operand:DI 0 "register_operand" "")
 	(and:DI (unspec:DI
-		  [(match_operand:DI 2 "reg_or_const_int_operand" "")]
+		  [(match_operand:DI 2 "reg_or_cint_operand" "")]
 		  UNSPEC_ZAP)
-		(match_operand:DI 1 "reg_or_const_int_operand" "")))]
+		(match_operand:DI 1 "reg_or_cint_operand" "")))]
   ""
 {
   if (GET_CODE (operands[2]) == CONST_INT)
@@ -7501,9 +7419,9 @@
 (define_insn "*builtin_zap_1"
   [(set (match_operand:DI 0 "register_operand" "=r,r,r,r")
 	(and:DI (unspec:DI
-		  [(match_operand:QI 2 "reg_or_const_int_operand" "n,n,r,r")]
+		  [(match_operand:QI 2 "reg_or_cint_operand" "n,n,r,r")]
 		  UNSPEC_ZAP)
-		(match_operand:DI 1 "reg_or_const_int_operand" "n,r,J,r")))]
+		(match_operand:DI 1 "reg_or_cint_operand" "n,r,J,r")))]
   ""
   "@
    #
@@ -7562,9 +7480,9 @@
 (define_expand "builtin_zapnot"
   [(set (match_operand:DI 0 "register_operand" "")
 	(and:DI (unspec:DI
-		  [(not:QI (match_operand:DI 2 "reg_or_const_int_operand" ""))]
+		  [(not:QI (match_operand:DI 2 "reg_or_cint_operand" ""))]
 		  UNSPEC_ZAP)
-		(match_operand:DI 1 "reg_or_const_int_operand" "")))]
+		(match_operand:DI 1 "reg_or_cint_operand" "")))]
   ""
 {
   if (GET_CODE (operands[2]) == CONST_INT)
