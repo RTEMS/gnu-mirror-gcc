@@ -99,6 +99,7 @@ public class BasicButtonUI extends ButtonUI
     b.setBackground(defaults.getColor("Button.background"));
     b.setMargin(defaults.getInsets("Button.margin"));
     b.setBorder(defaults.getBorder("Button.border"));
+    b.setOpaque(true);
   }
 
   protected void uninstallDefaults(AbstractButton b)
@@ -250,7 +251,8 @@ public class BasicButtonUI extends ButtonUI
       paintButtonNormal(g, br, c);
 	
     paintIcon(g, c, ir);
-    paintText(g, c, tr, b.getText());
+    if (text != null)
+      paintText(g, c, tr, b.getText());
     paintFocus(g, c, vr, tr, ir);
   }
 

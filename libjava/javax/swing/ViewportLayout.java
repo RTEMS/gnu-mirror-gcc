@@ -41,75 +41,62 @@ import java.awt.Component;
 import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.LayoutManager;
+import java.awt.Point;
+import java.awt.Rectangle;
 import java.io.Serializable;
 
 /**
  * ViewportLayout
  * @author	Andrew Selkirk
- * @version	1.0
+ * @author	Graydon Hoare
  */
 public class ViewportLayout implements LayoutManager, Serializable
 {
   static final long serialVersionUID = -788225906076097229L;
 
-	//-------------------------------------------------------------
-	// Initialization ---------------------------------------------
-	//-------------------------------------------------------------
-
-	/**
-	 * Constructor ViewportLayout
-	 */
-	public ViewportLayout() {
-		// TODO
-	} // ViewportLayout()
-
-
-	//-------------------------------------------------------------
-	// Methods ----------------------------------------------------
-	//-------------------------------------------------------------
-
-	/**
-	 * addLayoutComponent
-	 * @param name TODO
-	 * @param c TODO
-	 */
-	public void addLayoutComponent(String name, Component c) {
-		// TODO
-	} // addLayoutComponent()
-
-	/**
-	 * removeLayoutComponent
-	 * @param c TODO
-	 */
-	public void removeLayoutComponent(Component c) {
-		// TODO
-	} // removeLayoutComponent()
-
-	/**
-	 * preferredLayoutSize
-	 * @param parent TODO
-	 * @returns Dimension
-	 */
-	public Dimension preferredLayoutSize(Container parent) {
-		return null; // TODO
-	} // preferredLayoutSize()
-
-	/**
-	 * minimumLayoutSize
-	 * @param parent TODO
-	 * @returns Dimension
-	 */
-	public Dimension minimumLayoutSize(Container parent) {
-		return null; // TODO
-	} // minimumLayoutSize()
-
-	/**
-	 * layoutContainer
-	 * @param parent TODO
-	 */
-	public void layoutContainer(Container parent) {
-		// TODO
-	} // layoutContainer()
-
-
-} // ViewportLayout
+  public ViewportLayout() 
+  {
+  }
+  public void addLayoutComponent(String name, Component c) 
+  {
+  }
+  public void removeLayoutComponent(Component c) 
+  {
+  }
+  public Dimension preferredLayoutSize(Container parent) 
+  {
+    JViewport vp = (JViewport)parent;
+    Component view = vp.getView();
+    if (view instanceof Scrollable)
+      {
+        Scrollable sc = (Scrollable) view;
+        Dimension d = sc.getPreferredScrollableViewportSize();
+        // System.err.println(this + ".preferredLayoutSize() : scrollable -> " + d);
+        return d;
+      }
+    else
+      return view.getPreferredSize();
+  }
+  public Dimension minimumLayoutSize(Container parent) 
+  {
+    JViewport vp = (JViewport)parent;
+    Component view = vp.getView();
+    return view.getMinimumSize();
+  }
+  public void layoutContainer(Container parent) 
+  {
+    JViewport vp = (JViewport)parent;
+    Component view = vp.getView();
+    Rectangle portBounds = vp.getBounds();
+    Dimension viewMinimum = view.getMinimumSize();
+    int width = Math.max(portBounds.width, 
+                         viewMinimum.width);
+    int height = Math.max(portBounds.height, 
+                          viewMinimum.height);
+    int x = Math.min(0, portBounds.width - width);
+    int y = Math.min(0, portBounds.height - height);
+    // System.err.println(this + ".layoutContainer() : width = " + width + ", height = " + height);
+    vp.setViewPosition(new Point(x, y));
+    vp.setViewSize(new Dimension(width, height));
+  }
+}
