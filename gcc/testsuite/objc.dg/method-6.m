@@ -1,5 +1,5 @@
-/* Check that sending messages to variables of type 'Class' does not involve instance methods,
-   unless they reside in root classes.  */
+/* APPLE LOCAL file */
+/* Check that sending messages to variables of type 'Class' does not involve instance methods, unless they reside in root classes.  */
 /* Author: Ziemowit Laski <zlaski@apple.com>  */
 /* { dg-do compile } */
 
@@ -29,3 +29,7 @@ void foo(void) {
 
   [Class port];  /* { dg-error ".Class. is not an Objective\\-C class name or alias" } */
 }
+
+/* APPLE LOCAL Objective-C */
+/* { dg-options "-Wstrict-selector-match" } */
+

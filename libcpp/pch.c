@@ -223,7 +223,7 @@ count_defs (cpp_reader *pfile ATTRIBUTE_UNUSED, cpp_hashnode *hn, void *ss_p)
       {
 	struct cpp_string news;
 	void **slot;
-	
+
 	news.len = NODE_LEN (hn);
 	news.text = NODE_NAME (hn);
 	slot = htab_find (ss->definedhash, &news);
@@ -423,7 +423,14 @@ cpp_valid_state (cpp_reader *r, const char *name, int fd)
   struct ht_node_list nl = { 0, 0, 0 };
   unsigned char *first, *last;
   unsigned int i;
-  
+  /* APPLE LOCAL begin pch distcc --mrs */
+  int skip_validation;
+
+  /* Skip pch validation if we have just validated it.  */
+  skip_validation = CPP_OPTION (r, pch_preprocess)
+    && CPP_OPTION (r, preprocessed);
+  /* APPLE LOCAL end pch distcc --mrs */
+
   /* Read in the list of identifiers that must be defined
      Check that they are defined in the same way.  */
   for (;;)
@@ -456,13 +463,18 @@ cpp_valid_state (cpp_reader *r, const char *name, int fd)
       if ((size_t)read (fd, namebuf, m.definition_length) 
 	  != m.definition_length)
 	goto error;
+
+      /* APPLE LOCAL begin pch distcc --mrs */
+      if (skip_validation)
+        continue;
+      /* APPLE LOCAL end pch distcc --mrs */
       
       h = cpp_lookup (r, namebuf, m.name_length);
       if (m.flags & NODE_POISONED
 	  || h->type != NT_MACRO
 	  || h->flags & NODE_POISONED)
 	{
-	  if (CPP_OPTION (r, warn_invalid_pch))
+          if (CPP_OPTION (r, warn_invalid_pch))
 	    cpp_error (r, CPP_DL_WARNING_SYSHDR,
 		       "%s: not used because `%.*s' not defined",
 		       name, m.name_length, namebuf);
@@ -491,6 +503,14 @@ cpp_valid_state (cpp_reader *r, const char *name, int fd)
   undeftab = xmalloc (m.definition_length);
   if ((size_t) read (fd, undeftab, m.definition_length) != m.definition_length)
     goto error;
+
+  /* APPLE LOCAL begin pch distcc --mrs */
+  if (skip_validation)
+    {
+      free (undeftab);
+      return 0;
+    }
+  /* APPLE LOCAL end pch distcc --mrs */
 
   /* Collect identifiers from the current hash table.  */
   nl.n_defs = 0;
@@ -630,6 +650,12 @@ cpp_read_state (cpp_reader *r, const char *name, FILE *f,
 		struct save_macro_data *data)
 {
   size_t i;
+  /* APPLE LOCAL begin pch distcc --mrs */
+  void (*saved_line_change)  PARAMS ((cpp_reader *, const cpp_token *, int));
+
+  saved_line_change = r->cb.line_change;
+  /* APPLE LOCAL end pch distcc --mrs */
+
   struct lexer_state old_state;
 
   /* Restore spec_nodes, which will be full of references to the old 
@@ -646,6 +672,8 @@ cpp_read_state (cpp_reader *r, const char *name, FILE *f,
   r->state.in_directive = 1;
   r->state.prevent_expansion = 1;
   r->state.angled_headers = 0;
+  /* APPLE LOCAL pch distcc --mrs */
+  r->cb.line_change = 0;
 
   /* Run through the carefully-saved macros, insert them.  */
   for (i = 0; i < data->count; i++)
@@ -678,6 +706,8 @@ cpp_read_state (cpp_reader *r, const char *name, FILE *f,
       free (data->defns[i]);
     }
   r->state = old_state;
+  /* APPLE LOCAL pch distcc --mrs */
+  r->cb.line_change = saved_line_change;
 
   _cpp_restore_pragma_names (r, data->saved_pragmas);
 

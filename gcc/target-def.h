@@ -294,6 +294,16 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #define TARGET_EXPAND_BUILTIN default_expand_builtin
 #define TARGET_FOLD_BUILTIN hook_tree_tree_bool_null
 
+/* APPLE LOCAL begin constant cfstrings */
+/* In c-common.c.  */
+#ifndef TARGET_EXPAND_TREE_BUILTIN
+#define TARGET_EXPAND_TREE_BUILTIN hook_tree_tree_tree_tree_null
+#endif
+#ifndef TARGET_CONSTRUCT_OBJC_STRING
+#define TARGET_CONSTRUCT_OBJC_STRING hook_tree_tree_null
+#endif
+/* APPLE LOCAL end constant cfstrings */
+
 /* In varasm.c.  */
 #ifndef TARGET_SECTION_TYPE_FLAGS
 #define TARGET_SECTION_TYPE_FLAGS default_section_type_flags
@@ -356,6 +366,10 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #define TARGET_ENCODE_SECTION_INFO default_encode_section_info
 #endif
 
+/* APPLE LOCAL begin AltiVec */
+#define TARGET_CAST_EXPR_AS_VECTOR_INIT false
+/* APPLE LOCAL end AltiVec */
+
 #define TARGET_FIXED_CONDITION_CODE_REGS hook_bool_uintp_uintp_false
 
 #define TARGET_CC_MODES_COMPATIBLE default_cc_modes_compatible
@@ -390,6 +404,10 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #define TARGET_STRICT_ARGUMENT_NAMING hook_bool_CUMULATIVE_ARGS_false
 #define TARGET_PRETEND_OUTGOING_VARARGS_NAMED \
   default_pretend_outgoing_varargs_named
+/* APPLE LOCAL begin Altivec */
+#define TARGET_SKIP_VEC_ARGS default_skip_vec_args
+/* APPLE LOCAL end Altivec */
+
 #define TARGET_SPLIT_COMPLEX_ARG NULL
 
 #define TARGET_GIMPLIFY_VA_ARG_EXPR std_gimplify_va_arg_expr
@@ -414,6 +432,9 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
    TARGET_STRICT_ARGUMENT_NAMING,				\
    TARGET_PRETEND_OUTGOING_VARARGS_NAMED,			\
    TARGET_SPLIT_COMPLEX_ARG,					\
+   /* APPLE LOCAL begin Altivec */				\
+   TARGET_SKIP_VEC_ARGS,					\
+   /* APPLE LOCAL end Altivec */				\
    TARGET_MUST_PASS_IN_STACK,					\
    TARGET_CALLEE_COPIES,					\
    TARGET_ARG_PARTIAL_BYTES					\
@@ -492,6 +513,10 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
   TARGET_ALIGN_ANON_BITFIELD,			\
   TARGET_INIT_BUILTINS,				\
   TARGET_EXPAND_BUILTIN,			\
+  /* APPLE LOCAL begin constant cfstrings */	\
+  TARGET_EXPAND_TREE_BUILTIN,			\
+  TARGET_CONSTRUCT_OBJC_STRING,			\
+  /* APPLE LOCAL end constant cfstrings */	\
   TARGET_FOLD_BUILTIN,				\
   TARGET_MANGLE_FUNDAMENTAL_TYPE,		\
   TARGET_INIT_LIBFUNCS,				\
@@ -536,6 +561,8 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
   TARGET_TERMINATE_DW2_EH_FRAME_INFO,		\
   TARGET_ASM_FILE_START_APP_OFF,		\
   TARGET_ASM_FILE_START_FILE_DIRECTIVE,		\
+  /* APPLE LOCAL AltiVec */			\
+  TARGET_CAST_EXPR_AS_VECTOR_INIT,		\
   TARGET_HANDLE_PRAGMA_REDEFINE_EXTNAME,	\
   TARGET_HANDLE_PRAGMA_EXTERN_PREFIX,		\
   TARGET_RELAXED_ORDERING,			\

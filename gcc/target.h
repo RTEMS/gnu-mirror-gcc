@@ -333,6 +333,18 @@ struct gcc_target
   rtx (* expand_builtin) (tree exp, rtx target, rtx subtarget,
 			  enum machine_mode mode, int ignore);
 
+  /* APPLE LOCAL begin constant cfstrings */
+  /* Expand a platform-specific (but machine-independent) builtin.  */
+  tree (* expand_tree_builtin) (tree function, tree params,
+				tree coerced_params);
+
+  /* Construct a target-specific Objective-C string object based on the
+     STRING_CST passed in STR, or NULL if the default Objective-C objects
+     (based on NSConstantString or NXConstantString) should be used
+     instead.  */
+  tree (* construct_objc_string) (tree str);
+  /* APPLE LOCAL end constant cfstrings */
+
   /* Fold a target-specific builtin.  */
   tree (* fold_builtin) (tree exp, bool ignore);
 
@@ -454,7 +466,7 @@ struct gcc_target
   /* Create the __builtin_va_list type.  */
   tree (* build_builtin_va_list) (void);
 
-  /* Gimplifies a VA_ARG_EXPR.  */
+ /* Gimplifies a VA_ARG_EXPR.  */
   tree (* gimplify_va_arg_expr) (tree valist, tree type, tree *pre_p,
 				 tree *post_p);
 
@@ -525,6 +537,9 @@ struct gcc_target
     /* Given a complex type T, return true if a parameter of type T
        should be passed as two scalars.  */
     bool (* split_complex_arg) (tree type);
+    /* APPLE LOCAL begin Altivec */
+    bool (*skip_vec_args) (tree, int, int*);
+    /* APPLE LOCAL end Altivec */
 
     /* Return true if type T, mode MODE, may not be passed in registers,
        but must be passed on the stack.  */
@@ -598,6 +613,17 @@ struct gcc_target
      at the beginning of assembly output.  */
   bool file_start_file_directive;
 
+  /* APPLE LOCAL begin AltiVec */
+  /* True if it is permissible to use cast expressions as
+     vector initializers, e.g.:
+
+       (vector unsigned int)(3, 4, 5, 6)
+       (vector float)(2.5)
+
+     This is required for the Motorola AltiVec syntax on the PowerPC.  */
+  bool cast_expr_as_vector_init;
+  /* APPLE LOCAL end AltiVec */
+  
   /* True if #pragma redefine_extname is to be supported.  */
   bool handle_pragma_redefine_extname;
 

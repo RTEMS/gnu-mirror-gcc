@@ -49,6 +49,11 @@ Boston, MA 02111-1307, USA.  */
 #include "cgraph.h"
 #include "tree-gimple.h"
 
+/* APPLE LOCAL begin pascal strings */
+#include "../../libcpp/internal.h"
+extern struct cpp_reader* parse_in;
+/* APPLE LOCAL end pascal strings */
+
 #ifndef CHECK_STACK_LIMIT
 #define CHECK_STACK_LIMIT (-1)
 #endif
@@ -505,6 +510,34 @@ struct processor_costs nocona_cost = {
 
 const struct processor_costs *ix86_cost = &pentium_cost;
 
+/* APPLE LOCAL begin Altivec */
+/* vector types */
+static GTY(()) tree unsigned_V16QI_type_node;
+static GTY(()) tree unsigned_V4SI_type_node;
+static GTY(()) tree unsigned_V8QI_type_node;
+static GTY(()) tree unsigned_V8HI_type_node;
+static GTY(()) tree unsigned_V4HI_type_node;
+static GTY(()) tree unsigned_V2HI_type_node;
+static GTY(()) tree unsigned_V2SI_type_node;
+static GTY(()) tree unsigned_V2DI_type_node;
+static GTY(()) tree unsigned_V1DI_type_node;
+
+static GTY(()) tree V16QI_type_node;
+static GTY(()) tree V4SF_type_node;
+static GTY(()) tree V4SI_type_node;
+static GTY(()) tree V8QI_type_node;
+static GTY(()) tree V8HI_type_node;
+static GTY(()) tree V4HI_type_node;
+static GTY(()) tree V2HI_type_node;
+static GTY(()) tree V2SI_type_node;
+static GTY(()) tree V2SF_type_node;
+static GTY(()) tree V2DI_type_node;
+static GTY(()) tree V2DF_type_node;
+static GTY(()) tree V16SF_type_node;
+static GTY(()) tree V1DI_type_node;
+static GTY(()) tree V4DF_type_node;
+/* APPLE LOCAL end Altivec */
+
 /* Processor feature/optimization bitmasks.  */
 #define m_386 (1<<PROCESSOR_I386)
 #define m_486 (1<<PROCESSOR_I486)
@@ -919,6 +952,11 @@ static rtx ix86_struct_value_rtx (tree, int);
 static bool ix86_ms_bitfield_layout_p (tree);
 static tree ix86_handle_struct_attribute (tree *, tree, tree, int, bool *);
 static int extended_reg_mentioned_1 (rtx *, void *);
+/* APPLE LOCAL begin why is this local? */
+#if TARGET_MACHO
+static bool ix86_binds_local_p (tree);
+#endif
+/* APPLE LOCAL end why is this local? */
 static bool ix86_rtx_costs (rtx, int, int, int *);
 static int min_insn_size (rtx);
 static tree ix86_md_asm_clobbers (tree clobbers);
@@ -1030,6 +1068,13 @@ static void init_ext_80387_constants (void);
 #undef TARGET_MS_BITFIELD_LAYOUT_P
 #define TARGET_MS_BITFIELD_LAYOUT_P ix86_ms_bitfield_layout_p
 
+/* APPLE LOCAL begin why is this local? */
+#if TARGET_MACHO
+#undef TARGET_BINDS_LOCAL_P
+#define TARGET_BINDS_LOCAL_P ix86_binds_local_p
+#endif
+/* APPLE LOCAL end why is this local? */
+
 #undef TARGET_ASM_OUTPUT_MI_THUNK
 #define TARGET_ASM_OUTPUT_MI_THUNK x86_output_mi_thunk
 #undef TARGET_ASM_CAN_OUTPUT_MI_THUNK
@@ -1042,6 +1087,12 @@ static void init_ext_80387_constants (void);
 #define TARGET_RTX_COSTS ix86_rtx_costs
 #undef TARGET_ADDRESS_COST
 #define TARGET_ADDRESS_COST ix86_address_cost
+
+/* APPLE LOCAL begin SSE stack alignment */
+#ifndef BASIC_STACK_BOUNDARY
+#define BASIC_STACK_BOUNDARY (32)
+#endif
+/* APPLE LOCAL end SSE stack alignment */
 
 #undef TARGET_FIXED_CONDITION_CODE_REGS
 #define TARGET_FIXED_CONDITION_CODE_REGS ix86_fixed_condition_code_regs
@@ -1202,6 +1253,12 @@ override_options (void)
 #ifdef SUBTARGET_OVERRIDE_OPTIONS
   SUBTARGET_OVERRIDE_OPTIONS;
 #endif
+
+  /* APPLE LOCAL begin constant cfstrings */
+#ifdef SUBSUBTARGET_OVERRIDE_OPTIONS
+  SUBSUBTARGET_OVERRIDE_OPTIONS;
+#endif
+  /* APPLE LOCAL end constant cfstrings */
 
   /* Set the default values for switches whose default depends on TARGET_64BIT
      in case they weren't overwritten by command line options.  */
@@ -1426,9 +1483,11 @@ override_options (void)
      The default of 128 bits is for Pentium III's SSE __m128, but we
      don't want additional code to keep the stack aligned when
      optimizing for code size.  */
+  /* APPLE LOCAL begin SSE stack alignment */
   ix86_preferred_stack_boundary = (optimize_size
-				   ? TARGET_64BIT ? 128 : 32
+				   ? TARGET_64BIT ? 128 : BASIC_STACK_BOUNDARY
 				   : 128);
+  /* APPLE LOCAL end SSE stack alignment */
   if (ix86_preferred_stack_boundary_string)
     {
       i = atoi (ix86_preferred_stack_boundary_string);
@@ -1583,17 +1642,48 @@ override_options (void)
      so it won't slow down the compilation and make x87 code slower.  */
   if (!TARGET_SCHEDULE)
     flag_schedule_insns_after_reload = flag_schedule_insns = 0;
+
+  /* APPLE LOCAL begin dynamic-no-pic */
+#if TARGET_MACHO
+  if (MACHO_DYNAMIC_NO_PIC_P)
+    {
+      if (flag_pic)
+	warning ("-mdynamic-no-pic overrides -fpic or -fPIC");
+      flag_pic = 0;
+    }
+  else
+#endif
+  if (flag_pic == 1)
+    {
+      /* Darwin doesn't support -fpic.  */
+      warning ("-fpic is not supported; -fPIC assumed");  
+      flag_pic = 2;
+    }
+  /* APPLE LOCAL end dynamic-no-pic */
 }
 
 void
 optimization_options (int level, int size ATTRIBUTE_UNUSED)
 {
+  /* APPLE LOCAL begin disable strict aliasing; breaks too much existing code.  */
+#if TARGET_MACHO
+  flag_strict_aliasing = 0;
+#endif
+  /* APPLE LOCAL end disable strict aliasing; breaks too much existing code.  */
   /* For -O2 and beyond, turn off -fschedule-insns by default.  It tends to
      make the problem with not enough registers even worse.  */
 #ifdef INSN_SCHEDULING
   if (level > 1)
     flag_schedule_insns = 0;
 #endif
+
+  /* APPLE LOCAL begin pragma fenv */
+  /* Trapping math is not needed by many users, and is expensive.
+     C99 permits us to default it off and we do that.  It is
+     turned on when <fenv.h> is included (see darwin_pragma_fenv
+     in darwin-c.c).  */
+  flag_trapping_math = 0;
+  /* APPLE LOCAL end pragma fenv */
 
   /* The default values of these switches depend on the TARGET_64BIT
      that is not known at this moment.  Mark these values with 2 and
@@ -3877,7 +3967,8 @@ static int pic_labels_used;
 static void
 get_pc_thunk_name (char name[32], unsigned int regno)
 {
-  if (USE_HIDDEN_LINKONCE)
+  /* APPLE LOCAL deep branch prediction pic-base.  */
+  if (USE_HIDDEN_LINKONCE || TARGET_MACHO)
     sprintf (name, "__i686.get_pc_thunk.%s", reg_names[regno]);
   else
     ASM_GENERATE_INTERNAL_LABEL (name, "LPR", regno);
@@ -3921,6 +4012,18 @@ ix86_file_end (void)
 	  fputc ('\n', asm_out_file);
 	  ASM_DECLARE_FUNCTION_NAME (asm_out_file, name, decl);
 	}
+      /* APPLE LOCAL begin deep branch prediction pic-base */
+      else if (TARGET_MACHO)
+	{
+	  darwin_textcoal_nt_section ();
+	  fputs (".weak_definition\t", asm_out_file);
+	  assemble_name (asm_out_file, name);
+	  fputs ("\n.private_extern\t", asm_out_file);
+	  assemble_name (asm_out_file, name);
+	  fputs ("\n", asm_out_file);
+	  ASM_OUTPUT_LABEL (asm_out_file, name);
+	}
+      /* APPLE LOCAL end deep branch prediction pic-base */
       else
 	{
 	  text_section ();
@@ -3976,12 +4079,24 @@ output_set_got (rtx dest)
       xops[2] = gen_rtx_SYMBOL_REF (Pmode, ggc_strdup (name));
       xops[2] = gen_rtx_MEM (QImode, xops[2]);
       output_asm_insn ("call\t%X2", xops);
+      /* APPLE LOCAL begin deep branch prediction pic-base */
+#if TARGET_MACHO
+      /* Output the "canonical" label name ("Lxx$pb") here too.  This
+         is what will be referred to by the Mach-O PIC subsystem.  */
+      if (cfun)
+	ASM_OUTPUT_LABEL (asm_out_file, machopic_function_base_name ());
+#endif
+      /* APPLE LOCAL end deep branch prediction pic-base */
     }
 
+  /* APPLE LOCAL deep branch prediction pic-base */
+#if !TARGET_MACHO
   if (!flag_pic || TARGET_DEEP_BRANCH_PREDICTION)
     output_asm_insn ("add{l}\t{%1, %0|%0, %1}", xops);
   else if (!TARGET_MACHO)
     output_asm_insn ("add{l}\t{%1+[.-%a2], %0|%0, %a1+(.-%a2)}", xops);
+#endif	/* !TARGET_MACHO */
+  /* APPLE LOCAL deep branch prediction pic-base */
 
   return "";
 }
@@ -4651,6 +4766,24 @@ ix86_output_function_epilogue (FILE *file ATTRIBUTE_UNUSED,
 {
   if (pic_offset_table_rtx)
     REGNO (pic_offset_table_rtx) = REAL_PIC_OFFSET_TABLE_REGNUM;
+  /* APPLE LOCAL begin */
+#if TARGET_MACHO
+  /* Mach-O doesn't support labels at the end of objects, so if
+     it looks like we might want one, insert a NOP.  */
+  {
+    rtx insn = get_last_insn ();
+    while (insn
+	   && NOTE_P (insn)
+	   && NOTE_LINE_NUMBER (insn) != NOTE_INSN_DELETED_LABEL)
+      insn = PREV_INSN (insn);
+    if (insn
+	&& (LABEL_P (insn)
+	    || (NOTE_P (insn)
+		&& NOTE_LINE_NUMBER (insn) == NOTE_INSN_DELETED_LABEL)))
+      fputs ("\tnop\n", file);
+  }
+#endif
+  /* APPLE LOCAL end */
 }
 
 /* Extract the parts of an RTL expression that is a valid memory address
@@ -4971,7 +5104,23 @@ legitimate_constant_p (rtx x)
       /* TLS symbols are never valid.  */
       if (tls_symbolic_operand (x, Pmode))
 	return false;
+      /* APPLE LOCAL begin dynamic-no-pic */
+      if (TARGET_MACHO && TARGET_DYNAMIC_NO_PIC)
+	return machopic_symbol_defined_p (x);
+      /* APPLE LOCAL end dynamic-no-pic */
       break;
+
+      /* APPLE LOCAL begin dynamic-no-pic */
+    case PLUS:
+      {
+	rtx left = XEXP (x, 0);
+	rtx right = XEXP (x, 1);
+	bool left_is_constant = legitimate_constant_p (left);
+	bool right_is_constant = legitimate_constant_p (right);
+	return left_is_constant && right_is_constant;
+      }
+      break;
+      /* APPLE LOCAL end dynamic-no-pic */
 
     default:
       break;
@@ -5273,7 +5422,8 @@ legitimate_address_p (enum machine_mode mode, rtx addr, int strict)
 	    goto report_error;
 	  }
 
-      else if (flag_pic && (SYMBOLIC_CONST (disp)
+      /* APPLE LOCAL dynamic-no-pic */
+      else if (MACHOPIC_INDIRECT && (SYMBOLIC_CONST (disp)
 #if TARGET_MACHO
 			    && !machopic_operand_p (disp)
 #endif
@@ -5294,11 +5444,19 @@ legitimate_address_p (enum machine_mode mode, rtx addr, int strict)
 		  goto report_error;
 		}
 	    }
-	  else if (! legitimate_pic_address_disp_p (disp))
+	  /* APPLE LOCAL begin dynamic-no-pic */
+	  else if (flag_pic && ! legitimate_pic_address_disp_p (disp))
 	    {
 	      reason = "displacement is an invalid pic construct";
 	      goto report_error;
 	    }
+	  /* APPLE LOCAL begin dynamic-no-pic */
+	  else if (TARGET_DYNAMIC_NO_PIC && !legitimate_constant_p (disp))
+	    {
+	      reason = "displacment must be referenced via non_lazy_pointer";
+	      goto report_error;
+	    }
+	  /* APPLE LOCAL end dynamic-no-pic */
 
           /* This code used to verify that a symbolic pic displacement
 	     includes the pic_offset_table_rtx register.
@@ -5721,6 +5879,10 @@ legitimize_address (rtx x, rtx oldx ATTRIBUTE_UNUSED, enum machine_mode mode)
 
   if (flag_pic && SYMBOLIC_CONST (x))
     return legitimize_pic_address (x, 0);
+  /* APPLE LOCAL begin dynamic-no-pic */
+  if (MACHO_DYNAMIC_NO_PIC_P && SYMBOLIC_CONST (x))
+    return machopic_indirect_data_reference (x, 0);
+  /* APPLE LOCAL end dynamic-no-pic */
 
   /* Canonicalize shifts by 0, 1, 2, 3 into multiply */
   if (GET_CODE (x) == ASHIFT
@@ -5891,7 +6053,19 @@ output_pic_addr_const (FILE *file, rtx x, int code)
      if (SYMBOL_REF_DECL (x))
        mark_decl_referenced (SYMBOL_REF_DECL (x));
 
+     /* APPLE LOCAL begin stubify optimized symbols */
+#if TARGET_MACHO
+     {
+       const char *name = XSTR (x, 0);
+       if (MACHOPIC_INDIRECT
+	   && machopic_classify_symbol (x) == MACHOPIC_UNDEFINED_FUNCTION)
+	 name = machopic_indirection_name (x, /*stub_p=*/true);
+       assemble_name (file, name);
+     }
+#else
       assemble_name (file, XSTR (x, 0));
+#endif
+     /* APPLE LOCAL end stubify optimized symbols */
       if (!TARGET_MACHO && code == 'P' && ! SYMBOL_REF_LOCAL_P (x))
 	fputs ("@PLT", file);
       break;
@@ -6721,7 +6895,13 @@ print_operand (FILE *file, rtx x, int code)
 	}
       if (GET_CODE (x) == CONST_INT)
 	fprintf (file, HOST_WIDE_INT_PRINT_DEC, INTVAL (x));
-      else if (flag_pic)
+      /* APPLE LOCAL begin dynamic-no-pic */
+      else if (flag_pic
+#if TARGET_MACHO
+	       || MACHOPIC_INDIRECT
+#endif
+	       )
+      /* APPLE LOCAL end dynamic-no-pic */
 	output_pic_addr_const (file, x, code);
       else
 	output_addr_const (file, x);
@@ -7515,7 +7695,8 @@ void
 ix86_expand_move (enum machine_mode mode, rtx operands[])
 {
   int strict = (reload_in_progress || reload_completed);
-  rtx op0, op1;
+  /* APPLE LOCAL dynamic-no-pic */
+  rtx insn, op0, op1;
   enum tls_model model;
 
   op0 = operands[0];
@@ -7549,29 +7730,49 @@ ix86_expand_move (enum machine_mode mode, rtx operands[])
 	}
     }
 
-  if (flag_pic && mode == Pmode && symbolic_operand (op1, Pmode))
+  /* APPLE LOCAL begin dynamic-no-pic */
+  if (MACHOPIC_INDIRECT
+      && mode == Pmode && symbolic_operand (op1, Pmode))
+  /* APPLE LOCAL end dynamic-no-pic */
     {
 #if TARGET_MACHO
-      if (MACHOPIC_PURE)
+      /* APPLE LOCAL begin dynamic-no-pic */
+      if (MACHOPIC_INDIRECT)
 	{
 	  rtx temp = ((reload_in_progress
 		       || ((op0 && GET_CODE (op0) == REG)
 			   && mode == Pmode))
 		      ? op0 : gen_reg_rtx (Pmode));
 	  op1 = machopic_indirect_data_reference (op1, temp);
-	  op1 = machopic_legitimize_pic_address (op1, mode,
-						 temp == op1 ? 0 : temp);
+	  if (MACHOPIC_PURE)
+	    op1 = machopic_legitimize_pic_address (op1, mode,
+						   temp == op1 ? 0 : temp);
 	}
-      else if (MACHOPIC_INDIRECT)
-	op1 = machopic_indirect_data_reference (op1, 0);
-      if (op0 == op1)
-	return;
-#else
+      if (op0 != op1 && GET_CODE (op0) != MEM)
+	{
+	  insn = gen_rtx_SET (VOIDmode, op0, op1);
+	  emit_insn (insn);
+	  return;
+	}
+      if (GET_CODE (op0) == MEM)
+	op1 = force_reg (Pmode, op1);
+      else
+	{
+	  rtx temp = op0;
+	  if (GET_CODE (temp) != REG)
+	    temp = gen_reg_rtx (Pmode);
+	  temp = legitimize_pic_address (op1, temp);
+	  if (temp == op0)
+	    return;
+	  op1 = temp;
+	}
+#else /* TARGET_MACHO */
       if (GET_CODE (op0) == MEM)
 	op1 = force_reg (Pmode, op1);
       else
 	op1 = legitimize_address (op1, op1, Pmode);
 #endif /* TARGET_MACHO */
+      /* APPLE LOCAL end dynamic-no-pic */
     }
   else
     {
@@ -11699,7 +11900,8 @@ ix86_expand_call (rtx retval, rtx fnaddr, rtx callarg1,
     abort ();
 
 #if TARGET_MACHO
-  if (flag_pic && GET_CODE (XEXP (fnaddr, 0)) == SYMBOL_REF)
+  /* APPLE LOCAL dynamic-no-pic */
+  if (MACHOPIC_INDIRECT && GET_CODE (XEXP (fnaddr, 0)) == SYMBOL_REF)
     fnaddr = machopic_indirect_call_target (fnaddr);
 #else
   /* Static functions and indirect calls don't need the pic register.  */
@@ -13235,6 +13437,12 @@ ix86_init_builtins (void)
 {
   if (TARGET_MMX)
     ix86_init_mmx_sse_builtins ();
+
+  /* APPLE LOCAL begin constant cfstrings */
+#ifdef SUBTARGET_INIT_BUILTINS
+  SUBTARGET_INIT_BUILTINS;
+#endif
+  /* APPLE LOCAL end constant cfstrings */
 }
 
 /* Set up all the MMX/SSE builtins.  This is not called if TARGET_MMX
@@ -15190,6 +15398,21 @@ ix86_memory_move_cost (enum machine_mode mode, enum reg_class class, int in)
     }
 }
 
+/* APPLE LOCAL begin why is this local? */
+#if TARGET_MACHO
+/* Cross-module name binding.  Darwin does not support overriding
+   functions at dynamic-link time.  */
+
+static bool
+ix86_binds_local_p (tree decl)
+{
+  /* APPLE LOCAL kext treat vtables as overridable  */
+  return default_binds_local_p_1 (decl, 
+	flag_apple_kext && lang_hooks.vtable_p (decl));
+}
+#endif
+/* APPLE LOCAL end why is this local? */
+
 /* Compute a (partial) cost for rtx X.  Return true if the complete
    cost has been computed, and false if subexpressions should be
    scanned.  In either case, *TOTAL contains the cost result.  */
@@ -15548,11 +15771,37 @@ machopic_output_stub (FILE *file, const char *symb, const char *stub)
 
   fprintf (file, "\tjmp dyld_stub_binding_helper\n");
 
-  machopic_lazy_symbol_ptr_section ();
+  /* APPLE LOCAL begin deep branch prediction pic-base.  */
+  /* N.B. Keep the correspondence of these
+     'symbol_ptr/symbol_ptr2/symbol_ptr3' sections consistent with the
+     old-pic/new-pic/non-pic stubs; altering this will break
+     compatibility with existing dylibs.  */
+  if (MACHOPIC_PURE)
+    {
+      /* PIC stubs.  */
+      if (TARGET_DEEP_BRANCH_PREDICTION)
+	machopic_lazy_symbol_ptr2_section ();	/* PIC stub using "CALL get_pc_thunk".  */
+      else
+	machopic_lazy_symbol_ptr_section ();	/* PIC stub using inline picbase: "CALL L42 ! L42: pop %ebx".  */
+    }
+  else
+    {
+      machopic_lazy_symbol_ptr3_section ();	/* -mdynamic-no-pic stub.  */
+    }
+  /* APPLE LOCAL end deep branch prediction pic-base.  */
   fprintf (file, "%s:\n", lazy_ptr_name);
   fprintf (file, "\t.indirect_symbol %s\n", symbol_name);
   fprintf (file, "\t.long %s\n", binder_name);
 }
+
+/* APPLE LOCAL begin deep branch prediction pic-base */
+void
+darwin_x86_file_end (void)
+{
+  darwin_file_end ();
+  ix86_file_end ();
+}
+/* APPLE LOCAL end deep branch prediction pic-base */
 #endif /* TARGET_MACHO */
 
 /* Order the registers for register allocator.  */
@@ -15873,6 +16122,14 @@ x86_field_alignment (tree field, int computed)
 
   if (TARGET_64BIT || TARGET_ALIGN_DOUBLE)
     return computed;
+  /* APPLE LOCAL begin mac68k alignment */
+  if (TARGET_ALIGN_MAC68K)
+    {
+      if (computed >= 128)
+	return computed;
+      return MIN (computed, 16);
+    }
+  /* APPLE LOCAL end mac68k alignment */
   mode = TYPE_MODE (TREE_CODE (type) == ARRAY_TYPE
 		    ? get_inner_array_type (type) : type);
   if (mode == DFmode || mode == DCmode
