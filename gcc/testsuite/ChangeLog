@@ -1,3 +1,20 @@
+2005-02-26  Andrew Pinski  <pinskia@physics.uc.edu>
+
+	PR tree-opt/20188
+	* gcc.dg/tree-ssa/inline_asm-1.c: New test.
+	* gcc.dg/tree-ssa/inline_asm-2.c: New test.
+	* gcc.dg/asm-b.c: New test.
+
+2005-02-26  Richard Sandiford  <rsandifo@redhat.com>
+
+	* gcc.c-torture/execute/ieee/mul-subnormal-single-1.x: New file.
+	Disable this test on IRIX 6.
+
+2005-02-25  Diego Novillo  <dnovillo@redhat.com>
+
+	PR tree-optimization/20204
+	* testsuite/gcc.dg/pr20204.c: New test.
+
 2005-02-24  Jakub Jelinek  <jakub@redhat.com>
 
 	PR target/20196
