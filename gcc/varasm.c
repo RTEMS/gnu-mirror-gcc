@@ -50,6 +50,9 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "target.h"
 #include "tree-mudflap.h"
 #include "cgraph.h"
+/* APPLE LOCAL begin hot/cold partitioning  */
+#include "cfglayout.h"
+/* APPLE LOCAl end hot/cold partitioning  */
 
 #ifdef XCOFF_DEBUGGING_INFO
 #include "xcoffout.h"		/* Needed for external data
@@ -97,6 +100,16 @@ int size_directive_output;
 
 tree last_assemble_variable_decl;
 
+/* APPLE LOCAL begin hot/cold partitioning  */
+/* The following global variable indicates if the section label for the
+   "cold" section of code has been output yet to the assembler.  The
+   label is useful when running gdb.  This is part of the optimization that
+   partitions hot and cold basic blocks into separate sections of the .o
+   file.  */
+
+bool unlikely_section_label_printed = false;
+/* APPLE LOCAL end hot/cold partitioning  */
+
 /* RTX_UNCHANGING_P in a MEM can mean it is stored into, for initialization.
    So giving constant the alias set for the type will allow such
    initializations to appear to conflict with the load of the constant.  We
@@ -142,7 +155,10 @@ static bool asm_emit_uninitialised (tree, const char*,
 				    unsigned HOST_WIDE_INT);
 static void mark_weak (tree);
 
-enum in_section { no_section, in_text, in_data, in_named
+/* APPLE LOCAL begin hot/cold partitioning  */
+enum in_section { no_section, in_text, in_unlikely_executed_text, in_data, 
+		  in_named
+/* APPLE LOCAL end hot/cold partitioning  */
 #ifdef BSS_SECTION_ASM_OP
   , in_bss
 #endif
@@ -195,9 +211,42 @@ text_section (void)
   if (in_section != in_text)
     {
       in_section = in_text;
+      /* APPLE LOCAL begin hot/cold partitioning  */
       fprintf (asm_out_file, "%s\n", TEXT_SECTION_ASM_OP);
+      assemble_align (FUNCTION_BOUNDARY);
+      /* APPLE LOCAL end hot/cold partitioning  */
     }
 }
+
+/* APPLE LOCAL begin hot/cold partitioning  */
+/* Tell assembler to switch to unlikely-to-be-executed text section.  */
+
+void
+unlikely_text_section (void)
+{
+  if ((in_section != in_unlikely_executed_text)
+      &&  (in_section != in_named 
+	   || strcmp (in_named_name, UNLIKELY_EXECUTED_TEXT_SECTION_NAME) != 0))
+    {
+      named_section (NULL_TREE, UNLIKELY_EXECUTED_TEXT_SECTION_NAME, 0);
+      assemble_align (FUNCTION_BOUNDARY);
+      in_section = in_unlikely_executed_text;
+
+      if (!unlikely_section_label_printed)
+	{
+	  char *unlikely_section_name;
+	  unlikely_section_name = xmalloc ((strlen (current_function_name ()) 
+					    + 20) *
+					   sizeof (char));
+	  sprintf (unlikely_section_name, "_%s_unlikely_section:",
+		   current_function_name ());
+	  ASM_OUTPUT_LABEL (asm_out_file, unlikely_section_name);
+	  unlikely_section_label_printed = true;
+	  free (unlikely_section_name);
+	}
+    }
+}
+/* APPLE LOCAL end hot/cold partitioning  */
 
 /* Tell assembler to switch to data section.  */
 
@@ -240,6 +289,23 @@ in_text_section (void)
 {
   return in_section == in_text;
 }
+
+/* APPLE LOCAL begin hot/cold partitioning  */
+/* Determine if we're in the unlikely-to-be-executed text section.  */
+
+int
+in_unlikely_text_section (void)
+{
+  bool ret_val;
+
+  ret_val = ((in_section == in_unlikely_executed_text)
+	     || (in_section == in_named
+		 && (strcmp (in_named_name, UNLIKELY_EXECUTED_TEXT_SECTION_NAME)
+		     == 0)));
+
+  return ret_val;
+}
+/* APPLE LOCAL end hot/cold partitioning  */
 
 /* Determine if we're in the data section.  */
 
@@ -480,11 +546,15 @@ asm_output_aligned_bss (FILE *file, tree decl ATTRIBUTE_UNUSED,
 void
 function_section (tree decl)
 {
+  /* APPLE LOCAL begin hot/cold partitioning  */
   if (decl != NULL_TREE
       && DECL_SECTION_NAME (decl) != NULL_TREE)
     named_section (decl, (char *) 0, 0);
+  else if (scan_ahead_for_unlikely_executed_note (get_insns()))
+    unlikely_text_section ();
   else
-    text_section ();
+    text_section (); 
+  /* APPLE LOCAL end hot/cold partitioning  */
 }
 
 /* Switch to section for variable DECL.  RELOC is the same as the
@@ -818,6 +888,8 @@ make_decl_rtl (tree decl, const char *asmspec)
 
   x = gen_rtx_SYMBOL_REF (Pmode, name);
   SYMBOL_REF_WEAK (x) = DECL_WEAK (decl);
+  /* APPLE LOCAL weak import */
+  SYMBOL_REF_WEAK_IMPORT (x) = DECL_WEAK_IMPORT (decl);
   SYMBOL_REF_DECL (x) = decl;
 
   x = gen_rtx_MEM (DECL_MODE (decl), x);
@@ -1036,6 +1108,10 @@ assemble_start_function (tree decl, const char *fnname)
 {
   int align;
 
+  /* APPLE LOCAL begin hot/cold partitioning  */
+  unlikely_section_label_printed = false;
+  /* APPLE LOCAL end hot/cold partitioning  */
+
   /* The following code does not need preprocessing in the assembler.  */
 
   app_disable ();
@@ -1123,7 +1199,10 @@ assemble_zeros (unsigned HOST_WIDE_INT size)
 #ifdef ASM_NO_SKIP_IN_TEXT
   /* The `space' pseudo in the text section outputs nop insns rather than 0s,
      so we must output 0s explicitly in the text section.  */
-  if (ASM_NO_SKIP_IN_TEXT && in_text_section ())
+  /* APPLE LOCAL begin hot/cold partitioning  */
+  if ((ASM_NO_SKIP_IN_TEXT && in_text_section ())
+      || (ASM_NO_SKIP_IN_TEXT && in_unlikely_text_section ()))
+  /* APPLE LOCAL end hot/cold partitioning  */
     {
       unsigned HOST_WIDE_INT i;
       for (i = 0; i < size; i++)
@@ -1361,6 +1440,10 @@ assemble_variable (tree decl, int top_level ATTRIBUTE_UNUSED,
   if (flag_syntax_only)
     return;
 
+  /* APPLE LOCAL duplicate decls in multiple files.  */
+  if (DECL_DUPLICATE_DECL (decl))
+    return;
+
   app_disable ();
 
   if (! dont_output_data
@@ -1484,8 +1567,31 @@ assemble_variable (tree decl, int top_level ATTRIBUTE_UNUSED,
   /* Switch to the appropriate section.  */
   variable_section (decl, reloc);
 
+  /* APPLE LOCAL begin zerofill turly 20020218  */
+#ifdef ASM_OUTPUT_ZEROFILL
+  /* We need a ZEROFILL COALESCED option!  */
+  if (flag_no_common
+      && ! dont_output_data
+      /* APPLE LOCAL coalescing */
+      && ! DECL_COALESCED (decl)
+      && (DECL_INITIAL (decl) == 0 || DECL_INITIAL (decl) == error_mark_node))
+    {
+      ASM_OUTPUT_ZEROFILL (asm_out_file, name,
+			   tree_low_cst (DECL_SIZE_UNIT (decl), 1),
+			   floor_log2 (DECL_ALIGN (decl) / BITS_PER_UNIT));
+
+      /********************************/
+      /* NOTE THE EARLY RETURN HERE!! */
+      /********************************/
+      return;
+    }
+#endif
+  /* APPLE LOCAL end zerofill turly 20020218  */
+
   /* dbxout.c needs to know this.  */
-  if (in_text_section ())
+  /* APPLE LOCAL begin hot/cold partitioning  */
+  if (in_text_section () || in_unlikely_text_section ())
+  /* APPLE LOCAL end hot/cold partitioning  */
     DECL_IN_TEXT_SECTION (decl) = 1;
 
   /* Output the alignment of this data.  */
@@ -3250,6 +3356,8 @@ initializer_constant_valid_p (tree value, tree endtype)
     {
     case CONSTRUCTOR:
       if ((TREE_CODE (TREE_TYPE (value)) == UNION_TYPE
+	   /* APPLE LOCAL AltiVec */
+	   || TREE_CODE (TREE_TYPE (value)) == VECTOR_TYPE
 	   || TREE_CODE (TREE_TYPE (value)) == RECORD_TYPE)
 	  && TREE_CONSTANT (value)
 	  && CONSTRUCTOR_ELTS (value))
@@ -4032,6 +4140,16 @@ merge_weak (tree newdecl, tree olddecl)
     /* OLDDECL was weak, but NEWDECL was not explicitly marked as
        weak.  Just update NEWDECL to indicate that it's weak too.  */
     mark_weak (newdecl);
+
+  /* APPLE LOCAL begin weak_import (Radar 2809704) ilr */
+  if (DECL_WEAK_IMPORT (olddecl) != DECL_WEAK_IMPORT (newdecl))
+    {
+      if (! DECL_EXTERNAL (olddecl) && ! DECL_EXTERNAL (newdecl))
+	warning (
+		 "%Jinconsistent weak_import attribute with previous declaration of `%D'", newdecl, olddecl);
+      DECL_WEAK_IMPORT (newdecl) = 1;
+    }
+  /* APPLE LOCAL end weak_import ilr */
 }
 
 /* Declare DECL to be a weak symbol.  */
@@ -4116,6 +4234,16 @@ globalize_decl (tree decl)
       return;
     }
 #endif
+
+  /* APPLE LOCAL begin coalescing */
+  /* Weak definitions are used for coalesced symbols.  They're not the
+     same thing as weak references.  The naming is unfortunate. */
+#ifdef ASM_WEAK_DEFINITIONIZE_LABEL
+  if (DECL_COALESCED (decl) && flag_weak_coalesced_definitions)
+    ASM_WEAK_DEFINITIONIZE_LABEL (asm_out_file, name);
+#endif /* ASM_WEAK_DEFINITIONIZE_LABEL */
+  
+  /* APPLE LOCAL end coalescing */
 
   (*targetm.asm_out.globalize_label) (asm_out_file, name);
 }
@@ -4334,6 +4462,10 @@ default_section_type_flags_1 (tree decl, const char *name, int reloc,
     flags = SECTION_CODE;
   else if (decl && decl_readonly_section_1 (decl, reloc, shlib))
     flags = 0;
+  /* APPLE LOCAL begin hot/cold partitioning  */
+  else if (strcmp (name, UNLIKELY_EXECUTED_TEXT_SECTION_NAME) == 0)
+    flags = SECTION_CODE;
+  /* APPLE LOCAL end hot/cold partitioning  */
   else
     flags = SECTION_WRITE;
 
@@ -4932,6 +5064,15 @@ default_globalize_label (FILE * stream, const char *name)
   putc ('\n', stream);
 }
 #endif /* GLOBAL_ASM_OP */
+
+/* APPLE LOCAL begin coalescing */
+int
+darwin_named_section_is (const char* name)
+{
+  return (in_section == in_named
+	  && strcmp (in_named_name, name) == 0);
+}
+/* APPLE LOCAL end coalescing */
 
 /* This is how to output an internal numbered label where PREFIX is
    the class of label and LABELNO is the number within the class.  */

@@ -29,6 +29,7 @@
 
 #ifdef TREE_CODE
 extern void init_cumulative_args (CUMULATIVE_ARGS *, tree, rtx, int, int, int);
+
 extern void rs6000_va_start (tree, rtx);
 #endif /* TREE_CODE */
 
@@ -127,10 +128,13 @@ extern int mfcr_operation (rtx, enum machine_mode);
 extern int mtcrf_operation (rtx, enum machine_mode);
 extern int lmw_operation (rtx, enum machine_mode);
 extern struct rtx_def *create_TOC_reference (rtx);
+/* APPLE LOCAL RTX_COST for multiply */
+extern int rs6000_rtx_mult_cost (rtx);
 extern void rs6000_split_multireg_move (rtx, rtx);
 extern void rs6000_emit_move (rtx, rtx, enum machine_mode);
 extern rtx rs6000_legitimize_address (rtx, rtx, enum machine_mode);
-extern rtx rs6000_legitimize_reload_address (rtx, enum machine_mode,
+/* APPLE LOCAL pass reload addr by address */
+extern rtx rs6000_legitimize_reload_address (rtx *, enum machine_mode,
 			    int, int, int, int *);
 extern int rs6000_legitimate_address (enum machine_mode, rtx, int);
 extern bool rs6000_mode_dependent_address (rtx);
@@ -204,8 +208,13 @@ extern int rs6000_tls_symbol_ref (rtx, enum machine_mode);
 extern void rs6000_pragma_longcall (struct cpp_reader *);
 extern void rs6000_cpu_cpp_builtins (struct cpp_reader *);
 
+/* APPLE LOCAL AltiVec */
+extern bool rs6000_expand_macro_p (const struct cpp_token *);
+
 #if TARGET_MACHO
-char *output_call (rtx, rtx *, int, int);
+void add_compiler_stub PARAMS ((tree, tree, int));
+void output_compiler_stub PARAMS ((void));
+extern char* output_call PARAMS ((rtx, rtx *, int, int));
 #endif
 
 #endif  /* rs6000-protos.h */
