@@ -60,6 +60,12 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "except.h"
 #include "langhooks-def.h"
 
+/* APPLE LOCAL begin new tree dump */
+#include "dmp-tree.h"
+extern int c_dump_tree_p (FILE *, const char *, tree, int);
+extern lang_dump_tree_p_t c_prev_lang_dump_tree_p;
+/* APPLE LOCAL end new tree dump */
+
 /* In grokdeclarator, distinguish syntactic contexts of declarators.  */
 enum decl_context
 { NORMAL,			/* Ordinary declaration */
@@ -327,15 +333,33 @@ static void clone_underlying_type (tree);
 static bool flexible_array_type_p (tree);
 static hashval_t link_hash_hash	(const void *);
 static int link_hash_eq (const void *, const void *);
+/* APPLE LOCAL loop transpose */
+static void loop_transpose (tree);
+static tree perform_loop_transpose (tree *, int *, void *);
+static tree tree_contains_1 (tree *, int *, void *);
+static bool tree_contains (tree, tree);
+static tree should_transpose_for_loops_1 (tree *, int *, void *);
+static bool should_transpose_for_loops (tree, tree, tree, tree*);
+static tree find_tree_with_code_1 (tree *, int *, void *);
+static tree find_tree_with_code (tree, enum tree_code);
+static tree find_pointer (tree);
+
 
 /* States indicating how grokdeclarator() should handle declspecs marked
    with __attribute__((deprecated)).  An object declared as
    __attribute__((deprecated)) suppresses warnings of uses of other
    deprecated items.  */
+/* APPLE LOCAL begin unavailable */
+/* Also add an __attribute__((unavailable)).  An object declared as
+   __attribute__((unavailable)) suppresses any reports of being
+   declared with unavailable or deprecated items.  */
+/* APPLE LOCAL end unavailable */
 
 enum deprecated_states {
   DEPRECATED_NORMAL,
   DEPRECATED_SUPPRESS
+  /* APPLE LOCAL unavailable */
+  , DEPRECATED_UNAVAILABLE_SUPPRESS
 };
 
 static enum deprecated_states deprecated_state = DEPRECATED_NORMAL;
@@ -938,6 +962,7 @@ diagnose_mismatched_decls (tree newdecl, tree olddecl,
 
   /* Two different categories of symbol altogether.  This is an error
      unless OLDDECL is a builtin.  OLDDECL will be discarded in any case.  */
+
   if (TREE_CODE (olddecl) != TREE_CODE (newdecl))
     {
       if (TREE_CODE (olddecl) != FUNCTION_DECL
@@ -1004,6 +1029,14 @@ diagnose_mismatched_decls (tree newdecl, tree olddecl,
 	}
       else
 	{
+     /* BEGIN APPLE LOCAL disable_typechecking_for_spec_flag */
+        if (disable_typechecking_for_spec_flag)
+          {
+            warning ("%Jconflicting types for `%D'", newdecl, newdecl);
+            warning ("%Jprevious declaration of `%D'", olddecl, olddecl);
+            return 0;
+          }
+      /* END APPLE LOCAL disable_typechecking_for_spec_flag */
 	  error ("%Jconflicting types for '%D'", newdecl, newdecl);
 	  diagnose_arglist_conflict (newdecl, olddecl, newtype, oldtype);
 	  locate_old_decl (olddecl, error);
@@ -1478,16 +1511,23 @@ merge_decls (tree newdecl, tree olddecl, tree newtype, tree oldtype)
 	}
     }
 
+  /* APPLE LOCAL begin peserve invisible flag for gap */
   /* Copy most of the decl-specific fields of NEWDECL into OLDDECL.
-     But preserve OLDDECL's DECL_UID.  */
+     But preserve OLDDECL's DECL_UID, C_DECL_INVISIBLE, and
+     DUPLICATE_DECL.  */
   {
     unsigned olddecl_uid = DECL_UID (olddecl);
+    unsigned olddecl_c_decl_invisible = C_DECL_INVISIBLE (olddecl);
+    unsigned olddecl_duplicate_decl = DECL_DUPLICATE_DECL (olddecl);
 
     memcpy ((char *) olddecl + sizeof (struct tree_common),
 	    (char *) newdecl + sizeof (struct tree_common),
 	    sizeof (struct tree_decl) - sizeof (struct tree_common));
     DECL_UID (olddecl) = olddecl_uid;
+    C_DECL_INVISIBLE (olddecl) = olddecl_c_decl_invisible;
+    DECL_DUPLICATE_DECL (olddecl) = olddecl_duplicate_decl;
   }
+  /* APPLE LOCAL end peserve invisible flag for gap */
 
   /* If OLDDECL had its DECL_RTL instantiated, re-invoke make_decl_rtl
      so that encode_section_info has a chance to look at the new decl
@@ -1723,8 +1763,17 @@ pushdecl (tree x)
  	  tree ext = any_external_decl (name);
 	  if (ext)
 	    {
+  	      /* APPLE LOCAL begin peserve invisible flag for gap */
+	      unsigned old_decl_external = DECL_EXTERNAL(ext);
 	      if (duplicate_decls (x, ext))
+	      {
 		x = copy_node (ext);
+                /* invisible declaration  must remain external in case current decl
+                   is public static. Otherwise, we get duplicate definition. */
+                if (C_DECL_INVISIBLE (ext) && TREE_CODE (ext) == VAR_DECL)
+                  DECL_EXTERNAL(ext) = old_decl_external;
+	      }
+  	      /* APPLE LOCAL end peserve invisible flag for gap */
 	    }
 	  else
 	    record_external_decl (x);
@@ -2233,6 +2282,15 @@ c_init_decl_processing (void)
   make_fname_decl = c_make_fname_decl;
   start_fname_decls ();
 
+  /* APPLE LOCAL begin new tree dump */
+#if 0
+  /* MERGE FIXME: 3468690 */
+  /* For condensed tree dumps with debugger.  */
+  c_prev_lang_dump_tree_p = set_dump_tree_p (c_dump_tree_p);
+  SET_MAX_DMP_TREE_CODE(LAST_C_TREE_CODE);
+#endif
+  /* APPLE LOCAL end new tree dump */
+
   first_builtin_decl = global_scope->names;
   last_builtin_decl = global_scope->names_last;
 }
@@ -2316,6 +2374,7 @@ builtin_function (const char *name, tree type, int function_code,
 
   return decl;
 }
+
 
 /* Called when a declaration is seen that contains no names to declare.
    If its type is a reference to a structure, union or enum inherited
@@ -2505,8 +2564,37 @@ start_decl (tree declarator, tree declspecs, int initialized, tree attributes)
 
   /* An object declared as __attribute__((deprecated)) suppresses
      warnings of uses of other deprecated items.  */
+
+  /* APPLE LOCAL begin unavailable */
+  /* An object declared as __attribute__((unavailable)) suppresses
+     any reports of being declared with unavailable or deprecated
+     items.  An object declared as __attribute__((deprecated))
+     suppresses warnings of uses of other deprecated items.  */
+#ifdef A_LESS_INEFFICENT_WAY /* which I really don't want to do!  */
   if (lookup_attribute ("deprecated", attributes))
     deprecated_state = DEPRECATED_SUPPRESS;
+  else if (lookup_attribute ("unavailable", attributes))
+    deprecated_state = DEPRECATED_UNAVAILABLE_SUPPRESS;
+#else /* a more efficient way doing what lookup_attribute would do */
+  tree a;
+
+  for (a = attributes; a; a = TREE_CHAIN (a))
+    {
+      tree name = TREE_PURPOSE (a);
+      if (TREE_CODE (name) == IDENTIFIER_NODE)
+        if (is_attribute_p ("deprecated", name))
+	  {
+	    deprecated_state = DEPRECATED_SUPPRESS;
+	    break;
+	  }
+        if (is_attribute_p ("unavailable", name))
+	  {
+	    deprecated_state = DEPRECATED_UNAVAILABLE_SUPPRESS;
+	    break;
+	  }
+    }
+#endif
+  /* APPLE LOCAL end unavailable */
 
   decl = grokdeclarator (declarator, declspecs,
 			 NORMAL, initialized, NULL);
@@ -3343,13 +3431,26 @@ grokdeclarator (tree declarator, tree declspecs,
     {
       tree id = TREE_VALUE (spec);
 
-      /* If the entire declaration is itself tagged as deprecated then
-         suppress reports of deprecated items.  */
+      /* APPLE LOCAL begin unavailable */
+      /* If the entire declaration is itself tagged as unavailable then
+         suppress reports of unavailable/deprecated items.  If the
+         entire declaration is tagged as only deprecated we still
+         report unavailable uses.  */
       if (id && TREE_DEPRECATED (id))
         {
-	  if (deprecated_state != DEPRECATED_SUPPRESS)
-	    warn_deprecated_use (id);
+          if (TREE_UNAVAILABLE (id))
+            {
+              if (deprecated_state != DEPRECATED_UNAVAILABLE_SUPPRESS)
+              	warn_unavailable_use (id);
+            }
+          else 
+            {
+              if (deprecated_state != DEPRECATED_SUPPRESS
+                  && deprecated_state != DEPRECATED_UNAVAILABLE_SUPPRESS)
+              	warn_deprecated_use (id);
+           }
         }
+      /* APPLE LOCAL end unavailable */
 
       if (id == ridpointers[(int) RID_INT])
 	explicit_int = 1;
@@ -3478,6 +3579,8 @@ grokdeclarator (tree declarator, tree declspecs,
     {
       specbits &= ~(1 << (int) RID_LONG);
       type = long_double_type_node;
+      /* APPLE LOCAL -Wlong-double dpatel */
+      warn_about_long_double ();
     }
 
   /* Check all other uses of type modifiers.  */
@@ -3662,6 +3765,8 @@ grokdeclarator (tree declarator, tree declspecs,
 		     | 1 << (int) RID_STATIC
 		     | 1 << (int) RID_EXTERN)) == (1 << (int) RID_THREAD))
       nclasses++;
+    /* APPLE LOCAL private extern */
+    if (specbits & 1 << (int) RID_PRIVATE_EXTERN) nclasses++;
 
     /* Warn about storage classes that are invalid for certain
        kinds of declarations (parameters, typenames, etc.).  */
@@ -4366,6 +4471,13 @@ grokdeclarator (tree declarator, tree declspecs,
 	if (defaulted_int)
 	  C_FUNCTION_IMPLICIT_INT (decl) = 1;
 
+	/* APPLE LOCAL begin private extern */
+        DECL_VISIBILITY (decl)
+          = ((specbits & (1 << (int) RID_PRIVATE_EXTERN)) != 0)
+	  ? VISIBILITY_HIDDEN
+	  : VISIBILITY_DEFAULT;
+	/* APPLE LOCAL end private extern */
+
 	/* Record presence of `inline', if it is reasonable.  */
 	if (MAIN_NAME_P (declarator))
 	  {
@@ -4398,7 +4510,9 @@ grokdeclarator (tree declarator, tree declspecs,
       {
 	/* It's a variable.  */
 	/* An uninitialized decl with `extern' is a reference.  */
-	int extern_ref = !initialized && (specbits & (1 << (int) RID_EXTERN));
+	/* APPLE LOCAL private extern */
+	int extern_ref = !initialized && (specbits & ((1 << (int) RID_EXTERN)
+						      | (1 << (int) RID_PRIVATE_EXTERN)));
 
 	/* Move type qualifiers down to element of an array.  */
 	if (TREE_CODE (type) == ARRAY_TYPE && type_quals)
@@ -4436,6 +4550,12 @@ grokdeclarator (tree declarator, tree declspecs,
 	  pedwarn ("%Jvariable '%D' declared `inline'", decl, decl);
 
 	DECL_EXTERNAL (decl) = extern_ref;
+
+	/* APPLE LOCAL private extern */
+        DECL_VISIBILITY (decl)
+	  = ((specbits & (1 << (int) RID_PRIVATE_EXTERN)) != 0)
+	  ? VISIBILITY_HIDDEN
+	  : VISIBILITY_DEFAULT;
 
 	/* At file scope, the presence of a `static' or `register' storage
 	   class specifier, or the absence of all storage class specifiers
@@ -5434,7 +5554,9 @@ start_function (tree declspecs, tree declarator, tree attributes)
       return 0;
     }
 
-  decl_attributes (&decl1, attributes, 0);
+  /* APPLE LOCAL begin weak_import (Radar 2809704) ilr */
+  decl_attributes (&decl1, attributes, (int)ATTR_FLAG_FUNCTION_DEF);
+  /* APPLE LOCAL end weak_import ilr */
 
   if (DECL_DECLARED_INLINE_P (decl1)
       && DECL_UNINLINABLE (decl1)
@@ -6143,6 +6265,13 @@ finish_function (void)
       && current_function_returns_null)
     warning ("this function may return with or without a value");
 
+  /* APPLE LOCAL begin loop transposition */
+  /* Perform loop tranformations before doing inlining, but do not 
+     do it if syntax only is requested. */
+  if (!flag_syntax_only && flag_loop_transpose)
+    loop_transpose(fndecl);
+  /* APPLE LOCAL end loop transposition */
+
   /* Store the end of the function, so that we get good line number
      info for the epilogue.  */
   cfun->function_end_locus = input_location;
@@ -6544,7 +6673,37 @@ link_hash_eq (const void *x1_p, const void *x2_p)
 
 /* Propagate information between definitions and uses between multiple
    translation units in TU_LIST based on linkage rules.  */
+/* APPLE LOCAL rewritten to support -fno-common, no unit-at-a-time.
+   The general idea is to identify the unique definition, and mark 
+   all the other declarations that refer to the same object as duplicates.  
+   varasm emits only non-duplicates.  I think some of the problems are actually
+   connected with unit-at-a-time rather  than no-common, now that you mention it.   
+   The following used to fail and now work:
 
+file1:
+int i2 = 2;    // optionally add 'extern'
+
+file 2:
+extern int i2;     // optionally elide 'extern'
+
+cc file1.c file2.c
+FATAL:  Symbol _i2 already defined.
+
+This is independent of -fno-common.  The order of the files may be interchanged.
+(With -fno-common, the variant where you omit 'extern' in file 2 is of course an
+error, which was and still is detected correctly at compile time.)
+
+file 1:
+int i1;
+
+file 2:
+extern int i1;
+
+cc file1.c file2.c
+6:  Ignoring attempt to redefine symbol.
+
+This used to fail with -fno-common, in either order.
+*/
 void
 merge_translation_unit_decls (void)
 {
@@ -6567,23 +6726,43 @@ merge_translation_unit_decls (void)
 
   link_hash_table = htab_create (1021, link_hash_hash, link_hash_eq, NULL);
 
-  /* Enter any actual definitions into the hash table.  */
+  /* Enter any actual definitions into the hash table.
+     For functions, ignore declarations.  For variables, declarations
+     are kept in the table until a definition is found; duplicate
+     declarations are so marked, so that varasm will emit only one
+     of them.  */
   for (tu = tu_list; tu; tu = TREE_CHAIN (tu))
     for (decl = BLOCK_VARS (DECL_INITIAL (tu)); decl; decl = TREE_CHAIN (decl))
-      if (TREE_PUBLIC (decl) && ! DECL_EXTERNAL (decl))
+      if (TREE_PUBLIC (decl) && 
+	    (TREE_CODE (decl) == VAR_DECL || !DECL_EXTERNAL (decl)))
 	{
 	  PTR *slot;
+	  tree old_decl;
+
+	  /* Insert in table.  Declarations go in.  */
 	  slot = htab_find_slot (link_hash_table, decl, INSERT);
+	  old_decl = *slot;
 
-	  /* If we've already got a definition, work out which one is
-	     the real one, put it into the hash table, and make the
-	     other one DECL_EXTERNAL.  This is important to avoid
-	     putting out two definitions of the same symbol in the
-	     assembly output.  */
-	  if (*slot != NULL)
+	  if (old_decl == NULL)
 	    {
-	      tree old_decl = (tree) *slot;
-
+	      /* New definition or declaration.  */
+	      *slot = decl;
+	    }
+	  else if (old_decl == decl)
+	    /* This currently gets called once per file (seems like 
+	       potentially a big time sink, but doesn't show up as 
+	       such), so this can happen.  */
+	    ;
+	  /* If this is a definition and we've already got a definition, 
+	     work out which one is the real one, put it into the hash 
+	     table, and make the other one DECL_EXTERNAL.  This is 
+	     important to avoid putting out two definitions of the 
+	     same symbol in the assembly output.  */
+	  else if (!DECL_EXTERNAL (old_decl) && !DECL_EXTERNAL (decl))
+	    {
+	      /* Should be from different files.  */
+	      if (DECL_CONTEXT (old_decl) == DECL_CONTEXT (decl))
+		abort ();
 	      /* If this is weak or common or whatever, suppress it
 		 in favor of the other definition.  */
 	      if (DECL_WEAK (decl))
@@ -6601,6 +6780,7 @@ merge_translation_unit_decls (void)
 		  DECL_COMMON (decl) = 0;
 		  DECL_ONE_ONLY (decl) = 0;
 		  DECL_WEAK (decl) = 0;
+		  DECL_DUPLICATE_DECL (decl) = 1;
 		}
 	      else if (DECL_EXTERNAL (old_decl))
 		{
@@ -6608,6 +6788,7 @@ merge_translation_unit_decls (void)
 		  DECL_COMMON (old_decl) = 0;
 		  DECL_ONE_ONLY (old_decl) = 0;
 		  DECL_WEAK (old_decl) = 0;
+		  DECL_DUPLICATE_DECL (old_decl) = 1;
 		  *slot = decl;
 		}
 	      else
@@ -6616,8 +6797,20 @@ merge_translation_unit_decls (void)
 		  error ("%J'%D' previously defined here", old_decl, old_decl);
 		}
 	    }
+	  else if (DECL_EXTERNAL (old_decl))
+	    {
+	      /* Old entry is a declaration.  Mark it duplicate and
+		 replace with new decl (whether declaration or
+		 definition).  */
+	      DECL_DUPLICATE_DECL (old_decl) = 1;
+	      *slot = decl;
+	    }
 	  else
-	    *slot = decl;
+	    {
+	      /* Old entry is definition, new one declaration.
+		 Mark the declaration as a dup.  */
+	      DECL_DUPLICATE_DECL (decl) = 1;
+	    }
 	}
 
   /* Now insert the desired information from all the definitions
@@ -6632,13 +6825,38 @@ merge_translation_unit_decls (void)
 	  if (! global_decl)
 	    continue;
 
-	  /* Print any appropriate error messages, and partially merge
-	     the decls.  */
-	  (void) duplicate_decls (decl, global_decl);
+	  /* APPLE LOCAL begin */
+	  /* For global VARs, make sure DECL_RTL is set; it must be propagated
+	     to all the copies, or aliasing won't work.  */
+	  if (TREE_CODE (global_decl) == VAR_DECL && !DECL_RTL_SET_P (global_decl))
+	    make_decl_rtl (global_decl, 0);
+	  /* APPLE LOCAL end */
+
+	  /* APPLE LOCAL begin fix radar 3645899, IMA problem  */
+	  /* Check to make sure that if either decl is a built-in function
+	     decl, it was not supposed to be disabled by a compiler flag.  If
+	     not, then print any appropriate error messages and partially
+	     merge the decls.  */
+
+	  if ((TREE_CODE (decl) == FUNCTION_DECL && DECL_BUILT_IN (decl))
+	      || (TREE_CODE (global_decl) == FUNCTION_DECL 
+		  && DECL_BUILT_IN (global_decl)))
+	    {
+	      const char *name1, *name2;
+	      name1 = IDENTIFIER_POINTER (DECL_NAME (decl));
+	      name2 = IDENTIFIER_POINTER (DECL_NAME (global_decl));
+	      if (!builtin_function_disabled_p (name1)
+		  && !builtin_function_disabled_p (name2))
+		(void) duplicate_decls (decl, global_decl);
+	    }
+	  else
+	  /* APPLE LOCAL end fix radar 3645899, IMA problem  */
+	    (void) duplicate_decls (decl, global_decl);
 	}
 
   htab_delete (link_hash_table);
 }
+/* APPLE LOCAL end rewrite */
 
 /* Perform final processing on file-scope data.  */
 
@@ -6697,5 +6915,580 @@ c_reset_state (void)
        link = TREE_CHAIN (link))
     pushdecl (copy_node (link));
 }
+
+/* APPLE LOCAL begin loop transposition (currently unsafe) */
+/* This pass on trees is to transpose loops so that memory systems will 
+   not be overtaxed.
+   So it changes:
+    for(i=0;i<size0;i++)
+      for(j=0;j<size1;j++)
+        a = a + pointer[j][i];
+   into
+    for(j=0;j<size1;j++)
+      for(i=0;i<size0;i++)
+	a = a + pointer[j][i];
+
+   and
+    for(i=0;i<size0;i++)
+      {
+        for(j=0;j<size1;j++)
+          {
+            a = a + pointer[j][i];
+          }
+        pointer[i][i] = b * pointer[i][i];
+      }
+   into
+    for(j=0;j<size1;j++)
+      {
+        for(i=0;i<size0;i++)
+          {
+            a = a + pointer[j][i];
+          }
+      }
+    for(j=0;j<size1;j++)
+      {
+        pointer[i][i] = b * pointer[i][i];
+      }
+
+   Note this is experimental because it does not always get it right,
+   but works on SPEC 2000 and the bootstrap of gcc.
+   Here is a case it miscompiles:
+
+    struct {
+	double unew[1782225];
+    } COMMON;
+
+    double swimneg_1()
+    {
+	double ucheck = 0;
+	int i, j;
+	for(i = 1; i <= 1334;i++) {
+	    for(j = 1;j <= 1334;j++) {
+		ucheck += COMMON.unew[(i-1) + 1335*(j-1) ];
+	    }
+	    COMMON.unew[i + 1335*(i)] *= 2;
+	}
+	return ucheck;
+    }
+
+    The loops are incorrectly transposed because it does not know 
+    that the modification of
+    COMMON.unew_[icheck_ + 1335*icheck_] (in the outer loop)
+    needs to be done right after the inner loop. */
+
+static tree
+find_tree_with_code_1 (tree *tp, int *walk_subtrees ATTRIBUTE_UNUSED, 
+		       void *data)
+{
+  if (*tp == NULL_TREE)
+    return NULL_TREE;
+  if (TREE_CODE (*tp) == *((enum tree_code *)data))
+    return *tp;
+  return NULL_TREE;
+}
+
+static tree find_tree_with_code (tree body, enum tree_code code)
+{
+  enum tree_code temp = code;
+  return walk_tree_without_duplicates (&body, find_tree_with_code_1, (void *)&temp);
+}
+
+static tree
+find_pointer (tree t)
+{
+  tree temp2 = find_tree_with_code (t, ARRAY_REF);
+  if (temp2)
+    return TREE_OPERAND (temp2, 0);
+  temp2 = find_tree_with_code (t, INDIRECT_REF);
+  if (temp2)
+    {
+      temp2 = TREE_OPERAND (temp2, 0);
+      if (TREE_CODE (temp2) == PLUS_EXPR)
+	{
+	  temp2 = TREE_OPERAND (temp2, 0);
+	  if (TREE_CODE (temp2) == PARM_DECL || TREE_CODE (temp2) == VAR_DECL)
+	    return temp2;
+	  return find_pointer (temp2);
+	}
+    }
+ return NULL_TREE;
+}
+
+typedef struct should_transpose_for_loops_t
+{
+  tree inner_var;
+  tree outer_var;
+  bool doit;
+  tree already_modified;
+} should_transpose_for_loops_t;
+
+/* If the transposition should be done, set data->doit to true and
+   return NULL.  If it should not, set data->doit to false and 
+   return *tp. */
+
+static tree
+should_transpose_for_loops_1 (tree *tp, int *walk_subtrees, void *data)
+{
+  tree assignment_to = *tp;
+  should_transpose_for_loops_t *temp = (should_transpose_for_loops_t*)data;
+  tree inner_var = temp->inner_var;
+  tree outer_var = temp->outer_var;
+  if (*tp == NULL_TREE)
+    return NULL_TREE;
+  /* We cannot do the transposition if any of these are in the loop. */
+  if (TREE_CODE (*tp) == LABEL_DECL || TREE_CODE (*tp) == GOTO_STMT 
+      || TREE_CODE (*tp) == FOR_STMT || TREE_CODE (*tp) == DO_STMT
+      || TREE_CODE (*tp) == WHILE_STMT || TREE_CODE (*tp) == IF_STMT
+      || TREE_CODE (*tp) == BREAK_STMT || TREE_CODE (*tp) == CONTINUE_STMT 
+      || TREE_CODE (*tp) == RETURN_EXPR)
+    {
+      temp->doit = false;
+      return *tp;
+    }
+  if (TREE_CODE (assignment_to) == MODIFY_EXPR)
+    {
+      tree temp1;
+      tree temp2 = find_pointer (TREE_OPERAND (assignment_to, 0));
+      /* We cannot do the transposition because the pointer temp2 is modified 
+         with a value dependent on itself.
+         (Note this could be better if it is only dependent on a non-forward 
+         loop dependent). */
+      if (temp2 != NULL_TREE 
+          && tree_contains (TREE_OPERAND (assignment_to, 1), temp2))
+        {
+          temp->doit = false;
+          return *tp;
+        }
+      for (temp1 = temp->already_modified;
+	   temp1 != NULL_TREE;
+	   temp1 = TREE_CHAIN (temp1))
+	{
+          tree temp3 = TREE_VALUE(temp1);
+          tree temp4 = TREE_OPERAND (assignment_to, 1);
+          /* We cannot do the transposition because the pointer temp3 is 
+             modified with a value dependent on itself or already has 
+             been modified. */
+          if (tree_contains (temp4, temp3)
+              || (temp2 != NULL_TREE && temp3 == temp2))
+            {
+              temp->doit = false;
+              return *tp;
+            }
+        }
+      /* If it is non-null, add temp2 to the list of already modified 
+	 pointers. */
+      if(temp2 != NULL_TREE)
+	temp->already_modified = 
+	       tree_cons(NULL_TREE, temp2, temp->already_modified);
+    }
+  /* Check for pointer[inner][outer], pointer[inner*outersize+outer] and 
+     array[inner][outer].  */
+  if ((TREE_CODE (assignment_to) == INDIRECT_REF 
+       && TREE_CODE (TREE_OPERAND (assignment_to, 0)) == PLUS_EXPR)
+      || (TREE_CODE (assignment_to) == ARRAY_REF 
+          && TREE_CODE (TREE_OPERAND (assignment_to, 1)) == PLUS_EXPR))
+    {
+      tree plus1_expr_assignment = TREE_OPERAND (assignment_to, 
+                            TREE_CODE (assignment_to) == ARRAY_REF ? 1 : 0);
+      tree side0 = TREE_OPERAND (plus1_expr_assignment, 0);
+      tree side1 = TREE_OPERAND (plus1_expr_assignment, 1);
+      STRIP_NOPS (side0);
+      STRIP_NOPS (side1);
+      /* This handles a[inner][outer].  */
+      if ((TREE_CODE (side0) == INDIRECT_REF
+            && tree_contains (side0, inner_var) 
+            && !tree_contains (side0, outer_var) 
+            && tree_contains (side1, outer_var)
+            && !tree_contains (side1, inner_var))
+          || (TREE_CODE (side1) == INDIRECT_REF
+              && tree_contains (side1, inner_var) 
+              && !tree_contains (side1, outer_var) 
+              && tree_contains (side0, outer_var)
+              && !tree_contains (side0, inner_var)))
+        {
+          *walk_subtrees = 0; /* already walked them */
+          temp->doit = true;
+          return NULL_TREE;
+        } 
+      else
+        {
+          tree side = NULL_TREE;
+          /* Handle array[inner*size+outer+offset] and pointer[inner*size+outer]
+             (FIXME need to handle array[inner*size+outer] 
+             (and pointer[inner*size+outer+offset]?) )*/
+          if (tree_contains (side0, inner_var) 
+              && tree_contains (side0, outer_var))
+            side = side0;
+          else if (tree_contains (side1, inner_var) 
+                   && tree_contains (side1, outer_var))
+            side = side1;
+          if (side && (TREE_CODE (side) == MULT_EXPR))
+            {
+              tree temp0 = TREE_OPERAND (side, 0);
+              tree temp1 = TREE_OPERAND (side, 1);
+              STRIP_NOPS (temp0);
+              STRIP_NOPS (temp1);
+              if (tree_contains (temp0, inner_var) 
+                  && tree_contains (temp0, outer_var))
+                side = temp0;
+              else if (tree_contains (temp1, inner_var) 
+                       && tree_contains (temp1, outer_var))
+                side = temp1;
+              else
+                side = NULL_TREE;
+            }
+          if (side && (TREE_CODE (side) == PLUS_EXPR))
+            {
+              tree side10 = TREE_OPERAND (side, 0);
+              tree side11 = TREE_OPERAND (side, 1);
+              STRIP_NOPS (side10);
+              STRIP_NOPS (side11);
+              if ((TREE_CODE (side10) == MULT_EXPR
+                    && tree_contains (side10, inner_var) 
+                    && !tree_contains (side10, outer_var)
+                    && tree_contains (side11, outer_var)
+		    && !tree_contains (side11, inner_var))
+                  || (TREE_CODE (side11) == MULT_EXPR
+                      && tree_contains (side11, inner_var)  
+                      && !tree_contains (side11, outer_var) 
+                      && tree_contains (side10, outer_var)
+                      && !tree_contains (side10, inner_var)))
+                {
+                  *walk_subtrees = 0; /* already walked them */
+                  temp->doit = true;
+                  return NULL;
+                }
+              else
+                {
+                  temp->doit = false;
+                  return *tp;
+                }
+            }
+        }
+    }
+  /* We cannot do the transposition if there is an assignment to the 
+     outer_var or inner_var.  */
+  if (TREE_CODE (assignment_to) == MODIFY_EXPR)
+    {
+      tree side1 = TREE_OPERAND (assignment_to, 1);
+      STRIP_NOPS (side1);
+      if (side1 == outer_var || side1 == inner_var)
+        {
+          temp->doit = false;
+          return *tp;
+        }
+    }
+  return NULL_TREE;
+}
+
+/* Return true if the loops should be interchanged based on body, inner
+   variable and outer variable, and also set already_modified to the pointers
+   that are modified during the loop.  */
+
+static bool
+should_transpose_for_loops (tree body, tree inner_var, tree outer_var, 
+			    tree *already_modified)
+{
+  should_transpose_for_loops_t temp;
+  temp.inner_var = inner_var;
+  temp.outer_var = outer_var;
+  temp.already_modified = *already_modified;
+  temp.doit = false;
+  if (walk_tree (&body, should_transpose_for_loops_1, &temp, NULL))
+    return false;
+  *already_modified = temp.already_modified;
+  return temp.doit;
+}
+
+static tree
+tree_contains_1 (tree *tp, int *walk_subtrees ATTRIBUTE_UNUSED, void *data)
+{
+  if (*tp == data)
+    return data;
+  return NULL_TREE;
+}
+
+static bool
+tree_contains (tree body, tree x)
+{
+  return walk_tree_without_duplicates (&body, tree_contains_1, (void *)x)
+       != NULL_TREE;
+}
+
+/* Look for two nested loops and transpose them if this is a good idea. 
+   Currently limited to FOR statements in C.  */
+
+static tree
+perform_loop_transpose (tree *tp, int *walk_subtrees, 
+			void *data ATTRIBUTE_UNUSED)
+{
+  tree already_modified = NULL_TREE;
+  if (*tp == NULL_TREE)
+    return NULL_TREE;
+  if (TREE_CODE (*tp) == FOR_STMT)
+    {
+      tree outer_loop = *tp;
+      tree inner_loop = TREE_OPERAND (outer_loop, 3);
+      tree before_inner_loop = NULL_TREE;
+      tree right_before_inner_loop = NULL_TREE;
+      /* If the loops contains a call or an if statement or is empty, 
+         do not do the transposition.  */
+      if (inner_loop == NULL_TREE 
+          || find_tree_with_code (inner_loop, CALL_EXPR) != NULL_TREE
+          || find_tree_with_code (inner_loop, IF_STMT) != NULL_TREE)
+          return NULL_TREE;
+      /* A compound stmt after the outer for loop.  */
+      if (TREE_CODE (inner_loop) == COMPOUND_STMT 
+          && TREE_OPERAND (inner_loop, 0) != NULL_TREE
+          && TREE_CODE (TREE_OPERAND (inner_loop, 0)) == SCOPE_STMT)
+        {
+          tree previous = NULL_TREE;
+          before_inner_loop = TREE_OPERAND (inner_loop, 0);
+          
+          /* If the outer loop contains variable definitions, do not 
+             do the transposition.  FIXME: if the only definition is
+             the inner loop variable we could do it.  */
+          if (TREE_OPERAND (before_inner_loop, 0) != NULL_TREE)
+	    return NULL_TREE;
+          
+          /* Find the inner loop if there is any.
+             FIXME: will not work if the inner loop is another compound loop.  */
+          for (inner_loop = before_inner_loop;
+               inner_loop != NULL_TREE && TREE_CODE (inner_loop) != FOR_STMT;
+               inner_loop = TREE_CHAIN (inner_loop))
+	    previous = inner_loop;
+          
+          /* If there is no inner loop do not do anything.  */
+          if (inner_loop == NULL_TREE)
+	    return NULL_TREE;
+          
+          /* If the inner_loop is equal to the start of the compound 
+             statement set the start to NULL. */
+          if (inner_loop == before_inner_loop)
+            before_inner_loop = NULL_TREE;
+          
+          right_before_inner_loop = previous;
+        }
+      /* We found the inner loop.  */
+      if (inner_loop != NULL_TREE && TREE_CODE (inner_loop) == FOR_STMT)
+        {
+          tree outer_init = TREE_OPERAND (outer_loop, 0);
+          tree inner_init = TREE_OPERAND (inner_loop, 0);
+          /* FIXME: does not handle C99/C++ style for init statements */
+          if (outer_init != NULL_TREE && inner_init != NULL_TREE
+              && TREE_CODE (outer_init) == EXPR_STMT 
+              && TREE_CODE (inner_init) == EXPR_STMT)
+            {
+              tree outer_init_expr = TREE_OPERAND (outer_init, 0);
+              tree inner_init_expr = TREE_OPERAND (inner_init, 0);
+              if (outer_init_expr != NULL_TREE && inner_init_expr != NULL_TREE
+                  && TREE_CODE (inner_init_expr) == MODIFY_EXPR
+                  && TREE_CODE (outer_init_expr) == MODIFY_EXPR)
+                {
+                  tree outer_var = TREE_OPERAND (outer_init_expr, 0);
+                  tree inner_var = TREE_OPERAND (inner_init_expr, 0);
+                  /* The inner_var should be independent of outer_var */
+                  if (!tree_contains (TREE_OPERAND (inner_init_expr, 1), 
+                                      outer_var)
+                      && !tree_contains (TREE_OPERAND (inner_loop, 1), 
+                                         outer_var)
+                      && !tree_contains (TREE_OPERAND (inner_loop, 2), 
+                                         outer_var)
+                      /* The outer loop variable should be independent of 
+                         inner_var also. */
+                      && !tree_contains (TREE_OPERAND (outer_loop, 1), 
+                                         inner_var)
+                      && !tree_contains (TREE_OPERAND (outer_loop, 2), 
+                                         inner_var))
+                    {
+                      tree inner_loop_body = TREE_OPERAND (inner_loop, 3);
+                      if (should_transpose_for_loops (inner_loop_body, 
+                               inner_var, outer_var, &already_modified))
+                        {
+                          tree newouter;
+                          tree newinner;
+                          /* Is the outter loop's body a compound statement?  */
+                          if (TREE_CODE (TREE_OPERAND (outer_loop, 3)) 
+                              == COMPOUND_STMT)
+                            {
+                              tree after_loop = TREE_CHAIN (inner_loop);
+                              tree find;
+                              tree allloops_stmt;
+                              tree outloopafter;
+                              tree outloopbefore;
+                              allloops_stmt = build_stmt (COMPOUND_STMT, 
+                                                          NULL_TREE);
+                              outloopbefore = build_stmt (FOR_STMT, outer_init,
+                                                 TREE_OPERAND (outer_loop, 1),
+                                                 TREE_OPERAND (outer_loop, 2), 
+                                                 NULL_TREE);
+			      /* Use copies of the loop test
+				 expression (TREE_OPERAND #1) for
+				 these, lest the tree-profiler mix the
+				 execution counts of two different
+				 loops.  */
+                              outloopafter = build_stmt (FOR_STMT, outer_init,
+                                                 copy_node (TREE_OPERAND (outer_loop, 1)),
+                                                 TREE_OPERAND (outer_loop, 2), 
+                                                 NULL_TREE);
+                              newinner = build_stmt (FOR_STMT, outer_init,
+					         copy_node (TREE_OPERAND (outer_loop, 1)),
+                                                 TREE_OPERAND (outer_loop, 2), 
+                                                 inner_loop_body);
+                              newouter = build_stmt (FOR_STMT, inner_init, 
+                                                 TREE_OPERAND (inner_loop, 1),
+                                                 TREE_OPERAND (inner_loop, 2), 
+                                                 newinner);
+                              /* This new compound statement has no scope. */
+                              COMPOUND_STMT_NO_SCOPE (allloops_stmt) = 1;
+                              /* Move to the next statement in the chain of 
+                                 before_inner_loop if it is a scope statement */
+                              if (before_inner_loop != NULL_TREE 
+                                  && TREE_CODE (before_inner_loop) 
+                                     == SCOPE_STMT)
+                                {
+                                  if (right_before_inner_loop != NULL_TREE)
+                                    TREE_CHAIN (right_before_inner_loop) 
+                                       = NULL_TREE;
+                                  before_inner_loop 
+                                      = TREE_CHAIN (before_inner_loop);
+                                }
+                              /* Are there statements before the inner loop? */
+                              if (before_inner_loop != NULL_TREE)
+                                {
+                                  tree beforeloopbody 
+                                     = build_stmt (COMPOUND_STMT, NULL_TREE);
+                                  COMPOUND_STMT_NO_SCOPE (beforeloopbody) = 1;
+                                  beforeloopbody 
+                                     = build_stmt (COMPOUND_STMT, NULL_TREE);
+                                  COMPOUND_BODY (beforeloopbody) 
+                                     = before_inner_loop;
+                                  FOR_BODY (outloopbefore) = beforeloopbody;
+				  /* If the outer loop body depends on the inner
+				     variable we can't do the transposition. */
+				  if (tree_contains (outloopbefore, inner_var))
+				    return NULL_TREE;
+
+                                  for (find = already_modified;
+                                       find != NULL_TREE;
+                                       find = TREE_CHAIN (find))
+				    {
+                                      tree temp3 = TREE_VALUE(find);
+                                      if (tree_contains(outloopbefore, temp3))
+					/* We cannot do the transposition
+					   because there is a reference to
+					   something modified in the outer loop. */
+					return NULL_TREE;
+				    }
+                                  /* If the new before loop body is independent
+                                     of the outer variable, remove the loop 
+                                     and make the body the first statement in 
+                                     the chain of all the statements. */
+                                  if (!tree_contains (beforeloopbody, 
+                                                      outer_var))
+                                    {
+                                      COMPOUND_BODY (allloops_stmt) 
+                                           = beforeloopbody;
+                                      TREE_CHAIN (beforeloopbody) = newouter;
+                                    } 
+                                  else
+                                    {
+                                      COMPOUND_BODY (allloops_stmt) 
+                                          = outloopbefore;
+                                      TREE_CHAIN (outloopbefore) = newouter;
+                                    }
+                                }
+                              else
+				{
+				  COMPOUND_BODY (allloops_stmt) = newouter;
+				  outloopbefore = NULL_TREE;
+                                }
+                              if (after_loop != NULL_TREE 
+                                  && TREE_CHAIN (after_loop) == NULL_TREE)
+                                {
+                                  if (TREE_CODE (after_loop) != SCOPE_STMT)
+				    FOR_BODY (outloopafter) = after_loop;
+                                  else
+				    outloopafter = NULL_TREE;
+                                 } 
+                               else
+                                 {
+                                   tree afterloopbody 
+                                       = build_stmt (COMPOUND_STMT, NULL_TREE);
+                                   tree temp5;
+                                   COMPOUND_STMT_NO_SCOPE (afterloopbody) = 1;
+                                   COMPOUND_BODY (afterloopbody) = after_loop;
+                                   FOR_BODY (outloopafter) = afterloopbody;
+                                   for (temp5 = after_loop;
+                                        temp5 != NULL_TREE;
+                                        temp5 = TREE_CHAIN (temp5))
+                                     if (TREE_CODE (TREE_CHAIN (temp5)) 
+                                           == SCOPE_STMT)
+                                       TREE_CHAIN (temp5) = NULL_TREE;
+				   /* If the outer loop body depends on the inner
+				      variable, we cannot do the transposition. */
+				   if (tree_contains (afterloopbody, inner_var))
+				     return NULL_TREE;
+				   /* FIXME: need to check for the afterloopbody
+				      containing a pointer that gets modified
+				      before the inner loop has a chance to
+				      read it. */
+                                   for (find = already_modified;
+                                        find != NULL_TREE;
+                                        find = TREE_CHAIN (find))
+                                     {
+                                       tree temp3 = TREE_VALUE(find);
+				       /* If something references something that
+					  is stored into we cannot do the
+					  transposition. */
+                                       if (tree_contains(afterloopbody, temp3))
+					 return NULL_TREE;
+                                     }
+                                   /* If the stuff after the inner_loop is not 
+                                      dependent on the loop variable pull it 
+                                      out of the loop. */
+                                   if (!tree_contains (afterloopbody, outer_var))
+				     outloopafter = afterloopbody;
+                                }
+                              TREE_CHAIN (newouter) = outloopafter;
+                              if (outloopafter == NULL_TREE 
+                                  && outloopbefore == NULL_TREE)
+                                  allloops_stmt = newouter;
+                              TREE_CHAIN (allloops_stmt) 
+                                   = TREE_CHAIN (outer_loop);
+                              *walk_subtrees = 0;
+                              *tp = allloops_stmt;
+                              return NULL_TREE;
+                            }
+                          /* Do the transposition. */
+                          newinner = build_stmt (FOR_STMT, outer_init,
+                                                 TREE_OPERAND (outer_loop, 1),
+                                                 TREE_OPERAND (outer_loop, 2), 
+                                                 inner_loop_body);
+                          newouter = build_stmt (FOR_STMT, inner_init, 
+                                                 TREE_OPERAND (inner_loop, 1),
+                                                 TREE_OPERAND (inner_loop, 2), 
+                                                 newinner);
+                          TREE_CHAIN (newouter) = TREE_CHAIN (outer_loop);
+                          *tp = newouter;
+                          *walk_subtrees = 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+  return NULL_TREE;
+}
+
+/* The main entry point for the transposition.  */
+void
+loop_transpose (tree fn)
+{
+  /*timevar_push (TV_LOOP_TRANSPOSE);*/
+  walk_tree (&DECL_SAVED_TREE (fn), perform_loop_transpose, NULL, NULL);
+  /*timevar_pop (TV_LOOP_TRANSPOSE);*/
+}
+/* APPLE LOCAL end loop transposition */
 
 #include "gt-c-decl.h"

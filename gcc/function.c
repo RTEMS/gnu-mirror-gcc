@@ -602,6 +602,23 @@ assign_stack_local (enum machine_mode mode, HOST_WIDE_INT size, int align)
 {
   return assign_stack_local_1 (mode, size, align, cfun);
 }
+
+/* APPLE LOCAL begin new function for rs6000 consumption */
+/* Wrapper around assign_stack_local_1;  assign a local stack slot for the
+   current function, then set the mem_alias to a new alias set.
+   This can be used only in situations where the target code can
+   guarantee that the slot is used in a way that cannot conflict
+   with anything else.  */
+
+rtx
+assign_stack_local_with_alias (enum machine_mode mode, HOST_WIDE_INT size, 
+			       int align)
+{
+  rtx mem = assign_stack_local_1 (mode, size, align, cfun);
+  set_mem_alias_set (mem, new_alias_set ());
+  return mem;
+}
+/* APPLE LOCAL end new function for rs6000 consumption */
 
 /* Allocate a temporary stack slot and record it for possible later
    reuse.
@@ -4223,6 +4240,10 @@ assign_parms (tree fndecl)
   int reg_parm_stack_space ATTRIBUTE_UNUSED = 0;
   rtx conversion_insns = 0;
 
+  /* APPLE LOCAL begin Altivec */
+  int pass, last_pass;
+  /* APPLE LOCAL end Altivec */
+
   /* Nonzero if function takes extra anonymous args.
      This means the last named arg must be on the stack
      right before the anonymous ones.  */
@@ -4282,7 +4303,14 @@ assign_parms (tree fndecl)
      caller did.  */
   current_function_pretend_args_size = 0;
 
-  for (parm = fnargs; parm; parm = TREE_CHAIN (parm))
+  /* APPLE LOCAL begin Altivec */
+  /* In first pass over formal arguments, only consider non-vector args.
+     In 2nd pass, if needed, consider all vector args. */
+  last_pass = 1;
+  for (pass = 1; pass <= last_pass; pass++)
+  {
+  /* APPLE LOCAL end Altivec */
+    for (parm = fnargs; parm; parm = TREE_CHAIN (parm))
     {
       rtx entry_parm;
       rtx stack_parm;
@@ -4344,6 +4372,11 @@ assign_parms (tree fndecl)
 	  DECL_INCOMING_RTL (parm) = DECL_RTL (parm);
 	  continue;
 	}
+
+      /* APPLE LOCAL begin Altivec */
+      if (!stdarg && targetm.calls.skip_vec_args (passed_type, pass, &last_pass))
+	continue;
+      /* APPLE LOCAL end Altivec */
 
       /* If the parm is to be passed as a transparent union, use the
 	 type of the first field for the tests below.  We have already
@@ -5140,6 +5173,9 @@ assign_parms (tree fndecl)
 	  SET_DECL_RTL (parm, stack_parm);
 	}
     }
+  /* APPLE LOCAL begin Altivec */
+  }
+  /* APPLE LOCAL end Altivec */
 
   if (SPLIT_COMPLEX_ARGS && fnargs != orig_fnargs)
     {
@@ -5205,6 +5241,8 @@ assign_parms (tree fndecl)
   /* We have aligned all the args, so add space for the pretend args.  */
   stack_args_size.constant += extra_pretend_bytes;
   current_function_args_size = stack_args_size.constant;
+  /* APPLE LOCAL sibcall 3007352 */
+  cfun->unrounded_args_size = stack_args_size.constant;
 
   /* Adjust function incoming argument size for alignment and
      minimum length.  */
@@ -6438,7 +6476,6 @@ expand_function_start (tree subr, int parms_have_cleanups)
   if (cfun->static_chain_decl)
     {
       rtx x;
-
       expand_var (cfun->static_chain_decl);
       x = expand_expr (cfun->static_chain_decl, NULL_RTX,
 		       VOIDmode, EXPAND_WRITE);

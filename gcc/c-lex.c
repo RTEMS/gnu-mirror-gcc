@@ -41,6 +41,10 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "tm_p.h"
 #include "splay-tree.h"
 #include "debug.h"
+/* APPLE LOCAL begin AltiVec */
+#include "target.h"
+#include "cpphash.h"
+/* APPLE LOCAL end AltiVec */
 
 /* We may keep statistics about how long which files took to compile.  */
 static int header_time, body_time;
@@ -106,6 +110,24 @@ init_c_lex (void)
       cb->define = cb_define;
       cb->undef = cb_undef;
     }
+
+  /* APPLE LOCAL begin Symbol Separation */
+  /* Set up call back routines. These routines are used when separate symbol
+     repositories are used.  */
+  if (write_symbols != NO_DEBUG)
+    {
+      cb->restore_write_symbols = cb_restore_write_symbols;
+      cb->clear_write_symbols = cb_clear_write_symbols;
+      cb->is_builtin_identifier = cb_is_builtin_identifier;
+      cb->start_symbol_repository = cb_start_symbol_repository;
+      cb->end_symbol_repository = cb_end_symbol_repository;
+      if (flag_grepository)
+	{
+	  cpp_options *options = cpp_get_options (parse_in);
+	  options->use_ss = 1;
+	}
+    }
+  /* APPLE LOCAL end Symbol Separation */
 }
 
 struct c_fileinfo *
@@ -177,7 +199,8 @@ cb_ident (cpp_reader *pfile ATTRIBUTE_UNUSED,
     {
       /* Convert escapes in the string.  */
       cpp_string cstr = { 0, 0 };
-      if (cpp_interpret_string (pfile, str, 1, &cstr, false))
+      /* APPLE LOCAL pascal strings */
+      if (cpp_interpret_string (pfile, str, 1, &cstr, false, false))
 	{
 	  ASM_OUTPUT_IDENT (asm_out_file, (const char *) cstr.text);
 	  free ((void *)cstr.text);
@@ -298,18 +321,71 @@ cb_undef (cpp_reader *pfile ATTRIBUTE_UNUSED, source_location loc,
 			 (const char *) NODE_NAME (node));
 }
 
+/* APPLE LOCAL begin AltiVec */
+/* We need a small circular buffer for lookaheads (and lookbacks).  */
+
+#define C_LEX_BUFCAPACITY 16
+#define C_LEX_OFFS_BOUND(OFFS)		\
+	((OFFS) >= 0 			\
+	 ? (OFFS) % C_LEX_BUFCAPACITY	\
+	 : (OFFS) + C_LEX_BUFCAPACITY)
+
+static int c_lex_buf_beg = 0, c_lex_buf_end = 0;
+static const cpp_token *c_lex_buf[C_LEX_BUFCAPACITY];
+
 static inline const cpp_token *
-get_nonpadding_token (void)
+get_nonpadding_token (int from_buffer)
 {
   const cpp_token *tok;
+
   timevar_push (TV_CPP);
-  do
-    tok = cpp_get_token (parse_in);
-  while (tok->type == CPP_PADDING);
+  if (from_buffer && c_lex_buf_beg != c_lex_buf_end)
+    {
+      tok = c_lex_buf[c_lex_buf_beg++];
+      c_lex_buf_beg = C_LEX_OFFS_BOUND (c_lex_buf_beg);
+    }
+  else
+    {
+      do
+	tok = cpp_get_token (parse_in);
+      while (tok->type == CPP_PADDING);
+      c_lex_buf[c_lex_buf_end++] = tok;
+      c_lex_buf_end = C_LEX_OFFS_BOUND (c_lex_buf_end);
+      if (from_buffer)
+	c_lex_buf_beg = c_lex_buf_end;
+    }
   timevar_pop (TV_CPP);
+  return tok;
+}  
+
+const cpp_token *
+c_lex_peek (int offset)
+{
+  const cpp_token *tok;
+
+  if (offset >= 0)
+    {
+      while (C_LEX_OFFS_BOUND (c_lex_buf_end - c_lex_buf_beg) < offset + 1)
+	get_nonpadding_token (0);
+      tok = c_lex_buf[C_LEX_OFFS_BOUND (c_lex_buf_beg + offset)];
+    }
+  else
+    tok = c_lex_buf[C_LEX_OFFS_BOUND (c_lex_buf_end + offset)];
 
   return tok;
 }
+
+void
+c_lex_prepend (const cpp_token *tok_array, int size)
+{
+  while (size--)
+    {
+      --c_lex_buf_beg;
+      c_lex_buf_beg = C_LEX_OFFS_BOUND (c_lex_buf_beg);
+      c_lex_buf[c_lex_buf_beg] = &tok_array[size];
+    }
+}
+/* APPLE LOCAL end AltiVec */
 
 int
 c_lex_with_flags (tree *value, unsigned char *cpp_flags)
@@ -319,12 +395,24 @@ c_lex_with_flags (tree *value, unsigned char *cpp_flags)
   static bool no_more_pch;
 
  retry:
-  tok = get_nonpadding_token ();
+  tok = get_nonpadding_token (1);
 
  retry_after_at:
   switch (tok->type)
     {
     case CPP_NAME:
+      /* APPLE LOCAL begin AltiVec */
+      /* Conditional macros are expanded whenever a call-back predicate
+	 says they should be.  */
+      if ((tok->val.node->flags & NODE_DISABLED)
+        && (*targetm.expand_macro_p) (tok))
+	{
+	  c_lex_prepend (tok->val.node->value.macro->exp.tokens,
+			 tok->val.node->value.macro->count);
+	  goto retry;
+	}
+      /* APPLE LOCAL end AltiVec */
+
       *value = HT_IDENT_TO_GCC_IDENT (HT_NODE (tok->val.node));
       break;
 
@@ -356,7 +444,8 @@ c_lex_with_flags (tree *value, unsigned char *cpp_flags)
     case CPP_ATSIGN:
       /* An @ may give the next token special significance in Objective-C.  */
       atloc = input_location;
-      tok = get_nonpadding_token ();
+      /* APPLE LOCAL AltiVec */
+      tok = get_nonpadding_token (1);
       if (c_dialect_objc ())
 	{
 	  tree val;
@@ -646,7 +735,8 @@ static enum cpp_ttype
 lex_string (const cpp_token *tok, tree *valp, bool objc_string)
 {
   tree value;
-  bool wide = false;
+  /* APPLE LOCAL pascal strings */
+  bool wide = false, pascal_p = false;
   size_t count = 1;
   struct obstack str_ob;
   cpp_string istr;
@@ -658,12 +748,18 @@ lex_string (const cpp_token *tok, tree *valp, bool objc_string)
 
   if (tok->type == CPP_WSTRING)
     wide = true;
+  /* APPLE LOCAL begin pascal strings */
+  else if (CPP_OPTION (parse_in, pascal_strings)
+	   && str.text[1] == '\\' && str.text[2] == 'p')
+    pascal_p = true;
+  /* APPLE LOCAL AltiVec */
 
-  tok = get_nonpadding_token ();
+  tok = get_nonpadding_token (1);
   if (c_dialect_objc () && tok->type == CPP_ATSIGN)
     {
       objc_string = true;
-      tok = get_nonpadding_token ();
+      /* APPLE LOCAL AltiVec */
+      tok = get_nonpadding_token (1);
     }
   if (tok->type == CPP_STRING || tok->type == CPP_WSTRING)
     {
@@ -677,11 +773,13 @@ lex_string (const cpp_token *tok, tree *valp, bool objc_string)
 	    wide = true;
 	  obstack_grow (&str_ob, &tok->val.str, sizeof (cpp_string));
 
-	  tok = get_nonpadding_token ();
+	  /* APPLE LOCAL ALtiVec */	  
+	  tok = get_nonpadding_token (1);
 	  if (c_dialect_objc () && tok->type == CPP_ATSIGN)
 	    {
 	      objc_string = true;
-	      tok = get_nonpadding_token ();
+		 /* APPLE LOCAL AltiVec */
+	      tok = get_nonpadding_token (1);
 	    }
 	}
       while (tok->type == CPP_STRING || tok->type == CPP_WSTRING);
@@ -691,12 +789,18 @@ lex_string (const cpp_token *tok, tree *valp, bool objc_string)
   /* We have read one more token than we want.  */
   _cpp_backup_tokens (parse_in, 1);
 
+  /* APPLE LOCAL begin pascal strings */
+  if (wide || objc_string)
+    pascal_p = false;
+  /* APPLE LOCAL end pascal strings */
+    
   if (count > 1 && !objc_string && warn_traditional && !in_system_header)
     warning ("traditional C rejects string constant concatenation");
 
   if ((c_lex_string_translate
        ? cpp_interpret_string : cpp_interpret_string_notranslate)
-      (parse_in, strs, count, &istr, wide))
+      /* APPLE LOCAL pascal strings */
+      (parse_in, strs, count, &istr, wide, pascal_p))
     {
       value = build_string (istr.len, (char *)istr.text);
       free ((void *)istr.text);
@@ -715,7 +819,11 @@ lex_string (const cpp_token *tok, tree *valp, bool objc_string)
 	value = build_string (1, "");
     }
 
-  TREE_TYPE (value) = wide ? wchar_array_type_node : char_array_type_node;
+  /* APPLE LOCAL begin pascal strings */
+  TREE_TYPE (value) = wide ? wchar_array_type_node
+			   : pascal_p ? pascal_string_type_node
+				      : char_array_type_node;
+  /* APPLE LOCAL end pascal strings */
   *valp = fix_string_type (value);
 
   if (strs != &str)
@@ -755,3 +863,17 @@ lex_charconst (const cpp_token *token)
   TREE_TYPE (value) = type;
   return value;
 }
+
+/* APPLE LOCAL begin Symbol Separation */
+
+/* Write context information in .cinfo file.
+   Use PCH routines directly. But set and restore cinfo_state before using them.  */
+void
+c_common_write_context (void)
+{
+  /* MERGE FIXME: This used to say 'lineno', not '0', but now we don't
+     have a 'lineno' variable (and it was probably always wrong).  */
+  (*debug_hooks->end_symbol_repository) (0);
+  cpp_write_symbol_deps (parse_in);
+}
+/* APPLE LOCAL end Symbol Separation */
