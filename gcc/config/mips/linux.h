@@ -127,7 +127,7 @@ void FN ()							\
 	builtin_define_std ("linux");				\
 	builtin_assert ("system=linux");			\
 	/* The GNU C++ standard library requires this.  */	\
-	if (c_language = clk_cplusplus)				\
+	if (c_language == clk_cplusplus)			\
 	  builtin_define ("_GNU_SOURCE");			\
 								\
       if (mips_abi == ABI_N32)					\
@@ -252,3 +252,10 @@ void FN ()							\
 /* The current Linux binutils uses MIPS_STABS_ELF and doesn't support
    COFF.  */
 #undef SDB_DEBUGGING_INFO
+
+#undef LIB_SPEC
+#define LIB_SPEC "\
+%{shared: -lc} \
+%{!static:-rpath-link %R/lib:%R/usr/lib} \
+%{!shared: %{pthread:-lpthread} \
+  %{profile:-lc_p} %{!profile: -lc}}"
