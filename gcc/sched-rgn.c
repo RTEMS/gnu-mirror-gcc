@@ -626,7 +626,8 @@ find_rgns (edge_list, dom)
   int *max_hdr, *dfs_nr, *stack, *degree;
   char no_loops = 1;
   int node, child, loop_head, i, head, tail;
-  int count = 0, sp, idx = 0, current_edge = out_edges[0];
+  int count = 0, sp, idx = 0;
+  int current_edge = out_edges[ENTRY_BLOCK_PTR->succ->dest->index];
   int num_bbs, num_insns, unreachable;
   int too_large_failure;
   basic_block bb;
@@ -1967,7 +1968,8 @@ static int schedule_more_p PARAMS ((void));
 static const char *rgn_print_insn PARAMS ((rtx, int));
 static int rgn_rank PARAMS ((rtx, rtx));
 static int contributes_to_priority PARAMS ((rtx, rtx));
-static void compute_jump_reg_dependencies PARAMS ((rtx, regset));
+static void compute_jump_reg_dependencies PARAMS ((rtx, regset, regset,
+						   regset));
 
 /* Return nonzero if there are more insns that should be scheduled.  */
 
@@ -2254,12 +2256,16 @@ contributes_to_priority (next, insn)
   return BLOCK_NUM (next) == BLOCK_NUM (insn);
 }
 
-/* INSN is a JUMP_INSN.  Store the set of registers that must be considered
-   to be set by this jump in SET.  */
+/* INSN is a JUMP_INSN, COND_SET is the set of registers that are
+   conditionally set before INSN.  Store the set of registers that
+   must be considered as used by this jump in USED and that of
+   registers that must be considered as set in SET.  */
 
 static void
-compute_jump_reg_dependencies (insn, set)
+compute_jump_reg_dependencies (insn, cond_set, used, set)
      rtx insn ATTRIBUTE_UNUSED;
+     regset cond_set ATTRIBUTE_UNUSED;
+     regset used ATTRIBUTE_UNUSED;
      regset set ATTRIBUTE_UNUSED;
 {
   /* Nothing to do here, since we postprocess jumps in

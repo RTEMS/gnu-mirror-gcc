@@ -137,7 +137,7 @@ extern int target_flags;
   {"relax-immediates",      RELAX_IMM_BIT,				\
      "" },								\
   {"no-relax-immediates", - RELAX_IMM_BIT,				\
-     N_("Do not arbitary sized immediates in bit operations") },	\
+     N_("Do not arbitrary sized immediates in bit operations") },	\
   {"wide-bitfields",        W_FIELD_BIT,				\
      N_("Always treat bit-field as int-sized") },			\
   {"no-wide-bitfields",   - W_FIELD_BIT,				\
@@ -610,7 +610,8 @@ extern const enum reg_class reg_class_from_letter[];
 /* Return the register class of a scratch register needed to copy IN into
    or out of a register in CLASS in MODE.  If it can be done directly,
    NO_REGS is returned.  */
-#define SECONDARY_RELOAD_CLASS(CLASS, MODE, X) NO_REGS
+#define SECONDARY_RELOAD_CLASS(CLASS, MODE, X) \
+  mcore_secondary_reload_class (CLASS, MODE, X)
 
 /* Return the maximum number of consecutive registers
    needed to represent mode MODE in a register of class CLASS. 
