@@ -70,7 +70,7 @@ extern const char * const *h8_reg_names;
     }							\
   while (0)
 
-#define LINK_SPEC "%{mh:-m h8300h} %{ms:-m h8300s}"
+#define LINK_SPEC "%{mh:%{mn:-m h8300hn}} %{mh:%{!mn:-m h8300h}} %{ms:%{mn:-m h8300sn}} %{ms:%{!mn:-m h8300s}}"
 
 #define LIB_SPEC "%{mrelax:-relax} %{g:-lg} %{!p:%{!pg:-lc}}%{p:-lc_p}%{pg:-lc_p}"
 
@@ -792,8 +792,7 @@ struct cum_arg
        /* We handle signed and unsigned offsets here.  */	\
        && INTVAL (X) > (TARGET_H8300 ? -0x10000 : -0x1000000)	\
        && INTVAL (X) < (TARGET_H8300 ? 0x10000 : 0x1000000))	\
-   || ((GET_CODE (X) == HIGH || GET_CODE (X) == CONST)		\
-       && TARGET_H8300))
+   || (GET_CODE (X) == HIGH || GET_CODE (X) == CONST))
 
 /* Nonzero if the constant value X is a legitimate general operand.
    It is given that X satisfies CONSTANT_P or is a CONST_DOUBLE.  */
@@ -1074,7 +1073,7 @@ struct cum_arg
 #define ASM_APP_OFF "; #NO_APP\n"
 
 #define FILE_ASM_OP "\t.file\n"
-#define IDENT_ASM_OP "\t.ident\n"
+#define IDENT_ASM_OP "\t.ident\t"
 
 /* The assembler op to get a word, 2 bytes for the H8/300, 4 for H8/300H.  */
 #define ASM_WORD_OP							\

@@ -615,6 +615,7 @@ static int cprop		PARAMS ((int));
 static int one_cprop_pass	PARAMS ((int, int));
 static bool constprop_register	PARAMS ((rtx, rtx, rtx, int));
 static struct expr *find_bypass_set PARAMS ((int, int));
+static bool reg_killed_on_edge	    PARAMS ((rtx, edge));
 static int bypass_block		    PARAMS ((basic_block, rtx, rtx));
 static int bypass_conditional_jumps PARAMS ((void));
 static void alloc_pre_mem	PARAMS ((int, int));
@@ -699,6 +700,7 @@ static void free_insn_expr_list_list	PARAMS ((rtx *));
 static void clear_modify_mem_tables	PARAMS ((void));
 static void free_modify_mem_tables	PARAMS ((void));
 static rtx gcse_emit_move_after		PARAMS ((rtx, rtx, rtx));
+static void local_cprop_find_used_regs	PARAMS ((rtx *, void *));
 static bool do_local_cprop		PARAMS ((rtx, rtx, int, rtx*));
 static bool adjust_libcall_notes	PARAMS ((rtx, rtx, rtx, rtx*));
 static void local_cprop_pass		PARAMS ((int));
@@ -3932,6 +3934,15 @@ try_replace_reg (from, to, insn)
   if (num_changes_pending () && apply_change_group ())
     success = 1;
 
+  /* Try to simplify SET_SRC if we have substituted a constant.  */
+  if (success && set && CONSTANT_P (to))
+    {
+      src = simplify_rtx (SET_SRC (set));
+
+      if (src)
+	validate_change (insn, &SET_SRC (set), src, 0);
+    }
+
   if (!success && set && reg_mentioned_p (from, SET_SRC (set)))
     {
       /* If above failed and this is a single set, try to simplify the source of
@@ -3943,9 +3954,12 @@ try_replace_reg (from, to, insn)
 	  && validate_change (insn, &SET_SRC (set), src, 0))
 	success = 1;
 
-      /* If we've failed to do replacement, have a single SET, and don't already
-	 have a note, add a REG_EQUAL note to not lose information.  */
-      if (!success && note == 0 && set != 0)
+      /* If we've failed to do replacement, have a single SET, don't already
+	 have a note, and have no special SET, add a REG_EQUAL note to not
+	 lose information.  */
+      if (!success && note == 0 && set != 0
+	  && GET_CODE (XEXP (set, 0)) != ZERO_EXTRACT
+	  && GET_CODE (XEXP (set, 0)) != SIGN_EXTRACT)
 	note = set_unique_reg_note (insn, REG_EQUAL, copy_rtx (src));
     }
 
@@ -4049,28 +4063,29 @@ cprop_jump (bb, setcc, jump, from, src)
      rtx from;
      rtx src;
 {
-  rtx new, new_set;
+  rtx new;
   rtx set = pc_set (jump);
+  rtx set_src = SET_SRC (set);
 
   /* First substitute in the INSN condition as the SET_SRC of the JUMP,
      then substitute that given values in this expanded JUMP.  */
-  if (setcc != NULL
+  if (setcc != NULL_RTX
       && !modified_between_p (from, setcc, jump)
       && !modified_between_p (src, setcc, jump))
     {
       rtx setcc_set = single_set (setcc);
-      new_set = simplify_replace_rtx (SET_SRC (set),
+      set_src = simplify_replace_rtx (set_src,
 				      SET_DEST (setcc_set),
 				      SET_SRC (setcc_set));
     }
   else
-    new_set = set;
+    setcc = NULL_RTX;
 
-  new = simplify_replace_rtx (new_set, from, src);
+  new = simplify_replace_rtx (set_src, from, src);
 
   /* If no simplification can be made, then try the next
      register.  */
-  if (rtx_equal_p (new, new_set) || rtx_equal_p (new, SET_SRC (set)))
+  if (rtx_equal_p (new, SET_SRC (set)))
     return 0;
 
   /* If this is now a no-op delete it, otherwise this must be a valid insn.  */
@@ -4128,6 +4143,7 @@ constprop_register (insn, from, to, alter_jumps)
      conditional branch instructions first.  */
   if (alter_jumps
       && (sset = single_set (insn)) != NULL
+      && NEXT_INSN (insn)
       && any_condjump_p (NEXT_INSN (insn)) && onlyjump_p (NEXT_INSN (insn)))
     {
       rtx dest = SET_DEST (sset);
@@ -4220,6 +4236,8 @@ cprop_insn (insn, alter_jumps)
 		  print_rtl (gcse_file, src);
 		  fprintf (gcse_file, "\n");
 		}
+	      if (INSN_DELETED_P (insn))
+		return 1;
 	    }
 	}
       else if (GET_CODE (src) == REG
@@ -4249,6 +4267,53 @@ cprop_insn (insn, alter_jumps)
   return changed;
 }
 
+/* Like find_used_regs, but avoid recording uses that appear in
+   input-output contexts such as zero_extract or pre_dec.  This
+   restricts the cases we consider to those for which local cprop
+   can legitimately make replacements.  */
+
+static void
+local_cprop_find_used_regs (xptr, data)
+     rtx *xptr;
+     void *data;
+{
+  rtx x = *xptr;
+
+  if (x == 0)
+    return;
+
+  switch (GET_CODE (x))
+    {
+    case ZERO_EXTRACT:
+    case SIGN_EXTRACT:
+    case STRICT_LOW_PART:
+      return;
+
+    case PRE_DEC:
+    case PRE_INC:
+    case POST_DEC:
+    case POST_INC:
+    case PRE_MODIFY:
+    case POST_MODIFY:
+      /* Can only legitimately appear this early in the context of
+	 stack pushes for function arguments, but handle all of the
+	 codes nonetheless.  */
+      return;
+
+    case SUBREG:
+      /* Setting a subreg of a register larger than word_mode leaves
+	 the non-written words unchanged.  */
+      if (GET_MODE_BITSIZE (GET_MODE (SUBREG_REG (x))) > BITS_PER_WORD)
+	return;
+      break;
+
+    default:
+      break;
+    }
+
+  find_used_regs (xptr, data);
+}
+  
 /* LIBCALL_SP is a zero-terminated array of insns at the end of a libcall;
    their REG_EQUAL notes need updating.  */
 
@@ -4277,6 +4342,9 @@ do_local_cprop (x, insn, alter_jumps, libcall_sp)
 	{
 	  rtx this_rtx = l->loc;
 	  rtx note;
+
+	  if (l->in_libcall)
+	    continue;
 
 	  if (CONSTANT_P (this_rtx))
 	    newcnst = this_rtx;
@@ -4376,6 +4444,7 @@ local_cprop_pass (alter_jumps)
   rtx insn;
   struct reg_use *reg_used;
   rtx libcall_stack[MAX_NESTED_LIBCALLS + 1], *libcall_sp;
+  bool changed = false;
 
   cselib_init ();
   libcall_sp = &libcall_stack[MAX_NESTED_LIBCALLS];
@@ -4399,21 +4468,34 @@ local_cprop_pass (alter_jumps)
 	  do
 	    {
 	      reg_use_count = 0;
-	      note_uses (&PATTERN (insn), find_used_regs, NULL);
+	      note_uses (&PATTERN (insn), local_cprop_find_used_regs, NULL);
 	      if (note)
-		find_used_regs (&XEXP (note, 0), NULL);
+		local_cprop_find_used_regs (&XEXP (note, 0), NULL);
 
 	      for (reg_used = &reg_use_table[0]; reg_use_count > 0;
 		   reg_used++, reg_use_count--)
 		if (do_local_cprop (reg_used->reg_rtx, insn, alter_jumps,
 		    libcall_sp))
-		  break;
+		  {
+		    changed = true;
+		    break;
+		  }
+	      if (INSN_DELETED_P (insn))
+		break;
 	    }
 	  while (reg_use_count);
 	}
       cselib_process_insn (insn);
     }
   cselib_finish ();
+  /* Global analysis may get into infinite loops for unreachable blocks.  */
+  if (changed && alter_jumps)
+    {
+      delete_unreachable_blocks ();
+      free_reg_set_mem ();
+      alloc_reg_set_mem (max_reg_num ());
+      compute_sets (get_insns ());
+    }
 }
 
 /* Forward propagate copies.  This includes copies and constants.  Return
@@ -4502,6 +4584,9 @@ one_cprop_pass (pass, alter_jumps)
       fprintf (gcse_file, "%d const props, %d copy props\n\n",
 	       const_prop_count, copy_prop_count);
     }
+  /* Global analysis may get into infinite loops for unreachable blocks.  */
+  if (changed && alter_jumps)
+    delete_unreachable_blocks ();
 
   return changed;
 }
@@ -4550,11 +4635,35 @@ find_bypass_set (regno, bb)
 }
 
 
+/* Subroutine of bypass_block that checks whether a pseudo is killed by
+   any of the instructions inserted on an edge.  Jump bypassing places
+   condition code setters on CFG edges using insert_insn_on_edge.  This
+   function is required to check that our data flow analysis is still
+   valid prior to commit_edge_insertions.  */
+
+static bool
+reg_killed_on_edge (reg, e)
+     rtx reg;
+     edge e;
+{
+  rtx insn;
+
+  for (insn = e->insns; insn; insn = NEXT_INSN (insn))
+    if (INSN_P (insn) && reg_set_p (reg, insn))
+      return true;
+
+  return false;
+}
+
 /* Subroutine of bypass_conditional_jumps that attempts to bypass the given
    basic block BB which has more than one predecessor.  If not NULL, SETCC
    is the first instruction of BB, which is immediately followed by JUMP_INSN
    JUMP.  Otherwise, SETCC is NULL, and JUMP is the first insn of BB.
-   Returns nonzero if a change was made.  */
+   Returns nonzero if a change was made.
+
+   During the jump bypassing pass, we may place copies of SETCC instuctions
+   on CFG edges.  The following routine must be careful to pay attention to
+   these inserted insns when performing its transformations.  */
 
 static int
 bypass_block (bb, setcc, jump)
@@ -4562,7 +4671,7 @@ bypass_block (bb, setcc, jump)
      rtx setcc, jump;
 {
   rtx insn, note;
-  edge e, enext;
+  edge e, enext, edest;
   int i, change;
 
   insn = (setcc != NULL) ? setcc : jump;
@@ -4594,6 +4703,10 @@ bypass_block (bb, setcc, jump)
 	  if (! set)
 	    continue;
 
+	  /* Check the data flow is valid after edge insertions.  */
+	  if (e->insns && reg_killed_on_edge (reg_used->reg_rtx, e))
+	    continue;
+
 	  src = SET_SRC (pc_set (jump));
 
 	  if (setcc != NULL)
@@ -4604,10 +4717,27 @@ bypass_block (bb, setcc, jump)
 	  new = simplify_replace_rtx (src, reg_used->reg_rtx,
 				      SET_SRC (set->expr));
 
+	  /* Jump bypassing may have already placed instructions on 
+	     edges of the CFG.  We can't bypass an outgoing edge that
+	     has instructions associated with it, as these insns won't
+	     get executed if the incoming edge is redirected.  */
+
 	  if (new == pc_rtx)
-	    dest = FALLTHRU_EDGE (bb)->dest;
+	    {
+	      edest = FALLTHRU_EDGE (bb);
+	      dest = edest->insns ? NULL : edest->dest;
+	    }
 	  else if (GET_CODE (new) == LABEL_REF)
-	    dest = BRANCH_EDGE (bb)->dest;
+	    {
+	      dest = BLOCK_FOR_INSN (XEXP (new, 0));
+	      /* Don't bypass edges containing instructions.  */
+	      for (edest = bb->succ; edest; edest = edest->succ_next)
+		if (edest->dest == dest && edest->insns)
+		  {
+		    dest = NULL;
+		    break;
+		  }
+	    }
 	  else
 	    dest = NULL;
 
@@ -5189,13 +5319,36 @@ pre_insert_copy_insn (expr, insn)
   rtx reg = expr->reaching_reg;
   int regno = REGNO (reg);
   int indx = expr->bitmap_index;
-  rtx set = single_set (insn);
-  rtx new_insn;
+  rtx pat = PATTERN (insn);
+  rtx set, new_insn;
+  int i;
 
-  if (!set)
+  /* This block matches the logic in hash_scan_insn.  */
+  if (GET_CODE (pat) == SET)
+    set = pat;
+  else if (GET_CODE (pat) == PARALLEL)
+    {
+      /* Search through the parallel looking got the set whose
+	 source was the expression that we're interested in.  */
+      set = NULL_RTX;
+      for (i = 0; i < XVECLEN (pat, 0); i++)
+	{
+	  rtx x = XVECEXP (pat, 0, i);
+	  if (GET_CODE (x) == SET
+	      && expr_equiv_p (SET_SRC (x), expr->expr))
+	    {
+	      set = x;
+	      break;
+	    }
+	}
+      if (! set)
+	abort ();
+    }
+  else
     abort ();
 
-  new_insn = emit_insn_after (gen_move_insn (reg, SET_DEST (set)), insn);
+  new_insn = gen_move_insn (reg, copy_rtx (SET_DEST (set)));
+  new_insn = emit_insn_after (new_insn, insn);
 
   /* Keep register set table up to date.  */
   record_one_set (regno, new_insn);
