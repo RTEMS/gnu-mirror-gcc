@@ -1144,7 +1144,7 @@ build_component_ref (datum, component)
 	 end does it - by giving the anonymous entities each a
 	 separate name and type, and then have build_component_ref
 	 recursively call itself.  We can't do that here.  */
-      for (; field; field = TREE_CHAIN (field))
+      do
 	{
 	  tree subdatum = TREE_VALUE (field);
 
@@ -1161,7 +1161,10 @@ build_component_ref (datum, component)
 	    warn_deprecated_use (subdatum);
 
 	  datum = ref;
+
+	  field = TREE_CHAIN (field);
 	}
+      while (field);
 
       return ref;
     }
@@ -1454,6 +1457,17 @@ build_external_ref (id, fun)
     {
       ref = DECL_INITIAL (ref);
       TREE_CONSTANT (ref) = 1;
+    }
+  else if (current_function_decl != 0
+	   && DECL_CONTEXT (current_function_decl) != 0
+	   && (TREE_CODE (ref) == VAR_DECL
+	       || TREE_CODE (ref) == PARM_DECL
+	       || TREE_CODE (ref) == FUNCTION_DECL))
+    {
+      tree context = decl_function_context (ref);
+    
+      if (context != 0 && context != current_function_decl)
+	DECL_NONLOCAL (ref) = 1;
     }
 
   return ref;
@@ -3331,7 +3345,7 @@ c_mark_addressable (exp)
 	    pedwarn ("address of register variable `%s' requested",
 		     IDENTIFIER_POINTER (DECL_NAME (x)));
 	  }
-	put_var_into_stack (x);
+	put_var_into_stack (x, /*rescan=*/true);
 
 	/* drops in */
       case FUNCTION_DECL:
@@ -4233,6 +4247,11 @@ convert_for_assignment (type, rhs, errtype, fundecl, funname, parmnum)
 			     errtype, funname, parmnum);
       return convert (type, rhs);
     }
+  else if (codel == POINTER_TYPE && coder == ARRAY_TYPE)
+    {
+      error ("invalid use of non-lvalue array");
+      return error_mark_node;
+    }
   else if (codel == POINTER_TYPE && coder == INTEGER_TYPE)
     {
       /* An explicit constant 0 can convert to a pointer,
@@ -4244,12 +4263,10 @@ convert_for_assignment (type, rhs, errtype, fundecl, funname, parmnum)
 	     && TREE_CODE (TREE_TYPE (rhs)) == INTEGER_TYPE
 	     && TREE_CODE (TREE_OPERAND (rhs, 0)) == INTEGER_CST
 	     && integer_zerop (TREE_OPERAND (rhs, 0))))
-	{
 	  warn_for_assignment ("%s makes pointer from integer without a cast",
 			       errtype, funname, parmnum);
-	  return convert (type, rhs);
-	}
-      return null_pointer_node;
+
+      return convert (type, rhs);
     }
   else if (codel == INTEGER_TYPE && coder == POINTER_TYPE)
     {
@@ -4745,6 +4762,20 @@ digest_init (type, init, require_constant)
 	  return inside_init;
 	}
     }
+  /* Build a VECTOR_CST from a *constant* vector constructor.  If the
+     vector constructor is not constant (e.g. {1,2,3,foo()}) then punt
+     below and handle as a constructor.  */
+  if (code == VECTOR_TYPE
+      && comptypes (TREE_TYPE (inside_init), type)
+      && TREE_CONSTANT (inside_init))
+    {
+      if (TREE_CODE (inside_init) == VECTOR_CST
+	  && comptypes (TYPE_MAIN_VARIANT (TREE_TYPE (inside_init)),
+			TYPE_MAIN_VARIANT (type)))
+	return inside_init;
+      else
+	return build_vector (type, CONSTRUCTOR_ELTS (inside_init));
+    }
 
   /* Any type can be initialized
      from an expression of the same type, optionally with braces.  */
@@ -4763,8 +4794,16 @@ digest_init (type, init, require_constant)
 			    TREE_TYPE (type)))))
     {
       if (code == POINTER_TYPE)
-	inside_init = default_function_array_conversion (inside_init);
+	{
+	  inside_init = default_function_array_conversion (inside_init);
 
+	  if (TREE_CODE (TREE_TYPE (inside_init)) == ARRAY_TYPE)
+	    {
+	      error_init ("invalid use of non-lvalue array");
+	      return error_mark_node;
+	    }
+	 }
+    
       if (require_constant && !flag_isoc99
 	  && TREE_CODE (inside_init) == COMPOUND_LITERAL_EXPR)
 	{
@@ -5266,6 +5305,7 @@ push_init_level (implicit)
 	  && constructor_fields == 0)
 	process_init_element (pop_init_level (1));
       else if (TREE_CODE (constructor_type) == ARRAY_TYPE
+	       && constructor_max_index 
 	       && tree_int_cst_lt (constructor_max_index, constructor_index))
 	process_init_element (pop_init_level (1));
       else
@@ -5719,6 +5759,8 @@ set_init_index (first, last)
     error_init ("nonconstant array index in initializer");
   else if (TREE_CODE (constructor_type) != ARRAY_TYPE)
     error_init ("array index in non-array initializer");
+  else if (tree_int_cst_sgn (first) == -1)
+    error_init ("array index in initializer exceeds array bounds");
   else if (constructor_max_index
 	   && tree_int_cst_lt (constructor_max_index, first))
     error_init ("array index in initializer exceeds array bounds");
@@ -6618,13 +6660,18 @@ process_init_element (value)
 			        bit_position (constructor_fields),
 			        DECL_SIZE (constructor_fields));
 
-	      constructor_unfilled_fields = TREE_CHAIN (constructor_fields);
-	      /* Skip any nameless bit fields.  */
-	      while (constructor_unfilled_fields != 0
-		     && DECL_C_BIT_FIELD (constructor_unfilled_fields)
-		     && DECL_NAME (constructor_unfilled_fields) == 0)
-		constructor_unfilled_fields =
-		  TREE_CHAIN (constructor_unfilled_fields);
+	      /* If the current field was the first one not yet written out,
+		 it isn't now, so update.  */
+	      if (constructor_unfilled_fields == constructor_fields)
+		{
+		  constructor_unfilled_fields = TREE_CHAIN (constructor_fields);
+		  /* Skip any nameless bit fields.  */
+		  while (constructor_unfilled_fields != 0
+			 && DECL_C_BIT_FIELD (constructor_unfilled_fields)
+			 && DECL_NAME (constructor_unfilled_fields) == 0)
+		    constructor_unfilled_fields =
+		      TREE_CHAIN (constructor_unfilled_fields);
+		}
 	    }
 
 	  constructor_fields = TREE_CHAIN (constructor_fields);
@@ -6857,9 +6904,9 @@ simple_asm_stmt (expr)
     {
       tree stmt;
 
-      stmt = add_stmt (build_stmt (ASM_STMT, NULL_TREE, expr,
-				   NULL_TREE, NULL_TREE,
-				   NULL_TREE));
+      /* Simple asm statements are treated as volatile.  */
+      stmt = add_stmt (build_stmt (ASM_STMT, ridpointers[(int) RID_VOLATILE],
+				   expr, NULL_TREE, NULL_TREE, NULL_TREE));
       ASM_INPUT_P (stmt) = 1;
       return stmt;
     }

@@ -1,6 +1,6 @@
 /* Output routines for GCC for Hitachi / SuperH SH.
-   Copyright (C) 1993, 1994, 1995, 1997, 1997, 1998, 1999, 2000, 2001, 2002
-   Free Software Foundation, Inc.
+   Copyright (C) 1993, 1994, 1995, 1997, 1997, 1998, 1999, 2000, 2001, 2002,
+   2004 Free Software Foundation, Inc.
    Contributed by Steve Chamberlain (sac@cygnus.com).
    Improved by Jim Wilson (wilson@cygnus.com). 
 
@@ -953,6 +953,7 @@ output_far_jump (insn, op)
   const char *jump;
   int far;
   int offset = branch_dest (insn) - INSN_ADDRESSES (INSN_UID (insn));
+  rtx prev;
 
   this.lab = gen_label_rtx ();
 
@@ -977,10 +978,10 @@ output_far_jump (insn, op)
 	jump = "mov.l	%O0,%1; jmp	@%1";
     }
   /* If we have a scratch register available, use it.  */
-  if (GET_CODE (PREV_INSN (insn)) == INSN
-      && INSN_CODE (PREV_INSN (insn)) == CODE_FOR_indirect_jump_scratch)
+  if (GET_CODE ((prev = prev_nonnote_insn (insn))) == INSN
+      && INSN_CODE (prev) == CODE_FOR_indirect_jump_scratch)
     {
-      this.reg = SET_DEST (PATTERN (PREV_INSN (insn)));
+      this.reg = SET_DEST (XVECEXP (PATTERN (prev), 0, 0));
       if (REGNO (this.reg) == R0_REG && flag_pic && ! TARGET_SH2)
 	jump = "mov.l	r1,@-r15; mova	%O0,r0; mov.l	@r0,r1; add	r1,r0; mov.l	@r15+,r1; jmp	@%1";
       output_asm_insn (jump, &this.lab);
@@ -2728,7 +2729,7 @@ find_barrier (num_mova, mova, from)
 	{
 	  if (num_mova)
 	    num_mova--;
-	  if (barrier_align (next_real_insn (from)) == CACHE_LOG)
+	  if (barrier_align (next_real_insn (from)) == align_jumps_log)
 	    {
 	      /* We have just passed the barrier in front of the
 		 ADDR_DIFF_VEC, which is stored in found_barrier.  Since
@@ -3064,6 +3065,14 @@ gen_block_redirect (jump, addr, need_block)
       else if (recog_memoized (prev) == CODE_FOR_block_branch_redirect)
 	need_block = 0;
     }
+  if (GET_CODE (PATTERN (jump)) == RETURN)
+    {
+      if (! need_block)
+	return prev;
+      /* Reorg even does nasty things with return insns that cause branches
+	 to go out of range - see find_end_label and callers.  */
+      return emit_insn_before (gen_block_branch_redirect (GEN_INT (0)) , jump);
+    }
   /* We can't use JUMP_LABEL here because it might be undefined
      when not optimizing.  */
   dest = XEXP (SET_SRC (PATTERN (jump)), 0);
@@ -3142,7 +3151,7 @@ gen_block_redirect (jump, addr, need_block)
       rtx next = next_active_insn (next_active_insn (dest));
       if (next && GET_CODE (next) == JUMP_INSN
 	  && GET_CODE (PATTERN (next)) == SET
-	  && recog_memoized (next) == CODE_FOR_jump)
+	  && recog_memoized (next) == CODE_FOR_jump_compact)
 	{
 	  dest = JUMP_LABEL (next);
 	  if (dest
@@ -3166,6 +3175,13 @@ gen_block_redirect (jump, addr, need_block)
       rtx insn = emit_insn_before (gen_indirect_jump_scratch
 				   (reg, GEN_INT (INSN_UID (JUMP_LABEL (jump))))
 				   , jump);
+      /* ??? We would like this to have the scope of the jump, but that
+	 scope will change when a delay slot insn of an inner scope is added.
+	 Hence, after delay slot scheduling, we'll have to expect
+	 NOTE_INSN_BLOCK_END notes between the indirect_jump_scratch and
+	 the jump.  */
+	 
+      INSN_SCOPE (insn) = INSN_SCOPE (jump);
       INSN_CODE (insn) = CODE_FOR_indirect_jump_scratch;
       return insn;
     }
@@ -3225,11 +3241,16 @@ gen_far_branch (bp)
   JUMP_LABEL (jump) = bp->far_label;
   if (! invert_jump (insn, label, 1))
     abort ();
-  (emit_insn_after
-   (gen_stuff_delay_slot
-    (GEN_INT (INSN_UID (XEXP (SET_SRC (PATTERN (jump)), 0))),
-     GEN_INT (recog_memoized (insn) == CODE_FOR_branch_false)),
-    insn));
+  /* If we are branching around a jump (rather than a return), prevent
+     reorg from using an insn from the jump target as the delay slot insn -
+     when reorg did this, it pessimized code (we rather hide the delay slot)
+     and it could cause branches to go out of range.  */
+  if (bp->far_label)
+    (emit_insn_after
+     (gen_stuff_delay_slot
+      (GEN_INT (INSN_UID (XEXP (SET_SRC (PATTERN (jump)), 0))),
+       GEN_INT (recog_memoized (insn) == CODE_FOR_branch_false)),
+      insn));
   /* Prevent reorg from undoing our splits.  */
   gen_block_redirect (jump, bp->address += 2, 2);
 }
@@ -3308,14 +3329,14 @@ barrier_align (barrier_or_label)
       return ((TARGET_SMALLCODE
 	       || ((unsigned) XVECLEN (pat, 1) * GET_MODE_SIZE (GET_MODE (pat))
 		   <= (unsigned)1 << (CACHE_LOG - 2)))
-	      ? 1 << TARGET_SHMEDIA : CACHE_LOG);
+	      ? 1 << TARGET_SHMEDIA : align_jumps_log);
     }
 
   if (TARGET_SMALLCODE)
     return 0;
 
   if (! TARGET_SH2 || ! optimize)
-    return CACHE_LOG;
+    return align_jumps_log;
 
   /* When fixing up pcloads, a constant table might be inserted just before
      the basic block that ends with the barrier.  Thus, we can't trust the
@@ -3380,7 +3401,8 @@ barrier_align (barrier_or_label)
 	      || (x = (NEXT_INSN (NEXT_INSN (PREV_INSN (prev)))),	    
 		  (INSN_P (x) 
 		   && (INSN_CODE (x) == CODE_FOR_block_branch_redirect
-		       || INSN_CODE (x) == CODE_FOR_indirect_jump_scratch))))
+		       || INSN_CODE (x) == CODE_FOR_indirect_jump_scratch
+		       || INSN_CODE (x) == CODE_FOR_stuff_delay_slot))))
 	    {
 	      rtx pat = PATTERN (prev);
 	      if (GET_CODE (pat) == PARALLEL)
@@ -3391,7 +3413,7 @@ barrier_align (barrier_or_label)
 	}
     }
   
-  return CACHE_LOG;
+  return align_jumps_log;
 }
 
 /* If we are inside a phony loop, almost any kind of label can turn up as the
@@ -3416,10 +3438,7 @@ sh_loop_align (label)
       || recog_memoized (next) == CODE_FOR_consttable_2)
     return 0;
 
-  if (TARGET_SH5)
-    return 3;
-
-  return 2;
+  return align_loops_log;
 }
 
 /* Exported to toplev.c.
@@ -4027,7 +4046,7 @@ split_branches (first)
 			|| ((beyond = next_active_insn (beyond))
 			    && GET_CODE (beyond) == JUMP_INSN))
 		    && GET_CODE (PATTERN (beyond)) == SET
-		    && recog_memoized (beyond) == CODE_FOR_jump
+		    && recog_memoized (beyond) == CODE_FOR_jump_compact
 		    && ((INSN_ADDRESSES
 			 (INSN_UID (XEXP (SET_SRC (PATTERN (beyond)), 0)))
 			 - INSN_ADDRESSES (INSN_UID (insn)) + (unsigned) 252)
@@ -4041,7 +4060,7 @@ split_branches (first)
 	    if ((GET_CODE (next) == JUMP_INSN
 		 || GET_CODE (next = next_active_insn (next)) == JUMP_INSN)
 		&& GET_CODE (PATTERN (next)) == SET
-		&& recog_memoized (next) == CODE_FOR_jump
+		&& recog_memoized (next) == CODE_FOR_jump_compact
 		&& ((INSN_ADDRESSES
 		     (INSN_UID (XEXP (SET_SRC (PATTERN (next)), 0)))
 		     - INSN_ADDRESSES (INSN_UID (insn)) + (unsigned) 252)
@@ -4129,9 +4148,6 @@ split_branches (first)
 
    If relaxing, output the label and pseudo-ops used to link together
    calls and the instruction which set the registers.  */
-
-/* ??? This is unnecessary, and probably should be deleted.  This makes
-   the insn_addresses declaration above unnecessary.  */
 
 /* ??? The addresses printed by this routine for insns are nonsense for
    insns which are inside of a sequence where none of the inner insns have
@@ -5235,7 +5251,7 @@ sh_build_va_list ()
   if (TARGET_SH5 || (! TARGET_SH3E && ! TARGET_SH4) || TARGET_HITACHI)
     return ptr_type_node;
 
-  record = make_node (RECORD_TYPE);
+  record = (*lang_hooks.types.make_type) (RECORD_TYPE);
 
   f_next_o = build_decl (FIELD_DECL, get_identifier ("__va_next_o"),
 			 ptr_type_node);
@@ -7355,14 +7371,14 @@ sh_initialize_trampoline (tramp, fnaddr, cxt)
       emit_insn (gen_mshflo_w_x (gen_rtx_SUBREG (V4HImode, quad0, 0),
 				 gen_rtx_SUBREG (V2HImode, fnaddr, 0),
 				 movishori));
-      emit_insn (gen_rotldi3_mextr (quad0, quad0,
+      emit_insn (gen_rotrdi3_mextr (quad0, quad0,
 				    GEN_INT (TARGET_LITTLE_ENDIAN ? 24 : 56)));
       emit_insn (gen_ashldi3_media (quad0, quad0, GEN_INT (2)));
       emit_move_insn (gen_rtx_MEM (DImode, tramp), quad0);
       emit_insn (gen_mshflo_w_x (gen_rtx_SUBREG (V4HImode, cxtload, 0),
 				 gen_rtx_SUBREG (V2HImode, cxt, 0),
 				 movishori));
-      emit_insn (gen_rotldi3_mextr (cxtload, cxtload,
+      emit_insn (gen_rotrdi3_mextr (cxtload, cxtload,
 				    GEN_INT (TARGET_LITTLE_ENDIAN ? 24 : 56)));
       emit_insn (gen_ashldi3_media (cxtload, cxtload, GEN_INT (2)));
       if (TARGET_LITTLE_ENDIAN)
@@ -7740,24 +7756,25 @@ sh_expand_binop_v2sf (code, op0, op1, op2)
 
 /* Return the class of registers for which a mode change from FROM to TO
    is invalid.  */
-enum reg_class 
-sh_cannot_change_mode_class (from, to)
+bool
+sh_cannot_change_mode_class (from, to, class)
      enum machine_mode from, to;
+     enum reg_class class;
 {
   if (GET_MODE_SIZE (from) != GET_MODE_SIZE (to))
     {
        if (TARGET_LITTLE_ENDIAN)
          {
 	   if (GET_MODE_SIZE (to) < 8 || GET_MODE_SIZE (from) < 8)
-	     return DF_REGS;
+	     return reg_classes_intersect_p (DF_REGS, class);
 	 }
        else
 	 {
 	   if (GET_MODE_SIZE (from) < 8)
-	     return DF_HI_REGS;
+	     return reg_classes_intersect_p (DF_HI_REGS, class);
 	 }
     }
-  return NO_REGS;
+  return 0;
 }
 
 
@@ -7796,6 +7813,9 @@ sh_register_move_cost (mode, srcclass, dstclass)
 {
   if (dstclass == T_REGS || dstclass == PR_REGS)
     return 10;
+
+  if (dstclass == MAC_REGS && srcclass == MAC_REGS)
+    return 4;
 
   if (mode == SImode && ! TARGET_SHMEDIA && TARGET_FMOVD
       && REGCLASS_HAS_FP_REG (srcclass)
@@ -7848,6 +7868,53 @@ sh_register_operand (op, mode)
   if (op == CONST0_RTX (mode) && TARGET_SHMEDIA)
     return 1;
   return register_operand (op, mode);
+}
+
+/* INSN is an sfunc; return the rtx that describes the address used.  */
+static rtx
+extract_sfunc_addr (rtx insn)
+{
+  rtx pattern, part = NULL_RTX;
+  int len, i;
+
+  pattern = PATTERN (insn);
+  len = XVECLEN (pattern, 0);
+  for (i = 0; i < len; i++)
+    {
+      part = XVECEXP (pattern, 0, i);
+      if (GET_CODE (part) == USE && GET_MODE (XEXP (part, 0)) == Pmode
+	  && GENERAL_REGISTER_P (true_regnum (XEXP (part, 0))))
+	return XEXP (part, 0);
+    }
+  if (GET_CODE (XVECEXP (pattern, 0, 0)) == UNSPEC_VOLATILE)
+    return XVECEXP (XVECEXP (pattern, 0, 0), 0, 1);
+  abort ();
+}
+
+/* Verify that the register in use_sfunc_addr still agrees with the address
+   used in the sfunc.  This prevents fill_slots_from_thread from changing
+   use_sfunc_addr.
+   INSN is the use_sfunc_addr instruction, and REG is the register it
+   guards.  */
+int
+check_use_sfunc_addr (rtx insn, rtx reg)
+{
+  /* Search for the sfunc.  It should really come right after INSN.  */
+  while ((insn = NEXT_INSN (insn)))
+    {
+      if (GET_CODE (insn) == CODE_LABEL || GET_CODE (insn) == JUMP_INSN)
+	break;
+      if (! INSN_P (insn))
+	continue;
+	
+      if (GET_CODE (PATTERN (insn)) == SEQUENCE)
+	insn = XVECEXP (PATTERN (insn), 0, 0);
+      if (GET_CODE (PATTERN (insn)) != PARALLEL
+	  || get_attr_type (insn) != TYPE_SFUNC)
+	continue;
+      return rtx_equal_p (extract_sfunc_addr (insn), reg);
+    }
+  abort ();
 }
 
 #include "gt-sh.h"
