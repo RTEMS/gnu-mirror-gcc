@@ -28,16 +28,6 @@ Boston, MA 02111-1307, USA.  */
 #undef MD_EXEC_PREFIX
 #undef MD_STARTFILE_PREFIX
 
-/* Output at beginning of assembler file.  */
-/* The .file command should always begin the output.  */
-#undef ASM_FILE_START
-#define ASM_FILE_START(FILE)						\
-  do {									\
-	mips_asm_file_start (FILE);					\
-	fprintf (FILE, "\t.version\t\"01.01\"\n");			\
-  } while (0)
-
-
 /* Required to keep collect2.c happy */
 #undef OBJECT_FORMAT_COFF
 
@@ -47,6 +37,7 @@ Boston, MA 02111-1307, USA.  */
 
 
 /* Handle #pragma weak and #pragma pack.  */
+#undef HANDLE_SYSV_PRAGMA
 #define HANDLE_SYSV_PRAGMA 1
 
 /* Use more efficient ``thunks'' to implement C++ vtables. */
@@ -118,6 +109,13 @@ Boston, MA 02111-1307, USA.  */
 %{fPIC:-D__PIC__ -D__pic__} %{fpic:-D__PIC__ -D__pic__} \
 %{pthread:-D_REENTRANT}"
 
+/* The GNU C++ standard library requires that these macros be defined.  */
+#undef CPLUSPLUS_CPP_SPEC
+#define CPLUSPLUS_CPP_SPEC "\
+-D__LANGUAGE_C_PLUS_PLUS -D_LANGUAGE_C_PLUS_PLUS \
+-D_GNU_SOURCE %(cpp) \
+"
+
 /* Provide a STARTFILE_SPEC appropriate for GNU/Linux.  Here we add
    the GNU/Linux magical crtbegin.o file (see crtstuff.c) which
    provides part of the support for getting C++ file-scope static
@@ -170,3 +168,92 @@ Boston, MA 02111-1307, USA.  */
 %{mabi=64: -64} \
 %{!fno-PIC:%{!fno-pic:-KPIC}} \
 %{fno-PIC:-non_shared} %{fno-pic:-non_shared}"
+
+/* We don't need those nonsenses.  */
+#undef INVOKE__main
+#undef CTOR_LIST_BEGIN
+#undef CTOR_LIST_END
+#undef DTOR_LIST_BEGIN
+#undef DTOR_LIST_END
+
+/* The MIPS assembler has different syntax for .set. We set it to
+   .dummy to trap any errors.  */
+#undef SET_ASM_OP
+#define SET_ASM_OP "\t.dummy\t"
+
+#undef  ASM_OUTPUT_SOURCE_LINE
+#define ASM_OUTPUT_SOURCE_LINE(FILE, LINE)				\
+do									\
+  {									\
+    static int sym_lineno = 1;						\
+    fprintf (FILE, "%sLM%d:\n\t%s 68,0,%d,%sLM%d",			\
+	     LOCAL_LABEL_PREFIX, sym_lineno, ASM_STABN_OP,		\
+	     LINE, LOCAL_LABEL_PREFIX, sym_lineno);			\
+    putc ('-', FILE);							\
+    assemble_name (FILE,						\
+		   XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0));\
+    putc ('\n', FILE);							\
+    sym_lineno++;							\
+  }									\
+while (0)
+
+/* This is how we tell the assembler that two symbols have the
+   same value.  */
+#undef ASM_OUTPUT_DEF
+#define ASM_OUTPUT_DEF(FILE,LABEL1,LABEL2)				\
+  do {									\
+	fprintf ((FILE), "\t");						\
+	assemble_name (FILE, LABEL1);					\
+	fprintf (FILE, "=");						\
+	assemble_name (FILE, LABEL2);					\
+	fprintf (FILE, "\n");						\
+ } while (0)
+
+#undef ASM_OUTPUT_DEFINE_LABEL_DIFFERENCE_SYMBOL
+#define ASM_OUTPUT_DEFINE_LABEL_DIFFERENCE_SYMBOL(FILE, SY, HI, LO)    	\
+  do {									\
+	fputc ('\t', FILE);						\
+	assemble_name (FILE, SY);					\
+	fputc ('=', FILE);						\
+	assemble_name (FILE, HI);					\
+	fputc ('-', FILE);						\
+	assemble_name (FILE, LO);					\
+  } while (0)
+
+#undef ASM_DECLARE_FUNCTION_NAME
+#define ASM_DECLARE_FUNCTION_NAME(STREAM, NAME, DECL)			\
+  do {									\
+    if (!flag_inhibit_size_directive)					\
+      {									\
+	fputs ("\t.ent\t", STREAM);					\
+	assemble_name (STREAM, NAME);					\
+	putc ('\n', STREAM);						\
+      }									\
+    fprintf (STREAM, "\t%s\t ", TYPE_ASM_OP);				\
+    assemble_name (STREAM, NAME);					\
+    putc (',', STREAM);							\
+    fprintf (STREAM, TYPE_OPERAND_FMT, "function");			\
+    putc ('\n', STREAM);						\
+    assemble_name (STREAM, NAME);					\
+    fputs (":\n", STREAM);						\
+  } while (0)
+
+#undef ASM_DECLARE_FUNCTION_SIZE
+#define ASM_DECLARE_FUNCTION_SIZE(STREAM, NAME, DECL)			\
+  do {									\
+    if (!flag_inhibit_size_directive)					\
+      {									\
+	fputs ("\t.end\t", STREAM);					\
+	assemble_name (STREAM, NAME);					\
+	putc ('\n', STREAM);						\
+      }									\
+  } while (0)
+
+/* Tell function_prologue in mips.c that we have already output the .ent/.end
+   pseudo-ops.  */
+#define FUNCTION_NAME_ALREADY_DECLARED
+
+/* Output #ident as a .ident.  */
+#undef ASM_OUTPUT_IDENT
+#define ASM_OUTPUT_IDENT(FILE, NAME) \
+  fprintf (FILE, "\t%s\t\"%s\"\n", IDENT_ASM_OP, NAME);

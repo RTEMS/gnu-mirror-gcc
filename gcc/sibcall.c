@@ -466,7 +466,7 @@ optimize_sibling_and_tail_recursive_calls ()
   /* We need cfg information to determine which blocks are succeeded
      only by the epilogue.  */
   find_basic_blocks (insns, max_reg_num (), 0);
-  cleanup_cfg (insns);
+  cleanup_cfg ();
 
   /* If there are no basic blocks, then there is nothing to do.  */
   if (n_basic_blocks == 0)
@@ -541,6 +541,12 @@ optimize_sibling_and_tail_recursive_calls ()
 
 	     ?!? This test is overly conservative and will be replaced.  */
 	  if (frame_offset)
+	    goto failure;
+
+	  /* Any function that calls setjmp might have longjmp called from
+	     any called function.  ??? We really should represent this
+	     properly in the CFG so that this needn't be special cased.  */
+	  if (current_function_calls_setjmp)
 	    goto failure;
 
 	  /* Taking the address of a local variable is fatal to tail

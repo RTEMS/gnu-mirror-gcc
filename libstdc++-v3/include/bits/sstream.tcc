@@ -1,6 +1,6 @@
 // String based streams -*- C++ -*-
 
-// Copyright (C) 1997-1999 Free Software Foundation, Inc.
+// Copyright (C) 1997-1999, 2001 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -36,10 +36,11 @@
 
 #include <bits/std_sstream.h>
 
-namespace std {
+namespace std
+{
 
   template <class _CharT, class _Traits, class _Alloc>
-    basic_stringbuf<_CharT, _Traits, _Alloc>::int_type 
+    typename basic_stringbuf<_CharT, _Traits, _Alloc>::int_type 
     basic_stringbuf<_CharT, _Traits, _Alloc>::
     pbackfail(int_type __c)
     {
@@ -73,7 +74,7 @@ namespace std {
     }
   
   template <class _CharT, class _Traits, class _Alloc>
-    basic_stringbuf<_CharT, _Traits, _Alloc>::int_type 
+    typename basic_stringbuf<_CharT, _Traits, _Alloc>::int_type 
     basic_stringbuf<_CharT, _Traits, _Alloc>::
     overflow(int_type __c)
     {
@@ -113,7 +114,7 @@ namespace std {
     }
 
   template <class _CharT, class _Traits, class _Alloc>
-    basic_stringbuf<_CharT, _Traits, _Alloc>::pos_type
+    typename basic_stringbuf<_CharT, _Traits, _Alloc>::pos_type
     basic_stringbuf<_CharT, _Traits, _Alloc>::
     seekoff(off_type __off, ios_base::seekdir __way, ios_base::openmode __mode)
     {
@@ -171,7 +172,7 @@ namespace std {
     }
 
   template <class _CharT, class _Traits, class _Alloc>
-    basic_stringbuf<_CharT, _Traits, _Alloc>::pos_type
+    typename basic_stringbuf<_CharT, _Traits, _Alloc>::pos_type
     basic_stringbuf<_CharT, _Traits, _Alloc>::
     seekpos(pos_type __sp, ios_base::openmode __mode)
     {
@@ -209,12 +210,4 @@ namespace std {
 } // namespace std
 
 #endif	/* _CPP_BITS_SSTREAM_TCC */
-
-
-
-
-
-
-
-
 

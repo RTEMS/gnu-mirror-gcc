@@ -107,13 +107,17 @@ extern signed_word GC_mem_found;
     {
 	register unsigned i;
 
-	/* Map size 0 to 1.  This avoids problems at lower levels. */
-	  GC_size_map[0] = 1;
+	/* Map size 0 to something bigger.			   */
+        /* This avoids problems at lower levels. 		   */
 	/* One word objects don't have to be 2 word aligned.	   */
-	  for (i = 1; i < sizeof(word); i++) {
-	      GC_size_map[i] = 1;
+	  for (i = 0; i < sizeof(word); i++) {
+	      GC_size_map[i] = MIN_WORDS;
 	  }
-	  GC_size_map[sizeof(word)] = ROUNDED_UP_WORDS(sizeof(word));
+#	  if MIN_WORDS > 1
+	    GC_size_map[sizeof(word)] = MIN_WORDS;
+#	  else
+	    GC_size_map[sizeof(word)] = ROUNDED_UP_WORDS(sizeof(word));
+#	  endif
 	for (i = sizeof(word) + 1; i <= 8 * sizeof(word); i++) {
 #           ifdef ALIGN_DOUBLE
 	      GC_size_map[i] = (ROUNDED_UP_WORDS(i) + 1) & (~1);
@@ -202,7 +206,7 @@ extern signed_word GC_mem_found;
  */
 word GC_stack_last_cleared = 0;	/* GC_no when we last did this */
 # ifdef THREADS
-#   define CLEAR_SIZE 2048
+#   define CLEAR_SIZE 512
 # else
 #   define CLEAR_SIZE 213
 # endif

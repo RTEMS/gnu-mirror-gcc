@@ -335,6 +335,9 @@ _Jv_JNI_PopLocalFrame (JNIEnv *env, jobject result, int stop)
       rf = n;
     }
 
+  // Update the local frame information.
+  env->locals = rf;
+
   return result == NULL ? NULL : _Jv_JNI_NewLocalRef (env, result);
 }
 
@@ -369,11 +372,15 @@ wrap_value (JNIEnv *, T value)
   return value;
 }
 
-template<>
-static jobject
-wrap_value (JNIEnv *env, jobject value)
+// This specialization is used for jobject, jclass, jstring, jarray,
+// etc.
+template<typename T>
+static T *
+wrap_value (JNIEnv *env, T *value)
 {
-  return value == NULL ? value : _Jv_JNI_NewLocalRef (env, value);
+  return (value == NULL
+	  ? value
+	  : (T *) _Jv_JNI_NewLocalRef (env, (jobject) value));
 }
 
 
@@ -1068,8 +1075,13 @@ _Jv_JNI_GetAnyFieldID (JNIEnv *env, jclass clazz,
 
       // FIXME: what if field_class == NULL?
 
+      java::lang::ClassLoader *loader = clazz->getClassLoader ();
       while (clazz != NULL)
 	{
+	  // We acquire the class lock so that fields aren't resolved
+	  // while we are running.
+	  JvSynchronize sync (clazz);
+
 	  jint count = (is_static
 			? JvNumStaticFields (clazz)
 			: JvNumInstanceFields (clazz));
@@ -1078,12 +1090,11 @@ _Jv_JNI_GetAnyFieldID (JNIEnv *env, jclass clazz,
 			    : JvGetFirstInstanceField (clazz));
 	  for (jint i = 0; i < count; ++i)
 	    {
-	      // The field is resolved as a side effect of class
-	      // initialization.
-	      JvAssert (field->isResolved ());
-
 	      _Jv_Utf8Const *f_name = field->getNameUtf8Const(clazz);
 
+	      // The field might be resolved or it might not be.  It
+	      // is much simpler to always resolve it.
+	      _Jv_ResolveField (field, loader);
 	      if (_Jv_equalUtf8Consts (f_name, a_name)
 		  && field->getClass() == field_class)
 		return field;
@@ -1353,7 +1364,9 @@ _Jv_JNI_GetPrimitiveArrayRegion (JNIEnv *env, JArray<T> *array,
 				 jsize start, jsize len,
 				 T *buf)
 {
-  if (start < 0 || len >= array->length || start + len >= array->length)
+  // The cast to unsigned lets us save a comparison.
+  if (start < 0 || len < 0
+      || (unsigned long) (start + len) > (unsigned long) array->length)
     {
       try
 	{
@@ -1378,7 +1391,9 @@ static void
 _Jv_JNI_SetPrimitiveArrayRegion (JNIEnv *env, JArray<T> *array, 
 				 jsize start, jsize len, T *buf)
 {
-  if (start < 0 || len >= array->length || start + len >= array->length)
+  // The cast to unsigned lets us save a comparison.
+  if (start < 0 || len < 0
+      || (unsigned long) (start + len) > (unsigned long) array->length)
     {
       try
 	{
@@ -1591,8 +1606,6 @@ _Jv_JNI_UnregisterNatives (JNIEnv *, jclass)
 
 
 
-#ifdef INTERPRETER
-
 // Add a character to the buffer, encoding properly.
 static void
 add_char (char *buf, jchar c, int *here)
@@ -1612,11 +1625,14 @@ add_char (char *buf, jchar c, int *here)
       buf[(*here)++] = '_';
       buf[(*here)++] = '3';
     }
-  else if (c == '/')
+
+  // Also check for `.' here because we might be passed an internal
+  // qualified class name like `foo.bar'.
+  else if (c == '/' || c == '.')
     buf[(*here)++] = '_';
   else if ((c >= '0' && c <= '9')
-      || (c >= 'a' && c <= 'z')
-      || (c >= 'A' && c <= 'Z'))
+	   || (c >= 'a' && c <= 'z')
+	   || (c >= 'A' && c <= 'Z'))
     buf[(*here)++] = (char) c;
   else
     {
@@ -1626,7 +1642,7 @@ add_char (char *buf, jchar c, int *here)
       for (int i = 0; i < 4; ++i)
 	{
 	  int val = c & 0x0f;
-	  buf[(*here) + 4 - i] = (val > 10) ? ('a' + val - 10) : ('0' + val);
+	  buf[(*here) + 3 - i] = (val > 10) ? ('a' + val - 10) : ('0' + val);
 	  c >>= 4;
 	}
       *here += 4;
@@ -1745,6 +1761,8 @@ _Jv_LookupJNIMethod (jclass klass, _Jv_Utf8Const *name,
 
   return function;
 }
+
+#ifdef INTERPRETER
 
 // This function is the stub which is used to turn an ordinary (CNI)
 // method call into a JNI call.
