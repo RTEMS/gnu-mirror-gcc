@@ -74,6 +74,7 @@ extern enum machine_mode select_cc_mode PARAMS ((enum rtx_code, rtx, rtx));
 /* Define the function that build the compare insn for scc and bcc.  */
 extern rtx gen_compare_reg PARAMS ((enum rtx_code code, rtx, rtx));
 extern void sparc_emit_float_lib_cmp PARAMS ((rtx, rtx, enum rtx_code));
+extern void sparc_emit_floatunsdi PARAMS ((rtx [2]));
 /* This function handles all v9 scc insns */
 extern int gen_v9_scc PARAMS ((enum rtx_code, rtx *));
 extern void sparc_initialize_trampoline PARAMS ((rtx, rtx, rtx));
@@ -85,10 +86,11 @@ extern void sparc_emit_set_const64 PARAMS ((rtx, rtx));
 extern void sparc_emit_set_symbolic_const64 PARAMS ((rtx, rtx, rtx));
 extern int sparc_splitdi_legitimate PARAMS ((rtx, rtx));
 extern int sparc_absnegfloat_split_legitimate PARAMS ((rtx, rtx));
-extern char *output_cbranch PARAMS ((rtx, int, int, int, int, rtx));
+extern char *output_cbranch PARAMS ((rtx, rtx, int, int, int, int, rtx));
 extern const char *output_return PARAMS ((rtx *));
 extern const char *output_sibcall PARAMS ((rtx, rtx));
-extern char *output_v9branch PARAMS ((rtx, int, int, int, int, int, rtx));
+extern char *output_v9branch PARAMS ((rtx, rtx, int, int, int, int, int,
+				      rtx));
 extern void emit_v9_brxx_insn PARAMS ((enum rtx_code, rtx, rtx));
 extern void print_operand PARAMS ((FILE *, rtx, int));
 extern int mems_ok_for_ldd_peep PARAMS ((rtx, rtx, rtx));

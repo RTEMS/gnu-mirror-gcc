@@ -6027,6 +6027,9 @@ make_extraction (mode, inner, pos, pos_rtx, len,
       if (mode == tmode)
 	return new;
 
+      if (GET_CODE (new) == CONST_INT)
+	return GEN_INT (trunc_int_for_mode (INTVAL (new), mode));
+
       /* If we know that no extraneous bits are set, and that the high
 	 bit is not set, convert the extraction to the cheaper of
 	 sign and zero extension, that are equivalent in these cases.  */
@@ -10835,9 +10838,9 @@ simplify_comparison (code, pop0, pop1)
 	      && XEXP (op0, 1) == XEXP (XEXP (op0, 0), 1)
 	      && (tmode = mode_for_size (mode_width - INTVAL (XEXP (op0, 1)),
 					 MODE_INT, 1)) != BLKmode
-	      && ((unsigned HOST_WIDE_INT) const_op <= GET_MODE_MASK (tmode)
-		  || ((unsigned HOST_WIDE_INT) -const_op
-		      <= GET_MODE_MASK (tmode))))
+	      && (((unsigned HOST_WIDE_INT) const_op
+		   + (GET_MODE_MASK (tmode) >> 1) + 1)
+		  <= GET_MODE_MASK (tmode)))
 	    {
 	      op0 = gen_lowpart_for_combine (tmode, XEXP (XEXP (op0, 0), 0));
 	      continue;
@@ -10854,9 +10857,9 @@ simplify_comparison (code, pop0, pop1)
 	      && XEXP (op0, 1) == XEXP (XEXP (XEXP (op0, 0), 0), 1)
 	      && (tmode = mode_for_size (mode_width - INTVAL (XEXP (op0, 1)),
 					 MODE_INT, 1)) != BLKmode
-	      && ((unsigned HOST_WIDE_INT) const_op <= GET_MODE_MASK (tmode)
-		  || ((unsigned HOST_WIDE_INT) -const_op
-		      <= GET_MODE_MASK (tmode))))
+	      && (((unsigned HOST_WIDE_INT) const_op
+		   + (GET_MODE_MASK (tmode) >> 1) + 1)
+		  <= GET_MODE_MASK (tmode)))
 	    {
 	      rtx inner = XEXP (XEXP (XEXP (op0, 0), 0), 0);
 	      rtx add_const = XEXP (XEXP (op0, 0), 1);
@@ -10881,10 +10884,18 @@ simplify_comparison (code, pop0, pop1)
 	      && mode_width <= HOST_BITS_PER_WIDE_INT
 	      && (nonzero_bits (XEXP (op0, 0), mode)
 		  & (((HOST_WIDE_INT) 1 << INTVAL (XEXP (op0, 1))) - 1)) == 0
-	      && (const_op == 0
-		  || (floor_log2 (const_op) + INTVAL (XEXP (op0, 1))
-		      < mode_width)))
+	      && (((unsigned HOST_WIDE_INT) const_op
+		   + (GET_CODE (op0) != LSHIFTRT
+		      ? ((GET_MODE_MASK (mode) >> INTVAL (XEXP (op0, 1)) >> 1)
+			 + 1)
+		      : 0))
+		  <= GET_MODE_MASK (mode) >> INTVAL (XEXP (op0, 1))))
 	    {
+	      /* If the shift was logical, then we must make the condition
+		 unsigned.  */
+	      if (GET_CODE (op0) == LSHIFTRT)
+		code = unsigned_condition (code);
+
 	      const_op <<= INTVAL (XEXP (op0, 1));
 	      op1 = GEN_INT (const_op);
 	      op0 = XEXP (op0, 0);
@@ -10962,14 +10973,22 @@ simplify_comparison (code, pop0, pop1)
 	 tmode = GET_MODE_WIDER_MODE (tmode))
       if (have_insn_for (COMPARE, tmode))
 	{
+	  int zero_extended;
+
 	  /* If the only nonzero bits in OP0 and OP1 are those in the
 	     narrower mode and this is an equality or unsigned comparison,
 	     we can use the wider mode.  Similarly for sign-extended
 	     values, in which case it is true for all comparisons.  */
-	  if (((code == EQ || code == NE
-		|| code == GEU || code == GTU || code == LEU || code == LTU)
-	       && (nonzero_bits (op0, tmode) & ~GET_MODE_MASK (mode)) == 0
-	       && (nonzero_bits (op1, tmode) & ~GET_MODE_MASK (mode)) == 0)
+	  zero_extended = ((code == EQ || code == NE
+			    || code == GEU || code == GTU
+			    || code == LEU || code == LTU)
+			   && (nonzero_bits (op0, tmode)
+			       & ~GET_MODE_MASK (mode)) == 0
+			   && ((GET_CODE (op1) == CONST_INT
+				|| (nonzero_bits (op1, tmode)
+				    & ~GET_MODE_MASK (mode)) == 0)));
+
+	  if (zero_extended
 	      || ((num_sign_bit_copies (op0, tmode)
 		   > GET_MODE_BITSIZE (tmode) - GET_MODE_BITSIZE (mode))
 		  && (num_sign_bit_copies (op1, tmode)
@@ -10986,6 +11005,8 @@ simplify_comparison (code, pop0, pop1)
 							   XEXP (op0, 1)));
 
 	      op0 = gen_lowpart_for_combine (tmode, op0);
+	      if (zero_extended && GET_CODE (op1) == CONST_INT)
+		op1 = GEN_INT (INTVAL (op1) & GET_MODE_MASK (mode));
 	      op1 = gen_lowpart_for_combine (tmode, op1);
 	      break;
 	    }

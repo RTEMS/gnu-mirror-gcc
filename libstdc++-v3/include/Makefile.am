@@ -179,9 +179,6 @@ c_base_headers = \
 	${c_base_srcdir}/std_ctime.h \
 	${c_base_srcdir}/std_cwchar.h \
 	${c_base_srcdir}/std_cwctype.h 
-# Some of the "C" headers need extra files.
-c_base_headers_extra = \
-	${c_base_srcdir}/cmath.tcc 
 c_base_headers_rename = \
 	cassert \
 	cctype \
@@ -201,6 +198,15 @@ c_base_headers_rename = \
 	ctime \
 	cwchar \
 	cwctype 
+
+# Some of the different "C" header models need extra files.
+# For --enable-cheaders=c_std
+if GLIBCPP_C_HEADERS_C_STD
+c_base_headers_extra = \
+	${c_base_srcdir}/cmath.tcc 
+else
+c_base_headers_extra = 
+endif
 
 std_srcdir = ${glibcpp_srcdir}/include/std
 std_builddir = .
@@ -287,6 +293,7 @@ extra_target_headers = \
 thread_target_headers = \
 	${target_builddir}/gthr.h \
 	${target_builddir}/gthr-single.h \
+	${target_builddir}/gthr-posix.h \
 	${target_builddir}/gthr-default.h
 
 # List of all timestamp files.  By keeping only one copy of this list, both
@@ -325,7 +332,7 @@ stamp-c_base: ${c_base_headers} ${c_base_headers_extra}
 	  official_name=`echo $$h | sed -e 's,.*/std_,,' -e 's,\.h$$,,'` ;\
 	  @LN_S@ $$h ./$${official_name} || true ;\
 	done) ;\
-	(cd ${c_base_builddir} && @LN_S@ ${c_base_headers_extra}  . || true) ;\
+	(cd ${bits_builddir} && @LN_S@ ${c_base_headers_extra}  . || true) ;\
 	echo `date` > stamp-c_base
 
 stamp-backward: ${backward_headers}
@@ -388,11 +395,19 @@ ${target_builddir}/gthr-single.h: ${toplevel_srcdir}/gcc/gthr-single.h \
 	    -e 's/\(GCC${uppercase}*_H\)/_GLIBCPP_\1/g' \
 	    < ${toplevel_srcdir}/gcc/gthr-single.h > $@
 
+${target_builddir}/gthr-posix.h: ${toplevel_srcdir}/gcc/gthr-posix.h \
+				   stamp-${target_alias}
+	sed -e 's/\(UNUSED\)/_GLIBCPP_\1/g' \
+	    -e 's/\(GCC${uppercase}*_H\)/_GLIBCPP_\1/g' \
+	    -e 's/\(${uppercase}*WEAK\)/_GLIBCPP_\1/g' \
+	    < ${toplevel_srcdir}/gcc/gthr-posix.h > $@
+
 ${target_builddir}/gthr-default.h: ${toplevel_srcdir}/gcc/${glibcpp_thread_h} \
 				   stamp-${target_alias}
 	sed -e 's/\(UNUSED\)/_GLIBCPP_\1/g' \
 	    -e 's/\(GCC${uppercase}*_H\)/_GLIBCPP_\1/g' \
 	    -e 's/\(${uppercase}*WEAK\)/_GLIBCPP_\1/g' \
+	    -e 's,^#include "\(.*\)",#include <bits/\1>,g' \
 	    < ${toplevel_srcdir}/gcc/${glibcpp_thread_h} > $@
 
 # For robustness sake (in light of junk files or in-source
@@ -420,7 +435,7 @@ install-data-local:
 	  $(INSTALL_DATA) ${c_base_builddir}/$${file} \
 	    ${gxx_include_dir}/${c_base_builddir}; done
 	for file in ${c_base_headers_extra}; do \
-	  $(INSTALL_DATA) $${file} ${gxx_include_dir}/${c_base_builddir}; done
+	  $(INSTALL_DATA) $${file} ${gxx_include_dir}/${bits_builddir}; done
 	$(INSTALL) -d ${gxx_include_dir}/${std_builddir}
 	for file in ${std_headers_rename}; do \
 	  $(INSTALL_DATA) ${std_builddir}/$${file} \

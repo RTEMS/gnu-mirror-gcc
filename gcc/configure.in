@@ -214,8 +214,7 @@ no)	;;
 	;;
 esac
 ], 
-# Enable some checks by default for development versions of GCC
-[ac_checking=1; ac_tree_checking=1; ac_gc_checking=1;])
+[])
 if test x$ac_checking != x ; then
   AC_DEFINE(ENABLE_CHECKING, 1,
 [Define if you want more run-time sanity checks.  This one gets a grab
@@ -494,7 +493,7 @@ else
   # that we can use it.
   gcc_AC_CHECK_PROG_VER(MAKEINFO, makeinfo, --version,
   [GNU texinfo.* \([0-9][0-9.]*\)],
-  [4.*])
+  [4.[1-9]*])
 fi
 
 if test $gcc_cv_prog_makeinfo_modern = no; then
@@ -1484,6 +1483,8 @@ if test x"$gcc_cv_as_hidden" = xyes; then
 		[Define if your assembler supports .hidden.])
 fi
 AC_MSG_RESULT($gcc_cv_as_hidden)
+libgcc_visibility=$gcc_cv_as_hidden
+AC_SUBST(libgcc_visibility)
 
 AC_MSG_CHECKING(assembler leb128 support)
 gcc_cv_as_leb128=no

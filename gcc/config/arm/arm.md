@@ -4132,27 +4132,6 @@
   }"
 )
 
-(define_expand "movaddr"
-  [(set (match_operand:SI 0 "s_register_operand" "")
-	(match_operand:DI 1 "address_operand" ""))]
-  "TARGET_ARM"
-  ""
-)
-
-(define_insn "*movaddr_insn"
-  [(set (match_operand:SI 0 "s_register_operand" "=r")
-	(match_operand:DI 1 "address_operand" "p"))]
-  "TARGET_ARM
-   && reload_completed
-   && (GET_CODE (operands[1]) == LABEL_REF
-       || (GET_CODE (operands[1]) == CONST
-	   && GET_CODE (XEXP (operands[1], 0)) == PLUS
-	   && GET_CODE (XEXP (XEXP (operands[1], 0), 0)) == LABEL_REF
-	   && GET_CODE (XEXP (XEXP (operands[1], 0), 1)) == CONST_INT))"
-  "adr%?\\t%0, %a1"
-  [(set_attr "predicable" "yes")]
-)
-
 ;; When generating pic, we need to load the symbol offset into a register.
 ;; So that the optimizer does not confuse this with a normal symbol load
 ;; we use an unspec.  The offset will be loaded from a constant pool entry,
@@ -8299,6 +8278,7 @@
   "TARGET_ARM
    && !BYTES_BIG_ENDIAN
    && !TARGET_MMU_TRAPS
+   && !arm_arch4
    && REGNO (operands[0]) != FRAME_POINTER_REGNUM
    && REGNO (operands[1]) != FRAME_POINTER_REGNUM
    && (GET_CODE (operands[2]) != REG
@@ -8317,6 +8297,7 @@
   "TARGET_ARM
    && !BYTES_BIG_ENDIAN
    && !TARGET_MMU_TRAPS
+   && !arm_arch4
    && REGNO (operands[0]) != FRAME_POINTER_REGNUM
    && REGNO (operands[1]) != FRAME_POINTER_REGNUM
    && (GET_CODE (operands[2]) != REG
@@ -8481,6 +8462,7 @@
   "TARGET_ARM
    && !BYTES_BIG_ENDIAN
    && !TARGET_MMU_TRAPS
+   && !arm_arch4
    && REGNO (operands[0]) != FRAME_POINTER_REGNUM
    && REGNO (operands[1]) != FRAME_POINTER_REGNUM
    && REGNO (operands[3]) != FRAME_POINTER_REGNUM"
@@ -8501,6 +8483,7 @@
   "TARGET_ARM
    && !BYTES_BIG_ENDIAN
    && !TARGET_MMU_TRAPS
+   && !arm_arch4
    && REGNO (operands[0]) != FRAME_POINTER_REGNUM
    && REGNO (operands[1]) != FRAME_POINTER_REGNUM
    && REGNO (operands[3]) != FRAME_POINTER_REGNUM"
@@ -8564,6 +8547,7 @@
   "TARGET_ARM
    && !BYTES_BIG_ENDIAN
    && !TARGET_MMU_TRAPS
+   && !arm_arch4
    && REGNO (operands[0]) != REGNO(operands[1])
    && (GET_CODE (operands[2]) != REG
        || REGNO(operands[0]) != REGNO (operands[2]))"
@@ -9138,11 +9122,28 @@
 
 ;; Miscellaneous Thumb patterns
 
-(define_insn "tablejump"
+(define_expand "tablejump"
+  [(parallel [(set (pc) (match_operand:SI 0 "register_operand" "l*r"))
+	      (use (label_ref (match_operand 1 "" "")))])]
+  "TARGET_THUMB"
+  "
+  if (flag_pic)
+    {
+      /* Hopefully, CSE will eliminate this copy.  */
+      rtx reg1 = copy_addr_to_reg (gen_rtx_LABEL_REF (Pmode, operands[1]));
+      rtx reg2 = gen_reg_rtx (SImode);
+
+      emit_insn (gen_addsi3 (reg2, operands[0], reg1));
+      operands[0] = reg2;
+    }
+  "
+)
+
+(define_insn "*thumb_tablejump"
   [(set (pc) (match_operand:SI 0 "register_operand" "l*r"))
    (use (label_ref (match_operand 1 "" "")))]
   "TARGET_THUMB"
-  "mov	pc, %0"
+  "mov\\t%|pc, %0"
   [(set_attr "length" "2")]
 )
 

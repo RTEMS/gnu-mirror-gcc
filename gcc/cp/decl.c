@@ -46,6 +46,7 @@ Boston, MA 02111-1307, USA.  */
 #include "tm_p.h"
 #include "target.h"
 #include "c-common.h"
+#include "c-pragma.h"
 #include "diagnostic.h"
 
 extern const struct attribute_spec *lang_attribute_table;
@@ -2500,6 +2501,7 @@ maybe_push_to_top_level (pseudo)
   s->bindings = b;
   s->need_pop_function_context = need_pop;
   s->function_decl = current_function_decl;
+  s->last_parms = last_function_parms;
 
   scope_chain = s;
   current_function_decl = NULL_TREE;
@@ -2541,6 +2543,7 @@ pop_from_top_level ()
   if (s->need_pop_function_context)
     pop_function_context_from (NULL_TREE);
   current_function_decl = s->function_decl;
+  last_function_parms = s->last_parms;
 
   free (s);
 }
@@ -3514,16 +3517,16 @@ duplicate_decls (newdecl, olddecl)
       tree newtype;
 
       /* Merge the data types specified in the two decls.  */
-      newtype = common_type (TREE_TYPE (newdecl), TREE_TYPE (olddecl));
+      newtype = merge_types (TREE_TYPE (newdecl), TREE_TYPE (olddecl));
 
-      /* If common_type produces a non-typedef type, just use the old type.  */
+      /* If merge_types produces a non-typedef type, just use the old type.  */
       if (TREE_CODE (newdecl) == TYPE_DECL
 	  && newtype == DECL_ORIGINAL_TYPE (newdecl))
 	newtype = oldtype;
 
       if (TREE_CODE (newdecl) == VAR_DECL)
 	DECL_THIS_EXTERN (newdecl) |= DECL_THIS_EXTERN (olddecl);
-      /* Do this after calling `common_type' so that default
+      /* Do this after calling `merge_types' so that default
 	 parameters don't confuse us.  */
       else if (TREE_CODE (newdecl) == FUNCTION_DECL
 	  && (TYPE_RAISES_EXCEPTIONS (TREE_TYPE (newdecl))
@@ -5345,7 +5348,7 @@ lookup_tag (form, name, binding_level, thislevel_only)
 	    if (old && DECL_ORIGINAL_TYPE (TYPE_NAME (old)))
 	      old = NULL_TREE;
 	    if (old && TREE_CODE (old) != form
-		&& !(form != ENUMERAL_TYPE && TREE_CODE (old) == TEMPLATE_DECL))
+		&& (form == ENUMERAL_TYPE || TREE_CODE (old) == ENUMERAL_TYPE))
 	      {
 		error ("`%#D' redeclared as %C", old, form);
 		return NULL_TREE;
@@ -5361,14 +5364,12 @@ lookup_tag (form, name, binding_level, thislevel_only)
 	    if (TREE_PURPOSE (tail) == name)
 	      {
 		enum tree_code code = TREE_CODE (TREE_VALUE (tail));
-		/* Should tighten this up; it'll probably permit
-		   UNION_TYPE and a struct template, for example.  */
+		
 		if (code != form
-		    && !(form != ENUMERAL_TYPE && code == TEMPLATE_DECL))
+		    && (form == ENUMERAL_TYPE || code == ENUMERAL_TYPE))
 		  {
 		    /* Definition isn't the kind we were looking for.  */
-		    error ("`%#D' redeclared as %C", TREE_VALUE (tail),
-			      form);
+		    error ("`%#D' redeclared as %C", TREE_VALUE (tail), form);
 		    return NULL_TREE;
 		  }
 		return TREE_VALUE (tail);
@@ -7259,6 +7260,10 @@ start_decl (declarator, declspecs, initialized, attributes, prefix_attributes)
   /* Set attributes here so if duplicate decl, will have proper attributes.  */
   cplus_decl_attributes (&decl, attributes, 0);
 
+  /* If #pragma weak was used, mark the decl weak now.  */
+  if (current_binding_level == global_binding_level)
+    maybe_apply_pragma_weak (decl);
+
   if (TREE_CODE (decl) == FUNCTION_DECL
       && DECL_DECLARED_INLINE_P (decl)
       && DECL_UNINLINABLE (decl)
@@ -7859,18 +7864,21 @@ make_rtl_for_nonlocal_decl (decl, init, asmspec)
      DECL_STMT is expanded.  */
   defer_p = DECL_FUNCTION_SCOPE_P (decl) || DECL_VIRTUAL_P (decl);
 
-  /* We try to defer namespace-scope static constants so that they are
-     not emitted into the object file unnecessarily.  */
-  if (!DECL_VIRTUAL_P (decl)
-      && TREE_READONLY (decl)
-      && DECL_INITIAL (decl) != NULL_TREE
-      && DECL_INITIAL (decl) != error_mark_node
-      && ! EMPTY_CONSTRUCTOR_P (DECL_INITIAL (decl))
-      && toplev
-      && !TREE_PUBLIC (decl))
+  /* We try to defer namespace-scope static constants and template
+     instantiations so that they are not emitted into the object file
+     unnecessarily.  */
+  if ((!DECL_VIRTUAL_P (decl)
+       && TREE_READONLY (decl)
+       && DECL_INITIAL (decl) != NULL_TREE
+       && DECL_INITIAL (decl) != error_mark_node
+       && ! EMPTY_CONSTRUCTOR_P (DECL_INITIAL (decl))
+       && toplev
+       && !TREE_PUBLIC (decl))
+      || DECL_COMDAT (decl))
     {
-      /* Fool with the linkage according to #pragma interface.  */
-      if (!interface_unknown)
+      /* Fool with the linkage of static consts according to #pragma
+	 interface.  */
+      if (!interface_unknown && !TREE_PUBLIC (decl))
 	{
 	  TREE_PUBLIC (decl) = 1;
 	  DECL_EXTERNAL (decl) = interface_only;
@@ -8030,8 +8038,7 @@ destroy_local_var (decl)
   cleanup = maybe_build_cleanup (decl);
 
   /* Record the cleanup required for this declaration.  */
-  if (DECL_SIZE (decl) && TREE_TYPE (decl) != error_mark_node
-      && cleanup)
+  if (DECL_SIZE (decl) && cleanup)
     finish_decl_cleanup (decl, cleanup);
 }
 
@@ -8065,8 +8072,10 @@ cp_finish_decl (decl, init, asmspec_tree, flags)
     }
 
   /* If a name was specified, get the string.  */
+  if (current_binding_level == global_binding_level)
+    asmspec_tree = maybe_apply_renaming_pragma (decl, asmspec_tree);
   if (asmspec_tree)
-      asmspec = TREE_STRING_POINTER (asmspec_tree);
+    asmspec = TREE_STRING_POINTER (asmspec_tree);
 
   if (init && TREE_CODE (init) == NAMESPACE_DECL)
     {
@@ -11295,9 +11304,7 @@ friend declaration requires class-key, i.e. `friend %#T'",
 	  /* Only try to do this stuff if we didn't already give up.  */
 	  if (type != integer_type_node)
 	    {
-	      /* DR 209. The friendly class does not need to be accessible
-                 in the scope of the class granting friendship. */
-	      skip_type_access_control ();
+	      decl_type_access_control (TYPE_NAME (type));
 
 	      /* A friendly class?  */
 	      if (current_class_type)
@@ -11559,33 +11566,32 @@ friend declaration requires class-key, i.e. `friend %#T'",
 	if (friendp)
 	  {
 	    /* Friends are treated specially.  */
-            tree t = NULL_TREE;
-	    
-	    /* DR 209. The friend does not need to be accessible at this
-               point. */
-	    skip_type_access_control ();
-	    
 	    if (ctype == current_class_type)
 	      warning ("member functions are implicitly friends of their class");
-
-            if (decl && DECL_NAME (decl))
-              {
-                if (template_class_depth (current_class_type) == 0)
-                  {
-              	    decl = check_explicit_specialization
-              	            (declarator, decl,
-              	             template_count, 2 * (funcdef_flag != 0) + 4);
-              	    if (decl == error_mark_node)
-              	      return error_mark_node;
-                  }
-              
-                t = do_friend (ctype, declarator, decl,
-              		       last_function_parms, *attrlist, flags, quals,
-              		       funcdef_flag);
-              }
-            if (t && funcdef_flag)
-              return t;
-	    return void_type_node;
+ 	    else
+ 	      {
+ 		tree t = NULL_TREE;
+ 		if (decl && DECL_NAME (decl))
+ 		  {
+ 		    if (template_class_depth (current_class_type) == 0)
+ 		      {
+ 			decl
+ 			  = check_explicit_specialization
+ 			  (declarator, decl,
+ 			   template_count, 2 * (funcdef_flag != 0) + 4);
+ 			if (decl == error_mark_node)
+ 			  return error_mark_node;
+ 		      }
+		    
+ 		    t = do_friend (ctype, declarator, decl,
+ 				   last_function_parms, *attrlist,
+				   flags, quals, funcdef_flag);
+ 		  }
+ 		if (t && funcdef_flag)
+ 		  return t;
+  
+ 		return void_type_node;
+ 	      }
 	  }
 
 	/* Structure field.  It may not be a function, except for C++ */
@@ -12863,19 +12869,6 @@ xref_tag (code_type_node, name, globalize)
 	redeclare_class_template (ref, current_template_parms);
     }
 
-  /* Until the type is defined, tentatively accept whatever
-     structure tag the user hands us.  */
-  if (!COMPLETE_TYPE_P (ref)
-      && ref != current_class_type
-      /* Have to check this, in case we have contradictory tag info.  */
-      && IS_AGGR_TYPE_CODE (TREE_CODE (ref)))
-    {
-      if (tag_code == class_type)
-	CLASSTYPE_DECLARED_CLASS (ref) = 1;
-      else if (tag_code == record_type)
-	CLASSTYPE_DECLARED_CLASS (ref) = 0;
-    }
-
   TYPE_ATTRIBUTES (ref) = attributes;
 
   return ref;
@@ -13117,9 +13110,6 @@ start_enum (name)
       enumtype = make_node (ENUMERAL_TYPE);
       pushtag (name, enumtype, 0);
     }
-
-  if (current_class_type)
-    TREE_ADDRESSABLE (b->tags) = 1;
 
   return enumtype;
 }
@@ -13494,6 +13484,10 @@ start_function (declspecs, declarator, attrs, flags)
 	return 0;
 
       cplus_decl_attributes (&decl1, attrs, 0);
+
+      /* If #pragma weak was used, mark the decl weak now.  */
+      if (current_binding_level == global_binding_level)
+	maybe_apply_pragma_weak (decl1);
 
       fntype = TREE_TYPE (decl1);
 
@@ -14224,15 +14218,16 @@ finish_function (flags)
     DECL_UNINLINABLE (fndecl) = 1;
 
   /* Complain if there's just no return statement.  */
-  if (!processing_template_decl
+  if (warn_return_type
+      && !processing_template_decl
       && TREE_CODE (TREE_TYPE (fntype)) != VOID_TYPE
       && !current_function_returns_value && !current_function_returns_null
-      && !DECL_NAME (DECL_RESULT (fndecl))
       /* Don't complain if we abort or throw.  */
       && !current_function_returns_abnormally
-      /* If we have -Wreturn-type, let flow complain.  Unless we're an
+      && !DECL_NAME (DECL_RESULT (fndecl))
+      /* Normally, with -Wreturn-type, flow will complain.  Unless we're an
 	 inline function, as we might never be compiled separately.  */
-      && (!warn_return_type || DECL_INLINE (fndecl)))
+      && DECL_INLINE (fndecl))
     warning ("no return statement in function returning non-void");
     
   /* Clear out memory we no longer need.  */
@@ -14518,7 +14513,7 @@ maybe_build_cleanup (decl)
 
       return rval;
     }
-  return 0;
+  return NULL_TREE;
 }
 
 /* When a stmt has been parsed, this function is called.  */

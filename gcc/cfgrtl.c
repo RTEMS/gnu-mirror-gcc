@@ -928,6 +928,9 @@ force_nonfallthru_and_redirect (e, target)
       /* Change the existing edge's source to be the new block, and add
 	 a new edge from the entry block to the new block.  */
       e->src = bb;
+      bb->count = e->count;
+      bb->frequency = EDGE_FREQUENCY (e);
+      bb->loop_depth = 0;
       for (pe1 = &ENTRY_BLOCK_PTR->succ; *pe1; pe1 = &(*pe1)->succ_next)
 	if (*pe1 == e)
 	  {
@@ -1214,6 +1217,7 @@ split_edge (edge_in)
 			   : edge_in->dest->index, before, NULL);
   bb->count = edge_in->count;
   bb->frequency = EDGE_FREQUENCY (edge_in);
+  bb->loop_depth = edge_in->dest->loop_depth;
 
   /* ??? This info is likely going to be out of date very soon.  */
   if (edge_in->dest->global_live_at_start)
@@ -1897,9 +1901,30 @@ purge_dead_edges (bb)
   rtx insn = bb->end, note;
   bool purged = false;
 
-  /* ??? This makes no sense since the later test includes more cases.  */
-  if (GET_CODE (insn) == JUMP_INSN && !simplejump_p (insn))
-    return false;
+  /* If this instruction cannot trap, remove REG_EH_REGION notes.  */
+  if (GET_CODE (insn) == INSN
+      && (note = find_reg_note (insn, REG_EH_REGION, NULL)))
+    {
+      rtx eqnote;
+
+      if (! may_trap_p (PATTERN (insn))
+	  || ((eqnote = find_reg_equal_equiv_note (insn))
+	      && ! may_trap_p (XEXP (eqnote, 0))))
+	remove_note (insn, note);
+    }
+
+  /* Cleanup abnormal edges caused by throwing insns that have been
+     eliminated.  */
+  if (! can_throw_internal (bb->end))
+    for (e = bb->succ; e; e = next)
+      {
+	next = e->succ_next;
+	if (e->flags & EDGE_EH)
+	  {
+	    remove_edge (e);
+	    purged = true;
+	  }
+      }
 
   if (GET_CODE (insn) == JUMP_INSN)
     {
@@ -1967,31 +1992,6 @@ purge_dead_edges (bb)
 
       return purged;
     }
-
-  /* If this instruction cannot trap, remove REG_EH_REGION notes.  */
-  if (GET_CODE (insn) == INSN
-      && (note = find_reg_note (insn, REG_EH_REGION, NULL)))
-    {
-      rtx eqnote;
-
-      if (! may_trap_p (PATTERN (insn))
-	  || ((eqnote = find_reg_equal_equiv_note (insn))
-	      && ! may_trap_p (XEXP (eqnote, 0))))
-	remove_note (insn, note);
-    }
-
-  /* Cleanup abnormal edges caused by throwing insns that have been
-     eliminated.  */
-  if (! can_throw_internal (bb->end))
-    for (e = bb->succ; e; e = next)
-      {
-	next = e->succ_next;
-	if (e->flags & EDGE_EH)
-	  {
-	    remove_edge (e);
-	    purged = true;
-	  }
-      }
 
   /* If we don't see a jump insn, we don't know exactly why the block would
      have been broken at this point.  Look for a simple, non-fallthru edge,
