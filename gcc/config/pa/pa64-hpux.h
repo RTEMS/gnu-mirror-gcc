@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler, for HPs running
    HPUX using the 64bit runtime model.
-   Copyright (C) 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2001, 2002, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -63,6 +63,18 @@ Boston, MA 02111-1307, USA.  */
    isn't available.  We also usually need to link with libdld and it's
    only available in shared form.  */
 #undef LIB_SPEC
+#if ((TARGET_DEFAULT | TARGET_CPU_DEFAULT) & MASK_GNU_LD)
+#define LIB_SPEC \
+  "%{!shared:\
+     %{!p:%{!pg: -lc %{static:%{!nolibdld:-a shared -ldld -a archive -lc}}}}\
+     %{p:%{!pg:%{static:%{!mhp-ld:-a shared}%{mhp-ld:-a archive_shared}}\
+	   -lprof %{static:-a archive} -lc\
+	   %{static:%{!nolibdld:-a shared -ldld -a archive -lc}}}}\
+     %{pg:%{static:%{!mhp-ld:-a shared}%{mhp-ld:-a archive_shared}}\
+       -lgprof %{static:-a archive} -lc\
+       %{static:%{!nolibdld:-a shared -ldld -a archive -lc}}}}\
+   /usr/lib/pa20_64/milli.a"
+#else
 #define LIB_SPEC \
   "%{!shared:\
      %{!p:%{!pg: -lc %{static:%{!nolibdld:-a shared -ldld -a archive -lc}}}}\
@@ -73,6 +85,7 @@ Boston, MA 02111-1307, USA.  */
        -lgprof %{static:-a archive} -lc\
        %{static:%{!nolibdld:-a shared -ldld -a archive -lc}}}}\
    /usr/lib/pa20_64/milli.a"
+#endif
 
 /* Under hpux11, the normal location of the `ld' and `as' programs is the
    /usr/ccs/bin directory.  */
@@ -95,6 +108,17 @@ Boston, MA 02111-1307, USA.  */
 #undef MD_STARTFILE_PREFIX_1
 #define MD_STARTFILE_PREFIX_1 "/opt/langtools/lib/pa20_64/"
 #endif
+
+/* This macro specifies the biggest alignment supported by the object
+   file format of this machine.
+
+   The .align directive in the HP assembler allows alignments up to
+   4096 bytes.  However, the maximum alignment of a global common symbol
+   is 16 bytes using HP ld.  For consistency, we use the same limit
+   with GNU ld.  */
+#undef MAX_OFILE_ALIGNMENT
+#define MAX_OFILE_ALIGNMENT                                             \
+  (TREE_PUBLIC (decl) && DECL_COMMON (decl) ? 128 : 32768)
 
 /* Due to limitations in the target structure, it isn't currently possible
    to dynamically switch between the GNU and HP assemblers.  */
@@ -124,25 +148,16 @@ Boston, MA 02111-1307, USA.  */
 #define HP_FINI_ARRAY_SECTION_ASM_OP	"\t.section\t.fini"
 #define GNU_FINI_ARRAY_SECTION_ASM_OP	"\t.section\t.fini_array"
 
+/* We need to override the following two macros defined in elfos.h since
+   the .comm directive has a different syntax and it can't be used for
+   local common symbols.  */
 #undef ASM_OUTPUT_ALIGNED_COMMON
 #define ASM_OUTPUT_ALIGNED_COMMON(FILE, NAME, SIZE, ALIGN)		\
-do {									\
-  bss_section ();							\
-  assemble_name ((FILE), (NAME));					\
-  fprintf ((FILE), "\t.comm "HOST_WIDE_INT_PRINT_UNSIGNED"\n",		\
-	   MAX ((unsigned HOST_WIDE_INT)(SIZE),				\
-		((unsigned HOST_WIDE_INT)(ALIGN) / BITS_PER_UNIT)));	\
-} while (0)
+  pa_asm_output_aligned_common (FILE, NAME, SIZE, ALIGN)
 
 #undef ASM_OUTPUT_ALIGNED_LOCAL
 #define ASM_OUTPUT_ALIGNED_LOCAL(FILE, NAME, SIZE, ALIGN)		\
-do {									\
-  bss_section ();							\
-  fprintf ((FILE), "\t.align %d\n", ((ALIGN) / BITS_PER_UNIT));		\
-  assemble_name ((FILE), (NAME));					\
-  fprintf ((FILE), "\n\t.block "HOST_WIDE_INT_PRINT_UNSIGNED"\n",	\
-	   (unsigned HOST_WIDE_INT)(SIZE));				\
-} while (0)
+  pa_asm_output_aligned_local (FILE, NAME, SIZE, ALIGN)
 
 /* The define in pa.h doesn't work with the alias attribute.  The
    default is ok with the following define for GLOBAL_ASM_OP.  */

@@ -31,6 +31,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "coretypes.h"
 #include "tm.h"
 #include "tree.h"
+#include "version.h"
 #include "tm_p.h"
 #include "flags.h"
 #include "input.h"
@@ -61,12 +62,19 @@ static void real_abort (void) ATTRIBUTE_NORETURN;
 static diagnostic_context global_diagnostic_context;
 diagnostic_context *global_dc = &global_diagnostic_context;
 
+/* APPLE LOCAL error-colon */
+static int gcc_error_colon = 0;
+
 /* Boilerplate text used in two locations.  */
 #define bug_report_request \
 "Please submit a full bug report,\n\
 with preprocessed source if appropriate.\n\
 See %s for instructions.\n"
 
+/* APPLE LOCAL insert assembly ".abort" directive on fatal error   */
+#ifdef EXIT_FROM_FATAL_DIAGNOSTIC
+#define exit(status)	EXIT_FROM_FATAL_DIAGNOSTIC (status)
+#endif
 
 /* Return a malloc'd string containing MSG formatted a la printf.  The
    caller is responsible for freeing the memory.  */
@@ -87,6 +95,11 @@ build_message_string (const char *msg, ...)
 char *
 file_name_as_prefix (const char *f)
 {
+  /* APPLE LOCAL begin error-colon */
+  if (gcc_error_colon)
+    return build_message_string ("%s: error: ", f);
+  else
+  /* APPLE LOCAL end error-colon */
   return build_message_string ("%s: ", f);
 }
 
@@ -172,13 +185,13 @@ diagnostic_build_prefix (diagnostic_info *diagnostic)
 #undef DEFINE_DIAGNOSTIC_KIND
     "must-not-happen"
   };
-   if (diagnostic->kind >= DK_LAST_DIAGNOSTIC_KIND)
-     abort();
+  expanded_location s = expand_location (diagnostic->location);
+  if (diagnostic->kind >= DK_LAST_DIAGNOSTIC_KIND)
+    abort();
 
-  return diagnostic->location.file
+  return s.file
     ? build_message_string ("%s:%d: %s",
-                            diagnostic->location.file,
-                            diagnostic->location.line,
+                            s.file, s.line,
                             _(diagnostic_kind_text[diagnostic->kind]))
     : build_message_string ("%s: %s", progname,
                             _(diagnostic_kind_text[diagnostic->kind]));
@@ -190,6 +203,23 @@ diagnostic_count_diagnostic (diagnostic_context *context,
 			     diagnostic_info *diagnostic)
 {
   diagnostic_t kind = diagnostic->kind;
+
+  /* APPLE LOCAL begin error-colon */
+  /* Here so it gets executed early on.  */
+  {
+    static int done = 0;
+    if (!done)
+      {
+	done = 1;	/* Do this only once.  */
+	/* Pretend we saw "-w" on commandline.  */
+	if (getenv ("GCC_DASH_W"))
+	  inhibit_warnings = 1;	/* referenced by diagnostic.h:diagnostic_report_warnings() */
+	if (getenv ("GCC_ERROR_COLON"))
+	  gcc_error_colon = 1;
+      }
+  }
+  /* APPLE LOCAL end error-colon */
+
   switch (kind)
     {
     default:
@@ -205,8 +235,9 @@ diagnostic_count_diagnostic (diagnostic_context *context,
 	   || diagnostic_kind_count (context, DK_SORRY) > 0)
 	  && !context->abort_on_error)
 	{
+	  expanded_location s = expand_location (diagnostic->location);
 	  fnotice (stderr, "%s:%d: confused by earlier errors, bailing out\n",
-		   diagnostic->location.file, diagnostic->location.line);
+		   s.file, s.line);
 	  exit (FATAL_EXIT_CODE);
 	}
 #endif
@@ -264,6 +295,11 @@ diagnostic_action_after_output (diagnostic_context *context,
     case DK_SORRY:
       if (context->abort_on_error)
 	real_abort ();
+      if (flag_fatal_errors)
+	{
+	  fnotice (stderr, "compilation terminated due to -Wfatal-errors.\n");
+	  exit (FATAL_EXIT_CODE);
+	}
       break;
 
     case DK_ICE:
@@ -293,7 +329,7 @@ void
 diagnostic_report_current_function (diagnostic_context *context)
 {
   diagnostic_report_current_module (context);
-  (*lang_hooks.print_error_function) (context, input_filename);
+  lang_hooks.print_error_function (context, input_filename);
 }
 
 void
@@ -307,16 +343,20 @@ diagnostic_report_current_module (diagnostic_context *context)
       pp_needs_newline (context->printer) = false;
     }
 
-  if (input_file_stack && diagnostic_last_module_changed (context))
+  p = input_file_stack;
+  if (p && diagnostic_last_module_changed (context))
     {
-      p = input_file_stack;
+      expanded_location xloc = expand_location (p->location);
       pp_verbatim (context->printer,
                    "In file included from %s:%d",
-                   p->location.file, p->location.line);
+		   xloc.file, xloc.line);
       while ((p = p->next) != NULL)
-	pp_verbatim (context->printer,
-                     ",\n                 from %s:%d",
-                     p->location.file, p->location.line);
+	{
+	  xloc = expand_location (p->location);
+	  pp_verbatim (context->printer,
+		       ",\n                 from %s:%d",
+		       xloc.file, xloc.line);
+	}
       pp_verbatim (context->printer, ":\n");
       diagnostic_set_last_module (context);
     }

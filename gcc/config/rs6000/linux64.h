@@ -50,6 +50,13 @@
 #undef	TARGET_AIX
 #define	TARGET_AIX TARGET_64BIT
 
+#ifdef HAVE_LD_NO_DOT_SYMS
+/* New ABI uses a local sym for the function entry point.  */
+extern int dot_symbols;
+#undef DOT_SYMBOLS
+#define DOT_SYMBOLS dot_symbols
+#endif
+
 #undef PROCESSOR_DEFAULT64
 #define PROCESSOR_DEFAULT64 PROCESSOR_PPC630
 
@@ -57,7 +64,7 @@
 #define	TARGET_RELOCATABLE (!TARGET_64BIT && (target_flags & MASK_RELOCATABLE))
 
 #undef	RS6000_ABI_NAME
-#define	RS6000_ABI_NAME (TARGET_64BIT ? "aixdesc" : "sysv")
+#define	RS6000_ABI_NAME "linux"
 
 #define INVALID_64BIT "-m%s not supported in this configuration"
 #define INVALID_32BIT INVALID_64BIT
@@ -75,6 +82,7 @@
 	      rs6000_current_abi = ABI_AIX;			\
 	      error (INVALID_64BIT, "call");			\
 	    }							\
+	  dot_symbols = !strcmp (rs6000_abi_name, "aixdesc");	\
 	  if (target_flags & MASK_RELOCATABLE)			\
 	    {							\
 	      target_flags &= ~MASK_RELOCATABLE;		\
@@ -259,16 +267,6 @@
 #define AGGREGATE_PADDING_FIXED TARGET_64BIT
 #define AGGREGATES_PAD_UPWARD_ALWAYS 0
 
-/* We don't want anything in the reg parm area being passed on the
-   stack.  */
-#define MUST_PASS_IN_STACK(MODE, TYPE)				\
-  ((TARGET_64BIT						\
-    && (TYPE) != 0						\
-    && (TREE_CODE (TYPE_SIZE (TYPE)) != INTEGER_CST		\
-	|| TREE_ADDRESSABLE (TYPE)))				\
-   || (!TARGET_64BIT						\
-       && default_must_pass_in_stack ((MODE), (TYPE))))
-
 /* Specify padding for the last element of a block move between
    registers and memory.  FIRST is nonzero if this is the only
    element.  */
@@ -396,11 +394,19 @@
    object files, each potentially with a different TOC pointer.  For
    that reason, place a nop after the call so that the linker can
    restore the TOC pointer if a TOC adjusting call stub is needed.  */
+#if DOT_SYMBOLS
 #define CRT_CALL_STATIC_FUNCTION(SECTION_OP, FUNC)	\
   asm (SECTION_OP "\n"					\
 "	bl ." #FUNC "\n"				\
 "	nop\n"						\
 "	.previous");
+#else
+#define CRT_CALL_STATIC_FUNCTION(SECTION_OP, FUNC)	\
+  asm (SECTION_OP "\n"					\
+"	bl " #FUNC "\n"					\
+"	nop\n"						\
+"	.previous");
+#endif
 #endif
 
 /* FP save and restore routines.  */
@@ -425,13 +431,11 @@
       if (!flag_inhibit_size_directive)					\
 	{								\
 	  fputs ("\t.size\t", (FILE));					\
-	  if (TARGET_64BIT)						\
+	  if (TARGET_64BIT && DOT_SYMBOLS)				\
 	    putc ('.', (FILE));						\
 	  assemble_name ((FILE), (FNAME));				\
 	  fputs (",.-", (FILE));					\
-	  if (TARGET_64BIT)						\
-	    putc ('.', (FILE));						\
-	  assemble_name ((FILE), (FNAME));				\
+	  rs6000_output_function_entry (FILE, FNAME);			\
 	  putc ('\n', (FILE));						\
 	}								\
     }									\
@@ -475,14 +479,13 @@
 do									\
   {									\
     char temp[256];							\
+    const char *s;							\
     ASM_GENERATE_INTERNAL_LABEL (temp, "LM", COUNTER);			\
     fprintf (FILE, "\t.stabn 68,0,%d,", LINE);				\
     assemble_name (FILE, temp);						\
     putc ('-', FILE);							\
-    if (TARGET_64BIT)							\
-      putc ('.', FILE);							\
-    assemble_name (FILE,						\
-		   XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0));\
+    s = XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0);		\
+    rs6000_output_function_entry (FILE, s);				\
     putc ('\n', FILE);							\
     (*targetm.asm_out.internal_label) (FILE, "LM", COUNTER);		\
   }									\
@@ -492,19 +495,20 @@ while (0)
 #define DBX_OUTPUT_BRAC(FILE, NAME, BRAC) \
   do									\
     {									\
-      const char *flab;							\
+      const char *s;							\
       fprintf (FILE, "%s%d,0,0,", ASM_STABN_OP, BRAC);			\
       assemble_name (FILE, NAME);					\
       putc ('-', FILE);							\
       if (current_function_func_begin_label != NULL_TREE)		\
-	flab = IDENTIFIER_POINTER (current_function_func_begin_label);	\
+	{								\
+	  s = IDENTIFIER_POINTER (current_function_func_begin_label);	\
+	  assemble_name (FILE, s);					\
+	}								\
       else								\
 	{								\
-	  if (TARGET_64BIT)						\
-	    putc ('.', FILE);						\
-	  flab = XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0);	\
+	  s = XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0);	\
+	  rs6000_output_function_entry (FILE, s);			\
 	}								\
-      assemble_name (FILE, flab);					\
       putc ('\n', FILE);						\
     }									\
   while (0)
@@ -516,12 +520,12 @@ while (0)
 #define	DBX_OUTPUT_NFUN(FILE, LSCOPE, DECL)				\
   do									\
     {									\
+      const char *s;							\
       fprintf (FILE, "%s\"\",%d,0,0,", ASM_STABS_OP, N_FUN);		\
       assemble_name (FILE, LSCOPE);					\
       putc ('-', FILE);							\
-      if (TARGET_64BIT)							\
-        putc ('.', FILE);						\
-      assemble_name (FILE, XSTR (XEXP (DECL_RTL (DECL), 0), 0));	\
+      s = XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0);		\
+      rs6000_output_function_entry (FILE, s);				\
       putc ('\n', FILE);						\
     }									\
   while (0)
@@ -547,6 +551,11 @@ while (0)
 
 #define LINK_GCC_C_SEQUENCE_SPEC \
   "%{static:--start-group} %G %L %{static:--end-group}%{!static:%G}"
+
+/* Use --as-needed -lgcc_s for eh support.  */
+#ifdef HAVE_LD_AS_NEEDED
+#define USE_LD_AS_NEEDED 1
+#endif
 
 /* Do code reading to identify a signal frame, and set the frame
    state data appropriately.  See unwind-dw2.c for the structs.  */

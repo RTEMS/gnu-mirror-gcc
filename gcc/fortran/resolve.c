@@ -1,23 +1,23 @@
 /* Perform type resolution on the various stuctures.
-   Copyright (C) 2001, 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
-This file is part of GNU G95.
+This file is part of GCC.
 
-GNU G95 is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2, or (at your option)
-any later version.
+GCC is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2, or (at your option) any later
+version.
 
-GNU G95 is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+GCC is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU G95; see the file COPYING.  If not, write to
-the Free Software Foundation, 59 Temple Place - Suite 330,
-Boston, MA 02111-1307, USA.  */
+along with GCC; see the file COPYING.  If not, write to the Free
+Software Foundation, 59 Temple Place - Suite 330,Boston, MA
+02111-1307, USA.  */
 
 #include "config.h"
 #include "gfortran.h"
@@ -247,6 +247,162 @@ resolve_formal_arglists (gfc_namespace * ns)
 }
 
 
+static void
+resolve_contained_fntype (gfc_symbol * sym, gfc_namespace * ns)
+{
+  try t;
+  
+  /* If this namespace is not a function, ignore it.  */
+  if (! sym
+      || !(sym->attr.function
+	   || sym->attr.flavor == FL_VARIABLE))
+    return;
+
+  /* Try to find out of what type the function is.  If there was an
+     explicit RESULT clause, try to get the type from it.  If the
+     function is never defined, set it to the implicit type.  If
+     even that fails, give up.  */
+  if (sym->result != NULL)
+    sym = sym->result;
+
+  if (sym->ts.type == BT_UNKNOWN)
+    {
+      /* Assume we can find an implicit type.  */
+      t = SUCCESS;
+
+      if (sym->result == NULL)
+	t = gfc_set_default_type (sym, 0, ns);
+      else
+	{
+	  if (sym->result->ts.type == BT_UNKNOWN)
+	    t = gfc_set_default_type (sym->result, 0, NULL);
+
+	  sym->ts = sym->result->ts;
+	}
+
+      if (t == FAILURE)
+	gfc_error ("Contained function '%s' at %L has no IMPLICIT type",
+		    sym->name, &sym->declared_at); /* FIXME */
+    }
+}
+
+
+/* Add NEW_ARGS to the formal argument list of PROC, taking care not to
+   introduce duplicates.   */
+
+static void
+merge_argument_lists (gfc_symbol *proc, gfc_formal_arglist *new_args)
+{
+  gfc_formal_arglist *f, *new_arglist;
+  gfc_symbol *new_sym;
+
+  for (; new_args != NULL; new_args = new_args->next)
+    {
+      new_sym = new_args->sym;
+      /* See if ths arg is already in the formal argument list.  */
+      for (f = proc->formal; f; f = f->next)
+	{
+	  if (new_sym == f->sym)
+	    break;
+	}
+
+      if (f)
+	continue;
+
+      /* Add a new argument.  Argument order is not important.  */
+      new_arglist = gfc_get_formal_arglist ();
+      new_arglist->sym = new_sym;
+      new_arglist->next = proc->formal;
+      proc->formal  = new_arglist;
+    }
+}
+
+
+/* Resolve alternate entry points.  If a symbol has multiple entry points we
+   create a new master symbol for the main routine, and turn the existing
+   symbol into an entry point.  */
+
+static void
+resolve_entries (gfc_namespace * ns)
+{
+  gfc_namespace *old_ns;
+  gfc_code *c;
+  gfc_symbol *proc;
+  gfc_entry_list *el;
+  char name[GFC_MAX_SYMBOL_LEN + 1];
+  static int master_count = 0;
+
+  if (ns->proc_name == NULL)
+    return;
+
+  /* No need to do anything if this procedure doesn't have alternate entry
+     points.  */
+  if (!ns->entries)
+    return;
+
+  /* We may already have resolved alternate entry points.  */
+  if (ns->proc_name->attr.entry_master)
+    return;
+
+  /* If this isn't a procedure something as gone horribly wrong.   */
+  assert (ns->proc_name->attr.flavor == FL_PROCEDURE);
+  
+  /* Remember the current namespace.  */
+  old_ns = gfc_current_ns;
+
+  gfc_current_ns = ns;
+
+  /* Add the main entry point to the list of entry points.  */
+  el = gfc_get_entry_list ();
+  el->sym = ns->proc_name;
+  el->id = 0;
+  el->next = ns->entries;
+  ns->entries = el;
+  ns->proc_name->attr.entry = 1;
+
+  /* Add an entry statement for it.  */
+  c = gfc_get_code ();
+  c->op = EXEC_ENTRY;
+  c->ext.entry = el;
+  c->next = ns->code;
+  ns->code = c;
+
+  /* Create a new symbol for the master function.  */
+  /* Give the internal function a unique name (within this file).
+     Also include teh function name so the user has some hope of figuring
+     out whats going on.  */
+  snprintf (name, GFC_MAX_SYMBOL_LEN, "master.%d.%s",
+	    master_count++, ns->proc_name->name);
+  name[GFC_MAX_SYMBOL_LEN] = '\0';
+  gfc_get_ha_symbol (name, &proc);
+  assert (proc != NULL);
+
+  gfc_add_procedure (&proc->attr, PROC_INTERNAL, NULL);
+  if (ns->proc_name->attr.subroutine)
+    gfc_add_subroutine (&proc->attr, NULL);
+  else
+    {
+      gfc_add_function (&proc->attr, NULL);
+      gfc_internal_error ("TODO: Functions with alternate entry points");
+    }
+  proc->attr.access = ACCESS_PRIVATE;
+  proc->attr.entry_master = 1;
+
+  /* Merge all the entry point arguments.  */
+  for (el = ns->entries; el; el = el->next)
+    merge_argument_lists (proc, el->sym->formal);
+
+  /* And use it for the function body.  */
+  ns->proc_name = proc;
+
+  /* FInalize the new symbols.  */
+  gfc_commit_symbols ();
+
+  /* Restore the original namespace.  */
+  gfc_current_ns = old_ns;
+}
+
+
 /* Resolve contained function types.  Because contained functions can call one
    another, they have to be worked out before any of the contained procedures
    can be resolved.
@@ -259,65 +415,20 @@ resolve_formal_arglists (gfc_namespace * ns)
 static void
 resolve_contained_functions (gfc_namespace * ns)
 {
-  gfc_symbol *contained_sym, *sym_lower;
   gfc_namespace *child;
-  try t;
+  gfc_entry_list *el;
 
   resolve_formal_arglists (ns);
 
   for (child = ns->contained; child; child = child->sibling)
     {
-      sym_lower = child->proc_name;
+      /* Resolve alternate entry points first.  */
+      resolve_entries (child); 
 
-      /* If this namespace is not a function, ignore it.  */
-      if (! sym_lower
-	  || !( sym_lower->attr.function
-		|| sym_lower->attr.flavor == FL_VARIABLE))
-	continue;
-
-      /* Find the contained symbol in the current namespace.  */
-      gfc_find_symbol (sym_lower->name, ns, 0, &contained_sym);
-
-      if (contained_sym == NULL)
-	gfc_internal_error ("resolve_contained_functions(): Contained "
-			    "function not found in parent namespace");
-
-      /* Try to find out of what type the function is.  If there was an
-	 explicit RESULT clause, try to get the type from it.  If the
-	 function is never defined, set it to the implicit type.  If
-	 even that fails, give up.  */
-      if (sym_lower->result != NULL)
-	sym_lower = sym_lower->result;
-
-      if (sym_lower->ts.type == BT_UNKNOWN)
-	{
-	  /* Assume we can find an implicit type.  */
-	  t = SUCCESS;
-
-	  if (sym_lower->result == NULL)
-	    t = gfc_set_default_type (sym_lower, 0, child);
-	  else
-	    {
-	      if (sym_lower->result->ts.type == BT_UNKNOWN)
-		t = gfc_set_default_type (sym_lower->result, 0, NULL);
-
-	      sym_lower->ts = sym_lower->result->ts;
-	    }
-
-	  if (t == FAILURE)
-	    gfc_error ("Contained function '%s' at %L has no IMPLICIT type",
-			sym_lower->name, &sym_lower->declared_at); /* FIXME */
-	}
-
-      /* If the symbol in the parent of the contained namespace is not
-	 the same as the one in contained namespace itself, copy over
-	 the type information.  */
-      /* ??? Shouldn't we replace the symbol with the parent symbol instead?  */
-      if (contained_sym != sym_lower)
-	{
-	  contained_sym->ts = sym_lower->ts;
-	  contained_sym->as = gfc_copy_array_spec (sym_lower->as);
-	}
+      /* Then check function return types.  */
+      resolve_contained_fntype (child->proc_name, child);
+      for (el = child->entries; el; el = el->next)
+	resolve_contained_fntype (el->sym, child);
     }
 }
 
@@ -371,7 +482,7 @@ resolve_structure_cons (gfc_expr * expr)
 /****************** Expression name resolution ******************/
 
 /* Returns 0 if a symbol was not declared with a type or
-   or attribute declaration statement, nonzero otherwise.  */
+   attribute declaration statement, nonzero otherwise.  */
 
 static int
 was_declared (gfc_symbol * sym)
@@ -2064,7 +2175,7 @@ gfc_resolve_expr (gfc_expr * e)
 
 
 /* Resolve the expressions in an iterator structure and require that they all
-   be of integer type. */
+   be of integer type.  */
 
 try
 gfc_resolve_iterator (gfc_iterator * iter)
@@ -2585,13 +2696,6 @@ validate_case_label_expr (gfc_expr * e, gfc_expr * case_expr)
   gfc_typespec case_ts = case_expr->ts;
 
   if (e == NULL) return SUCCESS;
-
-  if (e->expr_type != EXPR_CONSTANT)
-    {
-      gfc_error ("Expression in CASE statement at %L must be a constant",
-		 &e->where);
-      return FAILURE;
-    }
 
   if (e->ts.type != case_ts.type)
     {
@@ -3459,13 +3563,13 @@ resolve_code (gfc_code * code, gfc_namespace * ns)
 	{
 	case EXEC_NOP:
 	case EXEC_CYCLE:
-	case EXEC_IOLENGTH:
 	case EXEC_PAUSE:
 	case EXEC_STOP:
 	case EXEC_EXIT:
 	case EXEC_CONTINUE:
 	case EXEC_DT_END:
 	case EXEC_TRANSFER:
+	case EXEC_ENTRY:
 	  break;
 
 	case EXEC_WHERE:
@@ -3627,6 +3731,14 @@ resolve_code (gfc_code * code, gfc_namespace * ns)
 
 	case EXEC_INQUIRE:
 	  if (gfc_resolve_inquire (code->ext.inquire) == FAILURE)
+	      break;
+
+	  resolve_branch (code->ext.inquire->err, code);
+	  break;
+
+	case EXEC_IOLENGTH:
+	  assert(code->ext.inquire != NULL);
+	  if (gfc_resolve_inquire (code->ext.inquire) == FAILURE)
 	    break;
 
 	  resolve_branch (code->ext.inquire->err, code);
@@ -3687,6 +3799,9 @@ resolve_symbol (gfc_symbol * sym)
   /* Zero if we are checking a formal namespace.  */
   static int formal_ns_flag = 1;
   int formal_ns_save, check_constant, mp_flag;
+  int i;
+  const char *whynot;
+
 
   if (sym->attr.flavor == FL_UNKNOWN)
     {
@@ -3711,7 +3826,7 @@ resolve_symbol (gfc_symbol * sym)
   if (sym->ts.type == BT_UNKNOWN)
     {
       if (sym->attr.flavor == FL_VARIABLE || sym->attr.flavor == FL_PARAMETER)
-	gfc_set_default_type (sym, 0, NULL);
+	gfc_set_default_type (sym, 1, NULL);
 
       if (sym->attr.flavor == FL_PROCEDURE && sym->attr.function)
 	{
@@ -3728,19 +3843,32 @@ resolve_symbol (gfc_symbol * sym)
 	}
     }
 
+  /* Assumed size arrays and assumed shape arrays must be dummy
+     arguments.  */ 
+
   if (sym->as != NULL
       && (sym->as->type == AS_ASSUMED_SIZE
 	  || sym->as->type == AS_ASSUMED_SHAPE)
       && sym->attr.dummy == 0)
     {
-      gfc_error("Assumed %s array at %L must be a dummy argument",
-		sym->as->type == AS_ASSUMED_SIZE ? "size" : "shape",
-                &sym->declared_at);
+      gfc_error ("Assumed %s array at %L must be a dummy argument",
+		 sym->as->type == AS_ASSUMED_SIZE ? "size" : "shape",
+                 &sym->declared_at);
       return;
     }
 
+  /* A parameter array's shape needs to be constant.  */
+
+  if (sym->attr.flavor == FL_PARAMETER && sym->as != NULL 
+      && !gfc_is_compile_time_shape (sym->as))
+    {
+      gfc_error ("Parameter array '%s' at %L cannot be automatic "
+		 "or assumed shape", sym->name, &sym->declared_at);
+	  return;
+    }
+
   /* Make sure that character string variables with assumed length are
-     dummy argument.  */
+     dummy arguments.  */
 
   if (sym->attr.flavor == FL_VARIABLE && !sym->attr.result
       && sym->ts.type == BT_CHARACTER
@@ -3835,6 +3963,50 @@ resolve_symbol (gfc_symbol * sym)
 	}
     }
 
+  if (sym->attr.flavor == FL_VARIABLE)
+    {
+      /* Can the sybol have an initializer?  */
+      whynot = NULL;
+      if (sym->attr.allocatable)
+	whynot = "Allocatable";
+      else if (sym->attr.external)
+	whynot = "External";
+      else if (sym->attr.dummy)
+	whynot = "Dummy";
+      else if (sym->attr.intrinsic)
+	whynot = "Intrinsic";
+      else if (sym->attr.result)
+	whynot = "Function Result";
+      else if (sym->attr.dimension && !sym->attr.pointer)
+	{
+	  /* Don't allow initialization of automatic arrays.  */
+	  for (i = 0; i < sym->as->rank; i++)
+	    {
+	      if (sym->as->lower[i] == NULL
+		  || sym->as->lower[i]->expr_type != EXPR_CONSTANT
+		  || sym->as->upper[i] == NULL
+		  || sym->as->upper[i]->expr_type != EXPR_CONSTANT)
+		{
+		  whynot = "Automatic array";
+		  break;
+		}
+	    }
+	}
+
+      /* Reject illegal initializers.  */
+      if (sym->value && whynot)
+	{
+	  gfc_error ("%s '%s' at %L cannot have an initializer",
+		     whynot, sym->name, &sym->declared_at);
+	  return;
+	}
+
+      /* Assign default initializer.  */
+      if (sym->ts.type == BT_DERIVED && !(sym->value || whynot))
+	sym->value = gfc_default_initializer (&sym->ts);
+    }
+
+
   /* Make sure that intrinsic exist */
   if (sym->attr.intrinsic
       && ! gfc_intrinsic_name(sym->name, 0)
@@ -3897,7 +4069,7 @@ check_data_variable (gfc_data_variable * var, locus * where)
   mpz_t size;
   mpz_t offset;
   try t;
-  int mark = 0;
+  ar_type mark = AR_UNKNOWN;
   int i;
   mpz_t section_index[GFC_MAX_DIMENSIONS];
   gfc_ref *ref;
@@ -3934,14 +4106,14 @@ check_data_variable (gfc_data_variable * var, locus * where)
       switch (ref->u.ar.type)
 	{
 	case AR_FULL:
-	  mark = 1;
+	  mark = AR_FULL;
 	  break;
 
 	case AR_SECTION:
           ar = &ref->u.ar;
           /* Get the start position of array section.  */
           gfc_get_section_index (ar, section_index, &offset);
-          mark = 2;
+          mark = AR_SECTION;
 	  break;
 
 	default:
@@ -3976,17 +4148,17 @@ check_data_variable (gfc_data_variable * var, locus * where)
       /* Assign initial value to symbol.  */
       gfc_assign_data_value (var->expr, values.vnode->expr, offset);
 
-      if (mark == 1)
+      if (mark == AR_FULL)
         mpz_add_ui (offset, offset, 1);
 
       /* Modify the array section indexes and recalculate the offset for
          next element.  */
-      else if (mark == 2)
+      else if (mark == AR_SECTION)
         gfc_advance_section (section_index, ar, &offset);
 
       mpz_sub_ui (size, size, 1);
     }
-  if (mark == 2)
+  if (mark == AR_SECTION)
     {
       for (i = 0; i < ar->dimen; i++)
         mpz_clear (section_index[i]);
@@ -4379,6 +4551,8 @@ gfc_resolve (gfc_namespace * ns)
 
   old_ns = gfc_current_ns;
   gfc_current_ns = ns;
+
+  resolve_entries (ns);
 
   resolve_contained_functions (ns);
 

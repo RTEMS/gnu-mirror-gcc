@@ -471,16 +471,22 @@ extern const char *alpha_tls_size_string; /* For -mtls-size= */
    type, but kept valid in the wider mode.  The signedness of the
    extension may differ from that of the type.
 
-   For Alpha, we always store objects in a full register.  32-bit objects
-   are always sign-extended, but smaller objects retain their signedness.  */
+   For Alpha, we always store objects in a full register.  32-bit integers
+   are always sign-extended, but smaller objects retain their signedness.
 
-#define PROMOTE_MODE(MODE,UNSIGNEDP,TYPE)  \
-  if (GET_MODE_CLASS (MODE) == MODE_INT		\
-      && GET_MODE_SIZE (MODE) < UNITS_PER_WORD)	\
-    {						\
-      if ((MODE) == SImode)			\
-	(UNSIGNEDP) = 0;			\
-      (MODE) = DImode;				\
+   Note that small vector types can get mapped onto integer modes at the
+   whim of not appearing in alpha-modes.def.  We never promoted these
+   values before; don't do so now that we've trimed the set of modes to
+   those actually implemented in the backend.  */
+
+#define PROMOTE_MODE(MODE,UNSIGNEDP,TYPE)			\
+  if (GET_MODE_CLASS (MODE) == MODE_INT				\
+      && (TYPE == NULL || TREE_CODE (TYPE) != VECTOR_TYPE)	\
+      && GET_MODE_SIZE (MODE) < UNITS_PER_WORD)			\
+    {								\
+      if ((MODE) == SImode)					\
+	(UNSIGNEDP) = 0;					\
+      (MODE) = DImode;						\
     }
 
 /* Define this if most significant bit is lowest numbered
@@ -512,7 +518,7 @@ extern const char *alpha_tls_size_string; /* For -mtls-size= */
 #define PARM_BOUNDARY 64
 
 /* Boundary (in *bits*) on which stack pointer should be aligned.  */
-#define STACK_BOUNDARY 64
+#define STACK_BOUNDARY 128
 
 /* Allocation boundary (in *bits*) for the code of a function.  */
 #define FUNCTION_BOUNDARY 32
@@ -1040,10 +1046,9 @@ extern int alpha_memory_latency;
    (TYPE is null for libcalls where that information may not be available.)  */
 
 #define FUNCTION_ARG_ADVANCE(CUM, MODE, TYPE, NAMED)			\
-  if (MUST_PASS_IN_STACK (MODE, TYPE))					\
-    (CUM) = 6;								\
-  else									\
-    (CUM) += ALPHA_ARG_SIZE (MODE, TYPE, NAMED)
+  ((CUM) += 								\
+   (targetm.calls.must_pass_in_stack (MODE, TYPE))			\
+    ? 6 : ALPHA_ARG_SIZE (MODE, TYPE, NAMED))
 
 /* Determine where to put an argument to a function.
    Value is zero to push the argument on the stack,
@@ -1063,15 +1068,6 @@ extern int alpha_memory_latency;
 
 #define FUNCTION_ARG(CUM, MODE, TYPE, NAMED)	\
   function_arg((CUM), (MODE), (TYPE), (NAMED))
-
-/* A C expression that indicates when an argument must be passed by
-   reference.  If nonzero for an argument, a copy of that argument is
-   made in memory and a pointer to the argument is passed instead of
-   the argument itself.  The pointer is passed in whatever way is
-   appropriate for passing a pointer to that type.  */
-
-#define FUNCTION_ARG_PASS_BY_REFERENCE(CUM, MODE, TYPE, NAMED) \
-  ((MODE) == TFmode || (MODE) == TCmode)
 
 /* For an arg passed partly in registers and partly in memory,
    this is the number of registers used.
@@ -1347,7 +1343,7 @@ do {									     \
 #define MOVE_MAX 8
 
 /* If a memory-to-memory move would take MOVE_RATIO or more simple
-   move-instruction pairs, we will do a movstr or libcall instead.
+   move-instruction pairs, we will do a movmem or libcall instead.
 
    Without byte/word accesses, we want no more than four instructions;
    with, several single byte accesses are better.  */
@@ -1374,7 +1370,7 @@ do {									     \
 /* Define if loading in MODE, an integral mode narrower than BITS_PER_WORD
    will either zero-extend or sign-extend.  The value of this macro should
    be the code that says which one of the two operations is implicitly
-   done, NIL if none.  */
+   done, UNKNOWN if none.  */
 #define LOAD_EXTEND_OP(MODE) ((MODE) == SImode ? SIGN_EXTEND : ZERO_EXTEND)
 
 /* Define if loading short immediate values into registers sign extends.  */
@@ -1619,76 +1615,15 @@ do {						\
 #define PRINT_OPERAND_PUNCT_VALID_P(CODE) \
   ((CODE) == '/' || (CODE) == ',' || (CODE) == '-' || (CODE) == '~' \
    || (CODE) == '#' || (CODE) == '*' || (CODE) == '&' || (CODE) == '+')
-
+
 /* Print a memory address as an operand to reference that memory location.  */
 
 #define PRINT_OPERAND_ADDRESS(FILE, ADDR) \
   print_operand_address((FILE), (ADDR))
-
-/* Define the codes that are matched by predicates in alpha.c.  */
-
-#define PREDICATE_CODES 						\
-  {"reg_or_0_operand", {SUBREG, REG, CONST_INT, CONST_DOUBLE,		\
-			CONST_VECTOR}},					\
-  {"reg_or_6bit_operand", {SUBREG, REG, CONST_INT}},			\
-  {"reg_or_8bit_operand", {SUBREG, REG, CONST_INT}},			\
-  {"reg_or_const_int_operand", {SUBREG, REG, CONST_INT}},		\
-  {"cint8_operand", {CONST_INT}},					\
-  {"reg_or_cint_operand", {SUBREG, REG, CONST_INT}},			\
-  {"add_operand", {SUBREG, REG, CONST_INT}},				\
-  {"sext_add_operand", {SUBREG, REG, CONST_INT}},			\
-  {"const48_operand", {CONST_INT}},					\
-  {"and_operand", {SUBREG, REG, CONST_INT}},				\
-  {"or_operand", {SUBREG, REG, CONST_INT}},				\
-  {"mode_mask_operand", {CONST_INT}},					\
-  {"mul8_operand", {CONST_INT}},					\
-  {"mode_width_operand", {CONST_INT}},					\
-  {"alpha_comparison_operator", {EQ, LE, LT, LEU, LTU}},		\
-  {"alpha_zero_comparison_operator", {EQ, NE, LE, LT, LEU, LTU}},	\
-  {"alpha_swapped_comparison_operator", {EQ, GE, GT, GEU, GTU}},	\
-  {"signed_comparison_operator", {EQ, NE, LE, LT, GE, GT}},		\
-  {"alpha_fp_comparison_operator", {EQ, LE, LT, UNORDERED}},		\
-  {"divmod_operator", {DIV, MOD, UDIV, UMOD}},				\
-  {"fix_operator", {FIX, UNSIGNED_FIX}},				\
-  {"const0_operand", {CONST_INT, CONST_DOUBLE, CONST_VECTOR}},		\
-  {"samegp_function_operand", {SYMBOL_REF}},				\
-  {"direct_call_operand", {SYMBOL_REF}},				\
-  {"local_symbolic_operand", {SYMBOL_REF, CONST, LABEL_REF}},		\
-  {"small_symbolic_operand", {SYMBOL_REF, CONST}},			\
-  {"global_symbolic_operand", {SYMBOL_REF, CONST}},			\
-  {"dtp16_symbolic_operand", {CONST}},					\
-  {"dtp32_symbolic_operand", {CONST}},					\
-  {"gotdtp_symbolic_operand", {CONST}},					\
-  {"tp16_symbolic_operand", {CONST}},					\
-  {"tp32_symbolic_operand", {CONST}},					\
-  {"gottp_symbolic_operand", {CONST}},					\
-  {"call_operand", {REG, SYMBOL_REF}},					\
-  {"input_operand", {SUBREG, REG, MEM, CONST_INT, CONST_DOUBLE,		\
-		     CONST_VECTOR, SYMBOL_REF, CONST, LABEL_REF, HIGH}},\
-  {"some_operand", {SUBREG, REG, MEM, CONST_INT, CONST_DOUBLE,		\
-		    CONST_VECTOR, SYMBOL_REF, CONST, LABEL_REF, HIGH}},	\
-  {"some_ni_operand", {SUBREG, REG, MEM}},				\
-  {"aligned_memory_operand", {MEM}},					\
-  {"unaligned_memory_operand", {MEM}},					\
-  {"reg_or_unaligned_mem_operand", {SUBREG, REG, MEM}},			\
-  {"any_memory_operand", {MEM}},					\
-  {"normal_memory_operand", {MEM}},					\
-  {"hard_fp_register_operand", {SUBREG, REG}},				\
-  {"hard_int_register_operand", {SUBREG, REG}},				\
-  {"reg_not_elim_operand", {SUBREG, REG}},				\
-  {"reg_no_subreg_operand", {REG}},					\
-  {"addition_operation", {PLUS}},					\
-  {"symbolic_operand", {SYMBOL_REF, LABEL_REF, CONST}},			\
-  {"some_small_symbolic_operand", {SET, PARALLEL, PREFETCH, UNSPEC,	\
-				   UNSPEC_VOLATILE}},
 
 /* Implement `va_start' for varargs and stdarg.  */
 #define EXPAND_BUILTIN_VA_START(valist, nextarg) \
   alpha_va_start (valist, nextarg)
-
-/* Implement `va_arg'.  */
-#define EXPAND_BUILTIN_VA_ARG(valist, type) \
-  alpha_va_arg (valist, type)
 
 /* Tell collect that the object format is ECOFF.  */
 #define OBJECT_FORMAT_COFF
@@ -1836,9 +1771,3 @@ do {							\
 
 /* The system headers under Alpha systems are generally C++-aware.  */
 #define NO_IMPLICIT_EXTERN_C
-
-/* Generate calls to memcpy, etc., not bcopy, etc.  */
-#define TARGET_MEM_FUNCTIONS 1
-
-/* Pass complex arguments independently.  */
-#define SPLIT_COMPLEX_ARGS 1
