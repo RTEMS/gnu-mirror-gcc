@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler, for DEC Alpha w/ELF.
-   Copyright (C) 1996, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1996, 1997, 1998 Free Software Foundation, Inc.
    Contributed by Richard Henderson (rth@tamu.edu).
 
 This file is part of GNU CC.
@@ -20,10 +20,10 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.    */
 
 /* This is used on Alpha platforms that use the ELF format.
-Currently only Linux uses this. */
+   Currently only GNU/Linux uses this. */
 
 #undef TARGET_VERSION
-#define TARGET_VERSION fprintf (stderr, " (Alpha Linux/ELF)");
+#define TARGET_VERSION fprintf (stderr, " (Alpha GNU/Linux with ELF)");
 
 #undef OBJECT_FORMAT_COFF
 #undef EXTENDED_COFF
@@ -39,6 +39,15 @@ Currently only Linux uses this. */
 -Asystem(linux) -Acpu(alpha) -Amachine(alpha) -D__ELF__"
 
 #undef LINK_SPEC
+#ifdef USE_GNULIBC_1
+#define LINK_SPEC "-m elf64alpha -G 8 %{O*:-O3} %{!O*:-O1}	\
+  %{shared:-shared}						\
+  %{!shared:							\
+    %{!static:							\
+      %{rdynamic:-export-dynamic}				\
+      %{!dynamic-linker:-dynamic-linker /lib/ld.so.1}}		\
+    %{static:-static}}"
+#else
 #define LINK_SPEC "-m elf64alpha -G 8 %{O*:-O3} %{!O*:-O1}	\
   %{shared:-shared}						\
   %{!shared:							\
@@ -46,6 +55,20 @@ Currently only Linux uses this. */
       %{rdynamic:-export-dynamic}				\
       %{!dynamic-linker:-dynamic-linker /lib/ld-linux.so.2}}	\
     %{static:-static}}"
+#endif
+
+#ifndef USE_GNULIBC_1
+#undef DEFAULT_VTABLE_THUNKS
+#define DEFAULT_VTABLE_THUNKS 1
+#endif
+
+#ifndef USE_GNULIBC_1
+#undef LIB_SPEC
+#define LIB_SPEC \
+  "%{shared: -lc} \
+   %{!shared: %{mieee-fp:-lieee} %{pthread:-lpthread} \
+	%{profile:-lc_p} %{!profile: -lc}}"
+#endif
 
 /* Output at beginning of assembler file.  */
 
@@ -474,8 +497,8 @@ do {									 \
 #undef PREFERRED_DEBUGGING_TYPE
 #define PREFERRED_DEBUGGING_TYPE DBX_DEBUG
 
-/* Provide a STARTFILE_SPEC appropriate for Linux.  Here we add
-   the Linux magical crtbegin.o file (see crtstuff.c) which
+/* Provide a STARTFILE_SPEC appropriate for GNU/Linux.  Here we add
+   the GNU/Linux magical crtbegin.o file (see crtstuff.c) which
    provides part of the support for getting C++ file-scope static
    object constructed before entering `main'. */
    
@@ -483,14 +506,14 @@ do {									 \
 #define STARTFILE_SPEC \
   "%{!shared: \
      %{pg:gcrt1.o%s} %{!pg:%{p:gcrt1.o%s} %{!p:crt1.o%s}}}\
-   crti.o%s %{!shared:crtbegin.o%s} %{shared:crtbeginS.o%s}"
+   crti.o%s crtbegin.o%s"
 
-/* Provide a ENDFILE_SPEC appropriate for Linux.  Here we tack on
-   the Linux magical crtend.o file (see crtstuff.c) which
+/* Provide a ENDFILE_SPEC appropriate for GNU/Linux.  Here we tack on
+   the GNU/Linux magical crtend.o file (see crtstuff.c) which
    provides part of the support for getting C++ file-scope static
    object constructed before entering `main', followed by a normal
-   Linux "finalizer" file, `crtn.o'.  */
+   GNU/Linux "finalizer" file, `crtn.o'.  */
 
 #undef	ENDFILE_SPEC
 #define ENDFILE_SPEC \
-  "%{!shared:crtend.o%s} %{shared:crtendS.o%s} crtn.o%s"
+  "crtend.o%s crtn.o%s"

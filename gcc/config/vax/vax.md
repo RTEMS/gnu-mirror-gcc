@@ -1,5 +1,5 @@
 ;;- Machine description for GNU compiler, Vax Version
-;;   Copyright (C) 1987, 88, 91, 94, 95, 1996 Free Software Foundation, Inc.
+;;   Copyright (C) 1987, 88, 91, 94-96, 1998 Free Software Foundation, Inc.
 
 ;; This file is part of GNU CC.
 
@@ -1837,14 +1837,17 @@
 
 ;; Note that operand 1 is total size of args, in bytes,
 ;; and what the call insn wants is the number of words.
+;; It is used in the call instruction as a byte, but in the addl2 as
+;; a word.  Since the only time we actually use it in the call instruction
+;; is when it is a constant, SImode (for addl2) is the proper mode.
 (define_insn "call_pop"
   [(call (match_operand:QI 0 "memory_operand" "m")
-	 (match_operand:QI 1 "general_operand" "g"))
+	 (match_operand:SI 1 "const_int_operand" "n"))
    (set (reg:SI 14) (plus:SI (reg:SI 14)
 			     (match_operand:SI 3 "immediate_operand" "i")))]
   ""
   "*
-  if (GET_CODE (operands[1]) != CONST_INT || INTVAL (operands[1]) > 255 * 4)
+  if (INTVAL (operands[1]) > 255 * 4)
     /* Vax `calls' really uses only one byte of #args, so pop explicitly.  */
     return \"calls $0,%0\;addl2 %1,sp\";
   operands[1] = gen_rtx (CONST_INT, VOIDmode, (INTVAL (operands[1]) + 3)/ 4);
@@ -1854,12 +1857,12 @@
 (define_insn "call_value_pop"
   [(set (match_operand 0 "" "=g")
 	(call (match_operand:QI 1 "memory_operand" "m")
-	      (match_operand:QI 2 "general_operand" "g")))
+	      (match_operand:SI 2 "const_int_operand" "n")))
    (set (reg:SI 14) (plus:SI (reg:SI 14)
 			     (match_operand:SI 4 "immediate_operand" "i")))]
   ""
   "*
-  if (GET_CODE (operands[2]) != CONST_INT || INTVAL (operands[2]) > 255 * 4)
+  if (INTVAL (operands[2]) > 255 * 4)
     /* Vax `calls' really uses only one byte of #args, so pop explicitly.  */
     return \"calls $0,%1\;addl2 %2,sp\";
   operands[2] = gen_rtx (CONST_INT, VOIDmode, (INTVAL (operands[2]) + 3)/ 4);
@@ -1870,11 +1873,11 @@
 ;; operands.  In that case, combine may simplify the adjustment of sp.
 (define_insn ""
   [(call (match_operand:QI 0 "memory_operand" "m")
-	 (match_operand:QI 1 "general_operand" "g"))
+	 (match_operand:SI 1 "const_int_operand" "n"))
    (set (reg:SI 14) (reg:SI 14))]
   ""
   "*
-  if (GET_CODE (operands[1]) != CONST_INT || INTVAL (operands[1]) > 255 * 4)
+  if (INTVAL (operands[1]) > 255 * 4)
     /* Vax `calls' really uses only one byte of #args, so pop explicitly.  */
     return \"calls $0,%0\;addl2 %1,sp\";
   operands[1] = gen_rtx (CONST_INT, VOIDmode, (INTVAL (operands[1]) + 3)/ 4);
@@ -1884,11 +1887,11 @@
 (define_insn ""
   [(set (match_operand 0 "" "=g")
 	(call (match_operand:QI 1 "memory_operand" "m")
-	      (match_operand:QI 2 "general_operand" "g")))
+	      (match_operand:SI 2 "const_int_operand" "n")))
    (set (reg:SI 14) (reg:SI 14))]
   ""
   "*
-  if (GET_CODE (operands[2]) != CONST_INT || INTVAL (operands[2]) > 255 * 4)
+  if (INTVAL (operands[2]) > 255 * 4)
     /* Vax `calls' really uses only one byte of #args, so pop explicitly.  */
     return \"calls $0,%1\;addl2 %2,sp\";
   operands[2] = gen_rtx (CONST_INT, VOIDmode, (INTVAL (operands[2]) + 3)/ 4);
