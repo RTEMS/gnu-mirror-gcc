@@ -1,6 +1,6 @@
 /* Fold a constant sub-tree into a single node for C-compiler
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -4729,7 +4729,7 @@ fold_binary_op_with_conditional_arg (enum tree_code code, tree type,
 	{
 	  arg = save_expr (arg);
 	  lhs = rhs = 0;
-	  save = 1;
+	  save = saved_expr_p (arg);
 	}
     }
 
@@ -4740,6 +4740,12 @@ fold_binary_op_with_conditional_arg (enum tree_code code, tree type,
 
   test = fold (build (COND_EXPR, type, test, lhs, rhs));
 
+  /* If ARG involves a SAVE_EXPR, we need to ensure it is evaluated
+     ahead of the COND_EXPR we made.  Otherwise we would have it only
+     evaluated in one branch, with the other branch using the result
+     but missing the evaluation code.  Beware that the save_expr call
+     above might not return a SAVE_EXPR, so testing the TREE_CODE
+     of ARG is not enough to decide here.  */
   if (save)
     return build (COMPOUND_EXPR, type,
 		  convert (void_type_node, arg),
