@@ -308,6 +308,11 @@ struct gcc_target
   rtx (* expand_builtin) (tree exp, rtx target, rtx subtarget,
 			  enum machine_mode mode, int ignore);
 
+  /* For a vendor-specific fundamental TYPE, return a pointer to
+     a statically-allocated string containing the C++ mangling for
+     TYPE.  In all other cases, return NULL.  */
+  const char * (* mangle_fundamental_type) (tree type);
+
   /* Make any adjustments to libfunc names needed for this target.  */
   void (* init_libfuncs) (void);
 
@@ -455,6 +460,20 @@ struct gcc_target
      at the beginning of assembly output.  */
   bool file_start_file_directive;
 
+  /* APPLE LOCAL begin AltiVec */
+  /* Return true if we should expand a disabled (conditional) macro.  */
+  bool (* expand_macro_p) (const struct cpp_token *);
+  
+  /* True if it is permissible to use cast expressions as
+     vector initializers, e.g.:
+
+       (vector unsigned int)(3, 4, 5, 6)
+       (vector float)(2.5)
+
+     This is required for the Motorola AltiVec syntax on the PowerPC.  */
+  bool cast_expr_as_vector_init;
+  /* APPLE LOCAL end AltiVec */
+  
   /* Functions relating to calls - argument passing, returns, etc.  */
   struct calls {
     bool (*promote_function_args) (tree fntype);
@@ -472,6 +491,9 @@ struct gcc_target
        targetm.calls.setup_incoming_varargs() and/or
        targetm.calls.strict_argument_naming().  */
     bool (*pretend_outgoing_varargs_named) (CUMULATIVE_ARGS *ca);
+    /* APPLE LOCAL begin Altivec */
+    bool (*skip_vec_args) (tree, int, int*);
+    /* APPLE LOCAL end Altivec */
   } calls;
 };
 
