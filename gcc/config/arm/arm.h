@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler, for ARM.
    Copyright (C) 1991, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
-   2001, 2002, 2003 Free Software Foundation, Inc.
+   2001, 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Pieter `Tiggr' Schoenmakers (rcpieter@win.tue.nl)
    and Martin Simmons (@harleqn.co.uk).
    More major hacks by Richard Earnshaw (rearnsha@arm.com)
@@ -2475,10 +2475,11 @@ extern int making_const_table;
     {							\
       if (TARGET_THUMB) 				\
         {						\
-          if (is_called_in_ARM_mode (DECL))		\
+          if (is_called_in_ARM_mode (DECL)      \
+			  || current_function_is_thunk)		\
             fprintf (STREAM, "\t.code 32\n") ;		\
           else						\
-           fprintf (STREAM, "\t.thumb_func\n") ;	\
+           fprintf (STREAM, "\t.code 16\n\t.thumb_func\n") ;	\
         }						\
       if (TARGET_POKE_FUNCTION_NAME)			\
         arm_poke_function_name (STREAM, (char *) NAME);	\

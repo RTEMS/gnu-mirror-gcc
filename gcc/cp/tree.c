@@ -1,6 +1,6 @@
 /* Language-dependent node constructors for parse phase of GNU compiler.
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -985,7 +985,8 @@ build_exception_variant (tree type, tree raises)
 
   for (; v; v = TYPE_NEXT_VARIANT (v))
     if (TYPE_QUALS (v) == type_quals
-        && comp_except_specs (raises, TYPE_RAISES_EXCEPTIONS (v), 1))
+        && comp_except_specs (raises, TYPE_RAISES_EXCEPTIONS (v), 1)
+	&& (*targetm.comp_type_attributes) (type, v))
       return v;
 
   /* Need to build a new variant.  */
@@ -1954,6 +1955,23 @@ make_ptrmem_cst (tree type, tree member)
   TREE_TYPE (ptrmem_cst) = type;
   PTRMEM_CST_MEMBER (ptrmem_cst) = member;
   return ptrmem_cst;
+}
+
+/* Build a variant of TYPE that has the indicated ATTRIBUTES.  May
+   return an existing type of an appropriate type already exists.  */
+
+tree
+cp_build_type_attribute_variant (tree type, tree attributes)
+{
+  tree new_type;
+
+  new_type = build_type_attribute_variant (type, attributes);
+  if (TREE_CODE (new_type) == FUNCTION_TYPE
+      && (TYPE_RAISES_EXCEPTIONS (new_type) 
+	  != TYPE_RAISES_EXCEPTIONS (type)))
+    new_type = build_exception_variant (new_type,
+					TYPE_RAISES_EXCEPTIONS (type));
+  return new_type;
 }
 
 /* Apply FUNC to all language-specific sub-trees of TP in a pre-order

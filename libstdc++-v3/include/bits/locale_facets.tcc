@@ -299,7 +299,7 @@ namespace std
 
       // Digit grouping is checked. If grouping and found_grouping don't
       // match, then get very very upset, and set failbit.
-      if (__lc->_M_use_grouping && __found_grouping.size())
+      if (__found_grouping.size())
         {
           // Add the ending grouping if a decimal wasn't found.
 	  if (!__found_dec)
@@ -492,7 +492,7 @@ namespace std
 
 	// Digit grouping is checked. If grouping and found_grouping don't
 	// match, then get very very upset, and set failbit.
-	if (__lc->_M_use_grouping && __found_grouping.size())
+	if (__found_grouping.size())
 	  {
 	    // Add the ending grouping.
 	    __found_grouping += static_cast<char>(__sep_pos);
@@ -1207,7 +1207,7 @@ namespace std
 		  || ((static_cast<part>(__p.field[3]) != money_base::none)
 		      && __i == 2)) 
 		{
-		  // According to 22.2.6.1.2.2, symbol is required
+		  // According to 22.2.6.1.2, p2, symbol is required
 		  // if (__io.flags() & ios_base::showbase),
 		  // otherwise is optional and consumed only if
 		  // other characters are needed to complete the
@@ -1253,11 +1253,15 @@ namespace std
 		  }
 		else if (__c == __d && !__testdecfound)
 		  {
-		    __grouping_tmp += static_cast<char>(__sep_pos);
+		    // If no grouping chars are seen, no grouping check
+		    // is applied. Therefore __grouping_tmp is adjusted
+		    // only if decimal_point comes after some thousands_sep.
+		    if (__grouping_tmp.size())
+		      __grouping_tmp += static_cast<char>(__sep_pos);
 		    __sep_pos = 0;
 		    __testdecfound = true;
 		  }
-		else if (__c == __sep)
+		else if (__c == __sep && !__testdecfound)
 		  {
 		    if (__grouping.size())
 		      {
@@ -1289,10 +1293,9 @@ namespace std
 	{
 	  const size_type __len = __sign.size();
 	  size_type __i = 1;
-	  for (; __beg != __end && __i < __len; ++__i)
-	    for (; __beg != __end
-		   && *__beg != __sign[__i]; ++__beg);
-	  
+	  for (; __beg != __end && __i < __len
+		 && *__beg == __sign[__i]; ++__beg, ++__i);
+
 	  if (__i != __len)
 	    __testvalid = false;
 	}
@@ -1317,8 +1320,12 @@ namespace std
 	    __tmp_units.insert(__tmp_units.begin(), __ctype.widen('-'));
 
 	  // Test for grouping fidelity.
-	  if (__grouping.size() && __grouping_tmp.size())
+	  if (__grouping_tmp.size())
 	    {
+	      // Add the ending grouping if a decimal wasn't found.
+	      if (!__testdecfound)
+		__grouping_tmp += static_cast<char>(__sep_pos);
+
 	      if (!std::__verify_grouping(__grouping.data(),
 					  __grouping.size(),
 					  __grouping_tmp))
@@ -1385,7 +1392,7 @@ namespace std
       _CharT* __ws = static_cast<_CharT*>(__builtin_alloca(sizeof(_CharT) 
 							   * __cs_size));
       __ctype.widen(__cs, __cs + __len, __ws);
-      string_type __digits(__ws);
+      const string_type __digits(__ws, __len);
       return this->do_put(__s, __intl, __io, __fill, __digits); 
     }
 
@@ -2253,14 +2260,14 @@ namespace std
 	  // Who came up with these rules, anyway? Jeeze.
           const locale& __loc = __io._M_getloc();
 	  const ctype<_CharT>& __ctype = use_facet<ctype<_CharT> >(__loc); 
-	  const _CharT __minus = __ctype.widen('-');
-	  const _CharT __plus = __ctype.widen('+');
-	  const bool __testsign = _Traits::eq(__olds[0], __minus)
-	                          || _Traits::eq(__olds[0], __plus);
 
-	  const bool __testhex = _Traits::eq(__ctype.widen('0'), __olds[0]) 
-	                         && (_Traits::eq(__ctype.widen('x'), __olds[1]) 
-				     || _Traits::eq(__ctype.widen('X'), __olds[1]));
+	  const bool __testsign = _Traits::eq(__ctype.widen('-'), __olds[0])
+	                          || _Traits::eq(__ctype.widen('+'), __olds[0]);
+	  const bool __testhex = (_Traits::eq(__ctype.widen('0'), __olds[0])
+				  && __oldlen > 1
+				  && (_Traits::eq(__ctype.widen('x'), __olds[1]) 
+				      || _Traits::eq(__ctype.widen('X'),
+						     __olds[1])));
 	  if (__testhex)
 	    {
 	      __news[0] = __olds[0]; 
@@ -2284,24 +2291,24 @@ namespace std
   bool
   __verify_grouping(const char* __grouping, size_t __grouping_size,
 		    const string& __grouping_tmp)
-    { 
-      const size_t __n = __grouping_tmp.size() - 1;
-      const size_t __min = std::min(__n, __grouping_size - 1);
-      size_t __i = __n;
-      bool __test = true;
-
-      // Parsed number groupings have to match the
-      // numpunct::grouping string exactly, starting at the
-      // right-most point of the parsed sequence of elements ...
-      for (size_t __j = 0; __j < __min && __test; --__i, ++__j)
-	__test = __grouping_tmp[__i] == __grouping[__j];
-      for (; __i && __test; --__i)
-	__test = __grouping_tmp[__i] == __grouping[__min];
-      // ... but the last parsed grouping can be <= numpunct
-      // grouping.
-      __test &= __grouping_tmp[0] <= __grouping[__min];
-      return __test;
-    }
+  { 
+    const size_t __n = __grouping_tmp.size() - 1;
+    const size_t __min = std::min(__n, __grouping_size - 1);
+    size_t __i = __n;
+    bool __test = true;
+    
+    // Parsed number groupings have to match the
+    // numpunct::grouping string exactly, starting at the
+    // right-most point of the parsed sequence of elements ...
+    for (size_t __j = 0; __j < __min && __test; --__i, ++__j)
+      __test = __grouping_tmp[__i] == __grouping[__j];
+    for (; __i && __test; --__i)
+      __test = __grouping_tmp[__i] == __grouping[__min];
+    // ... but the last parsed grouping can be <= numpunct
+    // grouping.
+    __test &= __grouping_tmp[0] <= __grouping[__min];
+    return __test;
+  }
 
   template<typename _CharT>
     _CharT*
