@@ -1,3 +1,137 @@
+2001-07-04  Joseph S. Myers  <jsm28@cam.ac.uk>
+
+	* g77.texi: Use gpl.texi and funding.texi.  Remove Look and Feel
+	section.  Add Funding Free Software to invariant sections.
+	* Make-lang.in ($(srcdir)/f/g77.info, f/g77.dvi): Update
+	dependencies and use doc/include in search path.
+
+20010617 Release Manager
+
+        * GCC 3.0 Released.
+
+Wed Jun 13 11:22:39 2001  Mark Mitchell  <mark@codesourcery.com>
+
+	* BUGS: Remove.
+	* NEWS: Likewise.
+
+2001-06-10  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* g77install.texi: Remove all documentation here.  Point
+	to the GCC installation procedures.
+	* g77.texi: Add documentation on how to get output always
+	flushed and how to increase the maximum unit number.
+	* bugs.texi: Add documentation on how to change the threshold
+	for putting local arrays on the stack.
+
+2001-06-07  Theodore Papadopoulo  <Theodore.Papadopoulo@sophia.inria.fr>
+
+	* Make-lang.in ($(srcdir)/f/g77.info): Added dependencies on
+	fdl.texi.
+	(f/g77.dvi): Use TEXI2DVI instead of custom tex calls.  Create the
+	dvi file in the f directory.
+
+2001-06-03  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* root.texi: Fix typo in patches e-mail address.
+
+2001-06-03  Toon Moene  <toon@moene.indiv.nluug.nl>
+	    Jan van Male  <jan.vanmale@fenk.wau.nl>
+
+	* root.texi: Define `help' and `patches' mailing list
+	addresses.
+	* news.texi: Remove `prerelease' from 0.5.26
+	* g77.texi: Use two spaces between command options, eliminate
+	some 'overfull hboxes'.  Use help and patches mailing list
+	addresses where appropriate.
+
+2001-06-02  Joseph S. Myers  <jsm28@cam.ac.uk>
+
+	* g77.texi: Move contents to just after title page.
+
+2001-06-02  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* com.c (ffecom_init_0): Make CHARACTER*1 unsigned.
+
+2001-05-22  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* g77.texi: Update last-changed date.
+	* news.texi: Update copyright years, last-changed date.
+
+2001-05-22  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* g77.texi: Update maintenance information for
+	GNU Fortran.
+	* news.texi: Make more news in 0.5.26 `user visible
+	changes'. Acknowledge work by important contributors.
+
+2001-05-20  Joseph S. Myers  <jsm28@cam.ac.uk>
+
+	* Make-lang.in (f/g77.dvi): Include $(srcdir) in TEXINPUTS.
+
+2001-05-19  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* Make-lang.in: Have $(MAKEINFO) look into the parent
+	directory for includes.
+	* g77.texi: Use the GFDL.
+
+Sun May 13 12:25:06 2001  Mark Mitchell  <mark@codesourcery.com>
+
+	* Make-lang.in: Replace all uses of `touch' with $(STAMP).
+
+2001-04-21  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* news.texi: Update release information for 0.5.26.
+
+Thu Apr 19 12:49:24 2001  Mark Mitchell  <mark@codesourcery.com>
+
+	* top.c (ffe_decode_option): Do not permit language-independent
+	processing for -ffixed-line-length.
+
+2001-04-02  Jakub Jelinek  <jakub@redhat.com>
+
+	* lex.c (ffelex_hash_): Avoid eating one whole line after
+	#line.
+
+Mon Apr  2 22:38:09 2001  Toon Moene <toon@moene.indiv.nluug.nl>
+
+	* com.c (duplicate_decls): Fix thinko in lazy DECL_RTL patch
+	of 2001-03-04.
+
+Mon Mar 26 18:13:30 2001  Mark Mitchell  <mark@codesourcery.com>
+
+	* com.c (duplicate_decls): Don't copy DECL_FRAME_SIZE.
+
+2001-03-22  Zack Weinberg  <zackw@stanford.edu>
+
+	* lang-specs.h: Add zero initializer for cpp_spec field to
+	all array elements.
+
+Mon Mar 19 15:05:39 2001  Mark Mitchell  <mark@codesourcery.com>
+
+	* com.c (builtin_function): Use SET_DECL_ASSEMBLER_NAME.
+
+2001-03-15  Zack Weinberg  <zackw@stanford.edu>
+
+	* proj.h, intdoc.c: Delete 'bool' type.  Don't include
+	stddef.h here.
+	* com.c: Rename variables named 'true' and/or 'false'.
+
+Wed Mar 14 09:29:27 2001  Mark Mitchell  <mark@codesourcery.com>
+
+	* com.c (ffecom_member_phase_2): Use COPY_DECL_RTL,
+	DECL_RTL_SET_P, etc.
+	(duplicate_decls): Likewise.
+	(start_decl): Likewise.
+	
+Fri Feb 23 15:28:39 2001  Richard Kenner  <kenner@vlsi1.ultra.nyu.edu>
+
+	* com.c (set_block): Set NAMES and BLOCKS from BLOCK.
+
+2001-02-19  Joseph S. Myers  <jsm28@cam.ac.uk>
+
+	* root.texi: Clear DEVELOPMENT.  Update GCC version number to 3.0.
+	* BUGS, NEWS: Regenerate.
+
 Sun Feb  4 15:52:44 2001  Richard Kenner  <kenner@vlsi1.ultra.nyu.edu>
 
 	* com.c (ffecom_init_0): Call fatal_error instead of fatal.

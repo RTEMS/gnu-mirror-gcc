@@ -61,6 +61,7 @@ static void handle_pragma_vtable PARAMS ((cpp_reader *));
 static void handle_pragma_unit PARAMS ((cpp_reader *));
 static void handle_pragma_interface PARAMS ((cpp_reader *));
 static void handle_pragma_implementation PARAMS ((cpp_reader *));
+static void handle_pragma_java_exceptions PARAMS ((cpp_reader *));
 static void cxx_init PARAMS ((void));
 static void cxx_finish PARAMS ((void));
 static void cxx_init_options PARAMS ((void));
@@ -83,10 +84,6 @@ static void init_operators PARAMS ((void));
 #endif
 
 #include "cpplib.h"
-
-/* Pending language change.
-   Positive is push count, negative is pop count.  */
-int pending_lang_change = 0;
 
 extern int yychar;		/*  the lookahead symbol		*/
 extern YYSTYPE yylval;		/*  the semantic value of the		*/
@@ -317,7 +314,7 @@ operator_name_info_t assignment_operator_name_info[(int) LAST_CPLUS_TREE_CODE];
 
 /* Initialize data structures that keep track of operator names.  */
 
-#define DEF_OPERATOR(NAME, C, NM, OM, AR, AP) \
+#define DEF_OPERATOR(NAME, C, M, AR, AP) \
  CONSTRAINT (C, sizeof "operator " + sizeof NAME <= 256);
 #include "operators.def"
 #undef DEF_OPERATOR
@@ -329,7 +326,7 @@ init_operators ()
   char buffer[256];
   struct operator_name_info_t *oni;
 
-#define DEF_OPERATOR(NAME, CODE, NEW_MANGLING, OLD_MANGLING, ARITY, ASSN_P) \
+#define DEF_OPERATOR(NAME, CODE, MANGLING, ARITY, ASSN_P)		    \
   sprintf (buffer, ISALPHA (NAME[0]) ? "operator %s" : "operator%s", NAME); \
   identifier = get_identifier (buffer);					    \
   IDENTIFIER_OPNAME_P (identifier) = 1;					    \
@@ -339,7 +336,7 @@ init_operators ()
 	 : &operator_name_info[(int) CODE]);				    \
   oni->identifier = identifier;						    \
   oni->name = NAME;							    \
-  oni->mangled_name = flag_new_abi ? NEW_MANGLING : OLD_MANGLING;
+  oni->mangled_name = MANGLING;
 
 #include "operators.def"
 #undef DEF_OPERATOR
@@ -684,6 +681,8 @@ init_cp_pragma ()
   cpp_register_pragma (parse_in, "GCC", "interface", handle_pragma_interface);
   cpp_register_pragma (parse_in, "GCC", "implementation",
 		       handle_pragma_implementation);
+  cpp_register_pragma (parse_in, "GCC", "java_exceptions",
+		       handle_pragma_java_exceptions);
 }
 
 const char *
@@ -1015,7 +1014,7 @@ check_for_missing_semicolon (type)
        && yychar != SELFNAME)
       || yychar == 0  /* EOF */)
     {
-      if (ANON_AGGRNAME_P (TYPE_IDENTIFIER (type)))
+      if (TYPE_ANONYMOUS_P (type))
 	error ("semicolon missing after %s declaration",
 	       TREE_CODE (type) == ENUMERAL_TYPE ? "enum" : "struct");
       else
@@ -1180,6 +1179,18 @@ handle_pragma_implementation (dfile)
       ifiles->next = impl_file_chain;
       impl_file_chain = ifiles;
     }
+}
+
+/* Indicate that this file uses Java-personality exception handling.  */
+static void
+handle_pragma_java_exceptions (dfile)
+     cpp_reader *dfile ATTRIBUTE_UNUSED;
+{
+  tree x;
+  if (c_lex (&x) != CPP_EOF)
+    warning ("junk at end of #pragma GCC java_exceptions");
+
+  choose_personality_routine (lang_java);
 }
 
 void
@@ -1517,11 +1528,11 @@ retrofit_lang_decl (t)
 
   DECL_LANG_SPECIFIC (t) = ld;
   if (current_lang_name == lang_name_cplusplus)
-    DECL_LANGUAGE (t) = lang_cplusplus;
+    SET_DECL_LANGUAGE (t, lang_cplusplus);
   else if (current_lang_name == lang_name_c)
-    DECL_LANGUAGE (t) = lang_c;
+    SET_DECL_LANGUAGE (t, lang_c);
   else if (current_lang_name == lang_name_java)
-    DECL_LANGUAGE (t) = lang_java;
+    SET_DECL_LANGUAGE (t, lang_java);
   else my_friendly_abort (64);
 
 #ifdef GATHER_STATISTICS

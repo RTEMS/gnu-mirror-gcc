@@ -370,7 +370,8 @@ extern const char *c4x_rpts_cycles_string, *c4x_cpu_version_string;
 
 /* If a structure has a floating point field then force structure
    to have BLKMODE.  */
-#define STRUCT_FORCE_BLK(FIELD) (TREE_CODE (TREE_TYPE (FIELD)) == REAL_TYPE)
+#define MEMBER_TYPE_FORCES_BLK(FIELD) \
+  (TREE_CODE (TREE_TYPE (FIELD)) == REAL_TYPE)
 
 /* Number of bits in the high and low parts of a two stage
    load of an immediate constant.  */
@@ -629,12 +630,16 @@ extern const char *c4x_rpts_cycles_string, *c4x_cpu_version_string;
 
 #define CLASS_LIKELY_SPILLED_P(CLASS) ((CLASS) == INDEX_REGS)
 
-/* CCmode is wrongly defined in machmode.def  It should have a size
-   of UNITS_PER_WORD.  */
+/* CCmode is wrongly defined in machmode.def.  It should have a size
+   of UNITS_PER_WORD.  HFmode is 40-bits and thus fits within a single
+   extended precision register.  Similarly, HCmode fits within two
+   extended precision registers.  */
 
 #define HARD_REGNO_NREGS(REGNO, MODE)				\
-(((MODE) == CCmode || (MODE) == CC_NOOVmode) ? 1 : ((MODE) == HFmode) ? 1 : \
-((GET_MODE_SIZE(MODE) + UNITS_PER_WORD - 1) / UNITS_PER_WORD))
+(((MODE) == CCmode || (MODE) == CC_NOOVmode) ? 1 : \
+ ((MODE) == HFmode) ? 1 : \
+ ((MODE) == HCmode) ? 2 : \
+ ((GET_MODE_SIZE(MODE) + UNITS_PER_WORD - 1) / UNITS_PER_WORD))
 
 
 /* A C expression that is nonzero if the hard register REGNO is preserved
@@ -2162,6 +2167,10 @@ dtors_section ()							\
 
 
 /* Overall Framework of an Assembler File.  */
+/* We need to have a data section we can identify so that we can set
+   the DP register back to a data pointer in the small memory model.
+   This is only required for ISRs if we are paranoid that someone
+   may have quietly changed this register on the sly.  */
 
 #define ASM_FILE_START(FILE)					\
 {								\
@@ -2184,17 +2193,8 @@ dtors_section ()							\
       }								\
     else							\
       output_quoted_string (FILE, main_input_filename);		\
-    fprintf (FILE, "\n");					\
+    fputs ("\n\t.data\ndata_sec:\n", FILE);			\
 }
-
-/* We need to have a data section we can identify so that we can set
-   the DP register back to a data pointer in the small memory model.
-   This is only required for ISRs if we are paranoid that someone
-   may have quietly changed this register on the sly.  */
-
-#define ASM_IDENTIFY_GCC(FILE) \
-    if (! TARGET_TI) fputs ("gcc2_compiled.:\n", FILE);	\
-      fputs ("\t.data\ndata_sec:\n", FILE);
 
 #define ASM_COMMENT_START ";"
 

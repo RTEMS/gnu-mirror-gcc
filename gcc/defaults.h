@@ -102,16 +102,6 @@ do { ASM_OUTPUT_LABEL(FILE,LABEL_ALTERNATE_NAME (INSN)); } while (0)
   while (0)
 #endif
 
-#ifndef ASM_IDENTIFY_GCC
-  /* Default the definition, only if ASM_IDENTIFY_GCC is not set,
-     because if it is set, we might not want ASM_IDENTIFY_LANGUAGE
-     outputting labels, if we do want it to, then it must be defined
-     in the tm.h file.  */
-#ifndef ASM_IDENTIFY_LANGUAGE
-#define ASM_IDENTIFY_LANGUAGE(FILE) output_lang_identify (FILE);
-#endif
-#endif
-
 /* This is how we tell the assembler to equate two values.  */
 #ifdef SET_ASM_OP
 #ifndef ASM_OUTPUT_DEF
@@ -179,6 +169,13 @@ do { ASM_OUTPUT_LABEL(FILE,LABEL_ALTERNATE_NAME (INSN)); } while (0)
 #ifndef SUPPORTS_INIT_PRIORITY
 #define SUPPORTS_INIT_PRIORITY 1
 #endif /* SUPPORTS_INIT_PRIORITY */
+
+/* If duplicate library search directories can be removed from a
+   linker command without changing the linker's semantics, give this
+   symbol a nonzero.  */
+#ifndef LINK_ELIMINATE_DUPLICATE_LDIRECTORIES
+#define LINK_ELIMINATE_DUPLICATE_LDIRECTORIES 0
+#endif /* LINK_ELIMINATE_DUPLICATE_LDIRECTORIES */
 
 /* If we have a definition of INCOMING_RETURN_ADDR_RTX, assume that
    the rest of the DWARF 2 frame unwind support is also provided.  */
@@ -301,6 +298,44 @@ do {								\
 #ifndef CPLUSPLUS_CPP_SPEC
 #ifdef CPP_SPEC
 #define CPLUSPLUS_CPP_SPEC CPP_SPEC
+#endif
+#endif
+
+/* By default, the C++ compiler will use the lowest bit of the pointer
+   to function to indicate a pointer-to-member-function points to a
+   virtual member function.  However, if FUNCTION_BOUNDARY indicates
+   function addresses aren't always even, the lowest bit of the delta
+   field will be used.  */
+#ifndef TARGET_PTRMEMFUNC_VBIT_LOCATION
+#define TARGET_PTRMEMFUNC_VBIT_LOCATION \
+  (FUNCTION_BOUNDARY >= 2 * BITS_PER_UNIT \
+   ? ptrmemfunc_vbit_in_pfn : ptrmemfunc_vbit_in_delta)
+#endif
+
+/* Select a format to encode pointers in exception handling data.  We
+   prefer those that result in fewer dynamic relocations.  Assume no
+   special support here and encode direct references.  */
+#ifndef ASM_PREFERRED_EH_DATA_FORMAT
+#define ASM_PREFERRED_EH_DATA_FORMAT(CODE,GLOBAL)  DW_EH_PE_absptr
+#endif
+
+/* True if it is possible to profile code that does not have a frame
+   pointer.  */
+
+#ifndef TARGET_ALLOWS_PROFILING_WITHOUT_FRAME_POINTER
+#define TARGET_ALLOWS_PROFILING_WITHOUT_FRAME_POINTER true
+#endif
+
+#ifndef ACCUMULATE_OUTGOING_ARGS
+#define ACCUMULATE_OUTGOING_ARGS 0
+#endif
+
+/* Supply a default definition for PUSH_ARGS.  */
+#ifndef PUSH_ARGS
+#ifdef PUSH_ROUNDING
+#define PUSH_ARGS	!ACCUMULATE_OUTGOING_ARGS
+#else
+#define PUSH_ARGS	0
 #endif
 #endif
 

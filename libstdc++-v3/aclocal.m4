@@ -13,8 +13,6 @@ dnl PARTICULAR PURPOSE.
 dnl
 dnl Initialize configure bits.
 dnl
-dnl Define OPTLEVEL='-O2' if new inlining code present.
-dnl
 dnl GLIBCPP_CONFIGURE
 AC_DEFUN(GLIBCPP_CONFIGURE, [
   dnl Default to --enable-multilib
@@ -26,10 +24,10 @@ AC_DEFUN(GLIBCPP_CONFIGURE, [
     *)   AC_MSG_ERROR(bad value ${enableval} for multilib option) ;;
    esac], [multilib=yes])dnl
 
-  glibcpp_basedir=$auxdir/$1/libstdc++-v3
+  glibcpp_basedir=$srcdir/$toprel/$1/libstdc++-v3
   AC_SUBST(glibcpp_basedir)
 
-  AM_INIT_AUTOMAKE(libstdc++, 2.90.8)
+  AM_INIT_AUTOMAKE(libstdc++, 3.0.0)
 
   # Never versions of autoconf add an underscore to these functions.
   # Prevent future problems ...
@@ -90,15 +88,15 @@ AC_DEFUN(LIB_AC_PROG_CXX,
 [AC_BEFORE([$0], [AC_PROG_CXXCPP])dnl
 dnl Fool anybody using AC_PROG_CXX.
 AC_PROVIDE([AC_PROG_CXX])
-# Use CXX_libstdcxx so that we do not cause CXX to be cached with the
+# Use glibcpp_CXX so that we do not cause CXX to be cached with the
 # flags that come in CXX while configuring libstdc++.  They're different
 # from those used for all other target libraries.  If CXX is set in
 # the environment, respect that here.
-CXX_libstdcxx=$CXX
-AC_CHECK_PROGS(CXX_libstdcxx, $CCC c++ g++ gcc CC cxx cc++, gcc)
-CXX=$CXX_libstdcxx
-AC_SUBST(CXX)
-test -z "$CXX" && AC_MSG_ERROR([no acceptable c++ found in \$PATH])
+glibcpp_CXX=$CXX
+AC_CHECK_PROGS(glibcpp_CXX, $CCC c++ g++ gcc CC cxx cc++, gcc)
+AC_SUBST(glibcpp_CXX)
+CXX=$glibcpp_CXX
+test -z "$glibcpp_CXX" && AC_MSG_ERROR([no acceptable c++ found in \$PATH])
 
 AC_PROG_CXX_GNU
 
@@ -128,8 +126,7 @@ LIB_AC_PROG_CXX
 
   AC_CHECK_TOOL(AS, as)
   AC_CHECK_TOOL(AR, ar)
-  AC_CHECK_TOOL(RANLIB, ranlib, :)
-
+  AC_CHECK_TOOL(RANLIB, ranlib, ranlib-not-found-in-path-error)
   AC_PROG_INSTALL
 
   AM_MAINTAINER_MODE
@@ -142,14 +139,12 @@ LIB_AC_PROG_CXX
   # automake happy, but we dont execute it, since we dont care about
   # the result.
   if false; then
+    # autoconf 2.50 runs AC_EXEEXT by default, and the macro expands
+    # to nothing, so nothing would remain between `then' and `fi' if it
+    # were not for the `:' below.
+    :
     AC_EXEEXT
   fi
-
-  # configure.host sets the following important variables
-  #        glibcpp_cflags    - host specific C compiler flags
-  #        glibcpp_cxxflags  - host specific C++ compiler flags
-  glibcpp_cflags=
-  glibcpp_cxxflags=
 
   . [$]{glibcpp_basedir}/configure.host
 
@@ -159,13 +154,8 @@ LIB_AC_PROG_CXX
   esac
 
   # This does for the target what configure.host does for the host.  In
-  # addition to modifying the same flags, it also sets up symlinks.
+  # addition to possibly modifying the same flags, it also sets up symlinks.
   GLIBCPP_CHECK_TARGET
-
-  GLIBCPP_CFLAGS="[$]{glibcpp_cflags}"
-  GLIBCPP_CXXFLAGS="[$]{glibcpp_cxxflags}"
-  AC_SUBST(GLIBCPP_CFLAGS)
-  AC_SUBST(GLIBCPP_CXXFLAGS)
 ])
 
 
@@ -179,11 +169,11 @@ if test ! -f stamp-sanity-compiler; then
   AC_MSG_CHECKING([for g++ that will successfully compile libstdc++-v3])
   AC_LANG_SAVE
   AC_LANG_CPLUSPLUS
-  AC_EGREP_CPP(ok, [
-  #if (__GNUC__ > 2) || (__GNUC__ == 2 && __GNUC_MINOR__ >= 95) 
-    ok
+  AC_TRY_COMPILE(, [
+  #if __GNUC__ < 3
+    not_ok
   #endif
-  ], gpp_satisfactory=yes, AC_MSG_ERROR([please upgrade to gcc-2.95 or above]))
+  ], gpp_satisfactory=yes, AC_MSG_ERROR([please upgrade to GCC 3.0 or above]))
   AC_LANG_RESTORE
   AC_MSG_RESULT($gpp_satisfactory)
   touch stamp-sanity-compiler
@@ -192,22 +182,21 @@ fi
 
 
 dnl
-dnl Test for newer compiler features, or features that are present in newer
-dnl compiler version but not older compiler versions should be placed
-dnl here.
+dnl Tests for newer compiler features, or features that are present in newer
+dnl compiler versions but not older compiler versions still in use, should
+dnl be placed here.
 dnl
-dnl Define WFMT_FLAGS='-fdiagnostics-show-location=once' if possible
-dnl 
 dnl Define WERROR='-Werror' if requested and possible; g++'s that lack the
 dnl new inlining code or the new system_header pragma will die on -Werror.
 dnl Leave it out by default and use maint-mode to use it.
 dnl
 dnl Define SECTION_FLAGS='-ffunction-sections -fdata-sections' if
-dnl compiler supports it.  
+dnl compiler supports it and the user has not requested debug mode.
+dnl
 dnl GLIBCPP_CHECK_COMPILER_FEATURES
 AC_DEFUN(GLIBCPP_CHECK_COMPILER_FEATURES, [
   # All these tests are for C++; save the language and the compiler flags.
-  # The CXXFLAGS thing is suspicious, but based on similar bits 
+  # The CXXFLAGS thing is suspicious, but based on similar bits previously
   # found in GLIBCPP_CONFIGURE.
   AC_LANG_SAVE
   AC_LANG_CPLUSPLUS
@@ -220,22 +209,6 @@ AC_DEFUN(GLIBCPP_CHECK_COMPILER_FEATURES, [
   else
     WERROR='-Werror'
   fi
-
-  # Check for more sophisticated diagnostic control.
-  AC_MSG_CHECKING([for g++ that supports -fdiagnostics-show-location=once])
-  CXXFLAGS='-Werror -fdiagnostics-show-location=once'
-  AC_TRY_COMPILE(, [int foo;
-  ], [ac_gabydiags=yes], [ac_gabydiags=no])
-  if test "$ac_test_CXXFLAGS" = set; then
-    CXXFLAGS="$ac_save_CXXFLAGS"
-  else
-    # this is the suspicious part
-    CXXFLAGS=''
-  fi
-  if test x"$ac_gabydiags" = x"yes"; then
-    WFMT_FLAGS='-fdiagnostics-show-location=once'
-  fi
-  AC_MSG_RESULT($ac_gabydiags)
 
   # Check for -ffunction-sections -fdata-sections
   AC_MSG_CHECKING([for g++ that supports -ffunction-sections -fdata-sections])
@@ -255,7 +228,6 @@ AC_DEFUN(GLIBCPP_CHECK_COMPILER_FEATURES, [
 
   AC_LANG_RESTORE
   AC_SUBST(WERROR)
-  AC_SUBST(WFMT_FLAGS)
   AC_SUBST(SECTION_FLAGS)
 ])
 
@@ -337,7 +309,11 @@ AC_DEFUN(GLIBCPP_CHECK_MATH_DECL_1, [
     AC_CACHE_VAL(glibcpp_cv_func_$1_use, [
       AC_LANG_SAVE
       AC_LANG_CPLUSPLUS
-      AC_TRY_COMPILE([#include <math.h>], 
+      AC_TRY_COMPILE([#include <math.h>
+		      #ifdef HAVE_IEEEFP_H
+		      #include <ieeefp.h>
+		      #endif
+		     ], 
                      [ $1(0);], 
                      [glibcpp_cv_func_$1_use=yes], [glibcpp_cv_func_$1_use=no])
       AC_LANG_RESTORE
@@ -396,7 +372,7 @@ AC_DEFUN(GLIBCPP_CHECK_MATH_DECLS_AND_LINKAGES_1, [
 dnl
 dnl Check to see if the (math function) argument passed is
 dnl declared when using the c++ compiler
-dnl ASSUMES argument is a math function with ONE parameter
+dnl ASSUMES argument is a math function with TWO parameters
 dnl
 dnl GLIBCPP_CHECK_MATH_DECL_2
 AC_DEFUN(GLIBCPP_CHECK_MATH_DECL_2, [
@@ -442,7 +418,7 @@ AC_DEFUN(GLIBCPP_CHECK_MATH_DECL_AND_LINKAGE_2, [
 dnl
 dnl Check to see if the (math function) argument passed is
 dnl declared when using the c++ compiler
-dnl ASSUMES argument is a math function with ONE parameter
+dnl ASSUMES argument is a math function with THREE parameters
 dnl
 dnl GLIBCPP_CHECK_MATH_DECL_3
 AC_DEFUN(GLIBCPP_CHECK_MATH_DECL_3, [
@@ -489,9 +465,6 @@ dnl
 dnl Check to see if the (stdlib function) argument passed is
 dnl 1) declared when using the c++ compiler
 dnl 2) has "C" linkage
-dnl
-dnl Define HAVE_STRTOLD if "strtold" is declared and links
-dnl Define HAVE_STRTOF if "strtof" is declared and links
 dnl
 dnl argument 1 is name of function to check
 dnl
@@ -635,8 +608,9 @@ dnl 1) make sure the name is declared when using the c++ compiler
 dnl 2) make sure the name has "C" linkage
 dnl This might seem like overkill but experience has shown that it's not...
 dnl
-dnl Define HAVE_STRTOF etc if "strtof" is found.
-dnl Define HAVE_STRTOLD etc if "strtold" is found.
+dnl Define HAVE_STRTOLD if "strtold" is declared and links
+dnl Define HAVE_STRTOF if "strtof" is declared and links
+dnl Define HAVE_DRAND48 if "drand48" is declared and links
 dnl
 dnl GLIBCPP_CHECK_STDLIB_SUPPORT
 AC_DEFUN(GLIBCPP_CHECK_STDLIB_SUPPORT, [
@@ -644,8 +618,8 @@ AC_DEFUN(GLIBCPP_CHECK_STDLIB_SUPPORT, [
   ac_save_CXXFLAGS="$CXXFLAGS"
   CXXFLAGS='-fno-builtins -D_GNU_SOURCE'
 
-  AC_CHECK_FUNCS(strtof)
   GLIBCPP_CHECK_STDLIB_DECL_AND_LINKAGE_2(strtold)
+  AC_CHECK_FUNCS(drand48)
 
   CXXFLAGS="$ac_save_CXXFLAGS"
 ])
@@ -770,7 +744,7 @@ dnl GLIBCPP_CHECK_COMPLEX_MATH_SUPPORT
 AC_DEFUN(GLIBCPP_CHECK_COMPLEX_MATH_SUPPORT, [
   dnl Check for complex versions of math functions of platform.
   AC_CHECK_LIB(m, main)
-  AC_REPLACE_MATHFUNCS(nan hypot hypotf atan2f expf copysignf)
+  AC_REPLACE_MATHFUNCS(nan hypot hypotf copysignf)
 
   dnl Compile the long double complex functions only if the function 
   dnl provides the non-complex long double functions that are needed.
@@ -849,9 +823,19 @@ AC_DEFUN(GLIBCPP_CHECK_WCHAR_T_SUPPORT, [
     AC_MSG_RESULT($has_weof)
   
     dnl Tests for wide character functions used in char_traits<wchar_t>.
-    AC_CHECK_FUNCS(wcslen wmemchr wmemcmp wmemcpy wmemmove wmemset \
-    wcsrtombs mbsrtowcs, ac_wfuncs=yes, ac_wfuncs=no)
+    ac_wfuncs=yes
+    AC_CHECK_FUNCS(wcslen wmemchr wmemcmp wmemcpy wmemmove wmemset,, \
+    ac_wfuncs=no)
   
+    dnl Checks for names injected into std:: by the c_std headers.
+    AC_CHECK_FUNCS(btowc wctob fgetwc fgetwc fgetws fputwc fputws fwide \
+    fwprintf fwscanf swprintf swscanf vfwprintf vfwscanf vswprintf vswscanf \
+    vwprintf vwscanf wprintf wscanf getwc getwchar mbsinit mbrlen mbrtowc \
+    mbsrtowcs wcsrtombs putwc putwchar ungetwc wcrtomb wcstod wcstof wcstol \
+    wcstoul wcscpy wcsncpy wcscat wcsncat wcscmp wcscoll wcsncmp wcsxfrm \
+    wcscspn wcsspn wcstok wcsftime wcschr wcspbrk wcsrchr wcsstr,, \
+    ac_wfuncs=no)
+
     AC_MSG_CHECKING([for ISO C99 wchar_t support])
     if test x"$has_weof" = xyes && test x"$has_wchar_minmax" = xyes \
        && test x"$ac_wfuncs" = xyes; then
@@ -889,88 +873,15 @@ AC_DEFUN(GLIBCPP_CHECK_WCHAR_T_SUPPORT, [
     dnl above support is present.
     AC_MSG_CHECKING([for enabled wchar_t specializations])
     if test x"$ac_isoC99_wchar_t" = xyes \
-       && test x"$ac_XPG2_wchar_t" = xyes; then
-      libinst_wstring_la="libinst-wstring.la"
+    && test x"$ac_XPG2_wchar_t" = xyes; then
       AC_DEFINE(_GLIBCPP_USE_WCHAR_T)
       AC_MSG_RESULT("yes")
     else
-      libinst_wstring_la=""
       AC_MSG_RESULT("no")
     fi
-    AC_SUBST(libinst_wstring_la)
-  
   else
     dnl Wide characters disabled by the user. 
     AC_MSG_WARN([wchar_t support disabled.])
-  fi
-])
-
-
-dnl
-dnl Check to see if this version of GNU C++ is afflicted by bugs in
-dnl __complex__ float support.
-dnl
-dnl Define _GLIBCPP_BUGGY_FLOAT_COMPLEX if buggy.
-dnl
-dnl Check to see if this version of GNU C++ is afflicted by bugs in 
-dnl __complex__ support.Check for buggy __complex__ that will cause ICE in
-dnl gcc-2.95.x when using the library, unless we define the default copy
-dnl ctor in the specializations of complex<>. 
-dnl 
-dnl Define _GLIBCPP_BUGGY_COMPLEX if buggy.
-dnl GLIBCPP_CHECK_COMPLEX_MATH_COMPILER_SUPPORT
-AC_DEFUN(GLIBCPP_CHECK_COMPLEX_MATH_COMPILER_SUPPORT, [
-  AC_REQUIRE([AC_PROG_CXX])
-
-  AC_MSG_CHECKING([for GNU C++ __complex__ support])
-  AC_CACHE_VAL(glibcpp_cv_complex, [
-    AC_LANG_SAVE
-    AC_LANG_CPLUSPLUS
-    AC_TRY_COMPILE([struct dcomplex { __complex__ double x; }; \
-                    dcomplex f(const dcomplex& x) { return dcomplex(x); }], \
-                    [ dcomplex x; f(x); ],
-      glibcpp_cv_complex=ok,
-      glibcpp_cv_complex=buggy
-    )
-    AC_LANG_RESTORE
-  ])
-  AC_MSG_RESULT($glibcpp_cv_complex)
-  if test $glibcpp_cv_complex = buggy; then
-    AC_DEFINE(_GLIBCPP_BUGGY_COMPLEX)
-  fi
-
-  AC_MSG_CHECKING([for GNU C++ __complex__ float support])
-  AC_CACHE_VAL(glibcpp_cv_float_complex, [
-    AC_LANG_SAVE
-    AC_LANG_CPLUSPLUS
-    rm -f conftest.h
-    cat > conftest.h <<EOB
-      //
-      // Check for buggy __complex__ that causes ICE in most versions of egcs
-      // and gcc-2.95.x on certain platforms (eg., x86-win32).
-      //
-      // See http://gcc.gnu.org/ml/gcc-bugs/1999-07n/msg00845.html for
-      // more info on the bug itself.
-      //
-      struct
-      float_complex
-      {
-       __complex__ float m_value;
-       float_complex (float = 0.0f, float = 0.0f);
-       float_complex (__complex__ float val) : m_value (val) {}
-       float_complex foo (const float_complex &val)
-         { return float_complex (~val.m_value); }
-      };
-EOB
-    AC_TRY_COMPILE([#include "conftest.h"], ,
-      glibcpp_cv_float_complex=ok,
-      glibcpp_cv_float_complex=buggy
-    )
-    AC_LANG_RESTORE
-  ])
-  AC_MSG_RESULT($glibcpp_cv_float_complex)
-  if test $glibcpp_cv_float_complex = buggy; then
-    AC_DEFINE(_GLIBCPP_BUGGY_FLOAT_COMPLEX)
   fi
 ])
 
@@ -1079,8 +990,8 @@ dnl
 AC_DEFUN(GLIBCPP_ENABLE_CLOCALE, [
   AC_MSG_CHECKING([for clocale to use])
   AC_ARG_ENABLE(clocale,
-  [  --enable-clocale       enable model for target locale package. 
-     --enable-clocale=MODEL use MODEL target-speific locale package. [default=generic]
+  [  --enable-clocale        enable model for target locale package. 
+  --enable-clocale=MODEL  use MODEL target-speific locale package. [default=generic]
   ], 
   if test x$enable_clocale = xno; then
      enable_clocale=generic
@@ -1123,8 +1034,8 @@ dnl
 AC_DEFUN(GLIBCPP_ENABLE_CSTDIO, [
   AC_MSG_CHECKING([for cstdio to use])
   AC_ARG_ENABLE(cstdio,
-  [  --enable-cstdio        enable stdio for target io package. 
-     --enable-cstdio=LIB    use LIB target-speific io package. [default=stdio]
+  [  --enable-cstdio         enable stdio for target io package. 
+  --enable-cstdio=LIB     use LIB target-speific io package. [default=stdio]
   ], 
   if test x$enable_cstdio = xno; then
      enable_cstdio=stdio
@@ -1137,7 +1048,8 @@ AC_DEFUN(GLIBCPP_ENABLE_CSTDIO, [
   case x${enable_cstdio_flag} in
     xlibio)
       CSTDIO_H=config/c_io_libio.h
-      CSTDIO_CC=config/c_io_libio.cc
+      BASIC_FILE_H=config/basic_file_libio.h
+      BASIC_FILE_CC=config/basic_file_libio.cc
       AC_MSG_RESULT(libio)
 
       # see if we are on a system with libio native (ie, linux)
@@ -1193,14 +1105,13 @@ AC_DEFUN(GLIBCPP_ENABLE_CSTDIO, [
     xstdio | x | xno | xnone | xyes)
       # default
       CSTDIO_H=config/c_io_stdio.h
-      CSTDIO_CC=config/c_io_stdio.cc
+      BASIC_FILE_H=config/basic_file_stdio.h
+      BASIC_FILE_CC=config/basic_file_stdio.cc
       AC_MSG_RESULT(stdio)
 
       # We're not using stdio.
       need_libio=no
       need_wlibio=no
-      # Wide characters are not supported with this package.
-      enable_c_mbchar=no
       ;;
     *)
       echo "$enable_cstdio is an unknown io package" 1>&2
@@ -1208,7 +1119,8 @@ AC_DEFUN(GLIBCPP_ENABLE_CSTDIO, [
       ;;
   esac
   AC_LINK_FILES($CSTDIO_H, include/bits/c++io.h)
-  AC_LINK_FILES($CSTDIO_CC, src/c++io.cc)
+  AC_LINK_FILES($BASIC_FILE_H, include/bits/basic_file_model.h)
+  AC_LINK_FILES($BASIC_FILE_CC, src/basic_file.cc)
 
   # 2000-08-04 bkoz hack
   CCODECVT_C=config/c_io_libio_codecvt.c
@@ -1229,82 +1141,249 @@ AC_DEFUN(GLIBCPP_ENABLE_CSTDIO, [
 
 
 dnl
-dnl Check for which threading library to use.
-dnl
-dnl GLIBCPP_ENABLE_THREADS
-dnl --enable-threads=posix sets config/threads-posix.h et. al.
-dnl 
-dnl Default is no threads, which also disables _IO_MTSAFE_IO in
-dnl libio.  Any actual thread package will enable it.
+dnl Setup to use the gcc gthr.h thread-specific memory and mutex model.
+dnl We must stage the required headers so that they will be installed
+dnl with the library (unlike libgcc, the STL implementation is provided
+dnl solely within headers).  Since we must not inject random user-space
+dnl macro names into user-provided C++ code, we first stage into <file>-in
+dnl and process to <file> with an output command.  The reason for a two-
+dnl stage process here is to correctly handle $srcdir!=$objdir without
+dnl having to write complex code (the sed commands to clean the macro
+dnl namespace are complex and fragile enough as it is).  We must also
+dnl add a relative path so that -I- is supported properly.
 dnl
 AC_DEFUN(GLIBCPP_ENABLE_THREADS, [
-  dnl Note this comes from the gcc/config.in and libjava/config.in
-  dnl Efforts should be made to keep this in sync.
-  AC_MSG_CHECKING([for threads package to use])
-  AC_ARG_ENABLE(threads,
-  [  --enable-threads       enable thread usage for target GCC.
-     --enable-threads=LIB   use LIB thread package for target GCC. [default=no]
-  ],
-  if test x$enable_threads = xno; then
-    enable_threads=''
-  fi,
-    enable_threads='')
+  AC_MSG_CHECKING([for thread model used by GCC])
+  target_thread_file=`$CC -v 2>&1 | sed -n 's/^Thread model: //p'`
+  AC_MSG_RESULT([$target_thread_file])
 
-  enable_threads_flag=$enable_threads
-
-  dnl Check if a valid thread package
-  case x${enable_threads_flag} in
-        x | xno | xnone)
-                # No threads
-                target_thread_file='single'
-                ;;
-        xyes)
-                # default
-                target_thread_file='posix'
-                ;;
-        xdecosf1 | xirix | xmach | xos2 | xposix | xpthreads | xsingle | \
-        xsolaris | xwin32 | xdce | xvxworks)
-                target_thread_file=$enable_threads_flag
-                ;;
-        *)
-                echo "$enable_threads is an unknown thread package" 1>&2
-                exit 1
-                ;;
-  esac
-
-  dnl Check for thread package actually supported in libstdc++ 
-  THREADH=
-  case "$target_thread_file" in
-    no | none | single)
-      THREADH=threads-no.h
-      ;;
-    posix | pthreads)
-      THREADH=threads-posix.h
-      ;;
-    decosf1 | irix | mach | os2 | solaris | win32 | dce | vxworks)
-      AC_MSG_ERROR(thread package $THREADS not yet supported)
-      ;;
-    *)
-      AC_MSG_ERROR($THREADS is an unsupported/unknown thread package)
-      ;;
-  esac
-  AC_MSG_RESULT($THREADH)
-
-  AC_LINK_FILES(config/$THREADH, include/bits/c++threads.h)
-  if test $THREADH != threads-no.h; then
-    AC_DEFINE(_GLIBCPP_USE_THREADS)
+  AC_LINK_FILES($toprel/gcc/gthr.h, include/bits/gthr.h-in)
+  AC_LINK_FILES($toprel/gcc/gthr-single.h,
+		include/bits/gthr-single.h-in)
+  AC_LINK_FILES($toprel/gcc/gthr-$target_thread_file.h,
+		include/bits/gthr-default.h-in)
+  if test $target_thread_file != single; then
+    AC_DEFINE(HAVE_GTHR_DEFAULT)
+    AC_DEFINE(_GLIBCPP_SUPPORTS_WEAK, __GXX_WEAK__)
   fi
+  AC_OUTPUT_COMMANDS([d=include/bits; a='[ABCDEFGHIJKLMNOPQRSTUVWXYZ_]'
+    rm -f $d/gthr.h $d/gthr-single.h $d/gthr-default.h
+    sed '/^#/s/\('"$a$a"'*\)/_GLIBCPP_\1/g' <$d/gthr.h-in \
+      | sed 's,"gthr-,"bits/gthr-,' >$d/gthr.h
+    sed 's/\(UNUSED\)/_GLIBCPP_\1/g' <$d/gthr-single.h-in \
+      | sed 's/\(GCC'"$a"'*_H\)/_GLIBCPP_\1/g' >$d/gthr-single.h
+    sed 's/\(UNUSED\)/_GLIBCPP_\1/g' <$d/gthr-default.h-in \
+      | sed 's/\(GCC'"$a"'*_H\)/_GLIBCPP_\1/g' \
+      | sed 's/\('"$a"'*WEAK\)/_GLIBCPP_\1/g' >$d/gthr-default.h])
+])
+
+
+dnl
+dnl Check for exception handling support.  If an explicit enable/disable
+dnl sjlj exceptions is given, we don't have to detect.  Otherwise the
+dnl target may or may not support call frame exceptions.
+dnl
+dnl GLIBCPP_ENABLE_SJLJ_EXCEPTIONS
+dnl --enable-sjlj-exceptions forces the use of builtin setjmp.
+dnl --disable-sjlj-exceptions forces the use of call frame unwinding.
+dnl
+dnl Define _GLIBCPP_SJLJ_EXCEPTIONS if the compiler is configured for it.
+dnl
+AC_DEFUN(GLIBCPP_ENABLE_SJLJ_EXCEPTIONS, [
+  AC_MSG_CHECKING([for exception model to use])
+  AC_LANG_SAVE
+  AC_LANG_CPLUSPLUS
+  AC_ARG_ENABLE(sjlj-exceptions,
+  [  --enable-sjlj-exceptions  force use of builtin_setjmp for exceptions],
+  [:],
+  [dnl Botheration.  Now we've got to detect the exception model.
+   dnl Link tests against libgcc.a are problematic since -- at least
+   dnl as of this writing -- we've not been given proper -L bits for
+   dnl single-tree newlib and libgloss.
+   dnl
+   dnl This is what AC_TRY_COMPILE would do if it didn't delete the
+   dnl conftest files before we got a change to grep them first.
+   cat > conftest.$ac_ext << EOF
+[#]line __oline__ "configure"
+struct S { ~S(); };
+void bar();
+void foo()
+{
+  S s;
+  bar();
+}
+EOF
+   old_CXXFLAGS="$CXXFLAGS"  
+   CXXFLAGS=-S
+   if AC_TRY_EVAL(ac_compile); then
+     if grep _Unwind_SjLj_Resume conftest.s >/dev/null 2>&1 ; then
+       enable_sjlj_exceptions=yes
+     elif grep _Unwind_Resume conftest.s >/dev/null 2>&1 ; then
+       enable_sjlj_exceptions=no
+     fi
+   fi
+   CXXFLAGS="$old_CXXFLAGS"
+   rm -f conftest*])
+   if test x$enable_sjlj_exceptions = xyes; then
+     AC_DEFINE(_GLIBCPP_SJLJ_EXCEPTIONS, 1,
+	[Define if the compiler is configured for setjmp/longjmp exceptions.])
+     ac_exception_model_name=sjlj
+   elif test x$enable_sjlj_exceptions = xno; then
+     ac_exception_model_name="call frame"
+   else
+     AC_MSG_ERROR([unable to detect exception model])
+   fi
+   AC_LANG_RESTORE
+   AC_MSG_RESULT($ac_exception_model_name)
+])
+
+
+dnl
+dnl Check for ISO/IEC 9899:1999 "C99" support.
+dnl
+dnl GLIBCPP_ENABLE_C99
+dnl --enable-c99 defines _GLIBCPP_USE_C99
+dnl --disable-c99 leaves _GLIBCPP_USE_C99 undefined
+dnl  +  Usage:  GLIBCPP_ENABLE_C99[(DEFAULT)]
+dnl       Where DEFAULT is either `yes' or `no'.  If omitted, it
+dnl       defaults to `no'.
+dnl  +  If 'C99' stuff is not available, ignores DEFAULT and sets `no'.
+dnl
+dnl GLIBCPP_ENABLE_C99
+AC_DEFUN(GLIBCPP_ENABLE_C99, [dnl
+  define([GLIBCPP_ENABLE_C99_DEFAULT], ifelse($1, yes, yes, no))dnl
+
+  AC_ARG_ENABLE(c99,
+  changequote(<<, >>)dnl
+  <<--enable-c99      turns on 'ISO/IEC 9899:1999 support' [default=>>GLIBCPP_ENABLE_C99_DEFAULT],
+  changequote([, ])dnl
+  [case "$enableval" in
+   yes) enable_c99=yes ;;
+   no)  enable_c99=no ;;
+   *)   AC_MSG_ERROR([Unknown argument to enable/disable C99]) ;;
+   esac],
+  enable_c99=GLIBCPP_ENABLE_C99_DEFAULT)dnl
+ 
+  AC_LANG_SAVE
+  AC_LANG_CPLUSPLUS
+
+  # Check for the existence of <math.h> functions used if C99 is enabled.
+  ac_c99_math=yes;
+  AC_MSG_CHECKING([for ISO C99 support in <math.h>])
+  AC_TRY_COMPILE([#include <math.h>],[fpclassify(0.0);],, [ac_c99_math=no])
+  AC_TRY_COMPILE([#include <math.h>],[isfinite(0.0);],, [ac_c99_math=no])
+  AC_TRY_COMPILE([#include <math.h>],[isinf(0.0);],, [ac_c99_math=no])
+  AC_TRY_COMPILE([#include <math.h>],[isnan(0.0);],, [ac_c99_math=no])
+  AC_TRY_COMPILE([#include <math.h>],[isnormal(0.0);],, [ac_c99_math=no])
+  AC_TRY_COMPILE([#include <math.h>],[signbit(0.0);],, [ac_c99_math=no])
+  AC_TRY_COMPILE([#include <math.h>],[isgreater(0.0,0.0);],, [ac_c99_math=no])
+  AC_TRY_COMPILE([#include <math.h>],
+                 [isgreaterequal(0.0,0.0);],, [ac_c99_math=no])
+  AC_TRY_COMPILE([#include <math.h>],[isless(0.0,0.0);],, [ac_c99_math=no])
+  AC_TRY_COMPILE([#include <math.h>],[islessequal(0.0,0.0);],,[ac_c99_math=no])
+  AC_TRY_COMPILE([#include <math.h>],
+	         [islessgreater(0.0,0.0);],, [ac_c99_math=no])
+  AC_TRY_COMPILE([#include <math.h>],
+	         [isunordered(0.0,0.0);],, [ac_c99_math=no])
+  AC_MSG_RESULT($ac_c99_math)
+
+  # Check for the existence in <stdio.h> of vscanf, et. al.
+  ac_c99_stdio=yes;
+  AC_MSG_CHECKING([for ISO C99 support in <stdio.h>])
+  AC_TRY_COMPILE([#include <stdio.h>],
+		 [snprintf("12", 0, "%i");],, [ac_c99_stdio=no])
+  AC_TRY_COMPILE([#include <stdio.h>
+		  #include <stdarg.h>
+		  void foo(char* fmt, ...)
+		  {va_list args; va_start(args, fmt);
+	          vfscanf(stderr, "%i", args);}],
+	          [],, [ac_c99_stdio=no])	
+  AC_TRY_COMPILE([#include <stdio.h>
+		  #include <stdarg.h>
+		  void foo(char* fmt, ...)
+		  {va_list args; va_start(args, fmt);
+	          vscanf("%i", args);}],
+	          [],, [ac_c99_stdio=no])
+  AC_TRY_COMPILE([#include <stdio.h>
+		  #include <stdarg.h>
+		  void foo(char* fmt, ...)
+		  {va_list args; va_start(args, fmt);
+	          vsnprintf(fmt, 0, "%i", args);}],
+	          [],, [ac_c99_stdio=no])
+  AC_TRY_COMPILE([#include <stdio.h>
+		  #include <stdarg.h>
+		  void foo(char* fmt, ...)
+		  {va_list args; va_start(args, fmt);
+	          vsscanf(fmt, "%i", args);}],
+	          [],, [ac_c99_stdio=no])
+  AC_MSG_RESULT($ac_c99_stdio)
+
+  # Check for the existence in <stdlib.h> of lldiv_t, et. al.
+  ac_c99_stdlib=yes;
+  AC_MSG_CHECKING([for lldiv_t declaration])
+  AC_CACHE_VAL(ac_c99_lldiv_t, [
+  AC_TRY_COMPILE([#include <stdlib.h>], 
+                   [ lldiv_t mydivt;], 
+                   [ac_c99_lldiv_t=yes], [ac_c99_lldiv_t=no])
+  ])
+  AC_MSG_RESULT($ac_c99_lldiv_t)
+
+  AC_MSG_CHECKING([for ISO C99 support in <stdlib.h>])
+  AC_TRY_COMPILE([#include <stdlib.h>],
+	         [char* tmp; strtof("gnu", &tmp);],, [ac_c99_stdlib=no])
+  AC_TRY_COMPILE([#include <stdlib.h>],
+	         [char* tmp; strtold("gnu", &tmp);],, [ac_c99_stdlib=no])
+  AC_TRY_COMPILE([#include <stdlib.h>],
+	         [char* tmp; strtoll("gnu", &tmp, 10);],, [ac_c99_stdlib=no])
+  AC_TRY_COMPILE([#include <stdlib.h>],
+	         [char* tmp; strtoull("gnu", &tmp, 10);],, [ac_c99_stdlib=no])
+  AC_TRY_COMPILE([#include <stdlib.h>], [llabs(10);],, [ac_c99_stdlib=no])
+  AC_TRY_COMPILE([#include <stdlib.h>], [lldiv(10,1);],, [ac_c99_stdlib=no])
+  AC_TRY_COMPILE([#include <stdlib.h>], [atoll("10");],, [ac_c99_stdlib=no])
+  AC_TRY_COMPILE([#include <stdlib.h>], [_Exit(0);],, [ac_c99_stdlib=no])
+  if test x"$ac_c99_lldiv_t" = x"no"; then
+    ac_c99_stdlib=no; 
+  fi; 
+  AC_MSG_RESULT($ac_c99_stdlib)
+
+  # Check for the existence of <wchar.h> functions used if C99 is enabled.
+  # XXX the wchar.h checks should be rolled into the general C99 bits.
+  ac_c99_wchar=yes;
+  AC_MSG_CHECKING([for additional ISO C99 support in <wchar.h>])
+  AC_TRY_COMPILE([#include <wchar.h>], 
+	         [wcstold(L"10.0", NULL);],, [ac_c99_wchar=no])
+  AC_TRY_COMPILE([#include <wchar.h>], 
+	         [wcstoll(L"10", NULL, 10);],, [ac_c99_wchar=no])
+  AC_TRY_COMPILE([#include <wchar.h>], 
+	         [wcstoull(L"10", NULL, 10);],, [ac_c99_wchar=no])
+  AC_MSG_RESULT($ac_c99_wchar)
+
+  AC_MSG_CHECKING([for enabled ISO C99 support])
+  if test x"$ac_c99_math" = x"no" || test x"$ac_c99_stdio" = x"no" \
+      || test x"$ac_c99_stdlib" = x"no" \
+      || test x"$ac_c99_wchar" = x"no"; then
+    enable_c99=no; 
+  fi; 
+  AC_MSG_RESULT($enable_c99)
+
+  # Option parsed, now set things appropriately
+  if test x"$enable_c99" = x"yes"; then
+    AC_DEFINE(_GLIBCPP_USE_C99)
+  fi
+
+  AC_LANG_RESTORE
 ])
 
 
 dnl
 dnl Check for template specializations for the 'long long' type extension.
+dnl NB: Must check for C99 support before calling _GLIBCPP_ENABLE_LONG_LONG
 dnl
 dnl GLIBCPP_ENABLE_LONG_LONG
 dnl --enable-long-long defines _GLIBCPP_USE_LONG_LONG
 dnl --disable-long-long leaves _GLIBCPP_USE_LONG_LONG undefined
 dnl  +  Usage:  GLIBCPP_ENABLE_LONG_LONG[(DEFAULT)]
-dnl       Where DEFAULT is either `yes' or `no'.  If ommitted, it
+dnl       Where DEFAULT is either `yes' or `no'.  If omitted, it
 dnl       defaults to `no'.
 dnl  +  If 'long long' stuff is not available, ignores DEFAULT and sets `no'.
 dnl
@@ -1322,44 +1401,20 @@ AC_DEFUN(GLIBCPP_ENABLE_LONG_LONG, [dnl
    *)   AC_MSG_ERROR([Unknown argument to enable/disable long long]) ;;
    esac],
   enable_long_long=GLIBCPP_ENABLE_LONG_LONG_DEFAULT)dnl
- 
-  # Allow use of os-dependent settings, so that macros that turn on
-  # C99 capabilities can be defined and used in a consistent way.
-  OS_INC_PATH=${srcdir}/$os_include_dir
-  ac_test_CFLAGS="${CFLAGS+set}"
-  ac_save_CFLAGS="$CFLAGS"
-  CFLAGS="-I$OS_INC_PATH"
 
-  # Check for the existence of functions used if long long is enabled.
-  AC_CHECK_FUNC(strtoll,,ac_strtoll=no)
-  AC_CHECK_FUNC(strtoull,,ac_strtoull=no)
-
-  # Check for lldiv_t, et. al.
-  AC_MSG_CHECKING([for lldiv_t declaration])
-  AC_CACHE_VAL(glibcpp_lldiv_t_use, [
-  AC_TRY_COMPILE([#include <bits/os_defines.h>
-                  #include <stdlib.h>], 
-                   [ lldiv_t mydivt;], 
-                   [glibcpp_lldiv_t_use=yes], [glibcpp_lldiv_t_use=no])
-  ])
-  AC_MSG_RESULT($glibcpp_lldiv_t_use)
-  if test x$glibcpp_lldiv_t_use = x"yes"; then
-    AC_DEFINE(HAVE_LLDIV_T)
+  # iostreams require strtoll, strtoull to compile. If the
+  # GLIBCPP_ENABLE_C99 tests found these, and if C99 support is enabled,
+  # go ahead and allow long long to be used.
+  if test x"$enable_c99" = x"no"; then
+    enable_long_long=no; 
   fi
 
-  AC_MSG_CHECKING([for enabled long long])
-  if test x"$ac_strtoll" = xno || test x"$ac_strtoull" = xno; then 
-    enable_long_long=no; 
-  fi; 
-  AC_MSG_RESULT($enable_long_long)
-
   # Option parsed, now set things appropriately
+  AC_MSG_CHECKING([for enabled long long support])
   if test x"$enable_long_long" = xyes; then
     AC_DEFINE(_GLIBCPP_USE_LONG_LONG)
   fi
-
-  # Reset CFLAGS
-  CFLAGS="$ac_save_CFLAGS"
+  AC_MSG_RESULT($enable_long_long)
 ])
 
 
@@ -1378,8 +1433,7 @@ define([GLIBCPP_ENABLE_CHEADERS_DEFAULT], ifelse($1, c_std, c_std, c_std))dnl
 AC_MSG_CHECKING([for c header strategy to use])
 AC_ARG_ENABLE(cheaders,
 changequote(<<, >>)dnl
-<<  --enable-cheaders construct "C" header files for
-                           g++ [default=>>GLIBCPP_ENABLE_CHEADERS_DEFAULT],
+<<  --enable-cheaders       construct "C" header files for g++ [default=>>GLIBCPP_ENABLE_CHEADERS_DEFAULT],
 changequote([, ])
   [case "$enableval" in
    c) 
@@ -1517,6 +1571,9 @@ dnl  GLIBCPP_EXPORT_INSTALL_INFO
 dnl  calculates gxx_install_dir
 dnl  exports glibcpp_toolexecdir
 dnl  exports glibcpp_toolexeclibdir
+dnl  exports glibcpp_builddir
+dnl  exports glibcpp_srcdir
+dnl  exports glibcpp_prefixdir
 dnl
 dnl Assumes cross_compiling bits already done, and with_cross_host in
 dnl particular
@@ -1527,6 +1584,17 @@ AC_DEFUN(GLIBCPP_EXPORT_INSTALL_INFO, [
 glibcpp_toolexecdir=no
 glibcpp_toolexeclibdir=no
 
+# Export build and source directories.
+# These need to be absolute paths, yet at the same time need to
+# canonicalize only relative paths, because then amd will not unmount
+# drives. Thus the use of PWDCMD: set it to 'pawd' or 'amq -w' if using amd.
+glibcpp_builddir=`pwd`
+case $srcdir in
+[\\/$]* | ?:[\\/]*) glibcpp_srcdir=${srcdir} ;;
+*) glibcpp_srcdir=`cd "$srcdir" && ${PWDCMD-pwd} || echo "$srcdir"` ;;
+esac
+glibcpp_prefixdir=${prefix}
+
 AC_MSG_CHECKING([for interface version number])
 libstdcxx_interface=$INTERFACE
 AC_MSG_RESULT($libstdcxx_interface)
@@ -1534,7 +1602,7 @@ AC_MSG_RESULT($libstdcxx_interface)
 # Process the option --with-gxx-include-dir=<path to include-files directory>
 AC_MSG_CHECKING([for --with-gxx-include-dir])
 AC_ARG_WITH(gxx-include-dir,
-[ --with-gxx-include-dir  the installation directory for include files],
+[  --with-gxx-include-dir  the installation directory for include files],
 [case "${withval}" in
   yes)
     AC_MSG_ERROR(Missing directory for --with-gxx-include-dir)
@@ -1570,14 +1638,14 @@ AC_MSG_RESULT($version_specific_libs)
 
 # Default case for install directory for include files.
 if test x"$version_specific_libs" = x"no" \
-   && test x"$gxx_include_dir"=x"no"; then
+   && test x"$gxx_include_dir" = x"no"; then
   gxx_include_dir='$(prefix)'/include/g++-${libstdcxx_interface}
 fi
 
 # Calculate glibcpp_toolexecdir, glibcpp_toolexeclibdir
 # Install a library built with a cross compiler in tooldir, not libdir.
 if test x"$glibcpp_toolexecdir" = x"no"; then 
-  if test x"$with_cross_host" = x"yes"; then
+  if test -n "$with_cross_host" && test x"$with_cross_host" != x"no"; then
     glibcpp_toolexecdir='$(exec_prefix)/$(target_alias)'
     glibcpp_toolexeclibdir='$(toolexecdir)/lib$(MULTISUBDIR)'
   else
@@ -1589,6 +1657,9 @@ fi
 AC_MSG_CHECKING([for install location])
 AC_MSG_RESULT($gxx_include_dir)
 
+AC_SUBST(glibcpp_builddir)
+AC_SUBST(glibcpp_srcdir)
+AC_SUBST(glibcpp_prefixdir)
 AC_SUBST(gxx_include_dir)
 AC_SUBST(glibcpp_toolexecdir)
 AC_SUBST(glibcpp_toolexeclibdir)
@@ -1729,6 +1800,7 @@ AC_DEFUN([AM_PROG_LIBTOOL])
 AC_DEFUN([AC_LIBTOOL_DLOPEN])
 AC_DEFUN([AC_PROG_LD])
 ])
+
 
 
 # Do all the work for Automake.  This macro actually does too much --

@@ -61,8 +61,10 @@ JAVA_TARGET_INDEPENDENT_BIN_TOOLS = gcjh jv-scan jcf-dump
 .PHONY: java
 
 jvspec.o: $(srcdir)/java/jvspec.c system.h $(GCC_H) $(CONFIG_H)
+	(SHLIB_LINK='$(SHLIB_LINK)' \
+	SHLIB_MULTILIB='$(SHLIB_MULTILIB)'; \
 	$(CC) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(DRIVER_DEFINES) \
-		$(INCLUDES) $(srcdir)/java/jvspec.c $(OUTPUT_OPTION)
+		$(INCLUDES) $(srcdir)/java/jvspec.c)
 
 # Create the compiler driver for $(GCJ).
 $(GCJ)$(exeext): gcc.o jvspec.o version.o \
@@ -78,14 +80,13 @@ $(GCJ)-cross$(exeext): $(GCJ)$(exeext)
 $(INTL_TARGETS): $(srcdir)/java/parse.c $(srcdir)/java/parse-scan.c
 
 $(srcdir)/java/parse.c: $(srcdir)/java/parse.y
-	(cd $(srcdir)/java && \
-	$(BISON) -t --name-prefix=java_ $(BISONFLAGS) -o p$$$$.c parse.y && \
-	mv -f p$$$$.c parse.c)
+	$(BISON) -t --name-prefix=java_ $(BISONFLAGS) \
+	    -o p$$$$.c $(srcdir)/java/parse.y && \
+	mv -f p$$$$.c $(srcdir)/java/parse.c
 
 $(srcdir)/java/parse-scan.c:  $(srcdir)/java/parse-scan.y
-	(cd $(srcdir)/java && \
-	$(BISON) -t $(BISONFLAGS) -o ps$$$$.c parse-scan.y && \
-	mv -f ps$$$$.c parse-scan.c)
+	$(BISON) -t $(BISONFLAGS) -o ps$$$$.c $(srcdir)/java/parse-scan.y && \
+	mv -f ps$$$$.c $(srcdir)/java/parse-scan.c
 
 $(srcdir)/java/keyword.h: $(srcdir)/java/keyword.gperf
 	(cd $(srcdir)/java || exit 1; \
@@ -252,7 +253,7 @@ java/decl.o: java/decl.c $(CONFIG_H) $(JAVA_TREE_H) java/jcf.h \
   toplev.h system.h function.h gcc.h
 java/except.o: java/except.c $(CONFIG_H) $(JAVA_TREE_H) java/jcf.h real.h \
   $(RTL_H) java/javaop.h java/java-opcodes.h except.h java/java-except.h \
-  eh-common.h toplev.h system.h function.h
+  toplev.h system.h function.h
 java/expr.o: java/expr.c $(CONFIG_H) $(JAVA_TREE_H) java/jcf.h real.h \
   $(RTL_H) $(EXPR_H) java/javaop.h java/java-opcodes.h except.h \
   java/java-except.h java/java-except.h java/parse.h toplev.h \
@@ -293,13 +294,14 @@ java/jcf-path.o: java/jcf-path.c $(CONFIG_H) system.h java/jcf.h
 	  $(srcdir)/java/jcf-path.c $(OUTPUT_OPTION)
 
 # Documentation
-$(srcdir)/java/gcj.info: $(srcdir)/java/gcj.texi
+$(srcdir)/java/gcj.info: $(srcdir)/java/gcj.texi \
+	 $(srcdir)/doc/include/fdl.texi $(srcdir)/doc/include/gpl.texi
 	if test "x$(BUILD_INFO)" = xinfo; then \
 	  rm -f $(srcdir)/java/gcc.info*; \
-	  cd $(srcdir)/java && $(MAKEINFO) -o gcj.info gcj.texi; \
+	  cd $(srcdir)/java && $(MAKEINFO) -I../doc/include -o gcj.info gcj.texi; \
 	else true; fi
 
-java/gcj.dvi: $(srcdir)/java/gcj.texi
-	TEXINPUTS=${texidir}:$(srcdir)/java:$$TEXINPUTS tex gcj.texi
-	texindex gcj.??
-	TEXINPUTS=${texidir}:$(srcdir)/java:$$TEXINPUTS tex gcj.texi
+java/gcj.dvi: $(srcdir)/java/gcj.texi $(srcdir)/doc/include/fdl.texi \
+	 $(srcdir)/doc/include/gpl.texi
+	s=`cd $(srcdir); pwd`; export s; \
+	cd java && $(TEXI2DVI) -I $$s/doc/include $$s/java/gcj.texi

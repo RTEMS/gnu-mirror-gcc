@@ -1,6 +1,6 @@
 ## Makefile for the math subdirectory of the GNU C++ Standard library.
 ##
-## Copyright (C) 1997, 1998, 1999, 2000 Cygnus Solutions
+## Copyright (C) 1997, 1998, 1999, 2000, 2001 Free Software Foundation, Inc.
 ##
 ## This file is part of the libstdc++ version 3 distribution.
 ## Process this file with automake to produce Makefile.in.
@@ -31,7 +31,7 @@ EXTRA_LONG_DOUBLE_yes = \
 	hypotl.c signbitl.c
 
 EXTRA_DIST = \
-	hypot.c hypotf.c atan2f.c expf.c \
+	hypot.c hypotf.c \
 	$(EXTRA_LONG_DOUBLE_yes) 
 
 libmath_la_LIBADD = \
@@ -40,8 +40,7 @@ libmath_la_LIBADD = \
 
 libmath_la_DEPENDENCIES = $(libmath_la_LIBADD)
 
-libmath_la_SOURCES = \
-	signbit.c signbitf.c
+libmath_la_SOURCES = signbit.c signbitf.c stubs.c
 
 LINK = $(LIBTOOL) --mode=link "$(CCLD)" $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
 

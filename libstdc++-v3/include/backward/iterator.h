@@ -1,3 +1,32 @@
+// Backward-compat support -*- C++ -*-
+
+// Copyright (C) 2001 Free Software Foundation, Inc.
+//
+// This file is part of the GNU ISO C++ Library.  This library is free
+// software; you can redistribute it and/or modify it under the
+// terms of the GNU General Public License as published by the
+// Free Software Foundation; either version 2, or (at your option)
+// any later version.
+
+// This library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License along
+// with this library; see the file COPYING.  If not, write to the Free
+// Software Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307,
+// USA.
+
+// As a special exception, you may use this file as part of a free software
+// library without restriction.  Specifically, if other files instantiate
+// templates or use macros or inline functions from this file, or you compile
+// this file and link it with other files to produce an executable, this
+// file does not by itself cause the resulting executable to be covered by
+// the GNU General Public License.  This exception does not however
+// invalidate any other reasons why the executable file might be covered by
+// the GNU General Public License.
+
 /*
  *
  * Copyright (c) 1994
@@ -27,75 +56,59 @@
 #ifndef _CPP_BACKWARD_ITERATOR_H
 #define _CPP_BACKWARD_ITERATOR_H 1
 
-#ifndef _CPP_BACKWARD_FUNCTION_H
+#include "backward_warning.h"
 #include "function.h"
-#endif
 #include <stddef.h>
 #include "iostream.h"
-#ifndef _CPP_BITS_STL_ITERATOR_H
-#include <bits/stl_iterator.h>
-#endif
-#ifndef _CPP_BITS_TYPE_TRAITS_H
-#include <bits/type_traits.h>
-#endif
-#ifndef _CPP_BITS_STL_CONSTRUCT_H
-#include <bits/stl_construct.h>
-#endif
-#ifndef _CPP_BITS_STL_RAW_STORAGE_ITERATOR_H
-#include <bits/stl_raw_storage_iter.h>
-#endif
+#include "iterator.h"
 
-#ifdef __STL_USE_NAMESPACES
+#include <bits/stl_construct.h>
+#include <bits/stl_raw_storage_iter.h>
 
 // Names from stl_iterator.h
-
-using __STD::input_iterator_tag;
-using __STD::output_iterator_tag;
-using __STD::forward_iterator_tag;
-using __STD::bidirectional_iterator_tag;
-using __STD::random_access_iterator_tag;
+using std::input_iterator_tag;
+using std::output_iterator_tag;
+using std::forward_iterator_tag;
+using std::bidirectional_iterator_tag;
+using std::random_access_iterator_tag;
 
 #if 0
-using __STD::iterator;
+using std::iterator;
 #endif
-using __STD::input_iterator;
-using __STD::output_iterator;
-using __STD::forward_iterator;
-using __STD::bidirectional_iterator;
-using __STD::random_access_iterator;
+using std::input_iterator;
+using std::output_iterator;
+using std::forward_iterator;
+using std::bidirectional_iterator;
+using std::random_access_iterator;
 
-#ifdef __STL_CLASS_PARTIAL_SPECIALIZATION
-using __STD::iterator_traits;
-#endif
+using std::iterator_traits;
 
-using __STD::iterator_category;
-using __STD::distance_type;
-using __STD::value_type;
+using std::iterator_category;
+using std::distance_type;
+using std::value_type;
 
-using __STD::distance; 
-using __STD::advance; 
+using std::distance; 
+using std::advance; 
 
-using __STD::insert_iterator;
-using __STD::front_insert_iterator;
-using __STD::back_insert_iterator;
-using __STD::inserter;
-using __STD::front_inserter;
-using __STD::back_inserter;
+using std::insert_iterator;
+using std::front_insert_iterator;
+using std::back_insert_iterator;
+using std::inserter;
+using std::front_inserter;
+using std::back_inserter;
 
-using __STD::reverse_iterator;
-using __STD::reverse_bidirectional_iterator;
+using std::reverse_iterator;
+using std::reverse_bidirectional_iterator;
 
-using __STD::istream_iterator;
-using __STD::ostream_iterator;
+using std::istream_iterator;
+using std::ostream_iterator;
 
 // Names from stl_construct.h
-using __STD::construct;
-using __STD::destroy;
+using std::construct;
+using std::destroy;
 
 // Names from stl_raw_storage_iter.h
-using __STD::raw_storage_iterator;
-
-#endif /* __STL_USE_NAMESPACES */
+using std::raw_storage_iterator;
 
 #endif /* _CPP_BACKWARD_ITERATOR_H */
 
