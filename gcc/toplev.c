@@ -63,6 +63,7 @@ Boston, MA 02111-1307, USA.  */
 #include "timevar.h"
 #include "diagnostic.h"
 #include "ssa.h"
+#include "params.h"
 
 #ifndef ACCUMULATE_OUTGOING_ARGS
 #define ACCUMULATE_OUTGOING_ARGS 0
@@ -163,10 +164,6 @@ static const char *decl_name PARAMS ((tree, int));
 
 static void float_signal PARAMS ((int)) ATTRIBUTE_NORETURN;
 static void crash_signal PARAMS ((int)) ATTRIBUTE_NORETURN;
-#ifdef ASM_IDENTIFY_LANGUAGE
-/* This might or might not be used in ASM_IDENTIFY_LANGUAGE. */
-static void output_lang_identify PARAMS ((FILE *)) ATTRIBUTE_UNUSED;
-#endif
 static void compile_file PARAMS ((const char *));
 static void display_help PARAMS ((void));
 static void display_target_options PARAMS ((void));
@@ -389,6 +386,9 @@ int optimize_size = 0;
 int errorcount = 0;
 int warningcount = 0;
 int sorrycount = 0;
+
+/* Nonzero if we should exit after parsing options.  */
+static int exit_after_options = 0;
 
 /* The FUNCTION_DECL for the function currently being compiled,
    or 0 if between functions.  */
@@ -958,6 +958,14 @@ int flag_leading_underscore = -1;
 /* The user symbol prefix after having resolved same.  */
 const char *user_label_prefix;
 
+static const param_info lang_independent_params[] = {
+#define DEFPARAM(ENUM, OPTION, HELP, DEFAULT) \
+  { OPTION, DEFAULT },
+#include "params.def"
+#undef DEFPARAM
+  { NULL, 0 }
+};
+
 /* A default for same.  */
 #ifndef USER_LABEL_PREFIX
 #define USER_LABEL_PREFIX ""
@@ -1046,9 +1054,9 @@ lang_independent_options f_options[] =
   {"pretend-float", &flag_pretend_float, 1,
    "Pretend that host and target use the same FP format"},
   {"schedule-insns", &flag_schedule_insns, 1,
-   "Reschedule instructions to avoid pipeline stalls"},
+   "Reschedule instructions before register allocation"},
   {"schedule-insns2", &flag_schedule_insns_after_reload, 1,
-  "Run two passes of the instruction scheduler"},
+   "Reschedule instructions after register allocation"},
   {"sched-interblock",&flag_schedule_interblock, 1,
    "Enable scheduling across basic blocks" },
   {"sched-spec",&flag_schedule_speculative, 1,
@@ -1794,21 +1802,6 @@ output_file_directive (asm_file, input_name)
 #endif
 }
 
-#ifdef ASM_IDENTIFY_LANGUAGE
-/* Routine to build language identifier for object file.  */
-
-static void
-output_lang_identify (asm_out_file)
-     FILE *asm_out_file;
-{
-  int len = strlen (lang_identify ()) + sizeof ("__gnu_compiled_") + 1;
-  char *s = (char *) alloca (len);
-
-  sprintf (s, "__gnu_compiled_%s", lang_identify ());
-  ASM_OUTPUT_LABEL (asm_out_file, s);
-}
-#endif
-
 /* Routine to open a dump file.  Return true if the dump file is enabled.  */
 
 static int
@@ -2014,7 +2007,7 @@ check_global_declarations (vec, len)
 	/* Cancel the RTL for this decl so that, if debugging info
 	   output for global variables is still to come,
 	   this one will be omitted.  */
-	DECL_RTL (decl) = NULL;
+	SET_DECL_RTL (decl, NULL_RTX);
 
       /* Warn about any function
 	 declared static but not defined.
@@ -2281,18 +2274,6 @@ compile_file (name)
 	  fprintf (asm_out_file, "\n");
 	}
 #endif
-
-      /* Output something to inform GDB that this compilation was by GCC.  */
-#ifndef ASM_IDENTIFY_GCC
-      fprintf (asm_out_file, "gcc2_compiled.:\n");
-#else
-      ASM_IDENTIFY_GCC (asm_out_file);
-#endif
-
-  /* Output something to identify which front-end produced this file.  */
-#ifdef ASM_IDENTIFY_LANGUAGE
-      ASM_IDENTIFY_LANGUAGE (asm_out_file);
-#endif
     } /* ! flag_syntax_only  */
 
 #ifndef ASM_OUTPUT_SECTION_NAME
@@ -2319,25 +2300,6 @@ compile_file (name)
   if (flag_function_sections && write_symbols != NO_DEBUG)
     warning ("-ffunction-sections may affect debugging on some targets.");
 #endif
-
-  /* ??? Note: There used to be a conditional here
-      to call assemble_zeros without fail if DBX_DEBUGGING_INFO is defined.
-      This was to guarantee separation between gcc_compiled. and
-      the first function, for the sake of dbx on Suns.
-      However, having the extra zero here confused the Emacs
-      code for unexec, and might confuse other programs too.
-      Therefore, I took out that change.
-      In future versions we should find another way to solve
-      that dbx problem.  -- rms, 23 May 93.  */
-
-  /* Don't let the first function fall at the same address
-     as gcc_compiled., if profiling.  */
-  if (profile_flag || profile_block_flag)
-    {
-      /* It's best if we can write a nop here since some
-	 assemblers don't tolerate zeros in the text section.  */
-      output_asm_insn (get_insn_template (CODE_FOR_nop, NULL), NULL_PTR);
-    }
 
   /* If dbx symbol table desired, initialize writing it
      and output the predefined types.  */
@@ -2482,6 +2444,15 @@ compile_file (name)
   ASM_FILE_END (asm_out_file);
 #endif
 
+  /* Attach a special .ident directive to the end of the file to identify
+     the version of GCC which compiled this code.  The format of the .ident
+     string is patterned after the ones produced by native SVR4 compilers.  */
+#ifdef IDENT_ASM_OP
+  if (!flag_no_ident)
+    fprintf (asm_out_file, "%s\"GCC: (GNU) %s\"\n",
+	     IDENT_ASM_OP, version_string);
+#endif
+
   /* Language-specific end of compilation actions.  */
  finish_syntax:
   if (lang_hooks.finish)
@@ -2520,7 +2491,7 @@ compile_file (name)
     {
       int i;
 
-      for (i = 0; i < DFI_MAX; ++i)
+      for (i = 0; i < (int) DFI_MAX; ++i)
 	if (dump_file[i].initialized && dump_file[i].graph_dump_p)
 	  {
 	    char seq[16];
@@ -2584,7 +2555,8 @@ rest_of_decl_compilation (decl, asmspec, top_level, at_end)
       || TREE_CODE (decl) == FUNCTION_DECL)
     {
       timevar_push (TV_VARCONST);
-      make_decl_rtl (decl, asmspec);
+      if (asmspec)
+	make_decl_rtl (decl, asmspec);
       /* Initialized extern variable exists to be replaced
 	 with its value, or represents something that will be
 	 output in another file.  */
@@ -2610,14 +2582,15 @@ rest_of_decl_compilation (decl, asmspec, top_level, at_end)
     {
       if (decode_reg_name (asmspec) >= 0)
 	{
-	  DECL_RTL (decl) = 0;
+	  SET_DECL_RTL (decl, NULL_RTX);
 	  make_decl_rtl (decl, asmspec);
 	}
       else
 	{
 	  error ("invalid register name `%s' for register variable", asmspec);
 	  DECL_REGISTER (decl) = 0;
-	  make_decl_rtl (decl, NULL);
+	  if (!top_level)
+	    expand_decl (decl);
 	}
     }
 #if defined (DBX_DEBUGGING_INFO) || defined (XCOFF_DEBUGGING_INFO)
@@ -2684,23 +2657,45 @@ note_deferral_of_defined_inline_function (decl)
   /* Generate the DWARF info for the "abstract" instance of a function
      which we may later generate inlined and/or out-of-line instances
      of.  */
-  if (write_symbols == DWARF_DEBUG && DECL_INLINE (decl))
+  if (write_symbols == DWARF_DEBUG
+      && (DECL_INLINE (decl) || DECL_ABSTRACT (decl))
+      && ! DECL_ABSTRACT_ORIGIN (decl))
     {
       /* The front-end may not have set CURRENT_FUNCTION_DECL, but the
 	 DWARF code expects it to be set in this case.  Intuitively,
 	 DECL is the function we just finished defining, so setting
 	 CURRENT_FUNCTION_DECL is sensible.  */
       tree saved_cfd = current_function_decl;
+      int was_abstract = DECL_ABSTRACT (decl);
       current_function_decl = decl;
 
       /* Let the DWARF code do its work.  */
       set_decl_abstract_flags (decl, 1);
       dwarfout_file_scope_decl (decl, 0);
-      set_decl_abstract_flags (decl, 0);
+      if (! was_abstract)
+	set_decl_abstract_flags (decl, 0);
 
       /* Reset CURRENT_FUNCTION_DECL.  */
       current_function_decl = saved_cfd;
     }
+#endif
+}
+
+/* FNDECL is an inline function which is about to be emitted out of line.
+   Do any preparation, such as emitting abstract debug info for the inline
+   before it gets mangled by optimization.  */
+
+void
+note_outlining_of_inline_function (fndecl)
+     tree fndecl;
+{
+#ifdef DWARF2_DEBUGGING_INFO
+  /* The DWARF 2 backend tries to reduce debugging bloat by not emitting
+     the abstract description of inline functions until something tries to
+     reference them.  Force it out now, before optimizations mangle the
+     block tree.  */
+  if (write_symbols == DWARF2_DEBUG)
+    dwarf2out_abstract_function (fndecl);
 #endif
 }
 
@@ -2771,7 +2766,8 @@ rest_of_compilation (decl)
 	  }
 
       /* If requested, consider whether to make this function inline.  */
-      if (DECL_INLINE (decl) || flag_inline_functions)
+      if ((DECL_INLINE (decl) && !flag_no_inline) 
+	  || flag_inline_functions)
 	{
 	  timevar_push (TV_INTEGRATION);
 	  lose = function_cannot_inline_p (decl);
@@ -3992,7 +3988,7 @@ decode_d_option (arg)
     switch (c = *arg++)
       {
       case 'a':
-	for (i = 0; i < DFI_MAX; ++i)
+	for (i = 0; i < (int) DFI_MAX; ++i)
 	  dump_file[i].enabled = 1;
 	break;
       case 'A':
@@ -4023,7 +4019,7 @@ decode_d_option (arg)
 
       default:
 	matched = 0;
-	for (i = 0; i < DFI_MAX; ++i)
+	for (i = 0; i < (int) DFI_MAX; ++i)
 	  if (c == dump_file[i].debug_switch)
 	    {
 	      dump_file[i].enabled = 1;
@@ -4066,8 +4062,12 @@ decode_f_option (arg)
 
   if ((option_value = skip_leading_substring (arg, "inline-limit-"))
       || (option_value = skip_leading_substring (arg, "inline-limit=")))
-    inline_max_insns =
-      read_integral_parameter (option_value, arg - 2, inline_max_insns);
+    {
+      int val =
+      read_integral_parameter (option_value, arg - 2,
+                               MAX_INLINE_INSNS);
+      set_param_value ("max-inline-insns", val);
+    }
 #ifdef INSN_SCHEDULING
   else if ((option_value = skip_leading_substring (arg, "sched-verbose=")))
     fix_sched_param ("verbose", option_value);
@@ -4338,19 +4338,53 @@ independent_decode_option (argc, argv)
   if (!strcmp (arg, "-help"))
     {
       display_help ();
-      exit (0);
+      exit_after_options = 1;
     }
 
   if (!strcmp (arg, "-target-help"))
     {
       display_target_options ();
-      exit (0);
+      exit_after_options = 1;
     }
 
   if (!strcmp (arg, "-version"))
     {
       print_version (stderr, "");
-      exit (0);
+      exit_after_options = 1;
+    }
+
+  /* Handle '--param <name>=<value>'.  */
+  if (strcmp (arg, "-param") == 0)
+    {
+      char *equal;
+
+      if (argc == 1)
+      {
+        error ("-param option missing argument");
+        return 1;
+      }
+
+      /* Get the '<name>=<value' parameter.  */
+      arg = argv[1];
+      /* Look for the `='.  */
+      equal = strchr (arg, '=');
+      if (!equal)
+      error ("invalid --param option: %s", arg);
+      else
+      {
+        int val;
+
+        /* Zero out the `=' sign so that we get two separate strings.  */
+        *equal = '\0';
+        /* Figure out what value is specified.  */
+        val = read_integral_parameter (equal + 1, NULL, INVALID_PARAM_VAL);
+        if (val != INVALID_PARAM_VAL)
+          set_param_value (arg, val);
+        else
+          error ("invalid parameter value `%s'", equal + 1);
+      }
+
+      return 2;
     }
 
   if (*arg == 'Y')
@@ -4594,6 +4628,9 @@ main (argc, argv)
   /* Initialize the diagnostics reporting machinery.  */
   initialize_diagnostics ();
 
+  /* Register the language-independent parameters.  */
+  add_params (lang_independent_params, LAST_PARAM);
+
   /* Perform language-specific options intialization.  */
   if (lang_hooks.init_options)
     (*lang_hooks.init_options) ();
@@ -4762,6 +4799,9 @@ main (argc, argv)
   /* All command line options have been processed.  */
   if (lang_hooks.post_options)
     (*lang_hooks.post_options) ();
+
+  if (exit_after_options)
+    exit (0);
 
   /* Reflect any language-specific diagnostic option setting.  */
   reshape_diagnostic_buffer ();

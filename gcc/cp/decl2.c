@@ -346,11 +346,6 @@ int flag_labels_ok;
 int flag_ms_extensions;
 
 /* C++ specific flags.  */   
-/* Zero means that `this' is a *const.  This gives nice behavior in the
-   2.0 world.  1 gives 1.2-compatible behavior.  2 gives Spring behavior.
-   -2 means we're constructing an object and it has fixed type.  */
-
-int flag_this_is_variable;
 
 /* Nonzero means we should attempt to elide constructors when possible.  */
 
@@ -435,17 +430,6 @@ int flag_inline_trees = 0;
 
 int max_tinst_depth = 50;
 
-/* The name-mangling scheme to use.  Must be 1 or greater to support
-   template functions with identical types, but different template
-   arguments.  */
-int name_mangling_version = 2;
-
-/* Nonzero if squashed mangling is to be performed. 
-   This uses the B and K codes to reference previously seen class types 
-   and class qualifiers.       */
-
-int flag_do_squangling;
-
 /* Nonzero means output .vtable_{entry,inherit} for use in doing vtable gc.  */
 
 int flag_vtable_gc;
@@ -512,7 +496,6 @@ lang_f_options[] =
   {"permissive", &flag_permissive, 1},
   {"repo", &flag_use_repository, 1},
   {"rtti", &flag_rtti, 1},
-  {"squangle", &flag_do_squangling, 1},
   {"stats", &flag_detailed_statistics, 1},
   {"use-cxa-atexit", &flag_use_cxa_atexit, 1},
   {"vtable-gc", &flag_vtable_gc, 1},
@@ -530,8 +513,9 @@ static const char * const unsupported_options[] = {
   "enum-int-equiv",
   "guiding-decls",
   "nonnull-objects",
-  "this-is-variable",
+  "squangle",
   "strict-prototype",
+  "this-is-variable",
 };
 
 /* Compare two option strings, pointed two by P1 and P2, for use with
@@ -622,8 +606,10 @@ cxx_decode_option (argc, argv)
 	  = read_integral_parameter (option_value, p - 2, max_tinst_depth);
       else if ((option_value
                 = skip_leading_substring (p, "name-mangling-version-")))
-	name_mangling_version 
-	  = read_integral_parameter (option_value, p - 2, name_mangling_version);
+	{
+	  warning ("-fname-mangling-version is no longer supported");
+	  return 1;
+	}
       else if ((option_value
                 = skip_leading_substring (p, "dump-translation-unit=")))
 	{
@@ -934,7 +920,10 @@ build_artificial_parm (name, type)
 
    This function adds the "in-charge" flag to member function FN if
    appropriate.  It is called from grokclassfn and tsubst.
-   FN must be either a constructor or destructor.  */
+   FN must be either a constructor or destructor.
+
+   The in-charge flag follows the 'this' parameter, and is followed by the
+   VTT parm (if any), then the user-written parms.  */
 
 void
 maybe_retrofit_in_chrg (fn)
@@ -957,17 +946,38 @@ maybe_retrofit_in_chrg (fn)
       && !TYPE_USES_VIRTUAL_BASECLASSES (DECL_CONTEXT (fn)))
     return;
 
-  /* First add it to DECL_ARGUMENTS...  */
-  parm = build_artificial_parm (in_charge_identifier, integer_type_node);
-  TREE_READONLY (parm) = 1;
-  parms = DECL_ARGUMENTS (fn);
-  TREE_CHAIN (parm) = TREE_CHAIN (parms);
-  TREE_CHAIN (parms) = parm;
-
-  /* ...and then to TYPE_ARG_TYPES.  */
   arg_types = TYPE_ARG_TYPES (TREE_TYPE (fn));
   basetype = TREE_TYPE (TREE_VALUE (arg_types));
-  arg_types = hash_tree_chain (integer_type_node, TREE_CHAIN (arg_types));
+  arg_types = TREE_CHAIN (arg_types);
+
+  parms = TREE_CHAIN (DECL_ARGUMENTS (fn));
+
+  /* If this is a subobject constructor or destructor, our caller will
+     pass us a pointer to our VTT.  */
+  if (TYPE_USES_VIRTUAL_BASECLASSES (DECL_CONTEXT (fn)))
+    {
+      parm = build_artificial_parm (vtt_parm_identifier, vtt_parm_type);
+
+      /* First add it to DECL_ARGUMENTS between 'this' and the real args...  */
+      TREE_CHAIN (parm) = parms;
+      parms = parm;
+
+      /* ...and then to TYPE_ARG_TYPES.  */
+      arg_types = hash_tree_chain (vtt_parm_type, arg_types);
+
+      DECL_HAS_VTT_PARM_P (fn) = 1;
+    }
+
+  /* Then add the in-charge parm (before the VTT parm).  */
+  parm = build_artificial_parm (in_charge_identifier, integer_type_node);
+  TREE_CHAIN (parm) = parms;
+  parms = parm;
+  arg_types = hash_tree_chain (integer_type_node, arg_types);
+
+  /* Insert our new parameter(s) into the list.  */
+  TREE_CHAIN (DECL_ARGUMENTS (fn)) = parms;
+
+  /* And rebuild the function type.  */
   fntype = build_cplus_method_type (basetype, TREE_TYPE (TREE_TYPE (fn)),
 				    arg_types);
   if (TYPE_RAISES_EXCEPTIONS (TREE_TYPE (fn)))
@@ -977,18 +987,6 @@ maybe_retrofit_in_chrg (fn)
 
   /* Now we've got the in-charge parameter.  */
   DECL_HAS_IN_CHARGE_PARM_P (fn) = 1;
-
-  /* If this is a subobject constructor or destructor, our caller will
-     pass us a pointer to our VTT.  */
-  if (TYPE_USES_VIRTUAL_BASECLASSES (DECL_CONTEXT (fn)))
-    {
-      DECL_VTT_PARM (fn) = build_artificial_parm (vtt_parm_identifier, 
-						  vtt_parm_type);
-      DECL_CONTEXT (DECL_VTT_PARM (fn)) = fn;
-      DECL_USE_VTT_PARM (fn) = build_artificial_parm (NULL_TREE,
-						      boolean_type_node);
-      DECL_CONTEXT (DECL_USE_VTT_PARM (fn)) = fn;
-    }
 }
 
 /* Classes overload their constituent function names automatically.
@@ -1060,17 +1058,17 @@ grokclassfn (ctype, function, flags, quals)
   DECL_ARGUMENTS (function) = last_function_parms;
   DECL_CONTEXT (function) = ctype;
 
+  if (flags == DTOR_FLAG)
+    DECL_DESTRUCTOR_P (function) = 1;
+
   if (flags == DTOR_FLAG || DECL_CONSTRUCTOR_P (function))
     maybe_retrofit_in_chrg (function);
 
   if (flags == DTOR_FLAG)
     {
       DECL_DESTRUCTOR_P (function) = 1;
-      set_mangled_name_for_decl (function);
       TYPE_HAS_DESTRUCTOR (ctype) = 1;
     }
-  else
-    set_mangled_name_for_decl (function);
 }
 
 /* Work on the expr used by alignof (this is only called by the parser).  */
@@ -1435,22 +1433,6 @@ check_classfn (ctype, function)
 		   fndecls = OVL_NEXT (fndecls))
 		{
 		  fndecl = OVL_CURRENT (fndecls);
-		  /* The DECL_ASSEMBLER_NAME for a TEMPLATE_DECL, or
-		     for a for member function of a template class, is
-		     not mangled, so the check below does not work
-		     correctly in that case.  Since mangled destructor
-		     names do not include the type of the arguments,
-		     we can't use this short-cut for them, either.
-		     (It's not legal to declare arguments for a
-		     destructor, but some people try.)  */
-		  if (!DECL_DESTRUCTOR_P (function)
-		      && (DECL_ASSEMBLER_NAME (function)
-			  != DECL_NAME (function))
-		      && (DECL_ASSEMBLER_NAME (fndecl)
-			  != DECL_NAME (fndecl))
-		      && (DECL_ASSEMBLER_NAME (function) 
-			  == DECL_ASSEMBLER_NAME (fndecl)))
-		    return fndecl;
 
 		  /* We cannot simply call decls_match because this
 		     doesn't work for static member functions that are 
@@ -1524,11 +1506,6 @@ finish_static_data_member_decl (decl, init, asmspec_tree, flags)
      tree asmspec_tree;
      int flags;
 {
-  const char *asmspec = 0;
-
-  if (asmspec_tree)
-    asmspec = TREE_STRING_POINTER (asmspec_tree);
-
   my_friendly_assert (TREE_PUBLIC (decl), 0);
 
   DECL_CONTEXT (decl) = current_class_type;
@@ -1537,11 +1514,9 @@ finish_static_data_member_decl (decl, init, asmspec_tree, flags)
      decl of our TREE_CHAIN.  Instead, we modify cp_finish_decl to do
      the right thing, namely, to put this decl out straight away.  */
   /* current_class_type can be NULL_TREE in case of error.  */
-  if (!asmspec && current_class_type)
-    {
-      DECL_INITIAL (decl) = error_mark_node;
-      DECL_ASSEMBLER_NAME (decl) = mangle_decl (decl);
-    }
+  if (!asmspec_tree && current_class_type)
+    DECL_INITIAL (decl) = error_mark_node;
+
   if (! processing_template_decl)
     {
       if (!pending_statics)
@@ -1671,12 +1646,6 @@ grokfield (declarator, declspecs, init, asmspec_tree, attrlist)
       if (CLASS_TYPE_P (TREE_TYPE (value)))
         CLASSTYPE_GOT_SEMICOLON (TREE_TYPE (value)) = 1;
       
-      /* Now that we've updated the context, we need to remangle the
-	 name for this TYPE_DECL.  */
-      DECL_ASSEMBLER_NAME (value) = DECL_NAME (value);
-      if (!uses_template_parms (value)) 
-	DECL_ASSEMBLER_NAME (value) = mangle_type (TREE_TYPE (value));
-
       if (processing_template_decl)
 	value = push_template_decl (value);
 
@@ -1774,8 +1743,8 @@ grokfield (declarator, declspecs, init, asmspec_tree, attrlist)
 	{
 	  /* This must override the asm specifier which was placed
 	     by grokclassfn.  Lay this out fresh.  */
-	  DECL_RTL (value) = NULL_RTX;
-	  DECL_ASSEMBLER_NAME (value) = get_identifier (asmspec);
+	  SET_DECL_RTL (value, NULL_RTX);
+	  SET_DECL_ASSEMBLER_NAME (value, get_identifier (asmspec));
 	}
       cp_finish_decl (value, init, asmspec_tree, flags);
 
@@ -1927,25 +1896,8 @@ grok_function_init (decl, init)
 
   if (TREE_CODE (type) == FUNCTION_TYPE)
     cp_error ("initializer specified for non-member function `%D'", decl);
-#if 0
-  /* We'll check for this in finish_struct_1.  */
-  else if (DECL_VINDEX (decl) == NULL_TREE)
-    cp_error ("initializer specified for non-virtual member function `%D'", decl);
-#endif
   else if (integer_zerop (init))
     {
-#if 0
-      /* Mark this function as being "defined".  */
-      DECL_INITIAL (decl) = error_mark_node;
-      /* pure virtual destructors must be defined.  */
-      /* pure virtual needs to be defined (as abort) only when put in 
-	 vtbl. For wellformed call, it should be itself. pr4737 */
-      if (!DECL_DESTRUCTOR_P (decl)))
-	{
-	  /* Give this node rtl from `abort'.  */
-	  DECL_RTL (decl) = DECL_RTL (abort_fndecl);
-	}
-#endif
       DECL_PURE_VIRTUAL_P (decl) = 1;
       if (DECL_OVERLOADED_OPERATOR_P (decl) == NOP_EXPR)
 	{
@@ -2205,7 +2157,7 @@ finish_anon_union (anon_union_decl)
   if (static_p)
     {
       make_decl_rtl (main_decl, 0);
-      DECL_RTL (anon_union_decl) = DECL_RTL (main_decl);
+      COPY_DECL_RTL (main_decl, anon_union_decl);
       expand_anon_union_decl (anon_union_decl, 
 			      NULL_TREE,
 			      DECL_ANON_UNION_ELEMS (anon_union_decl));
@@ -2455,7 +2407,7 @@ key_method (type)
   for (method = TYPE_METHODS (type); method != NULL_TREE;
        method = TREE_CHAIN (method))
     if (DECL_VINDEX (method) != NULL_TREE
-	&& ! DECL_THIS_INLINE (method)
+	&& ! DECL_DECLARED_INLINE_P (method)
 	&& ! DECL_PURE_VIRTUAL_P (method))
       return method;
 
@@ -2707,7 +2659,8 @@ import_export_decl (decl)
       if ((DECL_IMPLICIT_INSTANTIATION (decl)
 	   || DECL_FRIEND_PSEUDO_TEMPLATE_INSTANTIATION (decl))
 	  && (flag_implicit_templates
-	      || (flag_implicit_inline_templates && DECL_THIS_INLINE (decl))))
+	      || (flag_implicit_inline_templates 
+		  && DECL_DECLARED_INLINE_P (decl))))
 	{
 	  if (!TREE_PUBLIC (decl))
 	    /* Templates are allowed to have internal linkage.  See 
@@ -2721,21 +2674,24 @@ import_export_decl (decl)
     }
   else if (DECL_FUNCTION_MEMBER_P (decl))
     {
-      tree ctype = DECL_CONTEXT (decl);
-      import_export_class (ctype);
-      if (CLASSTYPE_INTERFACE_KNOWN (ctype)
-	  && ! DECL_THIS_INLINE (decl))
+      if (!DECL_DECLARED_INLINE_P (decl))
 	{
-	  DECL_NOT_REALLY_EXTERN (decl)
-	    = ! (CLASSTYPE_INTERFACE_ONLY (ctype)
-		 || (DECL_THIS_INLINE (decl) && ! flag_implement_inlines
-		     && !DECL_VINDEX (decl)));
+	  tree ctype = DECL_CONTEXT (decl);
+	  import_export_class (ctype);
+	  if (CLASSTYPE_INTERFACE_KNOWN (ctype))
+	    {
+	      DECL_NOT_REALLY_EXTERN (decl)
+		= ! (CLASSTYPE_INTERFACE_ONLY (ctype)
+		     || (DECL_DECLARED_INLINE_P (decl) 
+			 && ! flag_implement_inlines
+			 && !DECL_VINDEX (decl)));
 
-	  /* Always make artificials weak.  */
-	  if (DECL_ARTIFICIAL (decl) && flag_weak)
-	    comdat_linkage (decl);
-	  else
-	    maybe_make_one_only (decl);
+	      /* Always make artificials weak.  */
+	      if (DECL_ARTIFICIAL (decl) && flag_weak)
+		comdat_linkage (decl);
+	      else
+		maybe_make_one_only (decl);
+	    }
 	}
       else
 	comdat_linkage (decl);
@@ -2762,7 +2718,8 @@ import_export_decl (decl)
 	{
 	  DECL_NOT_REALLY_EXTERN (decl)
 	    = ! (CLASSTYPE_INTERFACE_ONLY (ctype)
-		 || (DECL_THIS_INLINE (decl) && ! flag_implement_inlines
+		 || (DECL_DECLARED_INLINE_P (decl) 
+		     && ! flag_implement_inlines
 		     && !DECL_VINDEX (decl)));
 
 	  /* Always make artificials weak.  */
@@ -3571,8 +3528,7 @@ finish_file ()
 
   timevar_push (TV_VARCONST);
 
-  if (new_abi_rtti_p ())
-    emit_support_tinfos ();
+  emit_support_tinfos ();
   
   do 
     {
@@ -3592,8 +3548,7 @@ finish_file ()
       
       /* Write out needed type info variables. Writing out one variable
          might cause others to be needed.  */
-      if (new_abi_rtti_p ()
-          && walk_globals (tinfo_decl_p, emit_tinfo_decl, /*data=*/0))
+      if (walk_globals (tinfo_decl_p, emit_tinfo_decl, /*data=*/0))
 	reconsider = 1;
 
       /* The list of objects with static storage duration is built up
@@ -4537,6 +4492,9 @@ set_decl_namespace (decl, scope, friendp)
       if (!old)
 	/* No old declaration at all. */
 	goto complain;
+      /* A template can be explicitly specialized in any namespace.  */
+      if (processing_explicit_instantiation)
+	return;
       if (!is_overloaded_fn (decl))
 	/* Don't compare non-function decls with decls_match here,
 	   since it can't check for the correct constness at this
@@ -5030,16 +4988,6 @@ validate_nonmember_using_decl (decl, scope, name)
   if (TREE_CODE (decl) == SCOPE_REF
       && TREE_OPERAND (decl, 0) == fake_std_node)
     {
-      if (namespace_bindings_p ()
-	  && current_namespace == global_namespace)
-	/* There's no need for a using declaration at all, here,
-	   since `std' is the same as `::'.  We can't just pass this
-	   on because we'll complain later about declaring something
-	   in the same scope as a using declaration with the same
-	   name.  We return NULL_TREE which indicates to the caller
-	   that there's no need to do any further processing.  */
-	return NULL_TREE;
-
       *scope = global_namespace;
       *name = TREE_OPERAND (decl, 1);
     }
@@ -5052,7 +5000,8 @@ validate_nonmember_using_decl (decl, scope, name)
 
 	 A using-declaration for a class member shall be a
 	 member-declaration.  */
-      if (TREE_CODE (*scope) != NAMESPACE_DECL)
+      if (!processing_template_decl
+          && TREE_CODE (*scope) != NAMESPACE_DECL)
 	{
 	  if (TYPE_P (*scope))
 	    cp_error ("`%T' is not a namespace", *scope);
@@ -5124,22 +5073,21 @@ do_nonmember_using_decl (scope, name, oldval, oldtype, newval, newtype)
 	    {
 	      tree old_fn = OVL_CURRENT (tmp1);
 
-	      if (!OVL_USED (tmp1)
-		  && compparms (TYPE_ARG_TYPES (TREE_TYPE (new_fn)),
-				TYPE_ARG_TYPES (TREE_TYPE (old_fn))))
+              if (new_fn == old_fn)
+                /* The function already exists in the current namespace.  */
+                break;
+	      else if (OVL_USED (tmp1))
+	        continue; /* this is a using decl */
+	      else if (compparms (TYPE_ARG_TYPES (TREE_TYPE (new_fn)),
+		  		  TYPE_ARG_TYPES (TREE_TYPE (old_fn))))
 		{
-		  if (!(DECL_EXTERN_C_P (new_fn)
-			&& DECL_EXTERN_C_P (old_fn)))
-		    /* There was already a non-using declaration in
-		       this scope with the same parameter types.  */
-		    cp_error ("`%D' is already declared in this scope",
-			      name);
+	          /* There was already a non-using declaration in
+		     this scope with the same parameter types. If both
+	             are the same extern "C" functions, that's ok.  */
+                  if (!decls_match (new_fn, old_fn))
+    	            cp_error ("`%D' is already declared in this scope", name);
 		  break;
 		}
-	      else if (duplicate_decls (new_fn, old_fn))
-		/* We're re-using something we already used 
-		   before.  We don't need to add it again.  */ 
-		break;
 	    }
 
 	  /* If we broke out of the loop, there's no reason to add
@@ -5209,6 +5157,12 @@ do_local_using_decl (decl)
 
   decl = validate_nonmember_using_decl (decl, &scope, &name);
   if (decl == NULL_TREE)
+    return;
+
+  if (building_stmt_tree ()
+      && at_function_scope_p ())
+    add_decl_stmt (decl);
+  if (processing_template_decl)
     return;
 
   oldval = lookup_name_current_level (name);

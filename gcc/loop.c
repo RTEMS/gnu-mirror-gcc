@@ -7259,6 +7259,7 @@ check_dbra_loop (loop, insn_count)
       if (bl->giv_count == 0 && ! loop->exit_count)
 	{
 	  rtx bivreg = regno_reg_rtx[bl->regno];
+	  struct iv_class *blt;
 
 	  /* If there are no givs for this biv, and the only exit is the
 	     fall through at the end of the loop, then
@@ -7294,6 +7295,14 @@ check_dbra_loop (loop, insn_count)
 		    no_use_except_counting = 0;
 		    break;
 		  }
+	      }
+
+	  /* A biv has uses besides counting if it is used to set another biv.  */
+	  for (blt = ivs->list; blt; blt = blt->next)
+	    if (blt->init_set && reg_mentioned_p (bivreg, SET_SRC (blt->init_set)))
+	      {
+		no_use_except_counting = 0;
+		break;
 	      }
 	}
 
@@ -8813,7 +8822,7 @@ load_mems (loop)
   struct loop_regs *regs = LOOP_REGS (loop);
   int maybe_never = 0;
   int i;
-  rtx p;
+  rtx p, prev_ebb_head;
   rtx label = NULL_RTX;
   rtx end_label;
   /* Nonzero if the next instruction may never be executed.  */
@@ -8875,6 +8884,7 @@ load_mems (loop)
        PREV_INSN (p) && GET_CODE (p) != CODE_LABEL;
        p = PREV_INSN (p))
     ;
+  prev_ebb_head = p;
 
   cselib_init ();
 
@@ -8965,7 +8975,7 @@ load_mems (loop)
       loop_info->mems[i].reg = reg;
 
       /* Now, replace all references to the MEM with the
-	 corresponding pesudos.  */
+	 corresponding pseudos.  */
       maybe_never = 0;
       for (p = next_insn_in_loop (loop, loop->scan_start);
 	   p != NULL_RTX;
@@ -9036,7 +9046,7 @@ load_mems (loop)
 		  if (CONSTANT_P (equiv->loc))
 		    const_equiv = equiv;
 		  else if (GET_CODE (equiv->loc) == REG
-			   /* Extending hard register lifetimes cuases crash
+			   /* Extending hard register lifetimes causes crash
 			      on SRC targets.  Doing so on non-SRC is
 			      probably also not good idea, since we most
 			      probably have pseudoregister equivalence as
@@ -9062,8 +9072,19 @@ load_mems (loop)
 	      if (best_equiv)
 		best = copy_rtx (best_equiv->loc);
 	    }
+
 	  set = gen_move_insn (reg, best);
 	  set = loop_insn_hoist (loop, set);
+	  if (REG_P (best))
+	    {
+	      for (p = prev_ebb_head; p != loop->start; p = NEXT_INSN (p))
+		if (REGNO_LAST_UID (REGNO (best)) == INSN_UID (p))
+		  {
+		    REGNO_LAST_UID (REGNO (best)) = INSN_UID (set);
+		    break;
+		  }
+	    }
+
 	  if (const_equiv)
 	    REG_NOTES (set) = gen_rtx_EXPR_LIST (REG_EQUAL,
 						 copy_rtx (const_equiv->loc),
