@@ -22,11 +22,20 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
    Emacs needs to know if the arch is 64 or 32-bits.  */
 
 #undef  CPP_CPU64_DEFAULT_SPEC
-#define CPP_CPU64_DEFAULT_SPEC "-D__sparc64__ -D__sparc_v9__ -D__arch64__"
+#define CPP_CPU64_DEFAULT_SPEC \
+  "-D__sparc64__ -D__sparc_v9__ -D__sparcv9 -D__sparc__ -D__arch64__"
+
+#undef  FBSD_TARGET_CPU_CPP_BUILTINS
+#define FBSD_TARGET_CPU_CPP_BUILTINS()		\
+  do						\
+    {						\
+      builtin_define ("__LP64__");		\
+    }						\
+  while (0)
 
 /* Because we include sparc/sysv4.h.  */
 #undef  CPP_PREDEFINES
-#define CPP_PREDEFINES FBSD_CPP_PREDEFINES
+/* Do not define it here, we now use TARGET_OS_CPP_BUILTINS.  */
 
 #define LINK_SPEC "%(link_arch)						\
   %{!mno-relax:%{!r:-relax}}						\
