@@ -163,7 +163,7 @@ java::lang::Runtime::_load (jstring path, jboolean do_search)
 
   if (do_search)
     {
-      ClassLoader *sys = ClassLoader::getSystemClassLoader();
+      ClassLoader *sys = ClassLoader::systemClassLoader;
       ClassLoader *look = NULL;
       gnu::gcj::runtime::StackTrace *t = new gnu::gcj::runtime::StackTrace(10);
       try
@@ -552,6 +552,9 @@ java::lang::Runtime::insertSystemProperties (java::util::Properties *newprops)
 
   // The path to libgcj's boot classes
   SET ("sun.boot.class.path", BOOT_CLASS_PATH);
+
+  // If there is a default system database, set it.
+  SET ("gnu.gcj.precompiled.db.path", LIBGCJ_DEFAULT_DATABASE);
 
   // Set some properties according to whatever was compiled in with
   // `-D'.  Important: after this point, the only properties that
