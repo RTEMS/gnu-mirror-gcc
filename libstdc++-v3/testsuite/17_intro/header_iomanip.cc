@@ -20,15 +20,11 @@
 
 // 17.4.1.2 Headers, iomanip
 
-#include <iomanip>              // { dg-do compile }
-#include <debug_assert.h>
+#include <iomanip>
+#include <testsuite_hooks.h>
 
 
 int main(void)
 {
   return 0;
 }
-
-
-
-

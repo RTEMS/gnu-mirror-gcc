@@ -20,7 +20,7 @@
 
 #include <string>
 #include <stdexcept>
-#include <debug_assert.h>
+#include <testsuite_hooks.h>
 
 // 21.3.6.2 basic_string rfind
 bool test01(void)
@@ -121,4 +121,5 @@ int main()
   test01();
   test02();
   test03();
+  return 0;
 }

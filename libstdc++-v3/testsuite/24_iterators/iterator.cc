@@ -21,7 +21,7 @@
 
 #include <string>
 #include <vector>
-#include <debug_assert.h>
+#include <testsuite_hooks.h>
 
 int 
 string_stuff()
@@ -594,6 +594,5 @@ main(int argc, char **argv)
    assert (failures == 0);
 #endif
 
-   return failures ? 1 : 0;
+   return 0;
 }
-

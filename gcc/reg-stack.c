@@ -161,7 +161,6 @@
 #include "regs.h"
 #include "hard-reg-set.h"
 #include "flags.h"
-#include "insn-flags.h"
 #include "toplev.h"
 #include "recog.h"
 #include "output.h"
@@ -334,22 +333,18 @@ next_flags_user (insn)
 {
   /* Search forward looking for the first use of this value. 
      Stop at block boundaries.  */
-  /* ??? This really cries for BLOCK_END!  */
 
-  while (1)
+  while (insn != current_block->end)
     {
       insn = NEXT_INSN (insn);
-      if (!insn)
-	return NULL_RTX;
 
       if (INSN_P (insn) && reg_mentioned_p (ix86_flags_rtx, PATTERN (insn)))
         return insn;
 
-      if (GET_CODE (insn) == JUMP_INSN
-	  || GET_CODE (insn) == CODE_LABEL
-	  || GET_CODE (insn) == CALL_INSN)
+      if (GET_CODE (insn) == CALL_INSN)
 	return NULL_RTX;
     }
+  return NULL_RTX;
 }
 
 /* Reorganise the stack into ascending numbers,
@@ -788,12 +783,8 @@ stack_result (decl)
   if (aggregate_value_p (DECL_RESULT (decl)))
     return 0;
 
-  result = DECL_RTL (DECL_RESULT (decl));
-  /* ?!?  What is this code supposed to do?  Can this code actually
-     trigger if we kick out aggregates above?  */
-  if (result != 0
-      && ! (GET_CODE (result) == REG
-	    && REGNO (result) < FIRST_PSEUDO_REGISTER))
+  result = DECL_RTL_IF_SET (DECL_RESULT (decl));
+  if (result != 0)
     {
 #ifdef FUNCTION_OUTGOING_VALUE
       result
@@ -1122,7 +1113,8 @@ move_for_stack_reg (insn, regstack, pat)
 	  regstack->top--;
 	  CLEAR_HARD_REG_BIT (regstack->reg_set, REGNO (src));
 	}
-      else if (GET_MODE (src) == XFmode && regstack->top < REG_STACK_SIZE - 1)
+      else if ((GET_MODE (src) == XFmode || GET_MODE (src) == TFmode)
+	       && regstack->top < REG_STACK_SIZE - 1)
 	{
 	  /* A 387 cannot write an XFmode value to a MEM without
 	     clobbering the source reg.  The output code can handle
@@ -1230,17 +1222,12 @@ swap_rtx_condition (insn)
 
       /* Search forward looking for the first use of this value. 
 	 Stop at block boundaries.  */
-      /* ??? This really cries for BLOCK_END!  */
-      while (1)
+      while (insn != current_block->end)
 	{
 	  insn = NEXT_INSN (insn);
-	  if (insn == NULL_RTX)
-	    return 0;
 	  if (INSN_P (insn) && reg_mentioned_p (dest, insn))
 	    break;
-	  if (GET_CODE (insn) == JUMP_INSN)
-	    return 0;
-	  if (GET_CODE (insn) == CODE_LABEL)
+	  if (GET_CODE (insn) == CALL_INSN)
 	    return 0;
 	}
 
@@ -1263,8 +1250,19 @@ swap_rtx_condition (insn)
 
   if (swap_rtx_condition_1 (pat))
     {
+      int fail = 0;
       INSN_CODE (insn) = -1;
       if (recog_memoized (insn) == -1)
+	fail = 1;
+      /* In case the flags don't die here, recurse to try fix
+         following user too.  */
+      else if (! dead_or_set_p (insn, ix86_flags_rtx))
+	{
+	  insn = next_flags_user (insn);
+	  if (!insn || !swap_rtx_condition (insn))
+	    fail = 1;
+	}
+      if (fail)
 	{
 	  swap_rtx_condition_1 (pat);
 	  return 0;
@@ -2554,10 +2552,15 @@ convert_regs_1 (file, block)
 	    }
 	}
 
-      /* Care for EH edges specially.  The normal return path may return
-	 a value in st(0), but the EH path will not, and there's no need
-	 to add popping code to the edge.  */
-      if (e->flags & (EDGE_EH | EDGE_ABNORMAL_CALL))
+      /* Care for non-call EH edges specially.  The normal return path have
+	 values in registers.  These will be popped en masse by the unwind
+	 library.  */
+      if ((e->flags & (EDGE_EH | EDGE_ABNORMAL_CALL)) == EDGE_EH)
+	target_stack->top = -1;
+
+      /* Other calls may appear to have values live in st(0), but the
+	 abnormal return path will not have actually loaded the values.  */
+      else if (e->flags & EDGE_ABNORMAL_CALL)
 	{
 	  /* Assert that the lifetimes are as we expect -- one value
 	     live at st(0) on the end of the source block, and no

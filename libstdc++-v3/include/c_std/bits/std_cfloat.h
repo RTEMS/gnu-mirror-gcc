@@ -31,8 +31,6 @@
 // ISO C++ 14882: 18.2.2  Implementation properties: C library
 //
 
-// Note: This is not a conforming implementation.
-
 #ifndef _CPP_CFLOAT
 #define _CPP_CFLOAT 1
 
@@ -40,4 +38,3 @@
 #include <float.h>
 
 #endif
-

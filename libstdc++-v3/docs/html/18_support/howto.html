@@ -8,7 +8,7 @@
    <META NAME="GENERATOR" CONTENT="vi and eight fingers">
    <TITLE>libstdc++-v3 HOWTO:  Chapter 18</TITLE>
 <LINK REL=StyleSheet HREF="../lib3styles.css">
-<!-- $Id: howto.html,v 1.7 2000/12/03 23:47:47 jsm28 Exp $ -->
+<!-- $Id: howto.html,v 1.1.4.2 2001/05/30 21:59:31 pme Exp $ -->
 </HEAD>
 <BODY>
 
@@ -171,7 +171,7 @@
             reverse order of registration, once per registration call.
             (This isn't actually new.)
         <LI>The previous two actions are &quot;interleaved,&quot; that is,
-            given this code:
+            given this pseudocode:
             <PRE>
               extern "C or C++" void  f1 (void);
               extern "C or C++" void  f2 (void);
@@ -185,6 +185,11 @@
             will be destroyed.  If f1 or f2 allow an exception to propogate
             out of them, Bad Things happen.
       </OL>
+   </P>
+   <P>Note also that <TT>atexit()</TT> is only required to store 32
+      functions, and the compiler/library might already be using some of
+      those slots.  If you think you may run out, we recommend using
+      the xatexit/xexit combination from libiberty, which has no such limit.
    </P>
    <P>Return <A HREF="#top">to top of page</A> or
       <A HREF="../faq/index.html">to the FAQ</A>.
@@ -259,9 +264,8 @@
 <HR>
 <P CLASS="fineprint"><EM>
 Comments and suggestions are welcome, and may be sent to
-<A HREF="mailto:pme@sources.redhat.com">Phil Edwards</A> or
-<A HREF="mailto:gdr@gcc.gnu.org">Gabriel Dos Reis</A>.
-<BR> $Id: howto.html,v 1.7 2000/12/03 23:47:47 jsm28 Exp $
+<A HREF="mailto:libstdc++@gcc.gnu.org">the mailing list</A>.
+<BR> $Id: howto.html,v 1.1.4.2 2001/05/30 21:59:31 pme Exp $
 </EM></P>
 
 

@@ -65,7 +65,7 @@ lvalue_p_1 (ref, treat_class_rvalues_as_lvalues)
   if (TREE_CODE (TREE_TYPE (ref)) == REFERENCE_TYPE)
     return clk_ordinary;
 
-  if (ref == current_class_ptr && flag_this_is_variable <= 0)
+  if (ref == current_class_ptr)
     return clk_none;
 
   switch (TREE_CODE (ref))
@@ -516,7 +516,7 @@ cp_build_qualified_type_real (type, type_quals, complain)
   if (type == error_mark_node)
     return type;
 
-  if (type_quals == TYPE_QUALS (type))
+  if (type_quals == CP_TYPE_QUALS (type))
     return type;
 
   /* A restrict-qualified pointer type must be a pointer (or reference)
@@ -883,7 +883,7 @@ debug_binfo (elem)
     fprintf (stderr, "no vtable decl yet\n");
   fprintf (stderr, "virtuals:\n");
   virtuals = BINFO_VIRTUALS (elem);
-  n = first_vfun_index (BINFO_TYPE (elem));
+  n = 0;
 
   while (virtuals)
     {
@@ -1037,6 +1037,8 @@ cp_statement_code_p (code)
     case RETURN_INIT:
     case TRY_BLOCK:
     case HANDLER:
+    case USING_STMT:
+    case EH_SPEC_BLOCK:
       return 1;
 
     default:
@@ -1187,16 +1189,18 @@ walk_tree (tp, func, data, htab)
   if (!*tp)
     return NULL_TREE;
 
-  if (htab) {
-    void **slot;
-    /* Don't walk the same tree twice, if the user has requested that we
-       avoid doing so. */
-    if (htab_find (htab, *tp))
-      return NULL_TREE;
-    /* If we haven't already seen this node, add it to the table. */
-    slot = htab_find_slot (htab, *tp, INSERT);
-    *slot = *tp;
-  }
+  if (htab)
+    {
+      void **slot;
+      
+      /* Don't walk the same tree twice, if the user has requested
+         that we avoid doing so. */
+      if (htab_find (htab, *tp))
+	return NULL_TREE;
+      /* If we haven't already seen this node, add it to the table. */
+      slot = htab_find_slot (htab, *tp, INSERT);
+      *slot = *tp;
+    }
 
   /* Call the function.  */
   walk_subtrees = 1;
@@ -1501,7 +1505,7 @@ no_linkage_helper (tp, walk_subtrees, data)
   if (TYPE_P (t)
       && (CLASS_TYPE_P (t) || TREE_CODE (t) == ENUMERAL_TYPE)
       && (decl_function_context (TYPE_MAIN_DECL (t))
-	  || ANON_AGGRNAME_P (TYPE_IDENTIFIER (t))))
+	  || TYPE_ANONYMOUS_P (t)))
     return t;
   return NULL_TREE;
 }
@@ -1955,10 +1959,10 @@ cp_tree_equal (t1, t2)
 	 as being equivalent to anything.  */
       if ((TREE_CODE (TREE_OPERAND (t1, 0)) == VAR_DECL
 	   && DECL_NAME (TREE_OPERAND (t1, 0)) == NULL_TREE
-	   && DECL_RTL (TREE_OPERAND (t1, 0)) == 0)
+	   && !DECL_RTL_SET_P (TREE_OPERAND (t1, 0)))
 	  || (TREE_CODE (TREE_OPERAND (t2, 0)) == VAR_DECL
 	      && DECL_NAME (TREE_OPERAND (t2, 0)) == NULL_TREE
-	      && DECL_RTL (TREE_OPERAND (t2, 0)) == 0))
+	      && !DECL_RTL_SET_P (TREE_OPERAND (t2, 0))))
 	cmp = 1;
       else
 	cmp = cp_tree_equal (TREE_OPERAND (t1, 0), TREE_OPERAND (t2, 0));
@@ -2007,21 +2011,27 @@ cp_tree_equal (t1, t2)
 
   switch (TREE_CODE_CLASS (code1))
     {
-      int i;
     case '1':
     case '2':
     case '<':
     case 'e':
     case 'r':
     case 's':
-      cmp = 1;
-      for (i = 0; i < TREE_CODE_LENGTH (code1); ++i)
-	{
-	  cmp = cp_tree_equal (TREE_OPERAND (t1, i), TREE_OPERAND (t2, i));
-	  if (cmp <= 0)
-	    return cmp;
-	}
-      return cmp;
+      {
+	int i;
+	
+	cmp = 1;
+	for (i = 0; i < TREE_CODE_LENGTH (code1); ++i)
+	  {
+	    cmp = cp_tree_equal (TREE_OPERAND (t1, i), TREE_OPERAND (t2, i));
+	    if (cmp <= 0)
+	      return cmp;
+	  }
+	return cmp;
+      }
+    
+      case 't':
+	return same_type_p (t1, t2) ? 1 : 0;
     }
 
   return -1;
@@ -2212,6 +2222,19 @@ cp_valid_lang_attribute (attr_name, attr_args, decl, type)
   tree decl ATTRIBUTE_UNUSED;
   tree type ATTRIBUTE_UNUSED;
 {
+  if (is_attribute_p ("java_interface", attr_name))
+    {
+      if (attr_args != NULL_TREE
+	  || decl != NULL_TREE
+	  || ! CLASS_TYPE_P (type)
+	  || ! TYPE_FOR_JAVA (type))
+	{
+	  error ("`java_interface' attribute can only be applied to Java class definitions");
+	  return 0;
+	}
+      TYPE_JAVA_INTERFACE (type) = 1;
+      return 1;
+    }
   if (is_attribute_p ("com_interface", attr_name))
     {
       if (! flag_vtable_thunks)
@@ -2229,9 +2252,6 @@ cp_valid_lang_attribute (attr_name, attr_args, decl, type)
 	  return 0;
 	}
 
-      if (!flag_new_abi)
-	/* The v3 ABI is already COM compliant; don't set this flag.  */
-	CLASSTYPE_COM_INTERFACE (type) = 1;
       return 1;
     }
   else if (is_attribute_p ("init_priority", attr_name))
@@ -2322,6 +2342,7 @@ init_tree ()
   make_lang_type_fn = cp_make_lang_type;
   lang_unsave = cp_unsave;
   lang_statement_code_p = cp_statement_code_p;
+  lang_set_decl_assembler_name = mangle_decl;
   list_hash_table = htab_create (31, list_hash, list_hash_eq, NULL);
   ggc_add_root (&list_hash_table, 1, 
 		sizeof (list_hash_table),

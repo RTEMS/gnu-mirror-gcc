@@ -54,6 +54,7 @@ AT&T C compiler.  From the example below I would conclude the following:
 #include "reload.h"
 #include "output.h"
 #include "toplev.h"
+#include "ggc.h"
 #include "tm_p.h"
 
 /* Mips systems use the SDB functions to dump out symbols, but do not
@@ -301,28 +302,6 @@ static struct sdb_file *current_file;
 
 #endif /* MIPS_DEBUGGING_INFO */
 
-/* Set up for SDB output at the start of compilation.  */
-
-void
-sdbout_init (asm_file, input_file_name, syms)
-     FILE *asm_file ATTRIBUTE_UNUSED;
-     const char *input_file_name ATTRIBUTE_UNUSED;
-     tree syms ATTRIBUTE_UNUSED;
-{
-#ifdef MIPS_DEBUGGING_INFO
-  current_file = (struct sdb_file *) xmalloc (sizeof *current_file);
-  current_file->next = NULL;
-  current_file->name = input_file_name;
-#endif
-
-#ifdef RMS_QUICK_HACK_1
-  tree t;
-  for (t = syms; t; t = TREE_CHAIN (t))
-    if (DECL_NAME (t) && IDENTIFIER_POINTER (DECL_NAME (t)) != 0
-	&& !strcmp (IDENTIFIER_POINTER (DECL_NAME (t)), "__vtbl_ptr_type"))
-      sdbout_symbol (t, 0);
-#endif  
-}
 
 #if 0
 
@@ -771,10 +750,11 @@ sdbout_symbol (decl, local)
       /* If there was an error in the declaration, don't dump core
 	 if there is no RTL associated with the variable doesn't
 	 exist.  */
-      if (DECL_RTL (decl) == 0)
+      if (!DECL_RTL_SET_P (decl))
 	return;
 
-      DECL_RTL (decl) = eliminate_regs (DECL_RTL (decl), 0, NULL_RTX);
+      SET_DECL_RTL (decl, 
+		    eliminate_regs (DECL_RTL (decl), 0, NULL_RTX));
 #ifdef LEAF_REG_REMAP
       if (current_function_uses_only_leaf_regs)
 	leaf_renumber_regs_insn (DECL_RTL (decl));
@@ -843,7 +823,10 @@ sdbout_symbol (decl, local)
 	return;
 
       /* Record the name for, starting a symtab entry.  */
-      name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
+      if (local)
+	name = IDENTIFIER_POINTER (DECL_NAME (decl));
+      else
+	name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
 
       if (GET_CODE (value) == MEM
 	  && GET_CODE (XEXP (value, 0)) == SYMBOL_REF)
@@ -1246,7 +1229,7 @@ sdbout_one_type (type)
 		const char *name;
 
 		CONTIN;
-		name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (tem));
+		name = IDENTIFIER_POINTER (DECL_NAME (tem));
 		PUT_SDB_DEF (name);
 		if (DECL_BIT_FIELD_TYPE (tem))
 		  {
@@ -1308,7 +1291,8 @@ sdbout_parms (parms)
 	   so that the debugging output will be accurate.  */
 	DECL_INCOMING_RTL (parms)
 	  = eliminate_regs (DECL_INCOMING_RTL (parms), 0, NULL_RTX);
-	DECL_RTL (parms) = eliminate_regs (DECL_RTL (parms), 0, NULL_RTX);
+	SET_DECL_RTL (parms,
+		      eliminate_regs (DECL_RTL (parms), 0, NULL_RTX));
 
 	if (PARM_PASSED_IN_MEMORY (parms))
 	  {
@@ -1637,6 +1621,33 @@ sdbout_resume_previous_source_file ()
   free (current_file);
   current_file = next;
   PUT_SDB_SRC_FILE (current_file->name);
+#endif
+}
+
+/* Set up for SDB output at the start of compilation.  */
+
+void
+sdbout_init (asm_file, input_file_name, syms)
+     FILE *asm_file ATTRIBUTE_UNUSED;
+     const char *input_file_name ATTRIBUTE_UNUSED;
+     tree syms ATTRIBUTE_UNUSED;
+{
+#ifdef MIPS_DEBUGGING_INFO
+  current_file = (struct sdb_file *) xmalloc (sizeof *current_file);
+  current_file->next = NULL;
+  current_file->name = input_file_name;
+#endif
+
+#ifdef RMS_QUICK_HACK_1
+  tree t;
+  for (t = syms; t; t = TREE_CHAIN (t))
+    if (DECL_NAME (t) && IDENTIFIER_POINTER (DECL_NAME (t)) != 0
+	&& !strcmp (IDENTIFIER_POINTER (DECL_NAME (t)), "__vtbl_ptr_type"))
+      sdbout_symbol (t, 0);
+#endif  
+
+#ifdef SDB_ALLOW_FORWARD_REFERENCES
+  ggc_add_tree_root (&anonymous_types, 1);
 #endif
 }
 

@@ -159,6 +159,7 @@ Boston, MA 02111-1307, USA.  */
 #include "output.h"
 #include "function.h"
 #include "expr.h" 
+#include "params.h"
 
 #include "obstack.h"
 #define obstack_chunk_alloc gmalloc
@@ -627,8 +628,8 @@ static int handle_avail_expr	PARAMS ((rtx, struct expr *));
 static int classic_gcse		PARAMS ((void));
 static int one_classic_gcse_pass PARAMS ((int));
 static void invalidate_nonnull_info PARAMS ((rtx, rtx, void *));
-static void delete_null_pointer_checks_1 PARAMS ((unsigned int *, sbitmap *,
-						  sbitmap *,
+static void delete_null_pointer_checks_1 PARAMS ((varray_type *, unsigned int *,
+						  sbitmap *, sbitmap *,
 						  struct null_pointer_info *));
 static rtx process_insert_insn	PARAMS ((struct expr *));
 static int pre_edge_insert	PARAMS ((struct edge_list *, struct expr **));
@@ -680,7 +681,7 @@ gcse_main (f, file)
      a high connectivity will take a long time and is unlikely to be
      particularly useful.
 
-     In normal circumstances a cfg should have about twice has many edges
+     In normal circumstances a cfg should have about twice as many edges
      as blocks.  But we do not want to punish small functions which have
      a couple switch statements.  So we require a relatively large number
      of basic blocks and the ratio of edges to blocks to be high.  */
@@ -689,6 +690,19 @@ gcse_main (f, file)
       if (warn_disabled_optimization)
       warning ("GCSE disabled: %d > 1000 basic blocks and %d >= 20 edges/basic block",
                n_basic_blocks, n_edges / n_basic_blocks);
+      return 0;
+    }
+
+  /* If allocating memory for the cprop bitmap would take up too much
+     storage it's better just to disable the optimization.  */
+  if ((n_basic_blocks 
+       * SBITMAP_SET_SIZE (max_gcse_regno)
+       * sizeof (SBITMAP_ELT_TYPE)) > MAX_GCSE_MEMORY)
+    {
+      if (warn_disabled_optimization)
+	warning ("GCSE disabled: %d basic blocks and %d registers",
+		 n_basic_blocks, max_gcse_regno);
+
       return 0;
     }
 
@@ -1917,7 +1931,7 @@ hash_scan_set (pat, insn, set_p)
   if (GET_CODE (dest) == REG)
     {
       int regno = REGNO (dest);
-      rtx tmp;
+      rtx tmp, note;
 
       /* Only record sets of pseudo-regs in the hash table.  */
       if (! set_p
@@ -1925,7 +1939,14 @@ hash_scan_set (pat, insn, set_p)
 	  /* Don't GCSE something if we can't do a reg/reg copy.  */
 	  && can_copy_p [GET_MODE (dest)]
 	  /* Is SET_SRC something we want to gcse?  */
-	  && want_to_gcse_p (src))
+	  && want_to_gcse_p (src)
+	  /* Don't GCSE if it has attached REG_EQUIV note.
+	     At this point this only function parameters should have
+	     REG_EQUIV notes and if the argument slot is used somewhere
+	     explicitely, it means address of parameter has been taken,
+	     so we should not extend the lifetime of the pseudo.  */
+	  && ((note = find_reg_note (insn, REG_EQUIV, NULL_RTX)) == 0
+	      || GET_CODE (XEXP (note, 0)) != MEM))
 	{
 	  /* An expression is not anticipatable if its operands are
 	     modified before this insn.  */
@@ -4967,7 +4988,9 @@ invalidate_nonnull_info (x, setter, data)
    they are not our responsibility to free.  */
 
 static void
-delete_null_pointer_checks_1 (block_reg, nonnull_avin, nonnull_avout, npi)
+delete_null_pointer_checks_1 (delete_list, block_reg, nonnull_avin,
+			      nonnull_avout, npi)
+     varray_type *delete_list;
      unsigned int *block_reg;
      sbitmap *nonnull_avin;
      sbitmap *nonnull_avout;
@@ -5097,9 +5120,12 @@ delete_null_pointer_checks_1 (block_reg, nonnull_avin, nonnull_avout, npi)
 	  LABEL_NUSES (JUMP_LABEL (new_jump))++;
 	  emit_barrier_after (new_jump);
 	}
-      delete_insn (last_insn);
+      if (!*delete_list)
+	VARRAY_RTX_INIT (*delete_list, 10, "delete_list");
+
+      VARRAY_PUSH_RTX (*delete_list, last_insn);
       if (compare_and_branch == 2)
-	delete_insn (earliest);
+	VARRAY_PUSH_RTX (*delete_list, earliest);
 
       /* Don't check this block again.  (Note that BLOCK_END is
 	 invalid here; we deleted the last instruction in the 
@@ -5138,10 +5164,12 @@ delete_null_pointer_checks (f)
 {
   sbitmap *nonnull_avin, *nonnull_avout;
   unsigned int *block_reg;
+  varray_type delete_list = NULL;
   int bb;
   int reg;
   int regs_per_pass;
   int max_reg;
+  unsigned int i;
   struct null_pointer_info npi;
 
   /* If we have only a single block, then there's nothing to do.  */
@@ -5152,7 +5180,7 @@ delete_null_pointer_checks (f)
      a high connectivity will take a long time and is unlikely to be
      particularly useful.
 
-     In normal circumstances a cfg should have about twice has many edges
+     In normal circumstances a cfg should have about twice as many edges
      as blocks.  But we do not want to punish small functions which have
      a couple switch statements.  So we require a relatively large number
      of basic blocks and the ratio of edges to blocks to be high.  */
@@ -5210,8 +5238,16 @@ delete_null_pointer_checks (f)
     {
       npi.min_reg = reg;
       npi.max_reg = MIN (reg + regs_per_pass, max_reg);
-      delete_null_pointer_checks_1 (block_reg, nonnull_avin,
+      delete_null_pointer_checks_1 (&delete_list, block_reg, nonnull_avin,
 				    nonnull_avout, &npi);
+    }
+
+  /* Now delete the instructions all at once.  This breaks the CFG.  */
+  if (delete_list)
+    {
+      for (i = 0; i < VARRAY_ACTIVE_SIZE (delete_list); i++)
+	delete_insn (VARRAY_RTX (delete_list, i));
+      VARRAY_FREE (delete_list);
     }
 
   /* Free the table of registers compared at the end of every block.  */

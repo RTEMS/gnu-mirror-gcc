@@ -600,7 +600,7 @@ build_java_athrow (node)
 
   call = build (CALL_EXPR,
 		void_type_node,
-		build_address_of (throw_node[exceptions_via_longjmp ? 1 : 0]),
+		build_address_of (throw_node),
 		build_tree_list (NULL_TREE, node),
 		NULL_TREE);
   TREE_SIDE_EFFECTS (call) = 1;
@@ -1157,7 +1157,9 @@ build_instanceof (value, type)
 		    value,
 		    boolean_true_node, boolean_false_node);
     }
-  else if (DECL_P (klass) && DECL_P (valclass)
+  else if (! TYPE_ARRAY_P (type)
+	   && ! TYPE_ARRAY_P (valtype)
+	   && DECL_P (klass) && DECL_P (valclass)
 	   && ! CLASS_INTERFACE (valclass)
 	   && ! CLASS_INTERFACE (klass)
 	   && ! inherits_from_p (type, valtype)
@@ -1656,7 +1658,7 @@ tree
 build_class_init (clas, expr)
      tree clas, expr;
 {
-  tree init, call;
+  tree init;
   struct init_test_hash_entry *ite;
   if (inherits_from_p (current_class, clas))
     return expr;
@@ -1687,14 +1689,14 @@ build_class_init (clas, expr)
 		    build_tree_list (NULL_TREE, build_class_ref (clas)),
 		    NULL_TREE);
       TREE_SIDE_EFFECTS (init) = 1;
-      call = build (COMPOUND_EXPR, TREE_TYPE (expr), init, 
-		    build (MODIFY_EXPR, boolean_type_node,
-			   ite->init_test_decl, boolean_true_node));
-      TREE_SIDE_EFFECTS (call) = 1;
       init = build (COND_EXPR, void_type_node,
 		    build (EQ_EXPR, boolean_type_node, 
 			   ite->init_test_decl, boolean_false_node),
-		    call, integer_zero_node);
+		    init, integer_zero_node);
+      TREE_SIDE_EFFECTS (init) = 1;
+      init = build (COMPOUND_EXPR, TREE_TYPE (expr), init, 
+		    build (MODIFY_EXPR, boolean_type_node,
+			   ite->init_test_decl, boolean_true_node));
       TREE_SIDE_EFFECTS (init) = 1;
     }
 
@@ -2355,9 +2357,9 @@ get_primitive_array_vtable (tree elt)
 struct rtx_def *
 java_lang_expand_expr (exp, target, tmode, modifier)
      register tree exp;
-     rtx target ATTRIBUTE_UNUSED;
-     enum machine_mode tmode ATTRIBUTE_UNUSED;
-     enum expand_modifier modifier ATTRIBUTE_UNUSED;
+     rtx target;
+     enum machine_mode tmode;
+     enum expand_modifier modifier;
 {
   tree current;
 
@@ -2498,18 +2500,20 @@ java_lang_expand_expr (exp, target, tmode, modifier)
       for (current = TREE_OPERAND (exp, 1); current; 
 	   current = TREE_CHAIN (current))
 	{
-	  tree type;
 	  tree catch = TREE_OPERAND (current, 0);
 	  tree decl = BLOCK_EXPR_DECLS (catch);
-	  type = (decl ? TREE_TYPE (TREE_TYPE (decl)) : NULL_TREE);
-	  start_catch_handler (prepare_eh_table_type (type));
-	  expand_expr_stmt (TREE_OPERAND (current, 0));
+	  tree type = (decl ? TREE_TYPE (TREE_TYPE (decl)) : NULL_TREE);
 
-	  expand_resume_after_catch ();
-	  end_catch_handler ();
+	  expand_start_catch (type);
+	  expand_expr_stmt (TREE_OPERAND (current, 0));
+	  expand_end_catch ();
 	}
       expand_end_all_catch ();
       return const0_rtx;
+
+    case JAVA_EXC_OBJ_EXPR:
+      return expand_expr (build_exception_object_ref (TREE_TYPE (exp)),
+			  target, tmode, modifier);
 
     default:
       internal_error ("Can't expand %s", tree_code_name [TREE_CODE (exp)]);
@@ -2808,7 +2812,7 @@ process_jvm_instruction (PC, byte_ops, length)
   if (instruction_bits [PC] & BCODE_EXCEPTION_TARGET)
     {
       tree type = pop_type (ptr_type_node);
-      push_value (build1 (NOP_EXPR, type, soft_exceptioninfo_call_node));
+      push_value (build (JAVA_EXC_OBJ_EXPR, type));
     }
 
   switch (byte_ops[PC++])
@@ -3264,16 +3268,31 @@ force_evaluation_order (node)
       if (TREE_SIDE_EFFECTS (TREE_OPERAND (node, 1)))
 	TREE_OPERAND (node, 0) = save_expr (TREE_OPERAND (node, 0));
     }
-  else if (TREE_CODE (node) == CALL_EXPR || TREE_CODE (node) == NEW_CLASS_EXPR)
+  else if (TREE_CODE (node) == CALL_EXPR
+           || TREE_CODE (node) == NEW_CLASS_EXPR
+           || (TREE_CODE (node) == COMPOUND_EXPR
+               && TREE_CODE (TREE_OPERAND (node, 0)) == CALL_EXPR
+               && TREE_CODE (TREE_OPERAND (node, 1)) == SAVE_EXPR)) 
     {
       tree arg, cmp;
 
       if (!TREE_OPERAND (node, 1))
 	return node;
 
+      arg = node;
+      
+      /* Position arg properly, account for wrapped around ctors. */
+      if (TREE_CODE (node) == COMPOUND_EXPR)
+        arg = TREE_OPERAND (node, 0);
+      
+      arg = TREE_OPERAND (arg, 1);
+      
+      /* Not having a list of argument here is an error. */ 
+      if (TREE_CODE (arg) != TREE_LIST)
+        abort ();
+
       /* This reverses the evaluation order. This is a desired effect. */
-      for (cmp = NULL_TREE, arg = TREE_OPERAND (node, 1); 
-	   arg; arg = TREE_CHAIN (arg))
+      for (cmp = NULL_TREE; arg; arg = TREE_CHAIN (arg))
 	{
 	  tree saved = save_expr (force_evaluation_order (TREE_VALUE (arg)));
 	  cmp = (cmp == NULL_TREE ? saved :

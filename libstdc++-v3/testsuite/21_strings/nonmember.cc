@@ -111,7 +111,7 @@ template<class charT, class traits, class Allocator>
 */
 
 #include <string>
-#include <debug_assert.h>
+#include <testsuite_hooks.h>
 
 int test01(void)
 {
@@ -293,12 +293,8 @@ template<class charT, class traits, class Allocator>
   return 0;
 }
 
-int main() {
+int main() 
+{
   test01();
+  return 0;
 }
-
-
-
-
-
-

@@ -31,7 +31,6 @@ Boston, MA 02111-1307, USA.  */
 #include "real.h"
 #include "insn-config.h"
 #include "conditions.h"
-#include "insn-flags.h"
 #include "output.h"
 #include "insn-attr.h"
 #include "flags.h"
@@ -2378,6 +2377,11 @@ eligible_for_epilogue_delay (trial, slot)
   if (num_gfregs)
     return 0;
 
+  /* If the function uses __builtin_eh_return, the eh_return machinery
+     occupies the delay slot.  */
+  if (current_function_calls_eh_return)
+    return 0;
+
   /* In the case of a true leaf function, anything can go into the delay slot.
      A delay slot only exists however if the frame size is zero, otherwise
      we will put an insn to adjust the stack after the return.  */
@@ -2414,7 +2418,8 @@ eligible_for_epilogue_delay (trial, slot)
   src = SET_SRC (pat);
 
   /* This matches "*return_[qhs]i" or even "*return_di" on TARGET_ARCH64.  */
-  if (arith_operand (src, GET_MODE (src)))
+  if (GET_MODE_CLASS (GET_MODE (src)) != MODE_FLOAT
+      && arith_operand (src, GET_MODE (src)))
     {
       if (TARGET_ARCH64)
         return GET_MODE_SIZE (GET_MODE (src)) <= GET_MODE_SIZE (DImode);
@@ -2423,7 +2428,8 @@ eligible_for_epilogue_delay (trial, slot)
     }
 
   /* This matches "*return_di".  */
-  else if (arith_double_operand (src, GET_MODE (src)))
+  else if (GET_MODE_CLASS (GET_MODE (src)) != MODE_FLOAT
+	   && arith_double_operand (src, GET_MODE (src)))
     return GET_MODE_SIZE (GET_MODE (src)) <= GET_MODE_SIZE (DImode);
 
   /* This matches "*return_sf_no_fpu".  */
@@ -2520,7 +2526,8 @@ eligible_for_sibcall_delay (trial)
 
   src = SET_SRC (pat);
 
-  if (arith_operand (src, GET_MODE (src)))
+  if (GET_MODE_CLASS (GET_MODE (src)) != MODE_FLOAT
+      && arith_operand (src, GET_MODE (src)))
     {
       if (TARGET_ARCH64)
         return GET_MODE_SIZE (GET_MODE (src)) <= GET_MODE_SIZE (DImode);
@@ -2528,7 +2535,8 @@ eligible_for_sibcall_delay (trial)
         return GET_MODE_SIZE (GET_MODE (src)) <= GET_MODE_SIZE (SImode);
     }
 
-  else if (arith_double_operand (src, GET_MODE (src)))
+  else if (GET_MODE_CLASS (GET_MODE (src)) != MODE_FLOAT
+	   && arith_double_operand (src, GET_MODE (src)))
     return GET_MODE_SIZE (GET_MODE (src)) <= GET_MODE_SIZE (DImode);
 
   else if (! TARGET_FPU && restore_operand (SET_DEST (pat), SFmode)
@@ -3591,8 +3599,17 @@ output_function_epilogue (file, size, leaf_function)
 
       if (! leaf_function)
 	{
+	  if (current_function_calls_eh_return)
+	    {
+	      if (current_function_epilogue_delay_list)
+		abort ();
+	      if (SKIP_CALLERS_UNIMP_P)
+		abort ();
+
+	      fputs ("\trestore\n\tretl\n\tadd\t%sp, %g1, %sp\n", file);
+	    }
 	  /* If we wound up with things in our delay slot, flush them here.  */
-	  if (current_function_epilogue_delay_list)
+	  else if (current_function_epilogue_delay_list)
 	    {
 	      rtx delay = PATTERN (XEXP (current_function_epilogue_delay_list, 0));
 
@@ -3632,6 +3649,8 @@ output_function_epilogue (file, size, leaf_function)
 	  else
 	    fprintf (file, "\t%s\n\trestore\n", ret);
 	}
+      else if (current_function_calls_eh_return)
+	abort ();
       /* All of the following cases are for leaf functions.  */
       else if (current_function_epilogue_delay_list)
 	{
@@ -4683,9 +4702,11 @@ function_value (type, mode, incoming_p)
 
 	  return function_arg_record_value (type, mode, 0, 1, regbase);
 	}
-      else if (TREE_CODE (type) == UNION_TYPE)
+      else if (AGGREGATE_TYPE_P (type))
 	{
-	  int bytes = int_size_in_bytes (type);
+	  /* All other aggregate types are passed in an integer register
+	     in a mode corresponding to the size of the type.  */
+	  HOST_WIDE_INT bytes = int_size_in_bytes (type);
 
 	  if (bytes > 32)
 	    abort ();
@@ -4697,7 +4718,7 @@ function_value (type, mode, incoming_p)
   if (TARGET_ARCH64
       && GET_MODE_CLASS (mode) == MODE_INT 
       && GET_MODE_SIZE (mode) < UNITS_PER_WORD
-      && type && TREE_CODE (type) != UNION_TYPE)
+      && type && ! AGGREGATE_TYPE_P (type))
     mode = DImode;
 
   if (incoming_p)
@@ -6886,7 +6907,7 @@ sparc_flat_epilogue_delay_slots ()
   return 0;
 }
 
-/* Return true is TRIAL is a valid insn for the epilogue delay slot.
+/* Return true if TRIAL is a valid insn for the epilogue delay slot.
    Any single length instruction which doesn't reference the stack or frame
    pointer is OK.  */
 
