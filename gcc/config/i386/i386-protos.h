@@ -42,6 +42,12 @@ extern int standard_80387_constant_p PARAMS ((rtx));
 extern int standard_sse_constant_p PARAMS ((rtx));
 extern int symbolic_reference_mentioned_p PARAMS ((rtx));
 
+extern int any_fp_register_operand PARAMS ((rtx, enum machine_mode));
+extern int register_and_not_any_fp_reg_operand PARAMS ((rtx, enum machine_mode));
+
+extern int fp_register_operand PARAMS ((rtx, enum machine_mode));
+extern int register_and_not_fp_reg_operand PARAMS ((rtx, enum machine_mode));
+
 extern int x86_64_general_operand PARAMS ((rtx, enum machine_mode));
 extern int x86_64_szext_general_operand PARAMS ((rtx, enum machine_mode));
 extern int x86_64_nonmemory_operand PARAMS ((rtx, enum machine_mode));
@@ -57,6 +63,7 @@ extern int initial_exec_symbolic_operand PARAMS ((rtx, enum machine_mode));
 extern int local_exec_symbolic_operand PARAMS ((rtx, enum machine_mode));
 extern int pic_symbolic_operand PARAMS ((rtx, enum machine_mode));
 extern int call_insn_operand PARAMS ((rtx, enum machine_mode));
+extern int sibcall_insn_operand PARAMS ((rtx, enum machine_mode));
 extern int constant_call_address_operand PARAMS ((rtx, enum machine_mode));
 extern int const0_operand PARAMS ((rtx, enum machine_mode));
 extern int const1_operand PARAMS ((rtx, enum machine_mode));
@@ -110,6 +117,7 @@ extern const char *output_fix_trunc PARAMS ((rtx, rtx*));
 extern const char *output_fp_compare PARAMS ((rtx, rtx*, int, int));
 
 extern void i386_dwarf_output_addr_const PARAMS ((FILE*, rtx));
+extern void i386_output_dwarf_dtprel PARAMS ((FILE*, int, rtx));
 extern rtx i386_simplify_dwarf_addr PARAMS ((rtx));
 
 extern void ix86_expand_clear PARAMS ((rtx));
@@ -130,7 +138,7 @@ extern void ix86_expand_branch PARAMS ((enum rtx_code, rtx));
 extern int ix86_expand_setcc PARAMS ((enum rtx_code, rtx));
 extern int ix86_expand_int_movcc PARAMS ((rtx[]));
 extern int ix86_expand_fp_movcc PARAMS ((rtx[]));
-extern void ix86_expand_call PARAMS ((rtx, rtx, rtx, rtx, rtx));
+extern void ix86_expand_call PARAMS ((rtx, rtx, rtx, rtx, rtx, int));
 extern void x86_initialize_trampoline PARAMS ((rtx, rtx, rtx));
 extern rtx ix86_zero_extend_to_Pmode PARAMS ((rtx));
 extern void ix86_split_long_move PARAMS ((rtx[]));
@@ -146,7 +154,7 @@ extern int ix86_attr_length_address_default PARAMS ((rtx));
 
 extern enum machine_mode ix86_fp_compare_mode PARAMS ((enum rtx_code));
 
-extern int x86_64_sign_extended_value PARAMS ((rtx));
+extern int x86_64_sign_extended_value PARAMS ((rtx, int));
 extern int x86_64_zero_extended_value PARAMS ((rtx));
 extern rtx ix86_libcall_value PARAMS ((enum machine_mode));
 extern bool ix86_function_value_regno_p PARAMS ((int));
@@ -177,6 +185,7 @@ extern void ix86_set_move_mem_attrs PARAMS ((rtx, rtx, rtx, rtx, rtx));
 extern void emit_i387_cw_initialization PARAMS ((rtx, rtx));
 extern bool ix86_fp_jump_nontrivial_p PARAMS ((enum rtx_code));
 extern void x86_order_regs_for_local_alloc PARAMS ((void));
+extern void x86_function_profiler PARAMS ((FILE *, int));
 
 
 #ifdef TREE_CODE
@@ -204,7 +213,6 @@ extern tree ix86_handle_shared_attribute PARAMS ((tree *, tree, tree, int, bool 
 extern unsigned int i386_pe_section_type_flags PARAMS ((tree, const char *,
 							int));
 extern void i386_pe_asm_named_section PARAMS ((const char *, unsigned int));
-extern void x86_output_mi_thunk PARAMS ((FILE *, int, tree));
 extern int x86_field_alignment PARAMS ((tree, int));
 #endif
 
@@ -212,6 +220,13 @@ extern rtx ix86_tls_get_addr PARAMS ((void));
 extern void x86_machine_dependent_reorg PARAMS ((rtx));
 
 /* In winnt.c  */
+extern int i386_pe_dllexport_name_p PARAMS ((const char *));
+extern int i386_pe_dllimport_name_p PARAMS ((const char *));
+extern void i386_pe_unique_section PARAMS ((tree, int));
+extern void i386_pe_declare_function_type PARAMS ((FILE *, const char *, int));
+extern void i386_pe_record_external_function PARAMS ((const char *));
+extern void i386_pe_record_exported_symbol PARAMS ((const char *, int));
+extern void i386_pe_asm_file_end PARAMS ((FILE *));
 extern void i386_pe_encode_section_info PARAMS ((tree, int));
 extern const char *i386_pe_strip_name_encoding PARAMS ((const char *));
 extern const char *i386_pe_strip_name_encoding_full PARAMS ((const char *));
