@@ -111,6 +111,7 @@ struct basic_block_def entry_exit_blocks[2]
     EXIT_BLOCK_PTR,		/* next_bb */
     0,				/* loop_depth */
     NULL,                       /* loop_father */
+    { NULL, NULL },		/* dom */
     0,				/* count */
     0,				/* frequency */
     0,				/* flags */
@@ -133,6 +134,7 @@ struct basic_block_def entry_exit_blocks[2]
     NULL,			/* next_bb */
     0,				/* loop_depth */
     NULL,                       /* loop_father */
+    { NULL, NULL },		/* dom */
     0,				/* count */
     0,				/* frequency */
     0,				/* flags */
@@ -543,7 +545,7 @@ dump_flow_info (FILE *file)
       gcov_type lsum;
 
       fprintf (file, "\nBasic block %d: first insn %d, last %d, ",
-	       bb->index, INSN_UID (bb->head), INSN_UID (bb->end));
+	       bb->index, INSN_UID (BB_HEAD (bb)), INSN_UID (BB_END (bb)));
       fprintf (file, "prev %d, next %d, ",
 	       bb->prev_bb->index, bb->next_bb->index);
       fprintf (file, "loop_depth %d, count ", bb->loop_depth);

@@ -73,6 +73,7 @@ compilation is specified by a string called a "spec".  */
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
+#include "multilib.h" /* before tm.h */
 #include "tm.h"
 #include <signal.h>
 #if ! defined( SIGCHLD ) && defined( SIGCLD )
@@ -676,7 +677,7 @@ proper position among the other output files.  */
 %{!fsyntax-only:%{!c:%{!M:%{!MM:%{!E:%{!S:\
     %(linker) %l " LINK_PIE_SPEC "%X %{o*} %{A} %{d} %{e*} %{m} %{N} %{n} %{r}\
     %{s} %{t} %{u*} %{x} %{z} %{Z} %{!A:%{!nostdlib:%{!nostartfiles:%S}}}\
-    %{static:} %{L*} %(link_libgcc) %o %{fprofile-arcs:-lgcov}\
+    %{static:} %{L*} %(link_libgcc) %o %{fprofile-arcs|fprofile-generate:-lgcov}\
     %{!nostdlib:%{!nodefaultlibs:%(link_gcc_c_sequence)}}\
     %{!A:%{!nostdlib:%{!nostartfiles:%E}}} %{T*} }}}}}}"
 #endif
@@ -791,7 +792,6 @@ static const char *multilib_select;
 static const char *multilib_matches;
 static const char *multilib_defaults;
 static const char *multilib_exclusions;
-#include "multilib.h"
 
 /* Check whether a particular argument is a default argument.  */
 
@@ -1633,12 +1633,14 @@ init_spec (void)
 #else
 			    "-lgcc_s%M"
 #endif
+			    ,
+			    "-lgcc",
+			    "-lgcc_eh"
 #ifdef USE_LIBUNWIND_EXCEPTIONS
 			    " -lunwind"
 #endif
-			    ,
-			    "-lgcc",
-			    "-lgcc_eh");
+			    );
+
 	    p += 5;
 	    in_sep = 0;
 	  }
@@ -1654,7 +1656,11 @@ init_spec (void)
 #endif
 			    ,
 			    "libgcc.a%s",
-			    "libgcc_eh.a%s");
+			    "libgcc_eh.a%s"
+#ifdef USE_LIBUNWIND_EXCEPTIONS
+			    " -lunwind"
+#endif
+			    );
 	    p += 10;
 	    in_sep = 0;
 	  }
@@ -2678,7 +2684,14 @@ execute (void)
 	}
       fflush (stderr);
       if (verbose_only_flag != 0)
-	return 0;
+        {
+	  /* verbose_only_flag should act as if the spec was
+	     executed, so increment execution_count before
+	     returning.  This prevents spurious warnings about
+	     unused linker input files, etc.  */
+	  execution_count++;
+	  return 0;
+        }
 #ifdef DEBUG
       notice ("\nGo ahead? (y or n) ");
       fflush (stderr);
@@ -2809,7 +2822,7 @@ execute (void)
 		    fatal ("\
 Internal error: %s (program %s)\n\
 Please submit a full bug report.\n\
-See %s for instructions.",
+Send email to %s for instructions.",
 			   strsignal (WTERMSIG (status)), commands[j].prog,
 			   bug_report_url);
 		  signal_count++;
@@ -4082,29 +4095,41 @@ set_collect_gcc_options (void)
       if (switches[i].live_cond == SWITCH_IGNORE)
 	continue;
 
-      obstack_grow (&collect_obstack, "'-", 2);
+#if defined(_WIN32) && !defined(__CYGWIN__)
+#define QUOTE_STR "\""
+#define QUOTE_CHAR '"'
+#define QUOTED_QUOTE_STR "\"\\\"\""
+#else
+#define QUOTE_STR "\'"
+#define QUOTE_CHAR '\''
+#define QUOTED_QUOTE_STR "'\\''"
+#endif
+
+      obstack_grow (&collect_obstack, QUOTE_STR "-", 2);
       q = switches[i].part1;
-      while ((p = strchr (q, '\'')))
+      while ((p = strchr (q, QUOTE_CHAR)))
 	{
 	  obstack_grow (&collect_obstack, q, p - q);
-	  obstack_grow (&collect_obstack, "'\\''", 4);
+	  obstack_grow (&collect_obstack, QUOTED_QUOTE_STR, 
+			strlen (QUOTED_QUOTE_STR));
 	  q = ++p;
 	}
       obstack_grow (&collect_obstack, q, strlen (q));
-      obstack_grow (&collect_obstack, "'", 1);
+      obstack_grow (&collect_obstack, QUOTE_STR, 1);
 
       for (args = switches[i].args; args && *args; args++)
 	{
-	  obstack_grow (&collect_obstack, " '", 2);
+	  obstack_grow (&collect_obstack, " " QUOTE_STR, 2);
 	  q = *args;
-	  while ((p = strchr (q, '\'')))
+	  while ((p = strchr (q, QUOTE_CHAR)))
 	    {
 	      obstack_grow (&collect_obstack, q, p - q);
-	      obstack_grow (&collect_obstack, "'\\''", 4);
+	      obstack_grow (&collect_obstack, QUOTED_QUOTE_STR,
+			    strlen (QUOTED_QUOTE_STR));
 	      q = ++p;
 	    }
 	  obstack_grow (&collect_obstack, q, strlen (q));
-	  obstack_grow (&collect_obstack, "'", 1);
+	  obstack_grow (&collect_obstack, QUOTE_STR, 1);
 	}
     }
   obstack_grow (&collect_obstack, "\0", 1);

@@ -818,7 +818,7 @@ enum reg_class {
 
    'U' is a symbolic operand.
 
-   'W' is a vector zero.   */
+   'W' is a vector zero.  */
 
 #define EXTRA_CONSTRAINT  alpha_extra_constraint
 
@@ -1679,10 +1679,6 @@ do {						\
   {"some_small_symbolic_operand", {SET, PARALLEL, PREFETCH, UNSPEC,	\
 				   UNSPEC_VOLATILE}},
 
-/* Define the `__builtin_va_list' type for the ABI.  */
-#define BUILD_VA_LIST_TYPE(VALIST) \
-  (VALIST) = alpha_build_va_list ()
-
 /* Implement `va_start' for varargs and stdarg.  */
 #define EXPAND_BUILTIN_VA_START(valist, nextarg) \
   alpha_va_start (valist, nextarg)

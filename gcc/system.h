@@ -251,28 +251,6 @@ extern int errno;
 #include <sys/wait.h>
 #endif
 
-#ifndef WIFSIGNALED
-#define WIFSIGNALED(S) (((S) & 0xff) != 0 && ((S) & 0xff) != 0x7f)
-#endif
-#ifndef WTERMSIG
-#define WTERMSIG(S) ((S) & 0x7f)
-#endif
-#ifndef WIFEXITED
-#define WIFEXITED(S) (((S) & 0xff) == 0)
-#endif
-#ifndef WEXITSTATUS
-#define WEXITSTATUS(S) (((S) & 0xff00) >> 8)
-#endif
-#ifndef WSTOPSIG
-#define WSTOPSIG WEXITSTATUS
-#endif
-#ifndef WCOREDUMP
-#define WCOREDUMP(S) ((S) & WCOREFLG)
-#endif
-#ifndef WCOREFLG
-#define WCOREFLG 0200
-#endif
-
 /* The HAVE_DECL_* macros are three-state, undefined, 0 or 1.  If they
    are defined to 0 then we must provide the relevant declaration
    here.  These checks will be in the undefined state while configure
@@ -490,8 +468,8 @@ extern int snprintf (char *, size_t, const char *, ...);
    FIXME: provide a complete autoconf test for buggy enum bitfields.  */
 
 #if (GCC_VERSION > 2000)
-#define ENUM_BITFIELD(TYPE) enum TYPE
-#define CHAR_BITFIELD unsigned char
+#define ENUM_BITFIELD(TYPE) __extension__ enum TYPE
+#define CHAR_BITFIELD __extension__ unsigned char
 #else
 #define ENUM_BITFIELD(TYPE) unsigned int
 #define CHAR_BITFIELD unsigned int
@@ -594,7 +572,8 @@ typedef char _Bool;
 	ASM_SIMPLIFY_DWARF_ADDR INIT_TARGET_OPTABS INIT_SUBTARGET_OPTABS \
 	INIT_GOFAST_OPTABS MULSI3_LIBCALL MULDI3_LIBCALL DIVSI3_LIBCALL \
 	DIVDI3_LIBCALL UDIVSI3_LIBCALL UDIVDI3_LIBCALL MODSI3_LIBCALL	\
-	MODDI3_LIBCALL UMODSI3_LIBCALL UMODDI3_LIBCALL
+	MODDI3_LIBCALL UMODSI3_LIBCALL UMODDI3_LIBCALL BUILD_VA_LIST_TYPE \
+	PRETEND_OUTGOING_VARARGS_NAMED
 
 /* Other obsolete target macros, or macros that used to be in target
    headers and were not used, and may be obsolete or may never have
@@ -618,7 +597,9 @@ typedef char _Bool;
 	DBX_WORKING_DIRECTORY INSN_CACHE_DEPTH INSN_CACHE_SIZE		   \
 	INSN_CACHE_LINE_WIDTH INIT_SECTION_PREAMBLE NEED_ATEXIT ON_EXIT	   \
 	EXIT_BODY OBJECT_FORMAT_ROSE MULTIBYTE_CHARS MAP_CHARACTER	   \
-	LIBGCC_NEEDS_DOUBLE
+	LIBGCC_NEEDS_DOUBLE FINAL_PRESCAN_LABEL DEFAULT_CALLER_SAVES	   \
+	LOAD_ARGS_REVERSED MAX_INTEGER_COMPUTATION_MODE			   \
+	CONVERT_HARD_REGISTER_TO_SSA_P
 
 /* Hooks that are no longer used.  */
  #pragma GCC poison LANG_HOOKS_FUNCTION_MARK LANG_HOOKS_FUNCTION_FREE	\
