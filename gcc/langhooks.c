@@ -26,7 +26,7 @@ Boston, MA 02111-1307, USA.  */
 #include "toplev.h"
 #include "tree.h"
 #include "tree-inline.h"
-#include "tree-simple.h"
+#include "tree-gimple.h"
 #include "rtl.h"
 #include "insn-config.h"
 #include "integrate.h"
@@ -216,8 +216,8 @@ lhd_can_use_bit_fields_p (void)
 void
 lhd_clear_binding_stack (void)
 {
-  while (! (*lang_hooks.decls.global_bindings_p) ())
-    poplevel (0, 0, 0);
+  while (! lang_hooks.decls.global_bindings_p ())
+    lang_hooks.decls.poplevel (0, 0, 0);
 }
 
 /* Type promotion for variable arguments.  */
@@ -420,6 +420,39 @@ lhd_tree_inlining_anon_aggr_type_p (tree t ATTRIBUTE_UNUSED)
   return 0;
 }
 
+/* APPLE LOCAL begin new tree dump */
+/* Do nothing language hooks for dmp_tree().  */
+void 
+lhd_dump_tree_do_nothing (FILE *file ATTRIBUTE_UNUSED,
+			  tree node ATTRIBUTE_UNUSED,
+			  int indent ATTRIBUTE_UNUSED,
+			  int after_id ATTRIBUTE_UNUSED)
+{
+}
+
+int
+lhd_dump_tree_blank_line_do_nothing (tree previous_node ATTRIBUTE_UNUSED,
+				     tree current_node ATTRIBUTE_UNUSED)
+{
+  return 0;
+}
+
+int
+lhd_dump_tree_lineno_do_nothing (FILE *file ATTRIBUTE_UNUSED,
+				 tree node ATTRIBUTE_UNUSED)
+{
+  return 0;
+}
+
+int 
+lhd_dmp_tree3_do_nothing (FILE *file ATTRIBUTE_UNUSED,
+			  tree node ATTRIBUTE_UNUSED,
+			  int flags ATTRIBUTE_UNUSED)
+{
+  return 0;
+}
+/* APPLE LOCAL end new tree dump */
+
 /* lang_hooks.tree_inlining.start_inlining and end_inlining perform any
    language-specific bookkeeping necessary for processing
    FN. start_inlining returns nonzero if inlining should proceed, zero if
@@ -520,7 +553,7 @@ write_global_declarations (void)
      Really output inline functions that must actually be callable
      and have not been output so far.  */
 
-  tree globals = (*lang_hooks.decls.getdecls) ();
+  tree globals = lang_hooks.decls.getdecls ();
   int len = list_length (globals);
   tree *vec = xmalloc (sizeof (tree) * len);
   int i;
@@ -565,11 +598,11 @@ lhd_print_error_function (diagnostic_context *context, const char *file)
 	  if (TREE_CODE (TREE_TYPE (current_function_decl)) == METHOD_TYPE)
 	    pp_printf
 	      (context->printer, "In member function `%s':",
-	       (*lang_hooks.decl_printable_name) (current_function_decl, 2));
+	       lang_hooks.decl_printable_name (current_function_decl, 2));
 	  else
 	    pp_printf
 	      (context->printer, "In function `%s':",
-	       (*lang_hooks.decl_printable_name) (current_function_decl, 2));
+	       lang_hooks.decl_printable_name (current_function_decl, 2));
 	}
 
       diagnostic_set_last_function (context);

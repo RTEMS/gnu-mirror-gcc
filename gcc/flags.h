@@ -39,6 +39,13 @@ enum debug_info_type
 /* Specify which kind of debugging info to generate.  */
 extern enum debug_info_type write_symbols;
 
+/* APPLE LOCAL begin Symbol Separation */
+extern enum debug_info_type orig_write_symbols;
+
+/* Nonzero means, try to look for separate symbol repositories.  */
+extern int flag_grepository;
+/* APPLE LOCAL end Symbol Separation */
+
 /* Names of debug_info_type, for error messages.  */
 extern const char *const debug_type_names[];
 
@@ -184,7 +191,7 @@ extern bool warn_deprecated_decl;
 /* Nonzero means warn about constructs which might not be strict
    aliasing safe.  */
 
-extern bool warn_strict_aliasing;
+extern int warn_strict_aliasing;
 
 /* Nonzero if generating code to do profiling.  */
 
@@ -209,6 +216,11 @@ extern int flag_branch_probabilities;
 /* Nonzero if basic blocks should be reordered.  */
 
 extern int flag_reorder_blocks;
+
+/* Nonzero if basic blocks should be partitioned into hot and cold
+   sections of the .o file, in addition to being reordered.  */
+
+extern int flag_reorder_blocks_and_partition;
 
 /* Nonzero if functions should be reordered.  */
 
@@ -239,7 +251,15 @@ extern int flag_print_asm_name;
 
 extern int flag_signed_char;
 
-/* Nonzero means give an enum type only as many bytes as it needs.  */
+/* APPLE LOCAL begin Pascal strings 2001-07-05 --zll */
+/* Nonzero means initial "\p" in string becomes a length byte and
+   string type becomes _unsigned_ char* .  */
+
+extern int flag_pascal_strings;
+/* APPLE LOCAL end Pascal strings 2001-07-05 --zll */
+
+/* Nonzero means give an enum type only as many bytes as it needs.  A value
+   of 2 means it has not yet been initialized.  */
 
 extern int flag_short_enums;
 
@@ -277,18 +297,6 @@ extern int flag_float_store;
 
 extern int flag_strength_reduce;
 
-/* Nonzero enables loop unrolling in unroll.c.  Only loops for which the
-   number of iterations can be calculated at compile-time (UNROLL_COMPLETELY,
-   UNROLL_MODULO) or at run-time (preconditioned to be UNROLL_MODULO) are
-   unrolled.  */
-
-extern int flag_old_unroll_loops;
-
-/* Nonzero enables loop unrolling in unroll.c.  All loops are unrolled.
-   This is generally not a win.  */
-
-extern int flag_old_unroll_all_loops;
-
 /* Nonzero forces all invariant computations in loops to be moved
    outside the loop.  */
 
@@ -303,6 +311,12 @@ extern int flag_prefetch_loop_arrays;
 
 extern int flag_reduce_all_givs;
 
+/* Nonzero enables loop unrolling.  */
+extern int flag_unroll_loops;
+
+/* Nonzero enables loop unswitching.  */
+extern int flag_unswitch_loops;
+
 /* Nonzero for -fcse-follow-jumps:
    have cse follow jumps to do a more extensive job.  */
 
@@ -316,6 +330,10 @@ extern int flag_cse_skip_blocks;
 /* Nonzero for -fexpensive-optimizations:
    perform miscellaneous relatively-expensive optimizations.  */
 extern int flag_expensive_optimizations;
+
+/* Nonzero means to use global dataflow analysis to eliminate
+   useless null pointer tests.  */
+extern int flag_delete_null_pointer_checks;
 
 /* Nonzero means don't put addresses of constant functions in registers.
    Used for compiling the Unix kernel, where strange substitutions are
@@ -378,6 +396,13 @@ extern int flag_rerun_loop_opt;
 
 extern int flag_inline_functions;
 
+/* APPLE LOCAL begin -fobey-inline */
+/* Nonzero for -fobey-inline: 'inline' keyword must be obeyed, regardless
+   of codesize.  */
+
+extern int flag_obey_inline;
+/* APPLE LOCAL end -fobey-inline */
+
 /* Nonzero for -fkeep-inline-functions: even if we make a function
    go inline everywhere, keep its definition around for debugging
    purposes.  */
@@ -402,6 +427,10 @@ extern int flag_really_no_inline;
 extern int flag_syntax_only;
 extern int rtl_dump_and_exit;
 
+/* Nonzero if we are exiting on the first error occurred.  */
+
+extern int flag_fatal_errors;
+
 /* Nonzero means we should save auxiliary info into a .X file.  */
 
 extern int flag_gen_aux_info;
@@ -409,6 +438,9 @@ extern int flag_gen_aux_info;
 /* Nonzero means make the text shared if supported.  */
 
 extern int flag_shared_data;
+
+/* Controls the activiation of SMS modulo scheduling. */
+extern int flag_modulo_sched;
 
 /* flag_schedule_insns means schedule insns within basic blocks (before
    local_alloc).
@@ -725,11 +757,36 @@ extern int flag_tree_ccp;
 /* Enable SSA-DCE on trees.  */
 extern int flag_tree_dce;
 
+/* Enable SSA-CHREC on trees.  */
+extern int flag_scalar_evolutions;
+
+/* Enable the analysis of all the data dependences.  */
+extern int flag_all_data_deps;
+
+/* Enable loop optimizations on trees.  */
+
+extern int flag_tree_loop;
+
+/* Enable linear loop transforms on trees. */
+extern int flag_tree_loop_linear;
+
+/* Enable the elimination of checks on trees.  */
+extern int flag_tree_elim_checks;
+
+/* Enable data dependence graph.  */
+extern int flag_ddg;
+
+/* Enable loop vectorization on trees */
+extern int flag_tree_vectorize;
+
 /* Enable SSA->normal pass memory location coalescing.  */
 extern int flag_tree_combine_temps;
 
 /* Enable SSA->normal pass expression replacement.  */
 extern int flag_tree_ter;
+
+/* Enable SSA_>normal live range splitting.  */
+extern int flag_tree_live_range_split;
 
 /* Enable dominator optimizations.  */
 extern int flag_tree_dom;
@@ -739,9 +796,6 @@ extern int flag_tree_ch;
 
 /* Enable dead store and redundant load elimination */
 extern int flag_tree_dse;
-
-/* Enable loop optimization on tree-ssa.  */
-extern int flag_tree_loop;
 
 /* Enable scalar replacement of aggregates.  */
 extern int flag_tree_sra;
@@ -825,5 +879,38 @@ extern int flag_abi_version;
    and the rounding mode is important.  */
 #define HONOR_SIGN_DEPENDENT_ROUNDING(MODE) \
   (MODE_HAS_SIGN_DEPENDENT_ROUNDING (MODE) && flag_rounding_math)
+
+/* APPLE LOCAL begin -fast or -fastf or -fastcp */
+/* Nonzero if we should perform SPEC oriented optimizations for C.  */
+extern int flag_fast;
+/* Nonzero if we should perform SPEC oriented optimizations for C that is
+   produced by the NAG Fortan-to-C translator.  */
+extern int flag_fastf;
+/* Nonzero if we should perform SPEC oriented optimizations for C++.  */
+extern int flag_fastcp;
+/* APPLE LOCAL end -fast or -fastf or -fastcp */
+
+/* APPLE LOCAL gdb only used symbols */
+#ifdef DBX_ONLY_USED_SYMBOLS
+/* Nonzero if generating debugger info for used symbols only.  */
+extern int flag_debug_only_used_symbols;
+#endif
+
+/* APPLE LOCAL BEGIN pch distcc --mrs */
+/* True if PCH should omit from the -E output all lines from PCH files
+   found in PCH files.  */
+extern int flag_pch_preprocess;
+/* APPLE LOCAL END pch distcc --mrs */
+
+/* APPLE LOCAL begin loop transposition */
+/* Nonzero if we should perform automatic loop transposition. */
+extern int flag_loop_transpose;
+/* APPLE LOCAL end loop transposition */
+
+/* APPLE LOCAL begin predictive compilation */
+extern int predictive_compilation;
+/* APPLE LOCAL end predictive compilation */
+
+extern int disable_typechecking_for_spec_flag;
 
 #endif /* ! GCC_FLAGS_H */

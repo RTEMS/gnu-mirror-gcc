@@ -45,17 +45,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include "tree-inline.h"
 #include "varray.h"
 #include "c-tree.h"
-#include "tree-simple.h"
+#include "tree-gimple.h"
 #include "hashtab.h"
 #include "function.h"
 #include "cgraph.h"
 #include "tree-pass.h"
 #include "timevar.h"
-
-/* Reduce ifdefery later.  */
-#ifndef HAVE_BANSHEE
-#define HAVE_BANSHEE 0
-#endif
 
 /*  This file contains the implementation of the common parts of the
     tree points-to analysis infrastructure.
@@ -105,14 +100,12 @@ static bool call_may_return (tree);
 static bool
 call_may_clobber (tree expr)
 {
-  tree callee;
   int flags;
 
   if (TREE_CODE (expr) != CALL_EXPR)
     return false;
 
-  callee = get_callee_fndecl (expr);
-  flags = (callee) ? flags_from_decl_or_type (callee) : 0;
+  flags = call_expr_flags (expr);
   return (! (flags & (ECF_CONST | ECF_PURE | ECF_NORETURN)));
 }
 
@@ -121,14 +114,12 @@ call_may_clobber (tree expr)
 static bool
 call_may_return (tree expr)
 {
-  tree callee;
   int flags;
   
   if (TREE_CODE (expr) != CALL_EXPR)
     return false;
 
-  callee = get_callee_fndecl (expr);
-  flags = (callee) ? flags_from_decl_or_type (callee) : 0;
+  flags = call_expr_flags (expr);
   return ! (flags & ECF_NORETURN);
 }
 
@@ -629,7 +620,8 @@ find_func_aliases (tree stp)
       else
 	{
 	  /* x.f = y  or x->f = y */
-	  if (TREE_CODE (op0) == COMPONENT_REF 
+	  if ((TREE_CODE (op0) == COMPONENT_REF 
+	       || TREE_CODE (op0) == BIT_FIELD_REF)
 	      && is_gimple_variable (op1))
 	    {
 	      if (rhsAV != NULL)
@@ -975,7 +967,7 @@ static void
 create_alias_vars (void)
 {
   basic_block bb;
-#if HAVE_BANSHEE
+#ifdef HAVE_BANSHEE
   if (flag_tree_points_to == PTA_ANDERSEN)
     current_alias_ops = andersen_alias_ops;
   else

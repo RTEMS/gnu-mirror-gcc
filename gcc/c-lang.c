@@ -42,10 +42,16 @@ enum c_language_kind c_language = clk_c;
 
 #undef LANG_HOOKS_NAME
 #define LANG_HOOKS_NAME "GNU C"
+#undef LANG_HOOKS_IDENTIFIER_SIZE
+#define LANG_HOOKS_IDENTIFIER_SIZE C_SIZEOF_STRUCT_LANG_IDENTIFIER
 #undef LANG_HOOKS_INIT
 #define LANG_HOOKS_INIT c_objc_common_init
 #undef LANG_HOOKS_FINISH
 #define LANG_HOOKS_FINISH c_common_finish
+/* APPLE LOCAL begin Objective-C++ */
+#undef LANG_HOOKS_FINISH_FILE
+#define LANG_HOOKS_FINISH_FILE c_objc_common_finish_file
+/* APPLE LOCAL end Objective-C++ */
 #undef LANG_HOOKS_INIT_OPTIONS
 #define LANG_HOOKS_INIT_OPTIONS c_common_init_options
 #undef LANG_HOOKS_INITIALIZE_DIAGNOSTICS
@@ -68,6 +74,8 @@ enum c_language_kind c_language = clk_c;
 #define LANG_HOOKS_MARK_ADDRESSABLE c_mark_addressable
 #undef LANG_HOOKS_PARSE_FILE
 #define LANG_HOOKS_PARSE_FILE c_common_parse_file
+#undef LANG_HOOKS_CLEAR_BINDING_STACK
+#define LANG_HOOKS_CLEAR_BINDING_STACK lhd_do_nothing
 #undef LANG_HOOKS_TRUTHVALUE_CONVERSION
 #define LANG_HOOKS_TRUTHVALUE_CONVERSION c_objc_common_truthvalue_conversion
 #undef LANG_HOOKS_FINISH_INCOMPLETE_DECL
@@ -92,9 +100,6 @@ enum c_language_kind c_language = clk_c;
 #define LANG_HOOKS_FUNCTION_MISSING_NORETURN_OK_P c_missing_noreturn_ok_p
 #undef LANG_HOOKS_DUP_LANG_SPECIFIC_DECL
 #define LANG_HOOKS_DUP_LANG_SPECIFIC_DECL c_dup_lang_specific_decl
-
-#undef LANG_HOOKS_RTL_EXPAND_STMT
-#define LANG_HOOKS_RTL_EXPAND_STMT expand_stmt_toplev
 
 /* Attribute hooks.  */
 #undef LANG_HOOKS_COMMON_ATTRIBUTE_TABLE
@@ -143,6 +148,37 @@ enum c_language_kind c_language = clk_c;
 #undef LANG_HOOKS_REGISTER_BUILTIN_TYPE
 #define LANG_HOOKS_REGISTER_BUILTIN_TYPE c_register_builtin_type
 
+/* APPLE LOCAL begin new tree dump */
+#if 0
+/* MERGE FIXME 3468690 */
+#undef LANG_HOOKS_DUMP_DECL
+#define LANG_HOOKS_DUMP_DECL c_dump_decl
+#undef LANG_HOOKS_DUMP_TYPE
+#define LANG_HOOKS_DUMP_TYPE c_dump_type
+#undef LANG_HOOKS_DUMP_IDENTIFIER
+#define LANG_HOOKS_DUMP_IDENTIFIER c_dump_identifier
+#undef LANG_HOOKS_DUMP_BLANK_LINE_P
+#define LANG_HOOKS_DUMP_BLANK_LINE_P c_dump_blank_line_p
+#undef LANG_HOOKS_DUMP_LINENO_P
+#define LANG_HOOKS_DUMP_LINENO_P c_dump_lineno_p
+#undef LANG_HOOKS_DMP_TREE3
+#define LANG_HOOKS_DMP_TREE3 c_dmp_tree3
+#endif
+/* APPLE LOCAL end new tree dump */
+
+/* The C front end's scoping structure is very different from
+   that expected by the language-independent code; it is best
+   to disable all of pushlevel, poplevel, set_block, and getdecls.
+   This means it must also provide its own write_globals.  */
+
+#undef LANG_HOOKS_PUSHLEVEL
+#define LANG_HOOKS_PUSHLEVEL lhd_do_nothing_i
+#undef LANG_HOOKS_POPLEVEL
+#define LANG_HOOKS_POPLEVEL lhd_do_nothing_iii_return_null_tree
+#undef LANG_HOOKS_SET_BLOCK
+#define LANG_HOOKS_SET_BLOCK lhd_do_nothing_t
+#undef LANG_HOOKS_GETDECLS
+#define LANG_HOOKS_GETDECLS lhd_return_null_tree_v
 #undef LANG_HOOKS_WRITE_GLOBALS
 #define LANG_HOOKS_WRITE_GLOBALS c_write_global_declarations
 
