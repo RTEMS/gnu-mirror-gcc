@@ -1,5 +1,5 @@
-/* ANSI and traditional C compatability macros.
-   Copyright (C) 1996 Free Software Foundation, Inc.
+/* ANSI and traditional C compatibility macros.
+   Copyright (C) 1996, 1997, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -46,14 +46,6 @@ Boston, MA 02111-1307, USA.  */
 #endif
 #endif
 
-#ifndef STDIO_PROTO
-#ifdef BUFSIZ
-#define STDIO_PROTO(ARGS) PROTO(ARGS)
-#else
-#define STDIO_PROTO(ARGS) ()
-#endif
-#endif
-
 /* Define a generic NULL if one hasn't already been defined.  */
 
 #ifndef NULL
@@ -84,5 +76,32 @@ Boston, MA 02111-1307, USA.  */
 #endif
 
 #endif /* ! __STDC__ */
+
+/* We don't have autoconf for libgcc2.c since it's a target, so don't
+   define these functions, which aren't used there anyway.  */
+
+#ifndef IN_LIBGCC2
+
+#ifndef HAVE_BCOPY
+#define bcopy(src,dst,len) memcpy ((dst),(src),(len))
+#endif
+
+#ifndef HAVE_BZERO
+#define bzero(dst,len) memset ((dst),0,(len))
+#endif
+
+#ifndef HAVE_BCMP
+#define bcmp(left,right,len) memcmp ((left),(right),(len))
+#endif
+
+#ifndef HAVE_RINDEX
+#define rindex strrchr
+#endif
+
+#ifndef HAVE_INDEX
+#define index strchr
+#endif
+
+#endif /* IN_LIBGCC2 */
 
 #endif /* ANSIDECL_H */

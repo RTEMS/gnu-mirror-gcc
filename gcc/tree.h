@@ -1,5 +1,5 @@
 /* Front-end tree definitions for GNU compiler.
-   Copyright (C) 1989, 93, 94, 95, 96, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1989, 93, 94, 95, 96, 97, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -93,12 +93,24 @@ enum built_in_function
   BUILT_IN_CONSTANT_P,
   BUILT_IN_FRAME_ADDRESS,
   BUILT_IN_RETURN_ADDRESS,
+  BUILT_IN_AGGREGATE_INCOMING_ADDRESS,
   BUILT_IN_CALLER_RETURN_ADDRESS,
   BUILT_IN_APPLY_ARGS,
   BUILT_IN_APPLY,
   BUILT_IN_RETURN,
   BUILT_IN_SETJMP,
   BUILT_IN_LONGJMP,
+
+  /* Various hooks for the DWARF 2 __throw routine.  */
+  BUILT_IN_FP, BUILT_IN_SP,
+  BUILT_IN_UNWIND_INIT,
+  BUILT_IN_DWARF_FP_REGNUM,
+  BUILT_IN_DWARF_REG_SIZE,
+  BUILT_IN_FROB_RETURN_ADDR,
+  BUILT_IN_EXTRACT_RETURN_ADDR,
+  BUILT_IN_SET_RETURN_ADDR_REG,
+  BUILT_IN_EH_STUB,
+  BUILT_IN_SET_EH_REGS,
 
   /* C++ extensions */
   BUILT_IN_NEW,
@@ -184,7 +196,7 @@ struct tree_common
    static_flag:
 
        TREE_STATIC in
-           VAR_DECL, FUNCTION_DECL, CONSTRUCTOR
+           VAR_DECL, FUNCTION_DECL, CONSTRUCTOR, ADDR_EXPR
        TREE_NO_UNUSED_WARNING in
            CONVERT_EXPR, NOP_EXPR, COMPOUND_EXPR
        TREE_VIA_VIRTUAL in
@@ -233,7 +245,7 @@ struct tree_common
    readonly_flag:
 
        TREE_READONLY in
-           VAR_DECL, PARM_DECL, FIELD_DECL, ..._REF
+           all expressions
        ITERATOR_BOUND_P in
            VAR_DECL if iterator (C)
        TYPE_READONLY in
@@ -254,6 +266,8 @@ struct tree_common
            FUNCTION_DECL
        TREE_PARMLIST in
            TREE_PARMLIST (C++)
+       SAVE_EXPR_NOPLACEHOLDER in
+	   SAVE_EXPR
 
    asm_written_flag:
 
@@ -605,6 +619,7 @@ struct tree_vec
 /* In a SAVE_EXPR node.  */
 #define SAVE_EXPR_CONTEXT(NODE) TREE_OPERAND(NODE, 1)
 #define SAVE_EXPR_RTL(NODE) (*(struct rtx_def **) &(NODE)->exp.operands[2])
+#define SAVE_EXPR_NOPLACEHOLDER(NODE) TREE_UNSIGNED (NODE)
 
 /* In a RTL_EXPR node.  */
 #define RTL_EXPR_SEQUENCE(NODE) (*(struct rtx_def **) &(NODE)->exp.operands[0])
@@ -737,7 +752,7 @@ struct tree_block
    the same way that the first union alternative would be passed.  */
 #define TYPE_TRANSPARENT_UNION(NODE) ((NODE)->type.transparent_union_flag)
 
-/* Indicated that objects of this type should be layed out in as
+/* Indicated that objects of this type should be laid out in as
    compact a way as possible.  */
 #define TYPE_PACKED(NODE) ((NODE)->type.packed_flag)
 
@@ -1156,8 +1171,7 @@ struct tree_decl
   struct rtx_def *rtl;	/* acts as link to register transfer language
 				   (rtl) info */
   /* For FUNCTION_DECLs: points to insn that constitutes its definition
-     on the permanent obstack.  For any other kind of decl, this is the
-     alignment.  */
+     on the permanent obstack.  For FIELD_DECL, this is DECL_FIELD_SIZE.  */
   union {
     struct rtx_def *r;
     HOST_WIDE_INT i;
@@ -1216,7 +1230,10 @@ extern char *xstrdup			PROTO((char *));
 extern char *oballoc			PROTO((int));
 extern char *permalloc			PROTO((int));
 extern char *savealloc			PROTO((int));
+extern char *expralloc			PROTO((int));
+#ifdef NEED_DECLARATION_FREE
 extern void free			PROTO((void *));
+#endif
 
 /* Lowest level primitive for allocating a node.
    The TREE_CODE is the only argument.  Contents are initialized
@@ -1266,6 +1283,7 @@ extern tree build_string		PROTO((int, char *));
 extern tree build1			PROTO((enum tree_code, tree, tree));
 extern tree build_tree_list		PROTO((tree, tree));
 extern tree build_decl_list		PROTO((tree, tree));
+extern tree build_expr_list		PROTO((tree, tree));
 extern tree build_decl			PROTO((enum tree_code, tree, tree));
 extern tree build_block			PROTO((tree, tree, tree, tree, tree));
 
@@ -1296,6 +1314,7 @@ extern int tree_int_cst_equal		PROTO((tree, tree));
 extern int tree_int_cst_lt		PROTO((tree, tree));
 extern int tree_int_cst_sgn		PROTO((tree));
 extern int index_type_equal		PROTO((tree, tree));
+extern tree get_inner_array_type	PROTO((tree));
 
 /* From expmed.c.  Since rtl.h is included after tree.h, we can't
    put the prototype here.  Rtl.h does declare the prototype if
@@ -1374,7 +1393,7 @@ extern tree pedantic_non_lvalue		PROTO((tree));
 
 extern tree convert			PROTO((tree, tree));
 extern tree size_in_bytes		PROTO((tree));
-extern int int_size_in_bytes		PROTO((tree));
+extern HOST_WIDE_INT int_size_in_bytes	PROTO((tree));
 extern tree size_binop			PROTO((enum tree_code, tree, tree));
 extern tree size_int			PROTO((unsigned HOST_WIDE_INT));
 extern tree round_up			PROTO((tree, int));
@@ -1404,6 +1423,7 @@ extern tree perm_tree_cons		PROTO((tree, tree, tree));
 extern tree temp_tree_cons		PROTO((tree, tree, tree));
 extern tree saveable_tree_cons		PROTO((tree, tree, tree));
 extern tree decl_tree_cons		PROTO((tree, tree, tree));
+extern tree expr_tree_cons		PROTO((tree, tree, tree));
 
 /* Return the last tree node in a chain.  */
 
@@ -1453,7 +1473,7 @@ extern int lvalue_or_else		PROTO((tree, char *));
 extern tree save_expr			PROTO((tree));
 
 /* unsave_expr (EXP) returns an expression equivalent to EXP but it
-   can be used multiple times and will evaluate EXP, in it's entirety
+   can be used multiple times and will evaluate EXP, in its entirety
    each time.  */
 
 extern tree unsave_expr			PROTO((tree));
@@ -1658,6 +1678,7 @@ extern void (*incomplete_decl_finalize_hook) ();
 
 /* In tree.c */
 extern char *perm_calloc			PROTO((int, long));
+extern tree get_file_function_name		PROTO((int));
 extern tree get_set_constructor_bits		PROTO((tree, char *, int));
 extern tree get_set_constructor_bytes		PROTO((tree,
 						       unsigned char *, int));
@@ -1692,8 +1713,8 @@ extern void expand_null_return			PROTO((void));
 extern void expand_return			PROTO((tree));
 extern void expand_start_bindings		PROTO((int));
 extern void expand_end_bindings			PROTO((tree, int, int));
-extern void start_cleanup_deferal		PROTO((void));
-extern void end_cleanup_deferal			PROTO((void));
+extern void start_cleanup_deferral		PROTO((void));
+extern void end_cleanup_deferral		PROTO((void));
 extern void mark_block_as_eh_region		PROTO((void));
 extern void mark_block_as_not_eh_region		PROTO((void));
 extern int is_eh_region				PROTO((void));
@@ -1744,6 +1765,52 @@ extern void rrotate_double	PROTO((HOST_WIDE_INT, HOST_WIDE_INT,
 				       HOST_WIDE_INT *));
 extern int operand_equal_p	PROTO((tree, tree, int));
 extern tree invert_truthvalue	PROTO((tree));
+
+/* Interface of the DWARF2 unwind info support.  */
+
+/* Decide whether we want to emit frame unwind information for the current
+   translation unit.  */
+
+extern int dwarf2out_do_frame		PROTO((void));
+
+/* Generate a new label for the CFI info to refer to.  */
+
+extern char *dwarf2out_cfi_label	PROTO((void));
+
+/* Entry point to update the canonical frame address (CFA).  */
+
+extern void dwarf2out_def_cfa		PROTO((char *, unsigned, long));
+
+/* Add the CFI for saving a register window.  */
+
+extern void dwarf2out_window_save	PROTO((char *));
+
+/* Add a CFI to update the running total of the size of arguments pushed
+   onto the stack.  */
+
+extern void dwarf2out_args_size		PROTO((char *, long));
+
+/* Entry point for saving a register to the stack.  */
+
+extern void dwarf2out_reg_save		PROTO((char *, unsigned, long));
+
+/* Entry point for saving the return address in the stack.  */
+
+extern void dwarf2out_return_save	PROTO((char *, long));
+
+/* Entry point for saving the return address in a register.  */
+
+extern void dwarf2out_return_reg	PROTO((char *, unsigned));
+
+/* Output a marker (i.e. a label) for the beginning of a function, before
+   the prologue.  */
+
+extern void dwarf2out_begin_prologue	PROTO((void));
+
+/* Output a marker (i.e. a label) for the absolute end of the generated
+   code for a function definition.  */
+
+extern void dwarf2out_end_epilogue	PROTO((void));
 
 /* The language front-end must define these functions.  */
 

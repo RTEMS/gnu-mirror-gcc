@@ -1,5 +1,5 @@
 /* Configuration for GNU C-compiler for PowerPC running System V.4.
-   Copyright (C) 1995 Free Software Foundation, Inc.
+   Copyright (C) 1995, 1998 Free Software Foundation, Inc.
 
    Cloned from sparc/xm-sysv4.h by Michael Meissner (meissner@cygnus.com).
 
@@ -46,21 +46,17 @@ Boston, MA 02111-1307, USA.  */
 #define SUCCESS_EXIT_CODE 0
 #define FATAL_EXIT_CODE 33
 
-#include "xm-svr4.h"
-
 /* if not compiled with GNU C, use the C alloca and use only int bitfields. */
 #ifndef __GNUC__
 #define	USE_C_ALLOCA
+#ifdef __STDC__
+extern void *alloca ();
+#else
 extern char *alloca ();
+#endif
 #undef ONLY_INT_FIELDS
 #define ONLY_INT_FIELDS
 #endif
-
-/* Solaris has a different declaration of sys_siglist than collect uses.  */
-#define DONT_DECLARE_SYS_SIGLIST
-
-/* We have STRERROR */
-#define HAVE_STRERROR
 
 #ifdef __PPC__
 #ifndef __STDC__

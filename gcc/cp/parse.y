@@ -1,5 +1,5 @@
 /* YACC parser for C++ syntax.
-   Copyright (C) 1988, 89, 93, 94, 95, 1996 Free Software Foundation, Inc.
+   Copyright (C) 1988, 89, 93, 94, 95, 96, 1997 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GNU CC.
@@ -41,6 +41,7 @@ Boston, MA 02111-1307, USA.  */
 #include "lex.h"
 #include "cp-tree.h"
 #include "output.h"
+#include "except.h"
 
 /* Since parsers are distinct for each language, put the language string
    definition here.  (fnf) */
@@ -61,8 +62,6 @@ extern tree last_tree;
 extern tree strip_attrs		PROTO((tree));
 /* END FSF LOCAL */
 
-void yyerror ();
-
 /* Like YYERROR but do call yyerror.  */
 #define YYERROR1 { yyerror ("syntax error"); YYERROR; }
 
@@ -73,11 +72,11 @@ void yyerror ();
    error message if the user supplies an empty conditional expression.  */
 static char *cond_stmt_keyword;
 
+static tree empty_parms PROTO((void));
+
 /* Nonzero if we have an `extern "C"' acting as an extern specifier.  */
 int have_extern_spec;
 int used_extern_spec;
-
-void yyhook ();
 
 /* Cons up an empty parameter list.  */
 #ifdef __GNUC__
@@ -89,10 +88,7 @@ empty_parms ()
   tree parms;
 
   if (strict_prototype
-      /* Only go ahead with using the void list node if we're actually
-	 parsing a class in C++, not a struct in extern "C" mode.  */
-      || (current_class_type != NULL
-	  && current_lang_name == lang_name_cplusplus))
+      || current_class_type != NULL)
     parms = void_list_node;
   else
     parms = NULL_TREE;
@@ -113,6 +109,9 @@ empty_parms ()
    but they can also serve as typespecs in declarations.  */
 %token TYPENAME
 %token SELFNAME
+
+/* A template function.  */
+%token PFUNCNAME
 
 /* Reserved words that specify storage class.
    yylval contains an IDENTIFIER_NODE which indicates which one.  */
@@ -166,7 +165,7 @@ empty_parms ()
 %nonassoc IF
 %nonassoc ELSE
 
-%left IDENTIFIER TYPENAME SELFNAME PTYPENAME SCSPEC TYPESPEC CV_QUALIFIER ENUM AGGR ELLIPSIS TYPEOF SIGOF OPERATOR NSNAME TYPENAME_KEYWORD
+%left IDENTIFIER PFUNCNAME TYPENAME SELFNAME PTYPENAME SCSPEC TYPESPEC CV_QUALIFIER ENUM AGGR ELLIPSIS TYPEOF SIGOF OPERATOR NSNAME TYPENAME_KEYWORD
 
 %left '{' ',' ';'
 
@@ -197,6 +196,7 @@ empty_parms ()
 %type <code> unop
 
 %type <ttype> identifier IDENTIFIER TYPENAME CONSTANT expr nonnull_exprlist
+%type <ttype> PFUNCNAME
 %type <ttype> paren_expr_or_null nontrivial_exprlist SELFNAME
 %type <ttype> expr_no_commas cast_expr unary_expr primary string STRING
 %type <ttype> reserved_declspecs boolean.literal
@@ -228,6 +228,7 @@ empty_parms ()
 %type <ttype> fcast_or_absdcl regcast_or_absdcl
 %type <ttype> expr_or_declarator complex_notype_declarator
 %type <ttype> notype_unqualified_id unqualified_id qualified_id
+%type <ttype> template_id object_template_id notype_template_declarator
 %type <ttype> overqualified_id notype_qualified_id any_id
 %type <ttype> complex_direct_notype_declarator functional_cast
 %type <ttype> complex_parmlist parms_comma
@@ -262,12 +263,12 @@ empty_parms ()
 %type <ttype> template_type template_arg_list template_arg
 %type <ttype> condition xcond paren_cond_or_null
 %type <ttype> type_name nested_name_specifier nested_type ptr_to_mem
-%type <ttype> complete_type_name notype_identifier
+%type <ttype> complete_type_name notype_identifier nonnested_type
 %type <ttype> complex_type_name nested_name_specifier_1
 %type <itype> nomods_initdecls nomods_initdcl0
 %type <ttype> new_initializer new_placement
 %type <ttype> using_decl .poplevel
-
+%type <ttype> typename_sub typename_sub0 typename_sub1 typename_sub2
 /* in order to recognize aggr tags as defining and thus shadowing.  */
 %token TYPENAME_DEFN IDENTIFIER_DEFN PTYPENAME_DEFN
 %type <ttype> named_class_head_sans_basetype_defn
@@ -301,7 +302,7 @@ static tree current_aggr;
 /* Tell yyparse how to print a token's value, if yydebug is set.  */
 
 #define YYPRINT(FILE,YYCHAR,YYLVAL) yyprint(FILE,YYCHAR,YYLVAL)
-extern void yyprint ();
+extern void yyprint			PROTO((FILE *, int, YYSTYPE));
 extern tree combine_strings		PROTO((tree));
 %}
 
@@ -363,7 +364,7 @@ lang_extdef:
 	;
 
 extdef:
-	  fndef
+	  fndef eat_saved_input
 		{ if (pending_inlines) do_pending_inlines (); }
 	| datadef
 		{ if (pending_inlines) do_pending_inlines (); }
@@ -374,7 +375,7 @@ extdef:
 		  assemble_asm ($3); }
 	| extern_lang_string '{' extdefs_opt '}'
 		{ pop_lang_context (); }
-	| extern_lang_string .hush_warning fndef .warning_ok
+	| extern_lang_string .hush_warning fndef .warning_ok eat_saved_input
 		{ if (pending_inlines) do_pending_inlines ();
 		  pop_lang_context (); }
 	| extern_lang_string .hush_warning datadef .warning_ok
@@ -435,7 +436,8 @@ template_header:
 	  template_parm_list '>'
 		{ $$ = end_template_parm_list ($4); }
 	| TEMPLATE '<' '>'
-		{ $$ = NULL_TREE; }
+                { begin_specialization(); 
+		  $$ = NULL_TREE; }
 	;
 
 template_parm_list:
@@ -487,10 +489,20 @@ template_parm:
 template_def:
 	  template_header
 	  extdef
-		{ end_template_decl (); }
+                { 
+                  if ($1) 
+                    end_template_decl (); 
+		  else
+		    end_specialization ();
+		}
 	| template_header
 	  error  %prec EMPTY
-		{ end_template_decl (); }
+		{ 
+                  if ($1) 
+                    end_template_decl ();
+		  else
+		    end_specialization (); 
+                }
 	;
 
 datadef:
@@ -539,8 +551,9 @@ fndef:
 	  fn.def1 maybe_return_init ctor_initializer_opt compstmt_or_error
 		{ finish_function (lineno, (int)$3, 0); }
 	| fn.def1 maybe_return_init function_try_block
-		{ if ($<ttype>$) process_next_inline ($<ttype>$); }
-	  eat_saved_input
+		{ }
+	| fn.def1 maybe_return_init error
+		{ }
 	;
 
 constructor_declarator:
@@ -702,6 +715,27 @@ fn.def2:
 		  $$ = start_method (specs, $2); goto rest_of_mdef; }
 	| constructor_declarator
 		{ $$ = start_method (NULL_TREE, $$); goto rest_of_mdef; }
+        | template_header fn.def2 
+                { 
+                  if ($1)
+                    end_template_decl (); 
+		  else
+		    end_specialization ();
+
+		  if ($2 && DECL_TEMPLATE_INFO ($2)
+		      && !DECL_TEMPLATE_SPECIALIZATION ($2))
+		    {
+		      $$ = DECL_TI_TEMPLATE ($2); 
+		      check_member_template ($$);
+		    }
+		  else if ($2)
+		    $$ = $2;
+		  else 
+		    {
+		      cp_error("invalid member template declaration");
+		      $$ = NULL_TREE;
+		    }
+		}
 	;
 
 return_id:
@@ -729,7 +763,7 @@ base_init:
 		    error ("no base initializers given following ':'");
 		  setup_vtbl_ptr ();
 		  /* Always keep the BLOCK node associated with the outermost
-		     pair of curley braces of a function.  These are needed
+		     pair of curly braces of a function.  These are needed
 		     for correct operation of dwarfout.c.  */
 		  keep_next_level ();
 		}
@@ -781,19 +815,16 @@ member_init:
 		{ expand_member_init (current_class_ref, $1, $3); }
 	| notype_identifier LEFT_RIGHT
 		{ expand_member_init (current_class_ref, $1, void_type_node); }
-	| complete_type_name '(' nonnull_exprlist ')'
+	| nonnested_type '(' nonnull_exprlist ')'
 		{ expand_member_init (current_class_ref, $1, $3); }
-	| complete_type_name LEFT_RIGHT
+	| nonnested_type LEFT_RIGHT
 		{ expand_member_init (current_class_ref, $1, void_type_node); }
-	/* GNU extension */
-	| notype_qualified_id '(' nonnull_exprlist ')'
-		{
-		  do_member_init (OP0 ($1), OP1 ($1), $3);
-		}
-	| notype_qualified_id LEFT_RIGHT
-		{
-		  do_member_init (OP0 ($1), OP1 ($1), void_type_node);
-		}
+	| typename_sub '(' nonnull_exprlist ')'
+		{ expand_member_init (current_class_ref, TYPE_MAIN_DECL ($1),
+				      $3); }
+	| typename_sub LEFT_RIGHT
+		{ expand_member_init (current_class_ref, TYPE_MAIN_DECL ($1),
+				      void_type_node); }
 	;
 
 identifier:
@@ -817,8 +848,9 @@ identifier_defn:
 	;
 
 explicit_instantiation:
-	  TEMPLATE aggr template_type
-		{ do_type_instantiation ($3, NULL_TREE); }
+	  TEMPLATE typespec ';'
+		{ do_type_instantiation ($2.t, NULL_TREE);
+		  yyungetc (';', 1); }
 	| TEMPLATE typed_declspecs declarator
 		{ tree specs = strip_attrs ($2.t);
 		  do_decl_instantiation (specs, $3, NULL_TREE); }
@@ -826,8 +858,9 @@ explicit_instantiation:
 		{ do_decl_instantiation (NULL_TREE, $2, NULL_TREE); }
 	| TEMPLATE constructor_declarator
 		{ do_decl_instantiation (NULL_TREE, $2, NULL_TREE); }
-	| SCSPEC TEMPLATE aggr template_type
-		{ do_type_instantiation ($4, $1); }
+	| SCSPEC TEMPLATE typespec ';'
+		{ do_type_instantiation ($3.t, $1);
+		  yyungetc (';', 1); }
 	| SCSPEC TEMPLATE typed_declspecs declarator
 		{ tree specs = strip_attrs ($3.t);
 		  do_decl_instantiation (specs, $4, $1); }
@@ -1016,20 +1049,20 @@ already_scoped_stmt:
 
 nontrivial_exprlist:
 	  expr_no_commas ',' expr_no_commas
-		{ $$ = tree_cons (NULL_TREE, $$, 
-		                  build_tree_list (NULL_TREE, $3)); }
+		{ $$ = expr_tree_cons (NULL_TREE, $$, 
+		                  build_expr_list (NULL_TREE, $3)); }
 	| expr_no_commas ',' error
-		{ $$ = tree_cons (NULL_TREE, $$, 
-		                  build_tree_list (NULL_TREE, error_mark_node)); }
+		{ $$ = expr_tree_cons (NULL_TREE, $$, 
+		                  build_expr_list (NULL_TREE, error_mark_node)); }
 	| nontrivial_exprlist ',' expr_no_commas
-		{ chainon ($$, build_tree_list (NULL_TREE, $3)); }
+		{ chainon ($$, build_expr_list (NULL_TREE, $3)); }
 	| nontrivial_exprlist ',' error
-		{ chainon ($$, build_tree_list (NULL_TREE, error_mark_node)); }
+		{ chainon ($$, build_expr_list (NULL_TREE, error_mark_node)); }
 	;
 
 nonnull_exprlist:
 	  expr_no_commas
-		{ $$ = build_tree_list (NULL_TREE, $$); }
+		{ $$ = build_expr_list (NULL_TREE, $$); }
 	| nontrivial_exprlist
 	;
 
@@ -1055,6 +1088,8 @@ unary_expr:
 	/* Refer to the address of a label as a pointer.  */
 	| ANDAND identifier
 		{ tree label = lookup_label ($2);
+		  if (pedantic)
+		    pedwarn ("ANSI C++ forbids `&&'");
 		  if (label == NULL_TREE)
 		    $$ = null_pointer_node;
 		  else
@@ -1251,11 +1286,34 @@ expr_no_commas:
 notype_unqualified_id:
 	  '~' see_typename identifier
 		{ $$ = build_parse_node (BIT_NOT_EXPR, $3); }
+        | template_id
 	| operator_name
 	| IDENTIFIER
 	| PTYPENAME
 	| NSNAME  %prec EMPTY
 	;
+
+template_id:
+        PFUNCNAME '<' template_arg_list template_close_bracket 
+                { $$ = lookup_template_function ($1, $3); }
+        | PFUNCNAME '<' template_close_bracket
+                { $$ = lookup_template_function ($1, NULL_TREE); }
+        | operator_name '<' template_arg_list template_close_bracket
+                { $$ = lookup_template_function 
+		    (do_identifier ($1, 1), $3); }
+        | operator_name '<' template_close_bracket
+                { $$ = lookup_template_function 
+		    (do_identifier ($1, 1), NULL_TREE); }
+	;
+
+object_template_id:
+        TEMPLATE identifier '<' template_arg_list template_close_bracket
+                { $$ = lookup_template_function ($2, $4); }
+        | TEMPLATE PFUNCNAME '<' template_arg_list template_close_bracket
+                { $$ = lookup_template_function (DECL_NAME ($2), $4); }
+        | TEMPLATE operator_name '<' template_arg_list template_close_bracket
+                { $$ = lookup_template_function (DECL_NAME ($2), $4); }
+        ;
 
 unqualified_id:
 	  notype_unqualified_id
@@ -1273,9 +1331,17 @@ expr_or_declarator:
 		{ $$ = $2; }
 	;
 
+notype_template_declarator:
+	  IDENTIFIER '<' template_arg_list template_close_bracket
+                { $$ = lookup_template_function ($1, $3); }
+	| NSNAME '<' template_arg_list template_close_bracket
+                { $$ = lookup_template_function ($1, $3); }
+	;
+		
 direct_notype_declarator:
 	  complex_direct_notype_declarator
 	| notype_unqualified_id
+	| notype_template_declarator
 	| '(' expr_or_declarator ')'
 		{ $$ = finish_decl_parsing ($2); }
 	;
@@ -1285,7 +1351,7 @@ primary:
 		{
 		  if (TREE_CODE ($$) == BIT_NOT_EXPR)
 		    $$ = build_x_unary_op (BIT_NOT_EXPR, TREE_OPERAND ($$, 0));
-		  else
+		  else if (TREE_CODE ($$) != TEMPLATE_ID_EXPR)
 		    $$ = do_identifier ($$, 1);
 		}		
 	| CONSTANT
@@ -1488,6 +1554,20 @@ primary:
 				       NULL_TREE, NULL_TREE);
 		  else
 		    $$ = build_member_call (OP0 ($$), OP1 ($$), NULL_TREE); }
+        | object object_template_id %prec UNARY
+                { 
+		  $$ = build_x_component_ref ($$, $2, NULL_TREE, 1); 
+		}
+        | object object_template_id '(' nonnull_exprlist ')'
+                {
+		  $$ = build_method_call ($1, $2, $4, 
+					  NULL_TREE, LOOKUP_NORMAL); 
+                }
+	| object object_template_id LEFT_RIGHT
+                {
+		  $$ = build_method_call ($1, $2, NULL_TREE,
+					  NULL_TREE, LOOKUP_NORMAL); 
+                }
 	| object unqualified_id  %prec UNARY
 		{ $$ = build_x_component_ref ($$, $2, NULL_TREE, 1); }
 	| object overqualified_id  %prec UNARY
@@ -1644,7 +1724,7 @@ nodecls:
 		    store_parm_decls ();
 		  setup_vtbl_ptr ();
 		  /* Always keep the BLOCK node associated with the outermost
-		     pair of curley braces of a function.  These are needed
+		     pair of curly braces of a function.  These are needed
 		     for correct operation of dwarfout.c.  */
 		  keep_next_level ();
 		}
@@ -2091,16 +2171,16 @@ initlist:
 	  init
 		{ $$ = build_tree_list (NULL_TREE, $$); }
 	| initlist ',' init
-		{ $$ = tree_cons (NULL_TREE, $3, $$); }
+		{ $$ = expr_tree_cons (NULL_TREE, $3, $$); }
 	/* These are for labeled elements.  */
 	| '[' expr_no_commas ']' init
-		{ $$ = build_tree_list ($2, $4); }
+		{ $$ = build_expr_list ($2, $4); }
 	| initlist ',' CASE expr_no_commas ':' init
-		{ $$ = tree_cons ($4, $6, $$); }
+		{ $$ = expr_tree_cons ($4, $6, $$); }
 	| identifier ':' init
-		{ $$ = build_tree_list ($$, $3); }
+		{ $$ = build_expr_list ($$, $3); }
 	| initlist ',' identifier ':' init
-		{ $$ = tree_cons ($3, $5, $$); }
+		{ $$ = expr_tree_cons ($3, $5, $$); }
 	;
 
 fn.defpen:
@@ -2109,19 +2189,23 @@ fn.defpen:
 				  NULL_TREE, 1);
 		  reinit_parse_for_function (); }
 
-pending_inlines:
-	  /* empty */
-	| pending_inlines fn.defpen maybe_return_init ctor_initializer_opt
-	  compstmt_or_error
+pending_inline:
+	  fn.defpen maybe_return_init ctor_initializer_opt compstmt_or_error
 		{
 		  int nested = (hack_decl_function_context
 				(current_function_decl) != NULL_TREE);
-		  finish_function (lineno, (int)$4, nested);
-		  process_next_inline ($2);
+		  finish_function (lineno, (int)$3, nested);
+		  process_next_inline ($1);
 		}
-	| pending_inlines fn.defpen maybe_return_init function_try_block
-		{ process_next_inline ($2); }
-	  eat_saved_input
+	| fn.defpen maybe_return_init function_try_block
+		{ process_next_inline ($1); }
+	| fn.defpen maybe_return_init error
+		{ process_next_inline ($1); }
+	;
+
+pending_inlines:
+	/* empty */
+	| pending_inlines pending_inline eat_saved_input
 	;
 
 /* A regurgitated default argument.  The value of DEFARG_MARKER will be
@@ -2129,6 +2213,8 @@ pending_inlines:
 defarg_again:
 	DEFARG_MARKER expr_no_commas END_OF_SAVED_INPUT
 		{ replace_defarg ($1, $2); }
+	| DEFARG_MARKER error END_OF_SAVED_INPUT
+		{ replace_defarg ($1, error_mark_node); }
 
 pending_defargs:
 	  /* empty */ %prec EMPTY
@@ -2169,14 +2255,13 @@ structsp:
 	| ENUM complex_type_name
 		{ $$.t = xref_tag (enum_type_node, $2, NULL_TREE, 1); 
 		  $$.new_type_flag = 0; }
-	| TYPENAME_KEYWORD nested_name_specifier identifier
-		{ $$.t = make_typename_type ($2, $3); 
-		  $$.new_type_flag = 0; }
-	| TYPENAME_KEYWORD global_scope nested_name_specifier identifier
-		{ $$.t = make_typename_type ($3, $4); 
+	| TYPENAME_KEYWORD typename_sub
+		{ $$.t = $2;
 		  $$.new_type_flag = 0; }
 	/* C++ extensions, merged with C to avoid shift/reduce conflicts */
-	| class_head left_curly opt.component_decl_list '}' maybe_attribute
+	| class_head left_curly 
+                { reset_specialization(); }
+          opt.component_decl_list '}' maybe_attribute
 		{
 		  int semi;
 		  tree id;
@@ -2199,7 +2284,7 @@ structsp:
 		    ;
 		  else
 		    {
-		      $<ttype>$ = finish_struct ($1, $3, $5, semi);
+		      $<ttype>$ = finish_struct ($1, $4, $6, semi);
 		      if (semi) note_got_semicolon ($<ttype>$);
 		    }
 
@@ -2208,7 +2293,7 @@ structsp:
 		  if (! semi)
 		    check_for_missing_semicolon ($1); 
 		  if (current_scope () == current_function_decl)
-		    do_pending_defargs ($1);
+		    do_pending_defargs ();
 		}
 	  pending_defargs
 		{
@@ -2218,9 +2303,9 @@ structsp:
 		}
 	  pending_inlines
 		{ 
-		  $$.t = $<ttype>6;
+		  $$.t = $<ttype>7;
 		  $$.new_type_flag = 1; 
-		  if (current_scope () == current_function_decl)
+		  if (current_class_type == NULL_TREE)
 		    clear_inline_text_obstack (); 
 		}
 	| class_head  %prec EMPTY
@@ -2273,16 +2358,17 @@ named_complex_class_head_sans_basetype:
 	  aggr nested_name_specifier identifier
 		{
 		  current_aggr = $1;
-		  if (TREE_CODE ($3) == TYPE_DECL)
-		    $$ = $3;
-		  else
-		    {
-		      cp_error ("`%T' does not have a nested type named `%D'",
-				$2, $3);
-		      $$ = xref_tag
-			(current_aggr, make_anon_name (), NULL_TREE, 1);
-		      $$ = TYPE_MAIN_DECL ($$);
-		    }
+		  $$ = handle_class_head ($1, $2, $3);
+		}
+	| aggr global_scope nested_name_specifier identifier
+		{
+		  current_aggr = $1;
+		  $$ = handle_class_head ($1, $3, $4);
+		}
+	| aggr global_scope identifier
+		{
+		  current_aggr = $1;
+		  $$ = handle_class_head ($1, NULL_TREE, $3);
 		}
 	| aggr template_type
 		{ current_aggr = $$; $$ = $2; }
@@ -2415,11 +2501,9 @@ base_class:
 	;
 
 base_class.1:
-	  complete_type_name
-	| TYPENAME_KEYWORD nested_name_specifier identifier
-		{ $$ = TYPE_MAIN_DECL (make_typename_type ($2, $3)); }
-	| TYPENAME_KEYWORD global_scope nested_name_specifier identifier
-		{ $$ = TYPE_MAIN_DECL (make_typename_type ($3, $4)); }
+	  typename_sub
+		{ $$ = TYPE_MAIN_DECL ($1); }
+	| nonnested_type
 	| SIGOF '(' expr ')'
 		{
 		  if (current_aggr == signature_type_node)
@@ -2705,7 +2789,27 @@ component_decl_1:
 				  build_tree_list ($3, NULL_TREE)); }
 	| using_decl
 		{ $$ = do_class_using_decl ($1); }
-	;
+        | template_header component_decl_1 
+                { 
+                  if ($1)
+		    end_template_decl (); 
+                  else
+                    end_specialization ();
+
+		  if ($2 && DECL_TEMPLATE_INFO ($2)
+		      && !DECL_TEMPLATE_SPECIALIZATION ($2))
+		    {
+		      $$ = DECL_TI_TEMPLATE ($2); 
+		      check_member_template ($$);
+		    }
+		  else if ($2)
+		    $$ = $2;
+		  else
+		    {
+		      cp_error("invalid member template declaration");
+		      $$ = NULL_TREE;
+		    }
+		}
 
 /* The case of exactly one component is handled directly by component_decl.  */
 /* ??? Huh? ^^^ */
@@ -2908,23 +3012,20 @@ after_type_declarator:
 	| direct_after_type_declarator
 	;
 
-complete_type_name:
+nonnested_type:
 	  type_name  %prec EMPTY
 		{
 		  if (TREE_CODE ($1) == IDENTIFIER_NODE)
 		    {
+		      $$ = lookup_name ($1, 1);
 		      if (current_class_type
 			  && TYPE_BEING_DEFINED (current_class_type)
 			  && ! IDENTIFIER_CLASS_VALUE ($1))
 			{
-			  /* Be sure to get an inherited typedef.  */
-			  $$ = lookup_name ($1, 1);
 			  /* Remember that this name has been used in the class
 			     definition, as per [class.scope0] */
 			  pushdecl_class_level ($$);
 			}
-		      else
-			$$ = identifier_typedecl_value ($1);
 		    }
 		  else
 		    $$ = $1;
@@ -2932,11 +3033,15 @@ complete_type_name:
 	| global_scope type_name
 		{
 		  if (TREE_CODE ($2) == IDENTIFIER_NODE)
-		    $$ = identifier_typedecl_value ($2);
+		    $$ = IDENTIFIER_GLOBAL_VALUE ($2);
 		  else
 		    $$ = $2;
 		  got_scope = NULL_TREE;
 		}
+	;
+
+complete_type_name:
+	  nonnested_type
 	| nested_type
 	| global_scope nested_type
 		{ $$ = $2; }
@@ -3014,18 +3119,33 @@ complex_direct_notype_declarator:
 		      TREE_COMPLEXITY ($$) = current_class_depth;
 		    }
 		}
+        | nested_name_specifier notype_template_declarator
+                { got_scope = NULL_TREE;
+		  $$ = build_parse_node (SCOPE_REF, $1, $2);
+		  if ($1 != current_class_type)
+		    {
+		      push_nested_class ($1, 3);
+		      TREE_COMPLEXITY ($$) = current_class_depth;
+		    }
+		}
 	;
 
 qualified_id:
 	  nested_name_specifier unqualified_id
 		{ got_scope = NULL_TREE;
 		  $$ = build_parse_node (SCOPE_REF, $$, $2); }
+        | nested_name_specifier object_template_id
+                { got_scope = NULL_TREE;
+ 		  $$ = build_parse_node (SCOPE_REF, $1, $2); }
 	;
 
 notype_qualified_id:
 	  nested_name_specifier notype_unqualified_id
 		{ got_scope = NULL_TREE;
 		  $$ = build_parse_node (SCOPE_REF, $$, $2); }
+        | nested_name_specifier object_template_id
+                { got_scope = NULL_TREE;
+		  $$ = build_parse_node (SCOPE_REF, $1, $2); }
 	;
 
 overqualified_id:
@@ -3082,11 +3202,7 @@ nested_name_specifier_1:
 		{
 		  if (TREE_CODE ($$) == IDENTIFIER_NODE)
 		    $$ = lastiddecl;
-		  if (TREE_CODE ($$) == NAMESPACE_DECL
-		      && DECL_NAME ($$) == get_identifier ("std"))
-		    got_scope = void_type_node;
-		  else
-		    got_scope = $$;
+		  got_scope = $$;
 		}
 	| template_type SCOPE
 		{ got_scope = $$ = complete_type (TREE_TYPE ($1)); }
@@ -3102,11 +3218,71 @@ nested_name_specifier_1:
 		{ goto failed_scope; } */
 	;
 
+typename_sub:
+	  typename_sub0
+	| global_scope typename_sub0
+		{ $$ = $2; }
+	;
+
+typename_sub0:
+	  typename_sub1 identifier
+		{
+		  if (TREE_CODE_CLASS (TREE_CODE ($1)) == 't')
+		    $$ = make_typename_type ($1, $2);
+		  else if (TREE_CODE ($2) == IDENTIFIER_NODE)
+		    cp_error ("`%T' is not a class or namespace", $2);
+		  else
+		    $$ = $2;
+		}
+	;
+
+typename_sub1:
+	  typename_sub2
+		{
+		  if (TREE_CODE ($1) == IDENTIFIER_NODE)
+		    cp_error ("`%T' is not a class or namespace", $1);
+		}
+	| typename_sub1 typename_sub2
+		{
+		  if (TREE_CODE_CLASS (TREE_CODE ($1)) == 't')
+		    $$ = make_typename_type ($1, $2);
+		  else if (TREE_CODE ($2) == IDENTIFIER_NODE)
+		    cp_error ("`%T' is not a class or namespace", $2);
+		  else
+		    $$ = $2;
+		}
+	;
+
+typename_sub2:
+	  TYPENAME SCOPE
+		{
+		  if (TREE_CODE ($1) != IDENTIFIER_NODE)
+		    $$ = lastiddecl;
+		  got_scope = $$ = complete_type (TREE_TYPE ($$));
+		}
+	| SELFNAME SCOPE
+		{
+		  if (TREE_CODE ($1) != IDENTIFIER_NODE)
+		    $$ = lastiddecl;
+		  got_scope = $$ = complete_type (TREE_TYPE ($$));
+		}
+	| template_type SCOPE
+		{ got_scope = $$ = complete_type (TREE_TYPE ($$)); }
+	| PTYPENAME SCOPE
+	| IDENTIFIER SCOPE
+	| NSNAME SCOPE
+		{
+		  if (TREE_CODE ($$) == IDENTIFIER_NODE)
+		    $$ = lastiddecl;
+		  got_scope = $$;
+		}
+	;
+
 complex_type_name:
 	  global_scope type_name
 		{
 		  if (TREE_CODE ($2) == IDENTIFIER_NODE)
-		    $$ = identifier_typedecl_value ($2);
+		    $$ = IDENTIFIER_GLOBAL_VALUE ($2);
 		  else
 		    $$ = $2;
 		  got_scope = NULL_TREE;
@@ -3712,7 +3888,7 @@ function_try_block:
 		    store_parm_decls ();
 		  expand_start_early_try_stmts ();
 		}
-	  ctor_initializer_opt compstmt_or_error
+	  ctor_initializer_opt compstmt
 		{ expand_start_all_catch (); }
 	  handler_seq
 		{

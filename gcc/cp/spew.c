@@ -45,7 +45,9 @@ struct token  {
   YYSTYPE	yylval;
 };
 
-static int do_aggr ();
+static int do_aggr PROTO((void));
+static int probe_obstack PROTO((struct obstack *, tree, unsigned int));
+static void scan_tokens PROTO((int));
 
 /* From lex.c: */
 /* the declaration found for the last IDENTIFIER token read in.
@@ -187,6 +189,8 @@ scan_tokens (n)
     }
 }
 
+/* Like _obstack_allocated_p, but stop after checking NLEVELS chunks.  */
+
 static int
 probe_obstack (h, obj, nlevels)
      struct obstack *h;
@@ -227,8 +231,6 @@ peekyylex ()
   scan_tokens (0);
   return nth_token (0)->yychar;
 }
-
-extern tree snarf_defarg ();
 
 int
 yylex ()
@@ -310,12 +312,11 @@ yylex ()
 	    {
 	    case TYPENAME:
 	    case SELFNAME:
-	      lastiddecl = identifier_typedecl_value (tmp_token.yylval.ttype);
-	      if (lastiddecl != trrr)
-		lastiddecl = trrr;
+	      lastiddecl = trrr;
 	      if (got_scope)
 		tmp_token.yylval.ttype = trrr;
 	      break;
+	    case PFUNCNAME:
 	    case IDENTIFIER:
 	      lastiddecl = trrr;
 	      break;
@@ -377,6 +378,10 @@ yylex ()
   if (spew_debug)
     debug_yychar (yychar);
 #endif
+
+  if (yychar == PFUNCNAME)
+    yylval.ttype = do_identifier (yylval.ttype, 1);
+
   return yychar;
 }
 

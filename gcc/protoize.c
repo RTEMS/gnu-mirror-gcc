@@ -1,5 +1,5 @@
 /* Protoize program - Original version by Ron Guilmette (rfg@segfault.us.com).
-   Copyright (C) 1989, 92-96, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1989, 92-97, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -74,6 +74,18 @@ Boston, MA 02111-1307, USA.  */
 #endif
 #include <setjmp.h>
 
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+
+#ifdef HAVE_STRING_H
+#include <string.h>
+#else
+#ifdef HAVE_STRINGS_H
+#include <strings.h>
+#endif
+#endif
+
 #include "gansidecl.h"
 
 /* Include getopt.h for the sake of getopt_long.
@@ -89,11 +101,7 @@ extern int errno;
 
 #ifndef HAVE_STRERROR
 extern int sys_nerr;
-#if defined(bsd4_4)
-extern const char *const sys_errlist[];
-#else
 extern char *sys_errlist[];
-#endif
 #else
 extern char *strerror();
 #endif
@@ -109,7 +117,11 @@ extern char *version_string;
 
 #define my_access(file,flag)	access((char *)file, flag)
 #define my_stat(file,pkt)	stat((char *)file, pkt)
+#ifdef __MINGW32__
+#define my_link(file1, file2)	-1
+#else
 #define my_link(file1, file2)	link((char *)file1, (char *)file2)
+#endif
 #define my_unlink(file)		unlink((char *)file)
 #define my_open(file, mode, flag)	open((char *)file, mode, flag)
 #define my_chmod(file, mode)	chmod((char *)file, mode)
@@ -177,18 +189,12 @@ typedef char * const_pointer_type;
 /* Declaring stat or __flsbuf with a prototype
    causes conflicts with system headers on some systems.  */
 
-#ifndef abort
-typedef void voidfn ();
-extern VOLATILE voidfn abort;
-#endif
 extern int creat ();
 #if 0 /* These conflict with stdio.h on some systems.  */
 extern int fprintf (FILE *, const char *, ...);
 extern int printf (const char *, ...);
 extern int open (const char *, int, ...);
 #endif /* 0 */
-extern void exit ();
-extern void free ();
 extern int read ();
 extern int write ();
 extern int close ();
@@ -197,9 +203,6 @@ extern int atoi ();
 extern int puts ();
 extern int fputs ();
 extern int fputc ();
-#if !defined(_WIN32)
-extern int link ();
-#endif
 extern int unlink ();
 extern int access ();
 
@@ -216,7 +219,9 @@ extern size_t   strlen ()
 
 #endif /* !defined (POSIX) */
 
+#ifdef NEED_DECLARATION_RINDEX
 extern char *rindex ();
+#endif
 
 /* Look for these where the `const' qualifier is intentionally cast aside.  */
 
@@ -304,39 +309,41 @@ static const int hash_mask = (HASH_TABLE_SIZE - 1);
 #define LOCAL_INCLUDE_DIR "/usr/local/include"
 #endif
 
-struct default_include { const char *fname; int x1, x2; } include_defaults[]
+struct default_include { const char *fname; 
+			 const char *component;
+			 int x1, x2; } include_defaults[]
 #ifdef INCLUDE_DEFAULTS
   = INCLUDE_DEFAULTS;
 #else
   = {
     /* Pick up GNU C++ specific include files.  */
-    { GPLUSPLUS_INCLUDE_DIR, 1, 1 },
+    { GPLUSPLUS_INCLUDE_DIR, "G++", 1, 1 },
 #ifdef CROSS_COMPILE
     /* This is the dir for fixincludes.  Put it just before
        the files that we fix.  */
-    { GCC_INCLUDE_DIR, 0, 0 },
+    { GCC_INCLUDE_DIR, "GCC", 0, 0 },
     /* For cross-compilation, this dir name is generated
        automatically in Makefile.in.  */
-    { CROSS_INCLUDE_DIR, 0, 0 },
+    { CROSS_INCLUDE_DIR, 0, 0, 0 },
     /* This is another place that the target system's headers might be.  */
-    { TOOL_INCLUDE_DIR, 0, 0 },
+    { TOOL_INCLUDE_DIR, "BINUTILS", 0, 0 },
 #else /* not CROSS_COMPILE */
     /* This should be /use/local/include and should come before
        the fixincludes-fixed header files.  */
-    { LOCAL_INCLUDE_DIR, 0, 1 },
+    { LOCAL_INCLUDE_DIR, 0, 0, 1 },
     /* This is here ahead of GCC_INCLUDE_DIR because assert.h goes here.
        Likewise, behind LOCAL_INCLUDE_DIR, where glibc puts its assert.h.  */
-    { TOOL_INCLUDE_DIR, 0, 0 },
+    { TOOL_INCLUDE_DIR, "BINUTILS", 0, 0 },
     /* This is the dir for fixincludes.  Put it just before
        the files that we fix.  */
-    { GCC_INCLUDE_DIR, 0, 0 },
+    { GCC_INCLUDE_DIR, "GCC", 0, 0 },
     /* Some systems have an extra dir of include files.  */
 #ifdef SYSTEM_INCLUDE_DIR
-    { SYSTEM_INCLUDE_DIR, 0, 0 },
+    { SYSTEM_INCLUDE_DIR, 0, 0, 0 },
 #endif
-    { STANDARD_INCLUDE_DIR, 0, 0},
+    { STANDARD_INCLUDE_DIR, 0, 0, 0},
 #endif /* not CROSS_COMPILE */
-    { 0, 0, 0}
+    { 0, 0, 0, 0}
     };
 #endif /* no INCLUDE_DEFAULTS */
 
@@ -825,12 +832,13 @@ safe_write (desc, ptr, len, out_fname)
     int written = write (desc, ptr, len);
     if (written < 0)
       {
+	int errno_val = errno;
 #ifdef EINTR
-	if (errno == EINTR)
+	if (errno_val == EINTR)
 	  continue;
 #endif
 	fprintf (stderr, "%s: error writing file `%s': %s\n",
-		 pname, shortpath (NULL, out_fname), my_strerror(errno));
+		 pname, shortpath (NULL, out_fname), my_strerror (errno_val));
 	return;
       }
     ptr += written;
@@ -1521,8 +1529,10 @@ find_file (filename, do_not_stat)
         {
           if (my_stat (filename, &stat_buf) == -1)
             {
+	      int errno_val = errno;
               fprintf (stderr, "%s: %s: can't get status: %s\n",
-		       pname, shortpath (NULL, filename), my_strerror(errno));
+		       pname, shortpath (NULL, filename),
+		       my_strerror (errno_val));
               stat_buf.st_mtime = (time_t) -1;
             }
         }
@@ -1947,7 +1957,7 @@ save_def_or_dec (l, is_syscalls)
         }
 
       /* Handle a special case.  If we have a function definition marked as
-         being in "old" style, and if it's formal names list is empty, then
+         being in "old" style, and if its formal names list is empty, then
          it may actually have the string "void" in its real formals list
          in the original source code.  Just to make sure, we will get setup
          to convert such things anyway.
@@ -2212,9 +2222,10 @@ start_over: ;
 	}
       else
 	{
+	  int errno_val = errno;
 	  fprintf (stderr, "%s: can't read aux info file `%s': %s\n",
 		   pname, shortpath (NULL, aux_info_filename),
-		   my_strerror(errno));
+		   my_strerror (errno_val));
 	  errors++;
 	  return;
 	}
@@ -2240,9 +2251,10 @@ start_over: ;
 	}
       if (my_access (aux_info_filename, R_OK) == -1)
 	{
+	  int errno_val = errno;
 	  fprintf (stderr, "%s: can't read aux info file `%s': %s\n",
 		   pname, shortpath (NULL, aux_info_filename),
-		   my_strerror(errno));
+		   my_strerror (errno_val));
 	  errors++;
 	  return;
 	}
@@ -2255,9 +2267,10 @@ start_over: ;
   
     if (my_stat (aux_info_filename, &stat_buf) == -1)
       {
+	int errno_val = errno;
         fprintf (stderr, "%s: can't get status of aux info file `%s': %s\n",
 		 pname, shortpath (NULL, aux_info_filename),
-		 my_strerror(errno));
+		 my_strerror (errno_val));
         errors++;
         return;
       }
@@ -2282,9 +2295,10 @@ start_over: ;
 
 	if (my_stat (base_source_filename, &stat_buf) == -1)
 	  {
+	    int errno_val = errno;
 	    fprintf (stderr, "%s: can't get status of aux info file `%s': %s\n",
 		     pname, shortpath (NULL, base_source_filename),
-		     my_strerror(errno));
+		     my_strerror (errno_val));
 	    errors++;
 	    return;
 	  }
@@ -2303,9 +2317,10 @@ start_over: ;
   
     if ((aux_info_file = my_open (aux_info_filename, O_RDONLY, 0444 )) == -1)
       {
+	int errno_val = errno;
         fprintf (stderr, "%s: can't open aux info file `%s' for reading: %s\n",
 		 pname, shortpath (NULL, aux_info_filename),
-		 my_strerror(errno));
+		 my_strerror (errno_val));
         return;
       }
   
@@ -2319,9 +2334,10 @@ start_over: ;
   
     if (safe_read (aux_info_file, aux_info_base, aux_info_size) != aux_info_size)
       {
+	int errno_val = errno;
         fprintf (stderr, "%s: error reading aux info file `%s': %s\n",
 		 pname, shortpath (NULL, aux_info_filename),
-		 my_strerror(errno));
+		 my_strerror (errno_val));
         free (aux_info_base);
         close (aux_info_file);
         return;
@@ -2331,9 +2347,10 @@ start_over: ;
   
     if (close (aux_info_file))
       {
+	int errno_val = errno;
         fprintf (stderr, "%s: error closing aux info file `%s': %s\n",
 		 pname, shortpath (NULL, aux_info_filename),
-		 my_strerror(errno));
+		 my_strerror (errno_val));
         free (aux_info_base);
         close (aux_info_file);
         return;
@@ -2345,9 +2362,12 @@ start_over: ;
 
   if (must_create && !keep_it)
     if (my_unlink (aux_info_filename) == -1)
-      fprintf (stderr, "%s: can't delete aux info file `%s': %s\n",
-	       pname, shortpath (NULL, aux_info_filename),
-	       my_strerror(errno));
+      {
+	int errno_val = errno;
+	fprintf (stderr, "%s: can't delete aux info file `%s': %s\n",
+		 pname, shortpath (NULL, aux_info_filename),
+		 my_strerror (errno_val));
+      }
 
   /* Save a pointer into the first line of the aux_info file which
      contains the filename of the directory from which the compiler
@@ -2411,9 +2431,10 @@ start_over: ;
 		xfree (aux_info_relocated_name);
                 if (keep_it && my_unlink (aux_info_filename) == -1)
                   {
+		    int errno_val = errno;
                     fprintf (stderr, "%s: can't delete file `%s': %s\n",
 			     pname, shortpath (NULL, aux_info_filename),
-			     my_strerror(errno));
+			     my_strerror (errno_val));
                     return;
                   }
 		must_create = 1;
@@ -2487,17 +2508,19 @@ rename_c_file (hp)
 
   if (my_link (filename, new_filename) == -1)
     {
+      int errno_val = errno;
       fprintf (stderr, "%s: warning: can't link file `%s' to `%s': %s\n",
 	       pname, shortpath (NULL, filename),
-	       shortpath (NULL, new_filename), my_strerror(errno));
+	       shortpath (NULL, new_filename), my_strerror (errno_val));
       errors++;
       return;
     }
 
   if (my_unlink (filename) == -1)
     {
+      int errno_val = errno;
       fprintf (stderr, "%s: warning: can't delete file `%s': %s\n",
-	       pname, shortpath (NULL, filename), my_strerror(errno));
+	       pname, shortpath (NULL, filename), my_strerror (errno_val));
       errors++;
       return;
     }
@@ -2784,7 +2807,7 @@ connect_defs_and_decs (hp)
 
      Also, for each item which is only a function declaration, but which
      nonetheless has its own prototype already (obviously supplied by the user)
-     declare the item as it's own definition.
+     declare the item as its own definition.
 
      Note that when/if there are multiple user-supplied prototypes already
      present for multiple declarations of any given function, these multiple
@@ -4194,8 +4217,10 @@ edit_file (hp)
   /* The cast avoids an erroneous warning on AIX.  */
   if (my_stat ((char *)convert_filename, &stat_buf) == -1)
     {
+      int errno_val = errno;
       fprintf (stderr, "%s: can't get status for file `%s': %s\n",
-	       pname, shortpath (NULL, convert_filename), my_strerror(errno));
+	       pname, shortpath (NULL, convert_filename),
+	       my_strerror (errno_val));
       return;
     }
   orig_size = stat_buf.st_size;
@@ -4228,9 +4253,10 @@ edit_file (hp)
 
     if ((input_file = my_open (convert_filename, O_RDONLY, 0444)) == -1)
       {
+	int errno_val = errno;
         fprintf (stderr, "%s: can't open file `%s' for reading: %s\n",
 		 pname, shortpath (NULL, convert_filename),
-		 my_strerror(errno));
+		 my_strerror (errno_val));
         return;
       }
 
@@ -4240,10 +4266,11 @@ edit_file (hp)
 
     if (safe_read (input_file, new_orig_text_base, orig_size) != orig_size)
       {
+	int errno_val = errno;
         close (input_file);
         fprintf (stderr, "\n%s: error reading input file `%s': %s\n",
 		 pname, shortpath (NULL, convert_filename),
-		 my_strerror(errno));
+		 my_strerror (errno_val));
         return;
       }
 
@@ -4274,9 +4301,10 @@ edit_file (hp)
     strcat (clean_filename, ".clean");
     if ((clean_file = creat (clean_filename, 0666)) == -1)
       {
+	int errno_val = errno;
         fprintf (stderr, "%s: can't create/open clean file `%s': %s\n",
 		 pname, shortpath (NULL, clean_filename),
-		 my_strerror(errno));
+		 my_strerror (errno_val));
         return;
       }
   
@@ -4371,7 +4399,8 @@ edit_file (hp)
       strcat (new_filename, save_suffix);
       if (my_link (convert_filename, new_filename) == -1)
         {
-          if (errno == EEXIST)
+	  int errno_val = errno;
+	  if (errno_val == EEXIST)
             {
               if (!quiet_flag)
                 fprintf (stderr, "%s: warning: file `%s' already saved in `%s'\n",
@@ -4385,7 +4414,7 @@ edit_file (hp)
 		       pname,
 		       shortpath (NULL, convert_filename),
 		       shortpath (NULL, new_filename),
-		       my_strerror(errno));
+		       my_strerror (errno_val));
               return;
             }
         }
@@ -4393,8 +4422,10 @@ edit_file (hp)
 
   if (my_unlink (convert_filename) == -1)
     {
+      int errno_val = errno;
       fprintf (stderr, "%s: can't delete file `%s': %s\n",
-	       pname, shortpath (NULL, convert_filename), my_strerror(errno));
+	       pname, shortpath (NULL, convert_filename),
+	       my_strerror (errno_val));
       return;
     }
 
@@ -4405,9 +4436,10 @@ edit_file (hp)
   
     if ((output_file = creat (convert_filename, 0666)) == -1)
       {
+	int errno_val = errno;
         fprintf (stderr, "%s: can't create/open output file `%s': %s\n",
 		 pname, shortpath (NULL, convert_filename),
-		 my_strerror(errno));
+		 my_strerror (errno_val));
         return;
       }
   
@@ -4432,8 +4464,12 @@ edit_file (hp)
 
   /* The cast avoids an erroneous warning on AIX.  */
   if (my_chmod ((char *)convert_filename, stat_buf.st_mode) == -1)
-    fprintf (stderr, "%s: can't change mode of file `%s': %s\n",
-	     pname, shortpath (NULL, convert_filename), my_strerror(errno));
+    {
+      int errno_val = errno;
+      fprintf (stderr, "%s: can't change mode of file `%s': %s\n",
+	       pname, shortpath (NULL, convert_filename),
+	       my_strerror (errno_val));
+    }
 
   /* Note:  We would try to change the owner and group of the output file
      to match those of the input file here, except that may not be a good
