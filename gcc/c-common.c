@@ -1,6 +1,6 @@
 /* Subroutines shared by all languages that are variants of C.
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
-   2001, 2002, 2003 Free Software Foundation, Inc.
+   2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -4128,7 +4128,7 @@ c_expand_expr (tree exp, rtx target, enum machine_mode tmode,
 	expand_stmt (STMT_EXPR_STMT (exp));
 	expand_end_stmt_expr (rtl_expr);
 
-	result = expand_expr (rtl_expr, target, tmode, modifier);
+	result = expand_expr_real (rtl_expr, target, tmode, modifier, alt_rtl);
 	if (preserve_result && GET_CODE (result) == MEM)
 	  {
 	    if (GET_MODE (result) != BLKmode)
@@ -4286,21 +4286,6 @@ c_init_attributes (void)
 #undef DEF_ATTR_INT
 #undef DEF_ATTR_IDENT
 #undef DEF_ATTR_TREE_LIST
-}
-
-/* Output a -Wshadow warning MSGCODE about NAME, and give the location
-   of the previous declaration DECL.  */
-void
-shadow_warning (enum sw_kind msgcode, const char *name, tree decl)
-{
-  static const char *const msgs[] = {
-    /* SW_PARAM  */ N_("declaration of \"%s\" shadows a parameter"),
-    /* SW_LOCAL  */ N_("declaration of \"%s\" shadows a previous local"),
-    /* SW_GLOBAL */ N_("declaration of \"%s\" shadows a global declaration")
-  };
-
-  warning (msgs[msgcode], name);
-  warning ("%Jshadowed declaration is here", decl);
 }
 
 /* Attribute handlers common to C front ends.  */
@@ -5780,6 +5765,24 @@ c_estimate_num_insns_1 (tree *tp, int *walk_subtrees, void *data)
 	  *count += ((size + MOVE_MAX_PIECES - 1) / MOVE_MAX_PIECES);
       }
       break;
+    case CALL_EXPR:
+      {
+	tree decl = get_callee_fndecl (x);
+
+	if (decl && DECL_BUILT_IN (decl))
+	  switch (DECL_FUNCTION_CODE (decl))
+	    {
+	    case BUILT_IN_CONSTANT_P:
+	      *walk_subtrees = 0;
+	      return NULL_TREE;
+	    case BUILT_IN_EXPECT:
+	      return NULL_TREE;
+	    default:
+	      break;
+	    }
+	*count += 10;
+	break;
+      }
     /* Few special cases of expensive operations.  This is usefull
        to avoid inlining on functions having too many of these.  */
     case TRUNC_DIV_EXPR:
@@ -5791,7 +5794,6 @@ c_estimate_num_insns_1 (tree *tp, int *walk_subtrees, void *data)
     case FLOOR_MOD_EXPR:
     case ROUND_MOD_EXPR:
     case RDIV_EXPR:
-    case CALL_EXPR:
       *count += 10;
       break;
     /* Various containers that will produce no code themselves.  */

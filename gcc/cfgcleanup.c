@@ -1,6 +1,6 @@
 /* Control flow optimization code for GNU compiler.
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1785,13 +1785,13 @@ try_optimize_cfg (int mode)
 	      /* If B has a single outgoing edge, but uses a
 		 non-trivial jump instruction without side-effects, we
 		 can either delete the jump entirely, or replace it
-		 with a simple unconditional jump.  Use
-		 redirect_edge_and_branch to do the dirty work.  */
+		 with a simple unconditional jump.  */
 	      if (b->succ
 		  && ! b->succ->succ_next
 		  && b->succ->dest != EXIT_BLOCK_PTR
 		  && onlyjump_p (BB_END (b))
-		  && redirect_edge_and_branch (b->succ, b->succ->dest))
+		  && try_redirect_by_replacing_jump (b->succ, b->succ->dest,
+						     (mode & CLEANUP_CFGLAYOUT) != 0))
 		{
 		  update_forwarder_flag (b);
 		  changed_here = true;
@@ -1897,7 +1897,8 @@ cleanup_cfg (int mode)
 						 PROP_DEATH_NOTES
 						 | PROP_SCAN_DEAD_CODE
 						 | PROP_KILL_DEAD_CODE
-						 | PROP_LOG_LINKS))
+			  			 | ((mode & CLEANUP_LOG_LINKS)
+						    ? PROP_LOG_LINKS : 0)))
 	    break;
 	}
       else if (!(mode & (CLEANUP_NO_INSN_DEL | CLEANUP_PRE_SIBCALL))

@@ -1253,11 +1253,15 @@ namespace std
 		  }
 		else if (__c == __d && !__testdecfound)
 		  {
-		    __grouping_tmp += static_cast<char>(__sep_pos);
+		    // If no grouping chars are seen, no grouping check
+		    // is applied. Therefore __grouping_tmp is adjusted
+		    // only if decimal_point comes after some thousands_sep.
+		    if (__grouping_tmp.size())
+		      __grouping_tmp += static_cast<char>(__sep_pos);
 		    __sep_pos = 0;
 		    __testdecfound = true;
 		  }
-		else if (__c == __sep)
+		else if (__c == __sep && !__testdecfound)
 		  {
 		    if (__grouping.size())
 		      {
@@ -1319,6 +1323,10 @@ namespace std
 	  // Test for grouping fidelity.
 	  if (__grouping.size() && __grouping_tmp.size())
 	    {
+	      // Add the ending grouping if a decimal wasn't found.
+	      if (!__testdecfound)
+		__grouping_tmp += static_cast<char>(__sep_pos);
+
 	      if (!std::__verify_grouping(__grouping.data(),
 					  __grouping.size(),
 					  __grouping_tmp))
@@ -1385,7 +1393,7 @@ namespace std
       _CharT* __ws = static_cast<_CharT*>(__builtin_alloca(sizeof(_CharT) 
 							   * __cs_size));
       __ctype.widen(__cs, __cs + __len, __ws);
-      string_type __digits(__ws);
+      const string_type __digits(__ws, __len);
       return this->do_put(__s, __intl, __io, __fill, __digits); 
     }
 
