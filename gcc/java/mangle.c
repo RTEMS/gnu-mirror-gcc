@@ -82,7 +82,7 @@ java_mangle_decl (obstack, decl)
       mangle_method_decl (decl);
       break;
     default:
-      internal_error ("Can't mangle %s", tree_code_name [TREE_CODE (decl)]);
+      internal_error ("can't mangle %s", tree_code_name [TREE_CODE (decl)]);
     }
   return finish_mangling ();
 }
@@ -142,20 +142,13 @@ mangle_method_decl (mdecl)
   /* Mangle the name of the type that contains mdecl */
   mangle_record_type (DECL_CONTEXT (mdecl), /* for_pointer = */ 0);
 
-  /* Mangle the function name. There three cases
-       - mdecl is java.lang.Object.Object(), use `C2' for its name
-         (denotes a base object constructor.)
+  /* Mangle the function name.  There are two cases:
        - mdecl is a constructor, use `C1' for its name, (denotes a
          complete object constructor.)
        - mdecl is not a constructor, standard mangling is performed.
      We terminate the mangled function name with a `E'. */
   if (ID_INIT_P (method_name))
-    {
-      if (DECL_CONTEXT (mdecl) == object_type_node)
-	obstack_grow (mangle_obstack, "C2", 2);
-      else
-	obstack_grow (mangle_obstack, "C1", 2);
-    }
+    obstack_grow (mangle_obstack, "C1", 2);
   else
     mangle_member_name (method_name);
   obstack_1grow (mangle_obstack, 'E');
@@ -187,19 +180,9 @@ mangle_member_name (name)
   append_gpp_mangled_name (IDENTIFIER_POINTER (name),
 			   IDENTIFIER_LENGTH (name));
 
-  /* If NAME happens to be a C++ keyword, add `$' or `.' or `_'. */
+  /* If NAME happens to be a C++ keyword, add `$'. */
   if (cxx_keyword_p (IDENTIFIER_POINTER (name), IDENTIFIER_LENGTH (name)))
-    {
-#ifndef NO_DOLLAR_IN_LABEL
-      obstack_1grow (mangle_obstack, '$');
-#else  /* NO_DOLLAR_IN_LABEL */
-#ifndef NO_DOT_IN_LABEL
-      obstack_1grow (mangle_obstack, '.');
-#else  /* NO_DOT_IN_LABEL */
-      obstack_1grow (mangle_obstack, '_');
-#endif /* NO_DOT_IN_LABEL */
-#endif /* NO_DOLLAR_IN_LABEL */
-    }
+    obstack_1grow (mangle_obstack, '$');
 }
 
 /* Append the mangled name of TYPE onto OBSTACK.  */
@@ -255,14 +238,14 @@ mangle_type (type)
 
 /* The compression table is a vector that keeps track of things we've
    already seen, so they can be reused. For example, java.lang.Object
-   Would generate three entries: two package names and a type. If
+   would generate three entries: two package names and a type. If
    java.lang.String is presented next, the java.lang will be matched
    against the first two entries (and kept for compression as S_0), and
    type String would be added to the table. See mangle_record_type.
    COMPRESSION_NEXT is the index to the location of the next insertion
    of an element.  */
 
-static tree compression_table;
+static GTY(()) tree compression_table;
 static int  compression_next;
 
 /* Find a POINTER_TYPE in the compression table. Use a special
@@ -327,7 +310,19 @@ find_compression_record_match (type, next_current)
 	  {
 	    match = i = j;
 	    saved_current = current;
+	    i++;
 	    break;
+	  }
+	else
+	  {
+	    /* We don't want to match an element that appears in the middle
+	    of a package name, so skip forward to the next complete type name.
+	    IDENTIFIER_NODEs are partial package names while RECORD_TYPEs
+	    represent complete type names. */
+	    while (j < compression_next 
+		   && TREE_CODE (TREE_VEC_ELT (compression_table, j)) == 
+		      IDENTIFIER_NODE)
+	      j++;
 	  }
     }
 
@@ -436,12 +431,12 @@ mangle_pointer_type (type)
    the template indicator where already used an compress appropriately.
    It handles pointers. */
 
+/* atms: array template mangled string. */
+static GTY(()) tree atms;
 static void
 mangle_array_type (p_type)
      tree p_type;
 {
-  /* atms: array template mangled string. */
-  static tree atms = NULL_TREE;
   tree type, elt_type;
   int match;
 
@@ -455,7 +450,6 @@ mangle_array_type (p_type)
   if (!atms)
     {
       atms = get_identifier ("6JArray");
-      ggc_add_tree_root (&atms, 1);
     }
 
   /* Maybe we have what we're looking in the compression table. */
@@ -607,9 +601,7 @@ compression_table_add (type)
       for (i = 0; i < compression_next; i++)
 	TREE_VEC_ELT (new, i) = TREE_VEC_ELT (compression_table, i);
 
-      ggc_del_root (&compression_table);
       compression_table = new;
-      ggc_add_tree_root (&compression_table, 1);
     }
   TREE_VEC_ELT (compression_table, compression_next++) = type;
 }
@@ -629,9 +621,6 @@ init_mangling (obstack)
 
   /* Mangled name are to be suffixed */
   obstack_grow (mangle_obstack, "_Z", 2);
-
-  /* Register the compression table with the GC */
-  ggc_add_tree_root (&compression_table, 1);
 }
 
 /* Mangling finalization routine. The mangled name is returned as a
@@ -646,7 +635,6 @@ finish_mangling ()
     /* Mangling already finished.  */
     abort ();
 
-  ggc_del_root (&compression_table);
   compression_table = NULL_TREE;
   compression_next = 0;
   obstack_1grow (mangle_obstack, '\0');
@@ -657,3 +645,5 @@ finish_mangling ()
 #endif
   return result;
 }
+
+#include "gt-java-mangle.h"

@@ -1,5 +1,5 @@
 /* PrivilegedExceptionAction.java -- Perform a privileged operation
-   Copyright (C) 1998 Free Software Foundation, Inc.
+   Copyright (C) 1998, 2002 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -18,24 +18,35 @@ along with GNU Classpath; see the file COPYING.  If not, write to the
 Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 02111-1307 USA.
 
-As a special exception, if you link this library with other files to
-produce an executable, this library does not by itself cause the
-resulting executable to be covered by the GNU General Public License.
-This exception does not however invalidate any other reasons why the
-executable file might be covered by the GNU General Public License. */
+Linking this library statically or dynamically with other modules is
+making a combined work based on this library.  Thus, the terms and
+conditions of the GNU General Public License cover the whole
+combination.
+
+As a special exception, the copyright holders of this library give you
+permission to link this library with independent modules to produce an
+executable, regardless of the license terms of these independent
+modules, and to copy and distribute the resulting executable under
+terms of your choice, provided that you also meet, for each linked
+independent module, the terms and conditions of the license of that
+module.  An independent module is a module which is not derived from
+or based on this library.  If you modify this library, you may extend
+this exception to your version of the library, but you are not
+obligated to do so.  If you do not wish to do so, delete this
+exception statement from your version. */
 
 package java.security;
 
 /**
- * This interface defines a method that is called by 
+ * This interface defines a method that is called by
  * <code>AccessController.doPrivileged()</code> in order to perform a
  * privileged operation with higher privileges enabled.  This interface
  * differs from <code>PrivilegedAction</code> in that the <code>run</code>
  * method in this interface may throw a checked exception.
  *
- * @version 0.0
- *
  * @author Aaron M. Renn (arenn@urbanophile.com)
+ * @since 1.1
+ * @status updated to 1.4
  */
 public interface PrivilegedExceptionAction
 {
@@ -44,9 +55,11 @@ public interface PrivilegedExceptionAction
    * successfully complete.  It is called when a section of code invokes
    * <code>AccessController.doPrivileged()</code>.
    *
-   * @return obj An implementation defined return value.
-   *
-   * @exception Exception An implementation specific exception.
+   * @return obj An implementation defined return value
+   * @throws Exception An implementation specific exception
+   * @see AccessController#doPrivileged(PrivilegedExceptionAction)
+   * @see AccessController#doPrivileged(PrivilegedExceptionAction,
+   *                                    AccessControlContext)
    */
-  public abstract Object run() throws Exception;
-}
+  Object run() throws Exception;
+} // interface PrivilegedExceptionAction

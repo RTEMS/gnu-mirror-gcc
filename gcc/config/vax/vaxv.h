@@ -1,5 +1,5 @@
-/* Definitions of target machine for GNU compiler.  Vax sysV version.
-   Copyright (C) 1988, 1993, 1996, 2000 Free Software Foundation, Inc.
+/* Definitions of target machine for GNU compiler.  VAX sysV version.
+   Copyright (C) 1988, 1993, 1996, 2000, 2002 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -22,8 +22,17 @@ Boston, MA 02111-1307, USA.  */
 
 #define SCCS_DIRECTIVE
 
-#undef CPP_PREDEFINES
-#define CPP_PREDEFINES "-Dvax -Dunix -Asystem=unix -Asystem=svr3 -Acpu=vax -Amachine=vax"
+#define TARGET_OS_CPP_BUILTINS()		\
+  do						\
+    {						\
+      builtin_define_std ("unix");		\
+      builtin_assert ("system=svr3");		\
+						\
+      builtin_define_std ("vax");		\
+      if (TARGET_G_FLOAT)			\
+	builtin_define_std ("GFLOAT");		\
+    }						\
+  while (0)
 
 /* Output #ident as a .ident.  */
 
@@ -51,9 +60,9 @@ output_file_directive ((FILE), main_input_filename)
 
 #define ASM_OUTPUT_ASCII(FILE,PTR,LEN)			\
 do {							\
-  const unsigned char *s;				\
-  int i;						\
-  for (i = 0, s = (PTR); i < (LEN); s++, i++)		\
+  const unsigned char *s = (const unsigned char *)(PTR);\
+  size_t i, limit = (LEN);				\
+  for (i = 0; i < limit; s++, i++)		\
     {							\
       if ((i % 8) == 0)					\
 	fputs ("\n\t.byte\t", (FILE));			\
@@ -61,10 +70,3 @@ do {							\
     }							\
   fputs ("\n", (FILE));					\
 } while (0)
-
-#undef ASM_OUTPUT_DOUBLE
-#define ASM_OUTPUT_DOUBLE(FILE,VALUE)			\
-do { char dstr[30];					\
-     REAL_VALUE_TO_DECIMAL (VALUE, "%.20e", dstr);	\
-     fprintf (FILE, "\t.double 0d%s\n", dstr);		\
-   } while (0)

@@ -31,6 +31,15 @@ Print the full structure of the tree that is $.
 Works only when an inferior is executing.
 end
 
+define pct
+set debug_c_tree ($)
+end
+
+document pct
+Print the tree that is $ in C syntax.
+Works only when an inferior is executing.
+end
+
 define ptc
 output (enum tree_code) $.common.code
 echo \n
@@ -88,7 +97,6 @@ end
 
 # Put breakpoints at exit and fancy_abort in case abort is mapped
 # to either fprintf/exit or fancy_abort.
-b exit
 b fancy_abort
 
 # Make gdb complain about symbol reading errors.  This is so that gcc
@@ -99,4 +107,5 @@ set complaints 20
 # stdio stop working and therefore the `pr' command above as well.
 # Put this last because gcc does not reference it any more unless
 # USE_SYSTEM_ABORT is defined, so gdb may complain and bail out.
+b exit
 b abort

@@ -1,6 +1,6 @@
 // 1999-05-11 bkoz
 
-// Copyright (C) 1999 Free Software Foundation, Inc.
+// Copyright (C) 1999, 2002 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -21,23 +21,22 @@
 // 21.3.3 string capacity
 
 #include <string>
-#include <cstdio>
-#include <debug_assert.h>
+#include <testsuite_hooks.h>
 
 template<typename T>
   struct A { };
 
 template<typename T>
   bool
-  operator==(const A<T>& a, const A<T>& b) { }
+  operator==(const A<T>& a, const A<T>& b) { return true; }
 
 template<typename T>
   bool
-  operator<(const A<T>& a, const A<T>& b) { }
+  operator<(const A<T>& a, const A<T>& b) { return true; }
 
 struct B { };
 
-bool test01()
+void test01()
 {
   // 1 POD types : resize, capacity, reserve
   bool test = true;
@@ -161,17 +160,36 @@ bool test01()
   VERIFY( b01 == true );
   sz04 = str02.size();  
   VERIFY( sz03 >= sz04 );
-
-#ifdef DEBUG_ASSERT
-  assert(test);
-#endif
-  
-  return test;
 }
+
+// libstdc++/4548
+// http://gcc.gnu.org/ml/libstdc++/2001-11/msg00150.html
+void test02()
+{
+  bool test = true;
+
+  std::string str01 = "twelve chars";
+  // str01 becomes shared
+  std::string str02 = str01;
+  str01.reserve(1);
+  VERIFY( str01.capacity() == 12 );
+}
+
+#if !__GXX_WEAK__
+// Explicitly instantiate for systems with no COMDAT or weak support.
+template 
+  std::basic_string< A<B> >::size_type 
+  std::basic_string< A<B> >::_Rep::_S_max_size;
+
+template 
+  A<B>
+  std::basic_string< A<B> >::_Rep::_S_terminal;
+#endif
 
 int main()
 {
   test01();
+  test02();
 
   return 0;
 }

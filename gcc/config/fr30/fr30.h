@@ -1,7 +1,7 @@
 /*{{{  Comment.  */ 
 
 /* Definitions of FR30 target. 
-   Copyright (C) 1998, 1999, 2000 Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
    Contributed by Cygnus Solutions.
 
 This file is part of GNU CC.
@@ -22,37 +22,12 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 /*}}}*/ 
-/*{{{  Includes.  */ 
-
-/* Set up System V.4 (aka ELF) defaults.  */
-#include "svr4.h"
-
-/*}}}*/ 
 /*{{{  Driver configuration.  */ 
 
-/* A C expression which determines whether the option `-CHAR' takes arguments.
-   The value should be the number of arguments that option takes-zero, for many
-   options.
-
-   By default, this macro is defined to handle the standard options properly.
-   You need not define it unless you wish to add additional options which take
-   arguments.
-
-   Defined in svr4.h.  */
+/* Defined in svr4.h.  */
 #undef SWITCH_TAKES_ARG
 
-/* A C expression which determines whether the option `-NAME' takes arguments.
-   The value should be the number of arguments that option takes-zero, for many
-   options.  This macro rather than `SWITCH_TAKES_ARG' is used for
-   multi-character option names.
-
-   By default, this macro is defined as `DEFAULT_WORD_SWITCH_TAKES_ARG', which
-   handles the standard options properly.  You need not define
-   `WORD_SWITCH_TAKES_ARG' unless you wish to add additional options which take
-   arguments.  Any redefinition should call `DEFAULT_WORD_SWITCH_TAKES_ARG' and
-   then check for additional options.
-
-   Defined in svr4.h.  */
+/* Defined in svr4.h.  */
 #undef WORD_SWITCH_TAKES_ARG
 
 /*}}}*/ 
@@ -65,7 +40,13 @@ Boston, MA 02111-1307, USA.  */
    predefined macros that identify this machine and system.  These macros will
    be predefined unless the `-ansi' option is specified. */
 
-#define CPP_PREDEFINES "-Dfr30 -D__fr30__ -Amachine=fr30"
+#define TARGET_CPU_CPP_BUILTINS()		\
+  do						\
+    {						\
+      builtin_define_std ("fr30");		\
+      builtin_assert ("machine=fr30");		\
+    }						\
+   while (0)
 
 /* Use LDI:20 instead of LDI:32 to load addresses.  */
 #define TARGET_SMALL_MODEL_MASK	(1 << 0)
@@ -87,9 +68,6 @@ extern int target_flags;
 
 #define TARGET_VERSION fprintf (stderr, " (fr30)");
 
-/* Define this macro if debugging can be performed even without a frame
-   pointer.  If this macro is defined, GNU CC will turn on the
-   `-fomit-frame-pointer' option whenever `-O' is specified.  */
 #define CAN_DEBUG_WITHOUT_FP
 
 #undef  STARTFILE_SPEC
@@ -105,61 +83,14 @@ extern int target_flags;
 /*}}}*/ 
 /*{{{  Storage Layout.  */ 
 
-/* Define this macro to have the value 1 if the most significant bit in a byte
-   has the lowest number; otherwise define it to have the value zero.  This
-   means that bit-field instructions count from the most significant bit.  If
-   the machine has no bit-field instructions, then this must still be defined,
-   but it doesn't matter which value it is defined to.  This macro need not be
-   a constant.
-
-   This macro does not affect the way structure fields are packed into bytes or
-   words; that is controlled by `BYTES_BIG_ENDIAN'.  */
 #define BITS_BIG_ENDIAN 1
 
-/* Define this macro to have the value 1 if the most significant byte in a word
-   has the lowest number.  This macro need not be a constant.  */
 #define BYTES_BIG_ENDIAN 1
 
-/* Define this macro to have the value 1 if, in a multiword object, the most
-   significant word has the lowest number.  This applies to both memory
-   locations and registers; GNU CC fundamentally assumes that the order of
-   words in memory is the same as the order in registers.  This macro need not
-   be a constant.  */
 #define WORDS_BIG_ENDIAN 1
 
-/* Define this macro to be the number of bits in an addressable storage unit
-   (byte); normally 8.  */
-#define BITS_PER_UNIT 	8
-
-/* Number of bits in a word; normally 32.  */
-#define BITS_PER_WORD 	32
-
-/* Number of storage units in a word; normally 4.  */
 #define UNITS_PER_WORD 	4
 
-/* Width of a pointer, in bits.  You must specify a value no wider than the
-   width of `Pmode'.  If it is not equal to the width of `Pmode', you must
-   define `POINTERS_EXTEND_UNSIGNED'.  */
-#define POINTER_SIZE 	32
-
-/* A macro to update MODE and UNSIGNEDP when an object whose type is TYPE and
-   which has the specified mode and signedness is to be stored in a register.
-   This macro is only called when TYPE is a scalar type.
-
-   On most RISC machines, which only have operations that operate on a full
-   register, define this macro to set M to `word_mode' if M is an integer mode
-   narrower than `BITS_PER_WORD'.  In most cases, only integer modes should be
-   widened because wider-precision floating-point operations are usually more
-   expensive than their narrower counterparts.
-
-   For most machines, the macro definition does not change UNSIGNEDP.  However,
-   some machines, have instructions that preferentially handle either signed or
-   unsigned quantities of certain modes.  For example, on the DEC Alpha, 32-bit
-   loads from memory and 32-bit add instructions sign-extend the result to 64
-   bits.  On such machines, set UNSIGNEDP according to which kind of extension
-   is more efficient.
-
-   Do not define this macro if it would never modify MODE.  */
 #define PROMOTE_MODE(MODE,UNSIGNEDP,TYPE)	\
   do						\
     {						\
@@ -169,165 +100,33 @@ extern int target_flags;
     }						\
   while (0)
 
-/* Normal alignment required for function parameters on the stack, in bits.
-   All stack parameters receive at least this much alignment regardless of data
-   type.  On most machines, this is the same as the size of an integer.  */
 #define PARM_BOUNDARY 32
 
-/* Define this macro if you wish to preserve a certain alignment for the stack
-   pointer.  The definition is a C expression for the desired alignment
-   (measured in bits).
-
-   If `PUSH_ROUNDING' is not defined, the stack will always be aligned to the
-   specified boundary.  If `PUSH_ROUNDING' is defined and specifies a less
-   strict alignment than `STACK_BOUNDARY', the stack may be momentarily
-   unaligned while pushing arguments.  */
 #define STACK_BOUNDARY 32
 
-/* Alignment required for a function entry point, in bits.  */
 #define FUNCTION_BOUNDARY 32
 
-/* Biggest alignment that any data type can require on this machine,
-   in bits.  */
 #define BIGGEST_ALIGNMENT 32
 
-/* If defined, a C expression to compute the alignment for a static variable.
-   TYPE is the data type, and ALIGN is the alignment that the object
-   would ordinarily have.  The value of this macro is used instead of that
-   alignment to align the object.
-
-   If this macro is not defined, then ALIGN is used.
-
-   One use of this macro is to increase alignment of medium-size data to make
-   it all fit in fewer cache lines.  Another is to cause character arrays to be
-   word-aligned so that `strcpy' calls that copy constants to character arrays
-   can be done inline.  */
 #define DATA_ALIGNMENT(TYPE, ALIGN)		\
   (TREE_CODE (TYPE) == ARRAY_TYPE		\
    && TYPE_MODE (TREE_TYPE (TYPE)) == QImode	\
    && (ALIGN) < BITS_PER_WORD ? BITS_PER_WORD : (ALIGN))
 
-/* If defined, a C expression to compute the alignment given to a constant that
-   is being placed in memory.  CONSTANT is the constant and ALIGN is the
-   alignment that the object would ordinarily have.  The value of this macro is
-   used instead of that alignment to align the object.
-
-   If this macro is not defined, then ALIGN is used.
-
-   The typical use of this macro is to increase alignment for string constants
-   to be word aligned so that `strcpy' calls that copy constants can be done
-   inline.  */
 #define CONSTANT_ALIGNMENT(EXP, ALIGN)  \
   (TREE_CODE (EXP) == STRING_CST	\
    && (ALIGN) < BITS_PER_WORD ? BITS_PER_WORD : (ALIGN))
 
-/* Define this macro to be the value 1 if instructions will fail to work if
-   given data not on the nominal alignment.  If instructions will merely go
-   slower in that case, define this macro as 0.  */
 #define STRICT_ALIGNMENT 1
 
-/* Define this if you wish to imitate the way many other C compilers handle
-   alignment of bitfields and the structures that contain them.
-
-   The behavior is that the type written for a bitfield (`int', `short', or
-   other integer type) imposes an alignment for the entire structure, as if the
-   structure really did contain an ordinary field of that type.  In addition,
-   the bitfield is placed within the structure so that it would fit within such
-   a field, not crossing a boundary for it.
-
-   Thus, on most machines, a bitfield whose type is written as `int' would not
-   cross a four-byte boundary, and would force four-byte alignment for the
-   whole structure.  (The alignment used may not be four bytes; it is
-   controlled by the other alignment parameters.)
-
-   If the macro is defined, its definition should be a C expression; a nonzero
-   value for the expression enables this behavior.
-
-   Note that if this macro is not defined, or its value is zero, some bitfields
-   may cross more than one alignment boundary.  The compiler can support such
-   references if there are `insv', `extv', and `extzv' insns that can directly
-   reference memory.
-
-   The other known way of making bitfields work is to define
-   `STRUCTURE_SIZE_BOUNDARY' as large as `BIGGEST_ALIGNMENT'.  Then every
-   structure can be accessed with fullwords.
-
-   Unless the machine has bitfield instructions or you define
-   `STRUCTURE_SIZE_BOUNDARY' that way, you must define
-   `PCC_BITFIELD_TYPE_MATTERS' to have a nonzero value.
-
-   If your aim is to make GNU CC use the same conventions for laying out
-   bitfields as are used by another compiler, here is how to investigate what
-   the other compiler does.  Compile and run this program:
-
-        struct foo1
-        {
-          char x;
-          char :0;
-          char y;
-        };
-
-        struct foo2
-        {
-          char x;
-          int :0;
-          char y;
-        };
-
-        main ()
-        {
-          printf ("Size of foo1 is %d\n",
-                  sizeof (struct foo1));
-          printf ("Size of foo2 is %d\n",
-                  sizeof (struct foo2));
-          exit (0);
-        }
-
-   If this prints 2 and 5, then the compiler's behavior is what you would get
-   from `PCC_BITFIELD_TYPE_MATTERS'.
-
-   Defined in svr4.h.  */
+/* Defined in svr4.h.  */
 #define PCC_BITFIELD_TYPE_MATTERS 1
 
-/* A code distinguishing the floating point format of the target machine.
-   There are three defined values:
-
-   IEEE_FLOAT_FORMAT'
-        This code indicates IEEE floating point.  It is the default;
-        there is no need to define this macro when the format is IEEE.
-
-   VAX_FLOAT_FORMAT'
-        This code indicates the peculiar format used on the Vax.
-
-   UNKNOWN_FLOAT_FORMAT'
-        This code indicates any other format.
-
-   The value of this macro is compared with `HOST_FLOAT_FORMAT'
-   to determine whether the target machine has the same format as
-   the host machine.  If any other formats are actually in use on supported
-   machines, new codes should be defined for them.
-
-   The ordering of the component words of floating point values stored in
-   memory is controlled by `FLOAT_WORDS_BIG_ENDIAN' for the target machine and
-   `HOST_FLOAT_WORDS_BIG_ENDIAN' for the host.  */
 #define TARGET_FLOAT_FORMAT IEEE_FLOAT_FORMAT
-
-/* GNU CC supports two ways of implementing C++ vtables: traditional or with
-   so-called "thunks".  The flag `-fvtable-thunk' chooses between them.  Define
-   this macro to be a C expression for the default value of that flag.  If
-   `DEFAULT_VTABLE_THUNKS' is 0, GNU CC uses the traditional implementation by
-   default.  The "thunk" implementation is more efficient (especially if you
-   have provided an implementation of `ASM_OUTPUT_MI_THUNK', but is not binary
-   compatible with code compiled using the traditional implementation.  If you
-   are writing a new ports, define `DEFAULT_VTABLE_THUNKS' to 1.
-
-   If you do not define this macro, the default for `-fvtable-thunk' is 0.  */
-#define DEFAULT_VTABLE_THUNKS 1
 
 /*}}}*/ 
 /*{{{  Layout of Source Language Data Types.  */ 
 
-#define CHAR_TYPE_SIZE 		 8
 #define SHORT_TYPE_SIZE 	16
 #define INT_TYPE_SIZE 		32
 #define LONG_TYPE_SIZE 		32
@@ -336,9 +135,6 @@ extern int target_flags;
 #define DOUBLE_TYPE_SIZE 	64
 #define LONG_DOUBLE_TYPE_SIZE 	64
 
-/* An expression whose value is 1 or 0, according to whether the type `char'
-   should be signed or unsigned by default.  The user can always override this
-   default with the options `-fsigned-char' and `-funsigned-char'.  */
 #define DEFAULT_SIGNED_CHAR 1
 
 /*}}}*/ 
@@ -635,11 +431,6 @@ enum reg_class
 /*}}}*/ 
 /*{{{  CONSTANTS.  */ 
 
-/* Return true if a value is inside a range */
-#define IN_RANGE(VALUE, LOW, HIGH)					\
-  (   ((unsigned HOST_WIDE_INT)((VALUE) - (LOW)))			\
-   <= ((unsigned HOST_WIDE_INT)( (HIGH) - (LOW))))
-
 /* A C expression that defines the machine-dependent operand constraint letters
    (`I', `J', `K', .. 'P') that specify particular ranges of integer values.
    If C is one of those letters, the expression should check that VALUE, an
@@ -836,7 +627,7 @@ enum reg_class
    FUNDECL is a C variable whose value is a tree node that describes the
    function in question.  Normally it is a node of type `FUNCTION_DECL' that
    describes the declaration of the function.  From this it is possible to
-   obtain the DECL_MACHINE_ATTRIBUTES of the function.
+   obtain the DECL_ATTRIBUTES of the function.
 
    FUNTYPE is a C variable whose value is a tree node that describes the
    function in question.  Normally it is a node of type `FUNCTION_TYPE' that
@@ -854,7 +645,7 @@ enum reg_class
    variable number of bytes is passed, it is zero, and argument popping will
    always be the responsibility of the calling function.
 
-   On the Vax, all functions always pop their arguments, so the definition of
+   On the VAX, all functions always pop their arguments, so the definition of
    this macro is STACK-SIZE.  On the 68000, using the standard calling
    convention, no functions pop their arguments, so the value of the macro is
    always 0 in this case.  But an alternative calling convention is available
@@ -1192,61 +983,7 @@ do										\
 
 /* A C compound statement with a conditional `goto LABEL;' executed if X (an
    RTX) is a legitimate memory address on the target machine for a memory
-   operand of mode MODE.
-
-   It usually pays to define several simpler macros to serve as subroutines for
-   this one.  Otherwise it may be too complicated to understand.
-
-   This macro must exist in two variants: a strict variant and a non-strict
-   one.  The strict variant is used in the reload pass.  It must be defined so
-   that any pseudo-register that has not been allocated a hard register is
-   considered a memory reference.  In contexts where some kind of register is
-   required, a pseudo-register with no hard register must be rejected.
-
-   The non-strict variant is used in other passes.  It must be defined to
-   accept all pseudo-registers in every context where some kind of register is
-   required.
-
-   Compiler source files that want to use the strict variant of this macro
-   define the macro `REG_OK_STRICT'.  You should use an `#ifdef REG_OK_STRICT'
-   conditional to define the strict variant in that case and the non-strict
-   variant otherwise.
-
-   Subroutines to check for acceptable registers for various purposes (one for
-   base registers, one for index registers, and so on) are typically among the
-   subroutines used to define `GO_IF_LEGITIMATE_ADDRESS'.  Then only these
-   subroutine macros need have two variants; the higher levels of macros may be
-   the same whether strict or not.
-
-   Normally, constant addresses which are the sum of a `symbol_ref' and an
-   integer are stored inside a `const' RTX to mark them as constant.
-   Therefore, there is no need to recognize such sums specifically as
-   legitimate addresses.  Normally you would simply recognize any `const' as
-   legitimate.
-
-   Usually `PRINT_OPERAND_ADDRESS' is not prepared to handle constant sums that
-   are not marked with `const'.  It assumes that a naked `plus' indicates
-   indexing.  If so, then you *must* reject such naked constant sums as
-   illegitimate addresses, so that none of them will be given to
-   `PRINT_OPERAND_ADDRESS'.
-
-   On some machines, whether a symbolic address is legitimate depends on the
-   section that the address refers to.  On these machines, define the macro
-   `ENCODE_SECTION_INFO' to store the information into the `symbol_ref', and
-   then check for it here.  When you see a `const', you will have to look
-   inside it to find the `symbol_ref' in order to determine the section.
-
-   The best way to modify the name string is by adding text to the beginning,
-   with suitable punctuation to prevent any ambiguity.  Allocate the new name
-   in `saveable_obstack'.  You will have to modify `ASM_OUTPUT_LABELREF' to
-   remove and decode the added text and output the name accordingly, and define
-   `STRIP_NAME_ENCODING' to access the original name string.
-
-   You can check the information stored here into the `symbol_ref' in the
-   definitions of the macros `GO_IF_LEGITIMATE_ADDRESS' and
-   `PRINT_OPERAND_ADDRESS'.
-
-   Used in explow.c, recog.c, reload.c.  */
+   operand of mode MODE.  */
 
 /* On the FR30 we only have one real addressing mode - an address in a
    register.  There are three special cases however:
@@ -1293,8 +1030,9 @@ do										\
 	goto LABEL;							\
       if (GET_CODE (X) == PLUS						\
 	  && ((MODE) == SImode || (MODE) == SFmode)			\
-	  && (XEXP (X, 0) == frame_pointer_rtx				\
-	      || XEXP(X,0) == arg_pointer_rtx)				\
+	  && GET_CODE (XEXP (X, 0)) == REG \
+          && (REGNO (XEXP (X, 0)) == FRAME_POINTER_REGNUM \
+           || REGNO (XEXP (X, 0)) == ARG_POINTER_REGNUM) \
 	  && GET_CODE (XEXP (X, 1)) == CONST_INT			\
 	  && IN_RANGE (INTVAL (XEXP (X, 1)), -(1 << 9), (1 <<  9) - 4))	\
         goto LABEL;							\
@@ -1382,17 +1120,6 @@ do										\
    same word of the structure, but to different bytes.  */
 #define SLOW_BYTE_ACCESS 1
 
-/* Define this macro if zero-extension (of a `char' or `short' to an `int') can
-   be done faster if the destination is a register that is known to be zero.
-
-   If you define this macro, you must have instruction patterns that recognize
-   RTL structures like this:
-
-        (set (strict_low_part (subreg:QI (reg:SI ...) 0)) ...)
-
-   and likewise for `HImode'.  */
-#define SLOW_ZERO_EXTEND 0
-
 /*}}}*/ 
 /*{{{  Dividing the output into sections.  */ 
 
@@ -1413,7 +1140,7 @@ do										\
    uninitialized global data will be output in the data section if
    `-fno-common' is passed, otherwise `ASM_OUTPUT_COMMON' will be
    used.  */
-#define BSS_SECTION_ASM_OP "\t.bss"
+#define BSS_SECTION_ASM_OP "\t.section .bss"
 
 /*}}}*/ 
 /*{{{  The Overall Framework of an Assembler File.  */
@@ -1434,75 +1161,6 @@ do										\
    GNU assembler to resume making the time-saving assumptions that are valid
    for ordinary compiler output.  */
 #define ASM_APP_OFF "#NO_APP\n"
-
-/*}}}*/ 
-/*{{{  Output of Data.  */
-
-/* This is how to output an assembler line defining a `float' constant.  */
-#define ASM_OUTPUT_FLOAT(FILE, VALUE)			\
-  do							\
-    {							\
-      long t;						\
-      char str[30];					\
-      							\
-      REAL_VALUE_TO_TARGET_SINGLE ((VALUE), t);		\
-      REAL_VALUE_TO_DECIMAL ((VALUE), "%.20e", str);	\
-      							\
-      fprintf (FILE, "\t.word\t0x%lx %s %s\n",		\
-	       t, ASM_COMMENT_START, str);		\
-    }							\
-  while (0)
-
-/* This is how to output an assembler line defining a `double' constant.  */
-#define ASM_OUTPUT_DOUBLE(FILE, VALUE)				\
-  do								\
-    {								\
-      long t[2];						\
-      char str[30];						\
-      								\
-      REAL_VALUE_TO_TARGET_DOUBLE ((VALUE), t);			\
-      REAL_VALUE_TO_DECIMAL ((VALUE), "%.20e", str);		\
-      								\
-      fprintf (FILE, "\t.word\t0x%lx %s %s\n\t.word\t0x%lx\n",	\
-	       t[0], ASM_COMMENT_START, str, t[1]);		\
-    }								\
-  while (0)
-
-/* This is how to output an assembler line defining a `char' constant.  */
-#define ASM_OUTPUT_CHAR(FILE, VALUE)		\
-  do						\
-    {						\
-      fprintf (FILE, "\t.byte\t");		\
-      output_addr_const (FILE, (VALUE));	\
-      fprintf (FILE, "\n");			\
-    }						\
-  while (0)
-
-/* This is how to output an assembler line defining a `short' constant.  */
-#define ASM_OUTPUT_SHORT(FILE, VALUE)		\
-  do						\
-    {						\
-      fprintf (FILE, "\t.hword\t");		\
-      output_addr_const (FILE, (VALUE));	\
-      fprintf (FILE, "\n");			\
-    }						\
-  while (0)
-
-/* This is how to output an assembler line defining an `int' constant.
-   We also handle symbol output here.  */
-#define ASM_OUTPUT_INT(FILE, VALUE)		\
-  do						\
-    {						\
-      fprintf (FILE, "\t.word\t");		\
-      output_addr_const (FILE, (VALUE));	\
-      fprintf (FILE, "\n");			\
-    }						\
-  while (0)
-
-/* A C statement to output to the stdio stream STREAM an assembler instruction
-   to assemble a single byte containing the number VALUE.  */
-#define ASM_OUTPUT_BYTE(STREAM, VALUE) \
-  fprintf (STREAM, "%s0x%x\n", ASM_BYTE_OP, (VALUE))
 
 /*}}}*/ 
 /*{{{  Output and Generation of Labels.  */ 
@@ -1587,12 +1245,8 @@ do										\
 
 /* A C compound statement to output to stdio stream STREAM the assembler syntax
    for an instruction operand that is a memory reference whose address is X.  X
-   is an RTL expression.
+   is an RTL expression.  */
 
-   On some machines, the syntax for a symbolic address depends on the section
-   that the address refers to.  On these machines, define the macro
-   `ENCODE_SECTION_INFO' to store the information into the `symbol_ref', and
-   then check for it here.  *Note Assembler Format::.  */
 #define PRINT_OPERAND_ADDRESS(STREAM, X) fr30_print_operand_address (STREAM, X)
 
 /* If defined, C string expressions to be used for the `%R', `%L', `%U', and
@@ -1644,49 +1298,11 @@ fprintf (STREAM, "\t.word .L%d\n", VALUE)
   fprintf ((STREAM), "\t.p2align %d\n", (POWER))
 
 /*}}}*/ 
-/*{{{  Macros Affecting all Debug Formats.  */ 
-
-/* A C expression that returns the DBX register number for the compiler
-   register number REGNO.  In simple cases, the value of this expression may be
-   REGNO itself.  But sometimes there are some registers that the compiler
-   knows about and DBX does not, or vice versa.  In such cases, some register
-   may need to have one number in the compiler and another for DBX.
-
-   If two registers have consecutive numbers inside GNU CC, and they can be
-   used as a pair to hold a multiword value, then they *must* have consecutive
-   numbers after renumbering with `DBX_REGISTER_NUMBER'.  Otherwise, debuggers
-   will be unable to access such a pair, because they expect register pairs to
-   be consecutive in their own numbering scheme.
-
-   If you find yourself defining `DBX_REGISTER_NUMBER' in way that does not
-   preserve register pairs, then what you must do instead is redefine the
-   actual register numbering scheme.  */
-#define DBX_REGISTER_NUMBER(REGNO) (REGNO)
-
-/*}}}*/ 
-/*{{{  Macros for SDB and Dwarf Output.  */ 
-
-/* Define this macro to allow references to structure, union, or enumeration
-   tags that have not yet been seen to be handled.  Some assemblers choke if
-   forward tags are used, while some require it.  */
-/* #define SDB_ALLOW_FORWARD_REFERENCES */
-
-#define DWARF_LINE_MIN_INSTR_LENGTH 2
-     
-/*}}}*/ 
 /*{{{  Miscellaneous Parameters.  */ 
 
 /* An alias for a machine mode name.  This is the machine mode that elements of
    a jump-table should have.  */
 #define CASE_VECTOR_MODE SImode
-
-/* An alias for a tree code that is the easiest kind of division to compile
-   code for in the general case.  It may be `TRUNC_DIV_EXPR', `FLOOR_DIV_EXPR',
-   `CEIL_DIV_EXPR' or `ROUND_DIV_EXPR'.  These four division operators differ
-   in how they round the result to an integer.  `EASY_DIV_EXPR' is used when it
-   is permissible to use any of those kinds of division and the choice should
-   be made on the basis of efficiency.  */
-#define EASY_DIV_EXPR TRUNC_DIV_EXPR
 
 /* The maximum number of bytes that a single instruction can move quickly from
    memory to memory.  */

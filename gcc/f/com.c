@@ -1,5 +1,5 @@
 /* com.c -- Implementation File (module.c template V1.0)
-   Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001
+   Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002
    Free Software Foundation, Inc.
    Contributed by James Craig Burley.
 
@@ -81,8 +81,8 @@ the Free Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 /* Include files. */
 
 #include "proj.h"
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 #include "flags.h"
+#include "real.h"
 #include "rtl.h"
 #include "toplev.h"
 #include "tree.h"
@@ -90,9 +90,10 @@ the Free Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "convert.h"
 #include "ggc.h"
 #include "diagnostic.h"
-#endif	/* FFECOM_targetCURRENT == FFECOM_targetGCC */
-
-#define FFECOM_GCC_INCLUDE 1	/* Enable -I. */
+#include "intl.h"
+#include "langhooks.h"
+#include "langhooks-def.h"
+#include "debug.h"
 
 /* VMS-specific definitions */
 #ifdef VMS
@@ -138,13 +139,6 @@ typedef struct { unsigned :16, :16, :16; } vms_ino_t;
 
 /* Externals defined here.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
-
-/* ~~gcc/tree.h *should* declare this, because toplev.c and dwarfout.c
-   reference it.  */
-
-const char * const language_string = "GNU F77";
-
 /* Stream for reading from the input file.  */
 FILE *finput;
 
@@ -162,7 +156,7 @@ tree string_type_node;
    inventions should be renamed to be canonical.  Note that only
    the ones currently required to be global are so.  */
 
-static tree ffecom_tree_fun_type_void;
+static GTY(()) tree ffecom_tree_fun_type_void;
 
 tree ffecom_integer_type_node;	/* Abbrev for _tree_type[blah][blah]. */
 tree ffecom_integer_zero_node;	/* Like *_*_* with g77's integer type. */
@@ -173,13 +167,14 @@ tree ffecom_tree_type[FFEINFO_basictype][FFEINFO_kindtype];
    just use build_function_type and build_pointer_type on the
    appropriate _tree_type array element.  */
 
-static tree ffecom_tree_fun_type[FFEINFO_basictype][FFEINFO_kindtype];
-static tree ffecom_tree_ptr_to_fun_type[FFEINFO_basictype][FFEINFO_kindtype];
-static tree ffecom_tree_subr_type;
-static tree ffecom_tree_ptr_to_subr_type;
-static tree ffecom_tree_blockdata_type;
+static GTY(()) tree ffecom_tree_fun_type[FFEINFO_basictype][FFEINFO_kindtype];
+static GTY(()) tree 
+  ffecom_tree_ptr_to_fun_type[FFEINFO_basictype][FFEINFO_kindtype];
+static GTY(()) tree ffecom_tree_subr_type;
+static GTY(()) tree ffecom_tree_ptr_to_subr_type;
+static GTY(()) tree ffecom_tree_blockdata_type;
 
-static tree ffecom_tree_xargc_;
+static GTY(()) tree ffecom_tree_xargc_;
 
 ffecomSymbol ffecom_symbol_null_
 =
@@ -195,10 +190,10 @@ ffeinfoKindtype ffecom_label_kind_ = FFEINFO_basictypeNONE;
 
 int ffecom_f2c_typecode_[FFEINFO_basictype][FFEINFO_kindtype];
 tree ffecom_f2c_integer_type_node;
-tree ffecom_f2c_ptr_to_integer_type_node;
+static GTY(()) tree ffecom_f2c_ptr_to_integer_type_node;
 tree ffecom_f2c_address_type_node;
 tree ffecom_f2c_real_type_node;
-tree ffecom_f2c_ptr_to_real_type_node;
+static GTY(()) tree ffecom_f2c_ptr_to_real_type_node;
 tree ffecom_f2c_doublereal_type_node;
 tree ffecom_f2c_complex_type_node;
 tree ffecom_f2c_doublecomplex_type_node;
@@ -212,7 +207,6 @@ tree ffecom_f2c_ftnlen_two_node;
 tree ffecom_f2c_ptr_to_ftnlen_type_node;
 tree ffecom_f2c_ftnint_type_node;
 tree ffecom_f2c_ptr_to_ftnint_type_node;
-#endif	/* FFECOM_targetCURRENT == FFECOM_targetGCC */
 
 /* Simple definitions and enumerations. */
 
@@ -252,16 +246,13 @@ typedef enum
 
 /* Internal typedefs. */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 typedef struct _ffecom_concat_list_ ffecomConcatList_;
-#endif	/* FFECOM_targetCURRENT == FFECOM_targetGCC */
 
 /* Private include files. */
 
 
 /* Internal structure definitions. */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 struct _ffecom_concat_list_
   {
     ffebld *exprs;
@@ -270,11 +261,17 @@ struct _ffecom_concat_list_
     ffetargetCharacterSize minlen;
     ffetargetCharacterSize maxlen;
   };
-#endif	/* FFECOM_targetCURRENT == FFECOM_targetGCC */
 
 /* Static functions (internal). */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
+static tree ffe_type_for_mode PARAMS ((enum machine_mode, int));
+static tree ffe_type_for_size PARAMS ((unsigned int, int));
+static tree ffe_unsigned_type PARAMS ((tree));
+static tree ffe_signed_type PARAMS ((tree));
+static tree ffe_signed_or_unsigned_type PARAMS ((int, tree));
+static bool ffe_mark_addressable PARAMS ((tree));
+static tree ffe_truthvalue_conversion PARAMS ((tree));
+static void ffecom_init_decl_processing PARAMS ((void));
 static tree ffecom_arglist_expr_ (const char *argstring, ffebld args);
 static tree ffecom_widest_expr_type_ (ffebld list);
 static bool ffecom_overlap_ (tree dest_decl, tree dest_offset,
@@ -367,21 +364,20 @@ static tree ffecom_vardesc_array_ (ffesymbol s);
 static tree ffecom_vardesc_dims_ (ffesymbol s);
 static tree ffecom_convert_narrow_ (tree type, tree expr);
 static tree ffecom_convert_widen_ (tree type, tree expr);
-#endif	/* FFECOM_targetCURRENT == FFECOM_targetGCC */
 
 /* These are static functions that parallel those found in the C front
    end and thus have the same names.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree bison_rule_compstmt_ (void);
 static void bison_rule_pushlevel_ (void);
 static void delete_block (tree block);
 static int duplicate_decls (tree newdecl, tree olddecl);
 static void finish_decl (tree decl, tree init, bool is_top_level);
 static void finish_function (int nested);
-static const char *lang_printable_name (tree decl, int v);
+static const char *ffe_printable_name (tree decl, int v);
+static void ffe_print_error_function (diagnostic_context *, const char *);
 static tree lookup_name_current_level (tree name);
-static struct binding_level *make_binding_level (void);
+static struct f_binding_level *make_binding_level (void);
 static void pop_f_function_context (void);
 static void push_f_function_context (void);
 static void push_parm_decl (tree parm);
@@ -391,15 +387,11 @@ static tree storedecls (tree decls);
 static void store_parm_decls (int is_main_program);
 static tree start_decl (tree decl, bool is_top_level);
 static void start_function (tree name, tree type, int nested, int public);
-#endif	/* FFECOM_targetCURRENT == FFECOM_targetGCC */
-#if FFECOM_GCC_INCLUDE
 static void ffecom_file_ (const char *name);
-static void ffecom_initialize_char_syntax_ (void);
 static void ffecom_close_include_ (FILE *f);
 static int ffecom_decode_include_option_ (char *spec);
 static FILE *ffecom_open_include_ (char *name, ffewhereLine l,
 				   ffewhereColumn c);
-#endif	/* FFECOM_GCC_INCLUDE */
 
 /* Static objects accessed by functions in this module. */
 
@@ -407,16 +399,15 @@ static ffesymbol ffecom_primary_entry_ = NULL;
 static ffesymbol ffecom_nested_entry_ = NULL;
 static ffeinfoKind ffecom_primary_entry_kind_;
 static bool ffecom_primary_entry_is_proc_;
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
-static tree ffecom_outer_function_decl_;
-static tree ffecom_previous_function_decl_;
-static tree ffecom_which_entrypoint_decl_;
-static tree ffecom_float_zero_ = NULL_TREE;
-static tree ffecom_float_half_ = NULL_TREE;
-static tree ffecom_double_zero_ = NULL_TREE;
-static tree ffecom_double_half_ = NULL_TREE;
-static tree ffecom_func_result_;/* For functions. */
-static tree ffecom_func_length_;/* For CHARACTER fns. */
+static GTY(()) tree ffecom_outer_function_decl_;
+static GTY(()) tree ffecom_previous_function_decl_;
+static GTY(()) tree ffecom_which_entrypoint_decl_;
+static GTY(()) tree ffecom_float_zero_;
+static GTY(()) tree ffecom_float_half_;
+static GTY(()) tree ffecom_double_zero_;
+static GTY(()) tree ffecom_double_half_;
+static GTY(()) tree ffecom_func_result_;/* For functions. */
+static GTY(()) tree ffecom_func_length_;/* For CHARACTER fns. */
 static ffebld ffecom_list_blockdata_;
 static ffebld ffecom_list_common_;
 static ffebld ffecom_master_arglist_;
@@ -426,9 +417,9 @@ static ffetargetCharacterSize ffecom_master_size_;
 static int ffecom_num_fns_ = 0;
 static int ffecom_num_entrypoints_ = 0;
 static bool ffecom_is_altreturning_ = FALSE;
-static tree ffecom_multi_type_node_;
-static tree ffecom_multi_retval_;
-static tree
+static GTY(()) tree ffecom_multi_type_node_;
+static GTY(()) tree ffecom_multi_retval_;
+static GTY(()) tree
   ffecom_multi_fields_[FFEINFO_basictype][FFEINFO_kindtype];
 static bool ffecom_member_namelisted_;	/* _member_phase1_ namelisted? */
 static bool ffecom_doing_entry_ = FALSE;
@@ -438,17 +429,11 @@ static int ffecom_typesize_integer1_;
 
 /* Holds pointer-to-function expressions.  */
 
-static tree ffecom_gfrt_[FFECOM_gfrt]
-=
-{
-#define DEFGFRT(CODE,NAME,TYPE,ARGS,VOLATILE,COMPLEX,CONST) NULL_TREE,
-#include "com-rt.def"
-#undef DEFGFRT
-};
+static GTY(()) tree ffecom_gfrt_[FFECOM_gfrt];
 
 /* Holds the external names of the functions.  */
 
-static const char *ffecom_gfrt_name_[FFECOM_gfrt]
+static const char *const ffecom_gfrt_name_[FFECOM_gfrt]
 =
 {
 #define DEFGFRT(CODE,NAME,TYPE,ARGS,VOLATILE,COMPLEX,CONST) NAME,
@@ -458,7 +443,7 @@ static const char *ffecom_gfrt_name_[FFECOM_gfrt]
 
 /* Whether the function returns.  */
 
-static bool ffecom_gfrt_volatile_[FFECOM_gfrt]
+static const bool ffecom_gfrt_volatile_[FFECOM_gfrt]
 =
 {
 #define DEFGFRT(CODE,NAME,TYPE,ARGS,VOLATILE,COMPLEX,CONST) VOLATILE,
@@ -468,7 +453,7 @@ static bool ffecom_gfrt_volatile_[FFECOM_gfrt]
 
 /* Whether the function returns type complex.  */
 
-static bool ffecom_gfrt_complex_[FFECOM_gfrt]
+static const bool ffecom_gfrt_complex_[FFECOM_gfrt]
 =
 {
 #define DEFGFRT(CODE,NAME,TYPE,ARGS,VOLATILE,COMPLEX,CONST) COMPLEX,
@@ -479,7 +464,7 @@ static bool ffecom_gfrt_complex_[FFECOM_gfrt]
 /* Whether the function is const
    (i.e., has no side effects and only depends on its arguments).  */
 
-static bool ffecom_gfrt_const_[FFECOM_gfrt]
+static const bool ffecom_gfrt_const_[FFECOM_gfrt]
 =
 {
 #define DEFGFRT(CODE,NAME,TYPE,ARGS,VOLATILE,COMPLEX,CONST) CONST,
@@ -489,7 +474,7 @@ static bool ffecom_gfrt_const_[FFECOM_gfrt]
 
 /* Type code for the function return value.  */
 
-static ffecomRttype_ ffecom_gfrt_type_[FFECOM_gfrt]
+static const ffecomRttype_ ffecom_gfrt_type_[FFECOM_gfrt]
 =
 {
 #define DEFGFRT(CODE,NAME,TYPE,ARGS,VOLATILE,COMPLEX,CONST) TYPE,
@@ -499,18 +484,15 @@ static ffecomRttype_ ffecom_gfrt_type_[FFECOM_gfrt]
 
 /* String of codes for the function's arguments.  */
 
-static const char *ffecom_gfrt_argstring_[FFECOM_gfrt]
+static const char *const ffecom_gfrt_argstring_[FFECOM_gfrt]
 =
 {
 #define DEFGFRT(CODE,NAME,TYPE,ARGS,VOLATILE,COMPLEX,CONST) ARGS,
 #include "com-rt.def"
 #undef DEFGFRT
 };
-#endif	/* FFECOM_targetCURRENT == FFECOM_targetGCC */
 
 /* Internal macros. */
-
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 
 /* We let tm.h override the types used here, to handle trivial differences
    such as the choice of unsigned int or long unsigned int for size_t.
@@ -544,7 +526,7 @@ static const char *ffecom_gfrt_argstring_[FFECOM_gfrt]
 /* Note that the information in the `names' component of the global contour
    is duplicated in the IDENTIFIER_GLOBAL_VALUEs of all identifiers.  */
 
-struct binding_level
+struct f_binding_level GTY(())
   {
     /* A chain of _DECL nodes for all variables, constants, functions,
        and typedef types.  These are in the reverse of the order supplied.
@@ -561,7 +543,7 @@ struct binding_level
     tree this_block;
 
     /* The binding level which this one is contained in (inherits from).  */
-    struct binding_level *level_chain;
+    struct f_binding_level *level_chain;
 
     /* 0: no ffecom_prepare_* functions called at this level yet;
        1: ffecom_prepare* functions called, except not ffecom_prepare_end;
@@ -569,36 +551,38 @@ struct binding_level
     int prep_state;
   };
 
-#define NULL_BINDING_LEVEL (struct binding_level *) NULL
+#define NULL_BINDING_LEVEL (struct f_binding_level *) NULL
 
 /* The binding level currently in effect.  */
 
-static struct binding_level *current_binding_level;
+static GTY(()) struct f_binding_level *current_binding_level;
 
 /* A chain of binding_level structures awaiting reuse.  */
 
-static struct binding_level *free_binding_level;
+static GTY((deletable (""))) struct f_binding_level *free_binding_level;
 
 /* The outermost binding level, for names of file scope.
    This is created when the compiler is started and exists
    through the entire run.  */
 
-static struct binding_level *global_binding_level;
+static struct f_binding_level *global_binding_level;
 
 /* Binding level structures are initialized by copying this one.  */
 
-static struct binding_level clear_binding_level
+static const struct f_binding_level clear_binding_level
 =
 {NULL, NULL, NULL, NULL_BINDING_LEVEL, 0};
 
 /* Language-dependent contents of an identifier.  */
 
-struct lang_identifier
-  {
-    struct tree_identifier ignore;
-    tree global_value, local_value, label_value;
-    bool invented;
-  };
+struct lang_identifier GTY(())
+{
+  struct tree_identifier common;
+  tree global_value;
+  tree local_value;
+  tree label_value;
+  bool invented;
+};
 
 /* Macros for access to language-specific slots in an identifier.  */
 /* Each of these slots contains a DECL node or null.  */
@@ -619,6 +603,24 @@ struct lang_identifier
 #define IDENTIFIER_INVENTED(NODE)	\
   (((struct lang_identifier *)(NODE))->invented)
 
+/* The resulting tree type.  */
+union lang_tree_node 
+  GTY((desc ("TREE_CODE (&%h.generic) == IDENTIFIER_NODE")))
+{
+  union tree_node GTY ((tag ("0"), 
+			desc ("tree_node_structure (&%h)"))) 
+    generic;
+  struct lang_identifier GTY ((tag ("1"))) identifier;
+};
+
+/* Fortran doesn't use either of these.  */
+struct lang_decl GTY(()) 
+{
+};
+struct lang_type GTY(())
+{
+};
+
 /* In identifiers, C uses the following fields in a special way:
    TREE_PUBLIC	      to record that there was a previous local extern decl.
    TREE_USED	      to record that such a decl was used.
@@ -628,13 +630,11 @@ struct lang_identifier
    that have names.  Here so we can clear out their names' definitions
    at the end of the function.  */
 
-static tree named_labels;
+static GTY(()) tree named_labels;
 
 /* A list of LABEL_DECLs from outer contexts that are currently shadowed.  */
 
-static tree shadowed_labels;
-
-#endif /* FFECOM_targetCURRENT == FFECOM_targetGCC */
+static GTY(()) tree shadowed_labels;
 
 /* Return the subscript expression, modified to do range-checking.
 
@@ -671,16 +671,46 @@ ffecom_subscript_check_ (tree array, tree element, int dim, int total_dims,
     }
 
   element = ffecom_save_tree (element);
-  cond = ffecom_2 (LE_EXPR, integer_type_node,
-		   low,
-		   element);
-  if (high)
+  if (total_dims == 0)
     {
-      cond = ffecom_2 (TRUTH_ANDIF_EXPR, integer_type_node,
-		       cond,
-		       ffecom_2 (LE_EXPR, integer_type_node,
-				 element,
-				 high));
+      /* Special handling for substring range checks.  Fortran allows the
+         end subscript < begin subscript, which means that expressions like
+       string(1:0) are valid (and yield a null string).  In view of this,
+       enforce two simpler conditions:
+          1) element<=high for end-substring;
+          2) element>=low for start-substring.
+       Run-time character movement will enforce remaining conditions.
+
+       More complicated checks would be better, but present structure only
+       provides one index element at a time, so it is not possible to
+       enforce a check of both i and j in string(i:j).  If it were, the
+       complete set of rules would read,
+         if ( ((j<i) && ((low<=i<=high) || (low<=j<=high))) ||
+              ((low<=i<=high) && (low<=j<=high)) )
+           ok ;
+         else
+           range error ;
+      */
+      if (dim)
+        cond = ffecom_2 (LE_EXPR, integer_type_node, element, high);
+      else
+        cond = ffecom_2 (LE_EXPR, integer_type_node, low, element);
+    }
+  else
+    {
+      /* Array reference substring range checking.  */
+
+      cond = ffecom_2 (LE_EXPR, integer_type_node,
+                     low,
+                     element);
+      if (high)
+        {
+          cond = ffecom_2 (TRUTH_ANDIF_EXPR, integer_type_node,
+                         cond,
+                         ffecom_2 (LE_EXPR, integer_type_node,
+                                   element,
+                                   high));
+        }
     }
 
   {
@@ -849,7 +879,7 @@ ffecom_arrayref_ (tree item, ffebld expr, int want_ptr)
 	return item;
 
       if (ffeinfo_where (ffebld_info (expr)) == FFEINFO_whereFLEETING
-	  && ! mark_addressable (item))
+	  && ! ffe_mark_addressable (item))
 	return error_mark_node;
     }
 
@@ -949,7 +979,6 @@ ffecom_arrayref_ (tree item, ffebld expr, int want_ptr)
    and such might well be stable too, but for things like calculations,
    we do need to calculate a snapshot of a value before picking at it.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_stabilize_aggregate_ (tree ref)
 {
@@ -1022,13 +1051,11 @@ ffecom_stabilize_aggregate_ (tree ref)
 
   return result;
 }
-#endif
 
 /* A rip-off of gcc's convert.c convert_to_complex function,
    reworked to handle complex implemented as C structures
    (RECORD_TYPE with two fields, real and imaginary `r' and `i').  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_convert_to_complex_ (tree type, tree expr)
 {
@@ -1038,7 +1065,7 @@ ffecom_convert_to_complex_ (tree type, tree expr)
   assert (TREE_CODE (type) == RECORD_TYPE);
 
   subtype = TREE_TYPE (TYPE_FIELDS (type));
-  
+
   if (form == REAL_TYPE || form == INTEGER_TYPE || form == ENUMERAL_TYPE)
     {
       expr = convert (subtype, expr);
@@ -1071,16 +1098,14 @@ ffecom_convert_to_complex_ (tree type, tree expr)
     error ("pointer value used where a complex was expected");
   else
     error ("aggregate value used where a complex was expected");
-  
+
   return ffecom_2 (COMPLEX_EXPR, type,
 		   convert (subtype, integer_zero_node),
 		   convert (subtype, integer_zero_node));
 }
-#endif
 
 /* Like gcc's convert(), but crashes if widening might happen.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_convert_narrow_ (type, expr)
      tree type, expr;
@@ -1149,11 +1174,9 @@ ffecom_convert_narrow_ (type, expr)
   assert ("conversion to non-scalar type requested" == NULL);
   return error_mark_node;
 }
-#endif
 
 /* Like gcc's convert(), but crashes if narrowing might happen.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_convert_widen_ (type, expr)
      tree type, expr;
@@ -1222,13 +1245,11 @@ ffecom_convert_widen_ (type, expr)
   assert ("conversion to non-scalar type requested" == NULL);
   return error_mark_node;
 }
-#endif
 
 /* Handles making a COMPLEX type, either the standard
    (but buggy?) gbe way, or the safer (but less elegant?)
    f2c way.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_make_complex_type_ (tree subtype)
 {
@@ -1253,12 +1274,10 @@ ffecom_make_complex_type_ (tree subtype)
 
   return type;
 }
-#endif
 
 /* Chooses either the gbe or the f2c way to build a
    complex constant.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_build_complex_constant_ (tree type, tree realpart, tree imagpart)
 {
@@ -1277,9 +1296,7 @@ ffecom_build_complex_constant_ (tree type, tree realpart, tree imagpart)
 
   return bothparts;
 }
-#endif
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_arglist_expr_ (const char *c, ffebld expr)
 {
@@ -1292,7 +1309,7 @@ ffecom_arglist_expr_ (const char *c, ffebld expr)
   tree item;
   bool ptr = FALSE;
   tree wanted = NULL_TREE;
-  static char zed[] = "0";
+  static const char zed[] = "0";
 
   if (c == NULL)
     c = &zed[0];
@@ -1425,9 +1442,7 @@ ffecom_arglist_expr_ (const char *c, ffebld expr)
 
   return list;
 }
-#endif
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_widest_expr_type_ (ffebld list)
 {
@@ -1463,7 +1478,6 @@ ffecom_widest_expr_type_ (ffebld list)
   assert (t != NULL_TREE);
   return t;
 }
-#endif
 
 /* Check whether a partial overlap between two expressions is possible.
 
@@ -1515,7 +1529,6 @@ ffecom_possible_partial_overlap_ (ffebld expr1, ffebld expr2 ATTRIBUTE_UNUSED)
    change before it is finally modified.  dest_* are the canonized
    destination itself.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static bool
 ffecom_overlap_ (tree dest_decl, tree dest_offset, tree dest_size,
 		 tree source_tree, ffebld source UNUSED,
@@ -1695,12 +1708,10 @@ ffecom_overlap_ (tree dest_decl, tree dest_offset, tree dest_size,
 
   return TRUE;		/* Destination and source overlap. */
 }
-#endif
 
 /* Check whether dest might overlap any of a list of arguments or is
    in a COMMON area the callee might know about (and thus modify).  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static bool
 ffecom_args_overlapping_ (tree dest_tree, ffebld dest UNUSED,
 			  tree args, tree callee_commons,
@@ -1736,13 +1747,11 @@ ffecom_args_overlapping_ (tree dest_tree, ffebld dest UNUSED,
 
   return FALSE;
 }
-#endif
 
 /* Build a string for a variable name as used by NAMELIST.  This means that
    if we're using the f2c library, we build an uppercase string, since
    f2c does this.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_build_f2c_string_ (int i, const char *s)
 {
@@ -1774,13 +1783,11 @@ ffecom_build_f2c_string_ (int i, const char *s)
   }
 }
 
-#endif
 /* Returns CALL_EXPR or equivalent with given type (pass NULL_TREE for
    type to just get whatever the function returns), handling the
    f2c value-returning convention, if required, by prepending
    to the arglist a pointer to a temporary to receive the return value.	 */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_call_ (tree fn, ffeinfoKindtype kt, bool is_f2c_complex,
 	      tree type, tree args, tree dest_tree,
@@ -1844,12 +1851,10 @@ ffecom_call_ (tree fn, ffeinfoKindtype kt, bool is_f2c_complex,
 
   return item;
 }
-#endif
 
 /* Given two arguments, transform them and make a call to the given
    function via ffecom_call_.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_call_binop_ (tree fn, ffeinfoKindtype kt, bool is_f2c_complex,
 		    tree type, ffebld left, ffebld right,
@@ -1898,7 +1903,6 @@ ffecom_call_binop_ (tree fn, ffeinfoKindtype kt, bool is_f2c_complex,
 		       dest_tree, dest, dest_used, callee_commons,
 		       scalar_args, hook);
 }
-#endif
 
 /* Return ptr/length args for char subexpression
 
@@ -1910,7 +1914,6 @@ ffecom_call_binop_ (tree fn, ffeinfoKindtype kt, bool is_f2c_complex,
    Note that if with_null is TRUE, and the expression is an opCONTER,
    a null byte is appended to the string.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static void
 ffecom_char_args_x_ (tree *xitem, tree *length, ffebld expr, bool with_null)
 {
@@ -2264,7 +2267,6 @@ ffecom_char_args_x_ (tree *xitem, tree *length, ffebld expr, bool with_null)
 
   *xitem = item;
 }
-#endif
 
 /* Check the size of the type to be sure it doesn't overflow the
    "portable" capacities of the compiler back end.  `dummy' types
@@ -2273,7 +2275,6 @@ ffecom_char_args_x_ (tree *xitem, tree *length, ffebld expr, bool with_null)
    must still enforce its size requirements, though, and the back
    end takes care of this in stor-layout.c.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_check_size_overflow_ (ffesymbol s, tree type, bool dummy)
 {
@@ -2286,9 +2287,13 @@ ffecom_check_size_overflow_ (ffesymbol s, tree type, bool dummy)
   if (TREE_CODE (TYPE_SIZE (type)) != INTEGER_CST)
     return type;
 
+  /* An array is too large if size is negative or the type_size overflows
+     or its "upper half" is larger than 3 (which would make the signed
+     byte size and offset computations overflow).  */
+
   if ((tree_int_cst_sgn (TYPE_SIZE (type)) < 0)
-      || (!dummy && (((TREE_INT_CST_HIGH (TYPE_SIZE (type)) != 0))
-		     || TREE_OVERFLOW (TYPE_SIZE (type)))))
+      || (!dummy && (TREE_INT_CST_HIGH (TYPE_SIZE (type)) > 3
+	             || TREE_OVERFLOW (TYPE_SIZE (type)))))
     {
       ffebad_start (FFEBAD_ARRAY_LARGE);
       ffebad_string (ffesymbol_text (s));
@@ -2300,13 +2305,11 @@ ffecom_check_size_overflow_ (ffesymbol s, tree type, bool dummy)
 
   return type;
 }
-#endif
 
 /* Builds a length argument (PARM_DECL).  Also wraps type in an array type
    where the dimension info is (1:size) where <size> is ffesymbol_size(s) if
    known, length_arg if not known (FFETARGET_charactersizeNONE).  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_char_enhance_arg_ (tree *xtype, ffesymbol s)
 {
@@ -2325,9 +2328,7 @@ ffecom_char_enhance_arg_ (tree *xtype, ffesymbol s)
       else
 	tlen = ffecom_get_invented_identifier ("__g77_%s", "length");
       tlen = build_decl (PARM_DECL, tlen, ffecom_f2c_ftnlen_type_node);
-#if BUILT_FOR_270
       DECL_ARTIFICIAL (tlen) = 1;
-#endif
     }
 
   if (sz == FFETARGET_charactersizeNONE)
@@ -2350,7 +2351,6 @@ ffecom_char_enhance_arg_ (tree *xtype, ffesymbol s)
   return tlen;
 }
 
-#endif
 /* ffecom_concat_list_gather_ -- Gather list of concatenated string exprs
 
    ffecomConcatList_ catlist;
@@ -2361,14 +2361,13 @@ ffecom_char_enhance_arg_ (tree *xtype, ffesymbol s)
    Scans expr for character subexpressions, updates and returns catlist
    accordingly.	 */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static ffecomConcatList_
 ffecom_concat_list_gather_ (ffecomConcatList_ catlist, ffebld expr,
 			    ffetargetCharacterSize max)
 {
   ffetargetCharacterSize sz;
 
-recurse:			/* :::::::::::::::::::: */
+ recurse:
 
   if (expr == NULL)
     return catlist;
@@ -2464,7 +2463,6 @@ recurse:			/* :::::::::::::::::::: */
     }
 }
 
-#endif
 /* ffecom_concat_list_kill_ -- Kill list of concatenated string exprs
 
    ffecomConcatList_ catlist;
@@ -2472,7 +2470,6 @@ recurse:			/* :::::::::::::::::::: */
 
    Anything allocated within the list info is deallocated.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static void
 ffecom_concat_list_kill_ (ffecomConcatList_ catlist)
 {
@@ -2481,13 +2478,11 @@ ffecom_concat_list_kill_ (ffecomConcatList_ catlist)
 		    catlist.max * sizeof (catlist.exprs[0]));
 }
 
-#endif
 /* Make list of concatenated string exprs.
 
    Returns a flattened list of concatenated subexpressions given a
    tree of such expressions.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static ffecomConcatList_
 ffecom_concat_list_new_ (ffebld expr, ffetargetCharacterSize max)
 {
@@ -2497,13 +2492,10 @@ ffecom_concat_list_new_ (ffebld expr, ffetargetCharacterSize max)
   return ffecom_concat_list_gather_ (catlist, expr, max);
 }
 
-#endif
-
 /* Provide some kind of useful info on member of aggregate area,
    since current g77/gcc technology does not provide debug info
    on these members.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static void
 ffecom_debug_kludge_ (tree aggr, const char *aggr_type, ffesymbol member,
 		      tree member_type UNUSED, ffetargetOffset offset)
@@ -2582,7 +2574,6 @@ ffecom_debug_kludge_ (tree aggr, const char *aggr_type, ffesymbol member,
   if (buff != &space[0])
     malloc_kill_ks (malloc_pool_image (), buff, len + 1);
 }
-#endif
 
 /* ffecom_do_entry_ -- Do compilation of a particular entrypoint
 
@@ -2593,7 +2584,6 @@ ffecom_debug_kludge_ (tree aggr, const char *aggr_type, ffesymbol member,
    Makes a public entry point that calls our private master fn (already
    compiled).  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static void
 ffecom_do_entry_ (ffesymbol fn, int entrynum)
 {
@@ -2950,7 +2940,6 @@ ffecom_do_entry_ (ffesymbol fn, int entrynum)
   ffecom_doing_entry_ = FALSE;
 }
 
-#endif
 /* Transform expr into gcc tree with possible destination
 
    Recursive descent on expr while making corresponding tree nodes and
@@ -2958,7 +2947,6 @@ ffecom_do_entry_ (ffesymbol fn, int entrynum)
    with temporary that would be made in certain cases, temporary isn't
    made, destination used instead, and dest_used flag set TRUE.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_expr_ (ffebld expr, tree dest_tree, ffebld dest,
 	      bool *dest_used, bool assignp, bool widenp)
@@ -3155,6 +3143,7 @@ ffecom_expr_ (ffebld expr, tree dest_tree, ffebld dest,
 
 	      if (ffesymbol_hook (s).assign_tree == NULL_TREE)
 		{
+		  /* xgettext:no-c-format */
 		  ffebad_start_msg ("ASSIGN'ed label cannot fit into `%A' at %0 -- using wider sibling",
 				    FFEBAD_severityWARNING);
 		  ffebad_string (ffesymbol_text (s));
@@ -3209,7 +3198,7 @@ ffecom_expr_ (ffebld expr, tree dest_tree, ffebld dest,
 
     case FFEBLD_opUMINUS:
       left = ffecom_expr_ (ffebld_left (expr), NULL, NULL, NULL, FALSE, widenp);
-      if (tree_type_x) 
+      if (tree_type_x)
 	{
 	  tree_type = tree_type_x;
 	  left = convert (tree_type, left);
@@ -3219,7 +3208,7 @@ ffecom_expr_ (ffebld expr, tree dest_tree, ffebld dest,
     case FFEBLD_opADD:
       left = ffecom_expr_ (ffebld_left (expr), NULL, NULL, NULL, FALSE, widenp);
       right = ffecom_expr_ (ffebld_right (expr), NULL, NULL, NULL, FALSE, widenp);
-      if (tree_type_x) 
+      if (tree_type_x)
 	{
 	  tree_type = tree_type_x;
 	  left = convert (tree_type, left);
@@ -3230,7 +3219,7 @@ ffecom_expr_ (ffebld expr, tree dest_tree, ffebld dest,
     case FFEBLD_opSUBTRACT:
       left = ffecom_expr_ (ffebld_left (expr), NULL, NULL, NULL, FALSE, widenp);
       right = ffecom_expr_ (ffebld_right (expr), NULL, NULL, NULL, FALSE, widenp);
-      if (tree_type_x) 
+      if (tree_type_x)
 	{
 	  tree_type = tree_type_x;
 	  left = convert (tree_type, left);
@@ -3241,7 +3230,7 @@ ffecom_expr_ (ffebld expr, tree dest_tree, ffebld dest,
     case FFEBLD_opMULTIPLY:
       left = ffecom_expr_ (ffebld_left (expr), NULL, NULL, NULL, FALSE, widenp);
       right = ffecom_expr_ (ffebld_right (expr), NULL, NULL, NULL, FALSE, widenp);
-      if (tree_type_x) 
+      if (tree_type_x)
 	{
 	  tree_type = tree_type_x;
 	  left = convert (tree_type, left);
@@ -3252,7 +3241,7 @@ ffecom_expr_ (ffebld expr, tree dest_tree, ffebld dest,
     case FFEBLD_opDIVIDE:
       left = ffecom_expr_ (ffebld_left (expr), NULL, NULL, NULL, FALSE, widenp);
       right = ffecom_expr_ (ffebld_right (expr), NULL, NULL, NULL, FALSE, widenp);
-      if (tree_type_x) 
+      if (tree_type_x)
 	{
 	  tree_type = tree_type_x;
 	  left = convert (tree_type, left);
@@ -3771,6 +3760,10 @@ ffecom_expr_ (ffebld expr, tree dest_tree, ffebld dest,
       item = ffecom_arg_ptr_to_expr (ffebld_left (expr), &list);
       return convert (tree_type, item);
 
+    case FFEBLD_opPERCENT_VAL:
+      item = ffecom_arg_expr (ffebld_left (expr), &list);
+      return convert (tree_type, item);
+
     case FFEBLD_opITEM:
     case FFEBLD_opSTAR:
     case FFEBLD_opBOUNDS:
@@ -3814,14 +3807,12 @@ ffecom_expr_ (ffebld expr, tree dest_tree, ffebld dest,
 #endif
 }
 
-#endif
 /* Returns the tree that does the intrinsic invocation.
 
    Note: this function applies only to intrinsics returning
    CHARACTER*1 or non-CHARACTER results, and to intrinsic
    subroutines.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_expr_intrinsic_ (ffebld expr, tree dest_tree,
 			ffebld dest, bool *dest_used)
@@ -5447,12 +5438,10 @@ ffecom_expr_intrinsic_ (ffebld expr, tree dest_tree,
      the bottom of this source file.  */
 }
 
-#endif
 /* For power (exponentiation) where right-hand operand is type INTEGER,
    generate in-line code to do it the fast way (which, if the operand
    is a constant, might just mean a series of multiplies).  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_expr_power_integer_ (ffebld expr)
 {
@@ -5631,7 +5620,7 @@ ffecom_expr_power_integer_ (ffebld expr)
     basetypeof_l_is_int
       = build_int_2 ((TREE_CODE (ltype) == INTEGER_TYPE), 0);
 
-    se = expand_start_stmt_expr ();
+    se = expand_start_stmt_expr (/*has_scope=*/1);
 
     ffecom_start_compstmt ();
 
@@ -5820,7 +5809,6 @@ ffecom_expr_power_integer_ (ffebld expr)
   return result;
 }
 
-#endif
 /* ffecom_expr_transform_ -- Transform symbols in expr
 
    ffebld expr;	 // FFE expression.
@@ -5828,14 +5816,13 @@ ffecom_expr_power_integer_ (ffebld expr)
 
    Recursive descent on expr while transforming any untransformed SYMTERs.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static void
 ffecom_expr_transform_ (ffebld expr)
 {
   tree t;
   ffesymbol s;
 
-tail_recurse:			/* :::::::::::::::::::: */
+ tail_recurse:
 
   if (expr == NULL)
     return;
@@ -5883,10 +5870,8 @@ tail_recurse:			/* :::::::::::::::::::: */
   return;
 }
 
-#endif
 /* Make a type based on info in live f2c.h file.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static void
 ffecom_f2c_make_type_ (tree *type, int tcode, const char *name)
 {
@@ -5955,8 +5940,6 @@ ffecom_f2c_make_type_ (tree *type, int tcode, const char *name)
 			*type));
 }
 
-#endif
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 /* Set the f2c list-directed-I/O code for whatever (integral) type has the
    given size.  */
 
@@ -5977,12 +5960,10 @@ ffecom_f2c_set_lio_code_ (ffeinfoBasictype bt, int size,
       }
 }
 
-#endif
 /* Finish up globals after doing all program units in file
 
    Need to handle only uninitialized COMMON areas.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static ffeglobal
 ffecom_finish_global_ (ffeglobal global)
 {
@@ -6025,10 +6006,8 @@ ffecom_finish_global_ (ffeglobal global)
   return global;
 }
 
-#endif
 /* Finish up any untransformed symbols.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static ffesymbol
 ffecom_finish_symbol_transform_ (ffesymbol s)
 {
@@ -6072,12 +6051,10 @@ ffecom_finish_symbol_transform_ (ffesymbol s)
   return s;
 }
 
-#endif
 /* Append underscore(s) to name before calling get_identifier.  "us"
    is nonzero if the name already contains an underscore and thus
    needs two underscores appended.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_get_appended_identifier_ (char us, const char *name)
 {
@@ -6099,11 +6076,9 @@ ffecom_get_appended_identifier_ (char us, const char *name)
   return id;
 }
 
-#endif
 /* Decide whether to append underscore to name before calling
    get_identifier.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_get_external_identifier_ (ffesymbol s)
 {
@@ -6129,7 +6104,6 @@ ffecom_get_external_identifier_ (ffesymbol s)
   return ffecom_get_appended_identifier_ (us, name);
 }
 
-#endif
 /* Decide whether to append underscore to internal name before calling
    get_identifier.
 
@@ -6145,7 +6119,6 @@ ffecom_get_external_identifier_ (ffesymbol s)
    If the name does contain an underscore, then transform it just
    like we transform an external identifier.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_get_identifier_ (const char *name)
 {
@@ -6159,7 +6132,6 @@ ffecom_get_identifier_ (const char *name)
 					  name);
 }
 
-#endif
 /* ffecom_gen_sfuncdef_ -- Generate definition of statement function
 
    tree t;
@@ -6170,7 +6142,6 @@ ffecom_get_identifier_ (const char *name)
    Call after setting up containing function and getting trees for all
    other symbols.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_gen_sfuncdef_ (ffesymbol s, ffeinfoBasictype bt, ffeinfoKindtype kt)
 {
@@ -6299,17 +6270,12 @@ ffecom_gen_sfuncdef_ (ffesymbol s, ffeinfoBasictype bt, ffeinfoKindtype kt)
   return func;
 }
 
-#endif
-
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static const char *
 ffecom_gfrt_args_ (ffecomGfrt ix)
 {
   return ffecom_gfrt_argstring_[ix];
 }
 
-#endif
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_gfrt_tree_ (ffecomGfrt ix)
 {
@@ -6321,34 +6287,17 @@ ffecom_gfrt_tree_ (ffecomGfrt ix)
 		   ffecom_gfrt_[ix]);
 }
 
-#endif
 /* Return initialize-to-zero expression for this VAR_DECL.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 /* A somewhat evil way to prevent the garbage collector
    from collecting 'tree' structures.  */
 #define NUM_TRACKED_CHUNK 63
-static struct tree_ggc_tracker 
+struct tree_ggc_tracker GTY(())
 {
   struct tree_ggc_tracker *next;
   tree trees[NUM_TRACKED_CHUNK];
-} *tracker_head = NULL;
-
-static void 
-mark_tracker_head (void *arg)
-{
-  struct tree_ggc_tracker *head;
-  int i;
-  
-  for (head = * (struct tree_ggc_tracker **) arg;
-       head != NULL;
-       head = head->next)
-  {
-    ggc_mark (head);
-    for (i = 0; i < NUM_TRACKED_CHUNK; i++)
-      ggc_mark_tree (head->trees[i]);
-  }
-}
+};
+static GTY(()) struct tree_ggc_tracker *tracker_head;
 
 void
 ffecom_save_tree_forever (tree t)
@@ -6365,7 +6314,7 @@ ffecom_save_tree_forever (tree t)
   {
     /* Need to allocate a new block.  */
     struct tree_ggc_tracker *old_head = tracker_head;
-    
+
     tracker_head = ggc_alloc (sizeof (*tracker_head));
     tracker_head->next = old_head;
     tracker_head->trees[0] = t;
@@ -6407,8 +6356,6 @@ ffecom_init_zero_ (tree decl)
   return init;
 }
 
-#endif
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_intrinsic_ichar_ (tree tree_type, ffebld arg,
 			 tree *maybe_tree)
@@ -6512,7 +6459,6 @@ ffecom_intrinsic_ichar_ (tree tree_type, ffebld arg,
     }
 }
 
-#endif
 /* ffecom_intrinsic_len_ -- Return length info for char arg (LEN())
 
    tree length_arg;
@@ -6523,7 +6469,6 @@ ffecom_intrinsic_ichar_ (tree tree_type, ffebld arg,
    subexpressions by constructing the appropriate tree for the
    length-of-character-text argument in a calling sequence.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_intrinsic_len_ (ffebld expr)
 {
@@ -6664,14 +6609,12 @@ ffecom_intrinsic_len_ (ffebld expr)
   return length;
 }
 
-#endif
 /* Handle CHARACTER assignments.
 
    Generates code to do the assignment.	 Used by ordinary assignment
    statement handler ffecom_let_stmt and by statement-function
    handler to generate code for a statement function.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static void
 ffecom_let_char_ (tree dest_tree, tree dest_length,
 		  ffetargetCharacterSize dest_size, ffebld source)
@@ -6873,7 +6816,6 @@ ffecom_let_char_ (tree dest_tree, tree dest_length,
   ffecom_concat_list_kill_ (catlist);
 }
 
-#endif
 /* ffecom_make_gfrt_ -- Make initial info for run-time routine
 
    ffecomGfrt ix;
@@ -6882,7 +6824,6 @@ ffecom_let_char_ (tree dest_tree, tree dest_length,
    Assumes gfrt_[ix] is NULL_TREE, and replaces it with the FUNCTION_DECL
    for the indicated run-time routine (ix).  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static void
 ffecom_make_gfrt_ (ffecomGfrt ix)
 {
@@ -6981,10 +6922,8 @@ ffecom_make_gfrt_ (ffecomGfrt ix)
   ffecom_gfrt_[ix] = t;
 }
 
-#endif
 /* Phase 1 pass over each member of a COMMON/EQUIVALENCE group.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static void
 ffecom_member_phase1_ (ffestorag mst UNUSED, ffestorag st)
 {
@@ -6994,12 +6933,10 @@ ffecom_member_phase1_ (ffestorag mst UNUSED, ffestorag st)
     ffecom_member_namelisted_ = TRUE;
 }
 
-#endif
 /* Phase 2 pass over each member of a COMMON/EQUIVALENCE group.  Declare
    the member so debugger will see it.  Otherwise nobody should be
    referencing the member.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static void
 ffecom_member_phase2_ (ffestorag mst, ffestorag st)
 {
@@ -7044,7 +6981,6 @@ ffecom_member_phase2_ (ffestorag mst, ffestorag st)
   finish_decl (t, NULL_TREE, FALSE);
 }
 
-#endif
 /* Prepare source expression for assignment into a destination perhaps known
    to be of a specific size.  */
 
@@ -7100,7 +7036,6 @@ ffecom_prepare_let_char_ (ffetargetCharacterSize dest_size, ffebld source)
    always known by both the caller and the callee, though the code allows
    for someday permitting CHAR*(*) stmtfunc dummies).  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static void
 ffecom_push_dummy_decls_ (ffebld dummy_list, bool stmtfunc)
 {
@@ -7170,13 +7105,11 @@ ffecom_push_dummy_decls_ (ffebld dummy_list, bool stmtfunc)
   ffecom_transform_only_dummies_ = FALSE;
 }
 
-#endif
 /* ffecom_start_progunit_ -- Beginning of program unit
 
    Does GNU back end stuff necessary to teach it about the start of its
    equivalent of a Fortran program unit.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static void
 ffecom_start_progunit_ ()
 {
@@ -7399,7 +7332,6 @@ ffecom_start_progunit_ ()
     ffesymbol_drive (ffecom_finish_symbol_transform_);
 }
 
-#endif
 /* ffecom_sym_transform_ -- Transform FFE sym into backend sym
 
    ffesymbol s;
@@ -7408,7 +7340,6 @@ ffecom_start_progunit_ ()
    The ffesymbol_hook info for s is updated with appropriate backend info
    on the symbol.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static ffesymbol
 ffecom_sym_transform_ (ffesymbol s)
 {
@@ -7472,9 +7403,7 @@ ffecom_sym_transform_ (ffesymbol s)
 	  t = build_decl (PARM_DECL,
 			  ffecom_get_identifier_ (ffesymbol_text (s)),
 			  ffecom_tree_ptr_to_subr_type);
-#if BUILT_FOR_270
 	  DECL_ARTIFICIAL (t) = 1;
-#endif
 	  addr = TRUE;
 	  break;
 
@@ -7941,9 +7870,7 @@ ffecom_sym_transform_ (ffesymbol s)
 	      }
 
 	    t = build_decl (PARM_DECL, t, type);
-#if BUILT_FOR_270
 	    DECL_ARTIFICIAL (t) = 1;
-#endif
 
 	    /* If this arg is present in every entry point's list of
 	       dummy args, then we're done.  */
@@ -8163,9 +8090,7 @@ ffecom_sym_transform_ (ffesymbol s)
 	  t = build_decl (PARM_DECL,
 			  ffecom_get_identifier_ (ffesymbol_text (s)),
 			  t);
-#if BUILT_FOR_270
 	  DECL_ARTIFICIAL (t) = 1;
-#endif
 	  addr = TRUE;
 	  break;
 
@@ -8233,9 +8158,7 @@ ffecom_sym_transform_ (ffesymbol s)
 	  t = build_decl (PARM_DECL,
 			  ffecom_get_identifier_ (ffesymbol_text (s)),
 			  ffecom_tree_ptr_to_subr_type);
-#if BUILT_FOR_270
 	  DECL_ARTIFICIAL (t) = 1;
-#endif
 	  addr = TRUE;
 	  break;
 
@@ -8428,7 +8351,6 @@ ffecom_sym_transform_ (ffesymbol s)
   return s;
 }
 
-#endif
 /* Transform into ASSIGNable symbol.
 
    Symbol has already been transformed, but for whatever reason, the
@@ -8437,7 +8359,6 @@ ffecom_sym_transform_ (ffesymbol s)
    another local symbol of type void * and stuff that in the assign_tree
    argument.  The F77/F90 standards allow this implementation.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static ffesymbol
 ffecom_sym_transform_assign_ (ffesymbol s)
 {
@@ -8511,7 +8432,6 @@ ffecom_sym_transform_assign_ (ffesymbol s)
   return s;
 }
 
-#endif
 /* Implement COMMON area in back end.
 
    Because COMMON-based variables can be referenced in the dimension
@@ -8540,7 +8460,6 @@ ffecom_sym_transform_assign_ (ffesymbol s)
    though we might do that as well just for debugging purposes (and
    stuff the rtl with the appropriate offset expression).  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static void
 ffecom_transform_common_ (ffesymbol s)
 {
@@ -8692,10 +8611,8 @@ ffecom_transform_common_ (ffesymbol s)
   ffecom_save_tree_forever (cbt);
 }
 
-#endif
 /* Make master area for local EQUIVALENCE.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static void
 ffecom_transform_equiv_ (ffestorag eqst)
 {
@@ -8825,10 +8742,8 @@ ffecom_transform_equiv_ (ffestorag eqst)
 		   eqst);
 }
 
-#endif
 /* Implement NAMELIST in back end.  See f2c/format.c for more info.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_transform_namelist_ (ffesymbol s)
 {
@@ -8908,14 +8823,11 @@ ffecom_transform_namelist_ (ffesymbol s)
   return nmlt;
 }
 
-#endif
-
 /* A subroutine of ffecom_tree_canonize_ref_.  The incoming tree is
    analyzed on the assumption it is calculating a pointer to be
    indirected through.  It must return the proper decl and offset,
    taking into account different units of measurements for offsets.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static void
 ffecom_tree_canonize_ptr_ (tree *decl, tree *offset,
 			   tree t)
@@ -8970,7 +8882,6 @@ ffecom_tree_canonize_ptr_ (tree *decl, tree *offset,
       break;
     }
 }
-#endif
 
 /* Given a tree that is possibly intended for use as an lvalue, return
    information representing a canonical view of that tree as a decl, an
@@ -9003,7 +8914,6 @@ ffecom_tree_canonize_ptr_ (tree *decl, tree *offset,
    whereas converting the array offsets to consistant offsets will
    reveal the overlap.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static void
 ffecom_tree_canonize_ref_ (tree *decl, tree *offset,
 			   tree *size, tree t)
@@ -9155,11 +9065,9 @@ ffecom_tree_canonize_ref_ (tree *decl, tree *offset,
       return;
     }
 }
-#endif
 
 /* Do divide operation appropriate to type of operands.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_tree_divide_ (tree tree_type, tree left, tree right,
 		     tree dest_tree, ffebld dest, bool *dest_used,
@@ -9247,10 +9155,8 @@ ffecom_tree_divide_ (tree tree_type, tree left, tree right,
     }
 }
 
-#endif
 /* Build type info for non-dummy variable.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_type_localvar_ (ffesymbol s, ffeinfoBasictype bt,
 		       ffeinfoKindtype kt)
@@ -9307,19 +9213,15 @@ ffecom_type_localvar_ (ffesymbol s, ffeinfoBasictype bt,
   return type;
 }
 
-#endif
 /* Build Namelist type.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
+static GTY(()) tree ffecom_type_namelist_var;
 static tree
 ffecom_type_namelist_ ()
 {
-  static tree type = NULL_TREE;
-
-  if (type == NULL_TREE)
+  if (ffecom_type_namelist_var == NULL_TREE)
     {
-      static tree namefield, varsfield, nvarsfield;
-      tree vardesctype;
+      tree namefield, varsfield, nvarsfield, vardesctype, type;
 
       vardesctype = ffecom_type_vardesc_ ();
 
@@ -9336,25 +9238,21 @@ ffecom_type_namelist_ ()
       TYPE_FIELDS (type) = namefield;
       layout_type (type);
 
-      ggc_add_tree_root (&type, 1);
+      ffecom_type_namelist_var = type;
     }
 
-  return type;
+  return ffecom_type_namelist_var;
 }
-
-#endif
 
 /* Build Vardesc type.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
+static GTY(()) tree ffecom_type_vardesc_var;
 static tree
 ffecom_type_vardesc_ ()
 {
-  static tree type = NULL_TREE;
-  static tree namefield, addrfield, dimsfield, typefield;
-
-  if (type == NULL_TREE)
+  if (ffecom_type_vardesc_var == NULL_TREE)
     {
+      tree namefield, addrfield, dimsfield, typefield, type;
       type = make_node (RECORD_TYPE);
 
       namefield = ffecom_decl_field (type, NULL_TREE, "name",
@@ -9369,15 +9267,12 @@ ffecom_type_vardesc_ ()
       TYPE_FIELDS (type) = namefield;
       layout_type (type);
 
-      ggc_add_tree_root (&type, 1);
+      ffecom_type_vardesc_var = type;
     }
 
-  return type;
+  return ffecom_type_vardesc_var;
 }
 
-#endif
-
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_vardesc_ (ffebld expr)
 {
@@ -9466,8 +9361,6 @@ ffecom_vardesc_ (ffebld expr)
   return ffesymbol_hook (s).vardesc_tree;
 }
 
-#endif
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_vardesc_array_ (ffesymbol s)
 {
@@ -9513,8 +9406,6 @@ ffecom_vardesc_array_ (ffesymbol s)
   return var;
 }
 
-#endif
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 static tree
 ffecom_vardesc_dims_ (ffesymbol s)
 {
@@ -9624,14 +9515,12 @@ ffecom_vardesc_dims_ (ffesymbol s)
   }
 }
 
-#endif
 /* Essentially does a "fold (build1 (code, type, node))" while checking
    for certain housekeeping things.
 
    NOTE: for building an ADDR_EXPR around a FUNCTION_DECL, use
    ffecom_1_fn instead.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_1 (enum tree_code code, tree type, tree node)
 {
@@ -9643,7 +9532,7 @@ ffecom_1 (enum tree_code code, tree type, tree node)
 
   if (code == ADDR_EXPR)
     {
-      if (!mark_addressable (node))
+      if (!ffe_mark_addressable (node))
 	assert ("can't mark_addressable this node!" == NULL);
     }
 
@@ -9685,11 +9574,12 @@ ffecom_1 (enum tree_code code, tree type, tree node)
 
   if (TREE_SIDE_EFFECTS (node))
     TREE_SIDE_EFFECTS (item) = 1;
-  if ((code == ADDR_EXPR) && staticp (node))
+  if (code == ADDR_EXPR && staticp (node))
     TREE_CONSTANT (item) = 1;
+  else if (code == INDIRECT_REF)
+    TREE_READONLY (item) = TYPE_READONLY (type);
   return fold (item);
 }
-#endif
 
 /* Like ffecom_1 (ADDR_EXPR, TREE_TYPE (node), node), except
    handles TREE_CODE (node) == FUNCTION_DECL.  In particular,
@@ -9697,7 +9587,6 @@ ffecom_1 (enum tree_code code, tree type, tree node)
    function does not mean the function needs to be separately
    compiled).  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_1_fn (tree node)
 {
@@ -9718,12 +9607,10 @@ ffecom_1_fn (tree node)
     TREE_CONSTANT (item) = 1;
   return fold (item);
 }
-#endif
 
 /* Essentially does a "fold (build (code, type, node1, node2))" while
    checking for certain housekeeping things.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_2 (enum tree_code code, tree type, tree node1,
 	  tree node2)
@@ -9892,7 +9779,6 @@ ffecom_2 (enum tree_code code, tree type, tree node1,
   return fold (item);
 }
 
-#endif
 /* ffecom_2pass_advise_entrypoint -- Advise that there's this entrypoint
 
    ffesymbol s;	 // the ENTRY point itself
@@ -9911,7 +9797,6 @@ ffecom_2 (enum tree_code code, tree type, tree node1,
    03-Jan-92  JCB  2.0
       Return FALSE if the return type conflicts with previous entrypoints.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 bool
 ffecom_2pass_advise_entrypoint (ffesymbol entry)
 {
@@ -10049,7 +9934,6 @@ ffecom_2pass_advise_entrypoint (ffesymbol entry)
   return TRUE;
 }
 
-#endif
 /* ffecom_2pass_do_entrypoint -- Do compilation of entrypoint
 
    ffesymbol s;	 // the ENTRY point itself
@@ -10059,7 +9943,6 @@ ffecom_2pass_advise_entrypoint (ffesymbol entry)
    happen.  Must be called for each entrypoint after
    ffecom_finish_progunit is called.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 void
 ffecom_2pass_do_entrypoint (ffesymbol entry)
 {
@@ -10080,13 +9963,10 @@ ffecom_2pass_do_entrypoint (ffesymbol entry)
   ffecom_do_entry_ (entry, ent_num);
 }
 
-#endif
-
 /* Essentially does a "fold (build (code, type, node1, node2))" while
    checking for certain housekeeping things.  Always sets
    TREE_SIDE_EFFECTS.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_2s (enum tree_code code, tree type, tree node1,
 	   tree node2)
@@ -10103,11 +9983,9 @@ ffecom_2s (enum tree_code code, tree type, tree node1,
   return fold (item);
 }
 
-#endif
 /* Essentially does a "fold (build (code, type, node1, node2, node3))" while
    checking for certain housekeeping things.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_3 (enum tree_code code, tree type, tree node1,
 	  tree node2, tree node3)
@@ -10127,12 +10005,10 @@ ffecom_3 (enum tree_code code, tree type, tree node1,
   return fold (item);
 }
 
-#endif
 /* Essentially does a "fold (build (code, type, node1, node2, node3))" while
    checking for certain housekeeping things.  Always sets
    TREE_SIDE_EFFECTS.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_3s (enum tree_code code, tree type, tree node1,
 	   tree node2, tree node3)
@@ -10149,8 +10025,6 @@ ffecom_3s (enum tree_code code, tree type, tree node1,
   TREE_SIDE_EFFECTS (item) = 1;
   return fold (item);
 }
-
-#endif
 
 /* ffecom_arg_expr -- Transform argument expr into gcc tree
 
@@ -10169,7 +10043,6 @@ ffecom_3s (enum tree_code code, tree type, tree node1,
       we allow CHARACTER*(*) dummies to statement functions, we'll need
       it).  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_arg_expr (ffebld expr, tree *length)
 {
@@ -10186,7 +10059,6 @@ ffecom_arg_expr (ffebld expr, tree *length)
   return ffecom_arg_ptr_to_expr (expr, &ign);
 }
 
-#endif
 /* Transform expression into constant argument-pointer-to-expression tree.
 
    If the expression can be transformed into a argument-pointer-to-expression
@@ -10255,7 +10127,6 @@ ffecom_arg_ptr_to_const_expr (ffebld expr, tree *length)
    length argument.  This might even be seen as a feature, if a null
    byte can always be appended.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_arg_ptr_to_expr (ffebld expr, tree *length)
 {
@@ -10498,7 +10369,6 @@ ffecom_arg_ptr_to_expr (ffebld expr, tree *length)
   return item;
 }
 
-#endif
 /* Generate call to run-time function.
 
    The first arg is the GNU Fortran Run-Time function index, the second
@@ -10506,7 +10376,6 @@ ffecom_arg_ptr_to_expr (ffebld expr, tree *length)
    (WITHOUT TREE_SIDE_EFFECTS set!) that makes the call and returns the
    result (which may be void).	*/
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_call_gfrt (ffecomGfrt ix, tree args, tree hook)
 {
@@ -10516,11 +10385,9 @@ ffecom_call_gfrt (ffecomGfrt ix, tree args, tree hook)
 		       NULL_TREE, args, NULL_TREE, NULL,
 		       NULL, NULL_TREE, TRUE, hook);
 }
-#endif
 
 /* Transform constant-union to tree.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_constantunion (ffebldConstantUnion *cu, ffeinfoBasictype bt,
 		      ffeinfoKindtype kt, tree tree_type)
@@ -10788,8 +10655,6 @@ ffecom_constantunion (ffebldConstantUnion *cu, ffeinfoBasictype bt,
   return item;
 }
 
-#endif
-
 /* Transform expression into constant tree.
 
    If the expression can be transformed into a tree that is constant,
@@ -10829,7 +10694,6 @@ ffecom_const_expr (ffebld expr)
 
 /* Handy way to make a field in a struct/union.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_decl_field (tree context, tree prevfield,
 		   const char *name, tree type)
@@ -10846,35 +10710,25 @@ ffecom_decl_field (tree context, tree prevfield,
   return field;
 }
 
-#endif
-
 void
 ffecom_close_include (FILE *f)
 {
-#if FFECOM_GCC_INCLUDE
   ffecom_close_include_ (f);
-#endif
 }
 
 int
 ffecom_decode_include_option (char *spec)
 {
-#if FFECOM_GCC_INCLUDE
   return ffecom_decode_include_option_ (spec);
-#else
-  return 1;
-#endif
 }
 
 /* End a compound statement (block).  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_end_compstmt (void)
 {
   return bison_rule_compstmt_ ();
 }
-#endif	/* FFECOM_targetCURRENT == FFECOM_targetGCC */
 
 /* ffecom_end_transition -- Perform end transition on all symbols
 
@@ -10885,28 +10739,20 @@ ffecom_end_compstmt (void)
 void
 ffecom_end_transition ()
 {
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
   ffebld item;
-#endif
 
   if (ffe_is_ffedebug ())
     fprintf (dmpout, "; end_stmt_transition\n");
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
   ffecom_list_blockdata_ = NULL;
   ffecom_list_common_ = NULL;
-#endif
 
   ffesymbol_drive (ffecom_sym_end_transition);
   if (ffe_is_ffedebug ())
     {
       ffestorag_report ();
-#if FFECOM_targetCURRENT == FFECOM_targetFFE
-      ffesymbol_report_all ();
-#endif
     }
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
   ffecom_start_progunit_ ();
 
   for (item = ffecom_list_blockdata_;
@@ -10957,7 +10803,6 @@ ffecom_end_transition ()
     ffecom_transform_common_ (ffebld_symter (ffebld_head (item)));
 
   ffecom_list_common_ = NULL;
-#endif
 }
 
 /* ffecom_exec_transition -- Perform exec transition on all symbols
@@ -10983,9 +10828,6 @@ ffecom_exec_transition ()
   if (ffe_is_ffedebug ())
     {
       ffestorag_report ();
-#if FFECOM_targetCURRENT == FFECOM_targetFFE
-      ffesymbol_report_all ();
-#endif
     }
 
   if (inhibited)
@@ -10997,7 +10839,6 @@ ffecom_exec_transition ()
    Convert dest and source using ffecom_expr, then join them
    with an ASSIGN op and pass the whole thing to expand_expr_stmt.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 void
 ffecom_expand_let_stmt (ffebld dest, ffebld source)
 {
@@ -11107,7 +10948,6 @@ ffecom_expand_let_stmt (ffebld dest, ffebld source)
 		    source);
 }
 
-#endif
 /* ffecom_expr -- Transform expr into gcc tree
 
    tree t;
@@ -11117,41 +10957,34 @@ ffecom_expand_let_stmt (ffebld dest, ffebld source)
    Recursive descent on expr while making corresponding tree nodes and
    attaching type info and such.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_expr (ffebld expr)
 {
   return ffecom_expr_ (expr, NULL_TREE, NULL, NULL, FALSE, FALSE);
 }
 
-#endif
 /* Like ffecom_expr, but return tree usable for assigned GOTO or FORMAT.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_expr_assign (ffebld expr)
 {
   return ffecom_expr_ (expr, NULL_TREE, NULL, NULL, TRUE, FALSE);
 }
 
-#endif
 /* Like ffecom_expr_rw, but return tree usable for ASSIGN.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_expr_assign_w (ffebld expr)
 {
   return ffecom_expr_ (expr, NULL_TREE, NULL, NULL, TRUE, FALSE);
 }
 
-#endif
 /* Transform expr for use as into read/write tree and stabilize the
    reference.  Not for use on CHARACTER expressions.
 
    Recursive descent on expr while making corresponding tree nodes and
    attaching type info and such.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_expr_rw (tree type, ffebld expr)
 {
@@ -11162,14 +10995,12 @@ ffecom_expr_rw (tree type, ffebld expr)
   return stabilize_reference (ffecom_expr (expr));
 }
 
-#endif
 /* Transform expr for use as into write tree and stabilize the
    reference.  Not for use on CHARACTER expressions.
 
    Recursive descent on expr while making corresponding tree nodes and
    attaching type info and such.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_expr_w (tree type, ffebld expr)
 {
@@ -11180,10 +11011,8 @@ ffecom_expr_w (tree type, ffebld expr)
   return stabilize_reference (ffecom_expr (expr));
 }
 
-#endif
 /* Do global stuff.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 void
 ffecom_finish_compile ()
 {
@@ -11193,10 +11022,8 @@ ffecom_finish_compile ()
   ffeglobal_drive (ffecom_finish_global_);
 }
 
-#endif
 /* Public entry point for front end to access finish_decl.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 void
 ffecom_finish_decl (tree decl, tree init, bool is_top_level)
 {
@@ -11204,10 +11031,8 @@ ffecom_finish_decl (tree decl, tree init, bool is_top_level)
   finish_decl (decl, init, FALSE);
 }
 
-#endif
 /* Finish a program unit.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 void
 ffecom_finish_progunit ()
 {
@@ -11219,11 +11044,8 @@ ffecom_finish_progunit ()
   finish_function (0);
 }
 
-#endif
-
 /* Wrapper for get_identifier.  pattern is sprintf-like.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_get_invented_identifier (const char *pattern, ...)
 {
@@ -11356,16 +11178,16 @@ ffecom_init_0 ()
 
   if (ffe_is_do_internal_checks ())
     {
-      static char names[][12]
+      static const char names[][12]
 	=
       {"bar", "bletch", "foo", "foobar"};
-      char *name;
+      const char *name;
       unsigned long ul;
       double fl;
 
       name = bsearch ("foo", &names[0], ARRAY_SIZE (names), sizeof (names[0]),
 		      (int (*)(const void *, const void *)) strcmp);
-      if (name != (char *) &names[2])
+      if (name != &names[0][2])
 	{
 	  assert ("bsearch doesn't work, #define FFEPROJ_BSEARCH 0 in proj.h"
 		  == NULL);
@@ -11388,10 +11210,6 @@ ffecom_init_0 ()
 	  abort ();
 	}
     }
-
-#if FFECOM_GCC_INCLUDE
-  ffecom_initialize_char_syntax_ ();
-#endif
 
   ffecom_outer_function_decl_ = NULL_TREE;
   current_function_decl = NULL_TREE;
@@ -11913,27 +11731,25 @@ ffecom_init_0 ()
     = build_function_type (void_type_node, NULL_TREE);
 
   builtin_function ("__builtin_sqrtf", float_ftype_float,
-		    BUILT_IN_FSQRT, BUILT_IN_NORMAL, "sqrtf");
-  builtin_function ("__builtin_fsqrt", double_ftype_double,
-		    BUILT_IN_FSQRT, BUILT_IN_NORMAL, "sqrt");
+		    BUILT_IN_SQRTF, BUILT_IN_NORMAL, "sqrtf");
+  builtin_function ("__builtin_sqrt", double_ftype_double,
+		    BUILT_IN_SQRT, BUILT_IN_NORMAL, "sqrt");
   builtin_function ("__builtin_sqrtl", ldouble_ftype_ldouble,
-		    BUILT_IN_FSQRT, BUILT_IN_NORMAL, "sqrtl");
+		    BUILT_IN_SQRTL, BUILT_IN_NORMAL, "sqrtl");
   builtin_function ("__builtin_sinf", float_ftype_float,
-		    BUILT_IN_SIN, BUILT_IN_NORMAL, "sinf");
+		    BUILT_IN_SINF, BUILT_IN_NORMAL, "sinf");
   builtin_function ("__builtin_sin", double_ftype_double,
 		    BUILT_IN_SIN, BUILT_IN_NORMAL, "sin");
   builtin_function ("__builtin_sinl", ldouble_ftype_ldouble,
-		    BUILT_IN_SIN, BUILT_IN_NORMAL, "sinl");
+		    BUILT_IN_SINL, BUILT_IN_NORMAL, "sinl");
   builtin_function ("__builtin_cosf", float_ftype_float,
-		    BUILT_IN_COS, BUILT_IN_NORMAL, "cosf");
+		    BUILT_IN_COSF, BUILT_IN_NORMAL, "cosf");
   builtin_function ("__builtin_cos", double_ftype_double,
 		    BUILT_IN_COS, BUILT_IN_NORMAL, "cos");
   builtin_function ("__builtin_cosl", ldouble_ftype_ldouble,
-		    BUILT_IN_COS, BUILT_IN_NORMAL, "cosl");
+		    BUILT_IN_COSL, BUILT_IN_NORMAL, "cosl");
 
-#if BUILT_FOR_270
   pedantic_lvalues = FALSE;
-#endif
 
   ffecom_f2c_make_type_ (&ffecom_f2c_integer_type_node,
 			 FFECOM_f2cINTEGER,
@@ -11995,11 +11811,7 @@ ffecom_init_0 ()
   {
     REAL_VALUE_TYPE point_5;
 
-#ifdef REAL_ARITHMETIC
     REAL_ARITHMETIC (point_5, RDIV_EXPR, dconst1, dconst2);
-#else
-    point_5 = .5;
-#endif
     ffecom_float_half_ = build_real (float_type_node, point_5);
     ffecom_double_half_ = build_real (double_type_node, point_5);
   }
@@ -12023,9 +11835,8 @@ ffecom_init_0 ()
 	       (int) FLOAT_TYPE_SIZE);
       warning ("and pointers are %d bits wide, but g77 doesn't yet work",
 	  (int) TREE_INT_CST_LOW (TYPE_SIZE (TREE_TYPE (null_pointer_node))));
-      warning ("properly unless they all are 32 bits wide.");
-      warning ("Please keep this in mind before you report bugs.  g77 should");
-      warning ("support non-32-bit machines better as of version 0.6.");
+      warning ("properly unless they all are 32 bits wide");
+      warning ("Please keep this in mind before you report bugs.");
     }
 #endif
 
@@ -12049,12 +11860,10 @@ ffecom_init_0 ()
 #endif
 }
 
-#endif
 /* ffecom_init_2 -- Initialize
 
    ffecom_init_2();  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 void
 ffecom_init_2 ()
 {
@@ -12070,7 +11879,6 @@ ffecom_init_2 ()
   ffecom_multi_retval_ = NULL_TREE;
 }
 
-#endif
 /* ffecom_list_expr -- Transform list of exprs into gcc tree
 
    tree t;
@@ -12079,7 +11887,6 @@ ffecom_init_2 ()
 
    List of actual args is transformed into corresponding gcc backend list.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_list_expr (ffebld expr)
 {
@@ -12111,7 +11918,6 @@ ffecom_list_expr (ffebld expr)
   return list;
 }
 
-#endif
 /* ffecom_list_ptr_to_expr -- Transform list of exprs into gcc tree
 
    tree t;
@@ -12121,7 +11927,6 @@ ffecom_list_expr (ffebld expr)
    List of actual args is transformed into corresponding gcc backend list for
    use in calling an external procedure (vs. a statement function).  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_list_ptr_to_expr (ffebld expr)
 {
@@ -12153,10 +11958,8 @@ ffecom_list_ptr_to_expr (ffebld expr)
   return list;
 }
 
-#endif
 /* Obtain gcc's LABEL_DECL tree for label.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_lookup_label (ffelab label)
 {
@@ -12216,13 +12019,11 @@ ffecom_lookup_label (ffelab label)
   return glabel;
 }
 
-#endif
 /* Stabilizes the arguments.  Don't use this if the lhs and rhs come from
    a single source specification (as in the fourth argument of MVBITS).
    If the type is NULL_TREE, the type of lhs is used to make the type of
    the MODIFY_EXPR.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_modify (tree newtype, tree lhs,
 	       tree rhs)
@@ -12239,16 +12040,12 @@ ffecom_modify (tree newtype, tree lhs,
   return ffecom_2s (MODIFY_EXPR, newtype, lhs, rhs);
 }
 
-#endif
-
 /* Register source file name.  */
 
 void
 ffecom_file (const char *name)
 {
-#if FFECOM_GCC_INCLUDE
   ffecom_file_ (name);
-#endif
 }
 
 /* ffecom_notify_init_storage -- An aggregate storage is now fully init'ed
@@ -12283,10 +12080,6 @@ void
 ffecom_notify_init_storage (ffestorag st)
 {
   ffebld init;			/* The initialization expression. */
-#if 0 && FFECOM_targetCURRENT == FFECOM_targetGCC
-  ffetargetOffset size;		/* The size of the entity. */
-  ffetargetAlign pad;		/* Its initial padding. */
-#endif
 
   if (ffestorag_init (st) == NULL)
     {
@@ -12294,50 +12087,8 @@ ffecom_notify_init_storage (ffestorag st)
       assert (init != NULL);
       ffestorag_set_accretion (st, NULL);
       ffestorag_set_accretes (st, 0);
-
-#if 0 && FFECOM_targetCURRENT == FFECOM_targetGCC
-      /* For GNU backend, just turn ACCTER into ARRTER and proceed. */
-      size = ffebld_accter_size (init);
-      pad = ffebld_accter_pad (init);
-      ffebit_kill (ffebld_accter_bits (init));
-      ffebld_set_op (init, FFEBLD_opARRTER);
-      ffebld_set_arrter (init, ffebld_accter (init));
-      ffebld_arrter_set_size (init, size);
-      ffebld_arrter_set_pad (init, size);
-#endif
-
-#if FFECOM_TWOPASS
       ffestorag_set_init (st, init);
-#endif
     }
-#if FFECOM_ONEPASS
-  else
-    init = ffestorag_init (st);
-#endif
-
-#if FFECOM_ONEPASS		/* Process the inits, wipe 'em out. */
-  ffestorag_set_init (st, ffebld_new_any ());
-
-  if (ffebld_op (init) == FFEBLD_opANY)
-    return;			/* Oh, we already did this! */
-
-#if FFECOM_targetCURRENT == FFECOM_targetFFE
-  {
-    ffesymbol s;
-
-    if (ffestorag_symbol (st) != NULL)
-      s = ffestorag_symbol (st);
-    else
-      s = ffestorag_typesymbol (st);
-
-    fprintf (dmpout, "= initialize_storage \"%s\" ",
-	     (s != NULL) ? ffesymbol_text (s) : "(unnamed)");
-    ffebld_dump (init);
-    fputc ('\n', dmpout);
-  }
-#endif
-
-#endif /* if FFECOM_ONEPASS */
 }
 
 /* ffecom_notify_init_symbol -- A symbol is now fully init'ed
@@ -12372,10 +12123,6 @@ void
 ffecom_notify_init_symbol (ffesymbol s)
 {
   ffebld init;			/* The initialization expression. */
-#if 0 && FFECOM_targetCURRENT == FFECOM_targetGCC
-  ffetargetOffset size;		/* The size of the entity. */
-  ffetargetAlign pad;		/* Its initial padding. */
-#endif
 
   if (ffesymbol_storage (s) == NULL)
     return;			/* Do nothing until COMMON/EQUIVALENCE
@@ -12386,40 +12133,8 @@ ffecom_notify_init_symbol (ffesymbol s)
     {
       ffesymbol_set_accretion (s, NULL);
       ffesymbol_set_accretes (s, 0);
-
-#if 0 && FFECOM_targetCURRENT == FFECOM_targetGCC
-      /* For GNU backend, just turn ACCTER into ARRTER and proceed. */
-      size = ffebld_accter_size (init);
-      pad = ffebld_accter_pad (init);
-      ffebit_kill (ffebld_accter_bits (init));
-      ffebld_set_op (init, FFEBLD_opARRTER);
-      ffebld_set_arrter (init, ffebld_accter (init));
-      ffebld_arrter_set_size (init, size);
-      ffebld_arrter_set_pad (init, size);
-#endif
-
-#if FFECOM_TWOPASS
       ffesymbol_set_init (s, init);
-#endif
     }
-#if FFECOM_ONEPASS
-  else
-    init = ffesymbol_init (s);
-#endif
-
-#if FFECOM_ONEPASS
-  ffesymbol_set_init (s, ffebld_new_any ());
-
-  if (ffebld_op (init) == FFEBLD_opANY)
-    return;			/* Oh, we already did this! */
-
-#if FFECOM_targetCURRENT == FFECOM_targetFFE
-  fprintf (dmpout, "= initialize_symbol \"%s\" ", ffesymbol_text (s));
-  ffebld_dump (init);
-  fputc ('\n', dmpout);
-#endif
-
-#endif /* if FFECOM_ONEPASS */
 }
 
 /* ffecom_notify_primary_entry -- Learn which is the primary entry point
@@ -12451,7 +12166,6 @@ ffecom_notify_primary_entry (ffesymbol s)
 	fprintf (stderr, "  %s:\n", ffesymbol_text (s));
     }
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
   if (ffecom_primary_entry_kind_ == FFEINFO_kindSUBROUTINE)
     {
       ffebld list;
@@ -12469,17 +12183,12 @@ ffecom_notify_primary_entry (ffesymbol s)
 	    }
 	}
     }
-#endif
 }
 
 FILE *
 ffecom_open_include (char *name, ffewhereLine l, ffewhereColumn c)
 {
-#if FFECOM_GCC_INCLUDE
   return ffecom_open_include_ (name, l, c);
-#else
-  return fopen (name, "r");
-#endif
 }
 
 /* ffecom_ptr_to_expr -- Transform expr into gcc tree with & in front
@@ -12490,7 +12199,6 @@ ffecom_open_include (char *name, ffewhereLine l, ffewhereColumn c)
 
    Like ffecom_expr, but sticks address-of in front of most things.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_ptr_to_expr (ffebld expr)
 {
@@ -12593,7 +12301,6 @@ ffecom_ptr_to_expr (ffebld expr)
   return error_mark_node;
 }
 
-#endif
 /* Obtain a temp var with given data type.
 
    size is FFETARGET_charactersizeNONE for a non-CHARACTER type
@@ -12601,7 +12308,6 @@ ffecom_ptr_to_expr (ffebld expr)
 
    elements is -1 for a scalar or > 0 for an array of type.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_make_tempvar (const char *commentary, tree type,
 		     ffetargetCharacterSize size, int elements)
@@ -12636,7 +12342,6 @@ ffecom_make_tempvar (const char *commentary, tree type,
 
   return t;
 }
-#endif
 
 /* Prepare argument pointer to expression.
 
@@ -13009,7 +12714,6 @@ ffecom_ptr_to_const_expr (ffebld expr)
    meaning no return value or the caller expects it to be returned somewhere
    else (which is handled by other parts of this module).  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_return_expr (ffebld expr)
 {
@@ -13080,30 +12784,24 @@ ffecom_return_expr (ffebld expr)
   return rtn;
 }
 
-#endif
 /* Do save_expr only if tree is not error_mark_node.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_save_tree (tree t)
 {
   return save_expr (t);
 }
-#endif
 
 /* Start a compound statement (block).  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 void
 ffecom_start_compstmt (void)
 {
   bison_rule_pushlevel_ ();
 }
-#endif	/* FFECOM_targetCURRENT == FFECOM_targetGCC */
 
 /* Public entry point for front end to access start_decl.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_start_decl (tree decl, bool is_initialized)
 {
@@ -13111,7 +12809,6 @@ ffecom_start_decl (tree decl, bool is_initialized)
   return start_decl (decl, FALSE);
 }
 
-#endif
 /* ffecom_sym_commit -- Symbol's state being committed to reality
 
    ffesymbol s;
@@ -13120,14 +12817,12 @@ ffecom_start_decl (tree decl, bool is_initialized)
    Does whatever the backend needs when a symbol is committed after having
    been backtrackable for a period of time.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 void
 ffecom_sym_commit (ffesymbol s UNUSED)
 {
   assert (!ffesymbol_retractable ());
 }
 
-#endif
 /* ffecom_sym_end_transition -- Perform end transition on all symbols
 
    ffecom_sym_end_transition();
@@ -13147,7 +12842,6 @@ ffecom_sym_end_transition (ffesymbol s)
 
   s = ffest_sym_end_transition (s);
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
   if ((ffesymbol_kind (s) == FFEINFO_kindBLOCKDATA)
       && (ffesymbol_where (s) == FFEINFO_whereGLOBAL))
     {
@@ -13157,7 +12851,6 @@ ffecom_sym_end_transition (ffesymbol s)
 					      FFEINTRIN_impNONE),
 			   ffecom_list_blockdata_);
     }
-#endif
 
   /* This is where we finally notice that a symbol has partial initialization
      and finalize it. */
@@ -13175,7 +12868,6 @@ ffecom_sym_end_transition (ffesymbol s)
       ffecom_notify_init_storage (st);
     }
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
   if ((ffesymbol_kind (s) == FFEINFO_kindCOMMON)
       && (ffesymbol_where (s) == FFEINFO_whereLOCAL)
       && (ffesymbol_storage (s) != NULL))
@@ -13186,7 +12878,6 @@ ffecom_sym_end_transition (ffesymbol s)
 					      FFEINTRIN_impNONE),
 			   ffecom_list_common_);
     }
-#endif
 
   return s;
 }
@@ -13264,7 +12955,6 @@ ffecom_sym_learned (ffesymbol s)
    Does whatever the backend needs when a symbol is retracted after having
    been backtrackable for a period of time.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 void
 ffecom_sym_retract (ffesymbol s UNUSED)
 {
@@ -13296,10 +12986,8 @@ ffecom_sym_retract (ffesymbol s UNUSED)
 #endif
 }
 
-#endif
 /* Create temporary gcc label.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_temp_label ()
 {
@@ -13316,34 +13004,28 @@ ffecom_temp_label ()
   return glabel;
 }
 
-#endif
 /* Return an expression that is usable as an arg in a conditional context
    (IF, DO WHILE, .NOT., and so on).
 
    Use the one provided for the back end as of >2.6.0.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_truth_value (tree expr)
 {
-  return truthvalue_conversion (expr);
+  return ffe_truthvalue_conversion (expr);
 }
 
-#endif
 /* Return the inversion of a truth value (the inversion of what
    ffecom_truth_value builds).
 
    Apparently invert_truthvalue, which is properly in the back end, is
    enough for now, so just use it.  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_truth_value_invert (tree expr)
 {
   return invert_truthvalue (ffecom_truth_value (expr));
 }
-
-#endif
 
 /* Return the tree that is the type of the expression, as would be
    returned in TREE_TYPE(ffecom_expr(expr)), without otherwise
@@ -13420,7 +13102,6 @@ ffecom_type_expr (ffebld expr)
    run time with the entrypoint number (0 for SUBROUTINE/FUNCTION, 1 for
    first ENTRY statement, and so on).  */
 
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 tree
 ffecom_which_entrypoint_decl ()
 {
@@ -13428,8 +13109,6 @@ ffecom_which_entrypoint_decl ()
 
   return ffecom_which_entrypoint_decl_;
 }
-
-#endif
 
 /* The following sections consists of private and public functions
    that have the same names and perform roughly the same functions
@@ -13445,8 +13124,6 @@ ffecom_which_entrypoint_decl ()
 
    Functions named after rule "foo:" in c-parse.y are named
    "bison_rule_foo_" so they are easy to find.  */
-
-#if FFECOM_targetCURRENT == FFECOM_targetGCC
 
 static void
 bison_rule_pushlevel_ ()
@@ -13668,13 +13345,11 @@ duplicate_decls (tree newdecl, tree olddecl)
       if (DECL_SECTION_NAME (newdecl) == NULL_TREE)
 	DECL_SECTION_NAME (newdecl) = DECL_SECTION_NAME (olddecl);
 
-#if BUILT_FOR_270
       if (TREE_CODE (newdecl) == FUNCTION_DECL)
 	{
 	  DECL_STATIC_CONSTRUCTOR(newdecl) |= DECL_STATIC_CONSTRUCTOR(olddecl);
 	  DECL_STATIC_DESTRUCTOR (newdecl) |= DECL_STATIC_DESTRUCTOR (olddecl);
 	}
-#endif
     }
   /* If cannot merge, then use the new type and qualifiers,
      and don't preserve the old rtl.  */
@@ -13967,7 +13642,7 @@ finish_function (int nested)
    nested function and all).  */
 
 static const char *
-lang_printable_name (tree decl, int v)
+ffe_printable_name (tree decl, int v)
 {
   /* Just to keep GCC quiet about the unused variable.
      In theory, differing values of V should produce different
@@ -13984,10 +13659,9 @@ lang_printable_name (tree decl, int v)
 /* g77's function to print out name of current function that caused
    an error.  */
 
-#if BUILT_FOR_270
 static void
-lang_print_error_function (diagnostic_context *context __attribute__((unused)),
-                           const char *file)
+ffe_print_error_function (diagnostic_context *context __attribute__((unused)),
+			  const char *file)
 {
   static ffeglobal last_g = NULL;
   static ffesymbol last_s = NULL;
@@ -14008,33 +13682,12 @@ lang_print_error_function (diagnostic_context *context __attribute__((unused)),
       if (ffecom_nested_entry_ == NULL)
 	{
 	  s = ffecom_primary_entry_;
-	  switch (ffesymbol_kind (s))
-	    {
-	    case FFEINFO_kindFUNCTION:
-	      kind = "function";
-	      break;
-
-	    case FFEINFO_kindSUBROUTINE:
-	      kind = "subroutine";
-	      break;
-
-	    case FFEINFO_kindPROGRAM:
-	      kind = "program";
-	      break;
-
-	    case FFEINFO_kindBLOCKDATA:
-	      kind = "block-data";
-	      break;
-
-	    default:
-	      kind = ffeinfo_kind_message (ffesymbol_kind (s));
-	      break;
-	    }
+	  kind = _(ffeinfo_kind_message (ffesymbol_kind (s)));
 	}
       else
 	{
 	  s = ffecom_nested_entry_;
-	  kind = "statement function";
+	  kind = _("In statement function");
 	}
     }
 
@@ -14044,19 +13697,18 @@ lang_print_error_function (diagnostic_context *context __attribute__((unused)),
 	fprintf (stderr, "%s: ", file);
 
       if (s == NULL)
-	fprintf (stderr, "Outside of any program unit:\n");
+	fprintf (stderr, _("Outside of any program unit:\n"));
       else
 	{
 	  const char *name = ffesymbol_text (s);
 
-	  fprintf (stderr, "In %s `%s':\n", kind, name);
+	  fprintf (stderr, "%s `%s':\n", kind, name);
 	}
 
       last_g = g;
       last_s = s;
     }
 }
-#endif
 
 /* Similar to `lookup_name' but look only at current binding level.  */
 
@@ -14078,13 +13730,13 @@ lookup_name_current_level (tree name)
   return t;
 }
 
-/* Create a new `struct binding_level'.  */
+/* Create a new `struct f_binding_level'.  */
 
-static struct binding_level *
+static struct f_binding_level *
 make_binding_level ()
 {
   /* NOSTRICT */
-  return (struct binding_level *) xmalloc (sizeof (struct binding_level));
+  return ggc_alloc (sizeof (struct f_binding_level));
 }
 
 /* Save and restore the variables in this file and elsewhere
@@ -14096,7 +13748,7 @@ struct f_function
   struct f_function *next;
   tree named_labels;
   tree shadowed_labels;
-  struct binding_level *binding_level;
+  struct f_binding_level *binding_level;
 };
 
 struct f_function *f_function_chain;
@@ -14184,7 +13836,7 @@ pushdecl_top_level (x)
      tree x;
 {
   register tree t;
-  register struct binding_level *b = current_binding_level;
+  register struct f_binding_level *b = current_binding_level;
   register tree f = current_function_decl;
 
   current_binding_level = global_binding_level;
@@ -14288,7 +13940,7 @@ start_decl (tree decl, bool is_top_level)
 
    Returns 1 on success.  If the DECLARATOR is not suitable for a function
    (it defines a datum instead), we return 0, which tells
-   yyparse to report a parse error.
+   ffe_parse_file to report a parse error.
 
    NESTED is nonzero for a function nested within another function.  */
 
@@ -14405,15 +14057,6 @@ convert (type, expr)
   return error_mark_node;
 }
 
-/* integrate_decl_tree calls this function, but since we don't use the
-   DECL_LANG_SPECIFIC field, this is a no-op.  */
-
-void
-copy_lang_decl (node)
-     tree node UNUSED;
-{
-}
-
 /* Return the list of declarations of the current level.
    Note that this list is in reverse order unless/until
    you nreverse it; and when you do nreverse it, you must
@@ -14433,137 +14076,12 @@ global_bindings_p ()
   return current_binding_level == global_binding_level;
 }
 
-/* Print an error message for invalid use of an incomplete type.
-   VALUE is the expression that was used (or 0 if that isn't known)
-   and TYPE is the type that was invalid.  */
-
-void
-incomplete_type_error (value, type)
-     tree value UNUSED;
-     tree type;
+static void
+ffecom_init_decl_processing ()
 {
-  if (TREE_CODE (type) == ERROR_MARK)
-    return;
-
-  assert ("incomplete type?!?" == NULL);
-}
-
-/* Mark ARG for GC.  */
-static void 
-mark_binding_level (void *arg)
-{
-  struct binding_level *level = *(struct binding_level **) arg;
-
-  while (level)
-    {
-      ggc_mark_tree (level->names);
-      ggc_mark_tree (level->blocks);
-      ggc_mark_tree (level->this_block);
-      level = level->level_chain;
-    }
-}
-
-void
-init_decl_processing ()
-{
-  static tree *const tree_roots[] = {
-    &current_function_decl,
-    &string_type_node,
-    &ffecom_tree_fun_type_void,
-    &ffecom_integer_zero_node,
-    &ffecom_integer_one_node,
-    &ffecom_tree_subr_type,
-    &ffecom_tree_ptr_to_subr_type,
-    &ffecom_tree_blockdata_type,
-    &ffecom_tree_xargc_,
-    &ffecom_f2c_integer_type_node,
-    &ffecom_f2c_ptr_to_integer_type_node,
-    &ffecom_f2c_address_type_node,
-    &ffecom_f2c_real_type_node,
-    &ffecom_f2c_ptr_to_real_type_node,
-    &ffecom_f2c_doublereal_type_node,
-    &ffecom_f2c_complex_type_node,
-    &ffecom_f2c_doublecomplex_type_node,
-    &ffecom_f2c_longint_type_node,
-    &ffecom_f2c_logical_type_node,
-    &ffecom_f2c_flag_type_node,
-    &ffecom_f2c_ftnlen_type_node,
-    &ffecom_f2c_ftnlen_zero_node,
-    &ffecom_f2c_ftnlen_one_node,
-    &ffecom_f2c_ftnlen_two_node,
-    &ffecom_f2c_ptr_to_ftnlen_type_node,
-    &ffecom_f2c_ftnint_type_node,
-    &ffecom_f2c_ptr_to_ftnint_type_node,
-    &ffecom_outer_function_decl_,
-    &ffecom_previous_function_decl_,
-    &ffecom_which_entrypoint_decl_,
-    &ffecom_float_zero_,
-    &ffecom_float_half_,
-    &ffecom_double_zero_,
-    &ffecom_double_half_,
-    &ffecom_func_result_,
-    &ffecom_func_length_,
-    &ffecom_multi_type_node_,
-    &ffecom_multi_retval_,
-    &named_labels,
-    &shadowed_labels
-  };
-  size_t i;
-
   malloc_init ();
 
-  /* Record our roots.  */
-  for (i = 0; i < ARRAY_SIZE (tree_roots); i++)
-    ggc_add_tree_root (tree_roots[i], 1);
-  ggc_add_tree_root (&ffecom_tree_type[0][0], 
-		     FFEINFO_basictype*FFEINFO_kindtype);
-  ggc_add_tree_root (&ffecom_tree_fun_type[0][0], 
-		     FFEINFO_basictype*FFEINFO_kindtype);
-  ggc_add_tree_root (&ffecom_tree_ptr_to_fun_type[0][0], 
-		     FFEINFO_basictype*FFEINFO_kindtype);
-  ggc_add_tree_root (ffecom_gfrt_, FFECOM_gfrt);
-  ggc_add_root (&current_binding_level, 1, sizeof current_binding_level,
-                mark_binding_level);
-  ggc_add_root (&free_binding_level, 1, sizeof current_binding_level,
-                mark_binding_level);
-  ggc_add_root (&tracker_head, 1, sizeof tracker_head, mark_tracker_head);
-
   ffe_init_0 ();
-}
-
-const char *
-init_parse (filename)
-     const char *filename;
-{
-  /* Open input file.  */
-  if (filename == 0 || !strcmp (filename, "-"))
-    {
-      finput = stdin;
-      filename = "stdin";
-    }
-  else
-    finput = fopen (filename, "r");
-  if (finput == 0)
-    fatal_io_error ("can't open %s", filename);
-
-#ifdef IO_BUFFER_SIZE
-  setvbuf (finput, (char *) xmalloc (IO_BUFFER_SIZE), _IOFBF, IO_BUFFER_SIZE);
-#endif
-
-  /* Make identifier nodes long enough for the language-specific slots.  */
-  set_identifier_size (sizeof (struct lang_identifier));
-  decl_printable_name = lang_printable_name;
-#if BUILT_FOR_270
-  print_error_function = lang_print_error_function;
-#endif
-
-  return filename;
-}
-
-void
-finish_parse ()
-{
-  fclose (finput);
 }
 
 /* Delete the node BLOCK from the current binding level.
@@ -14600,24 +14118,126 @@ insert_block (block)
 }
 
 /* Each front end provides its own.  */
-static void ffe_init PARAMS ((void));
+static const char *ffe_init PARAMS ((const char *));
 static void ffe_finish PARAMS ((void));
 static void ffe_init_options PARAMS ((void));
+static void ffe_print_identifier PARAMS ((FILE *, tree, int));
 
-struct lang_hooks lang_hooks = {ffe_init,
-				ffe_finish,
-				ffe_init_options,
-				ffe_decode_option,
-				NULL /* post_options */};
-
-/* used by print-tree.c */
-
-void
-lang_print_xnode (file, node, indent)
-     FILE *file UNUSED;
-     tree node UNUSED;
-     int indent UNUSED;
+struct language_function GTY(())
 {
+  int unused;
+};
+
+#undef  LANG_HOOKS_NAME
+#define LANG_HOOKS_NAME			"GNU F77"
+#undef  LANG_HOOKS_INIT
+#define LANG_HOOKS_INIT			ffe_init
+#undef  LANG_HOOKS_FINISH
+#define LANG_HOOKS_FINISH		ffe_finish
+#undef  LANG_HOOKS_INIT_OPTIONS
+#define LANG_HOOKS_INIT_OPTIONS		ffe_init_options
+#undef  LANG_HOOKS_DECODE_OPTION
+#define LANG_HOOKS_DECODE_OPTION	ffe_decode_option
+#undef  LANG_HOOKS_PARSE_FILE
+#define LANG_HOOKS_PARSE_FILE		ffe_parse_file
+#undef  LANG_HOOKS_MARK_ADDRESSABLE
+#define LANG_HOOKS_MARK_ADDRESSABLE	ffe_mark_addressable
+#undef  LANG_HOOKS_PRINT_IDENTIFIER
+#define LANG_HOOKS_PRINT_IDENTIFIER	ffe_print_identifier
+#undef  LANG_HOOKS_DECL_PRINTABLE_NAME
+#define LANG_HOOKS_DECL_PRINTABLE_NAME	ffe_printable_name
+#undef  LANG_HOOKS_PRINT_ERROR_FUNCTION
+#define LANG_HOOKS_PRINT_ERROR_FUNCTION ffe_print_error_function
+#undef  LANG_HOOKS_TRUTHVALUE_CONVERSION
+#define LANG_HOOKS_TRUTHVALUE_CONVERSION ffe_truthvalue_conversion
+
+#undef  LANG_HOOKS_TYPE_FOR_MODE
+#define LANG_HOOKS_TYPE_FOR_MODE	ffe_type_for_mode
+#undef  LANG_HOOKS_TYPE_FOR_SIZE
+#define LANG_HOOKS_TYPE_FOR_SIZE	ffe_type_for_size
+#undef  LANG_HOOKS_SIGNED_TYPE
+#define LANG_HOOKS_SIGNED_TYPE		ffe_signed_type
+#undef  LANG_HOOKS_UNSIGNED_TYPE
+#define LANG_HOOKS_UNSIGNED_TYPE	ffe_unsigned_type
+#undef  LANG_HOOKS_SIGNED_OR_UNSIGNED_TYPE
+#define LANG_HOOKS_SIGNED_OR_UNSIGNED_TYPE ffe_signed_or_unsigned_type
+
+/* We do not wish to use alias-set based aliasing at all.  Used in the
+   extreme (every object with its own set, with equivalences recorded) it
+   might be helpful, but there are problems when it comes to inlining.  We
+   get on ok with flag_argument_noalias, and alias-set aliasing does
+   currently limit how stack slots can be reused, which is a lose.  */
+#undef LANG_HOOKS_GET_ALIAS_SET
+#define LANG_HOOKS_GET_ALIAS_SET hook_get_alias_set_0
+
+const struct lang_hooks lang_hooks = LANG_HOOKS_INITIALIZER;
+
+/* Table indexed by tree code giving a string containing a character
+   classifying the tree code.  Possibilities are
+   t, d, s, c, r, <, 1, 2 and e.  See tree.def for details.  */
+
+#define DEFTREECODE(SYM, NAME, TYPE, LENGTH) TYPE,
+
+const char tree_code_type[] = {
+#include "tree.def"
+};
+#undef DEFTREECODE
+
+/* Table indexed by tree code giving number of expression
+   operands beyond the fixed part of the node structure.
+   Not used for types or decls.  */
+
+#define DEFTREECODE(SYM, NAME, TYPE, LENGTH) LENGTH,
+
+const unsigned char tree_code_length[] = {
+#include "tree.def"
+};
+#undef DEFTREECODE
+
+/* Names of tree components.
+   Used for printing out the tree and error messages.  */
+#define DEFTREECODE(SYM, NAME, TYPE, LEN) NAME,
+
+const char *const tree_code_name[] = {
+#include "tree.def"
+};
+#undef DEFTREECODE
+
+static const char *
+ffe_init (filename)
+     const char *filename;
+{
+  /* Open input file.  */
+  if (filename == 0 || !strcmp (filename, "-"))
+    {
+      finput = stdin;
+      filename = "stdin";
+    }
+  else
+    finput = fopen (filename, "r");
+  if (finput == 0)
+    fatal_io_error ("can't open %s", filename);
+
+#ifdef IO_BUFFER_SIZE
+  setvbuf (finput, (char *) xmalloc (IO_BUFFER_SIZE), _IOFBF, IO_BUFFER_SIZE);
+#endif
+
+  ffecom_init_decl_processing ();
+
+  /* If the file is output from cpp, it should contain a first line
+     `# 1 "real-filename"', and the current design of gcc (toplev.c
+     in particular and the way it sets up information relied on by
+     INCLUDE) requires that we read this now, and store the
+     "real-filename" info in master_input_filename.  Ask the lexer
+     to try doing this.  */
+  ffelex_hash_kludge (finput);
+
+  /* FIXME: The ffelex_hash_kludge code needs to be cleaned up to
+     return the new file name.  */
+  if (main_input_filename)
+    filename = main_input_filename;
+
+  return filename;
 }
 
 static void
@@ -14627,27 +14247,8 @@ ffe_finish ()
 
   if (ffe_is_ffedebug ())
     malloc_pool_display (malloc_pool_image ());
-}
 
-const char *
-lang_identify ()
-{
-  return "f77";
-}
-
-/* Return the typed-based alias set for T, which may be an expression
-   or a type.  Return -1 if we don't do anything special.  */
-
-HOST_WIDE_INT
-lang_get_alias_set (t)
-     tree t ATTRIBUTE_UNUSED;
-{
-  /* We do not wish to use alias-set based aliasing at all.  Used in the
-     extreme (every object with its own set, with equivalences recorded)
-     it might be helpful, but there are problems when it comes to inlining.
-     We get on ok with flag_argument_noalias, and alias-set aliasing does
-     currently limit how stack slots can be reused, which is a lose.  */
-  return 0;
+  fclose (finput);
 }
 
 static void
@@ -14657,24 +14258,13 @@ ffe_init_options ()
   flag_move_all_movables = 1;
   flag_reduce_all_givs = 1;
   flag_argument_noalias = 2;
+  flag_merge_constants = 2;
   flag_errno_math = 0;
   flag_complex_divide_method = 1;
 }
 
-static void
-ffe_init ()
-{
-  /* If the file is output from cpp, it should contain a first line
-     `# 1 "real-filename"', and the current design of gcc (toplev.c
-     in particular and the way it sets up information relied on by
-     INCLUDE) requires that we read this now, and store the
-     "real-filename" info in master_input_filename.  Ask the lexer
-     to try doing this.  */
-  ffelex_hash_kludge (finput);
-}
-
-int
-mark_addressable (exp)
+static bool
+ffe_mark_addressable (exp)
      tree exp;
 {
   register tree x = exp;
@@ -14689,7 +14279,7 @@ mark_addressable (exp)
 
       case CONSTRUCTOR:
 	TREE_ADDRESSABLE (x) = 1;
-	return 1;
+	return true;
 
       case VAR_DECL:
       case CONST_DECL:
@@ -14701,7 +14291,7 @@ mark_addressable (exp)
 	    if (TREE_PUBLIC (x))
 	      {
 		assert ("address of global register var requested" == NULL);
-		return 0;
+		return false;
 	      }
 	    assert ("address of register variable requested" == NULL);
 	  }
@@ -14710,7 +14300,7 @@ mark_addressable (exp)
 	    if (TREE_PUBLIC (x))
 	      {
 		assert ("address of global register var requested" == NULL);
-		return 0;
+		return false;
 	      }
 	    assert ("address of register var requested" == NULL);
 	  }
@@ -14725,19 +14315,8 @@ mark_addressable (exp)
 #endif
 
       default:
-	return 1;
+	return true;
       }
-}
-
-/* If DECL has a cleanup, build and return that cleanup here.
-   This is a callback called by expand_expr.  */
-
-tree
-maybe_build_cleanup (decl)
-     tree decl UNUSED;
-{
-  /* There are no cleanups in Fortran.  */
-  return NULL_TREE;
 }
 
 /* Exit a binding level.
@@ -14863,7 +14442,7 @@ poplevel (keep, reverse, functionbody)
   /* Pop the current level, and free the structure for reuse.  */
 
   {
-    register struct binding_level *level = current_binding_level;
+    register struct f_binding_level *level = current_binding_level;
     current_binding_level = current_binding_level->level_chain;
 
     level->level_chain = free_binding_level;
@@ -14894,35 +14473,14 @@ poplevel (keep, reverse, functionbody)
   return block;
 }
 
-void
-print_lang_decl (file, node, indent)
-     FILE *file UNUSED;
-     tree node UNUSED;
-     int indent UNUSED;
-{
-}
-
-void
-print_lang_identifier (file, node, indent)
+static void
+ffe_print_identifier (file, node, indent)
      FILE *file;
      tree node;
      int indent;
 {
   print_node (file, "global", IDENTIFIER_GLOBAL_VALUE (node), indent + 4);
   print_node (file, "local", IDENTIFIER_LOCAL_VALUE (node), indent + 4);
-}
-
-void
-print_lang_statistics ()
-{
-}
-
-void
-print_lang_type (file, node, indent)
-     FILE *file UNUSED;
-     tree node UNUSED;
-     int indent UNUSED;
-{
 }
 
 /* Record a decl-node X as belonging to the current lexical scope.
@@ -14939,7 +14497,7 @@ pushdecl (x)
 {
   register tree t;
   register tree name = DECL_NAME (x);
-  register struct binding_level *b = current_binding_level;
+  register struct f_binding_level *b = current_binding_level;
 
   if ((TREE_CODE (x) == FUNCTION_DECL)
       && (DECL_INITIAL (x) == 0)
@@ -14952,9 +14510,7 @@ pushdecl (x)
     {
       if (IDENTIFIER_INVENTED (name))
 	{
-#if BUILT_FOR_270
 	  DECL_ARTIFICIAL (x) = 1;
-#endif
 	  DECL_IN_SYSTEM_HEADER (x) = 1;
 	}
 
@@ -15073,7 +14629,7 @@ void
 pushlevel (tag_transparent)
      int tag_transparent;
 {
-  register struct binding_level *newlevel = NULL_BINDING_LEVEL;
+  register struct f_binding_level *newlevel = NULL_BINDING_LEVEL;
 
   assert (! tag_transparent);
 
@@ -15116,20 +14672,8 @@ set_block (block)
 					   BLOCK_SUBBLOCKS (block));
 }
 
-/* ~~gcc/tree.h *should* declare this, because toplev.c references it.  */
-
-/* Can't 'yydebug' a front end not generated by yacc/bison!  */
-
-void
-set_yydebug (value)
-     int value;
-{
-  if (value)
-    fprintf (stderr, "warning: no yacc/bison-generated output to debug!\n");
-}
-
-tree
-signed_or_unsigned_type (unsignedp, type)
+static tree
+ffe_signed_or_unsigned_type (unsignedp, type)
      int unsignedp;
      tree type;
 {
@@ -15149,15 +14693,15 @@ signed_or_unsigned_type (unsignedp, type)
     return (unsignedp ? long_long_unsigned_type_node
 	    : long_long_integer_type_node);
 
-  type2 = type_for_size (TYPE_PRECISION (type), unsignedp);
+  type2 = ffe_type_for_size (TYPE_PRECISION (type), unsignedp);
   if (type2 == NULL_TREE)
     return type;
 
   return type2;
 }
 
-tree
-signed_type (type)
+static tree
+ffe_signed_type (type)
      tree type;
 {
   tree type1 = TYPE_MAIN_VARIANT (type);
@@ -15185,7 +14729,7 @@ signed_type (type)
     return intQI_type_node;
 #endif
 
-  type2 = type_for_size (TYPE_PRECISION (type1), 0);
+  type2 = ffe_type_for_size (TYPE_PRECISION (type1), 0);
   if (type2 != NULL_TREE)
     return type2;
 
@@ -15211,8 +14755,8 @@ signed_type (type)
 
    The resulting type should always be `integer_type_node'.  */
 
-tree
-truthvalue_conversion (expr)
+static tree
+ffe_truthvalue_conversion (expr)
      tree expr;
 {
   if (TREE_CODE (expr) == ERROR_MARK)
@@ -15289,15 +14833,15 @@ truthvalue_conversion (expr)
       return ffecom_2 ((TREE_SIDE_EFFECTS (TREE_OPERAND (expr, 1))
 			? TRUTH_OR_EXPR : TRUTH_ORIF_EXPR),
 		       integer_type_node,
-		       truthvalue_conversion (TREE_OPERAND (expr, 0)),
-		       truthvalue_conversion (TREE_OPERAND (expr, 1)));
+		       ffe_truthvalue_conversion (TREE_OPERAND (expr, 0)),
+		       ffe_truthvalue_conversion (TREE_OPERAND (expr, 1)));
 
     case NEGATE_EXPR:
     case ABS_EXPR:
     case FLOAT_EXPR:
     case FFS_EXPR:
       /* These don't change whether an object is non-zero or zero.  */
-      return truthvalue_conversion (TREE_OPERAND (expr, 0));
+      return ffe_truthvalue_conversion (TREE_OPERAND (expr, 0));
 
     case LROTATE_EXPR:
     case RROTATE_EXPR:
@@ -15305,15 +14849,15 @@ truthvalue_conversion (expr)
 	 we can't ignore them if their second arg has side-effects.  */
       if (TREE_SIDE_EFFECTS (TREE_OPERAND (expr, 1)))
 	return build (COMPOUND_EXPR, integer_type_node, TREE_OPERAND (expr, 1),
-		      truthvalue_conversion (TREE_OPERAND (expr, 0)));
+		      ffe_truthvalue_conversion (TREE_OPERAND (expr, 0)));
       else
-	return truthvalue_conversion (TREE_OPERAND (expr, 0));
+	return ffe_truthvalue_conversion (TREE_OPERAND (expr, 0));
 
     case COND_EXPR:
       /* Distribute the conversion into the arms of a COND_EXPR.  */
       return fold (build (COND_EXPR, integer_type_node, TREE_OPERAND (expr, 0),
-			  truthvalue_conversion (TREE_OPERAND (expr, 1)),
-			  truthvalue_conversion (TREE_OPERAND (expr, 2))));
+			  ffe_truthvalue_conversion (TREE_OPERAND (expr, 1)),
+			  ffe_truthvalue_conversion (TREE_OPERAND (expr, 2))));
 
     case CONVERT_EXPR:
       /* Don't cancel the effect of a CONVERT_EXPR from a REFERENCE_TYPE,
@@ -15326,7 +14870,7 @@ truthvalue_conversion (expr)
       /* If this is widening the argument, we can ignore it.  */
       if (TYPE_PRECISION (TREE_TYPE (expr))
 	  >= TYPE_PRECISION (TREE_TYPE (TREE_OPERAND (expr, 0))))
-	return truthvalue_conversion (TREE_OPERAND (expr, 0));
+	return ffe_truthvalue_conversion (TREE_OPERAND (expr, 0));
       break;
 
     case MINUS_EXPR:
@@ -15371,20 +14915,20 @@ truthvalue_conversion (expr)
 	    ((TREE_SIDE_EFFECTS (expr)
 	      ? TRUTH_OR_EXPR : TRUTH_ORIF_EXPR),
 	     integer_type_node,
-	     truthvalue_conversion (ffecom_1 (REALPART_EXPR,
-					      TREE_TYPE (TREE_TYPE (expr)),
-					      expr)),
-	     truthvalue_conversion (ffecom_1 (IMAGPART_EXPR,
-					      TREE_TYPE (TREE_TYPE (expr)),
-					      expr))));
+	     ffe_truthvalue_conversion (ffecom_1 (REALPART_EXPR,
+						  TREE_TYPE (TREE_TYPE (expr)),
+						  expr)),
+	     ffe_truthvalue_conversion (ffecom_1 (IMAGPART_EXPR,
+						  TREE_TYPE (TREE_TYPE (expr)),
+						  expr))));
 
   return ffecom_2 (NE_EXPR, integer_type_node,
 		   expr,
 		   convert (TREE_TYPE (expr), integer_zero_node));
 }
 
-tree
-type_for_mode (mode, unsignedp)
+static tree
+ffe_type_for_mode (mode, unsignedp)
      enum machine_mode mode;
      int unsignedp;
 {
@@ -15440,8 +14984,8 @@ type_for_mode (mode, unsignedp)
   return 0;
 }
 
-tree
-type_for_size (bits, unsignedp)
+static tree
+ffe_type_for_size (bits, unsignedp)
      unsigned bits;
      int unsignedp;
 {
@@ -15476,8 +15020,8 @@ type_for_size (bits, unsignedp)
   return 0;
 }
 
-tree
-unsigned_type (type)
+static tree
+ffe_unsigned_type (type)
      tree type;
 {
   tree type1 = TYPE_MAIN_VARIANT (type);
@@ -15505,7 +15049,7 @@ unsigned_type (type)
     return unsigned_intQI_type_node;
 #endif
 
-  type2 = type_for_size (TYPE_PRECISION (type1), 1);
+  type2 = ffe_type_for_size (TYPE_PRECISION (type1), 1);
   if (type2 != NULL_TREE)
     return type2;
 
@@ -15519,26 +15063,7 @@ unsigned_type (type)
 
   return type;
 }
-
-void 
-lang_mark_tree (t)
-     union tree_node *t ATTRIBUTE_UNUSED;
-{
-  if (TREE_CODE (t) == IDENTIFIER_NODE)
-    {
-      struct lang_identifier *i = (struct lang_identifier *) t;
-      ggc_mark_tree (IDENTIFIER_GLOBAL_VALUE (i));
-      ggc_mark_tree (IDENTIFIER_LOCAL_VALUE (i));
-      ggc_mark_tree (IDENTIFIER_LABEL_VALUE (i));
-    }
-  else if (TYPE_P (t) && TYPE_LANG_SPECIFIC (t))
-    ggc_mark (TYPE_LANG_SPECIFIC (t));
-}
-
-#endif /* FFECOM_targetCURRENT == FFECOM_targetGCC */
 
-#if FFECOM_GCC_INCLUDE
-
 /* From gcc/cccp.c, the code to handle -I.  */
 
 /* Skip leading "./" from a directory name.
@@ -15615,20 +15140,6 @@ static int input_file_stack_tick = 0;  /* Incremented when status changes.  */
 static int indepth = -1;
 
 typedef struct file_buf FILE_BUF;
-
-typedef unsigned char U_CHAR;
-
-/* table to tell if char can be part of a C identifier. */
-U_CHAR is_idchar[256];
-/* table to tell if char can be first char of a c identifier. */
-U_CHAR is_idstart[256];
-/* table to tell if c is horizontal space.  */
-U_CHAR is_hor_space[256];
-/* table to tell if c is horizontal or vertical space.  */
-static U_CHAR is_space[256];
-
-#define SKIP_WHITE_SPACE(p) do { while (is_hor_space[*p]) p++; } while (0)
-#define SKIP_ALL_WHITE_SPACE(p) do { while (is_space[*p]) p++; } while (0)
 
 /* Nonzero means -I- has been seen,
    so don't look for #include "foo" the source-file directory.  */
@@ -15804,6 +15315,7 @@ print_containing_files (ffebadSeverity sev)
 	else
 	  str2 = "";
 
+	/* xgettext:no-c-format */
 	ffebad_start_msg ("%A from %B at %0%C", sev);
 	ffebad_here (0, ip->line, ip->column);
 	ffebad_string (str1);
@@ -15829,10 +15341,10 @@ read_filename_string (ch, f)
 
   len = 20;
   set = alloc = xmalloc (len + 1);
-  if (! is_space[ch])
+  if (! ISSPACE (ch))
     {
       *set++ = ch;
-      while ((ch = getc (f)) != EOF && ! is_space[ch])
+      while ((ch = getc (f)) != EOF && ! ISSPACE (ch))
 	{
 	  if (set - alloc == len)
 	    {
@@ -15900,10 +15412,10 @@ read_name_map (dirname)
 	  char *from, *to;
 	  struct file_name_map *ptr;
 
-	  if (is_space[ch])
+	  if (ISSPACE (ch))
 	    continue;
 	  from = read_filename_string (ch, f);
-	  while ((ch = getc (f)) != EOF && is_hor_space[ch])
+	  while ((ch = getc (f)) != EOF && ISSPACE (ch) && ch != '\n')
 	    ;
 	  to = read_filename_string (ch, f);
 
@@ -15954,45 +15466,6 @@ ffecom_file_ (const char *name)
   fp->nominal_fname = fp->fname = name;
 }
 
-/* Initialize syntactic classifications of characters.  */
-
-static void
-ffecom_initialize_char_syntax_ ()
-{
-  register int i;
-
-  /*
-   * Set up is_idchar and is_idstart tables.  These should be
-   * faster than saying (is_alpha (c) || c == '_'), etc.
-   * Set up these things before calling any routines tthat
-   * refer to them.
-   */
-  for (i = 'a'; i <= 'z'; i++) {
-    is_idchar[i - 'a' + 'A'] = 1;
-    is_idchar[i] = 1;
-    is_idstart[i - 'a' + 'A'] = 1;
-    is_idstart[i] = 1;
-  }
-  for (i = '0'; i <= '9'; i++)
-    is_idchar[i] = 1;
-  is_idchar['_'] = 1;
-  is_idstart['_'] = 1;
-
-  /* horizontal space table */
-  is_hor_space[' '] = 1;
-  is_hor_space['\t'] = 1;
-  is_hor_space['\v'] = 1;
-  is_hor_space['\f'] = 1;
-  is_hor_space['\r'] = 1;
-
-  is_space[' '] = 1;
-  is_space['\t'] = 1;
-  is_space['\v'] = 1;
-  is_space['\f'] = 1;
-  is_space['\n'] = 1;
-  is_space['\r'] = 1;
-}
-
 static void
 ffecom_close_include_ (FILE *f)
 {
@@ -16020,7 +15493,7 @@ ffecom_decode_include_option_ (char *spec)
       dirtmp->fname = spec;
       dirtmp->got_name_map = 0;
       if (spec[0] == 0)
-	error ("Directory name must immediately follow -I");
+	error ("directory name must immediately follow -I");
       else
 	append_include_chain (dirtmp, dirtmp);
     }
@@ -16162,6 +15635,7 @@ ffecom_open_include_ (char *name, ffewhereLine l, ffewhereColumn c)
 	  if (f == NULL && errno == EACCES)
 	    {
 	      print_containing_files (FFEBAD_severityWARNING);
+	      /* xgettext:no-c-format */
 	      ffebad_start_msg ("At %0, INCLUDE file %A exists, but is not readable",
 				FFEBAD_severityWARNING);
 	      ffebad_string (fname);
@@ -16196,6 +15670,7 @@ ffecom_open_include_ (char *name, ffewhereLine l, ffewhereColumn c)
   if (indepth >= (INPUT_STACK_MAX - 1))
     {
       print_containing_files (FFEBAD_severityFATAL);
+      /* xgettext:no-c-format */
       ffebad_start_msg ("At %0, INCLUDE nesting too deep",
 			FFEBAD_severityFATAL);
       ffebad_string (fname);
@@ -16217,7 +15692,6 @@ ffecom_open_include_ (char *name, ffewhereLine l, ffewhereColumn c)
 
   return f;
 }
-#endif	/* FFECOM_GCC_INCLUDE */
 
 /**INDENT* (Do not reformat this comment even with -fca option.)
    Data-gathering files: Given the source file listed below, compiled with
@@ -16661,7 +16135,7 @@ typedef doublereal E_f; // real function with -R not specified //
 
 // (No such symbols should be defined in a strict ANSI C compiler.
    We can avoid trouble with f2c-translated code by using
-   gcc -ansi [-traditional].) //
+   gcc -ansi.) //
 
 
 
@@ -16703,12 +16177,12 @@ typedef doublereal E_f; // real function with -R not specified //
     void pow_ci();
     double pow_dd();
     void pow_zz();
-    double acos(), r_imag(), r_int(), log(), r_lg10(), r_mod(), r_nint(), 
+    double acos(), r_imag(), r_int(), log(), r_lg10(), r_mod(), r_nint(),
             asin(), atan(), atan2(), c_abs();
     void c_cos(), c_exp(), c_log(), r_cnjg();
     double cos(), cosh();
     void c_sin(), c_sqrt();
-    double d_dim(), exp(), r_dim(), d_int(), d_lg10(), d_mod(), d_nint(), 
+    double d_dim(), exp(), r_dim(), d_int(), d_lg10(), d_mod(), d_nint(),
             d_sign(), sin(), sinh(), sqrt(), tan(), tanh();
     integer i_dim(), i_dnnt(), i_indx(), i_sign(), i_len();
     logical l_ge(), l_gt(), l_le(), l_lt();
@@ -16716,7 +16190,7 @@ typedef doublereal E_f; // real function with -R not specified //
     double r_sign();
 
     // Local variables //
-    extern // Subroutine // int fooa_(), fooc_(), food_(), fooi_(), foor_(), 
+    extern // Subroutine // int fooa_(), fooc_(), food_(), fooi_(), foor_(),
             fool_(), fooz_(), getem_();
     static char a1[10], a2[10];
     static complex c1, c2;
@@ -17092,3 +16566,6 @@ typedef doublereal E_f; // real function with -R not specified //
 -------- (end output file from f2c)
 
 */
+
+#include "gt-f-com.h"
+#include "gtype-f.h"

@@ -1,5 +1,5 @@
 /* Definitions of MCore target. 
-   Copyright (C) 1998, 1999, 2000 Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
    Contributed by Cygnus Solutions.
 
 This file is part of GNU CC.
@@ -27,9 +27,6 @@ Boston, MA 02111-1307, USA.  */
 
 #define SUBTARGET_CPP_PREDEFINES " -D__ELF__"
 
-#include "svr4.h"
-#include "mcore/mcore.h"
-
 /* Use DWARF2 debugging info.  */
 #ifndef DWARF2_DEBUGGING_INFO
 #define DWARF2_DEBUGGING_INFO 1
@@ -43,32 +40,12 @@ Boston, MA 02111-1307, USA.  */
 #define DWARF_DEBUGGING_INFO 1
 #endif
 
-/* The numbers used to denote specific machine registers in the System V
-   Release 4 DWARF debugging information are quite likely to be totally
-   different from the numbers used in BSD stabs debugging information
-   for the same kind of target machine.  Thus, we undefine the macro
-   DBX_REGISTER_NUMBER here as an extra inducement to get people to
-   provide proper machine-specific definitions of DBX_REGISTER_NUMBER
-   (which is also used to provide DWARF registers numbers in dwarfout.c)
-   in their tm.h files which include this file.  */
-
-#undef  DBX_REGISTER_NUMBER
-#define DBX_REGISTER_NUMBER(REGNO) (REGNO)
-
-/* MCore defines .long and .short to NOT force any alignment.
-   This lets you misalign as much as you wish.  */
-#define	UNALIGNED_INT_ASM_OP	"\t.long\t"
-#define	UNALIGNED_SHORT_ASM_OP	"\t.short\t"
-
 #define EXPORTS_SECTION_ASM_OP	"\t.section .exports"
 
-#define SUBTARGET_EXTRA_SECTIONS in_const, in_exports
+#define SUBTARGET_EXTRA_SECTIONS in_exports
 
 #define SUBTARGET_EXTRA_SECTION_FUNCTIONS	\
-  CONST_SECTION_FUNCTION			\
-  EXPORT_SECTION_FUNCTION			\
-
-/* CONST_SECTION_FUNCTION is defined svr4.h.  */
+  EXPORT_SECTION_FUNCTION
 
 #define EXPORT_SECTION_FUNCTION 				\
 void								\
@@ -82,8 +59,7 @@ exports_section ()						\
 }
 
 #define SUBTARGET_SWITCH_SECTIONS		\
-  case in_exports: exports_section (); break;	\
-  case in_const: const_section (); break;
+  case in_exports: exports_section (); break;
 
 
 #define MCORE_EXPORT_NAME(STREAM, NAME)			\
@@ -91,7 +67,7 @@ exports_section ()						\
     {							\
       exports_section ();				\
       fprintf (STREAM, "\t.ascii \" -export:%s\"\n",	\
-	       MCORE_STRIP_NAME_ENCODING (NAME));	\
+	       (* targetm.strip_name_encoding) (NAME));	\
     }							\
   while (0);
 
@@ -178,11 +154,9 @@ exports_section ()						\
 #undef  ENDFILE_SPEC
 #define ENDFILE_SPEC  "%{!mno-lsim:-lsim} crtend.o%s crtn.o%s"
 
-
 /* The subroutine calls in the .init and .fini sections create literal
    pools which must be jumped around...  */
-#define FORCE_INIT_SECTION_ALIGN	asm ("br 1f ; .literals ; 1:")
-#define FORCE_FINI_SECTION_ALIGN	asm ("br 1f ; .literals ; 1:")
+#define FORCE_CODE_SECTION_ALIGN	asm ("br 1f ; .literals ; 1:");
 
 #undef  CTORS_SECTION_ASM_OP
 #define CTORS_SECTION_ASM_OP	"\t.section\t.ctors,\"aw\""

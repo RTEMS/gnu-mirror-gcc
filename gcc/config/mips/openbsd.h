@@ -35,7 +35,7 @@ Boston, MA 02111-1307, USA.  */
 #define LIB_SPEC OBSD_LIB_SPEC
 
 /* By default, OpenBSD mips is little endian.  This is important to set
-   here as mips/mips.h defaults to big endian unless DECSTATION.  */
+   here as mips/mips.h defaults to big endian.  */
 #ifndef TARGET_ENDIAN_DEFAULT
 #define TARGET_ENDIAN_DEFAULT 0
 #endif
@@ -53,16 +53,17 @@ Boston, MA 02111-1307, USA.  */
 	support.  */
 #undef SET_ASM_OP
 
-/* Run-time target specifications.  */
-#if TARGET_ENDIAN_DEFAULT != 0
-#define CPP_PREDEFINES "-D__SYSTYPE_BSD__ -D__NO_LEADING_UNDERSCORES__ \
--D__GP_SUPPORT__ -D__MIPSEB__ -D__unix__  -D__OpenBSD__ -D__mips__ \
--Asystem=unix -Asystem=OpenBSD -Acpu=mips -Amachine=mips -Aendian=big"
-#else
-#define CPP_PREDEFINES "-D__SYSTYPE_BSD__ -D__NO_LEADING_UNDERSCORES__ \
--D__GP_SUPPORT__ -D__MIPSEL__ -D__unix__  -D__OpenBSD__ -D__mips__ \
--Asystem=unix -Asystem=OpenBSD -Acpu=mips -Amachine=mips -Aendian=little"
-#endif
+#define TARGET_OS_CPP_BUILTINS()			\
+    do {						\
+	builtin_define ("__unix__");			\
+	builtin_define ("__SYSTYPE_BSD__");		\
+	builtin_define ("__NO_LEADING_UNDERSCORES__");	\
+	builtin_define ("__GP_SUPPORT__");		\
+	builtin_define ("__OpenBSD__");			\
+	builtin_assert ("system=unix");			\
+	builtin_assert ("system=OpenBSD");		\
+	builtin_assert ("machine=mips");			\
+} while (0)
 
 /* Layout of source language data types.  */
 
@@ -81,7 +82,7 @@ Boston, MA 02111-1307, USA.  */
 
 /* Controlling the compilation driver.  */
 
-/* LINK_SPEC appropriate for OpenBSD:  support for GCC options 
+/* LINK_SPEC appropriate for OpenBSD:  support for GCC options
    -static, -assert, and -nostdlib. Dynamic loader control.  */
 #undef LINK_SPEC
 #define LINK_SPEC \
@@ -103,22 +104,21 @@ Boston, MA 02111-1307, USA.  */
 #undef ASM_FINAL_SPEC
 #undef STARTFILE_SPEC
 
-/* A C statement to output something to the assembler file to switch to 
-   section NAME for object DECL which is either a FUNCTION_DECL, a VAR_DECL 
-   or NULL_TREE.  Some target formats do not support arbitrary sections.  
-   Do not define this macro in such cases. mips.h doesn't define this, 
-   do it here.  */
-#define ASM_OUTPUT_SECTION_NAME(F, DECL, NAME, RELOC)                        \
-do {                                                                         \
-  extern FILE *asm_out_text_file;                                            \
-  if ((DECL) && TREE_CODE (DECL) == FUNCTION_DECL)                           \
-    fprintf (asm_out_text_file, "\t.section %s,\"ax\",@progbits\n", (NAME)); \
-  else if ((DECL) && DECL_READONLY_SECTION (DECL, RELOC))                    \
-    fprintf (F, "\t.section %s,\"a\",@progbits\n", (NAME));                  \
-  else if (! strcmp (NAME, ".bss"))                         	     	     \
-    fprintf (F, "\t.section %s,\"aw\",@nobits\n", (NAME));      	     \
-  else                                                                       \
-    fprintf (F, "\t.section %s,\"aw\",@progbits\n", (NAME));                 \
+/* Switch into a generic section.  */
+#undef TARGET_ASM_NAMED_SECTION
+#define TARGET_ASM_NAMED_SECTION  default_elf_asm_named_section
+
+/* Not having TARGET_GAS here seems a mistake.  If we actually need to
+   be prepared for file switching, then we need a custom
+   TARGET_ASM_NAMED_SECTION too.  */
+
+#undef TEXT_SECTION
+#define TEXT_SECTION()				\
+do {						\
+  if (TARGET_FILE_SWITCHING)			\
+    abort ();					\
+  fputs (TEXT_SECTION_ASM_OP, asm_out_file);	\
+  fputc ('\n', asm_out_file);			\
 } while (0)
 
 /* collect2 support (Macros for initialization).  */

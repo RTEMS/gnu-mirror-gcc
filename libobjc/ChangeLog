@@ -1,3 +1,112 @@
+2002-06-15  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
+
+	* Object.m: Fix signed/unsigned warning.
+	* Protocol.m: Likewise.
+	* archive.c: Always include stdlib.h.
+	(objc_read_short, objc_read_unsigned_short, objc_read_int,
+	objc_read_long, __objc_read_nbyte_uint, __objc_read_nbyte_ulong):
+	Fix signed/unsigned warning.
+	(objc_write_type, objc_read_type, objc_write_types,
+	objc_read_types): Ensure ctype 8-bit safety.
+	(__objc_no_write, __objc_no_read): Mark unused parameters.
+	* class.c (class_table_setup): Specify void arg.
+	* encoding.c (atoi, objc_sizeof_type, objc_alignof_type,
+	objc_skip_typespec, objc_skip_offset,
+	objc_layout_structure_next_member): Ensure ctype 8-bit safety.
+	(objc_layout_structure_next_member): Ensure variables are
+	initialized.
+	* gc.c (__objc_generate_gc_type_description,
+	class_ivar_set_gcinvisible): Mark unused parameters.
+	* init.c (__objc_send_load, __objc_destroy_class_tree_node): Mark
+	unused parameters.
+	(__objc_init_protocols) Fix signed/unsigned warning.
+	* nil_method.c (nil_method): Mark unused parameters.
+	* thr.h (objc_thread_callback): Specify void arg.
+	* sarray.c (sarray_new, sarray_realloc, sarray_free): Fix
+	signed/unsigned warning.
+	(sarray_free): Fix formatting.
+	* selector.c (sel_types_match): Ensure ctype 8-bit safety.
+	* sendmsg.c (__objc_init_install_dtable) Mark unused parameters.
+
+2002-06-09  Andreas Jaeger  <aj@suse.de>
+
+	* encoding.c (objc_layout_structure_next_member): Remove unused
+	variable.
+
+2002-05-20  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
+
+	* Makefile.in (SHELL): Set to @SHELL@.
+	(WARN_CFLAGS): New.
+	(ALL_CFLAGS): Add $(WARN_CFLAGS).
+
+2002-05-16  Rainer Orth  <ro@TechFak.Uni-Bielefeld.DE>
+
+	* aclocal.m4: Allow for PWDCMD to override hardcoded pwd.
+	* configure: Regenerate.
+
+2002-05-08  Alexandre Oliva  <aoliva@redhat.com>
+
+	* configure.in (ORIGINAL_LD_FOR_MULTILIBS): Preserve LD at
+	script entry, and set LD to it when configuring multilibs.
+	* configure: Rebuilt.
+
+2002-04-19  David O'Brien  <obrien@FreeBSD.org>
+
+	* encoding.c (MAX, MIN, ROUNDING): #undef before defining.
+
+2002-04-09  Hans-Peter Nilsson  <hp@bitrange.com>
+
+	PR objc/6107
+	* objc/objc-api.h (struct objc_protocol_list): Change type of
+	member count from int to size_t.
+
+2002-02-11  Franz Sirl  <Franz.Sirl-kernel@lauterbach.com>
+
+	PR libobjc/4039
+	* aclocal.m4: Replace with version copied from libstdc++-v3.
+	* configure.in: Update for changes to aclocal and Makefile.
+	* configure: Regenerate.
+	* Makefile.in: Correct install of multilibs and shared libs, use
+	INSTALL_DATA for include files.
+
+Mon Dec 17 17:02:12 2001  Nicola Pero  <nicola@brainstorm.co.uk>
+
+	* init.c (__objc_exec_class): Fixed bug in the loop on unclaimed
+	categories - when an unclaimed category was found, the loop was
+	doing two steps forward instead of one, so that in certain cases
+	it was failing to properly load all the categories.  (Reported
+	with fix by Alexander Malmberg <alexander@malmberg.org>).
+
+2001-11-14  Aldy Hernandez  <aldyh@redhat.com>
+
+        * encoding.c: Add target_flags.
+
+2001-11-07  Aldy Hernandez  <aldyh@redhat.com>
+
+	 * objc/objc-api.h (_C_VECTOR): New.
+
+	 * encoding.c (VECTOR_TYPE): New.
+
+Mon Oct 29 21:29:21 2001  Nicola Pero  <n.pero@mi.flashnet.it>
+
+	* class.c: Rewritten the class table to use optimized, lock-free
+        lookup.  This more than doubles the speed of class method
+        invocations.  (class_table_setup), (class_table_insert),
+        (class_table_replace), (class_table_get_safe),
+        (class_table_next), (class_table_print),
+        (class_table_print_histogram): New functions.
+        (__objc_init_class_tables): Use class_table_setup.
+        (__objc_add_class_to_hash): Use class_table_get_safe and
+        class_table_insert.  (objc_lookup_class), (objc_get_class): Do not
+        assert the existence of the table; do not lock the runtime; use
+        class_table_get_safe.  (objc_next_class): Use class_table_next.
+        (__objc_resolve_class_links): Use class_table_next.
+        (class_pose_as): Use class_table_replace.
+
+2001-09-10  Ovidiu Predescu  <ovidiu@cup.hp.com>
+
+	* gc.c: Removed the DEBUG declaration.
+
 Wed Jul 18 12:48:56 2001  Nicola Pero  <n.pero@mi.flashnet.it>
 
 	* thr.c (objc_mutex_lock): Invoke __objc_thread_id directly,
@@ -107,14 +216,14 @@ Wed Jan  3 00:49:10 2001  Ovidiu Predescu  <ovidiu@cup.hp.com>
 	function. This can alleviate problems __builtin_apply() and
 	friends have on various platforms. (Solution suggested by Helge
 	Hess.)
-	
+
 	* objc/objc-api.h: Define __objc_msg_forward.
 
 	* sendmsg.c: Define gen_rtx_REG.
 
 2000-12-06      Ralf Corsepius <corsepiu@faw.uni-ulm.de>
 
-	* thr-rtems.c: New file. Stub to compile. 
+	* thr-rtems.c: New file. Stub to compile.
 
 2000-09-06  Alexandre Oliva  <aoliva@redhat.com>
 
@@ -156,7 +265,7 @@ Sun Aug  6 22:51:16 2000  Ovidiu Predescu  <ovidiu@cup.hp.com>
 
 Fri Jul 28 08:58:02 2000  Nicola Pero  <nicola@brainstorm.co.uk>
 
-	* configure.in: Added libtool support; build shared libraries 
+	* configure.in: Added libtool support; build shared libraries
 	if --enable-shared was passed on command line.
 	* Makefile.in: Modified most compilation commands to use libtool.
 	* aclocal.m4: New symbolic link to the ../libtool.m4, from the
@@ -217,7 +326,7 @@ Tue Sep 21 07:47:10 1999  Jeffrey A Law  (law@cygnus.com)
 
 	* Makefile.in (gc.o, gc_gc.o): Do not pass -fgnu-runtime to
 	the compiler when building C code.
-	
+
 Fri Aug  6 23:32:29 1999  Daniel Jacobowitz <drow@drow.them.org>
 
 	* Makefile.in (FLAGS_TO_PASS): Include prefix, exec_prefix,
@@ -296,7 +405,7 @@ Sat Oct 17 05:21:31 1998  Ovidiu Predescu  <ovidiu@slip.net>
 Mon Oct 11 21:25:27 1998  Ovidiu Predescu  <ovidiu@slip.net>
 
 	* encoding.c: Redefine get_inner_array_type to get the first entry
- 	in the structure.
+	in the structure.
 
 Thu Oct  8 12:21:14 1998  Richard Frith-Macdonald <richard@brainstorm.co.uk>
 
@@ -361,4 +470,3 @@ Mon Sep 21 23:27:10 1998  Ovidiu Predescu <ovidiu@slip.net>
 1998-09-21  Ben Elliston  <bje@cygnus.com>
 
 	* New directory.  Moved files from ../gcc/objc.
-

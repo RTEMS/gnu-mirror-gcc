@@ -1,6 +1,6 @@
 /* Prototypes for exported functions defined in avr.c
    
-   Copyright (C) 2000, 2001 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2002 Free Software Foundation, Inc.
    Contributed by Denis Chertykov (denisc@overta.ru)
 
    This file is part of GNU CC.
@@ -43,11 +43,6 @@ extern void   gas_output_ascii          PARAMS ((FILE *file, const char *str,
 #ifdef TREE_CODE
 extern void   asm_output_external          PARAMS ((FILE *file, tree decl,
 						   char *name));
-extern void   unique_section               PARAMS ((tree decl, int reloc));
-extern void   encode_section_info          PARAMS ((tree decl));
-extern void   asm_output_section_name      PARAMS ((FILE *file, tree decl,
-						   const char *name,
-						   int reloc));
 extern int    avr_progmem_p                PARAMS ((tree decl));
 
 
@@ -103,6 +98,7 @@ extern const char * lshrsi3_out PARAMS ((rtx insn, rtx operands[], int *len));
 
 extern void avr_output_bld PARAMS ((rtx operands[], int bit_nr));
 extern void avr_output_addr_vec_elt PARAMS ((FILE *stream, int value));
+extern const char *avr_out_sbxx_branch PARAMS ((rtx insn, rtx operands[]));
 
 extern enum reg_class preferred_reload_class PARAMS ((rtx x,
 						     enum reg_class class));
@@ -118,9 +114,6 @@ extern const char * output_reload_insisf PARAMS ((rtx insn, rtx *operands,
 						int *len));
 extern int    default_rtx_costs      PARAMS ((rtx X, RTX_CODE code,
 					     RTX_CODE outer_code));
-extern void   asm_output_char        PARAMS ((FILE *file, rtx value));
-extern void   asm_output_short       PARAMS ((FILE *file, rtx value));
-extern void   asm_output_byte        PARAMS ((FILE *file, int value));
 extern enum reg_class secondary_input_reload_class PARAMS ((enum reg_class,
 							   enum machine_mode,
 							   rtx));
@@ -147,6 +140,7 @@ extern int    compare_eq_p           PARAMS ((rtx insn));
 extern void   out_shift_with_cnt     PARAMS ((const char *template, rtx insn,
 					      rtx operands[], int *len,
 					      int t_len));
+extern int    avr_io_address_p	     PARAMS ((rtx x, int size));
 extern int    const_int_pow2_p       PARAMS ((rtx x));
 extern int    avr_peep2_scratch_safe PARAMS ((rtx reg_rtx));
 #endif /* RTX_CODE */

@@ -1,5 +1,6 @@
-/* Definitions for DECstation running BSD as target machine for GNU compiler.
-   Copyright (C) 1993, 1995, 1996, 1997, 1999, 2000 Free Software Foundation, Inc.
+/* Definitions of target machine for GNU compiler, for MIPS NetBSD systems.
+   Copyright (C) 1993, 1995, 1996, 1997, 1999, 2000, 2001, 2002
+   Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -18,208 +19,136 @@ along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
-#define DECSTATION
 
-/* Look for the include files in the system-defined places.  */
+/* Define default target values. */
 
-#ifndef CROSS_COMPILE
-#undef GPLUSPLUS_INCLUDE_DIR
-#define GPLUSPLUS_INCLUDE_DIR "/usr/include/g++"
-
-#undef GCC_INCLUDE_DIR
-#define GCC_INCLUDE_DIR "/usr/include"
-
-#undef INCLUDE_DEFAULTS
-#define INCLUDE_DEFAULTS			\
-  {						\
-    { GPLUSPLUS_INCLUDE_DIR, "G++", 1, 1 },	\
-    { GCC_INCLUDE_DIR, "GCC", 0, 0 },		\
-    { 0, 0, 0, 0 }				\
-  }
-
-/* Under NetBSD, the normal location of the various *crt*.o files is the
-   /usr/lib directory.  */
-
-#undef STANDARD_STARTFILE_PREFIX
-#define STANDARD_STARTFILE_PREFIX "/usr/lib/"
+#ifndef TARGET_ENDIAN_DEFAULT
+#define TARGET_ENDIAN_DEFAULT MASK_BIG_ENDIAN
 #endif
 
-/* Provide a LINK_SPEC appropriate for NetBSD.  Here we provide support
-   for the special GCC options -static, -assert, and -nostdlib.  */
+#ifndef MACHINE_TYPE
+#if TARGET_ENDIAN_DEFAULT != 0
+#define MACHINE_TYPE "NetBSD/mipseb ELF"
+#else
+#define MACHINE_TYPE "NetBSD/mipsel ELF"
+#endif
+#endif
+
+#define TARGET_DEFAULT (MASK_GAS|MASK_ABICALLS)
+
+#define TARGET_OS_CPP_BUILTINS()			\
+  do							\
+    {							\
+      NETBSD_OS_CPP_BUILTINS_ELF();			\
+      builtin_define ("__NO_LEADING_UNDERSCORES__");	\
+      builtin_define ("__GP_SUPPORT__");		\
+      builtin_assert ("machine=mips");			\
+      if (TARGET_LONG64)				\
+	builtin_define ("__LONG64");			\
+    }							\
+  while (0)
+
+
+/* XXX Don't use DWARF-2 debugging info, for now.  */
+#undef DBX_DEBUGGING_INFO
+#define DBX_DEBUGGING_INFO
+#undef PREFERRED_DEBUGGING_TYPE
+#define PREFERRED_DEBUGGING_TYPE DBX_DEBUG
+
+
+/* Include the generic MIPS ELF configuration.  */
+#include <mips/elf.h>
+
+/* Now clean up after it.  */
+#undef OBJECT_FORMAT_COFF
+#undef MD_EXEC_PREFIX
+#undef MD_STARTFILE_PREFIX
+#undef US_SOFTWARE_GOFAST
+#undef INIT_SUBTARGET_OPTABS
+#define INIT_SUBTARGET_OPTABS
+
+
+/* Get generic NetBSD definitions.  */
+#include <netbsd.h>
+
+
+/* Get generic NetBSD ELF definitions.  */
+#include <netbsd-elf.h>
+
+
+/* Extra specs we need.  */
+#undef SUBTARGET_EXTRA_SPECS
+#define SUBTARGET_EXTRA_SPECS						\
+  { "subtarget_endian_default",	SUBTARGET_ENDIAN_DEFAULT_SPEC },	\
+  { "netbsd_cpp_spec",		NETBSD_CPP_SPEC },			\
+  { "netbsd_link_spec",		NETBSD_LINK_SPEC_ELF },			\
+  { "netbsd_entry_point",	NETBSD_ENTRY_POINT },
+
+#if TARGET_ENDIAN_DEFAULT != 0
+#define SUBTARGET_ENDIAN_DEFAULT_SPEC "-D__MIPSEB__"
+#else
+#define SUBTARGET_ENDIAN_DEFAULT_SPEC "-D__MIPSEL__"
+#endif
+
+/* Provide a SUBTARGET_CPP_SPEC appropriate for NetBSD.  */
+
+#undef SUBTARGET_CPP_SPEC
+#define SUBTARGET_CPP_SPEC "%(netbsd_cpp_spec)"
+
+/* Provide a LINK_SPEC appropriate for a NetBSD/mips target.
+   This is a copy of LINK_SPEC from <netbsd-elf.h> tweaked for
+   the MIPS target.  */
 
 #undef LINK_SPEC
 #define LINK_SPEC \
-  "%{G*} %{EB} %{EL} %{mips1} %{mips2} %{mips3} \
-   %{!nostartfiles:%{!r*:%{!e*:-e __start}}} -dc -dp %{static:-Bstatic} %{assert*}"
+  "%{EL:-m elf32lmip} \
+   %{EB:-m elf32bmip} \
+   %(endian_spec) \
+   %{G*} %{mips1} %{mips2} %{mips3} %{mips4} %{mips32} %{mips64} \
+   %{bestGnum} %{call_shared} %{no_archive} %{exact_version} \
+   %(netbsd_link_spec)"
 
-/* Implicit library calls should use memcpy, not bcopy, etc.  */
+#define NETBSD_ENTRY_POINT "__start"
 
-#define TARGET_MEM_FUNCTIONS
+#undef SUBTARGET_ASM_SPEC
+#define SUBTARGET_ASM_SPEC						\
+  "%{fpic:-KPIC} %{fPIC:-KPIC}"
 
-/* Define mips-specific netbsd predefines... */
-#ifndef CPP_PREDEFINES
-#define CPP_PREDEFINES "-D__ANSI_COMPAT \
--DMIPSEL -DR3000 -DSYSTYPE_BSD -D_SYSTYPE_BSD -D__NetBSD__ -Dmips \
--D__NO_LEADING_UNDERSCORES__ -D__GP_SUPPORT__ \
--Dunix -D_R3000 \
--Asystem=unix -Asystem=NetBSD -Amachine=mips"
-#endif
 
-#ifndef SUBTARGET_CPP_SPEC
-#define SUBTARGET_CPP_SPEC "%{posix:-D_POSIX_SOURCE}"
-#endif
+/* -G is incompatible with -KPIC which is the default, so only allow objects
+   in the small data section if the user explicitly asks for it.  */
 
-#define LIB_SPEC "%{!p:%{!pg:-lc}}%{p:-lc_p}%{pg:-lc_p}"
-#define STARTFILE_SPEC ""
+#undef MIPS_DEFAULT_GVALUE
+#define MIPS_DEFAULT_GVALUE 0
 
-#ifndef MACHINE_TYPE
-#define MACHINE_TYPE "NetBSD/pmax"
-#endif
 
-#define TARGET_DEFAULT MASK_GAS
-#define PREFERRED_DEBUGGING_TYPE DBX_DEBUG
+/* This defines which switch letters take arguments.  -G is a MIPS
+   special.  */
 
-#include "mips/mips.h"
+#undef SWITCH_TAKES_ARG
+#define SWITCH_TAKES_ARG(CHAR)						\
+  (DEFAULT_SWITCH_TAKES_ARG (CHAR)					\
+   || (CHAR) == 'R'							\
+   || (CHAR) == 'G')
 
-/*
- * Some imports from svr4.h in support of shared libraries.
- * Currently, we need the DECLARE_OBJECT_SIZE stuff.
- */
 
-/* Define the strings used for the special svr4 .type and .size directives.
-   These strings generally do not vary from one system running svr4 to
-   another, but if a given system (e.g. m88k running svr) needs to use
-   different pseudo-op names for these, they may be overridden in the
-   file which includes this one.  */
-
-#undef TYPE_ASM_OP
-#undef SIZE_ASM_OP
-#undef WEAK_ASM_OP
-#define TYPE_ASM_OP	"\t.type\t"
-#define SIZE_ASM_OP	"\t.size\t"
-#define WEAK_ASM_OP	"\t.weak\t"
-
-/* The following macro defines the format used to output the second
-   operand of the .type assembler directive.  Different svr4 assemblers
-   expect various different forms for this operand.  The one given here
-   is just a default.  You may need to override it in your machine-
-   specific tm.h file (depending upon the particulars of your assembler).  */
-
-#undef TYPE_OPERAND_FMT
-#define TYPE_OPERAND_FMT	"@%s"
-
-/* Write the extra assembler code needed to declare a function's result.
-   Most svr4 assemblers don't require any special declaration of the
-   result value, but there are exceptions.  */
-
-#ifndef ASM_DECLARE_RESULT
-#define ASM_DECLARE_RESULT(FILE, RESULT)
-#endif
-
-/* These macros generate the special .type and .size directives which
-   are used to set the corresponding fields of the linker symbol table
-   entries in an ELF object file under SVR4.  These macros also output
-   the starting labels for the relevant functions/objects.  */
-
-/* Write the extra assembler code needed to declare a function properly.
-   Some svr4 assemblers need to also have something extra said about the
-   function's return value.  We allow for that here.  */
-
-#undef ASM_DECLARE_FUNCTION_NAME
-#define ASM_DECLARE_FUNCTION_NAME(FILE, NAME, DECL)			\
-  do {									\
-    fprintf (FILE, "%s", TYPE_ASM_OP);					\
-    assemble_name (FILE, NAME);						\
-    putc (',', FILE);							\
-    fprintf (FILE, TYPE_OPERAND_FMT, "function");			\
-    putc ('\n', FILE);							\
-    ASM_DECLARE_RESULT (FILE, DECL_RESULT (DECL));			\
-  } while (0)
-
-/* Write the extra assembler code needed to declare an object properly.  */
-
-#undef ASM_DECLARE_OBJECT_NAME
-#define ASM_DECLARE_OBJECT_NAME(FILE, NAME, DECL)			\
-  do {									\
-    fprintf (FILE, "%s", TYPE_ASM_OP);					\
-    assemble_name (FILE, NAME);						\
-    putc (',', FILE);							\
-    fprintf (FILE, TYPE_OPERAND_FMT, "object");				\
-    putc ('\n', FILE);							\
-    size_directive_output = 0;						\
-    if (!flag_inhibit_size_directive && DECL_SIZE (DECL))		\
-      {									\
-	size_directive_output = 1;					\
-	fprintf (FILE, "%s", SIZE_ASM_OP);				\
-	assemble_name (FILE, NAME);					\
-	fprintf (FILE, ",%d\n",  int_size_in_bytes (TREE_TYPE (DECL)));	\
-      }									\
-    ASM_OUTPUT_LABEL(FILE, NAME);					\
-  } while (0)
-
-/* Output the size directive for a decl in rest_of_decl_compilation
-   in the case where we did not do so before the initializer.
-   Once we find the error_mark_node, we know that the value of
-   size_directive_output was set
-   by ASM_DECLARE_OBJECT_NAME when it was run for the same decl.  */
-
-#undef ASM_FINISH_DECLARE_OBJECT
-#define ASM_FINISH_DECLARE_OBJECT(FILE, DECL, TOP_LEVEL, AT_END)	 \
-do {									 \
-     const char *name = XSTR (XEXP (DECL_RTL (DECL), 0), 0);		 \
-     if (!flag_inhibit_size_directive && DECL_SIZE (DECL)		 \
-         && ! AT_END && TOP_LEVEL					 \
-	 && DECL_INITIAL (DECL) == error_mark_node			 \
-	 && !size_directive_output)					 \
-       {								 \
-	 size_directive_output = 1;					 \
-	 fprintf (FILE, "%s", SIZE_ASM_OP);				 \
-	 assemble_name (FILE, name);					 \
-	 fprintf (FILE, ",%d\n",  int_size_in_bytes (TREE_TYPE (DECL))); \
-       }								 \
-   } while (0)
-
-/* This is how to declare the size of a function.  */
-
-#undef ASM_DECLARE_FUNCTION_SIZE
-#define ASM_DECLARE_FUNCTION_SIZE(FILE, FNAME, DECL)			\
-  do {									\
-    if (!flag_inhibit_size_directive)					\
-      {									\
-        char label[256];						\
-	static int labelno;						\
-	labelno++;							\
-	ASM_GENERATE_INTERNAL_LABEL (label, "Lfe", labelno);		\
-	ASM_OUTPUT_INTERNAL_LABEL (FILE, "Lfe", labelno);		\
-	fprintf (FILE, "%s", SIZE_ASM_OP);				\
-	assemble_name (FILE, (FNAME));					\
-        fprintf (FILE, ",");						\
-	assemble_name (FILE, label);					\
-        fprintf (FILE, "-");						\
-	assemble_name (FILE, (FNAME));					\
-	putc ('\n', FILE);						\
-      }									\
-  } while (0)
-
-/*
- A C statement to output something to the assembler file to switch to section
- NAME for object DECL which is either a FUNCTION_DECL, a VAR_DECL or
- NULL_TREE.  Some target formats do not support arbitrary sections.  Do not
- define this macro in such cases.
-*/
-#define ASM_OUTPUT_SECTION_NAME(F, DECL, NAME, RELOC)                        \
-do {                                                                         \
-  extern FILE *asm_out_text_file;                                            \
-  if ((DECL) && TREE_CODE (DECL) == FUNCTION_DECL)                           \
-    fprintf (asm_out_text_file, "\t.section %s,\"ax\",@progbits\n", (NAME)); \
-  else if ((DECL) && DECL_READONLY_SECTION (DECL, RELOC))                    \
-    fprintf (F, "\t.section %s,\"a\",@progbits\n", (NAME));                  \
-  else if (! strcmp (NAME, ".bss"))                         	             \
-    fprintf (F, "\t.section %s,\"aw\",@nobits\n", (NAME));      	     \
-  else                                                                       \
-    fprintf (F, "\t.section %s,\"aw\",@progbits\n", (NAME));                 \
-} while (0)
-
-/* Since gas and gld are standard on NetBSD, we don't need these */
 #undef ASM_FINAL_SPEC
-#undef STARTFILE_SPEC
+#undef SET_ASM_OP
+
+
+/* NetBSD hasn't historically provided _flush_cache(), but rather
+   _cacheflush(), which takes the same arguments as the former.  */
+#undef CACHE_FLUSH_FUNC
+#define CACHE_FLUSH_FUNC "_cacheflush"
+
+
+/* Make gcc agree with <machine/ansi.h> */
+
+#undef WCHAR_TYPE
+#define WCHAR_TYPE "int"
+
+#undef WCHAR_TYPE_SIZE
+#define WCHAR_TYPE_SIZE 32
+
+#undef WINT_TYPE
+#define WINT_TYPE "int"

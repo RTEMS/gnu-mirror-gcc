@@ -29,13 +29,14 @@
 # language	- name of language as it would appear in $(LANGUAGES)
 # compilers	- value to add to $(COMPILERS)
 # stagestuff	- files to add to $(STAGESTUFF)
-# diff_excludes	- files to ignore when building diffs between two versions.
 
 language="java"
 
 compilers="jc1\$(exeext) jvgenmain\$(exeext)"
 
 stagestuff="jc1\$(exeext) gcj\$(exeext) jvgenmain\$(exeext) gcjh\$(exeext) jv-scan\$(exeext) jcf-dump\$(exeext)"
+
+gtfiles="\$(srcdir)/java/java-tree.h \$(srcdir)/java/builtins.c \$(srcdir)/java/class.c \$(srcdir)/java/constants.c \$(srcdir)/java/decl.c \$(srcdir)/java/expr.c \$(srcdir)/java/jcf-parse.c \$(srcdir)/java/jcf-write.c \$(srcdir)/java/lang.c \$(srcdir)/java/mangle.c \$(srcdir)/java/parse.y"
 
 target_libs=${libgcj_saved}
 lang_dirs="zlib fastjar"

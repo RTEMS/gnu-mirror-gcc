@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler, for DEC Alpha
    running Windows/NT.
-   Copyright (C) 1995, 1996, 1999, 2000 Free Software Foundation, Inc.
+   Copyright (C) 1995, 1996, 1999, 2000, 2002 Free Software Foundation, Inc.
 
    Donn Terry, Softway Systems, Inc.
    From code
@@ -25,15 +25,18 @@ Boston, MA 02111-1307, USA.  */
 
 /* cpp handles __STDC__ */
 /* The three "Alpha" defines on the first such line are from the CLAXP spec */
-#undef CPP_PREDEFINES
-#define CPP_PREDEFINES " \
-  -D__INTERIX \
-  -D__OPENNT \
-  -D__Alpha_AXP -D_M_ALPHA -D_ALPHA_  \
-  -D__alpha -D__alpha__\
-  -D__stdcall= \
-  -D__cdecl= \
-  -Asystem=unix -Asystem=interix -Acpu=alpha -Amachine=alpha"
+#define TARGET_OS_CPP_BUILTINS()				\
+    do {							\
+	builtin_define ("__INTERIX");				\
+	builtin_define ("__OPENNT");				\
+	builtin_define ("__Alpha_AXP");				\
+	builtin_define ("_M_ALPHA");				\
+	builtin_define ("_ALPHA_");				\
+	builtin_define ("__stdcall=");				\
+	builtin_define ("__cdecl=");				\
+	builtin_assert ("system=unix");				\
+	builtin_assert ("system=interix");			\
+    } while (0)
 
 #undef CPP_SUBTARGET_SPEC
 #define CPP_SUBTARGET_SPEC "\
@@ -64,17 +67,9 @@ Boston, MA 02111-1307, USA.  */
 
 /* The following are needed for C++, but also needed for profiling */
 
-/* Support const sections and the ctors and dtors sections for g++.
-   Note that there appears to be two different ways to support const
-   sections at the moment.  You can either #define the symbol
-   READONLY_DATA_SECTION (giving it some code which switches to the
-   readonly data section) or else you can #define the symbols
-   EXTRA_SECTIONS, EXTRA_SECTION_FUNCTIONS, SELECT_SECTION, and
-   SELECT_RTX_SECTION.  We do both here just to be on the safe side.  */
+/* Support const sections and the ctors and dtors sections for g++.  */
 
-#define USE_CONST_SECTION	1
-
-#define CONST_SECTION_ASM_OP	"\t.rdata"
+#define READONLY_DATA_SECTION_ASM_OP	"\t.rdata"
 
 /* Define the pseudo-ops used to switch to the .ctors and .dtors sections.
 
@@ -94,86 +89,8 @@ Boston, MA 02111-1307, USA.  */
 #define CTORS_SECTION_ASM_OP	"\t.ctors"
 #define DTORS_SECTION_ASM_OP	"\t.dtors"
 
-/* A default list of other sections which we might be "in" at any given
-   time.  For targets that use additional sections (e.g. .tdesc) you
-   should override this definition in the target-specific file which
-   includes this file.  */
-
-#undef EXTRA_SECTIONS
-#define EXTRA_SECTIONS in_const, in_ctors, in_dtors
-
-/* A default list of extra section function definitions.  For targets
-   that use additional sections (e.g. .tdesc) you should override this
-   definition in the target-specific file which includes this file.  */
-
-#undef EXTRA_SECTION_FUNCTIONS
-#define EXTRA_SECTION_FUNCTIONS						\
-  CONST_SECTION_FUNCTION						\
-  CTORS_SECTION_FUNCTION						\
-  DTORS_SECTION_FUNCTION
-
-#undef READONLY_DATA_SECTION
-#define READONLY_DATA_SECTION() const_section ()
-
-#define CONST_SECTION_FUNCTION						\
-void									\
-const_section ()							\
-{									\
-  if (!USE_CONST_SECTION)						\
-    text_section();							\
-  else if (in_section != in_const)					\
-    {									\
-      fprintf (asm_out_file, "%s\n", CONST_SECTION_ASM_OP);		\
-      in_section = in_const;						\
-    }									\
-}
-
-#define CTORS_SECTION_FUNCTION						\
-void									\
-ctors_section ()							\
-{									\
-  if (in_section != in_ctors)						\
-    {									\
-      fprintf (asm_out_file, "%s\n", CTORS_SECTION_ASM_OP);		\
-      in_section = in_ctors;						\
-    }									\
-}
-
-#define DTORS_SECTION_FUNCTION						\
-void									\
-dtors_section ()							\
-{									\
-  if (in_section != in_dtors)						\
-    {									\
-      fprintf (asm_out_file, "%s\n", DTORS_SECTION_ASM_OP);		\
-      in_section = in_dtors;						\
-    }									\
-}
-
-#define INT_ASM_OP		"\t.long\t"
-
-/* A C statement (sans semicolon) to output an element in the table of
-   global constructors.  */
-#define ASM_OUTPUT_CONSTRUCTOR(FILE,NAME)				\
-  do {									\
-    ctors_section ();							\
-    fprintf (FILE, "%s", INT_ASM_OP);					\
-    assemble_name (FILE, NAME);						\
-    fprintf (FILE, "\n");						\
-  } while (0)
-
-/* A C statement (sans semicolon) to output an element in the table of
-   global destructors.  */
-#define ASM_OUTPUT_DESTRUCTOR(FILE,NAME)       				\
-  do {									\
-    dtors_section ();                   				\
-    fprintf (FILE, "%s", INT_ASM_OP);					\
-    assemble_name (FILE, NAME);              				\
-    fprintf (FILE, "\n");						\
-  } while (0)
-
 /* The linker will take care of this, and having them causes problems with
-   ld -r (specifically -rU). */
+   ld -r (specifically -rU).  */
 #define CTOR_LISTS_DEFINED_EXTERNALLY 1
 
 #define SET_ASM_OP	"\t.set\t"
@@ -201,11 +118,11 @@ while (0)
 #define PCC_BITFIELD_TYPE_TEST TYPE_NATIVE(rec)
 #define GROUP_BITFIELDS_BY_ALIGN TYPE_NATIVE(rec)
 
-/* DWARF2 Unwinding doesn't work with exception handling yet. */
+/* DWARF2 Unwinding doesn't work with exception handling yet.  */
 #undef DWARF2_UNWIND_INFO
 #define DWARF2_UNWIND_INFO 0
 
-/* Don't assume anything about the header files. */
+/* Don't assume anything about the header files.  */
 #define NO_IMPLICIT_EXTERN_C
 
 /* The definition of this macro implies that there are cases where
@@ -213,7 +130,7 @@ while (0)
 
    On NT (according to the spec) anything except strings/array that fits
    in 64 bits is returned in the registers (this appears to differ from
-   the rest of the Alpha family). */
+   the rest of the Alpha family).  */
 
 #undef RETURN_IN_MEMORY
 #define RETURN_IN_MEMORY(TYPE) \
@@ -233,7 +150,7 @@ while (0)
 }
 
 /* The current Interix assembler (consistent with the DEC documentation)
-   uses a=b NOT .set a,b; .set is for assembler options. */
+   uses a=b NOT .set a,b; .set is for assembler options.  */
 #undef ASM_OUTPUT_DEFINE_LABEL_DIFFERENCE_SYMBOL
 #define ASM_OUTPUT_DEFINE_LABEL_DIFFERENCE_SYMBOL(FILE, SY, HI, LO)    	\
  do {									\

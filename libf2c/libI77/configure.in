@@ -1,5 +1,5 @@
 # Process this file with autoconf to produce a configure script.
-#   Copyright (C) 1995, 1997, 1998, 2001 Free Software Foundation, Inc.
+#   Copyright (C) 1995, 1997, 1998, 2001, 2002 Free Software Foundation, Inc.
 #   Contributed by Dave Love (d.love@dl.ac.uk).
 #
 #This file is part of GNU Fortran.
@@ -28,7 +28,10 @@ AC_CONFIG_HEADER(config.h)
 AC_DEFINE(_XOPEN_SOURCE, 500L, [Get Single Unix Specification semantics])
 # The following is needed by irix6.2 so that struct timeval is declared.
 AC_DEFINE(_XOPEN_SOURCE_EXTENDED, 1, [Get Single Unix Specification semantics])
+# The following is needed by Solaris2.5.1 so that struct timeval is declared.
+AC_DEFINE(__EXTENSIONS__, 1, [Solaris extensions])
 AC_DEFINE(_FILE_OFFSET_BITS, 64, [Get 64-bit file size support])
+AC_DEFINE(_LARGEFILE_SOURCE, 1, [Define for HP-UX ftello and fseeko extension.])
 
 dnl Checks for programs.
 
@@ -39,6 +42,9 @@ define([AC_PROG_CC_WORKS],[])
 # For g77 we'll set CC to point at the built gcc, but this will get it into
 # the makefiles
 AC_PROG_CC
+
+LIBTOOL='$(SHELL) ../libtool'
+AC_SUBST(LIBTOOL)
 
 test "$AR" || AR=ar
 AC_SUBST(AR)
@@ -56,17 +62,6 @@ the G77 runtime system.  If necessary, install gcc now with \`LANGUAGES=c',
 then the target library, then build with \`LANGUAGES=f77'.])])
 
 AC_HEADER_STDC
-dnl We could do this if we didn't know we were using gcc
-dnl AC_MSG_CHECKING(for prototype-savvy compiler)
-dnl AC_CACHE_VAL(g77_cv_sys_proto,                
-dnl   [AC_TRY_LINK(,                             
-dnl dnl looks screwy because TRY_LINK expects a function body
-dnl    [return 0;} int foo (int * bar) {],       
-dnl    g77_cv_sys_proto=yes,                      
-dnl    [g77_cv_sys_proto=no                       
-dnl     AC_DEFINE(KR_headers)])])                
-dnl AC_MSG_RESULT($g77_cv_sys_proto)              
-
 AC_MSG_CHECKING(for posix)
 AC_CACHE_VAL(g77_cv_header_posix,
   AC_EGREP_CPP(yes,
@@ -118,11 +113,6 @@ AC_CACHE_VAL(g77_cv_sys_mingw32,
 AC_MSG_RESULT($g77_cv_sys_mingw32)
 
 
-AC_CHECK_HEADER(fcntl.h,
-   test $g77_cv_header_posix = yes && AC_DEFINE(_POSIX_SOURCE),
-   AC_DEFINE(NO_FCNTL, 1, [Define if fcntl.h is missing.]) 
-   AC_DEFINE(OPEN_DECL, 1, [Define if fcntl.h is missing.]))
-
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
 AC_TYPE_SIZE_T
@@ -148,6 +138,7 @@ AC_CHECK_FUNCS(ftello)
 AC_CHECK_FUNCS(ftruncate)
 AC_CHECK_FUNCS(mkstemp)
 AC_CHECK_FUNCS(tempnam)
+AC_CHECK_FUNCS(tmpnam)
 
 # posix will guarantee the right behaviour for sprintf, else we can't be
 # sure; HEADER_STDC wouldn't be the right check in sunos4, for instance.

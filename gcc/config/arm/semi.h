@@ -21,11 +21,17 @@ Boston, MA 02111-1307, USA.  */
 
 #define STARTFILE_SPEC  "crt0.o%s"
 
+#ifndef LIB_SPEC
 #define LIB_SPEC "-lc"
+#endif
 
+#ifndef SUBTARGET_CPP_SPEC
 #define SUBTARGET_CPP_SPEC "-D__semi__"
+#endif
 
+#ifndef LINK_SPEC
 #define LINK_SPEC "%{mbig-endian:-EB} -X"
+#endif
 
 #ifndef TARGET_VERSION
 #define TARGET_VERSION fputs (" (ARM/semi-hosted)", stderr);
@@ -55,15 +61,13 @@ Boston, MA 02111-1307, USA.  */
 #define ASM_SPEC "\
 %{fpic: -k} %{fPIC: -k} \
 %{mbig-endian:-EB} \
-%{mcpu=*:-m%*} \
-%{march=*:-m%*} \
+%{mcpu=*:-mcpu=%*} \
+%{march=*:-march=%*} \
 %{mapcs-float:-mfloat} \
 %{msoft-float:-mno-fpu} \
 %{mthumb-interwork:-mthumb-interwork} \
 %(subtarget_extra_asm_spec)"
 #endif
-
-#include "arm/aout.h"
 
 #undef  CPP_APCS_PC_DEFAULT_SPEC
 #define CPP_APCS_PC_DEFAULT_SPEC "-D__APCS_32__"

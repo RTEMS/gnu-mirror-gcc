@@ -82,11 +82,16 @@ public class File implements Serializable, Comparable
   // Remove duplicate and redundant separator characters.
   private String normalizePath(String p)
   {
+    // On Windows, convert any '/' to '\'.  This appears to be the same logic
+    // that Sun's Win32 Java performs.
+    if (separatorChar == '\\')
+      p = p.replace ('/', '\\');
+
     int dupIndex = p.indexOf(dupSeparator);
     int plen = p.length();
-    
+
     // Special case: permit Windows UNC path prefix.
-    if (dupSeparator == "\\" && dupIndex == 0)
+    if (dupSeparator.equals("\\\\") && dupIndex == 0)
       dupIndex = p.indexOf(dupSeparator, 1);
 
     if (dupIndex == -1)
@@ -157,7 +162,7 @@ public class File implements Serializable, Comparable
   }
 
   /** @since 1.2 */
-  public File getAbsoluteFile () throws IOException
+  public File getAbsoluteFile ()
   {
     return new File (getAbsolutePath());
   }
@@ -181,6 +186,9 @@ public class File implements Serializable, Comparable
     int last = path.lastIndexOf(separatorChar);
     if (last == -1)
       return null;
+    // FIXME: POSIX assumption.
+    if (last == 0 && path.charAt (0) == '/')
+      ++last;
     return path.substring(0, last);
   }
 
@@ -281,7 +289,8 @@ public class File implements Serializable, Comparable
 
   public URL toURL () throws MalformedURLException
   {
-    return new URL ("file:" + path + (isDirectory() ? "/" : ""));
+    return new URL ("file://" + getAbsolutePath ()
+		    + (isDirectory() ? "/" : ""));
   }
 
   private final native boolean performMkdir ();

@@ -23,8 +23,6 @@ Boston, MA 02111-1307, USA.  */
 
 #define SUBTARGET_CPU_DEFAULT TARGET_CPU_arm710
 
-#include "arm/coff.h"
-
 #undef  SUBTARGET_CPP_SPEC
 #define SUBTARGET_CPP_SPEC		\
 "%{march=arm710:-DCPU=ARM710A}		\
@@ -39,8 +37,10 @@ Boston, MA 02111-1307, USA.  */
   %{!mcpu*:%{!march=*:-DCPU=ARM710A}}	\
 "
 
-#undef  CPP_PREDEFINES
-#define CPP_PREDEFINES  "-D__vxworks -Acpu=arm -Amachine=arm"
+#define TARGET_OS_CPP_BUILTINS()		\
+    do {					\
+	builtin_define ("__vxworks");		\
+    } while (0)
 
 /* VxWorks does all the library stuff itself.  */
 #undef  LIB_SPEC

@@ -1,22 +1,22 @@
 /* Conditional constant propagation pass for the GNU compiler.
-   Copyright (C) 2000,2001 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2002 Free Software Foundation, Inc.
    Original framework by Daniel Berlin <dan@cgsoftware.com>
    Fleshed out and major cleanups by Jeff Law <law@redhat.com>
-   
-This file is part of GNU CC.
-   
-GNU CC is free software; you can redistribute it and/or modify it
-under the terms of the GNU General Public License as published by the
-Free Software Foundation; either version 2, or (at your option) any
-later version.
-   
-GNU CC is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+
+This file is part of GCC.
+
+GCC is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2, or (at your option) any later
+version.
+
+GCC is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
 FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
 for more details.
-   
+
 You should have received a copy of the GNU General Public License
-along with GNU CC; see the file COPYING.  If not, write to the Free
+along with GCC; see the file COPYING.  If not, write to the Free
 Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 02111-1307, USA.  */
 
@@ -44,7 +44,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 	5. Another simple SSA DCE pass to remove dead code exposed
 	   by CCP.
 
-   When we exit, we are still in SSA form. 
+   When we exit, we are still in SSA form.
 
 
    Potential further enhancements:
@@ -83,7 +83,7 @@ typedef enum
   VARYING
 } latticevalue;
 
-/* Main structure for CCP. 
+/* Main structure for CCP.
 
    Contains the lattice value and, if it's a constant, the constant
    value.  */
@@ -185,7 +185,7 @@ visit_phi_node (phi_node, block)
 	  /* If the current value of PHI_NODE is UNDEFINED and one
 	     node in PHI_NODE is CONSTANT, then the new value of the
 	     PHI is that CONSTANT.  Note this can turn into VARYING
-	     if we find another distinct constant later.  */ 
+	     if we find another distinct constant later.  */
 	  if (phi_node_lattice_val == UNDEFINED
 	      && phi_node_expr == NULL
 	      && current_parm_lattice_val == CONSTANT)
@@ -237,7 +237,7 @@ defs_to_varying (insn)
     }
 }
 
-/* Go through the expression, call the approriate evaluation routines
+/* Go through the expression, call the appropriate evaluation routines
    to attempt cprop */
 static void
 visit_expression (insn, block)
@@ -245,6 +245,30 @@ visit_expression (insn, block)
      basic_block block;
 {
   rtx src, dest, set;
+
+
+  /* Ugh.  CALL_INSNs may end a basic block and have multiple edges
+     leading out from them.
+
+     Mark all the outgoing edges as executable, then fall into the
+     normal processing below.  */
+  if (GET_CODE (insn) == CALL_INSN && block->end == insn)
+    {
+      edge curredge;
+
+      for (curredge = block->succ; curredge;
+	   curredge = curredge->succ_next)
+	{
+	  int index = EIE (curredge->src, curredge->dest);
+
+	  if (TEST_BIT (executable_edges, index))
+	    continue;
+
+	  SET_BIT (executable_edges, index);
+	  edge_info[index] = flow_edges;
+	  flow_edges = curredge;
+	}
+    }
 
   set = single_set (insn);
   if (! set)
@@ -264,7 +288,7 @@ visit_expression (insn, block)
     }
 
   /* Hard registers are not put in SSA form and thus we must consider
-     them varying.  All the more reason to avoid hard registers in 
+     them varying.  All the more reason to avoid hard registers in
      RTL until as late as possible in the compilation.  */
   if (GET_CODE (dest) == REG && REGNO (dest) < FIRST_PSEUDO_REGISTER)
     {
@@ -427,7 +451,7 @@ visit_expression (insn, block)
       rtx simplified = NULL;
 
       /* We've got some kind of INSN.  If it's simple, try to evaluate
-	 it and record the results. 
+	 it and record the results.
 
 	 We already know this insn is a single_set and that it sets
 	 a pseudo register.   So we just need to extract the source
@@ -450,7 +474,13 @@ visit_expression (insn, block)
 		  defs_to_undefined (insn);
 		  break;
 		}
-		
+
+	      /* Determine the mode for the operation before we simplify
+		 our arguments to constants.  */
+	      mode = GET_MODE (src0);
+	      if (mode == VOIDmode)
+		mode = GET_MODE (src1);
+
 	      /* Simplify source operands to whatever known values they
 		 may have.  */
 	      if (GET_CODE (src0) == REG
@@ -463,10 +493,6 @@ visit_expression (insn, block)
 
 	      /* See if the simplifier can determine if this operation
 		 computes a constant value.  */
-	      mode = GET_MODE (src0);
-	      if (mode == VOIDmode)
-		mode = GET_MODE (src1);
-
 	      simplified = simplify_relational_operation (GET_CODE (src),
 							  mode, src0, src1);
 	      break;
@@ -476,6 +502,7 @@ visit_expression (insn, block)
 	  case '1':
 	    {
 	      rtx src0 = XEXP (src, 0);
+	      enum machine_mode mode0 = GET_MODE (src0);
 
 	      /* If the operand is undefined, then the result is undefined.  */
 	      if (GET_CODE (src0) == REG
@@ -484,7 +511,7 @@ visit_expression (insn, block)
 		  defs_to_undefined (insn);
 		  break;
 		}
-		
+
 	      /* Simplify source operands to whatever known values they
 		 may have.  */
 	      if (GET_CODE (src0) == REG
@@ -496,7 +523,7 @@ visit_expression (insn, block)
 	      simplified = simplify_unary_operation (GET_CODE (src),
 						     GET_MODE (src),
 						     src0,
-						     GET_MODE (src0));
+						     mode0);
 	      break;
 	    }
 
@@ -515,7 +542,7 @@ visit_expression (insn, block)
 		  defs_to_undefined (insn);
 		  break;
 		}
-		
+
 	      /* Simplify source operands to whatever known values they
 		 may have.  */
 	      if (GET_CODE (src0) == REG
@@ -552,7 +579,7 @@ visit_expression (insn, block)
 		  defs_to_undefined (insn);
 		  break;
 		}
-		
+
 	      /* Simplify source operands to whatever known values they
 		 may have.  */
 	      if (GET_CODE (src0) == REG
@@ -575,7 +602,7 @@ visit_expression (insn, block)
 						       src0, src1, src2);
 	      break;
 	    }
-	
+
 	  default:
 	    defs_to_varying (insn);
 	}
@@ -590,14 +617,14 @@ visit_expression (insn, block)
 	  values[REGNO (dest)].const_value = simplified;
 	}
       else
-        defs_to_varying (insn);
+	defs_to_varying (insn);
     }
 }
 
 /* Iterate over the FLOW_EDGES work list.  Simulate the target block
    for each edge.  */
 static void
-examine_flow_edges (void)
+examine_flow_edges ()
 {
   while (flow_edges != NULL)
     {
@@ -638,15 +665,15 @@ examine_flow_edges (void)
 
 	      currinsn = NEXT_INSN (currinsn);
 	    }
-	  
+
 	  /* Don't forget the last insn in the block.  */
 	  if (INSN_P (currinsn))
 	    visit_expression (currinsn, succ_block);
-	  
+
 	  /* If we haven't looked at the next block, and it has a
 	     single successor, add it onto the worklist.  This is because
 	     if we only have one successor, we know it gets executed,
-	     so we don't have to wait for cprop to tell us. */
+	     so we don't have to wait for cprop to tell us.  */
 	  if (succ_edge != NULL
 	      && succ_edge->succ_next == NULL
 	      && !TEST_BIT (executable_edges,
@@ -675,7 +702,7 @@ follow_def_use_chains ()
 
       /* Pick an entry off the worklist (it does not matter which
 	 entry we pick).  */
-      member = sbitmap_first_set_bit (ssa_edges); 
+      member = sbitmap_first_set_bit (ssa_edges);
       RESET_BIT (ssa_edges, member);
 
       /* Iterate through all the uses of this entry.  */
@@ -689,7 +716,7 @@ follow_def_use_chains ()
 	    {
 	      if (TEST_BIT (executable_blocks, BLOCK_NUM (useinsn)))
 		visit_phi_node (useinsn, BLOCK_FOR_INSN (useinsn));
-	    }	  
+	    }
 	  else
 	    {
 	      if (TEST_BIT (executable_blocks, BLOCK_NUM (useinsn)))
@@ -700,7 +727,7 @@ follow_def_use_chains ()
 }
 
 /* Examine each edge to see if we were able to prove any were
-   not executable. 
+   not executable.
 
    If an edge is not executable, then we can remove its alternative
    in PHI nodes as the destination of the edge, we can simplify the
@@ -713,6 +740,7 @@ optimize_unexecutable_edges (edges, executable_edges)
      sbitmap executable_edges;
 {
   int i;
+  basic_block bb;
 
   for (i = 0; i < NUM_EDGES (edges); i++)
     {
@@ -734,7 +762,7 @@ optimize_unexecutable_edges (edges, executable_edges)
 		  remove_phi_alternative (PATTERN (insn), edge->src);
 		  if (rtl_dump_file)
 		    fprintf (rtl_dump_file,
-			     "Removing alternative for bb %d of phi %d\n", 
+			     "Removing alternative for bb %d of phi %d\n",
 			     edge->src->index, SSA_NAME (PATTERN (insn)));
 		  insn = NEXT_INSN (insn);
 		}
@@ -770,9 +798,8 @@ optimize_unexecutable_edges (edges, executable_edges)
      In cases B & C we are removing uses of registers, so make sure
      to note those changes for the DF analyzer.  */
 
-  for (i = 0; i < n_basic_blocks; i++)
+  FOR_EACH_BB (bb)
     {
-      basic_block bb = BASIC_BLOCK (i);
       rtx insn = bb->end;
       edge edge = bb->succ;
 
@@ -807,7 +834,7 @@ optimize_unexecutable_edges (edges, executable_edges)
 	}
     }
 }
- 
+
 /* Perform substitution of known values for pseudo registers.
 
    ??? Note we do not do simplifications or constant folding here, it
@@ -815,7 +842,7 @@ optimize_unexecutable_edges (edges, executable_edges)
    anyway.  Consider that if the simplification would result in an
    expression that produces a constant value that the value would
    have been discovered and recorded already.
-   
+
    We perform two transformations.  First, we initialize pseudos to their
    known constant values at their definition point.  Second, we try to
    replace uses with the known constant value.  */
@@ -839,8 +866,13 @@ ssa_ccp_substitute_constants ()
 	  /* Do not try to simplify PHI nodes down to a constant load.
 	     That will be done later as we translate out of SSA.  Also,
 	     doing that here could violate the rule that all PHI nodes
-	     are consecutive at the start of the basic block.  */
-	  if (! PHI_NODE_P (def))
+	     are consecutive at the start of the basic block.
+
+	     Don't do anything to nodes that were already sets to
+	     constants.	 */
+	  if (! PHI_NODE_P (def)
+	      && ! ((GET_CODE (def) == INSN
+		     && GET_CODE (SET_SRC (set)) == CONST_INT)))
 	    {
 	      if (rtl_dump_file)
 		fprintf (rtl_dump_file,
@@ -869,13 +901,13 @@ ssa_ccp_substitute_constants ()
 		  && (GET_CODE (useinsn) == INSN
 		      || GET_CODE (useinsn) == JUMP_INSN))
 		{
-		  
+
 		  if (validate_replace_src (regno_reg_rtx [i],
 					values[i].const_value,
 					    useinsn))
 		    {
 		      if (rtl_dump_file)
-			fprintf (rtl_dump_file, 
+			fprintf (rtl_dump_file,
 				 "Register %d in insn %d replaced with constant\n",
 				 i, INSN_UID (useinsn));
 		      INSN_CODE (useinsn) = -1;
@@ -883,7 +915,7 @@ ssa_ccp_substitute_constants ()
 				      BLOCK_FOR_INSN (useinsn),
 				      useinsn);
 		    }
-		  
+
 		}
 	    }
 	}
@@ -897,7 +929,7 @@ ssa_ccp_substitute_constants ()
 static void
 ssa_ccp_df_delete_unreachable_insns ()
 {
-  int i;
+  basic_block b;
 
   /* Use the CFG to find all the reachable blocks.  */
   find_unreachable_blocks ();
@@ -905,14 +937,9 @@ ssa_ccp_df_delete_unreachable_insns ()
   /* Now we know what blocks are not reachable.  Mark all the insns
      in those blocks as deleted for the DF analyzer.   We'll let the
      normal flow code actually remove the unreachable blocks.  */
-  for (i = n_basic_blocks - 1; i >= 0; --i)
+  FOR_EACH_BB_REVERSE (b)
     {
-      basic_block b = BASIC_BLOCK (i);
-
-      if (b->aux != NULL)
-	/* This block was found.  Tidy up the mark.  */
-	b->aux = NULL;
-      else
+      if (!(b->flags & BB_REACHABLE))
 	{
 	  rtx start = b->head;
 	  rtx end = b->end;
@@ -952,7 +979,7 @@ ssa_ccp_df_delete_unreachable_insns ()
    operate on so that it can be called for sub-graphs.  */
 
 void
-ssa_const_prop (void)
+ssa_const_prop ()
 {
   unsigned int i;
   edge curredge;
@@ -963,9 +990,6 @@ ssa_const_prop (void)
   df_analyzer = df_init ();
   df_analyse (df_analyzer, 0,
 	      DF_RD_CHAIN | DF_RU_CHAIN | DF_REG_INFO | DF_HARD_REGS);
-
-  /* We need mappings from insn to its containing block.  */
-  compute_bb_for_insn (get_max_uid ());
 
   /* Perform a quick and dirty dead code elimination pass.  This is not
      as aggressive as it could be, but it's good enough to clean up a
@@ -980,7 +1004,7 @@ ssa_const_prop (void)
   for (i = 0; i < VARRAY_SIZE (ssa_definition); i++)
     {
       if (i < FIRST_PSEUDO_REGISTER)
-        values[i].lattice_val = VARYING;
+	values[i].lattice_val = VARYING;
       else
 	values[i].lattice_val = UNDEFINED;
       values[i].const_value = NULL;
@@ -989,7 +1013,7 @@ ssa_const_prop (void)
   ssa_edges = sbitmap_alloc (VARRAY_SIZE (ssa_definition));
   sbitmap_zero (ssa_edges);
 
-  executable_blocks = sbitmap_alloc (n_basic_blocks);
+  executable_blocks = sbitmap_alloc (last_basic_block);
   sbitmap_zero (executable_blocks);
 
   executable_edges = sbitmap_alloc (NUM_EDGES (edges));
@@ -1054,6 +1078,9 @@ ssa_const_prop (void)
   sbitmap_free (executable_blocks);
   executable_blocks = NULL;
 
+  sbitmap_free (ssa_edges);
+  ssa_edges = NULL;
+
   free_edge_list (edges);
   edges = NULL;
 
@@ -1070,7 +1097,7 @@ mark_references (current_rtx, data)
      void *data;
 {
   rtx x = *current_rtx;
-  sbitmap worklist = (sbitmap)data;
+  sbitmap worklist = (sbitmap) data;
 
   if (x == NULL_RTX)
     return 0;
@@ -1146,7 +1173,7 @@ ssa_fast_dce (df)
 		  == NOTE_INSN_DELETED))
 	  || side_effects_p (PATTERN (VARRAY_RTX (ssa_definition, reg))))
 	continue;
-      
+
       /* Iterate over the uses of this register.  If we can not find
 	 any uses that have not been deleted, then the definition of
 	 this register is dead.  */
@@ -1168,7 +1195,7 @@ ssa_fast_dce (df)
 
       /* If we did not find a use of this register, then the definition
 	 of this register is dead.  */
-	     
+
       if (! found_use)
 	{
 	  rtx def = VARRAY_RTX (ssa_definition, reg);
@@ -1181,35 +1208,13 @@ ssa_fast_dce (df)
 	     deleted.  */
 	  df_insn_delete (df, BLOCK_FOR_INSN (def), def);
 
-	  if (PHI_NODE_P (def))
-	    {
-	      if (def == BLOCK_FOR_INSN (def)->head
-		  && def == BLOCK_FOR_INSN (def)->end)
-		{
-		  /* Delete it.  */
-		  PUT_CODE (def, NOTE);
-		  NOTE_LINE_NUMBER (def) = NOTE_INSN_DELETED;
-		}
-	      else if (def == BLOCK_FOR_INSN (def)->head)
-	        {
-		  BLOCK_FOR_INSN (def)->head = NEXT_INSN (def);
-		  flow_delete_insn (def);
-		}
-	      else if (def == BLOCK_FOR_INSN (def)->end)
-		{
-		  BLOCK_FOR_INSN (def)->end = PREV_INSN (def);
-		  flow_delete_insn (def);
-		}
-	      else
-		flow_delete_insn (def);
-	    }
-	  else
-	    {
-	      flow_delete_insn (def);
-	    }
 	  VARRAY_RTX (ssa_definition, reg) = NULL;
 	}
     }
 
   sbitmap_free (worklist);
+
+  /* Update the use-def chains in the df_analyzer as needed.  */
+  df_analyse (df_analyzer, 0,
+	      DF_RD_CHAIN | DF_RU_CHAIN | DF_REG_INFO | DF_HARD_REGS);
 }

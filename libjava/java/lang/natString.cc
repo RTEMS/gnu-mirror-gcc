@@ -1,6 +1,6 @@
 // natString.cc - Implementation of java.lang.String native methods.
 
-/* Copyright (C) 1998, 1999, 2000, 2001  Free Software Foundation
+/* Copyright (C) 1998, 1999, 2000, 2001, 2002  Free Software Foundation
 
    This file is part of libgcj.
 
@@ -198,7 +198,7 @@ unintern (jobject obj)
   // interning the String.  If we subsequently re-intern the same
   // String, then we set the bit.  When finalizing, if the bit is set
   // then we clear it and re-register the finalizer.  We know this is
-  // a safe approach because both the intern() and unintern() acquire
+  // a safe approach because both intern() and unintern() acquire
   // the class lock; this bit can't be manipulated when the lock is
   // not held.  So if we are finalizing and the bit is clear then we
   // know all references are gone and we can clear the entry in the
@@ -400,7 +400,7 @@ _Jv_AllocString(jsize len)
 #else
   // Class needs no initialization, and there is no finalizer, so
   // we can go directly to the collector's allocator interface.
-  jstring obj = (jstring) _Jv_AllocPtrFreeObj(&StringClass, sz);
+  jstring obj = (jstring) _Jv_AllocPtrFreeObj(sz, &StringClass);
 #endif
   obj->data = obj;
   obj->boffset = sizeof(java::lang::String);
@@ -456,9 +456,8 @@ java::lang::String::init(jcharArray chars, jint offset, jint count,
     }
   else
     {
-      JvAssert (offset == 0);
       array = chars;
-      pdst = elements (array);
+      pdst = &(elements(array)[offset]);
     }
 
   data = array;
@@ -523,6 +522,7 @@ java::lang::String::init (jbyteArray bytes, jint offset, jint count,
 	  avail -= done;
 	}
     }
+  converter->done ();
   this->data = array;
   this->boffset = (char *) elements (array) - (char *) array;
   this->count = outpos;
@@ -604,6 +604,7 @@ java::lang::String::getBytes (jstring enc)
 	  todo -= converted;
 	}
     }
+  converter->done ();
   if (bufpos == buflen)
     return buffer;
   jbyteArray result = JvNewByteArray(bufpos);

@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler,
    for Alpha NetBSD systems.
-   Copyright (C) 1998 Free Software Foundation, Inc.
+   Copyright (C) 1998, 2002 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -22,12 +22,52 @@ Boston, MA 02111-1307, USA.  */
 #undef TARGET_DEFAULT
 #define TARGET_DEFAULT (MASK_FP | MASK_FPREGS | MASK_GAS)
 
-#undef CPP_PREDEFINES
-#define CPP_PREDEFINES "-D_LONGLONG -Dnetbsd -Dunix " SUB_CPP_PREDEFINES
-
-#undef LIB_SPEC
-#define LIB_SPEC "%{pg:-lgmon} %{pg:-lc_p} %{!pg:-lc}"
+#define TARGET_OS_CPP_BUILTINS()		\
+    do {					\
+	NETBSD_OS_CPP_BUILTINS_ELF();		\
+	NETBSD_OS_CPP_BUILTINS_LP64();		\
+    } while (0)
 
 /* Show that we need a GP when profiling.  */
 #undef TARGET_PROFILING_NEEDS_GP
 #define TARGET_PROFILING_NEEDS_GP 1
+
+
+/* Provide a CPP_SUBTARGET_SPEC appropriate for NetBSD/alpha.  We use
+   this to pull in CPP specs that all NetBSD configurations need.  */
+
+#undef CPP_SUBTARGET_SPEC
+#define CPP_SUBTARGET_SPEC "%(netbsd_cpp_spec)"
+
+#undef SUBTARGET_EXTRA_SPECS
+#define SUBTARGET_EXTRA_SPECS			\
+  { "netbsd_cpp_spec", NETBSD_CPP_SPEC },	\
+  { "netbsd_link_spec", NETBSD_LINK_SPEC_ELF },	\
+  { "netbsd_entry_point", NETBSD_ENTRY_POINT },
+
+
+/* Provide a LINK_SPEC appropriate for a NetBSD/alpha ELF target.  */
+
+#undef LINK_SPEC
+#define LINK_SPEC \
+  "%{G*} %{relax:-relax} \
+   %{O*:-O3} %{!O*:-O1} \
+   %(netbsd_link_spec)"
+
+#define NETBSD_ENTRY_POINT "__start"
+
+
+/* Provide an ENDFILE_SPEC appropriate for NetBSD/alpha ELF.  Here we
+   add crtend.o, which provides part of the support for getting
+   C++ file-scope static objects deconstructed after exiting "main".
+
+   We also need to handle the GCC option `-ffast-math'.  */
+
+#undef ENDFILE_SPEC
+#define ENDFILE_SPEC		\
+  "%{ffast-math|funsafe-math-optimizations:crtfm%O%s} \
+   %{!shared:crtend%O%s} %{shared:crtendS%O%s}"
+
+
+#undef TARGET_VERSION
+#define TARGET_VERSION fprintf (stderr, " (NetBSD/alpha ELF)");

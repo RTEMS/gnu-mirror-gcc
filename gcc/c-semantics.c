@@ -1,25 +1,25 @@
 /* This file contains the definitions and documentation for the common
    tree codes used in the GNU C and C++ compilers (see c-common.def
    for the standard codes).  
-   Copyright (C) 2000, 2001 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2002 Free Software Foundation, Inc.
    Written by Benjamin Chelf (chelf@codesourcery.com).
 
-This file is part of GNU CC.
+This file is part of GCC.
 
-GNU CC is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2, or (at your option)
-any later version.
+GCC is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2, or (at your option) any later
+version.
 
-GNU CC is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+GCC is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU CC; see the file COPYING.  If not, write to
-the Free Software Foundation, 59 Temple Place - Suite 330,
-Boston, MA 02111-1307, USA.  */
+along with GCC; see the file COPYING.  If not, write to the Free
+Software Foundation, 59 Temple Place - Suite 330, Boston, MA
+02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
@@ -36,6 +36,7 @@ Boston, MA 02111-1307, USA.  */
 #include "expr.h"
 #include "output.h"
 #include "timevar.h"
+#include "predict.h"
 
 /* If non-NULL, the address of a language-specific function for
    expanding statements.  */
@@ -60,6 +61,7 @@ begin_stmt_tree (t)
   *t = build_nt (EXPR_STMT, void_zero_node);
   last_tree = *t;
   last_expr_type = NULL_TREE;
+  last_expr_filename = input_filename;
 }
 
 /* T is a statement.  Add it to the statement-tree.  */
@@ -68,6 +70,19 @@ tree
 add_stmt (t)
      tree t;
 {
+  if (input_filename != last_expr_filename)
+    {
+      /* If the filename has changed, also add in a FILE_STMT.  Do a string
+	 compare first, though, as it might be an equivalent string.  */
+      int add = (strcmp (input_filename, last_expr_filename) != 0);
+      last_expr_filename = input_filename;
+      if (add)
+	{
+	  tree pos = build_nt (FILE_STMT, get_identifier (input_filename));
+	  add_stmt (pos);
+	}
+    }
+
   /* Add T to the statement-tree.  */
   TREE_CHAIN (last_tree) = t;
   last_tree = t;
@@ -170,19 +185,12 @@ finish_stmt_tree (t)
 tree
 build_stmt VPARAMS ((enum tree_code code, ...))
 {
-#ifndef ANSI_PROTOTYPES
-  enum tree_code code;
-#endif
-  va_list p;
-  register tree t;
-  register int length;
-  register int i;
+  tree t;
+  int length;
+  int i;
 
-  VA_START (p, code);
-
-#ifndef ANSI_PROTOTYPES
-  code = va_arg (p, enum tree_code);
-#endif
+  VA_OPEN (p, code);
+  VA_FIXEDARG (p, enum tree_code, code);
 
   t = make_node (code);
   length = TREE_CODE_LENGTH (code);
@@ -191,7 +199,7 @@ build_stmt VPARAMS ((enum tree_code code, ...))
   for (i = 0; i < length; i++)
     TREE_OPERAND (t, i) = va_arg (p, tree);
 
-  va_end (p);
+  VA_CLOSE (p);
   return t;
 }
 
@@ -243,7 +251,7 @@ make_rtl_for_local_static (decl)
      already create RTL, which means that the modification to
      DECL_ASSEMBLER_NAME came only via the explicit extension.  */
   if (DECL_ASSEMBLER_NAME (decl) != DECL_NAME (decl)
-      && !DECL_RTL (decl))
+      && !DECL_RTL_SET_P (decl))
     asmspec = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
 
   rest_of_decl_compilation (decl, asmspec, /*top_level=*/0, /*at_end=*/0);
@@ -278,7 +286,7 @@ emit_local_var (decl)
     expand_end_target_temps ();
 }
 
-/* Helper for generating the RTL at the beginning of a scope. */
+/* Helper for generating the RTL at the beginning of a scope.  */
 
 void
 genrtl_do_pushlevel ()
@@ -287,7 +295,7 @@ genrtl_do_pushlevel ()
   clear_last_expr ();
 }
 
-/* Generate the RTL for DESTINATION, which is a GOTO_STMT. */
+/* Generate the RTL for DESTINATION, which is a GOTO_STMT.  */
 
 void
 genrtl_goto_stmt (destination)
@@ -312,11 +320,28 @@ genrtl_goto_stmt (destination)
     expand_computed_goto (destination);
 }
 
-/* Generate the RTL for EXPR, which is an EXPR_STMT. */
+/* Generate the RTL for EXPR, which is an EXPR_STMT.  Provided just
+   for backward compatibility.  genrtl_expr_stmt_value() should be
+   used for new code.  */
 
-void 
+void
 genrtl_expr_stmt (expr)
      tree expr;
+{
+  genrtl_expr_stmt_value (expr, -1, 1);
+}
+
+/* Generate the RTL for EXPR, which is an EXPR_STMT.  WANT_VALUE tells
+   whether to (1) save the value of the expression, (0) discard it or
+   (-1) use expr_stmts_for_value to tell.  The use of -1 is
+   deprecated, and retained only for backward compatibility.
+   MAYBE_LAST is non-zero if this EXPR_STMT might be the last statement
+   in expression statement.  */
+
+void 
+genrtl_expr_stmt_value (expr, want_value, maybe_last)
+     tree expr;
+     int want_value, maybe_last;
 {
   if (expr != NULL_TREE)
     {
@@ -326,14 +351,14 @@ genrtl_expr_stmt (expr)
 	expand_start_target_temps ();
       
       if (expr != error_mark_node)
-	expand_expr_stmt (expr);
+	expand_expr_stmt_value (expr, want_value, maybe_last);
       
       if (stmts_are_full_exprs_p ())
 	expand_end_target_temps ();
     }
 }
 
-/* Generate the RTL for T, which is a DECL_STMT. */
+/* Generate the RTL for T, which is a DECL_STMT.  */
 
 void
 genrtl_decl_stmt (t)
@@ -368,7 +393,7 @@ genrtl_decl_stmt (t)
     (*lang_expand_decl_stmt) (t);
 }
 
-/* Generate the RTL for T, which is an IF_STMT. */
+/* Generate the RTL for T, which is an IF_STMT.  */
 
 void
 genrtl_if_stmt (t)
@@ -389,7 +414,7 @@ genrtl_if_stmt (t)
   expand_end_cond ();
 }
 
-/* Generate the RTL for T, which is a WHILE_STMT. */
+/* Generate the RTL for T, which is a WHILE_STMT.  */
 
 void
 genrtl_while_stmt (t)
@@ -403,7 +428,7 @@ genrtl_while_stmt (t)
 
   cond = expand_cond (WHILE_COND (t));
   emit_line_note (input_filename, lineno);
-  expand_exit_loop_if_false (0, cond);
+  expand_exit_loop_top_cond (0, cond);
   genrtl_do_pushlevel ();
   
   expand_stmt (WHILE_BODY (t));
@@ -411,7 +436,7 @@ genrtl_while_stmt (t)
   expand_end_loop ();
 }
 
-/* Generate the RTL for T, which is a DO_STMT. */
+/* Generate the RTL for T, which is a DO_STMT.  */
 
 void
 genrtl_do_stmt (t)
@@ -445,7 +470,7 @@ genrtl_do_stmt (t)
     }
 }
 
-/* Build the node for a return statement and return it. */
+/* Build the node for a return statement and return it.  */
 
 tree
 build_return_stmt (expr)
@@ -454,7 +479,7 @@ build_return_stmt (expr)
   return (build_stmt (RETURN_STMT, expr));
 }
 
-/* Generate the RTL for STMT, which is a RETURN_STMT. */
+/* Generate the RTL for STMT, which is a RETURN_STMT.  */
 
 void
 genrtl_return_stmt (stmt)
@@ -462,13 +487,7 @@ genrtl_return_stmt (stmt)
 {
   tree expr;
 
-  /* If RETURN_NULLIFIED_P is set, the frontend has arranged to set up
-     the return value separately, so just return the return value
-     itself.  This is used for the C++ named return value optimization.  */
-  if (RETURN_NULLIFIED_P (stmt))
-    expr = DECL_RESULT (current_function_decl);
-  else
-    expr = RETURN_EXPR (stmt);
+  expr = RETURN_EXPR (stmt);
 
   emit_line_note (input_filename, lineno);
   if (!expr)
@@ -481,7 +500,7 @@ genrtl_return_stmt (stmt)
     }
 }
 
-/* Generate the RTL for T, which is a FOR_STMT. */
+/* Generate the RTL for T, which is a FOR_STMT.  */
 
 void
 genrtl_for_stmt (t)
@@ -511,7 +530,7 @@ genrtl_for_stmt (t)
   /* Expand the condition.  */
   emit_line_note (input_filename, lineno);
   if (cond)
-    expand_exit_loop_if_false (0, cond);
+    expand_exit_loop_top_cond (0, cond);
 
   /* Expand the body.  */
   genrtl_do_pushlevel ();
@@ -527,7 +546,7 @@ genrtl_for_stmt (t)
   expand_end_loop ();
 }
 
-/* Build a break statement node and return it. */
+/* Build a break statement node and return it.  */
 
 tree
 build_break_stmt ()
@@ -535,7 +554,7 @@ build_break_stmt ()
   return (build_stmt (BREAK_STMT));
 }
 
-/* Generate the RTL for a BREAK_STMT. */
+/* Generate the RTL for a BREAK_STMT.  */
 
 void
 genrtl_break_stmt ()
@@ -545,7 +564,7 @@ genrtl_break_stmt ()
     error ("break statement not within loop or switch");
 }
 
-/* Build a continue statement node and return it. */
+/* Build a continue statement node and return it.  */
 
 tree
 build_continue_stmt ()
@@ -553,7 +572,7 @@ build_continue_stmt ()
   return (build_stmt (CONTINUE_STMT));
 }
 
-/* Generate the RTL for a CONTINUE_STMT. */
+/* Generate the RTL for a CONTINUE_STMT.  */
 
 void
 genrtl_continue_stmt ()
@@ -563,7 +582,7 @@ genrtl_continue_stmt ()
     error ("continue statement not within a loop");   
 }
 
-/* Generate the RTL for T, which is a SCOPE_STMT. */
+/* Generate the RTL for T, which is a SCOPE_STMT.  */
 
 void
 genrtl_scope_stmt (t)
@@ -608,7 +627,7 @@ genrtl_scope_stmt (t)
     }
 }
 
-/* Generate the RTL for T, which is a SWITCH_STMT. */
+/* Generate the RTL for T, which is a SWITCH_STMT.  */
 
 void
 genrtl_switch_stmt (t)
@@ -620,16 +639,16 @@ genrtl_switch_stmt (t)
   cond = expand_cond (SWITCH_COND (t));
   if (cond == error_mark_node)
     /* The code is in error, but we don't want expand_end_case to
-       crash. */
+       crash.  */
     cond = boolean_false_node;
 
   emit_line_note (input_filename, lineno);
   expand_start_case (1, cond, TREE_TYPE (cond), "switch statement");
   expand_stmt (SWITCH_BODY (t));
-  expand_end_case (cond);
+  expand_end_case_type (cond, SWITCH_TYPE (t));
 }
 
-/* Create a CASE_LABEL tree node and return it. */
+/* Create a CASE_LABEL tree node and return it.  */
 
 tree
 build_case_label (low_value, high_value, label_decl)
@@ -641,7 +660,7 @@ build_case_label (low_value, high_value, label_decl)
 }
 
 
-/* Generate the RTL for a CASE_LABEL. */
+/* Generate the RTL for a CASE_LABEL.  */
 
 void 
 genrtl_case_label (case_label)
@@ -668,7 +687,7 @@ genrtl_case_label (case_label)
 		 CASE_LABEL_DECL (case_label), &duplicate);
 }
 
-/* Generate the RTL for T, which is a COMPOUND_STMT. */
+/* Generate the RTL for T, which is a COMPOUND_STMT.  */
 
 void
 genrtl_compound_stmt (t)
@@ -682,12 +701,12 @@ genrtl_compound_stmt (t)
 
 #ifdef ENABLE_CHECKING
   /* Make sure that we've pushed and popped the same number of levels.  */
-  if (n != current_nesting_level ())
+  if (!COMPOUND_STMT_NO_SCOPE (t) && n != current_nesting_level ())
     abort ();
 #endif
 }
 
-/* Generate the RTL for an ASM_STMT. */
+/* Generate the RTL for an ASM_STMT.  */
 
 void
 genrtl_asm_stmt (cv_qualifier, string, output_operands,
@@ -716,15 +735,15 @@ genrtl_asm_stmt (cv_qualifier, string, output_operands,
 			   input_filename, lineno);
 }
 
-/* Generate the RTL for a DECL_CLEANUP. */
+/* Generate the RTL for a DECL_CLEANUP.  */
 
 void 
-genrtl_decl_cleanup (decl, cleanup)
-     tree decl;
-     tree cleanup;
+genrtl_decl_cleanup (t)
+     tree t;
 {
+  tree decl = CLEANUP_DECL (t);
   if (!decl || (DECL_SIZE (decl) && TREE_TYPE (decl) != error_mark_node))
-    expand_decl_cleanup (decl, cleanup);
+    expand_decl_cleanup_eh (decl, CLEANUP_EXPR (t), CLEANUP_EH_ONLY (t));
 }
 
 /* We're about to expand T, a statement.  Set up appropriate context
@@ -740,7 +759,7 @@ prep_stmt (t)
 }
 
 /* Generate the RTL for the statement T, its substatements, and any
-   other statements at its nesting level. */
+   other statements at its nesting level.  */
 
 void
 expand_stmt (t)
@@ -756,12 +775,19 @@ expand_stmt (t)
 
       switch (TREE_CODE (t))
 	{
+	case FILE_STMT:
+	  input_filename = FILE_STMT_FILENAME (t);
+	  break;
+
 	case RETURN_STMT:
 	  genrtl_return_stmt (t);
 	  break;
 
 	case EXPR_STMT:
-	  genrtl_expr_stmt (EXPR_STMT_EXPR (t));
+	  genrtl_expr_stmt_value (EXPR_STMT_EXPR (t), TREE_ADDRESSABLE (t),
+				  TREE_CHAIN (t) == NULL
+				  || (TREE_CODE (TREE_CHAIN (t)) == SCOPE_STMT
+				      && TREE_CHAIN (TREE_CHAIN (t)) == NULL));
 	  break;
 
 	case DECL_STMT:
@@ -809,6 +835,14 @@ expand_stmt (t)
 	  break;
 
 	case GOTO_STMT:
+	  /* Emit information for branch prediction.  */
+	  if (!GOTO_FAKE_P (t)
+	      && TREE_CODE (GOTO_DESTINATION (t)) == LABEL_DECL)
+	    {
+	      rtx note = emit_note (NULL, NOTE_INSN_PREDICTION);
+
+	      NOTE_PREDICTION (note) = NOTE_PREDICT (PRED_GOTO, NOT_TAKEN);
+	    }
 	  genrtl_goto_stmt (GOTO_DESTINATION (t));
 	  break;
 
@@ -820,6 +854,10 @@ expand_stmt (t)
 
 	case SCOPE_STMT:
 	  genrtl_scope_stmt (t);
+	  break;
+
+	case CLEANUP_STMT:
+	  genrtl_decl_cleanup (t);
 	  break;
 
 	default:
@@ -838,4 +876,3 @@ expand_stmt (t)
       t = TREE_CHAIN (t);
     }
 }
-

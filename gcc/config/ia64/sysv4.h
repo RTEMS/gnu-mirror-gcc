@@ -4,11 +4,11 @@
 #undef PREFERRED_DEBUGGING_TYPE
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
 
+/* Stabs does not work properly for 64-bit targets.  */
+#undef DBX_DEBUGGING_INFO
+
 /* Various pseudo-ops for which the Intel assembler uses non-standard
    definitions.  */
-
-#undef ASM_BYTE_OP
-#define ASM_BYTE_OP "\tdata1\t"
 
 #undef STRING_ASM_OP
 #define STRING_ASM_OP "\tstringz\t"
@@ -21,6 +21,11 @@
 
 #undef ASCII_DATA_ASM_OP
 #define ASCII_DATA_ASM_OP "\tstring\t"
+
+/* ia64-specific options for gas
+   ??? ia64 gas doesn't accept standard svr4 assembler options?  */
+#undef ASM_SPEC
+#define ASM_SPEC "-x %{mconstant-gp} %{mauto-pic} %(asm_extra)"
 
 /* ??? Unfortunately, .lcomm doesn't work, because it puts things in either
    .bss or .sbss, and we can't control the decision of which is used.  When
@@ -37,8 +42,7 @@ extern int size_directive_output;
 #undef ASM_OUTPUT_ALIGNED_LOCAL
 #define ASM_OUTPUT_ALIGNED_DECL_LOCAL(FILE, DECL, NAME, SIZE, ALIGN) \
 do {									\
-  if ((DECL)								\
-      && XSTR (XEXP (DECL_RTL (DECL), 0), 0)[0] == SDATA_NAME_FLAG_CHAR) \
+  if ((DECL) && sdata_symbolic_operand (XEXP (DECL_RTL (DECL), 0), Pmode)) \
     sbss_section ();							\
   else									\
     bss_section ();							\
@@ -47,11 +51,6 @@ do {									\
   ASM_OUTPUT_SKIP (FILE, SIZE ? SIZE : 1);				\
 } while (0)
 
-/* ??? Intel assembler does not allow "." in section names, so turn off
-   gnu.linkonce section support, but only when using the Intel assembler.  */
-#undef UNIQUE_SECTION_P
-#define UNIQUE_SECTION_P(DECL) (TARGET_GNU_AS ? DECL_ONE_ONLY (DECL) : 0)
-
 /* The # tells the Intel assembler that this is not a register name.
    However, we can't emit the # in a label definition, so we set a variable
    in ASM_OUTPUT_LABEL to control whether we want the postfix here or not.
@@ -59,30 +58,19 @@ do {									\
    we have to scan it for a non-label character and insert the # there.  */
 
 #undef ASM_OUTPUT_LABELREF
-#define ASM_OUTPUT_LABELREF(STREAM, NAME) 				\
-  do									\
-    {									\
-      const char * real_name;						\
-      const char * name_end;						\
-									\
-      STRIP_NAME_ENCODING (real_name, NAME);				\
-      name_end = strchr (real_name, '+');				\
-									\
-      if (name_end)							\
-	* name_end = 0;							\
-									\
-      asm_fprintf (STREAM, "%U%s", real_name);				\
-									\
-      if (ia64_asm_output_label)					\
-	asm_fprintf (STREAM, "#");					\
-									\
-      if (name_end)							\
-	{								\
-	  * name_end = '+';						\
-	  asm_fprintf (STREAM, name_end);				\
-	}								\
-    }									\
-  while (0)
+#define ASM_OUTPUT_LABELREF(STREAM, NAME)	\
+do {						\
+  const char *name_ = NAME;			\
+  if (*name_ == ENCODE_SECTION_INFO_CHAR)	\
+    name_ += 2;					\
+  if (*name_ == '*')				\
+    name_++;					\
+  else						\
+    fputs (user_label_prefix, STREAM);		\
+  fputs (name_, STREAM);			\
+  if (!ia64_asm_output_label)			\
+    fputc ('#', STREAM);			\
+} while (0)
 
 /* Intel assembler requires both flags and type if declaring a non-predefined
    section.  */
@@ -90,46 +78,6 @@ do {									\
 #define INIT_SECTION_ASM_OP	"\t.section\t.init,\"ax\",\"progbits\""
 #undef FINI_SECTION_ASM_OP
 #define FINI_SECTION_ASM_OP	"\t.section\t.fini,\"ax\",\"progbits\""
-#undef CTORS_SECTION_ASM_OP
-#define CTORS_SECTION_ASM_OP	"\t.section\t.ctors,\"aw\",\"progbits\""
-#undef DTORS_SECTION_ASM_OP
-#define DTORS_SECTION_ASM_OP	"\t.section\t.dtors,\"aw\",\"progbits\""
-
-/* A C statement (sans semicolon) to output an element in the table of
-   global constructors.  */
-/* Must override this to get @fptr relocation.  */
-#undef ASM_OUTPUT_CONSTRUCTOR
-#define ASM_OUTPUT_CONSTRUCTOR(FILE,NAME)				\
-  do {									\
-    ctors_section ();							\
-    if (TARGET_NO_PIC || TARGET_AUTO_PIC)				\
-      fputs ("\tdata8\t ", FILE);					\
-    else								\
-      fputs ("\tdata8\t @fptr(", FILE);					\
-    assemble_name (FILE, NAME);						\
-    if (TARGET_NO_PIC || TARGET_AUTO_PIC)				\
-      fputs ("\n", FILE);						\
-    else								\
-      fputs (")\n", FILE);						\
-  } while (0)
-
-/* A C statement (sans semicolon) to output an element in the table of
-   global destructors.  */
-/* Must override this to get @fptr relocation.  */
-#undef ASM_OUTPUT_DESTRUCTOR
-#define ASM_OUTPUT_DESTRUCTOR(FILE,NAME)       				\
-  do {									\
-    dtors_section ();                   				\
-    if (TARGET_NO_PIC || TARGET_AUTO_PIC)				\
-      fputs ("\tdata8\t ", FILE);					\
-    else								\
-      fputs ("\tdata8\t @fptr(", FILE);					\
-    assemble_name (FILE, NAME);              				\
-    if (TARGET_NO_PIC || TARGET_AUTO_PIC)				\
-      fputs ("\n", FILE);						\
-    else								\
-      fputs (")\n", FILE);						\
-  } while (0)
 
 /* svr4.h undefines this, so we need to define it here.  */
 #define DBX_REGISTER_NUMBER(REGNO) \
@@ -191,67 +139,15 @@ do {									\
   emit_safe_across_calls (STREAM);					\
 } while (0)
 
-/* Case label alignment is handled by ADDR_VEC_ALIGN now.  */
-
-#undef ASM_OUTPUT_BEFORE_CASE_LABEL
-#define ASM_OUTPUT_BEFORE_CASE_LABEL(FILE,PREFIX,NUM,TABLE)
-
-/* We override svr4.h so that we can support the sdata section.  */
-
-#undef SELECT_SECTION
-#define SELECT_SECTION(DECL,RELOC)					\
-{									\
-  if (TREE_CODE (DECL) == STRING_CST)					\
-    {									\
-      if (! flag_writable_strings)					\
-	const_section ();						\
-      else								\
-	data_section ();						\
-    }									\
-  else if (TREE_CODE (DECL) == VAR_DECL)				\
-    {									\
-      if (XSTR (XEXP (DECL_RTL (DECL), 0), 0)[0]			\
-	  == SDATA_NAME_FLAG_CHAR)					\
-        sdata_section ();						\
-      /* ??? We need the extra ! RELOC check, because the default is to \
-	 only check RELOC if flag_pic is set, and we don't set flag_pic \
-	 (yet?).  */							\
-      else if (DECL_READONLY_SECTION (DECL, RELOC) && ! (RELOC))	\
-	const_section ();						\
-      else								\
-	data_section ();						\
-    }									\
-  /* This could be a CONSTRUCTOR containing ADDR_EXPR of a VAR_DECL,	\
-     in which case we can't put it in a shared library rodata.  */	\
-  else if (flag_pic && (RELOC))						\
-    data_section ();							\
-  else									\
-    const_section ();							\
-}
-
-/* Similarly for constant pool data.  */
-
-extern unsigned int ia64_section_threshold;
-#undef SELECT_RTX_SECTION
-#define SELECT_RTX_SECTION(MODE, RTX)					\
-{									\
-  if (GET_MODE_SIZE (MODE) > 0						\
-      && GET_MODE_SIZE (MODE) <= ia64_section_threshold)		\
-    sdata_section ();							\
-  else if (flag_pic && symbolic_operand ((RTX), (MODE)))		\
-    data_section ();							\
-  else									\
-    const_section ();							\
-}
+/* Override default elf definition.  */
+#undef	TARGET_ASM_SELECT_RTX_SECTION
+#define TARGET_ASM_SELECT_RTX_SECTION  ia64_select_rtx_section
 
 #undef EXTRA_SECTIONS
-#define EXTRA_SECTIONS in_const, in_ctors, in_dtors, in_sdata, in_sbss
+#define EXTRA_SECTIONS in_sdata, in_sbss
 
 #undef EXTRA_SECTION_FUNCTIONS
 #define EXTRA_SECTION_FUNCTIONS						\
-  CONST_SECTION_FUNCTION						\
-  CTORS_SECTION_FUNCTION						\
-  DTORS_SECTION_FUNCTION						\
   SDATA_SECTION_FUNCTION						\
   SBSS_SECTION_FUNCTION
 

@@ -1,5 +1,5 @@
 /* Routines for GCC for ARM/pe.
-   Copyright (C) 1995, 1996, 2000 Free Software Foundation, Inc.
+   Copyright (C) 1995, 1996, 2000, 2001, 2002 Free Software Foundation, Inc.
    Contributed by Doug Evans (dje@cygnus.com).
 
 This file is part of GNU CC.
@@ -45,7 +45,7 @@ arm_dllexport_p (decl)
   if (TREE_CODE (decl) != VAR_DECL
       && TREE_CODE (decl) != FUNCTION_DECL)
     return 0;
-  exp = lookup_attribute ("dllexport", DECL_MACHINE_ATTRIBUTES (decl));
+  exp = lookup_attribute ("dllexport", DECL_ATTRIBUTES (decl));
   if (exp)
     return 1;
 
@@ -67,7 +67,7 @@ arm_dllimport_p (decl)
   if (TREE_CODE (decl) != VAR_DECL
       && TREE_CODE (decl) != FUNCTION_DECL)
     return 0;
-  imp = lookup_attribute ("dllimport", DECL_MACHINE_ATTRIBUTES (decl));
+  imp = lookup_attribute ("dllimport", DECL_ATTRIBUTES (decl));
   if (imp)
     return 1;
 
@@ -204,13 +204,12 @@ arm_mark_dllimport (decl)
   XEXP (DECL_RTL (decl), 0) = newrtl;
 }
 
-/* Cover function to implement ENCODE_SECTION_INFO.  */
-
 void
-arm_pe_encode_section_info (decl)
+arm_pe_encode_section_info (decl, first)
      tree decl;
+     int first ATTRIBUTE_UNUSED;
 {
-  /* This bit is copied from arm.h.  */
+  /* This bit is copied from arm_encode_section_info.  */
   if (optimize > 0 && TREE_CONSTANT (decl)
       && (!flag_writable_strings || TREE_CODE (decl) != STRING_CST))
     {
@@ -247,8 +246,6 @@ arm_pe_encode_section_info (decl)
     }
 }
 
-/* Cover function for UNIQUE_SECTION.  */
-
 void
 arm_pe_unique_section (decl, reloc)
      tree decl;
@@ -257,11 +254,10 @@ arm_pe_unique_section (decl, reloc)
   int len;
   const char * name;
   char * string;
-  char * prefix;
+  const char * prefix;
 
   name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
-  /* Strip off any encoding in fnname.  */
-  STRIP_NAME_ENCODING (name, name);
+  name = arm_strip_name_encoding (name);
 
   /* The object is put in, for example, section .text$foo.
      The linker will then ultimately place them in .text

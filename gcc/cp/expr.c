@@ -32,9 +32,6 @@ Boston, MA 02111-1307, USA.  */
 #include "except.h"
 #include "tm_p.h"
 
-static rtx cplus_expand_expr PARAMS ((tree, rtx, enum machine_mode,
-				    enum expand_modifier));
-
 /* Hook used by output_constant to expand language-specific
    constants.  */
 
@@ -79,12 +76,12 @@ cplus_expand_constant (cst)
 
 /* Hook used by expand_expr to expand language-specific tree codes.  */
 
-static rtx
-cplus_expand_expr (exp, target, tmode, modifier)
+rtx
+cxx_expand_expr (exp, target, tmode, modifier)
      tree exp;
      rtx target;
      enum machine_mode tmode;
-     enum expand_modifier modifier;
+     int modifier;  /* Actually an enum expand_modifier.  */
 {
   tree type = TREE_TYPE (exp);
   register enum machine_mode mode = TYPE_MODE (type);
@@ -105,9 +102,10 @@ cplus_expand_expr (exp, target, tmode, modifier)
 			  target, tmode, modifier);
 
     case OFFSET_REF:
-      return expand_expr (default_conversion (resolve_offset_ref (exp)),
-			  target, tmode, EXPAND_NORMAL);
-
+      /* Offset refs should not make it through to here. */
+      abort ();
+      return const0_rtx;
+      
     case THROW_EXPR:
       expand_expr (TREE_OPERAND (exp, 0), const0_rtx, VOIDmode, 0);
       return NULL;
@@ -125,16 +123,9 @@ cplus_expand_expr (exp, target, tmode, modifier)
     default:
       return c_expand_expr (exp, target, tmode, modifier);
     }
-  my_friendly_abort (40);
+  abort ();
   /* NOTREACHED */
   return NULL;
-}
-
-void
-init_cplus_expand ()
-{
-  lang_expand_expr = cplus_expand_expr;
-  lang_expand_constant = cplus_expand_constant;
 }
 
 int

@@ -1,6 +1,6 @@
 // natFileDescriptorWin32.cc - Native part of FileDescriptor class.
 
-/* Copyright (C) 1998, 1999, 2000  Red Hat, Inc.
+/* Copyright (C) 1998, 1999, 2000, 2001  Free Software Foundation, Inc.
 
    This file is part of libgcj.
 
@@ -17,6 +17,7 @@ details.  */
 #include <string.h>
 
 #include <windows.h>
+#undef STRICT
 
 #include <gcj/cni.h>
 #include <jvm.h>
@@ -30,6 +31,17 @@ details.  */
 #include <java/lang/String.h>
 #include <java/lang/Thread.h>
 #include <java/io/FileNotFoundException.h>
+
+// FIXME: casting a FILE (pointer) to a jint will not work on Win64 --
+//        we should be using gnu.gcj.RawData's.
+
+void
+java::io::FileDescriptor::init(void)
+{
+  in = new java::io::FileDescriptor((jint)(GetStdHandle (STD_INPUT_HANDLE)));
+  out = new java::io::FileDescriptor((jint)(GetStdHandle (STD_OUTPUT_HANDLE)));
+  err = new java::io::FileDescriptor((jint)(GetStdHandle (STD_ERROR_HANDLE)));
+}
 
 static char *
 winerr (void)
@@ -73,7 +85,6 @@ java::io::FileDescriptor::open (jstring path, jint jflags) {
 
   HANDLE handle = NULL;
   DWORD access = 0;
-  DWORD share = FILE_SHARE_READ;
   DWORD create = OPEN_EXISTING;
   char buf[MAX_PATH] = "";
 
@@ -85,7 +96,6 @@ java::io::FileDescriptor::open (jstring path, jint jflags) {
   if ((jflags & READ) && (jflags & WRITE))
     {
       access = GENERIC_READ | GENERIC_WRITE;
-      share = 0;
       if (jflags & APPEND)
 	create = OPEN_ALWAYS;
       else
@@ -96,14 +106,13 @@ java::io::FileDescriptor::open (jstring path, jint jflags) {
   else
     {
       access = GENERIC_WRITE;
-      share = 0;
       if (jflags & APPEND)
 	create = OPEN_ALWAYS;
       else
         create = CREATE_ALWAYS;
     }
 
-  handle = CreateFile(buf, access, share, NULL, create, 0, NULL);
+  handle = CreateFile(buf, access, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, create, 0, NULL);
 
   if (handle == INVALID_HANDLE_VALUE)
     {
@@ -112,6 +121,13 @@ java::io::FileDescriptor::open (jstring path, jint jflags) {
       throw new FileNotFoundException (JvNewStringLatin1 (msg));
     }
 
+  // For APPEND mode, move the file pointer to the end of the file.
+  if (jflags & APPEND)
+    {
+      DWORD low = SetFilePointer (handle, 0, NULL, FILE_END);
+      if ((low == 0xffffffff) && (GetLastError () != NO_ERROR)) 
+        throw new FileNotFoundException (JvNewStringLatin1 (winerr ()));
+    }
   return (jint)handle;
 }
 
@@ -171,15 +187,19 @@ java::io::FileDescriptor::close (void)
 }
 
 jint
-java::io::FileDescriptor::seek (jlong pos, jint whence)
+java::io::FileDescriptor::seek (jlong pos, jint whence, jboolean eof_trunc)
 {
   JvAssert (whence == SET || whence == CUR);
 
   jlong len = length();
   jlong here = getFilePointer();
 
-  if ((whence == SET && pos > len) || (whence == CUR && here + pos > len))
-    throw new EOFException;
+  if (eof_trunc
+      && ((whence == SET && pos > len) || (whence == CUR && here + pos > len)))
+    {
+      whence = SET;
+      pos = len;
+    }
 
   LONG high = pos >> 32;
   DWORD low = SetFilePointer ((HANDLE)fd, (DWORD)(0xffffffff & pos), &high, whence == SET ? FILE_BEGIN : FILE_CURRENT);
@@ -239,6 +259,7 @@ java::io::FileDescriptor::read(jbyteArray buffer, jint offset, jint count)
   if (! ReadFile((HANDLE)fd, bytes, count, &read, NULL))
     throw new IOException (JvNewStringLatin1 (winerr ()));
 
+  if (read == 0) return -1;
   return (jint)read;
 }
 

@@ -1,5 +1,5 @@
 /* Variables and structures for declaration processing.
-   Copyright (C) 1993, 2000 Free Software Foundation, Inc.
+   Copyright (C) 1993, 2000, 2002 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -31,17 +31,18 @@ enum decl_context
 };
 
 /* We need this in here to get the decl_context definition.  */
-extern tree grokdeclarator			PARAMS ((tree, tree, enum decl_context, int, tree));
+extern tree grokdeclarator PARAMS ((tree, tree, enum decl_context, int,
+				    tree *));
 
 /* Parsing a function declarator leaves a list of parameter names
    or a chain or parameter decls here.  */
-extern tree last_function_parms;
+extern GTY(()) tree last_function_parms;
 
 /* A list of objects which have constructors or destructors
    which reside in the global scope.  The decl is stored in
    the TREE_VALUE slot and the initializer is stored
    in the TREE_PURPOSE slot.  */
-extern tree static_aggregates;
+extern GTY(()) tree static_aggregates;
 
 #ifdef DEBUG_CP_BINDING_LEVELS
 /* Purely for debugging purposes.  */

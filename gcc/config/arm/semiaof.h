@@ -20,8 +20,11 @@ along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
-#define CPP_PREDEFINES \
-    "-Darm -Dsemi -Acpu=arm -Amachine=arm"
+#define TARGET_OS_CPP_BUILTINS()		\
+    do {					\
+	builtin_define_std ("arm");		\
+	builtin_define_std ("semi");		\
+    } while (0)
 
 #define ASM_SPEC "%{g -g} -arch 4 \
 -apcs 3%{mapcs-32:/32bit}%{mapcs-26:/26bit}%{!mapcs-26:%{!macps-32:/32bit}}"
@@ -35,9 +38,5 @@ Boston, MA 02111-1307, USA.  */
 /* The Norcroft C library defines size_t as "unsigned int" */
 #define SIZE_TYPE "unsigned int"
 
-#include "arm/aof.h"
-
 #undef CPP_APCS_PC_DEFAULT_SPEC
 #define CPP_APCS_PC_DEFAULT_SPEC "-D__APCS_32__"
-
-

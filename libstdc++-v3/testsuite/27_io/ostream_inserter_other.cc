@@ -1,7 +1,7 @@
 // 1999-08-16 bkoz
 // 1999-11-01 bkoz
 
-// Copyright (C) 1999, 2000, 2001 Free Software Foundation
+// Copyright (C) 1999, 2000, 2001, 2002 Free Software Foundation
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -26,7 +26,7 @@
 #include <ostream>
 #include <sstream>
 #include <fstream>
-#include <debug_assert.h>
+#include <testsuite_hooks.h>
 
 const int size = 1000;
 const char name_01[] = "ostream_inserter_other-1.tst";
@@ -67,7 +67,7 @@ test02()
   f_out1 << strbuf01;
   state02 = f_out1.rdstate();
   VERIFY( state01 != state02 );
-  VERIFY( (state02 & std::ios_base::failbit) != 0 );
+  VERIFY( (state02 & std::ios_base::badbit) != 0 );
 
   // filebuf->filebuf
   std::ifstream f_in(name_01);
@@ -155,6 +155,7 @@ main()
   test01();
   test02();
   test03();
+  test04();
 
   return 0;
 }

@@ -23,7 +23,7 @@
 #include <ostream>
 #include <sstream>
 #include <fstream>
-#include <debug_assert.h>
+#include <testsuite_hooks.h>
 
 
 bool test01()
@@ -166,6 +166,13 @@ void test04(void)
   VERIFY( state01 == state02 );
   pos06 = is03.tellp(); 
   VERIFY( pos05 == pos06 ); 
+
+  // libstdc++/6414
+  if01.seekg(0, std::ios_base::beg);
+  pos01 = if01.tellg();
+  if01.peek();
+  pos02 = if01.tellg();
+  VERIFY( pos02 == pos01 );
 
 #ifdef DEBUG_ASSERT
   assert(test);

@@ -39,10 +39,6 @@ extern void c4x_expand_epilogue PARAMS ((void));
 
 extern int c4x_null_epilogue_p PARAMS ((void));
 
-extern int c4x_handle_pragma PARAMS ((int (* p_getc) (void),
-				      void (* p_ungetc) (int),
-				      char *));
-
 extern void c4x_global_label (const char *);
 
 extern void c4x_external_ref (const char *);
@@ -56,8 +52,6 @@ extern void c4x_function_arg_advance PARAMS ((CUMULATIVE_ARGS *,
 extern struct rtx_def *c4x_function_arg PARAMS ((CUMULATIVE_ARGS *,
 						 enum machine_mode, tree,
 						 int));
-
-extern void c4x_encode_section_info PARAMS ((tree));
 
 #endif /* TREE_CODE */
 
@@ -106,8 +100,6 @@ extern char *c4x_output_cbranch PARAMS ((const char *, rtx));
 extern int c4x_label_conflict PARAMS ((rtx, rtx, rtx));
 
 extern int c4x_address_conflict PARAMS ((rtx, rtx, int, int));
-
-extern int c4x_adjust_cost PARAMS ((rtx, rtx, rtx, int));
 
 extern void c4x_process_after_reload PARAMS ((rtx));
 
@@ -162,6 +154,10 @@ extern int src_hi_operand PARAMS ((rtx, enum machine_mode));
 extern int lsrc_operand PARAMS ((rtx, enum machine_mode));
 
 extern int tsrc_operand PARAMS ((rtx, enum machine_mode));
+
+extern int nonimmediate_src_operand PARAMS ((rtx, enum machine_mode));
+
+extern int nonimmediate_lsrc_operand PARAMS ((rtx, enum machine_mode));
 
 extern int addr_reg_operand PARAMS ((rtx, enum machine_mode));
 
@@ -276,25 +272,25 @@ extern int valid_parallel_operands_5 PARAMS ((rtx *, enum machine_mode));
 
 extern int valid_parallel_operands_6 PARAMS ((rtx *, enum machine_mode));
 
-extern rtx smulhi3_libfunc;
-extern rtx umulhi3_libfunc;
-extern rtx fix_truncqfhi2_libfunc;
-extern rtx fixuns_truncqfhi2_libfunc;
-extern rtx fix_trunchfhi2_libfunc;
-extern rtx fixuns_trunchfhi2_libfunc;
-extern rtx floathiqf2_libfunc;
-extern rtx floatunshiqf2_libfunc;
-extern rtx floathihf2_libfunc;
-extern rtx floatunshihf2_libfunc;
+extern GTY(()) rtx smulhi3_libfunc;
+extern GTY(()) rtx umulhi3_libfunc;
+extern GTY(()) rtx fix_truncqfhi2_libfunc;
+extern GTY(()) rtx fixuns_truncqfhi2_libfunc;
+extern GTY(()) rtx fix_trunchfhi2_libfunc;
+extern GTY(()) rtx fixuns_trunchfhi2_libfunc;
+extern GTY(()) rtx floathiqf2_libfunc;
+extern GTY(()) rtx floatunshiqf2_libfunc;
+extern GTY(()) rtx floathihf2_libfunc;
+extern GTY(()) rtx floatunshihf2_libfunc;
 
-extern struct rtx_def *c4x_compare_op0;	/* Operand 0 for comparisons.  */
-extern struct rtx_def *c4x_compare_op1;	/* Operand 1 for comparisons.  */
+extern GTY(()) rtx c4x_compare_op0;	/* Operand 0 for comparisons.  */
+extern GTY(()) rtx c4x_compare_op1;	/* Operand 1 for comparisons.  */
 
 #endif /* RTX_CODE */
 
 /* Smallest class containing REGNO.  */
-extern enum reg_class c4x_regclass_map[];
-extern enum machine_mode c4x_caller_save_map[];
+extern enum reg_class c4x_regclass_map[FIRST_PSEUDO_REGISTER];
+extern enum machine_mode c4x_caller_save_map[FIRST_PSEUDO_REGISTER];
 
 extern int c4x_rpts_cycles;	        /* Max cycles for RPTS.  */
 extern int c4x_cpu_version;		/* Cpu version C30/31/32/40/44.  */
@@ -308,5 +304,11 @@ extern void c4x_pr_INTERRUPT		PARAMS ((cpp_reader *));
 extern void c4x_pr_ignored		PARAMS ((cpp_reader *));
 extern void c4x_init_pragma		PARAMS ((int (*) (tree *)));
 #endif
+
+extern GTY(()) tree code_tree;
+extern GTY(()) tree data_tree;
+extern GTY(()) tree pure_tree;
+extern GTY(()) tree noreturn_tree;
+extern GTY(()) tree interrupt_tree;
 
 #endif /* ! GCC_C4X_PROTOS_H */

@@ -75,9 +75,9 @@ extern void m88k_va_start PARAMS ((int, tree, rtx));
 struct m88k_lang_independent_options;
 #endif
 extern void output_file_start PARAMS ((FILE *,
-				       struct m88k_lang_independent_options *,
+				       const struct m88k_lang_independent_options *,
 				       int,
-				       struct m88k_lang_independent_options *,
+				       const struct m88k_lang_independent_options *,
 				       int));
 
 extern int null_prologue PARAMS ((void));
@@ -86,8 +86,6 @@ extern void m88k_layout_frame PARAMS ((void));
 extern void m88k_expand_prologue PARAMS ((void));
 extern void m88k_expand_epilogue PARAMS ((void));
 extern void output_function_profiler PARAMS ((FILE *, int, const char *, int));
-extern void output_function_block_profiler PARAMS ((FILE *, int));
-extern void output_block_profiler PARAMS ((FILE *, int));
 extern void output_ascii PARAMS ((FILE *, const char *, int,
 				  const char *, int));
 extern void output_label PARAMS ((int));

@@ -66,7 +66,7 @@
 #undef DBL_MAX_10_EXP
 #define DBL_MAX_10_EXP 308
 
-#if defined(__sparcv9) || defined(__arch64__)
+#if defined(__sparcv9) || defined(__arch64__) || defined(__LONG_DOUBLE_128__)
 
    /* Number of base-FLT_RADIX digits in the significand of a long double */
 #undef LDBL_MANT_DIG
@@ -119,7 +119,7 @@
 
 #endif /* sparc32 */
 
-#if __STDC_VERSION__ >= 199901L
+#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
    /* The floating-point expression evaluation method.
         -1  indeterminate
          0  evaluate all operations and constants just to the range and

@@ -1,5 +1,6 @@
 /* Subroutines for insn-output.c for Matsushita MN10200 series
-   Copyright (C) 1997, 1998, 1999, 2000, 2001 Free Software Foundation, Inc.
+   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002
+   Free Software Foundation, Inc.
    Contributed by Jeff Law (law@cygnus.com).
 
 This file is part of GNU CC.
@@ -67,6 +68,8 @@ static void count_tst_insns PARAMS ((int *));
 static int out_of_line_epilogue;
 
 /* Initialize the GCC target structure.  */
+#undef TARGET_ASM_ALIGNED_HI_OP
+#define TARGET_ASM_ALIGNED_HI_OP "\t.hword\t"
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -82,8 +85,6 @@ asm_file_start (file)
   else
     fprintf (file, "\n\n");
   output_file_directive (file, main_input_filename);
-  ggc_add_rtx_root (&zero_dreg, 1);
-  ggc_add_rtx_root (&zero_areg, 1);
 }
 
 /* Print operand X using operand code CODE to assembly language output file
@@ -613,7 +614,7 @@ expand_prologue ()
 		}
 	    }
 
-	  /* Now see if we could load the value into a address register.  */
+	  /* Now see if we could load the value into an address register.  */
 	  if (zero_dreg == NULL_RTX
 	      && areg_count > 2
 	      && (!regs_ever_live[5] || !regs_ever_live[6]))
@@ -1029,7 +1030,7 @@ enum shift_type
 
 enum shift_mode
   {
-    HIshift, 
+    HIshift
   };
 
 /* For single bit shift insns, record assembler and what bits of the

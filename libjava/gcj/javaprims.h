@@ -1,6 +1,6 @@
 // javaprims.h - Main external header file for libgcj.  -*- c++ -*-
 
-/* Copyright (C) 1998, 1999, 2000, 2001  Free Software Foundation
+/* Copyright (C) 1998, 1999, 2000, 2001, 2002  Free Software Foundation
 
    This file is part of libgcj.
 
@@ -134,6 +134,7 @@ extern "Java"
       class Boolean;
       class Byte;
       class CPlusPlusDemangler;
+      class CharSequence;
       class Character;
       class Character$Subset;
       class Character$UnicodeBlock;
@@ -161,6 +162,7 @@ extern "Java"
       class IllegalThreadStateException;
       class IncompatibleClassChangeError;
       class IndexOutOfBoundsException;
+      class InheritableThreadLocal;
       class InstantiationError;
       class InstantiationException;
       class Integer;
@@ -186,21 +188,30 @@ extern "Java"
       class Runtime;
       class RuntimeException;
       class RuntimePermission;
+      class SecurityContext;
       class SecurityException;
       class SecurityManager;
       class Short;
       class StackOverflowError;
+      class StackTraceElement;
+      class StrictMath;
       class String;
+      class String$CaseInsensitiveComparator;
       class StringBuffer;
       class StringIndexOutOfBoundsException;
       class System;
       class Thread;
       class ThreadDeath;
       class ThreadGroup;
+      class ThreadLocal;
+      class ThreadLocal$Value;
       class Throwable;
       class UnknownError;
       class UnsatisfiedLinkError;
+      class UnsupportedClassVersionError;
       class UnsupportedOperationException;
+      class VMClassLoader;
+      class VMSecurityManager;
       class VerifyError;
       class VirtualMachineError;
       class Void;
@@ -231,32 +242,43 @@ extern "Java"
     {
       class AbstractCollection;
       class AbstractList;
-      class AbstractList$AbstractListItr;
       class AbstractMap;
       class AbstractSequentialList;
       class AbstractSet;
       class ArrayList;
       class Arrays;
+      class Arrays$ArrayList;
       class Arrays$ListImpl;
       class BasicMapEntry;
       class BitSet;
       class Calendar;
       class Collection;
       class Collections;
+      class Collections$CopiesList;
+      class Collections$EmptyList;
+      class Collections$EmptyMap;
+      class Collections$EmptySet;
       class Collections$ReverseComparator;
+      class Collections$SingletonList;
+      class Collections$SingletonMap;
+      class Collections$SingletonSet;
       class Collections$SynchronizedCollection;
       class Collections$SynchronizedIterator;
       class Collections$SynchronizedList;
       class Collections$SynchronizedListIterator;
       class Collections$SynchronizedMap;
+      class Collections$SynchronizedMapEntry;
+      class Collections$SynchronizedRandomAccessList;
       class Collections$SynchronizedSet;
       class Collections$SynchronizedSortedMap;
       class Collections$SynchronizedSortedSet;
       class Collections$UnmodifiableCollection;
+      class Collections$UnmodifiableEntrySet;
       class Collections$UnmodifiableIterator;
       class Collections$UnmodifiableList;
       class Collections$UnmodifiableListIterator;
       class Collections$UnmodifiableMap;
+      class Collections$UnmodifiableRandomAccessList;
       class Collections$UnmodifiableSet;
       class Collections$UnmodifiableSortedMap;
       class Collections$UnmodifiableSortedSet;
@@ -270,14 +292,20 @@ extern "Java"
       class EventObject;
       class GregorianCalendar;
       class HashMap;
-      class HashMap$Entry;
+      class HashMap$HashEntry;
       class HashMap$HashIterator;
       class HashSet;
       class Hashtable;
-      class Hashtable$Entry;
       class Hashtable$Enumerator;
+      class Hashtable$HashEntry;
       class Hashtable$HashIterator;
+      class IdentityHashMap;
+      class IdentityHashMap$IdentityEntry;
+      class IdentityHashMap$IdentityIterator;
       class Iterator;
+      class LinkedHashMap;
+      class LinkedHashMap$LinkedHashEntry;
+      class LinkedHashSet;
       class LinkedList;
       class LinkedList$Entry;
       class LinkedList$LinkedListItr;
@@ -287,6 +315,7 @@ extern "Java"
       class Locale;
       class Map;
       class Map$Entry;
+      class Map$Map;
       class MissingResourceException;
       class NoSuchElementException;
       class Observable;
@@ -295,7 +324,10 @@ extern "Java"
       class PropertyPermission;
       class PropertyResourceBundle;
       class Random;
+      class RandomAccess;
+      class RandomAccessSubList;
       class ResourceBundle;
+      class ResourceBundle$Security;
       class Set;
       class SimpleTimeZone;
       class SortedMap;
@@ -313,12 +345,11 @@ extern "Java"
       class TreeMap$Node;
       class TreeMap$SubMap;
       class TreeMap$TreeIterator;
-      class TreeMap$VerifyResult;
       class TreeSet;
       class Vector;
       class WeakHashMap;
-      class WeakHashMap$Entry;
       class WeakHashMap$WeakBucket;
+      class WeakHashMap$WeakEntry;
       class WeakHashMap$WeakEntrySet;
       namespace jar
       {
@@ -356,7 +387,7 @@ extern "Java"
         class ZipOutputStream;
       };
     };
-  };
+  };  
 };
   
 typedef struct java::lang::Object* jobject;
@@ -369,6 +400,8 @@ typedef struct _Jv_Field *jfieldID;
 typedef struct _Jv_Method *jmethodID;
 
 extern "C" jobject _Jv_AllocObject (jclass, jint) __attribute__((__malloc__));
+extern "C" jobject _Jv_AllocObjectNoFinalizer (jclass, jint) __attribute__((__malloc__));
+extern "C" jobject _Jv_AllocObjectNoInitNoFinalizer (jclass, jint) __attribute__((__malloc__));
 #ifdef JV_HASH_SYNCHRONIZATION
   extern "C" jobject _Jv_AllocPtrFreeObject (jclass, jint)
   			    __attribute__((__malloc__));
@@ -393,14 +426,23 @@ extern "C" jsize _Jv_GetStringUTFLength (jstring);
 extern "C" jsize _Jv_GetStringUTFRegion (jstring, jsize, jsize, char *);
 
 extern jint _Jv_CreateJavaVM (void* /*vm_args*/);
+
+void
+_Jv_ThreadRun (java::lang::Thread* thread);
+jint
+_Jv_AttachCurrentThread(java::lang::Thread* thread);
 extern "C" java::lang::Thread*
 _Jv_AttachCurrentThread(jstring name, java::lang::ThreadGroup* group);
+extern "C" java::lang::Thread*
+_Jv_AttachCurrentThreadAsDaemon(jstring name, java::lang::ThreadGroup* group);
 extern "C" jint _Jv_DetachCurrentThread (void);
 
 extern "C" void _Jv_Throw (jthrowable) __attribute__ ((__noreturn__));
 extern "C" void* _Jv_Malloc (jsize) __attribute__((__malloc__));
 extern "C" void* _Jv_Realloc (void *, jsize);
 extern "C" void _Jv_Free (void*);
+extern void (*_Jv_RegisterClassHook) (jclass cl);
+extern "C" void _Jv_RegisterClassHookDefault (jclass);
 
 typedef unsigned short _Jv_ushort __attribute__((__mode__(__HI__)));
 typedef unsigned int _Jv_uint __attribute__((__mode__(__SI__)));

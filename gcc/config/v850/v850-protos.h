@@ -19,7 +19,7 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 /* Function prototypes that cannot exist in v850.h due to dependency
-   compilcations.  */
+   complications.  */
 #ifndef GCC_V850_PROTOS_H
 #define GCC_V850_PROTOS_H
 
@@ -72,7 +72,6 @@ extern rtx    v850_va_arg                   PARAMS ((tree, tree));
 #endif /* TREE_CODE */
 
 #ifdef TREE_CODE
-extern void   v850_encode_data_area         PARAMS ((tree));
 extern int    v850_interrupt_function_p     PARAMS ((tree));
 extern void   v850_output_aligned_bss       PARAMS ((FILE *, tree, const char *, int, int));
 extern void   v850_output_common            PARAMS ((FILE *, tree, const char *, int, int));

@@ -1,6 +1,6 @@
 // Bitset definitions -*- C++ -*-
 
-// Copyright (C) 2001 Free Software Foundation
+// Copyright (C) 2001, 2002 Free Software Foundation
 //
 // This file is part of GNU CC.
 //
@@ -8,12 +8,12 @@
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation; either version 2, or (at your option)
 // any later version.
-// 
+//
 // GNU CC is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License
 // along with GNU CC; see the file COPYING.  If not, write to
 // the Free Software Foundation, 59 Temple Place - Suite 330,
@@ -39,9 +39,9 @@
  * in supporting documentation.  Silicon Graphics makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- */ 
+ */
 
-#include <bits/std_bitset.h>
+#include <bitset>
 
 //
 // Definitions of non-inline functions from the single-word version of
@@ -59,7 +59,7 @@ std::_Base_bitset<1>::_M_do_find_first(std::size_t __not_found) const
       unsigned char __this_byte
         = static_cast<unsigned char>(__thisword & (~(unsigned char)0));
       if ( __this_byte )
-        return __j*CHAR_BIT + _First_one<true>::_S_first_one[__this_byte];
+        return __j * CHAR_BIT + _S_first_one[__this_byte];
 
       __thisword >>= CHAR_BIT;
     }
@@ -69,7 +69,7 @@ std::_Base_bitset<1>::_M_do_find_first(std::size_t __not_found) const
 }
 
 std::size_t
-std::_Base_bitset<1>::_M_do_find_next(std::size_t __prev, 
+std::_Base_bitset<1>::_M_do_find_next(std::size_t __prev,
 				      std::size_t __not_found) const
 {
   // make bound inclusive
@@ -93,7 +93,7 @@ std::_Base_bitset<1>::_M_do_find_next(std::size_t __prev,
       unsigned char __this_byte
         = static_cast<unsigned char>(__thisword & (~(unsigned char)0));
       if ( __this_byte )
-        return __j*CHAR_BIT + _First_one<true>::_S_first_one[__this_byte];
+        return __j * CHAR_BIT + _S_first_one[__this_byte];
 
       __thisword >>= CHAR_BIT;
     }
@@ -103,11 +103,11 @@ std::_Base_bitset<1>::_M_do_find_next(std::size_t __prev,
   return __not_found;
 } // end _M_do_find_next
 
-// ------------------------------------------------------------
-// Lookup tables for find and count operations.
 
-template<bool __dummy>
-unsigned char std::_Bit_count<__dummy>::_S_bit_count[] = {
+// Lookup tables for find and count operations.  In _S_bit_count, the value
+// *at* an index is the number of bits set *in* that index.
+unsigned char std::_S_bit_count[256] =
+{
   0, /*   0 */ 1, /*   1 */ 1, /*   2 */ 2, /*   3 */ 1, /*   4 */
   2, /*   5 */ 2, /*   6 */ 3, /*   7 */ 1, /*   8 */ 2, /*   9 */
   2, /*  10 */ 3, /*  11 */ 2, /*  12 */ 3, /*  13 */ 3, /*  14 */
@@ -160,10 +160,10 @@ unsigned char std::_Bit_count<__dummy>::_S_bit_count[] = {
   6, /* 245 */ 6, /* 246 */ 7, /* 247 */ 5, /* 248 */ 6, /* 249 */
   6, /* 250 */ 7, /* 251 */ 6, /* 252 */ 7, /* 253 */ 7, /* 254 */
   8  /* 255 */
-}; // end _Bit_count
+}; // end _S_bit_count
 
-template<bool __dummy>
-unsigned char std::_First_one<__dummy>::_S_first_one[] = {
+unsigned char std::_S_first_one[256] =
+{
   0, /*   0 */ 0, /*   1 */ 1, /*   2 */ 0, /*   3 */ 2, /*   4 */
   0, /*   5 */ 1, /*   6 */ 0, /*   7 */ 3, /*   8 */ 0, /*   9 */
   1, /*  10 */ 0, /*  11 */ 2, /*  12 */ 0, /*  13 */ 1, /*  14 */
@@ -216,12 +216,5 @@ unsigned char std::_First_one<__dummy>::_S_first_one[] = {
   0, /* 245 */ 1, /* 246 */ 0, /* 247 */ 3, /* 248 */ 0, /* 249 */
   1, /* 250 */ 0, /* 251 */ 2, /* 252 */ 0, /* 253 */ 1, /* 254 */
   0, /* 255 */
-}; // end _First_one
+}; // end _S_first_one
 
-// Explicitly instantiate them.
-
-template unsigned char std::_Bit_count<false>::_S_bit_count[];
-template unsigned char std::_Bit_count<true>::_S_bit_count[];
-
-template unsigned char std::_First_one<false>::_S_first_one[];
-template unsigned char std::_First_one<true>::_S_first_one[];

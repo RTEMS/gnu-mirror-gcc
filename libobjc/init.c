@@ -329,7 +329,8 @@ __objc_send_message_in_list (MethodList_t method_list, Class class, SEL op)
 }
 
 static void
-__objc_send_load (objc_class_tree *tree, int level)
+__objc_send_load (objc_class_tree *tree,
+		  int level __attribute__ ((__unused__)))
 {
   static SEL load_sel = 0;
   Class class = tree->class;
@@ -342,7 +343,8 @@ __objc_send_load (objc_class_tree *tree, int level)
 }
 
 static void
-__objc_destroy_class_tree_node (objc_class_tree *tree, int level)
+__objc_destroy_class_tree_node (objc_class_tree *tree,
+				int level __attribute__ ((__unused__)))
 {
   objc_free (tree);
 }
@@ -599,9 +601,7 @@ __objc_exec_class (Module_t module)
 
   /* Scan the unclaimed category hash.  Attempt to attach any unclaimed
      categories to objects.  */
-  for (cell = &unclaimed_categories;
-       *cell;
-       ({ if (*cell) cell = &(*cell)->tail; }))
+  for (cell = &unclaimed_categories; *cell; )
     {
       Category_t category = (*cell)->head;
       Class class = objc_lookup_class (category->class_name);
@@ -630,6 +630,8 @@ __objc_exec_class (Module_t module)
              only done for root classes. */
           __objc_register_instance_methods_to_class(class);
 	}
+      else
+	cell = &(*cell)->tail;
     }
   
   if (unclaimed_proto_list && objc_lookup_class ("Protocol"))
@@ -776,7 +778,7 @@ static void init_check_module_version(Module_t module)
 static void
 __objc_init_protocols (struct objc_protocol_list* protos)
 {
-  int i;
+  size_t i;
   static Class proto_class = 0;
 
   if (! protos)

@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler.  Iris version 5.
    Copyright (C) 1993, 1995, 1996, 1998, 2000,
-   2001 Free Software Foundation, Inc.
+   2001, 2002 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -18,6 +18,8 @@ You should have received a copy of the GNU General Public License
 along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
+
+#define TARGET_IRIX5 1
 
 #ifndef TARGET_DEFAULT
 #define	TARGET_DEFAULT	MASK_ABICALLS
@@ -54,35 +56,51 @@ Boston, MA 02111-1307, USA.  */
 
 #define WCHAR_TYPE     "int"
 #define WCHAR_TYPE_SIZE        INT_TYPE_SIZE
-#define MAX_WCHAR_TYPE_SIZE    MAX_INT_TYPE_SIZE
+#define MAX_WCHAR_TYPE_SIZE    64
 
 #define WORD_SWITCH_TAKES_ARG(STR)			\
  (DEFAULT_WORD_SWITCH_TAKES_ARG (STR)			\
   || !strcmp (STR, "rpath"))
 
+#define TARGET_OS_CPP_BUILTINS()			\
+    do {						\
+	builtin_define_std ("host_mips");		\
+	builtin_define_std ("sgi");			\
+	builtin_define_std ("unix");			\
+	builtin_define_std ("SYSTYPE_SVR4");		\
+	builtin_define ("_MODERN_C");			\
+	builtin_define ("_SVR4_SOURCE");		\
+	builtin_define ("__DSO__");			\
+	builtin_define ("_MIPS_SIM=_MIPS_SIM_ABI32");	\
+	builtin_define ("_MIPS_SZPTR=32");		\
+	builtin_assert ("system=unix");			\
+	builtin_assert ("system=svr4");			\
+	builtin_assert ("machine=sgi");			\
+							\
+     if (!TARGET_FLOAT64)                               \
+        builtin_define ("_MIPS_FPSET=16");              \
+     else                                               \
+        builtin_define ("_MIPS_FPSET=32");              \
+							\
+     if (!TARGET_INT64)                                 \
+        builtin_define ("_MIPS_SZINT=32");              \
+     else                                               \
+        builtin_define ("_MIPS_SZINT=64");              \
+							\
+     if (!TARGET_LONG64)				\
+	builtin_define ("_MIPS_SZLONG=32");		\
+     else						\
+	builtin_define ("_MIPS_SZLONG=64");		\
+							\
+     if (!flag_iso)					\
+       {						\
+	 builtin_define ("__EXTENSIONS__");		\
+	 builtin_define ("_SGI_SOURCE");		\
+       }						\
+} while (0);
+
 #undef SUBTARGET_CC1_SPEC
 #define SUBTARGET_CC1_SPEC "%{static: -mno-abicalls}"
-
-/* ??? _MIPS_SIM and _MIPS_SZPTR should eventually depend on options when
-   options for them exist.  */
-
-#undef CPP_PREDEFINES
-#define CPP_PREDEFINES \
- "-Dunix -Dmips -Dsgi -Dhost_mips -DMIPSEB -D_MIPSEB -DSYSTYPE_SVR4 \
-  -D_SVR4_SOURCE -D_MODERN_C -D__DSO__ \
-  -D_MIPS_SIM=_MIPS_SIM_ABI32 -D_MIPS_SZPTR=32 \
-  -Asystem=unix -Asystem=svr4 -Acpu=mips -Amachine=sgi"
-
-#undef SUBTARGET_CPP_SPEC
-#define SUBTARGET_CPP_SPEC "\
-%{!ansi:-D__EXTENSIONS__ -D_SGI_SOURCE -D_LONGLONG} \
-%{!mfp64: -D_MIPS_FPSET=16}%{mfp64: -D_MIPS_FPSET=32} \
-%{mips1: -D_MIPS_ISA=_MIPS_ISA_MIPS1} \
-%{mips2: -D_MIPS_ISA=_MIPS_ISA_MIPS2} \
-%{mips3: -D_MIPS_ISA=_MIPS_ISA_MIPS3} \
-%{!mips1: %{!mips2: %{!mips3: -D_MIPS_ISA=_MIPS_ISA_MIPS1}}} \
-%{!mint64: -D_MIPS_SZINT=32}%{mint64: -D_MIPS_SZINT=64} \
-%{!mlong64: -D_MIPS_SZLONG=32}%{mlong64: -D_MIPS_SZLONG=64}"
 
 #undef LINK_SPEC
 #define LINK_SPEC "\
@@ -114,7 +132,7 @@ Boston, MA 02111-1307, USA.  */
 /* We do not want to run mips-tfile!  */
 #undef ASM_FINAL_SPEC
 
-/* The system header files are C++ aware. */
+/* The system header files are C++ aware.  */
 /* ??? Unfortunately, most but not all of the headers are C++ aware.
    Specifically, curses.h is not, and as a consequence, defining this
    used to prevent libg++ building.  This is no longer the case so
@@ -123,7 +141,7 @@ Boston, MA 02111-1307, USA.  */
    fixing.  */
 #define NO_IMPLICIT_EXTERN_C 1
 
-/* We don't support debugging info for now. */
+/* We don't support debugging info for now.  */
 #undef DBX_DEBUGGING_INFO
 #undef SDB_DEBUGGING_INFO
 #undef MIPS_DEBUGGING_INFO
@@ -154,10 +172,6 @@ do {						\
   assemble_name (FILE, NAME);			\
   fputs (" .text\n", FILE);			\
 } while (0)
-
-/* To get unaligned data, we have to turn off auto alignment.  */
-#define UNALIGNED_SHORT_ASM_OP		"\t.align 0\n\t.half\t"
-#define UNALIGNED_INT_ASM_OP		"\t.align 0\n\t.word\t"
 
 /* Also do this for libcalls.  */
 #define ASM_OUTPUT_EXTERNAL_LIBCALL(FILE, FUN)	\

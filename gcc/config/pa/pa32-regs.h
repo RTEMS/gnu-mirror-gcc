@@ -17,7 +17,7 @@
    differently: the left and right halves of registers are addressable
    as 32 bit registers. So, we will set things up like the 68k which
    has different fp units: define separate register sets for the 1.0
-   and 1.1 fp units. */
+   and 1.1 fp units.  */
 
 #define FIRST_PSEUDO_REGISTER 89  /* 32 general regs + 56 fp regs +
 				     + 1 shift reg */
@@ -97,6 +97,7 @@
 
 #define CONDITIONAL_REGISTER_USAGE \
 {						\
+  int i;					\
   if (!TARGET_PA_11)				\
     {						\
       for (i = 56; i < 88; i++) 		\
@@ -163,18 +164,23 @@
    : ((GET_MODE_SIZE (MODE) + UNITS_PER_WORD - 1) / UNITS_PER_WORD))
 
 /* Value is 1 if hard register REGNO can hold a value of machine-mode MODE.
-   On the HP-PA, the cpu registers can hold any mode.  We
-   force this to be an even register is it cannot hold the full mode.  */
+   On the HP-PA, the cpu registers can hold any mode.  For DImode, we
+   choose a set of general register that includes the incoming arguments
+   and the return value.  We specify a set with no overlaps so that we don't
+   have to specify that the destination register in patterns using this mode
+   is an early clobber.  */
 #define HARD_REGNO_MODE_OK(REGNO, MODE) \
   ((REGNO) == 0 ? (MODE) == CCmode || (MODE) == CCFPmode		\
-   /* On 1.0 machines, don't allow wide non-fp modes in fp regs. */	\
+   /* On 1.0 machines, don't allow wide non-fp modes in fp regs.  */	\
    : !TARGET_PA_11 && FP_REGNO_P (REGNO)				\
      ? GET_MODE_SIZE (MODE) <= 4 || GET_MODE_CLASS (MODE) == MODE_FLOAT	\
    : FP_REGNO_P (REGNO)							\
      ? GET_MODE_SIZE (MODE) <= 4 || ((REGNO) & 1) == 0			\
-   /* Make wide modes be in aligned registers. */			\
    : (GET_MODE_SIZE (MODE) <= UNITS_PER_WORD				\
-      || (GET_MODE_SIZE (MODE) <= 4 * UNITS_PER_WORD && ((REGNO) & 1) == 0)))
+      || (GET_MODE_SIZE (MODE) == 2 * UNITS_PER_WORD			\
+	  && ((((REGNO) & 1) == 1 && (REGNO) <= 25) || (REGNO) == 28))	\
+      || (GET_MODE_SIZE (MODE) == 4 * UNITS_PER_WORD			\
+	  && (((REGNO) & 3) == 3 && (REGNO) <= 23))))
 
 /* How to renumber registers for dbx and gdb.
 
@@ -231,7 +237,7 @@ enum reg_class { NO_REGS, R1_REGS, GENERAL_REGS, FPUPPER_REGS, FP_REGS,
 /* Define which registers fit in which classes.
    This is an initializer for a vector of HARD_REG_SET
    of length N_REG_CLASSES. Register 0, the "condition code" register,
-   is in no class. */
+   is in no class.  */
 
 #define REG_CLASS_CONTENTS	\
  {{0x00000000, 0x00000000, 0x00000000},	/* NO_REGS */			\

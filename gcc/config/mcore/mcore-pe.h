@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler, for MCore using COFF/PE.
-   Copyright (C) 1994, 1999, 2000 Free Software Foundation, Inc.
+   Copyright (C) 1994, 1999, 2000, 2002 Free Software Foundation, Inc.
    Contributed by Michael Tiemann (tiemann@cygnus.com).
 
 This file is part of GNU CC.
@@ -24,6 +24,10 @@ Boston, MA 02111-1307, USA.  */
 
 #define SUBTARGET_CPP_PREDEFINES " -D__pe__"
 
+/* The MCore ABI says that bitfields are unsigned by default.  */
+/* The EPOC C++ environment does not support exceptions.  */
+#define CC1_SPEC "-funsigned-bitfields %{!DIN_GCC:-fno-rtti} %{!DIN_GCC:-fno-exceptions}"
+
 #include "svr3.h"
 #include "mcore/mcore.h"
 #include "dbxcoff.h"
@@ -39,17 +43,15 @@ Boston, MA 02111-1307, USA.  */
    and readonly data. This gets them out of default places.  */
 
 #define SUBTARGET_SWITCH_SECTIONS 		\
-  case in_drectve: drectve_section (); break;	\
-  case in_rdata:   rdata_section (); break;
+  case in_drectve: drectve_section (); break;
 
 #define DRECTVE_SECTION_ASM_OP	"\t.section .drectve"
-#define RDATA_SECTION_ASM_OP	"\t.section .rdata"
+#define READONLY_DATA_SECTION_ASM_OP	"\t.section .rdata"
 
-#define SUBTARGET_EXTRA_SECTIONS in_drectve, in_rdata
+#define SUBTARGET_EXTRA_SECTIONS in_drectve
 
 #define SUBTARGET_EXTRA_SECTION_FUNCTIONS \
-  DRECTVE_SECTION_FUNCTION		  \
-  RDATA_SECTION_FUNCTION
+  DRECTVE_SECTION_FUNCTION
 
 #define DRECTVE_SECTION_FUNCTION 				\
 void								\
@@ -62,63 +64,12 @@ drectve_section ()						\
     }								\
 }
 
-#define RDATA_SECTION_FUNCTION 					\
-void								\
-rdata_section ()						\
-{								\
-  if (in_section != in_rdata)					\
-    {								\
-      fprintf (asm_out_file, "%s\n", RDATA_SECTION_ASM_OP);	\
-      in_section = in_rdata;					\
-    }								\
-}
-
-#undef  READONLY_DATA_SECTION
-#define READONLY_DATA_SECTION() rdata_section ()
-
-/* A C statement or statements to switch to the appropriate
-   section for output of DECL.  DECL is either a `VAR_DECL' node
-   or a constant of some sort.  RELOC indicates whether forming
-   the initial value of DECL requires link-time relocations.  */
-#undef  SELECT_SECTION
-#define SELECT_SECTION(DECL, RELOC)					\
-{									\
-  if (TREE_CODE (DECL) == STRING_CST)					\
-    {									\
-      if (! flag_writable_strings)					\
-	rdata_section ();						\
-      else								\
-	data_section ();						\
-    }									\
-  else if (TREE_CODE (DECL) == VAR_DECL)				\
-    {									\
-      if ((0 && RELOC)	/* should be (flag_pic && RELOC) */		\
-	  || !TREE_READONLY (DECL) || TREE_SIDE_EFFECTS (DECL)		\
-	  || !DECL_INITIAL (DECL)					\
-	  || (DECL_INITIAL (DECL) != error_mark_node			\
-	      && !TREE_CONSTANT (DECL_INITIAL (DECL))))			\
-	data_section ();						\
-      else								\
-	rdata_section ();						\
-    }									\
-  else									\
-    rdata_section ();							\
-}
-
-/* A C statement or statements to switch to the appropriate
-   section for output of RTX in mode MODE.  RTX is some kind
-   of constant in RTL.  The argument MODE is redundant except
-   in the case of a `const_int' rtx.  Currently, these always
-   go into the const section.  */
-#undef  SELECT_RTX_SECTION
-#define SELECT_RTX_SECTION(MODE, RTX) rdata_section ()
-
 #define MCORE_EXPORT_NAME(STREAM, NAME)			\
   do							\
     {							\
       drectve_section ();				\
       fprintf (STREAM, "\t.ascii \" -export:%s\"\n",	\
-	       MCORE_STRIP_NAME_ENCODING (NAME));	\
+	       (* targetm.strip_name_encoding) (NAME));	\
     }							\
   while (0);
 
@@ -183,68 +134,16 @@ rdata_section ()						\
 #define STARTFILE_SPEC "crt0.o%s"
 #define ENDFILE_SPEC  "%{!mno-lsim:-lsim}"
 
-#undef  CTORS_SECTION_ASM_OP
-#define CTORS_SECTION_ASM_OP	"\t.section\t.ctors,\"x\""
-#undef  DTORS_SECTION_ASM_OP
-#define DTORS_SECTION_ASM_OP	"\t.section\t.dtors,\"x\""
-
-#define INT_ASM_OP "\t.long\t"
-
-#undef  ASM_OUTPUT_CONSTRUCTOR
-#define ASM_OUTPUT_CONSTRUCTOR(STREAM, NAME) 	\
-  do						\
-    {						\
-      ctors_section ();				\
-      fprintf (STREAM, "%s", INT_ASM_OP);	\
-      assemble_name (STREAM, NAME);		\
-      fprintf (STREAM, "\n");			\
-    }						\
-  while (0)
-
-/* A C statement (sans semicolon) to output an element in the table of
-   global destructors.  */
-#undef  ASM_OUTPUT_DESTRUCTOR
-#define ASM_OUTPUT_DESTRUCTOR(STREAM, NAME) 	\
-  do						\
-    {						\
-      dtors_section ();                   	\
-      fprintf (STREAM, "%s", INT_ASM_OP);	\
-      assemble_name (STREAM, NAME);             \
-      fprintf (STREAM, "\n");			\
-    }						\
-  while (0)
-
 /* __CTOR_LIST__ and __DTOR_LIST__ must be defined by the linker script.  */
 #define CTOR_LISTS_DEFINED_EXTERNALLY
 
 #undef DO_GLOBAL_CTORS_BODY
 #undef DO_GLOBAL_DTORS_BODY
 #undef INIT_SECTION_ASM_OP
-
-#define UNIQUE_SECTION_P(DECL) DECL_ONE_ONLY (DECL)
+#undef DTORS_SECTION_ASM_OP
 
 #define SUPPORTS_ONE_ONLY 1
 
-/* A C statement to output something to the assembler file to switch to section
-   NAME for object DECL which is either a FUNCTION_DECL, a VAR_DECL or
-   NULL_TREE.  Some target formats do not support arbitrary sections.  Do not
-   define this macro in such cases.  */
-#undef  ASM_OUTPUT_SECTION_NAME
-#define ASM_OUTPUT_SECTION_NAME(STREAM, DECL, NAME, RELOC) 	\
-  do								\
-    {								\
-      if ((DECL) && TREE_CODE (DECL) == FUNCTION_DECL)		\
-	fprintf (STREAM, "\t.section %s,\"x\"\n", NAME);	\
-      else if ((DECL) && DECL_READONLY_SECTION (DECL, RELOC))	\
-	fprintf (STREAM, "\t.section %s,\"\"\n", NAME);		\
-      else							\
-	fprintf (STREAM, "\t.section %s,\"w\"\n", NAME);	\
-      /* Functions may have been compiled at various levels of	\
-	 optimization so we can't use `same_size' here.  	\
-	 Instead, have the linker pick one.  */			\
-      if ((DECL) && DECL_ONE_ONLY (DECL))			\
-	fprintf (STREAM, "\t.linkonce %s\n",			\
-		 TREE_CODE (DECL) == FUNCTION_DECL		\
-		 ? "discard" : "same_size");			\
-    }								\
-  while (0)
+/* Switch into a generic section.  */
+#undef TARGET_ASM_NAMED_SECTION
+#define TARGET_ASM_NAMED_SECTION  default_pe_asm_named_section

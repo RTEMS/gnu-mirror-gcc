@@ -32,14 +32,22 @@ Boston, MA 02111-1307, USA.  */
 
 /* Names to predefine in the preprocessor for this target machine.  */
 
-#define CPP_PREDEFINES "\
--Dunix -D__osf__ -D_LONGLONG -DSYSTYPE_BSD \
--D_SYSTYPE_BSD -Asystem=unix -Asystem=xpg4"
-
-/* Tru64 UNIX V5 requires additional definitions for 16 byte long double
-   support.  Empty by default.  */
-
-#define CPP_XFLOAT_SPEC ""
+#define TARGET_OS_CPP_BUILTINS()		\
+    do {					\
+	builtin_define_std ("unix");		\
+	builtin_define_std ("SYSTYPE_BSD");	\
+	builtin_define ("_SYSTYPE_BSD");	\
+	builtin_define ("__osf__");		\
+	builtin_define ("_LONGLONG");		\
+	builtin_define ("__EXTERN_PREFIX");	\
+	builtin_assert ("system=unix");		\
+	builtin_assert ("system=xpg4");		\
+	/* Tru64 UNIX V5 has a 16 byte long	\
+	   double type and requires __X_FLOAT	\
+	   to be defined for <math.h>.  */	\
+        if (LONG_DOUBLE_TYPE_SIZE == 128)	\
+          builtin_define ("__X_FLOAT");		\
+    } while (0)
 
 /* Accept DEC C flags for multithreaded programs.  We use _PTHREAD_USE_D4
    instead of PTHREAD_USE_D4 since both have the same effect and the former
@@ -47,7 +55,7 @@ Boston, MA 02111-1307, USA.  */
 
 #undef CPP_SUBTARGET_SPEC
 #define CPP_SUBTARGET_SPEC \
-"%{pthread|threads:-D_REENTRANT} %{threads:-D_PTHREAD_USE_D4} %(cpp_xfloat)"
+"%{pthread|threads:-D_REENTRANT} %{threads:-D_PTHREAD_USE_D4}"
 
 /* Under OSF4, -p and -pg require -lprof1, and -lprof1 requires -lpdf.  */
 
@@ -56,12 +64,13 @@ Boston, MA 02111-1307, USA.  */
  %{threads: -lpthreads} %{pthread|threads: -lpthread -lmach -lexc} -lc"
 
 /* Pass "-G 8" to ld because Alpha's CC does.  Pass -O3 if we are
-   optimizing, -O1 if we are not.  Pass -shared, -non_shared or
+   optimizing, -O1 if we are not.  Pass -S to silence `weak symbol
+   multiply defined' warnings.  Pass -shared, -non_shared or
    -call_shared as appropriate.  Pass -hidden_symbol so that our
    constructor and call-frame data structures are not accidentally
    overridden.  */
 #define LINK_SPEC  \
-  "-G 8 %{O*:-O3} %{!O*:-O1} %{static:-non_shared} \
+  "-G 8 %{O*:-O3} %{!O*:-O1} -S %{static:-non_shared} \
    %{!static:%{shared:-shared -hidden_symbol _GLOBAL_*} \
    %{!shared:-call_shared}} %{pg} %{taso} %{rpath*}"
 
@@ -93,19 +102,18 @@ Boston, MA 02111-1307, USA.  */
 
 #define ASM_OLDAS_SPEC ""
 
-/* No point in running CPP on our assembler output.  */
-#if ((TARGET_DEFAULT | TARGET_CPU_DEFAULT) & MASK_GAS) != 0
-/* Don't pass -g to GNU as, because some versions don't accept this option.  */
-#define ASM_SPEC "%{malpha-as:-g %(asm_oldas)} -nocpp %{pg}"
-#else
 /* In OSF/1 v3.2c, the assembler by default does not output file names which
    causes mips-tfile to fail.  Passing -g to the assembler fixes this problem.
    ??? Strictly speaking, we need -g only if the user specifies -g.  Passing
    it always means that we get slightly larger than necessary object files
    if the user does not specify -g.  If we don't pass -g, then mips-tfile
    will need to be fixed to work in this case.  Pass -O0 since some
-   optimization are broken and don't help us anyway.  */
-#define ASM_SPEC "%{!mgas:-g %(asm_oldas)} -nocpp %{pg} -O0"
+   optimization are broken and don't help us anyway.  Pass -nocpp because
+   there's no point in running CPP on our assembler output.  */
+#if ((TARGET_DEFAULT | TARGET_CPU_DEFAULT) & MASK_GAS) != 0
+#define ASM_SPEC "%{malpha-as:-g %(asm_oldas) -nocpp %{pg} -O0}"
+#else
+#define ASM_SPEC "%{!mgas:-g %(asm_oldas) -nocpp %{pg} -O0}"
 #endif
 
 /* Specify to run a post-processor, mips-tfile after the assembler
@@ -135,9 +143,7 @@ Boston, MA 02111-1307, USA.  */
 #endif
 
 #undef SUBTARGET_EXTRA_SPECS
-#define SUBTARGET_EXTRA_SPECS		\
-  { "cpp_xfloat", CPP_XFLOAT_SPEC },	\
-  { "asm_oldas", ASM_OLDAS_SPEC }
+#define SUBTARGET_EXTRA_SPECS { "asm_oldas", ASM_OLDAS_SPEC }
 
 /* Indicate that we have a stamp.h to use.  */
 #ifndef CROSS_COMPILE
@@ -209,3 +215,7 @@ __enable_execute_stack (addr)						\
 /* Handle #pragma weak and #pragma pack.  */
 #undef HANDLE_SYSV_PRAGMA
 #define HANDLE_SYSV_PRAGMA 1
+
+/* Handle #pragma extern_prefix.  Technically only needed for Tru64 5.x,
+   but easier to manipulate preprocessor bits from here.  */
+#define HANDLE_PRAGMA_EXTERN_PREFIX 1

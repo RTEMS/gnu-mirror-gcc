@@ -2,26 +2,25 @@
    Copyright (C) 1987, 1988, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
    1999, 2000, 2001 Free Software Foundation, Inc.
 
-This file is part of GNU CC.
+This file is part of GCC.
 
-GNU CC is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2, or (at your option)
-any later version.
+GCC is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2, or (at your option) any later
+version.
 
-GNU CC is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+GCC is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU CC; see the file COPYING.  If not, write to
-the Free Software Foundation, 59 Temple Place - Suite 330,
-Boston, MA 02111-1307, USA.  */
+along with GCC; see the file COPYING.  If not, write to the Free
+Software Foundation, 59 Temple Place - Suite 330, Boston, MA
+02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
-#include <setjmp.h>
 
 #include "rtl.h"
 #include "tm_p.h"
@@ -36,7 +35,6 @@ Boston, MA 02111-1307, USA.  */
 #include "toplev.h"
 #include "output.h"
 #include "ggc.h"
-#include "obstack.h"
 #include "hashtab.h"
 #include "cselib.h"
 
@@ -60,7 +58,6 @@ static cselib_val *new_cselib_val	PARAMS ((unsigned int,
 static void add_mem_for_addr		PARAMS ((cselib_val *, cselib_val *,
 						 rtx));
 static cselib_val *cselib_lookup_mem	PARAMS ((rtx, int));
-static rtx cselib_subst_to_values	PARAMS ((rtx));
 static void cselib_invalidate_regno	PARAMS ((unsigned int,
 						 enum machine_mode));
 static int cselib_mem_conflict_p	PARAMS ((rtx, rtx));
@@ -81,7 +78,7 @@ static void cselib_record_sets		PARAMS ((rtx));
      the locations of the entries with the rtx we are looking up.  */
 
 /* A table that enables us to look up elts by their value.  */
-static htab_t hash_table;
+static GTY((param_is (cselib_val))) htab_t hash_table;
 
 /* This is a global so we don't have to pass this through every function.
    It is used in new_elt_loc_list to set SETTING_INSN.  */
@@ -103,27 +100,27 @@ static int n_useless_values;
 /* This table maps from register number to values.  It does not contain
    pointers to cselib_val structures, but rather elt_lists.  The purpose is
    to be able to refer to the same register in different modes.  */
-static varray_type reg_values;
+static GTY(()) varray_type reg_values;
+static GTY((deletable (""))) varray_type reg_values_old;
 #define REG_VALUES(I) VARRAY_ELT_LIST (reg_values, (I))
+
+/* The largest number of hard regs used by any entry added to the
+   REG_VALUES table.  Cleared on each clear_table() invocation.   */
+static unsigned int max_value_regs;
 
 /* Here the set of indices I with REG_VALUES(I) != 0 is saved.  This is used
    in clear_table() for fast emptying.  */
-static varray_type used_regs;
+static GTY(()) varray_type used_regs;
+static GTY((deletable (""))) varray_type used_regs_old;
 
 /* We pass this to cselib_invalidate_mem to invalidate all of
    memory for a non-const call instruction.  */
-static rtx callmem;
-
-/* Memory for our structures is allocated from this obstack.  */
-static struct obstack cselib_obstack;
-
-/* Used to quickly free all memory.  */
-static char *cselib_startobj;
+static GTY(()) rtx callmem;
 
 /* Caches for unused structures.  */
-static cselib_val *empty_vals;
-static struct elt_list *empty_elt_lists;
-static struct elt_loc_list *empty_elt_loc_lists;
+static GTY((deletable (""))) cselib_val *empty_vals;
+static GTY((deletable (""))) struct elt_list *empty_elt_lists;
+static GTY((deletable (""))) struct elt_loc_list *empty_elt_loc_lists;
 
 /* Set by discard_useless_locs if it deleted the last location of any
    value.  */
@@ -143,8 +140,7 @@ new_elt_list (next, elt)
   if (el)
     empty_elt_lists = el->next;
   else
-    el = (struct elt_list *) obstack_alloc (&cselib_obstack,
-					    sizeof (struct elt_list));
+    el = (struct elt_list *) ggc_alloc (sizeof (struct elt_list));
   el->next = next;
   el->elt = elt;
   return el;
@@ -163,8 +159,7 @@ new_elt_loc_list (next, loc)
   if (el)
     empty_elt_loc_lists = el->next;
   else
-    el = (struct elt_loc_list *) obstack_alloc (&cselib_obstack,
-						sizeof (struct elt_loc_list));
+    el = (struct elt_loc_list *) ggc_alloc (sizeof (struct elt_loc_list));
   el->next = next;
   el->loc = loc;
   el->setting_insn = cselib_current_insn;
@@ -229,14 +224,12 @@ clear_table (clear_all)
     for (i = 0; i < VARRAY_ACTIVE_SIZE (used_regs); i++)
       REG_VALUES (VARRAY_UINT (used_regs, i)) = 0;
 
+  max_value_regs = 0;
+
   VARRAY_POP_ALL (used_regs);
 
   htab_empty (hash_table);
-  obstack_free (&cselib_obstack, cselib_startobj);
 
-  empty_vals = 0;
-  empty_elt_lists = 0;
-  empty_elt_loc_lists = 0;
   n_useless_values = 0;
 
   next_unknown_value = 0;
@@ -595,6 +588,22 @@ hash_rtx (x, mode, create)
 		 + (unsigned) CONST_DOUBLE_HIGH (x));
       return hash ? hash : (unsigned int) CONST_DOUBLE;
 
+    case CONST_VECTOR:
+      {
+	int units;
+	rtx elt;
+
+	units = CONST_VECTOR_NUNITS (x);
+
+	for (i = 0; i < units; ++i)
+	  {
+	    elt = CONST_VECTOR_ELT (x, i);
+	    hash += hash_rtx (elt, GET_MODE (elt), 0);
+	  }
+
+	return hash;
+      }
+
       /* Assume there is only one rtx object for any given label.  */
     case LABEL_REF:
       hash
@@ -684,7 +693,7 @@ new_cselib_val (value, mode)
   if (e)
     empty_vals = e->u.next_free;
   else
-    e = (cselib_val *) obstack_alloc (&cselib_obstack, sizeof (cselib_val));
+    e = (cselib_val *) ggc_alloc (sizeof (cselib_val));
 
   if (value == 0)
     abort ();
@@ -765,7 +774,7 @@ cselib_lookup_mem (x, create)
    X isn't actually modified; if modifications are needed, new rtl is
    allocated.  However, the return value can share rtl with X.  */
 
-static rtx
+rtx
 cselib_subst_to_values (x)
      rtx x;
 {
@@ -788,15 +797,27 @@ cselib_subst_to_values (x)
     case MEM:
       e = cselib_lookup_mem (x, 0);
       if (! e)
-	abort ();
+	{
+	  /* This happens for autoincrements.  Assign a value that doesn't
+	     match any other.  */
+	  e = new_cselib_val (++next_unknown_value, GET_MODE (x));
+	}
       return e->u.val_rtx;
 
-      /* CONST_DOUBLEs must be special-cased here so that we won't try to
-	 look up the CONST_DOUBLE_MEM inside.  */
     case CONST_DOUBLE:
+    case CONST_VECTOR:
     case CONST_INT:
       return x;
 
+    case POST_INC:
+    case PRE_INC:
+    case POST_DEC:
+    case PRE_DEC:
+    case POST_MODIFY:
+    case PRE_MODIFY:
+      e = new_cselib_val (++next_unknown_value, GET_MODE (x));
+      return e->u.val_rtx;
+      
     default:
       break;
     }
@@ -871,6 +892,14 @@ cselib_lookup (x, mode, create)
       if (! create)
 	return 0;
 
+      if (i < FIRST_PSEUDO_REGISTER)
+	{
+	  unsigned int n = HARD_REGNO_NREGS (i, mode);
+
+	  if (n > max_value_regs)
+	    max_value_regs = n;
+	}
+
       e = new_cselib_val (++next_unknown_value, GET_MODE (x));
       e->locs = new_elt_loc_list (e->locs, x);
       if (REG_VALUES (i) == 0)
@@ -931,11 +960,22 @@ cselib_invalidate_regno (regno, mode)
      pseudos, only REGNO is affected.  For hard regs, we must take MODE
      into account, and we must also invalidate lower register numbers
      if they contain values that overlap REGNO.  */
-  endregno = regno + 1;
   if (regno < FIRST_PSEUDO_REGISTER && mode != VOIDmode) 
-    endregno = regno + HARD_REGNO_NREGS (regno, mode);
+    {
+      if (regno < max_value_regs)
+	i = 0;
+      else
+	i = regno - max_value_regs;
 
-  for (i = 0; i < endregno; i++)
+      endregno = regno + HARD_REGNO_NREGS (regno, mode);
+    }
+  else
+    {
+      i = regno;
+      endregno = regno + 1;
+    }
+
+  for (; i < endregno; i++)
     {
       struct elt_list **l = &REG_VALUES (i);
 
@@ -992,7 +1032,7 @@ cselib_mem_conflict_p (mem_base, val)
   code = GET_CODE (val);
   switch (code)
     {
-      /* Get rid of a few simple cases quickly. */
+      /* Get rid of a few simple cases quickly.  */
     case REG:
     case PC:
     case CC0:
@@ -1000,6 +1040,7 @@ cselib_mem_conflict_p (mem_base, val)
     case CONST:
     case CONST_INT:
     case CONST_DOUBLE:
+    case CONST_VECTOR:
     case SYMBOL_REF:
     case LABEL_REF:
       return 0;
@@ -1144,6 +1185,14 @@ cselib_record_set (dest, src_elt, dest_addr_elt)
       if (REG_VALUES (dreg) == 0)
         VARRAY_PUSH_UINT (used_regs, dreg);
 
+      if (dreg < FIRST_PSEUDO_REGISTER)
+	{
+	  unsigned int n = HARD_REGNO_NREGS (dreg, GET_MODE (dest));
+
+	  if (n > max_value_regs)
+	    max_value_regs = n;
+	}
+
       REG_VALUES (dreg) = new_elt_list (REG_VALUES (dreg), src_elt);
       if (src_elt->locs == 0)
 	n_useless_values--;
@@ -1179,8 +1228,15 @@ cselib_record_sets (insn)
   int i;
   struct set sets[MAX_SETS];
   rtx body = PATTERN (insn);
+  rtx cond = 0;
 
   body = PATTERN (insn);
+  if (GET_CODE (body) == COND_EXEC)
+    {
+      cond = COND_EXEC_TEST (body);
+      body = COND_EXEC_CODE (body);
+    }
+
   /* Find all sets.  */
   if (GET_CODE (body) == SET)
     {
@@ -1219,7 +1275,10 @@ cselib_record_sets (insn)
       /* We don't know how to record anything but REG or MEM.  */
       if (GET_CODE (dest) == REG || GET_CODE (dest) == MEM)
         {
-	  sets[i].src_elt = cselib_lookup (sets[i].src, GET_MODE (dest), 1);
+	  rtx src = sets[i].src;
+	  if (cond)
+	    src = gen_rtx_IF_THEN_ELSE (GET_MODE (src), cond, src, dest);
+	  sets[i].src_elt = cselib_lookup (src, GET_MODE (dest), 1);
 	  if (GET_CODE (dest) == MEM)
 	    sets[i].dest_addr_elt = cselib_lookup (XEXP (dest, 0), Pmode, 1);
 	  else
@@ -1254,8 +1313,8 @@ cselib_process_insn (insn)
 
   /* Forget everything at a CODE_LABEL, a volatile asm, or a setjmp.  */
   if (GET_CODE (insn) == CODE_LABEL
-      || (GET_CODE (insn) == NOTE
-	  && NOTE_LINE_NUMBER (insn) == NOTE_INSN_SETJMP)
+      || (GET_CODE (insn) == CALL_INSN
+	  && find_reg_note (insn, REG_SETJMP, NULL))
       || (GET_CODE (insn) == INSN
 	  && GET_CODE (PATTERN (insn)) == ASM_OPERANDS
 	  && MEM_VOLATILE_P (PATTERN (insn))))
@@ -1279,7 +1338,7 @@ cselib_process_insn (insn)
 	if (call_used_regs[i])
 	  cselib_invalidate_regno (i, VOIDmode);
 
-      if (! CONST_CALL_P (insn))
+      if (! CONST_OR_PURE_CALL_P (insn))
 	cselib_invalidate_mem (callmem);
     }
 
@@ -1329,20 +1388,25 @@ cselib_update_varray_sizes ()
 void
 cselib_init ()
 {
-  /* These are only created once.  */
+  /* This is only created once.  */
   if (! callmem)
-    {
-      gcc_obstack_init (&cselib_obstack);
-      cselib_startobj = obstack_alloc (&cselib_obstack, 0);
-
-      callmem = gen_rtx_MEM (BLKmode, const0_rtx);
-      ggc_add_rtx_root (&callmem, 1);
-    }
+    callmem = gen_rtx_MEM (BLKmode, const0_rtx);
 
   cselib_nregs = max_reg_num ();
-  VARRAY_ELT_LIST_INIT (reg_values, cselib_nregs, "reg_values");
-  VARRAY_UINT_INIT (used_regs, cselib_nregs, "used_regs");
-  hash_table = htab_create (31, get_value_hash, entry_and_rtx_equal_p, NULL);
+  if (reg_values_old != NULL && VARRAY_SIZE (reg_values_old) >= cselib_nregs)
+    {
+      reg_values = reg_values_old;
+      used_regs = used_regs_old;
+      VARRAY_CLEAR (reg_values);
+      VARRAY_CLEAR (used_regs);
+    }
+  else
+    {
+      VARRAY_ELT_LIST_INIT (reg_values, cselib_nregs, "reg_values");
+      VARRAY_UINT_INIT (used_regs, cselib_nregs, "used_regs");
+    }
+  hash_table = htab_create_ggc (31, get_value_hash, entry_and_rtx_equal_p, 
+				NULL);
   clear_table (1);
 }
 
@@ -1351,8 +1415,13 @@ cselib_init ()
 void
 cselib_finish ()
 {
-  clear_table (0);
-  VARRAY_FREE (reg_values);
-  VARRAY_FREE (used_regs);
-  htab_delete (hash_table);
+  reg_values_old = reg_values;
+  reg_values = 0;
+  used_regs_old = used_regs;
+  used_regs = 0;
+  hash_table = 0;
+  n_useless_values = 0;
+  next_unknown_value = 0;
 }
+
+#include "gt-cselib.h"

@@ -1,7 +1,7 @@
 /* Program to write C++-suitable header files from a Java(TM) .class
    file.  This is similar to SUN's javah.
 
-Copyright (C) 1996, 1998, 1999, 2000 Free Software Foundation, Inc.
+Copyright (C) 1996, 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -33,6 +33,7 @@ The Free Software Foundation is independent of Sun Microsystems, Inc.  */
 #include "javaop.h"
 #include "java-tree.h"
 #include "java-opcodes.h"
+#include "hashtab.h"
 
 #include <getopt.h>
 
@@ -120,7 +121,7 @@ static struct method_name *method_name_list;
 static void print_field_info PARAMS ((FILE*, JCF*, int, int, JCF_u2));
 static void print_mangled_classname PARAMS ((FILE*, JCF*, const char*, int));
 static int  print_cxx_classname PARAMS ((FILE*, const char*, JCF*, int));
-static void print_method_info PARAMS ((FILE*, JCF*, int, int, JCF_u2, int));
+static void print_method_info PARAMS ((FILE*, JCF*, int, int, JCF_u2));
 static void print_c_decl PARAMS ((FILE*, JCF*, int, int, int, const char *,
 				  int));
 static void print_stub_or_jni PARAMS ((FILE*, JCF*, int, int, int,
@@ -142,6 +143,8 @@ static char *get_field_name PARAMS ((JCF *, int, JCF_u2));
 static void print_field_name PARAMS ((FILE *, JCF *, int, JCF_u2));
 static const unsigned char *super_class_name PARAMS ((JCF *, int *));
 static void print_include PARAMS ((FILE *, const unsigned char *, int));
+static int gcjh_streq PARAMS ((const void *p1, const void *p2));
+static int throwable_p PARAMS ((const unsigned char *signature));
 static const unsigned char *decode_signature_piece
   PARAMS ((FILE *, const unsigned char *, const unsigned char *, int *));
 static void print_class_decls PARAMS ((FILE *, JCF *, int));
@@ -151,6 +154,7 @@ static void version PARAMS ((void)) ATTRIBUTE_NORETURN;
 static int overloaded_jni_method_exists_p PARAMS ((const unsigned char *, int,
 						   const char *, int));
 static void jni_print_char PARAMS ((FILE *, int));
+static void decompile_return_statement PARAMS ((FILE *, JCF *, int, int, int));
 
 JCF_u2 current_field_name;
 JCF_u2 current_field_value;
@@ -187,9 +191,14 @@ static int method_declared = 0;
 static int method_access = 0;
 static int method_printed = 0;
 static int method_synthetic = 0;
+static int method_signature = 0;
+
 #define HANDLE_METHOD(ACCESS_FLAGS, NAME, SIGNATURE, ATTRIBUTE_COUNT)	\
   {									\
     method_synthetic = 0;						\
+    method_printed = 0;							\
+    decompiled = 0;							\
+    method_signature = SIGNATURE;					\
     if (ATTRIBUTE_COUNT)						\
       method_synthetic = peek_attribute (jcf, ATTRIBUTE_COUNT,		\
 				  (const char *)"Synthetic", 9);	\
@@ -204,15 +213,14 @@ static int method_synthetic = 0;
       } 								\
     if (method_pass && !method_synthetic)				\
       {									\
-	decompiled = 0; method_printed = 0;				\
 	if (out)							\
 	  print_method_info (out, jcf, NAME, SIGNATURE,			\
-			     ACCESS_FLAGS, method_synthetic);		\
+			     ACCESS_FLAGS);				\
       }									\
     else if (!method_synthetic)						\
       {									\
 	print_method_info (NULL, jcf, NAME, SIGNATURE,			\
-			   ACCESS_FLAGS, method_synthetic);		\
+			   ACCESS_FLAGS);				\
 	if (! stubs && ! flag_jni)					\
 	  add_class_decl (out, jcf, SIGNATURE);				\
       }									\
@@ -287,9 +295,7 @@ jni_print_char (stream, ch)
     fputs ("_3", stream);
   else if (ch == '/')
     fputs ("_", stream);
-  else if ((ch >= '0' && ch <= '9')
-	   || (ch >= 'a' && ch <= 'z')
-	   || (ch >= 'A' && ch <= 'Z'))
+  else if (ISALNUM (ch))
     fputc (ch, stream);
   else
     {
@@ -390,7 +396,7 @@ utf8_cmp (str, length, name)
 
 /* This is a sorted list of all C++ keywords.  */
 
-static const char *cxx_keywords[] =
+static const char *const cxx_keywords[] =
 {
   "_Complex",
   "__alignof",
@@ -421,9 +427,9 @@ static const char *cxx_keywords[] =
   "__typeof__",
   "__volatile",
   "__volatile__",
-  "asm",
   "and",
   "and_eq",
+  "asm",
   "auto",
   "bitand",
   "bitor",
@@ -483,8 +489,8 @@ static const char *cxx_keywords[] =
   "true",
   "try",
   "typedef",
-  "typename",
   "typeid",
+  "typename",
   "typeof",
   "union",
   "unsigned",
@@ -786,9 +792,9 @@ DEFUN(print_field_info, (stream, jcf, name_index, sig_index, flags),
 
 
 static void
-DEFUN(print_method_info, (stream, jcf, name_index, sig_index, flags, synth),
+DEFUN(print_method_info, (stream, jcf, name_index, sig_index, flags),
       FILE *stream AND JCF* jcf
-      AND int name_index AND int sig_index AND JCF_u2 flags AND int synth)
+      AND int name_index AND int sig_index AND JCF_u2 flags)
 {
   const unsigned char *str;
   int length, is_init = 0;
@@ -800,10 +806,6 @@ DEFUN(print_method_info, (stream, jcf, name_index, sig_index, flags, synth),
     fprintf (stream, "<not a UTF8 constant>");
   str = JPOOL_UTF_DATA (jcf, name_index);
   length = JPOOL_UTF_LENGTH (jcf, name_index);
-
-  /* Ignore synthetic methods. */
-  if (synth)
-    return;
 
   if (str[0] == '<')
     {
@@ -894,6 +896,133 @@ DEFUN(print_method_info, (stream, jcf, name_index, sig_index, flags, synth),
     free (override);
 }
 
+/* A helper for the decompiler which prints a `return' statement where
+   the type is a reference type.  If METHODTYPE and OBJECTTYPE are not
+   identical, we emit a cast.  We do this because the C++ compiler
+   doesn't know that a reference can be cast to the type of an
+   interface it implements.  METHODTYPE is the index of the method's
+   signature.  NAMEINDEX is the index of the field name; -1 for
+   `this'.  OBJECTTYPE is the index of the object's type.  */
+static void
+decompile_return_statement (out, jcf, methodtype, nameindex, objecttype)
+     FILE *out;
+     JCF *jcf;
+     int methodtype, nameindex, objecttype;
+{
+  int cast = 0;
+  int obj_name_len, method_name_len;
+  const unsigned char *obj_data, *method_data;
+
+  obj_name_len = JPOOL_UTF_LENGTH (jcf, objecttype);
+  obj_data = JPOOL_UTF_DATA (jcf, objecttype);
+
+  method_name_len = JPOOL_UTF_LENGTH (jcf, methodtype);
+  method_data = JPOOL_UTF_DATA (jcf, methodtype);
+
+  /* Skip forward to return type part of method.  */
+  while (*method_data != ')')
+    {
+      ++method_data;
+      --method_name_len;
+    }
+  /* Skip past `)'.  */
+  ++method_data;
+  --method_name_len;
+
+  /* If we see an `L', skip it and the trailing `;'.  */
+  if (method_data[0] == 'L' && method_data[method_name_len - 1] == ';')
+    {
+      ++method_data;
+      method_name_len -= 2;
+    }
+  if (obj_data[0] == 'L' && obj_data[obj_name_len - 1] == ';')
+    {
+      ++obj_data;
+      obj_name_len -= 2;
+    }
+
+  /* FIXME: if METHODTYPE is a superclass of OBJECTTYPE then we don't
+     need a cast.  Right now there is no way to determine if this is
+     the case.  */
+  if (method_name_len != obj_name_len)
+    cast = 1;
+  else
+    {
+      int i;
+      for (i = 0; i < method_name_len; ++i)
+	{
+	  if (method_data[i] != obj_data[i])
+	    {
+	      cast = 1;
+	      break;
+	    }
+	}
+    }
+
+  fputs (" { return ", out);
+
+  if (cast)
+    {
+      int array_depth = 0;
+      const unsigned char *limit;
+
+      fputs ("reinterpret_cast<", out);
+
+      while (*method_data == '[')
+	{
+	  ++method_data;
+	  ++array_depth;
+	  --method_name_len;
+	  fputs ("JArray<", out);
+	}
+
+      /* Leading space to avoid C++ digraphs.  */
+      fputs (" ::", out);
+
+      /* If we see an `L', skip it and the trailing `;'.  Only do this
+	 if we've seen an array specification.  If we don't have an
+	 array then the `L' was stripped earlier.  */
+      if (array_depth && method_data[0] == 'L'
+	  && method_data[method_name_len - 1] == ';')
+	{
+	  ++method_data;
+	  method_name_len -= 2;
+	}
+
+      limit = method_data + method_name_len;
+      while (method_data < limit)
+	{
+	  int ch = UTF8_GET (method_data, limit);
+	  if (ch == '/')
+	    fputs ("::", out);
+	  else
+	    jcf_print_char (out, ch);
+	}
+      fputs (" *", out);
+
+      /* Close each array.  */
+      while (array_depth > 0)
+	{
+	  fputs ("> *", out);
+	  --array_depth;
+	}
+
+      /* Close the cast.  */
+      fputs ("> (", out);
+    }
+
+  if (nameindex == -1)
+    fputs ("this", out);
+  else
+    print_field_name (out, jcf, nameindex, 0);
+
+  if (cast)
+    fputs (")", out);
+
+  fputs ("; }", out);
+}
+
+
 /* Try to decompile a method body.  Right now we just try to handle a
    simple case that we can do.  Expand as desired.  */
 static void
@@ -920,24 +1049,32 @@ decompile_method (out, jcf, code_len)
 	  || codes[4] == OPCODE_lreturn))
     {
       /* Found code like `return FIELD'.  */
-      fputs (" { return ", out);
       index = (codes[2] << 8) | codes[3];
       /* FIXME: ensure that tag is CONSTANT_Fieldref.  */
-      /* FIXME: ensure that the field's class is this class.  */
       name_and_type = JPOOL_USHORT2 (jcf, index);
       /* FIXME: ensure that tag is CONSTANT_NameAndType.  */
       name = JPOOL_USHORT1 (jcf, name_and_type);
-      /* FIXME: flags.  */
-      print_field_name (out, jcf, name, 0);
-      fputs ("; }", out);
+      if (codes[4] == OPCODE_areturn)
+	decompile_return_statement (out, jcf, method_signature,
+				    name, JPOOL_USHORT2 (jcf, name_and_type));
+      else
+	{
+	  fputs (" { return ", out);
+	  /* FIXME: flags.  */
+	  print_field_name (out, jcf, name, 0);
+	  fputs ("; }", out);
+	}
       decompiled = 1;
     }
   else if (code_len == 2
 	   && codes[0] == OPCODE_aload_0
-	   && codes[1] == OPCODE_areturn)
+	   && codes[1] == OPCODE_areturn
+	   /* We're going to generate `return this'.  This only makes
+	      sense for non-static methods.  */
+	   && ! (method_access & ACC_STATIC))
     {
-      /* Found `return this'.  */
-      fputs (" { return this; }", out);
+      decompile_return_statement (out, jcf, method_signature, -1,
+				  JPOOL_USHORT1 (jcf, jcf->this_class));
       decompiled = 1;
     }
   else if (code_len == 1 && codes[0] == OPCODE_return)
@@ -955,6 +1092,117 @@ decompile_method (out, jcf, code_len)
       fputs (" { return 0; }", out);
       decompiled = 1;
     }
+}
+
+/* Like strcmp, but invert the return result for the hash table.  This
+   should probably be in hashtab.c to complement the existing string
+   hash function.  */
+static int
+gcjh_streq (p1, p2)
+     const void *p1, *p2;
+{
+  return ! strcmp ((char *) p1, (char *) p2);
+}
+
+/* Return 1 if the initial part of CLNAME names a subclass of throwable, 
+   or 0 if not.  CLNAME may be extracted from a signature, and can be 
+   terminated with either `;' or NULL.  */
+static int
+throwable_p (clname)
+     const unsigned char *clname;
+{
+  int length;
+  unsigned char *current;
+  int i;
+  int result = 0;
+
+  /* We keep two hash tables of class names.  In one we list all the
+     classes which are subclasses of Throwable.  In the other we will
+     all other classes.  We keep two tables to make the code a bit
+     simpler; we don't have to have a structure mapping class name to
+     a `throwable?' bit.  */
+  static htab_t throw_hash;
+  static htab_t non_throw_hash;
+  static int init_done = 0;
+
+  if (! init_done)
+    {
+      PTR *slot;
+      const unsigned char *str;
+
+      /* Self-initializing.  The cost of this really doesn't matter.
+	 We also don't care about freeing these, either.  */
+      throw_hash = htab_create (10, htab_hash_string, gcjh_streq,
+				(htab_del) free);
+      non_throw_hash = htab_create (10, htab_hash_string, gcjh_streq,
+				    (htab_del) free);
+
+      /* Make sure the root classes show up in the tables.  */
+      str = xstrdup ("java.lang.Throwable");
+      slot = htab_find_slot (throw_hash, str, INSERT);
+      *slot = (PTR) str;
+
+      str = xstrdup ("java.lang.Object");
+      slot = htab_find_slot (non_throw_hash, str, INSERT);
+      *slot = (PTR) str;
+
+      init_done = 1;
+    }
+
+  for (length = 0; clname[length] != ';' && clname[length] != '\0'; ++length)
+    ;
+  current = (unsigned char *) ALLOC (length);
+  for (i = 0; i < length; ++i)
+    current[i] = clname[i] == '/' ? '.' : clname[i];
+  current[length] = '\0';
+
+  /* We don't compute the hash slot here because the table might be
+     modified by the recursion.  In that case the slot could be
+     invalidated.  */
+  if (htab_find (throw_hash, current))
+    result = 1;
+  else if (htab_find (non_throw_hash, current))
+    result = 0;
+  else
+    {
+      JCF jcf;
+      PTR *slot;
+      unsigned char *super, *tmp;
+      int super_length = -1;
+      const char *classfile_name = find_class (current, strlen (current),
+					       &jcf, 0);
+
+      if (! classfile_name)
+	{
+	  fprintf (stderr, "couldn't find class %s\n", current);
+	  found_error = 1;
+	  return 0;
+	}
+      if (jcf_parse_preamble (&jcf) != 0
+	  || jcf_parse_constant_pool (&jcf) != 0
+	  || verify_constant_pool (&jcf) > 0)
+	{
+	  fprintf (stderr, "parse error while reading %s\n", classfile_name);
+	  found_error = 1;
+	  return 0;
+	}
+      jcf_parse_class (&jcf);
+
+      tmp = (unsigned char *) super_class_name (&jcf, &super_length);
+      super = (unsigned char *) ALLOC (super_length + 1);
+      memcpy (super, tmp, super_length);      
+      super[super_length] = '\0';
+
+      result = throwable_p (super);
+      slot = htab_find_slot (result ? throw_hash : non_throw_hash,
+			     current, INSERT);
+      *slot = current;
+      current = NULL;
+
+      JCF_FINISH (&jcf);
+    }
+
+  return result;
 }
 
 /* Print one piece of a signature.  Returns pointer to next parseable
@@ -975,8 +1223,7 @@ decode_signature_piece (stream, signature, limit, need_space)
 
     array_loop:
       for (signature++; (signature < limit
-			 && *signature >= '0'
-			 && *signature <= '9'); signature++)
+			 && ISDIGIT (*signature)); signature++)
 	;
       switch (*signature)
 	{
@@ -1071,24 +1318,16 @@ decode_signature_piece (stream, signature, limit, need_space)
     case 'L':
       if (flag_jni)
 	{
-	  /* We know about certain types and special-case their
-	     names.
-	     FIXME: something like java.lang.Exception should be
-	     printed as `jthrowable', because it is a subclass.  This
-	     means that gcjh must read the entire hierarchy and
-	     comprehend it.  */
+	  /* We know about certain types and special-case their names.  */
 	  if (! strncmp (signature, "Ljava/lang/String;",
 			 sizeof ("Ljava/lang/String;") -1))
 	    ctype = "jstring";
 	  else if (! strncmp (signature, "Ljava/lang/Class;",
 			      sizeof ("Ljava/lang/Class;") - 1))
 	    ctype = "jclass";
-	  else if (! strncmp (signature, "Ljava/lang/Throwable;",
-			      sizeof ("Ljava/lang/Throwable;") - 1))
+	  /* Skip leading 'L' for throwable_p call.  */
+	  else if (throwable_p (signature + 1))
 	    ctype = "jthrowable";
-	  else if (! strncmp (signature, "Ljava/lang/ref/WeakReference;",
-			      sizeof ("Ljava/lang/ref/WeakReference;") - 1))
-	    ctype = "jweak";
 	  else
 	    ctype = "jobject";
 
@@ -1370,12 +1609,13 @@ DEFUN(print_stub_or_jni, (stream, jcf, name_index, signature_index, is_init,
 	  if (flag_jni)
 	    fputs ("\n{\n  (*env)->FatalError (\"", stream);
 	  else
-	    fputs ("\n{\n  JvFail (\"", stream);
+	    fputs ("\n{\n  throw new ::java::lang::UnsupportedOperationException (JvNewStringLatin1 (\"", stream);
 	  print_name_for_stub_or_jni (stream, jcf, name_index,
 				      signature_index, is_init,
 				      name_override,
 				      flags);
-	  fputs (" not implemented\");\n}\n\n", stream);
+	  fprintf (stream, " not implemented\")%s;\n}\n\n",
+		   flag_jni ? "" : ")");
 	}
     }
 }
@@ -1628,6 +1868,7 @@ print_namelet (out, name, depth)
       print_namelet (out, c, depth + 2);
       c = next;
     }
+  name->subnamelets = NULL;
 
   if (name->name)
     {
@@ -1835,12 +2076,24 @@ DEFUN(process_file, (jcf, out),
 	{
 	  /* Strip off the ".class" portion of the name when printing
 	     the include file name.  */
-	  int len = strlen (jcf->classname);
+	  char *name;
+	  int i, len = strlen (jcf->classname);
 	  if (len > 6 && ! strcmp (&jcf->classname[len - 6], ".class"))
 	    len -= 6;
-	  print_include (out, jcf->classname, len);
+	  /* Turn the class name into a file name.  */
+	  name = xmalloc (len + 1);
+	  for (i = 0; i < len; ++i)
+	    name[i] = jcf->classname[i] == '.' ? '/' : jcf->classname[i];
+	  name[i] = '\0';
+	  print_include (out, name, len);
+	  free (name);
+
 	  if (! flag_jni)
-	    print_include (out, "gcj/cni", -1);
+	    {
+	      print_include (out, "gcj/cni", -1);
+	      print_include (out, "java/lang/UnsupportedOperationException",
+			     -1);
+	    }
 	}
     }
 
@@ -1954,41 +2207,45 @@ DEFUN(process_file, (jcf, out),
 /* This is used to mark options with no short value.  */
 #define LONG_OPT(Num)  ((Num) + 128)
 
-#define OPT_classpath LONG_OPT (0)
-#define OPT_CLASSPATH LONG_OPT (1)
-#define OPT_HELP      LONG_OPT (2)
-#define OPT_TEMP      LONG_OPT (3)
-#define OPT_VERSION   LONG_OPT (4)
-#define OPT_PREPEND   LONG_OPT (5)
-#define OPT_FRIEND    LONG_OPT (6)
-#define OPT_ADD       LONG_OPT (7)
-#define OPT_APPEND    LONG_OPT (8)
-#define OPT_M         LONG_OPT (9)
-#define OPT_MM        LONG_OPT (10)
-#define OPT_MG        LONG_OPT (11)
-#define OPT_MD        LONG_OPT (12)
-#define OPT_MMD       LONG_OPT (13)
+#define OPT_classpath     LONG_OPT (0)
+#define OPT_CLASSPATH     OPT_classpath
+#define OPT_bootclasspath LONG_OPT (1)
+#define OPT_extdirs       LONG_OPT (2)
+#define OPT_HELP          LONG_OPT (3)
+#define OPT_TEMP          LONG_OPT (4)
+#define OPT_VERSION       LONG_OPT (5)
+#define OPT_PREPEND       LONG_OPT (6)
+#define OPT_FRIEND        LONG_OPT (7)
+#define OPT_ADD           LONG_OPT (8)
+#define OPT_APPEND        LONG_OPT (9)
+#define OPT_M             LONG_OPT (10)
+#define OPT_MM            LONG_OPT (11)
+#define OPT_MG            LONG_OPT (12)
+#define OPT_MD            LONG_OPT (13)
+#define OPT_MMD           LONG_OPT (14)
 
-static struct option options[] =
+static const struct option options[] =
 {
-  { "classpath", required_argument, NULL, OPT_classpath },
-  { "CLASSPATH", required_argument, NULL, OPT_CLASSPATH },
-  { "help",      no_argument,       NULL, OPT_HELP },
-  { "stubs",     no_argument,       &stubs, 1 },
-  { "td",        required_argument, NULL, OPT_TEMP },
-  { "verbose",   no_argument,       NULL, 'v' },
-  { "version",   no_argument,       NULL, OPT_VERSION },
-  { "prepend",   required_argument, NULL, OPT_PREPEND },
-  { "friend",    required_argument, NULL, OPT_FRIEND },
-  { "add",       required_argument, NULL, OPT_ADD },
-  { "append",    required_argument, NULL, OPT_APPEND },
-  { "M",         no_argument,       NULL, OPT_M   },
-  { "MM",        no_argument,       NULL, OPT_MM  },
-  { "MG",        no_argument,       NULL, OPT_MG  },
-  { "MD",        no_argument,       NULL, OPT_MD  },
-  { "MMD",       no_argument,       NULL, OPT_MMD },
-  { "jni",       no_argument,       &flag_jni, 1 },
-  { NULL,        no_argument,       NULL, 0 }
+  { "classpath",     required_argument, NULL, OPT_classpath },
+  { "bootclasspath", required_argument, NULL, OPT_bootclasspath },
+  { "extdirs",       required_argument, NULL, OPT_extdirs },
+  { "CLASSPATH",     required_argument, NULL, OPT_CLASSPATH },
+  { "help",          no_argument,       NULL, OPT_HELP },
+  { "stubs",         no_argument,       &stubs, 1 },
+  { "td",            required_argument, NULL, OPT_TEMP },
+  { "verbose",       no_argument,       NULL, 'v' },
+  { "version",       no_argument,       NULL, OPT_VERSION },
+  { "prepend",       required_argument, NULL, OPT_PREPEND },
+  { "friend",        required_argument, NULL, OPT_FRIEND },
+  { "add",           required_argument, NULL, OPT_ADD },
+  { "append",        required_argument, NULL, OPT_APPEND },
+  { "M",             no_argument,       NULL, OPT_M   },
+  { "MM",            no_argument,       NULL, OPT_MM  },
+  { "MG",            no_argument,       NULL, OPT_MG  },
+  { "MD",            no_argument,       NULL, OPT_MD  },
+  { "MMD",           no_argument,       NULL, OPT_MMD },
+  { "jni",           no_argument,       &flag_jni, 1 },
+  { NULL,            no_argument,       NULL, 0 }
 };
 
 static void
@@ -2012,8 +2269,9 @@ help ()
   printf ("  -prepend TEXT           Insert TEXT before start of class\n");
   printf ("\n");
   printf ("  --classpath PATH        Set path to find .class files\n");
-  printf ("  --CLASSPATH PATH        Set path to find .class files\n");
   printf ("  -IDIR                   Append directory to class path\n");
+  printf ("  --bootclasspath PATH    Override built-in class path\n");
+  printf ("  --extdirs PATH          Set extensions directory path\n");
   printf ("  -d DIRECTORY            Set output directory name\n");
   printf ("  -o FILE                 Set output file name\n");
   printf ("  -td DIRECTORY           Set temporary directory name\n");
@@ -2038,8 +2296,8 @@ help ()
 static void
 version ()
 {
-  printf ("gcjh (%s)\n\n", version_string);
-  printf ("Copyright (C) 2001 Free Software Foundation, Inc.\n");
+  printf ("gcjh (GCC) %s\n\n", version_string);
+  printf ("Copyright (C) 2002 Free Software Foundation, Inc.\n");
   printf ("This is free software; see the source for copying conditions.  There is NO\n");
   printf ("warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n");
   exit (0);
@@ -2093,8 +2351,12 @@ DEFUN(main, (argc, argv),
 	  jcf_path_classpath_arg (optarg);
 	  break;
 
-	case OPT_CLASSPATH:
-	  jcf_path_CLASSPATH_arg (optarg);
+	case OPT_bootclasspath:
+	  jcf_path_bootclasspath_arg (optarg);
+	  break;
+
+	case OPT_extdirs:
+	  jcf_path_extdirs_arg (optarg);
 	  break;
 
 	case OPT_HELP:
@@ -2171,7 +2433,7 @@ DEFUN(main, (argc, argv),
       usage ();
     }
 
-  jcf_path_seal ();
+  jcf_path_seal (verbose);
 
   if (output_file && emit_dependencies)
     {

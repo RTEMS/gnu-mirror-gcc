@@ -32,9 +32,19 @@ Boston, MA 02111-1307, USA.  */
 #ifndef MATH_LIBRARY
 #define MATH_LIBRARY "-lm"
 #endif
+#ifndef MATH_LIBRARY_PROFILE
+#define MATH_LIBRARY_PROFILE "-lm"
+#endif
 
 #ifndef LIBSTDCXX
 #define LIBSTDCXX "-lstdc++"
+#endif
+#ifndef LIBSTDCXX_PROFILE
+#define LIBSTDCXX_PROFILE "-lstdc++"
+#endif
+
+#ifndef LIBUNWIND
+#define LIBUNWIND "-lunwind"
 #endif
 
 void
@@ -44,6 +54,9 @@ lang_specific_driver (in_argc, in_argv, in_added_libraries)
      int *in_added_libraries;
 {
   int i, j;
+
+  /* If non-zero, the user gave us the `-p' or `-pg' flag.  */ 
+  int saw_profile_flag = 0;
 
   /* If non-zero, the user gave us the `-v' flag.  */ 
   int saw_verbose_flag = 0;
@@ -137,6 +150,8 @@ lang_specific_driver (in_argc, in_argv, in_added_libraries)
 	    }
 	  else if (strcmp (argv[i], "-lc") == 0)
 	    args[i] |= WITHLIBC;
+	  else if (strcmp (argv[i], "-pg") == 0 || strcmp (argv[i], "-p") == 0)
+	    saw_profile_flag++;
 	  else if (strcmp (argv[i], "-v") == 0)
 	    {
 	      saw_verbose_flag = 1;
@@ -151,6 +166,7 @@ lang_specific_driver (in_argc, in_argv, in_added_libraries)
 	    saw_speclang = 1;
 	  else if (((argv[i][2] == '\0'
 		     && (char *)strchr ("bBVDUoeTuIYmLiA", argv[i][1]) != NULL)
+		    || strcmp (argv[i], "-Xlinker") == 0
 		    || strcmp (argv[i], "-Tdata") == 0))
 	    quote = argv[i];
 	  else if (library != 0 && ((argv[i][2] == '\0'
@@ -258,14 +274,18 @@ lang_specific_driver (in_argc, in_argv, in_added_libraries)
   /* Add `-lstdc++' if we haven't already done so.  */
   if (library)
     {
-      arglist[j++] = LIBSTDCXX;
+      arglist[j++] = saw_profile_flag ? LIBSTDCXX_PROFILE : LIBSTDCXX;
       added_libraries++;
+#ifdef USE_LIBUNWIND_EXCEPTIONS
+      arglist[j++] = LIBUNWIND;
+      added_libraries++;
+#endif
     }
   if (saw_math)
     arglist[j++] = saw_math;
   else if (library && need_math)
     {
-      arglist[j++] = MATH_LIBRARY;
+      arglist[j++] = saw_profile_flag ? MATH_LIBRARY_PROFILE : MATH_LIBRARY;
       added_libraries++;
     }
   if (saw_libc)

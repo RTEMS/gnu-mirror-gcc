@@ -1,6 +1,6 @@
 // ClassLoader.java - Define policies for loading Java classes.
 
-/* Copyright (C) 1998, 1999, 2000, 2001  Free Software Foundation
+/* Copyright (C) 1998, 1999, 2000, 2001, 2002  Free Software Foundation
 
    This file is part of libgcj.
 
@@ -20,9 +20,7 @@ import java.security.Permission;
 import java.security.Permissions;
 import java.security.Policy;
 import java.security.ProtectionDomain;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Stack;
+import java.util.*;
 
 /**
  * The class <code>ClassLoader</code> is intended to be subclassed by
@@ -34,7 +32,47 @@ import java.util.Stack;
 
 public abstract class ClassLoader
 {
-  static private ClassLoader system;
+  /**
+   * The desired assertion status of classes loaded by this loader, if not
+   * overridden by package or class instructions.
+   */
+  // Package visible for use by Class.
+  boolean defaultAssertionStatus = VMClassLoader.defaultAssertionStatus();
+
+  /**
+   * The command-line state of the package assertion status overrides. This
+   * map is never modified, so it does not need to be synchronized.
+   */
+  // Package visible for use by Class.
+  static final Map systemPackageAssertionStatus
+    = VMClassLoader.packageAssertionStatus();
+
+  /**
+   * The map of package assertion status overrides, or null if no package
+   * overrides have been specified yet. The values of the map should be
+   * Boolean.TRUE or Boolean.FALSE, and the unnamed package is represented
+   * by the null key. This map must be synchronized on this instance.
+   */
+  // Package visible for use by Class.
+  Map packageAssertionStatus;
+
+  /**
+   * The command-line state of the class assertion status overrides. This
+   * map is never modified, so it does not need to be synchronized.
+   */
+  // Package visible for use by Class.
+  static final Map systemClassAssertionStatus
+    = VMClassLoader.classAssertionStatus();
+
+  /**
+   * The map of class assertion status overrides, or null if no class
+   * overrides have been specified yet. The values of the map should be
+   * Boolean.TRUE or Boolean.FALSE. This map must be synchronized on this
+   * instance.
+   */
+  // Package visible for use by Class.
+  Map classAssertionStatus;
+
   private ClassLoader parent;
   private HashMap definedPackages = new HashMap();
 
@@ -46,9 +84,7 @@ public abstract class ClassLoader
 
   public static ClassLoader getSystemClassLoader ()
   {
-    if (system == null)
-      system = gnu.gcj.runtime.VMClassLoader.instance;
-    return system;
+    return gnu.gcj.runtime.VMClassLoader.instance;
   }
 
   /**
@@ -120,7 +156,7 @@ public abstract class ClassLoader
 	  if (parent != null)
 	    return parent.loadClass (name, link);
 	  else
-	    c = system.findClass (name);
+	    c = gnu.gcj.runtime.VMClassLoader.instance.findClass (name);
 	} catch (ClassNotFoundException ex) {
 	  /* ignore, we'll try findClass */;
 	}
@@ -199,6 +235,7 @@ public abstract class ClassLoader
   }
 
   protected final Class defineClass(String name, byte[] data, int off, int len)
+    throws ClassFormatError
   {
     return defineClass (name, data, off, len, defaultProtectionDomain);
   }
@@ -256,7 +293,7 @@ public abstract class ClassLoader
 
       return defineClass0 (name, data, off, len, protectionDomain);
 
-    } catch (ClassFormatError x) {
+    } catch (LinkageError x) {
       throw x;		// rethrow
 
     } catch (java.lang.VirtualMachineError x) {
@@ -464,7 +501,7 @@ public abstract class ClassLoader
   protected final Class findSystemClass(String name) 
     throws java.lang.ClassNotFoundException
   {
-    return getSystemClassLoader ().loadClass (name);
+    return gnu.gcj.runtime.VMClassLoader.instance.loadClass (name);
   }
 
   /*
@@ -578,5 +615,79 @@ public abstract class ClassLoader
   {
     // Default to returning null.  Derived classes implement this.
     return null;
+  }
+
+  /**
+   * Set the default assertion status for classes loaded by this classloader,
+   * used unless overridden by a package or class request.
+   *
+   * @param enabled true to set the default to enabled
+   * @see #setClassAssertionStatus(String, boolean)
+   * @see #setPackageAssertionStatus(String, boolean)
+   * @see #clearAssertionStatus()
+   * @since 1.4
+   */
+  public void setDefaultAssertionStatus(boolean enabled)
+  {
+    defaultAssertionStatus = enabled;
+  }
+
+  /**
+   * Set the default assertion status for packages, used unless overridden
+   * by a class request. This default also covers subpackages, unless they
+   * are also specified. The unnamed package should use null for the name.
+   *
+   * @param name the package (and subpackages) to affect
+   * @param enabled true to set the default to enabled
+   * @see #setDefaultAssertionStatus(String, boolean)
+   * @see #setClassAssertionStatus(String, boolean)
+   * @see #clearAssertionStatus()
+   * @since 1.4
+   */
+  public synchronized void setPackageAssertionStatus(String name,
+                                                     boolean enabled)
+  {
+    if (packageAssertionStatus == null)
+      packageAssertionStatus
+        = new HashMap(systemPackageAssertionStatus);
+    packageAssertionStatus.put(name, Boolean.valueOf(enabled));
+  }
+  
+  /**
+   * Set the default assertion status for a class. This only affects the
+   * status of top-level classes, any other string is harmless.
+   *
+   * @param name the class to affect
+   * @param enabled true to set the default to enabled
+   * @throws NullPointerException if name is null
+   * @see #setDefaultAssertionStatus(String, boolean)
+   * @see #setPackageAssertionStatus(String, boolean)
+   * @see #clearAssertionStatus()
+   * @since 1.4
+   */
+  public synchronized void setClassAssertionStatus(String name,
+                                                   boolean enabled)
+  {
+    if (classAssertionStatus == null)
+      classAssertionStatus = new HashMap(systemClassAssertionStatus);
+    // The toString() hack catches null, as required.
+    classAssertionStatus.put(name.toString(), Boolean.valueOf(enabled));
+  }
+  
+  /**
+   * Resets the default assertion status of this classloader, its packages
+   * and classes, all to false. This allows overriding defaults inherited
+   * from the command line.
+   *
+   * @see #setDefaultAssertionStatus(boolean)
+   * @see #setClassAssertionStatus(String, boolean)
+   * @see #setPackageAssertionStatus(String, boolean)
+   * @since 1.4
+   */
+  public synchronized void clearAssertionStatus()
+  {
+    defaultAssertionStatus = false;
+    packageAssertionStatus = new HashMap();
+    classAssertionStatus = new HashMap();
   }
 }

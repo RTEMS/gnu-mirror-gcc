@@ -1,6 +1,6 @@
 // Specific definitions for Solaris 7,8  -*- C++ -*-
 
-// Copyright (C) 2000 Free Software Foundation, Inc.
+// Copyright (C) 2000, 2002 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -27,14 +27,11 @@
 // invalidate any other reasons why the executable file might be covered by
 // the GNU General Public License.
 
-
 #ifndef _GLIBCPP_OS_DEFINES
-#  define _GLIBCPP_OS_DEFINES
+#define _GLIBCPP_OS_DEFINES 1
 
-/* System-specific #define, typedefs, corrections, etc, go here.  This
-   file will come before all others. */
-
-#define _GLIBCPP_AVOID_FSEEK 1
+// System-specific #define, typedefs, corrections, etc, go here.  This
+// file will come before all others.
 
 // These are typedefs which libio assumes are already in place (because
 // they really are, under Linux).
@@ -42,7 +39,9 @@
 #define __off64_t   off64_t
 #define __ssize_t   ssize_t
 
-// Without this all the libio vtbls are offset wrongly.
-#define _G_USING_THUNKS 0
+#if defined(__sparcv9) || defined(__arch64__)
+#define __glibcpp_long_bits 64
+#endif
 
 #endif
+
