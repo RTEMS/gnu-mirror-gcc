@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler.  Sun 68000/68020 version.
-   Copyright (C) 2000 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2002 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -48,7 +48,6 @@ extern int strict_low_part_peephole_ok PARAMS ((enum machine_mode, rtx, rtx));
 
 /* Functions from m68k.c used in macros.  */
 extern int symbolic_operand PARAMS ((rtx, enum machine_mode));
-extern int const_int_cost PARAMS ((rtx));
 extern int standard_68881_constant_p PARAMS ((rtx));
 extern int standard_sun_fpa_constant_p PARAMS ((rtx));
 extern void print_operand_address PARAMS ((FILE *, rtx));

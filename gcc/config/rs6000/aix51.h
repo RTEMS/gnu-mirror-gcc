@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler,
    for IBM RS/6000 POWER running AIX V5.
-   Copyright (C) 2001 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2003 Free Software Foundation, Inc.
    Contributed by David Edelsohn (edelsohn@gnu.org).
 
 This file is part of GNU CC.
@@ -62,7 +62,7 @@ do {									\
 #undef ASM_SPEC
 #define ASM_SPEC "-u %{maix64:-a64 -mppc64} %(asm_cpu)"
 
-/* Common ASM definitions used by ASM_SPEC amonst the various targets
+/* Common ASM definitions used by ASM_SPEC amongst the various targets
    for handling -mcpu=xxx switches.  */
 #undef ASM_CPU_SPEC
 #define ASM_CPU_SPEC \
@@ -96,9 +96,22 @@ do {									\
 #undef	ASM_DEFAULT_SPEC
 #define ASM_DEFAULT_SPEC "-mcom"
 
-#undef CPP_PREDEFINES
-#define CPP_PREDEFINES "-D_IBMR2 -D_POWER -D_LONG_LONG \
--D_AIX -D_AIX32 -D_AIX41 -D_AIX43 -D_AIX51 -Asystem=unix -Asystem=aix"
+#undef TARGET_OS_CPP_BUILTINS
+#define TARGET_OS_CPP_BUILTINS()      \
+  do                                  \
+    {                                 \
+      builtin_define ("_IBMR2");      \
+      builtin_define ("_POWER");      \
+      builtin_define ("_LONG_LONG");  \
+      builtin_define ("_AIX");        \
+      builtin_define ("_AIX32");      \
+      builtin_define ("_AIX41");      \
+      builtin_define ("_AIX43");      \
+      builtin_define ("_AIX51");      \
+      builtin_assert ("system=unix"); \
+      builtin_assert ("system=aix");  \
+    }                                 \
+  while (0)
 
 #undef CPP_SPEC
 #define CPP_SPEC "%{posix: -D_POSIX_SOURCE}	\

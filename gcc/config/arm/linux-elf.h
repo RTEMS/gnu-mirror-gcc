@@ -48,9 +48,9 @@ Boston, MA 02111-1307, USA.  */
 
 /* Now we define the strings used to build the spec file.  */
 #define LIB_SPEC \
-  "%{shared: -lc} \
-   %{!shared: %{pthread:-lpthread} \
-   %{profile:-lc_p} %{!profile: -lc}}"
+  "%{pthread:-lpthread} \
+   %{shared:-lc} \
+   %{!shared:%{profile:-lc_p}%{!profile:-lc}}"
 
 #define LIBGCC_SPEC "%{msoft-float:-lfloat} -lgcc"
 
@@ -98,9 +98,6 @@ Boston, MA 02111-1307, USA.  */
 	builtin_assert ("system=unix");		\
 	builtin_assert ("system=posix");	\
     } while (0)
-
-/* Allow #sccs in preprocessor.  */
-#define SCCS_DIRECTIVE
 
 /* This is how we tell the assembler that two symbols have the same value.  */
 #define ASM_OUTPUT_DEF(FILE, NAME1, NAME2) \

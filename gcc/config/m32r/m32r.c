@@ -21,6 +21,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "rtl.h"
 #include "regs.h"
@@ -36,7 +38,7 @@ Boston, MA 02111-1307, USA.  */
 #include "recog.h"
 #include "toplev.h"
 #include "ggc.h"
-#include "m32r-protos.h"
+#include "tm_p.h"
 #include "target.h"
 #include "target-def.h"
 
@@ -77,6 +79,8 @@ static int    m32r_issue_rate	   PARAMS ((void));
 static void m32r_select_section PARAMS ((tree, int, unsigned HOST_WIDE_INT));
 static void m32r_encode_section_info PARAMS ((tree, int));
 static const char *m32r_strip_name_encoding PARAMS ((const char *));
+static void init_idents PARAMS ((void));
+static bool m32r_rtx_costs PARAMS ((rtx, int, int, int *));
 
 /* Initialize the GCC target structure.  */
 #undef TARGET_ATTRIBUTE_TABLE
@@ -109,6 +113,11 @@ static const char *m32r_strip_name_encoding PARAMS ((const char *));
 #define TARGET_ENCODE_SECTION_INFO m32r_encode_section_info
 #undef TARGET_STRIP_NAME_ENCODING
 #define TARGET_STRIP_NAME_ENCODING m32r_strip_name_encoding
+
+#undef TARGET_RTX_COSTS
+#define TARGET_RTX_COSTS m32r_rtx_costs
+#undef TARGET_ADDRESS_COST
+#define TARGET_ADDRESS_COST hook_int_rtx_0
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -271,7 +280,7 @@ static tree large_ident1;
 static tree large_ident2;
 
 static void
-init_idents PARAMS ((void))
+init_idents ()
 {
   if (small_ident1 == 0)
     {
@@ -599,8 +608,8 @@ addr24_operand (op, mode)
       rtx sym = XEXP (XEXP (op, 0), 0);
       return (SMALL_NAME_P (XSTR (sym, 0))
 	      || (TARGET_ADDR24
-		  && (CONSTANT_POOL_ADDRESS_P (op)
-		      || LIT_NAME_P (XSTR (op, 0)))));
+		  && (CONSTANT_POOL_ADDRESS_P (sym)
+		      || LIT_NAME_P (XSTR (sym, 0)))));
     }
 
   return 0;
@@ -836,7 +845,7 @@ move_src_operand (op, mode)
 
 	  low = CONST_DOUBLE_LOW (op);
 	  high = CONST_DOUBLE_HIGH (op);
-	  return high == 0 && low <= 0xffffffff;
+	  return high == 0 && low <= (unsigned) 0xffffffff;
 	}
       else
 	return 0;
@@ -1028,7 +1037,7 @@ extend_operand (op, mode)
     }
 }
 
-/* Return non-zero if the operand is an insn that is a small insn.
+/* Return nonzero if the operand is an insn that is a small insn.
    Allow const_int 0 as well, which is a placeholder for NOP slots.  */
 
 int
@@ -1045,7 +1054,7 @@ small_insn_p (op, mode)
   return get_attr_length (op) == 2;
 }
 
-/* Return non-zero if the operand is an insn that is a large insn.  */
+/* Return nonzero if the operand is an insn that is a large insn.  */
 
 int
 large_insn_p (op, mode)
@@ -1446,12 +1455,8 @@ m32r_setup_incoming_varargs (cum, mode, type, pretend_size, no_rtl)
   if (mode == BLKmode)
     abort ();
 
-  /* We must treat `__builtin_va_alist' as an anonymous arg.  */
-  if (current_function_varargs)
-    first_anon_arg = *cum;
-  else
-    first_anon_arg = (ROUND_ADVANCE_CUM (*cum, mode, type)
-		      + ROUND_ADVANCE_ARG (mode, type));
+  first_anon_arg = (ROUND_ADVANCE_CUM (*cum, mode, type)
+		    + ROUND_ADVANCE_ARG (mode, type));
 
   if (first_anon_arg < M32R_MAX_PARM_REGS)
     {
@@ -1752,17 +1757,54 @@ m32r_variable_issue (stream, verbose, insn, how_many)
 
 /* Cost functions.  */
 
-/* Provide the costs of an addressing mode that contains ADDR.
-   If ADDR is not a valid address, its cost is irrelevant.
-
-   This function is trivial at the moment.  This code doesn't live
-   in m32r.h so it's easy to experiment.  */
-
-int
-m32r_address_cost (addr)
-     rtx addr ATTRIBUTE_UNUSED;
+static bool
+m32r_rtx_costs (x, code, outer_code, total)
+     rtx x;
+     int code, outer_code ATTRIBUTE_UNUSED;
+     int *total;
 {
-  return 1;
+  switch (code)
+    {
+      /* Small integers are as cheap as registers.  4 byte values can be
+         fetched as immediate constants - let's give that the cost of an
+         extra insn.  */
+    case CONST_INT:
+      if (INT16_P (INTVAL (x)))
+	{
+	  *total = 0;
+	  return true;
+	}
+      /* FALLTHRU */
+
+    case CONST:
+    case LABEL_REF:
+    case SYMBOL_REF:
+      *total = COSTS_N_INSNS (1);
+      return true;
+
+    case CONST_DOUBLE:
+      {
+	rtx high, low;
+	split_double (x, &high, &low);
+	*total = COSTS_N_INSNS (!INT16_P (INTVAL (high))
+			        + !INT16_P (INTVAL (low)));
+	return true;
+      }
+
+    case MULT:
+      *total = COSTS_N_INSNS (3);
+      return true;
+
+    case DIV:
+    case UDIV:
+    case MOD:
+    case UMOD:
+      *total = COSTS_N_INSNS (10);
+      return true;
+
+    default:
+      return false;
+    }
 }
 
 /* Type of function DECL.
@@ -2184,7 +2226,7 @@ m32r_output_function_epilogue (file, size)
   m32r_compute_function_type (NULL_TREE);
 }
 
-/* Return non-zero if this function is known to have a null or 1 instruction
+/* Return nonzero if this function is known to have a null or 1 instruction
    epilogue.  */
 
 int
@@ -2314,14 +2356,13 @@ m32r_print_operand (file, x, code)
 
     case 'A' :
       {
-	REAL_VALUE_TYPE d;
 	char str[30];
 
 	if (GET_CODE (x) != CONST_DOUBLE
 	    || GET_MODE_CLASS (GET_MODE (x)) != MODE_FLOAT)
 	  fatal_insn ("bad insn for 'A'", x);
-	REAL_VALUE_FROM_CONST_DOUBLE (d, x);
-	REAL_VALUE_TO_DECIMAL (d, "%.20e", str);
+
+	real_to_decimal (str, CONST_DOUBLE_REAL_VALUE (x), sizeof (str), 0, 1);
 	fprintf (file, "%s", str);
 	return;
       }
@@ -2593,7 +2634,7 @@ zero_and_one (operand1, operand2)
 	||((INTVAL (operand1) == 1) && (INTVAL (operand2) == 0)));
 }
 
-/* Return non-zero if the operand is suitable for use in a conditional move sequence.  */
+/* Return nonzero if the operand is suitable for use in a conditional move sequence.  */
 int
 conditional_move_operand (operand, mode)
      rtx operand;
@@ -2865,7 +2906,7 @@ m32r_output_block_move (insn, operands)
      stores are done without any increment, then the remaining ones can use
      the pre-increment addressing mode.
      
-     Note: expand_block_move() also relies upon this behaviour when building
+     Note: expand_block_move() also relies upon this behavior when building
      loops to copy large blocks.  */
   first_time = 1;
   

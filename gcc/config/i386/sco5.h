@@ -72,7 +72,7 @@ Boston, MA 02111-1307, USA.  */
 #define EH_FRAME_SECTION_NAME	\
   ((TARGET_ELF) ? EH_FRAME_SECTION_NAME_ELF : EH_FRAME_SECTION_NAME_COFF)
 
-/* Avoid problems (long sectino names, forward assembler refs) with DWARF
+/* Avoid problems (long section names, forward assembler refs) with DWARF
    exception unwinding when we're generating COFF */
 #define DWARF2_UNWIND_INFO	\
   ((TARGET_ELF) ? 1 : 0 )  
@@ -139,13 +139,9 @@ do {									\
 #define ASM_DECLARE_FUNCTION_NAME(FILE, NAME, DECL)			\
   do {									\
     if (TARGET_ELF) {							\
-      fprintf (FILE, "%s", TYPE_ASM_OP);				\
-      assemble_name (FILE, NAME);					\
-      putc (',', FILE);							\
-      fprintf (FILE, TYPE_OPERAND_FMT, "function");			\
-      putc ('\n', FILE);						\
+      ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "function");		\
       ASM_DECLARE_RESULT (FILE, DECL_RESULT (DECL));			\
-      ASM_OUTPUT_LABEL(FILE, NAME);					\
+      ASM_OUTPUT_LABEL (FILE, NAME);					\
     } else								\
       SCO_DEFAULT_ASM_COFF(FILE, NAME);					\
 } while (0)
@@ -153,34 +149,28 @@ do {									\
 #undef ASM_DECLARE_FUNCTION_SIZE
 #define ASM_DECLARE_FUNCTION_SIZE(FILE, FNAME, DECL)			\
   do {									\
-    if (TARGET_ELF) { if (!flag_inhibit_size_directive)			\
-      {									\
-	fprintf (FILE, "%s", SIZE_ASM_OP);				\
-	assemble_name (FILE, (FNAME));					\
-        fprintf (FILE, ",.-");						\
-	assemble_name (FILE, (FNAME));					\
-	putc ('\n', FILE);						\
-      }	}								\
+    if (TARGET_ELF && !flag_inhibit_size_directive)			\
+      ASM_OUTPUT_MEASURED_SIZE (FILE, FNAME);				\
   } while (0)
 
 #undef ASM_DECLARE_OBJECT_NAME
 #define ASM_DECLARE_OBJECT_NAME(FILE, NAME, DECL)			\
   do {									\
     if (TARGET_ELF) {							\
-      fprintf (FILE, "%s", TYPE_ASM_OP);				\
-      assemble_name (FILE, NAME);					\
-      putc (',', FILE);							\
-      fprintf (FILE, TYPE_OPERAND_FMT, "object");			\
-      putc ('\n', FILE);						\
+      HOST_WIDE_INT size;						\
+									\
+      ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "object");			\
+									\
       size_directive_output = 0;					\
-      if (!flag_inhibit_size_directive && DECL_SIZE (DECL))		\
-        {								\
-  	size_directive_output = 1;					\
-	fprintf (FILE, "%s", SIZE_ASM_OP);				\
-	assemble_name (FILE, NAME);					\
-	fprintf (FILE, ",%d\n",  int_size_in_bytes (TREE_TYPE (DECL)));	\
-        }								\
-      ASM_OUTPUT_LABEL(FILE, NAME);					\
+      if (!flag_inhibit_size_directive					\
+	  && (DECL) && DECL_SIZE (DECL))				\
+	{								\
+	  size_directive_output = 1;					\
+	  size = int_size_in_bytes (TREE_TYPE (DECL));			\
+	  ASM_OUTPUT_SIZE_DIRECTIVE (FILE, NAME, size);			\
+	}								\
+									\
+      ASM_OUTPUT_LABEL (FILE, NAME);					\
     } else								\
       SCO_DEFAULT_ASM_COFF(FILE, NAME);					\
   } while (0)
@@ -198,17 +188,17 @@ do {									\
 #undef ASM_FINISH_DECLARE_OBJECT
 #define ASM_FINISH_DECLARE_OBJECT(FILE, DECL, TOP_LEVEL, AT_END)	 \
 do {									 \
-  if (TARGET_ELF) {							\
+  if (TARGET_ELF) {							 \
      const char *name = XSTR (XEXP (DECL_RTL (DECL), 0), 0);		 \
+     HOST_WIDE_INT size;						 \
      if (!flag_inhibit_size_directive && DECL_SIZE (DECL)		 \
          && ! AT_END && TOP_LEVEL					 \
 	 && DECL_INITIAL (DECL) == error_mark_node			 \
 	 && !size_directive_output)					 \
        {								 \
 	 size_directive_output = 1;					 \
-	 fprintf (FILE, "%s", SIZE_ASM_OP);			 	 \
-	 assemble_name (FILE, name);					 \
-	 fprintf (FILE, ",%d\n",  int_size_in_bytes (TREE_TYPE (DECL))); \
+	 size = int_size_in_bytes (TREE_TYPE (DECL));			 \
+	 ASM_OUTPUT_SIZE_DIRECTIVE (FILE, name, size);			 \
        }								 \
     }									 \
 } while (0)
@@ -353,24 +343,16 @@ do {									\
 do {									\
   if (TARGET_ELF)							\
     ASM_OUTPUT_ALIGN ((FILE), 2);					\
-  ASM_OUTPUT_INTERNAL_LABEL((FILE),(PREFIX),(NUM));			\
+  (*targetm.asm_out.internal_label)((FILE),(PREFIX),(NUM));			\
 } while (0)
 
 #undef ASM_OUTPUT_IDENT
 #define ASM_OUTPUT_IDENT(FILE, NAME) \
   fprintf (FILE, "%s\"%s\"\n", IDENT_ASM_OP, NAME);
 
-#undef ASM_GLOBALIZE_LABEL
-#define ASM_GLOBALIZE_LABEL(FILE,NAME)	\
-  (fprintf ((FILE), "%s", GLOBAL_ASM_OP), assemble_name (FILE, NAME), fputs ("\n", FILE))
-
 #undef ASM_OUTPUT_EXTERNAL_LIBCALL
 #define ASM_OUTPUT_EXTERNAL_LIBCALL(FILE, FUN)				\
-  if (TARGET_ELF) ASM_GLOBALIZE_LABEL (FILE, XSTR (FUN, 0))
-
-#undef ASM_OUTPUT_INTERNAL_LABEL
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)			\
-  fprintf (FILE, ".%s%d:\n", PREFIX, NUM)
+  if (TARGET_ELF) (*targetm.asm_out.globalize_label) (FILE, XSTR (FUN, 0))
 
 /* The prefix to add to user-visible assembler symbols.  */
 
@@ -427,16 +409,12 @@ do {									\
 #define DBX_REGISTER_NUMBER(n) \
   ((TARGET_ELF) ? svr4_dbx_register_map[n] : dbx_register_map[n])
 
-#undef DWARF2_DEBUGGING_INFO
-#undef DWARF_DEBUGGING_INFO
-#undef SDB_DEBUGGING_INFO
-#undef DBX_DEBUGGING_INFO
-#undef PREFERRED_DEBUGGING_TYPE
-
 #define DWARF2_DEBUGGING_INFO 1
 #define DWARF_DEBUGGING_INFO 1
-#define SDB_DEBUGGING_INFO   1
-#define DBX_DEBUGGING_INFO   1
+#define SDB_DEBUGGING_INFO 1
+#define DBX_DEBUGGING_INFO 1
+
+#undef PREFERRED_DEBUGGING_TYPE
 #define PREFERRED_DEBUGGING_TYPE					\
   ((TARGET_ELF) ? DWARF2_DEBUG: SDB_DEBUG)
 
@@ -529,7 +507,6 @@ init_section ()								\
 #undef TARGET_SUBTARGET_DEFAULT
 #define TARGET_SUBTARGET_DEFAULT (MASK_80387 | MASK_IEEE_FP | MASK_FLOAT_RETURNS)
 
-#undef HANDLE_SYSV_PRAGMA
 #define HANDLE_SYSV_PRAGMA 1
 
 /* Though OpenServer supports .weak in COFF, we don't use it.
@@ -540,9 +517,6 @@ init_section ()								\
 #define ASM_WEAKEN_LABEL(FILE,NAME) \
   do { fputs ("\t.weak\t", FILE); assemble_name (FILE, NAME);		\
 	fputc ('\n', FILE); } while (0)
-
-#undef SCCS_DIRECTIVE
-#define SCCS_DIRECTIVE 1
 
 /*
  * Define sizes and types

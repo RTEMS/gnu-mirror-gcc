@@ -1,5 +1,5 @@
 /* Exception handling and frame unwind runtime interface routines.
-   Copyright (C) 2001 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2003 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -31,7 +31,12 @@ extern "C" {
    inefficient for 32-bit and smaller machines.  */
 typedef unsigned _Unwind_Word __attribute__((__mode__(__word__)));
 typedef signed _Unwind_Sword __attribute__((__mode__(__word__)));
+#if defined(__ia64__) && defined(__hpux__)
+typedef unsigned _Unwind_Ptr __attribute__((__mode__(__word__)));
+#else
 typedef unsigned _Unwind_Ptr __attribute__((__mode__(__pointer__)));
+#endif
+typedef unsigned _Unwind_Internal_Ptr __attribute__((__mode__(__pointer__)));
 
 /* @@@ The IA-64 ABI uses a 64-bit word to identify the producer and
    consumer of an exception.  We'll go along with this for now even on
@@ -177,7 +182,7 @@ _Unwind_GetDataRelBase (struct _Unwind_Context *_C)
 }
 
 static inline _Unwind_Ptr
-_Unwind_GetTextRelBase (struct _Unwind_Context *_C)
+_Unwind_GetTextRelBase (struct _Unwind_Context *_C __attribute__ ((__unused__)))
 {
   abort ();
   return 0;
@@ -186,6 +191,10 @@ _Unwind_GetTextRelBase (struct _Unwind_Context *_C)
 extern _Unwind_Ptr _Unwind_GetDataRelBase (struct _Unwind_Context *);
 extern _Unwind_Ptr _Unwind_GetTextRelBase (struct _Unwind_Context *);
 #endif
+
+/* @@@ Given an address, return the entry point of the function that
+   contains it.  */
+extern void * _Unwind_FindEnclosingFunction (void *pc);
 
 #ifdef __cplusplus
 }

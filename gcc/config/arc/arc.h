@@ -131,7 +131,7 @@ extern int target_flags;
 /* Instruction set characteristics.
    These are internal macros, set by the appropriate -mcpu= option.  */
 
-/* Non-zero means the cpu has a barrel shifter.  */
+/* Nonzero means the cpu has a barrel shifter.  */
 #define TARGET_SHIFTER 0
 
 extern const char *arc_cpu_string;
@@ -149,7 +149,7 @@ extern const char *arc_text_string,*arc_data_string,*arc_rodata_string;
 extern int arc_cpu_type;
 
 /* Check if CPU is an extension and set `arc_cpu_type' and `arc_mangle_cpu'
-   appropriately.  The result should be non-zero if the cpu is recognized,
+   appropriately.  The result should be nonzero if the cpu is recognized,
    otherwise zero.  This is intended to be redefined in a cover file.
    This is used by arc_init.  */
 #define ARC_EXTENSION_CPU(cpu) 0
@@ -231,7 +231,7 @@ if (GET_MODE_CLASS (MODE) == MODE_INT		\
 /* Every structure's size must be a multiple of this.  */
 #define STRUCTURE_SIZE_BOUNDARY 8
 
-/* A bitfield declared as `int' forces `int' alignment for the struct.  */
+/* A bit-field declared as `int' forces `int' alignment for the struct.  */
 #define PCC_BITFIELD_TYPE_MATTERS 1
 
 /* No data type wants to be aligned rounder than this.  */
@@ -665,15 +665,9 @@ extern enum reg_class arc_regno_reg_class[FIRST_PSEUDO_REGISTER];
    a reg.  This includes arguments that have to be passed by reference as the
    pointer to them is passed in a reg if one is available (and that is what
    we're given).
-   When passing arguments NAMED is always 1.  When receiving arguments NAMED
-   is 1 for each argument except the last in a stdarg/varargs function.  In
-   a stdarg function we want to treat the last named arg as named.  In a
-   varargs function we want to treat the last named arg (which is
-   `__builtin_va_alist') as unnamed.
    This macro is only used in this file.  */
-#define PASS_IN_REG_P(CUM, MODE, TYPE, NAMED) \
-((!current_function_varargs || (NAMED))					\
- && (CUM) < MAX_ARC_PARM_REGS						\
+#define PASS_IN_REG_P(CUM, MODE, TYPE) \
+((CUM) < MAX_ARC_PARM_REGS						\
  && ((ROUND_ADVANCE_CUM ((CUM), (MODE), (TYPE))				\
       + ROUND_ADVANCE_ARG ((MODE), (TYPE))				\
       <= MAX_ARC_PARM_REGS)))
@@ -693,7 +687,7 @@ extern enum reg_class arc_regno_reg_class[FIRST_PSEUDO_REGISTER];
 /* On the ARC the first MAX_ARC_PARM_REGS args are normally in registers
    and the rest are pushed.  */
 #define FUNCTION_ARG(CUM, MODE, TYPE, NAMED) \
-(PASS_IN_REG_P ((CUM), (MODE), (TYPE), (NAMED))				\
+(PASS_IN_REG_P ((CUM), (MODE), (TYPE))					\
  ? gen_rtx_REG ((MODE), ROUND_ADVANCE_CUM ((CUM), (MODE), (TYPE)))	\
  : 0)
 
@@ -995,42 +989,11 @@ do { \
 #define SELECT_CC_MODE(OP, X, Y) \
 arc_select_cc_mode (OP, X, Y)
 
-/* Return non-zero if SELECT_CC_MODE will never return MODE for a
+/* Return nonzero if SELECT_CC_MODE will never return MODE for a
    floating point inequality comparison.  */
 #define REVERSIBLE_CC_MODE(MODE) 1 /*???*/
 
 /* Costs.  */
-
-/* An insn is define to cost 4 "units", and we work from there.
-   COSTS_N_INSNS (N) is defined as (N) * 4 - 2 so that seems reasonable.
-   Some values are supposed to be defined relative to each other and thus
-   aren't necessarily related to COSTS_N_INSNS.  */
-
-/* Compute the cost of computing a constant rtl expression RTX
-   whose rtx-code is CODE.  The body of this macro is a portion
-   of a switch statement.  If the code is computed here,
-   return it with a return statement.  Otherwise, break from the switch.  */
-/* Small integers are as cheap as registers.  4 byte values can be fetched
-   as immediate constants - let's give that the cost of an extra insn.  */
-#define CONST_COSTS(X, CODE, OUTER_CODE) \
-  case CONST_INT :						\
-    if (SMALL_INT (INTVAL (X)))					\
-      return 0;							\
-    /* fall through */						\
-  case CONST :							\
-  case LABEL_REF :						\
-  case SYMBOL_REF :						\
-    return 4;							\
-  case CONST_DOUBLE :						\
-    {								\
-      rtx high, low;						\
-      split_double (X, &high, &low);				\
-      return 4 * (!SMALL_INT (INTVAL (high))			\
-		  + !SMALL_INT (INTVAL (low)));			\
-    }
-
-/* Compute the cost of an address.  */
-#define ADDRESS_COST(ADDR) (REG_P (ADDR) ? 1 : arc_address_cost (ADDR))
 
 /* Compute extra cost of moving data between one register class
    and another.  */
@@ -1046,22 +1009,6 @@ arc_select_cc_mode (OP, X, Y)
 /* ??? What's the right value here?  Branches are certainly more
    expensive than reg->reg moves.  */
 #define BRANCH_COST 2
-
-/* Provide the costs of a rtl expression.  This is in the body of a
-   switch on CODE.  The purpose for the cost of MULT is to encourage
-   `synth_mult' to find a synthetic multiply when reasonable.
-
-   If we need more than 12 insns to do a multiply, then go out-of-line,
-   since the call overhead will be < 10% of the cost of the multiply.  */
-#define RTX_COSTS(X, CODE, OUTER_CODE) \
-  case ASHIFT :						\
-  case ASHIFTRT :					\
-  case LSHIFTRT :					\
-    if (TARGET_SHIFTER)					\
-      return COSTS_N_INSNS (1);				\
-    if (GET_CODE (XEXP ((X), 1)) != CONST_INT)		\
-      return COSTS_N_INSNS (16);			\
-    return COSTS_N_INSNS (INTVAL (XEXP ((X), 1)));
 
 /* Nonzero if access to memory by bytes is slow and undesirable.
    For RISC chips, it means that access to memory by bytes is no
@@ -1180,19 +1127,8 @@ extern const char *arc_text_section, *arc_data_section, *arc_rodata_section;
    no longer contain unusual constructs.  */
 #define ASM_APP_OFF ""
 
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME.  */
-#define ASM_OUTPUT_LABEL(FILE, NAME) \
-do { assemble_name (FILE, NAME); fputs (":\n", FILE); } while (0)
-
-/* This is how to output a command to make the user-level label named NAME
-   defined for reference from other files.  */
-#define ASM_GLOBALIZE_LABEL(FILE, NAME) \
-do {				\
-  fputs ("\t.global\t", FILE);	\
-  assemble_name (FILE, NAME);	\
-  fputs ("\n", FILE);		\
-} while (0)
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP "\t.global\t"
 
 /* A C statement (sans semicolon) to output on FILE an assembler pseudo-op to
    declare a library function name external.  The name of the library function
@@ -1219,7 +1155,7 @@ do {							\
    compiled for different cpus.  */
 /* We work around a dwarfout.c deficiency by watching for labels from it and
    not adding the '_' prefix nor the cpu suffix.  There is a comment in
-   dwarfout.c that says it should be using ASM_OUTPUT_INTERNAL_LABEL.  */
+   dwarfout.c that says it should be using (*targetm.asm_out.internal_label).  */
 extern const char *arc_mangle_cpu;
 #define ASM_OUTPUT_LABELREF(FILE, NAME) \
 do {							\
@@ -1233,22 +1169,6 @@ do {							\
       fprintf (FILE, "%s", NAME);			\
     }							\
 } while (0)
-
-/* This is how to output a definition of an internal numbered label where
-   PREFIX is the class of label and NUM is the number within the class.  */
-#undef ASM_OUTPUT_INTERNAL_LABEL
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE, PREFIX, NUM) \
-do {						\
-  arc_ccfsm_at_label (PREFIX, NUM);		\
-  fprintf (FILE, ".%s%d:\n", PREFIX, NUM);	\
-} while (0)
-
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO) \
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),	\
-  sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO)))
 
 /* Assembler pseudo-op to equate one value with another.  */
 /* ??? This is needed because dwarfout.c provides a default definition too
@@ -1328,12 +1248,8 @@ do { if ((LOG) != 0) fprintf (FILE, "\t.align %d\n", 1 << (LOG)); } while (0)
 /* Debugging information.  */
 
 /* Generate DBX and DWARF debugging information.  */
-#ifndef DBX_DEBUGGING_INFO
-#define DBX_DEBUGGING_INFO
-#endif
-#ifndef DWARF_DEBUGGING_INFO
-#define DWARF_DEBUGGING_INFO
-#endif
+#define DBX_DEBUGGING_INFO 1
+#define DWARF_DEBUGGING_INFO 1
 
 /* Prefer STABS (for now).  */
 #undef PREFERRED_DEBUGGING_TYPE
@@ -1416,8 +1332,8 @@ enum arc_function_type {
 
 
 /* Implement `va_start' for varargs and stdarg.  */
-#define EXPAND_BUILTIN_VA_START(stdarg, valist, nextarg) \
-  arc_va_start (stdarg, valist, nextarg)
+#define EXPAND_BUILTIN_VA_START(valist, nextarg) \
+  arc_va_start (valist, nextarg)
 
 /* Implement `va_arg'.  */
 #define EXPAND_BUILTIN_VA_ARG(valist, type) \

@@ -46,6 +46,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 
 #include "tree.h"
 #include "rtl.h"
@@ -68,7 +70,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "target.h"
 #include "debug.h"
 #include "expr.h"
-#include "profile.h"
 #include "cfglayout.h"
 
 #ifdef XCOFF_DEBUGGING_INFO
@@ -136,10 +137,6 @@ static unsigned int insn_noperands;
 
 static rtx last_ignored_compare = 0;
 
-/* Flag indicating this insn is the start of a new basic block.  */
-
-static int new_block = 1;
-
 /* Assign a unique number to each insn that is output.
    This can be used to generate unique local labels.  */
 
@@ -203,17 +200,6 @@ static char *line_note_exists;
 rtx current_insn_predicate;
 #endif
 
-struct function_list
-{
-  struct function_list *next; 	/* next function */
-  const char *name; 		/* function name */
-  long cfg_checksum;		/* function checksum */
-  long count_edges;		/* number of intrumented edges in this function */
-};
-
-static struct function_list *functions_head = 0;
-static struct function_list **functions_tail = &functions_head;
-
 #ifdef HAVE_ATTR_length
 static int asm_insn_count	PARAMS ((rtx));
 #endif
@@ -222,6 +208,7 @@ static void profile_after_prologue PARAMS ((FILE *));
 static void notice_source_line	PARAMS ((rtx));
 static rtx walk_alter_subreg	PARAMS ((rtx *));
 static void output_asm_name	PARAMS ((void));
+static void output_alternate_entry_point PARAMS ((FILE *, rtx));
 static tree get_mem_expr_from_op	PARAMS ((rtx, int *));
 static void output_asm_operand_names PARAMS ((rtx *, int *, int));
 static void output_operand	PARAMS ((rtx, int));
@@ -250,273 +237,6 @@ init_final (filename)
 #ifdef ASSEMBLER_DIALECT
   dialect_number = ASSEMBLER_DIALECT;
 #endif
-}
-
-/* Called at end of source file,
-   to output the arc-profiling table for this entire compilation.  */
-
-void
-end_final (filename)
-     const char *filename;
-{
-  if (profile_arc_flag && profile_info.count_instrumented_edges)
-    {
-      char name[20];
-      tree string_type, string_cst;
-      tree structure_decl, structure_value, structure_pointer_type;
-      tree field_decl, decl_chain, value_chain;
-      tree sizeof_field_value, domain_type;
-
-      /* Build types.  */
-      string_type = build_pointer_type (char_type_node);
-
-      /* Libgcc2 bb structure.  */
-      structure_decl = make_node (RECORD_TYPE);
-      structure_pointer_type = build_pointer_type (structure_decl);
-
-      /* Output the main header, of 7 words:
-         0:  1 if this file is initialized, else 0.
-         1:  address of file name (LPBX1).
-         2:  address of table of counts (LPBX2).
-         3:  number of counts in the table.
-         4:  always 0, libgcc2 uses this as a pointer to next ``struct bb''
-
-         The following are GNU extensions:
-
-         5:  Number of bytes in this header.
-         6:  address of table of function checksums (LPBX7).  */
-
-      /* The zero word.  */
-      decl_chain =
-	build_decl (FIELD_DECL, get_identifier ("zero_word"),
-		    long_integer_type_node);
-      value_chain = build_tree_list (decl_chain,
-				     convert (long_integer_type_node,
-					      integer_zero_node));
-
-      /* Address of filename.  */
-      {
-	char *cwd, *da_filename;
-	int da_filename_len;
-
-	field_decl =
-	  build_decl (FIELD_DECL, get_identifier ("filename"), string_type);
-	TREE_CHAIN (field_decl) = decl_chain;
-	decl_chain = field_decl;
-
-	cwd = getpwd ();
-	da_filename_len = strlen (filename) + strlen (cwd) + 4 + 1;
-	da_filename = (char *) alloca (da_filename_len);
-	strcpy (da_filename, cwd);
-	strcat (da_filename, "/");
-	strcat (da_filename, filename);
-	strip_off_ending (da_filename, da_filename_len - 3);
-	strcat (da_filename, ".da");
-	da_filename_len = strlen (da_filename);
-	string_cst = build_string (da_filename_len + 1, da_filename);
-	domain_type = build_index_type (build_int_2 (da_filename_len, 0));
-	TREE_TYPE (string_cst)
-	  = build_array_type (char_type_node, domain_type);
-	value_chain = tree_cons (field_decl,
-				 build1 (ADDR_EXPR, string_type, string_cst),
-				 value_chain);
-      }
-
-      /* Table of counts.  */
-      {
-	tree gcov_type_type = make_unsigned_type (GCOV_TYPE_SIZE);
-	tree gcov_type_pointer_type = build_pointer_type (gcov_type_type);
-	tree domain_tree
-	  = build_index_type (build_int_2 (profile_info.
-					   count_instrumented_edges - 1, 0));
-	tree gcov_type_array_type
-	  = build_array_type (gcov_type_type, domain_tree);
-	tree gcov_type_array_pointer_type
-	  = build_pointer_type (gcov_type_array_type);
-	tree counts_table;
-
-	field_decl =
-	  build_decl (FIELD_DECL, get_identifier ("counts"),
-		      gcov_type_pointer_type);
-	TREE_CHAIN (field_decl) = decl_chain;
-	decl_chain = field_decl;
-
-	/* No values.  */
-	counts_table
-	  = build (VAR_DECL, gcov_type_array_type, NULL_TREE, NULL_TREE);
-	TREE_STATIC (counts_table) = 1;
-	ASM_GENERATE_INTERNAL_LABEL (name, "LPBX", 2);
-	DECL_NAME (counts_table) = get_identifier (name);
-	assemble_variable (counts_table, 0, 0, 0);
-
-	value_chain = tree_cons (field_decl,
-				 build1 (ADDR_EXPR,
-					 gcov_type_array_pointer_type,
-					 counts_table), value_chain);
-      }
-
-      /* Count of the # of instrumented arcs.  */
-      field_decl
-	= build_decl (FIELD_DECL, get_identifier ("ncounts"),
-		      long_integer_type_node);
-      TREE_CHAIN (field_decl) = decl_chain;
-      decl_chain = field_decl;
-
-      value_chain = tree_cons (field_decl,
-			       convert (long_integer_type_node,
-					build_int_2 (profile_info.
-						     count_instrumented_edges,
-						     0)), value_chain);
-      /* Pointer to the next bb.  */
-      field_decl
-	= build_decl (FIELD_DECL, get_identifier ("next"),
-		      structure_pointer_type);
-      TREE_CHAIN (field_decl) = decl_chain;
-      decl_chain = field_decl;
-
-      value_chain = tree_cons (field_decl, null_pointer_node, value_chain);
-
-      /* sizeof(struct bb).  We'll set this after entire structure
-	 is laid out.  */
-      field_decl
-	= build_decl (FIELD_DECL, get_identifier ("sizeof_bb"),
-		      long_integer_type_node);
-      TREE_CHAIN (field_decl) = decl_chain;
-      decl_chain = field_decl;
-
-      sizeof_field_value = tree_cons (field_decl, NULL, value_chain);
-      value_chain = sizeof_field_value;
-
-      /* struct bb_function [].  */
-      {
-	struct function_list *item;
-	int num_nodes;
-	tree checksum_field, arc_count_field, name_field;
-	tree domain;
-	tree array_value_chain = NULL_TREE;
-	tree bb_fn_struct_type;
-	tree bb_fn_struct_array_type;
-	tree bb_fn_struct_array_pointer_type;
-	tree bb_fn_struct_pointer_type;
-	tree field_value, field_value_chain;
-
-	bb_fn_struct_type = make_node (RECORD_TYPE);
-
-	checksum_field = build_decl (FIELD_DECL, get_identifier ("checksum"),
-				     long_integer_type_node);
-
-	arc_count_field
-	  = build_decl (FIELD_DECL, get_identifier ("arc_count"),
-		        integer_type_node);
-	TREE_CHAIN (checksum_field) = arc_count_field;
-
-	name_field
-	  = build_decl (FIELD_DECL, get_identifier ("name"), string_type);
-	TREE_CHAIN (arc_count_field) = name_field;
-
-	TYPE_FIELDS (bb_fn_struct_type) = checksum_field;
-
-	num_nodes = 0;
-
-	for (item = functions_head; item != 0; item = item->next)
-	  num_nodes++;
-
-	/* Note that the array contains a terminator, hence no - 1.  */
-	domain = build_index_type (build_int_2 (num_nodes, 0));
-
-	bb_fn_struct_pointer_type = build_pointer_type (bb_fn_struct_type);
-	bb_fn_struct_array_type
-	  = build_array_type (bb_fn_struct_type, domain);
-	bb_fn_struct_array_pointer_type
-	  = build_pointer_type (bb_fn_struct_array_type);
-
-	layout_type (bb_fn_struct_type);
-	layout_type (bb_fn_struct_pointer_type);
-	layout_type (bb_fn_struct_array_type);
-	layout_type (bb_fn_struct_array_pointer_type);
-
-	for (item = functions_head; item != 0; item = item->next)
-	  {
-	    size_t name_len;
-
-	    /* create constructor for structure.  */
-	    field_value_chain
-	      = build_tree_list (checksum_field,
-				 convert (long_integer_type_node,
-					  build_int_2 (item->cfg_checksum, 0)));
-	    field_value_chain
-	      = tree_cons (arc_count_field,
-			   convert (integer_type_node,
-				    build_int_2 (item->count_edges, 0)),
-			   field_value_chain);
-
-	    name_len = strlen (item->name);
-	    string_cst = build_string (name_len + 1, item->name);
-	    domain_type = build_index_type (build_int_2 (name_len, 0));
-	    TREE_TYPE (string_cst)
-	      = build_array_type (char_type_node, domain_type);
-	    field_value_chain = tree_cons (name_field,
-					   build1 (ADDR_EXPR, string_type,
-						   string_cst),
-					   field_value_chain);
-
-	    /* Add to chain.  */
-	    array_value_chain
-	      = tree_cons (NULL_TREE, build (CONSTRUCTOR,
-					     bb_fn_struct_type, NULL_TREE,
-					     nreverse (field_value_chain)),
-			   array_value_chain);
-	  }
-
-	/* Add terminator.  */
-	field_value = build_tree_list (arc_count_field,
-				       convert (integer_type_node,
-						build_int_2 (-1, 0)));
-
-	array_value_chain = tree_cons (NULL_TREE,
-				       build (CONSTRUCTOR, bb_fn_struct_type,
-					      NULL_TREE, field_value),
-				       array_value_chain);
-
-
-	/* Create constructor for array.  */
-	field_decl
-	  = build_decl (FIELD_DECL, get_identifier ("function_infos"),
-		        bb_fn_struct_pointer_type);
-	value_chain = tree_cons (field_decl,
-				 build1 (ADDR_EXPR,
-					 bb_fn_struct_array_pointer_type,
-					 build (CONSTRUCTOR,
-						bb_fn_struct_array_type,
-						NULL_TREE,
-						nreverse
-						(array_value_chain))),
-				 value_chain);
-	TREE_CHAIN (field_decl) = decl_chain;
-	decl_chain = field_decl;
-      }
-
-      /* Finish structure.  */
-      TYPE_FIELDS (structure_decl) = nreverse (decl_chain);
-      layout_type (structure_decl);
-
-      structure_value
-	= build (VAR_DECL, structure_decl, NULL_TREE, NULL_TREE);
-      DECL_INITIAL (structure_value)
-	= build (CONSTRUCTOR, structure_decl, NULL_TREE,
-	         nreverse (value_chain));
-      TREE_STATIC (structure_value) = 1;
-      ASM_GENERATE_INTERNAL_LABEL (name, "LPBX", 0);
-      DECL_NAME (structure_value) = get_identifier (name);
-
-      /* Size of this structure.  */
-      TREE_VALUE (sizeof_field_value)
-	= convert (long_integer_type_node,
-		   build_int_2 (int_size_in_bytes (structure_decl), 0));
-
-      /* Build structure.  */
-      assemble_variable (structure_value, 0, 0, 0);
-    }
 }
 
 /* Default target function prologue and epilogue assembler output.
@@ -957,7 +677,8 @@ compute_alignments ()
       int fallthru_frequency = 0, branch_frequency = 0, has_fallthru = 0;
       edge e;
 
-      if (GET_CODE (label) != CODE_LABEL)
+      if (GET_CODE (label) != CODE_LABEL
+	  || probably_never_executed_bb_p (bb))
 	continue;
       max_log = LABEL_ALIGN (label);
       max_skip = LABEL_ALIGN_MAX_SKIP;
@@ -994,10 +715,11 @@ compute_alignments ()
 	    }
 	}
       /* In case block is frequent and reached mostly by non-fallthru edge,
-	 align it.  It is most likely an first block of loop.  */
+	 align it.  It is most likely a first block of loop.  */
       if (has_fallthru
+	  && maybe_hot_bb_p (bb)
 	  && branch_frequency + fallthru_frequency > BB_FREQ_MAX / 10
-	  && branch_frequency > fallthru_frequency * 5)
+	  && branch_frequency > fallthru_frequency * 2)
 	{
 	  log = LOOP_ALIGN (label);
 	  if (max_log < log)
@@ -1269,7 +991,7 @@ shorten_branches (first)
 	    }
 	}
 
-      INSN_ADDRESSES (uid) = insn_current_address;
+      INSN_ADDRESSES (uid) = insn_current_address + insn_lengths[uid];
 
       if (GET_CODE (insn) == NOTE || GET_CODE (insn) == BARRIER
 	  || GET_CODE (insn) == CODE_LABEL)
@@ -1681,12 +1403,6 @@ final_start_function (first, file, optimize)
   /* First output the function prologue: code to set up the stack frame.  */
   (*targetm.asm_out.function_prologue) (file, get_frame_size ());
 
-#ifdef VMS_DEBUGGING_INFO
-  /* Output label after the prologue of the function.  */
-  if (write_symbols == VMS_DEBUG || write_symbols == VMS_AND_DWARF2_DEBUG)
-    vmsdbgout_after_prologue ();
-#endif
-
   /* If the machine represents the prologue as RTL, the profiling code must
      be emitted when NOTE_INSN_PROLOGUE_END is scanned.  */
 #ifdef HAVE_prologue
@@ -1724,7 +1440,7 @@ profile_function (file)
 #ifndef NO_PROFILE_COUNTERS
   data_section ();
   ASM_OUTPUT_ALIGN (file, floor_log2 (align / BITS_PER_UNIT));
-  ASM_OUTPUT_INTERNAL_LABEL (file, "LP", current_function_funcdef_no);
+  (*targetm.asm_out.internal_label) (file, "LP", current_function_funcdef_no);
   assemble_integer (const0_rtx, LONG_TYPE_SIZE / BITS_PER_UNIT, align, 1);
 #endif
 
@@ -1797,12 +1513,12 @@ final_end_function ()
   (*targetm.asm_out.function_epilogue) (asm_out_file, get_frame_size ());
 
   /* And debug output.  */
-  (*debug_hooks->end_epilogue) ();
+  (*debug_hooks->end_epilogue) (last_linenum, last_filename);
 
 #if defined (DWARF2_UNWIND_INFO)
   if (write_symbols != DWARF2_DEBUG && write_symbols != VMS_AND_DWARF2_DEBUG
       && dwarf2out_do_frame ())
-    dwarf2out_end_epilogue ();
+    dwarf2out_end_epilogue (last_linenum, last_filename);
 #endif
 }
 
@@ -1829,7 +1545,6 @@ final (first, file, optimize, prescan)
   int max_uid = 0;
 
   last_ignored_compare = 0;
-  new_block = 1;
 
   /* Make a map indicating which line numbers appear in this function.
      When producing SDB debugging info, delete troublesome line number
@@ -1910,22 +1625,6 @@ final (first, file, optimize, prescan)
       insn = final_scan_insn (insn, file, optimize, prescan, 0);
     }
 
-  /* Store function names for edge-profiling.  */
-  /* ??? Probably should re-use the existing struct function.  */
-
-  if (cfun->arc_profile)
-    {
-      struct function_list *new_item = xmalloc (sizeof (struct function_list));
-
-      *functions_tail = new_item;
-      functions_tail = &new_item->next;
-
-      new_item->next = 0;
-      new_item->name = xstrdup (current_function_name);
-      new_item->cfg_checksum = profile_info.current_function_cfg_checksum;
-      new_item->count_edges = profile_info.count_edges_instrumented_now;
-    }
-
   free (line_note_exists);
   line_note_exists = NULL;
 }
@@ -1947,6 +1646,39 @@ get_insn_template (code, insn)
 	abort ();
       return (*(insn_output_fn) output) (recog_data.operand, insn);
 
+    default:
+      abort ();
+    }
+}
+
+/* Emit the appropriate declaration for an alternate-entry-point
+   symbol represented by INSN, to FILE.  INSN is a CODE_LABEL with
+   LABEL_KIND != LABEL_NORMAL.
+
+   The case fall-through in this function is intentional.  */
+static void
+output_alternate_entry_point (file, insn)
+     FILE *file;
+     rtx insn;
+{
+  const char *name = LABEL_NAME (insn);
+
+  switch (LABEL_KIND (insn))
+    {
+    case LABEL_WEAK_ENTRY:
+#ifdef ASM_WEAKEN_LABEL
+      ASM_WEAKEN_LABEL (file, name);
+#endif
+    case LABEL_GLOBAL_ENTRY:
+      (*targetm.asm_out.globalize_label) (file, name);
+    case LABEL_STATIC_ENTRY:
+#ifdef ASM_OUTPUT_TYPE_DIRECTIVE
+      ASM_OUTPUT_TYPE_DIRECTIVE (file, name, "function");
+#endif
+      ASM_OUTPUT_LABEL (file, name);
+      break;
+
+    case LABEL_NORMAL:
     default:
       abort ();
     }
@@ -2028,7 +1760,7 @@ final_scan_insn (insn, file, optimize, prescan, nopeepholes)
 
 	case NOTE_INSN_FUNCTION_BEG:
 	  app_disable ();
-	  (*debug_hooks->end_prologue) (last_linenum);
+	  (*debug_hooks->end_prologue) (last_linenum, last_filename);
 	  break;
 
 	case NOTE_INSN_BLOCK_BEG:
@@ -2158,7 +1890,11 @@ final_scan_insn (insn, file, optimize, prescan, nopeepholes)
 #ifdef ASM_OUTPUT_MAX_SKIP_ALIGN
 	      ASM_OUTPUT_MAX_SKIP_ALIGN (file, align, max_skip);
 #else
+#ifdef ASM_OUTPUT_ALIGN_WITH_NOP
+              ASM_OUTPUT_ALIGN_WITH_NOP (file, align);
+#else
 	      ASM_OUTPUT_ALIGN (file, align);
+#endif
 #endif
 	    }
 	}
@@ -2191,7 +1927,6 @@ final_scan_insn (insn, file, optimize, prescan, nopeepholes)
 #endif
       if (prescan > 0)
 	break;
-      new_block = 1;
 
 #ifdef FINAL_PRESCAN_LABEL
       FINAL_PRESCAN_INSN (insn, NULL, 0);
@@ -2242,19 +1977,16 @@ final_scan_insn (insn, file, optimize, prescan, nopeepholes)
 	      ASM_OUTPUT_CASE_LABEL (file, "L", CODE_LABEL_NUMBER (insn),
 				     NEXT_INSN (insn));
 #else
-	      if (LABEL_ALTERNATE_NAME (insn))
-		ASM_OUTPUT_ALTERNATE_LABEL_NAME (file, insn);
-	      else
-		ASM_OUTPUT_INTERNAL_LABEL (file, "L", CODE_LABEL_NUMBER (insn));
+	      (*targetm.asm_out.internal_label) (file, "L", CODE_LABEL_NUMBER (insn));
 #endif
 #endif
 	      break;
 	    }
 	}
-      if (LABEL_ALTERNATE_NAME (insn))
-	ASM_OUTPUT_ALTERNATE_LABEL_NAME (file, insn);
+      if (LABEL_ALT_ENTRY_P (insn))
+	output_alternate_entry_point (file, insn);
       else
-	ASM_OUTPUT_INTERNAL_LABEL (file, "L", CODE_LABEL_NUMBER (insn));
+	(*targetm.asm_out.internal_label) (file, "L", CODE_LABEL_NUMBER (insn));
       break;
 
     default:
@@ -2736,7 +2468,6 @@ final_scan_insn (insn, file, optimize, prescan, nopeepholes)
 
 	    if (prev_nonnote_insn (insn) != last_ignored_compare)
 	      abort ();
-	    new_block = 0;
 
 	    /* We have already processed the notes between the setter and
 	       the user.  Make sure we don't process them again, this is
@@ -2770,7 +2501,6 @@ final_scan_insn (insn, file, optimize, prescan, nopeepholes)
 	    abort ();
 #endif
 
-	    new_block = 0;
 	    return new;
 	  }
 
@@ -2892,12 +2622,7 @@ alter_subreg (xp)
       else if (GET_CODE (y) == REG)
 	{
 	  unsigned int regno = subreg_hard_regno (x, 1);
-	  PUT_CODE (x, REG);
-	  REGNO (x) = regno;
-	  ORIGINAL_REGNO (x) = ORIGINAL_REGNO (y);
-	  /* This field has a different meaning for REGs and SUBREGs.  Make
-	     sure to clear it!  */
-	  RTX_FLAG (x, used) = 0;
+	  *xp = gen_rtx_REG_offset (y, GET_MODE (x), regno, SUBREG_BYTE (x));
 	}
       else
 	abort ();
@@ -3163,11 +2888,8 @@ get_mem_expr_from_op (op, paddressp)
 
   *paddressp = 0;
 
-  if (op == NULL)
-    return 0;
-
-  if (GET_CODE (op) == REG && ORIGINAL_REGNO (op) >= FIRST_PSEUDO_REGISTER)
-    return REGNO_DECL (ORIGINAL_REGNO (op));
+  if (GET_CODE (op) == REG)
+    return REG_EXPR (op);
   else if (GET_CODE (op) != MEM)
     return 0;
 
@@ -3211,16 +2933,22 @@ output_asm_operand_names (operands, oporder, nops)
   for (i = 0; i < nops; i++)
     {
       int addressp;
-      tree expr = get_mem_expr_from_op (operands[oporder[i]], &addressp);
+      rtx op = operands[oporder[i]];
+      tree expr = get_mem_expr_from_op (op, &addressp);
 
+      fprintf (asm_out_file, "%c%s",
+	       wrote ? ',' : '\t', wrote ? "" : ASM_COMMENT_START);
+      wrote = 1;
       if (expr)
 	{
-	  fprintf (asm_out_file, "%c%s %s",
-		   wrote ? ',' : '\t', wrote ? "" : ASM_COMMENT_START,
+	  fprintf (asm_out_file, "%s",
 		   addressp ? "*" : "");
 	  print_mem_expr (asm_out_file, expr);
 	  wrote = 1;
 	}
+      else if (REG_P (op) && ORIGINAL_REGNO (op)
+	       && ORIGINAL_REGNO (op) != REGNO (op))
+	fprintf (asm_out_file, " tmp%i", ORIGINAL_REGNO (op));
     }
 }
 
@@ -3982,7 +3710,7 @@ leaf_function_p ()
   return 1;
 }
 
-/* Return 1 if branch is an forward branch.
+/* Return 1 if branch is a forward branch.
    Uses insn_shuid array, so it works only in the final pass.  May be used by
    output templates to customary add branch prediction hints.
  */
@@ -4019,7 +3747,7 @@ int
 only_leaf_regs_used ()
 {
   int i;
-  char *permitted_reg_in_leaf_functions = LEAF_REGISTERS;
+  const char *const permitted_reg_in_leaf_functions = LEAF_REGISTERS;
 
   for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
     if ((regs_ever_live[i] || global_regs[i])

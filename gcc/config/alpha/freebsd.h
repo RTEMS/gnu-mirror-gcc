@@ -32,14 +32,14 @@ Boston, MA 02111-1307, USA.  */
 	  builtin_define ("__PIC__");		\
 	  builtin_define ("__pic__");		\
 	}					\
-    }
+    }						\
   while (0)
 
 #undef  CPP_SPEC
 #define CPP_SPEC "%(cpp_subtarget) %{posix:-D_POSIX_SOURCE}"
 
 #define LINK_SPEC "%{G*} %{relax:-relax}				\
-  %{p:%e`-p' not supported; use `-pg' and gprof(1)}			\
+  %{p:%nconsider using `-pg' instead of `-p' with gprof(1)}		\
   %{Wl,*:%*}								\
   %{assert*} %{R*} %{rpath*} %{defsym*}					\
   %{shared:-Bshareable %{h*} %{soname*}}				\

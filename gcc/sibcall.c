@@ -20,6 +20,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 
 #include "rtl.h"
 #include "regs.h"
@@ -54,7 +56,7 @@ static rtx skip_unreturned_value 	PARAMS ((rtx));
 /* Examine a CALL_PLACEHOLDER pattern and determine where the call's
    return value is located.  P_HARD_RETURN receives the hard register
    that the function used; P_SOFT_RETURN receives the pseudo register
-   that the sequence used.  Return non-zero if the values were located.  */
+   that the sequence used.  Return nonzero if the values were located.  */
 
 static int
 identify_call_return_value (cp, p_hard_return, p_soft_return)
@@ -574,8 +576,8 @@ optimize_sibling_and_tail_recursive_calls ()
   rtx insn, insns;
   basic_block alternate_exit = EXIT_BLOCK_PTR;
   bool no_sibcalls_this_function = false;
-  int successful_sibling_call = 0;
-  int replaced_call_placeholder = 0;
+  bool successful_replacement = false;
+  bool replaced_call_placeholder = false;
   edge e;
 
   insns = get_insns ();
@@ -676,8 +678,7 @@ optimize_sibling_and_tail_recursive_calls ()
 	     sibling call optimizations, but not tail recursion.
 	     Similarly if we use varargs or stdarg since they implicitly
 	     may take the address of an argument.  */
-	  if (current_function_calls_alloca
-	      || current_function_varargs || current_function_stdarg)
+	  if (current_function_calls_alloca || current_function_stdarg)
 	    sibcall = 0;
 
 	  /* See if there are any reasons we can't perform either sibling or
@@ -692,7 +693,7 @@ optimize_sibling_and_tail_recursive_calls ()
 	      || current_function_calls_setjmp
 	      /* Can't if more than one successor or single successor is not
 		 exit block.  These two tests prevent tail call optimization
-		 in the presense of active exception handlers.  */
+		 in the presence of active exception handlers.  */
 	      || call_block->succ == NULL
 	      || call_block->succ->succ_next != NULL
 	      || (call_block->succ->dest != EXIT_BLOCK_PTR
@@ -705,10 +706,11 @@ optimize_sibling_and_tail_recursive_calls ()
 	  /* Select a set of insns to implement the call and emit them.
 	     Tail recursion is the most efficient, so select it over
 	     a tail/sibling call.  */
-	  if (sibcall)
-	    successful_sibling_call = 1;
 
-	  replaced_call_placeholder = 1;
+	  if (sibcall || tailrecursion)
+	    successful_replacement = true;
+	  replaced_call_placeholder = true;
+
 	  replace_call_placeholder (insn,
 				    tailrecursion != 0
 				      ? sibcall_use_tail_recursion
@@ -718,7 +720,7 @@ optimize_sibling_and_tail_recursive_calls ()
 	}
     }
 
-  if (successful_sibling_call)
+  if (successful_replacement)
     {
       rtx insn;
       tree arg;

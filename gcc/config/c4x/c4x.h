@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler.  TMS320C[34]x
-   Copyright (C) 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+   2003 Free Software Foundation, Inc.
 
    Contributed by Michael Hayes (m.hayes@elec.canterbury.ac.nz)
               and Herman Ten Brugge (Haj.Ten.Brugge@net.HCC.nl).
@@ -22,8 +22,6 @@
    the Free Software Foundation, 59 Temple Place - Suite 330,
    Boston, MA 02111-1307, USA.  */
 
-#include "hwint.h"
-
 /* RUN-TIME TARGET SPECIFICATION.  */
 
 #define C4x   1
@@ -35,7 +33,8 @@
 	builtin_define ("_BIGMODEL");		\
       if (!TARGET_MEMPARM)			\
 	builtin_define ("_REGPARM");		\
-      if (flag_inline_functions)		\
+      if (flag_inline_functions			\
+	  || flag_inline_trees)			\
 	builtin_define ("_INLINE");		\
       if (TARGET_C3X)				\
 	{					\
@@ -92,23 +91,21 @@
 
 #define ASM_SPEC "\
 %{!mcpu=30:%{!mcpu=31:%{!mcpu=32:%{!mcpu=33:%{!mcpu=40:%{!mcpu=44:\
-%{!m30:%{!m40:-m40}}}}}}}} \
-%{mcpu=30:-m30} \
-%{mcpu=31:-m31} \
-%{mcpu=32:-m32} \
-%{mcpu=33:-m33} \
-%{mcpu=40:-m40} \
-%{mcpu=44:-m44} \
-%{m30:-m30} \
-%{m31:-m31} \
-%{m32:-m32} \
-%{m33:-m33} \
-%{m40:-m40} \
-%{m44:-m44} \
-%{mmemparm:-p} %{mregparm:-r} \
-%{!mmemparm:%{!mregparm:-r}} \
-%{mbig:-b} %{msmall:-s} \
-%{!msmall:%{!mbig:-b}}"
+%{!m30:%{!m31:%{!m32:%{!m33:%{!m40:%{!m44:-m40}}}}}}}}}}}} \
+%{mcpu=30} \
+%{mcpu=31} \
+%{mcpu=32} \
+%{mcpu=33} \
+%{mcpu=40} \
+%{mcpu=44} \
+%{m30} \
+%{m31} \
+%{m32} \
+%{m33} \
+%{m40} \
+%{m44} \
+%{mmemparm} %{mregparm} %{!mmemparm:%{!mregparm:-mregparm}} \
+%{mbig} %{msmall} %{!msmall:%{!mbig:-mbig}}"
 
 /* Define linker options.  */
 
@@ -152,7 +149,7 @@
 #define C30_FLAG            0x0100000 /* Emit C30 code.  */
 #define C31_FLAG            0x0200000 /* Emit C31 code.  */
 #define C32_FLAG            0x0400000 /* Emit C32 code.  */
-#define C33_FLAG            0x0400000 /* Emit C33 code.  */
+#define C33_FLAG            0x0800000 /* Emit C33 code.  */
 #define C40_FLAG            0x1000000 /* Emit C40 code.  */
 #define C44_FLAG            0x2000000 /* Emit C44 code.  */
 
@@ -1165,9 +1162,6 @@ CUMULATIVE_ARGS;
 
 /* Varargs handling.  */
 
-#define	EXPAND_BUILTIN_VA_START(stdarg, valist, nextarg) \
-  c4x_va_start (stdarg, valist, nextarg)
-
 #define EXPAND_BUILTIN_VA_ARG(valist, type) \
   c4x_va_arg (valist, type)
 
@@ -1336,7 +1330,7 @@ CUMULATIVE_ARGS;
 
 #ifndef REG_OK_STRICT
 
-/* Nonzero if X is a hard or pseudo reg that can be used as an base.  */
+/* Nonzero if X is a hard or pseudo reg that can be used as a base.  */
 
 #define REG_OK_FOR_BASE_P(X) IS_ADDR_OR_PSEUDO_REG(X)
 
@@ -1467,106 +1461,6 @@ CUMULATIVE_ARGS;
 
 /* Descripting Relative Cost of Operations.  */
 
-/* Provide the costs of a rtl expression.  This is in the body of a
-   switch on CODE. 
-
-   Note that we return, rather than break so that rtx_cost doesn't
-   include CONST_COSTS otherwise expand_mult will think that it is
-   cheaper to synthesise a multiply rather than to use a multiply
-   instruction.  I think this is because the algorithm synth_mult
-   doesn't take into account the loading of the operands, whereas the
-   calculation of mult_cost does. 
-*/
-
-
-#define RTX_COSTS(RTX, CODE, OUTER_CODE)				\
-    case PLUS:								\
-    case MINUS:								\
-    case AND:								\
-    case IOR:								\
-    case XOR:								\
-    case ASHIFT:							\
-    case ASHIFTRT:							\
-    case LSHIFTRT:							\
-    return COSTS_N_INSNS (1);						\
-    case MULT:								\
-    return COSTS_N_INSNS (GET_MODE_CLASS (GET_MODE (RTX)) == MODE_FLOAT \
-			  || TARGET_MPYI ? 1 : 14);			\
-    case DIV:								\
-    case UDIV:								\
-    case MOD: 								\
-    case UMOD:								\
-    return COSTS_N_INSNS (GET_MODE_CLASS (GET_MODE (RTX)) == MODE_FLOAT	\
-			  ? 15 : 50);
-
-/* Compute the cost of computing a constant rtl expression RTX
-   whose rtx-code is CODE.  The body of this macro is a portion
-   of a switch statement.  If the code is computed here,
-   return it with a return statement.  Otherwise, break from the switch.
-
-   An insn is assumed to cost 4 units.
-   COSTS_N_INSNS (N) is defined as (N) * 4 - 2.
-
-   Some small integers are effectively free for the C40.  We should
-   also consider if we are using the small memory model.  With
-   the big memory model we require an extra insn for a constant
-   loaded from memory.  
-
-   This is used by expand_binop to decide whether to force a constant
-   into a register.  If the cost is greater than 2 and the constant
-   is used within a short loop, it gets forced into a register.  
-   Ideally, there should be some weighting as to how mnay times it is used
-   within the loop.  */
-
-#define SHIFT_CODE_P(C) ((C) == ASHIFT || (C) == ASHIFTRT || (C) == LSHIFTRT)
-
-#define LOGICAL_CODE_P(C) ((C) == NOT || (C) == AND \
-                           || (C) == IOR || (C) == XOR)
-
-#define NON_COMMUTATIVE_CODE_P ((C) == MINUS || (C) == COMPARE)
-
-#define CONST_COSTS(RTX,CODE,OUTER_CODE)			\
-	case CONST_INT:						\
-           if (c4x_J_constant (RTX))				\
-	     return 0;						\
-	   if (! TARGET_C3X					\
-	       && OUTER_CODE == AND				\
-               && GET_CODE (RTX) == CONST_INT			\
-	       && (INTVAL (RTX) == 255 || INTVAL (RTX) == 65535))	\
-	     return 0;						\
-	   if (! TARGET_C3X					\
-	       && (OUTER_CODE == ASHIFTRT || OUTER_CODE == LSHIFTRT)	\
-               && GET_CODE (RTX) == CONST_INT			\
-	       && (INTVAL (RTX) == 16 || INTVAL (RTX) == 24))	\
-	     return 0;						\
-           if (TARGET_C3X && SHIFT_CODE_P (OUTER_CODE))		\
-	     return 3;						\
-           if (LOGICAL_CODE_P (OUTER_CODE) 			\
-               ? c4x_L_constant (RTX) : c4x_I_constant (RTX))	\
-	     return 2;						\
-	case CONST:						\
-	case LABEL_REF:						\
-	case SYMBOL_REF:					\
-	   return 4;						\
-	case CONST_DOUBLE:					\
-	   if (c4x_H_constant (RTX))				\
-	     return 2;						\
-           if (GET_MODE (RTX) == QFmode)			\
-	     return 4;						\
-           else							\
-	     return 8;
-
-/* Compute the cost of an address.  This is meant to approximate the size
-   and/or execution delay of an insn using that address.  If the cost is
-   approximated by the RTL complexity, including CONST_COSTS above, as
-   is usually the case for CISC machines, this macro should not be defined.
-   For aggressively RISCy machines, only one insn format is allowed, so
-   this macro should be a constant.  The value of this macro only matters
-   for valid addresses.  We handle the most common address without 
-   a call to c4x_address_cost.  */
-
-#define ADDRESS_COST(ADDR) (REG_P (ADDR) ? 1 : c4x_address_cost (ADDR))
-
 #define	CANONICALIZE_COMPARISON(CODE, OP0, OP1)		\
 if (REG_P (OP1) && ! REG_P (OP0))			\
 {							\
@@ -1650,20 +1544,6 @@ fini_section ()							\
 /* Switch into a generic section.  */
 #define TARGET_ASM_NAMED_SECTION c4x_asm_named_section
 
-/* The TI assembler wants to have hex numbers this way.  */
-
-#undef HOST_WIDE_INT_PRINT_HEX
-#ifndef HOST_WIDE_INT_PRINT_HEX
-# if HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_INT
-#  define HOST_WIDE_INT_PRINT_HEX "0%xh"
-# else
-#  if HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_LONG
-#   define HOST_WIDE_INT_PRINT_HEX "0%lxh"
-#  else
-#   define HOST_WIDE_INT_PRINT_HEX "0%llxh"
-#  endif
-# endif
-#endif /* ! HOST_WIDE_INT_PRINT_HEX */
 
 /* Overall Framework of an Assembler File.  */
 /* We need to have a data section we can identify so that we can set
@@ -1677,6 +1557,7 @@ fini_section ()							\
     if (TARGET_C30) dspversion = 30;				\
     if (TARGET_C31) dspversion = 31;				\
     if (TARGET_C32) dspversion = 32;				\
+    if (TARGET_C33) dspversion = 33;                            \
     if (TARGET_C40) dspversion = 40;				\
     if (TARGET_C44) dspversion = 44;				\
     fprintf (FILE, "\t.version\t%d\n", dspversion);		\
@@ -1706,16 +1587,8 @@ fini_section ()							\
 
 #define NO_DOT_IN_LABEL		/* Only required for TI format.  */
 
-#define ASM_OUTPUT_LABEL(FILE, NAME)	\
-do { assemble_name (FILE, NAME); fputs (":\n", FILE); } while (0);
-
-#define ASM_GLOBALIZE_LABEL(FILE, NAME) \
-  do {                                  \
-    fprintf (FILE, "\t.global\t");	\
-    assemble_name (FILE, NAME);		\
-    fputs ("\n", FILE); 	        \
-    c4x_global_label (NAME);		\
-  } while (0);
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP "\t.global\t"
 
 #define ASM_OUTPUT_EXTERNAL(FILE, DECL, NAME) \
 c4x_external_ref (NAME)
@@ -1734,12 +1607,6 @@ c4x_file_end (FILE)
 
 #define USER_LABEL_PREFIX "_"
 
-/* This is how to output an internal numbered label where
-   PREFIX is the class of label and NUM is the number within the class.  */
-
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE, PREFIX, NUM)	\
-asm_fprintf (FILE, "%s%d:\n", PREFIX, NUM)
-
 /* This is how to store into the string LABEL
    the symbol_ref name of an internal numbered label where
    PREFIX is the class of label and NUM is the number within the class.
@@ -1747,14 +1614,6 @@ asm_fprintf (FILE, "%s%d:\n", PREFIX, NUM)
 
 #define ASM_GENERATE_INTERNAL_LABEL(BUFFER, PREFIX, NUM) \
     sprintf (BUFFER, "*%s%d", PREFIX, NUM)
-
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)  \
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),    \
-  sprintf ((OUTPUT), "%s$%d", (NAME), (LABELNO)))
 
 /* A C statement to output to the stdio stream STREAM assembler code which
    defines (equates) the symbol NAME to have the value VALUE.  */
@@ -1794,10 +1653,6 @@ do {						\
 #define FLOAT_TYPE_SIZE		32
 #define DOUBLE_TYPE_SIZE	32
 #define LONG_DOUBLE_TYPE_SIZE	64 /* Actually only 40.  */
-
-/* Allow #sccs in preprocessor.  */
-
-#define SCCS_DIRECTIVE
 
 /* Output #ident as a .ident.  */
 
@@ -1871,18 +1726,17 @@ do {						\
 #define PRINT_OPERAND_ADDRESS(FILE, X) c4x_print_operand_address(FILE, X)
 
 /* C4x specific pragmas.  */
-#define REGISTER_TARGET_PRAGMAS(PFILE) do {				\
-  cpp_register_pragma (PFILE, 0, "CODE_SECTION", c4x_pr_CODE_SECTION);	\
-  cpp_register_pragma (PFILE, 0, "DATA_SECTION", c4x_pr_DATA_SECTION);	\
-  cpp_register_pragma (PFILE, 0, "FUNC_CANNOT_INLINE", c4x_pr_ignored);	\
-  cpp_register_pragma (PFILE, 0, "FUNC_EXT_CALLED", c4x_pr_ignored);	\
-  cpp_register_pragma (PFILE, 0, "FUNC_IS_PURE", c4x_pr_FUNC_IS_PURE);	\
-  cpp_register_pragma (PFILE, 0, "FUNC_IS_SYSTEM", c4x_pr_ignored);	\
-  cpp_register_pragma (PFILE, 0, "FUNC_NEVER_RETURNS",			\
-		       c4x_pr_FUNC_NEVER_RETURNS);			\
-  cpp_register_pragma (PFILE, 0, "FUNC_NO_GLOBAL_ASG", c4x_pr_ignored);	\
-  cpp_register_pragma (PFILE, 0, "FUNC_NO_IND_ASG", c4x_pr_ignored);	\
-  cpp_register_pragma (PFILE, 0, "INTERRUPT", c4x_pr_INTERRUPT);	\
+#define REGISTER_TARGET_PRAGMAS() do {					  \
+  c_register_pragma (0, "CODE_SECTION", c4x_pr_CODE_SECTION);		  \
+  c_register_pragma (0, "DATA_SECTION", c4x_pr_DATA_SECTION);		  \
+  c_register_pragma (0, "FUNC_CANNOT_INLINE", c4x_pr_ignored);		  \
+  c_register_pragma (0, "FUNC_EXT_CALLED", c4x_pr_ignored);		  \
+  c_register_pragma (0, "FUNC_IS_PURE", c4x_pr_FUNC_IS_PURE);		  \
+  c_register_pragma (0, "FUNC_IS_SYSTEM", c4x_pr_ignored);		  \
+  c_register_pragma (0, "FUNC_NEVER_RETURNS", c4x_pr_FUNC_NEVER_RETURNS); \
+  c_register_pragma (0, "FUNC_NO_GLOBAL_ASG", c4x_pr_ignored);		  \
+  c_register_pragma (0, "FUNC_NO_IND_ASG", c4x_pr_ignored);		  \
+  c_register_pragma (0, "INTERRUPT", c4x_pr_INTERRUPT);			  \
 } while (0)
 
 /* Assembler Commands for Alignment.  */
@@ -1906,7 +1760,7 @@ do {						\
    to avoid conflict with TI's use of .def).  */
 
 #define SDB_DELIM "\n"
-#define SDB_DEBUGGING_INFO
+#define SDB_DEBUGGING_INFO 1
 
 /* Don't use octal since this can confuse gas for the c4x.  */
 #define PUT_SDB_TYPE(a) fprintf(asm_out_file, "\t.type\t0x%x%s", a, SDB_DELIM)
@@ -2002,27 +1856,27 @@ do { fprintf (asm_out_file, "\t.sdef\t");		\
 {								\
   if (TARGET_C3X)						\
     {								\
-      asm_fprintf (FILE, "\tldiu\t0,ar1\n");			\
-      asm_fprintf (FILE, "\tlsh\t16,ar1\n");			\
-      asm_fprintf (FILE, "\tor\t0,ar1\n");			\
-      asm_fprintf (FILE, "\tldiu\t0,ar0\n");			\
-      asm_fprintf (FILE, "\tbud\tar1\n");			\
-      asm_fprintf (FILE, "\tlsh\t16,ar0\n");			\
-      asm_fprintf (FILE, "\tor\t0,ar0\n");			\
-      asm_fprintf (FILE, "\tor\t1000h,st\n");			\
+      fprintf (FILE, "\tldiu\t0,ar1\n");			\
+      fprintf (FILE, "\tlsh\t16,ar1\n");			\
+      fprintf (FILE, "\tor\t0,ar1\n");				\
+      fprintf (FILE, "\tldiu\t0,ar0\n");			\
+      fprintf (FILE, "\tbud\tar1\n");				\
+      fprintf (FILE, "\tlsh\t16,ar0\n");			\
+      fprintf (FILE, "\tor\t0,ar0\n");				\
+      fprintf (FILE, "\tor\t1000h,st\n");			\
     }								\
   else								\
     {								\
-      asm_fprintf (FILE, "\tlaj\t$+4\n");			\
-      asm_fprintf (FILE, "\taddi3\t4,r11,ar0\n");		\
-      asm_fprintf (FILE, "\tlda\t*ar0,ar1\n");			\
-      asm_fprintf (FILE, "\tlda\t*+ar0(1),ar0\n");		\
-      asm_fprintf (FILE, "\tbud\tar1\n");			\
-      asm_fprintf (FILE, "\tnop\n");				\
-      asm_fprintf (FILE, "\tnop\n");				\
-      asm_fprintf (FILE, "\tor\t1000h,st\n");			\
-      asm_fprintf (FILE, "\t.word\t0\n");			\
-      asm_fprintf (FILE, "\t.word\t0\n");			\
+      fprintf (FILE, "\tlaj\t$+4\n");				\
+      fprintf (FILE, "\taddi3\t4,r11,ar0\n");			\
+      fprintf (FILE, "\tlda\t*ar0,ar1\n");			\
+      fprintf (FILE, "\tlda\t*+ar0(1),ar0\n");			\
+      fprintf (FILE, "\tbud\tar1\n");				\
+      fprintf (FILE, "\tnop\n");				\
+      fprintf (FILE, "\tnop\n");				\
+      fprintf (FILE, "\tor\t1000h,st\n");			\
+      fprintf (FILE, "\t.word\t0\n");				\
+      fprintf (FILE, "\t.word\t0\n");				\
     }								\
 }
 
@@ -2085,13 +1939,13 @@ do { fprintf (asm_out_file, "\t.sdef\t");		\
 #define BSS_SECTION_ASM_OP "\t.bss"
 
 #define ASM_OUTPUT_REG_PUSH(FILE, REGNO)  \
-  asm_fprintf (FILE, "\tpush\t%s\n", reg_names[REGNO])
+  fprintf (FILE, "\tpush\t%s\n", reg_names[REGNO])
 
 /* This is how to output an insn to pop a register from the stack.
    It need not be very fast code.  */
 
 #define ASM_OUTPUT_REG_POP(FILE, REGNO)  \
-  asm_fprintf (FILE, "\tpop\t%s\n", reg_names[REGNO])
+  fprintf (FILE, "\tpop\t%s\n", reg_names[REGNO])
 
 /* Value is 1 if truncating an integer of INPREC bits to OUTPREC bits
    is done just by pretending it is already truncated.  */

@@ -1,5 +1,5 @@
 /* Definitions of various defaults for tm.h macros.
-   Copyright (C) 1992, 1996, 1997, 1998, 1999, 2000, 2001, 2002
+   Copyright (C) 1992, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003
    Free Software Foundation, Inc.
    Contributed by Ron Guilmette (rfg@monkeys.com)
 
@@ -22,6 +22,13 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #ifndef GCC_DEFAULTS_H
 #define GCC_DEFAULTS_H
+
+#ifndef GET_ENVIRONMENT
+#define GET_ENVIRONMENT(VALUE, NAME) do { (VALUE) = getenv (NAME); } while (0)
+#endif
+
+#define obstack_chunk_alloc xmalloc
+#define obstack_chunk_free free
 
 /* Define default standard character escape sequences.  */
 #ifndef TARGET_BELL
@@ -47,21 +54,27 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 # define CPP_PREDEFINES ""
 #endif
 
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable or function named NAME.
+/* Store in OUTPUT a string (made with alloca) containing an
+   assembler-name for a local static variable or function named NAME.
    LABELNO is an integer which is different for each call.  */
 
+#ifndef ASM_PN_FORMAT
+# ifndef NO_DOT_IN_LABEL
+#  define ASM_PN_FORMAT "%s.%lu"
+# else
+#  ifndef NO_DOLLAR_IN_LABEL
+#   define ASM_PN_FORMAT "%s$%lu"
+#  else
+#   define ASM_PN_FORMAT "__%s_%lu"
+#  endif
+# endif
+#endif /* ! ASM_PN_FORMAT */
+
 #ifndef ASM_FORMAT_PRIVATE_NAME
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)			\
-  do {									\
-    int len = strlen (NAME);						\
-    char *temp = (char *) alloca (len + 3);				\
-    temp[0] = 'L';							\
-    strcpy (&temp[1], (NAME));						\
-    temp[len + 1] = '.';						\
-    temp[len + 2] = 0;							\
-    (OUTPUT) = (char *) alloca (strlen (NAME) + 11);			\
-    ASM_GENERATE_INTERNAL_LABEL (OUTPUT, temp, LABELNO);		\
+# define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO) \
+  do { const char *const name_ = (NAME); \
+       char *const output_ = (OUTPUT) = (char *) alloca (strlen (name_) + 32);\
+       sprintf (output_, ASM_PN_FORMAT, name_, (unsigned long)(LABELNO)); \
   } while (0)
 #endif
 
@@ -75,15 +88,9 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #ifndef ASM_OUTPUT_ADDR_VEC_ELT
 #define ASM_OUTPUT_ADDR_VEC_ELT(FILE, VALUE)  \
 do { fputs (integer_asm_op (POINTER_SIZE / UNITS_PER_WORD, TRUE), FILE); \
-     ASM_OUTPUT_INTERNAL_LABEL (FILE, "L", (VALUE));			\
+     (*targetm.asm_out.internal_label) (FILE, "L", (VALUE));			\
      fputc ('\n', FILE);						\
    } while (0)
-#endif
-
-/* Provide default for ASM_OUTPUT_ALTERNATE_LABEL_NAME.  */
-#ifndef ASM_OUTPUT_ALTERNATE_LABEL_NAME
-#define ASM_OUTPUT_ALTERNATE_LABEL_NAME(FILE,INSN) \
-do { ASM_OUTPUT_LABEL(FILE,LABEL_ALTERNATE_NAME (INSN)); } while (0)
 #endif
 
 /* choose a reasonable default for ASM_OUTPUT_ASCII.  */
@@ -139,6 +146,14 @@ do { ASM_OUTPUT_LABEL(FILE,LABEL_ALTERNATE_NAME (INSN)); } while (0)
 #endif
 #endif
 
+/* This is how to output the definition of a user-level label named
+   NAME, such as the label on a static function or variable NAME.  */
+
+#ifndef ASM_OUTPUT_LABEL
+#define ASM_OUTPUT_LABEL(FILE,NAME) \
+  do { assemble_name ((FILE), (NAME)); fputs (":\n", (FILE)); } while (0)
+#endif
+
 /* This is how to output a reference to a user-level label named NAME.  */
 
 #ifndef ASM_OUTPUT_LABELREF
@@ -151,7 +166,7 @@ do { ASM_OUTPUT_LABEL(FILE,LABEL_ALTERNATE_NAME (INSN)); } while (0)
 
 #ifndef ASM_OUTPUT_DEBUG_LABEL
 #define ASM_OUTPUT_DEBUG_LABEL(FILE, PREFIX, NUM) \
-  ASM_OUTPUT_INTERNAL_LABEL (FILE, PREFIX, NUM)
+  (*targetm.asm_out.internal_label) (FILE, PREFIX, NUM)
 #endif
 
 /* This is how we tell the assembler that a symbol is weak.  */
@@ -165,6 +180,51 @@ do { ASM_OUTPUT_LABEL(FILE,LABEL_ALTERNATE_NAME (INSN)); } while (0)
         ASM_OUTPUT_DEF (STREAM, NAME, VALUE);		\
     }							\
   while (0)
+#endif
+#endif
+
+/* How to emit a .type directive.  */
+#ifndef ASM_OUTPUT_TYPE_DIRECTIVE
+#if defined TYPE_ASM_OP && defined TYPE_OPERAND_FMT
+#define ASM_OUTPUT_TYPE_DIRECTIVE(STREAM, NAME, TYPE)	\
+  do							\
+    {							\
+      fputs (TYPE_ASM_OP, STREAM);			\
+      assemble_name (STREAM, NAME);			\
+      fputs (", ", STREAM);				\
+      fprintf (STREAM, TYPE_OPERAND_FMT, TYPE);		\
+      putc ('\n', STREAM);				\
+    }							\
+  while (0)
+#endif
+#endif
+
+/* How to emit a .size directive.  */
+#ifndef ASM_OUTPUT_SIZE_DIRECTIVE
+#ifdef SIZE_ASM_OP
+#define ASM_OUTPUT_SIZE_DIRECTIVE(STREAM, NAME, SIZE)	\
+  do							\
+    {							\
+      HOST_WIDE_INT size_ = (SIZE);			\
+      fputs (SIZE_ASM_OP, STREAM);			\
+      assemble_name (STREAM, NAME);			\
+      fputs (", ", STREAM);				\
+      fprintf (STREAM, HOST_WIDE_INT_PRINT_DEC, size_);	\
+      putc ('\n', STREAM);				\
+    }							\
+  while (0)
+
+#define ASM_OUTPUT_MEASURED_SIZE(STREAM, NAME)		\
+  do							\
+    {							\
+      fputs (SIZE_ASM_OP, STREAM);			\
+      assemble_name (STREAM, NAME);			\
+      fputs (", .-", STREAM);				\
+      assemble_name (STREAM, NAME);			\
+      putc ('\n', STREAM);				\
+    }							\
+  while (0)
+
 #endif
 #endif
 
@@ -184,6 +244,11 @@ do { ASM_OUTPUT_LABEL(FILE,LABEL_ALTERNATE_NAME (INSN)); } while (0)
 #else
 #define SUPPORTS_ONE_ONLY 0
 #endif
+#endif
+
+/* By default, there is no prefix on user-defined symbols.  */
+#ifndef USER_LABEL_PREFIX
+#define USER_LABEL_PREFIX ""
 #endif
 
 /* If the target supports weak symbols, define TARGET_ATTRIBUTE_WEAK to
@@ -371,7 +436,7 @@ do { ASM_OUTPUT_LABEL(FILE,LABEL_ALTERNATE_NAME (INSN)); } while (0)
 #endif
 
 /* By default, the C++ compiler will use function addresses in the
-   vtable entries.  Setting this non-zero tells the compiler to use
+   vtable entries.  Setting this nonzero tells the compiler to use
    function descriptors instead.  The value of this macro says how
    many words wide the descriptor is (normally 2).  It is assumed 
    that the address of a function descriptor may be treated as a
@@ -383,7 +448,7 @@ do { ASM_OUTPUT_LABEL(FILE,LABEL_ALTERNATE_NAME (INSN)); } while (0)
 /* By default, the vtable entries are void pointers, the so the alignment
    is the same as pointer alignment.  The value of this macro specifies
    the alignment of the vtable entry in bits.  It should be defined only
-   when special alignment is necessary. */
+   when special alignment is necessary.  */
 #ifndef TARGET_VTABLE_ENTRY_ALIGN
 #define TARGET_VTABLE_ENTRY_ALIGN POINTER_SIZE
 #endif
@@ -454,14 +519,16 @@ You Lose!  You must define PREFERRED_DEBUGGING_TYPE!
 #define PREFERRED_DEBUGGING_TYPE NO_DEBUG
 #endif
 
-/* This is set to 1 if BYTES_BIG_ENDIAN is defined but the target uses a
-   little-endian method of passing and returning structures in registers.
-   On the HP-UX IA64 and PA64 platforms structures are aligned differently
-   then integral values and setting this value to 1 will allow for the
-   special handling of structure arguments and return values in regs.  */
+/* Define codes for all the float formats that we know of.  */
+#define UNKNOWN_FLOAT_FORMAT 0
+#define IEEE_FLOAT_FORMAT 1
+#define VAX_FLOAT_FORMAT 2
+#define IBM_FLOAT_FORMAT 3
+#define C4X_FLOAT_FORMAT 4
 
-#ifndef FUNCTION_ARG_REG_LITTLE_ENDIAN
-#define FUNCTION_ARG_REG_LITTLE_ENDIAN 0
+/* Default to IEEE float if not specified.  Nearly all machines use it.  */
+#ifndef TARGET_FLOAT_FORMAT
+#define	TARGET_FLOAT_FORMAT	IEEE_FLOAT_FORMAT
 #endif
 
 /* Determine the register class for registers suitable to be the base
@@ -505,6 +572,17 @@ You Lose!  You must define PREFERRED_DEBUGGING_TYPE!
    && !ROUND_TOWARDS_ZERO)
 #endif
 
+/* If FLOAT_WORDS_BIG_ENDIAN and HOST_FLOAT_WORDS_BIG_ENDIAN are not defined
+   in the header files, then this implies the word-endianness is the same as
+   for integers.  */
+#ifndef FLOAT_WORDS_BIG_ENDIAN
+#define FLOAT_WORDS_BIG_ENDIAN WORDS_BIG_ENDIAN
+#endif
+
+#ifndef TARGET_FLT_EVAL_METHOD
+#define TARGET_FLT_EVAL_METHOD 0
+#endif
+
 #ifndef HOT_TEXT_SECTION_NAME
 #define HOT_TEXT_SECTION_NAME "text.hot"
 #endif
@@ -518,9 +596,60 @@ You Lose!  You must define PREFERRED_DEBUGGING_TYPE!
 #endif
 
 /* Determine whether __cxa_atexit, rather than atexit, is used to
-   register C++ destructors for local statics and global objects. */
+   register C++ destructors for local statics and global objects.  */
 #ifndef DEFAULT_USE_CXA_ATEXIT
 #define DEFAULT_USE_CXA_ATEXIT 0
+#endif
+
+/* Determine whether extra constraint letter should be handled
+   via address reload (like 'o').  */
+#ifndef EXTRA_MEMORY_CONSTRAINT
+#define EXTRA_MEMORY_CONSTRAINT(C,STR) 0
+#endif
+
+/* Determine whether extra constraint letter should be handled
+   as an address (like 'p').  */
+#ifndef EXTRA_ADDRESS_CONSTRAINT
+#define EXTRA_ADDRESS_CONSTRAINT(C,STR) 0
+#endif
+
+/* When a port defines CONSTRAINT_LEN, it should use DEFAULT_CONSTRAINT_LEN
+   for all the characters that it does not want to change, so things like the
+  'length' of a digit in a matching constraint is an implementation detail,
+   and not part of the interface.  */
+#define DEFAULT_CONSTRAINT_LEN(C,STR) 1
+
+#ifndef CONSTRAINT_LEN
+#define CONSTRAINT_LEN(C,STR) DEFAULT_CONSTRAINT_LEN (C, STR)
+#endif
+
+#if defined (CONST_OK_FOR_LETTER_P) && ! defined (CONST_OK_FOR_CONSTRAINT_P)
+#define CONST_OK_FOR_CONSTRAINT_P(VAL,C,STR) CONST_OK_FOR_LETTER_P (VAL, C)
+#endif
+
+#if defined (CONST_DOUBLE_OK_FOR_LETTER_P) && ! defined (CONST_DOUBLE_OK_FOR_CONSTRAINT_P)
+#define CONST_DOUBLE_OK_FOR_CONSTRAINT_P(OP,C,STR) \
+  CONST_DOUBLE_OK_FOR_LETTER_P (OP, C)
+#endif
+
+#define REG_CLASS_FROM_CONSTRAINT(C,STR) REG_CLASS_FROM_LETTER (C)
+
+#if defined (EXTRA_CONSTRAINT) && ! defined (EXTRA_CONSTRAINT_STR)
+#define EXTRA_CONSTRAINT_STR(OP, C,STR) EXTRA_CONSTRAINT (OP, C)
+#endif
+
+/* Determine whether the the entire c99 runtime
+   is present in the runtime library.  */
+#ifndef TARGET_C99_FUNCTIONS
+#define TARGET_C99_FUNCTIONS 0
+#endif
+
+/* Indicate that CLZ and CTZ are undefined at zero.  */
+#ifndef CLZ_DEFINED_VALUE_AT_ZERO 
+#define CLZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE)  0
+#endif
+#ifndef CTZ_DEFINED_VALUE_AT_ZERO 
+#define CTZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE)  0
 #endif
 
 #endif  /* ! GCC_DEFAULTS_H */

@@ -1,5 +1,5 @@
 /* Subroutines for insn-output.c for Tensilica's Xtensa architecture.
-   Copyright (C) 2001 Free Software Foundation, Inc.
+   Copyright 2001,2002 Free Software Foundation, Inc.
    Contributed by Bob Wilson (bwilson@tensilica.com) at Tensilica.
 
 This file is part of GCC.
@@ -21,9 +21,10 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "regs.h"
-#include "machmode.h"
 #include "hard-reg-set.h"
 #include "basic-block.h"
 #include "real.h"
@@ -90,6 +91,7 @@ const char *xtensa_st_opcodes[(int) MAX_MACHINE_MODE];
 struct machine_function GTY(())
 {
   int accesses_prev_frame;
+  bool incoming_a7_copied;
 };
 
 /* Vector, indexed by hard register number, which contains 1 for a
@@ -107,10 +109,10 @@ const char xtensa_leaf_regs[FIRST_PSEUDO_REGISTER] =
 /* Map hard register number to register class */
 const enum reg_class xtensa_regno_to_class[FIRST_PSEUDO_REGISTER] =
 {
-  GR_REGS,	SP_REG,		GR_REGS,	GR_REGS,
-  GR_REGS,	GR_REGS,	GR_REGS,	GR_REGS,
-  GR_REGS,	GR_REGS,	GR_REGS,	GR_REGS,
-  GR_REGS,	GR_REGS,	GR_REGS,	GR_REGS,
+  RL_REGS,	SP_REG,		RL_REGS,	RL_REGS,
+  RL_REGS,	RL_REGS,	RL_REGS,	GR_REGS,
+  RL_REGS,	RL_REGS,	RL_REGS,	RL_REGS,
+  RL_REGS,	RL_REGS,	RL_REGS,	RL_REGS,
   AR_REGS,	AR_REGS,	BR_REGS,
   FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
   FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
@@ -197,9 +199,12 @@ static rtx fixup_subreg_mem PARAMS ((rtx x));
 static enum machine_mode xtensa_find_mode_for_size PARAMS ((unsigned));
 static struct machine_function * xtensa_init_machine_status PARAMS ((void));
 static void printx PARAMS ((FILE *, signed int));
-static void xtensa_select_rtx_section PARAMS ((enum machine_mode, rtx,
-					       unsigned HOST_WIDE_INT));
+static unsigned int xtensa_multibss_section_type_flags
+  PARAMS ((tree, const char *, int));
+static void xtensa_select_rtx_section
+  PARAMS ((enum machine_mode, rtx, unsigned HOST_WIDE_INT));
 static void xtensa_encode_section_info PARAMS ((tree, int));
+static bool xtensa_rtx_costs PARAMS ((rtx, int, int, int *));
 
 static rtx frame_size_const;
 static int current_function_arg_words;
@@ -235,6 +240,11 @@ static const int reg_nonleaf_alloc_order[FIRST_PSEUDO_REGISTER] =
 #define TARGET_ASM_SELECT_RTX_SECTION  xtensa_select_rtx_section
 #undef TARGET_ENCODE_SECTION_INFO
 #define TARGET_ENCODE_SECTION_INFO  xtensa_encode_section_info
+
+#undef TARGET_RTX_COSTS
+#define TARGET_RTX_COSTS xtensa_rtx_costs
+#undef TARGET_ADDRESS_COST
+#define TARGET_ADDRESS_COST hook_int_rtx_0
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -1273,45 +1283,8 @@ xtensa_emit_move_sequence (operands, mode)
       if (!xtensa_valid_move (mode, operands))
 	operands[1] = force_reg (mode, operands[1]);
 
-      /* Check if this move is copying an incoming argument in a7.  If
-	 so, emit the move, followed by the special "set_frame_ptr"
-	 unspec_volatile insn, at the very beginning of the function.
-	 This is necessary because the register allocator will ignore
-	 conflicts with a7 and may assign some other pseudo to a7.  If
-	 that pseudo was assigned prior to this move, it would clobber
-	 the incoming argument in a7.  By copying the argument out of
-	 a7 as the very first thing, and then immediately following
-	 that with an unspec_volatile to keep the scheduler away, we
-	 should avoid any problems.  */
-
-      if (a7_overlap_mentioned_p (operands[1]))
-	{
-	  rtx mov;
-	  switch (mode)
-	    {
-	    case SImode:
-	      mov = gen_movsi_internal (operands[0], operands[1]);
-	      break;
-	    case HImode:
-	      mov = gen_movhi_internal (operands[0], operands[1]);
-	      break;
-	    case QImode:
-	      mov = gen_movqi_internal (operands[0], operands[1]);
-	      break;
-	    default:
-	      abort ();
-	    }
-
-	  /* Insert the instructions before any other argument copies.
-	     (The set_frame_ptr insn comes _after_ the move, so push it
-	     out first.)  */
-	  push_topmost_sequence ();
-	  emit_insn_after (gen_set_frame_ptr (), get_insns ());
-	  emit_insn_after (mov, get_insns ());
-	  pop_topmost_sequence ();
-
-	  return 1;
-	}
+      if (xtensa_copy_incoming_a7 (operands, mode))
+	return 1;
     }
 
   /* During reload we don't want to emit (subreg:X (mem:Y)) since that
@@ -1340,6 +1313,74 @@ fixup_subreg_mem (x)
       x = alter_subreg (&temp);
     }
   return x;
+}
+
+
+/* Check if this move is copying an incoming argument in a7.  If so,
+   emit the move, followed by the special "set_frame_ptr"
+   unspec_volatile insn, at the very beginning of the function.  This
+   is necessary because the register allocator will ignore conflicts
+   with a7 and may assign some other pseudo to a7.  If that pseudo was
+   assigned prior to this move, it would clobber the incoming argument
+   in a7.  By copying the argument out of a7 as the very first thing,
+   and then immediately following that with an unspec_volatile to keep
+   the scheduler away, we should avoid any problems.  */
+
+bool
+xtensa_copy_incoming_a7 (operands, mode)
+     rtx *operands;
+     enum machine_mode mode;
+{
+  if (a7_overlap_mentioned_p (operands[1])
+      && !cfun->machine->incoming_a7_copied)
+    {
+      rtx mov;
+      switch (mode)
+	{
+	case DFmode:
+	  mov = gen_movdf_internal (operands[0], operands[1]);
+	  break;
+	case SFmode:
+	  mov = gen_movsf_internal (operands[0], operands[1]);
+	  break;
+	case DImode:
+	  mov = gen_movdi_internal (operands[0], operands[1]);
+	  break;
+	case SImode:
+	  mov = gen_movsi_internal (operands[0], operands[1]);
+	  break;
+	case HImode:
+	  mov = gen_movhi_internal (operands[0], operands[1]);
+	  break;
+	case QImode:
+	  mov = gen_movqi_internal (operands[0], operands[1]);
+	  break;
+	default:
+	  abort ();
+	}
+
+      /* Insert the instructions before any other argument copies.
+	 (The set_frame_ptr insn comes _after_ the move, so push it
+	 out first.)  */
+      push_topmost_sequence ();
+      emit_insn_after (gen_set_frame_ptr (), get_insns ());
+      emit_insn_after (mov, get_insns ());
+      pop_topmost_sequence ();
+
+      /* Ideally the incoming argument in a7 would only be copied
+	 once, since propagating a7 into the body of a function
+	 will almost certainly lead to errors.  However, there is
+	 at least one harmless case (in GCSE) where the original
+	 copy from a7 is changed to copy into a new pseudo.  Thus,
+	 we use a flag to only do this special treatment for the
+	 first copy of a7.  */
+
+      cfun->machine->incoming_a7_copied = true;
+
+      return 1;
+    }
+
+  return 0;
 }
 
 
@@ -1632,7 +1673,7 @@ xtensa_emit_call (callop, operands)
   rtx tgt = operands[callop];
 
   if (GET_CODE (tgt) == CONST_INT)
-    sprintf (result, "call8\t0x%x", INTVAL (tgt));
+    sprintf (result, "call8\t0x%lx", INTVAL (tgt));
   else if (register_operand (tgt, VOIDmode))
     sprintf (result, "callx8\t%%%d", callop);
   else
@@ -1961,11 +2002,11 @@ print_operand (file, op, letter)
 	  }
 
 	case 'L':
-	  fprintf (file, "%d", (32 - INTVAL (op)) & 0x1f);
+	  fprintf (file, "%ld", (32 - INTVAL (op)) & 0x1f);
 	  break;
 
 	case 'R':
-	  fprintf (file, "%d", INTVAL (op) & 0x1f);
+	  fprintf (file, "%ld", INTVAL (op) & 0x1f);
 	  break;
 
 	case 'x':
@@ -1974,7 +2015,7 @@ print_operand (file, op, letter)
 
 	case 'd':
 	default:
-	  fprintf (file, "%d", INTVAL (op));
+	  fprintf (file, "%ld", INTVAL (op));
 	  break;
 
 	}
@@ -2235,7 +2276,7 @@ xtensa_reorg (first)
 void
 xtensa_function_prologue (file, size)
      FILE *file;
-     int size ATTRIBUTE_UNUSED;
+     HOST_WIDE_INT size ATTRIBUTE_UNUSED;
 {
   unsigned long tsize = compute_frame_size (get_frame_size ());
 
@@ -2268,7 +2309,7 @@ xtensa_function_prologue (file, size)
 void
 xtensa_function_epilogue (file, size)
      FILE *file;
-     int size ATTRIBUTE_UNUSED;
+     HOST_WIDE_INT size ATTRIBUTE_UNUSED;
 {
   rtx insn = get_last_insn ();
   /* If the last insn was a BARRIER, we don't have to write anything. */
@@ -2278,6 +2319,33 @@ xtensa_function_epilogue (file, size)
     fprintf (file, TARGET_DENSITY ? "\tretw.n\n" : "\tretw\n");
 
   xtensa_current_frame_size = 0;
+}
+
+
+rtx
+xtensa_return_addr (count, frame)
+     int count;
+     rtx frame;
+{
+  rtx result, retaddr;
+
+  if (count == -1)
+    retaddr = gen_rtx_REG (Pmode, 0);
+  else
+    {
+      rtx addr = plus_constant (frame, -4 * UNITS_PER_WORD);
+      addr = memory_address (Pmode, addr);
+      retaddr = gen_reg_rtx (Pmode);
+      emit_move_insn (retaddr, gen_rtx_MEM (Pmode, addr));
+    }
+
+  /* The 2 most-significant bits of the return address on Xtensa hold
+     the register window size.  To get the real return address, these
+     bits must be replaced with the high bits from the current PC.  */
+
+  result = gen_reg_rtx (Pmode);
+  emit_insn (gen_fix_return_addr (result, retaddr));
+  return result;
 }
 
 
@@ -2295,7 +2363,7 @@ xtensa_function_epilogue (file, size)
    argument word N for N >= 6. */
 
 tree
-xtensa_build_va_list (void)
+xtensa_build_va_list ()
 {
   tree f_stk, f_reg, f_ndx, record, type_decl;
 
@@ -2366,8 +2434,7 @@ xtensa_builtin_saveregs ()
    current function to fill in an initial va_list. */
 
 void
-xtensa_va_start (stdarg_p, valist, nextarg)
-     int stdarg_p ATTRIBUTE_UNUSED;
+xtensa_va_start (valist, nextarg)
      tree valist;
      rtx nextarg ATTRIBUTE_UNUSED;
 {
@@ -2586,16 +2653,22 @@ xtensa_va_arg (valist, type)
 
 
 enum reg_class
-xtensa_preferred_reload_class (x, class)
+xtensa_preferred_reload_class (x, class, isoutput)
      rtx x;
      enum reg_class class;
+     int isoutput;
 {
-  if (CONSTANT_P (x) && GET_CODE (x) == CONST_DOUBLE)
+  if (!isoutput && CONSTANT_P (x) && GET_CODE (x) == CONST_DOUBLE)
     return NO_REGS;
 
-  /* Don't use sp for reloads! */
-  if (class == AR_REGS)
-    return GR_REGS;
+  /* Don't use the stack pointer or hard frame pointer for reloads!
+     The hard frame pointer would normally be OK except that it may
+     briefly hold an incoming argument in the prologue, and reload
+     won't know that it is live because the hard frame pointer is
+     treated specially.  */
+
+  if (class == AR_REGS || class == GR_REGS)
+    return RL_REGS;
 
   return class;
 }
@@ -2617,13 +2690,13 @@ xtensa_secondary_reload_class (class, mode, x, isoutput)
   if (!isoutput)
     {
       if (class == FP_REGS && constantpool_mem_p (x))
-	return GR_REGS;
+	return RL_REGS;
     }
 
   if (ACC_REG_P (regno))
-    return (class == GR_REGS ? NO_REGS : GR_REGS);
+    return ((class == GR_REGS || class == RL_REGS) ? NO_REGS : RL_REGS);
   if (class == ACC_REG)
-    return (GP_REG_P (regno) ? NO_REGS : GR_REGS);
+    return (GP_REG_P (regno) ? NO_REGS : RL_REGS);
 
   return NO_REGS;
 }
@@ -2652,6 +2725,10 @@ order_regs_for_local_alloc ()
       for (i = 0; i < num_arg_regs; i++)
 	reg_alloc_order[nxt++] = GP_ARG_FIRST + i;
 
+      /* list the coprocessor registers in order */
+      for (i = 0; i < BR_REG_NUM; i++)
+	reg_alloc_order[nxt++] = BR_REG_FIRST + i;
+
       /* list the FP registers in order for now */
       for (i = 0; i < 16; i++)
 	reg_alloc_order[nxt++] = FP_REG_FIRST + i;
@@ -2661,10 +2738,6 @@ order_regs_for_local_alloc ()
       reg_alloc_order[nxt++] = 1;	/* a1 = stack pointer */
       reg_alloc_order[nxt++] = 16;	/* pseudo frame pointer */
       reg_alloc_order[nxt++] = 17;	/* pseudo arg pointer */
-
-      /* list the coprocessor registers in order */
-      for (i = 0; i < BR_REG_NUM; i++)
-	reg_alloc_order[nxt++] = BR_REG_FIRST + i;
 
       reg_alloc_order[nxt++] = ACC_REG_FIRST;	/* MAC16 accumulator */
     }
@@ -2720,6 +2793,34 @@ a7_overlap_mentioned_p (x)
   return 0;
 }
 
+
+/* Some Xtensa targets support multiple bss sections.  If the section
+   name ends with ".bss", add SECTION_BSS to the flags.  */
+
+static unsigned int
+xtensa_multibss_section_type_flags (decl, name, reloc)
+     tree decl;
+     const char *name;
+     int reloc;
+{
+  unsigned int flags = default_section_type_flags (decl, name, reloc);
+  const char *suffix;
+
+  suffix = strrchr (name, '.');
+  if (suffix && strcmp (suffix, ".bss") == 0)
+    {
+      if (!decl || (TREE_CODE (decl) == VAR_DECL
+		    && DECL_INITIAL (decl) == NULL_TREE))
+	flags |= SECTION_BSS;  /* @nobits */
+      else
+	warning ("only uninitialized variables can be placed in a "
+		 ".bss section");
+    }
+
+  return flags;
+}
+
+
 /* The literal pool stays with the function.  */
 
 static void
@@ -2741,6 +2842,218 @@ xtensa_encode_section_info (decl, first)
 {
   if (TREE_CODE (decl) == FUNCTION_DECL && ! TREE_PUBLIC (decl))
     SYMBOL_REF_FLAG (XEXP (DECL_RTL (decl), 0)) = 1;
+}
+
+/* Compute a (partial) cost for rtx X.  Return true if the complete
+   cost has been computed, and false if subexpressions should be
+   scanned.  In either case, *TOTAL contains the cost result.  */
+
+static bool
+xtensa_rtx_costs (x, code, outer_code, total)
+     rtx x;
+     int code, outer_code;
+     int *total;
+{
+  switch (code)
+    {
+    case CONST_INT:
+      switch (outer_code)
+	{
+	case SET:
+	  if (xtensa_simm12b (INTVAL (x)))
+	    {
+	      *total = 4;
+	      return true;
+	    }
+	  break;
+	case PLUS:
+	  if (xtensa_simm8 (INTVAL (x))
+	      || xtensa_simm8x256 (INTVAL (x)))
+	    {
+	      *total = 0;
+	      return true;
+	    }
+	  break;
+	case AND:
+	  if (xtensa_mask_immediate (INTVAL (x)))
+	    {
+	      *total = 0;
+	      return true;
+	    }
+	  break;
+	case COMPARE:
+	  if ((INTVAL (x) == 0) || xtensa_b4const (INTVAL (x)))
+	    {
+	      *total = 0;
+	      return true;
+	    }
+	  break;
+	case ASHIFT:
+	case ASHIFTRT:
+	case LSHIFTRT:
+	case ROTATE:
+	case ROTATERT:
+	  /* no way to tell if X is the 2nd operand so be conservative */
+	default: break;
+	}
+      if (xtensa_simm12b (INTVAL (x)))
+	*total = 5;
+      else
+	*total = 6;
+      return true;
+
+    case CONST:
+    case LABEL_REF:
+    case SYMBOL_REF:
+      *total = 5;
+      return true;
+
+    case CONST_DOUBLE:
+      *total = 7;
+      return true;
+
+    case MEM:
+      {
+	int num_words =
+	  (GET_MODE_SIZE (GET_MODE (x)) > UNITS_PER_WORD) ?  2 : 1;
+
+	if (memory_address_p (GET_MODE (x), XEXP ((x), 0)))
+	  *total = COSTS_N_INSNS (num_words);
+	else
+	  *total = COSTS_N_INSNS (2*num_words);
+	return true;
+      }
+
+    case FFS:
+      *total = COSTS_N_INSNS (TARGET_NSA ? 5 : 50);
+      return true;
+
+    case NOT:
+      *total = COSTS_N_INSNS ((GET_MODE (x) == DImode) ? 3 : 2);
+      return true;
+
+    case AND:
+    case IOR:
+    case XOR:
+      if (GET_MODE (x) == DImode)
+	*total = COSTS_N_INSNS (2);
+      else
+	*total = COSTS_N_INSNS (1);
+      return true;
+
+    case ASHIFT:
+    case ASHIFTRT:
+    case LSHIFTRT:
+      if (GET_MODE (x) == DImode)
+	*total = COSTS_N_INSNS (50);
+      else
+	*total = COSTS_N_INSNS (1);
+      return true;
+
+    case ABS:
+      {
+	enum machine_mode xmode = GET_MODE (x);
+	if (xmode == SFmode)
+	  *total = COSTS_N_INSNS (TARGET_HARD_FLOAT ? 1 : 50);
+	else if (xmode == DFmode)
+	  *total = COSTS_N_INSNS (50);
+	else
+	  *total = COSTS_N_INSNS (4);
+	return true;
+      }
+
+    case PLUS:
+    case MINUS:
+      {
+	enum machine_mode xmode = GET_MODE (x);
+	if (xmode == SFmode)
+	  *total = COSTS_N_INSNS (TARGET_HARD_FLOAT ? 1 : 50);
+	else if (xmode == DFmode || xmode == DImode)
+	  *total = COSTS_N_INSNS (50);
+	else
+	  *total = COSTS_N_INSNS (1);
+	return true;
+      }
+
+    case NEG:
+      *total = COSTS_N_INSNS ((GET_MODE (x) == DImode) ? 4 : 2);
+      return true;
+
+    case MULT:
+      {
+	enum machine_mode xmode = GET_MODE (x);
+	if (xmode == SFmode)
+	  *total = COSTS_N_INSNS (TARGET_HARD_FLOAT ? 4 : 50);
+	else if (xmode == DFmode || xmode == DImode)
+	  *total = COSTS_N_INSNS (50);
+	else if (TARGET_MUL32)
+	  *total = COSTS_N_INSNS (4);
+	else if (TARGET_MAC16)
+	  *total = COSTS_N_INSNS (16);
+	else if (TARGET_MUL16)
+	  *total = COSTS_N_INSNS (12);
+	else
+	  *total = COSTS_N_INSNS (50);
+	return true;
+      }
+
+    case DIV:
+    case MOD:
+      {
+	enum machine_mode xmode = GET_MODE (x);
+	if (xmode == SFmode)
+	  {
+	    *total = COSTS_N_INSNS (TARGET_HARD_FLOAT_DIV ? 8 : 50);
+	    return true;
+	  }
+	else if (xmode == DFmode)
+	  {
+	    *total = COSTS_N_INSNS (50);
+	    return true;
+	  }
+      }
+      /* fall through */
+
+    case UDIV:
+    case UMOD:
+      {
+	enum machine_mode xmode = GET_MODE (x);
+	if (xmode == DImode)
+	  *total = COSTS_N_INSNS (50);
+	else if (TARGET_DIV32)
+	  *total = COSTS_N_INSNS (32);
+	else
+	  *total = COSTS_N_INSNS (50);
+	return true;
+      }
+
+    case SQRT:
+      if (GET_MODE (x) == SFmode)
+	*total = COSTS_N_INSNS (TARGET_HARD_FLOAT_SQRT ? 8 : 50);
+      else
+	*total = COSTS_N_INSNS (50);
+      return true;
+
+    case SMIN:
+    case UMIN:
+    case SMAX:
+    case UMAX:
+      *total = COSTS_N_INSNS (TARGET_MINMAX ? 1 : 50);
+      return true;
+
+    case SIGN_EXTRACT:
+    case SIGN_EXTEND:
+      *total = COSTS_N_INSNS (TARGET_SEXT ? 1 : 2);
+      return true;
+
+    case ZERO_EXTRACT:
+    case ZERO_EXTEND:
+      *total = COSTS_N_INSNS (1);
+      return true;
+
+    default:
+      return false;
+    }
 }
 
 #include "gt-xtensa.h"

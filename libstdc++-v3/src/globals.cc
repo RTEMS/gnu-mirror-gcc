@@ -1,4 +1,4 @@
-// Copyright (C) 2001, 2002 Free Software Foundation, Inc.
+// Copyright (C) 2001, 2002, 2003 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -44,17 +44,39 @@
 // Because <iostream> declares the standard streams to be [io]stream
 // types instead of say [io]fstream types, it is also necessary to
 // allocate the actual file buffers in this file.
-namespace std 
+namespace __gnu_cxx
 {
-  // Standard "C" locale.
-  typedef char fake_locale[sizeof(locale)]
-  __attribute__ ((aligned(__alignof__(locale))));
-  fake_locale c_locale;
+  using namespace std;
+
+  typedef char fake_facet_name[sizeof(char*)]
+  __attribute__ ((aligned(__alignof__(char*))));
+  fake_facet_name facet_name[6 + _GLIBCPP_NUM_CATEGORIES];
 
   typedef char fake_locale_Impl[sizeof(locale::_Impl)]
   __attribute__ ((aligned(__alignof__(locale::_Impl))));
   fake_locale_Impl c_locale_impl;
-  
+
+
+  // NB: The asm directives renames these non-exported, namespace
+  // __gnu_cxx symbols into the mistakenly exported, namespace std
+  // symbols in GLIBCPP_3.2.
+  // The rename syntax is 
+  //   asm (".symver currentname,oldname@@GLIBCPP_3.2")
+  // At the same time, these new __gnu_cxx symbols are not exported.
+  // In the future, GLIBCXX_ABI > 5 should remove all uses of
+  // _GLIBCPP_ASM_SYMVER in this file.
+  typedef char fake_locale[sizeof(locale)]
+  __attribute__ ((aligned(__alignof__(locale))));
+  fake_locale c_locale;
+
+  // GLIBCXX_ABI > 5 will not need this symbol at all.
+  // It's here just as a placeholder, as the size of this exported
+  // object changed. The new symbol is not exported.
+  const int o = sizeof(locale::_Impl) - sizeof(char*[_GLIBCPP_NUM_CATEGORIES]);
+  typedef char fake_locale_Impl_compat[o]
+  __attribute__ ((aligned(__alignof__(o))));
+  fake_locale_Impl_compat  c_locale_impl_compat;
+
   typedef char fake_facet_vec[sizeof(locale::facet*)]
   __attribute__ ((aligned(__alignof__(locale::facet*))));
   fake_facet_vec facet_vec[_GLIBCPP_NUM_FACETS];
@@ -167,39 +189,19 @@ namespace std
   fake_messages_w messages_w;
 #endif
 
-  // Standard stream objects.
-  typedef char fake_istream[sizeof(istream)]
-  __attribute__ ((aligned(__alignof__(istream))));
-  typedef char fake_ostream[sizeof(ostream)] 
-  __attribute__ ((aligned(__alignof__(ostream))));
-  fake_istream cin;
-  fake_ostream cout;
-  fake_ostream cerr;
-  fake_ostream clog;
-
-  typedef char fake_filebuf[sizeof(__gnu_cxx::stdio_filebuf<char>)]
-  __attribute__ ((aligned(__alignof__(__gnu_cxx::stdio_filebuf<char>))));
+  typedef char fake_filebuf[sizeof(stdio_filebuf<char>)]
+  __attribute__ ((aligned(__alignof__(stdio_filebuf<char>))));
   fake_filebuf buf_cout;
   fake_filebuf buf_cin;
   fake_filebuf buf_cerr;
 
 #ifdef _GLIBCPP_USE_WCHAR_T
-  typedef char fake_wistream[sizeof(wistream)] 
-  __attribute__ ((aligned(__alignof__(wistream))));
-  typedef char fake_wostream[sizeof(wostream)] 
-  __attribute__ ((aligned(__alignof__(wostream))));
-  fake_wistream wcin;
-  fake_wostream wcout;
-  fake_wostream wcerr;
-  fake_wostream wclog;
-
-  typedef char fake_wfilebuf[sizeof(__gnu_cxx::stdio_filebuf<wchar_t>)]
-  __attribute__ ((aligned(__alignof__(__gnu_cxx::stdio_filebuf<wchar_t>))));
+  typedef char fake_wfilebuf[sizeof(stdio_filebuf<wchar_t>)]
+  __attribute__ ((aligned(__alignof__(stdio_filebuf<wchar_t>))));
   fake_wfilebuf buf_wcout;
   fake_wfilebuf buf_wcin;
   fake_wfilebuf buf_wcerr;
 #endif
-
 
   // Globals for once-only runtime initialization of mutex objects.  This
   // allows static initialization of these objects on systems that need a
@@ -223,4 +225,28 @@ namespace std
   _GLIBCPP_mutex_address_init ()
   { __GTHREAD_MUTEX_INIT_FUNCTION (_GLIBCPP_mutex_address); }
 #endif
-}
+} // namespace __gnu_cxx
+
+namespace std
+{
+  // Standard stream objects.
+  typedef char fake_istream[sizeof(istream)]
+  __attribute__ ((aligned(__alignof__(istream))));
+  typedef char fake_ostream[sizeof(ostream)] 
+  __attribute__ ((aligned(__alignof__(ostream))));
+  fake_istream cin;
+  fake_ostream cout;
+  fake_ostream cerr;
+  fake_ostream clog;
+
+#ifdef _GLIBCPP_USE_WCHAR_T
+  typedef char fake_wistream[sizeof(wistream)] 
+  __attribute__ ((aligned(__alignof__(wistream))));
+  typedef char fake_wostream[sizeof(wostream)] 
+  __attribute__ ((aligned(__alignof__(wostream))));
+  fake_wistream wcin;
+  fake_wostream wcout;
+  fake_wostream wcerr;
+  fake_wostream wclog;
+#endif
+} // namespace std

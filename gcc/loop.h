@@ -28,7 +28,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #define LOOP_UNROLL 1
 #define LOOP_BCT 2
 #define LOOP_PREFETCH 4
-#define LOOP_FIRST_PASS 8
+#define LOOP_AUTO_UNROLL 8
 
 /* Get the loop info pointer of a loop.  */
 #define LOOP_INFO(LOOP) ((struct loop_info *) (LOOP)->aux)
@@ -145,7 +145,7 @@ struct induction
 				   same biv register.  */
   struct induction *same;	/* If this giv has been combined with another
 				   giv, this points to the base giv.  The base
-				   giv will have COMBINED_WITH non-zero.  */
+				   giv will have COMBINED_WITH nonzero.  */
   HOST_WIDE_INT const_adjust;	/* Used by loop unrolling, when an address giv
 				   is split, and a constant is eliminated from
 				   the address, the -constant is stored here
@@ -248,7 +248,7 @@ struct loop_reg
      During code motion, a negative value indicates a reg that has
      been made a candidate; in particular -2 means that it is an
      candidate that we know is equal to a constant and -1 means that
-     it is an candidate not known equal to a constant.  After code
+     it is a candidate not known equal to a constant.  After code
      motion, regs moved have 0 (which is accurate now) while the
      failed candidates have the original number of times set.
 
@@ -316,6 +316,9 @@ struct loop_info
   int has_multiple_exit_targets;
   /* Nonzero if there is an indirect jump in the current function.  */
   int has_indirect_jump;
+  /* Whether loop unrolling has emitted copies of the loop body so
+     that the main loop needs no exit tests.  */
+  int preconditioned;
   /* Register or constant initial loop value.  */
   rtx initial_value;
   /* Register or constant value used for comparison test.  */
@@ -374,7 +377,7 @@ struct loop_info
   struct loop_regs regs;
   /* The induction variable information in loop.  */
   struct loop_ivs ivs;
-  /* Non-zero if call is in pre_header extended basic block.  */
+  /* Nonzero if call is in pre_header extended basic block.  */
   int pre_header_has_call;
 };
 

@@ -35,12 +35,12 @@
 
 #include "auto-host.h" /* For HAVE_LD_EH_FRAME_HDR.  */
 #include "tconfig.h"
+#include "tsystem.h"
 #ifndef inhibit_libc
-#include <stddef.h>
-#include <stdlib.h>
 #include <link.h>
 #endif
-#include "tsystem.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "dwarf2.h"
 #include "unwind.h"
 #define NO_BASE_OF_ENCODED_VALUE
@@ -79,8 +79,8 @@ struct unw_eh_frame_hdr
   unsigned char table_enc;
 };
 
-/* Like base_of_encoded_value, but take the base from a struct object
-   instead of an _Unwind_Context.  */
+/* Like base_of_encoded_value, but take the base from a struct
+   unw_eh_callback_data instead of an _Unwind_Context.  */
 
 static _Unwind_Ptr
 base_from_cb_data (unsigned char encoding, struct unw_eh_callback_data *data)
@@ -155,7 +155,7 @@ _Unwind_IteratePhdrCallback (struct dl_phdr_info *info, size_t size, void *ptr)
   data->dbase = NULL;
   if (p_dynamic)
     {
-      /* For dynamicly linked executables and shared libraries,
+      /* For dynamically linked executables and shared libraries,
 	 DT_PLTGOT is the gp value for that object.  */
       ElfW(Dyn) *dyn = (ElfW(Dyn) *) (p_dynamic->p_vaddr + load_base);
       for (; dyn->d_tag != DT_NULL ; dyn++)

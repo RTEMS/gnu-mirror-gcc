@@ -26,6 +26,7 @@ extern void   asm_file_start                    PARAMS ((FILE *file));
 extern void   asm_file_end                      PARAMS ((FILE *file));
 extern void   avr_init_once                     PARAMS ((void));
 extern void   avr_override_options              PARAMS ((void));
+extern void   avr_optimization_options		PARAMS ((int level, int size));
 extern char * avr_change_section                PARAMS ((char *sect_name));
 extern int    avr_ret_register                  PARAMS ((void));
 extern enum reg_class class_likely_spilled_p    PARAMS ((int c));
@@ -35,6 +36,7 @@ extern int    frame_pointer_required_p          PARAMS ((void));
 extern void   asm_globalize_label         PARAMS ((FILE *file, const char *name));
 extern void   order_regs_for_local_alloc  PARAMS ((void));
 extern int    initial_elimination_offset  PARAMS ((int from, int to));
+extern int    avr_simple_epilogue         PARAMS ((void));
 extern void   progmem_section             PARAMS ((void));
 extern int    mask_one_bit_p              PARAMS ((HOST_WIDE_INT mask));
 extern void   gas_output_limited_string PARAMS ((FILE *file, const char *str));
@@ -102,7 +104,6 @@ extern const char *avr_out_sbxx_branch PARAMS ((rtx insn, rtx operands[]));
 
 extern enum reg_class preferred_reload_class PARAMS ((rtx x,
 						     enum reg_class class));
-extern int    avr_address_cost       PARAMS ((rtx x));
 extern int    extra_constraint       PARAMS ((rtx x, int c));
 extern rtx    legitimize_address     PARAMS ((rtx x, rtx oldx,
 					     enum machine_mode mode));
@@ -112,8 +113,6 @@ extern const char * output_reload_inhi PARAMS ((rtx insn, rtx *operands,
 						int *len));
 extern const char * output_reload_insisf PARAMS ((rtx insn, rtx *operands,
 						int *len));
-extern int    default_rtx_costs      PARAMS ((rtx X, RTX_CODE code,
-					     RTX_CODE outer_code));
 extern enum reg_class secondary_input_reload_class PARAMS ((enum reg_class,
 							   enum machine_mode,
 							   rtx));

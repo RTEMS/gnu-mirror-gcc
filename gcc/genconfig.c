@@ -21,8 +21,10 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 02111-1307, USA.  */
 
 
-#include "hconfig.h"
+#include "bconfig.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "errors.h"
 #include "gensupport.h"
@@ -55,10 +57,10 @@ static void gen_split PARAMS ((rtx));
 static void gen_peephole PARAMS ((rtx));
 static void gen_peephole2 PARAMS ((rtx));
 
-/* RECOG_P will be non-zero if this pattern was seen in a context where it will
+/* RECOG_P will be nonzero if this pattern was seen in a context where it will
    be used to recognize, rather than just generate an insn. 
 
-   NON_PC_SET_SRC will be non-zero if this pattern was seen in a SET_SRC
+   NON_PC_SET_SRC will be nonzero if this pattern was seen in a SET_SRC
    of a SET whose destination is not (pc).  */
 
 static void
@@ -340,7 +342,14 @@ main (argc, argv)
   printf ("#endif\n");
 
   if (have_cc0_flag)
-    printf ("#define HAVE_cc0 1\n");
+    {
+      printf ("#define HAVE_cc0 1\n");
+      printf ("#define CC0_P(X) ((X) == cc0_rtx)\n");
+    }
+  else
+    {
+      printf ("#define CC0_P(X) 0\n");
+    }
 
   if (have_cmove_flag)
     printf ("#define HAVE_conditional_move 1\n");

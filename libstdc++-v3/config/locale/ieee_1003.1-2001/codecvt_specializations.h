@@ -1,6 +1,6 @@
 // Locale support (codecvt) -*- C++ -*-
 
-// Copyright (C) 2000, 2001, 2002 Free Software Foundation, Inc.
+// Copyright (C) 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -230,7 +230,7 @@
       do_always_noconv() const throw();
 
       virtual int 
-      do_length(const state_type&, const extern_type* __from, 
+      do_length(state_type&, const extern_type* __from, 
 		const extern_type* __end, size_t __max) const;
 
       virtual int 
@@ -260,7 +260,7 @@
 	   extern_type* __to, extern_type* __to_end,
 	   extern_type*& __to_next) const
     {
-      result __ret = error;
+      result __ret = codecvt_base::error;
       if (__state._M_good())
 	{
 	  typedef state_type::__desc_type	__desc_type;
@@ -304,7 +304,7 @@
 	    {
 	      __from_next = reinterpret_cast<const intern_type*>(__cfrom);
 	      __to_next = reinterpret_cast<extern_type*>(__cto);
-	      __ret = ok;
+	      __ret = codecvt_base::ok;
 	    }
 	  else 
 	    {
@@ -312,10 +312,10 @@
 		{
 		  __from_next = reinterpret_cast<const intern_type*>(__cfrom);
 		  __to_next = reinterpret_cast<extern_type*>(__cto);
-		  __ret = partial;
+		  __ret = codecvt_base::partial;
 		}
 	      else
-		__ret = error;
+		__ret = codecvt_base::error;
 	    }
 	}
       return __ret; 
@@ -327,7 +327,7 @@
     do_unshift(state_type& __state, extern_type* __to, 
 	       extern_type* __to_end, extern_type*& __to_next) const
     {
-      result __ret = error;
+      result __ret = codecvt_base::error;
       if (__state._M_good())
 	{
 	  typedef state_type::__desc_type	__desc_type;
@@ -345,14 +345,14 @@
 	    {
 	      __to_next = reinterpret_cast<extern_type*>(__cto);
 	      if (__tlen == __tmultiple * (__to_end - __to))
-		__ret = noconv;
+		__ret = codecvt_base::noconv;
 	      else if (__tlen == 0)
-		__ret = ok;
+		__ret = codecvt_base::ok;
 	      else
-		__ret = partial;
+		__ret = codecvt_base::partial;
 	    }
 	  else 
-	    __ret = error;
+	    __ret = codecvt_base::error;
 	}
       return __ret; 
     }
@@ -365,7 +365,7 @@
 	  intern_type* __to, intern_type* __to_end, 
 	  intern_type*& __to_next) const
     { 
-      result __ret = error;
+      result __ret = codecvt_base::error;
       if (__state._M_good())
 	{
 	  typedef state_type::__desc_type	__desc_type;
@@ -410,7 +410,7 @@
 	    {
 	      __from_next = reinterpret_cast<const extern_type*>(__cfrom);
 	      __to_next = reinterpret_cast<intern_type*>(__cto);
-	      __ret = ok;
+	      __ret = codecvt_base::ok;
 	    }
 	  else 
 	    {
@@ -418,10 +418,10 @@
 		{
 		  __from_next = reinterpret_cast<const extern_type*>(__cfrom);
 		  __to_next = reinterpret_cast<intern_type*>(__cto);
-		  __ret = partial;
+		  __ret = codecvt_base::partial;
 		}
 	      else
-		__ret = error;
+		__ret = codecvt_base::error;
 	    }
 	}
       return __ret; 
@@ -447,9 +447,9 @@
   template<typename _InternT, typename _ExternT>
     int 
     codecvt<_InternT, _ExternT, __enc_traits>::
-    do_length(const state_type&, const extern_type* __from, 
+    do_length(state_type&, const extern_type* __from, 
 	      const extern_type* __end, size_t __max) const
-    { return min(__max, static_cast<size_t>(__end - __from)); }
+    { return std::min(__max, static_cast<size_t>(__end - __from)); }
 
 #ifdef _GLIBCPP_RESOLVE_LIB_DEFECTS
 // 74.  Garbled text for codecvt::do_max_length

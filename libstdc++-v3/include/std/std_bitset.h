@@ -1,6 +1,6 @@
 // <bitset> -*- C++ -*-
 
-// Copyright (C) 2001, 2002 Free Software Foundation, Inc.
+// Copyright (C) 2001, 2002, 2003 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -52,6 +52,7 @@
 
 #include <cstddef>     // for size_t
 #include <cstring>     // for memset
+#include <limits>      // for numeric_limits
 #include <string>
 #include <bits/functexcept.h>   // for invalid_argument, out_of_range,
                                 // overflow_error
@@ -59,15 +60,12 @@
 #include <istream>     // for istream (operator>>)
 
 
-#define _GLIBCPP_BITSET_BITS_PER_WORD (CHAR_BIT*sizeof(unsigned long))
+#define _GLIBCPP_BITSET_BITS_PER_WORD  numeric_limits<unsigned long>::digits
 #define _GLIBCPP_BITSET_WORDS(__n) \
  ((__n) < 1 ? 0 : ((__n) + _GLIBCPP_BITSET_BITS_PER_WORD - 1)/_GLIBCPP_BITSET_BITS_PER_WORD)
 
 namespace std
 {
-  extern unsigned char 	_S_bit_count[256];
-  extern unsigned char 	_S_first_one[256];
-
   /**
    *  @if maint
    *  Base class, general case.  It is a class inveriant that _Nw will be
@@ -97,7 +95,7 @@ namespace std
 
       static size_t
       _S_whichbyte(size_t __pos )
-      { return (__pos % _GLIBCPP_BITSET_BITS_PER_WORD) / CHAR_BIT; }
+      { return (__pos % _GLIBCPP_BITSET_BITS_PER_WORD) / __CHAR_BIT__; }
 
       static size_t
       _S_whichbit(size_t __pos )
@@ -191,14 +189,8 @@ namespace std
       _M_do_count() const
       {
 	size_t __result = 0;
-	const unsigned char* __byte_ptr = (const unsigned char*)_M_w;
-	const unsigned char* __end_ptr = (const unsigned char*)(_M_w + _Nw);
-
-	while ( __byte_ptr < __end_ptr )
-	  {
-	    __result += _S_bit_count[*__byte_ptr];
-	    __byte_ptr++;
-	  }
+	for (size_t __i = 0; __i < _Nw; __i++)
+	  __result += __builtin_popcountl(_M_w[__i]);
 	return __result;
       }
 
@@ -219,7 +211,7 @@ namespace std
     void
     _Base_bitset<_Nw>::_M_do_left_shift(size_t __shift)
     {
-      if (__shift != 0)
+      if (__builtin_expect(__shift != 0, 1))
 	{
 	  const size_t __wshift = __shift / _GLIBCPP_BITSET_BITS_PER_WORD;
 	  const size_t __offset = __shift % _GLIBCPP_BITSET_BITS_PER_WORD;
@@ -244,7 +236,7 @@ namespace std
     void
     _Base_bitset<_Nw>::_M_do_right_shift(size_t __shift)
     {
-      if (__shift != 0)
+      if (__builtin_expect(__shift != 0, 1))
 	{
 	  const size_t __wshift = __shift / _GLIBCPP_BITSET_BITS_PER_WORD;
 	  const size_t __offset = __shift % _GLIBCPP_BITSET_BITS_PER_WORD;
@@ -280,23 +272,12 @@ namespace std
     size_t
     _Base_bitset<_Nw>::_M_do_find_first(size_t __not_found) const
     {
-      for (size_t __i = 0; __i < _Nw; __i++ )
+      for (size_t __i = 0; __i < _Nw; __i++)
 	{
 	  _WordT __thisword = _M_w[__i];
-	  if ( __thisword != static_cast<_WordT>(0) )
-	    {
-	      // find byte within word
-	      for (size_t __j = 0; __j < sizeof(_WordT); __j++ )
-		{
-		  unsigned char __this_byte
-		    = static_cast<unsigned char>(__thisword & (~(unsigned char)0));
-		  if (__this_byte)
-		    return __i*_GLIBCPP_BITSET_BITS_PER_WORD + __j*CHAR_BIT +
-		      _S_first_one[__this_byte];
-
-		  __thisword >>= CHAR_BIT;
-		}
-	    }
+	  if (__thisword != static_cast<_WordT>(0))
+	    return __i * _GLIBCPP_BITSET_BITS_PER_WORD
+	      + __builtin_ctzl(__thisword);
 	}
       // not found, so return an indication of failure.
       return __not_found;
@@ -318,44 +299,20 @@ namespace std
       _WordT __thisword = _M_w[__i];
 
       // mask off bits below bound
-      __thisword &= (~static_cast<_WordT>(0)) << _S_whichbit(__prev);
+      __thisword >>= __prev + 1;
 
-      if ( __thisword != static_cast<_WordT>(0) )
-	{
-	  // find byte within word
-	  // get first byte into place
-	  __thisword >>= _S_whichbyte(__prev) * CHAR_BIT;
-	  for (size_t __j = _S_whichbyte(__prev); __j < sizeof(_WordT); __j++)
-	    {
-	      unsigned char __this_byte
-		= static_cast<unsigned char>(__thisword & (~(unsigned char)0));
-	      if ( __this_byte )
-		return __i*_GLIBCPP_BITSET_BITS_PER_WORD + __j*CHAR_BIT +
-		  _S_first_one[__this_byte];
-
-	      __thisword >>= CHAR_BIT;
-	    }
-	}
+      if (__thisword != static_cast<_WordT>(0))
+	return __i * _GLIBCPP_BITSET_BITS_PER_WORD
+	  + __builtin_ctzl(__thisword);
 
       // check subsequent words
       __i++;
       for ( ; __i < _Nw; __i++ )
 	{
 	  __thisword = _M_w[__i];
-	  if ( __thisword != static_cast<_WordT>(0) )
-	    {
-	      // find byte within word
-	      for (size_t __j = 0; __j < sizeof(_WordT); __j++ )
-		{
-		  unsigned char __this_byte
-		    = static_cast<unsigned char>(__thisword & (~(unsigned char)0));
-		  if ( __this_byte )
-		    return __i*_GLIBCPP_BITSET_BITS_PER_WORD + __j*CHAR_BIT +
-		      _S_first_one[__this_byte];
-
-		  __thisword >>= CHAR_BIT;
-		}
-	    }
+	  if (__thisword != static_cast<_WordT>(0))
+	    return __i * _GLIBCPP_BITSET_BITS_PER_WORD
+	      + __builtin_ctzl(__thisword);
 	}
       // not found, so return an indication of failure.
       return __not_found;
@@ -384,7 +341,7 @@ namespace std
 
       static size_t
       _S_whichbyte(size_t __pos )
-      { return (__pos % _GLIBCPP_BITSET_BITS_PER_WORD) / CHAR_BIT; }
+      { return (__pos % _GLIBCPP_BITSET_BITS_PER_WORD) / __CHAR_BIT__; }
 
       static size_t
       _S_whichbit(size_t __pos )
@@ -438,29 +395,34 @@ namespace std
       _M_is_any() const { return _M_w != 0; }
 
       size_t
-      _M_do_count() const
-      {
-	size_t __result = 0;
-	const unsigned char* __byte_ptr = (const unsigned char*)&_M_w;
-	const unsigned char* __end_ptr
-	  = ((const unsigned char*)&_M_w)+sizeof(_M_w);
-	while ( __byte_ptr < __end_ptr )
-	  {
-	    __result += _S_bit_count[*__byte_ptr];
-	    __byte_ptr++;
-	  }
-	return __result;
-      }
+      _M_do_count() const { return __builtin_popcountl(_M_w); }
 
       unsigned long
       _M_do_to_ulong() const { return _M_w; }
 
       size_t
-      _M_do_find_first(size_t __not_found) const;
+      _M_do_find_first(size_t __not_found) const
+      {
+        if (_M_w != 0)
+          return __builtin_ctzl(_M_w);
+        else
+          return __not_found;
+      }
 
       // find the next "on" bit that follows "prev"
       size_t
-      _M_do_find_next(size_t __prev, size_t __not_found) const;
+      _M_do_find_next(size_t __prev, size_t __not_found) const
+      {
+	++__prev;
+	if (__prev >= _GLIBCPP_BITSET_BITS_PER_WORD)
+	  return __not_found;
+
+	_WordT __x = _M_w >> __prev;
+	if (__x != 0)
+	  return __builtin_ctzl(__x) + __prev;
+	else
+	  return __not_found;
+      }
     };
 
 
@@ -485,7 +447,7 @@ namespace std
 
       static size_t
       _S_whichbyte(size_t __pos )
-      { return (__pos % _GLIBCPP_BITSET_BITS_PER_WORD) / CHAR_BIT; }
+      { return (__pos % _GLIBCPP_BITSET_BITS_PER_WORD) / __CHAR_BIT__; }
 
       static size_t
       _S_whichbit(size_t __pos )
@@ -570,6 +532,7 @@ namespace std
     struct _Sanitize<0>
     { static void _S_do_sanitize(unsigned long) { } };
 
+
   /**
    *  @brief  The %bitset class represents a @e fixed-size sequence of bits.
    *
@@ -578,17 +541,19 @@ namespace std
    *  (Note that %bitset does @e not meet the formal requirements of a
    *  <a href="tables.html#65">container</a>.  Mainly, it lacks iterators.)
    *
-   *  The template argument, @a _Nb, may be any non-negative number of type
-   *  size_t.
+   *  The template argument, @a Nb, may be any non-negative number,
+   *  specifying the number of bits (e.g., "0", "12", "1024*1024").
    *
-   *  A %bitset of size N has N % (sizeof(unsigned long) * CHAR_BIT) unused
-   *  bits.  (They are the high-order bits in the highest word.)  It is
-   *  a class invariant that those unused bits are always zero.
+   *  In the general unoptimized case, storage is allocated in word-sized
+   *  blocks.  Let B be the number of bits in a word, then (Nb+(B-1))/B
+   *  words will be used for storage.  B - Nb%B bits are unused.  (They are
+   *  the high-order bits in the highest word.)  It is a class invariant
+   *  that those unused bits are always zero.
    *
    *  If you think of %bitset as "a simple array of bits," be aware that
    *  your mental picture is reversed:  a %bitset behaves the same way as
    *  bits in integers do, with the bit at index 0 in the "least significant
-   *  / right-hand" position, and the bit at index N-1 in the "most
+   *  / right-hand" position, and the bit at index Nb-1 in the "most
    *  significant / left-hand" position.  Thus, unlike other containers, a
    *  %bitset's index "counts from right to left," to put it very loosely.
    *
@@ -619,6 +584,7 @@ namespace std
    *  @endcode
    *
    *  Also see http://gcc.gnu.org/onlinedocs/libstdc++/ext/sgiexts.html#ch23
+   *  for a description of extensions.
    *
    *  @if maint
    *  Most of the actual code isn't contained in %bitset<> itself, but in the
@@ -805,16 +771,26 @@ namespace std
     bitset<_Nb>&
     operator<<=(size_t __pos)
     {
-      this->_M_do_left_shift(__pos);
-      this->_M_do_sanitize();
+      if (__builtin_expect(__pos < _Nb, 1))
+        {
+          this->_M_do_left_shift(__pos);
+          this->_M_do_sanitize();
+        }
+      else
+	this->_M_do_reset();
       return *this;
     }
 
     bitset<_Nb>&
     operator>>=(size_t __pos)
     {
-      this->_M_do_right_shift(__pos);
-      this->_M_do_sanitize();
+      if (__builtin_expect(__pos < _Nb, 1))
+        {
+          this->_M_do_right_shift(__pos);
+          this->_M_do_sanitize();
+        }
+      else
+	this->_M_do_reset();
       return *this;
     }
     //@}
@@ -1096,7 +1072,7 @@ namespace std
     bitset<_Nb>::_M_copy_from_string(const basic_string<_CharT,_Traits,_Alloc>& __s, size_t __pos, size_t __n)
     {
       reset();
-      const size_t __nbits = min(_Nb, min(__n, __s.size() - __pos));
+      const size_t __nbits = std::min(_Nb, std::min(__n, __s.size() - __pos));
       for (size_t __i = 0; __i < __nbits; ++__i)
 	{
 	  switch(__s[__pos + __nbits - __i - 1])
@@ -1183,6 +1159,7 @@ namespace std
       typename basic_istream<_CharT, _Traits>::sentry __sentry(__is);
       if (__sentry)
 	{
+	  ios_base::iostate  __state = ios_base::goodbit;
 	  basic_streambuf<_CharT, _Traits>* __buf = __is.rdbuf();
 	  for (size_t __i = 0; __i < _Nb; ++__i)
 	    {
@@ -1191,7 +1168,7 @@ namespace std
 	      typename _Traits::int_type __c1 = __buf->sbumpc();
 	      if (_Traits::eq_int_type(__c1, __eof))
 		{
-		  __is.setstate(ios_base::eofbit);
+		  __state |= ios_base::eofbit;
 		  break;
 		}
 	      else
@@ -1201,19 +1178,21 @@ namespace std
 
 		  if (__c == '0' || __c == '1')
 		    __tmp.push_back(__c);
-		  else if (_Traits::eq_int_type(__buf->sputbackc(__c2),
-						__eof))
+		  else if (_Traits::eq_int_type(__buf->sputbackc(__c2), __eof))
 		    {
-		      __is.setstate(ios_base::failbit);
+		      __state |= ios_base::failbit;
 		      break;
 		    }
 		}
 	    }
 
 	  if (__tmp.empty() && !_Nb)
-	    __is.setstate(ios_base::failbit);
+	    __state |= ios_base::failbit;
 	  else
 	    __x._M_copy_from_string(__tmp, static_cast<size_t>(0), _Nb);
+
+	  if (__state != ios_base::goodbit)
+	    __is.setstate(__state);    // may throw an exception
 	}
 
       return __is;
@@ -1231,5 +1210,6 @@ namespace std
 } // namespace std
 
 #undef _GLIBCPP_BITSET_WORDS
+#undef _GLIBCPP_BITSET_BITS_PER_WORD
 
 #endif /* _GLIBCPP_BITSET_H */

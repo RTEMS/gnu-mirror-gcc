@@ -1,5 +1,5 @@
 /* Definitions of Tensilica's Xtensa target machine for GNU compiler.
-   Copyright (C) 2001 Free Software Foundation, Inc.
+   Copyright 2001,2002 Free Software Foundation, Inc.
    Contributed by Bob Wilson (bwilson@tensilica.com) at Tensilica.
 
 This file is part of GCC.
@@ -191,29 +191,28 @@ extern unsigned xtensa_current_frame_size;
 
 
 #define OVERRIDE_OPTIONS override_options ()
+
+/* Target CPU builtins.  */
+#define TARGET_CPU_CPP_BUILTINS()					\
+  do {									\
+    builtin_assert ("cpu=xtensa");					\
+    builtin_assert ("machine=xtensa");					\
+    builtin_define ("__XTENSA__");					\
+    builtin_define (TARGET_BIG_ENDIAN ? "__XTENSA_EB__" : "__XTENSA_EL__"); \
+    if (!TARGET_HARD_FLOAT)						\
+      builtin_define ("__XTENSA_SOFT_FLOAT__");				\
+    if (flag_pic)							\
+      {									\
+        builtin_define ("__PIC__");					\
+        builtin_define ("__pic__");					\
+      }									\
+  } while (0)
 
-#if XCHAL_HAVE_BE
-#define CPP_ENDIAN_SPEC "\
-  %{mlittle-endian:-D__XTENSA_EL__} \
-  %{!mlittle-endian:-D__XTENSA_EB__} "
-#else /* !XCHAL_HAVE_BE */
-#define CPP_ENDIAN_SPEC "\
-  %{mbig-endian:-D__XTENSA_EB__} \
-  %{!mbig-endian:-D__XTENSA_EL__} "
-#endif /* !XCHAL_HAVE_BE */
-
-#if XCHAL_HAVE_FP
-#define CPP_FLOAT_SPEC "%{msoft-float:-D__XTENSA_SOFT_FLOAT__}"
+#ifdef __XTENSA_EB__
+#define LIBGCC2_WORDS_BIG_ENDIAN 1
 #else
-#define CPP_FLOAT_SPEC "%{!mhard-float:-D__XTENSA_SOFT_FLOAT__}"
+#define LIBGCC2_WORDS_BIG_ENDIAN 0
 #endif
-
-#undef CPP_SPEC
-#define CPP_SPEC CPP_ENDIAN_SPEC CPP_FLOAT_SPEC
-
-/* Define this to set the endianness to use in libgcc2.c, which can
-   not depend on target_flags.  */
-#define LIBGCC2_WORDS_BIG_ENDIAN XCHAL_HAVE_BE
 
 /* Show we can debug even without a frame pointer.  */
 #define CAN_DEBUG_WITHOUT_FP
@@ -249,12 +248,6 @@ extern unsigned xtensa_current_frame_size;
 #define FLOAT_TYPE_SIZE 32
 #define DOUBLE_TYPE_SIZE 64
 #define LONG_DOUBLE_TYPE_SIZE 64
-
-/* Tell the preprocessor the maximum size of wchar_t.  */
-#ifndef MAX_WCHAR_TYPE_SIZE
-#ifndef WCHAR_TYPE_SIZE
-#endif
-#endif
 
 /* Allocation boundary (in *bits*) for storing pointers in memory.  */
 #define POINTER_BOUNDARY 32
@@ -354,7 +347,6 @@ extern unsigned xtensa_current_frame_size;
    0 - 15	AR[0] - AR[15]
    16		FRAME_POINTER (fake = initial sp)
    17		ARG_POINTER (fake = initial sp + framesize)
-   18           LOOP_COUNT (loop count special register)
    18		BR[0] for floating-point CC
    19 - 34	FR[0] - FR[15]
    35		MAC16 accumulator */
@@ -403,10 +395,11 @@ extern unsigned xtensa_current_frame_size;
    have been exhausted.  */
 
 #define REG_ALLOC_ORDER \
-{  8,  9, 10, 11, 12, 13, 14, 15,  7,  6,  5,  4,  3,  2, 19, \
-  20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, \
+{  8,  9, 10, 11, 12, 13, 14, 15,  7,  6,  5,  4,  3,  2, \
+  18, \
+  19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, \
    0,  1, 16, 17, \
-  36, \
+  35, \
 }
 
 #define ORDER_REGS_FOR_LOCAL_ALLOC order_regs_for_local_alloc ()
@@ -432,11 +425,6 @@ extern int leaf_function;
 #define GP_REG_FIRST 0
 #define GP_REG_LAST  17
 #define GP_REG_NUM   (GP_REG_LAST - GP_REG_FIRST + 1)
-
-/* Special registers */
-#define SPEC_REG_FIRST 18
-#define SPEC_REG_LAST  18
-#define SPEC_REG_NUM   (SPEC_REG_LAST - SPEC_REG_FIRST + 1)
 
 /* Coprocessor registers */
 #define BR_REG_FIRST 18
@@ -481,9 +469,6 @@ extern char xtensa_hard_regno_mode_ok[][FIRST_PSEUDO_REGISTER];
     GET_MODE_CLASS (MODE1) == MODE_COMPLEX_FLOAT)			\
    == (GET_MODE_CLASS (MODE2) == MODE_FLOAT ||				\
        GET_MODE_CLASS (MODE2) == MODE_COMPLEX_FLOAT))
-
-/* Register to use for LCOUNT special register.  */
-#define COUNT_REGISTER_REGNUM (SPEC_REG_FIRST + 0)
 
 /* Register to use for pushing function arguments.  */
 #define STACK_POINTER_REGNUM (GP_REG_FIRST + 1)
@@ -557,6 +542,7 @@ enum reg_class
   FP_REGS,			/* floating point registers */
   ACC_REG,			/* MAC16 accumulator */
   SP_REG,			/* sp register (aka a1) */
+  RL_REGS,			/* preferred reload regs (not sp or fp) */
   GR_REGS,			/* integer registers except sp */
   AR_REGS,			/* all integer registers */
   ALL_REGS,			/* all registers */
@@ -577,6 +563,7 @@ enum reg_class
   "FP_REGS",								\
   "ACC_REG",								\
   "SP_REG",								\
+  "RL_REGS",								\
   "GR_REGS",								\
   "AR_REGS",								\
   "ALL_REGS"								\
@@ -592,6 +579,7 @@ enum reg_class
   { 0xfff80000, 0x00000007 }, /* floating-point registers */ \
   { 0x00000000, 0x00000008 }, /* MAC16 accumulator */ \
   { 0x00000002, 0x00000000 }, /* stack pointer register */ \
+  { 0x0000ff7d, 0x00000000 }, /* preferred reload registers */ \
   { 0x0000fffd, 0x00000000 }, /* general-purpose registers */ \
   { 0x0003ffff, 0x00000000 }, /* integer registers */ \
   { 0xffffffff, 0x0000000f }  /* all registers */ \
@@ -707,10 +695,10 @@ extern enum reg_class xtensa_char_to_class[256];
    : FALSE)
 
 #define PREFERRED_RELOAD_CLASS(X, CLASS)				\
-  xtensa_preferred_reload_class (X, CLASS)
+  xtensa_preferred_reload_class (X, CLASS, 0)
 
 #define PREFERRED_OUTPUT_RELOAD_CLASS(X, CLASS)				\
-  (CLASS)
+  xtensa_preferred_reload_class (X, CLASS, 1)
   
 #define SECONDARY_INPUT_RELOAD_CLASS(CLASS, MODE, X)			\
   xtensa_secondary_reload_class (CLASS, MODE, X, 0)
@@ -796,13 +784,13 @@ extern enum reg_class xtensa_char_to_class[256];
 /* Don't worry about compatibility with PCC.  */
 #define DEFAULT_PCC_STRUCT_RETURN 0
 
-/* For Xtensa, we would like to be able to return up to 6 words in
-   memory but GCC cannot support that.  The return value must be given
-   one of the standard MODE_INT modes, and there is no 6 word mode.
-   Instead, if we try to return a 6 word structure, GCC selects the
-   next biggest mode (OImode, 8 words) and then the register allocator
-   fails because there is no 8-register group beginning with a10.  So
-   we have to fall back on the next largest size which is 4 words... */
+/* For Xtensa, up to 4 words can be returned in registers.  (It would
+   have been nice to allow up to 6 words in registers but GCC cannot
+   support that.  The return value must be given one of the standard
+   MODE_INT modes, and there is no 6 word mode.  Instead, if we try to
+   return a 6 word structure, GCC selects the next biggest mode
+   (OImode, 8 words) and then the register allocator fails because
+   there is no 8-register group beginning with a10.)  */
 #define RETURN_IN_MEMORY(TYPE)						\
   ((unsigned HOST_WIDE_INT) int_size_in_bytes (TYPE) > 4 * UNITS_PER_WORD)
 
@@ -857,9 +845,6 @@ extern enum reg_class xtensa_char_to_class[256];
    the stack. */
 #define FUNCTION_ARG_REGNO_P(N)						\
   ((N) >= GP_OUTGOING_ARG_FIRST && (N) <= GP_OUTGOING_ARG_LAST)
-
-/* Use IEEE floating-point format.  */
-#define TARGET_FLOAT_FORMAT IEEE_FLOAT_FORMAT
 
 /* Define a data type for recording info about an argument list
    during the scan of that argument list.  This data type should
@@ -1035,8 +1020,8 @@ typedef struct xtensa_args {
   xtensa_builtin_saveregs
 
 /* Implement `va_start' for varargs and stdarg.  */
-#define EXPAND_BUILTIN_VA_START(stdarg, valist, nextarg) \
-  xtensa_va_start (stdarg, valist, nextarg)
+#define EXPAND_BUILTIN_VA_START(valist, nextarg) \
+  xtensa_va_start (valist, nextarg)
 
 /* Implement `va_arg'.  */
 #define EXPAND_BUILTIN_VA_ARG(valist, type) \
@@ -1060,8 +1045,7 @@ typedef struct xtensa_args {
    we currently need to ensure that there is a frame pointer when these
    builtin functions are used. */
 
-#define SETUP_FRAME_ADDRESSES() \
-  xtensa_setup_frame_addresses ()
+#define SETUP_FRAME_ADDRESSES  xtensa_setup_frame_addresses
 
 /* A C expression whose value is RTL representing the address in a
    stack frame where the pointer to the caller's frame is stored.
@@ -1085,22 +1069,8 @@ typedef struct xtensa_args {
 
 /* A C expression whose value is RTL representing the value of the
    return address for the frame COUNT steps up from the current
-   frame, after the prologue.  FRAMEADDR is the frame pointer of the
-   COUNT frame, or the frame pointer of the COUNT - 1 frame if
-   'RETURN_ADDR_IN_PREVIOUS_FRAME' is defined.
-
-   The 2 most-significant bits of the return address on Xtensa hold
-   the register window size.  To get the real return address, these bits
-   must be masked off and replaced with the high bits from the current
-   PC.  Since it is unclear how the __builtin_return_address function
-   is used, the current code does not do this masking and simply returns
-   the raw return address from the a0 register. */
-#define RETURN_ADDR_RTX(count, frame)					\
-  ((count) == -1							\
-   ? gen_rtx_REG (Pmode, 0)						\
-   : gen_rtx_MEM (Pmode, memory_address					\
-		  (Pmode, plus_constant (frame, -4 * UNITS_PER_WORD))))
-
+   frame, after the prologue.  */
+#define RETURN_ADDR_RTX  xtensa_return_addr
 
 /* Addressing modes, and classification of registers for them.  */
 
@@ -1305,162 +1275,6 @@ typedef struct xtensa_args {
    indexing purposes) so give the MEM rtx a words's mode.  */
 #define FUNCTION_MODE SImode
 
-/* A C expression that evaluates to true if it is ok to perform a
-   sibling call to DECL.  */
-/* TODO: fix this up to allow at least some sibcalls */
-#define FUNCTION_OK_FOR_SIBCALL(DECL) 0
-
-/* Xtensa constant costs.  */
-#define CONST_COSTS(X, CODE, OUTER_CODE)				\
-  case CONST_INT:							\
-    switch (OUTER_CODE)							\
-      {									\
-      case SET:								\
-	if (xtensa_simm12b (INTVAL (X))) return 4;			\
-	break;								\
-      case PLUS:							\
-	if (xtensa_simm8 (INTVAL (X))) return 0;			\
-	if (xtensa_simm8x256 (INTVAL (X))) return 0;			\
-	break;								\
-      case AND:								\
-	if (xtensa_mask_immediate (INTVAL (X))) return 0;		\
-	break;								\
-      case COMPARE:							\
-	if ((INTVAL (X) == 0) || xtensa_b4const (INTVAL (X))) return 0;	\
-	break;								\
-      case ASHIFT:							\
-      case ASHIFTRT:							\
-      case LSHIFTRT:							\
-      case ROTATE:							\
-      case ROTATERT:							\
-        /* no way to tell if X is the 2nd operand so be conservative */	\
-      default: break;							\
-      }									\
-    if (xtensa_simm12b (INTVAL (X))) return 5;				\
-    return 6;								\
-  case CONST:								\
-  case LABEL_REF:							\
-  case SYMBOL_REF:							\
-    return 5;								\
-  case CONST_DOUBLE:							\
-    return 7;
-
-/* Costs of various Xtensa operations.  */
-#define RTX_COSTS(X, CODE, OUTER_CODE)					\
-  case MEM:								\
-    {									\
-	int num_words =							\
-	  (GET_MODE_SIZE (GET_MODE (X)) > UNITS_PER_WORD) ?  2 : 1;	\
-	if (memory_address_p (GET_MODE (X), XEXP ((X), 0)))		\
-	  return COSTS_N_INSNS (num_words);				\
-									\
-	return COSTS_N_INSNS (2*num_words);				\
-    }									\
-									\
-  case FFS:								\
-    return COSTS_N_INSNS (TARGET_NSA ? 5 : 50);				\
-									\
-  case NOT:								\
-    return COSTS_N_INSNS ((GET_MODE (X) == DImode) ? 3 : 2);		\
-									\
-  case AND:								\
-  case IOR:								\
-  case XOR:								\
-    if (GET_MODE (X) == DImode) return COSTS_N_INSNS (2);		\
-    return COSTS_N_INSNS (1);						\
-									\
-  case ASHIFT:								\
-  case ASHIFTRT:							\
-  case LSHIFTRT:							\
-    if (GET_MODE (X) == DImode) return COSTS_N_INSNS (50);		\
-    return COSTS_N_INSNS (1);						\
-									\
-  case ABS:								\
-    {									\
-	enum machine_mode xmode = GET_MODE (X);				\
-	if (xmode == SFmode)						\
-	  return COSTS_N_INSNS (TARGET_HARD_FLOAT ? 1 : 50);		\
-	if (xmode == DFmode)						\
-	  return COSTS_N_INSNS (50);					\
-	return COSTS_N_INSNS (4);					\
-    }									\
-									\
-  case PLUS:								\
-  case MINUS:								\
-    {									\
-	enum machine_mode xmode = GET_MODE (X);				\
-	if (xmode == SFmode)						\
-	  return COSTS_N_INSNS (TARGET_HARD_FLOAT ? 1 : 50);		\
-	if (xmode == DFmode || xmode == DImode)				\
-	  return COSTS_N_INSNS (50);					\
-	return COSTS_N_INSNS (1);					\
-    }									\
-									\
-  case NEG:								\
-    return COSTS_N_INSNS ((GET_MODE (X) == DImode) ? 4 : 2);		\
-									\
-  case MULT:								\
-    {									\
-	enum machine_mode xmode = GET_MODE (X);				\
-	if (xmode == SFmode)						\
-	  return COSTS_N_INSNS (TARGET_HARD_FLOAT ? 4 : 50);		\
-	if (xmode == DFmode || xmode == DImode)				\
-	    return COSTS_N_INSNS (50);					\
-	if (TARGET_MUL32)						\
-	  return COSTS_N_INSNS (4);					\
-	if (TARGET_MAC16)						\
-	  return COSTS_N_INSNS (16);					\
-	if (TARGET_MUL16)						\
-	  return COSTS_N_INSNS (12);					\
-	return COSTS_N_INSNS (50);					\
-    }									\
-									\
-  case DIV:								\
-  case MOD:								\
-    {									\
-	enum machine_mode xmode = GET_MODE (X);				\
-	if (xmode == SFmode)						\
-	  return COSTS_N_INSNS (TARGET_HARD_FLOAT_DIV ? 8 : 50);	\
-	if (xmode == DFmode)						\
-	  return COSTS_N_INSNS (50);					\
-    }									\
-    /* fall through */							\
-									\
-  case UDIV:								\
-  case UMOD:								\
-    {									\
-	enum machine_mode xmode = GET_MODE (X);				\
-	if (xmode == DImode)						\
-	  return COSTS_N_INSNS (50);					\
-	if (TARGET_DIV32)						\
-	  return COSTS_N_INSNS (32);					\
-	return COSTS_N_INSNS (50);					\
-    }									\
-									\
-  case SQRT:								\
-    if (GET_MODE (X) == SFmode)						\
-      return COSTS_N_INSNS (TARGET_HARD_FLOAT_SQRT ? 8 : 50);		\
-    return COSTS_N_INSNS (50);						\
-									\
-  case SMIN:								\
-  case UMIN:								\
-  case SMAX:								\
-  case UMAX:								\
-    return COSTS_N_INSNS (TARGET_MINMAX ? 1 : 50);			\
-									\
-  case SIGN_EXTRACT:							\
-  case SIGN_EXTEND:							\
-    return COSTS_N_INSNS (TARGET_SEXT ? 1 : 2);				\
-									\
-  case ZERO_EXTRACT:							\
-  case ZERO_EXTEND:							\
-    return COSTS_N_INSNS (1);
-
-
-/* An expression giving the cost of an addressing mode that
-   contains ADDRESS.  */
-#define ADDRESS_COST(ADDR) 1
-
 /* A C expression for the cost of moving data from a register in
    class FROM to one in class TO.  The classes are expressed using
    the enumeration values such as 'GENERAL_REGS'.  A value of 2 is
@@ -1560,23 +1374,8 @@ typedef struct xtensa_args {
       goto FAIL;							\
   } while (0)
 
-
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME. */
-#define ASM_OUTPUT_LABEL(STREAM, NAME)					\
-  do {									\
-    assemble_name (STREAM, NAME);					\
-    fputs (":\n", STREAM);						\
-  } while (0)
-
-/* This is how to output a command to make the user-level label named NAME
-   defined for reference from other files.  */
-#define ASM_GLOBALIZE_LABEL(STREAM, NAME)				\
-  do {									\
-    fputs ("\t.global\t", STREAM);					\
-    assemble_name (STREAM, NAME);					\
-    fputs ("\n", STREAM);						\
-  } while (0)
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP "\t.global\t"
 
 /* This says how to define a global common symbol.  */
 #define ASM_OUTPUT_COMMON(STREAM, NAME, SIZE, ROUNDED)			\
@@ -1671,15 +1470,6 @@ typedef struct xtensa_args {
   do {									\
     xtensa_output_literal (FILE, X, MODE, LABELNO);			\
     goto JUMPTO;							\
-  } while (0)
-
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)			\
-  do {									\
-    (OUTPUT) = (char *) alloca (strlen (NAME) + 10);			\
-    sprintf ((OUTPUT), "%s.%u", (NAME), (LABELNO));			\
   } while (0)
 
 /* How to start an assembler comment. */

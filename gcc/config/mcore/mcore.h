@@ -284,7 +284,7 @@ extern int mcore_stack_increment;
 /* Every structures size must be a multiple of 8 bits.  */
 #define STRUCTURE_SIZE_BOUNDARY 8
 
-/* Look at the fundamental type that is used for a bitfield and use 
+/* Look at the fundamental type that is used for a bit-field and use 
    that to impose alignment on the enclosing structure.
    struct s {int a:8}; should have same alignment as "int", not "char".  */
 #define	PCC_BITFIELD_TYPE_MATTERS	1
@@ -1004,37 +1004,6 @@ extern const enum reg_class reg_class_from_letter[];
 #define Pmode          SImode
 #define FUNCTION_MODE  Pmode
 
-/* The relative costs of various types of constants.  Note that cse.c defines
-   REG = 1, SUBREG = 2, any node = (2 + sum of subnodes).  */
-#define CONST_COSTS(RTX, CODE, OUTER_CODE)      \
-  case CONST_INT:				\
-    return mcore_const_costs (RTX, OUTER_CODE); \
-  case CONST: 					\
-  case LABEL_REF:				\
-  case SYMBOL_REF:				\
-    return 5;					\
-  case CONST_DOUBLE:				\
-      return 10;
-
-/* provide the cost for an address calculation.
-   All addressing modes cost the same on the MCore.  */
-#define	ADDRESS_COST(RTX)	1
-
-/* Provide the cost of an rtl expression. */
-#define RTX_COSTS(X, CODE, OUTER_CODE)			\
-  case AND:                                             \
-    return COSTS_N_INSNS (mcore_and_cost (X));          \
-  case IOR:                                             \
-    return COSTS_N_INSNS (mcore_ior_cost (X));          \
-  case DIV:						\
-  case UDIV:						\
-  case MOD:						\
-  case UMOD:						\
-    return COSTS_N_INSNS (100);				\
-  case FLOAT:						\
-  case FIX:						\
-    return 100;
-
 /* Compute extra cost of moving data between one register class
    and another.  All register moves are cheap.  */
 #define REGISTER_MOVE_COST(MODE, SRCCLASS, DSTCLASS) 2
@@ -1112,10 +1081,6 @@ switch_to_section (section, decl)				\
 	   (STACK_BOUNDARY / BITS_PER_UNIT))
 
   
-/* Output a label definition.  */
-#define ASM_OUTPUT_LABEL(FILE,NAME)  \
-  do { assemble_name (FILE, NAME); fputs (":\n", FILE); } while (0)
-
 /* Output a reference to a label.  */
 #undef  ASM_OUTPUT_LABELREF
 #define ASM_OUTPUT_LABELREF(STREAM, NAME)  \
@@ -1165,11 +1130,8 @@ extern long mcore_current_compilation_timestamp;
     }								\
   while (0)
 
-/* Output a globalising directive for a label.  */
-#define ASM_GLOBALIZE_LABEL(STREAM,NAME)  \
-  (fprintf (STREAM, "\t.export\t"),	  \
-   assemble_name (STREAM, NAME),	  \
-   fputc ('\n',STREAM))                   \
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP "\t.export\t"
 
 /* The prefix to add to user-visible assembler symbols. */
 #undef  USER_LABEL_PREFIX
@@ -1179,16 +1141,6 @@ extern long mcore_current_compilation_timestamp;
 #undef  ASM_GENERATE_INTERNAL_LABEL
 #define ASM_GENERATE_INTERNAL_LABEL(STRING, PREFIX, NUM)  \
   sprintf (STRING, "*.%s%ld", PREFIX, (long) NUM)
-
-/* Output an internal label definition.  */
-#undef  ASM_OUTPUT_INTERNAL_LABEL
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)	\
-  fprintf (FILE, ".%s%d:\n", PREFIX, NUM)
-
-/* Construct a private name.  */
-#define ASM_FORMAT_PRIVATE_NAME(OUTVAR,NAME,NUMBER)  \
-  ((OUTVAR) = (char *) alloca (strlen (NAME) + 10),  \
-   sprintf ((OUTVAR), "%s.%d", (NAME), (NUMBER)))
 
 /* Jump tables must be 32 bit aligned. */
 #undef  ASM_OUTPUT_CASE_LABEL

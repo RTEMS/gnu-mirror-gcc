@@ -1,6 +1,6 @@
 /* Optimize jump instructions, for GNU compiler.
    Copyright (C) 1987, 1988, 1989, 1991, 1992, 1993, 1994, 1995, 1996, 1997
-   1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   1998, 1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -36,6 +36,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "tm_p.h"
 #include "flags.h"
@@ -59,7 +61,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
    or even change what is live at any point.
    So perhaps let combiner do it.  */
 
-static int init_label_info		PARAMS ((rtx));
+static rtx next_nonnote_insn_in_loop	PARAMS ((rtx));
+static void init_label_info		PARAMS ((rtx));
 static void mark_all_labels		PARAMS ((rtx));
 static int duplicate_loop_exit_test	PARAMS ((rtx));
 static void delete_computation		PARAMS ((rtx));
@@ -78,10 +81,8 @@ rebuild_jump_labels (f)
      rtx f;
 {
   rtx insn;
-  int max_uid = 0;
 
-  max_uid = init_label_info (f) + 1;
-
+  init_label_info (f);
   mark_all_labels (f);
 
   /* Keep track of labels used from static data; we don't track them
@@ -119,6 +120,27 @@ cleanup_barriers ()
     }
 }
 
+/* Return the next insn after INSN that is not a NOTE and is in the loop,
+   i.e. when there is no such INSN before NOTE_INSN_LOOP_END return NULL_RTX.
+   This routine does not look inside SEQUENCEs.  */
+
+static rtx
+next_nonnote_insn_in_loop (insn)
+     rtx insn;
+{
+  while (insn)
+    {
+      insn = NEXT_INSN (insn);
+      if (insn == 0 || GET_CODE (insn) != NOTE)
+	break;
+      if (GET_CODE (insn) == NOTE
+	  && NOTE_LINE_NUMBER (insn) == NOTE_INSN_LOOP_END)
+	return NULL_RTX;
+    }
+
+  return insn;
+}
+
 void
 copy_loop_headers (f)
      rtx f;
@@ -137,7 +159,7 @@ copy_loop_headers (f)
 	 the values of regno_first_uid and regno_last_uid.  */
       if (GET_CODE (insn) == NOTE
 	  && NOTE_LINE_NUMBER (insn) == NOTE_INSN_LOOP_BEG
-	  && (temp1 = next_nonnote_insn (insn)) != 0
+	  && (temp1 = next_nonnote_insn_in_loop (insn)) != 0
 	  && any_uncondjump_p (temp1) && onlyjump_p (temp1))
 	{
 	  temp = PREV_INSN (insn);
@@ -186,36 +208,29 @@ purge_line_number_notes (f)
 /* Initialize LABEL_NUSES and JUMP_LABEL fields.  Delete any REG_LABEL
    notes whose labels don't occur in the insn any more.  Returns the
    largest INSN_UID found.  */
-static int
+static void
 init_label_info (f)
      rtx f;
 {
-  int largest_uid = 0;
   rtx insn;
 
   for (insn = f; insn; insn = NEXT_INSN (insn))
-    {
-      if (GET_CODE (insn) == CODE_LABEL)
-	LABEL_NUSES (insn) = (LABEL_PRESERVE_P (insn) != 0);
-      else if (GET_CODE (insn) == JUMP_INSN)
-	JUMP_LABEL (insn) = 0;
-      else if (GET_CODE (insn) == INSN || GET_CODE (insn) == CALL_INSN)
-	{
-	  rtx note, next;
+    if (GET_CODE (insn) == CODE_LABEL)
+      LABEL_NUSES (insn) = (LABEL_PRESERVE_P (insn) != 0);
+    else if (GET_CODE (insn) == JUMP_INSN)
+      JUMP_LABEL (insn) = 0;
+    else if (GET_CODE (insn) == INSN || GET_CODE (insn) == CALL_INSN)
+      {
+	rtx note, next;
 
-	  for (note = REG_NOTES (insn); note; note = next)
-	    {
-	      next = XEXP (note, 1);
-	      if (REG_NOTE_KIND (note) == REG_LABEL
-		  && ! reg_mentioned_p (XEXP (note, 0), PATTERN (insn)))
-		remove_note (insn, note);
-	    }
-	}
-      if (INSN_UID (insn) > largest_uid)
-	largest_uid = INSN_UID (insn);
-    }
-
-  return largest_uid;
+	for (note = REG_NOTES (insn); note; note = next)
+	  {
+	    next = XEXP (note, 1);
+	    if (REG_NOTE_KIND (note) == REG_LABEL
+		&& ! reg_mentioned_p (XEXP (note, 0), PATTERN (insn)))
+	      remove_note (insn, note);
+	  }
+      }
 }
 
 /* Mark the label each jump jumps to.
@@ -293,7 +308,8 @@ duplicate_loop_exit_test (loop_start)
   rtx insn, set, reg, p, link;
   rtx copy = 0, first_copy = 0;
   int num_insns = 0;
-  rtx exitcode = NEXT_INSN (JUMP_LABEL (next_nonnote_insn (loop_start)));
+  rtx exitcode
+    = NEXT_INSN (JUMP_LABEL (next_nonnote_insn_in_loop (loop_start)));
   rtx lastexit;
   int max_reg = max_reg_num ();
   rtx *reg_map = 0;
@@ -962,7 +978,7 @@ signed_condition (code)
     }
 }
 
-/* Return non-zero if CODE1 is more strict than CODE2, i.e., if the
+/* Return nonzero if CODE1 is more strict than CODE2, i.e., if the
    truth of CODE1 implies the truth of CODE2.  */
 
 int
@@ -1255,7 +1271,7 @@ onlyjump_p (insn)
 
 #ifdef HAVE_cc0
 
-/* Return non-zero if X is an RTX that only sets the condition codes
+/* Return nonzero if X is an RTX that only sets the condition codes
    and has no side effects.  */
 
 int
@@ -1397,7 +1413,6 @@ mark_jump_label (x, insn, in_mem)
     case PC:
     case CC0:
     case REG:
-    case SUBREG:
     case CONST_INT:
     case CONST_DOUBLE:
     case CLOBBER:
@@ -1917,7 +1932,7 @@ never_reached_warning (avoided_insn, finish)
 	}
       else if (INSN_P (insn))
 	{
-	  if (reached_end)
+	  if (reached_end || a_line_note == NULL)
 	    break;
 	  contains_insn = 1;
 	}
@@ -2409,4 +2424,16 @@ true_regnum (x)
 					   SUBREG_BYTE (x), GET_MODE (x));
     }
   return -1;
+}
+
+/* Return regno of the register REG and handle subregs too.  */
+unsigned int
+reg_or_subregno (reg)
+     rtx reg;
+{
+  if (REG_P (reg))
+    return REGNO (reg);
+  if (GET_CODE (reg) == SUBREG)
+    return REGNO (SUBREG_REG (reg));
+  abort ();
 }

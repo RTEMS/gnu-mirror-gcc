@@ -20,9 +20,17 @@ Boston, MA 02111-1307, USA.  */
 
 #define TARGET_VERSION fprintf (stderr, " (80386, LYNX BSD syntax)"); 
 
-#undef CPP_PREDEFINES
-#define CPP_PREDEFINES "-Dunix -DI386 -DLynx -DIBITS32 \
-  -Asystem=unix -Asystem=lynx"
+#define TARGET_OS_CPP_BUILTINS()		\
+  do						\
+    {						\
+	builtin_define_std ("unix");		\
+	builtin_define_std ("I386");		\
+	builtin_define_std ("Lynx");		\
+	builtin_define_std ("IBITS32");		\
+	builtin_assert ("system=unix");		\
+	builtin_assert ("system=lynx");		\
+    }						\
+  while (0)
 
 /* Provide required defaults for linker switches.  */
 
@@ -60,10 +68,3 @@ Boston, MA 02111-1307, USA.  */
 #undef  ASM_GENERATE_INTERNAL_LABEL
 #define ASM_GENERATE_INTERNAL_LABEL(BUF,PREFIX,NUMBER)	\
   sprintf ((BUF), ".%s%ld", (PREFIX), (long)(NUMBER))
-
-/* This is how to output an internal numbered label where
-   PREFIX is the class of label and NUM is the number within the class.  */
-
-#undef  ASM_OUTPUT_INTERNAL_LABEL
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)	\
-  fprintf (FILE, ".%s%d:\n", PREFIX, NUM)

@@ -60,7 +60,6 @@ extern int arith32_operand PARAMS ((rtx, enum machine_mode));
 extern int power2_operand PARAMS ((rtx, enum machine_mode));
 extern int cmplpower2_operand PARAMS ((rtx, enum machine_mode));
 extern enum machine_mode select_cc_mode PARAMS ((RTX_CODE, rtx));
-extern int i960_address_cost PARAMS ((rtx));
 extern int emit_move_sequence PARAMS ((rtx *, enum machine_mode));
 extern int i960_bypass PARAMS ((rtx, rtx, rtx, int));
 extern void i960_print_operand_addr PARAMS ((FILE *, rtx));
@@ -73,7 +72,7 @@ extern struct rtx_def *i960_function_arg PARAMS ((CUMULATIVE_ARGS *,
 						  enum machine_mode,
 						  tree, int));
 extern rtx i960_va_arg PARAMS ((tree, tree));
-extern void i960_va_start PARAMS ((int, tree, rtx));
+extern void i960_va_start PARAMS ((tree, rtx));
 #endif /* TREE_CODE */
 extern enum reg_class secondary_reload_class PARAMS ((enum reg_class, enum machine_mode, rtx));
 #endif /* RTX_CODE */
@@ -98,9 +97,7 @@ extern int compute_frame_size PARAMS ((int));
 extern void output_function_profiler PARAMS ((FILE *, int));
 extern void i960_scan_opcode PARAMS ((const char *));
 
-#ifdef GCC_C_PRAGMA_H
-extern void i960_pr_align PARAMS ((cpp_reader *));
-extern void i960_pr_noalign PARAMS ((cpp_reader *));
-#endif
+extern void i960_pr_align PARAMS ((struct cpp_reader *));
+extern void i960_pr_noalign PARAMS ((struct cpp_reader *));
 
 #endif /* ! GCC_I960_PROTOS_H  */

@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler,
    for ATMEL AVR at90s8515, ATmega103/103L, ATmega603/603L microcontrollers.
-   Copyright (C) 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
    Contributed by Denis Chertykov (denisc@overta.ru)
 
 This file is part of GNU CC.
@@ -22,7 +22,7 @@ Boston, MA 02111-1307, USA.  */
 
 /* Names to predefine in the preprocessor for this target machine. */
 
-#define TARGET_CPU_CPP_BUILTINS() 		\
+#define TARGET_CPU_CPP_BUILTINS()		\
   do						\
     {						\
       builtin_define_std ("AVR");		\
@@ -58,7 +58,7 @@ extern int target_flags;
 
 #define TARGET_ORDER_1		(target_flags & MASK_ORDER_1)
 #define TARGET_ORDER_2		(target_flags & MASK_ORDER_2)
-#define TARGET_INT8  		(target_flags & MASK_INT8)
+#define TARGET_INT8		(target_flags & MASK_INT8)
 #define TARGET_NO_INTERRUPTS	(target_flags & MASK_NO_INTERRUPTS)
 #define TARGET_INSN_SIZE_DUMP	(target_flags & MASK_INSN_SIZE_DUMP)
 #define TARGET_CALL_PROLOGUES	(target_flags & MASK_CALL_PROLOGUES)
@@ -70,7 +70,7 @@ extern int target_flags;
    This is for debugging the compiler itself.  */
 
 #define TARGET_RTL_DUMP		(target_flags & MASK_RTL_DUMP)
-#define TARGET_ALL_DEBUG 	(target_flags & MASK_ALL_DEBUG)
+#define TARGET_ALL_DEBUG	(target_flags & MASK_ALL_DEBUG)
 
 #define TARGET_SWITCHES {						\
   { "order1", MASK_ORDER_1, NULL },					\
@@ -121,7 +121,7 @@ extern int avr_asm_only_p;
    fprintf (stderr, " (68k, MIT syntax)");
    #endif  */
 
-#define OVERRIDE_OPTIONS avr_override_options()
+#define OVERRIDE_OPTIONS avr_override_options ()
 /* `OVERRIDE_OPTIONS'
    Sometimes certain combinations of command options do not make
    sense on a particular target machine.  You can define a macro
@@ -244,7 +244,7 @@ extern int avr_asm_only_p;
 /* A C expression for a string describing the name of the data type
    to use for size values.  The typedef name `size_t' is defined
    using the contents of the string.
-   
+
    The string can contain more than one keyword.  If so, separate
    them with spaces, and write first any length keyword, then
    `unsigned' if appropriate, and finally `int'.  The string must
@@ -252,7 +252,7 @@ extern int avr_asm_only_p;
    `init_decl_processing' in the file `c-decl.c'.  You may not omit
    `int' or change the order--that would cause the compiler to crash
    on startup.
-   
+
    If you don't define this macro, the default is `"long unsigned
    int"'.  */
 
@@ -261,7 +261,7 @@ extern int avr_asm_only_p;
    to use for the result of subtracting two pointers.  The typedef
    name `ptrdiff_t' is defined using the contents of the string.  See
    `SIZE_TYPE' above for more information.
-   
+
    If you don't define this macro, the default is `"long int"'.  */
 
 
@@ -365,10 +365,10 @@ extern int avr_asm_only_p;
 /* If defined, an initializer for a vector of integers, containing the
    numbers of hard registers in the order in which GNU CC should
    prefer to use them (from most preferred to least).
-   
+
    If this macro is not defined, registers are used lowest numbered
    first (all else being equal).
-   
+
    One use of this macro is on machines where the highest numbered
    registers must always be saved and the save-multiple-registers
    instruction supports only sequences of consetionve registers.  On
@@ -543,10 +543,10 @@ enum reg_class {
      0x00000000},		/* POINTER_REGS, r26 - r31 */		\
   {(3 << REG_X) | (3 << REG_Y) | (3 << REG_Z) | (3 << REG_W),		\
      0x00000000},		/* ADDW_REGS, r24 - r31 */		\
-  {0x00ff0000,0x00000000}, 	/* SIMPLE_LD_REGS r16 - r23 */          \
+  {0x00ff0000,0x00000000},	/* SIMPLE_LD_REGS r16 - r23 */          \
   {(3 << REG_X)|(3 << REG_Y)|(3 << REG_Z)|(3 << REG_W)|(0xff << 16),	\
      0x00000000},	/* LD_REGS, r16 - r31 */			\
-  {0x0000ffff,0x00000000}, 	/* NO_LD_REGS  r0 - r15 */              \
+  {0x0000ffff,0x00000000},	/* NO_LD_REGS  r0 - r15 */              \
   {0xffffffff,0x00000000},	/* GENERAL_REGS, r0 - r31 */		\
   {0xffffffff,0x00000003}	/* ALL_REGS */				\
 }
@@ -675,7 +675,7 @@ enum reg_class {
    machines allow copying all registers to and from memory, but
    require a scratch register for stores to some memory locations
    (e.g., those with symbolic address on the RT, and those with
-   certain symbolic address on the Sparc when compiling PIC).  In
+   certain symbolic address on the SPARC when compiling PIC).  In
    some cases, both an intermediate and a scratch register are
    required.
 
@@ -731,7 +731,7 @@ enum reg_class {
 /* `SECONDARY_MEMORY_NEEDED (CLASS1, CLASS2, M)'
    Certain machines have the property that some registers cannot be
    copied to some other registers without using memory.  Define this
-   macro on those machines to be a C expression that is non-zero if
+   macro on those machines to be a C expression that is nonzero if
    objects of mode M in registers of CLASS1 can only be copied to
    registers of class CLASS2 by storing a register of CLASS1 into
    memory and loading that memory location into a register of CLASS2.
@@ -755,16 +755,16 @@ enum reg_class {
    classes that there would not be enough registers to use as spill
    registers if this were done.
 
-   Define `SMALL_REGISTER_CLASSES' to be an expression with a non-zero
-   value on these machines.  When this macro has a non-zero value, the
+   Define `SMALL_REGISTER_CLASSES' to be an expression with a nonzero
+   value on these machines.  When this macro has a nonzero value, the
    compiler allows registers explicitly used in the rtl to be used as
    spill registers but avoids extending the lifetime of these
    registers.
 
-   It is always safe to define this macro with a non-zero value, but
+   It is always safe to define this macro with a nonzero value, but
    if you unnecessarily define it, you will reduce the amount of
    optimizations that can be performed in some cases.  If you do not
-   define this macro with a non-zero value when it is required, the
+   define this macro with a nonzero value when it is required, the
    compiler will run out of spill registers and print a fatal error
    message.  For most machines, you should not define this macro at
    all.  */
@@ -999,7 +999,7 @@ enum reg_class {
 				      || (FROM) == FRAME_POINTER_REGNUM+1) \
 				     && ! FRAME_POINTER_REQUIRED	   \
 				     ))
-/* A C expression that returns non-zero if the compiler is allowed to
+/* A C expression that returns nonzero if the compiler is allowed to
    try to replace register number FROM-REG with register number
    TO-REG.  This macro need only be defined if `ELIMINABLE_REGS' is
    defined, and will usually be the constant 1, since most of the
@@ -1115,7 +1115,7 @@ enum reg_class {
    You may use the macro `MUST_PASS_IN_STACK (MODE, TYPE)' in the
    definition of this macro to determine if this argument is of a
    type that must be passed in the stack.  If `REG_PARM_STACK_SPACE'
-   is not defined and `FUNCTION_ARG' returns non-zero for such an
+   is not defined and `FUNCTION_ARG' returns nonzero for such an
    argument, the compiler will abort.  If `REG_PARM_STACK_SPACE' is
    defined, the argument will be computed in the stack and then
    loaded into a register.  */
@@ -1148,7 +1148,7 @@ typedef struct avr_args {
    is zero for a call to an explicitly named function, a library
    function call, or when `INIT_CUMULATIVE_ARGS' is used to find
    arguments for the function being compiled.
-   
+
    When processing a call to a compiler support library function,
    LIBNAME identifies which one.  It is a `symbol_ref' rtx which
    contains the name of the function, as a string.  LIBNAME is 0 when
@@ -1164,7 +1164,7 @@ typedef struct avr_args {
    MODE, TYPE and NAMED describe that argument.  Once this is done,
    the variable CUM is suitable for analyzing the *following*
    argument with `FUNCTION_ARG', etc.
-   
+
    This macro need not do anything if the argument in question was
    passed on the stack.  The compiler knows how to track the amount
    of stack space used for arguments without any special help. */
@@ -1307,8 +1307,6 @@ extern int avr_reg_order[];
    addressing.  */
 
 #define HAVE_PRE_DECREMENT 1
-/* #define HAVE_PRE_INCREMENT
-   #define HAVE_POST_DECREMENT  */
 /* Similar for other kinds of addressing.  */
 
 #define CONSTANT_ADDRESS_P(X) CONSTANT_P (X)
@@ -1498,7 +1496,7 @@ do {									    \
    top level, you'll need to replace first the top leve It is not
    necessary for this macro to come up with a legitimate address;
    but often a machine-dependent strategy can generate better code.  */
-	
+
 #define GO_IF_MODE_DEPENDENT_ADDRESS(ADDR,LABEL)			\
       if (GET_CODE (ADDR) == POST_INC || GET_CODE (ADDR) == PRE_DEC)	\
         goto LABEL
@@ -1522,102 +1520,6 @@ do {									    \
    satisfies `CONSTANT_P', so you need not check this.  In fact, `1'
    is a suitable definition for this macro on machines where anything
    `CONSTANT_P' is valid.  */
-
-#define CONST_COSTS(x,CODE,OUTER_CODE)		\
-    case CONST_INT:				\
-      if (OUTER_CODE == PLUS			\
-	  || OUTER_CODE == IOR			\
-	  || OUTER_CODE == AND			\
-	  || OUTER_CODE == MINUS		\
-	  || OUTER_CODE == SET			\
-	  || INTVAL (x) == 0)			\
-        return 2;				\
-      if (OUTER_CODE == COMPARE			\
-	  && INTVAL (x) >= 0			\
-	  && INTVAL (x) <= 255)			\
-        return 2;				\
-    case CONST:					\
-    case LABEL_REF:				\
-    case SYMBOL_REF:				\
-      return 4;					\
-    case CONST_DOUBLE:				\
-      return 4;
-
-/* A part of a C `switch' statement that describes the relative costs
-   of constant RTL expressions.  It must contain `case' labels for
-   expression codes `const_int', `const', `symbol_ref', `label_ref'
-   and `const_double'.  Each case must ultimately reach a `return'
-   statement to return the relative cost of the use of that kind of
-   constant value in an expression.  The cost may depend on the
-   precise value of the constant, which is available for examination
-   in X, and the rtx code of the expression in which it is contained,
-   found in OUTER_CODE.
-
-   CODE is the expression code--redundant, since it can be obtained
-   with `GET_CODE (X)'.  */
-
-#define DEFAULT_RTX_COSTS(x, code, outer_code)		\
-{							\
-  int cst = default_rtx_costs (x, code, outer_code);	\
-  if (cst>0)						\
-    return cst; 			                \
-  else if (cst<0)					\
-    total += -cst; 			                \
-  break;						\
-}
-
-/* Like `CONST_COSTS' but applies to nonconstant RTL expressions.
-   This can be used, for example, to indicate how costly a multiply
-   instruction is.  In writing this macro, you can use the construct
-   `COSTS_N_INSNS (N)' to specify a cost equal to N fast
-   instructions.  OUTER_CODE is the code of the expression in which X
-   is contained.
-
-   This macro is optional; do not define it if the default cost
-   assumptions are adequate for the target machine.  */
-
-#define ADDRESS_COST(ADDRESS) avr_address_cost (ADDRESS)
-
-/* An expression giving the cost of an addressing mode that contains
-   ADDRESS.  If not defined, the cost is computed from the ADDRESS
-   expression and the `CONST_COSTS' values.
-
-   For most CISC machines, the default cost is a good approximation
-   of the true cost of the addressing mode.  However, on RISC
-   machines, all instructions normally have the same length and
-   execution time.  Hence all addresses will have equal costs.
-
-   In cases where more than one form of an address is known, the form
-   with the lowest cost will be used.  If multiple forms have the
-   same, lowest, cost, the one that is the most complex will be used.
-
-   For example, suppose an address that is equal to the sum of a
-   register and a constant is used twice in the same basic block.
-   When this macro is not defined, the address will be computed in a
-   register and memory references will be indirect through that
-   register.  On machines where the cost of the addressing mode
-   containing the sum is no higher than that of a simple indirect
-   reference, this will produce an additional instruction and
-   possibly require an additional register.  Proper specification of
-   this macro eliminates this overhead for such machines.
-
-   Similar use of this macro is made in strength reduction of loops.
-
-   ADDRESS need not be valid as an address.  In such a case, the cost
-   is not relevant and can be any value; invalid addresses need not be
-   assigned a different cost.
-
-   On machines where an address involving more than one register is as
-   cheap as an address computation involving only one register,
-   defining `ADDRESS_COST' to reflect this can cause two registers to
-   be live over a region of code where only one would have been if
-   `ADDRESS_COST' were not defined in that manner.  This effect should
-   be considered in the definition of this macro.  Equivalent costs
-   should probably only be given to addresses with different numbers
-   of registers on machines with lots of registers.
-
-   This macro will normally either not be defined or be defined as a
-   constant.  */
 
 #define REGISTER_MOVE_COST(MODE, FROM, TO) ((FROM) == STACK_REG ? 6 \
 					    : (TO) == STACK_REG ? 12 \
@@ -1679,10 +1581,10 @@ do {									    \
    cost many times greater than aligned accesses, for example if they
    are emulated in a trap handler.
 
-   When this macro is non-zero, the compiler will act as if
-   `STRICT_ALIGNMENT' were non-zero when generating code for block
+   When this macro is nonzero, the compiler will act as if
+   `STRICT_ALIGNMENT' were nonzero when generating code for block
    moves.  This can cause significantly more instructions to be
-   produced.  Therefore, do not set this macro non-zero if unaligned
+   produced.  Therefore, do not set this macro nonzero if unaligned
    accesses only add a cycle or two to the time for a memory access.
 
    If the value of this macro is always zero, it need not be defined.
@@ -1754,13 +1656,13 @@ do {									    \
 #define EXTRA_SECTION_FUNCTIONS						      \
 									      \
 void									      \
-progmem_section (void)							      \
+progmem_section ()							      \
 {									      \
   if (in_section != in_progmem)						      \
     {									      \
       fprintf (asm_out_file,						      \
 	       "\t.section .progmem.gcc_sw_table, \"%s\", @progbits\n",	      \
-	       AVR_MEGA ? "a" : "ax"); 					      \
+	       AVR_MEGA ? "a" : "ax");					      \
       /* Should already be aligned, this is just to be safe if it isn't.  */  \
       fprintf (asm_out_file, "\t.p2align 1\n");				      \
       in_section = in_progmem;						      \
@@ -1845,9 +1747,9 @@ progmem_section (void)							      \
 
 #define OBJC_PROLOGUE {}
 /* A C statement to output any assembler statements which are
-   required to precede any Objective C object definitions or message
+   required to precede any Objective-C object definitions or message
    sending.  The statement is executed only when compiling an
-   Objective C program.  */
+   Objective-C program.  */
 
 
 #define ASM_OUTPUT_ASCII(FILE, P, SIZE)	 gas_output_ascii (FILE,P,SIZE)
@@ -1915,17 +1817,6 @@ do {									\
    This macro controls how the assembler definitions of uninitialized
    static variables are output.  */
 
-#define ASM_OUTPUT_LABEL(STREAM, NAME)		\
-{						\
-  assemble_name (STREAM, NAME);			\
-  fprintf (STREAM, ":\n");			\
-}
-/* A C statement (sans semicolon) to output to the stdio stream
-   STREAM the assembler definition of a label named NAME.  Use the
-   expression `assemble_name (STREAM, NAME)' to output the name
-   itself; before and after that, output the additional assembler
-   syntax for defining the name, and a newline.  */
-
 #undef TYPE_ASM_OP
 #undef SIZE_ASM_OP
 #undef WEAK_ASM_OP
@@ -1947,16 +1838,12 @@ do {									\
    is just a default.  You may need to override it in your machine-
    specific tm.h file (depending upon the particulars of your assembler).  */
 
-
-#define ASM_DECLARE_FUNCTION_NAME(FILE, NAME, DECL)	\
-do {						   	\
-     fprintf (FILE, "%s", TYPE_ASM_OP);	   		\
-     assemble_name (FILE, NAME);		   	\
-     putc (',', FILE);				   	\
-     fprintf (FILE, TYPE_OPERAND_FMT, "function");	\
-     putc ('\n', FILE);				   	\
-     ASM_OUTPUT_LABEL (FILE, NAME);		   	\
+#define ASM_DECLARE_FUNCTION_NAME(FILE, NAME, DECL)		\
+do {								\
+     ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "function");	\
+     ASM_OUTPUT_LABEL (FILE, NAME);				\
 } while (0)
+
 /* A C statement (sans semicolon) to output to the stdio stream
    STREAM any text necessary for declaring the name NAME of a
    function which is being defined.  This macro is responsible for
@@ -1970,20 +1857,7 @@ do {						   	\
 #define ASM_DECLARE_FUNCTION_SIZE(FILE, FNAME, DECL)			\
   do {									\
     if (!flag_inhibit_size_directive)					\
-      {									\
-        char label[256];						\
-	static int labelno;						\
-	labelno++;							\
-	ASM_GENERATE_INTERNAL_LABEL (label, "Lfe", labelno);		\
-	ASM_OUTPUT_INTERNAL_LABEL (FILE, "Lfe", labelno);		\
-	fprintf (FILE, "%s", SIZE_ASM_OP);				\
-	assemble_name (FILE, (FNAME));					\
-        fprintf (FILE, ",");						\
-	assemble_name (FILE, label);					\
-        fprintf (FILE, "-");						\
-	assemble_name (FILE, (FNAME));					\
-	putc ('\n', FILE);						\
-      }									\
+      ASM_OUTPUT_MEASURED_SIZE (FILE, FNAME);				\
   } while (0)
 /* A C statement (sans semicolon) to output to the stdio stream
    STREAM any text necessary for declaring the size of a function
@@ -1994,22 +1868,17 @@ do {						   	\
    If this macro is not defined, then the function size is not
    defined.  */
 
-#define ASM_DECLARE_OBJECT_NAME(FILE, NAME, DECL)			  \
-do {									  \
-      fprintf (FILE, "%s", TYPE_ASM_OP);				  \
-      assemble_name (FILE, NAME);					  \
-      putc (',', FILE);							  \
-      fprintf (FILE, TYPE_OPERAND_FMT, "object");			  \
-      putc ('\n', FILE);						  \
-      size_directive_output = 0;					  \
-      if (!flag_inhibit_size_directive && DECL_SIZE (DECL))		  \
-	{								  \
-	  size_directive_output = 1;					  \
-	  fprintf (FILE, "%s", SIZE_ASM_OP);				  \
-	  assemble_name (FILE, NAME);					  \
-	  fprintf (FILE, ",%d\n",  int_size_in_bytes (TREE_TYPE (DECL))); \
-    }									  \
-  ASM_OUTPUT_LABEL(FILE, NAME);						  \
+#define ASM_DECLARE_OBJECT_NAME(FILE, NAME, DECL)			\
+do {									\
+  ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "object");			\
+  size_directive_output = 0;						\
+  if (!flag_inhibit_size_directive && DECL_SIZE (DECL))			\
+    {									\
+      size_directive_output = 1;					\
+      ASM_OUTPUT_SIZE_DIRECTIVE (FILE, NAME,				\
+				 int_size_in_bytes (TREE_TYPE (DECL)));	\
+    }									\
+  ASM_OUTPUT_LABEL(FILE, NAME);						\
 } while (0)
 /* A C statement (sans semicolon) to output to the stdio stream
    STREAM any text necessary for declaring the name NAME of an
@@ -2021,20 +1890,22 @@ do {									  \
    If this macro is not defined, then the variable name is defined in
    the usual manner as a label (by means of `ASM_OUTPUT_LABEL').  */
 
+#undef ASM_FINISH_DECLARE_OBJECT
 #define ASM_FINISH_DECLARE_OBJECT(FILE, DECL, TOP_LEVEL, AT_END)	 \
 do {									 \
      const char *name = XSTR (XEXP (DECL_RTL (DECL), 0), 0);		 \
+     HOST_WIDE_INT size;						 \
      if (!flag_inhibit_size_directive && DECL_SIZE (DECL)		 \
          && ! AT_END && TOP_LEVEL					 \
 	 && DECL_INITIAL (DECL) == error_mark_node			 \
 	 && !size_directive_output)					 \
        {								 \
 	 size_directive_output = 1;					 \
-	 fprintf (FILE, "%s", SIZE_ASM_OP);				 \
-	 assemble_name (FILE, name);					 \
-	 fprintf (FILE, ",%d\n",  int_size_in_bytes (TREE_TYPE (DECL))); \
+	 size = int_size_in_bytes (TREE_TYPE (DECL));			 \
+	 ASM_OUTPUT_SIZE_DIRECTIVE (FILE, name, size);			 \
        }								 \
    } while (0)
+
 /* A C statement (sans semicolon) to finish up declaring a variable
    name once the compiler has processed its initializer fully and
    thus has had a chance to determine the size of an array when
@@ -2081,26 +1952,14 @@ do {									 \
    If your target assembler doesn't support the .string directive, you
    should define this to zero.  */
 
-#define ASM_GLOBALIZE_LABEL(STREAM, NAME)	\
-do {						\
-  fprintf (STREAM, ".global\t");		\
-  assemble_name (STREAM, NAME);			\
-  fprintf (STREAM, "\n");			\
-}						\
-while (0)
-     
-/* A C statement (sans semicolon) to output to the stdio stream
-   STREAM some commands that will make the label NAME global; that
-   is, available for reference from other files.  Use the expression
-   `assemble_name (STREAM, NAME)' to output the name itself; before
-   and after that, output the additional assembler syntax for making
-   that name global, and a newline.  */
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP ".global\t"
 
-#define ASM_WEAKEN_LABEL(FILE, NAME) 	\
+#define ASM_WEAKEN_LABEL(FILE, NAME)	\
   do					\
     {					\
       fputs ("\t.weak\t", (FILE));	\
-      assemble_name ((FILE), (NAME)); 	\
+      assemble_name ((FILE), (NAME));	\
       fputc ('\n', (FILE));		\
     }					\
   while (0)
@@ -2147,32 +2006,13 @@ while (0)
    setting the `DECL_ONE_ONLY' flag is enough to mark a declaration to
    be emitted as one-only.  */
 
-#define ASM_OUTPUT_INTERNAL_LABEL(STREAM, PREFIX, NUM)	\
-fprintf(STREAM, ".%s%d:\n", PREFIX, NUM)
-/* A C statement to output to the stdio stream STREAM a label whose
-   name is made from the string PREFIX and the number NUM.
-
-   It is absolutely essential that these labels be distinct from the
-   labels used for user-level functions and variables.  Otherwise,
-   certain programs will have name conflicts with internal labels.
-
-   It is desirable to exclude internal labels from the symbol table
-   of the object file.  Most assemblers have a naming convention for
-   labels that should be excluded; on many systems, the letter `L' at
-   the beginning of a label has this effect.  You should find out what
-   convention your system uses, and follow it.
-
-   The usual definition of this macro is as follows:
-
-   fprintf (STREAM, "L%s%d:\n", PREFIX, NUM)  */
-
 #define ASM_GENERATE_INTERNAL_LABEL(STRING, PREFIX, NUM)	\
 sprintf (STRING, "*.%s%d", PREFIX, NUM)
 /* A C statement to store into the string STRING a label whose name
    is made from the string PREFIX and the number NUM.
 
    This string, when output subsequently by `assemble_name', should
-   produce the output that `ASM_OUTPUT_INTERNAL_LABEL' would produce
+   produce the output that `(*targetm.asm_out.internal_label)' would produce
    with the same PREFIX and NUM.
 
    If the string begins with `*', then `assemble_name' will output
@@ -2182,27 +2022,6 @@ sprintf (STRING, "*.%s%d", PREFIX, NUM)
    output the string, and may change it.  (Of course,
    `ASM_OUTPUT_LABELREF' is also part of your machine description, so
    you should know what it does on your machine.)  */
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)	\
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),	\
-  sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO)))
-
-/* A C expression to assign to OUTVAR (which is a variable of type
-   `char *') a newly allocated string made from the string NAME and
-   the number NUMBER, with some suitable punctuation added.  Use
-   `alloca' to get space for the string.
-
-   The string will be used as an argument to `ASM_OUTPUT_LABELREF' to
-   produce an assembler label for an internal static variable whose
-   name is NAME.  Therefore, the string must be such as to result in
-   valid assembler code.  The argument NUMBER is different each time
-   this macro is executed; it prevents conflicts between
-   similarly-named internal static variables in different scopes.
-
-   Ideally this string should not be a valid C identifier, to prevent
-   any conflict with the user's own symbols.  Most assemblers allow
-   periods or percent signs in assembler symbols; putting at least
-   one of these between the name and the number will suffice.  */
 
 /* `ASM_OUTPUT_WEAK_ALIAS (STREAM, NAME, VALUE)'
    A C statement to output to the stdio stream STREAM assembler code
@@ -2348,18 +2167,18 @@ sprintf (STRING, "*.%s%d", PREFIX, NUM)
    The definition should be a C statement to output to the stdio
    stream STREAM an assembler pseudo-instruction to generate a
    reference to a label.  VALUE is the number of an internal label
-   whose definition is output using `ASM_OUTPUT_INTERNAL_LABEL'.  For
+   whose definition is output using `(*targetm.asm_out.internal_label)'.  For
    example,
 
    fprintf (STREAM, "\t.word L%d\n", VALUE)  */
 
 #define ASM_OUTPUT_CASE_LABEL(STREAM, PREFIX, NUM, TABLE) \
-  progmem_section (), ASM_OUTPUT_INTERNAL_LABEL (STREAM, PREFIX, NUM)
+  progmem_section (), (*targetm.asm_out.internal_label) (STREAM, PREFIX, NUM)
 
 /* `ASM_OUTPUT_CASE_LABEL (STREAM, PREFIX, NUM, TABLE)'
    Define this if the label before a jump-table needs to be output
    specially.  The first three arguments are the same as for
-   `ASM_OUTPUT_INTERNAL_LABEL'; the fourth argument is the jump-table
+   `(*targetm.asm_out.internal_label)'; the fourth argument is the jump-table
    which follows (a `jump_insn' containing an `addr_vec' or
    `addr_diff_vec').
 
@@ -2367,7 +2186,7 @@ sprintf (STRING, "*.%s%d", PREFIX, NUM)
    the table.
 
    If this macro is not defined, these labels are output with
-   `ASM_OUTPUT_INTERNAL_LABEL'.  */
+   `(*targetm.asm_out.internal_label)'.  */
 
 /* `ASM_OUTPUT_CASE_END (STREAM, NUM, TABLE)'
    Define this if something special must be output at the end of a
@@ -2567,15 +2386,13 @@ extern int avr_case_values_threshold;
 
    Do not define this macro if it does not need to do anything.  */
 
+#define CC1PLUS_SPEC "%{!frtti:-fno-rtti} \
+    %{!fenforce-eh-specs:-fno-enforce-eh-specs} \
+    %{!fexceptions:-fno-exceptions}"
+/* A C string constant that tells the GNU CC drvier program options to
+   pass to `cc1plus'.  */
+
 #define ASM_SPEC "%{mmcu=*:-mmcu=%*}"
-/* A C string constant that tells the GNU CC driver program options to
-   pass to the assembler.  It can also specify how to translate
-   options you give to GNU CC into options for GNU CC to pass to the
-   assembler.  See the file `sun3.h' for an example of this.
-
-   Do not define this macro if it does not need to do anything.  */
-
-#define ASM_FINAL_SPEC ""
 /* A C string constant that tells the GNU CC driver program how to
    run any programs which cleanup after the normal assembler.
    Normally, this is not needed.  See the file `mips.h' for an
@@ -2727,8 +2544,6 @@ extern int avr_case_values_threshold;
 extern struct rtx_def *tmp_reg_rtx;
 extern struct rtx_def *zero_reg_rtx;
 extern struct rtx_def *ldi_reg_rtx;
-
-#define TARGET_FLOAT_FORMAT IEEE_FLOAT_FORMAT
 
 #define PREFERRED_DEBUGGING_TYPE DBX_DEBUG
 

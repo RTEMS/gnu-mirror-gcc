@@ -21,12 +21,14 @@
  * MA 02111-1307, USA.                                                      *
  *                                                                          *
  * GNAT was originally developed  by the GNAT team at  New York University. *
- * It is now maintained by Ada Core Technologies Inc (http://www.gnat.com). *
+ * Extensive contributions were provided by Ada Core Technologies Inc.      *
  *                                                                          *
  ****************************************************************************/
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "real.h"
 #include "flags.h"
@@ -87,6 +89,10 @@ tree gnu_block_stack;
    the raised exception.  Nonzero means we are in an exception
    handler.  Not used in the zero-cost case.  */
 static GTY(()) tree gnu_except_ptr_stack;
+
+/* List of TREE_LIST nodes containing pending elaborations lists.
+   used to prevent the elaborations being reclaimed by GC.  */
+static GTY(()) tree gnu_pending_elaboration_lists;
 
 /* Map GNAT tree codes to GCC tree codes for simple expressions.  */
 static enum tree_code gnu_codes[Number_Node_Kinds];
@@ -576,11 +582,13 @@ tree_transform (gnat_node)
 		gigi_abort (336);
 
 	      else
-		gnu_result
-		  = build_real (gnu_result_type,
-				REAL_VALUE_LDEXP
-				(TREE_REAL_CST (gnu_result),
-				 - UI_To_Int (Denominator (ur_realval))));
+		{
+		  REAL_VALUE_TYPE tmp;
+
+		  real_ldexp (&tmp, &TREE_REAL_CST (gnu_result),
+			      - UI_To_Int (Denominator (ur_realval)));
+		  gnu_result = build_real (gnu_result_type, tmp);
+		}
 	    }
 
 	  /* Now see if we need to negate the result.  Do it this way to
@@ -2609,8 +2617,7 @@ tree_transform (gnat_node)
 	   the body so that the line number notes are written 
 	   correctly.  */
 	set_lineno (gnat_node, 0);
-	DECL_SOURCE_FILE (gnu_subprog_decl) = input_filename;
-	DECL_SOURCE_LINE (gnu_subprog_decl) = lineno;
+	annotate_with_file_line (gnu_subprog_decl, input_filename, lineno);
 
 	begin_subprog_body (gnu_subprog_decl);
 	set_lineno (gnat_node, 1);
@@ -5296,6 +5303,10 @@ build_unit_elab (gnat_unit, body_p, gnu_elab_list)
   if (gnu_elab_list == 0)
     return 1;
 
+  /* Prevent the elaboration list from being reclaimed by the GC.  */
+  gnu_pending_elaboration_lists = chainon (gnu_pending_elaboration_lists,
+					   gnu_elab_list);
+
   /* Set our file and line number to that of the object and set up the
      elaboration routine.  */
   gnu_decl = create_subprog_decl (create_concat_name (gnat_unit,
@@ -5328,8 +5339,8 @@ build_unit_elab (gnat_unit, body_p, gnu_elab_list)
       {
 	tree lhs = TREE_PURPOSE (gnu_elab_list);
 
-	input_filename = DECL_SOURCE_FILE (lhs);
-	lineno = DECL_SOURCE_LINE (lhs);
+	input_filename = TREE_FILENAME (lhs);
+	lineno = TREE_LINENO (lhs);
 
 	/* If LHS has a padded type, convert it to the unpadded type
 	   so the assignment is done properly.  */
@@ -5355,6 +5366,9 @@ build_unit_elab (gnat_unit, body_p, gnu_elab_list)
   poplevel (kept_level_p (), 1, 0);
   gnu_block_stack = TREE_CHAIN (gnu_block_stack);
   end_subprog_body ();
+
+  /* We are finished with the elaboration list it can now be discarded.  */
+  gnu_pending_elaboration_lists = TREE_CHAIN (gnu_pending_elaboration_lists);
 
   /* If there were no insns, we don't need an elab routine.  It would
      be nice to not output this one, but there's no good way to do that.  */

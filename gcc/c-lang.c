@@ -22,14 +22,16 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "c-tree.h"
 #include "c-common.h"
 #include "ggc.h"
 #include "langhooks.h"
 #include "langhooks-def.h"
+#include "tree-inline.h"
 
-static const char *c_init PARAMS ((const char *));
 static void c_init_options PARAMS ((void));
 
 /* ### When changing hooks, consider if ObjC needs changing too!! ### */
@@ -37,13 +39,13 @@ static void c_init_options PARAMS ((void));
 #undef LANG_HOOKS_NAME
 #define LANG_HOOKS_NAME "GNU C"
 #undef LANG_HOOKS_INIT
-#define LANG_HOOKS_INIT c_init
+#define LANG_HOOKS_INIT c_objc_common_init
 #undef LANG_HOOKS_FINISH
 #define LANG_HOOKS_FINISH c_common_finish
 #undef LANG_HOOKS_INIT_OPTIONS
 #define LANG_HOOKS_INIT_OPTIONS c_init_options
 #undef LANG_HOOKS_DECODE_OPTION
-#define LANG_HOOKS_DECODE_OPTION c_decode_option
+#define LANG_HOOKS_DECODE_OPTION c_common_decode_option
 #undef LANG_HOOKS_POST_OPTIONS
 #define LANG_HOOKS_POST_OPTIONS c_common_post_options
 #undef LANG_HOOKS_GET_ALIAS_SET
@@ -52,6 +54,8 @@ static void c_init_options PARAMS ((void));
 #define LANG_HOOKS_SAFE_FROM_P c_safe_from_p
 #undef LANG_HOOKS_EXPAND_EXPR
 #define LANG_HOOKS_EXPAND_EXPR c_expand_expr
+#undef LANG_HOOKS_EXPAND_DECL
+#define LANG_HOOKS_EXPAND_DECL c_expand_decl
 #undef LANG_HOOKS_MARK_ADDRESSABLE
 #define LANG_HOOKS_MARK_ADDRESSABLE c_mark_addressable
 #undef LANG_HOOKS_PARSE_FILE
@@ -83,18 +87,26 @@ static void c_init_options PARAMS ((void));
 #undef LANG_HOOKS_FORMAT_ATTRIBUTE_TABLE
 #define LANG_HOOKS_FORMAT_ATTRIBUTE_TABLE c_common_format_attribute_table
 
+#undef LANG_HOOKS_TREE_INLINING_WALK_SUBTREES
+#define LANG_HOOKS_TREE_INLINING_WALK_SUBTREES \
+  c_walk_subtrees
 #undef LANG_HOOKS_TREE_INLINING_CANNOT_INLINE_TREE_FN
 #define LANG_HOOKS_TREE_INLINING_CANNOT_INLINE_TREE_FN \
   c_cannot_inline_tree_fn
 #undef LANG_HOOKS_TREE_INLINING_DISREGARD_INLINE_LIMITS
 #define LANG_HOOKS_TREE_INLINING_DISREGARD_INLINE_LIMITS \
   c_disregard_inline_limits
+#undef LANG_HOOKS_TREE_INLINING_TREE_CHAIN_MATTERS_P
+#define LANG_HOOKS_TREE_INLINING_TREE_CHAIN_MATTERS_P \
+  c_tree_chain_matters_p
 #undef LANG_HOOKS_TREE_INLINING_ANON_AGGR_TYPE_P
 #define LANG_HOOKS_TREE_INLINING_ANON_AGGR_TYPE_P \
   anon_aggr_type_p
 #undef LANG_HOOKS_TREE_INLINING_CONVERT_PARM_FOR_INLINING
 #define LANG_HOOKS_TREE_INLINING_CONVERT_PARM_FOR_INLINING \
   c_convert_parm_for_inlining
+#undef LANG_HOOKS_TREE_DUMP_DUMP_TREE_FN
+#define LANG_HOOKS_TREE_DUMP_DUMP_TREE_FN c_dump_tree
 
 #undef LANG_HOOKS_TYPE_FOR_MODE
 #define LANG_HOOKS_TYPE_FOR_MODE c_common_type_for_mode
@@ -110,6 +122,10 @@ static void c_init_options PARAMS ((void));
 #define LANG_HOOKS_INCOMPLETE_TYPE_ERROR c_incomplete_type_error
 #undef LANG_HOOKS_TYPE_PROMOTES_TO
 #define LANG_HOOKS_TYPE_PROMOTES_TO c_type_promotes_to
+
+/* Hooks for tree simplification.  */
+#undef LANG_HOOKS_SIMPLIFY_EXPR
+#define LANG_HOOKS_SIMPLIFY_EXPR c_simplify_expr
 
 /* ### When changing hooks, consider if ObjC needs changing too!! ### */
 
@@ -157,13 +173,6 @@ c_init_options ()
   c_common_init_options (clk_c);
 }
 
-static const char *
-c_init (filename)
-     const char *filename;
-{
-  return c_objc_common_init (filename);
-}
-
 /* Used by c-lex.c, but only for objc.  */
 
 tree
@@ -180,14 +189,21 @@ is_class_name (arg)
   return 0;
 }
 
+tree
+objc_is_id (arg)
+    tree arg ATTRIBUTE_UNUSED;
+{
+  return 0;
+}
+
 void
-maybe_objc_check_decl (decl)
+objc_check_decl (decl)
      tree decl ATTRIBUTE_UNUSED;
 {
 }
 
 int
-maybe_objc_comptypes (lhs, rhs, reflexive)
+objc_comptypes (lhs, rhs, reflexive)
      tree lhs ATTRIBUTE_UNUSED;
      tree rhs ATTRIBUTE_UNUSED;
      int reflexive ATTRIBUTE_UNUSED;
@@ -196,13 +212,7 @@ maybe_objc_comptypes (lhs, rhs, reflexive)
 }
 
 tree
-maybe_building_objc_message_expr ()
-{
-  return 0;
-}
-
-int
-recognize_objc_keyword ()
+objc_message_selector ()
 {
   return 0;
 }

@@ -249,16 +249,7 @@ enum reg_class { NO_REGS, R1_REGS, GENERAL_REGS, FPUPPER_REGS, FP_REGS,
   {0x00000000, 0x00000000, 0x01000000},	/* SHIFT_REGS */		\
   {0xfffffffe, 0xffffffff, 0x01ffffff}}	/* ALL_REGS */
 
-/* This may not actually be necessary anymore.  But until I can prove
-   otherwise it will stay.  */
-#define CLASS_CANNOT_CHANGE_MODE	NO_REGS
-
-/* Defines illegal mode changes for CLASS_CANNOT_CHANGE_MODE.  */
-#define CLASS_CANNOT_CHANGE_MODE_P(FROM,TO) \
-  (GET_MODE_SIZE (FROM) != GET_MODE_SIZE (TO))
-
-/* The same information, inverted:
-   Return the class number of the smallest class containing
+/* Return the class number of the smallest class containing
    reg number REGNO.  This could be a conditional expression
    or could index an array.  */
 
@@ -268,14 +259,12 @@ enum reg_class { NO_REGS, R1_REGS, GENERAL_REGS, FPUPPER_REGS, FP_REGS,
    : (REGNO) < 32 ? GENERAL_REGS					\
    : (REGNO) < 56 ? FP_REGS						\
    : (REGNO) < 88 ? FPUPPER_REGS					\
-   : (REGNO) < 88 ? FPUPPER_REGS					\
    : SHIFT_REGS)
 
 /* Get reg_class from a letter such as appears in the machine description.  */
 /* Keep 'x' for backward compatibility with user asm.   */
 #define REG_CLASS_FROM_LETTER(C) \
   ((C) == 'f' ? FP_REGS :					\
-   (C) == 'y' ? FPUPPER_REGS :					\
    (C) == 'y' ? FPUPPER_REGS :					\
    (C) == 'x' ? FP_REGS :					\
    (C) == 'q' ? SHIFT_REGS :					\

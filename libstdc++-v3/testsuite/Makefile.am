@@ -1,6 +1,6 @@
 ## Makefile for the testsuite subdirectory of the GNU C++ Standard library.
 ##
-## Copyright (C) 2001, 2002 Free Software Foundation, Inc.
+## Copyright (C) 2001, 2002, 2003 Free Software Foundation, Inc.
 ##
 ## This file is part of the libstdc++ version 3 distribution.
 ## Process this file with automake to produce Makefile.in.
@@ -36,12 +36,43 @@ RUNTEST = `if [ -f @glibcpp_srcdir@/../dejagnu/runtest ] ; then \
 AM_RUNTESTFLAGS =
 RUNTESTFLAGS =
 
-CXX = @glibcpp_CXX@ @GLIBCPP_INCLUDES@
-# Use common includes from acinclude.m4/GLIBCPP_EXPORT_INCLUDES
-INCLUDES = @TOPLEVEL_INCLUDES@
+## CXX is actually a "C" compiler. These are real C++ programs.
+## Do the same thing as `testsuite_flags --build-cxx`
+CXX_fake = @glibcpp_CXX@ 
+CXX=`echo $(CXX_fake) | sed 's/xgcc/g++/g'`
+CXXLINK = \
+	LD_RUN_PATH=${LD_RUN_PATH:+$LD_RUN_PATH:}${glibcpp_builddir}/src/.libs\
+	$(LIBTOOL) --tag=CXX --mode=link $(CXX) \
+	$(AM_CXXFLAGS) $(CXXFLAGS) $(LDFLAGS) -o $@
 
+INCLUDES = \
+	-nostdinc++ \
+	@GLIBCPP_INCLUDES@ @LIBSUPCXX_INCLUDES@ @TOPLEVEL_INCLUDES@ 
+
+## Build support library.
 noinst_LIBRARIES = libv3test.a
+libv3test_a_SOURCES = testsuite_hooks.cc testsuite_allocator.cc
 
-libv3test_a_SOURCES = testsuite_hooks.cc
+## Build support utilities.
+## Only build this as native, as need to find startup files and libc to link.
+if GLIBCPP_BUILD_ABI_CHECK
+noinst_PROGRAMS = abi_check
+else
+noinst_PROGRAMS = 
+endif
+abi_check_SOURCES = abi_check.cc
 
+# Enable wchar_t tests if capable.
+if GLIBCPP_TEST_WCHAR_T
+all-local: stamp_wchar
+else
+all-local:
+endif
 
+stamp_wchar:
+	touch testsuite_wchar_t
+
+# By adding these files here, automake will remove them for 'make clean'
+CLEANFILES = *.txt *.tst *.exe core* filebuf_* tmp ostream_* *.log *.sum \
+	testsuite_files testsuite_wchar_t \
+	site.exp abi_check 

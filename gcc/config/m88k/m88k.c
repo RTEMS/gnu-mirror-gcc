@@ -23,6 +23,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "regs.h"
 #include "hard-reg-set.h"
@@ -74,6 +76,11 @@ static void m88k_svr3_asm_out_destructor PARAMS ((rtx, int));
 static void m88k_select_section PARAMS ((tree, int, unsigned HOST_WIDE_INT));
 static int m88k_adjust_cost PARAMS ((rtx, rtx, rtx, int));
 static void m88k_encode_section_info PARAMS ((tree, int));
+#ifdef AS_BUG_DOT_LABELS
+static void m88k_internal_label PARAMS ((FILE *, const char *, unsigned long));
+#endif
+static bool m88k_rtx_costs PARAMS ((rtx, int, int, int *));
+static int m88k_address_cost PARAMS ((rtx));
 
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_BYTE_OP
@@ -101,6 +108,15 @@ static void m88k_encode_section_info PARAMS ((tree, int));
 
 #undef TARGET_ENCODE_SECTION_INFO
 #define TARGET_ENCODE_SECTION_INFO  m88k_encode_section_info
+#ifdef AS_BUG_DOT_LABELS
+#undef TARGET_ASM_INTERNAL_LABEL
+#define  TARGET_ASM_INTERNAL_LABEL m88k_internal_label
+#endif
+
+#undef TARGET_RTX_COSTS
+#define TARGET_RTX_COSTS m88k_rtx_costs
+#undef TARGET_ADDRESS_COST
+#define TARGET_ADDRESS_COST m88k_address_cost
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -246,7 +262,7 @@ output_load_const_dimode (operands)
    do the move.  Otherwise, return 0 and the caller will emit the move
    normally.
 
-   SCRATCH if non zero can be used as a scratch register for the move
+   SCRATCH if nonzero can be used as a scratch register for the move
    operation.  It is provided by a SECONDARY_RELOAD_* macro if needed.  */
 
 int
@@ -315,7 +331,7 @@ emit_move_sequence (operands, mode, scratch)
 /* Return a legitimate reference for ORIG (either an address or a MEM)
    using the register REG.  If PIC and the address is already
    position-independent, use ORIG.  Newly generated position-independent
-   addresses go into a reg.  This is REG if non zero, otherwise we
+   addresses go into a reg.  This is REG if nonzero, otherwise we
    allocate register(s) as necessary.  If this is called during reload,
    and we need a second temp register, then we use SCRATCH, which is
    provided via the SECONDARY_INPUT_RELOAD_CLASS mechanism.  */
@@ -892,7 +908,9 @@ output_call (operands, addr)
       jump = XVECEXP (final_sequence, 0, 1);
       if (GET_CODE (jump) == JUMP_INSN)
 	{
+#ifndef USE_GAS
 	  rtx low, high;
+#endif
 	  const char *last;
 	  rtx dest = XEXP (SET_SRC (PATTERN (jump)), 0);
 	  int delta = 4 * (INSN_ADDRESSES (INSN_UID (dest))
@@ -1714,7 +1732,7 @@ void
 output_label (label_number)
      int label_number;
 {
-  ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L", label_number);
+  (*targetm.asm_out.internal_label) (asm_out_file, "L", label_number);
 }
 
 /* Generate the assembly code for function entry.
@@ -1906,7 +1924,7 @@ m88k_layout_frame ()
   m88k_stack_size = m88k_fp_offset + STARTING_FRAME_OFFSET;
 
   /* First, combine m88k_stack_size and size.  If m88k_stack_size is
-     non-zero, align the frame size to 8 mod 16; otherwise align the
+     nonzero, align the frame size to 8 mod 16; otherwise align the
      frame size to 0 mod 16.  (If stacks are 8 byte aligned, this ends
      up as a NOP.  */
   {
@@ -1947,7 +1965,6 @@ uses_arg_area_p ()
   register tree parm;
 
   if (current_function_decl == 0
-      || current_function_varargs
       || variable_args_p)
     return 1;
 
@@ -2619,8 +2636,7 @@ m88k_build_va_list ()
 /* Implement `va_start' for varargs and stdarg.  */
 
 void
-m88k_va_start (stdarg_p, valist, nextarg)
-     int stdarg_p ATTRIBUTE_UNUSED;
+m88k_va_start (valist, nextarg)
      tree valist;
      rtx nextarg ATTRIBUTE_UNUSED;
 {
@@ -2923,7 +2939,7 @@ print_operand (file, x, code)
       fprintf (file, "%d", value);
       return;
 
-    case 'S': /* compliment the value and then... */
+    case 'S': /* complement the value and then... */
       value = ~value;
     case 's': /* print the width and offset values forming the integer
 		 constant with a SET instruction.  See integer_ok_for_set. */
@@ -3339,5 +3355,103 @@ m88k_encode_section_info (decl, first)
 	       && flag_writable_strings
 	       && TREE_STRING_LENGTH (decl) <= m88k_gp_threshold)
 	SYMBOL_REF_FLAG (XEXP (TREE_CST_RTL (decl), 0)) = 1;
+    }
+}
+
+#ifdef AS_BUG_DOT_LABELS /* The assembler requires a declaration of local.  */
+static void
+m88k_internal_label (stream, prefix, labelno)
+     FILE *stream;
+     const char *prefix;
+     unsigned long labelno;
+{
+  fprintf (stream, TARGET_SVR4 ? ".%s%lu:\n%s.%s%lu\n" : "@%s%ld:\n",
+	   prefix, labelno, INTERNAL_ASM_OP, prefix, labelno);
+}
+#endif
+
+static bool
+m88k_rtx_costs (x, code, outer_code, total)
+     rtx x;
+     int code, outer_code;
+     int *total;
+{
+  switch (code)
+    {
+    /* We assume that any 16 bit integer can easily be recreated, so we
+       indicate 0 cost, in an attempt to get GCC not to optimize things
+       like comparison against a constant.  */
+    case CONST_INT:
+      if (SMALL_INT (x))
+        *total = 0;
+      else if (SMALL_INTVAL (- INTVAL (x)))
+        *total = 2;
+      else if (classify_integer (SImode, INTVAL (x)) != m88k_oru_or)
+        *total = 4;
+      else
+        *total = 7;
+      return true;
+
+    case HIGH:
+      *total = 2;
+      return true;
+
+    case CONST:
+    case LABEL_REF:
+    case SYMBOL_REF:
+      if (flag_pic)
+        *total = (flag_pic == 2) ? 11 : 8;
+      else
+	*total = 5;
+      return true;
+
+    /* The cost of CONST_DOUBLE is zero (if it can be placed in an insn, it
+       is as good as a register; since it can't be placed in any insn, it
+       won't do anything in cse, but it will cause expand_binop to pass the
+       constant to the define_expands).  */
+    case CONST_DOUBLE:
+      *total = 0;
+      return true;
+
+    case MEM:
+      *total = COSTS_N_INSNS (2);
+      return true;
+
+    case MULT:
+      *total = COSTS_N_INSNS (3);
+      return true;
+
+    case DIV:
+    case UDIV:
+    case MOD:
+    case UMOD:
+      *total = COSTS_N_INSNS (38);
+      return true;
+
+    default:
+      return false;
+    }
+}
+
+/* Provide the costs of an addressing mode that contains ADDR.
+   If ADDR is not a valid address, its cost is irrelevant.
+   REG+REG is made slightly more expensive because it might keep
+   a register live for longer than we might like.  */
+static int
+m88k_address_cost (x)
+     rtx x;
+{
+  switch (GET_CODE (x))
+    {
+    case REG:
+    case LO_SUM:
+    case MULT:
+      return 1;
+    case HIGH:
+      return 2;
+    case PLUS:
+      return (REG_P (XEXP (x, 0)) && REG_P (XEXP (x, 1))) ? 2 : 1;
+    default:
+      return 4;
     }
 }

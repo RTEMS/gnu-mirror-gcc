@@ -18,6 +18,10 @@ along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
+/* Name of function (attribute) to translate insn into number of insn
+   alternatives reservation.  */
+#define INSN_ALTS_FUNC_NAME "insn_alts"
+
 /* Defined in genattrtab.c: */
 extern rtx check_attr_test	PARAMS ((rtx, int, int));
 extern rtx make_numeric_value	PARAMS ((int));
@@ -33,7 +37,9 @@ extern void gen_query_cpu_unit		PARAMS ((rtx));
 extern void gen_bypass			PARAMS ((rtx));
 extern void gen_excl_set		PARAMS ((rtx));
 extern void gen_presence_set		PARAMS ((rtx));
+extern void gen_final_presence_set	PARAMS ((rtx));
 extern void gen_absence_set		PARAMS ((rtx));
+extern void gen_final_absence_set	PARAMS ((rtx));
 extern void gen_automaton		PARAMS ((rtx));
 extern void gen_automata_option		PARAMS ((rtx));
 extern void gen_reserv   		PARAMS ((rtx));

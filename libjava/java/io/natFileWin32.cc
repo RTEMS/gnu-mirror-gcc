@@ -1,6 +1,6 @@
 // natFileWin32.cc - Native part of File class.
 
-/* Copyright (C) 1998, 1999, 2002  Red Hat, Inc.
+/* Copyright (C) 1998, 1999, 2002, 2003  Red Hat, Inc.
 
    This file is part of libgcj.
 
@@ -83,10 +83,13 @@ java::io::File::attr (jint query)
 
   JvAssert (query == MODIFIED || query == LENGTH);
 
-  WIN32_FILE_ATTRIBUTE_DATA info;
-  if (! GetFileAttributesEx(buf, GetFileExInfoStandard, &info))
+  WIN32_FIND_DATA info;
+  HANDLE sHandle;
+  if ( ( sHandle = FindFirstFile( buf, &info)) == INVALID_HANDLE_VALUE)
     return 0;
-
+  
+  FindClose( sHandle);
+  
   if (query == LENGTH)
     return ((long long)info.nFileSizeHigh) << 32 | (unsigned long long)info.nFileSizeLow;
   else {
@@ -116,7 +119,8 @@ java::io::File::getCanonicalPath (void)
 jboolean
 java::io::File::isAbsolute (void)
 {
-  if (path->charAt(0) == '/' || path->charAt(0) == '\\')
+  if (path->length() > 0
+      && (path->charAt(0) == '/' || path->charAt(0) == '\\'))
     return true;
   if (path->length() < 3)
     return false;
@@ -142,8 +146,10 @@ java::io::File::performList (java::io::FilenameFilter *filter,
     return NULL;
   char *buf = (char *) __builtin_alloca (JvGetStringUTFLength (canon) + 5);
   jsize total = JvGetStringUTFRegion (canon, 0, canon->length(), buf);
-  // FIXME?
-  strcpy(&buf[total], "\\*.*");
+  if (buf[total-1] == '\\')
+    strcpy (&buf[total], "*.*");
+  else
+    strcpy (&buf[total], "\\*.*");
 
   WIN32_FIND_DATA data;
   HANDLE handle = FindFirstFile (buf, &data);

@@ -27,13 +27,15 @@
  * file might be covered by the  GNU Public License.                        *
  *                                                                          *
  * GNAT was originally developed  by the GNAT team at  New York University. *
- * It is now maintained by Ada Core Technologies Inc (http://www.gnat.com). *
+ * Extensive contributions were provided by Ada Core Technologies Inc.      *
  *                                                                          *
  ****************************************************************************/
 
 /* Include a default definition for TARGET_FLAGS for gnatpsta.  */
 
 #include "config.h"
-#define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
+#include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 
 int target_flags = TARGET_DEFAULT;

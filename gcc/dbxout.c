@@ -1,6 +1,6 @@
 /* Output dbx-format symbol table information from GNU compiler.
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -70,6 +70,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 
 #include "tree.h"
 #include "rtl.h"
@@ -135,10 +137,70 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #define STABS_GCC_MARKER "gcc2_compiled."
 #endif
 
+enum typestatus {TYPE_UNSEEN, TYPE_XREF, TYPE_DEFINED};
+
+/* Structure recording information about a C data type.
+   The status element says whether we have yet output
+   the definition of the type.  TYPE_XREF says we have
+   output it as a cross-reference only.
+   The file_number and type_number elements are used if DBX_USE_BINCL
+   is defined.  */
+
+struct typeinfo GTY(())
+{
+  enum typestatus status;
+  int file_number;
+  int type_number;
+};
+
+/* Vector recording information about C data types.
+   When we first notice a data type (a tree node),
+   we assign it a number using next_type_number.
+   That is its index in this vector.  */
+
+static GTY ((length ("typevec_len"))) struct typeinfo *typevec;
+
+/* Number of elements of space allocated in `typevec'.  */
+
+static GTY(()) int typevec_len;
+
+/* In dbx output, each type gets a unique number.
+   This is the number for the next type output.
+   The number, once assigned, is in the TYPE_SYMTAB_ADDRESS field.  */
+
+static GTY(()) int next_type_number;
+
+/* When using N_BINCL in dbx output, each type number is actually a
+   pair of the file number and the type number within the file.
+   This is a stack of input files.  */
+
+struct dbx_file GTY(())
+{
+  struct dbx_file *next;
+  int file_number;
+  int next_type_number;
+};
+
+/* This is the top of the stack.  */
+
+static GTY(()) struct dbx_file *current_file;
+
+/* This is the next file number to use.  */
+
+static GTY(()) int next_file_number;
+
 /* Typical USG systems don't have stab.h, and they also have
    no use for DBX-format debugging info.  */
 
 #if defined (DBX_DEBUGGING_INFO) || defined (XCOFF_DEBUGGING_INFO)
+
+/* Last source file name mentioned in a NOTE insn.  */
+
+static const char *lastfile;
+
+/* Current working directory.  */
+
+static const char *cwd;
 
 /* Nonzero if we have actually used any of the GDB extensions
    to the debugging format.  The idea is that we use them for the
@@ -155,7 +217,7 @@ static int source_label_number = 1;
 #endif
 
 #ifdef DEBUG_SYMS_TEXT
-#define FORCE_TEXT text_section ();
+#define FORCE_TEXT function_section (current_function_decl);
 #else
 #define FORCE_TEXT
 #endif
@@ -185,72 +247,6 @@ static int source_label_number = 1;
 /* Stream for writing to assembler file.  */
 
 static FILE *asmfile;
-
-/* Last source file name mentioned in a NOTE insn.  */
-
-static const char *lastfile;
-
-/* Current working directory.  */
-
-static const char *cwd;
-
-enum typestatus {TYPE_UNSEEN, TYPE_XREF, TYPE_DEFINED};
-
-/* Structure recording information about a C data type.
-   The status element says whether we have yet output
-   the definition of the type.  TYPE_XREF says we have
-   output it as a cross-reference only.
-   The file_number and type_number elements are used if DBX_USE_BINCL
-   is defined.  */
-
-struct typeinfo
-{
-  enum typestatus status;
-#ifdef DBX_USE_BINCL
-  int file_number;
-  int type_number;
-#endif
-};
-
-/* Vector recording information about C data types.
-   When we first notice a data type (a tree node),
-   we assign it a number using next_type_number.
-   That is its index in this vector.  */
-
-struct typeinfo *typevec;
-
-/* Number of elements of space allocated in `typevec'.  */
-
-static int typevec_len;
-
-/* In dbx output, each type gets a unique number.
-   This is the number for the next type output.
-   The number, once assigned, is in the TYPE_SYMTAB_ADDRESS field.  */
-
-static int next_type_number;
-
-#ifdef DBX_USE_BINCL
-
-/* When using N_BINCL in dbx output, each type number is actually a
-   pair of the file number and the type number within the file.
-   This is a stack of input files.  */
-
-struct dbx_file
-{
-  struct dbx_file *next;
-  int file_number;
-  int next_type_number;
-};
-
-/* This is the top of the stack.  */
-
-static struct dbx_file *current_file;
-
-/* This is the next file number to use.  */
-
-static int next_file_number;
-
-#endif /* DBX_USE_BINCL */
 
 /* These variables are for dbxout_symbol to communicate to
    dbxout_finish_symbol.
@@ -294,6 +290,7 @@ static void dbxout_finish		PARAMS ((const char *));
 static void dbxout_start_source_file	PARAMS ((unsigned, const char *));
 static void dbxout_end_source_file	PARAMS ((unsigned));
 static void dbxout_typedefs		PARAMS ((tree));
+static void dbxout_fptype_value		PARAMS ((tree));
 static void dbxout_type_index		PARAMS ((tree));
 #if DBX_CONTIN_LENGTH > 0
 static void dbxout_continue		PARAMS ((void));
@@ -340,8 +337,8 @@ const struct gcc_debug_hooks dbx_debug_hooks =
   debug_true_tree,		/* ignore_block */
   dbxout_source_line,		/* source_line */
   dbxout_source_line,		/* begin_prologue: just output line info */
-  debug_nothing_int,		/* end_prologue */
-  debug_nothing_void,		/* end_epilogue */
+  debug_nothing_int_charstar,	/* end_prologue */
+  debug_nothing_int_charstar,	/* end_epilogue */
 #ifdef DBX_FUNCTION_FIRST
   dbxout_begin_function,
 #else
@@ -370,7 +367,7 @@ const struct gcc_debug_hooks xcoff_debug_hooks =
   debug_true_tree,		/* ignore_block */
   xcoffout_source_line,
   xcoffout_begin_prologue,	/* begin_prologue */
-  debug_nothing_int,		/* end_prologue */
+  debug_nothing_int_charstar,	/* end_prologue */
   xcoffout_end_epilogue,
   debug_nothing_tree,		/* begin_function */
   xcoffout_end_function,
@@ -392,16 +389,20 @@ dbxout_function_end ()
      the system doesn't insert underscores in front of user generated
      labels.  */
   ASM_GENERATE_INTERNAL_LABEL (lscope_label_name, "Lscope", scope_labelno);
-  ASM_OUTPUT_INTERNAL_LABEL (asmfile, "Lscope", scope_labelno);
+  (*targetm.asm_out.internal_label) (asmfile, "Lscope", scope_labelno);
   scope_labelno++;
 
   /* By convention, GCC will mark the end of a function with an N_FUN
      symbol and an empty string.  */
+#ifdef DBX_OUTPUT_NFUN
+  DBX_OUTPUT_NFUN (asmfile, lscope_label_name, current_function_decl);
+#else
   fprintf (asmfile, "%s\"\",%d,0,0,", ASM_STABS_OP, N_FUN);
   assemble_name (asmfile, lscope_label_name);
   putc ('-', asmfile);
   assemble_name (asmfile, XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0));
   fprintf (asmfile, "\n");
+#endif
 }
 #endif /* DBX_DEBUGGING_INFO */
 
@@ -418,7 +419,7 @@ dbxout_init (input_file_name)
   asmfile = asm_out_file;
 
   typevec_len = 100;
-  typevec = (struct typeinfo *) xcalloc (typevec_len, sizeof typevec[0]);
+  typevec = (struct typeinfo *) ggc_calloc (typevec_len, sizeof typevec[0]);
 
   /* Convert Ltext into the appropriate format for local labels in case
      the system doesn't insert underscores in front of user generated
@@ -461,7 +462,7 @@ dbxout_init (input_file_name)
   assemble_name (asmfile, ltext_label_name);
   fputc ('\n', asmfile);
   text_section ();
-  ASM_OUTPUT_INTERNAL_LABEL (asmfile, "Ltext", 0);
+  (*targetm.asm_out.internal_label) (asmfile, "Ltext", 0);
 #endif /* no DBX_OUTPUT_MAIN_SOURCE_FILENAME */
 
 #ifdef DBX_OUTPUT_GCC_MARKER
@@ -477,7 +478,7 @@ dbxout_init (input_file_name)
   next_type_number = 1;
 
 #ifdef DBX_USE_BINCL
-  current_file = (struct dbx_file *) xmalloc (sizeof *current_file);
+  current_file = (struct dbx_file *) ggc_alloc (sizeof *current_file);
   current_file->next = NULL;
   current_file->file_number = 0;
   current_file->next_type_number = 1;
@@ -534,7 +535,7 @@ dbxout_start_source_file (line, filename)
      const char *filename ATTRIBUTE_UNUSED;
 {
 #ifdef DBX_USE_BINCL
-  struct dbx_file *n = (struct dbx_file *) xmalloc (sizeof *n);
+  struct dbx_file *n = (struct dbx_file *) ggc_alloc (sizeof *n);
 
   n->next = current_file;
   n->file_number = next_file_number++;
@@ -553,12 +554,8 @@ dbxout_end_source_file (line)
      unsigned int line ATTRIBUTE_UNUSED;
 {
 #ifdef DBX_USE_BINCL
-  struct dbx_file *next;
-
   fprintf (asmfile, "%s%d,0,0,0\n", ASM_STABN_OP, N_EINCL);
-  next = current_file->next;
-  free (current_file);
-  current_file = next;
+  current_file = current_file->next;
 #endif
 }
 
@@ -589,7 +586,7 @@ dbxout_source_file (file, filename)
 	; /* Don't change section amid function.  */
       else
 	text_section ();
-      ASM_OUTPUT_INTERNAL_LABEL (file, "Ltext", source_label_number);
+      (*targetm.asm_out.internal_label) (file, "Ltext", source_label_number);
       source_label_number++;
 #endif
       lastfile = filename;
@@ -620,7 +617,7 @@ dbxout_begin_block (line, n)
      unsigned int line ATTRIBUTE_UNUSED;
      unsigned int n;
 {
-  ASM_OUTPUT_INTERNAL_LABEL (asmfile, "LBB", n);
+  (*targetm.asm_out.internal_label) (asmfile, "LBB", n);
 }
 
 /* Describe the end line-number of an internal block within a function.  */
@@ -630,7 +627,7 @@ dbxout_end_block (line, n)
      unsigned int line ATTRIBUTE_UNUSED;
      unsigned int n;
 {
-  ASM_OUTPUT_INTERNAL_LABEL (asmfile, "LBE", n);
+  (*targetm.asm_out.internal_label) (asmfile, "LBE", n);
 }
 
 /* Output dbx data for a function definition.
@@ -683,6 +680,61 @@ dbxout_finish (filename)
 #ifdef DBX_OUTPUT_MAIN_SOURCE_FILE_END
   DBX_OUTPUT_MAIN_SOURCE_FILE_END (asmfile, filename);
 #endif /* DBX_OUTPUT_MAIN_SOURCE_FILE_END */
+}
+
+/* Output floating point type values used by the 'R' stab letter.
+   These numbers come from include/aout/stab_gnu.h in binutils/gdb.
+
+   There are only 3 real/complex types defined, and we need 7/6.
+   We use NF_SINGLE as a generic float type, and NF_COMPLEX as a generic
+   complex type.  Since we have the type size anyways, we don't really need
+   to distinguish between different FP types, we only need to distinguish
+   between float and complex.  This works fine with gdb.
+
+   We only use this for complex types, to avoid breaking backwards
+   compatibility for real types.  complex types aren't in ISO C90, so it is
+   OK if old debuggers don't understand the debug info we emit for them.  */
+
+/* ??? These are supposed to be IEEE types, but we don't check for that.
+   We could perhaps add additional numbers for non-IEEE types if we need
+   them.  */
+
+static void
+dbxout_fptype_value (type)
+     tree type;
+{
+  char value = '0';
+  enum machine_mode mode = TYPE_MODE (type);
+
+  if (TREE_CODE (type) == REAL_TYPE)
+    {
+      if (mode == SFmode)
+	value = '1';
+      else if (mode == DFmode)
+	value = '2';
+      else if (mode == TFmode || mode == XFmode)
+	value = '6';
+      else
+	/* Use NF_SINGLE as a generic real type for other sizes.  */
+	value = '1';
+    }
+  else if (TREE_CODE (type) == COMPLEX_TYPE)
+    {
+      if (mode == SCmode)
+	value = '3';
+      else if (mode == DCmode)
+	value = '4';
+      else if (mode == TCmode || mode == XCmode)
+	value = '5';
+      else
+	/* Use NF_COMPLEX as a generic complex type for other sizes.  */
+	value = '3';
+    }
+  else
+    abort ();
+
+  putc (value, asmfile);
+  CHARS (1);
 }
 
 /* Output the index of a type.  */
@@ -1048,7 +1100,9 @@ dbxout_type (type, full)
   static int anonymous_type_number = 0;
 
   if (TREE_CODE (type) == VECTOR_TYPE)
-    type = TYPE_DEBUG_REPRESENTATION_TYPE (type);
+    /* The frontend feeds us a representation for the vector as a struct
+       containing an array.  Pull out the array type.  */
+    type = TREE_TYPE (TYPE_FIELDS (TYPE_DEBUG_REPRESENTATION_TYPE (type)));
 
   /* If there was an input error and we don't really have a type,
      avoid crashing and write something that is at least valid
@@ -1085,8 +1139,9 @@ dbxout_type (type, full)
       if (next_type_number == typevec_len)
 	{
 	  typevec
-	    = (struct typeinfo *) xrealloc (typevec,
-					    typevec_len * 2 * sizeof typevec[0]);
+	    = (struct typeinfo *) ggc_realloc (typevec,
+					       (typevec_len * 2 
+						* sizeof typevec[0]));
 	  memset ((char *) (typevec + typevec_len), 0,
 		 typevec_len * sizeof typevec[0]);
 	  typevec_len *= 2;
@@ -1356,9 +1411,9 @@ dbxout_type (type, full)
 
       if (TREE_CODE (TREE_TYPE (type)) == REAL_TYPE)
 	{
-	  fprintf (asmfile, "r");
+	  putc ('R', asmfile);
 	  CHARS (1);
-	  dbxout_type_index (type);
+	  dbxout_fptype_value (type);
 	  putc (';', asmfile);
 	  CHARS (1);
 	  print_wide_int (2 * int_size_in_bytes (TREE_TYPE (type)));
@@ -2430,7 +2485,7 @@ dbxout_prepare_symbol (decl)
      tree decl ATTRIBUTE_UNUSED;
 {
 #ifdef WINNING_GDB
-  const char *filename = DECL_SOURCE_FILE (decl);
+  const char *filename = TREE_FILENAME (decl);
 
   dbxout_source_file (asmfile, filename);
 #endif
@@ -2445,7 +2500,7 @@ dbxout_finish_symbol (sym)
 #else
   int line = 0;
   if (use_gnu_debug_info_extensions && sym != 0)
-    line = DECL_SOURCE_LINE (sym);
+    line = TREE_LINENO (sym);
 
   fprintf (asmfile, "\",%d,0,%d,", current_sym_code, line);
   if (current_sym_addr)
@@ -2456,7 +2511,7 @@ dbxout_finish_symbol (sym)
 #endif
 }
 
-/* Output definitions of all the decls in a chain. Return non-zero if
+/* Output definitions of all the decls in a chain. Return nonzero if
    anything was output */
 
 int
@@ -2677,6 +2732,7 @@ dbxout_parms (parms)
 	      current_sym_value
 	        = INTVAL (XEXP (XEXP (XEXP (DECL_RTL (parms), 0), 0), 1));
 	    current_sym_addr = 0;
+	    current_sym_code = N_PSYM;
 
 	    FORCE_TEXT;
 	    fprintf (asmfile, "%s\"%s:v", ASM_STABS_OP, decl_name);
@@ -2943,3 +2999,5 @@ dbxout_begin_function (decl)
 #endif /* DBX_DEBUGGING_INFO */
 
 #endif /* DBX_DEBUGGING_INFO || XCOFF_DEBUGGING_INFO */
+
+#include "gt-dbxout.h"

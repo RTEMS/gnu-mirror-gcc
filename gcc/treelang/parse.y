@@ -42,17 +42,10 @@
 
    */
 
-#undef IN_GCC
-
-typedef void *tree;
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include "ansidecl.h"
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "diagnostic.h"
 
 #include "treelang.h"
@@ -804,7 +797,7 @@ init_opt:
 }
 |init {
   /* Nothing to do.  */
-}
+};
 
 init:
 ASSIGN init_element {

@@ -20,8 +20,10 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 02111-1307, USA.  */
 
 
-#include "hconfig.h"
+#include "bconfig.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "errors.h"
 #include "gensupport.h"
@@ -112,15 +114,27 @@ static const char * const optabs[] =
     abs_optab->handlers[(int) $A].insn_code = CODE_FOR_$(abs$F$a2$)",
   "absv_optab->handlers[(int) $A].insn_code = CODE_FOR_$(absv$I$a2$)",
   "sqrt_optab->handlers[$A].insn_code = CODE_FOR_$(sqrt$a2$)",
+  "floor_optab->handlers[$A].insn_code = CODE_FOR_$(floor$a2$)",
+  "ceil_optab->handlers[$A].insn_code = CODE_FOR_$(ceil$a2$)",
+  "round_optab->handlers[$A].insn_code = CODE_FOR_$(round$a2$)",
+  "trunc_optab->handlers[$A].insn_code = CODE_FOR_$(trunc$a2$)",
+  "nearbyint_optab->handlers[$A].insn_code = CODE_FOR_$(nearbyint$a2$)",
   "sin_optab->handlers[$A].insn_code = CODE_FOR_$(sin$a2$)",
   "cos_optab->handlers[$A].insn_code = CODE_FOR_$(cos$a2$)",
+  "exp_optab->handlers[$A].insn_code = CODE_FOR_$(exp$a2$)",
+  "log_optab->handlers[$A].insn_code = CODE_FOR_$(log$a2$)",
   "strlen_optab->handlers[$A].insn_code = CODE_FOR_$(strlen$a$)",
   "one_cmpl_optab->handlers[$A].insn_code = CODE_FOR_$(one_cmpl$a2$)",
   "ffs_optab->handlers[$A].insn_code = CODE_FOR_$(ffs$a2$)",
+  "clz_optab->handlers[$A].insn_code = CODE_FOR_$(clz$a2$)",
+  "ctz_optab->handlers[$A].insn_code = CODE_FOR_$(ctz$a2$)",
+  "popcount_optab->handlers[$A].insn_code = CODE_FOR_$(popcount$a2$)",
+  "parity_optab->handlers[$A].insn_code = CODE_FOR_$(parity$a2$)",
   "mov_optab->handlers[$A].insn_code = CODE_FOR_$(mov$a$)",
   "movstrict_optab->handlers[$A].insn_code = CODE_FOR_$(movstrict$a$)",
   "cmp_optab->handlers[$A].insn_code = CODE_FOR_$(cmp$a$)",
   "tst_optab->handlers[$A].insn_code = CODE_FOR_$(tst$a$)",
+  "addcc_optab->handlers[$A].insn_code = CODE_FOR_$(add$acc$)",
   "bcc_gen_fctn[$C] = gen_$(b$c$)",
   "setcc_gen_code[$C] = CODE_FOR_$(s$c$)",
   "movcc_gen_code[$A] = CODE_FOR_$(mov$acc$)",
@@ -327,6 +341,8 @@ from the machine description file `md'.  */\n\n");
 
   printf ("#include \"config.h\"\n");
   printf ("#include \"system.h\"\n");
+  printf ("#include \"coretypes.h\"\n");
+  printf ("#include \"tm.h\"\n");
   printf ("#include \"rtl.h\"\n");
   printf ("#include \"flags.h\"\n");
   printf ("#include \"insn-config.h\"\n");

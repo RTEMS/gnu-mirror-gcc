@@ -20,6 +20,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "rtl.h"
 #include "hard-reg-set.h"
@@ -29,6 +31,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "function.h"
 #include "obstack.h"
 #include "cfglayout.h"
+#include "cfgloop.h"
 
 /* The contents of the current function definition are allocated
    in this obstack, and all are freed at the end of the function.  */
@@ -46,10 +49,11 @@ static void set_block_levels		PARAMS ((tree, int));
 static void change_scope		PARAMS ((rtx, tree, tree));
 
 void verify_insn_chain			PARAMS ((void));
-static void cleanup_unconditional_jumps	PARAMS ((void));
+static void cleanup_unconditional_jumps	PARAMS ((struct loops *));
 static void fixup_fallthru_exit_predecessor PARAMS ((void));
 static rtx unlink_insn_chain PARAMS ((rtx, rtx));
 static rtx duplicate_insn_chain PARAMS ((rtx, rtx));
+static void break_superblocks PARAMS ((void));
 
 static rtx
 unlink_insn_chain (first, last)
@@ -241,6 +245,10 @@ scope_to_insns_initialize ()
 	    }
 	}
     }
+
+  /* Tag the blocks with a depth number so that change_scope can find
+     the common parent easily.  */
+  set_block_levels (DECL_INITIAL (cfun->decl), 0);
 }
 
 /* For each lexical block, set BLOCK_NUMBER to the depth at which it is
@@ -257,6 +265,20 @@ set_block_levels (block, level)
       set_block_levels (BLOCK_SUBBLOCKS (block), level + 1);
       block = BLOCK_CHAIN (block);
     }
+}
+
+/* Return sope resulting from combination of S1 and S2.  */
+tree
+choose_inner_scope (s1, s2)
+     tree s1, s2;
+{
+   if (!s1)
+     return s2;
+   if (!s2)
+     return s1;
+   if (BLOCK_NUMBER (s1) > BLOCK_NUMBER (s2))
+     return s1;
+   return s2;
 }
 
 /* Emit lexical block notes needed to change scope from S1 to S2.  */
@@ -315,10 +337,6 @@ scope_to_insns_finalize ()
   tree cur_block = DECL_INITIAL (cfun->decl);
   rtx insn, note;
 
-  /* Tag the blocks with a depth number so that change_scope can find
-     the common parent easily.  */
-  set_block_levels (cur_block, 0);
-
   insn = get_insns ();
   if (!active_insn_p (insn))
     insn = next_active_insn (insn);
@@ -327,6 +345,18 @@ scope_to_insns_finalize ()
       tree this_block;
 
       this_block = INSN_SCOPE (insn);
+      /* For sequences compute scope resulting from merging all scopes
+         of instructions nested inside.  */
+      if (GET_CODE (PATTERN (insn)) == SEQUENCE)
+	{
+	  int i;
+	  rtx body = PATTERN (insn);
+
+	  this_block = NULL;
+	  for (i = 0; i < XVECLEN (body, 0); i++)
+	    this_block = choose_inner_scope (this_block,
+			    		 INSN_SCOPE (XVECEXP (body, 0, i)));
+	}
       if (! this_block)
 	continue;
 
@@ -582,13 +612,14 @@ verify_insn_chain ()
 }
 
 /* Remove any unconditional jumps and forwarder block creating fallthru
-   edges instead.  During BB reordering fallthru edges are not required
+   edges instead.  During BB reordering, fallthru edges are not required
    to target next basic block in the linear CFG layout, so the unconditional
    jumps are not needed.  If LOOPS is not null, also update loop structure &
    dominators.  */
 
 static void
-cleanup_unconditional_jumps ()
+cleanup_unconditional_jumps (loops)
+     struct loops *loops;
 {
   basic_block bb;
 
@@ -610,7 +641,26 @@ cleanup_unconditional_jumps ()
 		fprintf (rtl_dump_file, "Removing forwarder BB %i\n",
 			 bb->index);
 
-	      redirect_edge_succ (bb->pred, bb->succ->dest);
+	      if (loops)
+		{
+		  /* bb cannot be loop header, as it only has one entry
+		     edge.  It could be a loop latch.  */
+		  if (bb->loop_father->header == bb)
+		    abort ();
+
+		  if (bb->loop_father->latch == bb)
+		    bb->loop_father->latch = bb->pred->src;
+
+		  if (get_immediate_dominator
+		      (loops->cfg.dom, bb->succ->dest) == bb)
+		    set_immediate_dominator
+		      (loops->cfg.dom, bb->succ->dest, bb->pred->src);
+
+		  remove_bb_from_loops (bb);
+		  delete_from_dominance_info (loops->cfg.dom, bb);
+		}
+
+	      redirect_edge_succ_nodup (bb->pred, bb->succ->dest);
 	      flow_delete_block (bb);
 	      bb = prev;
 	    }
@@ -627,8 +677,6 @@ cleanup_unconditional_jumps ()
 	  else
 	    continue;
 
-	  /* Cleanup barriers and delete ADDR_VECs in a way as they are belonging
-             to removed tablejump anyway.  */
 	  insn = NEXT_INSN (bb->end);
 	  while (insn
 		 && (GET_CODE (insn) != NOTE
@@ -638,12 +686,6 @@ cleanup_unconditional_jumps ()
 
 	      if (GET_CODE (insn) == BARRIER)
 		delete_barrier (insn);
-	      else if (GET_CODE (insn) == JUMP_INSN)
-		delete_insn_chain (PREV_INSN (insn), insn);
-	      else if (GET_CODE (insn) == CODE_LABEL)
-		;
-	      else if (GET_CODE (insn) != NOTE)
-		abort ();
 
 	      insn = next;
 	    }
@@ -691,14 +733,14 @@ cfg_layout_can_duplicate_bb_p (bb)
   if (bb == EXIT_BLOCK_PTR || bb == ENTRY_BLOCK_PTR)
     return false;
 
-  /* Duplicating fallthru block to exit would require adding an jump
+  /* Duplicating fallthru block to exit would require adding a jump
      and splitting the real last BB.  */
   for (s = bb->succ; s; s = s->succ_next)
     if (s->dest == EXIT_BLOCK_PTR && s->flags & EDGE_FALLTHRU)
        return false;
 
   /* Do not attempt to duplicate tablejumps, as we need to unshare
-     the dispatch table.  This is dificult to do, as the instructions
+     the dispatch table.  This is difficult to do, as the instructions
      computing jump destination may be hoisted outside the basic block.  */
   if (GET_CODE (bb->end) == JUMP_INSN && JUMP_LABEL (bb->end)
       && (next = next_nonnote_insn (JUMP_LABEL (bb->end)))
@@ -723,7 +765,6 @@ duplicate_insn_chain (from, to)
      be reordered later.  */
   for (insn = from; insn != NEXT_INSN (to); insn = NEXT_INSN (insn))
     {
-      rtx new;
       switch (GET_CODE (insn))
 	{
 	case INSN:
@@ -735,7 +776,7 @@ duplicate_insn_chain (from, to)
 	  if (GET_CODE (PATTERN (insn)) == ADDR_VEC
 	      || GET_CODE (PATTERN (insn)) == ADDR_DIFF_VEC)
 	    break;
-	  new = emit_copy_of_insn_after (insn, get_last_insn ());
+	  emit_copy_of_insn_after (insn, get_last_insn ());
 	  break;
 
 	case CODE_LABEL:
@@ -804,13 +845,14 @@ duplicate_insn_chain (from, to)
 }
 
 /* Redirect Edge to DEST.  */
-void
+bool
 cfg_layout_redirect_edge (e, dest)
      edge e;
      basic_block dest;
 {
   basic_block src = e->src;
   basic_block old_next_bb = src->next_bb;
+  bool ret;
 
   /* Redirect_edge_and_branch may decide to turn branch into fallthru edge
      in the case the basic block appears to be in sequence.  Avoid this
@@ -831,9 +873,11 @@ cfg_layout_redirect_edge (e, dest)
 	    delete_insn (src->end);
 	}
       redirect_edge_succ_nodup (e, dest);
+
+      ret = true;
     }
   else
-    redirect_edge_and_branch (e, dest);
+    ret = redirect_edge_and_branch (e, dest);
 
   /* We don't want simplejumps in the insn stream during cfglayout.  */
   if (simplejump_p (src->end))
@@ -843,9 +887,25 @@ cfg_layout_redirect_edge (e, dest)
       src->succ->flags |= EDGE_FALLTHRU;
     }
   src->next_bb = old_next_bb;
+
+  return ret;
 }
 
-/* Create an duplicate of the basic block BB and redirect edge E into it.  */
+/* Same as split_block but update cfg_layout structures.  */
+edge
+cfg_layout_split_block (bb, insn)
+     basic_block bb;
+     rtx insn;
+{
+  edge fallthru = split_block (bb, insn);
+
+  alloc_aux_for_block (fallthru->dest, sizeof (struct reorder_block_def));
+  RBI (fallthru->dest)->footer = RBI (fallthru->src)->footer;
+  RBI (fallthru->src)->footer = NULL;
+  return fallthru;
+}
+
+/* Create a duplicate of the basic block BB and redirect edge E into it.  */
 
 basic_block
 cfg_layout_duplicate_bb (bb, e)
@@ -931,6 +991,7 @@ cfg_layout_duplicate_bb (bb, e)
     bb->frequency = 0;
 
   RBI (new_bb)->original = bb;
+  RBI (bb)->copy = new_bb;
   return new_bb;
 }
 
@@ -938,15 +999,45 @@ cfg_layout_duplicate_bb (bb, e)
    CFG layout changes.  It keeps LOOPS up-to-date if not null.  */
 
 void
-cfg_layout_initialize ()
+cfg_layout_initialize (loops)
+     struct loops *loops;
 {
   /* Our algorithm depends on fact that there are now dead jumptables
      around the code.  */
   alloc_aux_for_blocks (sizeof (struct reorder_block_def));
 
-  cleanup_unconditional_jumps ();
+  cleanup_unconditional_jumps (loops);
 
   record_effective_endpoints ();
+}
+
+/* Splits superblocks.  */
+static void
+break_superblocks ()
+{
+  sbitmap superblocks;
+  int i, need;
+
+  superblocks = sbitmap_alloc (n_basic_blocks);
+  sbitmap_zero (superblocks);
+
+  need = 0;
+
+  for (i = 0; i < n_basic_blocks; i++)
+    if (BASIC_BLOCK(i)->flags & BB_SUPERBLOCK)
+      {
+	BASIC_BLOCK(i)->flags &= ~BB_SUPERBLOCK;
+	SET_BIT (superblocks, i);
+	need = 1;
+      }
+
+  if (need)
+    {
+      rebuild_jump_labels (get_insns ());
+      find_many_sub_basic_blocks (superblocks);
+    }
+
+  free (superblocks);
 }
 
 /* Finalize the changes: reorder insn list according to the sequence, enter
@@ -963,6 +1054,8 @@ cfg_layout_finalize ()
 #endif
 
   free_aux_for_blocks ();
+
+  break_superblocks ();
 
 #ifdef ENABLE_CHECKING
   verify_flow_info ();

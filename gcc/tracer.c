@@ -1,6 +1,6 @@
 /* The tracer pass for the GNU compiler.
    Contributed by Jan Hubicka, SuSE Labs.
-   Copyright (C) 2001 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2002 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -35,6 +35,8 @@
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "rtl.h"
 #include "hard-reg-set.h"
@@ -49,6 +51,8 @@
 static int count_insns		PARAMS ((basic_block));
 static bool ignore_bb_p		PARAMS ((basic_block));
 static bool better_p		PARAMS ((edge, edge));
+static edge find_best_successor PARAMS ((basic_block));
+static edge find_best_predecessor PARAMS ((basic_block));
 static int find_trace		PARAMS ((basic_block, basic_block *));
 static void tail_duplicate	PARAMS ((void));
 static void layout_superblocks	PARAMS ((void));
@@ -63,9 +67,10 @@ static int branch_ratio_cutoff;
 
 #define seen(bb) (RBI (bb)->visited || RBI (bb)->next)
 
-/* Return true if we should ignore the basic block for purposes of tracing. */
+/* Return true if we should ignore the basic block for purposes of tracing.  */
 static bool
-ignore_bb_p (basic_block bb)
+ignore_bb_p (bb)
+     basic_block bb;
 {
   if (bb->index < 0)
     return true;
@@ -110,7 +115,8 @@ better_p (e1, e2)
 /* Return most frequent successor of basic block BB.  */
 
 static edge
-find_best_successor (basic_block bb)
+find_best_successor (bb)
+     basic_block bb;
 {
   edge e;
   edge best = NULL;
@@ -128,7 +134,8 @@ find_best_successor (basic_block bb)
 /* Return most frequent predecessor of basic block BB.  */
 
 static edge
-find_best_predecessor (basic_block bb)
+find_best_predecessor (bb)
+     basic_block bb;
 {
   edge e;
   edge best = NULL;
@@ -280,7 +287,7 @@ tail_duplicate ()
 	      bb2 = cfg_layout_duplicate_bb (bb2, e);
 
 	      /* Reconsider the original copy of block we've duplicated.
-	         Removing the most common predecesor may make it to be
+	         Removing the most common predecessor may make it to be
 	         head.  */
 	      blocks[old->index] =
 		fibheap_insert (heap, -old->frequency, old);
@@ -359,7 +366,7 @@ tracer ()
 {
   if (n_basic_blocks <= 1)
     return;
-  cfg_layout_initialize ();
+  cfg_layout_initialize (NULL);
   mark_dfs_back_edges ();
   if (rtl_dump_file)
     dump_flow_info (rtl_dump_file);

@@ -37,6 +37,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "toplev.h"
 #include "rtl.h"
 #include "tree.h"
@@ -50,7 +52,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "insn-config.h"
 #include "recog.h"
 #include "real.h"
-#include "obstack.h"
 #include "bitmap.h"
 #include "basic-block.h"
 #include "ggc.h"
@@ -68,7 +69,7 @@ enum machine_mode ptr_mode;	/* Mode whose width is POINTER_SIZE.  */
 /* This is *not* reset after each function.  It gives each CODE_LABEL
    in the entire compilation a unique label number.  */
 
-static int label_num = 1;
+static GTY(()) int label_num = 1;
 
 /* Highest label number in current function.
    Zero means use the value of label_num instead.
@@ -156,6 +157,10 @@ static GTY ((if_marked ("ggc_marked_p"), param_is (struct rtx_def)))
 static GTY ((if_marked ("ggc_marked_p"), param_is (struct mem_attrs)))
      htab_t mem_attrs_htab;
 
+/* A hash table storing register attribute structures.  */
+static GTY ((if_marked ("ggc_marked_p"), param_is (struct reg_attrs)))
+     htab_t reg_attrs_htab;
+
 /* A hash table storing all CONST_DOUBLEs.  */
 static GTY ((if_marked ("ggc_marked_p"), param_is (struct rtx_def)))
      htab_t const_double_htab;
@@ -189,6 +194,10 @@ static int mem_attrs_htab_eq            PARAMS ((const void *,
 static mem_attrs *get_mem_attrs		PARAMS ((HOST_WIDE_INT, tree, rtx,
 						 rtx, unsigned int,
 						 enum machine_mode));
+static hashval_t reg_attrs_htab_hash    PARAMS ((const void *));
+static int reg_attrs_htab_eq            PARAMS ((const void *,
+						 const void *));
+static reg_attrs *get_reg_attrs		PARAMS ((tree, int));
 static tree component_ref_for_mem_expr	PARAMS ((tree));
 static rtx gen_const_vector_0		PARAMS ((enum machine_mode));
 
@@ -205,7 +214,7 @@ const_int_htab_hash (x)
   return (hashval_t) INTVAL ((struct rtx_def *) x);
 }
 
-/* Returns non-zero if the value represented by X (which is really a
+/* Returns nonzero if the value represented by X (which is really a
    CONST_INT) is the same as that given by Y (which is really a
    HOST_WIDE_INT *).  */
 
@@ -222,16 +231,21 @@ static hashval_t
 const_double_htab_hash (x)
      const void *x;
 {
-  hashval_t h = 0;
-  size_t i;
   rtx value = (rtx) x;
+  hashval_t h;
 
-  for (i = 0; i < sizeof(CONST_DOUBLE_FORMAT)-1; i++)
-    h ^= XWINT (value, i);
+  if (GET_MODE (value) == VOIDmode)
+    h = CONST_DOUBLE_LOW (value) ^ CONST_DOUBLE_HIGH (value);
+  else
+    {
+      h = real_hash (CONST_DOUBLE_REAL_VALUE (value));	
+      /* MODE is used in the comparison, so it should be in the hash.  */
+      h ^= GET_MODE (value);
+    }
   return h;
 }
 
-/* Returns non-zero if the value represented by X (really a ...)
+/* Returns nonzero if the value represented by X (really a ...)
    is the same as that represented by Y (really a ...) */
 static int
 const_double_htab_eq (x, y)
@@ -239,15 +253,15 @@ const_double_htab_eq (x, y)
      const void *y;
 {
   rtx a = (rtx)x, b = (rtx)y;
-  size_t i;
 
   if (GET_MODE (a) != GET_MODE (b))
     return 0;
-  for (i = 0; i < sizeof(CONST_DOUBLE_FORMAT)-1; i++)
-    if (XWINT (a, i) != XWINT (b, i))
-      return 0;
-
-  return 1;
+  if (GET_MODE (a) == VOIDmode)
+    return (CONST_DOUBLE_LOW (a) == CONST_DOUBLE_LOW (b)
+	    && CONST_DOUBLE_HIGH (a) == CONST_DOUBLE_HIGH (b));
+  else
+    return real_identical (CONST_DOUBLE_REAL_VALUE (a),
+			   CONST_DOUBLE_REAL_VALUE (b));
 }
 
 /* Returns a hash code for X (which is a really a mem_attrs *).  */
@@ -264,7 +278,7 @@ mem_attrs_htab_hash (x)
 	  ^ (size_t) p->expr);
 }
 
-/* Returns non-zero if the value represented by X (which is really a
+/* Returns nonzero if the value represented by X (which is really a
    mem_attrs *) is the same as that given by Y (which is also really a
    mem_attrs *).  */
 
@@ -316,6 +330,60 @@ get_mem_attrs (alias, expr, offset, size, align, mode)
     {
       *slot = ggc_alloc (sizeof (mem_attrs));
       memcpy (*slot, &attrs, sizeof (mem_attrs));
+    }
+
+  return *slot;
+}
+
+/* Returns a hash code for X (which is a really a reg_attrs *).  */
+
+static hashval_t
+reg_attrs_htab_hash (x)
+     const void *x;
+{
+  reg_attrs *p = (reg_attrs *) x;
+
+  return ((p->offset * 1000) ^ (long) p->decl);
+}
+
+/* Returns non-zero if the value represented by X (which is really a
+   reg_attrs *) is the same as that given by Y (which is also really a
+   reg_attrs *).  */
+
+static int
+reg_attrs_htab_eq (x, y)
+     const void *x;
+     const void *y;
+{
+  reg_attrs *p = (reg_attrs *) x;
+  reg_attrs *q = (reg_attrs *) y;
+
+  return (p->decl == q->decl && p->offset == q->offset);
+}
+/* Allocate a new reg_attrs structure and insert it into the hash table if
+   one identical to it is not already in the table.  We are doing this for
+   MEM of mode MODE.  */
+
+static reg_attrs *
+get_reg_attrs (decl, offset)
+     tree decl;
+     int offset;
+{
+  reg_attrs attrs;
+  void **slot;
+
+  /* If everything is the default, we can just return zero.  */
+  if (decl == 0 && offset == 0)
+    return 0;
+
+  attrs.decl = decl;
+  attrs.offset = offset;
+
+  slot = htab_find_slot (reg_attrs_htab, &attrs, INSERT);
+  if (*slot == 0)
+    {
+      *slot = ggc_alloc (sizeof (reg_attrs));
+      memcpy (*slot, &attrs, sizeof (reg_attrs));
     }
 
   return *slot;
@@ -515,10 +583,12 @@ gen_rtx_REG (mode, regno)
 
   if (mode == Pmode && !reload_in_progress)
     {
-      if (regno == FRAME_POINTER_REGNUM)
+      if (regno == FRAME_POINTER_REGNUM
+	  && (!reload_completed || frame_pointer_needed))
 	return frame_pointer_rtx;
 #if FRAME_POINTER_REGNUM != HARD_FRAME_POINTER_REGNUM
-      if (regno == HARD_FRAME_POINTER_REGNUM)
+      if (regno == HARD_FRAME_POINTER_REGNUM
+	  && (!reload_completed || frame_pointer_needed))
 	return hard_frame_pointer_rtx;
 #endif
 #if FRAME_POINTER_REGNUM != ARG_POINTER_REGNUM && HARD_FRAME_POINTER_REGNUM != ARG_POINTER_REGNUM
@@ -529,7 +599,7 @@ gen_rtx_REG (mode, regno)
       if (regno == RETURN_ADDRESS_POINTER_REGNUM)
 	return return_address_pointer_rtx;
 #endif
-      if (regno == PIC_OFFSET_TABLE_REGNUM
+      if (regno == (unsigned) PIC_OFFSET_TABLE_REGNUM
 	  && fixed_regs[PIC_OFFSET_TABLE_REGNUM])
 	return pic_offset_table_rtx;
       if (regno == STACK_POINTER_REGNUM)
@@ -543,7 +613,11 @@ gen_rtx_REG (mode, regno)
      This code is disabled for now until we can fix the various backends
      which depend on having non-shared hard registers in some cases.   Long
      term we want to re-enable this code as it can significantly cut down
-     on the amount of useless RTL that gets generated.  */
+     on the amount of useless RTL that gets generated.
+
+     We'll also need to fix some code that runs after reload that wants to
+     set ORIGINAL_REGNO.  */
+
   if (cfun
       && cfun->emit
       && regno_reg_rtx
@@ -796,19 +870,14 @@ gen_reg_rtx (mode)
 	 which makes much better code.  Besides, allocating DCmode
 	 pseudos overstrains reload on some machines like the 386.  */
       rtx realpart, imagpart;
-      int size = GET_MODE_UNIT_SIZE (mode);
-      enum machine_mode partmode
-	= mode_for_size (size * BITS_PER_UNIT,
-			 (GET_MODE_CLASS (mode) == MODE_COMPLEX_FLOAT
-			  ? MODE_FLOAT : MODE_INT),
-			 0);
+      enum machine_mode partmode = GET_MODE_INNER (mode);
 
       realpart = gen_reg_rtx (partmode);
       imagpart = gen_reg_rtx (partmode);
       return gen_rtx_CONCAT (mode, realpart, imagpart);
     }
 
-  /* Make sure regno_pointer_align, regno_decl, and regno_reg_rtx are large
+  /* Make sure regno_pointer_align, and regno_reg_rtx are large
      enough to have an element for this pseudo reg number.  */
 
   if (reg_rtx_no == f->emit->regno_pointer_align_length)
@@ -816,7 +885,6 @@ gen_reg_rtx (mode)
       int old_size = f->emit->regno_pointer_align_length;
       char *new;
       rtx *new1;
-      tree *new2;
 
       new = ggc_realloc (f->emit->regno_pointer_align, old_size * 2);
       memset (new + old_size, 0, old_size);
@@ -827,17 +895,76 @@ gen_reg_rtx (mode)
       memset (new1 + old_size, 0, old_size * sizeof (rtx));
       regno_reg_rtx = new1;
 
-      new2 = (tree *) ggc_realloc (f->emit->regno_decl,
-				   old_size * 2 * sizeof (tree));
-      memset (new2 + old_size, 0, old_size * sizeof (tree));
-      f->emit->regno_decl = new2;
-
       f->emit->regno_pointer_align_length = old_size * 2;
     }
 
   val = gen_raw_REG (mode, reg_rtx_no);
   regno_reg_rtx[reg_rtx_no++] = val;
   return val;
+}
+
+/* Generate an register with same attributes as REG,
+   but offsetted by OFFSET.  */
+
+rtx
+gen_rtx_REG_offset (reg, mode, regno, offset)
+     enum machine_mode mode;
+     unsigned int regno;
+     int offset;
+     rtx reg;
+{
+  rtx new = gen_rtx_REG (mode, regno);
+  REG_ATTRS (new) = get_reg_attrs (REG_EXPR (reg),
+		 		   REG_OFFSET (reg) + offset);
+  return new;
+}
+
+/* Set the decl for MEM to DECL.  */
+
+void
+set_reg_attrs_from_mem (reg, mem)
+     rtx reg;
+     rtx mem;
+{
+  if (MEM_OFFSET (mem) && GET_CODE (MEM_OFFSET (mem)) == CONST_INT)
+    REG_ATTRS (reg)
+      = get_reg_attrs (MEM_EXPR (mem), INTVAL (MEM_OFFSET (mem)));
+}
+
+/* Assign the RTX X to declaration T.  */
+void
+set_decl_rtl (t, x)
+     tree t;
+     rtx x;
+{
+  DECL_CHECK (t)->decl.rtl = x;
+
+  if (!x)
+    return;
+  /* For register, we maitain the reverse information too.  */
+  if (GET_CODE (x) == REG)
+    REG_ATTRS (x) = get_reg_attrs (t, 0);
+  else if (GET_CODE (x) == SUBREG)
+    REG_ATTRS (SUBREG_REG (x))
+      = get_reg_attrs (t, -SUBREG_BYTE (x));
+  if (GET_CODE (x) == CONCAT)
+    {
+      if (REG_P (XEXP (x, 0)))
+        REG_ATTRS (XEXP (x, 0)) = get_reg_attrs (t, 0);
+      if (REG_P (XEXP (x, 1)))
+	REG_ATTRS (XEXP (x, 1))
+	  = get_reg_attrs (t, GET_MODE_UNIT_SIZE (GET_MODE (XEXP (x, 0))));
+    }
+  if (GET_CODE (x) == PARALLEL)
+    {
+      int i;
+      for (i = 0; i < XVECLEN (x, 0); i++)
+	{
+	  rtx y = XVECEXP (x, 0, i);
+	  if (REG_P (XEXP (y, 0)))
+	    REG_ATTRS (XEXP (y, 0)) = get_reg_attrs (t, INTVAL (XEXP (y, 1)));
+	}
+    }
 }
 
 /* Identify REG (which may be a CONCAT) as a user register.  */
@@ -964,6 +1091,11 @@ gen_lowpart_common (mode, x)
 	  > ((xsize + (UNITS_PER_WORD - 1)) / UNITS_PER_WORD)))
     return 0;
 
+  /* Don't allow generating paradoxical FLOAT_MODE subregs.  */
+  if (GET_MODE_CLASS (mode) == MODE_FLOAT
+      && GET_MODE (x) != VOIDmode && msize > xsize)
+    return 0;
+
   offset = subreg_lowpart_offset (mode, GET_MODE (x));
 
   if ((GET_CODE (x) == ZERO_EXTEND || GET_CODE (x) == SIGN_EXTEND)
@@ -986,8 +1118,12 @@ gen_lowpart_common (mode, x)
 	return gen_rtx_fmt_e (GET_CODE (x), mode, XEXP (x, 0));
     }
   else if (GET_CODE (x) == SUBREG || GET_CODE (x) == REG
-	   || GET_CODE (x) == CONCAT)
+	   || GET_CODE (x) == CONCAT || GET_CODE (x) == CONST_VECTOR)
     return simplify_gen_subreg (mode, x, GET_MODE (x), offset);
+  else if ((GET_MODE_CLASS (mode) == MODE_VECTOR_INT
+	    || GET_MODE_CLASS (mode) == MODE_VECTOR_FLOAT)
+	   && GET_MODE (x) == VOIDmode)
+    return simplify_gen_subreg (mode, x, int_mode_for_mode (mode), offset);
   /* If X is a CONST_INT or a CONST_DOUBLE, extract the appropriate bits
      from the low-order part of the constant.  */
   else if ((GET_MODE_CLASS (mode) == MODE_INT
@@ -1032,10 +1168,9 @@ gen_lowpart_common (mode, x)
 	   && GET_CODE (x) == CONST_INT)
     {
       REAL_VALUE_TYPE r;
-      HOST_WIDE_INT i;
+      long i = INTVAL (x);
 
-      i = INTVAL (x);
-      r = REAL_VALUE_FROM_TARGET_SINGLE (i);
+      real_from_target (&r, &i, mode);
       return CONST_DOUBLE_FROM_REAL_VALUE (r, mode);
     }
   else if (GET_MODE_CLASS (mode) == MODE_FLOAT
@@ -1044,8 +1179,8 @@ gen_lowpart_common (mode, x)
 	   && GET_MODE (x) == VOIDmode)
     {
       REAL_VALUE_TYPE r;
-      HOST_WIDE_INT i[2];
       HOST_WIDE_INT low, high;
+      long i[2];
 
       if (GET_CODE (x) == CONST_INT)
 	{
@@ -1058,18 +1193,17 @@ gen_lowpart_common (mode, x)
 	  high = CONST_DOUBLE_HIGH (x);
 	}
 
-#if HOST_BITS_PER_WIDE_INT == 32
+      if (HOST_BITS_PER_WIDE_INT > 32)
+	high = low >> 31 >> 1;
+
       /* REAL_VALUE_TARGET_DOUBLE takes the addressing order of the
 	 target machine.  */
       if (WORDS_BIG_ENDIAN)
 	i[0] = high, i[1] = low;
       else
 	i[0] = low, i[1] = high;
-#else
-      i[0] = low;
-#endif
 
-      r = REAL_VALUE_FROM_TARGET_DOUBLE (i);
+      real_from_target (&r, i, mode);
       return CONST_DOUBLE_FROM_REAL_VALUE (r, mode);
     }
   else if ((GET_MODE_CLASS (mode) == MODE_INT
@@ -1674,19 +1808,22 @@ component_ref_for_mem_expr (ref)
 
 /* Given REF, a MEM, and T, either the type of X or the expression
    corresponding to REF, set the memory attributes.  OBJECTP is nonzero
-   if we are making a new object of this type.  */
+   if we are making a new object of this type.  BITPOS is nonzero if
+   there is an offset outstanding on T that will be applied later.  */
 
 void
-set_mem_attributes (ref, t, objectp)
+set_mem_attributes_minus_bitpos (ref, t, objectp, bitpos)
      rtx ref;
      tree t;
      int objectp;
+     HOST_WIDE_INT bitpos;
 {
   HOST_WIDE_INT alias = MEM_ALIAS_SET (ref);
   tree expr = MEM_EXPR (ref);
   rtx offset = MEM_OFFSET (ref);
   rtx size = MEM_SIZE (ref);
   unsigned int align = MEM_ALIGN (ref);
+  HOST_WIDE_INT apply_bitpos = 0;
   tree type;
 
   /* It can happen that type_for_mode was given a mode for which there
@@ -1755,6 +1892,7 @@ set_mem_attributes (ref, t, objectp)
 	{
 	  expr = t;
 	  offset = const0_rtx;
+	  apply_bitpos = bitpos;
 	  size = (DECL_SIZE_UNIT (t)
 		  && host_integerp (DECL_SIZE_UNIT (t), 1)
 		  ? GEN_INT (tree_low_cst (DECL_SIZE_UNIT (t), 1)) : 0);
@@ -1779,6 +1917,7 @@ set_mem_attributes (ref, t, objectp)
 	{
 	  expr = component_ref_for_mem_expr (t);
 	  offset = const0_rtx;
+	  apply_bitpos = bitpos;
 	  /* ??? Any reason the field size would be different than
 	     the size we got from the type?  */
 	}
@@ -1790,25 +1929,95 @@ set_mem_attributes (ref, t, objectp)
 
 	  do
 	    {
+	      tree index = TREE_OPERAND (t, 1);
+	      tree array = TREE_OPERAND (t, 0);
+	      tree domain = TYPE_DOMAIN (TREE_TYPE (array));
+	      tree low_bound = (domain ? TYPE_MIN_VALUE (domain) : 0);
+	      tree unit_size = TYPE_SIZE_UNIT (TREE_TYPE (TREE_TYPE (array)));
+
+	      /* We assume all arrays have sizes that are a multiple of a byte.
+		 First subtract the lower bound, if any, in the type of the
+		 index, then convert to sizetype and multiply by the size of the
+		 array element.  */
+	      if (low_bound != 0 && ! integer_zerop (low_bound))
+		index = fold (build (MINUS_EXPR, TREE_TYPE (index),
+				     index, low_bound));
+
+	      /* If the index has a self-referential type, pass it to a
+		 WITH_RECORD_EXPR; if the component size is, pass our
+		 component to one.  */
+	      if (! TREE_CONSTANT (index)
+		  && contains_placeholder_p (index))
+		index = build (WITH_RECORD_EXPR, TREE_TYPE (index), index, t);
+	      if (! TREE_CONSTANT (unit_size)
+		  && contains_placeholder_p (unit_size))
+		unit_size = build (WITH_RECORD_EXPR, sizetype,
+				   unit_size, array);
+
 	      off_tree
 		= fold (build (PLUS_EXPR, sizetype,
 			       fold (build (MULT_EXPR, sizetype,
-					    TREE_OPERAND (t, 1),
-					    TYPE_SIZE_UNIT (TREE_TYPE (t)))),
+					    index,
+					    unit_size)),
 			       off_tree));
 	      t = TREE_OPERAND (t, 0);
 	    }
 	  while (TREE_CODE (t) == ARRAY_REF);
 
-	  if (TREE_CODE (t) == COMPONENT_REF)
+	  if (DECL_P (t))
+	    {
+	      expr = t;
+	      offset = NULL;
+	      if (host_integerp (off_tree, 1))
+		{
+		  HOST_WIDE_INT ioff = tree_low_cst (off_tree, 1);
+		  HOST_WIDE_INT aoff = (ioff & -ioff) * BITS_PER_UNIT;
+		  align = DECL_ALIGN (t);
+		  if (aoff && (unsigned HOST_WIDE_INT) aoff < align)
+	            align = aoff;
+		  offset = GEN_INT (ioff);
+		  apply_bitpos = bitpos;
+		}
+	    }
+	  else if (TREE_CODE (t) == COMPONENT_REF)
 	    {
 	      expr = component_ref_for_mem_expr (t);
 	      if (host_integerp (off_tree, 1))
-		offset = GEN_INT (tree_low_cst (off_tree, 1));
+		{
+		  offset = GEN_INT (tree_low_cst (off_tree, 1));
+		  apply_bitpos = bitpos;
+		}
 	      /* ??? Any reason the field size would be different than
 		 the size we got from the type?  */
 	    }
+	  else if (flag_argument_noalias > 1
+		   && TREE_CODE (t) == INDIRECT_REF
+		   && TREE_CODE (TREE_OPERAND (t, 0)) == PARM_DECL)
+	    {
+	      expr = t;
+	      offset = NULL;
+	    }
 	}
+
+      /* If this is a Fortran indirect argument reference, record the
+	 parameter decl.  */
+      else if (flag_argument_noalias > 1
+	       && TREE_CODE (t) == INDIRECT_REF
+	       && TREE_CODE (TREE_OPERAND (t, 0)) == PARM_DECL)
+	{
+	  expr = t;
+	  offset = NULL;
+	}
+    }
+
+  /* If we modified OFFSET based on T, then subtract the outstanding 
+     bit position offset.  Similarly, increase the size of the accessed
+     object to contain the negative offset.  */
+  if (apply_bitpos)
+    {
+      offset = plus_constant (offset, -(apply_bitpos / BITS_PER_UNIT));
+      if (size)
+	size = plus_constant (size, apply_bitpos / BITS_PER_UNIT);
     }
 
   /* Now set the attributes we computed above.  */
@@ -1825,6 +2034,28 @@ set_mem_attributes (ref, t, objectp)
 	   || TREE_CODE (t) == ARRAY_RANGE_REF
 	   || TREE_CODE (t) == BIT_FIELD_REF)
     MEM_IN_STRUCT_P (ref) = 1;
+}
+
+void
+set_mem_attributes (ref, t, objectp)
+     rtx ref;
+     tree t;
+     int objectp;
+{
+  set_mem_attributes_minus_bitpos (ref, t, objectp, 0);
+}
+
+/* Set the decl for MEM to DECL.  */
+
+void
+set_mem_attrs_from_reg (mem, reg)
+     rtx mem;
+     rtx reg;
+{
+  MEM_ATTRS (mem)
+    = get_mem_attrs (MEM_ALIAS_SET (mem), REG_EXPR (reg),
+		     GEN_INT (REG_OFFSET (reg)),
+		     MEM_SIZE (mem), MEM_ALIGN (mem), GET_MODE (mem));
 }
 
 /* Set the alias set of MEM to SET.  */
@@ -1877,6 +2108,17 @@ set_mem_offset (mem, offset)
 {
   MEM_ATTRS (mem) = get_mem_attrs (MEM_ALIAS_SET (mem), MEM_EXPR (mem),
 				   offset, MEM_SIZE (mem), MEM_ALIGN (mem),
+				   GET_MODE (mem));
+}
+
+/* Set the size of MEM to SIZE.  */
+
+void
+set_mem_size (mem, size)
+     rtx mem, size;
+{
+  MEM_ATTRS (mem) = get_mem_attrs (MEM_ALIAS_SET (mem), MEM_EXPR (mem),
+				   MEM_OFFSET (mem), size, MEM_ALIGN (mem),
 				   GET_MODE (mem));
 }
 
@@ -1963,7 +2205,7 @@ adjust_address_1 (memref, mode, offset, validate, adjust)
   unsigned int memalign = MEM_ALIGN (memref);
 
   /* ??? Prefer to create garbage instead of creating shared rtl.
-     This may happen even if offset is non-zero -- consider
+     This may happen even if offset is nonzero -- consider
      (plus (plus reg reg) const_int) -- so do this always.  */
   addr = copy_rtx (addr);
 
@@ -2180,14 +2422,8 @@ widen_memory_access (memref, mode, offset)
 rtx
 gen_label_rtx ()
 {
-  rtx label;
-
-  label = gen_rtx_CODE_LABEL (VOIDmode, 0, NULL_RTX, NULL_RTX,
-		  	      NULL, label_num++, NULL, NULL);
-
-  LABEL_NUSES (label) = 0;
-  LABEL_ALTERNATE_NAME (label) = NULL;
-  return label;
+  return gen_rtx_CODE_LABEL (VOIDmode, 0, NULL_RTX, NULL_RTX,
+		  	     NULL, label_num++, NULL);
 }
 
 /* For procedure integration.  */
@@ -3089,7 +3325,7 @@ mark_label_nuses (x)
 /* Try splitting insns that can be split for better scheduling.
    PAT is the pattern which might split.
    TRIAL is the insn providing PAT.
-   LAST is non-zero if we should return the last insn of the sequence produced.
+   LAST is nonzero if we should return the last insn of the sequence produced.
 
    If this routine succeeds in splitting, it returns the first or last
    replacement insn depending on the value of LAST.  Otherwise, it
@@ -3916,7 +4152,7 @@ rtx
 emit_jump_insn_before (x, before)
      rtx x, before;
 {
-  rtx insn, last;
+  rtx insn, last = NULL_RTX;
 
 #ifdef ENABLE_RTL_CHECKING
   if (before == NULL_RTX)
@@ -3963,7 +4199,7 @@ rtx
 emit_call_insn_before (x, before)
      rtx x, before;
 {
-  rtx last, insn;
+  rtx last = NULL_RTX, insn;
 
 #ifdef ENABLE_RTL_CHECKING
   if (before == NULL_RTX)
@@ -4448,7 +4684,7 @@ rtx
 emit_jump_insn (x)
      rtx x;
 {
-  rtx last, insn;
+  rtx last = NULL_RTX, insn;
 
   switch (GET_CODE (x))
     {
@@ -5117,10 +5353,6 @@ init_emit ()
     = (rtx *) ggc_alloc_cleared (f->emit->regno_pointer_align_length
 				 * sizeof (rtx));
 
-  f->emit->regno_decl
-    = (tree *) ggc_alloc_cleared (f->emit->regno_pointer_align_length
-				  * sizeof (tree));
-
   /* Put copies of all the hard registers into regno_reg_rtx.  */
   memcpy (regno_reg_rtx,
 	  static_regno_reg_rtx,
@@ -5183,8 +5415,24 @@ gen_const_vector_0 (mode)
   for (i = 0; i < units; ++i)
     RTVEC_ELT (v, i) = CONST0_RTX (inner);
 
-  tem = gen_rtx_CONST_VECTOR (mode, v);
+  tem = gen_rtx_raw_CONST_VECTOR (mode, v);
   return tem;
+}
+
+/* Generate a vector like gen_rtx_raw_CONST_VEC, but use the zero vector when
+   all elements are zero.  */
+rtx
+gen_rtx_CONST_VECTOR (mode, v)
+     enum machine_mode mode;
+     rtvec v;
+{
+  rtx inner_zero = CONST0_RTX (GET_MODE_INNER (mode));
+  int i;
+
+  for (i = GET_MODE_NUNITS (mode) - 1; i >= 0; i--)
+    if (RTVEC_ELT (v, i) != inner_zero)
+      return gen_rtx_raw_CONST_VECTOR (mode, v);
+  return CONST0_RTX (mode);
 }
 
 /* Create some permanent unique rtl objects shared between all functions.
@@ -5200,14 +5448,16 @@ init_emit_once (line_numbers)
 
   /* Initialize the CONST_INT, CONST_DOUBLE, and memory attribute hash
      tables.  */
-  const_int_htab = htab_create (37, const_int_htab_hash,
-				const_int_htab_eq, NULL);
+  const_int_htab = htab_create_ggc (37, const_int_htab_hash,
+				    const_int_htab_eq, NULL);
 
-  const_double_htab = htab_create (37, const_double_htab_hash,
-				   const_double_htab_eq, NULL);
+  const_double_htab = htab_create_ggc (37, const_double_htab_hash,
+				       const_double_htab_eq, NULL);
 
-  mem_attrs_htab = htab_create (37, mem_attrs_htab_hash,
-				mem_attrs_htab_eq, NULL);
+  mem_attrs_htab = htab_create_ggc (37, mem_attrs_htab_hash,
+				    mem_attrs_htab_eq, NULL);
+  reg_attrs_htab = htab_create_ggc (37, reg_attrs_htab_hash,
+				    reg_attrs_htab_eq, NULL);
 
   no_line_numbers = ! line_numbers;
 
@@ -5281,7 +5531,7 @@ init_emit_once (line_numbers)
      tries to use these variables.  */
   for (i = - MAX_SAVED_CONST_INT; i <= MAX_SAVED_CONST_INT; i++)
     const_int_rtx[i + MAX_SAVED_CONST_INT] =
-      gen_rtx_raw_CONST_INT (VOIDmode, i);
+      gen_rtx_raw_CONST_INT (VOIDmode, (HOST_WIDE_INT) i);
 
   if (STORE_FLAG_VALUE >= - MAX_SAVED_CONST_INT
       && STORE_FLAG_VALUE <= MAX_SAVED_CONST_INT)
@@ -5378,7 +5628,7 @@ init_emit_once (line_numbers)
 #endif
 #endif
 
-  if (PIC_OFFSET_TABLE_REGNUM != INVALID_REGNUM)
+  if ((unsigned) PIC_OFFSET_TABLE_REGNUM != INVALID_REGNUM)
     pic_offset_table_rtx = gen_raw_REG (Pmode, PIC_OFFSET_TABLE_REGNUM);
 }
 

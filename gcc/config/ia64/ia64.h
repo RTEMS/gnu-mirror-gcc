@@ -31,13 +31,26 @@ Boston, MA 02111-1307, USA.  */
 
 /* Run-time target specifications */
 
-#define EXTRA_SPECS \
-  { "cpp_cpu", CPP_CPU_SPEC }, \
-  { "asm_extra", ASM_EXTRA_SPEC },
+/* Target CPU builtins.  */
+#define TARGET_CPU_CPP_BUILTINS()		\
+do {						\
+	builtin_assert("cpu=ia64");		\
+	builtin_assert("machine=ia64");		\
+	builtin_define("__ia64");		\
+	builtin_define("__ia64__");		\
+	builtin_define("__itanium__");		\
+	builtin_define("__ELF__");		\
+	if (!TARGET_ILP32)			\
+	  {					\
+	    builtin_define("_LP64");		\
+	    builtin_define("__LP64__");		\
+	  }					\
+	if (TARGET_BIG_ENDIAN)			\
+	  builtin_define("__BIG_ENDIAN__");	\
+} while (0)
 
-#define CPP_CPU_SPEC " \
-  -Acpu=ia64 -Amachine=ia64 -D__ia64 -D__ia64__ %{!milp32:-D_LP64 -D__LP64__} \
-  -D__ELF__"
+#define EXTRA_SPECS \
+  { "asm_extra", ASM_EXTRA_SPEC },
 
 #define CC1_SPEC "%(cc1_cpu) "
 
@@ -72,11 +85,17 @@ extern int target_flags;
 
 #define MASK_AUTO_PIC	0x00000400	/* generate automatically PIC */
 
-#define MASK_INLINE_DIV_LAT 0x00000800	/* inline div, min latency.  */
+#define MASK_INLINE_FLOAT_DIV_LAT 0x00000800 /* inline div, min latency.  */
 
-#define MASK_INLINE_DIV_THR 0x00001000	/* inline div, max throughput.  */
+#define MASK_INLINE_FLOAT_DIV_THR 0x00001000 /* inline div, max throughput.  */
+
+#define MASK_INLINE_INT_DIV_LAT   0x00000800 /* inline div, min latency.  */
+
+#define MASK_INLINE_INT_DIV_THR   0x00001000 /* inline div, max throughput.  */
 
 #define MASK_DWARF2_ASM 0x40000000	/* test dwarf2 line info via gas.  */
+
+#define MASK_EARLY_STOP_BITS 0x00002000 /* tune stop bits for the model.  */
 
 #define TARGET_BIG_ENDIAN	(target_flags & MASK_BIG_ENDIAN)
 
@@ -100,12 +119,19 @@ extern int target_flags;
 
 #define TARGET_AUTO_PIC		(target_flags & MASK_AUTO_PIC)
 
-#define TARGET_INLINE_DIV_LAT	(target_flags & MASK_INLINE_DIV_LAT)
+#define TARGET_INLINE_FLOAT_DIV_LAT (target_flags & MASK_INLINE_FLOAT_DIV_LAT)
 
-#define TARGET_INLINE_DIV_THR	(target_flags & MASK_INLINE_DIV_THR)
+#define TARGET_INLINE_FLOAT_DIV_THR (target_flags & MASK_INLINE_FLOAT_DIV_THR)
 
-#define TARGET_INLINE_DIV \
-  (target_flags & (MASK_INLINE_DIV_LAT | MASK_INLINE_DIV_THR))
+#define TARGET_INLINE_INT_DIV_LAT   (target_flags & MASK_INLINE_INT_DIV_LAT)
+
+#define TARGET_INLINE_INT_DIV_THR   (target_flags & MASK_INLINE_INT_DIV_THR)
+
+#define TARGET_INLINE_FLOAT_DIV \
+  (target_flags & (MASK_INLINE_FLOAT_DIV_LAT | MASK_INLINE_FLOAT_DIV_THR))
+
+#define TARGET_INLINE_INT_DIV \
+  (target_flags & (MASK_INLINE_INT_DIV_LAT | MASK_INLINE_INT_DIV_THR))
 
 #define TARGET_DWARF2_ASM	(target_flags & MASK_DWARF2_ASM)
 
@@ -113,6 +139,9 @@ extern int ia64_tls_size;
 #define TARGET_TLS14		(ia64_tls_size == 14)
 #define TARGET_TLS22		(ia64_tls_size == 22)
 #define TARGET_TLS64		(ia64_tls_size == 64)
+#define TARGET_EARLY_STOP_BITS	(target_flags & MASK_EARLY_STOP_BITS)
+
+#define TARGET_HPUX_LD		0
 
 /* This macro defines names of command options to set and clear bits in
    `target_flags'.  Its definition is an initializer with a subgrouping for
@@ -150,14 +179,22 @@ extern int ia64_tls_size;
       N_("gp is constant (but save/restore gp on indirect calls)") },	\
   { "auto-pic",		MASK_AUTO_PIC,					\
       N_("Generate self-relocatable code") },				\
-  { "inline-divide-min-latency", MASK_INLINE_DIV_LAT,			\
-      N_("Generate inline division, optimize for latency") },		\
-  { "inline-divide-max-throughput", MASK_INLINE_DIV_THR,		\
-      N_("Generate inline division, optimize for throughput") },	\
+  { "inline-float-divide-min-latency", MASK_INLINE_FLOAT_DIV_LAT,	\
+      N_("Generate inline floating point division, optimize for latency") },\
+  { "inline-float-divide-max-throughput", MASK_INLINE_FLOAT_DIV_THR,	\
+      N_("Generate inline floating point division, optimize for throughput") },\
+  { "inline-int-divide-min-latency", MASK_INLINE_INT_DIV_LAT,		\
+      N_("Generate inline integer division, optimize for latency") },	\
+  { "inline-int-divide-max-throughput", MASK_INLINE_INT_DIV_THR,	\
+      N_("Generate inline integer division, optimize for throughput") },\
   { "dwarf2-asm", 	MASK_DWARF2_ASM,				\
       N_("Enable Dwarf 2 line debug info via GNU as")},			\
   { "no-dwarf2-asm", 	-MASK_DWARF2_ASM,				\
       N_("Disable Dwarf 2 line debug info via GNU as")},		\
+  { "early-stop-bits", MASK_EARLY_STOP_BITS,				\
+      N_("Enable earlier placing stop bits for better scheduling")},	\
+  { "no-early-stop-bits", -MASK_EARLY_STOP_BITS,			\
+      N_("Disable earlier placing stop bits")},				\
   SUBTARGET_SWITCHES							\
   { "",			TARGET_DEFAULT | TARGET_CPU_DEFAULT,		\
       NULL }								\
@@ -183,12 +220,30 @@ extern int ia64_tls_size;
 
 extern const char *ia64_fixed_range_string;
 extern const char *ia64_tls_size_string;
+
+/* Which processor to schedule for. The cpu attribute defines a list
+   that mirrors this list, so changes to i64.md must be made at the
+   same time.  */
+
+enum processor_type
+{
+  PROCESSOR_ITANIUM,			/* Original Itanium. */
+  PROCESSOR_ITANIUM2,
+  PROCESSOR_max
+};
+
+extern enum processor_type ia64_tune;
+
+extern const char *ia64_tune_string;
+
 #define TARGET_OPTIONS \
 {									\
   { "fixed-range=", 	&ia64_fixed_range_string,			\
       N_("Specify range of registers to make fixed")},			\
   { "tls-size=",	&ia64_tls_size_string,				\
       N_("Specify bit size of immediate TLS offsets")},			\
+  { "tune=",		&ia64_tune_string,				\
+      N_("Schedule code for given CPU")},				\
 }
 
 /* Sometimes certain combinations of command options do not make sense on a
@@ -207,13 +262,6 @@ extern const char *ia64_tls_size_string;
 /* #define OPTIMIZATION_OPTIONS(LEVEL,SIZE) */
 
 /* Driver configuration */
-
-/* A C string constant that tells the GNU CC driver program options to pass to
-   CPP.  It can also specify how to translate options you give to GNU CC into
-   options for GNU CC to pass to the CPP.  */
-
-#define CPP_SPEC \
-  "%{mcpu=itanium:-D__itanium__} %{mbig-endian:-D__BIG_ENDIAN__} %(cpp_cpu)"
 
 /* A C string constant that tells the GNU CC driver program options to pass to
    `cc1'.  It can also specify how to translate options you give to GNU CC into
@@ -254,7 +302,7 @@ extern const char *ia64_tls_size_string;
 
 /* A C expression whose value is zero if pointers that need to be extended
    from being `POINTER_SIZE' bits wide to `Pmode' are sign-extended and one if
-   they are zero-extended and negative one if there is an ptr_extend operation.
+   they are zero-extended and negative one if there is a ptr_extend operation.
 
    You need not define this macro if the `POINTER_SIZE' is equal to the width
    of `Pmode'.  */
@@ -321,10 +369,10 @@ while (0)
 
 /* Define this if you wish to imitate the way many other C compilers handle
    alignment of bitfields and the structures that contain them.
-   The behavior is that the type written for a bitfield (`int', `short', or
+   The behavior is that the type written for a bit-field (`int', `short', or
    other integer type) imposes an alignment for the entire structure, as if the
    structure really did contain an ordinary field of that type.  In addition,
-   the bitfield is placed within the structure so that it would fit within such
+   the bit-field is placed within the structure so that it would fit within such
    a field, not crossing a boundary for it.  */
 #define PCC_BITFIELD_TYPE_MATTERS 1
 
@@ -334,11 +382,8 @@ while (0)
 /* Allow pairs of registers to be used, which is the intent of the default.  */
 #define MAX_FIXED_MODE_SIZE GET_MODE_BITSIZE (TImode)
 
-/* A code distinguishing the floating point format of the target machine.  */
-#define TARGET_FLOAT_FORMAT IEEE_FLOAT_FORMAT
-
 /* By default, the C++ compiler will use function addresses in the
-   vtable entries.  Setting this non-zero tells the compiler to use
+   vtable entries.  Setting this nonzero tells the compiler to use
    function descriptors instead.  The value of this macro says how
    many words wide the descriptor is (normally 2).  It is assumed
    that the address of a function descriptor may be treated as a
@@ -376,9 +421,8 @@ while (0)
 
 #define LONG_DOUBLE_TYPE_SIZE 128
 
-/* Tell real.c that this is the 80-bit Intel extended float format
-   packaged in a 128-bit entity.  */
-
+/* By default we use the 80-bit Intel extended float format packaged
+   in a 128-bit entity.  */
 #define INTEL_EXTENDED_IEEE_FORMAT 1
 
 #define DEFAULT_SIGNED_CHAR 1
@@ -545,7 +589,7 @@ while (0)
    all the FIXED_REGISTERS.  Until this problem has been
    resolved this macro can be used to overcome this situation.
    In particular, block_propagate() requires this list
-   be acurate, or we can remove registers which should be live.
+   be accurate, or we can remove registers which should be live.
    This macro is used in regs_invalidated_by_call.  */
 
 #define CALL_REALLY_USED_REGISTERS \
@@ -965,7 +1009,7 @@ enum reg_class
 
 /* Certain machines have the property that some registers cannot be copied to
    some other registers without using memory.  Define this macro on those
-   machines to be a C expression that is non-zero if objects of mode M in
+   machines to be a C expression that is nonzero if objects of mode M in
    registers of CLASS1 can only be copied to registers of class CLASS2 by
    storing a register of CLASS1 into memory and loading that memory location
    into a register of CLASS2.  */
@@ -989,17 +1033,12 @@ enum reg_class
    : ((CLASS) == FR_REGS && (MODE) == TFmode) ? 1		\
    : (GET_MODE_SIZE (MODE) + UNITS_PER_WORD - 1) / UNITS_PER_WORD)
 
-/* If defined, gives a class of registers that cannot be used as the
-   operand of a SUBREG that changes the mode of the object illegally.  */
-
-#define CLASS_CANNOT_CHANGE_MODE        FR_REGS
-
-/* Defines illegal mode changes for CLASS_CANNOT_CHANGE_MODE.
-   In FP regs, we can't change FP values to integer values and vice
+/* In FP regs, we can't change FP values to integer values and vice
    versa, but we can change e.g. DImode to SImode.  */
 
-#define CLASS_CANNOT_CHANGE_MODE_P(FROM,TO) \
-  (GET_MODE_CLASS (FROM) != GET_MODE_CLASS (TO))
+#define CANNOT_CHANGE_MODE_CLASS(FROM, TO, CLASS) 	\
+  (GET_MODE_CLASS (FROM) != GET_MODE_CLASS (TO)		\
+   ? reg_classes_intersect_p (CLASS, FR_REGS) : 0)
 
 /* A C expression that defines the machine-dependent operand constraint
    letters (`I', `J', `K', .. 'P') that specify particular ranges of
@@ -1195,7 +1234,7 @@ enum reg_class
   {RETURN_ADDRESS_POINTER_REGNUM, BR_REG (0)},				\
 }
 
-/* A C expression that returns non-zero if the compiler is allowed to try to
+/* A C expression that returns nonzero if the compiler is allowed to try to
    replace register number FROM with register number TO.  The frame pointer
    is automatically handled.  */
 
@@ -1339,10 +1378,6 @@ do {									\
 (((REGNO) >= GR_ARG_FIRST && (REGNO) < (GR_ARG_FIRST + MAX_ARGUMENT_SLOTS)) \
  || ((REGNO) >= FR_ARG_FIRST && (REGNO) < (FR_ARG_FIRST + MAX_ARGUMENT_SLOTS)))
 
-/* Implement `va_start' for varargs and stdarg.  */
-#define EXPAND_BUILTIN_VA_START(stdarg, valist, nextarg) \
-  ia64_va_start (stdarg, valist, nextarg)
-
 /* Implement `va_arg'.  */
 #define EXPAND_BUILTIN_VA_ARG(valist, type) \
   ia64_va_arg (valist, type)
@@ -1427,39 +1462,6 @@ do {									\
 
 #define ASM_FILE_START(FILE) \
   emit_safe_across_calls (FILE)
-
-/* A C compound statement that outputs the assembler code for a thunk function,
-   used to implement C++ virtual function calls with multiple inheritance.  */
-
-#define ASM_OUTPUT_MI_THUNK(FILE, THUNK_FNDECL, DELTA, FUNCTION) \
-do {									\
-  if (CONST_OK_FOR_I (DELTA))						\
-    {									\
-      fprintf (FILE, "\tadds r32 = ");					\
-      fprintf (FILE, HOST_WIDE_INT_PRINT_DEC, (DELTA));			\
-      fprintf (FILE, ", r32\n");					\
-    }									\
-  else									\
-    {									\
-      if (CONST_OK_FOR_J (DELTA))					\
-        {								\
-          fprintf (FILE, "\taddl r2 = ");				\
-          fprintf (FILE, HOST_WIDE_INT_PRINT_DEC, (DELTA));		\
-          fprintf (FILE, ", r0\n");					\
-        }								\
-      else								\
-        {								\
-	  fprintf (FILE, "\tmovl r2 = ");				\
-	  fprintf (FILE, HOST_WIDE_INT_PRINT_DEC, (DELTA));		\
-	  fprintf (FILE, "\n");						\
-        }								\
-      fprintf (FILE, "\t;;\n");						\
-      fprintf (FILE, "\tadd r32 = r2, r32\n");				\
-    }									\
-  fprintf (FILE, "\tbr ");						\
-  assemble_name (FILE, XSTR (XEXP (DECL_RTL (FUNCTION), 0), 0));	\
-  fprintf (FILE, "\n");							\
-} while (0)
 
 /* Output part N of a function descriptor for DECL.  For ia64, both
    words are emitted with a single relocation, so ignore N > 0.  */
@@ -1672,68 +1674,6 @@ do {									\
 
 /* Describing Relative Costs of Operations */
 
-/* A part of a C `switch' statement that describes the relative costs of
-   constant RTL expressions.  */
-
-/* ??? This is incomplete.  */
-
-#define CONST_COSTS(X, CODE, OUTER_CODE)				\
-  case CONST_INT:							\
-    if ((X) == const0_rtx)						\
-      return 0;								\
-    switch (OUTER_CODE)							\
-      {									\
-      case SET:								\
-	return CONST_OK_FOR_J (INTVAL (X)) ? 0 : COSTS_N_INSNS (1);	\
-      case PLUS:							\
-	if (CONST_OK_FOR_I (INTVAL (X)))				\
-	  return 0;							\
-	if (CONST_OK_FOR_J (INTVAL (X)))				\
-	  return 1;							\
-	return COSTS_N_INSNS (1);					\
-      default:								\
-	if (CONST_OK_FOR_K (INTVAL (X)) || CONST_OK_FOR_L (INTVAL (X)))	\
-	  return 0;							\
-	return COSTS_N_INSNS (1);					\
-      }									\
-  case CONST_DOUBLE:							\
-    return COSTS_N_INSNS (1);						\
-  case CONST:								\
-  case SYMBOL_REF:							\
-  case LABEL_REF:							\
-    return COSTS_N_INSNS (3);
-
-/* Like `CONST_COSTS' but applies to nonconstant RTL expressions.  */
-
-#define RTX_COSTS(X, CODE, OUTER_CODE)					\
-  case MULT:								\
-    /* For multiplies wider than HImode, we have to go to the FPU,	\
-       which normally involves copies.  Plus there's the latency	\
-       of the multiply itself, and the latency of the instructions to	\
-       transfer integer regs to FP regs.  */				\
-    if (GET_MODE_SIZE (GET_MODE (X)) > 2)				\
-      return COSTS_N_INSNS (10);					\
-    return COSTS_N_INSNS (2);						\
-  case PLUS:								\
-  case MINUS:								\
-  case ASHIFT:								\
-  case ASHIFTRT:							\
-  case LSHIFTRT:							\
-    return COSTS_N_INSNS (1);						\
-  case DIV:								\
-  case UDIV:								\
-  case MOD:								\
-  case UMOD:								\
-    /* We make divide expensive, so that divide-by-constant will be	\
-       optimized to a multiply.  */					\
-    return COSTS_N_INSNS (60);
-
-/* An expression giving the cost of an addressing mode that contains ADDRESS.
-   If not defined, the cost is computed from the ADDRESS expression and the
-   `CONST_COSTS' values.  */
-
-#define ADDRESS_COST(ADDRESS) 0
-
 /* A C expression for the cost of moving data from a register in class FROM to
    one in class TO, using MODE.  */
 
@@ -1909,16 +1849,8 @@ do {									\
   ia64_asm_output_label = 0;						\
 } while (0)
 
-/* A C statement (sans semicolon) to output to the stdio stream STREAM some
-   commands that will make the label NAME global; that is, available for
-   reference from other files.  */
-
-#define ASM_GLOBALIZE_LABEL(STREAM,NAME)				\
-do {									\
-  fputs ("\t.global ", STREAM);						\
-  assemble_name (STREAM, NAME);						\
-  fputs ("\n", STREAM);							\
-} while (0)
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP "\t.global "
 
 /* A C statement (sans semicolon) to output to the stdio stream STREAM any text
    necessary for declaring the name of an external symbol named NAME which is
@@ -1935,18 +1867,9 @@ do {									\
   sprintf (LABEL, "*.%s%d", PREFIX, NUM);				\
 } while (0)
 
-/* A C expression to assign to OUTVAR (which is a variable of type `char *') a
-   newly allocated string made from the string NAME and the number NUMBER, with
-   some suitable punctuation added.  */
-
 /* ??? Not sure if using a ? in the name for Intel as is safe.  */
 
-#define ASM_FORMAT_PRIVATE_NAME(OUTVAR, NAME, NUMBER)			\
-do {									\
-  (OUTVAR) = (char *) alloca (strlen (NAME) + 12);			\
-  sprintf (OUTVAR, "%s%c%ld", (NAME), (TARGET_GNU_AS ? '.' : '?'),	\
-	   (long)(NUMBER));						\
-} while (0)
+#define ASM_PN_FORMAT (TARGET_GNU_AS ? "%s.%lu" : "%s?%lu")
 
 /* A C statement to output to the stdio stream STREAM assembler code which
    defines (equates) the symbol NAME to have the value VALUE.  */
@@ -2257,13 +2180,13 @@ do {									\
 /* Define this macro if GNU CC should produce dwarf version 2 format debugging
    output in response to the `-g' option.  */
 
-#define DWARF2_DEBUGGING_INFO
+#define DWARF2_DEBUGGING_INFO 1
 
 #define DWARF2_ASM_LINE_DEBUG_INFO (TARGET_DWARF2_ASM)
 
 /* Use tags for debug info labels, so that they don't break instruction
    bundles.  This also avoids getting spurious DV warnings from the
-   assembler.  This is similar to ASM_OUTPUT_INTERNAL_LABEL, except that we
+   assembler.  This is similar to (*targetm.asm_out.internal_label), except that we
    add brackets around the label.  */
 
 #define ASM_OUTPUT_DEBUG_LABEL(FILE, PREFIX, NUM) \
@@ -2420,7 +2343,7 @@ do {									\
 
 #define PREFETCH_BLOCK 32
 
-#define HANDLE_SYSV_PRAGMA
+#define HANDLE_SYSV_PRAGMA 1
 
 /* In rare cases, correct code generation requires extra machine dependent
    processing between the second jump optimization pass and delayed branch
@@ -2525,5 +2448,10 @@ enum fetchop_code {
 
 #undef  PROFILE_BEFORE_PROLOGUE
 #define PROFILE_BEFORE_PROLOGUE 1
+
+
+
+/* Switch on code for querying unit reservations.  */
+#define CPU_UNITS_QUERY 1
 
 /* End of ia64.h */

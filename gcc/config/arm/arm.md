@@ -1,6 +1,6 @@
 ;;- Machine description for ARM for GNU compiler
 ;;  Copyright 1991, 1993, 1994, 1995, 1996, 1996, 1997, 1998, 1999, 2000,
-;;  2001, 2002  Free Software Foundation, Inc.
+;;  2001, 2002, 2003  Free Software Foundation, Inc.
 ;;  Contributed by Pieter `Tiggr' Schoenmakers (rcpieter@win.tue.nl)
 ;;  and Martin Simmons (@harleqn.co.uk).
 ;;  More major hacks by Richard Earnshaw (rearnsha@arm.com).
@@ -24,9 +24,6 @@
 
 ;;- See file "rtl.def" for documentation on define_insn, match_*, et. al.
 
-;; There are patterns in this file to support XFmode arithmetic.
-;; Unfortunately RISC iX doesn't work well with these so they are disabled.
-;; (See arm.h)
 
 ;;---------------------------------------------------------------------------
 ;; Constants
@@ -61,14 +58,12 @@
 			;   value to it before trying to dereference it.
    (UNSPEC_PRLG_STK  4) ; A special barrier that prevents frame accesses 
 			;   being scheduled before the stack adjustment insn.
-   (UNSPEC_CLZ	     5) ; `clz' instruction, count leading zeros (SImode):
-			;   operand 0 is the result,
-			;   operand 1 is the parameter.
    (UNSPEC_PROLOGUE_USE 6) ; As USE insns are not meaningful after reload,
    			; this unspec is used to prevent the deletion of
    			; instructions setting registers for EH handling
    			; and stack frame generation.  Operand 0 is the
    			; register to "use".
+   (UNSPEC_CHECK_ARCH 7); Set CCs to indicate 26-bit or 32-bit mode.
   ]
 )
 
@@ -152,7 +147,6 @@
 ; mult		a multiply instruction
 ; block		blockage insn, this blocks all functional units
 ; float		a floating point arithmetic operation (subject to expansion)
-; fdivx		XFmode floating point division
 ; fdivd		DFmode floating point division
 ; fdivs		SFmode floating point division
 ; fmul		Floating point multiply
@@ -179,7 +173,7 @@
 	(const_string "normal"))
 
 ; Load scheduling, set from the arm_ld_sched variable
-; initialised by arm_override_options() 
+; initialized by arm_override_options() 
 (define_attr "ldsched" "no,yes" (const (symbol_ref "arm_ld_sched")))
 
 ; condition codes: this one is used by final_prescan_insn to speed up
@@ -855,18 +849,6 @@
    (set_attr "predicable" "yes")]
 )
 
-(define_insn "addxf3"
-  [(set (match_operand:XF          0 "s_register_operand" "=f,f")
-	(plus:XF (match_operand:XF 1 "s_register_operand"  "f,f")
-		 (match_operand:XF 2 "fpu_add_operand"    "fG,H")))]
-  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "@
-   adf%?e\\t%0, %1, %2
-   suf%?e\\t%0, %1, #%N2"
-  [(set_attr "type" "farith")
-   (set_attr "predicable" "yes")]
-)
-
 (define_expand "subdi3"
  [(parallel
    [(set (match_operand:DI            0 "s_register_operand" "")
@@ -1115,18 +1097,6 @@
 		   (match_operand:SF 2 "s_register_operand" "f"))))]
   "TARGET_ARM && TARGET_HARD_FLOAT"
   "suf%?d\\t%0, %1, %2"
-  [(set_attr "type" "farith")
-   (set_attr "predicable" "yes")]
-)
-
-(define_insn "subxf3"
-  [(set (match_operand:XF           0 "s_register_operand" "=f,f")
-	(minus:XF (match_operand:XF 1 "fpu_rhs_operand"     "f,G")
-		  (match_operand:XF 2 "fpu_rhs_operand"    "fG,f")))]
-  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "@
-   suf%?e\\t%0, %1, %2
-   rsf%?e\\t%0, %2, %1"
   [(set_attr "type" "farith")
    (set_attr "predicable" "yes")]
 )
@@ -1414,16 +1384,6 @@
   [(set_attr "type" "fmul")
    (set_attr "predicable" "yes")]
 )
-
-(define_insn "mulxf3"
-  [(set (match_operand:XF 0 "s_register_operand" "=f")
-	(mult:XF (match_operand:XF 1 "s_register_operand" "f")
-		 (match_operand:XF 2 "fpu_rhs_operand" "fG")))]
-  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "muf%?e\\t%0, %1, %2"
-  [(set_attr "type" "fmul")
-   (set_attr "predicable" "yes")]
-)
 
 ;; Division insns
 
@@ -1484,18 +1444,6 @@
   [(set_attr "type" "fdivd")
    (set_attr "predicable" "yes")]
 )
-
-(define_insn "divxf3"
-  [(set (match_operand:XF 0 "s_register_operand" "=f,f")
-	(div:XF (match_operand:XF 1 "fpu_rhs_operand" "f,G")
-		(match_operand:XF 2 "fpu_rhs_operand" "fG,f")))]
-  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "@
-   dvf%?e\\t%0, %1, %2
-   rdf%?e\\t%0, %2, %1"
-  [(set_attr "type" "fdivx")
-   (set_attr "predicable" "yes")]
-)
 
 ;; Modulo insns
 
@@ -1550,16 +1498,6 @@
   "TARGET_ARM && TARGET_HARD_FLOAT"
   "rmf%?d\\t%0, %1, %2"
   [(set_attr "type" "fdivd")
-   (set_attr "predicable" "yes")]
-)
-
-(define_insn "modxf3"
-  [(set (match_operand:XF 0 "s_register_operand" "=f")
-	(mod:XF (match_operand:XF 1 "s_register_operand" "f")
-		(match_operand:XF 2 "fpu_rhs_operand" "fG")))]
-  "ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "rmf%?e\\t%0, %1, %2"
-  [(set_attr "type" "fdivx")
    (set_attr "predicable" "yes")]
 )
 
@@ -1837,7 +1775,8 @@
 		(match_operand:SI 1 "s_register_operand" "r")
 		(match_operand:SI 2 "const_int_operand" "n")
 		(match_operand:SI 3 "const_int_operand" "n"))
-	       (const_int 0)))]
+	       (const_int 0)))
+   (clobber (reg:CC CC_REGNUM))]
   "TARGET_ARM
    && (INTVAL (operands[3]) >= 0 && INTVAL (operands[3]) < 32
        && INTVAL (operands[2]) > 0 
@@ -1856,9 +1795,9 @@
 ;;; ??? This pattern is bogus.  If operand3 has bits outside the range
 ;;; represented by the bitfield, then this will produce incorrect results.
 ;;; Somewhere, the value needs to be truncated.  On targets like the m68k,
-;;; which have a real bitfield insert instruction, the truncation happens
-;;; in the bitfield insert instruction itself.  Since arm does not have a
-;;; bitfield insert instruction, we would have to emit code here to truncate
+;;; which have a real bit-field insert instruction, the truncation happens
+;;; in the bit-field insert instruction itself.  Since arm does not have a
+;;; bit-field insert instruction, we would have to emit code here to truncate
 ;;; the value before we insert.  This loses some of the advantage of having
 ;;; this insv pattern, so this pattern needs to be reevalutated.
 
@@ -1866,7 +1805,7 @@
   [(set (zero_extract:SI (match_operand:SI 0 "s_register_operand" "")
                          (match_operand:SI 1 "general_operand" "")
                          (match_operand:SI 2 "general_operand" ""))
-        (match_operand:SI 3 "nonmemory_operand" ""))]
+        (match_operand:SI 3 "reg_or_int_operand" ""))]
   "TARGET_ARM"
   "
   {
@@ -2034,7 +1973,7 @@
   "TARGET_ARM
    && reload_completed
    && operands[0] != operands[1]"
-  [(set (match_dup 0) (and:SI (not:SI (match_dup 1)) (match_dup 2)))
+  [(set (match_dup 0) (and:SI (not:SI (match_dup 2)) (match_dup 1)))
    (set (match_dup 3) (match_dup 4))]
   "
   {
@@ -2051,11 +1990,11 @@
   [(set (match_operand:DI 0 "s_register_operand" "=&r,&r")
 	(and:DI (not:DI (sign_extend:DI
 			 (match_operand:SI 2 "s_register_operand" "r,r")))
-		(match_operand:DI 1 "s_register_operand" "?r,0")))]
+		(match_operand:DI 1 "s_register_operand" "0,r")))]
   "TARGET_ARM"
   "#"
   "TARGET_ARM && reload_completed"
-  [(set (match_dup 0) (and:SI (not:SI (match_dup 1)) (match_dup 2)))
+  [(set (match_dup 0) (and:SI (not:SI (match_dup 2)) (match_dup 1)))
    (set (match_dup 3) (and:SI (not:SI
 				(ashiftrt:SI (match_dup 2) (const_int 31)))
 			       (match_dup 4)))]
@@ -2791,15 +2730,6 @@
    (set_attr "predicable" "yes")]
 )
 
-(define_insn "negxf2"
-  [(set (match_operand:XF 0 "s_register_operand" "=f")
-	(neg:XF (match_operand:XF 1 "s_register_operand" "f")))]
-  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "mnf%?e\\t%0, %1"
-  [(set_attr "type" "ffarith")
-   (set_attr "predicable" "yes")]
-)
-
 ;; abssi2 doesn't really clobber the condition codes if a different register
 ;; is being set.  To keep things simple, assume during rtl manipulations that
 ;; it does, but tell the final scan operator the truth.  Similarly for
@@ -2861,15 +2791,6 @@
    (set_attr "predicable" "yes")]
 )
 
-(define_insn "absxf2"
-  [(set (match_operand:XF 0 "s_register_operand" "=f")
-	(abs:XF (match_operand:XF 1 "s_register_operand" "f")))]
-  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "abs%?e\\t%0, %1"
-  [(set_attr "type" "ffarith")
-   (set_attr "predicable" "yes")]
-)
-
 (define_insn "sqrtsf2"
   [(set (match_operand:SF 0 "s_register_operand" "=f")
 	(sqrt:SF (match_operand:SF 1 "s_register_operand" "f")))]
@@ -2897,83 +2818,6 @@
   [(set_attr "type" "float_em")
    (set_attr "predicable" "yes")]
 )
-
-(define_insn "sqrtxf2"
-  [(set (match_operand:XF 0 "s_register_operand" "=f")
-	(sqrt:XF (match_operand:XF 1 "s_register_operand" "f")))]
-  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "sqt%?e\\t%0, %1"
-  [(set_attr "type" "float_em")
-   (set_attr "predicable" "yes")]
-)
-
-;; SIN COS TAN and family are always emulated, so it's probably better
-;; to always call a library function.
-;(define_insn "sinsf2"
-;  [(set (match_operand:SF 0 "s_register_operand" "=f")
-;	(unspec:SF [(match_operand:SF 1 "s_register_operand" "f")]
-;		    UNSPEC_SIN))]
-;  "TARGET_ARM && TARGET_HARD_FLOAT"
-;  "sin%?s\\t%0, %1"
-;[(set_attr "type" "float_em")])
-;
-;(define_insn "sindf2"
-;  [(set (match_operand:DF 0 "s_register_operand" "=f")
-;	(unspec:DF [(match_operand:DF 1 "s_register_operand" "f")]
-;		    UNSPEC_SIN))]
-;  "TARGET_ARM && TARGET_HARD_FLOAT"
-;  "sin%?d\\t%0, %1"
-;[(set_attr "type" "float_em")])
-;
-;(define_insn "*sindf_esfdf"
-;  [(set (match_operand:DF 0 "s_register_operand" "=f")
-;	(unspec:DF [(float_extend:DF
-;		     (match_operand:SF 1 "s_register_operand" "f"))]
-;		    UNSPEC_SIN))]
-;  "TARGET_ARM && TARGET_HARD_FLOAT"
-;  "sin%?d\\t%0, %1"
-;[(set_attr "type" "float_em")])
-;
-;(define_insn "sinxf2"
-;  [(set (match_operand:XF 0 "s_register_operand" "=f")
-;	(unspec:XF [(match_operand:XF 1 "s_register_operand" "f")]
-;		   UNSPEC_SIN))]
-;  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-;  "sin%?e\\t%0, %1"
-;[(set_attr "type" "float_em")])
-;
-;(define_insn "cossf2"
-;  [(set (match_operand:SF 0 "s_register_operand" "=f")
-;	(unspec:SF [(match_operand:SF 1 "s_register_operand" "f")]
-;		   UNSPEC_COS))]
-;  "TARGET_ARM && TARGET_HARD_FLOAT"
-;  "cos%?s\\t%0, %1"
-;[(set_attr "type" "float_em")])
-;
-;(define_insn "cosdf2"
-;  [(set (match_operand:DF 0 "s_register_operand" "=f")
-;	(unspec:DF [(match_operand:DF 1 "s_register_operand" "f")]
-;		   UNSPEC_COS))]
-;  "TARGET_ARM && TARGET_HARD_FLOAT"
-;  "cos%?d\\t%0, %1"
-;[(set_attr "type" "float_em")])
-;
-;(define_insn "*cosdf_esfdf"
-;  [(set (match_operand:DF 0 "s_register_operand" "=f")
-;	(unspec:DF [(float_extend:DF
-;		     (match_operand:SF 1 "s_register_operand" "f"))]
-;		   UNSPEC_COS))]
-;  "TARGET_ARM && TARGET_HARD_FLOAT"
-;  "cos%?d\\t%0, %1"
-;[(set_attr "type" "float_em")])
-;
-;(define_insn "cosxf2"
-;  [(set (match_operand:XF 0 "s_register_operand" "=f")
-;	(unspec:XF [(match_operand:XF 1 "s_register_operand" "f")]
-;		   UNSEPC_COS))]
-;  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-;  "cos%?e\\t%0, %1"
-;[(set_attr "type" "float_em")])
 
 (define_insn_and_split "one_cmpldi2"
   [(set (match_operand:DI 0 "s_register_operand" "=&r,&r")
@@ -3058,15 +2902,6 @@
    (set_attr "predicable" "yes")]
 )
 
-(define_insn "floatsixf2"
-  [(set (match_operand:XF 0 "s_register_operand" "=f")
-	(float:XF (match_operand:SI 1 "s_register_operand" "r")))]
-  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "flt%?e\\t%0, %1"
-  [(set_attr "type" "r_2_f")
-   (set_attr "predicable" "yes")]
-)
-
 (define_insn "fix_truncsfsi2"
   [(set (match_operand:SI         0 "s_register_operand" "=r")
 	(fix:SI (match_operand:SF 1 "s_register_operand" "f")))]
@@ -3085,15 +2920,6 @@
    (set_attr "predicable" "yes")]
 )
 
-(define_insn "fix_truncxfsi2"
-  [(set (match_operand:SI 0 "s_register_operand" "=r")
-	(fix:SI (match_operand:XF 1 "s_register_operand" "f")))]
-  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "fix%?z\\t%0, %1"
-  [(set_attr "type" "f_2_r")
-   (set_attr "predicable" "yes")]
-)
-
 ;; Truncation insns
 
 (define_insn "truncdfsf2"
@@ -3102,26 +2928,6 @@
 	 (match_operand:DF 1 "s_register_operand" "f")))]
   "TARGET_ARM && TARGET_HARD_FLOAT"
   "mvf%?s\\t%0, %1"
-  [(set_attr "type" "ffarith")
-   (set_attr "predicable" "yes")]
-)
-
-(define_insn "truncxfsf2"
-  [(set (match_operand:SF 0 "s_register_operand" "=f")
-	(float_truncate:SF
-	 (match_operand:XF 1 "s_register_operand" "f")))]
-  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "mvf%?s\\t%0, %1"
-  [(set_attr "type" "ffarith")
-   (set_attr "predicable" "yes")]
-)
-
-(define_insn "truncxfdf2"
-  [(set (match_operand:DF 0 "s_register_operand" "=f")
-	(float_truncate:DF
-	 (match_operand:XF 1 "s_register_operand" "f")))]
-  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "mvf%?d\\t%0, %1"
   [(set_attr "type" "ffarith")
    (set_attr "predicable" "yes")]
 )
@@ -3856,25 +3662,6 @@
   [(set_attr "type" "ffarith")
    (set_attr "predicable" "yes")]
 )
-
-(define_insn "extendsfxf2"
-  [(set (match_operand:XF 0 "s_register_operand" "=f")
-	(float_extend:XF (match_operand:SF 1 "s_register_operand" "f")))]
-  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "mvf%?e\\t%0, %1"
-  [(set_attr "type" "ffarith")
-   (set_attr "predicable" "yes")]
-)
-
-(define_insn "extenddfxf2"
-  [(set (match_operand:XF 0 "s_register_operand" "=f")
-	(float_extend:XF (match_operand:DF 1 "s_register_operand" "f")))]
-  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "mvf%?e\\t%0, %1"
-  [(set_attr "type" "ffarith")
-   (set_attr "predicable" "yes")]
-)
-
 
 ;; Move insns (including loads and stores)
 
@@ -3912,7 +3699,7 @@
 ;;  DONE;
 ;;}")
 
-;; Recognise garbage generated above.
+;; Recognize garbage generated above.
 
 ;;(define_insn ""
 ;;  [(set (match_operand:TI 0 "general_operand" "=r,r,r,<,>,m")
@@ -4204,7 +3991,7 @@
    (use (label_ref (match_operand 1 "" "")))]
   "TARGET_THUMB && flag_pic"
   "*
-  ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, \"L\",
+  (*targetm.asm_out.internal_label) (asm_out_file, \"L\",
 			     CODE_LABEL_NUMBER (operands[1]));
   return \"add\\t%0, %|pc\";
   "
@@ -4217,7 +4004,7 @@
    (use (label_ref (match_operand 1 "" "")))]
   "TARGET_ARM && flag_pic"
   "*
-    ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, \"L\",
+    (*targetm.asm_out.internal_label) (asm_out_file, \"L\",
 			       CODE_LABEL_NUMBER (operands[1]));
     return \"add%?\\t%0, %|pc, %0\";
   "
@@ -4415,6 +4202,14 @@
 	        }
 
 	      emit_insn (gen_movsi (reg, GEN_INT (val)));
+	      operands[1] = gen_lowpart (HImode, reg);
+	    }
+	  else if (arm_arch4 && !no_new_pseudos && optimize > 0
+		   && GET_CODE (operands[1]) == MEM)
+	    {
+	      rtx reg = gen_reg_rtx (SImode);
+
+	      emit_insn (gen_zero_extendhisi2 (reg, operands[1]));
 	      operands[1] = gen_lowpart (HImode, reg);
 	    }
           else if (!arm_arch4)
@@ -4673,7 +4468,7 @@
   "
 )
 
-;; Pattern to recognise insn generated default case above
+;; Pattern to recognize insn generated default case above
 (define_insn "*movhi_insn_arch4"
   [(set (match_operand:HI 0 "nonimmediate_operand" "=r,r,m,r")    
 	(match_operand:HI 1 "general_operand"      "rI,K,r,m"))]
@@ -4814,9 +4609,16 @@
 	      emit_insn (gen_movsi (reg, operands[1]));
 	      operands[1] = gen_lowpart (QImode, reg);
 	    }
-         if (GET_CODE (operands[0]) == MEM)
-	   operands[1] = force_reg (QImode, operands[1]);
-       }
+	  if (GET_CODE (operands[1]) == MEM && optimize > 0)
+	    {
+	      rtx reg = gen_reg_rtx (SImode);
+
+	      emit_insn (gen_zero_extendqisi2 (reg, operands[1]));
+	      operands[1] = gen_lowpart (QImode, reg);
+	    }
+          if (GET_CODE (operands[0]) == MEM)
+	    operands[1] = force_reg (QImode, operands[1]);
+        }
     }
   else /* TARGET_THUMB */
     {
@@ -5156,19 +4958,15 @@
 )
 
 
-(define_expand "movxf"
-  [(set (match_operand:XF 0 "general_operand" "")
-	(match_operand:XF 1 "general_operand" ""))]
-  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "")
-
-;; Even when the XFmode patterns aren't enabled, we enable this after
-;; reloading so that we can push floating point registers in the prologue.
+;; Saving and restoring the floating point registers in the prologue should
+;; be done in XFmode, even though we don't support that for anything else
+;; (Well, strictly it's 'internal representation', but that's effectively
+;; XFmode).
 
 (define_insn "*movxf_hard_insn"
   [(set (match_operand:XF 0 "nonimmediate_operand" "=f,f,f,m,f,r,r")
 	(match_operand:XF 1 "general_operand" "fG,H,m,f,r,f,r"))]
-  "TARGET_ARM && TARGET_HARD_FLOAT && (ENABLE_XF_PATTERNS || reload_completed)"
+  "TARGET_ARM && TARGET_HARD_FLOAT && reload_completed"
   "*
   switch (which_alternative)
     {
@@ -5635,17 +5433,6 @@
   "
 )
 
-(define_expand "cmpxf"
-  [(match_operand:XF 0 "s_register_operand" "")
-   (match_operand:XF 1 "fpu_rhs_operand" "")]
-  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "
-  arm_compare_op0 = operands[0];
-  arm_compare_op1 = operands[1];
-  DONE;
-  "
-)
-
 (define_insn "*arm_cmpsi_insn"
   [(set (reg:CC CC_REGNUM)
 	(compare:CC (match_operand:SI 0 "s_register_operand" "r,r")
@@ -5744,18 +5531,6 @@
    (set_attr "type" "f_2_r")]
 )
 
-(define_insn "*cmpxf_insn"
-  [(set (reg:CCFP CC_REGNUM)
-	(compare:CCFP (match_operand:XF 0 "s_register_operand" "f,f")
-		      (match_operand:XF 1 "fpu_add_operand" "fG,H")))]
-  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "@
-   cmf%?\\t%0, %1
-   cnf%?\\t%0, #%N1"
-  [(set_attr "conds" "set")
-   (set_attr "type" "f_2_r")]
-)
-
 (define_insn "*cmpsf_trap"
   [(set (reg:CCFPE CC_REGNUM)
 	(compare:CCFPE (match_operand:SF 0 "s_register_operand" "f,f")
@@ -5800,18 +5575,6 @@
 			(match_operand:SF 1 "s_register_operand" "f"))))]
   "TARGET_ARM && TARGET_HARD_FLOAT"
   "cmf%?e\\t%0, %1"
-  [(set_attr "conds" "set")
-   (set_attr "type" "f_2_r")]
-)
-
-(define_insn "*cmpxf_trap"
-  [(set (reg:CCFPE CC_REGNUM)
-	(compare:CCFPE (match_operand:XF 0 "s_register_operand" "f,f")
-		       (match_operand:XF 1 "fpu_add_operand" "fG,H")))]
-  "TARGET_ARM && ENABLE_XF_PATTERNS && TARGET_HARD_FLOAT"
-  "@
-   cmf%?e\\t%0, %1
-   cnf%?e\\t%0, #%N1"
   [(set_attr "conds" "set")
    (set_attr "type" "f_2_r")]
 )
@@ -6014,7 +5777,7 @@
   if (arm_ccfsm_state != 0)
     abort ();
 
-  return \"bvs\\t%l0;beq\\t%l0\";
+  return \"bvs\\t%l0\;beq\\t%l0\";
   "
   [(set_attr "conds" "jump_clob")
    (set_attr "length" "8")]
@@ -6031,7 +5794,7 @@
   if (arm_ccfsm_state != 0)
     abort ();
 
-  return \"bmi\\t%l0;bgt\\t%l0\";
+  return \"bmi\\t%l0\;bgt\\t%l0\";
   "
   [(set_attr "conds" "jump_clob")
    (set_attr "length" "8")]
@@ -6066,7 +5829,7 @@
   if (arm_ccfsm_state != 0)
     abort ();
 
-  return \"bmi\\t%l0;bgt\\t%l0\";
+  return \"bmi\\t%l0\;bgt\\t%l0\";
   "
   [(set_attr "conds" "jump_clob")
    (set_attr "length" "8")]
@@ -6083,7 +5846,7 @@
   if (arm_ccfsm_state != 0)
     abort ();
 
-  return \"bvs\\t%l0;beq\\t%l0\";
+  return \"bvs\\t%l0\;beq\\t%l0\";
   "
   [(set_attr "conds" "jump_clob")
    (set_attr "length" "8")]
@@ -6288,8 +6051,12 @@
   "
   {
     enum rtx_code code = GET_CODE (operands[1]);
-    rtx ccreg = arm_gen_compare_reg (code, arm_compare_op0, arm_compare_op1);
+    rtx ccreg;
 
+    if (code == UNEQ || code == LTGT)
+      FAIL;
+
+    ccreg = arm_gen_compare_reg (code, arm_compare_op0, arm_compare_op1);
     operands[1] = gen_rtx (code, VOIDmode, ccreg, const0_rtx);
   }"
 )
@@ -6304,6 +6071,9 @@
   {
     enum rtx_code code = GET_CODE (operands[1]);
     rtx ccreg;
+
+    if (code == UNEQ || code == LTGT)
+      FAIL;
 
     /* When compiling for SOFT_FLOAT, ensure both arms are in registers. 
        Otherwise, ensure it is a valid FP add operand */
@@ -6325,8 +6095,12 @@
   "
   {
     enum rtx_code code = GET_CODE (operands[1]);
-    rtx ccreg = arm_gen_compare_reg (code, arm_compare_op0, arm_compare_op1);
+    rtx ccreg;
 
+    if (code == UNEQ || code == LTGT)
+      FAIL;
+
+    ccreg = arm_gen_compare_reg (code, arm_compare_op0, arm_compare_op1);
     operands[1] = gen_rtx (code, VOIDmode, ccreg, const0_rtx);
   }"
 )
@@ -6665,8 +6439,8 @@
 (define_expand "sibcall"
   [(parallel [(call (match_operand 0 "memory_operand" "")
 		    (match_operand 1 "general_operand" ""))
-	      (use (match_operand 2 "" ""))
-	      (use (reg:SI LR_REGNUM))])]
+	      (return)
+	      (use (match_operand 2 "" ""))])]
   "TARGET_ARM"
   "
   {
@@ -6679,8 +6453,8 @@
   [(parallel [(set (match_operand 0 "register_operand" "")
 		   (call (match_operand 1 "memory_operand" "")
 			 (match_operand 2 "general_operand" "")))
-	      (use (match_operand 3 "" ""))
-	      (use (reg:SI LR_REGNUM))])]
+	      (return)
+	      (use (match_operand 3 "" ""))])]
   "TARGET_ARM"
   "
   {
@@ -6692,8 +6466,8 @@
 (define_insn "*sibcall_insn"
  [(call (mem:SI (match_operand:SI 0 "" "X"))
 	(match_operand 1 "" ""))
-  (use (match_operand 2 "" ""))
-  (use (reg:SI LR_REGNUM))]
+  (return)
+  (use (match_operand 2 "" ""))]
   "TARGET_ARM && GET_CODE (operands[0]) == SYMBOL_REF"
   "*
   return NEED_PLT_RELOC ? \"b%?\\t%a0(PLT)\" : \"b%?\\t%a0\";
@@ -6705,8 +6479,8 @@
  [(set (match_operand 0 "s_register_operand" "=r,f")
        (call (mem:SI (match_operand:SI 1 "" "X,X"))
 	     (match_operand 2 "" "")))
-  (use (match_operand 3 "" ""))
-  (use (reg:SI LR_REGNUM))]
+  (return)
+  (use (match_operand 3 "" ""))]
   "TARGET_ARM && GET_CODE (operands[1]) == SYMBOL_REF"
   "*
   return NEED_PLT_RELOC ? \"b%?\\t%a1(PLT)\" : \"b%?\\t%a1\";
@@ -6769,6 +6543,33 @@
   }"
   [(set_attr "conds" "use")
    (set_attr "type" "load")]
+)
+
+;; Generate a sequence of instructions to determine if the processor is
+;; in 26-bit or 32-bit mode, and return the appropriate return address
+;; mask.
+
+(define_expand "return_addr_mask"
+  [(set (match_dup 1)
+      (compare:CC_NOOV (unspec [(const_int 0)] UNSPEC_CHECK_ARCH)
+		       (const_int 0)))
+   (set (match_operand:SI 0 "s_register_operand" "")
+      (if_then_else:SI (eq (match_dup 1) (const_int 0))
+		       (const_int -1)
+		       (const_int 67108860)))] ; 0x03fffffc
+  "TARGET_ARM"
+  "
+  operands[1] = gen_rtx_REG (CC_NOOVmode, 24);
+  ")
+
+(define_insn "*check_arch2"
+  [(set (match_operand:CC_NOOV 0 "cc_register" "")
+      (compare:CC_NOOV (unspec [(const_int 0)] UNSPEC_CHECK_ARCH)
+		       (const_int 0)))]
+  "TARGET_ARM"
+  "teq\\t%|r0, %|r0\;teq\\t%|pc, %|pc"
+  [(set_attr "length" "8")
+   (set_attr "conds" "set")]
 )
 
 ;; Call subroutine returning any type.
@@ -8373,7 +8174,7 @@
 ; We must watch to see that the source/destination register isn't also the
 ; same as the base address register, and that if the index is a register,
 ; that it is not the same as the base address register.  In such cases the
-; instruction that we would generate would have UNPREDICTABLE behaviour so 
+; instruction that we would generate would have UNPREDICTABLE behavior so 
 ; we cannot use it.
 
 (define_peephole
@@ -8626,18 +8427,27 @@
   "
 )
 
+;; Note - although unspec_volatile's USE all hard registers,
+;; USEs are ignored after relaod has completed.  Thus we need
+;; to add an unspec of the link register to ensure that flow
+;; does not think that it is unused by the sibcall branch that
+;; will replace the standard function epilogue.
 (define_insn "sibcall_epilogue"
-  [(unspec_volatile [(const_int 0)] VUNSPEC_EPILOGUE)]
+  [(parallel [(unspec:SI [(reg:SI LR_REGNUM)] UNSPEC_PROLOGUE_USE)
+              (unspec_volatile [(return)] VUNSPEC_EPILOGUE)])]
   "TARGET_ARM"
   "*
-  output_asm_insn (\"%@ Sibcall epilogue\", operands);
   if (USE_RETURN_INSN (FALSE))
     return output_return_instruction (const_true_rtx, FALSE, FALSE);
   return arm_output_epilogue (FALSE);
   "
 ;; Length is absolute worst case
   [(set_attr "length" "44")
-   (set_attr "type" "block")]
+   (set_attr "type" "block")
+   ;; We don't clobber the conditions, but the potential length of this
+   ;; operation is sufficient to make conditionalizing the sequence 
+   ;; unlikely to be profitable.
+   (set_attr "conds" "clob")]
 )
 
 (define_insn "*epilogue_insns"
@@ -8651,7 +8461,11 @@
   "
   ; Length is absolute worst case
   [(set_attr "length" "44")
-   (set_attr "type" "block")]
+   (set_attr "type" "block")
+   ;; We don't clobber the conditions, but the potential length of this
+   ;; operation is sufficient to make conditionalizing the sequence 
+   ;; unlikely to be profitable.
+   (set_attr "conds" "clob")]
 )
 
 (define_expand "eh_epilogue"
@@ -8815,7 +8629,8 @@
   [(set (match_operand:SI 0 "s_register_operand" "=r")
 	(sign_extract:SI (match_operand:SI 1 "s_register_operand" "r")
 			 (const_int 1)
-			 (match_operand:SI 2 "const_int_operand" "n")))]
+			 (match_operand:SI 2 "const_int_operand" "n")))
+    (clobber (reg:CC CC_REGNUM))]
   "TARGET_ARM"
   "*
     operands[2] = GEN_INT (1 << INTVAL (operands[2]));
@@ -8831,7 +8646,8 @@
 	(not:SI
 	 (sign_extract:SI (match_operand:SI 1 "s_register_operand" "r")
 			  (const_int 1)
-			  (match_operand:SI 2 "const_int_operand" "n"))))]
+			  (match_operand:SI 2 "const_int_operand" "n"))))
+   (clobber (reg:CC CC_REGNUM))]
   "TARGET_ARM"
   "*
     operands[2] = GEN_INT (1 << INTVAL (operands[2]));
@@ -8881,6 +8697,16 @@
     return \"\";
   }"
   [(set_attr "type" "store4")]
+)
+
+(define_insn "stack_tie"
+  [(set (mem:BLK (scratch))
+	(unspec:BLK [(match_operand:SI 0 "s_register_operand" "r")
+		     (match_operand:SI 1 "s_register_operand" "r")]
+		    UNSPEC_PRLG_STK))]
+  ""
+  ""
+  [(set_attr "length" "0")]
 )
 
 ;; Similarly for the floating point registers
@@ -9022,10 +8848,9 @@
 
 ;; V5 Instructions,
 
-(define_insn "clz"
-  [(set (match_operand:SI             0 "s_register_operand" "=r")
-	(unspec:SI [(match_operand:SI 1 "s_register_operand" "r")]
-		   UNSPEC_CLZ))]
+(define_insn "clzsi2"
+  [(set (match_operand:SI 0 "s_register_operand" "=r")
+	(clz:SI (match_operand:SI 1 "s_register_operand" "r")))]
   "TARGET_ARM && arm_arch5"
   "clz\\t%0, %1")
 
@@ -9043,8 +8868,28 @@
 
     emit_insn (gen_negsi2 (t1, operands[1]));
     emit_insn (gen_andsi3 (t2, operands[1], t1));
-    emit_insn (gen_clz (t3, t2));
+    emit_insn (gen_clzsi2 (t3, t2));
     emit_insn (gen_subsi3 (operands[0], GEN_INT (32), t3));
+    DONE;
+  }"
+)
+
+(define_expand "ctzsi2"
+  [(set (match_operand:SI 0 "s_register_operand" "")
+	(ctz:SI (match_operand:SI 1 "s_register_operand" "")))]
+  "TARGET_ARM && arm_arch5"
+  "
+  {
+    rtx t1, t2, t3;
+
+    t1 = gen_reg_rtx (SImode);
+    t2 = gen_reg_rtx (SImode);
+    t3 = gen_reg_rtx (SImode);
+
+    emit_insn (gen_negsi2 (t1, operands[1]));
+    emit_insn (gen_andsi3 (t2, operands[1], t1));
+    emit_insn (gen_clzsi2 (t3, t2));
+    emit_insn (gen_subsi3 (operands[0], GEN_INT (31), t3));
     DONE;
   }"
 )

@@ -1,6 +1,6 @@
 // natRuntime.cc - Implementation of native side of Runtime class.
 
-/* Copyright (C) 1998, 1999, 2000, 2001, 2002  Free Software Foundation
+/* Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003  Free Software Foundation
 
    This file is part of libgcj.
 
@@ -21,11 +21,15 @@ details.  */
 #include <java/lang/UnsatisfiedLinkError.h>
 #include <gnu/gcj/runtime/FileDeleter.h>
 #include <gnu/gcj/runtime/FinalizerThread.h>
+#include <java/io/File.h>
 #include <java/util/Properties.h>
 #include <java/util/TimeZone.h>
 #include <java/lang/StringBuffer.h>
 #include <java/lang/Process.h>
 #include <java/lang/ConcreteProcess.h>
+#include <java/lang/ClassLoader.h>
+#include <gnu/gcj/runtime/StackTrace.h>
+#include <java/lang/ArrayIndexOutOfBoundsException.h>
 
 #include <jni.h>
 
@@ -101,12 +105,24 @@ _Jv_FindSymbolInExecutable (const char *symname)
   return NULL;
 }
 
+void
+_Jv_SetDLLSearchPath (const char *path)
+{
+  lt_dlsetsearchpath (path);
+}
+
 #else
 
 void *
-_Jv_FindSymbolInExecutable (const char *symname)
+_Jv_FindSymbolInExecutable (const char *)
 {
   return NULL;
+}
+
+void
+_Jv_SetDLLSearchPath (const char *)
+{
+  // Nothing.
 }
 
 #endif /* USE_LTDL */
@@ -148,18 +164,63 @@ java::lang::Runtime::_load (jstring path, jboolean do_search)
   using namespace java::lang;
 #ifdef USE_LTDL
   jint len = _Jv_GetStringUTFLength (path);
-  char buf[len + 1 + 3];
+  char buf[len + 1 + strlen (_Jv_platform_solib_prefix)
+	   + strlen (_Jv_platform_solib_suffix)];
   int offset = 0;
-#ifndef WIN32
-  // On Unix boxes, prefix library name with `lib', for loadLibrary.
   if (do_search)
     {
-      strcpy (buf, "lib");
-      offset = 3;
+      strcpy (buf, _Jv_platform_solib_prefix);
+      offset = strlen (_Jv_platform_solib_prefix);
     }
-#endif
   jsize total = JvGetStringUTFRegion (path, 0, path->length(), &buf[offset]);
   buf[offset + total] = '\0';
+
+  char *lib_name = buf;
+
+  if (do_search)
+    {
+      ClassLoader *sys = ClassLoader::getSystemClassLoader();
+      ClassLoader *look = NULL;
+      gnu::gcj::runtime::StackTrace *t = new gnu::gcj::runtime::StackTrace(10);
+      try
+      	{
+	  for (int i = 0; i < 10; ++i)
+	    {
+	      jclass klass = t->classAt(i);
+	      if (klass != NULL)
+		{
+		  ClassLoader *loader = klass->getClassLoaderInternal();
+		  if (loader != NULL && loader != sys)
+		    {
+		      look = loader;
+		      break;
+		    }
+		}
+	    }
+	}
+      catch (::java::lang::ArrayIndexOutOfBoundsException *e)
+	{
+	}
+
+      if (look != NULL)
+	{
+	  // Don't include solib prefix in string passed to
+	  // findLibrary.
+	  jstring name = look->findLibrary(JvNewStringUTF(&buf[offset]));
+	  if (name != NULL)
+	    {
+	      len = _Jv_GetStringUTFLength (name);
+	      lib_name = (char *) _Jv_AllocBytes(len + 1);
+	      total = JvGetStringUTFRegion (name, 0,
+					    name->length(), lib_name);
+	      lib_name[total] = '\0';
+	      // Don't append suffixes any more; we have the full file
+	      // name.
+	      do_search = false;
+	    }
+	}
+    }
+
   lt_dlhandle h;
   // FIXME: make sure path is absolute.
   {
@@ -167,7 +228,7 @@ java::lang::Runtime::_load (jstring path, jboolean do_search)
     // concurrent modification by class registration calls which may be run
     // during the dlopen().
     JvSynchronize sync (&java::lang::Class::class$);
-    h = do_search ? lt_dlopenext (buf) : lt_dlopen (buf);
+    h = do_search ? lt_dlopenext (lib_name) : lt_dlopen (lib_name);
   }
   if (h == NULL)
     {
@@ -180,6 +241,19 @@ java::lang::Runtime::_load (jstring path, jboolean do_search)
   add_library (h);
 
   void *onload = lt_dlsym (h, "JNI_OnLoad");
+
+#ifdef WIN32
+  // On Win32, JNI_OnLoad is an "stdcall" function taking two pointers
+  // (8 bytes) as arguments.  It could also have been exported as
+  // "JNI_OnLoad@8" (MinGW) or "_JNI_OnLoad@8" (MSVC).
+  if (onload == NULL)
+    {
+      onload = lt_dlsym (h, "JNI_OnLoad@8");
+      if (onload == NULL)
+	onload = lt_dlsym (h, "_JNI_OnLoad@8");
+    }
+#endif /* WIN32 */
+
   if (onload != NULL)
     {
       JavaVM *vm = _Jv_GetJavaVM ();
@@ -188,7 +262,7 @@ java::lang::Runtime::_load (jstring path, jboolean do_search)
 	  // FIXME: what?
 	  return;
 	}
-      jint vers = ((jint (*) (JavaVM *, void *)) onload) (vm, NULL);
+      jint vers = ((jint (JNICALL *) (JavaVM *, void *)) onload) (vm, NULL);
       if (vers != JNI_VERSION_1_1 && vers != JNI_VERSION_1_2
 	  && vers != JNI_VERSION_1_4)
 	{
@@ -367,7 +441,8 @@ java::lang::Runtime::insertSystemProperties (java::util::Properties *newprops)
   // nothing else when installing gcj.  Plus, people are free to
   // redefine `java.home' with `-D' if necessary.
   SET ("java.home", PREFIX);
-  
+  SET ("gnu.classpath.home", PREFIX);
+
   SET ("file.encoding", default_file_encoding);
 
 #ifdef HAVE_UNAME
@@ -532,15 +607,38 @@ java::lang::Runtime::insertSystemProperties (java::util::Properties *newprops)
 		      sb->toString ());
     }
 
+  // The name used to invoke this process (argv[0] in C).
+  SET ("gnu.gcj.progname", _Jv_ThisExecutable());
+
   // Allow platform specific settings and overrides.
   _Jv_platform_initProperties (newprops);
+
+  // If java.library.path is set, tell libltdl so we search the new
+  // directories as well.  FIXME: does this work properly on Windows?
+  String *path = newprops->getProperty(JvNewStringLatin1("java.library.path"));
+  if (path)
+    {
+      char *val = (char *) _Jv_Malloc (JvGetStringUTFLength (path) + 1);
+      jsize total = JvGetStringUTFRegion (path, 0, path->length(), val);
+      val[total] = '\0';
+      _Jv_SetDLLSearchPath (val);
+      _Jv_Free (val);
+    }
+  else
+    {
+      // Set a value for user code to see.
+      // FIXME: JDK sets this to the actual path used, including
+      // LD_LIBRARY_PATH, etc.
+      SET ("java.library.path", "");
+    }
 }
 
 java::lang::Process *
 java::lang::Runtime::execInternal (jstringArray cmd,
-				   jstringArray env)
+				   jstringArray env,
+				   java::io::File *dir)
 {
-  return new java::lang::ConcreteProcess (cmd, env);
+  return new java::lang::ConcreteProcess (cmd, env, dir);
 }
 
 jint
@@ -565,19 +663,9 @@ java::lang::Runtime::nativeGetLibname (jstring pathname, jstring libname)
 #endif
     }
 
-  // FIXME: use platform function here.
-#ifndef WIN32
-  sb->append (JvNewStringLatin1 ("lib"));
-#endif
-
+  sb->append (JvNewStringLatin1 (_Jv_platform_solib_prefix));
   sb->append(libname);
-
-  // FIXME: use platform function here.
-#ifdef WIN32
-  sb->append (JvNewStringLatin1 ("dll"));
-else
-  sb->append (JvNewStringLatin1 ("so"));
-#endif
+  sb->append (JvNewStringLatin1 (_Jv_platform_solib_suffix));
 
   return sb->toString();
 }

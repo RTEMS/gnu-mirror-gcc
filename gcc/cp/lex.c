@@ -1,22 +1,22 @@
 /* Separate lexical analyzer for GNU C++.
    Copyright (C) 1987, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
-This file is part of GNU CC.
+This file is part of GCC.
 
-GNU CC is free software; you can redistribute it and/or modify
+GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2, or (at your option)
 any later version.
 
-GNU CC is distributed in the hope that it will be useful,
+GCC is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU CC; see the file COPYING.  If not, write to
+along with GCC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
@@ -25,17 +25,17 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "input.h"
 #include "tree.h"
 #include "cp-tree.h"
 #include "cpplib.h"
 #include "lex.h"
-#include "parse.h"
 #include "flags.h"
 #include "c-pragma.h"
 #include "toplev.h"
 #include "output.h"
-#include "ggc.h"
 #include "tm_p.h"
 #include "timevar.h"
 #include "diagnostic.h"
@@ -45,10 +45,7 @@ Boston, MA 02111-1307, USA.  */
 #include <locale.h>
 #endif
 
-extern void yyprint PARAMS ((FILE *, int, YYSTYPE));
-
 static int interface_strcmp PARAMS ((const char *));
-static int *init_cpp_parse PARAMS ((void));
 static void init_cp_pragma PARAMS ((void));
 
 static tree parse_strconst_pragma PARAMS ((const char *, int));
@@ -58,42 +55,12 @@ static void handle_pragma_interface PARAMS ((cpp_reader *));
 static void handle_pragma_implementation PARAMS ((cpp_reader *));
 static void handle_pragma_java_exceptions PARAMS ((cpp_reader *));
 
-#ifdef GATHER_STATISTICS
-#ifdef REDUCE_LENGTH
-static int reduce_cmp PARAMS ((int *, int *));
-static int token_cmp PARAMS ((int *, int *));
-#endif
-#endif
 static int is_global PARAMS ((tree));
 static void init_operators PARAMS ((void));
 static void copy_lang_type PARAMS ((tree));
 
 /* A constraint that can be tested at compile time.  */
-#ifdef __STDC__
 #define CONSTRAINT(name, expr) extern int constraint_##name [(expr) ? 1 : -1]
-#else
-#define CONSTRAINT(name, expr) extern int constraint_/**/name [(expr) ? 1 : -1]
-#endif
-
-#include "cpplib.h"
-
-extern int yychar;		/*  the lookahead symbol		*/
-extern YYSTYPE yylval;		/*  the semantic value of the		*/
-				/*  lookahead symbol			*/
-
-/* These flags are used by c-lex.c.  In C++, they're always off and on,
-   respectively.  */
-int warn_traditional = 0;
-int flag_digraphs = 1;
-
-/* the declaration found for the last IDENTIFIER token read in.
-   yylex must look this up to detect typedefs, which get token type TYPENAME,
-   so it is left around in case the identifier is not a typedef but is
-   used in a context which makes it a reference to a variable.  */
-tree lastiddecl;
-
-/* Array for holding counts of the numbers of tokens seen.  */
-extern int *token_count;
 
 /* Functions and data structures for #pragma interface.
 
@@ -155,21 +122,6 @@ tree
 make_reference_declarator (cv_qualifiers, target)
      tree cv_qualifiers, target;
 {
-  if (target)
-    {
-      if (TREE_CODE (target) == ADDR_EXPR)
-	{
-	  error ("cannot declare references to references");
-	  return target;
-	}
-      if (TREE_CODE (target) == INDIRECT_REF)
-	{
-	  error ("cannot declare pointers to references");
-	  return target;
-	}
-      if (TREE_CODE (target) == IDENTIFIER_NODE && ANON_AGGRNAME_P (target))
-	  error ("type name expected before `&'");
-    }
   target = build_nt (ADDR_EXPR, target);
   TREE_TYPE (target) = cv_qualifiers;
   return target;
@@ -224,20 +176,6 @@ cxx_finish ()
   c_common_finish ();
 }
 
-static int *
-init_cpp_parse ()
-{
-#ifdef GATHER_STATISTICS
-#ifdef REDUCE_LENGTH
-  reduce_count = (int *) xcalloc (sizeof (int), (REDUCE_LENGTH + 1));
-  reduce_count += 1;
-  token_count = (int *) xcalloc (sizeof (int), (TOKEN_LENGTH + 1));
-  token_count += 1;
-#endif
-#endif
-  return token_count;
-}
-
 /* A mapping from tree codes to operator name information.  */
 operator_name_info_t operator_name_info[(int) LAST_CPLUS_TREE_CODE];
 /* Similar, but for assignment operators.  */
@@ -267,7 +205,8 @@ init_operators ()
 	 : &operator_name_info[(int) CODE]);				    \
   oni->identifier = identifier;						    \
   oni->name = NAME;							    \
-  oni->mangled_name = MANGLING;
+  oni->mangled_name = MANGLING;                                             \
+  oni->arity = ARITY;
 
 #include "operators.def"
 #undef DEF_OPERATOR
@@ -327,7 +266,6 @@ struct resword
    _true_.  */
 #define D_EXT		0x01	/* GCC extension */
 #define D_ASM		0x02	/* in C99, but has a switch to turn it off */
-#define D_OPNAME	0x04	/* operator names */
 
 CONSTRAINT(ridbits_fit, RID_LAST_MODIFIER < sizeof(unsigned long) * CHAR_BIT);
 
@@ -367,18 +305,13 @@ static const struct resword reswords[] =
   { "__volatile",	RID_VOLATILE,	0 },
   { "__volatile__",	RID_VOLATILE,	0 },
   { "asm",		RID_ASM,	D_ASM },
-  { "and",		RID_AND,	D_OPNAME },
-  { "and_eq",		RID_AND_EQ,	D_OPNAME },
   { "auto",		RID_AUTO,	0 },
-  { "bitand",		RID_BITAND,	D_OPNAME },
-  { "bitor",		RID_BITOR,	D_OPNAME },
   { "bool",		RID_BOOL,	0 },
   { "break",		RID_BREAK,	0 },
   { "case",		RID_CASE,	0 },
   { "catch",		RID_CATCH,	0 },
   { "char",		RID_CHAR,	0 },
   { "class",		RID_CLASS,	0 },
-  { "compl",		RID_COMPL,	D_OPNAME },
   { "const",		RID_CONST,	0 },
   { "const_cast",	RID_CONSTCAST,	0 },
   { "continue",		RID_CONTINUE,	0 },
@@ -404,11 +337,7 @@ static const struct resword reswords[] =
   { "mutable",		RID_MUTABLE,	0 },
   { "namespace",	RID_NAMESPACE,	0 },
   { "new",		RID_NEW,	0 },
-  { "not",		RID_NOT,	D_OPNAME },
-  { "not_eq",		RID_NOT_EQ,	D_OPNAME },
   { "operator",		RID_OPERATOR,	0 },
-  { "or",		RID_OR,		D_OPNAME },
-  { "or_eq",		RID_OR_EQ,	D_OPNAME },
   { "private",		RID_PRIVATE,	0 },
   { "protected",	RID_PROTECTED,	0 },
   { "public",		RID_PUBLIC,	0 },
@@ -439,150 +368,7 @@ static const struct resword reswords[] =
   { "volatile",		RID_VOLATILE,	0 },
   { "wchar_t",          RID_WCHAR,	0 },
   { "while",		RID_WHILE,	0 },
-  { "xor",		RID_XOR,	D_OPNAME },
-  { "xor_eq",		RID_XOR_EQ,	D_OPNAME },
 
-};
-
-/* Table mapping from RID_* constants to yacc token numbers.
-   Unfortunately we have to have entries for all the keywords in all
-   three languages.  */
-const short rid_to_yy[RID_MAX] =
-{
-  /* RID_STATIC */	SCSPEC,
-  /* RID_UNSIGNED */	TYPESPEC,
-  /* RID_LONG */	TYPESPEC,
-  /* RID_CONST */	CV_QUALIFIER,
-  /* RID_EXTERN */	SCSPEC,
-  /* RID_REGISTER */	SCSPEC,
-  /* RID_TYPEDEF */	SCSPEC,
-  /* RID_SHORT */	TYPESPEC,
-  /* RID_INLINE */	SCSPEC,
-  /* RID_VOLATILE */	CV_QUALIFIER,
-  /* RID_SIGNED */	TYPESPEC,
-  /* RID_AUTO */	SCSPEC,
-  /* RID_RESTRICT */	CV_QUALIFIER,
-
-  /* C extensions.  Bounded pointers are not yet in C++ */
-  /* RID_BOUNDED */	0,
-  /* RID_UNBOUNDED */	0,
-  /* RID_COMPLEX */	TYPESPEC,
-  /* RID_THREAD */	SCSPEC,
-
-  /* C++ */
-  /* RID_FRIEND */	SCSPEC,
-  /* RID_VIRTUAL */	SCSPEC,
-  /* RID_EXPLICIT */	SCSPEC,
-  /* RID_EXPORT */	EXPORT,
-  /* RID_MUTABLE */	SCSPEC,
-
-  /* ObjC */
-  /* RID_IN */		0,
-  /* RID_OUT */		0,
-  /* RID_INOUT */	0,
-  /* RID_BYCOPY */	0,
-  /* RID_BYREF */	0,
-  /* RID_ONEWAY */	0,
-
-  /* C */
-  /* RID_INT */		TYPESPEC,
-  /* RID_CHAR */	TYPESPEC,
-  /* RID_FLOAT */	TYPESPEC,
-  /* RID_DOUBLE */	TYPESPEC,
-  /* RID_VOID */	TYPESPEC,
-  /* RID_ENUM */	ENUM,
-  /* RID_STRUCT */	AGGR,
-  /* RID_UNION */	AGGR,
-  /* RID_IF */		IF,
-  /* RID_ELSE */	ELSE,
-  /* RID_WHILE */	WHILE,
-  /* RID_DO */		DO,
-  /* RID_FOR */		FOR,
-  /* RID_SWITCH */	SWITCH,
-  /* RID_CASE */	CASE,
-  /* RID_DEFAULT */	DEFAULT,
-  /* RID_BREAK */	BREAK,
-  /* RID_CONTINUE */	CONTINUE,
-  /* RID_RETURN */	RETURN_KEYWORD,
-  /* RID_GOTO */	GOTO,
-  /* RID_SIZEOF */	SIZEOF,
-
-  /* C extensions */
-  /* RID_ASM */		ASM_KEYWORD,
-  /* RID_TYPEOF */	TYPEOF,
-  /* RID_ALIGNOF */	ALIGNOF,
-  /* RID_ATTRIBUTE */	ATTRIBUTE,
-  /* RID_VA_ARG */	VA_ARG,
-  /* RID_EXTENSION */	EXTENSION,
-  /* RID_IMAGPART */	IMAGPART,
-  /* RID_REALPART */	REALPART,
-  /* RID_LABEL */	LABEL,
-  /* RID_PTRBASE */	0,
-  /* RID_PTREXTENT */	0,
-  /* RID_PTRVALUE */	0,
-  /* RID_CHOOSE_EXPR */	0,
-  /* RID_TYPES_COMPATIBLE_P */ 0,
-
-  /* RID_FUNCTION_NAME */	VAR_FUNC_NAME,
-  /* RID_PRETTY_FUNCTION_NAME */ VAR_FUNC_NAME,
-  /* RID_c99_FUNCTION_NAME */	VAR_FUNC_NAME,
-
-  /* C++ */
-  /* RID_BOOL */	TYPESPEC,
-  /* RID_WCHAR */	TYPESPEC,
-  /* RID_CLASS */	AGGR,
-  /* RID_PUBLIC */	VISSPEC,
-  /* RID_PRIVATE */	VISSPEC,
-  /* RID_PROTECTED */	VISSPEC,
-  /* RID_TEMPLATE */	TEMPLATE,
-  /* RID_NULL */	CONSTANT,
-  /* RID_CATCH */	CATCH,
-  /* RID_DELETE */	DELETE,
-  /* RID_FALSE */	CXX_FALSE,
-  /* RID_NAMESPACE */	NAMESPACE,
-  /* RID_NEW */		NEW,
-  /* RID_OPERATOR */	OPERATOR,
-  /* RID_THIS */	THIS,
-  /* RID_THROW */	THROW,
-  /* RID_TRUE */	CXX_TRUE,
-  /* RID_TRY */		TRY,
-  /* RID_TYPENAME */	TYPENAME_KEYWORD,
-  /* RID_TYPEID */	TYPEID,
-  /* RID_USING */	USING,
-
-  /* casts */
-  /* RID_CONSTCAST */	CONST_CAST,
-  /* RID_DYNCAST */	DYNAMIC_CAST,
-  /* RID_REINTCAST */	REINTERPRET_CAST,
-  /* RID_STATCAST */	STATIC_CAST,
-
-  /* alternate spellings */
-  /* RID_AND */		ANDAND,
-  /* RID_AND_EQ */	ASSIGN,
-  /* RID_NOT */		'!',
-  /* RID_NOT_EQ */	EQCOMPARE,
-  /* RID_OR */		OROR,
-  /* RID_OR_EQ */	ASSIGN,
-  /* RID_XOR */		'^',
-  /* RID_XOR_EQ */	ASSIGN,
-  /* RID_BITAND */	'&',
-  /* RID_BITOR */	'|',
-  /* RID_COMPL */	'~',
-
-  /* Objective C */
-  /* RID_ID */			0,
-  /* RID_AT_ENCODE */		0,
-  /* RID_AT_END */		0,
-  /* RID_AT_CLASS */		0,
-  /* RID_AT_ALIAS */		0,
-  /* RID_AT_DEFS */		0,
-  /* RID_AT_PRIVATE */		0,
-  /* RID_AT_PROTECTED */	0,
-  /* RID_AT_PUBLIC */		0,
-  /* RID_AT_PROTOCOL */		0,
-  /* RID_AT_SELECTOR */		0,
-  /* RID_AT_INTERFACE */	0,
-  /* RID_AT_IMPLEMENTATION */	0
 };
 
 void
@@ -590,14 +376,10 @@ init_reswords ()
 {
   unsigned int i;
   tree id;
-  int mask = ((flag_operator_names ? 0 : D_OPNAME)
-	      | (flag_no_asm ? D_ASM : 0)
+  int mask = ((flag_no_asm ? D_ASM : 0)
 	      | (flag_no_gnu_keywords ? D_EXT : 0));
 
-  /* It is not necessary to register ridpointers as a GC root, because
-     all the trees it points to are permanently interned in the
-     get_identifier hash anyway.  */
-  ridpointers = (tree *) xcalloc ((int) RID_MAX, sizeof (tree));
+  ridpointers = (tree *) ggc_calloc ((int) RID_MAX, sizeof (tree));
   for (i = 0; i < ARRAY_SIZE (reswords); i++)
     {
       id = get_identifier (reswords[i].word);
@@ -611,18 +393,13 @@ init_reswords ()
 static void
 init_cp_pragma ()
 {
-  cpp_register_pragma (parse_in, 0, "vtable", handle_pragma_vtable);
-  cpp_register_pragma (parse_in, 0, "unit", handle_pragma_unit);
-
-  cpp_register_pragma (parse_in, 0, "interface", handle_pragma_interface);
-  cpp_register_pragma (parse_in, 0, "implementation",
-		       handle_pragma_implementation);
-
-  cpp_register_pragma (parse_in, "GCC", "interface", handle_pragma_interface);
-  cpp_register_pragma (parse_in, "GCC", "implementation",
-		       handle_pragma_implementation);
-  cpp_register_pragma (parse_in, "GCC", "java_exceptions",
-		       handle_pragma_java_exceptions);
+  c_register_pragma (0, "vtable", handle_pragma_vtable);
+  c_register_pragma (0, "unit", handle_pragma_unit);
+  c_register_pragma (0, "interface", handle_pragma_interface);
+  c_register_pragma (0, "implementation", handle_pragma_implementation);
+  c_register_pragma ("GCC", "interface", handle_pragma_interface);
+  c_register_pragma ("GCC", "implementation", handle_pragma_implementation);
+  c_register_pragma ("GCC", "java_exceptions", handle_pragma_java_exceptions);
 }
 
 /* Initialize the C++ front end.  This function is very sensitive to
@@ -636,7 +413,6 @@ cxx_init (filename)
   input_filename = "<internal>";
 
   init_reswords ();
-  init_spew ();
   init_tree ();
   init_cp_semantics ();
   init_operators ();
@@ -668,7 +444,6 @@ cxx_init (filename)
   TREE_TYPE (null_node) = c_common_type_for_size (POINTER_SIZE, 0);
   ridpointers[RID_NULL] = null_node;
 
-  token_count = init_cpp_parse ();
   interface_unknown = 1;
 
   filename = c_common_init (filename);
@@ -682,161 +457,6 @@ cxx_init (filename)
   return filename;
 }
 
-inline void
-yyprint (file, yychar, yylval)
-     FILE *file;
-     int yychar;
-     YYSTYPE yylval;
-{
-  tree t;
-  switch (yychar)
-    {
-    case IDENTIFIER:
-    case TYPENAME:
-    case TYPESPEC:
-    case PTYPENAME:
-    case PFUNCNAME:
-    case IDENTIFIER_DEFN:
-    case TYPENAME_DEFN:
-    case PTYPENAME_DEFN:
-    case SCSPEC:
-    case PRE_PARSED_CLASS_DECL:
-      t = yylval.ttype;
-      if (TREE_CODE (t) == TYPE_DECL || TREE_CODE (t) == TEMPLATE_DECL)
-	{
-	  fprintf (file, " `%s'", IDENTIFIER_POINTER (DECL_NAME (t)));
-	  break;
-	}
-      my_friendly_assert (TREE_CODE (t) == IDENTIFIER_NODE, 224);
-      if (IDENTIFIER_POINTER (t))
-	  fprintf (file, " `%s'", IDENTIFIER_POINTER (t));
-      break;
-
-    case AGGR:
-      if (yylval.ttype == class_type_node)
-	fprintf (file, " `class'");
-      else if (yylval.ttype == record_type_node)
-	fprintf (file, " `struct'");
-      else if (yylval.ttype == union_type_node)
-	fprintf (file, " `union'");
-      else if (yylval.ttype == enum_type_node)
-	fprintf (file, " `enum'");
-      else
-	abort ();
-      break;
-
-    case CONSTANT:
-      t = yylval.ttype;
-      if (TREE_CODE (t) == INTEGER_CST)
-	fprintf (file,
-#if HOST_BITS_PER_WIDE_INT == 64
-#if HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_INT
-		 " 0x%x%016x",
-#else
-#if HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_LONG
-		 " 0x%lx%016lx",
-#else
-		 " 0x%llx%016llx",
-#endif
-#endif
-#else
-#if HOST_BITS_PER_WIDE_INT != HOST_BITS_PER_INT
-		 " 0x%lx%08lx",
-#else
-		 " 0x%x%08x",
-#endif
-#endif
-		 TREE_INT_CST_HIGH (t), TREE_INT_CST_LOW (t));
-      break;
-    }
-}
-
-#if defined(GATHER_STATISTICS) && defined(REDUCE_LENGTH)
-static int *reduce_count;
-#endif
-
-int *token_count;
-
-#if 0
-#define REDUCE_LENGTH ARRAY_SIZE (yyr2)
-#define TOKEN_LENGTH (256 + ARRAY_SIZE (yytname))
-#endif
-
-#ifdef GATHER_STATISTICS
-#ifdef REDUCE_LENGTH
-void
-yyhook (yyn)
-     int yyn;
-{
-  reduce_count[yyn] += 1;
-}
-
-static int
-reduce_cmp (p, q)
-     int *p, *q;
-{
-  return reduce_count[*q] - reduce_count[*p];
-}
-
-static int
-token_cmp (p, q)
-     int *p, *q;
-{
-  return token_count[*q] - token_count[*p];
-}
-#endif
-#endif
-
-void
-print_parse_statistics ()
-{
-#ifdef GATHER_STATISTICS
-#ifdef REDUCE_LENGTH
-#if YYDEBUG != 0
-  int i;
-  int maxlen = REDUCE_LENGTH;
-  unsigned *sorted;
-
-  if (reduce_count[-1] == 0)
-    return;
-
-  if (TOKEN_LENGTH > REDUCE_LENGTH)
-    maxlen = TOKEN_LENGTH;
-  sorted = (unsigned *) alloca (sizeof (int) * maxlen);
-
-  for (i = 0; i < TOKEN_LENGTH; i++)
-    sorted[i] = i;
-  qsort (sorted, TOKEN_LENGTH, sizeof (int), token_cmp);
-  for (i = 0; i < TOKEN_LENGTH; i++)
-    {
-      int idx = sorted[i];
-      if (token_count[idx] == 0)
-	break;
-      if (token_count[idx] < token_count[-1])
-	break;
-      fprintf (stderr, "token %d, `%s', count = %d\n",
-	       idx, yytname[YYTRANSLATE (idx)], token_count[idx]);
-    }
-  fprintf (stderr, "\n");
-  for (i = 0; i < REDUCE_LENGTH; i++)
-    sorted[i] = i;
-  qsort (sorted, REDUCE_LENGTH, sizeof (int), reduce_cmp);
-  for (i = 0; i < REDUCE_LENGTH; i++)
-    {
-      int idx = sorted[i];
-      if (reduce_count[idx] == 0)
-	break;
-      if (reduce_count[idx] < reduce_count[-1])
-	break;
-      fprintf (stderr, "rule %d, line %d, count = %d\n",
-	       idx, yyrline[idx], reduce_count[idx]);
-    }
-  fprintf (stderr, "\n");
-#endif
-#endif
-#endif
-}
-
 /* Helper function to load global variables with interface
    information.  */
 
@@ -850,7 +470,7 @@ extract_interface_info ()
       tree til = tinst_for_decl ();
 
       if (til)
-	finfo = get_fileinfo (TINST_FILE (til));
+	finfo = get_fileinfo (TREE_FILENAME (til));
     }
   if (!finfo)
     finfo = get_fileinfo (input_filename);
@@ -898,36 +518,6 @@ interface_strcmp (s)
 
   /* No matches.  */
   return 1;
-}
-
-/* Heuristic to tell whether the user is missing a semicolon
-   after a struct or enum declaration.  Emit an error message
-   if we know the user has blown it.  */
-
-void
-check_for_missing_semicolon (type)
-     tree type;
-{
-  if (yychar < 0)
-    yychar = yylex ();
-
-  if ((yychar > 255
-       && yychar != SCSPEC
-       && yychar != IDENTIFIER
-       && yychar != TYPENAME
-       && yychar != CV_QUALIFIER
-       && yychar != SELFNAME)
-      || yychar == 0  /* EOF */)
-    {
-      if (TYPE_ANONYMOUS_P (type))
-	error ("semicolon missing after %s declaration",
-	       TREE_CODE (type) == ENUMERAL_TYPE ? "enum" : "struct");
-      else
-	error ("semicolon missing after declaration of `%T'", type);
-      shadow_tag (build_tree_list (0, type));
-    }
-  /* Could probably also hack cases where class { ... } f (); appears.  */
-  clear_anon_tags ();
 }
 
 void
@@ -1094,16 +684,7 @@ handle_pragma_java_exceptions (dfile)
   choose_personality_routine (lang_java);
 }
 
-void
-do_pending_lang_change ()
-{
-  for (; pending_lang_change > 0; --pending_lang_change)
-    push_lang_context (lang_name_c);
-  for (; pending_lang_change < 0; ++pending_lang_change)
-    pop_lang_context ();
-}
-
-/* Return true if d is in a global scope. */
+/* Return true if d is in a global scope.  */
 
 static int
 is_global (d)
@@ -1124,22 +705,48 @@ is_global (d)
       }
 }
 
+/* Issue an error message indicating that the lookup of NAME (an
+   IDENTIFIER_NODE) failed.  */
+
+void
+unqualified_name_lookup_error (tree name)
+{
+  if (IDENTIFIER_OPNAME_P (name))
+    {
+      if (name != ansi_opname (ERROR_MARK))
+	error ("`%D' not defined", name);
+    }
+  else if (current_function_decl == 0)
+    error ("`%D' was not declared in this scope", name);
+  else
+    {
+      if (IDENTIFIER_NAMESPACE_VALUE (name) != error_mark_node
+	  || IDENTIFIER_ERROR_LOCUS (name) != current_function_decl)
+	{
+	  static int undeclared_variable_notice;
+
+	  error ("`%D' undeclared (first use this function)", name);
+
+	  if (! undeclared_variable_notice)
+	    {
+	      error ("(Each undeclared identifier is reported only once for each function it appears in.)");
+	      undeclared_variable_notice = 1;
+	    }
+	}
+      /* Prevent repeated error messages.  */
+      SET_IDENTIFIER_NAMESPACE_VALUE (name, error_mark_node);
+      SET_IDENTIFIER_ERROR_LOCUS (name, current_function_decl);
+    }
+}
+
 tree
-do_identifier (token, parsing, args)
+do_identifier (token, args)
      register tree token;
-     int parsing;
      tree args;
 {
   register tree id;
-  int lexing = (parsing == 1);
 
-  if (! lexing)
-    id = lookup_name (token, 0);
-  else
-    id = lastiddecl;
-
-  if (lexing && id && TREE_DEPRECATED (id))
-    warn_deprecated_use (id);
+  id = lookup_name (token, 0);
 
   /* Do Koenig lookup if appropriate (inside templates we build lookup
      expressions instead).
@@ -1150,11 +757,6 @@ do_identifier (token, parsing, args)
 
   if (args && !current_template_parms && (!id || is_global (id)))
     id = lookup_arg_dependent (token, id, args);
-
-  /* Remember that this name has been used in the class definition, as per
-     [class.scope0] */
-  if (id && parsing)
-    maybe_note_name_used_in_class (token, id);
 
   if (id == error_mark_node)
     {
@@ -1174,78 +776,15 @@ do_identifier (token, parsing, args)
       else if (IDENTIFIER_TYPENAME_P (token))
 	/* A templated conversion operator might exist.  */
 	return token;
-      else if (IDENTIFIER_OPNAME_P (token))
-	{
-	  if (token != ansi_opname (ERROR_MARK))
-	    error ("`%D' not defined", token);
-	  id = error_mark_node;
-	}
-      else if (current_function_decl == 0)
-	{
-	  error ("`%D' was not declared in this scope", token);
-	  id = error_mark_node;
-	}
       else
 	{
-	  if (IDENTIFIER_NAMESPACE_VALUE (token) != error_mark_node
-	      || IDENTIFIER_ERROR_LOCUS (token) != current_function_decl)
-	    {
-	      static int undeclared_variable_notice;
-
-	      error ("`%D' undeclared (first use this function)", token);
-
-	      if (! undeclared_variable_notice)
-		{
-		  error ("(Each undeclared identifier is reported only once for each function it appears in.)");
-		  undeclared_variable_notice = 1;
-		}
-	    }
-	  id = error_mark_node;
-	  /* Prevent repeated error messages.  */
-	  SET_IDENTIFIER_NAMESPACE_VALUE (token, error_mark_node);
-	  SET_IDENTIFIER_ERROR_LOCUS (token, current_function_decl);
+	  unqualified_name_lookup_error (token);
+	  return error_mark_node;
 	}
     }
 
-  if (TREE_CODE (id) == VAR_DECL && DECL_DEAD_FOR_LOCAL (id))
-    {
-      tree shadowed = DECL_SHADOWED_FOR_VAR (id);
-      while (shadowed != NULL_TREE && TREE_CODE (shadowed) == VAR_DECL
-	     && DECL_DEAD_FOR_LOCAL (shadowed))
-	shadowed = DECL_SHADOWED_FOR_VAR (shadowed);
-      if (!shadowed)
-	shadowed = IDENTIFIER_NAMESPACE_VALUE (DECL_NAME (id));
-      if (shadowed)
-	{
-	  if (!DECL_ERROR_REPORTED (id))
-	    {
-	      warning ("name lookup of `%s' changed",
-		       IDENTIFIER_POINTER (token));
-	      cp_warning_at ("  matches this `%D' under ISO standard rules",
-			     shadowed);
-	      cp_warning_at ("  matches this `%D' under old rules", id);
-	      DECL_ERROR_REPORTED (id) = 1;
-	    }
-	  id = shadowed;
-	}
-      else if (!DECL_ERROR_REPORTED (id))
-	{
-	  DECL_ERROR_REPORTED (id) = 1;
-	  if (TYPE_HAS_NONTRIVIAL_DESTRUCTOR (TREE_TYPE (id)))
-	    {
-	      error ("name lookup of `%s' changed for new ISO `for' scoping",
-		     IDENTIFIER_POINTER (token));
-	      cp_error_at ("  cannot use obsolete binding at `%D' because it has a destructor", id);
-	      id = error_mark_node;
-	    }
-	  else
-	    {
-	      pedwarn ("name lookup of `%s' changed for new ISO `for' scoping",
-		       IDENTIFIER_POINTER (token));
-	      cp_pedwarn_at ("  using obsolete binding at `%D'", id);
-	    }
-	}
-    }
+  id = check_for_out_of_scope_variable (id);
+
   /* TREE_USED is set in `hack_identifier'.  */
   if (TREE_CODE (id) == CONST_DECL)
     {
@@ -1280,24 +819,10 @@ do_identifier (token, parsing, args)
 }
 
 tree
-do_scoped_id (token, parsing)
+do_scoped_id (token, id)
      tree token;
-     int parsing;
+     tree id;
 {
-  tree id;
-  /* during parsing, this is ::name. Otherwise, it is black magic. */
-  if (parsing)
-    {
-      id = make_node (CPLUS_BINDING);
-      if (!qualified_lookup_using_namespace (token, global_namespace, id, 0))
-	id = NULL_TREE;
-      else
-	id = BINDING_VALUE (id);
-    }
-  else
-    id = IDENTIFIER_GLOBAL_VALUE (token);
-  if (parsing && yychar == YYEMPTY)
-    yychar = yylex ();
   if (!id || (TREE_CODE (id) == FUNCTION_DECL
 	      && DECL_ANTICIPATED (id)))
     {

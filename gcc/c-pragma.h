@@ -1,5 +1,5 @@
 /* Pragma related interfaces.
-   Copyright (C) 1995, 1998, 1999, 2000, 2001, 2002
+   Copyright (C) 1995, 1998, 1999, 2000, 2001, 2002, 2003
    Free Software Foundation, Inc.
 
 This file is part of GCC.
@@ -26,7 +26,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #define YYDEBUG 1
 extern int yydebug;
 
-struct cpp_reader;
 extern struct cpp_reader* parse_in;
 
 #ifdef HANDLE_SYSV_PRAGMA
@@ -50,18 +49,14 @@ extern struct cpp_reader* parse_in;
 
 extern void init_pragma PARAMS ((void));
 
-/* Duplicate prototypes for the register_pragma stuff and the typedef for
-   cpp_reader, to avoid dragging cpplib.h in almost everywhere...  */
-#ifndef GCC_CPPLIB_H
-typedef struct cpp_reader cpp_reader;
-
-extern void cpp_register_pragma PARAMS ((cpp_reader *,
-					 const char *, const char *,
-					 void (*) PARAMS ((cpp_reader *))));
-#endif
-
+/* Front-end wrapper for pragma registration to avoid dragging
+   cpplib.h in almost everywhere.  */
+extern void c_register_pragma
+	PARAMS ((const char *, const char *,
+		 void (*) PARAMS ((struct cpp_reader *))));
 extern void maybe_apply_pragma_weak PARAMS ((tree));
 extern tree maybe_apply_renaming_pragma PARAMS ((tree, tree));
+extern void add_to_renaming_pragma_list PARAMS ((tree, tree));
 
 extern int c_lex PARAMS ((tree *));
 

@@ -21,15 +21,17 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
-#include "intl.h"
-#include "rtl.h"
-
 #ifdef HAVE_SYS_TIMES_H
 # include <sys/times.h>
 #endif
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
 #endif
+#include "coretypes.h"
+#include "tm.h"
+#include "intl.h"
+#include "rtl.h"
+#include "toplev.h"
 
 #ifndef HAVE_CLOCK_T
 typedef int clock_t;
@@ -43,16 +45,6 @@ struct tms
   clock_t tms_cutime;
   clock_t tms_cstime;
 };
-#endif
-
-#if defined HAVE_DECL_GETRUSAGE && !HAVE_DECL_GETRUSAGE
-extern int getrusage PARAMS ((int, struct rusage *));
-#endif
-#if defined HAVE_DECL_TIMES && !HAVE_DECL_TIMES
-extern clock_t times PARAMS ((struct tms *));
-#endif
-#if defined HAVE_DECL_CLOCK && !HAVE_DECL_CLOCK
-extern clock_t clock PARAMS ((void));
 #endif
 
 #ifndef RUSAGE_SELF
@@ -78,17 +70,26 @@ extern clock_t clock PARAMS ((void));
 /* Prefer times to getrusage to clock (each gives successively less
    information).  */
 #ifdef HAVE_TIMES
+# if defined HAVE_DECL_TIMES && !HAVE_DECL_TIMES
+  extern clock_t times PARAMS ((struct tms *));
+# endif
 # define USE_TIMES
 # define HAVE_USER_TIME
 # define HAVE_SYS_TIME
 # define HAVE_WALL_TIME
 #else
 #ifdef HAVE_GETRUSAGE
+# if defined HAVE_DECL_GETRUSAGE && !HAVE_DECL_GETRUSAGE
+  extern int getrusage PARAMS ((int, struct rusage *));
+# endif
 # define USE_GETRUSAGE
 # define HAVE_USER_TIME
 # define HAVE_SYS_TIME
 #else
 #ifdef HAVE_CLOCK
+# if defined HAVE_DECL_CLOCK && !HAVE_DECL_CLOCK
+  extern clock_t clock PARAMS ((void));
+# endif
 # define USE_CLOCK
 # define HAVE_USER_TIME
 #endif
@@ -100,13 +101,13 @@ extern clock_t clock PARAMS ((void));
    precompute them.  Whose wonderful idea was it to make all those
    _constants_ variable at run time, anyway?  */
 #ifdef USE_TIMES
-static float ticks_to_msec;
-#define TICKS_TO_MSEC (1 / (float)TICKS_PER_SECOND)
+static double ticks_to_msec;
+#define TICKS_TO_MSEC (1 / (double)TICKS_PER_SECOND)
 #endif
 
 #ifdef USE_CLOCK
-static float clocks_to_msec;
-#define CLOCKS_TO_MSEC (1 / (float)CLOCKS_PER_SEC)
+static double clocks_to_msec;
+#define CLOCKS_TO_MSEC (1 / (double)CLOCKS_PER_SEC)
 #endif
 
 #include "flags.h"
@@ -114,7 +115,7 @@ static float clocks_to_msec;
 
 /* See timevar.h for an explanation of timing variables.  */
 
-/* This macro evaluates to non-zero if timing variables are enabled.  */
+/* This macro evaluates to nonzero if timing variables are enabled.  */
 #define TIMEVAR_ENABLE (time_report)
 
 /* A timing variable.  */
@@ -131,11 +132,11 @@ struct timevar_def
   /* The name of this timing variable.  */
   const char *name;
 
-  /* Non-zero if this timing variable is running as a standalone
+  /* Nonzero if this timing variable is running as a standalone
      timer.  */
   unsigned standalone : 1;
 
-  /* Non-zero if this timing variable was ever started or pushed onto
+  /* Nonzero if this timing variable was ever started or pushed onto
      the timing stack.  */
   unsigned used : 1;
 };
@@ -176,7 +177,7 @@ static void timevar_accumulate
 
 /* Fill the current times into TIME.  The definition of this function
    also defines any or all of the HAVE_USER_TIME, HAVE_SYS_TIME, and
-   HAVA_WALL_TIME macros.  */
+   HAVE_WALL_TIME macros.  */
 
 static void
 get_time (now)
@@ -317,7 +318,11 @@ timevar_pop (timevar)
     return;
 
   if (&timevars[timevar] != stack->timevar)
-    abort ();
+    {
+      sorry ("cannot timevar_pop '%s' when top of timevars stack is '%s'",
+             timevars[timevar].name, stack->timevar->name);
+      abort ();
+    }
 
   /* What time is it?  */
   get_time (&now);
@@ -449,7 +454,7 @@ timevar_print (fp)
   for (id = 0; id < (unsigned int) TIMEVAR_LAST; ++id)
     {
       struct timevar_def *tv = &timevars[(timevar_id_t) id];
-      const float tiny = 5e-3;
+      const double tiny = 5e-3;
 
       /* Don't print the total execution time here; that goes at the
 	 end.  */

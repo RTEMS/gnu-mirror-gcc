@@ -1,6 +1,6 @@
 // Locale support (codecvt) -*- C++ -*-
 
-// Copyright (C) 2000, 2001 Free Software Foundation, Inc.
+// Copyright (C) 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -66,10 +66,10 @@
     {
     public:
       // Types:
-      typedef codecvt_base::result			result;
-      typedef _InternT 					intern_type;
-      typedef _ExternT 					extern_type;
-      typedef _StateT  					state_type;
+      typedef codecvt_base::result	result;
+      typedef _InternT 			intern_type;
+      typedef _ExternT 			extern_type;
+      typedef _StateT  			state_type;
       
       // 22.2.1.5.1 codecvt members
       result
@@ -106,7 +106,7 @@
       { return this->do_always_noconv(); }
 
       int
-      length(const state_type& __state, const extern_type* __from,
+      length(state_type& __state, const extern_type* __from,
 	     const extern_type* __end, size_t __max) const
       { return this->do_length(__state, __from, __end, __max); }
 
@@ -144,7 +144,7 @@
       do_always_noconv() const throw() = 0;
 
       virtual int 
-      do_length(const state_type&, const extern_type* __from, 
+      do_length(state_type&, const extern_type* __from, 
 		const extern_type* __end, size_t __max) const = 0;
 
       virtual int 
@@ -159,17 +159,23 @@
     {
     public:      
       // Types:
-      typedef codecvt_base::result			result;
-      typedef _InternT intern_type;
-      typedef _ExternT extern_type;
-      typedef _StateT  state_type;
+      typedef codecvt_base::result	result;
+      typedef _InternT 			intern_type;
+      typedef _ExternT 			extern_type;
+      typedef _StateT  			state_type;
 
-      // Data Members:
-      static locale::id id;
+    protected:
+      __c_locale			_M_c_locale_codecvt;
+
+    public:
+      static locale::id 		id;
 
       explicit 
       codecvt(size_t __refs = 0) 
-      : __codecvt_abstract_base<_InternT,_ExternT,_StateT> (__refs) { }
+      : __codecvt_abstract_base<_InternT, _ExternT, _StateT> (__refs) { }
+
+      explicit 
+      codecvt(__c_locale __cloc, size_t __refs = 0);
 
     protected:
       virtual 
@@ -198,7 +204,7 @@
       do_always_noconv() const throw();
 
       virtual int 
-      do_length(const state_type&, const extern_type* __from, 
+      do_length(state_type&, const extern_type* __from, 
 		const extern_type* __end, size_t __max) const;
 
       virtual int 
@@ -215,15 +221,21 @@
     {
     public:      
       // Types:
-      typedef char 	intern_type;
-      typedef char 	extern_type;
-      typedef mbstate_t state_type;
+      typedef char 			intern_type;
+      typedef char 			extern_type;
+      typedef mbstate_t 		state_type;
 
-      // Data Members:
+    protected:
+      __c_locale			_M_c_locale_codecvt;
+
+    public:
       static locale::id id;
 
       explicit 
       codecvt(size_t __refs = 0);
+
+      explicit 
+      codecvt(__c_locale __cloc, size_t __refs = 0);
 
     protected:
       virtual 
@@ -252,7 +264,7 @@
       do_always_noconv() const throw();
 
       virtual int 
-      do_length(const state_type&, const extern_type* __from, 
+      do_length(state_type&, const extern_type* __from, 
 		const extern_type* __end, size_t __max) const;
 
       virtual int 
@@ -267,15 +279,21 @@
     {
     public:
       // Types:
-      typedef wchar_t 	intern_type;
-      typedef char 	extern_type;
-      typedef mbstate_t state_type;
+      typedef wchar_t 			intern_type;
+      typedef char 			extern_type;
+      typedef mbstate_t 		state_type;
 
-      // Data Members:
-      static locale::id id;
+    protected:
+      __c_locale			_M_c_locale_codecvt;
+
+    public:
+      static locale::id 		id;
 
       explicit 
       codecvt(size_t __refs = 0);
+
+      explicit 
+      codecvt(__c_locale __cloc, size_t __refs = 0);
 
     protected:
       virtual 
@@ -306,7 +324,7 @@
       bool do_always_noconv() const throw();
 
       virtual 
-      int do_length(const state_type&, const extern_type* __from,
+      int do_length(state_type&, const extern_type* __from,
 		    const extern_type* __end, size_t __max) const;
 
       virtual int 
@@ -320,8 +338,14 @@
     {
     public:
       explicit 
-      codecvt_byname(const char*, size_t __refs = 0) 
-      : codecvt<_InternT, _ExternT, _StateT>(__refs) { }
+      codecvt_byname(const char* __s, size_t __refs = 0) 
+      : codecvt<_InternT, _ExternT, _StateT>(__refs)
+      { 
+	if (this->_M_c_locale_codecvt != this->_S_c_locale)
+	  _S_destroy_c_locale(this->_M_c_locale_codecvt);
+	_S_create_c_locale(this->_M_c_locale_codecvt, __s); 
+      }
+
     protected:
       virtual 
       ~codecvt_byname() { }

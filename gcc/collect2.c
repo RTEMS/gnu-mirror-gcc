@@ -1,7 +1,7 @@
 /* Collect static initialization info into data structures that can be
    traversed by C++ initialization and finalization routines.
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
    Contributed by Chris Smith (csmith@convex.com).
    Heavily modified by Michael Meissner (meissner@cygnus.com),
    Per Bothner (bothner@cygnus.com), and John Gilmore (gnu@cygnus.com).
@@ -28,6 +28,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include <signal.h>
 #if ! defined( SIGCHLD ) && defined( SIGCLD )
 #  define SIGCHLD SIGCLD
@@ -57,10 +59,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "obstack.h"
 #include "intl.h"
 #include "version.h"
-
-/* Obstack allocation and deallocation routines.  */
-#define obstack_chunk_alloc xmalloc
-#define obstack_chunk_free free
 
 /* On certain systems, we have code that works by scanning the object file
    directly.  But this code uses system-specific header files and library
@@ -144,11 +142,9 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 /* Some systems use __main in a way incompatible with its use in gcc, in these
    cases use the macros NAME__MAIN to give a quoted symbol and SYMBOL__MAIN to
-   give the same symbol without quotes for an alternative entry point.  You
-   must define both, or neither.  */
+   give the same symbol without quotes for an alternative entry point.  */
 #ifndef NAME__MAIN
 #define NAME__MAIN "__main"
-#define SYMBOL__MAIN __main
 #endif
 
 /* This must match tree.h.  */
@@ -237,18 +233,10 @@ static struct head exports;		/* list of exported symbols */
 static struct head frame_tables;	/* list of frame unwind info tables */
 
 struct obstack temporary_obstack;
-struct obstack permanent_obstack;
 char * temporary_firstobj;
 
-/* Holds the return value of pexecute.  */
-int pexecute_pid;
-
-/* Defined in the automatically-generated underscore.c.  */
-extern int prepends_underscore;
-
-#ifndef GET_ENV_PATH_LIST
-#define GET_ENV_PATH_LIST(VAR,NAME)	do { (VAR) = getenv (NAME); } while (0)
-#endif
+/* Holds the return value of pexecute and fork.  */
+int pid;
 
 /* Structure to hold all the directories in which to search for files to
    execute.  */
@@ -314,7 +302,6 @@ static int is_in_list		PARAMS ((const char *, struct id *));
 #endif
 static void write_aix_file	PARAMS ((FILE *, struct id *));
 static char *resolve_lib_name	PARAMS ((const char *));
-static int ignore_library	PARAMS ((const char *));
 #endif
 static char *extract_string	PARAMS ((const char **));
 
@@ -526,8 +513,8 @@ dump_file (name)
 	  if (*word == '.')
 	    ++word, putc ('.', stderr);
 	  p = word;
-	  if (*p == '_' && prepends_underscore)
-	    ++p;
+	  if (!strncmp (p, USER_LABEL_PREFIX, strlen (USER_LABEL_PREFIX)))
+	    p += strlen (USER_LABEL_PREFIX);
 
 	  if (no_demangle)
 	    result = 0;
@@ -577,6 +564,15 @@ is_ctor_dtor (s)
   const char *orig_s = s;
 
   static const struct names special[] = {
+#ifndef NO_DOLLAR_IN_LABEL
+    { "GLOBAL__I$", sizeof ("GLOBAL__I$")-1, 1, 0 },
+    { "GLOBAL__D$", sizeof ("GLOBAL__D$")-1, 2, 0 },
+#else
+#ifndef NO_DOT_IN_LABEL
+    { "GLOBAL__I.", sizeof ("GLOBAL__I.")-1, 1, 0 },
+    { "GLOBAL__D.", sizeof ("GLOBAL__D.")-1, 2, 0 },
+#endif /* NO_DOT_IN_LABEL */
+#endif /* NO_DOLLAR_IN_LABEL */
     { "GLOBAL__I_", sizeof ("GLOBAL__I_")-1, 1, 0 },
     { "GLOBAL__D_", sizeof ("GLOBAL__D_")-1, 2, 0 },
     { "GLOBAL__F_", sizeof ("GLOBAL__F_")-1, 5, 0 },
@@ -753,7 +749,7 @@ prefix_from_env (env, pprefix)
      struct path_prefix *pprefix;
 {
   const char *p;
-  GET_ENV_PATH_LIST (p, env);
+  GET_ENVIRONMENT (p, env);
 
   if (p)
     prefix_from_string (p, pprefix);
@@ -917,7 +913,6 @@ main (argc, argv)
 #endif
 
   obstack_begin (&temporary_obstack, 0);
-  obstack_begin (&permanent_obstack, 0);
   temporary_firstobj = (char *) obstack_alloc (&temporary_obstack, 0);
 
   current_demangling_style = auto_demangling;
@@ -1077,18 +1072,18 @@ main (argc, argv)
     {
       const char *q = extract_string (&p);
       if (*q == '-' && (q[1] == 'm' || q[1] == 'f'))
-	*c_ptr++ = obstack_copy0 (&permanent_obstack, q, strlen (q));
+	*c_ptr++ = xstrdup (q);
       if (strcmp (q, "-EL") == 0 || strcmp (q, "-EB") == 0)
-	*c_ptr++ = obstack_copy0 (&permanent_obstack, q, strlen (q));
+	*c_ptr++ = xstrdup (q);
       if (strcmp (q, "-shared") == 0)
 	shared_obj = 1;
       if (*q == '-' && q[1] == 'B')
 	{
-	  *c_ptr++ = obstack_copy0 (&permanent_obstack, q, strlen (q));
+	  *c_ptr++ = xstrdup (q);
 	  if (q[2] == 0)
 	    {
 	      q = extract_string (&p);
-	      *c_ptr++ = obstack_copy0 (&permanent_obstack, q, strlen (q));
+	      *c_ptr++ = xstrdup (q);
 	    }
 	}
     }
@@ -1497,7 +1492,7 @@ main (argc, argv)
 }
 
 
-/* Wait for a process to finish, and exit if a non-zero status is found.  */
+/* Wait for a process to finish, and exit if a nonzero status is found.  */
 
 int
 collect_wait (prog)
@@ -1505,7 +1500,7 @@ collect_wait (prog)
 {
   int status;
 
-  pwait (pexecute_pid, &status, 0);
+  pwait (pid, &status, 0);
   if (status)
     {
       if (WIFSIGNALED (status))
@@ -1594,9 +1589,8 @@ collect_execute (prog, argv, redir)
       dup2 (redir_handle, STDERR_FILENO);
     }
 
-  pexecute_pid = pexecute (argv[0], argv, argv[0], NULL,
-			   &errmsg_fmt, &errmsg_arg,
-			   (PEXECUTE_FIRST | PEXECUTE_LAST | PEXECUTE_SEARCH));
+  pid = pexecute (argv[0], argv, argv[0], NULL, &errmsg_fmt, &errmsg_arg,
+		  (PEXECUTE_FIRST | PEXECUTE_LAST | PEXECUTE_SEARCH));
 
   if (redir)
     {
@@ -1608,7 +1602,7 @@ collect_execute (prog, argv, redir)
       close (redir_handle);
     }
 
- if (pexecute_pid == -1)
+ if (pid == -1)
    fatal_perror (errmsg_fmt, errmsg_arg);
 }
 
@@ -2075,7 +2069,6 @@ scan_prog_file (prog_name, which_pass)
   void (*quit_handler) PARAMS ((int));
   char *real_nm_argv[4];
   const char **nm_argv = (const char **) real_nm_argv;
-  int pid;
   int argc = 0;
   int pipe_fd[2];
   char *p, buf[1024];
@@ -2135,7 +2128,7 @@ scan_prog_file (prog_name, which_pass)
 	fatal_perror ("close %d", pipe_fd[1]);
 
       execv (nm_file_name, real_nm_argv);
-      fatal_perror ("execvp %s", nm_file_name);
+      fatal_perror ("execv %s", nm_file_name);
     }
 
   /* Parent context from here on.  */
@@ -2520,7 +2513,6 @@ scan_libraries (prog_name)
   void (*quit_handler) PARAMS ((int));
   char *real_ldd_argv[4];
   const char **ldd_argv = (const char **) real_ldd_argv;
-  int pid;
   int argc = 0;
   int pipe_fd[2];
   char buf[1024];
@@ -2690,7 +2682,44 @@ scan_libraries (prog_name)
 
 #endif
 
-extern char *ldgetname ();
+#ifdef COLLECT_EXPORT_LIST
+/* Array of standard AIX libraries which should not
+   be scanned for ctors/dtors.  */
+static const char *const aix_std_libs[] = {
+  "/unix",
+  "/lib/libc.a",
+  "/lib/libm.a",
+  "/lib/libc_r.a",
+  "/lib/libm_r.a",
+  "/usr/lib/libc.a",
+  "/usr/lib/libm.a",
+  "/usr/lib/libc_r.a",
+  "/usr/lib/libm_r.a",
+  "/usr/lib/threads/libc.a",
+  "/usr/ccs/lib/libc.a",
+  "/usr/ccs/lib/libm.a",
+  "/usr/ccs/lib/libc_r.a",
+  "/usr/ccs/lib/libm_r.a",
+  NULL
+};
+
+/* This function checks the filename and returns 1
+   if this name matches the location of a standard AIX library.  */
+static int ignore_library	PARAMS ((const char *));
+static int
+ignore_library (name)
+     const char *name;
+{
+  const char *const *p = &aix_std_libs[0];
+  while (*p++ != NULL)
+    if (! strcmp (name, *p)) return 1;
+  return 0;
+}
+#endif /* COLLECT_EXPORT_LIST */
+
+#if defined (HAVE_DECL_LDGETNAME) && !HAVE_DECL_LDGETNAME
+extern char *ldgetname PARAMS ((LDFILE *, GCC_SYMENT *));
+#endif
 
 /* COFF version to scan the name list of the loaded program for
    the symbols g++ uses for static constructors and destructors.
@@ -2908,38 +2937,6 @@ if (debug) fprintf (stderr, "found: %s\n", lib_buf);
   else
     fatal ("library lib%s not found", name);
   return (NULL);
-}
-
-/* Array of standard AIX libraries which should not
-   be scanned for ctors/dtors.  */
-static const char *const aix_std_libs[] = {
-  "/unix",
-  "/lib/libc.a",
-  "/lib/libm.a",
-  "/lib/libc_r.a",
-  "/lib/libm_r.a",
-  "/usr/lib/libc.a",
-  "/usr/lib/libm.a",
-  "/usr/lib/libc_r.a",
-  "/usr/lib/libm_r.a",
-  "/usr/lib/threads/libc.a",
-  "/usr/ccs/lib/libc.a",
-  "/usr/ccs/lib/libm.a",
-  "/usr/ccs/lib/libc_r.a",
-  "/usr/ccs/lib/libm_r.a",
-  NULL
-};
-
-/* This function checks the filename and returns 1
-   if this name matches the location of a standard AIX library.  */
-static int
-ignore_library (name)
-     const char *name;
-{
-  const char *const *p = &aix_std_libs[0];
-  while (*p++ != NULL)
-    if (! strcmp (name, *p)) return 1;
-  return 0;
 }
 #endif /* COLLECT_EXPORT_LIST */
 

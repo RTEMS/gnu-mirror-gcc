@@ -1,6 +1,6 @@
 // Streambuf iterators
 
-// Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002
+// Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003
 // Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
@@ -28,8 +28,6 @@
 // invalidate any other reasons why the executable file might be covered by
 // the GNU General Public License.
 
-// XXX Should specialize copy, find algorithms for streambuf iterators.
-
 /** @file streambuf_iterator.h
  *  This is an internal header file, included by other library headers.
  *  You should not attempt to use it directly.
@@ -39,6 +37,10 @@
 #define _CPP_BITS_STREAMBUF_ITERATOR_H 1
 
 #pragma GCC system_header
+
+#include <streambuf>
+
+// NB: Should specialize copy, find algorithms for streambuf iterators.
 
 namespace std
 {
@@ -69,13 +71,13 @@ namespace std
 
     public:
       istreambuf_iterator() throw() 
-      : _M_sbuf(0), _M_c(-2) { }
+      : _M_sbuf(0), _M_c(traits_type::eof()) { }
       
       istreambuf_iterator(istream_type& __s) throw()
-      : _M_sbuf(__s.rdbuf()), _M_c(-2) { }
+      : _M_sbuf(__s.rdbuf()), _M_c(traits_type::eof()) { }
 
       istreambuf_iterator(streambuf_type* __s) throw()
-      : _M_sbuf(__s), _M_c(-2) { }
+      : _M_sbuf(__s), _M_c(traits_type::eof()) { }
        
       // NB: The result of operator*() on an end of stream is undefined.
       char_type 
@@ -85,21 +87,25 @@ namespace std
       istreambuf_iterator& 
       operator++()
       { 
-	if (_M_sbuf && _M_sbuf->sbumpc() == traits_type::eof())
+	const int_type __eof = traits_type::eof();
+	if (_M_sbuf && traits_type::eq_int_type(_M_sbuf->sbumpc(), __eof))
 	  _M_sbuf = 0;
 	else
-	  _M_c = -2;
+	  _M_c = __eof;
 	return *this; 
       }
 
       istreambuf_iterator
       operator++(int)
       {
+	const int_type __eof = traits_type::eof();
 	istreambuf_iterator __old = *this;
-	if (_M_sbuf && (__old._M_c = _M_sbuf->sbumpc()) == traits_type::eof())
+	if (_M_sbuf
+	    && traits_type::eq_int_type((__old._M_c = _M_sbuf->sbumpc()), 
+					__eof))
 	  _M_sbuf = 0;
 	else
-	  _M_c = -2;
+	  _M_c = __eof;
 	return __old; 
       }
 
@@ -110,8 +116,8 @@ namespace std
       equal(const istreambuf_iterator& __b) const
       {
 	const int_type __eof = traits_type::eof();
-	bool __thiseof = _M_get() == __eof;
-	bool __beof = __b._M_get() == __eof;
+	bool __thiseof = traits_type::eq_int_type(_M_get(), __eof);
+	bool __beof = traits_type::eq_int_type(__b._M_get(), __eof);
 	return (__thiseof && __beof || (!__thiseof && !__beof));
       }
 #endif
@@ -120,13 +126,14 @@ namespace std
       int_type 
       _M_get() const
       { 
-	int_type __ret = traits_type::eof();
+	const int_type __eof = traits_type::eof();
+	int_type __ret = __eof;
 	if (_M_sbuf)
 	  { 
-	    if (_M_c != static_cast<int_type>(-2))
+	    if (!traits_type::eq_int_type(_M_c, __eof))
 	      __ret = _M_c;
 	    else 
-	      if ((__ret = _M_sbuf->sgetc()) == traits_type::eof())
+	      if (traits_type::eq_int_type((__ret = _M_sbuf->sgetc()), __eof))
 		_M_sbuf = 0;
 	  }
 	return __ret;
@@ -161,7 +168,6 @@ namespace std
       bool 		_M_failed;
 
     public:
-      inline 
       ostreambuf_iterator(ostream_type& __s) throw ()
       : _M_sbuf(__s.rdbuf()), _M_failed(!_M_sbuf) { }
       
@@ -169,7 +175,13 @@ namespace std
       : _M_sbuf(__s), _M_failed(!_M_sbuf) { }
 
       ostreambuf_iterator& 
-      operator=(_CharT __c);
+      operator=(_CharT __c)
+      {
+	if (!_M_failed && 
+	    _Traits::eq_int_type(_M_sbuf->sputc(__c), _Traits::eof()))
+	  _M_failed = true;
+	return *this;
+      }
 
       ostreambuf_iterator& 
       operator*() throw()
@@ -186,16 +198,13 @@ namespace std
       bool 
       failed() const throw()
       { return _M_failed; }
-    };
 
-  template<typename _CharT, typename _Traits>
-    inline ostreambuf_iterator<_CharT, _Traits>&
-    ostreambuf_iterator<_CharT, _Traits>::operator=(_CharT __c)
-    {
-      if (!_M_failed && 
-          _Traits::eq_int_type(_M_sbuf->sputc(__c), _Traits::eof()))
-	_M_failed = true;
-      return *this;
-    }
+      ostreambuf_iterator& 
+      _M_put(const _CharT* __ws, streamsize __len)
+      {
+	this->_M_sbuf->sputn(__ws, __len);
+	return *this;
+      }
+    };
 } // namespace std
 #endif

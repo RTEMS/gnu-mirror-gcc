@@ -1,7 +1,7 @@
 /* This file contains the definitions and documentation for the common
    tree codes used in the GNU C and C++ compilers (see c-common.def
    for the standard codes).  
-   Copyright (C) 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
    Written by Benjamin Chelf (chelf@codesourcery.com).
 
 This file is part of GCC.
@@ -23,6 +23,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "function.h"
 #include "splay-tree.h"
@@ -37,17 +39,11 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "output.h"
 #include "timevar.h"
 #include "predict.h"
+#include "langhooks.h"
 
 /* If non-NULL, the address of a language-specific function for
    expanding statements.  */
 void (*lang_expand_stmt) PARAMS ((tree));
-
-/* If non-NULL, the address of a language-specific function for
-   expanding a DECL_STMT.  After the language-independent cases are
-   handled, this function will be called.  If this function is not
-   defined, it is assumed that declarations other than those for
-   variables and labels do not require any RTL generation.  */
-void (*lang_expand_decl_stmt) PARAMS ((tree));
 
 /* Create an empty statement tree rooted at T.  */
 
@@ -144,6 +140,8 @@ add_scope_stmt (begin_p, partial_p)
     }
   else
     {
+      if (partial_p != SCOPE_PARTIAL_P (TREE_PURPOSE (top)))
+	abort ();
       TREE_VALUE (top) = ss;
       *stack_ptr = TREE_CHAIN (top);
     }
@@ -335,7 +333,7 @@ genrtl_expr_stmt (expr)
    whether to (1) save the value of the expression, (0) discard it or
    (-1) use expr_stmts_for_value to tell.  The use of -1 is
    deprecated, and retained only for backward compatibility.
-   MAYBE_LAST is non-zero if this EXPR_STMT might be the last statement
+   MAYBE_LAST is nonzero if this EXPR_STMT might be the last statement
    in expression statement.  */
 
 void 
@@ -367,15 +365,15 @@ genrtl_decl_stmt (t)
   tree decl;
   emit_line_note (input_filename, lineno);
   decl = DECL_STMT_DECL (t);
+  if (DECL_EXTERNAL (decl))
+    /* Do nothing.  */;
   /* If this is a declaration for an automatic local
      variable, initialize it.  Note that we might also see a
      declaration for a namespace-scope object (declared with
      `extern').  We don't have to handle the initialization
      of those objects here; they can only be declarations,
      rather than definitions.  */
-  if (TREE_CODE (decl) == VAR_DECL 
-      && !TREE_STATIC (decl)
-      && !DECL_EXTERNAL (decl))
+  else if (TREE_CODE (decl) == VAR_DECL && !TREE_STATIC (decl))
     {
       /* Let the back-end know about this variable.  */
       if (!anon_aggr_type_p (TREE_TYPE (decl)))
@@ -386,11 +384,8 @@ genrtl_decl_stmt (t)
     }
   else if (TREE_CODE (decl) == VAR_DECL && TREE_STATIC (decl))
     make_rtl_for_local_static (decl);
-  else if (TREE_CODE (decl) == LABEL_DECL 
-	   && C_DECLARED_LABEL_FLAG (decl))
-    declare_nonlocal_label (decl);
-  else if (lang_expand_decl_stmt)
-    (*lang_expand_decl_stmt) (t);
+  else
+    (*lang_hooks.expand_decl) (decl);
 }
 
 /* Generate the RTL for T, which is an IF_STMT.  */
@@ -420,16 +415,20 @@ void
 genrtl_while_stmt (t)
      tree t;
 {
-  tree cond;
+  tree cond = WHILE_COND (t);
+
   emit_nop ();
   emit_line_note (input_filename, lineno);
   expand_start_loop (1); 
   genrtl_do_pushlevel ();
 
-  cond = expand_cond (WHILE_COND (t));
-  emit_line_note (input_filename, lineno);
-  expand_exit_loop_top_cond (0, cond);
-  genrtl_do_pushlevel ();
+  if (cond && !integer_nonzerop (cond))
+    {
+      cond = expand_cond (cond);
+      emit_line_note (input_filename, lineno);
+      expand_exit_loop_top_cond (0, cond);
+      genrtl_do_pushlevel ();
+    }
   
   expand_stmt (WHILE_BODY (t));
 
@@ -447,12 +446,24 @@ genrtl_do_stmt (t)
   /* Recognize the common special-case of do { ... } while (0) and do
      not emit the loop widgetry in this case.  In particular this
      avoids cluttering the rtl with dummy loop notes, which can affect
-     alignment of adjacent labels.  */
-  if (integer_zerop (cond))
+     alignment of adjacent labels.  COND can be NULL due to parse
+     errors.  */
+  if (!cond || integer_zerop (cond))
     {
       expand_start_null_loop ();
       expand_stmt (DO_BODY (t));
       expand_end_null_loop ();
+    }
+  else if (integer_nonzerop (cond))
+    {
+      emit_nop ();
+      emit_line_note (input_filename, lineno);
+      expand_start_loop (1);
+
+      expand_stmt (DO_BODY (t));
+
+      emit_line_note (input_filename, lineno);
+      expand_end_loop ();
     }
   else
     {
@@ -487,7 +498,7 @@ genrtl_return_stmt (stmt)
 {
   tree expr;
 
-  expr = RETURN_EXPR (stmt);
+  expr = RETURN_STMT_EXPR (stmt);
 
   emit_line_note (input_filename, lineno);
   if (!expr)
@@ -506,7 +517,7 @@ void
 genrtl_for_stmt (t)
      tree t;
 {
-  tree cond;
+  tree cond = FOR_COND (t);
   const char *saved_filename;
   int saved_lineno;
 
@@ -518,9 +529,11 @@ genrtl_for_stmt (t)
   /* Expand the initialization.  */
   emit_nop ();
   emit_line_note (input_filename, lineno);
-  expand_start_loop_continue_elsewhere (1); 
+  if (FOR_EXPR (t))
+    expand_start_loop_continue_elsewhere (1); 
+  else
+    expand_start_loop (1);
   genrtl_do_pushlevel ();
-  cond = expand_cond (FOR_COND (t));
 
   /* Save the filename and line number so that we expand the FOR_EXPR
      we can reset them back to the saved values.  */
@@ -528,21 +541,26 @@ genrtl_for_stmt (t)
   saved_lineno = lineno;
 
   /* Expand the condition.  */
-  emit_line_note (input_filename, lineno);
-  if (cond)
-    expand_exit_loop_top_cond (0, cond);
+  if (cond && !integer_nonzerop (cond))
+    {
+      cond = expand_cond (cond);
+      emit_line_note (input_filename, lineno);
+      expand_exit_loop_top_cond (0, cond);
+      genrtl_do_pushlevel ();
+    }
 
   /* Expand the body.  */
-  genrtl_do_pushlevel ();
   expand_stmt (FOR_BODY (t));
 
   /* Expand the increment expression.  */
   input_filename = saved_filename;
   lineno = saved_lineno;
   emit_line_note (input_filename, lineno);
-  expand_loop_continue_here ();
   if (FOR_EXPR (t))
-    genrtl_expr_stmt (FOR_EXPR (t));
+    {
+      expand_loop_continue_here ();
+      genrtl_expr_stmt (FOR_EXPR (t));
+    }
   expand_end_loop ();
 }
 
@@ -616,6 +634,7 @@ genrtl_scope_stmt (t)
 	{
 	  if (TREE_CODE (fn) == FUNCTION_DECL 
 	      && DECL_CONTEXT (fn) == current_function_decl
+	      && DECL_SAVED_INSNS (fn)
 	      && !TREE_ASM_WRITTEN (fn)
 	      && TREE_ADDRESSABLE (fn))
 	    {
@@ -673,8 +692,7 @@ genrtl_case_label (case_label)
   if (cleanup)
     {
       static int explained = 0;
-      warning_with_decl (TREE_PURPOSE (cleanup), 
-			 "destructor needed for `%#D'");
+      warning ("destructor needed for `%#D'", (TREE_PURPOSE (cleanup)));
       warning ("where case label appears here");
       if (!explained)
 	{
@@ -709,29 +727,21 @@ genrtl_compound_stmt (t)
 /* Generate the RTL for an ASM_STMT.  */
 
 void
-genrtl_asm_stmt (cv_qualifier, string, output_operands,
+genrtl_asm_stmt (volatile_p, string, output_operands,
 		 input_operands, clobbers, asm_input_p)
-     tree cv_qualifier;
+     int volatile_p;
      tree string;
      tree output_operands;
      tree input_operands;
      tree clobbers;
      int asm_input_p;
 {
-  if (cv_qualifier != NULL_TREE
-      && cv_qualifier != ridpointers[(int) RID_VOLATILE])
-    {
-      warning ("%s qualifier ignored on asm",
-	       IDENTIFIER_POINTER (cv_qualifier));
-      cv_qualifier = NULL_TREE;
-    }
-
   emit_line_note (input_filename, lineno);
   if (asm_input_p)
-    expand_asm (string);
+    expand_asm (string, volatile_p);
   else
     c_expand_asm_operands (string, output_operands, input_operands, 
-			   clobbers, cv_qualifier != NULL_TREE,
+			   clobbers, volatile_p,
 			   input_filename, lineno);
 }
 
@@ -847,7 +857,7 @@ expand_stmt (t)
 	  break;
 
 	case ASM_STMT:
-	  genrtl_asm_stmt (ASM_CV_QUAL (t), ASM_STRING (t),
+	  genrtl_asm_stmt (ASM_VOLATILE_P (t), ASM_STRING (t),
 			   ASM_OUTPUTS (t), ASM_INPUTS (t),
 			   ASM_CLOBBERS (t), ASM_INPUT_P (t));
 	  break;

@@ -602,6 +602,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "version.h"
 #include "intl.h"
 
@@ -2948,7 +2950,7 @@ parse_def (name_start)
 	{
 	  int ch2;
 	  arg_number = strtol (arg_start, (char **) &arg_end_p1, 0);
-	  if (arg_end_p1 != arg_start || (ch2 = *arg_end_p1 != ';') || ch2 != ',')
+	  if (arg_end_p1 != arg_start || ((ch2 = *arg_end_p1) != ';') || ch2 != ',')
 	    arg_was_number++;
 	}
 
@@ -3004,7 +3006,7 @@ parse_def (name_start)
 		    {
 		      int ch2;
 		      arg_number = strtol (arg_start, (char **) &arg_end_p1, 0);
-		      if (arg_end_p1 != arg_start || (ch2 = *arg_end_p1 != ';') || ch2 != ',')
+		      if (arg_end_p1 != arg_start || ((ch2 = *arg_end_p1) != ';') || ch2 != ',')
 			arg_was_number++;
 
 		      if (t_ptr == &temp_array[0])
@@ -3078,7 +3080,7 @@ parse_def (name_start)
 		    {
 		      int ch2;
 		      arg_number = strtol (arg_start, (char **) &arg_end_p1, 0);
-		      if (arg_end_p1 != arg_start || (ch2 = *arg_end_p1 != ';') || ch2 != ',')
+		      if (arg_end_p1 != arg_start || ((ch2 = *arg_end_p1) != ';') || ch2 != ',')
 			arg_was_number++;
 
 		      if (t_ptr == &temp_array[0])

@@ -21,6 +21,8 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "hashtable.h"
 
 /* The code below is a specialization of Vladimir Makarov's expandable
@@ -45,7 +47,7 @@ static void ht_expand PARAMS ((hash_table *));
 #define OBSTACK_CHUNK_FREE free
 #endif
 
-/* Initialise an obstack.  */
+/* Initialize an obstack.  */
 void
 gcc_obstack_init (obstack)
      struct obstack *obstack;

@@ -1,5 +1,5 @@
 /* Print RTL for GNU C Compiler.
-   Copyright (C) 1987, 1988, 1992, 1997, 1998, 1999, 2000
+   Copyright (C) 1987, 1988, 1992, 1997, 1998, 1999, 2000, 2002, 2003
    Free Software Foundation, Inc.
 
 This file is part of GCC.
@@ -22,6 +22,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 
 /* We don't want the tree code checking code for the access to the
@@ -91,6 +93,12 @@ print_mem_expr (outfile, expr)
       if (DECL_NAME (TREE_OPERAND (expr, 1)))
 	fprintf (outfile, ".%s",
 		 IDENTIFIER_POINTER (DECL_NAME (TREE_OPERAND (expr, 1))));
+    }
+  else if (TREE_CODE (expr) == INDIRECT_REF)
+    {
+      fputs (" (*", outfile);
+      print_mem_expr (outfile, TREE_OPERAND (expr, 0));
+      fputs (")", outfile);
     }
   else if (DECL_NAME (expr))
     fprintf (outfile, " %s", IDENTIFIER_POINTER (DECL_NAME (expr)));
@@ -188,6 +196,11 @@ print_rtx (in_rtx)
 	    }
 	}
     }
+
+#ifndef GENERATOR_FILE
+  if (GET_CODE (in_rtx) == CONST_DOUBLE && FLOAT_MODE_P (GET_MODE (in_rtx)))
+    i = 5;
+#endif
 
   /* Get the format string and skip the first elements if we have handled
      them already.  */
@@ -396,6 +409,23 @@ print_rtx (in_rtx)
 	    else
 	      fprintf (outfile, " %d", value);
 
+	    if (GET_CODE (in_rtx) == REG && REG_ATTRS (in_rtx))
+	      {
+		fputs (" [", outfile);
+		if (ORIGINAL_REGNO (in_rtx) != REGNO (in_rtx))
+		  fprintf (outfile, "orig:%i", ORIGINAL_REGNO (in_rtx));
+		if (REG_EXPR (in_rtx))
+		  print_mem_expr (outfile, REG_EXPR (in_rtx));
+
+		if (REG_OFFSET (in_rtx))
+		  {
+		    fputc ('+', outfile);
+		    fprintf (outfile, HOST_WIDE_INT_PRINT_DEC,
+			     REG_OFFSET (in_rtx));
+		  }
+		fputs (" ]", outfile);
+	      }
+
 	    if (is_insn && &INSN_CODE (in_rtx) == &XINT (in_rtx, i)
 		&& XINT (in_rtx, i) >= 0
 		&& (name = get_insn_name (XINT (in_rtx, i))) != NULL)
@@ -480,6 +510,7 @@ print_rtx (in_rtx)
 
   switch (GET_CODE (in_rtx))
     {
+#ifndef GENERATOR_FILE
     case MEM:
       fputs (" [", outfile);
       fprintf (outfile, HOST_WIDE_INT_PRINT_DEC, MEM_ALIAS_SET (in_rtx));
@@ -507,18 +538,17 @@ print_rtx (in_rtx)
       fputc (']', outfile);
       break;
 
-#if 0
-    /* It would be nice to do this, but it would require real.o to
-       be linked into the MD-generator programs.  Maybe we should
-       do that.  -zw 2002-03-03  */
     case CONST_DOUBLE:
       if (FLOAT_MODE_P (GET_MODE (in_rtx)))
 	{
-	  REAL_VALUE_TYPE val;
-	  char s[30];
+	  char s[60];
 
-	  REAL_VALUE_FROM_CONST_DOUBLE (val, in_rtx);
-	  REAL_VALUE_TO_DECIMAL (val, "%.16g", s);
+	  real_to_decimal (s, CONST_DOUBLE_REAL_VALUE (in_rtx),
+			   sizeof (s), 0, 1);
+	  fprintf (outfile, " %s", s);
+
+	  real_to_hexadecimal (s, CONST_DOUBLE_REAL_VALUE (in_rtx),
+			       sizeof (s), 0, 1);
 	  fprintf (outfile, " [%s]", s);
 	}
       break;
@@ -526,9 +556,14 @@ print_rtx (in_rtx)
 
     case CODE_LABEL:
       fprintf (outfile, " [%d uses]", LABEL_NUSES (in_rtx));
-      if (LABEL_ALTERNATE_NAME (in_rtx))
-	fprintf (outfile, " [alternate name: %s]",
-		 LABEL_ALTERNATE_NAME (in_rtx));
+      switch (LABEL_KIND (in_rtx))
+	{
+	  case LABEL_NORMAL: break;
+	  case LABEL_STATIC_ENTRY: fputs (" [entry]", outfile); break;
+	  case LABEL_GLOBAL_ENTRY: fputs (" [global entry]", outfile); break;
+	  case LABEL_WEAK_ENTRY: fputs (" [weak entry]", outfile); break;
+	  default: abort();
+	}
       break;
 
     case CALL_PLACEHOLDER:

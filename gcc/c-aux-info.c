@@ -24,6 +24,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "toplev.h"
 #include "flags.h"
 #include "tree.h"
@@ -188,7 +190,7 @@ gen_formal_list_for_type (fntype, style)
 /* For the generation of an ANSI prototype for a function definition, we have
    to look at the formal parameter list of the function's own "type" to
    determine if the function's formal parameter list should end with an
-   ellipsis.  Given a tree node, the following function will return non-zero
+   ellipsis.  Given a tree node, the following function will return nonzero
    if the "function type" parameter list should end with an ellipsis.  */
 
 static int
@@ -471,7 +473,7 @@ gen_type (ret_val, t, style)
 
    The given entity may be either a variable or a function.
 
-   If the "is_func_definition" parameter is non-zero, assume that the thing
+   If the "is_func_definition" parameter is nonzero, assume that the thing
    we are generating a declaration for is a FUNCTION_DECL node which is
    associated with a function definition.  In this case, we can assume that
    an attached list of DECL nodes for function formal arguments is present.  */
@@ -582,8 +584,8 @@ gen_aux_info_record (fndecl, is_definition, is_implicit, is_prototyped)
       /* Write the actual line of auxiliary info.  */
 
       fprintf (aux_info_file, "/* %s:%d:%c%c */ %s;",
-	       DECL_SOURCE_FILE (fndecl),
-	       DECL_SOURCE_LINE (fndecl),
+	       TREE_FILENAME (fndecl),
+	       TREE_LINENO (fndecl),
 	       (is_implicit) ? 'I' : (is_prototyped) ? 'N' : 'O',
 	       (is_definition) ? 'F' : 'C',
 	       gen_decl (fndecl, is_definition, ansi));

@@ -120,6 +120,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "rtl.h"
 #include "tm_p.h"
@@ -139,9 +141,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "obstack.h"
 #include "splay-tree.h"
-
-#define obstack_chunk_alloc xmalloc
-#define obstack_chunk_free free
 
 /* EXIT_IGNORE_STACK should be nonzero if, when returning from a function,
    the stack pointer does not matter.  The value is tested only in
@@ -272,10 +271,10 @@ struct propagate_block_info
   /* The length of mem_set_list.  */
   int mem_set_list_len;
 
-  /* Non-zero if the value of CC0 is live.  */
+  /* Nonzero if the value of CC0 is live.  */
   int cc0_live;
 
-  /* Flags controling the set of information propagate_block collects.  */
+  /* Flags controlling the set of information propagate_block collects.  */
   int flags;
 };
 
@@ -432,6 +431,16 @@ life_analysis (f, file, flags)
     SET_HARD_REG_BIT (elim_reg_set, eliminables[i].from);
 #else
   SET_HARD_REG_BIT (elim_reg_set, FRAME_POINTER_REGNUM);
+#endif
+
+
+#ifdef CANNOT_CHANGE_MODE_CLASS
+  if (flags & PROP_REG_INFO)
+    {
+      int j;
+      for (j=0; j < NUM_MACHINE_MODES; ++j)
+	INIT_REG_SET (&subregs_of_mode[j]);
+    }
 #endif
 
   if (! optimize)
@@ -684,6 +693,16 @@ update_life_info (blocks, extent, prop_flags)
 	     partial improvement (see MAX_MEM_SET_LIST_LEN usage).
 	     Further improvement may be possible.  */
 	  cleanup_cfg (CLEANUP_EXPENSIVE);
+
+	  /* Zap the life information from the last round.  If we don't 
+	     do this, we can wind up with registers that no longer appear
+	     in the code being marked live at entry, which twiggs bogus
+	     warnings from regno_uninitialized.  */
+	  FOR_EACH_BB (bb)
+	    {
+	      CLEAR_REG_SET (bb->global_live_at_start);
+	      CLEAR_REG_SET (bb->global_live_at_end);
+	    }
 	}
 
       /* If asked, remove notes from the blocks we'll update.  */
@@ -800,7 +819,7 @@ update_life_info_in_dirty_blocks (extent, prop_flags)
 
 /* Free the variables allocated by find_basic_blocks.
 
-   KEEP_HEAD_END_P is non-zero if basic_block_info is not to be freed.  */
+   KEEP_HEAD_END_P is nonzero if basic_block_info is not to be freed.  */
 
 void
 free_basic_block_vars (keep_head_end_p)
@@ -999,7 +1018,7 @@ mark_regs_live_at_end (set)
   /* Many architectures have a GP register even without flag_pic.
      Assume the pic register is not in use, or will be handled by
      other means, if it is not fixed.  */
-  if (PIC_OFFSET_TABLE_REGNUM != INVALID_REGNUM
+  if ((unsigned) PIC_OFFSET_TABLE_REGNUM != INVALID_REGNUM
       && fixed_regs[PIC_OFFSET_TABLE_REGNUM])
     SET_REGNO_REG_SET (set, PIC_OFFSET_TABLE_REGNUM);
 #endif
@@ -1088,7 +1107,7 @@ calculate_global_regs_live (blocks_in, blocks_out, flags)
   int i;
 
   /* Some passes used to forget clear aux field of basic block causing
-     sick behaviour here.  */
+     sick behavior here.  */
 #ifdef ENABLE_CHECKING
   FOR_BB_BETWEEN (bb, ENTRY_BLOCK_PTR, NULL, next_bb)
     if (bb->aux)
@@ -1228,7 +1247,7 @@ calculate_global_regs_live (blocks_in, blocks_out, flags)
 
 	  /* Any constant, or pseudo with constant equivalences, may
 	     require reloading from memory using the pic register.  */
-	  if (PIC_OFFSET_TABLE_REGNUM != INVALID_REGNUM
+	  if ((unsigned) PIC_OFFSET_TABLE_REGNUM != INVALID_REGNUM
 	      && fixed_regs[PIC_OFFSET_TABLE_REGNUM])
 	    SET_REGNO_REG_SET (new_live_at_end, PIC_OFFSET_TABLE_REGNUM);
 	}
@@ -1376,7 +1395,7 @@ calculate_global_regs_live (blocks_in, blocks_out, flags)
 }
 
 
-/* This structure is used to pass parameters to an from the
+/* This structure is used to pass parameters to and from the
    the function find_regno_partial(). It is used to pass in the
    register number we are looking, as well as to return any rtx
    we find.  */
@@ -1523,6 +1542,7 @@ allocate_reg_life_data ()
       REG_N_DEATHS (i) = 0;
       REG_N_CALLS_CROSSED (i) = 0;
       REG_LIVE_LENGTH (i) = 0;
+      REG_FREQ (i) = 0;
       REG_BASIC_BLOCK (i) = REG_BLOCK_UNKNOWN;
     }
 }
@@ -1650,22 +1670,38 @@ propagate_one_insn (pbi, insn)
       else
 	{
 
+	/* If INSN contains a RETVAL note and is dead, but the libcall
+	   as a whole is not dead, then we want to remove INSN, but
+	   not the whole libcall sequence.
+
+	   However, we need to also remove the dangling REG_LIBCALL	
+	   note so that we do not have mis-matched LIBCALL/RETVAL
+	   notes.  In theory we could find a new location for the
+	   REG_RETVAL note, but it hardly seems worth the effort. 
+
+	   NOTE at this point will be the RETVAL note if it exists.  */
 	  if (note)
 	    {
-	      /* If INSN contains a RETVAL note and is dead, but the libcall
-		 as a whole is not dead, then we want to remove INSN, but
-		 not the whole libcall sequence.
-
-		 However, we need to also remove the dangling REG_LIBCALL	
-		 note so that we do not have mis-matched LIBCALL/RETVAL
-		 notes.  In theory we could find a new location for the
-		 REG_RETVAL note, but it hardly seems worth the effort.  */
 	      rtx libcall_note;
 	 
 	      libcall_note
 		= find_reg_note (XEXP (note, 0), REG_LIBCALL, NULL_RTX);
 	      remove_note (XEXP (note, 0), libcall_note);
 	    }
+
+	  /* Similarly if INSN contains a LIBCALL note, remove the
+	     dangling REG_RETVAL note.  */
+	  note = find_reg_note (insn, REG_LIBCALL, NULL_RTX);
+	  if (note)
+	    {
+	      rtx retval_note;
+
+	      retval_note
+		= find_reg_note (XEXP (note, 0), REG_RETVAL, NULL_RTX);
+	      remove_note (XEXP (note, 0), retval_note);
+	    }
+
+	  /* Now delete INSN.  */
 	  propagate_block_delete_insn (insn);
 	}
 
@@ -2029,7 +2065,7 @@ free_propagate_block_info (pbi)
    case, the resulting set will be equal to the union of the two sets that
    would otherwise be computed.
 
-   Return non-zero if an INSN is deleted (i.e. by dead code removal).  */
+   Return nonzero if an INSN is deleted (i.e. by dead code removal).  */
 
 int
 propagate_block (bb, live, local_set, cond_local_set, flags)
@@ -2083,7 +2119,7 @@ propagate_block (bb, live, local_set, cond_local_set, flags)
    (SET expressions whose destinations are registers dead after the insn).
    NEEDED is the regset that says which regs are alive after the insn.
 
-   Unless CALL_OK is non-zero, an insn is needed if it contains a CALL.
+   Unless CALL_OK is nonzero, an insn is needed if it contains a CALL.
 
    If X is the entire body of an insn, NOTES contains the reg notes
    pertaining to the insn.  */
@@ -2096,6 +2132,10 @@ insn_dead_p (pbi, x, call_ok, notes)
      rtx notes ATTRIBUTE_UNUSED;
 {
   enum rtx_code code = GET_CODE (x);
+
+  /* Don't eliminate insns that may trap.  */
+  if (flag_non_call_exceptions && may_trap_p (x))
+    return 0;
 
 #ifdef AUTO_INC_DEC
   /* As flow is invoked after combine, we must take existing AUTO_INC
@@ -2349,7 +2389,7 @@ regno_uninitialized (regno)
 	      || FUNCTION_ARG_REGNO_P (regno))))
     return 0;
 
-  return REGNO_REG_SET_P (ENTRY_BLOCK_PTR->next_bb->global_live_at_start, regno);
+  return REGNO_REG_SET_P (ENTRY_BLOCK_PTR->global_live_at_end, regno);
 }
 
 /* 1 if register REGNO was alive at a place where `setjmp' was called
@@ -2364,7 +2404,7 @@ regno_clobbered_at_setjmp (regno)
     return 0;
 
   return ((REG_N_SETS (regno) > 1
-	   || REGNO_REG_SET_P (ENTRY_BLOCK_PTR->next_bb->global_live_at_start, regno))
+	   || REGNO_REG_SET_P (ENTRY_BLOCK_PTR->global_live_at_end, regno))
 	  && REGNO_REG_SET_P (regs_live_at_setjmp, regno));
 }
 
@@ -3498,6 +3538,12 @@ find_auto_inc (pbi, x, insn)
 								  addr,
 								  inc_val)),
 			  insn, x, incr, addr);
+      else if (HAVE_PRE_MODIFY_DISP && offset == INTVAL (inc_val))
+	attempt_auto_inc (pbi, gen_rtx_PRE_MODIFY (Pmode, addr,
+						    gen_rtx_PLUS (Pmode,
+								  addr,
+								  inc_val)),
+			  insn, x, incr, addr);
     }
   else if (GET_CODE (inc_val) == REG
 	   && ! reg_set_between_p (inc_val, PREV_INSN (insn),
@@ -3796,12 +3842,11 @@ mark_used_regs (pbi, x, cond, insn)
       break;
 
     case SUBREG:
-#ifdef CLASS_CANNOT_CHANGE_MODE
+#ifdef CANNOT_CHANGE_MODE_CLASS
       if (GET_CODE (SUBREG_REG (x)) == REG
-	  && REGNO (SUBREG_REG (x)) >= FIRST_PSEUDO_REGISTER
-	  && CLASS_CANNOT_CHANGE_MODE_P (GET_MODE (x),
-					 GET_MODE (SUBREG_REG (x))))
-	REG_CHANGES_MODE (REGNO (SUBREG_REG (x))) = 1;
+	  && REGNO (SUBREG_REG (x)) >= FIRST_PSEUDO_REGISTER)
+	SET_REGNO_REG_SET (&subregs_of_mode[GET_MODE (x)],
+			   REGNO (SUBREG_REG (x)));
 #endif
 
       /* While we're here, optimize this case.  */
@@ -3845,13 +3890,12 @@ mark_used_regs (pbi, x, cond, insn)
 	       || GET_CODE (testreg) == SIGN_EXTRACT
 	       || GET_CODE (testreg) == SUBREG)
 	  {
-#ifdef CLASS_CANNOT_CHANGE_MODE
+#ifdef CANNOT_CHANGE_MODE_CLASS
 	    if (GET_CODE (testreg) == SUBREG
 		&& GET_CODE (SUBREG_REG (testreg)) == REG
-		&& REGNO (SUBREG_REG (testreg)) >= FIRST_PSEUDO_REGISTER
-		&& CLASS_CANNOT_CHANGE_MODE_P (GET_MODE (SUBREG_REG (testreg)),
-					       GET_MODE (testreg)))
-	      REG_CHANGES_MODE (REGNO (SUBREG_REG (testreg))) = 1;
+		&& REGNO (SUBREG_REG (testreg)) >= FIRST_PSEUDO_REGISTER)
+	      SET_REGNO_REG_SET (&subregs_of_mode[GET_MODE (testreg)],
+				 REGNO (SUBREG_REG (testreg)));
 #endif
 
 	    /* Modifying a single register in an alternate mode
@@ -4197,7 +4241,7 @@ dump_regset (r, outf)
     });
 }
 
-/* Print a human-reaable representation of R on the standard error
+/* Print a human-readable representation of R on the standard error
    stream.  This function is designed to be used from within the
    debugger.  */
 

@@ -33,7 +33,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
      - Edge redirection with updating and optimizing of insn chain
 	 block_label, redirect_edge_and_branch,
 	 redirect_edge_and_branch_force, tidy_fallthru_edge, force_nonfallthru
-     - Edge splitting and commiting to edges
+     - Edge splitting and committing to edges
 	 split_edge, insert_insn_on_edge, commit_edge_insertions
      - Dumping and debugging
 	 print_rtl_with_bb, dump_bb, debug_bb, debug_bb_n
@@ -44,6 +44,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "rtl.h"
 #include "hard-reg-set.h"
@@ -360,13 +362,15 @@ flow_delete_block_noexpunge (b)
      and remove the associated NOTE_INSN_EH_REGION_BEG and
      NOTE_INSN_EH_REGION_END notes.  */
 
-  /* Get rid of all NOTE_INSN_PREDICTIONs hanging before the block.  */
+  /* Get rid of all NOTE_INSN_PREDICTIONs and NOTE_INSN_LOOP_CONTs
+     hanging before the block.  */
 
   for (insn = PREV_INSN (b->head); insn; insn = PREV_INSN (insn))
     {
       if (GET_CODE (insn) != NOTE)
 	break;
-      if (NOTE_LINE_NUMBER (insn) == NOTE_INSN_PREDICTION)
+      if (NOTE_LINE_NUMBER (insn) == NOTE_INSN_PREDICTION
+	  || NOTE_LINE_NUMBER (insn) == NOTE_INSN_LOOP_CONT)
 	NOTE_LINE_NUMBER (insn) = NOTE_INSN_DELETED;
     }
 
@@ -791,7 +795,7 @@ try_redirect_by_replacing_jump (e, target)
 /* Return last loop_beg note appearing after INSN, before start of next
    basic block.  Return INSN if there are no such notes.
 
-   When emitting jump to redirect an fallthru edge, it should always appear
+   When emitting jump to redirect a fallthru edge, it should always appear
    after the LOOP_BEG notes, as loop optimizer expect loop to either start by
    fallthru edge or jump following the LOOP_BEG note jumping to the loop exit
    test.  */
@@ -931,12 +935,23 @@ force_nonfallthru_and_redirect (e, target)
      edge e;
      basic_block target;
 {
-  basic_block jump_block, new_bb = NULL;
+  basic_block jump_block, new_bb = NULL, src = e->src;
   rtx note;
   edge new_edge;
+  int abnormal_edge_flags = 0;
 
   if (e->flags & EDGE_ABNORMAL)
-    abort ();
+    {
+      /* Irritating special case - fallthru edge to the same block as abnormal
+	 edge.
+	 We can't redirect abnormal edge, but we still can split the fallthru
+	 one and create separate abnormal edge to original destination. 
+	 This allows bb-reorder to make such edge non-fallthru.  */
+      if (e->dest != target)
+	abort ();
+      abnormal_edge_flags = e->flags & ~(EDGE_FALLTHRU | EDGE_CAN_FALLTHRU);
+      e->flags &= EDGE_FALLTHRU | EDGE_CAN_FALLTHRU;
+    }
   else if (!(e->flags & EDGE_FALLTHRU))
     abort ();
   else if (e->src == ENTRY_BLOCK_PTR)
@@ -960,12 +975,24 @@ force_nonfallthru_and_redirect (e, target)
       make_single_succ_edge (ENTRY_BLOCK_PTR, bb, EDGE_FALLTHRU);
     }
 
-  if (e->src->succ->succ_next)
+  if (e->src->succ->succ_next || abnormal_edge_flags)
     {
       /* Create the new structures.  */
+
+      /* Position the new block correctly relative to loop notes.  */
       note = last_loop_beg_note (e->src->end);
-      jump_block
-	= create_basic_block (NEXT_INSN (note), NULL, e->src);
+      note = NEXT_INSN (note);
+
+      /* ... and ADDR_VECs.  */
+      if (note != NULL
+	  && GET_CODE (note) == CODE_LABEL
+	  && NEXT_INSN (note)
+	  && GET_CODE (NEXT_INSN (note)) == JUMP_INSN
+	  && (GET_CODE (PATTERN (NEXT_INSN (note))) == ADDR_DIFF_VEC
+	      || GET_CODE (PATTERN (NEXT_INSN (note))) == ADDR_VEC))
+	note = NEXT_INSN (NEXT_INSN (note));
+
+      jump_block = create_basic_block (note, NULL, e->src);
       jump_block->count = e->count;
       jump_block->frequency = EDGE_FREQUENCY (e);
       jump_block->loop_depth = target->loop_depth;
@@ -1014,6 +1041,9 @@ force_nonfallthru_and_redirect (e, target)
 
   emit_barrier_after (jump_block->end);
   redirect_edge_succ_nodup (e, target);
+
+  if (abnormal_edge_flags)
+    make_edge (src, target, abnormal_edge_flags);
 
   return new_bb;
 }
@@ -1191,7 +1221,6 @@ split_edge (edge_in)
      edge edge_in;
 {
   basic_block bb;
-  edge edge_out;
   rtx before;
 
   /* Abnormal edges cannot be split.  */
@@ -1257,7 +1286,7 @@ split_edge (edge_in)
 		    edge_in->dest->global_live_at_start);
     }
 
-  edge_out = make_single_succ_edge (bb, edge_in->dest, EDGE_FALLTHRU);
+  make_single_succ_edge (bb, edge_in->dest, EDGE_FALLTHRU);
 
   /* For non-fallthry edges, we must adjust the predecessor's
      jump instruction to target our new block.  */
@@ -1790,7 +1819,7 @@ verify_flow_info ()
 	  if (e->flags & EDGE_FALLTHRU)
 	    n_fallthru++;
 
-	  if ((e->flags & ~EDGE_DFS_BACK) == 0)
+	  if ((e->flags & ~(EDGE_DFS_BACK | EDGE_CAN_FALLTHRU)) == 0)
 	    n_branch++;
 
 	  if (e->flags & EDGE_ABNORMAL_CALL)

@@ -31,7 +31,6 @@ extern int cris_simple_epilogue PARAMS ((void));
 extern const char *cris_op_str PARAMS ((rtx));
 extern int cris_eligible_for_epilogue_delay PARAMS ((rtx));
 extern void cris_notice_update_cc PARAMS ((rtx, rtx));
-extern int cris_address_cost PARAMS ((rtx));
 extern void cris_print_operand PARAMS ((FILE *, rtx, int));
 extern void cris_print_operand_address PARAMS ((FILE *, rtx));
 extern int cris_side_effect_mode_ok PARAMS ((enum rtx_code, rtx *, int, int,
@@ -52,15 +51,7 @@ extern rtx cris_expand_builtin_va_arg PARAMS ((tree, tree));
 # endif
 #endif /* RTX_CODE */
 
-#ifdef STDIO_INCLUDED
-# ifdef TREE_CODE
-extern void cris_asm_output_mi_thunk PARAMS ((FILE *, tree, int, tree));
-# endif
-#endif
-
-#ifdef GCC_C_PRAGMA_H
-extern void cris_pragma_expand_mul PARAMS ((cpp_reader *));
-#endif
+extern void cris_pragma_expand_mul PARAMS ((struct cpp_reader *));
 
 /* Need one that returns an int; usable in expressions. */
 extern int cris_fatal PARAMS ((char *));

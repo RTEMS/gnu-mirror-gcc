@@ -100,12 +100,11 @@ struct emit_status GTY(())
   unsigned char * GTY ((length ("%h.regno_pointer_align_length"))) 
     regno_pointer_align;
 
-  /* Indexed by pseudo register number, if nonzero gives the decl
-     corresponding to that register.  */
-  tree * GTY ((length ("%h.regno_pointer_align_length"))) regno_decl;
-
   /* Indexed by pseudo register number, gives the rtx for that pseudo.
-     Allocated in parallel with regno_pointer_align.  */
+     Allocated in parallel with regno_pointer_align. 
+
+     Note MEM expressions can appear in this array due to the actions
+     of put_var_into_stack.  */
   rtx * GTY ((length ("%h.regno_pointer_align_length"))) x_regno_reg_rtx;
 };
 
@@ -116,7 +115,6 @@ struct emit_status GTY(())
 #define seq_stack (cfun->emit->sequence_stack)
 
 #define REGNO_POINTER_ALIGN(REGNO) (cfun->emit->regno_pointer_align[REGNO])
-#define REGNO_DECL(REGNO) (cfun->emit->regno_decl[REGNO])
 
 struct expr_status GTY(())
 {
@@ -135,7 +133,7 @@ struct expr_status GTY(())
      since code outside the conditional won't know whether or not the
      arguments need to be popped.)
 
-     When INHIBIT_DEFER_POP is non-zero, however, the compiler does not
+     When INHIBIT_DEFER_POP is nonzero, however, the compiler does not
      attempt to defer pops.  Instead, the stack is popped immediately
      after each call.  Rather then setting this variable directly, use
      NO_DEFER_POP and OK_DEFER_POP.  */
@@ -219,7 +217,7 @@ struct function GTY(())
      used for the current function's args.  */
   CUMULATIVE_ARGS args_info;
 
-  /* If non-zero, an RTL expression for the location at which the current 
+  /* If nonzero, an RTL expression for the location at which the current
      function returns its result.  If the current function returns its
      result in a register, current_function_return_rtx will always be
      the hard register containing the result.  */
@@ -415,6 +413,9 @@ struct function GTY(())
   /* Nonzero if the function calls __builtin_eh_return.  */
   unsigned int calls_eh_return : 1;
 
+  /* Nonzero if the function calls __builtin_constant_p.  */
+  unsigned int calls_constant_p : 1;
+
   /* Nonzero if function being compiled receives nonlocal gotos
      from nested functions.  */
   unsigned int has_nonlocal_label : 1;
@@ -434,6 +435,13 @@ struct function GTY(())
      we should try to cut corners where we can.  */
   unsigned int is_thunk : 1;
 
+  /* This bit is used by the exception handling logic.  It is set if all
+     calls (if any) are sibling calls.  Such functions do not have to
+     have EH tables generated, as they cannot throw.  A call to such a
+     function, however, should be treated as throwing if any of its callees
+     can throw.  */
+  unsigned int all_throwers_are_sibcalls : 1;
+ 
   /* Nonzero if instrumentation calls for function entry and exit should be
      generated.  */
   unsigned int instrument_entry_exit : 1;
@@ -448,12 +456,7 @@ struct function GTY(())
      function.  */
   unsigned int limit_stack : 1;
 
-  /* Nonzero if current function uses varargs.h or equivalent.
-     Zero for functions that use stdarg.h.  */
-  unsigned int varargs : 1;
-
-  /* Nonzero if current function uses stdarg.h or equivalent.
-     Zero for functions that use varargs.h.  */
+  /* Nonzero if current function uses stdarg.h or equivalent.  */
   unsigned int stdarg : 1;
 
   /* Nonzero if this function is being processed in function-at-a-time
@@ -495,6 +498,10 @@ struct function GTY(())
        (set only when profile feedback is available).  */
     FUNCTION_FREQUENCY_HOT
   } function_frequency;
+
+  /* Maximal number of entities in the single jumptable.  Used to estimate
+     final flowgraph size.  */
+  int max_jumptable_ents;
 };
 
 /* The function currently being compiled.  */
@@ -514,6 +521,7 @@ extern int virtuals_instantiated;
 #define current_function_calls_alloca (cfun->calls_alloca)
 #define current_function_calls_longjmp (cfun->calls_longjmp)
 #define current_function_calls_eh_return (cfun->calls_eh_return)
+#define current_function_calls_constant_p (cfun->calls_constant_p)
 #define current_function_has_computed_jump (cfun->has_computed_jump)
 #define current_function_contains_functions (cfun->contains_functions)
 #define current_function_is_thunk (cfun->is_thunk)
@@ -522,7 +530,6 @@ extern int virtuals_instantiated;
 #define current_function_pretend_args_size (cfun->pretend_args_size)
 #define current_function_outgoing_args_size (cfun->outgoing_args_size)
 #define current_function_arg_offset_rtx (cfun->arg_offset_rtx)
-#define current_function_varargs (cfun->varargs)
 #define current_function_stdarg (cfun->stdarg)
 #define current_function_internal_arg_pointer (cfun->internal_arg_pointer)
 #define current_function_return_rtx (cfun->return_rtx)
@@ -596,8 +603,6 @@ extern void free_after_parsing		PARAMS ((struct function *));
 extern void free_after_compilation	PARAMS ((struct function *));
 
 extern void init_varasm_status		PARAMS ((struct function *));
-
-extern rtx get_first_block_beg		PARAMS ((void));
 
 #ifdef RTX_CODE
 extern void diddle_return_value		PARAMS ((void (*)(rtx, void*), void*));

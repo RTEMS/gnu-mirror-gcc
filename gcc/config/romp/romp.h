@@ -111,7 +111,7 @@ extern int target_flags;
 /* Every structure's size must be a multiple of this.  */
 #define STRUCTURE_SIZE_BOUNDARY 8
 
-/* A bitfield declared as `int' forces `int' alignment for the struct.  */
+/* A bit-field declared as `int' forces `int' alignment for the struct.  */
 #define PCC_BITFIELD_TYPE_MATTERS 1
 
 /* Make strings word-aligned so strcpy from constants will be faster.  */
@@ -834,12 +834,6 @@ struct rt_cargs {int gregs, fregs; };
 
 /* Addressing modes, and classification of registers for them.  */
 
-/* #define HAVE_POST_INCREMENT 0 */
-/* #define HAVE_POST_DECREMENT 0 */
-
-/* #define HAVE_PRE_DECREMENT 0 */
-/* #define HAVE_PRE_INCREMENT 0 */
-
 /* Macros to check register numbers against specific register classes.  */
 
 /* These assume that REGNO is a hard or pseudo reg number.
@@ -1085,7 +1079,7 @@ struct rt_cargs {int gregs, fregs; };
 #define MOVE_MAX 4
 
 /* Nonzero if access to memory by bytes is no faster than for words.
-   Also non-zero if doing byte operations (specifically shifts) in registers
+   Also nonzero if doing byte operations (specifically shifts) in registers
    is undesirable.  */
 #define SLOW_BYTE_ACCESS 1
 
@@ -1100,7 +1094,7 @@ struct rt_cargs {int gregs, fregs; };
 #define LOAD_EXTEND_OP(MODE) ZERO_EXTEND
 
 /* This is BSD, so it wants DBX format.  */
-#define DBX_DEBUGGING_INFO
+#define DBX_DEBUGGING_INFO 1
 
 /* Define the letter code used in a stabs entry for parameters passed
    with the register attribute.
@@ -1167,73 +1161,6 @@ struct rt_cargs {int gregs, fregs; };
    At some point, this should be extended to see how to express that.  */
 
 /* #define SHIFT_COUNT_TRUNCATED */
-
-/* Compute the cost of computing a constant rtl expression RTX whose
-   rtx-code is CODE, contained within an expression of code OUTER_CODE.
-   The body of this macro is a portion of a switch statement.  If the
-   code is computed here, return it with a return statement.  Otherwise,
-   break from the switch.  */
-
-#define CONST_COSTS(RTX,CODE,OUTER_CODE) \
-  case CONST_INT:						\
-    if (((OUTER_CODE) == IOR && exact_log2 (INTVAL (RTX)) >= 0)	\
-	|| ((OUTER_CODE) == AND && exact_log2 (~INTVAL (RTX)) >= 0) \
-	|| (((OUTER_CODE) == PLUS || (OUTER_CODE) == MINUS)	\
-	    && (unsigned int) (INTVAL (RTX) + 15) < 31)		\
-	|| ((OUTER_CODE) == SET && (unsigned int) INTVAL (RTX) < 16))\
-      return 0;							\
-    return ((unsigned int) (INTVAL(RTX) + 0x8000) < 0x10000		\
-	    || (INTVAL (RTX) & 0xffff0000) == 0) ? 0 : COSTS_N_INSNS (2);\
-  case CONST:							\
-  case LABEL_REF:						\
-  case SYMBOL_REF:						\
-    if (current_function_operand (RTX, Pmode)) return 0;	\
-    return COSTS_N_INSNS (2);					\
-  case CONST_DOUBLE:						\
-    if ((RTX) == CONST0_RTX (GET_MODE (RTX))) return 2;		\
-    return ((GET_MODE_CLASS (GET_MODE (RTX)) == MODE_FLOAT)	\
-	    ? COSTS_N_INSNS (5) : COSTS_N_INSNS (4));
-
-/* Provide the costs of a rtl expression.  This is in the body of a
-   switch on CODE. 
-
-   References to our own data area are really references to r14, so they
-   are very cheap.  Multiples and divides are very expensive.  */
-
-#define RTX_COSTS(X,CODE,OUTER_CODE)			\
-  case MEM:						\
-    return current_function_operand (X, Pmode) ? 0 : COSTS_N_INSNS (2);	\
-  case MULT:						\
-    return (TARGET_IN_LINE_MUL && GET_MODE_CLASS (GET_MODE (X)) == MODE_INT)\
-	   ? COSTS_N_INSNS (19) : COSTS_N_INSNS (25);	\
-  case DIV:						\
-  case UDIV:						\
-  case MOD:						\
-  case UMOD:						\
-    return COSTS_N_INSNS (45);
-
-/* Compute the cost of an address.  This is meant to approximate the size
-   and/or execution delay of an insn using that address.  If the cost is
-   approximated by the RTL complexity, including CONST_COSTS above, as
-   is usually the case for CISC machines, this macro should not be defined.
-   For aggressively RISCy machines, only one insn format is allowed, so
-   this macro should be a constant.  The value of this macro only matters
-   for valid addresses.
-
-   For the ROMP, everything is cost 0 except for addresses involving
-   symbolic constants, which are cost 1.  */
-
-#define ADDRESS_COST(RTX)				\
-  ((GET_CODE (RTX) == SYMBOL_REF			\
-    && ! CONSTANT_POOL_ADDRESS_P (RTX))			\
-   || GET_CODE (RTX) == LABEL_REF			\
-   || (GET_CODE (RTX) == CONST				\
-       && ! constant_pool_address_operand (RTX, Pmode))	\
-   || (GET_CODE (RTX) == PLUS				\
-       && ((GET_CODE (XEXP (RTX, 1)) == SYMBOL_REF	\
-	    && ! CONSTANT_POOL_ADDRESS_P (XEXP (RTX, 0))) \
-	   || GET_CODE (XEXP (RTX, 1)) == LABEL_REF	\
-	   || GET_CODE (XEXP (RTX, 1)) == CONST)))
 
 /* Adjust the length of an INSN.  LENGTH is the currently-computed length and
    should be adjusted to reflect any required changes.  This macro is used when
@@ -1315,34 +1242,19 @@ struct rt_cargs {int gregs, fregs; };
  "r10", "r11", "r12", "r13", "r14", "r15", "ap",		\
  "fr0", "fr1", "fr2", "fr3", "fr4", "fr5", "fr6", "fr7" }
 
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME.  */
-
-#define ASM_OUTPUT_LABEL(FILE,NAME)	\
-  do { assemble_name (FILE, NAME); fputs (":\n", FILE); } while (0)
-
-/* This is how to output a command to make the user-level label named NAME
-   defined for reference from other files.  */
-
-#define ASM_GLOBALIZE_LABEL(FILE,NAME)	\
-  do { fputs ("\t.globl ", FILE); assemble_name (FILE, NAME); fputs ("\n", FILE);} while (0)
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP "\t.globl "
 
 /* The prefix to add to user-visible assembler symbols.  */
 
 #define USER_LABEL_PREFIX "_"
 
-/* This is how to output an internal numbered label where
-   PREFIX is the class of label and NUM is the number within the class.  */
-
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)	\
-  fprintf (FILE, "%s%d:\n", PREFIX, NUM)
-
 /* This is how to output a label for a jump table.  Arguments are the same as
-   for ASM_OUTPUT_INTERNAL_LABEL, except the insn for the jump table is
+   for (*targetm.asm_out.internal_label), except the insn for the jump table is
    passed.  */
 
 #define ASM_OUTPUT_CASE_LABEL(FILE,PREFIX,NUM,TABLEINSN)	\
-{ ASM_OUTPUT_ALIGN (FILE, 2); ASM_OUTPUT_INTERNAL_LABEL (FILE, PREFIX, NUM); }
+{ ASM_OUTPUT_ALIGN (FILE, 2); (*targetm.asm_out.internal_label) (FILE, PREFIX, NUM); }
 
 /* This is how to store into the string LABEL
    the symbol_ref name of an internal numbered label where
@@ -1400,14 +1312,6 @@ struct rt_cargs {int gregs, fregs; };
 ( fputs (".lcomm ", (FILE)),				\
   assemble_name ((FILE), (NAME)),			\
   fprintf ((FILE), ",%d\n", (SIZE)))
-
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)	\
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),	\
-  sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO)))
 
 /* Print operand X (an rtx) in assembler syntax to file FILE.
    CODE is a letter or dot (`z' in `%z0') or 0 if no letter was specified.

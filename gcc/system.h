@@ -1,6 +1,6 @@
 /* Get common system includes and various definitions and declarations based
    on autoconf macros.
-   Copyright (C) 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -22,11 +22,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #ifndef GCC_SYSTEM_H
 #define GCC_SYSTEM_H
-
-/* This is the location of the online document giving information how
-   to report bugs. If you change this string, also check for strings
-   not under control of the preprocessor.  */
-#define GCCBUGURL "<URL:http://www.gnu.org/software/gcc/bugs.html>"
 
 /* We must include stdarg.h/varargs.h before stdio.h.  */
 #ifdef ANSI_PROTOTYPES
@@ -104,6 +99,11 @@ extern int fprintf_unlocked PARAMS ((FILE *, const char *, ...));
 
 #endif
 
+/* ??? Glibc's fwrite/fread_unlocked macros cause 
+   "warning: signed and unsigned type in conditional expression".  */
+#undef fread_unlocked
+#undef fwrite_unlocked
+
 /* There are an extraordinary number of issues with <ctype.h>.
    The last straw is that it varies with the locale.  Use libiberty's
    replacement instead.  */
@@ -116,6 +116,10 @@ extern int fprintf_unlocked PARAMS ((FILE *, const char *, ...));
 #if !defined (errno) && defined (HAVE_DECL_ERRNO) && !HAVE_DECL_ERRNO
 extern int errno;
 #endif
+
+/* Some of glibc's string inlines cause warnings.  Plus we'd rather
+   rely on (and therefore test) GCC's string builtins.  */
+#define __NO_STRING_INLINES
 
 #ifdef STRING_WITH_STRINGS
 # include <string.h>
@@ -326,7 +330,8 @@ extern PTR realloc PARAMS ((PTR, size_t));
 
 /* If the system doesn't provide strsignal, we get it defined in
    libiberty but no declaration is supplied.  */
-#ifndef HAVE_STRSIGNAL
+#if !defined (HAVE_STRSIGNAL) \
+    || (defined (HAVE_DECL_STRSIGNAL) && !HAVE_DECL_STRSIGNAL)
 # ifndef strsignal
 extern const char *strsignal PARAMS ((int));
 # endif
@@ -475,7 +480,7 @@ extern void abort PARAMS ((void));
 
 /* Say how to test for an absolute pathname.  On Unix systems, this is if
    it starts with a leading slash or a '$', the latter meaning the value of
-   an environment variable is to be used.  On machien with DOS-based
+   an environment variable is to be used.  On machine with DOS-based
    file systems, it is also absolute if it starts with a drive identifier.  */
 #ifdef HAVE_DOS_BASED_FILE_SYSTEM
 #define IS_ABSOLUTE_PATHNAME(STR) \
@@ -572,6 +577,13 @@ typedef char _Bool;
 #define really_call_calloc calloc
 #define really_call_realloc realloc
 
+#if defined(FLEX_SCANNER) || defined(YYBISON)
+/* Flex and bison use malloc and realloc.  Yuk.  Note that this means
+   really_call_* cannot be used in a .l or .y file.  */
+#define malloc xmalloc
+#define realloc xrealloc
+#endif
+
 #if (GCC_VERSION >= 3000)
 
 /* Note autoconf checks for prototype declarations and includes
@@ -583,11 +595,7 @@ typedef char _Bool;
 #undef strdup
  #pragma GCC poison calloc strdup
 
-#if defined(FLEX_SCANNER) || defined (YYBISON)
-/* Flex and bison use malloc and realloc.  Yuk.  */
-#define malloc xmalloc
-#define realloc xrealloc
-#else
+#if !defined(FLEX_SCANNER) && !defined(YYBISON)
 #undef malloc
 #undef realloc
  #pragma GCC poison malloc realloc
@@ -604,7 +612,9 @@ typedef char _Bool;
 	MD_INIT_BUILTINS MD_EXPAND_BUILTIN ASM_OUTPUT_CONSTRUCTOR	\
 	ASM_OUTPUT_DESTRUCTOR SIGNED_CHAR_SPEC MAX_CHAR_TYPE_SIZE	\
 	WCHAR_UNSIGNED UNIQUE_SECTION SELECT_SECTION SELECT_RTX_SECTION	\
-	ENCODE_SECTION_INFO STRIP_NAME_ENCODING
+	ENCODE_SECTION_INFO STRIP_NAME_ENCODING ASM_GLOBALIZE_LABEL	\
+	ASM_OUTPUT_MI_THUNK CONST_COSTS RTX_COSTS DEFAULT_RTX_COSTS	\
+	ADDRESS_COST
 
 /* Other obsolete target macros, or macros that used to be in target
    headers and were not used, and may be obsolete or may never have
@@ -620,7 +630,8 @@ typedef char _Bool;
 	NO_BUILTIN_PTRDIFF_TYPE NO_BUILTIN_WCHAR_TYPE NO_BUILTIN_WINT_TYPE \
 	BLOCK_PROFILER BLOCK_PROFILER_CODE FUNCTION_BLOCK_PROFILER	   \
 	FUNCTION_BLOCK_PROFILER_EXIT MACHINE_STATE_SAVE			   \
-	MACHINE_STATE_RESTORE
+	MACHINE_STATE_RESTORE SCCS_DIRECTIVE SECTION_ASM_OP		   \
+	ASM_OUTPUT_DEFINE_LABEL_DIFFERENCE_SYMBOL ASM_OUTPUT_INTERNAL_LABEL
 
 /* Hooks that are no longer used.  */
  #pragma GCC poison LANG_HOOKS_FUNCTION_MARK LANG_HOOKS_FUNCTION_FREE	\

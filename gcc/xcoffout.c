@@ -26,6 +26,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "rtl.h"
 #include "flags.h"
@@ -429,7 +431,7 @@ xcoffout_declare_function (file, decl, name)
   /* Any pending .bi or .ei must occur before the .function pseudo op.
      Otherwise debuggers will think that the function is in the previous
      file and/or at the wrong line number.  */
-  xcoffout_source_file (file, DECL_SOURCE_FILE (decl), 0);
+  xcoffout_source_file (file, TREE_FILENAME (decl), 0);
   dbxout_symbol (decl, 0);
 
   /* .function NAME, TOP, MAPPING, TYPE, SIZE
@@ -476,7 +478,9 @@ xcoffout_end_function (last_linenum)
    Called after the epilogue is output.  */
 
 void
-xcoffout_end_epilogue ()
+xcoffout_end_epilogue (line, file)
+     unsigned int line ATTRIBUTE_UNUSED;
+     const char *file ATTRIBUTE_UNUSED;
 {
   /* We need to pass the correct function size to .function, otherwise,
      the xas assembler can't figure out the correct size for the function

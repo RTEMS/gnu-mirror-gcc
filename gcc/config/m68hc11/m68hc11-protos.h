@@ -1,6 +1,6 @@
 /* Prototypes for exported functions defined in m68hc11.c
    Copyright (C) 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
-   Contributed by Stephane Carrez (stcarrez@worldnet.fr)
+   Contributed by Stephane Carrez (stcarrez@nerim.fr)
 
 This file is part of GNU CC.
 
@@ -21,6 +21,7 @@ Boston, MA 02111-1307, USA.  */
 
 
 extern int m68hc11_override_options PARAMS((void));
+extern int m68hc11_optimization_options PARAMS((int,int));
 extern void m68hc11_conditional_register_usage PARAMS((void));
 extern int hard_regno_mode_ok PARAMS((int, enum machine_mode));
 
@@ -41,18 +42,6 @@ extern void m68hc11_function_arg_advance PARAMS((CUMULATIVE_ARGS*,
 #endif
 
 #ifdef RTX_CODE
-extern rtx m68hc11_compare_op0;
-extern rtx m68hc11_compare_op1;
-extern GTY(()) rtx m68hc11_soft_tmp_reg;
-extern GTY(()) rtx ix_reg;
-extern GTY(()) rtx iy_reg;
-extern GTY(()) rtx d_reg;
-extern GTY(()) rtx da_reg;
-extern GTY(()) rtx stack_push_word;
-extern GTY(()) rtx stack_pop_word;
-extern GTY(()) rtx z_reg;
-extern GTY(()) rtx z_reg_qi;
-
 extern void m68hc11_initialize_trampoline PARAMS((rtx, rtx, rtx));
 
 extern rtx m68hc11_expand_compare_and_branch PARAMS((enum rtx_code,
@@ -100,9 +89,6 @@ extern int m68hc11_memory_move_cost PARAMS((enum machine_mode, enum reg_class,
                                            int));
 extern int m68hc11_register_move_cost PARAMS((enum machine_mode,
 					      enum reg_class, enum reg_class));
-extern int m68hc11_rtx_costs PARAMS((rtx, enum rtx_code, enum rtx_code));
-extern int m68hc11_address_cost PARAMS((rtx));
-
 
 extern void m68hc11_emit_libcall PARAMS((const char*, enum rtx_code,
                                          enum machine_mode, enum machine_mode,
@@ -151,10 +137,7 @@ extern int m68hc11_function_arg_pass_by_reference PARAMS((const CUMULATIVE_ARGS*
                                                           int));
 extern int m68hc11_function_arg_padding PARAMS((enum machine_mode, tree));
 
-extern void m68hc11_expand_builtin_va_start PARAMS((int, tree, rtx));
-
 extern rtx m68hc11_va_arg PARAMS((tree,tree));
-extern void m68hc11_expand_builtin_va_start PARAMS((int,tree,rtx));
 
 extern void m68hc11_function_epilogue PARAMS((FILE*,int));
 

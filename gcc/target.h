@@ -1,5 +1,5 @@
 /* Data structure definitions for a generic GCC target.
-   Copyright (C) 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2002, 2003 Free Software Foundation, Inc.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the
@@ -69,6 +69,16 @@ struct gcc_target
        and UNALIGNED_OP are NULL.  */
     bool (* integer) PARAMS ((rtx x, unsigned int size, int aligned_p));
 
+    /* Output code that will globalize a label.  */
+    void (* globalize_label) PARAMS ((FILE *, const char *));
+
+    /* Output an internal label.  */
+    void (* internal_label) PARAMS ((FILE *, const char *, unsigned long));
+
+    /* Emit an assembler directive to set visibility for the symbol
+       associated with the tree decl.  */
+    void (* visibility) PARAMS ((tree, int));
+
     /* Output the assembler code for entry to a function.  */
     void (* function_prologue) PARAMS ((FILE *, HOST_WIDE_INT));
 
@@ -92,7 +102,7 @@ struct gcc_target
     void (* eh_frame_section) PARAMS ((void));
 
     /* Select and switch to a section for EXP.  It may be a DECL or a
-       constant for which TREE_CST_RTL is valid.  RELOC is non-zero if
+       constant for which TREE_CST_RTL is valid.  RELOC is nonzero if
        runtime relocations must be applied; bit 1 will be set if the
        runtime relocations require non-local name resolution.  ALIGN is
        the required alignment of the data.  */
@@ -112,6 +122,27 @@ struct gcc_target
 
     /* Output a destructor for a symbol with a given priority.  */
     void (* destructor) PARAMS ((rtx, int));
+
+    /* Output the assembler code for a thunk function.  THUNK_DECL is the
+       declaration for the thunk function itself, FUNCTION is the decl for
+       the target function.  DELTA is an immediate constant offset to be
+       added to THIS.  If VCALL_OFFSET is nonzero, the word at
+       *(*this + vcall_offset) should be added to THIS.  */
+    void (* output_mi_thunk) PARAMS ((FILE *file, tree thunk_decl,
+				      HOST_WIDE_INT delta,
+				      HOST_WIDE_INT vcall_offset,
+				      tree function_decl));
+
+    /* Determine whether output_mi_thunk would succeed.  */
+    /* ??? Ideally, this hook would not exist, and success or failure
+       would be returned from output_mi_thunk directly.  But there's
+       too much undo-able setup involved in invoking output_mi_thunk.
+       Could be fixed by making output_mi_thunk emit rtl instead of
+       text to the output file.  */
+    bool (* can_output_mi_thunk) PARAMS ((tree thunk_decl,
+				          HOST_WIDE_INT delta,
+				          HOST_WIDE_INT vcall_offset,
+				          tree function_decl));
   } asm_out;
 
   /* Functions relating to instruction scheduling.  */
@@ -146,6 +177,11 @@ struct gcc_target
     int (* reorder)  PARAMS ((FILE *, int, rtx *, int *, int));
     int (* reorder2) PARAMS ((FILE *, int, rtx *, int *, int));
 
+    /* The following member value is a pointer to a function called
+       after evaluation forward dependencies of insns in chain given
+       by two parameter values (head and tail correspondingly).  */
+    void (* dependencies_evaluation_hook) PARAMS ((rtx, rtx));
+
     /* The following member value is a pointer to a function returning
        nonzero if we should use DFA based scheduling.  The default is
        to use the old pipeline scheduler.  */
@@ -175,6 +211,25 @@ struct gcc_target
        try to choose ready insn which permits to start maximum number of
        insns on the same cycle.  */
     int (* first_cycle_multipass_dfa_lookahead) PARAMS ((void));
+    /* The following member value is pointer to a function controlling
+       what insns from the ready insn queue will be considered for the
+       multipass insn scheduling.  If the hook returns zero for insn
+       passed as the parameter, the insn will be not chosen to be
+       issued.  */
+    int (* first_cycle_multipass_dfa_lookahead_guard) PARAMS ((rtx));
+    /* The following member value is pointer to a function called by
+       the insn scheduler before issuing insn passed as the third
+       parameter on given cycle.  If the hook returns nonzero, the
+       insn is not issued on given processors cycle.  Instead of that,
+       the processor cycle is advanced.  If the value passed through
+       the last parameter is zero, the insn ready queue is not sorted
+       on the new cycle start as usually.  The first parameter passes
+       file for debugging output.  The second one passes the scheduler
+       verbose level of the debugging output.  The forth and the fifth
+       parameter values are correspondingly processor cycle on which
+       the previous insn has been issued and the current processor
+       cycle.  */
+    int (* dfa_new_cycle) PARAMS ((FILE *, int, rtx, int, int, int *));
     /* The values of the following members are pointers to functions
        used to improve the first cycle multipass scheduling by
        inserting nop insns.  dfa_scheduler_bubble gives a function
@@ -234,6 +289,17 @@ struct gcc_target
      not, at the current point in the compilation.  */
   bool (* cannot_modify_jumps_p) PARAMS ((void));
 
+  /* True if the constant X cannot be placed in the constant pool.  */
+  bool (* cannot_force_const_mem) PARAMS ((rtx));
+
+  /* Given an address RTX, undo the effects of LEGITIMIZE_ADDRESS.  */
+  rtx (* delegitimize_address) PARAMS ((rtx));
+
+  /* True if it is OK to do sibling call optimization for the specified
+     call expression EXP.  DECL will be the called function, or NULL if
+     this is an indirect call.  */
+  bool (*function_ok_for_sibcall) PARAMS ((tree decl, tree exp));
+  
   /* True if EXP should be placed in a "small data" section.  */
   bool (* in_small_data_p) PARAMS ((tree));
 
@@ -248,6 +314,20 @@ struct gcc_target
   /* Undo the effects of encode_section_info on the symbol string.  */
   const char * (* strip_name_encoding) PARAMS ((const char *));
 
+  /* True if MODE is valid for a pointer in __attribute__((mode("MODE"))).  */
+  bool (* valid_pointer_mode) PARAMS ((enum machine_mode mode));
+
+  /* Compute a (partial) cost for rtx X.  Return true if the complete
+     cost has been computed, and false if subexpressions should be
+     scanned.  In either case, *TOTAL contains the cost result.  */
+  /* Note that CODE and OUTER_CODE ought to be RTX_CODE, but that's
+     not necessarily defined at this point.  */
+  bool (* rtx_costs) PARAMS ((rtx x, int code, int outer_code, int *total));
+
+  /* Compute the cost of X, used as an address.  Never called with
+     invalid addresses.  */
+  int (* address_cost) PARAMS ((rtx x));
+
   /* Leave the boolean fields at the end.  */
 
   /* True if arbitrary sections are supported.  */
@@ -259,6 +339,12 @@ struct gcc_target
 
   /* True if thread-local storage is supported.  */
   bool have_tls;
+
+  /* True if a small readonly data section is supported.  */
+  bool have_srodata_section;
+
+  /* True if EH frame info sections should be zero-terminated.  */
+  bool terminate_dw2_eh_frame_info;
 };
 
 extern struct gcc_target targetm;

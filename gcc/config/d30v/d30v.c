@@ -21,6 +21,8 @@
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "tree.h"
 #include "regs.h"
@@ -52,6 +54,7 @@ static void d30v_output_function_prologue PARAMS ((FILE *, HOST_WIDE_INT));
 static void d30v_output_function_epilogue PARAMS ((FILE *, HOST_WIDE_INT));
 static int d30v_adjust_cost PARAMS ((rtx, rtx, rtx, int));
 static int d30v_issue_rate PARAMS ((void));
+static bool d30v_rtx_costs PARAMS ((rtx, int, int, int *));
 
 /* Define the information needed to generate branch and scc insns.  This is
    stored from the compare operation.  */
@@ -96,6 +99,11 @@ enum reg_class reg_class_from_letter[256];
 #define TARGET_SCHED_ADJUST_COST d30v_adjust_cost
 #undef TARGET_SCHED_ISSUE_RATE
 #define TARGET_SCHED_ISSUE_RATE d30v_issue_rate
+
+#undef TARGET_RTX_COSTS
+#define TARGET_RTX_COSTS d30v_rtx_costs
+#undef TARGET_ADDRESS_COST
+#define TARGET_ADDRESS_COST hook_int_rtx_0
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -1867,7 +1875,7 @@ debug_stack_info (info)
 }
 
 
-/* Return non-zero if this function is known to have a null or 1 instruction epilogue.  */
+/* Return nonzero if this function is known to have a null or 1 instruction epilogue.  */
 
 int
 direct_return ()
@@ -1985,7 +1993,7 @@ d30v_function_arg_boundary (mode, type)
    You may use the macro `MUST_PASS_IN_STACK (MODE, TYPE)' in the definition of
    this macro to determine if this argument is of a type that must be passed in
    the stack.  If `REG_PARM_STACK_SPACE' is not defined and `FUNCTION_ARG'
-   returns non-zero for such an argument, the compiler will abort.  If
+   returns nonzero for such an argument, the compiler will abort.  If
    `REG_PARM_STACK_SPACE' is defined, the argument will be computed in the
    stack and then loaded into a register.  */
 
@@ -2225,8 +2233,7 @@ d30v_build_va_list ()
 /* Expand __builtin_va_start to do the va_start macro.  */
 
 void 
-d30v_expand_builtin_va_start (stdarg_p, valist, nextarg)
-     int stdarg_p ATTRIBUTE_UNUSED;
+d30v_expand_builtin_va_start (valist, nextarg)
      tree valist;
      rtx nextarg ATTRIBUTE_UNUSED;
 {
@@ -3503,4 +3510,24 @@ rtx
 d30v_return_addr ()
 {
   return get_hard_reg_initial_val (Pmode, GPR_LINK);
+}
+
+static bool
+d30v_rtx_costs (x, code, outer_code, total)
+     rtx x;
+     int code;
+     int outer_code ATTRIBUTE_UNUSED;
+     int *total;
+{
+  switch (code)
+    {
+    case MULT:
+      *total = COSTS_N_INSNS ((GET_CODE (XEXP (x, 1)) == CONST_INT
+			       && exact_log2 (INTVAL (XEXP (x, 1))) >= 0)
+			      ? 1 : 2);
+      return true;
+
+    default:
+      return false;
+    }
 }

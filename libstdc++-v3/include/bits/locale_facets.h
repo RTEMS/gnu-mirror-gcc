@@ -1,6 +1,6 @@
 // Locale support -*- C++ -*-
 
-// Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002
+// Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003
 // Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
@@ -44,7 +44,9 @@
 
 #include <ctime>	// For struct tm
 #include <cwctype>	// For wctype_t
-#include <ios>		// For ios_base
+#include <iosfwd>
+#include <bits/ios_base.h>  // For ios_base, ios_base::iostate
+#include <streambuf>
 
 namespace std
 {
@@ -54,6 +56,110 @@ namespace std
 #else
 # define  _GLIBCPP_NUM_FACETS 14
 #endif
+
+  // Convert string to numeric value of type _Tv and store results.  
+  // NB: This is specialized for all required types, there is no
+  // generic definition.
+  template<typename _Tv>
+    void
+    __convert_to_v(const char* __in, _Tv& __out, ios_base::iostate& __err, 
+		   const __c_locale& __cloc, int __base = 10);
+
+  // Explicit specializations for required types.
+  template<>
+    void
+    __convert_to_v(const char*, long&, ios_base::iostate&, 
+		   const __c_locale&, int);
+
+  template<>
+    void
+    __convert_to_v(const char*, unsigned long&, ios_base::iostate&, 
+		   const __c_locale&, int);
+
+#ifdef _GLIBCPP_USE_LONG_LONG
+  template<>
+    void
+    __convert_to_v(const char*, long long&, ios_base::iostate&, 
+		   const __c_locale&, int);
+
+  template<>
+    void
+    __convert_to_v(const char*, unsigned long long&, ios_base::iostate&, 
+		   const __c_locale&, int);
+#endif
+
+  template<>
+    void
+    __convert_to_v(const char*, float&, ios_base::iostate&, 
+		   const __c_locale&, int);
+
+  template<>
+    void
+    __convert_to_v(const char*, double&, ios_base::iostate&, 
+		   const __c_locale&, int);
+
+ template<>
+    void
+    __convert_to_v(const char*, long double&, ios_base::iostate&, 
+		   const __c_locale&, int);
+
+  // NB: __pad is a struct, rather than a function, so it can be
+  // partially-specialized.
+  template<typename _CharT, typename _Traits>
+    struct __pad
+    {
+      static void
+      _S_pad(ios_base& __io, _CharT __fill, _CharT* __news, 
+	     const _CharT* __olds, const streamsize __newlen, 
+	     const streamsize __oldlen, const bool __num);
+    };
+
+  // Used by both numeric and monetary facets.
+  // Check to make sure that the __grouping_tmp string constructed in
+  // money_get or num_get matches the canonical grouping for a given
+  // locale.
+  // __grouping_tmp is parsed L to R
+  // 1,222,444 == __grouping_tmp of "\1\3\3"
+  // __grouping is parsed R to L
+  // 1,222,444 == __grouping of "\3" == "\3\3\3"
+  template<typename _CharT>
+    bool
+    __verify_grouping(const basic_string<_CharT>& __grouping, 
+		      basic_string<_CharT>& __grouping_tmp);
+
+  // Used by both numeric and monetary facets.
+  // Inserts "group separator" characters into an array of characters.
+  // It's recursive, one iteration per group.  It moves the characters
+  // in the buffer this way: "xxxx12345" -> "12,345xxx".  Call this
+  // only with __gbeg != __gend.
+  template<typename _CharT>
+    _CharT*
+    __add_grouping(_CharT* __s, _CharT __sep,  
+		   const char* __gbeg, const char* __gend, 
+		   const _CharT* __first, const _CharT* __last);
+
+  // This template permits specializing facet output code for
+  // ostreambuf_iterator.  For ostreambuf_iterator, sputn is
+  // significantly more efficient than incrementing iterators.
+  template<typename _CharT>
+    inline
+    ostreambuf_iterator<_CharT>
+    __write(ostreambuf_iterator<_CharT> __s, const _CharT* __ws, int __len)
+    {
+      __s._M_put(__ws, __len);
+      return __s;
+    }
+
+  // This is the unspecialized form of the template.
+  template<typename _CharT, typename _OutIter>
+    inline
+    _OutIter
+    __write(_OutIter __s, const _CharT* __ws, int __len)
+    {
+      for (int __j = 0; __j < __len; __j++, ++__s)
+	*__s = __ws[__j];
+      return __s;
+    }
 
   // 22.2.1.1  Template class ctype
   // Include host and configuration specific ctype enums for ctype_base.
@@ -440,9 +546,8 @@ namespace std
 
     // num_put
     // Construct and return valid scanf format for floating point types.
-    static bool
-    _S_format_float(const ios_base& __io, char* __fptr, char __mod, 
-		    streamsize __prec);
+    static void
+    _S_format_float(const ios_base& __io, char* __fptr, char __mod);
     
     // Construct and return valid scanf format for integer types.
     static void
@@ -522,7 +627,7 @@ namespace std
 
       // For use at construction time only.
       void 
-      _M_initialize_numpunct(__c_locale __cloc = _S_c_locale);
+      _M_initialize_numpunct(__c_locale __cloc = NULL);
     };
 
   template<typename _CharT>
@@ -652,6 +757,7 @@ namespace std
       virtual iter_type 
       do_get(iter_type, iter_type, ios_base&, ios_base::iostate&, bool&) const;
 
+
       virtual iter_type 
       do_get(iter_type, iter_type, ios_base&, ios_base::iostate&, long&) const;
 
@@ -696,6 +802,23 @@ namespace std
 
   template<typename _CharT, typename _InIter>
     locale::id num_get<_CharT, _InIter>::id;
+
+#if 0
+  // Partial specialization for istreambuf_iterator, so can use traits_type.
+  template<typename _CharT>
+    class num_get<_CharT, istreambuf_iterator<_CharT> >;
+
+      iter_type 
+      _M_extract_float(iter_type, iter_type, ios_base&, ios_base::iostate&, 
+		       string& __xtrc) const;
+
+      iter_type 
+      _M_extract_int(iter_type, iter_type, ios_base&, ios_base::iostate&, 
+		     string& __xtrc, int& __base) const;
+
+      virtual iter_type 
+      do_get(iter_type, iter_type, ios_base&, ios_base::iostate&, bool&) const;
+#endif
 
   template<typename _CharT, typename _OutIter>
     class num_put : public locale::facet, public __num_base
@@ -826,7 +949,6 @@ namespace std
       : locale::facet(__refs)
       { _M_c_locale_collate = _S_c_locale; }
 
-      // Non-standard.
       explicit 
       collate(__c_locale __cloc, size_t __refs = 0) 
       : locale::facet(__refs)
@@ -855,10 +977,7 @@ namespace std
   protected:
       virtual
       ~collate() 
-      {
-	if (_M_c_locale_collate != _S_c_locale)
-	  _S_destroy_c_locale(_M_c_locale_collate); 
-      }
+      { _S_destroy_c_locale(_M_c_locale_collate); }
 
       virtual int  
       do_compare(const _CharT* __lo1, const _CharT* __hi1,
@@ -904,9 +1023,8 @@ namespace std
       collate_byname(const char* __s, size_t __refs = 0)
       : collate<_CharT>(__refs) 
       { 
-	if (_M_c_locale_collate != _S_c_locale)
-	  _S_destroy_c_locale(_M_c_locale_collate);
-	_S_create_c_locale(_M_c_locale_collate, __s); 
+	_S_destroy_c_locale(this->_M_c_locale_collate);
+	_S_create_c_locale(this->_M_c_locale_collate, __s); 
       }
 
     protected:
@@ -936,7 +1054,7 @@ namespace std
 
     protected:
       __c_locale			_M_c_locale_timepunct;
-      const char*			_M_name_timepunct;
+      char*				_M_name_timepunct;
       const _CharT* 			_M_date_format;
       const _CharT* 			_M_date_era_format;
       const _CharT* 			_M_time_format;
@@ -995,14 +1113,10 @@ namespace std
 
     public:
       explicit 
-      __timepunct(size_t __refs = 0) 
-      : locale::facet(__refs), _M_name_timepunct("C")
-      { _M_initialize_timepunct(); }
+      __timepunct(size_t __refs = 0);
 
       explicit 
-      __timepunct(__c_locale __cloc, const char* __s, size_t __refs = 0) 
-      : locale::facet(__refs), _M_name_timepunct(__s)
-      { _M_initialize_timepunct(__cloc); }
+      __timepunct(__c_locale __cloc, const char* __s, size_t __refs = 0);
 
       void
       _M_put(_CharT* __s, size_t __maxlen, const _CharT* __format, 
@@ -1103,16 +1217,13 @@ namespace std
 
       // For use at construction time only.
       void 
-      _M_initialize_timepunct(__c_locale __cloc = _S_c_locale);
+      _M_initialize_timepunct(__c_locale __cloc = NULL);
     };
 
   template<typename _CharT>
     locale::id __timepunct<_CharT>::id;
 
   // Specializations.
-  template<>
-    __timepunct<char>::~__timepunct();
-
   template<> 
     const char*
     __timepunct<char>::_S_timezones[14];
@@ -1126,9 +1237,6 @@ namespace std
     __timepunct<char>::_M_put(char*, size_t, const char*, const tm*) const;
 
 #ifdef _GLIBCPP_USE_WCHAR_T
-  template<>
-    __timepunct<wchar_t>::~__timepunct();
-
   template<> 
     const wchar_t*
     __timepunct<wchar_t>::_S_timezones[14];
@@ -1147,6 +1255,8 @@ namespace std
   template<typename _CharT>
     const _CharT* __timepunct<_CharT>::_S_timezones[14];
 
+  // Include host and configuration specific timepunct functions.
+  #include <bits/time_members.h>
 
   template<typename _CharT, typename _InIter>
     class time_get : public locale::facet, public time_base
@@ -1357,8 +1467,9 @@ namespace std
       { _M_initialize_moneypunct(); }
 
       explicit 
-      moneypunct(__c_locale __cloc, size_t __refs = 0) : locale::facet(__refs)
-      { _M_initialize_moneypunct(__cloc); }
+      moneypunct(__c_locale __cloc, const char* __s, size_t __refs = 0) 
+      : locale::facet(__refs)
+      { _M_initialize_moneypunct(__cloc, __s); }
 
       char_type
       decimal_point() const
@@ -1438,7 +1549,8 @@ namespace std
 
       // For use at construction time only.
        void 
-       _M_initialize_moneypunct(__c_locale __cloc = _S_c_locale);
+       _M_initialize_moneypunct(__c_locale __cloc = NULL, 
+				const char* __name = NULL);
     };
 
   template<typename _CharT, bool _Intl>
@@ -1455,11 +1567,11 @@ namespace std
 
   template<> 
     void
-    moneypunct<char, true>::_M_initialize_moneypunct(__c_locale __cloc);
+    moneypunct<char, true>::_M_initialize_moneypunct(__c_locale, const char*);
 
   template<> 
     void
-    moneypunct<char, false>::_M_initialize_moneypunct(__c_locale __cloc);
+    moneypunct<char, false>::_M_initialize_moneypunct(__c_locale, const char*);
 
 #ifdef _GLIBCPP_USE_WCHAR_T
   template<>
@@ -1470,11 +1582,13 @@ namespace std
 
   template<> 
     void
-    moneypunct<wchar_t, true>::_M_initialize_moneypunct(__c_locale __cloc);
+    moneypunct<wchar_t, true>::_M_initialize_moneypunct(__c_locale, 
+							const char*);
 
   template<> 
     void
-    moneypunct<wchar_t, false>::_M_initialize_moneypunct(__c_locale __cloc);
+    moneypunct<wchar_t, false>::_M_initialize_moneypunct(__c_locale, 
+							 const char*);
 #endif
 
   template<typename _CharT, bool _Intl>
@@ -1602,27 +1716,17 @@ namespace std
       // Underlying "C" library locale information saved from
       // initialization, needed by messages_byname as well.
       __c_locale			_M_c_locale_messages;
-#if 1
-      // Only needed if glibc < 2.3
-      const char*			_M_name_messages;
-#endif
+      char*				_M_name_messages;
 
     public:
       static locale::id 		id;
 
       explicit 
-      messages(size_t __refs = 0) 
-      : locale::facet(__refs), _M_name_messages("C")
-      { _M_c_locale_messages = _S_c_locale; }
+      messages(size_t __refs = 0);
 
       // Non-standard.
       explicit 
-      messages(__c_locale __cloc, const char* __name, size_t __refs = 0) 
-      : locale::facet(__refs)
-      { 
-	_M_name_messages = __name;
-	_M_c_locale_messages = _S_clone_c_locale(__cloc); 
-      }
+      messages(__c_locale __cloc, const char* __s, size_t __refs = 0);
 
       catalog 
       open(const basic_string<char>& __s, const locale& __loc) const
@@ -1642,11 +1746,7 @@ namespace std
 
     protected:
       virtual 
-      ~messages()
-       { 
-	 if (_M_c_locale_messages != _S_c_locale)
-	   _S_destroy_c_locale(_M_c_locale_messages); 
-       }
+      ~messages();
 
       virtual catalog 
       do_open(const basic_string<char>&, const locale&) const;
@@ -1714,8 +1814,11 @@ namespace std
     string
     messages<char>::do_get(catalog, int, int, const string&) const;
 
-  // Include host and configuration specific messages virtual functions.
-  #include <bits/messages_members.h>
+#ifdef _GLIBCPP_USE_WCHAR_T
+  template<>
+    wstring
+    messages<wchar_t>::do_get(catalog, int, int, const wstring&) const;
+#endif
 
   template<typename _CharT>
     class messages_byname : public messages<_CharT>
@@ -1725,20 +1828,16 @@ namespace std
       typedef basic_string<_CharT> 	string_type;
 
       explicit 
-      messages_byname(const char* __s, size_t __refs = 0)
-      : messages<_CharT>(__refs) 
-      { 
-	_M_name_messages = __s;
-	if (_M_c_locale_messages != _S_c_locale)
-	  _S_destroy_c_locale(_M_c_locale_messages);
-	_S_create_c_locale(_M_c_locale_messages, __s); 
-      }
+      messages_byname(const char* __s, size_t __refs = 0);
 
     protected:
       virtual 
       ~messages_byname() 
       { }
     };
+
+  // Include host and configuration specific messages functions.
+  #include <bits/messages_members.h>
 
 
   // Subclause convenience interfaces, inlines.

@@ -1,25 +1,28 @@
 /* Help friends in C++.
-   Copyright (C) 1997, 1998, 1999, 2000, 2001 Free Software Foundation, Inc.
+   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003
+   Free Software Foundation, Inc.
 
-This file is part of GNU CC.
+This file is part of GCC.
 
-GNU CC is free software; you can redistribute it and/or modify
+GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2, or (at your option)
 any later version.
 
-GNU CC is distributed in the hope that it will be useful,
+GCC is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU CC; see the file COPYING.  If not, write to
+along with GCC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "rtl.h"
 #include "expr.h"
@@ -30,7 +33,7 @@ Boston, MA 02111-1307, USA.  */
 
 /* Friend data structures are described in cp-tree.h.  */
 
-/* Returns non-zero if SUPPLICANT is a friend of TYPE.  */
+/* Returns nonzero if SUPPLICANT is a friend of TYPE.  */
 
 int
 is_friend (type, supplicant)
@@ -114,7 +117,7 @@ is_friend (type, supplicant)
   else
     context = NULL_TREE;
 
-  /* A namespace is not friend to anybody. */
+  /* A namespace is not friend to anybody.  */
   if (context && TREE_CODE (context) == NAMESPACE_DECL)
     context = NULL_TREE;
 
@@ -159,12 +162,17 @@ add_friend (type, decl)
 		  return;
 		}
 	    }
+
+	  maybe_add_class_template_decl_list (type, decl, /*friend_p=*/1);
+
 	  TREE_VALUE (list) = tree_cons (error_mark_node, decl,
 					 TREE_VALUE (list));
 	  return;
 	}
       list = TREE_CHAIN (list);
     }
+
+  maybe_add_class_template_decl_list (type, decl, /*friend_p=*/1);
 
   DECL_FRIENDLIST (typedecl)
     = tree_cons (DECL_NAME (decl), build_tree_list (error_mark_node, decl),
@@ -198,24 +206,25 @@ make_friend_class (type, friend_type)
       return;
     }
 
-  if (CLASS_TYPE_P (friend_type)
-      && CLASSTYPE_TEMPLATE_SPECIALIZATION (friend_type)
-      && uses_template_parms (friend_type))
-    {
-      /* [temp.friend]
-	 
-	 Friend declarations shall not declare partial
-	 specializations.  */
-      error ("partial specialization `%T' declared `friend'",
-		friend_type);
-      return;
-    }
-  
   if (processing_template_decl > template_class_depth (type))
     /* If the TYPE is a template then it makes sense for it to be
        friends with itself; this means that each instantiation is
        friends with all other instantiations.  */
-    is_template_friend = 1;
+    {
+      if (CLASS_TYPE_P (friend_type)
+	  && CLASSTYPE_TEMPLATE_SPECIALIZATION (friend_type)
+	  && uses_template_parms (friend_type))
+	{
+	  /* [temp.friend]
+	     Friend declarations shall not declare partial
+	     specializations.  */
+	  error ("partial specialization `%T' declared `friend'",
+		 friend_type);
+	  return;
+	}
+  
+      is_template_friend = 1;
+    }
   else if (same_type_p (type, friend_type))
     {
       pedwarn ("class `%T' is implicitly friends with itself",
@@ -230,7 +239,7 @@ make_friend_class (type, friend_type)
      A friend of a class or class template can be a function or
      class template, a specialization of a function template or
      class template, or an ordinary (nontemplate) function or
-     class. */
+     class.  */
   if (!is_template_friend)
     ;/* ok */
   else if (TREE_CODE (friend_type) == TYPENAME_TYPE)
@@ -267,6 +276,8 @@ make_friend_class (type, friend_type)
 		TREE_VALUE (classes), type);
   else
     {
+      maybe_add_class_template_decl_list (type, friend_type, /*friend_p=*/1);
+
       CLASSTYPE_FRIEND_CLASSES (type)
 	= tree_cons (NULL_TREE, friend_type, CLASSTYPE_FRIEND_CLASSES (type));
       if (is_template_friend)
@@ -396,14 +407,14 @@ do_friend (ctype, declarator, decl, parmdecls, attrlist,
 	    /* This must be a local class, so pushdecl will be ok, and
 	       insert an unqualified friend into the local scope
 	       (rather than the containing namespace scope, which the
-	       next choice will do). */
+	       next choice will do).  */
 	    decl = pushdecl (decl);
 	  else
 	    {
 	      /* We can't use pushdecl, as we might be in a template
 	         class specialization, and pushdecl will insert an
 	         unqualified friend decl into the template parameter
-	         scope, rather than the namespace containing it. */
+	         scope, rather than the namespace containing it.  */
 	      tree ns = decl_namespace_context (decl);
 	      
 	      push_nested_namespace (ns);

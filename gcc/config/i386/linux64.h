@@ -42,6 +42,12 @@ Boston, MA 02111-1307, USA.  */
 #undef CPP_SPEC
 #define CPP_SPEC "%{posix:-D_POSIX_SOURCE} %{pthread:-D_REENTRANT}"
 
+/* The svr4 ABI for the i386 says that records and unions are returned
+   in memory.  In the 64bit compilation we will turn this flag off in
+   override_options, as we never do pcc_struct_return scheme on this target.  */
+#undef DEFAULT_PCC_STRUCT_RETURN
+#define DEFAULT_PCC_STRUCT_RETURN 1
+
 /* Provide a LINK_SPEC.  Here we provide support for the special GCC
    options -static and -shared, which allow us to link things in one
    of these three modes by applying the appropriate combinations of
@@ -51,7 +57,7 @@ Boston, MA 02111-1307, USA.  */
    done.  */
 
 #undef	LINK_SPEC
-#define LINK_SPEC "%{!m32:-m elf_x86_64 -Y P,/usr/lib64} %{m32:-m elf_i386} \
+#define LINK_SPEC "%{!m32:-m elf_x86_64} %{m32:-m elf_i386} \
   %{shared:-shared} \
   %{!shared: \
     %{!static: \
@@ -62,21 +68,14 @@ Boston, MA 02111-1307, USA.  */
 
 #undef  STARTFILE_SPEC
 #define STARTFILE_SPEC \
-  "%{m32:%{!shared: \
-       %{pg:gcrt1.o%s} %{!pg:%{p:gcrt1.o%s} \
-       %{!p:%{profile:gcrt1.o%s} %{!profile:crt1.o%s}}}} \
-     crti.o%s %{static:crtbeginT.o%s}\
-     %{!static:%{!shared:crtbegin.o%s} %{shared:crtbeginS.o%s}}} \
-   %{!m32:%{!shared: \
-       %{pg:/usr/lib64/gcrt1.o%s} %{!pg:%{p:/usr/lib64/gcrt1.o%s} \
-       %{!p:%{profile:/usr/lib64/gcrt1.o%s} %{!profile:/usr/lib64/crt1.o%s}}}}\
-     /usr/lib64/crti.o%s %{static:crtbeginT.o%s} \
-     %{!static:%{!shared:crtbegin.o%s} %{shared:crtbeginS.o%s}}}"
+  "%{!shared: \
+     %{pg:gcrt1.o%s} %{!pg:%{p:gcrt1.o%s} \
+     %{!p:%{profile:gcrt1.o%s} %{!profile:crt1.o%s}}}} \
+   crti.o%s %{static:crtbeginT.o%s} \
+   %{!static:%{!shared:crtbegin.o%s} %{shared:crtbeginS.o%s}}"
 
 #undef  ENDFILE_SPEC
-#define ENDFILE_SPEC "\
-  %{m32:%{!shared:crtend.o%s} %{shared:crtendS.o%s} crtn.o%s} \
-  %{!m32:%{!shared:crtend.o%s} %{shared:crtendS.o%s} /usr/lib64/crtn.o%s}"
+#define ENDFILE_SPEC "%{!shared:crtend.o%s} %{shared:crtendS.o%s} crtn.o%s"
 
 #define MULTILIB_DEFAULTS { "m64" }
 
@@ -117,17 +116,17 @@ Boston, MA 02111-1307, USA.  */
     (FS)->regs.reg[0].how = REG_SAVED_OFFSET;				\
     (FS)->regs.reg[0].loc.offset = (long)&sc_->rax - new_cfa_;		\
     (FS)->regs.reg[1].how = REG_SAVED_OFFSET;				\
-    (FS)->regs.reg[1].loc.offset = (long)&sc_->rbx - new_cfa_;		\
+    (FS)->regs.reg[1].loc.offset = (long)&sc_->rdx - new_cfa_;		\
     (FS)->regs.reg[2].how = REG_SAVED_OFFSET;				\
     (FS)->regs.reg[2].loc.offset = (long)&sc_->rcx - new_cfa_;		\
     (FS)->regs.reg[3].how = REG_SAVED_OFFSET;				\
-    (FS)->regs.reg[3].loc.offset = (long)&sc_->rdx - new_cfa_;		\
+    (FS)->regs.reg[3].loc.offset = (long)&sc_->rbx - new_cfa_;		\
     (FS)->regs.reg[4].how = REG_SAVED_OFFSET;				\
-    (FS)->regs.reg[4].loc.offset = (long)&sc_->rbp - new_cfa_;		\
+    (FS)->regs.reg[4].loc.offset = (long)&sc_->rsi - new_cfa_;		\
     (FS)->regs.reg[5].how = REG_SAVED_OFFSET;				\
-    (FS)->regs.reg[5].loc.offset = (long)&sc_->rsi - new_cfa_;		\
+    (FS)->regs.reg[5].loc.offset = (long)&sc_->rdi - new_cfa_;		\
     (FS)->regs.reg[6].how = REG_SAVED_OFFSET;				\
-    (FS)->regs.reg[6].loc.offset = (long)&sc_->rdi - new_cfa_;		\
+    (FS)->regs.reg[6].loc.offset = (long)&sc_->rbp - new_cfa_;		\
     (FS)->regs.reg[8].how = REG_SAVED_OFFSET;				\
     (FS)->regs.reg[8].loc.offset = (long)&sc_->r8 - new_cfa_;		\
     (FS)->regs.reg[9].how = REG_SAVED_OFFSET;				\
@@ -144,6 +143,8 @@ Boston, MA 02111-1307, USA.  */
     (FS)->regs.reg[14].loc.offset = (long)&sc_->r14 - new_cfa_;		\
     (FS)->regs.reg[15].how = REG_SAVED_OFFSET;				\
     (FS)->regs.reg[15].loc.offset = (long)&sc_->r15 - new_cfa_;		\
+    (FS)->regs.reg[16].how = REG_SAVED_OFFSET;				\
+    (FS)->regs.reg[16].loc.offset = (long)&sc_->rip - new_cfa_;		\
     (FS)->retaddr_column = 16;						\
     goto SUCCESS;							\
   } while (0)

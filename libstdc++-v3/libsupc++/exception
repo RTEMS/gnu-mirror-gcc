@@ -41,11 +41,13 @@ extern "C++" {
 
 namespace std 
 {
-  /** This is the base class for all exceptions thrown by the standard
+  /**
+   *  @brief Base class for all library exceptions.
+   *
+   *  This is the base class for all exceptions thrown by the standard
    *  library, and by certain language expressions.  You are free to derive
    *  your own %exception classes, or use a different hierarchy, or to
    *  throw non-class data (e.g., fundamental types).
-   *  @brief Base class for all library exceptions.
    */
   class exception 
   {
@@ -76,7 +78,7 @@ namespace std
   /// Takes a new handler function as an argument, returns the old function.
   terminate_handler set_terminate(terminate_handler) throw();
   /** The runtime will call this function if %exception handling must be
-   *  abandoned for any reason.  */
+   *  abandoned for any reason.  It can also be called by the user.  */
   void terminate() __attribute__ ((__noreturn__));
 
   /// Takes a new handler function as an argument, returns the old function.
@@ -107,6 +109,8 @@ namespace __gnu_cxx
       @endcode
       to use.  For more info, see
       http://gcc.gnu.org/onlinedocs/libstdc++/19_diagnostics/howto.html#4
+
+      In 3.4 and later, this is on by default.
   */
   void __verbose_terminate_handler ();
 } // namespace __gnu_cxx

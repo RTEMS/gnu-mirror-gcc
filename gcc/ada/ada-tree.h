@@ -21,7 +21,7 @@
  * MA 02111-1307, USA.                                                      *
  *                                                                          *
  * GNAT was originally developed  by the GNAT team at  New York University. *
- * It is now maintained by Ada Core Technologies Inc (http://www.gnat.com). *
+ * Extensive contributions were provided by Ada Core Technologies Inc.      *
  *                                                                          *
  ****************************************************************************/
 
@@ -43,7 +43,8 @@ struct tree_loop_id GTY(())
 
 /* The language-specific tree.  */
 union lang_tree_node 
-  GTY((desc ("TREE_CODE (&%h.generic) == GNAT_LOOP_ID")))
+  GTY((desc ("TREE_CODE (&%h.generic) == GNAT_LOOP_ID"),
+       chain_next ("(union lang_tree_node *)TREE_CHAIN (&%h.generic)")))
 {
   union tree_node GTY ((tag ("0"), 
 			desc ("tree_node_structure (&%h)"))) 
@@ -181,7 +182,7 @@ struct lang_type GTY(())
 #define TYPE_DIGITS_VALUE(NODE)  \
   ((long) TYPE_LANG_SPECIFIC (INTEGER_TYPE_CHECK (NODE)))
 #define SET_TYPE_DIGITS_VALUE(NODE, X)  \
-  (TYPE_LANG_SPECIFIC (INTEGER_TYPE_CHECK (NODE)) = (struct lang_type *)(X))
+  (TYPE_LANG_SPECIFIC (INTEGER_TYPE_CHECK (NODE)) = (struct lang_type *)(size_t)(X))
 
 /* For INTEGER_TYPE, stores the RM_Size of the type.  */
 #define TYPE_RM_SIZE_INT(NODE)	TYPE_VALUES (INTEGER_TYPE_CHECK (NODE))

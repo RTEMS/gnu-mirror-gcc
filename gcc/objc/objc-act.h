@@ -1,20 +1,21 @@
 /* Declarations for objc-act.c.
-   Copyright (C) 1990, 2000, 2001 Free Software Foundation, Inc.
+   Copyright (C) 1990, 2000, 2001, 2002, 2003
+   Free Software Foundation, Inc.
 
-This file is part of GNU CC.
+This file is part of GCC.
 
-GNU CC is free software; you can redistribute it and/or modify
+GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2, or (at your option)
 any later version.
 
-GNU CC is distributed in the hope that it will be useful,
+GCC is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU CC; see the file COPYING.  If not, write to
+along with GCC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
@@ -24,7 +25,6 @@ Boston, MA 02111-1307, USA.  */
 /*** Public Interface (procedures) ***/
 
 const char *objc_init				PARAMS ((const char *));
-int objc_decode_option				PARAMS ((int, char **));
 const char *objc_printable_name			PARAMS ((tree, int));
 
 /* used by yyparse */
@@ -64,8 +64,6 @@ void objc_declare_alias				PARAMS ((tree, tree));
 void objc_declare_class				PARAMS ((tree));
 void objc_declare_protocols			PARAMS ((tree));
 
-extern int objc_receiver_context;
-
 /* the following routines are used to implement statically typed objects */
 
 int objc_comptypes				PARAMS ((tree, tree, int));
@@ -100,6 +98,7 @@ tree build_encode_expr				PARAMS ((tree));
 #define CLASS_STATIC_TEMPLATE(CLASS) TREE_VEC_ELT (TYPE_BINFO (CLASS), 2)
 #define CLASS_CATEGORY_LIST(CLASS) TREE_VEC_ELT (TYPE_BINFO (CLASS), 3)
 #define CLASS_PROTOCOL_LIST(CLASS) TREE_VEC_ELT (TYPE_BINFO (CLASS), 4)
+#define CLASS_OWN_IVARS(CLASS) TREE_VEC_ELT (TYPE_BINFO (CLASS), 5)
 #define PROTOCOL_NAME(CLASS) ((CLASS)->type.name)
 #define PROTOCOL_LIST(CLASS) TREE_VEC_ELT (TYPE_BINFO (CLASS), 0)
 #define PROTOCOL_NST_METHODS(CLASS) ((CLASS)->type.minval)
