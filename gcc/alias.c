@@ -1,5 +1,6 @@
 /* Alias analysis for GNU C
-   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003
+   Free Software Foundation, Inc.
    Contributed by John Carr (jfc@mit.edu).
 
 This file is part of GCC.
@@ -109,6 +110,8 @@ static tree decl_for_component_ref	PARAMS ((tree));
 static rtx adjust_offset_for_component_ref PARAMS ((tree, rtx));
 static int nonoverlapping_memrefs_p	PARAMS ((rtx, rtx));
 static int write_dependence_p           PARAMS ((rtx, rtx, int));
+static void set_reg_known_value		PARAMS ((unsigned int, rtx));
+static void set_reg_known_equiv_p	PARAMS ((unsigned int, int));
 
 static int nonlocal_mentioned_p_1       PARAMS ((rtx *, void *));
 static int nonlocal_mentioned_p         PARAMS ((rtx));
@@ -172,16 +175,16 @@ static GTY (()) rtx static_reg_base_value[FIRST_PSEUDO_REGISTER];
 
    Because this array contains only pseudo registers it has no effect
    after reload.  */
-static rtx *alias_invariant;
+static GTY((length("alias_invariant_size"))) rtx *alias_invariant;
+unsigned GTY(()) int alias_invariant_size;
 
 /* Vector indexed by N giving the initial (unchanging) value known for
-   pseudo-register N.  This array is initialized in
-   init_alias_analysis, and does not change until end_alias_analysis
-   is called.  */
-rtx *reg_known_value;
+   pseudo-register N.  This array is initialized in init_alias_analysis,
+   and does not change until end_alias_analysis is called.  */
+static GTY((length("reg_known_value_size"))) rtx *reg_known_value;
 
 /* Indicates number of valid entries in reg_known_value.  */
-static unsigned int reg_known_value_size;
+static GTY(()) unsigned int reg_known_value_size;
 
 /* Vector recording for each reg_known_value whether it is due to a
    REG_EQUIV note.  Future passes (viz., reload) may replace the
@@ -195,7 +198,7 @@ static unsigned int reg_known_value_size;
    REG_EQUIV notes.  One could argue that the REG_EQUIV notes are
    wrong, but solving the problem in the scheduler will likely give
    better code, so we do it here.  */
-char *reg_known_equiv_p;
+static bool *reg_known_equiv_p;
 
 /* True when scanning insns from the start of the rtl to the
    NOTE_INSN_FUNCTION_BEG note.  */
@@ -322,6 +325,8 @@ int
 objects_must_conflict_p (t1, t2)
      tree t1, t2;
 {
+  HOST_WIDE_INT set1, set2;
+
   /* If neither has a type specified, we don't know if they'll conflict
      because we may be using them to store objects of various types, for
      example the argument and local variables areas of inlined functions.  */
@@ -342,15 +347,15 @@ objects_must_conflict_p (t1, t2)
       || (t1 != 0 && TYPE_VOLATILE (t1) && t2 != 0 && TYPE_VOLATILE (t2)))
     return 1;
 
-  /* If one is aggregate and the other is scalar then they may not
-     conflict.  */
-  if ((t1 != 0 && AGGREGATE_TYPE_P (t1))
-      != (t2 != 0 && AGGREGATE_TYPE_P (t2)))
-    return 0;
+  set1 = t1 ? get_alias_set (t1) : 0;
+  set2 = t2 ? get_alias_set (t2) : 0;
 
-  /* Otherwise they conflict only if the alias sets conflict.  */
-  return alias_sets_conflict_p (t1 ? get_alias_set (t1) : 0,
-				t2 ? get_alias_set (t2) : 0);
+  /* Otherwise they conflict if they have no alias set or the same. We
+     can't simply use alias_sets_conflict_p here, because we must make
+     sure that every subtype of t1 will conflict with every subtype of
+     t2 for which a pair of subobjects of these respective subtypes
+     overlaps on the stack.  */
+  return set1 == 0 || set2 == 0 || set1 == set2;
 }
 
 /* T is an expression with pointer type.  Find the DECL on which this
@@ -503,6 +508,8 @@ get_alias_set (t)
 	      /* If we haven't computed the actual alias set, do it now.  */
 	      if (DECL_POINTER_ALIAS_SET (decl) == -2)
 		{
+		  tree pointed_to_type = TREE_TYPE (TREE_TYPE (decl));
+
 		  /* No two restricted pointers can point at the same thing.
 		     However, a restricted pointer can point at the same thing
 		     as an unrestricted pointer, if that unrestricted pointer
@@ -511,11 +518,22 @@ get_alias_set (t)
 		     alias set for the type pointed to by the type of the
 		     decl.  */
 		  HOST_WIDE_INT pointed_to_alias_set
-		    = get_alias_set (TREE_TYPE (TREE_TYPE (decl)));
+		    = get_alias_set (pointed_to_type);
 
 		  if (pointed_to_alias_set == 0)
 		    /* It's not legal to make a subset of alias set zero.  */
-		    ;
+		    DECL_POINTER_ALIAS_SET (decl) = 0;
+		  else if (AGGREGATE_TYPE_P (pointed_to_type))
+		    /* For an aggregate, we must treat the restricted
+		       pointer the same as an ordinary pointer.  If we
+		       were to make the type pointed to by the
+		       restricted pointer a subset of the pointed-to
+		       type, then we would believe that other subsets
+		       of the pointed-to type (such as fields of that
+		       type) do not conflict with the type pointed to
+		       by the restricted pointer.   */
+		    DECL_POINTER_ALIAS_SET (decl)
+		      = pointed_to_alias_set;
 		  else
 		    {
 		      DECL_POINTER_ALIAS_SET (decl) = new_alias_set ();
@@ -785,14 +803,15 @@ find_base_value (src)
 	{
 	  /* If we're inside init_alias_analysis, use new_reg_base_value
 	     to reduce the number of relaxation iterations.  */
-	  if (new_reg_base_value && new_reg_base_value[regno])
+	  if (new_reg_base_value && new_reg_base_value[regno]
+	      && REG_N_SETS (regno) == 1)
 	    return new_reg_base_value[regno];
 
 	  if (reg_base_value[regno])
 	    return reg_base_value[regno];
 	}
 
-      return src;
+      return 0;
 
     case MEM:
       /* Check for an argument passed in memory.  Only record in the
@@ -1025,7 +1044,7 @@ record_base_value (regno, val, invariant)
   if (regno >= reg_base_value_size)
     return;
 
-  if (invariant && alias_invariant)
+  if (invariant && alias_invariant && regno < alias_invariant_size)
     alias_invariant[regno] = val;
 
   if (GET_CODE (val) == REG)
@@ -1050,9 +1069,75 @@ clear_reg_alias_info (reg)
 {
   unsigned int regno = REGNO (reg);
 
-  if (regno < reg_known_value_size && regno >= FIRST_PSEUDO_REGISTER)
-    reg_known_value[regno] = reg;
+  if (regno >= FIRST_PSEUDO_REGISTER)
+    {
+      regno -= FIRST_PSEUDO_REGISTER;
+      if (regno < reg_known_value_size)
+	{
+	  reg_known_value[regno] = reg;
+	  reg_known_equiv_p[regno] = false;
+	}
+    }
 }
+
+/* If a value is known for REGNO, return it.  */
+
+rtx 
+get_reg_known_value (regno)
+     unsigned int regno;
+{
+  if (regno >= FIRST_PSEUDO_REGISTER)
+    {
+      regno -= FIRST_PSEUDO_REGISTER;
+      if (regno < reg_known_value_size)
+	return reg_known_value[regno];
+    }
+  return NULL;
+}
+
+/* Set it.  */
+
+static void
+set_reg_known_value (regno, val)
+     unsigned int regno;
+     rtx val;
+{
+  if (regno >= FIRST_PSEUDO_REGISTER)
+    {
+      regno -= FIRST_PSEUDO_REGISTER;
+      if (regno < reg_known_value_size)
+	reg_known_value[regno] = val;
+    }
+}
+
+/* Similarly for reg_known_equiv_p.  */
+
+bool
+get_reg_known_equiv_p (regno)
+     unsigned int regno;
+{
+  if (regno >= FIRST_PSEUDO_REGISTER)
+    {
+      regno -= FIRST_PSEUDO_REGISTER;
+      if (regno < reg_known_value_size)
+	return reg_known_equiv_p[regno];
+    }
+  return false;
+}
+
+static void
+set_reg_known_equiv_p (regno, val)
+     unsigned int regno;
+     int val;
+{
+  if (regno >= FIRST_PSEUDO_REGISTER)
+    {
+      regno -= FIRST_PSEUDO_REGISTER;
+      if (regno < reg_known_value_size)
+	reg_known_equiv_p[regno] = val;
+    }
+}
+
 
 /* Returns a canonical version of X, from the point of view alias
    analysis.  (For example, if X is a MEM whose address is a register,
@@ -1064,11 +1149,16 @@ canon_rtx (x)
      rtx x;
 {
   /* Recursively look for equivalences.  */
-  if (GET_CODE (x) == REG && REGNO (x) >= FIRST_PSEUDO_REGISTER
-      && REGNO (x) < reg_known_value_size)
-    return reg_known_value[REGNO (x)] == x
-      ? x : canon_rtx (reg_known_value[REGNO (x)]);
-  else if (GET_CODE (x) == PLUS)
+  if (GET_CODE (x) == REG && REGNO (x) >= FIRST_PSEUDO_REGISTER)
+    {
+      rtx t = get_reg_known_value (REGNO (x));
+      if (t == x)
+	return x;
+      if (t)
+	return canon_rtx (t);
+    }
+
+  if (GET_CODE (x) == PLUS)
     {
       rtx x0 = canon_rtx (XEXP (x, 0));
       rtx x1 = canon_rtx (XEXP (x, 1));
@@ -2694,14 +2784,9 @@ init_alias_analysis ()
   unsigned int ui;
   rtx insn;
 
-  reg_known_value_size = maxreg;
-
-  reg_known_value
-    = (rtx *) xcalloc ((maxreg - FIRST_PSEUDO_REGISTER), sizeof (rtx))
-    - FIRST_PSEUDO_REGISTER;
-  reg_known_equiv_p
-    = (char*) xcalloc ((maxreg - FIRST_PSEUDO_REGISTER), sizeof (char))
-    - FIRST_PSEUDO_REGISTER;
+  reg_known_value_size = maxreg - FIRST_PSEUDO_REGISTER;
+  reg_known_value = ggc_calloc (reg_known_value_size, sizeof (rtx));
+  reg_known_equiv_p = xcalloc (reg_known_value_size, sizeof (bool));
 
   /* Overallocate reg_base_value to allow some growth during loop
      optimization.  Loop unrolling can create a large number of
@@ -2714,10 +2799,9 @@ init_alias_analysis ()
   reg_seen = (char *) xmalloc (reg_base_value_size);
   if (! reload_completed && flag_unroll_loops)
     {
-      /* ??? Why are we realloc'ing if we're just going to zero it?  */
-      alias_invariant = (rtx *)xrealloc (alias_invariant,
-					 reg_base_value_size * sizeof (rtx));
-      memset ((char *)alias_invariant, 0, reg_base_value_size * sizeof (rtx));
+      alias_invariant = (rtx *) ggc_alloc_cleared (reg_base_value_size
+						   * sizeof (rtx));
+      alias_invariant_size = reg_base_value_size;
     }
 
   /* The basic idea is that each pass through this loop will use the
@@ -2806,6 +2890,7 @@ init_alias_analysis ()
 		{
 		  unsigned int regno = REGNO (SET_DEST (set));
 		  rtx src = SET_SRC (set);
+		  rtx t;
 
 		  if (REG_NOTES (insn) != 0
 		      && (((note = find_reg_note (insn, REG_EQUAL, 0)) != 0
@@ -2813,29 +2898,28 @@ init_alias_analysis ()
 			  || (note = find_reg_note (insn, REG_EQUIV, NULL_RTX)) != 0)
 		      && GET_CODE (XEXP (note, 0)) != EXPR_LIST
 		      && ! rtx_varies_p (XEXP (note, 0), 1)
-		      && ! reg_overlap_mentioned_p (SET_DEST (set), XEXP (note, 0)))
+		      && ! reg_overlap_mentioned_p (SET_DEST (set),
+						    XEXP (note, 0)))
 		    {
-		      reg_known_value[regno] = XEXP (note, 0);
-		      reg_known_equiv_p[regno] = REG_NOTE_KIND (note) == REG_EQUIV;
+		      set_reg_known_value (regno, XEXP (note, 0));
+		      set_reg_known_equiv_p (regno,
+			REG_NOTE_KIND (note) == REG_EQUIV);
 		    }
 		  else if (REG_N_SETS (regno) == 1
 			   && GET_CODE (src) == PLUS
 			   && GET_CODE (XEXP (src, 0)) == REG
-			   && REGNO (XEXP (src, 0)) >= FIRST_PSEUDO_REGISTER
-			   && (reg_known_value[REGNO (XEXP (src, 0))])
+			   && (t = get_reg_known_value (REGNO (XEXP (src, 0))))
 			   && GET_CODE (XEXP (src, 1)) == CONST_INT)
 		    {
-		      rtx op0 = XEXP (src, 0);
-		      op0 = reg_known_value[REGNO (op0)];
-		      reg_known_value[regno]
-			= plus_constant (op0, INTVAL (XEXP (src, 1)));
-		      reg_known_equiv_p[regno] = 0;
+		      t = plus_constant (t, INTVAL (XEXP (src, 1)));
+		      set_reg_known_value (regno, t);
+		      set_reg_known_equiv_p (regno, 0);
 		    }
 		  else if (REG_N_SETS (regno) == 1
 			   && ! rtx_varies_p (src, 1))
 		    {
-		      reg_known_value[regno] = src;
-		      reg_known_equiv_p[regno] = 0;
+		      set_reg_known_value (regno, src);
+		      set_reg_known_equiv_p (regno, 0);
 		    }
 		}
 	    }
@@ -2859,9 +2943,9 @@ init_alias_analysis ()
   while (changed && ++pass < MAX_ALIAS_LOOP_PASSES);
 
   /* Fill in the remaining entries.  */
-  for (i = FIRST_PSEUDO_REGISTER; i < maxreg; i++)
+  for (i = 0; i < (int)reg_known_value_size; i++)
     if (reg_known_value[i] == 0)
-      reg_known_value[i] = regno_reg_rtx[i];
+      reg_known_value[i] = regno_reg_rtx[i + FIRST_PSEUDO_REGISTER];
 
   /* Simplify the reg_base_value array so that no register refers to
      another register, except to special registers indirectly through
@@ -2904,17 +2988,16 @@ init_alias_analysis ()
 void
 end_alias_analysis ()
 {
-  free (reg_known_value + FIRST_PSEUDO_REGISTER);
   reg_known_value = 0;
   reg_known_value_size = 0;
-  free (reg_known_equiv_p + FIRST_PSEUDO_REGISTER);
+  free (reg_known_equiv_p);
   reg_known_equiv_p = 0;
   reg_base_value = 0;
   reg_base_value_size = 0;
   if (alias_invariant)
     {
-      free (alias_invariant);
       alias_invariant = 0;
+      alias_invariant_size = 0;
     }
 }
 
