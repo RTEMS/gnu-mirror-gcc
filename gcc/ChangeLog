@@ -1,3 +1,25 @@
+Wed Jul 15 00:52:54 PDT 1998 Jeff Law  (law@cygnus.com)
+
+	* version.c: Bump for snapshot.
+
+Wed Jul 15 00:52:20 PDT 1998 Jeff Law  (law@cygnus.com)
+
+	* version.c: Bump for snapshot.
+
+Tue Jul 14 14:15:30 1998  Nick Clifton  <nickc@cygnus.com>
+
+	* gcc.c: Remove ANSI-C ism from --help code.
+
+	* toplev.c: Support --help with USE_CPPLIB.
+
+Tue Jul 14 02:20:38 1998  Jeffrey A Law  (law@cygnus.com)
+
+	* configure.in: Rework gas feature code to work with symlink based
+	source trees.
+
+	* version.c: Bump to avoid problems with old spec files during
+	bootstrap.
+
 Mon Jul 13 23:11:44 1998  David S. Miller  <davem@pierdol.cobaltmicro.com>
 
 	* config/sparc/sparc.c (output_scc_insn): Enclose || conditions in

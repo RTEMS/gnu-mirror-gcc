@@ -62,6 +62,7 @@ static tree namespace_ancestor PROTO((tree, tree));
 static void add_using_namespace PROTO((tree, tree, int));
 static tree ambiguous_decl PROTO((tree, tree, tree));
 static tree build_anon_union_vars PROTO((tree, tree*, int, int));
+static void check_decl_namespace PROTO((void));
 
 extern int current_class_depth;
 
@@ -3125,6 +3126,8 @@ finish_file ()
   if (! global_bindings_p () || current_class_type)
     return;
 
+  check_decl_namespace ();
+
   start_time = get_run_time ();
 
   /* Otherwise, GDB can get confused, because in only knows
@@ -3842,7 +3845,7 @@ namespace_ancestor (ns1, ns2)
 {
   if (is_namespace_ancestor (ns1, ns2))
     return ns1;
-  return namespace_ancestor (DECL_CONTEXT (ns1), ns2);
+  return namespace_ancestor (CP_DECL_CONTEXT (ns1), ns2);
 }
 
 /* Insert used into the using list of user. Set indirect_flag if this
@@ -4116,6 +4119,12 @@ pop_decl_namespace ()
   decl_namespace_list = TREE_CHAIN (decl_namespace_list);
 }
 
+static void 
+check_decl_namespace ()
+{
+  my_friendly_assert (decl_namespace_list == NULL_TREE, 980711);
+}
+
 /* [basic.lookup.koenig] */
 /* A non-zero return value in the functions below indicates an error.
    All nodes allocated in the procedure are on the scratch obstack. */
@@ -4140,7 +4149,26 @@ add_function (k, fn)
 {
   if (ovl_member (fn, k->functions))
     return 0;
-  k->functions = build_overload (fn, k->functions);
+  /* We must find only functions, or exactly one non-function. */
+  if (k->functions && is_overloaded_fn (k->functions)
+      && is_overloaded_fn (fn))
+    k->functions = build_overload (fn, k->functions);
+  else 
+    if(k->functions)
+      {
+	tree f1 = OVL_CURRENT (k->functions);
+	tree f2 = fn;
+	if (is_overloaded_fn (f1))
+	  {
+	    fn = f1; f1 = f2; f2 = fn;
+	  }
+	cp_error_at ("`%D' is not a function,", f1);
+	cp_error_at ("  conflict with `%D'", f2);
+	cp_error ("  in call to `%D'", k->name);
+	return 1;
+      }
+    else
+      k->functions = fn;
   return 0;
 }
 
@@ -4160,13 +4188,6 @@ arg_assoc_namespace (k, scope)
   value = namespace_binding (k->name, scope);
   if (!value)
     return 0;
-  
-  if (!is_overloaded_fn (value))
-    {
-      cp_error_at ("`%D' is not a function", value);
-      cp_error ("in call to `%D'", k->name);
-      return 1;
-    }
   
   for (; value; value = OVL_NEXT (value))
     if (add_function (k, OVL_CURRENT (value)))
@@ -4332,11 +4353,8 @@ arg_assoc (k, n)
 	n = TREE_VALUE (n);
 	continue;
       case FUNCTION_DECL: /* 'd' */
-	if (arg_assoc_args (k, FUNCTION_ARG_CHAIN (n)))
+	if (arg_assoc_args (k, TYPE_ARG_TYPES (TREE_TYPE (n))))
 	  return 1;	
-	if (DECL_FUNCTION_MEMBER_P (n))
-	  if (arg_assoc_type (k, DECL_CLASS_CONTEXT (n)))
-	    return 1;
 	return 0;
       case TEMPLATE_DECL:
         /* XXX Type of a function template in the context of Koenig lookup?
