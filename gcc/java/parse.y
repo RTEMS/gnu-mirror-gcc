@@ -10789,7 +10789,11 @@ patch_invoke (patch, method, args)
      is NULL.  */
   if (check != NULL_TREE)
     {
-      patch = build (COMPOUND_EXPR, TREE_TYPE (patch), check, patch);
+      /* We have to call force_evaluation_order now because creating a
+ 	 COMPOUND_EXPR wraps the arg list in a way that makes it
+ 	 unrecognizable by force_evaluation_order later.  Yuk.  */
+      patch = build (COMPOUND_EXPR, TREE_TYPE (patch), check, 
+ 		     force_evaluation_order (patch));
       TREE_SIDE_EFFECTS (patch) = 1;
     }
 
@@ -12854,6 +12858,43 @@ patch_assignment (node, wfl_op1)
     {
       TREE_CONSTANT (lvalue) = 1;
       DECL_INITIAL (lvalue) = new_rhs;
+    }
+
+  /* Copy the rhs if it's a reference.  */
+  if (! flag_check_references && optimize > 0)
+    {
+      switch (TREE_CODE (new_rhs))
+	{
+	case ARRAY_REF:
+	case INDIRECT_REF:
+	case COMPONENT_REF:
+	  /* Transform a = foo.bar 
+	     into a = { int tmp; tmp = foo.bar; tmp; ).   	     
+	     We need to ensure that if a read from memory fails
+	     because of a NullPointerException, a destination variable
+	     will remain unchanged.  An explicit temporary does what
+	     we need.  
+
+	     If flag_check_references is set, this is unnecessary
+	     because we'll check each reference before doing any
+	     reads.  If optimize is not set the result will never be
+	     written to a stack slot that contains the LHS.  */
+	  {
+	    tree tmp = build_decl (VAR_DECL, get_identifier ("<tmp>"), 
+				   TREE_TYPE (new_rhs));
+	    tree block = build (BLOCK, TREE_TYPE (new_rhs), NULL);
+	    tree assignment 
+	      = build (MODIFY_EXPR, TREE_TYPE (new_rhs), tmp, fold (new_rhs));
+	    BLOCK_VARS (block) = tmp;
+	    BLOCK_EXPR_BODY (block) 
+	      = build (COMPOUND_EXPR, TREE_TYPE (new_rhs), assignment, tmp);
+	    TREE_SIDE_EFFECTS (block) = 1;
+	    new_rhs = block;
+	  }
+	  break;
+	default:
+	  break;
+	}
     }
 
   TREE_OPERAND (node, 0) = lvalue;
