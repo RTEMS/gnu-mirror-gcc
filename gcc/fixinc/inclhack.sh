@@ -563,6 +563,18 @@ struct rusage;
         -e '/^[ ]*typedef[ 	][ 	]*unsigned char[ 	][ 	]*bool[ 	]*;/a\
 #endif
 ' \
+        -e '/^typedef[ 	][ 	]*int[ 	][ 	]*bool[ 	]*;/i\
+#ifndef __cplusplus
+' \
+        -e '/^typedef[ 	][ 	]*int[ 	][ 	]*bool[ 	]*;/a\
+#endif
+' \
+        -e '/^[ ]*typedef[ 	][ 	]*unsigned int[ 	][ 	]*bool[ 	]*;/i\
+#ifndef __cplusplus
+' \
+        -e '/^[ ]*typedef[ 	][ 	]*unsigned int[ 	][ 	]*bool[ 	]*;/a\
+#endif
+' \
           < $infile > ${DESTDIR}/fixinc.tmp
     rm -f ${DESTFILE}
     mv -f ${DESTDIR}/fixinc.tmp ${DESTFILE}
@@ -626,8 +638,6 @@ struct rusage;
 	./stropts.h | \
 	./time.h | \
 	./unistd.h )
-    if ( test -n "`egrep '^[ 	]*#[ 	]*pragma[ 	]extern_prefix' ${file}`"
-       ) > /dev/null 2>&1 ; then
     fixlist="${fixlist}
       bad_lval"
     if [ ! -r ${DESTFILE} ]
@@ -638,7 +648,6 @@ struct rusage;
           < $infile > ${DESTDIR}/fixinc.tmp
     rm -f ${DESTFILE}
     mv -f ${DESTDIR}/fixinc.tmp ${DESTFILE}
-    fi # end of selection 'if'
     ;; # case end for file name test
     esac
 
@@ -739,7 +748,7 @@ struct rusage;
     # Fix  17:  No_Double_Slash
     #
     if ( test -n "`egrep '(^|[^:])//[^\"*]' ${file}`" -a \
-              '(' -z `echo ${file} | egrep '(CC|cxx|\+\+)/' ` ')'
+              '('  -z "`echo ${file} | egrep '(CC|cxx|\+\+)/'`" ')'
        ) > /dev/null 2>&1 ; then
     fixlist="${fixlist}
       no_double_slash"
@@ -832,7 +841,7 @@ s%^\([ 	]*#[ 	]*else\)[ 	]*[^/ 	].*%\1%' \
     #
     # Fix  21:  Endif_Label
     #
-    if ( test -n "`egrep '^[ 	]*#[ 	]*endif[ 	]+[!-.0-z{|}~]' ${file}`"
+    if ( test -n "`egrep '^[ 	]*#[ 	]*endif[ 	]+[!-.0-z{|}~]|^[ 	]*#[ 	]*endif[ 	]+/[^*]' ${file}`"
        ) > /dev/null 2>&1 ; then
     fixlist="${fixlist}
       endif_label"
@@ -1056,7 +1065,8 @@ extern "C" {\
     then infile=${file}
     else infile=${DESTFILE} ; fi 
 
-    sed -e 's/\([ 	]*[ 	](_|DES)IO[A-Z]*[ 	]*(\)\([^,'\'']\),/\1'\''\2'\'',/' \
+    sed -e 's/\([ 	]*[ 	]_IO[A-Z]*[ 	]*(\)\([^,'\'']\),/\1'\''\2'\'',/' \
+        -e 's/\([ 	]*[ 	]DESIO[A-Z]*[ 	]*(\)\([^,'\'']\),/\1'\''\2'\'',/' \
         -e '/#[ 	]*define[ 	]*[ 	]_IO/s/'\''\([cgxtf]\)'\''/\1/g' \
         -e '/#[ 	]*define[ 	]*[ 	]DESIOC/s/'\''\([cdgx]\)'\''/\1/g' \
           < $infile > ${DESTDIR}/fixinc.tmp
@@ -1068,7 +1078,7 @@ extern "C" {\
     #
     # Fix  31:  Ioctl_Fix_Ctrl
     #
-    if ( test -n "`egrep 'CTRL[ 	]' ${file}`"
+    if ( test -n "`egrep 'CTRL[ 	]*\\(' ${file}`"
        ) > /dev/null 2>&1 ; then
     fixlist="${fixlist}
       ioctl_fix_ctrl"
@@ -1274,7 +1284,8 @@ struct __file_s;
     #
     # Fix  40:  Limits_Ifndefs
     #
-    case "${file}" in ./limits.h )
+    case "${file}" in ./limits.h | \
+	./sys/limits.h )
     if ( test -z "`egrep 'ifndef[ 	]+FLT_MIN' ${file}`"
        ) > /dev/null 2>&1 ; then
     fixlist="${fixlist}
@@ -1572,9 +1583,9 @@ s/\\+++fixinc_eol+++/\\/g
 	   ) > /dev/null 2>&1
 	then sed -e '/define[ 	]HUGE_VAL[ 	]DBL_MAX/s/DBL_MAX/$dbl_max_def/'
 	else cat ; fi |
-	sed -e'/define[ 	]HUGE_VAL[ 	]/i\
+	sed -e '/define[ 	]HUGE_VAL[ 	]/i\
 #ifndef HUGE_VAL
-' -e'/define[ 	]HUGE_VAL[ 	]/a\
+' -e '/define[ 	]HUGE_VAL[ 	]/a\
 #endif
 ' ) < $infile > ${DESTDIR}/fixinc.tmp
 
@@ -2011,7 +2022,7 @@ typedef __regmatch_t	regmatch_t;
     # Fix  67:  Sun_Catmacro
     #
     case "${file}" in ./pixrect/memvar.h )
-    if ( test -n "`egrep '^#define[ 	]+CAT(a,b)' ${file}`"
+    if ( test -n "`egrep '^#define[ 	]+CAT\\(a,b\\)' ${file}`"
        ) > /dev/null 2>&1 ; then
     fixlist="${fixlist}
       sun_catmacro"
@@ -2155,8 +2166,7 @@ void	(*signal(...))(...);\
 	./rpc/clnt.h | \
 	./rpc/svc.h | \
 	./rpc/xdr.h )
-    if ( test -n "`egrep '\\(\\*[a-z][a-z_]*\\)\\(\\)' ${file}`" -a \
-              -z "`egrep '\\(\\*[a-z][a-z_]*\\)\\([ 	]*[a-zA-Z.].*\\)' ${file}`"
+    if ( test -n "`egrep '\\(\\*[a-z][a-z_]*\\)\\(\\)' ${file}`"
        ) > /dev/null 2>&1 ; then
     fixlist="${fixlist}
       sun_auth_proto"
@@ -3091,7 +3101,7 @@ find . -name DONE -exec rm -f '{}' ';'
 
 echo 'Removing unneeded directories:'
 cd $LIB
-all_dirs=`find . -type d -print | sort -r`
+all_dirs=`find . -type d \! -name '.' -print | sort -r`
 for file in $all_dirs; do
   rmdir $LIB/$file > /dev/null 2>&1
 done
