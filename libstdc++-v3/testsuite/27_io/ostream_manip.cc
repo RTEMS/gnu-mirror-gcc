@@ -23,7 +23,7 @@
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
-#include <debug_assert.h>
+#include <testsuite_hooks.h>
 
 bool test01(void)
 {
@@ -121,9 +121,5 @@ bool test02()
 int main()
 { 
   test01();
+  return 0;
 }
-
-
-
-
-

@@ -495,6 +495,15 @@ enum reg_class {
 
 #define STARTING_FRAME_OFFSET 0
 
+/* We do not know if the caller has a frame pointer, so we cannot go
+   beyond level 0.  */
+
+#define RETURN_ADDR_RTX(COUNT, FRAME)					   \
+  ((COUNT) == 0								   \
+   ? gen_rtx_MEM (Pmode,						   \
+		  plus_constant (arg_pointer_rtx, -GET_MODE_SIZE (Pmode))) \
+   : 0)
+
 /* If we generate an insn to push BYTES bytes,
    this says how many the stack pointer really advances by.
 
@@ -846,12 +855,6 @@ struct cum_arg
 
 /* Extra constraints.  */
 
-/* 'T' if valid for dec.[wl] on H8/300H and H8/S.  Note that, for
-   inc.[wl], we can use 'K', which has already been defined.  */
-#define OK_FOR_T(OP)				\
-  (GET_CODE (OP) == CONST_INT			\
-   && (INTVAL (OP) == -1 || INTVAL (OP) == -2))
-
 /* Nonzero if X is a constant address suitable as an 8-bit absolute on
    the H8/300H, which is a special case of the 'R' operand.  */
 
@@ -881,8 +884,7 @@ struct cum_arg
        && GET_CODE (XEXP (OP, 0)) == CONST_INT))
 
 #define EXTRA_CONSTRAINT(OP, C)			\
-  ((C) == 'T' ? OK_FOR_T (OP) :			\
-   (C) == 'U' ? OK_FOR_U (OP) :			\
+  ((C) == 'U' ? OK_FOR_U (OP) :			\
    0)
 
 /* GO_IF_LEGITIMATE_ADDRESS recognizes an RTL expression
@@ -1067,8 +1069,6 @@ h8300_valid_machine_decl_attribute (DECL, ATTRIBUTES, IDENTIFIER, ARGS)
 #define CC_NO_CARRY CC_NO_OVERFLOW
 
 /* Control the assembler format that we output.  */
-
-#define ASM_IDENTIFY_GCC(FILE) /* nothing */
 
 /* Output at beginning/end of assembler file.  */
 

@@ -1377,25 +1377,33 @@ simplify_binary_operation (code, mode, op0, op1)
       break;
 
     case DIV:
-      if (arg1s == 0)
+      if (arg1s == 0
+	  || (arg0s == (HOST_WIDE_INT) 1 << (HOST_BITS_PER_WIDE_INT - 1)
+	      && arg1s == -1))
 	return 0;
       val = arg0s / arg1s;
       break;
 
     case MOD:
-      if (arg1s == 0)
+      if (arg1s == 0
+	  || (arg0s == (HOST_WIDE_INT) 1 << (HOST_BITS_PER_WIDE_INT - 1)
+	      && arg1s == -1))
 	return 0;
       val = arg0s % arg1s;
       break;
 
     case UDIV:
-      if (arg1 == 0)
+      if (arg1 == 0
+	  || (arg0s == (HOST_WIDE_INT) 1 << (HOST_BITS_PER_WIDE_INT - 1)
+	      && arg1s == -1))
 	return 0;
       val = (unsigned HOST_WIDE_INT) arg0 / arg1;
       break;
 
     case UMOD:
-      if (arg1 == 0)
+      if (arg1 == 0
+	  || (arg0s == (HOST_WIDE_INT) 1 << (HOST_BITS_PER_WIDE_INT - 1)
+	      && arg1s == -1))
 	return 0;
       val = (unsigned HOST_WIDE_INT) arg0 % arg1;
       break;
@@ -2635,12 +2643,11 @@ hash_rtx (x, mode, create)
       if (! e)
 	return 0;
 
-      hash += e->value;
-      return hash;
+      return e->value;
 
     case CONST_INT:
       hash += ((unsigned) CONST_INT << 7) + (unsigned) mode + INTVAL (x);
-      return hash ? hash : CONST_INT;
+      return hash ? hash : (unsigned int) CONST_INT;
 
     case CONST_DOUBLE:
       /* This is like the general case, except that it only counts
@@ -2652,18 +2659,18 @@ hash_rtx (x, mode, create)
       else
 	hash += ((unsigned) CONST_DOUBLE_LOW (x)
 		 + (unsigned) CONST_DOUBLE_HIGH (x));
-      return hash ? hash : CONST_DOUBLE;
+      return hash ? hash : (unsigned int) CONST_DOUBLE;
 
       /* Assume there is only one rtx object for any given label.  */
     case LABEL_REF:
       hash
 	+= ((unsigned) LABEL_REF << 7) + (unsigned long) XEXP (x, 0);
-      return hash ? hash : LABEL_REF;
+      return hash ? hash : (unsigned int) LABEL_REF;
 
     case SYMBOL_REF:
       hash
 	+= ((unsigned) SYMBOL_REF << 7) + (unsigned long) XSTR (x, 0);
-      return hash ? hash : SYMBOL_REF;
+      return hash ? hash : (unsigned int) SYMBOL_REF;
 
     case PRE_DEC:
     case PRE_INC:
@@ -2737,7 +2744,7 @@ hash_rtx (x, mode, create)
 	abort ();
     }
 
-  return hash ? hash : 1 + GET_CODE (x);
+  return hash ? hash : 1 + (unsigned int) GET_CODE (x);
 }
 
 /* Create a new value structure for VALUE and initialize it.  The mode of the

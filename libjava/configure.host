@@ -23,7 +23,6 @@ libgcj_flags=
 libgcj_cflags=
 libgcj_cxxflags=
 libgcj_javaflags=
-libgcj_sjlj=
 libgcj_interpreter=
 
 case "${target_optspace}:${host}" in
@@ -46,6 +45,7 @@ AM_RUNTESTFLAGS=
 echo "$target"
 
 DIVIDESPEC=-fuse-divide-subroutine
+EXCEPTIONSPEC=-fnon-call-exceptions
 
 case "${host}" in
   mips-tx39-*|mipstx39-unknown-*)
@@ -62,22 +62,19 @@ case "${host}" in
 	libgcj_interpreter=yes
 	libgcj_cxxflags="-D__NO_MATH_INLINES"
 	libgcj_cflags="-D__NO_MATH_INLINES"
-	DIVIDESPEC=-fno-use-divide-subroutine
 	;;
   alpha*-*)
 	libgcj_flags="${libgcj_flags} -mieee"
 	libgcj_interpreter=yes
-	libgcj_sjlj=yes
+	;;
+  powerpc*-*)
+	libgcj_interpreter=yes
 	;;
   sparc-*)
         ;;
   ia64-*)
         libgcj_flags="${libgcj_flags} -funwind-tables"
-	libgcj_sjlj=yes
 	libgcj_interpreter=yes
-	;;
-  *)
-        libgcj_sjlj=yes
 	;;
 esac
 

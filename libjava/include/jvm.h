@@ -1,6 +1,6 @@
 // jvm.h - Header file for private implementation information. -*- c++ -*-
 
-/* Copyright (C) 1998, 1999, 2000  Free Software Foundation
+/* Copyright (C) 1998, 1999, 2000, 2001  Free Software Foundation
 
    This file is part of libgcj.
 
@@ -27,10 +27,35 @@ details.  */
 /* Structure of the virtual table.  */
 struct _Jv_VTable
 {
+#ifdef __ia64__
+  jclass clas;
+  unsigned long : 64;
+  void *gc_descr;
+  unsigned long : 64;
+
+  typedef struct { void *pc, *gp; } vtable_elt;
+#else
   jclass clas;
   void *gc_descr;
-  void *method[1];
-  void *get_finalizer() { return method[0]; }
+
+  typedef void *vtable_elt;
+#endif
+
+  // This must be last, as derived classes "extend" this by
+  // adding new data members.
+  vtable_elt method[1];
+
+#ifdef __ia64__
+  void *get_method(int i) { return &method[i]; }
+  void set_method(int i, void *fptr) { method[i] = *(vtable_elt *)fptr; }
+#else
+  void *get_method(int i) { return method[i]; }
+  void set_method(int i, void *fptr) { method[i] = fptr; }
+#endif
+
+  void *get_finalizer() { return get_method(0); }
+  static size_t vtable_elt_size() { return sizeof(vtable_elt); }
+  static _Jv_VTable *new_vtable (int count);
 };
 
 // Number of virtual methods on object.  FIXME: it sucks that we have
@@ -38,12 +63,9 @@ struct _Jv_VTable
 #define NUM_OBJECT_METHODS 5
 
 // This structure is the type of an array's vtable.
-struct _Jv_ArrayVTable
+struct _Jv_ArrayVTable : public _Jv_VTable
 {
-  jclass clas;
-  void *gc_descr;
-  void *method[NUM_OBJECT_METHODS];
-  void *get_finalizer() { return method[0]; }
+  vtable_elt extra_method[NUM_OBJECT_METHODS - 1];
 };
 
 union _Jv_word
@@ -163,6 +185,18 @@ void *_Jv_AllocBytesChecked (jsize size) __attribute__((__malloc__));
 extern "C" void JvRunMain (jclass klass, int argc, const char **argv);
 void _Jv_RunMain (const char* name, int argc, const char **argv, bool is_jar);
 
+// Delayed until after _Jv_AllocBytes is declared.
+//
+// Note that we allocate this as unscanned memory -- the vtables
+// are handled specially by the GC.
+
+inline _Jv_VTable *
+_Jv_VTable::new_vtable (int count)
+{
+  size_t size = sizeof(_Jv_VTable) + (count - 1) * vtable_elt_size ();
+  return (_Jv_VTable *) _Jv_AllocBytes (size);
+}
+
 // This function is used to determine the hash code of an object.
 inline jint
 _Jv_HashCode (jobject obj)
@@ -219,6 +253,7 @@ extern "C" void _Jv_CheckArrayStore (jobject array, jobject obj);
 extern "C" void _Jv_RegisterClass (jclass klass);
 extern "C" void _Jv_RegisterClasses (jclass *classes);
 extern void _Jv_UnregisterClass (_Jv_Utf8Const*, java::lang::ClassLoader*);
+extern void _Jv_ResolveField (_Jv_Field *, java::lang::ClassLoader*);
 
 extern jclass _Jv_FindClass (_Jv_Utf8Const *name,
 			     java::lang::ClassLoader *loader);

@@ -31,8 +31,6 @@
 // ISO C++ 14882: 20.4.6  C library
 //
 
-// Note: This is not a conforming implementation.
-
 #ifndef _CPP_CSIGNAL
 #define _CPP_CSIGNAL 1
 
@@ -45,8 +43,8 @@
 namespace std
 {
   using ::sig_atomic_t;
-  extern "C" void (*signal(int, void (*__func)(int)))(int); 
-  extern "C" int raise(int);
+  using ::signal;
+  using ::raise;
 }
 
 #endif

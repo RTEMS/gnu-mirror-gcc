@@ -447,11 +447,6 @@ extern int flag_pic;
 
 extern int flag_exceptions;
 
-/* Nonzero means use the new model for exception handling. Replaces 
-   -DNEW_EH_MODEL as a compile option. */
-
-extern int flag_new_exceptions;
-
 /* Nonzero means generate frame unwind info table when supported */
 
 extern int flag_unwind_tables;
@@ -579,10 +574,6 @@ extern int flag_prefix_function_name;
 extern int g_switch_value;
 extern int g_switch_set;
 
-/* Value of the -finline-limit flag.  */
-
-extern int inline_max_insns;
-
 /* Values of the -falign-* flags: how much to align labels in code. 
    0 means `use default', 1 means `don't align'.  
    For each variable, there is an _log variant which is the power
@@ -621,5 +612,8 @@ extern int flag_eliminate_dwarf2_dups;
 /* Non-zero means to collect statistics which might be expensive
    and to print them when we are done.  */
 extern int flag_detailed_statistics;
+
+/* Nonzero means enable synchronous exceptions for non-call instructions.  */
+extern int flag_non_call_exceptions;
 
 #endif /* GCC_FLAGS_H */

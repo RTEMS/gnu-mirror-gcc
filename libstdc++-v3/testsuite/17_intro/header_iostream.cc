@@ -20,15 +20,11 @@
 
 // 17.4.1.2 Headers, iostream
 
-#include <iostream>             // { dg-do compile }
-#include <debug_assert.h>
+#include <iostream>
+#include <testsuite_hooks.h>
 
 
 int main(void)
 {
   return 0;
 }
-
-
-
-

@@ -4276,6 +4276,20 @@
     }
 }")
 
+(define_insn "*call_osf_1_noreturn"
+  [(call (mem:DI (match_operand:DI 0 "call_operand" "c,R,i"))
+	 (match_operand 1 "" ""))
+   (clobber (reg:DI 27))
+   (clobber (reg:DI 26))]
+  "! TARGET_WINDOWS_NT && ! TARGET_OPEN_VMS
+   && find_reg_note (insn, REG_NORETURN, NULL_RTX)"
+  "@
+   jsr $26,($27),0
+   bsr $26,$%0..ng
+   jsr $26,%0"
+  [(set_attr "type" "jsr")
+   (set_attr "length" "*,*,8")])
+      
 (define_insn "*call_osf_1"
   [(call (mem:DI (match_operand:DI 0 "call_operand" "c,R,i"))
 	 (match_operand 1 "" ""))
@@ -4659,7 +4673,7 @@
   "
 {
   alpha_split_tfmode_pair (operands);
-  if (rtx_equal_p (operands[0], operands[3]))
+  if (reg_overlap_mentioned_p (operands[0], operands[3]))
     {
       rtx tmp;
       tmp = operands[0], operands[0] = operands[1], operands[1] = tmp;
@@ -4717,7 +4731,7 @@
    st%, %R1,%0"
   [(set_attr "type" "ilog,iadd,iadd,ild,ist,fcpys,fld,fst")])
 
-(define_insn "*movsf_fix"
+(define_insn "*movsi_fix"
   [(set (match_operand:SI 0 "nonimmediate_operand" "=r,r,r,r,m,*f,*f,m,r,*f")
 	(match_operand:SI 1 "input_operand" "rJ,K,L,m,rJ,*fJ,m,*f,*f,r"))]
   "! TARGET_WINDOWS_NT && ! TARGET_OPEN_VMS && TARGET_FIX
@@ -5886,22 +5900,6 @@
   DONE;
 }")
 
-(define_expand "eh_epilogue"
-  [(use (match_operand:DI 0 "register_operand" "r"))
-   (use (match_operand:DI 1 "register_operand" "r"))
-   (use (match_operand:DI 2 "register_operand" "r"))]
-  "! TARGET_OPEN_VMS"
-  "
-{
-  cfun->machine->eh_epilogue_sp_ofs = operands[1];
-  if (GET_CODE (operands[2]) != REG || REGNO (operands[2]) != 26)
-    {
-      rtx ra = gen_rtx_REG (Pmode, 26);
-      emit_move_insn (ra, operands[2]);
-      operands[2] = ra;
-    }
-}")
-
 ;; In creating a large stack frame, NT _must_ use ldah+lda to load
 ;; the frame size into a register.  We use this pattern to ensure
 ;; we get lda instead of addq.
@@ -5961,12 +5959,35 @@
   [(set_attr "length" "12")
    (set_attr "type" "multi")])
 
-(define_insn "exception_receiver"
-  [(unspec_volatile [(const_int 0)] 7)]
+(define_expand "exception_receiver"
+  [(unspec_volatile [(match_dup 0)] 7)]
   "! TARGET_OPEN_VMS && ! TARGET_WINDOWS_NT"
-  "br $29,$LSJ%=\\n$LSJ%=:\;ldgp $29,0($29)"
-  [(set_attr "length" "12")
+  "
+{
+  if (TARGET_LD_BUGGY_LDGP)
+    operands[0] = alpha_gp_save_rtx ();
+  else
+    operands[0] = const0_rtx;
+}")
+
+(define_insn "*exception_receiver_1"
+  [(unspec_volatile [(const_int 0)] 7)]
+  "! TARGET_LD_BUGGY_LDGP"
+  "ldgp $29,0($26)"
+  [(set_attr "length" "8")
    (set_attr "type" "multi")])
+
+;; ??? We don't represent the usage of $29 properly in address loads
+;; and function calls.  This leads to the following move being deleted
+;; as dead code unless it is represented as a volatile unspec.
+
+(define_insn "*exception_receiver_2"
+  [(unspec_volatile [(match_operand:DI 0 "nonimmediate_operand" "r,m")] 7)]
+  "TARGET_LD_BUGGY_LDGP"
+  "@
+   mov %0,$29
+   ldq $29,%0"
+  [(set_attr "type" "ilog,ild")])
 
 (define_expand "nonlocal_goto_receiver"
   [(unspec_volatile [(const_int 0)] 1)

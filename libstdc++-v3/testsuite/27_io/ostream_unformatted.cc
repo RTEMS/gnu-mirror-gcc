@@ -20,7 +20,7 @@
 
 #include <sstream>
 #include <ostream>
-#include <debug_assert.h>
+#include <testsuite_hooks.h>
 
 
 void test01()
@@ -50,4 +50,5 @@ void test01()
 int main()
 {
   test01();
+  return 0;
 }

@@ -40,6 +40,7 @@ static tree convert_ieee_real_to_integer PARAMS ((tree, tree));
 static tree parse_signature_type PARAMS ((const unsigned char **,
 					 const unsigned char *));
 static tree lookup_do PARAMS ((tree, tree, tree, tree, tree (*)(tree)));
+static tree build_null_signature PARAMS ((tree));
 
 tree * type_map;
 extern struct obstack permanent_obstack;
@@ -406,7 +407,9 @@ build_java_array_type (element_type, length)
   el_name = TYPE_NAME (el_name);
   if (TREE_CODE (el_name) == TYPE_DECL)
     el_name = DECL_NAME (el_name);
-  TYPE_NAME (t) = identifier_subst (el_name, "", '.', '.', "[]");
+  TYPE_NAME (t) = build_decl (TYPE_DECL,
+                             identifier_subst (el_name, "", '.', '.', "[]"),
+                             t);
 
   set_java_signature (t, sig);
   set_super_info (0, t, object_type_node, 0);
@@ -420,6 +423,7 @@ build_java_array_type (element_type, length)
   DECL_CONTEXT (fld) = t;
   FIELD_PUBLIC (fld) = 1;
   FIELD_FINAL (fld) = 1;
+  TREE_READONLY (fld) = 1;
 
   atype = build_prim_array_type (element_type, length);
   arfld = build_decl (FIELD_DECL, get_identifier ("data"), atype);
@@ -574,6 +578,13 @@ get_type_from_signature (tree signature)
       IDENTIFIER_SIGNATURE_TYPE (signature) = type;
     }
   return type;
+}
+
+static tree
+build_null_signature (type)
+     tree type ATTRIBUTE_UNUSED;
+{
+  return NULL_TREE;
 }
 
 /* Return the signature string for the arguments of method type TYPE. */
@@ -758,9 +769,20 @@ lookup_java_method (searched_class, method_name, method_signature)
 		    method_signature, build_java_signature);
 }
 
-/* Search in class SEARCHED_CLASS (an its superclasses) for a method
+/* Return true iff CLASS (or its ancestors) has a method METHOD_NAME. */
+
+int
+has_method (class, method_name)
+     tree class;
+     tree method_name;
+{
+  return lookup_do (class, class,  method_name,
+		    NULL_TREE, build_null_signature) != NULL_TREE;
+}
+
+/* Search in class SEARCHED_CLASS (and its superclasses) for a method
    matching METHOD_NAME and signature SIGNATURE.  Also search in
-   SEARCHED_INTERFACE (an its superinterfaces) for a similar match.
+   SEARCHED_INTERFACE (and its superinterfaces) for a similar match.
    Return the matched method DECL or NULL_TREE.  SIGNATURE_BUILDER is
    used on method candidates to build their (sometimes partial)
    signature.  */
