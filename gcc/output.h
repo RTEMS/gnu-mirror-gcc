@@ -206,6 +206,10 @@ extern void exception_section		PARAMS ((void));
    The rtl is stored into DECL.  */
 extern void make_function_rtl		PARAMS ((tree));
 
+/* Revise the name in a function's rtl definition to have a
+   bounded-pointer prefix.  */
+extern void remake_function_rtl		PARAMS ((tree));
+
 /* Declare DECL to be a weak symbol.  */
 extern void declare_weak		PARAMS ((tree));
 #endif /* TREE_CODE */
@@ -265,6 +269,12 @@ extern void assemble_end_function	PARAMS ((tree, const char *));
    DONT_OUTPUT_DATA if nonzero means don't actually output the
    initial value (that will be done by the caller).  */
 extern void assemble_variable		PARAMS ((tree, int, int, int));
+
+/* Output a set directive for the extent of a global variable which
+   can have variable size, i.e., any variable having a type whose
+   layout terminates with an array type (e.g., a simple array, or a
+   record or union type with a terminating array member.  */
+extern void assemble_high_bound		PARAMS ((tree));
 
 /* Output something to declare an external symbol to the assembler.
    (Most assemblers don't need this, so we normally output nothing.)

@@ -652,6 +652,25 @@ dtors_section ()						\
   while (0)
 #endif
 
+/* Output a set directive to define <declname>.high_bound.  */
+#define ASM_DECLARE_HIGH_BOUND(FILE, DECL)						\
+  do											\
+    {											\
+      if (DECL_ARGUMENTS (DECL))							\
+	{										\
+	  tree high_bound = DECL_ARGUMENTS (DECL);					\
+	  fprintf (FILE, "\t%s\t ", SET_ASM_OP);					\
+	  assemble_name (FILE, IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (high_bound)));	\
+	  fprintf (FILE, ",");								\
+	  assemble_name (FILE, IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (DECL)));	\
+	  fprintf (FILE, "+");								\
+	  fprintf (FILE, HOST_WIDE_INT_PRINT_DEC,					\
+		   int_size_in_bytes (DECL));						\
+	  putc ('\n', FILE);								\
+	}										\
+    }											\
+  while (0)
+
 /* A table of bytes codes used by the ASM_OUTPUT_ASCII and
    ASM_OUTPUT_LIMITED_STRING macros.  Each byte in the table
    corresponds to a particular byte value [0..255].  For any

@@ -163,6 +163,7 @@ struct tree_common
        TREE_ADDRESSABLE in
    	   VAR_DECL, FUNCTION_DECL, FIELD_DECL, CONSTRUCTOR, LABEL_DECL,
 	   ..._TYPE, IDENTIFIER_NODE
+       TREE_BOUNDS_CHECK in COMPOUND_EXPR
 
    static_flag:
 
@@ -487,6 +488,11 @@ extern void tree_class_check_failed PARAMS ((const tree, int,
    had its address taken.  That matters for inline functions.  */
 #define TREE_ADDRESSABLE(NODE) ((NODE)->common.addressable_flag)
 
+/* In COMPOUND_EXPR, nonzero means the compound expression represents
+   runtime bounds checks.  If we wish to toss the checks, the simple,
+   unchecked pointer value resides in TREE_OPERAND (t, 1).  */
+#define TREE_BOUNDS_CHECK(NODE) (EXPR_CHECK (NODE)->common.addressable_flag)
+
 /* In a VAR_DECL, nonzero means allocate static storage.
    In a FUNCTION_DECL, nonzero if function has been defined.
    In a CONSTRUCTOR, nonzero means allocate static storage.  */
@@ -657,8 +663,9 @@ extern void tree_class_check_failed PARAMS ((const tree, int,
    If the data type is signed, the value is sign-extended to 2 words
    even though not all of them may really be in use.
    In an unsigned constant shorter than 2 words, the extra bits are 0.  */
-#define TREE_INT_CST_LOW(NODE) (INTEGER_CST_CHECK (NODE)->int_cst.int_cst_low)
-#define TREE_INT_CST_HIGH(NODE) (INTEGER_CST_CHECK (NODE)->int_cst.int_cst_high)
+#define TREE_INT_CST(NODE) (INTEGER_CST_CHECK (NODE)->int_cst.int_cst.a)
+#define TREE_INT_CST_LOW(NODE) (INTEGER_CST_CHECK (NODE)->int_cst.int_cst.w.low)
+#define TREE_INT_CST_HIGH(NODE) (INTEGER_CST_CHECK (NODE)->int_cst.int_cst.w.high)
 
 #define INT_CST_LT(A, B)  \
 (TREE_INT_CST_HIGH (A) < TREE_INT_CST_HIGH (B)			\
@@ -677,8 +684,13 @@ struct tree_int_cst
   struct tree_common common;
   struct rtx_def *rtl;	/* acts as link to register transfer language
 			   (rtl) info */
-  unsigned HOST_WIDE_INT int_cst_low;
-  HOST_WIDE_INT int_cst_high;
+  union {
+    unsigned HOST_WIDE_INT a[2];
+    struct {
+      unsigned HOST_WIDE_INT low;
+      HOST_WIDE_INT high;
+    } w;
+  } int_cst;
 };
 
 /* In REAL_CST, STRING_CST, COMPLEX_CST nodes, and CONSTRUCTOR nodes,
@@ -1051,12 +1063,12 @@ struct tree_block
    of such chains is always the unbounded type.  */
 
 /* Access the field decls of a bounded-pointer type.  */
-#define TYPE_BOUNDED_VALUE(TYPE) TYPE_FIELDS (TYPE)
-#define TYPE_BOUNDED_BASE(TYPE) TREE_CHAIN (TYPE_BOUNDED_VALUE (TYPE))
-#define TYPE_BOUNDED_EXTENT(TYPE) TREE_CHAIN (TYPE_BOUNDED_BASE (TYPE))
+#define TYPE_BOUNDED_VALUE_FIELD(TYPE) TYPE_FIELDS (TYPE)
+#define TYPE_LOW_BOUND_FIELD(TYPE) TREE_CHAIN (TYPE_BOUNDED_VALUE_FIELD (TYPE))
+#define TYPE_HIGH_BOUND_FIELD(TYPE) TREE_CHAIN (TYPE_LOW_BOUND_FIELD (TYPE))
 
 /* Access the simple-pointer subtype of a bounded-pointer type.  */
-#define TYPE_BOUNDED_SUBTYPE(TYPE) TREE_TYPE (TYPE_BOUNDED_VALUE (TYPE))
+#define TYPE_BOUNDED_SUBTYPE(TYPE) TREE_TYPE (TYPE_BOUNDED_VALUE_FIELD (TYPE))
 
 /* Find the unbounded counterpart to a type, or return TYPE if it is
    already unbounded.  */
@@ -1573,6 +1585,13 @@ struct tree_type
    argument's depth.  */
 #define DECL_POINTER_DEPTH(DECL) (DECL_CHECK (DECL)->decl.pointer_depth)
 
+/* Nonzero means that this field terminates a struct or union.
+   All union members are considred to terminate the union.  */
+/* GKM FIMXE: This works for C, but not C++.  */
+#define FINAL_FIELD_P(DECL)				\
+  (TREE_CODE (DECL_FIELD_CONTEXT (DECL)) == UNION_TYPE	\
+   || TREE_CHAIN (DECL) == NULL_TREE)
+
 struct tree_decl
 {
   struct tree_common common;
@@ -1703,6 +1722,9 @@ enum tree_index
   TI_INTEGER_ZERO,
   TI_INTEGER_ONE,
   TI_NULL_POINTER,
+  TI_NULL_UNBOUNDED_PTR,
+  TI_STRICT_NULL_BOUNDED_PTR,
+  TI_PERMISSIVE_NULL_BOUNDED_PTR,
 
   TI_SIZE_ZERO,
   TI_SIZE_ONE,
@@ -1722,7 +1744,11 @@ enum tree_index
 
   TI_VOID_TYPE,
   TI_PTR_TYPE,
+  TI_UNBOUNDED_PTR_TYPE,
+  TI_BOUNDED_PTR_TYPE,
   TI_CONST_PTR_TYPE,
+  TI_CONST_UNBOUNDED_PTR_TYPE,
+  TI_CONST_BOUNDED_PTR_TYPE,
   TI_PTRDIFF_TYPE,
   TI_VA_LIST_TYPE,
 
@@ -1731,6 +1757,11 @@ enum tree_index
   TI_V8QI_TYPE,
   TI_V4HI_TYPE,
   TI_V2SI_TYPE,
+
+  TI_MAIN_IDENTIFIER,
+
+  TI_CHECK_BOUNDS_FUNC,
+  TI_TRAP_FUNC,
 
   TI_MAX
 };
@@ -1759,7 +1790,17 @@ extern tree global_trees[TI_MAX];
 #define bitsize_one_node		global_trees[TI_BITSIZE_ONE]
 #define bitsize_unit_node		global_trees[TI_BITSIZE_UNIT]
 
+/* null_pointer_node is either bounded or unbounded according to the
+   default boundedness of pointer types.  */
 #define null_pointer_node		global_trees[TI_NULL_POINTER]
+/* null_unbounded_ptr_node is always unbounded.  */
+#define null_unbounded_ptr_node		global_trees[TI_NULL_UNBOUNDED_PTR]
+/* strict_null_bounded_ptr_node has an extent of 0, so that dereferencing
+   it is disallowed and raises a bounds violation.  */
+#define strict_null_bounded_ptr_node	global_trees[TI_STRICT_NULL_BOUNDED_PTR]
+/* permissive_null_bounded_ptr_node has bounds of ~0, so that dereferencing
+   it is permissable and raises no bounds violation.  */
+#define permissive_null_bounded_ptr_node	global_trees[TI_PERMISSIVE_NULL_BOUNDED_PTR]
 
 #define float_type_node			global_trees[TI_FLOAT_TYPE]
 #define double_type_node		global_trees[TI_DOUBLE_TYPE]
@@ -1772,12 +1813,27 @@ extern tree global_trees[TI_MAX];
 
 #define void_type_node			global_trees[TI_VOID_TYPE]
 /* The C type `void *'.  */
+/* ptr_type_node is either a bounded or an unbounded pointer type according
+   to the default boundedness of pointer types.  */
 #define ptr_type_node			global_trees[TI_PTR_TYPE]
+/* null_unbounded_ptr_node is always an unbounded pointer type.  */
+#define unbounded_ptr_type_node		global_trees[TI_UNBOUNDED_PTR_TYPE]
+/* strict_null_bounded_ptr_node is always a bounded pointer type.  */
+#define bounded_ptr_type_node		global_trees[TI_BOUNDED_PTR_TYPE]
 /* The C type `const void *'.  */
 #define const_ptr_type_node		global_trees[TI_CONST_PTR_TYPE]
+#define const_unbounded_ptr_type_node	global_trees[TI_CONST_UNBOUNDED_PTR_TYPE]
+#define const_bounded_ptr_type_node	global_trees[TI_CONST_BOUNDED_PTR_TYPE]
 #define ptrdiff_type_node		global_trees[TI_PTRDIFF_TYPE]
 #define va_list_type_node		global_trees[TI_VA_LIST_TYPE]
 
+#define main_identifier_node		global_trees[TI_MAIN_IDENTIFIER]
+/* Returns non-zero iff ID_NODE is an IDENTIFIER_NODE whose name is
+   `main'.  */
+#define MAIN_NAME_P(ID_NODE) ((ID_NODE) == main_identifier_node)
+
+#define trap_fndecl			global_trees[TI_TRAP_FUNC]
+
 #define V4SF_type_node			global_trees[TI_V4SF_TYPE]
 #define V4SI_type_node			global_trees[TI_V4SI_TYPE]
 #define V8QI_type_node			global_trees[TI_V8QI_TYPE]
@@ -1893,8 +1949,19 @@ extern tree build_expr_list		PARAMS ((tree, tree));
 extern tree build_decl			PARAMS ((enum tree_code, tree, tree));
 extern tree build_block			PARAMS ((tree, tree, tree, tree, tree));
 extern tree build_expr_wfl              PARAMS ((tree, const char *, int, int));
+
+/* Construct nodes for use by bounded pointers */
 
-/* Construct various nodes representing data types.  */
+extern tree build_va_list_type		PARAMS ((void));
+extern tree build_null_pointer_node	PARAMS ((tree));
+extern tree build_bounded_ptr_constructor PARAMS ((tree));
+extern tree build_bounded_ptr_constructor_2 PARAMS ((tree, tree));
+extern tree build_bounded_ptr_constructor_3 PARAMS ((tree, tree, tree));
+extern tree build_bounded_ptr_field_ref PARAMS ((tree, int));
+#define build_bounded_ptr_value_ref(T) build_bounded_ptr_field_ref ((T), 0)
+#define build_low_bound_ref(T) build_bounded_ptr_field_ref ((T), 1)
+#define build_high_bound_ref(T) build_bounded_ptr_field_ref ((T), 2)
+extern tree build_bounded_ptr_check PARAMS ((tree, tree));
 
 extern tree make_signed_type		PARAMS ((int));
 extern tree make_unsigned_type		PARAMS ((int));
@@ -1902,7 +1969,14 @@ extern void initialize_sizetypes	PARAMS ((void));
 extern void set_sizetype		PARAMS ((tree));
 extern tree signed_or_unsigned_type 	PARAMS ((int, tree));
 extern void fixup_unsigned_type		PARAMS ((tree));
-extern tree build_pointer_type		PARAMS ((tree));
+extern tree build_pointer_type_2	PARAMS ((enum tree_code, tree));
+extern enum tree_code default_pointer_type_code PARAMS ((tree));
+#define build_pointer_type(TYPE) \
+  build_pointer_type_2 (POINTER_TYPE, (TYPE))
+#define build_bounded_ptr_pointer_type(TYPE) \
+  build_pointer_type_2 (RECORD_TYPE, (TYPE))
+#define build_default_pointer_type(TYPE) \
+  build_pointer_type_2 (VOID_TYPE, (TYPE))
 extern tree build_reference_type 	PARAMS ((tree));
 extern tree build_index_type		PARAMS ((tree));
 extern tree build_index_2_type		PARAMS ((tree, tree));
@@ -1928,7 +2002,8 @@ extern int tree_int_cst_sgn		PARAMS ((tree));
 extern int tree_expr_nonnegative_p		PARAMS ((tree));
 extern int index_type_equal		PARAMS ((tree, tree));
 extern tree get_inner_array_type	PARAMS ((tree));
-
+extern tree expose_string_constant	PARAMS ((tree));
+
 /* From expmed.c.  Since rtl.h is included after tree.h, we can't
    put the prototype here.  Rtl.h does declare the prototype if
    tree.h had been included.  */
@@ -2028,6 +2103,8 @@ typedef struct record_layout_info_s
      instance variables) encountered in T.  */
   tree pending_statics;
   int packed_maybe_necessary;
+  unsigned int bounded_flag;
+  unsigned int pointer_depth;
 } *record_layout_info;
 
 extern record_layout_info start_record_layout PARAMS ((tree));
@@ -2745,13 +2822,19 @@ extern struct rtx_def *emit_line_note_force	PARAMS ((const char *, int));
 
 extern int setjmp_call_p		PARAMS ((tree));
 
+/* Tree list of FUNCTION_DECL nodes that might need bounded-pointer thunks.  */
+extern tree bounded_pointer_thunk_decls;
+
 /* In front end.  */
 
 extern int mark_addressable		PARAMS ((tree));
 extern void incomplete_type_error	PARAMS ((tree, tree));
+extern tree get_high_bound_decl		PARAMS ((tree));
+extern int variable_high_bound_p		PARAMS ((tree));
 extern void print_lang_statistics	PARAMS ((void));
 extern tree truthvalue_conversion	PARAMS ((tree));
 extern void split_specs_attrs		PARAMS ((tree, tree *, tree *));
+extern int (*valid_lang_attribute)	PARAMS ((tree, tree, tree, tree));
 #ifdef BUFSIZ
 extern void print_lang_decl		PARAMS ((FILE *, tree, int));
 extern void print_lang_type		PARAMS ((FILE *, tree, int));
@@ -2759,6 +2842,8 @@ extern void print_lang_identifier	PARAMS ((FILE *, tree, int));
 #endif
 extern int global_bindings_p		PARAMS ((void));
 extern void insert_block		PARAMS ((tree));
+extern void push_decl_for_bounded_pointer_thunk PARAMS ((tree));
+extern void compile_bounded_pointer_thunk PARAMS ((tree));
 
 /* In integrate.c */
 extern void save_for_inline_nocopy	PARAMS ((tree));

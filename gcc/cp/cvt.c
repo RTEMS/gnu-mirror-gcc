@@ -999,7 +999,8 @@ convert (type, expr)
 
   intype = TREE_TYPE (expr);
 
-  if (POINTER_TYPE_P (type) && POINTER_TYPE_P (intype))
+  if (POINTER_TYPE_P (type) && POINTER_TYPE_P (intype)
+      && BOUNDED_POINTER_TYPE_P (type) == BOUNDED_POINTER_TYPE_P (intype))
     {
       expr = decl_constant_value (expr);
       return fold (build1 (NOP_EXPR, type, expr));

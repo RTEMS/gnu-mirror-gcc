@@ -50,22 +50,29 @@ static int missing_braces_mentioned;
 /* 1 if we explained undeclared var errors.  */
 static int undeclared_variable_notice;
 
-static tree qualify_type		PARAMS ((tree, tree));
-static int comp_target_types		PARAMS ((tree, tree));
-static int function_types_compatible_p	PARAMS ((tree, tree));
-static int type_lists_compatible_p	PARAMS ((tree, tree));
+static int comp_target_types_how	PARAMS ((tree, tree, int));
+#define comp_target_types(a, b) comp_target_types_physically ((a), (b))
+#define comp_target_types_physically(a, b) comp_target_types_how ((a), (b), 0)
+#define comp_target_types_logically(a, b) comp_target_types_how ((a), (b), 1)
+static int function_types_compatible_p	PARAMS ((tree, tree, int));
+static int type_lists_compatible_p	PARAMS ((tree, tree, int));
 static tree decl_constant_value		PARAMS ((tree));
 static tree lookup_field		PARAMS ((tree, tree, tree *));
-static tree convert_arguments		PARAMS ((tree, tree, tree, tree));
+static tree convert_arguments		PARAMS ((tree, tree, tree, tree, tree));
 static tree pointer_int_sum		PARAMS ((enum tree_code, tree, tree));
 static tree pointer_diff		PARAMS ((tree, tree));
+static tree build_high_bound	PARAMS ((tree));
 static tree unary_complex_lvalue	PARAMS ((enum tree_code, tree));
 static void pedantic_lvalue_warning	PARAMS ((enum tree_code));
 static tree internal_build_compound_expr PARAMS ((tree, int));
-static tree convert_for_assignment	PARAMS ((tree, tree, const char *,
-						 tree, tree, int));
-static void warn_for_assignment		PARAMS ((const char *, const char *,
-						 tree, int));
+static tree convert_for_assignment	PARAMS ((tree, tree, const char *, tree,
+					       tree, int));
+static void diagnostic_for_assignment	PARAMS ((int, const char *, const char *,
+					       tree, int));
+#define warn_for_assignment(msgid, opname, function, argnum) \
+  diagnostic_for_assignment (0, (msgid), (opname), (function), (argnum))
+#define error_for_assignment(msgid, opname, function, argnum) \
+  diagnostic_for_assignment (1, (msgid), (opname), (function), (argnum))
 static tree valid_compound_expr_initializer PARAMS ((tree, tree));
 static void push_string			PARAMS ((const char *));
 static void push_member_name		PARAMS ((tree));
@@ -163,17 +170,6 @@ incomplete_type_error (value, type)
 	error ("invalid use of incomplete typedef `%s'",
 	       IDENTIFIER_POINTER (DECL_NAME (TYPE_NAME (type))));
     }
-}
-
-/* Return a variant of TYPE which has all the type qualifiers of LIKE
-   as well as those of TYPE.  */
-
-static tree
-qualify_type (type, like)
-     tree type, like;
-{
-  return c_build_qualified_type (type, 
-				 TYPE_QUALS (type) | TYPE_QUALS (like));
 }
 
 /* Return the common type of two types.
@@ -284,6 +280,11 @@ common_type (t1, t2)
       else
 	return build_type_attribute_variant (t2, attributes);
 
+    case RECORD_TYPE:
+      if (!BOUNDED_POINTER_TYPE_P (t1)
+	  || !BOUNDED_POINTER_TYPE_P (t2))
+	return build_type_attribute_variant (t1, attributes);
+      /* FALL THROUGH */
     case POINTER_TYPE:
       /* For two pointers, do this recursively on the target type,
 	 and combine the qualifiers of the two types' targets.  */
@@ -293,12 +294,10 @@ common_type (t1, t2)
       {
 	tree pointed_to_1 = TREE_TYPE (t1);
 	tree pointed_to_2 = TREE_TYPE (t2);
-	tree target = common_type (TYPE_MAIN_VARIANT (pointed_to_1),
-				   TYPE_MAIN_VARIANT (pointed_to_2));
-	t1 = build_pointer_type (c_build_qualified_type 
-				 (target, 
-				  TYPE_QUALS (pointed_to_1) | 
-				  TYPE_QUALS (pointed_to_2)));
+	tree target = common_type (TYPE_MAIN_PHYSICAL_VARIANT (pointed_to_1),
+				   TYPE_MAIN_PHYSICAL_VARIANT (pointed_to_2));
+	int type_quals = TYPE_QUALS (pointed_to_1) | TYPE_QUALS (pointed_to_2);
+	t1 = build_pointer_type_2 (code1, c_build_qualified_type (target, type_quals));
 	return build_type_attribute_variant (t1, attributes);
       }
 #if 0
@@ -422,11 +421,15 @@ common_type (t1, t2)
 
 /* Return 1 if TYPE1 and TYPE2 are compatible types for assignment
    or various other operations.  Return 2 if they are compatible
-   but a warning may be needed if you use them together.  */
+   but a warning may be needed if you use them together.
+
+   Nonzero LOGICALP means to ignore differences of boundedness for
+   pointer types.  */
 
 int
-comptypes (type1, type2)
+comptypes_how (type1, type2, logicalp)
      tree type1, type2;
+     int logicalp;
 {
   register tree t1 = type1;
   register tree t2 = type2;
@@ -461,19 +464,30 @@ comptypes (type1, type2)
 
   /* Different classes of types can't be compatible.  */
 
-  if (TREE_CODE (t1) != TREE_CODE (t2)) return 0;
+  if (TREE_CODE (t1) != TREE_CODE (t2)
+      && !(logicalp && MAYBE_BOUNDED_POINTER_TYPE_P (t1)
+	   && MAYBE_BOUNDED_POINTER_TYPE_P (t2)))
+    return 0;
 
-  /* Qualifiers must match.  */
+  /* Qualifiers other than BOUNDED must match.  */
 
-  if (TYPE_QUALS (t1) != TYPE_QUALS (t2))
+  if ((TYPE_QUALS (t1) & ~TYPE_QUAL_BOUNDED) != (TYPE_QUALS (t2) & ~TYPE_QUAL_BOUNDED))
     return 0;
 
   /* Allow for two different type nodes which have essentially the same
      definition.  Note that we already checked for equality of the type
      qualifiers (just above).  */
 
-  if (TYPE_MAIN_VARIANT (t1) == TYPE_MAIN_VARIANT (t2))
-    return 1;
+  if (logicalp)
+    {
+      if (TYPE_MAIN_VARIANT (t1) == TYPE_MAIN_VARIANT (t2))
+	return 1;
+    }
+  else
+    {
+      if (TYPE_MAIN_VARIANTS_PHYSICALLY_EQUAL_P (t1, t2))
+	return 1;
+    }
 
 #ifndef COMP_TYPE_ATTRIBUTES
 #define COMP_TYPE_ATTRIBUTES(t1,t2)	1
@@ -494,7 +508,7 @@ comptypes (type1, type2)
       break;
 
     case FUNCTION_TYPE:
-      val = function_types_compatible_p (t1, t2);
+      val = function_types_compatible_p (t1, t2, logicalp);
       break;
 
     case ARRAY_TYPE:
@@ -524,6 +538,9 @@ comptypes (type1, type2)
       }
 
     case RECORD_TYPE:
+      if (BOUNDED_POINTER_TYPE_P (t1) && BOUNDED_POINTER_TYPE_P (t2))
+	return comptypes (TYPE_BOUNDED_SUBTYPE (t1),
+			  TYPE_BOUNDED_SUBTYPE (t2));
       if (maybe_objc_comptypes (t1, t2, 0) == 1)
 	val = 1;
       break;
@@ -538,8 +555,9 @@ comptypes (type1, type2)
    ignoring their qualifiers.  */
 
 static int
-comp_target_types (ttl, ttr)
+comp_target_types_how (ttl, ttr, logicalp)
      tree ttl, ttr;
+     int logicalp;
 {
   int val;
 
@@ -547,8 +565,8 @@ comp_target_types (ttl, ttr)
   if ((val = maybe_objc_comptypes (ttl, ttr, 1)) >= 0)
     return val;
 
-  val = comptypes (TYPE_MAIN_VARIANT (TREE_TYPE (ttl)),
-		   TYPE_MAIN_VARIANT (TREE_TYPE (ttr)));
+  val = comptypes_how (TYPE_MAIN_VARIANT (TREE_TYPE (ttl)),
+		       TYPE_MAIN_VARIANT (TREE_TYPE (ttr)), logicalp);
 
   if (val == 2 && pedantic)
     pedwarn ("types are not quite compatible");
@@ -565,8 +583,9 @@ comp_target_types (ttl, ttr)
    Otherwise, the argument types must match.  */
 
 static int
-function_types_compatible_p (f1, f2)
+function_types_compatible_p (f1, f2, logicalp)
      tree f1, f2;
+     int logicalp;
 {
   tree args1, args2;
   /* 1 if no need for warning yet, 2 if warning cause has been seen.  */
@@ -574,7 +593,7 @@ function_types_compatible_p (f1, f2)
   int val1;
 
   if (!(TREE_TYPE (f1) == TREE_TYPE (f2)
-	|| (val = comptypes (TREE_TYPE (f1), TREE_TYPE (f2)))))
+	|| (val = comptypes_how (TREE_TYPE (f1), TREE_TYPE (f2), logicalp))))
     return 0;
 
   args1 = TYPE_ARG_TYPES (f1);
@@ -591,7 +610,7 @@ function_types_compatible_p (f1, f2)
 	 compare that with the other type's arglist.
 	 If they don't match, ask for a warning (but no error).  */
       if (TYPE_ACTUAL_ARG_TYPES (f1)
-	  && 1 != type_lists_compatible_p (args2, TYPE_ACTUAL_ARG_TYPES (f1)))
+	  && 1 != type_lists_compatible_p (args2, TYPE_ACTUAL_ARG_TYPES (f1), logicalp))
 	val = 2;
       return val;
     }
@@ -600,13 +619,13 @@ function_types_compatible_p (f1, f2)
       if (!self_promoting_args_p (args1))
 	return 0;
       if (TYPE_ACTUAL_ARG_TYPES (f2)
-	  && 1 != type_lists_compatible_p (args1, TYPE_ACTUAL_ARG_TYPES (f2)))
+	  && 1 != type_lists_compatible_p (args1, TYPE_ACTUAL_ARG_TYPES (f2), logicalp))
 	val = 2;
       return val;
     }
 
   /* Both types have argument lists: compare them and propagate results.  */
-  val1 = type_lists_compatible_p (args1, args2);
+  val1 = type_lists_compatible_p (args1, args2, logicalp);
   return val1 != 1 ? val1 : val;
 }
 
@@ -615,8 +634,9 @@ function_types_compatible_p (f1, f2)
    or 2 for compatible with warning.  */
 
 static int
-type_lists_compatible_p (args1, args2)
+type_lists_compatible_p (args1, args2, logicalp)
      tree args1, args2;
+     int logicalp;
 {
   /* 1 if no need for warning yet, 2 if warning cause has been seen.  */
   int val = 1;
@@ -644,7 +664,7 @@ type_lists_compatible_p (args1, args2)
 	  if (simple_type_promotes_to (TREE_VALUE (args1)) != NULL_TREE)
 	    return 0;
 	}
-      else if (! (newval = comptypes (TREE_VALUE (args1), TREE_VALUE (args2))))
+      else if (! (newval = comptypes_how (TREE_VALUE (args1), TREE_VALUE (args2), logicalp)))
 	{
 	  /* Allow  wait (union {union wait *u; int *i} *)
 	     and  wait (union wait *)  to be compatible.  */
@@ -947,9 +967,7 @@ default_conversion (exp)
     }
   if (code == ARRAY_TYPE)
     {
-      register tree adr;
       tree restype = TREE_TYPE (type);
-      tree ptrtype;
       int constp = 0;
       int volatilep = 0;
 
@@ -960,15 +978,19 @@ default_conversion (exp)
 	}
 
       if (TYPE_QUALS (type) || constp || volatilep)
-	restype 
-	  = c_build_qualified_type (restype,
-				    TYPE_QUALS (type) 
-				    | (constp * TYPE_QUAL_CONST)
-				    | (volatilep * TYPE_QUAL_VOLATILE));
+	restype = c_build_qualified_type (restype,
+					  TYPE_QUALS (type)
+					  | (TYPE_QUALS (restype)
+					     & TYPE_QUAL_BOUNDED)
+					  | (constp * TYPE_QUAL_CONST)
+					  | (volatilep * TYPE_QUAL_VOLATILE));
 
       if (TREE_CODE (exp) == INDIRECT_REF)
-	return convert (TYPE_POINTER_TO (restype),
-			TREE_OPERAND (exp, 0));
+	{
+	  tree op0 = TREE_OPERAND (exp, 0);
+	  op0 = build_bounded_ptr_constructor (op0);
+	  return convert (build_default_pointer_type (restype), op0);
+	}
 
       if (TREE_CODE (exp) == COMPOUND_EXPR)
 	{
@@ -984,25 +1006,30 @@ default_conversion (exp)
 	  return error_mark_node;
 	}
 
-      ptrtype = build_pointer_type (restype);
-
-      if (TREE_CODE (exp) == VAR_DECL)
-	{
-	  /* ??? This is not really quite correct
-	     in that the type of the operand of ADDR_EXPR
-	     is not the target type of the type of the ADDR_EXPR itself.
-	     Question is, can this lossage be avoided?  */
-	  adr = build1 (ADDR_EXPR, ptrtype, exp);
-	  if (mark_addressable (exp) == 0)
-	    return error_mark_node;
-	  TREE_CONSTANT (adr) = staticp (exp);
-	  TREE_SIDE_EFFECTS (adr) = 0;   /* Default would be, same as EXP.  */
-	  return adr;
-	}
-      /* This way is better for a COMPONENT_REF since it can
-	 simplify the offset for a component.  */
-      adr = build_unary_op (ADDR_EXPR, exp, 1);
-      return convert (ptrtype, adr);
+      {
+	tree addr;
+	if (TREE_CODE (exp) == VAR_DECL)
+	  {
+	    addr = build1 (ADDR_EXPR,
+			   build_pointer_type (TREE_TYPE (exp)), exp);
+	    if (mark_addressable (exp) == 0)
+	      return error_mark_node;
+	    TREE_CONSTANT (addr) = staticp (exp);
+	    TREE_SIDE_EFFECTS (addr) = 0;   /* Default would be, same as EXP.  */
+	    addr = build_bounded_ptr_constructor (addr);
+	  }
+	else
+	  {
+	    /* This way is better for a COMPONENT_REF since it can
+	       simplify the offset for a component.  */
+	    addr = build_unary_op (ADDR_EXPR, exp, 1);
+	    /* While converting &x[y] to x+y, we might have already wrapped
+	       a bounded-pointer constructor around addr.  */
+	    if (!TREE_BOUNDED (addr))
+	      addr = build_bounded_ptr_constructor (addr);
+	  }
+	return convert (build_default_pointer_type (restype), addr);
+      }
     }
   return exp;
 }
@@ -1141,7 +1168,8 @@ build_component_ref (datum, component)
 
   /* See if there is a field or component with name COMPONENT.  */
 
-  if (code == RECORD_TYPE || code == UNION_TYPE)
+  if ((code == RECORD_TYPE && !BOUNDED_POINTER_TYPE_P (type))
+      || code == UNION_TYPE)
     {
       tree indirect = 0;
 
@@ -1191,6 +1219,166 @@ build_component_ref (datum, component)
 
   return error_mark_node;
 }
+
+tree
+build_bounded_ptr_field_ref (bp, field_number)
+     tree bp;
+     int field_number;
+{
+  tree orig_bp = bp;
+  tree subtype, field;
+  int i;
+  
+  if (! TREE_BOUNDED (bp))
+    {
+      if (field_number)
+	error ("can't take __ptr%s of unbounded pointer",
+	       ((field_number == 1) ? "low" : "high"));
+      return bp;
+    }
+  if (! BOUNDED_POINTER_TYPE_P (TREE_TYPE (bp)))
+    abort ();
+
+  subtype = TYPE_BOUNDED_SUBTYPE (TREE_TYPE (bp));
+  field = TYPE_FIELDS (TREE_TYPE (bp));
+
+  for (i = 0; i < field_number && field; i++)
+    field = TREE_CHAIN (field);
+
+  /* GKM FIXME: what about NON_LVALUE_EXPR? */
+  while (TREE_CODE (bp) == NOP_EXPR)
+    bp = TREE_OPERAND (bp, 0);
+
+  /* NOP_EXPR should never change boundedness */
+  if (! TREE_BOUNDED (bp) || ! BOUNDED_POINTER_TYPE_P (TREE_TYPE (bp)))
+    abort ();
+
+  /* GKM FIXME: should this be done by fold? */
+  if (TREE_CODE (bp) == CONVERT_EXPR
+      && !TREE_BOUNDED (TREE_OPERAND (bp, 0)))
+    return convert (subtype, TREE_OPERAND (bp, 0));
+
+  if (TREE_CODE (bp) == CONSTRUCTOR)
+    {
+      tree elts = CONSTRUCTOR_ELTS (bp);
+      tree value;
+
+      if (!BOUNDED_POINTER_TYPE_P (TREE_TYPE (bp)))
+	error ("expected expression having bounded-pointer type");
+      for (i = 0; i < field_number && elts; i++)
+	elts = TREE_CHAIN (elts);
+      if (elts == NULL_TREE)
+	{
+	  error ("field %s not found", IDENTIFIER_POINTER (DECL_NAME (field)));
+	  return error_mark_node;
+	}
+      value = TREE_VALUE (elts);
+      /* If the underlaying value is an integer type, keep it that way
+         for enclosing arithmetic.  */
+      if (TREE_CODE (TREE_TYPE (value)) != INTEGER_TYPE
+	  && subtype != TYPE_BOUNDED_SUBTYPE (TREE_TYPE (bp)))
+	value = convert (subtype, value);
+      return value;
+    }
+  else
+    {
+      tree ref = build (COMPONENT_REF, subtype, orig_bp, field);
+      TREE_CONSTANT (ref) = (TREE_CONSTANT (orig_bp) && TREE_CONSTANT (field));
+      TREE_READONLY (ref) = (TREE_READONLY (orig_bp) || TREE_READONLY (field));
+      TREE_THIS_VOLATILE (ref) = (TREE_THIS_VOLATILE (orig_bp)
+				  || TREE_THIS_VOLATILE (field));
+      TREE_SIDE_EFFECTS (ref) = (TREE_THIS_VOLATILE (ref)
+				 || TREE_SIDE_EFFECTS (orig_bp)
+				 || TREE_SIDE_EFFECTS (field));
+      return ref;
+    }
+}
+
+
+/* This is just like build_bounded_ptr_value_ref except with the
+   side-effect of generating bounds checks.  Strip away bounds, check
+   pointer value against low_bound & high_bound, then return a
+   COMPONENT_REF to the pointer value, or return the pointer value
+   itself if we can.
+
+   BP is the bounded pointer to check and extract the value ref.
+
+   LENGTH is the number of bytes the user wishes to operate upon, and
+   is supplied when expanding builtin mem & str functions.  When we
+   get a valid LENGTH, we check BP.value against BP.low_bound, and
+   BP.value+LENGTH against BP.high_bound.  */
+
+tree
+build_bounded_ptr_check (bp, length)
+     tree bp;
+     tree length;
+{
+  tree value, low_bound, high_bound, compare;
+
+  if (!TREE_BOUNDED (bp))
+    abort ();
+
+  if (skip_evaluation || ! flag_bounds_check)
+    return build_bounded_ptr_value_ref (bp);
+
+  if (TREE_SIDE_EFFECTS (bp) && TREE_CODE (bp) != CONSTRUCTOR)
+    bp = save_expr (bp);
+
+  value = build_bounded_ptr_value_ref (bp);
+  /* The type of value might be integer, but since we're not doing
+     arithmetic, coerce it back to pointer.  */
+  if (TREE_CODE (TREE_TYPE (value)) == INTEGER_TYPE)
+    value = convert (TYPE_BOUNDED_SUBTYPE (TREE_TYPE (bp)), value);
+  low_bound = build_low_bound_ref (bp);
+  high_bound = build_high_bound_ref (bp);
+
+  if (TREE_CODE (bp) == CONSTRUCTOR)
+    {
+      if (TREE_SIDE_EFFECTS (value))
+	value = save_expr (value);
+#if 0
+      if (TREE_SIDE_EFFECTS (low_bound))
+	low_bound = save_expr (low_bound);
+      if (TREE_SIDE_EFFECTS (high_bound))
+	high_bound = save_expr (high_bound);
+#endif
+    }
+
+  /* GKM FIXME: fold needs to be enhanced to evaluate expressions of
+     the form (a >= (a + i)) ==> 0, where `a' is an address and `i' is
+     a positive integer.  */
+  compare = fold (build_binary_op (TRUTH_ORIF_EXPR,
+				   fold (build_binary_op (LT_EXPR, value, low_bound, 1)),
+				   fold (build_binary_op (GE_EXPR, value, high_bound, 1)), 1));
+  if (integer_zerop (compare))
+    return value;
+  else
+    {
+      tree crash, maybe_crash, check;
+      int save_warn_unused_value = warn_unused_value;
+      warn_unused_value = 0;
+      crash = build_compound_expr (tree_cons (NULL_TREE,
+					      build_function_call (trap_fndecl, NULL_TREE),
+					      tree_cons (NULL_TREE, integer_zero_node,
+							 NULL_TREE)));
+      maybe_crash = fold (build_binary_op (TRUTH_ANDIF_EXPR, compare, crash, 1));
+      check = build_compound_expr (tree_cons (NULL_TREE, maybe_crash,
+					      tree_cons (NULL_TREE, value,
+							 NULL_TREE)));
+#if 0
+      /* GKM FIXME: make this an error when it's reliable.  */
+      if (integer_onep (compare))
+	warning ("bounds violation");
+#endif
+      warn_unused_value = save_warn_unused_value;
+      TREE_BOUNDS_CHECK (check) = 1;
+      /* Save the original bp in case we later wish to toss the bounds
+         check.  This can happen if we later build an ADDR_EXPR.  */
+      TREE_CHAIN (check) = bp;
+      return check;
+    }
+}
+
 
 /* Given an expression PTR for a pointer, return an expression
    for the value pointed to.
@@ -1201,8 +1389,21 @@ build_indirect_ref (ptr, errorstring)
      tree ptr;
      const char *errorstring;
 {
-  register tree pointer = default_conversion (ptr);
-  register tree type = TREE_TYPE (pointer);
+  register tree pointer;
+  register tree type;
+
+  /* This is either *(&foo) or (&foo)->, so just toss the bounds
+     without checking.  */
+  if (BOUNDED_POINTER_TYPE_P (TREE_TYPE (ptr))
+      && (TREE_CODE (ptr) == CONSTRUCTOR
+	  && (TREE_CODE (TREE_VALUE (CONSTRUCTOR_ELTS (ptr))) == ADDR_EXPR)))
+    ptr = build_bounded_ptr_value_ref (ptr);
+
+  pointer = default_conversion (ptr);
+  if (BOUNDED_POINTER_TYPE_P (TREE_TYPE (pointer)))
+    pointer = build_bounded_ptr_check (pointer, NULL_TREE);
+
+  type = TREE_TYPE (pointer);
 
   if (TREE_CODE (type) == POINTER_TYPE)
     {
@@ -1214,8 +1415,8 @@ build_indirect_ref (ptr, errorstring)
       else
 	{
 	  tree t = TREE_TYPE (type);
-	  register tree ref = build1 (INDIRECT_REF,
-				      TYPE_MAIN_VARIANT (t), pointer);
+	  tree ref = build1 (INDIRECT_REF,
+			     TYPE_MAIN_PHYSICAL_VARIANT (t), pointer);
 
 	  if (!COMPLETE_OR_VOID_TYPE_P (t) && TREE_CODE (t) != ARRAY_TYPE)
 	    {
@@ -1268,10 +1469,14 @@ build_array_ref (array, index)
     return error_mark_node;
 
   if (TREE_CODE (TREE_TYPE (array)) == ARRAY_TYPE
-      && TREE_CODE (array) != INDIRECT_REF)
+      && TREE_CODE (array) != INDIRECT_REF
+      /* If we're checking bounds, compile a[i] as *(a + i).  */
+      && ! (flag_bounds_check && default_pointer_boundedness
+	    && lvalue_p (array)))
     {
       tree rval, type;
 
+      /* GKM FIXME: handle flag_bounds_check.  */;
       /* Subscripting with type char is likely to lose
 	 on a machine where chars are signed.
 	 So warn on any machine, but optionally.
@@ -1311,6 +1516,12 @@ build_array_ref (array, index)
 	  && TYPE_VALUES (TREE_TYPE (array))
 	  && ! int_fits_type_p (index, TYPE_VALUES (TREE_TYPE (array))))
 	{
+#if 0
+	  /* GKM FIXME: doesn't handle var-arrays properly.
+	     We need to use pointer bounds.  */
+	  if (flag_bounds_check)
+	    warning ("array bounds violation");
+#endif
 	  if (mark_addressable (array) == 0)
 	    return error_mark_node;
 	}
@@ -1332,7 +1543,7 @@ build_array_ref (array, index)
 	    pedwarn ("ANSI C forbids subscripting non-lvalue array");
 	}
 
-      type = TYPE_MAIN_VARIANT (TREE_TYPE (TREE_TYPE (array)));
+      type = TYPE_MAIN_PHYSICAL_VARIANT (TREE_TYPE (TREE_TYPE (array)));
       rval = build (ARRAY_REF, type, array, index);
       /* Array ref is const/volatile if the array elements are
          or if the array is.  */
@@ -1349,9 +1560,14 @@ build_array_ref (array, index)
 	       in an inline function.
 	       Hope it doesn't break something else.  */
 	    | TREE_THIS_VOLATILE (array));
-      return require_complete_type (fold (rval));
+      TREE_BOUNDED (rval) = BOUNDED_POINTER_TYPE_P (type);
+      rval = require_complete_type (fold (rval));
+      return rval;
     }
 
+  /* Index might be a int-casted pointer, so toss its bounds.  */
+  if (TREE_BOUNDED (index))
+    index = build_bounded_ptr_value_ref (index);
   {
     tree ar = default_conversion (array);
     tree ind = default_conversion (index);
@@ -1375,7 +1591,7 @@ build_array_ref (array, index)
     if (ar == error_mark_node)
       return ar;
 
-    if (TREE_CODE (TREE_TYPE (ar)) != POINTER_TYPE
+    if (! MAYBE_BOUNDED_POINTER_TYPE_P (TREE_TYPE (ar))
 	|| TREE_CODE (TREE_TYPE (TREE_TYPE (ar))) == FUNCTION_TYPE)
       {
 	error ("subscripted value is neither array nor pointer");
@@ -1506,9 +1722,10 @@ build_function_call (function, params)
       /* Differs from default_conversion by not setting TREE_ADDRESSABLE
 	 (because calling an inline function does not mean the function
 	 needs to be separately compiled).  */
-      fntype = build_type_variant (TREE_TYPE (function),
-				   TREE_READONLY (function),
-				   TREE_THIS_VOLATILE (function));
+      fntype = TREE_TYPE (function);
+      fntype = build_qualified_type (fntype, (TREE_FUNC_QUALS (function)
+					      | (TYPE_BOUNDED (fntype)
+						 * TYPE_QUAL_BOUNDED)));
       fundecl = function;
       function = build1 (ADDR_EXPR, build_pointer_type (fntype), function);
     }
@@ -1534,7 +1751,7 @@ build_function_call (function, params)
      function prototype, or apply default promotions.  */
 
   coerced_params
-    = convert_arguments (TYPE_ARG_TYPES (fntype), params, name, fundecl);
+    = convert_arguments (TYPE_ARG_TYPES (fntype), params, name, fundecl, fntype);
 
   /* Check for errors in format strings.  */
 
@@ -1580,15 +1797,24 @@ build_function_call (function, params)
    This is also where warnings about wrong number of args are generated.
 
    Both VALUES and the returned value are chains of TREE_LIST nodes
-   with the elements of the list in the TREE_VALUE slots of those nodes.  */
+   with the elements of the list in the TREE_VALUE slots of those nodes.
+
+   FUNDECL is a FUNCTION_DECL node, or NULL for calls through pointers
+   and FUNTYPE is the call's FUNCTION_TYPE node.  */
 
 static tree
-convert_arguments (typelist, values, name, fundecl)
-     tree typelist, values, name, fundecl;
+convert_arguments (typelist, values, name, fundecl, funtype)
+     tree typelist, values, name, fundecl, funtype;
 {
   register tree typetail, valtail;
   register tree result = NULL;
   int parmnum;
+  int depth = (fundecl ? DECL_POINTER_DEPTH (fundecl)
+	       : TYPE_POINTER_DEPTH (funtype));
+  int varargs_boundedp = (funtype == default_function_type
+			  ? default_pointer_boundedness
+			  : TYPE_AMBIENT_BOUNDEDNESS (funtype));
+  int boundedp = TYPE_BOUNDED (funtype);
 
   /* Scan the given expressions and types, producing individual
      converted arguments and pushing them on RESULT in reverse order.  */
@@ -1599,6 +1825,8 @@ convert_arguments (typelist, values, name, fundecl)
     {
       register tree type = typetail ? TREE_VALUE (typetail) : 0;
       register tree val = TREE_VALUE (valtail);
+      /* Formal parm type is specified by a function prototype.  */
+      tree parmval;
 
       if (type == void_type_node)
 	{
@@ -1609,7 +1837,14 @@ convert_arguments (typelist, values, name, fundecl)
 	    error ("too many arguments to function");
 	  break;
 	}
-
+#if 0
+      /* GKM FIXME: we don't do this anymore */
+      else if (type && TREE_CODE (type) == INTEGER_CST)
+	{
+	  varargs_boundedp = TREE_INT_CST_LOW (type);
+	  type = NULL_TREE;
+	}
+#endif
       /* Strip NON_LVALUE_EXPRs since we aren't using as an lvalue.  */
       /* Do not use STRIP_NOPS here!  We do not want an enumerator with value 0
 	 to convert automatically to a pointer.  */
@@ -1620,13 +1855,26 @@ convert_arguments (typelist, values, name, fundecl)
 	  || TREE_CODE (TREE_TYPE (val)) == FUNCTION_TYPE)
 	val = default_conversion (val);
 
+      if (TREE_BOUNDED (val)
+	  && !(type ? (BOUNDED_POINTER_TYPE_P (type)
+		       || (TREE_CODE (type) == UNION_TYPE
+			   && TYPE_TRANSPARENT_UNION (type)
+			   && TYPE_BOUNDED (type)))
+	       : varargs_boundedp)
+	  && !(fundecl && DECL_BUILT_IN (fundecl)
+	       /* GKM FIXME: what other builtins need this? */
+	       && (DECL_FUNCTION_CODE (fundecl) == BUILT_IN_STDARG_START
+		   || DECL_FUNCTION_CODE (fundecl) == BUILT_IN_VARARGS_START)))
+	/* Silently strip away bounds if arg-type or funtype expects
+	   unbounded pointers.  */
+	val = build_bounded_ptr_value_ref (val);
+      /* GKM FIXME: silently add permissive bounds if arg-type or
+	 funtype expects bounded pointers?  */
+
       val = require_complete_type (val);
 
       if (type != 0)
 	{
-	  /* Formal parm type is specified by a function prototype.  */
-	  tree parmval;
-
 	  if (!COMPLETE_TYPE_P (type))
 	    {
 	      error ("type of formal parameter %d is incomplete", parmnum + 1);
@@ -1642,16 +1890,20 @@ convert_arguments (typelist, values, name, fundecl)
 
 		  if (INTEGRAL_TYPE_P (type)
 		      && TREE_CODE (TREE_TYPE (val)) == REAL_TYPE)
-		    warn_for_assignment ("%s as integer rather than floating due to prototype", (char *) 0, name, parmnum + 1);
+		    warn_for_assignment ("%s as integer rather than floating due to prototype",
+					 (char *) 0, name, parmnum + 1);
 		  else if (TREE_CODE (type) == COMPLEX_TYPE
 			   && TREE_CODE (TREE_TYPE (val)) == REAL_TYPE)
-		    warn_for_assignment ("%s as complex rather than floating due to prototype", (char *) 0, name, parmnum + 1);
+		    warn_for_assignment ("%s as complex rather than floating due to prototype",
+					 (char *) 0, name, parmnum + 1);
 		  else if (TREE_CODE (type) == REAL_TYPE
 			   && INTEGRAL_TYPE_P (TREE_TYPE (val)))
-		    warn_for_assignment ("%s as floating rather than integer due to prototype", (char *) 0, name, parmnum + 1);
+		    warn_for_assignment ("%s as floating rather than integer due to prototype",
+					 (char *) 0, name, parmnum + 1);
 		  else if (TREE_CODE (type) == REAL_TYPE
 			   && TREE_CODE (TREE_TYPE (val)) == COMPLEX_TYPE)
-		    warn_for_assignment ("%s as floating rather than complex due to prototype", (char *) 0, name, parmnum + 1);
+		    warn_for_assignment ("%s as floating rather than complex due to prototype",
+					 (char *) 0, name, parmnum + 1);
 		  /* ??? At some point, messages should be written about
 		     conversions between complex types, but that's too messy
 		     to do now.  */
@@ -1661,7 +1913,8 @@ convert_arguments (typelist, values, name, fundecl)
 		      /* Warn if any argument is passed as `float',
 			 since without a prototype it would be `double'.  */
 		      if (formal_prec == TYPE_PRECISION (float_type_node))
-			warn_for_assignment ("%s as `float' rather than `double' due to prototype", (char *) 0, name, parmnum + 1);
+			warn_for_assignment ("%s as `float' rather than `double' due to prototype",
+					     (char *) 0, name, parmnum + 1);
 		    }
 		  /* Detect integer changing in width or signedness.  */
 		  else if (INTEGRAL_TYPE_P (type)
@@ -1676,7 +1929,8 @@ convert_arguments (typelist, values, name, fundecl)
 			   and the actual arg is that enum type.  */
 			;
 		      else if (formal_prec != TYPE_PRECISION (type1))
-			warn_for_assignment ("%s with different width due to prototype", (char *) 0, name, parmnum + 1);
+			warn_for_assignment ("%s with different width due to prototype",
+					     (char *) 0, name, parmnum + 1);
 		      else if (TREE_UNSIGNED (type) == TREE_UNSIGNED (type1))
 			;
 		      /* Don't complain if the formal parameter type
@@ -1710,9 +1964,11 @@ convert_arguments (typelist, values, name, fundecl)
 			       && TREE_UNSIGNED (TREE_TYPE (val)))
 			;
 		      else if (TREE_UNSIGNED (type))
-			warn_for_assignment ("%s as unsigned due to prototype", (char *) 0, name, parmnum + 1);
+			warn_for_assignment ("%s as unsigned due to prototype",
+					     (char *) 0, name, parmnum + 1);
 		      else
-			warn_for_assignment ("%s as signed due to prototype", (char *) 0, name, parmnum + 1);
+			warn_for_assignment ("%s as signed due to prototype",
+					     (char *) 0, name, parmnum + 1);
 		    }
 		}
 
@@ -1726,19 +1982,46 @@ convert_arguments (typelist, values, name, fundecl)
 		  && (TYPE_PRECISION (type) < TYPE_PRECISION (integer_type_node)))
 		parmval = default_conversion (parmval);
 	    }
-	  result = tree_cons (NULL_TREE, parmval, result);
 	}
+      else if (TREE_CODE (TREE_TYPE (val)) == POINTER_TYPE
+	       && varargs_boundedp)
+	/* GKM FIXME: BUG: this generates 0..0 bounds. */
+	parmval = convert_for_assignment
+	  (build_qualified_type (TREE_TYPE (val), (TYPE_QUALS (TREE_TYPE (val))
+						   | TYPE_QUAL_BOUNDED)),
+	   val, (char *) 0, /* arg passing  */
+	   fundecl, name, parmnum + 1);
       else if (TREE_CODE (TREE_TYPE (val)) == REAL_TYPE
                && (TYPE_PRECISION (TREE_TYPE (val))
 	           < TYPE_PRECISION (double_type_node)))
 	/* Convert `float' to `double'.  */
-	result = tree_cons (NULL_TREE, convert (double_type_node, val), result);
+	parmval = convert (double_type_node, val);
       else
 	/* Convert `short' and `char' to full-size `int'.  */
-	result = tree_cons (NULL_TREE, default_conversion (val), result);
+	parmval = default_conversion (val);
+
+      result = tree_cons (NULL_TREE, parmval, result);
+      depth = MAX (depth, TYPE_POINTER_DEPTH (TREE_TYPE (parmval)));
+      boundedp |= TYPE_BOUNDED (TREE_TYPE (parmval));
 
       if (typetail)
 	typetail = TREE_CHAIN (typetail);
+    }
+
+  if (fundecl)
+    {
+      int old_depth = DECL_POINTER_DEPTH (fundecl);
+      int old_boundedp = TREE_BOUNDED (fundecl);
+      if (depth > old_depth)
+	DECL_POINTER_DEPTH (fundecl) = depth;
+      TREE_BOUNDED (fundecl) |= boundedp;
+      if (!depth != !old_depth || old_boundedp != boundedp)
+	/* If the function was implicitly declared, or has a
+	   non-prototype decl, we don't discover what types it has for
+	   arguments until now.  If there are pointers among the
+	   arguments, we must remake DECL_ASSEMBLER_NAME to have the
+	   special BP prefix.  */
+	remake_function_rtl (fundecl);
     }
 
   if (typetail != 0 && TREE_VALUE (typetail) != void_type_node)
@@ -1888,6 +2171,7 @@ build_binary_op (code, orig_op0, orig_op1, convert_p)
   tree type0, type1;
   register enum tree_code code0, code1;
   tree op0, op1;
+  tree bp0, bp1;
 
   /* Expression code to give to the expression when it is built.
      Normally this is CODE, which is what the caller asked for,
@@ -1942,16 +2226,58 @@ build_binary_op (code, orig_op0, orig_op1, convert_p)
       op1 = orig_op1;
     }
 
+  /* Binary operations on BP types should always be on the value field.
+     The underlaying BP operand might be obscured by integer casts, so
+     strip those away first.  */
+
   type0 = TREE_TYPE (op0);
-  type1 = TREE_TYPE (op1);
-
-  /* The expression codes of the data types of the arguments tell us
-     whether the arguments are integers, floating, pointers, etc.  */
+  bp0 = op0;
+  while (TREE_CODE (bp0) == NOP_EXPR
+	 || TREE_CODE (bp0) == CONVERT_EXPR
+	 || TREE_CODE (bp0) == NON_LVALUE_EXPR)
+    bp0 = TREE_OPERAND (bp0, 0);
+  if (TREE_BOUNDED (bp0))
+    {
+      if (TREE_CODE (bp0) == BIND_EXPR)
+	bp0 = save_expr (bp0);
+      op0 = build_bounded_ptr_value_ref (bp0);
+      /* BP constructors shadow scalar-type conversions, so we must
+	 take care to restore them.  */
+      if (TREE_CODE (TREE_TYPE (op0)) != POINTER_TYPE)
+	type0 = TREE_TYPE (op0);
+      else if (BOUNDED_POINTER_TYPE_P (type0))
+	type0 = TYPE_BOUNDED_SUBTYPE (type0);
+      /* Convert back to scalar type, if op0 was a int-casted pointer */
+      op0 = convert (type0, op0);
+    }
+  else
+    bp0 = NULL_TREE;
   code0 = TREE_CODE (type0);
-  code1 = TREE_CODE (type1);
-
-  /* Strip NON_LVALUE_EXPRs, etc., since we aren't using as an lvalue.  */
   STRIP_TYPE_NOPS (op0);
+
+  type1 = TREE_TYPE (op1);
+  bp1 = op1;
+  while (TREE_CODE (bp1) == NOP_EXPR
+	 || TREE_CODE (bp1) == CONVERT_EXPR
+	 || TREE_CODE (bp1) == NON_LVALUE_EXPR)
+    bp1 = TREE_OPERAND (bp1, 0);
+  if (TREE_BOUNDED (bp1))
+    {
+      if (TREE_CODE (bp1) == BIND_EXPR)
+	bp1 = save_expr (bp1);
+      op1 = build_bounded_ptr_value_ref (bp1);
+      /* BP constructors shadow scalar-type conversions, so we must
+	 take care to restore them.  */
+      if (TREE_CODE (TREE_TYPE (op1)) != POINTER_TYPE)
+	type1 = TREE_TYPE (op1);
+      else if (BOUNDED_POINTER_TYPE_P (type1))
+	type1 = TYPE_BOUNDED_SUBTYPE (type1);
+      /* Convert back to scalar type, if op1 was a int-casted pointer */
+      op1 = convert (type1, op1);
+    }
+  else
+    bp1 = NULL_TREE;
+  code1 = TREE_CODE (type1);
   STRIP_TYPE_NOPS (op1);
 
   /* If an error was already reported for one of the arguments,
@@ -1965,9 +2291,30 @@ build_binary_op (code, orig_op0, orig_op1, convert_p)
     case PLUS_EXPR:
       /* Handle the pointer + int case.  */
       if (code0 == POINTER_TYPE && code1 == INTEGER_TYPE)
-	return pointer_int_sum (PLUS_EXPR, op0, op1);
+	{
+	  tree result = pointer_int_sum (PLUS_EXPR, op0, op1);
+	  if (bp1 && TREE_CODE (op0) == INTEGER_CST)
+	    /* This happens when we add ((char *) 0) to an integer
+	       expression in order to convert that expression back to
+	       pointer.  When an integer expression has bounds, it
+	       was once a bounded pointer that was converted to integer
+	       so that it could be masked or rounded up to an alignment
+	       boundary.  */
+	    result = build_bounded_ptr_constructor_2 (result, bp1);
+	  else if (bp0)
+	    result = build_bounded_ptr_constructor_2 (result, bp0);
+	  return result;
+	}
       else if (code1 == POINTER_TYPE && code0 == INTEGER_TYPE)
-	return pointer_int_sum (PLUS_EXPR, op1, op0);
+	{
+	  tree result = pointer_int_sum (PLUS_EXPR, op1, op0);
+	  if (bp0 && TREE_CODE (op1) == INTEGER_CST)
+	    /* See comment immediately above.  */
+	    result = build_bounded_ptr_constructor_2 (result, bp0);
+	  else if (bp1)
+	    result = build_bounded_ptr_constructor_2 (result, bp1);
+	  return result;
+	}
       else
 	common = 1;
       break;
@@ -1977,10 +2324,25 @@ build_binary_op (code, orig_op0, orig_op1, convert_p)
 	 We must subtract them as integers, then divide by object size.  */
       if (code0 == POINTER_TYPE && code1 == POINTER_TYPE
 	  && comp_target_types (type0, type1))
-	return pointer_diff (op0, op1);
+	{
+	  /* Preserve pointer bounds for expressions that temporarily
+	     convert pointer to integer like so: (p - (char *) 0).
+	     This is often done so the pointer value can be
+	     manipulated as an integer for masking and rounding up to
+	     an alignment boundary.  */
+	  tree result = pointer_diff (op0, op1);
+	  if (bp0 && TREE_CODE (op1) == INTEGER_CST)
+	    result = build_bounded_ptr_constructor_2 (result, bp0);
+	  return result;
+	}
       /* Handle pointer minus int.  Just like pointer plus int.  */
       else if (code0 == POINTER_TYPE && code1 == INTEGER_TYPE)
-	return pointer_int_sum (MINUS_EXPR, op0, op1);
+	{
+	  tree result = pointer_int_sum (MINUS_EXPR, op0, op1);
+	  if (bp0)
+	    result = build_bounded_ptr_constructor_2 (result, bp0);
+	  return result;
+	}
       else
 	common = 1;
       break;
@@ -2209,7 +2571,7 @@ build_binary_op (code, orig_op0, orig_op1, convert_p)
 	    pedwarn ("comparison of distinct pointer types lacks a cast");
 
 	  if (result_type == NULL_TREE)
-	    result_type = ptr_type_node;
+	    result_type = unbounded_ptr_type_node;
 	}
       else if (code0 == POINTER_TYPE && TREE_CODE (op1) == INTEGER_CST
 	       && integer_zerop (op1))
@@ -2247,7 +2609,7 @@ build_binary_op (code, orig_op0, orig_op1, convert_p)
 	    }
 	  else
 	    {
-	      result_type = ptr_type_node;
+	      result_type = unbounded_ptr_type_node;
 	      pedwarn ("comparison of distinct pointer types lacks a cast");
 	    }
 	}
@@ -2275,7 +2637,7 @@ build_binary_op (code, orig_op0, orig_op1, convert_p)
 	    }
 	  else
 	    {
-	      result_type = ptr_type_node;
+	      result_type = unbounded_ptr_type_node;
 	      pedwarn ("comparison of distinct pointer types lacks a cast");
 	    }
 	}
@@ -2622,7 +2984,25 @@ build_binary_op (code, orig_op0, orig_op1, convert_p)
     if (folded == result)
       TREE_CONSTANT (folded) = TREE_CONSTANT (op0) & TREE_CONSTANT (op1);
     if (final_type != 0)
-      return convert (final_type, folded);
+      folded = convert (final_type, folded);
+
+    if (TREE_CODE_CLASS (code) == '2')
+      {
+	if (bp0 && bp1)
+	  {
+	    if (code0 != POINTER_TYPE)
+	      bp0 = NULL_TREE;
+	    if (code1 != POINTER_TYPE)
+	      bp1 = NULL_TREE;
+	    if (bp0 || bp1)
+	      abort ();
+	  }
+	if (bp0)
+	  folded = build_bounded_ptr_constructor_2 (folded, bp0);
+	else if (bp1)
+	  folded = build_bounded_ptr_constructor_2 (folded, bp1);
+      }
+
     return folded;
   }
 }
@@ -2713,6 +3093,8 @@ pointer_int_sum (resultcode, ptrop, intop)
   folded = fold (result);
   if (folded == result)
     TREE_CONSTANT (folded) = TREE_CONSTANT (ptrop) & TREE_CONSTANT (intop);
+
+  /* GKM FIXME: propagate the pointer's bounds to the result */
   return folded;
 }
 
@@ -2849,6 +3231,11 @@ build_unary_op (code, xarg, noconvert)
       break;
 
     case TRUTH_NOT_EXPR:
+      if (BOUNDED_POINTER_TYPE_P (TREE_TYPE (arg)))
+	{
+	  arg = build_bounded_ptr_value_ref (arg);
+	  typecode = TREE_CODE (TREE_TYPE (arg));
+	}
       if (typecode != INTEGER_TYPE
 	  && typecode != REAL_TYPE && typecode != POINTER_TYPE
 	  && typecode != COMPLEX_TYPE
@@ -2884,6 +3271,39 @@ build_unary_op (code, xarg, noconvert)
     case POSTINCREMENT_EXPR:
     case PREDECREMENT_EXPR:
     case POSTDECREMENT_EXPR:
+      argtype = TREE_TYPE (arg);
+      if (BOUNDED_POINTER_TYPE_P (argtype))
+	{
+	  tree expr, rec, ref;
+	  arg = stabilize_reference (arg);
+	  ref = build_bounded_ptr_value_ref (arg);
+	  rec = TREE_OPERAND (ref, 0);
+	  while (TREE_CODE (rec) == NOP_EXPR || TREE_CODE (rec) == CONVERT_EXPR)
+	    {
+	      /* We do this to avoid running afoul of the
+		 lvalue_or_else checks below, when we send the
+		 component-ref through again.  */
+	      pedantic_lvalue_warning (CONVERT_EXPR);
+	      if (BOUNDED_POINTER_TYPE_P (TREE_TYPE (rec))
+		  && BOUNDED_POINTER_TYPE_P (TREE_TYPE (TREE_OPERAND (rec, 0))))
+		rec = TREE_OPERAND (rec, 0);
+	      else
+		break;
+	    }
+	  TREE_OPERAND (ref, 0) = rec;
+	  expr = build_unary_op (code, ref, noconvert);
+	  val = build (CONSTRUCTOR, argtype, NULL_TREE,
+		       tree_cons (TYPE_BOUNDED_VALUE_FIELD (argtype), expr,
+				  tree_cons (TYPE_LOW_BOUND_FIELD (argtype),
+					     build_low_bound_ref (arg),
+					     tree_cons (TYPE_HIGH_BOUND_FIELD (argtype),
+							build_high_bound_ref (arg),
+							NULL_TREE))));
+	  TREE_THIS_VOLATILE (val) = TREE_THIS_VOLATILE (expr);
+	  TREE_SIDE_EFFECTS (val) = TREE_SIDE_EFFECTS (expr);
+	  return val;
+	}
+
       /* Handle complex lvalues (when permitted)
 	 by reduction to simpler cases.  */
 
@@ -2906,7 +3326,7 @@ build_unary_op (code, xarg, noconvert)
 
       /* Report invalid types.  */
 
-      if (typecode != POINTER_TYPE
+      if (!MAYBE_BOUNDED_POINTER_TYPE_P (TREE_TYPE (arg))
 	  && typecode != INTEGER_TYPE && typecode != REAL_TYPE)
 	{
 	  error ("wrong type argument to %s",
@@ -2924,7 +3344,7 @@ build_unary_op (code, xarg, noconvert)
 
 	/* Compute the increment.  */
 
-	if (typecode == POINTER_TYPE)
+	if (MAYBE_BOUNDED_POINTER_TYPE_P (argtype))
 	  {
 	    /* If pointer target is an undefined struct,
 	       we just cannot know how to do the arithmetic.  */
@@ -3017,6 +3437,13 @@ build_unary_op (code, xarg, noconvert)
       /* Note that this operation never does default_conversion
 	 regardless of NOCONVERT.  */
 
+      /* We're just taking the address, so revert to the bounded
+	 pointer and toss the bounds checks we generated earlier.  */
+      if ((TREE_CODE (arg) == INDIRECT_REF || TREE_CODE (arg) == ARRAY_REF)
+	  && TREE_CODE (TREE_OPERAND (arg, 0)) == COMPOUND_EXPR
+	  && TREE_BOUNDS_CHECK (TREE_OPERAND (arg, 0)))
+	TREE_OPERAND (arg, 0) = TREE_CHAIN (TREE_OPERAND (arg, 0));
+
       /* Let &* cancel out to simplify resulting code.  */
       if (TREE_CODE (arg) == INDIRECT_REF)
 	{
@@ -3057,7 +3484,7 @@ build_unary_op (code, xarg, noconvert)
 	case FIX_CEIL_EXPR:
 	  if (pedantic)
 	    pedwarn ("ANSI C forbids the address of a cast expression");
-	  return convert (build_pointer_type (TREE_TYPE (arg)),
+	  return convert (build_default_pointer_type (TREE_TYPE (arg)),
 			  build_unary_op (ADDR_EXPR, TREE_OPERAND (arg, 0),
 					  0));
 	}
@@ -3086,6 +3513,7 @@ build_unary_op (code, xarg, noconvert)
 					  TREE_READONLY (arg),
 					  TREE_THIS_VOLATILE (arg));
 
+      /* GKM FIXME: why don't we build a BP constructor here? */
       argtype = build_pointer_type (argtype);
 
       if (mark_addressable (arg) == 0)
@@ -3093,12 +3521,18 @@ build_unary_op (code, xarg, noconvert)
 
       {
 	tree addr;
+	tree high_bound = NULL_TREE;
 
 	if (TREE_CODE (arg) == COMPONENT_REF)
 	  {
 	    tree field = TREE_OPERAND (arg, 1);
 
 	    addr = build_unary_op (ADDR_EXPR, TREE_OPERAND (arg, 0), 0);
+
+	    /* We're just taking the address, so revert to the bounded
+	       pointer and toss the bounds checks we generated earlier.  */
+	    if (TREE_CODE (addr) == COMPOUND_EXPR && TREE_BOUNDS_CHECK (addr))
+	      addr = TREE_CHAIN (addr);
 
 	    if (DECL_C_BIT_FIELD (field))
 	      {
@@ -3107,12 +3541,24 @@ build_unary_op (code, xarg, noconvert)
 		return error_mark_node;
 	      }
 
+	    if (TREE_BOUNDED (addr))
+	      {
+		/* If the final field has array type, it might have
+		   variable length, so we must preserve the high_bound of
+		   the entire record as the high_bound of the field.  */
+		/* GKM FIXME: is this test sufficent to identify the
+                   final field?  */
+		if (FINAL_FIELD_P (field))
+		  high_bound = build_high_bound_ref (addr);
+		addr = build_bounded_ptr_value_ref (addr);
+	      }
+
 	    addr = fold (build (PLUS_EXPR, argtype,
 				convert (argtype, addr),
 				convert (argtype, byte_position (field))));
 	  }
 	else
-	  addr = build1 (code, argtype, arg);
+	  addr = build1 (ADDR_EXPR, argtype, arg);
 
 	/* Address of a static or external variable or
 	   file-scope function counts as a constant.  */
@@ -3120,6 +3566,21 @@ build_unary_op (code, xarg, noconvert)
 	    && ! (TREE_CODE (arg) == FUNCTION_DECL
 		  && DECL_CONTEXT (arg) != 0))
 	  TREE_CONSTANT (addr) = 1;
+
+	/* Don't wrap bounds around a component_ref with an integer
+	   constant value: it is most likely comes from offsetof.
+	   Don't wrap bounds around function addresses.  */
+	if (default_pointer_boundedness
+	    && ! (TREE_CODE (arg) == COMPONENT_REF
+		  && TREE_CODE (addr) == INTEGER_CST)
+	    && TREE_CODE (arg) != FUNCTION_DECL)
+	  {
+	    if (high_bound)
+	      addr = build_bounded_ptr_constructor_3 (addr, addr, high_bound);
+	    else
+	      addr = build_bounded_ptr_constructor (addr);
+	  }
+
 	return addr;
       }
 
@@ -3130,6 +3591,201 @@ build_unary_op (code, xarg, noconvert)
   if (argtype == 0)
     argtype = TREE_TYPE (arg);
   return fold (build1 (code, argtype, arg));
+}
+
+/* Build a CONSTRUCTOR node containing the three components of a bounded
+   pointer, built from the bare-pointer ADDR.  This function is sometimes
+   called on the result of a build_unary_op (ADDR_EXPR ...).  if BP is
+   non-NULL, it is a bounded pointer from which to take the low_bound and
+   high_bound.  Otherwise, if BP is NULL, we use ADDR for the low_bound, and
+   construct high_bound as the sum of the low_bound and the sizeof ADDR.  */
+
+tree
+build_bounded_ptr_constructor (addr)
+     tree addr;
+{
+  tree string_type = NULL_TREE;
+
+  if (TREE_BOUNDED (addr) || BOUNDED_POINTER_TYPE_P (TREE_TYPE (addr)))
+    abort ();
+
+  if (addr == error_mark_node
+      /* GKM FIXME: this is rather brutish */
+      || !default_pointer_boundedness)
+    return addr;
+
+  if (TREE_CODE (addr) == STRING_CST)
+    {
+      string_type = (TREE_READONLY (addr)
+		     ? const_string_type_node : string_type_node);
+      addr = build_unary_op (ADDR_EXPR, addr, 1);
+      return convert (string_type, addr);
+    }
+
+  if (TREE_SIDE_EFFECTS (addr))
+    addr = stabilize_reference (addr);
+
+  return build_bounded_ptr_constructor_3 (addr, addr,
+					  build_high_bound (addr));
+}
+
+/* Return nonzero if type is an array type, or is a struct or union
+   type (possibly nested) that possesses a flexible array member.  An
+   array, or a struct with a flexible array member might have variable
+   length, so we must refer to its bounds-checking high_bound
+   symbolically.  */
+
+int
+variable_high_bound_p (type)
+     tree type;
+{
+  /* GKM FIXME: This is too permissive: only zero-length array members are FAMs.  */
+  if (TREE_CODE (type) == ARRAY_TYPE)
+    return 1;
+  else if (TREE_CODE (type) == RECORD_TYPE
+	   || TREE_CODE (type) == UNION_TYPE)
+    {
+      tree field = TYPE_FIELDS (type);
+      if (field == NULL_TREE)
+	return 0;
+      while (TREE_CHAIN (field))
+	field = TREE_CHAIN (field);
+      return variable_high_bound_p (TREE_TYPE (field));
+    }
+  else
+    return 0;
+}
+
+static tree
+build_high_bound (addr)
+     tree addr;
+{
+  tree deep = addr;
+  STRIP_NOPS (deep);
+  if (TREE_CODE (deep) == ADDR_EXPR)
+    {
+      tree datum = TREE_OPERAND (deep, 0);
+      if (TREE_CODE (datum) == FUNCTION_DECL)
+	return build_high_bound_ref (permissive_null_bounded_ptr_node);
+      if (TREE_CODE (datum) == VAR_DECL && DECL_EXTERNAL (datum)
+	  && (! COMPLETE_TYPE_P (TREE_TYPE (datum))
+	      || variable_high_bound_p (TREE_TYPE (datum))))
+	{
+	  tree high_bound = get_high_bound_decl (datum);
+	  TREE_USED (high_bound) = 1;
+	  return build1 (ADDR_EXPR, TREE_TYPE (addr), high_bound);
+	}
+      if (TREE_CODE (datum) == STRING_CST)
+	{
+	  if (TREE_TYPE (addr) != TREE_TYPE (deep))
+	    abort ();
+	}
+      else if (DECL_EXTERNAL (datum) && variable_high_bound_p (TREE_TYPE (datum)))
+	abort ();
+    }
+  return build_binary_op (PLUS_EXPR, addr, integer_one_node, 0);
+#if 0
+  {
+    ... if (variable_high_bound_p (TREE_TYPE (datum)))
+  }
+  warning ("unknown high_bound for bounded pointer");
+  return build_high_bound_ref (permissive_null_bounded_ptr_node);
+#endif
+}
+
+/* Build a phony VAR_DECL to represent the end address of VAR.
+   GKM FIXME: We should The linker should synthesize a definition if none exists.  */
+
+tree
+get_high_bound_decl (decl)
+     tree decl;
+{
+  tree high_bound, ext_id;
+  char const *var_name;
+  char *ext_name;
+
+  if (TREE_CODE (decl) != VAR_DECL || DECL_ASSEMBLER_NAME (decl) == NULL_TREE)
+    abort ();
+
+  if (DECL_ARGUMENTS (decl))
+    return DECL_ARGUMENTS (decl);
+
+  var_name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
+  ext_name = alloca (strlen (var_name) + sizeof (".high_bound"));
+  sprintf (ext_name, "%s%s", var_name, ".high_bound");
+  ext_id = get_identifier (ext_name);
+
+  high_bound = copy_node (decl);
+  TREE_USED (high_bound) = 0;
+  /* GKM FIXME: this doesn't handle local scope statics */
+  DECL_ARGUMENTS (decl) = high_bound;
+  DECL_NAME (high_bound) = DECL_ASSEMBLER_NAME (high_bound) = ext_id;
+  DECL_RTL (high_bound)
+    = gen_rtx_MEM (VOIDmode,
+		   gen_rtx (SYMBOL_REF, Pmode,
+			    IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (high_bound))));
+  return high_bound;
+}
+
+tree
+build_bounded_ptr_constructor_2 (addr, bounds)
+     tree addr;
+     tree bounds;
+{
+  tree low_bound, high_bound;
+
+  if (TREE_BOUNDED (addr) || BOUNDED_POINTER_TYPE_P (TREE_TYPE (addr)))
+    abort ();
+
+  if (addr == error_mark_node
+      /* GKM FIXME: this is rather brutish */
+      || !default_pointer_boundedness)
+    return addr;
+
+  low_bound = build_low_bound_ref (bounds);
+  high_bound = build_high_bound_ref (bounds);
+  return build_bounded_ptr_constructor_3 (addr, low_bound, high_bound);
+}
+
+tree
+build_bounded_ptr_constructor_3 (addr, low_bound, high_bound)
+     tree addr;
+     tree low_bound;
+     tree high_bound;
+{
+  tree type = (TREE_CODE (TREE_TYPE (addr)) == POINTER_TYPE
+	       ? TREE_TYPE (addr) : TREE_TYPE (low_bound));
+  tree bptype = build_qualified_type (type, TYPE_QUALS (type) | TYPE_QUAL_BOUNDED);
+  tree value, result;
+
+  if (TREE_BOUNDED (addr) || BOUNDED_POINTER_TYPE_P (type))
+    abort ();
+
+  if (addr == error_mark_node
+      /* GKM FIXME: this is rather brutish */
+      || !default_pointer_boundedness)
+    return addr;
+
+  if (TREE_CODE (TREE_TYPE (type)) == FUNCTION_TYPE)
+    {
+      low_bound = build_low_bound_ref (strict_null_bounded_ptr_node);
+      high_bound = build_high_bound_ref (strict_null_bounded_ptr_node);
+    }
+
+  value = build_tree_list (TYPE_BOUNDED_VALUE_FIELD (bptype), addr);
+  low_bound = build_tree_list (TYPE_LOW_BOUND_FIELD (bptype),
+			  convert (type, low_bound));
+  high_bound = build_tree_list (TYPE_HIGH_BOUND_FIELD (bptype),
+			    convert (type, high_bound));
+
+  result  = build (CONSTRUCTOR, bptype, NULL_TREE,
+		   chainon (value, chainon (low_bound, high_bound)));
+  TREE_THIS_VOLATILE (result) = TREE_THIS_VOLATILE (addr);
+  TREE_SIDE_EFFECTS (result) = TREE_SIDE_EFFECTS (addr);
+  TREE_CONSTANT (result) = TREE_CONSTANT (addr);
+  TREE_READONLY (result) = TREE_READONLY (addr);
+
+  return result;
 }
 
 #if 0
@@ -3445,10 +4101,12 @@ build_conditional_expr (ifexp, op1, op2)
      after promotion.  */
   if (TYPE_MAIN_VARIANT (type1) == TYPE_MAIN_VARIANT (type2))
     {
-      if (type1 == type2)
-	result_type = type1;
+      /* If pointer types differ only in boundedness, use the bounded type.  */
+      if (TREE_CODE (type1) == TREE_CODE (type2)
+	  || BOUNDED_POINTER_TYPE_P (type1))
+	result_type = TYPE_MAIN_PHYSICAL_VARIANT (type1);
       else
-	result_type = TYPE_MAIN_VARIANT (type1);
+	result_type = TYPE_MAIN_PHYSICAL_VARIANT (type2);
     }
   else if ((code1 == INTEGER_TYPE || code1 == REAL_TYPE
             || code1 == COMPLEX_TYPE)
@@ -3492,41 +4150,48 @@ build_conditional_expr (ifexp, op1, op2)
 	pedwarn ("ANSI C forbids conditional expr with only one void side");
       result_type = void_type_node;
     }
-  else if (code1 == POINTER_TYPE && code2 == POINTER_TYPE)
+  else if (MAYBE_BOUNDED_POINTER_TYPE_P (type1) && MAYBE_BOUNDED_POINTER_TYPE_P (type2))
     {
+      tree subtype1 = TREE_TYPE (type1);
+      tree subtype2 = TREE_TYPE (type2);
       if (comp_target_types (type1, type2))
 	result_type = common_type (type1, type2);
-      else if (integer_zerop (op1) && TREE_TYPE (type1) == void_type_node
+      else if (integer_zerop (op1) && subtype1 == void_type_node
 	       && TREE_CODE (orig_op1) != NOP_EXPR)
-	result_type = qualify_type (type2, type1);
-      else if (integer_zerop (op2) && TREE_TYPE (type2) == void_type_node
+	result_type = c_build_qualified_type (type2, (TYPE_QUALS (type2)
+						      | TYPE_QUALS (type1)));
+      else if (integer_zerop (op2) && subtype2 == void_type_node
 	       && TREE_CODE (orig_op2) != NOP_EXPR)
-	result_type = qualify_type (type1, type2);
-      else if (VOID_TYPE_P (TREE_TYPE (type1)))
+	result_type = c_build_qualified_type (type1, (TYPE_QUALS (type1)
+						      | TYPE_QUALS (type2)));
+      else if (VOID_TYPE_P (subtype1))
 	{
-	  if (pedantic && TREE_CODE (TREE_TYPE (type2)) == FUNCTION_TYPE)
+	  if (pedantic && TREE_CODE (subtype2) == FUNCTION_TYPE)
 	    pedwarn ("ANSI C forbids conditional expr between `void *' and function pointer");
-	  result_type = qualify_type (type1, type2);
+	  result_type = c_build_qualified_type (type1, (TYPE_QUALS (type1)
+							| TYPE_QUALS (type2)));
 	}
-      else if (VOID_TYPE_P (TREE_TYPE (type2)))
+      else if (VOID_TYPE_P (subtype2))
 	{
-	  if (pedantic && TREE_CODE (TREE_TYPE (type1)) == FUNCTION_TYPE)
+	  if (pedantic && TREE_CODE (subtype1) == FUNCTION_TYPE)
 	    pedwarn ("ANSI C forbids conditional expr between `void *' and function pointer");
-	  result_type = qualify_type (type2, type1);
+	  result_type = c_build_qualified_type (type2, (TYPE_QUALS (type2)
+							| TYPE_QUALS (type1)));
 	}
       else
 	{
 	  pedwarn ("pointer type mismatch in conditional expression");
-	  result_type = build_pointer_type (void_type_node);
+	  result_type = ptr_type_node;
 	}
     }
-  else if (code1 == POINTER_TYPE && code2 == INTEGER_TYPE)
+  else if (MAYBE_BOUNDED_POINTER_TYPE_P (type1) && code2 == INTEGER_TYPE)
     {
       if (! integer_zerop (op2))
 	pedwarn ("pointer/integer type mismatch in conditional expression");
       else
 	{
-	  op2 = null_pointer_node;
+	  op2 = (BOUNDED_POINTER_TYPE_P (type1)
+		 ? strict_null_bounded_ptr_node : null_unbounded_ptr_node);
 #if 0  /* The spec seems to say this is permitted.  */
 	  if (pedantic && TREE_CODE (type1) == FUNCTION_TYPE)
 	    pedwarn ("ANSI C forbids conditional expr between 0 and function pointer");
@@ -3534,13 +4199,14 @@ build_conditional_expr (ifexp, op1, op2)
 	}
       result_type = type1;
     }
-  else if (code2 == POINTER_TYPE && code1 == INTEGER_TYPE)
+  else if (MAYBE_BOUNDED_POINTER_TYPE_P (type2) && code1 == INTEGER_TYPE)
     {
       if (!integer_zerop (op1))
 	pedwarn ("pointer/integer type mismatch in conditional expression");
       else
 	{
-	  op1 = null_pointer_node;
+	  op1 = (BOUNDED_POINTER_TYPE_P (type2)
+		 ? strict_null_bounded_ptr_node : null_unbounded_ptr_node);
 #if 0  /* The spec seems to say this is permitted.  */
 	  if (pedantic && TREE_CODE (type2) == FUNCTION_TYPE)
 	    pedwarn ("ANSI C forbids conditional expr between 0 and function pointer");
@@ -3562,9 +4228,8 @@ build_conditional_expr (ifexp, op1, op2)
 
   /* Merge const and volatile flags of the incoming types.  */
   result_type
-    = build_type_variant (result_type,
-			  TREE_READONLY (op1) || TREE_READONLY (op2),
-			  TREE_THIS_VOLATILE (op1) || TREE_THIS_VOLATILE (op2));
+    = build_qualified_type (result_type,
+			    TREE_EXPR_QUALS (op1) | TREE_EXPR_QUALS (op2));
 
   if (result_type != TREE_TYPE (op1))
     op1 = convert_and_check (result_type, op1);
@@ -3657,7 +4322,9 @@ build_c_cast (type, expr)
   
   if (type == error_mark_node || expr == error_mark_node)
     return error_mark_node;
-  type = TYPE_MAIN_VARIANT (type);
+
+  /* Toss qualifiers, but preserve boundedness.  */
+  type = TYPE_MAIN_PHYSICAL_VARIANT (type);
 
 #if 0
   /* Strip NON_LVALUE_EXPRs since we aren't using as an lvalue.  */
@@ -3681,8 +4348,9 @@ build_c_cast (type, expr)
     {
       if (pedantic)
 	{
-	  if (TREE_CODE (type) == RECORD_TYPE
-	      || TREE_CODE (type) == UNION_TYPE)
+	  if ((TREE_CODE (type) == RECORD_TYPE
+	       || TREE_CODE (type) == UNION_TYPE)
+	      && !BOUNDED_POINTER_TYPE_P (type))
 	    pedwarn ("ANSI C forbids casting nonscalar to the same type");
 	}
     }
@@ -3694,8 +4362,8 @@ build_c_cast (type, expr)
 	value = default_conversion (value);
 
       for (field = TYPE_FIELDS (type); field; field = TREE_CHAIN (field))
-	if (comptypes (TYPE_MAIN_VARIANT (TREE_TYPE (field)),
-		       TYPE_MAIN_VARIANT (TREE_TYPE (value))))
+	if (comptypes (TYPE_MAIN_PHYSICAL_VARIANT (TREE_TYPE (field)),
+		       TYPE_MAIN_PHYSICAL_VARIANT (TREE_TYPE (value))))
 	  break;
 
       if (field)
@@ -3742,13 +4410,14 @@ build_c_cast (type, expr)
       /* Optionally warn about potentially worrisome casts.  */
 
       if (warn_cast_qual
-	  && TREE_CODE (type) == POINTER_TYPE
-	  && TREE_CODE (otype) == POINTER_TYPE)
+	  && MAYBE_BOUNDED_POINTER_TYPE_P (type)
+	  && MAYBE_BOUNDED_POINTER_TYPE_P (otype))
 	{
 	  tree in_type = type;
 	  tree in_otype = otype;
 	  int warn = 0;
 
+	  /* GKM FIXME: warn about altering boundedness of intermediates. */
 	  /* Check that the qualifiers on IN_TYPE are a superset of
 	     the qualifiers of IN_OTYPE.  The outermost level of
 	     POINTER_TYPE nodes is uninteresting and we stop as soon
@@ -3759,8 +4428,8 @@ build_c_cast (type, expr)
 	      in_type = TREE_TYPE (in_type);
 	      warn |= (TYPE_QUALS (in_otype) & ~TYPE_QUALS (in_type));
 	    }
-	  while (TREE_CODE (in_type) == POINTER_TYPE
-		 && TREE_CODE (in_otype) == POINTER_TYPE);
+	  while (MAYBE_BOUNDED_POINTER_TYPE_P (in_type) == POINTER_TYPE
+		 && MAYBE_BOUNDED_POINTER_TYPE_P (in_otype) == POINTER_TYPE);
 
 	  if (warn)
 	    /* There are qualifiers present in IN_OTYPE that are not
@@ -3770,8 +4439,8 @@ build_c_cast (type, expr)
 
       /* Warn about possible alignment problems.  */
       if (STRICT_ALIGNMENT && warn_cast_align
-	  && TREE_CODE (type) == POINTER_TYPE
-	  && TREE_CODE (otype) == POINTER_TYPE
+	  && MAYBE_BOUNDED_POINTER_TYPE_P (type)
+	  && MAYBE_BOUNDED_POINTER_TYPE_P (otype)
 	  && TREE_CODE (TREE_TYPE (otype)) != VOID_TYPE
 	  && TREE_CODE (TREE_TYPE (otype)) != FUNCTION_TYPE
 	  /* Don't warn about opaque types, where the actual alignment
@@ -3799,6 +4468,14 @@ build_c_cast (type, expr)
 	  /* Don't warn about converting any constant.  */
 	  && !TREE_CONSTANT (value))
 	warning ("cast to pointer from integer of different size");
+
+      if (BOUNDED_POINTER_TYPE_P (type) && ! TREE_BOUNDED (value)
+	  && ! integer_zerop (value))
+	{
+	  /* GKM FIXME: print better diagnostic message */
+	  warning ("cast to bounded pointer from unbounded type");
+	  type = TYPE_BOUNDED_SUBTYPE (type);
+	}
 
       ovalue = value;
       value = convert (type, value);
@@ -3838,6 +4515,7 @@ build_modify_expr (lhs, modifycode, rhs)
   tree newrhs;
   tree lhstype = TREE_TYPE (lhs);
   tree olhstype = lhstype;
+  tree bplhs = NULL_TREE;
 
   /* Types that aren't fully specified cannot be used in assignments.  */
   lhs = require_complete_type (lhs);
@@ -3899,6 +4577,13 @@ build_modify_expr (lhs, modifycode, rhs)
   if (modifycode != NOP_EXPR)
     {
       lhs = stabilize_reference (lhs);
+      /* For bounded pointer `a', convert `a += n' to `a.value += n'  */
+      if (modifycode != NOP_EXPR && BOUNDED_POINTER_TYPE_P (lhstype))
+	{
+	  bplhs = lhs;
+	  lhs = build_bounded_ptr_value_ref (bplhs);
+	  lhstype = TREE_TYPE (lhs);
+	}
       newrhs = build_binary_op (modifycode, lhs, rhs, 1);
     }
 
@@ -3980,6 +4665,8 @@ build_modify_expr (lhs, modifycode, rhs)
 
   result = build (MODIFY_EXPR, lhstype, lhs, newrhs);
   TREE_SIDE_EFFECTS (result) = 1;
+  if (bplhs)
+    result = build_bounded_ptr_constructor_2 (result, bplhs);
 
   /* If we got the LHS in a different type for storing in,
      convert the result back to the nominal type of LHS
@@ -4034,7 +4721,7 @@ convert_for_assignment (type, rhs, errtype, fundecl, funname, parmnum)
   if (coder == ERROR_MARK)
     return error_mark_node;
 
-  if (TYPE_MAIN_VARIANT (type) == TYPE_MAIN_VARIANT (rhstype))
+  if (TYPE_MAIN_VARIANTS_PHYSICALLY_EQUAL_P (type, rhstype))
     {
       overflow_warning (rhs);
       /* Check for Objective-C protocols.  This will issue a warning if
@@ -4088,14 +4775,14 @@ convert_for_assignment (type, rhs, errtype, fundecl, funname, parmnum)
 	{
 	  tree memb_type = TREE_TYPE (memb_types);
 
-	  if (comptypes (TYPE_MAIN_VARIANT (memb_type),
-			 TYPE_MAIN_VARIANT (rhstype)))
+	  if (comptypes (TYPE_MAIN_PHYSICAL_VARIANT (memb_type),
+			 TYPE_MAIN_PHYSICAL_VARIANT (rhstype)))
 	    break;
 
-	  if (TREE_CODE (memb_type) != POINTER_TYPE)
+	  if (! MAYBE_BOUNDED_POINTER_TYPE_P (memb_type))
 	    continue;
 
-	  if (coder == POINTER_TYPE)
+	  if (MAYBE_BOUNDED_POINTER_TYPE_P (rhstype))
 	    {
 	      register tree ttl = TREE_TYPE (memb_type);
 	      register tree ttr = TREE_TYPE (rhstype);
@@ -4128,7 +4815,8 @@ convert_for_assignment (type, rhs, errtype, fundecl, funname, parmnum)
 	      || (TREE_CODE (rhs) == NOP_EXPR
 		  && integer_zerop (TREE_OPERAND (rhs, 0))))
 	    {
-	      rhs = null_pointer_node;
+	      rhs = (BOUNDED_POINTER_TYPE_P (rhstype)
+		     ? strict_null_bounded_ptr_node : null_unbounded_ptr_node);
 	      break;
 	    }
 	}
@@ -4170,8 +4858,8 @@ convert_for_assignment (type, rhs, errtype, fundecl, funname, parmnum)
     }
 
   /* Conversions among pointers */
-  else if ((codel == POINTER_TYPE || codel == REFERENCE_TYPE)
-	   && (coder == POINTER_TYPE || coder == REFERENCE_TYPE))
+  else if (MAYBE_BOUNDED_INDIRECT_TYPE_P (type)
+	   && MAYBE_BOUNDED_INDIRECT_TYPE_P (rhstype))
     {
       register tree ttl = TREE_TYPE (type);
       register tree ttr = TREE_TYPE (rhstype);
@@ -4199,7 +4887,11 @@ convert_for_assignment (type, rhs, errtype, fundecl, funname, parmnum)
 	  else if (TREE_CODE (ttr) != FUNCTION_TYPE
 		   && TREE_CODE (ttl) != FUNCTION_TYPE)
 	    {
-	      if (TYPE_QUALS (ttr) & ~TYPE_QUALS (ttl))
+	      if (TREE_CODE (ttr) == TREE_CODE (ttl)
+		  && TYPE_BOUNDED (ttr) != TYPE_BOUNDED (ttl))
+		warn_for_assignment ("%s might alter boundedness of pointer target type",
+				     errtype, funname, parmnum);
+	      if ((TYPE_QUALS (ttr) & ~TYPE_QUALS (ttl)) & ~TYPE_QUAL_BOUNDED)
 		warn_for_assignment ("%s discards qualifiers from pointer target type",
 				     errtype, funname, parmnum);
 	      /* If this is not a case of ignoring a mismatch in signedness,
@@ -4224,12 +4916,19 @@ convert_for_assignment (type, rhs, errtype, fundecl, funname, parmnum)
 				     errtype, funname, parmnum);
 	    }
 	}
+      else if (comp_target_types_logically (type, rhstype))
+	error_for_assignment ("%s between pointer types of different boundedness",
+			      errtype, funname, parmnum);
       else
 	warn_for_assignment ("%s from incompatible pointer type",
 			     errtype, funname, parmnum);
+
+      /* Strip away bounds here so convert_to_pointer won't complain.  */
+      if (TREE_BOUNDED (rhs) && !BOUNDED_POINTER_TYPE_P (type))
+	rhs = build_bounded_ptr_value_ref (rhs);
       return convert (type, rhs);
     }
-  else if (codel == POINTER_TYPE && coder == INTEGER_TYPE)
+  else if (MAYBE_BOUNDED_POINTER_TYPE_P (type) && coder == INTEGER_TYPE)
     {
       /* An explicit constant 0 can convert to a pointer,
 	 or one that results from arithmetic, even including
@@ -4245,9 +4944,10 @@ convert_for_assignment (type, rhs, errtype, fundecl, funname, parmnum)
 			       errtype, funname, parmnum);
 	  return convert (type, rhs);
 	}
-      return null_pointer_node;
+      return (BOUNDED_POINTER_TYPE_P (type)
+	      ? strict_null_bounded_ptr_node : null_unbounded_ptr_node);
     }
-  else if (codel == INTEGER_TYPE && coder == POINTER_TYPE)
+  else if (codel == INTEGER_TYPE && MAYBE_BOUNDED_POINTER_TYPE_P (rhstype))
     {
       warn_for_assignment ("%s makes integer from pointer without a cast",
 			   errtype, funname, parmnum);
@@ -4284,7 +4984,8 @@ convert_for_assignment (type, rhs, errtype, fundecl, funname, parmnum)
    Objective-C selector.  */
 
 static void
-warn_for_assignment (msgid, opname, function, argnum)
+diagnostic_for_assignment (errorp, msgid, opname, function, argnum)
+     int errorp;
      const char *msgid;
      const char *opname;
      tree function;
@@ -4319,7 +5020,10 @@ warn_for_assignment (msgid, opname, function, argnum)
 	}
       opname = new_opname;
     }
-  pedwarn (msgid, opname);
+  if (errorp)
+    error (msgid, opname);
+  else
+    pedwarn (msgid, opname);
 }
 
 /* If VALUE is a compound expr all of whose expressions are constant, then
@@ -4402,7 +5106,8 @@ store_init_value (decl, init)
 #endif
 
   if (warn_traditional
-      && AGGREGATE_TYPE_P (TREE_TYPE (decl)) && ! TREE_STATIC (decl))
+      && AGGREGATE_TYPE_P (TREE_TYPE (decl))
+      && ! BOUNDED_POINTER_TYPE_P (TREE_TYPE (decl)) && ! TREE_STATIC (decl))
     warning ("traditional C rejects automatic aggregate initialization");
 
   DECL_INITIAL (decl) = value;
@@ -4631,6 +5336,8 @@ digest_init (type, init, require_constant, constructor_constant)
   if (code == ARRAY_TYPE)
     {
       tree typ1 = TYPE_MAIN_VARIANT (TREE_TYPE (type));
+      if (TREE_BOUNDED (inside_init))
+	inside_init = expose_string_constant (inside_init);
       if ((typ1 == char_type_node
 	   || typ1 == signed_char_type_node
 	   || typ1 == unsigned_char_type_node
@@ -4680,8 +5387,8 @@ digest_init (type, init, require_constant, constructor_constant)
      from an expression of the same type, optionally with braces.  */
 
   if (inside_init && TREE_TYPE (inside_init) != 0
-      && (comptypes (TYPE_MAIN_VARIANT (TREE_TYPE (inside_init)),
-		     TYPE_MAIN_VARIANT (type))
+      && (comptypes (TYPE_MAIN_PHYSICAL_VARIANT (TREE_TYPE (inside_init)),
+		     TYPE_MAIN_PHYSICAL_VARIANT (type))
 	  || (code == ARRAY_TYPE
 	      && comptypes (TREE_TYPE (inside_init), type))
 	  || (code == POINTER_TYPE
@@ -4737,8 +5444,9 @@ digest_init (type, init, require_constant, constructor_constant)
 
   /* Handle scalar types, including conversions.  */
 
-  if (code == INTEGER_TYPE || code == REAL_TYPE || code == POINTER_TYPE
-      || code == ENUMERAL_TYPE || code == COMPLEX_TYPE)
+  if (code == INTEGER_TYPE || code == REAL_TYPE
+      || code == ENUMERAL_TYPE || code == COMPLEX_TYPE
+      || MAYBE_BOUNDED_POINTER_TYPE_P (type))
     {
       /* Note that convert_for_assignment calls default_conversion
 	 for arrays and functions.  We must not call it in the
@@ -5538,7 +6246,31 @@ pop_init_level (implicit)
 	assemble_zeros (size - tree_low_cst (filled, 1));
     }
 
-	  
+  /* If the final field of an initialized struct is a flexible array
+     member, increment the decl's size according to the number of
+     excess array elements.  */
+  if (constructor_decl && constructor_depth == 2
+      && constructor_fields && FINAL_FIELD_P (constructor_fields)
+      && TREE_CODE (p->type) != ARRAY_TYPE
+      /* GKM FIXME: the array could be nested deeper, but then we'd
+	 need to dig deeper to find eltype.  */
+      && TREE_CODE (constructor_type) == ARRAY_TYPE
+      && constructor_index && variable_high_bound_p (constructor_type))
+    {
+      tree eltype = TREE_TYPE (constructor_type);
+      tree size = size_binop (MULT_EXPR, TYPE_SIZE (eltype), constructor_index);
+      tree incr = size_binop (MINUS_EXPR, size, TYPE_SIZE (constructor_type));
+
+      DECL_SIZE (constructor_decl) = size_binop (PLUS_EXPR, incr,
+						 DECL_SIZE (constructor_decl));
+
+      DECL_SIZE_UNIT (constructor_decl)
+	= size_binop (PLUS_EXPR, size_binop (FLOOR_DIV_EXPR,
+					     convert (sizetype, incr),
+					     size_int (BITS_PER_UNIT)),
+		      DECL_SIZE_UNIT (constructor_decl));
+    }
+
   constructor_type = p->type;
   constructor_fields = p->fields;
   constructor_index = p->index;
@@ -5912,14 +6644,21 @@ output_init_element (value, type, field, pending)
      int pending;
 {
   int duplicate = 0;
+  tree val = value;
+
+  STRIP_NOPS (val);
+  if (TREE_CODE (val) == CONVERT_EXPR
+      && BOUNDED_POINTER_TYPE_P (TREE_TYPE (TREE_OPERAND (val, 0))))
+    value = convert (TREE_TYPE (value),
+		     build_bounded_ptr_value_ref (TREE_OPERAND (val, 0)));
 
   if (TREE_CODE (TREE_TYPE (value)) == FUNCTION_TYPE
       || (TREE_CODE (TREE_TYPE (value)) == ARRAY_TYPE
 	  && !(TREE_CODE (value) == STRING_CST
 	       && TREE_CODE (type) == ARRAY_TYPE
 	       && TREE_CODE (TREE_TYPE (type)) == INTEGER_TYPE)
-	  && !comptypes (TYPE_MAIN_VARIANT (TREE_TYPE (value)),
-			 TYPE_MAIN_VARIANT (type))))
+	  && !comptypes (TYPE_MAIN_PHYSICAL_VARIANT (TREE_TYPE (value)),
+			 TYPE_MAIN_PHYSICAL_VARIANT (type))))
     value = default_conversion (value);
 
   if (value == error_mark_node)
@@ -6329,8 +7068,16 @@ process_init_element (value)
 
 	  fieldtype = TREE_TYPE (constructor_fields);
 	  if (fieldtype != error_mark_node)
-	    fieldtype = TYPE_MAIN_VARIANT (fieldtype);
+	    fieldtype = TYPE_MAIN_PHYSICAL_VARIANT (fieldtype);
 	  fieldcode = TREE_CODE (fieldtype);
+
+	  if (BOUNDED_POINTER_TYPE_P (fieldtype))
+	    {
+	      if (string_flag)
+		value = build_bounded_ptr_constructor (value);
+	      else if (integer_zerop (value))
+		value = strict_null_bounded_ptr_node;
+	    }
 
 	  /* Accept a string constant to initialize a subarray.  */
 	  if (value != 0
@@ -6342,9 +7089,10 @@ process_init_element (value)
 	     and we don't have an element of its type, push into it.  */
 	  else if (value != 0 && !constructor_no_implicit
 		   && value != error_mark_node
-		   && TYPE_MAIN_VARIANT (TREE_TYPE (value)) != fieldtype
+		   && TYPE_MAIN_PHYSICAL_VARIANT (TREE_TYPE (value)) != fieldtype
 		   && (fieldcode == RECORD_TYPE || fieldcode == ARRAY_TYPE
-		       || fieldcode == UNION_TYPE))
+		       || fieldcode == UNION_TYPE)
+		   && ! BOUNDED_POINTER_TYPE_P (fieldtype))
 	    {
 	      push_init_level (1);
 	      continue;
@@ -6396,8 +7144,16 @@ process_init_element (value)
 
 	  fieldtype = TREE_TYPE (constructor_fields);
 	  if (fieldtype != error_mark_node)
-	    fieldtype = TYPE_MAIN_VARIANT (fieldtype);
+	    fieldtype = TYPE_MAIN_PHYSICAL_VARIANT (fieldtype);
 	  fieldcode = TREE_CODE (fieldtype);
+
+	  if (BOUNDED_POINTER_TYPE_P (fieldtype))
+	    {
+	      if (string_flag)
+		value = build_bounded_ptr_constructor (value);
+	      else if (integer_zerop (value))
+		value = strict_null_bounded_ptr_node;
+	    }
 
 	  /* Accept a string constant to initialize a subarray.  */
 	  if (value != 0
@@ -6409,9 +7165,10 @@ process_init_element (value)
 	     and we don't have an element of its type, push into it.  */
 	  else if (value != 0 && !constructor_no_implicit
 		   && value != error_mark_node
-		   && TYPE_MAIN_VARIANT (TREE_TYPE (value)) != fieldtype
+		   && TYPE_MAIN_PHYSICAL_VARIANT (TREE_TYPE (value)) != fieldtype
 		   && (fieldcode == RECORD_TYPE || fieldcode == ARRAY_TYPE
-		       || fieldcode == UNION_TYPE))
+		       || fieldcode == UNION_TYPE)
+		   && ! BOUNDED_POINTER_TYPE_P (fieldtype))
 	    {
 	      push_init_level (1);
 	      continue;
@@ -6436,7 +7193,7 @@ process_init_element (value)
 	}
       if (TREE_CODE (constructor_type) == ARRAY_TYPE)
 	{
-	  tree elttype = TYPE_MAIN_VARIANT (TREE_TYPE (constructor_type));
+	  tree elttype = TYPE_MAIN_PHYSICAL_VARIANT (TREE_TYPE (constructor_type));
 	  enum tree_code eltcode = TREE_CODE (elttype);
 
 	  /* Accept a string constant to initialize a subarray.  */
@@ -6449,9 +7206,10 @@ process_init_element (value)
 	     and we don't have an element of its type, push into it.  */
 	  else if (value != 0 && !constructor_no_implicit
 		   && value != error_mark_node
-		   && TYPE_MAIN_VARIANT (TREE_TYPE (value)) != elttype
+		   && TYPE_MAIN_PHYSICAL_VARIANT (TREE_TYPE (value)) != elttype
 		   && (eltcode == RECORD_TYPE || eltcode == ARRAY_TYPE
-		       || eltcode == UNION_TYPE))
+		       || eltcode == UNION_TYPE)
+		   && !BOUNDED_POINTER_TYPE_P (elttype))
 	    {
 	      push_init_level (1);
 	      continue;
@@ -6540,8 +7298,7 @@ c_expand_asm_operands (string, outputs, inputs, clobbers, vol, filename, line)
   register tree *o = (tree *) alloca (noutputs * sizeof (tree));
   register tree tail;
 
-  if (TREE_CODE (string) == ADDR_EXPR)
-    string = TREE_OPERAND (string, 0);
+  string = expose_string_constant (string);
   if (TREE_CODE (string) != STRING_CST)
     {
       error ("asm template is not a string constant");
@@ -6553,12 +7310,17 @@ c_expand_asm_operands (string, outputs, inputs, clobbers, vol, filename, line)
     {
       tree output = TREE_VALUE (tail);
 
+      if (TREE_BOUNDED (output))
+	output = TREE_VALUE (tail) = build_bounded_ptr_value_ref (output);
+
       /* We can remove conversions that just change the type, not the mode.  */
       STRIP_NOPS (output);
       o[i] = output;
 
       /* Allow conversions as LHS here.  build_modify_expr as called below
 	 will do the right thing with them.  */
+      /* ??? This code does nothing, since the value of output is
+         discarded. ??? */
       while (TREE_CODE (output) == NOP_EXPR
 	     || TREE_CODE (output) == CONVERT_EXPR
 	     || TREE_CODE (output) == FLOAT_EXPR
@@ -6575,9 +7337,15 @@ c_expand_asm_operands (string, outputs, inputs, clobbers, vol, filename, line)
   /* Don't do this for other types--
      it would screw up operands expected to be in memory.  */
   for (i = 0, tail = inputs; tail; tail = TREE_CHAIN (tail), i++)
-    if (TREE_CODE (TREE_TYPE (TREE_VALUE (tail))) == ARRAY_TYPE
-	|| TREE_CODE (TREE_TYPE (TREE_VALUE (tail))) == FUNCTION_TYPE)
-      TREE_VALUE (tail) = default_conversion (TREE_VALUE (tail));
+    {
+      tree input = TREE_VALUE (tail);
+      if (TREE_CODE (TREE_TYPE (input)) == ARRAY_TYPE
+	  || TREE_CODE (TREE_TYPE (input)) == FUNCTION_TYPE)
+	input = default_conversion (input);
+      if (TREE_BOUNDED (input))
+	input = build_bounded_ptr_value_ref (input);
+      TREE_VALUE (tail) = input;
+    }
 
   /* Generate the ASM_OPERANDS insn;
      store into the TREE_VALUEs of OUTPUTS some trees for
@@ -6669,13 +7437,13 @@ c_expand_return (retval)
 	      {
 		tree op1 = TREE_OPERAND (inner, 1);
 
-		while (! POINTER_TYPE_P (TREE_TYPE (op1))
+		while (! MAYBE_BOUNDED_INDIRECT_TYPE_P (TREE_TYPE (op1))
 		       && (TREE_CODE (op1) == NOP_EXPR
 			   || TREE_CODE (op1) == NON_LVALUE_EXPR
 			   || TREE_CODE (op1) == CONVERT_EXPR))
 		  op1 = TREE_OPERAND (op1, 0);
 
-		if (POINTER_TYPE_P (TREE_TYPE (op1)))
+		if (MAYBE_BOUNDED_INDIRECT_TYPE_P (TREE_TYPE (op1)))
 		  break;
 
 		inner = TREE_OPERAND (inner, 0);

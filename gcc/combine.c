@@ -512,6 +512,7 @@ combine_instructions (f, nregs)
 #endif
   register int i;
   register rtx links, nextlinks;
+  rtx trap_insns = NULL_RTX;
 
   int new_direct_jump_p = 0;
 

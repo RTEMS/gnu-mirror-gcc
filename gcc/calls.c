@@ -33,6 +33,7 @@ Boston, MA 02111-1307, USA.  */
 #include "tm_p.h"
 #include "timevar.h"
 #include "sbitmap.h"
+#include "ggc.h"
 
 #ifndef ACCUMULATE_OUTGOING_ARGS
 #define ACCUMULATE_OUTGOING_ARGS 0
@@ -2171,7 +2172,13 @@ expand_call (exp, target, ignore)
 	      warning_with_decl (fndecl, "can't inline call to `%s'");
 	      warning ("called from here");
 	    }
+
 	  mark_addressable (fndecl);
+
+	  if (flag_bounded_pointer_thunks
+	      && !is_integrable && !DECL_INLINE (fndecl))
+	    bounded_pointer_thunk_decls
+	      = perm_tree_cons (NULL_TREE, fndecl, bounded_pointer_thunk_decls);
 	}
 
       flags |= flags_from_decl_or_type (fndecl);
@@ -2670,7 +2677,8 @@ expand_call (exp, target, ignore)
 
       /* Now we are about to start emitting insns that can be deleted
 	 if a libcall is deleted.  */
-      if (flags & (ECF_CONST | ECF_PURE | ECF_MALLOC))
+      if ((flags & (ECF_CONST | ECF_PURE))
+	  || ((flags & ECF_MALLOC) && ! BOUNDED_POINTER_TYPE_P (TREE_TYPE (funtype))))
 	start_sequence ();
 
       adjusted_args_size = args_size;
@@ -3106,7 +3114,7 @@ expand_call (exp, target, ignore)
 	  end_sequence ();
 	  emit_insns (insns);
 	}
-      else if (flags & ECF_MALLOC)
+      else if ((flags & ECF_MALLOC) && ! BOUNDED_POINTER_TYPE_P (TREE_TYPE (funtype)))
 	{
 	  rtx temp = gen_reg_rtx (GET_MODE (valreg));
 	  rtx last, insns;
@@ -4525,4 +4533,16 @@ store_one_arg (arg, argblock, flags, variable_size,
   pop_temp_slots ();
 
   return sibcall_failure;
+}
+
+/* Tree list of FUNCTION_DECL nodes that might need bounded-pointer thunks.  */
+
+tree bounded_pointer_thunk_decls;
+
+/* This function is run once to initialize calls.c.  */
+
+void
+init_calls ()
+{
+  ggc_add_tree_root (&bounded_pointer_thunk_decls, 1);
 }

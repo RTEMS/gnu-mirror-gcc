@@ -3502,18 +3502,24 @@ These macros will help you generate code for profiling.
 @item FUNCTION_PROFILER (@var{file}, @var{labelno})
 A C statement or compound statement to output to @var{file} some
 assembler code to call the profiling subroutine @code{mcount}.
-Before calling, the assembler code must load the address of a
-counter variable into a register where @code{mcount} expects to
-find the address.  The name of this variable is @samp{LP} followed
-by the number @var{labelno}, so you would generate the name using
-@samp{LP%d} in a @code{fprintf}.
 
 @findex mcount
-The details of how the address should be passed to @code{mcount} are
-determined by your operating system environment, not by GCC.  To
-figure them out, compile a small program for profiling using the
-system's installed C compiler and look at the assembler code that
-results.
+The details of how @code{mcount} expects to be called are determined by
+your operating system environment, not by GCC.  To figure them out,
+compile a small program for profiling using the system's installed C
+compiler and look at the assembler code that results.
+
+Older implementations of @code{mcount} expect the address of a counter
+variable to be loaded into some register.  The name of this variable is
+@samp{LP} followed by the number @var{labelno}, so you would generate
+the name using @samp{LP%d} in a @code{fprintf}.
+
+@findex NO_PROFILE_COUNTERS
+@item NO_PROFILE_COUNTERS
+Define this macro if the @code{mcount} subroutine on your system does
+not need a counter variable allocated for each function.  This is true
+for almost all modern implementations.  If you define this macro, you
+must not use the @var{labelno} argument to @code{FUNCTION_PROFILER}.
 
 @findex PROFILE_BEFORE_PROLOGUE
 @item PROFILE_BEFORE_PROLOGUE
@@ -4282,6 +4288,26 @@ A C expression that is nonzero the machine supports post-increment addressing.
 @itemx HAVE_POST_DECREMENT
 @itemx HAVE_PRE_DECREMENT
 Similar for other kinds of addressing.
+
+@findex HAVE_POST_MODIFY_DISP
+@item HAVE_POST_MODIFY_DISP
+Define this macro if the machine supports post-modify addressing
+with a constant displacement.
+
+@findex HAVE_PRE_MODIFY_DISP
+@item HAVE_PRE_MODIFY_DISP
+Define this macro if the machine supports pre-modify addressing
+with a constant displacement.
+
+@findex HAVE_POST_MODIFY_REG
+@item HAVE_POST_MODIFY_REG
+Define this macro if the machine supports post-modify addressing
+by the contents of a register.
+
+@findex HAVE_PRE_MODIFY_REG
+@item HAVE_PRE_MODIFY_REG
+Define this macro if the machine supports pre-modify addressing
+by the contents of a register.
 
 @findex CONSTANT_ADDRESS_P
 @item CONSTANT_ADDRESS_P (@var{x})

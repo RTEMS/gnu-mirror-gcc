@@ -1,3 +1,75 @@
+2000-07-30 Herman A.J. ten Brugge <Haj.Ten.Brugge@net.HCC.nl>
+	   Michael Hayes  <m.hayes@elec.canterbury.ac.nz>
+
+	* config/c4x/c4x.md (set_ldp_prologue): Add for RTL prologue/epilogue.
+	(push_st, push_dp, pop_st, pop_dp, popqi_unspec): Likewise.
+	(nodb_call, return_from_epilogue): Likewise.
+	(return_from_interrupt_epilogue, prologue, epilogue): Likewise.
+	* config/c4x/c4x.c (c4x_expand_prologue, c4x_expand_eplilogue): Add.
+	* config/c4x/c4x-protos.h (c4x_interrupt_function_p): Add.
+	(c4x_expand_prologue, c4x_expand_epilogue): Likewise.
+	(c4x_valid_type_attribute_p): Likewise.
+	* config/c4x/c4x.h (FUNCTION_PROLOGUE, FUNCTION_EPILOGUE): Delete.
+	(FUNCTION_BLOCK_PROFILER_EXIT): Convert to emit RTL.
+	
+2000-07-30  Michael Hayes  <m.hayes@elec.canterbury.ac.nz>
+
+	* config/c4x/c4x.c (c4x_emit_move_sequence): Use loadqi_big_constant
+	and loadhi_big_constant if applicable.
+	* config/c4x/c4x.md (loadqi_big_constant, loadhi_big_constant): Tweak
+	and add new splitter.s
+
+2000-07-30  Michael Hayes  <m.hayes@elec.canterbury.ac.nz>
+
+	* config/c4x/c4x.c (c4x_rptb_insert): Make more robust.
+
+2000-07-30  Michael Hayes  <m.hayes@elec.canterbury.ac.nz>
+
+	* config/c4x/c4x.h (ASM_FORMAT_PRIVATE_NAME): Output $ in label.
+
+2000-07-30  Michael Hayes  <m.hayes@elec.canterbury.ac.nz>
+	
+	* config/c4x/c4x.h (IS_XXX_REGNO): Rewrite to avoid unsigned warnings.
+
+2000-07-30  Michael Hayes  <m.hayes@elec.canterbury.ac.nz>
+
+	* config/c4x/libgcc.S (divqf3): Improve accuracy.
+
+2000-07-27  Mark Mitchell  <mark@codesourcery.com>
+
+	Put phi nodes after NOTE_INSN_BASIC_BLOCK.
+	* rtl.h (NOTE_INSN_BASIC_BLOCK_P): New macro.
+	* bb-reorder.c (get_next_bb_note): Use NOTE_INSN_BASIC_BLOCK_P.
+	(get_prev_bb_note): Likewise.
+	(remove_scope_notes): Likewise.
+	* flow.c (commit_one_edge_insertion): Likewise.
+	(merge_blocks_nomove): Likewise.
+	(verify_flow_info): Likewise.
+	* gcse.c (insert_insn_end_bb): Likewise.
+	* reg-stack.c (emit_swap_insn): Likewise.
+	* ssa.c (first_insn_after_basic_block_note): New function.
+	(insert_phi_node): Use it.
+	(rename_block): Likewise.
+	(eliminate_phi): Likewise.
+	(make_regs_equivalent_over_bad_edges): Likewise.
+	(make_equivalent_phi_alternatives_equivalent): Likewise.
+	(for_each_successor_phi): Likewise.
+	(convert_from_ssa): Modify phi-node deletion algorithm.
+	
+2000-07-29  Andreas Jaeger  <aj@suse.de>
+
+	* configure.in (mips*-*-linux*): Use mips*el to check for little
+	endian MIPS, add tmake_file.
+
+	* config/mips/linux.h (TARGET_VERSION): Use GNU/Linux.
+	(SUBTARGET_CPP_SPEC): Default MIPS_ISA is 1.
+	Patches by Maciej W. Rozycki <macro@ds2.pg.gda.pl>.
+
+2000-07-28  Richard Henderson  <rth@cygnus.com>
+
+	* config/ia64/ia64.c (ia64_print_operand): Fix typos.
+	Sign extend mode size before negating.
+
 2000-07-28  Richard Henderson  <rth@cygnus.com>
 
 	* emit-rtl.c (gen_lowpart_common): Add missing 'c' variable.
@@ -3986,6 +4058,57 @@ Wed May 31 01:31:42 2000  Jeffrey A Law  (law@cygnus.com)
 	in the block is more than just a simple conditional branch.
 	(noce_process_if_block): Similarly.
 
+2000-05-31  Greg McGary  <greg@mcgary.org>
+
+	* c-typeck.c (pop_init_level): Check constructor_fields
+	before dereferencing.
+
+2000-05-30  Greg McGary  <greg@mcgary.org>
+
+	* c-common.c (decl_attributes): Test `target' before dereference.
+	* c-decl.c (finish_decl): Call assemble_extent for arrays and
+	structs with flexbile array members.
+	(grokdeclarator): Surround unused variable decls with `#if 0'
+	* c-parse.in (unary_expr): Always call build_bounded_ptr_value_ref
+	when parsing `__ptrvalue' exprs.
+	* c-typeck.c (build_bounded_ptr_field_ref): Don't warn when taking
+	the value of an unbounded pointer--it's a no-op.
+	(build_array_ref): Toss bounds attached to an array index.
+	(build_binary_op): Take extra care to preserve bounds across all
+	bit-manipulations of pointer values.
+	(build_unary_op): Call FINAL_FIELD_P for detecting flexible
+	array members of structs.
+	(build_bounded_ptr_constructor): Call build_bounded_ptr_extent.
+	(variable_extent_p, build_bounded_ptr_extent, get_extent_decl):
+	New functions.
+	(build_extent_decl): Remove function.
+	(pop_init_level): Adjust the decl size of an initialized struct
+	to account for the length of a flexible array member.
+	* convert.c (convert_to_pointer): Invert `if'.
+	* cpplex.c (expand_name_space): Adjust base and end
+	along with pointer values.
+	(_cpp_squeeze_toklist): Likewise.
+	* dbxout.c (dbxout_symbol_location): Ignore non-parm decls
+	for types that have a variable-length component.
+	* output.h (assemble_extent): New function decl.
+	* real.c (asctoeg): Rewrite `etens' handling in a way that
+	doesn't violate array bounds.
+	* tree.c (int_size_in_bytes): Accept decl as well as type nodes.
+	Return DECL_SIZE_UNIT for decls and TYPE_SIZE_UNIT for types.
+	* tree.h (TREE_INT_CST): New macro.
+	(TREE_INT_CST_HIGH, TREE_INT_CST_LOW): Access union members.
+	(struct tree_int_cst): Add union for accessing low/high as
+	uint/int members or as uint array.
+	(FINAL_FIELD_P): New macro.
+	(get_extent_decl, variable_extent_p): New function decls.
+	* varasm.c (const_hash, compare_constant_1, record_constant_1)
+	[INTEGER_CST]: Use TREE_INT_CST.
+	(assemble_extent): New function.
+	* config/elfos.h (ASM_DECLARE_EXTENT): New macro.
+	* config/i386/i386.c (ix86_valid_type_attribute_p):
+	Warn only once about incompatibility of `regparm' attribute
+	and `-fbounded-pointers'.
+
 Tue May 30 22:25:57 2000  Alexandre Oliva  <aoliva@cygnus.com>
 
 	* optabs.c (prepare_float_lib_cmp): Protect *px and *py from
@@ -5180,6 +5303,39 @@ Fri May 19 06:49:35 2000  Richard Kenner  <kenner@vlsi1.ultra.nyu.edu>
 
 	* config/elfos.h (SELECT_SECTION): Don't access DECL_INITIAL of
 	a CONSTRUCTOR.
+
+2000-05-18  Greg McGary  <greg@mcgary.org>
+
+	* builtins.c (expand_builtin_va_arg): Assert that va types
+	are unbounded.
+	* c-decl.c (grokdeclarator): Force pointer-conversion of va_list
+	arrays types to be unbounded.
+	* c-typeck.c (build_bounded_ptr_field_ref): Report an error on
+	access to __ptrbase or __ptrextent of an unbounded pointer.
+	Warn on access to __ptrvalue of an unbounded pointer.
+	(build_bounded_ptr_check): Punt on warnings for
+	compile-time-determined bounds violations.
+	(build_array_ref): Compile lvalue a[i] as *(a+i), so we can
+	leverage the pointer bounds checking code.
+	(build_binary_op): Wrap save_expr around bounded-pointer bind_exprs.
+	(build_c_cast): Warn about casting ints and unbounded pointers
+	with bounded types, while implictly demoting the cast-type to be
+	unbounded.
+	* combine.c (combine_instructions): Disable redundant-check
+	optimizations which don't belong here and which crash the PPC backend.
+	(rtx_and_links_equal_p): Remove function.
+	* convert.c (convert_to_pointer): Simplify condition.
+	convert to from unbounded to bounded pointer by constructing
+	bounds rather than with a CONVERT_EXPR.
+	* fold-const.c (fold): Handle unbounded-to-bounded pointer
+	conversions in the form of CONSTRUCTOR nodes.
+	* config/rs6000/rs6000.c (rs6000_build_va_list, rs6000_va_arg):
+	Make internal va_list pointers unbounded.
+	* config/rs6000/sysv4.h (LIB_LINUX_SPEC, STARTFILE_LINUX_SPEC):
+	Handle -fbounded-pointers.
+	* emit-rtl.c (init_emit_once): Don't treat multi-dimensional array
+	as linear.
+	* optabs.c (init_optabs): Likewise.
 
 2000-05-18  Chris Demetriou  <cgd@sibyte.com>
 

@@ -1020,7 +1020,8 @@ dbxout_type (type, full, show_arg_types)
 	 
       for (tem = TYPE_MAIN_VARIANT (type); tem; tem = TYPE_NEXT_VARIANT (tem))
 	if (!TYPE_READONLY (tem) && !TYPE_VOLATILE (tem)
-	    && TYPE_NAME (tem) == TYPE_NAME (type))
+	    && TYPE_NAME (tem) == TYPE_NAME (type)
+	    && TREE_CODE (tem) == TREE_CODE (type))
 	  {
 	    type = tem;
 	    break;
@@ -2105,10 +2106,14 @@ dbxout_symbol_location (decl, type, suffix, home)
        If it's not a parameter, ignore it.
        (VAR_DECLs like this can be made by integrate.c.)  */
     {
+      if (TREE_CODE (decl) != PARM_DECL)
+	return 0;
       if (GET_CODE (XEXP (home, 0)) == REG)
 	{
 	  letter = 'r';
 	  current_sym_code = N_RSYM;
+	  if (REGNO (XEXP (home, 0)) >= FIRST_PSEUDO_REGISTER)
+	    abort ();
 	  current_sym_value = DBX_REGISTER_NUMBER (REGNO (XEXP (home, 0)));
 	}
       else

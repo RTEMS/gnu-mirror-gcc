@@ -402,7 +402,6 @@ static rtx ix86_expand_int_compare PARAMS ((enum rtx_code, rtx, rtx));
 static enum machine_mode ix86_fp_compare_mode PARAMS ((enum rtx_code));
 static enum rtx_code ix86_prepare_fp_compare_args PARAMS ((enum rtx_code,
 							   rtx *, rtx *));
-static rtx ix86_expand_compare PARAMS ((enum rtx_code));
 static rtx gen_push PARAMS ((rtx));
 static int memory_address_length PARAMS ((rtx addr));
 static int ix86_flags_dependant PARAMS ((rtx, rtx, enum attr_type));
@@ -568,6 +567,8 @@ override_options ()
       if (ix86_regparm < 0 || ix86_regparm > REGPARM_MAX)
 	fatal ("-mregparm=%d is not between 0 and %d",
 	       ix86_regparm, REGPARM_MAX);
+      if (flag_bounded_pointers && ix86_regparm)
+	fatal ("-mregparm is incompatible with -fbounded-pointers");
     }
 
   /* Validate -malign-loops= value, or provide default.  */
@@ -765,6 +766,16 @@ ix86_valid_type_attribute_p (type, attributes, identifier, args)
 
       if (compare_tree_int (cst, REGPARM_MAX) > 0)
 	return 0;
+
+      if (flag_bounded_pointers)
+	{
+	  static int warned = 0;
+	  /* Explain once why regparm is ignored.  Each instance
+	     already gets a warning that the attribute is ignored.  */
+	  if (!warned++)
+	    warning ("`regparm' attribute is incompatible with -fbounded-pointers");
+	  return 0;
+	}
 
       return 1;
     }
@@ -4841,7 +4852,7 @@ ix86_expand_fp_compare (code, op0, op1, scratch)
 			 const0_rtx);
 }
 
-static rtx
+rtx
 ix86_expand_compare (code)
      enum rtx_code code;
 {

@@ -708,6 +708,10 @@ ggc_alloc (size)
      the end.  */
   memset (result, 0xaf, 1 << order);
 #endif
+#if __BOUNDED_POINTERS__
+  __ptrlow (result) = __ptrvalue (result);
+  __ptrhigh (result) = ((char *) __ptrlow (result)) + size;
+#endif
 
   /* Keep track of how many bytes are being allocated.  This
      information is used in deciding when to collect.  */

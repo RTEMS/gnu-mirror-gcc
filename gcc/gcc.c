@@ -451,7 +451,9 @@ proper position among the other output files.  */
 
 /* config.h can define LIB_SPEC to override the default libraries.  */
 #ifndef LIB_SPEC
-#define LIB_SPEC "%{!shared:%{g*:-lg} %{!p:%{!pg:-lc}}%{p:-lc_p}%{pg:-lc_p}}"
+#define LIB_SPEC "%{fbounded-pointer-thunks:-lgccbp}\
+		  %{!shared:%{g*:-lg} %{!p:%{!pg:%{!fbounded-pointers:-lc}}}\
+		  %{p:-lc_p}%{pg:-lc_p}%{fbounded-pointers:-lc_b}}"
 #endif
 
 /* config.h can define LIBGCC_SPEC to override how and when libgcc.a is
@@ -562,6 +564,8 @@ static const char *cpp_options =
  %{fshort-wchar:-D__WCHAR_TYPE__=short\\ unsigned\\ int}\
  %{fshow-column} %{fno-show-column}\
  %{fleading-underscore} %{fno-leading-underscore}\
+ %{fbounded-pointers:-D__BOUNDED_POINTERS__=1}\
+ %{fbounded-pointer-thunks:-D__BOUNDED_POINTER_THUNKS__=1}\
  %{g*} %{W*} %{w} %{pedantic*} %{H} %{d*} %C %{D*} %{U*} %{i*} %Z %i\
  %{E:%W{o*}}%{M:%W{o*}}%{MM:%W{o*}}";
 
