@@ -873,29 +873,17 @@ ident_fndecl (t)
   return NULL_TREE;
 }
 
-#ifndef NO_DOLLAR_IN_LABEL
-#  define GLOBAL_THING "_GLOBAL_$"
-#else
-#  ifndef NO_DOT_IN_LABEL
-#    define GLOBAL_THING "_GLOBAL_."
-#  else
-#    define GLOBAL_THING "_GLOBAL__"
-#  endif
-#endif
-
-#define GLOBAL_IORD_P(NODE) \
-  ! strncmp (IDENTIFIER_POINTER(NODE), GLOBAL_THING, sizeof (GLOBAL_THING) - 1)
+#define GLOBAL_THING "_GLOBAL__"
 
 static void
 dump_global_iord (t)
      tree t;
 {
-  const char *name = IDENTIFIER_POINTER (t);
   const char *p = NULL;
 
-  if (name [sizeof (GLOBAL_THING) - 1] == 'I')
+  if (DECL_GLOBAL_CTOR_P (t))
     p = "initializers";
-  else if (name [sizeof (GLOBAL_THING) - 1] == 'D')
+  else if (DECL_GLOBAL_DTOR_P (t))
     p = "destructors";
   else
     my_friendly_abort (352);
@@ -1041,8 +1029,8 @@ dump_decl (t, flags)
       /* Fall through.  */
 
     case FUNCTION_DECL:
-      if (GLOBAL_IORD_P (DECL_ASSEMBLER_NAME (t)))
-	dump_global_iord (DECL_ASSEMBLER_NAME (t));
+      if (DECL_GLOBAL_CTOR_P (t) || DECL_GLOBAL_DTOR_P (t))
+	dump_global_iord (t);
       else if (! DECL_LANG_SPECIFIC (t))
 	print_identifier (scratch_buffer, "<internal>");
       else
@@ -1203,7 +1191,7 @@ dump_function_decl (t, flags)
     }
 
   fntype = TREE_TYPE (t);
-  parmtypes = TYPE_ARG_TYPES (fntype);
+  parmtypes = FUNCTION_FIRST_USER_PARMTYPE (t);
 
   if (DECL_CLASS_SCOPE_P (t))
     cname = DECL_CONTEXT (t);
@@ -1241,14 +1229,6 @@ dump_function_decl (t, flags)
 
   if (flags & TFF_DECL_SPECIFIERS) 
     {
-      if (TREE_CODE (fntype) == METHOD_TYPE && parmtypes)
-	/* Skip "this" parameter.  */
-	parmtypes = TREE_CHAIN (parmtypes);
-
-      /* Skip past the "in_charge" parameter.  */
-      if (DECL_HAS_IN_CHARGE_PARM_P (t))
-	parmtypes = TREE_CHAIN (parmtypes);
-
       dump_parameters (parmtypes, flags);
 
       if (show_return)
@@ -1963,7 +1943,7 @@ dump_expr (t, flags)
 	      t = TYPE_METHOD_BASETYPE (t);
 	      virtuals = TYPE_BINFO_VIRTUALS (TYPE_MAIN_VARIANT (t));
 
-	      n = tree_low_cst (idx, 0) - first_vfun_index (t);
+	      n = tree_low_cst (idx, 0);
 
 	      /* Map vtable index back one, to allow for the null pointer to
 		 member.  */
@@ -2123,7 +2103,7 @@ dump_expr (t, flags)
       break;
 
     case BIND_EXPR:
-      output_add_character (scratch_buffer, '}');
+      output_add_character (scratch_buffer, '{');
       dump_expr (TREE_OPERAND (t, 1), flags & ~TFF_EXPR_IN_PARENS);
       output_add_character (scratch_buffer, '}');
       break;

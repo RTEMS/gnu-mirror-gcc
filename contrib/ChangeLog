@@ -1,3 +1,114 @@
+2001-07-03  Joseph S. Myers  <jsm28@cam.ac.uk>
+
+	* texi2pod.pl: Handle @r inside @item.
+
+2001-06-21  Joseph S. Myers  <jsm28@cam.ac.uk>
+
+	* gcc_release: Add another space to ChangeLog headers.  Use tab to
+	indent ChangeLog message.  Update release status in Fortran
+	version files.
+
+2001-06-18  Mark Mitchell  <mark@codesourcery.com>
+
+	* gcc_release (build_sources): Fix dates generated
+	for ChangeLogs.
+
+	* gcc_release: Add support for modifying ChangeLogs and
+	updating versions.
+
+20010617 Release Manager
+
+        * GCC 3.0 Released.
+
+2001-06-14  Albert Chin-A-Young  <china@thewrittenword.com>
+
+        * contrib/gcc_update: Fix timestamp on gcc/f/intdoc.texi.
+
+2001-06-14  Mark Mitchell  <mark@codesourcery.com>
+            Gerald Pfeifer  <pfeifer@dbai.tuwien.ac.at>
+
+	* gcc_release (build_sources): Generate more files from 
+	web documents.
+	(CVS): Use compression everywhere.
+
+2001-06-14  Gerald Pfeifer  <pfeifer@dbai.tuwien.ac.at>
+
+	* gcc_release (build_sources): Obtain some documentation files
+	from the wwwdocs module.
+
+2001-06-13  Mark Mitchell  <mark@codesourcery.com>
+
+	* gcc_release (-b): Remove option. 
+	(build_sources): Generate NEWS files.
+	(build_tarfiles): Set permissions on directories and files.
+	Always generate BZIP2 files.
+	* gennews: Set TERM to vt100 for Lynx.
+
+2001-06-13  Gerald Pfeifer  <pfeifer@dbai.tuwien.ac.at>
+
+	* gcc_release (build_sources): Generate documentation in HTML from
+	gcc/doc/install.texi.
+
+2001-06-13  Gerald Pfeifer  <pfeifer@dbai.tuwien.ac.at>
+
+	* release: Remove.
+
+2001-06-11  Mark Mitchell  <mark@codesourcery.com>
+
+	* gcc_build: Output information about the commands used to 
+	configure the compiler.
+
+2001-06-09  Joseph S. Myers  <jsm28@cam.ac.uk>
+
+	* gcc_update: Update for move of documentation to gcc/doc.
+
+2001-06-07  Joseph S. Myers  <jsm28@cam.ac.uk>
+
+	* gennews: Update for GCC 3.0.
+
+2001-06-07  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* gcc_release: Tweaks for solaris /bin/sh.
+
+2001-06-02  Gerald Pfeifer  <pfeifer@dbai.tuwien.ac.at>
+
+	* gcc_release: Fail for unknown modes instead of ignoring them.
+
+2001-05-28  Rainer Orth  <ro@TechFak.Uni-Bielefeld.DE>
+
+	* contrib/test_summary (files): Sort before evaluating.
+
+2001-05-27  Joseph S. Myers  <jsm28@cam.ac.uk>
+
+	* gcc_release: Support creating diffs.  Support creating .bz2
+	files.  Support creating CVS tags.  Support creating snapshots
+	without generated files.  Move generated .gmo files to the source
+	directory.  Update comments.  Fix typos.
+
+2001-05-21  Mark Mitchell  <mark@codesourcery.com>
+
+	* gcc_build: Use -d when invoking gcc_update.
+
+2001-05-18  Andreas Jaeger  <aj@suse.de>
+
+	* gcc_update: Add rules for libf2c/libI77.
+
+2001-05-17  Alexandre Oliva  <aoliva@redhat.com>
+
+	* gcc_update (touch_files): Use simpler, yet as portable, syntax.
+
+2001-05-14  Loren J. Rittle  <ljrittle@acm.org>
+
+	* gcc_update (touch_files): Enhance make portability.
+
+2001-05-14  Alexandre Oliva  <aoliva@redhat.com>
+
+	* gcc_update (touch_files): Use a Makefile to touch files.
+
+2001-05-03  Joseph S. Myers  <jsm28@cam.ac.uk>
+
+	* texi2pod.pl: Add copyright and GPL notices.
+
 2001-01-24  Joseph S. Myers  <jsm28@cam.ac.uk>
 
 	* texi2pod.pl: Handle "\,".
@@ -153,7 +264,7 @@ Sat Nov 11 17:29:03 2000  Mark P Mitchell  <mark@codesourcery.com>
 2000-09-28  Gerald Pfeifer  <pfeifer@dbai.tuwien.ac.at>
 
 	* gcc_update (touch_files): Add some informative output.
-	
+
 2000-09-16  Andreas Jaeger  <aj@suse.de>
 
 	* gcc_update: Remove gcc/c-parse.gperf.

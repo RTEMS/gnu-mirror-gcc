@@ -105,6 +105,10 @@ int flag_assume_compiled = 1;
 
 int flag_emit_class_files = 0;
 
+/* Nonzero if input file is a file with a list of filenames to compile. */
+
+int flag_filelist_file = 0;
+
 /* When non zero, we emit xref strings. Values of the flag for xref
    backends are defined in xref_flag_table, xref.c.  */
 
@@ -140,10 +144,8 @@ const char *current_encoding = NULL;
 /* When non zero, report the now deprecated empty statements.  */
 int flag_extraneous_semicolon;
 
-/* From gcc/flags.h, and indicates if exceptions are turned on or not.  */
-
-extern int flag_new_exceptions;
-extern int flag_exceptions;
+/* When non zero, always check for a non gcj generated classes archive.  */
+int flag_force_classes_archive_check;
 
 /* Table of language-dependent -f options.
    STRING is the option name.  VARIABLE is the address of the variable.
@@ -156,10 +158,12 @@ lang_f_options[] =
 {
   {"emit-class-file", &flag_emit_class_files, 1},
   {"emit-class-files", &flag_emit_class_files, 1},
+  {"filelist-file", &flag_filelist_file, 1},
   {"use-divide-subroutine", &flag_use_divide_subroutine, 1},
   {"use-boehm-gc", &flag_use_boehm_gc, 1},
   {"hash-synchronization", &flag_hash_synchronization, 1},
-  {"jni", &flag_jni, 1}
+  {"jni", &flag_jni, 1},
+  {"force-classes-archive-check", &flag_force_classes_archive_check, 1}
 };
 
 static struct string_option
@@ -643,8 +647,6 @@ java_init ()
   print_error_function = lang_print_error;
   lang_expand_expr = java_lang_expand_expr;
 
-  flag_exceptions = 1;
-
   /* Append to Gcc tree node definition arrays */
 
   memcpy (tree_code_type + (int) LAST_AND_UNUSED_TREE_CODE,
@@ -691,8 +693,9 @@ void lang_init_source (level)
 static void
 java_init_options ()
 {
-  flag_new_exceptions = 1;
   flag_bounds_check = 1;
+  flag_exceptions = 1;
+  flag_non_call_exceptions = 1;
 }
 
 const char *

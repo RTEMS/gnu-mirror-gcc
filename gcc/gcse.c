@@ -159,6 +159,7 @@ Boston, MA 02111-1307, USA.  */
 #include "output.h"
 #include "function.h"
 #include "expr.h" 
+#include "params.h"
 
 #include "obstack.h"
 #define obstack_chunk_alloc gmalloc
@@ -627,8 +628,8 @@ static int handle_avail_expr	PARAMS ((rtx, struct expr *));
 static int classic_gcse		PARAMS ((void));
 static int one_classic_gcse_pass PARAMS ((int));
 static void invalidate_nonnull_info PARAMS ((rtx, rtx, void *));
-static void delete_null_pointer_checks_1 PARAMS ((unsigned int *, sbitmap *,
-						  sbitmap *,
+static void delete_null_pointer_checks_1 PARAMS ((varray_type *, unsigned int *,
+						  sbitmap *, sbitmap *,
 						  struct null_pointer_info *));
 static rtx process_insert_insn	PARAMS ((struct expr *));
 static int pre_edge_insert	PARAMS ((struct edge_list *, struct expr **));
@@ -689,6 +690,19 @@ gcse_main (f, file)
       if (warn_disabled_optimization)
       warning ("GCSE disabled: %d > 1000 basic blocks and %d >= 20 edges/basic block",
                n_basic_blocks, n_edges / n_basic_blocks);
+      return 0;
+    }
+
+  /* If allocating memory for the cprop bitmap would take up too much
+     storage it's better just to disable the optimization.  */
+  if ((n_basic_blocks 
+       * SBITMAP_SET_SIZE (max_gcse_regno)
+       * sizeof (SBITMAP_ELT_TYPE)) > MAX_GCSE_MEMORY)
+    {
+      if (warn_disabled_optimization)
+	warning ("GCSE disabled: %d basic blocks and %d registers",
+		 n_basic_blocks, max_gcse_regno);
+
       return 0;
     }
 
@@ -4967,7 +4981,9 @@ invalidate_nonnull_info (x, setter, data)
    they are not our responsibility to free.  */
 
 static void
-delete_null_pointer_checks_1 (block_reg, nonnull_avin, nonnull_avout, npi)
+delete_null_pointer_checks_1 (delete_list, block_reg, nonnull_avin,
+			      nonnull_avout, npi)
+     varray_type *delete_list;
      unsigned int *block_reg;
      sbitmap *nonnull_avin;
      sbitmap *nonnull_avout;
@@ -5097,9 +5113,12 @@ delete_null_pointer_checks_1 (block_reg, nonnull_avin, nonnull_avout, npi)
 	  LABEL_NUSES (JUMP_LABEL (new_jump))++;
 	  emit_barrier_after (new_jump);
 	}
-      delete_insn (last_insn);
+      if (!*delete_list)
+	VARRAY_RTX_INIT (*delete_list, 10, "delete_list");
+
+      VARRAY_PUSH_RTX (*delete_list, last_insn);
       if (compare_and_branch == 2)
-	delete_insn (earliest);
+	VARRAY_PUSH_RTX (*delete_list, earliest);
 
       /* Don't check this block again.  (Note that BLOCK_END is
 	 invalid here; we deleted the last instruction in the 
@@ -5138,10 +5157,12 @@ delete_null_pointer_checks (f)
 {
   sbitmap *nonnull_avin, *nonnull_avout;
   unsigned int *block_reg;
+  varray_type delete_list = NULL;
   int bb;
   int reg;
   int regs_per_pass;
   int max_reg;
+  unsigned int i;
   struct null_pointer_info npi;
 
   /* If we have only a single block, then there's nothing to do.  */
@@ -5210,8 +5231,16 @@ delete_null_pointer_checks (f)
     {
       npi.min_reg = reg;
       npi.max_reg = MIN (reg + regs_per_pass, max_reg);
-      delete_null_pointer_checks_1 (block_reg, nonnull_avin,
+      delete_null_pointer_checks_1 (&delete_list, block_reg, nonnull_avin,
 				    nonnull_avout, &npi);
+    }
+
+  /* Now delete the instructions all at once.  This breaks the CFG.  */
+  if (delete_list)
+    {
+      for (i = 0; i < VARRAY_ACTIVE_SIZE (delete_list); i++)
+	delete_insn (VARRAY_RTX (delete_list, i));
+      VARRAY_FREE (delete_list);
     }
 
   /* Free the table of registers compared at the end of every block.  */
