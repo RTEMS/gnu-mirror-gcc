@@ -1,5 +1,5 @@
 /* Control and data flow functions for trees.
-   Copyright 2001, 2002, 2003 Free Software Foundation, Inc.
+   Copyright 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Alexandre Oliva <aoliva@redhat.com>
 
 This file is part of GCC.
@@ -39,7 +39,7 @@ Boston, MA 02111-1307, USA.  */
 #include "langhooks.h"
 #include "cgraph.h"
 #include "intl.h"
-
+#include "diagnostic.h"
 
 /* This should be eventually be generalized to other languages, but
    this would require a shared function-as-trees infrastructure.  */
@@ -95,9 +95,6 @@ typedef struct inline_data
   int in_target_cleanup_p;
   /* A list of the functions current function has inlined.  */
   varray_type inlined_fns;
-  /* The approximate number of instructions we have inlined in the
-     current call stack.  */
-  int inlined_insns;
   /* We use the same mechanism to build clones that we do to perform
      inlining.  However, there are a few places where we need to
      distinguish between those two situations.  This flag is true if
@@ -575,8 +572,11 @@ copy_body_r (tree *tp, int *walk_subtrees, void *data)
   /* Local variables and labels need to be replaced by equivalent
      variables.  We don't want to copy static variables; there's only
      one of those, no matter how many times we inline the containing
-     function.  */
-  else if ((*lang_hooks.tree_inlining.auto_var_in_fn_p) (*tp, fn))
+     function.
+     We do not also want to copy the label which we put into
+     GOTO_STMT which replaced RETURN_STMT.  */
+  else if (*tp != id->ret_label
+	   && (*lang_hooks.tree_inlining.auto_var_in_fn_p) (*tp, fn))
     {
       tree new_decl;
 
@@ -1340,7 +1340,8 @@ expand_call_inline (tree *tp, int *walk_subtrees, void *data)
 	}
       else if (warn_inline && DECL_DECLARED_INLINE_P (fn)
 	       && !DECL_IN_SYSTEM_HEADER (fn)
-	       && strlen (reason))
+	       && strlen (reason)
+	       && !lookup_attribute ("noinline", DECL_ATTRIBUTES (fn)))
 	{
 	  warning ("%Jinlining failed in call to '%F': %s", fn, fn, reason);
 	  warning ("called from here");
@@ -1547,8 +1548,11 @@ expand_call_inline (tree *tp, int *walk_subtrees, void *data)
   splay_tree_delete (id->decl_map);
   id->decl_map = st;
 
-  /* The new expression has side-effects if the old one did.  */
-  TREE_SIDE_EFFECTS (expr) = TREE_SIDE_EFFECTS (t);
+  /* Although, from the semantic viewpoint, the new expression has
+     side-effects only if the old one did, it is not possible, from
+     the technical viewpoint, to evaluate the body of a function
+     multiple times without serious havoc.  */
+  TREE_SIDE_EFFECTS (expr) = 1;
 
   /* Replace the call by the inlined body.  Wrap it in an
      EXPR_WITH_FILE_LOCATION so that we'll get debugging line notes
@@ -1569,11 +1573,6 @@ expand_call_inline (tree *tp, int *walk_subtrees, void *data)
      the equivalent inlined version either.  */
   TREE_USED (*tp) = 1;
 
-  /* Our function now has more statements than it did before.  */
-  DECL_ESTIMATED_INSNS (VARRAY_TREE (id->fns, 0)) += DECL_ESTIMATED_INSNS (fn);
-  /* For accounting, subtract one for the saved call/ret.  */
-  id->inlined_insns += DECL_ESTIMATED_INSNS (fn) - 1;
-
   /* Update callgraph if needed.  */
   if (id->decl)
     {
@@ -1589,11 +1588,6 @@ expand_call_inline (tree *tp, int *walk_subtrees, void *data)
     id->current_decl = old_decl;
   }
   VARRAY_POP (id->fns);
-
-  /* If we've returned to the top level, clear out the record of how
-     much inlining has been done.  */
-  if (VARRAY_ACTIVE_SIZE (id->fns) == id->first_inlined_fn)
-    id->inlined_insns = 0;
 
   /* Don't walk into subtrees.  We've already handled them above.  */
   *walk_subtrees = 0;
@@ -1626,6 +1620,12 @@ optimize_inline_calls (tree fn)
   inline_data id;
   tree prev_fn;
 
+  /* There is no point in performing inlining if errors have already
+     occurred -- and we might crash if we try to inline invalid
+     code.  */
+  if (errorcount || sorrycount)
+    return;
+
   /* Clear out ID.  */
   memset (&id, 0, sizeof (id));
 
@@ -1634,9 +1634,6 @@ optimize_inline_calls (tree fn)
   /* Don't allow recursion into FN.  */
   VARRAY_TREE_INIT (id.fns, 32, "fns");
   VARRAY_PUSH_TREE (id.fns, fn);
-  if (!DECL_ESTIMATED_INSNS (fn))
-    DECL_ESTIMATED_INSNS (fn) 
-      = (*lang_hooks.tree_inlining.estimate_num_insns) (fn);
   /* Or any functions that aren't finished yet.  */
   prev_fn = NULL_TREE;
   if (current_function_decl)

@@ -2057,7 +2057,7 @@ struct rtx_const GTY(())
 
 /* Uniquize all constants that appear in memory.
    Each constant in memory thus far output is recorded
-   in `const_hash_table'.  */
+   in `const_desc_table'.  */
 
 struct constant_descriptor_tree GTY(())
 {
@@ -2104,9 +2104,18 @@ const_hash_1 (const tree exp)
       return real_hash (TREE_REAL_CST_PTR (exp));
 
     case STRING_CST:
-      p = TREE_STRING_POINTER (exp);
-      len = TREE_STRING_LENGTH (exp);
+      if (flag_writable_strings)
+	{
+	  p = (char *) &exp;
+	  len = sizeof exp;
+	}
+      else
+	{
+	  p = TREE_STRING_POINTER (exp);
+	  len = TREE_STRING_LENGTH (exp);
+	}
       break;
+
     case COMPLEX_CST:
       return (const_hash_1 (TREE_REALPART (exp)) * 5
 	      + const_hash_1 (TREE_IMAGPART (exp)));
@@ -2221,7 +2230,7 @@ compare_constant (const tree t1, const tree t2)
 
     case STRING_CST:
       if (flag_writable_strings)
-	return 0;
+	return t1 == t2;
 
       if (TYPE_MODE (TREE_TYPE (t1)) != TYPE_MODE (TREE_TYPE (t2)))
 	return 0;
@@ -2341,7 +2350,8 @@ compare_constant (const tree t1, const tree t2)
 }
 
 /* Make a copy of the whole tree structure for a constant.  This
-   handles the same types of nodes that compare_constant handles.  */
+   handles the same types of nodes that compare_constant handles.
+   Writable string constants are never copied.  */
 
 static tree
 copy_constant (tree exp)
@@ -2357,9 +2367,12 @@ copy_constant (tree exp)
       else
 	return copy_node (exp);
 
+    case STRING_CST:
+      if (flag_writable_strings)
+	return exp;
+      /* FALLTHROUGH */
     case INTEGER_CST:
     case REAL_CST:
-    case STRING_CST:
       return copy_node (exp);
 
     case COMPLEX_CST:
@@ -2466,7 +2479,7 @@ build_constant_desc (tree exp)
    If DEFER is nonzero, this constant can be deferred and output only
    if referenced in the function after all optimizations.
 
-   The const_hash_table records which constants already have label strings.  */
+   `const_desc_table' records which constants already have label strings.  */
 
 rtx
 output_constant_def (tree exp, int defer)
@@ -3543,61 +3556,61 @@ initializer_constant_valid_p (tree value, tree endtype)
 
     case CONVERT_EXPR:
     case NOP_EXPR:
-      /* Allow conversions between pointer types.  */
-      if (POINTER_TYPE_P (TREE_TYPE (value))
-	  && POINTER_TYPE_P (TREE_TYPE (TREE_OPERAND (value, 0))))
-	return initializer_constant_valid_p (TREE_OPERAND (value, 0), endtype);
+      {
+	tree src;
+	tree src_type;
+	tree dest_type;
 
-      /* Allow conversions between real types.  */
-      if (FLOAT_TYPE_P (TREE_TYPE (value))
-	  && FLOAT_TYPE_P (TREE_TYPE (TREE_OPERAND (value, 0))))
-	return initializer_constant_valid_p (TREE_OPERAND (value, 0), endtype);
+	src = TREE_OPERAND (value, 0);
+	src_type = TREE_TYPE (src);
+	dest_type = TREE_TYPE (value);
 
-      /* Allow length-preserving conversions between integer types.  */
-      if (INTEGRAL_TYPE_P (TREE_TYPE (value))
-	  && INTEGRAL_TYPE_P (TREE_TYPE (TREE_OPERAND (value, 0)))
-	  && (TYPE_PRECISION (TREE_TYPE (value))
-	      == TYPE_PRECISION (TREE_TYPE (TREE_OPERAND (value, 0)))))
-	return initializer_constant_valid_p (TREE_OPERAND (value, 0), endtype);
+	/* Allow conversions between pointer types, floating-point
+	   types, and offset types.  */
+	if ((POINTER_TYPE_P (dest_type) && POINTER_TYPE_P (src_type))
+	    || (FLOAT_TYPE_P (dest_type) && FLOAT_TYPE_P (src_type))
+	    || (TREE_CODE (dest_type) == OFFSET_TYPE
+		&& TREE_CODE (src_type) == OFFSET_TYPE))
+	  return initializer_constant_valid_p (src, endtype);
 
-      /* Allow conversions between other integer types only if
-	 explicit value.  */
-      if (INTEGRAL_TYPE_P (TREE_TYPE (value))
-	  && INTEGRAL_TYPE_P (TREE_TYPE (TREE_OPERAND (value, 0))))
-	{
-	  tree inner = initializer_constant_valid_p (TREE_OPERAND (value, 0),
-						     endtype);
-	  if (inner == null_pointer_node)
-	    return null_pointer_node;
-	  break;
-	}
+	/* Allow length-preserving conversions between integer types.  */
+	if (INTEGRAL_TYPE_P (dest_type) && INTEGRAL_TYPE_P (src_type)
+	    && (TYPE_PRECISION (dest_type) == TYPE_PRECISION (src_type)))
+	  return initializer_constant_valid_p (src, endtype);
 
-      /* Allow (int) &foo provided int is as wide as a pointer.  */
-      if (INTEGRAL_TYPE_P (TREE_TYPE (value))
-	  && POINTER_TYPE_P (TREE_TYPE (TREE_OPERAND (value, 0)))
-	  && (TYPE_PRECISION (TREE_TYPE (value))
-	      >= TYPE_PRECISION (TREE_TYPE (TREE_OPERAND (value, 0)))))
-	return initializer_constant_valid_p (TREE_OPERAND (value, 0),
-					     endtype);
+	/* Allow conversions between other integer types only if
+	   explicit value.  */
+	if (INTEGRAL_TYPE_P (dest_type) && INTEGRAL_TYPE_P (src_type))
+	  {
+	    tree inner = initializer_constant_valid_p (src, endtype);
+	    if (inner == null_pointer_node)
+	      return null_pointer_node;
+	    break;
+	  }
 
-      /* Likewise conversions from int to pointers, but also allow
-	 conversions from 0.  */
-      if ((POINTER_TYPE_P (TREE_TYPE (value))
-	   || TREE_CODE (TREE_TYPE (value)) == OFFSET_TYPE)
-	  && INTEGRAL_TYPE_P (TREE_TYPE (TREE_OPERAND (value, 0))))
-	{
-	  if (integer_zerop (TREE_OPERAND (value, 0)))
-	    return null_pointer_node;
-	  else if (TYPE_PRECISION (TREE_TYPE (value))
-		   <= TYPE_PRECISION (TREE_TYPE (TREE_OPERAND (value, 0))))
-	    return initializer_constant_valid_p (TREE_OPERAND (value, 0),
-						 endtype);
-	}
+	/* Allow (int) &foo provided int is as wide as a pointer.  */
+	if (INTEGRAL_TYPE_P (dest_type) && POINTER_TYPE_P (src_type)
+	    && (TYPE_PRECISION (dest_type) >= TYPE_PRECISION (src_type)))
+	  return initializer_constant_valid_p (src, endtype);
 
-      /* Allow conversions to union types if the value inside is okay.  */
-      if (TREE_CODE (TREE_TYPE (value)) == UNION_TYPE)
-	return initializer_constant_valid_p (TREE_OPERAND (value, 0),
-					     endtype);
+	/* Likewise conversions from int to pointers, but also allow
+	   conversions from 0.  */
+	if ((POINTER_TYPE_P (dest_type)
+	     || TREE_CODE (dest_type) == OFFSET_TYPE)
+	    && INTEGRAL_TYPE_P (src_type))
+	  {
+	    if (integer_zerop (src))
+	      return null_pointer_node;
+	    else if (TYPE_PRECISION (dest_type) <= TYPE_PRECISION (src_type))
+	      return initializer_constant_valid_p (src, endtype);
+	  }
+
+	/* Allow conversions to struct or union types if the value
+	   inside is okay.  */
+	if (TREE_CODE (dest_type) == RECORD_TYPE
+	    || TREE_CODE (dest_type) == UNION_TYPE)
+	  return initializer_constant_valid_p (src, endtype);
+      }
       break;
 
     case PLUS_EXPR:
@@ -4371,19 +4384,69 @@ globalize_decl (tree decl)
   (*targetm.asm_out.globalize_label) (asm_out_file, name);
 }
 
+/* Some targets do not allow a forward or undefined reference in a
+   ASM_OUTPUT_DEF.  Thus, a mechanism is needed to defer the output
+   of this assembler code.  The output_def_pair struct holds the
+   declaration and target for a deferred output define.  */
+struct output_def_pair GTY(())
+{
+  tree decl;
+  tree target;
+};
+typedef struct output_def_pair *output_def_pair;
+
+/* Variable array of deferred output defines.  */
+static GTY ((param_is (struct output_def_pair))) varray_type output_defs;
+
+#ifdef ASM_OUTPUT_DEF
+/* Output the assembler code for a define (equate) using ASM_OUTPUT_DEF
+   or ASM_OUTPUT_DEF_FROM_DECLS.  The function defines the symbol whose
+   tree node is DECL to have the value of the tree node TARGET.  */
+
+static void
+assemble_output_def (tree decl ATTRIBUTE_UNUSED, tree target ATTRIBUTE_UNUSED)
+{
+#ifdef ASM_OUTPUT_DEF_FROM_DECLS
+  ASM_OUTPUT_DEF_FROM_DECLS (asm_out_file, decl, target);
+#else
+  ASM_OUTPUT_DEF (asm_out_file,
+		  IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl)),
+		  IDENTIFIER_POINTER (target));
+#endif
+}
+#endif
+
+/* Process the varray of pending assembler defines.  */
+
+void
+process_pending_assemble_output_defs (void)
+{
+#ifdef ASM_OUTPUT_DEF
+  size_t i;
+  output_def_pair p;
+
+  if (!output_defs)
+    return;
+
+  for (i = 0; i < VARRAY_ACTIVE_SIZE (output_defs); i++)
+    {
+      p = VARRAY_GENERIC_PTR (output_defs, i);
+      assemble_output_def (p->decl, p->target);
+    }
+
+  output_defs = NULL;
+#endif
+}
+
 /* Emit an assembler directive to make the symbol for DECL an alias to
    the symbol for TARGET.  */
 
 void
 assemble_alias (tree decl, tree target ATTRIBUTE_UNUSED)
 {
-  const char *name;
-
   /* We must force creation of DECL_RTL for debug info generation, even though
      we don't use it here.  */
   make_decl_rtl (decl, NULL);
-
-  name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
 
 #ifdef ASM_OUTPUT_DEF
   /* Make name accessible from other files, if appropriate.  */
@@ -4394,16 +4457,28 @@ assemble_alias (tree decl, tree target ATTRIBUTE_UNUSED)
       maybe_assemble_visibility (decl);
     }
 
-#ifdef ASM_OUTPUT_DEF_FROM_DECLS
-  ASM_OUTPUT_DEF_FROM_DECLS (asm_out_file, decl, target);
-#else
-  ASM_OUTPUT_DEF (asm_out_file, name, IDENTIFIER_POINTER (target));
-#endif
+  if (TARGET_DEFERRED_OUTPUT_DEFS (decl, target))
+    {
+      output_def_pair p;
+
+      if (!output_defs)
+	VARRAY_GENERIC_PTR_INIT (output_defs, 10, "output defs");
+	
+      p = ggc_alloc (sizeof (struct output_def_pair));
+      p->decl = decl;
+      p->target = target;
+      VARRAY_PUSH_GENERIC_PTR (output_defs, p);
+    }
+  else
+    assemble_output_def (decl, target);
 #else /* !ASM_OUTPUT_DEF */
 #if defined (ASM_OUTPUT_WEAK_ALIAS) || defined (ASM_WEAKEN_DECL)
   if (DECL_WEAK (decl))
     {
+      const char *name;
       tree *p, t;
+
+      name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
 #ifdef ASM_WEAKEN_DECL
       ASM_WEAKEN_DECL (asm_out_file, decl, name, IDENTIFIER_POINTER (target));
 #else
@@ -4490,16 +4565,16 @@ make_decl_one_only (tree decl)
 
   TREE_PUBLIC (decl) = 1;
 
-  if (TREE_CODE (decl) == VAR_DECL
-      && (DECL_INITIAL (decl) == 0 || DECL_INITIAL (decl) == error_mark_node))
-    DECL_COMMON (decl) = 1;
-  else if (SUPPORTS_ONE_ONLY)
+  if (SUPPORTS_ONE_ONLY)
     {
 #ifdef MAKE_DECL_ONE_ONLY
       MAKE_DECL_ONE_ONLY (decl);
 #endif
       DECL_ONE_ONLY (decl) = 1;
     }
+  else if (TREE_CODE (decl) == VAR_DECL
+      && (DECL_INITIAL (decl) == 0 || DECL_INITIAL (decl) == error_mark_node))
+    DECL_COMMON (decl) = 1;
   else if (SUPPORTS_WEAK)
     DECL_WEAK (decl) = 1;
   else
