@@ -1,3 +1,231 @@
+2003-01-06  Richard Henderson  <rth@redhat.com>
+
+	* config/alpha/alpha.c (alpha_encode_section_info): Adjust symbol_str
+	properly when changing "local-ness".
+	* config/alpha/alpha.md (movdi_er_high_g): Allow all symbols.
+
+2003-01-05  Andreas Jaeger  <aj@suse.de>
+
+	* unwind-dw2-fde.h (last_fde): Add unused attribute for obj.
+
+2003-01-05  John David Anglin  <dave@hiauly1.hia.nrc.ca>
+
+	* pa64-hpux.h (JCR_SECTION_NAME): Define.
+	(PA_INIT_FRAME_DUMMY_ASM_OP): Check EH_FRAME_SECTION_NAME instead of
+	USE_EH_FRAME_REGISTRY when defining.
+
+2003-01-04  John David Anglin  <dave.anglin@nrc.ca>
+
+	* config.gcc (hppa*64*-*-hpux11*): Define extra_parts.  Don't use
+	collect2.
+	* pa-hpux11.h (LDD_SUFFIX, PARSE_LDD_OUTPUT): Undefine.
+	(HAS_INIT_SECTION, LD_INIT_SWITCH, LD_FINI_SWITCH): Define.
+	* pa64-hpux.h (HP_INIT_ARRAY_SECTION_ASM_OP,
+	GNU_INIT_ARRAY_SECTION_ASM_OP, HP_FINI_ARRAY_SECTION_ASM_OP,
+	GNU_FINI_ARRAY_SECTION_ASM_OP): Define.
+	(CTORS_SECTION_ASM_OP, DTORS_SECTION_ASM_OP): Define when not using
+	elfos.h.
+	(EH_FRAME_IN_DATA_SECTION): Delete define.
+	(HAS_INIT_SECTION, LD_INIT_SWITCH, LD_FINI_SWITCH): Undefine.
+	(STARTFILE_SPEC): Use crtbegin.o.
+	(ENDFILE_SPEC): Use crtend.o.
+	(INIT_SECTION_ASM_OP, FINI_SECTION_ASM_OP, CRT_CALL_STATIC_FUNCTION,
+	SUPPORTS_INIT_PRIORITY, PA_CXA_FINALIZE_STUB, PA_INIT_FINI_HACK,
+	PA_INIT_FRAME_DUMMY_ASM_OP, PA_JV_REGISTERCLASSES_STUB,
+	DTOR_LIST_BEGIN): Define.
+	* pa.c (TARGET_ASM_CONSTRUCTOR): Define.
+	(pa_asm_out_constructor, pa_asm_out_destructor): New functions.
+	* som.h (SUPPORTS_INIT_PRIORITY): Delete define.
+
+2003-01-02  Eric Christopher  <echristo@redhat.com>
+
+	* config/mips/mips.md (movdf_internal2): Fix constraints.
+
+2003-01-03  Gerald Pfeifer  <pfeifer@dbai.tuwien.ac.at>
+
+	* doc/install.texi (Configuration): Fix markup for reference to
+	gcc/config.gcc.
+
+2003-01-02  Kazu Hirata  <kazu@cs.umass.edu>
+
+	* config/h8300/h8300.c (stack_pointer_operand): New.
+	(const_int_gt_2_operand): Likewise.
+	(const_int_ge_8_operand): Likewise.
+	* config/h8300/h8300.md (a splitter): Likewise.
+	(a peephole2): Likewise.
+	* config/h8300/h8300-protos.h: Add prototypes for the new
+	functions above.
+
+2003-01-02  Neil Booth  <neil@daikokuya.co.uk>
+
+	* gccbug.in: Update for new categories.
+
+2002-12-31  Tom Tromey  <tromey@redhat.com>
+
+	* doc/install.texi (Testing): Fixed typo.
+
+2002-12-31  Jerry Quinn  <jlquinn@optonline.net>
+
+	* gcc/doc/invoke.texi (Optimization Options): Clean up -O flag
+	descriptions.
+
+2002-12-31  Jerry Quinn  <jlquinn@optonline.net>
+
+	* gcc/doc/invoke.texi (Optimization Options): List the options
+	enabled by each -O flag.
+
+2002-12-31  David Edelsohn  <edelsohn@gnu.org>
+
+	* config/rs6000/rs6000.h (WIDEST_HARDWARE_FP_SIZE): Define.
+
+2002-12-31  Gerald Pfeifer  <pfeifer@dbai.tuwien.ac.at>
+
+	* doc/install.texi (Configuration): Explicitly refer
+	gcc/config.gcc for a list of cpu models.
+
+2002-12-30  Joseph S. Myers  <jsm@polyomino.org.uk>
+
+	* doc/gcc.texi, doc/gccint.texi: Update last modification dates.
+
+2002-12-30  Tom Tromey  <tromey@redhat.com>
+
+	* doc/install.texi (Testing): Mention Jacks.
+
+2002-12-30  Joseph S. Myers  <jsm@polyomino.org.uk>
+
+	* doc/service.texi: Uncomment and update FAQ link.
+
+2002-12-28  Joseph S. Myers  <jsm@polyomino.org.uk>
+
+	* doc/cpp.texi, doc/gcc.texi, doc/gccint.texi, doc/install.texi:
+	Use @copying.
+
+2002-12-28  Joseph S. Myers  <jsm@polyomino.org.uk>
+
+	* configure.in: Increase makeinfo version requirement to 4.[2-9].
+	* configure: Regenerate.
+	* doc/install.texi: Update Texinfo version requirement.
+
+2002-12-27  Joseph S. Myers  <jsm@polyomino.org.uk>
+
+	* doc/include/texinfo.tex: Update to version 2002-12-26.16.
+
+2002-12-26  Joseph S. Myers  <jsm@polyomino.org.uk>
+
+	* doc/standards.texi, doc/invoke.texi: Point to 3.3 version of
+	c99status.html.
+
+2002-12-26  Kazu Hirata  <kazu@cs.umass.edu>
+
+	* config/h8300/h8300.h (IDENT_ASM_OP): End with a tab.
+
+2002-12-23  Larin Hennessy  <larin@science.oregonstate.edu>
+
+	* doc/install.texi: Remove i386-*-isc, i860-*-bsd,
+	m68k-altos-sysv, m68k-isi-bsd, m68k-sony-bsd entries.
+	* doc/invoke.texi: Remove AMD 29K, ARM RISC/iX, Clipper, Convex,
+	DG/UX entries.
+	* doc/md.texi: Remove AMD 29K entries.
+	* doc/trouble.texi: Remove Alliant, DG/UX, Iris 4.0.5F, GAS
+	1.38.1, NewsOS, RT PC, WE32K entries.
+
+2002-12-23  Aldy Hernandez  <aldyh@redhat.com>
+
+	PR/8763
+	* config/rs6000/altivec.md (mulv4sf3): Rewrite to add -0.0 vector.
+	(altivec_vspltisw_v4sf): Name pattern.
+	(altivec_vslw_v4sf): New pattern.
+
+2002-12-23  Joseph S. Myers  <jsm@polyomino.org.uk>
+
+	* doc/include/gcc-common.texi: Clear DEVELOPMENT.
+
+2002-12-23  David Edelsohn  <edelsohn@gnu.org>
+
+	PR middle-end/8784
+	* expr.c (expand_assignment): Apply special treatment to
+	ARRAY_TYPE.
+
+2002-12-21  Kazu Hirata  <kazu@cs.umass.edu>
+
+	* config/h8300/h8300.md (zero_extendqisi2): Correct the
+	length.
+
+2002-12-19  Devang Patel <dpatel@apple.com>
+
+	* config/darwin.h (TARGET_OPTION_TRANSLATE_TABLE): Add support for -dynamic.
+	(CPP_SPEC): Define __STATIC__ and __DYNAMIC__ depending on -dynamic.
+	(LINK_SPEC): Pass -dynamic to linker.
+	* config/rs6000/darwin.h: Reject conflicting -static and -dynamic.
+
+2002-12-19  Kazu Hirata  <kazu@cs.umass.edu>
+
+	* config/h8300/h8300.md (pushqi_h8300): Don't push the stack
+	pointer.
+	(pushqi_h8300hs): Likewise.
+	(pushhi_h8300): Likewise.
+	(pushhi_h8300hs): Likewise.
+
+2002-12-19  Eric Botcazou  <ebotcazou@libertysurf.fr>
+
+	PR optimization/8988
+	* loop.c (maybe_eliminate_biv): Kill REG_EQUAL notes mentioning
+	the biv when eliminating.
+
+2002-12-19  Aldy Hernandez  <aldyh@redhat.com>
+
+	PR 8553
+	* config/rs6000/altivec.md ("absv8hi2"): Add & to clobbered
+	registers.
+	("absv16qi2"): Same.
+	("absv4si2"): Same.
+	("absv4sf2"): Same.
+	("altivec_abss_v16qi"): Same.
+	("altivec_abss_v8hi"): Same.
+	("altivec_abss_v4si"): Same.
+
+2002-12-19  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* config/s390/s390.md ("*tsthiCCT", "*tsthiCCT_cconly",
+	"*tstqiCCT", "*tstqiCCT_cconly"): New insns.
+
+2002-12-18  Aldy Hernandez  <aldyh@redhat.com>
+
+	* config/rs6000/altivec.h (vec_cmplt macro): Reverse arguments in
+	macro.
+	(vec_cmplt C++ functions): Reverse arguments.
+
+2002-12-17  Kazu Hirata  <kazu@cs.umass.edu>
+
+	* doc/c-tree.texi: Restore deliberate spelling mistakes.
+
+2002-12-17  Kazu Hirata  <kazu@cs.umass.edu>
+
+	* doc/c-tree.texi: Fix typos and follow spelling conventions.
+	* doc/cpp.texi: Likewise.
+	* doc/extend.texi: Likewise.
+	* doc/gty.texi: Likewise.
+	* doc/install.texi: Likewise.
+	* doc/invoke.texi: Likewise.
+	* doc/md.texi: Likewise.
+	* doc/passes.texi: Likewise.
+	* doc/rtl.texi: Likewise.
+	* doc/sourcebuild.texi: Likewise.
+	* doc/tm.texi: Likewise.
+
+2002-12-17  Jerry Quinn  <jlquinn@optonline.net>
+
+	* doc/invoke.texi: Minor spelling and grammar fixes.
+
+2002-12-16  Mark Mitchell  <mark@codesourcery.com>
+
+	* version.c (version_string): Mark as prerelease.
+
+2002-12-13  John David Anglin  <dave@hiauly1.hia.nrc.ca>
+
+	* pa.c (output_millicode_call): Correct typo.
+	(output_call): Likewise.
+
 Fri Dec 13 21:07:18 2002  Alexandre Oliva  <aoliva@redhat.com>
 
 	* config/mn10300/mn10300.c (print_operand) <case N>: Check
@@ -191,7 +419,7 @@ Wed Dec 11 18:39:52 2002  J"orn Rennecke <joern.rennecke@superh.com>
 
 	* config/darwin.h(LINK_SPEC): Add darwin specific linker options.
 	* doc/invoke.texi: Add new "Darwin Options" section.
-	
+
 2002-12-10  Jim Wilson  <wilson@redhat.com>
 
 	* rs6000.h (RETURN_IN_MEMORY): If ABI_V4, then TFmode is returned in
@@ -268,7 +496,7 @@ Mon Dec  9 21:33:38 CET 2002  Jan Hubicka  <jh@suse.cz>
 	* stmt.c (expand_return): Ditto.
 	* expr.c (move_block_from_reg): Ditto.
 	(copy_blkmode_from_reg): Ditto.
-	* expmed.c (store_bit_field): Ditto. 
+	* expmed.c (store_bit_field): Ditto.
 
 2002-12-09  Svein E. Seldal  <Svein.Seldal@solidas.com>
 
@@ -529,7 +757,7 @@ Mon Dec  2 14:43:22 2002  J"orn Rennecke <joern.rennecke@superh.com>
 	* c-format.c (T_ST): Use size_type_node, not c_size_type_node.
 	* tree.h (TI_SIZE_TYPE): New enumeral.
 	(size_type_node): Likewise.
-	
+
 2002-11-30  John David Anglin  <dave@hiauly1.hia.nrc.ca>
 
 	* cfg.c (dump_flow_info): Use max_reg_num () to determine the largest
@@ -1106,7 +1334,7 @@ Thu Nov 21 23:52:04 CET 2002  Jan Hubicka  <jH@suse.cz>
 	(ggc_realloc): Update valgrind annotations.
 	* ggc-page.c [!ENABLE_VALGRIND_CHECKING] (VALGRIND_DISCARD):
 	Define as empty.
- 	(alloc_anon, free_page, ggc_alloc, poison_pages): Add machinery to
+	(alloc_anon, free_page, ggc_alloc, poison_pages): Add machinery to
 	valgrind-annotate memory.
 
 2002-11-20  Ulrich Weigand  <uweigand@de.ibm.com>
