@@ -524,7 +524,7 @@ dbxout_typedefs (syms)
 	  tree type = TREE_TYPE (syms);
 	  if (TYPE_NAME (type)
 	      && TREE_CODE (TYPE_NAME (type)) == TYPE_DECL
-	      && COMPLETE_TYPE_P (type)
+	      && COMPLETE_OR_VOID_TYPE_P (type)
 	      && ! TREE_ASM_WRITTEN (TYPE_NAME (type)))
 	    dbxout_symbol (TYPE_NAME (type), 0);
 	}
@@ -1621,9 +1621,7 @@ dbxout_type (type, full)
 				* BITS_PER_UNIT);
 		putc (',', asmfile);
 		CHARS (1);
-		print_wide_int (tree_low_cst (DECL_SIZE
-					      (TYPE_NAME
-					       (BINFO_TYPE (child))),
+		print_wide_int (tree_low_cst (TYPE_SIZE (BINFO_TYPE (child)),
 					      0)
 				* BITS_PER_UNIT);
 		putc (';', asmfile);
