@@ -1,5 +1,5 @@
 /* Low-level functions for atomic operations.  PA-RISC version. -*- C++ -*-
-   Copyright 2002 Free Software Foundation, Inc.
+   Copyright 2002, 2004 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -17,6 +17,15 @@
    write to the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
    Boston, MA 02111-1307, USA.  */
 
+// As a special exception, you may use this file as part of a free software
+// library without restriction.  Specifically, if other files instantiate
+// templates or use macros or inline functions from this file, or you compile
+// this file and link it with other files to produce an executable, this
+// file does not by itself cause the resulting executable to be covered by
+// the GNU General Public License.  This exception does not however
+// invalidate any other reasons why the executable file might be covered by
+// the GNU General Public License.
+
 #ifndef _BITS_ATOMICITY_H
 #define _BITS_ATOMICITY_H	1
 
@@ -25,11 +34,12 @@ typedef int _Atomic_word;
 template <int __inst>
 struct __Atomicity_lock
 {
-  static volatile int __attribute__ ((aligned (16))) _S_atomicity_lock;
+  static volatile int _S_atomicity_lock;
 };
 
 template <int __inst>
-volatile int __Atomicity_lock<__inst>::_S_atomicity_lock = 1;
+volatile int
+__Atomicity_lock<__inst>::_S_atomicity_lock __attribute__ ((aligned (16))) = 1;
 
 /* Because of the lack of weak support when using the hpux
    som linker, we explicitly instantiate the atomicity lock
@@ -58,8 +68,9 @@ __exchange_and_add (volatile _Atomic_word* __mem, int __val)
 
   result = *__mem;
   *__mem = result + __val;
-  __asm__ __volatile__("");
-  lock = tmp;
+  /* Reset lock with PA 2.0 "ordered" store.  */
+  __asm__ __volatile__ ("stw,ma %1,0(%0)"
+			: : "r" (&lock), "r" (tmp) : "memory");
   return result;
 }
 
@@ -80,8 +91,9 @@ __atomic_add (_Atomic_word* __mem, int __val)
 			: "r" (&lock));
 
   *__mem += __val;
-  __asm__ __volatile__("");
-  lock = tmp;
+  /* Reset lock with PA 2.0 "ordered" store.  */
+  __asm__ __volatile__ ("stw,ma %1,0(%0)"
+			: : "r" (&lock), "r" (tmp) : "memory");
 }
 
 #endif
