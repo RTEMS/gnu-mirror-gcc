@@ -494,16 +494,12 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_set__Ljava_lang_String_2Ljava_lang_S
   const char *name;
   const char *value;
   void *ptr;
-  GtkArg arg;
 
   ptr = NSA_GET_PTR (env, obj);
   name = (*env)->GetStringUTFChars (env, jname, NULL);
   value = (*env)->GetStringUTFChars (env, jvalue, NULL);
 
-  arg.type = GTK_TYPE_STRING;
-  arg.name = (char *) name;
-  GTK_VALUE_STRING (arg) = (char *) value;
-  gdk_threads_enter();                          
+  gdk_threads_enter();
   g_object_set(ptr, name, value, NULL);
   gdk_threads_leave();
 
@@ -512,20 +508,20 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_set__Ljava_lang_String_2Ljava_lang_S
 }
 
 JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkComponentPeer_set__Ljava_lang_String_2Z
-  (JNIEnv *env, jobject obj, jstring jname, jboolean value)
+  (JNIEnv *env, jobject obj, jstring jname, jboolean jvalue)
 {
   const char *name;
+  gboolean value;
   void *ptr;
-  GtkArg arg;
 
   ptr = NSA_GET_PTR (env, obj);
+
   name = (*env)->GetStringUTFChars (env, jname, NULL);
+  /* Apparently a jboolean can have a value greater than 1.  gboolean
+     variables may only contain the value TRUE or FALSE. */
+  value = jvalue ? TRUE : FALSE;
 
-  arg.type = GTK_TYPE_BOOL;
-  arg.name = (char *) name;
-  GTK_VALUE_BOOL (arg) = value;
-
-  gdk_threads_enter();                          
+  gdk_threads_enter();
   g_object_set(ptr, name, value, NULL);
   gdk_threads_leave();
 
@@ -537,15 +533,10 @@ JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkComponentPeer_set__Ljava_la
 {
   const char *name;
   void *ptr;
-  GtkArg arg;
 
   ptr = NSA_GET_PTR (env, obj);
   name = (*env)->GetStringUTFChars (env, jname, NULL);
 
-  arg.type = GTK_TYPE_INT;
-  arg.name = (char *) name;
-  GTK_VALUE_INT (arg) = value;
-  
   gdk_threads_enter();                          
   g_object_set(ptr, name, value, NULL);
   gdk_threads_leave();
@@ -558,15 +549,10 @@ JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkComponentPeer_set__Ljava_la
 {
   const char *name;
   void *ptr;
-  GtkArg arg;
 
   ptr = NSA_GET_PTR (env, obj);
   name = (*env)->GetStringUTFChars (env, jname, NULL);
 
-  arg.type = GTK_TYPE_FLOAT;
-  arg.name = (char *) name;
-  GTK_VALUE_FLOAT (arg) = value;
-  
   gdk_threads_enter();                          
   g_object_set(ptr, name, value, NULL);
   gdk_threads_leave();
@@ -580,7 +566,6 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_set__Ljava_lang_String_2Ljava_lang_O
 {
   const char *name;
   void *ptr1, *ptr2;
-  GtkArg arg;
 
   ptr1 = NSA_GET_PTR (env, obj1);
   ptr2 = NSA_GET_PTR (env, obj2);
@@ -598,34 +583,11 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_set__Ljava_lang_String_2Ljava_lang_O
       return;
     }
 
-  arg.type = GTK_TYPE_OBJECT;
-  arg.name = (char *) name;
-  GTK_VALUE_OBJECT (arg) = GTK_OBJECT (ptr2);
-  
   gdk_threads_enter();                          
   g_object_set(ptr1, name, ptr2, NULL);
   gdk_threads_leave();
 
   (*env)->ReleaseStringUTFChars (env, jname, name);
-}
-
-JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkComponentPeer_create
-  (JNIEnv *env, jobject obj, jstring jtypename)
-{
-  const char *typename;
-  gpointer widget;
-
-  typename = (*env)->GetStringUTFChars (env, jtypename, NULL);
-
-  gdk_threads_enter ();
-  gtk_button_get_type ();
-  widget = gtk_object_newv (gtk_type_from_name (typename),
-			    0, NULL);
-/*    widget = gtk_type_new (gtk_type_from_name (typename)); */
-  gdk_threads_leave ();
-
-  (*env)->ReleaseStringUTFChars (env, jtypename, typename);
-  NSA_SET_PTR (env, obj, widget);
 }
 
 JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkComponentPeer_connectHooks
@@ -637,15 +599,10 @@ JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkComponentPeer_connectHooks
 
   gdk_threads_enter ();
   gtk_widget_realize (GTK_WIDGET (ptr));
+
   if(GTK_IS_BUTTON(ptr))
-    {
-      g_print("-- connecting a button --\n");
-      connect_awt_hook (env, obj, 1, GTK_BUTTON(ptr)->event_window);
-    }
+    connect_awt_hook (env, obj, 1, GTK_BUTTON(ptr)->event_window);
   else
-    {
-  connect_awt_hook (env, obj, 1, GTK_WIDGET (ptr)->window);
-      g_print("Connection object %p with window %p (but ptr is %p)\n", obj, GTK_WIDGET(ptr)->window, ptr);
-    }
+    connect_awt_hook (env, obj, 1, GTK_WIDGET (ptr)->window);
   gdk_threads_leave ();
 }

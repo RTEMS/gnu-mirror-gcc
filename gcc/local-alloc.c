@@ -356,16 +356,15 @@ local_alloc (void)
      See the declarations of these variables, above,
      for what they mean.  */
 
-  qty = (struct qty *) xmalloc (max_qty * sizeof (struct qty));
-  qty_phys_copy_sugg
-    = (HARD_REG_SET *) xmalloc (max_qty * sizeof (HARD_REG_SET));
-  qty_phys_num_copy_sugg = (short *) xmalloc (max_qty * sizeof (short));
-  qty_phys_sugg = (HARD_REG_SET *) xmalloc (max_qty * sizeof (HARD_REG_SET));
-  qty_phys_num_sugg = (short *) xmalloc (max_qty * sizeof (short));
+  qty = xmalloc (max_qty * sizeof (struct qty));
+  qty_phys_copy_sugg = xmalloc (max_qty * sizeof (HARD_REG_SET));
+  qty_phys_num_copy_sugg = xmalloc (max_qty * sizeof (short));
+  qty_phys_sugg = xmalloc (max_qty * sizeof (HARD_REG_SET));
+  qty_phys_num_sugg = xmalloc (max_qty * sizeof (short));
 
-  reg_qty = (int *) xmalloc (max_regno * sizeof (int));
-  reg_offset = (char *) xmalloc (max_regno * sizeof (char));
-  reg_next_in_qty = (int *) xmalloc (max_regno * sizeof (int));
+  reg_qty = xmalloc (max_regno * sizeof (int));
+  reg_offset = xmalloc (max_regno * sizeof (char));
+  reg_next_in_qty = xmalloc (max_regno * sizeof (int));
 
   /* Determine which pseudo-registers can be allocated by local-alloc.
      In general, these are the registers used only in a single block and
@@ -409,7 +408,7 @@ local_alloc (void)
       else
 	{
 #define CLEAR(vector)  \
-	  memset ((char *) (vector), 0, (sizeof (*(vector))) * next_qty);
+	  memset ((vector), 0, (sizeof (*(vector))) * next_qty);
 
 	  CLEAR (qty_phys_copy_sugg);
 	  CLEAR (qty_phys_num_copy_sugg);
@@ -798,7 +797,7 @@ update_equiv_regs (void)
   regset_head cleared_regs;
   int clear_regnos = 0;
 
-  reg_equiv = (struct equivalence *) xcalloc (max_regno, sizeof *reg_equiv);
+  reg_equiv = xcalloc (max_regno, sizeof *reg_equiv);
   INIT_REG_SET (&cleared_regs);
 
   init_alias_analysis ();
@@ -1218,8 +1217,7 @@ block_alloc (int b)
 
   /* +2 to leave room for a post_mark_life at the last insn and for
      the birth of a CLOBBER in the first insn.  */
-  regs_live_at = (HARD_REG_SET *) xcalloc ((2 * insn_count + 2),
-					   sizeof (HARD_REG_SET));
+  regs_live_at = xcalloc ((2 * insn_count + 2), sizeof (HARD_REG_SET));
 
   /* Initialize table of hardware registers currently live.  */
 
@@ -1475,7 +1473,7 @@ block_alloc (int b)
      number of suggested registers they need so we allocate those with
      the most restrictive needs first.  */
 
-  qty_order = (int *) xmalloc (next_qty * sizeof (int));
+  qty_order = xmalloc (next_qty * sizeof (int));
   for (i = 0; i < next_qty; i++)
     qty_order[i] = i;
 
@@ -1740,7 +1738,7 @@ qty_sugg_compare_1 (const void *q1p, const void *q2p)
 
    Combining registers means marking them as having the same quantity
    and adjusting the offsets within the quantity if either of
-   them is a SUBREG).
+   them is a SUBREG.
 
    We don't actually combine a hard reg with a pseudo; instead
    we just record the hard reg as the suggestion for the pseudo's quantity.
@@ -1751,7 +1749,7 @@ qty_sugg_compare_1 (const void *q1p, const void *q2p)
    there is no REG_DEAD note on INSN.  This occurs during the processing
    of REG_NO_CONFLICT blocks.
 
-   MAY_SAVE_COPYCOPY is nonzero if this insn is simply copying USEDREG to
+   MAY_SAVE_COPY is nonzero if this insn is simply copying USEDREG to
    SETREG or if the input and output must share a register.
    In that case, we record a hard reg suggestion in QTY_PHYS_COPY_SUGG.
 

@@ -21,9 +21,6 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
-#include "coretypes.h"
-#include "tm.h"
-
 #include "cpplib.h"
 #include "cpphash.h"
 #include "obstack.h"
@@ -109,6 +106,7 @@ static unsigned int read_flag (cpp_reader *, unsigned int);
 static int strtoul_for_line (const uchar *, unsigned int, unsigned long *);
 static void do_diagnostic (cpp_reader *, int, int);
 static cpp_hashnode *lex_macro_node (cpp_reader *);
+static int undefine_macros (cpp_reader *, cpp_hashnode *, void *);
 static void do_include_common (cpp_reader *, enum include_type);
 static struct pragma_entry *lookup_pragma_entry (struct pragma_entry *,
                                                  const cpp_hashnode *);
@@ -279,7 +277,7 @@ prepare_directive_trad (cpp_reader *pfile)
 				    || pfile->directive == &dtable[T_ELIF]);
       if (no_expand)
 	pfile->state.prevent_expansion++;
-      scan_out_logical_line (pfile, NULL);
+      _cpp_scan_out_logical_line (pfile, NULL);
       if (no_expand)
 	pfile->state.prevent_expansion--;
       pfile->state.skipping = was_skipping;
@@ -443,7 +441,7 @@ run_directive (cpp_reader *pfile, int dir_no, const char *buf, size_t count)
 		   /* from_stage3 */ true, 1);
   /* Disgusting hack.  */
   if (dir_no == T_PRAGMA)
-    pfile->buffer->inc = pfile->buffer->prev->inc;
+    pfile->buffer->file = pfile->buffer->prev->file;
   start_directive (pfile);
 
   /* This is a short-term fix to prevent a leading '#' being
@@ -456,7 +454,7 @@ run_directive (cpp_reader *pfile, int dir_no, const char *buf, size_t count)
   pfile->directive->handler (pfile);
   end_directive (pfile, 1);
   if (dir_no == T_PRAGMA)
-    pfile->buffer->inc = NULL;
+    pfile->buffer->file = NULL;
   _cpp_pop_buffer (pfile);
 }
 
@@ -539,6 +537,45 @@ do_undef (cpp_reader *pfile)
     }
   check_eol (pfile);
 }
+
+/* Undefine a single macro/assertion/whatever.  */
+
+static int
+undefine_macros (cpp_reader *pfile, cpp_hashnode *h, 
+		 void *data_p ATTRIBUTE_UNUSED)
+{
+  switch (h->type)
+    {
+    case NT_VOID:
+      break;
+      
+    case NT_MACRO:
+      if (pfile->cb.undef)
+        (*pfile->cb.undef) (pfile, pfile->directive_line, h);
+
+      if (CPP_OPTION (pfile, warn_unused_macros))
+        _cpp_warn_if_unused_macro (pfile, h, NULL);
+
+      /* And fall through....  */
+    case NT_ASSERTION:
+      _cpp_free_definition (h);
+      break;
+
+    default:
+      abort ();
+    }
+  h->flags &= ~NODE_POISONED;
+  return 1;
+}
+
+/* Undefine all macros and assertions.  */
+
+void
+cpp_undef_all (cpp_reader *pfile)
+{
+  cpp_forall_identifiers (pfile, undefine_macros, NULL);
+}
+
 
 /* Helper routine used by parse_include.  Reinterpret the current line
    as an h-char-sequence (< ... >); we are looking at the first token
@@ -647,7 +684,7 @@ do_include_common (cpp_reader *pfile, enum include_type type)
 	pfile->cb.include (pfile, pfile->directive_line,
 			   pfile->directive->name, fname, angle_brackets);
 
-      _cpp_execute_include (pfile, fname, angle_brackets, type);
+      _cpp_stack_include (pfile, fname, angle_brackets, type);
     }
 
   free ((void *) fname);
@@ -662,13 +699,6 @@ do_include (cpp_reader *pfile)
 static void
 do_import (cpp_reader *pfile)
 {
-  if (CPP_OPTION (pfile, warn_import))
-    {
-      CPP_OPTION (pfile, warn_import) = 0;
-      cpp_error (pfile, DL_WARNING,
-   "#import is obsolete, use an #ifndef wrapper in the header file");
-    }
-
   do_include_common (pfile, IT_IMPORT);
 }
 
@@ -733,21 +763,6 @@ strtoul_for_line (const uchar *str, unsigned int len, long unsigned int *nump)
   return 0;
 }
 
-/* Subroutine of do_line and do_linemarker.  Convert escape sequences
-   in a string, but do not perform character set conversion.  */
-static bool
-interpret_string_notranslate (cpp_reader *pfile, const cpp_string *in,
-			      cpp_string *out)
-{
-  iconv_t save_narrow_cset_desc = pfile->narrow_cset_desc;
-  bool retval;
-
-  pfile->narrow_cset_desc = (iconv_t) -1;
-  retval = cpp_interpret_string (pfile, in, 1, out, false);
-  pfile->narrow_cset_desc = save_narrow_cset_desc;
-  return retval;
-}
-
 /* Interpret #line command.
    Note that the filename string (if any) is a true string constant
    (escapes are interpreted), unlike in #line.  */
@@ -780,7 +795,7 @@ do_line (cpp_reader *pfile)
   if (token->type == CPP_STRING)
     {
       cpp_string s = { 0, 0 };
-      if (interpret_string_notranslate (pfile, &token->val.str, &s))
+      if (_cpp_interpret_string_notranslate (pfile, &token->val.str, &s))
 	new_file = (const char *)s.text;
       check_eol (pfile);
     }
@@ -829,7 +844,7 @@ do_linemarker (cpp_reader *pfile)
   if (token->type == CPP_STRING)
     {
       cpp_string s = { 0, 0 };
-      if (interpret_string_notranslate (pfile, &token->val.str, &s))
+      if (_cpp_interpret_string_notranslate (pfile, &token->val.str, &s))
 	new_file = (const char *)s.text;
       
       new_sysp = 0;
@@ -876,8 +891,8 @@ _cpp_do_file_change (cpp_reader *pfile, enum lc_reason reason,
 		     const char *to_file, unsigned int file_line,
 		     unsigned int sysp)
 {
-  pfile->map = add_line_map (&pfile->line_maps, reason, sysp,
-			     pfile->line, to_file, file_line);
+  pfile->map = linemap_add (&pfile->line_maps, reason, sysp,
+			    pfile->line, to_file, file_line);
 
   if (pfile->cb.file_change)
     pfile->cb.file_change (pfile, pfile->map);
@@ -1125,14 +1140,6 @@ do_pragma (cpp_reader *pfile)
 	}
     }
 
-  /* FIXME.  This is an awful kludge to get the front ends to update
-     their notion of line number for diagnostic purposes.  The line
-     number should be passed to the handler and they should do it
-     themselves.  Stand-alone CPP must ignore us, otherwise it will
-     prefix the directive with spaces, hence the 1.  Ugh.  */
-  if (pfile->cb.line_change)
-    pfile->cb.line_change (pfile, token, 1);
-
   if (p)
     p->u.handler (pfile);
   else if (pfile->cb.def_pragma)
@@ -1148,15 +1155,11 @@ do_pragma (cpp_reader *pfile)
 static void
 do_pragma_once (cpp_reader *pfile)
 {
-  if (CPP_OPTION (pfile, warn_deprecated))
-    cpp_error (pfile, DL_WARNING, "#pragma once is obsolete");
-
   if (pfile->buffer->prev == NULL)
     cpp_error (pfile, DL_WARNING, "#pragma once in main file");
-  else
-    _cpp_never_reread (pfile->buffer->inc);
 
   check_eol (pfile);
+  _cpp_mark_file_once_only (pfile, pfile->buffer->file);
 }
 
 /* Handle #pragma GCC poison, to poison one or more identifiers so
@@ -1783,7 +1786,7 @@ cpp_define (cpp_reader *pfile, const char *str)
      tack " 1" on the end.  */
 
   count = strlen (str);
-  buf = (char *) alloca (count + 3);
+  buf = alloca (count + 3);
   memcpy (buf, str, count);
 
   p = strchr (str, '=');
@@ -1844,7 +1847,7 @@ handle_assertion (cpp_reader *pfile, const char *str, int type)
 
   /* Copy the entire option so we can modify it.  Change the first
      "=" in the string to a '(', and tack a ')' on the end.  */
-  char *buf = (char *) alloca (count + 2);
+  char *buf = alloca (count + 2);
 
   memcpy (buf, str, count);
   if (p)
@@ -1922,7 +1925,7 @@ void
 _cpp_pop_buffer (cpp_reader *pfile)
 {
   cpp_buffer *buffer = pfile->buffer;
-  struct include_file *inc = buffer->inc;
+  struct _cpp_file *inc = buffer->file;
   struct if_stack *ifs;
 
   /* Walk back up the conditional stack till we reach its level at

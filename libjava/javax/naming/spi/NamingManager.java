@@ -83,13 +83,17 @@ public class NamingManager
 
 	try
 	  {
-	    icf = (InitialContextFactory) Class.forName (java_naming_factory_initial).newInstance ();
+	    icf = (InitialContextFactory)Class.forName
+		(java_naming_factory_initial, true,
+		 Thread.currentThread().getContextClassLoader())
+		.newInstance ();
 	  }
 	catch (Exception exception)
 	  {
 	    NoInitialContextException e
-	      = new NoInitialContextException ("Can't load InitialContextFactory class: "
-					       + java_naming_factory_initial);
+	      = new NoInitialContextException
+	      ("Can't load InitialContextFactory class: "
+	       + java_naming_factory_initial);
 	    e.setRootCause(exception);
 	    throw e;
 	  }
@@ -125,7 +129,9 @@ public class NamingManager
 	String aTry = tokens.nextToken ();
 	try
 	  {
-	    Class factoryClass = Class.forName (aTry + "." + scheme);
+	    Class factoryClass = Class.forName (aTry + "." + scheme,
+						true,
+						Thread.currentThread().getContextClassLoader());
 	    ObjectFactory factory =
 	      (ObjectFactory) factoryClass.newInstance ();
 	    Object obj = factory.getObjectInstance (refInfo, name,
@@ -227,7 +233,9 @@ public class NamingManager
 	    if (fClass != null)
 	      {
 		// Exceptions here are passed to the caller.
-		Class k = Class.forName (fClass);
+		Class k = Class.forName (fClass,
+					 true,
+					 Thread.currentThread().getContextClassLoader());
 		factory = (ObjectFactory) k.newInstance ();
 	      }
 	    else
@@ -271,7 +279,9 @@ public class NamingManager
 	    while (tokens.hasMoreTokens ())
 	      {
 		String klassName = tokens.nextToken ();
-		Class k = Class.forName (klassName);
+		Class k = Class.forName (klassName,
+					 true,
+					 Thread.currentThread().getContextClassLoader());
 		factory = (ObjectFactory) k.newInstance ();
 		Object obj = factory.getObjectInstance (refInfo, name,
 							nameCtx, environment);
@@ -337,7 +347,9 @@ public class NamingManager
 	String klassName = tokens.nextToken ();
 	try
 	  {
-	    Class k = Class.forName (klassName);
+	    Class k = Class.forName (klassName,
+				     true,
+				     Thread.currentThread().getContextClassLoader());
 	    StateFactory factory = (StateFactory) k.newInstance ();
 	    Object o = factory.getStateToBind (obj, name, nameCtx,
 					       environment);

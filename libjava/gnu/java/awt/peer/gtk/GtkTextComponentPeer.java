@@ -37,9 +37,14 @@ exception statement from your version. */
 
 
 package gnu.java.awt.peer.gtk;
-import java.awt.peer.*;
-import java.awt.*;
-import java.awt.event.*;
+
+import java.awt.AWTEvent;
+import java.awt.Component;
+import java.awt.Rectangle;
+import java.awt.TextComponent;
+import java.awt.event.KeyEvent;
+import java.awt.event.TextEvent;
+import java.awt.peer.TextComponentPeer;
 
 public class GtkTextComponentPeer extends GtkComponentPeer
   implements TextComponentPeer
@@ -50,7 +55,9 @@ public class GtkTextComponentPeer extends GtkComponentPeer
 
     setText (tc.getText ());
   }
-  
+
+  public native void connectHooks ();
+
   public native int getCaretPosition ();
   public native void setCaretPosition (int pos);
   public native int getSelectionStart ();
@@ -78,17 +85,5 @@ public class GtkTextComponentPeer extends GtkComponentPeer
   protected void postTextEvent ()
   {
     q.postEvent (new TextEvent (awtComponent, TextEvent.TEXT_VALUE_CHANGED));
-  }
-
-  public void handleEvent (AWTEvent e)
-  {
-    if (e.getID () == KeyEvent.KEY_TYPED
-        && ((TextComponent)e.getSource()).isEditable())
-      {
-        KeyEvent ke = (KeyEvent)e;
-
-        if (!ke.isConsumed())
-          postTextEvent ();
-      }
   }
 }

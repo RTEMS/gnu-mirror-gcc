@@ -155,7 +155,7 @@ init_flow (void)
   if (!initialized)
     {
       gcc_obstack_init (&flow_obstack);
-      flow_firstobj = (char *) obstack_alloc (&flow_obstack, 0);
+      flow_firstobj = obstack_alloc (&flow_obstack, 0);
       initialized = 1;
     }
   else
@@ -163,7 +163,7 @@ init_flow (void)
       free_alloc_pool (bb_pool);
       free_alloc_pool (edge_pool);
       obstack_free (&flow_obstack, flow_firstobj);
-      flow_firstobj = (char *) obstack_alloc (&flow_obstack, 0);
+      flow_firstobj = obstack_alloc (&flow_obstack, 0);
     }
   bb_pool = create_alloc_pool ("Basic block pool",
 			       sizeof (struct basic_block_def), 100);
@@ -491,48 +491,49 @@ dump_flow_info (FILE *file)
   static const char * const reg_class_names[] = REG_CLASS_NAMES;
 
   fprintf (file, "%d registers.\n", max_regno);
-  for (i = FIRST_PSEUDO_REGISTER; i < max_regno; i++)
-    if (REG_N_REFS (i))
-      {
-	enum reg_class class, altclass;
+  if (reg_n_info)
+    for (i = FIRST_PSEUDO_REGISTER; i < max_regno; i++)
+      if (REG_N_REFS (i))
+	{
+	  enum reg_class class, altclass;
 
-	fprintf (file, "\nRegister %d used %d times across %d insns",
-		 i, REG_N_REFS (i), REG_LIVE_LENGTH (i));
-	if (REG_BASIC_BLOCK (i) >= 0)
-	  fprintf (file, " in block %d", REG_BASIC_BLOCK (i));
-	if (REG_N_SETS (i))
-	  fprintf (file, "; set %d time%s", REG_N_SETS (i),
-		   (REG_N_SETS (i) == 1) ? "" : "s");
-	if (regno_reg_rtx[i] != NULL && REG_USERVAR_P (regno_reg_rtx[i]))
-	  fprintf (file, "; user var");
-	if (REG_N_DEATHS (i) != 1)
-	  fprintf (file, "; dies in %d places", REG_N_DEATHS (i));
-	if (REG_N_CALLS_CROSSED (i) == 1)
-	  fprintf (file, "; crosses 1 call");
-	else if (REG_N_CALLS_CROSSED (i))
-	  fprintf (file, "; crosses %d calls", REG_N_CALLS_CROSSED (i));
-	if (regno_reg_rtx[i] != NULL
-	    && PSEUDO_REGNO_BYTES (i) != UNITS_PER_WORD)
-	  fprintf (file, "; %d bytes", PSEUDO_REGNO_BYTES (i));
+	  fprintf (file, "\nRegister %d used %d times across %d insns",
+		   i, REG_N_REFS (i), REG_LIVE_LENGTH (i));
+	  if (REG_BASIC_BLOCK (i) >= 0)
+	    fprintf (file, " in block %d", REG_BASIC_BLOCK (i));
+	  if (REG_N_SETS (i))
+	    fprintf (file, "; set %d time%s", REG_N_SETS (i),
+		     (REG_N_SETS (i) == 1) ? "" : "s");
+	  if (regno_reg_rtx[i] != NULL && REG_USERVAR_P (regno_reg_rtx[i]))
+	    fprintf (file, "; user var");
+	  if (REG_N_DEATHS (i) != 1)
+	    fprintf (file, "; dies in %d places", REG_N_DEATHS (i));
+	  if (REG_N_CALLS_CROSSED (i) == 1)
+	    fprintf (file, "; crosses 1 call");
+	  else if (REG_N_CALLS_CROSSED (i))
+	    fprintf (file, "; crosses %d calls", REG_N_CALLS_CROSSED (i));
+	  if (regno_reg_rtx[i] != NULL
+	      && PSEUDO_REGNO_BYTES (i) != UNITS_PER_WORD)
+	    fprintf (file, "; %d bytes", PSEUDO_REGNO_BYTES (i));
 
-	class = reg_preferred_class (i);
-	altclass = reg_alternate_class (i);
-	if (class != GENERAL_REGS || altclass != ALL_REGS)
-	  {
-	    if (altclass == ALL_REGS || class == ALL_REGS)
-	      fprintf (file, "; pref %s", reg_class_names[(int) class]);
-	    else if (altclass == NO_REGS)
-	      fprintf (file, "; %s or none", reg_class_names[(int) class]);
-	    else
-	      fprintf (file, "; pref %s, else %s",
-		       reg_class_names[(int) class],
-		       reg_class_names[(int) altclass]);
-	  }
+	  class = reg_preferred_class (i);
+	  altclass = reg_alternate_class (i);
+	  if (class != GENERAL_REGS || altclass != ALL_REGS)
+	    {
+	      if (altclass == ALL_REGS || class == ALL_REGS)
+		fprintf (file, "; pref %s", reg_class_names[(int) class]);
+	      else if (altclass == NO_REGS)
+		fprintf (file, "; %s or none", reg_class_names[(int) class]);
+	      else
+		fprintf (file, "; pref %s, else %s",
+			 reg_class_names[(int) class],
+			 reg_class_names[(int) altclass]);
+	    }
 
-	if (regno_reg_rtx[i] != NULL && REG_POINTER (regno_reg_rtx[i]))
-	  fprintf (file, "; pointer");
-	fprintf (file, ".\n");
-      }
+	  if (regno_reg_rtx[i] != NULL && REG_POINTER (regno_reg_rtx[i]))
+	    fprintf (file, "; pointer");
+	  fprintf (file, ".\n");
+	}
 
   fprintf (file, "\n%d basic blocks, %d edges.\n", n_basic_blocks, n_edges);
   FOR_EACH_BB (bb)
@@ -636,7 +637,7 @@ dump_edge_info (FILE *file, edge e, int do_succ)
     {
       static const char * const bitnames[] = {
 	"fallthru", "ab", "abcall", "eh", "fake", "dfs_back",
-	"can_fallthru", "irreducible", "sibcall"
+	"can_fallthru", "irreducible", "sibcall", "loop_exit"
       };
       int comma = 0;
       int i, flags = e->flags;
@@ -697,7 +698,7 @@ alloc_aux_for_blocks (int size)
   /* Check whether AUX data are still allocated.  */
   else if (first_block_aux_obj)
     abort ();
-  first_block_aux_obj = (char *) obstack_alloc (&block_aux_obstack, 0);
+  first_block_aux_obj = obstack_alloc (&block_aux_obstack, 0);
   if (size)
     {
       basic_block bb;
@@ -763,7 +764,7 @@ alloc_aux_for_edges (int size)
   else if (first_edge_aux_obj)
     abort ();
 
-  first_edge_aux_obj = (char *) obstack_alloc (&edge_aux_obstack, 0);
+  first_edge_aux_obj = obstack_alloc (&edge_aux_obstack, 0);
   if (size)
     {
       basic_block bb;
@@ -819,9 +820,8 @@ verify_flow_info (void)
   basic_block bb, last_bb_seen;
   basic_block *last_visited;
 
-  last_visited = (basic_block *) xcalloc (last_basic_block + 2,
-					  sizeof (basic_block));
-  edge_checksum = (size_t *) xcalloc (last_basic_block + 2, sizeof (size_t));
+  last_visited = xcalloc (last_basic_block + 2, sizeof (basic_block));
+  edge_checksum = xcalloc (last_basic_block + 2, sizeof (size_t));
 
   /* Check bb chain & numbers.  */
   last_bb_seen = ENTRY_BLOCK_PTR;

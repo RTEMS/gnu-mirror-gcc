@@ -19,6 +19,9 @@ along with GCC; see the file COPYING.  If not, write to the Free
 Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 02111-1307, USA.  */
 
+#ifndef GCC_FUNCTION_H
+#define GCC_FUNCTION_H
+
 struct var_refs_queue GTY(())
 {
   rtx modified;
@@ -389,6 +392,23 @@ struct function GTY(())
      delay list for them is recorded here.  */
   rtx epilogue_delay_list;
 
+  /* How commonly executed the function is.  Initialized during branch
+     probabilities pass.  */
+  enum function_frequency {
+    /* This function most likely won't be executed at all.
+       (set only when profile feedback is available).  */
+    FUNCTION_FREQUENCY_UNLIKELY_EXECUTED,
+    /* The default value.  */
+    FUNCTION_FREQUENCY_NORMAL,
+    /* Optimize this function hard
+       (set only when profile feedback is available).  */
+    FUNCTION_FREQUENCY_HOT
+  } function_frequency;
+
+  /* Maximal number of entities in the single jumptable.  Used to estimate
+     final flowgraph size.  */
+  int max_jumptable_ents;
+
   /* Collected bit flags.  */
 
   /* Nonzero if function being compiled needs to be given an address
@@ -488,22 +508,12 @@ struct function GTY(())
   /* Nonzero if code to initialize arg_pointer_save_area has been emitted.  */
   unsigned int arg_pointer_save_area_init : 1;
 
-  /* How commonly executed the function is.  Initialized during branch
-     probabilities pass.  */
-  enum function_frequency {
-    /* This function most likely won't be executed at all.
-       (set only when profile feedback is available).  */
-    FUNCTION_FREQUENCY_UNLIKELY_EXECUTED,
-    /* The default value.  */
-    FUNCTION_FREQUENCY_NORMAL,
-    /* Optimize this function hard
-       (set only when profile feedback is available).  */
-    FUNCTION_FREQUENCY_HOT
-  } function_frequency;
+  /* Flag for use by ther rtl inliner, to tell if the function has been
+     processed at least once.  */
+  unsigned int rtl_inline_init : 1;
 
-  /* Maximal number of entities in the single jumptable.  Used to estimate
-     final flowgraph size.  */
-  int max_jumptable_ents;
+  /* Nonzero if the rtl inliner has saved the function for inlining.  */
+  unsigned int saved_for_inline : 1;
 };
 
 /* The function currently being compiled.  */
@@ -621,3 +631,5 @@ extern void init_virtual_regs (struct emit_status *);
 
 /* Called once, at initialization, to initialize function.c.  */
 extern void init_function_once (void);
+
+#endif  /* GCC_FUNCTION_H */

@@ -61,14 +61,14 @@ enum c_language_kind c_language = clk_objc;
 #define LANG_HOOKS_MARK_ADDRESSABLE c_mark_addressable
 #undef LANG_HOOKS_TRUTHVALUE_CONVERSION
 #define LANG_HOOKS_TRUTHVALUE_CONVERSION c_common_truthvalue_conversion
-#undef LANG_HOOKS_INSERT_DEFAULT_ATTRIBUTES
-#define LANG_HOOKS_INSERT_DEFAULT_ATTRIBUTES c_insert_default_attributes
 #undef LANG_HOOKS_FINISH_INCOMPLETE_DECL
 #define LANG_HOOKS_FINISH_INCOMPLETE_DECL c_finish_incomplete_decl
 #undef LANG_HOOKS_UNSAFE_FOR_REEVAL
 #define LANG_HOOKS_UNSAFE_FOR_REEVAL c_common_unsafe_for_reeval
 #undef LANG_HOOKS_STATICP
 #define LANG_HOOKS_STATICP c_staticp
+#undef LANG_HOOKS_SET_DECL_ASSEMBLER_NAME
+#define LANG_HOOKS_SET_DECL_ASSEMBLER_NAME c_static_assembler_name
 #undef LANG_HOOKS_NO_BODY_BLOCKS
 #define LANG_HOOKS_NO_BODY_BLOCKS true
 #undef LANG_HOOKS_DUP_LANG_SPECIFIC_DECL
@@ -79,11 +79,16 @@ enum c_language_kind c_language = clk_objc;
 #define LANG_HOOKS_DECL_PRINTABLE_NAME objc_printable_name
 #undef LANG_HOOKS_WARN_UNUSED_GLOBAL_DECL
 #define LANG_HOOKS_WARN_UNUSED_GLOBAL_DECL c_warn_unused_global_decl
+#undef LANG_HOOKS_DECL_UNINIT
+#define LANG_HOOKS_DECL_UNINIT c_decl_uninit
 
 #undef LANG_HOOKS_FUNCTION_ENTER_NESTED
 #define LANG_HOOKS_FUNCTION_ENTER_NESTED c_push_function_context
 #undef LANG_HOOKS_FUNCTION_LEAVE_NESTED
 #define LANG_HOOKS_FUNCTION_LEAVE_NESTED c_pop_function_context
+
+#undef LANG_HOOKS_RTL_EXPAND_STMT
+#define LANG_HOOKS_RTL_EXPAND_STMT expand_stmt
 
 /* Attribute hooks.  */
 #undef LANG_HOOKS_COMMON_ATTRIBUTE_TABLE
@@ -124,6 +129,9 @@ enum c_language_kind c_language = clk_objc;
 #define LANG_HOOKS_INCOMPLETE_TYPE_ERROR c_incomplete_type_error
 #undef LANG_HOOKS_TYPE_PROMOTES_TO
 #define LANG_HOOKS_TYPE_PROMOTES_TO c_type_promotes_to
+
+#undef LANG_HOOKS_WRITE_GLOBALS
+#define LANG_HOOKS_WRITE_GLOBALS c_write_global_declarations
 
 /* Each front end provides its own hooks, for toplev.c.  */
 const struct lang_hooks lang_hooks = LANG_HOOKS_INITIALIZER;

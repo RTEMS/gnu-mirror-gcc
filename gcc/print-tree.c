@@ -49,7 +49,7 @@ static struct bucket **table;
 void
 debug_tree (tree node)
 {
-  table = (struct bucket **) xcalloc (HASH_SIZE, sizeof (struct bucket *));
+  table = xcalloc (HASH_SIZE, sizeof (struct bucket *));
   print_node (stderr, "", node, 0);
   free (table);
   table = 0;
@@ -200,7 +200,7 @@ print_node (FILE *file, const char *prefix, tree node, int indent)
       }
 
   /* Add this node to the table.  */
-  b = (struct bucket *) xmalloc (sizeof (struct bucket));
+  b = xmalloc (sizeof (struct bucket));
   b->node = node;
   b->next = table[hash];
   table[hash] = b;
@@ -317,10 +317,8 @@ print_node (FILE *file, const char *prefix, tree node, int indent)
       if (TREE_CODE (node) == TYPE_DECL && TYPE_DECL_SUPPRESS_DEBUG (node))
 	fputs (" suppress-debug", file);
 
-      if (TREE_CODE (node) == FUNCTION_DECL && DID_INLINE_FUNC (node))
-	fputs (" autoinline", file);
-      else if (TREE_CODE (node) == FUNCTION_DECL && DECL_INLINE (node))
-	fputs (" inline", file);
+      if (TREE_CODE (node) == FUNCTION_DECL && DECL_INLINE (node))
+	fputs (DECL_DECLARED_INLINE_P (node) ? " inline" : " autoinline", file);
       if (TREE_CODE (node) == FUNCTION_DECL && DECL_BUILT_IN (node))
 	fputs (" built-in", file);
       if (TREE_CODE (node) == FUNCTION_DECL && DECL_NO_STATIC_CHAIN (node))
@@ -599,7 +597,7 @@ print_node (FILE *file, const char *prefix, tree node, int indent)
 	      indent_to (file, indent + 4);
 	      fprintf (file, "rtl %d ", i);
 	      if (TREE_OPERAND (node, i))
-		print_rtl (file, (struct rtx_def *) TREE_OPERAND (node, i));
+		print_rtl (file, (rtx) TREE_OPERAND (node, i));
 	      else
 		fprintf (file, "(nil)");
 	      fprintf (file, "\n");

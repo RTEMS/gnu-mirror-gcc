@@ -435,13 +435,12 @@ insn_scope (rtx insn)
    return VARRAY_TREE (block_locators_blocks, min);
 }
 
-/* Return line number of the statement that produced this insn.  */
+/* Return line number of the statement specified by the locator.  */
 int
-insn_line (rtx insn)
+locator_line (int loc)
 {
   int max = VARRAY_ACTIVE_SIZE (line_locators_locs);
   int min = 0;
-  int loc = INSN_LOCATOR (insn);
 
   if (!max || !loc)
     return 0;
@@ -463,13 +462,19 @@ insn_line (rtx insn)
    return VARRAY_INT (line_locators_lines, min);
 }
 
-/* Return source file of the statement that produced this insn.  */
+/* Return line number of the statement that produced this insn.  */
+int
+insn_line (rtx insn)
+{
+  return locator_line (INSN_LOCATOR (insn));
+}
+
+/* Return source file of the statement specified by LOC.  */
 const char *
-insn_file (rtx insn)
+locator_file (int loc)
 {
   int max = VARRAY_ACTIVE_SIZE (file_locators_locs);
   int min = 0;
-  int loc = INSN_LOCATOR (insn);
 
   if (!max || !loc)
     return NULL;
@@ -489,6 +494,13 @@ insn_file (rtx insn)
 	}
     }
    return VARRAY_CHAR_PTR (file_locators_files, min);
+}
+
+/* Return source file of the statement that produced this insn.  */
+const char *
+insn_file (rtx insn)
+{
+  return locator_file (INSN_LOCATOR (insn));
 }
 
 /* Rebuild all the NOTE_INSN_BLOCK_BEG and NOTE_INSN_BLOCK_END notes based
@@ -783,7 +795,7 @@ fixup_reorder_chain (void)
   prev_bb->next_bb = EXIT_BLOCK_PTR;
   EXIT_BLOCK_PTR->prev_bb = prev_bb;
 
-  /* Anoying special case - jump around dead jumptables left in the code.  */
+  /* Annoying special case - jump around dead jumptables left in the code.  */
   FOR_EACH_BB (bb)
     {
       edge e;

@@ -1055,10 +1055,10 @@ regmove_optimize (rtx f, int nregs, FILE *regmove_dump_file)
      can suppress some optimizations in those zones.  */
   mark_flags_life_zones (discover_flags_reg ());
 
-  regno_src_regno = (int *) xmalloc (sizeof *regno_src_regno * nregs);
+  regno_src_regno = xmalloc (sizeof *regno_src_regno * nregs);
   for (i = nregs; --i >= 0; ) regno_src_regno[i] = -1;
 
-  regmove_bb_head = (int *) xmalloc (sizeof (int) * (old_max_uid + 1));
+  regmove_bb_head = xmalloc (sizeof (int) * (old_max_uid + 1));
   for (i = old_max_uid; i >= 0; i--) regmove_bb_head[i] = -1;
   FOR_EACH_BB (bb)
     regmove_bb_head[INSN_UID (bb->head)] = bb->index;
@@ -2032,7 +2032,7 @@ fixup_match_1 (rtx insn, rtx set, rtx src, rtx src_subreg, rtx dst,
 }
 
 
-/* return nonzero if X is stable and mentions no registers but for
+/* Return nonzero if X is stable and mentions no registers but for
    mentioning SRC or mentioning / changing DST .  If in doubt, presume
    it is unstable.
    The rationale is that we want to check if we can move an insn easily
@@ -2064,7 +2064,7 @@ stable_and_no_regs_but_for_p (rtx x, rtx src, rtx dst)
       if (code == MEM
 	  && ! stable_and_no_regs_but_for_p (XEXP (x, 0), src, dst))
 	return 0;
-      /* fall through */
+      /* Fall through.  */
     default:
       return ! rtx_unstable_p (x);
     }
@@ -2198,7 +2198,7 @@ record_one_stack_memref (rtx insn, rtx *mem, struct csa_memlist *next_memlist)
 {
   struct csa_memlist *ml;
 
-  ml = (struct csa_memlist *) xmalloc (sizeof (*ml));
+  ml = xmalloc (sizeof (*ml));
 
   if (XEXP (*mem, 0) == stack_pointer_rtx)
     ml->sp_offset = 0;

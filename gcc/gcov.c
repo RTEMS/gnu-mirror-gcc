@@ -82,6 +82,8 @@ typedef struct arc_info
 
   /* transition counts.  */
   gcov_type count;
+  /* used in cycle search, so that we do not clobber original counts.  */
+  gcov_type cs_count;
 
   unsigned int count_valid : 1;
   unsigned int on_tree : 1;
@@ -417,14 +419,12 @@ print_usage (int error_p)
 static void
 print_version (void)
 {
-  unsigned version = GCOV_VERSION;
-
-  fnotice (stdout, "gcov %.4s (GCC %s)\n",
-	   (const char *)&version, version_string);
-  fnotice (stdout, "Copyright (C) 2002 Free Software Foundation, Inc.\n");
+  fnotice (stdout, "gcov (GCC) %s\n", version_string);
+  fnotice (stdout, "Copyright (C) 2003 Free Software Foundation, Inc.\n");
   fnotice (stdout,
-	   "This is free software; see the source for copying conditions.  There is NO\n\
-warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n");
+	   "This is free software; see the source for copying conditions.\n"
+  	   "There is NO warranty; not even for MERCHANTABILITY or \n"
+	   "FITNESS FOR A PARTICULAR PURPOSE.\n\n");
   exit (SUCCESS_EXIT_CODE);
 }
 
@@ -522,7 +522,7 @@ process_file (const char *file_name)
   for (fn = functions; fn; fn = fn->next)
     solve_flow_graph (fn);
   for (src = sources; src; src = src->next)
-    src->lines = (line_t *) xcalloc (src->num_lines, sizeof (line_t));
+    src->lines = xcalloc (src->num_lines, sizeof (line_t));
   for (fn = functions; fn; fn = fn->next)
     {
       coverage_t coverage;
@@ -684,7 +684,7 @@ find_source (const char *file_name)
     if (!strcmp (file_name, src->name))
       return src;
 
-  src = (source_t *)xcalloc (1, sizeof (source_t));
+  src = xcalloc (1, sizeof (source_t));
   src->name = xstrdup (file_name);
   src->coverage.name = src->name;
   src->index = sources ? sources->index + 1 : 1;
@@ -723,13 +723,10 @@ read_graph_file (void)
   if (version != GCOV_VERSION)
     {
       char v[4], e[4];
-      unsigned required = GCOV_VERSION;
 
-      for (ix = 4; ix--; required >>= 8, version >>= 8)
-	{
-	  v[ix] = version;
-	  e[ix] = required;
-	}
+      GCOV_UNSIGNED2STRING (v, version);
+      GCOV_UNSIGNED2STRING (e, GCOV_VERSION);
+
       fnotice (stderr, "%s:version `%.4s', prefer `%.4s'\n",
 	       bbg_file_name, v, e);
     }
@@ -753,7 +750,7 @@ read_graph_file (void)
 	  src = find_source (gcov_read_string ());
 	  lineno = gcov_read_unsigned ();
 
-	  fn = (function_t *)xcalloc (1, sizeof (function_t));
+	  fn = xcalloc (1, sizeof (function_t));
 	  fn->name = function_name;
 	  fn->ident = ident;
 	  fn->checksum = checksum;
@@ -786,11 +783,10 @@ read_graph_file (void)
 		     bbg_file_name, fn->name);
 	  else
 	    {
-	      unsigned ix, num_blocks = length / 4;
+	      unsigned ix, num_blocks = GCOV_TAG_BLOCKS_NUM (length);
 	      fn->num_blocks = num_blocks;
 
-	      fn->blocks
-		= (block_t *)xcalloc (fn->num_blocks, sizeof (block_t));
+	      fn->blocks = xcalloc (fn->num_blocks, sizeof (block_t));
 	      for (ix = 0; ix != num_blocks; ix++)
 		fn->blocks[ix].flags = gcov_read_unsigned ();
 	    }
@@ -798,7 +794,7 @@ read_graph_file (void)
       else if (fn && tag == GCOV_TAG_ARCS)
 	{
 	  unsigned src = gcov_read_unsigned ();
-	  unsigned num_dests = (length - 4) / 8;
+	  unsigned num_dests = GCOV_TAG_ARCS_NUM (length);
 
 	  if (src >= fn->num_blocks || fn->blocks[src].succ)
 	    goto corrupt;
@@ -811,7 +807,7 @@ read_graph_file (void)
 
 	      if (dest >= fn->num_blocks)
 		goto corrupt;
-	      arc = (arc_t *) xcalloc (1, sizeof (arc_t));
+	      arc = xcalloc (1, sizeof (arc_t));
 
 	      arc->dst = &fn->blocks[dest];
 	      arc->src = &fn->blocks[src];
@@ -856,8 +852,7 @@ read_graph_file (void)
       else if (fn && tag == GCOV_TAG_LINES)
 	{
 	  unsigned blockno = gcov_read_unsigned ();
-	  unsigned *line_nos
-	    = (unsigned *)xcalloc ((length - 4) / 4, sizeof (unsigned));
+	  unsigned *line_nos = xcalloc (length - 1, sizeof (unsigned));
 
 	  if (blockno >= fn->num_blocks || fn->blocks[blockno].u.line.encoding)
 	    goto corrupt;
@@ -991,10 +986,13 @@ read_count_file (void)
   version = gcov_read_unsigned ();
   if (version != GCOV_VERSION)
     {
-      unsigned desired = GCOV_VERSION;
+      char v[4], e[4];
+
+      GCOV_UNSIGNED2STRING (v, version);
+      GCOV_UNSIGNED2STRING (e, GCOV_VERSION);
       
       fnotice (stderr, "%s:version `%.4s', prefer version `%.4s'\n",
-	       da_file_name, (const char *)&version, (const char *)&desired);
+	       da_file_name, v, e);
     }
   tag = gcov_read_unsigned ();
   if (tag != bbg_stamp)
@@ -1045,12 +1043,11 @@ read_count_file (void)
 	}
       else if (tag == GCOV_TAG_FOR_COUNTER (GCOV_COUNTER_ARCS) && fn)
 	{
-	  if (length != 8 * fn->num_counts)
+	  if (length != GCOV_TAG_COUNTER_LENGTH (fn->num_counts))
 	    goto mismatch;
 
 	  if (!fn->counts)
-	    fn->counts
-	      = (gcov_type *)xcalloc (fn->num_counts, sizeof (gcov_type));
+	    fn->counts = xcalloc (fn->num_counts, sizeof (gcov_type));
 
 	  for (ix = 0; ix != fn->num_counts; ix++)
 	    fn->counts[ix] += gcov_read_counter ();
@@ -1492,7 +1489,7 @@ static void
 add_line_counts (coverage_t *coverage, function_t *fn)
 {
   unsigned ix;
-  line_t *line = NULL; /* this is propagated from one iteration to the
+  line_t *line = NULL; /* This is propagated from one iteration to the
 			  next.  */
 
   /* Scan each basic block.  */
@@ -1627,6 +1624,10 @@ accumulate_line_counts (source_t *src)
 		  if (flag_branches)
 		    add_branch_counts (&src->coverage, arc);
 		}
+
+	      /* Initialize the cs_count.  */
+	      for (arc = block->succ; arc; arc = arc->succ_next)
+		arc->cs_count = arc->count;
 	    }
 
 	  /* Find the loops. This uses the algorithm described in
@@ -1643,7 +1644,8 @@ accumulate_line_counts (source_t *src)
 
 	     For each loop we find, locate the arc with the smallest
 	     transition count, and add that to the cumulative
-	     count. Remove the arc from consideration.  */
+	     count.  Decrease flow over the cycle and remove the arc
+	     from consideration.  */
 	  for (block = line->u.blocks; block; block = block->chain)
 	    {
 	      block_t *head = block;
@@ -1669,25 +1671,33 @@ accumulate_line_counts (source_t *src)
 		  if (dst == block)
 		    {
 		      /* Found a closing arc.  */
-		      gcov_type cycle_count = arc->count;
+		      gcov_type cycle_count = arc->cs_count;
 		      arc_t *cycle_arc = arc;
 		      arc_t *probe_arc;
 
 		      /* Locate the smallest arc count of the loop.  */
 		      for (dst = head; (probe_arc = dst->u.cycle.arc);
 			   dst = probe_arc->src)
-			if (cycle_count > probe_arc->count)
+			if (cycle_count > probe_arc->cs_count)
 			  {
-			    cycle_count = probe_arc->count;
+			    cycle_count = probe_arc->cs_count;
 			    cycle_arc = probe_arc;
 			  }
 
 		      count += cycle_count;
 		      cycle_arc->cycle = 1;
+
+		      /* Remove the flow from the cycle.  */
+		      arc->cs_count -= cycle_count;
+		      for (dst = head; (probe_arc = dst->u.cycle.arc);
+			   dst = probe_arc->src)
+			probe_arc->cs_count -= cycle_count;
+
 		      /* Unwind to the cyclic arc.  */
 		      while (head != cycle_arc->src)
 			{
 			  arc = head->u.cycle.arc;
+			  head->u.cycle.arc = NULL;
 			  head = arc->src;
 			}
 		      /* Move on.  */

@@ -167,15 +167,18 @@ read_counts_file (void)
     }
   else if ((tag = gcov_read_unsigned ()) != GCOV_VERSION)
     {
-      gcov_unsigned_t required = GCOV_VERSION;
+      char v[4], e[4];
+
+      GCOV_UNSIGNED2STRING (v, tag);
+      GCOV_UNSIGNED2STRING (e, GCOV_VERSION);
 
       warning ("`%s' is version `%.4s', expected version `%.4s'",
- 	       da_file_name, (const char *)&tag, (const char *)&required);
+ 	       da_file_name, v, e);
       gcov_close ();
       return;
     }
 
-  /* Read and discard the stamp. */
+  /* Read and discard the stamp.  */
   gcov_read_unsigned ();
   
   counts_hash = htab_create (10,
@@ -229,7 +232,7 @@ read_counts_file (void)
       else if (GCOV_TAG_IS_COUNTER (tag) && fn_ident)
 	{
 	  counts_entry_t **slot, *entry, elt;
-	  unsigned n_counts = length / 8;
+	  unsigned n_counts = GCOV_TAG_COUNTER_NUM (length);
 	  unsigned ix;
 
 	  elt.ident = fn_ident;
@@ -851,19 +854,18 @@ create_coverage (void)
   rest_of_decl_compilation (ctor, 0, 1, 0);
   announce_function (ctor);
   current_function_decl = ctor;
-  DECL_INITIAL (ctor) = error_mark_node;
   make_decl_rtl (ctor, NULL);
   init_function_start (ctor);
-  (*lang_hooks.decls.pushlevel) (0);
   expand_function_start (ctor, 0);
-
   /* Actually generate the code to call __gcov_init.  */
   gcov_info_address = force_reg (Pmode, XEXP (DECL_RTL (gcov_info), 0));
   emit_library_call (gcov_init_libfunc, LCT_NORMAL, VOIDmode, 1,
 		     gcov_info_address, Pmode);
 
   expand_function_end ();
-  (*lang_hooks.decls.poplevel) (1, 0, 1);
+  /* Create a dummy BLOCK.  */
+  DECL_INITIAL (ctor) = make_node (BLOCK);
+  TREE_USED (DECL_INITIAL (ctor)) = 1;
 
   rest_of_compilation (ctor);
 
@@ -885,12 +887,12 @@ coverage_init (const char *filename)
   int len = strlen (filename);
 
   /* Name of da file.  */
-  da_file_name = (char *) xmalloc (len + strlen (GCOV_DATA_SUFFIX) + 1);
+  da_file_name = xmalloc (len + strlen (GCOV_DATA_SUFFIX) + 1);
   strcpy (da_file_name, filename);
   strcat (da_file_name, GCOV_DATA_SUFFIX);
 
   /* Name of bbg file.  */
-  bbg_file_name = (char *) xmalloc (len + strlen (GCOV_NOTE_SUFFIX) + 1);
+  bbg_file_name = xmalloc (len + strlen (GCOV_NOTE_SUFFIX) + 1);
   strcpy (bbg_file_name, filename);
   strcat (bbg_file_name, GCOV_NOTE_SUFFIX);
 

@@ -76,12 +76,6 @@ namespace std
       __basic_file*
       sys_open(int __fd, ios_base::openmode __mode, bool __del);
 
-      int
-      sys_getc();
-
-      int
-      sys_ungetc(int);
-
       __basic_file* 
       close(); 
 
@@ -95,6 +89,10 @@ namespace std
 
       streamsize 
       xsputn(const char* __s, streamsize __n);
+
+      streamsize 
+      xsputn_2(const char* __s1, streamsize __n1,
+	       const char* __s2, streamsize __n2);
 
       streamsize 
       xsgetn(char* __s, streamsize __n);

@@ -128,6 +128,30 @@ bool warn_unused_value;
 /* Hack for cooperation between set_Wunused and set_Wextra.  */
 static bool maybe_warn_unused_parameter;
 
+/* Type(s) of debugging information we are producing (if any).  See
+   flags.h for the definitions of the different possible types of
+   debugging information.  */
+enum debug_info_type write_symbols = NO_DEBUG;
+
+/* Level of debugging information we are producing.  See flags.h for
+   the definitions of the different possible levels.  */
+enum debug_info_level debug_info_level = DINFO_LEVEL_NONE;
+
+/* Nonzero means use GNU-only extensions in the generated symbolic
+   debugging information.  Currently, this only has an effect when
+   write_symbols is set to DBX_DEBUG, XCOFF_DEBUG, or DWARF_DEBUG.  */
+bool use_gnu_debug_info_extensions;
+
+/* Columns of --help display.  */
+static unsigned int columns = 80;
+
+/* What to print when a switch has no documentation.  */
+static const char undocumented_msg[] = N_("This switch lacks documentation");
+
+/* Input file names.  */
+const char **in_fnames;
+unsigned num_in_fnames;
+
 static size_t find_opt (const char *, int);
 static int common_handle_option (size_t scode, const char *arg, int value);
 static void handle_param (const char *);
@@ -137,8 +161,13 @@ static char *write_langs (unsigned int lang_mask);
 static void complain_wrong_lang (const char *, const struct cl_option *,
 				 unsigned int lang_mask);
 static void handle_options (unsigned int, const char **, unsigned int);
-static void wrap_help (const char *help, const char *item, int item_width);
+static void wrap_help (const char *help, const char *item, unsigned int);
 static void print_help (void);
+static void print_param_help (void);
+static void print_filtered_help (unsigned int flag);
+static unsigned int print_switch (const char *text, unsigned int indent);
+static void set_debug_level (enum debug_info_type type, int extended,
+			     const char *arg);
 
 /* Perform a binary search to find which option the command-line INPUT
    matches.  Returns its index in the option array, and N_OPTS
@@ -413,7 +442,7 @@ handle_options (unsigned int argc, const char **argv, unsigned int lang_mask)
       if (opt[0] != '-' || opt[1] == '\0')
 	{
 	  main_input_filename = opt;
-	  (*lang_hooks.handle_filename) (opt);
+	  add_input_filename (opt);
 	  n = 1;
 	  continue;
 	}
@@ -428,6 +457,15 @@ handle_options (unsigned int argc, const char **argv, unsigned int lang_mask)
     }
 }
 
+/* Handle FILENAME from the command line.  */
+void
+add_input_filename (const char *filename)
+{
+  num_in_fnames++;
+  in_fnames = xrealloc (in_fnames, num_in_fnames * sizeof (in_fnames[0]));
+  in_fnames[num_in_fnames - 1] = filename;
+}
+
 /* Parse command line options and set default flag values.  Do minimal
    options processing.  */
 void
@@ -437,6 +475,8 @@ decode_options (unsigned int argc, const char **argv)
 
   /* Perform language-specific options initialization.  */
   lang_mask = (*lang_hooks.init_options) (argc, argv);
+
+  lang_hooks.initialize_diagnostics (global_dc);
 
   /* Scan to see what optimization level has been specified.  That will
      determine the default value of many flags.  */
@@ -516,6 +556,7 @@ decode_options (unsigned int argc, const char **argv)
       flag_delete_null_pointer_checks = 1;
       flag_reorder_blocks = 1;
       flag_reorder_functions = 1;
+      flag_unit_at_a_time = 1;
     }
 
   if (optimize >= 3)
@@ -523,7 +564,6 @@ decode_options (unsigned int argc, const char **argv)
       flag_inline_functions = 1;
       flag_rename_registers = 1;
       flag_unswitch_loops = 1;
-      flag_unit_at_a_time = 1;
     }
 
   if (optimize < 2 || optimize_size)
@@ -1062,7 +1102,7 @@ common_handle_option (size_t scode, const char *arg,
       break;
 
     case OPT_fmessage_length_:
-      output_set_maximum_length (&global_dc->buffer, value);
+      pp_set_line_maximum_length (global_dc->printer, value);
       break;
 
     case OPT_fmove_all_movables:
@@ -1180,8 +1220,12 @@ common_handle_option (size_t scode, const char *arg,
       flag_rerun_loop_opt = value;
       break;
 
+    case OPT_frounding_math:
+      flag_rounding_math = value;
+      break;
+
     case OPT_fsched_interblock:
-      flag_schedule_interblock= value;
+      flag_schedule_interblock = value;
       break;
 
     case OPT_fsched_spec:
@@ -1359,7 +1403,46 @@ common_handle_option (size_t scode, const char *arg,
       break;
 
     case OPT_g:
-      decode_g_option (arg);
+      set_debug_level (NO_DEBUG, DEFAULT_GDB_EXTENSIONS, arg);
+      break;
+
+    case OPT_gcoff:
+      set_debug_level (SDB_DEBUG, false, arg);
+      break;
+
+    case OPT_gdwarf:
+      if (*arg)
+	{
+	  error ("use -gdwarf -gN for DWARF v1 level N, "
+		 "and -gdwarf-2 for DWARF v2" );
+	  break;
+	}
+
+      /* Fall through.  */
+    case OPT_gdwarf_:
+      set_debug_level (DWARF_DEBUG, code == OPT_gdwarf_, arg);
+      break;
+
+    case OPT_gdwarf_2:
+      set_debug_level (DWARF2_DEBUG, false, arg);
+      break;
+
+    case OPT_ggdb:
+      set_debug_level (NO_DEBUG, 2, arg);
+      break;
+
+    case OPT_gstabs:
+    case OPT_gstabs_:
+      set_debug_level (DBX_DEBUG, code == OPT_gstabs_, arg);
+      break;
+
+    case OPT_gvms:
+      set_debug_level (VMS_DEBUG, false, arg);
+      break;
+
+    case OPT_gxcoff:
+    case OPT_gxcoff_:
+      set_debug_level (XCOFF_DEBUG, code == OPT_gxcoff_, arg);
       break;
 
     case OPT_m:
@@ -1468,7 +1551,10 @@ set_fast_math_flags (int set)
   flag_finite_math_only = set;
   flag_errno_math = !set;
   if (set)
-    flag_signaling_nans = 0;
+    {
+      flag_signaling_nans = 0;
+      flag_rounding_math = 0;
+    }
 }
 
 /* Return true iff flags are set as if -ffast-math.  */
@@ -1481,22 +1567,179 @@ fast_math_flags_set_p (void)
 	  && !flag_errno_math);
 }
 
+/* Handle a debug output -g switch.  EXTENDED is true or false to support
+   extended output (2 is special and means "-ggdb" was given).  */
+static void
+set_debug_level (enum debug_info_type type, int extended, const char *arg)
+{
+  static bool type_explicit;
+
+  use_gnu_debug_info_extensions = extended;
+
+  if (type == NO_DEBUG)
+    {
+      if (write_symbols == NO_DEBUG)
+	{
+	  write_symbols = PREFERRED_DEBUGGING_TYPE;
+
+	  if (extended == 2)
+	    {
+#ifdef DWARF2_DEBUGGING_INFO
+	      write_symbols = DWARF2_DEBUG;
+#elif defined DBX_DEBUGGING_INFO
+	      write_symbols = DBX_DEBUG;
+#endif
+	    }
+
+	  if (write_symbols == NO_DEBUG)
+	    warning ("target system does not support debug output");
+	}
+    }
+  else
+    {
+      /* Does it conflict with an already selected type?  */
+      if (type_explicit && write_symbols != NO_DEBUG && type != write_symbols)
+	error ("debug format \"%s\" conflicts with prior selection",
+	       debug_type_names[type]);
+      write_symbols = type;
+      type_explicit = true;
+    }
+
+  /* A debug flag without a level defaults to level 2.  */
+  if (*arg == '\0')
+    {
+      if (!debug_info_level)
+	debug_info_level = 2;
+    }
+  else
+    {
+      debug_info_level = integral_argument (arg);
+      if (debug_info_level == (unsigned int) -1)
+	error ("unrecognised debug output level \"%s\"", arg);
+      else if (debug_info_level > 3)
+	error ("debug output level %s is too high", arg);
+    }
+}
+
 /* Output --help text.  */
 static void
 print_help (void)
 {
-  size_t i, len;
+  size_t i;
+  const char *p;
 
-  printf (_("\nThe following options are language-independent:\n"));
+  GET_ENVIRONMENT (p, "COLUMNS");
+  if (p)
+    {
+      int value = atoi (p);
+      if (value > 0)
+	columns = value;
+    }
+
+  puts (_("The following options are language-independent:\n"));
+
+  print_filtered_help (CL_COMMON);
+  print_param_help ();
+
+  for (i = 0; lang_names[i]; i++)
+    {
+      printf (_("The %s front end recognizes the following options:\n\n"),
+	      lang_names[i]);
+      print_filtered_help (1U << i);
+    }
+
+  display_target_options ();
+}
+
+/* Print the help for --param.  */
+static void
+print_param_help (void)
+{
+  size_t i;
+
+  puts (_("The --param option recognizes the following as parameters:\n"));
+
+  for (i = 0; i < LAST_PARAM; i++)
+    {
+      const char *help = compiler_params[i].help;
+      const char *param = compiler_params[i].option;
+
+      if (help == NULL || *help == '\0')
+	help = undocumented_msg;
+
+      /* Get the translation.  */
+      help = _(help);
+
+      wrap_help (help, param, strlen (param));
+    }
+
+  putchar ('\n');
+}
+
+/* Print help for a specific front-end, etc.  */
+static void
+print_filtered_help (unsigned int flag)
+{
+  unsigned int i, len, filter, indent = 0;
+  bool duplicates = false;
+  const char *help, *opt, *tab;
+  static char *printed;
+
+  if (flag == CL_COMMON)
+    {
+      filter = flag;
+      if (!printed)
+	printed = xmalloc (cl_options_count);
+      memset (printed, 0, cl_options_count);
+    }
+  else
+    {
+      /* Don't print COMMON options twice.  */
+      filter = flag | CL_COMMON;
+
+      for (i = 0; i < cl_options_count; i++)
+	{
+	  if ((cl_options[i].flags & filter) != flag)
+	    continue;
+
+	  /* Skip help for internal switches.  */
+	  if (cl_options[i].flags & CL_UNDOCUMENTED)
+	    continue;
+
+	  /* Skip switches that have already been printed, mark them to be
+	     listed later.  */
+	  if (printed[i])
+	    {
+	      duplicates = true;
+	      indent = print_switch (cl_options[i].opt_text, indent);
+	    }
+	}
+
+      if (duplicates)
+	{
+	  putchar ('\n');
+	  putchar ('\n');
+	}
+    }
 
   for (i = 0; i < cl_options_count; i++)
     {
-      const char *help = cl_options[i].help;
-      const char *opt, *tab;
-
-      /* During transition, ignore switches with no help.  */
-      if (!help)
+      if ((cl_options[i].flags & filter) != flag)
 	continue;
+
+      /* Skip help for internal switches.  */
+      if (cl_options[i].flags & CL_UNDOCUMENTED)
+	continue;
+
+      /* Skip switches that have already been printed.  */
+      if (printed[i])
+	continue;
+
+      printed[i] = true;
+
+      help = cl_options[i].help;
+      if (!help)
+	help = undocumented_msg;
 
       /* Get the translation.  */
       help = _(help);
@@ -1517,16 +1760,41 @@ print_help (void)
       wrap_help (help, opt, len);
     }
 
-  puts ( "\n" );
-  display_help ();
+  putchar ('\n');
+}
+
+/* Output ITEM, of length ITEM_WIDTH, in the left column, followed by
+   word-wrapped HELP in a second column.  */
+static unsigned int
+print_switch (const char *text, unsigned int indent)
+{
+  unsigned int len = strlen (text) + 1; /* trailing comma */
+
+  if (indent)
+    {
+      putchar (',');
+      if (indent + len > columns)
+	{
+	  putchar ('\n');
+	  putchar (' ');
+	  indent = 1;
+	}
+    }
+  else
+    putchar (' ');
+
+  putchar (' ');
+  fputs (text, stdout);
+
+  return indent + len + 1;
 }
 
 /* Output ITEM, of length ITEM_WIDTH, in the left column, followed by
    word-wrapped HELP in a second column.  */
 static void
-wrap_help (const char *help, const char *item, int item_width)
+wrap_help (const char *help, const char *item, unsigned int item_width)
 {
-  const int columns = 80, col_width = 27;
+  unsigned int col_width = 27;
   unsigned int remaining, room, len;
 
   remaining = strlen (help);
@@ -1534,6 +1802,8 @@ wrap_help (const char *help, const char *item, int item_width)
   do
     {
       room = columns - 3 - MAX (col_width, item_width);
+      if (room > columns)
+	room = 0;
       len = remaining;
 
       if (room < len)
@@ -1546,7 +1816,9 @@ wrap_help (const char *help, const char *item, int item_width)
 		break;
 	      if (help[i] == ' ')
 		len = i;
-	      else if (help[i] == '-')
+	      else if ((help[i] == '-' || help[i] == '/')
+		       && help[i + 1] != ' '
+		       && ISALPHA (help[i - 1]))
 		len = i + 1;
 	    }
 	}

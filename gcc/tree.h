@@ -57,7 +57,8 @@ extern const char tree_code_type[];
    expression.  */
 
 #define IS_EXPR_CODE_CLASS(CLASS) \
-  ((CLASS) == '<' || (CLASS) == '1' || (CLASS) == '2' || (CLASS) == 'e')
+  ((CLASS) == '<' || (CLASS) == '1' || (CLASS) == '2' || (CLASS) == 'e' \
+   || (CLASS) == 'r' || (CLASS) == 's')
 
 /* Number of argument-words in each kind of tree-node.  */
 
@@ -291,7 +292,7 @@ struct tree_common GTY(())
 #define EXPR_CHECK(T) __extension__					\
 ({  const tree __t = (T);						\
     char const __c = TREE_CODE_CLASS (TREE_CODE (__t));			\
-    if (!IS_EXPR_CODE_CLASS (__c) && __c != 'r' && __c != 's')		\
+    if (!IS_EXPR_CODE_CLASS (__c))					\
       tree_class_check_failed (__t, 'e', __FILE__, __LINE__,		\
 			       __FUNCTION__);				\
     __t; })
@@ -445,13 +446,21 @@ extern void tree_operand_check_failed (int, enum tree_code,
   (TREE_CODE (TYPE) == INTEGER_TYPE || TREE_CODE (TYPE) == ENUMERAL_TYPE  \
    || TREE_CODE (TYPE) == BOOLEAN_TYPE || TREE_CODE (TYPE) == CHAR_TYPE)
 
+/* Nonzero if TYPE represents a scalar floating-point type.  */
+
+#define SCALAR_FLOAT_TYPE_P(TYPE) (TREE_CODE (TYPE) == REAL_TYPE)
+
+/* Nonzero if TYPE represents a complex floating-point type.  */
+
+#define COMPLEX_FLOAT_TYPE_P(TYPE)	\
+  (TREE_CODE (TYPE) == COMPLEX_TYPE	\
+   && TREE_CODE (TREE_TYPE (TYPE)) == REAL_TYPE)
+
 /* Nonzero if TYPE represents a floating-point type, including complex
    floating-point types.  */
 
 #define FLOAT_TYPE_P(TYPE)		\
-  (TREE_CODE (TYPE) == REAL_TYPE	\
-   || (TREE_CODE (TYPE) == COMPLEX_TYPE \
-       && TREE_CODE (TREE_TYPE (TYPE)) == REAL_TYPE))
+  (SCALAR_FLOAT_TYPE_P (TYPE) || COMPLEX_FLOAT_TYPE_P (TYPE))
 
 /* Nonzero if TYPE represents an aggregate (multi-component) type.  */
 
@@ -1253,12 +1262,13 @@ struct tree_type GTY(())
    the name from decl_attributes to make_function_rtl and make_decl_rtl.  */
 #define DECL_SECTION_NAME(NODE) (DECL_CHECK (NODE)->decl.section_name)
 
-/*  For FIELD_DECLs, this is the
-    RECORD_TYPE, UNION_TYPE, or QUAL_UNION_TYPE node that the field is
-    a member of.  For VAR_DECL, PARM_DECL, FUNCTION_DECL, LABEL_DECL,
-    and CONST_DECL nodes, this points to either the FUNCTION_DECL for the
-    containing function, the RECORD_TYPE or UNION_TYPE for the containing
-    type, or NULL_TREE if the given decl has "file scope".  */
+/*  For FIELD_DECLs, this is the RECORD_TYPE, UNION_TYPE, or
+    QUAL_UNION_TYPE node that the field is a member of.  For VAR_DECL,
+    PARM_DECL, FUNCTION_DECL, LABEL_DECL, and CONST_DECL nodes, this
+    points to either the FUNCTION_DECL for the containing function,
+    the RECORD_TYPE or UNION_TYPE for the containing type, or
+    NULL_TREE or a TRANSLATION_UNIT_DECL if the given decl has "file
+    scope".  */
 #define DECL_CONTEXT(NODE) (DECL_CHECK (NODE)->decl.context)
 #define DECL_FIELD_CONTEXT(NODE) (FIELD_DECL_CHECK (NODE)->decl.context)
 /* In a DECL this is the field where attributes are stored.  */
@@ -1287,6 +1297,7 @@ struct tree_type GTY(())
 /* In PARM_DECL, holds the type as written (perhaps a function or array).  */
 #define DECL_ARG_TYPE_AS_WRITTEN(NODE) (PARM_DECL_CHECK (NODE)->decl.result)
 /* For a FUNCTION_DECL, holds the tree of BINDINGs.
+   For a TRANSLATION_UNIT_DECL, holds the namespace's BLOCK.
    For a VAR_DECL, holds the initial value.
    For a PARM_DECL, not used--default
    values for parameters are encoded in the type of the function,
@@ -1471,10 +1482,12 @@ struct tree_type GTY(())
    where it is called.  */
 #define DECL_INLINE(NODE) (FUNCTION_DECL_CHECK (NODE)->decl.inline_flag)
 
-/* Nonzero in a FUNCTION_DECL means this function has been found inlinable
-   only by virtue of -finline-functions  */
-#define DID_INLINE_FUNC(NODE) \
-  (FUNCTION_DECL_CHECK (NODE)->decl.inlined_function_flag)
+/* Nonzero in a FUNCTION_DECL means that this function was declared inline,
+   such as via the `inline' keyword in C/C++.  This flag controls the linkage
+   semantics of 'inline'; whether or not the function is inlined is
+   controlled by DECL_INLINE.  */
+#define DECL_DECLARED_INLINE_P(NODE) \
+  (FUNCTION_DECL_CHECK (NODE)->decl.declared_inline_flag)
 
 /* In a FUNCTION_DECL, nonzero if the function cannot be inlined.  */
 #define DECL_UNINLINABLE(NODE) (FUNCTION_DECL_CHECK (NODE)->decl.uninlinable)
@@ -1604,6 +1617,18 @@ struct tree_type GTY(())
 #define DECL_POINTER_ALIAS_SET_KNOWN_P(NODE) \
   (DECL_POINTER_ALIAS_SET (NODE) != - 1)
 
+/* In a FUNCTION_DECL for which DECL_BUILT_IN does not hold, this is
+   the approximate number of statements in this function.  There is
+   no need for this number to be exact; it is only used in various
+   heuristics regarding optimization.  */
+#define DECL_ESTIMATED_INSNS(NODE) \
+  (FUNCTION_DECL_CHECK (NODE)->decl.u1.i)
+
+/* Nonzero for a decl which is at file scope.  */
+#define DECL_FILE_SCOPE_P(EXP) 					\
+  (! DECL_CONTEXT (EXP)						\
+   || TREE_CODE (DECL_CONTEXT (EXP)) == TRANSLATION_UNIT_DECL)
+
 struct function;
 
 struct tree_decl GTY(())
@@ -1644,7 +1669,7 @@ struct tree_decl GTY(())
   unsigned user_align : 1;
   unsigned uninlinable : 1;
   unsigned thread_local_flag : 1;
-  unsigned inlined_function_flag : 1;
+  unsigned declared_inline_flag : 1;
   unsigned unused : 3;
   /* three unused bits.  */
 
@@ -1777,6 +1802,9 @@ enum tree_index
   TI_BITSIZE_ONE,
   TI_BITSIZE_UNIT,
 
+  TI_BOOLEAN_FALSE,
+  TI_BOOLEAN_TRUE,
+
   TI_COMPLEX_INTEGER_TYPE,
   TI_COMPLEX_FLOAT_TYPE,
   TI_COMPLEX_DOUBLE_TYPE,
@@ -1786,12 +1814,18 @@ enum tree_index
   TI_DOUBLE_TYPE,
   TI_LONG_DOUBLE_TYPE,
 
+  TI_FLOAT_PTR_TYPE,
+  TI_DOUBLE_PTR_TYPE,
+  TI_LONG_DOUBLE_PTR_TYPE,
+  TI_INTEGER_PTR_TYPE,
+
   TI_VOID_TYPE,
   TI_PTR_TYPE,
   TI_CONST_PTR_TYPE,
   TI_SIZE_TYPE,
   TI_PTRDIFF_TYPE,
   TI_VA_LIST_TYPE,
+  TI_BOOLEAN_TYPE,
 
   TI_VOID_LIST_NODE,
 
@@ -1820,6 +1854,7 @@ enum tree_index
   TI_V2DI_TYPE,
   TI_V1DI_TYPE,
   TI_V16QI_TYPE,
+  TI_V4DF_TYPE,
 
   TI_MAIN_IDENTIFIER,
 
@@ -1862,6 +1897,11 @@ extern GTY(()) tree global_trees[TI_MAX];
 #define double_type_node		global_trees[TI_DOUBLE_TYPE]
 #define long_double_type_node		global_trees[TI_LONG_DOUBLE_TYPE]
 
+#define float_ptr_type_node		global_trees[TI_FLOAT_PTR_TYPE]
+#define double_ptr_type_node		global_trees[TI_DOUBLE_PTR_TYPE]
+#define long_double_ptr_type_node	global_trees[TI_LONG_DOUBLE_PTR_TYPE]
+#define integer_ptr_type_node		global_trees[TI_INTEGER_PTR_TYPE]
+
 #define complex_integer_type_node	global_trees[TI_COMPLEX_INTEGER_TYPE]
 #define complex_float_type_node		global_trees[TI_COMPLEX_FLOAT_TYPE]
 #define complex_double_type_node	global_trees[TI_COMPLEX_DOUBLE_TYPE]
@@ -1876,6 +1916,10 @@ extern GTY(()) tree global_trees[TI_MAX];
 #define size_type_node                  global_trees[TI_SIZE_TYPE]
 #define ptrdiff_type_node		global_trees[TI_PTRDIFF_TYPE]
 #define va_list_type_node		global_trees[TI_VA_LIST_TYPE]
+
+#define boolean_type_node		global_trees[TI_BOOLEAN_TYPE]
+#define boolean_false_node		global_trees[TI_BOOLEAN_FALSE]
+#define boolean_true_node		global_trees[TI_BOOLEAN_TRUE]
 
 /* The node that should be placed at the end of a parameter list to
    indicate that the function does not take a variable number of
@@ -1910,6 +1954,7 @@ extern GTY(()) tree global_trees[TI_MAX];
 #define V2DF_type_node			global_trees[TI_V2DF_TYPE]
 #define V16SF_type_node			global_trees[TI_V16SF_TYPE]
 #define V1DI_type_node			global_trees[TI_V1DI_TYPE]
+#define V4DF_type_node			global_trees[TI_V4DF_TYPE]
 
 /* An enumeration of the standard C integer types.  These must be
    ordered so that shorter types appear before longer ones, and so
@@ -2029,10 +2074,18 @@ extern tree make_tree_vec (int);
 
 extern tree get_identifier (const char *);
 
+#if GCC_VERSION >= 3000
+#define get_identifier(str) \
+  (__builtin_constant_p (str)				\
+    ? get_identifier_with_length ((str), strlen (str))  \
+    : get_identifier (str))
+#endif
+
+
 /* Identical to get_identifier, except that the length is assumed
    known.  */
 
-extern tree get_identifier_with_length (const char *, unsigned int);
+extern tree get_identifier_with_length (const char *, size_t);
 
 /* If an identifier with the name TEXT (a null-terminated string) has
    previously been referred to, return that node; otherwise return
@@ -2077,6 +2130,7 @@ extern tree build_index_2_type (tree, tree);
 extern tree build_array_type (tree, tree);
 extern tree build_function_type (tree, tree);
 extern tree build_function_type_list (tree, ...);
+extern tree build_method_type_directly (tree, tree, tree);
 extern tree build_method_type (tree, tree);
 extern tree build_offset_type (tree, tree);
 extern tree build_complex_type (tree);
@@ -2358,7 +2412,7 @@ enum size_type_kind
   USIZETYPE,		/* Unsigned representation of sizes in bytes.  */
   BITSIZETYPE,		/* Normal representation of sizes in bits.  */
   SBITSIZETYPE,		/* Signed representation of sizes in bits.  */
-  UBITSIZETYPE,	        /* Unsifgned representation of sizes in bits.  */
+  UBITSIZETYPE,	        /* Unsigned representation of sizes in bits.  */
   TYPE_KIND_LAST};
 
 extern GTY(()) tree sizetype_tab[(int) TYPE_KIND_LAST];
@@ -2432,6 +2486,11 @@ extern int fields_length (tree);
    aggregate of zeros.  Otherwise return FALSE.  */
 
 extern bool initializer_zerop (tree);
+
+/* Given an initializer INIT, return TRUE if INIT is at least 3/4 zeros.
+   Otherwise return FALSE.  */
+
+extern int mostly_zeros_p (tree);
 
 /* integer_zerop (tree x) is nonzero if X is an integer constant of value 0 */
 
@@ -2547,7 +2606,7 @@ extern tree substitute_in_expr (tree, tree, tree);
 
 extern tree variable_size (tree);
 
-/* stabilize_reference (EXP) returns an reference equivalent to EXP
+/* stabilize_reference (EXP) returns a reference equivalent to EXP
    but it can be used multiple times
    and only evaluate the subexpressions once.  */
 
@@ -2711,6 +2770,7 @@ extern void using_eh_for_cleanups (void);
    subexpressions are not changed.  */
 
 extern tree fold (tree);
+extern tree fold_initializer (tree);
 extern tree fold_single_bit_test (enum tree_code, tree, tree, tree);
 
 extern int force_fit_type (tree, int);
@@ -2796,6 +2856,7 @@ extern void expand_main_function (void);
 extern void init_dummy_function_start (void);
 extern void expand_dummy_function_end (void);
 extern void init_function_for_compilation (void);
+extern void allocate_struct_function (tree);
 extern void init_function_start (tree);
 extern void assign_parms (tree);
 extern void put_var_into_stack (tree, int);
@@ -2810,7 +2871,7 @@ extern void pop_temp_slots (void);
 extern void push_temp_slots (void);
 extern void preserve_temp_slots (rtx);
 extern void preserve_rtl_expr_temps (tree);
-extern int aggregate_value_p (tree);
+extern int aggregate_value_p (tree, tree);
 extern void free_temps_for_rtl_expr (tree);
 extern void instantiate_virtual_regs (tree, rtx);
 extern void unshare_all_rtl (tree, rtx);
@@ -2896,6 +2957,7 @@ extern void output_inline_function (tree);
 extern void set_decl_origin_self (tree);
 
 /* In stor-layout.c */
+extern void set_min_and_max_values_for_integral_type (tree, int, bool);
 extern void fixup_signed_type (tree);
 extern void internal_reference_types (void);
 
@@ -2908,6 +2970,7 @@ enum tls_model decl_tls_model (tree);
 enum symbol_visibility decl_visibility (tree);
 extern void resolve_unique_section (tree, int, int);
 extern void mark_referenced (tree);
+extern void notice_global_symbol (tree);
 
 /* In stmt.c */
 extern void emit_nop (void);
@@ -3015,4 +3078,28 @@ extern void fancy_abort (const char *, int, const char *)
     ATTRIBUTE_NORETURN;
 #define abort() fancy_abort (__FILE__, __LINE__, __FUNCTION__)
 
+/* Enum and arrays used for tree allocation stats. 
+   Keep in sync with tree.c:tree_node_kind_names.  */
+typedef enum
+{
+  d_kind,
+  t_kind,
+  b_kind,
+  s_kind,
+  r_kind,
+  e_kind,
+  c_kind,
+  id_kind,
+  perm_list_kind,
+  temp_list_kind,
+  vec_kind,
+  x_kind,
+  lang_decl,
+  lang_type,
+  all_kinds
+} tree_node_kind;
+
+extern int tree_node_counts[];
+extern int tree_node_sizes[];
+    
 #endif  /* GCC_TREE_H  */

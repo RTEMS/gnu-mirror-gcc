@@ -38,6 +38,8 @@ Boston, MA 02111-1307, USA.  */
 #include "splay-tree.h"
 #include "langhooks.h"
 #include "cgraph.h"
+#include "intl.h"
+
 
 /* This should be eventually be generalized to other languages, but
    this would require a shared function-as-trees infrastructure.  */
@@ -106,6 +108,7 @@ typedef struct inline_data
   htab_t tree_pruner;
   /* Decl of function we are inlining into.  */
   tree decl;
+  tree current_decl;
 } inline_data;
 
 /* Prototypes.  */
@@ -115,7 +118,8 @@ static tree copy_body_r (tree *, int *, void *);
 static tree copy_body (inline_data *);
 static tree expand_call_inline (tree *, int *, void *);
 static void expand_calls_inline (tree *, inline_data *);
-static int inlinable_function_p (tree, inline_data *, int);
+static bool inlinable_function_p (tree);
+static int limits_allow_inlining (tree, inline_data *);
 static tree remap_decl (tree, inline_data *);
 #ifndef INLINER_FOR_JAVA
 static tree initialize_inlined_parameters (inline_data *, tree, tree);
@@ -126,10 +130,6 @@ static tree initialize_inlined_parameters (inline_data *, tree, tree, tree);
 static void remap_block (tree *, tree, inline_data *);
 static tree add_stmt_to_compound (tree, tree, tree);
 #endif /* INLINER_FOR_JAVA */
-static tree find_alloca_call_1 (tree *, int *, void *);
-static tree find_alloca_call (tree);
-static tree find_builtin_longjmp_call_1 (tree *, int *, void *);
-static tree find_builtin_longjmp_call (tree);
 
 /* Remap DECL during the copying of the BLOCK tree for the function.  */
 
@@ -872,192 +872,330 @@ declare_return_variable (struct inline_data *id, tree return_slot_addr,
 
 /* Returns nonzero if a function can be inlined as a tree.  */
 
-int
-tree_inlinable_function_p (tree fn, int nolimit)
+bool
+tree_inlinable_function_p (tree fn)
 {
-  return inlinable_function_p (fn, NULL, nolimit);
+  return inlinable_function_p (fn);
 }
 
-/* If *TP is possibly call to alloca, return nonzero.  */
+static const char *inline_forbidden_reason;
+
 static tree
-find_alloca_call_1 (tree *tp, int *walk_subtrees ATTRIBUTE_UNUSED,
-		    void *data ATTRIBUTE_UNUSED)
+inline_forbidden_p_1 (tree *nodep, int *walk_subtrees ATTRIBUTE_UNUSED,
+		      void *fnp)
 {
-  if (alloca_call_p (*tp))
-    return *tp;
-  return NULL;
+  tree node = *nodep;
+  tree fn = (tree) fnp;
+  tree t;
+
+  switch (TREE_CODE (node))
+    {
+    case CALL_EXPR:
+      /* Refuse to inline alloca call unless user explicitly forced so as this
+	 may change program's memory overhead drastically when the function
+	 using alloca is called in loop.  In GCC present in SPEC2000 inlining
+	 into schedule_block cause it to require 2GB of ram instead of 256MB.  */
+      if (alloca_call_p (node)
+	  && !lookup_attribute ("always_inline", DECL_ATTRIBUTES (fn)))
+	{
+	  inline_forbidden_reason
+	    = N_("%Jfunction '%F' can never be inlined because it uses "
+		 "alloca (override using the always_inline attribute)");
+	  return node;
+	}
+      t = get_callee_fndecl (node);
+      if (! t)
+	break;
+
+
+      /* We cannot inline functions that call setjmp.  */
+      if (setjmp_call_p (t))
+	{
+	  inline_forbidden_reason
+	    = N_("%Jfunction '%F' can never be inlined because it uses setjmp");
+	  return node;
+	}
+
+      switch (DECL_FUNCTION_CODE (t))
+	{
+	  /* We cannot inline functions that take a variable number of
+	     arguments.  */
+	case BUILT_IN_VA_START:
+	case BUILT_IN_STDARG_START:
+	  {
+	    inline_forbidden_reason
+	      = N_("%Jfunction '%F' can never be inlined because it "
+		   "uses variable argument lists");
+	    return node;
+	  }
+	case BUILT_IN_LONGJMP:
+	  {
+	    /* We can't inline functions that call __builtin_longjmp at all.
+	       The non-local goto machinery really requires the destination
+	       be in a different function.  If we allow the function calling
+	       __builtin_longjmp to be inlined into the function calling
+	       __builtin_setjmp, Things will Go Awry.  */
+	    /* ??? Need front end help to identify "regular" non-local goto.  */
+            if (DECL_BUILT_IN_CLASS (t) == BUILT_IN_NORMAL)
+	      {
+		inline_forbidden_reason
+		  = N_("%Jfunction '%F' can never be inlined "
+		       "because it uses setjmp-longjmp exception handling");
+	        return node;
+	      }
+	  }
+
+	default:
+	  break;
+	}
+      break;
+
+#ifndef INLINER_FOR_JAVA
+    case DECL_STMT:
+      /* We cannot inline functions that contain other functions.  */
+      if (TREE_CODE (TREE_OPERAND (node, 0)) == FUNCTION_DECL
+	  && DECL_INITIAL (TREE_OPERAND (node, 0)))
+	{
+	  inline_forbidden_reason
+	    = N_("%Jfunction '%F' can never be inlined "
+		 "because it contains a nested function");
+	  return node;
+	}
+      break;
+
+    case GOTO_STMT:
+    case GOTO_EXPR:
+      t = TREE_OPERAND (node, 0);
+
+      /* We will not inline a function which uses computed goto.  The
+	 addresses of its local labels, which may be tucked into
+	 global storage, are of course not constant across
+	 instantiations, which causes unexpected behavior.  */
+      if (TREE_CODE (t) != LABEL_DECL)
+	{
+	  inline_forbidden_reason
+	    = N_("%Jfunction '%F' can never be inlined "
+		 "because it contains a computed goto");
+	  return node;
+	}
+
+      /* We cannot inline a nested function that jumps to a nonlocal
+         label.  */
+      if (TREE_CODE (t) == LABEL_DECL && DECL_CONTEXT (t) != fn)
+	{
+	  inline_forbidden_reason
+	    = N_("%Jfunction '%F' can never be inlined "
+		 "because it contains a nonlocal goto");
+	  return node;
+	}
+
+      break;
+
+    case RECORD_TYPE:
+    case UNION_TYPE:
+      /* We cannot inline a function of the form
+
+	   void F (int i) { struct S { int ar[i]; } s; }
+
+	 Attempting to do so produces a catch-22.
+	 If walk_tree examines the TYPE_FIELDS chain of RECORD_TYPE/
+	 UNION_TYPE nodes, then it goes into infinite recursion on a
+	 structure containing a pointer to its own type.  If it doesn't,
+	 then the type node for S doesn't get adjusted properly when
+	 F is inlined, and we abort in find_function_data.  */
+      for (t = TYPE_FIELDS (node); t; t = TREE_CHAIN (t))
+	if (variably_modified_type_p (TREE_TYPE (t)))
+	  {
+	    inline_forbidden_reason
+	      = N_("%Jfunction '%F' can never be inlined "
+		   "because it uses variable sized variables");
+	    return node;
+	  }
+#endif
+    default:
+      break;
+    }
+
+  return NULL_TREE;
 }
 
 /* Return subexpression representing possible alloca call, if any.  */
 static tree
-find_alloca_call (tree exp)
+inline_forbidden_p (tree fndecl)
 {
   location_t saved_loc = input_location;
   tree ret = walk_tree_without_duplicates
-		(&exp, find_alloca_call_1, NULL);
+		(&DECL_SAVED_TREE (fndecl), inline_forbidden_p_1, fndecl);
   input_location = saved_loc;
   return ret;
 }
 
-static tree
-find_builtin_longjmp_call_1 (tree *tp, int *walk_subtrees ATTRIBUTE_UNUSED,
-			     void *data ATTRIBUTE_UNUSED)
+/* Returns nonzero if FN is a function that does not have any
+   fundamental inline blocking properties.  */
+
+static bool
+inlinable_function_p (tree fn)
 {
-  tree exp = *tp, decl;
-
-  if (TREE_CODE (exp) == CALL_EXPR
-      && TREE_CODE (TREE_OPERAND (exp, 0)) == ADDR_EXPR
-      && (decl = TREE_OPERAND (TREE_OPERAND (exp, 0), 0),
-	  TREE_CODE (decl) == FUNCTION_DECL)
-      && DECL_BUILT_IN_CLASS (decl) == BUILT_IN_NORMAL
-      && DECL_FUNCTION_CODE (decl) == BUILT_IN_LONGJMP)
-    return decl;
-
-  return NULL;
-}
-
-static tree
-find_builtin_longjmp_call (tree exp)
-{
-  location_t saved_loc = input_location;
-  tree ret = walk_tree_without_duplicates
-		(&exp, find_builtin_longjmp_call_1, NULL);
-  input_location = saved_loc;
-  return ret;
-}
-
-/* Returns nonzero if FN is a function that can be inlined into the
-   inlining context ID_.  If ID_ is NULL, check whether the function
-   can be inlined at all.  */
-
-static int
-inlinable_function_p (tree fn, inline_data *id, int nolimit)
-{
-  int inlinable;
-  int currfn_insns = 0;
-  int max_inline_insns_single = MAX_INLINE_INSNS_SINGLE;
+  bool inlinable = true;
 
   /* If we've already decided this function shouldn't be inlined,
      there's no need to check again.  */
   if (DECL_UNINLINABLE (fn))
-    return 0;
+    return false;
 
   /* See if there is any language-specific reason it cannot be
      inlined.  (It is important that this hook be called early because
-     in C++ it may result in template instantiation.)  */
+     in C++ it may result in template instantiation.)
+     If the function is not inlinable for language-specific reasons,
+     it is left up to the langhook to explain why.  */
   inlinable = !(*lang_hooks.tree_inlining.cannot_inline_tree_fn) (&fn);
 
-  /* We may be here either because fn is declared inline or because
-     we use -finline-functions.  For the second case, we are more
-     restrictive.  */
-  if (DID_INLINE_FUNC (fn))
-    max_inline_insns_single = MAX_INLINE_INSNS_AUTO;
+  /* If we don't have the function body available, we can't inline it.
+     However, this should not be recorded since we also get here for
+     forward declared inline functions.  Therefore, return at once.  */
+  if (!DECL_SAVED_TREE (fn))
+    return false;
 
-  /* The number of instructions (estimated) of current function.  */
-  if (!nolimit && !DECL_ESTIMATED_INSNS (fn))
-    DECL_ESTIMATED_INSNS (fn)
-      = (*lang_hooks.tree_inlining.estimate_num_insns) (fn);
-  currfn_insns = DECL_ESTIMATED_INSNS (fn);
+  /* If we're not inlining at all, then we cannot inline this function.  */
+  else if (!flag_inline_trees)
+    inlinable = false;
 
-  /* If we're not inlining things, then nothing is inlinable.  */
-  if (! flag_inline_trees)
-    inlinable = 0;
-  /* If we're not inlining all functions and the function was not
-     declared `inline', we don't inline it.  Don't think of
-     disregarding DECL_INLINE when flag_inline_trees == 2; it's the
-     front-end that must set DECL_INLINE in this case, because
-     dwarf2out loses if a function is inlined that doesn't have
-     DECL_INLINE set.  */
-  else if (! DECL_INLINE (fn) && !nolimit)
-    inlinable = 0;
+  /* Only try to inline functions if DECL_INLINE is set.  This should be
+     true for all functions declared `inline', and for all other functions
+     as well with -finline-functions.
+
+     Don't think of disregarding DECL_INLINE when flag_inline_trees == 2;
+     it's the front-end that must set DECL_INLINE in this case, because
+     dwarf2out loses if a function that does not have DECL_INLINE set is
+     inlined anyway.  That is why we have both DECL_INLINE and
+     DECL_DECLARED_INLINE_P.  */
+  /* FIXME: When flag_inline_trees dies, the check for flag_unit_at_a_time
+	    here should be redundant.  */
+  else if (!DECL_INLINE (fn) && !flag_unit_at_a_time)
+    inlinable = false;
+
 #ifdef INLINER_FOR_JAVA
   /* Synchronized methods can't be inlined.  This is a bug.  */
   else if (METHOD_SYNCHRONIZED (fn))
-    inlinable = 0;
+    inlinable = false;
 #endif /* INLINER_FOR_JAVA */
-  /* We can't inline functions that are too big.  Only allow a single
-     function to be of MAX_INLINE_INSNS_SINGLE size.  Make special
-     allowance for extern inline functions, though.  */
-  else if (!nolimit
-	   && ! (*lang_hooks.tree_inlining.disregard_inline_limits) (fn)
-	   && currfn_insns > max_inline_insns_single)
-    inlinable = 0;
-  /* We can't inline functions that call __builtin_longjmp at all.
-     The non-local goto machinery really requires the destination
-     be in a different function.  If we allow the function calling
-     __builtin_longjmp to be inlined into the function calling
-     __builtin_setjmp, Things will Go Awry.  */
-  /* ??? Need front end help to identify "regular" non-local goto.  */
-  else if (find_builtin_longjmp_call (DECL_SAVED_TREE (fn)))
-    inlinable = 0;
-  /* Refuse to inline alloca call unless user explicitly forced so as this may
-     change program's memory overhead drastically when the function using alloca
-     is called in loop.  In GCC present in SPEC2000 inlining into schedule_block
-     cause it to require 2GB of ram instead of 256MB.  */
-  else if (lookup_attribute ("always_inline", DECL_ATTRIBUTES (fn)) == NULL
-	   && find_alloca_call (DECL_SAVED_TREE (fn)))
-    inlinable = 0;
+
+  else if (inline_forbidden_p (fn))
+    {
+      /* See if we should warn about uninlinable functions.  Previously,
+	 some of these warnings would be issued while trying to expand
+	 the function inline, but that would cause multiple warnings
+	 about functions that would for example call alloca.  But since
+	 this a property of the function, just one warning is enough.
+	 As a bonus we can now give more details about the reason why a
+	 function is not inlinable.
+	 We only warn for functions declared `inline' by the user.  */
+      bool do_warning = (warn_inline
+			 && DECL_INLINE (fn)
+			 && DECL_DECLARED_INLINE_P (fn)
+			 && !DECL_IN_SYSTEM_HEADER (fn));
+
+      if (do_warning)
+	warning (inline_forbidden_reason, fn, fn);
+
+      inlinable = false;
+    }
 
   /* Squirrel away the result so that we don't have to check again.  */
-  DECL_UNINLINABLE (fn) = ! inlinable;
+  DECL_UNINLINABLE (fn) = !inlinable;
 
-  /* In case we don't disregard the inlining limits and we basically
-     can inline this function, investigate further.  */
-  if (! (*lang_hooks.tree_inlining.disregard_inline_limits) (fn)
-      && inlinable && !nolimit)
-    {
-      int sum_insns = (id ? id->inlined_insns : 0) + currfn_insns;
-      /* In the extreme case that we have exceeded the recursive inlining
-         limit by a huge factor (128), we just say no. Should not happen
-         in real life.  */
-      if (sum_insns > MAX_INLINE_INSNS * 128)
-	 inlinable = 0;
-      /* If we did not hit the extreme limit, we use a linear function
-         with slope -1/MAX_INLINE_SLOPE to exceedingly decrease the
-         allowable size. We always allow a size of MIN_INLINE_INSNS
-         though.  */
-      else if ((sum_insns > MAX_INLINE_INSNS)
-	       && (currfn_insns > MIN_INLINE_INSNS))
-	{
-	  int max_curr = MAX_INLINE_INSNS_SINGLE
-			- (sum_insns - MAX_INLINE_INSNS) / MAX_INLINE_SLOPE;
-	  if (currfn_insns > max_curr)
-	    inlinable = 0;
-	}
-    }
+  return inlinable;
+}
 
-  /* If we don't have the function body available, we can't inline
-     it.  */
-  if (! DECL_SAVED_TREE (fn))
-    inlinable = 0;
+/* We can't inline functions that are too big.  Only allow a single
+   function to be of MAX_INLINE_INSNS_SINGLE size.  Make special
+   allowance for extern inline functions, though.
 
-  /* Check again, language hooks may have modified it.  */
-  if (! inlinable || DECL_UNINLINABLE (fn))
+   Return nonzero if the function FN can be inlined into the inlining
+   context ID.  */
+
+static int
+limits_allow_inlining (tree fn, inline_data *id)
+{
+  int estimated_insns = 0;
+  size_t i;
+
+  /* Don't even bother if the function is not inlinable.  */
+  if (!inlinable_function_p (fn))
     return 0;
 
-  /* Don't do recursive inlining, either.  We don't record this in
-     DECL_UNINLINABLE; we may be able to inline this function later.  */
-  if (id)
+  /* Investigate the size of the function.  Return at once
+     if the function body size is too large.  */
+  if (!(*lang_hooks.tree_inlining.disregard_inline_limits) (fn))
     {
-      size_t i;
+      int currfn_max_inline_insns;
 
-      for (i = 0; i < VARRAY_ACTIVE_SIZE (id->fns); ++i)
-	if (VARRAY_TREE (id->fns, i) == fn)
-	  return 0;
+      /* If we haven't already done so, get an estimate of the number of
+	 instructions that will be produces when expanding this function.  */
+      if (!DECL_ESTIMATED_INSNS (fn))
+	DECL_ESTIMATED_INSNS (fn)
+	  = (*lang_hooks.tree_inlining.estimate_num_insns) (fn);
+      estimated_insns = DECL_ESTIMATED_INSNS (fn);
 
-      if (DECL_INLINED_FNS (fn))
+      /* We may be here either because fn is declared inline or because
+	 we use -finline-functions.  For the second case, we are more
+	 restrictive.
+
+	 FIXME: -finline-functions should imply -funit-at-a-time, it's
+		about equally expensive but unit-at-a-time produces
+		better code.  */
+      currfn_max_inline_insns = DECL_DECLARED_INLINE_P (fn) ?
+		MAX_INLINE_INSNS_SINGLE : MAX_INLINE_INSNS_AUTO;
+
+      /* If the function is too big to be inlined, adieu.  */
+      if (estimated_insns > currfn_max_inline_insns)
+	return 0;
+
+      /* We now know that we don't disregard the inlining limits and that 
+	 we basically should be able to inline this function.
+	 We always allow inlining functions if we estimate that they are
+	 smaller than MIN_INLINE_INSNS.  Otherwise, investigate further.  */
+      if (estimated_insns > MIN_INLINE_INSNS)
 	{
-	  int j;
-	  tree inlined_fns = DECL_INLINED_FNS (fn);
+	  int sum_insns = (id ? id->inlined_insns : 0) + estimated_insns;
 
-	  for (j = 0; j < TREE_VEC_LENGTH (inlined_fns); ++j)
-	    if (TREE_VEC_ELT (inlined_fns, j) == VARRAY_TREE (id->fns, 0))
-	      return 0;
+	  /* In the extreme case that we have exceeded the recursive inlining
+	     limit by a huge factor (128), we just say no.
+
+	     FIXME:  Should not happen in real life, but people have reported
+		     that it actually does!?  */
+	  if (sum_insns > MAX_INLINE_INSNS * 128)
+	    return 0;
+
+	  /* If we did not hit the extreme limit, we use a linear function
+	     with slope -1/MAX_INLINE_SLOPE to exceedingly decrease the
+	     allowable size.  */
+	  else if (sum_insns > MAX_INLINE_INSNS)
+	    {
+	      if (estimated_insns > currfn_max_inline_insns
+			- (sum_insns - MAX_INLINE_INSNS) / MAX_INLINE_SLOPE)
+	        return 0;
+	    }
 	}
     }
 
-  /* Return the result.  */
-  return inlinable;
+  /* Don't allow recursive inlining.  */
+  for (i = 0; i < VARRAY_ACTIVE_SIZE (id->fns); ++i)
+    if (VARRAY_TREE (id->fns, i) == fn)
+      return 0;
+
+  if (DECL_INLINED_FNS (fn))
+    {
+      int j;
+      tree inlined_fns = DECL_INLINED_FNS (fn);
+
+      for (j = 0; j < TREE_VEC_LENGTH (inlined_fns); ++j)
+	if (TREE_VEC_ELT (inlined_fns, j) == VARRAY_TREE (id->fns, 0))
+	  return 0;
+    }
+
+  /* Go ahead, this function can be inlined.  */
+  return 1;
 }
 
 /* If *TP is a CALL_EXPR, replace it with its inline expansion.  */
@@ -1145,6 +1283,10 @@ expand_call_inline (tree *tp, int *walk_subtrees, void *data)
   if (!fn)
     return NULL_TREE;
 
+  /* Turn forward declarations into real ones.  */
+  if (flag_unit_at_a_time)
+    fn = cgraph_node (fn)->decl;
+
   /* If fn is a declaration of a function in a nested scope that was
      globally declared inline, we don't set its DECL_INITIAL.
      However, we can't blindly follow DECL_ABSTRACT_ORIGIN because the
@@ -1159,14 +1301,14 @@ expand_call_inline (tree *tp, int *walk_subtrees, void *data)
 
   /* Don't try to inline functions that are not well-suited to
      inlining.  */
-  if ((!flag_unit_at_a_time || !DECL_SAVED_TREE (fn)
-       || !cgraph_global_info (fn)->inline_once)
-      && !inlinable_function_p (fn, id, 0))
+  if ((flag_unit_at_a_time
+       && (!DECL_SAVED_TREE (fn) || !cgraph_inline_p (id->current_decl, fn)))
+      || (!flag_unit_at_a_time && !limits_allow_inlining (fn, id)))
     {
-      if (warn_inline && DECL_INLINE (fn) && !DID_INLINE_FUNC (fn)
+      if (warn_inline && DECL_INLINE (fn) && DECL_DECLARED_INLINE_P (fn)
 	  && !DECL_IN_SYSTEM_HEADER (fn))
 	{
-	  warning_with_decl (fn, "inlining failed in call to `%s'");
+	  warning ("%Jinlining failed in call to '%F'", fn, fn);
 	  warning ("called from here");
 	}
       return NULL_TREE;
@@ -1191,6 +1333,9 @@ expand_call_inline (tree *tp, int *walk_subtrees, void *data)
   expr = build1 (STMT_EXPR, TREE_TYPE (TREE_TYPE (fn)), make_node (COMPOUND_STMT));
   /* There is no scope associated with the statement-expression.  */
   STMT_EXPR_NO_SCOPE (expr) = 1;
+  if (lookup_attribute ("warn_unused_result",
+			TYPE_ATTRIBUTES (TREE_TYPE (fn))))
+    STMT_EXPR_WARN_UNUSED_RESULT (expr) = 1;
   stmt = STMT_EXPR_STMT (expr);
 #else /* INLINER_FOR_JAVA */
   /* Build a block containing code to initialize the arguments, the
@@ -1403,7 +1548,12 @@ expand_call_inline (tree *tp, int *walk_subtrees, void *data)
     }
 
   /* Recurse into the body of the just inlined function.  */
-  expand_calls_inline (inlined_body, id);
+  {
+    tree old_decl = id->current_decl;
+    id->current_decl = fn;
+    expand_calls_inline (inlined_body, id);
+    id->current_decl = old_decl;
+  }
   VARRAY_POP (id->fns);
 
   /* If we've returned to the top level, clear out the record of how
@@ -1446,6 +1596,7 @@ optimize_inline_calls (tree fn)
   memset (&id, 0, sizeof (id));
 
   id.decl = fn;
+  id.current_decl = fn;
   /* Don't allow recursion into FN.  */
   VARRAY_TREE_INIT (id.fns, 32, "fns");
   VARRAY_PUSH_TREE (id.fns, fn);
@@ -1589,15 +1740,11 @@ walk_tree (tree *tp, walk_tree_fn func, void *data, void *htab_)
     }
 
   /* Handle common cases up front.  */
-  if (IS_EXPR_CODE_CLASS (TREE_CODE_CLASS (code))
-      || TREE_CODE_CLASS (code) == 'r'
-      || TREE_CODE_CLASS (code) == 's')
+  if (IS_EXPR_CODE_CLASS (TREE_CODE_CLASS (code)))
 #else /* INLINER_FOR_JAVA */
   if (code != EXIT_BLOCK_EXPR
       && code != SAVE_EXPR
-      && (IS_EXPR_CODE_CLASS (TREE_CODE_CLASS (code))
-	  || TREE_CODE_CLASS (code) == 'r'
-	  || TREE_CODE_CLASS (code) == 's'))
+      && IS_EXPR_CODE_CLASS (TREE_CODE_CLASS (code)))
 #endif /* INLINER_FOR_JAVA */
     {
       int i, len;
@@ -1790,9 +1937,7 @@ copy_tree_r (tree *tp, int *walk_subtrees, void *data ATTRIBUTE_UNUSED)
 
   /* We make copies of most nodes.  */
   if (IS_EXPR_CODE_CLASS (TREE_CODE_CLASS (code))
-      || TREE_CODE_CLASS (code) == 'r'
       || TREE_CODE_CLASS (code) == 'c'
-      || TREE_CODE_CLASS (code) == 's'
       || code == TREE_LIST
       || code == TREE_VEC
       || (*lang_hooks.tree_inlining.tree_chain_matters_p) (*tp))

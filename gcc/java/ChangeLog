@@ -1,4 +1,199 @@
-Wed Jul  9 02:29:15 CEST 2003  Jan Hubicka  <jh@suse.cz>
+2003-09-21  Richard Henderson  <rth@redhat.com>
+
+	* class.c, decl.c, jcf-parse.c, jcf-write.c, parse.y, 
+	resource.c: Revert.
+
+2003-09-21  Richard Henderson  <rth@redhat.com>
+
+	* class.c, decl.c, jcf-parse.c, jcf-write.c, parse.y, 
+	resource.c: Update for DECL_SOURCE_LOCATION rename and change to const.
+
+2003-09-20  Richard Henderson  <rth@redhat.com>
+
+        * check-init.c, class.c, decl.c, expr.c: Use %J in diagnostics.
+
+2003-09-18  Roger Sayle  <roger@eyesopen.com>
+
+	* expr.c (java_truthvalue_conversion): Remove FFS_EXPR case.
+	* check-init.c (check_init): Likewise.
+
+2003-09-18  Roger Sayle  <roger@eyesopen.com>
+
+	* jcf-write.c (generate_bytecode_insns): Add support for fconst_2.
+
+2003-09-16  Andrew Haley  <aph@redhat.com>
+
+	* jcf-write.c (generate_bytecode_insns): Add MIN_EXPR and MAX_EXPR.
+
+2003-09-17  Ranjit Mathew  <rmathew@hotmail.com>
+
+	Fixes PR java/9577
+	* mangle.c (find_compression_record_match): Skip
+	over a "6JArray" (the array template mangled string)
+	IDENTIFIER_NODE.
+	(mangle_array_type): Correct minor typo.
+	(atms): Move definition to the beginning.
+
+2003-09-16  Bryce McKinlay  <bryce@mckinlay.net.nz>
+
+	* class.c (add_miranda_methods): Ensure super-interfaces are laid 
+	out. Fix for PR java/12254.
+
+2003-09-11  Richard Henderson  <rth@redhat.com>
+
+        * parse.y (source_end_java_method): Update for new
+        cgraph_finalize_function argument.
+
+2003-09-09  Richard Henderson  <rth@redhat.com>
+
+        * parse.y (source_end_java_method): Update call to
+        cgraph_finalize_function.
+
+2003-09-03  Jeff Sturm  <jsturm@one-point.com>
+
+	* decl.c (java_expand_body): New function.
+	* expr.c (build_class_init): Set DECL_IGNORED_P.
+	* java-tree.h (start_complete_expand_method,
+	java_expand_body): Declare.
+	* jcf-parse.c (cgraph.h): Include.
+	(java_parse_file): Handle flag_unit_at_a_time.
+	* lang.c (LANG_HOOKS_TREE_INLINING_START_INLINING,
+	LANG_HOOKS_CALLGRAPH_EXPAND_FUNCTION): Define.
+	(java_estimate_num_insns): Use walk_tree_without_duplicates.
+	(java_start_inlining): New function.
+	* parse.h (java_finish_classes): Declare.
+	* parse.y: Include cgraph.h.
+	(block): Don't special-case empty block production.
+	(craft_constructor): Set DECL_INLINE.
+	(source_end_java_method): Handle flag_unit_at_a_time.
+	Replace inline code with call to java_expand_body.
+	(start_complete_expand_method): Remove static modifier.
+	(java_expand_method_bodies): Patch function tree for
+	class initialization and/or synchronization as needed.
+	Don't begin RTL expansion yet.
+	(java_expand_classes): Check flag_unit_at_a_time before
+	calling finish_class.
+	(java_finish_classes): New function.
+	(java_complete_lhs): Ensure COMPOUND_EXPR has non-NULL type.
+	(patch_assignment): Set DECL_CONTEXT on temporary variable.
+	(emit_test_initialization): Set DECL_IGNORED_P.
+
+2003-09-03  Roger Sayle  <roger@eyesopen.com>
+
+	* builtins.c (enum builtin_type): Delete unused enumeration.
+	* Make-lang.in (java/builtins.o): Remove built-types.def dependency.
+
+2003-08-28  Tom Tromey  <tromey@redhat.com>
+
+	* gcj.texi (Extensions): Document gcjlib URLs.
+
+2003-08-20  Tom Tromey  <tromey@redhat.com>
+
+	* gcj.texi (Extensions): Added xref.
+	(libgcj Runtime Properties): Document
+	gnu.gcj.runtime.VMClassLoader.library_control.
+
+2003-08-13  Tom Tromey  <tromey@redhat.com>
+
+	* gcj.texi (Invoking gij): Document -X and -?.
+
+2003-08-13  Mohan Embar  <gnustuff@thisiscool.com>
+
+	* Make-lang.in: Added missing win32-host.o to JAVA_OBJS,
+	GCJH_OBJS, JCFDUMP_OBJS
+	* win32-host.c: Removed the unnecessary and broken dependency
+	on jcf.h
+
+2003-08-11  Tom Tromey  <tromey@redhat.com>
+
+	* parse.y (java_check_regular_methods): Typo fixes.  Call
+	check_interface_throws_clauses.  Use
+	check_concrete_throws_clauses.
+	(check_interface_throws_clauses): New function.
+	(check_concrete_throws_clauses): New function.
+	(hack_is_accessible_p): New function.
+	(find_most_specific_methods_list): Added FIXME.
+	* typeck.c (lookup_do): Use `flags' argument to decide what to
+	do.  Reimplemented.
+	(lookup_argument_method_generic): New function.
+	(lookup_argument_method2): Removed.
+	* jcf.h (ACC_INVISIBLE): New define.
+	* jcf-write.c (generate_classfile): Skip invisible methods.
+	* class.c (add_miranda_methods): New function.
+	(layout_class_methods): Use it.
+	(get_access_flags_from_decl): Use ACC_INVISIBLE.
+	* java-tree.h (METHOD_INVISIBLE): New define.
+	(lang_decl_func) [invisible]: New field.
+	(lookup_argument_method_generic): Declare.
+	(SEARCH_INTERFACE): New define.
+	(SEARCH_SUPER): Likewise.
+	(SEARCH_ONLY_INTERFACE): Likewise.
+	(SEARCH_VISIBLE): Likewise.
+	(lookup_argument_method2): Removed declaration.
+
+2003-08-05  Tom Tromey  <tromey@redhat.com>
+
+	Fix for PR java/11600:
+	* parse.y (java_complete_lhs): See whether we're calling a method
+	on an array.
+	(check_thrown_exceptions): Added `is_array_call' argument;
+	fixed `clone' checking; updated all callers.
+
+2003-08-05  Steven Bosscher  <steven@gcc.gnu.org>
+
+	* java-tree.h (DECL_ESTIMATED_INSNS): Remove (moved to tree.h).
+
+2003-08-03  Tom Tromey  <tromey@redhat.com>
+
+	* java-tree.h (METHOD_TRANSIENT): Removed.
+	* decl.c (pushdecl): Removed some dead code.
+	* class.c (get_access_flags_from_decl): Can't have transient
+	method.
+	(add_method_1): Can't have a transient method.
+
+2003-07-28  Andreas Jaeger  <aj@suse.de>
+
+	* jvspec.c: Convert to ISO C90 prototypes.
+
+2003-07-25  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* decl.c (force_poplevels): Fix warning call.
+
+2003-07-25  Gabriel Dos Reis  <gdr@integrable-solutions.net>
+
+	* expr.c (expand_java_field_op): Don't use xxx_with_decl
+	(expand_java_field_op): Likewise.
+	* class.c (layout_class_method): Likewise
+	(emit_register_classes): Likewise.
+	* decl.c (pushdecl): Likewise.
+	(poplevel): Likewise.
+	(force_poplevels): Likewise.
+	(give_name_to_locals): Likewise.
+	* check-init.c (check_for_initialization): Likewise.
+
+2003-07-24  Jason Merrill  <jason@redhat.com>
+
+	* java-tree.h: Move boolean_type_node et al to the back end.
+
+2003-07-19  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
+
+	* class.c java-tree.h jcf-write.c jvspec.c: Remove unnecessary
+	casts.
+
+2003-07-19  Neil Booth  <neil@daikokuya.co.uk>
+
+	* lang.opt: Don't show -MD_ and -MDD_.
+
+2003-07-18  Neil Booth  <neil@daikokuya.co.uk>
+
+	* lang-options.h: Remove.
+	* lang.opt: Add help text.
+
+2003-07-15  Kazu Hirata  <kazu@cs.umass.edu>
+
+	* expr.c: Remove the last argument to expand_assignment().
+
+2003-07-09  Jan Hubicka  <jh@suse.cz>
 
 	* java-tree.h (DECL_NUM_STMTS): Rename to...
 	(DECL_ESTIMATED_INSNS): ... this.
@@ -183,7 +378,7 @@ Wed Jul  9 02:29:15 CEST 2003  Jan Hubicka  <jh@suse.cz>
 
 	* lang.c (java_init_options): Update.
 
-Thu Jun  5 18:33:40 CEST 2003  Jan Hubicka  <jh@suse.cz>
+2003-06-05  Jan Hubicka  <jh@suse.cz>
 
 	* Make-lang.in:  Add support for stageprofile and stagefeedback
 

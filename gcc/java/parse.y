@@ -71,6 +71,7 @@ definitions and other extensions.  */
 #include "ggc.h"
 #include "debug.h"
 #include "tree-inline.h"
+#include "cgraph.h"
 
 /* Local function prototypes */
 static char *java_accstring_lookup (int);
@@ -141,7 +142,6 @@ static tree java_complete_tree (tree);
 static tree maybe_generate_pre_expand_clinit (tree);
 static int analyze_clinit_body (tree, tree);
 static int maybe_yank_clinit (tree);
-static void start_complete_expand_method (tree);
 static void java_complete_expand_method (tree);
 static void java_expand_method_bodies (tree);
 static int  unresolved_type_p (tree, tree *);
@@ -220,10 +220,11 @@ static tree build_try_finally_statement (int, tree, tree);
 static tree patch_try_statement (tree);
 static tree patch_synchronized_statement (tree, tree);
 static tree patch_throw_statement (tree, tree);
-static void check_thrown_exceptions (int, tree);
+static void check_thrown_exceptions (int, tree, tree);
 static int check_thrown_exceptions_do (tree);
 static void purge_unchecked_exceptions (tree);
 static bool ctors_unchecked_throws_clause_p (tree);
+static void check_concrete_throws_clauses (tree, tree, tree, tree);
 static void check_throws_clauses (tree, tree, tree);
 static void finish_method_declaration (tree);
 static tree build_super_invocation (tree);
@@ -244,7 +245,9 @@ static void start_artificial_method_body (tree);
 static void end_artificial_method_body (tree);
 static int check_method_redefinition (tree, tree);
 static int check_method_types_complete (tree);
+static bool hack_is_accessible_p (tree, tree);
 static void java_check_regular_methods (tree);
+static void check_interface_throws_clauses (tree, tree);
 static void java_check_abstract_methods (tree);
 static void unreachable_stmt_error (tree);
 static tree find_expr_with_wfl (tree);
@@ -1349,14 +1352,8 @@ variable_initializers:
 
 /* 19.11 Production from 14: Blocks and Statements  */
 block:
-	OCB_TK CCB_TK
-		{
-		  /* Store the location of the `}' when doing xrefs */
-		  if (current_function_decl && flag_emit_xref)
-		    DECL_END_SOURCE_LINE (current_function_decl) =
-		      EXPR_WFL_ADD_COL ($2.location, 1);
-		  $$ = empty_stmt_node;
-		}
+	block_begin block_end
+		{ $$ = $2; }
 |	block_begin block_statements block_end
 		{ $$ = $3; }
 ;
@@ -5402,6 +5399,7 @@ craft_constructor (tree class_decl, tree args)
   /* Now, mark the artificial parameters. */
   DECL_FUNCTION_NAP (decl) = artificial;
   DECL_FUNCTION_SYNTHETIC_CTOR (decl) = DECL_CONSTRUCTOR_P (decl) = 1;
+  DECL_INLINE (decl) = 1;
   return decl;
 }
 
@@ -6244,11 +6242,35 @@ java_check_methods (tree class_decl)
   CLASS_METHOD_CHECKED_P (TREE_TYPE (class_decl)) = 1;
 }
 
+/* Like not_accessible_p, but doesn't refer to the current class at
+   all.  */
+static bool
+hack_is_accessible_p (tree member, tree from_where)
+{
+  int flags = get_access_flags_from_decl (member);
+
+  if (from_where == DECL_CONTEXT (member)
+      || (flags & ACC_PUBLIC))
+    return true;
+
+  if ((flags & ACC_PROTECTED))
+    {
+      if (inherits_from_p (from_where, DECL_CONTEXT (member)))
+	return true;
+    }
+
+  if ((flags & ACC_PRIVATE))
+    return false;
+
+  /* Package private, or protected.  */
+  return in_same_package (TYPE_NAME (from_where),
+			  TYPE_NAME (DECL_CONTEXT (member)));
+}
+
 /* Check all the methods of CLASS_DECL. Methods are first completed
    then checked according to regular method existence rules.  If no
    constructor for CLASS_DECL were encountered, then build its
    declaration.  */
-
 static void
 java_check_regular_methods (tree class_decl)
 {
@@ -6298,7 +6320,8 @@ java_check_regular_methods (tree class_decl)
 	}
 
       sig = build_java_argument_signature (TREE_TYPE (method));
-      found = lookup_argument_method2 (class, DECL_NAME (method), sig);
+      found = lookup_argument_method_generic (class, DECL_NAME (method), sig,
+					      SEARCH_SUPER | SEARCH_INTERFACE);
 
       /* Inner class can't declare static methods */
       if (METHOD_STATIC (method) && !TOPLEVEL_CLASS_DECL_P (class_decl))
@@ -6357,7 +6380,7 @@ java_check_regular_methods (tree class_decl)
 	    continue;
 	  parse_error_context
 	    (method_wfl,
-	     "%s methods can't be overriden. Method `%s' is %s in class `%s'",
+	     "%s methods can't be overridden. Method `%s' is %s in class `%s'",
 	     (METHOD_FINAL (found) ? "Final" : "Static"),
 	     lang_printable_name (found, 0),
 	     (METHOD_FINAL (found) ? "final" : "static"),
@@ -6371,7 +6394,7 @@ java_check_regular_methods (tree class_decl)
 	{
 	  parse_error_context
 	    (method_wfl,
-	     "Instance methods can't be overriden by a static method. Method `%s' is an instance method in class `%s'",
+	     "Instance methods can't be overridden by a static method. Method `%s' is an instance method in class `%s'",
 	     lang_printable_name (found, 0),
 	     IDENTIFIER_POINTER
 	       (DECL_NAME (TYPE_NAME (DECL_CONTEXT (found)))));
@@ -6380,7 +6403,7 @@ java_check_regular_methods (tree class_decl)
 
       /* - Overriding/hiding public must be public
 	 - Overriding/hiding protected must be protected or public
-         - If the overriden or hidden method has default (package)
+         - If the overridden or hidden method has default (package)
            access, then the overriding or hiding method must not be
            private; otherwise, a compile-time error occurs.  If
            `found' belongs to an interface, things have been already
@@ -6402,12 +6425,19 @@ java_check_regular_methods (tree class_decl)
 	  continue;
 	}
 
-      /* Overriding methods must have compatible `throws' clauses on checked
-	 exceptions, if any */
-      check_throws_clauses (method, method_wfl, found);
-
-      /* Inheriting multiple methods with the same signature. FIXME */
+      /* Check this method against all the other implementations it
+	 overrides.  Here we only check the class hierarchy; the rest
+	 of the checking is done later.  If this method is just a
+	 Miranda method, we can skip the check.  */
+      if (! METHOD_INVISIBLE (method))
+	check_concrete_throws_clauses (class, method, DECL_NAME (method), sig);
     }
+
+  /* The above throws clause check only looked at superclasses.  Now
+     we must also make sure that all methods declared in interfaces
+     have compatible throws clauses.  FIXME: there are more efficient
+     ways to organize this checking; we should implement one.  */
+  check_interface_throws_clauses (class, class);
 
   if (!TYPE_NVIRTUALS (class))
     TYPE_METHODS (class) = nreverse (TYPE_METHODS (class));
@@ -6420,13 +6450,83 @@ java_check_regular_methods (tree class_decl)
     abort ();
 }
 
-/* Return a nonzero value if the `throws' clause of METHOD (if any)
-   is incompatible with the `throws' clause of FOUND (if any).  */
+/* Check to make sure that all the methods in all the interfaces
+   implemented by CLASS_DECL are compatible with the concrete
+   implementations available in CHECK_CLASS_DECL.  */
+static void
+check_interface_throws_clauses (tree check_class_decl, tree class_decl)
+{
+  for (; class_decl != NULL_TREE; class_decl = CLASSTYPE_SUPER (class_decl))
+    {
+      tree bases = TYPE_BINFO_BASETYPES (class_decl);
+      int iface_len = TREE_VEC_LENGTH (bases) - 1;
+      int i;
 
+      for (i = iface_len; i > 0; --i)
+	{
+	  tree interface = BINFO_TYPE (TREE_VEC_ELT (bases, i));
+	  tree iface_method;
+
+	  for (iface_method = TYPE_METHODS (interface);
+	       iface_method != NULL_TREE;
+	       iface_method = TREE_CHAIN (iface_method))
+	    {
+	      tree sig, method;
+
+	      /* First look for a concrete method implemented or
+		 inherited by this class.  No need to search
+		 interfaces here, since we're already looking through
+		 all of them.  */
+	      sig = build_java_argument_signature (TREE_TYPE (iface_method));
+	      method
+		= lookup_argument_method_generic (check_class_decl,
+						  DECL_NAME (iface_method),
+						  sig, SEARCH_VISIBLE);
+	      /* If we don't find an implementation, that is ok.  Any
+		 potential errors from that are diagnosed elsewhere.
+		 Also, multiple inheritance with conflicting throws
+		 clauses is fine in the absence of a concrete
+		 implementation.  */
+	      if (method != NULL_TREE && !METHOD_ABSTRACT (method))
+		{
+		  tree method_wfl = DECL_FUNCTION_WFL (method);
+		  check_throws_clauses (method, method_wfl, iface_method);
+		}
+	    }
+
+	  /* Now check superinterfaces.  */
+	  check_interface_throws_clauses (check_class_decl, interface);
+	}
+    }
+}
+
+/* Check throws clauses of a method against the clauses of all the
+   methods it overrides.  We do this by searching up the class
+   hierarchy, examining all matching accessible methods.  */
+static void
+check_concrete_throws_clauses (tree class, tree self_method,
+			       tree name, tree signature)
+{
+  tree method = lookup_argument_method_generic (class, name, signature,
+						SEARCH_SUPER | SEARCH_VISIBLE);
+  while (method != NULL_TREE)
+    {
+      if (! METHOD_INVISIBLE (method) && hack_is_accessible_p (method, class))
+	check_throws_clauses (self_method, DECL_FUNCTION_WFL (self_method),
+			      method);
+
+      method = lookup_argument_method_generic (DECL_CONTEXT (method),
+					       name, signature,
+					       SEARCH_SUPER | SEARCH_VISIBLE);
+    }
+}
+
+/* Generate an error if the `throws' clause of METHOD (if any) is
+   incompatible with the `throws' clause of FOUND (if any).  */
 static void
 check_throws_clauses (tree method, tree method_wfl, tree found)
 {
-  tree mthrows, fthrows;
+  tree mthrows;
 
   /* Can't check these things with class loaded from bytecode. FIXME */
   if (!CLASS_FROM_SOURCE_P (DECL_CONTEXT (found)))
@@ -6435,28 +6535,31 @@ check_throws_clauses (tree method, tree method_wfl, tree found)
   for (mthrows = DECL_FUNCTION_THROWS (method);
        mthrows; mthrows = TREE_CHAIN (mthrows))
     {
+      tree fthrows;
+
       /* We don't verify unchecked expressions */
       if (IS_UNCHECKED_EXCEPTION_P (TREE_VALUE (mthrows)))
 	continue;
       /* Checked expression must be compatible */
       for (fthrows = DECL_FUNCTION_THROWS (found);
 	   fthrows; fthrows = TREE_CHAIN (fthrows))
-	if (inherits_from_p (TREE_VALUE (mthrows), TREE_VALUE (fthrows)))
-	  break;
+	{
+	  if (inherits_from_p (TREE_VALUE (mthrows), TREE_VALUE (fthrows)))
+	    break;
+	}
       if (!fthrows)
 	{
 	  parse_error_context
-	    (method_wfl, "Invalid checked exception class `%s' in `throws' clause. The exception must be a subclass of an exception thrown by `%s' from class `%s'",
+	    (method_wfl, "Invalid checked exception class `%s' in `throws' clause.  The exception must be a subclass of an exception thrown by `%s' from class `%s'",
 	     IDENTIFIER_POINTER (DECL_NAME (TYPE_NAME (TREE_VALUE (mthrows)))),
 	     lang_printable_name (found, 0),
 	     IDENTIFIER_POINTER
-	       (DECL_NAME (TYPE_NAME (DECL_CONTEXT (found)))));
+	     (DECL_NAME (TYPE_NAME (DECL_CONTEXT (found)))));
 	}
     }
 }
 
 /* Check abstract method of interface INTERFACE */
-
 static void
 java_check_abstract_methods (tree interface_decl)
 {
@@ -6470,8 +6573,7 @@ java_check_abstract_methods (tree interface_decl)
       if (check_method_redefinition (interface, method))
 	continue;
 
-      /* 3- Overriding is OK as far as we preserve the return type and
-	 the thrown exceptions (FIXME) */
+      /* 3- Overriding is OK as far as we preserve the return type.  */
       found = lookup_java_interface_method2 (interface, method);
       if (found)
 	{
@@ -7369,30 +7471,20 @@ source_end_java_method (void)
      patched.  Dump it to a file if the user requested it.  */
   dump_java_tree (TDI_original, fndecl);
 
-  java_optimize_inline (fndecl);
-
-  /* Generate function's code */
-  if (BLOCK_EXPR_BODY (DECL_FUNCTION_BODY (fndecl))
-      && ! flag_emit_class_files
-      && ! flag_emit_xref)
-    expand_expr_stmt (BLOCK_EXPR_BODY (DECL_FUNCTION_BODY (fndecl)));
-
-  /* pop out of its parameters */
-  pushdecl_force_head (DECL_ARGUMENTS (fndecl));
-  poplevel (1, 0, 1);
-  BLOCK_SUPERCONTEXT (DECL_INITIAL (fndecl)) = fndecl;
-
-  /* Generate rtl for function exit.  */
-  if (! flag_emit_class_files && ! flag_emit_xref)
+  /* In unit-at-a-time mode, don't expand the method yet.  */
+  if (DECL_SAVED_TREE (fndecl) && flag_unit_at_a_time)
     {
-      input_line = DECL_FUNCTION_LAST_LINE (fndecl);
-      expand_function_end ();
-
-      /* Run the optimizers and output assembler code for this function. */
-      rest_of_compilation (fndecl);
+      cgraph_finalize_function (fndecl, false);
+      current_function_decl = NULL_TREE;
+      java_parser_context_restore_global ();
+      return;
     }
 
-  current_function_decl = NULL_TREE;
+  java_optimize_inline (fndecl);
+
+  /* Expand the function's body.  */
+  java_expand_body (fndecl);
+
   java_parser_context_restore_global ();
 }
 
@@ -7862,7 +7954,7 @@ maybe_yank_clinit (tree mdecl)
 /* Install the argument from MDECL. Suitable to completion and
    expansion of mdecl's body.  */
 
-static void
+void
 start_complete_expand_method (tree mdecl)
 {
   tree tem;
@@ -8005,15 +8097,26 @@ java_expand_method_bodies (tree class)
   tree decl;
   for (decl = TYPE_METHODS (class); decl; decl = TREE_CHAIN (decl))
     {
-      if (!DECL_FUNCTION_BODY (decl))
+      tree block;
+      tree body;
+
+      if (! DECL_FUNCTION_BODY (decl))
 	continue;
 
       current_function_decl = decl;
 
-      /* Save the function for inlining.  */
-      if (flag_inline_trees)
-	DECL_SAVED_TREE (decl) =
-	  BLOCK_EXPR_BODY (DECL_FUNCTION_BODY (decl));
+      block = BLOCK_EXPR_BODY (DECL_FUNCTION_BODY (decl));
+
+      if (TREE_CODE (block) != BLOCK)
+	abort ();
+
+      /* Save the function body for inlining.  */
+      DECL_SAVED_TREE (decl) = block;
+
+      body = BLOCK_EXPR_BODY (block);
+
+      if (TREE_TYPE (body) == NULL_TREE)
+	abort ();
 
       /* It's time to assign the variable flagging static class
 	 initialization based on which classes invoked static methods
@@ -8046,15 +8149,41 @@ java_expand_method_bodies (tree class)
 	    }
 	}
 
-      /* Prepare the function for RTL expansion */
-      start_complete_expand_method (decl);
+      /* Prepend class initialization to static methods.  */
+      if (METHOD_STATIC (decl) && ! METHOD_PRIVATE (decl)
+	  && ! flag_emit_class_files
+	  && ! DECL_CLINIT_P (decl)
+	  && ! CLASS_INTERFACE (TYPE_NAME (class)))
+	{
+	  tree init = build (CALL_EXPR, void_type_node,
+			     build_address_of (soft_initclass_node),
+			     build_tree_list (NULL_TREE,
+					      build_class_ref (class)),
+			     NULL_TREE);
+	  TREE_SIDE_EFFECTS (init) = 1;
+	  body = build (COMPOUND_EXPR, TREE_TYPE (body), init, body);
+	  BLOCK_EXPR_BODY (block) = body;
+	}
 
-      /* Expand function start, generate initialization flag
-	 assignment, and handle synchronized methods. */
-      complete_start_java_method (decl);
+      /* Wrap synchronized method bodies in a monitorenter
+	 plus monitorexit cleanup.  */
+      if (METHOD_SYNCHRONIZED (decl) && ! flag_emit_class_files)
+	{
+	  tree enter, exit, lock;
+	  if (METHOD_STATIC (decl))
+	    lock = build_class_ref (class);
+	  else
+	    lock = DECL_ARGUMENTS (decl);
+	  BUILD_MONITOR_ENTER (enter, lock);
+	  BUILD_MONITOR_EXIT (exit, lock);
 
-      /* Expand the rest of the function body and terminate
-         expansion. */
+	  body = build (COMPOUND_EXPR, void_type_node,
+			enter,
+			build (TRY_FINALLY_EXPR, void_type_node, body, exit));
+	  BLOCK_EXPR_BODY (block) = body;
+	}
+
+      /* Expand the the function body.  */
       source_end_java_method ();
     }
 }
@@ -9017,8 +9146,26 @@ java_expand_classes (void)
 	  else if (! flag_syntax_only)
 	    {
 	      java_expand_method_bodies (current_class);
-	      finish_class ();
+	      if (!flag_unit_at_a_time)
+		finish_class ();
 	    }
+	}
+    }
+}
+
+void
+java_finish_classes (void)
+{
+  static struct parser_ctxt *cur_ctxp = NULL;
+  for (cur_ctxp = ctxp_for_generation; cur_ctxp; cur_ctxp = cur_ctxp->next)
+    {
+      tree current;
+      ctxp = cur_ctxp;
+      for (current = ctxp->class_list; current; current = TREE_CHAIN (current))
+	{
+	  current_class = TREE_TYPE (current);
+	  outgoing_cpool = TYPE_CPOOL (current_class);
+	  finish_class ();
 	}
     }
 }
@@ -9454,7 +9601,13 @@ resolve_qualified_expression_name (tree wfl, tree *found_decl,
 	  if (location
 	      && !OUTER_FIELD_ACCESS_IDENTIFIER_P
 	            (DECL_NAME (current_function_decl)))
-	    check_thrown_exceptions (location, ret_decl);
+	    {
+	      tree arguments = NULL_TREE;
+	      if (TREE_CODE (qual_wfl) == CALL_EXPR
+		  && TREE_OPERAND (qual_wfl, 1) != NULL_TREE)
+		arguments = TREE_VALUE (TREE_OPERAND (qual_wfl, 1));
+	      check_thrown_exceptions (location, ret_decl, arguments);
+	    }
 
 	  /* If the previous call was static and this one is too,
 	     build a compound expression to hold the two (because in
@@ -10094,7 +10247,7 @@ patch_method_invocation (tree patch, tree primary, tree where, int from_super,
   tree this_arg = NULL_TREE;
   int is_array_clone_call = 0;
 
-  /* Should be overriden if everything goes well. Otherwise, if
+  /* Should be overridden if everything goes well. Otherwise, if
      something fails, it should keep this value. It stop the
      evaluation of a bogus assignment. See java_complete_tree,
      MODIFY_EXPR: for the reasons why we sometimes want to keep on
@@ -11051,10 +11204,15 @@ find_most_specific_methods_list (tree list)
 
   /* If we have several and they're all abstract, just pick the
      closest one. */
-  if (candidates > 0 && (candidates == abstract))
+  if (candidates > 0 && candidates == abstract)
     {
+      /* FIXME: merge the throws clauses.  There is no convenient way
+	 to do this in gcj right now, since ideally we'd like to
+	 introduce a new METHOD_DECL here, but that is really not
+	 possible.  */
       new_list = nreverse (new_list);
       TREE_CHAIN (new_list) = NULL_TREE;
+      return new_list;
     }
 
   /* We have several (we couldn't find a most specific), all but one
@@ -11541,6 +11699,8 @@ java_complete_lhs (tree node)
 		      && TREE_CODE (wfl_op2) != DEFAULT_EXPR)
 		    unreachable_stmt_error (*ptr);
 		}
+	      if (TREE_TYPE (*ptr) == NULL_TREE)
+		TREE_TYPE (*ptr) = void_type_node;
 	      ptr = next;
 	    }
 	  *ptr = java_complete_tree (*ptr);
@@ -11897,13 +12057,20 @@ java_complete_lhs (tree node)
 	  int in_this = CALL_THIS_CONSTRUCTOR_P (node);
 	  int from_super = (EXPR_WFL_NODE (TREE_OPERAND (node, 0)) ==
                            super_identifier_node);
+	  tree arguments;
 
 	  node = patch_method_invocation (node, NULL_TREE, NULL_TREE,
 					  from_super, 0, &decl);
 	  if (node == error_mark_node)
 	    return error_mark_node;
 
-	  check_thrown_exceptions (EXPR_WFL_LINECOL (node), decl);
+	  if (TREE_CODE (node) == CALL_EXPR
+	      && TREE_OPERAND (node, 1) != NULL_TREE)
+	    arguments = TREE_VALUE (TREE_OPERAND (node, 1));
+	  else
+	    arguments = NULL_TREE;
+	  check_thrown_exceptions (EXPR_WFL_LINECOL (node), decl,
+				   arguments);
 	  /* If we call this(...), register signature and positions */
 	  if (in_this)
 	    DECL_CONSTRUCTOR_CALLS (current_function_decl) =
@@ -12764,6 +12931,7 @@ patch_assignment (tree node, tree wfl_op1)
 	    tree block = build (BLOCK, TREE_TYPE (new_rhs), NULL);
 	    tree assignment 
 	      = build (MODIFY_EXPR, TREE_TYPE (new_rhs), tmp, fold (new_rhs));
+	    DECL_CONTEXT (tmp) = current_function_decl;
 	    BLOCK_VARS (block) = tmp;
 	    BLOCK_EXPR_BODY (block) 
 	      = build (COMPOUND_EXPR, TREE_TYPE (new_rhs), assignment, tmp);
@@ -15621,22 +15789,28 @@ patch_throw_statement (tree node, tree wfl_op1)
 }
 
 /* Check that exception said to be thrown by method DECL can be
-   effectively caught from where DECL is invoked.  */
-
+   effectively caught from where DECL is invoked.  THIS_EXPR is the
+   expression that computes `this' for the method call.  */
 static void
-check_thrown_exceptions (int location, tree decl)
+check_thrown_exceptions (int location, tree decl, tree this_expr)
 {
   tree throws;
-  /* For all the unchecked exceptions thrown by DECL */
+  int is_array_call = 0;
+
+  if (this_expr != NULL_TREE
+      && TREE_CODE (TREE_TYPE (this_expr)) == POINTER_TYPE
+      && TYPE_ARRAY_P (TREE_TYPE (TREE_TYPE (this_expr))))
+    is_array_call = 1;
+
+  /* For all the unchecked exceptions thrown by DECL.  */
   for (throws = DECL_FUNCTION_THROWS (decl); throws;
        throws = TREE_CHAIN (throws))
     if (!check_thrown_exceptions_do (TREE_VALUE (throws)))
       {
-#if 1
-	/* Temporary hack to suppresses errors about cloning arrays. FIXME */
-	if (DECL_NAME (decl) == get_identifier ("clone"))
+	/* Suppress errors about cloning arrays.  */
+	if (is_array_call && DECL_NAME (decl) == get_identifier ("clone"))
 	  continue;
-#endif
+
 	EXPR_WFL_LINECOL (wfl_operator) = location;
 	if (DECL_FINIT_P (current_function_decl))
 	  parse_error_context
@@ -16090,6 +16264,8 @@ emit_test_initialization (void **entry_p, void *info)
       LOCAL_CLASS_INITIALIZATION_FLAG (decl) = 1;
       DECL_CONTEXT (decl) = current_function_decl;
       DECL_INITIAL (decl) = boolean_true_node;
+      /* Don't emit any symbolic debugging info for this decl.  */
+      DECL_IGNORED_P (decl) = 1;
 
       /* The trick is to find the right context for it. */
       block = BLOCK_SUBBLOCKS (GET_CURRENT_BLOCK (current_function_decl));

@@ -73,6 +73,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "tm_p.h"
 #include "target.h"
 #include "langhooks.h"
+#include "cgraph.h"
 
 /* Provide defaults for stuff that may not be defined when using
    sjlj exceptions.  */
@@ -458,8 +459,7 @@ init_eh (void)
 void
 init_eh_for_function (void)
 {
-  cfun->eh = (struct eh_status *)
-    ggc_alloc_cleared (sizeof (struct eh_status));
+  cfun->eh = ggc_alloc_cleared (sizeof (struct eh_status));
 }
 
 /* Start an exception handling region.  All instructions emitted
@@ -477,7 +477,7 @@ expand_eh_region_start (void)
     return;
 
   /* Insert a new blank region as a leaf in the tree.  */
-  new_region = (struct eh_region *) ggc_alloc_cleared (sizeof (*new_region));
+  new_region = ggc_alloc_cleared (sizeof (*new_region));
   cur_region = cfun->eh->cur_region;
   new_region->outer = cur_region;
   if (cur_region)
@@ -1158,7 +1158,7 @@ add_ehl_entry (rtx label, struct eh_region *region)
 
   LABEL_PRESERVE_P (label) = 1;
 
-  entry = (struct ehl_map_entry *) ggc_alloc (sizeof (*entry));
+  entry = ggc_alloc (sizeof (*entry));
   entry->label = label;
   entry->region = region;
 
@@ -1237,8 +1237,7 @@ current_function_has_exception_handlers (void)
 static struct eh_region *
 duplicate_eh_region_1 (struct eh_region *o, struct inline_remap *map)
 {
-  struct eh_region *n
-    = (struct eh_region *) ggc_alloc_cleared (sizeof (struct eh_region));
+  struct eh_region *n = ggc_alloc_cleared (sizeof (struct eh_region));
 
   n->region_number = o->region_number + cfun->eh->last_region_number;
   n->type = o->type;
@@ -1493,7 +1492,7 @@ add_ttypes_entry (htab_t ttypes_hash, tree type)
     {
       /* Filter value is a 1 based table index.  */
 
-      n = (struct ttypes_filter *) xmalloc (sizeof (*n));
+      n = xmalloc (sizeof (*n));
       n->t = type;
       n->filter = VARRAY_ACTIVE_SIZE (cfun->eh->ttype_data) + 1;
       *slot = n;
@@ -1521,7 +1520,7 @@ add_ehspec_entry (htab_t ehspec_hash, htab_t ttypes_hash, tree list)
     {
       /* Filter value is a -1 based byte index into a uleb128 buffer.  */
 
-      n = (struct ttypes_filter *) xmalloc (sizeof (*n));
+      n = xmalloc (sizeof (*n));
       n->t = list;
       n->filter = -(VARRAY_ACTIVE_SIZE (cfun->eh->ehspec_data) + 1);
       *slot = n;
@@ -2142,12 +2141,12 @@ sjlj_emit_dispatch_table (rtx dispatch_label, struct sjlj_lp_info *lp_info)
   dispatch = copy_to_reg (mem);
 
   mem = adjust_address (fc, word_mode, sjlj_fc_data_ofs);
-  if (word_mode != Pmode)
+  if (word_mode != ptr_mode)
     {
 #ifdef POINTERS_EXTEND_UNSIGNED
-      mem = convert_memory_address (Pmode, mem);
+      mem = convert_memory_address (ptr_mode, mem);
 #else
-      mem = convert_to_mode (Pmode, mem, 0);
+      mem = convert_to_mode (ptr_mode, mem, 0);
 #endif
     }
   emit_move_insn (cfun->eh->exc_ptr, mem);
@@ -2187,8 +2186,8 @@ sjlj_build_landing_pads (void)
 {
   struct sjlj_lp_info *lp_info;
 
-  lp_info = (struct sjlj_lp_info *) xcalloc (cfun->eh->last_region_number + 1,
-					     sizeof (struct sjlj_lp_info));
+  lp_info = xcalloc (cfun->eh->last_region_number + 1,
+		     sizeof (struct sjlj_lp_info));
 
   if (sjlj_find_directly_reachable_regions (lp_info))
     {
@@ -2975,10 +2974,7 @@ expand_builtin_frob_return_addr (tree addr_tree)
 {
   rtx addr = expand_expr (addr_tree, NULL_RTX, ptr_mode, 0);
 
-#ifdef POINTERS_EXTEND_UNSIGNED
-  if (GET_MODE (addr) != Pmode)
-    addr = convert_memory_address (Pmode, addr);
-#endif
+  addr = convert_memory_address (Pmode, addr);
 
 #ifdef RETURN_ADDR_OFFSET
   addr = force_reg (Pmode, addr);
@@ -2999,10 +2995,7 @@ expand_builtin_eh_return (tree stackadj_tree ATTRIBUTE_UNUSED,
 
 #ifdef EH_RETURN_STACKADJ_RTX
   tmp = expand_expr (stackadj_tree, cfun->eh->ehr_stackadj, VOIDmode, 0);
-#ifdef POINTERS_EXTEND_UNSIGNED
-  if (GET_MODE (tmp) != Pmode)
-    tmp = convert_memory_address (Pmode, tmp);
-#endif
+  tmp = convert_memory_address (Pmode, tmp);
   if (!cfun->eh->ehr_stackadj)
     cfun->eh->ehr_stackadj = copy_to_reg (tmp);
   else if (tmp != cfun->eh->ehr_stackadj)
@@ -3010,10 +3003,7 @@ expand_builtin_eh_return (tree stackadj_tree ATTRIBUTE_UNUSED,
 #endif
 
   tmp = expand_expr (handler_tree, cfun->eh->ehr_handler, VOIDmode, 0);
-#ifdef POINTERS_EXTEND_UNSIGNED
-  if (GET_MODE (tmp) != Pmode)
-    tmp = convert_memory_address (Pmode, tmp);
-#endif
+  tmp = convert_memory_address (Pmode, tmp);
   if (!cfun->eh->ehr_handler)
     cfun->eh->ehr_handler = copy_to_reg (tmp);
   else if (tmp != cfun->eh->ehr_handler)
@@ -3108,7 +3098,7 @@ add_action_record (htab_t ar_hash, int filter, int next)
 
   if ((new = *slot) == NULL)
     {
-      new = (struct action_record *) xmalloc (sizeof (*new));
+      new = xmalloc (sizeof (*new));
       new->offset = VARRAY_ACTIVE_SIZE (cfun->eh->action_record_data) + 1;
       new->filter = filter;
       new->next = next;
@@ -3239,8 +3229,7 @@ add_call_site (rtx landing_pad, int action)
   if (used >= size)
     {
       size = (size ? size * 2 : 64);
-      data = (struct call_site_record *)
-	ggc_realloc (data, sizeof (*data) * size);
+      data = ggc_realloc (data, sizeof (*data) * size);
       cfun->eh->call_site_data = data;
       cfun->eh->call_site_data_size = size;
     }
@@ -3707,11 +3696,28 @@ output_function_exception_table (void)
       rtx value;
 
       if (type == NULL_TREE)
-	type = integer_zero_node;
+	value = const0_rtx;
       else
-	type = lookup_type_for_runtime (type);
+	{
+	  struct cgraph_varpool_node *node;
 
-      value = expand_expr (type, NULL_RTX, VOIDmode, EXPAND_INITIALIZER);
+	  type = lookup_type_for_runtime (type);
+	  value = expand_expr (type, NULL_RTX, VOIDmode, EXPAND_INITIALIZER);
+
+	  /* Let cgraph know that the rtti decl is used.  Not all of the
+	     paths below go through assemble_integer, which would take
+	     care of this for us.  */
+	  if (TREE_CODE (type) == ADDR_EXPR)
+	    {
+	      type = TREE_OPERAND (type, 0);
+	      node = cgraph_varpool_node (type);
+	      if (node)
+		cgraph_varpool_mark_needed_node (node);
+	    }
+	  else if (TREE_CODE (type) != INTEGER_CST)
+	    abort ();
+	}
+
       if (tt_format == DW_EH_PE_absptr || tt_format == DW_EH_PE_aligned)
 	assemble_integer (value, tt_format_size,
 			  tt_format_size * BITS_PER_UNIT, 1);
