@@ -126,6 +126,9 @@ tree build_encode_expr (tree);
 	 ? (TYPE)->type.context : NULL_TREE)
 #define SET_TYPE_PROTOCOL_LIST(TYPE, P) (TYPE_CHECK (TYPE)->type.context = (P))
 
+/* APPLE LOCAL objc speedup --dpatel */
+#define IDENTIFIER_INTERFACE_VALUE(NODE) (((struct lang_identifier *) (NODE))->interface_value)
+
 /* Set by `continue_class' and checked by `is_public'.  */
 
 #define TREE_STATIC_TEMPLATE(record_type) (TREE_PUBLIC (record_type))
@@ -234,7 +237,6 @@ enum objc_tree_index
     OCTI_MCLS_DECL,
     OCTI_SEL_TABLE_DECL,
     OCTI_MODULES_DECL,
-    OCTI_STRG_DECL,
 
     OCTI_INTF_CTX,
     OCTI_IMPL_CTX,
@@ -360,7 +362,6 @@ extern GTY(()) tree objc_global_trees[OCTI_MAX];
 #define UOBJC_METACLASS_decl		objc_global_trees[OCTI_MCLS_DECL]
 #define UOBJC_SELECTOR_TABLE_decl	objc_global_trees[OCTI_SEL_TABLE_DECL]
 #define UOBJC_MODULES_decl		objc_global_trees[OCTI_MODULES_DECL]
-#define UOBJC_STRINGS_decl		objc_global_trees[OCTI_STRG_DECL]
 
 /* The following are used when compiling a class implementation.
    implementation_template will normally be an interface, however if
