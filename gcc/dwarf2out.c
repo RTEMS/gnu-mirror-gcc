@@ -386,9 +386,9 @@ static void def_cfa_1		 	PARAMS ((const char *,
 /* Hook used by __throw.  */
 
 rtx
-expand_builtin_dwarf_fp_regnum ()
+expand_builtin_dwarf_sp_column ()
 {
-  return GEN_INT (DWARF_FRAME_REGNUM (HARD_FRAME_POINTER_REGNUM));
+  return GEN_INT (DWARF_FRAME_REGNUM (STACK_POINTER_REGNUM));
 }
 
 /* Return a pointer to a copy of the section string name S with all
@@ -432,6 +432,15 @@ expand_builtin_init_dwarf_reg_sizes (address)
 
 	emit_move_insn (adjust_address (mem, mode, offset), GEN_INT (size));
       }
+
+#ifdef DWARF_ALT_FRAME_RETURN_COLUMN
+  {
+    enum machine_mode save_mode = Pmode;
+    HOST_WIDE_INT offset = DWARF_ALT_FRAME_RETURN_COLUMN * GET_MODE_SIZE (mode);
+    HOST_WIDE_INT size = GET_MODE_SIZE (save_mode);
+    emit_move_insn (adjust_address (mem, mode, offset), GEN_INT (size));
+  }
+#endif
 }
 
 /* Convert a DWARF call frame info. operation to its string name */
@@ -1812,7 +1821,7 @@ output_call_frame_info (for_eh)
   dw_fde_ref fde;
   dw_cfi_ref cfi;
   char l1[20], l2[20], section_start_label[20];
-  int any_lsda_needed = 0;
+  bool any_lsda_needed = false;
   char augmentation[6];
   int augmentation_size;
   int fde_encoding = DW_EH_PE_absptr;
@@ -1823,17 +1832,19 @@ output_call_frame_info (for_eh)
   if (fde_table_in_use == 0)
     return;
 
-  /* If we don't have any functions we'll want to unwind out of, don't emit any
-     EH unwind information.  */
+  /* If we don't have any functions we'll want to unwind out of, don't
+     emit any EH unwind information.  Note that if exceptions aren't
+     enabled, we won't have collected nothrow information, and if we
+     asked for asynchronous tables, we always want this info.  */
   if (for_eh)
     {
-      int any_eh_needed = flag_asynchronous_unwind_tables;
+      bool any_eh_needed = !flag_exceptions || flag_asynchronous_unwind_tables;
 
       for (i = 0; i < fde_table_in_use; i++)
 	if (fde_table[i].uses_eh_lsda)
-	  any_eh_needed = any_lsda_needed = 1;
+	  any_eh_needed = any_lsda_needed = true;
 	else if (! fde_table[i].nothrow)
-	  any_eh_needed = 1;
+	  any_eh_needed = true;
 
       if (! any_eh_needed)
 	return;
@@ -1971,7 +1982,7 @@ output_call_frame_info (for_eh)
       fde = &fde_table[i];
 
       /* Don't emit EH unwind info for leaf functions that don't need it.  */
-      if (!flag_asynchronous_unwind_tables && for_eh
+      if (for_eh && !flag_asynchronous_unwind_tables && flag_exceptions
 	  && (fde->nothrow || fde->all_throwers_are_sibcalls)
 	  && !fde->uses_eh_lsda)
 	continue;
@@ -8177,6 +8188,11 @@ mem_loc_descriptor (rtl, mode)
 	add_loc_descr (&mem_loc_result, new_loc_descr (DW_OP_deref, 0, 0));
       break;
 
+    case LO_SUM:
+	 rtl = XEXP (rtl, 1);
+
+      /* ... fall through ...  */
+
     case LABEL_REF:
       /* Some ports can transform a symbol ref into a label ref, because
  	 the symbol ref is too far away and has to be dumped into a constant
@@ -9242,13 +9258,17 @@ rtl_for_decl_location (decl)
   rtl = DECL_RTL_IF_SET (decl);
 
   /* When generating abstract instances, ignore everything except
-     constants and symbols living in memory.  */
+     constants, symbols living in memory, and symbols living in
+     fixed registers.  */
   if (! reload_completed)
     {
       if (rtl
 	  && (CONSTANT_P (rtl)
 	      || (GET_CODE (rtl) == MEM
-	          && CONSTANT_P (XEXP (rtl, 0)))))
+	          && CONSTANT_P (XEXP (rtl, 0)))
+	      || (GET_CODE (rtl) == REG
+	          && TREE_CODE (decl) == VAR_DECL
+		  && TREE_STATIC (decl))))
 	{
 #ifdef ASM_SIMPLIFY_DWARF_ADDR
 	  rtl = ASM_SIMPLIFY_DWARF_ADDR (rtl);
@@ -10368,19 +10388,20 @@ gen_enumeration_type_die (type, context_die)
 	   link != NULL; link = TREE_CHAIN (link))
 	{
 	  dw_die_ref enum_die = new_die (DW_TAG_enumerator, type_die, link);
+	  tree value = TREE_VALUE (link);
 
 	  add_name_attribute (enum_die,
 			      IDENTIFIER_POINTER (TREE_PURPOSE (link)));
 
-	  if (host_integerp (TREE_VALUE (link), 0))
-	    {
-	      if (tree_int_cst_sgn (TREE_VALUE (link)) < 0)
-		add_AT_int (enum_die, DW_AT_const_value,
-			    tree_low_cst (TREE_VALUE (link), 0));
-	      else
-		add_AT_unsigned (enum_die, DW_AT_const_value,
-				 tree_low_cst (TREE_VALUE (link), 0));
-	    }
+	  if (host_integerp (value, TREE_UNSIGNED (TREE_TYPE (value))))
+	    /* DWARF2 does not provide a way of indicating whether or
+	       not enumeration constants are signed or unsigned.  GDB
+	       always assumes the values are signed, so we output all
+	       values as if they were signed.  That means that
+	       enumeration constants with very large unsigned values
+	       will appear to have negative values in the debugger.  */
+	    add_AT_int (enum_die, DW_AT_const_value,
+			tree_low_cst (value, tree_int_cst_sgn (value) > 0));
 	}
     }
   else
@@ -11039,15 +11060,19 @@ gen_inlined_subroutine_die (stmt, context_die, depth)
      dw_die_ref context_die;
      int depth;
 {
+  tree decl = block_ultimate_origin (stmt);
+
+  /* Emit info for the abstract instance first, if we haven't yet.  We
+     must emit this even if the block is abstract, otherwise when we
+     emit the block below (or elsewhere), we may end up trying to emit
+     a die whose origin die hasn't been emitted, and crashing.  */
+  dwarf2out_abstract_function (decl);
+
   if (! BLOCK_ABSTRACT (stmt))
     {
       dw_die_ref subr_die
 	= new_die (DW_TAG_inlined_subroutine, context_die, stmt);
-      tree decl = block_ultimate_origin (stmt);
       char label[MAX_ARTIFICIAL_LABEL_BYTES];
-
-      /* Emit info for the abstract instance first, if we haven't yet.  */
-      dwarf2out_abstract_function (decl);
 
       add_abstract_origin_attribute (subr_die, decl);
       ASM_GENERATE_INTERNAL_LABEL (label, BLOCK_BEGIN_LABEL,
@@ -11082,8 +11107,12 @@ gen_field_die (decl, context_die)
      tree decl;
      dw_die_ref context_die;
 {
-  dw_die_ref decl_die = new_die (DW_TAG_member, context_die, decl);
+  dw_die_ref decl_die;
 
+  if (TREE_TYPE (decl) == error_mark_node)
+    return;
+    
+  decl_die = new_die (DW_TAG_member, context_die, decl);
   add_name_and_src_coords_attributes (decl_die, decl);
   add_type_attribute (decl_die, member_declared_type (decl),
 		      TREE_READONLY (decl), TREE_THIS_VOLATILE (decl),
@@ -11473,6 +11502,21 @@ gen_type_die (type, context_die)
   if (type == NULL_TREE || type == error_mark_node)
     return;
 
+  if (TYPE_NAME (type) && TREE_CODE (TYPE_NAME (type)) == TYPE_DECL
+      && DECL_ORIGINAL_TYPE (TYPE_NAME (type)))
+    {
+      if (TREE_ASM_WRITTEN (type))
+	return;
+
+      /* Prevent broken recursion; we can't hand off to the same type.  */
+      if (DECL_ORIGINAL_TYPE (TYPE_NAME (type)) == type)
+	abort ();
+
+      TREE_ASM_WRITTEN (type) = 1;
+      gen_decl_die (TYPE_NAME (type), context_die);
+      return;
+    }
+
   /* We are going to output a DIE to represent the unqualified version
      of this type (i.e. without any const or volatile qualifiers) so
      get the main variant (i.e. the unqualified version) of this type
@@ -11483,18 +11527,6 @@ gen_type_die (type, context_die)
 
   if (TREE_ASM_WRITTEN (type))
     return;
-
-  if (TYPE_NAME (type) && TREE_CODE (TYPE_NAME (type)) == TYPE_DECL
-      && DECL_ORIGINAL_TYPE (TYPE_NAME (type)))
-    {
-      /* Prevent broken recursion; we can't hand off to the same type.  */
-      if (DECL_ORIGINAL_TYPE (TYPE_NAME (type)) == type)
-	abort ();
-
-      TREE_ASM_WRITTEN (type) = 1;
-      gen_decl_die (TYPE_NAME (type), context_die);
-      return;
-    }
 
   switch (TREE_CODE (type))
     {
@@ -11799,6 +11831,10 @@ decls_for_scope (stmt, context_die, depth)
 	gen_decl_die (decl, context_die);
     }
 
+  /* If we're at -g1, we're not interested in subblocks.  */
+  if (debug_info_level <= DINFO_LEVEL_TERSE)
+    return;
+
   /* Output the DIEs to represent all sub-blocks (and the items declared
      therein) of this block.  */
   for (subblocks = BLOCK_SUBBLOCKS (stmt);
@@ -12076,7 +12112,9 @@ dwarf2out_decl (decl)
       /* If we're a nested function, initially use a parent of NULL; if we're
 	 a plain function, this will be fixed up in decls_for_scope.  If
 	 we're a method, it will be ignored, since we already have a DIE.  */
-      if (decl_function_context (decl))
+      if (decl_function_context (decl)
+	  /* But if we're in terse mode, we don't care about scope.  */
+	  && debug_info_level > DINFO_LEVEL_TERSE)
 	context_die = NULL;
       break;
 
