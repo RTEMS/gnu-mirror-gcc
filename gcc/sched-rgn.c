@@ -63,6 +63,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "toplev.h"
 #include "recog.h"
 #include "cfglayout.h"
+#include "params.h"
 #include "sched-int.h"
 #include "target.h"
 
@@ -156,7 +157,7 @@ static int *containing_rgn;
 void debug_regions (void);
 static void find_single_block_region (void);
 static void find_rgns (struct edge_list *);
-static int too_large (int, int *, int *);
+static bool too_large (int, int *, int *);
 
 extern void debug_live (int, int);
 
@@ -551,10 +552,10 @@ find_single_block_region (void)
 }
 
 /* Update number of blocks and the estimate for number of insns
-   in the region.  Return 1 if the region is "too large" for interblock
-   scheduling (compile time considerations), otherwise return 0.  */
+   in the region.  Return true if the region is "too large" for interblock
+   scheduling (compile time considerations).  */
 
-static int
+static bool
 too_large (int block, int *num_bbs, int *num_insns)
 {
   (*num_bbs)++;

@@ -193,6 +193,8 @@ struct rtx_def GTY((chain_next ("RTX_NEXT (&%h)"),
      1 in a CALL_INSN if it is a sibling call.
      1 in a SET that is for a return.
      In a CODE_LABEL, part of the two-bit alternate entry field.  */
+  /* APPLE LOCAL weak import
+     SYMBOL_REF_WEAK_IMPORT in a SYMBOL_REF.  */
   unsigned int jump : 1;
   /* In a CODE_LABEL, part of the two-bit alternate entry field.
      1 in a MEM if it cannot trap.  */
@@ -850,6 +852,13 @@ enum reg_note
      computed goto.  */
   REG_NON_LOCAL_GOTO,
 
+  /* APPLE LOCAL begin hot/cold partitioning  */
+  /* Indicates that a jump crosses between hot and cold sections
+     in a (partitioned) assembly or .o file, and therefore should not be
+     reduced to a simpler jump by optimizations.  */
+  REG_CROSSING_JUMP,
+  /* APPLE LOCAL end hot/cold partitioning  */
+
   /* This kind of note is generated at each to `setjmp',
      and similar functions that can return twice.  */
   REG_SETJMP,
@@ -1010,6 +1019,12 @@ enum insn_note
 
   /* Record a prediction.  Uses NOTE_PREDICTION.  */
   NOTE_INSN_PREDICTION,
+
+  /* APPLE LOCAL begin hot/cold partitioning  */
+  /* Record that the current basic block is unlikely to be executed and
+     should be moved to the UNLIKELY_EXECUTED_TEXT_SECTION.  */
+  NOTE_INSN_UNLIKELY_EXECUTED_CODE,
+  /* APPLE LOCAL end hot/cold partitioning  */
 
   /* The location of a variable.  */
   NOTE_INSN_VAR_LOCATION,
@@ -1390,6 +1405,12 @@ do {						\
 #define SYMBOL_REF_WEAK(RTX)						\
   (RTL_FLAG_CHECK1("SYMBOL_REF_WEAK", (RTX), SYMBOL_REF)->return_val)
 
+/* APPLE LOCAL begin weak import */
+/* 1 means a SYMBOL_REF is weak import. */
+#define SYMBOL_REF_WEAK_IMPORT(RTX)					\
+  (RTL_FLAG_CHECK1("SYMBOL_REF_WEAK", (RTX), SYMBOL_REF)->jump)
+/* APPLE LOCAL end weak import */
+
 /* The tree (decl or constant) associated with the symbol, or null.  */
 #define SYMBOL_REF_DECL(RTX)	X0TREE ((RTX), 2)
 
@@ -1639,6 +1660,9 @@ extern rtx simplify_subtraction (rtx);
 
 /* In function.c  */
 extern rtx assign_stack_local (enum machine_mode, HOST_WIDE_INT, int);
+/* APPLE LOCAL next declaration */
+extern rtx assign_stack_local_with_alias (enum machine_mode, 
+					  HOST_WIDE_INT, int);
 extern rtx assign_stack_temp (enum machine_mode, HOST_WIDE_INT, int);
 extern rtx assign_stack_temp_for_type (enum machine_mode,
 				       HOST_WIDE_INT, int, tree);
@@ -2432,6 +2456,20 @@ extern void invert_br_probabilities (rtx);
 extern bool expensive_function_p (int);
 /* In tracer.c */
 extern void tracer (void);
+
+/* In stor-layout.c.  */
+extern void get_mode_bounds (enum machine_mode, int, rtx *, rtx *);
+
+/* In doloop.c.  */
+extern rtx doloop_condition_get (rtx);
+
+/* In loop-unswitch.c  */
+extern rtx reversed_condition (rtx);
+extern rtx compare_and_jump_seq (rtx, rtx, enum rtx_code, rtx, int, rtx);
+
+/* In loop-iv.c  */
+extern rtx canon_condition (rtx);
+extern void simplify_using_condition (rtx, rtx *, struct bitmap_head_def *);
 
 /* In var-tracking.c */
 extern void variable_tracking_main (void);

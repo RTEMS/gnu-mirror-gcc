@@ -51,8 +51,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 static int missing_braces_mentioned;
 
 static tree qualify_type (tree, tree);
-static int same_translation_unit_p (tree, tree);
-static int tagged_types_tu_compatible_p (tree, tree, int);
 static int comp_target_types (tree, tree, int);
 static int function_types_compatible_p (tree, tree, int);
 static int type_lists_compatible_p (tree, tree, int);
@@ -576,9 +574,14 @@ comptypes (tree type1, tree type2, int flags)
       break;
 
     case VECTOR_TYPE:
-      /* The target might allow certain vector types to be compatible.  */
-      val = (*targetm.vector_opaque_p) (t1)
-	|| (*targetm.vector_opaque_p) (t2);
+      /* This is a comparison of types.  If both of them are opaque,
+         the types are identical as long as their size is equal; else
+	 check if the underlying types are identical as well.  */
+      val = TYPE_VECTOR_SUBPARTS (t1) == TYPE_VECTOR_SUBPARTS (t2)
+            && (targetm.vector_opaque_p (t1)
+	        ? targetm.vector_opaque_p (t2)
+		: !targetm.vector_opaque_p (t2) 
+		  && comptypes (TREE_TYPE (t1), TREE_TYPE (t2), 0));
       break;
 
     default:
@@ -617,7 +620,7 @@ comp_target_types (tree ttl, tree ttr, int reflexive)
    If the CONTEXT chain ends in a null, that type's context is still
    being parsed, so if two types have context chains ending in null,
    they're in the same translation unit.  */
-static int
+int
 same_translation_unit_p (tree t1, tree t2)
 {
   while (t1 && TREE_CODE (t1) != TRANSLATION_UNIT_DECL)
@@ -632,7 +635,7 @@ same_translation_unit_p (tree t1, tree t2)
   while (t2 && TREE_CODE (t2) != TRANSLATION_UNIT_DECL)
     switch (TREE_CODE_CLASS (TREE_CODE (t2)))
       {
-      case 'd': t2 = DECL_CONTEXT (t1); break;
+      case 'd': t2 = DECL_CONTEXT (t2); break;
       case 't': t2 = TYPE_CONTEXT (t2); break;
       case 'b': t2 = BLOCK_SUPERCONTEXT (t2); break;
       default: abort ();
@@ -650,6 +653,10 @@ struct tagged_tu_seen {
   const struct tagged_tu_seen * next;
   tree t1;
   tree t2;
+/* APPLE LOCAL begin IMA speed up */
+  int  isEnum;
+  int  enumMatched;
+/* APPLE LOCAL end IMA speed up */
 };
 
 /* Can they be compatible with each other?  We choose to break the
@@ -663,7 +670,7 @@ static const struct tagged_tu_seen * tagged_tu_seen_base;
    units are being compiled.  See C99 6.2.7 paragraph 1 for the exact
    rules.  */
 
-static int
+int
 tagged_types_tu_compatible_p (tree t1, tree t2, int flags)
 {
   tree s1, s2;
@@ -698,45 +705,73 @@ tagged_types_tu_compatible_p (tree t1, tree t2, int flags)
     const struct tagged_tu_seen * tts_i;
     for (tts_i = tagged_tu_seen_base; tts_i != NULL; tts_i = tts_i->next)
       if (tts_i->t1 == t1 && tts_i->t2 == t2)
-	return 1;
+/* APPLE LOCAL begin IMA speed up */
+	return tts_i->isEnum ? tts_i->enumMatched : 1;
+/* APPLE LOCAL end IMA speed up */
   }
   
   switch (TREE_CODE (t1))
     {
     case ENUMERAL_TYPE:
       {
-      
-        /* Speed up the case where the type values are in the same order. */
-        tree tv1 = TYPE_VALUES (t1);
-        tree tv2 = TYPE_VALUES (t2);
-        
-        if (tv1 == tv2)
-          return 1;
-        
+	struct tagged_tu_seen *tts;
+/* APPLE LOCAL begin IMA speed up */
+	int res;
+	bool done;
+	/* Speed up the case where the type values are in the same order. */
+	tree tv1 = TYPE_VALUES (t1);
+	tree tv2 = TYPE_VALUES (t2);
+	if (tv1 == tv2)
+	  return 1;
+
+	res = 0;
+	done = false;
         for (;tv1 && tv2; tv1 = TREE_CHAIN (tv1), tv2 = TREE_CHAIN (tv2))
           {
             if (TREE_PURPOSE (tv1) != TREE_PURPOSE (tv2))
               break;
             if (simple_cst_equal (TREE_VALUE (tv1), TREE_VALUE (tv2)) != 1)
-              return 0;
+	      {
+	        res = 0;
+		done = true;
+		break;
+	      }
           }
-        
-        if (tv1 == NULL_TREE && tv2 == NULL_TREE)
-          return 1;
-        if (tv1 == NULL_TREE || tv2 == NULL_TREE)
-          return 0;
-        
-	if (list_length (TYPE_VALUES (t1)) != list_length (TYPE_VALUES (t2)))
-	  return 0;
-	
-	for (s1 = TYPE_VALUES (t1); s1; s1 = TREE_CHAIN (s1))
+    
+	if (!done)
+	  {
+            if (tv1 == NULL_TREE && tv2 == NULL_TREE)
+              res = 1, done = true;
+            else if (tv1 == NULL_TREE || tv2 == NULL_TREE)
+              res = 0, done = true;
+	  }
+
+	if (!done && list_length (TYPE_VALUES (t1)) == list_length (TYPE_VALUES (t2)))
+	{
+	  res = 1;
+	  for (s1 = TYPE_VALUES (t1); s1; s1 = TREE_CHAIN (s1))
 	  {
 	    s2 = purpose_member (TREE_PURPOSE (s1), TYPE_VALUES (t2));
 	    if (s2 == NULL
 		|| simple_cst_equal (TREE_VALUE (s1), TREE_VALUE (s2)) != 1)
-	      return 0;
+	    {
+	      res = 0;
+	      break;
+	    }
 	  }
-	return 1;
+	}
+	if (tagged_tu_seen_base)
+	{
+	  tts = xmalloc(sizeof (struct tagged_tu_seen));
+	  tts->next = tagged_tu_seen_base;
+	  tts->t1 = t1;
+	  tts->t2 = t2;
+	  tts->isEnum = 1;
+	  tts->enumMatched = res;
+	  tagged_tu_seen_base = tts;
+	}
+	return res;
+/* APPLE LOCAL end IMA speed up */
       }
 
     case UNION_TYPE:
@@ -748,10 +783,14 @@ tagged_types_tu_compatible_p (tree t1, tree t2, int flags)
 	  {
 	    bool ok = false;
 	    struct tagged_tu_seen tts;
+	    const struct tagged_tu_seen * tts_i;
 
 	    tts.next = tagged_tu_seen_base;
 	    tts.t1 = t1;
 	    tts.t2 = t2;
+/* APPLE LOCAL begin IMA speed up */
+	    tts.isEnum = 0;
+/* APPLE LOCAL end IMA speed up */
 	    tagged_tu_seen_base = &tts;
 	
 	    if (DECL_NAME (s1) != NULL)
@@ -773,6 +812,15 @@ tagged_types_tu_compatible_p (tree t1, tree t2, int flags)
 		    ok = true;
 		    break;
 		  }
+	    tts_i = tagged_tu_seen_base;
+/* APPLE LOCAL begin IMA speed up */
+	    while (tts_i->isEnum)
+	    {
+	      const struct tagged_tu_seen* p = tts_i->next;
+	      free((struct tagged_tu_seen*)tts_i);
+	      tts_i = p;
+	    }
+/* APPLE LOCAL end IMA speed up */
 	    tagged_tu_seen_base = tts.next;
 	    if (! ok)
 	      return 0;
@@ -783,12 +831,16 @@ tagged_types_tu_compatible_p (tree t1, tree t2, int flags)
     case RECORD_TYPE:
       {
 	struct tagged_tu_seen tts;
+	const struct tagged_tu_seen * tts_i;
 	
 	tts.next = tagged_tu_seen_base;
 	tts.t1 = t1;
 	tts.t2 = t2;
+/* APPLE LOCAL begin IMA speed up */
+	tts.isEnum = 0;
+/* APPLE LOCAL end IMA speed up */
 	tagged_tu_seen_base = &tts;
-	  
+
 	for (s1 = TYPE_FIELDS (t1), s2 = TYPE_FIELDS (t2); 
 	     s1 && s2;
 	     s1 = TREE_CHAIN (s1), s2 = TREE_CHAIN (s2))
@@ -798,6 +850,7 @@ tagged_types_tu_compatible_p (tree t1, tree t2, int flags)
 		|| DECL_NAME (s1) != DECL_NAME (s2))
 	      break;
 	    result = comptypes (TREE_TYPE (s1), TREE_TYPE (s2), flags);
+
 	    if (result == 0)
 	      break;
 	    if (result == 2)
@@ -808,6 +861,16 @@ tagged_types_tu_compatible_p (tree t1, tree t2, int flags)
 				     DECL_FIELD_BIT_OFFSET (s2)) != 1)
 	      break;
 	  }
+
+	tts_i = tagged_tu_seen_base;
+/* APPLE LOCAL begin IMA speed up */
+	while (tts_i->isEnum)
+	{
+	  const struct tagged_tu_seen* p = tts_i->next;
+	  free((struct tagged_tu_seen*)tts_i);
+	  tts_i = p;
+	}
+/* APPLE LOCAL end IMA speed up */
 	tagged_tu_seen_base = tts.next;
 	if (s1 && s2)
 	  return 0;
@@ -2832,24 +2895,29 @@ internal_build_compound_expr (tree list, int first_p)
 
   rest = internal_build_compound_expr (TREE_CHAIN (list), FALSE);
 
-  if (! TREE_SIDE_EFFECTS (TREE_VALUE (list)))
+  /* APPLE LOCAL begin AltiVec */
+  if (!targetm.cast_expr_as_vector_init)
     {
-      /* The left-hand operand of a comma expression is like an expression
-         statement: with -Wextra or -Wunused, we should warn if it doesn't have
-	 any side-effects, unless it was explicitly cast to (void).  */
-      if (warn_unused_value
-           && ! (TREE_CODE (TREE_VALUE (list)) == CONVERT_EXPR
-                && VOID_TYPE_P (TREE_TYPE (TREE_VALUE (list)))))
-        warning ("left-hand operand of comma expression has no effect");
+      if (! TREE_SIDE_EFFECTS (TREE_VALUE (list)))
+	{
+	  /* The left-hand operand of a comma expression is like an expression
+	     statement: with -Wextra or -Wunused, we should warn if it doesn't have
+	     any side-effects, unless it was explicitly cast to (void).  */
+	  if (warn_unused_value
+	      && ! (TREE_CODE (TREE_VALUE (list)) == CONVERT_EXPR
+		    && VOID_TYPE_P (TREE_TYPE (TREE_VALUE (list)))))
+	    warning ("left-hand operand of comma expression has no effect");
+	}
+
+      /* With -Wunused, we should also warn if the left-hand operand does have
+	 side-effects, but computes a value which is not used.  For example, in
+	 `foo() + bar(), baz()' the result of the `+' operator is not used,
+	 so we should issue a warning.  */
+      else if (warn_unused_value)
+	warn_if_unused_value (TREE_VALUE (list));
     }
-
-  /* With -Wunused, we should also warn if the left-hand operand does have
-     side-effects, but computes a value which is not used.  For example, in
-     `foo() + bar(), baz()' the result of the `+' operator is not used,
-     so we should issue a warning.  */
-  else if (warn_unused_value)
-    warn_if_unused_value (TREE_VALUE (list));
-
+  /* APPLE LOCAL end AltiVec */
+  
   return build (COMPOUND_EXPR, TREE_TYPE (rest), TREE_VALUE (list), rest);
 }
 
@@ -2862,6 +2930,13 @@ build_c_cast (tree type, tree expr)
 
   if (type == error_mark_node || expr == error_mark_node)
     return error_mark_node;
+
+  /* APPLE LOCAL begin AltiVec */
+  /* If we are casting to a vector type, treat the expression as a vector
+     initializer if this target supports it.  */
+  if (TREE_CODE (type) == VECTOR_TYPE && targetm.cast_expr_as_vector_init)
+    return vector_constructor_from_expr (expr, type);
+  /* APPLE LOCAL end AltiVec */
 
   /* The ObjC front-end uses TYPE_MAIN_VARIANT to tie together types differing
      only in <protocol> qualifications.  But when constructing cast expressions,
@@ -3045,6 +3120,13 @@ build_c_cast (tree type, tree expr)
       /* Replace a nonvolatile const static variable with its value.  */
       if (optimize && TREE_CODE (value) == VAR_DECL)
 	value = decl_constant_value (value);
+      /* APPLE LOCAL begin don't sign-extend pointers cast to integers */
+      if (TREE_CODE (type) == INTEGER_TYPE
+	  && TREE_CODE (otype) == POINTER_TYPE
+	  && TYPE_PRECISION (type) > TYPE_PRECISION (otype)
+	  && TREE_UNSIGNED (type))
+        value = convert (c_common_type_for_size (POINTER_SIZE, 1), value);
+      /* APPLE LOCAL end don't sign-extend pointers cast to integers */
       value = convert (type, value);
 
       /* Ignore any integer overflow caused by the cast.  */
@@ -3259,9 +3341,8 @@ convert_for_assignment (tree type, tree rhs, const char *errtype,
       return rhs;
     }
   /* Some types can interconvert without explicit casts.  */
-  else if (codel == VECTOR_TYPE && coder == VECTOR_TYPE
-	   && ((*targetm.vector_opaque_p) (type)
-	       || (*targetm.vector_opaque_p) (rhstype)))
+  else if (codel == VECTOR_TYPE
+           && vector_types_compatible_p (type, TREE_TYPE (rhs)))
     return convert (type, rhs);
   /* Arithmetic types all interconvert, and enum is treated like int.  */
   else if ((codel == INTEGER_TYPE || codel == REAL_TYPE
@@ -3869,13 +3950,21 @@ digest_init (tree type, tree init, int require_constant)
 
 	  if ((TYPE_MAIN_VARIANT (TREE_TYPE (TREE_TYPE (inside_init)))
 	       != char_type_node)
+          /* APPLE LOCAL begin pascal strings */
+	      && (TYPE_MAIN_VARIANT (TREE_TYPE (TREE_TYPE (inside_init)))
+	       != unsigned_char_type_node)
+          /* APPLE LOCAL end pascal strings */
 	      && TYPE_PRECISION (typ1) == TYPE_PRECISION (char_type_node))
 	    {
 	      error_init ("char-array initialized from wide string");
 	      return error_mark_node;
 	    }
-	  if ((TYPE_MAIN_VARIANT (TREE_TYPE (TREE_TYPE (inside_init)))
-	       == char_type_node)
+          /* APPLE LOCAL begin pascal strings */
+	  if (((TYPE_MAIN_VARIANT (TREE_TYPE (TREE_TYPE (inside_init)))
+		== char_type_node)
+	       || (TYPE_MAIN_VARIANT (TREE_TYPE (TREE_TYPE (inside_init)))
+		   == unsigned_char_type_node))
+          /* APPLE LOCAL end pascal strings */
 	      && TYPE_PRECISION (typ1) != TYPE_PRECISION (char_type_node))
 	    {
 	      error_init ("int-array initialized from non-wide string");
@@ -3906,11 +3995,11 @@ digest_init (tree type, tree init, int require_constant)
      vector constructor is not constant (e.g. {1,2,3,foo()}) then punt
      below and handle as a constructor.  */
     if (code == VECTOR_TYPE
-        && comptypes (TREE_TYPE (inside_init), type, COMPARE_STRICT)
+        && vector_types_compatible_p (TREE_TYPE (inside_init), type)
         && TREE_CONSTANT (inside_init))
       {
 	if (TREE_CODE (inside_init) == VECTOR_CST
-	    && comptypes (TYPE_MAIN_VARIANT (TREE_TYPE (inside_init)),
+            && comptypes (TYPE_MAIN_VARIANT (TREE_TYPE (inside_init)),
 			  TYPE_MAIN_VARIANT (type),
 			  COMPARE_STRICT))
 	  return inside_init;
@@ -4011,7 +4100,8 @@ digest_init (tree type, tree init, int require_constant)
   /* Handle scalar types, including conversions.  */
 
   if (code == INTEGER_TYPE || code == REAL_TYPE || code == POINTER_TYPE
-      || code == ENUMERAL_TYPE || code == BOOLEAN_TYPE || code == COMPLEX_TYPE)
+      || code == ENUMERAL_TYPE || code == BOOLEAN_TYPE || code == COMPLEX_TYPE
+      || code == VECTOR_TYPE)
     {
       /* Note that convert_for_assignment calls default_conversion
 	 for arrays and functions.  We must not call it in the
