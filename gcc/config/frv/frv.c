@@ -48,7 +48,9 @@ Boston, MA 02111-1307, USA.  */
 #include <ctype.h>
 #include "target.h"
 #include "target-def.h"
+#include "targhooks.h"
 #include "integrate.h"
+#include "langhooks.h"
 
 #ifndef FRV_INLINE
 #define FRV_INLINE inline
@@ -262,7 +264,6 @@ static void frv_registers_update		(rtx, unsigned char [],
 static int frv_registers_used_p			(rtx, unsigned char [], int);
 static int frv_registers_set_p			(rtx, unsigned char [], int);
 static int frv_issue_rate			(void);
-static int frv_use_dfa_pipeline_interface	(void);
 static void frv_pack_insns			(void);
 static void frv_function_prologue		(FILE *, HOST_WIDE_INT);
 static void frv_function_epilogue		(FILE *, HOST_WIDE_INT);
@@ -285,7 +286,9 @@ static bool frv_cannot_force_const_mem		(rtx);
 static const char *unspec_got_name		(int);
 static void frv_output_const_unspec		(FILE *,
 						 const struct frv_unspec *);
+static bool frv_function_ok_for_sibcall		(tree, tree);
 static rtx frv_struct_value_rtx			(tree, int);
+static bool frv_must_pass_in_stack (enum machine_mode mode, tree type);
 
 /* Initialize the GCC target structure.  */
 #undef  TARGET_ASM_FUNCTION_PROLOGUE
@@ -317,13 +320,19 @@ static rtx frv_struct_value_rtx			(tree, int);
 #undef  TARGET_SCHED_ISSUE_RATE
 #define TARGET_SCHED_ISSUE_RATE frv_issue_rate
 #undef  TARGET_SCHED_USE_DFA_PIPELINE_INTERFACE
-#define TARGET_SCHED_USE_DFA_PIPELINE_INTERFACE frv_use_dfa_pipeline_interface
+#define TARGET_SCHED_USE_DFA_PIPELINE_INTERFACE hook_int_void_1
 
+#undef TARGET_FUNCTION_OK_FOR_SIBCALL
+#define TARGET_FUNCTION_OK_FOR_SIBCALL frv_function_ok_for_sibcall
 #undef TARGET_CANNOT_FORCE_CONST_MEM
 #define TARGET_CANNOT_FORCE_CONST_MEM frv_cannot_force_const_mem
 
 #undef TARGET_STRUCT_VALUE_RTX
 #define TARGET_STRUCT_VALUE_RTX frv_struct_value_rtx
+#undef TARGET_MUST_PASS_IN_STACK
+#define TARGET_MUST_PASS_IN_STACK frv_must_pass_in_stack
+#undef TARGET_PASS_BY_REFERENCE
+#define TARGET_PASS_BY_REFERENCE hook_pass_by_reference_must_pass_in_stack
 
 #undef TARGET_EXPAND_BUILTIN_SAVEREGS
 #define TARGET_EXPAND_BUILTIN_SAVEREGS frv_expand_builtin_saveregs
@@ -332,6 +341,16 @@ static rtx frv_struct_value_rtx			(tree, int);
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
+/* Any function call that satisfies the machine-independent
+   requirements is eligible on FR-V.  */
+
+static bool
+frv_function_ok_for_sibcall (tree decl ATTRIBUTE_UNUSED,
+			     tree exp ATTRIBUTE_UNUSED)
+{
+  return true;
+}
+
 /* Return true if SYMBOL is a small data symbol and relocation RELOC
    can be used to access it directly in a load or store.  */
 
@@ -1749,7 +1768,7 @@ frv_function_epilogue (FILE *file ATTRIBUTE_UNUSED,
    slots for arguments passed to the current function.  */
 
 void
-frv_expand_epilogue (int sibcall_p)
+frv_expand_epilogue (bool emit_return)
 {
   frv_stack_t *info = frv_stack_info ();
   rtx fp = frame_pointer_rtx;
@@ -1769,9 +1788,7 @@ frv_expand_epilogue (int sibcall_p)
 
   /* Set RETURN_ADDR to the address we should return to.  Set it to NULL if
      no return instruction should be emitted.  */
-  if (sibcall_p)
-    return_addr = 0;
-  else if (info->save_p[LR_REGNO])
+  if (info->save_p[LR_REGNO])
     {
       int lr_offset;
       rtx mem;
@@ -1814,8 +1831,20 @@ frv_expand_epilogue (int sibcall_p)
   if (current_function_calls_eh_return)
     emit_insn (gen_stack_adjust (sp, sp, EH_RETURN_STACKADJ_RTX));
 
-  if (return_addr)
+  if (emit_return)
     emit_jump_insn (gen_epilogue_return (return_addr));
+  else
+    {
+      rtx lr = return_addr;
+
+      if (REGNO (return_addr) != LR_REGNO)
+	{
+	  lr = gen_rtx_REG (Pmode, LR_REGNO);
+	  emit_move_insn (lr, return_addr);
+	}
+
+      emit_insn (gen_rtx_USE (VOIDmode, lr));
+    }
 }
 
 
@@ -2054,35 +2083,6 @@ frv_expand_builtin_va_start (tree valist, rtx nextarg)
   TREE_SIDE_EFFECTS (t) = 1;
 
   expand_expr (t, const0_rtx, VOIDmode, EXPAND_NORMAL);
-}
-
-
-/* Expand __builtin_va_arg to do the va_arg macro.  */
-
-rtx
-frv_expand_builtin_va_arg (tree valist, tree type)
-{
-  rtx addr;
-  rtx mem;
-  rtx reg;
-
-  if (TARGET_DEBUG_ARG)
-    {
-      fprintf (stderr, "va_arg:\n");
-      debug_tree (type);
-    }
-
-  if (! AGGREGATE_TYPE_P (type))
-    return std_expand_builtin_va_arg (valist, type);
-
-  addr = std_expand_builtin_va_arg (valist, ptr_type_node);
-  mem  = gen_rtx_MEM (Pmode, addr);
-  reg  = gen_reg_rtx (Pmode);
-
-  set_mem_alias_set (mem, get_varargs_alias_set ());
-  emit_move_insn (reg, mem);
-
-  return reg;
 }
 
 
@@ -3018,6 +3018,19 @@ frv_init_cumulative_args (CUMULATIVE_ARGS *cum,
 }
 
 
+/* Return true if we should pass an argument on the stack rather than
+   in registers.  */
+
+static bool
+frv_must_pass_in_stack (enum machine_mode mode, tree type)
+{
+  if (mode == BLKmode)
+    return true;
+  if (type == NULL)
+    return false;
+  return AGGREGATE_TYPE_P (type);
+}
+
 /* If defined, a C expression that gives the alignment boundary, in bits, of an
    argument with the specified mode and type.  If it is not defined,
    `PARM_BOUNDARY' is used for all arguments.  */
@@ -3028,37 +3041,6 @@ frv_function_arg_boundary (enum machine_mode mode ATTRIBUTE_UNUSED,
 {
   return BITS_PER_WORD;
 }
-
-
-/* A C expression that controls whether a function argument is passed in a
-   register, and which register.
-
-   The arguments are CUM, of type CUMULATIVE_ARGS, which summarizes (in a way
-   defined by INIT_CUMULATIVE_ARGS and FUNCTION_ARG_ADVANCE) all of the previous
-   arguments so far passed in registers; MODE, the machine mode of the argument;
-   TYPE, the data type of the argument as a tree node or 0 if that is not known
-   (which happens for C support library functions); and NAMED, which is 1 for an
-   ordinary argument and 0 for nameless arguments that correspond to `...' in the
-   called function's prototype.
-
-   The value of the expression should either be a `reg' RTX for the hard
-   register in which to pass the argument, or zero to pass the argument on the
-   stack.
-
-   For machines like the VAX and 68000, where normally all arguments are
-   pushed, zero suffices as a definition.
-
-   The usual way to make the ANSI library `stdarg.h' work on a machine where
-   some arguments are usually passed in registers, is to cause nameless
-   arguments to be passed on the stack instead.  This is done by making
-   `FUNCTION_ARG' return 0 whenever NAMED is 0.
-
-   You may use the macro `MUST_PASS_IN_STACK (MODE, TYPE)' in the definition of
-   this macro to determine if this argument is of a type that must be passed in
-   the stack.  If `REG_PARM_STACK_SPACE' is not defined and `FUNCTION_ARG'
-   returns nonzero for such an argument, the compiler will abort.  If
-   `REG_PARM_STACK_SPACE' is defined, the argument will be computed in the
-   stack and then loaded into a register.  */
 
 rtx
 frv_function_arg (CUMULATIVE_ARGS *cum,
@@ -3169,27 +3151,6 @@ frv_function_arg_partial_nregs (CUMULATIVE_ARGS *cum,
 }
 
 
-
-/* A C expression that indicates when an argument must be passed by reference.
-   If nonzero for an argument, a copy of that argument is made in memory and a
-   pointer to the argument is passed instead of the argument itself.  The
-   pointer is passed in whatever way is appropriate for passing a pointer to
-   that type.
-
-   On machines where `REG_PARM_STACK_SPACE' is not defined, a suitable
-   definition of this macro might be
-        #define FUNCTION_ARG_PASS_BY_REFERENCE(CUM, MODE, TYPE, NAMED)  \
-          MUST_PASS_IN_STACK (MODE, TYPE)  */
-
-int
-frv_function_arg_pass_by_reference (CUMULATIVE_ARGS *cum ATTRIBUTE_UNUSED,
-                                    enum machine_mode mode,
-                                    tree type,
-                                    int named ATTRIBUTE_UNUSED)
-{
-  return MUST_PASS_IN_STACK (mode, type);
-}
-
 /* If defined, a C expression that indicates when it is the called function's
    responsibility to make a copy of arguments passed by invisible reference.
    Normally, the caller makes a copy and passes the address of the copy to the
@@ -3529,7 +3490,7 @@ frv_legitimate_memory_operand (rtx op, enum machine_mode mode, int condexec_p)
 }
 
 void
-frv_expand_fdpic_call (rtx *operands, int ret_value)
+frv_expand_fdpic_call (rtx *operands, bool ret_value, bool sibcall)
 {
   rtx lr = gen_rtx_REG (Pmode, LR_REGNO);
   rtx picreg = get_hard_reg_initial_val (SImode, FDPIC_REG);
@@ -3565,8 +3526,9 @@ frv_expand_fdpic_call (rtx *operands, int ret_value)
      all external functions, so one would have to also mark function
      declarations available in the same module with non-default
      visibility, which is advantageous in itself.  */
-  if (GET_CODE (addr) == SYMBOL_REF && !SYMBOL_REF_LOCAL_P (addr)
-      && TARGET_INLINE_PLT)
+  if (GET_CODE (addr) == SYMBOL_REF
+      && ((!SYMBOL_REF_LOCAL_P (addr) && TARGET_INLINE_PLT)
+	  || sibcall))
     {
       rtx x, dest;
       dest = gen_reg_rtx (SImode);
@@ -3598,7 +3560,11 @@ frv_expand_fdpic_call (rtx *operands, int ret_value)
   picreg = gen_reg_rtx (DImode);
   emit_insn (gen_movdi_ldd (picreg, addr));
 
-  if (ret_value)
+  if (sibcall && ret_value)
+    c = gen_sibcall_value_fdpicdi (rvrtx, picreg, const0_rtx);
+  else if (sibcall)
+    c = gen_sibcall_fdpicdi (picreg, const0_rtx);
+  else if (ret_value)
     c = gen_call_value_fdpicdi (rvrtx, picreg, const0_rtx, lr);
   else
     c = gen_call_fdpicdi (picreg, const0_rtx, lr);
@@ -4342,9 +4308,6 @@ move_destination_operand (rtx op, enum machine_mode mode)
       return TRUE;
 
     case MEM:
-      if (GET_CODE (XEXP (op, 0)) == ADDRESSOF)
-        return TRUE;
-
       return frv_legitimate_memory_operand (op, mode, FALSE);
     }
 
@@ -4435,9 +4398,6 @@ move_source_operand (rtx op, enum machine_mode mode)
       return TRUE;
 
     case MEM:
-      if (GET_CODE (XEXP (op, 0)) == ADDRESSOF)
-        return TRUE;
-
       return frv_legitimate_memory_operand (op, mode, FALSE);
     }
 
@@ -4477,9 +4437,6 @@ condexec_dest_operand (rtx op, enum machine_mode mode)
       return TRUE;
 
     case MEM:
-      if (GET_CODE (XEXP (op, 0)) == ADDRESSOF)
-        return TRUE;
-
       return frv_legitimate_memory_operand (op, mode, TRUE);
     }
 
@@ -4523,9 +4480,6 @@ condexec_source_operand (rtx op, enum machine_mode mode)
       return TRUE;
 
     case MEM:
-      if (GET_CODE (XEXP (op, 0)) == ADDRESSOF)
-        return TRUE;
-
       return frv_legitimate_memory_operand (op, mode, TRUE);
     }
 
@@ -4758,6 +4712,21 @@ call_operand (rtx op, enum machine_mode mode)
 
   if (GET_CODE (op) == SYMBOL_REF)
     return TRUE;
+
+  /* Note this doesn't allow reg+reg or reg+imm12 addressing (which should
+     never occur anyway), but prevents reload from not handling the case
+     properly of a call through a pointer on a function that calls
+     vfork/setjmp, etc. due to the need to flush all of the registers to stack.  */
+  return gpr_or_int12_operand (op, mode);
+}
+
+/* Return true if operand is a memory reference suitable for a sibcall.  */
+
+int
+sibcall_operand (rtx op, enum machine_mode mode)
+{
+  if (GET_MODE (op) != mode && mode != VOIDmode && GET_CODE (op) != CONST_INT)
+    return FALSE;
 
   /* Note this doesn't allow reg+reg or reg+imm12 addressing (which should
      never occur anyway), but prevents reload from not handling the case
@@ -5194,9 +5163,6 @@ condexec_memory_operand (rtx op, enum machine_mode mode)
     return FALSE;
 
   addr = XEXP (op, 0);
-  if (GET_CODE (addr) == ADDRESSOF)
-    return TRUE;
-
   return frv_legitimate_address_p (mode, addr, reload_completed, TRUE, FALSE);
 }
 
@@ -6627,7 +6593,7 @@ frv_ifcvt_init_extra_fields (ce_if_block_t *ce_info ATTRIBUTE_UNUSED)
 }
 
 
-/* Internal function to add a potenial insn to the list of insns to be inserted
+/* Internal function to add a potential insn to the list of insns to be inserted
    if the conditional execution conversion is successful.  */
 
 static void
@@ -8338,15 +8304,6 @@ frv_issue_rate (void)
       return 4;
     }
 }
-
-
-/* Implement TARGET_SCHED_USE_DFA_PIPELINE_INTERFACE.  */
-
-static int
-frv_use_dfa_pipeline_interface (void)
-{
-  return true;
-}
 
 /* Update the register state information, to know about which registers are set
    or clobbered.  */
@@ -8932,7 +8889,7 @@ frv_pack_insns (void)
 
 
 #define def_builtin(name, type, code) \
-  builtin_function ((name), (type), (code), BUILT_IN_MD, NULL, NULL)
+  lang_hooks.builtin_function ((name), (type), (code), BUILT_IN_MD, NULL, NULL)
 
 struct builtin_description
 {

@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2003 Free Software Foundation, Inc.          --
+--          Copyright (C) 1992-2004 Free Software Foundation, Inc.          --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -122,9 +122,9 @@ package body Ada.Exceptions is
 
    package Exception_Data is
 
-      ----------------------------------
-      --  Exception messages routines --
-      ----------------------------------
+      ---------------------------------
+      -- Exception messages routines --
+      ---------------------------------
 
       procedure Set_Exception_C_Msg
         (Id   : Exception_Id;
@@ -331,20 +331,6 @@ package body Ada.Exceptions is
    --  exception occurrence referenced by the Current_Excep in the TSD.
    --  Abort is deferred before the raise call.
 
-   procedure Raise_With_Msg (E : Exception_Id; Setup : Boolean);
-   pragma No_Return (Raise_With_Msg);
-   --  Similar to above, with an extra parameter to indicate wether
-   --  Setup_Exception has been called already.
-
-   procedure Raise_After_Setup (E : Exception_Id);
-   pragma No_Return (Raise_After_Setup);
-   pragma Export (C, Raise_After_Setup, "__gnat_raise_after_setup");
-   --  Wrapper to Raise_With_Msg and Setup set to True.
-   --
-   --  This is called by System.Tasking.Entry_Calls.Check_Exception when an
-   --  exception has occured during an entry call. The exception to propagate
-   --  has been setup and initialized via Transfer_Occurrence in this case.
-
    procedure Raise_With_Location_And_Msg
      (E : Exception_Id;
       F : Big_String_Ptr;
@@ -501,6 +487,7 @@ package body Ada.Exceptions is
    procedure Rcheck_26 (File : Big_String_Ptr; Line : Integer);
    procedure Rcheck_27 (File : Big_String_Ptr; Line : Integer);
    procedure Rcheck_28 (File : Big_String_Ptr; Line : Integer);
+   procedure Rcheck_29 (File : Big_String_Ptr; Line : Integer);
 
    pragma Export (C, Rcheck_00, "__gnat_rcheck_00");
    pragma Export (C, Rcheck_01, "__gnat_rcheck_01");
@@ -531,6 +518,7 @@ package body Ada.Exceptions is
    pragma Export (C, Rcheck_26, "__gnat_rcheck_26");
    pragma Export (C, Rcheck_27, "__gnat_rcheck_27");
    pragma Export (C, Rcheck_28, "__gnat_rcheck_28");
+   pragma Export (C, Rcheck_29, "__gnat_rcheck_29");
 
    ---------------------------------------------
    -- Reason Strings for Run-Time Check Calls --
@@ -565,11 +553,13 @@ package body Ada.Exceptions is
    Rmsg_21 : constant String := "potentially blocking operation"   & NUL;
    Rmsg_22 : constant String := "stubbed subprogram called"        & NUL;
    Rmsg_23 : constant String := "unchecked union restriction"      & NUL;
-   Rmsg_24 : constant String := "empty storage pool"               & NUL;
-   Rmsg_25 : constant String := "explicit raise"                   & NUL;
-   Rmsg_26 : constant String := "infinite recursion"               & NUL;
-   Rmsg_27 : constant String := "object too large"                 & NUL;
-   Rmsg_28 : constant String := "restriction violation"            & NUL;
+   Rmsg_24 : constant String := "illegal use of"
+             & " remote access-to-class-wide type, see RM E.4(18)" & NUL;
+   Rmsg_25 : constant String := "empty storage pool"               & NUL;
+   Rmsg_26 : constant String := "explicit raise"                   & NUL;
+   Rmsg_27 : constant String := "infinite recursion"               & NUL;
+   Rmsg_28 : constant String := "object too large"                 & NUL;
+   Rmsg_29 : constant String := "restriction violation"            & NUL;
 
    -----------------------
    -- Polling Interface --
@@ -703,7 +693,13 @@ package body Ada.Exceptions is
          P := P - 1;
       end loop;
 
-      return Name (P .. Name'Length);
+      --  Return result making sure lower bound is 1
+
+      declare
+         subtype Rname is String (1 .. Name'Length - P + 1);
+      begin
+         return Rname (Name (P .. Name'Length));
+      end;
    end Exception_Name_Simple;
 
    --------------------
@@ -983,13 +979,11 @@ package body Ada.Exceptions is
    -- Raise_With_Msg --
    --------------------
 
-   procedure Raise_With_Msg (E : Exception_Id; Setup : Boolean) is
+   procedure Raise_With_Msg (E : Exception_Id) is
       Excep : constant EOA := Get_Current_Excep.all;
 
    begin
-      if not Setup then
-         Exception_Propagation.Setup_Exception (Excep, Excep);
-      end if;
+      Exception_Propagation.Setup_Exception (Excep, Excep);
 
       Excep.Exception_Raised := False;
       Excep.Id               := E;
@@ -999,20 +993,6 @@ package body Ada.Exceptions is
       Abort_Defer.all;
       Raise_Current_Excep (E);
    end Raise_With_Msg;
-
-   procedure Raise_With_Msg (E : Exception_Id) is
-   begin
-      Raise_With_Msg (E, Setup => False);
-   end Raise_With_Msg;
-
-   -----------------------
-   -- Raise_After_Setup --
-   -----------------------
-
-   procedure Raise_After_Setup (E : Exception_Id) is
-   begin
-      Raise_With_Msg (E, Setup => True);
-   end Raise_After_Setup;
 
    --------------------------------------
    -- Calls to Run-Time Check Routines --
@@ -1140,7 +1120,7 @@ package body Ada.Exceptions is
 
    procedure Rcheck_24 (File : Big_String_Ptr; Line : Integer) is
    begin
-      Raise_Storage_Error_Msg (File, Line, To_Ptr (Rmsg_24'Address));
+      Raise_Program_Error_Msg (File, Line, To_Ptr (Rmsg_24'Address));
    end Rcheck_24;
 
    procedure Rcheck_25 (File : Big_String_Ptr; Line : Integer) is
@@ -1162,6 +1142,11 @@ package body Ada.Exceptions is
    begin
       Raise_Storage_Error_Msg (File, Line, To_Ptr (Rmsg_28'Address));
    end Rcheck_28;
+
+   procedure Rcheck_29 (File : Big_String_Ptr; Line : Integer) is
+   begin
+      Raise_Storage_Error_Msg (File, Line, To_Ptr (Rmsg_29'Address));
+   end Rcheck_29;
 
    -------------
    -- Reraise --

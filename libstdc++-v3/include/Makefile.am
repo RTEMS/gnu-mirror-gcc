@@ -145,7 +145,6 @@ bits_headers = \
 	${bits_srcdir}/stl_set.h \
 	${bits_srcdir}/stl_stack.h \
 	${bits_srcdir}/stl_tempbuf.h \
-	${bits_srcdir}/stl_threads.h \
 	${bits_srcdir}/stl_tree.h \
 	${bits_srcdir}/stl_uninitialized.h \
 	${bits_srcdir}/stl_vector.h \
@@ -202,6 +201,7 @@ ext_srcdir = ${glibcxx_srcdir}/include/ext
 ext_builddir = ./ext
 ext_headers = \
 	${ext_srcdir}/algorithm \
+	${ext_srcdir}/bitmap_allocator.h \
 	${ext_srcdir}/debug_allocator.h \
 	${ext_srcdir}/demangle.h \
 	${ext_srcdir}/enc_filebuf.h \
@@ -340,7 +340,8 @@ host_headers = \
 	${host_srcdir}/ctype_inline.h \
 	${host_srcdir}/ctype_noninline.h \
 	${host_srcdir}/os_defines.h \
-	${glibcxx_srcdir}/$(ATOMIC_WORD_SRCDIR)/atomic_word.h 
+	${glibcxx_srcdir}/$(ATOMIC_WORD_SRCDIR)/atomic_word.h \
+	${glibcxx_srcdir}/$(ABI_TWEAKS_SRCDIR)/cxxabi_tweaks.h
 
 # Non-installed host_header files.
 host_headers_noinst = \
@@ -350,6 +351,7 @@ host_headers_noinst = \
 host_headers_extra = \
 	${host_builddir}/basic_file.h \
 	${host_builddir}/c++config.h \
+	${host_builddir}/c++allocator.h \
 	${host_builddir}/c++io.h \
 	${host_builddir}/c++locale.h \
 	${host_builddir}/messages_members.h \
@@ -479,6 +481,7 @@ stamp-host: ${host_headers} ${host_headers_noinst} stamp-${host_alias}
 	  (cd ${host_builddir} ;\
 	  $(LN_S) ${host_headers} . || true ;\
 	  $(LN_S) ${glibcxx_srcdir}/$(BASIC_FILE_H) basic_file.h || true ;\
+	  $(LN_S) ${glibcxx_srcdir}/$(ALLOCATOR_H) c++allocator.h || true ;\
 	  $(LN_S) ${glibcxx_srcdir}/$(CSTDIO_H) c++io.h || true ;\
 	  $(LN_S) ${glibcxx_srcdir}/$(CLOCALE_H) c++locale.h || true ;\
 	  $(LN_S) ${glibcxx_srcdir}/$(CLOCALE_INTERNAL_H) . || true ;\
@@ -538,8 +541,8 @@ ${pch_input}: ${allstamped} ${host_builddir}/c++config.h ${pch_source}
 	if [ ! -d "${pch_output_builddir}" ]; then \
 	  mkdir -p ${pch_output_builddir}; \
 	fi; \
-	$(CXX) $(PCHFLAGS) $(AM_CPPFLAGS) ${pch_source} -O0 -g -o ${pch_output_builddir}/O0g; \
-	$(CXX) $(PCHFLAGS) $(AM_CPPFLAGS) ${pch_source} -O2 -g -o ${pch_output_builddir}/O2g;
+	$(CXX) $(PCHFLAGS) $(AM_CPPFLAGS) ${pch_source} -O0 -g -o ${pch_output_builddir}/O0g.gch; \
+	$(CXX) $(PCHFLAGS) $(AM_CPPFLAGS) ${pch_source} -O2 -g -o ${pch_output_builddir}/O2g.gch;
 
 # For robustness sake (in light of junk files or in-source
 # configuration), copy from the build or source tree to the install

@@ -433,7 +433,7 @@ enum reg_class
 
 #define N_REG_CLASSES (int) LIM_REG_CLASSES
 
-/* Give names of register classes as strings for dump file.   */
+/* Give names of register classes as strings for dump file.  */
 
 #define REG_CLASS_NAMES							    \
  {"NO_REGS", "GENERAL_REGS", "FLOAT_REG0", "LONG_FLOAT_REG0", "FLOAT_REGS", \
@@ -1104,7 +1104,7 @@ __transfer_from_trampoline ()		\
 /* The number of scalar move insns which should be generated instead
    of a string move insn or a library call.
    
-   We have a smart movstrsi insn */
+   We have a smart movmemsi insn */
 #define MOVE_RATIO 0
 
 #define STORE_RATIO (optimize_size ? 3 : 15)
