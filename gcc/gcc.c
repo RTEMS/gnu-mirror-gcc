@@ -908,7 +908,8 @@ static const struct option_map option_map[] =
    {"--assemble", "-S", 0},
    {"--assert", "-A", "a"},
    {"--classpath", "-fclasspath=", "aj"},
-   {"--CLASSPATH", "-fCLASSPATH=", "aj"},
+   {"--bootclasspath", "-fbootclasspath=", "aj"},
+   {"--CLASSPATH", "-fclasspath=", "aj"},
    {"--comments", "-C", 0},
    {"--compile", "-c", 0},
    {"--debug", "-g", "oj"},
@@ -1416,18 +1417,18 @@ init_gcc_specs (obstack, shared_name, static_name, eh_name)
 {
   char *buf;
 
-  buf = concat ("%{!shared:%{!shared-libgcc:", static_name, " ",
+  buf = concat ("%{static|static-libgcc:", static_name, " ", eh_name,
+		"}%{!static:%{!static-libgcc:",
+		"%{!shared:%{!shared-libgcc:", static_name, " ",
 		eh_name, "}%{shared-libgcc:", shared_name, " ",
-		static_name, "}}",
-		"%{shared:%{static-libgcc:", static_name, " ",
-		eh_name, "}%{!static-libgcc:",
+		static_name, "}}%{shared:",
 #ifdef LINK_EH_SPEC
 		"%{shared-libgcc:", shared_name,
 		"}%{!shared-libgcc:", static_name, "}",
 #else
 		shared_name,
 #endif
-		"}}", NULL);
+		"}}}", NULL);
 
   obstack_grow (obstack, buf, strlen (buf));
   free (buf);
@@ -6376,7 +6377,7 @@ validate_all_switches ()
     {
       p = comp->spec;
       while ((c = *p++))
-	if (c == '%' && *p == '{')
+	if (c == '%' && (*p == '{' || (*p == 'W' && *++p == '{')))
 	  /* We have a switch spec.  */
 	  validate_switches (p + 1);
     }
@@ -6386,14 +6387,14 @@ validate_all_switches ()
     {
       p = *(spec->ptr_spec);
       while ((c = *p++))
-	if (c == '%' && *p == '{')
+	if (c == '%' && (*p == '{' || (*p == 'W' && *++p == '{')))
 	  /* We have a switch spec.  */
 	  validate_switches (p + 1);
     }
 
   p = link_command_spec;
   while ((c = *p++))
-    if (c == '%' && *p == '{')
+    if (c == '%' && (*p == '{' || (*p == 'W' && *++p == '{')))
       /* We have a switch spec.  */
       validate_switches (p + 1);
 }

@@ -8897,8 +8897,38 @@ rtl_for_decl_location (decl)
      and will have been substituted directly into all expressions that use it.
      C does not have such a concept, but C++ and other languages do.  */
   else if (TREE_CODE (decl) == VAR_DECL && DECL_INITIAL (decl))
-    rtl = expand_expr (DECL_INITIAL (decl), NULL_RTX, VOIDmode,
-		       EXPAND_INITIALIZER);
+    {
+      /* If a variable is initialized with a string constant without embedded
+	 zeros, build CONST_STRING.  */
+      if (TREE_CODE (DECL_INITIAL (decl)) == STRING_CST
+	  && TREE_CODE (TREE_TYPE (decl)) == ARRAY_TYPE)
+	{
+	  tree arrtype = TREE_TYPE (decl);
+	  tree enttype = TREE_TYPE (arrtype);
+	  tree domain = TYPE_DOMAIN (arrtype);
+	  tree init = DECL_INITIAL (decl);
+	  enum machine_mode mode = TYPE_MODE (enttype);
+
+	  if (GET_MODE_CLASS (mode) == MODE_INT && GET_MODE_SIZE (mode) == 1
+	      && domain
+	      && integer_zerop (TYPE_MIN_VALUE (domain))
+	      && compare_tree_int (TYPE_MAX_VALUE (domain),
+				   TREE_STRING_LENGTH (init) - 1) == 0
+	      && ((size_t) TREE_STRING_LENGTH (init)
+		  == strlen (TREE_STRING_POINTER (init)) + 1))
+	    rtl = gen_rtx_CONST_STRING (VOIDmode, TREE_STRING_POINTER (init));
+	}
+
+      if (rtl == NULL)
+	{
+	  rtl = expand_expr (DECL_INITIAL (decl), NULL_RTX, VOIDmode,
+			     EXPAND_INITIALIZER);
+	  /* If expand_expr returned a MEM, we cannot use it, since
+	     it won't be output, leading to unresolved symbol.  */
+	  if (rtl && GET_CODE (rtl) == MEM)
+	    rtl = NULL;
+	}
+    }
 
   return rtl;
 }
@@ -10574,6 +10604,20 @@ gen_inlined_subroutine_die (stmt, context_die, depth)
       decls_for_scope (stmt, subr_die, depth);
       current_function_has_inlines = 1;
     }
+  else
+    /* We may get here if we're the outer block of function A that was
+       inlined into function B that was inlined into function C.  When
+       generating debugging info for C, dwarf2out_abstract_function(B)
+       would mark all inlined blocks as abstract, including this one.
+       So, we wouldn't (and shouldn't) expect labels to be generated
+       for this one.  Instead, just emit debugging info for
+       declarations within the block.  This is particularly important
+       in the case of initializers of arguments passed from B to us:
+       if they're statement expressions containing declarations, we
+       wouldn't generate dies for their abstract variables, and then,
+       when generating dies for the real variables, we'd die (pun
+       intended :-)  */
+    gen_lexical_block_die (stmt, context_die, depth);
 }
 
 /* Generate a DIE for a field in a record, or structure.  */

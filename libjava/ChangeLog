@@ -1,3 +1,165 @@
+2002-03-09  Adam Megacz  <adam@xwt.org>
+
+        * win32.cc (_CRT_MT, __mingwthr_key_dtor) Added fake
+        definitions to simulate -mthreads.
+
+2002-03-09  Adam Megacz  <adam@xwt.org>
+
+        * win32.cc (_Jv_platform_gettimeofday) Cast 1000 to long long to
+        avoid precision loss.
+
+2002-03-09  Per Bothner  <per@bothner.com>
+
+	* gnu/gcj/xlib/WindowAttributes.java  Assign null to RawData, not 0.
+	* gnu/gcj/xlib/XImage.java:  Likewise.
+	* gnu/gcj/xlib/XColor.java:  Likewise.
+
+2002-03-09  Adam Megacz  <adam@xwt.org>
+
+	* java/lang/Win32Process.java (ConcreteProcess): Now throws an
+	IOException so that Throwable.printStackTrace fails correctly.
+
+2002-03-08  Adam Megacz  <adam@xwt.org>
+
+	* java/net/natPlainSocketImpl.cc (read, write, close): Formatting
+	fixed.
+	
+2002-03-09  Bryce McKinlay  <bryce@waitaki.otago.ac.nz>
+
+	* posix.cc (_Jv_platform_gettimeofday): Make sure result doesn't get
+	truncated to int.
+
+2002-03-08  Tom Tromey  <tromey@redhat.com>
+
+	* include/jni.h: Include stdio.h.
+
+2002-03-08  Tom Tromey  <tromey@redhat.com>
+
+	* posix.cc (internal_gettimeofday): New function.
+	(_Jv_select): Use it.
+
+2002-03-07  Adam Megacz  <adam@xwt.org>
+
+	* java/lang/natSystem.cc (currentTimeMillis): Now uses updated
+       _Jv_platform_gettimeofday signature.
+	
+2002-03-07  Adam Megacz  <adam@xwt.org>
+
+       * win32.cc (_Jv_platform_gettimeofday): Now takes no args,
+       returns jlong. Added implementation
+       * posix.cc (_Jv_platform_gettimeofday): Now takes no args,
+       returns jlong.
+       * win32.h (_Jv_platform_gettimeofday): Now takes no args,
+       returns jlong.
+       * posix.h (_Jv_platform_gettimeofday): Now takes no args,
+       returns jlong.
+       * java/lang/natSystem.cc (currentTimeMillis): Now uses updated
+       _Jv_platform_gettimeofday signature.
+
+2002-03-07  Adam Megacz  <adam@xwt.org>
+
+        * java/net/natPlainSocketImpl.cc: Changed USE_WINSOCK to
+        WIN32, and added thunks for read(), write(), and close().
+        * java/net/natPlainSocketImpl.cc (accept, read, read):
+        Disabled timeouts on WIN32 pending discussion.
+
+2002-03-07  Adam Megacz  <adam@xwt.org>
+
+        * java/io/FileDescriptor.java: Initialize in/out/err in init().
+        * java/io/natFileDescriptorWin32.cc (init()): Added function.
+        * java/io/natFileDescriptorPosix.cc (init()): Added function.
+        * java/io/natFileDescriptorEcos.cc (init()): Added function.
+
+2002-03-07  Bryce McKinlay  <bryce@waitaki.otago.ac.nz>
+
+	* java/net/natPlainSocketImpl.cc (_Jv_recv): Removed.
+	(read): Call recv() directly, not _Jv_recv().
+
+2002-03-06  Tom Tromey  <tromey@redhat.com>
+
+	* include/config.h.in: Rebuilt.
+	* configure: Rebuilt.
+	* Makefile.in: Rebuilt.
+
+2002-03-06  Eric Blake  <ebb9@email.byu.edu>
+
+	* scripts/unicode-decomp.pl: Move from chartables.pl, and remove
+	the code for generating include/java-chartables.h.
+	* scripts/unicode-blocks.pl: Move from scripts/blocks.pl, and
+	merge with Classpath.
+	* scripts/unicode-muncher.pl: Copy from Classpath.
+	* scritps/MakeCharTables.java: New file.
+	* gnu/gcj/convert/Blocks-3.txt: New file.
+	* gnu/gcj/convert/UnicodeData-3.0.0.txt: New file.
+	* gnu/gcj/convert/UnicodeCharacterDatabase-3.0.0.html: New file.
+	* gnu/java/lang/CharData.java: Copy from Classpath.
+	* Makefile.am (ordinary_java_source_files): Add
+	gnu/java/lang/CharData.java.
+	* configure.in: Remove --enable-fast-character option.
+	* java/lang/Character.java: Merge algorithms and Javadoc with
+	Classpath.
+	* java/lang/natCharacter.cc: Implement Unicode lookup table more
+	efficiently.
+	* include/java-chardecomp.h: Regenerate.
+	* include/java-chartables.h: Regenerate.
+
+2002-03-06  Bryce McKinlay  <bryce@waitaki.otago.ac.nz>
+
+	* java/awt/MediaTracker.java: Implemented.
+	* Makefile.am: Add MediaTracker.
+	* Makefile.in: Rebuilt.
+
+2002-03-05  Tom Tromey  <tromey@redhat.com>
+
+	* java/lang/natPosixProcess.cc (fail): Removed.
+	(startProcess): Simplified error-handling.  Preserve
+	LD_LIBRARY_PATH across exec.
+
+2002-03-05  Tom Tromey  <tromey@redhat.com>
+
+	* jni.cc (_Jv_LookupJNIMethod): Throw UnsatisfiedLinkError, not
+	AbstractMethodError.
+
+2002-03-04  Adam Megacz <adam@xwt.org>
+
+	* java/net/natInetAddress.cc: Changed USE_WINSOCK to WIN32, added
+	'#undef STRICT'.
+
+2002-03-03  Bryce McKinlay  <bryce@waitaki.otago.ac.nz>
+
+	* Makefile.am: Use -bootclasspath, not -CLASSPATH.
+	* Makefile.in: Rebuilt.
+
+2002-03-03 Mark Wielaard <mark@klomp.org>
+
+	* java/util/Timer (TaskQueue.stop): set elements to zero.
+
+2002-02-28  Anthony Green  <green@redhat.com>
+
+	* java/lang/reflect/natMethod.cc (result): Add void* element.
+	(_Jv_CallAnyMethodA): Handle FFI_TYPE_POINTER arguments.  Move
+	constructor test.
+
+2002-02-26  Tom Tromey  <tromey@redhat.com>
+
+	* java/lang/natSystem.cc (init_properties): Use __VERSION__.
+	* gij.cc (version): Use __VERSION__.
+	* include/config.h.in: Rebuilt.
+	* acconfig.h (GCJVERSION): Removed.
+	* configure: Rebuilt.
+	* configure.in (GCJVERSION): Removed.
+
+2002-02-26  Andreas Schwab  <schwab@suse.de>
+
+	* acinclude.m4 (LIB_AC_PROG_CXX): Use glibjava_CXX instead of
+	glibcpp_CXX, since libjava uses even another CXX.
+	* aclocal.m4, configure: Regenerated.
+
+2002-02-26  Tom Tromey  <tromey@redhat.com>
+
+	* java/lang/natPosixProcess.cc (startProcess): Use FD_CLOEXEC, not
+	`1'.
+
 2002-02-25  Bryce McKinlay  <bryce@waitaki.otago.ac.nz>
 
 	* Makefile.am (GCJCOMPILE): Use -fCLASSPATH not -fclasspath. Fixes

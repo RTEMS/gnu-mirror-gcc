@@ -762,7 +762,7 @@ extern int rs6000_altivec_abi;
 #define XER_REGNO    76
 #define FIRST_ALTIVEC_REGNO	77
 #define LAST_ALTIVEC_REGNO	108
-#define TOTAL_ALTIVEC_REGS	(LAST_ALTIVEC_REGNO - FIRST_ALTIVEC_REGNO)
+#define TOTAL_ALTIVEC_REGS	(LAST_ALTIVEC_REGNO - FIRST_ALTIVEC_REGNO + 1)
 #define VRSAVE_REGNO		109
 
 /* List the order in which to allocate registers.  Each register must be
@@ -2426,7 +2426,7 @@ extern int toc_initialized;
 #define ASM_OUTPUT_DEF_FROM_DECLS(FILE,decl,target)	\
 do {							\
   const char * alias = XSTR (XEXP (DECL_RTL (decl), 0), 0); \
-  char * name = IDENTIFIER_POINTER (target);		\
+  const char * name = IDENTIFIER_POINTER (target);	\
   if (TREE_CODE (decl) == FUNCTION_DECL			\
       && DEFAULT_ABI == ABI_AIX)			\
     {							\

@@ -28,6 +28,10 @@ Boston, MA 02111-1307, USA.  */
 #ifndef GCC_CP_TREE_H
 #define GCC_CP_TREE_H
 
+#ifndef __GNUC__
+#error "You should be using 'make bootstrap' -- see installation instructions"
+#endif
+
 #include "c-common.h"
 
 /* Usage of TREE_LANG_FLAG_?:
@@ -1590,7 +1594,7 @@ struct lang_type
 #define CLEAR_BINFO_MARKED(NODE)		\
   (TREE_VIA_VIRTUAL (NODE)			\
    ? CLEAR_CLASSTYPE_MARKED (BINFO_TYPE (NODE))	\
-   : (TREE_LANG_FLAG_0 (NODE) = 0))
+   : (void)(TREE_LANG_FLAG_0 (NODE) = 0))
 
 /* Nonzero means that this class is on a path leading to a new vtable.  */
 #define BINFO_VTABLE_PATH_MARKED(NODE)		\

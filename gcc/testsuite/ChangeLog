@@ -1,3 +1,51 @@
+2002-03-09  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.c-torture/execute/va-arg-22.c: New test.
+
+Sat Mar  9 07:30:53 2002  Richard Kenner  <kenner@vlsi1.ultra.nyu.edu>
+
+	* gcc.c-torture/compile/20020309-1.c: New test.
+
+2002-03-08  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.c-torture/execute/20020307-2.c: New test.
+
+2002-03-08  Richard Earnshaw  <rearnsha@arm.com>
+
+	* gcc.c-torture/execute/20020307-1.c: New test.
+
+2002-03-05  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/20020304-1.c: New test.
+
+	* gcc.c-torture/compile/20020304-2.c: New test.
+
+2002-03-04  Zack Weinberg  <zack@codesourcery.com>
+
+	* gcc.c-torture/compile/20020304-1.c: New test case
+	(from PR c/5830). 
+
+2002-03-02  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.dg/other/classkey1.C: New test.
+
+2002-03-01  Richard Henderson  <rth@redhat.com>
+
+	* gcc.c-torture/compile/981223-1.x: New.
+	* gcc.c-torture/compile/920625-1.x: New.
+
+2002-02-28  Richard Henderson  <rth@redhat.com>
+
+	* g++.dg/opt/vtgc1.C: Adjust patterns for ia64.
+
+2002-02-26  Alexandre Oliva  <aoliva@redhat.com>
+
+	* gcc.dg/debug/20020224-1.c: New.
+
+2002-02-26  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.dg/debug/debug4.C: New test.
+
 2002-02-25  Kazu Hirata  <kazu@hxi.com>
 
 	* gcc.c-torture/execute/960416-1.x: New.
