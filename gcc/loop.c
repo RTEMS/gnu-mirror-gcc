@@ -1,6 +1,6 @@
 /* Perform various loop optimizations, including strength reduction.
    Copyright (C) 1987, 1988, 1989, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   1998, 1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -54,6 +54,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "predict.h"
 #include "insn-flags.h"
 #include "optabs.h"
+#include "ggc.h"
 
 /* Not really meaningful values, but at least something.  */
 #ifndef SIMULTANEOUS_PREFETCHES
@@ -326,10 +327,12 @@ static void update_reg_last_use PARAMS ((rtx, rtx));
 static rtx next_insn_in_loop PARAMS ((const struct loop *, rtx));
 static void loop_regs_scan PARAMS ((const struct loop *, int));
 static int count_insns_in_loop PARAMS ((const struct loop *));
+static int find_mem_in_note_1 PARAMS ((rtx *, void *));
+static rtx find_mem_in_note PARAMS ((rtx));
 static void load_mems PARAMS ((const struct loop *));
 static int insert_loop_mem PARAMS ((rtx *, void *));
 static int replace_loop_mem PARAMS ((rtx *, void *));
-static void replace_loop_mems PARAMS ((rtx, rtx, rtx));
+static void replace_loop_mems PARAMS ((rtx, rtx, rtx, int));
 static int replace_loop_reg PARAMS ((rtx *, void *));
 static void replace_loop_regs PARAMS ((rtx insn, rtx, rtx));
 static void note_reg_stored PARAMS ((rtx, rtx, void *));
@@ -550,7 +553,10 @@ loop_optimize (f, dumpfile, flags)
       struct loop *loop = &loops->array[i];
 
       if (! loop->invalid && loop->end)
-	scan_loop (loop, flags);
+        {
+          scan_loop (loop, flags);
+          ggc_collect ();
+        }
     }
 
   end_alias_analysis ();
@@ -815,11 +821,17 @@ scan_loop (loop, flags)
 		    }
 		}
 
+	      /* Don't try to optimize a MODE_CC set with a constant
+		 source.  It probably will be combined with a conditional
+		 jump.  */
+	      if (GET_MODE_CLASS (GET_MODE (SET_DEST (set))) == MODE_CC
+		  && CONSTANT_P (src))
+		;
 	      /* Don't try to optimize a register that was made
 		 by loop-optimization for an inner loop.
 		 We don't know its life-span, so we can't compute
 		 the benefit.  */
-	      if (REGNO (SET_DEST (set)) >= max_reg_before_loop)
+	      else if (REGNO (SET_DEST (set)) >= max_reg_before_loop)
 		;
 	      else if (/* The register is used in basic blocks other
 			  than the one where it is set (meaning that
@@ -3277,7 +3289,7 @@ loop_invariant_p (loop, x)
 	 These have always been created by the unroller and are set in
 	 the loop, hence are never invariant. */
 
-      if (REGNO (x) >= regs->num)
+      if (REGNO (x) >= (unsigned) regs->num)
 	return 0;
 
       if (regs->array[REGNO (x)].set_in_loop < 0)
@@ -4204,7 +4216,15 @@ emit_prefetch_instructions (loop)
 		 non-constant INIT_VAL to have the same mode as REG, which
 		 in this case we know to be Pmode.  */
 	      if (GET_MODE (init_val) != Pmode && !CONSTANT_P (init_val))
-		init_val = convert_to_mode (Pmode, init_val, 0);
+		{
+		  rtx seq;
+
+		  start_sequence ();
+		  init_val = convert_to_mode (Pmode, init_val, 0);
+		  seq = get_insns ();
+		  end_sequence ();
+		  loop_insn_emit_before (loop, 0, loop_start, seq);
+		}
 	      loop_iv_add_mult_emit_before (loop, init_val,
 					    info[i].giv->mult_val,
 					    add_val, reg, 0, loop_start);
@@ -4761,6 +4781,9 @@ loop_givs_reduce (loop, bl)
 	    {
 	      rtx insert_before;
 
+	      /* Skip if location is the same as a previous one.  */
+	      if (tv->same)
+		continue;
 	      if (! auto_inc_opt)
 		insert_before = NEXT_INSN (tv->insn);
 	      else if (auto_inc_opt == 1)
@@ -5668,6 +5691,7 @@ record_biv (loop, v, insn, dest_reg, inc_val, mult_val, location,
   v->always_computable = ! not_every_iteration;
   v->always_executed = ! not_every_iteration;
   v->maybe_multiple = maybe_multiple;
+  v->same = 0;
 
   /* Add this to the reg's iv_class, creating a class
      if this is the first incrementation of the reg.  */
@@ -5704,6 +5728,17 @@ record_biv (loop, v, insn, dest_reg, inc_val, mult_val, location,
 
       /* Put it in the array of biv register classes.  */
       REG_IV_CLASS (ivs, REGNO (dest_reg)) = bl;
+    }
+  else
+    {
+      /* Check if location is the same as a previous one.  */
+      struct induction *induction;
+      for (induction = bl->biv; induction; induction = induction->next_iv)
+	if (location == induction->location)
+	  {
+	    v->same = induction;
+	    break;
+	  }
     }
 
   /* Update IV_CLASS entry for this biv.  */
@@ -6141,6 +6176,10 @@ update_giv_derive (loop, p)
       if (GET_CODE (p) == CODE_LABEL || GET_CODE (p) == JUMP_INSN
 	  || biv->insn == p)
 	{
+	  /* Skip if location is the same as a previous one.  */
+	  if (biv->same)
+	    continue;
+
 	  for (giv = bl->giv; giv; giv = giv->next_iv)
 	    {
 	      /* If cant_derive is already true, there is no point in
@@ -6244,7 +6283,7 @@ basic_induction_var (loop, x, mode, dest_reg, p, inc_val, mult_val, location)
 {
   enum rtx_code code;
   rtx *argp, arg;
-  rtx insn, set = 0;
+  rtx insn, set = 0, last, inc;
 
   code = GET_CODE (x);
   *location = NULL;
@@ -6272,7 +6311,26 @@ basic_induction_var (loop, x, mode, dest_reg, p, inc_val, mult_val, location)
       if (loop_invariant_p (loop, arg) != 1)
 	return 0;
 
-      *inc_val = convert_modes (GET_MODE (dest_reg), GET_MODE (x), arg, 0);
+      /* convert_modes can emit new instructions, e.g. when arg is a loop
+	 invariant MEM and dest_reg has a different mode.
+	 These instructions would be emitted after the end of the function
+	 and then *inc_val would be an unitialized pseudo.
+	 Detect this and bail in this case.
+	 Other alternatives to solve this can be introducing a convert_modes
+	 variant which is allowed to fail but not allowed to emit new
+	 instructions, emit these instructions before loop start and let
+	 it be garbage collected if *inc_val is never used or saving the
+	 *inc_val initialization sequence generated here and when *inc_val
+	 is going to be actually used, emit it at some suitable place.  */
+      last = get_last_insn ();
+      inc = convert_modes (GET_MODE (dest_reg), GET_MODE (x), arg, 0);
+      if (get_last_insn () != last)
+	{
+	  delete_insns_since (last);
+	  return 0;
+	}
+
+      *inc_val = inc;
       *mult_val = const1_rtx;
       *location = argp;
       return 1;
@@ -6353,7 +6411,15 @@ basic_induction_var (loop, x, mode, dest_reg, p, inc_val, mult_val, location)
 	  && GET_MODE_CLASS (mode) != MODE_CC)
 	{
 	  /* Possible bug here?  Perhaps we don't know the mode of X.  */
-	  *inc_val = convert_modes (GET_MODE (dest_reg), mode, x, 0);
+	  last = get_last_insn ();
+	  inc = convert_modes (GET_MODE (dest_reg), mode, x, 0);
+	  if (get_last_insn () != last)
+	    {
+	      delete_insns_since (last);
+	      return 0;
+	    }
+
+	  *inc_val = inc;
 	  *mult_val = const0_rtx;
 	  return 1;
 	}
@@ -7242,6 +7308,9 @@ express_from (g1, g2)
       && GET_CODE (g2->mult_val) == CONST_INT)
     {
       if (g1->mult_val == const0_rtx
+	  || (g1->mult_val == constm1_rtx
+	      && INTVAL (g2->mult_val)
+		 == (HOST_WIDE_INT) 1 << (HOST_BITS_PER_WIDE_INT - 1))
 	  || INTVAL (g2->mult_val) % INTVAL (g1->mult_val) != 0)
 	return NULL_RTX;
       mult = GEN_INT (INTVAL (g2->mult_val) / INTVAL (g1->mult_val));
@@ -7834,11 +7903,12 @@ loop_iv_add_mult_emit_before (loop, b, m, a, reg, before_bb, before_insn)
   update_reg_last_use (b, before_insn);
   update_reg_last_use (m, before_insn);
 
-  loop_insn_emit_before (loop, before_bb, before_insn, seq);
-
   /* It is possible that the expansion created lots of new registers.
-     Iterate over the sequence we just created and record them all.  */
+     Iterate over the sequence we just created and record them all.  We
+     must do this before inserting the sequence.  */
   loop_regs_update (loop, seq);
+
+  loop_insn_emit_before (loop, before_bb, before_insn, seq);
 }
 
 
@@ -7863,11 +7933,12 @@ loop_iv_add_mult_sink (loop, b, m, a, reg)
   update_reg_last_use (b, loop->sink);
   update_reg_last_use (m, loop->sink);
 
-  loop_insn_sink (loop, seq);
-
   /* It is possible that the expansion created lots of new registers.
-     Iterate over the sequence we just created and record them all.  */
+     Iterate over the sequence we just created and record them all.  We
+     must do this before inserting the sequence.  */
   loop_regs_update (loop, seq);
+
+  loop_insn_sink (loop, seq);
 }
 
 
@@ -7886,11 +7957,12 @@ loop_iv_add_mult_hoist (loop, b, m, a, reg)
   /* Use copy_rtx to prevent unexpected sharing of these rtx.  */
   seq = gen_add_mult (copy_rtx (b), copy_rtx (m), copy_rtx (a), reg);
 
-  loop_insn_hoist (loop, seq);
-
   /* It is possible that the expansion created lots of new registers.
-     Iterate over the sequence we just created and record them all.  */
+     Iterate over the sequence we just created and record them all.  We
+     must do this before inserting the sequence.  */
   loop_regs_update (loop, seq);
+
+  loop_insn_hoist (loop, seq);
 }
 
 
@@ -8624,11 +8696,12 @@ maybe_eliminate_biv (loop, bl, eliminate_p, threshold, insn_count)
       enum rtx_code code = GET_CODE (p);
       basic_block where_bb = 0;
       rtx where_insn = threshold >= insn_count ? 0 : p;
+      rtx note;
 
       /* If this is a libcall that sets a giv, skip ahead to its end.  */
       if (GET_RTX_CLASS (code) == 'i')
 	{
-	  rtx note = find_reg_note (p, REG_LIBCALL, NULL_RTX);
+	  note = find_reg_note (p, REG_LIBCALL, NULL_RTX);
 
 	  if (note)
 	    {
@@ -8646,6 +8719,8 @@ maybe_eliminate_biv (loop, bl, eliminate_p, threshold, insn_count)
 		}
 	    }
 	}
+
+      /* Closely examine the insn if the biv is mentioned.  */
       if ((code == INSN || code == JUMP_INSN || code == CALL_INSN)
 	  && reg_mentioned_p (reg, PATTERN (p))
 	  && ! maybe_eliminate_biv_1 (loop, PATTERN (p), p, bl,
@@ -8657,6 +8732,12 @@ maybe_eliminate_biv (loop, bl, eliminate_p, threshold, insn_count)
 		     bl->regno, INSN_UID (p));
 	  break;
 	}
+
+      /* If we are eliminating, kill REG_EQUAL notes mentioning the biv.  */
+      if (eliminate_p
+	  && (note = find_reg_note (p, REG_EQUAL, NULL_RTX)) != NULL_RTX
+	  && reg_mentioned_p (reg, XEXP (note, 0)))
+	remove_note (p, note);
     }
 
   if (p == loop->end)
@@ -9571,6 +9652,8 @@ insert_loop_mem (mem, data)
   for (i = 0; i < loop_info->mems_idx; ++i)
     if (rtx_equal_p (m, loop_info->mems[i].mem))
       {
+        if (MEM_VOLATILE_P (m) && !MEM_VOLATILE_P (loop_info->mems[i].mem))
+          loop_info->mems[i].mem = m;
 	if (GET_MODE (m) != GET_MODE (loop_info->mems[i].mem))
 	  /* The modes of the two memory accesses are different.  If
 	     this happens, something tricky is going on, and we just
@@ -9972,7 +10055,7 @@ load_mems (loop)
 	      else
 	        /* Replace the memory reference with the shadow register.  */
 		replace_loop_mems (p, loop_info->mems[i].mem,
-				   loop_info->mems[i].reg);
+				   loop_info->mems[i].reg, written);
 	    }
 
 	  if (GET_CODE (p) == CODE_LABEL
@@ -10345,6 +10428,33 @@ try_swap_copy_prop (loop, replacement, regno)
     }
 }
 
+/* Worker function for find_mem_in_note, called via for_each_rtx.  */
+
+static int
+find_mem_in_note_1 (x, data)
+     rtx *x;
+     void *data;
+{
+  if (*x != NULL_RTX && GET_CODE (*x) == MEM)
+    {
+      rtx *res = (rtx *) data;
+      *res = *x;
+      return 1;
+    }
+  return 0;
+}
+
+/* Returns the first MEM found in NOTE by depth-first search.  */
+
+static rtx
+find_mem_in_note (note)
+     rtx note;
+{
+  if (note && for_each_rtx (&note, find_mem_in_note_1, &note))
+    return note;
+  return NULL_RTX;
+}
+  
 /* Replace MEM with its associated pseudo register.  This function is
    called from load_mems via for_each_rtx.  DATA is actually a pointer
    to a structure describing the instruction currently being scanned
@@ -10387,10 +10497,11 @@ replace_loop_mem (mem, data)
 }
 
 static void
-replace_loop_mems (insn, mem, reg)
+replace_loop_mems (insn, mem, reg, written)
      rtx insn;
      rtx mem;
      rtx reg;
+     int written;
 {
   loop_replace_args args;
 
@@ -10399,6 +10510,26 @@ replace_loop_mems (insn, mem, reg)
   args.replacement = reg;
 
   for_each_rtx (&insn, replace_loop_mem, &args);
+
+  /* If we hoist a mem write out of the loop, then REG_EQUAL
+     notes referring to the mem are no longer valid.  */
+  if (written)
+    {
+      rtx note, sub;
+      rtx *link;
+
+      for (link = &REG_NOTES (insn); (note = *link); link = &XEXP (note, 1))
+	{
+	  if (REG_NOTE_KIND (note) == REG_EQUAL
+	      && (sub = find_mem_in_note (note))
+	      && true_dependence (mem, VOIDmode, sub, rtx_varies_p))
+	    {
+	      /* Remove the note.  */
+	      validate_change (NULL_RTX, link, XEXP (note, 1), 1);
+	      break;
+	    }
+	}
+    }
 }
 
 /* Replace one register with another.  Called through for_each_rtx; PX points

@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler, for ARM.
    Copyright (C) 1991, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
-   2001, 2002 Free Software Foundation, Inc.
+   2001, 2002, 2004 Free Software Foundation, Inc.
    Contributed by Pieter `Tiggr' Schoenmakers (rcpieter@win.tue.nl)
    and Martin Simmons (@harleqn.co.uk).
    More major hacks by Richard Earnshaw (rearnsha@arm.com)
@@ -2003,10 +2003,17 @@ typedef struct
 		  && INTVAL (op) <= 31)					\
 		goto LABEL;						\
 	    }								\
-	  /* NASTY: Since this limits the addressing of unsigned	\
-	     byte loads.  */						\
-	  range = ((MODE) == HImode || (MODE) == QImode)		\
-	    ? (arm_arch4 ? 256 : 4095) : 4096;				\
+  	  /* XXX For ARM v4 we may be doing a sign-extend operation	\
+	     during the load, but that has a restricted addressing	\
+	     range and we are unable to tell here whether that is the	\
+	     case.  To be safe we restrict all loads to that		\
+	     range.  */							\
+          if (arm_arch4)						\
+	    range = (mode == HImode || mode == QImode) ? 256 : 4096;	\
+	  else if (mode == HImode)					\
+	    range = 4095;						\
+	  else								\
+	    range = 4096;						\
 	  if (code == CONST_INT && INTVAL (INDEX) < range		\
 	      && INTVAL (INDEX) > -range)				\
 	    goto LABEL;							\
@@ -2029,7 +2036,7 @@ typedef struct
 	   && GET_CODE (XEXP (X, 0)) == REG				\
 	   && ARM_REG_OK_FOR_BASE_P (XEXP (X, 0)))			\
     goto LABEL;								\
-  else if (GET_MODE_SIZE (MODE) >= 4 && reload_completed		\
+  else if (reload_completed						\
 	   && (GET_CODE (X) == LABEL_REF				\
 	       || (GET_CODE (X) == CONST				\
 		   && GET_CODE (XEXP ((X), 0)) == PLUS			\
@@ -2180,6 +2187,7 @@ typedef struct
 	goto WIN;							\
     }									\
   else if (GET_MODE_CLASS (MODE) != MODE_FLOAT				\
+	   && GET_MODE_SIZE (mode) == 4					\
 	   && GET_CODE (X) == SYMBOL_REF				\
 	   && CONSTANT_POOL_ADDRESS_P (X)				\
 	   && ! (flag_pic						\
