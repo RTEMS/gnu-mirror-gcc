@@ -23,6 +23,9 @@
 /* Note that some other tm.h files include this one and then override
    many of the definitions.  */
 
+/* APPLE LOCAL fat builds */
+#define DEFAULT_TARGET_ARCH "ppc"
+
 /* Definitions for the object file format.  These are set at
    compile-time.  */
 
@@ -109,8 +112,10 @@
    program.
 
    Do not define this macro if it does not need to do anything.  */
-
+			
+#ifndef SUBTARGET_EXTRA_SPECS
 #define SUBTARGET_EXTRA_SPECS
+#endif
 
 #define EXTRA_SPECS							\
   { "cpp_default",		CPP_DEFAULT_SPEC },			\
@@ -197,6 +202,15 @@ extern int target_flags;
    0x00100000, and sysv4.h uses 0x00800000 -> 0x40000000.
    0x80000000 is not available because target_flags is signed.  */
 
+/* APPLE LOCAL long-branch  */
+/* gen call addr in register for >64M range */
+#define MASK_LONG_BRANCH	0x02000000
+
+/* APPLE LOCAL BEGIN fix-and-continue mrs  */
+#define MASK_FIX_AND_CONTINUE	0x04000000
+#define MASK_INDIRECT_ALL_DATA	0x08000000
+/* APPLE LOCAL END fix-and-continue mrs  */
+
 #define TARGET_POWER		(target_flags & MASK_POWER)
 #define TARGET_POWER2		(target_flags & MASK_POWER2)
 #define TARGET_POWERPC		(target_flags & MASK_POWERPC)
@@ -215,6 +229,8 @@ extern int target_flags;
 #define TARGET_SCHED_PROLOG	(target_flags & MASK_SCHED_PROLOG)
 #define TARGET_ALTIVEC		(target_flags & MASK_ALTIVEC)
 #define TARGET_AIX_STRUCT_RET	(target_flags & MASK_AIX_STRUCT_RET)
+/* APPLE LOCAL long-branch  */
+#define TARGET_LONG_BRANCH	(target_flags & MASK_LONG_BRANCH)
 
 /* Define TARGET_MFCRF if the target assembler supports the optional
    field operand for mfcr and the target processor supports the
@@ -225,7 +241,6 @@ extern int target_flags;
 #else
 #define TARGET_MFCRF 0
 #endif
-
 
 #define TARGET_32BIT		(! TARGET_64BIT)
 #define TARGET_HARD_FLOAT	(! TARGET_SOFT_FLOAT)
@@ -248,6 +263,10 @@ extern int target_flags;
 #endif
 
 #define TARGET_XL_CALL 0
+/* APPLE LOCAL BEGIN fix-and-continue mrs  */
+#define TARGET_FIX_AND_CONTINUE   (target_flags & MASK_FIX_AND_CONTINUE)
+#define TARGET_INDIRECT_ALL_DATA  (target_flags & MASK_INDIRECT_ALL_DATA)
+/* APPLE LOCAL END fix-and-continue mrs  */
 
 /* Run-time compilation parameters selecting different hardware subsets.
 
@@ -346,6 +365,23 @@ extern int target_flags;
 			""},						\
   {"no-svr4-struct-return", MASK_AIX_STRUCT_RET,			\
 			""},						\
+  /* APPLE LOCAL long-branch  */					\
+  {"long-branch",	MASK_LONG_BRANCH,				\
+	N_("Generate 32-bit call addresses (range > 64M)")},		\
+  {"no-long-branch",	-MASK_LONG_BRANCH, ""},				\
+  {"longcall",	MASK_LONG_BRANCH,					\
+	N_("Generate 32-bit call addresses (range > 64M)")},		\
+  {"no-longcall",	-MASK_LONG_BRANCH, ""},				\
+  /* APPLE LOCAL BEGIN fix-and-continue mrs  */				\
+  {"fix-and-continue",  MASK_FIX_AND_CONTINUE,				\
+      N_("Generate code suitable for fast turn around debugging")},	\
+  {"no-fix-and-continue", -MASK_FIX_AND_CONTINUE,			\
+      N_("Don't generate code suitable for fast turn around debugging")},\
+  {"indirect-data",	MASK_INDIRECT_ALL_DATA,				\
+      N_("Generate code suitable for fast turn around debugging")},	\
+  {"no-indirect-data",	-MASK_INDIRECT_ALL_DATA,			\
+      N_("Don't generate code suitable for fast turn around debugging")},\
+  /* APPLE LOCAL END fix-and-continue mrs  */				\
   {"mfcrf",		MASK_MFCRF,					\
 			N_("Generate single field mfcr instruction")},	\
   {"no-mfcrf",		- MASK_MFCRF,					\
@@ -539,6 +575,10 @@ extern const char *rs6000_warn_altivec_long_switch;
 #define MASK_ALIGN_POWER   0x00000000
 #define MASK_ALIGN_NATURAL 0x00000001
 #define TARGET_ALIGN_NATURAL (rs6000_alignment_flags & MASK_ALIGN_NATURAL)
+/* APPLE LOCAL begin Macintosh alignment 2002-2-26 ff */
+#define MASK_ALIGN_MAC68K  0x00000002
+#define TARGET_ALIGN_MAC68K (rs6000_alignment_flags & MASK_ALIGN_MAC68K)
+/* APPLE LOCAL end Macintosh alignment 2002-2-26 ff */
 #else
 #define TARGET_ALIGN_NATURAL 0
 #endif
@@ -727,6 +767,13 @@ extern const char *rs6000_warn_altivec_long_switch;
 
 /* Allocation boundary (in *bits*) for the code of a function.  */
 #define FUNCTION_BOUNDARY 32
+
+/* Constants for alignment macros below.  */
+/* APPLE LOCAL begin Macintosh alignment */
+#define RS6000_DOUBLE_ALIGNMENT 64
+#define RS6000_LONGLONG_ALIGNMENT 64
+#define RS6000_VECTOR_ALIGNMENT 128
+/* APPLE LOCAL end Macintosh alignment */
 
 /* No data type wants to be aligned rounder than this.  */
 #define BIGGEST_ALIGNMENT 128
@@ -1162,8 +1209,7 @@ extern const char *rs6000_warn_altivec_long_switch;
       = call_really_used_regs[RS6000_PIC_OFFSET_TABLE_REGNUM] = 1;	\
   if (DEFAULT_ABI == ABI_DARWIN						\
       && PIC_OFFSET_TABLE_REGNUM != INVALID_REGNUM)			\
-    global_regs[RS6000_PIC_OFFSET_TABLE_REGNUM]				\
-      = fixed_regs[RS6000_PIC_OFFSET_TABLE_REGNUM]			\
+      fixed_regs[RS6000_PIC_OFFSET_TABLE_REGNUM]			\
       = call_used_regs[RS6000_PIC_OFFSET_TABLE_REGNUM]			\
       = call_really_used_regs[RS6000_PIC_OFFSET_TABLE_REGNUM] = 1;	\
   if (TARGET_ALTIVEC)                                                   \
@@ -1528,6 +1574,9 @@ extern enum rs6000_abi rs6000_current_abi;	/* available for use by subtarget */
    makes the stack pointer a smaller address.  */
 #define STACK_GROWS_DOWNWARD
 
+/* Offsets recorded in opcodes are a multiple of this alignment factor.  */
+#define DWARF_CIE_DATA_ALIGNMENT (-((int) (TARGET_32BIT ? 4 : 8)))
+
 /* Define this if the nominal address of the stack frame
    is at the high-address end of the local variables;
    that is, each additional local variable allocated
@@ -1717,6 +1766,9 @@ typedef struct machine_function GTY(())
   int sysv_varargs_p;
   /* Flags if __builtin_return_address (n) with n >= 1 was used.  */
   int ra_needs_full_frame;
+  /* APPLE LOCAL volatile pic base reg in leaves */
+  /* Substitute PIC register in leaf functions */
+  int substitute_pic_base_reg;
   /* Some local-dynamic symbol.  */
   const char *some_ld_name;
   /* Whether the instruction chain has been scanned already.  */
@@ -2015,7 +2067,6 @@ typedef struct rs6000_args
    On the RS/6000, all integer constants are acceptable, most won't be valid
    for particular insns, though.  Only easy FP constants are
    acceptable.  */
-
 #define LEGITIMATE_CONSTANT_P(X)				\
   (((GET_CODE (X) != CONST_DOUBLE				\
      && GET_CODE (X) != CONST_VECTOR)				\
@@ -2126,7 +2177,8 @@ typedef struct rs6000_args
 #define LEGITIMIZE_RELOAD_ADDRESS(X,MODE,OPNUM,TYPE,IND_LEVELS,WIN)	     \
 do {									     \
   int win;								     \
-  (X) = rs6000_legitimize_reload_address ((X), (MODE), (OPNUM),		     \
+  /* APPLE LOCAL pass reload addr by address */				     \
+  (X) = rs6000_legitimize_reload_address (&(X), (MODE), (OPNUM),	     \
 			(int)(TYPE), (IND_LEVELS), &win);		     \
   if ( win )								     \
     goto WIN;								     \
