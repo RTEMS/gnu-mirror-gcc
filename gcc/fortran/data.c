@@ -1,45 +1,41 @@
 /* Supporting functions for resolving DATA statement.
-   Copyright (C) 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Lifang Zeng <zlf605@hotmail.com>
 
-This file is part of GNU G95.
+This file is part of GCC.
 
-GNU G95 is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2, or (at your option)
-any later version.
+GCC is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2, or (at your option) any later
+version.
 
-GNU G95 is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+GCC is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU G95; see the file COPYING.  If not, write to
-the Free Software Foundation, 59 Temple Place - Suite 330,
-Boston, MA 02111-1307, USA.  */
+along with GCC; see the file COPYING.  If not, write to the Free
+Software Foundation, 59 Temple Place - Suite 330,Boston, MA
+02111-1307, USA.  */
 
 
 /* Notes for DATA statement implementation:
-                                                                                
+                                                                               
    We first assign initial value to each symbol by gfc_assign_data_value
    during resolveing DATA statement. Refer to check_data_variable and
    traverse_data_list in resolve.c.
-                                                                                
+                                                                               
    The complexity exists in the handleing of array section, implied do
    and array of struct appeared in DATA statement.
-                                                                                
+                                                                               
    We call gfc_conv_structure, gfc_con_array_array_initializer,
    etc., to convert the initial value. Refer to trans-expr.c and
    trans-array.c.  */
 
 #include "config.h"
-#include "system.h"
-#include "coretypes.h"
-#include "toplev.h"
 #include "gfortran.h"
 #include "assert.h"
-#include "trans.h"
 
 static void formalize_init_expr (gfc_expr *);
 
@@ -109,7 +105,73 @@ find_con_by_component (gfc_component *com, gfc_constructor *con)
 }
 
 
-/* Assign the initial value RVALUE to  LVALUE's symbol->value.  */
+/* Create a character type intialization expression from RVALUE.
+   TS [and REF] describe [the substring of] the variable being initialized.
+   INIT is thh existing initializer, not NULL.  Initialization is performed
+   according to normal assignment rules.  */
+
+static gfc_expr *
+create_character_intializer (gfc_expr * init, gfc_typespec * ts,
+			     gfc_ref * ref, gfc_expr * rvalue)
+{
+  int len;
+  int start;
+  int end;
+  char *dest;
+	    
+  gfc_extract_int (ts->cl->length, &len);
+
+  if (init == NULL)
+    {
+      /* Create a new initializer.  */
+      init = gfc_get_expr ();
+      init->expr_type = EXPR_CONSTANT;
+      init->ts = *ts;
+      
+      dest = gfc_getmem (len);
+      init->value.character.length = len;
+      init->value.character.string = dest;
+      /* Blank the string if we're only setting a substring.  */
+      if (ref != NULL)
+	memset (dest, ' ', len);
+    }
+  else
+    dest = init->value.character.string;
+
+  if (ref)
+    {
+      assert (ref->type == REF_SUBSTRING);
+
+      /* Only set a substring of the destination.  Fortran substring bounds
+         are one-based [start, end], we want zero based [start, end).  */
+      gfc_extract_int (ref->u.ss.start, &start);
+      start--;
+      gfc_extract_int (ref->u.ss.end, &end);
+    }
+  else
+    {
+      /* Set the whole string.  */
+      start = 0;
+      end = len;
+    }
+
+  /* Copy the initial value.  */
+  len = rvalue->value.character.length;
+  if (len > end - start)
+    len = end - start;
+  memcpy (&dest[start], rvalue->value.character.string, len);
+
+  /* Pad with spaces.  Substrings will already be blanked.  */
+  if (len < end - start && ref == NULL)
+    memset (&dest[start + len], ' ', end - (start + len));
+
+  return init;
+}
+
+/* Assign the initial value RVALUE to  LVALUE's symbol->value. If the
+   LVALUE already has an initialization, we extend this, otherwise we
+   create a new one.  */
+
 void
 gfc_assign_data_value (gfc_expr * lvalue, gfc_expr * rvalue, mpz_t index)
 {
@@ -119,16 +181,26 @@ gfc_assign_data_value (gfc_expr * lvalue, gfc_expr * rvalue, mpz_t index)
   gfc_constructor *con;
   gfc_constructor *last_con;
   gfc_symbol *symbol;
+  gfc_typespec *last_ts;
   mpz_t offset;
 
-  ref = lvalue->ref;
   symbol = lvalue->symtree->n.sym;
   init = symbol->value;
+  last_ts = &symbol->ts;
   last_con = NULL;
   mpz_init_set_si (offset, 0);
 
+  /* Find/create the parent expressions for subobject references.  */
   for (ref = lvalue->ref; ref; ref = ref->next)
     {
+      /* Break out of the loop if we find a substring.  */
+      if (ref->type == REF_SUBSTRING)
+	{
+	  /* A substring should always br the last subobject reference.  */
+	  assert (ref->next == NULL);
+	  break;
+	}
+
       /* Use the existing initializer expression if it exists.  Otherwise
          create a new one.  */
       if (init == NULL)
@@ -142,15 +214,11 @@ gfc_assign_data_value (gfc_expr * lvalue, gfc_expr * rvalue, mpz_t index)
 	case REF_ARRAY:
 	  if (init == NULL)
 	    {
+	      /* The element typespec will be the same as the array
+		 typespec.  */
+	      expr->ts = *last_ts;
 	      /* Setup the expression to hold the constructor.  */
 	      expr->expr_type = EXPR_ARRAY;
-	      if (ref->next)
-		{
-		  assert (ref->next->type == REF_COMPONENT);
-		  expr->ts.type = BT_DERIVED;
-		}
-	      else
-		expr->ts = rvalue->ts;
 	      expr->rank = ref->u.ar.as->rank;
 	    }
 	  else
@@ -184,6 +252,7 @@ gfc_assign_data_value (gfc_expr * lvalue, gfc_expr * rvalue, mpz_t index)
 	    }
 	  else
 	    assert (expr->expr_type == EXPR_STRUCTURE);
+	  last_ts = &ref->u.c.component->ts;
 
 	  /* Find the same element in the existing constructor.  */
 	  con = expr->value.constructor;
@@ -199,13 +268,11 @@ gfc_assign_data_value (gfc_expr * lvalue, gfc_expr * rvalue, mpz_t index)
 	    }
 	  break;
 
-	case REF_SUBSTRING:
-	  gfc_todo_error ("Substring reference in DATA statement");
-
 	default:
 	  abort ();
 	}
 
+      
       if (init == NULL)
 	{
 	  /* Point the container at the new expression.  */
@@ -218,17 +285,23 @@ gfc_assign_data_value (gfc_expr * lvalue, gfc_expr * rvalue, mpz_t index)
       last_con = con;
     }
 
-  expr = gfc_copy_expr (rvalue);
-  if (!gfc_compare_types (&lvalue->ts, &expr->ts))
-    gfc_convert_type (expr, &lvalue->ts, 0);
+  if (ref || last_ts->type == BT_CHARACTER)
+    expr = create_character_intializer (init, last_ts, ref, rvalue);
+  else
+    {
+      /* We should never be overwriting an existing initializer.  */
+      assert (!init);
+
+      expr = gfc_copy_expr (rvalue);
+      if (!gfc_compare_types (&lvalue->ts, &expr->ts))
+	gfc_convert_type (expr, &lvalue->ts, 0);
+
+    }
 
   if (last_con == NULL)
     symbol->value = expr;
   else
-    {
-      assert (!last_con->expr);
-      last_con->expr = expr;
-    }
+    last_con->expr = expr;
 }
 
 
@@ -439,7 +512,7 @@ gfc_get_section_index (gfc_array_ref *ar, mpz_t *section_index, mpz_t *offset)
 	  break;
 
 	case DIMEN_VECTOR:
-	  gfc_todo_error ("Vectors sections in data statements");
+	  gfc_internal_error ("TODO: Vector sections in data statements");
 
 	default:
 	  abort ();
