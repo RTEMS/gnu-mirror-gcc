@@ -26,7 +26,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 /* This is the location of the online document giving information how
    to report bugs. If you change this string, also check for strings
    not under control of the preprocessor.  */
-#define GCCBUGURL "<URL:http://www.gnu.org/software/gcc/bugs.html>"
+#define GCCBUGURL "<URL:http://bugzilla.redhat.com/bugzilla/>"
 
 /* We must include stdarg.h/varargs.h before stdio.h.  */
 #ifdef ANSI_PROTOTYPES
@@ -605,7 +605,10 @@ typedef char _Bool;
 	OMIT_EH_TABLE EASY_DIV_EXPR IMPLICIT_FIX_EXPR			   \
 	LONGJMP_RESTORE_FROM_STACK MAX_INT_TYPE_SIZE ASM_IDENTIFY_GCC	   \
 	STDC_VALUE TRAMPOLINE_ALIGN ASM_IDENTIFY_GCC_AFTER_SOURCE	   \
-	SLOW_ZERO_EXTEND SUBREG_REGNO_OFFSET DWARF_LINE_MIN_INSTR_LENGTH
+	SLOW_ZERO_EXTEND SUBREG_REGNO_OFFSET DWARF_LINE_MIN_INSTR_LENGTH   \
+	BLOCK_PROFILER BLOCK_PROFILER_CODE FUNCTION_BLOCK_PROFILER         \
+	FUNCTION_BLOCK_PROFILER_EXIT MACHINE_STATE_SAVE                    \
+	MACHINE_STATE_RESTORE
 
 #endif /* IN_GCC */
 

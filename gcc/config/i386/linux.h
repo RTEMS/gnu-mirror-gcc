@@ -63,14 +63,11 @@ Boston, MA 02111-1307, USA.  */
     fprintf (FILE, "\tcall\tmcount\n");					\
 }
 
-/* True if it is possible to profile code that does not have a frame
-   pointer.  
-
-   The GLIBC version of mcount for the x86 assumes that there is a
+/* The GLIBC version of mcount for the x86 assumes that there is a
    frame, so we cannot allow profiling without a frame pointer.  */
 
-#undef TARGET_ALLOWS_PROFILING_WITHOUT_FRAME_POINTER
-#define TARGET_ALLOWS_PROFILING_WITHOUT_FRAME_POINTER false
+#undef SUBTARGET_FRAME_POINTER_REQUIRED
+#define SUBTARGET_FRAME_POINTER_REQUIRED current_function_profile
 
 #undef SIZE_TYPE
 #define SIZE_TYPE "unsigned int"
@@ -85,7 +82,7 @@ Boston, MA 02111-1307, USA.  */
 #define WCHAR_TYPE_SIZE BITS_PER_WORD
     
 #undef CPP_PREDEFINES
-#define CPP_PREDEFINES "-D__ELF__ -Dunix -Dlinux -Asystem=posix"
+#define CPP_PREDEFINES "-D__ELF__ -Dunix -D__gnu_linux__ -Dlinux -Asystem=posix"
 
 #undef CPP_SPEC
 #ifdef USE_GNULIBC_1

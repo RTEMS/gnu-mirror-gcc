@@ -231,6 +231,8 @@ extern void mergeable_constant_section	PARAMS ((enum machine_mode,
 
 /* Declare DECL to be a weak symbol.  */
 extern void declare_weak		PARAMS ((tree));
+/* Merge weak status.  */
+extern void merge_weak			PARAMS ((tree, tree));
 #endif /* TREE_CODE */
 
 /* Emit any pending weak declarations.  */
@@ -254,6 +256,8 @@ extern void make_var_volatile		PARAMS ((tree));
 extern void assemble_constant_align	PARAMS ((tree));
 
 extern void assemble_alias		PARAMS ((tree, tree));
+
+extern void assemble_visibility		PARAMS ((tree, const char *));
 
 /* Output a string of literal assembler code
    for an `asm' keyword used between functions.  */
@@ -484,9 +488,6 @@ extern const char *user_label_prefix;
 #define STRIP_NAME_ENCODING(VAR,SYMBOL_NAME) \
   (VAR) = ((SYMBOL_NAME) + ((SYMBOL_NAME)[0] == '*'))
 #endif
-/* Assign unique numbers to labels generated for profiling.  */
-
-extern int profile_label_no;
 
 /* Default target function prologue and epilogue assembler output.  */
 extern void default_function_pro_epilogue PARAMS ((FILE *, HOST_WIDE_INT));
@@ -513,7 +514,8 @@ extern void no_asm_to_stream PARAMS ((FILE *));
 #define SECTION_STRINGS  0x10000	/* contains zero terminated strings without
 					   embedded zeros */
 #define SECTION_OVERRIDE 0x20000	/* allow override of default flags */
-#define SECTION_MACH_DEP 0x40000	/* subsequent bits reserved for target */
+#define SECTION_TLS	 0x40000	/* contains thread-local storage */
+#define SECTION_MACH_DEP 0x80000	/* subsequent bits reserved for target */
 
 extern unsigned int get_named_section_flags PARAMS ((const char *));
 extern bool set_named_section_flags	PARAMS ((const char *, unsigned int));

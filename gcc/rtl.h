@@ -1237,6 +1237,8 @@ extern rtx gen_rtx			PARAMS ((enum rtx_code,
 extern rtvec gen_rtvec			PARAMS ((int, ...));
 extern rtx copy_insn_1			PARAMS ((rtx));
 extern rtx copy_insn			PARAMS ((rtx));
+extern rtx gen_int_mode			PARAMS ((HOST_WIDE_INT,
+						 enum machine_mode));
 
 /* In rtl.c */
 extern rtx rtx_alloc			PARAMS ((RTX_CODE));
@@ -1490,6 +1492,7 @@ extern rtx find_reg_equal_equiv_note	PARAMS ((rtx));
 extern int find_reg_fusage		PARAMS ((rtx, enum rtx_code, rtx));
 extern int find_regno_fusage		PARAMS ((rtx, enum rtx_code,
 						 unsigned int));
+extern int pure_call_p			PARAMS ((rtx));
 extern void remove_note			PARAMS ((rtx, rtx));
 extern int side_effects_p		PARAMS ((rtx));
 extern int volatile_refs_p		PARAMS ((rtx));
@@ -1961,6 +1964,7 @@ extern int reg_classes_intersect_p	PARAMS ((enum reg_class, enum reg_class));
 extern int reg_class_subset_p		PARAMS ((enum reg_class, enum reg_class));
 extern void globalize_reg		PARAMS ((int));
 extern void init_regs			PARAMS ((void));
+extern void init_fake_stack_mems	PARAMS ((void));
 extern void init_reg_sets		PARAMS ((void));
 extern void regset_release_memory	PARAMS ((void));
 extern void regclass_init		PARAMS ((void));

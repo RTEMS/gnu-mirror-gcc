@@ -1,5 +1,5 @@
 /* Definitions of various defaults for tm.h macros.
-   Copyright (C) 1992, 1996, 1997, 1998, 1999, 2000, 2001
+   Copyright (C) 1992, 1996, 1997, 1998, 1999, 2000, 2001, 2002
    Free Software Foundation, Inc.
    Contributed by Ron Guilmette (rfg@monkeys.com)
 
@@ -158,7 +158,7 @@ do { ASM_OUTPUT_LABEL(FILE,LABEL_ALTERNATE_NAME (INSN)); } while (0)
 
 /* This determines whether or not we support weak symbols.  */
 #ifndef SUPPORTS_WEAK
-#ifdef ASM_WEAKEN_LABEL
+#if defined (ASM_WEAKEN_LABEL) || defined (ASM_WEAKEN_DECL)
 #define SUPPORTS_WEAK 1
 #else
 #define SUPPORTS_WEAK 0
@@ -285,6 +285,11 @@ do {								\
 #define CHAR_TYPE_SIZE BITS_PER_UNIT
 #endif
 
+#ifndef BOOL_TYPE_SIZE
+/* `bool' has size and alignment `1', on almost all platforms.  */
+#define BOOL_TYPE_SIZE CHAR_TYPE_SIZE
+#endif
+
 #ifndef SHORT_TYPE_SIZE
 #define SHORT_TYPE_SIZE (BITS_PER_UNIT * MIN ((UNITS_PER_WORD + 1) / 2, 2))
 #endif
@@ -393,13 +398,6 @@ do {								\
    ? ptrmemfunc_vbit_in_pfn : ptrmemfunc_vbit_in_delta)
 #endif
 
-/* True if it is possible to profile code that does not have a frame
-   pointer.  */
-
-#ifndef TARGET_ALLOWS_PROFILING_WITHOUT_FRAME_POINTER
-#define TARGET_ALLOWS_PROFILING_WITHOUT_FRAME_POINTER true
-#endif
-
 #ifndef DEFAULT_GDB_EXTENSIONS
 #define DEFAULT_GDB_EXTENSIONS 1
 #endif
@@ -455,6 +453,12 @@ You Lose!  You must define PREFERRED_DEBUGGING_TYPE!
    the mode of the memory access.  */
 #ifndef MODE_BASE_REG_CLASS
 #define MODE_BASE_REG_CLASS(MODE) BASE_REG_CLASS
+#endif
+
+/* Determine whether __cxa_atexit, rather than atexit, is used to
+   register C++ destructors for local statics and global objects. */
+#ifndef DEFAULT_USE_CXA_ATEXIT
+#define DEFAULT_USE_CXA_ATEXIT 0
 #endif
 
 #endif  /* ! GCC_DEFAULTS_H */

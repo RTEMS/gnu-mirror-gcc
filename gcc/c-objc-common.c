@@ -145,7 +145,7 @@ c_cannot_inline_tree_fn (fnp)
   tree fn = *fnp;
   tree t;
 
-  if (optimize == 0
+  if (flag_really_no_inline
       && lookup_attribute ("always_inline", DECL_ATTRIBUTES (fn)) == NULL)
     return 1;
 
@@ -217,7 +217,7 @@ c_objc_common_init (filename)
 
   filename = c_common_init (filename);
 
-  add_c_tree_codes ();
+  lang_unsafe_for_reeval = c_unsafe_for_reeval;
 
   save_lang_status = &push_c_function_context;
   restore_lang_status = &pop_c_function_context;
@@ -324,7 +324,7 @@ finish_cdtor (body)
 
   RECHAIN_STMTS (body, COMPOUND_BODY (body));
 
-  finish_function (0);
+  finish_function (0, 0);
 }
 
 /* Called at end of parsing, but before end-of-file processing.  */

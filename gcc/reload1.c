@@ -41,6 +41,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "real.h"
 #include "toplev.h"
 #include "except.h"
+#include "tree.h"
 
 /* This file contains the reload pass of the compiler, which is
    run after register allocation has been done.  It checks that
@@ -443,7 +444,7 @@ static int constraint_accepts_reg_p	PARAMS ((const char *, rtx));
 static void reload_cse_regs_1		PARAMS ((rtx));
 static int reload_cse_noop_set_p	PARAMS ((rtx));
 static int reload_cse_simplify_set	PARAMS ((rtx, rtx));
-static int reload_cse_simplify_operands	PARAMS ((rtx));
+static int reload_cse_simplify_operands	PARAMS ((rtx, rtx));
 static void reload_combine		PARAMS ((void));
 static void reload_combine_note_use	PARAMS ((rtx *, rtx));
 static void reload_combine_note_store	PARAMS ((rtx, rtx, void *));
@@ -458,8 +459,8 @@ static HOST_WIDE_INT sext_for_mode	PARAMS ((enum machine_mode,
 static void failed_reload		PARAMS ((rtx, int));
 static int set_reload_reg		PARAMS ((int, int));
 static void reload_cse_delete_noop_set	PARAMS ((rtx, rtx));
-static void reload_cse_simplify		PARAMS ((rtx));
-static void fixup_abnormal_edges	PARAMS ((void));
+static void reload_cse_simplify		PARAMS ((rtx, rtx));
+void fixup_abnormal_edges		PARAMS ((void));
 extern void dump_needs			PARAMS ((struct insn_chain *));
 
 /* Initialize the reload pass once per compilation.  */
@@ -790,7 +791,12 @@ reload (first, global)
 	      i = REGNO (SET_DEST (set));
 	      if (i > LAST_VIRTUAL_REGISTER)
 		{
-		  if (GET_CODE (x) == MEM)
+		  /* It can happen that a REG_EQUIV note contains a MEM
+		     that is not a legitimate memory operand.  As later
+		     stages of reload assume that all addresses found
+		     in the reg_equiv_* arrays were originally legitimate,
+		     we ignore such REG_EQUIV notes.  */
+		  if (memory_operand (x, VOIDmode))
 		    {
 		      /* Always unshare the equivalence, so we can
 			 substitute into this insn without touching the
@@ -1277,6 +1283,11 @@ reload (first, global)
   obstack_free (&reload_obstack, reload_startobj);
   unused_insn_chains = 0;
   fixup_abnormal_edges ();
+
+  /* Replacing pseudos with their memory equivalents might have
+     created shared rtx.  Subsequent passes would get confused
+     by this, so unshare everything here.  */
+  unshare_all_rtl_again (first);
 
   return failure;
 }
@@ -2057,10 +2068,19 @@ alter_reg (i, from_reg)
 	 memory.  If this is a shared MEM, make a copy.  */
       if (REGNO_DECL (i))
 	{
-	  if (from_reg != -1 && spill_stack_slot[from_reg] == x)
-	    x = copy_rtx (x);
+	  rtx decl = DECL_RTL_IF_SET (REGNO_DECL (i));
 
-	  set_mem_expr (x, REGNO_DECL (i));
+	  /* We can do this only for the DECLs home pseudo, not for
+	     any copies of it, since otherwise when the stack slot
+	     is reused, nonoverlapping_memrefs_p might think they
+	     cannot overlap.  */
+	  if (decl && GET_CODE (decl) == REG && REGNO (decl) == (unsigned) i)
+	    {
+	      if (from_reg != -1 && spill_stack_slot[from_reg] == x)
+		x = copy_rtx (x);
+
+	      set_mem_expr (x, REGNO_DECL (i));
+	    }
 	}
 
       /* Save the stack slot for later.  */
@@ -2553,7 +2573,7 @@ eliminate_regs (x, mem_mode, insn)
 		   )
 		  || x_size == new_size)
 	      )
-	    return adjust_address_nv (x, GET_MODE (x), SUBREG_BYTE (x));
+	    return adjust_address_nv (new, GET_MODE (x), SUBREG_BYTE (x));
 	  else
 	    return gen_rtx_SUBREG (GET_MODE (x), new, SUBREG_BYTE (x));
 	}
@@ -5555,6 +5575,7 @@ choose_reload_regs (chain)
 				  && ! TEST_HARD_REG_BIT (reg_reloaded_dead, i))
 			      /* Don't clobber the frame pointer.  */
 			      || (i == HARD_FRAME_POINTER_REGNUM
+				  && frame_pointer_needed
 				  && rld[r].out)
 			      /* Don't really use the inherited spill reg
 				 if we need it wider than we've got it.  */
@@ -5725,7 +5746,9 @@ choose_reload_regs (chain)
 
 	      /* If we found an equivalent reg, say no code need be generated
 		 to load it, and use it as our reload reg.  */
-	      if (equiv != 0 && regno != HARD_FRAME_POINTER_REGNUM)
+	      if (equiv != 0 
+		  && (regno != HARD_FRAME_POINTER_REGNUM 
+		      || !frame_pointer_needed))
 		{
 		  int nr = HARD_REGNO_NREGS (regno, rld[r].mode);
 		  int k;
@@ -6888,6 +6911,7 @@ do_output_reload (chain, rl, j)
   rtx pseudo = rl->out_reg;
 
   if (pseudo
+      && optimize
       && GET_CODE (pseudo) == REG
       && ! rtx_equal_p (rl->in_reg, pseudo)
       && REGNO (pseudo) >= FIRST_PSEUDO_REGISTER
@@ -7137,8 +7161,7 @@ emit_reload_insns (chain)
 		    for (k = 1; k < nnr; k++)
 		      reg_last_reload_reg[nregno + k]
 			= (nr == nnr
-			   ? gen_rtx_REG (reg_raw_mode[REGNO (rld[r].reg_rtx) + k],
-					  REGNO (rld[r].reg_rtx) + k)
+			   ? regno_reg_rtx[REGNO (rld[r].reg_rtx) + k]
 			   : 0);
 
 		  /* Now do the inverse operation.  */
@@ -7187,8 +7210,7 @@ emit_reload_insns (chain)
 		    for (k = 1; k < nnr; k++)
 		      reg_last_reload_reg[nregno + k]
 			= (nr == nnr
-			   ? gen_rtx_REG (reg_raw_mode[REGNO (rld[r].reg_rtx) + k],
-					  REGNO (rld[r].reg_rtx) + k)
+			   ? regno_reg_rtx[REGNO (rld[r].reg_rtx) + k]
 			   : 0);
 
 		  /* Unless we inherited this reload, show we haven't
@@ -8014,6 +8036,7 @@ static void
 reload_cse_delete_noop_set (insn, value)
      rtx insn, value;
 {
+  bool purge = BLOCK_FOR_INSN (insn)->end == insn;
   if (value)
     {
       PATTERN (insn) = gen_rtx_USE (VOIDmode, value);
@@ -8022,6 +8045,8 @@ reload_cse_delete_noop_set (insn, value)
     }
   else
     delete_insn (insn);
+  if (purge)
+    purge_dead_edges (BLOCK_FOR_INSN (insn));
 }
 
 /* See whether a single set SET is a noop.  */
@@ -8034,8 +8059,9 @@ reload_cse_noop_set_p (set)
 
 /* Try to simplify INSN.  */
 static void
-reload_cse_simplify (insn)
+reload_cse_simplify (insn, testreg)
      rtx insn;
+     rtx testreg;
 {
   rtx body = PATTERN (insn);
 
@@ -8062,7 +8088,7 @@ reload_cse_simplify (insn)
       if (count > 0)
 	apply_change_group ();
       else
-	reload_cse_simplify_operands (insn);
+	reload_cse_simplify_operands (insn, testreg);
     }
   else if (GET_CODE (body) == PARALLEL)
     {
@@ -8105,7 +8131,7 @@ reload_cse_simplify (insn)
       if (count > 0)
 	apply_change_group ();
       else
-	reload_cse_simplify_operands (insn);
+	reload_cse_simplify_operands (insn, testreg);
     }
 }
 
@@ -8131,6 +8157,7 @@ reload_cse_regs_1 (first)
      rtx first;
 {
   rtx insn;
+  rtx testreg = gen_raw_REG (VOIDmode, -1);
 
   cselib_init ();
   init_alias_analysis ();
@@ -8138,7 +8165,7 @@ reload_cse_regs_1 (first)
   for (insn = first; insn; insn = NEXT_INSN (insn))
     {
       if (INSN_P (insn))
-	reload_cse_simplify (insn);
+	reload_cse_simplify (insn, testreg);
 
       cselib_process_insn (insn);
     }
@@ -8309,8 +8336,9 @@ reload_cse_simplify_set (set, insn)
    hard registers.  */
 
 static int
-reload_cse_simplify_operands (insn)
+reload_cse_simplify_operands (insn, testreg)
      rtx insn;
+     rtx testreg;
 {
   int i, j;
 
@@ -8330,7 +8358,6 @@ reload_cse_simplify_operands (insn)
   int *op_alt_regno[MAX_RECOG_OPERANDS];
   /* Array of alternatives, sorted in order of decreasing desirability.  */
   int *alternative_order;
-  rtx reg = gen_rtx_REG (VOIDmode, -1);
 
   extract_insn (insn);
 
@@ -8414,8 +8441,8 @@ reload_cse_simplify_operands (insn)
 	  if (! TEST_HARD_REG_BIT (equiv_regs[i], regno))
 	    continue;
 
-	  REGNO (reg) = regno;
-	  PUT_MODE (reg, mode);
+	  REGNO (testreg) = regno;
+	  PUT_MODE (testreg, mode);
 
 	  /* We found a register equal to this operand.  Now look for all
 	     alternatives that can accept this register and have not been
@@ -8457,10 +8484,10 @@ reload_cse_simplify_operands (insn)
 		     alternative yet and the operand being replaced is not
 		     a cheap CONST_INT.  */
 		  if (op_alt_regno[i][j] == -1
-		      && reg_fits_class_p (reg, class, 0, mode)
+		      && reg_fits_class_p (testreg, class, 0, mode)
 		      && (GET_CODE (recog_data.operand[i]) != CONST_INT
 			  || (rtx_cost (recog_data.operand[i], SET)
-			      > rtx_cost (reg, SET))))
+			      > rtx_cost (testreg, SET))))
 		    {
 		      alternative_nregs[j]++;
 		      op_alt_regno[i][j] = regno;
@@ -9460,7 +9487,7 @@ copy_eh_notes (insn, x)
    proper call and fix the damage.
  
    Similar handle instructions throwing exceptions internally.  */
-static void
+void
 fixup_abnormal_edges ()
 {
   int i;
@@ -9504,8 +9531,19 @@ fixup_abnormal_edges ()
 	      next = NEXT_INSN (insn);
 	      if (INSN_P (insn))
 		{
-	          insert_insn_on_edge (PATTERN (insn), e);
+		  rtx seq;
+
 	          delete_insn (insn);
+
+		  /* We're not deleting it, we're moving it.  */
+		  INSN_DELETED_P (insn) = 0;
+
+		  /* Emit a sequence, rather than scarfing the pattern, so
+		     that we don't lose REG_NOTES etc.  */
+		  /* ??? Could copy the test from gen_sequence, but don't
+		     think it's worth the bother.  */
+		  seq = gen_rtx_SEQUENCE (VOIDmode, gen_rtvec (1, insn));
+	          insert_insn_on_edge (seq, e);
 		}
 	      insn = next;
 	    }

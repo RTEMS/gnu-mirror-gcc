@@ -633,8 +633,7 @@ static rtx df_reg_use_gen (regno)
   rtx reg;
   rtx use;
 
-  reg = regno >= FIRST_PSEUDO_REGISTER
-    ? regno_reg_rtx[regno] : gen_rtx_REG (reg_raw_mode[regno], regno);
+  reg = regno_reg_rtx[regno];
 
   use = gen_rtx_USE (GET_MODE (reg), reg);
   return use;
@@ -648,8 +647,7 @@ static rtx df_reg_clobber_gen (regno)
   rtx reg;
   rtx use;
 
-  reg = regno >= FIRST_PSEUDO_REGISTER
-    ? regno_reg_rtx[regno] : gen_rtx_REG (reg_raw_mode[regno], regno);
+  reg = regno_reg_rtx[regno];
 
   use = gen_rtx_CLOBBER (GET_MODE (reg), reg);
   return use;
@@ -905,7 +903,7 @@ df_ref_record (df, reg, loc, insn, ref_type, ref_flags)
       endregno = regno + HARD_REGNO_NREGS (regno, GET_MODE (reg));
 
       for (i = regno; i < endregno; i++)
-	df_ref_record_1 (df, gen_rtx_REG (reg_raw_mode[i], i),
+	df_ref_record_1 (df, regno_reg_rtx[i],
 			 loc, insn, ref_type, ref_flags);
     }
   else
@@ -1236,13 +1234,13 @@ df_insn_refs_record (df, bb, insn)
 	       note = XEXP (note, 1))
 	    {
 	      if (GET_CODE (XEXP (note, 0)) == USE)
-		df_uses_record (df, &SET_DEST (XEXP (note, 0)), DF_REF_REG_USE,
+		df_uses_record (df, &XEXP (XEXP (note, 0), 0), DF_REF_REG_USE,
 				bb, insn, 0);
 	    }
 
 	  /* The stack ptr is used (honorarily) by a CALL insn.  */
 	  x = df_reg_use_gen (STACK_POINTER_REGNUM);
-	  df_uses_record (df, &SET_DEST (x), DF_REF_REG_USE, bb, insn, 0);
+	  df_uses_record (df, &XEXP (x, 0), DF_REF_REG_USE, bb, insn, 0);
 
 	  if (df->flags & DF_HARD_REGS)
 	    {

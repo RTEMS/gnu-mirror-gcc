@@ -4,7 +4,7 @@
  *                                                                          *
  *                                 L I N K                                  *
  *                                                                          *
- *                            $Revision: 1.1 $
+ *                            $Revision: 1.1.16.1 $
  *                                                                          *
  *                          C Implementation File                           *
  *                                                                          *
@@ -28,7 +28,7 @@
  * file might be covered by the  GNU Public License.                        *
  *                                                                          *
  * GNAT was originally developed  by the GNAT team at  New York University. *
- * It is now maintained by Ada Core Technologies Inc (http://www.gnat.com). *
+ * Extensive contributions were provided by Ada Core Technologies Inc.      *
  *                                                                          *
  ****************************************************************************/
 
@@ -158,11 +158,11 @@ const char *object_library_extension = ".a";
 
 #elif defined (linux)
 const char *object_file_option = "";
-const char *run_path_option = "-Wl,-rpath,";
-char shared_libgnat_default = STATIC;
+const char *run_path_option = "";
+char shared_libgnat_default = SHARED;
 int link_max = 2147483647;
 unsigned char objlist_file_supported = 0;
-unsigned char using_gnu_linker = 0;
+unsigned char using_gnu_linker = 1;
 const char *object_library_extension = ".a";
 
 #elif defined (__svr4__) && defined (i386)

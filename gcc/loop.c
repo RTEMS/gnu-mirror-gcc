@@ -235,6 +235,7 @@ FILE *loop_dump_stream;
 
 /* Forward declarations.  */
 
+static void invalidate_loops_containing_label PARAMS ((rtx));
 static void find_and_verify_loops PARAMS ((rtx, struct loops *));
 static void mark_loop_jump PARAMS ((rtx, struct loop *));
 static void prescan_loop PARAMS ((struct loop *));
@@ -2492,6 +2493,8 @@ prescan_loop (loop)
 	      loop_info->unknown_address_altered = 1;
 	      loop_info->has_nonconst_call = 1;
 	    }
+	  else if (pure_call_p (insn))
+	    loop_info->has_nonconst_call = 1;
 	  loop_info->has_call = 1;
 	  if (can_throw_internal (insn))
 	    loop_info->has_multiple_exit_targets = 1;
@@ -2504,16 +2507,17 @@ prescan_loop (loop)
 
 	      if (set)
 		{
+		  rtx src = SET_SRC (set);
 		  rtx label1, label2;
 
-		  if (GET_CODE (SET_SRC (set)) == IF_THEN_ELSE)
+		  if (GET_CODE (src) == IF_THEN_ELSE)
 		    {
-		      label1 = XEXP (SET_SRC (set), 1);
-		      label2 = XEXP (SET_SRC (set), 2);
+		      label1 = XEXP (src, 1);
+		      label2 = XEXP (src, 2);
 		    }
 		  else
 		    {
-		      label1 = SET_SRC (PATTERN (insn));
+		      label1 = src;
 		      label2 = NULL_RTX;
 		    }
 
@@ -2607,6 +2611,17 @@ prescan_loop (loop)
     }
 }
 
+/* Invalidate all loops containing LABEL.  */
+
+static void
+invalidate_loops_containing_label (label)
+     rtx label;
+{
+  struct loop *loop;
+  for (loop = uid_loop[INSN_UID (label)]; loop; loop = loop->outer)
+    loop->invalid = 1;
+}
+
 /* Scan the function looking for loops.  Record the start and end of each loop.
    Also mark as invalid loops any loops that contain a setjmp or are branched
    to from outside the loop.  */
@@ -2693,23 +2708,12 @@ find_and_verify_loops (f, loops)
 
   /* Any loop containing a label used in an initializer must be invalidated,
      because it can be jumped into from anywhere.  */
-
   for (label = forced_labels; label; label = XEXP (label, 1))
-    {
-      for (loop = uid_loop[INSN_UID (XEXP (label, 0))];
-	   loop; loop = loop->outer)
-	loop->invalid = 1;
-    }
+    invalidate_loops_containing_label (XEXP (label, 0));
 
   /* Any loop containing a label used for an exception handler must be
      invalidated, because it can be jumped into from anywhere.  */
-
-  for (label = exception_handler_labels; label; label = XEXP (label, 1))
-    {
-      for (loop = uid_loop[INSN_UID (XEXP (label, 0))];
-	   loop; loop = loop->outer)
-	loop->invalid = 1;
-    }
+  for_each_eh_label (invalidate_loops_containing_label);
 
   /* Now scan all insn's in the function.  If any JUMP_INSN branches into a
      loop that it is not contained within, that loop is marked invalid.
@@ -2733,11 +2737,7 @@ find_and_verify_loops (f, loops)
 	  {
 	    rtx note = find_reg_note (insn, REG_LABEL, NULL_RTX);
 	    if (note)
-	      {
-		for (loop = uid_loop[INSN_UID (XEXP (note, 0))];
-		     loop; loop = loop->outer)
-		  loop->invalid = 1;
-	      }
+	      invalidate_loops_containing_label (XEXP (note, 0));
 	  }
 
 	if (GET_CODE (insn) != JUMP_INSN)
@@ -4039,6 +4039,7 @@ emit_prefetch_instructions (loop)
 	      int bytes_ahead = PREFETCH_BLOCK * (ahead + y);
 	      rtx before_insn = info[i].giv->insn;
 	      rtx prev_insn = PREV_INSN (info[i].giv->insn);
+	      rtx seq;
 
 	      /* We can save some effort by offsetting the address on
 		 architectures with offsettable memory references.  */
@@ -4053,14 +4054,17 @@ emit_prefetch_instructions (loop)
 		  loc = reg;
 		}
 
+	      start_sequence ();
 	      /* Make sure the address operand is valid for prefetch.  */
 	      if (! (*insn_data[(int)CODE_FOR_prefetch].operand[0].predicate)
 		    (loc,
 		     insn_data[(int)CODE_FOR_prefetch].operand[0].mode))
 		loc = force_reg (Pmode, loc);
-	      emit_insn_before (gen_prefetch (loc, GEN_INT (info[i].write),
-		                              GEN_INT (3)),
-				before_insn);
+	      emit_insn (gen_prefetch (loc, GEN_INT (info[i].write),
+		                       GEN_INT (3)));
+	      seq = gen_sequence ();
+	      end_sequence ();
+	      emit_insn_before (seq, before_insn);
 
 	      /* Check all insns emitted and record the new GIV
 		 information.  */
@@ -4086,11 +4090,17 @@ emit_prefetch_instructions (loop)
 	    {
 	      rtx reg = gen_reg_rtx (Pmode);
 	      rtx loop_start = loop->start;
+	      rtx init_val = info[i].class->initial_value;
 	      rtx add_val = simplify_gen_binary (PLUS, Pmode,
 						 info[i].giv->add_val,
 						 GEN_INT (y * PREFETCH_BLOCK));
 
-	      loop_iv_add_mult_emit_before (loop, info[i].class->initial_value,
+	      /* Functions called by LOOP_IV_ADD_EMIT_BEFORE expect a
+		 non-constant INIT_VAL to have the same mode as REG, which
+		 in this case we know to be Pmode.  */
+	      if (GET_MODE (init_val) != Pmode && !CONSTANT_P (init_val))
+		init_val = convert_to_mode (Pmode, init_val, 0);
+	      loop_iv_add_mult_emit_before (loop, init_val,
 					    info[i].giv->mult_val,
 				            add_val, reg, 0, loop_start);
 	      emit_insn_before (gen_prefetch (reg, GEN_INT (info[i].write),
@@ -5212,7 +5222,8 @@ strength_reduce (loop, flags)
      collected.  Always unroll loops that would be as small or smaller
      unrolled than when rolled.  */
   if ((flags & LOOP_UNROLL)
-      || (loop_info->n_iterations > 0
+      || (!(flags & LOOP_FIRST_PASS)
+	  && loop_info->n_iterations > 0
 	  && unrolled_insn_copies <= insn_count))
     unroll_loop (loop, insn_count, 1);
 
@@ -5846,7 +5857,7 @@ check_final_value (loop, v)
 #endif
 
   if ((final_value = final_giv_value (loop, v))
-      && (v->always_computable || last_use_this_basic_block (v->dest_reg, v->insn)))
+      && (v->always_executed || last_use_this_basic_block (v->dest_reg, v->insn)))
     {
       int biv_increment_seen = 0, before_giv_insn = 0;
       rtx p = v->insn;
@@ -6213,10 +6224,11 @@ basic_induction_var (loop, x, mode, dest_reg, p, inc_val, mult_val, location)
     case CONST:
       /* convert_modes aborts if we try to convert to or from CCmode, so just
          exclude that case.  It is very unlikely that a condition code value
-	 would be a useful iterator anyways.  */
+	 would be a useful iterator anyways.  convert_modes aborts if we try to
+	 convert a float mode to non-float or vice versa too.  */
       if (loop->level == 1
-	  && GET_MODE_CLASS (mode) != MODE_CC
-	  && GET_MODE_CLASS (GET_MODE (dest_reg)) != MODE_CC)
+	  && GET_MODE_CLASS (mode) == GET_MODE_CLASS (GET_MODE (dest_reg))
+	  && GET_MODE_CLASS (mode) != MODE_CC)
 	{
 	  /* Possible bug here?  Perhaps we don't know the mode of X.  */
 	  *inc_val = convert_modes (GET_MODE (dest_reg), mode, x, 0);
@@ -9258,7 +9270,8 @@ canonicalize_condition (insn, cond, reverse, earliest, want_reg)
 	{
 	case LE:
 	  if ((unsigned HOST_WIDE_INT) const_val != max_val >> 1)
-	    code = LT, op1 = GEN_INT (const_val + 1);
+	    code = LT, op1 = GEN_INT (trunc_int_for_mode (const_val + 1,
+							  GET_MODE (op0)));
 	  break;
 
 	/* When cross-compiling, const_val might be sign-extended from
@@ -9267,17 +9280,20 @@ canonicalize_condition (insn, cond, reverse, earliest, want_reg)
 	  if ((HOST_WIDE_INT) (const_val & max_val)
 	      != (((HOST_WIDE_INT) 1
 		   << (GET_MODE_BITSIZE (GET_MODE (op0)) - 1))))
-	    code = GT, op1 = GEN_INT (const_val - 1);
+	    code = GT, op1 = GEN_INT (trunc_int_for_mode (const_val - 1,
+							  GET_MODE (op0)));
 	  break;
 
 	case LEU:
 	  if (uconst_val < max_val)
-	    code = LTU, op1 = GEN_INT (uconst_val + 1);
+	    code = LTU, op1 = GEN_INT (trunc_int_for_mode (uconst_val + 1,
+							   GET_MODE (op0)));
 	  break;
 
 	case GEU:
 	  if (uconst_val != 0)
-	    code = GTU, op1 = GEN_INT (uconst_val - 1);
+	    code = GTU, op1 = GEN_INT (trunc_int_for_mode (uconst_val - 1,
+							   GET_MODE (op0)));
 	  break;
 
 	default:
@@ -9535,7 +9551,7 @@ loop_regs_scan (loop, extra_size)
   if (LOOP_INFO (loop)->has_call)
     for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
       if (TEST_HARD_REG_BIT (regs_invalidated_by_call, i)
-          && rtx_varies_p (gen_rtx_REG (Pmode, i), /*for_alias=*/1))
+          && rtx_varies_p (regno_reg_rtx[i], 1))
         {
           regs->array[i].may_not_optimize = 1;
           regs->array[i].set_in_loop = 1;

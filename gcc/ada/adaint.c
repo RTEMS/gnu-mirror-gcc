@@ -4,7 +4,7 @@
  *                                                                          *
  *                               A D A I N T                                *
  *                                                                          *
- *                            $Revision: 1.6 $
+ *                            $Revision: 1.7.2.2 $
  *                                                                          *
  *                          C Implementation File                           *
  *                                                                          *
@@ -28,7 +28,7 @@
  * file might be covered by the  GNU Public License.                        *
  *                                                                          *
  * GNAT was originally developed  by the GNAT team at  New York University. *
- * It is now maintained by Ada Core Technologies Inc (http://www.gnat.com). *
+ * Extensive contributions were provided by Ada Core Technologies Inc.      *
  *                                                                          *
  ****************************************************************************/
 
@@ -713,7 +713,7 @@ __gnat_tmp_name (tmp_filename)
   if (tmpdir == NULL)
     strcpy (tmp_filename, "/tmp/gnat-XXXXXX");
   else
-    sprintf (tmp_filename, "%s/gnat-XXXXXX", tmpdir);
+    sprintf (tmp_filename, "%200s/gnat-XXXXXX", tmpdir);
 
   close (mkstemp(tmp_filename));
 #else
@@ -2214,17 +2214,6 @@ int _flush_cache()
 }
 #endif
 
-#if defined (CROSS_COMPILE)  \
-  || (! (defined (sparc) && defined (sun) && defined (__SVR4)) \
-      && ! defined (linux) \
-      && ! defined (sgi) \
-      && ! defined (hpux) \
-      && ! (defined (__alpha__)  && defined (__osf__)) \
-      && ! defined (__MINGW32__))
-/* Dummy function to satisfy g-trasym.o.
-   Currently Solaris sparc, HP/UX, IRIX, GNU/Linux, Tru64 & Windows provide a
-   non-dummy version of this procedure in libaddr2line.a */
-
 void
 convert_addresses (addrs, n_addr, buf, len)
      void *addrs ATTRIBUTE_UNUSED;
@@ -2234,4 +2223,3 @@ convert_addresses (addrs, n_addr, buf, len)
 {
   *len = 0;
 }
-#endif

@@ -167,6 +167,9 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #ifndef EPILOGUE_USES
 #define EPILOGUE_USES(REGNO)  0
 #endif
+#ifndef EH_USES
+#define EH_USES(REGNO)  0
+#endif
 
 #ifdef HAVE_conditional_execution
 #ifndef REVERSE_CONDEXEC_PREDICATES_P
@@ -633,6 +636,7 @@ update_life_info (blocks, extent, prop_flags)
   regset tmp;
   regset_head tmp_head;
   int i;
+  int stabilized_prop_flags = prop_flags;
 
   tmp = INITIALIZE_REG_SET (tmp_head);
 
@@ -676,8 +680,21 @@ update_life_info (blocks, extent, prop_flags)
 					      | PROP_KILL_DEAD_CODE));
 	    }
 
-	  if (! changed || ! cleanup_cfg (CLEANUP_EXPENSIVE))
+	  /* Don't pass PROP_SCAN_DEAD_CODE or PROP_KILL_DEAD_CODE to
+	     subsequent propagate_block calls, since removing or acting as
+	     removing dead code can affect global register liveness, which
+	     is supposed to be finalized for this call after this loop.  */
+	  stabilized_prop_flags
+	    &= ~(PROP_SCAN_DEAD_CODE | PROP_KILL_DEAD_CODE);
+
+	  if (! changed)
 	    break;
+
+	  /* We repeat regardless of what cleanup_cfg says.  If there were
+	     instructions deleted above, that might have been only a
+	     partial improvement (see MAX_MEM_SET_LIST_LEN usage).
+	     Further improvement may be possible.  */
+	  cleanup_cfg (CLEANUP_EXPENSIVE);
 	}
 
       /* If asked, remove notes from the blocks we'll update.  */
@@ -692,7 +709,7 @@ update_life_info (blocks, extent, prop_flags)
 	  basic_block bb = BASIC_BLOCK (i);
 
 	  COPY_REG_SET (tmp, bb->global_live_at_end);
-	  propagate_block (bb, tmp, NULL, NULL, prop_flags);
+	  propagate_block (bb, tmp, NULL, NULL, stabilized_prop_flags);
 
 	  if (extent == UPDATE_LIFE_LOCAL)
 	    verify_local_live_at_start (tmp, bb);
@@ -705,7 +722,8 @@ update_life_info (blocks, extent, prop_flags)
 	  basic_block bb = BASIC_BLOCK (i);
 
 	  COPY_REG_SET (tmp, bb->global_live_at_end);
-	  propagate_block (bb, tmp, NULL, NULL, prop_flags);
+
+	  propagate_block (bb, tmp, NULL, NULL, stabilized_prop_flags);
 
 	  if (extent == UPDATE_LIFE_LOCAL)
 	    verify_local_live_at_start (tmp, bb);
@@ -1030,19 +1048,19 @@ calculate_global_regs_live (blocks_in, blocks_out, flags)
      int flags;
 {
   basic_block *queue, *qhead, *qtail, *qend;
-  regset tmp, new_live_at_end, call_used;
-  regset_head tmp_head, call_used_head;
+  regset tmp, new_live_at_end, invalidated_by_call;
+  regset_head tmp_head, invalidated_by_call_head;
   regset_head new_live_at_end_head;
   int i;
 
   tmp = INITIALIZE_REG_SET (tmp_head);
   new_live_at_end = INITIALIZE_REG_SET (new_live_at_end_head);
-  call_used = INITIALIZE_REG_SET (call_used_head);
+  invalidated_by_call = INITIALIZE_REG_SET (invalidated_by_call_head);
 
   /* Inconveniently, this is only readily available in hard reg set form.  */
   for (i = 0; i < FIRST_PSEUDO_REGISTER; ++i)
-    if (call_used_regs[i])
-      SET_REGNO_REG_SET (call_used, i);
+    if (TEST_HARD_REG_BIT (regs_invalidated_by_call, i))
+      SET_REGNO_REG_SET (invalidated_by_call, i);
 
   /* Create a worklist.  Allocate an extra slot for ENTRY_BLOCK, and one
      because the `head == tail' style test for an empty queue doesn't
@@ -1076,6 +1094,11 @@ calculate_global_regs_live (blocks_in, blocks_out, flags)
 	  bb->aux = bb;
 	}
     }
+
+  /* We clean aux when we remove the initially-enqueued bbs, but we
+     don't enqueue ENTRY and EXIT initially, so clean them upfront and
+     unconditionally.  */
+  ENTRY_BLOCK_PTR->aux = EXIT_BLOCK_PTR->aux = NULL;
 
   if (blocks_out)
     sbitmap_zero (blocks_out);
@@ -1111,21 +1134,40 @@ calculate_global_regs_live (blocks_in, blocks_out, flags)
 
       /* Begin by propagating live_at_start from the successor blocks.  */
       CLEAR_REG_SET (new_live_at_end);
-      for (e = bb->succ; e; e = e->succ_next)
-	{
-	  basic_block sb = e->dest;
 
-	  /* Call-clobbered registers die across exception and call edges.  */
-	  /* ??? Abnormal call edges ignored for the moment, as this gets
-	     confused by sibling call edges, which crashes reg-stack.  */
-	  if (e->flags & EDGE_EH)
-	    {
-	      bitmap_operation (tmp, sb->global_live_at_start,
-				call_used, BITMAP_AND_COMPL);
-	      IOR_REG_SET (new_live_at_end, tmp);
-	    }
-	  else
-	    IOR_REG_SET (new_live_at_end, sb->global_live_at_start);
+      if (bb->succ)
+	for (e = bb->succ; e; e = e->succ_next)
+	  {
+	    basic_block sb = e->dest;
+
+	    /* Call-clobbered registers die across exception and
+	       call edges.  */
+	    /* ??? Abnormal call edges ignored for the moment, as this gets
+	       confused by sibling call edges, which crashes reg-stack.  */
+	    if (e->flags & EDGE_EH)
+	      {
+		bitmap_operation (tmp, sb->global_live_at_start,
+				  invalidated_by_call, BITMAP_AND_COMPL);
+		IOR_REG_SET (new_live_at_end, tmp);
+	      }
+	    else
+	      IOR_REG_SET (new_live_at_end, sb->global_live_at_start);
+
+	    /* If a target saves one register in another (instead of on
+	       the stack) the save register will need to be live for EH.  */
+	    if (e->flags & EDGE_EH)
+	      for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+		if (EH_USES (i))
+		  SET_REGNO_REG_SET (new_live_at_end, i);
+	  }
+      else
+	{
+	  /* This might be a noreturn function that throws.  And
+	     even if it isn't, getting the unwind info right helps
+	     debugging.  */
+	  for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+	    if (EH_USES (i))
+	      SET_REGNO_REG_SET (new_live_at_end, i);
 	}
 
       /* The all-important stack pointer must always be live.  */
@@ -1273,7 +1315,7 @@ calculate_global_regs_live (blocks_in, blocks_out, flags)
 
   FREE_REG_SET (tmp);
   FREE_REG_SET (new_live_at_end);
-  FREE_REG_SET (call_used);
+  FREE_REG_SET (invalidated_by_call);
 
   if (blocks_out)
     {
@@ -1584,7 +1626,42 @@ propagate_one_insn (pbi, insn)
       if (libcall_is_dead)
 	prev = propagate_block_delete_libcall ( insn, note);
       else
-	propagate_block_delete_insn (pbi->bb, insn);
+	{
+
+	  /* If INSN contains a RETVAL note and is dead, but the libcall
+	     as a whole is not dead, then we want to remove INSN, but
+	     not the whole libcall sequence.
+
+	     However, we need to also remove the dangling REG_LIBCALL
+	     note so that we do not have mis-matched LIBCALL/RETVAL
+	     notes.  In theory we could find a new location for the
+	     REG_RETVAL note, but it hardly seems worth the effort.
+
+	     NOTE at this point will be the RETVAL note if it exists.  */
+	  if (note)
+	    {
+	      rtx libcall_note;
+
+	      libcall_note
+		= find_reg_note (XEXP (note, 0), REG_LIBCALL, NULL_RTX);
+	      remove_note (XEXP (note, 0), libcall_note);
+	    }
+
+	  /* Similarly if INSN contains a LIBCALL note, remove the
+	     dangling REG_RETVAL note.  */
+	  note = find_reg_note (insn, REG_LIBCALL, NULL_RTX);
+	  if (note)
+	    {
+	      rtx retval_note;
+
+	      retval_note
+		= find_reg_note (XEXP (note, 0), REG_RETVAL, NULL_RTX);
+	      remove_note (XEXP (note, 0), retval_note);
+	    }
+
+	  /* Now delete INSN.  */
+	  propagate_block_delete_insn (pbi->bb, insn);
+	}
 
       return prev;
     }
@@ -1679,8 +1756,7 @@ propagate_one_insn (pbi, insn)
 	    if (TEST_HARD_REG_BIT (regs_invalidated_by_call, i))
 	      {
 		/* We do not want REG_UNUSED notes for these registers.  */
-		mark_set_1 (pbi, CLOBBER, gen_rtx_REG (reg_raw_mode[i], i),
-			    cond, insn,
+		mark_set_1 (pbi, CLOBBER, regno_reg_rtx[i], cond, insn,
 			    pbi->flags & ~(PROP_DEATH_NOTES | PROP_REG_INFO));
 	      }
 	}
@@ -1728,8 +1804,7 @@ propagate_one_insn (pbi, insn)
 	     so they are made live.  */
 	  for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
 	    if (global_regs[i])
-	      mark_used_reg (pbi, gen_rtx_REG (reg_raw_mode[i], i),
-			     cond, insn);
+	      mark_used_reg (pbi, regno_reg_rtx[i], cond, insn);
 	}
     }
 
@@ -2727,7 +2802,7 @@ mark_set_1 (pbi, code, reg, cond, insn, flags)
 		    if (! REGNO_REG_SET_P (pbi->reg_live, i))
 		      REG_NOTES (insn)
 			= alloc_EXPR_LIST (REG_UNUSED,
-					   gen_rtx_REG (reg_raw_mode[i], i),
+					   regno_reg_rtx[i],
 					   REG_NOTES (insn));
 		}
 	    }
@@ -3535,7 +3610,7 @@ mark_used_reg (pbi, reg, cond, insn)
 		&& ! dead_or_set_regno_p (insn, i))
 	      REG_NOTES (insn)
 		= alloc_EXPR_LIST (REG_DEAD,
-				   gen_rtx_REG (reg_raw_mode[i], i),
+				   regno_reg_rtx[i],
 				   REG_NOTES (insn));
 	}
     }
@@ -3543,6 +3618,10 @@ mark_used_reg (pbi, reg, cond, insn)
   /* Mark the register as being live.  */
   for (i = regno_first; i <= regno_last; ++i)
     {
+#ifdef HAVE_conditional_execution
+      int this_was_live = REGNO_REG_SET_P (pbi->reg_live, i);
+#endif
+
       SET_REGNO_REG_SET (pbi->reg_live, i);
 
 #ifdef HAVE_conditional_execution
@@ -3554,7 +3633,7 @@ mark_used_reg (pbi, reg, cond, insn)
 	  struct reg_cond_life_info *rcli;
 	  rtx ncond;
 
-	  if (some_was_live)
+	  if (this_was_live)
 	    {
 	      node = splay_tree_lookup (pbi->reg_cond_dead, i);
 	      if (node == NULL)
@@ -3596,7 +3675,7 @@ mark_used_reg (pbi, reg, cond, insn)
 	      SET_REGNO_REG_SET (pbi->reg_cond_reg, REGNO (XEXP (cond, 0)));
 	    }
 	}
-      else if (some_was_live)
+      else if (this_was_live)
 	{
 	  /* The register may have been conditionally live previously, but
 	     is now unconditionally live.  Remove it from the conditionally

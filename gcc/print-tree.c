@@ -328,6 +328,8 @@ print_node (file, prefix, node, indent)
 	fputs (" common", file);
       if (DECL_EXTERNAL (node))
 	fputs (" external", file);
+      if (DECL_WEAK (node))
+	fputs (" weak", file);
       if (DECL_REGISTER (node) && TREE_CODE (node) != FIELD_DECL
 	  && TREE_CODE (node) != FUNCTION_DECL
 	  && TREE_CODE (node) != LABEL_DECL)
@@ -361,6 +363,8 @@ print_node (file, prefix, node, indent)
 
       if (TREE_CODE (node) == VAR_DECL && DECL_IN_TEXT_SECTION (node))
 	fputs (" in-text-section", file);
+      if (TREE_CODE (node) == VAR_DECL && DECL_THREAD_LOCAL (node))
+	fputs (" thread-local", file);
 
       if (TREE_CODE (node) == PARM_DECL && DECL_TRANSPARENT_UNION (node))
 	fputs (" transparent-union", file);

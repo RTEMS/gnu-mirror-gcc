@@ -149,6 +149,10 @@ static rtx *reg_base_value;
 static rtx *new_reg_base_value;
 static unsigned int reg_base_value_size; /* size of reg_base_value array */
 
+/* Static hunks of RTL used by the aliasing code; these are initialized
+   once per function to avoid unnecessary RTL allocations.  */
+static rtx static_reg_base_value[FIRST_PSEUDO_REGISTER];
+
 #define REG_BASE_VALUE(X) \
   (REGNO (X) < reg_base_value_size \
    ? reg_base_value[REGNO (X)] : 0)
@@ -564,6 +568,14 @@ get_alias_set (t)
      and references to functions, but that's different.)  */
   else if (TREE_CODE (t) == FUNCTION_TYPE)
     set = 0;
+
+  /* Unless the language specifies otherwise, let vector types alias
+     their components.  This avoids some nasty type punning issues in
+     normal usage.  And indeed lets vectors be treated more like an
+     array slice.  */
+  else if (TREE_CODE (t) == VECTOR_TYPE)
+    set = get_alias_set (TREE_TYPE (t));
+
   else
     /* Otherwise make a new alias set for this type.  */
     set = new_alias_set ();
@@ -2022,6 +2034,13 @@ true_dependence (mem, mem_mode, x, varies)
   if (MEM_VOLATILE_P (x) && MEM_VOLATILE_P (mem))
     return 1;
 
+  /* (mem:BLK (scratch)) is a special mechanism to conflict with everything.
+     This is used in epilogue deallocation functions.  */
+  if (GET_MODE (x) == BLKmode && GET_CODE (XEXP (x, 0)) == SCRATCH)
+    return 1;
+  if (GET_MODE (mem) == BLKmode && GET_CODE (XEXP (mem, 0)) == SCRATCH)
+    return 1;
+
   if (DIFFERENT_ALIAS_SETS_P (x, mem))
     return 0;
 
@@ -2097,6 +2116,13 @@ canon_true_dependence (mem, mem_mode, mem_addr, x, varies)
   if (MEM_VOLATILE_P (x) && MEM_VOLATILE_P (mem))
     return 1;
 
+  /* (mem:BLK (scratch)) is a special mechanism to conflict with everything.
+     This is used in epilogue deallocation functions.  */
+  if (GET_MODE (x) == BLKmode && GET_CODE (XEXP (x, 0)) == SCRATCH)
+    return 1;
+  if (GET_MODE (mem) == BLKmode && GET_CODE (XEXP (mem, 0)) == SCRATCH)
+    return 1;
+
   if (DIFFERENT_ALIAS_SETS_P (x, mem))
     return 0;
 
@@ -2154,6 +2180,13 @@ write_dependence_p (mem, x, writep)
   rtx base;
 
   if (MEM_VOLATILE_P (x) && MEM_VOLATILE_P (mem))
+    return 1;
+
+  /* (mem:BLK (scratch)) is a special mechanism to conflict with everything.
+     This is used in epilogue deallocation functions.  */
+  if (GET_MODE (x) == BLKmode && GET_CODE (XEXP (x, 0)) == SCRATCH)
+    return 1;
+  if (GET_MODE (mem) == BLKmode && GET_CODE (XEXP (mem, 0)) == SCRATCH)
     return 1;
 
   if (DIFFERENT_ALIAS_SETS_P (x, mem))
@@ -2400,8 +2433,6 @@ mark_constant_function ()
 }
 
 
-static HARD_REG_SET argument_registers;
-
 void
 init_alias_once ()
 {
@@ -2410,13 +2441,26 @@ init_alias_once ()
 #ifndef OUTGOING_REGNO
 #define OUTGOING_REGNO(N) N
 #endif
+  ggc_add_rtx_root (static_reg_base_value, (int) FIRST_PSEUDO_REGISTER);
   for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
     /* Check whether this register can hold an incoming pointer
        argument.  FUNCTION_ARG_REGNO_P tests outgoing register
        numbers, so translate if necessary due to register windows.  */
     if (FUNCTION_ARG_REGNO_P (OUTGOING_REGNO (i))
 	&& HARD_REGNO_MODE_OK (i, Pmode))
-      SET_HARD_REG_BIT (argument_registers, i);
+      static_reg_base_value[i]
+	= gen_rtx_ADDRESS (VOIDmode, gen_rtx_REG (Pmode, i));
+
+  static_reg_base_value[STACK_POINTER_REGNUM]
+    = gen_rtx_ADDRESS (Pmode, stack_pointer_rtx);
+  static_reg_base_value[ARG_POINTER_REGNUM]
+    = gen_rtx_ADDRESS (Pmode, arg_pointer_rtx);
+  static_reg_base_value[FRAME_POINTER_REGNUM]
+    = gen_rtx_ADDRESS (Pmode, frame_pointer_rtx);
+#if HARD_FRAME_POINTER_REGNUM != FRAME_POINTER_REGNUM
+  static_reg_base_value[HARD_FRAME_POINTER_REGNUM]
+    = gen_rtx_ADDRESS (Pmode, hard_frame_pointer_rtx);
+#endif
 
   alias_sets = splay_tree_new (splay_tree_compare_ints, 0, 0);
 }
@@ -2506,21 +2550,8 @@ init_alias_analysis ()
 	 The address expression is VOIDmode for an argument and
 	 Pmode for other registers.  */
 
-      for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
-	if (TEST_HARD_REG_BIT (argument_registers, i))
-	  new_reg_base_value[i] = gen_rtx_ADDRESS (VOIDmode,
-						   gen_rtx_REG (Pmode, i));
-
-      new_reg_base_value[STACK_POINTER_REGNUM]
-	= gen_rtx_ADDRESS (Pmode, stack_pointer_rtx);
-      new_reg_base_value[ARG_POINTER_REGNUM]
-	= gen_rtx_ADDRESS (Pmode, arg_pointer_rtx);
-      new_reg_base_value[FRAME_POINTER_REGNUM]
-	= gen_rtx_ADDRESS (Pmode, frame_pointer_rtx);
-#if HARD_FRAME_POINTER_REGNUM != FRAME_POINTER_REGNUM
-      new_reg_base_value[HARD_FRAME_POINTER_REGNUM]
-	= gen_rtx_ADDRESS (Pmode, hard_frame_pointer_rtx);
-#endif
+      memcpy (new_reg_base_value, static_reg_base_value,
+	      FIRST_PSEUDO_REGISTER * sizeof (rtx));
 
       /* Walk the insns adding values to the new_reg_base_value array.  */
       for (insn = get_insns (); insn; insn = NEXT_INSN (insn))
