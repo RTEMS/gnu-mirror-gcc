@@ -1,5 +1,5 @@
 /* Compilation switch flag definitions for GNU CC.
-   Copyright (C) 1987, 88, 94, 95, 96, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1987, 88, 94, 95, 96, 97, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -349,7 +349,7 @@ extern int flag_function_sections;
    the generated assembly code (to make it more readable).  This option
    is generally only of use to those who actually need to read the
    generated assembly code (perhaps while debugging the compiler itself).
-   -fverbose-asm is the default.  -fno-verbose-asm causes the extra information
+   -fno-verbose-asm, the default, causes the extra information
    to not be added and is useful when comparing two assembler files.  */
 
 extern int flag_verbose_asm;
@@ -373,6 +373,9 @@ extern int flag_pack_struct;
 /* Emit code to check for stack overflow; also may cause large objects
    to be allocated dynamically.  */
 extern int flag_stack_check;
+
+/* Do the full regmove optimization pass.  */
+extern int flag_regmove;
 
 /* Other basic status info about current function.  */
 
@@ -397,6 +400,14 @@ extern int current_function_has_nonlocal_label;
 
 extern int current_function_has_nonlocal_goto;
 
+/* Nonzero if GCC must add code to check memory access (used by Checker).  */
+
+extern int flag_check_memory_usage;
+
+/* Nonzero if GCC must prefix function names (used with
+   flag_check_memory_usage).  */
+
+extern int flag_prefix_function_name;
 /* Nonzero if the current function is a thunk, so we should try to cut
    corners where we can.  */
 extern int current_function_is_thunk;

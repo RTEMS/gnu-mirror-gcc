@@ -1,7 +1,7 @@
 /* Output Dwarf2 format symbol table information from the GNU C compiler.
-   Copyright (C) 1992, 1993, 1995, 1996, 1997 Free Software Foundation, Inc.
-   Contributed by Gary Funck (gary@intrepid.com).  Derived from the
-   DWARF 1 implementation written by Ron Guilmette (rfg@monkeys.com).
+   Copyright (C) 1992, 93, 95, 96, 97, 1998 Free Software Foundation, Inc.
+   Contributed by Gary Funck (gary@intrepid.com).
+   Derived from DWARF 1 implementation of Ron Guilmette (rfg@monkeys.com).
    Extensively modified by Jason Merrill (jason@cygnus.com).
 
 This file is part of GNU CC.
@@ -20,20 +20,15 @@ You should have received a copy of the GNU General Public License
 along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
 
-#include "config.h"
-#include "defaults.h"
-
 /* The first part of this file deals with the DWARF 2 frame unwind
    information, which is also used by the GCC efficient exception handling
    mechanism.  The second part, controlled only by an #ifdef
    DWARF2_DEBUGGING_INFO, deals with the other DWARF 2 debugging
    information.  */
 
-#if defined (DWARF2_DEBUGGING_INFO) || defined (DWARF2_UNWIND_INFO)
-
+#include "config.h"
+#include "defaults.h"
 #include <stdio.h>
-#include <setjmp.h>
-#include "dwarf2.h"
 #include "tree.h"
 #include "flags.h"
 #include "rtl.h"
@@ -44,9 +39,34 @@ the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  */
 #include "output.h"
 #include "expr.h"
 #include "except.h"
+#include "dwarf2.h"
 
-/* #define NDEBUG 1 */
-#include "assert.h"
+/* We cannot use <assert.h> in GCC source, since that would include
+   GCC's assert.h, which may not be compatible with the host compiler.  */
+#undef assert
+#ifdef NDEBUG
+# define assert(e)
+#else
+# define assert(e) do { if (! (e)) abort (); } while (0)
+#endif
+
+/* Decide whether we want to emit frame unwind information for the current
+   translation unit.  */
+
+int
+dwarf2out_do_frame ()
+{
+  return (write_symbols == DWARF2_DEBUG
+#ifdef DWARF2_FRAME_INFO
+          || DWARF2_FRAME_INFO
+#endif
+#ifdef DWARF2_UNWIND_INFO
+	  || (flag_exceptions && ! exceptions_via_longjmp)
+#endif
+	  );
+}
+
+#if defined (DWARF2_DEBUGGING_INFO) || defined (DWARF2_UNWIND_INFO)
 
 #ifndef __GNUC__
 #define inline
@@ -174,7 +194,6 @@ static unsigned long size_of_uleb128	PROTO((unsigned long));
 static unsigned long size_of_sleb128	PROTO((long));
 static void output_uleb128		PROTO((unsigned long));
 static void output_sleb128		PROTO((long));
-char *dwarf2out_cfi_label		PROTO((void));
 static void add_fde_cfi			PROTO((char *, dw_cfi_ref));
 static void lookup_cfa_1		PROTO((dw_cfi_ref, unsigned long *,
 					       long *));
@@ -191,6 +210,7 @@ static unsigned reg_number		PROTO((rtx));
    Theses may be overridden in the tm.h file (if necessary) for a particular
    assembler.  */
 
+#ifdef OBJECT_FORMAT_ELF
 #ifndef UNALIGNED_SHORT_ASM_OP
 #define UNALIGNED_SHORT_ASM_OP	".2byte"
 #endif
@@ -200,18 +220,10 @@ static unsigned reg_number		PROTO((rtx));
 #ifndef UNALIGNED_DOUBLE_INT_ASM_OP
 #define UNALIGNED_DOUBLE_INT_ASM_OP	".8byte"
 #endif
+#endif /* OBJECT_FORMAT_ELF */
+
 #ifndef ASM_BYTE_OP
 #define ASM_BYTE_OP		".byte"
-#endif
-
-#ifndef UNALIGNED_OFFSET_ASM_OP
-#define UNALIGNED_OFFSET_ASM_OP \
-  (DWARF_OFFSET_SIZE == 8 ? UNALIGNED_DOUBLE_INT_ASM_OP : UNALIGNED_INT_ASM_OP)
-#endif
-
-#ifndef UNALIGNED_WORD_ASM_OP
-#define UNALIGNED_WORD_ASM_OP \
-  (PTR_SIZE == 8 ? UNALIGNED_DOUBLE_INT_ASM_OP : UNALIGNED_INT_ASM_OP)
 #endif
 
 /* Data and reference forms for relocatable data.  */
@@ -238,9 +250,6 @@ static unsigned reg_number		PROTO((rtx));
 #ifndef FRAME_SECTION
 #define FRAME_SECTION		".debug_frame"
 #endif
-#if !defined (EH_FRAME_SECTION) && defined (ASM_OUTPUT_SECTION_NAME)
-#define EH_FRAME_SECTION	".eh_frame"
-#endif
 
 #ifndef FUNC_BEGIN_LABEL
 #define FUNC_BEGIN_LABEL	"LFB"
@@ -250,16 +259,35 @@ static unsigned reg_number		PROTO((rtx));
 #endif
 #define CIE_AFTER_SIZE_LABEL	"LSCIE"
 #define CIE_END_LABEL		"LECIE"
+#define CIE_LENGTH_LABEL	"LLCIE"
 #define FDE_AFTER_SIZE_LABEL	"LSFDE"
 #define FDE_END_LABEL		"LEFDE"
+#define FDE_LENGTH_LABEL	"LLFDE"
 
 /* Definitions of defaults for various types of primitive assembly language
    output operations.  These may be overridden from within the tm.h file,
-   but typically, that is unecessary.  */
+   but typically, that is unnecessary.  */
 
 #ifndef ASM_OUTPUT_SECTION
 #define ASM_OUTPUT_SECTION(FILE, SECTION) \
   fprintf ((FILE), SECTION_FORMAT, SECTION_ASM_OP, SECTION)
+#endif
+
+#ifndef ASM_OUTPUT_DWARF_DATA1
+#define ASM_OUTPUT_DWARF_DATA1(FILE,VALUE) \
+  fprintf ((FILE), "\t%s\t0x%x", ASM_BYTE_OP, VALUE)
+#endif
+
+#ifdef UNALIGNED_INT_ASM_OP
+
+#ifndef UNALIGNED_OFFSET_ASM_OP
+#define UNALIGNED_OFFSET_ASM_OP \
+  (DWARF_OFFSET_SIZE == 8 ? UNALIGNED_DOUBLE_INT_ASM_OP : UNALIGNED_INT_ASM_OP)
+#endif
+
+#ifndef UNALIGNED_WORD_ASM_OP
+#define UNALIGNED_WORD_ASM_OP \
+  (PTR_SIZE == 8 ? UNALIGNED_DOUBLE_INT_ASM_OP : UNALIGNED_INT_ASM_OP)
 #endif
 
 #ifndef ASM_OUTPUT_DWARF_DELTA2
@@ -317,11 +345,6 @@ static unsigned reg_number		PROTO((rtx));
   } while (0)
 #endif
 
-#ifndef ASM_OUTPUT_DWARF_DATA1
-#define ASM_OUTPUT_DWARF_DATA1(FILE,VALUE) \
-  fprintf ((FILE), "\t%s\t0x%x", ASM_BYTE_OP, VALUE)
-#endif
-
 #ifndef ASM_OUTPUT_DWARF_DATA2
 #define ASM_OUTPUT_DWARF_DATA2(FILE,VALUE) \
   fprintf ((FILE), "\t%s\t0x%x", UNALIGNED_SHORT_ASM_OP, (unsigned) VALUE)
@@ -360,8 +383,69 @@ static unsigned reg_number		PROTO((rtx));
   } while (0)
 #endif
 
+#ifndef ASM_OUTPUT_DWARF_VALUE4
+#define ASM_OUTPUT_DWARF_VALUE4(FILE,LABEL) \
+  do {	fprintf ((FILE), "\t%s\t", UNALIGNED_INT_ASM_OP);		\
+	assemble_name (FILE, LABEL);					\
+  } while (0)
+#endif
+
+#else /* UNALIGNED_INT_ASM_OP */
+
+/* We don't have unaligned support, let's hope the normal output works for
+   .debug_frame.  */
+
+#define ASM_OUTPUT_DWARF_ADDR(FILE,LABEL) \
+  assemble_integer (gen_rtx (SYMBOL_REF, Pmode, LABEL), PTR_SIZE, 1)
+
+#define ASM_OUTPUT_DWARF_OFFSET(FILE,LABEL) \
+  assemble_integer (gen_rtx (SYMBOL_REF, SImode, LABEL), 4, 1)
+
+#define ASM_OUTPUT_DWARF_DELTA2(FILE,LABEL1,LABEL2)			\
+  assemble_integer (gen_rtx (MINUS, HImode,			      	\
+			     gen_rtx (SYMBOL_REF, Pmode, LABEL1),   	\
+			     gen_rtx (SYMBOL_REF, Pmode, LABEL2)),	\
+		    2, 1)
+  
+#define ASM_OUTPUT_DWARF_DELTA4(FILE,LABEL1,LABEL2)			\
+  assemble_integer (gen_rtx (MINUS, SImode,			      	\
+			     gen_rtx (SYMBOL_REF, Pmode, LABEL1),   	\
+			     gen_rtx (SYMBOL_REF, Pmode, LABEL2)),	\
+		    4, 1)
+
+#define ASM_OUTPUT_DWARF_ADDR_DELTA(FILE,LABEL1,LABEL2)			\
+  assemble_integer (gen_rtx (MINUS, Pmode,				\
+			     gen_rtx (SYMBOL_REF, Pmode, LABEL1),	\
+			     gen_rtx (SYMBOL_REF, Pmode, LABEL2)),	\
+		    PTR_SIZE, 1)
+
+#define ASM_OUTPUT_DWARF_DELTA(FILE,LABEL1,LABEL2) \
+  ASM_OUTPUT_DWARF_DELTA4 (FILE,LABEL1,LABEL2)
+
+#define ASM_OUTPUT_DWARF_DATA4(FILE,VALUE) \
+  assemble_integer (GEN_INT (VALUE), 4, 1)
+
+#define ASM_OUTPUT_DWARF_VALUE4(FILE,LABEL) \
+  assemble_integer (gen_rtx (SYMBOL_REF, Pmode, LABEL), 4, 1)
+
+#endif /* UNALIGNED_INT_ASM_OP */
+
+#ifdef SET_ASM_OP
+#ifndef ASM_OUTPUT_DEFINE_LABEL_DIFFERENCE_SYMBOL
+#define ASM_OUTPUT_DEFINE_LABEL_DIFFERENCE_SYMBOL(FILE, SY, HI, LO)	\
+  do {	fprintf ((FILE), "\t%s\t", SET_ASM_OP);				\
+	assemble_name (FILE, SY);					\
+	fprintf ((FILE), ",");						\
+	assemble_name (FILE, HI);					\
+	fprintf ((FILE), "-");						\
+	assemble_name (FILE, LO);					\
+	fprintf ((FILE), "\n");						\
+  } while (0)
+#endif
+#endif /* SET_ASM_OP */
+
 /* This is similar to the default ASM_OUTPUT_ASCII, except that no trailing
-   newline is produced.  When flag_verbose_asm is asserted, we add commnetary
+   newline is produced.  When flag_debug_asm is asserted, we add commentary
    at the end of the line, so we must avoid output of a newline here.  */
 #ifndef ASM_OUTPUT_DWARF_STRING
 #define ASM_OUTPUT_DWARF_STRING(FILE,P) \
@@ -404,6 +488,14 @@ static unsigned reg_number		PROTO((rtx));
 #define DWARF_FRAME_REGNUM(REG) DBX_REGISTER_NUMBER (REG)
 #endif
 
+/* Hook used by __throw.  */
+
+rtx
+expand_builtin_dwarf_fp_regnum ()
+{
+  return GEN_INT (DWARF_FRAME_REGNUM (HARD_FRAME_POINTER_REGNUM));
+}
+
 /* The offset from the incoming value of %sp to the top of the stack frame
    for the current function.  */
 #ifndef INCOMING_FRAME_SP_OFFSET
@@ -443,6 +535,104 @@ reg_number (rtl)
 
   regno = DBX_REGISTER_NUMBER (regno);
   return regno;
+}
+
+struct reg_size_range
+{
+  int beg;
+  int end;
+  int size;
+};
+
+/* Given a register number in REG_TREE, return an rtx for its size in bytes.
+   We do this in kind of a roundabout way, by building up a list of
+   register size ranges and seeing where our register falls in one of those
+   ranges.  We need to do it this way because REG_TREE is not a constant,
+   and the target macros were not designed to make this task easy.  */
+
+rtx
+expand_builtin_dwarf_reg_size (reg_tree, target)
+     tree reg_tree;
+     rtx target;
+{
+  enum machine_mode mode;
+  int size;
+  struct reg_size_range ranges[5];
+  tree t, t2;
+
+  int i = 0;
+  int n_ranges = 0;
+  int last_size = -1;
+
+  for (; i < FIRST_PSEUDO_REGISTER; ++i)
+    {
+      /* The return address is out of order on the MIPS, and we don't use
+	 copy_reg for it anyway, so we don't care here how large it is.  */
+      if (DWARF_FRAME_REGNUM (i) == DWARF_FRAME_RETURN_COLUMN)
+	continue;
+
+      mode = reg_raw_mode[i];
+
+      /* CCmode is arbitrarily given a size of 4 bytes.  It is more useful
+	 to use the same size as word_mode, since that reduces the number
+	 of ranges we need.  It should not matter, since the result should
+	 never be used for a condition code register anyways.  */
+      if (GET_MODE_CLASS (mode) == MODE_CC)
+	mode = word_mode;
+
+      size = GET_MODE_SIZE (mode);
+
+      /* If this register is not valid in the specified mode and
+	 we have a previous size, use that for the size of this
+	 register to avoid making junk tiny ranges.  */
+      if (! HARD_REGNO_MODE_OK (i, mode) && last_size != -1)
+	size = last_size;
+
+      if (size != last_size)
+	{
+	  ranges[n_ranges].beg = i;
+	  ranges[n_ranges].size = last_size = size;
+	  ++n_ranges;
+	  assert (n_ranges <= 5);
+	}
+      ranges[n_ranges-1].end = i;
+    }
+
+  /* The usual case: fp regs surrounded by general regs.  */
+  if (n_ranges == 3 && ranges[0].size == ranges[2].size)
+    {
+      assert ((DWARF_FRAME_REGNUM (ranges[1].end)
+	       - DWARF_FRAME_REGNUM (ranges[1].beg))
+	      == ranges[1].end - ranges[1].beg);
+      t  = fold (build (GE_EXPR, integer_type_node, reg_tree,
+			build_int_2 (DWARF_FRAME_REGNUM (ranges[1].beg), 0)));
+      t2 = fold (build (LE_EXPR, integer_type_node, reg_tree,
+			build_int_2 (DWARF_FRAME_REGNUM (ranges[1].end), 0)));
+      t = fold (build (TRUTH_ANDIF_EXPR, integer_type_node, t, t2));
+      t = fold (build (COND_EXPR, integer_type_node, t,
+		       build_int_2 (ranges[1].size, 0),
+		       build_int_2 (ranges[0].size, 0)));
+    }
+  else
+    {
+      --n_ranges;
+      t = build_int_2 (ranges[n_ranges].size, 0);
+      size = DWARF_FRAME_REGNUM (ranges[n_ranges].beg);
+      for (; n_ranges--; )
+	{
+	  assert ((DWARF_FRAME_REGNUM (ranges[n_ranges].end)
+		   - DWARF_FRAME_REGNUM (ranges[n_ranges].beg))
+		  == ranges[n_ranges].end - ranges[n_ranges].beg);
+	  assert (DWARF_FRAME_REGNUM (ranges[n_ranges].beg) < size);
+	  size = DWARF_FRAME_REGNUM (ranges[n_ranges].beg);
+	  t2 = fold (build (LE_EXPR, integer_type_node, reg_tree,
+			    build_int_2 (DWARF_FRAME_REGNUM
+					 (ranges[n_ranges].end), 0)));
+	  t = fold (build (COND_EXPR, integer_type_node, t2,
+			   build_int_2 (ranges[n_ranges].size, 0), t));
+	}
+    }
+  return expand_expr (t, target, Pmode, 0);
 }
 
 /* Convert a DWARF call frame info. operation to its string name */
@@ -497,6 +687,8 @@ dwarf_cfi_name (cfi_opc)
     /* GNU extensions */
     case DW_CFA_GNU_window_save:
       return "DW_CFA_GNU_window_save";
+    case DW_CFA_GNU_args_size:
+      return "DW_CFA_GNU_args_size";
 
     default:
       return "DW_CFA_<unknown>";
@@ -603,6 +795,8 @@ lookup_cfa_1 (cfi, regp, offsetp)
       *regp = cfi->dw_cfi_oprnd1.dw_cfi_reg_num;
       *offsetp = cfi->dw_cfi_oprnd2.dw_cfi_offset;
       break;
+    default:
+      break;
     }
 }
 
@@ -637,6 +831,9 @@ static long cfa_offset;
    from the CFA.  */
 static unsigned cfa_store_reg;
 static long cfa_store_offset;
+
+/* The running total of the size of arguments pushed onto the stack.  */
+static long args_size;
 
 /* Entry point to update the canonical frame address (CFA).
    LABEL is passed to add_fde_cfi.  The value of CFA is now to be
@@ -743,6 +940,20 @@ dwarf2out_window_save (label)
   add_fde_cfi (label, cfi);
 }
 
+/* Add a CFI to update the running total of the size of arguments
+   pushed onto the stack.  */
+
+void
+dwarf2out_args_size (label, size)
+     char *label;
+     long size;
+{
+  register dw_cfi_ref cfi = new_cfi ();
+  cfi->dw_cfi_opc = DW_CFA_GNU_args_size;
+  cfi->dw_cfi_oprnd1.dw_cfi_offset = size;
+  add_fde_cfi (label, cfi);
+}
+
 /* Entry point for saving a register to the stack.  REG is the GCC register
    number.  LABEL and OFFSET are passed to reg_save.  */
 
@@ -828,6 +1039,87 @@ initial_return_save (rtl)
   reg_save (NULL, DWARF_FRAME_RETURN_COLUMN, reg, offset - cfa_offset);
 }
 
+/* Check INSN to see if it looks like a push or a stack adjustment, and
+   make a note of it if it does.  EH uses this information to find out how
+   much extra space it needs to pop off the stack.  */
+
+static void
+dwarf2out_stack_adjust (insn)
+     rtx insn;
+{
+  long offset;
+  char *label;
+
+  if (GET_CODE (insn) == BARRIER)
+    {
+      /* When we see a BARRIER, we know to reset args_size to 0.  Usually
+	 the compiler will have already emitted a stack adjustment, but
+	 doesn't bother for calls to noreturn functions.  */
+#ifdef STACK_GROWS_DOWNWARD
+      offset = -args_size;
+#else
+      offset = args_size;
+#endif
+    }
+  else if (GET_CODE (PATTERN (insn)) == SET)
+    {
+      rtx src, dest;
+      enum rtx_code code;
+
+      insn = PATTERN (insn);
+      src = SET_SRC (insn);
+      dest = SET_DEST (insn);
+
+      if (dest == stack_pointer_rtx)
+	{
+	  /* (set (reg sp) (plus (reg sp) (const_int))) */
+	  code = GET_CODE (src);
+	  if (! (code == PLUS || code == MINUS)
+	      || XEXP (src, 0) != stack_pointer_rtx
+	      || GET_CODE (XEXP (src, 1)) != CONST_INT)
+	    return;
+
+	  offset = INTVAL (XEXP (src, 1));
+	}
+      else if (GET_CODE (dest) == MEM)
+	{
+	  /* (set (mem (pre_dec (reg sp))) (foo)) */
+	  src = XEXP (dest, 0);
+	  code = GET_CODE (src);
+
+	  if (! (code == PRE_DEC || code == PRE_INC)
+	      || XEXP (src, 0) != stack_pointer_rtx)
+	    return;
+
+	  offset = GET_MODE_SIZE (GET_MODE (dest));
+	}
+      else
+	return;
+
+      if (code == PLUS || code == PRE_INC)
+	offset = -offset;
+    }
+  else
+    return;
+
+  if (offset == 0)
+    return;
+
+  if (cfa_reg == STACK_POINTER_REGNUM)
+    cfa_offset += offset;
+
+#ifndef STACK_GROWS_DOWNWARD
+  offset = -offset;
+#endif
+  args_size += offset;
+  if (args_size < 0)
+    args_size = 0;
+
+  label = dwarf2out_cfi_label ();
+  dwarf2out_def_cfa (label, cfa_reg, cfa_offset);
+  dwarf2out_args_size (label, args_size);
+}
+
 /* Record call frame debugging information for INSN, which either
    sets SP or FP (adjusting how we calculate the frame address) or saves a
    register to the stack.  If INSN is NULL_RTX, initialize our state.  */
@@ -857,9 +1149,19 @@ dwarf2out_frame_debug (insn)
       return;
     }
 
+  if (! RTX_FRAME_RELATED_P (insn))
+    {
+      dwarf2out_stack_adjust (insn);
+      return;
+    }
+
   label = dwarf2out_cfi_label ();
     
   insn = PATTERN (insn);
+  /* Assume that in a PARALLEL prologue insn, only the first elt is
+     significant.  Currently this is true.  */
+  if (GET_CODE (insn) == PARALLEL)
+    insn = XVECEXP (insn, 0, 0);
   assert (GET_CODE (insn) == SET);
 
   src = SET_SRC (insn);
@@ -899,13 +1201,21 @@ dwarf2out_frame_debug (insn)
 		  abort ();
 		}
 
+	      if (XEXP (src, 0) == hard_frame_pointer_rtx)
+		{
+		  /* Restoring SP from FP in the epilogue.  */
+		  assert (cfa_reg == HARD_FRAME_POINTER_REGNUM);
+		  cfa_reg = STACK_POINTER_REGNUM;
+		}
+	      else
+		assert (XEXP (src, 0) == stack_pointer_rtx);
+
 	      if (GET_CODE (src) == PLUS)
 		offset = -offset;
 	      if (cfa_reg == STACK_POINTER_REGNUM)
 		cfa_offset += offset;
 	      if (cfa_store_reg == STACK_POINTER_REGNUM)
 		cfa_store_offset += offset;
-	      assert (XEXP (src, 0) == stack_pointer_rtx);
 	    }
 	  else
 	    {
@@ -914,9 +1224,9 @@ dwarf2out_frame_debug (insn)
 	      assert (XEXP (src, 1) == stack_pointer_rtx);
 	      assert (GET_CODE (XEXP (src, 0)) == REG
 		      && REGNO (XEXP (src, 0)) == cfa_temp_reg);
-	      assert (cfa_store_reg == STACK_POINTER_REGNUM);
+	      assert (cfa_reg == STACK_POINTER_REGNUM);
 	      cfa_store_reg = REGNO (dest);
-	      cfa_store_offset -= cfa_temp_value;
+	      cfa_store_offset = cfa_offset - cfa_temp_value;
 	    }
 	  break;
 
@@ -949,7 +1259,7 @@ dwarf2out_frame_debug (insn)
 	case PRE_INC:
 	case PRE_DEC:
 	  offset = GET_MODE_SIZE (GET_MODE (dest));
-	  if (GET_CODE (src) == PRE_INC)
+	  if (GET_CODE (XEXP (dest, 0)) == PRE_INC)
 	    offset = -offset;
 
 	  assert (REGNO (XEXP (XEXP (dest, 0), 0)) == STACK_POINTER_REGNUM);
@@ -1048,7 +1358,7 @@ output_uleb128 (value)
     }
   while (value != 0);
 
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s ULEB128 0x%x", ASM_COMMENT_START, save_value);
 }
 
@@ -1079,7 +1389,7 @@ output_sleb128 (value)
     }
 
   while (more);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s SLEB128 %d", ASM_COMMENT_START, save_value);
 }
 
@@ -1095,7 +1405,7 @@ output_cfi (cfi, fde)
       ASM_OUTPUT_DWARF_DATA1 (asm_out_file,
 			      cfi->dw_cfi_opc
 			      | (cfi->dw_cfi_oprnd1.dw_cfi_offset & 0x3f));
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, "\t%s DW_CFA_advance_loc 0x%x",
 		 ASM_COMMENT_START, cfi->dw_cfi_oprnd1.dw_cfi_offset);
       fputc ('\n', asm_out_file);
@@ -1106,7 +1416,7 @@ output_cfi (cfi, fde)
       ASM_OUTPUT_DWARF_DATA1 (asm_out_file,
 			      cfi->dw_cfi_opc
 			      | (cfi->dw_cfi_oprnd1.dw_cfi_reg_num & 0x3f));
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, "\t%s DW_CFA_offset, column 0x%x",
 		 ASM_COMMENT_START, cfi->dw_cfi_oprnd1.dw_cfi_reg_num);
 
@@ -1119,7 +1429,7 @@ output_cfi (cfi, fde)
       ASM_OUTPUT_DWARF_DATA1 (asm_out_file,
 			      cfi->dw_cfi_opc
 			      | (cfi->dw_cfi_oprnd1.dw_cfi_reg_num & 0x3f));
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, "\t%s DW_CFA_restore, column 0x%x",
 		 ASM_COMMENT_START, cfi->dw_cfi_oprnd1.dw_cfi_reg_num);
 
@@ -1128,7 +1438,7 @@ output_cfi (cfi, fde)
   else
     {
       ASM_OUTPUT_DWARF_DATA1 (asm_out_file, cfi->dw_cfi_opc);
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, "\t%s %s", ASM_COMMENT_START,
 		 dwarf_cfi_name (cfi->dw_cfi_opc));
 
@@ -1192,11 +1502,28 @@ output_cfi (cfi, fde)
 	  break;
 	case DW_CFA_GNU_window_save:
 	  break;
+	case DW_CFA_GNU_args_size:
+	  output_uleb128 (cfi->dw_cfi_oprnd1.dw_cfi_offset);
+          fputc ('\n', asm_out_file);
+	  break;
 	default:
 	  break;
 	}
      }
 }
+
+#if !defined (EH_FRAME_SECTION)
+#if defined (EH_FRAME_SECTION_ASM_OP)
+#define EH_FRAME_SECTION() eh_frame_section();
+#else
+#if defined (ASM_OUTPUT_SECTION_NAME)
+#define EH_FRAME_SECTION()				\
+  do {							\
+      named_section (NULL_TREE, ".eh_frame", 0);	\
+  } while (0)
+#endif
+#endif
+#endif
 
 /* Output the call frame information used to used to record information
    that relates to calculating the frame pointer, and records the
@@ -1212,24 +1539,30 @@ output_call_frame_info (for_eh)
   register dw_cfi_ref cfi;
   unsigned long fde_pad;
   char l1[20], l2[20];
+#ifdef ASM_OUTPUT_DEFINE_LABEL_DIFFERENCE_SYMBOL
+  char ld[20];
+#endif
 
   /* Do we want to include a pointer to the exception table?  */
   int eh_ptr = for_eh && exception_table_p ();
 
-  /* Only output the info if it will be interesting.  */
-  for (i = 0; i < fde_table_in_use; ++i)
-    if (fde_table[i].dw_fde_cfi != NULL)
-      break;
-  if (i == fde_table_in_use)
-    return;
-
   fputc ('\n', asm_out_file);
+
+  /* We're going to be generating comments, so turn on app.  */
+  if (flag_debug_asm)
+    app_enable ();
+
   if (for_eh)
     {
 #ifdef EH_FRAME_SECTION
-      ASM_OUTPUT_SECTION_NAME (asm_out_file, NULL_TREE, EH_FRAME_SECTION, 0);
+      EH_FRAME_SECTION ();
 #else
+      tree label = get_file_function_name ('F');
+
       data_section ();
+      ASM_OUTPUT_ALIGN (asm_out_file, floor_log2 (PTR_SIZE));
+      ASM_GLOBALIZE_LABEL (asm_out_file, IDENTIFIER_POINTER (label));
+      ASM_OUTPUT_LABEL (asm_out_file, IDENTIFIER_POINTER (label));
 #endif
       assemble_label ("__FRAME_BEGIN__");
     }
@@ -1239,70 +1572,93 @@ output_call_frame_info (for_eh)
   /* Output the CIE. */
   ASM_GENERATE_INTERNAL_LABEL (l1, CIE_AFTER_SIZE_LABEL, for_eh);
   ASM_GENERATE_INTERNAL_LABEL (l2, CIE_END_LABEL, for_eh);
-  ASM_OUTPUT_DWARF_DELTA (asm_out_file, l2, l1);
-  if (flag_verbose_asm)
+#ifdef ASM_OUTPUT_DEFINE_LABEL_DIFFERENCE_SYMBOL
+  ASM_GENERATE_INTERNAL_LABEL (ld, CIE_LENGTH_LABEL, for_eh);
+  if (for_eh)
+    ASM_OUTPUT_DWARF_VALUE4 (asm_out_file, ld);
+  else
+    ASM_OUTPUT_DWARF_OFFSET (asm_out_file, ld);
+#else
+  if (for_eh)
+    ASM_OUTPUT_DWARF_DELTA4 (asm_out_file, l2, l1);
+  else
+    ASM_OUTPUT_DWARF_DELTA (asm_out_file, l2, l1);
+#endif
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Length of Common Information Entry",
 	     ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_LABEL (asm_out_file, l1);
 
-  ASM_OUTPUT_DWARF_DATA4 (asm_out_file, DW_CIE_ID);
-  if (flag_verbose_asm)
+  if (for_eh)
+    /* Now that the CIE pointer is PC-relative for EH,
+       use 0 to identify the CIE.  */
+    ASM_OUTPUT_DWARF_DATA4 (asm_out_file, 0);
+  else
+    ASM_OUTPUT_DWARF_DATA4 (asm_out_file, DW_CIE_ID);
+
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s CIE Identifier Tag", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
-  if (DWARF_OFFSET_SIZE == 8)
+  if (! for_eh && DWARF_OFFSET_SIZE == 8)
     {
       ASM_OUTPUT_DWARF_DATA4 (asm_out_file, DW_CIE_ID);
       fputc ('\n', asm_out_file);
     }
 
   ASM_OUTPUT_DWARF_DATA1 (asm_out_file, DW_CIE_VERSION);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s CIE Version", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   if (eh_ptr)
     {
-      /* The "z" augmentation was defined by SGI; the FDE contains a pointer
-	 to the exception region info for the frame.  */
-      ASM_OUTPUT_DWARF_STRING (asm_out_file, "z");
-      if (flag_verbose_asm)
-	fprintf (asm_out_file, "\t%s CIE Augmentation", ASM_COMMENT_START);
+      /* The CIE contains a pointer to the exception region info for the
+         frame.  Make the augmentation string three bytes (including the
+         trailing null) so the pointer is 4-byte aligned.  The Solaris ld
+         can't handle unaligned relocs.  */
+      if (flag_debug_asm)
+	{
+	  ASM_OUTPUT_DWARF_STRING (asm_out_file, "eh");
+	  fprintf (asm_out_file, "\t%s CIE Augmentation", ASM_COMMENT_START);
+	}
+      else
+	{
+	  ASM_OUTPUT_ASCII (asm_out_file, "eh", 3);
+	}
+      fputc ('\n', asm_out_file);
+
+      ASM_OUTPUT_DWARF_ADDR (asm_out_file, "__EXCEPTION_TABLE__");
+      if (flag_debug_asm)
+	fprintf (asm_out_file, "\t%s pointer to exception region info",
+		 ASM_COMMENT_START);
     }
   else
     {
       ASM_OUTPUT_DWARF_DATA1 (asm_out_file, 0);
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, "\t%s CIE Augmentation (none)",
 		 ASM_COMMENT_START);
     }
 
   fputc ('\n', asm_out_file);
   output_uleb128 (1);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, " (CIE Code Alignment Factor)");
 
   fputc ('\n', asm_out_file);
   output_sleb128 (DWARF_CIE_DATA_ALIGNMENT);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, " (CIE Data Alignment Factor)");
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_DWARF_DATA1 (asm_out_file, DWARF_FRAME_RETURN_COLUMN);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s CIE RA Column", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
-  if (eh_ptr)
-    {
-      output_uleb128 (0);
-      if (flag_verbose_asm)
-	fprintf (asm_out_file, "\t%s CIE augmentation fields length",
-		 ASM_COMMENT_START);
-      fputc ('\n', asm_out_file);
-    }
 
   for (cfi = cie_cfi_head; cfi != NULL; cfi = cfi->dw_cfi_next)
     output_cfi (cfi, NULL);
@@ -1310,61 +1666,53 @@ output_call_frame_info (for_eh)
   /* Pad the CIE out to an address sized boundary.  */
   ASM_OUTPUT_ALIGN (asm_out_file, floor_log2 (PTR_SIZE));
   ASM_OUTPUT_LABEL (asm_out_file, l2);
+#ifdef ASM_OUTPUT_DEFINE_LABEL_DIFFERENCE_SYMBOL
+  ASM_OUTPUT_DEFINE_LABEL_DIFFERENCE_SYMBOL (asm_out_file, ld, l2, l1);
+#endif
 
   /* Loop through all of the FDE's.  */
   for (i = 0; i < fde_table_in_use; ++i)
     {
       fde = &fde_table[i];
-      if (fde->dw_fde_cfi == NULL)
-	continue;
 
       ASM_GENERATE_INTERNAL_LABEL (l1, FDE_AFTER_SIZE_LABEL, for_eh + i*2);
       ASM_GENERATE_INTERNAL_LABEL (l2, FDE_END_LABEL, for_eh + i*2);
-      ASM_OUTPUT_DWARF_DELTA (asm_out_file, l2, l1);
-      if (flag_verbose_asm)
+#ifdef ASM_OUTPUT_DEFINE_LABEL_DIFFERENCE_SYMBOL
+      ASM_GENERATE_INTERNAL_LABEL (ld, FDE_LENGTH_LABEL, for_eh + i*2);
+      if (for_eh)
+	ASM_OUTPUT_DWARF_VALUE4 (asm_out_file, ld);
+      else
+	ASM_OUTPUT_DWARF_OFFSET (asm_out_file, ld);
+#else
+      if (for_eh)
+	ASM_OUTPUT_DWARF_DELTA4 (asm_out_file, l2, l1);
+      else
+	ASM_OUTPUT_DWARF_DELTA (asm_out_file, l2, l1);
+#endif
+      if (flag_debug_asm)
 	fprintf (asm_out_file, "\t%s FDE Length", ASM_COMMENT_START);
       fputc ('\n', asm_out_file);
       ASM_OUTPUT_LABEL (asm_out_file, l1);
 
       if (for_eh)
-	ASM_OUTPUT_DWARF_ADDR (asm_out_file, "__FRAME_BEGIN__");
+	ASM_OUTPUT_DWARF_DELTA (asm_out_file, l1, "__FRAME_BEGIN__");
       else
 	ASM_OUTPUT_DWARF_OFFSET (asm_out_file, stripattributes (FRAME_SECTION));
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, "\t%s FDE CIE offset", ASM_COMMENT_START);
 
       fputc ('\n', asm_out_file);
       ASM_OUTPUT_DWARF_ADDR (asm_out_file, fde->dw_fde_begin);
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, "\t%s FDE initial location", ASM_COMMENT_START);
 
       fputc ('\n', asm_out_file);
       ASM_OUTPUT_DWARF_ADDR_DELTA (asm_out_file,
 				   fde->dw_fde_end, fde->dw_fde_begin);
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, "\t%s FDE address range", ASM_COMMENT_START);
 
       fputc ('\n', asm_out_file);
-      if (eh_ptr)
-	{
-	  output_uleb128 (PTR_SIZE);
-	  if (flag_verbose_asm)
-	    fprintf (asm_out_file, "\t%s FDE augmentation fields length",
-		     ASM_COMMENT_START);
-	  fputc ('\n', asm_out_file);
-
-	  /* For now, a pointer to the translation unit's info will do.
-	     ??? Eventually this should point to the function's info.  */
-	  if (exception_table_p ())
-	    ASM_OUTPUT_DWARF_ADDR (asm_out_file, "__EXCEPTION_TABLE__");
-	  else
-	    ASM_OUTPUT_DWARF_ADDR_DATA (asm_out_file, 0);
-
-	  if (flag_verbose_asm)
-	    fprintf (asm_out_file, "\t%s pointer to exception region info",
-		     ASM_COMMENT_START);
-	  fputc ('\n', asm_out_file);
-	}
 
       /* Loop through the Call Frame Instructions associated with
 	 this FDE.  */
@@ -1375,12 +1723,15 @@ output_call_frame_info (for_eh)
       /* Pad the FDE out to an address sized boundary.  */
       ASM_OUTPUT_ALIGN (asm_out_file, floor_log2 (PTR_SIZE));
       ASM_OUTPUT_LABEL (asm_out_file, l2);
+#ifdef ASM_OUTPUT_DEFINE_LABEL_DIFFERENCE_SYMBOL
+      ASM_OUTPUT_DEFINE_LABEL_DIFFERENCE_SYMBOL (asm_out_file, ld, l2, l1);
+#endif
     }
 #ifndef EH_FRAME_SECTION
   if (for_eh)
     {
       /* Emit terminating zero for table.  */
-      ASM_OUTPUT_DWARF_DATA (asm_out_file, 0);
+      ASM_OUTPUT_DWARF_DATA4 (asm_out_file, 0);
       fputc ('\n', asm_out_file);
     }
 #endif
@@ -1389,16 +1740,10 @@ output_call_frame_info (for_eh)
      get a value of 0.  Putting .align 0 after the label fixes it.  */
   ASM_OUTPUT_ALIGN (asm_out_file, 0);
 #endif
-}
 
-/* Decide whether we want to emit frame unwind information for the current
-   translation unit.  */
-
-int
-dwarf2out_do_frame ()
-{
-  return (write_symbols == DWARF2_DEBUG
-	  || (flag_exceptions && ! exceptions_via_longjmp));
+  /* Turn off app to make assembly quicker.  */
+  if (flag_debug_asm)
+    app_disable ();
 }
 
 /* Output a marker (i.e. a label) for the beginning of a function, before
@@ -1435,6 +1780,8 @@ dwarf2out_begin_prologue ()
   fde->dw_fde_current_label = NULL;
   fde->dw_fde_end = NULL;
   fde->dw_fde_cfi = NULL;
+
+  args_size = 0;
 }
 
 /* Output a marker (i.e. a label) for the absolute end of the generated code
@@ -1563,7 +1910,7 @@ typedef struct dw_fp_struct
 dw_float_const;
 
 /* Each entry in the line_info_table maintains the file and
-   line nuber associated with the label generated for that
+   line number associated with the label generated for that
    entry.  The label gives the PC value associated with
    the line number entry.  */
 
@@ -1584,7 +1931,7 @@ typedef struct dw_separate_line_info_struct
 }
 dw_separate_line_info_entry;
 
-/* The dw_val_node describes an attibute's value, as it is
+/* The dw_val_node describes an attribute's value, as it is
    represented internally.  */
 
 typedef struct dw_val_struct
@@ -1777,7 +2124,7 @@ static unsigned next_block_number = 2;
 
 /* A pointer to the base of a table of references to DIE's that describe
    declarations.  The table is indexed by DECL_UID() which is a unique
-   number, indentifying each decl.  */
+   number identifying each decl.  */
 static dw_die_ref *decl_die_table;
 
 /* Number of elements currently allocated for the decl_die_table.  */
@@ -1800,7 +2147,7 @@ static tree *decl_scope_table;
 /* Number of elements currently allocated for the decl_scope_table.  */
 static unsigned decl_scope_table_allocated;
 
-/* Current level of nesting of declataion scopes.  */
+/* Current level of nesting of declaration scopes.  */
 static unsigned decl_scope_depth;
 
 /* Size (in elements) of increments by which we may expand the
@@ -1946,7 +2293,7 @@ static void add_AT_addr			PROTO((dw_die_ref,
 					       enum dwarf_attribute, char *));
 static void add_AT_lbl_id		PROTO((dw_die_ref,
 					       enum dwarf_attribute, char *));
-static void add_AT_setion_offset	PROTO((dw_die_ref,
+static void add_AT_section_offset	PROTO((dw_die_ref,
 					       enum dwarf_attribute, char *));
 static int is_extern_subr_die		PROTO((dw_die_ref));
 static dw_attr_ref get_AT		PROTO((dw_die_ref,
@@ -1977,7 +2324,7 @@ static void add_loc_descr		PROTO((dw_loc_descr_ref *,
 static void print_spaces		PROTO((FILE *));
 static void print_die			PROTO((dw_die_ref, FILE *));
 static void print_dwarf_line_table	PROTO((FILE *));
-static void add_sibling_atttributes	PROTO((dw_die_ref));
+static void add_sibling_attributes	PROTO((dw_die_ref));
 static void build_abbrev_table		PROTO((dw_die_ref));
 static unsigned long size_of_string	PROTO((char *));
 static unsigned long size_of_loc_descr	PROTO((dw_loc_descr_ref));
@@ -2008,10 +2355,11 @@ static tree root_type			PROTO((tree));
 static int is_base_type			PROTO((tree));
 static dw_die_ref modified_type_die	PROTO((tree, int, int, dw_die_ref));
 static int type_is_enum			PROTO((tree));
-static dw_loc_descr_ref reg_loc_descr_ref PROTO((rtx));
+static dw_loc_descr_ref reg_loc_descriptor PROTO((rtx));
 static dw_loc_descr_ref based_loc_descr	PROTO((unsigned, long));
 static int is_based_loc			PROTO((rtx));
 static dw_loc_descr_ref mem_loc_descriptor PROTO((rtx));
+static dw_loc_descr_ref concat_loc_descriptor PROTO((rtx, rtx));
 static dw_loc_descr_ref loc_descriptor	PROTO((rtx));
 static unsigned ceiling			PROTO((unsigned, unsigned));
 static tree field_type			PROTO((tree));
@@ -2103,7 +2451,7 @@ static unsigned lookup_filename		PROTO((char *));
 #define STR_SECTION		".debug_str"
 #endif
 
-/* Standerd ELF section names for compiled code and data.  */
+/* Standard ELF section names for compiled code and data.  */
 #ifndef TEXT_SECTION
 #define TEXT_SECTION		".text"
 #endif
@@ -2314,7 +2662,7 @@ addr_to_string (x)
   return xstrdup (buf);
 }
 
-/* Test if rtl node points to a psuedo register.  */
+/* Test if rtl node points to a pseudo register.  */
 
 static inline int
 is_pseudo_reg (rtl)
@@ -3752,7 +4100,7 @@ print_spaces (outfile)
   fprintf (outfile, "%*s", print_indent, "");
 }
 
-/* Print the information assoaciated with a given DIE, and its children.
+/* Print the information associated with a given DIE, and its children.
    This routine is a debugging aid only.  */
 
 static void
@@ -3818,6 +4166,8 @@ print_die (die, outfile)
 	    fprintf (outfile, "\"%s\"", a->dw_attr_val.v.val_str);
 	  else
 	    fprintf (outfile, "<null>");
+	  break;
+	default:
 	  break;
 	}
 
@@ -3955,8 +4305,8 @@ build_abbrev_table (die)
 	{
 	  n_alloc = abbrev_die_table_allocated + ABBREV_DIE_TABLE_INCREMENT;
 	  abbrev_die_table 
-	    = (dw_die_ref *) xmalloc (abbrev_die_table,
-				      sizeof (dw_die_ref) * n_alloc);
+	    = (dw_die_ref *) xrealloc (abbrev_die_table,
+				       sizeof (dw_die_ref) * n_alloc);
 
 	  bzero ((char *) &abbrev_die_table[abbrev_die_table_allocated],
 		 (n_alloc - abbrev_die_table_allocated) * sizeof (dw_die_ref));
@@ -4199,10 +4549,10 @@ size_of_die (die)
   return size;
 }
 
-/* Size the debgging information associted with a given DIE.
+/* Size the debugging information associated with a given DIE.
    Visits the DIE's children recursively.  Updates the global
    variable next_die_offset, on each time through.  Uses the
-   current value of next_die_offset to updete the die_offset
+   current value of next_die_offset to update the die_offset
    field in each DIE.  */
 
 static void
@@ -4432,7 +4782,7 @@ size_of_pubnames ()
   return size;
 }
 
-/* Return the size of the information in the .debug_aranges seciton.  */
+/* Return the size of the information in the .debug_aranges section.  */
 
 static unsigned long
 size_of_aranges ()
@@ -4516,7 +4866,7 @@ output_value_format (v)
   enum dwarf_form form = value_format (v);
 
   output_uleb128 (form);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, " (%s)", dwarf_form_name (form));
 
   fputc ('\n', asm_out_file);
@@ -4536,12 +4886,12 @@ output_abbrev_section ()
       register dw_die_ref abbrev = abbrev_die_table[abbrev_id];
 
       output_uleb128 (abbrev_id);
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, " (abbrev code)");
 
       fputc ('\n', asm_out_file);
       output_uleb128 (abbrev->die_tag);
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, " (TAG: %s)",
 		 dwarf_tag_name (abbrev->die_tag));
 
@@ -4549,7 +4899,7 @@ output_abbrev_section ()
       fprintf (asm_out_file, "\t%s\t0x%x", ASM_BYTE_OP,
 	       abbrev->die_child != NULL ? DW_children_yes : DW_children_no);
 
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, "\t%s %s",
 		 ASM_COMMENT_START,
 		 (abbrev->die_child != NULL
@@ -4561,7 +4911,7 @@ output_abbrev_section ()
 	   a_attr = a_attr->dw_attr_next)
 	{
 	  output_uleb128 (a_attr->dw_attr);
-	  if (flag_verbose_asm)
+	  if (flag_debug_asm)
 	    fprintf (asm_out_file, " (%s)",
 		     dwarf_attr_name (a_attr->dw_attr));
 
@@ -4723,7 +5073,7 @@ output_die (die)
   register int i;
 
   output_uleb128 (die->die_abbrev);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, " (DIE (0x%x) %s)",
 	     die->die_offset, dwarf_tag_name (die->die_tag));
 
@@ -4754,7 +5104,7 @@ output_die (die)
 	      abort ();
 	    }
 
-	  if (flag_verbose_asm)
+	  if (flag_debug_asm)
 	    fprintf (asm_out_file, "\t%s %s",
 		     ASM_COMMENT_START, dwarf_attr_name (a->dw_attr));
 
@@ -4764,7 +5114,7 @@ output_die (die)
 	    {
 	      /* Output the opcode.  */
 	      ASM_OUTPUT_DWARF_DATA1 (asm_out_file, loc->dw_loc_opc);
-	      if (flag_verbose_asm)
+	      if (flag_debug_asm)
 		fprintf (asm_out_file, "\t%s %s", ASM_COMMENT_START,
 			 dwarf_stack_op_name (loc->dw_loc_opc));
 
@@ -4806,7 +5156,7 @@ output_die (die)
 
 	case dw_val_class_long_long:
 	  ASM_OUTPUT_DWARF_DATA1 (asm_out_file, 8);
-	  if (flag_verbose_asm)
+	  if (flag_debug_asm)
 	    fprintf (asm_out_file, "\t%s %s",
 		   ASM_COMMENT_START, dwarf_attr_name (a->dw_attr));
 
@@ -4815,7 +5165,7 @@ output_die (die)
 				  a->dw_attr_val.v.val_long_long.hi,
 				  a->dw_attr_val.v.val_long_long.low);
 
-	  if (flag_verbose_asm)
+	  if (flag_debug_asm)
 	    fprintf (asm_out_file,
 		     "\t%s long long constant", ASM_COMMENT_START);
 	  
@@ -4825,7 +5175,7 @@ output_die (die)
 	case dw_val_class_float:
 	  ASM_OUTPUT_DWARF_DATA1 (asm_out_file,
 				  a->dw_attr_val.v.val_float.length * 4);
-	  if (flag_verbose_asm)
+	  if (flag_debug_asm)
 	    fprintf (asm_out_file, "\t%s %s",
 		     ASM_COMMENT_START, dwarf_attr_name (a->dw_attr));
 
@@ -4834,7 +5184,7 @@ output_die (die)
 	    {
 	      ASM_OUTPUT_DWARF_DATA4 (asm_out_file,
 				      a->dw_attr_val.v.val_float.array[i]);
-	      if (flag_verbose_asm)
+	      if (flag_debug_asm)
 		fprintf (asm_out_file, "\t%s fp constant word %d",
 			 ASM_COMMENT_START, i);
 
@@ -4878,7 +5228,12 @@ output_die (die)
 	  break;
 
 	case dw_val_class_str:
-	  ASM_OUTPUT_DWARF_STRING (asm_out_file, a->dw_attr_val.v.val_str);
+	  if (flag_debug_asm)
+	    ASM_OUTPUT_DWARF_STRING (asm_out_file, a->dw_attr_val.v.val_str);
+	  else
+	    ASM_OUTPUT_ASCII (asm_out_file,
+			      a->dw_attr_val.v.val_str,
+			      strlen (a->dw_attr_val.v.val_str) + 1);
 	  break;
 
 	default:
@@ -4889,7 +5244,7 @@ output_die (die)
 	  && a->dw_attr_val.val_class != dw_val_class_long_long
 	  && a->dw_attr_val.val_class != dw_val_class_float)
 	{
-	  if (flag_verbose_asm)
+	  if (flag_debug_asm)
 	    fprintf (asm_out_file, "\t%s %s",
 		     ASM_COMMENT_START, dwarf_attr_name (a->dw_attr));
 
@@ -4904,7 +5259,7 @@ output_die (die)
     {
       /* Add null byte to terminate sibling list. */
       ASM_OUTPUT_DWARF_DATA1 (asm_out_file, 0);
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, "\t%s end of children of DIE 0x%x",
 		 ASM_COMMENT_START, die->die_offset);
 
@@ -4919,24 +5274,24 @@ static void
 output_compilation_unit_header ()
 {
   ASM_OUTPUT_DWARF_DATA (asm_out_file, next_die_offset - DWARF_OFFSET_SIZE);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Length of Compilation Unit Info.",
 	     ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_DWARF_DATA2 (asm_out_file, DWARF_VERSION);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s DWARF version number", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_DWARF_OFFSET (asm_out_file, stripattributes (ABBREV_SECTION));
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Offset Into Abbrev. Section",
 	     ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_DWARF_DATA1 (asm_out_file, PTR_SIZE);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Pointer Size (in bytes)", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
@@ -4991,25 +5346,25 @@ output_pubnames ()
 
   ASM_OUTPUT_DWARF_DATA (asm_out_file, pubnames_length);
 
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Length of Public Names Info.",
 	     ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_DWARF_DATA2 (asm_out_file, DWARF_VERSION);
 
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s DWARF Version", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_DWARF_OFFSET (asm_out_file, stripattributes (DEBUG_INFO_SECTION));
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Offset of Compilation Unit Info.",
 	     ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_DWARF_DATA (asm_out_file, next_die_offset);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Compilation Unit Length", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
@@ -5018,14 +5373,20 @@ output_pubnames ()
       register pubname_ref pub = &pubname_table[i];
 
       ASM_OUTPUT_DWARF_DATA (asm_out_file, pub->die->die_offset);
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, "\t%s DIE offset", ASM_COMMENT_START);
 
       fputc ('\n', asm_out_file);
 
-      ASM_OUTPUT_DWARF_STRING (asm_out_file, pub->name);
-      if (flag_verbose_asm)
-	fprintf (asm_out_file, "%s external name", ASM_COMMENT_START);
+      if (flag_debug_asm)
+	{
+	  ASM_OUTPUT_DWARF_STRING (asm_out_file, pub->name);
+	  fprintf (asm_out_file, "%s external name", ASM_COMMENT_START);
+	}
+      else
+	{
+	  ASM_OUTPUT_ASCII (asm_out_file, pub->name, strlen (pub->name) + 1);
+	}
 
       fputc ('\n', asm_out_file);
     }
@@ -5066,29 +5427,29 @@ output_aranges ()
   register unsigned long aranges_length = size_of_aranges ();
 
   ASM_OUTPUT_DWARF_DATA (asm_out_file, aranges_length);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Length of Address Ranges Info.",
 	     ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_DWARF_DATA2 (asm_out_file, DWARF_VERSION);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s DWARF Version", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_DWARF_OFFSET (asm_out_file, stripattributes (DEBUG_INFO_SECTION));
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Offset of Compilation Unit Info.",
 	     ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_DWARF_DATA1 (asm_out_file, PTR_SIZE);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Size of Address", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_DWARF_DATA1 (asm_out_file, 0);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Size of Segment Descriptor",
 	     ASM_COMMENT_START);
 
@@ -5097,18 +5458,18 @@ output_aranges ()
   if (PTR_SIZE == 8)
     fprintf (asm_out_file, ",0,0");
 
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Pad to %d byte boundary",
 	     ASM_COMMENT_START, 2 * PTR_SIZE);
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_DWARF_ADDR (asm_out_file, TEXT_SECTION);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Address", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_DWARF_ADDR_DELTA (asm_out_file, text_end_label, TEXT_SECTION);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "%s Length", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
@@ -5127,7 +5488,7 @@ output_aranges ()
 	  ASM_OUTPUT_DWARF_ADDR (asm_out_file, name);
 	}
 
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, "\t%s Address", ASM_COMMENT_START);
 
       fputc ('\n', asm_out_file);
@@ -5138,7 +5499,7 @@ output_aranges ()
 	ASM_OUTPUT_DWARF_ADDR_DATA (asm_out_file,
 				    get_AT_unsigned (a, DW_AT_byte_size));
 
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, "%s Length", ASM_COMMENT_START);
 
       fputc ('\n', asm_out_file);
@@ -5173,47 +5534,47 @@ output_line_info ()
   register unsigned long function;
 
   ASM_OUTPUT_DWARF_DATA (asm_out_file, size_of_line_info ());
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Length of Source Line Info.",
 	     ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_DWARF_DATA2 (asm_out_file, DWARF_VERSION);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s DWARF Version", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_DWARF_DATA (asm_out_file, size_of_line_prolog ());
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Prolog Length", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_DWARF_DATA1 (asm_out_file, DWARF_LINE_MIN_INSTR_LENGTH);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Minimum Instruction Length",
 	     ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   ASM_OUTPUT_DWARF_DATA1 (asm_out_file, DWARF_LINE_DEFAULT_IS_STMT_START);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Default is_stmt_start flag",
 	     ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   fprintf (asm_out_file, "\t%s\t%d", ASM_BYTE_OP, DWARF_LINE_BASE);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Line Base Value (Special Opcodes)",
 	     ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   fprintf (asm_out_file, "\t%s\t%u", ASM_BYTE_OP, DWARF_LINE_RANGE);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Line Range Value (Special Opcodes)",
 	     ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
   fprintf (asm_out_file, "\t%s\t%u", ASM_BYTE_OP, DWARF_LINE_OPCODE_BASE);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Special Opcode Base", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
@@ -5233,27 +5594,35 @@ output_line_info ()
 	  break;
 	}
       ASM_OUTPUT_DWARF_DATA1 (asm_out_file, n_op_args);
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, "\t%s opcode: 0x%x has %d args",
 		 ASM_COMMENT_START, opc, n_op_args);
       fputc ('\n', asm_out_file);
     }
 
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "%s Include Directory Table\n", ASM_COMMENT_START);
 
   /* Include directory table is empty, at present */
   ASM_OUTPUT_DWARF_DATA1 (asm_out_file, 0);
   fputc ('\n', asm_out_file);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "%s File Name Table\n", ASM_COMMENT_START);
 
   for (ft_index = 1; ft_index < file_table_in_use; ++ft_index)
     {
-      ASM_OUTPUT_DWARF_STRING (asm_out_file, file_table[ft_index]);
-      if (flag_verbose_asm)
-	fprintf (asm_out_file, "%s File Entry: 0x%x",
-		 ASM_COMMENT_START, ft_index);
+      if (flag_debug_asm)
+	{
+	  ASM_OUTPUT_DWARF_STRING (asm_out_file, file_table[ft_index]);
+	  fprintf (asm_out_file, "%s File Entry: 0x%x",
+		   ASM_COMMENT_START, ft_index);
+	}
+      else
+	{
+	  ASM_OUTPUT_ASCII (asm_out_file,
+			    file_table[ft_index],
+			    strlen (file_table[ft_index]) + 1);
+	}
 
       fputc ('\n', asm_out_file);
 
@@ -5276,7 +5645,7 @@ output_line_info ()
 
   /* Set the address register to the first location in the text section */
   ASM_OUTPUT_DWARF_DATA1 (asm_out_file, 0);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s DW_LNE_set_address", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
@@ -5311,7 +5680,7 @@ output_line_info ()
 	{
 	  /* This can handle deltas up to 0xffff.  This takes 3 bytes.  */
 	  ASM_OUTPUT_DWARF_DATA1 (asm_out_file, DW_LNS_fixed_advance_pc);
-	  if (flag_verbose_asm)
+	  if (flag_debug_asm)
 	    fprintf (asm_out_file, "\t%s DW_LNS_fixed_advance_pc",
 		     ASM_COMMENT_START);
 
@@ -5323,7 +5692,7 @@ output_line_info ()
 	{
 	  /* This can handle any delta.  This takes 4+PTR_SIZE bytes.  */
 	  ASM_OUTPUT_DWARF_DATA1 (asm_out_file, 0);
-	  if (flag_verbose_asm)
+	  if (flag_debug_asm)
 	    fprintf (asm_out_file, "\t%s DW_LNE_set_address",
 		     ASM_COMMENT_START);
 	  fputc ('\n', asm_out_file);
@@ -5343,12 +5712,12 @@ output_line_info ()
 	{
 	  current_file = line_info->dw_file_num;
 	  ASM_OUTPUT_DWARF_DATA1 (asm_out_file, DW_LNS_set_file);
-	  if (flag_verbose_asm)
+	  if (flag_debug_asm)
 	    fprintf (asm_out_file, "\t%s DW_LNS_set_file", ASM_COMMENT_START);
 
 	  fputc ('\n', asm_out_file);
 	  output_uleb128 (current_file);
-	  if (flag_verbose_asm)
+	  if (flag_debug_asm)
 	    fprintf (asm_out_file, " (\"%s\")", file_table[current_file]);
 
 	  fputc ('\n', asm_out_file);
@@ -5366,7 +5735,7 @@ output_line_info ()
 	     takes 1 byte.  */
 	  ASM_OUTPUT_DWARF_DATA1 (asm_out_file,
 				  DWARF_LINE_OPCODE_BASE + line_delta);
-	  if (flag_verbose_asm)
+	  if (flag_debug_asm)
 	      fprintf (asm_out_file,
 		       "\t%s line %d", ASM_COMMENT_START, current_line);
 
@@ -5377,7 +5746,7 @@ output_line_info ()
 	  /* This can handle any delta.  This takes at least 4 bytes, depending
 	     on the value being encoded.  */
 	  ASM_OUTPUT_DWARF_DATA1 (asm_out_file, DW_LNS_advance_line);
-	  if (flag_verbose_asm)
+	  if (flag_debug_asm)
 	    fprintf (asm_out_file, "\t%s advance to line %d",
 		     ASM_COMMENT_START, current_line);
 
@@ -5393,7 +5762,7 @@ output_line_info ()
   if (0)
     {
       ASM_OUTPUT_DWARF_DATA1 (asm_out_file, DW_LNS_fixed_advance_pc);
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, "\t%s DW_LNS_fixed_advance_pc",
 		 ASM_COMMENT_START);
 
@@ -5404,7 +5773,7 @@ output_line_info ()
   else
     {
       ASM_OUTPUT_DWARF_DATA1 (asm_out_file, 0);
-      if (flag_verbose_asm)
+      if (flag_debug_asm)
 	fprintf (asm_out_file, "\t%s DW_LNE_set_address", ASM_COMMENT_START);
       fputc ('\n', asm_out_file);
       output_uleb128 (1 + PTR_SIZE);
@@ -5417,7 +5786,7 @@ output_line_info ()
 
   /* Output the marker for the end of the line number info.  */
   ASM_OUTPUT_DWARF_DATA1 (asm_out_file, 0);
-  if (flag_verbose_asm)
+  if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s DW_LNE_end_sequence", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
@@ -5445,7 +5814,7 @@ output_line_info ()
 
 	  /* Set the address register to the first line in the function */
 	  ASM_OUTPUT_DWARF_DATA1 (asm_out_file, 0);
-	  if (flag_verbose_asm)
+	  if (flag_debug_asm)
 	    fprintf (asm_out_file, "\t%s DW_LNE_set_address",
 		     ASM_COMMENT_START);
 
@@ -5463,7 +5832,7 @@ output_line_info ()
 	  if (0)
 	    {
 	      ASM_OUTPUT_DWARF_DATA1 (asm_out_file, DW_LNS_fixed_advance_pc);
-	      if (flag_verbose_asm)
+	      if (flag_debug_asm)
 		fprintf (asm_out_file, "\t%s DW_LNS_fixed_advance_pc",
 			 ASM_COMMENT_START);
 
@@ -5475,7 +5844,7 @@ output_line_info ()
 	  else
 	    {
 	      ASM_OUTPUT_DWARF_DATA1 (asm_out_file, 0);
-	      if (flag_verbose_asm)
+	      if (flag_debug_asm)
 		fprintf (asm_out_file, "\t%s DW_LNE_set_address",
 			 ASM_COMMENT_START);
 	      fputc ('\n', asm_out_file);
@@ -5495,12 +5864,12 @@ output_line_info ()
 	{
 	  current_file = line_info->dw_file_num;
 	  ASM_OUTPUT_DWARF_DATA1 (asm_out_file, DW_LNS_set_file);
-	  if (flag_verbose_asm)
+	  if (flag_debug_asm)
 	    fprintf (asm_out_file, "\t%s DW_LNS_set_file", ASM_COMMENT_START);
 
 	  fputc ('\n', asm_out_file);
 	  output_uleb128 (current_file);
-	  if (flag_verbose_asm)
+	  if (flag_debug_asm)
 	    fprintf (asm_out_file, " (\"%s\")", file_table[current_file]);
 
 	  fputc ('\n', asm_out_file);
@@ -5517,7 +5886,7 @@ output_line_info ()
 	    {
 	      ASM_OUTPUT_DWARF_DATA1 (asm_out_file,
 				      DWARF_LINE_OPCODE_BASE + line_delta);
-	      if (flag_verbose_asm)
+	      if (flag_debug_asm)
 		fprintf (asm_out_file,
 			 "\t%s line %d", ASM_COMMENT_START, current_line);
 
@@ -5526,7 +5895,7 @@ output_line_info ()
 	  else
 	    {
 	      ASM_OUTPUT_DWARF_DATA1 (asm_out_file, DW_LNS_advance_line);
-	      if (flag_verbose_asm)
+	      if (flag_debug_asm)
 		fprintf (asm_out_file, "\t%s advance to line %d",
 			 ASM_COMMENT_START, current_line);
 
@@ -5552,7 +5921,7 @@ output_line_info ()
 	  if (0)
 	    {
 	      ASM_OUTPUT_DWARF_DATA1 (asm_out_file, DW_LNS_fixed_advance_pc);
-	      if (flag_verbose_asm)
+	      if (flag_debug_asm)
 		fprintf (asm_out_file, "\t%s DW_LNS_fixed_advance_pc",
 			 ASM_COMMENT_START);
 
@@ -5564,7 +5933,7 @@ output_line_info ()
 	  else
 	    {
 	      ASM_OUTPUT_DWARF_DATA1 (asm_out_file, 0);
-	      if (flag_verbose_asm)
+	      if (flag_debug_asm)
 		fprintf (asm_out_file, "\t%s DW_LNE_set_address",
 			 ASM_COMMENT_START);
 	      fputc ('\n', asm_out_file);
@@ -5578,7 +5947,7 @@ output_line_info ()
 
 	  /* Output the marker for the end of this sequence.  */
 	  ASM_OUTPUT_DWARF_DATA1 (asm_out_file, 0);
-	  if (flag_verbose_asm)
+	  if (flag_debug_asm)
 	    fprintf (asm_out_file, "\t%s DW_LNE_end_sequence",
 		     ASM_COMMENT_START);
 
@@ -6033,6 +6402,30 @@ mem_loc_descriptor (rtl)
   return mem_loc_result;
 }
 
+/* Return a descriptor that describes the concatenation of two locations.
+   This is typically a complex variable.  */
+
+static dw_loc_descr_ref
+concat_loc_descriptor (x0, x1)
+     register rtx x0, x1;
+{
+  dw_loc_descr_ref cc_loc_result = NULL;
+
+  if (!is_pseudo_reg (x0)
+      && (GET_CODE (x0) != MEM || !is_pseudo_reg (XEXP (x0, 0))))
+    add_loc_descr (&cc_loc_result, loc_descriptor (x0));
+  add_loc_descr (&cc_loc_result,
+	         new_loc_descr (DW_OP_piece, GET_MODE_SIZE (GET_MODE (x0)), 0));
+
+  if (!is_pseudo_reg (x1)
+      && (GET_CODE (x1) != MEM || !is_pseudo_reg (XEXP (x1, 0))))
+    add_loc_descr (&cc_loc_result, loc_descriptor (x1));
+  add_loc_descr (&cc_loc_result,
+		 new_loc_descr (DW_OP_piece, GET_MODE_SIZE (GET_MODE (x1)), 0));
+
+  return cc_loc_result;
+}
+
 /* Output a proper Dwarf location descriptor for a variable or parameter
    which is either allocated in a register or in a memory location.  For a
    register, we just generate an OP_REG and the register number.  For a
@@ -6062,6 +6455,10 @@ loc_descriptor (rtl)
 
     case MEM:
       loc_result = mem_loc_descriptor (XEXP (rtl, 0));
+      break;
+
+    case CONCAT:
+      loc_result = concat_loc_descriptor (XEXP (rtl, 0), XEXP (rtl, 1));
       break;
 
     default:
@@ -6271,7 +6668,10 @@ add_AT_location_description (die, attr_kind, rtl)
 
   if (is_pseudo_reg (rtl)
       || (GET_CODE (rtl) == MEM
-	  && is_pseudo_reg (XEXP (rtl, 0))))
+	  && is_pseudo_reg (XEXP (rtl, 0)))
+      || (GET_CODE (rtl) == CONCAT
+	  && is_pseudo_reg (XEXP (rtl, 0))
+	  && is_pseudo_reg (XEXP (rtl, 1))))
     return;
 
   add_AT_loc (die, attr_kind, loc_descriptor (rtl));
@@ -6519,7 +6919,7 @@ add_location_or_const_value_attribute (die, decl)
      get valid non-NULL DECL_INCOMING_RTL values, but integrate.c
      doesn't currently generate these values for inlined instances of
      inline function parameters, so when we see such cases, we are
-     just SOL (shit-out-of-luck) for the time being (until integrate.c
+     just out-of-luck for the time being (until integrate.c
      gets fixed).  */
 
   /* Use DECL_RTL as the "location" unless we find something better.  */
@@ -6555,6 +6955,11 @@ add_location_or_const_value_attribute (die, decl)
 
   switch (GET_CODE (rtl))
     {
+    case ADDRESSOF:
+      /* The address of a variable that was optimized away; don't emit
+	 anything.  */
+      break;
+
     case CONST_INT:
     case CONST_DOUBLE:
     case CONST_STRING:
@@ -6569,6 +6974,7 @@ add_location_or_const_value_attribute (die, decl)
     case MEM:
     case REG:
     case SUBREG:
+    case CONCAT:
       add_AT_location_description (die, DW_AT_location, rtl);
       break;
 
@@ -6655,10 +7061,22 @@ add_bound_info (subrange_die, bound_attr, bound)
 	{
 	  register dw_die_ref ctx = lookup_decl_die (current_function_decl);
 	  register dw_die_ref decl_die = new_die (DW_TAG_variable, ctx);
+	  register rtx loc = SAVE_EXPR_RTL (bound);
+
+	  /* If the RTL for the SAVE_EXPR is memory, handle the case where
+	     it references an outer function's frame.  */
+
+	  if (GET_CODE (loc) == MEM)
+	    {
+	      rtx new_addr = fix_lexical_addr (XEXP (loc, 0), bound);
+
+	      if (XEXP (loc, 0) != new_addr)
+		loc = gen_rtx (MEM, GET_MODE (loc), new_addr);
+	    }
+
 	  add_AT_flag (decl_die, DW_AT_artificial, 1);
 	  add_type_attribute (decl_die, TREE_TYPE (bound), 1, 0, ctx);
-	  add_AT_location_description (decl_die, DW_AT_location,
-				       SAVE_EXPR_RTL (bound));
+	  add_AT_location_description (decl_die, DW_AT_location, loc);
 	  add_AT_die_ref (subrange_die, bound_attr, decl_die);
 	}
 
@@ -6667,6 +7085,7 @@ add_bound_info (subrange_die, bound_attr, bound)
 
     case MAX_EXPR:
     case VAR_DECL:
+    case COMPONENT_REF:
       /* ??? These types of bounds can be created by the Ada front end,
 	 and it isn't clear how to emit debug info for them.  */
       break;
@@ -7133,7 +7552,7 @@ decl_start_label (decl)
   return fnname;
 }
 
-/* These routines generate the internnal representation of the DIE's for
+/* These routines generate the internal representation of the DIE's for
    the compilation unit.  Debugging information is collected by walking
    the declaration trees passed in from dwarf2out_decl().  */
 
@@ -7341,7 +7760,7 @@ gen_enumeration_type_die (type, context_die)
 
       TREE_ASM_WRITTEN (type) = 1;
       add_byte_size_attribute (type_die, type);
-      if (type_tag (type))
+      if (TYPE_STUB_DECL (type) != NULL_TREE)
 	add_src_coords_attributes (type_die, TYPE_STUB_DECL (type));
 
       /* If the first reference to this type was as the return type of an
@@ -7529,6 +7948,17 @@ gen_subprogram_die (decl, context_die)
       subr_die = new_die (DW_TAG_subprogram, context_die);
       add_abstract_origin_attribute (subr_die, origin);
     }
+  else if (old_die && DECL_ABSTRACT (decl)
+	   && get_AT_unsigned (old_die, DW_AT_inline))
+    {
+      /* This must be a redefinition of an extern inline function.
+	 We can just reuse the old die here.  */
+      subr_die = old_die;
+
+      /* Clear out the inlined attribute and parm types.  */
+      remove_AT (subr_die, DW_AT_inline);
+      remove_children (subr_die);
+    }
   else if (old_die)
     {
       register unsigned file_index
@@ -7613,6 +8043,10 @@ gen_subprogram_die (decl, context_die)
     }
   else if (DECL_ABSTRACT (decl))
     {
+      /* ??? Checking DECL_DEFER_OUTPUT is correct for static inline functions,
+	 but not for extern inline functions.  We can't get this completely
+	 correct because information about whether the function was declared
+	 inline is not saved anywhere.  */
       if (DECL_DEFER_OUTPUT (decl))
 	{
 	  if (DECL_INLINE (decl))
@@ -8054,6 +8488,9 @@ gen_compile_unit_die (main_input_filename)
   else if (strcmp (language_string, "GNU F77") == 0)
     add_AT_unsigned (comp_unit_die, DW_AT_language, DW_LANG_Fortran77);
 
+  else if (strcmp (language_string, "GNU Pascal") == 0)
+    add_AT_unsigned (comp_unit_die, DW_AT_language, DW_LANG_Pascal83);
+
   else if (flag_traditional)
     add_AT_unsigned (comp_unit_die, DW_AT_language, DW_LANG_C);
 
@@ -8105,7 +8542,7 @@ gen_inheritance_die (binfo, context_die)
     add_AT_unsigned (die, DW_AT_accessibility, DW_ACCESS_protected);
 }
 
-/* Genearate a DIE for a class member.  */
+/* Generate a DIE for a class member.  */
 
 static void
 gen_member_die (type, context_die)
@@ -8198,7 +8635,7 @@ gen_struct_or_union_type_die (type, context_die)
          this type is expressed in terms of this type itself.  */
       TREE_ASM_WRITTEN (type) = 1;
       add_byte_size_attribute (type_die, type);
-      if (type_tag (type))
+      if (TYPE_STUB_DECL (type) != NULL_TREE)
 	add_src_coords_attributes (type_die, TYPE_STUB_DECL (type));
 
       /* If the first reference to this type was as the return type of an
@@ -8311,6 +8748,13 @@ gen_type_die (type, context_die)
 
     case POINTER_TYPE:
     case REFERENCE_TYPE:
+      /* We must set TREE_ASM_WRITTEN in case this is a recursive type.  This
+	 ensures that the gen_type_die recursion will terminate even if the
+	 type is recursive.  Recursive types are possible in Ada.  */
+      /* ??? We could perhaps do this for all types before the switch
+	 statement.  */
+      TREE_ASM_WRITTEN (type) = 1;
+
       /* For these types, all that is required is that we output a DIE (or a
          set of DIEs) to represent the "basis" type.  */
       gen_type_die (TREE_TYPE (type), context_die);
@@ -8540,7 +8984,7 @@ gen_block_die (stmt, context_die, depth)
 }
 
 /* Generate all of the decls declared within a given scope and (recursively)
-   all of it's sub-blocks.  */
+   all of its sub-blocks.  */
 
 static void
 decls_for_scope (stmt, context_die, depth)
@@ -8784,11 +9228,11 @@ dwarf2out_decl (decl)
       /* What we would really like to do here is to filter out all mere
          file-scope declarations of file-scope functions which are never
          referenced later within this translation unit (and keep all of ones
-         that *are* referenced later on) but we aren't clarvoiant, so we have 
+         that *are* referenced later on) but we aren't clairvoyant, so we have 
          no idea which functions will be referenced in the future (i.e. later 
          on within the current translation unit). So here we just ignore all
          file-scope function declarations which are not also definitions.  If 
-         and when the debugger needs to know something about these funcstion, 
+         and when the debugger needs to know something about these functions,
          it wil have to hunt around and find the DWARF information associated 
          with the definition of the function. Note that we can't just check
          `DECL_EXTERNAL' to find out which FUNCTION_DECL nodes represent
@@ -9131,10 +9575,6 @@ dwarf2out_init (asm_out_file, main_input_filename)
   gen_compile_unit_die (main_input_filename);
 
   ASM_GENERATE_INTERNAL_LABEL (text_end_label, TEXT_END_LABEL, 0);
-
-  /* Initialize the frame unwind information.  Eventually this should be
-     called from compile_file instead.  */
-  dwarf2out_frame_init ();
 }
 
 /* Output stuff that dwarf requires at the end of every file,
@@ -9190,10 +9630,6 @@ dwarf2out_finish ()
   ASM_OUTPUT_SECTION (asm_out_file, BSS_SECTION);
   ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, BSS_END_LABEL, 0);
 #endif
-
-  /* Output the frame unwind information.  Eventually this should be called
-     from compile_file instead.  */
-  dwarf2out_frame_finish ();
 
   /* Output the source line correspondence table.  */
   if (line_info_table_in_use > 1 || separate_line_info_table_in_use)

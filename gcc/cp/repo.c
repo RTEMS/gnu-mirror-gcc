@@ -1,5 +1,5 @@
 /* Code to maintain a C++ template repository.
-   Copyright (C) 1995 Free Software Foundation, Inc.
+   Copyright (C) 1995, 1997 Free Software Foundation, Inc.
    Contributed by Jason Merrill (jason@cygnus.com)
 
 This file is part of GNU CC.
@@ -25,16 +25,34 @@ Boston, MA 02111-1307, USA.  */
    The results of the automatic process should be easily reproducible with
    explicit code.  */
 
-#include <stdio.h>
 #include "config.h"
+#include <stdio.h>
 #include "tree.h"
 #include "cp-tree.h"
 #include "input.h"
 #include "obstack.h"
 
-extern char * rindex ();
+#ifdef HAVE_STRING_H
+#include <string.h>
+#endif
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#else
 extern char * getenv ();
-extern char * getpwd ();
+#endif
+
+#ifdef NEED_DECLARATION_RINDEX
+extern char *rindex ();
+#endif rindex
+extern char *getpwd PROTO((void));
+
+static tree repo_get_id PROTO((tree));
+static char *save_string PROTO((char *, int));
+static char *extract_string PROTO((char **));
+static char *get_base_filename PROTO((char *));
+static void open_repo_file PROTO((char *));
+static char *afgets PROTO((FILE *));
+static void reopen_repo_file_for_write PROTO((void));
 
 static tree pending_repo;
 static tree original_repo;
@@ -420,7 +438,7 @@ finish_repo ()
     if (strcmp (old_main, main_input_filename) != 0
 	|| strcmp (old_dir, dir) != 0
 	|| (args == NULL) != (old_args == NULL)
-	|| strcmp (old_args, args) != 0)
+	|| (args && strcmp (old_args, args) != 0))
       repo_changed = 1;
 
   if (! repo_changed || errorcount || sorrycount)
