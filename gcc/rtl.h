@@ -1452,6 +1452,7 @@ extern rtx emit_copy_of_insn_after (rtx, rtx);
 extern void set_reg_attrs_from_mem (rtx, rtx);
 extern void set_mem_attrs_from_reg (rtx, rtx);
 extern void set_reg_attrs_for_parm (rtx, rtx);
+extern int mem_expr_equal_p (tree, tree);
 
 /* In rtl.c */
 extern rtx rtx_alloc (RTX_CODE);
@@ -1482,8 +1483,6 @@ extern rtx gen_lowpart_if_possible (enum machine_mode, rtx);
 /* In emit-rtl.c */
 extern rtx gen_highpart (enum machine_mode, rtx);
 extern rtx gen_highpart_mode (enum machine_mode, enum machine_mode, rtx);
-extern rtx gen_realpart (enum machine_mode, rtx);
-extern rtx gen_imagpart (enum machine_mode, rtx);
 extern rtx operand_subword (rtx, unsigned int, int, enum machine_mode);
 
 /* In emit-rtl.c */
@@ -1530,19 +1529,25 @@ extern rtx assign_temp (tree, int, int, int);
 
 /* In emit-rtl.c */
 extern rtx emit_insn_before (rtx, rtx);
+extern rtx emit_insn_before_noloc (rtx, rtx);
 extern rtx emit_insn_before_setloc (rtx, rtx, int);
 extern rtx emit_jump_insn_before (rtx, rtx);
+extern rtx emit_jump_insn_before_noloc (rtx, rtx);
 extern rtx emit_jump_insn_before_setloc (rtx, rtx, int);
 extern rtx emit_call_insn_before (rtx, rtx);
+extern rtx emit_call_insn_before_noloc (rtx, rtx);
 extern rtx emit_call_insn_before_setloc (rtx, rtx, int);
 extern rtx emit_barrier_before (rtx);
 extern rtx emit_label_before (rtx, rtx);
 extern rtx emit_note_before (int, rtx);
 extern rtx emit_insn_after (rtx, rtx);
+extern rtx emit_insn_after_noloc (rtx, rtx);
 extern rtx emit_insn_after_setloc (rtx, rtx, int);
 extern rtx emit_jump_insn_after (rtx, rtx);
+extern rtx emit_jump_insn_after_noloc (rtx, rtx);
 extern rtx emit_jump_insn_after_setloc (rtx, rtx, int);
 extern rtx emit_call_insn_after (rtx, rtx);
+extern rtx emit_call_insn_after_noloc (rtx, rtx);
 extern rtx emit_call_insn_after_setloc (rtx, rtx, int);
 extern rtx emit_barrier_after (rtx);
 extern rtx emit_label_after (rtx, rtx);
@@ -1998,6 +2003,7 @@ extern int cse_main (rtx, int, int, FILE *);
 #endif
 extern void cse_end_of_basic_block (rtx, struct cse_basic_block_data *,
 				    int, int, int);
+extern void cse_condition_code_reg (void);
 
 /* In jump.c */
 extern int comparison_dominates_p (enum rtx_code, enum rtx_code);
@@ -2047,7 +2053,6 @@ extern void init_emit (void);
 extern void init_emit_once (int);
 extern void push_topmost_sequence (void);
 extern void pop_topmost_sequence (void);
-extern int subreg_realpart_p (rtx);
 extern void reverse_comparison (rtx);
 extern void set_new_first_and_last_insn (rtx, rtx);
 extern void set_new_last_label_num (int);
@@ -2140,6 +2145,8 @@ extern int preserve_subexpressions_p (void);
 /* In expr.c */
 extern rtx move_by_pieces (rtx, rtx, unsigned HOST_WIDE_INT,
 			   unsigned int, int);
+extern rtx read_complex_part (rtx, bool);
+extern void write_complex_part (rtx, rtx, bool);
 
 /* In flow.c */
 extern void recompute_reg_usage (rtx, int);
@@ -2191,6 +2198,8 @@ extern void regclass (rtx, int, FILE *);
 extern void reg_scan (rtx, unsigned int, int);
 extern void reg_scan_update (rtx, rtx, unsigned int);
 extern void fix_register (const char *, int, int);
+extern void init_subregs_of_mode (void);
+extern void record_subregs_of_mode (rtx);
 #ifdef HARD_CONST
 extern void cannot_change_mode_set_regs (HARD_REG_SET *,
 					 enum machine_mode, unsigned int);
@@ -2295,6 +2304,8 @@ extern void end_alias_analysis (void);
 extern rtx addr_side_effect_eval (rtx, int, int);
 extern bool memory_modified_in_insn_p (rtx, rtx);
 extern rtx find_base_term (rtx);
+extern rtx get_reg_known_value (unsigned int);
+extern bool get_reg_known_equiv_p (unsigned int);
 
 /* In sibcall.c */
 typedef enum {
@@ -2324,6 +2335,6 @@ extern void if_convert (int);
 extern void invert_br_probabilities (rtx);
 extern bool expensive_function_p (int);
 /* In tracer.c */
-extern void tracer (void);
+extern void tracer (unsigned int);
 
 #endif /* ! GCC_RTL_H */

@@ -1,6 +1,6 @@
 /* Procedure integration for GCC.
    Copyright (C) 1988, 1991, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -308,8 +308,8 @@ initialize_for_inline (tree fndecl)
 	parmdecl_map[REGNO (p)] = parms;
       else if (GET_CODE (p) == CONCAT)
 	{
-	  rtx preal = gen_realpart (GET_MODE (XEXP (p, 0)), p);
-	  rtx pimag = gen_imagpart (GET_MODE (preal), p);
+	  rtx preal = XEXP (p, 0);
+	  rtx pimag = XEXP (p, 1);
 
 	  if (GET_CODE (preal) == REG)
 	    parmdecl_map[REGNO (preal)] = parms;
@@ -960,10 +960,10 @@ expand_inline_function (tree fndecl, tree parms, rtx target, int ignore,
 	process_reg_param (map, loc, copy);
       else if (GET_CODE (loc) == CONCAT)
 	{
-	  rtx locreal = gen_realpart (GET_MODE (XEXP (loc, 0)), loc);
-	  rtx locimag = gen_imagpart (GET_MODE (XEXP (loc, 0)), loc);
-	  rtx copyreal = gen_realpart (GET_MODE (locreal), copy);
-	  rtx copyimag = gen_imagpart (GET_MODE (locimag), copy);
+	  rtx locreal = XEXP (loc, 0);
+	  rtx locimag = XEXP (loc, 1);
+	  rtx copyreal = read_complex_part (copy, false);
+	  rtx copyimag = read_complex_part (copy, true);
 
 	  process_reg_param (map, locreal, copyreal);
 	  process_reg_param (map, locimag, copyimag);
