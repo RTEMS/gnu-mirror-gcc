@@ -1,6 +1,6 @@
 // 2002-01-23  Loren J. Rittle <rittle@labs.mot.com> <ljrittle@acm.org>
 //
-// Copyright (C) 2002 Free Software Foundation, Inc.
+// Copyright (C) 2002, 2003 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -18,7 +18,7 @@
 // Software Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307,
 // USA.
 
-// { dg-do run { target *-*-freebsd* *-*-netbsd* *-*-linux* *-*-solaris* *-*-cygwin } }
+// { dg-do run { target *-*-freebsd* *-*-netbsd* *-*-linux* *-*-solaris* *-*-cygwin *-*-darwin* } }
 // { dg-options "-pthread" { target *-*-freebsd* *-*-netbsd* *-*-linux* } }
 // { dg-options "-pthreads" { target *-*-solaris* } }
 
@@ -107,7 +107,7 @@ main (int argc, char** argv)
 
   task_queue* tq[thread_pairs];
 
-#if defined(__sun) && defined(__svr4__)
+#if defined(__sun) && defined(__svr4__) && _XOPEN_VERSION >= 500
   pthread_setconcurrency (thread_pairs * 2);
 #endif
 
