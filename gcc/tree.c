@@ -31,6 +31,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "flags.h"
 #include "tree.h"
 #include "real.h"
@@ -119,7 +121,7 @@ static GTY ((if_marked ("type_hash_marked_p"), param_is (struct type_hash)))
 static void set_type_quals PARAMS ((tree, int));
 static void append_random_chars PARAMS ((char *));
 static int type_hash_eq PARAMS ((const void *, const void *));
-static unsigned int type_hash_hash PARAMS ((const void *));
+static hashval_t type_hash_hash PARAMS ((const void *));
 static void print_type_hash_statistics PARAMS((void));
 static void finish_vector_type PARAMS((tree));
 static tree make_vector PARAMS ((enum machine_mode, tree, int));
@@ -177,7 +179,7 @@ tree_size (node)
     case '1':  /* a unary arithmetic expression */
     case '2':  /* a binary arithmetic expression */
       return (sizeof (struct tree_exp)
-	      + (TREE_CODE_LENGTH (code) - 1) * sizeof (char *));
+	      + TREE_CODE_LENGTH (code) * sizeof (char *) - sizeof (char *));
 
     case 'c':  /* a constant */
       /* We can't use TREE_CODE_LENGTH for INTEGER_CST, since the number of
@@ -199,7 +201,7 @@ tree_size (node)
 	length = (sizeof (struct tree_common)
 		  + TREE_CODE_LENGTH (code) * sizeof (char *));
 	if (code == TREE_VEC)
-	  length += (TREE_VEC_LENGTH (node) - 1) * sizeof (char *);
+	  length += TREE_VEC_LENGTH (node) * sizeof (char *) - sizeof (char *);
 	return length;
       }
 
@@ -474,11 +476,8 @@ build_real (type, d)
   REAL_VALUE_TYPE *dp;
   int overflow = 0;
 
-  /* Check for valid float value for this type on this target machine;
-     if not, can print error message and store a valid value in D.  */
-#ifdef CHECK_FLOAT_VALUE
-  CHECK_FLOAT_VALUE (TYPE_MODE (type), d, overflow);
-#endif
+  /* ??? Used to check for overflow here via CHECK_FLOAT_TYPE.
+     Consider doing it via real_convert now.  */
 
   v = make_node (REAL_CST);
   dp = ggc_alloc (sizeof (REAL_VALUE_TYPE));
@@ -726,6 +725,24 @@ integer_pow2p (expr)
 	  || (low == 0 && (high & (high - 1)) == 0));
 }
 
+/* Return 1 if EXPR is an integer constant other than zero or a
+   complex constant other than zero.  */
+
+int
+integer_nonzerop (expr)
+     tree expr;
+{
+  STRIP_NOPS (expr);
+
+  return ((TREE_CODE (expr) == INTEGER_CST
+	   && ! TREE_CONSTANT_OVERFLOW (expr)
+	   && (TREE_INT_CST_LOW (expr) != 0
+	       || TREE_INT_CST_HIGH (expr) != 0))
+	  || (TREE_CODE (expr) == COMPLEX_CST
+	      && (integer_nonzerop (TREE_REALPART (expr))
+		  || integer_nonzerop (TREE_IMAGPART (expr)))));
+}
+
 /* Return the power of two represented by a tree node known to be a
    power of two.  */
 
@@ -947,41 +964,6 @@ chain_member (elem, chain)
   return 0;
 }
 
-/* Return nonzero if ELEM is equal to TREE_VALUE (CHAIN) for any piece of
-   chain CHAIN.  This and the next function are currently unused, but
-   are retained for completeness.  */
-
-int
-chain_member_value (elem, chain)
-     tree elem, chain;
-{
-  while (chain)
-    {
-      if (elem == TREE_VALUE (chain))
-	return 1;
-      chain = TREE_CHAIN (chain);
-    }
-
-  return 0;
-}
-
-/* Return nonzero if ELEM is equal to TREE_PURPOSE (CHAIN)
-   for any piece of chain CHAIN.  */
-
-int
-chain_member_purpose (elem, chain)
-     tree elem, chain;
-{
-  while (chain)
-    {
-      if (elem == TREE_PURPOSE (chain))
-	return 1;
-      chain = TREE_CHAIN (chain);
-    }
-
-  return 0;
-}
-
 /* Return the length of a chain of nodes chained through TREE_CHAIN.
    We expect a null pointer to mark the end of the chain.
    This is the Lisp primitive `length'.  */
@@ -1073,31 +1055,6 @@ nreverse (t)
       prev = decl;
     }
   return prev;
-}
-
-/* Given a chain CHAIN of tree nodes,
-   construct and return a list of those nodes.  */
-
-tree
-listify (chain)
-     tree chain;
-{
-  tree result = NULL_TREE;
-  tree in_tail = chain;
-  tree out_tail = NULL_TREE;
-
-  while (in_tail)
-    {
-      tree next = tree_cons (NULL_TREE, in_tail, NULL_TREE);
-      if (out_tail)
-	TREE_CHAIN (out_tail) = next;
-      else
-	result = next;
-      out_tail = next;
-      in_tail = TREE_CHAIN (in_tail);
-    }
-
-  return result;
 }
 
 /* Return a newly created TREE_LIST node whose
@@ -2555,54 +2512,7 @@ build_type_attribute_variant (ttype, attribute)
   return ttype;
 }
 
-/* Default value of targetm.comp_type_attributes that always returns 1.  */
-
-int
-default_comp_type_attributes (type1, type2)
-     tree type1 ATTRIBUTE_UNUSED;
-     tree type2 ATTRIBUTE_UNUSED;
-{
-  return 1;
-}
-
-/* Default version of targetm.set_default_type_attributes that always does
-   nothing.  */
-
-void
-default_set_default_type_attributes (type)
-     tree type ATTRIBUTE_UNUSED;
-{
-}
-
-/* Default version of targetm.insert_attributes that always does nothing.  */
-void
-default_insert_attributes (decl, attr_ptr)
-     tree decl ATTRIBUTE_UNUSED;
-     tree *attr_ptr ATTRIBUTE_UNUSED;
-{
-}
-
-/* Default value of targetm.function_attribute_inlinable_p that always
-   returns false.  */
-bool
-default_function_attribute_inlinable_p (fndecl)
-     tree fndecl ATTRIBUTE_UNUSED;
-{
-  /* By default, functions with machine attributes cannot be inlined.  */
-  return false;
-}
-
-/* Default value of targetm.ms_bitfield_layout_p that always returns
-   false.  */
-bool
-default_ms_bitfield_layout_p (record)
-     tree record ATTRIBUTE_UNUSED;
-{
-  /* By default, GCC does not use the MS VC++ bitfield layout rules.  */
-  return false;
-}
-
-/* Return non-zero if IDENT is a valid name for attribute ATTR,
+/* Return nonzero if IDENT is a valid name for attribute ATTR,
    or zero if not.
 
    We try both `text' and `__text__', ATTR may be either one.  */
@@ -2939,7 +2849,7 @@ type_hash_eq (va, vb)
 
 /* Return the cached hash value.  */
 
-static unsigned int
+static hashval_t
 type_hash_hash (item)
      const void *item;
 {
@@ -3277,24 +3187,6 @@ tree_low_cst (t, pos)
     abort ();
 }
 
-/* Return the most significant bit of the integer constant T.  */
-
-int
-tree_int_cst_msb (t)
-     tree t;
-{
-  int prec;
-  HOST_WIDE_INT h;
-  unsigned HOST_WIDE_INT l;
-
-  /* Note that using TYPE_PRECISION here is wrong.  We care about the
-     actual bits, not the (arbitrary) range of the type.  */
-  prec = GET_MODE_BITSIZE (TYPE_MODE (TREE_TYPE (t))) - 1;
-  rshift_double (TREE_INT_CST_LOW (t), TREE_INT_CST_HIGH (t), prec,
-		 2 * HOST_BITS_PER_WIDE_INT, &l, &h, 0);
-  return (l & 1) == 1;
-}
-
 /* Return an indication of the sign of the integer constant T.
    The return value is -1 if T < 0, 0 if T == 0, and 1 if T > 0.
    Note that -1 will never be returned it T's type is unsigned.  */
@@ -3498,26 +3390,28 @@ compare_tree_int (t, u)
    (RECORD_TYPE, UNION_TYPE and ENUMERAL_TYPE nodes are
    constructed by language-dependent code, not here.)  */
 
-/* Construct, lay out and return the type of pointers to TO_TYPE.
-   If such a type has already been constructed, reuse it.  */
+/* Construct, lay out and return the type of pointers to TO_TYPE
+   with mode MODE. If such a type has already been constructed,
+   reuse it.  */
 
 tree
-build_pointer_type (to_type)
+build_pointer_type_for_mode (to_type, mode)
      tree to_type;
+     enum machine_mode mode;
 {
   tree t = TYPE_POINTER_TO (to_type);
 
   /* First, if we already have a type for pointers to TO_TYPE, use it.  */
-
-  if (t != 0)
+  if (t != 0 && mode == ptr_mode)
     return t;
 
-  /* We need a new one.  */
   t = make_node (POINTER_TYPE);
 
   TREE_TYPE (t) = to_type;
+  TYPE_MODE (t) = mode;
 
   /* Record this type as the pointer to TO_TYPE.  */
+  if (mode == ptr_mode)
   TYPE_POINTER_TO (to_type) = t;
 
   /* Lay out the type.  This function has many callers that are concerned
@@ -3528,30 +3422,53 @@ build_pointer_type (to_type)
   return t;
 }
 
-/* Build the node for the type of references-to-TO_TYPE.  */
+/* By default build pointers in ptr_mode.  */
 
 tree
-build_reference_type (to_type)
+build_pointer_type (to_type)
      tree to_type;
+{
+  return build_pointer_type_for_mode (to_type, ptr_mode);
+}
+
+/* Construct, lay out and return the type of references to TO_TYPE
+   with mode MODE. If such a type has already been constructed,
+   reuse it.  */
+
+tree
+build_reference_type_for_mode (to_type, mode)
+     tree to_type;
+     enum machine_mode mode;
 {
   tree t = TYPE_REFERENCE_TO (to_type);
 
   /* First, if we already have a type for pointers to TO_TYPE, use it.  */
-
-  if (t)
+  if (t != 0 && mode == ptr_mode)
     return t;
 
-  /* We need a new one.  */
   t = make_node (REFERENCE_TYPE);
 
   TREE_TYPE (t) = to_type;
+  TYPE_MODE (t) = mode;
 
   /* Record this type as the pointer to TO_TYPE.  */
+  if (mode == ptr_mode)
   TYPE_REFERENCE_TO (to_type) = t;
 
   layout_type (t);
 
   return t;
+}
+
+
+/* Build the node for the type of references-to-TO_TYPE by default
+   in ptr_mode.  */
+
+tree
+build_reference_type (to_type)
+     tree to_type;
+{
+  return build_reference_type_for_mode (to_type, ptr_mode);
 }
 
 /* Build a type that is compatible with t but has no cv quals anywhere
@@ -3646,36 +3563,6 @@ build_index_2_type (lowval, highval)
      tree lowval, highval;
 {
   return build_range_type (sizetype, lowval, highval);
-}
-
-/* Return nonzero iff ITYPE1 and ITYPE2 are equal (in the LISP sense).
-   Needed because when index types are not hashed, equal index types
-   built at different times appear distinct, even though structurally,
-   they are not.  */
-
-int
-index_type_equal (itype1, itype2)
-     tree itype1, itype2;
-{
-  if (TREE_CODE (itype1) != TREE_CODE (itype2))
-    return 0;
-
-  if (TREE_CODE (itype1) == INTEGER_TYPE)
-    {
-      if (TYPE_PRECISION (itype1) != TYPE_PRECISION (itype2)
-	  || TYPE_MODE (itype1) != TYPE_MODE (itype2)
-	  || simple_cst_equal (TYPE_SIZE (itype1), TYPE_SIZE (itype2)) != 1
-	  || TYPE_ALIGN (itype1) != TYPE_ALIGN (itype2))
-	return 0;
-
-      if (1 == simple_cst_equal (TYPE_MIN_VALUE (itype1),
-				 TYPE_MIN_VALUE (itype2))
-	  && 1 == simple_cst_equal (TYPE_MAX_VALUE (itype1),
-				    TYPE_MAX_VALUE (itype2)))
-	return 1;
-    }
-
-  return 0;
 }
 
 /* Construct, lay out and return the type of arrays of elements with ELT_TYPE
@@ -4154,6 +4041,65 @@ int_fits_type_p (c, type)
     }
 }
 
+/* Returns true if T is, contains, or refers to a type with variable
+   size.  This concept is more general than that of C99 'variably
+   modified types': in C99, a struct type is never variably modified
+   because a VLA may not appear as a structure member.  However, in
+   GNU C code like:
+    
+     struct S { int i[f()]; };
+
+   is valid, and other languages may define similar constructs.  */
+
+bool
+variably_modified_type_p (type)
+     tree type;
+{
+  /* If TYPE itself has variable size, it is variably modified.  
+
+     We do not yet have a representation of the C99 '[*]' syntax.
+     When a representation is chosen, this function should be modified
+     to test for that case as well.  */
+  if (TYPE_SIZE (type) 
+      && TYPE_SIZE (type) != error_mark_node
+      && TREE_CODE (TYPE_SIZE (type)) != INTEGER_CST)
+    return true;
+
+  /* If TYPE is a pointer or reference, it is variably modified if 
+     the type pointed to is variably modified.  */
+  if ((TREE_CODE (type) == POINTER_TYPE
+       || TREE_CODE (type) == REFERENCE_TYPE)
+      && variably_modified_type_p (TREE_TYPE (type)))
+    return true;
+  
+  /* If TYPE is an array, it is variably modified if the array
+     elements are.  (Note that the VLA case has already been checked
+     above.)  */
+  if (TREE_CODE (type) == ARRAY_TYPE
+      && variably_modified_type_p (TREE_TYPE (type)))
+    return true;
+
+  /* If TYPE is a function type, it is variably modified if any of the
+     parameters or the return type are variably modified.  */
+  if (TREE_CODE (type) == FUNCTION_TYPE
+      || TREE_CODE (type) == METHOD_TYPE)
+    {
+      tree parm;
+
+      if (variably_modified_type_p (TREE_TYPE (type)))
+	return true;
+      for (parm = TYPE_ARG_TYPES (type); 
+	   parm && parm != void_list_node; 
+	   parm = TREE_CHAIN (parm))
+	if (variably_modified_type_p (TREE_VALUE (parm)))
+	  return true;
+    }
+
+  /* The current language may have other cases to check, but in general,
+     all other types are not variably modified.  */
+  return (*lang_hooks.tree_inlining.var_mod_type_p) (type);
+}
+
 /* Given a DECL or TYPE, return the scope in which it was declared, or
    NULL_TREE if there is no containing scope.  */
 
@@ -4609,6 +4555,22 @@ tree_class_check_failed (node, cl, file, line, function)
      tree_code_name[TREE_CODE (node)], function, trim_filename (file), line);
 }
 
+/* Similar to above, except that the check is for the bounds of a TREE_VEC's
+   (dynamically sized) vector.  */
+
+void
+tree_vec_elt_check_failed (idx, len, file, line, function)
+     int idx;
+     int len;
+     const char *file;
+     int line;
+     const char *function;
+{
+  internal_error
+    ("tree check: accessed elt %d of tree_vec with %d elts in %s, at %s:%d",
+     idx + 1, len, function, trim_filename (file), line);
+}
+
 #endif /* ENABLE_TREE_CHECKING */
 
 /* For a new vector type node T, build the information necessary for
@@ -4766,6 +4728,8 @@ build_common_tree_nodes_2 (short_double)
 
   unsigned_V4SI_type_node
     = make_vector (V4SImode, unsigned_intSI_type_node, 1);
+  unsigned_V2HI_type_node
+    = make_vector (V2HImode, unsigned_intHI_type_node, 1);
   unsigned_V2SI_type_node
     = make_vector (V2SImode, unsigned_intSI_type_node, 1);
   unsigned_V2DI_type_node
@@ -4778,10 +4742,13 @@ build_common_tree_nodes_2 (short_double)
     = make_vector (V8HImode, unsigned_intHI_type_node, 1);
   unsigned_V16QI_type_node
     = make_vector (V16QImode, unsigned_intQI_type_node, 1);
+  unsigned_V1DI_type_node
+    = make_vector (V1DImode, unsigned_intDI_type_node, 1);
 
   V16SF_type_node = make_vector (V16SFmode, float_type_node, 0);
   V4SF_type_node = make_vector (V4SFmode, float_type_node, 0);
   V4SI_type_node = make_vector (V4SImode, intSI_type_node, 0);
+  V2HI_type_node = make_vector (V2HImode, intHI_type_node, 0);
   V2SI_type_node = make_vector (V2SImode, intSI_type_node, 0);
   V2DI_type_node = make_vector (V2DImode, intDI_type_node, 0);
   V4HI_type_node = make_vector (V4HImode, intHI_type_node, 0);
@@ -4790,6 +4757,7 @@ build_common_tree_nodes_2 (short_double)
   V2SF_type_node = make_vector (V2SFmode, float_type_node, 0);
   V2DF_type_node = make_vector (V2DFmode, double_type_node, 0);
   V16QI_type_node = make_vector (V16QImode, intQI_type_node, 0);
+  V1DI_type_node = make_vector (V1DImode, intDI_type_node, 0);
 }
 
 /* Returns a vector tree node given a vector mode, the inner type, and

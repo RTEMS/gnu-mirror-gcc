@@ -21,6 +21,8 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "cpplib.h"
 #include "cpphash.h"
 #include "prefix.h"
@@ -194,7 +196,7 @@ path_include (pfile, list, path)
 
 /* Append DIR to include path PATH.  DIR must be allocated on the
    heap; this routine takes responsibility for freeing it.  CXX_AWARE
-   is non-zero if the header contains extern "C" guards for C++,
+   is nonzero if the header contains extern "C" guards for C++,
    otherwise it is zero.  */
 static void
 append_include_chain (pfile, dir, path, cxx_aware)
@@ -515,7 +517,7 @@ cpp_create_reader (lang)
 {
   cpp_reader *pfile;
 
-  /* Initialise this instance of the library if it hasn't been already.  */
+  /* Initialize this instance of the library if it hasn't been already.  */
   init_library ();
 
   pfile = (cpp_reader *) xcalloc (1, sizeof (cpp_reader));
@@ -543,7 +545,7 @@ cpp_create_reader (lang)
   CPP_OPTION (pfile, unsigned_char) = 0;
   CPP_OPTION (pfile, unsigned_wchar) = 1;
 
-  /* Initialise the line map.  Start at logical line 1, so we can use
+  /* Initialize the line map.  Start at logical line 1, so we can use
      a line number of zero for special states.  */
   init_line_maps (&pfile->line_maps);
   pfile->line = 1;
@@ -562,7 +564,7 @@ cpp_create_reader (lang)
   pfile->cur_run = &pfile->base_run;
   pfile->cur_token = pfile->base_run.base;
 
-  /* Initialise the base context.  */
+  /* Initialize the base context.  */
   pfile->context = &pfile->base_context;
   pfile->base_context.macro = 0;
   pfile->base_context.prev = pfile->base_context.next = 0;
@@ -574,7 +576,7 @@ cpp_create_reader (lang)
   /* The expression parser stack.  */
   _cpp_expand_op_stack (pfile);
 
-  /* Initialise the buffer obstack.  */
+  /* Initialize the buffer obstack.  */
   gcc_obstack_init (&pfile->buffer_ob);
 
   _cpp_init_includes (pfile);
@@ -583,7 +585,7 @@ cpp_create_reader (lang)
 }
 
 /* Free resources used by PFILE.  Accessing PFILE after this function
-   returns leads to undefined behaviour.  Returns the error count.  */
+   returns leads to undefined behavior.  Returns the error count.  */
 void
 cpp_destroy (pfile)
      cpp_reader *pfile;
@@ -808,7 +810,7 @@ init_standard_includes (pfile)
 		  && !CPP_OPTION (pfile, no_standard_cplusplus_includes)))
 	    {
 	      /* Does this dir start with the prefix?  */
-	      if (!memcmp (p->fname, default_prefix, default_len))
+	      if (!strncmp (p->fname, default_prefix, default_len))
 		{
 		  /* Yes; change prefix and add to search list.  */
 		  int flen = strlen (p->fname);
@@ -840,7 +842,7 @@ init_standard_includes (pfile)
 }
 
 /* Pushes a command line -imacro and -include file indicated by P onto
-   the buffer stack.  Returns non-zero if successful.  */
+   the buffer stack.  Returns nonzero if successful.  */
 static bool
 push_include (pfile, p)
      cpp_reader *pfile;
@@ -1229,7 +1231,7 @@ parse_option (input)
       md = (mn + mx) / 2;
 
       opt_len = cl_options[md].opt_len;
-      comp = memcmp (input, cl_options[md].opt_text, opt_len);
+      comp = strncmp (input, cl_options[md].opt_text, opt_len);
 
       if (comp > 0)
 	mn = md + 1;
@@ -1254,7 +1256,7 @@ parse_option (input)
 	      for (; mn < (unsigned int) N_OPTS; mn++)
 		{
 		  opt_len = cl_options[mn].opt_len;
-		  if (memcmp (input, cl_options[mn].opt_text, opt_len))
+		  if (strncmp (input, cl_options[mn].opt_text, opt_len))
 		    break;
 		  if (input[opt_len] == '\0')
 		    return mn;

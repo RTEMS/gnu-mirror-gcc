@@ -25,6 +25,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "input.h"
 #include "tree.h"
 #include "cp-tree.h"
@@ -263,7 +265,8 @@ init_operators ()
 	 : &operator_name_info[(int) CODE]);				    \
   oni->identifier = identifier;						    \
   oni->name = NAME;							    \
-  oni->mangled_name = MANGLING;
+  oni->mangled_name = MANGLING;                                             \
+  oni->arity = ARITY;
 
 #include "operators.def"
 #undef DEF_OPERATOR
@@ -540,7 +543,7 @@ const short rid_to_yy[RID_MAX] =
   /* RID_REINTCAST */	REINTERPRET_CAST,
   /* RID_STATCAST */	STATIC_CAST,
 
-  /* Objective C */
+  /* Objective-C */
   /* RID_ID */			0,
   /* RID_AT_ENCODE */		0,
   /* RID_AT_END */		0,
@@ -1073,7 +1076,7 @@ do_pending_lang_change ()
     pop_lang_context ();
 }
 
-/* Return true if d is in a global scope. */
+/* Return true if d is in a global scope.  */
 
 static int
 is_global (d)
@@ -1135,7 +1138,7 @@ do_identifier (token, parsing, args)
      tree args;
 {
   register tree id;
-  int lexing = (parsing == 1);
+  int lexing = (parsing == 1 || parsing == 3);
 
   if (! lexing)
     id = lookup_name (token, 0);
@@ -1157,7 +1160,7 @@ do_identifier (token, parsing, args)
 
   /* Remember that this name has been used in the class definition, as per
      [class.scope0] */
-  if (id && parsing)
+  if (id && parsing && parsing != 3)
     maybe_note_name_used_in_class (token, id);
 
   if (id == error_mark_node)

@@ -21,6 +21,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "splay-tree.h"
 #include "diagnostic.h"
@@ -592,7 +594,7 @@ dequeue_and_dump (di)
   fprintf (di->stream, "\n");
 }
 
-/* Return non-zero if FLAG has been specified for the dump, and NODE
+/* Return nonzero if FLAG has been specified for the dump, and NODE
    is not the root node of the dump.  */
 
 int dump_flag (di, flag, node)
@@ -709,7 +711,7 @@ dump_begin (phase, flag_ptr)
   return stream;
 }
 
-/* Returns non-zero if tree dump PHASE is enabled.  */
+/* Returns nonzero if tree dump PHASE is enabled.  */
 
 int
 dump_enabled_p (phase)
@@ -738,7 +740,7 @@ dump_end (phase, stream)
   fclose (stream);
 }
 
-/* Parse ARG as a dump switch. Return non-zero if it is, and store the
+/* Parse ARG as a dump switch. Return nonzero if it is, and store the
    relevant details in the dump_files array.  */
 
 int

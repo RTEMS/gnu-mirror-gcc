@@ -19,8 +19,10 @@ along with GCC; see the file COPYING.  If not, write to the Free
 Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 02111-1307, USA.  */
 
-#include "hconfig.h"
+#include "bconfig.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "obstack.h"
 #include "hashtab.h"
@@ -35,7 +37,7 @@ static char *read_string	PARAMS ((struct obstack *, FILE *, int));
 static char *read_quoted_string	PARAMS ((struct obstack *, FILE *));
 static char *read_braced_string	PARAMS ((struct obstack *, FILE *));
 static void read_escape		PARAMS ((struct obstack *, FILE *));
-static unsigned def_hash PARAMS ((const void *));
+static hashval_t def_hash	PARAMS ((const void *));
 static int def_name_eq_p PARAMS ((const void *, const void *));
 static void read_constants PARAMS ((FILE *infile, char *tmp_char));
 static void validate_const_int PARAMS ((FILE *, const char *));
@@ -401,7 +403,7 @@ atoll (p)
 #endif
 
 /* Given a constant definition, return a hash code for its name.  */
-static unsigned
+static hashval_t
 def_hash (def)
      const void *def;
 {

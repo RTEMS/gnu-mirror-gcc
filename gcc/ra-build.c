@@ -20,6 +20,8 @@
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "tm_p.h"
 #include "insn-config.h"
@@ -275,7 +277,7 @@ copy_insn_p (insn, source, target)
   s_regno = (unsigned) REGNO (GET_CODE (s) == SUBREG ? SUBREG_REG (s) : s);
   d_regno = (unsigned) REGNO (GET_CODE (d) == SUBREG ? SUBREG_REG (d) : d);
 
-  /* Copies between hardregs are useless for us, as not coalesable anyway. */
+  /* Copies between hardregs are useless for us, as not coalesable anyway.  */
   if ((s_regno < FIRST_PSEUDO_REGISTER
        && d_regno < FIRST_PSEUDO_REGISTER)
       || s_regno >= max_normal_pseudo
@@ -563,7 +565,7 @@ remember_move (insn)
       SET_BIT (move_handled, INSN_UID (insn));
       if (copy_insn_p (insn, &s, &d))
 	{
-	  /* Some sanity test for the copy insn. */
+	  /* Some sanity test for the copy insn.  */
 	  struct df_link *slink = DF_INSN_USES (df, insn);
 	  struct df_link *link = DF_INSN_DEFS (df, insn);
 	  if (!link || !link->ref || !slink || !slink->ref)
@@ -612,7 +614,7 @@ struct curr_use {
    It is only called with DEF and USE being (reg:M a) or (subreg:M1 (reg:M2 a)
    x) rtx's.  Furthermore if it's a subreg rtx M1 is at least one word wide,
    and a is a multi-word pseudo.  If DEF or USE are hardregs, they are in
-   wordmode, so we don't need to check for further hardregs which would result
+   word_mode, so we don't need to check for further hardregs which would result
    from wider references.  We are never called with paradoxical subregs.
 
    This returns:
@@ -844,7 +846,7 @@ live_out_1 (df, use, insn)
       else
 	{
 	  /* If this insn doesn't completely define the USE, increment also
-	     it's spanned deaths count (if this insn contains a death). */
+	     it's spanned deaths count (if this insn contains a death).  */
 	  if (uid >= death_insns_max_uid)
 	    abort ();
 	  if (TEST_BIT (insns_with_deaths, uid))
@@ -876,7 +878,7 @@ live_out (df, use, insn)
       && (use->undefined & ~visit_trace[uid].undefined) == 0)
     {
       union_web_parts (visit_trace[uid].wp, use->wp);
-      /* Don't search any further, as we already were here with this regno. */
+      /* Don't search any further, as we already were here with this regno.  */
       return 0;
     }
   else
@@ -2813,7 +2815,7 @@ moves_to_webs (df)
       if (m->source_web && m->target_web
 	  /* If the usable_regs don't intersect we can't coalesce the two
 	     webs anyway, as this is no simple copy insn (it might even
-	     need an intermediate stack temp to execute this "copy" insn). */
+	     need an intermediate stack temp to execute this "copy" insn).  */
 	  && hard_regs_intersect_p (&m->source_web->usable_regs,
 				    &m->target_web->usable_regs))
 	{

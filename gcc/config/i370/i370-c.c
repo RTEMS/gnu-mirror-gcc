@@ -24,11 +24,13 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "toplev.h"
 #include "cpplib.h"
 #include "c-pragma.h"
-#include "i370-protos.h"
+#include "tm_p.h"
 
 #ifdef TARGET_HLASM
 

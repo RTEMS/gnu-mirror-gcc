@@ -22,6 +22,7 @@
 
 #include <new>
 #include <string>
+#include <vector>
 #include <stdexcept>
 #include <testsuite_hooks.h>
 
@@ -214,6 +215,19 @@ void test04()
   VERIFY( str02 == "onifotrop" );
 }
 
+// libstdc++/8347
+void test05()
+{
+  bool test = true;
+
+  std::vector<char> empty;
+  std::string empty2(empty.begin(), empty.end());
+
+  // libstdc++/8716 (same underlying situation, same fix)
+  char const * s = NULL;
+  std::string zero_length_built_with_NULL(s,0);
+}
+
 int main()
 { 
   __set_testsuite_memlimit();
@@ -221,5 +235,6 @@ int main()
   test02();
   test03();
   test04();
+  test05();
   return 0;
 }
