@@ -27,13 +27,15 @@
 #ifndef _CPP_VECTOR
 #define _CPP_VECTOR 1
 
-#include <bits/stl_range_errors.h>
+#pragma GCC system_header
+
+#include <bits/functexcept.h>
 #include <bits/stl_algobase.h>
 #include <bits/stl_alloc.h>
 #include <bits/stl_construct.h>
 #include <bits/stl_uninitialized.h>
 #include <bits/stl_vector.h>
-#include <ext/stl_bvector.h> 
+#include <bits/stl_bvector.h> 
 
 #endif /* _CPP_VECTOR */
 

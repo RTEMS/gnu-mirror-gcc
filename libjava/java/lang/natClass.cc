@@ -72,7 +72,8 @@ static _Jv_Utf8Const *finit_leg_name = _Jv_makeUtf8Const ("$finit$", 7);
 
 
 jclass
-java::lang::Class::forName (jstring className, java::lang::ClassLoader *loader)
+java::lang::Class::forName (jstring className, jboolean initialize,
+                            java::lang::ClassLoader *loader)
 {
   if (! className)
     JvThrow (new java::lang::NullPointerException);
@@ -90,10 +91,11 @@ java::lang::Class::forName (jstring className, java::lang::ClassLoader *loader)
 		  ? _Jv_FindClassFromSignature (name->data, loader)
 		  : _Jv_FindClass (name, loader));
 
-  if (klass)
+  if (klass == NULL)
+    throw new java::lang::ClassNotFoundException (className);
+ 
+  if (initialize)
     _Jv_InitClass (klass);
-  else
-    JvThrow (new java::lang::ClassNotFoundException (className));
 
   return klass;
 }
@@ -102,7 +104,7 @@ jclass
 java::lang::Class::forName (jstring className)
 {
   // FIXME: should use class loader from calling method.
-  return forName (className, NULL);
+  return forName (className, true, NULL);
 }
 
 java::lang::reflect::Constructor *
@@ -290,8 +292,12 @@ java::lang::Class::getSignature (JArray<jclass> *param_types,
   java::lang::StringBuffer *buf = new java::lang::StringBuffer ();
   buf->append((jchar) '(');
   jclass *v = elements (param_types);
-  for (int i = 0; i < param_types->length; ++i)
-    v[i]->getSignature(buf);
+  // A NULL param_types means "no parameters".
+  if (param_types != NULL)
+    {
+      for (int i = 0; i < param_types->length; ++i)
+	v[i]->getSignature(buf);
+    }
   buf->append((jchar) ')');
   if (is_constructor)
     buf->append((jchar) 'V');
@@ -627,7 +633,7 @@ java::lang::Class::isAssignableFrom (jclass klass)
 jboolean
 java::lang::Class::isInstance (jobject obj)
 {
-  if (__builtin_expect (! obj || isPrimitive (), false))
+  if (! obj)
     return false;
   _Jv_InitClass (this);
   return _Jv_IsAssignableFrom (this, JV_CLASS (obj));
@@ -903,11 +909,8 @@ _Jv_LookupInterfaceMethodIdx (jclass klass, jclass iface, int method_idx)
 jboolean
 _Jv_IsAssignableFrom (jclass target, jclass source)
 {
-  if (source == target
-      || (target == &ObjectClass && !source->isPrimitive())
-      || (source->ancestors != NULL 
-          && source->ancestors[source->depth - target->depth] == target))
-     return true;
+  if (source == target)
+    return true;
      
   // If target is array, so must source be.  
   if (target->isArray ())
@@ -932,15 +935,31 @@ _Jv_IsAssignableFrom (jclass target, jclass source)
       if (__builtin_expect ((if_idt == NULL), false))
 	return false; // No class implementing TARGET has been loaded.    
       jshort cl_iindex = cl_idt->cls.iindex;
-      if (cl_iindex <= if_idt->iface.ioffsets[0])
+      if (cl_iindex < if_idt->iface.ioffsets[0])
         {
 	  jshort offset = if_idt->iface.ioffsets[cl_iindex];
-	  if (offset < cl_idt->cls.itable_length
+	  if (offset != -1 && offset < cl_idt->cls.itable_length
 	      && cl_idt->cls.itable[offset] == target)
 	    return true;
 	}
+      return false;
     }
+     
+  // Primitive TYPE classes are only assignable to themselves.
+  if (__builtin_expect (target->isPrimitive(), false))
+    return false;
     
+  if (target == &ObjectClass)
+    {
+      if (source->isPrimitive())
+        return false;
+      return true;
+    }
+  else if (source->ancestors != NULL 
+           && source->depth >= target->depth
+	   && source->ancestors[source->depth - target->depth] == target)
+    return true;
+      
   return false;
 }
 
@@ -1310,7 +1329,7 @@ _Jv_FindIIndex (jclass *ifaces, jshort *offsets, jshort num)
         {
 	  if (j >= num)
 	    goto found;
-	  if (i > ifaces[j]->idt->iface.ioffsets[0])
+	  if (i >= ifaces[j]->idt->iface.ioffsets[0])
 	    continue;
 	  int ioffset = ifaces[j]->idt->iface.ioffsets[i];
 	  /* We can potentially share this position with another class. */

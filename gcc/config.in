@@ -26,9 +26,6 @@
 /* Define if you don't have vprintf but do have _doprnt.  */
 #undef HAVE_DOPRNT
 
-/* Define if the `long double' type works.  */
-#undef HAVE_LONG_DOUBLE
-
 /* Define if you have the ANSI # stringizing operator in cpp. */
 #undef HAVE_STRINGIZE
 
@@ -158,6 +155,9 @@
 
 /* Define if you have the kill function.  */
 #undef HAVE_KILL
+
+/* Define if you have the lstat function.  */
+#undef HAVE_LSTAT
 
 /* Define if you have the munmap function.  */
 #undef HAVE_MUNMAP
@@ -312,11 +312,20 @@
    character sets for source code. */
 #undef MULTIBYTE_CHARS
 
+/* Define if your compiler supports the `long double' type. */
+#undef HAVE_LONG_DOUBLE
+
+/* Define if the `_Bool' type is built-in. */
+#undef HAVE__BOOL
+
 /* Always define this when using the GNU C Library */
 #undef _GNU_SOURCE
 
 /* Define if your compiler understands volatile. */
 #undef HAVE_VOLATILE
+
+/* Define if you have a working <stdbool.h> header file. */
+#undef HAVE_STDBOOL_H
 
 /* Define if you can safely include both <string.h> and <strings.h>. */
 #undef STRING_WITH_STRINGS
@@ -431,6 +440,12 @@
 /* Define if your assembler supports .hidden. */
 #undef HAVE_GAS_HIDDEN
 
+/* Define if your assembler supports .uleb128. */
+#undef HAVE_AS_LEB128
+
+/* Define if your assembler mis-optimizes .eh_frame data. */
+#undef USE_AS_TRADITIONAL_FORMAT
+
 /* Define if your assembler supports .register. */
 #undef HAVE_AS_REGISTER_PSEUDO_OP
 
@@ -448,6 +463,9 @@
 
 /* Define to 1 if you want to enable namespaces (-fhonor-std) by default. */
 #undef ENABLE_STD_NAMESPACE
+
+/* Define 0/1 to force the choice for exception handling model. */
+#undef CONFIG_SJLJ_EXCEPTIONS
 
 
 /* Bison unconditionally undefines `const' if neither `__STDC__' nor
