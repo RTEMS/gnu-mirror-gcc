@@ -1,5 +1,5 @@
 /* Graphics.java -- Abstract Java drawing class
-   Copyright (C) 1999, 2000, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2002, 2004 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -243,7 +243,7 @@ getClipRect()
   * region and the rectangle determined by the specified parameters.
   *
   * @param x The X coordinate of the upper left corner of the intersect rect.
-  * @param Y The Y coordinate of the upper left corner of the intersect rect.
+  * @param y The Y coordinate of the upper left corner of the intersect rect.
   * @param width The width of the intersect rect.
   * @param height The height of the intersect rect.
   */
@@ -279,7 +279,7 @@ getClip();
 /**
   * Sets the clipping region to the specified <code>Shape</code>.
   *
-  * @param shape The new clipping region.
+  * @param clip The new clipping region.
   */
 public abstract void
 setClip(Shape clip);
@@ -371,7 +371,7 @@ clearRect(int x, int y, int width, int height);
   * @param width The width of the draw rect.
   * @param height The height of the draw rect.
   * @param arcWidth The width of the corner arcs.
-  * @param arcHeigth The height of the corner arcs.
+  * @param arcHeight The height of the corner arcs.
   */
 public abstract void
 drawRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight);
@@ -386,7 +386,7 @@ drawRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight);
   * @param width The width of the fill rect.
   * @param height The height of the fill rect.
   * @param arcWidth The width of the corner arcs.
-  * @param arcHeigth The height of the corner arcs.
+  * @param arcHeight The height of the corner arcs.
   */
 public abstract void
 fillRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight);
@@ -417,7 +417,7 @@ draw3DRect(int x, int y, int width, int height, boolean raised)
   drawLine(x1, y2, x1, y1);
   setColor(br);
   drawLine(x2, y1, x2, y2);
-  drawLine(x2, y1, x1, y2);
+  drawLine(x2, y2, x1, y2);
   setColor(color);
 }
 
@@ -480,7 +480,7 @@ fillOval(int x, int y, int width, int height);
   * @param arcAngle The extent of the arc.
   */
 public abstract void
-drawArc(int x, int y, int width, int height, int startAngle, int arcAngle);
+drawArc(int x, int y, int width, int height, int arcStart, int arcAngle);
 
 /*************************************************************************/
 
@@ -498,7 +498,7 @@ drawArc(int x, int y, int width, int height, int startAngle, int arcAngle);
   * @param arcAngle The extent of the arc.
   */
 public abstract void
-fillArc(int x, int y, int width, int height, int startAngle, int arcAngle);
+fillArc(int x, int y, int width, int height, int arcStart, int arcAngle);
 
 /*************************************************************************/
 
@@ -732,14 +732,14 @@ finalize()
 /*************************************************************************/
 
 /**
-  * Returns a string representation of this object.
-  *
-  * @param A string representation of this object. 
-  */
+ * Returns a string representation of this object.
+ *
+ * @return A string representation of this object. 
+ */
 public String
 toString()
 {
-  return(super.toString());
+  return getClass ().getName () + "[font=" + getFont () + ",color=" + getColor () + "]";
 }
 
 public boolean

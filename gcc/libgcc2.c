@@ -1,7 +1,7 @@
 /* More subroutines needed by GCC output code on some machines.  */
 /* Compile this one with gcc.  */
 /* Copyright (C) 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003  Free Software Foundation, Inc.
+   2000, 2001, 2002, 2003, 2004  Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -73,7 +73,7 @@ __negdi2 (DWtype u)
 
 #ifdef L_addvsi3
 Wtype
-__addvsi3 (Wtype a, Wtype b)
+__addvSI3 (Wtype a, Wtype b)
 {
   const Wtype w = a + b;
 
@@ -82,11 +82,23 @@ __addvsi3 (Wtype a, Wtype b)
 
   return w;
 }
+#ifdef COMPAT_SIMODE_TRAPPING_ARITHMETIC
+SItype
+__addvsi3 (SItype a, SItype b)
+{
+  const SItype w = a + b;
+
+  if (b >= 0 ? w < a : w > a)
+    abort ();
+
+  return w;
+}
+#endif /* COMPAT_SIMODE_TRAPPING_ARITHMETIC */
 #endif
 
 #ifdef L_addvdi3
 DWtype
-__addvdi3 (DWtype a, DWtype b)
+__addvDI3 (DWtype a, DWtype b)
 {
   const DWtype w = a + b;
 
@@ -99,20 +111,32 @@ __addvdi3 (DWtype a, DWtype b)
 
 #ifdef L_subvsi3
 Wtype
-__subvsi3 (Wtype a, Wtype b)
+__subvSI3 (Wtype a, Wtype b)
 {
-  const DWtype w = a - b;
+  const Wtype w = a - b;
 
   if (b >= 0 ? w > a : w < a)
     abort ();
 
   return w;
 }
+#ifdef COMPAT_SIMODE_TRAPPING_ARITHMETIC
+SItype
+__subvsi3 (SItype a, SItype b)
+{
+  const SItype w = a - b;
+
+  if (b >= 0 ? w > a : w < a)
+    abort ();
+
+  return w;
+}
+#endif /* COMPAT_SIMODE_TRAPPING_ARITHMETIC */
 #endif
 
 #ifdef L_subvdi3
 DWtype
-__subvdi3 (DWtype a, DWtype b)
+__subvDI3 (DWtype a, DWtype b)
 {
   const DWtype w = a - b;
 
@@ -126,22 +150,34 @@ __subvdi3 (DWtype a, DWtype b)
 #ifdef L_mulvsi3
 #define WORD_SIZE (sizeof (Wtype) * BITS_PER_UNIT)
 Wtype
-__mulvsi3 (Wtype a, Wtype b)
+__mulvSI3 (Wtype a, Wtype b)
 {
   const DWtype w = (DWtype) a * (DWtype) b;
 
-  if (((a >= 0) == (b >= 0))
-      ? (UDWtype) w > (UDWtype) (((DWtype) 1 << (WORD_SIZE - 1)) - 1)
-      : (UDWtype) w < (UDWtype) ((DWtype) -1 << (WORD_SIZE - 1)))
+  if ((Wtype) (w >> WORD_SIZE) != (Wtype) w >> (WORD_SIZE - 1))
     abort ();
 
   return w;
 }
+#ifdef COMPAT_SIMODE_TRAPPING_ARITHMETIC
+#undef WORD_SIZE
+#define WORD_SIZE (sizeof (SItype) * BITS_PER_UNIT)
+SItype
+__mulvsi3 (SItype a, SItype b)
+{
+  const DItype w = (DItype) a * (DItype) b;
+
+  if ((SItype) (w >> WORD_SIZE) != (SItype) w >> (WORD_SIZE-1))
+    abort ();
+
+  return w;
+}
+#endif /* COMPAT_SIMODE_TRAPPING_ARITHMETIC */
 #endif
 
 #ifdef L_negvsi2
 Wtype
-__negvsi2 (Wtype a)
+__negvSI2 (Wtype a)
 {
   const Wtype w = -a;
 
@@ -150,11 +186,23 @@ __negvsi2 (Wtype a)
 
    return w;
 }
+#ifdef COMPAT_SIMODE_TRAPPING_ARITHMETIC
+SItype
+__negvsi2 (SItype a)
+{
+  const SItype w = -a;
+
+  if (a >= 0 ? w > 0 : w < 0)
+    abort ();
+
+   return w;
+}
+#endif /* COMPAT_SIMODE_TRAPPING_ARITHMETIC */
 #endif
 
 #ifdef L_negvdi2
 DWtype
-__negvdi2 (DWtype a)
+__negvDI2 (DWtype a)
 {
   const DWtype w = -a;
 
@@ -167,9 +215,27 @@ __negvdi2 (DWtype a)
 
 #ifdef L_absvsi2
 Wtype
-__absvsi2 (Wtype a)
+__absvSI2 (Wtype a)
 {
   Wtype w = a;
+
+  if (a < 0)
+#ifdef L_negvsi2
+    w = __negvSI2 (a);
+#else
+    w = -a;
+
+  if (w < 0)
+    abort ();
+#endif
+
+   return w;
+}
+#ifdef COMPAT_SIMODE_TRAPPING_ARITHMETIC
+SItype
+__absvsi2 (SItype a)
+{
+  SItype w = a;
 
   if (a < 0)
 #ifdef L_negvsi2
@@ -183,17 +249,18 @@ __absvsi2 (Wtype a)
 
    return w;
 }
+#endif /* COMPAT_SIMODE_TRAPPING_ARITHMETIC */
 #endif
 
 #ifdef L_absvdi2
 DWtype
-__absvdi2 (DWtype a)
+__absvDI2 (DWtype a)
 {
   DWtype w = a;
 
   if (a < 0)
 #ifdef L_negvdi2
-    w = __negvdi2 (a);
+    w = __negvDI2 (a);
 #else
     w = -a;
 
@@ -208,7 +275,7 @@ __absvdi2 (DWtype a)
 #ifdef L_mulvdi3
 #define WORD_SIZE (sizeof (Wtype) * BITS_PER_UNIT)
 DWtype
-__mulvdi3 (DWtype u, DWtype v)
+__mulvDI3 (DWtype u, DWtype v)
 {
   /* The unchecked multiplication needs 3 Wtype x Wtype multiplications,
      but the checked multiplication needs only two.  */
@@ -420,7 +487,6 @@ __ashrdi3 (DWtype u, word_type b)
 
 #ifdef L_ffssi2
 #undef int
-extern int __ffsSI2 (UWtype u);
 int
 __ffsSI2 (UWtype u)
 {
@@ -436,7 +502,6 @@ __ffsSI2 (UWtype u)
 
 #ifdef L_ffsdi2
 #undef int
-extern int __ffsDI2 (DWtype u);
 int
 __ffsDI2 (DWtype u)
 {
@@ -493,16 +558,16 @@ __udiv_w_sdiv (UWtype *rp, UWtype a1, UWtype a0, UWtype d)
     {
       if (a1 < d - a1 - (a0 >> (W_TYPE_SIZE - 1)))
 	{
-	  /* dividend, divisor, and quotient are nonnegative */
+	  /* Dividend, divisor, and quotient are nonnegative.  */
 	  sdiv_qrnnd (q, r, a1, a0, d);
 	}
       else
 	{
-	  /* Compute c1*2^32 + c0 = a1*2^32 + a0 - 2^31*d */
+	  /* Compute c1*2^32 + c0 = a1*2^32 + a0 - 2^31*d.  */
 	  sub_ddmmss (c1, c0, a1, a0, d >> 1, d << (W_TYPE_SIZE - 1));
-	  /* Divide (c1*2^32 + c0) by d */
+	  /* Divide (c1*2^32 + c0) by d.  */
 	  sdiv_qrnnd (q, r, c1, c0, d);
-	  /* Add 2^31 to quotient */
+	  /* Add 2^31 to quotient.  */
 	  q += (UWtype) 1 << (W_TYPE_SIZE - 1);
 	}
     }
@@ -613,7 +678,6 @@ const UQItype __clz_tab[] =
 
 #ifdef L_clzsi2
 #undef int
-extern int __clzSI2 (UWtype x);
 int
 __clzSI2 (UWtype x)
 {
@@ -627,7 +691,6 @@ __clzSI2 (UWtype x)
 
 #ifdef L_clzdi2
 #undef int
-extern int __clzDI2 (UDWtype x);
 int
 __clzDI2 (UDWtype x)
 {
@@ -647,7 +710,6 @@ __clzDI2 (UDWtype x)
 
 #ifdef L_ctzsi2
 #undef int
-extern int __ctzSI2 (UWtype x);
 int
 __ctzSI2 (UWtype x)
 {
@@ -661,7 +723,6 @@ __ctzSI2 (UWtype x)
 
 #ifdef L_ctzdi2
 #undef int
-extern int __ctzDI2 (UDWtype x);
 int
 __ctzDI2 (UDWtype x)
 {
@@ -700,7 +761,6 @@ const UQItype __popcount_tab[] =
 
 #ifdef L_popcountsi2
 #undef int
-extern int __popcountSI2 (UWtype x);
 int
 __popcountSI2 (UWtype x)
 {
@@ -715,7 +775,6 @@ __popcountSI2 (UWtype x)
 
 #ifdef L_popcountdi2
 #undef int
-extern int __popcountDI2 (UDWtype x);
 int
 __popcountDI2 (UDWtype x)
 {
@@ -730,7 +789,6 @@ __popcountDI2 (UDWtype x)
 
 #ifdef L_paritysi2
 #undef int
-extern int __paritySI2 (UWtype x);
 int
 __paritySI2 (UWtype x)
 {
@@ -752,7 +810,6 @@ __paritySI2 (UWtype x)
 
 #ifdef L_paritydi2
 #undef int
-extern int __parityDI2 (UDWtype x);
 int
 __parityDI2 (UDWtype x)
 {
@@ -1034,7 +1091,7 @@ __moddi3 (DWtype u, DWtype v)
   if (vv.s.high < 0)
     vv.ll = -vv.ll;
 
-  (void) __udivmoddi4 (uu.ll, vv.ll, &w);
+  (void) __udivmoddi4 (uu.ll, vv.ll, (UDWtype*)&w);
   if (c)
     w = -w;
 
@@ -1139,7 +1196,7 @@ __fixtfdi (TFtype a)
 }
 #endif
 
-#if defined(L_fixunsxfdi) && (LIBGCC2_LONG_DOUBLE_TYPE_SIZE == 96)
+#if defined(L_fixunsxfdi) && (LIBGCC2_LONG_DOUBLE_TYPE_SIZE == 80)
 #define WORD_SIZE (sizeof (Wtype) * BITS_PER_UNIT)
 #define HIGH_WORD_COEFF (((UDWtype) 1) << WORD_SIZE)
 
@@ -1168,7 +1225,7 @@ __fixunsxfDI (XFtype a)
 }
 #endif
 
-#if defined(L_fixxfdi) && (LIBGCC2_LONG_DOUBLE_TYPE_SIZE == 96)
+#if defined(L_fixxfdi) && (LIBGCC2_LONG_DOUBLE_TYPE_SIZE == 80)
 DWtype
 __fixxfdi (XFtype a)
 {
@@ -1247,7 +1304,7 @@ __fixsfdi (SFtype a)
 }
 #endif
 
-#if defined(L_floatdixf) && (LIBGCC2_LONG_DOUBLE_TYPE_SIZE == 96)
+#if defined(L_floatdixf) && (LIBGCC2_LONG_DOUBLE_TYPE_SIZE == 80)
 #define WORD_SIZE (sizeof (Wtype) * BITS_PER_UNIT)
 #define HIGH_HALFWORD_COEFF (((UDWtype) 1) << (WORD_SIZE / 2))
 #define HIGH_WORD_COEFF (((UDWtype) 1) << WORD_SIZE)
@@ -1342,7 +1399,7 @@ __floatdisf (DWtype u)
 }
 #endif
 
-#if defined(L_fixunsxfsi) && LIBGCC2_LONG_DOUBLE_TYPE_SIZE == 96
+#if defined(L_fixunsxfsi) && LIBGCC2_LONG_DOUBLE_TYPE_SIZE == 80
 /* Reenable the normal types, in case limits.h needs them.  */
 #undef char
 #undef short
@@ -1489,13 +1546,26 @@ __clear_cache (char *beg __attribute__((__unused__)),
 
 #endif /* L_clear_cache */
 
+#ifdef L_enable_execute_stack
+/* Attempt to turn on execute permission for the stack.  */
+
+#ifdef ENABLE_EXECUTE_STACK
+  ENABLE_EXECUTE_STACK
+#else
+void
+__enable_execute_stack (void *addr __attribute__((__unused__)))
+{}
+#endif /* ENABLE_EXECUTE_STACK */
+
+#endif /* L_enable_execute_stack */
+
 #ifdef L_trampoline
 
 /* Jump to a trampoline, loading the static chain address.  */
 
 #if defined(WINNT) && ! defined(__CYGWIN__) && ! defined (_UWIN)
 
-long
+int
 getpagesize (void)
 {
 #ifdef _ALPHA_

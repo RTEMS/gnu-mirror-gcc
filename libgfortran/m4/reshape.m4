@@ -23,20 +23,20 @@ Boston, MA 02111-1307, USA.  */
 #include <stdlib.h>
 #include <assert.h>
 #include "libgfortran.h"'
-include(types.m4)dnl
-define(rtype_kind, regexp(file, `_.\([0-9]+\)\.', `\1'))dnl
-define(rtype_letter, regexp(file, `_\(.\)[0-9]+\.', `\1'))dnl
-define(rtype_code,rtype_letter`'rtype_name)dnl
-define(rtype,get_arraytype(rtype_letter,rtype_kind))dnl
-define(rtype_name, get_typename(rtype_letter, rtype_kind))dnl
+include(iparm.m4)dnl
 
 typedef GFC_ARRAY_DESCRIPTOR(1, index_type) shape_type;
 
 /* The shape parameter is ignored. We can currently deduce the shape from the
    return array.  */
 dnl Only the kind (ie size) is used to name the function.
+
+extern void reshape_`'rtype_kind (rtype *, rtype *, shape_type *,
+				    rtype *, shape_type *);
+export_proto(reshape_`'rtype_kind);
+
 void
-`__reshape_'rtype_kind (rtype * ret, rtype * source, shape_type * shape,
+reshape_`'rtype_kind (rtype * ret, rtype * source, shape_type * shape,
                       rtype * pad, shape_type * order)
 {
   /* r.* indicates the return array.  */
@@ -229,4 +229,3 @@ void
         }
     }
 }
-

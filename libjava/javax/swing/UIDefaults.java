@@ -1,5 +1,5 @@
 /* UIDefaults.java -- database for all settings and interface bindings.
-   Copyright (C) 2002 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2004  Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -35,47 +35,43 @@ this exception to your version of the library, but you are not
 obligated to do so.  If you do not wish to do so, delete this
 exception statement from your version. */
 
+
 package javax.swing;
 
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Insets;
-import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.beans.PropertyChangeSupport;
 import java.lang.reflect.Method;
-import java.lang.reflect.Constructor;
 import java.util.Hashtable;
-import java.util.Iterator;
-import java.util.List;
-import java.util.ListIterator;
 import java.util.LinkedList;
+import java.util.ListIterator;
 import java.util.Locale;
-import java.util.Set;
-import java.util.HashSet;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
+
 import javax.swing.border.Border;
 import javax.swing.plaf.ComponentUI;
 
 /**
  * UIDefaults is a database where all settings and interface bindings are
  * stored into. An PLAF implementation fills one of these (see for example
- * plaf/basic/BasicDefaults.java) with "JButton" -> new BasicButtonUI().
+ * plaf/basic/BasicLookAndFeel.java) with "ButtonUI" -> new BasicButtonUI().
  *
  * @author Ronald Veldema (rveldema@cs.vu.nl)
  */
 public class UIDefaults extends Hashtable
 {
+  private LinkedList bundles;
+  private Locale defaultLocale;
+  private PropertyChangeSupport propertyChangeSupport;
 
-  LinkedList bundles;
-  Set listeners;
-  Locale defaultLocale;
-
-  interface ActiveValue
+  public interface ActiveValue
   {
     Object createValue(UIDefaults table);
-  } // interface ActiveValue
+  }
 
   public static class LazyInputMap implements LazyValue
   {
@@ -94,12 +90,12 @@ public class UIDefaults extends Hashtable
         }
       return im;
     }
-  } // class LazyInputMap
+  }
 
-  interface LazyValue
+  public interface LazyValue
   {
     Object createValue(UIDefaults table);
-  } // interface LazyValue
+  }
 
   public static class ProxyLazyValue implements LazyValue
   {
@@ -210,28 +206,24 @@ public class UIDefaults extends Hashtable
     {
       return inner.createValue (table);
     }
-  } // class ProxyLazyValue
+  }
 
   private static final long serialVersionUID = 7341222528856548117L;
 
   public UIDefaults()
   {
     bundles = new LinkedList ();
-    listeners = new HashSet ();
     defaultLocale = Locale.getDefault ();
+    propertyChangeSupport = new PropertyChangeSupport(this);
   }
 
   public UIDefaults(Object[] entries)
   {
-    bundles = new LinkedList ();
-    listeners = new HashSet ();
-    defaultLocale = Locale.getDefault ();
+    this();
 
     for (int i = 0; (2*i+1) < entries.length; ++i)
-      {
         put (entries[2*i], entries[2*i+1]);
       }
-  }
 
   public Object get(Object key)
   {
@@ -369,13 +361,13 @@ public class UIDefaults extends Hashtable
     return o instanceof String ? (String) o : null;
   }
 
-  int getInt(Object key)
+  public int getInt(Object key)
   {
     Object o = get(key);
     return o instanceof Integer ? ((Integer) o).intValue() : 0;
   }
 
-  int getInt(Object key, Locale l)
+  public int getInt(Object key, Locale l)
   {
     Object o = get(key, l);
     return o instanceof Integer ? ((Integer) o).intValue() : 0;
@@ -473,7 +465,6 @@ public class UIDefaults extends Hashtable
         getUIError ("InvocationTargetException ("+ ite.getTargetException() 
 		    +") calling createUI(...) on " + cls.toString ());
         return null;        
-
 	}
     catch (Exception e)
   {
@@ -482,43 +473,38 @@ public class UIDefaults extends Hashtable
       }
   }
 
-  void addPropertyChangeListener(PropertyChangeListener listener)
+  public void addPropertyChangeListener(PropertyChangeListener listener)
   {
-    listeners.add (listener);
+    propertyChangeSupport.addPropertyChangeListener(listener);
   }
 
-  void removePropertyChangeListener(PropertyChangeListener listener)
+  public void removePropertyChangeListener(PropertyChangeListener listener)
   {
-    listeners.remove (listener);
+    propertyChangeSupport.removePropertyChangeListener(listener);
   }
 
   public PropertyChangeListener[] getPropertyChangeListeners()
   {
-    return (PropertyChangeListener[]) listeners.toArray ();
+    return propertyChangeSupport.getPropertyChangeListeners();
   }
 
-  protected void firePropertyChange(String property, Object o, Object n)
+  protected void firePropertyChange(String property,
+				    Object oldValue, Object newValue)
   {
-    Iterator i = listeners.iterator ();
-    PropertyChangeEvent pce = new PropertyChangeEvent (this, property, o, n);
-    while (i.hasNext ())
-      {
-        PropertyChangeListener pcl = (PropertyChangeListener) i.next ();
-        pcl.propertyChange (pce);
-      }
+    propertyChangeSupport.firePropertyChange(property, oldValue, newValue);
   }
 
-  void addResourceBundle(String name)
+  public void addResourceBundle(String name)
   {
     bundles.addFirst (name);
   }
 
-  void removeResourceBundle(String name)
+  public void removeResourceBundle(String name)
   {
     bundles.remove (name);
   }
 
-  void setDefaultLocale(Locale loc)
+  public void setDefaultLocale(Locale loc)
   {
     defaultLocale = loc;
   }
@@ -527,4 +513,4 @@ public class UIDefaults extends Hashtable
   {
     return defaultLocale;
   }
-} // class UIDefaults
+}

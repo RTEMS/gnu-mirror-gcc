@@ -1,5 +1,5 @@
 /* Command line option handling.
-   Copyright (C) 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -22,7 +22,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #define GCC_OPTS_H
 
 extern void decode_options (unsigned int argc, const char **argv);
-extern void add_input_filename (const char *filename);
 
 struct cl_option
 {
@@ -31,12 +30,16 @@ struct cl_option
   unsigned short back_chain;
   unsigned char opt_len;
   unsigned int flags;
+  int *flag_var;
+  int has_set_value;
+  int set_value;
 };
 
 extern const struct cl_option cl_options[];
 extern const unsigned int cl_options_count;
 extern const char *const lang_names[];
 
+#define CL_REPORT		(1 << 23) /* Report argument with -fverbose-asm  */
 #define CL_JOINED		(1 << 24) /* If takes joined argument.  */
 #define CL_SEPARATE		(1 << 25) /* If takes a separate argument.  */
 #define CL_REJECT_NEGATIVE	(1 << 26) /* Reject no- form.  */

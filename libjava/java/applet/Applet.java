@@ -1,5 +1,5 @@
 /* Applet.java -- Java base applet class
-   Copyright (C) 1999, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2002, 2004  Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -48,6 +48,7 @@ import java.io.ObjectInputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Locale;
+
 import javax.accessibility.AccessibleContext;
 import javax.accessibility.AccessibleRole;
 import javax.accessibility.AccessibleState;
@@ -76,6 +77,12 @@ public class Applet extends Panel
 
   /** The applet stub for this applet. */
   private transient AppletStub stub;
+
+  /** Some applets call setSize in their constructors.  In that case,
+      these fields are used to store width and height values until a
+      stub is set. */
+  private transient int width;
+  private transient int height;
 
   /**
    * The accessibility context for this applet.
@@ -106,6 +113,9 @@ public class Applet extends Panel
   public final void setStub(AppletStub stub)
   {
     this.stub = stub;
+
+    if (width != 0 && height != 0)
+      stub.appletResize (width, height);
   }
 
   /**
@@ -173,7 +183,13 @@ public class Applet extends Panel
    */
   public void resize(int width, int height)
   {
-    stub.appletResize(width, height);
+    if (stub == null)
+      {
+        this.width = width;
+        this.height = height;
+      }
+    else
+      stub.appletResize(width, height);
   }
 
   /**
@@ -228,11 +244,11 @@ public class Applet extends Panel
   {
     try
       {
-        return getImage(new URL(url, name));
+	return getImage(new URL(url, name));
       }
     catch (MalformedURLException e)
       {
-        return null;
+	return null;
       }
   }
 
@@ -284,11 +300,11 @@ public class Applet extends Panel
   {
     try
       {
-        return getAudioClip(new URL(url, name));
+	return getAudioClip(new URL(url, name));
       }
     catch (MalformedURLException e)
       {
-        return null;
+	return null;
       }
   }
 
@@ -343,7 +359,7 @@ public class Applet extends Panel
     AudioClip ac = getAudioClip(url);
     try
       {
-        ac.play();
+	ac.play();
       }
     catch (Exception ignored)
       {
@@ -364,7 +380,7 @@ public class Applet extends Panel
   {
     try
       {
-        getAudioClip(url, name).play();
+	getAudioClip(url, name).play();
       }
     catch (Exception ignored)
       {
@@ -500,7 +516,7 @@ public class Applet extends Panel
     {
       AccessibleStateSet s = super.getAccessibleStateSet();
       if (isActive())
-        s.add(AccessibleState.ACTIVE);
+	s.add(AccessibleState.ACTIVE);
       return s;
     }
   } // class AccessibleApplet

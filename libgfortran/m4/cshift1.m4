@@ -24,15 +24,17 @@ Boston, MA 02111-1307, USA.  */
 #include <assert.h>
 #include <string.h>
 #include "libgfortran.h"'
-include(types.m4)dnl
-define(htype_kind, regexp(file, `_\([0-9]+\)\.', `\1'))dnl
-define(htype_code,`i'rtype_name)dnl
-define(htype,get_arraytype(i,htype_kind))dnl
-define(htype_name, get_typename(i,htype_kind))dnl
+include(iparm.m4)dnl
+
+void cshift1_`'atype_kind (const gfc_array_char * ret,
+			   const gfc_array_char * array,
+			   const atype * h, const atype_name * pwhich);
+export_proto(cshift1_`'atype_kind);
 
 void
-`__cshift1_'htype_kind (const gfc_array_char * ret, const gfc_array_char * array,
-    const htype * h, const htype_name * pwhich)
+cshift1_`'atype_kind (const gfc_array_char * ret,
+		      const gfc_array_char * array,
+		      const atype * h, const atype_name * pwhich)
 {
   /* r.* indicates the return array.  */
   index_type rstride[GFC_MAX_DIMENSIONS - 1];
@@ -46,10 +48,10 @@ void
   index_type soffset;
   const char *sptr;
   const char *src;
-`  /* h.* indicates the shift array.  */'
+  /* h.* indicates the shift array.  */
   index_type hstride[GFC_MAX_DIMENSIONS - 1];
   index_type hstride0;
-  const htype_name *hptr;
+  const atype_name *hptr;
 
   index_type count[GFC_MAX_DIMENSIONS - 1];
   index_type extent[GFC_MAX_DIMENSIONS - 1];
@@ -58,7 +60,7 @@ void
   index_type len;
   index_type n;
   int which;
-  htype_name sh;
+  atype_name sh;
 
   if (pwhich)
     which = *pwhich - 1;
@@ -75,7 +77,7 @@ void
   size = GFC_DESCRIPTOR_SIZE (array);
   n = 0;
 
-`/* Initialized for avoiding compiler warnings.  */'
+  /* Initialized for avoiding compiler warnings.  */
   roffset = size;
   soffset = size;
   len = 0;
@@ -120,7 +122,7 @@ void
 
   while (rptr)
     {
-`      /* Do the shift for this dimension.  */'
+      /* Do the shift for this dimension.  */
       sh = *hptr;
       sh = (div (sh, len)).rem;
       if (sh < 0)
@@ -172,4 +174,3 @@ void
         }
     }
 }
-

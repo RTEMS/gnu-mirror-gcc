@@ -24,10 +24,13 @@ Boston, MA 02111-1307, USA.  */
 
 /* endfile.c--  Implement the ENDFILE statement */
 
+extern void st_endfile (void);
+export_proto(st_endfile);
+
 void
 st_endfile (void)
 {
-  unit_t *u;
+  gfc_unit *u;
 
   library_start ();
 
@@ -38,6 +41,7 @@ st_endfile (void)
       if (u->current_record)
 	next_record (1);
 
+      flush(u->s);
       struncate (u->s);
       u->endfile = AFTER_ENDFILE;
     }

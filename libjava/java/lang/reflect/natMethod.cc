@@ -1,6 +1,6 @@
 // natMethod.cc - Native code for Method class.
 
-/* Copyright (C) 1998, 1999, 2000, 2001 , 2002, 2003 Free Software Foundation
+/* Copyright (C) 1998, 1999, 2000, 2001 , 2002, 2003, 2004 Free Software Foundation
 
    This file is part of libgcj.
 
@@ -30,6 +30,7 @@ details.  */
 #include <java/lang/Double.h>
 #include <java/lang/IllegalAccessException.h>
 #include <java/lang/IllegalArgumentException.h>
+#include <java/lang/IncompatibleClassChangeError.h>
 #include <java/lang/NullPointerException.h>
 #include <java/lang/ArrayIndexOutOfBoundsException.h>
 #include <java/lang/VirtualMachineError.h>
@@ -143,26 +144,23 @@ jobject
 java::lang::reflect::Method::invoke (jobject obj, jobjectArray args)
 {
   using namespace java::lang::reflect;
+  jclass iface = NULL;
   
   if (parameter_types == NULL)
     getType ();
     
   jmethodID meth = _Jv_FromReflectedMethod (this);
 
-  jclass objClass;
-  
   if (Modifier::isStatic(meth->accflags))
     {
       // We have to initialize a static class.  It is safe to do this
       // here and not in _Jv_CallAnyMethodA because JNI initializes a
       // class whenever a method lookup is done.
       _Jv_InitClass (declaringClass);
-      objClass = declaringClass;
     }
   else
     {
-      objClass = JV_CLASS (obj);
-     
+      jclass objClass = JV_CLASS (obj);
       if (! _Jv_IsAssignableFrom (declaringClass, objClass))
         throw new java::lang::IllegalArgumentException;
     }
@@ -184,12 +182,15 @@ java::lang::reflect::Method::invoke (jobject obj, jobjectArray args)
 	{
 	}
 
-      if (! _Jv_CheckAccess(caller, objClass, meth->accflags))
+      if (! _Jv_CheckAccess(caller, declaringClass, meth->accflags))
 	throw new IllegalAccessException;
     }
 
+  if (declaringClass->isInterface())
+    iface = declaringClass;
+  
   return _Jv_CallAnyMethodA (obj, return_type, meth, false,
-			     parameter_types, args);
+			     parameter_types, args, iface);
 }
 
 jint
@@ -243,7 +244,7 @@ _Jv_GetTypesFromSignature (jmethodID method,
 
   _Jv_Utf8Const* sig = method->signature;
   java::lang::ClassLoader *loader = declaringClass->getClassLoaderInternal();
-  char *ptr = sig->data;
+  char *ptr = sig->chars();
   int numArgs = 0;
   /* First just count the number of parameters. */
   for (; ; ptr++)
@@ -280,7 +281,7 @@ _Jv_GetTypesFromSignature (jmethodID method,
   JArray<jclass> *args = (JArray<jclass> *)
     JvNewObjectArray (numArgs, &java::lang::Class::class$, NULL);
   jclass* argPtr = elements (args);
-  for (ptr = sig->data; *ptr != '\0'; ptr++)
+  for (ptr = sig->chars(); *ptr != '\0'; ptr++)
     {
       int num_arrays = 0;
       jclass type;
@@ -341,7 +342,8 @@ _Jv_CallAnyMethodA (jobject obj,
 		    JArray<jclass> *parameter_types,
 		    jvalue *args,
 		    jvalue *result,
-		    jboolean is_jni_call)
+		    jboolean is_jni_call,
+		    jclass iface)
 {
   using namespace java::lang::reflect;
   
@@ -375,7 +377,7 @@ _Jv_CallAnyMethodA (jobject obj,
   // the JDK 1.2 docs specify that the new object must be allocated
   // before argument conversions are done.
   if (is_constructor)
-    obj = JvAllocObject (return_type);
+    obj = _Jv_AllocObject (return_type);
 
   const int size_per_arg = sizeof(jvalue);
   ffi_cif cif;
@@ -466,10 +468,43 @@ _Jv_CallAnyMethodA (jobject obj,
 
   void *ncode;
 
-  if (is_virtual_call && ! Modifier::isFinal (meth->accflags))
+  // FIXME: If a vtable index is -1 at this point it is invalid, so we
+  // have to use the ncode.  
+  //
+  // This can happen because methods in final classes don't have
+  // vtable entries, but _Jv_isVirtualMethod() doesn't know that.  We
+  // could solve this problem by allocating a vtable index for methods
+  // in final classes.
+  if (is_virtual_call 
+      && ! Modifier::isFinal (meth->accflags)
+      && (_Jv_ushort)-1 != meth->index)
     {
       _Jv_VTable *vtable = *(_Jv_VTable **) obj;
-      ncode = vtable->get_method (meth->index);
+      if (iface == NULL)
+	{
+	  if (is_jni_call && Modifier::isAbstract (meth->accflags))
+	    {
+	      // With JNI we don't know if this is an interface call
+	      // or a call to an abstract method.  Look up the method
+	      // by name, the slow way.
+	      _Jv_Method *concrete_meth
+		= _Jv_LookupDeclaredMethod (vtable->clas,
+					    meth->name,
+					    meth->signature,
+					    NULL);
+	      if (concrete_meth == NULL
+		  || concrete_meth->ncode == NULL
+		  || Modifier::isAbstract(concrete_meth->accflags))
+		throw new java::lang::IncompatibleClassChangeError
+		  (_Jv_GetMethodString (vtable->clas, meth->name));
+	      ncode = concrete_meth->ncode;
+	    }
+	  else
+	    ncode = vtable->get_method (meth->index);
+	}
+      else
+	ncode = _Jv_LookupInterfaceMethodIdx (vtable->clas, iface,
+					      meth->index);
     }
   else
     {
@@ -544,7 +579,8 @@ _Jv_CallAnyMethodA (jobject obj,
 		    jmethodID meth,
 		    jboolean is_constructor,
 		    JArray<jclass> *parameter_types,
-		    jobjectArray args)
+		    jobjectArray args,
+		    jclass iface)
 {
   if (parameter_types->length == 0 && args == NULL)
     {
@@ -612,7 +648,7 @@ _Jv_CallAnyMethodA (jobject obj,
   _Jv_CallAnyMethodA (obj, return_type, meth, is_constructor,
   		      _Jv_isVirtualMethod (meth),
 		      parameter_types, argvals, &ret_value,
-		      false);
+		      false, iface);
 
   jobject r;
 #define VAL(Wrapper, Field)  (new Wrapper (ret_value.Field))

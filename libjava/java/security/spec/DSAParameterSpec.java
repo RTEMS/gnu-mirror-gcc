@@ -1,5 +1,5 @@
 /* DSAParameterSpec.java --- DSA Parameter Specificaton class
-   Copyright (C) 1999 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2004 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -37,64 +37,65 @@ exception statement from your version. */
 
 
 package java.security.spec;
-import java.security.interfaces.DSAParams;
+
 import java.math.BigInteger;
+import java.security.interfaces.DSAParams;
 
 /**
-	DSA Parameter class Specification. Used to maintain the DSA
-	Parameters.
-
-	@since JDK 1.2
-
-	@author Mark Benvenuto
+ * DSA Parameter class Specification. Used to maintain the DSA
+ * Parameters.
+ *
+ * @since 1.2
+ *
+ * @author Mark Benvenuto
 */
-public class DSAParameterSpec extends Object implements AlgorithmParameterSpec, DSAParams
+public class DSAParameterSpec implements AlgorithmParameterSpec, DSAParams
 {
   private BigInteger p = null;
   private BigInteger q = null;
   private BigInteger g = null;
 
   /**
-     Constructs a new DSAParameterSpec with the specified p, q, and g.
-
-     @param p the prime
-     @param q the sub-prime
-     @param g the base
-  */
+   * Constructs a new DSAParameterSpec with the specified p, q, and g.
+   *
+   * @param p the prime
+   * @param q the sub-prime
+   * @param g the base
+   */
   public DSAParameterSpec(BigInteger p, BigInteger q, BigInteger g) 
   {
     this.p = p;
     this.q = q;
     this.g = g;
   }
+  
   /**
-     Returns p for the DSA algorithm.
-
-     @return Returns the requested BigInteger
-  */
+   * Returns p for the DSA algorithm.
+   *
+   * @return Returns the requested BigInteger
+   */
   public BigInteger getP() 
   {
     return this.p;
   }
 
   /**
-     Returns p for the DSA algorithm.
-
-     @return Returns the requested BigInteger
-  */
+   * Returns p for the DSA algorithm.
+   *
+   * @return Returns the requested BigInteger
+   */
   public BigInteger getQ() 
   {
     return this.q;
   }
 
   /**
-     Returns g for the DSA algorithm.
-
-     @return Returns the requested BigInteger
-  */
+   * Returns g for the DSA algorithm.
+   *
+   * @return Returns the requested BigInteger
+   */
   public BigInteger getG()
   {
     return this.g;
   }
-
 }

@@ -59,7 +59,7 @@ Jon Beniston for his Microsoft Windows port of Java.
 
 @item
 Daniel Berlin for better DWARF2 support, faster/better optimizations,
-improved alias analysis, plus migrating us to Bugzilla.
+improved alias analysis, plus migrating GCC to Bugzilla.
 
 @item
 Geoff Berry for his Java object serialization work and various patches.
@@ -67,6 +67,9 @@ Geoff Berry for his Java object serialization work and various patches.
 @item
 Eric Blake for helping to make GCJ and libgcj conform to the
 specifications.
+
+@item
+Janne Blomqvist for contributions to gfortran.
 
 @item
 Segher Boessenkool for various fixes.
@@ -80,14 +83,18 @@ Neil Booth for work on cpplib, lang hooks, debug hooks and other
 miscellaneous clean-ups.
 
 @item
+Steven Bosscher for integrating the gfortran front end into GCC and for
+contributing to the tree-ssa branch.
+
+@item
 Eric Botcazou for fixing middle- and backend bugs left and right.
 
 @item
 Per Bothner for his direction via the steering committee and various
-improvements to our infrastructure for supporting new languages.  Chill
+improvements to the infrastructure for supporting new languages.  Chill
 front end implementation.  Initial implementations of
 cpplib, fix-header, config.guess, libio, and past C++ library (libg++)
-maintainer.  Dreaming up, designing and implementing much of GCJ.
+maintainer.  Dreaming up, designing and implementing much of GCJ@.
 
 @item
 Devon Bowen helped port GCC to the Tahoe.
@@ -99,6 +106,9 @@ Don Bowman for mips-vxworks contributions.
 Dave Brolley for work on cpplib and Chill.
 
 @item
+Paul Brook for work on the ARM architecture and maintaining gfortran.
+
+@item
 Robert Brown implemented the support for Encore 32000 systems.
 
 @item
@@ -108,13 +118,13 @@ Christian Bruel for improvements to local store elimination.
 Herman A.J. ten Brugge for various fixes.
 
 @item
-Joerg Brunsmann for Java compiler hacking and help with the GCJ FAQ.
+Joerg Brunsmann for Java compiler hacking and help with the GCJ FAQ@.
 
 @item
 Joe Buck for his direction via the steering committee.
 
 @item
-Craig Burley for leadership of the Fortran effort.
+Craig Burley for leadership of the G77 Fortran effort.
 
 @item
 Stephan Buys for contributing Doxygen notes for libstdc++.
@@ -136,7 +146,7 @@ Steve Chamberlain for support for the Renesas SH and H8 processors
 and the PicoJava processor, and for GCJ config fixes.
 
 @item
-Glenn Chambers for help with the GCJ FAQ.
+Glenn Chambers for help with the GCJ FAQ@.
 
 @item
 John-Marc Chandonia for various libgcj patches.
@@ -151,7 +161,7 @@ Eric Christopher for his Java porting help and clean-ups.
 Branko Cibej for more warning contributions.
 
 @item
-The @uref{http://www.classpath.org,,GNU Classpath project}
+The @uref{http://www.gnu.org/software/classpath/,,GNU Classpath project}
 for all of their merged runtime code.
 
 @item
@@ -160,6 +170,10 @@ other random hacking.
 
 @item
 Michael Cook for libstdc++ cleanup patches to reduce warnings.
+
+@item
+R. Kelley Cook for making GCC buildable from a read-only directory as
+well as other miscellaneous build process and documentation clean-ups.
 
 @item
 Ralf Corsepius for SH testing and minor bugfixing.
@@ -186,6 +200,9 @@ that print a copy of their source.
 Russell Davidson for fstream and stringstream fixes in libstdc++.
 
 @item
+Bud Davis for work on the G77 and gfortran compilers.
+
+@item
 Mo DeJong for GCJ and libgcj bug fixes.
 
 @item
@@ -193,17 +210,20 @@ DJ Delorie for the DJGPP port, build and libiberty maintenance, and
 various bug fixes.
 
 @item
-Gabriel Dos Reis for contributions to g++, contributions and
+Arnaud Desitter for helping to debug gfortran.
+
+@item
+Gabriel Dos Reis for contributions to G++, contributions and
 maintenance of GCC diagnostics infrastructure, libstdc++-v3,
-including valarray<>, complex<>, maintaining the numerics library
-(including that pesky <limits> :-) and keeping up-to-date anything
+including @code{valarray<>}, @code{complex<>}, maintaining the numerics library
+(including that pesky @code{<limits>} :-) and keeping up-to-date anything
 to do with numbers.
 
 @item
 Ulrich Drepper for his work on glibc, testing of GCC using glibc, ISO C99
 support, CFG dumping support, etc., plus support of the C++ runtime
 libraries including for all kinds of C interface issues, contributing and
-maintaining complex<>, sanity checking and disbursement, configuration
+maintaining @code{complex<>}, sanity checking and disbursement, configuration
 architecture, libio maintenance, and early math work.
 
 @item
@@ -216,7 +236,7 @@ Richard Earnshaw for his ongoing work with the ARM@.
 David Edelsohn for his direction via the steering committee, ongoing work
 with the RS6000/PowerPC port, help cleaning up Haifa loop changes,
 doing the entire AIX port of libstdc++ with his bare hands, and for
-ensuring GCC properly keeps working on AIX.
+ensuring GCC properly keeps working on AIX@.
 
 @item
 Kevin Ediger for the floating point formatting of num_put::do_put in
@@ -259,7 +279,7 @@ feeding the gcc.gnu.org box and saving its users tons of spam.
 Fred Fish for BeOS support and Ada fixes.
 
 @item
-Ivan Fontes Garcia for the Portugese translation of the GCJ FAQ.
+Ivan Fontes Garcia for the Portugese translation of the GCJ FAQ@.
 
 @item
 Peter Gerwinski for various bug fixes and the Pascal front end.
@@ -285,7 +305,7 @@ via the steering committee.
 Anthony Green for his @option{-Os} contributions and Java front end work.
 
 @item
-Stu Grossman for gdb hacking, allowing GCJ developers to debug our code.
+Stu Grossman for gdb hacking, allowing GCJ developers to debug Java code.
 
 @item
 Michael K. Gschwind contributed the port to the PDP-11.
@@ -315,7 +335,7 @@ fixes.
 Dara Hazeghi for wading through myriads of target-specific bug reports.
 
 @item
-Kate Hedstrom for staking the g77 folks with an initial testsuite.
+Kate Hedstrom for staking the G77 folks with an initial testsuite.
 
 @item
 Richard Henderson for his ongoing SPARC, alpha, ia32, and ia64 work, loop
@@ -335,8 +355,11 @@ the support for the Sony NEWS machine.
 Kazu Hirata for caring and feeding the Renesas H8/300 port and various fixes.
 
 @item
+Katherine Holcomb for work on gfortran.
+
+@item
 Manfred Hollstein for his ongoing work to keep the m88k alive, lots
-of testing and bug fixing, particularly of our configury code.
+of testing and bug fixing, particularly of GCC configury code.
 
 @item
 Steve Holmgren for MachTen patches.
@@ -377,13 +400,16 @@ Kean Johnston for SCO OpenServer support and various fixes.
 
 @item
 Tim Josling for the sample language treelang based originally on Richard
-Kenner's "``toy'' language".
+Kenner's ``toy'' language.
 
 @item
 Nicolai Josuttis for additional libstdc++ documentation.
 
 @item
 Klaus Kaempf for his ongoing work to make alpha-vms a viable target.
+
+@item
+Steven G. Kargl for work on gfortran.
 
 @item
 David Kashtan of SRI adapted GCC to VMS@.
@@ -397,7 +423,7 @@ Geoffrey Keating for his ongoing work to make the PPC work for GNU/Linux
 and his automatic regression tester.
 
 @item
-Brendan Kehoe for his ongoing work with g++ and for a lot of early work
+Brendan Kehoe for his ongoing work with G++ and for a lot of early work
 in just about every part of libstdc++.
 
 @item
@@ -433,7 +459,7 @@ Thomas Koenig for various bug fixes.
 Bruce Korb for the new and improved fixincludes code.
 
 @item
-Benjamin Kosnik for his g++ work and for leading the libstdc++-v3 effort.
+Benjamin Kosnik for his G++ work and for leading the libstdc++-v3 effort.
 
 @item
 Charles LaBrec contributed the support for the Integrated Solutions
@@ -450,6 +476,9 @@ Marc Lehmann for his direction via the steering committee and helping
 with analysis and improvements of x86 performance.
 
 @item
+Victor Leikehman for work on gfortran.
+
+@item
 Ted Lemon wrote parts of the RTL reader and printer.
 
 @item
@@ -461,7 +490,7 @@ Warren Levy for tremendous work on libgcj (Java Runtime Library) and
 random work on the Java front end.
 
 @item
-Alain Lichnewsky ported GCC to the MIPS CPU.
+Alain Lichnewsky ported GCC to the MIPS CPU@.
 
 @item
 Oskar Liljeblad for hacking on AWT and his many Java bug reports and
@@ -515,7 +544,7 @@ for Java test code.
 Bryce McKinlay for numerous GCJ and libgcj fixes and improvements.
 
 @item
-Adam Megacz for his work on the Microsoft Windows port of GCJ.
+Adam Megacz for his work on the Microsoft Windows port of GCJ@.
 
 @item
 Michael Meissner for LRS framework, ia32, m32r, v850, m88k, MIPS,
@@ -523,7 +552,7 @@ powerpc, haifa, ECOFF debug support, and other assorted hacking.
 
 @item
 Jason Merrill for his direction via the steering committee and leading
-the g++ effort.
+the G++ effort.
 
 @item
 David Miller for his direction via the steering committee, lots of
@@ -553,7 +582,7 @@ maintenance, and his ongoing work to make us make Fortran run fast.
 Jason Molenda for major help in the care and feeding of all the services
 on the gcc.gnu.org (formerly egcs.cygnus.com) machine---mail, web
 services, ftp services, etc etc.  Doing all this work on scrap paper and
-the backs of envelopes would have been... difficult.
+the backs of envelopes would have been@dots{} difficult.
 
 @item
 Catherine Moore for fixing various ugly problems we have sent her
@@ -604,7 +633,7 @@ Hans-Peter Nilsson for the CRIS and MMIX ports, improvements to the search
 engine setup, various documentation fixes and other small fixes.
 
 @item
-Geoff Noer for this work on getting cygwin native builds working.
+Geoff Noer for his work on getting cygwin native builds working.
 
 @item
 Diego Novillo for his SPEC performance tracking web pages and assorted
@@ -620,10 +649,13 @@ Alexandre Oliva for various build infrastructure improvements, scripts and
 amazing testing work, including keeping libtool issues sane and happy.
 
 @item
+Stefan Olsson for work on mt_alloc.
+
+@item
 Melissa O'Neill for various NeXT fixes.
 
 @item
-Rainer Orth for random MIPS work, including improvements to our o32
+Rainer Orth for random MIPS work, including improvements to GCC's o32
 ABI support, improvements to dejagnu's MIPS support, Java configuration
 clean-ups and porting work, etc.
 
@@ -653,14 +685,14 @@ Ovidiu Predescu for his work on the Objective-C front end and runtime
 libraries.
 
 @item
-Jerry Quinn for major performance improvements in C++ formatted I/O.
+Jerry Quinn for major performance improvements in C++ formatted I/O@.
 
 @item
 Ken Raeburn for various improvements to checker, MIPS ports and various
 cleanups in the compiler.
 
 @item
-Rolf W. Rasmussen for hacking on AWT.
+Rolf W. Rasmussen for hacking on AWT@.
 
 @item
 David Reese of Sun Microsystems contributed to the Solaris on PowerPC
@@ -683,10 +715,18 @@ as well as keeping GCC properly working on FreeBSD and continuous testing.
 Craig Rodrigues for processing tons of bug reports.
 
 @item
+Ola R@"onnerup for work on mt_alloc.
+
+@item
 Gavin Romig-Koch for lots of behind the scenes MIPS work.
 
 @item
-Ken Rose for fixes to our delay slot filling code.
+David Ronis inspired and encouraged Craig to rewrite the G77
+documentation in texinfo format by contributing a first pass at a
+translation of the old @file{g77-0.5.16/f/DOC} file.
+
+@item
+Ken Rose for fixes to GCC's delay slot filling code.
 
 @item
 Paul Rubin wrote most of the preprocessor.
@@ -710,7 +750,7 @@ Roger Sayle for improvements to constant folding and GCC's RTL optimizers
 as well as for fixing numerous bugs.
 
 @item
-Bradley Schatz for his work on the GCJ FAQ.
+Bradley Schatz for his work on the GCJ FAQ@.
 
 @item
 Peter Schauer wrote the code to allow debugging to work on the Alpha.
@@ -719,20 +759,26 @@ Peter Schauer wrote the code to allow debugging to work on the Alpha.
 William Schelter did most of the work on the Intel 80386 support.
 
 @item
+Tobias Schl@"uter for work on gfortran.
+
+@item
 Bernd Schmidt for various code generation improvements and major
 work in the reload pass as well a serving as release manager for
 GCC 2.95.3.
 
 @item
-Peter Schmid for constant testing of libstdc++ -- especially application
+Peter Schmid for constant testing of libstdc++---especially application
 testing, going above and beyond what was requested for the release
-criteria -- and libstdc++ header file tweaks.
+criteria---and libstdc++ header file tweaks.
 
 @item
 Jason Schroeder for jcf-dump patches.
 
 @item
 Andreas Schwab for his work on the m68k port.
+
+@item
+Lars Segerlund for work on gfortran.
 
 @item
 Joel Sherrill for his direction via the steering committee, RTEMS
@@ -748,7 +794,7 @@ folding and help with the original VAX & m68k ports.
 
 @item
 Kenny Simpson for prompting libstdc++ fixes due to defect reports from
-the LWG (thereby keeping us in line with updates from the ISO).
+the LWG (thereby keeping GCC in line with updates from the ISO)@.
 
 @item
 Franz Sirl for his ongoing work with making the PPC port stable
@@ -768,13 +814,15 @@ Randy Smith finished the Sun FPA support.
 
 @item
 Scott Snyder for queue, iterator, istream, and string fixes and libstdc++
-testsuite entries.
+testsuite entries.  Also for providing the patch to G77 to add
+rudimentary support for @code{INTEGER*1}, @code{INTEGER*2}, and
+@code{LOGICAL*1}.
 
 @item
 Brad Spencer for contributions to the GLIBCPP_FORCE_NEW technique.
 
 @item
-Richard Stallman, for writing the original gcc and launching the GNU project.
+Richard Stallman, for writing the original GCC and launching the GNU project.
 
 @item
 Jan Stein of the Chalmers Computer Society provided support for
@@ -793,7 +841,7 @@ Graham Stott for various infrastructure improvements.
 John Stracke for his Java HTTP protocol fixes.
 
 @item
-Mike Stump for his Elxsi port, g++ contributions over the years and more
+Mike Stump for his Elxsi port, G++ contributions over the years and more
 recently his vxworks contributions
 
 @item
@@ -807,7 +855,7 @@ Ian Lance Taylor for his mips16 work, general configury hacking,
 fixincludes, etc.
 
 @item
-Holger Teutsch provided the support for the Clipper CPU.
+Holger Teutsch provided the support for the Clipper CPU@.
 
 @item
 Gary Thomas for his ongoing work to make the PPC work for GNU/Linux.
@@ -816,7 +864,7 @@ Gary Thomas for his ongoing work to make the PPC work for GNU/Linux.
 Philipp Thomas for random bug fixes throughout the compiler
 
 @item
-Jason Thorpe for thread support in libstdc++ on NetBSD.
+Jason Thorpe for thread support in libstdc++ on NetBSD@.
 
 @item
 Kresten Krab Thorup wrote the run time support for the Objective-C
@@ -849,6 +897,10 @@ types.
 Petter Urkedal for libstdc++ CXXFLAGS, math, and algorithms fixes.
 
 @item
+Andy Vaught for the design and initial implementation of the gfortran
+front end.
+
+@item
 Brent Verner for work with the libstdc++ cshadow files and their
 associated configure steps.
 
@@ -867,6 +919,9 @@ in time for GCC 3.0.
 Krister Walfridsson for random bug fixes.
 
 @item
+Feng Wang for contributions to gfortran.
+
+@item
 Stephen M. Webb for time and effort on making libstdc++ shadow files
 work with the tricky Solaris 8+ headers, and for pushing the build-time
 header tree.
@@ -883,7 +938,7 @@ Ulrich Weigand for work on the s390 port.
 Zack Weinberg for major work on cpplib and various other bug fixes.
 
 @item
-Matt Welsh for help with Linux Threads support in GCJ.
+Matt Welsh for help with Linux Threads support in GCJ@.
 
 @item
 Urban Widmark for help fixing java.io.
@@ -910,11 +965,17 @@ Carlo Wood for various fixes.
 Tom Wood for work on the m88k port.
 
 @item
+Canqun Yang for work on gfortran.
+
+@item
 Masanobu Yuhara of Fujitsu Laboratories implemented the machine
 description for the Tron architecture (specifically, the Gmicro).
 
 @item
-Kevin Zachmann helped ported GCC to the Tahoe.
+Kevin Zachmann helped port GCC to the Tahoe.
+
+@item
+Xiaoqiang Zhang for work on gfortran.
 
 @item
 Gilles Zunino for help porting Java to Irix.
@@ -966,6 +1027,9 @@ Sidney Cadot
 Bradford Castalia
 
 @item
+Jonathan Corbet
+
+@item
 Ralph Doncaster
 
 @item
@@ -976,6 +1040,9 @@ Levente Farkas
 
 @item
 Graham Fawcett
+
+@item
+Mark Fernyhough
 
 @item
 Robert A. French
@@ -1014,6 +1081,9 @@ Phil Hargett
 Amancio Hasty
 
 @item
+Takafumi Hayashi
+
+@item
 Bryan W. Headley
 
 @item
@@ -1026,6 +1096,9 @@ Joep Jansen
 Christian Joensson
 
 @item
+Michel Kern
+
+@item
 David Kidd
 
 @item
@@ -1033,6 +1106,9 @@ Tobias Kuipers
 
 @item
 Anand Krishnaswamy
+
+@item
+A. O. V. Le Blanc
 
 @item
 llewelly
@@ -1050,6 +1126,9 @@ Matthias Klose
 Martin Knoblauch
 
 @item
+Rick Lutowski
+
+@item
 Jesse Macnish
 
 @item
@@ -1065,6 +1144,9 @@ Matthias Mueller
 Pekka Nikander
 
 @item
+Rick Niles
+
+@item
 Jon Olson
 
 @item
@@ -1075,6 +1157,9 @@ Chris Pollard
 
 @item
 Richard Polton
+
+@item
+Derk Reefman
 
 @item
 David Rees
@@ -1095,6 +1180,12 @@ Danny Sadinoff
 Marc Schifer
 
 @item
+Erik Schnetter
+
+@item
+Wayne K. Schroll
+
+@item
 David Schuler
 
 @item
@@ -1107,10 +1198,19 @@ Tim Souder
 Adam Sulmicki
 
 @item
+Bill Thorson
+
+@item
 George Talbot
 
 @item
+Pedro A. M. Vazquez
+
+@item
 Gregory Warnes
+
+@item
+Ian Watson
 
 @item
 David E. Young

@@ -263,7 +263,7 @@ public class PushbackInputStream extends FilterInputStream
   /**
    * This method pushed back bytes from the passed in array into the
    * pushback buffer.  The bytes from <code>b[offset]</code> to
-   * <cdoe>b[offset + len]</code> are pushed in reverse order so that
+   * <code>b[offset + len]</code> are pushed in reverse order so that
    * the next byte read from the stream after this operation will be
    * <code>b[offset]</code> followed by <code>b[offset + 1]</code>,
    * etc.
@@ -302,7 +302,7 @@ public class PushbackInputStream extends FilterInputStream
    * <code>skip</code> method on the underlying <code>InputStream</code> to 
    * skip additional bytes if necessary.
    *
-   * @param numBytes The requested number of bytes to skip
+   * @param n The requested number of bytes to skip
    *
    * @return The actual number of bytes skipped.
    *

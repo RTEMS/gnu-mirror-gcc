@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2003 Free Software Foundation, Inc.
+/* Copyright (C) 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of the GNU Fortran 95 runtime library (libgfortran).
@@ -25,10 +25,13 @@ Boston, MA 02111-1307, USA.  */
 #include <limits.h>
 
 #include <unistd.h>
+#include <stdio.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#ifdef HAVE_SYS_MMAN_H
 #include <sys/mman.h>
+#endif
 #include <string.h>
 #include <errno.h>
 
@@ -37,6 +40,36 @@ Boston, MA 02111-1307, USA.  */
 
 #ifndef PATH_MAX
 #define PATH_MAX 1024
+#endif
+
+#ifndef MAP_FAILED
+#define MAP_FAILED ((void *) -1)
+#endif
+
+#ifndef PROT_READ
+#define PROT_READ 1
+#endif
+
+#ifndef PROT_WRITE
+#define PROT_WRITE 2
+#endif
+
+/* These flags aren't defined on all targets (mingw32), so provide them
+   here.  */
+#ifndef S_IRGRP
+#define S_IRGRP 0
+#endif
+
+#ifndef S_IWGRP
+#define S_IWGRP 0
+#endif
+
+#ifndef S_IROTH
+#define S_IROTH 0
+#endif
+
+#ifndef S_IWOTH
+#define S_IWOTH 0
 #endif
 
 /* This implementation of stream I/O is based on the paper:
@@ -82,11 +115,11 @@ typedef struct
   stream st;
 
   int fd;
-  offset_t buffer_offset;	/* File offset of the start of the buffer */
-  offset_t physical_offset;	/* Current physical file offset */
-  offset_t logical_offset;	/* Current logical file offset */
-  offset_t dirty_offset;	/* Start of modified bytes in buffer */
-  offset_t file_length;		/* Length of the file, -1 if not seekable. */
+  gfc_offset buffer_offset;	/* File offset of the start of the buffer */
+  gfc_offset physical_offset;	/* Current physical file offset */
+  gfc_offset logical_offset;	/* Current logical file offset */
+  gfc_offset dirty_offset;	/* Start of modified bytes in buffer */
+  gfc_offset file_length;	/* Length of the file, -1 if not seekable. */
 
   char *buffer;
   int len;			/* Physical length of the current buffer */
@@ -148,8 +181,8 @@ fix_fd (int fd)
 
   input = output = error = 0;
 
-/* Unix allocates the lowest descriptors first, so a loop is not
- * required, but this order is. */
+  /* Unix allocates the lowest descriptors first, so a loop is not
+     required, but this order is. */
 
   if (fd == STDIN_FILENO)
     {
@@ -238,7 +271,6 @@ readn (int fd, char *buffer, int len)
 const char *
 get_oserror (void)
 {
-
   return strerror (errno);
 }
 
@@ -248,10 +280,8 @@ get_oserror (void)
 void
 sys_exit (int code)
 {
-
   exit (code);
 }
-
 
 
 /*********************************************************************
@@ -263,7 +293,6 @@ sys_exit (int code)
 static try
 fd_flush (unix_stream * s)
 {
-
   if (s->ndirty == 0)
     return SUCCESS;;
 
@@ -276,7 +305,9 @@ fd_flush (unix_stream * s)
     return FAILURE;
 
   s->physical_offset = s->dirty_offset + s->ndirty;
-  if (s->physical_offset > s->file_length)
+
+  /* don't increment file_length if the file is non-seekable */
+  if (s->file_length != -1 && s->physical_offset > s->file_length)
     s->file_length = s->physical_offset;
   s->ndirty = 0;
 
@@ -289,7 +320,7 @@ fd_flush (unix_stream * s)
  * to come next. */
 
 static void
-fd_alloc (unix_stream * s, offset_t where, int *len)
+fd_alloc (unix_stream * s, gfc_offset where, int *len)
 {
   char *new_buffer;
   int n, read_len;
@@ -340,9 +371,9 @@ fd_alloc (unix_stream * s, offset_t where, int *len)
  * NULL on I/O error. */
 
 static char *
-fd_alloc_r_at (unix_stream * s, int *len, offset_t where)
+fd_alloc_r_at (unix_stream * s, int *len, gfc_offset where)
 {
-  offset_t m;
+  gfc_offset m;
   int n;
 
   if (where == -1)
@@ -385,9 +416,9 @@ fd_alloc_r_at (unix_stream * s, int *len, offset_t where)
  * we've already buffered the data or we need to load it. */
 
 static char *
-fd_alloc_w_at (unix_stream * s, int *len, offset_t where)
+fd_alloc_w_at (unix_stream * s, int *len, gfc_offset where)
 {
-  offset_t n;
+  gfc_offset n;
 
   if (where == -1)
     where = s->logical_offset;
@@ -402,21 +433,34 @@ fd_alloc_w_at (unix_stream * s, int *len, offset_t where)
     }
 
   /* Return a position within the current buffer */
-
-  if (s->ndirty == 0)
-    {				/* First write into a clean buffer */
-      s->dirty_offset = where;
-      s->ndirty = *len;
+  if (s->ndirty == 0 
+      || where > s->dirty_offset + s->ndirty    
+      || s->dirty_offset > where + *len)
+    {  /* Discontiguous blocks, start with a clean buffer.  */  
+        /* Flush the buffer.  */  
+       if (s->ndirty != 0)    
+         fd_flush (s);  
+       s->dirty_offset = where;  
+       s->ndirty = *len;
     }
   else
-    {
-      if (s->dirty_offset + s->ndirty == where)
-	s->ndirty += *len;
-      else
-	fd_flush (s);		/* Can't combine two dirty blocks */
+    {  
+      gfc_offset start;  /* Merge with the existing data.  */  
+      if (where < s->dirty_offset)    
+        start = where;  
+      else    
+        start = s->dirty_offset;  
+      if (where + *len > s->dirty_offset + s->ndirty)    
+        s->ndirty = where + *len - start;  
+      else    
+        s->ndirty = s->dirty_offset + s->ndirty - start;  
+        s->dirty_offset = start;
     }
 
   s->logical_offset = where + *len;
+
+  if (where + *len > s->file_length)
+    s->file_length = where + *len;
 
   n = s->logical_offset - s->buffer_offset;
   if (n > s->active)
@@ -429,7 +473,6 @@ fd_alloc_w_at (unix_stream * s, int *len, offset_t where)
 static try
 fd_sfree (unix_stream * s)
 {
-
   if (s->ndirty != 0 &&
       (s->buffer != s->small_buffer || options.all_unbuffered ||
        s->unbuffered))
@@ -440,9 +483,8 @@ fd_sfree (unix_stream * s)
 
 
 static int
-fd_seek (unix_stream * s, offset_t offset)
+fd_seek (unix_stream * s, gfc_offset offset)
 {
-
   s->physical_offset = s->logical_offset = offset;
 
   return (lseek (s->fd, offset, SEEK_SET) < 0) ? FAILURE : SUCCESS;
@@ -456,14 +498,16 @@ fd_seek (unix_stream * s, offset_t offset)
 static try
 fd_truncate (unix_stream * s)
 {
+  if (lseek (s->fd, s->logical_offset, SEEK_SET) == -1)
+    return FAILURE;
+
+  /* non-seekable files, like terminals and fifo's fail the lseek.
+     the fd is a regular file at this point */
 
   if (ftruncate (s->fd, s->logical_offset))
     return FAILURE;
 
   s->physical_offset = s->file_length = s->logical_offset;
-
-  if (lseek (s->fd, s->file_length, SEEK_SET) == -1)
-    return FAILURE;
 
   return SUCCESS;
 }
@@ -472,7 +516,6 @@ fd_truncate (unix_stream * s)
 static try
 fd_close (unix_stream * s)
 {
-
   if (fd_flush (s) == FAILURE)
     return FAILURE;
 
@@ -491,7 +534,6 @@ fd_close (unix_stream * s)
 static void
 fd_open (unix_stream * s)
 {
-
   if (isatty (s->fd))
     s->unbuffered = 1;
 
@@ -526,7 +568,6 @@ static int page_size, page_mask;
 static try
 mmap_flush (unix_stream * s)
 {
-
   if (!s->mmaped)
     return fd_flush (s);
 
@@ -547,9 +588,9 @@ mmap_flush (unix_stream * s)
  * guaranteed to be mappable. */
 
 static try
-mmap_alloc (unix_stream * s, offset_t where, int *len)
+mmap_alloc (unix_stream * s, gfc_offset where, int *len)
 {
-  offset_t offset;
+  gfc_offset offset;
   int length;
   char *p;
 
@@ -561,7 +602,7 @@ mmap_alloc (unix_stream * s, offset_t where, int *len)
   length = ((where - offset) & page_mask) + 2 * page_size;
 
   p = mmap (NULL, length, s->prot, MAP_SHARED, s->fd, offset);
-  if (p == MAP_FAILED)
+  if (p == (char *) MAP_FAILED)
     return FAILURE;
 
   s->mmaped = 1;
@@ -574,9 +615,9 @@ mmap_alloc (unix_stream * s, offset_t where, int *len)
 
 
 static char *
-mmap_alloc_r_at (unix_stream * s, int *len, offset_t where)
+mmap_alloc_r_at (unix_stream * s, int *len, gfc_offset where)
 {
-  offset_t m;
+  gfc_offset m;
 
   if (where == -1)
     where = s->logical_offset;
@@ -601,7 +642,7 @@ mmap_alloc_r_at (unix_stream * s, int *len, offset_t where)
 
 
 static char *
-mmap_alloc_w_at (unix_stream * s, int *len, offset_t where)
+mmap_alloc_w_at (unix_stream * s, int *len, gfc_offset where)
 {
   if (where == -1)
     where = s->logical_offset;
@@ -617,7 +658,8 @@ mmap_alloc_w_at (unix_stream * s, int *len, offset_t where)
     }
 
   if ((s->buffer == NULL || s->buffer_offset > where ||
-       where + *len > s->buffer_offset + s->active) &&
+       where + *len > s->buffer_offset + s->active ||
+       where < s->buffer_offset + s->active) &&
       mmap_alloc (s, where, len) == FAILURE)
     return NULL;
 
@@ -628,9 +670,8 @@ mmap_alloc_w_at (unix_stream * s, int *len, offset_t where)
 
 
 static int
-mmap_seek (unix_stream * s, offset_t offset)
+mmap_seek (unix_stream * s, gfc_offset offset)
 {
-
   s->logical_offset = offset;
   return SUCCESS;
 }
@@ -654,7 +695,6 @@ mmap_close (unix_stream * s)
 static try
 mmap_sfree (unix_stream * s)
 {
-
   return SUCCESS;
 }
 
@@ -672,7 +712,7 @@ mmap_open (unix_stream * s)
   page_mask = ~0;
 
   p = mmap (0, page_size, s->prot, MAP_SHARED, s->fd, 0);
-  if (p == MAP_FAILED)
+  if (p == (char *) MAP_FAILED)
     {
       fd_open (s);
       return SUCCESS;
@@ -715,9 +755,9 @@ mmap_open (unix_stream * s)
 
 
 static char *
-mem_alloc_r_at (unix_stream * s, int *len, offset_t where)
+mem_alloc_r_at (unix_stream * s, int *len, gfc_offset where)
 {
-  offset_t n;
+  gfc_offset n;
 
   if (where == -1)
     where = s->logical_offset;
@@ -725,12 +765,9 @@ mem_alloc_r_at (unix_stream * s, int *len, offset_t where)
   if (where < s->buffer_offset || where > s->buffer_offset + s->active)
     return NULL;
 
-  if (is_internal_unit() && where + *len > s->file_length)
-    return NULL;
-
   s->logical_offset = where + *len;
 
-  n = (where - s->buffer_offset) - s->active;
+  n = s->buffer_offset + s->active - where;
   if (*len > n)
     *len = n;
 
@@ -739,9 +776,9 @@ mem_alloc_r_at (unix_stream * s, int *len, offset_t where)
 
 
 static char *
-mem_alloc_w_at (unix_stream * s, int *len, offset_t where)
+mem_alloc_w_at (unix_stream * s, int *len, gfc_offset where)
 {
-  offset_t m;
+  gfc_offset m;
 
   if (where == -1)
     where = s->logical_offset;
@@ -758,9 +795,8 @@ mem_alloc_w_at (unix_stream * s, int *len, offset_t where)
 
 
 static int
-mem_seek (unix_stream * s, offset_t offset)
+mem_seek (unix_stream * s, gfc_offset offset)
 {
-
   if (offset > s->file_length)
     {
       errno = ESPIPE;
@@ -775,7 +811,6 @@ mem_seek (unix_stream * s, offset_t offset)
 static int
 mem_truncate (unix_stream * s)
 {
-
   return SUCCESS;
 }
 
@@ -783,6 +818,7 @@ mem_truncate (unix_stream * s)
 static try
 mem_close (unix_stream * s)
 {
+  free_mem (s);
 
   return SUCCESS;
 }
@@ -791,7 +827,6 @@ mem_close (unix_stream * s)
 static try
 mem_sfree (unix_stream * s)
 {
-
   return SUCCESS;
 }
 
@@ -807,8 +842,8 @@ mem_sfree (unix_stream * s)
 void
 empty_internal_buffer(stream *strm)
 {
-   unix_stream * s = (unix_stream *) strm;
-   memset(s->buffer, '\n', s->file_length);
+  unix_stream * s = (unix_stream *) strm;
+  memset(s->buffer, ' ', s->file_length);
 }
 
 /* open_internal()-- Returns a stream structure from an internal file */
@@ -869,6 +904,21 @@ fd_to_stream (int fd, int prot)
 }
 
 
+/* Given the Fortran unit number, convert it to a C file descriptor.  */
+
+int
+unit_to_fd(int unit)
+{
+  gfc_unit *us;
+
+  us = find_unit(unit);
+  if (us == NULL)
+    return -1;
+
+  return ((unix_stream *) us->s)->fd;
+}
+
+
 /* unpack_filename()-- Given a fortran string and a pointer to a
  * buffer that is PATH_MAX characters, convert the fortran string to a
  * C string in the buffer.  Returns nonzero if this is not possible.  */
@@ -876,7 +926,6 @@ fd_to_stream (int fd, int prot)
 static int
 unpack_filename (char *cstring, const char *fstring, int len)
 {
-
   len = fstrlen (fstring, len);
   if (len >= PATH_MAX)
     return 1;
@@ -891,8 +940,8 @@ unpack_filename (char *cstring, const char *fstring, int len)
 /* tempfile()-- Generate a temporary filename for a scratch file and
  * open it.  mkstemp() opens the file for reading and writing, but the
  * library mode prevents anything that is not allowed.  The descriptor
- * is returns, which is less than zero on error.  The template is
- * pointed to by ioparm.file, which is copied into the unit structure
+ * is returned, which is -1 on error.  The template is pointed to by 
+ * ioparm.file, which is copied into the unit structure
  * and freed later. */
 
 static int
@@ -910,9 +959,22 @@ tempfile (void)
 
   template = get_mem (strlen (tempdir) + 20);
 
-  st_sprintf (template, "%s/gfortantmpXXXXXX", tempdir);
+  st_sprintf (template, "%s/gfortrantmpXXXXXX", tempdir);
+
+#ifdef HAVE_MKSTEMP
 
   fd = mkstemp (template);
+
+#else /* HAVE_MKSTEMP */
+
+  if (mktemp (template))
+    do
+      fd = open (template, O_CREAT | O_EXCL, S_IREAD | S_IWRITE);
+    while (!(fd == -1 && errno == EEXIST) && mktemp (template));
+  else
+    fd = -1;
+
+#endif /* HAVE_MKSTEMP */
 
   if (fd < 0)
     free_mem (template);
@@ -926,14 +988,18 @@ tempfile (void)
 }
 
 
-/* regular_file()-- Open a regular file.  Returns the descriptor, which is less than zero on error. */
+/* regular_file()-- Open a regular file.
+ * Change flags->action if it is ACTION_UNSPECIFIED on entry.
+ * Returns the descriptor, which is less than zero on error. */
 
 static int
-regular_file (unit_action action, unit_status status)
+regular_file (unit_flags *flags)
 {
   char path[PATH_MAX + 1];
   struct stat statbuf;
   int mode;
+  int rwflag;
+  int fd;
 
   if (unpack_filename (path, ioparm.file, ioparm.file_len))
     {
@@ -941,30 +1007,31 @@ regular_file (unit_action action, unit_status status)
       return -1;
     }
 
-  mode = 0;
+  rwflag = 0;
 
-  switch (action)
+  switch (flags->action)
     {
     case ACTION_READ:
-      mode = O_RDONLY;
+      rwflag = O_RDONLY;
       break;
 
     case ACTION_WRITE:
-      mode = O_WRONLY;
+      rwflag = O_WRONLY;
       break;
 
     case ACTION_READWRITE:
-      mode = O_RDWR;
+    case ACTION_UNSPECIFIED:
+      rwflag = O_RDWR;
       break;
 
     default:
       internal_error ("regular_file(): Bad action");
     }
 
-  switch (status)
+  switch (flags->status)
     {
     case STATUS_NEW:
-      mode |= O_CREAT | O_EXCL;
+      rwflag |= O_CREAT | O_EXCL;
       break;
 
     case STATUS_OLD:		/* file must exist, so check for its existence */
@@ -974,40 +1041,74 @@ regular_file (unit_action action, unit_status status)
 
     case STATUS_UNKNOWN:
     case STATUS_SCRATCH:
-      mode |= O_CREAT;
+      rwflag |= O_CREAT;
       break;
 
     case STATUS_REPLACE:
-      mode |= O_TRUNC;
+        rwflag |= O_CREAT | O_TRUNC;
       break;
 
     default:
       internal_error ("regular_file(): Bad status");
     }
 
-  // mode |= O_LARGEFILE;
+  /* rwflag |= O_LARGEFILE; */
 
-  return open (path, mode,
-	       S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+  mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
+  fd = open (path, rwflag, mode);
+  if (flags->action == ACTION_UNSPECIFIED)
+    {
+      if (fd < 0)
+        {
+          rwflag = rwflag & !O_RDWR | O_RDONLY;
+          fd = open (path, rwflag, mode);
+          if (fd < 0)
+            {
+	      rwflag = rwflag & !O_RDONLY | O_WRONLY;
+              fd = open (path, rwflag, mode);
+              if (fd < 0)
+                flags->action = ACTION_READWRITE; /* Could not open at all.  */
+              else
+                flags->action = ACTION_WRITE;
+            }
+          else
+            flags->action = ACTION_READ;
+        }
+      else
+        flags->action = ACTION_READWRITE;
+    }
+  return fd;
 }
 
 
 /* open_external()-- Open an external file, unix specific version.
+ * Change flags->action if it is ACTION_UNSPECIFIED on entry.
  * Returns NULL on operating system error. */
 
 stream *
-open_external (unit_action action, unit_status status)
+open_external (unit_flags *flags)
 {
   int fd, prot;
 
-  fd =
-    (status == STATUS_SCRATCH) ? tempfile () : regular_file (action, status);
+  if (flags->status == STATUS_SCRATCH)
+    {
+      fd = tempfile ();
+      if (flags->action == ACTION_UNSPECIFIED)
+        flags->action = ACTION_READWRITE;
+      /* We can unlink scratch files now and it will go away when closed. */
+      unlink (ioparm.file);
+    }
+  else
+    {
+      /* regular_file resets flags->action if it is ACTION_UNSPECIFIED.  */
+      fd = regular_file (flags);
+    }
 
   if (fd < 0)
     return NULL;
   fd = fix_fd (fd);
 
-  switch (action)
+  switch (flags->action)
     {
     case ACTION_READ:
       prot = PROT_READ;
@@ -1025,12 +1126,6 @@ open_external (unit_action action, unit_status status)
       internal_error ("open_external(): Bad action");
     }
 
-  /* If this is a scratch file, we can unlink it now and the file will
-   * go away when it is closed. */
-
-  if (status == STATUS_SCRATCH)
-    unlink (ioparm.file);
-
   return fd_to_stream (fd, prot);
 }
 
@@ -1041,7 +1136,6 @@ open_external (unit_action action, unit_status status)
 stream *
 input_stream (void)
 {
-
   return fd_to_stream (STDIN_FILENO, PROT_READ);
 }
 
@@ -1052,7 +1146,6 @@ input_stream (void)
 stream *
 output_stream (void)
 {
-
   return fd_to_stream (STDOUT_FILENO, PROT_WRITE);
 }
 
@@ -1108,16 +1201,16 @@ compare_file_filename (stream * s, const char *name, int len)
 
 /* find_file0()-- Recursive work function for find_file() */
 
-static unit_t *
-find_file0 (unit_t * u, struct stat *st1)
+static gfc_unit *
+find_file0 (gfc_unit * u, struct stat *st1)
 {
   struct stat st2;
-  unit_t *v;
+  gfc_unit *v;
 
   if (u == NULL)
     return NULL;
 
-  if (fstat (((unix_stream *) u)->fd, &st2) >= 0 &&
+  if (fstat (((unix_stream *) u->s)->fd, &st2) >= 0 &&
       st1->st_dev == st2.st_dev && st1->st_ino == st2.st_ino)
     return u;
 
@@ -1136,7 +1229,7 @@ find_file0 (unit_t * u, struct stat *st1)
 /* find_file()-- Take the current filename and see if there is a unit
  * that has the file already open.  Returns a pointer to the unit if so. */
 
-unit_t *
+gfc_unit *
 find_file (void)
 {
   char path[PATH_MAX + 1];
@@ -1190,7 +1283,7 @@ stream_at_eof (stream * s)
  * with the unit.  Returns nonzero if something went wrong. */
 
 int
-delete_file (unit_t * u)
+delete_file (gfc_unit * u)
 {
   char path[PATH_MAX + 1];
 
@@ -1306,7 +1399,6 @@ inquire_formatted (const char *string, int len)
 const char *
 inquire_unformatted (const char *string, int len)
 {
-
   return inquire_formatted (string, len);
 }
 
@@ -1333,7 +1425,6 @@ inquire_access (const char *string, int len, int mode)
 const char *
 inquire_read (const char *string, int len)
 {
-
   return inquire_access (string, len, R_OK);
 }
 
@@ -1344,7 +1435,6 @@ inquire_read (const char *string, int len)
 const char *
 inquire_write (const char *string, int len)
 {
-
   return inquire_access (string, len, W_OK);
 }
 
@@ -1355,27 +1445,24 @@ inquire_write (const char *string, int len)
 const char *
 inquire_readwrite (const char *string, int len)
 {
-
   return inquire_access (string, len, R_OK | W_OK);
 }
 
 
 /* file_length()-- Return the file length in bytes, -1 if unknown */
 
-offset_t
+gfc_offset
 file_length (stream * s)
 {
-
   return ((unix_stream *) s)->file_length;
 }
 
 
 /* file_position()-- Return the current position of the file */
 
-offset_t
+gfc_offset
 file_position (stream * s)
 {
-
   return ((unix_stream *) s)->logical_offset;
 }
 
@@ -1386,8 +1473,16 @@ file_position (stream * s)
 int
 is_seekable (stream * s)
 {
+  /* by convention, if file_length == -1, the file is not seekable
+     note that a mmapped file is always seekable, an fd_ file may
+     or may not be. */
+  return ((unix_stream *) s)->file_length!=-1;
+}
 
-  return ((unix_stream *) s)->mmaped;
+try
+flush (stream *s)
+{
+  return fd_flush( (unix_stream *) s);
 }
 
 

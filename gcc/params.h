@@ -1,5 +1,5 @@
 /* params.h - Run-time parameters.
-   Copyright (C) 2001, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2003, 2004 Free Software Foundation, Inc.
    Written by Mark Mitchell <mark@codesourcery.com>.
 
 This file is part of GCC.
@@ -48,6 +48,13 @@ typedef struct param_info
   const char *const option;
   /* The associated value.  */
   int value;
+
+  /* Minimum acceptable value.  */
+  int min_value;
+  
+  /* Maxiumum acceptable value, if greater than minimum  */
+  int max_value;
+  
   /* A short description of the option.  */
   const char *const help;
 } param_info;
@@ -70,7 +77,7 @@ extern void set_param_value (const char *name, int value);
 
 typedef enum compiler_param
 {
-#define DEFPARAM(enumerator, option, msgid, default) \
+#define DEFPARAM(enumerator, option, msgid, default, min, max) \
   enumerator,
 #include "params.def"
 #undef DEFPARAM
@@ -82,6 +89,10 @@ typedef enum compiler_param
   (compiler_params[(int) ENUM].value)
 
 /* Macros for the various parameters.  */
+#define SRA_MAX_STRUCTURE_SIZE \
+  PARAM_VALUE (PARAM_SRA_MAX_STRUCTURE_SIZE)
+#define SRA_FIELD_STRUCTURE_RATIO \
+  PARAM_VALUE (PARAM_SRA_FIELD_STRUCTURE_RATIO)
 #define MAX_INLINE_INSNS_SINGLE \
   PARAM_VALUE (PARAM_MAX_INLINE_INSNS_SINGLE)
 #define MAX_INLINE_INSNS \
@@ -92,8 +103,8 @@ typedef enum compiler_param
   PARAM_VALUE (PARAM_MIN_INLINE_INSNS)
 #define MAX_INLINE_INSNS_AUTO \
   PARAM_VALUE (PARAM_MAX_INLINE_INSNS_AUTO)
-#define MAX_INLINE_INSNS_RTL \
-  PARAM_VALUE (PARAM_MAX_INLINE_INSNS_RTL)
+#define MAX_VARIABLE_EXPANSIONS \
+  PARAM_VALUE (PARAM_MAX_VARIABLE_EXPANSIONS)
 #define MAX_DELAY_SLOT_INSN_SEARCH \
   PARAM_VALUE (PARAM_MAX_DELAY_SLOT_INSN_SEARCH)
 #define MAX_DELAY_SLOT_LIVE_SEARCH \
@@ -104,10 +115,24 @@ typedef enum compiler_param
   ((size_t) PARAM_VALUE (PARAM_MAX_GCSE_MEMORY))
 #define MAX_GCSE_PASSES \
   PARAM_VALUE (PARAM_MAX_GCSE_PASSES)
+#define GCSE_AFTER_RELOAD_PARTIAL_FRACTION \
+  PARAM_VALUE (PARAM_GCSE_AFTER_RELOAD_PARTIAL_FRACTION)
+#define GCSE_AFTER_RELOAD_CRITICAL_FRACTION \
+  PARAM_VALUE (PARAM_GCSE_AFTER_RELOAD_CRITICAL_FRACTION)
 #define MAX_UNROLLED_INSNS \
   PARAM_VALUE (PARAM_MAX_UNROLLED_INSNS)
+#define MAX_SMS_LOOP_NUMBER \
+  PARAM_VALUE (PARAM_MAX_SMS_LOOP_NUMBER)
+#define SMS_MAX_II_FACTOR \
+  PARAM_VALUE (PARAM_SMS_MAX_II_FACTOR)
+#define SMS_DFA_HISTORY \
+  PARAM_VALUE (PARAM_SMS_DFA_HISTORY)
+#define SMS_LOOP_AVERAGE_COUNT_THRESHOLD \
+  PARAM_VALUE (PARAM_SMS_LOOP_AVERAGE_COUNT_THRESHOLD)
 #define GLOBAL_VAR_THRESHOLD \
   PARAM_VALUE (PARAM_GLOBAL_VAR_THRESHOLD)
-#define MAX_ALIAS_SET_SIZE \
-  PARAM_VALUE (PARAM_MAX_ALIAS_SET_SIZE)
+#define MAX_ALIASED_VOPS \
+  PARAM_VALUE (PARAM_MAX_ALIASED_VOPS)
+#define INTEGER_SHARE_LIMIT \
+  PARAM_VALUE (PARAM_INTEGER_SHARE_LIMIT)
 #endif /* ! GCC_PARAMS_H */

@@ -37,6 +37,7 @@ with Debug;    use Debug;
 with Einfo;    use Einfo;
 with Erroutc;  use Erroutc;
 with Fname;    use Fname;
+with Hostparm; use Hostparm;
 with Lib;      use Lib;
 with Namet;    use Namet;
 with Opt;      use Opt;
@@ -186,6 +187,14 @@ package body Errout is
    --  Class_Flag is set to True if the resulting entity should have
    --  'Class appended to its name (see Add_Class procedure), and is
    --  otherwise unchanged.
+
+   procedure VMS_Convert;
+   --  This procedure has no effect if called when the host is not OpenVMS.
+   --  If the host is indeed OpenVMS, then the error message stored in
+   --  Msg_Buffer is scanned for appearences of switch names which need
+   --  converting to corresponding VMS qualifer names. See Gnames/Vnames
+   --  table in Errout spec for precise definition of the conversion that
+   --  is performed by this routine in OpenVMS mode.
 
    -----------------------
    -- Change_Error_Text --
@@ -592,52 +601,8 @@ package body Errout is
    -----------------
 
    procedure Error_Msg_F (Msg : String; N : Node_Id) is
-      SI : constant Source_File_Index := Source_Index (Get_Source_Unit (N));
-      SF : constant Source_Ptr        := Source_First (SI);
-      F  : Node_Id;
-      S  : Source_Ptr;
-
    begin
-      F := First_Node (N);
-      S := Sloc (F);
-
-      --  The following circuit is a bit subtle. When we have parenthesized
-      --  expressions, then the Sloc will not record the location of the
-      --  paren, but we would like to post the flag on the paren. So what
-      --  we do is to crawl up the tree from the First_Node, adjusting the
-      --  Sloc value for any parentheses we know are present. Yes, we know
-      --  this circuit is not 100% reliable (e.g. because we don't record
-      --  all possible paren level valoues), but this is only for an error
-      --  message so it is good enough.
-
-      Node_Loop : loop
-         Paren_Loop : for J in 1 .. Paren_Count (F) loop
-
-            --  We don't look more than 12 characters behind the current
-            --  location, and in any case not past the front of the source.
-
-            Search_Loop : for K in 1 .. 12 loop
-               exit Search_Loop when S = SF;
-
-               if Source_Text (SI) (S - 1) = '(' then
-                  S := S - 1;
-                  exit Search_Loop;
-
-               elsif Source_Text (SI) (S - 1) <= ' ' then
-                  S := S - 1;
-
-               else
-                  exit Search_Loop;
-               end if;
-            end loop Search_Loop;
-         end loop Paren_Loop;
-
-         exit Node_Loop when F = N;
-         F := Parent (F);
-         exit Node_Loop when Nkind (F) not in N_Subexpr;
-      end loop Node_Loop;
-
-      Error_Msg_NEL (Msg, N, N, S);
+      Error_Msg_NEL (Msg, N, N, First_Sloc (N));
    end Error_Msg_F;
 
    ------------------
@@ -1381,6 +1346,58 @@ package body Errout is
       return Earliest;
    end First_Node;
 
+   ----------------
+   -- First_Sloc --
+   ----------------
+
+   function First_Sloc (N : Node_Id) return Source_Ptr is
+      SI : constant Source_File_Index := Source_Index (Get_Source_Unit (N));
+      SF : constant Source_Ptr        := Source_First (SI);
+      F  : Node_Id;
+      S  : Source_Ptr;
+
+   begin
+      F := First_Node (N);
+      S := Sloc (F);
+
+      --  The following circuit is a bit subtle. When we have parenthesized
+      --  expressions, then the Sloc will not record the location of the
+      --  paren, but we would like to post the flag on the paren. So what
+      --  we do is to crawl up the tree from the First_Node, adjusting the
+      --  Sloc value for any parentheses we know are present. Yes, we know
+      --  this circuit is not 100% reliable (e.g. because we don't record
+      --  all possible paren level valoues), but this is only for an error
+      --  message so it is good enough.
+
+      Node_Loop : loop
+         Paren_Loop : for J in 1 .. Paren_Count (F) loop
+
+            --  We don't look more than 12 characters behind the current
+            --  location, and in any case not past the front of the source.
+
+            Search_Loop : for K in 1 .. 12 loop
+               exit Search_Loop when S = SF;
+
+               if Source_Text (SI) (S - 1) = '(' then
+                  S := S - 1;
+                  exit Search_Loop;
+
+               elsif Source_Text (SI) (S - 1) <= ' ' then
+                  S := S - 1;
+
+               else
+                  exit Search_Loop;
+               end if;
+            end loop Search_Loop;
+         end loop Paren_Loop;
+
+         exit Node_Loop when F = N;
+         F := Parent (F);
+         exit Node_Loop when Nkind (F) not in N_Subexpr;
+      end loop Node_Loop;
+
+      return S;
+   end First_Sloc;
 
    ----------------
    -- Initialize --
@@ -2258,6 +2275,8 @@ package body Errout is
                Set_Msg_Char (C);
          end case;
       end loop;
+
+      VMS_Convert;
    end Set_Msg_Text;
 
    ----------------
@@ -2484,5 +2503,54 @@ package body Errout is
          Set_Msg_Char ('"');
       end if;
    end Unwind_Internal_Type;
+
+   -----------------
+   -- VMS_Convert --
+   -----------------
+
+   procedure VMS_Convert is
+      P : Natural;
+      L : Natural;
+      N : Natural;
+
+   begin
+      if not OpenVMS then
+         return;
+      end if;
+
+      P := Msg_Buffer'First;
+      loop
+         if P >= Msglen then
+            return;
+         end if;
+
+         if Msg_Buffer (P) = '-' then
+            for G in Gnames'Range loop
+               L := Gnames (G)'Length;
+
+               --  See if we have "-ggg switch", where ggg is Gnames entry
+
+               if P + L + 7 <= Msglen
+                 and then Msg_Buffer (P + 1 .. P + L) = Gnames (G).all
+                 and then Msg_Buffer (P + L + 1 .. P + L + 7) = " switch"
+               then
+                  --  Replace by "/vvv qualifier", where vvv is Vnames entry
+
+                  N := Vnames (G)'Length;
+                  Msg_Buffer (P + N + 11 .. Msglen + N - L + 3) :=
+                    Msg_Buffer (P + L + 8 .. Msglen);
+                  Msg_Buffer (P) := '/';
+                  Msg_Buffer (P + 1 .. P + N) := Vnames (G).all;
+                  Msg_Buffer (P + N + 1 .. P + N + 10) := " qualifier";
+                  P := P + N + 10;
+                  Msglen := Msglen + N - L + 3;
+                  exit;
+               end if;
+            end loop;
+         end if;
+
+         P := P + 1;
+      end loop;
+   end VMS_Convert;
 
 end Errout;

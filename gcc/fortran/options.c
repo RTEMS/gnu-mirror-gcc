@@ -1,26 +1,25 @@
 /* Parse and display command line options.
-   Copyright (C) 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2002, 2003, 2004 Free Software Foundation,
+   Inc.
    Contributed by Andy Vaught
 
-This file is part of GNU G95.
+This file is part of GCC.
 
-GNU G95 is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2, or (at your option)
-any later version.
+GCC is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2, or (at your option) any later
+version.
 
-GNU G95 is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+GCC is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU G95; see the file COPYING.  If not, write to
-the Free Software Foundation, 59 Temple Place - Suite 330,
-Boston, MA 02111-1307, USA.  */
+along with GCC; see the file COPYING.  If not, write to the Free
+Software Foundation, 59 Temple Place - Suite 330, Boston, MA
+02111-1307, USA.  */
 
-#include <string.h>
-#include <stdlib.h>
 
 #include "config.h"
 #include "system.h"
@@ -55,11 +54,11 @@ gfc_init_options (unsigned int argc ATTRIBUTE_UNUSED,
   gfc_option.warn_conversion = 0;
   gfc_option.warn_implicit_interface = 0;
   gfc_option.warn_line_truncation = 0;
+  gfc_option.warn_underflow = 1;
   gfc_option.warn_surprising = 0;
   gfc_option.warn_unused_labels = 0;
 
   gfc_option.flag_dollar_ok = 0;
-  gfc_option.flag_g77_calls = 1;
   gfc_option.flag_underscoring = 1;
   gfc_option.flag_second_underscore = 1;
   gfc_option.flag_implicit_none = 0;
@@ -69,7 +68,7 @@ gfc_init_options (unsigned int argc ATTRIBUTE_UNUSED,
   gfc_option.flag_pack_derived = 0;
   gfc_option.flag_repack_arrays = 0;
 
-  gfc_option.q_kind = gfc_default_double_kind ();
+  gfc_option.q_kind = gfc_default_double_kind;
   gfc_option.i8 = 0;
   gfc_option.r8 = 0;
   gfc_option.d8 = 0;
@@ -77,9 +76,11 @@ gfc_init_options (unsigned int argc ATTRIBUTE_UNUSED,
   flag_argument_noalias = 2;
 
   gfc_option.allow_std = GFC_STD_F95_OBS | GFC_STD_F95_DEL
-    | GFC_STD_F2003_OBS | GFC_STD_F2003_DEL | GFC_STD_F2003 | GFC_STD_GNU;
+    | GFC_STD_F2003 | GFC_STD_F95 | GFC_STD_F77 | GFC_STD_GNU;
   gfc_option.warn_std = GFC_STD_F95_OBS | GFC_STD_F95_DEL
-    | GFC_STD_F2003 | GFC_STD_GNU;
+    | GFC_STD_F2003;
+
+  gfc_option.warn_nonstd_intrinsics = 0;
 
   return CL_F95;
 }
@@ -106,11 +107,12 @@ gfc_post_options (const char **pfilename)
   if (!flag_no_inline)
     flag_no_inline = 1;
   if (flag_inline_functions)
-    {
-      flag_inline_trees = 2;
-      flag_inline_functions = 0;
-    }
-  
+    flag_inline_trees = 2;
+
+  /* If -pedantic, warn about the use of GNU extensions.  */
+  if (pedantic && (gfc_option.allow_std & GFC_STD_GNU) != 0)
+    gfc_option.warn_std |= GFC_STD_GNU;
+
   return false;
 }
 
@@ -123,8 +125,10 @@ set_Wall (void)
 
   gfc_option.warn_aliasing = 1;
   gfc_option.warn_line_truncation = 1;
+  gfc_option.warn_underflow = 1;
   gfc_option.warn_surprising = 1;
   gfc_option.warn_unused_labels = 1;
+  gfc_option.warn_nonstd_intrinsics = 1;
 
   set_Wunused (1);
   warn_return_type = 1;
@@ -155,7 +159,7 @@ gfc_handle_module_path_options (const char *arg)
       exit (3);
     }
 
-  gfc_option.module_dir = (char *) gfc_getmem (strlen (arg));
+  gfc_option.module_dir = (char *) gfc_getmem (strlen (arg) + 2);
   strcpy (gfc_option.module_dir, arg);
   strcat (gfc_option.module_dir, "/");
 }
@@ -198,6 +202,10 @@ gfc_handle_option (size_t scode, const char *arg, int value)
       gfc_option.warn_line_truncation = value;
       break;
 
+    case OPT_Wunderflow:
+      gfc_option.warn_underflow = value;
+      break;
+
     case OPT_Wsurprising:
       gfc_option.warn_surprising = value;
       break;
@@ -220,11 +228,6 @@ gfc_handle_option (size_t scode, const char *arg, int value)
 
     case OPT_ffree_form:
       gfc_option.source_form = FORM_FREE;
-      break;
-
-    case OPT_fg77_calls:
-      /*TODO: the non-g77 calling convention is broken beyond hope.  */
-      /*gfc_option.flag_g77_calls = value;*/
       break;
 
     case OPT_funderscoring:
@@ -259,12 +262,14 @@ gfc_handle_option (size_t scode, const char *arg, int value)
       gfc_option.flag_repack_arrays = value;
       break;
 
-    case OPT_ffixed_line_length_80:
-      gfc_option.fixed_line_length = 80;
+    case OPT_ffixed_line_length_none:
+      gfc_option.fixed_line_length = 0;
       break;
 
-    case OPT_ffixed_line_length_132:
-      gfc_option.fixed_line_length = 132;
+    case OPT_ffixed_line_length_:
+      if (value != 0 && value < 7)
+	gfc_fatal_error ("Fixed line length must be at least seven.");
+      gfc_option.fixed_line_length = value;
       break;
 
     case OPT_fmax_identifier_length_:
@@ -275,7 +280,7 @@ gfc_handle_option (size_t scode, const char *arg, int value)
       break;
 
     case OPT_qkind_:
-      if (gfc_validate_kind (BT_REAL, value) < 0)
+      if (gfc_validate_kind (BT_REAL, value, true) < 0)
 	gfc_fatal_error ("Argument to -fqkind isn't a valid real kind");
       gfc_option.q_kind = value;
       break;
@@ -299,26 +304,30 @@ gfc_handle_option (size_t scode, const char *arg, int value)
     case OPT_J:
     case OPT_M:
       gfc_handle_module_path_options (arg);
+      break;
     
     case OPT_std_f95:
-      gfc_option.allow_std = GFC_STD_F95_OBS | GFC_STD_F2003_OBS
-	| GFC_STD_F2003_DEL;
+      gfc_option.allow_std = GFC_STD_F95_OBS | GFC_STD_F95 | GFC_STD_F77;
       gfc_option.warn_std = GFC_STD_F95_OBS;
       gfc_option.max_identifier_length = 31;
       break;
 
     case OPT_std_f2003:
-      gfc_option.allow_std = GFC_STD_F95_OBS | GFC_STD_F2003_OBS
-	| GFC_STD_F2003;
-      gfc_option.warn_std = GFC_STD_F95_OBS | GFC_STD_F2003_OBS;
+      gfc_option.allow_std = GFC_STD_F95_OBS | GFC_STD_F77 
+	| GFC_STD_F2003 | GFC_STD_F95;
+      gfc_option.warn_std = GFC_STD_F95_OBS;
       gfc_option.max_identifier_length = 63;
       break;
 
     case OPT_std_gnu:
       gfc_option.allow_std = GFC_STD_F95_OBS | GFC_STD_F95_DEL
-	| GFC_STD_F2003_OBS | GFC_STD_F2003_DEL | GFC_STD_F2003 | GFC_STD_GNU;
-      gfc_option.warn_std = GFC_STD_F95_OBS | GFC_STD_F95_DEL
-	| GFC_STD_F2003_OBS | GFC_STD_F2003_DEL | GFC_STD_GNU;
+	| GFC_STD_F77 | GFC_STD_F95 | GFC_STD_F2003
+	| GFC_STD_GNU;
+      gfc_option.warn_std = GFC_STD_F95_OBS | GFC_STD_F95_DEL;
+      break;
+
+    case OPT_Wnonstd_intrinsics:
+      gfc_option.warn_nonstd_intrinsics = 1;
       break;
     }
 

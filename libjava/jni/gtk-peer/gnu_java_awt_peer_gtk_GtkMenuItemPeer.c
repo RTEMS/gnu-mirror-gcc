@@ -41,31 +41,26 @@ exception statement from your version. */
 #include "gnu_java_awt_peer_gtk_GtkComponentPeer.h"
 
 static void item_activate (GtkMenuItem *item __attribute__((unused)),
-                           jobject *peer_obj);
+                           jobject peer_obj);
 
-JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkMenuItemPeer_create
+JNIEXPORT void JNICALL
+Java_gnu_java_awt_peer_gtk_GtkMenuItemPeer_create
   (JNIEnv *env, jobject obj, jstring label)
 {
   GtkWidget *widget;
   const char *str;
-  jobject *gref;
 
-  /* Create global reference and save it for future use */
   NSA_SET_GLOBAL_REF (env, obj);
-  gref = NSA_GET_GLOBAL_REF (env, obj);
 
   str = (*env)->GetStringUTFChars (env, label, NULL);
 
   gdk_threads_enter ();
-  
-  if (strcmp (str, "-") == 0) /* "-" signals that we need a separator */
+
+  /* "-" signals that we need a separator. */
+  if (strcmp (str, "-") == 0)
     widget = gtk_menu_item_new ();
   else
     widget = gtk_menu_item_new_with_label (str);
-
-  /* Connect activate hook */
-  g_signal_connect (G_OBJECT (widget), "activate", 
-		      GTK_SIGNAL_FUNC (item_activate), *gref);
 
   gtk_widget_show (widget);
 
@@ -76,11 +71,80 @@ JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkMenuItemPeer_create
   NSA_SET_PTR (env, obj, widget);
 }
 
-JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkMenuItemPeer_setLabel
+JNIEXPORT void JNICALL
+Java_gnu_java_awt_peer_gtk_GtkMenuItemPeer_connectSignals
+  (JNIEnv *env, jobject obj)
+{
+  void *ptr = NSA_GET_PTR (env, obj);
+  jobject *gref = NSA_GET_GLOBAL_REF (env, obj);
+  g_assert (gref);
+  
+  gdk_threads_enter ();
+  
+  g_signal_connect (G_OBJECT (ptr), "activate",
+                    G_CALLBACK (item_activate), *gref);
+
+  gdk_threads_leave ();
+}
+
+JNIEXPORT void JNICALL 
+Java_gnu_java_awt_peer_gtk_GtkMenuItemPeer_gtkWidgetModifyFont
+  (JNIEnv *env, jobject obj, jstring name, jint style, jint size)
+{
+  const char *font_name;
+  void *ptr;
+  GtkWidget *label;
+  PangoFontDescription *font_desc;
+
+  ptr = NSA_GET_PTR (env, obj);
+
+  font_name = (*env)->GetStringUTFChars (env, name, NULL);
+
+  gdk_threads_enter();
+
+  label = gtk_bin_get_child (GTK_BIN (ptr));
+
+  if (label)
+    {
+      font_desc = pango_font_description_from_string (font_name);
+      pango_font_description_set_size (font_desc, size * dpi_conversion_factor);
+
+      if (style & AWT_STYLE_BOLD)
+        pango_font_description_set_weight (font_desc, PANGO_WEIGHT_BOLD);
+
+      if (style & AWT_STYLE_ITALIC)
+        pango_font_description_set_style (font_desc, PANGO_STYLE_OBLIQUE);
+
+      gtk_widget_modify_font (GTK_WIDGET(label), font_desc);
+
+      pango_font_description_free (font_desc);
+    }
+
+  gdk_threads_leave();
+
+  (*env)->ReleaseStringUTFChars (env, name, font_name);
+}
+
+JNIEXPORT void JNICALL
+Java_gnu_java_awt_peer_gtk_GtkMenuItemPeer_setEnabled
+  (JNIEnv *env, jobject obj, jboolean enabled)
+{
+  void *ptr;
+
+  ptr = NSA_GET_PTR (env, obj);
+
+  gdk_threads_enter ();
+  gtk_widget_set_sensitive (GTK_WIDGET (ptr), enabled);
+  gdk_threads_leave ();
+}
+
+JNIEXPORT void JNICALL
+Java_gnu_java_awt_peer_gtk_GtkMenuItemPeer_setLabel
   (JNIEnv *env, jobject obj, jstring label)
 {
   void *ptr;
   const char *str;
+  GtkAccelLabel *accel_label;
 
   ptr = NSA_GET_PTR (env, obj);
 
@@ -88,15 +152,10 @@ JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkMenuItemPeer_setLabel
 
   gdk_threads_enter ();
 
-  if (strcmp (str, "-") == 0) /* "-" signals that we need a separator */
-    gtk_container_remove (GTK_CONTAINER (ptr), GTK_BIN (ptr)->child);
-  else
-    {
-      GtkAccelLabel *accel_label = GTK_ACCEL_LABEL (GTK_BIN (ptr)->child);
+  accel_label = GTK_ACCEL_LABEL (GTK_BIN (ptr)->child);
 
-      gtk_label_set_text (GTK_LABEL (accel_label), str);
-      gtk_accel_label_refetch (accel_label);
-    }
+  gtk_label_set_text (GTK_LABEL (accel_label), str);
+  gtk_accel_label_refetch (accel_label);
 
   gdk_threads_leave ();
 
@@ -104,9 +163,8 @@ JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkMenuItemPeer_setLabel
 }
 
 static void
-item_activate (GtkMenuItem *item __attribute__((unused)), jobject *peer_obj)
+item_activate (GtkMenuItem *item __attribute__((unused)), jobject peer_obj)
 {
-  (*gdk_env)->CallVoidMethod (gdk_env, *peer_obj,
+  (*gdk_env)->CallVoidMethod (gdk_env, peer_obj,
 			      postMenuActionEventID);
 }
-

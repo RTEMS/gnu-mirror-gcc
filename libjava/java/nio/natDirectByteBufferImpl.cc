@@ -1,6 +1,6 @@
 // natDirectByteBufferImpl.cc
 
-/* Copyright (C) 2003  Free Software Foundation
+/* Copyright (C) 2003, 2004  Free Software Foundation
 
    This file is part of libgcj.
 
@@ -16,39 +16,57 @@ details.  */
 #include <stdlib.h>
 
 #include <gnu/gcj/RawData.h>
-#include <java/nio/DirectByteBufferImpl.h>
+#include <java/nio/VMDirectByteBuffer.h>
 
-gnu::gcj::RawData*
-java::nio::DirectByteBufferImpl::allocateImpl (jint capacity)
+using gnu::gcj::RawData;
+
+RawData*
+java::nio::VMDirectByteBuffer::allocate (jint capacity)
 {
   return reinterpret_cast<gnu::gcj::RawData*> (::malloc (capacity));
 }
 
 void
-java::nio::DirectByteBufferImpl::freeImpl (gnu::gcj::RawData* address)
+java::nio::VMDirectByteBuffer::free (gnu::gcj::RawData* address)
 {
   ::free (reinterpret_cast<void*> (address));
 }
 
 jbyte
-java::nio::DirectByteBufferImpl::getImpl (jint index)
+java::nio::VMDirectByteBuffer::get (RawData* address, jint index)
 {
-  jbyte* pointer = reinterpret_cast<jbyte*> (address) + offset + index;
+  jbyte* pointer = reinterpret_cast<jbyte*> (address) + index;
   return *pointer;
 }
 
 void
-java::nio::DirectByteBufferImpl::putImpl (jint index, jbyte value)
+java::nio::VMDirectByteBuffer::get (RawData* address, jint index,
+				    jbyteArray dst, jint offset, jint length)
 {
-  jbyte* pointer = reinterpret_cast<jbyte*> (address) + offset + index;
-  *pointer = value;
+  jbyte* src = reinterpret_cast<jbyte*> (address) + index;
+  memcpy (elements (dst) + offset, src, length);
 }
 
 void
-java::nio::DirectByteBufferImpl::shiftDown
-(jint dst_offset, jint src_offset, jint count)
+java::nio::VMDirectByteBuffer::put (gnu::gcj::RawData* address,
+				    jint index, jbyte value)
 {
-  jbyte* dst = reinterpret_cast<jbyte*> (address) + offset + dst_offset;
-  jbyte* src = reinterpret_cast<jbyte*> (address) + offset + src_offset;
+  jbyte* pointer = reinterpret_cast<jbyte*> (address) + index;
+  *pointer = value;
+}
+
+RawData*
+java::nio::VMDirectByteBuffer::adjustAddress (RawData* address, jint offset)
+{
+  jbyte* start = reinterpret_cast<jbyte*> (address) + offset;
+  return reinterpret_cast<RawData*>(start);
+}
+
+void
+java::nio::VMDirectByteBuffer::shiftDown (RawData* address, jint dst_offset,
+					  jint src_offset, jint count)
+{
+  jbyte* dst = reinterpret_cast<jbyte*> (address) + dst_offset;
+  jbyte* src = reinterpret_cast<jbyte*> (address) + src_offset;
   ::memmove(dst, src, count);
 }

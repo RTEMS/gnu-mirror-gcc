@@ -24,12 +24,11 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
---  This package defines the structure of the Project File tree.
+--  This package defines the structure of the Project File tree
 
 with GNAT.HTable;
 
 with Prj.Attr; use Prj.Attr;
-with Prj.Com;  use Prj.Com;
 with Table;    use Table;
 with Types;    use Types;
 
@@ -150,7 +149,7 @@ package Prj.Tree is
    --  this node.
 
    procedure Remove_Next_End_Node;
-   --  Remove the top of the end node stack.
+   --  Remove the top of the end node stack
 
    ------------------------
    -- Comment Processing --
@@ -172,13 +171,13 @@ package Prj.Tree is
    --  A table to store the comments that may be stored is the tree
 
    procedure Scan;
-   --  Scan the tokens and accumulate comments.
+   --  Scan the tokens and accumulate comments
 
    type Comment_Location is
      (Before, After, Before_End, After_End, End_Of_Line);
 
    procedure Add_Comments (To : Project_Node_Id; Where : Comment_Location);
-   --  Add comments to this node.
+   --  Add comments to this node
 
    ----------------------
    -- Access Functions --
@@ -235,7 +234,7 @@ package Prj.Tree is
 
    function Directory_Of (Node : Project_Node_Id) return Name_Id;
    pragma Inline (Directory_Of);
-   --  Only valid for N_Project nodes.
+   --  Only valid for N_Project nodes
 
    function Expression_Kind_Of (Node : Project_Node_Id) return Variable_Kind;
    pragma Inline (Expression_Kind_Of);
@@ -263,11 +262,15 @@ package Prj.Tree is
 
    function Path_Name_Of (Node : Project_Node_Id) return Name_Id;
    pragma Inline (Path_Name_Of);
-   --  Only valid for N_Project and N_With_Clause nodes.
+   --  Only valid for N_Project and N_With_Clause nodes
 
    function String_Value_Of (Node : Project_Node_Id) return Name_Id;
    pragma Inline (String_Value_Of);
    --  Only valid for N_With_Clause, N_Literal_String nodes or N_Comment
+
+   function Source_Index_Of (Node : Project_Node_Id) return Int;
+   pragma Inline (Source_Index_Of);
+   --  Only valid for N_Literal_String and N_Attribute_Declaration nodes
 
    function First_With_Clause_Of
      (Node : Project_Node_Id) return Project_Node_Id;
@@ -694,6 +697,11 @@ package Prj.Tree is
       To   : Project_Node_Id);
    pragma Inline (Set_Package_Node_Of);
 
+   procedure Set_Source_Index_Of
+     (Node : Project_Node_Id;
+      To   : Int);
+   pragma Inline (Set_Source_Index_Of);
+
    procedure Set_String_Type_Of
      (Node : Project_Node_Id;
       To   : Project_Node_Id);
@@ -772,6 +780,10 @@ package Prj.Tree is
 
          Name : Name_Id := No_Name;
          --  See below for what Project_Node_Kind it is used
+
+         Src_Index : Int := 0;
+         --  Index of a unit in a multi-unit source.
+         --  Onli for some N_Attribute_Declaration and N_Literal_String.
 
          Path_Name : Name_Id := No_Name;
          --  See below for what Project_Node_Kind it is used
@@ -1033,12 +1045,18 @@ package Prj.Tree is
          Node : Project_Node_Id;
          --  Node of the project in table Project_Nodes
 
+         Canonical_Path : Name_Id;
+         --  Resolved and canonical path of the project file
+
          Extended : Boolean;
          --  True when the project is being extended by another project
       end record;
 
       No_Project_Name_And_Node : constant Project_Name_And_Node :=
-        (Name => No_Name, Node => Empty_Node, Extended => True);
+        (Name           => No_Name,
+         Node           => Empty_Node,
+         Canonical_Path => No_Name,
+         Extended       => True);
 
       package Projects_Htable is new GNAT.HTable.Simple_HTable
         (Header_Num => Header_Num,

@@ -34,7 +34,7 @@ Boston, MA 02111-1307, USA.  */
 static void
 formatted_backspace (void)
 {
-  offset_t base;
+  gfc_offset base;
   char *p;
   int n;
 
@@ -71,16 +71,16 @@ formatted_backspace (void)
     }
   while (base != 0);
 
-/* base is the new pointer.  Seek to it exactly */
-
-done:
+  /* base is the new pointer.  Seek to it exactly */
+ done:
   if (sseek (current_unit->s, base) == FAILURE)
     goto io_error;
   current_unit->last_record--;
+  current_unit->endfile = NO_ENDFILE;
 
   return;
 
-io_error:
+ io_error:
   generate_error (ERROR_OS, NULL);
 }
 
@@ -92,12 +92,12 @@ io_error:
 static void
 unformatted_backspace (void)
 {
-  offset_t *p, new;
+  gfc_offset *p, new;
   int length;
 
-  length = sizeof (offset_t);
+  length = sizeof (gfc_offset);
 
-  p = (offset_t *) salloc_r_at (current_unit->s, &length,
+  p = (gfc_offset *) salloc_r_at (current_unit->s, &length,
 				file_position (current_unit->s) - length);
   if (p == NULL)
     goto io_error;
@@ -109,15 +109,18 @@ unformatted_backspace (void)
   current_unit->last_record--;
   return;
 
-io_error:
+ io_error:
   generate_error (ERROR_OS, NULL);
 }
 
 
+extern void st_backspace (void);
+export_proto(st_backspace);
+
 void
 st_backspace (void)
 {
-  unit_t *u;
+  gfc_unit *u;
 
   library_start ();
 
@@ -149,12 +152,12 @@ st_backspace (void)
       if (file_position (u->s) == 0)
 	goto done;		/* Common special case */
 
-      if (u->flags.form == FORM_UNFORMATTED)
+      if (u->flags.form == FORM_FORMATTED)
 	formatted_backspace ();
       else
 	unformatted_backspace ();
     }
 
-done:
+ done:
   library_end ();
 }

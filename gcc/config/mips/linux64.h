@@ -1,6 +1,6 @@
 /* Definitions for MIPS running Linux-based GNU systems with ELF format
    using n32/64 abi.
-   Copyright 2002, 2003 Free Software Foundation, Inc.
+   Copyright 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -30,13 +30,8 @@ Boston, MA 02111-1307, USA.  */
   { "driver_default_abi_self_spec", DRIVER_DEFAULT_ABI_SELF_SPEC },
 #define DRIVER_SELF_SPECS \
 "%{!EB:%{!EL:%(endian_spec)}}", \
-"%{mabi-fake-default:%{!mabi=*:-mabi=32}}", \
 "%(driver_default_abi_self_spec)", \
 "%{!mips*:%{!march=*:%{mabi=32:-mips1}%{mabi=n32|mabi=64:-mips3}}}"
-
-#undef SUBTARGET_TARGET_SWITCHES
-#define SUBTARGET_TARGET_SWITCHES \
-  { "abi-fake-default", 0, N_("Same as -mabi=32, just trickier") },
 
 #undef SUBTARGET_ASM_SPEC
 #define SUBTARGET_ASM_SPEC "\
@@ -80,14 +75,6 @@ Boston, MA 02111-1307, USA.  */
    relative to a debug info section, specified to be 4 bytes in the DWARF-2
    specification.  The SGI/MIPS ABI defines it to be the same as PTR_SIZE.  */
 #define DWARF_OFFSET_SIZE PTR_SIZE
-
-#undef ASM_PREFERRED_EH_DATA_FORMAT
-#if 0  /* We can't use relative addressing modes on NEWABI :-(  */
-#define ASM_PREFERRED_EH_DATA_FORMAT(CODE, GLOBAL)       		\
-   (flag_pic								\
-    ? ((GLOBAL) ? DW_EH_PE_indirect : 0) | DW_EH_PE_sdata4		\
-    : DW_EH_PE_absptr)
-#endif
 
 /* GNU/Linux doesn't use the same floating-point format that IRIX uses
    for long double.  There's no need to override this here, since

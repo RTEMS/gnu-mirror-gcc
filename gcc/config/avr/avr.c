@@ -68,7 +68,6 @@ static void avr_file_start (void);
 static void avr_file_end (void);
 static void avr_output_function_prologue (FILE *, HOST_WIDE_INT);
 static void avr_output_function_epilogue (FILE *, HOST_WIDE_INT);
-static void avr_unique_section (tree, int);
 static void avr_insert_attributes (tree, tree *);
 static unsigned int avr_section_type_flags (tree, const char *, int);
 
@@ -177,6 +176,9 @@ static const struct mcu_type_s avr_mcu_types[] = {
   { "at90c8534", 2, "__AVR_AT90C8534__" },
   { "at90s8535", 2, "__AVR_AT90S8535__" },
   { "at86rf401", 2, "__AVR_AT86RF401__" },
+    /* Classic + MOVW, <= 8K.  */
+  { "attiny13",   2, "__AVR_ATtiny13__" },
+  { "attiny2313", 2, "__AVR_ATtiny2313__" },
     /* Classic, > 8K.  */
   { "avr3",      3, NULL },
   { "atmega103", 3, "__AVR_ATmega103__" },
@@ -187,6 +189,8 @@ static const struct mcu_type_s avr_mcu_types[] = {
     /* Enhanced, <= 8K.  */
   { "avr4",      4, NULL },
   { "atmega8",   4, "__AVR_ATmega8__" },
+  { "atmega48",   4, "__AVR_ATmega48__" },
+  { "atmega88",   4, "__AVR_ATmega88__" },
   { "atmega8515", 4, "__AVR_ATmega8515__" },
   { "atmega8535", 4, "__AVR_ATmega8535__" },
     /* Enhanced, > 8K.  */
@@ -195,11 +199,18 @@ static const struct mcu_type_s avr_mcu_types[] = {
   { "atmega161", 5, "__AVR_ATmega161__" },
   { "atmega162", 5, "__AVR_ATmega162__" },
   { "atmega163", 5, "__AVR_ATmega163__" },
+  { "atmega165", 5, "__AVR_ATmega165__" },
+  { "atmega168", 5, "__AVR_ATmega168__" },
   { "atmega169", 5, "__AVR_ATmega169__" },
   { "atmega32",  5, "__AVR_ATmega32__" },
   { "atmega323", 5, "__AVR_ATmega323__" },
+  { "atmega325", 5, "__AVR_ATmega325__" },
+  { "atmega3250", 5, "__AVR_ATmega3250__" },
   { "atmega64",  5, "__AVR_ATmega64__" },
+  { "atmega645", 5, "__AVR_ATmega645__" },
+  { "atmega6450", 5, "__AVR_ATmega6450__" },
   { "atmega128", 5, "__AVR_ATmega128__" },
+  { "at90can128", 5, "__AVR_AT90CAN128__" },
   { "at94k",     5, "__AVR_AT94K__" },
     /* Assembler only.  */
   { "avr1",      1, NULL },
@@ -231,8 +242,8 @@ int avr_case_values_threshold = 30000;
 #define TARGET_ASM_FUNCTION_EPILOGUE avr_output_function_epilogue
 #undef TARGET_ATTRIBUTE_TABLE
 #define TARGET_ATTRIBUTE_TABLE avr_attribute_table
-#undef TARGET_ASM_UNIQUE_SECTION
-#define TARGET_ASM_UNIQUE_SECTION avr_unique_section
+#undef TARGET_ASM_FUNCTION_RODATA_SECTION
+#define TARGET_ASM_FUNCTION_RODATA_SECTION default_no_function_rodata_section
 #undef TARGET_INSERT_ATTRIBUTES
 #define TARGET_INSERT_ATTRIBUTES avr_insert_attributes
 #undef TARGET_SECTION_TYPE_FLAGS
@@ -4251,6 +4262,7 @@ _reg_unused_after (rtx insn, rtx reg)
 
   while ((insn = NEXT_INSN (insn)))
     {
+      rtx set;
       code = GET_CODE (insn);
 
 #if 0
@@ -4262,6 +4274,9 @@ _reg_unused_after (rtx insn, rtx reg)
 	return 1;
       /* else */
 #endif
+
+      if (!INSN_P (insn))
+	continue;
 
       if (code == JUMP_INSN)
 	return 0;
@@ -4320,17 +4335,14 @@ _reg_unused_after (rtx insn, rtx reg)
 	    return 1;
 	}
 
-      if (GET_RTX_CLASS (code) == 'i')
-	{
-	  rtx set = single_set (insn);
+      set = single_set (insn);
 
-	  if (set && reg_overlap_mentioned_p (reg, SET_SRC (set)))
-	    return 0;
-	  if (set && reg_overlap_mentioned_p (reg, SET_DEST (set)))
-	    return GET_CODE (SET_DEST (set)) != MEM;
-	  if (set == 0 && reg_overlap_mentioned_p (reg, PATTERN (insn)))
-	    return 0;
-	}
+      if (set && reg_overlap_mentioned_p (reg, SET_SRC (set)))
+	return 0;
+      if (set && reg_overlap_mentioned_p (reg, SET_DEST (set)))
+	return GET_CODE (SET_DEST (set)) != MEM;
+      if (set == 0 && reg_overlap_mentioned_p (reg, PATTERN (insn)))
+	return 0;
     }
   return 1;
 }
@@ -4352,38 +4364,6 @@ avr_assemble_integer (rtx x, unsigned int size, int aligned_p)
     }
   return default_assemble_integer (x, size, aligned_p);
 }
-
-/* Sets section name for declaration DECL.  */
-  
-static void
-avr_unique_section (tree decl, int reloc ATTRIBUTE_UNUSED)
-{
-  int len;
-  const char *name, *prefix;
-  char *string;
-
-  name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
-  name = (* targetm.strip_name_encoding) (name);
-
-  if (TREE_CODE (decl) == FUNCTION_DECL)
-    {
-      if (flag_function_sections)
-	prefix = ".text.";
-      else
-	prefix = ".text";
-    }
-  else 
-    abort ();
-
-  if (flag_function_sections)
-    {
-      len = strlen (name) + strlen (prefix);
-      string = alloca (len + 1);
-      sprintf (string, "%s%s", prefix, name);
-      DECL_SECTION_NAME (decl) = build_string (len, string);
-    }
-}
-
 
 /* The routine used to output NUL terminated strings.  We use a special
    version of this for most svr4 targets because doing so makes the
@@ -4543,7 +4523,7 @@ avr_handle_progmem_attribute (tree *node, tree name,
 	}
       else
 	{
-	  warning ("`%s' attribute ignored", IDENTIFIER_POINTER (name));
+	  warning ("%qs attribute ignored", IDENTIFIER_POINTER (name));
 	  *no_add_attrs = true;
 	}
     }
@@ -4562,9 +4542,35 @@ avr_handle_fndecl_attribute (tree *node, tree name,
 {
   if (TREE_CODE (*node) != FUNCTION_DECL)
     {
-      warning ("`%s' attribute only applies to functions",
+      warning ("%qs attribute only applies to functions",
 	       IDENTIFIER_POINTER (name));
       *no_add_attrs = true;
+    }
+  else
+    {
+      const char *func_name = IDENTIFIER_POINTER (DECL_NAME (*node));
+      const char *attr = IDENTIFIER_POINTER (name);
+
+      /* If the function has the 'signal' or 'interrupt' attribute, test to
+         make sure that the name of the function is "__vector_NN" so as to
+         catch when the user misspells the interrupt vector name.  */
+
+      if (strncmp (attr, "interrupt", strlen ("interrupt")) == 0)
+        {
+          if (strncmp (func_name, "__vector", strlen ("__vector")) != 0)
+            {
+              warning ("`%s' appears to be a misspelled interrupt handler",
+                       func_name);
+            }
+        }
+      else if (strncmp (attr, "signal", strlen ("signal")) == 0)
+        {
+          if (strncmp (func_name, "__vector", strlen ("__vector")) != 0)
+            {
+              warning ("`%s' appears to be a misspelled signal handler",
+                       func_name);
+            }
+        }
     }
 
   return NULL_TREE;
@@ -4574,7 +4580,7 @@ avr_handle_fndecl_attribute (tree *node, tree name,
    if found return 1, otherwise 0.  */
 
 int
-avr_progmem_p (tree decl)
+avr_progmem_p (tree decl, tree attributes)
 {
   tree a;
 
@@ -4582,7 +4588,7 @@ avr_progmem_p (tree decl)
     return 0;
 
   if (NULL_TREE
-      != lookup_attribute ("progmem", DECL_ATTRIBUTES (decl)))
+      != lookup_attribute ("progmem", attributes))
     return 1;
 
   a=decl;
@@ -4606,7 +4612,7 @@ avr_insert_attributes (tree node, tree *attributes)
 {
   if (TREE_CODE (node) == VAR_DECL
       && (TREE_STATIC (node) || DECL_EXTERNAL (node))
-      && avr_progmem_p (node))
+      && avr_progmem_p (node, *attributes))
     {
       static const char dsec[] = ".progmem.data";
       *attributes = tree_cons (get_identifier ("section"),
@@ -4644,7 +4650,7 @@ static void
 avr_file_start (void)
 {
   if (avr_asm_only_p)
-    error ("MCU `%s' supported for assembler only", avr_mcu_name);
+    error ("MCU %qs supported for assembler only", avr_mcu_name);
 
   default_file_start ();
 
@@ -5120,6 +5126,12 @@ avr_hard_regno_mode_ok (int regno, enum machine_mode mode)
      register, so r29 may be allocated and overwrite the high byte of
      the frame pointer.  Do not allow any value to start in r29.  */
   if (regno == REG_Y + 1)
+    return 0;
+
+  /* Reload can use r28:r29 for reload register and for frame pointer
+   in one insn. It's wrong. We must disable it.  */
+  if (mode != Pmode && reload_in_progress && frame_pointer_required_p ()
+      && regno <= REG_Y && (regno + GET_MODE_SIZE (mode)) >= (REG_Y + 1))
     return 0;
 
   if (mode == QImode)

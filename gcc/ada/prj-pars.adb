@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---             Copyright (C) 2001-2002 Free Software Foundation, Inc.       --
+--             Copyright (C) 2001-2004 Free Software Foundation, Inc.       --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -26,9 +26,10 @@
 
 with Ada.Exceptions; use Ada.Exceptions;
 
-with Prj.Err;  use Prj.Err;
+with Opt;
 with Output;   use Output;
 with Prj.Com;  use Prj.Com;
+with Prj.Err;  use Prj.Err;
 with Prj.Part;
 with Prj.Proc;
 with Prj.Tree; use Prj.Tree;
@@ -64,7 +65,8 @@ package body Prj.Pars is
            (Project           => The_Project,
             Success           => Success,
             From_Project_Node => Project_Tree,
-            Report_Error      => null);
+            Report_Error      => null,
+            Follow_Links      => Opt.Follow_Links);
          Prj.Err.Finalize;
 
          if not Success then

@@ -58,7 +58,9 @@ public abstract class SampleModel
 
   public SampleModel(int dataType, int w, int h, int numBands)
   {
-    if ((w<=0) || (h<=0)) throw new IllegalArgumentException();
+    if ((w <= 0) || (h <= 0)) 
+      throw new IllegalArgumentException((w <= 0 ? " width<=0" : " width is ok")
+                                         +(h <= 0 ? " height<=0" : " height is ok"));
 	
     // FIXME: How can an int be greater than Integer.MAX_VALUE?
     // FIXME: How do we identify an unsupported data type?
@@ -68,7 +70,7 @@ public abstract class SampleModel
     this.height = h;
     this.numBands = numBands;  
   }
-
+  
   public final int getWidth()
   {
     return width;
@@ -454,6 +456,17 @@ public abstract class SampleModel
 
     public abstract SampleModel createCompatibleSampleModel(int w, int h);
 
+    /**
+     * Return a SampleModel with a subset of the bands in this model.
+     * 
+     * Selects bands.length bands from this sample model.  The bands chosen
+     * are specified in the indices of bands[].  This also permits permuting
+     * the bands as well as taking a subset.  Thus, giving an array with
+     * 1, 2, 3, ..., numbands, will give an identical sample model.
+     * 
+     * @param bands Array with band indices to include.
+     * @return A new sample model
+     */
     public abstract SampleModel createSubsetSampleModel(int[] bands);
 
     public abstract DataBuffer createDataBuffer();

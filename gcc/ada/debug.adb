@@ -345,7 +345,8 @@ package body Debug is
    --  dA   Forces output of representation information, including full
    --       information for all internal type and object entities, as well
    --       as all user defined type and object entities including private
-   --       and incomplete types.
+   --       and incomplete types. This debug switch also automatically sets
+   --       the equivalent of -gnatR3m.
 
    --  dB   Output debug encodings for types and variants. See Exp_Dbug for
    --       exact form of the generated output.
@@ -470,7 +471,7 @@ package body Debug is
    --       testing high integrity mode.
 
    --  d.x  No exception handlers in generated code. This causes exception
-   --       handles to be eliminated from the generated code. They are still
+   --       handlers to be eliminated from the generated code. They are still
    --       fully compiled and analyzed, they just get eliminated from the
    --       code generation step.
 

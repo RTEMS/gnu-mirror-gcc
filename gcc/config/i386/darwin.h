@@ -1,5 +1,5 @@
 /* Target definitions for x86 running Darwin.
-   Copyright (C) 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2002, 2004 Free Software Foundation, Inc.
    Contributed by Apple Computer Inc.
 
 This file is part of GCC.
@@ -23,7 +23,7 @@ Boston, MA 02111-1307, USA.  */
 #undef TARGET_MACHO
 #define TARGET_MACHO 1
 
-#define TARGET_VERSION fprintf (stderr, " (i386 Darwin)");
+#define TARGET_VERSION fprintf (stderr, " (i686 Darwin)");
 
 #define TARGET_OS_CPP_BUILTINS()                \
   do                                            \
@@ -39,17 +39,22 @@ Boston, MA 02111-1307, USA.  */
    the kernel or some such.  */
 
 #undef CC1_SPEC
-#define CC1_SPEC "%{!static:-fPIC}"
+#define CC1_SPEC "%{!static:-fPIC}\
+  %{g: %{!fno-eliminate-unused-debug-symbols: -feliminate-unused-debug-symbols }}"
 
-#define ASM_SPEC "-arch i386 \
-  %{Zforce_cpusubtype_ALL:-force_cpusubtype_ALL} \
-  %{!Zforce_cpusubtype_ALL:%{mmmx:-force_cpusubtype_ALL}\
-			   %{msse:-force_cpusubtype_ALL}\
-			   %{msse2:-force_cpusubtype_ALL}}"
+#undef ASM_SPEC
+#define ASM_SPEC "-arch i686 -force_cpusubtype_ALL"
 
 #undef SUBTARGET_EXTRA_SPECS
-#define SUBTARGET_EXTRA_SPECS			\
-  { "darwin_arch", "i386" },
+#define SUBTARGET_EXTRA_SPECS					\
+  { "darwin_arch", "i686" },					\
+  { "darwin_subarch", "%{march=pentium3:pentIIm3;:i686}" },
+   
+
+/* Use the following macro for any Darwin/x86-specific command-line option
+   translation.  */
+#define SUBTARGET_OPTION_TRANSLATE_TABLE \
+  { "", "" }
 
 /* The Darwin assembler mostly follows AT&T syntax.  */
 #undef ASSEMBLER_DIALECT
@@ -86,6 +91,11 @@ Boston, MA 02111-1307, USA.  */
 /* Define the syntax of pseudo-ops, labels and comments.  */
 
 #define LPREFIX "L"
+
+/* These are used by -fbranch-probabilities */
+#define HOT_TEXT_SECTION_NAME "__TEXT,__text,regular,pure_instructions"
+#define UNLIKELY_EXECUTED_TEXT_SECTION_NAME \
+                              "__TEXT,__unlikely,regular,pure_instructions"
 
 /* Assembler pseudos to introduce constants of various size.  */
 
@@ -127,9 +137,9 @@ Boston, MA 02111-1307, USA.  */
     do {								\
       if (MACHOPIC_INDIRECT)						\
 	{								\
-	  const char *name = machopic_stub_name ("*mcount");		\
+	  const char *name = machopic_mcount_stub_name ();		\
 	  fprintf (FILE, "\tcall %s\n", name+1);  /*  skip '&'  */	\
-	  machopic_validate_stub_or_non_lazy_ptr (name, /*stub:*/1);	\
+	  machopic_validate_stub_or_non_lazy_ptr (name);		\
 	}								\
       else fprintf (FILE, "\tcall mcount\n");				\
     } while (0)

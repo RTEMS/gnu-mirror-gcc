@@ -1,5 +1,5 @@
 /* MappedByteBuffer.java -- 
-   Copyright (C) 2002 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2004  Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -39,33 +39,51 @@ exception statement from your version. */
 package java.nio;
 
 /**
- * @author Michael Koch
+ * @author Michael Koch (konqueror@gmx.de)
  * @since 1.4
  */
 public abstract class MappedByteBuffer extends ByteBuffer
 {
-  private boolean loaded = false;
-  
   MappedByteBuffer (int capacity, int limit, int position, int mark)
   {
     super (capacity, limit, position, mark);
   }
   
+  void forceImpl()
+  {
+  }
+
   public final MappedByteBuffer force ()
   {
-    // FIXME: Flush to disk here.
+    forceImpl();
     return this;
   }
     
+  boolean isLoadedImpl()
+  {
+    load();
+    return true;
+  }
+
   public final boolean isLoaded ()
   {
-    return loaded;
+    return isLoadedImpl();
   }
     
+  void loadImpl()
+  {
+  }
+
   public final MappedByteBuffer load ()
   {
-    // FIXME: Try to load all pages into memory.
-    loaded = true;
+    loadImpl();
     return this;
   }
+
+  void unmapImpl ()
+  {
+    forceImpl();
+  }
+
+  public void finalize () { unmapImpl(); }
 }

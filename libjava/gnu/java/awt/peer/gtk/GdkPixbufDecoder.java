@@ -1,52 +1,57 @@
 /* GdkPixbufDecoder.java -- Image data decoding object
-   Copyright (C) 2003 Free Software Foundation, Inc.
-   
-   This file is part of GNU Classpath.
-   
-   GNU Classpath is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2, or (at your option)
-   any later version.
-   
-   GNU Classpath is distributed in the hope that it will be useful, but
-   WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   General Public License for more details.
-   
-   You should have received a copy of the GNU General Public License
-   along with GNU Classpath; see the file COPYING.  If not, write to the
-   Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA.
-   
-   Linking this library statically or dynamically with other modules is
-   making a combined work based on this library.  Thus, the terms and
-   conditions of the GNU General Public License cover the whole
-   combination.
-   
-   As a special exception, the copyright holders of this library give you
-   permission to link this library with independent modules to produce an
-   executable, regardless of the license terms of these independent
-   modules, and to copy and distribute the resulting executable under
-   terms of your choice, provided that you also meet, for each linked
-   independent module, the terms and conditions of the license of that
-   module.  An independent module is a module which is not derived from
-   or based on this library.  If you modify this library, you may extend
-   this exception to your version of the library, but you are not
-   obligated to do so.  If you do not wish to do so, delete this
-   exception statement from your version. */
+   Copyright (C) 2003, 2004  Free Software Foundation, Inc.
+
+This file is part of GNU Classpath.
+
+GNU Classpath is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2, or (at your option)
+any later version.
+
+GNU Classpath is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with GNU Classpath; see the file COPYING.  If not, write to the
+Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+02111-1307 USA.
+
+Linking this library statically or dynamically with other modules is
+making a combined work based on this library.  Thus, the terms and
+conditions of the GNU General Public License cover the whole
+combination.
+
+As a special exception, the copyright holders of this library give you
+permission to link this library with independent modules to produce an
+executable, regardless of the license terms of these independent
+modules, and to copy and distribute the resulting executable under
+terms of your choice, provided that you also meet, for each linked
+independent module, the terms and conditions of the license of that
+module.  An independent module is a module which is not derived from
+or based on this library.  If you modify this library, you may extend
+this exception to your version of the library, but you are not
+obligated to do so.  If you do not wish to do so, delete this
+exception statement from your version. */
 
 
 package gnu.java.awt.peer.gtk;
 
-import java.awt.image.*;
+import gnu.classpath.Configuration;
+
+import java.awt.image.BufferedImage;
+import java.awt.image.ColorModel;
+import java.awt.image.DirectColorModel;
+import java.awt.image.ImageConsumer;
+import java.awt.image.ImageProducer;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
-import java.io.InputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
-import java.util.Vector;
 import java.util.Hashtable;
-import gnu.classpath.Configuration;
+import java.util.Vector;
 
 public class GdkPixbufDecoder extends gnu.java.awt.image.ImageDecoder
 {
@@ -77,19 +82,16 @@ public class GdkPixbufDecoder extends gnu.java.awt.image.ImageDecoder
   public GdkPixbufDecoder (String filename)
   {
     super (filename);
-    initState ();
   }
   
   public GdkPixbufDecoder (URL url)
   {
     super (url);
-    initState ();
   }
 
   public GdkPixbufDecoder (byte[] imagedata, int imageoffset, int imagelength)
   {
     super (imagedata, imageoffset, imagelength);
-    initState ();
   }
 
   // called back by native side
@@ -135,6 +137,7 @@ public class GdkPixbufDecoder extends gnu.java.awt.image.ImageDecoder
 
     byte bytes[] = new byte[4096];
     int len = 0;
+    initState();
     while ((len = is.read (bytes)) != -1)
       pumpBytes (bytes, len);
     
@@ -220,4 +223,31 @@ public class GdkPixbufDecoder extends gnu.java.awt.image.ImageDecoder
     dec.startProduction (bb);
     return bb.getBufferedImage ();
   }
+
+  public static BufferedImage createBufferedImage (URL u)
+  {
+    BufferedImageBuilder bb = new BufferedImageBuilder ();
+    GdkPixbufDecoder dec = new GdkPixbufDecoder (u);
+    dec.startProduction (bb);
+    return bb.getBufferedImage ();
+  }
+
+  public static BufferedImage createBufferedImage (byte[] imagedata, int imageoffset,
+                                                   int imagelength)
+  {
+    BufferedImageBuilder bb = new BufferedImageBuilder ();
+    GdkPixbufDecoder dec = new GdkPixbufDecoder (imagedata, imageoffset, imagelength);
+    dec.startProduction (bb);
+    return bb.getBufferedImage ();
+  }
+  
+  public static BufferedImage createBufferedImage (ImageProducer producer)
+  {
+    BufferedImageBuilder bb = new BufferedImageBuilder ();
+    producer.startProduction(bb);
+    return bb.getBufferedImage ();
+  }
+  
+
+
 }

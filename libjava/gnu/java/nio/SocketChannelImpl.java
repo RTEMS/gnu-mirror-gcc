@@ -38,12 +38,12 @@ exception statement from your version. */
 
 package gnu.java.nio;
 
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import gnu.java.net.PlainSocketImpl;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.SocketTimeoutException;
@@ -53,13 +53,12 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.NoConnectionPendingException;
 import java.nio.channels.NotYetConnectedException;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
 import java.nio.channels.UnresolvedAddressException;
 import java.nio.channels.UnsupportedAddressTypeException;
-import java.nio.channels.SocketChannel;
-import java.nio.channels.Selector;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.spi.SelectorProvider;
-import gnu.classpath.Configuration;
 
 public final class SocketChannelImpl extends SocketChannel
 {
@@ -183,7 +182,7 @@ public final class SocketChannelImpl extends SocketChannel
     // FIXME: Handle blocking/non-blocking mode.
 
     Selector selector = provider().openSelector();
-    register (selector, SelectionKey.OP_CONNECT);
+    register(selector, SelectionKey.OP_CONNECT);
 
     if (isBlocking())
       {
@@ -217,7 +216,7 @@ public final class SocketChannelImpl extends SocketChannel
     return socket;
   }
 
-  public int read (ByteBuffer dst) throws IOException
+  public int read(ByteBuffer dst) throws IOException
   {
     if (!isConnected())
       throw new NotYetConnectedException();
@@ -228,12 +227,9 @@ public final class SocketChannelImpl extends SocketChannel
     int available = input.available();
     int len = dst.capacity() - dst.position();
 	
-    if (available == 0)
+    if ((! isBlocking()) && available == 0)
       return 0;
     
-    if (len > available)
-      len = available;
-
     if (dst.hasArray())
       {
         offset = dst.arrayOffset() + dst.position();

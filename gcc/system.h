@@ -179,7 +179,7 @@ extern int errno;
    UPPER.  However the bounds themselves can be either positive or
    negative.  */
 #define IN_RANGE(VALUE, LOWER, UPPER) \
-  ((unsigned HOST_WIDE_INT) ((VALUE) - (LOWER)) <= ((UPPER) - (LOWER)))
+  ((unsigned HOST_WIDE_INT)((VALUE) - (LOWER)) <= ((UPPER) - (LOWER)))
 
 /* Infrastructure for defining missing _MAX and _MIN macros.  Note that
    macros defined with these cannot be used in #if.  */
@@ -303,6 +303,10 @@ extern char *getenv (const char *);
 extern int getopt (int, char * const *, const char *);
 #endif
 
+#if defined (HAVE_DECL_GETPAGESIZE) && !HAVE_DECL_GETPAGESIZE
+extern int getpagesize (void);
+#endif
+
 #if defined (HAVE_DECL_GETWD) && !HAVE_DECL_GETWD
 extern char *getwd (char *);
 #endif
@@ -372,13 +376,6 @@ extern int snprintf (char *, size_t, const char *, ...);
   ((GCC_VERSION >= 2007) || (__STDC_VERSION__ >= 199901L))
 #endif
 
-/* 1 if we have _Bool.  */
-#ifndef HAVE__BOOL
-# define HAVE__BOOL \
-   ((GCC_VERSION >= 3000) || (__STDC_VERSION__ >= 199901L))
-#endif
-
-
 #if HAVE_SYS_STAT_H
 # include <sys/stat.h>
 #endif
@@ -419,16 +416,6 @@ extern int snprintf (char *, size_t, const char *, ...);
 # else
 #  define S_ISFIFO(m) 0
 # endif
-#endif
-
-/* Approximate O_NONBLOCK.  */
-#ifndef O_NONBLOCK
-#define O_NONBLOCK O_NDELAY
-#endif
-
-/* Approximate O_NOCTTY.  */
-#ifndef O_NOCTTY
-#define O_NOCTTY 0
 #endif
 
 /* Define well known filenos if the system does not define them.  */
@@ -495,14 +482,6 @@ extern int snprintf (char *, size_t, const char *, ...);
 #define ENUM_BITFIELD(TYPE) unsigned int
 #endif
 
-/* We only use bool bitfields with gcc3.  Some supposedly C99
-   compilers don't handle them correctly.  */
-#if (GCC_VERSION >= 3000)
-#define BOOL_BITFIELD _Bool
-#else
-#define BOOL_BITFIELD unsigned int
-#endif
-
 #ifndef offsetof
 #define offsetof(TYPE, MEMBER)	((size_t) &((TYPE *) 0)->MEMBER)
 #endif
@@ -521,28 +500,54 @@ extern int snprintf (char *, size_t, const char *, ...);
 #define __builtin_expect(a, b) (a)
 #endif
 
-/* Provide some sort of boolean type.  We use stdbool.h if it's
-  available.  This must be after all inclusion of system headers,
-  as some of them will mess us up.  */
-#undef bool
-#undef true
-#undef false
+/* Redefine abort to report an internal error w/o coredump, and
+   reporting the location of the error in the source file.  */
+extern void fancy_abort (const char *, int, const char *) ATTRIBUTE_NORETURN;
+#define abort() fancy_abort (__FILE__, __LINE__, __FUNCTION__)
+
+/* Use gcc_assert(EXPR) to test invariants.  */
+#if ENABLE_ASSERT_CHECKING
+#define gcc_assert(EXPR) 						\
+   ((void)(!(EXPR) ? fancy_abort (__FILE__, __LINE__, __FUNCTION__), 0 : 0))
+#else
+/* Include EXPR, so that unused variable warnings do not occur.  */
+#define gcc_assert(EXPR) ((void)(0 && (EXPR)))
+#endif
+
+/* Use gcc_unreachable() to mark unreachable locations (like an
+   unreachable default case of a switch.  Do not use gcc_assert(0).  */
+#define gcc_unreachable() (fancy_abort (__FILE__, __LINE__, __FUNCTION__))
+
+/* Provide a fake boolean type.  We make no attempt to use the
+   C99 _Bool, as it may not be available in the bootstrap compiler,
+   and even if it is, it is liable to be buggy.
+   This must be after all inclusion of system headers, as some of
+   them will mess us up.  */
+
 #undef TRUE
 #undef FALSE
 
-#ifdef HAVE_STDBOOL_H
-# include <stdbool.h>
-#else
-# if !HAVE__BOOL
-typedef char _Bool;
-# endif
-# define bool _Bool
+#ifdef __cplusplus
+  /* Obsolete.  */
+# define TRUE true
+# define FALSE false
+#else /* !__cplusplus */
+# undef bool
+# undef true
+# undef false
+
+# define bool unsigned char
 # define true 1
 # define false 0
-#endif
 
-#define TRUE true
-#define FALSE false
+  /* Obsolete.  */
+# define TRUE true
+# define FALSE false
+#endif /* !__cplusplus */
+
+
+/* Some compilers do not allow the use of unsigned char in bitfields.  */
+#define BOOL_BITFIELD unsigned int
 
 /* As the last action in this file, we poison the identifiers that
    shouldn't be used.  Note, luckily gcc-3.0's token-based integrated
@@ -605,7 +610,12 @@ typedef char _Bool;
 	ASM_OUTPUT_SECTION_NAME PROMOTE_FUNCTION_ARGS			\
 	STRUCT_VALUE_INCOMING STRICT_ARGUMENT_NAMING			\
 	PROMOTE_FUNCTION_RETURN PROMOTE_PROTOTYPES STRUCT_VALUE_REGNUM	\
-	SETUP_INCOMING_VARARGS EXPAND_BUILTIN_SAVEREGS
+	SETUP_INCOMING_VARARGS EXPAND_BUILTIN_SAVEREGS			\
+	DEFAULT_SHORT_ENUMS SPLIT_COMPLEX_ARGS MD_ASM_CLOBBERS		\
+	HANDLE_PRAGMA_REDEFINE_EXTNAME HANDLE_PRAGMA_EXTERN_PREFIX	\
+	MUST_PASS_IN_STACK FUNCTION_ARG_PASS_BY_REFERENCE               \
+        VECTOR_MODE_SUPPORTED_P TARGET_SUPPORTS_HIDDEN 			\
+	FUNCTION_ARG_PARTIAL_NREGS
 
 /* Other obsolete target macros, or macros that used to be in target
    headers and were not used, and may be obsolete or may never have
@@ -622,7 +632,7 @@ typedef char _Bool;
 	BLOCK_PROFILER BLOCK_PROFILER_CODE FUNCTION_BLOCK_PROFILER	   \
 	FUNCTION_BLOCK_PROFILER_EXIT MACHINE_STATE_SAVE			   \
 	MACHINE_STATE_RESTORE SCCS_DIRECTIVE SECTION_ASM_OP		   \
-	ASM_OUTPUT_DEFINE_LABEL_DIFFERENCE_SYMBOL ASM_OUTPUT_INTERNAL_LABEL \
+	ASM_OUTPUT_DEFINE_LABEL_DIFFERENCE_SYMBOL \
 	OBJC_PROLOGUE ALLOCATE_TRAMPOLINE HANDLE_PRAGMA ROUND_TYPE_SIZE	   \
 	ROUND_TYPE_SIZE_UNIT CONST_SECTION_ASM_OP CRT_GET_RFIB_TEXT	   \
 	DBX_LBRAC_FIRST DBX_OUTPUT_ENUM DBX_OUTPUT_SOURCE_FILENAME	   \
@@ -636,11 +646,29 @@ typedef char _Bool;
 	PROMOTED_MODE EXPAND_BUILTIN_VA_END				   \
 	LINKER_DOES_NOT_WORK_WITH_DWARF2 FUNCTION_ARG_KEEP_AS_REFERENCE	   \
 	GIV_SORT_CRITERION MAX_LONG_TYPE_SIZE MAX_LONG_DOUBLE_TYPE_SIZE	   \
-	MAX_WCHAR_TYPE_SIZE GCOV_TYPE_SIZE SHARED_SECTION_ASM_OP
+	MAX_WCHAR_TYPE_SIZE GCOV_TYPE_SIZE SHARED_SECTION_ASM_OP	   \
+	INTEGRATE_THRESHOLD                                                \
+	FINAL_REG_PARM_STACK_SPACE MAYBE_REG_PARM_STACK_SPACE		   \
+	TRADITIONAL_PIPELINE_INTERFACE DFA_PIPELINE_INTERFACE		   \
+	DBX_OUTPUT_STANDARD_TYPES BUILTIN_SETJMP_FRAME_VALUE		   \
+	SUNOS4_SHARED_LIBRARIES PROMOTE_FOR_CALL_ONLY			   \
+	SPACE_AFTER_L_OPTION NO_RECURSIVE_FUNCTION_CSE			   \
+	DEFAULT_MAIN_RETURN TARGET_MEM_FUNCTIONS EXPAND_BUILTIN_VA_ARG	   \
+	COLLECT_PARSE_FLAG DWARF2_GENERATE_TEXT_SECTION_LABEL WINNING_GDB  \
+	ASM_OUTPUT_FILENAME ASM_OUTPUT_SOURCE_LINE FILE_NAME_JOINER	   \
+	GDB_INV_REF_REGPARM_STABS_LETTER DBX_MEMPARM_STABS_LETTER	   \
+	PUT_SDB_SRC_FILE STABS_GCC_MARKER DBX_OUTPUT_FUNCTION_END	   \
+	DBX_OUTPUT_GCC_MARKER DBX_FINISH_SYMBOL SDB_GENERATE_FAKE	   \
+	NON_SAVING_SETJMP TARGET_LATE_RTL_PROLOGUE_EPILOGUE		   \
+	CASE_DROPS_THROUGH
 
 /* Hooks that are no longer used.  */
  #pragma GCC poison LANG_HOOKS_FUNCTION_MARK LANG_HOOKS_FUNCTION_FREE	\
-	LANG_HOOKS_MARK_TREE LANG_HOOKS_INSERT_DEFAULT_ATTRIBUTES
+	LANG_HOOKS_MARK_TREE LANG_HOOKS_INSERT_DEFAULT_ATTRIBUTES \
+	LANG_HOOKS_TREE_INLINING_ESTIMATE_NUM_INSNS \
+	LANG_HOOKS_PUSHLEVEL LANG_HOOKS_SET_BLOCK \
+	LANG_HOOKS_MAYBE_BUILD_CLEANUP LANG_HOOKS_UPDATE_DECL_AFTER_SAVING \
+	LANG_HOOKS_POPLEVEL
 
 /* Libiberty macros that are no longer used in GCC.  */
 #undef ANSI_PROTOTYPES

@@ -1,23 +1,23 @@
 /* Deal with interfaces.
-   Copyright (C) 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2002, 2004 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
-This file is part of GNU G95.
+This file is part of GCC.
 
-GNU G95 is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2, or (at your option)
-any later version.
+GCC is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2, or (at your option) any later
+version.
 
-GNU G95 is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+GCC is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU G95; see the file COPYING.  If not, write to
-the Free Software Foundation, 59 Temple Place - Suite 330,
-Boston, MA 02111-1307, USA.  */
+along with GCC; see the file COPYING.  If not, write to the Free
+Software Foundation, 59 Temple Place - Suite 330, Boston, MA
+02111-1307, USA.  */
 
 
 /* Deal with interfaces.  An explicit interface is represented as a
@@ -65,9 +65,7 @@ Boston, MA 02111-1307, USA.  */
    the program unit name.  */
 
 #include "config.h"
-#include <string.h>
-#include <stdlib.h>
-
+#include "system.h"
 #include "gfortran.h"
 #include "match.h"
 
@@ -710,7 +708,7 @@ count_types_test (gfc_formal_arglist * f1, gfc_formal_arglist * f2)
 	  ac1++;
 
       /* Count the number of arguments in f2 with that type, including
-         those that are optional. */
+         those that are optional.  */
       ac2 = 0;
 
       for (f = f2; f; f = f->next)
@@ -1096,7 +1094,8 @@ compare_parameter (gfc_symbol * formal, gfc_expr * actual,
       return compare_interfaces (formal, actual->symtree->n.sym, 0);
     }
 
-  if (!gfc_compare_types (&formal->ts, &actual->ts))
+  if (actual->expr_type != EXPR_NULL
+      && !gfc_compare_types (&formal->ts, &actual->ts))
     return 0;
 
   if (symbol_rank (formal) == actual->rank)
@@ -1235,7 +1234,8 @@ compare_actual_formal (gfc_actual_arglist ** ap,
 	  return 0;
 	}
 
-      if (compare_pointer (f->sym, a->expr) == 0)
+      if (a->expr->expr_type != EXPR_NULL
+	  && compare_pointer (f->sym, a->expr) == 0)
 	{
 	  if (where)
 	    gfc_error ("Actual argument for '%s' must be a pointer at %L",
@@ -1291,6 +1291,11 @@ compare_actual_formal (gfc_actual_arglist ** ap,
   if (*ap == NULL && n > 0)
     *ap = new[0];
 
+  /* Note the types of omitted optional arguments.  */
+  for (a = actual, f = formal; a; a = a->next, f = f->next)
+    if (a->expr == NULL && a->label == NULL)
+      a->missing_arg_type = f->sym->ts.type;
+
   return 1;
 }
 
@@ -1306,7 +1311,7 @@ argpair;
    order:
     - p->a->expr == NULL
     - p->a->expr->expr_type != EXPR_VARIABLE
-    - growing p->a->expr->symbol.   */
+    - growing p->a->expr->symbol.  */
 
 static int
 pair_cmp (const void *p1, const void *p2)
@@ -1616,7 +1621,7 @@ find_sym_in_symtree (gfc_symbol * sym)
 
 /* This subroutine is called when an expression is being resolved.
    The expression node in question is either a user defined operator
-   or an instrinsic operator with arguments that aren't compatible
+   or an intrinsic operator with arguments that aren't compatible
    with the operator.  This subroutine builds an actual argument list
    corresponding to the operands, then searches for a compatible
    interface.  If one is found, the expression node is replaced with
@@ -1833,7 +1838,7 @@ gfc_add_interface (gfc_symbol * new)
 
   intr = gfc_get_interface ();
   intr->sym = new;
-  intr->where = *gfc_current_locus ();
+  intr->where = gfc_current_locus;
 
   intr->next = *head;
   *head = intr;

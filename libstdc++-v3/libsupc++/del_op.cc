@@ -1,6 +1,6 @@
 // Boilerplate support routines for -*- C++ -*- dynamic memory management.
 
-// Copyright (C) 1997, 1998, 1999, 2000 Free Software Foundation
+// Copyright (C) 1997, 1998, 1999, 2000, 2004 Free Software Foundation
 //
 // This file is part of GCC.
 //
@@ -29,10 +29,18 @@
 // the GNU General Public License.
 
 #include "new"
+#include <cstdlib>
+#include <bits/c++config.h>
 
-extern "C" void free (void *);
+#if _GLIBCXX_HOSTED
+using std::free;
+#else
+// A freestanding C runtime may not provide "free" -- but there is no
+// other reasonable way to implement "operator delete".
+extern "C" void free(void *);
+#endif
 
-void
+_GLIBCXX_WEAK_DEFINITION void
 operator delete (void *ptr) throw ()
 {
   if (ptr)

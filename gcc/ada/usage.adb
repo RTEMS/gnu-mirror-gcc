@@ -134,9 +134,6 @@ begin
    Write_Switch_Char ("c");
    Write_Line ("Check syntax and semantics only (no code generation)");
 
-   Write_Switch_Char ("C");
-   Write_Line ("Compress names in external names and debug info tables");
-
    --  Line for -gnatd switch
 
    Write_Switch_Char ("d?");
@@ -161,6 +158,11 @@ begin
 
    Write_Switch_Char ("ef");
    Write_Line ("Full source path in brief error messages");
+
+   --  Line for -gnateI switch
+
+   Write_Switch_Char ("eInnn");
+   Write_Line ("Index in multi-unit source, e.g. -gnateI2");
 
    --  Line for -gnatem switch
 
@@ -267,10 +269,12 @@ begin
    Write_Switch_Char ("Q");
    Write_Line ("Don't quit, write ali/tree file even if compile errors");
 
-   --  Line for -gnatR switch
+   --  Lines for -gnatR switch
 
    Write_Switch_Char ("R?");
-   Write_Line ("List rep inf (?=0/1/2/3 for none/types/all/variable)");
+   Write_Line ("List rep info (?=0/1/2/3 for none/types/all/variable)");
+   Write_Switch_Char ("R?s");
+   Write_Line ("List rep info to file.rep instead of standard output");
 
    --  Lines for -gnats switch
 
@@ -371,8 +375,8 @@ begin
    Write_Line ("        n*   normal warning mode (cancels -gnatws/-gnatwe)");
    Write_Line ("        o*   turn on warnings for address clause overlay");
    Write_Line ("        O    turn off warnings for address clause overlay");
-   Write_Line ("        p    turn on warnings for ineffective pragma inline");
-   Write_Line ("        P*   turn off warnings for ineffective pragma inline");
+   Write_Line ("        p    turn on warnings for ineffective pragma Inline");
+   Write_Line ("        P*   turn off warnings for ineffective pragma Inline");
    Write_Line ("        r    turn on warnings for redundant construct");
    Write_Line ("        R*   turn off warnings for redundant construct");
    Write_Line ("        s    suppress all warnings");
@@ -432,6 +436,7 @@ begin
    Write_Line ("        i    check if-then layout");
    Write_Line ("        k    check casing rules for keywords");
    Write_Line ("        l    check reference manual layout");
+   Write_Line ("        Lnnn check max nest level < nnn");
    Write_Line ("        m    check line length <= 79 characters");
    Write_Line ("        n    check casing of package Standard identifiers");
    Write_Line ("        Mnnn check line length <= nnn characters");
@@ -440,6 +445,7 @@ begin
    Write_Line ("        r    check casing for identifier references");
    Write_Line ("        s    check separate subprogram specs present");
    Write_Line ("        t    check token separation rules");
+   Write_Line ("        x    check extra parens around conditionals");
 
    --  Lines for -gnatyN switch
 

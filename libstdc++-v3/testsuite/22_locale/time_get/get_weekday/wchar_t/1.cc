@@ -1,6 +1,6 @@
 // 2001-09-21 Benjamin Kosnik  <bkoz@redhat.com>
 
-// Copyright (C) 2001, 2002, 2003 Free Software Foundation
+// Copyright (C) 2001, 2002, 2003, 2004 Free Software Foundation
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -27,20 +27,12 @@
 void test01()
 {
   using namespace std;
-  typedef time_base::dateorder dateorder;
-  typedef istreambuf_iterator<wchar_t> iterator_type;
-
   bool test __attribute__((unused)) = true;
 
-  // basic construction and sanity checks.
+  typedef istreambuf_iterator<wchar_t> iterator_type;
+
+  // basic construction
   locale loc_c = locale::classic();
-  locale loc_hk = __gnu_test::try_named_locale("en_HK");
-  locale loc_fr = __gnu_test::try_named_locale("fr_FR@euro");
-  locale loc_de = __gnu_test::try_named_locale("de_DE");
-  VERIFY( loc_hk != loc_c );
-  VERIFY( loc_hk != loc_fr );
-  VERIFY( loc_hk != loc_de );
-  VERIFY( loc_de != loc_fr );
 
   const wstring empty;
 
@@ -82,39 +74,43 @@ void test01()
   iterator_type is_it03(iss);
   tm time03;
   errorstate = good;
-  tim_get.get_weekday(is_it03, end, iss, errorstate, &time03);
+  iterator_type ret03 = tim_get.get_weekday(is_it03, end, iss, errorstate,
+					    &time03);
   VERIFY( time03.tm_wday == time_bday.tm_wday );
   VERIFY( errorstate == good );
-  VERIFY( *is_it03 == L' ' );
+  VERIFY( *ret03 == L' ' );
 
   iss.str(L"San");
   iterator_type is_it04(iss);
   tm time04;
   time04.tm_wday = 4;
   errorstate = good;
-  tim_get.get_weekday(is_it04, end, iss, errorstate, &time04);
+  iterator_type ret04 = tim_get.get_weekday(is_it04, end, iss, errorstate,
+					    &time04);
   VERIFY( time04.tm_wday == 4 );
-  VERIFY( *is_it04 == L'n' );
+  VERIFY( *ret04 == L'n' );
   VERIFY( errorstate == ios_base::failbit );
 
   iss.str(L"Tuesday ");
   iterator_type is_it05(iss);
   tm time05;
   errorstate = good;
-  tim_get.get_weekday(is_it05, end, iss, errorstate, &time05);
+  iterator_type ret05 = tim_get.get_weekday(is_it05, end, iss, errorstate,
+					    &time05);
   VERIFY( time05.tm_wday == 2 );
   VERIFY( errorstate == good );
-  VERIFY( *is_it05 == L' ' );
+  VERIFY( *ret05 == L' ' );
 
   iss.str(L"Tuesducky "); // Kind of like Fryday, without the swirls.
   iterator_type is_it06(iss);
   tm time06;
   time06.tm_wday = 4;
   errorstate = good;
-  tim_get.get_weekday(is_it06, end, iss, errorstate, &time06);
+  iterator_type ret06 = tim_get.get_weekday(is_it06, end, iss, errorstate,
+					    &time06);
   VERIFY( time06.tm_wday == 4 );
   VERIFY( errorstate == ios_base::failbit );
-  VERIFY( *is_it05 == L'u' );
+  VERIFY( *ret06 == L'u' );
 }
 
 int main()

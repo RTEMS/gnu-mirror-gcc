@@ -37,8 +37,14 @@
 #include <cstring>
 #include <cstdio>
 #include <cctype>
+#include <bits/concurrence.h>
 
 using namespace std;
+
+namespace __gnu_internal
+{
+  __glibcxx_mutex_define_initialized(iterator_base_mutex);
+} // namespace __gnu_internal
 
 namespace __gnu_debug
 {
@@ -114,10 +120,10 @@ namespace __gnu_debug
 	__old->_M_attach(0, false);
       }
     
-    for (_Safe_iterator_base* __iter = _M_const_iterators; __iter; )
+    for (_Safe_iterator_base* __iter2 = _M_const_iterators; __iter2; )
       {
-	_Safe_iterator_base* __old = __iter;
-	__iter = __iter->_M_next;
+	_Safe_iterator_base* __old = __iter2;
+	__iter2 = __iter2->_M_next;
 	__old->_M_attach(0, true);
       }
   }
@@ -134,10 +140,10 @@ namespace __gnu_debug
 	  __old->_M_attach(0, false);
       }
 
-    for (_Safe_iterator_base* __iter = _M_const_iterators; __iter; )
+    for (_Safe_iterator_base* __iter2 = _M_const_iterators; __iter2; )
       {
-	_Safe_iterator_base* __old = __iter;
-	__iter = __iter->_M_next;
+	_Safe_iterator_base* __old = __iter2;
+	__iter2 = __iter2->_M_next;
 	if (__old->_M_singular())
 	  __old->_M_attach(0, true);
       }
@@ -188,6 +194,7 @@ namespace __gnu_debug
     // Attach to the new sequence (if there is one)
     if (__seq)
       {
+	__gnu_cxx::lock sentry(__gnu_internal::iterator_base_mutex);
 	_M_sequence = __seq;
 	_M_version = _M_sequence->_M_version;
 	_M_prior = 0;
@@ -212,6 +219,7 @@ namespace __gnu_debug
   _Safe_iterator_base::
   _M_detach()
   {
+    __gnu_cxx::lock sentry(__gnu_internal::iterator_base_mutex);
     if (_M_sequence)
       {
 	// Remove us from this sequence's list
@@ -569,12 +577,17 @@ namespace __gnu_debug
 	  {
 	    // [__start, __end) denotes the next word
 	    __end = __start;
-	    while (isalnum(*__end)) ++__end;
-	    if (__start == __end) ++__end;
-	    if (isspace(*__end)) ++__end;
+	    while (isalnum(*__end))
+	      ++__end;
+	    if (__start == __end)
+	      ++__end;
+	    if (isspace(*__end))
+	      ++__end;
 	    
-	    assert(__end - __start + 1< __bufsize);
-	    _M_format_word(__buf, __end - __start + 1, "%s", __start);
+	    const ptrdiff_t __len = __end - __start;
+	    assert(__len < __bufsize);
+	    memcpy(__buf, __start, __len);
+	    __buf[__len] = '\0';
 	    _M_print_word(__buf);
 	    __start = __end;
 	    

@@ -1,6 +1,6 @@
 // Stream buffer classes -*- C++ -*-
 
-// Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003
+// Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004
 // Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
@@ -33,12 +33,11 @@
 //
 
 /** @file streambuf
- *  This is a Standard C++ Library header.  You should @c #include this header
- *  in your programs, rather than any of the "st[dl]_*.h" implementation files.
+ *  This is a Standard C++ Library header.
  */
 
-#ifndef _CLIBXX_STREAMBUF
-#define _CLIBXX_STREAMBUF 1
+#ifndef _GLIBXX_STREAMBUF
+#define _GLIBXX_STREAMBUF 1
 
 #pragma GCC system_header
 
@@ -154,7 +153,12 @@ namespace std
       friend streamsize
       __copy_streambufs<>(__streambuf_type* __sbin,
 			  __streambuf_type* __sbout);
-      
+
+      template<typename _CharT2, typename _Traits2, typename _Alloc>
+        friend basic_istream<_CharT2, _Traits2>&
+        getline(basic_istream<_CharT2, _Traits2>&,
+		basic_string<_CharT2, _Traits2, _Alloc>&, _CharT2);
+
     protected:
       //@{
       /**
@@ -762,14 +766,31 @@ namespace std
       }
 #endif
 
-    // _GLIBCXX_RESOLVE_LIB_DEFECTS
-    // Side effect of DR 50. 
     private:
-      basic_streambuf(const __streambuf_type&) { }; 
+      // _GLIBCXX_RESOLVE_LIB_DEFECTS
+      // Side effect of DR 50. 
+      basic_streambuf(const __streambuf_type& __sb)
+      : _M_in_beg(__sb._M_in_beg), _M_in_cur(__sb._M_in_cur), 
+      _M_in_end(__sb._M_in_end), _M_out_beg(__sb._M_out_beg), 
+      _M_out_cur(__sb._M_out_cur), _M_out_end(__sb._M_out_cur),
+      _M_buf_locale(__sb._M_buf_locale) 
+      { }
 
       __streambuf_type& 
       operator=(const __streambuf_type&) { return *this; };
     };
+
+  // Explicit specialization declarations, defined in src/streambuf.cc.
+  template<>
+    streamsize
+    __copy_streambufs(basic_streambuf<char>* __sbin,
+		      basic_streambuf<char>* __sbout);
+#ifdef _GLIBCXX_USE_WCHAR_T
+  template<>
+    streamsize
+    __copy_streambufs(basic_streambuf<wchar_t>* __sbin,
+		      basic_streambuf<wchar_t>* __sbout);
+#endif
 } // namespace std
 
 #ifndef _GLIBCXX_EXPORT_TEMPLATE

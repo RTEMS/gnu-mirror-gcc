@@ -68,7 +68,7 @@
 # endif
 #endif
 
-#include <limits> // For <off_t>::max() and min()
+#include <limits> // For <off_t>::max() and min() and <streamsize>::max()
 
 namespace __gnu_internal
 {
@@ -105,6 +105,73 @@ namespace __gnu_internal
       default: return 0; // invalid
       }
   }
+
+  // Wrapper handling partial write.
+  static std::streamsize
+  xwrite(int __fd, const char* __s, std::streamsize __n)
+  {
+    std::streamsize __nleft = __n;
+
+    for (;;)
+      {
+	const std::streamsize __ret = write(__fd, __s, __nleft);
+	if (__ret == -1L && errno == EINTR)
+	  continue;
+	if (__ret == -1L)
+	  break;
+
+	__nleft -= __ret;
+	if (__nleft == 0)
+	  break;
+
+	__s += __ret;
+      }
+
+    return __n - __nleft;
+  }
+
+#ifdef _GLIBCXX_HAVE_WRITEV
+  // Wrapper handling partial writev.
+  static std::streamsize
+  xwritev(int __fd, const char* __s1, std::streamsize __n1,
+	  const char* __s2, std::streamsize __n2)
+  {
+    std::streamsize __nleft = __n1 + __n2;
+    std::streamsize __n1_left = __n1;
+
+    struct iovec __iov[2];
+    __iov[1].iov_base = const_cast<char*>(__s2);
+    __iov[1].iov_len = __n2;
+
+    for (;;)
+      {
+	__iov[0].iov_base = const_cast<char*>(__s1);
+	__iov[0].iov_len = __n1_left;
+
+	const std::streamsize __ret = writev(__fd, __iov, 2);
+	if (__ret == -1L && errno == EINTR)
+	  continue;
+	if (__ret == -1L)
+	  break;
+
+	__nleft -= __ret;
+	if (__nleft == 0)
+	  break;
+
+	const std::streamsize __off = __ret - __n1_left;
+	if (__off >= 0)
+	  {
+	    __nleft -= xwrite(__fd, __s2 + __off, __n2 - __off);
+	    break;
+	  }
+	
+	__s1 += __ret;
+	__n1_left -= __ret;
+      }
+
+    return __n1 + __n2 - __nleft;
+  }
+#endif
 } // namespace __gnu_internal
 
 namespace std 
@@ -122,10 +189,17 @@ namespace std
     __basic_file* __ret = NULL;
     if (!this->is_open() && __file)
       {
- 	_M_cfile = __file;
- 	_M_cfile_created = false;
-	this->sync();
-  	__ret = this;
+	int __err;
+	errno = 0;	
+	do
+	  __err = this->sync();
+	while (__err && errno == EINTR);
+	if (!__err)
+	  {
+	    _M_cfile = __file;
+	    _M_cfile_created = false;
+	    __ret = this;
+	  }
       }
     return __ret;
   }
@@ -135,12 +209,12 @@ namespace std
   {
     __basic_file* __ret = NULL;
     const char* __c_mode = __gnu_internal::fopen_mode(__mode);
-    if (__c_mode && !this->is_open() 
-	&& (_M_cfile = fdopen(__fd, __c_mode)))
+    if (__c_mode && !this->is_open() && (_M_cfile = fdopen(__fd, __c_mode)))
       {
+	char* __buf = NULL;
 	_M_cfile_created = true;
 	if (__fd == 0)
-	  setvbuf(_M_cfile, reinterpret_cast<char*>(NULL), _IONBF, 0);
+	  setvbuf(_M_cfile, __buf, _IONBF, 0);
 	__ret = this;
       }
     return __ret;
@@ -173,7 +247,11 @@ namespace std
   
   int 
   __basic_file<char>::fd() 
-  { return fileno(_M_cfile) ; }
+  { return fileno(_M_cfile); }
+  
+  __c_file*
+  __basic_file<char>::file() 
+  { return _M_cfile; }
   
   __basic_file<char>* 
   __basic_file<char>::close()
@@ -181,12 +259,21 @@ namespace std
     __basic_file* __ret = static_cast<__basic_file*>(NULL);
     if (this->is_open())
       {
+	int __err = 0;
 	if (_M_cfile_created)
-	  fclose(_M_cfile);
-	else
-	  this->sync();
+	  {
+	    // In general, no need to zero errno in advance if checking
+	    // for error first. However, C89/C99 (at variance with IEEE
+	    // 1003.1, f.i.) do not mandate that fclose must set errno
+	    // upon error.
+	    errno = 0;
+	    do
+	      __err = fclose(_M_cfile);
+	    while (__err && errno == EINTR);
+	  }
 	_M_cfile = 0;
-	__ret = this;
+	if (!__err)
+	  __ret = this;
       }
     return __ret;
   }
@@ -200,16 +287,10 @@ namespace std
     while (__ret == -1L && errno == EINTR);
     return __ret;
   }
-    
+
   streamsize 
   __basic_file<char>::xsputn(const char* __s, streamsize __n)
-  {
-    streamsize __ret;
-    do
-      __ret = write(this->fd(), __s, __n);
-    while (__ret == -1L && errno == EINTR);
-    return __ret;
-  }
+  { return __gnu_internal::xwrite(this->fd(), __s, __n); }
 
   streamsize 
   __basic_file<char>::xsputn_2(const char* __s1, streamsize __n1,
@@ -217,30 +298,13 @@ namespace std
   {
     streamsize __ret = 0;
 #ifdef _GLIBCXX_HAVE_WRITEV
-    struct iovec __iov[2];
-    __iov[0].iov_base = const_cast<char*>(__s1);
-    __iov[0].iov_len = __n1;
-    __iov[1].iov_base = const_cast<char*>(__s2);
-    __iov[1].iov_len = __n2;
-
-    do
-      __ret = writev(this->fd(), __iov, 2);
-    while (__ret == -1L && errno == EINTR);
+    __ret = __gnu_internal::xwritev(this->fd(), __s1, __n1, __s2, __n2);
 #else
     if (__n1)
-      do
-	__ret = write(this->fd(), __s1, __n1);
-      while (__ret == -1L && errno == EINTR);
+      __ret = __gnu_internal::xwrite(this->fd(), __s1, __n1);
 
     if (__ret == __n1)
-      {
-	do
-	  __ret = write(this->fd(), __s2, __n2);
-	while (__ret == -1L && errno == EINTR);
-	
-	if (__ret != -1L)
-	  __ret += __n1;
-      }
+      __ret += __gnu_internal::xwrite(this->fd(), __s2, __n2);
 #endif
     return __ret;
   }
@@ -251,8 +315,8 @@ namespace std
 #ifdef _GLIBCXX_USE_LFS
     return lseek64(this->fd(), __off, __way);
 #else
-    if (__off > std::numeric_limits<off_t>::max()
-	|| __off < std::numeric_limits<off_t>::min())
+    if (__off > numeric_limits<off_t>::max()
+	|| __off < numeric_limits<off_t>::min())
       return -1L;
     return lseek(this->fd(), __off, __way);
 #endif
@@ -288,10 +352,21 @@ namespace std
 
 #if defined(_GLIBCXX_HAVE_S_ISREG) || defined(_GLIBCXX_HAVE_S_IFREG)
     // Regular files.
+#ifdef _GLIBCXX_USE_LFS
+    struct stat64 __buffer;
+    const int __err = fstat64(this->fd(), &__buffer);
+    if (!__err && _GLIBCXX_ISREG(__buffer.st_mode))
+      {
+	const streamoff __off = __buffer.st_size - lseek64(this->fd(), 0,
+							   ios_base::cur);
+	return std::min(__off, streamoff(numeric_limits<streamsize>::max()));
+      }
+#else
     struct stat __buffer;
-    int __ret = fstat(this->fd(), &__buffer);
-    if (!__ret && _GLIBCXX_ISREG(__buffer.st_mode))
-	return __buffer.st_size - lseek(this->fd(), 0, ios_base::cur);
+    const int __err = fstat(this->fd(), &__buffer);
+    if (!__err && _GLIBCXX_ISREG(__buffer.st_mode))
+      return __buffer.st_size - lseek(this->fd(), 0, ios_base::cur);
+#endif
 #endif
     return 0;
   }

@@ -48,21 +48,15 @@
 #ifndef _ALLOCATOR_H
 #define _ALLOCATOR_H 1
 
-#if 1
-# include <ext/new_allocator.h>
-# define __glibcxx_default_allocator  __gnu_cxx::new_allocator
-#endif
-
-#if 0
-# include <ext/pool_allocator.h>
-# define __glibcxx_default_allocator  __gnu_cxx::__pool_alloc
-#endif
+// Define the base class to std::allocator.
+#include <bits/c++allocator.h>
 
 namespace std
 {
   template<typename _Tp>
     class allocator;
 
+  /// allocator<void> specialization.
   template<>
     class allocator<void>
     {
@@ -79,12 +73,13 @@ namespace std
     };
 
   /**
-   *  @brief  The "standard" allocator, as per [20.4].
+   * @brief  The "standard" allocator, as per [20.4].
    *
-   *  (See @link Allocators allocators info @endlink for more.)
+   *  Further details:
+   *  http://gcc.gnu.org/onlinedocs/libstdc++/20_util/allocator.html
    */
   template<typename _Tp>
-    class allocator: public __glibcxx_default_allocator<_Tp>
+    class allocator: public ___glibcxx_base_allocator<_Tp>
     {
    public:
       typedef size_t     size_type;
@@ -101,8 +96,8 @@ namespace std
 
       allocator() throw() { }
 
-      allocator(const allocator& a) throw()
-      : __glibcxx_default_allocator<_Tp>(a) { }
+      allocator(const allocator& __a) throw()
+      : ___glibcxx_base_allocator<_Tp>(__a) { }
 
       template<typename _Tp1>
         allocator(const allocator<_Tp1>&) throw() { }
@@ -131,7 +126,7 @@ namespace std
 #endif
 
   // Undefine.
-#undef __glibcxx_default_allocator
+#undef ___glibcxx_base_allocator
 } // namespace std
 
 #endif

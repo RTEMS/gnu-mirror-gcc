@@ -112,7 +112,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 /* TODO:
 
    Split out from life_analysis:
-	- local property discovery (bb->local_live, bb->local_set)
+	- local property discovery
 	- global property computation
 	- log links creation
 	- pre/post modify transformation
@@ -160,7 +160,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #ifdef HAVE_conditional_execution
 #ifndef REVERSE_CONDEXEC_PREDICATES_P
-#define REVERSE_CONDEXEC_PREDICATES_P(x, y) ((x) == reverse_condition (y))
+#define REVERSE_CONDEXEC_PREDICATES_P(x, y) \
+  (GET_CODE ((x)) == reversed_comparison_code ((y), NULL))
 #endif
 #endif
 
@@ -291,7 +292,7 @@ static int verify_wide_reg_1 (rtx *, void *);
 static void verify_wide_reg (int, basic_block);
 static void verify_local_live_at_start (regset, basic_block);
 static void notice_stack_pointer_modification_1 (rtx, rtx, void *);
-static void notice_stack_pointer_modification (rtx);
+static void notice_stack_pointer_modification (void);
 static void mark_reg (rtx, void *);
 static void mark_regs_live_at_end (regset);
 static void calculate_global_regs_live (sbitmap, sbitmap, int);
@@ -329,6 +330,7 @@ static int invalidate_mems_from_autoinc (rtx *, void *);
 static void invalidate_mems_from_set (struct propagate_block_info *, rtx);
 static void clear_log_links (sbitmap);
 static int count_or_remove_death_notes_bb (basic_block, int);
+static void allocate_bb_life_data (void);
 
 /* Return the INSN immediately following the NOTE_INSN_BASIC_BLOCK
    note associated with the BLOCK.  */
@@ -343,20 +345,18 @@ first_insn_after_basic_block_note (basic_block block)
 
   if (insn == NULL_RTX)
     return NULL_RTX;
-  if (GET_CODE (insn) == CODE_LABEL)
+  if (LABEL_P (insn))
     insn = NEXT_INSN (insn);
-  if (!NOTE_INSN_BASIC_BLOCK_P (insn))
-    abort ();
+  gcc_assert (NOTE_INSN_BASIC_BLOCK_P (insn));
 
   return NEXT_INSN (insn);
 }
 
-/* Perform data flow analysis.
-   F is the first insn of the function; FLAGS is a set of PROP_* flags
-   to be used in accumulating flow info.  */
+/* Perform data flow analysis for the whole control flow graph.
+   FLAGS is a set of PROP_* flags to be used in accumulating flow info.  */
 
 void
-life_analysis (rtx f, FILE *file, int flags)
+life_analysis (FILE *file, int flags)
 {
 #ifdef ELIMINABLE_REGS
   int i;
@@ -378,7 +378,7 @@ life_analysis (rtx f, FILE *file, int flags)
 
 #ifdef CANNOT_CHANGE_MODE_CLASS
   if (flags & PROP_REG_INFO)
-    bitmap_initialize (&subregs_of_mode, 1);
+    init_subregs_of_mode ();
 #endif
 
   if (! optimize)
@@ -403,13 +403,13 @@ life_analysis (rtx f, FILE *file, int flags)
 
   /* Always remove no-op moves.  Do this before other processing so
      that we don't have to keep re-scanning them.  */
-  delete_noop_moves (f);
+  delete_noop_moves ();
 
   /* Some targets can emit simpler epilogues if they know that sp was
      not ever modified during the function.  After reload, of course,
      we've already emitted the epilogue so there's no sense searching.  */
   if (! reload_completed)
-    notice_stack_pointer_modification (f);
+    notice_stack_pointer_modification ();
 
   /* Allocate and zero out data structures that will record the
      data from lifetime analysis.  */
@@ -442,8 +442,6 @@ life_analysis (rtx f, FILE *file, int flags)
   if (file)
     dump_flow_info (file);
 
-  free_basic_block_vars (1);
-
   /* Removing dead insns should have made jumptables really dead.  */
   delete_dead_jumptables ();
 }
@@ -458,7 +456,7 @@ verify_wide_reg_1 (rtx *px, void *pregno)
   rtx x = *px;
   unsigned int regno = *(int *) pregno;
 
-  if (GET_CODE (x) == REG && REGNO (x) == regno)
+  if (REG_P (x) && REGNO (x) == regno)
     {
       if (GET_MODE_BITSIZE (GET_MODE (x)) <= BITS_PER_WORD)
 	return 2;
@@ -489,13 +487,12 @@ verify_wide_reg (int regno, basic_block bb)
 	break;
       head = NEXT_INSN (head);
     }
-
-  if (rtl_dump_file)
+  if (dump_file)
     {
-      fprintf (rtl_dump_file, "Register %d died unexpectedly.\n", regno);
-      dump_bb (bb, rtl_dump_file, 0);
+      fprintf (dump_file, "Register %d died unexpectedly.\n", regno);
+      dump_bb (bb, dump_file, 0);
     }
-  abort ();
+  fatal_error ("internal consistency failure");
 }
 
 /* A subroutine of update_life_info.  Verify that there are no untoward
@@ -510,42 +507,42 @@ verify_local_live_at_start (regset new_live_at_start, basic_block bb)
 	 registers.  The regsets should exactly match.  */
       if (! REG_SET_EQUAL_P (new_live_at_start, bb->global_live_at_start))
 	{
-	  if (rtl_dump_file)
+	  if (dump_file)
 	    {
-	      fprintf (rtl_dump_file,
+	      fprintf (dump_file,
 		       "live_at_start mismatch in bb %d, aborting\nNew:\n",
 		       bb->index);
-	      debug_bitmap_file (rtl_dump_file, new_live_at_start);
-	      fputs ("Old:\n", rtl_dump_file);
-	      dump_bb (bb, rtl_dump_file, 0);
+	      debug_bitmap_file (dump_file, new_live_at_start);
+	      fputs ("Old:\n", dump_file);
+	      dump_bb (bb, dump_file, 0);
 	    }
-	  abort ();
+	  fatal_error ("internal consistency failure");
 	}
     }
   else
     {
-      int i;
+      unsigned i;
+      reg_set_iterator rsi;
 
       /* Find the set of changed registers.  */
       XOR_REG_SET (new_live_at_start, bb->global_live_at_start);
 
-      EXECUTE_IF_SET_IN_REG_SET (new_live_at_start, 0, i,
+      EXECUTE_IF_SET_IN_REG_SET (new_live_at_start, 0, i, rsi)
 	{
 	  /* No registers should die.  */
 	  if (REGNO_REG_SET_P (bb->global_live_at_start, i))
 	    {
-	      if (rtl_dump_file)
+	      if (dump_file)
 		{
-		  fprintf (rtl_dump_file,
+		  fprintf (dump_file,
 			   "Register %d died unexpectedly.\n", i);
-		  dump_bb (bb, rtl_dump_file, 0);
+		  dump_bb (bb, dump_file, 0);
 		}
-	      abort ();
+	      fatal_error ("internal consistency failure");
 	    }
-
 	  /* Verify that the now-live register is wider than word_mode.  */
 	  verify_wide_reg (i, bb);
-	});
+	}
     }
 }
 
@@ -570,15 +567,15 @@ verify_local_live_at_start (regset new_live_at_start, basic_block bb)
    unless the caller resets it to zero.  */
 
 int
-update_life_info (sbitmap blocks, enum update_life_extent extent, int prop_flags)
+update_life_info (sbitmap blocks, enum update_life_extent extent,
+		  int prop_flags)
 {
   regset tmp;
-  regset_head tmp_head;
-  int i;
+  unsigned i;
   int stabilized_prop_flags = prop_flags;
   basic_block bb;
 
-  tmp = INITIALIZE_REG_SET (tmp_head);
+  tmp = ALLOC_REG_SET (&reg_obstack);
   ndead = 0;
 
   if ((prop_flags & PROP_REG_INFO) && !reg_deaths)
@@ -589,9 +586,8 @@ update_life_info (sbitmap blocks, enum update_life_extent extent, int prop_flags
 
   /* Changes to the CFG are only allowed when
      doing a global update for the entire CFG.  */
-  if ((prop_flags & PROP_ALLOW_CFG_CHANGES)
-      && (extent == UPDATE_LIFE_LOCAL || blocks))
-    abort ();
+  gcc_assert (!(prop_flags & PROP_ALLOW_CFG_CHANGES)
+	      || (extent != UPDATE_LIFE_LOCAL && !blocks));
 
   /* For a global update, we go through the relaxation process again.  */
   if (extent != UPDATE_LIFE_LOCAL)
@@ -686,13 +682,15 @@ update_life_info (sbitmap blocks, enum update_life_extent extent, int prop_flags
 
   if (prop_flags & PROP_REG_INFO)
     {
+      reg_set_iterator rsi;
+
       /* The only pseudos that are live at the beginning of the function
 	 are those that were not set anywhere in the function.  local-alloc
 	 doesn't know how to handle these correctly, so mark them as not
 	 local to any one basic block.  */
       EXECUTE_IF_SET_IN_REG_SET (ENTRY_BLOCK_PTR->global_live_at_end,
-				 FIRST_PSEUDO_REGISTER, i,
-				 { REG_BASIC_BLOCK (i) = REG_BLOCK_GLOBAL; });
+				 FIRST_PSEUDO_REGISTER, i, rsi)
+	REG_BASIC_BLOCK (i) = REG_BLOCK_GLOBAL;
 
       /* We have a problem with any pseudoreg that lives across the setjmp.
 	 ANSI says that if a user variable does not change in value between
@@ -703,14 +701,14 @@ update_life_info (sbitmap blocks, enum update_life_extent extent, int prop_flags
 	 that hard reg where this pseudo is dead, thus clobbering the pseudo.
 	 Conclusion: such a pseudo must not go in a hard reg.  */
       EXECUTE_IF_SET_IN_REG_SET (regs_live_at_setjmp,
-				 FIRST_PSEUDO_REGISTER, i,
-				 {
-				   if (regno_reg_rtx[i] != 0)
-				     {
-				       REG_LIVE_LENGTH (i) = -1;
-				       REG_BASIC_BLOCK (i) = REG_BLOCK_UNKNOWN;
-				     }
-				 });
+				 FIRST_PSEUDO_REGISTER, i, rsi)
+	{
+	  if (regno_reg_rtx[i] != 0)
+	    {
+	      REG_LIVE_LENGTH (i) = -1;
+	      REG_BASIC_BLOCK (i) = REG_BLOCK_UNKNOWN;
+	    }
+	}
     }
   if (reg_deaths)
     {
@@ -719,8 +717,8 @@ update_life_info (sbitmap blocks, enum update_life_extent extent, int prop_flags
     }
   timevar_pop ((extent == UPDATE_LIFE_LOCAL || blocks)
 	       ? TV_LIFE_UPDATE : TV_LIFE);
-  if (ndead && rtl_dump_file)
-    fprintf (rtl_dump_file, "deleted %i dead insns\n", ndead);
+  if (ndead && dump_file)
+    fprintf (dump_file, "deleted %i dead insns\n", ndead);
   return ndead;
 }
 
@@ -762,34 +760,32 @@ update_life_info_in_dirty_blocks (enum update_life_extent extent, int prop_flags
   return retval;
 }
 
-/* Free the variables allocated by find_basic_blocks.
-
-   KEEP_HEAD_END_P is nonzero if basic_block_info is not to be freed.  */
+/* Free the variables allocated by find_basic_blocks.  */
 
 void
-free_basic_block_vars (int keep_head_end_p)
+free_basic_block_vars (void)
 {
-  if (! keep_head_end_p)
+  if (basic_block_info)
     {
-      if (basic_block_info)
-	{
-	  clear_edges ();
-	  basic_block_info = NULL;
-	}
-      n_basic_blocks = 0;
-      last_basic_block = 0;
-
-      ENTRY_BLOCK_PTR->aux = NULL;
-      ENTRY_BLOCK_PTR->global_live_at_end = NULL;
-      EXIT_BLOCK_PTR->aux = NULL;
-      EXIT_BLOCK_PTR->global_live_at_start = NULL;
+      clear_edges ();
+      basic_block_info = NULL;
     }
+  n_basic_blocks = 0;
+  last_basic_block = 0;
+  n_edges = 0;
+
+  label_to_block_map = NULL;
+
+  ENTRY_BLOCK_PTR->aux = NULL;
+  ENTRY_BLOCK_PTR->global_live_at_end = NULL;
+  EXIT_BLOCK_PTR->aux = NULL;
+  EXIT_BLOCK_PTR->global_live_at_start = NULL;
 }
 
 /* Delete any insns that copy a register to itself.  */
 
 int
-delete_noop_moves (rtx f ATTRIBUTE_UNUSED)
+delete_noop_moves (void)
 {
   rtx insn, next;
   basic_block bb;
@@ -824,8 +820,8 @@ delete_noop_moves (rtx f ATTRIBUTE_UNUSED)
 	    }
 	}
     }
-  if (nnoops && rtl_dump_file)
-    fprintf (rtl_dump_file, "deleted %i noop moves", nnoops);
+  if (nnoops && dump_file)
+    fprintf (dump_file, "deleted %i noop moves", nnoops);
   return nnoops;
 }
 
@@ -840,14 +836,14 @@ delete_dead_jumptables (void)
   for (insn = get_insns (); insn; insn = next)
     {
       next = NEXT_INSN (insn);
-      if (GET_CODE (insn) == CODE_LABEL
+      if (LABEL_P (insn)
 	  && LABEL_NUSES (insn) == LABEL_PRESERVE_P (insn)
-	  && GET_CODE (next) == JUMP_INSN
+	  && JUMP_P (next)
 	  && (GET_CODE (PATTERN (next)) == ADDR_VEC
 	      || GET_CODE (PATTERN (next)) == ADDR_DIFF_VEC))
 	{
-	  if (rtl_dump_file)
-	    fprintf (rtl_dump_file, "Dead jumptable %i removed\n", INSN_UID (insn));
+	  if (dump_file)
+	    fprintf (dump_file, "Dead jumptable %i removed\n", INSN_UID (insn));
 	  delete_insn (NEXT_INSN (insn));
 	  delete_insn (insn);
 	  next = NEXT_INSN (next);
@@ -866,15 +862,16 @@ notice_stack_pointer_modification_1 (rtx x, rtx pat ATTRIBUTE_UNUSED,
       /* The stack pointer is only modified indirectly as the result
 	 of a push until later in flow.  See the comments in rtl.texi
 	 regarding Embedded Side-Effects on Addresses.  */
-      || (GET_CODE (x) == MEM
-	  && GET_RTX_CLASS (GET_CODE (XEXP (x, 0))) == 'a'
+      || (MEM_P (x)
+	  && GET_RTX_CLASS (GET_CODE (XEXP (x, 0))) == RTX_AUTOINC
 	  && XEXP (XEXP (x, 0), 0) == stack_pointer_rtx))
     current_function_sp_is_unchanging = 0;
 }
 
 static void
-notice_stack_pointer_modification (rtx f)
+notice_stack_pointer_modification (void)
 {
+  basic_block bb;
   rtx insn;
 
   /* Assume that the stack pointer is unchanging if alloca hasn't
@@ -883,17 +880,19 @@ notice_stack_pointer_modification (rtx f)
   if (! current_function_sp_is_unchanging)
     return;
 
-  for (insn = f; insn; insn = NEXT_INSN (insn))
-    {
-      if (INSN_P (insn))
-	{
-	  /* Check if insn modifies the stack pointer.  */
-	  note_stores (PATTERN (insn), notice_stack_pointer_modification_1,
-		       NULL);
-	  if (! current_function_sp_is_unchanging)
-	    return;
-	}
-    }
+  FOR_EACH_BB (bb)
+    FOR_BB_INSNS (bb, insn)
+      {
+	if (INSN_P (insn))
+	  {
+	    /* Check if insn modifies the stack pointer.  */
+	    note_stores (PATTERN (insn),
+			 notice_stack_pointer_modification_1,
+			 NULL);
+	    if (! current_function_sp_is_unchanging)
+	      return;
+	  }
+      }
 }
 
 /* Mark a register in SET.  Hard registers in large modes get all
@@ -905,8 +904,7 @@ mark_reg (rtx reg, void *xset)
   regset set = (regset) xset;
   int regno = REGNO (reg);
 
-  if (GET_MODE (reg) == BLKmode)
-    abort ();
+  gcc_assert (GET_MODE (reg) != BLKmode);
 
   SET_REGNO_REG_SET (set, regno);
   if (regno < FIRST_PSEUDO_REGISTER)
@@ -1021,33 +1019,44 @@ calculate_global_regs_live (sbitmap blocks_in, sbitmap blocks_out, int flags)
 {
   basic_block *queue, *qhead, *qtail, *qend, bb;
   regset tmp, new_live_at_end, invalidated_by_call;
-  regset_head tmp_head, invalidated_by_call_head;
-  regset_head new_live_at_end_head;
+
+  /* The registers that are modified within this in block.  */
+  regset *local_sets;
+
+  /* The registers that are conditionally modified within this block.
+     In other words, regs that are set only as part of a COND_EXEC.  */
+  regset *cond_local_sets;
+
   int i;
 
   /* Some passes used to forget clear aux field of basic block causing
      sick behavior here.  */
 #ifdef ENABLE_CHECKING
   FOR_BB_BETWEEN (bb, ENTRY_BLOCK_PTR, NULL, next_bb)
-    if (bb->aux)
-      abort ();
+    gcc_assert (!bb->aux);
 #endif
 
-  tmp = INITIALIZE_REG_SET (tmp_head);
-  new_live_at_end = INITIALIZE_REG_SET (new_live_at_end_head);
-  invalidated_by_call = INITIALIZE_REG_SET (invalidated_by_call_head);
+  tmp = ALLOC_REG_SET (&reg_obstack);
+  new_live_at_end = ALLOC_REG_SET (&reg_obstack);
+  invalidated_by_call = ALLOC_REG_SET (&reg_obstack);
 
   /* Inconveniently, this is only readily available in hard reg set form.  */
   for (i = 0; i < FIRST_PSEUDO_REGISTER; ++i)
     if (TEST_HARD_REG_BIT (regs_invalidated_by_call, i))
       SET_REGNO_REG_SET (invalidated_by_call, i);
 
+  /* Allocate space for the sets of local properties.  */
+  local_sets = xcalloc (last_basic_block - (INVALID_BLOCK + 1),
+			sizeof (regset));
+  cond_local_sets = xcalloc (last_basic_block - (INVALID_BLOCK + 1),
+			     sizeof (regset));
+
   /* Create a worklist.  Allocate an extra slot for ENTRY_BLOCK, and one
      because the `head == tail' style test for an empty queue doesn't
      work with a full queue.  */
-  queue = xmalloc ((n_basic_blocks + 2) * sizeof (*queue));
+  queue = xmalloc ((n_basic_blocks - (INVALID_BLOCK + 1)) * sizeof (*queue));
   qtail = queue;
-  qhead = qend = queue + n_basic_blocks + 2;
+  qhead = qend = queue + n_basic_blocks - (INVALID_BLOCK + 1);
 
   /* Queue the blocks set in the initial mask.  Do this in reverse block
      number order so that we are more likely for the first round to do
@@ -1101,6 +1110,7 @@ calculate_global_regs_live (sbitmap blocks_in, sbitmap blocks_out, int flags)
       int rescan, changed;
       basic_block bb;
       edge e;
+      edge_iterator ei;
 
       bb = *qhead++;
       if (qhead == qend)
@@ -1110,8 +1120,8 @@ calculate_global_regs_live (sbitmap blocks_in, sbitmap blocks_out, int flags)
       /* Begin by propagating live_at_start from the successor blocks.  */
       CLEAR_REG_SET (new_live_at_end);
 
-      if (bb->succ)
-	for (e = bb->succ; e; e = e->succ_next)
+      if (EDGE_COUNT (bb->succs) > 0)
+	FOR_EACH_EDGE (e, ei, bb->succs)
 	  {
 	    basic_block sb = e->dest;
 
@@ -1120,11 +1130,9 @@ calculate_global_regs_live (sbitmap blocks_in, sbitmap blocks_out, int flags)
 	    /* ??? Abnormal call edges ignored for the moment, as this gets
 	       confused by sibling call edges, which crashes reg-stack.  */
 	    if (e->flags & EDGE_EH)
-	      {
-		bitmap_operation (tmp, sb->global_live_at_start,
-				  invalidated_by_call, BITMAP_AND_COMPL);
-		IOR_REG_SET (new_live_at_end, tmp);
-	      }
+	      bitmap_ior_and_compl_into (new_live_at_end,
+					 sb->global_live_at_start,
+					 invalidated_by_call);
 	    else
 	      IOR_REG_SET (new_live_at_end, sb->global_live_at_start);
 
@@ -1178,13 +1186,16 @@ calculate_global_regs_live (sbitmap blocks_in, sbitmap blocks_out, int flags)
 	}
 
       /* On our first pass through this block, we'll go ahead and continue.
-	 Recognize first pass by local_set NULL.  On subsequent passes, we
-	 get to skip out early if live_at_end wouldn't have changed.  */
+	 Recognize first pass by checking if local_set is NULL for this
+         basic block.  On subsequent passes, we get to skip out early if
+	 live_at_end wouldn't have changed.  */
 
-      if (bb->local_set == NULL)
+      if (local_sets[bb->index - (INVALID_BLOCK + 1)] == NULL)
 	{
-	  bb->local_set = OBSTACK_ALLOC_REG_SET (&flow_obstack);
-	  bb->cond_local_set = OBSTACK_ALLOC_REG_SET (&flow_obstack);
+	  local_sets[bb->index - (INVALID_BLOCK + 1)]
+	    = ALLOC_REG_SET (&reg_obstack);
+	  cond_local_sets[bb->index - (INVALID_BLOCK + 1)]
+	    = ALLOC_REG_SET (&reg_obstack);
 	  rescan = 1;
 	}
       else
@@ -1193,39 +1204,39 @@ calculate_global_regs_live (sbitmap blocks_in, sbitmap blocks_out, int flags)
 	     rescan the block.  This wouldn't be necessary if we had
 	     precalculated local_live, however with PROP_SCAN_DEAD_CODE
 	     local_live is really dependent on live_at_end.  */
-	  CLEAR_REG_SET (tmp);
-	  rescan = bitmap_operation (tmp, bb->global_live_at_end,
-				     new_live_at_end, BITMAP_AND_COMPL);
+	  rescan = bitmap_intersect_compl_p (bb->global_live_at_end,
+					     new_live_at_end);
 
-	  if (! rescan)
+	  if (!rescan)
 	    {
-	      /* If any of the registers in the new live_at_end set are
-		 conditionally set in this basic block, we must rescan.
-	         This is because conditional lifetimes at the end of the
-		 block do not just take the live_at_end set into account,
-		 but also the liveness at the start of each successor
-		 block.  We can miss changes in those sets if we only
-		 compare the new live_at_end against the previous one.  */
-	      CLEAR_REG_SET (tmp);
-	      rescan = bitmap_operation (tmp, new_live_at_end,
-					 bb->cond_local_set, BITMAP_AND);
+	      regset cond_local_set;
+
+	       /* If any of the registers in the new live_at_end set are
+		  conditionally set in this basic block, we must rescan.
+		  This is because conditional lifetimes at the end of the
+		  block do not just take the live_at_end set into
+		  account, but also the liveness at the start of each
+		  successor block.  We can miss changes in those sets if
+		  we only compare the new live_at_end against the
+		  previous one.  */
+	      cond_local_set = cond_local_sets[bb->index - (INVALID_BLOCK + 1)];
+	      rescan = bitmap_intersect_p (new_live_at_end, cond_local_set);
 	    }
 
-	  if (! rescan)
+	  if (!rescan)
 	    {
+	      regset local_set;
+
 	      /* Find the set of changed bits.  Take this opportunity
 		 to notice that this set is empty and early out.  */
-	      CLEAR_REG_SET (tmp);
-	      changed = bitmap_operation (tmp, bb->global_live_at_end,
-					  new_live_at_end, BITMAP_XOR);
-	      if (! changed)
+	      bitmap_xor (tmp, bb->global_live_at_end, new_live_at_end);
+	      if (bitmap_empty_p (tmp))
 		continue;
-
-	      /* If any of the changed bits overlap with local_set,
-		 we'll have to rescan the block.  Detect overlap by
-		 the AND with ~local_set turning off bits.  */
-	      rescan = bitmap_operation (tmp, tmp, bb->local_set,
-					 BITMAP_AND_COMPL);
+  
+	      /* If any of the changed bits overlap with local_sets[bb],
+ 		 we'll have to rescan the block.  */
+	      local_set = local_sets[bb->index - (INVALID_BLOCK + 1)];
+	      rescan = bitmap_intersect_p (tmp, local_set);
 	    }
 	}
 
@@ -1238,14 +1249,11 @@ calculate_global_regs_live (sbitmap blocks_in, sbitmap blocks_out, int flags)
 	{
 	  /* Add to live_at_start the set of all registers in
 	     new_live_at_end that aren't in the old live_at_end.  */
-
-	  bitmap_operation (tmp, new_live_at_end, bb->global_live_at_end,
-			    BITMAP_AND_COMPL);
+	  
+	  changed = bitmap_ior_and_compl_into (bb->global_live_at_start,
+					       new_live_at_end,
+					       bb->global_live_at_end);
 	  COPY_REG_SET (bb->global_live_at_end, new_live_at_end);
-
-	  changed = bitmap_operation (bb->global_live_at_start,
-				      bb->global_live_at_start,
-				      tmp, BITMAP_IOR);
 	  if (! changed)
 	    continue;
 	}
@@ -1255,8 +1263,10 @@ calculate_global_regs_live (sbitmap blocks_in, sbitmap blocks_out, int flags)
 
 	  /* Rescan the block insn by insn to turn (a copy of) live_at_end
 	     into live_at_start.  */
-	  propagate_block (bb, new_live_at_end, bb->local_set,
-			   bb->cond_local_set, flags);
+	  propagate_block (bb, new_live_at_end,
+			   local_sets[bb->index - (INVALID_BLOCK + 1)],
+			   cond_local_sets[bb->index - (INVALID_BLOCK + 1)],
+			   flags);
 
 	  /* If live_at start didn't change, no need to go farther.  */
 	  if (REG_SET_EQUAL_P (bb->global_live_at_start, new_live_at_end))
@@ -1267,7 +1277,7 @@ calculate_global_regs_live (sbitmap blocks_in, sbitmap blocks_out, int flags)
 
       /* Queue all predecessors of BB so that we may re-examine
 	 their live_at_end.  */
-      for (e = bb->pred; e; e = e->pred_next)
+      FOR_EACH_EDGE (e, ei, bb->preds)
 	{
 	  basic_block pb = e->src;
 	  if (pb->aux == NULL)
@@ -1289,20 +1299,22 @@ calculate_global_regs_live (sbitmap blocks_in, sbitmap blocks_out, int flags)
       EXECUTE_IF_SET_IN_SBITMAP (blocks_out, 0, i,
 	{
 	  basic_block bb = BASIC_BLOCK (i);
-	  FREE_REG_SET (bb->local_set);
-	  FREE_REG_SET (bb->cond_local_set);
+	  FREE_REG_SET (local_sets[bb->index - (INVALID_BLOCK + 1)]);
+	  FREE_REG_SET (cond_local_sets[bb->index - (INVALID_BLOCK + 1)]);
 	});
     }
   else
     {
       FOR_EACH_BB (bb)
 	{
-	  FREE_REG_SET (bb->local_set);
-	  FREE_REG_SET (bb->cond_local_set);
+	  FREE_REG_SET (local_sets[bb->index - (INVALID_BLOCK + 1)]);
+	  FREE_REG_SET (cond_local_sets[bb->index - (INVALID_BLOCK + 1)]);
 	}
     }
 
   free (queue);
+  free (cond_local_sets);
+  free (local_sets);
 }
 
 
@@ -1335,7 +1347,7 @@ find_regno_partial (rtx *ptr, void *data)
     case ZERO_EXTRACT:
     case SIGN_EXTRACT:
     case STRICT_LOW_PART:
-      if (GET_CODE (XEXP (*ptr, 0)) == REG && REGNO (XEXP (*ptr, 0)) == reg)
+      if (REG_P (XEXP (*ptr, 0)) && REGNO (XEXP (*ptr, 0)) == reg)
 	{
 	  param->retval = XEXP (*ptr, 0);
 	  return 1;
@@ -1343,7 +1355,7 @@ find_regno_partial (rtx *ptr, void *data)
       break;
 
     case SUBREG:
-      if (GET_CODE (SUBREG_REG (*ptr)) == REG
+      if (REG_P (SUBREG_REG (*ptr))
 	  && REGNO (SUBREG_REG (*ptr)) == reg)
 	{
 	  param->retval = SUBREG_REG (*ptr);
@@ -1370,15 +1382,17 @@ initialize_uninitialized_subregs (void)
 {
   rtx insn;
   edge e;
-  int reg, did_something = 0;
+  unsigned reg, did_something = 0;
   find_regno_partial_param param;
+  edge_iterator ei;
 
-  for (e = ENTRY_BLOCK_PTR->succ; e; e = e->succ_next)
+  FOR_EACH_EDGE (e, ei, ENTRY_BLOCK_PTR->succs)
     {
       basic_block bb = e->dest;
       regset map = bb->global_live_at_start;
-      EXECUTE_IF_SET_IN_REG_SET (map,
-				 FIRST_PSEUDO_REGISTER, reg,
+      reg_set_iterator rsi;
+
+      EXECUTE_IF_SET_IN_REG_SET (map, FIRST_PSEUDO_REGISTER, reg, rsi)
 	{
 	  int uid = REGNO_FIRST_UID (reg);
 	  rtx i;
@@ -1406,7 +1420,7 @@ initialize_uninitialized_subregs (void)
 		  did_something = 1;
 		}
 	    }
-	});
+	}
     }
 
   if (did_something)
@@ -1418,20 +1432,20 @@ initialize_uninitialized_subregs (void)
 /* Subroutines of life analysis.  */
 
 /* Allocate the permanent data structures that represent the results
-   of life analysis.  Not static since used also for stupid life analysis.  */
+   of life analysis.  */
 
-void
+static void
 allocate_bb_life_data (void)
 {
   basic_block bb;
 
   FOR_BB_BETWEEN (bb, ENTRY_BLOCK_PTR, NULL, next_bb)
     {
-      bb->global_live_at_start = OBSTACK_ALLOC_REG_SET (&flow_obstack);
-      bb->global_live_at_end = OBSTACK_ALLOC_REG_SET (&flow_obstack);
+      bb->global_live_at_start = ALLOC_REG_SET (&reg_obstack);
+      bb->global_live_at_end = ALLOC_REG_SET (&reg_obstack);
     }
 
-  regs_live_at_setjmp = OBSTACK_ALLOC_REG_SET (&flow_obstack);
+  regs_live_at_setjmp = ALLOC_REG_SET (&reg_obstack);
 }
 
 void
@@ -1440,8 +1454,7 @@ allocate_reg_life_data (void)
   int i;
 
   max_regno = max_reg_num ();
-  if (reg_deaths)
-    abort ();
+  gcc_assert (!reg_deaths);
   reg_deaths = xcalloc (sizeof (*reg_deaths), max_regno);
 
   /* Recalculate the register space, in case it has grown.  Old style
@@ -1479,7 +1492,7 @@ propagate_block_delete_insn (rtx insn)
      real good way to fix up the reference to the deleted label
      when the label is deleted, so we just allow it here.  */
 
-  if (inote && GET_CODE (inote) == CODE_LABEL)
+  if (inote && LABEL_P (inote))
     {
       rtx label = XEXP (inote, 0);
       rtx next;
@@ -1489,7 +1502,7 @@ propagate_block_delete_insn (rtx insn)
 	 jump following it, but not the label itself.  */
       if (LABEL_NUSES (label) == 1 + LABEL_PRESERVE_P (label)
 	  && (next = next_nonnote_insn (label)) != NULL
-	  && GET_CODE (next) == JUMP_INSN
+	  && JUMP_P (next)
 	  && (GET_CODE (PATTERN (next)) == ADDR_VEC
 	      || GET_CODE (PATTERN (next)) == ADDR_DIFF_VEC))
 	{
@@ -1534,7 +1547,7 @@ propagate_one_insn (struct propagate_block_info *pbi, rtx insn)
   int insn_is_dead = 0;
   int libcall_is_dead = 0;
   rtx note;
-  int i;
+  unsigned i;
 
   if (! INSN_P (insn))
     return prev;
@@ -1628,7 +1641,7 @@ propagate_one_insn (struct propagate_block_info *pbi, rtx insn)
     /* Does this instruction increment or decrement a register?  */
     if ((flags & PROP_AUTOINC)
 	&& x != 0
-	&& GET_CODE (SET_DEST (x)) == REG
+	&& REG_P (SET_DEST (x))
 	&& (GET_CODE (SET_SRC (x)) == PLUS
 	    || GET_CODE (SET_SRC (x)) == MINUS)
 	&& XEXP (SET_SRC (x), 0) == SET_DEST (x)
@@ -1660,12 +1673,18 @@ propagate_one_insn (struct propagate_block_info *pbi, rtx insn)
 	   && GET_CODE (SET_SRC (PATTERN (insn))) == PLUS
 	   && XEXP (SET_SRC (PATTERN (insn)), 0) == stack_pointer_rtx
 	   && GET_CODE (XEXP (SET_SRC (PATTERN (insn)), 1)) == CONST_INT)
-    /* We have an insn to pop a constant amount off the stack.
-       (Such insns use PLUS regardless of the direction of the stack,
-       and any insn to adjust the stack by a constant is always a pop.)
-       These insns, if not dead stores, have no effect on life, though
-       they do have an effect on the memory stores we are tracking.  */
-    invalidate_mems_from_set (pbi, stack_pointer_rtx);
+    {
+      /* We have an insn to pop a constant amount off the stack.
+         (Such insns use PLUS regardless of the direction of the stack,
+         and any insn to adjust the stack by a constant is always a pop
+	 or part of a push.)
+         These insns, if not dead stores, have no effect on life, though
+         they do have an effect on the memory stores we are tracking.  */
+      invalidate_mems_from_set (pbi, stack_pointer_rtx);
+      /* Still, we need to update local_set, lest ifcvt.c:dead_or_predicable
+	 concludes that the stack pointer is not modified.  */
+      mark_set_regs (pbi, PATTERN (insn), insn);
+    }
   else
     {
       rtx note;
@@ -1673,15 +1692,18 @@ propagate_one_insn (struct propagate_block_info *pbi, rtx insn)
 	 in a register clobbered by calls.  Find all regs now live and
 	 record this for them.  */
 
-      if (GET_CODE (insn) == CALL_INSN && (flags & PROP_REG_INFO))
-	EXECUTE_IF_SET_IN_REG_SET (pbi->reg_live, 0, i,
-				   { REG_N_CALLS_CROSSED (i)++; });
+      if (CALL_P (insn) && (flags & PROP_REG_INFO))
+	{
+	  reg_set_iterator rsi;
+	  EXECUTE_IF_SET_IN_REG_SET (pbi->reg_live, 0, i, rsi)
+	    REG_N_CALLS_CROSSED (i)++;
+	}
 
       /* Record sets.  Do this even for dead instructions, since they
 	 would have killed the values if they hadn't been deleted.  */
       mark_set_regs (pbi, PATTERN (insn), insn);
 
-      if (GET_CODE (insn) == CALL_INSN)
+      if (CALL_P (insn))
 	{
 	  regset live_at_end;
 	  bool sibcall_p;
@@ -1725,8 +1747,9 @@ propagate_one_insn (struct propagate_block_info *pbi, rtx insn)
 					      current_function_return_rtx,
 					      (rtx *) 0)))
 	      {
+		enum rtx_code code = global_regs[i] ? SET : CLOBBER;
 		/* We do not want REG_UNUSED notes for these registers.  */
-		mark_set_1 (pbi, CLOBBER, regno_reg_rtx[i], cond, insn,
+		mark_set_1 (pbi, code, regno_reg_rtx[i], cond, insn,
 			    pbi->flags & ~(PROP_DEATH_NOTES | PROP_REG_INFO));
 	      }
 	}
@@ -1750,7 +1773,7 @@ propagate_one_insn (struct propagate_block_info *pbi, rtx insn)
       prev = PREV_INSN (insn);
 #endif
 
-      if (! insn_is_dead && GET_CODE (insn) == CALL_INSN)
+      if (! insn_is_dead && CALL_P (insn))
 	{
 	  int i;
 	  rtx note, cond;
@@ -1822,62 +1845,67 @@ init_propagate_block_info (basic_block bb, regset live, regset local_set,
   /* If this block ends in a conditional branch, for each register
      live from one side of the branch and not the other, record the
      register as conditionally dead.  */
-  if (GET_CODE (BB_END (bb)) == JUMP_INSN
+  if (JUMP_P (BB_END (bb))
       && any_condjump_p (BB_END (bb)))
     {
-      regset_head diff_head;
-      regset diff = INITIALIZE_REG_SET (diff_head);
+      regset diff = ALLOC_REG_SET (&reg_obstack);
       basic_block bb_true, bb_false;
-      int i;
+      unsigned i;
 
       /* Identify the successor blocks.  */
-      bb_true = bb->succ->dest;
-      if (bb->succ->succ_next != NULL)
+      bb_true = EDGE_SUCC (bb, 0)->dest;
+      if (EDGE_COUNT (bb->succs) > 1)
 	{
-	  bb_false = bb->succ->succ_next->dest;
+	  bb_false = EDGE_SUCC (bb, 1)->dest;
 
-	  if (bb->succ->flags & EDGE_FALLTHRU)
+	  if (EDGE_SUCC (bb, 0)->flags & EDGE_FALLTHRU)
 	    {
 	      basic_block t = bb_false;
 	      bb_false = bb_true;
 	      bb_true = t;
 	    }
-	  else if (! (bb->succ->succ_next->flags & EDGE_FALLTHRU))
-	    abort ();
+	  else
+	    gcc_assert (EDGE_SUCC (bb, 1)->flags & EDGE_FALLTHRU);
 	}
       else
 	{
 	  /* This can happen with a conditional jump to the next insn.  */
-	  if (JUMP_LABEL (BB_END (bb)) != BB_HEAD (bb_true))
-	    abort ();
+	  gcc_assert (JUMP_LABEL (BB_END (bb)) == BB_HEAD (bb_true));
 
 	  /* Simplest way to do nothing.  */
 	  bb_false = bb_true;
 	}
 
       /* Compute which register lead different lives in the successors.  */
-      if (bitmap_operation (diff, bb_true->global_live_at_start,
-			    bb_false->global_live_at_start, BITMAP_XOR))
-	{
+      bitmap_xor (diff, bb_true->global_live_at_start,
+		  bb_false->global_live_at_start);
+      
+      if (!bitmap_empty_p (diff))
+	  {
 	  /* Extract the condition from the branch.  */
 	  rtx set_src = SET_SRC (pc_set (BB_END (bb)));
 	  rtx cond_true = XEXP (set_src, 0);
 	  rtx reg = XEXP (cond_true, 0);
+ 	  enum rtx_code inv_cond;
 
 	  if (GET_CODE (reg) == SUBREG)
 	    reg = SUBREG_REG (reg);
 
 	  /* We can only track conditional lifetimes if the condition is
-	     in the form of a comparison of a register against zero.  
-	     If the condition is more complex than that, then it is safe
-	     not to record any information.  */
-	  if (GET_CODE (reg) == REG
+ 	     in the form of a reversible comparison of a register against
+ 	     zero.  If the condition is more complex than that, then it is
+ 	     safe not to record any information.  */
+ 	  inv_cond = reversed_comparison_code (cond_true, BB_END (bb));
+ 	  if (inv_cond != UNKNOWN
+ 	      && REG_P (reg)
 	      && XEXP (cond_true, 1) == const0_rtx)
 	    {
 	      rtx cond_false
-		= gen_rtx_fmt_ee (reverse_condition (GET_CODE (cond_true)),
+		= gen_rtx_fmt_ee (inv_cond,
 				  GET_MODE (cond_true), XEXP (cond_true, 0),
 				  XEXP (cond_true, 1));
+	      reg_set_iterator rsi;
+
 	      if (GET_CODE (XEXP (set_src, 1)) == PC)
 		{
 		  rtx t = cond_false;
@@ -1888,25 +1916,24 @@ init_propagate_block_info (basic_block bb, regset live, regset local_set,
 	      SET_REGNO_REG_SET (pbi->reg_cond_reg, REGNO (reg));
 
 	      /* For each such register, mark it conditionally dead.  */
-	      EXECUTE_IF_SET_IN_REG_SET
-		(diff, 0, i,
-		 {
-		   struct reg_cond_life_info *rcli;
-		   rtx cond;
+	      EXECUTE_IF_SET_IN_REG_SET (diff, 0, i, rsi)
+		{
+		  struct reg_cond_life_info *rcli;
+		  rtx cond;
 
-		   rcli = xmalloc (sizeof (*rcli));
+		  rcli = xmalloc (sizeof (*rcli));
 
-		   if (REGNO_REG_SET_P (bb_true->global_live_at_start, i))
-		     cond = cond_false;
-		   else
-		     cond = cond_true;
-		   rcli->condition = cond;
-		   rcli->stores = const0_rtx;
-		   rcli->orig_condition = cond;
+		  if (REGNO_REG_SET_P (bb_true->global_live_at_start, i))
+		    cond = cond_false;
+		  else
+		    cond = cond_true;
+		  rcli->condition = cond;
+		  rcli->stores = const0_rtx;
+		  rcli->orig_condition = cond;
 
-		   splay_tree_insert (pbi->reg_cond_dead, i,
-				      (splay_tree_value) rcli);
-		 });
+		  splay_tree_insert (pbi->reg_cond_dead, i,
+				     (splay_tree_value) rcli);
+		}
 	    }
 	}
 
@@ -1923,16 +1950,16 @@ init_propagate_block_info (basic_block bb, regset live, regset local_set,
 	    && (TYPE_RETURNS_STACK_DEPRESSED
 		(TREE_TYPE (current_function_decl))))
       && (flags & PROP_SCAN_DEAD_STORES)
-      && (bb->succ == NULL
-	  || (bb->succ->succ_next == NULL
-	      && bb->succ->dest == EXIT_BLOCK_PTR
+      && (EDGE_COUNT (bb->succs) == 0
+	  || (EDGE_COUNT (bb->succs) == 1
+	      && EDGE_SUCC (bb, 0)->dest == EXIT_BLOCK_PTR
 	      && ! current_function_calls_eh_return)))
     {
       rtx insn, set;
       for (insn = BB_END (bb); insn != BB_HEAD (bb); insn = PREV_INSN (insn))
-	if (GET_CODE (insn) == INSN
+	if (NONJUMP_INSN_P (insn)
 	    && (set = single_set (insn))
-	    && GET_CODE (SET_DEST (set)) == MEM)
+	    && MEM_P (SET_DEST (set)))
 	  {
 	    rtx mem = SET_DEST (set);
 	    rtx canon_mem = canon_rtx (mem);
@@ -1965,12 +1992,14 @@ free_propagate_block_info (struct propagate_block_info *pbi)
   if (pbi->flags & PROP_REG_INFO)
     {
       int num = pbi->insn_num;
-      int i;
+      unsigned i;
+      reg_set_iterator rsi;
 
-      EXECUTE_IF_SET_IN_REG_SET (pbi->reg_live, 0, i,
-	 { REG_LIVE_LENGTH (i) += num - reg_deaths[i];
-	   reg_deaths[i] = 0;
-         });
+      EXECUTE_IF_SET_IN_REG_SET (pbi->reg_live, 0, i, rsi)
+	{
+	  REG_LIVE_LENGTH (i) += num - reg_deaths[i];
+	  reg_deaths[i] = 0;
+	}
     }
   if (pbi->reg_next_use)
     free (pbi->reg_next_use);
@@ -2008,12 +2037,13 @@ propagate_block (basic_block bb, regset live, regset local_set,
 
   if (flags & PROP_REG_INFO)
     {
-      int i;
+      unsigned i;
+      reg_set_iterator rsi;
 
       /* Process the regs live at the end of the block.
 	 Mark them as not local to any one basic block.  */
-      EXECUTE_IF_SET_IN_REG_SET (live, 0, i,
-				 { REG_BASIC_BLOCK (i) = REG_BLOCK_GLOBAL; });
+      EXECUTE_IF_SET_IN_REG_SET (live, 0, i, rsi)
+	REG_BASIC_BLOCK (i) = REG_BLOCK_GLOBAL;
     }
 
   /* Scan the block an insn at a time from end to beginning.  */
@@ -2024,7 +2054,7 @@ propagate_block (basic_block bb, regset live, regset local_set,
       /* If this is a call to `setjmp' et al, warn if any
 	 non-volatile datum is live.  */
       if ((flags & PROP_REG_INFO)
-	  && GET_CODE (insn) == CALL_INSN
+	  && CALL_P (insn)
 	  && find_reg_note (insn, REG_SETJMP, NULL))
 	IOR_REG_SET (regs_live_at_setjmp, pbi->reg_live);
 
@@ -2102,7 +2132,7 @@ insn_dead_p (struct propagate_block_info *pbi, rtx x, int call_ok,
       else if (volatile_refs_p (SET_SRC (x)))
 	return 0;
 
-      if (GET_CODE (r) == MEM)
+      if (MEM_P (r))
 	{
 	  rtx temp, canon_r;
 
@@ -2118,7 +2148,7 @@ insn_dead_p (struct propagate_block_info *pbi, rtx x, int call_ok,
 	     rtx_equal_p does not check the alias set or flags, we also
 	     must have the potential for them to conflict (anti_dependence).  */
 	  for (temp = pbi->mem_set_list; temp != 0; temp = XEXP (temp, 1))
-	    if (unchanging_anti_dependence (r, XEXP (temp, 0)))
+	    if (anti_dependence (r, XEXP (temp, 0)))
 	      {
 		rtx mem = XEXP (temp, 0);
 
@@ -2147,7 +2177,7 @@ insn_dead_p (struct propagate_block_info *pbi, rtx x, int call_ok,
 		 || GET_CODE (r) == ZERO_EXTRACT)
 	    r = XEXP (r, 0);
 
-	  if (GET_CODE (r) == REG)
+	  if (REG_P (r))
 	    {
 	      int regno = REGNO (r);
 
@@ -2220,14 +2250,22 @@ insn_dead_p (struct propagate_block_info *pbi, rtx x, int call_ok,
     }
 
   /* A CLOBBER of a pseudo-register that is dead serves no purpose.  That
-     is not necessarily true for hard registers.  */
-  else if (code == CLOBBER && GET_CODE (XEXP (x, 0)) == REG
-	   && REGNO (XEXP (x, 0)) >= FIRST_PSEUDO_REGISTER
-	   && ! REGNO_REG_SET_P (pbi->reg_live, REGNO (XEXP (x, 0))))
-    return 1;
+     is not necessarily true for hard registers until after reload.  */
+  else if (code == CLOBBER)
+    {
+      if (REG_P (XEXP (x, 0))
+	  && (REGNO (XEXP (x, 0)) >= FIRST_PSEUDO_REGISTER
+	      || reload_completed)
+	  && ! REGNO_REG_SET_P (pbi->reg_live, REGNO (XEXP (x, 0))))
+	return 1;
+    }
 
-  /* We do not check other CLOBBER or USE here.  An insn consisting of just
-     a CLOBBER or just a USE should not be deleted.  */
+  /* ??? A base USE is a historical relic.  It ought not be needed anymore.
+     Instances where it is still used are either (1) temporary and the USE
+     escaped the pass, (2) cruft and the USE need not be emitted anymore,
+     or (3) hiding bugs elsewhere that are not properly representing data
+     flow.  */
+
   return 0;
 }
 
@@ -2255,14 +2293,14 @@ libcall_dead_p (struct propagate_block_info *pbi, rtx note, rtx insn)
     {
       rtx r = SET_SRC (x);
 
-      if (GET_CODE (r) == REG)
+      if (REG_P (r))
 	{
 	  rtx call = XEXP (note, 0);
 	  rtx call_pat;
 	  int i;
 
 	  /* Find the call insn.  */
-	  while (call != insn && GET_CODE (call) != CALL_INSN)
+	  while (call != insn && !CALL_P (call))
 	    call = NEXT_INSN (call);
 
 	  /* If there is none, do nothing special,
@@ -2365,7 +2403,7 @@ invalidate_mems_from_autoinc (rtx *px, void *data)
   rtx x = *px;
   struct propagate_block_info *pbi = data;
 
-  if (GET_RTX_CLASS (GET_CODE (x)) == 'a')
+  if (GET_RTX_CLASS (GET_CODE (x)) == RTX_AUTOINC)
     {
       invalidate_mems_from_set (pbi, XEXP (x, 0));
       return -1;
@@ -2454,8 +2492,7 @@ mark_set_regs (struct propagate_block_info *pbi, rtx x, rtx insn)
 	    switch (code = GET_CODE (sub))
 	      {
 	      case COND_EXEC:
-		if (cond != NULL_RTX)
-		  abort ();
+		gcc_assert (!cond);
 
 		cond = COND_EXEC_TEST (sub);
 		sub = COND_EXEC_CODE (sub);
@@ -2520,17 +2557,19 @@ mark_set_1 (struct propagate_block_info *pbi, enum rtx_code code, rtx reg, rtx c
 		      flags);
       return;
 
-    case ZERO_EXTRACT:
     case SIGN_EXTRACT:
+      /* SIGN_EXTRACT cannot be an lvalue.  */
+      gcc_unreachable ();
+
+    case ZERO_EXTRACT:
     case STRICT_LOW_PART:
       /* ??? Assumes STRICT_LOW_PART not used on multi-word registers.  */
       do
 	reg = XEXP (reg, 0);
       while (GET_CODE (reg) == SUBREG
 	     || GET_CODE (reg) == ZERO_EXTRACT
-	     || GET_CODE (reg) == SIGN_EXTRACT
 	     || GET_CODE (reg) == STRICT_LOW_PART);
-      if (GET_CODE (reg) == MEM)
+      if (MEM_P (reg))
 	break;
       not_dead = (unsigned long) REGNO_REG_SET_P (pbi->reg_live, REGNO (reg));
       /* Fall through.  */
@@ -2542,7 +2581,7 @@ mark_set_1 (struct propagate_block_info *pbi, enum rtx_code code, rtx reg, rtx c
       break;
 
     case SUBREG:
-      if (GET_CODE (SUBREG_REG (reg)) == REG)
+      if (REG_P (SUBREG_REG (reg)))
 	{
 	  enum machine_mode outer_mode = GET_MODE (reg);
 	  enum machine_mode inner_mode = GET_MODE (SUBREG_REG (reg));
@@ -2595,22 +2634,22 @@ mark_set_1 (struct propagate_block_info *pbi, enum rtx_code code, rtx reg, rtx c
      If this set is a REG, then it kills any MEMs which use the reg.  */
   if (optimize && (flags & PROP_SCAN_DEAD_STORES))
     {
-      if (GET_CODE (reg) == REG)
+      if (REG_P (reg))
 	invalidate_mems_from_set (pbi, reg);
 
       /* If the memory reference had embedded side effects (autoincrement
-	 address modes.  Then we may need to kill some entries on the
+	 address modes) then we may need to kill some entries on the
 	 memory set list.  */
-      if (insn && GET_CODE (reg) == MEM)
+      if (insn && MEM_P (reg))
 	for_each_rtx (&PATTERN (insn), invalidate_mems_from_autoinc, pbi);
 
-      if (GET_CODE (reg) == MEM && ! side_effects_p (reg)
+      if (MEM_P (reg) && ! side_effects_p (reg)
 	  /* ??? With more effort we could track conditional memory life.  */
 	  && ! cond)
 	add_to_mem_set_list (pbi, canon_rtx (reg));
     }
 
-  if (GET_CODE (reg) == REG
+  if (REG_P (reg)
       && ! (regno_first == FRAME_POINTER_REGNUM
 	    && (! reload_completed || frame_pointer_needed))
 #if FRAME_POINTER_REGNUM != HARD_FRAME_POINTER_REGNUM
@@ -2726,10 +2765,18 @@ mark_set_1 (struct propagate_block_info *pbi, enum rtx_code code, rtx reg, rtx c
 		     in ASM_OPERANDs.  If these registers get replaced,
 		     we might wind up changing the semantics of the insn,
 		     even if reload can make what appear to be valid
-		     assignments later.  */
+		     assignments later.
+
+		     We don't build a LOG_LINK for global registers to
+		     or from a function call.  We don't want to let
+		     combine think that it knows what is going on with
+		     global registers.  */
 		  if (y && (BLOCK_NUM (y) == blocknum)
 		      && (regno_first >= FIRST_PSEUDO_REGISTER
-			  || asm_noperands (PATTERN (y)) < 0))
+			  || (asm_noperands (PATTERN (y)) < 0
+			      && ! ((CALL_P (insn)
+				     || CALL_P (y))
+				    && global_regs[regno_first]))))
 		    LOG_LINKS (y) = alloc_INSN_LIST (insn, LOG_LINKS (y));
 		}
 	    }
@@ -2792,7 +2839,7 @@ mark_set_1 (struct propagate_block_info *pbi, enum rtx_code code, rtx reg, rtx c
 	      }
 	}
     }
-  else if (GET_CODE (reg) == REG)
+  else if (REG_P (reg))
     {
       if (flags & (PROP_LOG_LINKS | PROP_AUTOINC))
 	pbi->reg_next_use[regno_first] = 0;
@@ -2936,8 +2983,8 @@ flush_reg_cond_reg_1 (splay_tree_node node, void *data)
       xdata[1] = node->key;
       return -1;
     }
-  else if (rcli->condition == const1_rtx)
-    abort ();
+  else
+    gcc_assert (rcli->condition != const1_rtx);
 
   return 0;
 }
@@ -2972,10 +3019,10 @@ ior_reg_cond (rtx old, rtx x, int add)
 {
   rtx op0, op1;
 
-  if (GET_RTX_CLASS (GET_CODE (old)) == '<')
+  if (COMPARISON_P (old))
     {
-      if (GET_RTX_CLASS (GET_CODE (x)) == '<'
-	  && REVERSE_CONDEXEC_PREDICATES_P (GET_CODE (x), GET_CODE (old))
+      if (COMPARISON_P (x)
+	  && REVERSE_CONDEXEC_PREDICATES_P (x, old)
 	  && REGNO (XEXP (x, 0)) == REGNO (XEXP (old, 0)))
 	return const1_rtx;
       if (GET_CODE (x) == GET_CODE (old)
@@ -3051,29 +3098,25 @@ ior_reg_cond (rtx old, rtx x, int add)
       return gen_rtx_IOR (0, old, x);
 
     default:
-      abort ();
+      gcc_unreachable ();
     }
 }
 
 static rtx
 not_reg_cond (rtx x)
 {
-  enum rtx_code x_code;
-
   if (x == const0_rtx)
     return const1_rtx;
   else if (x == const1_rtx)
     return const0_rtx;
-  x_code = GET_CODE (x);
-  if (x_code == NOT)
+  if (GET_CODE (x) == NOT)
     return XEXP (x, 0);
-  if (GET_RTX_CLASS (x_code) == '<'
-      && GET_CODE (XEXP (x, 0)) == REG)
+  if (COMPARISON_P (x)
+      && REG_P (XEXP (x, 0)))
     {
-      if (XEXP (x, 1) != const0_rtx)
-	abort ();
+      gcc_assert (XEXP (x, 1) == const0_rtx);
 
-      return gen_rtx_fmt_ee (reverse_condition (x_code),
+      return gen_rtx_fmt_ee (reversed_comparison_code (x, NULL),
 			     VOIDmode, XEXP (x, 0), const0_rtx);
     }
   return gen_rtx_NOT (0, x);
@@ -3084,10 +3127,10 @@ and_reg_cond (rtx old, rtx x, int add)
 {
   rtx op0, op1;
 
-  if (GET_RTX_CLASS (GET_CODE (old)) == '<')
+  if (COMPARISON_P (old))
     {
-      if (GET_RTX_CLASS (GET_CODE (x)) == '<'
-	  && GET_CODE (x) == reverse_condition (GET_CODE (old))
+      if (COMPARISON_P (x)
+	  && GET_CODE (x) == reversed_comparison_code (old, NULL)
 	  && REGNO (XEXP (x, 0)) == REGNO (XEXP (old, 0)))
 	return const0_rtx;
       if (GET_CODE (x) == GET_CODE (old)
@@ -3163,7 +3206,7 @@ and_reg_cond (rtx old, rtx x, int add)
       return gen_rtx_AND (0, old, x);
 
     default:
-      abort ();
+      gcc_unreachable ();
     }
 }
 
@@ -3177,7 +3220,7 @@ elim_reg_cond (rtx x, unsigned int regno)
 {
   rtx op0, op1;
 
-  if (GET_RTX_CLASS (GET_CODE (x)) == '<')
+  if (COMPARISON_P (x))
     {
       if (REGNO (XEXP (x, 0)) == regno)
 	return const0_rtx;
@@ -3223,7 +3266,7 @@ elim_reg_cond (rtx x, unsigned int regno)
       return x;
 
     default:
-      abort ();
+      gcc_unreachable ();
     }
 }
 #endif /* HAVE_conditional_execution */
@@ -3245,6 +3288,7 @@ attempt_auto_inc (struct propagate_block_info *pbi, rtx inc, rtx insn,
   rtx q = SET_DEST (set);
   rtx y = SET_SRC (set);
   int opnum = XEXP (y, 0) == incr_reg ? 0 : 1;
+  int changed;
 
   /* Make sure this reg appears only once in this insn.  */
   if (count_occurrences (PATTERN (insn), incr_reg, 1) != 1)
@@ -3261,7 +3305,7 @@ attempt_auto_inc (struct propagate_block_info *pbi, rtx inc, rtx insn,
       if (! validate_change (insn, &XEXP (mem, 0), inc, 0))
 	return;
     }
-  else if (GET_CODE (q) == REG
+  else if (REG_P (q)
 	   /* PREV_INSN used here to check the semi-open interval
 	      [insn,incr).  */
 	   && ! reg_used_between_p (q,  PREV_INSN (insn), incr)
@@ -3304,7 +3348,7 @@ attempt_auto_inc (struct propagate_block_info *pbi, rtx inc, rtx insn,
 	 use of INCR_REG.  If a use of INCR_REG was just placed in
 	 the insn before INSN, make that the next use.
 	 Otherwise, invalidate it.  */
-      if (GET_CODE (PREV_INSN (insn)) == INSN
+      if (NONJUMP_INSN_P (PREV_INSN (insn))
 	  && GET_CODE (PATTERN (PREV_INSN (insn))) == SET
 	  && SET_SRC (PATTERN (PREV_INSN (insn))) == incr_reg)
 	pbi->reg_next_use[regno] = PREV_INSN (insn);
@@ -3327,7 +3371,7 @@ attempt_auto_inc (struct propagate_block_info *pbi, rtx inc, rtx insn,
       /* If there are any calls between INSN and INCR, show
 	 that REGNO now crosses them.  */
       for (temp = insn; temp != incr; temp = NEXT_INSN (temp))
-	if (GET_CODE (temp) == CALL_INSN)
+	if (CALL_P (temp))
 	  REG_N_CALLS_CROSSED (regno)++;
 
       /* Invalidate alias info for Q since we just changed its value.  */
@@ -3344,8 +3388,8 @@ attempt_auto_inc (struct propagate_block_info *pbi, rtx inc, rtx insn,
 
   /* Modify the old increment-insn to simply copy
      the already-incremented value of our register.  */
-  if (! validate_change (incr, &SET_SRC (set), incr_reg, 0))
-    abort ();
+  changed = validate_change (incr, &SET_SRC (set), incr_reg, 0);
+  gcc_assert (changed);
 
   /* If that makes it a no-op (copying the register into itself) delete
      it so it won't appear to be a "use" and a "set" of this
@@ -3372,9 +3416,7 @@ attempt_auto_inc (struct propagate_block_info *pbi, rtx inc, rtx insn,
 	    }
 	}
 
-      PUT_CODE (incr, NOTE);
-      NOTE_LINE_NUMBER (incr) = NOTE_INSN_DELETED;
-      NOTE_SOURCE_FILE (incr) = 0;
+      SET_INSN_DELETED (incr);
     }
 
   if (regno >= FIRST_PSEUDO_REGISTER)
@@ -3402,7 +3444,7 @@ find_auto_inc (struct propagate_block_info *pbi, rtx x, rtx insn)
   int regno;
   int size = GET_MODE_SIZE (GET_MODE (x));
 
-  if (GET_CODE (insn) == JUMP_INSN)
+  if (JUMP_P (insn))
     return;
 
   /* Here we detect use of an index register which might be good for
@@ -3411,7 +3453,7 @@ find_auto_inc (struct propagate_block_info *pbi, rtx x, rtx insn)
   if (GET_CODE (addr) == PLUS && GET_CODE (XEXP (addr, 1)) == CONST_INT)
     offset = INTVAL (XEXP (addr, 1)), addr = XEXP (addr, 0);
 
-  if (GET_CODE (addr) != REG)
+  if (!REG_P (addr))
     return;
 
   regno = REGNO (addr);
@@ -3466,7 +3508,7 @@ find_auto_inc (struct propagate_block_info *pbi, rtx x, rtx insn)
 								  inc_val)),
 			  insn, x, incr, addr);
     }
-  else if (GET_CODE (inc_val) == REG
+  else if (REG_P (inc_val)
 	   && ! reg_set_between_p (inc_val, PREV_INSN (insn),
 				   NEXT_INSN (incr)))
 
@@ -3553,10 +3595,7 @@ mark_used_reg (struct propagate_block_info *pbi, rtx reg,
       for (i = regno_first; i <= regno_last; ++i)
 	if (! REGNO_REG_SET_P (pbi->reg_live, i))
 	  {
-#ifdef ENABLE_CHECKING
-	    if (reg_deaths[i])
-	      abort ();
-#endif
+	    gcc_assert (!reg_deaths[i]);
 	    reg_deaths[i] = pbi->insn_num;
 	  }
     }
@@ -3713,7 +3752,7 @@ mark_used_regs (struct propagate_block_info *pbi, rtx x, rtx cond, rtx insn)
     case CLOBBER:
       /* If we are clobbering a MEM, mark any registers inside the address
 	 as being used.  */
-      if (GET_CODE (XEXP (x, 0)) == MEM)
+      if (MEM_P (XEXP (x, 0)))
 	mark_used_regs (pbi, XEXP (XEXP (x, 0), 0), cond, insn);
       return;
 
@@ -3737,7 +3776,7 @@ mark_used_regs (struct propagate_block_info *pbi, rtx x, rtx cond, rtx insn)
 	      while (temp)
 		{
 		  next = XEXP (temp, 1);
-		  if (unchanging_anti_dependence (XEXP (temp, 0), x))
+		  if (anti_dependence (XEXP (temp, 0), x))
 		    {
 		      /* Splice temp out of the list.  */
 		      if (prev)
@@ -3768,17 +3807,13 @@ mark_used_regs (struct propagate_block_info *pbi, rtx x, rtx cond, rtx insn)
 
     case SUBREG:
 #ifdef CANNOT_CHANGE_MODE_CLASS
-      if ((flags & PROP_REG_INFO)
-	  && GET_CODE (SUBREG_REG (x)) == REG
-	  && REGNO (SUBREG_REG (x)) >= FIRST_PSEUDO_REGISTER)
-	bitmap_set_bit (&subregs_of_mode, REGNO (SUBREG_REG (x))
-					  * MAX_MACHINE_MODE
-					  + GET_MODE (x));
+      if (flags & PROP_REG_INFO)
+	record_subregs_of_mode (x);
 #endif
 
       /* While we're here, optimize this case.  */
       x = SUBREG_REG (x);
-      if (GET_CODE (x) != REG)
+      if (!REG_P (x))
 	goto retry;
       /* Fall through.  */
 
@@ -3794,7 +3829,7 @@ mark_used_regs (struct propagate_block_info *pbi, rtx x, rtx cond, rtx insn)
 
 	/* If storing into MEM, don't show it as being used.  But do
 	   show the address as being used.  */
-	if (GET_CODE (testreg) == MEM)
+	if (MEM_P (testreg))
 	  {
 #ifdef AUTO_INC_DEC
 	    if (flags & PROP_AUTOINC)
@@ -3814,17 +3849,11 @@ mark_used_regs (struct propagate_block_info *pbi, rtx x, rtx cond, rtx insn)
 	   then this SET is not needed.  */
 	while (GET_CODE (testreg) == STRICT_LOW_PART
 	       || GET_CODE (testreg) == ZERO_EXTRACT
-	       || GET_CODE (testreg) == SIGN_EXTRACT
 	       || GET_CODE (testreg) == SUBREG)
 	  {
 #ifdef CANNOT_CHANGE_MODE_CLASS
-	    if ((flags & PROP_REG_INFO)
-		&& GET_CODE (testreg) == SUBREG
-		&& GET_CODE (SUBREG_REG (testreg)) == REG
-		&& REGNO (SUBREG_REG (testreg)) >= FIRST_PSEUDO_REGISTER)
-	      bitmap_set_bit (&subregs_of_mode, REGNO (SUBREG_REG (testreg))
-						* MAX_MACHINE_MODE
-						+ GET_MODE (testreg));
+	    if ((flags & PROP_REG_INFO) && GET_CODE (testreg) == SUBREG)
+	      record_subregs_of_mode (testreg);
 #endif
 
 	    /* Modifying a single register in an alternate mode
@@ -3847,7 +3876,7 @@ mark_used_regs (struct propagate_block_info *pbi, rtx x, rtx cond, rtx insn)
 
 	if ((GET_CODE (testreg) == PARALLEL
 	     && GET_MODE (testreg) == BLKmode)
-	    || (GET_CODE (testreg) == REG
+	    || (REG_P (testreg)
 		&& (regno = REGNO (testreg),
 		    ! (regno == FRAME_POINTER_REGNUM
 		       && (! reload_completed || frame_pointer_needed)))
@@ -3908,8 +3937,7 @@ mark_used_regs (struct propagate_block_info *pbi, rtx x, rtx cond, rtx insn)
       }
 
     case COND_EXEC:
-      if (cond != NULL_RTX)
-	abort ();
+      gcc_assert (!cond);
 
       mark_used_regs (pbi, COND_EXEC_TEST (x), NULL_RTX, insn);
 
@@ -4033,7 +4061,7 @@ try_pre_increment (rtx insn, rtx reg, HOST_WIDE_INT amount)
      because if the incremented register is spilled and must be reloaded
      there would be no way to store the incremented value back in memory.  */
 
-  if (GET_CODE (insn) == JUMP_INSN)
+  if (JUMP_P (insn))
     return 0;
 
   use = 0;
@@ -4137,20 +4165,22 @@ find_use_as_address (rtx x, rtx reg, HOST_WIDE_INT plusconst)
 void
 dump_regset (regset r, FILE *outf)
 {
-  int i;
+  unsigned i;
+  reg_set_iterator rsi;
+
   if (r == NULL)
     {
       fputs (" (nil)", outf);
       return;
     }
 
-  EXECUTE_IF_SET_IN_REG_SET (r, 0, i,
+  EXECUTE_IF_SET_IN_REG_SET (r, 0, i, rsi)
     {
       fprintf (outf, " %d", i);
       if (i < FIRST_PSEUDO_REGISTER)
 	fprintf (outf, " [%s]",
 		 reg_names[i]);
-    });
+    }
 }
 
 /* Print a human-readable representation of R on the standard error
@@ -4187,7 +4217,10 @@ void
 recompute_reg_usage (rtx f ATTRIBUTE_UNUSED, int loop_step ATTRIBUTE_UNUSED)
 {
   allocate_reg_life_data ();
-  update_life_info (NULL, UPDATE_LIFE_LOCAL, PROP_REG_INFO);
+  /* distribute_notes in combiner fails to convert some of the REG_UNUSED notes
+   to REG_DEAD notes.  This causes CHECK_DEAD_NOTES in sched1 to abort.  To 
+   solve this update the DEATH_NOTES here.  */
+  update_life_info (NULL, UPDATE_LIFE_LOCAL, PROP_REG_INFO | PROP_DEATH_NOTES);
 }
 
 /* Optionally removes all the REG_DEAD and REG_UNUSED notes from a set of
@@ -4247,7 +4280,7 @@ count_or_remove_death_notes_bb (basic_block bb, int kill)
 	      switch (REG_NOTE_KIND (link))
 		{
 		case REG_DEAD:
-		  if (GET_CODE (XEXP (link, 0)) == REG)
+		  if (REG_P (XEXP (link, 0)))
 		    {
 		      rtx reg = XEXP (link, 0);
 		      int n;
@@ -4321,13 +4354,13 @@ clear_log_links (sbitmap blocks)
 void
 reg_set_to_hard_reg_set (HARD_REG_SET *to, bitmap from)
 {
-  int i;
+  unsigned i;
+  bitmap_iterator bi;
 
-  EXECUTE_IF_SET_IN_BITMAP
-    (from, 0, i,
-     {
-       if (i >= FIRST_PSEUDO_REGISTER)
-	 return;
-       SET_HARD_REG_BIT (*to, i);
-     });
+  EXECUTE_IF_SET_IN_BITMAP (from, 0, i, bi)
+    {
+      if (i >= FIRST_PSEUDO_REGISTER)
+	return;
+      SET_HARD_REG_BIT (*to, i);
+    }
 }
