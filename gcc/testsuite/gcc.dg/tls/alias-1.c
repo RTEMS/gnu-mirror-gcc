@@ -1,4 +1,6 @@
 /* { dg-do link } */
+/* { dg-require-visibility "" } */
+
 /* Test that encode_section_info handles the change from externally
    defined to locally defined (via hidden).   Extracted from glibc.  */
 
