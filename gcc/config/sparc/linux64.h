@@ -34,7 +34,7 @@ Boston, MA 02111-1307, USA.  */
 #undef TARGET_DEFAULT
 #define TARGET_DEFAULT \
   (MASK_V9 + MASK_PTR64 + MASK_64BIT /* + MASK_HARD_QUAD */ \
-   + MASK_STACK_BIAS + MASK_APP_REGS + MASK_EPILOGUE + MASK_FPU + MASK_LONG_DOUBLE_128)
+   + MASK_STACK_BIAS + MASK_APP_REGS + MASK_FPU + MASK_LONG_DOUBLE_128)
 #endif
 
 #undef ASM_CPU_DEFAULT_SPEC
@@ -58,8 +58,8 @@ Boston, MA 02111-1307, USA.  */
 
 #define STARTFILE_SPEC32 \
   "%{!shared: \
-     %{pg:gcrt1.o%s} %{!pg:%{p:gcrt1.o%s} %{!p:crt1.o%s}}}\
-   crti.o%s %{static:crtbeginT.o%s}\
+     %{pg:/usr/lib/gcrt1.o%s} %{!pg:%{/usr/lib/p:gcrt1.o%s} %{!p:/usr/lib/crt1.o%s}}}\
+   /usr/lib/crti.o%s %{static:crtbeginT.o%s}\
    %{!static:%{!shared:crtbegin.o%s} %{shared:crtbeginS.o%s}}"
 
 #define STARTFILE_SPEC64 \
@@ -97,28 +97,33 @@ Boston, MA 02111-1307, USA.  */
 #undef  ENDFILE_SPEC
 
 #define ENDFILE_SPEC32 \
-  "%{!shared:crtend.o%s} %{shared:crtendS.o%s} crtn.o%s"
+  "%{!shared:crtend.o%s} %{shared:crtendS.o%s} /usr/lib/crtn.o%s"
 
 #define ENDFILE_SPEC64 \
   "%{!shared:crtend.o%s} %{shared:crtendS.o%s} /usr/lib64/crtn.o%s"
   
+#define ENDFILE_SPEC_COMMON \
+  "%{ffast-math|funsafe-math-optimizations:crtfastmath.o%s}"
+
 #ifdef SPARC_BI_ARCH
 
 #if DEFAULT_ARCH32_P
 #define ENDFILE_SPEC "\
 %{m32:" ENDFILE_SPEC32 "} \
 %{m64:" ENDFILE_SPEC64 "} \
-%{!m32:%{!m64:" ENDFILE_SPEC32 "}}"
+%{!m32:%{!m64:" ENDFILE_SPEC32 "}} " \
+ENDFILE_SPEC_COMMON
 #else
 #define ENDFILE_SPEC "\
 %{m32:" ENDFILE_SPEC32 "} \
 %{m64:" ENDFILE_SPEC64 "} \
-%{!m32:%{!m64:" ENDFILE_SPEC64 "}}"
+%{!m32:%{!m64:" ENDFILE_SPEC64 "}} " \
+ENDFILE_SPEC_COMMON
 #endif
 
 #else
 
-#define ENDFILE_SPEC ENDFILE_SPEC64
+#define ENDFILE_SPEC ENDFILE_SPEC64 " " ENDFILE_SPEC_COMMON
 
 #endif
 
@@ -143,8 +148,6 @@ Boston, MA 02111-1307, USA.  */
 
 #undef WCHAR_TYPE_SIZE
 #define WCHAR_TYPE_SIZE 32
-
-#undef MAX_WCHAR_TYPE_SIZE
 
 /* Define for support of TFmode long double and REAL_ARITHMETIC.
    Sparc ABI says that long double is 4 words.  */
@@ -325,6 +328,9 @@ do {									\
 #undef COMMON_ASM_OP
 #define COMMON_ASM_OP "\t.common\t"
 
+#undef  LOCAL_LABEL_PREFIX
+#define LOCAL_LABEL_PREFIX  "."
+
 /* This is how to output a definition of an internal numbered label where
    PREFIX is the class of label and NUM is the number within the class.  */
 
@@ -361,3 +367,9 @@ do {									\
 #define LINK_EH_SPEC "%{!static:--eh-frame-hdr} "
 #endif
 
+/* Don't be different from other Linux platforms in this regard.  */
+#define HANDLE_PRAGMA_PACK_PUSH_POP
+
+/* We use GNU ld so undefine this so that attribute((init_priority)) works.  */
+#undef CTORS_SECTION_ASM_OP
+#undef DTORS_SECTION_ASM_OP

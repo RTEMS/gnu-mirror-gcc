@@ -1151,6 +1151,14 @@ enum reg_class
    in it.  */
 #define ARG_POINTER_REGNUM R_GR(0)
 
+/* Due to the way varargs and argument spilling happens, the argument
+   pointer is not 16-byte aligned like the stack pointer.  */
+#define INIT_EXPANDERS					\
+  do {							\
+    if (cfun && cfun->emit->regno_pointer_align)	\
+      REGNO_POINTER_ALIGN (ARG_POINTER_REGNUM) = 64;	\
+  } while (0)
+
 /* The register number for the return address register.  For IA-64, this
    is not actually a pointer as the name suggests, but that's a name that
    gen_rtx_REG already takes care to keep unique.  We modify
@@ -1267,6 +1275,7 @@ enum reg_class
 typedef struct ia64_args
 {
   int words;			/* # words of arguments so far  */
+  int int_regs;			/* # GR registers used so far  */
   int fp_regs;			/* # FR registers used so far  */
   int prototype;		/* whether function prototyped  */
 } CUMULATIVE_ARGS;
@@ -1277,6 +1286,7 @@ typedef struct ia64_args
 #define INIT_CUMULATIVE_ARGS(CUM, FNTYPE, LIBNAME, INDIRECT) \
 do {									\
   (CUM).words = 0;							\
+  (CUM).int_regs = 0;							\
   (CUM).fp_regs = 0;							\
   (CUM).prototype = ((FNTYPE) && TYPE_ARG_TYPES (FNTYPE)) || (LIBNAME);	\
 } while (0)
@@ -1290,6 +1300,7 @@ do {									\
 #define INIT_CUMULATIVE_INCOMING_ARGS(CUM, FNTYPE, LIBNAME) \
 do {									\
   (CUM).words = 0;							\
+  (CUM).int_regs = 0;							\
   (CUM).fp_regs = 0;							\
   (CUM).prototype = 1;							\
 } while (0)
@@ -1403,6 +1414,10 @@ do {									\
    used by the epilogue or the `return' pattern.  */
 
 #define EPILOGUE_USES(REGNO) ia64_epilogue_uses (REGNO)
+
+/* Nonzero for registers used by the exception handling mechanism.  */
+
+#define EH_USES(REGNO) ia64_eh_uses (REGNO)
 
 /* Output at beginning of assembler file.  */
 

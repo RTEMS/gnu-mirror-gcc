@@ -2444,7 +2444,7 @@ dead_or_predicable (test_bb, merge_bb, other_bb, new_dest, reversep)
      basic_block new_dest;
      int reversep;
 {
-  rtx head, end, jump, earliest, old_dest, new_label;
+  rtx head, end, jump, earliest, old_dest, new_label = NULL_RTX;
 
   jump = test_bb->end;
 
@@ -2756,6 +2756,7 @@ if_convert (x_life_data_ok)
 	if (UPDATE_LIFE (BASIC_BLOCK (block_num)))
 	  SET_BIT (update_life_blocks, block_num);
 
+      clear_aux_for_blocks ();
       count_or_remove_death_notes (update_life_blocks, 1);
       /* ??? See about adding a mode that verifies that the initial
 	set of blocks don't let registers come live.  */
@@ -2765,7 +2766,8 @@ if_convert (x_life_data_ok)
 
       sbitmap_free (update_life_blocks);
     }
-  clear_aux_for_blocks ();
+  else
+    clear_aux_for_blocks ();
 
   /* Write the final stats.  */
   if (rtl_dump_file && num_possible_if_blocks > 0)

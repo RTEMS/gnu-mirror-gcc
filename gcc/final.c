@@ -1564,8 +1564,6 @@ final_start_function (first, file, optimize)
   if (! HAVE_prologue)
 #endif
     profile_after_prologue (file);
-
-  profile_label_no++;
 }
 
 static void
@@ -1677,6 +1675,8 @@ final_end_function ()
       && dwarf2out_do_frame ())
     dwarf2out_end_epilogue ();
 #endif
+
+  profile_label_no++;
 }
 
 /* Output assembler code for some insns: all or part of a function.
@@ -2969,7 +2969,7 @@ output_operand_lossage VPARAMS ((const char *msgid, ...))
 {
   char *fmt_string;
   char *new_message;
-  char *pfx_str;
+  const char *pfx_str;
   VA_OPEN (ap, msgid);
   VA_FIXEDARG (ap, const char *, msgid);
 
