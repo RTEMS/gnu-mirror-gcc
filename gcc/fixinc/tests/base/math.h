@@ -35,6 +35,11 @@ extern double floor(), ceil(), fmod(), fabs _PARAMS((double));
 #endif  /* FIX_HEADER_BREAKAGE_CHECK */
 
 
+#if defined( HPUX11_CPP_POW_INLINE_CHECK )
+
+#endif  /* HPUX11_CPP_POW_INLINE_CHECK */
+
+
 #if defined( HPUX11_FABSF_CHECK )
 #ifdef _PA_RISC
 #ifndef __cplusplus
@@ -97,6 +102,13 @@ typedef struct exception t_math_exception;
 extern int class();
 #endif
 #endif  /* RS6000_DOUBLE_CHECK */
+
+
+#if defined( STRICT_ANSI_NOT_CTD_CHECK )
+#if 1||  !defined(__STRICT_ANSI__) /* not std C */
+int foo;
+#endif
+#endif  /* STRICT_ANSI_NOT_CTD_CHECK */
 
 
 #if defined( SUNOS_MATHERR_DECL_CHECK )

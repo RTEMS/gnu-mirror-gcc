@@ -239,8 +239,6 @@ struct tree_common
            INTEGER_TYPE, ENUMERAL_TYPE, FIELD_DECL
        DECL_BUILT_IN_NONANSI in
            FUNCTION_DECL
-       TREE_PARMLIST in
-           TREE_PARMLIST (C++)
        SAVE_EXPR_NOPLACEHOLDER in
 	   SAVE_EXPR
 
@@ -274,7 +272,8 @@ struct tree_common
 /* The tree-code says what kind of node it is.
    Codes are defined in tree.def.  */
 #define TREE_CODE(NODE) ((enum tree_code) (NODE)->common.code)
-#define TREE_SET_CODE(NODE, VALUE) ((NODE)->common.code = (int) (VALUE))
+#define TREE_SET_CODE(NODE, VALUE) \
+((NODE)->common.code = (ENUM_BITFIELD(tree_code)) (VALUE))
 
 /* When checking is enabled, errors will be generated if a tree node
    is accessed incorrectly. The macros abort with a fatal error.  */
@@ -823,7 +822,7 @@ struct tree_exp
 #define BLOCK_SUPERCONTEXT(NODE) (BLOCK_CHECK (NODE)->block.supercontext)
 /* Note: when changing this, make sure to find the places
    that use chainon or nreverse.  */
-#define BLOCK_CHAIN(NODE) TREE_CHAIN (NODE)
+#define BLOCK_CHAIN(NODE) TREE_CHAIN (BLOCK_CHECK (NODE))
 #define BLOCK_ABSTRACT_ORIGIN(NODE) (BLOCK_CHECK (NODE)->block.abstract_origin)
 #define BLOCK_ABSTRACT(NODE) (BLOCK_CHECK (NODE)->block.abstract_flag)
 
@@ -1256,11 +1255,37 @@ struct tree_type
 /* This is the name of the object as written by the user.
    It is an IDENTIFIER_NODE.  */
 #define DECL_NAME(NODE) (DECL_CHECK (NODE)->decl.name)
-/* This is the name of the object as the assembler will see it
-   (but before any translations made by ASM_OUTPUT_LABELREF).
-   Often this is the same as DECL_NAME.
-   It is an IDENTIFIER_NODE.  */
-#define DECL_ASSEMBLER_NAME(NODE) (DECL_CHECK (NODE)->decl.assembler_name)
+/* The name of the object as the assembler will see it (but before any
+   translations made by ASM_OUTPUT_LABELREF).  Often this is the same
+   as DECL_NAME.  It is an IDENTIFIER_NODE.  */
+#define DECL_ASSEMBLER_NAME(NODE)		\
+  ((DECL_ASSEMBLER_NAME_SET_P (NODE)		\
+    ? (void) 0					\
+    : (*lang_set_decl_assembler_name) (NODE)),	\
+   DECL_CHECK (NODE)->decl.assembler_name)
+/* Returns non-zero if the DECL_ASSEMBLER_NAME for NODE has been 
+   set.  If zero, the NODE might still have a DECL_ASSEMBLER_NAME --
+   it just hasn't been set yet.  */
+#define DECL_ASSEMBLER_NAME_SET_P(NODE) \
+  (DECL_CHECK (NODE)->decl.assembler_name != NULL_TREE)
+/* Set the DECL_ASSEMBLER_NAME for NODE to NAME.  */
+#define SET_DECL_ASSEMBLER_NAME(NODE, NAME) \
+  (DECL_CHECK (NODE)->decl.assembler_name = (NAME))
+/* Copy the DECL_ASSEMBLER_NAME from DECL1 to DECL2.  Note that if
+   DECL1's DECL_ASSEMBLER_NAME has not yet been set, using this macro
+   will not cause the DECL_ASSEMBLER_NAME of either DECL to be set.
+   In other words, the semantics of using this macro, are different
+   than saying:
+     
+     SET_DECL_ASSEMBLER_NAME(DECL2, DECL_ASSEMBLER_NAME (DECL1))
+
+   which will try to set the DECL_ASSEMBLER_NAME for DECL1.  */
+#define COPY_DECL_ASSEMBLER_NAME(DECL1, DECL2)				\
+  (DECL_ASSEMBLER_NAME_SET_P (DECL1)					\
+   ? (void) SET_DECL_ASSEMBLER_NAME (DECL2, 				\
+                                     DECL_ASSEMBLER_NAME (DECL1))	\
+   : (void) 0)
+
 /* Records the section name in a section attribute.  Used to pass
    the name from decl_attributes to make_function_rtl and make_decl_rtl.  */
 #define DECL_SECTION_NAME(NODE) (DECL_CHECK (NODE)->decl.section_name)
@@ -1310,7 +1335,10 @@ struct tree_type
 /* For a FIELD_DECL in a QUAL_UNION_TYPE, records the expression, which
    if nonzero, indicates that the field occupies the type.  */
 #define DECL_QUALIFIER(NODE) (FIELD_DECL_CHECK (NODE)->decl.initial)
-/* These two fields describe where in the source code the declaration was.  */
+/* These two fields describe where in the source code the declaration
+   was.  If the declaration appears in several places (as for a C
+   function that is declared first and then defined later), this
+   information should refer to the definition.  */
 #define DECL_SOURCE_FILE(NODE) (DECL_CHECK (NODE)->decl.filename)
 #define DECL_SOURCE_LINE(NODE) (DECL_CHECK (NODE)->decl.linenum)
 /* Holds the size of the datum, in bits, as a tree expression.
@@ -1342,8 +1370,27 @@ struct tree_type
    PROMOTED_MODE is defined, the mode of this expression may not be same
    as DECL_MODE.  In that case, DECL_MODE contains the mode corresponding
    to the variable's data type, while the mode
-   of DECL_RTL is the mode actually used to contain the data.  */
-#define DECL_RTL(NODE) (DECL_CHECK (NODE)->decl.rtl)
+   of DECL_RTL is the mode actually used to contain the data.  
+
+   This value can be evaluated lazily for functions, variables with
+   static storage duration, and labels.  */
+#define DECL_RTL(NODE)					\
+  (DECL_CHECK (NODE)->decl.rtl				\
+   ? (NODE)->decl.rtl					\
+   : (make_decl_rtl (NODE, NULL), (NODE)->decl.rtl))
+/* Set the DECL_RTL for NODE to RTL.  */
+#define SET_DECL_RTL(NODE, RTL) \
+  (DECL_CHECK (NODE)->decl.rtl = (RTL))
+/* Returns non-zero if the DECL_RTL for NODE has already been set.  */
+#define DECL_RTL_SET_P(NODE) \
+  (DECL_CHECK (NODE)->decl.rtl != NULL)
+/* Copy the RTL from NODE1 to NODE2.  If the RTL was not set for
+   NODE1, it will not be set for NODE2; this is a lazy copy.  */
+#define COPY_DECL_RTL(NODE1, NODE2) \
+  (DECL_CHECK (NODE2)->decl.rtl = DECL_CHECK (NODE1)->decl.rtl)
+/* The DECL_RTL for NODE, if it is set, or NULL, if it is not set.  */
+#define DECL_RTL_IF_SET(NODE) \
+  (DECL_RTL_SET_P (NODE) ? DECL_RTL (NODE) : NULL)
 /* Holds an INSN_LIST of all of the live ranges in which the variable
    has been moved to a possibly different register.  */
 #define DECL_LIVE_RANGE_RTL(NODE) (DECL_CHECK (NODE)->decl.live_range_rtl)
@@ -1352,9 +1399,6 @@ struct tree_type
 #define DECL_INCOMING_RTL(NODE) (PARM_DECL_CHECK (NODE)->decl.u2.r)
 /* For FUNCTION_DECL, if it is inline, holds the saved insn chain.  */
 #define DECL_SAVED_INSNS(NODE) (FUNCTION_DECL_CHECK (NODE)->decl.u2.f)
-/* For FUNCTION_DECL, if it is inline,
-   holds the size of the stack frame, as an integer.  */
-#define DECL_FRAME_SIZE(NODE) (FUNCTION_DECL_CHECK (NODE)->decl.u1.i)
 /* For FUNCTION_DECL, if it is built-in,
    this identifies which built-in operation it is.  */
 #define DECL_FUNCTION_CODE(NODE) (FUNCTION_DECL_CHECK (NODE)->decl.u1.f)
@@ -1460,6 +1504,9 @@ struct tree_type
 /* Nonzero in a FUNCTION_DECL means this function can be substituted
    where it is called.  */
 #define DECL_INLINE(NODE) (FUNCTION_DECL_CHECK (NODE)->decl.inline_flag)
+
+/* In a FUNCTION_DECL, nonzero if the function cannot be inlined.  */
+#define DECL_UNINLINABLE(NODE) (FUNCTION_DECL_CHECK (NODE)->decl.uninlinable)
 
 /* Nonzero in a FUNCTION_DECL means this is a built-in function
    that is not specified by ansi C and that users are supposed to be allowed
@@ -1632,7 +1679,8 @@ struct tree_decl
   unsigned pointer_depth : 2;
   unsigned non_addressable : 1;
   unsigned user_align : 1;
-  /* Three unused bits.  */
+  unsigned uninlinable : 1;
+  /* Two unused bits.  */
 
   unsigned lang_flag_0 : 1;
   unsigned lang_flag_1 : 1;
@@ -1643,12 +1691,15 @@ struct tree_decl
   unsigned lang_flag_6 : 1;
   unsigned lang_flag_7 : 1;
 
-  /* For a FUNCTION_DECL, if inline, this is the size of frame needed.
-     If built-in, this is the code for which built-in function.
-     For other kinds of decls, this is DECL_ALIGN and DECL_OFFSET_ALIGN.  */
   union {
-    HOST_WIDE_INT i;
+    /* In a FUNCTION_DECL for which DECL_BUILT_IN holds, this is
+       DECL_FUNCTION_CODE.  */
     enum built_in_function f;
+    /* In a FUNCITON_DECL for which DECL_BUILT_IN does not hold, this
+       is used by language-dependent code.  */
+    HOST_WIDE_INT i;
+    /* DECL_ALIGN and DECL_OFFSET_ALIGN.  (These are not used for
+       FUNCTION_DECLs).  */
     struct {unsigned int align : 24; unsigned int off_align : 8;} a;
   } u1;
 
@@ -1915,6 +1966,13 @@ extern tree get_identifier		PARAMS ((const char *));
 
 extern tree maybe_get_identifier	PARAMS ((const char *));
 
+/* Look up an identifier with the name TEXT, replace its identifier
+   node with NODE, and return the old identifier node.  This is used
+   by languages which need to enable and disable keywords based on
+   context; e.g. see remember_protocol_qualifiers in objc/objc-act.c.  */
+
+extern tree set_identifier		PARAMS ((const char *, tree));
+
 /* Construct various types of nodes.  */
 
 #define build_int_2(LO,HI)  \
@@ -2016,12 +2074,14 @@ extern tree lookup_attribute		PARAMS ((const char *, tree));
 
 extern tree merge_attributes		PARAMS ((tree, tree));
 
-/* Given a type node TYPE and a TYPE_QUALIFIER_SET, return a type for
-   the same kind of data as TYPE describes.  Variants point to the
-   "main variant" (which has no qualifiers set) via TYPE_MAIN_VARIANT,
-   and it points to a chain of other variants so that duplicate
-   variants are never made.  Only main variants should ever appear as
-   types of expressions.  */
+/* Return a version of the TYPE, qualified as indicated by the
+   TYPE_QUALS, if one exists.  If no qualified version exists yet,
+   return NULL_TREE.  */
+
+extern tree get_qualified_type          PARAMS ((tree, int));
+
+/* Like get_qualified_type, but creates the type if it does not
+   exist.  This function never returns NULL_TREE.  */
 
 extern tree build_qualified_type        PARAMS ((tree, int));
 
@@ -2466,6 +2526,8 @@ extern tree get_set_constructor_bits		PARAMS ((tree, char *, int));
 extern tree get_set_constructor_bytes		PARAMS ((tree,
 						       unsigned char *, int));
 extern tree get_callee_fndecl                   PARAMS ((tree));
+extern void set_decl_assembler_name             PARAMS ((tree));
+extern int type_num_arguments                   PARAMS ((tree));
 
 /* In stmt.c */
 
@@ -2508,13 +2570,8 @@ extern void start_cleanup_deferral		PARAMS ((void));
 extern void end_cleanup_deferral		PARAMS ((void));
 extern int is_body_block			PARAMS ((tree));
 
-extern void mark_block_as_eh_region		PARAMS ((void));
-extern void mark_block_as_not_eh_region		PARAMS ((void));
-extern int is_eh_region				PARAMS ((void));
 extern int conditional_context			PARAMS ((void));
 extern tree last_cleanup_this_contour		PARAMS ((void));
-extern int expand_dhc_cleanup			PARAMS ((tree));
-extern int expand_dcc_cleanup			PARAMS ((tree));
 extern void expand_start_case			PARAMS ((int, tree, tree,
 						       const char *));
 extern void expand_end_case			PARAMS ((tree));
@@ -2635,6 +2692,13 @@ extern int objects_must_conflict_p		PARAMS ((tree, tree));
 /* In c-common.c */
 extern HOST_WIDE_INT lang_get_alias_set		PARAMS ((tree));
 
+/* Set the DECL_ASSEMBLER_NAME for a node.  If it is the sort of thing
+   that the assembler should talk about, set DECL_ASSEMBLER_NAME to an
+   appropriate IDENTIFIER_NODE.  Otherwise, set it to the
+   ERROR_MARK_NODE to ensure that the assembler does not talk about
+   it.  */
+extern void (*lang_set_decl_assembler_name)     PARAMS ((tree));
+
 struct obstack;
 
 /* In tree.c */
@@ -2666,6 +2730,7 @@ extern void print_obstack_name		PARAMS ((char *, FILE *,
 #endif
 extern void expand_function_end		PARAMS ((const char *, int, int));
 extern void expand_function_start	PARAMS ((tree, int));
+extern void expand_pending_sizes        PARAMS ((tree));
 
 extern int real_onep			PARAMS ((tree));
 extern int real_twop			PARAMS ((tree));
@@ -2796,6 +2861,9 @@ extern int div_and_round_double		PARAMS ((enum tree_code, int,
 extern void emit_nop			PARAMS ((void));
 extern void expand_computed_goto	PARAMS ((tree));
 extern struct rtx_def *label_rtx	PARAMS ((tree));
+extern bool parse_output_constraint     PARAMS ((const char **,
+						 int, int, int,
+						 bool *, bool *, bool *));
 extern void expand_asm_operands		PARAMS ((tree, tree, tree, tree, int,
 						 const char *, int));
 extern int any_pending_cleanups		PARAMS ((int));

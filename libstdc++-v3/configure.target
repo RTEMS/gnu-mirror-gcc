@@ -16,17 +16,8 @@
 #   target_optspace       --enable-target-optspace ("yes", "no", "")
 
 # It possibly modifies the following shell variables:
-#   glibcpp_cflags         Special CFLAGS to use when building
-#   glibcpp_cxxflags       Special CXXFLAGS to use when building
 #   cpu_include_dir        CPU-specific include directory, relative to srcdir
 #   os_include_dir         OS-specific include directory, relative to srcdir
-# The first two are set in configure.host and modified here.
-
-
-# These are "local" and should be set in the switch statements below.  They
-# will be appended to their real conterparts once the dust settles.
-l_glibcpp_cflags=
-l_glibcpp_cxxflags=
 
 
 # Set any CPU dependent compiler flags.
@@ -47,6 +38,9 @@ case "${target_cpu}" in
     ;;
   i486 | i586 | i686 | i786)
     cpu_include_dir="config/cpu/i486"
+    ;;
+  mips*)
+    cpu_include_dir="config/cpu/mips"
     ;;
   powerpc | rs6000)
     cpu_include_dir="config/cpu/powerpc"
@@ -69,17 +63,6 @@ esac
 case "${target_os}" in
   aix4.[3456789]* | aix[56789]*)
     os_include_dir="config/os/aix"
-    case "$CXX" in
-      *pthread*)
-        enable_threads='posix'
-        ;;
-      *)
-        enable_threads='no'
-        ;;
-    esac
-    ;;
-  aix*)
-    os_include_dir="config/os/aix"
     ;;
   bsd* | freebsd* )
     os_include_dir="config/os/bsd/freebsd"
@@ -93,8 +76,12 @@ case "${target_os}" in
   linux* | gnu*)
     os_include_dir="config/os/gnu-linux"
     ;;
-  irix*)
-    os_include_dir="config/os/irix"
+  irix[1-6] | irix[1-5].* | irix6.[0-4])
+   # This is known to work on at least IRIX 5.2 and 6.3.
+   os_include_dir="config/os/irix/irix5.2"
+   ;;
+  irix6.5)
+    os_include_dir="config/os/irix/irix6.5"
     ;;
   netbsd*)
     os_include_dir="config/os/bsd/netbsd"
@@ -121,8 +108,15 @@ esac
 # THIS TABLE IS SORTED.  KEEP IT THAT WAY.
 
 case "${target}" in
+   *-*-aix[456789]*)
+     # We set os_include_dir to config/os/aix only on AIX 4.3 and
+     # newer, but config/os/aix/bits/atomicity.h works on earlier
+     # versions of AIX 4.*, so we explicitly duplicate the directory
+     # here, because os_include_dir.
+     ATOMICITYH=config/os/aix
+     ;;
    *-*-aix*)
-     ATOMICITYH=$os_include_dir
+     ATOMICITYH=config/cpu/generic
      ;;
    *-*-irix*)
      ATOMICITYH=$os_include_dir
@@ -131,11 +125,16 @@ case "${target}" in
      ATOMICITYH=$cpu_include_dir
      ;;
 esac
-    
 
-# Okay, folks, show's over.  Move along, move along.
+# Set LIMITSH to the directory where the configuration-dependent
+# limits.h can be found.
+# THIS TABLE IS SORTED.  KEEP IT THAT WAY.
 
-glibcpp_cflags="${glibcpp_cflags} ${libgcj_flags} ${l_glibcpp_cflags}"
-glibcpp_cxxflags="${glibcpp_cxxflags} ${libgcj_flags} ${l_glibcpp_cxxflags}"
-
-
+case "${target}" in
+   i?86-*-*)
+     LIMITSH=config/cpu/i386
+     ;;
+   *)
+     LIMITSH=config/cpu/generic
+     ;;
+esac
