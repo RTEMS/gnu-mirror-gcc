@@ -1,5 +1,5 @@
 /* FileDialog.java -- A filename selection dialog box
-   Copyright (C) 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2001, 2002, 2004  Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -39,8 +39,8 @@ exception statement from your version. */
 package java.awt;
 
 import java.awt.peer.FileDialogPeer;
-import java.awt.peer.DialogPeer;
 import java.io.FilenameFilter;
+import java.io.Serializable;
 
 /**
   * This class implements a file selection dialog box widget.
@@ -48,7 +48,7 @@ import java.io.FilenameFilter;
   * @author Aaron M. Renn (arenn@urbanophile.com)
   * @author Tom Tromey <tromey@redhat.com>
   */
-public class FileDialog extends Dialog implements java.io.Serializable
+public class FileDialog extends Dialog implements Serializable
 {
 
 /*
@@ -261,7 +261,7 @@ setFile(String file)
 /**
   * Returns the filename filter being used by this dialog.
   *
-  * @param The filename filter being used by this dialog.
+  * @return The filename filter being used by this dialog.
   */
 public FilenameFilter
 getFilenameFilter()

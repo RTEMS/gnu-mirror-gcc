@@ -1,5 +1,5 @@
-/* PlainDocument.java -- 
-   Copyright (C) 2002 Free Software Foundation, Inc.
+/* PlainDocument.java --
+   Copyright (C) 2002, 2004  Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -37,22 +37,86 @@ exception statement from your version. */
 
 package javax.swing.text;
 
+import java.util.ArrayList;
 
 public class PlainDocument extends AbstractDocument
 {
-    PlainDocument()
-    {
-	super(new GapContent());
-    }
+  private static final long serialVersionUID = 4758290289196893664L;
+    
+  public static final String lineLimitAttribute = "lineLimit";
+  public static final String tabSizeAttribute = "tabSize";
 
-    public Element getDefaultRootElement()
-    {
-	return null;
-    }
+  private Element rootElement;
+  private int tabSize;
+  
+  public PlainDocument()
+  {
+    this(new GapContent());
+  }
 
-    public Element getParagraphElement(int  pos)
-    {
-	return null;
-    }
+  public PlainDocument(AbstractDocument.Content content)
+  {
+    super(content);
+    tabSize = 8;
+    rootElement = createDefaultRoot();
+  }
+
+  protected void reindex()
+  {
+    Element[] lines;
+    try 
+      {
+        String str = content.getString(0, content.length());
+
+        ArrayList elts = new ArrayList();
+        int j = 0;
+        for (int i = str.indexOf('\n', 0); i != -1; i = str.indexOf('\n', i+1))
+          {
+            elts.add(createLeafElement(rootElement, null, j, i));
+            j = i;
+          }
+        
+        if (j < content.length())
+          elts.add(createLeafElement(rootElement, null, j, content.length()));
+        
+        lines = new Element[elts.size()];
+        for (int i = 0; i < elts.size(); ++i)
+          lines[i] = (Element) elts.get(i);
+        
+      }
+    catch (BadLocationException e)
+      {
+        lines = new Element[1];
+        lines[0] = createLeafElement(rootElement, null, 0, 1);
+      }
+
+    ((BranchElement) rootElement).replace(0, rootElement.getElementCount(), lines);
+  }
+
+  protected AbstractDocument.AbstractElement createDefaultRoot()
+  {
+    rootElement = createBranchElement(null, null);
+    reindex();
+    return (AbstractElement) rootElement;
+  }
+
+  protected void insertUpdate(DefaultDocumentEvent chng, AttributeSet attr)
+  {
+    reindex();
+  }
+
+  protected void removeUpdate(DefaultDocumentEvent chng)
+  {
+    reindex();
+  }
+
+  public Element getDefaultRootElement()
+  {
+    return rootElement;
+  }
+
+  public Element getParagraphElement(int pos)
+  {
+    return null;
+  }
 }
-

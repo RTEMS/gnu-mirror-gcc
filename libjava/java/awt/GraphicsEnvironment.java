@@ -1,5 +1,5 @@
 /* GraphicsEnvironment.java -- information about the graphics environment
-   Copyright (C) 2002 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2004  Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -38,6 +38,8 @@ exception statement from your version. */
 
 package java.awt;
 
+import gnu.java.awt.ClasspathToolkit;
+
 import java.awt.image.BufferedImage;
 import java.util.Locale;
 
@@ -46,7 +48,7 @@ import java.util.Locale;
  * on a given platform. The resources might be local or remote, and specify
  * the valid configurations for displaying graphics.
  *
- * @author Eric Blake <ebb9@email.byu.edu>
+ * @author Eric Blake (ebb9@email.byu.edu)
  * @see GraphicsDevice
  * @see GraphicsConfiguration
  * @since 1.4
@@ -70,7 +72,9 @@ public abstract class GraphicsEnvironment
    */
   public static GraphicsEnvironment getLocalGraphicsEnvironment()
   {
-    throw new Error("not implemented");
+    ClasspathToolkit tk;
+    tk = ((ClasspathToolkit) Toolkit.getDefaultToolkit ());
+    return tk.getLocalGraphicsEnvironment ();
   }
 
   /**

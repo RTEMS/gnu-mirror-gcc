@@ -36,14 +36,15 @@ this exception to your version of the library, but you are not
 obligated to do so.  If you do not wish to do so, delete this
 exception statement from your version. */
 
+
 package javax.swing;
 
 import java.io.Serializable;
 import java.util.EventListener;
+
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.swing.event.EventListenerList;
-
 
 /**
  * A default implementation of BoundedRangeModel.
@@ -203,7 +204,7 @@ public class DefaultBoundedRangeModel
    * Changes the current value of this bounded range model. In a
    * scroll bar visualization of a {@link BoundedRangeModel}, the
    * <code>value</code> is displayed as the position of the thumb;
-   * changing the <code>value</code> of a scroll bar&#x2019;s model
+   * changing the <code>value</code> of a scroll bar's model
    * thus moves the thumb to a different position.
    */
   public void setValue(int value)

@@ -1,4 +1,5 @@
-/* Copyright (C) 2000, 2002  Free Software Foundation
+/* ComponentColorModel.java --
+   Copyright (C) 2000, 2002, 2004  Free Software Foundation
 
 This file is part of GNU Classpath.
 
@@ -37,9 +38,10 @@ exception statement from your version. */
 
 package java.awt.image;
 
+import gnu.java.awt.Buffers;
+
 import java.awt.Point;
 import java.awt.color.ColorSpace;
-import gnu.java.awt.Buffers;
 
 public class ComponentColorModel extends ColorModel
 {
@@ -58,6 +60,32 @@ public class ComponentColorModel extends ColorModel
   {
     super(sum(bits), bits, colorSpace, hasAlpha, isAlphaPremultiplied,
 	  transparency, transferType);
+  }
+
+  /**
+   * Construct a new ComponentColorModel.
+   * 
+   * This constructor makes all bits of each sample significant, so for a
+   * transferType of DataBuffer.BYTE, the bits per sample is 8, etc.  If
+   * both hasAlpha and isAlphaPremultiplied are true, color samples are
+   * assumed to be premultiplied by the alpha component.  Transparency may be
+   * one of OPAQUE, BITMASK, or TRANSLUCENT. 
+   * 
+   * @param colorSpace The colorspace for this color model.
+   * @param hasAlpha True if there is an alpha component.
+   * @param isAlphaPremultiplied True if colors are already multiplied by
+   * alpha.
+   * @param transparency The type of alpha values.
+   * @param transferType Data type of pixel sample values.
+   * @since 1.4
+   */
+  public ComponentColorModel(ColorSpace colorSpace,
+			     boolean hasAlpha,
+			     boolean isAlphaPremultiplied,
+			     int transparency, int transferType)
+  {	
+    this(colorSpace, null, hasAlpha, isAlphaPremultiplied,
+         transparency, transferType);
   }
 
   public int getRed(int pixel)
@@ -95,12 +123,6 @@ public class ComponentColorModel extends ColorModel
   }
 
 
-  /* FIXME: Is the values returned from toRGB() in the [0.0, 1.0] or the
-     [0.0, 256) range? 
-     
-     we assume it is in the [0.0, 1.0] range along with the
-     other color spaces. */
-  
   /* Note, it's OK to pass a to large array to toRGB(). Extra
      elements are ignored. */
   
@@ -292,18 +314,55 @@ public class ComponentColorModel extends ColorModel
     return Raster.createWritableRaster(sm, origin);
   }
 
+
+  /**
+   * Creates a <code>SampleModel</code> whose arrangement of pixel
+   * data is compatible to this <code>ColorModel</code>.
+   *
+   * @param w the number of pixels in the horizontal direction.
+   * @param h the number of pixels in the vertical direction.
+   */
   public SampleModel createCompatibleSampleModel(int w, int h)
   {
-    int pixelStride = getNumComponents();
-    
-    /* TODO: Maybe we don't need to create a new offset array each
-       time, but rather use the same array every time. */
-    int[] bandOffsets = new int[pixelStride];
-    for (int i=0; i<pixelStride; i++) bandOffsets[i] = i;
-    return new ComponentSampleModel(transferType, w, h,
-				    pixelStride, pixelStride*w,
-				    bandOffsets);
+    int pixelStride, scanlineStride;
+    int[] bandOffsets;
+
+    pixelStride = getNumComponents();
+    scanlineStride = pixelStride * w;
+
+    /* We might be able to re-use the same bandOffsets array among
+     * multiple calls to this method. However, this optimization does
+     * not seem worthwile because setting up descriptive data
+     * structures (such as SampleModels) is neglectible in comparision
+     * to shuffling around masses of pixel data.
+     */
+    bandOffsets = new int[pixelStride];
+    for (int i = 0; i < pixelStride; i++)
+      bandOffsets[i] = i;
+
+    /* FIXME: Think about whether it would make sense to return the
+     * possibly more efficient PixelInterleavedSampleModel for other
+     * transferTypes as well. It seems unlikely that this would break
+     * any user applications, so the Mauve tests on this method
+     * might be too restrictive.
+     */
+    switch (transferType)
+      {
+      case DataBuffer.TYPE_BYTE:
+      case DataBuffer.TYPE_USHORT:
+        return new PixelInterleavedSampleModel(transferType, w, h,
+                                               pixelStride,
+                                               scanlineStride,
+                                               bandOffsets);
+
+      default:
+        return new ComponentSampleModel(transferType, w, h,
+                                        pixelStride,
+                                        scanlineStride,
+                                        bandOffsets);
+      }
   }
+
 
   public boolean isCompatibleSampleModel(SampleModel sm)
   {

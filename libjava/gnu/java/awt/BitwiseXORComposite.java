@@ -1,5 +1,5 @@
 /* BitwiseXORComposite.java -- Composite for emulating old-style XOR.
-   Copyright (C) 2003 Free Software Foundation, Inc.
+   Copyright (C) 2003, 2004  Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -41,7 +41,6 @@ package gnu.java.awt;
 import java.awt.Color;
 import java.awt.Composite;
 import java.awt.CompositeContext;
-import java.awt.Graphics;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.image.ColorModel;
@@ -232,7 +231,7 @@ public class BitwiseXORComposite
                         WritableRaster dstOut)
     {
       int aX, bX, dstX, aY, bY, dstY, width, height;
-      int xorPixel, transferType;
+      int xorPixel;
       int[] srcLine, dstLine;
 
       aX = src.getMinX();

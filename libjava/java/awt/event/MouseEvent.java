@@ -1,5 +1,5 @@
 /* MouseEvent.java -- a mouse event
-   Copyright (C) 1999, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2002, 2004  Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -38,11 +38,12 @@ exception statement from your version. */
 
 package java.awt.event;
 
+import gnu.java.awt.EventModifier;
+
 import java.awt.Component;
 import java.awt.Point;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import gnu.java.awt.EventModifier;
 
 /**
  * This event is generated for a mouse event. There are three main categories
@@ -220,11 +221,11 @@ public class MouseEvent extends InputEvent
     if ((modifiers & EventModifier.OLD_MASK) != 0)
       {
         if ((modifiers & BUTTON1_MASK) != 0)
-          button = BUTTON1;
+          this.button = BUTTON1;
         else if ((modifiers & BUTTON2_MASK) != 0)
-          button = BUTTON2;
+          this.button = BUTTON2;
         else if ((modifiers & BUTTON3_MASK) != 0)
-          button = BUTTON3;
+          this.button = BUTTON3;
       }
   }
 

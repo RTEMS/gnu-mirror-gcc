@@ -39,6 +39,7 @@ exception statement from your version. */
 package gnu.java.awt.peer.gtk;
 
 import java.awt.Adjustable;
+import java.awt.Dimension;
 import java.awt.ScrollPane;
 import java.awt.peer.ComponentPeer;
 import java.awt.peer.ScrollPanePeer;
@@ -53,7 +54,7 @@ public class GtkScrollPanePeer extends GtkContainerPeer
     create (awtComponent.getWidth (), awtComponent.getHeight ());
   }
 
-  native void gtkScrolledWindowSetScrollPosition(int x, int y);
+  // native void gtkScrolledWindowSetScrollPosition(int x, int y);
   native void gtkScrolledWindowSetHScrollIncrement (int u);
   native void gtkScrolledWindowSetVScrollIncrement (int u);
 
@@ -87,10 +88,10 @@ public class GtkScrollPanePeer extends GtkContainerPeer
   native public int getVScrollbarWidth ();
   native public void setScrollPosition (int x, int y);
 
-//    public Dimension getPreferredSize ()
-//    {
-//      return new Dimension (60, 60);
-//    }
+  public Dimension getPreferredSize ()
+  {
+    return awtComponent.getSize();
+  }
 
   public void setUnitIncrement (Adjustable adj, int u)
   {

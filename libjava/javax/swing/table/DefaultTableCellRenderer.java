@@ -1,4 +1,4 @@
-/* DefaultTableCellRenderer.java
+/* DefaultTableCellRenderer.java --
    Copyright (C) 2002, 2004 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
@@ -35,12 +35,14 @@ this exception to your version of the library, but you are not
 obligated to do so.  If you do not wish to do so, delete this
 exception statement from your version. */
 
+
 package javax.swing.table;
 
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Rectangle;
 import java.io.Serializable;
+
 import javax.swing.JLabel;
 import javax.swing.JTable;
 import javax.swing.border.Border;
@@ -54,7 +56,7 @@ public class DefaultTableCellRenderer extends JLabel
 {
   static final long serialVersionUID = 7878911414715528324L;
 
-  protected static Border noFocusBorder;
+  protected static Border noFocusBorder = new EmptyBorder(0, 0, 0, 0);
 
   public static class UIResource extends DefaultTableCellRenderer
     implements javax.swing.plaf.UIResource
@@ -70,7 +72,6 @@ public class DefaultTableCellRenderer extends JLabel
   public DefaultTableCellRenderer()
   {
     super();
-    this.noFocusBorder = new EmptyBorder(0, 0, 0, 0);
   }
 
   /**
@@ -123,8 +124,22 @@ public class DefaultTableCellRenderer extends JLabel
   {
     if (value!=null)
       super.setText(value.toString());
-    
-    return this;
+
+    setOpaque(true);
+    if (isSelected)
+      {
+        setBackground(table.getSelectionBackground());
+        setForeground(table.getSelectionForeground());
+      }
+    else
+      {
+        setBackground(table.getBackground());
+        setForeground(table.getForeground());
+      }
+
+    setEnabled(table.isEnabled());
+    setFont(table.getFont());
+    return this;    
   }
 
   /**
@@ -147,6 +162,11 @@ public class DefaultTableCellRenderer extends JLabel
    * do something.</p>
    */
   public void validate()
+  {
+    // Does nothing.
+  }
+
+  public void revalidate()
   {
     // Does nothing.
   }

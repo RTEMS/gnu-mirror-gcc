@@ -155,12 +155,15 @@ public class EventQueue
   /**
    * Posts a new event to the queue.
    *
-   * @param event The event to post to the queue.
+   * @param evt The event to post to the queue.
    *
    * @exception NullPointerException If event is null.
    */
   public synchronized void postEvent(AWTEvent evt)
   {
+    if (evt == null)
+      throw new NullPointerException();
+
     if (next != null)
       {
         next.postEvent(evt);
