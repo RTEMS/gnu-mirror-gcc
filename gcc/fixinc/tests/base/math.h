@@ -7,12 +7,12 @@
     This had to be done to correct non-standard usages in the
     original, manufacturer supplied header file.  */
 
-#ifndef FIXINC_SUNOS_MATHERR_DECL_CHECK
-#define FIXINC_SUNOS_MATHERR_DECL_CHECK 1
+#ifndef FIXINC_WRAP_MATH_H_SUNOS_MATHERR_DECL
+#define FIXINC_WRAP_MATH_H_SUNOS_MATHERR_DECL 1
 
 struct exception;
-#ifndef FIXINC_MATH_EXCEPTION_CHECK
-#define FIXINC_MATH_EXCEPTION_CHECK 1
+#ifndef FIXINC_WRAP_MATH_H_MATH_EXCEPTION
+#define FIXINC_WRAP_MATH_H_MATH_EXCEPTION 1
 
 #ifdef __cplusplus
 #define exception __math_exception
@@ -104,6 +104,21 @@ extern int class();
 #endif  /* RS6000_DOUBLE_CHECK */
 
 
+#if defined( SCO_MATH_CHECK )
+#ifndef __GNUC__
+#define __fp_class(a) \
+ __builtin_generic(a,"ld:__fplcassifyl;f:__fpclassifyf;:__fpclassify")
+#else
+#define __fp_class(a) \
+  __builtin_choose_expr(__builtin_types_compatible_p(typeof(a),long double),\
+   __fpclassifyl(a), \
+    __builtin_choose_expr(__builtin_types_compatible_p(typeof(a), float), \
+      __fpclassifyf(a),__fpclassify(a)))
+#endif
+
+#endif  /* SCO_MATH_CHECK */
+
+
 #if defined( STRICT_ANSI_NOT_CTD_CHECK )
 #if 1 && \
 && defined(mumbling) |& ( !defined(__STRICT_ANSI__)) \
@@ -144,6 +159,6 @@ extern double atof(const char *__nptr);
 #undef exception
 #endif
 
-#endif  /* FIXINC_MATH_EXCEPTION_CHECK */
+#endif  /* FIXINC_WRAP_MATH_H_MATH_EXCEPTION */
 
-#endif  /* FIXINC_SUNOS_MATHERR_DECL_CHECK */
+#endif  /* FIXINC_WRAP_MATH_H_SUNOS_MATHERR_DECL */
