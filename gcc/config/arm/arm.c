@@ -67,7 +67,6 @@ static void      arm_add_gc_roots 		PARAMS ((void));
 static int       arm_gen_constant		PARAMS ((enum rtx_code, Mmode, Hint, rtx, rtx, int, int));
 static unsigned  bit_count 			PARAMS ((Ulong));
 static int       const_ok_for_op 		PARAMS ((Hint, enum rtx_code));
-static int       eliminate_lr2ip		PARAMS ((rtx *));
 static rtx	 emit_multi_reg_push		PARAMS ((int));
 static rtx	 emit_sfm			PARAMS ((int, int));
 #ifndef AOF_ASSEMBLER
@@ -276,7 +275,10 @@ int arm_ld_sched = 0;
 int arm_is_strong = 0;
 
 /* Nonzero if this chip is an XScale.  */
-int arm_is_xscale = 0;
+int arm_arch_xscale = 0;
+
+/* Nonzero if tuning for XScale  */
+int arm_tune_xscale = 0;
 
 /* Nonzero if this chip is an ARM6 or an ARM7.  */
 int arm_is_6_or_7 = 0;
@@ -685,13 +687,14 @@ arm_override_options ()
   arm_arch4         = (insn_flags & FL_ARCH4) != 0;
   arm_arch5         = (insn_flags & FL_ARCH5) != 0;
   arm_arch5e        = (insn_flags & FL_ARCH5E) != 0;
-  arm_is_xscale     = (insn_flags & FL_XSCALE) != 0;
+  arm_arch_xscale   = (insn_flags & FL_XSCALE) != 0;
 
   arm_ld_sched      = (tune_flags & FL_LDSCHED) != 0;
   arm_is_strong     = (tune_flags & FL_STRONG) != 0;
   thumb_code	    = (TARGET_ARM == 0);
   arm_is_6_or_7     = (((tune_flags & (FL_MODE26 | FL_MODE32))
 		       && !(tune_flags & FL_ARCH4))) != 0;
+  arm_tune_xscale   = (tune_flags & FL_XSCALE) != 0;
 
   /* Default value for floating point code... if no co-processor
      bus, then schedule for emulated floating point.  Otherwise,
@@ -763,7 +766,7 @@ arm_override_options ()
   if (optimize_size || (tune_flags & FL_LDSCHED))
     arm_constant_limit = 1;
   
-  if (arm_is_xscale)
+  if (arm_arch_xscale)
     arm_constant_limit = 2;
 
   /* If optimizing for size, bump the number of instructions that we
@@ -920,6 +923,10 @@ use_return_insn (iscond)
   /* Naked functions and volatile functions need special
      consideration.  */
   if (func_type & (ARM_FT_VOLATILE | ARM_FT_NAKED))
+    return 0;
+
+  /* So do interrupt functions that use the frame pointer.  */
+  if (IS_INTERRUPT (func_type) && frame_pointer_needed)
     return 0;
   
   /* As do variadic functions.  */
@@ -2944,7 +2951,7 @@ arm_adjust_cost (insn, link, dep, cost)
 
   /* Some true dependencies can have a higher cost depending
      on precisely how certain input operands are used.  */
-  if (arm_is_xscale
+  if (arm_tune_xscale
       && REG_NOTE_KIND (link) == 0
       && recog_memoized (insn) < 0
       && recog_memoized (dep) < 0)
@@ -3775,6 +3782,12 @@ adjacent_mem_locations (a, b)
       else
 	reg1 = REGNO (XEXP (b, 0));
 
+      /* Don't accept any offset that will require multiple instructions to handle,
+	 since this would cause the arith_adjacentmem pattern to output an overlong
+	 sequence.  */
+      if (!const_ok_for_op (PLUS, val0) || !const_ok_for_op (PLUS, val1))
+	return 0;
+      
       return (reg0 == reg1) && ((val1 - val0) == 4 || (val0 - val1) == 4);
     }
   return 0;
@@ -4385,7 +4398,7 @@ arm_gen_load_multiple (base_regno, count, from, up, write_back, unchanging_p,
 
      As a compromise, we use ldr for counts of 1 or 2 regs, and ldm
      for counts of 3 or 4 regs.  */
-  if (arm_is_xscale && count <= 2 && ! optimize_size)
+  if (arm_tune_xscale && count <= 2 && ! optimize_size)
     {
       rtx seq;
       
@@ -4452,7 +4465,7 @@ arm_gen_store_multiple (base_regno, count, to, up, write_back, unchanging_p,
 
   /* See arm_gen_load_multiple for discussion of
      the pros/cons of ldm/stm usage for XScale.  */
-  if (arm_is_xscale && count <= 2 && ! optimize_size)
+  if (arm_tune_xscale && count <= 2 && ! optimize_size)
     {
       rtx seq;
       
@@ -5053,7 +5066,14 @@ arm_reload_in_hi (operands)
 	}
     }
 
-  scratch = gen_rtx_REG (SImode, REGNO (operands[2]));
+  /* Operands[2] may overlap operands[0] (though it won't overlap
+     operands[1]), that's why we asked for a DImode reg -- so we can
+     use the bit that does not overlap.  */
+  if (REGNO (operands[2]) == REGNO (operands[0]))
+    scratch = gen_rtx_REG (SImode, REGNO (operands[2]) + 1);
+  else
+    scratch = gen_rtx_REG (SImode, REGNO (operands[2]));
+
   emit_insn (gen_zero_extendqisi2 (scratch,
 				   gen_rtx_MEM (QImode,
 						plus_constant (base,
@@ -6419,56 +6439,26 @@ output_call (operands)
   return "";
 }
 
-static int
-eliminate_lr2ip (x)
-     rtx * x;
-{
-  int something_changed = 0;
-  rtx x0 = * x;
-  int code = GET_CODE (x0);
-  int i, j;
-  const char * fmt;
-  
-  switch (code)
-    {
-    case REG:
-      if (REGNO (x0) == LR_REGNUM)
-        {
-	  *x = gen_rtx_REG (SImode, IP_REGNUM);
-	  return 1;
-        }
-      return 0;
-    default:
-      /* Scan through the sub-elements and change any references there.  */
-      fmt = GET_RTX_FORMAT (code);
-      
-      for (i = GET_RTX_LENGTH (code) - 1; i >= 0; i--)
-	if (fmt[i] == 'e')
-	  something_changed |= eliminate_lr2ip (&XEXP (x0, i));
-	else if (fmt[i] == 'E')
-	  for (j = 0; j < XVECLEN (x0, i); j++)
-	    something_changed |= eliminate_lr2ip (&XVECEXP (x0, i, j));
-      
-      return something_changed;
-    }
-}
-  
 /* Output a 'call' insn that is a reference in memory.  */
 
 const char *
 output_call_mem (operands)
      rtx * operands;
 {
-  operands[0] = copy_rtx (operands[0]); /* Be ultra careful.  */
-  /* Handle calls using lr by using ip (which may be clobbered in subr anyway).  */
-  if (eliminate_lr2ip (&operands[0]))
-    output_asm_insn ("mov%?\t%|ip, %|lr", operands);
-
   if (TARGET_INTERWORK)
     {
       output_asm_insn ("ldr%?\t%|ip, %0", operands);
       output_asm_insn ("mov%?\t%|lr, %|pc", operands);
       output_asm_insn ("bx%?\t%|ip", operands);
+    }
+  else if (regno_use_in (LR_REGNUM, operands[0]))
+    {
+      /* LR is used in the memory address.  We load the address in the
+	 first instruction.  It's safe to use IP as the target of the
+	 load since the call will kill it anyway.  */
+      output_asm_insn ("ldr%?\t%|ip, %0", operands);
+      output_asm_insn ("mov%?\t%|lr, %|pc", operands);
+      output_asm_insn ("mov%?\t%|pc, %|ip", operands);
     }
   else
     {
@@ -6763,7 +6753,7 @@ output_move_double (operands)
                 }
               else
                 {
-		  otherops[1] = adjust_address (operands[1], VOIDmode, 4);
+		  otherops[1] = adjust_address (operands[1], SImode, 4);
 		  /* Take care of overlapping base/data reg.  */
 		  if (reg_mentioned_p (operands[0], operands[1]))
 		    {
@@ -6829,7 +6819,7 @@ output_move_double (operands)
 	  /* Fall through */
 
         default:
-	  otherops[0] = adjust_address (operands[0], VOIDmode, 4);
+	  otherops[0] = adjust_address (operands[0], SImode, 4);
 	  otherops[1] = gen_rtx_REG (SImode, 1 + REGNO (operands[1]));
 	  output_asm_insn ("str%?\t%1, %0", operands);
 	  output_asm_insn ("str%?\t%1, %0", otherops);
@@ -7710,7 +7700,7 @@ arm_output_epilogue (really_return)
       if (IS_INTERRUPT (func_type))
 	/* Interrupt handlers will have pushed the
 	   IP onto the stack, so restore it now.  */
-	print_multi_reg (f, "ldmfd\t%r", SP_REGNUM, 1 << IP_REGNUM);
+	print_multi_reg (f, "ldmfd\t%r!", SP_REGNUM, 1 << IP_REGNUM);
     }
   else
     {
@@ -7841,7 +7831,7 @@ arm_output_epilogue (really_return)
 
     default:
       if (frame_pointer_needed)
-	/* If we used the frame pointer then the return adddress
+	/* If we used the frame pointer then the return address
 	   will have been loaded off the stack directly into the
 	   PC, so there is no need to issue a MOV instruction
 	   here.  */
@@ -8149,10 +8139,14 @@ arm_compute_initial_elimination_offset (from, to)
 	  reg_mask = reg_mask & ~ (reg_mask & - reg_mask);
 	}
 
-      if (regs_ever_live[LR_REGNUM]
-	  /* If a stack frame is going to be created, the LR will
-	     be saved as part of that, so we do not need to allow
-	     for it here.  */
+      if ((regs_ever_live[LR_REGNUM]
+	   /* If optimizing for size, then we save the link register if
+	      any other integer register is saved.  This gives a smaller
+	      return sequence.  */
+	   || (optimize_size && call_saved_registers > 0))
+	  /* But if a stack frame is going to be created, the LR will
+	     be saved as part of that, so we do not need to allow for
+	     it here.  */
 	  && ! frame_pointer_needed)
 	call_saved_registers += 4;
 
@@ -8456,18 +8450,19 @@ arm_expand_prologue ()
       RTX_FRAME_RELATED_P (insn) = 1;
     }
 
-  /* If this is an interrupt service routine, and the link register is
-     going to be pushed, subtracting four now will mean that the
-     function return can be done with a single instruction.  */
+  /* If this is an interrupt service routine, and the link register
+     is going to be pushed, and we are not creating a stack frame,
+     (which would involve an extra push of IP and a pop in the epilogue)
+     subtracting four from LR now will mean that the function return
+     can be done with a single instruction.  */
   if ((func_type == ARM_FT_ISR || func_type == ARM_FT_FIQ)
-      && (live_regs_mask & (1 << LR_REGNUM)) != 0)
-    {
-      emit_insn (gen_rtx_SET (SImode, 
-			      gen_rtx_REG (SImode, LR_REGNUM),
-			      gen_rtx_PLUS (SImode,
-				    gen_rtx_REG (SImode, LR_REGNUM),
-				    GEN_INT (-4))));
-    }
+      && (live_regs_mask & (1 << LR_REGNUM)) != 0
+      && ! frame_pointer_needed)
+    emit_insn (gen_rtx_SET (SImode, 
+			    gen_rtx_REG (SImode, LR_REGNUM),
+			    gen_rtx_PLUS (SImode,
+					  gen_rtx_REG (SImode, LR_REGNUM),
+					  GEN_INT (-4))));
 
   if (live_regs_mask)
     {
