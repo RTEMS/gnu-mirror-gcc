@@ -2,7 +2,7 @@
 @c %**start of header
 @setfilename g77.info
 
-@set last-update 1999-05-13
+@set last-update 1999-05-28
 @set copyrights-g77 1995-1999
 
 @include root.texi
@@ -1471,7 +1471,7 @@ by type.  Explanations are in the following sections.
 -falias-check  -fargument-alias
 -fargument-noalias  -fno-argument-noalias-global
 -fno-globals  -fflatten-arrays
--fsubscript-check  -ff2c-subscript-check
+-fbounds-check  -ffortran-bounds-check
 @end smallexample
 @end table
 
@@ -3386,10 +3386,10 @@ It is intended for use only by @code{g77} developers,
 to evaluate code-generation issues.
 It might be removed at any time.
 
-@cindex -fsubscript-check option
-@cindex -ff2c-subscript-check option
-@item -fsubscript-check
-@itemx -ff2c-subscript-check
+@cindex -fbounds-check option
+@cindex -ffortran-bounds-check option
+@item -fbounds-check
+@itemx -ffortran-bounds-check
 @cindex bounds checking
 @cindex range checking
 @cindex array bounds checking
@@ -3414,12 +3414,12 @@ such as references to below the beginning of an assumed-size array.
 @code{g77} also generates checks for @code{CHARACTER} substring references,
 something @code{f2c} currently does not do.
 
-Since a future version of @code{g77} might use a different implementation,
-use the new @samp{-ff2c-subscript-check} option
-if your application requires use of @code{s_rnge} or a compile-time diagnostic.
+Use the new @samp{-ffortran-bounds-check} option
+to specify bounds-checking for only the Fortran code you are compiling,
+not necessarily for code written in other languages.
 
 @emph{Note:} To provide more detailed information on the offending subscript,
-@code{g77} provides @code{s_rnge}
+@code{g77} provides the @code{libg2c} run-time library routine @code{s_rnge}
 with somewhat differently-formatted information.
 Here's a sample diagnostic:
 
@@ -4243,7 +4243,7 @@ stream-based text file is translated to GNU Fortran lines as follows:
 A newline in the file is the character that represents the end of
 a line of text to the underlying system.
 For example, on ASCII-based systems, a newline is the @key{NL}
-character, which has ASCII value 12 (decimal).
+character, which has ASCII value 10 (decimal).
 
 @item
 Each newline in the file serves to end the line of text that precedes
@@ -11178,7 +11178,7 @@ themselves as @emph{visible} problems some time later.
 Overflowing the bounds of an array---usually by writing beyond
 the end of it---is one of two kinds of bug that often occurs
 in Fortran code.
-(Compile your code with the @samp{-fsubscript-check} option
+(Compile your code with the @samp{-fbounds-check} option
 to catch many of these kinds of errors at program run time.)
 
 The other kind of bug is a mismatch between the actual arguments
@@ -13808,8 +13808,16 @@ the source code of @code{g77} and rebuilding.
 How to do this depends on the version of @code{g77}:
 
 @table @code
-@item EGCS-1.0
-@itemx FSF
+@item G77 0.5.24 (EGCS 1.1)
+@itemx G77 0.5.25 (EGCS 1.2)
+Change the @code{lang_init_options} routine in @file{egcs/gcc/f/com.c}.
+
+(Note that these versions of @code{g77}
+perform internal consistency checking automatically
+when the @samp{-fversion} option is specified.)
+
+@item G77 0.5.23
+@itemx G77 0.5.24 (EGCS 1.0)
 Change the way @code{f771} handles the @samp{-fset-g77-defaults}
 option, which is always provided as the first option when
 called by @code{g77} or @code{gcc}.
@@ -13833,14 +13841,6 @@ It is in @file{@value{path-g77}/lang-specs.h} that @samp{-fset-g77-defaults},
 even when the user has not explicitly specified them.
 Other ``internal'' options such as @samp{-quiet} also
 are passed via this mechanism.
-
-@item EGCS-1.1
-@itemx EGCS-1.2
-Change the @code{lang_init_options} routine in @file{egcs/gcc/f/com.c}.
-
-(Note that these versions of @code{g77}
-perform internal consistency checking automatically
-when the @samp{-fversion} option is specified.)
 @end table
 
 @node Projects

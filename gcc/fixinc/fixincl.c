@@ -23,25 +23,9 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 #include "auto-host.h"
-
-#include <sys/types.h>
-#include <sys/param.h>
-#include <sys/stat.h>
-#ifdef HAVE_SYS_WAIT_H
-#include <sys/wait.h>
-#endif
+#include "gansidecl.h"
+#include "system.h"
 #include <signal.h>
-#include <stdio.h>
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-#include <stdlib.h>
-#include <errno.h>
-#include <string.h>
-#ifdef HAVE_FCNTL_H
-#include <fcntl.h>
-#endif
-#include <ctype.h>
 
 #include "gnu-regex.h"
 #include "server.h"
@@ -57,6 +41,13 @@ static const char program_id[] = "fixincl version 1.0";
 # define MAXPATHLEN     4096
 #endif
 #define NAME_TABLE_SIZE (MINIMUM_MAXIMUM_LINES * MAXPATHLEN)
+
+#ifndef EXIT_SUCCESS
+# define EXIT_SUCCESS 0
+#endif
+#ifndef EXIT_FAILURE
+# define EXIT_FAILURE 1
+#endif
 
 char *file_name_buf;
 
@@ -272,13 +263,6 @@ main (argc, argv)
  /*#*/ error "NON-BOGUS LIMITS NOT SUPPORTED?!?!"
 #endif
 
-  /*
-     Here we are the child of the grandparent process.  The parent
-     of all the little fixup processes.  We ignore the deaths of
-     our children.  */
-
-  signal (SIGCLD,  SIG_IGN);
-
   /*  For every file specified in stdandard in
       (except as throttled for bogus reasons)...
       */
@@ -382,7 +366,9 @@ initialize()
    `waitpid(2)'.  We also ensure that the children exit with success. */
 
 void
-wait_for_pid( pid_t child, int file_name_ct )
+wait_for_pid(child, file_name_ct)
+     pid_t child;
+     int file_name_ct;
 {
   for (;;) {
     int status;
@@ -934,18 +920,20 @@ process (pz_data, pz_file_name)
      char *pz_data;
      const char *pz_file_name;
 {
-  static char env_current_file[1024] = { "file=" };
+  static char env_current_file[1024];
   tFixDesc *p_fixd = fixDescList;
   int todo_ct = FIX_COUNT;
-  t_fd_pair fdp = { -1, -1 };
+  int read_fd = -1;
   int num_children = 0;
 
   /*  IF this is the first time through,
       THEN put the 'file' environment variable into the environment.
            This is used by some of the subject shell scripts and tests.   */
 
-  if (env_current_file[5] == NUL)
+  if (env_current_file[0] == NUL) {
+    strcpy (env_current_file, "file=");
     putenv (env_current_file);
+  }
 
   /*
      Ghastly as it is, this actually updates the value of the variable:
@@ -1059,10 +1047,10 @@ process (pz_data, pz_file_name)
           the first fix.  Any subsequent fixes will use the
           stdout descriptor of the previous fix as its stdin.  */
 
-      if (fdp.read_fd == -1)
+      if (read_fd == -1)
         {
-          fdp.read_fd = open (pz_file_name, O_RDONLY);
-          if (fdp.read_fd < 0)
+          read_fd = open (pz_file_name, O_RDONLY);
+          if (read_fd < 0)
             {
               fprintf (stderr, "Error %d (%s) opening %s\n", errno,
                        strerror (errno), pz_file_name);
@@ -1071,7 +1059,7 @@ process (pz_data, pz_file_name)
         }
 
       /*  This loop should only cycle for 1/2 of one loop.
-          "chain_open" starts a process that uses "fdp.read_fd" as
+          "chain_open" starts a process that uses "read_fd" as
           its stdin and returns the new fd this process will use
           for stdout.  */
 
@@ -1079,14 +1067,14 @@ process (pz_data, pz_file_name)
         {
           tSCC z_err[] = "Error %d (%s) starting filter process for %s\n";
           static int failCt = 0;
-          int fd = chain_open (fdp.read_fd,
+          int fd = chain_open (read_fd,
                                (t_pchar *) p_fixd->patch_args,
                                (process_chain_head == -1)
                                ? &process_chain_head : (pid_t *) NULL);
 
           if (fd != -1)
             {
-              fdp.read_fd = fd;
+              read_fd = fd;
               num_children++;
               break;
             }
@@ -1106,7 +1094,7 @@ process (pz_data, pz_file_name)
   /*  IF after all the tests we did not start any patch programs,
       THEN quit now.   */
 
-  if (fdp.read_fd < 0)
+  if (read_fd < 0)
     return;
 
   /*  OK.  We have work to do.  Read back in the output
@@ -1117,7 +1105,7 @@ process (pz_data, pz_file_name)
       output of the filter chain.
       */
   {
-    FILE *in_fp = fdopen (fdp.read_fd, "r");
+    FILE *in_fp = fdopen (read_fd, "r");
     FILE *out_fp = (FILE *) NULL;
     char *pz_cmp = pz_data;
 
@@ -1173,7 +1161,7 @@ process (pz_data, pz_file_name)
       }
     fclose (in_fp);
   }
-  close (fdp.read_fd);  /* probably redundant, but I'm paranoid */
+  close (read_fd);  /* probably redundant, but I'm paranoid */
 
   /* Wait for child processes created by chain_open()
      to avoid creating zombies.  */

@@ -72,14 +72,6 @@ Boston, MA 02111-1307, USA.  */
 #endif
 #define CHKR_PREFIX_SIZE (sizeof (CHKR_PREFIX) - 1)
 
-/* This macro gets just the user-specified name
-   out of the string in a SYMBOL_REF.  On most machines,
-   we discard the * if any and that's all.  */
-#ifndef STRIP_NAME_ENCODING
-#define STRIP_NAME_ENCODING(VAR,SYMBOL_NAME) \
-  (VAR) = ((SYMBOL_NAME) + ((SYMBOL_NAME)[0] == '*'))
-#endif
-
 /* File in which assembler code is being written.  */
 
 extern FILE *asm_out_file;
@@ -3896,6 +3888,13 @@ output_constant (exp, size)
      register int size;
 {
   register enum tree_code code = TREE_CODE (TREE_TYPE (exp));
+
+  /* Some front-ends use constants other than the standard
+     language-indepdent varieties, but which may still be output
+     directly.  Give the front-end a chance to convert EXP to a
+     language-independent representation.  */
+  if (lang_expand_constant)
+    exp = (*lang_expand_constant) (exp);
 
   if (size == 0 || flag_syntax_only)
     return;

@@ -2461,7 +2461,11 @@ build_object_call (obj, args)
       return error_mark_node;
     }
 
-  if (DECL_NAME (cand->fn) == ansi_opname [CALL_EXPR])
+  /* Since cand->fn will be a type, not a function, for a conversion
+     function, we must be careful not to unconditionally look at
+     DECL_NAME here.  */
+  if (TREE_CODE (cand->fn) == FUNCTION_DECL
+      && DECL_NAME (cand->fn) == ansi_opname [CALL_EXPR])
     return build_over_call (cand, mem_args, LOOKUP_NORMAL);
 
   obj = convert_like (TREE_VEC_ELT (cand->convs, 0), obj);
@@ -4341,8 +4345,8 @@ joust (cand1, cand2, warn)
 	   != DECL_CONSTRUCTOR_P (cand2->fn))
 	  /* Don't warn if the two conv ops convert to the same type...  */
 	  || (! DECL_CONSTRUCTOR_P (cand1->fn)
-	      && ! same_type_p (TREE_TYPE (cand1->second_conv),
-				TREE_TYPE (cand2->second_conv)))))
+	      && ! same_type_p (TREE_TYPE (TREE_TYPE (cand1->fn)),
+				TREE_TYPE (TREE_TYPE (cand2->fn))))))
     {
       int comp = compare_ics (cand1->second_conv, cand2->second_conv);
       if (comp != winner)
