@@ -23,14 +23,13 @@ Boston, MA 02111-1307, USA.  */
 #include <stdlib.h>
 #include <assert.h>
 #include "libgfortran.h"'
-include(types.m4)dnl
-define(rtype_kind, regexp(file, `_l\([0-9]+\)\.', `\1'))dnl
-define(rtype_code,`l'rtype_kind)dnl
-define(rtype,get_arraytype(l,rtype_kind))dnl
-define(rtype_name, get_typename(l, rtype_kind))dnl
+include(iparm.m4)dnl
+
+extern rtype_name dot_product_`'rtype_code (gfc_array_l4 *, gfc_array_l4 *);
+export_proto(dot_product_`'rtype_code);
 
 rtype_name
-`__dot_product_'rtype_code (gfc_array_l4 * a, gfc_array_l4 * b)
+dot_product_`'rtype_code (gfc_array_l4 * a, gfc_array_l4 * b)
 {
   GFC_LOGICAL_4 *pa;
   GFC_LOGICAL_4 *pb;
@@ -76,4 +75,3 @@ rtype_name
 
   return 0;
 }
-

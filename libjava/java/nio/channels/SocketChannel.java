@@ -1,5 +1,5 @@
-/* SocketChannel.java -- 
-   Copyright (C) 2002 Free Software Foundation, Inc.
+/* SocketChannel.java --
+   Copyright (C) 2002, 2004  Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -35,43 +35,48 @@ this exception to your version of the library, but you are not
 obligated to do so.  If you do not wish to do so, delete this
 exception statement from your version. */
 
+
 package java.nio.channels;
 
-import java.nio.channels.spi.AbstractSelectableChannel;
-import java.nio.channels.spi.SelectorProvider;
-import java.nio.ByteBuffer;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.spi.AbstractSelectableChannel;
+import java.nio.channels.spi.SelectorProvider;
 
 /**
- * @author Michael Koch
+ * @author Michael Koch (konqueror@gmx.de)
  * @since 1.4
  */
-abstract public class SocketChannel extends AbstractSelectableChannel
+public abstract class SocketChannel extends AbstractSelectableChannel
   implements ByteChannel, ScatteringByteChannel, GatheringByteChannel
 {
   /**
-   * Initializes this socket.
+   * Initializes this socket channel.
    */
-  protected SocketChannel (SelectorProvider provider)
+  protected SocketChannel(SelectorProvider provider)
   {
-    super (provider);
+    super(provider);
   }
- 
+
   /**
    * Opens a socket channel.
    *
+   * @return the new <code>SocketChannel</code> object
+   * 
    * @exception IOException If an error occurs
    */
-  public static SocketChannel open () throws IOException
+  public static SocketChannel open() throws IOException
   {
-    return SelectorProvider.provider ().openSocketChannel ();
+    return SelectorProvider.provider().openSocketChannel();
   }
-  
+
   /**
    * Opens a channel and connects it to a remote address.
    *
+   * @return the new <code>SocketChannel</code> object
+   * 
    * @exception AsynchronousCloseException If this channel is already connected.
    * @exception ClosedByInterruptException If another thread interrupts the
    * current thread while the connect operation is in progress, thereby closing
@@ -84,72 +89,80 @@ abstract public class SocketChannel extends AbstractSelectableChannel
    * @exception UnsupportedAddressTypeException If the type of the given remote
    * address is not supported.
    */
-  public static SocketChannel open (SocketAddress remote) throws IOException
+  public static SocketChannel open(SocketAddress remote)
+    throws IOException
   {
-    SocketChannel ch = open ();
-	
-    if (ch.connect (remote))
-      {
-      }
-    
+    SocketChannel ch = open();
+    ch.connect(remote);
     return ch;
   }
-    
+
   /**
    * Reads data from the channel.
+   *
+   * @return the number of bytes read, zero is valid too, -1 if end of stream
+   * is reached
    *
    * @exception IOException If an error occurs
    * @exception NotYetConnectedException If this channel is not yet connected.
    */
-  public final long read (ByteBuffer[] dsts) throws IOException
+  public final long read(ByteBuffer[] dsts) throws IOException
   {
     long b = 0;
-    
+
     for (int i = 0; i < dsts.length; i++)
-      {
-        b += read (dsts [i]);
-      }
-    
+      b += read(dsts[i]);
+
     return b;
   }
-    
+
   /**
    * Writes data to the channel.
    *
+   * @return the number of bytes written, zero is valid too
+   * 
    * @exception IOException If an error occurs
    * @exception NotYetConnectedException If this channel is not yet connected.
    */
-  public final long write (ByteBuffer[] dsts) throws IOException
+  public final long write(ByteBuffer[] dsts) throws IOException
   {
     long b = 0;
 
-    for (int  i= 0; i < dsts.length; i++)
-      {
-        b += write (dsts [i]);
-      }
-    
+    for (int i = 0; i < dsts.length; i++)
+      b += write(dsts[i]);
+
     return b;
-  }    
-   
+  }
+
   /**
    * Retrieves the valid operations for this channel.
+   *
+   * @return the valid operations
    */
-  public final int validOps ()
+  public final int validOps()
   {
-    return SelectionKey.OP_CONNECT | SelectionKey.OP_READ | SelectionKey.OP_WRITE;
+    return SelectionKey.OP_CONNECT | SelectionKey.OP_READ
+           | SelectionKey.OP_WRITE;
   }
 
   /**
    * Reads data from the channel.
    *
+   * @return the number of bytes read, zero is valid too, -1 if end of stream
+   * is reached
+   * 
    * @exception IOException If an error occurs
    * @exception NotYetConnectedException If this channel is not yet connected.
    */
-  public abstract int read (ByteBuffer dst) throws IOException;
+  public abstract int read(ByteBuffer dst) throws IOException;
 
   /**
    * Connects the channel's socket to the remote address.
    *
+   * @return <code>true</code> if the channel got successfully connected,
+   * <code>false</code> if the channel is in non-blocking mode and connection
+   * operation is still in progress.
+   * 
    * @exception AlreadyConnectedException If this channel is already connected.
    * @exception AsynchronousCloseException If this channel is already connected.
    * @exception ClosedByInterruptException If another thread interrupts the
@@ -166,8 +179,9 @@ abstract public class SocketChannel extends AbstractSelectableChannel
    * @exception UnsupportedAddressTypeException If the type of the given remote
    * address is not supported.
    */
-  public abstract boolean connect (SocketAddress remote) throws IOException;
-  
+  public abstract boolean connect(SocketAddress remote)
+    throws IOException;
+
   /**
    * Finishes the process of connecting a socket channel.
    *
@@ -180,46 +194,55 @@ abstract public class SocketChannel extends AbstractSelectableChannel
    * @exception NoConnectionPendingException If this channel is not connected
    * and a connection operation has not been initiated.
    */
-  public abstract boolean finishConnect () throws IOException;
- 
+  public abstract boolean finishConnect() throws IOException;
+
   /**
    * Tells whether or not the channel's socket is connected.
    */
-  public abstract boolean isConnected ();
-  
+  public abstract boolean isConnected();
+
   /**
    * Tells whether or not a connection operation is in progress on this channel.
    */
-  public abstract boolean isConnectionPending ();
-  
+  public abstract boolean isConnectionPending();
+
   /**
    * Reads data from the channel.
    *
+   * @return the number of bytes read, zero is valid too, -1 if end of stream
+   * is reached
+   * 
    * @exception IOException If an error occurs
    * @exception NotYetConnectedException If this channel is not yet connected.
    */
-  public abstract long read (ByteBuffer[] dsts, int offset, int length)
+  public abstract long read(ByteBuffer[] dsts, int offset, int length)
     throws IOException;
- 
+
   /**
    * Retrieves the channel's socket.
+   *
+   * @return the socket
    */
-  public abstract Socket socket ();
-  
+  public abstract Socket socket();
+
   /**
    * Writes data to the channel.
    *
+   * @return the number of bytes written, zero is valid too
+   * 
    * @exception IOException If an error occurs
    * @exception NotYetConnectedException If this channel is not yet connected.
    */
-  public abstract int write (ByteBuffer src) throws IOException;
-  
+  public abstract int write(ByteBuffer src) throws IOException;
+
   /**
    * Writes data to the channel.
    *
+   * @return the number of bytes written, zero is valid too
+   * 
    * @exception IOException If an error occurs
    * @exception NotYetConnectedException If this channel is not yet connected.
    */
-  public abstract long write (ByteBuffer[] srcs, int offset, int length)
+  public abstract long write(ByteBuffer[] srcs, int offset, int length)
     throws IOException;
 }

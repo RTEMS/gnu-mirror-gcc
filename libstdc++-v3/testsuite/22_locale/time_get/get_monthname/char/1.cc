@@ -1,6 +1,6 @@
 // 2001-09-21 Benjamin Kosnik  <bkoz@redhat.com>
 
-// Copyright (C) 2001, 2002, 2003 Free Software Foundation
+// Copyright (C) 2001, 2002, 2003, 2004 Free Software Foundation
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -27,23 +27,15 @@
 void test01()
 {
   using namespace std;
-  typedef time_base::dateorder dateorder;
+  bool test __attribute__((unused)) = true;
+
   typedef istreambuf_iterator<char> iterator_type;
 
   const ios_base::iostate good = ios_base::goodbit;
   ios_base::iostate errorstate = good;
 
-  bool test __attribute__((unused)) = true;
-
-  // basic construction and sanity checks.
+  // basic construction
   locale loc_c = locale::classic();
-  locale loc_hk = __gnu_test::try_named_locale("en_HK");
-  locale loc_fr = __gnu_test::try_named_locale("fr_FR@euro");
-  locale loc_de = __gnu_test::try_named_locale("de_DE");
-  VERIFY( loc_hk != loc_c );
-  VERIFY( loc_hk != loc_fr );
-  VERIFY( loc_hk != loc_de );
-  VERIFY( loc_de != loc_fr );
 
   // create "C" time objects
   const tm time_bday = { 0, 0, 12, 4, 3, 71, 0, 93, 0 };
@@ -78,39 +70,43 @@ void test01()
   iterator_type is_it03(iss);
   tm time03;
   errorstate = good;
-  tim_get.get_monthname(is_it03, end, iss, errorstate, &time03);
+  iterator_type ret03 = tim_get.get_monthname(is_it03, end, iss, errorstate,
+					     &time03);
   VERIFY( time03.tm_mon == time_bday.tm_mon );
   VERIFY( errorstate == good );
-  VERIFY( *is_it03 == ' ');
+  VERIFY( *ret03 == ' ' );
 
   iss.str("Aar");
   iterator_type is_it04(iss);
   tm time04;
   time04.tm_mon = 5;
   errorstate = good;
-  tim_get.get_monthname(is_it04, end, iss, errorstate, &time04);
+  iterator_type ret04 = tim_get.get_monthname(is_it04, end, iss, errorstate,
+					      &time04);
   VERIFY( time04.tm_mon == 5 );
-  VERIFY( *is_it04 == 'a');
+  VERIFY( *ret04 == 'a' );
   VERIFY( errorstate == ios_base::failbit );
 
   iss.str("December ");
   iterator_type is_it05(iss);
   tm time05;
   errorstate = good;
-  tim_get.get_monthname(is_it05, end, iss, errorstate, &time05);
+  iterator_type ret05 = tim_get.get_monthname(is_it05, end, iss, errorstate,
+					      &time05);
   VERIFY( time05.tm_mon == 11 );
   VERIFY( errorstate == good );
-  VERIFY( *is_it05 == ' ');
+  VERIFY( *ret05 == ' ' );
 
   iss.str("Decelember "); 
   iterator_type is_it06(iss);
   tm time06;
   time06.tm_mon = 4;
   errorstate = good;
-  tim_get.get_monthname(is_it06, end, iss, errorstate, &time06);
+  iterator_type ret06 = tim_get.get_monthname(is_it06, end, iss, errorstate,
+					      &time06);
   VERIFY( time06.tm_mon == 4 );
   VERIFY( errorstate == ios_base::failbit );
-  VERIFY( *is_it05 == 'l');
+  VERIFY( *ret06 == 'l' );
 }
 
 int main()

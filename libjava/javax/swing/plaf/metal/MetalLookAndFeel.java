@@ -40,11 +40,12 @@ exception statement from your version. */
 package javax.swing.plaf.metal;
 
 import javax.swing.UIDefaults;
-import javax.swing.plaf.basic.BasicDefaults;
 import javax.swing.plaf.basic.BasicLookAndFeel;
 
 public class MetalLookAndFeel extends BasicLookAndFeel
- {	   
+{	   
+  private static final long serialVersionUID = 6680646159193457980L;
+  
      public boolean isNativeLookAndFeel()        { return true; }
      public boolean isSupportedLookAndFeel()     { return true; }
      public String getDescription()              { return "Metal look and feel"; }
@@ -61,7 +62,7 @@ public class MetalLookAndFeel extends BasicLookAndFeel
      public UIDefaults getDefaults()
 	 {
 	   if (LAF_defaults == null)
-	     LAF_defaults = new BasicDefaults();
+	     LAF_defaults = super.getDefaults();
 	     
 	     //      Returns the default values for this look and feel. 
 	     return LAF_defaults;

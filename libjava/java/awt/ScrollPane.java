@@ -1,5 +1,5 @@
 /* ScrollPane.java -- Scrolling window
-   Copyright (C) 1999, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2002, 2004  Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -41,6 +41,7 @@ package java.awt;
 import java.awt.event.MouseEvent;
 import java.awt.peer.ComponentPeer;
 import java.awt.peer.ScrollPanePeer;
+
 import javax.accessibility.Accessible;
 
 /**
@@ -157,6 +158,9 @@ ScrollPane(int scrollbarDisplayPolicy)
     }
 
   wheelScrollingEnabled = true;
+
+  // Default size.
+  setSize(100,100);
 }
 
 /*************************************************************************/
@@ -400,6 +404,15 @@ addNotify()
 
   setPeer((ComponentPeer)getToolkit().createScrollPane(this));
   super.addNotify();
+
+  Component[] list = getComponents();
+  if (list != null && list.length > 0 && ! (list[0] instanceof Panel))
+  {
+    Panel panel = new Panel();
+    panel.setLayout(new BorderLayout());
+    panel.add(list[0], BorderLayout.CENTER);
+    add(panel);
+  }
 }
 
 /*************************************************************************/
@@ -527,7 +540,19 @@ printComponents(Graphics graphics)
 public String
 paramString()
 {
-  return(getClass().getName());
+  Insets insets = getInsets();
+  return getName() + ","
+         + getX() + ","
+         + getY() + ","
+         + getWidth() + "x" + getHeight() + ","
+         + "ScrollPosition=(" + scrollPosition.getX() + "," 
+                              + scrollPosition.getY() + "),"
+         + "Insets=(" + insets.top + ","
+                      + insets.left + ","
+                      + insets.bottom + ","
+                      + insets.right + "),"
+         + "ScrollbarDisplayPolicy=" + getScrollbarDisplayPolicy() + ","
+         + "wheelScrollingEnabled=" + isWheelScrollingEnabled();
 }
 
   /**

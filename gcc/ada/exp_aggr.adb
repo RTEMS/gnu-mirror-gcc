@@ -34,6 +34,7 @@ with Exp_Util; use Exp_Util;
 with Exp_Ch3;  use Exp_Ch3;
 with Exp_Ch7;  use Exp_Ch7;
 with Exp_Ch9;  use Exp_Ch9;
+with Exp_Tss;  use Exp_Tss;
 with Freeze;   use Freeze;
 with Hostparm; use Hostparm;
 with Itypes;   use Itypes;
@@ -74,7 +75,7 @@ package body Exp_Aggr is
 
    function Has_Default_Init_Comps (N : Node_Id) return Boolean;
    --  N is an aggregate (record or array). Checks the presence of default
-   --  initialization (<>) in any component (Ada 0Y: AI-287)
+   --  initialization (<>) in any component (Ada 2005: AI-287)
 
    ------------------------------------------------------
    -- Local subprograms for Record Aggregate Expansion --
@@ -142,6 +143,16 @@ package body Exp_Aggr is
    -----------------------------------------------------
    -- Local Subprograms for Array Aggregate Expansion --
    -----------------------------------------------------
+
+   procedure Convert_Array_Aggr_In_Allocator
+     (Decl   : Node_Id;
+      Aggr   : Node_Id;
+      Target : Node_Id);
+   --  If the aggregate appears within an allocator and can be expanded in
+   --  place, this routine generates the individual assignments to components
+   --  of the designated object. This is an optimization over the general
+   --  case, where a temporary is first created on the stack and then used to
+   --  construct the allocated object on the heap.
 
    procedure Convert_To_Positional
      (N                    : Node_Id;
@@ -443,8 +454,8 @@ package body Exp_Aggr is
       --
       --  Otherwise we call Build_Code recursively.
       --
-      --  Ada 0Y (AI-287): In case of default initialized component, Expr is
-      --  empty and we generate a call to the corresponding IP subprogram.
+      --  Ada 2005 (AI-287): In case of default initialized component, Expr
+      --  is empty and we generate a call to the corresponding IP subprogram.
 
       function Gen_Loop (L, H : Node_Id; Expr : Node_Id) return List_Id;
       --  Nodes L and H must be side-effect free expressions.
@@ -671,7 +682,7 @@ package body Exp_Aggr is
             Res : List_Id;
 
          begin
-            --  Ada 0Y (AI-287): Do nothing else in case of default
+            --  Ada 2005 (AI-287): Do nothing else in case of default
             --  initialized component.
 
             if not Present (Expr) then
@@ -739,7 +750,7 @@ package body Exp_Aggr is
 
          Set_Assignment_OK (Indexed_Comp);
 
-         --  Ada 0Y (AI-287): In case of default initialized component, Expr
+         --  Ada 2005 (AI-287): In case of default initialized component, Expr
          --  is not present (and therefore we also initialize Expr_Q to empty).
 
          if not Present (Expr) then
@@ -758,7 +769,7 @@ package body Exp_Aggr is
 
          elsif Present (Next (First (New_Indices))) then
 
-            --  Ada 0Y (AI-287): Do nothing in case of default initialized
+            --  Ada 2005 (AI-287): Do nothing in case of default initialized
             --  component because we have received the component type in
             --  the formal parameter Ctype.
 
@@ -792,7 +803,7 @@ package body Exp_Aggr is
             end if;
          end if;
 
-         --  Ada 0Y (AI-287): We only analyze the expression in case of non
+         --  Ada 2005 (AI-287): We only analyze the expression in case of non-
          --  default initialized components (otherwise Expr_Q is not present).
 
          if Present (Expr_Q)
@@ -818,19 +829,22 @@ package body Exp_Aggr is
             end if;
          end if;
 
-         --  Ada 0Y (AI-287): In case of default initialized component, call
+         --  Ada 2005 (AI-287): In case of default initialized component, call
          --  the initialization subprogram associated with the component type.
 
          if not Present (Expr) then
 
-            Append_List_To (L,
+            if Present (Base_Init_Proc (Etype (Ctype)))
+              or else Has_Task (Base_Type (Ctype))
+            then
+               Append_List_To (L,
                  Build_Initialization_Call (Loc,
                    Id_Ref            => Indexed_Comp,
                    Typ               => Ctype,
                    With_Default_Init => True));
+            end if;
 
          else
-
             --  Now generate the assignment with no associated controlled
             --  actions since the target of the assignment may not have
             --  been initialized, it is not possible to Finalize it as
@@ -918,7 +932,7 @@ package body Exp_Aggr is
          if Empty_Range (L, H) then
             Append_To (S, Make_Null_Statement (Loc));
 
-            --  Ada 0Y (AI-287): Nothing else need to be done in case of
+            --  Ada 2005 (AI-287): Nothing else need to be done in case of
             --  default initialized component.
 
             if not Present (Expr) then
@@ -1165,7 +1179,7 @@ package body Exp_Aggr is
 
       Aggr_Low  : constant Node_Id := Duplicate_Subexpr_No_Checks (Aggr_L);
       Aggr_High : constant Node_Id := Duplicate_Subexpr_No_Checks (Aggr_H);
-      --  After Duplicate_Subexpr these are side-effect free.
+      --  After Duplicate_Subexpr these are side-effect free
 
       Low        : Node_Id;
       High       : Node_Id;
@@ -1337,7 +1351,7 @@ package body Exp_Aggr is
          if Present (Component_Associations (N)) then
             Assoc := Last (Component_Associations (N));
 
-            --  Ada 0Y (AI-287)
+            --  Ada 2005 (AI-287)
 
             if Box_Present (Assoc) then
                Append_List (Gen_While (Add (Nb_Elements, To => Aggr_L),
@@ -1632,8 +1646,8 @@ package body Exp_Aggr is
              Selector_Name => Make_Identifier (Loc, Name_uController));
          Set_Assignment_OK (Ref);
 
-         --  Ada 0Y (AI-287): Give support to default initialization of limited
-         --  types and components.
+         --  Ada 2005 (AI-287): Give support to default initialization of
+         --  limited types and components.
 
          if (Nkind (Target) = N_Identifier
               and then Present (Etype (Target))
@@ -1790,7 +1804,7 @@ package body Exp_Aggr is
                   Check_Ancestor_Discriminants (Entity (A));
                end if;
 
-            --  Ada 0Y (AI-287): If the ancestor part is a limited type,
+            --  Ada 2005 (AI-287): If the ancestor part is a limited type,
             --  a recursive call expands the ancestor.
 
             elsif Is_Limited_Type (Etype (A)) then
@@ -1924,15 +1938,15 @@ package body Exp_Aggr is
       while Present (Comp) loop
          Selector := Entity (First (Choices (Comp)));
 
-         --  Ada 0Y (AI-287): Default initialization of a limited component
+         --  Ada 2005 (AI-287): Default initialization of a limited component
 
          if Box_Present (Comp)
             and then Is_Limited_Type (Etype (Selector))
          then
-            --  Ada 0Y (AI-287): If the component type has tasks then generate
-            --  the activation chain and master entities (except in case of an
-            --  allocator because in that case these entities are generated
-            --  by Build_Task_Allocate_Block_With_Init_Stmts).
+            --  Ada 2005 (AI-287): If the component type has tasks then
+            --  generate the activation chain and master entities (except
+            --  in case of an allocator because in that case these entities
+            --  are generated by Build_Task_Allocate_Block_With_Init_Stmts).
 
             declare
                Ctype            : constant Entity_Id := Etype (Selector);
@@ -2344,7 +2358,10 @@ package body Exp_Aggr is
       Access_Type : constant Entity_Id := Etype (Temp);
 
    begin
-      if Has_Default_Init_Comps (Aggr) then
+      if Is_Array_Type (Typ) then
+         Convert_Array_Aggr_In_Allocator (Decl, Aggr, Occ);
+
+      elsif Has_Default_Init_Comps (Aggr) then
          declare
             L          : constant List_Id := New_List;
             Init_Stmts : List_Id;
@@ -2486,6 +2503,34 @@ package body Exp_Aggr is
       Set_No_Initialization (N);
       Initialize_Discriminants (N, Typ);
    end Convert_Aggr_In_Object_Decl;
+
+   -------------------------------------
+   -- Convert_array_Aggr_In_Allocator --
+   -------------------------------------
+
+   procedure Convert_Array_Aggr_In_Allocator
+     (Decl   : Node_Id;
+      Aggr   : Node_Id;
+      Target : Node_Id)
+   is
+      Aggr_Code : List_Id;
+      Typ       : constant Entity_Id := Etype (Aggr);
+      Ctyp      : constant Entity_Id := Component_Type (Typ);
+
+   begin
+      --  The target is an explicit dereference of the allocated object.
+      --  Generate component assignments to it, as for an aggregate that
+      --  appears on the right-hand side of an assignment statement.
+
+      Aggr_Code :=
+        Build_Array_Aggr_Code (Aggr,
+          Ctype       => Ctyp,
+          Index       => First_Index (Typ),
+          Into        => Target,
+          Scalar_Comp => Is_Scalar_Type (Ctyp));
+
+      Insert_Actions_After (Decl, Aggr_Code);
+   end Convert_Array_Aggr_In_Allocator;
 
    ----------------------------
    -- Convert_To_Assignments --
@@ -2868,7 +2913,7 @@ package body Exp_Aggr is
    --  Start of processing for Convert_To_Positional
 
    begin
-      --  Ada 0Y (AI-287): Do not convert in case of default initialized
+      --  Ada 2005 (AI-287): Do not convert in case of default initialized
       --  components because in this case will need to call the corresponding
       --  IP procedure.
 
@@ -3447,7 +3492,10 @@ package body Exp_Aggr is
                            and then Check_Component (Right_Opnd (Comp)))
 
                  or else (Nkind (Comp) = N_Selected_Component
-                           and then Check_Component (Prefix (Comp)));
+                           and then Check_Component (Prefix (Comp)))
+
+                 or else (Nkind (Comp) = N_Unchecked_Type_Conversion
+                           and then Check_Component (Expression (Comp)));
             end Check_Component;
 
          --  Start of processing for Safe_Component
@@ -3507,7 +3555,17 @@ package body Exp_Aggr is
             end if;
 
             Aggr_In := First_Index (Etype (N));
-            Obj_In  := First_Index (Etype (Name (Parent (N))));
+            if Nkind (Parent (N)) = N_Assignment_Statement then
+               Obj_In  := First_Index (Etype (Name (Parent (N))));
+
+            else
+               --  Context is an allocator. Check bounds of aggregate
+               --  against given type in qualified expression.
+
+               pragma Assert (Nkind (Parent (Parent (N))) = N_Allocator);
+               Obj_In :=
+                 First_Index (Etype (Entity (Subtype_Mark (Parent (N)))));
+            end if;
 
             while Present (Aggr_In) loop
                Get_Index_Bounds (Aggr_In, Aggr_Lo, Aggr_Hi);
@@ -3996,6 +4054,11 @@ package body Exp_Aggr is
       --  create a temporary. The analysis for safety of on-line assignment
       --  is delicate, i.e. we don't know how to do it fully yet ???
 
+      --  For allocators we assign to the designated object in place if the
+      --  aggregate meets the same conditions as other in-place assignments.
+      --  In this case the aggregate may not come from source but was created
+      --  for default initialization, e.g. with Initialize_Scalars.
+
       if Requires_Transient_Scope (Typ) then
          Establish_Transient_Scope
            (N, Sec_Stack => Has_Controlled_Component (Typ));
@@ -4003,13 +4066,21 @@ package body Exp_Aggr is
 
       if Has_Default_Init_Comps (N) then
          Maybe_In_Place_OK := False;
+
+      elsif Is_Bit_Packed_Array (Typ)
+        or else Has_Controlled_Component (Typ)
+      then
+         Maybe_In_Place_OK := False;
+
       else
          Maybe_In_Place_OK :=
-           Comes_From_Source (N)
-             and then Nkind (Parent (N)) = N_Assignment_Statement
-             and then not Is_Bit_Packed_Array (Typ)
-             and then not Has_Controlled_Component (Typ)
-             and then In_Place_Assign_OK;
+          (Nkind (Parent (N)) = N_Assignment_Statement
+             and then Comes_From_Source (N)
+             and then In_Place_Assign_OK)
+
+          or else
+            (Nkind (Parent (Parent (N))) = N_Allocator
+              and then In_Place_Assign_OK);
       end if;
 
       if not Has_Default_Init_Comps (N)
@@ -4041,6 +4112,15 @@ package body Exp_Aggr is
             Set_Size_Known_At_Compile_Time (Typ, False);
             Set_Etype (Tmp, Typ);
          end if;
+
+      elsif Maybe_In_Place_OK
+        and then Nkind (Parent (N)) = N_Qualified_Expression
+        and then Nkind (Parent (Parent (N))) = N_Allocator
+      then
+         Set_Expansion_Delayed (N);
+         return;
+
+      --  In the remaining cases  the aggregate is the RHS of an assignment.
 
       elsif Maybe_In_Place_OK
         and then Is_Entity_Name (Name (Parent (N)))
@@ -4120,13 +4200,12 @@ package body Exp_Aggr is
 
             if Has_Default_Init_Comps (N) then
 
-               --  Ada 0Y (AI-287): This case has not been analyzed???
+               --  Ada 2005 (AI-287): This case has not been analyzed???
 
-               pragma Assert (False);
-               null;
+               raise Program_Error;
             end if;
 
-            --  Name in assignment is explicit dereference.
+            --  Name in assignment is explicit dereference
 
             Target := New_Copy (Tmp);
          end if;
@@ -4334,8 +4413,8 @@ package body Exp_Aggr is
       then
          Convert_To_Assignments (N, Typ);
 
-      --  Ada 0Y (AI-287): In case of default initialized components we convert
-      --  the aggregate into assignments.
+         --  Ada 2005 (AI-287): In case of default initialized components we
+         --  convert the aggregate into assignments.
 
       elsif Has_Default_Init_Comps (N) then
          Convert_To_Assignments (N, Typ);
@@ -4743,11 +4822,13 @@ package body Exp_Aggr is
       Typ    : Entity_Id;
       Target : Node_Id;
       Flist  : Node_Id   := Empty;
-      Obj    : Entity_Id := Empty) return List_Id is
+      Obj    : Entity_Id := Empty) return List_Id
+   is
    begin
       if Is_Record_Type (Etype (N)) then
          return Build_Record_Aggr_Code (N, Typ, Target, Flist, Obj);
-      elsif Is_Array_Type (Etype (N)) then
+
+      else pragma Assert (Is_Array_Type (Etype (N)));
          return
            Build_Array_Aggr_Code
              (N           => N,
@@ -4757,9 +4838,6 @@ package body Exp_Aggr is
               Scalar_Comp => Is_Scalar_Type (Component_Type (Typ)),
               Indices     => No_List,
               Flist       => Flist);
-      else
-         pragma Assert (False);
-         return New_List;
       end if;
    end Late_Expansion;
 
@@ -4872,9 +4950,13 @@ package body Exp_Aggr is
 
             Analyze_And_Resolve (N, Ctyp);
 
-            --  Must have a compile time value
+            --  Must have a compile time value. String literals have to
+            --  be converted into temporaries as well, because they cannot
+            --  easily be converted into their bit representation.
 
-            if not Compile_Time_Known_Value (N) then
+            if not Compile_Time_Known_Value (N)
+              or else Nkind (N) = N_String_Literal
+            then
                raise Not_Handled;
             end if;
 
@@ -4937,8 +5019,8 @@ package body Exp_Aggr is
          --  Otherwise we are all positional, so convert to proper value
 
          declare
-            Lov : constant Nat := UI_To_Int (Lob);
-            Hiv : constant Nat := UI_To_Int (Hib);
+            Lov : constant Int := UI_To_Int (Lob);
+            Hiv : constant Int := UI_To_Int (Hib);
 
             Len : constant Nat := Int'Max (0, Hiv - Lov + 1);
             --  The length of the array (number of elements)

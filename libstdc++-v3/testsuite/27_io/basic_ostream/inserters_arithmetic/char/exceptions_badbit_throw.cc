@@ -1,6 +1,6 @@
 // 2003-03-08  Jerry Quinn  <jlquinn@optonline.net>
 
-// Copyright (C) 2003 Free Software Foundation, Inc.
+// Copyright (C) 2003, 2004 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -30,7 +30,7 @@ void test_badbit()
   using namespace std;
   bool test __attribute__((unused)) = true;
 
-  locale loc(locale::classic(), new __gnu_test::fail_num_put);
+  locale loc(locale::classic(), new __gnu_test::fail_num_put_char);
   ostringstream stream("jaylib - champion sound");
   stream.imbue(loc);
 
@@ -39,7 +39,7 @@ void test_badbit()
 
   try 
     {
-      T i;
+      T i = T();
       stream << i;
       VERIFY( false );
     }

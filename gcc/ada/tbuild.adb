@@ -35,6 +35,7 @@ with Rident;   use Rident;
 with Sinfo;    use Sinfo;
 with Snames;   use Snames;
 with Stand;    use Stand;
+with Stringt;  use Stringt;
 with Uintp;    use Uintp;
 
 package body Tbuild is
@@ -113,7 +114,6 @@ package body Tbuild is
 
    procedure Discard_List (L : List_Id) is
       pragma Warnings (Off, L);
-
    begin
       null;
    end Discard_List;
@@ -124,7 +124,6 @@ package body Tbuild is
 
    procedure Discard_Node (N : Node_Or_Entity_Id) is
       pragma Warnings (Off, N);
-
    begin
       null;
    end Discard_Node;
@@ -157,10 +156,9 @@ package body Tbuild is
    --------------------
 
    function Make_DT_Access
-     (Loc  : Source_Ptr;
-      Rec  : Node_Id;
-      Typ  : Entity_Id)
-      return Node_Id
+     (Loc : Source_Ptr;
+      Rec : Node_Id;
+      Typ : Entity_Id) return Node_Id
    is
       Full_Type : Entity_Id := Typ;
 
@@ -183,10 +181,9 @@ package body Tbuild is
    -----------------------
 
    function Make_DT_Component
-     (Loc  : Source_Ptr;
-      Typ  : Entity_Id;
-      I    : Positive)
-      return Node_Id
+     (Loc : Source_Ptr;
+      Typ : Entity_Id;
+      I   : Positive) return Node_Id
    is
       X : Node_Id;
       Full_Type : Entity_Id := Typ;
@@ -215,8 +212,7 @@ package body Tbuild is
       Condition       : Node_Id;
       Then_Statements : List_Id;
       Elsif_Parts     : List_Id := No_List;
-      Else_Statements : List_Id := No_List)
-      return            Node_Id
+      Else_Statements : List_Id := No_List) return Node_Id
    is
    begin
       Check_Restriction (No_Implicit_Conditionals, Node);
@@ -234,8 +230,7 @@ package body Tbuild is
    function Make_Implicit_Label_Declaration
      (Loc                 : Source_Ptr;
       Defining_Identifier : Node_Id;
-      Label_Construct     : Node_Id)
-      return                Node_Id
+      Label_Construct     : Node_Id) return Node_Id
    is
       N : constant Node_Id :=
             Make_Implicit_Label_Declaration (Loc, Defining_Identifier);
@@ -255,8 +250,7 @@ package body Tbuild is
       Identifier             : Node_Id := Empty;
       Iteration_Scheme       : Node_Id := Empty;
       Has_Created_Identifier : Boolean := False;
-      End_Label              : Node_Id := Empty)
-      return                   Node_Id
+      End_Label              : Node_Id := Empty) return Node_Id
    is
    begin
       Check_Restriction (No_Implicit_Loops, Node);
@@ -281,8 +275,7 @@ package body Tbuild is
 
    function Make_Integer_Literal
      (Loc    : Source_Ptr;
-      Intval : Int)
-      return   Node_Id
+      Intval : Int) return Node_Id
    is
    begin
       return Make_Integer_Literal (Loc, UI_From_Int (Intval));
@@ -295,8 +288,7 @@ package body Tbuild is
    function Make_Raise_Constraint_Error
      (Sloc      : Source_Ptr;
       Condition : Node_Id := Empty;
-      Reason    : RT_Exception_Code)
-      return      Node_Id
+      Reason    : RT_Exception_Code) return Node_Id
    is
    begin
       pragma Assert (Reason in RT_CE_Exceptions);
@@ -314,8 +306,7 @@ package body Tbuild is
    function Make_Raise_Program_Error
      (Sloc      : Source_Ptr;
       Condition : Node_Id := Empty;
-      Reason    : RT_Exception_Code)
-      return      Node_Id
+      Reason    : RT_Exception_Code) return Node_Id
    is
    begin
       pragma Assert (Reason in RT_PE_Exceptions);
@@ -333,8 +324,7 @@ package body Tbuild is
    function Make_Raise_Storage_Error
      (Sloc      : Source_Ptr;
       Condition : Node_Id := Empty;
-      Reason    : RT_Exception_Code)
-      return      Node_Id
+      Reason    : RT_Exception_Code) return Node_Id
    is
    begin
       pragma Assert (Reason in RT_SE_Exceptions);
@@ -344,6 +334,22 @@ package body Tbuild is
           Reason =>
             UI_From_Int (RT_Exception_Code'Pos (Reason)));
    end Make_Raise_Storage_Error;
+
+   -------------------------
+   -- Make_String_Literal --
+   -------------------------
+
+   function Make_String_Literal
+     (Sloc   : Source_Ptr;
+      Strval : String) return Node_Id
+   is
+   begin
+      Start_String;
+      Store_String_Chars (Strval);
+      return
+        Make_String_Literal (Sloc,
+          Strval => End_String);
+   end Make_String_Literal;
 
    ---------------------------
    -- Make_Unsuppress_Block --
@@ -360,8 +366,7 @@ package body Tbuild is
    function Make_Unsuppress_Block
      (Loc   : Source_Ptr;
       Check : Name_Id;
-      Stmts : List_Id)
-      return  Node_Id
+      Stmts : List_Id) return Node_Id
    is
    begin
       return
@@ -403,8 +408,7 @@ package body Tbuild is
      (Related_Id   : Name_Id;
       Suffix       : Character := ' ';
       Suffix_Index : Int       := 0;
-      Prefix       : Character := ' ')
-      return         Name_Id
+      Prefix       : Character := ' ') return Name_Id
    is
    begin
       Get_Name_String (Related_Id);
@@ -441,8 +445,7 @@ package body Tbuild is
      (Related_Id   : Name_Id;
       Suffix       : String;
       Suffix_Index : Int       := 0;
-      Prefix       : Character := ' ')
-      return         Name_Id
+      Prefix       : Character := ' ') return Name_Id
    is
    begin
       Get_Name_String (Related_Id);
@@ -476,8 +479,7 @@ package body Tbuild is
 
    function New_External_Name
      (Suffix       : Character;
-      Suffix_Index : Nat)
-      return         Name_Id
+      Suffix_Index : Nat) return Name_Id
    is
    begin
       Name_Buffer (1) := Suffix;
@@ -505,8 +507,7 @@ package body Tbuild is
 
    function New_Occurrence_Of
      (Def_Id : Entity_Id;
-      Loc    : Source_Ptr)
-      return   Node_Id
+      Loc    : Source_Ptr) return Node_Id
    is
       Occurrence : Node_Id;
 
@@ -530,8 +531,7 @@ package body Tbuild is
 
    function New_Reference_To
      (Def_Id : Entity_Id;
-      Loc    : Source_Ptr)
-      return   Node_Id
+      Loc    : Source_Ptr) return Node_Id
    is
       Occurrence : Node_Id;
 
@@ -548,8 +548,7 @@ package body Tbuild is
 
    function New_Suffixed_Name
      (Related_Id : Name_Id;
-      Suffix     : String)
-      return       Name_Id
+      Suffix     : String) return Name_Id
    is
    begin
       Get_Name_String (Related_Id);
@@ -566,7 +565,6 @@ package body Tbuild is
 
    function OK_Convert_To (Typ : Entity_Id; Expr : Node_Id) return Node_Id is
       Result : Node_Id;
-
    begin
       Result :=
         Make_Type_Conversion (Sloc (Expr),
@@ -583,8 +581,7 @@ package body Tbuild is
 
    function Unchecked_Convert_To
      (Typ  : Entity_Id;
-      Expr : Node_Id)
-      return Node_Id
+      Expr : Node_Id) return Node_Id
    is
       Loc    : constant Source_Ptr := Sloc (Expr);
       Result : Node_Id;
@@ -607,8 +604,9 @@ package body Tbuild is
       then
          Result := Relocate_Node (Expr);
 
-      elsif Nkind (Expr) = N_Null then
-
+      elsif Nkind (Expr) = N_Null
+        and then Is_Access_Type (Typ)
+      then
          --  No need for a conversion
 
          Result := Relocate_Node (Expr);

@@ -1,5 +1,5 @@
 /* Loop optimizer initialization routines.
-   Copyright (C) 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -24,7 +24,9 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "tm.h"
 #include "rtl.h"
 #include "hard-reg-set.h"
+#include "obstack.h"
 #include "basic-block.h"
+#include "function.h"
 #include "cfgloop.h"
 #include "cfglayout.h"
 
@@ -35,12 +37,23 @@ loop_optimizer_init (FILE *dumpfile)
 {
   struct loops *loops = xcalloc (1, sizeof (struct loops));
   edge e;
+  edge_iterator ei;
+  static bool first_time = true;
+
+  if (first_time)
+    {
+      first_time = false;
+      init_set_costs ();
+    }
 
   /* Avoid annoying special cases of edges going to exit
      block.  */
-  for (e = EXIT_BLOCK_PTR->pred; e; e = e->pred_next)
-    if ((e->flags & EDGE_FALLTHRU) && e->src->succ->succ_next)
+
+  for (ei = ei_start (EXIT_BLOCK_PTR->preds); (e = ei_safe_edge (ei)); )
+    if ((e->flags & EDGE_FALLTHRU) && EDGE_COUNT (e->src->succs) > 1)
       split_edge (e);
+    else
+      ei_next (&ei);
 
   /* Find the loops.  */
 
@@ -48,7 +61,6 @@ loop_optimizer_init (FILE *dumpfile)
     {
       /* No loops.  */
       flow_loops_free (loops);
-      free_dominance_info (CDI_DOMINATORS);
       free (loops);
 
       return NULL;
@@ -84,15 +96,20 @@ loop_optimizer_init (FILE *dumpfile)
 void
 loop_optimizer_finalize (struct loops *loops, FILE *dumpfile)
 {
+  unsigned i;
+
   if (!loops)
     return;
+
+  for (i = 1; i < loops->num; i++)
+    if (loops->parray[i])
+      free_simple_loop_desc (loops->parray[i]);
 
   /* Another dump.  */
   flow_loops_dump (loops, dumpfile, NULL, 1);
 
   /* Clean up.  */
   flow_loops_free (loops);
-  free_dominance_info (CDI_DOMINATORS);
   free (loops);
 
   /* Checking.  */

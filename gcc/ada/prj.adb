@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---             Copyright (C) 2001-2003 Free Software Foundation, Inc.       --
+--             Copyright (C) 2001-2004 Free Software Foundation, Inc.       --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -27,6 +27,7 @@
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 
 with Namet;    use Namet;
+with Output;   use Output;
 with Osint;    use Osint;
 with Prj.Attr;
 with Prj.Com;
@@ -34,14 +35,16 @@ with Prj.Env;
 with Prj.Err;  use Prj.Err;
 with Scans;    use Scans;
 with Snames;   use Snames;
+with Uintp;    use Uintp;
 
-with GNAT.OS_Lib; use GNAT.OS_Lib;
+with GNAT.Case_Util; use GNAT.Case_Util;
+with GNAT.OS_Lib;    use GNAT.OS_Lib;
 
 package body Prj is
 
    The_Empty_String : Name_Id;
 
-   Ada_Language     : constant Name_Id := Name_Ada;
+   Name_C_Plus_Plus : Name_Id;
 
    subtype Known_Casing is Casing_Type range All_Upper_Case .. Mixed_Case;
 
@@ -56,15 +59,16 @@ package body Prj is
      First_Name_Id + Character'Pos ('-');
 
    Std_Naming_Data : Naming_Data :=
-     (Current_Language          => No_Name,
-      Dot_Replacement           => Standard_Dot_Replacement,
+     (Dot_Replacement           => Standard_Dot_Replacement,
       Dot_Repl_Loc              => No_Location,
       Casing                    => All_Lower_Case,
       Spec_Suffix               => No_Array_Element,
-      Current_Spec_Suffix       => No_Name,
+      Ada_Spec_Suffix           => No_Name,
       Spec_Suffix_Loc           => No_Location,
+      Impl_Suffixes             => No_Impl_Suffixes,
+      Supp_Suffixes             => No_Supp_Language_Index,
       Body_Suffix               => No_Array_Element,
-      Current_Body_Suffix       => No_Name,
+      Ada_Body_Suffix           => No_Name,
       Body_Suffix_Loc           => No_Location,
       Separate_Suffix           => No_Name,
       Sep_Suffix_Loc            => No_Location,
@@ -74,11 +78,14 @@ package body Prj is
       Implementation_Exceptions => No_Array_Element);
 
    Project_Empty : constant Project_Data :=
-     (First_Referred_By              => No_Project,
+     (Externally_Built               => False,
+      Languages                      => No_Languages,
+      Supp_Languages                 => No_Supp_Language_Index,
+      First_Referred_By              => No_Project,
       Name                           => No_Name,
       Path_Name                      => No_Name,
-      Virtual                        => False,
       Display_Path_Name              => No_Name,
+      Virtual                        => False,
       Location                       => No_Location,
       Mains                          => Nil_String,
       Directory                      => No_Name,
@@ -92,13 +99,18 @@ package body Prj is
       Library_Name                   => No_Name,
       Library_Kind                   => Static,
       Lib_Internal_Name              => No_Name,
-      Lib_Elaboration                => False,
       Standalone_Library             => False,
       Lib_Interface_ALIs             => Nil_String,
       Lib_Auto_Init                  => False,
       Symbol_Data                    => No_Symbols,
-      Sources_Present                => True,
+      Ada_Sources_Present            => True,
+      Other_Sources_Present          => True,
       Sources                        => Nil_String,
+      First_Other_Source             => No_Other_Source,
+      Last_Other_Source              => No_Other_Source,
+      Imported_Directories_Switches  => null,
+      Include_Path                   => null,
+      Include_Data_Set               => False,
       Source_Dirs                    => Nil_String,
       Known_Order_Of_Source_Dirs     => True,
       Object_Directory               => No_Name,
@@ -108,6 +120,10 @@ package body Prj is
       Extends                        => No_Project,
       Extended_By                    => No_Project,
       Naming                         => Std_Naming_Data,
+      First_Language_Processing      => Default_First_Language_Processing_Data,
+      Supp_Language_Processing       => No_Supp_Language_Index,
+      Default_Linker                 => No_Name,
+      Default_Linker_Path            => No_Name,
       Decl                           => No_Declarations,
       Imported_Projects              => Empty_Project_List,
       Ada_Include_Path               => null,
@@ -121,10 +137,21 @@ package body Prj is
       Language_Independent_Checked   => False,
       Checked                        => False,
       Seen                           => False,
-      Flag1                          => False,
-      Flag2                          => False,
+      Need_To_Build_Lib              => False,
       Depth                          => 0,
       Unkept_Comments                => False);
+
+   -----------------------
+   -- Add_Language_Name --
+   -----------------------
+
+   procedure Add_Language_Name (Name : Name_Id) is
+   begin
+      Last_Language_Index := Last_Language_Index + 1;
+      Language_Indexes.Set (Name, Last_Language_Index);
+      Language_Names.Increment_Last;
+      Language_Names.Table (Last_Language_Index) := Name;
+   end Add_Language_Name;
 
    -------------------
    -- Add_To_Buffer --
@@ -150,13 +177,24 @@ package body Prj is
       Buffer_Last := Buffer_Last + S'Length;
    end Add_To_Buffer;
 
+   ---------------------------
+   -- Display_Language_Name --
+   ---------------------------
+
+   procedure Display_Language_Name (Language : Language_Index) is
+   begin
+      Get_Name_String (Language_Names.Table (Language));
+      To_Upper (Name_Buffer (1 .. 1));
+      Write_Str (Name_Buffer (1 .. Name_Len));
+   end Display_Language_Name;
+
    -------------------
    -- Empty_Project --
    -------------------
 
    function Empty_Project return Project_Data is
    begin
-      Initialize;
+      Prj.Initialize;
       return Project_Empty;
    end Empty_Project;
 
@@ -190,9 +228,12 @@ package body Prj is
    is
 
       procedure Check (Project : Project_Id);
-      --  Check if a project has already been seen.
-      --  If not seen, mark it as seen, call Action,
-      --  and check all its imported projects.
+      --  Check if a project has already been seen. If not seen, mark it as
+      --  Seen, Call Action, and check all its imported projects.
+
+      -----------
+      -- Check --
+      -----------
 
       procedure Check (Project : Project_Id) is
          List : Project_List;
@@ -210,6 +251,8 @@ package body Prj is
          end if;
       end Check;
 
+   --  Start of procecessing for For_Every_Project_Imported
+
    begin
       for Project in Projects.First .. Projects.Last loop
          Projects.Table (Project).Seen := False;
@@ -217,6 +260,15 @@ package body Prj is
 
       Check (Project => By);
    end For_Every_Project_Imported;
+
+   ----------
+   -- Hash --
+   ----------
+
+   function Hash (Name : Name_Id) return Header_Num is
+   begin
+      return Hash (Get_Name_String (Name));
+   end Hash;
 
    -----------
    -- Image --
@@ -235,6 +287,7 @@ package body Prj is
    begin
       if not Initialized then
          Initialized := True;
+         Uintp.Initialize;
          Name_Len := 0;
          The_Empty_String := Name_Find;
          Empty_Name := The_Empty_String;
@@ -247,11 +300,15 @@ package body Prj is
          Name_Len := 1;
          Name_Buffer (1) := '/';
          Slash := Name_Find;
-         Std_Naming_Data.Current_Spec_Suffix := Default_Ada_Spec_Suffix;
-         Std_Naming_Data.Current_Body_Suffix := Default_Ada_Body_Suffix;
+         Name_Len := 3;
+         Name_Buffer (1 .. 3) := "c++";
+         Name_C_Plus_Plus := Name_Find;
+
+         Std_Naming_Data.Ada_Spec_Suffix := Default_Ada_Spec_Suffix;
+         Std_Naming_Data.Ada_Body_Suffix := Default_Ada_Body_Suffix;
          Std_Naming_Data.Separate_Suffix     := Default_Ada_Body_Suffix;
          Register_Default_Naming_Scheme
-           (Language            => Ada_Language,
+           (Language            => Name_Ada,
             Default_Spec_Suffix => Default_Ada_Spec_Suffix,
             Default_Body_Suffix => Default_Ada_Body_Suffix);
          Prj.Env.Initialize;
@@ -259,8 +316,90 @@ package body Prj is
          Set_Name_Table_Byte (Name_Project,  Token_Type'Pos (Tok_Project));
          Set_Name_Table_Byte (Name_Extends,  Token_Type'Pos (Tok_Extends));
          Set_Name_Table_Byte (Name_External, Token_Type'Pos (Tok_External));
+
+         Language_Indexes.Reset;
+         Last_Language_Index := No_Language_Index;
+         Language_Names.Init;
+         Add_Language_Name (Name_Ada);
+         Add_Language_Name (Name_C);
+         Add_Language_Name (Name_C_Plus_Plus);
       end if;
    end Initialize;
+
+   ----------------
+   -- Is_Present --
+   ----------------
+
+   function Is_Present
+     (Language   : Language_Index;
+      In_Project : Project_Data) return Boolean
+   is
+   begin
+      case Language is
+         when No_Language_Index =>
+            return False;
+
+         when First_Language_Indexes =>
+            return In_Project.Languages (Language);
+
+         when others =>
+            declare
+               Supp : Supp_Language;
+               Supp_Index : Supp_Language_Index := In_Project.Supp_Languages;
+
+            begin
+               while Supp_Index /= No_Supp_Language_Index loop
+                  Supp := Present_Languages.Table (Supp_Index);
+
+                  if Supp.Index = Language then
+                     return Supp.Present;
+                  end if;
+
+                  Supp_Index := Supp.Next;
+               end loop;
+
+               return False;
+            end;
+      end case;
+   end Is_Present;
+
+   ---------------------------------
+   -- Language_Processing_Data_Of --
+   ---------------------------------
+
+   function Language_Processing_Data_Of
+     (Language   : Language_Index;
+      In_Project : Project_Data) return Language_Processing_Data
+   is
+   begin
+      case Language is
+         when No_Language_Index =>
+            return Default_Language_Processing_Data;
+
+         when First_Language_Indexes =>
+            return In_Project.First_Language_Processing (Language);
+
+         when others =>
+            declare
+               Supp : Supp_Language_Data;
+               Supp_Index : Supp_Language_Index :=
+                 In_Project.Supp_Language_Processing;
+
+            begin
+               while Supp_Index /= No_Supp_Language_Index loop
+                  Supp := Supp_Languages.Table (Supp_Index);
+
+                  if Supp.Index = Language then
+                     return Supp.Data;
+                  end if;
+
+                  Supp_Index := Supp.Next;
+               end loop;
+
+               return Default_Language_Processing_Data;
+            end;
+      end case;
+   end Language_Processing_Data_Of;
 
    ------------------------------------
    -- Register_Default_Naming_Scheme --
@@ -306,13 +445,15 @@ package body Prj is
 
       if not Found then
          Element :=
-           (Index => Lang,
+           (Index     => Lang,
+            Src_Index => 0,
             Index_Case_Sensitive => False,
             Value => (Project  => No_Project,
                       Kind     => Single,
                       Location => No_Location,
                       Default  => False,
-                      Value    => Default_Spec_Suffix),
+                      Value    => Default_Spec_Suffix,
+                      Index    => 0),
             Next  => Std_Naming_Data.Spec_Suffix);
          Array_Elements.Increment_Last;
          Array_Elements.Table (Array_Elements.Last) := Element;
@@ -342,13 +483,15 @@ package body Prj is
 
       if not Found then
          Element :=
-           (Index => Lang,
+           (Index     => Lang,
+            Src_Index => 0,
             Index_Case_Sensitive => False,
             Value => (Project  => No_Project,
                       Kind     => Single,
                       Location => No_Location,
                       Default  => False,
-                      Value    => Default_Body_Suffix),
+                      Value    => Default_Body_Suffix,
+                      Index    => 0),
             Next  => Std_Naming_Data.Body_Suffix);
          Array_Elements.Increment_Last;
          Array_Elements.Table (Array_Elements.Last) := Element;
@@ -356,9 +499,9 @@ package body Prj is
       end if;
    end Register_Default_Naming_Scheme;
 
-   ------------
-   --  Reset --
-   ------------
+   -----------
+   -- Reset --
+   -----------
 
    procedure Reset is
    begin
@@ -370,6 +513,7 @@ package body Prj is
       String_Elements.Init;
       Prj.Com.Units.Init;
       Prj.Com.Units_Htable.Reset;
+      Prj.Com.Files_Htable.Reset;
    end Reset;
 
    ------------------------
@@ -377,16 +521,144 @@ package body Prj is
    ------------------------
 
    function Same_Naming_Scheme
-     (Left, Right : Naming_Data)
-      return        Boolean
+     (Left, Right : Naming_Data) return Boolean
    is
    begin
       return Left.Dot_Replacement = Right.Dot_Replacement
         and then Left.Casing = Right.Casing
-        and then Left.Current_Spec_Suffix = Right.Current_Spec_Suffix
-        and then Left.Current_Body_Suffix = Right.Current_Body_Suffix
+        and then Left.Ada_Spec_Suffix = Right.Ada_Spec_Suffix
+        and then Left.Ada_Body_Suffix = Right.Ada_Body_Suffix
         and then Left.Separate_Suffix = Right.Separate_Suffix;
    end Same_Naming_Scheme;
+
+   ---------
+   -- Set --
+   ---------
+
+   procedure Set
+     (Language   : Language_Index;
+      Present    : Boolean;
+      In_Project : in out Project_Data)
+   is
+   begin
+      case Language is
+         when No_Language_Index =>
+            null;
+
+         when First_Language_Indexes =>
+            In_Project.Languages (Language) := Present;
+
+         when others =>
+            declare
+               Supp : Supp_Language;
+               Supp_Index : Supp_Language_Index := In_Project.Supp_Languages;
+
+            begin
+               while Supp_Index /= No_Supp_Language_Index loop
+                  Supp := Present_Languages.Table (Supp_Index);
+
+                  if Supp.Index = Language then
+                     Present_Languages.Table (Supp_Index).Present := Present;
+                     return;
+                  end if;
+
+                  Supp_Index := Supp.Next;
+               end loop;
+
+               Supp := (Index => Language, Present => Present,
+                        Next  => In_Project.Supp_Languages);
+               Present_Languages.Increment_Last;
+               Supp_Index := Present_Languages.Last;
+               Present_Languages.Table (Supp_Index) := Supp;
+               In_Project.Supp_Languages := Supp_Index;
+            end;
+      end case;
+   end Set;
+
+   procedure Set
+     (Language_Processing : in Language_Processing_Data;
+      For_Language        : Language_Index;
+      In_Project          : in out Project_Data)
+   is
+   begin
+      case For_Language is
+         when No_Language_Index =>
+            null;
+
+         when First_Language_Indexes =>
+            In_Project.First_Language_Processing (For_Language) :=
+              Language_Processing;
+
+         when others =>
+            declare
+               Supp : Supp_Language_Data;
+               Supp_Index : Supp_Language_Index :=
+                 In_Project.Supp_Language_Processing;
+
+            begin
+               while Supp_Index /= No_Supp_Language_Index loop
+                  Supp := Supp_Languages.Table (Supp_Index);
+
+                  if Supp.Index = For_Language then
+                     Supp_Languages.Table (Supp_Index).Data :=
+                       Language_Processing;
+                     return;
+                  end if;
+
+                  Supp_Index := Supp.Next;
+               end loop;
+
+               Supp := (Index => For_Language, Data => Language_Processing,
+                        Next  => In_Project.Supp_Language_Processing);
+               Supp_Languages.Increment_Last;
+               Supp_Index := Supp_Languages.Last;
+               Supp_Languages.Table (Supp_Index) := Supp;
+               In_Project.Supp_Language_Processing := Supp_Index;
+            end;
+      end case;
+   end Set;
+
+   procedure Set
+     (Suffix       : Name_Id;
+      For_Language : Language_Index;
+      In_Project   : in out Project_Data)
+   is
+   begin
+      case For_Language is
+         when No_Language_Index =>
+            null;
+
+         when First_Language_Indexes =>
+            In_Project.Naming.Impl_Suffixes (For_Language) := Suffix;
+
+         when others =>
+            declare
+               Supp : Supp_Suffix;
+               Supp_Index : Supp_Language_Index :=
+                 In_Project.Naming.Supp_Suffixes;
+
+            begin
+               while Supp_Index /= No_Supp_Language_Index loop
+                  Supp := Supp_Suffix_Table.Table (Supp_Index);
+
+                  if Supp.Index = For_Language then
+                     Supp_Suffix_Table.Table (Supp_Index).Suffix := Suffix;
+                     return;
+                  end if;
+
+                  Supp_Index := Supp.Next;
+               end loop;
+
+               Supp := (Index => For_Language, Suffix => Suffix,
+                        Next  => In_Project.Naming.Supp_Suffixes);
+               Supp_Suffix_Table.Increment_Last;
+               Supp_Index := Supp_Suffix_Table.Last;
+               Supp_Suffix_Table.Table (Supp_Index) := Supp;
+               In_Project.Naming.Supp_Suffixes := Supp_Index;
+            end;
+      end case;
+   end Set;
+
 
    --------------------------
    -- Standard_Naming_Data --
@@ -394,9 +666,47 @@ package body Prj is
 
    function Standard_Naming_Data return Naming_Data is
    begin
-      Initialize;
+      Prj.Initialize;
       return Std_Naming_Data;
    end Standard_Naming_Data;
+
+   ---------------
+   -- Suffix_Of --
+   ---------------
+
+   function Suffix_Of
+     (Language   : Language_Index;
+      In_Project : Project_Data) return Name_Id
+   is
+   begin
+      case Language is
+         when No_Language_Index =>
+            return No_Name;
+
+         when First_Language_Indexes =>
+            return In_Project.Naming.Impl_Suffixes (Language);
+
+         when others =>
+            declare
+               Supp : Supp_Suffix;
+               Supp_Index : Supp_Language_Index :=
+                 In_Project.Naming.Supp_Suffixes;
+
+            begin
+               while Supp_Index /= No_Supp_Language_Index loop
+                  Supp := Supp_Suffix_Table.Table (Supp_Index);
+
+                  if Supp.Index = Language then
+                     return Supp.Suffix;
+                  end if;
+
+                  Supp_Index := Supp.Next;
+               end loop;
+
+               return No_Name;
+            end;
+      end case;
+   end  Suffix_Of;
 
    -----------
    -- Value --

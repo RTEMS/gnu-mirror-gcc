@@ -1,6 +1,6 @@
 // Function-Based Exception Support -*- C++ -*-
 
-// Copyright (C) 2001 Free Software Foundation, Inc.
+// Copyright (C) 2001, 2004 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -27,9 +27,16 @@
 // invalidate any other reasons why the executable file might be covered by
 // the GNU General Public License.
 
+/** @file functexcept.h
+ *  This header provides support for -fno-exceptions.
+ */
+
 //
 // ISO C++ 14882: 19.1  Exception classes
 //
+
+#ifndef _FUNCTEXCEPT_H
+#define _FUNCTEXCEPT_H 1
 
 #include <exception_defines.h>
 
@@ -83,3 +90,4 @@ namespace std
   __throw_ios_failure(const char* __s);
 } // namespace std
 
+#endif

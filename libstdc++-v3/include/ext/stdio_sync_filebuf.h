@@ -1,6 +1,6 @@
 // Iostreams wrapper for stdio FILE* -*- C++ -*-
 
-// Copyright (C) 2003 Free Software Foundation, Inc.
+// Copyright (C) 2003, 2004 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -27,7 +27,7 @@
 // invalidate any other reasons why the executable file might be covered by
 // the GNU General Public License.
 
-/** @file ext/stdiostream.h
+/** @file ext/stdio_sync_filebuf.h
  *  This file is a GNU extension to the Standard C++ Library.
  */
 
@@ -38,16 +38,6 @@
 
 #include <streambuf>
 #include <unistd.h>
-
-#if defined(_GLIBCXX_HAVE_S_ISREG) || defined(_GLIBCXX_HAVE_S_IFREG)
-# include <sys/stat.h>
-# ifdef _GLIBCXX_HAVE_S_ISREG
-#  define _GLIBCXX_ISREG(x) S_ISREG(x)
-# else
-#  define _GLIBCXX_ISREG(x) (((x) & S_IFMT) == S_IFREG)
-# endif
-#endif
-
 #include <cstdio>
 
 #ifdef _GLIBCXX_USE_WCHAR_T
@@ -56,6 +46,7 @@
 
 namespace __gnu_cxx
 {
+  /// @brief  class stdio_sync_filebuf.
   template<typename _CharT, typename _Traits = std::char_traits<_CharT> >
     class stdio_sync_filebuf : public std::basic_streambuf<_CharT, _Traits>
     {
@@ -81,8 +72,17 @@ namespace __gnu_cxx
       : _M_file(__f), _M_unget_buf(traits_type::eof())
       { }
 
-    protected:
+      /**
+       *  @return  The underlying FILE*.
+       *
+       *  This function can be used to access the underlying "C" file pointer.
+       *  Note that there is no way for the library to track what you do
+       *  with the file, so be careful.
+       */
+      std::__c_file* const
+      file() { return this->_M_file; }
 
+    protected:
       int_type
       syncgetc();
 
@@ -131,19 +131,6 @@ namespace __gnu_cxx
 
       virtual std::streamsize
       xsgetn(char_type* __s, std::streamsize __n);
-
-      virtual std::streamsize
-      showmanyc()
-      {
-#if defined(_GLIBCXX_HAVE_S_ISREG) || defined(_GLIBCXX_HAVE_S_IFREG)
-	// Regular files.
-	struct stat __buffer;
-	int __ret = fstat(fileno(_M_file), &__buffer);
-	if (!__ret && _GLIBCXX_ISREG(__buffer.st_mode))
-	  return __buffer.st_size - ftell(_M_file);
-#endif
-	return 0;
-      }
 
       virtual int_type
       overflow(int_type __c = traits_type::eof())

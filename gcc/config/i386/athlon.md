@@ -203,7 +203,7 @@
 				   (eq_attr "memory" "load,both")))
 			 "athlon-vector,athlon-load,athlon-ieu,athlon-mult,athlon-ieu")
 
-;; Idiv can not execute in parallel with other instructions.  Dealing with it
+;; Idiv cannot execute in parallel with other instructions.  Dealing with it
 ;; as with short latency vector instruction is good approximation avoiding
 ;; scheduler from trying too hard to can hide it's latency by overlap with
 ;; other instructions.
@@ -581,7 +581,7 @@
 			 (and (eq_attr "cpu" "k8")
 			      (eq_attr "type" "sselog"))
 			 "athlon-double,athlon-fpsched,athlon-fmul")
-;; ??? pcmp executes in addmul, probably not wortwhile to brother about that.
+;; ??? pcmp executes in addmul, probably not worthwhile to bother about that.
 (define_insn_reservation "athlon_ssecmp_load" 2
 			 (and (eq_attr "cpu" "athlon")
 			      (and (eq_attr "type" "ssecmp")

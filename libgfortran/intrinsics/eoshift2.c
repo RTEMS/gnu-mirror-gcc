@@ -1,4 +1,4 @@
-/* Generic implementation of the RESHAPE intrinsic
+/* Generic implementation of the EOSHIFT intrinsic
    Copyright 2002 Free Software Foundation, Inc.
    Contributed by Paul Brook <paul@nowt.org>
 
@@ -32,8 +32,8 @@ static const char zeros[16] =
    sizeof(int) < sizeof (index_type).  */
 
 static void
-__eoshift2 (const gfc_array_char * ret, const gfc_array_char * array,
-    int shift, const gfc_array_char * bound, int which)
+eoshift2 (gfc_array_char *ret, const gfc_array_char *array,
+	  int shift, const gfc_array_char *bound, int which)
 {
   /* r.* indicates the return array.  */
   index_type rstride[GFC_MAX_DIMENSIONS - 1];
@@ -60,6 +60,25 @@ __eoshift2 (const gfc_array_char * ret, const gfc_array_char * array,
   index_type n;
 
   size = GFC_DESCRIPTOR_SIZE (ret);
+
+  if (ret->data == NULL)
+    {
+      int i;
+
+      ret->data = internal_malloc_size (size * size0 ((array_t *)array));
+      ret->base = 0;
+      ret->dtype = array->dtype;
+      for (i = 0; i < GFC_DESCRIPTOR_RANK (array); i++)
+        {
+          ret->dim[i].lbound = 0;
+          ret->dim[i].ubound = array->dim[i].ubound - array->dim[i].lbound;
+
+          if (i == 0)
+            ret->dim[i].stride = 1;
+          else
+            ret->dim[i].stride = (ret->dim[i-1].ubound + 1) * ret->dim[i-1].stride;
+        }
+    }
 
   which = which - 1;
 
@@ -185,20 +204,58 @@ __eoshift2 (const gfc_array_char * ret, const gfc_array_char * array,
 }
 
 
+extern void eoshift2_1 (gfc_array_char *, const gfc_array_char *,
+			const GFC_INTEGER_1 *, const gfc_array_char *,
+			const GFC_INTEGER_1 *);
+export_proto(eoshift2_1);
+
 void
-__eoshift2_4 (const gfc_array_char * ret, const gfc_array_char * array,
-    const GFC_INTEGER_4 * pshift, const gfc_array_char * bound,
-    const GFC_INTEGER_4 * pdim)
+eoshift2_1 (gfc_array_char *ret, const gfc_array_char *array,
+	    const GFC_INTEGER_1 *pshift, const gfc_array_char *bound,
+	    const GFC_INTEGER_1 *pdim)
 {
-  __eoshift2 (ret, array, *pshift, bound, pdim ? *pdim : 1);
+  eoshift2 (ret, array, *pshift, bound, pdim ? *pdim : 1);
 }
 
 
+extern void eoshift2_2 (gfc_array_char *, const gfc_array_char *,
+			const GFC_INTEGER_2 *, const gfc_array_char *,
+			const GFC_INTEGER_2 *);
+export_proto(eoshift2_2);
+
 void
-__eoshift2_8 (const gfc_array_char * ret, const gfc_array_char * array,
-    const GFC_INTEGER_8 * pshift, const gfc_array_char * bound,
-    const GFC_INTEGER_8 * pdim)
+eoshift2_2 (gfc_array_char *ret, const gfc_array_char *array,
+	    const GFC_INTEGER_2 *pshift, const gfc_array_char *bound,
+	    const GFC_INTEGER_2 *pdim)
 {
-  __eoshift2 (ret, array, *pshift, bound, pdim ? *pdim : 1);
+  eoshift2 (ret, array, *pshift, bound, pdim ? *pdim : 1);
+}
+
+
+extern void eoshift2_4 (gfc_array_char *, const gfc_array_char *,
+			const GFC_INTEGER_4 *, const gfc_array_char *,
+			const GFC_INTEGER_4 *);
+export_proto(eoshift2_4);
+
+void
+eoshift2_4 (gfc_array_char *ret, const gfc_array_char *array,
+	    const GFC_INTEGER_4 *pshift, const gfc_array_char *bound,
+	    const GFC_INTEGER_4 *pdim)
+{
+  eoshift2 (ret, array, *pshift, bound, pdim ? *pdim : 1);
+}
+
+
+extern void eoshift2_8 (gfc_array_char *, const gfc_array_char *,
+			const GFC_INTEGER_8 *, const gfc_array_char *,
+			const GFC_INTEGER_8 *);
+export_proto(eoshift2_8);
+
+void
+eoshift2_8 (gfc_array_char *ret, const gfc_array_char *array,
+	    const GFC_INTEGER_8 *pshift, const gfc_array_char *bound,
+	    const GFC_INTEGER_8 *pdim)
+{
+  eoshift2 (ret, array, *pshift, bound, pdim ? *pdim : 1);
 }
 

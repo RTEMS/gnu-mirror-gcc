@@ -30,9 +30,11 @@
 /* Do not assume anything about header files.  */
 #define NO_IMPLICIT_EXTERN_C
 
-/* Default is to use APCS-32 mode.  */
+#undef  TARGET_DEFAULT_FLOAT_ABI
+#define TARGET_DEFAULT_FLOAT_ABI ARM_FLOAT_ABI_HARD
+
 #undef  TARGET_DEFAULT
-#define TARGET_DEFAULT (ARM_FLAG_APCS_32 | ARM_FLAG_MMU_TRAPS)
+#define TARGET_DEFAULT (0)
 
 #define SUBTARGET_CPU_DEFAULT TARGET_CPU_arm6
 
@@ -40,9 +42,7 @@
 
 #undef  MULTILIB_DEFAULTS
 #define MULTILIB_DEFAULTS \
-	{ "marm", "mlittle-endian", "mhard-float", "mapcs-32", "mno-thumb-interwork" }
-
-#define CPP_APCS_PC_DEFAULT_SPEC "-D__APCS_32__"
+	{ "marm", "mlittle-endian", "mhard-float", "mno-thumb-interwork" }
 
 /* The GNU C++ standard library requires that these macros be defined.  */
 #undef CPLUSPLUS_CPP_SPEC
@@ -92,7 +92,17 @@
    %{mbig-endian:-EB}" \
    SUBTARGET_EXTRA_LINK_SPEC
 
-#define TARGET_OS_CPP_BUILTINS() LINUX_TARGET_OS_CPP_BUILTINS()
+#define TARGET_OS_CPP_BUILTINS()		\
+  do						\
+    {						\
+	LINUX_TARGET_OS_CPP_BUILTINS();		\
+	if (flag_pic)				\
+	  {					\
+		builtin_define ("__PIC__");	\
+		builtin_define ("__pic__");	\
+	  }					\
+    }						\
+  while (0)
 
 /* This is how we tell the assembler that two symbols have the same value.  */
 #define ASM_OUTPUT_DEF(FILE, NAME1, NAME2) \
@@ -126,3 +136,8 @@
 
 #define LINK_GCC_C_SEQUENCE_SPEC \
   "%{static:--start-group} %G %L %{static:--end-group}%{!static:%G}"
+
+/* Use --as-needed -lgcc_s for eh support.  */
+#ifdef HAVE_LD_AS_NEEDED
+#define USE_LD_AS_NEEDED 1
+#endif

@@ -1,5 +1,5 @@
-/* JTree.java -- 
-   Copyright (C) 2002 Free Software Foundation, Inc.
+/* JTree.java --
+   Copyright (C) 2002, 2004  Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -40,17 +40,23 @@ package javax.swing;
 
 import java.awt.Dimension;
 import java.awt.Rectangle;
-import java.io.Serializable;
+import java.util.Enumeration;
 import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.Vector;
+
 import javax.accessibility.Accessible;
 import javax.accessibility.AccessibleContext;
-import javax.swing.event.TreeModelEvent;
-import javax.swing.event.TreeModelListener;
+import javax.swing.event.TreeExpansionEvent;
+import javax.swing.event.TreeExpansionListener;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
+import javax.swing.event.TreeWillExpandListener;
 import javax.swing.plaf.TreeUI;
-import javax.swing.tree.DefaultTreeSelectionModel;
+import javax.swing.tree.ExpandVetoException;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeCellRenderer;
+import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreeCellEditor;
 import javax.swing.tree.TreeCellRenderer;
 import javax.swing.tree.TreeModel;
@@ -58,69 +64,608 @@ import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 
-public class JTree extends JComponent implements Scrollable, Accessible
+
+public class JTree extends JComponent
+  implements Scrollable, Accessible
 {
-    JTree()
+  private static final long serialVersionUID = 7559816092864483649L;
+
+  public static final String ANCHOR_SELECTION_PATH_PROPERTY = "anchorSelectionPath";
+  public static final String CELL_EDITOR_PROPERTY = "cellEditor";
+  public static final String CELL_RENDERER_PROPERTY = "cellRenderer";
+  public static final String EDITABLE_PROPERTY = "editable";
+  public static final String EXPANDS_SELECTED_PATHS_PROPERTY = "expandsSelectedPaths";
+  public static final String INVOKES_STOP_CELL_EDITING_PROPERTY = "invokesStopCellEditing";
+  public static final String LARGE_MODEL_PROPERTY = "largeModel";
+  public static final String LEAD_SELECTION_PATH_PROPERTY = "leadSelectionPath";
+  public static final String ROOT_VISIBLE_PROPERTY = "rootVisible";
+  public static final String ROW_HEIGHT_PROPERTY = "rowHeight";
+  public static final String SCROLLS_ON_EXPAND_PROPERTY = "scrollsOnExpand";
+  public static final String SELECTION_MODEL_PROPERTY = "selectionModel";
+  public static final String SHOWS_ROOT_HANDLES_PROPERTY = "showsRootHandles";
+  public static final String TOGGLE_CLICK_COUNT_PROPERTY = "toggleClickCount";
+  public static final String TREE_MODEL_PROPERTY = "model";
+  public static final String VISIBLE_ROW_COUNT_PROPERTY = "visibleRowCount";
+
+  protected TreeCellEditor cellEditor;
+  protected TreeCellRenderer cellRenderer;
+  protected boolean editable;
+  protected boolean invokesStopCellEditing;
+  protected boolean largeModel;
+  protected boolean rootVisible;
+  protected int rowHeight;
+  protected boolean scrollsOnExpand;
+  protected TreeSelectionModel selectionModel;
+  protected boolean showsRootHandles;
+  protected int toggleClickCount;
+  protected TreeModel treeModel;
+  protected int visibleRowCount;
+
+  /**
+   * Creates a new <code>JTree</code> object.
+   */
+  public JTree()
+  {
+    this(createTreeModel(null));
+  }
+
+  /**
+   * Creates a new <code>JTree</code> object.
+   *
+   * @param value the initial nodes in the tree
+   */
+  public JTree(Hashtable value)
+  {
+    this(createTreeModel(value));
+  }
+
+  /**
+   * Creates a new <code>JTree</code> object.
+   *
+   * @param value the initial nodes in the tree
+   */
+  public JTree(Object[] value)
+  {
+    this(createTreeModel(value));
+  }
+
+  /**
+   * Creates a new <code>JTree</code> object.
+   *
+   * @param model the model to use
+   */
+  public JTree(TreeModel model)
+  {
+    treeModel = model;
+    setCellRenderer(new DefaultTreeCellRenderer());
+    updateUI();
+  }
+
+  /**
+   * Creates a new <code>JTree</code> object.
+   *
+   * @param root the root node
+   */
+  public JTree(TreeNode root)
+  {
+    this(root, false);
+  }
+
+  /**
+   * Creates a new <code>JTree</code> object.
+   *
+   * @param root the root node
+   * @param asksAllowChildren if false, all nodes without children are leaf nodes.
+   * If true, only nodes that do not allow children are leaf nodes.
+   */
+  public JTree(TreeNode root, boolean asksAllowChildren)
+  {
+    this(new DefaultTreeModel(root, asksAllowChildren));
+  }
+
+  /**
+   * Creates a new <code>JTree</code> object.
+   *
+   * @param value the initial nodes in the tree
+   */
+  public JTree(Vector value)
+  {
+    this(createTreeModel(value));
+  }
+
+  public static class DynamicUtilTreeNode 
+    extends DefaultMutableTreeNode
+  {
+    protected Object childValue;
+    protected boolean loadedChildren;
+    public DynamicUtilTreeNode(Object value,
+                               Object children) 
     {
-	updateUI();
+      super(value);
+      childValue = children;
+      loadedChildren = false;
+    }
+
+    public int getChildCount()
+    {
+      loadChildren();
+      return super.getChildCount();
+    }
+
+    protected void loadChildren()
+    {
+      if (!loadedChildren)
+        {
+          createChildren(this, childValue);
+          loadedChildren = true;
+        }
     }
     
-    public TreeUI getUI()
+    public Enumeration children()
     {
-        return (TreeUI) ui;
+      loadChildren();
+      return super.children();
     }
 
-    public void setUI(TreeUI ui)
+    public boolean isLeaf() 
     {
-        super.setUI(ui);
+      return (childValue == null || 
+              !(childValue instanceof Hashtable
+               || childValue instanceof Vector
+               || childValue.getClass().isArray()));
     }
 
-    public void updateUI()
+    public static void createChildren(DefaultMutableTreeNode parent,
+                                      Object children)
     {
-        setUI((TreeUI)UIManager.getUI(this));
+      if (children instanceof Hashtable)
+        {
+          Hashtable tab = (Hashtable) children;
+          Enumeration e = tab.keys();
+          while (e.hasMoreElements()) 
+            {
+              Object key = e.nextElement();
+              Object val = tab.get(key);
+              parent.add(new DynamicUtilTreeNode(key, val));
+            }
+        }
+      else if (children instanceof Vector)
+        {
+          Iterator i = ((Vector)children).iterator();
+          while (i.hasNext())
+            {
+              Object n = i.next();
+              parent.add(new DynamicUtilTreeNode(n,n));
+            }
+        }
+      else if (children.getClass().isArray())
+        {
+          Object[] arr = (Object[]) children;
+          for (int i = 0; i < arr.length; ++i)
+            parent.add(new DynamicUtilTreeNode(arr[i], arr[i]));
+      }
     }
+  }
 
-    
-    public String getUIClassID()
-    {
-	return "JTree";
-    }
+  /**
+   * Creates a new <code>TreeModel</code> object.
+   *
+   * @param value the values stored in the model
+   */
+  protected static TreeModel createTreeModel(Object value)
+  {
+    return new DefaultTreeModel(new DynamicUtilTreeNode(value, value));
+  }
 
+  /**
+   * Return the UI associated with this <code>JTree</code> object.
+   *
+   * @return the associated <code>TreeUI</code> object
+   */
+  public TreeUI getUI()
+  {
+    return (TreeUI) ui;
+  }
 
-    public AccessibleContext getAccessibleContext()
-    {
-      return null;
-    }
+  /**
+   * Sets the UI associated with this <code>JTree</code> object.
+   *
+   * @param ui the <code>TreeUI</code> to associate
+   */
+  public void setUI(TreeUI ui)
+  {
+    super.setUI(ui);
+  }
 
-    public Dimension getPreferredScrollableViewportSize()
-    {
-	return null;
-    }
+  /**
+   * This method resets the UI used to the Look and Feel defaults..
+   */
+  public void updateUI()
+  {
+    setUI((TreeUI) UIManager.getUI(this));
+    revalidate();
+    repaint();
+  }
 
-    public int getScrollableUnitIncrement(Rectangle visibleRect,
-					  int orientation,
-					  int direction)
-    {
-	return 1;
-    }
+  /**
+   * This method returns the String ID of the UI class of  Separator.
+   *
+   * @return The UI class' String ID.
+   */
+  public String getUIClassID()
+  {
+    return "TreeUI";
+  }
 
-    public int getScrollableBlockIncrement(Rectangle visibleRect,
-					   int orientation,
-					   int direction)
-    {
-	return 1;
-    }
+  /**
+   * Gets the AccessibleContext associated with this <code>JToggleButton</code>.
+   *
+   * @return the associated context
+   */
+  public AccessibleContext getAccessibleContext()
+  {
+    return null;
+  }
 
-    public boolean getScrollableTracksViewportWidth()
-    {
-	return false;
-    }
+  /**
+   * Returns the preferred viewport size..
+   *
+   * @return the preferred size
+   */
+  public Dimension getPreferredScrollableViewportSize()
+  {
+    return null;
+  }
 
-    public boolean getScrollableTracksViewportHeight()
-    {
-	return false;
-    }
+  public int getScrollableUnitIncrement(Rectangle visibleRect,
+                                        int orientation, int direction)
+  {
+    return 1;
+  }
+
+  public int getScrollableBlockIncrement(Rectangle visibleRect,
+                                         int orientation, int direction)
+  {
+    return 1;
+  }
+
+  public boolean getScrollableTracksViewportWidth()
+  {
+    return false;
+  }
+
+  public boolean getScrollableTracksViewportHeight()
+  {
+    return false;
+  }
+
+  /**
+   * Adds a <code>TreeExpansionListener</code> object to the tree.
+   *
+   * @param listener the listener to add
+   */
+  public void addTreeExpansionListener(TreeExpansionListener listener)
+  {
+    listenerList.add(TreeExpansionListener.class, listener);
+  }
+
+  /**
+   * Removes a <code>TreeExpansionListener</code> object from the tree.
+   *
+   * @param listener the listener to remove
+   */
+  public void removeTreeExpansionListener(TreeExpansionListener listener)
+  {
+    listenerList.remove(TreeExpansionListener.class, listener);
+  }
+
+  /**
+   * Returns all added <code>TreeExpansionListener</code> objects.
+   *
+   * @return an array of listeners
+   */
+  public TreeExpansionListener[] getTreeExpansionListeners()
+  {
+    return (TreeExpansionListener[]) getListeners(TreeExpansionListener.class);
+  }
+
+  /**
+   * Notifies all listeners that the tree was collapsed.
+   *
+   * @param path the path to the node that was collapsed
+   */
+  public void fireTreeCollapsed(TreePath path)
+  {
+    TreeExpansionEvent event = new TreeExpansionEvent(this, path);
+    TreeExpansionListener[] listeners = getTreeExpansionListeners();
+
+    for (int index = 0; index < listeners.length; ++index)
+      listeners[index].treeCollapsed(event);
+  }
+  
+  /**
+   * Notifies all listeners that the tree was expanded.
+   *
+   * @param path the path to the node that was expanded
+   */
+  public void fireTreeExpanded(TreePath path)
+  {
+    TreeExpansionEvent event = new TreeExpansionEvent(this, path);
+    TreeExpansionListener[] listeners = getTreeExpansionListeners();
+
+    for (int index = 0; index < listeners.length; ++index)
+      listeners[index].treeExpanded(event);
+  }
+
+  /**
+   * Adds a <code>TreeSelctionListener</code> object to the tree.
+   *
+   * @param listener the listener to add
+   */
+  public void addTreeSelectionListener(TreeSelectionListener listener)
+  {
+    listenerList.add(TreeSelectionListener.class, listener);
+  }
+
+  /**
+   * Removes a <code>TreeSelectionListener</code> object from the tree.
+   *
+   * @param listener the listener to remove
+   */
+  public void removeTreeSelectionListener(TreeSelectionListener listener)
+  {
+    listenerList.remove(TreeSelectionListener.class, listener);
+  }
+
+  /**
+   * Returns all added <code>TreeSelectionListener</code> objects.
+   *
+   * @return an array of listeners
+   */
+  public TreeSelectionListener[] getTreeSelectionListeners()
+  {
+    return (TreeSelectionListener[]) getListeners(TreeSelectionListener.class);
+  }
+
+  /**
+   * Notifies all listeners when the selection of the tree changed.
+   *
+   * @param event the event to send
+   */
+  protected void fireValueChanged(TreeSelectionEvent event)
+  {
+    TreeSelectionListener[] listeners = getTreeSelectionListeners();
+
+    for (int index = 0; index < listeners.length; ++index)
+      listeners[index].valueChanged(event);
+  }
+
+  /**
+   * Adds a <code>TreeWillExpandListener</code> object to the tree.
+   *
+   * @param listener the listener to add
+   */
+  public void addTreeWillExpandListener(TreeWillExpandListener listener)
+  {
+    listenerList.add(TreeWillExpandListener.class, listener);
+  }
+
+  /**
+   * Removes a <code>TreeWillExpandListener</code> object from the tree.
+   *
+   * @param listener the listener to remove
+   */
+  public void removeTreeWillExpandListener(TreeWillExpandListener listener)
+  {
+    listenerList.remove(TreeWillExpandListener.class, listener);
+  }
+
+  /**
+   * Returns all added <code>TreeWillExpandListener</code> objects.
+   *
+   * @return an array of listeners
+   */
+  public TreeWillExpandListener[] getTreeWillExpandListeners()
+  {
+    return (TreeWillExpandListener[]) getListeners(TreeWillExpandListener.class);
+  }
+
+  /**
+   * Notifies all listeners that the tree will collapse.
+   *
+   * @param path the path to the node that will collapse
+   */
+  public void fireTreeWillCollapse(TreePath path)
+    throws ExpandVetoException
+  {
+    TreeExpansionEvent event = new TreeExpansionEvent(this, path);
+    TreeWillExpandListener[] listeners = getTreeWillExpandListeners();
+
+    for (int index = 0; index < listeners.length; ++index)
+      listeners[index].treeWillCollapse(event);
+  }
+
+  /**
+   * Notifies all listeners that the tree will expand.
+   *
+   * @param path the path to the node that will expand
+   */
+  public void fireTreeWillExpand(TreePath path)
+    throws ExpandVetoException
+  {
+    TreeExpansionEvent event = new TreeExpansionEvent(this, path);
+    TreeWillExpandListener[] listeners = getTreeWillExpandListeners();
+
+    for (int index = 0; index < listeners.length; ++index)
+      listeners[index].treeWillExpand(event);
+  }
+
+  /**
+   * Returns the model of this <code>JTree</code> object.
+   *
+   * @return the associated <code>TreeModel</code>
+   */
+  public TreeModel getModel()
+  {
+    return treeModel;
+  }
+
+  /**
+   * Sets the model to use in <code>JTree</object>.
+   *
+   * @param model the <code>TreeModel</code> to use
+   */
+  public void setModel(TreeModel model)
+  {
+    treeModel = model;
+  }
+
+  /**
+   * Checks if this <code>JTree</code> object is editable.
+   *
+   * @return <code>true</code> if this tree object is editable,
+   * <code>false</code> otherwise
+   */
+  public boolean isEditable()
+  {
+    return editable;
+  }
+
+  /**
+   * Sets the <code>editable</code> property.
+   *
+   * @param flag <code>true</code> to make this tree object editable,
+   * <code>false</code> otherwise
+   */
+  public void setEditable(boolean flag)
+  {
+    if (editable == flag)
+      return;
+
+    boolean oldValue = editable;
+    editable = flag;
+    firePropertyChange("editable", oldValue, editable);
+  }
+
+  /**
+   * Checks if the root element is visible.
+   *
+   * @return <code>true</code> if the root element is visible,
+   * <code>false</code> otherwise
+   */
+  public boolean isRootVisible()
+  {
+    return rootVisible;
+  }
+
+  public void setRootVisible(boolean flag)
+  {
+    rootVisible = flag;
+  }
+
+  public boolean getShowsRootHandles()
+  {
+    return showsRootHandles;
+  }
+
+  public void setShowsRootHandles(boolean flag)
+  {
+    showsRootHandles = flag;
+  }
+
+  public TreeCellEditor getCellEditor()
+  {
+    return cellEditor;
+  }
+
+  public void setCellEditor(TreeCellEditor editor)
+  {
+    cellEditor = editor;
+  }
+  
+  public TreeCellRenderer getCellRenderer()
+  {
+    return cellRenderer;
+  }
+  
+  public void setCellRenderer(TreeCellRenderer newRenderer)
+  {
+    cellRenderer = newRenderer;
+  }
+
+  public TreeSelectionModel getSelectionModel()
+  {
+    return selectionModel;
+  }
+
+  public void setSelectionModel(TreeSelectionModel model)
+  {
+    selectionModel = model;
+  }
+
+  public int getVisibleRowCount()
+  {
+    return visibleRowCount;
+  }
+
+  public void setVisibleRowCount(int rows)
+  {
+    visibleRowCount = rows;
+  }
+
+  public boolean isLargeModel()
+  {
+    return largeModel;
+  }
+
+  public void setLargeModel(boolean large)
+  {
+    largeModel = large;
+  }
+
+  public int getRowHeight()
+  {
+    return rowHeight;
+  }
+
+  public void setRowHeight(int height)
+  {
+    rowHeight = height;
+  }
+
+  public boolean getInvokesStopCellEditing()
+  {
+    return invokesStopCellEditing;
+  }
+
+  public void setInvokesStopCellEditing(boolean invoke)
+  {
+    invokesStopCellEditing = invoke;
+  }
+
+  /**
+   * @since 1.3
+   */
+  public int getToggleClickCount()
+  {
+    return toggleClickCount;
+  }
+
+  /**
+   * @since 1.3
+   */
+  public void setToggleClickCount(int count)
+  {
+    toggleClickCount = count;
+  }
+
+  public boolean getScrollsOnExpand()
+  {
+    return scrollsOnExpand;
+  }
+
+  public void setScrollsOnExpand(boolean scroll)
+  {
+    scrollsOnExpand = scroll;
+  }
 }
-
-
-

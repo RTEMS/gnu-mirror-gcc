@@ -38,6 +38,10 @@ exception statement from your version. */
 
 package java.awt;
 
+import java.awt.font.FontRenderContext;
+import java.awt.font.LineMetrics;
+import java.text.CharacterIterator;
+
 // FIXME: I leave many methods basically unimplemented.  This
 // should be reviewed.
 
@@ -47,12 +51,12 @@ package java.awt;
   * least the following methods:
   * <p>
   * <ul>
-  * <li>getAscent
-  * <li>getDescent
-  * <li>getLeading()
-  * <li>getMaxAdvance()
-  * <li>charWidth(char)
-  * <li>charsWidth(char[], int, int)
+  * <li>getAscent()</li>
+  * <li>getDescent()</li>
+  * <li>getLeading()</li>
+  * <li>getMaxAdvance()</li>
+  * <li>charWidth(char)</li>
+  * <li>charsWidth(char[], int, int)</li>
   * </ul>
   *
   * @author Aaron M. Renn (arenn@urbanophile.com)
@@ -292,8 +296,7 @@ charsWidth(char buf[], int offset, int len)
 {
   int total_width = 0;
   for (int i = offset; i < len; i++)
-    total_width = charWidth(buf[i]);
-
+    total_width += charWidth(buf[i]);
   return(total_width);
 }
 
@@ -328,7 +331,12 @@ bytesWidth(byte buf[], int offset, int len)
 public int[]
 getWidths()
 {
-  return(new int[256]);
+  int [] result = new int[256];
+  for(char i = 0; i < 256; i++)
+  {
+    result[i]= charWidth(i);
+  }
+  return(result);
 }
 
 /*************************************************************************/
@@ -345,5 +353,111 @@ toString()
 	  + ",descent=" + getDescent() + ",height=" + getHeight() + "]");
 }
 
-} // class FontMetrics 
 
+// Generic FontRenderContext used when getLineMetrics is called with a
+// plain Graphics object.
+private static final FontRenderContext gRC = new FontRenderContext(null,
+								   false,
+								   false);
+
+/**
+  * Returns a {@link LineMetrics} object constructed with the
+  * specified text and the {@link FontRenderContext} of the Graphics
+  * object when it is an instance of Graphics2D or a generic
+  * FontRenderContext with a null transform, not anti-aliased and not
+  * using fractional metrics.
+  *
+  * @param text The string to calculate metrics from.
+  * @param g The Graphics object that will be used.
+  *
+  * @return A new {@link LineMetrics} object.
+  */
+public LineMetrics getLineMetrics(String text, Graphics g)
+{
+  return getLineMetrics(text, 0, text.length(), g);
+}
+
+/**
+ * Returns a {@link LineMetrics} object constructed with the
+ * specified text and the {@link FontRenderContext} of the Graphics
+ * object when it is an instance of Graphics2D or a generic
+ * FontRenderContext with a null transform, not anti-aliased and not
+ * using fractional metrics.
+ *
+ * @param text The string to calculate metrics from.
+ * @param begin Index of first character in <code>text</code> to measure.
+ * @param limit Index of last character in <code>text</code> to measure.
+ * @param g The Graphics object that will be used.
+ *
+ * @return A new {@link LineMetrics} object.
+ *
+ * @throws IndexOutOfBoundsException if the range [begin, limit] is
+ * invalid in <code>text</code>.
+ */
+public LineMetrics getLineMetrics(String text, int begin, 
+				  int limit, Graphics g)
+{
+  FontRenderContext rc;
+  if (g instanceof Graphics2D)
+    rc = ((Graphics2D) g).getFontRenderContext();
+  else
+    rc = gRC;
+  return font.getLineMetrics(text, begin, limit, rc);
+}
+
+/**
+ * Returns a {@link LineMetrics} object constructed with the
+ * specified text and the {@link FontRenderContext} of the Graphics
+ * object when it is an instance of Graphics2D or a generic
+ * FontRenderContext with a null transform, not anti-aliased and not
+ * using fractional metrics.
+ *
+ * @param chars The string to calculate metrics from.
+ * @param begin Index of first character in <code>text</code> to measure.
+ * @param limit Index of last character in <code>text</code> to measure.
+ * @param g The Graphics object that will be used.
+ *
+ * @return A new {@link LineMetrics} object.
+ *
+ * @throws IndexOutOfBoundsException if the range [begin, limit] is
+ * invalid in <code>text</code>.
+ */
+public LineMetrics getLineMetrics(char[] chars, int begin, 
+				  int limit, Graphics g)
+{
+  FontRenderContext rc;
+  if (g instanceof Graphics2D)
+    rc = ((Graphics2D) g).getFontRenderContext();
+  else
+    rc = gRC;
+  return font.getLineMetrics(chars, begin, limit, rc);
+}
+
+/**
+ * Returns a {@link LineMetrics} object constructed with the
+ * specified text and the {@link FontRenderContext} of the Graphics
+ * object when it is an instance of Graphics2D or a generic
+ * FontRenderContext with a null transform, not anti-aliased and not
+ * using fractional metrics.
+ *
+ * @param ci An iterator over the string to calculate metrics from.
+ * @param begin Index of first character in <code>text</code> to measure.
+ * @param limit Index of last character in <code>text</code> to measure.
+ * @param g The Graphics object that will be used.
+ *
+ * @return A new {@link LineMetrics} object.
+ *
+ * @throws IndexOutOfBoundsException if the range [begin, limit] is
+ * invalid in <code>text</code>.
+ */
+public LineMetrics getLineMetrics(CharacterIterator ci, int begin, 
+				  int limit, Graphics g)
+{
+  FontRenderContext rc;
+  if (g instanceof Graphics2D)
+    rc = ((Graphics2D) g).getFontRenderContext();
+  else
+    rc = gRC;
+  return font.getLineMetrics(ci, begin, limit, rc);
+}
+}

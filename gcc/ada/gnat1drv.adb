@@ -78,7 +78,7 @@ procedure Gnat1drv is
    --  Compilation unit node for main unit
 
    Main_Kind : Node_Kind;
-   --  Kind of main compilation unit node.
+   --  Kind of main compilation unit node
 
    Back_End_Mode : Back_End.Back_End_Mode_Type;
    --  Record back end mode
@@ -140,7 +140,7 @@ begin
               ("cannot locate file system.ads");
             raise Unrecoverable_Error;
 
-         --  Here if system.ads successfully read. Remember its source index.
+         --  Remember source index of system.ads (which was read successfully)
 
          else
             System_Source_File_Index := S;
@@ -162,6 +162,14 @@ begin
          Configurable_Run_Time_Mode := True;
       end if;
 
+      --  Set -gnatR3m mode if debug flag A set
+
+      if Debug_Flag_AA then
+         Back_Annotate_Rep_Info := True;
+         List_Representation_Info := 1;
+         List_Representation_Info_Mechanisms := True;
+      end if;
+
       --  Output copyright notice if full list mode
 
       if (Verbose_Mode or Full_List)
@@ -170,7 +178,8 @@ begin
          Write_Eol;
          Write_Str ("GNAT ");
          Write_Str (Gnat_Version_String);
-         Write_Str (" Copyright 1992-2004 Free Software Foundation, Inc.");
+         Write_Eol;
+         Write_Str ("Copyright 1992-2004 Free Software Foundation, Inc.");
          Write_Eol;
       end if;
 
@@ -310,7 +319,13 @@ begin
             --  include both in a partition, this is diagnosed at bind time.
             --  In Ada 83 mode this is not a warning case.
 
+            --  Note: if weird file names are being used, we can have a
+            --  situation where the file name that supposedly contains a
+            --  body, in fact contains a spec, or we can't tell what it
+            --  contains. Skip the error message in these cases.
+
             if Src_Ind /= No_Source_File
+              and then Get_Expected_Unit_Type (Fname) = Expect_Body
               and then not Source_File_Is_Subunit (Src_Ind)
             then
                Error_Msg_Name_1 := Sname;
@@ -323,7 +338,7 @@ begin
                --  a junk spec as not needing a body when it really does).
 
                if Main_Kind = N_Package_Declaration
-                 and then Ada_83
+                 and then Ada_Version = Ada_83
                  and then Operating_Mode = Generate_Code
                  and then Distribution_Stub_Mode /= Generate_Caller_Stub_Body
                  and then not Compilation_Errors
@@ -567,13 +582,17 @@ begin
       --  We don't call for annotations on a subunit, because to process those
       --  the back-end requires that the parent(s) be properly compiled.
 
+      --  Annotation is suppressed for targets where front-end layout is
+      --  enabled, because the front end determines representations.
+
       --  Annotation is also suppressed in the case of compiling for
       --  the Java VM, since representations are largely symbolic there.
 
       if Back_End_Mode = Declarations_Only
-        and then (not (Back_Annotate_Rep_Info or Debug_Flag_AA)
-                   or else Main_Kind = N_Subunit
-                   or else Hostparm.Java_VM)
+        and then (not Back_Annotate_Rep_Info
+                    or else Main_Kind = N_Subunit
+                    or else Targparm.Frontend_Layout_On_Target
+                    or else Hostparm.Java_VM)
       then
          Sem_Ch13.Validate_Unchecked_Conversions;
          Errout.Finalize;

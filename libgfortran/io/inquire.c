@@ -32,7 +32,7 @@ static char undefined[] = "UNDEFINED";
 /* inquire_via_unit()-- Inquiry via unit number.  The unit might not exist. */
 
 static void
-inquire_via_unit (unit_t * u)
+inquire_via_unit (gfc_unit * u)
 {
   const char *p;
 
@@ -73,8 +73,13 @@ inquire_via_unit (unit_t * u)
 
   if (ioparm.sequential != NULL)
     {
-      p = (u == NULL) ? inquire_sequential (NULL, 0) :
-	inquire_sequential (u->file, u->file_len);
+      /* disallow an open direct access file to be accessed
+         sequentially */
+      if (u->flags.access==ACCESS_DIRECT)
+        p = "NO";
+      else   
+        p = (u == NULL) ? inquire_sequential (NULL, 0) :
+        inquire_sequential (u->file, u->file_len);
 
       cf_strcpy (ioparm.sequential, ioparm.sequential_len, p);
     }
@@ -137,7 +142,7 @@ inquire_via_unit (unit_t * u)
 	switch (u->flags.blank)
 	  {
 	  case BLANK_NULL:
-	    p = "BLANK";
+          p = "NULL";
 	    break;
 	  case BLANK_ZERO:
 	    p = "ZERO";
@@ -161,7 +166,7 @@ inquire_via_unit (unit_t * u)
       cf_strcpy (ioparm.blank, ioparm.blank_len, p);
     }
 
-  if (ioparm.access != NULL)
+  if (ioparm.action != NULL)
     {
       if (u == NULL)
 	p = undefined;
@@ -181,7 +186,7 @@ inquire_via_unit (unit_t * u)
 	    internal_error ("inquire_via_unit(): Bad action");
 	  }
 
-      cf_strcpy (ioparm.access, ioparm.access_len, p);
+      cf_strcpy (ioparm.action, ioparm.action_len, p);
     }
 
   if (ioparm.read != NULL)
@@ -348,11 +353,16 @@ inquire_via_filename (void)
 }
 
 
+/* Library entry point for the INQUIRE statement (non-IOLENGTH
+   form).  */
+
+extern void st_inquire (void);
+export_proto(st_inquire);
 
 void
 st_inquire (void)
 {
-  unit_t *u;
+  gfc_unit *u;
 
   library_start ();
 

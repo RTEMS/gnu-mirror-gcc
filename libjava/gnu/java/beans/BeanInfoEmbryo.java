@@ -38,10 +38,20 @@ exception statement from your version. */
 
 package gnu.java.beans;
 
-import java.beans.*;
-import java.util.*;
-import gnu.java.lang.*;
-import java.lang.reflect.*;
+import java.beans.BeanDescriptor;
+import java.beans.BeanInfo;
+import java.beans.EventSetDescriptor;
+import java.beans.IndexedPropertyDescriptor;
+import java.beans.MethodDescriptor;
+import java.beans.PropertyDescriptor;
+import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.Enumeration;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.Vector;
 
 /**
  ** A BeanInfoEmbryo accumulates information about a Bean
@@ -59,7 +69,10 @@ import java.lang.reflect.*;
  **/
 
 public class BeanInfoEmbryo {
-	Hashtable properties = new Hashtable();
+
+	// by using a TreeMap the properties will be sorted alphabetically by name
+	// which matches the (undocumented) behavior of jdk
+	TreeMap properties = new TreeMap();
 	Hashtable events = new Hashtable();
 	Vector methods = new Vector();
 
@@ -78,9 +91,9 @@ public class BeanInfoEmbryo {
 
 		PropertyDescriptor[] Aproperties = new PropertyDescriptor[properties.size()];
 		int i = 0;
-		Enumeration enum = properties.elements();
-		while(enum.hasMoreElements()) {
-			Aproperties[i] = (PropertyDescriptor)enum.nextElement();
+		Iterator it = properties.entrySet().iterator();
+		while (it.hasNext()) {
+			Aproperties[i] = (PropertyDescriptor) (((Map.Entry)it.next()).getValue());
 			if(defaultPropertyName != null && Aproperties[i].getName().equals(defaultPropertyName)) {
 				defaultProperty = i;
 			}
@@ -89,9 +102,9 @@ public class BeanInfoEmbryo {
 
 		EventSetDescriptor[] Aevents = new EventSetDescriptor[events.size()];
 		i = 0;
-		enum = events.elements();
-		while(enum.hasMoreElements()) {
-			Aevents[i] = (EventSetDescriptor)enum.nextElement();
+		Enumeration e = events.elements();
+		while (e.hasMoreElements()) {
+			Aevents[i] = (EventSetDescriptor) e.nextElement();
 			if(defaultEventName != null && Aevents[i].getName().equals(defaultEventName)) {
 				defaultEvent = i;
 			}

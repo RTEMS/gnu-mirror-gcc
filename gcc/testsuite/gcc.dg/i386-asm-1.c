@@ -1,8 +1,10 @@
 /* PR inline-asm/11676 */
 /* { dg-do run { target i?86-*-* } } */
+/* { dg-skip-if "" { i?86-*-* } { "-m64" } { "" } } */
 /* { dg-options "-O2" } */
 
-static int bar(int x) __asm__("bar");
+extern void abort (void);
+static int bar(int x) __asm__("bar") __attribute__((regparm(1)));
 static int __attribute__((regparm(1), noinline, used))
 bar(int x)
 {

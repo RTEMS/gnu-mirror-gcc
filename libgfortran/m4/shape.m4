@@ -23,14 +23,13 @@ Boston, MA 02111-1307, USA.  */
 #include <stdlib.h>
 #include <assert.h>
 #include "libgfortran.h"'
-include(types.m4)dnl
-define(rtype_kind, regexp(file, `_i\([0-9]+\)\.', `\1'))dnl
-define(rtype_code,`i'rtype_name)dnl
-define(rtype,get_arraytype(i,rtype_kind))dnl
-define(rtype_name, get_typename(i, rtype_kind))dnl
+include(iparm.m4)dnl
+
+extern void shape_`'rtype_kind (rtype * ret, const rtype * array);
+export_proto(shape_`'rtype_kind);
 
 void
-`__shape_'rtype_kind (rtype * ret, const rtype * array)
+shape_`'rtype_kind (rtype * ret, const rtype * array)
 {
   int n;
   index_type stride;
@@ -45,4 +44,3 @@ void
         array->dim[n].ubound + 1 - array->dim[n].lbound;
     }
 }
-

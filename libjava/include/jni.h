@@ -1,4 +1,4 @@
-/* Copyright (C) 1998, 1999, 2000, 2001, 2002  Free Software Foundation
+/* Copyright (C) 1998, 1999, 2000, 2001, 2002, 2004  Free Software Foundation
 
    This file is part of libgcj.
 
@@ -44,7 +44,9 @@ typedef struct _Jv_JavaVM JavaVM;
 # ifdef __GNUC__
 
 /* If we're using gcc, we can use a platform-independent scheme to get
-   the right integer types.  */
+   the right integer types.  FIXME: this is not always correct, for
+   instance on the c4x it will be wrong -- it depends on whether
+   QImode is 8 bits.  */
 typedef int    jbyte  __attribute__((__mode__(__QI__)));
 typedef int    jshort __attribute__((__mode__(__HI__)));
 typedef int    jint   __attribute__((__mode__(__SI__)));
@@ -240,12 +242,6 @@ typedef union jvalue
   jobject  l;
 } jvalue;
 
-#ifdef __cplusplus
-typedef void * (*_Jv_func) (...);
-#else
-typedef void * (*_Jv_func) ();
-#endif
-
 /* This structure is used when registering native methods.  */
 typedef struct
 {
@@ -256,10 +252,10 @@ typedef struct
 
 struct JNINativeInterface
 {
-  _Jv_func reserved0;
-  _Jv_func reserved1;
-  _Jv_func reserved2;
-  _Jv_func reserved3;
+  void *reserved0;
+  void *reserved1;
+  void *reserved2;
+  void *reserved3;
 
   jint     (JNICALL *GetVersion)                   (JNIEnv *);
   jclass   (JNICALL *DefineClass)                  (JNIEnv *, const char *,
@@ -561,7 +557,7 @@ struct JNINativeInterface
   const char * (JNICALL *GetStringUTFChars) (JNIEnv *, jstring, jboolean *);
   void     (JNICALL *ReleaseStringUTFChars) (JNIEnv *, jstring, const char *);
   jsize    (JNICALL *GetArrayLength)       (JNIEnv *, jarray);
-  jarray   (JNICALL *NewObjectArray)       (JNIEnv *, jsize, jclass, jobject);
+  jobjectArray (JNICALL *NewObjectArray)    (JNIEnv *, jsize, jclass, jobject);
   jobject  (JNICALL *GetObjectArrayElement) (JNIEnv *, jobjectArray, jsize);
   void     (JNICALL *SetObjectArrayElement) (JNIEnv *, jobjectArray, jsize,
 					     jobject);
@@ -1386,7 +1382,7 @@ public:
   jsize GetArrayLength (jarray val0)
   { return p->GetArrayLength (this, val0); }
 
-  jarray NewObjectArray (jsize val0, jclass cl1, jobject obj2)
+  jobjectArray NewObjectArray (jsize val0, jclass cl1, jobject obj2)
   { return p->NewObjectArray (this, val0, cl1, obj2); }
 
   jobject GetObjectArrayElement (jobjectArray val0, jsize val1)
@@ -1574,9 +1570,9 @@ public:
 
 struct JNIInvokeInterface
 {
-  _Jv_func reserved0;
-  _Jv_func reserved1;
-  _Jv_func reserved2;
+  void *reserved0;
+  void *reserved1;
+  void *reserved2;
 
   jint (JNICALL *DestroyJavaVM)         (JavaVM *);
   jint (JNICALL *AttachCurrentThread)   (JavaVM *, void **, void *);

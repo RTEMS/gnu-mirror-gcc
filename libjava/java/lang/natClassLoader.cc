@@ -13,10 +13,12 @@ details.  */
 #include <config.h>
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <gcj/cni.h>
 #include <jvm.h>
+#include <execution.h>
 
 #include <java-threads.h>
 #include <java-interp.h>
@@ -32,6 +34,7 @@ details.  */
 #include <java/lang/ClassNotFoundException.h>
 #include <java/lang/ClassCircularityError.h>
 #include <java/lang/IncompatibleClassChangeError.h>
+#include <java/lang/ClassFormatError.h>
 #include <java/lang/VirtualMachineError.h>
 #include <java/lang/VMClassLoader.h>
 #include <java/lang/reflect/Modifier.h>
@@ -39,142 +42,6 @@ details.  */
 #include <java/lang/StringBuffer.h>
 #include <java/io/Serializable.h>
 #include <java/lang/Cloneable.h>
-
-void
-_Jv_WaitForState (jclass klass, int state)
-{
-  if (klass->state >= state)
-    return;
-  
-  _Jv_MonitorEnter (klass) ;
-
-  if (state == JV_STATE_LINKED)
-    {
-      // Must call _Jv_PrepareCompiledClass while holding the class
-      // mutex.
-#ifdef INTERPRETER
-      if (_Jv_IsInterpretedClass (klass))
-	_Jv_PrepareClass (klass);
-#endif
-      _Jv_PrepareCompiledClass (klass);
-      _Jv_MonitorExit (klass);
-      return;
-    }
-	
-  java::lang::Thread *self = java::lang::Thread::currentThread();
-
-  // this is similar to the strategy for class initialization.
-  // if we already hold the lock, just leave.
-  while (klass->state <= state
-	 && klass->thread 
-	 && klass->thread != self)
-    klass->wait ();
-
-  _Jv_MonitorExit (klass);
-
-  if (klass->state == JV_STATE_ERROR)
-    throw new java::lang::LinkageError;
-}
-
-typedef unsigned int uaddr __attribute__ ((mode (pointer)));
-
-/** This function does class-preparation for compiled classes.  
-    NOTE: It contains replicated functionality from
-    _Jv_ResolvePoolEntry, and this is intentional, since that function
-    lives in resolve.cc which is entirely conditionally compiled.
- */
-void
-_Jv_PrepareCompiledClass (jclass klass)
-{
-  if (klass->state >= JV_STATE_LINKED)
-    return;
-
-  // Short-circuit, so that mutually dependent classes are ok.
-  klass->state = JV_STATE_LINKED;
-
-  _Jv_Constants *pool = &klass->constants;
-
-  // Resolve class constants first, since other constant pool
-  // entries may rely on these.
-  for (int index = 1; index < pool->size; ++index)
-    {
-      if (pool->tags[index] == JV_CONSTANT_Class)
-	{
-	  _Jv_Utf8Const *name = pool->data[index].utf8;
-	  
-	  jclass found;
-	  if (name->data[0] == '[')
-	    found = _Jv_FindClassFromSignature (&name->data[0],
-						klass->loader);
-	  else
-	    found = _Jv_FindClass (name, klass->loader);
-		
-	  if (! found)
-	    {
-	      jstring str = _Jv_NewStringUTF (name->data);
-	      throw new java::lang::NoClassDefFoundError (str);
-	    }
-
-	  pool->data[index].clazz = found;
-	  pool->tags[index] |= JV_CONSTANT_ResolvedFlag;
-	}
-    }
-
-  // If superclass looks like a constant pool entry,
-  // resolve it now.
-  if ((uaddr) klass->superclass < pool->size)
-    klass->superclass = pool->data[(int) klass->superclass].clazz;
-
-  // Likewise for interfaces.
-  for (int i = 0; i < klass->interface_count; i++)
-    if ((uaddr) klass->interfaces[i] < pool->size)
-      klass->interfaces[i] = pool->data[(int) klass->interfaces[i]].clazz;
-
-  // Resolve the remaining constant pool entries.
-  for (int index = 1; index < pool->size; ++index)
-    {
-      if (pool->tags[index] == JV_CONSTANT_String)
-	{
-	  jstring str;
-
-	  str = _Jv_NewStringUtf8Const (pool->data[index].utf8);
-	  pool->data[index].o = str;
-	  pool->tags[index] |= JV_CONSTANT_ResolvedFlag;
-	}
-    }
-
-#ifdef INTERPRETER
-  // FIXME: although the comment up top says that this function is
-  // only called for compiled classes, it is actually called for every
-  // class.
-  if (! _Jv_IsInterpretedClass (klass))
-    {
-#endif /* INTERPRETER */
-      jfieldID f = JvGetFirstStaticField (klass);
-      for (int n = JvNumStaticFields (klass); n > 0; --n)
-	{
-	  int mod = f->getModifiers ();
-	  // If we have a static String field with a non-null initial
-	  // value, we know it points to a Utf8Const.
-	  _Jv_ResolveField(f, klass->loader);
-	  if (f->getClass () == &java::lang::String::class$
-	      && java::lang::reflect::Modifier::isStatic (mod))
-	    {
-	      jstring *strp = (jstring *) f->u.addr;
-	      if (*strp)
-		*strp = _Jv_NewStringUtf8Const ((_Jv_Utf8Const *) *strp);
-	    }
-	  f = f->getNextField ();
-	}
-#ifdef INTERPRETER
-    }
-#endif /* INTERPRETER */
-
-  klass->notifyAll ();
-
-  _Jv_PushClass (klass);
-}
-
 
 //
 //  A single class can have many "initiating" class loaders,
@@ -193,7 +60,7 @@ _Jv_PrepareCompiledClass (jclass klass)
 #define HASH_LEN 1013
 
 // Hash function for Utf8Consts.
-#define HASH_UTF(Utf) (((Utf)->hash) % HASH_LEN)
+#define HASH_UTF(Utf) ((Utf)->hash16() % HASH_LEN)
 
 struct _Jv_LoaderInfo
 {
@@ -206,6 +73,8 @@ static _Jv_LoaderInfo *initiated_classes[HASH_LEN];
 static jclass loaded_classes[HASH_LEN];
 
 // This is the root of a linked list of classes
+static jclass stack_head;
+
 
 
 
@@ -301,18 +170,26 @@ _Jv_RegisterInitiatingLoader (jclass klass, java::lang::ClassLoader *loader)
 // class chain.  At all other times, the caller should synchronize on
 // Class::class$.
 void
-_Jv_RegisterClasses (jclass *classes)
+_Jv_RegisterClasses (const jclass *classes)
 {
   for (; *classes; ++classes)
     {
       jclass klass = *classes;
 
       (*_Jv_RegisterClassHook) (klass);
+    }
+}
 
-      // registering a compiled class causes
-      // it to be immediately "prepared".  
-      if (klass->state == JV_STATE_NOTHING)
-	klass->state = JV_STATE_COMPILED;
+// This is a version of _Jv_RegisterClasses that takes a count.
+void
+_Jv_RegisterClasses_Counted (const jclass * classes, size_t count)
+{
+  size_t i;
+  for (i = 0; i < count; i++)
+    {
+      jclass klass = classes[i];
+
+      (*_Jv_RegisterClassHook) (klass);
     }
 }
 
@@ -321,9 +198,11 @@ _Jv_RegisterClassHookDefault (jclass klass)
 {
   jint hash = HASH_UTF (klass->name);
 
-  jclass check_class = loaded_classes[hash];
-
+  // The BC ABI makes this check unnecessary: we always resolve all
+  // data references via the appropriate class loader, so the kludge
+  // that required this check has gone.
   // If the class is already registered, don't re-register it.
+  jclass check_class = klass->next;
   while (check_class != NULL)
     {
       if (check_class == klass)
@@ -334,7 +213,7 @@ _Jv_RegisterClassHookDefault (jclass klass)
 	  // We size-limit MESSAGE so that you can't trash the stack.
 	  char message[200];
 	  strcpy (message, TEXT);
-	  strncpy (message + sizeof (TEXT) - 1, klass->name->data,
+	  strncpy (message + sizeof (TEXT) - 1, klass->name->chars(),
 		   sizeof (message) - sizeof (TEXT));
 	  message[sizeof (message) - 1] = '\0';
 	  if (! gcj::runtimeInitialized)
@@ -349,6 +228,9 @@ _Jv_RegisterClassHookDefault (jclass klass)
       check_class = check_class->next;
     }
 
+  // FIXME: this is really bogus!
+  if (! klass->engine)
+    klass->engine = &_Jv_soleCompiledEngine;
   klass->next = loaded_classes[hash];
   loaded_classes[hash] = klass;
 }
@@ -376,7 +258,7 @@ _Jv_FindClass (_Jv_Utf8Const *name, java::lang::ClassLoader *loader)
 
   if (! klass)
     {
-      jstring sname = _Jv_NewStringUTF (name->data);
+      jstring sname = name->toString();
 
       java::lang::ClassLoader *sys
 	= java::lang::ClassLoader::getSystemClassLoader ();
@@ -409,7 +291,7 @@ _Jv_FindClass (_Jv_Utf8Const *name, java::lang::ClassLoader *loader)
     {
       // we need classes to be in the hash while
       // we're loading, so that they can refer to themselves. 
-      _Jv_WaitForState (klass, JV_STATE_LOADED);
+      _Jv_Linker::wait_for_state (klass, JV_STATE_LOADED);
     }
 
   return klass;
@@ -419,7 +301,7 @@ jclass
 _Jv_NewClass (_Jv_Utf8Const *name, jclass superclass,
 	      java::lang::ClassLoader *loader)
 {
-  jclass ret = (jclass) JvAllocObject (&java::lang::Class::class$);
+  jclass ret = (jclass) _Jv_AllocObject (&java::lang::Class::class$);
   ret->name = name;
   ret->superclass = superclass;
   ret->loader = loader;
@@ -456,7 +338,7 @@ _Jv_NewArrayClass (jclass element, java::lang::ClassLoader *loader,
       len = 3;
     }
   else
-    len = element->name->length + 5;
+    len = element->name->len() + 5;
 
   {
     char signature[len];
@@ -469,8 +351,8 @@ _Jv_NewArrayClass (jclass element, java::lang::ClassLoader *loader,
       }
     else
       {
-	size_t length = element->name->length;
-	const char *const name = element->name->data;
+	size_t length = element->name->len();
+	const char *const name = element->name->chars();
 	if (name[0] != '[')
 	  signature[index++] = 'L';
 	memcpy (&signature[index], name, length);
@@ -522,7 +404,7 @@ _Jv_NewArrayClass (jclass element, java::lang::ClassLoader *loader,
   // cache one and reuse it. It is not necessary to synchronize this.
   if (!array_idt)
     {
-      _Jv_PrepareConstantTimeTables (array_class);
+      _Jv_Linker::wait_for_state(array_class, JV_STATE_PREPARED);
       array_idt = array_class->idt;
       array_depth = array_class->depth;
       array_ancestors = array_class->ancestors;
@@ -536,19 +418,19 @@ _Jv_NewArrayClass (jclass element, java::lang::ClassLoader *loader,
 
   using namespace java::lang::reflect;
   {
-    // Array classes are "abstract final"...
-    _Jv_ushort accflags = Modifier::FINAL | Modifier::ABSTRACT;
-    // ... and inherit accessibility from element type, per vmspec 5.3.3.2
-    accflags |= (element->accflags & Modifier::PUBLIC);
-    accflags |= (element->accflags & Modifier::PROTECTED);
-    accflags |= (element->accflags & Modifier::PRIVATE);      
+    // Array classes are "abstract final" and inherit accessibility
+    // from element type, per vmspec 5.3.3.2
+    _Jv_ushort accflags = (Modifier::FINAL | Modifier::ABSTRACT
+			   | (element->accflags
+			      & (Modifier::PUBLIC | Modifier::PROTECTED
+				 | Modifier::PRIVATE)));
     array_class->accflags = accflags;
   }
 
   // An array class has no visible instance fields. "length" is invisible to 
   // reflection.
 
-  // say this class is initialized and ready to go!
+  // Say this class is initialized and ready to go!
   array_class->state = JV_STATE_DONE;
 
   // vmspec, section 5.3.3 describes this
@@ -557,8 +439,6 @@ _Jv_NewArrayClass (jclass element, java::lang::ClassLoader *loader,
 
   element->arrayclass = array_class;
 }
-
-static jclass stack_head;
 
 // These two functions form a stack of classes.   When a class is loaded
 // it is pushed onto the stack by the class loader; this is so that

@@ -149,13 +149,15 @@ extern const char *get_insn_template (int, rtx);
 extern int add_weak (tree, const char *, const char *);
 
 /* Functions in flow.c */
-extern void allocate_for_life_analysis (void);
 extern int regno_clobbered_at_setjmp (int);
 
 /* Functions in varasm.c.  */
 
 /* Tell assembler to switch to text section.  */
 extern void text_section (void);
+
+/* Tell assembler to switch to unlikely-to-be-executed text section.  */
+extern void unlikely_text_section (void);
 
 /* Tell assembler to switch to data section.  */
 extern void data_section (void);
@@ -166,6 +168,9 @@ extern void readonly_data_section (void);
 
 /* Determine if we're in the text section.  */
 extern int in_text_section (void);
+
+/* Determine if we're in the unlikely-to-be-executed text section.  */
+extern int in_unlikely_text_section (void);
 
 #ifdef CTORS_SECTION_ASM_OP
 extern void ctors_section (void);
@@ -276,7 +281,6 @@ extern void assemble_zeros (unsigned HOST_WIDE_INT);
 
 /* Assemble an alignment pseudo op for an ALIGN-bit boundary.  */
 extern void assemble_align (int);
-extern void assemble_eh_align (int);
 
 /* Assemble a string constant with the specified C string as contents.  */
 extern void assemble_string (const char *, int);
@@ -286,13 +290,17 @@ extern void assemble_external_libcall (rtx);
 
 /* Assemble a label named NAME.  */
 extern void assemble_label (const char *);
-extern void assemble_eh_label (const char *);
 
-/* Output to FILE a reference to the assembler name of a C-level name NAME.
-   If NAME starts with a *, the rest of NAME is output verbatim.
-   Otherwise NAME is transformed in an implementation-defined way
-   (usually by the addition of an underscore).
-   Many macros in the tm file are defined to call this function.  */
+/* Output to FILE (an assembly file) a reference to NAME.  If NAME
+   starts with a *, the rest of NAME is output verbatim.  Otherwise
+   NAME is transformed in a target-specific way (usually by the
+   addition of an underscore).  */
+extern void assemble_name_raw (FILE *, const char *);
+
+/* Like assemble_name_raw, but should be used when NAME might refer to
+   an entity that is also represented as a tree (like a function or
+   variable).  If NAME does refer to such an entity, that entity will
+   be marked as referenced.  */
 extern void assemble_name (FILE *, const char *);
 
 /* Return the assembler directive for creating a given kind of integer
@@ -393,11 +401,6 @@ extern const char *weak_global_object_name;
 
 extern int current_function_is_leaf;
 
-/* Nonzero if function being compiled doesn't contain any instructions
-   that can throw an exception.  This is set prior to final.  */
-
-extern int current_function_nothrow;
-
 /* Nonzero if function being compiled doesn't modify the stack pointer
    (ignoring the prologue and epilogue).  This is only valid after
    life_analysis has run.  */
@@ -413,7 +416,7 @@ extern int current_function_uses_only_leaf_regs;
 /* Default file in which to dump debug output.  */
 
 #ifdef BUFSIZ
-extern FILE *rtl_dump_file;
+extern FILE *dump_file;
 #endif
 
 /* Nonnull if the insn currently being emitted was a COND_EXEC pattern.  */
@@ -426,6 +429,11 @@ extern rtx current_output_insn;
    This means that inconsistencies are the user's fault, so don't abort.
    The precise value is the insn being output, to pass to error_for_asm.  */
 extern rtx this_is_asm_operands;
+
+/* Carry information from ASM_DECLARE_OBJECT_NAME
+   to ASM_FINISH_DECLARE_OBJECT.  */
+extern int size_directive_output;
+extern tree last_assemble_variable_decl;
 
 /* Decide whether DECL needs to be in a writable section.
    RELOC is the same as for SELECT_SECTION.  */
@@ -470,17 +478,18 @@ extern void no_asm_to_stream (FILE *);
 #define SECTION_NOTYPE	 0x80000	/* don't output @progbits */
 #define SECTION_MACH_DEP 0x100000	/* subsequent bits reserved for target */
 
-extern unsigned int get_named_section_flags (const char *);
 extern bool set_named_section_flags (const char *, unsigned int);
-extern void named_section_flags (const char *, unsigned int);
+#define named_section_flags(NAME, FLAGS) \
+  named_section_real((NAME), (FLAGS), /*decl=*/NULL_TREE)
+extern void named_section_real (const char *, unsigned int, tree);
 extern bool named_section_first_declaration (const char *);
 extern unsigned int default_section_type_flags (tree, const char *, int);
 extern unsigned int default_section_type_flags_1 (tree, const char *, int, int);
 
-extern void default_no_named_section (const char *, unsigned int);
-extern void default_elf_asm_named_section (const char *, unsigned int);
-extern void default_coff_asm_named_section (const char *, unsigned int);
-extern void default_pe_asm_named_section (const char *, unsigned int);
+extern void default_no_named_section (const char *, unsigned int, tree);
+extern void default_elf_asm_named_section (const char *, unsigned int, tree);
+extern void default_coff_asm_named_section (const char *, unsigned int, tree);
+extern void default_pe_asm_named_section (const char *, unsigned int, tree);
 
 extern void default_stabs_asm_out_destructor (rtx, int);
 extern void default_named_section_asm_out_destructor (rtx, int);
@@ -495,6 +504,8 @@ extern void default_elf_select_section_1 (tree, int,
 					  unsigned HOST_WIDE_INT, int);
 extern void default_unique_section (tree, int);
 extern void default_unique_section_1 (tree, int, int);
+extern void default_function_rodata_section (tree);
+extern void default_no_function_rodata_section (tree);
 extern void default_select_rtx_section (enum machine_mode, rtx,
 					unsigned HOST_WIDE_INT);
 extern void default_elf_select_rtx_section (enum machine_mode, rtx,
@@ -504,11 +515,32 @@ extern const char *default_strip_name_encoding (const char *);
 extern bool default_binds_local_p (tree);
 extern bool default_binds_local_p_1 (tree, int);
 extern void default_globalize_label (FILE *, const char *);
+extern void default_emit_unwind_label (FILE *, tree, int, int);
 extern void default_internal_label (FILE *, const char *, unsigned long);
 extern void default_file_start (void);
 extern void file_end_indicate_exec_stack (void);
 extern bool default_valid_pointer_mode (enum machine_mode);
 
 extern int default_address_cost (rtx);
+
+/* dbxout helper functions */
+#if defined DBX_DEBUGGING_INFO || defined XCOFF_DEBUGGING_INFO
+
+extern void dbxout_int (int);
+extern void dbxout_stabd (int, int);
+extern void dbxout_begin_stabn (int);
+extern void dbxout_begin_stabn_sline (int);
+extern void dbxout_begin_empty_stabs (int);
+extern void dbxout_begin_simple_stabs (const char *, int);
+extern void dbxout_begin_simple_stabs_desc (const char *, int, int);
+
+extern void dbxout_stab_value_zero (void);
+extern void dbxout_stab_value_label (const char *);
+extern void dbxout_stab_value_label_diff (const char *, const char *);
+extern void dbxout_stab_value_internal_label (const char *, int *);
+extern void dbxout_stab_value_internal_label_diff (const char *, int *,
+						   const char *);
+
+#endif
 
 #endif /* ! GCC_OUTPUT_H */

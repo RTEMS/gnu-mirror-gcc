@@ -1,6 +1,6 @@
 // 2001-09-21 Benjamin Kosnik  <bkoz@redhat.com>
 
-// Copyright (C) 2001, 2002, 2003 Free Software Foundation
+// Copyright (C) 2001, 2002, 2003, 2004 Free Software Foundation
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -27,20 +27,12 @@
 void test01()
 {
   using namespace std;
-  typedef time_base::dateorder dateorder;
-  typedef istreambuf_iterator<char> iterator_type;
-
   bool test __attribute__((unused)) = true;
 
-  // basic construction and sanity checks.
+  typedef istreambuf_iterator<char> iterator_type;
+
+  // basic construction
   locale loc_c = locale::classic();
-  locale loc_hk = __gnu_test::try_named_locale("en_HK");
-  locale loc_fr = __gnu_test::try_named_locale("fr_FR@euro");
-  locale loc_de = __gnu_test::try_named_locale("de_DE");
-  VERIFY( loc_hk != loc_c );
-  VERIFY( loc_hk != loc_fr );
-  VERIFY( loc_hk != loc_de );
-  VERIFY( loc_de != loc_fr );
 
   const string empty;
 
@@ -75,24 +67,26 @@ void test01()
   iterator_type is_it02(iss);
   tm time02;
   errorstate = good;
-  tim_get.get_date(is_it02, end, iss, errorstate, &time02);
+  iterator_type ret02 = tim_get.get_date(is_it02, end, iss, errorstate,
+					 &time02);
   VERIFY( time02.tm_year == time_bday.tm_year );
   VERIFY( time02.tm_mon == time_bday.tm_mon );
   VERIFY( time02.tm_mday == time_bday.tm_mday );
   VERIFY( errorstate == good );
-  VERIFY( *is_it02 == ' ');
+  VERIFY( *ret02 == ' ' );
 
   iss.str("04/04d/71 ");
   iterator_type is_it03(iss);
   tm time03;
   time03.tm_year = 3;
   errorstate = good;
-  tim_get.get_date(is_it03, end, iss, errorstate, &time03);
+  iterator_type ret03 = tim_get.get_date(is_it03, end, iss, errorstate,
+					 &time03);
   VERIFY( time03.tm_year == 3 );
   VERIFY( time03.tm_mon == time_bday.tm_mon );
   VERIFY( time03.tm_mday == time_bday.tm_mday );
   VERIFY( errorstate == ios_base::failbit );
-  VERIFY( *is_it03 == 'd');
+  VERIFY( *ret03 == 'd' );
 }
 
 int main()

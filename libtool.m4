@@ -621,7 +621,7 @@ darwin* | rhapsody*)
   lt_cv_deplibs_check_method=pass_all
   ;;
 
-freebsd* )
+freebsd* | kfreebsd*-gnu)
   if echo __ELF__ | $CC -E - | grep __ELF__ > /dev/null; then
     case $host_cpu in
     i*86 )
@@ -679,17 +679,10 @@ irix5* | irix6*)
 
 # This must be Linux ELF.
 linux-gnu*)
-  case $host_cpu in
-  alpha* | mips* | hppa* | i*86 | powerpc* | sparc* | ia64* )
-    lt_cv_deplibs_check_method=pass_all ;;
-  *)
-    # glibc up to 2.1.1 does not perform some relocations on ARM
-    lt_cv_deplibs_check_method=['file_magic ELF [0-9][0-9]*-bit [LM]SB (shared object|dynamic lib )'] ;;
-  esac
-  lt_cv_file_magic_test_file=`echo /lib/libc.so* /lib/libc-*.so`
+  lt_cv_deplibs_check_method=pass_all
   ;;
 
-netbsd*)
+netbsd* | knetbsd*-gnu)
   if echo __ELF__ | $CC -E - | grep __ELF__ > /dev/null; then
     [lt_cv_deplibs_check_method='match_pattern /lib[^/\.]+\.so\.[0-9]+\.[0-9]+$']
   else

@@ -1,5 +1,5 @@
 /* JFormattedTextField.java --
-   Copyright (C) 2003 Free Software Foundation, Inc.
+   Copyright (C) 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -42,6 +42,7 @@ import java.awt.event.FocusEvent;
 import java.io.Serializable;
 import java.text.Format;
 import java.text.ParseException;
+
 import javax.swing.text.Document;
 import javax.swing.text.DocumentFilter;
 import javax.swing.text.NavigationFilter;
@@ -52,7 +53,7 @@ import javax.swing.text.NavigationFilter;
  */
 public class JFormattedTextField extends JTextField
 {
-  private static final long serialVersionUID = 2889768923115424035L;
+  private static final long serialVersionUID = 5464657870110180632L;
 
   public abstract static class AbstractFormatter implements Serializable
   {
@@ -131,9 +132,11 @@ public class JFormattedTextField extends JTextField
   public static final int REVERT = 2;
   public static final int PERSIST = 3;
 
+  private Object value;
+  
   public JFormattedTextField ()
   {
-    throw new InternalError ("not implemented");
+    this((AbstractFormatterFactory) null);
   }
 
   public JFormattedTextField (Format format)
@@ -148,7 +151,7 @@ public class JFormattedTextField extends JTextField
 
   public JFormattedTextField (AbstractFormatterFactory factory)
   {
-    throw new InternalError ("not implemented");
+    this(factory, null);
   }
 
   public JFormattedTextField (AbstractFormatterFactory factory, Object value)
@@ -158,7 +161,7 @@ public class JFormattedTextField extends JTextField
 
   public JFormattedTextField (Object value)
   {
-    throw new InternalError ("not implemented");
+    this.value = value;
   }
 
   public void commitEdit ()
@@ -189,12 +192,12 @@ public class JFormattedTextField extends JTextField
 
   public String getUIClassID ()
   {
-    throw new InternalError ("not implemented");
+    return "FormattedTextFieldUI";
   }
 
   public Object getValue ()
   {
-    throw new InternalError ("not implemented");
+    return value;
   }
 
   protected void invalidEdit ()
@@ -212,9 +215,15 @@ public class JFormattedTextField extends JTextField
     throw new InternalError ("not implemented");
   }
 
-  public void setDocument (Document document)
+  public void setDocument(Document newdoc)
   {
-    throw new InternalError ("not implemented");
+    Document document = getDocument();
+
+    if (document == newdoc)
+      return;
+    
+    setDocument(newdoc);
+    firePropertyChange("document", document, newdoc);
   }
 
   public void setLostFocusBehavior (int behavior)
@@ -232,8 +241,8 @@ public class JFormattedTextField extends JTextField
     throw new InternalError ("not implemented");
   }
 
-  public void setValue (Object value)
+  public void setValue (Object newValue)
   {
-    throw new InternalError ("not implemented");
+    value = newValue;
   }
 }

@@ -1,5 +1,5 @@
 /* Definitions of target machine for GCC, for SPARC64, ELF.
-   Copyright (C) 1994, 1995, 1996, 1997, 1998, 2000
+   Copyright (C) 1994, 1995, 1996, 1997, 1998, 2000, 2004
    Free Software Foundation, Inc.
    Contributed by Doug Evans, dje@cygnus.com.
 
@@ -37,15 +37,6 @@ Boston, MA 02111-1307, USA.  */
 
 #undef SPARC_DEFAULT_CMODEL
 #define SPARC_DEFAULT_CMODEL CM_EMBMEDANY
-
-/* Target OS builtins for config/sol.h.  */
-#undef TARGET_SUB_OS_CPP_BUILTINS
-#define TARGET_SUB_OS_CPP_BUILTINS()		\
-  do						\
-    {						\
-	builtin_define_std ("sparc");		\
-    }						\
-  while (0)
 
 /* __svr4__ is used by the C library (FIXME) */
 #undef CPP_SUBTARGET_SPEC
@@ -122,3 +113,17 @@ crtbegin.o%s \
 
 #undef PREFERRED_DEBUGGING_TYPE
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
+
+/* Don't include Solaris-specific format checks.  */
+#undef TARGET_N_FORMAT_TYPES
+#undef TARGET_FORMAT_TYPES
+
+/* Don't include Solaris-specific .init / .fini support.  */
+#undef ASM_DECLARE_FUNCTION_SIZE
+#define ASM_DECLARE_FUNCTION_SIZE(FILE, FNAME, DECL)		\
+  do								\
+    {								\
+      if (!flag_inhibit_size_directive)				\
+	ASM_OUTPUT_MEASURED_SIZE (FILE, FNAME);			\
+    }								\
+  while (0)

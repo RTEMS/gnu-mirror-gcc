@@ -48,13 +48,14 @@ endif
 # Source files linked in via configuration/make substitution for a
 # particular host.
 host_sources = \
+	atomicity.cc \
 	codecvt_members.cc \
 	collate_members.cc \
 	ctype_members.cc \
 	messages_members.cc \
 	monetary_members.cc \
 	numeric_members.cc \
-	time_members.cc
+	time_members.cc 
 
 codecvt_members.cc: ${glibcxx_srcdir}/$(CCODECVT_CC)
 	$(LN_S) ${glibcxx_srcdir}/$(CCODECVT_CC) . || true
@@ -77,6 +78,10 @@ numeric_members.cc: ${glibcxx_srcdir}/$(CNUMERIC_CC)
 time_members.cc: ${glibcxx_srcdir}/$(CTIME_CC)
 	$(LN_S) ${glibcxx_srcdir}/$(CTIME_CC) . || true
 
+atomicity_file = ${glibcxx_srcdir}/$(ATOMICITY_SRCDIR)/atomicity.h
+atomicity.cc: ${atomicity_file}
+	$(LN_S) ${atomicity_file} ./atomicity.cc || true
+
 # Source files linked in via configuration/make substitution for a
 # particular host, but with ad hoc naming rules.
 host_sources_extra = \
@@ -91,12 +96,14 @@ basic_file.cc: ${glibcxx_srcdir}/$(BASIC_FILE_CC)
 
 # Sources present in the src directory.
 sources = \
-	allocator.cc \
+	bitmap_allocator.cc \
+	pool_allocator.cc \
+	mt_allocator.cc \
 	codecvt.cc \
 	complex_io.cc \
 	ctype.cc \
 	debug.cc \
-	demangle.cc \
+	debug_list.cc \
 	functexcept.cc \
 	globals_locale.cc \
 	globals_io.cc \
@@ -119,12 +126,14 @@ sources = \
 	ext-inst.cc \
 	io-inst.cc \
 	istream-inst.cc \
+	istream.cc \
 	locale-inst.cc \
 	locale-misc-inst.cc \
 	misc-inst.cc \
 	ostream-inst.cc \
 	sstream-inst.cc \
 	streambuf-inst.cc \
+	streambuf.cc \
 	string-inst.cc \
 	valarray-inst.cc \
 	wlocale-inst.cc \

@@ -27,6 +27,7 @@
 with Atree;    use Atree;
 with Checks;   use Checks;
 with Einfo;    use Einfo;
+with Elists;   use Elists;
 with Exp_Ch2;  use Exp_Ch2;
 with Exp_Ch9;  use Exp_Ch9;
 with Exp_Imgv; use Exp_Imgv;
@@ -136,6 +137,11 @@ package body Exp_Attr is
    --  appropriate TSS from the type itself, or from its closest ancestor
    --  defining it, is returned. In both cases, inheritance of representation
    --  aspects is thus taken into account.
+
+   function Get_Stream_Convert_Pragma (T : Entity_Id) return Node_Id;
+   --  Given a type, find a corresponding stream convert pragma that applies to
+   --  the implementation base type of this type (Typ). If found, return the
+   --  pragma node, otherwise return Empty if no pragma is found.
 
    function Is_Constrained_Packed_Array (Typ : Entity_Id) return Boolean;
    --  Utility for array attributes, returns true on packed constrained
@@ -296,9 +302,11 @@ package body Exp_Attr is
 
       --  The generated call is given the provided set of parameters, and then
       --  wrapped in a conversion which converts the result to the target type
+      --  We use the base type as the target because a range check may be
+      --  required.
 
       Rewrite (N,
-        Unchecked_Convert_To (Etype (N),
+        Unchecked_Convert_To (Base_Type (Etype (N)),
           Make_Function_Call (Loc,
             Name => Fnm,
             Parameter_Associations => Args)));
@@ -908,12 +916,9 @@ package body Exp_Attr is
          if Pent = Standard_Standard
            or else Pent = Standard_ASCII
          then
-            Name_Buffer (1 .. Verbose_Library_Version'Length) :=
-              Verbose_Library_Version;
-            Name_Len := Verbose_Library_Version'Length;
             Rewrite (N,
               Make_String_Literal (Loc,
-                Strval => String_From_Name_Buffer));
+                Strval => Verbose_Library_Version));
 
          --  All other cases
 
@@ -1012,7 +1017,7 @@ package body Exp_Attr is
       --  Task_Entry_Caller or the Protected_Entry_Caller function.
 
       when Attribute_Caller => Caller : declare
-         Id_Kind    : constant Entity_Id := RTE (RO_AT_Task_ID);
+         Id_Kind    : constant Entity_Id := RTE (RO_AT_Task_Id);
          Ent        : constant Entity_Id := Entity (Pref);
          Conctype   : constant Entity_Id := Scope (Ent);
          Nest_Depth : Integer := 0;
@@ -1182,13 +1187,8 @@ package body Exp_Attr is
                   Res := Is_Constrained (Etype (Ent));
                end if;
 
-               if Res then
-                  Rewrite (N,
-                    New_Reference_To (Standard_True, Loc));
-               else
-                  Rewrite (N,
-                    New_Reference_To (Standard_False, Loc));
-               end if;
+               Rewrite (N,
+                 New_Reference_To (Boolean_Literals (Res), Loc));
             end;
 
          --  Prefix is not an entity name. These are also cases where
@@ -1196,16 +1196,13 @@ package body Exp_Attr is
          --  and type of the prefix.
 
          else
-            if not Is_Variable (Pref)
-              or else Nkind (Pref) = N_Explicit_Dereference
-              or else Is_Constrained (Etype (Pref))
-            then
-               Rewrite (N,
-                 New_Reference_To (Standard_True, Loc));
-            else
-               Rewrite (N,
-                 New_Reference_To (Standard_False, Loc));
-            end if;
+            Rewrite (N,
+              New_Reference_To (
+                Boolean_Literals (
+                  not Is_Variable (Pref)
+                    or else Nkind (Pref) = N_Explicit_Dereference
+                    or else Is_Constrained (Etype (Pref))),
+                Loc));
          end if;
 
          Analyze_And_Resolve (N, Standard_Boolean);
@@ -1670,7 +1667,7 @@ package body Exp_Attr is
       --  For a task it returns a reference to the _task_id component of
       --  corresponding record:
 
-      --    taskV!(Prefix)._Task_Id, converted to the type Task_ID defined
+      --    taskV!(Prefix)._Task_Id, converted to the type Task_Id defined
 
       --  in Ada.Task_Identification.
 
@@ -1688,7 +1685,7 @@ package body Exp_Attr is
             Rewrite (N,
               Unchecked_Convert_To (Id_Kind, Make_Reference (Loc, Pref)));
          else
-            Id_Kind := RTE (RO_AT_Task_ID);
+            Id_Kind := RTE (RO_AT_Task_Id);
 
             Rewrite (N,
               Unchecked_Convert_To (Id_Kind, Concurrent_Ref (Pref)));
@@ -1744,6 +1741,44 @@ package body Exp_Attr is
          --  the dispatching (class-wide type) case, where it is a reference
          --  to the dummy object initialized to the right internal tag.
 
+         procedure Freeze_Stream_Subprogram (F : Entity_Id);
+         --  The expansion of the attribute reference may generate a call to
+         --  a user-defined stream subprogram that is frozen by the call. This
+         --  can lead to access-before-elaboration problem if the reference
+         --  appears in an object declaration and the subprogram body has not
+         --  been seen. The freezing of the subprogram requires special code
+         --  because it appears in an expanded context where expressions do
+         --  not freeze their constituents.
+
+         ------------------------------
+         -- Freeze_Stream_Subprogram --
+         ------------------------------
+
+         procedure Freeze_Stream_Subprogram (F : Entity_Id) is
+            Decl : constant Node_Id := Unit_Declaration_Node (F);
+            Bod  : Node_Id;
+
+         begin
+            --  If this is user-defined subprogram, the corresponding
+            --  stream function appears as a renaming-as-body, and the
+            --  user subprogram must be retrieved by tree traversal.
+
+            if Present (Decl)
+              and then Nkind (Decl) = N_Subprogram_Declaration
+              and then Present (Corresponding_Body (Decl))
+            then
+               Bod := Corresponding_Body (Decl);
+
+               if Nkind (Unit_Declaration_Node (Bod)) =
+                 N_Subprogram_Renaming_Declaration
+               then
+                  Set_Is_Frozen (Entity (Name (Unit_Declaration_Node (Bod))));
+               end if;
+            end if;
+         end Freeze_Stream_Subprogram;
+
+      --  Start of processing for Input
+
       begin
          --  If no underlying type, we have an error that will be diagnosed
          --  elsewhere, so here we just completely ignore the expansion.
@@ -1773,9 +1808,7 @@ package body Exp_Attr is
             --  from which it is derived. The extra conversion is required
             --  for the derived case.
 
-            Prag :=
-              Get_Rep_Pragma
-                (Implementation_Base_Type (P_Type), Name_Stream_Convert);
+            Prag := Get_Stream_Convert_Pragma (P_Type);
 
             if Present (Prag) then
                Arg2  := Next (First (Pragma_Argument_Associations (Prag)));
@@ -1891,9 +1924,50 @@ package body Exp_Attr is
                pragma Assert
                  (Is_Record_Type (U_Type) or else Is_Protected_Type (U_Type));
 
+               --  Ada 2005 (AI-216): Program_Error is raised when executing
+               --  the default implementation of the Input attribute of an
+               --  unchecked union type if the type lacks default discriminant
+               --  values.
+
+               if Is_Unchecked_Union (Base_Type (U_Type))
+                 and then not Present (Discriminant_Constraint (U_Type))
+               then
+                  Insert_Action (N,
+                    Make_Raise_Program_Error (Loc,
+                      Reason => PE_Unchecked_Union_Restriction));
+
+                  return;
+               end if;
+
                Build_Record_Or_Elementary_Input_Function
                  (Loc, Base_Type (U_Type), Decl, Fname);
                Insert_Action (N, Decl);
+
+               if Nkind (Parent (N)) = N_Object_Declaration
+                 and then Is_Record_Type (U_Type)
+               then
+                  --  The stream function may contain calls to user-defined
+                  --  Read procedures for individual components.
+
+                  declare
+                     Comp : Entity_Id;
+                     Func : Entity_Id;
+
+                  begin
+                     Comp := First_Component (U_Type);
+                     while Present (Comp) loop
+                        Func :=
+                          Find_Stream_Subprogram
+                            (Etype (Comp), TSS_Stream_Read);
+
+                        if Present (Func) then
+                           Freeze_Stream_Subprogram (Func);
+                        end if;
+
+                        Next_Component (Comp);
+                     end loop;
+                  end;
+               end if;
             end if;
          end if;
 
@@ -1910,6 +1984,10 @@ package body Exp_Attr is
          Set_Controlling_Argument (Call, Cntrl);
          Rewrite (N, Unchecked_Convert_To (P_Type, Call));
          Analyze_And_Resolve (N, P_Type);
+
+         if Nkind (Parent (N)) = N_Object_Declaration then
+            Freeze_Stream_Subprogram (Fname);
+         end if;
       end Input;
 
       -------------------
@@ -2246,6 +2324,87 @@ package body Exp_Attr is
          Analyze_And_Resolve (N, Typ);
       end Mantissa;
 
+      ---------
+      -- Mod --
+      ---------
+
+      when Attribute_Mod => Mod_Case : declare
+         Arg  : constant Node_Id := Relocate_Node (First (Exprs));
+         Hi   : constant Node_Id := Type_High_Bound (Etype (Arg));
+         Modv : constant Uint    := Modulus (Btyp);
+
+      begin
+
+         --  This is not so simple. The issue is what type to use for the
+         --  computation of the modular value.
+
+         --  The easy case is when the modulus value is within the bounds
+         --  of the signed integer type of the argument. In this case we can
+         --  just do the computation in that signed integer type, and then
+         --  do an ordinary conversion to the target type.
+
+         if Modv <= Expr_Value (Hi) then
+            Rewrite (N,
+              Convert_To (Btyp,
+                Make_Op_Mod (Loc,
+                  Left_Opnd  => Arg,
+                  Right_Opnd => Make_Integer_Literal (Loc, Modv))));
+
+         --  Here we know that the modulus is larger than type'Last of the
+         --  integer type. There are three possible cases to consider:
+
+         --    a) The integer value is non-negative. In this case, it is
+         --    returned as the result (since it is less than the modulus).
+
+         --    b) The integer value is negative. In this case, we know that
+         --    the result is modulus + value, where the value might be as
+         --    small as -modulus. The trouble is what type do we use to do
+         --    this subtraction. No type will do, since modulus can be as
+         --    big as 2**64, and no integer type accomodates this value.
+         --    Let's do a bit of algebra
+
+         --         modulus + value
+         --      =  modulus - (-value)
+         --      =  (modulus - 1) - (-value - 1)
+
+         --    Now modulus - 1 is certainly in range of the modular type.
+         --    -value is in the range 1 .. modulus, so -value -1 is in the
+         --    range 0 .. modulus-1 which is in range of the modular type.
+         --    Furthermore, (-value - 1) can be expressed as -(value + 1)
+         --    which we can compute using the integer base type.
+
+         else
+            Rewrite (N,
+              Make_Conditional_Expression (Loc,
+                Expressions => New_List (
+                  Make_Op_Ge (Loc,
+                    Left_Opnd  => Duplicate_Subexpr (Arg),
+                    Right_Opnd => Make_Integer_Literal (Loc, 0)),
+
+                  Convert_To (Btyp,
+                    Duplicate_Subexpr_No_Checks (Arg)),
+
+                  Make_Op_Subtract (Loc,
+                    Left_Opnd =>
+                      Make_Integer_Literal (Loc,
+                        Intval => Modv - 1),
+                    Right_Opnd =>
+                      Convert_To (Btyp,
+                        Make_Op_Minus (Loc,
+                          Right_Opnd =>
+                            Make_Op_Add (Loc,
+                              Left_Opnd  => Duplicate_Subexpr_No_Checks (Arg),
+                              Right_Opnd =>
+                                Make_Integer_Literal (Loc,
+                                  Intval => 1))))))));
+
+
+
+         end if;
+
+         Analyze_And_Resolve (N, Btyp);
+      end Mod_Case;
+
       -----------
       -- Model --
       -----------
@@ -2304,9 +2463,7 @@ package body Exp_Attr is
             --  it is derived to type strmtyp. The conversion to acttyp is
             --  required for the derived case.
 
-            Prag :=
-              Get_Rep_Pragma
-                (Implementation_Base_Type (P_Type), Name_Stream_Convert);
+            Prag := Get_Stream_Convert_Pragma (P_Type);
 
             if Present (Prag) then
                Arg3 :=
@@ -2400,6 +2557,21 @@ package body Exp_Attr is
             else
                pragma Assert
                  (Is_Record_Type (U_Type) or else Is_Protected_Type (U_Type));
+
+               --  Ada 2005 (AI-216): Program_Error is raised when executing
+               --  the default implementation of the Output attribute of an
+               --  unchecked union type if the type lacks default discriminant
+               --  values.
+
+               if Is_Unchecked_Union (Base_Type (U_Type))
+                 and then not Present (Discriminant_Constraint (U_Type))
+               then
+                  Insert_Action (N,
+                    Make_Raise_Program_Error (Loc,
+                      Reason => PE_Unchecked_Union_Restriction));
+
+                  return;
+               end if;
 
                Build_Record_Or_Elementary_Output_Procedure
                  (Loc, Base_Type (U_Type), Decl, Pname);
@@ -2704,9 +2876,7 @@ package body Exp_Attr is
             --  where Itemx is the expression of the type conversion (i.e.
             --  the actual object), and typex is the type of Itemx.
 
-            Prag :=
-              Get_Rep_Pragma
-                (Implementation_Base_Type (P_Type), Name_Stream_Convert);
+            Prag := Get_Stream_Convert_Pragma (P_Type);
 
             if Present (Prag) then
                Arg2  := Next (First (Pragma_Argument_Associations (Prag)));
@@ -2787,13 +2957,22 @@ package body Exp_Attr is
                pragma Assert
                  (Is_Record_Type (U_Type) or else Is_Protected_Type (U_Type));
 
+               --  Ada 2005 (AI-216): Program_Error is raised when executing
+               --  the default implementation of the Read attribute of an
+               --  Unchecked_Union type.
+
+               if Is_Unchecked_Union (Base_Type (U_Type)) then
+                  Insert_Action (N,
+                    Make_Raise_Program_Error (Loc,
+                      Reason => PE_Unchecked_Union_Restriction));
+               end if;
+
                if Has_Discriminants (U_Type)
                  and then Present
                    (Discriminant_Default_Value (First_Discriminant (U_Type)))
                then
                   Build_Mutable_Record_Read_Procedure
                     (Loc, Base_Type (U_Type), Decl, Pname);
-
                else
                   Build_Record_Read_Procedure
                     (Loc, Base_Type (U_Type), Decl, Pname);
@@ -3625,8 +3804,8 @@ package body Exp_Attr is
          --     type(X)'Pos (X) >= 0
 
          --  We can't quite generate it that way because of the requirement
-         --  for the non-standard second argument of False, so we have to
-         --  explicitly create:
+         --  for the non-standard second argument of False in the resulting
+         --  rep_to_pos call, so we have to explicitly create:
 
          --     _rep_to_pos (X, False) >= 0
 
@@ -3635,7 +3814,7 @@ package body Exp_Attr is
 
          --    _rep_to_pos (X, False) >= 0
          --      and then
-         --     (X >= type(X)'First and then type(X)'Last <= X)
+         --       (X >= type(X)'First and then type(X)'Last <= X)
 
          elsif Is_Enumeration_Type (Ptyp)
            and then Present (Enum_Pos_To_Rep (Base_Type (Ptyp)))
@@ -3710,7 +3889,7 @@ package body Exp_Attr is
 
          --  But that's precisely what won't work because of possible
          --  unwanted optimization (and indeed the basic motivation for
-         --  the Valid attribute -is exactly that this test does not work.
+         --  the Valid attribute is exactly that this test does not work!)
          --  What will work is:
 
          --     Btyp!(X) >= Btyp!(type(X)'First)
@@ -3917,9 +4096,7 @@ package body Exp_Attr is
             --  it is derived to type strmtyp. The conversion to acttyp is
             --  required for the derived case.
 
-            Prag :=
-              Get_Rep_Pragma
-                (Implementation_Base_Type (P_Type), Name_Stream_Convert);
+            Prag := Get_Stream_Convert_Pragma (P_Type);
 
             if Present (Prag) then
                Arg3 :=
@@ -3968,13 +4145,22 @@ package body Exp_Attr is
                pragma Assert
                  (Is_Record_Type (U_Type) or else Is_Protected_Type (U_Type));
 
+               --  Ada 2005 (AI-216): Program_Error is raised when executing
+               --  the default implementation of the Write attribute of an
+               --  Unchecked_Union type.
+
+               if Is_Unchecked_Union (Base_Type (U_Type)) then
+                  Insert_Action (N,
+                    Make_Raise_Program_Error (Loc,
+                      Reason => PE_Unchecked_Union_Restriction));
+               end if;
+
                if Has_Discriminants (U_Type)
                  and then Present
                    (Discriminant_Default_Value (First_Discriminant (U_Type)))
                then
                   Build_Mutable_Record_Write_Procedure
                     (Loc, Base_Type (U_Type), Decl, Pname);
-
                else
                   Build_Record_Write_Procedure
                     (Loc, Base_Type (U_Type), Decl, Pname);
@@ -4043,6 +4229,7 @@ package body Exp_Attr is
            Attribute_Digits                       |
            Attribute_Emax                         |
            Attribute_Epsilon                      |
+           Attribute_Has_Access_Values            |
            Attribute_Has_Discriminants            |
            Attribute_Large                        |
            Attribute_Machine_Emax                 |
@@ -4215,6 +4402,46 @@ package body Exp_Attr is
 
       return Etype (Indx);
    end Get_Index_Subtype;
+
+   -------------------------------
+   -- Get_Stream_Convert_Pragma --
+   -------------------------------
+
+   function Get_Stream_Convert_Pragma (T : Entity_Id) return Node_Id is
+      Typ : Entity_Id;
+      N   : Node_Id;
+
+   begin
+      --  Note: we cannot use Get_Rep_Pragma here because of the peculiarity
+      --  that a stream convert pragma for a tagged type is not inherited from
+      --  its parent. Probably what is wrong here is that it is basically
+      --  incorrect to consider a stream convert pragma to be a representation
+      --  pragma at all ???
+
+      N := First_Rep_Item (Implementation_Base_Type (T));
+      while Present (N) loop
+         if Nkind (N) = N_Pragma and then Chars (N) = Name_Stream_Convert then
+
+            --  For tagged types this pragma is not inherited, so we
+            --  must verify that it is defined for the given type and
+            --  not an ancestor.
+
+            Typ :=
+              Entity (Expression (First (Pragma_Argument_Associations (N))));
+
+            if not Is_Tagged_Type (T)
+              or else T = Typ
+              or else (Is_Private_Type (Typ) and then T = Full_View (Typ))
+            then
+               return N;
+            end if;
+         end if;
+
+         Next_Rep_Item (N);
+      end loop;
+
+      return Empty;
+   end Get_Stream_Convert_Pragma;
 
    ---------------------------------
    -- Is_Constrained_Packed_Array --

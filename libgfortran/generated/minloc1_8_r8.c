@@ -27,8 +27,11 @@ Boston, MA 02111-1307, USA.  */
 #include "libgfortran.h"
 
 
+extern void minloc1_8_r8 (gfc_array_i8 *, gfc_array_r8 *, index_type *);
+export_proto(minloc1_8_r8);
+
 void
-__minloc1_8_r8 (gfc_array_i8 * retarray, gfc_array_r8 *array, index_type *pdim)
+minloc1_8_r8 (gfc_array_i8 *retarray, gfc_array_r8 *array, index_type *pdim)
 {
   index_type count[GFC_MAX_DIMENSIONS - 1];
   index_type extent[GFC_MAX_DIMENSIONS - 1];
@@ -66,6 +69,25 @@ __minloc1_8_r8 (gfc_array_i8 * retarray, gfc_array_r8 *array, index_type *pdim)
         array->dim[n + 1].ubound + 1 - array->dim[n + 1].lbound;
     }
 
+  if (retarray->data == NULL)
+    {
+      for (n = 0; n < rank; n++)
+        {
+          retarray->dim[n].lbound = 0;
+          retarray->dim[n].ubound = extent[n]-1;
+          if (n == 0)
+            retarray->dim[n].stride = 1;
+          else
+            retarray->dim[n].stride = retarray->dim[n-1].stride * extent[n-1];
+        }
+
+      retarray->data
+	 = internal_malloc_size (sizeof (GFC_INTEGER_8)
+		 		 * retarray->dim[rank-1].stride
+				 * extent[rank-1]);
+      retarray->base = 0;
+    }
+          
   for (n = 0; n < rank; n++)
     {
       count[n] = 0;
@@ -134,8 +156,14 @@ __minloc1_8_r8 (gfc_array_i8 * retarray, gfc_array_r8 *array, index_type *pdim)
     }
 }
 
+
+extern void mminloc1_8_r8 (gfc_array_i8 *, gfc_array_r8 *, index_type *,
+					       gfc_array_l4 *);
+export_proto(mminloc1_8_r8);
+
 void
-__mminloc1_8_r8 (gfc_array_i8 * retarray, gfc_array_r8 * array, index_type *pdim, gfc_array_l4 * mask)
+mminloc1_8_r8 (gfc_array_i8 * retarray, gfc_array_r8 * array,
+				  index_type *pdim, gfc_array_l4 * mask)
 {
   index_type count[GFC_MAX_DIMENSIONS - 1];
   index_type extent[GFC_MAX_DIMENSIONS - 1];

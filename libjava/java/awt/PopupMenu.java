@@ -1,5 +1,5 @@
 /* PopupMenu.java -- An AWT popup menu
-   Copyright (C) 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2001, 2002, 2004  Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -38,8 +38,10 @@ exception statement from your version. */
 
 package java.awt;
 
-import java.awt.peer.MenuPeer;
 import java.awt.peer.PopupMenuPeer;
+
+import javax.accessibility.AccessibleContext;
+import javax.accessibility.AccessibleRole;
 
 /**
   * This class implement an AWT popup menu widget
@@ -105,7 +107,7 @@ PopupMenu(String label)
 public void
 addNotify()
 {
-  if (peer != null)
+  if (peer == null)
     peer = getToolkit ().createPopupMenu (this);
   super.addNotify ();
 }
@@ -123,6 +125,8 @@ addNotify()
 public void
 show(Component component, int x, int y)
 {
+  if (getPeer() == null)
+    this.addNotify();
   PopupMenuPeer pmp = (PopupMenuPeer)getPeer();
   if (pmp != null)
     {
@@ -133,6 +137,24 @@ show(Component component, int x, int y)
       pmp.show (component, x, y);
     }
 }
+
+  protected class AccessibleAWTPopupMenu extends AccessibleAWTMenu
+  {
+    protected AccessibleAWTPopupMenu()
+    {
+    }
+    
+    public AccessibleRole getAccessibleRole()
+    {
+      return AccessibleRole.POPUP_MENU;
+    }
+    
+  }
+  
+  public AccessibleContext getAccessibleContext()
+  {
+    return new AccessibleAWTPopupMenu();
+  }
 
 } // class PopupMenu
 

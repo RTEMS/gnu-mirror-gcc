@@ -25,8 +25,11 @@ Boston, MA 02111-1307, USA.  */
 #include <assert.h>
 #include "libgfortran.h"
 
+extern void transpose (gfc_array_char *, gfc_array_char *);
+export_proto(transpose);
+
 void
-__transpose (gfc_array_char * ret, gfc_array_char * source)
+transpose (gfc_array_char *ret, gfc_array_char *source)
 {
   /* r.* indicates the return array.  */
   index_type rxstride, rystride;
@@ -43,6 +46,23 @@ __transpose (gfc_array_char * ret, gfc_array_char * source)
           && GFC_DESCRIPTOR_RANK (ret) == 2);
 
   size = GFC_DESCRIPTOR_SIZE (source);
+
+  if (ret->data == NULL)
+    {
+      assert (ret->dtype == source->dtype);
+
+      ret->dim[0].lbound = 0;
+      ret->dim[0].ubound = source->dim[1].ubound - source->dim[1].lbound;
+      ret->dim[0].stride = 1;
+
+      ret->dim[1].lbound = 0;
+      ret->dim[1].ubound = source->dim[0].ubound - source->dim[0].lbound;
+      ret->dim[1].stride = ret->dim[0].ubound+1;
+
+      ret->data = internal_malloc_size (size * size0 ((array_t*)ret));
+      ret->base = 0;
+    }
+
   sxstride = source->dim[0].stride * size;
   if (sxstride == 0)
     sxstride = size;
@@ -71,4 +91,3 @@ __transpose (gfc_array_char * ret, gfc_array_char * source)
       rptr += rxstride - (rystride * xcount);
     }
 }
-

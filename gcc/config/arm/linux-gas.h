@@ -1,6 +1,7 @@
 /* Definitions of target machine for GNU compiler.
    ARM Linux-based GNU systems version.
-   Copyright (C) 1997, 1998, 1999, 2000, 2001 Free Software Foundation, Inc.
+   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2004
+   Free Software Foundation, Inc.
    Contributed by Russell King  <rmk92@ecs.soton.ac.uk>.
 
    This file is part of GCC.
@@ -27,7 +28,7 @@
 #define DEFAULT_SIGNED_CHAR 0
 
 #undef  SUBTARGET_CPP_SPEC
-#define SUBTARGET_CPP_SPEC  "%{posix:-D_POSIX_SOURCE} %{fPIC|fPIE:-D__PIC__ -D__pic__} %{fpic|fpie:-D__PIC__ -D__pic__}"
+#define SUBTARGET_CPP_SPEC  "%{posix:-D_POSIX_SOURCE}"
 
 #undef  SIZE_TYPE
 #define SIZE_TYPE "unsigned int"

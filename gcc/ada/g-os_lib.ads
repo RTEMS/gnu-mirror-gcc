@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1995-2003 Free Software Foundation, Inc.          --
+--          Copyright (C) 1995-2004 Free Software Foundation, Inc.          --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -93,6 +93,7 @@ pragma Elaborate_Body (OS_Lib);
    -- Time/Date Stuff --
    ---------------------
 
+   type OS_Time is private;
    --  The OS's notion of time is represented by the private type OS_Time.
    --  This is the type returned by the File_Time_Stamp functions to obtain
    --  the time stamp of a specified file. Functions and a procedure (modeled
@@ -102,7 +103,8 @@ pragma Elaborate_Body (OS_Lib);
    --  cases but rather the actual (time-zone independent) time stamp of the
    --  file (of course in Unix systems, this *is* in GMT form).
 
-   type OS_Time is private;
+   Invalid_Time : constant OS_Time;
+   --  A special unique value used to flag an invalid time stamp value
 
    subtype Year_Type   is Integer range 1900 .. 2099;
    subtype Month_Type  is Integer range    1 ..   12;
@@ -110,6 +112,8 @@ pragma Elaborate_Body (OS_Lib);
    subtype Hour_Type   is Integer range    0 ..   23;
    subtype Minute_Type is Integer range    0 ..   59;
    subtype Second_Type is Integer range    0 ..   59;
+   --  Declarations similar to those in Calendar, breaking down the time
+
 
    function GM_Year    (Date : OS_Time) return Year_Type;
    function GM_Month   (Date : OS_Time) return Month_Type;
@@ -117,6 +121,7 @@ pragma Elaborate_Body (OS_Lib);
    function GM_Hour    (Date : OS_Time) return Hour_Type;
    function GM_Minute  (Date : OS_Time) return Minute_Type;
    function GM_Second  (Date : OS_Time) return Second_Type;
+   --  Functions to extract information from OS_Time value
 
    function "<"  (X, Y : OS_Time) return Boolean;
    function ">"  (X, Y : OS_Time) return Boolean;
@@ -134,6 +139,8 @@ pragma Elaborate_Body (OS_Lib);
       Hour    : out Hour_Type;
       Minute  : out Minute_Type;
       Second  : out Second_Type);
+   --  Analogous to the routine of similar name in Calendar, takes an OS_Time
+   --  and splits it into its component parts with obvious meanings.
 
    ----------------
    -- File Stuff --
@@ -191,7 +198,12 @@ pragma Elaborate_Body (OS_Lib);
       Fmode : Mode) return File_Descriptor;
    --  Creates new file with given name for writing, returning file descriptor
    --  for subsequent use in Write calls. File descriptor returned is
-   --  Invalid_FD if file cannot be successfully created
+   --  Invalid_FD if file cannot be successfully created.
+
+   function Create_Output_Text_File (Name  : String) return File_Descriptor;
+   --  Creates new text file with given name suitable to redirect standard
+   --  output, returning file descriptor. File descriptor returned is
+   --  Invalid_FD if file cannot be successfully created.
 
    function Create_New_File
      (Name  : String;
@@ -363,9 +375,11 @@ pragma Elaborate_Body (OS_Lib);
    function File_Time_Stamp (Name : String) return OS_Time;
    --  Given the name of a file or directory, Name, obtains and returns the
    --  time stamp. This function can be used for an unopened file.
+   --  Returns Invalid_Time is Name doesn't correspond to an existing file.
 
    function File_Time_Stamp (FD : File_Descriptor) return OS_Time;
    --  Get time stamp of file from file descriptor FD
+   --  Returns Invalid_Time is FD doesn't correspond to an existing file.
 
    function Normalize_Pathname
      (Name           : String;
@@ -384,6 +398,14 @@ pragma Elaborate_Body (OS_Lib);
    --  not true; for example, this is not true in Unix for two hard links
    --  designating the same file.
    --
+   --  On Windows, the returned path will start with a drive letter except
+   --  when Directory is not empty and does not include a drive letter.
+   --  If Directory is empty (the default) and Name is a relative path
+   --  or an absolute path without drive letter, the letter of the current
+   --  drive will start the returned path. If Case_Sensitive is True
+   --  (the default), then this drive letter will be forced to upper case
+   --  ("C:\...").
+   --
    --  If Resolve_Links is set to True, then the symbolic links, on systems
    --  that support them, will be fully converted to the name of the file
    --  or directory pointed to. This is slightly less efficient, since it
@@ -398,12 +420,12 @@ pragma Elaborate_Body (OS_Lib);
    --  returns an empty string.
    --
    --  For case-sensitive file systems, the value of Case_Sensitive parameter
-   --  is ignored. In systems that have a non case-sensitive file system like
-   --  Windows and OpenVMS, if this parameter is set OFF, then the result
-   --  is returned folded to lower case, this allows to checks if two files
-   --  are the same by applying this function to their names and by comparing
-   --  the results of these calls. If Case_Sensitive is ON, this function does
-   --  not change the casing of file and directory names.
+   --  is ignored.  For file systems that are not case-sensitive, such as
+   --  Windows and OpenVMS, if this parameter is set to False, then the file
+   --  and directory names are folded to lower case. This allows checking
+   --  whether two files are the same by applying this function to their names
+   --  and comparing the results.  If Case_Sensitive is set to True, this
+   --  function does not change the casing of file and directory names.
 
    function Is_Absolute_Path (Name : String) return Boolean;
    --  Returns True if Name is an absolute path name, i.e. it designates
@@ -447,6 +469,18 @@ pragma Elaborate_Body (OS_Lib);
    --  A symbolic link is an indirect pointer to a file; its directory entry
    --  contains the name of the file to which it is linked. Symbolic links may
    --  span file systems and may refer to directories.
+
+   procedure Set_Writable (Name : String);
+   --  Change the permissions on the named file to make it writable
+   --  for its owner.
+
+   procedure Set_Read_Only (Name : String);
+   --  Change the permissions on the named file to make it non-writable
+   --  for its owner.
+
+   procedure Set_Executable (Name : String);
+   --  Change the permissions on the named file to make it executable
+   --  for its owner.
 
    function Locate_Exec_On_Path
      (Exec_Name : String) return String_Access;
@@ -537,11 +571,10 @@ pragma Elaborate_Body (OS_Lib);
       Success      : out Boolean);
 
    function File_Time_Stamp (Name : C_File_Name) return OS_Time;
+   --  Returns Invalid_Time is Name doesn't correspond to an existing file.
 
    function Is_Regular_File (Name : C_File_Name) return Boolean;
-
    function Is_Directory (Name : C_File_Name) return Boolean;
-
    function Is_Readable_File (Name : C_File_Name) return Boolean;
    function Is_Writable_File (Name : C_File_Name) return Boolean;
    function Is_Symbolic_Link (Name : C_File_Name) return Boolean;
@@ -619,7 +652,38 @@ pragma Elaborate_Body (OS_Lib);
    --  operating systems which have no notion of separately spawnable programs.
    --
    --  "Spawn" should not be used in tasking applications.
+
+   procedure Spawn
+     (Program_Name           : String;
+      Args                   : Argument_List;
+      Output_File_Descriptor : File_Descriptor;
+      Return_Code            : out Integer;
+      Err_To_Out             : Boolean := True);
+   --  Similar to the procedure above, but redirects the output to
+   --  the file designated by Output_File_Descriptor. If Err_To_Out
+   --  is True, then the Standard Error output is also redirected.
    --
+   --  Return_Code is set to the status code returned by the operating
+   --  system as described above.
+   --
+   --  "Spawn" should not be used in tasking applications.
+
+   procedure Spawn
+     (Program_Name  : String;
+      Args          : Argument_List;
+      Output_File   : String;
+      Success       : out Boolean;
+      Return_Code   : out Integer;
+      Err_To_Out    : Boolean := True);
+   --  Similar to the procedure above, but saves the output of the command
+   --  to a file with the name Output_File.
+   --
+   --  Success is set to True if the command is executed and its output
+   --  successfully written to the file. If Success is True, then
+   --  Return_Code will be set to the status code returned by the
+   --  operating system. Otherwise, Return_Code is undefined.
+   --
+   --  "Spawn" should not be used in tasking applications.
 
    type Process_Id is private;
    --  A private type used to identify a process activated by the following
@@ -729,6 +793,9 @@ private
    --  It would actually be nice to use pragma Import (Intrinsic) here,
    --  but this was not properly supported till GNAT 3.15a, so that would
    --  cause bootstrap path problems. To be changed later ???
+
+   Invalid_Time : constant OS_Time := -1;
+   --  This value should match the return valud by __gnat_file_time_*
 
    pragma Inline ("<");
    pragma Inline (">");

@@ -145,7 +145,7 @@ package body CStand is
       Set_Ekind                      (E, E_Floating_Point_Type);
       Set_Etype                      (E, E);
       Init_Size                      (E, Siz);
-      Set_Prim_Alignment             (E);
+      Set_Elem_Alignment             (E);
       Init_Digits_Value              (E, Digs);
       Set_Float_Bounds               (E);
       Set_Is_Frozen                  (E);
@@ -171,7 +171,7 @@ package body CStand is
       Set_Ekind                      (E, E_Signed_Integer_Type);
       Set_Etype                      (E, E);
       Init_Size                      (E, Siz);
-      Set_Prim_Alignment             (E);
+      Set_Elem_Alignment             (E);
       Set_Integer_Bounds             (E, E, Lbound, Ubound);
       Set_Is_Frozen                  (E);
       Set_Is_Public                  (E);
@@ -189,35 +189,76 @@ package body CStand is
    procedure Create_Operators is
       Op_Node : Entity_Id;
 
-      --  Following list has two entries for concatenation, to include
-      --  explicitly the operation on wide strings.
+      --  The following tables define the binary and unary operators and their
+      --  corresponding result type.
 
       Binary_Ops : constant array (S_Binary_Ops) of Name_Id :=
-        (Name_Op_Add,      Name_Op_And,   Name_Op_Concat,   Name_Op_Concat,
-         Name_Op_Divide,   Name_Op_Eq,    Name_Op_Expon,    Name_Op_Ge,
-         Name_Op_Gt,       Name_Op_Le,    Name_Op_Lt,       Name_Op_Mod,
-         Name_Op_Multiply, Name_Op_Ne,    Name_Op_Or,       Name_Op_Rem,
-         Name_Op_Subtract, Name_Op_Xor);
+
+         --  There is one entry here for each binary operator, except for the
+         --  case of concatenation, where there are two entries, one for a
+         --  String result, and one for a Wide_String result.
+
+        (Name_Op_Add,
+         Name_Op_And,
+         Name_Op_Concat,
+         Name_Op_Concat,
+         Name_Op_Divide,
+         Name_Op_Eq,
+         Name_Op_Expon,
+         Name_Op_Ge,
+         Name_Op_Gt,
+         Name_Op_Le,
+         Name_Op_Lt,
+         Name_Op_Mod,
+         Name_Op_Multiply,
+         Name_Op_Ne,
+         Name_Op_Or,
+         Name_Op_Rem,
+         Name_Op_Subtract,
+         Name_Op_Xor);
 
       Bin_Op_Types : constant array (S_Binary_Ops) of Entity_Id :=
-        (Universal_Integer, Standard_Boolean,
-         Standard_String,   Standard_Wide_String,
-         Universal_Integer, Standard_Boolean,
-         Universal_Integer, Standard_Boolean,
-         Standard_Boolean,  Standard_Boolean,
-         Standard_Boolean,  Universal_Integer,
-         Universal_Integer, Standard_Boolean,
-         Standard_Boolean,  Universal_Integer,
-         Universal_Integer, Standard_Boolean);
+
+         --  This table has the corresponding result types. The entries are
+         --  ordered so they correspond to the Binary_Ops array above.
+
+        (Universal_Integer,       -- Add
+         Standard_Boolean,        -- And
+         Standard_String,         -- Concat (String)
+         Standard_Wide_String,    -- Concat (Wide_String)
+         Universal_Integer,       -- Divide
+         Standard_Boolean,        -- Eq
+         Universal_Integer,       -- Expon
+         Standard_Boolean,        -- Ge
+         Standard_Boolean,        -- Gt
+         Standard_Boolean,        -- Le
+         Standard_Boolean,        -- Lt
+         Universal_Integer,       -- Mod
+         Universal_Integer,       -- Multiply
+         Standard_Boolean,        -- Ne
+         Standard_Boolean,        -- Or
+         Universal_Integer,       -- Rem
+         Universal_Integer,       -- Subtract
+         Standard_Boolean);       -- Xor
 
       Unary_Ops : constant array (S_Unary_Ops) of Name_Id :=
-        (Name_Op_Abs, Name_Op_Subtract, Name_Op_Not, Name_Op_Add);
+
+         --  There is one entry here for each unary operator
+
+        (Name_Op_Abs,
+         Name_Op_Subtract,
+         Name_Op_Not,
+         Name_Op_Add);
 
       Unary_Op_Types : constant array (S_Unary_Ops) of Entity_Id :=
-        (Universal_Integer, Universal_Integer,
-         Standard_Boolean,  Universal_Integer);
 
-      --  Corresponding to Abs, Minus, Not, and Plus.
+         --  This table has the corresponding result types. The entries are
+         --  ordered so they correspond to the Unary_Ops array above.
+
+        (Universal_Integer,     -- Abs
+         Universal_Integer,     -- Subtract
+         Standard_Boolean,      -- Not
+         Universal_Integer);    -- Add
 
    begin
       for J in S_Binary_Ops loop
@@ -243,7 +284,6 @@ package body CStand is
 
       Set_Etype (First_Entity (Standard_Op_Concatw), Standard_Wide_String);
       Set_Etype (Last_Entity  (Standard_Op_Concatw), Standard_Wide_String);
-
    end Create_Operators;
 
    ---------------------
@@ -359,7 +399,7 @@ package body CStand is
       Set_Etype          (Standard_Boolean, Standard_Boolean);
       Init_Esize         (Standard_Boolean, Standard_Character_Size);
       Init_RM_Size       (Standard_Boolean, 1);
-      Set_Prim_Alignment (Standard_Boolean);
+      Set_Elem_Alignment (Standard_Boolean);
 
       Set_Is_Unsigned_Type           (Standard_Boolean);
       Set_Size_Known_At_Compile_Time (Standard_Boolean);
@@ -401,6 +441,11 @@ package body CStand is
       Set_Scalar_Range (Standard_Boolean, R_Node);
       Set_Etype (R_Node, Standard_Boolean);
       Set_Parent (R_Node, Standard_Boolean);
+
+      --  Record entity identifiers for boolean literals in the
+      --  Boolean_Literals array, for easy reference during expansion.
+
+      Boolean_Literals := (False => Standard_False, True => Standard_True);
 
       --  Create type definition nodes for predefined integer types
 
@@ -476,7 +521,7 @@ package body CStand is
       Set_Etype          (Standard_Character, Standard_Character);
       Init_Esize         (Standard_Character, Standard_Character_Size);
       Init_RM_Size       (Standard_Character, 8);
-      Set_Prim_Alignment (Standard_Character);
+      Set_Elem_Alignment (Standard_Character);
 
       Set_Is_Unsigned_Type           (Standard_Character);
       Set_Is_Character_Type          (Standard_Character);
@@ -522,7 +567,7 @@ package body CStand is
       Set_Etype      (Standard_Wide_Character, Standard_Wide_Character);
       Init_Size      (Standard_Wide_Character, Standard_Wide_Character_Size);
 
-      Set_Prim_Alignment             (Standard_Wide_Character);
+      Set_Elem_Alignment             (Standard_Wide_Character);
       Set_Is_Unsigned_Type           (Standard_Wide_Character);
       Set_Is_Character_Type          (Standard_Wide_Character);
       Set_Is_Known_Valid             (Standard_Wide_Character);
@@ -579,6 +624,7 @@ package body CStand is
       Set_Component_Type (Standard_String, Standard_Character);
       Set_Component_Size (Standard_String, Uint_8);
       Init_Size_Align    (Standard_String);
+      Set_Alignment      (Standard_String, Uint_1);
 
       --  Set index type of String
 
@@ -631,7 +677,7 @@ package body CStand is
       Set_Etype          (Standard_Natural, Base_Type (Standard_Integer));
       Init_Esize         (Standard_Natural, Standard_Integer_Size);
       Init_RM_Size       (Standard_Natural, Standard_Integer_Size - 1);
-      Set_Prim_Alignment (Standard_Natural);
+      Set_Elem_Alignment (Standard_Natural);
       Set_Size_Known_At_Compile_Time
                          (Standard_Natural);
       Set_Integer_Bounds (Standard_Natural,
@@ -654,7 +700,7 @@ package body CStand is
       Set_Etype          (Standard_Positive, Base_Type (Standard_Integer));
       Init_Esize         (Standard_Positive, Standard_Integer_Size);
       Init_RM_Size       (Standard_Positive, Standard_Integer_Size - 1);
-      Set_Prim_Alignment (Standard_Positive);
+      Set_Elem_Alignment (Standard_Positive);
 
       Set_Size_Known_At_Compile_Time (Standard_Positive);
 
@@ -772,7 +818,7 @@ package body CStand is
       Set_Scope          (Standard_A_Char, Standard_Standard);
       Set_Etype          (Standard_A_Char, Standard_A_String);
       Init_Size          (Standard_A_Char, System_Address_Size);
-      Set_Prim_Alignment (Standard_A_Char);
+      Set_Elem_Alignment (Standard_A_Char);
 
       Set_Directly_Designated_Type (Standard_A_Char, Standard_Character);
       Make_Name     (Standard_A_Char, "access_character");
@@ -806,7 +852,7 @@ package body CStand is
       Set_Scope             (Any_Access, Standard_Standard);
       Set_Etype             (Any_Access, Any_Access);
       Init_Size             (Any_Access, System_Address_Size);
-      Set_Prim_Alignment    (Any_Access);
+      Set_Elem_Alignment    (Any_Access);
       Make_Name             (Any_Access, "an access type");
 
       Any_Character := New_Standard_Entity;
@@ -817,7 +863,7 @@ package body CStand is
       Set_Is_Character_Type (Any_Character);
       Init_Esize            (Any_Character, Standard_Character_Size);
       Init_RM_Size          (Any_Character, 8);
-      Set_Prim_Alignment    (Any_Character);
+      Set_Elem_Alignment    (Any_Character);
       Set_Scalar_Range      (Any_Character, Scalar_Range (Standard_Character));
       Make_Name             (Any_Character, "a character type");
 
@@ -835,7 +881,7 @@ package body CStand is
       Set_Etype             (Any_Boolean, Standard_Boolean);
       Init_Esize            (Any_Boolean, Standard_Character_Size);
       Init_RM_Size          (Any_Boolean, 1);
-      Set_Prim_Alignment    (Any_Boolean);
+      Set_Elem_Alignment    (Any_Boolean);
       Set_Is_Unsigned_Type  (Any_Boolean);
       Set_Scalar_Range      (Any_Boolean, Scalar_Range (Standard_Boolean));
       Make_Name             (Any_Boolean, "a boolean type");
@@ -854,7 +900,7 @@ package body CStand is
       Set_Scope             (Any_Discrete, Standard_Standard);
       Set_Etype             (Any_Discrete, Any_Discrete);
       Init_Size             (Any_Discrete, Standard_Integer_Size);
-      Set_Prim_Alignment    (Any_Discrete);
+      Set_Elem_Alignment    (Any_Discrete);
       Make_Name             (Any_Discrete, "a discrete type");
 
       Any_Fixed := New_Standard_Entity;
@@ -862,7 +908,7 @@ package body CStand is
       Set_Scope             (Any_Fixed, Standard_Standard);
       Set_Etype             (Any_Fixed, Any_Fixed);
       Init_Size             (Any_Fixed, Standard_Integer_Size);
-      Set_Prim_Alignment    (Any_Fixed);
+      Set_Elem_Alignment    (Any_Fixed);
       Make_Name             (Any_Fixed, "a fixed-point type");
 
       Any_Integer := New_Standard_Entity;
@@ -870,7 +916,7 @@ package body CStand is
       Set_Scope             (Any_Integer, Standard_Standard);
       Set_Etype             (Any_Integer, Standard_Long_Long_Integer);
       Init_Size             (Any_Integer, Standard_Long_Long_Integer_Size);
-      Set_Prim_Alignment    (Any_Integer);
+      Set_Elem_Alignment    (Any_Integer);
 
       Set_Integer_Bounds
         (Any_Integer,
@@ -884,7 +930,7 @@ package body CStand is
       Set_Scope             (Any_Modular, Standard_Standard);
       Set_Etype             (Any_Modular, Standard_Long_Long_Integer);
       Init_Size             (Any_Modular, Standard_Long_Long_Integer_Size);
-      Set_Prim_Alignment    (Any_Modular);
+      Set_Elem_Alignment    (Any_Modular);
       Set_Is_Unsigned_Type  (Any_Modular);
       Make_Name             (Any_Modular, "a modular type");
 
@@ -893,7 +939,7 @@ package body CStand is
       Set_Scope             (Any_Numeric, Standard_Standard);
       Set_Etype             (Any_Numeric, Standard_Long_Long_Integer);
       Init_Size             (Any_Numeric, Standard_Long_Long_Integer_Size);
-      Set_Prim_Alignment    (Any_Numeric);
+      Set_Elem_Alignment    (Any_Numeric);
       Make_Name             (Any_Numeric, "a numeric type");
 
       Any_Real := New_Standard_Entity;
@@ -901,7 +947,7 @@ package body CStand is
       Set_Scope             (Any_Real, Standard_Standard);
       Set_Etype             (Any_Real, Standard_Long_Long_Float);
       Init_Size             (Any_Real, Standard_Long_Long_Float_Size);
-      Set_Prim_Alignment    (Any_Real);
+      Set_Elem_Alignment    (Any_Real);
       Make_Name             (Any_Real, "a real type");
 
       Any_Scalar := New_Standard_Entity;
@@ -909,7 +955,7 @@ package body CStand is
       Set_Scope             (Any_Scalar, Standard_Standard);
       Set_Etype             (Any_Scalar, Any_Scalar);
       Init_Size             (Any_Scalar, Standard_Integer_Size);
-      Set_Prim_Alignment    (Any_Scalar);
+      Set_Elem_Alignment    (Any_Scalar);
       Make_Name             (Any_Scalar, "a scalar type");
 
       Any_String := New_Standard_Entity;
@@ -969,7 +1015,7 @@ package body CStand is
       Set_Scope             (Standard_Unsigned, Standard_Standard);
       Set_Etype             (Standard_Unsigned, Standard_Unsigned);
       Init_Size             (Standard_Unsigned, Standard_Integer_Size);
-      Set_Prim_Alignment    (Standard_Unsigned);
+      Set_Elem_Alignment    (Standard_Unsigned);
       Set_Modulus           (Standard_Unsigned,
                               Uint_2 ** Standard_Integer_Size);
       Set_Is_Unsigned_Type  (Standard_Unsigned);
@@ -1018,7 +1064,7 @@ package body CStand is
       Set_Etype            (Universal_Fixed, Universal_Fixed);
       Set_Scope            (Universal_Fixed, Standard_Standard);
       Init_Size            (Universal_Fixed, Standard_Long_Long_Integer_Size);
-      Set_Prim_Alignment   (Universal_Fixed);
+      Set_Elem_Alignment   (Universal_Fixed);
       Set_Size_Known_At_Compile_Time
                            (Universal_Fixed);
 
@@ -1040,7 +1086,7 @@ package body CStand is
             Delta_Val := UR_From_Components (UI_From_Int (20), Uint_3, 10);
 
          --  In standard 64-bit mode, the size is 64-bits and the delta and
-         --  amll values are set to nanoseconds (1.0**(10.0**(-9))
+         --  small values are set to nanoseconds (1.0**(10.0**(-9))
 
          else
             Dlo := Intval (Type_Low_Bound (Standard_Integer_64));
@@ -1068,7 +1114,7 @@ package body CStand is
             Init_Size (Standard_Duration, 64);
          end if;
 
-         Set_Prim_Alignment (Standard_Duration);
+         Set_Elem_Alignment (Standard_Duration);
          Set_Delta_Value    (Standard_Duration, Delta_Val);
          Set_Small_Value    (Standard_Duration, Delta_Val);
          Set_Scalar_Range   (Standard_Duration,
@@ -1100,6 +1146,13 @@ package body CStand is
       --  Build standard exception type. Note that the type name here is
       --  actually used in the generated code, so it must be set correctly
 
+      --  ??? Also note that the Import_Code component is now declared
+      --  as a System.Standard_Library.Exception_Code to enforce run-time
+      --  library implementation consistency. It's too early here to resort
+      --  to rtsfind to get the proper node for that type, so we use the
+      --  closest possible available type node at hand instead. We should
+      --  probably be fixing this up at some point.
+
       Standard_Exception_Type := New_Standard_Entity;
       Set_Ekind       (Standard_Exception_Type, E_Record_Type);
       Set_Etype       (Standard_Exception_Type, Standard_Exception_Type);
@@ -1120,7 +1173,7 @@ package body CStand is
                                                              "Full_Name");
       Make_Component  (Standard_Exception_Type, Standard_A_Char,
                                                             "HTable_Ptr");
-      Make_Component  (Standard_Exception_Type, Standard_Integer,
+      Make_Component  (Standard_Exception_Type, Standard_Unsigned,
                                                           "Import_Code");
       Make_Component  (Standard_Exception_Type, Standard_A_Char,
                                                             "Raise_Hook");
@@ -1170,9 +1223,9 @@ package body CStand is
       Build_Exception (S_Tasking_Error);
 
       --  Numeric_Error is a normal exception in Ada 83, but in Ada 95
-      --  it is a renaming of Constraint_Error
+      --  it is a renaming of Constraint_Error. Is this test too early???
 
-      if Ada_83 then
+      if Ada_Version = Ada_83 then
          Build_Exception (S_Numeric_Error);
 
       else
