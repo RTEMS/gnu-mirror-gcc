@@ -2210,12 +2210,17 @@ check_default_tmpl_args (decl, parms, is_primary, is_partial)
 
   if (current_class_type
       && !TYPE_BEING_DEFINED (current_class_type)
-      && DECL_REAL_CONTEXT (decl) == current_class_type
       && DECL_LANG_SPECIFIC (decl)
-      && DECL_DEFINED_IN_CLASS_P (decl)) 
+      /* If this is either a friend defined in the scope of the class
+	 or a member function.  */
+      && DECL_CLASS_CONTEXT (decl) == current_class_type
+      /* And, if it was a member function, it really was defined in
+	 the scope of the class.  */
+      && (!DECL_FUNCTION_MEMBER_P (decl) || DECL_DEFINED_IN_CLASS_P (decl)))
     /* We already checked these parameters when the template was
-       declared, so there's no need to do it again now.  This is an
-       inline member function definition.  */
+       declared, so there's no need to do it again now.  This function
+       was defined in class scope, but we're processing it's body now
+       that the class is complete.  */
     return;
 
   if (TREE_CODE (decl) != TYPE_DECL || is_partial || !is_primary)
@@ -2781,18 +2786,14 @@ convert_nontype_argument (type, expr)
 	       applied.  */
 	    e = perform_qualification_conversions (type, expr);
 	    if (TREE_CODE (e) == NOP_EXPR)
-	      {
-		/* The call to perform_qualification_conversions will
-		   insert a NOP_EXPR over EXPR to do express
-		   conversion, if necessary.  But, that will confuse
-		   us if we use this (converted) template parameter to
-		   instantiate another template; then the thing will
-		   not look like a valid template argument.  So, just
-		   make a new constant, of the appropriate type.  */
-		e = make_node (PTRMEM_CST);
-		TREE_TYPE (e) = type;
-		PTRMEM_CST_MEMBER (e) = PTRMEM_CST_MEMBER (expr);
-	      }
+	      /* The call to perform_qualification_conversions will
+		 insert a NOP_EXPR over EXPR to do express conversion,
+		 if necessary.  But, that will confuse us if we use
+		 this (converted) template parameter to instantiate
+		 another template; then the thing will not look like a
+		 valid template argument.  So, just make a new
+		 constant, of the appropriate type.  */
+	      e = make_ptrmem_cst (type, PTRMEM_CST_MEMBER (expr));
 	    return e;
 	  }
 	else if (TREE_CODE (type_pointed_to) == FUNCTION_TYPE)
@@ -6540,6 +6541,8 @@ tsubst (t, args, complain, in_decl)
 	  }
 
 	f = make_typename_type (ctx, f);
+	if (f == error_mark_node)
+	  return f;
 	return cp_build_qualified_type (f, 
 					CP_TYPE_QUALS (f) 
 					| CP_TYPE_QUALS (t));
