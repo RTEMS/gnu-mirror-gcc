@@ -259,6 +259,7 @@ static rtx loop_call_insn_hoist PARAMS((const struct loop *, rtx));
 static rtx loop_insn_sink_or_swim PARAMS((const struct loop *, rtx));
 
 static void loop_dump_aux PARAMS ((const struct loop *, FILE *, int));
+static void loop_delete_insns PARAMS ((rtx, rtx));
 void debug_ivs PARAMS ((const struct loop *));
 void debug_iv_class PARAMS ((const struct iv_class *));
 void debug_biv PARAMS ((const struct induction *));
@@ -7259,6 +7260,7 @@ check_dbra_loop (loop, insn_count)
       if (bl->giv_count == 0 && ! loop->exit_count)
 	{
 	  rtx bivreg = regno_reg_rtx[bl->regno];
+	  struct iv_class *blt;
 
 	  /* If there are no givs for this biv, and the only exit is the
 	     fall through at the end of the loop, then
@@ -7294,6 +7296,14 @@ check_dbra_loop (loop, insn_count)
 		    no_use_except_counting = 0;
 		    break;
 		  }
+	      }
+
+	  /* A biv has uses besides counting if it is used to set another biv.  */
+	  for (blt = ivs->list; blt; blt = blt->next)
+	    if (blt->init_set && reg_mentioned_p (bivreg, SET_SRC (blt->init_set)))
+	      {
+		no_use_except_counting = 0;
+		break;
 	      }
 	}
 
@@ -8813,7 +8823,7 @@ load_mems (loop)
   struct loop_regs *regs = LOOP_REGS (loop);
   int maybe_never = 0;
   int i;
-  rtx p;
+  rtx p, prev_ebb_head;
   rtx label = NULL_RTX;
   rtx end_label;
   /* Nonzero if the next instruction may never be executed.  */
@@ -8832,7 +8842,7 @@ load_mems (loop)
      never executed.  Also check if there is a goto out of the loop other
      than right after the end of the loop.  */
   for (p = next_insn_in_loop (loop, loop->scan_start);
-       p != NULL_RTX && ! maybe_never;
+       p != NULL_RTX;
        p = next_insn_in_loop (loop, p))
     {
       if (GET_CODE (p) == CODE_LABEL)
@@ -8852,10 +8862,13 @@ load_mems (loop)
 	  /* If this is a jump outside of the loop but not right
 	     after the end of the loop, we would have to emit new fixup
 	     sequences for each such label.  */
-	  if (JUMP_LABEL (p) != end_label
-	      && (INSN_UID (JUMP_LABEL (p)) >= max_uid_for_loop
-		  || INSN_LUID (JUMP_LABEL (p)) < INSN_LUID (loop->start)
-		  || INSN_LUID (JUMP_LABEL (p)) > INSN_LUID (loop->end)))
+	  if (/* If we can't tell where control might go when this
+		 JUMP_INSN is executed, we must be conservative.  */
+	      !JUMP_LABEL (p)
+	      || (JUMP_LABEL (p) != end_label
+		  && (INSN_UID (JUMP_LABEL (p)) >= max_uid_for_loop
+		      || INSN_LUID (JUMP_LABEL (p)) < INSN_LUID (loop->start)
+		      || INSN_LUID (JUMP_LABEL (p)) > INSN_LUID (loop->end))))
 	    return;
 
 	  if (!any_condjump_p (p))
@@ -8875,6 +8888,7 @@ load_mems (loop)
        PREV_INSN (p) && GET_CODE (p) != CODE_LABEL;
        p = PREV_INSN (p))
     ;
+  prev_ebb_head = p;
 
   cselib_init ();
 
@@ -8965,7 +8979,7 @@ load_mems (loop)
       loop_info->mems[i].reg = reg;
 
       /* Now, replace all references to the MEM with the
-	 corresponding pesudos.  */
+	 corresponding pseudos.  */
       maybe_never = 0;
       for (p = next_insn_in_loop (loop, loop->scan_start);
 	   p != NULL_RTX;
@@ -9036,7 +9050,7 @@ load_mems (loop)
 		  if (CONSTANT_P (equiv->loc))
 		    const_equiv = equiv;
 		  else if (GET_CODE (equiv->loc) == REG
-			   /* Extending hard register lifetimes cuases crash
+			   /* Extending hard register lifetimes causes crash
 			      on SRC targets.  Doing so on non-SRC is
 			      probably also not good idea, since we most
 			      probably have pseudoregister equivalence as
@@ -9062,8 +9076,19 @@ load_mems (loop)
 	      if (best_equiv)
 		best = copy_rtx (best_equiv->loc);
 	    }
+
 	  set = gen_move_insn (reg, best);
 	  set = loop_insn_hoist (loop, set);
+	  if (REG_P (best))
+	    {
+	      for (p = prev_ebb_head; p != loop->start; p = NEXT_INSN (p))
+		if (REGNO_LAST_UID (REGNO (best)) == INSN_UID (p))
+		  {
+		    REGNO_LAST_UID (REGNO (best)) = INSN_UID (set);
+		    break;
+		  }
+	    }
+
 	  if (const_equiv)
 	    REG_NOTES (set) = gen_rtx_EXPR_LIST (REG_EQUAL,
 						 copy_rtx (const_equiv->loc),
@@ -9227,14 +9252,49 @@ try_copy_prop (loop, replacement, regno)
 	fprintf (loop_dump_stream, "  Replaced reg %d", regno);
       if (store_is_first && replaced_last)
 	{
-	  PUT_CODE (init_insn, NOTE);
-	  NOTE_LINE_NUMBER (init_insn) = NOTE_INSN_DELETED;
-	  if (loop_dump_stream)
-	    fprintf (loop_dump_stream, ", deleting init_insn (%d)",
-		     INSN_UID (init_insn));
+	  rtx first;
+	  rtx retval_note;
+
+	  /* Assume we're just deleting INIT_INSN.  */
+	  first = init_insn;
+	  /* Look for REG_RETVAL note.  If we're deleting the end of
+	     the libcall sequence, the whole sequence can go.  */
+	  retval_note = find_reg_note (init_insn, REG_RETVAL, NULL_RTX);
+	  /* If we found a REG_RETVAL note, find the first instruction
+	     in the sequence.  */
+	  if (retval_note)
+	    first = XEXP (retval_note, 0);
+
+	  /* Delete the instructions.  */
+	  loop_delete_insns (first, init_insn);
 	}
       if (loop_dump_stream)
 	fprintf (loop_dump_stream, ".\n");
+    }
+}
+
+/* Replace all the instructions from FIRST up to and including LAST
+   with NOTE_INSN_DELETED notes.  */
+
+static void
+loop_delete_insns (first, last)
+     rtx first;
+     rtx last;
+{
+  while (1)
+    {
+      PUT_CODE (first, NOTE);
+      NOTE_LINE_NUMBER (first) = NOTE_INSN_DELETED;
+      if (loop_dump_stream)
+	fprintf (loop_dump_stream, ", deleting init_insn (%d)",
+		 INSN_UID (first));
+
+      /* If this was the LAST instructions we're supposed to delete,
+	 we're done.  */
+      if (first == last)
+	break;
+
+      first = NEXT_INSN (first);
     }
 }
 
@@ -9269,7 +9329,7 @@ try_swap_copy_prop (loop, replacement, regno)
 	break;
     }
 
-  if (set)
+  if (insn != NULL_RTX)
     {
       rtx prev_insn;
       rtx prev_set;

@@ -2384,8 +2384,8 @@ expand_call (exp, target, ignore)
   args = (struct arg_data *) alloca (num_actuals * sizeof (struct arg_data));
   memset ((char *) args, 0, num_actuals * sizeof (struct arg_data));
 
-  /* Build up entries inthe ARGS array, compute the size of the arguments
-     into ARGS_SIZE, etc.  */
+  /* Build up entries in the ARGS array, compute the size of the
+     arguments into ARGS_SIZE, etc.  */
   initialize_argument_information (num_actuals, args, &args_size,
 				   n_named_args, actparms, fndecl,
 				   &args_so_far, reg_parm_stack_space,
@@ -2526,8 +2526,9 @@ expand_call (exp, target, ignore)
 	      {
 		tree var = build_decl (VAR_DECL, NULL_TREE,
 				       TREE_TYPE (args[i].tree_value));
-		DECL_RTL (var) = expand_expr (args[i].tree_value, NULL_RTX,
-					      VOIDmode, EXPAND_NORMAL);
+		SET_DECL_RTL (var,
+			      expand_expr (args[i].tree_value, NULL_RTX,
+					   VOIDmode, EXPAND_NORMAL));
 		args[i].tree_value = var;
 	      }
 	      break;
@@ -4593,10 +4594,10 @@ store_one_arg (arg, argblock, flags, variable_size, reg_parm_stack_space)
           {
 	    rtx size_rtx1 = GEN_INT (reg_parm_stack_space - arg->offset.constant);
 	    emit_push_insn (arg->value, arg->mode, TREE_TYPE (pval), size_rtx1,
-		            TYPE_ALIGN (TREE_TYPE (pval)) / BITS_PER_UNIT, 
-			    partial, reg, excess, argblock, 
-			    ARGS_SIZE_RTX (arg->offset), reg_parm_stack_space,
-		            ARGS_SIZE_RTX (arg->alignment_pad));
+		            TYPE_ALIGN (TREE_TYPE (pval)), partial, reg,
+			    excess, argblock, ARGS_SIZE_RTX (arg->offset),
+			    reg_parm_stack_space,
+			    ARGS_SIZE_RTX (arg->alignment_pad));
 
 	    size_rtx = GEN_INT (INTVAL(size_rtx) - reg_parm_stack_space);
 	  }

@@ -120,7 +120,7 @@ java_init_lex (finput, encoding)
     wfl_to_string = build_expr_wfl (get_identifier ("toString"), NULL, 0, 0);
 
   CPC_INITIALIZER_LIST (ctxp) = CPC_STATIC_INITIALIZER_LIST (ctxp) =
-    CPC_INSTANCE_INITIALIZER_LIST (ctxp) = ctxp->incomplete_class = NULL_TREE;
+    CPC_INSTANCE_INITIALIZER_LIST (ctxp) = NULL_TREE;
 
   memset ((PTR) ctxp->modifier_ctx, 0, 11*sizeof (ctxp->modifier_ctx[0]));
   memset ((PTR) current_jcf, 0, sizeof (JCF));
@@ -269,6 +269,7 @@ java_new_lexer (finput, encoding)
 	      outc = 2;
 
 	      r = iconv (handle, (const char **) &inp, &inc, &outp, &outc);
+	      iconv_close (handle);
 	      /* Conversion must be complete for us to use the result.  */
 	      if (r != (size_t) -1 && inc == 0 && outc == 0)
 		need_byteswap = (result != 0xfeff);
@@ -532,6 +533,16 @@ java_read_unicode (lex, unicode_escape_p)
         {
 	  unicode_t unicode = 0;
 	  int shift = 12;
+
+	  /* Recognize any number of `u's in \u.  */
+	  while ((c = java_read_char (lex)) == 'u')
+	    ;
+
+	  /* Unget the most recent character as it is not a `u'.  */
+	  if (c == UEOF)
+	    return UEOF;
+	  lex->unget_value = c;
+
 	  /* Next should be 4 hex digits, otherwise it's an error.
 	     The hex value is converted into the unicode, pushed into
 	     the Unicode stream.  */
@@ -543,11 +554,6 @@ java_read_unicode (lex, unicode_escape_p)
 		unicode |= (unicode_t)((c-'0') << shift);
 	      else if ((c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))
 	        unicode |= (unicode_t)((10+(c | 0x20)-'a') << shift);
-	      else if (c == 'u')
-		{
-		  /* Recognize any number of u in \u.  */
-		  shift += 4;
-		}
 	      else
 		java_lex_error ("Non hex digit in Unicode escape sequence", 0);
 	    }
@@ -1797,37 +1803,110 @@ utf8_cmp (str, length, name)
 
 static const char *cxx_keywords[] =
 {
+  "_Complex",
+  "__alignof",
+  "__alignof__",
+  "__asm",
+  "__asm__",
+  "__attribute",
+  "__attribute__",
+  "__builtin_va_arg",
+  "__complex",
+  "__complex__",
+  "__const",
+  "__const__",
+  "__extension__",
+  "__imag",
+  "__imag__",
+  "__inline",
+  "__inline__",
+  "__label__",
+  "__null",
+  "__real",
+  "__real__",
+  "__restrict",
+  "__restrict__",
+  "__signed",
+  "__signed__",
+  "__typeof",
+  "__typeof__",
+  "__volatile",
+  "__volatile__",
   "asm",
+  "and",
+  "and_eq",
   "auto",
+  "bitand",
+  "bitor",
   "bool",
+  "break",
+  "case",
+  "catch",
+  "char",
+  "class",
+  "compl",
+  "const",
   "const_cast",
+  "continue",
+  "default",
   "delete",
+  "do",
+  "double",
   "dynamic_cast",
+  "else",
   "enum",
   "explicit",
+  "export",
   "extern",
+  "false",
+  "float",
+  "for",
   "friend",
+  "goto",
+  "if",
   "inline",
+  "int",
+  "long",
   "mutable",
   "namespace",
-  "overload",
+  "new",
+  "not",
+  "not_eq",
+  "operator",
+  "or",
+  "or_eq",
+  "private",
+  "protected",
+  "public",
   "register",
   "reinterpret_cast",
+  "return",
+  "short",
   "signed",
   "sizeof",
+  "static",
   "static_cast",
   "struct",
+  "switch",
   "template",
+  "this",      
+  "throw",
+  "true",
+  "try",
   "typedef",
-  "typeid",
   "typename",
-  "typenameopt",
+  "typeid",
+  "typeof",
   "union",
   "unsigned",
   "using",
   "virtual",
+  "void",
   "volatile",
-  "wchar_t"
+  "wchar_t",
+  "while",
+  "xor",
+  "xor_eq"
 };
 
 /* Return true if NAME is a C++ keyword.  */

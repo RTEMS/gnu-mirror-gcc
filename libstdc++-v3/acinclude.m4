@@ -325,7 +325,11 @@ AC_DEFUN(GLIBCPP_CHECK_MATH_DECL_1, [
     AC_CACHE_VAL(glibcpp_cv_func_$1_use, [
       AC_LANG_SAVE
       AC_LANG_CPLUSPLUS
-      AC_TRY_COMPILE([#include <math.h>], 
+      AC_TRY_COMPILE([#include <math.h>
+		      #ifdef HAVE_IEEEFP_H
+		      #include <ieeefp.h>
+		      #endif
+		     ], 
                      [ $1(0);], 
                      [glibcpp_cv_func_$1_use=yes], [glibcpp_cv_func_$1_use=no])
       AC_LANG_RESTORE
@@ -1125,7 +1129,8 @@ AC_DEFUN(GLIBCPP_ENABLE_CSTDIO, [
   case x${enable_cstdio_flag} in
     xlibio)
       CSTDIO_H=config/c_io_libio.h
-      CSTDIO_CC=config/c_io_libio.cc
+      BASIC_FILE_H=config/basic_file_libio.h
+      BASIC_FILE_CC=config/basic_file_libio.cc
       AC_MSG_RESULT(libio)
 
       # see if we are on a system with libio native (ie, linux)
@@ -1181,7 +1186,8 @@ AC_DEFUN(GLIBCPP_ENABLE_CSTDIO, [
     xstdio | x | xno | xnone | xyes)
       # default
       CSTDIO_H=config/c_io_stdio.h
-      CSTDIO_CC=config/c_io_stdio.cc
+      BASIC_FILE_H=config/basic_file_stdio.h
+      BASIC_FILE_CC=config/basic_file_stdio.cc
       AC_MSG_RESULT(stdio)
 
       # We're not using stdio.
@@ -1196,7 +1202,8 @@ AC_DEFUN(GLIBCPP_ENABLE_CSTDIO, [
       ;;
   esac
   AC_LINK_FILES($CSTDIO_H, include/bits/c++io.h)
-  AC_LINK_FILES($CSTDIO_CC, src/c++io.cc)
+  AC_LINK_FILES($BASIC_FILE_H, include/bits/basic_file_model.h)
+  AC_LINK_FILES($BASIC_FILE_CC, src/basic_file.cc)
 
   # 2000-08-04 bkoz hack
   CCODECVT_C=config/c_io_libio_codecvt.c
@@ -1226,39 +1233,9 @@ dnl Default is no threads, which also disables _IO_MTSAFE_IO in
 dnl libio.  Any actual thread package will enable it.
 dnl
 AC_DEFUN(GLIBCPP_ENABLE_THREADS, [
-  dnl Note this comes from the gcc/config.in and libjava/config.in
-  dnl Efforts should be made to keep this in sync.
-  AC_MSG_CHECKING([for threads package to use])
-  AC_ARG_ENABLE(threads,
-  [  --enable-threads       enable thread usage for target GCC.
-     --enable-threads=LIB   use LIB thread package for target GCC. [default=no]
-  ],
-  if test x$enable_threads = xno; then
-    enable_threads=''
-  fi,
-    enable_threads='')
-
-  enable_threads_flag=$enable_threads
-
-  dnl Check if a valid thread package
-  case x${enable_threads_flag} in
-        x | xno | xnone)
-                # No threads
-                target_thread_file='single'
-                ;;
-        xyes)
-                # default
-                target_thread_file='posix'
-                ;;
-        xdecosf1 | xirix | xmach | xos2 | xposix | xpthreads | xsingle | \
-        xsolaris | xwin32 | xdce | xvxworks)
-                target_thread_file=$enable_threads_flag
-                ;;
-        *)
-                echo "$enable_threads is an unknown thread package" 1>&2
-                exit 1
-                ;;
-  esac
+  AC_MSG_CHECKING([for thread model used by GCC])
+  target_thread_file=`$CC -v 2>&1 | sed -n 's/^Thread model: //p'`
+  AC_MSG_RESULT([$target_thread_file])
 
   dnl Check for thread package actually supported in libstdc++ 
   THREADH=
@@ -1270,13 +1247,13 @@ AC_DEFUN(GLIBCPP_ENABLE_THREADS, [
       THREADH=threads-posix.h
       ;;
     decosf1 | irix | mach | os2 | solaris | win32 | dce | vxworks)
-      AC_MSG_ERROR(thread package $THREADS not yet supported)
+      AC_MSG_WARN(disabling unsupported thread package $target_thread_file)
+      THREADH=threads-no.h
       ;;
     *)
-      AC_MSG_ERROR($THREADS is an unsupported/unknown thread package)
+      AC_MSG_ERROR($target_thread_file: unsupported/unknown thread package)
       ;;
   esac
-  AC_MSG_RESULT($THREADH)
 
   AC_LINK_FILES(config/$THREADH, include/bits/c++threads.h)
   if test $THREADH != threads-no.h; then
@@ -1558,14 +1535,14 @@ AC_MSG_RESULT($version_specific_libs)
 
 # Default case for install directory for include files.
 if test x"$version_specific_libs" = x"no" \
-   && test x"$gxx_include_dir"=x"no"; then
+   && test x"$gxx_include_dir" = x"no"; then
   gxx_include_dir='$(prefix)'/include/g++-${libstdcxx_interface}
 fi
 
 # Calculate glibcpp_toolexecdir, glibcpp_toolexeclibdir
 # Install a library built with a cross compiler in tooldir, not libdir.
 if test x"$glibcpp_toolexecdir" = x"no"; then 
-  if test x"$with_cross_host" = x"yes"; then
+  if test -n "$with_cross_host" && test x"$with_cross_host" != x"no"; then
     glibcpp_toolexecdir='$(exec_prefix)/$(target_alias)'
     glibcpp_toolexeclibdir='$(toolexecdir)/lib$(MULTISUBDIR)'
   else

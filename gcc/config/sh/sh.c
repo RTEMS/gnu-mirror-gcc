@@ -905,8 +905,8 @@ output_file_start (file)
 {
   output_file_directive (file, main_input_filename);
 
-  /* Switch to the data section so that the coffsem symbol and the
-     gcc2_compiled. symbol aren't in the text section.  */
+  /* Switch to the data section so that the coffsem symbol
+     isn't in the text section.  */
   data_section ();
 
   if (TARGET_LITTLE_ENDIAN)
@@ -3987,7 +3987,23 @@ sh_expand_prologue ()
   push_regs (live_regs_mask, live_regs_mask2);
 
   if (flag_pic && regs_ever_live[PIC_OFFSET_TABLE_REGNUM])
-    emit_insn (gen_GOTaddr2picreg ());
+    {
+      rtx insn = get_last_insn ();
+      rtx last = emit_insn (gen_GOTaddr2picreg ());
+
+      /* Mark these insns as possibly dead.  Sometimes, flow2 may
+	 delete all uses of the PIC register.  In this case, let it
+	 delete the initialization too.  */
+      do
+	{
+	  insn = NEXT_INSN (insn);
+
+	  REG_NOTES (insn) = gen_rtx_EXPR_LIST (REG_MAYBE_DEAD,
+						const0_rtx,
+						REG_NOTES (insn));
+	}
+      while (insn != last);
+    }
 
   if (target_flags != save_flags)
     {

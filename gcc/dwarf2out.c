@@ -312,6 +312,11 @@ static void def_cfa_1		 	PARAMS ((const char *, dw_cfa_location *));
 #define FDE_AFTER_SIZE_LABEL	"LSFDE"
 #define FDE_END_LABEL		"LEFDE"
 #define FDE_LENGTH_LABEL	"LLFDE"
+#define LINE_NUMBER_BEGIN_LABEL	"LSLT"
+#define LINE_NUMBER_END_LABEL	"LELT"
+#define LN_PROLOG_AS_LABEL	"LASLTP"
+#define LN_PROLOG_END_LABEL	"LELTP"
+
 #define DIE_LABEL_PREFIX	"DW"
 
 /* Definitions of defaults for various types of primitive assembly language
@@ -1587,24 +1592,24 @@ dwarf2out_frame_debug_expr (expr, label)
 	  cfa_temp.offset |= INTVAL (XEXP (src, 1));
 	  break;
 
+	  /* Skip over HIGH, assuming it will be followed by a LO_SUM,
+	     which will fill in all of the bits.  */
+	  /* Rule 8 */
+	case HIGH:
+	  break;
+
+	  /* Rule 9 */
+	case LO_SUM:
+	  if (GET_CODE (XEXP (src, 1)) != CONST_INT)
+	    abort ();
+	  cfa_temp.reg = REGNO (dest);
+	  cfa_temp.offset = INTVAL (XEXP (src, 1));
+	  break;
+
 	default:
 	  abort ();
 	}
       def_cfa_1 (label, &cfa);
-      break;
-
-      /* Skip over HIGH, assuming it will be followed by a LO_SUM, which
-	 will fill in all of the bits.  */
-      /* Rule 8 */
-    case HIGH:
-      break;
-
-      /* Rule 9 */
-    case LO_SUM:
-      if (GET_CODE (XEXP (src, 1)) != CONST_INT)
-	abort ();
-      cfa_temp.reg = REGNO (dest);
-      cfa_temp.offset = INTVAL (XEXP (src, 1));
       break;
 
     case MEM:
@@ -3418,11 +3423,8 @@ struct file_table
    table.  */
 #define FILE_TABLE_INCREMENT 64
 
-/* Filenames referenced by declarations this compilation unit.  */
-static struct file_table decl_file_table;
-
-/* Filenames referenced by line numbers in this compilation unit.  */
-static struct file_table line_file_table;
+/* Filenames referenced by this compilation unit.  */
+static struct file_table file_table;
 
 /* Local pointer to the name of the main input file.  Initialized in
    dwarf2out_init.  */
@@ -3655,7 +3657,6 @@ static unsigned long size_of_die	PARAMS ((dw_die_ref));
 static void calc_die_sizes		PARAMS ((dw_die_ref));
 static void mark_dies			PARAMS ((dw_die_ref));
 static void unmark_dies			PARAMS ((dw_die_ref));
-static unsigned long size_of_line_prolog PARAMS ((void));
 static unsigned long size_of_pubnames	PARAMS ((void));
 static unsigned long size_of_aranges	PARAMS ((void));
 static enum dwarf_form value_format	PARAMS ((dw_attr_ref));
@@ -3754,13 +3755,11 @@ static void gen_block_die		PARAMS ((tree, dw_die_ref, int));
 static void decls_for_scope		PARAMS ((tree, dw_die_ref, int));
 static int is_redundant_typedef		PARAMS ((tree));
 static void gen_decl_die		PARAMS ((tree, dw_die_ref));
-static unsigned lookup_filename		PARAMS ((struct file_table *,
-						 const char *));
-static void init_file_table		PARAMS ((struct file_table *));
+static unsigned lookup_filename		PARAMS ((const char *));
+static void init_file_table		PARAMS ((void));
 static void add_incomplete_type		PARAMS ((tree));
 static void retry_incomplete_types	PARAMS ((void));
 static void gen_type_die_for_member	PARAMS ((tree, tree, dw_die_ref));
-static void gen_abstract_function	PARAMS ((tree));
 static rtx save_rtx			PARAMS ((rtx));
 static void splice_child_die		PARAMS ((dw_die_ref, dw_die_ref));
 static int file_info_cmp		PARAMS ((const void *, const void *));
@@ -5212,7 +5211,7 @@ print_dwarf_line_table (outfile)
     {
       line_info = &line_info_table[i];
       fprintf (outfile, "%5d: ", i);
-      fprintf (outfile, "%-20s", line_file_table.table[line_info->dw_file_num]);
+      fprintf (outfile, "%-20s", file_table.table[line_info->dw_file_num]);
       fprintf (outfile, "%6ld", line_info->dw_line_num);
       fprintf (outfile, "\n");
     }
@@ -5875,45 +5874,6 @@ unmark_dies (die)
   die->die_mark = 0;
   for (c = die->die_child; c; c = c->die_sib)
     unmark_dies (c);
-}
-
-/* Return the size of the line information prolog generated for the
-   compilation unit.  */
-
-static unsigned long
-size_of_line_prolog ()
-{
-  register unsigned long size;
-  register unsigned long ft_index;
-
-  size = DWARF_LINE_PROLOG_HEADER_SIZE;
-
-  /* Count the size of the table giving number of args for each
-     standard opcode.  */
-  size += DWARF_LINE_OPCODE_BASE - 1;
-
-  /* Include directory table is empty (at present).  Count only the
-     null byte used to terminate the table.  */
-  size += 1;
-
-  for (ft_index = 1; ft_index < decl_file_table.in_use; ++ft_index)
-    {
-      /* File name entry.  */
-      size += size_of_string (decl_file_table.table[ft_index]);
-
-      /* Include directory index.  */
-      size += size_of_uleb128 (0);
-
-      /* Modification time.  */
-      size += size_of_uleb128 (0);
-
-      /* File length in bytes.  */
-      size += size_of_uleb128 (0);
-    }
-
-  /* Count the file table terminator.  */
-  size += 1;
-  return size;
 }
 
 /* Return the size of the .debug_pubnames table  generated for the
@@ -6641,8 +6601,6 @@ struct dir_info
   char *path;		/* Path including directory name.  */
   int length;		/* Path length.  */
   int prefix;		/* Index of directory entry which is a prefix.  */
-  int nbytes;		/* Total number of bytes in all file names excluding
-			   paths.  */
   int count;		/* Number of files in this directory.  */
   int dir_idx;		/* Index of directory used as base.  */
   int used;		/* Used in the end?  */
@@ -6688,33 +6646,6 @@ file_info_cmp (p1, p2)
     }
 }
 
-/* Compute the maximum prefix of P2 appearing also in P1.  Entire
-   directory names must match.  */
-static int prefix_of PARAMS ((struct dir_info *, struct dir_info *));
-static int
-prefix_of (p1, p2)
-     struct dir_info *p1;
-     struct dir_info *p2;
-{
-  char *s1 = p1->path;
-  char *s2 = p2->path;
-  int len = p1->length < p2->length ? p1->length : p2->length;
-
-  while (*s1 == *s2 && s1 < p1->path + len)
-    ++s1, ++s2;
-
-  if (*s1 == '/' && *s2 == '/')
-    /* The whole of P1 is the prefix.  */
-    return p1->length;
-
-  /* Go back to the last directory component.  */
-  while (s1 > p1->path)
-    if (*--s1 == '/')
-      return s1 - p1->path + 1;
-
-  return 0;
-}
-
 /* Output the directory table and the file name table.  We try to minimize
    the total amount of memory needed.  A heuristic is used to avoid large
    slowdowns with many input files.  */
@@ -6732,18 +6663,18 @@ output_file_names ()
   int idx;
 
   /* Allocate the various arrays we need.  */
-  files = (struct file_info *) alloca (line_file_table.in_use
+  files = (struct file_info *) alloca (file_table.in_use
 				       * sizeof (struct file_info));
-  dirs = (struct dir_info *) alloca (line_file_table.in_use * 2
+  dirs = (struct dir_info *) alloca (file_table.in_use
 				     * sizeof (struct dir_info));
 
   /* Sort the file names.  */
-   for (i = 1; i < (int) line_file_table.in_use; ++i)
+  for (i = 1; i < (int) file_table.in_use; ++i)
     {
       char *f;
 
       /* Skip all leading "./".  */
-      f = line_file_table.table[i];
+      f = file_table.table[i];
       while (f[0] == '.' && f[1] == '/')
 	f += 2;
 
@@ -6756,86 +6687,49 @@ output_file_names ()
       f = strrchr (f, '/');
       files[i].fname = f == NULL ? files[i].path : f + 1;
     }
-  qsort (files + 1, line_file_table.in_use - 1, sizeof (files[0]),
+  qsort (files + 1, file_table.in_use - 1, sizeof (files[0]),
 	 file_info_cmp);
 
   /* Find all the different directories used.  */
   dirs[0].path = files[1].path;
   dirs[0].length = files[1].fname - files[1].path;
   dirs[0].prefix = -1;
-  dirs[0].nbytes = files[1].length - dirs[1].length + 1;
   dirs[0].count = 1;
   dirs[0].dir_idx = 0;
   dirs[0].used = 0;
   files[1].dir_idx = 0;
   ndirs = 1;
 
-  for (i = 2; i < (int) line_file_table.in_use; ++i)
+  for (i = 2; i < (int) file_table.in_use; ++i)
     if (files[i].fname - files[i].path == dirs[ndirs - 1].length
 	&& memcmp (dirs[ndirs - 1].path, files[i].path,
 		   dirs[ndirs - 1].length) == 0)
       {
 	/* Same directory as last entry.  */
 	files[i].dir_idx = ndirs - 1;
-	dirs[ndirs - 1].nbytes += files[i].length - dirs[ndirs - 1].length + 1;
 	++dirs[ndirs - 1].count;
       }
     else
       {
 	int j;
-	int max_idx;
-	int max_len;
 
 	/* This is a new directory.  */
 	dirs[ndirs].path = files[i].path;
 	dirs[ndirs].length = files[i].fname - files[i].path;
-	dirs[ndirs].nbytes = files[i].length - dirs[i].length + 1;
 	dirs[ndirs].count = 1;
 	dirs[ndirs].dir_idx = ndirs;
 	dirs[ndirs].used = 0;
 	files[i].dir_idx = ndirs;
 
 	/* Search for a prefix.  */
-	max_len = 0;
-	max_idx = 0;
+	dirs[ndirs].prefix = -1;
 	for (j = 0; j < ndirs; ++j)
-	  if (dirs[j].length > max_len)
-	    {
-	      int this_len = prefix_of (&dirs[j], &dirs[ndirs]);
-
-	      if (this_len > max_len)
-		{
-		  max_len = this_len;
-		  max_idx = j;
-		}
-	    }
-
-	/* Remember the prefix.  If this is a known prefix simply
-	   remember the index.  Otherwise we will have to create an
-	   artificial entry.  */
-	if (max_len == dirs[max_idx].length)
-	  /* This is our prefix.  */
-	  dirs[ndirs].prefix = max_idx;
-	else if (max_len > 0)
-	  {
-	    /* Create an entry without associated file.  Since we have
-	       to keep the dirs array sorted (means, entries with paths
-	       which come first) we have to move the new entry in the
-	       place of the old one.  */
-	    dirs[++ndirs] = dirs[max_idx];
-
-	    /* We don't have to set .path.  */
-	    dirs[max_idx].length = max_len;
-	    dirs[max_idx].nbytes = 0;
-	    dirs[max_idx].count = 0;
-	    dirs[max_idx].dir_idx = ndirs;
-	    dirs[max_idx].used = 0;
-	    dirs[max_idx].prefix = dirs[ndirs].prefix;
-
-	    dirs[ndirs - 1].prefix = dirs[ndirs].prefix = max_idx;
-	  }
-	else
-	  dirs[ndirs].prefix = -1;
+	  if (dirs[j].length < dirs[ndirs].length
+	      && dirs[j].length > 1
+	      && (dirs[ndirs].prefix == -1
+		  || dirs[j].length > dirs[dirs[ndirs].prefix].length)
+	      && memcmp (dirs[j].path, dirs[ndirs].path, dirs[j].length) == 0)
+	    dirs[ndirs].prefix = j;
 
 	++ndirs;
       }
@@ -6856,7 +6750,7 @@ output_file_names ()
       int j;
       int total;
 
-      /* We can always safe some space for the current directory.  But
+      /* We can always save some space for the current directory.  But
 	 this does not mean it will be enough to justify adding the
 	 directory.  */
       savehere[i] = dirs[i].length;
@@ -6872,26 +6766,26 @@ output_file_names ()
 		 dirs[j] path.  */
 	      int k;
 
-	       k = dirs[j].prefix;
-	       while (k != -1 && k != i)
-		 k = dirs[k].prefix;
+	      k = dirs[j].prefix;
+	      while (k != -1 && k != i)
+		k = dirs[k].prefix;
 
-	       if (k == i)
-		 {
-		   /* Yes it is.  We can possibly safe some memory but
-		      writing the filenames in dirs[j] relative to
-		      dirs[i].  */
-		   savehere[j] = dirs[i].length;
-		   total += (savehere[j] - saved[j]) * dirs[j].count;
-		 }
+	      if (k == i)
+		{
+		  /* Yes it is.  We can possibly save some memory but
+		     writing the filenames in dirs[j] relative to
+		     dirs[i].  */
+		  savehere[j] = dirs[i].length;
+		  total += (savehere[j] - saved[j]) * dirs[j].count;
+		}
 	    }
 	}
 
-      /* Check whether we can safe enough to justify adding the dirs[i]
+      /* Check whether we can save enough to justify adding the dirs[i]
 	 directory.  */
       if (total > dirs[i].length + 1)
 	{
-	   /* It's worthwhile adding.  */
+	  /* It's worthwhile adding.  */
           for (j = i; j < ndirs; ++j)
 	    if (savehere[j] > 0)
 	      {
@@ -6904,12 +6798,12 @@ output_file_names ()
 	}
     }
 
-  /* We have to emit them in the order they appear in the line_file_table
+  /* We have to emit them in the order they appear in the file_table
      array since the index is used in the debug info generation.  To
      do this efficiently we generate a back-mapping of the indices
      first.  */
-  backmap = (int *) alloca (line_file_table.in_use * sizeof (int));
-  for (i = 1; i < (int) line_file_table.in_use; ++i)
+  backmap = (int *) alloca (file_table.in_use * sizeof (int));
+  for (i = 1; i < (int) file_table.in_use; ++i)
     {
       backmap[files[i].file_idx] = i;
       /* Mark this directory as used.  */
@@ -6954,7 +6848,7 @@ output_file_names ()
   fputc ('\n', asm_out_file);
 
   /* Now write all the file names.  */
-  for (i = 1; i < (int) line_file_table.in_use; ++i)
+  for (i = 1; i < (int) file_table.in_use; ++i)
     {
       int file_idx = backmap[i];
       int dir_idx = dirs[files[file_idx].dir_idx].dir_idx;
@@ -7000,6 +6894,7 @@ output_file_names ()
 static void
 output_line_info ()
 {
+  char l1[20], l2[20], p1[20], p2[20];
   char line_label[MAX_ARTIFICIAL_LABEL_BYTES];
   char prev_line_label[MAX_ARTIFICIAL_LABEL_BYTES];
   register unsigned opc;
@@ -7011,23 +6906,29 @@ output_line_info ()
   register unsigned long current_file;
   register unsigned long function;
 
-  ASM_OUTPUT_DWARF_DELTA (asm_out_file, ".LTEND", ".LTSTART");
+  ASM_GENERATE_INTERNAL_LABEL (l1, LINE_NUMBER_BEGIN_LABEL, 0);
+  ASM_GENERATE_INTERNAL_LABEL (l2, LINE_NUMBER_END_LABEL, 0);
+  ASM_GENERATE_INTERNAL_LABEL (p1, LN_PROLOG_AS_LABEL, 0);
+  ASM_GENERATE_INTERNAL_LABEL (p2, LN_PROLOG_END_LABEL, 0);
+
+  ASM_OUTPUT_DWARF_DELTA (asm_out_file, l2, l1);
   if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Length of Source Line Info.",
 	     ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
-  ASM_OUTPUT_LABEL (asm_out_file, ".LTSTART");
+  ASM_OUTPUT_LABEL (asm_out_file, l1);
   ASM_OUTPUT_DWARF_DATA2 (asm_out_file, DWARF_VERSION);
   if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s DWARF Version", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
-  ASM_OUTPUT_DWARF_DATA (asm_out_file, size_of_line_prolog ());
+  ASM_OUTPUT_DWARF_DELTA (asm_out_file, p2, p1);
   if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Prolog Length", ASM_COMMENT_START);
 
   fputc ('\n', asm_out_file);
+  ASM_OUTPUT_LABEL (asm_out_file, p1);
   ASM_OUTPUT_DWARF_DATA1 (asm_out_file, DWARF_LINE_MIN_INSTR_LENGTH);
   if (flag_debug_asm)
     fprintf (asm_out_file, "\t%s Minimum Instruction Length",
@@ -7081,6 +6982,7 @@ output_line_info ()
 
   /* Write out the information about the files we use.  */
   output_file_names ();
+  ASM_OUTPUT_LABEL (asm_out_file, p2);
 
   /* We used to set the address register to the first location in the text
      section here, but that didn't accomplish anything since we already
@@ -7162,7 +7064,7 @@ output_line_info ()
 	  output_uleb128 (current_file);
 	  if (flag_debug_asm)
 	    fprintf (asm_out_file, " (\"%s\")",
-		     line_file_table.table[current_file]);
+		     file_table.table[current_file]);
 
 	  fputc ('\n', asm_out_file);
 	}
@@ -7335,7 +7237,7 @@ output_line_info ()
 	  output_uleb128 (current_file);
 	  if (flag_debug_asm)
 	    fprintf (asm_out_file, " (\"%s\")",
-		     line_file_table.table[current_file]);
+		     file_table.table[current_file]);
 
 	  fputc ('\n', asm_out_file);
 	}
@@ -7438,7 +7340,7 @@ output_line_info ()
     }
 
   /* Output the marker for the end of the line number info.  */
-  ASM_OUTPUT_LABEL (asm_out_file, ".LTEND");
+  ASM_OUTPUT_LABEL (asm_out_file, l2);
 }
 
 /* Given a pointer to a tree node for some base type, return a pointer to
@@ -7620,22 +7522,35 @@ modified_type_die (type, is_const_type, is_volatile_type, context_die)
 
   if (code != ERROR_MARK)
     {
-      type = build_type_variant (type, is_const_type, is_volatile_type);
+      tree qualified_type;
 
-      mod_type_die = lookup_type_die (type);
-      if (mod_type_die)
-	return mod_type_die;
+      /* See if we already have the appropriately qualified variant of
+	 this type.  */
+      qualified_type 
+	= get_qualified_type (type,
+			      ((is_const_type ? TYPE_QUAL_CONST : 0)
+			       | (is_volatile_type 
+				  ? TYPE_QUAL_VOLATILE : 0)));
+      /* If we do, then we can just use its DIE, if it exists.  */
+      if (qualified_type)
+	{
+	  mod_type_die = lookup_type_die (qualified_type);
+	  if (mod_type_die)
+	    return mod_type_die;
+	}
 
       /* Handle C typedef types.  */
-      if (TYPE_NAME (type) && TREE_CODE (TYPE_NAME (type)) == TYPE_DECL
-	  && DECL_ORIGINAL_TYPE (TYPE_NAME (type)))
+      if (qualified_type && TYPE_NAME (qualified_type) 
+	  && TREE_CODE (TYPE_NAME (qualified_type)) == TYPE_DECL
+	  && DECL_ORIGINAL_TYPE (TYPE_NAME (qualified_type)))
 	{
-	  tree dtype = TREE_TYPE (TYPE_NAME (type));
-	  if (type == dtype)
+	  tree type_name = TYPE_NAME (qualified_type);
+	  tree dtype = TREE_TYPE (type_name);
+	  if (qualified_type == dtype)
 	    {
 	      /* For a named type, use the typedef.  */
-	      gen_type_die (type, context_die);
-	      mod_type_die = lookup_type_die (type);
+	      gen_type_die (qualified_type, context_die);
+	      mod_type_die = lookup_type_die (qualified_type);
 	    }
 
 	  else if (is_const_type < TYPE_READONLY (dtype)
@@ -7643,7 +7558,7 @@ modified_type_die (type, is_const_type, is_volatile_type, context_die)
 	    /* cv-unqualified version of named type.  Just use the unnamed
 	       type to which it refers.  */
 	    mod_type_die
-	      = modified_type_die (DECL_ORIGINAL_TYPE (TYPE_NAME (type)),
+	      = modified_type_die (DECL_ORIGINAL_TYPE (type_name),
 				   is_const_type, is_volatile_type,
 				   context_die);
 	  /* Else cv-qualified version of named type; fall through.  */
@@ -7912,6 +7827,12 @@ mem_loc_descriptor (rtl, mode)
  	 pool.  */
     case CONST:
     case SYMBOL_REF:
+      /* Alternatively, the symbol in the constant pool can be referenced
+	 by a different symbol.  */
+      if (GET_CODE (rtl) == SYMBOL_REF
+	  && CONSTANT_POOL_ADDRESS_P (rtl))
+	rtl = get_pool_constant (rtl);
+
       mem_loc_result = new_loc_descr (DW_OP_addr, 0, 0);
       mem_loc_result->dw_loc_oprnd1.val_class = dw_val_class_addr;
       mem_loc_result->dw_loc_oprnd1.v.val_addr = save_rtx (rtl);
@@ -8696,11 +8617,21 @@ add_const_value_attribute (die, rtl)
 
 }
 
+/* Returns RTL for DECL indicating the location the debugger should
+   use to find the value of DECL at runtime.  Returns NULL_RTX if
+   there is no such location, or if a satisfactory location could not
+   be determined.  */
+
 static rtx
 rtl_for_decl_location (decl)
      tree decl;
 {
   register rtx rtl;
+
+  /* This function should not be called with an abstract declaration,
+     since such things have no location.  */
+  if (DECL_ABSTRACT (decl))
+    abort ();
 
   /* Here we have to decide where we are going to say the parameter "lives"
      (as far as the debugger is concerned).  We only have a couple of
@@ -8778,7 +8709,7 @@ rtl_for_decl_location (decl)
      gets fixed).  */
 
   /* Use DECL_RTL as the "location" unless we find something better.  */
-  rtl = DECL_RTL (decl);
+  rtl = DECL_RTL_IF_SET (decl);
 
   if (TREE_CODE (decl) == PARM_DECL)
     {
@@ -9014,8 +8945,8 @@ add_bound_info (subrange_die, bound_attr, bound)
 	 We assume that a MEM rtx is safe because gcc wouldn't put the
 	 value there unless it was going to be used repeatedly in the
 	 function, i.e. for cleanups.  */
-      if (! optimize || (SAVE_EXPR_RTL (bound)
-			 && GET_CODE (SAVE_EXPR_RTL (bound)) == MEM))
+      if (SAVE_EXPR_RTL (bound)
+	  && (! optimize || GET_CODE (SAVE_EXPR_RTL (bound)) == MEM))
 	{
 	  register dw_die_ref ctx = lookup_decl_die (current_function_decl);
 	  register dw_die_ref decl_die = new_die (DW_TAG_variable, ctx);
@@ -9063,6 +8994,16 @@ add_bound_info (subrange_die, bound_attr, bound)
 
 	dw_die_ref ctx, decl_die;
 	dw_loc_descr_ref loc;
+
+	/* If the CURRENT_FUNCTION_DECL is abstract, then we cannot
+	   compute the array bound based on the location of the BOUND,
+	   since the BOUND does not really exist.  Therefore, we
+	   simply omit the bound information.  
+
+	   Ideally, we would do better, and express the computation in
+	   some other way.  */
+	if (DECL_ABSTRACT (current_function_decl))
+	  break;
 
 	loc = loc_descriptor_from_tree (bound, 0);
 	if (loc == NULL)
@@ -9320,7 +9261,7 @@ add_abstract_origin_attribute (die, origin)
 	fn = TYPE_STUB_DECL (fn);
       fn = decl_function_context (fn);
       if (fn)
-	gen_abstract_function (fn);
+	dwarf2out_abstract_function (fn);
     }
 
   if (DECL_P (origin))
@@ -9365,8 +9306,7 @@ add_src_coords_attributes (die, decl)
      register dw_die_ref die;
      register tree decl;
 {
-  register unsigned file_index = lookup_filename (&decl_file_table,
-						  DECL_SOURCE_FILE (decl));
+  register unsigned file_index = lookup_filename (DECL_SOURCE_FILE (decl));
 
   add_AT_unsigned (die, DW_AT_decl_file, file_index);
   add_AT_unsigned (die, DW_AT_decl_line, DECL_SOURCE_LINE (decl));
@@ -9391,7 +9331,8 @@ add_name_and_src_coords_attributes (die, decl)
 
       if ((TREE_CODE (decl) == FUNCTION_DECL || TREE_CODE (decl) == VAR_DECL)
 	  && TREE_PUBLIC (decl)
-	  && DECL_ASSEMBLER_NAME (decl) != DECL_NAME (decl))
+	  && DECL_ASSEMBLER_NAME (decl) != DECL_NAME (decl)
+	  && !DECL_ABSTRACT (decl))
 	add_AT_string (die, DW_AT_MIPS_linkage_name,
 		       IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl)));
     }
@@ -9937,24 +9878,22 @@ gen_formal_types_die (function_or_method_type, context_die)
 {
   register tree link;
   register tree formal_type = NULL;
-  register tree first_parm_type = TYPE_ARG_TYPES (function_or_method_type);
+  register tree first_parm_type;
+  tree arg;
 
-#if 0
-  /* In the case where we are generating a formal types list for a C++
-     non-static member function type, skip over the first thing on the
-     TYPE_ARG_TYPES list because it only represents the type of the hidden
-     `this pointer'.  The debugger should be able to figure out (without
-     being explicitly told) that this non-static member function type takes a
-     `this pointer' and should be able to figure what the type of that hidden
-     parameter is from the DW_AT_member attribute of the parent
-     DW_TAG_subroutine_type DIE.  */
-  if (TREE_CODE (function_or_method_type) == METHOD_TYPE)
-    first_parm_type = TREE_CHAIN (first_parm_type);
-#endif
+  if (TREE_CODE (function_or_method_type) == FUNCTION_DECL)
+    {
+      arg = DECL_ARGUMENTS (function_or_method_type);
+      function_or_method_type = TREE_TYPE (function_or_method_type);
+    }
+  else
+    arg = NULL_TREE;
+  
+  first_parm_type = TYPE_ARG_TYPES (function_or_method_type);
 
   /* Make our first pass over the list of formal parameter types and output a
      DW_TAG_formal_parameter DIE for each one.  */
-  for (link = first_parm_type; link; link = TREE_CHAIN (link))
+  for (link = first_parm_type; link; )
     {
       register dw_die_ref parm_die;
 
@@ -9964,9 +9903,14 @@ gen_formal_types_die (function_or_method_type, context_die)
 
       /* Output a (nameless) DIE to represent the formal parameter itself.  */
       parm_die = gen_formal_parameter_die (formal_type, context_die);
-      if (TREE_CODE (function_or_method_type) == METHOD_TYPE
-	  && link == first_parm_type)
+      if ((TREE_CODE (function_or_method_type) == METHOD_TYPE
+	   && link == first_parm_type)
+	  || (arg && DECL_ARTIFICIAL (arg)))
 	add_AT_flag (parm_die, DW_AT_artificial, 1);
+
+      link = TREE_CHAIN (link);
+      if (arg)
+	arg = TREE_CHAIN (arg);
     }
 
   /* If this function type has an ellipsis, add a
@@ -10022,23 +9966,38 @@ gen_type_die_for_member (type, member, context_die)
    of a function which we may later generate inlined and/or
    out-of-line instances of.  */
 
-static void
-gen_abstract_function (decl)
+void
+dwarf2out_abstract_function (decl)
      tree decl;
 {
-  register dw_die_ref old_die = lookup_decl_die (decl);
+  register dw_die_ref old_die;
   tree save_fn;
+  tree context;
+  int was_abstract = DECL_ABSTRACT (decl);
 
+  /* Make sure we have the actual abstract inline, not a clone.  */
+  decl = DECL_ORIGIN (decl);
+
+  old_die = lookup_decl_die (decl);  
   if (old_die && get_AT_unsigned (old_die, DW_AT_inline))
     /* We've already generated the abstract instance.  */
     return;
 
+  /* Be sure we've emitted the in-class declaration DIE (if any) first, so
+     we don't get confused by DECL_ABSTRACT.  */
+  context = decl_class_context (decl);
+  if (context)
+    gen_type_die_for_member
+      (context, decl, decl_function_context (decl) ? NULL : comp_unit_die);
+ 
+  /* Pretend we've just finished compiling this function.  */
   save_fn = current_function_decl;
   current_function_decl = decl;
 
   set_decl_abstract_flags (decl, 1);
   dwarf2out_decl (decl);
-  set_decl_abstract_flags (decl, 0);
+  if (! was_abstract)
+    set_decl_abstract_flags (decl, 0);
 
   current_function_decl = save_fn;
 }
@@ -10089,23 +10048,15 @@ gen_subprogram_die (decl, context_die)
       subr_die = new_die (DW_TAG_subprogram, context_die);
       add_abstract_origin_attribute (subr_die, origin);
     }
-  else if (old_die && DECL_ABSTRACT (decl)
-	   && get_AT_unsigned (old_die, DW_AT_inline))
-    {
-      /* This must be a redefinition of an extern inline function.
-	 We can just reuse the old die here.  */
-      subr_die = old_die;
-
-      /* Clear out the inlined attribute and parm types.  */
-      remove_AT (subr_die, DW_AT_inline);
-      remove_children (subr_die);
-    }
   else if (old_die)
     {
-      register unsigned file_index
-	= lookup_filename (&decl_file_table, DECL_SOURCE_FILE (decl));
+      unsigned file_index = lookup_filename (DECL_SOURCE_FILE (decl));
 
-      if (get_AT_flag (old_die, DW_AT_declaration) != 1)
+      if (!get_AT_flag (old_die, DW_AT_declaration)
+	  /* We can have a normal definition following an inline one in the
+	     case of redefinition of GNU C extern inlines.
+	     It seems reasonable to use AT_specification in this case.  */
+	  && !get_AT_unsigned (old_die, DW_AT_inline))
 	{
 	  /* ??? This can happen if there is a bug in the program, for
 	     instance, if it has duplicate function definitions.  Ideally,
@@ -10175,15 +10126,17 @@ gen_subprogram_die (decl, context_die)
 
   if (declaration)
     {
-      if (! origin)
-	add_AT_flag (subr_die, DW_AT_declaration, 1);
+      if (!(old_die && get_AT_unsigned (old_die, DW_AT_inline)))
+	{
+	  add_AT_flag (subr_die, DW_AT_declaration, 1);
 
-      /* The first time we see a member function, it is in the context of
-         the class to which it belongs.  We make sure of this by emitting
-         the class first.  The next time is the definition, which is
-         handled above.  The two may come from the same source text.  */
-      if (DECL_CONTEXT (decl) || DECL_ABSTRACT (decl))
-	equate_decl_number_to_die (decl, subr_die);
+	  /* The first time we see a member function, it is in the context of
+	     the class to which it belongs.  We make sure of this by emitting
+	     the class first.  The next time is the definition, which is
+	     handled above.  The two may come from the same source text.  */
+	  if (DECL_CONTEXT (decl) || DECL_ABSTRACT (decl))
+	    equate_decl_number_to_die (decl, subr_die);
+	}
     }
   else if (DECL_ABSTRACT (decl))
     {
@@ -10206,7 +10159,7 @@ gen_subprogram_die (decl, context_die)
     }
   else if (!DECL_EXTERNAL (decl))
     {
-      if (origin == NULL_TREE)
+      if (!(old_die && get_AT_unsigned (old_die, DW_AT_inline)))
 	equate_decl_number_to_die (decl, subr_die);
 
       ASM_GENERATE_INTERNAL_LABEL (label_id, FUNC_BEGIN_LABEL,
@@ -10256,7 +10209,7 @@ gen_subprogram_die (decl, context_die)
   if (debug_info_level <= DINFO_LEVEL_TERSE)
     ;
   else if (declaration)
-    gen_formal_types_die (TREE_TYPE (decl), subr_die);
+    gen_formal_types_die (decl, subr_die);
   else
     {
       /* Generate DIEs to represent all known formal parameters */
@@ -10358,8 +10311,7 @@ gen_variable_die (decl, context_die)
       add_AT_die_ref (var_die, DW_AT_specification, old_die);
       if (DECL_NAME (decl))
 	{
-	  register unsigned file_index
-	    = lookup_filename (&decl_file_table, DECL_SOURCE_FILE (decl));
+	  unsigned file_index = lookup_filename (DECL_SOURCE_FILE (decl));
 
 	  if (get_AT_unsigned (old_die, DW_AT_decl_file) != file_index)
 	    add_AT_unsigned (var_die, DW_AT_decl_file, file_index);
@@ -10490,7 +10442,7 @@ gen_inlined_subroutine_die (stmt, context_die, depth)
       char label[MAX_ARTIFICIAL_LABEL_BYTES];
 
       /* Emit info for the abstract instance first, if we haven't yet.  */
-      gen_abstract_function (decl);
+      dwarf2out_abstract_function (decl);
 
       add_abstract_origin_attribute (subr_die, decl);
       ASM_GENERATE_INTERNAL_LABEL (label, BLOCK_BEGIN_LABEL,
@@ -10733,6 +10685,10 @@ gen_member_die (type, context_die)
   /* Now output info about the function members (if any).  */
   for (member = TYPE_METHODS (type); member; member = TREE_CHAIN (member))
     {
+      /* Don't include clones in the member list.  */
+      if (DECL_ABSTRACT_ORIGIN (member))
+	continue;
+
       child = lookup_decl_die (member);
       if (child)
 	splice_child_die (context_die, child);
@@ -11261,20 +11217,23 @@ gen_decl_die (decl, context_die)
 	  && (current_function_decl == NULL_TREE || DECL_ARTIFICIAL (decl)))
 	break;
 
+      /* If we're emitting a clone, emit info for the abstract instance.  */
+      if (DECL_ORIGIN (decl) != decl)
+	dwarf2out_abstract_function (DECL_ABSTRACT_ORIGIN (decl));
       /* If we're emitting an out-of-line copy of an inline function,
 	 emit info for the abstract instance and set up to refer to it.  */
-      if (DECL_INLINE (decl) && ! DECL_ABSTRACT (decl)
-	  && ! class_scope_p (context_die)
-	  /* gen_abstract_function won't emit a die if this is just a
-	     declaration.  We must avoid setting DECL_ABSTRACT_ORIGIN in
-	     that case, because that works only if we have a die.  */
-	  && DECL_INITIAL (decl) != NULL_TREE)
+      else if (DECL_INLINE (decl) && ! DECL_ABSTRACT (decl)
+	       && ! class_scope_p (context_die)
+	       /* dwarf2out_abstract_function won't emit a die if this is just
+		  a declaration.  We must avoid setting DECL_ABSTRACT_ORIGIN in
+		  that case, because that works only if we have a die.  */
+	       && DECL_INITIAL (decl) != NULL_TREE)
 	{
-	  gen_abstract_function (decl);
+	  dwarf2out_abstract_function (decl);
 	  set_decl_origin_self (decl);
 	}
-
-      if (debug_info_level > DINFO_LEVEL_TERSE)
+      /* Otherwise we're emitting the primary DIE for this decl.  */
+      else if (debug_info_level > DINFO_LEVEL_TERSE)
 	{
 	  /* Before we describe the FUNCTION_DECL itself, make sure that we
 	     have described its return type.  */
@@ -11394,7 +11353,7 @@ dwarf2out_add_library_unit_info (filename, context_list)
 
       TREE_PUBLIC (context_list_decl) = TRUE;
       add_name_attribute (unit_die, context_list);
-      file_index = lookup_filename (&decl_file_table, filename);
+      file_index = lookup_filename (filename);
       add_AT_unsigned (unit_die, DW_AT_decl_file, file_index);
       add_pubname (context_list_decl, unit_die);
     }
@@ -11568,54 +11527,60 @@ dwarf2out_ignore_block (block)
    was looked up last.  This handles the majority of all searches.  */
 
 static unsigned
-lookup_filename (t, file_name)
-     struct file_table *t;
+lookup_filename (file_name)
      const char *file_name;
 {
   register unsigned i;
 
+  /* ??? Why isn't DECL_SOURCE_FILE left null instead.  */
+  if (strcmp (file_name, "<internal>") == 0
+      || strcmp (file_name, "<built-in>") == 0)
+    return 0;
+
   /* Check to see if the file name that was searched on the previous
      call matches this file name.  If so, return the index.  */
-  if (t->last_lookup_index != 0)
-    if (strcmp (file_name, t->table[t->last_lookup_index]) == 0)
-      return t->last_lookup_index;
+  if (file_table.last_lookup_index != 0)
+    if (strcmp (file_name, file_table.table[file_table.last_lookup_index]) == 0)
+      return file_table.last_lookup_index;
 
   /* Didn't match the previous lookup, search the table */
-  for (i = 1; i < t->in_use; ++i)
-    if (strcmp (file_name, t->table[i]) == 0)
+  for (i = 1; i < file_table.in_use; ++i)
+    if (strcmp (file_name, file_table.table[i]) == 0)
       {
-	t->last_lookup_index = i;
+	file_table.last_lookup_index = i;
 	return i;
       }
 
   /* Prepare to add a new table entry by making sure there is enough space in
      the table to do so.  If not, expand the current table.  */
-  if (i == t->allocated)
+  if (i == file_table.allocated)
     {
-      t->allocated = i + FILE_TABLE_INCREMENT;
-      t->table = (char **)
-	xrealloc (t->table, t->allocated * sizeof (char *));
+      file_table.allocated = i + FILE_TABLE_INCREMENT;
+      file_table.table = (char **)
+	xrealloc (file_table.table, file_table.allocated * sizeof (char *));
     }
 
   /* Add the new entry to the end of the filename table.  */
-  t->table[i] = xstrdup (file_name);
-  t->in_use = i + 1;
-  t->last_lookup_index = i;
+  file_table.table[i] = xstrdup (file_name);
+  file_table.in_use = i + 1;
+  file_table.last_lookup_index = i;
+
+  if (DWARF2_ASM_LINE_DEBUG_INFO)
+    fprintf (asm_out_file, "\t.file %u \"%s\"\n", i, file_name);
 
   return i;
 }
 
 static void
-init_file_table (t)
-     struct file_table *t;
+init_file_table ()
 {
   /* Allocate the initial hunk of the file_table.  */
-  t->table = (char **) xcalloc (FILE_TABLE_INCREMENT, sizeof (char *));
-  t->allocated = FILE_TABLE_INCREMENT;
+  file_table.table = (char **) xcalloc (FILE_TABLE_INCREMENT, sizeof (char *));
+  file_table.allocated = FILE_TABLE_INCREMENT;
 
   /* Skip the first entry - file numbers begin at 1.  */
-  t->in_use = 1;
-  t->last_lookup_index = 0;
+  file_table.in_use = 1;
+  file_table.last_lookup_index = 0;
 }
 
 /* Output a label to mark the beginning of a source code line entry
@@ -11633,28 +11598,10 @@ dwarf2out_line (filename, line)
 
       if (DWARF2_ASM_LINE_DEBUG_INFO)
 	{
-#if 0
-	  unsigned old_in_use = line_file_table.in_use;
-#endif
-	  unsigned file_num = lookup_filename (&line_file_table, filename);
+	  unsigned file_num = lookup_filename (filename);
 
-	  /* Emit the .file and .loc directives understood by GNU as.  */
-#if 0
-	  /* ??? As of 2000-11-25, gas has a bug in which it doesn't
-	     actually use the file number argument.  It merely remembers
-	     the last .file directive emitted.  */
-	  if (file_num >= old_in_use)
-	    fprintf (asm_out_file, "\t.file %d \"%s\"\n", file_num, filename);
+	  /* Emit the .loc directive understood by GNU as.  */
 	  fprintf (asm_out_file, "\t.loc %d %d 0\n", file_num, line);
-#else
-	  static unsigned int last_file_num;
-	  if (file_num != last_file_num)
-	    {
-	      last_file_num = file_num;
-	      fprintf (asm_out_file, "\t.file 0 \"%s\"\n", filename);
-	    }
-	  fprintf (asm_out_file, "\t.loc 0 %d 0\n", line);
-#endif
 
 	  /* Indicate that line number info exists.  */
 	  ++line_info_table_in_use;
@@ -11688,7 +11635,7 @@ dwarf2out_line (filename, line)
 	  /* Add the new entry at the end of the line_info_table.  */
 	  line_info
 	    = &separate_line_info_table[separate_line_info_table_in_use++];
-	  line_info->dw_file_num = lookup_filename (&line_file_table, filename);
+	  line_info->dw_file_num = lookup_filename (filename);
 	  line_info->dw_line_num = line;
 	  line_info->function = current_funcdef_number;
 	}
@@ -11716,7 +11663,7 @@ dwarf2out_line (filename, line)
 
 	  /* Add the new entry at the end of the line_info_table.  */
 	  line_info = &line_info_table[line_info_table_in_use++];
-	  line_info->dw_file_num = lookup_filename (&line_file_table, filename);
+	  line_info->dw_file_num = lookup_filename (filename);
 	  line_info->dw_line_num = line;
 	}
     }
@@ -11785,11 +11732,15 @@ dwarf2out_init (asm_out_file, main_input_filename)
      register FILE *asm_out_file;
      register const char *main_input_filename;
 {
+  init_file_table ();
+
   /* Remember the name of the primary input file.  */
   primary_filename = main_input_filename;
 
-  init_file_table (&decl_file_table);
-  init_file_table (&line_file_table);
+  /* Add it to the file table first, under the assumption that we'll
+     be emitting line number data for it first, which avoids having
+     to add an initial DW_LNS_set_file.  */
+  lookup_filename (main_input_filename);
 
   /* Allocate the initial hunk of the decl_die_table.  */
   decl_die_table
@@ -11977,5 +11928,19 @@ dwarf2out_finish ()
       ASM_OUTPUT_SECTION (asm_out_file, ARANGES_SECTION);
       output_aranges ();
     }
+
+  /* At this point, we've switched sections like mad, but we've done
+     so behind the back of varasm.c.  Unfortunately, used
+     named_section to switch sections doesn't work either; GAS 2.9.5
+     is not pleased by:
+
+       .section debug_aranges,"a",@progbits
+
+     on i686-pc-linux-gnu.  
+
+     By calling force_data_section, we get varasm.c synched back up
+     with reality.  That makes subsequent calls to text_section and
+     such make sense.  */
+  force_data_section ();
 }
 #endif /* DWARF2_DEBUGGING_INFO */

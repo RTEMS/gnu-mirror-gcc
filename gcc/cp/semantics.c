@@ -59,6 +59,7 @@ static void genrtl_named_return_value PARAMS ((void));
 static void cp_expand_stmt PARAMS ((tree));
 static void genrtl_start_function PARAMS ((tree));
 static void genrtl_finish_function PARAMS ((tree));
+static tree clear_decl_rtl PARAMS ((tree *, int *, void *));
 
 /* Finish processing the COND, the SUBSTMT condition for STMT.  */
 
@@ -991,7 +992,7 @@ genrtl_named_return_value ()
 	 SImode but the DECL_RTL for the DECL_RESULT has DImode.  So,
 	 here, we use the mode the back-end has already assigned for
 	 the return value.  */
-      DECL_RTL (decl) = gen_reg_rtx (GET_MODE (DECL_RTL (decl)));
+      SET_DECL_RTL (decl, gen_reg_rtx (GET_MODE (DECL_RTL (decl))));
       if (TREE_ADDRESSABLE (decl))
 	put_var_into_stack (decl);
     }
@@ -1018,10 +1019,7 @@ finish_named_return_value (return_id, init)
   if (return_id != NULL_TREE)
     {
       if (DECL_NAME (decl) == NULL_TREE)
-	{
-	  DECL_NAME (decl) = return_id;
-	  DECL_ASSEMBLER_NAME (decl) = return_id;
-	}
+	DECL_NAME (decl) = return_id;
       else
 	{
 	  cp_error ("return identifier `%D' already in place", return_id);
@@ -1804,22 +1802,18 @@ begin_class_definition (t)
   /* Reset the interface data, at the earliest possible
      moment, as it might have been set via a class foo;
      before.  */
-  {
-    tree name = TYPE_IDENTIFIER (t);
-    
-    if (! ANON_AGGRNAME_P (name))
-      {
-	CLASSTYPE_INTERFACE_ONLY (t) = interface_only;
-	SET_CLASSTYPE_INTERFACE_UNKNOWN_X
-	  (t, interface_unknown);
-      }
-    
-    /* Only leave this bit clear if we know this
-       class is part of an interface-only specification.  */
-    if (! CLASSTYPE_INTERFACE_KNOWN (t)
-	|| ! CLASSTYPE_INTERFACE_ONLY (t))
-      CLASSTYPE_VTABLE_NEEDS_WRITING (t) = 1;
-  }
+  if (! TYPE_ANONYMOUS_P (t))
+    {
+      CLASSTYPE_INTERFACE_ONLY (t) = interface_only;
+      SET_CLASSTYPE_INTERFACE_UNKNOWN_X
+	(t, interface_unknown);
+    }
+
+  /* Only leave this bit clear if we know this
+     class is part of an interface-only specification.  */
+  if (! CLASSTYPE_INTERFACE_KNOWN (t)
+      || ! CLASSTYPE_INTERFACE_ONLY (t))
+    CLASSTYPE_VTABLE_NEEDS_WRITING (t) = 1;
   reset_specialization();
   
   /* Make a declaration for this class in its own scope.  */
@@ -1864,7 +1858,7 @@ finish_member_declaration (decl)
      A C language linkage is ignored for the names of class members
      and the member function type of class member functions.  */
   if (DECL_LANG_SPECIFIC (decl) && DECL_LANGUAGE (decl) == lang_c)
-    DECL_LANGUAGE (decl) = lang_cplusplus;
+    SET_DECL_LANGUAGE (decl, lang_cplusplus);
 
   /* Put functions on the TYPE_METHODS list and everything else on the
      TYPE_FIELDS list.  Note that these are built up in reverse order.
@@ -2177,6 +2171,9 @@ cp_expand_stmt (t)
       genrtl_named_return_value ();
       break;
 
+    case USING_STMT:
+      break;
+    
     default:
       my_friendly_abort (19990810);
       break;
@@ -2198,7 +2195,6 @@ simplify_aggr_init_exprs_r (tp, walk_subtrees, data)
   tree args;
   tree slot;
   tree type;
-  tree call_type;
   int copy_from_buffer_p;
 
   aggr_init_expr = *tp;
@@ -2221,17 +2217,20 @@ simplify_aggr_init_exprs_r (tp, walk_subtrees, data)
   args = TREE_OPERAND (aggr_init_expr, 1);
   slot = TREE_OPERAND (aggr_init_expr, 2);
   type = TREE_TYPE (aggr_init_expr);
-  call_type = type;
   if (AGGR_INIT_VIA_CTOR_P (aggr_init_expr))
     {
       /* Replace the first argument with the address of the third
 	 argument to the AGGR_INIT_EXPR.  */
-      call_type = build_pointer_type (type);
       mark_addressable (slot);
-      args = tree_cons (NULL_TREE, build1 (ADDR_EXPR, call_type, slot),
+      args = tree_cons (NULL_TREE, 
+			build1 (ADDR_EXPR, 
+				build_pointer_type (TREE_TYPE (slot)),
+				slot),
 			TREE_CHAIN (args));
     }
-  call_expr = build (CALL_EXPR, call_type, fn, args, NULL_TREE);
+  call_expr = build (CALL_EXPR, 
+		     TREE_TYPE (TREE_TYPE (TREE_TYPE (fn))),
+		     fn, args, NULL_TREE);
   TREE_SIDE_EFFECTS (call_expr) = 1;
 
   /* If we're using the non-reentrant PCC calling convention, then we
@@ -2241,7 +2240,7 @@ simplify_aggr_init_exprs_r (tp, walk_subtrees, data)
 #ifdef PCC_STATIC_STRUCT_RETURN  
   if (!AGGR_INIT_VIA_CTOR_P (aggr_init_expr) && aggregate_value_p (type))
     {
-      int old_ac;
+      int old_ac = flag_access_control;
 
       flag_access_control = 0;
       call_expr = build_aggr_init (slot, call_expr, LOOKUP_ONLYCONVERTING);
@@ -2373,9 +2372,6 @@ expand_body (fn)
       /* Or if this is a nested function.  */
       && !decl_function_context (fn))
     {
-      /* Give the function RTL now so that we can assign it to a
-	 function pointer, etc.  */
-      make_decl_rtl (fn, NULL);
       /* Set DECL_EXTERNAL so that assemble_external will be called as
 	 necessary.  We'll clear it again in finish_file.  */
       if (!DECL_EXTERNAL (fn))
@@ -2390,6 +2386,11 @@ expand_body (fn)
       note_deferral_of_defined_inline_function (fn);
       return;
     }
+
+  /* Compute the appropriate object-file linkage for inline
+     functions.  */
+  if (DECL_DECLARED_INLINE_P (fn))
+    import_export_decl (fn);
 
   /* Emit any thunks that should be emitted at the same time as FN.  */
   emit_associated_thunks (fn);
@@ -2641,6 +2642,10 @@ genrtl_finish_function (fn)
   if (function_depth > 1)
     ggc_push_context ();
 
+  /* There's no need to defer outputting this function any more; we
+     know we want to output it.  */
+  DECL_DEFER_OUTPUT (fn) = 0;
+
   /* Run the optimizers and output the assembler code for this
      function.  */
   rest_of_compilation (fn);
@@ -2681,23 +2686,52 @@ genrtl_finish_function (fn)
 
   --function_depth;
 
-  if (!DECL_SAVED_INSNS (fn)
-      && !(flag_inline_trees && DECL_INLINE (fn)))
+  /* If we don't need the RTL for this function anymore, stop pointing
+     to it.  That's especially important for LABEL_DECLs, since you
+     can reach all the instructions in the function from the
+     CODE_LABEL stored in the DECL_RTL for the LABEL_DECL.  */
+  if (!DECL_SAVED_INSNS (fn))
     {
       tree t;
 
-      /* Stop pointing to the local nodes about to be freed.  */
-      /* But DECL_INITIAL must remain nonzero so we know this
-	 was an actual function definition.  */
-      DECL_INITIAL (fn) = error_mark_node;
-      for (t = DECL_ARGUMENTS (fn); t; t = TREE_CHAIN (t))
-	DECL_RTL (t) = DECL_INCOMING_RTL (t) = NULL_RTX;
-    }
+      /* Walk the BLOCK-tree, clearing DECL_RTL for LABEL_DECLs and
+	 non-static local variables.  */
+      walk_tree_without_duplicates (&DECL_SAVED_TREE (fn),
+				    clear_decl_rtl,
+				    NULL);
 
+      /* Clear out the RTL for the arguments.  */
+      for (t = DECL_ARGUMENTS (fn); t; t = TREE_CHAIN (t))
+	{
+	  SET_DECL_RTL (t, NULL_RTX);
+	  DECL_INCOMING_RTL (t) = NULL_RTX;
+	}
+
+      if (!(flag_inline_trees && DECL_INLINE (fn)))
+	/* DECL_INITIAL must remain nonzero so we know this was an
+	   actual function definition.  */
+	DECL_INITIAL (fn) = error_mark_node;
+    }
+  
   /* Let the error reporting routines know that we're outside a
      function.  For a nested function, this value is used in
      pop_cp_function_context and then reset via pop_function_context.  */
   current_function_decl = NULL_TREE;
+}
+
+/* Clear out the DECL_RTL for the non-static variables in BLOCK and
+   its sub-blocks.  */
+
+static tree
+clear_decl_rtl (tp, walk_subtrees, data)
+     tree *tp;
+     int *walk_subtrees ATTRIBUTE_UNUSED;
+     void *data ATTRIBUTE_UNUSED;
+{
+  if (nonstatic_local_decl_p (*tp)) 
+    SET_DECL_RTL (*tp, NULL_RTX);
+    
+  return NULL_TREE;
 }
 
 /* Perform initialization related to this module.  */

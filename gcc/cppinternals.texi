@@ -94,12 +94,13 @@ Identifiers, macro expansion, hash nodes, lexing.
 * Hash Nodes::      All identifiers are hashed.
 * Macro Expansion:: Macro expansion algorithm.
 * Files::	    File handling.
-* Concept Index::   Index of concepts and terms.
 * Index::           Index.
 @end menu
 
 @node Conventions, Lexer, Top, Top
 @unnumbered Conventions
+@cindex interface
+@cindex header files
 
 cpplib has two interfaces - one is exposed internally only, and the
 other is for both internal and external use.
@@ -107,7 +108,9 @@ other is for both internal and external use.
 The convention is that functions and types that are exposed to multiple
 files internally are prefixed with @samp{_cpp_}, and are to be found in
 the file @samp{cpphash.h}.  Functions and types exposed to external
-clients are in @samp{cpplib.h}, and prefixed with @samp{cpp_}.
+clients are in @samp{cpplib.h}, and prefixed with @samp{cpp_}.  For
+historical reasons this is no longer quite true, but we should strive to
+stick to it.
 
 We are striving to reduce the information exposed in cpplib.h to the
 bare minimum necessary, and then to keep it there.  This makes clear
@@ -118,6 +121,8 @@ behaviour.
 
 @node Lexer, Whitespace, Conventions, Top
 @unnumbered The Lexer
+@cindex lexer
+@cindex tokens
 
 The lexer is contained in the file @samp{cpplex.c}.  We want to have a
 lexer that is single-pass, for efficiency reasons.  We would also like
@@ -179,17 +184,17 @@ problem.
 
 Another place where state flags are used to change behaviour is whilst
 parsing header names.  Normally, a @samp{<} would be lexed as a single
-token.  After a @samp{#include} directive, though, it should be lexed
+token.  After a @code{#include} directive, though, it should be lexed
 as a single token as far as the nearest @samp{>} character.  Note that
 we don't allow the terminators of header names to be escaped; the first
 @samp{"} or @samp{>} terminates the header name.
 
 Interpretation of some character sequences depends upon whether we are
 lexing C, C++ or Objective C, and on the revision of the standard in
-force.  For example, @samp{@@foo} is a single identifier token in
-objective C, but two separate tokens @samp{@@} and @samp{foo} in C or
-C++.  Such cases are handled in the main function @samp{_cpp_lex_token},
-based upon the flags set in the @samp{cpp_options} structure.
+force.  For example, @samp{::} is a single token in C++, but two
+separate @samp{:} tokens, and almost certainly a syntax error, in C.
+Such cases are handled in the main function @samp{_cpp_lex_token}, based
+upon the flags set in the @samp{cpp_options} structure.
 
 Note we have almost, but not quite, achieved the goal of not stepping
 backwards in the input stream.  Currently @samp{skip_escaped_newlines}
@@ -201,6 +206,11 @@ buffer it and continue to treat it as 3 separate characters.
 
 @node Whitespace, Hash Nodes, Lexer, Top
 @unnumbered Whitespace
+@cindex whitespace
+@cindex newlines
+@cindex escaped newlines
+@cindex paste avoidance
+@cindex line numbers
 
 The lexer has been written to treat each of @samp{\r}, @samp{\n},
 @samp{\r\n} and @samp{\n\r} as a single new line indicator.  This allows
@@ -221,8 +231,70 @@ characters, and @samp{skip_escaped_newlines} takes care of arbitrarily
 long sequences of escaped newlines, deferring to @samp{handle_newline}
 to handle the newlines themselves.
 
+Another whitespace issue only concerns the stand-alone preprocessor: we
+want to guarantee that re-reading the preprocessed output results in an
+identical token stream.  Without taking special measures, this might not
+be the case because of macro substitution.  We could simply insert a
+space between adjacent tokens, but ideally we would like to keep this to
+a minimum, both for aesthetic reasons and because it causes problems for
+people who still try to abuse the preprocessor for things like Fortran
+source and Makefiles.
+
+The token structure contains a flags byte, and two flags are of interest
+here: @samp{PREV_WHITE} and @samp{AVOID_LPASTE}.  @samp{PREV_WHITE}
+indicates that the token was preceded by whitespace; if this is the case
+we need not worry about it incorrectly pasting with its predecessor.
+The @samp{AVOID_LPASTE} flag is set by the macro expansion routines, and
+indicates that paste avoidance by insertion of a space to the left of
+the token may be necessary.  Recursively, the first token of a macro
+substitution, the first token after a macro substitution, the first
+token of a substituted argument, and the first token after a substituted
+argument are all flagged @samp{AVOID_LPASTE} by the macro expander.
+
+If a token flagged in this way does not have a @samp{PREV_WHITE} flag,
+and the routine @var{cpp_avoid_paste} determines that it might be
+misinterpreted by the lexer if a space is not inserted between it and
+the immediately preceding token, then stand-alone CPP's output routines
+will insert a space between them.  To avoid excessive spacing,
+@var{cpp_avoid_paste} tries hard to only request a space if one is
+likely to be necessary, but for reasons of efficiency it is slightly
+conservative and might recommend a space where one is not strictly
+needed.
+
+Finally, the preprocessor takes great care to ensure it keeps track of
+both the position of a token in the source file, for diagnostic
+purposes, and where it should appear in the output file, because using
+CPP for other languages like assembler requires this.  The two positions
+may differ for the following reasons:
+
+@itemize @bullet
+@item
+Escaped newlines are deleted, so lines spliced in this way are joined to
+form a single logical line.
+
+@item
+A macro expansion replaces the tokens that form its invocation, but any
+newlines appearing in the macro's arguments are interpreted as a single
+space, with the result that the macro's replacement appears in full on
+the same line that the macro name appeared in the source file.  This is
+particularly important for stringification of arguments - newlines
+embedded in the arguments must appear in the string as spaces.
+@end itemize
+
+The source file location is maintained in the @var{lineno} member of the
+@var{cpp_buffer} structure, and the column number inferred from the
+current position in the buffer relative to the @var{line_base} buffer
+variable, which is updated with every newline whether escaped or not.
+
+TODO: Finish this.
+
 @node Hash Nodes, Macro Expansion, Whitespace, Top
 @unnumbered Hash Nodes
+@cindex hash table
+@cindex identifiers
+@cindex macros
+@cindex assertions
+@cindex named operators
 
 When cpplib encounters an "identifier", it generates a hash code for it
 and stores it in the hash table.  By "identifier" we mean tokens with
@@ -239,7 +311,7 @@ time, each identifier falls into exactly one of three categories:
 @item Macros
 
 These have been declared to be macros, either on the command line or
-with @samp{#define}.  A few, such as @samp{__TIME__} are builtins
+with @code{#define}.  A few, such as @samp{__TIME__} are builtins
 entered in the hash table during initialisation.  The hash node for a
 normal macro points to a structure with more information about the
 macro, such as whether it is function-like, how many arguments it takes,
@@ -249,7 +321,7 @@ contain an enum indicating which of the various builtin macros it is.
 @item Assertions
 
 Assertions are in a separate namespace to macros.  To enforce this, cpp
-actually prepends a @samp{#} character before hashing and entering it in
+actually prepends a @code{#} character before hashing and entering it in
 the hash table.  An assertion's node points to a chain of answers to
 that assertion.
 
@@ -257,21 +329,21 @@ that assertion.
 
 Everything else falls into this category - an identifier that is not
 currently a macro, or a macro that has since been undefined with
-@samp{#undef}.
+@code{#undef}.
 
 When preprocessing C++, this category also includes the named operators,
 such as @samp{xor}.  In expressions these behave like the operators they
 represent, but in contexts where the spelling of a token matters they
 are spelt differently.  This spelling distinction is relevant when they
-are operands of the stringizing and pasting macro operators @samp{#} and
-@samp{##}.  Named operator hash nodes are flagged, both to catch the
+are operands of the stringizing and pasting macro operators @code{#} and
+@code{##}.  Named operator hash nodes are flagged, both to catch the
 spelling distinction and to prevent them from being defined as macros.
 @end itemize
 
 The same identifiers share the same hash node.  Since each identifier
 token, after lexing, contains a pointer to its hash node, this is used
 to provide rapid lookup of various information.  For example, when
-parsing a @samp{#define} statement, CPP flags each argument's identifier
+parsing a @code{#define} statement, CPP flags each argument's identifier
 hash node with the index of that argument.  This makes duplicated
 argument checking an O(1) operation for each argument.  Similarly, for
 each identifier in the macro's expansion, lookup to see if it is an
@@ -279,24 +351,80 @@ argument, and which argument it is, is also an O(1) operation.  Further,
 each directive name, such as @samp{endif}, has an associated directive
 enum stored in its hash node, so that directive lookup is also O(1).
 
-Later, CPP may also store C front-end information in its identifier hash
-table, such as a @samp{tree} pointer.
-
 @node Macro Expansion, Files, Hash Nodes, Top
 @unnumbered Macro Expansion Algorithm
-@printindex cp
 
-@node Files, Concept Index, Macro Expansion, Top
+@node Files, Index, Macro Expansion, Top
 @unnumbered File Handling
-@printindex cp
+@cindex files
 
-@node Concept Index, Index, Files, Top
-@unnumbered Concept Index
-@printindex cp
+Fairly obviously, the file handling code of cpplib resides in the file
+@samp{cppfiles.c}.  It takes care of the details of file searching,
+opening, reading and caching, for both the main source file and all the
+headers it recursively includes.
 
-@node Index,, Concept Index, Top
-@unnumbered Index of Directives, Macros and Options
-@printindex fn
+The basic strategy is to minimize the number of system calls.  On many
+systems, the basic @code{open ()} and @code{fstat ()} system calls can
+be quite expensive.  For every @code{#include}-d file, we need to try
+all the directories in the search path until we find a match.  Some
+projects, such as glibc, pass twenty or thirty include paths on the
+command line, so this can rapidly become time consuming.
+
+For a header file we have not encountered before we have little choice
+but to do this.  However, it is often the case that the same headers are
+repeatedly included, and in these cases we try to avoid repeating the
+filesystem queries whilst searching for the correct file.
+
+For each file we try to open, we store the constructed path in a splay
+tree.  This path first undergoes simplification by the function
+@code{_cpp_simplify_pathname}.  For example,
+@samp{/usr/include/bits/../foo.h} is simplified to
+@samp{/usr/include/foo.h} before we enter it in the splay tree and try
+to @code{open ()} the file.  CPP will then find subsequent uses of
+@samp{foo.h}, even as @samp{/usr/include/foo.h}, in the splay tree and
+save system calls.
+
+Further, it is likely the file contents have also been cached, saving a
+@code{read ()} system call.  We don't bother caching the contents of
+header files that are re-inclusion protected, and whose re-inclusion
+macro is defined when we leave the header file for the first time.  If
+the host supports it, we try to map suitably large files into memory,
+rather than reading them in directly.
+
+The include paths are intenally stored on a null-terminated
+singly-linked list, starting with the @code{"header.h"} directory search
+chain, which then links into the @code{<header.h>} directory chain.
+
+Files included with the @code{<foo.h>} syntax start the lookup directly
+in the second half of this chain.  However, files included with the
+@code{"foo.h"} syntax start at the beginning of the chain, but with one
+extra directory prepended.  This is the directory of the current file;
+the one containing the @code{#include} directive.  Prepending this
+directory on a per-file basis is handled by the function
+@code{search_from}.
+
+Note that a header included with a directory component, such as
+@code{#include "mydir/foo.h"} and opened as
+@samp{/usr/local/include/mydir/foo.h}, will have the complete path minus
+the basename @samp{foo.h} as the current directory.
+
+Enough information is stored in the splay tree that CPP can immediately
+tell whether it can skip the header file because of the multiple include
+optimisation, whether the file didn't exist or couldn't be opened for
+some reason, or whether the header was flagged not to be re-used, as it
+is with the obsolete @code{#import} directive.
+
+For the benefit of MS-DOS filesystems with an 8.3 filename limitation,
+CPP offers the ability to treat various include file names as aliases
+for the real header files with shorter names.  The map from one to the
+other is found in a special file called @samp{header.gcc}, stored in the
+command line (or system) include directories to which the mapping
+applies.  This may be higher up the directory tree than the full path to
+the file minus the base name.
+
+@node Index,, Files, Top
+@unnumbered Index
+@printindex cp
 
 @contents
 @bye
