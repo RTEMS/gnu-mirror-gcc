@@ -9242,13 +9242,17 @@ rtl_for_decl_location (decl)
   rtl = DECL_RTL_IF_SET (decl);
 
   /* When generating abstract instances, ignore everything except
-     constants and symbols living in memory.  */
+     constants, symbols living in memory, and symbols living in
+     fixed registers.  */
   if (! reload_completed)
     {
       if (rtl
 	  && (CONSTANT_P (rtl)
 	      || (GET_CODE (rtl) == MEM
-	          && CONSTANT_P (XEXP (rtl, 0)))))
+	          && CONSTANT_P (XEXP (rtl, 0)))
+	      || (GET_CODE (rtl) == REG
+	          && TREE_CODE (decl) == VAR_DECL
+		  && TREE_STATIC (decl))))
 	{
 #ifdef ASM_SIMPLIFY_DWARF_ADDR
 	  rtl = ASM_SIMPLIFY_DWARF_ADDR (rtl);
@@ -11473,6 +11477,21 @@ gen_type_die (type, context_die)
   if (type == NULL_TREE || type == error_mark_node)
     return;
 
+  if (TYPE_NAME (type) && TREE_CODE (TYPE_NAME (type)) == TYPE_DECL
+      && DECL_ORIGINAL_TYPE (TYPE_NAME (type)))
+    {
+      if (TREE_ASM_WRITTEN (type))
+	return;
+
+      /* Prevent broken recursion; we can't hand off to the same type.  */
+      if (DECL_ORIGINAL_TYPE (TYPE_NAME (type)) == type)
+	abort ();
+
+      TREE_ASM_WRITTEN (type) = 1;
+      gen_decl_die (TYPE_NAME (type), context_die);
+      return;
+    }
+
   /* We are going to output a DIE to represent the unqualified version
      of this type (i.e. without any const or volatile qualifiers) so
      get the main variant (i.e. the unqualified version) of this type
@@ -11483,18 +11502,6 @@ gen_type_die (type, context_die)
 
   if (TREE_ASM_WRITTEN (type))
     return;
-
-  if (TYPE_NAME (type) && TREE_CODE (TYPE_NAME (type)) == TYPE_DECL
-      && DECL_ORIGINAL_TYPE (TYPE_NAME (type)))
-    {
-      /* Prevent broken recursion; we can't hand off to the same type.  */
-      if (DECL_ORIGINAL_TYPE (TYPE_NAME (type)) == type)
-	abort ();
-
-      TREE_ASM_WRITTEN (type) = 1;
-      gen_decl_die (TYPE_NAME (type), context_die);
-      return;
-    }
 
   switch (TREE_CODE (type))
     {
@@ -11799,6 +11806,10 @@ decls_for_scope (stmt, context_die, depth)
 	gen_decl_die (decl, context_die);
     }
 
+  /* If we're at -g1, we're not interested in subblocks.  */
+  if (debug_info_level <= DINFO_LEVEL_TERSE)
+    return;
+
   /* Output the DIEs to represent all sub-blocks (and the items declared
      therein) of this block.  */
   for (subblocks = BLOCK_SUBBLOCKS (stmt);
@@ -12076,7 +12087,9 @@ dwarf2out_decl (decl)
       /* If we're a nested function, initially use a parent of NULL; if we're
 	 a plain function, this will be fixed up in decls_for_scope.  If
 	 we're a method, it will be ignored, since we already have a DIE.  */
-      if (decl_function_context (decl))
+      if (decl_function_context (decl)
+	  /* But if we're in terse mode, we don't care about scope.  */
+	  && debug_info_level > DINFO_LEVEL_TERSE)
 	context_die = NULL;
       break;
 
