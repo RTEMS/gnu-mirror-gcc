@@ -1,3 +1,96 @@
+Mon May 24 14:34:31 1999  Jeffrey A Law  (law@cygnus.com)
+
+	* loop.c (strength_reduce): Do not clear NOT_EVERY_ITERATION at the
+	last CODE_LABEL in a loop if we have previously passed a jump
+	to the top of the loop.
+
+Mon May 24 01:02:58 1999  Mark Mitchell  <mark@codesourcery.com>
+
+	* stmt.c (expand_end_bindings): Ignore any elements of VARS that
+	are not VAR_DECLs.
+
+Sun May 23 20:31:16 1999  Jeffrey A Law  (law@cygnus.com)
+
+	* loop.c (strength_reduce): Grow reg_single_usage as needed.
+
+Sun May 23 10:13:20 1999  David O'Brien <obrien@FreeBSD.org>
+
+	* i386/freebsd-elf.h (LINK_SPEC): Change -static to -Bstatic.
+	Also remove a useless comment.
+
+Sun May 23 10:05:23 1999  Jerry Quinn <jquinn@nortelnetworks.com>
+
+	* pa.md (negdf2,negsf2):  Use fneg instead of fsub on pa 2.0.
+
+Sat May 22 01:27:49 1999  Mark Mitchell  <mark@codesourcery.com>
+
+	* expr.h (lang_expand_constant): Guard with #ifdef TREE_CODE.
+
+Thu May 20 10:00:42 1999   Stephen L Moshier  <moshier@world.std.com>
+
+         * Makefile.in (GCC_FOR_TARGET): Add -I$(build_tooldir)/include.
+			 
+Thu May 20 09:58:57 1999  Jan Hubicka <hubicka@freesoft.cz>
+
+	* function.c (assign_stack_local): Align stack slot propertly.
+	(assign_outer_stack_local): Likewise.
+ 
+Thu May 20 10:38:43 1999  Mark Mitchell  <mark@codesourcery.com>
+
+	* expr.h (lang_expand_constant): Declare.
+	* toplev.c (lang_expand_constant): Define it.
+	* varasm.c (output_constant): Use it.
+
+Thu May 20 08:15:00 1999  Bruce Korb <ddsinc09@ix.netcom.com>
+
+	* fixinc/fixincl.c(main): we must not ignore SIGCLD now.
+
+Thu May 20 07:06:39 1999  Alexandre Oliva  <aoliva@acm.org>
+
+	* fixinc/Makefile.in(gnu-regex.o): add $(INCLUDES) to compile options
+	* fixinc/fixincl.c(wait_for_pid): K&R-ify arguments
+	(several places): omit static initialization
+	(process): use single fd, since only the read fd is used
+	* fixinc/gnu-regex.c: define 'const' away, if not supported
+	* fixinc/procopen.c(several places): omit static initialization
+	* fixinc/server.c: define 'volitile' away, if not supported
+
+1999-05-20  Andreas Schwab  <schwab@issan.cs.uni-dortmund.de>
+
+	* config/dbxcoff.h (DBX_OUTPUT_MAIN_SOURCE_FILE_END): Use
+	asm_fprintf and %L to generate the label name.
+	* config/dbxelf.h (DBX_OUTPUT_MAIN_SOURCE_FILE_END): Likewise.
+	(ASM_OUTPUT_SOURCE_LINE): Correct generation of internal labels.
+
+Thu May 20 01:40:55 1999  Jeffrey A Law  (law@cygnus.com)
+
+	* jump.c (can_reverse_comparison_p): Do not abort if the comparison
+	insn for a conditional jump can not be found.
+
+Wed May 19 23:58:58 1999  Jeffrey A Law  (law@cygnus.com)
+
+	* mips.h (ENCODE_SECTION_INFO): Do not perform GP optimizations
+	on variables in specific sections other than .sbss and .sdata.
+
+Tue May 18 11:20:48 1999  Mark Mitchell  <mark@codesourcery.com>
+
+	* stmt.c (expand_return): Call start_cleanup_deferral and
+	end_cleanup_deferral around conditional code.
+
+Wed May 19 03:10:08 1999  Bruce Korb <ddsinc09@ix.netcom.com>
+
+	* fixinc/fixincl.tpl: Avoid depending on ANSI C features for
+	filename lists.  Utilizes new AutoGen function "krstr".
+	* fixinc/fixincl.x: Rebuilt.
+
+Wed May 19 02:47:11 1999  Jan Hubicka  (hubicka@freesoft.cz)
+
+	* i386.c (output_float_compare): Avoid GNU-C extensions.
+
+Wed May 19 00:50:24 1999  Jeffrey A Law  (law@cygnus.com)
+
+	* version.c: Bump version to gcc-2.95 prerelease.
+
 Tue May 18 03:53:37 1999  Craig Burley  <craig@jcb-sc.com>
 
 	Improve open-coding of complex divide:
