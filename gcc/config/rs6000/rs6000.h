@@ -1471,12 +1471,22 @@ enum reg_class
     ? GENERAL_REGS					\
     : (CLASS)))
 
+#define DISPARAGE_RELOAD_CLASS(X, CLASS)			\
+  (GET_CODE (X) == REG						\
+   && REGNO (X) < FIRST_PSEUDO_REGISTER				\
+   && SECONDARY_MEMORY_NEEDED (GET_MODE_CLASS (GET_MODE (X)),	\
+			       CLASS, GET_MODE (X))		\
+   ? 6 : 0)
+
 /* Return the register class of a scratch register needed to copy IN into
    or out of a register in CLASS in MODE.  If it can be done directly,
    NO_REGS is returned.  */
 
-#define SECONDARY_RELOAD_CLASS(CLASS,MODE,IN) \
-  secondary_reload_class (CLASS, MODE, IN)
+#define SECONDARY_INPUT_RELOAD_CLASS(CLASS, MODE, IN) \
+  secondary_reload_class (CLASS, MODE, IN, 1)
+
+#define SECONDARY_OUTPUT_RELOAD_CLASS(CLASS, MODE, IN) \
+  secondary_reload_class (CLASS, MODE, IN, 0)
 
 /* If we are copying between FP or AltiVec registers and anything
    else, we need a memory location.  */
@@ -1767,19 +1777,19 @@ typedef struct rs6000_args
    for a call to a function whose data type is FNTYPE.
    For a library call, FNTYPE is 0.  */
 
-#define INIT_CUMULATIVE_ARGS(CUM,FNTYPE,LIBNAME,INDIRECT) \
-  init_cumulative_args (&CUM, FNTYPE, LIBNAME, FALSE, FALSE)
+#define INIT_CUMULATIVE_ARGS(CUM, FNTYPE, LIBNAME, INDIRECT, N_NAMED_ARGS) \
+  init_cumulative_args (&CUM, FNTYPE, LIBNAME, FALSE, FALSE, N_NAMED_ARGS)
 
 /* Similar, but when scanning the definition of a procedure.  We always
    set NARGS_PROTOTYPE large so we never return an EXPR_LIST.  */
 
-#define INIT_CUMULATIVE_INCOMING_ARGS(CUM,FNTYPE,LIBNAME) \
-  init_cumulative_args (&CUM, FNTYPE, LIBNAME, TRUE, FALSE)
+#define INIT_CUMULATIVE_INCOMING_ARGS(CUM, FNTYPE, LIBNAME) \
+  init_cumulative_args (&CUM, FNTYPE, LIBNAME, TRUE, FALSE, 1000)
 
 /* Like INIT_CUMULATIVE_ARGS' but only used for outgoing libcalls.  */
 
 #define INIT_CUMULATIVE_LIBCALL_ARGS(CUM, MODE, LIBNAME) \
-  init_cumulative_args (&CUM, NULL_TREE, LIBNAME, FALSE, TRUE)
+  init_cumulative_args (&CUM, NULL_TREE, LIBNAME, FALSE, TRUE, 0)
 
 /* Update the data in CUM to advance over an argument
    of mode MODE and data type TYPE.
@@ -2666,6 +2676,8 @@ extern char rs6000_reg_names[][8];	/* register names (0 vs. %r0).  */
   {"lwa_operand", {SUBREG, MEM, REG}},					   \
   {"volatile_mem_operand", {MEM}},					   \
   {"offsettable_mem_operand", {MEM}},					   \
+  {"invalid_gpr_mem", {MEM}},						   \
+  {"base_reg_operand", {REG}},						   \
   {"mem_or_easy_const_operand", {SUBREG, MEM, CONST_DOUBLE}},		   \
   {"add_operand", {SUBREG, REG, CONST_INT}},				   \
   {"non_add_cint_operand", {CONST_INT}},				   \

@@ -1452,6 +1452,7 @@ extern rtx emit_copy_of_insn_after (rtx, rtx);
 extern void set_reg_attrs_from_mem (rtx, rtx);
 extern void set_mem_attrs_from_reg (rtx, rtx);
 extern void set_reg_attrs_for_parm (rtx, rtx);
+extern int mem_expr_equal_p (tree, tree);
 
 /* In rtl.c */
 extern rtx rtx_alloc (RTX_CODE);
@@ -1572,6 +1573,19 @@ extern rtx prev_label (rtx);
 extern rtx next_label (rtx);
 extern rtx next_cc0_user (rtx);
 extern rtx prev_cc0_setter (rtx);
+
+#define emit_insn_before_sameloc(INSN, BEFORE) \
+  emit_insn_before_setloc (INSN, BEFORE, INSN_LOCATOR (BEFORE))
+#define emit_jump_insn_before_sameloc(INSN, BEFORE) \
+  emit_jump_insn_before_setloc (INSN, BEFORE, INSN_LOCATOR (BEFORE))
+#define emit_call_insn_before_sameloc(INSN, BEFORE) \
+  emit_call_insn_before_setloc (INSN, BEFORE, INSN_LOCATOR (BEFORE))
+#define emit_insn_after_sameloc(INSN, AFTER) \
+  emit_insn_after_setloc (INSN, AFTER, INSN_LOCATOR (AFTER))
+#define emit_jump_insn_after_sameloc(INSN, AFTER) \
+  emit_jump_insn_after_setloc (INSN, AFTER, INSN_LOCATOR (AFTER))
+#define emit_call_insn_after_sameloc(INSN, AFTER) \
+  emit_call_insn_after_setloc (INSN, AFTER, INSN_LOCATOR (AFTER))
 
 /* In cfglayout.c  */
 extern tree choose_inner_scope (tree, tree);
@@ -1998,6 +2012,7 @@ extern int cse_main (rtx, int, int, FILE *);
 #endif
 extern void cse_end_of_basic_block (rtx, struct cse_basic_block_data *,
 				    int, int, int);
+extern void cse_condition_code_reg (void);
 
 /* In jump.c */
 extern int comparison_dominates_p (enum rtx_code, enum rtx_code);

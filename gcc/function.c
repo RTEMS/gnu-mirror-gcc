@@ -1,6 +1,6 @@
 /* Expands front end tree to back end RTL for GCC.
    Copyright (C) 1987, 1988, 1989, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   1998, 1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   1998, 1999, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1430,8 +1430,9 @@ put_var_into_stack (tree decl, int rescan)
 
 static void
 put_reg_into_stack (struct function *function, rtx reg, tree type,
-		    enum machine_mode promoted_mode, enum machine_mode decl_mode,
-		    int volatile_p, unsigned int original_regno, int used_p, htab_t ht)
+		    enum machine_mode promoted_mode,
+		    enum machine_mode decl_mode, int volatile_p,
+		    unsigned int original_regno, int used_p, htab_t ht)
 {
   struct function *func = function ? function : cfun;
   rtx new = 0;
@@ -1441,7 +1442,11 @@ put_reg_into_stack (struct function *function, rtx reg, tree type,
     regno = REGNO (reg);
 
   if (regno < func->x_max_parm_reg)
-    new = func->x_parm_reg_stack_loc[regno];
+    {
+      if (!func->x_parm_reg_stack_loc)
+	abort ();
+      new = func->x_parm_reg_stack_loc[regno];
+    }
 
   if (new == 0)
     new = assign_stack_local_1 (decl_mode, GET_MODE_SIZE (decl_mode), 0, func);
@@ -4351,7 +4356,7 @@ assign_parms (tree fndecl)
 #ifdef INIT_CUMULATIVE_INCOMING_ARGS
   INIT_CUMULATIVE_INCOMING_ARGS (args_so_far, fntype, NULL_RTX);
 #else
-  INIT_CUMULATIVE_ARGS (args_so_far, fntype, NULL_RTX, fndecl);
+  INIT_CUMULATIVE_ARGS (args_so_far, fntype, NULL_RTX, fndecl, -1);
 #endif
 
   /* We haven't yet found an argument that we must push and pretend the
@@ -5221,14 +5226,28 @@ assign_parms (tree fndecl)
 	{
 	  if (TREE_CODE (TREE_TYPE (parm)) == COMPLEX_TYPE)
 	    {
-	      SET_DECL_RTL (parm,
-			    gen_rtx_CONCAT (DECL_MODE (parm),
-					    DECL_RTL (fnargs),
-					    DECL_RTL (TREE_CHAIN (fnargs))));
-	      DECL_INCOMING_RTL (parm)
-		= gen_rtx_CONCAT (DECL_MODE (parm),
-				  DECL_INCOMING_RTL (fnargs),
-				  DECL_INCOMING_RTL (TREE_CHAIN (fnargs)));
+	      rtx tmp, real, imag;
+	      enum machine_mode inner = GET_MODE_INNER (DECL_MODE (parm));
+
+	      real = DECL_RTL (fnargs);
+	      imag = DECL_RTL (TREE_CHAIN (fnargs));
+	      if (inner != GET_MODE (real))
+		{
+		  real = gen_lowpart_SUBREG (inner, real);
+		  imag = gen_lowpart_SUBREG (inner, imag);
+		}
+	      tmp = gen_rtx_CONCAT (DECL_MODE (parm), real, imag);
+	      SET_DECL_RTL (parm, tmp);
+
+	      real = DECL_INCOMING_RTL (fnargs);
+	      imag = DECL_INCOMING_RTL (TREE_CHAIN (fnargs));
+	      if (inner != GET_MODE (real))
+		{
+		  real = gen_lowpart_SUBREG (inner, real);
+		  imag = gen_lowpart_SUBREG (inner, imag);
+		}
+	      tmp = gen_rtx_CONCAT (DECL_MODE (parm), real, imag);
+	      DECL_INCOMING_RTL (parm) = tmp;
 	      fnargs = TREE_CHAIN (fnargs);
 	    }
 	  else
@@ -5683,7 +5702,7 @@ uninitialized_vars_warning (tree block)
 	     flow.c that the entire aggregate was initialized.
 	     Unions are troublesome because members may be shorter.  */
 	  && ! AGGREGATE_TYPE_P (TREE_TYPE (decl))
-	  && DECL_RTL (decl) != 0
+	  && DECL_RTL_SET_P (decl)
 	  && GET_CODE (DECL_RTL (decl)) == REG
 	  /* Global optimizations can make it difficult to determine if a
 	     particular variable has been initialized.  However, a VAR_DECL
@@ -5698,7 +5717,7 @@ uninitialized_vars_warning (tree block)
 		 decl, decl);
       if (extra_warnings
 	  && TREE_CODE (decl) == VAR_DECL
-	  && DECL_RTL (decl) != 0
+	  && DECL_RTL_SET_P (decl)
 	  && GET_CODE (DECL_RTL (decl)) == REG
 	  && regno_clobbered_at_setjmp (REGNO (DECL_RTL (decl))))
 	warning ("%Jvariable '%D' might be clobbered by `longjmp' or `vfork'",
@@ -6394,9 +6413,6 @@ allocate_struct_function (tree fndecl)
 
   init_stmt_for_function ();
   init_eh_for_function ();
-  init_emit ();
-  init_expr ();
-  init_varasm_status (cfun);
 
   (*lang_hooks.function.init) (cfun);
   if (init_machine_status)
@@ -6434,6 +6450,9 @@ prepare_function_start (tree fndecl)
     cfun = DECL_SAVED_INSNS (fndecl);
   else
     allocate_struct_function (fndecl);
+  init_emit ();
+  init_varasm_status (cfun);
+  init_expr ();
 
   cse_not_expected = ! optimize;
 
@@ -7254,7 +7273,7 @@ record_insns (rtx insns, varray_type *vecp)
     }
 }
 
-/* Set the specified locator to the insn chain.  */
+/* Set the locator of the insn chain starting at INSN to LOC.  */
 static void
 set_insn_locators (rtx insn, int loc)
 {
@@ -7895,6 +7914,7 @@ epilogue_done:
 #endif
 
 #ifdef HAVE_prologue
+  /* This is probably all useless now that we use locators.  */
   if (prologue_end)
     {
       rtx insn, prev;
