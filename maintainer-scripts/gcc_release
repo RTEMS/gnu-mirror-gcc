@@ -239,10 +239,6 @@ EOF
     contrib/gcc_build -d ${SOURCE_DIRECTORY} -o ${OBJECT_DIRECTORY} \
       -c "--enable-generated-files-in-srcdir" build || \
       error "Could not rebuild GCC"
-
-    # Regenerate the Fotran NEWS and BUGS files.
-    (cd ${OBJECT_DIRECTORY}/gcc && make f77.rebuilt) || \
-      error "Could not regenerate Fortran NEWS and BUGS files"
   fi
 
   # Move message catalogs to source directory.
@@ -396,7 +392,7 @@ announce_snapshot() {
   inform "Updating links and READMEs on the FTP server"
   
   TEXT_DATE=`date --date=$DATE +%B\ %d,\ %Y`
-  cd ~ftp/pub/gcc/snapshots
+  changedir ~ftp/pub/gcc/snapshots
   sed -e "s%@DATE@%$DATE%g" \
     -e "s%@TEXT_DATE@%$TEXT_DATE%g" \
     -e "s%@LAST_DATE@%$LAST_DATE%g" \

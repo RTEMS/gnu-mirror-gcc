@@ -1,6 +1,6 @@
 ;;- Machine description for HP PA-RISC architecture for GCC compiler
 ;;   Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
-;;   2002, 2003 Free Software Foundation, Inc.
+;;   2002, 2003, 2004 Free Software Foundation, Inc.
 ;;   Contributed by the Center for Software Science at the University
 ;;   of Utah.
 
@@ -2305,7 +2305,7 @@
 			  (const_int 4))
 		 (match_operand:SI 2 "register_operand" "")))
    (set (mem:SI (match_dup 0))
-        (match_operand:SI 3 "reg_or_0_operand" ""))]
+        (match_operand:SI 3 "register_operand" ""))]
   "!TARGET_SOFT_FLOAT
    && REG_OK_FOR_BASE_P (operands[2])
    && FP_REGNO_P (REGNO (operands[3]))"
@@ -3194,7 +3194,7 @@
 (define_insn "movstrsi_prereload"
   [(set (mem:BLK (match_operand:SI 0 "register_operand" "r,r"))
 	(mem:BLK (match_operand:SI 1 "register_operand" "r,r")))
-   (clobber (match_operand:SI 2 "register_operand" "=r,r"))	;loop cnt/tmp
+   (clobber (match_operand:SI 2 "register_operand" "=&r,&r"))	;loop cnt/tmp
    (clobber (match_operand:SI 3 "register_operand" "=&r,&r"))	;item tmp1
    (clobber (match_operand:SI 6 "register_operand" "=&r,&r"))	;item tmp2
    (clobber (match_operand:SI 7 "register_operand" "=&r,&r"))	;item tmp3
@@ -3263,9 +3263,9 @@
 }")
 
 (define_insn "movstrsi_postreload"
-  [(set (mem:BLK (match_operand:SI 0 "register_operand" "r,r"))
-	(mem:BLK (match_operand:SI 1 "register_operand" "r,r")))
-   (clobber (match_operand:SI 2 "register_operand" "=r,r"))	;loop cnt/tmp
+  [(set (mem:BLK (match_operand:SI 0 "register_operand" "+r,r"))
+	(mem:BLK (match_operand:SI 1 "register_operand" "+r,r")))
+   (clobber (match_operand:SI 2 "register_operand" "=&r,&r"))	;loop cnt/tmp
    (clobber (match_operand:SI 3 "register_operand" "=&r,&r"))	;item tmp1
    (clobber (match_operand:SI 6 "register_operand" "=&r,&r"))	;item tmp2
    (clobber (match_dup 0))
@@ -3360,7 +3360,7 @@
 (define_insn "movstrdi_prereload"
   [(set (mem:BLK (match_operand:DI 0 "register_operand" "r,r"))
 	(mem:BLK (match_operand:DI 1 "register_operand" "r,r")))
-   (clobber (match_operand:DI 2 "register_operand" "=r,r"))	;loop cnt/tmp
+   (clobber (match_operand:DI 2 "register_operand" "=&r,&r"))	;loop cnt/tmp
    (clobber (match_operand:DI 3 "register_operand" "=&r,&r"))	;item tmp1
    (clobber (match_operand:DI 6 "register_operand" "=&r,&r"))	;item tmp2
    (clobber (match_operand:DI 7 "register_operand" "=&r,&r"))	;item tmp3
@@ -3429,9 +3429,9 @@
 }")
 
 (define_insn "movstrdi_postreload"
-  [(set (mem:BLK (match_operand:DI 0 "register_operand" "r,r"))
-	(mem:BLK (match_operand:DI 1 "register_operand" "r,r")))
-   (clobber (match_operand:DI 2 "register_operand" "=r,r"))	;loop cnt/tmp
+  [(set (mem:BLK (match_operand:DI 0 "register_operand" "+r,r"))
+	(mem:BLK (match_operand:DI 1 "register_operand" "+r,r")))
+   (clobber (match_operand:DI 2 "register_operand" "=&r,&r"))	;loop cnt/tmp
    (clobber (match_operand:DI 3 "register_operand" "=&r,&r"))	;item tmp1
    (clobber (match_operand:DI 6 "register_operand" "=&r,&r"))	;item tmp2
    (clobber (match_dup 0))
@@ -3482,7 +3482,7 @@
 (define_insn "clrstrsi_prereload"
   [(set (mem:BLK (match_operand:SI 0 "register_operand" "r,r"))
 	(const_int 0))
-   (clobber (match_operand:SI 1 "register_operand" "=r,r"))	;loop cnt/tmp
+   (clobber (match_operand:SI 1 "register_operand" "=&r,&r"))	;loop cnt/tmp
    (clobber (match_operand:SI 4 "register_operand" "=&r,&r"))	;tmp1
    (use (match_operand:SI 2 "arith_operand" "J,1"))	 ;byte count
    (use (match_operand:SI 3 "const_int_operand" "n,n"))] ;alignment
@@ -3530,9 +3530,9 @@
 }")
 
 (define_insn "clrstrsi_postreload"
-  [(set (mem:BLK (match_operand:SI 0 "register_operand" "r,r"))
+  [(set (mem:BLK (match_operand:SI 0 "register_operand" "+r,r"))
 	(const_int 0))
-   (clobber (match_operand:SI 1 "register_operand" "=r,r"))	;loop cnt/tmp
+   (clobber (match_operand:SI 1 "register_operand" "=&r,&r"))	;loop cnt/tmp
    (clobber (match_dup 0))
    (use (match_operand:SI 2 "arith_operand" "J,1"))	 ;byte count
    (use (match_operand:SI 3 "const_int_operand" "n,n"))  ;alignment
@@ -3580,7 +3580,7 @@
 (define_insn "clrstrdi_prereload"
   [(set (mem:BLK (match_operand:DI 0 "register_operand" "r,r"))
 	(const_int 0))
-   (clobber (match_operand:DI 1 "register_operand" "=r,r"))	;loop cnt/tmp
+   (clobber (match_operand:DI 1 "register_operand" "=&r,&r"))	;loop cnt/tmp
    (clobber (match_operand:DI 4 "register_operand" "=&r,&r"))	;item tmp1
    (use (match_operand:DI 2 "arith_operand" "J,1"))	 ;byte count
    (use (match_operand:DI 3 "const_int_operand" "n,n"))] ;alignment
@@ -3628,9 +3628,9 @@
 }")
 
 (define_insn "clrstrdi_postreload"
-  [(set (mem:BLK (match_operand:DI 0 "register_operand" "r,r"))
+  [(set (mem:BLK (match_operand:DI 0 "register_operand" "+r,r"))
 	(const_int 0))
-   (clobber (match_operand:DI 1 "register_operand" "=r,r"))	;loop cnt/tmp
+   (clobber (match_operand:DI 1 "register_operand" "=&r,&r"))	;loop cnt/tmp
    (clobber (match_dup 0))
    (use (match_operand:DI 2 "arith_operand" "J,1"))	 ;byte count
    (use (match_operand:DI 3 "const_int_operand" "n,n"))  ;alignment
@@ -8858,8 +8858,7 @@ add,l %2,%3,%3\;bv,n %%r0(%3)"
 ;; Operand 0 contains the start address.
 ;; Operand 1 contains the end address.
 ;; Operand 2 contains the line length to use.
-;; Operand 3 contains the start address (clobbered).
-;; Operands 4 and 5 (icacheflush) are clobbered scratch registers.
+;; Operands 3 and 4 (icacheflush) are clobbered scratch registers.
 (define_insn "dcacheflush"
   [(const_int 1)
    (unspec_volatile [(mem:BLK (scratch))] 0)
@@ -8884,16 +8883,16 @@ add,l %2,%3,%3\;bv,n %%r0(%3)"
    (use (match_operand 0 "pmode_register_operand" "r"))
    (use (match_operand 1 "pmode_register_operand" "r"))
    (use (match_operand 2 "pmode_register_operand" "r"))
-   (clobber (match_scratch 3 "=&0"))
+   (clobber (match_operand 3 "pmode_register_operand" "=&r"))
    (clobber (match_operand 4 "pmode_register_operand" "=&r"))
-   (clobber (match_operand 5 "pmode_register_operand" "=&r"))]
+   (clobber (match_scratch 5 "=&0"))]
   ""
   "*
 {
   if (TARGET_64BIT)
-    return \"mfsp %%sr0,%5\;ldsid (%3),%4\;mtsp %4,%%sr0\;cmpb,*<<=,n %3,%1,.\;fic,m %2(%%sr0,%3)\;sync\;mtsp %5,%%sr0\;nop\;nop\;nop\;nop\;nop\;nop\";
+    return \"mfsp %%sr0,%4\;ldsid (%5),%3\;mtsp %3,%%sr0\;cmpb,*<<=,n %5,%1,.\;fic,m %2(%%sr0,%5)\;sync\;mtsp %4,%%sr0\;nop\;nop\;nop\;nop\;nop\;nop\";
   else
-    return \"mfsp %%sr0,%5\;ldsid (%3),%4\;mtsp %4,%%sr0\;cmpb,<<=,n %3,%1,.\;fic,m %2(%%sr0,%3)\;sync\;mtsp %5,%%sr0\;nop\;nop\;nop\;nop\;nop\;nop\";
+    return \"mfsp %%sr0,%4\;ldsid (%5),%3\;mtsp %3,%%sr0\;cmpb,<<=,n %5,%1,.\;fic,m %2(%%sr0,%5)\;sync\;mtsp %4,%%sr0\;nop\;nop\;nop\;nop\;nop\;nop\";
 }"
   [(set_attr "type" "multi")
    (set_attr "length" "52")])
