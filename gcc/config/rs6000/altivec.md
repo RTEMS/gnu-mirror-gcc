@@ -93,7 +93,9 @@
 (define_insn "*movv4si_internal"
   [(set (match_operand:V4SI 0 "nonimmediate_operand" "=m,v,v,o,r,r,v")
 	(match_operand:V4SI 1 "input_operand" "v,m,v,r,o,r,W"))]
-  "TARGET_ALTIVEC"
+  "TARGET_ALTIVEC 
+   && (register_operand (operands[0], V4SImode) 
+       || register_operand (operands[1], V4SImode))"
   "*
 {
   switch (which_alternative)
@@ -113,26 +115,10 @@
 (define_split
   [(set (match_operand:V4SI 0 "nonimmediate_operand" "")
         (match_operand:V4SI 1 "input_operand" ""))]
-  "TARGET_ALTIVEC && reload_completed && TARGET_POWERPC64 
+  "TARGET_ALTIVEC && reload_completed
    && gpr_or_gpr_p (operands[0], operands[1])"
-  [(set (match_dup 2) (match_dup 4))
-   (set (match_dup 3) (match_dup 5))]
-"{
-     rs6000_split_multireg_move (operands);
-}")
-
-(define_split
-  [(set (match_operand:V4SI 0 "nonimmediate_operand" "")
-        (match_operand:V4SI 1 "input_operand" ""))]
-  "TARGET_ALTIVEC && reload_completed && !TARGET_POWERPC64 
-   && gpr_or_gpr_p (operands[0], operands[1])"
-  [(set (match_dup 2) (match_dup 6))
-   (set (match_dup 3) (match_dup 7))
-   (set (match_dup 4) (match_dup 8))
-   (set (match_dup 5) (match_dup 9))]
-"{
-     rs6000_split_multireg_move (operands);
-}")
+  [(pc)]
+{ rs6000_split_multireg_move (operands[0], operands[1]); DONE; })
 
 (define_split
   [(set (match_operand:V4SI 0 "altivec_register_operand" "")
@@ -155,7 +141,9 @@
 (define_insn "*movv8hi_internal1"
   [(set (match_operand:V8HI 0 "nonimmediate_operand" "=m,v,v,o,r,r,v")
 	(match_operand:V8HI 1 "input_operand" "v,m,v,r,o,r,W"))]
-  "TARGET_ALTIVEC"
+  "TARGET_ALTIVEC 
+   && (register_operand (operands[0], V8HImode) 
+       || register_operand (operands[1], V8HImode))"
   "*
 {
    switch (which_alternative)
@@ -175,26 +163,10 @@
 (define_split
   [(set (match_operand:V8HI 0 "nonimmediate_operand" "")
         (match_operand:V8HI 1 "input_operand" ""))]
-  "TARGET_ALTIVEC && reload_completed && TARGET_POWERPC64 
+  "TARGET_ALTIVEC && reload_completed
    && gpr_or_gpr_p (operands[0], operands[1])"
-  [(set (match_dup 2) (match_dup 4))
-   (set (match_dup 3) (match_dup 5))]
-"{
-     rs6000_split_multireg_move (operands);
-}")
-
-(define_split
-  [(set (match_operand:V8HI 0 "nonimmediate_operand" "")
-        (match_operand:V8HI 1 "input_operand" ""))]
-  "TARGET_ALTIVEC && reload_completed && !TARGET_POWERPC64 
-   && gpr_or_gpr_p (operands[0], operands[1])"
-  [(set (match_dup 2) (match_dup 6))
-   (set (match_dup 3) (match_dup 7))
-   (set (match_dup 4) (match_dup 8))
-   (set (match_dup 5) (match_dup 9))]
-"{
-     rs6000_split_multireg_move (operands);
-}")
+  [(pc)]
+{ rs6000_split_multireg_move (operands[0], operands[1]); DONE; })
 
 (define_split
   [(set (match_operand:V8HI 0 "altivec_register_operand" "")
@@ -217,7 +189,9 @@
 (define_insn "*movv16qi_internal1"
   [(set (match_operand:V16QI 0 "nonimmediate_operand" "=m,v,v,o,r,r,v")
 	(match_operand:V16QI 1 "input_operand" "v,m,v,r,o,r,W"))]
-  "TARGET_ALTIVEC"
+  "TARGET_ALTIVEC
+   && (register_operand (operands[0], V16QImode)
+       || register_operand (operands[1], V16QImode))"
   "*
 {
   switch (which_alternative)
@@ -237,26 +211,10 @@
 (define_split
   [(set (match_operand:V16QI 0 "nonimmediate_operand" "")
         (match_operand:V16QI 1 "input_operand" ""))]
-  "TARGET_ALTIVEC && reload_completed && TARGET_POWERPC64 
+  "TARGET_ALTIVEC && reload_completed
    && gpr_or_gpr_p (operands[0], operands[1])"
-  [(set (match_dup 2) (match_dup 4))
-   (set (match_dup 3) (match_dup 5))]
-"{
-     rs6000_split_multireg_move (operands);
-}")
-
-(define_split
-  [(set (match_operand:V16QI 0 "nonimmediate_operand" "")
-        (match_operand:V16QI 1 "input_operand" ""))]
-  "TARGET_ALTIVEC && reload_completed && !TARGET_POWERPC64 
-   && gpr_or_gpr_p (operands[0], operands[1])"
-  [(set (match_dup 2) (match_dup 6))
-   (set (match_dup 3) (match_dup 7))
-   (set (match_dup 4) (match_dup 8))
-   (set (match_dup 5) (match_dup 9))]
-"{
-     rs6000_split_multireg_move (operands);
-}")
+  [(pc)]
+{ rs6000_split_multireg_move (operands[0], operands[1]); DONE; })
 
 (define_split
   [(set (match_operand:V16QI 0 "altivec_register_operand" "")
@@ -279,7 +237,9 @@
 (define_insn "*movv4sf_internal1"
   [(set (match_operand:V4SF 0 "nonimmediate_operand" "=m,v,v,o,r,r,v")
 	(match_operand:V4SF 1 "input_operand" "v,m,v,r,o,r,W"))]
-  "TARGET_ALTIVEC"
+  "TARGET_ALTIVEC
+   && (register_operand (operands[0], V4SFmode)
+       || register_operand (operands[1], V4SFmode))"
   "*
 {
   switch (which_alternative)
@@ -299,26 +259,10 @@
 (define_split
   [(set (match_operand:V4SF 0 "nonimmediate_operand" "")
         (match_operand:V4SF 1 "input_operand" ""))]
-  "TARGET_ALTIVEC && reload_completed && TARGET_POWERPC64 
+  "TARGET_ALTIVEC && reload_completed
    && gpr_or_gpr_p (operands[0], operands[1])"
-  [(set (match_dup 2) (match_dup 4))
-   (set (match_dup 3) (match_dup 5))]
-"{
-     rs6000_split_multireg_move (operands);
-}")
-
-(define_split
-  [(set (match_operand:V4SF 0 "nonimmediate_operand" "")
-        (match_operand:V4SF 1 "input_operand" ""))]
-  "TARGET_ALTIVEC && reload_completed && !TARGET_POWERPC64 
-   && gpr_or_gpr_p (operands[0], operands[1])"
-  [(set (match_dup 2) (match_dup 6))
-   (set (match_dup 3) (match_dup 7))
-   (set (match_dup 4) (match_dup 8))
-   (set (match_dup 5) (match_dup 9))]
-"{
-     rs6000_split_multireg_move (operands);
-}")
+  [(pc)]
+{ rs6000_split_multireg_move (operands[0], operands[1]); DONE; })
 
 (define_insn "get_vrsave_internal"
   [(set (match_operand:SI 0 "register_operand" "=r")
@@ -670,7 +614,7 @@
 		      (match_operand:V16QI 2 "register_operand" "v")
                       (match_operand:V4SI 3 "register_operand" "v")] 66))]
   "TARGET_ALTIVEC"
-  "vmsumubm %0,%1,%2,%3"
+  "vmsummbm %0,%1,%2,%3"
   [(set_attr "type" "veccomplex")])
 
 (define_insn "altivec_vmsumuhm"
