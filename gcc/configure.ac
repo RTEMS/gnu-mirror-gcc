@@ -171,10 +171,8 @@ AC_MSG_RESULT($generated_files_in_srcdir)
 
 if test "$generated_files_in_srcdir" = "yes"; then
   GENINSRC=''
-  docobjdir='$(srcdir)/doc'
 else
   GENINSRC='#'
-  docobjdir='$(objdir)/doc'
 fi
 AC_SUBST(GENINSRC)
 
@@ -323,7 +321,7 @@ AC_SUBST(warn_cflags)
 # Change the default to "no" on release branches.
 AC_ARG_ENABLE(werror, 
 [  --enable-werror         enable -Werror in bootstrap stage2 and later], [],
-[enable_werror=yes])
+[enable_werror=no])
 if test x$enable_werror = xyes ; then
   WERROR=-Werror
 fi
@@ -335,7 +333,7 @@ AC_ARG_ENABLE(checking,
 			  enable expensive run-time checks.  With LIST,
 			  enable only specific categories of checks.
 			  Categories are: misc,tree,rtl,rtlflag,gc,gcac,fold;
-			  default is misc,tree,gc,rtlflag],
+			  default is no checking],
 [ac_checking=
 ac_tree_checking=
 ac_rtl_checking=
@@ -367,8 +365,8 @@ no)	;;
 	;;
 esac
 ], 
-# Enable some checks by default for development versions of GCC
-[ac_checking=1; ac_tree_checking=1; ac_gc_checking=1; ac_rtlflag_checking=1;])
+# By default, disable all checks for release versions of GCC.
+[ac_checking=; ac_tree_checking=; ac_gc_checking=; ac_rtlflag_checking=;])
 nocommon_flag=""
 if test x$ac_checking != x ; then
   AC_DEFINE(ENABLE_CHECKING, 1,
@@ -2060,6 +2058,7 @@ foo:	.long	25
 	lda	$4,foo($29)			!tprel'
 	tls_first_major=2
 	tls_first_minor=13
+	tls_as_opt=--fatal-warnings
 	;;
   i[34567]86-*-*)
     conftest_s='
@@ -2079,6 +2078,7 @@ foo:	.long	25
 	leal	foo@NTPOFF(%ecx), %eax'
 	tls_first_major=2
 	tls_first_minor=14
+	tls_as_opt=--fatal-warnings
 	;;
   x86_64-*-*)
     conftest_s='
@@ -2093,6 +2093,7 @@ foo:	.long	25
 	movq	$foo@TPOFF, %rax'
 	tls_first_major=2
 	tls_first_minor=14
+	tls_as_opt=--fatal-warnings
 	;;
   ia64-*-*)
     conftest_s='
@@ -2110,6 +2111,7 @@ foo:	data8	25
 	movl	r24 = @tprel(foo#)'
 	tls_first_major=2
 	tls_first_minor=13
+	tls_as_opt=--fatal-warnings
 	;;
   powerpc-*-*)
     conftest_s='
@@ -2135,7 +2137,7 @@ x3:	.space 4
 	addi 9,9,x2@tprel@l'
 	tls_first_major=2
 	tls_first_minor=14
-	tls_as_opt=-a32
+	tls_as_opt="-a32 --fatal-warnings"
 	;;
   powerpc64-*-*)
     conftest_s='
@@ -2169,7 +2171,7 @@ x3:	.space 8
 	nop'
 	tls_first_major=2
 	tls_first_minor=14
-	tls_as_opt=-a64
+	tls_as_opt="-a64 --fatal-warnings"
 	;;
   s390-*-*)
     conftest_s='
@@ -2188,7 +2190,7 @@ foo:	.long	25
 	bas	%r14,0(%r1,%r13):tls_ldcall:foo'
 	tls_first_major=2
 	tls_first_minor=14
-	tls_as_opt=-m31
+	tls_as_opt="-m31 --fatal-warnings"
 	;;
   s390x-*-*)
     conftest_s='
@@ -2206,7 +2208,7 @@ foo:	.long	25
 	brasl	%r14,__tls_get_offset@PLT:tls_ldcall:foo'
 	tls_first_major=2
 	tls_first_minor=14
-	tls_as_opt="-m64 -Aesame"
+	tls_as_opt="-m64 -Aesame --fatal-warnings"
 	;;
   sh-*-* | sh[34]-*-*)
     conftest_s='
@@ -2220,9 +2222,44 @@ foo:	.long	25
 	.long	foo@TPOFF'
 	tls_first_major=2
 	tls_first_minor=13
+	tls_as_opt=--fatal-warnings
 	;;
   sparc*-*-*)
-    conftest_s='
+    case "$target" in
+      sparc*-sun-solaris2.*)
+	on_solaris=yes
+	;;
+      *)
+	on_solaris=no
+	;;
+    esac
+    if test x$on_solaris = xyes && test x$gas_flag = xno; then
+      conftest_s='
+	.section ".tdata",#alloc,#write,#tls
+foo:	.long	25
+	.text
+	sethi	%tgd_hi22(foo), %o0
+	add	%o0, %tgd_lo10(foo), %o1
+	add	%l7, %o1, %o0, %tgd_add(foo)
+	call	__tls_get_addr, %tgd_call(foo)
+	sethi	%tldm_hi22(foo), %l1
+	add	%l1, %tldm_lo10(foo), %l2
+	add	%l7, %l2, %o0, %tldm_add(foo)
+	call	__tls_get_addr, %tldm_call(foo)
+	sethi	%tldo_hix22(foo), %l3
+	xor	%l3, %tldo_lox10(foo), %l4
+	add	%o0, %l4, %l5, %tldo_add(foo)
+	sethi	%tie_hi22(foo), %o3
+	add	%o3, %tie_lo10(foo), %o3
+	ld	[%l7 + %o3], %o2, %tie_ld(foo)
+	add	%g7, %o2, %o4, %tie_add(foo)
+	sethi	%tle_hix22(foo), %l1
+	xor	%l1, %tle_lox10(foo), %o5
+	ld	[%g7 + %o5], %o1'
+	tls_first_major=0
+	tls_first_minor=0
+    else
+      conftest_s='
 	.section ".tdata","awT",@progbits
 foo:	.long	25
 	.text
@@ -2246,7 +2283,8 @@ foo:	.long	25
 	ld	[%g7 + %o5], %o1'
 	tls_first_major=2
 	tls_first_minor=14
-	tls_as_opt=-32
+	tls_as_opt="-32 --fatal-warnings"
+      fi
 	;;
 changequote([,])dnl
 esac
@@ -2254,8 +2292,7 @@ if test -z "$tls_first_major"; then
   : # If we don't have a check, assume no support.
 else
   gcc_GAS_CHECK_FEATURE(thread-local storage support, gcc_cv_as_tls,
-  [$tls_first_major,$tls_first_minor,0], [$tls_as_opt --fatal-warnings],
-  [$conftest_s],,
+  [$tls_first_major,$tls_first_minor,0], [$tls_as_opt], [$conftest_s],,
   [AC_DEFINE(HAVE_AS_TLS, 1,
 	    [Define if your assembler supports thread-local storage.])])
 fi
@@ -2858,7 +2895,7 @@ rm -f Make-hooks
 touch Make-hooks
 target_list="all.build all.cross start.encap rest.encap tags \
 	install-normal install-common install-man \
-	uninstall srcextra \
+	uninstall info man srcextra srcman srcinfo \
 	mostlyclean clean distclean maintainer-clean \
 	stage1 stage2 stage3 stage4 stageprofile stagefeedback"
 for t in $target_list
@@ -2951,7 +2988,6 @@ AC_SUBST(objdir)
 # Substitute configuration variables
 AC_SUBST(subdirs)
 AC_SUBST(srcdir)
-AC_SUBST(docobjdir)
 AC_SUBST(all_boot_languages)
 AC_SUBST(all_compilers)
 AC_SUBST(all_gtfiles)
@@ -3017,6 +3053,14 @@ AC_SUBST(cxx_target_objs)
 AC_SUBST(target_cpu_default)
 
 AC_SUBST_FILE(language_hooks)
+
+# If it doesn't already exist, create document directory
+echo "checking for the document directory." 1>&2
+if test -d doc ; then
+  true
+else
+  mkdir doc 
+fi
 
 # Echo link setup.
 if test x${build} = x${host} ; then

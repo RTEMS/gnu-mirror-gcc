@@ -2909,10 +2909,10 @@ push_template_decl_real (tree decl, int is_friend)
       else
 	tmpl = DECL_TI_TEMPLATE (decl);
       
-      if (is_member_template (tmpl)
-	  && DECL_FUNCTION_TEMPLATE_P (tmpl)
+      if (DECL_FUNCTION_TEMPLATE_P (tmpl)
 	  && DECL_TEMPLATE_INFO (decl) && DECL_TI_ARGS (decl) 
-	  && DECL_TEMPLATE_SPECIALIZATION (decl))
+	  && DECL_TEMPLATE_SPECIALIZATION (decl)
+	  && is_member_template (tmpl))
 	{
 	  tree new_tmpl;
 
@@ -4275,11 +4275,7 @@ lookup_template_class (tree d1,
 				   template,
 	                           complain, /*require_all_args=*/1);
 
-      if (arglist == error_mark_node
-	  || (!uses_template_parms (INNERMOST_TEMPLATE_ARGS (arglist))
-	      && check_instantiated_args (template,
-					  INNERMOST_TEMPLATE_ARGS (arglist),
-					  complain)))
+      if (arglist == error_mark_node)
 	/* We were unable to bind the arguments.  */
 	POP_TIMEVAR_AND_RETURN (TV_NAME_LOOKUP, error_mark_node);
 
@@ -4340,6 +4336,14 @@ lookup_template_class (tree d1,
 	 well.  */
       is_partial_instantiation = uses_template_parms (arglist);
 
+      /* If the deduced arguments are invalid, then the binding
+	 failed.  */
+      if (!is_partial_instantiation
+	  && check_instantiated_args (template,
+				      INNERMOST_TEMPLATE_ARGS (arglist),
+				      complain))
+	POP_TIMEVAR_AND_RETURN (TV_NAME_LOOKUP, error_mark_node);
+	
       if (!is_partial_instantiation 
 	  && !PRIMARY_TEMPLATE_P (template)
 	  && TREE_CODE (CP_DECL_CONTEXT (template)) == NAMESPACE_DECL)
@@ -4717,7 +4721,34 @@ for_each_template_parm (tree t, tree_fn_t fn, void* data, htab_t visited)
 int
 uses_template_parms (tree t)
 {
-  return for_each_template_parm (t, 0, 0, NULL);
+  bool dependent_p;
+  int saved_processing_template_decl;
+
+  saved_processing_template_decl = processing_template_decl;
+  if (!saved_processing_template_decl)
+    processing_template_decl = 1;
+  if (TYPE_P (t))
+    dependent_p = dependent_type_p (t);
+  else if (TREE_CODE (t) == TREE_VEC)
+    dependent_p = any_dependent_template_arguments_p (t);
+  else if (TREE_CODE (t) == TREE_LIST)
+    dependent_p = (uses_template_parms (TREE_VALUE (t))
+		   || uses_template_parms (TREE_CHAIN (t)));
+  else if (DECL_P (t) 
+	   || EXPR_P (t) 
+	   || TREE_CODE (t) == TEMPLATE_PARM_INDEX
+	   || TREE_CODE (t) == OVERLOAD
+	   || TREE_CODE (t) == BASELINK
+	   || TREE_CODE_CLASS (TREE_CODE (t)) == 'c')
+    dependent_p = (type_dependent_expression_p (t)
+		   || value_dependent_expression_p (t));
+  else if (t == error_mark_node)
+    dependent_p = false;
+  else 
+    abort ();
+  processing_template_decl = saved_processing_template_decl;
+
+  return dependent_p;
 }
 
 /* Returns true if T depends on any template parameter with level LEVEL.  */
@@ -5229,7 +5260,7 @@ instantiate_class_template (tree type)
      it now.  */
   push_deferring_access_checks (dk_no_deferred);
 
-  maybe_push_to_top_level (uses_template_parms (type));
+  push_to_top_level ();
 
   if (t)
     {
@@ -5370,7 +5401,9 @@ instantiate_class_template (tree type)
 	      tree newtag;
 
 	      newtag = tsubst (tag, args, tf_error, NULL_TREE);
-	      my_friendly_assert (newtag != error_mark_node, 20010206);
+	      if (newtag == error_mark_node)
+		continue;
+
 	      if (TREE_CODE (newtag) != ENUMERAL_TYPE)
 		{
 		  if (TYPE_LANG_SPECIFIC (tag) && CLASSTYPE_IS_TEMPLATE (tag))
@@ -5902,6 +5935,9 @@ tsubst_decl (tree t, tree args, tree type, tsubst_flags_t complain)
 	if (TREE_CODE (decl) == TYPE_DECL)
 	  {
 	    tree new_type = tsubst (TREE_TYPE (t), args, complain, in_decl);
+	    if (new_type == error_mark_node)
+	      return error_mark_node;
+
 	    TREE_TYPE (r) = new_type;
 	    CLASSTYPE_TI_TEMPLATE (new_type) = r;
 	    DECL_TEMPLATE_RESULT (r) = TYPE_MAIN_DECL (new_type);
@@ -7106,13 +7142,13 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 
     case TYPEOF_TYPE:
       {
-	tree e1 = tsubst_expr (TYPE_FIELDS (t), args, complain, in_decl);
-	if (e1 == error_mark_node)
-	  return error_mark_node;
+	tree type;
 
-	return cp_build_qualified_type_real (TREE_TYPE (e1),
+	type = finish_typeof (tsubst_expr (TYPE_FIELDS (t), args, complain, 
+					   in_decl));
+	return cp_build_qualified_type_real (type,
 					     cp_type_quals (t)
-					     | cp_type_quals (TREE_TYPE (e1)),
+					     | cp_type_quals (type),
 					     complain);
       }
 
@@ -8279,11 +8315,18 @@ tsubst_copy_and_build (tree t,
 	if (TREE_CODE (function) == OFFSET_REF)
 	  return build_offset_ref_call_from_tree (function, call_args);
 	if (TREE_CODE (function) == COMPONENT_REF)
-	  return (build_new_method_call 
-		  (TREE_OPERAND (function, 0),
-		   TREE_OPERAND (function, 1),
-		   call_args, NULL_TREE, 
-		   qualified_p ? LOOKUP_NONVIRTUAL : LOOKUP_NORMAL));
+	  {
+	    if (!BASELINK_P (TREE_OPERAND (function, 1)))
+	      return finish_call_expr (function, call_args,
+				       /*disallow_virtual=*/false,
+				       /*koenig_p=*/false);
+	    else
+	      return (build_new_method_call 
+		      (TREE_OPERAND (function, 0),
+		       TREE_OPERAND (function, 1),
+		       call_args, NULL_TREE, 
+		       qualified_p ? LOOKUP_NONVIRTUAL : LOOKUP_NORMAL));
+	  }
 	return finish_call_expr (function, call_args, 
 				 /*disallow_virtual=*/qualified_p,
 				 koenig_p);
@@ -8940,17 +8983,14 @@ type_unification_real (tree tparms,
 	 corresponds with a function parameter that contains only
 	 non-deducible template parameters and explicitly specified
 	 template parameters.  */
-      if (! uses_template_parms (parm))
+      if (!uses_template_parms (parm))
 	{
 	  tree type;
 
 	  if (!TYPE_P (arg))
 	    type = TREE_TYPE (arg);
 	  else
-	    {
-	      type = arg;
-	      arg = NULL_TREE;
-	    }
+	    type = arg;
 
 	  if (strict == DEDUCE_EXACT || strict == DEDUCE_ORDER)
 	    {
@@ -11755,11 +11795,16 @@ type_dependent_expression_p (tree expression)
 	  (INNERMOST_TEMPLATE_ARGS (DECL_TI_ARGS (expression)))))
     return true;
 
+  if (TREE_CODE (expression) == TEMPLATE_DECL
+      && !DECL_TEMPLATE_TEMPLATE_PARM_P (expression))
+    return false;
+
   if (TREE_TYPE (expression) == unknown_type_node)
     {
       if (TREE_CODE (expression) == ADDR_EXPR)
 	return type_dependent_expression_p (TREE_OPERAND (expression, 0));
-      if (TREE_CODE (expression) == COMPONENT_REF)
+      if (TREE_CODE (expression) == COMPONENT_REF
+	  || TREE_CODE (expression) == OFFSET_REF)
 	{
 	  if (type_dependent_expression_p (TREE_OPERAND (expression, 0)))
 	    return true;
@@ -11835,13 +11880,18 @@ bool
 any_dependent_template_arguments_p (tree args)
 {
   int i;
-  
+  int j;
+
   if (!args)
     return false;
 
-  for (i = 0; i < TREE_VEC_LENGTH (args); ++i)
-    if (dependent_template_arg_p (TREE_VEC_ELT (args, i)))
-      return true;
+  for (i = 0; i < TMPL_ARGS_DEPTH (args); ++i)
+    {
+      tree level = TMPL_ARGS_LEVEL (args, i + 1);
+      for (j = 0; j < TREE_VEC_LENGTH (level); ++j)
+	if (dependent_template_arg_p (TREE_VEC_ELT (level, j)))
+	  return true;
+    }
 
   return false;
 }
@@ -11980,6 +12030,10 @@ build_non_dependent_expr (tree expr)
      "char *" are allowed, even though normally a "const char *"
      cannot be used to initialize a "char *".  */
   if (TREE_CODE (expr) == STRING_CST)
+    return expr;
+  /* Preserve arithmetic constants, as an optimization -- there is no
+     reason to create a new node.  */
+  if (TREE_CODE (expr) == INTEGER_CST || TREE_CODE (expr) == REAL_CST)
     return expr;
 
   if (TREE_CODE (expr) == COND_EXPR)

@@ -5259,6 +5259,11 @@ s390_return_addr_rtx (int count, rtx frame)
 {
   rtx addr;
 
+  /* Without backchain, we fail for all but the current frame.  */
+
+  if (!TARGET_BACKCHAIN && count > 0)
+    return NULL_RTX;
+
   /* For the current frame, we need to make sure the initial
      value of RETURN_REGNUM is actually saved.  */
 
@@ -5295,7 +5300,7 @@ s390_frame_info (void)
   int i, j;
   HOST_WIDE_INT fsize = get_frame_size ();
 
-  if (fsize > 0x7fff0000)
+  if (!TARGET_64BIT && fsize > 0x7fff0000)
     fatal_error ("Total size of local variables exceeds architecture limit.");
 
   /* fprs 8 - 15 are caller saved for 64 Bit ABI.  */
@@ -5368,7 +5373,7 @@ s390_frame_info (void)
 /* Return offset between argument pointer and frame pointer
    initially after prologue.  */
 
-int
+HOST_WIDE_INT
 s390_arg_frame_offset (void)
 {
   HOST_WIDE_INT fsize = get_frame_size ();

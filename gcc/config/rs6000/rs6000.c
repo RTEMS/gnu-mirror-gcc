@@ -230,7 +230,7 @@ int toc_initialized;
 char toc_label_name[10];
 
 /* Alias set for saves and restores from the rs6000 stack.  */
-static int rs6000_sr_alias_set;
+static GTY(()) int rs6000_sr_alias_set;
 
 /* Call distance, overridden by -mlongcall and #pragma longcall(1).
    The only place that looks at this is rs6000_set_default_type_attributes;
@@ -2317,6 +2317,26 @@ input_operand (rtx op, enum machine_mode mode)
   return 0;
 }
 
+
+/* Darwin, AIX increases natural record alignment to doubleword if the first
+   field is an FP double while the FP fields remain word aligned.  */
+
+unsigned int
+rs6000_special_round_type_align (tree type, int computed, int specified)
+{
+  tree field = TYPE_FIELDS (type);
+
+  /* Skip all the static variables only if ABI is greater than
+     1 or equal to 0.   */
+  while (field != NULL && TREE_CODE (field) == VAR_DECL)
+    field = TREE_CHAIN (field);
+
+  if (field == NULL || field == type || DECL_MODE (field) != DFmode)
+    return MAX (computed, specified);
+
+  return MAX (MAX (computed, specified), 64);
+}
+
 /* Return 1 for an operand in small memory on V.4/eabi.  */
 
 int
@@ -3921,10 +3941,12 @@ function_arg_advance (CUMULATIVE_ARGS *cum, enum machine_mode mode,
       if (USE_ALTIVEC_FOR_ARG_P (cum, mode, type, named))
 	cum->vregno++;
       
-      /* In variable-argument functions, vector arguments get GPRs allocated
-	 even if they are going to be passed in a vector register.  */
-      if (cum->stdarg && DEFAULT_ABI != ABI_V4)
-	{
+      /* PowerPC64 Linux and AIX allocates GPRs for a vector argument
+	 even if it is going to be passed in a vector register.  
+	 Darwin does the same for variable-argument functions.  */
+      if ((DEFAULT_ABI == ABI_AIX && TARGET_64BIT)
+		   || (cum->stdarg && DEFAULT_ABI != ABI_V4))
+        {
 	  int align;
 	  
 	  /* Vector parameters must be 16-byte aligned.  This places
@@ -4228,7 +4250,32 @@ function_arg (CUMULATIVE_ARGS *cum, enum machine_mode mode,
     }
 
   if (USE_ALTIVEC_FOR_ARG_P (cum, mode, type, named))
-    return gen_rtx_REG (mode, cum->vregno);
+    if (TARGET_64BIT && ! cum->prototype)
+      {
+       /* Vector parameters get passed in vector register
+          and also in GPRs or memory, in absence of prototype.  */
+       int align_words;
+       rtx slot;
+       align_words = (cum->words + 1) & ~1;
+
+       if (align_words >= GP_ARG_NUM_REG)
+         {
+           slot = NULL_RTX;
+         }
+       else
+         {
+           slot = gen_rtx_REG (mode, GP_ARG_MIN_REG + align_words);
+         }
+       return gen_rtx_PARALLEL (mode,
+                gen_rtvec (2,
+                           gen_rtx_EXPR_LIST (VOIDmode,
+                                              slot, const0_rtx),
+                           gen_rtx_EXPR_LIST (VOIDmode,
+                                              gen_rtx_REG (mode, cum->vregno),
+                                              const0_rtx)));
+      }
+    else
+      return gen_rtx_REG (mode, cum->vregno);
   else if (TARGET_ALTIVEC_ABI && ALTIVEC_VECTOR_MODE (mode))
     {
       if (named || abi == ABI_V4)
@@ -11106,13 +11153,14 @@ rs6000_emit_eh_reg_restore (rtx source, rtx scratch)
     emit_move_insn (gen_rtx_REG (Pmode, LINK_REGISTER_REGNUM), operands[0]);
 }
 
+static GTY(()) int set = -1;
+
 int   
 get_TOC_alias_set (void)
 {
-    static int set = -1;
-    if (set == -1)
-      set = new_alias_set ();
-    return set;
+  if (set == -1)
+    set = new_alias_set ();
+  return set;
 }   
 
 /* This returns nonzero if the current function uses the TOC.  This is

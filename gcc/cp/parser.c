@@ -3761,12 +3761,18 @@ cp_parser_postfix_expression (cp_parser *parser, bool address_p)
 		      = build_min_nt (CALL_EXPR, postfix_expression, args);
 		    break;
 		  }
-		  
-		postfix_expression
-		  = (build_new_method_call 
-		     (instance, fn, args, NULL_TREE, 
-		      (idk == CP_ID_KIND_QUALIFIED 
-		       ? LOOKUP_NONVIRTUAL : LOOKUP_NORMAL)));
+
+		if (BASELINK_P (fn))
+		  postfix_expression
+		    = (build_new_method_call 
+		       (instance, fn, args, NULL_TREE, 
+			(idk == CP_ID_KIND_QUALIFIED 
+			 ? LOOKUP_NONVIRTUAL : LOOKUP_NORMAL)));
+		else
+		  postfix_expression
+		    = finish_call_expr (postfix_expression, args,
+					/*disallow_virtual=*/false,
+					/*koenig_p=*/false);
 	      }
 	    else if (TREE_CODE (postfix_expression) == OFFSET_REF
 		     || TREE_CODE (postfix_expression) == MEMBER_REF
@@ -3843,6 +3849,11 @@ cp_parser_postfix_expression (cp_parser *parser, bool address_p)
 		   being dependent.  */
 		if (!scope)
 		  scope = error_mark_node;
+		/* If the SCOPE was erroneous, make the various
+		   semantic analysis functions exit quickly -- and
+		   without issuing additional error messages.  */
+		if (scope == error_mark_node)
+		  postfix_expression = error_mark_node;
 	      }
 
 	    /* Consume the `.' or `->' operator.  */
@@ -7697,13 +7708,19 @@ cp_parser_type_parameter (cp_parser* parser)
 					 /*check_dependency_p=*/true,
 					 /*template_p=*/&is_template,
 					 /*declarator_p=*/false);
-	    /* Look up the name.  */
-	    default_argument 
-	      = cp_parser_lookup_name (parser, default_argument,
-				       /*is_type=*/false,
-				       /*is_template=*/is_template,
-				       /*is_namespace=*/false,
-				       /*check_dependency=*/true);
+	    if (TREE_CODE (default_argument) == TYPE_DECL)
+	      /* If the id-expression was a template-id that refers to
+		 a template-class, we already have the declaration here,
+		 so no further lookup is needed.  */
+		 ;
+	    else
+	      /* Look up the name.  */
+	      default_argument 
+		= cp_parser_lookup_name (parser, default_argument,
+					/*is_type=*/false,
+					/*is_template=*/is_template,
+					/*is_namespace=*/false,
+					/*check_dependency=*/true);
 	    /* See if the default argument is valid.  */
 	    default_argument
 	      = check_template_template_default_arg (default_argument);
@@ -11688,8 +11705,12 @@ cp_parser_class_specifier (cp_parser* parser)
 	  /* Figure out which function we need to process.  */
 	  fn = TREE_VALUE (queue_entry);
 
+	  /* A hack to prevent garbage collection.  */
+	  function_depth++;
+
 	  /* Parse the function.  */
 	  cp_parser_late_parsing_for_member (parser, fn);
+	  function_depth--;
 	}
 
     }

@@ -1157,8 +1157,7 @@ extern int sparc_mode_class[];
 #define RETURN_IN_MEMORY(TYPE)				\
 (TARGET_ARCH32						\
  ? (TYPE_MODE (TYPE) == BLKmode				\
-    || TYPE_MODE (TYPE) == TFmode			\
-    || TYPE_MODE (TYPE) == TCmode)			\
+    || TYPE_MODE (TYPE) == TFmode)			\
  : (TYPE_MODE (TYPE) == BLKmode				\
     && (unsigned HOST_WIDE_INT) int_size_in_bytes (TYPE) > 32))
 
@@ -1263,6 +1262,20 @@ enum reg_class { NO_REGS, FPCC_REGS, I64_REGS, GENERAL_REGS, FP_REGS,
    {-1, -1, 0, 0x20},	/* GENERAL_OR_FP_REGS */	\
    {-1, -1, -1, 0x20},	/* GENERAL_OR_EXTRA_FP_REGS */	\
    {-1, -1, -1, 0x3f}}	/* ALL_REGS */
+
+/* Defines invalid mode changes.  Borrowed from pa64-regs.h.
+
+   SImode loads to floating-point registers are not zero-extended.
+   The definition for LOAD_EXTEND_OP specifies that integer loads
+   narrower than BITS_PER_WORD will be zero-extended.  As a result,
+   we inhibit changes from SImode unless they are to a mode that is
+   identical in size.  */
+
+#define CANNOT_CHANGE_MODE_CLASS(FROM, TO, CLASS)		\
+  (TARGET_ARCH64						\
+   && (FROM) == SImode						\
+   && GET_MODE_SIZE (FROM) != GET_MODE_SIZE (TO)		\
+   ? reg_classes_intersect_p (CLASS, FP_REGS) : 0)
 
 /* The same information, inverted:
    Return the class number of the smallest class containing
@@ -1657,13 +1670,13 @@ extern char leaf_reg_remap[];
 #define BASE_RETURN_VALUE_REG(MODE)					\
   (TARGET_ARCH64							\
    ? (TARGET_FPU && FLOAT_MODE_P (MODE) ? 32 : 8)			\
-   : (((MODE) == SFmode || (MODE) == DFmode) && TARGET_FPU ? 32 : 8))
+   : (TARGET_FPU && FLOAT_MODE_P (MODE) && (MODE) != TFmode ? 32 : 8))
 
 #define BASE_OUTGOING_VALUE_REG(MODE)				\
   (TARGET_ARCH64						\
    ? (TARGET_FPU && FLOAT_MODE_P (MODE) ? 32			\
       : TARGET_FLAT ? 8 : 24)					\
-   : (((MODE) == SFmode || (MODE) == DFmode) && TARGET_FPU ? 32	\
+   : (TARGET_FPU && FLOAT_MODE_P (MODE) && (MODE) != TFmode ? 32\
       : (TARGET_FLAT ? 8 : 24)))
 
 #define BASE_PASSING_ARG_REG(MODE)				\

@@ -1,6 +1,6 @@
 /* Handle initialization things in C++.
    Copyright (C) 1987, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -1251,8 +1251,8 @@ expand_default_init (tree binfo, tree true_exp, tree exp, tree init, int flags)
    from TRUE_EXP.  In constructors, we don't know anything about
    the value being initialized.
 
-   FLAGS is just passes to `build_method_call'.  See that function for
-   its description.  */
+   FLAGS is just passed to `build_new_method_call'.  See that function
+   for its description.  */
 
 static void
 expand_aggr_init_1 (tree binfo, tree true_exp, tree exp, tree init, int flags)
@@ -1610,8 +1610,12 @@ decl_constant_value (tree decl)
 		      TREE_OPERAND (decl, 0), d1, d2);
     }
 
-  if (TREE_READONLY_DECL_P (decl)
-      && ! TREE_THIS_VOLATILE (decl)
+  if (DECL_P (decl)
+      && (/* Enumeration constants are constant.  */
+	  TREE_CODE (decl) == CONST_DECL
+	  /* And so are variables with a 'const' type -- unless they
+	     are also 'volatile'.  */
+	  || CP_TYPE_CONST_NON_VOLATILE_P (TREE_TYPE (decl)))
       && DECL_INITIAL (decl)
       && DECL_INITIAL (decl) != error_mark_node
       /* This is invalid if initial value is not constant.
@@ -2031,6 +2035,7 @@ build_new_1 (tree exp)
   else
     {
       tree fnname;
+      tree fns;
 
       fnname = ansi_opname (code);
 
@@ -2049,11 +2054,18 @@ build_new_1 (tree exp)
 	    }
 	  /* Create the argument list.  */
 	  args = tree_cons (NULL_TREE, size, placement);
-	  /* Call the function.  */
-	  alloc_call = build_method_call (build_dummy_object (true_type),
-					  fnname, args, 
-					  TYPE_BINFO (true_type),
-					  LOOKUP_NORMAL);
+	  /* Do name-lookup to find the appropriate operator.  */
+	  fns = lookup_fnfields (true_type, fnname, /*protect=*/2);
+	  if (TREE_CODE (fns) == TREE_LIST)
+	    {
+	      error ("request for member `%D' is ambiguous", fnname);
+	      print_candidates (fns);
+	      return error_mark_node;
+	    }
+	  alloc_call = build_new_method_call (build_dummy_object (true_type),
+					      fns, args,
+					      /*conversion_path=*/NULL_TREE,
+					      LOOKUP_NORMAL);
 	}
       else
 	{
