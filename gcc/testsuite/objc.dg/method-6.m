@@ -19,10 +19,10 @@ void foo(void) {
   Class receiver;
 
   [receiver port];  /* { dg-warning "multiple methods named .\\+port. found" } */
-       /* { dg-warning "using .\\-\\(unsigned\\)port." "" { target *-*-* } 9 } */
+       /* { dg-warning "using .\\-\\(unsigned( int)?\\)port." "" { target *-*-* } 9 } */
        /* { dg-warning "also found .\\+\\(Protocol \\*\\)port." "" { target *-*-* } 14 } */
 
-  [receiver starboard];  /* { dg-warning ".Class. may not respond to .\\+starboard." } */
+  [receiver starboard];  /* { dg-warning "no .\\+starboard. method found" } */
        /* { dg-warning "Messages without a matching method signature" "" { target *-*-* } 25 } */
        /* { dg-warning "will be assumed to return .id. and accept" "" { target *-*-* } 25 } */
        /* { dg-warning ".\.\.\.. as arguments" "" { target *-*-* } 25 } */
