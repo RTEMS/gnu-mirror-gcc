@@ -1,3 +1,307 @@
+2003-01-28  Nathan Sidwell  <nathan@codesourcery.com>
+
+	PR c++/9433
+	* libsupc++/tinfo.cc (__vmi_class_type_info::__do_dyncast): Cope
+	with bases which are very ambiguous.
+
+2003-01-28  Danny Smith  <dannysmith@users.sourceforge.net>
+
+	* src/Makefile.am (CONFIG_CXXFLAGS): Reverse order of
+	@EXTRA_CXX_FLAGS@ @SECTION_FLAGS@.
+	* libsupc++/Makefile.am (CONFIG_CXXFLAGS): Likewise.
+	* src/Makefile.in: Regenerate.
+	* libsupc++/Makefile.in: Regenerate.
+
+2003-01-27  Alexandre Oliva  <aoliva@redhat.com>
+
+	* acinclude.m4 (glibcpp_toolexeclibdir): Instead of
+	$(MULTISUBDIR), use `$CC -print-multi-os-directory`, unless
+	version_specific_libs is enabled.
+	* aclocal.m4, configure: Rebuilt.
+
+2003-01-26  Christian Cornelssen  <ccorn@cs.tu-berlin.de>
+
+	* include/Makefile.am (install-data-local): Prepend
+	$(DESTDIR) to destination paths in all (un)installation
+	commands.  Use ${c_base_builddir} and ${std_builddir}
+	as destination subdirectories to achieve consistency with
+	preceding mkinstalldirs commands.  No effect because both
+	variables contain "." only.
+	* include/Makefile.in: Regenerate.
+
+2003-01-23  Phil Edwards  <pme@gcc.gnu.org>
+
+	Bulk documentation merge (copy) from trunk.
+	* docs/doxygen/tables.html, docs/doxygen/user.cfg.in,
+	docs/html/configopts.html, docs/html/debug.html,
+	docs/html/documentation.html, docs/html/17_intro/howto.html,
+	docs/html/19_diagnostics/howto.html, docs/html/ext/sgiexts.html:
+	Merge from trunk.
+
+2003-01-23  Petur Runolfsson  <peturr02@ru.is>
+
+	PR libstdc++/9322
+	* include/std/std_streambuf.h
+	(basic_streambuf::basic_streambuf,
+	basic_streambuf::~basic_streambuf,
+	basic_streambuf::getloc, basic_streambuf::imbue):
+	Remove _M_buf_locale_init use.
+	* include/bits/fstream.tcc (basic_filebuf::imbue):  Likewise
+	* testsuite/27_io/filebuf_virtuals.cc (test08):  Add.
+	* testsuite/27_io/streambuf_members.cc (test08):  Add.
+	* testsuite/27_io/stringbuf_virtuals.cc (test08):  Add.
+
+2003-01-23  Benjamin Kosnik  <bkoz@redhat.com>
+
+	Revert include ordering.
+	* config/locale/generic/c_locale.h: Add include guards.
+	* config/locale/gnu/c_locale.h: Same.
+	* include/bits/locale_classes.h: Remove cctype include.
+	* include/std/std_iosfwd.h: Add c++locale.h, cctype includes.
+	* include/std/std_fstream.h: Remove streambuf include.
+	* include/std/std_sstream.h: Remove streambuf include.
+
+2003-01-23  Benjamin Kosnik  <bkoz@redhat.com>
+
+	Match 3.2.0 ABI.
+	* include/bits/stl_alloc.h: Revert.
+
+	* include/bits/codecvt.h: Revert.
+	* config/locale/gnu/codecvt_members.cc: Revert.
+	* src/codecvt.cc: Revert.
+	* src/localename.cc: Revert.
+
+	* include/bits/ios_base.h (ios_base::~ios_base): Revert.
+
+	* config/linker-map.gnu: Mostly match 3_2-branch file.
+	
+2003-01-22  Benjamin Kosnik  <bkoz@redhat.com>
+
+	* include/bits/locale_facets.h: Move non-facet classes requiring
+	<string> to...  
+	* include/bits/locale_classes.h: New.  
+	* include/bits/Makefile.am (bits_headers_src): Add locale_classes.h.
+	* include/bits/Makefile.in: Regenerate.
+
+	* include/bits/locale_facets.tcc (__convert_from_v): Move to...
+	* config/locale/gnu/c_locale.h: ...here.
+	* config/locale/generic/c_locale.h: Same.
+	
+	* include/bits/locale_facets.tcc: Move declarations to...
+	* include/bits/locale_facets.h: ...here.
+	* include/bits/basic_ios.h: Tweak includes accordingly.
+	* include/std/std_sstream.h: Add streambuf include.
+	* include/std/std_fstream.h: Ditto.
+	* include/std/std_locale.h: Add locale_classes.h include.
+	* include/std/std_iosfwd.h: Tweak.
+	* src/concept-inst.cc: Add iterator include.
+
+	* config/linker-map.gnu: Specify __cxa functions, mark __cxa_dyn_*
+	bits as unexported in the future.
+
+2003-01-15  Benjamin Kosnik  <bkoz@redhat.com>
+
+	* acinclude.m4 (GLIBCPP_CHECK_WCHAR_T_SUPPORT): Substitute
+	GLIBCPP_TEST_WCHAR_T if building wchar_t bits in the library.
+	* aclocal.m4: Regenerate.
+	* configure: Regenerate.
+	* testsuite/Makefile.am (all-local): Add conditional rule to
+	generate testsuite_wchar_t.
+	* testsuite/Makefile.in: Regenerate.
+	* testsuite/lib/libstdc++-v3-dg.exp
+	(libstdc++-v3-list-sourcefiles): Remove wchar_t files if
+	testsuite_wchar_t is not present in the build directory.
+	* testsuite/libstdc++-v3.dg/dg.exp: Add -g -O2 to DEFAULT_CXXFLAGS.
+	Remove setulimit bits.
+	* testsuite/26_numerics/complex_value.cc: Set to noopts.
+	* testsuite/Makefile.am (CLEANFILES): Add.
+	* testsuite/Makefile.in: Regenerate.	
+
+2003-01-15  Benjamin Kosnik  <bkoz@redhat.com>
+
+	Renames, namespaces for testsuite utilities.	
+	* testsuite/testsuite_hooks.h: Put into namespace __gnu_cxx_test.
+	(gnu_allocator_tracker): Rename to allocation_tracker.
+	(gnu_new_allocator): Rename to tracker_alloc.
+	(__set_testsuite_memlimit): Rename to set_memory_limits.
+	(gnu_assignment_operator): Rename to assignment_operator.
+	(gnu_destructor): Rename to destructor.
+	(gnu_copy_tracker): Rename to copy_tracker.
+	(gnu_char, gnu_int, gnu_long): Rename to pod_char, pod_int, pod_long.
+	(run_tests_wrapped_locale): New.
+	(run_tests_wrapped_env): New.
+	* testsuite/testsuite_hooks.cc: Same.
+	(class locale_data): Add.
+	(class enviornment_variable): Add.
+	(class not_found): Add.
+	* testsuite/testsuite_allocator.h: Same.
+	* testsuite/testsuite_allocator.cc: Same.
+	* testsuite/23_containers/deque_ctor.cc
+	(test_copy_ctor_exception_safety): Change gnu_allocator_tracker to
+	allocation_tracker. 
+	Change gnu_new_allocator to tracker_alloc.
+	Change gnu_counting_struct to counter.
+	Change gnu_copy_tracker to copy_tracker.
+	Change gnu_copy_constructor to copy_constructor.
+	Change gnu_assignment_operator to assignment_operator.	
+	Inject.
+	* testsuite/23_containers/vector_capacity.cc: Same.
+	* testsuite/23_containers/vector_ctor.cc (test01): Same.
+	* testsuite/23_containers/list_modifiers.cc: Change
+	gnu_copy_tracker to copy_tracker.
+	* testsuite/21_strings/ctor_copy_dtor.cc (main): Change
+	__set_testsuite_memlimit to set_memory_limits.
+	* testsuite/21_strings/insert.cc (main): Same.
+	* testsuite/27_io/filebuf.cc: Change gnu_char to pod_char.
+	* testsuite/27_io/stringstream.cc: Same.
+	* testsuite/27_io/stringbuf.cc: Same.
+	* testsuite/27_io/streambuf.cc: Same.
+	* testsuite/27_io/ostream.cc: Same.
+	* testsuite/27_io/istream.cc: Same.
+	* testsuite/27_io/fstream.cc: Same.
+	* testsuite/lib/libstdc++-v3-dg.exp
+	(libstdc++-v3-list-sourcefiles): Additionally handle files two and
+	three levels deeper in glob patterns.
+
+2003-01-15  John David Anglin  <dave@hiauly1.hia.nrc.ca>
+
+	* config/os/hpux/os_defines.h (_GLIBCPP_GTHREAD_USE_WEAK): Define for
+	__hppa__.
+
+2003-01-10  Benjamin Kosnik  <bkoz@redhat.com>
+	    Sysoltsev Slawa  <Vyatcheslav.Sysoltsev@intel.com>
+
+	PR libstdc++/9269
+	* include/std/std_fstream.h (basic_filebuf::uflow): Declare.
+	(basic_filebuf::underflow): Declare.
+	Move definitions.
+
+2003-01-07  Benjamin Kosnik  <bkoz@redhat.com>
+
+	PR libstdc++/8707
+	* Makefile.am (distclean-multi): Fix.
+	* Makefile.in: Regenerate.
+
+2003-01-06  Benjamin Kosnik  <bkoz@redhat.com>
+
+	* include/bits/locale_facets.h (messages): Move ctor, dtor
+	definitions to..
+	(__timepunct): Same.
+	* config/locale/gnu/messages_members.h (messages): Add dtor, ctor
+	definitions. Conditionalize for GNU systems.
+	* config/locale/generic/messages_members.h (messages): Add dtor, ctor
+	definitions.
+	* config/locale/gnu/time_members.h (messages): New. Add dtor, ctor
+	definitions. Conditionalize for GNU systems.
+	* config/locale/generic/time_members.h (messages): New. Add dtor, ctor
+	definitions.
+	* include/bits/localefwd.h (locale::facet::_S_c_name): Add.
+	* src/locale.cc: Define.
+	* src/localename.cc (locale::_Impl::_Impl(facet**, size_t, bool):
+	Use it.
+	* config/locale/gnu/time_members.h: Use it.
+	* config/locale/gnu/messages_members.h: Use it.
+	* config/linker-map.gnu: Add locale::facets details.	
+	* include/Makefile.am (target_headers_extra): Add time_members.h.
+	* include/Makefile.in: Regenerate.
+	* acinclude.m4: Export CTIME_H.
+	* aclocal.m4: Regenerate.
+	* configure: Regnerate.
+
+2003-01-06  Paolo Carlini  <pcarlini@unitus.it>
+
+	* src/codecvt.cc
+        (codecvt<char, char, mbstate_t>::do_in, do_out):
+        Tweak parameters to avoid unused parameter warnings.
+
+2003-01-06  Paolo Carlini  <pcarlini@unitus.it>
+
+	PR libstdc++/9151
+	* include/bits/locale_facets.cc (num_put::_M_convert_float):
+	Limit __prec to digits10 + 2, not digits10 + 1, taking into
+	account the possibility of %{g,G} conversion specifiers
+	inside _S_format_float.
+	* testsuite/27_io/ostream_inserter_arith.cc (test06): Add.
+
+2003-01-06  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
+
+	* testsuite/lib/libstdc++-v3-dg.exp (libstdc++-v3-init,
+	libstdc++-v3-list-sourcefiles): Additionally handle files one
+	level deeper in glob patterns.
+	
+	* testsuite/27_io/istream_extractor_arith.cc: Delete, split...
+	* testsuite/27_io/istream_extractor_arith/01.cc,
+	testsuite/27_io/istream_extractor_arith/02.cc,
+	testsuite/27_io/istream_extractor_arith/03.cc,
+	testsuite/27_io/istream_extractor_arith/06.cc,
+	testsuite/27_io/istream_extractor_arith/07.cc,
+	testsuite/27_io/istream_extractor_arith/08.cc,
+	testsuite/27_io/istream_extractor_arith/09.cc,
+	testsuite/27_io/istream_extractor_arith/10.cc,
+	testsuite/27_io/istream_extractor_arith/11.cc,
+	testsuite/27_io/istream_extractor_arith/12.cc,
+	testsuite/27_io/istream_extractor_arith/13.cc: ... to new files.
+	* testsuite/27_io/istream_extractor_arith/12.cc: Add XFAIL for
+	sparc*-*-solaris2*.
+
+2003-01-05  Paolo Carlini <pcarlini@unitus.it>
+
+	PR libstdc++/9168
+	* src/codecvt.cc
+	(codecvt<char, char, mbstate_t>::do_in, do_out):
+	Implement the resolution of DR19 (TC).
+	* testsuite/22_locale/codecvt_members_char_char.cc
+	(test01): Tweak.
+
+2002-12-29  Phil Edwards  <pme@gcc.gnu.org>
+
+	* include/std/std_bitset.h:  Better comments.
+
+2002-12-29  Phil Edwards  <pme@gcc.gnu.org>
+
+	* include/std/std_bitset.h (_Base_bitset::_M_do_left_shift,
+	_Base_bitset::_M_do_right_shift): Expect a non-zero shift.
+	(bitset::operator<<=, bitset::operator>>=):  When shifting more bits
+	than are in the bitset, zero memory rather than segfault.
+	(operator>>(basic_istream,bitset):  Only call setstate once, after
+	all work has been done.
+
+	* testsuite/23_containers/bitset_members.cc (test03):  New test.
+	* testsuite/23_containers/bitset_shift.cc (test02):  New test.
+
+2002-12-28  Joseph S. Myers  <jsm@polyomino.org.uk>
+
+	* docs/html/17_intro/porting.texi: Use @copying.
+	* docs/html/17_intro/porting.html: Regenerate.
+
+2002-12-23  Danny Smith  <dannysmith@users.sourceforge.net>
+
+	* config/io/basic_file_stdio.cc (__basic_file::_M_open_mode):
+	Don't use O_NONBLOCK if it is not defined.
+	(__basic_file::open): Don't use fcntl either.
+
+2002-12-19  Paolo Carlini  <pcarlini@unitus.it>
+
+	PR libstdc++/8949
+	* include/std/std_limits.h
+	(struct numeric_limits<short>,
+	struct numeric_limits<unsigned short>,
+	struct numeric_limits<int>,
+	struct numeric_limits<unsigned int>,
+	struct numeric_limits<long>,
+	struct numeric_limits<unsigned long>,
+	struct numeric_limits<long long>,
+	struct numeric_limits<unsigned long long>): According
+	to 18.2.1.2,53 and 18.2.1.5,1 is_iec559 shall be false.
+	* testsuite/18_support/numeric_limits.cc: Add test04.
+
+2002-12-18  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
+
+	* testsuite/23_containers/vector_capacity.cc (test03): Move ...
+	* testsuite/23_containers/vector_resize.cc: ...here as a new file.
+	Pass in -lmalloc for irix6.
+	* testsuite/27_io/ios_base_storage.cc: Pass in -lmalloc for irix6.
+
 2002-12-11  Paolo Carlini  <pcarlini@unitus.it>
 
 	PR libstdc++/8887

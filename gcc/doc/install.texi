@@ -58,7 +58,7 @@
 @end ifnothtml
 
 @c Part 2 Summary Description and Copyright
-@macro copyrightnotice
+@copying
 Copyright @copyright{} 1988, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
 @sp 1
@@ -79,9 +79,9 @@ Free Documentation License}''.
      You have freedom to copy and modify this GNU Manual, like GNU
      software.  Copies published by the Free Software Foundation raise
      funds for GNU development.
-@end macro
+@end copying
 @ifinfo
-@copyrightnotice{}
+@insertcopying
 @end ifinfo
 
 @c Part 3 Titlepage and Copyright
@@ -93,7 +93,7 @@ Free Documentation License}''.
 @c The following two commands start the copyright page.
 @page
 @vskip 0pt plus 1filll
-@copyrightnotice{}
+@insertcopying
 @end titlepage
 
 @c Part 4 Top node and Master Menu
@@ -197,7 +197,7 @@ not yet been merged into the main part of this manual.
 @ifhtml
 @uref{./index.html,,Return to the GCC Installation page}
 
-@copyrightnotice{}
+@insertcopying
 @end ifhtml
 @end ifset
 
@@ -559,12 +559,8 @@ whether you use the GNU assembler.  On any other system,
 @item @samp{hppa1.0-@var{any}-@var{any}}
 @item @samp{hppa1.1-@var{any}-@var{any}}
 @item @samp{i386-@var{any}-sysv}
-@item @samp{i386-@var{any}-isc}
-@item @samp{i860-@var{any}-bsd}
 @item @samp{m68k-bull-sysv}
 @item @samp{m68k-hp-hpux}
-@item @samp{m68k-sony-bsd}
-@item @samp{m68k-altos-sysv}
 @item @samp{m68000-hp-hpux}
 @item @samp{m68000-att-sysv}
 @item @samp{@var{any}-lynx-lynxos}
@@ -720,8 +716,8 @@ Specify which cpu variant the
 compiler should generate code for by default.  This is currently
 only supported on some ports, specifically arm, powerpc, and
 SPARC@.  If configure does not recognize the model name (e.g.@: arm700,
-603e, or ultrasparc) you provide, please check the configure script
-for a complete list of supported models.
+603e, or ultrasparc) you provide, please check the
+@file{gcc/config.gcc} script for a complete list of supported models.
 
 @item --enable-altivec
 Specify that the target supports AltiVec vector enhancements.  This
@@ -822,8 +818,8 @@ option.  This option has no effect on the other hosts.
 
 @item --nfp
 Specify that the machine does not have a floating point unit.  This
-option only applies to @samp{m68k-sun-sunos@var{n}} and
-@samp{m68k-isi-bsd}.  On any other system, @option{--nfp} has no effect.
+option only applies to @samp{m68k-sun-sunos@var{n}}.  On any other
+system, @option{--nfp} has no effect.
 
 @item --enable-checking
 @itemx --enable-checking=@var{list}
@@ -983,7 +979,7 @@ parser sources, releases contain the Bison-generated files and you do
 not need Bison installed to build them.
 
 When building from CVS or snapshots, or if you modify Texinfo
-documentation, you need version 4.1 or later of Texinfo installed if you
+documentation, you need version 4.2 or later of Texinfo installed if you
 want Info documentation to be regenerated.  Releases contain Info
 documentation pre-built for the unmodified documentation in the release.
 
@@ -1277,6 +1273,11 @@ testsuite at @file{libjava/testsuite/libjava.mauve/mauve}, or by
 specifying the location of that tree when invoking @samp{make}, as in
 @samp{make MAUVEDIR=~/mauve check}.
 
+@uref{http://www-124.ibm.com/developerworks/oss/cvs/jikes/~checkout~/jacks/jacks.html,,Jacks}
+is a free test suite that tests Java compiler front ends.  This suite
+can be run as part of libgcj testing by placing the Jacks tree within
+the libjava testsuite at @file{libjava/testsuite/libjava.jacks/jacks}.
+
 @section How to interpret test results
 
 After the testsuite has run you'll find various @file{*.sum} and @file{*.log}
@@ -1368,6 +1369,34 @@ in @file{@var{libdir}} (normally @file{@var{prefix}/lib}); internal
 parts of the compiler in @file{@var{libdir}/gcc-lib}; documentation in
 info format in @file{@var{infodir}} (normally @file{@var{prefix}/info}).
 
+When installing cross-compilers, GCC's executables
+are not only installed into @file{@var{bindir}}, that
+is, @file{@var{exec-prefix}/bin}, but additionally into
+@file{@var{exec-prefix}/@var{target-alias}/bin}, if that directory
+exists.  Typically, such @dfn{tooldirs} hold target-specific
+binutils, including assembler and linker.
+
+Installation into a temporary staging area or into a @command{chroot}
+jail can be achieved with the command
+
+@example
+make DESTDIR=@var{path-to-rootdir} install
+@end example
+
+@noindent where @var{path-to-rootdir} is the absolute path of
+a directory relative to which all installation paths will be
+interpreted.  Note that the directory specified by @code{DESTDIR}
+need not exist yet; it will be created if necessary.
+
+There is a subtle point with tooldirs and @code{DESTDIR}:
+If you relocate a cross-compiler installation with
+e.g.@: @samp{DESTDIR=@var{rootdir}}, then the directory
+@file{@var{rootdir}/@var{exec-prefix}/@var{target-alias}/bin} will
+be filled with duplicated GCC executables only if it already exists,
+it will not be created otherwise.  This is regarded as a feature,
+not as a bug, because it gives slightly more control to the packagers
+using the @code{DESTDIR} feature.
+
 If you built a released version of GCC using @samp{make bootstrap} then please
 quickly review the build status page for your release, available from
 @uref{http://gcc.gnu.org/buildstat.html}.
@@ -1434,7 +1463,7 @@ If you find a bug, please report it following our
 @uref{../bugs.html,,bug reporting guidelines}.
 
 If you want to print the GCC manuals, do @samp{cd @var{objdir}; make
-dvi}.  You will need to have @command{texi2dvi} (version at least 4.1)
+dvi}.  You will need to have @command{texi2dvi} (version at least 4.2)
 and @TeX{} installed.  This creates a number of @file{.dvi} files in
 subdirectories of @file{@var{objdir}}; these may be converted for
 printing with programs such as @command{dvips}.  You can also
@@ -2039,7 +2068,7 @@ and tested on @samp{i386-*-freebsd4.5} and @samp{alpha-*-freebsd5.0}.
 The static
 library may be incorrectly built (symbols are missing at link time).
 There is a rare timing-based startup hang (probably involves an
-assupmtion about the thread library).  Multi-threaded boehm-gc (required for
+assumption about the thread library).  Multi-threaded boehm-gc (required for
 libjava) exposes severe threaded signal-handling bugs on FreeBSD before
 4.5-RELEASE.  The alpha port may not fully bootstrap without some manual
 intervention: @command{gcjh} will crash with a floating-point exception while
@@ -2223,8 +2252,8 @@ applied in the GCC source tree, fixes the compatibility problems.
 Currently Glibc 2.2.3 (and older releases) and GCC 3.0 are out of sync
 since the latest exception handling changes for GCC@.  Compiling glibc
 with GCC 3.0 will give a binary incompatible glibc and therefore cause
-lots of problems and might make your system completly unusable.  This
-will definitly need fixes in glibc but might also need fixes in GCC@.  We
+lots of problems and might make your system completely unusable.  This
+will definitely need fixes in glibc but might also need fixes in GCC@.  We
 strongly advise to wait for glibc 2.2.4 and to read the release notes of
 glibc 2.2.4 whether patches for GCC 3.0 are needed.  You can use glibc
 2.2.3 with GCC 3.0, just do not try to recompile it.
@@ -2909,7 +2938,7 @@ or newer for a working GCC@.
 @end html
 @heading @anchor{powerpc-*-netbsd*}powerpc-*-netbsd*
 PowerPC system in big endian mode running NetBSD@.  To build the
-documentation you will need Texinfo version 4.1 (NetBSD 1.5.1 included
+documentation you will need Texinfo version 4.2 (NetBSD 1.5.1 included
 Texinfo version 3.12).
 
 @html

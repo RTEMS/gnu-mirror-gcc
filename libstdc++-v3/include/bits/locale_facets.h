@@ -1,6 +1,6 @@
 // Locale support -*- C++ -*-
 
-// Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002
+// Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003
 // Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
@@ -44,7 +44,9 @@
 
 #include <ctime>	// For struct tm
 #include <cwctype>	// For wctype_t
-#include <ios>		// For ios_base
+#include <iosfwd>
+#include <bits/ios_base.h>  // For ios_base, ios_base::iostate
+#include <streambuf>
 
 namespace std
 {
@@ -55,8 +57,72 @@ namespace std
 # define  _GLIBCPP_NUM_FACETS 14
 #endif
 
+  // Convert string to numeric value of type _Tv and store results.  
+  // NB: This is specialized for all required types, there is no
+  // generic definition.
+  template<typename _Tv>
+    void
+    __convert_to_v(const char* __in, _Tv& __out, ios_base::iostate& __err, 
+		   const __c_locale& __cloc, int __base = 10);
+
+  // Explicit specializations for required types.
+  template<>
+    void
+    __convert_to_v(const char*, long&, ios_base::iostate&, 
+		   const __c_locale&, int);
+
+  template<>
+    void
+    __convert_to_v(const char*, unsigned long&, ios_base::iostate&, 
+		   const __c_locale&, int);
+
+#ifdef _GLIBCPP_USE_LONG_LONG
+  template<>
+    void
+    __convert_to_v(const char*, long long&, ios_base::iostate&, 
+		   const __c_locale&, int);
+
+  template<>
+    void
+    __convert_to_v(const char*, unsigned long long&, ios_base::iostate&, 
+		   const __c_locale&, int);
+#endif
+
+  template<>
+    void
+    __convert_to_v(const char*, float&, ios_base::iostate&, 
+		   const __c_locale&, int);
+
+  template<>
+    void
+    __convert_to_v(const char*, double&, ios_base::iostate&, 
+		   const __c_locale&, int);
+
+ template<>
+    void
+    __convert_to_v(const char*, long double&, ios_base::iostate&, 
+		   const __c_locale&, int);
+
+
   template<typename _CharT, typename _Traits>
-    struct __pad;
+    struct __pad
+    {
+      static void
+      _S_pad(ios_base& __io, _CharT __fill, _CharT* __news, 
+	     const _CharT* __olds, const streamsize __newlen, 
+	     const streamsize __oldlen, const bool __num);
+    };
+
+  template<typename _CharT>
+    bool
+    __verify_grouping(const basic_string<_CharT>& __grouping, 
+		      basic_string<_CharT>& __grouping_tmp);
+
+  template<typename _CharT>
+    _CharT*
+    __add_grouping(_CharT* __s, _CharT __sep,  
+		   const char* __gbeg, const char* __gend, 
+		   const _CharT* __first, const _CharT* __last);
 
   // 22.2.1.1  Template class ctype
   // Include host and configuration specific ctype enums for ctype_base.
@@ -1011,22 +1077,10 @@ namespace std
 
     public:
       explicit 
-      __timepunct(size_t __refs = 0) 
-      : locale::facet(__refs)
-      { 
-	_M_name_timepunct = new char[2];
-	strcpy(_M_name_timepunct, "C");
-	_M_initialize_timepunct(); 
-      }
+      __timepunct(size_t __refs = 0);
 
       explicit 
-      __timepunct(__c_locale __cloc, const char* __s, size_t __refs = 0) 
-      : locale::facet(__refs)
-      { 
-	_M_name_timepunct = new char[strlen(__s) + 1];
-	strcpy(_M_name_timepunct, __s);
-	_M_initialize_timepunct(__cloc); 
-      }
+      __timepunct(__c_locale __cloc, const char* __s, size_t __refs = 0);
 
       void
       _M_put(_CharT* __s, size_t __maxlen, const _CharT* __format, 
@@ -1123,11 +1177,7 @@ namespace std
 
     protected:
       virtual 
-      ~__timepunct()
-      { 
-	delete [] _M_name_timepunct;
-	_S_destroy_c_locale(_M_c_locale_timepunct); 
-      }
+      ~__timepunct();
 
       // For use at construction time only.
       void 
@@ -1169,6 +1219,8 @@ namespace std
   template<typename _CharT>
     const _CharT* __timepunct<_CharT>::_S_timezones[14];
 
+  // Include host and configuration specific timepunct functions.
+  #include <bits/time_members.h>
 
   template<typename _CharT, typename _InIter>
     class time_get : public locale::facet, public time_base
@@ -1628,32 +1680,17 @@ namespace std
       // Underlying "C" library locale information saved from
       // initialization, needed by messages_byname as well.
       __c_locale			_M_c_locale_messages;
-#if 1
-      // Only needed if glibc < 2.3
       char*				_M_name_messages;
-#endif
 
     public:
       static locale::id 		id;
 
       explicit 
-      messages(size_t __refs = 0) 
-      : locale::facet(__refs)
-      { 
-	_M_name_messages = new char[2];
-	strcpy(_M_name_messages, "C");
-	_M_c_locale_messages = _S_c_locale; 
-      }
+      messages(size_t __refs = 0);
 
       // Non-standard.
       explicit 
-      messages(__c_locale __cloc, const char* __s, size_t __refs = 0) 
-      : locale::facet(__refs)
-      { 
-	_M_name_messages = new char[strlen(__s) + 1];
-	strcpy(_M_name_messages, __s);
-	_M_c_locale_messages = _S_clone_c_locale(__cloc); 
-      }
+      messages(__c_locale __cloc, const char* __s, size_t __refs = 0);
 
       catalog 
       open(const basic_string<char>& __s, const locale& __loc) const
@@ -1673,11 +1710,7 @@ namespace std
 
     protected:
       virtual 
-      ~messages()
-       { 
-	 delete [] _M_name_messages;
-	 _S_destroy_c_locale(_M_c_locale_messages); 
-       }
+      ~messages();
 
       virtual catalog 
       do_open(const basic_string<char>&, const locale&) const;
@@ -1751,9 +1784,6 @@ namespace std
     messages<wchar_t>::do_get(catalog, int, int, const wstring&) const;
 #endif
 
-  // Include host and configuration specific messages virtual functions.
-  #include <bits/messages_members.h>
-
   template<typename _CharT>
     class messages_byname : public messages<_CharT>
     {
@@ -1762,21 +1792,16 @@ namespace std
       typedef basic_string<_CharT> 	string_type;
 
       explicit 
-      messages_byname(const char* __s, size_t __refs = 0)
-      : messages<_CharT>(__refs) 
-      { 
-	delete [] _M_name_messages;
-	_M_name_messages = new char[strlen(__s) + 1];
-	strcpy(_M_name_messages, __s);
-	_S_destroy_c_locale(_M_c_locale_messages);
-	_S_create_c_locale(_M_c_locale_messages, __s); 
-      }
+      messages_byname(const char* __s, size_t __refs = 0);
 
     protected:
       virtual 
       ~messages_byname() 
       { }
     };
+
+  // Include host and configuration specific messages functions.
+  #include <bits/messages_members.h>
 
 
   // Subclause convenience interfaces, inlines.

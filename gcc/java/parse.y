@@ -1,6 +1,6 @@
 /* Source code parsing and tree node generation for the GNU compiler
    for the Java(TM) language.
-   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
    Contributed by Alexandre Petit-Bianco (apbianco@cygnus.com)
 
 This file is part of GNU CC.
@@ -4582,6 +4582,18 @@ method_header (flags, type, mdecl, throws)
 	   IDENTIFIER_POINTER (EXPR_WFL_NODE (id)));
     }
 
+  /* A native method can't be strictfp.  */
+  if ((flags & ACC_NATIVE) && (flags & ACC_STRICT))
+    parse_error_context (id, "native method `%s' can't be strictfp",
+			 IDENTIFIER_POINTER (EXPR_WFL_NODE (id)));
+  /* No such thing as a transient or volatile method.  */
+  if ((flags & ACC_TRANSIENT))
+    parse_error_context (id, "method `%s' can't be transient",
+			 IDENTIFIER_POINTER (EXPR_WFL_NODE (id)));
+  if ((flags & ACC_VOLATILE))
+    parse_error_context (id, "method `%s' can't be volatile",
+			 IDENTIFIER_POINTER (EXPR_WFL_NODE (id)));
+
   /* Things to be checked when declaring a constructor */
   if (!type)
     {
@@ -6365,17 +6377,8 @@ java_check_regular_methods (class_decl)
       if (check_method_redefinition (class, method))
 	continue;
 
-      /* If we see one constructor a mark so we don't generate the
-	 default one. Also skip other verifications: constructors
-	 can't be inherited hence hiden or overriden */
-     if (DECL_CONSTRUCTOR_P (method))
-       {
-	 saw_constructor = 1;
-	 continue;
-       }
-
-      /* We verify things thrown by the method. They must inherits from
-	 java.lang.Throwable */
+      /* We verify things thrown by the method.  They must inherit from
+	 java.lang.Throwable.  */
       for (mthrows = DECL_FUNCTION_THROWS (method);
 	   mthrows; mthrows = TREE_CHAIN (mthrows))
 	{
@@ -6384,6 +6387,15 @@ java_check_regular_methods (class_decl)
 	      (TREE_PURPOSE (mthrows), "Class `%s' in `throws' clause must be a subclass of class `java.lang.Throwable'",
 	       IDENTIFIER_POINTER
 	         (DECL_NAME (TYPE_NAME (TREE_VALUE (mthrows)))));
+	}
+
+      /* If we see one constructor a mark so we don't generate the
+	 default one.  Also skip other verifications: constructors
+	 can't be inherited hence hidden or overridden.  */
+      if (DECL_CONSTRUCTOR_P (method))
+	{
+	  saw_constructor = 1;
+	  continue;
 	}
 
       sig = build_java_argument_signature (TREE_TYPE (method));
@@ -10789,7 +10801,11 @@ patch_invoke (patch, method, args)
      is NULL.  */
   if (check != NULL_TREE)
     {
-      patch = build (COMPOUND_EXPR, TREE_TYPE (patch), check, patch);
+      /* We have to call force_evaluation_order now because creating a
+ 	 COMPOUND_EXPR wraps the arg list in a way that makes it
+ 	 unrecognizable by force_evaluation_order later.  Yuk.  */
+      patch = build (COMPOUND_EXPR, TREE_TYPE (patch), check, 
+ 		     force_evaluation_order (patch));
       TREE_SIDE_EFFECTS (patch) = 1;
     }
 
@@ -12854,6 +12870,43 @@ patch_assignment (node, wfl_op1)
     {
       TREE_CONSTANT (lvalue) = 1;
       DECL_INITIAL (lvalue) = new_rhs;
+    }
+
+  /* Copy the rhs if it's a reference.  */
+  if (! flag_check_references && ! flag_emit_class_files && optimize > 0)
+    {
+      switch (TREE_CODE (new_rhs))
+	{
+	case ARRAY_REF:
+	case INDIRECT_REF:
+	case COMPONENT_REF:
+	  /* Transform a = foo.bar 
+	     into a = { int tmp; tmp = foo.bar; tmp; ).   	     
+	     We need to ensure that if a read from memory fails
+	     because of a NullPointerException, a destination variable
+	     will remain unchanged.  An explicit temporary does what
+	     we need.  
+
+	     If flag_check_references is set, this is unnecessary
+	     because we'll check each reference before doing any
+	     reads.  If optimize is not set the result will never be
+	     written to a stack slot that contains the LHS.  */
+	  {
+	    tree tmp = build_decl (VAR_DECL, get_identifier ("<tmp>"), 
+				   TREE_TYPE (new_rhs));
+	    tree block = build (BLOCK, TREE_TYPE (new_rhs), NULL);
+	    tree assignment 
+	      = build (MODIFY_EXPR, TREE_TYPE (new_rhs), tmp, fold (new_rhs));
+	    BLOCK_VARS (block) = tmp;
+	    BLOCK_EXPR_BODY (block) 
+	      = build (COMPOUND_EXPR, TREE_TYPE (new_rhs), assignment, tmp);
+	    TREE_SIDE_EFFECTS (block) = 1;
+	    new_rhs = block;
+	  }
+	  break;
+	default:
+	  break;
+	}
     }
 
   TREE_OPERAND (node, 0) = lvalue;

@@ -121,6 +121,10 @@ static void pa_globalize_label PARAMS ((FILE *, const char *))
      ATTRIBUTE_UNUSED;
 static void pa_asm_output_mi_thunk PARAMS ((FILE *, tree, HOST_WIDE_INT,
 					    HOST_WIDE_INT, tree));
+#if !defined(USE_COLLECT2)
+static void pa_asm_out_constructor PARAMS ((rtx, int));
+static void pa_asm_out_destructor PARAMS ((rtx, int));
+#endif
 static void copy_fp_args PARAMS ((rtx)) ATTRIBUTE_UNUSED;
 static int length_fp_args PARAMS ((rtx)) ATTRIBUTE_UNUSED;
 static struct deferred_plabel *get_plabel PARAMS ((const char *))
@@ -202,6 +206,13 @@ static size_t n_deferred_plabels = 0;
 #define TARGET_ASM_OUTPUT_MI_THUNK pa_asm_output_mi_thunk
 #undef TARGET_ASM_CAN_OUTPUT_MI_THUNK
 #define TARGET_ASM_CAN_OUTPUT_MI_THUNK default_can_output_mi_thunk_no_vcall
+
+#if !defined(USE_COLLECT2)
+#undef TARGET_ASM_CONSTRUCTOR
+#define TARGET_ASM_CONSTRUCTOR pa_asm_out_constructor
+#undef TARGET_ASM_DESTRUCTOR
+#define TARGET_ASM_DESTRUCTOR pa_asm_out_destructor
+#endif
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -6330,7 +6341,7 @@ output_millicode_call (insn, call_dest)
       xoperands[1] = gen_label_rtx ();
       output_asm_insn ("ldo %0-%1(%2),%2", xoperands);
       ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
-				 CODE_LABEL_NUMBER (xoperands[3]));
+				 CODE_LABEL_NUMBER (xoperands[1]));
     }
   else
     /* ??? This branch may not reach its target.  */
@@ -6668,7 +6679,7 @@ output_call (insn, call_dest, sibcall)
 	  xoperands[1] = gen_label_rtx ();
 	  output_asm_insn ("ldo %0-%1(%%r2),%%r2", xoperands);
 	  ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
-				     CODE_LABEL_NUMBER (xoperands[3]));
+				     CODE_LABEL_NUMBER (xoperands[1]));
 	}
       else
 	/* ??? This branch may not reach its target.  */
@@ -6902,6 +6913,46 @@ fmpyaddoperands (operands)
   /* Passed.  Operands are suitable for fmpyadd.  */
   return 1;
 }
+
+#if !defined(USE_COLLECT2)
+static void
+pa_asm_out_constructor (symbol, priority)
+     rtx symbol;
+     int priority;
+{
+  if (!function_label_operand (symbol, VOIDmode))
+    hppa_encode_label (symbol);
+
+#ifdef CTORS_SECTION_ASM_OP
+  default_ctor_section_asm_out_constructor (symbol, priority);
+#else
+# ifdef TARGET_ASM_NAMED_SECTION
+  default_named_section_asm_out_constructor (symbol, priority);
+# else
+  default_stabs_asm_out_constructor (symbol, priority);
+# endif
+#endif
+}
+
+static void
+pa_asm_out_destructor (symbol, priority)
+     rtx symbol;
+     int priority;
+{
+  if (!function_label_operand (symbol, VOIDmode))
+    hppa_encode_label (symbol);
+
+#ifdef DTORS_SECTION_ASM_OP
+  default_dtor_section_asm_out_destructor (symbol, priority);
+#else
+# ifdef TARGET_ASM_NAMED_SECTION
+  default_named_section_asm_out_destructor (symbol, priority);
+# else
+  default_stabs_asm_out_destructor (symbol, priority);
+# endif
+#endif
+}
+#endif
 
 /* Returns 1 if the 6 operands specified in OPERANDS are suitable for
    use in fmpysub instructions.  */
