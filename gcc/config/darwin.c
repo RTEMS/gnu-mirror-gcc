@@ -42,11 +42,66 @@ Boston, MA 02111-1307, USA.  */
 #include "langhooks.h"
 #include "tm_p.h"
 #include "errors.h"
+/* APPLE LOCAL begin constant cfstrings */
+#include "hashtab.h"
+#include "toplev.h"
+
+static tree darwin_build_constant_cfstring (tree);
+/* APPLE LOCAL end constant cfstrings */
 
 static int machopic_data_defined_p (const char *);
 static void update_non_lazy_ptrs (const char *);
 static void update_stubs (const char *);
-static const char *machopic_non_lazy_ptr_name (const char*);
+const char *machopic_non_lazy_ptr_name (const char*);
+
+/* APPLE LOCAL prototypes  */
+static tree machopic_non_lazy_ptr_list_entry PARAMS ((const char*, int));
+static tree machopic_stub_list_entry PARAMS ((const char *));
+
+/* APPLE LOCAL begin coalescing  */
+void
+make_decl_coalesced (tree decl, int private_extern_p)
+      /* 0 for global, 1 for private extern */
+{
+  int no_toc_p = 1;             /* Don't add to table of contents */
+#if 0
+  const char *decl_name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
+#endif
+  static const char *const names[4] = {
+	"__TEXT,__textcoal,coalesced",
+	"__TEXT,__textcoal_nt,coalesced,no_toc",
+	"__DATA,__datacoal,coalesced",
+	"__DATA,__datacoal_nt,coalesced,no_toc",
+  };
+  const char *sec;
+  int idx;
+
+  /* Do nothing if coalescing is disabled.  */
+  if (!COALESCING_ENABLED_P())
+    return;
+
+  /* We *do* need to mark these *INTERNAL* functions coalesced: though
+     these pseudo-functions themselves will never appear, their cloned
+     descendants need to be marked coalesced too.  */
+#if 0
+  /* Don't touch anything with " *INTERNAL" in its name.  */
+  if (strstr (decl_name, " *INTERNAL") != NULL)
+    return;
+#endif
+
+  DECL_COALESCED (decl) = 1;
+  if (private_extern_p)
+    DECL_VISIBILITY (decl) = VISIBILITY_HIDDEN;
+  TREE_PUBLIC (decl) = 1;
+
+  idx = 0;
+  if (TREE_CODE (decl) != FUNCTION_DECL)
+    idx = 2;
+  sec = names[idx + (no_toc_p ? 1 : 0)];
+
+  DECL_SECTION_NAME (decl) = build_string (strlen (sec), sec);
+}
+/* APPLE LOCAL end coalescing  */
 
 int
 name_needs_quotes (const char *name)
@@ -187,6 +242,14 @@ machopic_ident_defined_p (tree ident)
 static int
 machopic_data_defined_p (const char *name)
 {
+  /* APPLE LOCAL BEGIN fix-and-continue mrs  */
+#ifndef TARGET_INDIRECT_ALL_DATA
+#define TARGET_INDIRECT_ALL_DATA 0  
+#endif
+  if (TARGET_INDIRECT_ALL_DATA)
+    return 0;
+  /* APPLE LOCAL END fix-and-continue mrs  */
+
   switch (machopic_classify_ident (get_identifier (name)))
     {
     case MACHOPIC_DEFINED_DATA:
@@ -264,18 +327,19 @@ static GTY(()) tree machopic_non_lazy_pointers;
    either by finding it in our list of pointer names, or by generating
    a new one.  */
 
-static const char *
-machopic_non_lazy_ptr_name (const char *name)
+/* APPLE LOCAL weak import */
+/* machopic_non_lazy_ptr_list_entry separated from machopic_non_lazy_ptr_name */
+static tree
+machopic_non_lazy_ptr_list_entry (const char *name, int create_p)
 {
-  const char *temp_name;
-  tree temp, ident = get_identifier (name);
-
+  tree temp, ident = (create_p) ? get_identifier (name) : NULL;
+  
   for (temp = machopic_non_lazy_pointers;
        temp != NULL_TREE;
        temp = TREE_CHAIN (temp))
     {
       if (ident == TREE_VALUE (temp))
-	return IDENTIFIER_POINTER (TREE_PURPOSE (temp));
+	return temp;
     }
 
   name = darwin_strip_name_encoding (name);
@@ -287,14 +351,14 @@ machopic_non_lazy_ptr_name (const char *name)
     {
       if (TREE_VALUE (temp))
 	{
-	  temp_name = IDENTIFIER_POINTER (TREE_VALUE (temp));
+	  const char *temp_name = IDENTIFIER_POINTER (TREE_VALUE (temp));
 	  temp_name = darwin_strip_name_encoding (temp_name);
 	  if (strcmp (name, temp_name) == 0)
-	    return IDENTIFIER_POINTER (TREE_PURPOSE (temp));
+	    return temp;
 	}
     }
 
-  {
+  if (create_p) {
     char *buffer;
     int namelen = strlen (name);
     int bufferlen = 0;
@@ -325,17 +389,39 @@ machopic_non_lazy_ptr_name (const char *name)
 
     TREE_USED (machopic_non_lazy_pointers) = 0;
 
-    return IDENTIFIER_POINTER (ptr_name);
+    return machopic_non_lazy_pointers;
   }
+
+  return NULL;
 }
+
+/* APPLE LOCAL begin coalescing */
+/* Was the variable NAME ever referenced?  */
+int
+machopic_var_referred_to_p (const char *name)
+{
+  return (machopic_non_lazy_ptr_list_entry (name, /*create:*/ 0) != NULL);
+}
+/* APPLE LOCAL end coalescing */
+
+/* APPLE LOCAL begin weak import */
+const char *
+machopic_non_lazy_ptr_name (const char *name)
+{
+    return IDENTIFIER_POINTER (TREE_PURPOSE 
+		(machopic_non_lazy_ptr_list_entry (name, /*create:*/ 1)));
+}
+/* APPLE LOCAL end weak import */
 
 static GTY(()) tree machopic_stubs;
 
 /* Return the name of the stub corresponding to the given name,
    generating a new stub name if necessary.  */
 
-const char *
-machopic_stub_name (const char *name)
+/* APPLE LOCAL begin weak import */
+/* machopic_stub_list_entry separated from machopic_stub_name */
+static tree
+machopic_stub_list_entry (const char *name)
 {
   tree temp, ident = get_identifier (name);
   const char *tname;
@@ -345,16 +431,22 @@ machopic_stub_name (const char *name)
        temp = TREE_CHAIN (temp))
     {
       if (ident == TREE_VALUE (temp))
-	return IDENTIFIER_POINTER (TREE_PURPOSE (temp));
+	return temp;
       tname = IDENTIFIER_POINTER (TREE_VALUE (temp));
       if (strcmp (name, tname) == 0)
-	return IDENTIFIER_POINTER (TREE_PURPOSE (temp));
+	return temp;
+
+      /* APPLE LOCAL Stripped encodings ('!T_' and '!t_') should match.  */
+      if (name [0] == '!' && tname[0] == '!'
+	  && strcmp (name + 4, tname + 4) == 0)
+	return temp;
+
       /* A library call name might not be section-encoded yet, so try
 	 it against a stripped name.  */
       if (name[0] != '!'
 	  && tname[0] == '!'
 	  && strcmp (name, tname + 4) == 0)
-	return IDENTIFIER_POINTER (TREE_PURPOSE (temp));
+	return temp;
     }
 
   name = darwin_strip_name_encoding (name);
@@ -406,9 +498,16 @@ machopic_stub_name (const char *name)
     machopic_stubs = tree_cons (ptr_name, ident, machopic_stubs);
     TREE_USED (machopic_stubs) = 0;
 
-    return IDENTIFIER_POINTER (ptr_name);
+    return machopic_stubs;
   }
 }
+
+const char * 
+machopic_stub_name (const char *name)
+{
+  return IDENTIFIER_POINTER (TREE_PURPOSE (machopic_stub_list_entry (name)));
+}
+/* APPLE LOCAL end weak import */
 
 void
 machopic_validate_stub_or_non_lazy_ptr (const char *name, int validate_stub)
@@ -448,6 +547,8 @@ machopic_indirect_data_reference (rtx orig, rtx reg)
   if (GET_CODE (orig) == SYMBOL_REF)
     {
       const char *name = XSTR (orig, 0);
+      /* APPLE LOCAL weak import */
+      tree sym;
       int defined = machopic_data_defined_p (name);
 
       if (defined && MACHO_DYNAMIC_NO_PIC_P)
@@ -499,8 +600,14 @@ machopic_indirect_data_reference (rtx orig, rtx reg)
 	  return orig;
 	}
 
+      /* APPLE LOCAL weak import */
+      sym = machopic_non_lazy_ptr_list_entry (name, /*create:*/ 1);
+      IDENTIFIER_WEAK_IMPORT (TREE_PURPOSE (sym)) =
+	IDENTIFIER_WEAK_IMPORT (TREE_VALUE (sym)) =
+	    SYMBOL_REF_WEAK_IMPORT (orig);
+
       ptr_ref = gen_rtx_SYMBOL_REF (Pmode,
-				    machopic_non_lazy_ptr_name (name));
+		    IDENTIFIER_POINTER (TREE_PURPOSE (sym)));
 
       ptr_ref = gen_rtx_MEM (Pmode, ptr_ref);
       RTX_UNCHANGING_P (ptr_ref) = 1;
@@ -585,9 +692,14 @@ machopic_indirect_call_target (rtx target)
 
       if (!machopic_name_defined_p (name))
 	{
-	  const char *stub_name = machopic_stub_name (name);
+	  /* APPLE LOCAL weak import */
+	  tree stub = machopic_stub_list_entry (name);
+	  IDENTIFIER_WEAK_IMPORT (TREE_PURPOSE (stub)) = 
+	    IDENTIFIER_WEAK_IMPORT (TREE_VALUE (stub)) =
+	      SYMBOL_REF_WEAK_IMPORT (XEXP (target, 0));
 
-	  XEXP (target, 0) = gen_rtx_SYMBOL_REF (mode, stub_name);
+	  XEXP (target, 0) = gen_rtx_SYMBOL_REF (mode, 
+		IDENTIFIER_POINTER (TREE_PURPOSE (stub)));
 	  RTX_UNCHANGING_P (target) = 1;
 	}
     }
@@ -855,6 +967,43 @@ machopic_legitimize_pic_address (rtx orig, enum machine_mode mode, rtx reg)
       if (RTX_UNCHANGING_P (base) && RTX_UNCHANGING_P (orig))
 	RTX_UNCHANGING_P (pic_ref) = 1;
 
+      /* APPLE LOCAL begin gen ADD */
+#ifdef MASK_80387
+      {
+	rtx mem, other;
+
+	if (GET_CODE (orig) == MEM) {
+	    mem = orig; other = base;
+	    /* Swap the kids only if there is only one MEM, and it's on the right.  */
+	    if (GET_CODE (base) != MEM) {
+		XEXP (pic_ref, 0) = orig;
+		XEXP (pic_ref, 1) = base;
+	      }
+	  }
+	else if (GET_CODE (base) == MEM) {
+	    mem = base; other = orig;
+	  } else
+	    mem = other = NULL_RTX;
+     
+	/* Both kids are MEMs.  */
+	if (other && GET_CODE (other) == MEM)
+	  other = force_reg (GET_MODE (other), other);
+
+	/* The x86 can't post-index a MEM; emit an ADD instruction to handle this.  */
+	if (mem && GET_CODE (mem) == MEM) {
+	  if ( ! reload_in_progress) {
+	    rtx set = gen_rtx_SET (VOIDmode, reg, pic_ref);
+	    rtx clobber_cc = gen_rtx_CLOBBER (VOIDmode, gen_rtx_REG (CCmode, FLAGS_REG));
+	    pic_ref = gen_rtx_PARALLEL (VOIDmode, gen_rtvec (2, set, clobber_cc));
+	    emit_insn (pic_ref);
+	    pic_ref = reg;
+	    is_complex = 0;
+	  }
+	}
+      }
+#endif
+      /* APPLE LOCAL end gen ADD */
+
       if (reg && is_complex)
 	{
 	  emit_move_insn (reg, pic_ref);
@@ -871,7 +1020,12 @@ machopic_legitimize_pic_address (rtx orig, enum machine_mode mode, rtx reg)
   else if (GET_CODE (orig) == MEM
 	   && GET_CODE (XEXP (orig, 0)) == SYMBOL_REF)
     {
-      rtx addr = machopic_legitimize_pic_address (XEXP (orig, 0), Pmode, reg);
+      /* APPLE LOCAL use new pseudo for temp; reusing reg confuses PRE */
+      rtx tempreg = reg;
+      rtx addr;
+      if ( !no_new_pseudos )
+	tempreg = gen_reg_rtx (Pmode);
+      addr = machopic_legitimize_pic_address (XEXP (orig, 0), Pmode, tempreg);
 
       addr = gen_rtx_MEM (GET_MODE (orig), addr);
       RTX_UNCHANGING_P (addr) = RTX_UNCHANGING_P (orig);
@@ -916,6 +1070,14 @@ machopic_finish (FILE *asm_out_file)
       else
 	stub[0] = '_', strcpy (stub + 1, stub_name);
 
+      /* APPLE LOCAL weak import */
+      if ( IDENTIFIER_WEAK_IMPORT (TREE_VALUE (temp)))
+	{
+	  fprintf (asm_out_file, "\t.weak_reference ");
+	  assemble_name (asm_out_file, sym_name); 
+	  fprintf (asm_out_file, "\n");
+	}
+
       machopic_output_stub (asm_out_file, sym, stub);
     }
 
@@ -929,7 +1091,11 @@ machopic_finish (FILE *asm_out_file)
       if (! TREE_USED (temp))
 	continue;
 
-      if (machopic_ident_defined_p (TREE_VALUE (temp)))
+      /* APPLE LOCAL fix-and-continue mrs  */
+      if (! TARGET_INDIRECT_ALL_DATA
+	  && (machopic_ident_defined_p (TREE_VALUE (temp))
+	      /* APPLE LOCAL private extern */
+	      || (sym_name[0] == '!' && sym_name[2] == 'p')))
 	{
 	  data_section ();
 	  assemble_align (GET_MODE_ALIGNMENT (Pmode));
@@ -940,6 +1106,17 @@ machopic_finish (FILE *asm_out_file)
 	}
       else
 	{
+	  /* APPLE LOCAL fix-and-continue mrs  */
+	  rtx init = const0_rtx;
+
+	  /* APPLE LOCAL weak import */
+	  if ( IDENTIFIER_WEAK_IMPORT (TREE_VALUE (temp)))
+	    {
+	      fprintf (asm_out_file, "\t.weak_reference ");
+	      assemble_name (asm_out_file, sym_name); 
+	      fprintf (asm_out_file, "\n");
+	    }
+
 	  machopic_nl_symbol_ptr_section ();
 	  assemble_name (asm_out_file, lazy_name);
 	  fprintf (asm_out_file, ":\n");
@@ -948,8 +1125,14 @@ machopic_finish (FILE *asm_out_file)
 	  assemble_name (asm_out_file, sym_name);
 	  fprintf (asm_out_file, "\n");
 
-	  assemble_integer (const0_rtx, GET_MODE_SIZE (Pmode),
+	  /* APPLE LOCAL BEGIN fix-and-continue mrs  */
+	  if (sym_name[3] == 's'
+	      && machopic_ident_defined_p (TREE_VALUE (temp)))
+	    init = gen_rtx_SYMBOL_REF (Pmode, sym_name);
+
+	  assemble_integer (init, GET_MODE_SIZE (Pmode),
 			    GET_MODE_ALIGNMENT (Pmode), 1);
+	  /* APPLE LOCAL END fix-and-continue mrs  */
 	}
     }
 }
@@ -1004,11 +1187,28 @@ darwin_encode_section_info (tree decl, rtx rtl, int first ATTRIBUTE_UNUSED)
   if ((TREE_CODE (decl) == FUNCTION_DECL
        || TREE_CODE (decl) == VAR_DECL)
       && !DECL_EXTERNAL (decl)
+      /* APPLE LOCAL  coalescing  */
+#ifdef DECL_IS_COALESCED_OR_WEAK
+      && ! DECL_IS_COALESCED_OR_WEAK (decl)
+#endif
       && ((TREE_STATIC (decl)
 	   && (!DECL_COMMON (decl) || !TREE_PUBLIC (decl)))
 	  || (DECL_INITIAL (decl)
 	      && DECL_INITIAL (decl) != error_mark_node)))
     defined = 1;
+  /* APPLE LOCAL fix OBJC codegen */
+  if (TREE_CODE (decl) == VAR_DECL)
+    {
+      sym_ref = XEXP (DECL_RTL (decl), 0);
+      orig_str = XSTR (sym_ref, 0);
+      if (  orig_str[0] == '_'
+	 && orig_str[1] == 'O' 
+	 && orig_str[2] == 'B' 
+	 && orig_str[3] == 'J'
+	 && orig_str[4] == 'C'
+	 && orig_str[5] == '_')
+	defined = 1;
+    }
 
   if (TREE_CODE (decl) == FUNCTION_DECL)
     code = (defined ? 'T' : 't');
@@ -1041,7 +1241,15 @@ darwin_encode_section_info (tree decl, rtx rtl, int first ATTRIBUTE_UNUSED)
       new_str[0] = '!';
       new_str[1] = code;
       new_str[2] = '_';
+      /* APPLE LOCAL private extern */
+      if (DECL_VISIBILITY (decl) == VISIBILITY_HIDDEN)
+	new_str[2] = 'p';
       new_str[3] = '_';
+      /* APPLE LOCAL BEGIN fix-and-continue mrs  */
+      if (TARGET_INDIRECT_ALL_DATA
+	  && TREE_CODE (decl) == VAR_DECL && ! TREE_PUBLIC (decl))
+	new_str[3] = 's';
+      /* APPLE LOCAL END fix-and-continue mrs  */
       memcpy (new_str + 4, orig_str, len);
       XSTR (sym_ref, 0) = ggc_alloc_string (new_str, new_len);
     }
@@ -1161,9 +1369,24 @@ machopic_select_section (tree exp, int reloc,
 	   && TREE_CODE (TREE_TYPE (exp)) == RECORD_TYPE
 	   && TYPE_NAME (TREE_TYPE (exp)))
     {
+      /* APPLE LOCAL begin constant strings */
+      extern int flag_next_runtime;
+      extern const char *constant_string_class_name;
+      /* APPLE LOCAL end constant strings */
       tree name = TYPE_NAME (TREE_TYPE (exp));
       if (TREE_CODE (name) == TYPE_DECL)
 	name = DECL_NAME (name);
+      /* APPLE LOCAL begin constant strings */
+      if (constant_string_class_name
+	  && !strcmp (IDENTIFIER_POINTER (name),
+		      constant_string_class_name))
+	{
+	  if (flag_next_runtime)
+	    objc_constant_string_object_section ();
+	  else
+	    objc_string_object_section ();
+	}
+      /* APPLE LOCAL end constant strings */
       if (!strcmp (IDENTIFIER_POINTER (name), "NSConstantString"))
 	objc_constant_string_object_section ();
       else if (!strcmp (IDENTIFIER_POINTER (name), "NXConstantString"))
@@ -1171,6 +1394,26 @@ machopic_select_section (tree exp, int reloc,
       else
 	base_function ();
     }
+  /* APPLE LOCAL begin constant cfstrings */
+  else if (TREE_CODE (exp) == CONSTRUCTOR
+	   && TREE_TYPE (exp)
+	   && TREE_CODE (TREE_TYPE (exp)) == ARRAY_TYPE
+	   && TREE_OPERAND (exp, 0))
+    {
+      tree name = TREE_OPERAND (exp, 0);
+      if (TREE_CODE (name) == TREE_LIST && TREE_VALUE (name)
+	  && TREE_CODE (TREE_VALUE (name)) == NOP_EXPR
+	  && TREE_OPERAND (TREE_VALUE (name), 0)
+	  && TREE_OPERAND (TREE_OPERAND (TREE_VALUE (name), 0), 0))
+	name = TREE_OPERAND (TREE_OPERAND (TREE_VALUE (name), 0), 0);
+      if (TREE_CODE (name) == VAR_DECL
+	  && !strcmp (IDENTIFIER_POINTER (DECL_NAME (name)),
+		      "__CFConstantStringClassReference"))
+	cfstring_constant_object_section ();
+      else
+	base_function ();
+    }
+  /* APPLE LOCAL end constant cfstrings */
   else if (TREE_CODE (exp) == VAR_DECL &&
 	   DECL_NAME (exp) &&
 	   TREE_CODE (DECL_NAME (exp)) == IDENTIFIER_NODE &&
@@ -1228,6 +1471,10 @@ machopic_select_section (tree exp, int reloc,
       else
 	base_function ();
     }
+  /* APPLE LOCAL begin darwin_set_section_for_var_p  */
+  else if (darwin_set_section_for_var_p (exp, reloc, align))
+    ;
+  /* APPLE LOCAL end darwin_set_section_for_var_p  */
   else
     base_function ();
 }
@@ -1289,6 +1536,175 @@ darwin_globalize_label (FILE *stream, const char *name)
     default_globalize_label (stream, name);
 }
 
+/* APPLE LOCAL begin assembly "abort" directive  */
+/* This can be called instead of EXIT.  It will emit a '.abort' directive
+   into any existing assembly file, causing assembly to immediately abort,
+   thus preventing the assembler from spewing out numerous, irrelevant
+   error messages.  */
+
+void
+abort_assembly_and_exit (int status)
+{
+  /* If we're aborting, get the assembler to abort, too.  */
+  if (status == FATAL_EXIT_CODE && asm_out_file != 0)
+    fprintf (asm_out_file, "\n.abort\n");
+
+  exit (status);
+}
+/* APPLE LOCAL end assembly "abort" directive  */
+
+/* APPLE LOCAL coalescing  */
+void
+darwin_asm_named_section (const char *name, unsigned int flags ATTRIBUTE_UNUSED)
+{
+  fprintf (asm_out_file, ".section %s\n", name);
+}
+
+unsigned int
+darwin_section_type_flags (tree decl, const char *name, int reloc)
+{
+  unsigned int flags = default_section_type_flags (decl, name, reloc);
+ 
+  /* Weak or coalesced variables live in a writable section.  */
+  if (decl != 0 && TREE_CODE (decl) != FUNCTION_DECL
+      && DECL_IS_COALESCED_OR_WEAK (decl))
+    flags |= SECTION_WRITE;
+  
+  return flags;
+}              
+/* APPLE LOCAL  end coalescing  */
+
+/* APPLE LOCAL begin double destructor turly 20020214  */
+#include "c-common.h"
+
+/* Handle __attribute__ ((apple_kext_compatibility)).
+   This only applies to darwin kexts for 295 compatibility -- it shrinks the
+   vtable for classes with this attribute (and their descendants) by not
+   outputting the new 3.0 nondeleting destructor.  This means that such
+   objects CANNOT be allocated on the stack or as globals UNLESS they have
+   a completely empty `operator delete'.
+   Luckily, this fits in with the Darwin kext model.
+   
+   This attribute also disables gcc3's potential overlaying of derived
+   class data members on the padding at the end of the base class.  */
+
+tree
+darwin_handle_odd_attribute (tree *node, tree name, tree args ATTRIBUTE_UNUSED,
+			     int flags ATTRIBUTE_UNUSED, bool *no_add_attrs)
+{
+  if (! POSSIBLY_COMPILING_APPLE_KEXT_P ())
+    {
+      warning ("`%s' 2.95 vtable-compatability attribute applies "
+	       "only when compiling a kext", IDENTIFIER_POINTER (name));
+
+      *no_add_attrs = true;
+    }
+  else if (TREE_CODE (*node) != RECORD_TYPE)
+    {
+      warning ("`%s' 2.95 vtable-compatability attribute applies "
+	       "only to C++ classes", IDENTIFIER_POINTER (name));
+
+      *no_add_attrs = true;
+    }
+
+  return NULL_TREE;
+}
+/* APPLE LOCAL end  double destructor turly 20020214  */
+
+/* APPLE LOCAL begin darwin_set_section_for_var_p  turly 20020226  */
+
+/* This is specifically for any initialised static class constants
+   which may be output by the C++ front end at the end of compilation. 
+   SELECT_SECTION () macro won't do because these are VAR_DECLs, not
+   STRING_CSTs or INTEGER_CSTs.  And by putting 'em in appropriate
+   sections, we save space.  */
+
+extern void cstring_section (void),
+	    literal4_section (void), literal8_section (void);
+int
+darwin_set_section_for_var_p (tree exp, int reloc, int align)
+{
+  if (!reloc && TREE_CODE (exp) == VAR_DECL
+      && DECL_ALIGN (exp) == align 
+      && TREE_READONLY (exp) && DECL_INITIAL (exp))
+    {
+      /* Put constant string vars in ".cstring" section.  */
+
+      if (TREE_CODE (TREE_TYPE (exp)) == ARRAY_TYPE
+	  && TREE_CODE (TREE_TYPE (TREE_TYPE (exp))) == INTEGER_TYPE
+	  && integer_onep (TYPE_SIZE_UNIT (TREE_TYPE (TREE_TYPE (exp))))
+	  && TREE_CODE (DECL_INITIAL (exp)) == STRING_CST)
+	{
+
+	  /* Compare string length with actual number of characters
+	     the compiler will write out (which is not necessarily
+	     TREE_STRING_LENGTH, in the case of a constant array of
+	     characters that is not null-terminated).   Select appropriate
+	     section accordingly. */
+
+	  if (MIN ( TREE_STRING_LENGTH (DECL_INITIAL(exp)),
+		    int_size_in_bytes (TREE_TYPE (exp)))
+	      == (long) strlen (TREE_STRING_POINTER (DECL_INITIAL (exp))) + 1)
+	    {
+	      cstring_section ();
+	      return 1;
+	    }
+	  else
+	    {
+	      const_section ();
+	      return 1;
+	    }
+	}
+     else
+      if (TREE_READONLY (TREE_TYPE (exp)) 
+	  && ((TREE_CODE (TREE_TYPE (exp)) == INTEGER_TYPE
+	       && TREE_CODE (DECL_INITIAL (exp)) == INTEGER_CST)
+	      || (TREE_CODE (TREE_TYPE (exp)) == REAL_TYPE
+	  	  && TREE_CODE (DECL_INITIAL (exp)) == REAL_CST))
+	  && TREE_CODE (TYPE_SIZE_UNIT (TREE_TYPE (DECL_INITIAL (exp))))
+		== INTEGER_CST)
+	{
+	  tree size = TYPE_SIZE_UNIT (TREE_TYPE (DECL_INITIAL (exp)));
+	  if (TREE_INT_CST_HIGH (size) != 0)
+	    return 0;
+
+	  /* Put integer and float consts in the literal4|8 sections.  */
+
+	  if (TREE_INT_CST_LOW (size) == 4)
+	    {
+	      literal4_section ();
+	      return 1;
+	    }
+	  else if (TREE_INT_CST_LOW (size) == 8)
+	    {
+	      literal8_section ();                                
+	      return 1;
+	    }
+	}
+    }
+  return 0;
+}
+/* APPLE LOCAL end darwin_set_section_for_var_p  turly 20020226  */
+
+/* APPLE LOCAL begin C++ EH */
+/* Generate a PC-relative reference to a Mach-O non-lazy-symbol.  */ 
+void
+darwin_non_lazy_pcrel (FILE *file, rtx addr)
+{
+  const char *str;
+  const char *nlp_name;
+
+  if (GET_CODE (addr) != SYMBOL_REF)
+    abort ();
+
+  str = darwin_strip_name_encoding (XSTR (addr, 0));
+  nlp_name = machopic_non_lazy_ptr_name (str);
+  fputs ("\t.long\t", file);
+  ASM_OUTPUT_LABELREF (file, nlp_name);
+  fputs ("-.", file);
+}
+/* APPLE LOCAL end C++ EH */
+
 /* Emit an assembler directive to set visibility for a symbol.  The
    only supported visibilities are VISIBILITY_DEFAULT and
    VISIBILITY_HIDDEN; the latter corresponds to Darwin's "private
@@ -1343,12 +1759,242 @@ void
 darwin_file_end (void)
 {
   machopic_finish (asm_out_file);
-  if (strcmp (lang_hooks.name, "GNU C++") == 0)
+  /* APPLE LOCAL constant cfstrings */
+  if (darwin_running_cxx)
     {
       constructor_section ();
       destructor_section ();
       ASM_OUTPUT_ALIGN (asm_out_file, 1);
     }
 }
+
+/* APPLE LOCAL begin constant cfstrings */
+int darwin_constant_cfstrings = 0;
+const char *darwin_constant_cfstrings_switch;
+int darwin_warn_nonportable_cfstrings = 1;  /* on by default. */
+const char *darwin_warn_nonportable_cfstrings_switch;
+int darwin_pascal_strings = 0;
+const char *darwin_pascal_strings_switch;
+int darwin_running_cxx;
+
+static GTY(()) tree cfstring_class_reference = NULL_TREE;
+static GTY(()) tree cfstring_type_node = NULL_TREE;
+static GTY(()) tree ccfstring_type_node = NULL_TREE;
+static GTY(()) tree pccfstring_type_node = NULL_TREE;
+static GTY(()) tree pcint_type_node = NULL_TREE;
+static GTY(()) tree pcchar_type_node = NULL_TREE;
+
+/* Store all constructed constant CFStrings in a hash table so that
+   they get uniqued properly.  */
+
+struct cfstring_descriptor GTY(())
+{
+  /* The literal argument .  */
+  tree literal;
+
+  /* The resulting constant CFString.  */
+  tree constructor;
+};
+
+static GTY((param_is (struct cfstring_descriptor))) htab_t cfstring_htab;
+
+static hashval_t cfstring_hash (const void *);
+static int cfstring_eq (const void *, const void *);
+
+void
+darwin_init_cfstring_builtins (void)
+{
+  tree field, fields, pccfstring_ftype_pcchar;
+
+  /* struct __builtin_CFString {
+       const int *isa;		(will point at
+       int flags;		 __CFConstantStringClassReference)
+       const char *str;
+       int length;
+     };  */
+
+  pcint_type_node
+    = build_pointer_type (build_qualified_type (integer_type_node,
+			  TYPE_QUAL_CONST));
+  pcchar_type_node
+    = build_pointer_type (build_qualified_type (char_type_node,
+			  TYPE_QUAL_CONST));
+  cfstring_type_node = (*lang_hooks.types.make_type) (RECORD_TYPE);
+  fields = build_decl (FIELD_DECL, NULL_TREE, pcint_type_node);
+  field = build_decl (FIELD_DECL, NULL_TREE, integer_type_node);
+  TREE_CHAIN (field) = fields; fields = field;
+  field = build_decl (FIELD_DECL, NULL_TREE, pcchar_type_node);
+  TREE_CHAIN (field) = fields; fields = field;
+  field = build_decl (FIELD_DECL, NULL_TREE, integer_type_node);
+  TREE_CHAIN (field) = fields; fields = field;
+  /* NB: The finish_builtin_struct() routine expects FIELD_DECLs in
+     reverse order!  */
+  finish_builtin_struct (cfstring_type_node, "__builtin_CFString",
+			 fields, NULL_TREE);
+
+  /* const struct __builtin_CFstring *
+     __builtin___CFStringMakeConstantString (const char *); */
+
+  ccfstring_type_node
+    = build_qualified_type (cfstring_type_node, TYPE_QUAL_CONST);
+  pccfstring_type_node
+    = build_pointer_type (ccfstring_type_node);
+  pccfstring_ftype_pcchar
+    = build_function_type_list (pccfstring_type_node,
+				pcchar_type_node, NULL_TREE);
+  builtin_function ("__builtin___CFStringMakeConstantString",
+		    pccfstring_ftype_pcchar,
+		    DARWIN_BUILTIN_CFSTRINGMAKECONSTANTSTRING,
+		    BUILT_IN_NORMAL, NULL, NULL_TREE);
+
+  /* extern int __CFConstantStringClassReference[];  */
+  cfstring_class_reference
+   = build_decl (VAR_DECL,
+		 get_identifier ("__CFConstantStringClassReference"),
+		 build_array_type (integer_type_node, NULL_TREE));
+  DECL_EXTERNAL (cfstring_class_reference) = 1;
+  TREE_PUBLIC (cfstring_class_reference) = 1;
+  TREE_USED (cfstring_class_reference) = 1;
+  DECL_ARTIFICIAL (cfstring_class_reference) = 1;
+  (*lang_hooks.decls.pushdecl) (cfstring_class_reference);
+  rest_of_decl_compilation (cfstring_class_reference, 0, 0, 0);
+  
+  /* Initialize the hash table used to hold the constant CFString objects.  */
+  cfstring_htab = htab_create_ggc (31, cfstring_hash,
+				   cfstring_eq, NULL);
+}
+
+tree
+darwin_expand_tree_builtin (tree function, tree params,
+			    tree coerced_params ATTRIBUTE_UNUSED)
+{
+  unsigned int fcode = DECL_FUNCTION_CODE (function);
+
+  switch (fcode)
+    {
+    case DARWIN_BUILTIN_CFSTRINGMAKECONSTANTSTRING:
+      if (!darwin_constant_cfstrings)
+	{
+	  error ("built-in function `%s' requires `-fconstant-cfstrings' flag",
+		 IDENTIFIER_POINTER (DECL_NAME (function)));
+	  return error_mark_node;
+	}
+
+      return darwin_build_constant_cfstring (TREE_VALUE (params));
+    default:
+      break;
+    }
+
+  return NULL_TREE;
+}
+
+static hashval_t
+cfstring_hash (const void *ptr)
+{
+  tree str = ((struct cfstring_descriptor *)ptr)->literal;
+  const unsigned char *p = (const unsigned char *) TREE_STRING_POINTER (str);
+  int i, len = TREE_STRING_LENGTH (str);
+  hashval_t h = len;
+
+  for (i = 0; i < len; i++)
+    h = ((h * 613) + p[i]);
+
+  return h;
+}
+
+static int
+cfstring_eq (const void *ptr1, const void *ptr2)
+{
+  tree str1 = ((struct cfstring_descriptor *)ptr1)->literal;
+  tree str2 = ((struct cfstring_descriptor *)ptr2)->literal;
+  int len1 = TREE_STRING_LENGTH (str1);
+
+  return (len1 == TREE_STRING_LENGTH (str2)
+	  && !memcmp (TREE_STRING_POINTER (str1), TREE_STRING_POINTER (str2),
+		      len1));
+}
+
+tree
+darwin_construct_objc_string (tree str)
+{
+  if (!darwin_constant_cfstrings)
+    return NULL_TREE;  /* Fall back to NSConstantString.  */
+  
+  return darwin_build_constant_cfstring (str);
+}
+
+static tree
+darwin_build_constant_cfstring (tree str)
+{
+  struct cfstring_descriptor *desc, key;
+  void **loc;
+
+  if (!str || TREE_CODE (str) != STRING_CST)
+    {
+      error ("CFString literal expression is not constant");
+      return error_mark_node;
+    }
+
+  /* Perhaps we already constructed a constant CFString just like this one? */
+  key.literal = str;
+  loc = htab_find_slot (cfstring_htab, &key, INSERT);
+  desc = *loc;
+
+  if (!desc)
+    {
+      tree initlist, constructor, field = TYPE_FIELDS (ccfstring_type_node);
+      int length = TREE_STRING_LENGTH (str) - 1;
+
+      if (darwin_warn_nonportable_cfstrings)
+	{
+	  extern int isascii (int);
+	  const char *s = TREE_STRING_POINTER (str);
+	  int l = 0;
+
+	  for (l = 0; l < length; l++)
+	    if (!s[l] || !isascii (s[l]))
+	      {
+		warning ("%s in CFString literal",
+			 s[l] ? "non-ASCII character" : "embedded NUL");
+		break;
+	      }
+	}
+
+      *loc = desc = ggc_alloc (sizeof (*desc));
+      desc->literal = str;
+
+      initlist = build_tree_list
+		 (field, build1 (ADDR_EXPR, pcint_type_node, 
+				 cfstring_class_reference));
+      field = TREE_CHAIN (field);
+      initlist = tree_cons (field, build_int_2 (0x000007c8, 0),
+			    initlist);
+      field = TREE_CHAIN (field);
+      initlist = tree_cons (field,
+			    build1 (ADDR_EXPR, pcchar_type_node,
+				    str), initlist);
+      field = TREE_CHAIN (field);
+      initlist = tree_cons (field, build_int_2 (length, 0),
+			    initlist);
+  
+      constructor = build_constructor (ccfstring_type_node,
+				       nreverse (initlist));
+      TREE_READONLY (constructor) = 1;
+      TREE_CONSTANT (constructor) = 1;
+      TREE_STATIC (constructor) = 1;
+
+      /* Fromage: The C++ flavor of 'build_unary_op' expects constructor nodes
+	 to have the TREE_HAS_CONSTRUCTOR (...) bit set.  However, this file is
+	 being built without any knowledge of C++ tree accessors; hence, we shall
+	 use the generic accessor that TREE_HAS_CONSTRUCTOR actually maps to!  */
+      if (darwin_running_cxx)
+	TREE_LANG_FLAG_4 (constructor) = 1;   /* TREE_HAS_CONSTRUCTOR  */
+
+      desc->constructor = constructor;
+    }
+
+  return build1 (ADDR_EXPR, pccfstring_type_node, desc->constructor);
+}     
+/* APPLE LOCAL end constant cfstrings */
 
 #include "gt-darwin.h"
