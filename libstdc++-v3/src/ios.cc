@@ -112,7 +112,9 @@ namespace std
   bool ios_base::Init::_S_synced_with_stdio = true;
 
   ios_base::ios_base() 
-  : _M_callbacks(0), _M_word_size(_S_local_word_size), _M_word(_M_local_word)
+  : _M_precision(), _M_width(), _M_flags(), _M_exception(), 
+  _M_streambuf_state(), _M_callbacks(0), _M_word_zero(), 
+  _M_word_size(_S_local_word_size), _M_word(_M_local_word), _M_ios_locale()
   {
     // Do nothing: basic_ios::init() does it.  
     // NB: _M_callbacks and _M_word must be zero for non-initialized
@@ -222,4 +224,15 @@ namespace std
       }
     _M_callbacks = 0;
   }
+
+  /* APPLE LOCAL begin  make libstdc++ more fine-grained  */
+#ifdef APPLE_KEYMGR
+  /* This function used to live in functexcept.cc, but now lives here to
+     avoid dragging in all of IOS when some other function in functexcept.cc
+     is called.  */    
+  void
+  __throw_ios_failure(const char* __s)
+  { throw ios_base::failure(__s); }
+#endif  /* APPLE_KEYMGR  */
+  /* APPLE LOCAL end  make libstdc++ more fine-grained  */
 } // namespace std

@@ -1,5 +1,5 @@
 /* Precompiled header implementation for the C languages.
-   Copyright (C) 2000, 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -35,6 +35,28 @@ Boston, MA 02111-1307, USA.  */
 #include "hosthooks.h"
 #include "target.h"
 
+/* APPLE LOCAL BEGIN pch distcc --mrs */
+#include "flags.h"
+#include "../libcpp/internal.h"
+/* APPLE LOCAL END pch distcc --mrs */
+
+/* This is a list of flag variables that must match exactly, and their
+   names for the error message.  The possible values for *flag_var must
+   fit in a 'signed char'.  */
+
+static const struct c_pch_matching 
+{
+  int *flag_var;
+  const char *flag_name;
+} pch_matching[] = {
+  { &flag_exceptions, "-fexceptions" },
+  { &flag_unit_at_a_time, "-funit-at-a-time" }
+};
+
+enum {
+  MATCH_SIZE = ARRAY_SIZE (pch_matching)
+};
+
 /* This structure is read very early when validating the PCH, and
    might be read for a PCH which is for a completely different compiler
    for a different operating system.  Thus, it should really only contain
@@ -52,6 +74,7 @@ struct c_pch_validity
   unsigned char target_machine_length;
   unsigned char version_length;
   unsigned char debug_info_type;
+  signed char match[MATCH_SIZE];
   void (*pch_init) (void);
   size_t target_data_length;
 };
@@ -120,6 +143,15 @@ pch_init (void)
   v.target_machine_length = strlen (target_machine);
   v.version_length = strlen (version_string);
   v.debug_info_type = write_symbols;
+  {
+    size_t i;
+    for (i = 0; i < MATCH_SIZE; i++)
+      {
+	v.match[i] = *pch_matching[i].flag_var;
+	if (v.match[i] != *pch_matching[i].flag_var)
+	  abort ();
+      }
+  }
   v.pch_init = &pch_init;
   target_validity = targetm.get_pch_validity (&v.target_data_length);
   
@@ -302,6 +334,20 @@ c_common_valid_pch (cpp_reader *pfile, const char *name, int fd)
       return 2;
     }
 
+  /* Check flags that must match exactly.  */
+  {
+    size_t i;
+    for (i = 0; i < MATCH_SIZE; i++)
+      if (*pch_matching[i].flag_var != v.match[i])
+	{
+	  if (cpp_get_options (pfile)->warn_invalid_pch)
+	    cpp_error (pfile, CPP_DL_WARNING, 
+		       "%s: settings for %s do not match", name,
+		       pch_matching[i].flag_name);
+	  return 2;
+	}
+  }
+
   /* If the text segment was not loaded at the same address as it was
      when the PCH file was created, function pointers loaded from the
      PCH will not be valid.  We could in theory remap all the function
@@ -355,6 +401,25 @@ c_common_read_pch (cpp_reader *pfile, const char *name,
   unsigned long written;
   struct save_macro_data *smd;
   
+  /* APPLE LOCAL BEGIN pch distcc --mrs */
+#if 0
+  /* MERGE FIXME: There is no 'print', and no 'outf'.  */
+  if (flag_pch_preprocess
+      && flag_preprocess_only)
+    {
+      fprintf (pfile->print.outf, "#include_pch \"%s\"\n", name);
+      pfile->print.line++;
+      pfile->print.printed = 0;
+    }
+
+  if (! flag_preprocess_only)
+    /* Before we wrote the file, we started a source file, so we have to start
+       one here to match.  */
+    /* MERGE FIXME: And there's no 'lineno'.  */
+    (*debug_hooks->start_source_file) (lineno, orig_name);
+  /* APPLE LOCAL END pch distcc --mrs */
+#endif
+  
   f = fdopen (fd, "rb");
   if (f == NULL)
     {
@@ -376,9 +441,13 @@ c_common_read_pch (cpp_reader *pfile, const char *name,
       long size = h.asm_size - written;
       if (size > 16384)
 	size = 16384;
-      if (fread (buf, size, 1, f) != 1
-	  || fwrite (buf, size, 1, asm_out_file) != 1)
-	cpp_errno (pfile, CPP_DL_ERROR, "reading");
+      /* APPLE LOCAL BEGIN pch distcc --mrs */
+      if (fread (buf, size, 1, f) != 1)
+	cpp_errno (pfile, CPP_DL_ERROR, "reading");	
+      else if (!flag_preprocess_only
+	       && fwrite (buf, size, 1, asm_out_file) != 1)
+	cpp_errno (pfile, CPP_DL_ERROR, "writing");
+      /* APPLE LOCAL END pch distcc --mrs */
       written += size;
     }
   free (buf);
@@ -401,6 +470,6 @@ c_common_no_more_pch (void)
   if (cpp_get_callbacks (parse_in)->valid_pch)
     {
       cpp_get_callbacks (parse_in)->valid_pch = NULL;
-      host_hooks.gt_pch_use_address (NULL, 0);
+      host_hooks.gt_pch_use_address (NULL, 0, -1, 0);
     }
 }

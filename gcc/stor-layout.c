@@ -66,6 +66,7 @@ static void place_union_field (record_layout_info, tree);
 static int excess_unit_span (HOST_WIDE_INT, HOST_WIDE_INT, HOST_WIDE_INT,
 			     HOST_WIDE_INT, tree);
 #endif
+static void force_type_save_exprs_1 (tree);
 extern void debug_rli (record_layout_info);
 
 /* SAVE_EXPRs for sizes of types and decls, waiting to be expanded.  */
@@ -79,6 +80,15 @@ int immediate_size_expand;
 
 /* Show that REFERENCE_TYPES are internal and should be Pmode.  Called only
    by front end.  */
+
+/* APPLE LOCAL begin Macintosh alignment 2002-5-24 --ff  */
+/* Keep track of whether we are laying out the first declared member
+   of a C++ class.  We need this flag to handle the case of classes
+   with v-tables where the test to see if the offset in the record
+   is zero is not sufficient to determine if we are dealing with the
+   first declared member.  */
+int darwin_align_is_first_member_of_class = 0;
+/* APPLE LOCAL end Macintosh alignment 2002-5-24 --ff  */
 
 void
 internal_reference_types (void)
@@ -140,16 +150,11 @@ variable_size (tree size)
      just return SIZE unchanged.  Likewise for self-referential sizes and
      constant sizes.  */
   if (TREE_CONSTANT (size)
-      || (*lang_hooks.decls.global_bindings_p) () < 0
+      || lang_hooks.decls.global_bindings_p () < 0
       || CONTAINS_PLACEHOLDER_P (size))
     return size;
 
-  if (TREE_CODE (size) == MINUS_EXPR && integer_onep (TREE_OPERAND (size, 1)))
-    /* If this is the upper bound of a C array, leave the minus 1 outside
-       the SAVE_EXPR so it can be folded away.  */
-    TREE_OPERAND (size, 0) = save = save_expr (TREE_OPERAND (size, 0));
-  else
-    size = save = save_expr (size);
+  size = save_expr (size);
 
   /* If an array with a variable number of elements is declared, and
      the elements require destruction, we will emit a cleanup for the
@@ -159,6 +164,7 @@ variable_size (tree size)
      `unsaved', i.e., all SAVE_EXPRs are recalculated.  However, we do
      not wish to do that here; the array-size is the same in both
      places.  */
+  save = skip_simple_arithmetic (size);
   if (TREE_CODE (save) == SAVE_EXPR)
     SAVE_EXPR_PERSISTENT_P (save) = 1;
 
@@ -167,7 +173,7 @@ variable_size (tree size)
        that determine sizes for variable size objects.  Trust it.  */
     return size;
 
-  if ((*lang_hooks.decls.global_bindings_p) ())
+  if (lang_hooks.decls.global_bindings_p ())
     {
       if (TREE_CONSTANT (size))
 	error ("type size can't be explicitly evaluated");
@@ -183,6 +189,60 @@ variable_size (tree size)
     put_pending_size (save);
 
   return size;
+}
+
+/* Given a type T, force elaboration of any SAVE_EXPRs used in the definition
+   of that type.  */
+
+void
+force_type_save_exprs (tree t)
+{
+  tree field;
+
+  switch (TREE_CODE (t))
+    {
+    case ERROR_MARK:
+      return;
+
+    case ARRAY_TYPE:
+    case SET_TYPE:
+    case VECTOR_TYPE:
+      /* It's probably overly-conservative to force elaboration of bounds and
+	 also the sizes, but it's better to be safe than sorry.  */
+      force_type_save_exprs_1 (TYPE_MIN_VALUE (TYPE_DOMAIN (t)));
+      force_type_save_exprs_1 (TYPE_MAX_VALUE (TYPE_DOMAIN (t)));
+      break;
+
+    case RECORD_TYPE:
+    case UNION_TYPE:
+    case QUAL_UNION_TYPE:
+      for (field = TYPE_FIELDS (t); field; field = TREE_CHAIN (field))
+	if (TREE_CODE (field) == FIELD_DECL)
+	  {
+	    force_type_save_exprs (TREE_TYPE (field));
+	    force_type_save_exprs_1 (DECL_FIELD_OFFSET (field));
+	  }
+      break;
+
+    default:
+      break;
+    }
+
+  force_type_save_exprs_1 (TYPE_SIZE (t));
+  force_type_save_exprs_1 (TYPE_SIZE_UNIT (t));
+}
+
+/* Utility routine of above, to verify that SIZE has been elaborated and
+   do so it it is a SAVE_EXPR and has not been.  */
+
+static void
+force_type_save_exprs_1 (tree size)
+{
+  if (size
+      && (size = skip_simple_arithmetic (size))
+      && TREE_CODE (size) == SAVE_EXPR
+      && !SAVE_EXPR_RTL (size))
+    expand_expr (size, NULL_RTX, VOIDmode, 0);
 }
 
 #ifndef MAX_FIXED_MODE_SIZE
@@ -363,7 +423,7 @@ layout_decl (tree decl, unsigned int known_align)
      size in bytes from the size in bits.  If we have already set the mode,
      don't set it again since we can be called twice for FIELD_DECLs.  */
 
-  TREE_UNSIGNED (decl) = TREE_UNSIGNED (type);
+  DECL_UNSIGNED (decl) = TYPE_UNSIGNED (type);
   if (DECL_MODE (decl) == VOIDmode)
     DECL_MODE (decl) = TYPE_MODE (type);
 
@@ -393,7 +453,7 @@ layout_decl (tree decl, unsigned int known_align)
 	     field.  */
 	  if (integer_zerop (DECL_SIZE (decl))
 	      && ! DECL_PACKED (decl)
-	      && ! (*targetm.ms_bitfield_layout_p) (DECL_FIELD_CONTEXT (decl)))
+	      && ! targetm.ms_bitfield_layout_p (DECL_FIELD_CONTEXT (decl)))
 	    {
 #ifdef PCC_BITFIELD_TYPE_MATTERS
 	      if (PCC_BITFIELD_TYPE_MATTERS)
@@ -459,11 +519,14 @@ layout_decl (tree decl, unsigned int known_align)
 	      || DECL_SIZE_UNIT (decl) == 0
 	      || TREE_CODE (DECL_SIZE_UNIT (decl)) == INTEGER_CST))
 	DECL_ALIGN (decl) = MIN (DECL_ALIGN (decl), BITS_PER_UNIT);
+/* APPLE LOCAL begin Macintosh alignment 2002-2-12 --ff */
+#ifdef PEG_ALIGN_FOR_MAC68K
+      else if (TARGET_ALIGN_MAC68K)
+	DECL_ALIGN (decl) = PEG_ALIGN_FOR_MAC68K (DECL_ALIGN (decl));
+#endif
+/* APPLE LOCAL end Macintosh alignment 2002-2-12 --ff */
 
-      /* Should this be controlled by DECL_USER_ALIGN, too?  */
-      if (maximum_field_alignment != 0)
-	DECL_ALIGN (decl) = MIN (DECL_ALIGN (decl), maximum_field_alignment);
-      if (! DECL_USER_ALIGN (decl))
+      if (! DECL_USER_ALIGN (decl) && ! DECL_PACKED (decl))
 	{
 	  /* Some targets (i.e. i386, VMS) limit struct field alignment
 	     to a lower boundary than alignment of variables unless
@@ -473,9 +536,16 @@ layout_decl (tree decl, unsigned int known_align)
 	    = MIN (DECL_ALIGN (decl), (unsigned) BIGGEST_FIELD_ALIGNMENT);
 #endif
 #ifdef ADJUST_FIELD_ALIGN
-	  DECL_ALIGN (decl) = ADJUST_FIELD_ALIGN (decl, DECL_ALIGN (decl));
+      /* APPLE LOCAL begin Macintosh alignment 2002-5-24 --ff */
+	  DECL_ALIGN (decl) = ADJUST_FIELD_ALIGN (decl, DECL_ALIGN (decl),
+						  known_align == 0);
+      /* APPLE LOCAL end Macintosh alignment 2002-5-24 --ff */
 #endif
 	}
+
+      /* Should this be controlled by DECL_USER_ALIGN, too?  */
+      if (maximum_field_alignment != 0)
+	DECL_ALIGN (decl) = MIN (DECL_ALIGN (decl), maximum_field_alignment);
     }
 
   /* Evaluate nonconstant size only once, either now or as soon as safe.  */
@@ -690,10 +760,23 @@ update_alignment_for_field (record_layout_info rli, tree field,
 		 && DECL_BIT_FIELD_TYPE (field)
 		 && ! integer_zerop (TYPE_SIZE (type)));
 
+#ifdef ADJUST_FIELD_ALIGN
+    if (! user_align)
+      /* APPLE LOCAL begin Macintosh alignment 2002-5-24 --ff */
+      /* The third argument to ADJUST_FIELD_ALIGN indicates whether
+	 we are dealing with the first field of the structure.  */
+      desired_align = 
+	ADJUST_FIELD_ALIGN (field, desired_align,
+			    (darwin_align_is_first_member_of_class 
+			     || (integer_zerop (rli->offset)
+				 && integer_zerop (rli->bitpos))));
+    /* APPLE LOCAL end Macintosh alignment 2002-5-24 --ff */
+#endif
+
   /* Record must have at least as much alignment as any field.
      Otherwise, the alignment of the field within the record is
      meaningless.  */
-  if (is_bitfield && (* targetm.ms_bitfield_layout_p) (rli->t))
+  if (is_bitfield && targetm.ms_bitfield_layout_p (rli->t))
     {
       /* Here, the alignment of the underlying type of a bitfield can
 	 affect the alignment of a record; even a zero-sized field
@@ -719,20 +802,33 @@ update_alignment_for_field (record_layout_info rli, tree field,
   else if (is_bitfield && PCC_BITFIELD_TYPE_MATTERS)
     {
       /* Named bit-fields cause the entire structure to have the
-	 alignment implied by their type.  */
-      if (DECL_NAME (field) != 0)
+	 alignment implied by their type.  Some targets also apply the same
+	 rules to unnamed bitfields.  */
+      if (DECL_NAME (field) != 0
+	  || targetm.align_anon_bitfield ())
 	{
 	  unsigned int type_align = TYPE_ALIGN (type);
 
 #ifdef ADJUST_FIELD_ALIGN
 	  if (! TYPE_USER_ALIGN (type))
-	    type_align = ADJUST_FIELD_ALIGN (field, type_align);
+	    /* APPLE LOCAL begin Macintosh alignment */
+	    type_align = ADJUST_FIELD_ALIGN (field, type_align,
+					     (darwin_align_is_first_member_of_class 
+					      || (integer_zerop (rli->offset)
+						  && integer_zerop (rli->bitpos))));
+	  /* APPLE LOCAL end Macintosh alignment */
 #endif
 
 	  if (maximum_field_alignment != 0)
 	    type_align = MIN (type_align, maximum_field_alignment);
 	  else if (DECL_PACKED (field))
 	    type_align = MIN (type_align, BITS_PER_UNIT);
+/* APPLE LOCAL begin Macintosh alignment 2002-2-12 --ff */
+#ifdef PEG_ALIGN_FOR_MAC68K
+	  else if (TARGET_ALIGN_MAC68K)
+	    type_align = PEG_ALIGN_FOR_MAC68K (type_align);
+#endif
+/* APPLE LOCAL end Macintosh alignment 2002-2-12 --ff */
 
 	  /* The alignment of the record is increased to the maximum
 	     of the current alignment, the alignment indicated on the
@@ -913,12 +1009,17 @@ place_field (record_layout_info rli, tree field)
      variable-sized fields, we need not worry about compatibility.  */
 #ifdef PCC_BITFIELD_TYPE_MATTERS
   if (PCC_BITFIELD_TYPE_MATTERS
-      && ! (* targetm.ms_bitfield_layout_p) (rli->t)
+      && ! targetm.ms_bitfield_layout_p (rli->t)
       && TREE_CODE (field) == FIELD_DECL
       && type != error_mark_node
       && DECL_BIT_FIELD (field)
       && ! DECL_PACKED (field)
       && maximum_field_alignment == 0
+/* APPLE LOCAL begin Macintosh alignment 2002-2-12 --ff */
+#ifdef PEG_ALIGN_FOR_MAC68K
+      && ! TARGET_ALIGN_MAC68K
+#endif
+/* APPLE LOCAL end Macintosh alignment 2002-2-12 --ff */
       && ! integer_zerop (DECL_SIZE (field))
       && host_integerp (DECL_SIZE (field), 1)
       && host_integerp (rli->offset, 1)
@@ -932,7 +1033,12 @@ place_field (record_layout_info rli, tree field)
 
 #ifdef ADJUST_FIELD_ALIGN
       if (! TYPE_USER_ALIGN (type))
-	type_align = ADJUST_FIELD_ALIGN (field, type_align);
+	/* APPLE LOCAL begin Macintosh alignment */
+	type_align = ADJUST_FIELD_ALIGN (field, type_align,
+					 (darwin_align_is_first_member_of_class 
+					  || (integer_zerop (rli->offset)
+					      && integer_zerop (rli->bitpos))));
+      /* APPLE LOCAL end Macintosh alignment */
 #endif
 
       /* A bit field may not span more units of alignment of its type
@@ -946,7 +1052,7 @@ place_field (record_layout_info rli, tree field)
 
 #ifdef BITFIELD_NBYTES_LIMITED
   if (BITFIELD_NBYTES_LIMITED
-      && ! (* targetm.ms_bitfield_layout_p) (rli->t)
+      && ! targetm.ms_bitfield_layout_p (rli->t)
       && TREE_CODE (field) == FIELD_DECL
       && type != error_mark_node
       && DECL_BIT_FIELD_TYPE (field)
@@ -964,7 +1070,12 @@ place_field (record_layout_info rli, tree field)
 
 #ifdef ADJUST_FIELD_ALIGN
       if (! TYPE_USER_ALIGN (type))
-	type_align = ADJUST_FIELD_ALIGN (field, type_align);
+	/* APPLE LOCAL begin Macintosh alignment */
+	type_align = ADJUST_FIELD_ALIGN (field, type_align,
+					 (darwin_align_is_first_member_of_class 
+					  || (integer_zerop (rli->offset)
+					      && integer_zerop (rli->bitpos))));
+      /* APPLE LOCAL end Macintosh alignment */
 #endif
 
       if (maximum_field_alignment != 0)
@@ -973,6 +1084,12 @@ place_field (record_layout_info rli, tree field)
 	 statement, so this code is unreachable currently.  */
       else if (DECL_PACKED (field))
 	type_align = MIN (type_align, BITS_PER_UNIT);
+/* APPLE LOCAL begin Macintosh alignment 2002-2-12 --ff */
+#ifdef PEG_ALIGN_FOR_MAC68K
+      else if (TARGET_ALIGN_MAC68K)
+	type_align = PEG_ALIGN_FOR_MAC68K (type_align);
+#endif
+/* APPLE LOCAL end Macintosh alignment 2002-2-12 --ff */
 
       /* A bit field may not span the unit of alignment of its type.
 	 Advance to next boundary if necessary.  */
@@ -997,7 +1114,7 @@ place_field (record_layout_info rli, tree field)
      Note: for compatibility, we use the type size, not the type alignment
      to determine alignment, since that matches the documentation */
 
-  if ((* targetm.ms_bitfield_layout_p) (rli->t)
+  if (targetm.ms_bitfield_layout_p (rli->t)
        && ((DECL_BIT_FIELD_TYPE (field) && ! DECL_PACKED (field))
 	  || (rli->prev_field && ! DECL_PACKED (rli->prev_field))))
     {
@@ -1327,6 +1444,17 @@ compute_record_mode (tree type)
      RECORD_TYPE.  This does not apply to unions.  */
   if (TREE_CODE (type) == RECORD_TYPE && mode != VOIDmode)
     TYPE_MODE (type) = mode;
+  /* APPLE LOCAL begin 8-byte-struct hack */
+#if defined RS6000_VARARGS_AREA
+  /* Make 8-byte structs BLKmode instead of DImode, which fixes both
+     struct-return methods and attempts to use floats in kernel code.
+     This should probably become a generic macro similar to
+     MEMBER_TYPE_FORCES_BLK above.  */
+  else if (mode_for_size_tree (TYPE_SIZE (type), MODE_INT, 1) == DImode
+	   && flag_pic)
+    ;
+#endif
+/* APPLE LOCAL end */
   else
     TYPE_MODE (type) = mode_for_size_tree (TYPE_SIZE (type), MODE_INT, 1);
 
@@ -1531,7 +1659,7 @@ layout_type (tree type)
     case CHAR_TYPE:
       if (TREE_CODE (TYPE_MIN_VALUE (type)) == INTEGER_CST
 	  && tree_int_cst_sgn (TYPE_MIN_VALUE (type)) >= 0)
-	TREE_UNSIGNED (type) = 1;
+	TYPE_UNSIGNED (type) = 1;
 
       TYPE_MODE (type) = smallest_mode_for_size (TYPE_PRECISION (type),
 						 MODE_INT);
@@ -1546,25 +1674,20 @@ layout_type (tree type)
       break;
 
     case COMPLEX_TYPE:
-      TREE_UNSIGNED (type) = TREE_UNSIGNED (TREE_TYPE (type));
+      TYPE_UNSIGNED (type) = TYPE_UNSIGNED (TREE_TYPE (type));
       TYPE_MODE (type)
 	= mode_for_size (2 * TYPE_PRECISION (TREE_TYPE (type)),
-			 (TREE_CODE (TREE_TYPE (type)) == INTEGER_TYPE
-			  ? MODE_COMPLEX_INT : MODE_COMPLEX_FLOAT),
+			 (TREE_CODE (TREE_TYPE (type)) == REAL_TYPE
+			  ? MODE_COMPLEX_FLOAT : MODE_COMPLEX_INT),
 			 0);
       TYPE_SIZE (type) = bitsize_int (GET_MODE_BITSIZE (TYPE_MODE (type)));
       TYPE_SIZE_UNIT (type) = size_int (GET_MODE_SIZE (TYPE_MODE (type)));
       break;
 
     case VECTOR_TYPE:
-      {
-	tree subtype;
-
-	subtype = TREE_TYPE (type);
-	TREE_UNSIGNED (type) = TREE_UNSIGNED (subtype);
-	TYPE_SIZE (type) = bitsize_int (GET_MODE_BITSIZE (TYPE_MODE (type)));
-	TYPE_SIZE_UNIT (type) = size_int (GET_MODE_SIZE (TYPE_MODE (type)));
-      }
+      TYPE_UNSIGNED (type) = TYPE_UNSIGNED (TREE_TYPE (type));
+      TYPE_SIZE (type) = bitsize_int (GET_MODE_BITSIZE (TYPE_MODE (type)));
+      TYPE_SIZE_UNIT (type) = size_int (GET_MODE_SIZE (TYPE_MODE (type)));
       break;
 
     case VOID_TYPE:
@@ -1604,7 +1727,7 @@ layout_type (tree type)
 
 	TYPE_SIZE (type) = bitsize_int (nbits);
 	TYPE_SIZE_UNIT (type) = size_int (GET_MODE_SIZE (mode));
-	TREE_UNSIGNED (type) = 1;
+	TYPE_UNSIGNED (type) = 1;
 	TYPE_PRECISION (type) = nbits;
       }
       break;
@@ -1654,7 +1777,7 @@ layout_type (tree type)
 	       sure the size is never negative.  We should really do this
 	       if *either* bound is non-constant, but this is the best
 	       compromise between C and Ada.  */
-	    if (! TREE_UNSIGNED (sizetype)
+	    if (!TYPE_UNSIGNED (sizetype)
 		&& TREE_CODE (TYPE_MIN_VALUE (index)) != INTEGER_CST
 		&& TREE_CODE (TYPE_MAX_VALUE (index)) != INTEGER_CST)
 	      length = size_binop (MAX_EXPR, length, size_zero_node);
@@ -1853,7 +1976,7 @@ initialize_sizetypes (void)
   TYPE_USER_ALIGN (t) = 0;
   TYPE_SIZE (t) = build_int_2 (GET_MODE_BITSIZE (SImode), 0);
   TYPE_SIZE_UNIT (t) = build_int_2 (GET_MODE_SIZE (SImode), 0);
-  TREE_UNSIGNED (t) = 1;
+  TYPE_UNSIGNED (t) = 1;
   TYPE_PRECISION (t) = GET_MODE_BITSIZE (SImode);
   TYPE_MIN_VALUE (t) = build_int_2 (0, 0);
   TYPE_IS_SIZETYPE (t) = 1;
@@ -1890,21 +2013,21 @@ set_sizetype (tree type)
 
   /* Make copies of nodes since we'll be setting TYPE_IS_SIZETYPE.  */
   sizetype = copy_node (type);
-  TYPE_DOMAIN (sizetype) = type;
+  TYPE_ORIG_SIZE_TYPE (sizetype) = type;
   TYPE_IS_SIZETYPE (sizetype) = 1;
   bitsizetype = make_node (INTEGER_TYPE);
   TYPE_NAME (bitsizetype) = TYPE_NAME (type);
   TYPE_PRECISION (bitsizetype) = precision;
   TYPE_IS_SIZETYPE (bitsizetype) = 1;
 
-  if (TREE_UNSIGNED (type))
+  if (TYPE_UNSIGNED (type))
     fixup_unsigned_type (bitsizetype);
   else
     fixup_signed_type (bitsizetype);
 
   layout_type (bitsizetype);
 
-  if (TREE_UNSIGNED (type))
+  if (TYPE_UNSIGNED (type))
     {
       usizetype = sizetype;
       ubitsizetype = bitsizetype;
@@ -2111,26 +2234,32 @@ get_best_mode (int bitsize, int bitpos, unsigned int align,
 }
 
 /* Gets minimal and maximal values for MODE (signed or unsigned depending on
-   SIGN).  */
+   SIGN).  The returned constants are made to be usable in TARGET_MODE.  */
 
 void
-get_mode_bounds (enum machine_mode mode, int sign, rtx *mmin, rtx *mmax)
+get_mode_bounds (enum machine_mode mode, int sign,
+		 enum machine_mode target_mode,
+		 rtx *mmin, rtx *mmax)
 {
-  int size = GET_MODE_BITSIZE (mode);
+  unsigned size = GET_MODE_BITSIZE (mode);
+  unsigned HOST_WIDE_INT min_val, max_val;
 
   if (size > HOST_BITS_PER_WIDE_INT)
     abort ();
 
   if (sign)
     {
-      *mmin = GEN_INT (-((unsigned HOST_WIDE_INT) 1 << (size - 1)));
-      *mmax = GEN_INT (((unsigned HOST_WIDE_INT) 1 << (size - 1)) - 1);
+      min_val = -((unsigned HOST_WIDE_INT) 1 << (size - 1));
+      max_val = ((unsigned HOST_WIDE_INT) 1 << (size - 1)) - 1;
     }
   else
     {
-      *mmin = const0_rtx;
-      *mmax = GEN_INT (((unsigned HOST_WIDE_INT) 1 << (size - 1) << 1) - 1);
+      min_val = 0;
+      max_val = ((unsigned HOST_WIDE_INT) 1 << (size - 1) << 1) - 1;
     }
+
+  *mmin = GEN_INT (trunc_int_for_mode (min_val, target_mode));
+  *mmax = GEN_INT (trunc_int_for_mode (max_val, target_mode));
 }
 
 #include "gt-stor-layout.h"
