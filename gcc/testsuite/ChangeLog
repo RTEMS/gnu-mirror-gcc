@@ -1,3 +1,131 @@
+2002-03-18  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* gcc.dg/cpp/wchar-1.c: Fix test.
+
+2002-03-18  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.dg/opt/conj1.C: New test.
+
+2002-03-17  Richard Earnshaw  <rearnsha@arm.com>
+
+	* gcc.dg/weak-1.c: Fix scan tests.
+
+2002-03-15  Mark Mitchell  <mark@codesourcery.com>
+
+	* g++.dg/opt/dtor1.C: New test.
+
+2002-03-15  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.c-torture/compile/20020315-1.c: New test.
+
+2002-03-14  Richard Earnshaw  <rearnsha@arm.com>
+
+	* gcc.c-torture/execute/20020314-1.c: New test.
+
+2002-03-14  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.dg/warn/Wunused-1.C: New test.
+
+2002-02-13  Richard Sandiford  <rsandifo@redhat.com>
+
+	* g++.dg/abi/mangle6.C: New test.
+
+2002-03-13  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.c-torture/compile/20020309-2.c: New test.
+
+	* gcc.c-torture/compile/20020312-1.c: New test.
+
+2002-03-12  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.dg/other/access1.C: New test.
+
+2002-03-12  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.c-torture/execute/wchar_t-1.c: New test.
+
+2002-03-12  David Edelsohn  <edelsohn@gnu.org>
+
+	* gcc.dg/20020103-1.c: Add rs6000 target and macro.
+
+2002-03-12  Aldy Hernandez  <aldyh@redhat.com>
+
+	* gcc.dg/20020103-1.c: Add other -D ppc variants.
+
+2002-03-12  Kazu Hirata  <kazu@hxi.com>
+
+	* gcc.c-torture/execute/20020307-1.c: Use long.
+
+2002-03-12  Roger Sayle  <roger@eyesopen.com>
+
+	* gcc.dg/20020312-1.c: New test case.
+
+2002-03-11  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* testsuite/g++.old-deja/g++.other/friend9.C: Revert DR 209 changes.
+	* testsuite/g++.old-deja/g++.robertl/eb56.C: Likewise.
+
+2002-03-11  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* testsuite/g++.dg/overload/pmf1.C: New test.
+
+2002-03-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR optimization/5844
+	* gcc.dg/20020310-1.c: New test.
+
+2002-03-11  Hans-Peter Nilsson  <hp@bitrange.com>
+
+	* gcc.c-torture/execute/20020227-1.c: New test.
+
+2002-03-09  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.c-torture/execute/va-arg-22.c: New test.
+
+Sat Mar  9 07:30:53 2002  Richard Kenner  <kenner@vlsi1.ultra.nyu.edu>
+
+	* gcc.c-torture/compile/20020309-1.c: New test.
+
+2002-03-08  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.c-torture/execute/20020307-2.c: New test.
+
+2002-03-08  Richard Earnshaw  <rearnsha@arm.com>
+
+	* gcc.c-torture/execute/20020307-1.c: New test.
+
+2002-03-05  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/20020304-1.c: New test.
+
+	* gcc.c-torture/compile/20020304-2.c: New test.
+
+2002-03-04  Zack Weinberg  <zack@codesourcery.com>
+
+	* gcc.c-torture/compile/20020304-1.c: New test case
+	(from PR c/5830).
+
+2002-03-02  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.dg/other/classkey1.C: New test.
+
+2002-03-01  Richard Henderson  <rth@redhat.com>
+
+	* gcc.c-torture/compile/981223-1.x: New.
+	* gcc.c-torture/compile/920625-1.x: New.
+
+2002-02-28  Richard Henderson  <rth@redhat.com>
+
+	* g++.dg/opt/vtgc1.C: Adjust patterns for ia64.
+
+2002-02-26  Alexandre Oliva  <aoliva@redhat.com>
+
+	* gcc.dg/debug/20020224-1.c: New.
+
+2002-02-26  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.dg/debug/debug4.C: New test.
+
 2002-02-25  Kazu Hirata  <kazu@hxi.com>
 
 	* gcc.c-torture/execute/960416-1.x: New.
@@ -126,7 +254,7 @@
 
 2002-02-12  David Billinghurst <David.Billinghurst@riotinto.com>
 
-	* gcc.dg/c99-flex-array-2.c: Add -std=iso9899:1999 
+	* gcc.dg/c99-flex-array-2.c: Add -std=iso9899:1999
 
 2002-02-10  Kazu Hirata  <kazu@hxi.com>
 
@@ -171,7 +299,7 @@
 2002-02-07  David Billinghurst <David.Billinghurst@riotinto.com>
 
 	PR fortran/5473
-	* g77.dg/pr5473.f: Now dg-error.  Add additional cases.  
+	* g77.dg/pr5473.f: Now dg-error.  Add additional cases.
 
 2002-02-07  Richard Henderson  <rth@redhat.com>
 
@@ -368,7 +496,7 @@
 	* gcc.c-torture/execute/20020127-1.c: New test.
 
 2002-01-27  David Billinghurst  <David.Billinghurst@riotinto.com>
- 
+
 	* g77.dg/f77-edit-i-in.f: New test
 	* g77.dg/f77-edit-i-out.f: New test
 

@@ -243,7 +243,7 @@ static tree build_instinit_invocation PARAMS ((tree));
 static void fix_constructors PARAMS ((tree));
 static tree build_alias_initializer_parameter_list PARAMS ((int, tree,
 							    tree, int *));
-static void craft_constructor PARAMS ((tree, tree));
+static tree craft_constructor PARAMS ((tree, tree));
 static int verify_constructor_super PARAMS ((tree));
 static tree create_artificial_method PARAMS ((tree, int, tree, tree, tree));
 static void start_artificial_method_body PARAMS ((tree));
@@ -5070,12 +5070,12 @@ parser_check_super_interface (super_decl, this_decl, this_wfl)
   if (!CLASS_INTERFACE (super_decl))
     {
       parse_error_context 
-	(this_wfl, "Can't use %s `%s' to implement/extend %s `%s'",
-	 (TYPE_ARRAY_P (super_type) ? "array" : "class"),
-	 IDENTIFIER_POINTER (DECL_NAME (super_decl)),
+	(this_wfl, "%s `%s' can't implement/extend %s `%s'",
 	 (CLASS_INTERFACE (TYPE_NAME (TREE_TYPE (this_decl))) ? 
-	  "interface" : "class"),
-	 IDENTIFIER_POINTER (DECL_NAME (this_decl)));
+	  "Interface" : "Class"),
+	 IDENTIFIER_POINTER (DECL_NAME (this_decl)),
+	 (TYPE_ARRAY_P (super_type) ? "array" : "class"),
+	 IDENTIFIER_POINTER (DECL_NAME (super_decl)));
       return 1;
     }
 
@@ -5400,7 +5400,7 @@ build_alias_initializer_parameter_list (mode, class_type, parm, artificial)
    where found. ARGS is non NULL when a special signature must be
    enforced. This is the case for anonymous classes.  */
 
-static void
+static tree
 craft_constructor (class_decl, args)
      tree class_decl, args;
 {
@@ -5449,6 +5449,7 @@ craft_constructor (class_decl, args)
   /* Now, mark the artificial parameters. */
   DECL_FUNCTION_NAP (decl) = artificial;
   DECL_FUNCTION_SYNTHETIC_CTOR (decl) = DECL_CONSTRUCTOR_P (decl) = 1;
+  return decl;
 }
 
 
@@ -5745,6 +5746,7 @@ do_resolve_class (enclosing, class_type, decl, cl)
 {
   tree new_class_decl = NULL_TREE, super = NULL_TREE;
   tree saved_enclosing_type = enclosing ? TREE_TYPE (enclosing) : NULL_TREE;
+  tree decl_result;
   struct hash_table _ht, *circularity_hash = &_ht;
 
   /* This hash table is used to register the classes we're going
@@ -5841,9 +5843,32 @@ do_resolve_class (enclosing, class_type, decl, cl)
       if (check_pkg_class_access (TYPE_NAME (class_type), cl, true))
         return NULL_TREE;
     }
-  
+
   /* 6- Last call for a resolution */
-  return IDENTIFIER_CLASS_VALUE (TYPE_NAME (class_type));
+  decl_result = IDENTIFIER_CLASS_VALUE (TYPE_NAME (class_type));
+
+  /* The final lookup might have registered a.b.c into a.b$c If we
+     failed at the first lookup, progressively change the name if
+     applicable and use the matching DECL instead. */
+  if (!decl_result && QUALIFIED_P (TYPE_NAME (class_type)))
+    {
+      tree name = TYPE_NAME (class_type);
+      char *separator;
+      do {
+
+       /* Reach the last '.', and if applicable, replace it by a `$' and
+          see if this exists as a type. */
+       if ((separator = strrchr (IDENTIFIER_POINTER (name), '.')))
+         {
+           int c = *separator;
+           *separator = '$';
+           name = get_identifier (IDENTIFIER_POINTER (name));
+           *separator = c;
+           decl_result = IDENTIFIER_CLASS_VALUE (name);
+         }
+      } while (!decl_result && separator);
+    }
+  return decl_result;
 }
 
 static tree
@@ -8975,8 +9000,10 @@ java_expand_classes ()
     }
   input_filename = main_input_filename;
 
-  /* Find anonymous classes and expand their constructor, now they
-     have been fixed. */
+
+  /* Find anonymous classes and expand their constructor. This extra pass is
+     neccessary because the constructor itself is only generated when the
+     method in which it is defined is expanded. */
   for (cur_ctxp = ctxp_for_generation; cur_ctxp; cur_ctxp = cur_ctxp->next)
     {
       tree current;
@@ -8994,7 +9021,7 @@ java_expand_classes ()
 		      restore_line_number_status (1);
 		      java_complete_expand_method (d);
 		      restore_line_number_status (0);
-		      break;	/* We now there are no other ones */
+		      break;	/* There is only one constructor. */
 		    }
 		}
 	    }
@@ -10831,7 +10858,14 @@ lookup_method_invoke (lc, cl, class, name, arg_list)
      know the arguments' types. */
 
   if (lc && ANONYMOUS_CLASS_P (class))
-    craft_constructor (TYPE_NAME (class), atl);
+    {
+      tree saved_current_class;
+      tree mdecl = craft_constructor (TYPE_NAME (class), atl);
+      saved_current_class = current_class;
+      current_class = class;
+      fix_constructors (mdecl);
+      current_class = saved_current_class;
+    }
 
   /* Find all candidates and then refine the list, searching for the
      most specific method. */
@@ -11252,11 +11286,17 @@ qualify_ambiguous_name (id)
 
     else if (code == INTEGER_CST)
       name = qual_wfl;
-    
+
     else if (code == CONVERT_EXPR &&
 	     TREE_CODE (TREE_OPERAND (qual_wfl, 0)) == EXPR_WITH_FILE_LOCATION)
       name = TREE_OPERAND (qual_wfl, 0);
-    
+
+    else if (code == CONVERT_EXPR
+	     && TREE_CODE (TREE_OPERAND (qual_wfl, 0)) == CALL_EXPR
+	     && (TREE_CODE (TREE_OPERAND (TREE_OPERAND (qual_wfl, 0), 0))
+		 == EXPR_WITH_FILE_LOCATION))
+      name = TREE_OPERAND (TREE_OPERAND (qual_wfl, 0), 0);
+
     else if ((code == ARRAY_REF || code == CALL_EXPR || code == MODIFY_EXPR) &&
 	     TREE_CODE (TREE_OPERAND (qual_wfl, 0)) == EXPR_WITH_FILE_LOCATION)
       name = EXPR_WFL_NODE (TREE_OPERAND (qual_wfl, 0));
@@ -12080,6 +12120,8 @@ java_complete_lhs (node)
       else
 	{
 	  node = patch_assignment (node, wfl_op1);
+	  if (node == error_mark_node)
+	    return error_mark_node;
 	  /* Reorganize the tree if necessary. */
 	  if (flag && (!JREFERENCE_TYPE_P (TREE_TYPE (node)) 
 		       || JSTRING_P (TREE_TYPE (node))))
@@ -12585,9 +12627,8 @@ patch_assignment (node, wfl_op1)
     {
       lhs_type = TREE_TYPE (lvalue);
     }
-  /* Or Lhs can be a array access. Should that be lvalue ? FIXME +
-     comment on reason why */
-  else if (TREE_CODE (wfl_op1) == ARRAY_REF)
+  /* Or Lhs can be an array access. */
+  else if (TREE_CODE (lvalue) == ARRAY_REF)
     {
       lhs_type = TREE_TYPE (lvalue);
       lvalue_from_array = 1;
@@ -12689,80 +12730,32 @@ patch_assignment (node, wfl_op1)
       && lvalue_from_array 
       && JREFERENCE_TYPE_P (TYPE_ARRAY_ELEMENT (lhs_type)))
     {
-      tree check;
-      tree base = lvalue;
-
-      /* We need to retrieve the right argument for
-         _Jv_CheckArrayStore.  This is somewhat complicated by bounds
-         and null pointer checks, both of which wrap the operand in
-         one layer of COMPOUND_EXPR.  */
-      if (TREE_CODE (lvalue) == COMPOUND_EXPR)
-	base = TREE_OPERAND (lvalue, 0);
-      else
-	{
-          tree op = TREE_OPERAND (base, 0);
-	  
-          /* We can have a SAVE_EXPR here when doing String +=.  */
-          if (TREE_CODE (op) == SAVE_EXPR)
-            op = TREE_OPERAND (op, 0);
-	  /* We can have a COMPOUND_EXPR here when doing bounds check. */
-	  if (TREE_CODE (op) == COMPOUND_EXPR)
-	    op = TREE_OPERAND (op, 1);
-	  base = TREE_OPERAND (op, 0);
-	  /* Strip the last PLUS_EXPR to obtain the base. */
-	  if (TREE_CODE (base) == PLUS_EXPR)
-	    base = TREE_OPERAND (base, 0);
-	}
-
-      /* Build the invocation of _Jv_CheckArrayStore */
+      tree array, store_check, base, index_expr;
+      
+      /* Save RHS so that it doesn't get re-evaluated by the store check. */ 
       new_rhs = save_expr (new_rhs);
-      check = build (CALL_EXPR, void_type_node,
-		     build_address_of (soft_checkarraystore_node),
-		     tree_cons (NULL_TREE, base,
-				build_tree_list (NULL_TREE, new_rhs)),
-		     NULL_TREE);
-      TREE_SIDE_EFFECTS (check) = 1;
 
-      /* We have to decide on an insertion point */
-      if (TREE_CODE (lvalue) == COMPOUND_EXPR)
+      /* Get the INDIRECT_REF. */
+      array = TREE_OPERAND (TREE_OPERAND (lvalue, 0), 0);
+      /* Get the array pointer expr. */
+      array = TREE_OPERAND (array, 0);
+      store_check = build_java_arraystore_check (array, new_rhs);
+      
+      index_expr = TREE_OPERAND (lvalue, 1);
+      
+      if (TREE_CODE (index_expr) == COMPOUND_EXPR)
 	{
-	  tree t;
-	  if (flag_bounds_check)
-	    {
-	      t = TREE_OPERAND (TREE_OPERAND (TREE_OPERAND (lvalue, 1), 0), 0);
-	      TREE_OPERAND (TREE_OPERAND (TREE_OPERAND (lvalue, 1), 0), 0) =
-		build (COMPOUND_EXPR, void_type_node, t, check);
-	    }
-	  else
-	    TREE_OPERAND (lvalue, 1) = build (COMPOUND_EXPR, lhs_type,
-					      check, TREE_OPERAND (lvalue, 1));
+	  /* A COMPOUND_EXPR here is a bounds check. The bounds check must 
+	     happen before the store check, so prepare to insert the store
+	     check within the second operand of the existing COMPOUND_EXPR. */
+	  base = index_expr;
 	}
-      else if (flag_bounds_check)
-	{
-          tree hook = lvalue;
-          tree compound = TREE_OPERAND (lvalue, 0);
-          tree bound_check, new_compound;
-
-          if (TREE_CODE (compound) == SAVE_EXPR)
-            {
-              compound = TREE_OPERAND (compound, 0);
-              hook = TREE_OPERAND (hook, 0);
-            }
-
-          /* Find the array bound check, hook the original array access. */
-          bound_check = TREE_OPERAND (compound, 0);
-          TREE_OPERAND (hook, 0) = TREE_OPERAND (compound, 1);
-
-	  /* Make sure the bound check will happen before the store check */
-          new_compound =
-            build (COMPOUND_EXPR, void_type_node, bound_check, check);
-
-          /* Re-assemble the augmented array access. */
-          lvalue = build (COMPOUND_EXPR, TREE_TYPE (lvalue),
-			  new_compound, lvalue);
-        }
       else
-        lvalue = build (COMPOUND_EXPR, TREE_TYPE (lvalue), check, lvalue);
+        base = lvalue;
+      
+      index_expr = TREE_OPERAND (base, 1);
+      TREE_OPERAND (base, 1) = build (COMPOUND_EXPR, TREE_TYPE (index_expr), 
+	  			      store_check, index_expr);
     }
 
   /* Final locals can be used as case values in switch
@@ -12830,12 +12823,6 @@ try_builtin_assignconv (wfl_op1, lhs_type, rhs)
 	  && TREE_CODE (lhs_type) == BOOLEAN_TYPE)
 	new_rhs = rhs;
     }
-
-  /* Zero accepted everywhere */
-  else if (TREE_CODE (rhs) == INTEGER_CST 
-      && TREE_INT_CST_HIGH (rhs) == 0 && TREE_INT_CST_LOW (rhs) == 0
-      && JPRIMITIVE_TYPE_P (rhs_type))
-    new_rhs = convert (lhs_type, rhs);
 
   /* 5.1.1 Try Identity Conversion,
      5.1.2 Try Widening Primitive Conversion */

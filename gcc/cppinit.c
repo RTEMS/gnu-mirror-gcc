@@ -1882,22 +1882,19 @@ init_dependency_output (pfile)
       CPP_OPTION (pfile, print_deps_append) = 1;
     }
   else if (CPP_OPTION (pfile, deps_file) == 0)
-    /* If -M or -MM was seen, default output to wherever was specified
-       with -o.  out_fname is non-NULL here.  */
+    /* If -M or -MM was seen without -MF, default output to wherever
+       was specified with -o.  out_fname is non-NULL here.  */
     CPP_OPTION (pfile, deps_file) = CPP_OPTION (pfile, out_fname);
 
-  /* When doing dependencies, we should suppress all output, including
-     -dM, -dI etc.  */
+  /* When doing dependencies, suppress normal preprocessed output.
+     Still do -dM, -dI etc. as e.g. glibc depends on this.  */
   CPP_OPTION (pfile, no_output) = 1;
-  CPP_OPTION (pfile, dump_macros) = 0;
-  CPP_OPTION (pfile, dump_includes) = 0;
 }
 
 /* Handle --help output.  */
 static void
 print_help ()
 {
-  fprintf (stderr, _("Usage: %s [switches] input output\n"), progname);
   /* To keep the lines from getting too long for some compilers, limit
      to about 500 characters (6 lines) per chunk.  */
   fputs (_("\
@@ -1960,6 +1957,8 @@ Switches:\n\
   fputs (_("\
   -M                        Generate make dependencies\n\
   -MM                       As -M, but ignore system header files\n\
+  -MD                       Generate make dependencies and compile\n\
+  -MMD                      As -MD, but ignore system header files\n\
   -MF <file>                Write dependency output to the given file\n\
   -MG                       Treat missing header file as generated files\n\
 "), stdout);
@@ -1971,8 +1970,8 @@ Switches:\n\
   fputs (_("\
   -D<macro>                 Define a <macro> with string '1' as its value\n\
   -D<macro>=<val>           Define a <macro> with <val> as its value\n\
-  -A<question> (<answer>)   Assert the <answer> to <question>\n\
-  -A-<question> (<answer>)  Disable the <answer> to <question>\n\
+  -A<question>=<answer>     Assert the <answer> to <question>\n\
+  -A-<question>=<answer>    Disable the <answer> to <question>\n\
   -U<macro>                 Undefine <macro> \n\
   -v                        Display the version number\n\
 "), stdout);
@@ -1989,7 +1988,7 @@ Switches:\n\
   -ftabstop=<number>        Distance between tab stops for column reporting\n\
   -P                        Do not generate #line directives\n\
   -$                        Do not allow '$' in identifiers\n\
-  -remap                    Remap file names when including files.\n\
+  -remap                    Remap file names when including files\n\
   --version                 Display version information\n\
   -h or --help              Display this information\n\
 "), stdout);
