@@ -431,15 +431,19 @@ string its argument points to.
 @cindex @code{sscanf}, and constant strings
 @cindex @code{fscanf}, and constant strings
 @cindex @code{scanf}, and constant strings
-Another consequence is that @code{sscanf} does not work on some very
-old systems when passed a string constant as its format control string
-or input.  This is because @code{sscanf} incorrectly tries to write
-into the string constant.  Likewise @code{fscanf} and @code{scanf}.
+@c APPLE LOCAL begin fwritable strings.
+Another consequence is that @code{sscanf} does not work on some systems
+when passed a string constant as its format control string or input.
+This is because @code{sscanf} incorrectly tries to write into the string
+constant.  Likewise @code{fscanf} and @code{scanf}.
 
-The solution to these problems is to change the program to use
+@opindex fwritable-strings
+The best solution to these problems is to change the program to use
 @code{char}-array variables with initialization strings for these
-purposes instead of string constants.
-
+purposes instead of string constants.  But if this is not possible,
+you can use the @option{-fwritable-strings} flag, which directs GCC
+to handle string constants the same way most C compilers do.
+@c APPLE LOCAL end fwritable strings.
 @item
 @code{-2147483648} is positive.
 
@@ -1113,7 +1117,7 @@ unspecified whether @samp{Base::operator=} is called more than once when
 the implicit copy-assignment for Derived objects is invoked (as it is
 inside @samp{func} in the example).
 
-g++ implements the ``intuitive'' algorithm for copy-assignment: assign all
+G++ implements the ``intuitive'' algorithm for copy-assignment: assign all
 direct bases, then assign all members.  In that algorithm, the virtual
 base subobject can be encountered more than once.  In the example, copying
 proceeds in the following order: @samp{val}, @samp{name} (via
@@ -1412,14 +1416,6 @@ There is no guarantee (in either the C or the C++ standard language
 definitions) that the increments will be evaluated in any particular
 order.  Either increment might happen first.  @code{func} might get the
 arguments @samp{2, 3}, or it might get @samp{3, 2}, or even @samp{2, 2}.
-
-@item
-Not allowing structures with volatile fields in registers.
-
-Strictly speaking, there is no prohibition in the ISO C standard
-against allowing structures with volatile fields in registers, but
-it does not seem to make any sense and is probably not what you wanted
-to do.  So the compiler will give an error message in this case.
 
 @item
 Making certain warnings into errors by default.

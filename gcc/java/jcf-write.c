@@ -1,5 +1,5 @@
 /* Write out a Java(TM) class file.
-   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003
+   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004
    Free Software Foundation, Inc.
 
 This file is part of GCC.
@@ -633,10 +633,7 @@ get_access_flags (tree decl)
 {
   int flags = 0;
   int isfield = TREE_CODE (decl) == FIELD_DECL || TREE_CODE (decl) == VAR_DECL;
-  if (CLASS_PUBLIC (decl))  /* same as FIELD_PUBLIC and METHOD_PUBLIC */
-    flags |= ACC_PUBLIC;
-  if (CLASS_FINAL (decl))  /* same as FIELD_FINAL and METHOD_FINAL */
-    flags |= ACC_FINAL;
+
   if (isfield || TREE_CODE (decl) == FUNCTION_DECL)
     {
       if (TREE_PROTECTED (decl))
@@ -646,6 +643,10 @@ get_access_flags (tree decl)
     }
   else if (TREE_CODE (decl) == TYPE_DECL)
     {
+      if (CLASS_PUBLIC (decl))
+	flags |= ACC_PUBLIC;
+      if (CLASS_FINAL (decl))
+	flags |= ACC_FINAL;
       if (CLASS_SUPER (decl))
 	flags |= ACC_SUPER;
       if (CLASS_ABSTRACT (decl))
@@ -669,6 +670,10 @@ get_access_flags (tree decl)
 
   if (TREE_CODE (decl) == FUNCTION_DECL)
     {
+      if (METHOD_PUBLIC (decl))
+	flags |= ACC_PUBLIC;
+      if (METHOD_FINAL (decl))
+	flags |= ACC_FINAL;
       if (METHOD_NATIVE (decl))
 	flags |= ACC_NATIVE;
       if (METHOD_STATIC (decl))
@@ -682,6 +687,10 @@ get_access_flags (tree decl)
     }
   if (isfield)
     {
+      if (FIELD_PUBLIC (decl))
+	flags |= ACC_PUBLIC;
+      if (FIELD_FINAL (decl))
+	flags |= ACC_FINAL;
       if (FIELD_STATIC (decl))
 	flags |= ACC_STATIC;
       if (FIELD_VOLATILE (decl))
@@ -762,7 +771,8 @@ static int
 find_constant_wide (HOST_WIDE_INT lo, HOST_WIDE_INT hi,
 		    struct jcf_partial *state)
 {
-  HOST_WIDE_INT w1, w2;
+  unsigned HOST_WIDE_INT w1;
+  HOST_WIDE_INT w2;
   lshift_double (lo, hi, -32, 64, &w1, &w2, 1);
   return find_constant2 (&state->cpool, CONSTANT_Long,
 			 (jword)(w1 & 0xFFFFFFFF), (jword)(lo & 0xFFFFFFFF));
@@ -812,7 +822,8 @@ find_constant_index (tree value, struct jcf_partial *state)
 static void
 push_long_const (HOST_WIDE_INT lo, HOST_WIDE_INT hi, struct jcf_partial *state)
 {
-  HOST_WIDE_INT highpart, dummy;
+  unsigned HOST_WIDE_INT highpart;
+  HOST_WIDE_INT dummy;
   jint lowpart = WORD_TO_INT (lo);
 
   rshift_double (lo, hi, 32, 64, &highpart, &dummy, 1);
@@ -823,7 +834,8 @@ push_long_const (HOST_WIDE_INT lo, HOST_WIDE_INT hi, struct jcf_partial *state)
       OP1(OPCODE_lconst_0 + lowpart);
     }
   else if ((highpart == 0 && lowpart > 0 && lowpart < 32768) 
-	   || (highpart == -1 && lowpart < 0 && lowpart >= -32768))
+	   || (highpart == (unsigned HOST_WIDE_INT)-1
+	       && lowpart < 0 && lowpart >= -32768))
       {
         push_int_const (lowpart, state);
         RESERVE (1);
@@ -2232,7 +2244,7 @@ generate_bytecode_insns (tree exp, int target, struct jcf_partial *state)
 		    /* Already converted to int, if needed. */
 		    if (TYPE_PRECISION (dst_type) <= 8)
 		      OP1 (OPCODE_i2b);
-		    else if (TREE_UNSIGNED (dst_type))
+		    else if (TYPE_UNSIGNED (dst_type))
 		      OP1 (OPCODE_i2c);
 		    else
 		      OP1 (OPCODE_i2s);
@@ -2849,11 +2861,11 @@ generate_classfile (tree clas, struct jcf_partial *state)
 {
   struct chunk *cpool_chunk;
   const char *source_file, *s;
-  char *ptr;
+  unsigned char *ptr;
   int i;
-  char *fields_count_ptr;
+  unsigned char *fields_count_ptr;
   int fields_count = 0;
-  char *methods_count_ptr;
+  unsigned char *methods_count_ptr;
   int methods_count = 0;
   tree part;
   int total_supers
@@ -3002,7 +3014,7 @@ generate_classfile (tree clas, struct jcf_partial *state)
 	  int code_attributes_count = 0;
 	  static tree Code_node = NULL_TREE;
 	  tree t;
-	  char *attr_len_ptr;
+	  unsigned char *attr_len_ptr;
 	  struct jcf_handler *handler;
 	  if (Code_node == NULL_TREE)
 	    Code_node = get_identifier ("Code");
@@ -3383,9 +3395,11 @@ make_class_file_name (tree clas)
       if (s == NULL)
 	break;
       *s = '\0';
+      /* Try to make directory if it doesn't already exist.  */
       if (stat (r, &sb) == -1
-	  /* Try to make it.  */
-	  && mkdir (r, 0755) == -1)
+	  && mkdir (r, 0755) == -1
+	  /* The directory might have been made by another process.  */
+	  && errno != EEXIST)
 	fatal_error ("can't create directory %s: %m", r);
 
       *s = sep;

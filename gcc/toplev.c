@@ -108,6 +108,8 @@ static void init_asm_output (const char *);
 static void finalize (void);
 
 static void crash_signal (int) ATTRIBUTE_NORETURN;
+/* APPLE LOCAL interrupt signal handler (radar 2941633)  --ilr */
+static void interrupt_signal (int) ATTRIBUTE_NORETURN;
 static void setup_core_dumping (void);
 static void compile_file (void);
 
@@ -138,6 +140,13 @@ static const char **save_argv;
    If there isn't any there, then this is the cc1 input file name.  */
 
 const char *main_input_filename;
+
+/* APPLE LOCAL fat builds (radar #2865464) --ilr */
+static int arch_specified = 0;
+
+/* Used to enable -fvar-tracking, -fweb and -frename-registers according
+   to optimize and default_debug_hooks in process_options ().  */
+#define AUTODETECT_FLAG_VAR_TRACKING 2
 
 /* Current position in real source file.  */
 
@@ -177,6 +186,10 @@ int target_flags_explicit;
 /* Debug hooks - dependent upon command line options.  */
 
 const struct gcc_debug_hooks *debug_hooks;
+
+/* Debug hooks - target default.  */
+
+static const struct gcc_debug_hooks *default_debug_hooks;
 
 /* Other flags saying which kinds of debugging dump have been requested.  */
 
@@ -255,12 +268,19 @@ int flag_branch_probabilities = 0;
 
 int flag_reorder_blocks = 0;
 
+/* Nonzero if blocks should be partitioned into hot and cold sections in
+   addition to being reordered. */
+
+int flag_reorder_blocks_and_partition = 0;
+
 /* Nonzero if functions should be reordered.  */
 
 int flag_reorder_functions = 0;
 
-/* Nonzero if registers should be renamed.  */
-
+/* Nonzero if registers should be renamed.  When
+   flag_rename_registers == AUTODETECT_FLAG_VAR_TRACKING it will be set
+   according to optimize and default_debug_hooks in process_options (),
+   but we do not do this yet because it triggers aborts in flow.c.  */
 int flag_rename_registers = 0;
 int flag_cprop_registers = 0;
 
@@ -305,15 +325,29 @@ unsigned local_tick;
 
 int flag_signed_char;
 
-/* Nonzero means give an enum type only as many bytes as it needs.  */
+/* Nonzero means give an enum type only as many bytes as it needs.  A value
+   of 2 means it has not yet been initialized.  */
 
 int flag_short_enums;
+
+/* APPLE LOCAL begin -fast */
+/* Nonzero if we should perform SPEC oriented optimizations.  */
+int flag_fast = 0;
+int flag_fastf = 0;
+int flag_fastcp = 0;
+/* APPLE LOCAL end -fast */
 
 /* Nonzero for -fcaller-saves: allocate values in regs that need to
    be saved across function calls, if that produces overall better code.
    Optional now, so people can test it.  */
 
 int flag_caller_saves = 0;
+
+/* APPLE LOCAL begin -ffppc 2001-08-01 --sts */
+/* Nonzero if the floating point precision control pass should
+   be performed. (x86 only really, but we pretend it's generic)  */
+int flag_fppc = 0;
+/* APPLE LOCAL end -ffppc 2001-08-01 --sts */
 
 /* Nonzero if structures and unions should be returned in memory.
 
@@ -370,22 +404,10 @@ int flag_thread_jumps;
 
 int flag_strength_reduce = 0;
 
-/* Nonzero enables loop unrolling in unroll.c.  Only loops for which the
-   number of iterations can be calculated at compile-time (UNROLL_COMPLETELY,
-   UNROLL_MODULO) or at run-time (preconditioned to be UNROLL_MODULO) are
-   unrolled.  */
-
-int flag_old_unroll_loops;
-
-/* Nonzero enables loop unrolling in unroll.c.  All loops are unrolled.
-   This is generally not a win.  */
-
-int flag_old_unroll_all_loops;
-
-/* Enables unrolling of simple loops in loop-unroll.c.  */
+/* Enables unrolling of simple loops.  */
 int flag_unroll_loops;
 
-/* Enables unrolling of all loops in loop-unroll.c.  */
+/* Enables unrolling of all loops.  */
 int flag_unroll_all_loops;
 
 /* Nonzero enables loop peeling.  */
@@ -412,6 +434,13 @@ int flag_reduce_all_givs = 0;
    default for -O2.  */
 
 int flag_regmove = 0;
+
+/* APPLE LOCAL begin fwritable strings  */
+/* Nonzero for -fwritable-strings:
+   store string constants in data segment and don't uniquize them.  */
+
+int flag_writable_strings = 0;
+/* APPLE LOCAL end fwritable strings  */
 
 /* Nonzero means don't put addresses of constant functions in registers.
    Used for compiling the Unix kernel, where strange substitutions are
@@ -486,13 +515,19 @@ int flag_complex_divide_method = 0;
 
 int flag_syntax_only = 0;
 
-/* Nonzero means performs web construction pass.  */
+/* Nonzero means performs web construction pass.  When flag_web ==
+   AUTODETECT_FLAG_VAR_TRACKING it will be set according to optimize
+   and default_debug_hooks in process_options ().  */
 
-int flag_web;
+int flag_web = AUTODETECT_FLAG_VAR_TRACKING;
 
 /* Nonzero means perform loop optimizer.  */
 
 int flag_loop_optimize;
+
+/* Nonzero means perform second pass of the loop optimizer.  */
+
+int flag_loop_optimize2;
 
 /* Nonzero means perform crossjumping.  */
 
@@ -563,6 +598,13 @@ int flag_rerun_loop_opt;
    good inline candidates.  */
 
 int flag_inline_functions;
+
+/* APPLE LOCAL begin -fobey-inline */
+/* Nonzero for -fobey-inline: 'inline' keyword must be obeyed, regardless
+   of codesize.  */
+
+int flag_obey_inline;
+/* APPLE LOCAL end -fobey-inline */
 
 /* Nonzero for -fkeep-inline-functions: even if we make a function
    go inline everywhere, keep its definition around for debugging
@@ -689,6 +731,9 @@ int flag_schedule_speculative_load_dangerous = 0;
 int flag_sched_stalled_insns = 0;
 int flag_sched_stalled_insns_dep = 1;
 
+/* The following flag controls the module scheduling activation. */
+int flag_modulo_sched = 0;
+
 int flag_single_precision_constant;
 
 /* flag_branch_on_count_reg means try to replace add-1,compare,branch tupple
@@ -813,11 +858,29 @@ int flag_tree_ccp = 0;
 /* Enable SSA-DCE on trees.  */
 int flag_tree_dce = 0;
 
+/* Enable the analysis of the scalar evolutions on trees.  */
+int flag_scalar_evolutions = 0;
+
+/* Enable the analysis of all data dependences.  */
+int flag_all_data_deps = 0;
+
+/* Enable data dependence graph.  */
+int flag_ddg = 0;
+
+/* Enable the elimination of checks on trees.  */
+int flag_tree_elim_checks = 0;
+
+/* Enable linear loop transforms on trees.  */
+int flag_tree_loop_linear = 0;
+
+/* Enable loop optimizations on trees.  */
+int flag_tree_loop = 0;
+
+/* Enable loop vectorization on trees */
+int flag_tree_vectorize = 0;
+
 /* Enable loop header copying on tree-ssa.  */
 int flag_tree_ch = 0;
-
-/* Enable loop optimization on tree-ssa.  */
-int flag_tree_loop = 0;
 
 /* Enable scalar replacement of aggregates.  */
 int flag_tree_sra = 0;
@@ -827,6 +890,9 @@ int flag_tree_combine_temps = 0;
 
 /* Enable SSA->normal pass expression replacement.  */
 int flag_tree_ter = 0;
+
+/* Enable SSA->normal live range splitting.  */
+int flag_tree_live_range_split = 0;
 
 /* Enable dominator optimizations.  */
 int flag_tree_dom = 0;
@@ -840,15 +906,28 @@ int flag_tree_dse = 0;
 /* Nonzero if we perform superblock formation.  */
 int flag_tracer = 0;
 
+/* APPLE LOCAL begin loop transposition */
+/* Nonzero if we should perform automatic loop transposition. */
+int flag_loop_transpose = 0;
+/* APPLE LOCAL end loop transposition */
+
 /* Nonzero if we perform whole unit at a time compilation.  */
 
 int flag_unit_at_a_time = 0;
 
+/* APPLE LOCAL BEGIN pch distcc --mrs */
+/* True if PCH should omit from the -E output all lines from PCH files
+   found in PCH files.  */
+int flag_pch_preprocess = 0;
+/* APPLE LOCAL END pch distcc --mrs */
+
+/* APPLE LOCAL begin predictive compilation */
+int predictive_compilation = -1;
+/* APPLE LOCAL end predictive compilation */
+
 /* Nonzero if we should track variables.  When
    flag_var_tracking == AUTODETECT_FLAG_VAR_TRACKING it will be set according
    to optimize, debug_info_level and debug_hooks in process_options ().  */
- 
-#define AUTODETECT_FLAG_VAR_TRACKING 2
 int flag_var_tracking = AUTODETECT_FLAG_VAR_TRACKING;
 
 /* Values of the -falign-* flags: how much to align labels in code.
@@ -942,15 +1021,16 @@ static const lang_independent_options f_options[] =
   {"expensive-optimizations", &flag_expensive_optimizations, 1 },
   {"thread-jumps", &flag_thread_jumps, 1 },
   {"strength-reduce", &flag_strength_reduce, 1 },
+  {"loop-transpose", &flag_loop_transpose, 1, },
   {"unroll-loops", &flag_unroll_loops, 1 },
   {"unroll-all-loops", &flag_unroll_all_loops, 1 },
-  {"old-unroll-loops", &flag_old_unroll_loops, 1 },
-  {"old-unroll-all-loops", &flag_old_unroll_all_loops, 1 },
   {"peel-loops", &flag_peel_loops, 1 },
   {"unswitch-loops", &flag_unswitch_loops, 1 },
   {"prefetch-loop-arrays", &flag_prefetch_loop_arrays, 1 },
   {"move-all-movables", &flag_move_all_movables, 1 },
   {"reduce-all-givs", &flag_reduce_all_givs, 1 },
+  /* APPLE LOCAL fwritable strings  */
+  {"writable-strings", &flag_writable_strings, 1 },
   {"peephole", &flag_no_peephole, 0 },
   {"force-mem", &flag_force_mem, 1 },
   {"force-addr", &flag_force_addr, 1 },
@@ -958,6 +1038,8 @@ static const lang_independent_options f_options[] =
   {"inline-functions", &flag_inline_functions, 1 },
   {"keep-inline-functions", &flag_keep_inline_functions, 1 },
   {"inline", &flag_no_inline, 0 },
+  /* APPLE LOCAL -fobey-inline */
+  {"obey-inline", &flag_obey_inline, 1, },
   {"keep-static-consts", &flag_keep_static_consts, 1 },
   {"syntax-only", &flag_syntax_only, 1 },
   {"shared-data", &flag_shared_data, 1 },
@@ -991,6 +1073,7 @@ static const lang_independent_options f_options[] =
   {"sched-stalled-insns-dep", &flag_sched_stalled_insns_dep, 1 },
   {"sched2-use-superblocks", &flag_sched2_use_superblocks, 1 },
   {"sched2-use-traces", &flag_sched2_use_traces, 1 },
+  {"modulo-sched", &flag_modulo_sched, 1 },
   {"branch-count-reg",&flag_branch_on_count_reg, 1 },
   {"pic", &flag_pic, 1 },
   {"PIC", &flag_pic, 2 },
@@ -1008,6 +1091,7 @@ static const lang_independent_options f_options[] =
   {"profile", &profile_flag, 1 },
   {"tree-based-profiling", &flag_tree_based_profiling, 1 },
   {"reorder-blocks", &flag_reorder_blocks, 1 },
+  {"reorder-blocks-and-partition", &flag_reorder_blocks_and_partition, 1},
   {"reorder-functions", &flag_reorder_functions, 1 },
   {"rename-registers", &flag_rename_registers, 1 },
   {"cprop-registers", &flag_cprop_registers, 1 },
@@ -1049,19 +1133,28 @@ static const lang_independent_options f_options[] =
   {"mem-report", &mem_report, 1 },
   { "trapv", &flag_trapv, 1 },
   { "wrapv", &flag_wrapv, 1 },
+  /* APPLE LOCAL -ffppc 2001-08-01 --sts */
+  { "fppc", &flag_fppc, 1 },
   { "new-ra", &flag_new_regalloc, 1 },
   { "var-tracking", &flag_var_tracking, 1},
   { "tree-gvn", &flag_tree_gvn, 1 },
   { "tree-pre", &flag_tree_pre, 1 },
   { "tree-ccp", &flag_tree_ccp, 1 },
   { "tree-dce", &flag_tree_dce, 1 },
+  { "scalar-evolutions", &flag_scalar_evolutions, 1 },
+  { "all-data-deps", &flag_all_data_deps, 1 },
+  { "tree-elim-checks", &flag_tree_elim_checks, 1 },
+  { "tree-ddg", &flag_ddg, 1 },
   { "tree-dominator-opts", &flag_tree_dom, 1 },
   { "tree-copyrename", &flag_tree_copyrename, 1 },
   { "tree-dse", &flag_tree_dse, 1 },
   { "tree-combine-temps", &flag_tree_combine_temps, 1 },
   { "tree-ter", &flag_tree_ter, 1 },
-  { "tree-ch", &flag_tree_ch, 1 },
-  { "tree-loop-optimize", &flag_tree_loop, 1 }
+  { "tree-loop-optimize", &flag_tree_loop, 1 },
+  { "tree-loop-linear", &flag_tree_loop_linear, 1},
+  { "tree-vectorize", &flag_tree_vectorize, 1},
+  { "tree-lrs", &flag_tree_live_range_split, 1 },
+  { "tree-ch", &flag_tree_ch, 1 }
 };
 
 /* Here is a table, controlled by the tm.h file, listing each -m switch
@@ -1120,7 +1213,12 @@ bool
 set_src_pwd (const char *pwd)
 {
   if (src_pwd)
-    return false;
+    {
+      if (strcmp (src_pwd, pwd) == 0)
+	return true;
+      else
+	return false;
+    }
 
   src_pwd = xstrdup (pwd);
   return true;
@@ -1149,7 +1247,7 @@ announce_function (tree decl)
       if (rtl_dump_and_exit)
 	verbatim ("%s ", IDENTIFIER_POINTER (DECL_NAME (decl)));
       else
-	verbatim (" %s", (*lang_hooks.decl_printable_name) (decl, 2));
+	verbatim (" %s", lang_hooks.decl_printable_name (decl, 2));
       fflush (stderr);
       pp_needs_newline (global_dc->printer) = true;
       diagnostic_set_last_function (global_dc);
@@ -1252,6 +1350,31 @@ floor_log2_wide (unsigned HOST_WIDE_INT x)
     x >>= 1;
   return log;
 }
+
+/* APPLE LOCAL begin interrupt signal handler (radar 2941633)  --ilr */
+/* If the compilation is interrupted do some cleanup. Any files created
+   by the compilation are deleted.  The compilation is terminated from
+   here.  */
+static void
+interrupt_signal (int signo ATTRIBUTE_UNUSED)
+{
+  /* Close the dump files.  */
+  if (flag_gen_aux_info)
+    {
+      fclose (aux_info_file);
+      unlink (aux_info_file_name);
+    }
+
+  if (asm_out_file)
+    {
+      fclose (asm_out_file);
+      if (asm_file_name && *asm_file_name)
+      	unlink (asm_file_name);
+    }
+
+  exit (FATAL_EXIT_CODE);
+}
+/* APPLE LOCAL end interrupt signal handler */
 
 /* Handler for fatal signals, such as SIGSEGV.  These are transformed
    into ICE messages, which is much more user friendly.  In case the
@@ -1386,7 +1509,7 @@ wrapup_global_declarations (tree *vec, int len)
 	DECL_DEFER_OUTPUT (decl) = 0;
 
       if (TREE_CODE (decl) == VAR_DECL && DECL_SIZE (decl) == 0)
-	(*lang_hooks.finish_incomplete_decl) (decl);
+	lang_hooks.finish_incomplete_decl (decl);
     }
 
   /* Now emit any global variables or functions that we have been
@@ -1523,7 +1646,7 @@ check_global_declarations (tree *vec, int len)
 	  /* Global register variables must be declared to reserve them.  */
 	  && ! (TREE_CODE (decl) == VAR_DECL && DECL_REGISTER (decl))
 	  /* Otherwise, ask the language.  */
-	  && (*lang_hooks.decls.warn_unused_global) (decl))
+	  && lang_hooks.decls.warn_unused_global (decl))
 	warning ("%J'%D' defined but not used", decl, decl);
 
       /* Avoid confusing the debug information machinery when there are
@@ -1575,6 +1698,46 @@ warn_deprecated_use (tree node)
     }
 }
 
+/* APPLE LOCAL begin "unavailable" attribute (radar 2809697) --ilr */
+/* Warn about a use of an identifier which was marked deprecated.  */
+void
+warn_unavailable_use (tree node)
+{
+  if (node == 0)
+    return;
+
+  if (DECL_P (node))
+    warning ("`%s' is unavailable (declared at %s:%d)",
+	     IDENTIFIER_POINTER (DECL_NAME (node)),
+	     DECL_SOURCE_FILE (node), DECL_SOURCE_LINE (node));
+  else if (TYPE_P (node))
+    {
+      const char *what = NULL;
+      tree decl = TYPE_STUB_DECL (node);
+
+      if (TREE_CODE (TYPE_NAME (node)) == IDENTIFIER_NODE)
+	what = IDENTIFIER_POINTER (TYPE_NAME (node));
+      else if (TREE_CODE (TYPE_NAME (node)) == TYPE_DECL
+	       && DECL_NAME (TYPE_NAME (node)))
+	what = IDENTIFIER_POINTER (DECL_NAME (TYPE_NAME (node)));
+
+      if (what)
+	{
+	  if (decl)
+	    warning ("`%s' is unavailable (declared at %s:%d)", what,
+		     DECL_SOURCE_FILE (decl), DECL_SOURCE_LINE (decl));
+	  else
+	    warning ("`%s' is unavailable", what);
+	}
+      else if (decl)
+	warning ("type is unavailable (declared at %s:%d)",
+		 DECL_SOURCE_FILE (decl), DECL_SOURCE_LINE (decl));
+      else
+	warning ("type is unavailable");
+    }
+}
+/* APPLE LOCAL end "unavailable" attribute (radar 2809697) --ilr */
+
 /* Save the current INPUT_LOCATION on the top entry in the
    INPUT_FILE_STACK.  Push a new entry for FILE and LINE, and set the
    INPUT_LOCATION accordingly.  */
@@ -1624,11 +1787,11 @@ compile_file (void)
 
   /* Call the parser, which parses the entire file (calling
      rest_of_compilation for each function).  */
-  (*lang_hooks.parse_file) (set_yydebug);
+  lang_hooks.parse_file (set_yydebug);
 
   /* In case there were missing block closers,
      get us back to the global binding level.  */
-  (*lang_hooks.clear_binding_stack) ();
+  lang_hooks.clear_binding_stack ();
 
   /* Compilation is now finished except for writing
      what's left of the symbol table output.  */
@@ -1637,7 +1800,7 @@ compile_file (void)
   if (flag_syntax_only)
     return;
 
-  (*lang_hooks.decls.final_write_globals)();
+  lang_hooks.decls.final_write_globals ();
 
   cgraph_varpool_assemble_pending_decls ();
 
@@ -1665,8 +1828,6 @@ compile_file (void)
 
   dw2_output_indirect_constants ();
 
-  targetm.asm_out.file_end ();
-
   /* Attach a special .ident directive to the end of the file to identify
      the version of GCC which compiled this code.  The format of the .ident
      string is patterned after the ones produced by native SVR4 compilers.  */
@@ -1675,6 +1836,11 @@ compile_file (void)
     fprintf (asm_out_file, "%s\"GCC: (GNU) %s\"\n",
 	     IDENT_ASM_OP, version_string);
 #endif
+
+  /* This must be at the end.  Some target ports emit end of file directives
+     into the assembly file here, and hence we can not output anything to the
+     assembly file after this point.  */
+  targetm.asm_out.file_end ();
 }
 
 /* Display help for target options.  */
@@ -1849,7 +2015,12 @@ set_target_switch (const char *name)
       }
 #endif
 
-  if (!valid_target_option)
+  /* APPLE LOCAL begin fat builds */
+  /* Note, the driver guarantees that -arch will precede the -m
+     options so that arch_specified will be known by the time we get
+     here.  For Radar 2865464.  */
+  if (!valid_target_option && !arch_specified)
+    /* APPLE LOCAL end fat builds */
     error ("invalid option `%s'", name);
 }
 
@@ -1942,6 +2113,18 @@ print_switch_values (FILE *file, int pos, int max,
 	  continue;
 	if ((*p)[1] == 'd')
 	  continue;
+        /* APPLE LOCAL begin -fast or -fastf or -fastcp */
+        if ((flag_fast || flag_fastf || flag_fastcp)
+            && (*p)[0] == '-' && (*p)[1] == 'O')
+          {
+            int optimize_val;
+            if ((*p)[2] == 's' && (*p)[3] == '\0')
+              continue;
+            optimize_val = read_integral_parameter (*p+2, 0, -1);
+            if (optimize_val != 3)
+              continue;
+          }
+        /* APPLE LOCAL end -fast or -fastf or -fastcp */
 
 	pos = print_single_switch (file, pos, max, indent, sep, term, *p, "");
       }
@@ -1957,8 +2140,15 @@ print_switch_values (FILE *file, int pos, int max,
 
   for (j = 0; j < ARRAY_SIZE (f_options); j++)
     if (*f_options[j].variable == f_options[j].on_value)
-      pos = print_single_switch (file, pos, max, indent, sep, term,
-				 "-f", f_options[j].string);
+      /* APPLE LOCAL begin -fverbose-asm print option values (radar 3372156) */
+      /* FSF candidate */
+      {
+	char value[256];
+	sprintf (value, "-f%s=%d", f_options[j].string,f_options[j].on_value);
+	pos = print_single_switch (file, pos, max, indent, sep, term,
+				   "", value);
+      }
+      /* APPLE LOCAL end */
 
   /* Print target specific options.  */
 
@@ -2167,7 +2357,7 @@ default_tree_printer (pretty_printer * pp, text_info *text)
       {
         tree t = va_arg (*text->args_ptr, tree);
         const char *n = DECL_NAME (t)
-          ? (*lang_hooks.decl_printable_name) (t, 2)
+          ? lang_hooks.decl_printable_name (t, 2)
           : "<anonymous>";
         pp_string (pp, n);
       }
@@ -2220,12 +2410,37 @@ general_init (const char *argv0)
 #if defined SIGIOT && (!defined SIGABRT || SIGABRT != SIGIOT)
   signal (SIGIOT, crash_signal);
 #endif
+  /* APPLE LOCAL begin interrupt signal handler (radar 2941633)  --ilr */
+  /* Handle compilation interrupts.  */
+  if (signal (SIGINT, SIG_IGN) != SIG_IGN)
+    signal (SIGINT, interrupt_signal);
+  if (signal (SIGKILL, SIG_IGN) != SIG_IGN)
+    signal (SIGINT, interrupt_signal);
+  if (signal (SIGTERM, SIG_IGN) != SIG_IGN)
+    signal (SIGTERM, interrupt_signal);
+  /* APPLE LOCAL end interrupt signal handler */
 #ifdef SIGFPE
   signal (SIGFPE, crash_signal);
 #endif
 
   /* Other host-specific signal setup.  */
   (*host_hooks.extra_signals)();
+
+  /* APPLE LOCAL begin setrlimit */
+#ifdef RLIMIT_STACK
+  /* Get rid of any avoidable limit on stack size.  */
+  {
+    struct rlimit rlim;
+
+    /* Set the stack limit huge.  (Compiles normally work within
+       a megabyte of stack, but the normal limit on OSX is 512K for
+       some reason.) */
+    getrlimit (RLIMIT_STACK, &rlim);
+    rlim.rlim_cur = rlim.rlim_max;
+    setrlimit (RLIMIT_STACK, &rlim);
+  }
+#endif /* RLIMIT_STACK defined */
+  /* APPLE LOCAL end setrlimit */
 
   /* Initialize the garbage-collector, string pools and tree type hash
      table.  */
@@ -2253,13 +2468,16 @@ process_options (void)
      initialization based on the command line options.  This hook also
      sets the original filename if appropriate (e.g. foo.i -> foo.c)
      so we can correctly initialize debug output.  */
-  no_backend = (*lang_hooks.post_options) (&main_input_filename);
+  no_backend = lang_hooks.post_options (&main_input_filename);
   input_filename = main_input_filename;
 
 #ifdef OVERRIDE_OPTIONS
   /* Some machines may reject certain combinations of options.  */
   OVERRIDE_OPTIONS;
 #endif
+
+  if (flag_short_enums == 2)
+    flag_short_enums = targetm.default_short_enums ();
 
   /* Set aux_base_name if not already set.  */
   if (aux_base_name)
@@ -2296,25 +2514,19 @@ process_options (void)
   if (flag_unroll_all_loops)
     flag_unroll_loops = 1;
 
-  if (flag_unroll_loops)
-    {
-      flag_old_unroll_loops = 0;
-      flag_old_unroll_all_loops = 0;
-    }
-
-  if (flag_old_unroll_all_loops)
-    flag_old_unroll_loops = 1;
+  if (flag_loop_optimize2)
+    flag_loop_optimize = 0;
 
   /* Old loop unrolling requires that strength_reduction be on also.  Silently
      turn on strength reduction here if it isn't already on.  Also, the loop
      unrolling code assumes that cse will be run after loop, so that must
      be turned on also.  */
-  if (flag_old_unroll_loops)
+  if (flag_unroll_loops)
     {
       flag_strength_reduce = 1;
       flag_rerun_cse_after_loop = 1;
     }
-  if (flag_unroll_loops || flag_peel_loops)
+  if (flag_peel_loops)
     flag_rerun_cse_after_loop = 1;
 
   if (flag_non_call_exceptions)
@@ -2382,6 +2594,30 @@ process_options (void)
 
   /* Now we know write_symbols, set up the debug hooks based on it.
      By default we do nothing for debug output.  */
+  if (PREFERRED_DEBUGGING_TYPE == NO_DEBUG)
+    default_debug_hooks = &do_nothing_debug_hooks;
+#if defined(DBX_DEBUGGING_INFO)
+  else if (PREFERRED_DEBUGGING_TYPE == DBX_DEBUG)
+    default_debug_hooks = &dbx_debug_hooks;
+#endif
+#if defined(XCOFF_DEBUGGING_INFO)
+  else if (PREFERRED_DEBUGGING_TYPE == XCOFF_DEBUG)
+    default_debug_hooks = &xcoff_debug_hooks;
+#endif
+#ifdef SDB_DEBUGGING_INFO
+  else if (PREFERRED_DEBUGGING_TYPE == SDB_DEBUG)
+    default_debug_hooks = &sdb_debug_hooks;
+#endif
+#ifdef DWARF2_DEBUGGING_INFO
+  else if (PREFERRED_DEBUGGING_TYPE == DWARF2_DEBUG)
+    default_debug_hooks = &dwarf2_debug_hooks;
+#endif
+#ifdef VMS_DEBUGGING_INFO
+  else if (PREFERRED_DEBUGGING_TYPE == VMS_DEBUG
+	   || PREFERRED_DEBUGGING_TYPE == VMS_AND_DWARF2_DEBUG)
+    default_debug_hooks = &vmsdbg_debug_hooks;
+#endif
+
   if (write_symbols == NO_DEBUG)
     debug_hooks = &do_nothing_debug_hooks;
 #if defined(DBX_DEBUGGING_INFO)
@@ -2409,14 +2645,33 @@ process_options (void)
 	   debug_type_names[write_symbols]);
 
   /* Now we know which debug output will be used so we can set
-     flag_var_tracking if user has not specified it.  */
-  if (flag_var_tracking == AUTODETECT_FLAG_VAR_TRACKING)
+     flag_var_tracking, flag_rename_registers and flag_web if the user has
+     not specified them.  */
+  if (debug_info_level < DINFO_LEVEL_NORMAL
+      || debug_hooks->var_location == do_nothing_debug_hooks.var_location)
     {
-      /* User has not specified -f(no-)var-tracking so autodetect it.  */
-      flag_var_tracking
-	= (optimize >= 1 && debug_info_level >= DINFO_LEVEL_NORMAL
-	   && debug_hooks->var_location != do_nothing_debug_hooks.var_location);
+      if (flag_var_tracking == 1)
+        {
+	  if (debug_info_level < DINFO_LEVEL_NORMAL)
+	    warning ("variable tracking requested, but useless unless "
+		     "producing debug info");
+	  else
+	    warning ("variable tracking requested, but not supported "
+		     "by this debug format");
+	}
+      flag_var_tracking = 0;
     }
+
+  if (flag_rename_registers == AUTODETECT_FLAG_VAR_TRACKING)
+    flag_rename_registers = default_debug_hooks->var_location
+	    		    != do_nothing_debug_hooks.var_location;
+
+  if (flag_web == AUTODETECT_FLAG_VAR_TRACKING)
+    flag_web = optimize >= 2 && (default_debug_hooks->var_location
+	    		         != do_nothing_debug_hooks.var_location);
+
+  if (flag_var_tracking == AUTODETECT_FLAG_VAR_TRACKING)
+    flag_var_tracking = optimize >= 1;
 
   /* If auxiliary info generation is desired, open the output file.
      This goes in the same directory as the source file--unlike
@@ -2520,7 +2775,7 @@ lang_dependent_init (const char *name)
     dump_base_name = name ? name : "gccdump";
 
   /* Other front-end initialization.  */
-  if ((*lang_hooks.init) () == 0)
+  if (lang_hooks.init () == 0)
     return 0;
 
   init_asm_output (name);
@@ -2529,11 +2784,13 @@ lang_dependent_init (const char *name)
      front end is initialized.  */
   init_eh ();
   init_optabs ();
+  init_optimization_passes ();
 
   /* The following initialization functions need to generate rtl, so
      provide a dummy function context for them.  */
   init_dummy_function_start ();
   init_expr_once ();
+  init_set_costs ();
   expand_dummy_function_end ();
 
   /* If dbx symbol table desired, initialize writing it and output the
@@ -2596,7 +2853,7 @@ finalize (void)
   free_reg_info ();
 
   /* Language-specific end of compilation actions.  */
-  (*lang_hooks.finish) ();
+  lang_hooks.finish ();
 }
 
 /* Initialize the compiler, and compile the input file.  */

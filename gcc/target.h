@@ -45,7 +45,10 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
    scattered throughout GCC.  */
 
 #include "tm.h"
-
+/* APPLE LOCAL AV if-conversion --dpatel  */
+#include "tree.h"
+/* APPLE LOCAL AV vmul_uch --haifa  */
+#include "tree-flow.h"
 struct gcc_target
 {
   /* Functions that output assembler for the target.  */
@@ -73,6 +76,13 @@ struct gcc_target
 
     /* Output code that will globalize a label.  */
     void (* globalize_label) (FILE *, const char *);
+
+    /* Output code that will emit a label for unwind info, if this
+       target requires such labels.  Second argument is the decl the
+       unwind info is associated with, third is a boolean: true if
+       this is for exception handling, fourth is a boolean: true if
+       this is only a placeholder for an omitted FDE. */
+    void (* unwind_label) (FILE *, tree, int, int);
 
     /* Output an internal label.  */
     void (* internal_label) (FILE *, const char *, unsigned long);
@@ -301,12 +311,32 @@ struct gcc_target
      Microsoft Visual C++ bitfield layout rules.  */
   bool (* ms_bitfield_layout_p) (tree record_type);
 
+  /* Return true if anonymous bitfields affect structure alignment.  */
+  bool (* align_anon_bitfield) (void);
+
   /* Set up target-specific built-in functions.  */
   void (* init_builtins) (void);
 
   /* Expand a target-specific builtin.  */
   rtx (* expand_builtin) (tree exp, rtx target, rtx subtarget,
 			  enum machine_mode mode, int ignore);
+
+  /* APPLE LOCAL begin constant cfstrings */
+  /* Expand a platform-specific (but machine-independent) builtin.  */
+  tree (* expand_tree_builtin) (tree function, tree params,
+				tree coerced_params);
+
+  /* Construct a target-specific Objective-C string object based on the
+     STRING_CST passed in STR, or NULL if the default Objective-C objects
+     (based on NSConstantString or NXConstantString) should be used
+     instead.  */
+  tree (* construct_objc_string) (tree str);
+  /* APPLE LOCAL end constant cfstrings */
+
+  /* For a vendor-specific fundamental TYPE, return a pointer to
+     a statically-allocated string containing the C++ mangling for
+     TYPE.  In all other cases, return NULL.  */
+  const char * (* mangle_fundamental_type) (tree type);
 
   /* Make any adjustments to libfunc names needed for this target.  */
   void (* init_libfuncs) (void);
@@ -407,6 +437,86 @@ struct gcc_target
   /* Create the __builtin_va_list type.  */
   tree (* build_builtin_va_list) (void);
 
+  /* APPLE LOCAL begin AV misaligned --haifa  */
+  /* APPLE LOCAL begin AV if-conversion --dpatel  */
+  /* Functions relating to vectorization.  */
+  struct vect
+  {
+    /* True if loads from misaligned addresses are supported.  */
+    bool (* support_misaligned_loads) (void);
+
+    /* True if loads from misaligned addresses are permuted.  */
+    bool (* permute_misaligned_loads) (void);
+
+    /* Function decl for mask used to shift left by vperm.  */
+    tree (* build_builtin_lvsl) (void);
+
+    /* Function decl for mask used to shift right by vperm.  */
+    tree (* build_builtin_lvsr) (void);
+
+    /* Function decl for vector permute.  */
+    tree (* build_builtin_vperm) (enum machine_mode);
+
+    /* True if vector compare instructions are supported.  */
+    bool (* support_vector_compare_p) (void);
+
+    /* True if vector compare instruction is supported in given code.  */
+    bool (* support_vector_compare_for_p) (tree, tree, enum tree_code);
+ 
+    /* Generate vector compare statement.  
+       Return value is vector compare statement.  */
+    tree (* vector_compare_stmt) (tree, tree, tree, tree, enum tree_code);
+    
+    /* True if vector select instructions are supported.  */
+    bool (* support_vector_select_p) (void);
+    
+    /* True if vector selector instruction are supported in given code.  */
+    bool (* support_vector_select_for_p) (tree);
+    
+    /* Generate vector select statement.  
+       Return value is vector select statement.  */
+    tree (* vector_select_stmt) (tree, tree, tree, tree, tree);
+
+    /* APPLE LOCAL begin AV vmul_uch --haifa  */
+    /* True if vector "mult_uch" can be supported (see below).  */
+    bool (* support_vmul_uch_p) (void);
+
+    /* Generate a sequence that vectorizes the following functionality:
+	  uchar x' = (ushort) x;
+	  uchar y' = (ushort) y;
+	  ushort prod = mul (x`, y`);
+	  ushort z` = prod >> 8;
+	  uchar z = (uchar) z`;
+       This sequence is modelled by a single scalar_stmt "mul_uch".
+       The function generates a vectorized sequence that multiplies two vectors
+       of unsigned chars, vx and vy, and converts the (vector of unsigned 
+       shorts) result back to a vector of unsigned chars, vz. The vectorized
+       sequence will replace the scalar_stmt "mul_uch".
+       The arguments are: tree vx, tree vy, tree vz, edge pe - where code can 
+       be inserted at the loop preheader), and a block_stmt_iterator that 
+       points to the place where the vectorized sequence should be inserted. 
+       The output: Generate a sequence of vectorized stmts; all the stmts but 
+       the last are inserted either at the preheader edge or at bsi; the last 
+       stmt is returned.  */
+    tree (* build_vmul_uch) (tree, tree, tree, edge, block_stmt_iterator *);
+    /* APPLE LOCAL end AV vmul_uch --haifa  */
+
+    /* APPLE LOCAL begin AV vector_init --haifa  */
+    /* True if the target supports vector initialization with a non-immediate 
+       value, of a certain type (passed as argument).  */
+    bool (* support_vector_init_p) (tree);
+
+    /* Generate a sequence to initialize a vector with a non-immediate value.
+       The arguments are: tree vectype - type of stmts to be generated, 
+       tree def - the scalar value to be put into the vector variable,
+       edge pe - the preheader edge where this code sequence is to be inserted,
+       struct bitmap_head_def - bitmap of variables to be renamed.  */
+    tree (* build_vector_init) (tree, tree, edge, struct bitmap_head_def *);
+    /* APPLE LOCAL end AV vector_init --haifa  */
+  } vect;
+  /* APPLE LOCAL end AV if-conversion --dpatel  */
+  /* APPLE LOCAL end AV misaligned --haifa  */
+
   /* Validity-checking routines for PCH files, target-specific.
      get_pch_validity returns a pointer to the data to be stored,
      and stores the size in its argument.  pch_valid_p gets the same
@@ -428,6 +538,33 @@ struct gcc_target
   /* This target hook should add STRING_CST trees for any hard regs
      the port wishes to automatically clobber for all asms.  */
   tree (* md_asm_clobbers) (tree);
+
+  /* Functions relating to calls - argument passing, returns, etc.  */
+  struct calls {
+    bool (*promote_function_args) (tree fntype);
+    bool (*promote_function_return) (tree fntype);
+    bool (*promote_prototypes) (tree fntype);
+    rtx (*struct_value_rtx) (tree fndecl, int incoming);
+    bool (*return_in_memory) (tree type, tree fndecl);
+    bool (*return_in_msb) (tree type);
+    rtx (*expand_builtin_saveregs) (void);
+    /* Returns pretend_argument_size.  */
+    void (*setup_incoming_varargs) (CUMULATIVE_ARGS *ca, enum machine_mode mode,
+				    tree type, int *pretend_arg_size,
+				    int second_time);
+    bool (*strict_argument_naming) (CUMULATIVE_ARGS *ca);
+    /* Returns true if we should use
+       targetm.calls.setup_incoming_varargs() and/or
+       targetm.calls.strict_argument_naming().  */
+    bool (*pretend_outgoing_varargs_named) (CUMULATIVE_ARGS *ca);
+
+    /* Given a complex type T, return true if a parameter of type T
+       should be passed as two scalars.  */
+    bool (* split_complex_arg) (tree type);
+    /* APPLE LOCAL begin Altivec */
+    bool (*skip_vec_args) (tree, int, int*);
+    /* APPLE LOCAL end Altivec */
+  } calls;
 
   /* Leave the boolean fields at the end.  */
 
@@ -455,24 +592,18 @@ struct gcc_target
      at the beginning of assembly output.  */
   bool file_start_file_directive;
 
-  /* Functions relating to calls - argument passing, returns, etc.  */
-  struct calls {
-    bool (*promote_function_args) (tree fntype);
-    bool (*promote_function_return) (tree fntype);
-    bool (*promote_prototypes) (tree fntype);
-    rtx (*struct_value_rtx) (tree fndecl, int incoming);
-    bool (*return_in_memory) (tree type, tree fndecl);
-    bool (*return_in_msb) (tree type);
-    rtx (*expand_builtin_saveregs) (void);
-    /* Returns pretend_argument_size.  */
-    void (*setup_incoming_varargs) (CUMULATIVE_ARGS *ca, enum machine_mode mode,
-				    tree type, int *pretend_arg_size, int second_time);
-    bool (*strict_argument_naming) (CUMULATIVE_ARGS *ca);
-    /* Returns true if we should use
-       targetm.calls.setup_incoming_varargs() and/or
-       targetm.calls.strict_argument_naming().  */
-    bool (*pretend_outgoing_varargs_named) (CUMULATIVE_ARGS *ca);
-  } calls;
+  /* APPLE LOCAL begin AltiVec */
+  /* True if it is permissible to use cast expressions as
+     vector initializers, e.g.:
+
+       (vector unsigned int)(3, 4, 5, 6)
+       (vector float)(2.5)
+
+     This is required for the Motorola AltiVec syntax on the PowerPC.  */
+  bool cast_expr_as_vector_init;
+  /* APPLE LOCAL end AltiVec */
+  
+  /* Leave the boolean fields at the end.  */
 };
 
 extern struct gcc_target targetm;

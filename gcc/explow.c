@@ -240,10 +240,7 @@ eliminate_constant_term (rtx x, rtx *constptr)
 rtx
 expr_size (tree exp)
 {
-  tree size = (*lang_hooks.expr_size) (exp);
-
-  if (CONTAINS_PLACEHOLDER_P (size))
-    size = build (WITH_RECORD_EXPR, sizetype, size, exp);
+  tree size = SUBSTITUTE_PLACEHOLDER_IN_EXPR (lang_hooks.expr_size (exp), exp);
 
   return expand_expr (size, NULL_RTX, TYPE_MODE (sizetype), 0);
 }
@@ -254,7 +251,7 @@ expr_size (tree exp)
 HOST_WIDE_INT
 int_expr_size (tree exp)
 {
-  tree t = (*lang_hooks.expr_size) (exp);
+  tree t = lang_hooks.expr_size (exp);
 
   if (t == 0
       || TREE_CODE (t) != INTEGER_CST
@@ -674,7 +671,22 @@ copy_to_mode_reg (enum machine_mode mode, rtx x)
   if (GET_MODE (x) != mode && GET_MODE (x) != VOIDmode)
     abort ();
   if (x != temp)
+  {
+    /* APPLE LOCAL begin Don't assign PARALLEL pattern to psuedo register */
+    tree exp = (current_function_decl != NULL_TREE) ? 
+	       DECL_RESULT (current_function_decl) : NULL_TREE;
+    if (exp != NULL_TREE && DECL_RTL_IF_SET (exp) == x
+	&& GET_CODE (x) == PARALLEL)
+      {
+	tree type = TREE_TYPE (exp);
+	rtx memloc = assign_temp (type, 1, 1, 1);
+	memloc = validize_mem (memloc); 
+	emit_group_store (memloc, x, type, int_size_in_bytes (type));
+	x = memloc;
+      }
+    /* APPLE LOCAL end Don't assign PARALLEL pattern to psuedo register */
     emit_move_insn (temp, x);
+  }
   return temp;
 }
 
@@ -770,6 +782,10 @@ force_not_mem (rtx x)
     return x;
 
   temp = gen_reg_rtx (GET_MODE (x));
+
+  if (MEM_POINTER (x))
+    REG_POINTER (temp) = 1;
+
   emit_move_insn (temp, x);
   return temp;
 }
@@ -798,6 +814,10 @@ copy_to_suggested_reg (rtx x, rtx target, enum machine_mode mode)
 
    FOR_CALL is nonzero if this call is promoting args for a call.  */
 
+#if defined(PROMOTE_MODE) && !defined(PROMOTE_FUNCTION_MODE)
+#define PROMOTE_FUNCTION_MODE PROMOTE_MODE
+#endif
+
 enum machine_mode
 promote_mode (tree type, enum machine_mode mode, int *punsignedp,
 	      int for_call ATTRIBUTE_UNUSED)
@@ -805,17 +825,28 @@ promote_mode (tree type, enum machine_mode mode, int *punsignedp,
   enum tree_code code = TREE_CODE (type);
   int unsignedp = *punsignedp;
 
-#ifdef PROMOTE_FOR_CALL_ONLY
+#ifndef PROMOTE_MODE
   if (! for_call)
     return mode;
 #endif
 
   switch (code)
     {
-#ifdef PROMOTE_MODE
+#ifdef PROMOTE_FUNCTION_MODE
     case INTEGER_TYPE:   case ENUMERAL_TYPE:   case BOOLEAN_TYPE:
     case CHAR_TYPE:      case REAL_TYPE:       case OFFSET_TYPE:
-      PROMOTE_MODE (mode, unsignedp, type);
+#ifdef PROMOTE_MODE
+      if (for_call)
+	{
+#endif
+	  PROMOTE_FUNCTION_MODE (mode, unsignedp, type);
+#ifdef PROMOTE_MODE
+	}
+      else
+	{
+	  PROMOTE_MODE (mode, unsignedp, type);
+	}
+#endif
       break;
 #endif
 

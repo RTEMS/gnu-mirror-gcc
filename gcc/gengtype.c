@@ -308,6 +308,16 @@ create_array (type_p t, const char *len)
   return v;
 }
 
+/* Return an options structure with name NAME and info INFO.  */
+options_p
+create_option (const char *name, void *info)
+{
+  options_p o = xmalloc (sizeof (*o));
+  o->name = name;
+  o->info = info;
+  return o;
+}
+
 /* Add a variable named S of type T with options O defined at POS,
    to `variables'.  */
 
@@ -1090,7 +1100,8 @@ open_base_files (void)
       "function.h", "insn-config.h", "expr.h", "hard-reg-set.h",
       "basic-block.h", "cselib.h", "insn-addr.h", "optabs.h",
       "libfuncs.h", "debug.h", "ggc.h", "cgraph.h",
-      "tree-alias-type.h", "tree-flow.h",
+      "tree-alias-type.h", "tree-flow.h", "reload.h",
+      "tree-data-ref.h", "tree-dg.h",
       NULL
     };
     const char *const *ifp;
@@ -1124,6 +1135,11 @@ get_file_basename (const char *f)
       int l1;
       int l2;
       s1 = basename - strlen (lang_dir_names [i]) - 1;
+      /* APPLE LOCAL begin Objective-C++ */
+      /* Don't confuse "objcp/" with "cp/".  */
+      if (s1[-1] != '/')
+	continue;
+      /* APPLE LOCAL end Objective-C++ */
       s2 = lang_dir_names [i];
       l1 = strlen (s1);
       l2 = strlen (s2);
@@ -1150,26 +1166,16 @@ get_file_basename (const char *f)
 unsigned
 get_base_file_bitmap (const char *input_file)
 {
-  const char *basename = get_file_basename (input_file);
-  const char *slashpos = strchr (basename, '/');
+  /* APPLE LOCAL Objective-C++ */
+  /* Variables were here.  */
   unsigned j;
   unsigned k;
   unsigned bitmap;
 
-  if (slashpos)
-    {
-      size_t i;
-      for (i = 1; i < NUM_BASE_FILES; i++)
-	if ((size_t)(slashpos - basename) == strlen (lang_dir_names [i])
-	    && memcmp (basename, lang_dir_names[i], strlen (lang_dir_names[i])) == 0)
-          {
-            /* It's in a language directory, set that language.  */
-            bitmap = 1 << i;
-            return bitmap;
-          }
-
-      abort (); /* Should have found the language.  */
-    }
+  /* APPLE LOCAL begin Objective-C++ */
+  /* Lose the subdirectory-based scanning, it's redundant
+     if the config-lang.in lists are correct.  */
+  /* APPLE LOCAL end Objective-C++ */
 
   /* If it's in any config-lang.in, then set for the languages
      specified.  */
@@ -1235,6 +1241,17 @@ get_output_file_with_visibility (const char *input_file)
     output_name = "gt-c-common.h", for_name = "c-common.c";
   else if (strcmp (basename, "c-tree.h") == 0)
     output_name = "gt-c-decl.h", for_name = "c-decl.c";
+  /* APPLE LOCAL begin Objective-C++ */
+  /* Put all lang-specific header roots in their own .h files.  */
+  else if (strcmp (basename, "cp/cp-tree.h") == 0)
+    output_name = "gt-cp-cp-tree-h.h", for_name = "cp/cp-tree.h";
+  else if (strcmp (basename, "cp/decl.h") == 0)
+    output_name = "gt-cp-decl-h.h", for_name = "cp/decl.h";
+  else if (strcmp (basename, "cp/lex.h") == 0)
+    output_name = "gt-cp-lex-h.h", for_name = "cp/lex.h";
+  else if (strcmp (basename, "objc/objc-act.h") == 0)
+    output_name = "gt-objc-objc-act-h.h", for_name = "objc/objc-act.h";
+  /* APPLE LOCAL end Objective-C++ */
   else
     {
       size_t i;

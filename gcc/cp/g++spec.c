@@ -46,6 +46,10 @@ Boston, MA 02111-1307, USA.  */
 #define LIBSTDCXX_PROFILE "-lstdc++"
 #endif
 
+/* APPLE LOCAL begin Handle static/shared libgcc correctly (radar 3554191, 3127145) */
+extern unsigned int macosx_version_min_required; /* defined in gcc.c */
+/* APPLE LOCAL end */
+
 void
 lang_specific_driver (int *in_argc, const char *const **in_argv,
 		      int *in_added_libraries)
@@ -167,9 +171,18 @@ lang_specific_driver (int *in_argc, const char *const **in_argv,
 		}
 	      saw_speclang = 1;
 	    }
+	  /* Arguments that go directly to the linker might be .o files,
+	     or something, and so might cause libstdc++ to be needed.  */
+	  else if (strcmp (argv[i], "-Xlinker") == 0)
+	    {
+	      quote = argv[i];
+	      if (library == 0)
+		library = 1;
+	    }
+	  else if (strncmp (argv[i], "-Wl,", 4) == 0)
+	    library = (library == 0) ? 1 : library;
 	  else if (((argv[i][2] == '\0'
 		     && strchr ("bBVDUoeTuIYmLiA", argv[i][1]) != NULL)
-		    || strcmp (argv[i], "-Xlinker") == 0
 		    || strcmp (argv[i], "-Tdata") == 0))
 	    quote = argv[i];
 	  else if ((argv[i][2] == '\0'
@@ -240,6 +253,13 @@ lang_specific_driver (int *in_argc, const char *const **in_argv,
 #ifndef ENABLE_SHARED_LIBGCC
   shared_libgcc = 0;
 #endif
+
+  /* APPLE LOCAL begin Handle static/shared libgcc correctly (radar 3554191, 3127145) */
+  {
+    if (macosx_version_min_required && macosx_version_min_required < 1040)
+      shared_libgcc = 0;
+  }
+  /* APPLE LOCAL end */
 
   /* Make sure to have room for the trailing NULL argument.  */
   num_args = argc + added + need_math + shared_libgcc + (library > 0) + 1;

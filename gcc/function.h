@@ -291,6 +291,15 @@ struct function GTY(())
      needed by inner routines.  */
   rtx x_arg_pointer_save_area;
 
+  /* APPLE LOCAL begin CW asm blocks */
+  /* Nonzero if this is an all-assembly function.  */
+  unsigned int cw_asm_function : 1;
+  /* Nonzero if we don't want to emit any return instructions. */
+  unsigned int cw_asm_noreturn : 1;
+  /* If nonzero, use this as the explicitly-defined frame size.  */
+  int cw_asm_frame_size;
+  /* APPLE LOCAL end CW asm blocks */
+
   /* Offset to end of allocated area of stack frame.
      If stack grows down, this is the address of the last stack slot allocated.
      If stack grows up, this is the address for the next slot.  */
@@ -322,8 +331,11 @@ struct function GTY(())
      element in this vector is one less than MAX_PARM_REG, above.  */
   rtx * GTY ((length ("%h.x_max_parm_reg"))) x_parm_reg_stack_loc;
 
-  /* List of all temporaries allocated, both available and in use.  */
-  struct temp_slot *x_temp_slots;
+  /* List of all used temporaries allocated, by level.  */
+  struct varray_head_tag * GTY((param_is (struct temp_slot))) x_used_temp_slots;
+
+  /* List of available temp slots.  */
+  struct temp_slot *x_avail_temp_slots;
 
   /* Current nesting level for temporaries.  */
   int x_temp_slot_level;
@@ -358,7 +370,7 @@ struct function GTY(())
   /* For md files.  */
 
   /* tm.h can use this to store whatever it likes.  */
-  struct machine_function * GTY ((maybe_undef (""))) machine;
+  struct machine_function * GTY ((maybe_undef)) machine;
   /* The largest alignment of slot allocated on the stack.  */
   int stack_alignment_needed;
   /* Preferred alignment of the end of stack frame.  */
@@ -397,6 +409,9 @@ struct function GTY(())
   /* Maximal number of entities in the single jumptable.  Used to estimate
      final flowgraph size.  */
   int max_jumptable_ents;
+
+  /* APPLE LOCAL sibcall optimization stomped CW frames (radar 3007352) */
+  int unrounded_args_size;
 
   /* UIDs for LABEL_DECLs.  */
   int last_label_uid;
@@ -563,7 +578,8 @@ extern int trampolines_created;
 #define rtl_expr_chain (cfun->x_rtl_expr_chain)
 #define last_parm_insn (cfun->x_last_parm_insn)
 #define function_call_count (cfun->x_function_call_count)
-#define temp_slots (cfun->x_temp_slots)
+#define used_temp_slots (cfun->x_used_temp_slots)
+#define avail_temp_slots (cfun->x_avail_temp_slots)
 #define temp_slot_level (cfun->x_temp_slot_level)
 #define target_temp_slot_level (cfun->x_target_temp_slot_level)
 #define var_temp_slot_level (cfun->x_var_temp_slot_level)
@@ -625,5 +641,7 @@ extern const char *current_function_name (void);
 
 /* Called once, at initialization, to initialize function.c.  */
 extern void init_function_once (void);
+
+extern void do_warn_unused_parameter (tree);
 
 #endif  /* GCC_FUNCTION_H */

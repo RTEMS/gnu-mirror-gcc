@@ -41,6 +41,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "tm_p.h"
 #include "splay-tree.h"
 #include "debug.h"
+/* APPLE LOCAL AltiVec */
+#include "../libcpp/internal.h"
 
 /* We may keep statistics about how long which files took to compile.  */
 static int header_time, body_time;
@@ -55,6 +57,18 @@ static splay_tree file_info_tree;
 int pending_lang_change; /* If we need to switch languages - C++ only */
 int c_header_level;	 /* depth in C headers - C++ only */
 bool c_lex_string_translate = true; /* If we need to translate characters received.  */
+
+/* APPLE LOCAL begin CW asm blocks */
+/* This points to the token that we're going to save briefly while
+   returning EOL/BOL tokens.  (This is global but static instead
+   static in c_lex() so as to avoid pointless init in non-asm
+   case.)  */
+static const cpp_token *cw_asm_saved_token = NULL;
+/* This tracks recursion in c_lex calls.  Lexer recursion can happen
+   in pragma processing for instance, but we don't any of the asm
+   special handling to be active then.  */
+static int c_lex_depth;
+/* APPLE LOCAL end CW asm blocks */
 
 static tree interpret_integer (const cpp_token *, unsigned int);
 static tree interpret_float (const cpp_token *, unsigned int);
@@ -106,6 +120,24 @@ init_c_lex (void)
       cb->define = cb_define;
       cb->undef = cb_undef;
     }
+
+  /* APPLE LOCAL begin Symbol Separation */
+  /* Set up call back routines. These routines are used when separate symbol
+     repositories are used.  */
+  if (write_symbols != NO_DEBUG)
+    {
+      cb->restore_write_symbols = cb_restore_write_symbols;
+      cb->clear_write_symbols = cb_clear_write_symbols;
+      cb->is_builtin_identifier = cb_is_builtin_identifier;
+      cb->start_symbol_repository = cb_start_symbol_repository;
+      cb->end_symbol_repository = cb_end_symbol_repository;
+      if (flag_grepository)
+	{
+	  cpp_options *options = cpp_get_options (parse_in);
+	  options->use_ss = 1;
+	}
+    }
+  /* APPLE LOCAL end Symbol Separation */
 }
 
 struct c_fileinfo *
@@ -177,7 +209,8 @@ cb_ident (cpp_reader *pfile ATTRIBUTE_UNUSED,
     {
       /* Convert escapes in the string.  */
       cpp_string cstr = { 0, 0 };
-      if (cpp_interpret_string (pfile, str, 1, &cstr, false))
+      /* APPLE LOCAL pascal strings */
+      if (cpp_interpret_string (pfile, str, 1, &cstr, false, false))
 	{
 	  ASM_OUTPUT_IDENT (asm_out_file, (const char *) cstr.text);
 	  free ((void *)cstr.text);
@@ -317,9 +350,90 @@ c_lex_with_flags (tree *value, unsigned char *cpp_flags)
   const cpp_token *tok;
   location_t atloc;
   static bool no_more_pch;
+  /* APPLE LOCAL begin CW asm blocks */
+  /* Make a local copy of the flag for efficiency, since the compiler can't
+     figure that it won't change during a compilation.  */
+  int flag_cw_asm_blocks_local = flag_cw_asm_blocks;
+  if (flag_cw_asm_blocks_local)
+    ++c_lex_depth;
+  /* APPLE LOCAL end CW asm blocks */
 
  retry:
+  /* APPLE LOCAL begin CW asm blocks */
+  /* If there's a token we saved while returning the special BOL
+     token, return it now.  */
+  if (cw_asm_saved_token)
+    {
+      if (cw_asm_at_bol)
+	{
+	  cw_asm_at_bol = 0;
+	  --c_lex_depth;
+	  return CPP_BOL;
+	}
+      tok = cw_asm_saved_token;
+      cw_asm_saved_token = NULL;
+      goto bypass;
+    }
+  /* APPLE LOCAL end CW asm blocks */
   tok = get_nonpadding_token ();
+
+  /* APPLE LOCAL begin CW asm blocks */
+  /* This test should be as efficient as possible, because it affects
+       all lexing with or without CW asm enabled.  */
+  if (flag_cw_asm_blocks_local && cw_asm_state != cw_asm_none && c_lex_depth == 1)
+    {
+      /* "}" switches us out of our special mode.  */
+      if (tok->type == CPP_CLOSE_BRACE && cw_asm_state >= cw_asm_decls)
+	{
+	  cw_asm_state = cw_asm_none;
+	  cw_asm_saved_token = tok;
+	  cw_asm_at_bol = 0;
+	  --c_lex_depth;
+	  return CPP_EOL;
+	}
+
+      /* This is tricky.  We're only ready to start parsing assembly
+	 instructions if we're in the asm block, we're not in the
+	 middle of parsing a C decl, and the next token is plausibly
+	 the beginning of an asm line.  This works because if we have
+	 a "typedef int nop", a nop at the beginning of a line should
+	 be taken as an instruction rather than a declaration of type
+	 nop.  (Doesn't have to go this way, but it's how CW works.)
+	 We're not quite as good as CW yet, because CW knows about the
+	 complete list of valid opcodes, and will try to take anything
+	 as a decl that is not in the opcode list.  */
+      if (cw_asm_state == cw_asm_decls
+	  && !cw_asm_in_decl)
+	{
+	  if ((tok->flags & BOL)
+	      && (tok->type == CPP_ATSIGN
+		  || (tok->type == CPP_NAME
+		      && (*value = HT_IDENT_TO_GCC_IDENT (HT_NODE (tok->val.node)))
+		      && !cw_asm_typename_or_reserved (*value))))
+	    {
+	      cw_asm_state = cw_asm_asm;
+	      cw_asm_block = 1;
+	      cw_asm_at_bol = 1;
+	      clear_cw_asm_labels ();
+	    }
+	  else
+	    {
+	      cw_asm_in_decl = 1;
+	    }
+	}
+      /* If we're in the asm block, save the token at the beginning of the
+	 line and return a beginning-of-line token instead.  */
+      if (cw_asm_state == cw_asm_asm && (tok->flags & BOL))
+	{
+	  cw_asm_saved_token = tok;
+	  cw_asm_at_bol = !cw_asm_at_bol;
+	  --c_lex_depth;
+	  /* In between lines, return first the EOL.  */
+	  return (cw_asm_at_bol ? CPP_EOL : CPP_BOL);
+	}
+    }
+ bypass:
+  /* APPLE LOCAL end CW asm blocks */
 
  retry_after_at:
   switch (tok->type)
@@ -354,6 +468,14 @@ c_lex_with_flags (tree *value, unsigned char *cpp_flags)
       break;
 
     case CPP_ATSIGN:
+      /* APPLE LOCAL begin CW asm blocks */
+      if (cw_asm_state >= cw_asm_decls)
+	{
+	  /* Return the @-sign verbatim.  */
+	  *value = NULL_TREE;
+	  break;
+	}
+      /* APPLE LOCAL end CW asm blocks */
       /* An @ may give the next token special significance in Objective-C.  */
       atloc = input_location;
       tok = get_nonpadding_token ();
@@ -368,12 +490,20 @@ c_lex_with_flags (tree *value, unsigned char *cpp_flags)
 		  && OBJC_IS_AT_KEYWORD (C_RID_CODE (val)))
 		{
 		  *value = val;
+		  /* APPLE LOCAL begin CW asm blocks */
+		  if (flag_cw_asm_blocks_local)
+		    --c_lex_depth;
+		  /* APPLE LOCAL end CW asm blocks */
 		  return CPP_AT_NAME;
 		}
 	      break;
 
 	    case CPP_STRING:
 	    case CPP_WSTRING:
+	      /* APPLE LOCAL begin CW asm blocks */
+	      if (flag_cw_asm_blocks_local)
+		--c_lex_depth;
+	      /* APPLE LOCAL end CW asm blocks */
 	      return lex_string (tok, value, true);
 
 	    default: break;
@@ -404,6 +534,10 @@ c_lex_with_flags (tree *value, unsigned char *cpp_flags)
 
     case CPP_STRING:
     case CPP_WSTRING:
+      /* APPLE LOCAL begin CW asm blocks */
+      if (flag_cw_asm_blocks_local)
+	--c_lex_depth;
+      /* APPLE LOCAL end CW asm blocks */
       return lex_string (tok, value, false);
       break;
 
@@ -417,6 +551,11 @@ c_lex_with_flags (tree *value, unsigned char *cpp_flags)
       *value = NULL_TREE;
       break;
     }
+
+  /* APPLE LOCAL begin CW asm blocks */
+  if (flag_cw_asm_blocks_local)
+    --c_lex_depth;
+  /* APPLE LOCAL end CW asm blocks */
 
   if (! no_more_pch)
     {
@@ -646,7 +785,8 @@ static enum cpp_ttype
 lex_string (const cpp_token *tok, tree *valp, bool objc_string)
 {
   tree value;
-  bool wide = false;
+  /* APPLE LOCAL pascal strings */
+  bool wide = false, pascal_p = false;
   size_t count = 1;
   struct obstack str_ob;
   cpp_string istr;
@@ -658,6 +798,11 @@ lex_string (const cpp_token *tok, tree *valp, bool objc_string)
 
   if (tok->type == CPP_WSTRING)
     wide = true;
+  /* APPLE LOCAL begin pascal strings */
+  else if (CPP_OPTION (parse_in, pascal_strings)
+	   && str.text[1] == '\\' && str.text[2] == 'p')
+    pascal_p = true;
+  /* APPLE LOCAL end pascal strings */
 
   tok = get_nonpadding_token ();
   if (c_dialect_objc () && tok->type == CPP_ATSIGN)
@@ -691,12 +836,18 @@ lex_string (const cpp_token *tok, tree *valp, bool objc_string)
   /* We have read one more token than we want.  */
   _cpp_backup_tokens (parse_in, 1);
 
+  /* APPLE LOCAL begin pascal strings */
+  if (wide || objc_string)
+    pascal_p = false;
+  /* APPLE LOCAL end pascal strings */
+    
   if (count > 1 && !objc_string && warn_traditional && !in_system_header)
     warning ("traditional C rejects string constant concatenation");
 
   if ((c_lex_string_translate
        ? cpp_interpret_string : cpp_interpret_string_notranslate)
-      (parse_in, strs, count, &istr, wide))
+      /* APPLE LOCAL pascal strings */
+      (parse_in, strs, count, &istr, wide, pascal_p))
     {
       value = build_string (istr.len, (char *)istr.text);
       free ((void *)istr.text);
@@ -715,7 +866,11 @@ lex_string (const cpp_token *tok, tree *valp, bool objc_string)
 	value = build_string (1, "");
     }
 
-  TREE_TYPE (value) = wide ? wchar_array_type_node : char_array_type_node;
+  /* APPLE LOCAL begin pascal strings */
+  TREE_TYPE (value) = wide ? wchar_array_type_node
+			   : pascal_p ? pascal_string_type_node
+				      : char_array_type_node;
+  /* APPLE LOCAL end pascal strings */
   *valp = fix_string_type (value);
 
   if (strs != &str)
@@ -755,3 +910,17 @@ lex_charconst (const cpp_token *token)
   TREE_TYPE (value) = type;
   return value;
 }
+
+/* APPLE LOCAL begin Symbol Separation */
+
+/* Write context information in .cinfo file.
+   Use PCH routines directly. But set and restore cinfo_state before using them.  */
+void
+c_common_write_context (void)
+{
+  /* MERGE FIXME: This used to say 'lineno', not '0', but now we don't
+     have a 'lineno' variable (and it was probably always wrong).  */
+  (*debug_hooks->end_symbol_repository) (0);
+  cpp_write_symbol_deps (parse_in);
+}
+/* APPLE LOCAL end Symbol Separation */

@@ -27,6 +27,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
    ought to be used instead.
 
    Before processing the first insn of the function, call `init_reload'.
+   init_reload actually has to be called earlier anyway.
 
    To scan an insn, call `find_reloads'.  This does two things:
    1. sets up tables describing which values must be reloaded
@@ -1300,18 +1301,31 @@ push_reload (rtx in, rtx out, rtx *inloc, rtx *outloc,
 	 and IN or CLASS and OUT.  Get the icode and push any required reloads
 	 needed for each of them if so.  */
 
+      /* APPLE LOCAL restoration of inmode/outmode */
 #ifdef SECONDARY_INPUT_RELOAD_CLASS
       if (in != 0)
-	secondary_in_reload
-	  = push_secondary_reload (1, in, opnum, optional, class, inmode, type,
-				   &secondary_in_icode);
+	{
+	  secondary_in_reload
+	    = push_secondary_reload (1, in, opnum, optional, class, inmode, type,
+				     &secondary_in_icode);
+#ifdef TARGET_POWERPC
+	  if ( secondary_in_reload != -1 && in_subreg_loc )
+	    inmode = GET_MODE (*in_subreg_loc);
+#endif
+	}
 #endif
 
 #ifdef SECONDARY_OUTPUT_RELOAD_CLASS
       if (out != 0 && GET_CODE (out) != SCRATCH)
-	secondary_out_reload
-	  = push_secondary_reload (0, out, opnum, optional, class, outmode,
-				   type, &secondary_out_icode);
+	{
+	  secondary_out_reload
+	    = push_secondary_reload (0, out, opnum, optional, class, outmode,
+				     type, &secondary_out_icode);
+#ifdef TARGET_POWERPC
+	  if ( secondary_out_reload != -1 && out_subreg_loc )
+	    outmode = GET_MODE (*out_subreg_loc);
+#endif
+	}
 #endif
 
       /* We found no existing reload suitable for re-use.
@@ -1720,7 +1734,13 @@ combine_reloads (void)
     if ((rld[i].when_needed == RELOAD_FOR_OUTPUT_ADDRESS
 	 || rld[i].when_needed == RELOAD_FOR_OUTADDR_ADDRESS)
 	&& rld[i].opnum == rld[output_reload].opnum)
+      /* APPLE LOCAL begin try destroyed input */
+#ifdef TARGET_POWERPC
+      goto try_destroyed_input;
+#else
       return;
+#endif
+      /* APPLE LOCAL end try destroyed input */
 
   /* Check each input reload; can we combine it?  */
 
@@ -1817,6 +1837,11 @@ combine_reloads (void)
      that it does not occur in the output (we already know it isn't an
      earlyclobber.  If this is an asm insn, give up.  */
 
+  /* APPLE LOCAL begin try destroyed input */
+#ifdef TARGET_POWERPC
+ try_destroyed_input:
+#endif
+  /* APPLE LOCAL end try destroyed input */
   if (INSN_CODE (this_insn) == -1)
     return;
 
