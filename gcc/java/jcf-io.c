@@ -343,6 +343,7 @@ DEFUN(caching_stat, (filename, buf),
 {
 #if JCF_USE_SCANDIR
   char *sep;
+  char origsep = 0;
   char *base;
   memoized_dirlist_entry *dent;
   void **slot;
@@ -356,15 +357,20 @@ DEFUN(caching_stat, (filename, buf),
 
   /* Get the name of the directory.  */
   sep = strrchr (filename, DIR_SEPARATOR);
+#ifdef DIR_SEPARATOR_2
+  if (! sep)
+    sep = strrchr (filename, DIR_SEPARATOR_2);
+#endif
   if (sep)
     {
+      origsep = *sep;
       *sep = '\0';
       base = sep + 1;
     }
   else
     base = filename;
 
-  /* Obtain the entry for this directory form the hash table.  */
+  /* Obtain the entry for this directory from the hash table.  */
   slot = htab_find_slot (memoized_dirlists, filename, INSERT);
   if (!*slot)
     {
@@ -375,20 +381,19 @@ DEFUN(caching_stat, (filename, buf),
       /* Unfortunately, scandir is not fully standardized.  In
 	 particular, the type of the function pointer passed as the
 	 third argument sometimes takes a "const struct dirent *"
-	 parameter, and sometimes just a "struct dirent *".  We rely
-	 on the ability to interchange these two types of function
-	 pointers.  */
+	 parameter, and sometimes just a "struct dirent *".  We cast
+	 to (void *) so that either way it is quietly accepted.  */
       dent->num_files = scandir (filename, &dent->files, 
-				 java_or_class_file, 
+				 (void *) java_or_class_file, 
 				 alphasort);
       *slot = dent;
     }
   else
     dent = *((memoized_dirlist_entry **) slot);
 
-  /* Put the spearator back.  */
+  /* Put the separator back.  */
   if (sep)
-    *sep = DIR_SEPARATOR;
+    *sep = origsep;
 
   /* If the file is not in the list, there is no need to stat it; it
      does not exist.  */

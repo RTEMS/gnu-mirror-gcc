@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler.
    Motorola 68HC11 and 68HC12.
-   Copyright (C) 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
    Contributed by Stephane Carrez (stcarrez@nerim.fr)
 
 This file is part of GNU CC.
@@ -43,13 +43,22 @@ Note:
 
 /* Compile and assemble for a 68hc11 unless there is a -m68hc12 option.  */
 #ifndef ASM_SPEC
-#define ASM_SPEC       "%{m68hc12:-m68hc12}%{!m68hc12:-m68hc11}"
+#define ASM_SPEC                                                \
+"%{m68hc12:-m68hc12}"                                           \
+"%{m68hcs12:-m68hcs12}"                                         \
+"%{!m68hc12:%{!m68hcs12:-m68hc11}} "                            \
+"%{mshort:-mshort}%{!mshort:-mlong} "                           \
+"%{fshort-double:-mshort-double}%{!fshort-double:-mlong-double}"
 #endif
 
 /* We need to tell the linker the target elf format.  Just pass an
    emulation option.  This can be overriden by -Wl option of gcc.  */
 #ifndef LINK_SPEC
-#define LINK_SPEC      "%{m68hc12:-m m68hc12elf}%{!m68hc12:-m m68hc11elf} %{mrelax:-relax}"
+#define LINK_SPEC                                               \
+"%{m68hc12:-m m68hc12elf}"                                      \
+"%{m68hcs12:-m m68hc12elf}"                                     \
+"%{!m68hc12:%{!m68hcs12:-m m68hc11elf}} "                       \
+"%{!mnorelax:%{!m68hc12:%{!m68hcs12:-relax}}}"
 #endif
 
 #ifndef LIB_SPEC
@@ -65,7 +74,8 @@ Note:
 "%{mshort:-D__HAVE_SHORT_INT__ -D__INT__=16}\
  %{!mshort:-D__INT__=32}\
  %{m68hc12:-Dmc6812 -DMC6812 -Dmc68hc12}\
- %{!m68hc12:-Dmc6811 -DMC6811 -Dmc68hc11}\
+ %{m68hcs12:-Dmc6812 -DMC6812 -Dmc68hcs12}\
+ %{!m68hc12:%{!m68hcs12:-Dmc6811 -DMC6811 -Dmc68hc11}}\
  %{fshort-double:-D__HAVE_SHORT_DOUBLE__}\
  %{mlong-calls:-D__USE_RTC__}"
 #endif
@@ -119,14 +129,16 @@ extern short *reg_renumber;	/* def in local_alloc.c */
 #define MASK_AUTO_INC_DEC       0004
 #define MASK_M6811              0010
 #define MASK_M6812              0020
-#define MASK_NO_DIRECT_MODE     0040
-#define MASK_MIN_MAX            0100
-#define MASK_LONG_CALLS         0200
+#define MASK_M68S12             0040
+#define MASK_NO_DIRECT_MODE     0100
+#define MASK_MIN_MAX            0200
+#define MASK_LONG_CALLS         0400
 
 #define TARGET_OP_TIME		(optimize && optimize_size == 0)
 #define TARGET_SHORT            (target_flags & MASK_SHORT)
 #define TARGET_M6811            (target_flags & MASK_M6811)
 #define TARGET_M6812            (target_flags & MASK_M6812)
+#define TARGET_M68S12           (target_flags & MASK_M68S12)
 #define TARGET_AUTO_INC_DEC     (target_flags & MASK_AUTO_INC_DEC)
 #define TARGET_MIN_MAX          (target_flags & MASK_MIN_MAX)
 #define TARGET_NO_DIRECT_MODE   (target_flags & MASK_NO_DIRECT_MODE)
@@ -178,10 +190,14 @@ extern short *reg_renumber;	/* def in local_alloc.c */
     N_("Compile for a 68HC11")},				\
   { "68hc12", MASK_M6812,					\
     N_("Compile for a 68HC12")},				\
+  { "68hcs12", MASK_M6812 | MASK_M68S12,			\
+    N_("Compile for a 68HCS12")},				\
   { "6811",   MASK_M6811,					\
     N_("Compile for a 68HC11")},				\
   { "6812",   MASK_M6812,					\
     N_("Compile for a 68HC12")},				\
+  { "68S12",  MASK_M6812 | MASK_M68S12,				\
+    N_("Compile for a 68HCS12")},				\
   { "", TARGET_DEFAULT, 0 }}
 
 /* This macro is similar to `TARGET_SWITCHES' but defines names of
@@ -214,7 +230,7 @@ extern const char *m68hc11_soft_reg_count;
 #endif
 
 /* Print subsidiary information on the compiler version in use.  */
-#define TARGET_VERSION		fprintf (stderr, " (MC68HC11/MC68HC12)")
+#define TARGET_VERSION	fprintf (stderr, " (MC68HC11/MC68HC12/MC68HCS12)")
 
 /* Sometimes certain combinations of command options do not make
    sense on a particular target machine.  You can define a macro
@@ -780,6 +796,12 @@ extern enum reg_class m68hc11_tmp_regs_class;
 
 #define SMALL_REGISTER_CLASSES 1
 
+/* A C expression that is nonzero if hard register number REGNO2 can be
+   considered for use as a rename register for REGNO1 */
+
+#define HARD_REGNO_RENAME_OK(REGNO1,REGNO2) \
+  m68hc11_hard_regno_rename_ok ((REGNO1), (REGNO2))
+
 /* A C expression whose value is nonzero if pseudos that have been
    assigned to registers of class CLASS would likely be spilled
    because registers of CLASS are needed for spill registers.
@@ -835,6 +857,7 @@ extern enum reg_class m68hc11_tmp_regs_class;
    (C) == 'L' ? ((VALUE) >= -65536 && (VALUE) <= 65535) : \
    (C) == 'M' ? ((VALUE) & 0x0ffffL) == 0 : \
    (C) == 'N' ? ((VALUE) == 1 || (VALUE) == -1) : \
+   (C) == 'I' ? ((VALUE) >= -2 && (VALUE) <= 2) : \
    (C) == 'O' ? (VALUE) == 16 : \
    (C) == 'P' ? ((VALUE) <= 2 && (VALUE) >= -8) : 0)
 
@@ -1031,6 +1054,10 @@ typedef struct m68hc11_args
 #define FUNCTION_ARG_PADDING(MODE, TYPE) \
   m68hc11_function_arg_padding ((MODE), (TYPE))
 
+#undef PAD_VARARGS_DOWN
+#define PAD_VARARGS_DOWN \
+  (m68hc11_function_arg_padding (TYPE_MODE (type), type) == downward)
+
 /* A C expression that indicates when it is the called function's
    responsibility to make a copy of arguments passed by invisible
    reference.  Normally, the caller makes a copy and passes the
@@ -1076,10 +1103,6 @@ typedef struct m68hc11_args
    it forbids all spill registers at that point.  Enabling
    caller saving results in spill failure.  */
 #define CALLER_SAVE_PROFITABLE(REFS,CALLS) 0
-
-/* Implement `va_arg'.  */
-#define EXPAND_BUILTIN_VA_ARG(valist, type) \
-  m68hc11_va_arg (valist, type)
 
 /* For an arg passed partly in registers and partly in memory,
    this is the number of registers used.
@@ -1694,6 +1717,7 @@ do {                                                                    \
 			      ROTATE, ROTATERT }},			\
 {"m68hc11_non_shift_operator", {AND, IOR, XOR, PLUS, MINUS}},		\
 {"m68hc11_unary_operator",   {NEG, NOT, SIGN_EXTEND, ZERO_EXTEND}},	\
+{"m68hc11_shift_operator",   {ASHIFT, ASHIFTRT, LSHIFTRT, ROTATE, ROTATERT}},\
 {"non_push_operand",         {SUBREG, REG, MEM}},			\
 {"reg_or_some_mem_operand",  {SUBREG, REG, MEM}},			\
 {"tst_operand",              {SUBREG, REG, MEM}},			\
@@ -1751,3 +1775,10 @@ extern int z_replacement_completed;
 extern int current_function_interrupt;
 extern int current_function_trap;
 extern int current_function_far;
+
+extern GTY(()) rtx m68hc11_compare_op0;
+extern GTY(()) rtx m68hc11_compare_op1;
+extern GTY(()) rtx m68hc11_soft_tmp_reg;
+extern GTY(()) rtx ix_reg;
+extern GTY(()) rtx iy_reg;
+extern GTY(()) rtx d_reg;

@@ -1377,8 +1377,8 @@ extern enum reg_class reg_class_from_letter[];
 /* ??? We need to renumber the internal numbers for the frnn registers
    when in little endian in order to allow mode size changes.  */
 
-#define CANNOT_CHANGE_MODE_CLASS(FROM, TO) 			    \
-  sh_cannot_change_mode_class (FROM, TO)
+#define CANNOT_CHANGE_MODE_CLASS(FROM, TO, CLASS) 			    \
+  sh_cannot_change_mode_class (FROM, TO, CLASS)
 
 /* Stack layout; function entry, exit and calling.  */
 
@@ -2574,7 +2574,7 @@ while (0)
 
 /* Specify the machine mode that this machine uses
    for the index in the tablejump instruction.  */
-#define CASE_VECTOR_MODE (TARGET_BIGTABLE ? SImode : HImode)
+#define CASE_VECTOR_MODE ((! optimize || TARGET_BIGTABLE) ? SImode : HImode)
 
 #define CASE_VECTOR_SHORTEN_MODE(MIN_OFFSET, MAX_OFFSET, BODY) \
 ((MIN_OFFSET) >= 0 && (MAX_OFFSET) <= 127 \
@@ -3047,7 +3047,7 @@ while (0)
 /* Output an absolute table element.  */
 
 #define ASM_OUTPUT_ADDR_VEC_ELT(STREAM,VALUE)  				\
-  if (TARGET_BIGTABLE) 							\
+  if (! optimize || TARGET_BIGTABLE)					\
     asm_fprintf ((STREAM), "\t.long\t%LL%d\n", (VALUE)); 		\
   else									\
     asm_fprintf ((STREAM), "\t.word\t%LL%d\n", (VALUE));

@@ -1,6 +1,6 @@
 /* Source code parsing and tree node generation for the GNU compiler
    for the Java(TM) language.
-   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
    Contributed by Alexandre Petit-Bianco (apbianco@cygnus.com)
 
 This file is part of GNU CC.
@@ -4582,6 +4582,18 @@ method_header (flags, type, mdecl, throws)
 	   IDENTIFIER_POINTER (EXPR_WFL_NODE (id)));
     }
 
+  /* A native method can't be strictfp.  */
+  if ((flags & ACC_NATIVE) && (flags & ACC_STRICT))
+    parse_error_context (id, "native method `%s' can't be strictfp",
+			 IDENTIFIER_POINTER (EXPR_WFL_NODE (id)));
+  /* No such thing as a transient or volatile method.  */
+  if ((flags & ACC_TRANSIENT))
+    parse_error_context (id, "method `%s' can't be transient",
+			 IDENTIFIER_POINTER (EXPR_WFL_NODE (id)));
+  if ((flags & ACC_VOLATILE))
+    parse_error_context (id, "method `%s' can't be volatile",
+			 IDENTIFIER_POINTER (EXPR_WFL_NODE (id)));
+
   /* Things to be checked when declaring a constructor */
   if (!type)
     {
@@ -5763,11 +5775,11 @@ resolve_class (enclosing, class_type, decl, cl)
   return resolved_type_decl;
 }
 
-/* Effectively perform the resolution of class CLASS_TYPE. DECL or CL
-   are used to report error messages. Do not try to replace TYPE_NAME
-   (class_type) by a variable, since it is changed by
-   find_in_imports{_on_demand} and (but it doesn't really matter)
-   qualify_and_find.  */
+/* Effectively perform the resolution of class CLASS_TYPE.  DECL or CL
+   are used to report error messages; CL must either be NULL_TREE or a
+   WFL wrapping a class.  Do not try to replace TYPE_NAME (class_type)
+   by a variable, since it is changed by find_in_imports{_on_demand}
+   and (but it doesn't really matter) qualify_and_find.  */
 
 tree
 do_resolve_class (enclosing, class_type, decl, cl)
@@ -6365,17 +6377,8 @@ java_check_regular_methods (class_decl)
       if (check_method_redefinition (class, method))
 	continue;
 
-      /* If we see one constructor a mark so we don't generate the
-	 default one. Also skip other verifications: constructors
-	 can't be inherited hence hiden or overriden */
-     if (DECL_CONSTRUCTOR_P (method))
-       {
-	 saw_constructor = 1;
-	 continue;
-       }
-
-      /* We verify things thrown by the method. They must inherits from
-	 java.lang.Throwable */
+      /* We verify things thrown by the method.  They must inherit from
+	 java.lang.Throwable.  */
       for (mthrows = DECL_FUNCTION_THROWS (method);
 	   mthrows; mthrows = TREE_CHAIN (mthrows))
 	{
@@ -6384,6 +6387,15 @@ java_check_regular_methods (class_decl)
 	      (TREE_PURPOSE (mthrows), "Class `%s' in `throws' clause must be a subclass of class `java.lang.Throwable'",
 	       IDENTIFIER_POINTER
 	         (DECL_NAME (TYPE_NAME (TREE_VALUE (mthrows)))));
+	}
+
+      /* If we see one constructor a mark so we don't generate the
+	 default one.  Also skip other verifications: constructors
+	 can't be inherited hence hidden or overridden.  */
+      if (DECL_CONSTRUCTOR_P (method))
+	{
+	  saw_constructor = 1;
+	  continue;
 	}
 
       sig = build_java_argument_signature (TREE_TYPE (method));
@@ -9049,6 +9061,65 @@ java_expand_classes ()
 	}
     }
 
+  /* Expanding the constructors of anonymous classes generates access
+     methods.  Scan all the methods looking for null DECL_RESULTs --
+     this will be the case if a method hasn't been expanded.  */
+  for (cur_ctxp = ctxp_for_generation; cur_ctxp; cur_ctxp = cur_ctxp->next)
+    {
+      tree current;
+      ctxp = cur_ctxp;
+      for (current = ctxp->class_list; current; current = TREE_CHAIN (current))
+	{
+	  tree d;
+	  current_class = TREE_TYPE (current);
+	  for (d = TYPE_METHODS (current_class); d; d = TREE_CHAIN (d))
+	    {
+	      if (DECL_RESULT (d) == NULL_TREE)
+		{
+		  restore_line_number_status (1);
+		  java_complete_expand_method (d);
+		  restore_line_number_status (0);
+		}
+	    }
+	}
+    }
+
+  /* ???  Instead of all this we could iterate around the list of
+     classes until there were no more un-expanded methods.  It would
+     take a little longer -- one pass over the whole list of methods
+     -- but it would be simpler.  Like this:  */
+#if 0
+    {
+      int something_changed;
+    
+      do
+	{
+	  something_changed = 0;
+	  for (cur_ctxp = ctxp_for_generation; cur_ctxp; cur_ctxp = cur_ctxp->next)
+	    {
+	      tree current;
+	      ctxp = cur_ctxp;
+	      for (current = ctxp->class_list; current; current = TREE_CHAIN (current))
+		{
+		  tree d;
+		  current_class = TREE_TYPE (current);
+		  for (d = TYPE_METHODS (current_class); d; d = TREE_CHAIN (d))
+		    {
+		      if (DECL_RESULT (d) == NULL_TREE)
+			{
+			  something_changed = 1;
+			  restore_line_number_status (1);
+			  java_complete_expand_method (d);
+			  restore_line_number_status (0);
+			}
+		    }
+		}
+	    }
+	}
+      while (something_changed);
+    }
+#endif
+
   /* If we've found error at that stage, don't try to generate
      anything, unless we're emitting xrefs or checking the syntax only
      (but not using -fsyntax-only for the purpose of generating
@@ -9402,6 +9473,19 @@ resolve_field_access (qual_wfl, field_decl, field_type)
 	return error_mark_node;
       if (is_static)
 	field_ref = maybe_build_class_init_for_field (decl, field_ref);
+
+      /* If we're looking at a static field, we may need to generate a
+	 class initialization for it.  This can happen when the access
+	 looks like `field.ref', where `field' is a static field in an
+	 interface we implement.  */
+      if (!flag_emit_class_files
+	  && !flag_emit_xref
+	  && TREE_CODE (where_found) == VAR_DECL
+	  && FIELD_STATIC (where_found))
+	{
+	  build_static_field_ref (where_found);
+	  field_ref = build_class_init (DECL_CONTEXT (where_found), field_ref);
+	}
     }
   else
     field_ref = decl;
@@ -10789,7 +10873,11 @@ patch_invoke (patch, method, args)
      is NULL.  */
   if (check != NULL_TREE)
     {
-      patch = build (COMPOUND_EXPR, TREE_TYPE (patch), check, patch);
+      /* We have to call force_evaluation_order now because creating a
+ 	 COMPOUND_EXPR wraps the arg list in a way that makes it
+ 	 unrecognizable by force_evaluation_order later.  Yuk.  */
+      patch = build (COMPOUND_EXPR, TREE_TYPE (patch), check, 
+ 		     force_evaluation_order (patch));
       TREE_SIDE_EFFECTS (patch) = 1;
     }
 
@@ -12854,6 +12942,43 @@ patch_assignment (node, wfl_op1)
     {
       TREE_CONSTANT (lvalue) = 1;
       DECL_INITIAL (lvalue) = new_rhs;
+    }
+
+  /* Copy the rhs if it's a reference.  */
+  if (! flag_check_references && ! flag_emit_class_files && optimize > 0)
+    {
+      switch (TREE_CODE (new_rhs))
+	{
+	case ARRAY_REF:
+	case INDIRECT_REF:
+	case COMPONENT_REF:
+	  /* Transform a = foo.bar 
+	     into a = { int tmp; tmp = foo.bar; tmp; ).   	     
+	     We need to ensure that if a read from memory fails
+	     because of a NullPointerException, a destination variable
+	     will remain unchanged.  An explicit temporary does what
+	     we need.  
+
+	     If flag_check_references is set, this is unnecessary
+	     because we'll check each reference before doing any
+	     reads.  If optimize is not set the result will never be
+	     written to a stack slot that contains the LHS.  */
+	  {
+	    tree tmp = build_decl (VAR_DECL, get_identifier ("<tmp>"), 
+				   TREE_TYPE (new_rhs));
+	    tree block = build (BLOCK, TREE_TYPE (new_rhs), NULL);
+	    tree assignment 
+	      = build (MODIFY_EXPR, TREE_TYPE (new_rhs), tmp, fold (new_rhs));
+	    BLOCK_VARS (block) = tmp;
+	    BLOCK_EXPR_BODY (block) 
+	      = build (COMPOUND_EXPR, TREE_TYPE (new_rhs), assignment, tmp);
+	    TREE_SIDE_EFFECTS (block) = 1;
+	    new_rhs = block;
+	  }
+	  break;
+	default:
+	  break;
+	}
     }
 
   TREE_OPERAND (node, 0) = lvalue;

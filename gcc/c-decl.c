@@ -1138,6 +1138,12 @@ duplicate_decls (newdecl, olddecl, different_binding_level)
 	    }
 	}
       error_with_decl (olddecl, "previous declaration of `%s'");
+
+      /* This is safer because the initializer might contain references
+	 to variables that were declared between olddecl and newdecl. This
+	 will make the initializer invalid for olddecl in case it gets
+	 assigned to olddecl below.  */
+      DECL_INITIAL (newdecl) = 0;
     }
   /* TLS cannot follow non-TLS declaration.  */
   else if (TREE_CODE (olddecl) == VAR_DECL && TREE_CODE (newdecl) == VAR_DECL
@@ -4544,6 +4550,8 @@ grokdeclarator (declarator, declspecs, decl_context, initialized)
 	   needed, and let dwarf2 know that the function is inlinable.  */
 	else if (flag_inline_trees == 2 && initialized)
 	  {
+	    if (!DECL_INLINE (decl))
+		DID_INLINE_FUNC (decl) = 1;
 	    DECL_INLINE (decl) = 1;
 	    DECL_DECLARED_INLINE_P (decl) = 0;
 	  }
