@@ -313,6 +313,7 @@ USE_COLLECT2 = @will_use_collect2@
 MAYBE_USE_COLLECT2 = @maybe_use_collect2@
 # It is convenient for configure to add the assignment at the beginning,
 # so don't override it here.
+USE_COLLECT2 = ld
 
 # List of extra C and assembler files to add to libgcc1.a.
 # Assembler files should have names ending in `.asm'.
@@ -443,7 +444,7 @@ INTERNAL_CFLAGS = $(CROSS) -DIN_GCC @extra_c_flags@
 
 # This is the variable actually used when we compile.
 ALL_CFLAGS = $(INTERNAL_CFLAGS) $(X_CFLAGS) $(T_CFLAGS) $(CFLAGS) $(XCFLAGS) \
-	@DEFS@
+	@DEFS@ $(SCHED_CFLAGS)
 
 # Likewise.
 ALL_CPPFLAGS = $(CPPFLAGS) $(X_CPPFLAGS) $(T_CPPFLAGS)
@@ -547,14 +548,17 @@ BC_OBJS = bc-emit.o bc-optab.o
 # Bytecode header files constructed at build time; vmsconfig.com wants this.
 BC_ALL = bc-arity.h bc-opcode.h bc-opname.h
 
+SCHED_PREFIX = @sched_prefix@
+SCHED_CFLAGS = @sched_cflags@
+
 # Language-independent object files.
 OBJS = toplev.o version.o tree.o print-tree.o stor-layout.o fold-const.o \
  function.o stmt.o except.o expr.o calls.o expmed.o explow.o optabs.o \
- varasm.o rtl.o print-rtl.o rtlanal.o emit-rtl.o real.o \
- dbxout.o sdbout.o dwarfout.o dwarf2out.o xcoffout.o bitmap.o \
+ varasm.o rtl.o print-rtl.o rtlanal.o emit-rtl.o real.o regmove.o \
+ dbxout.o sdbout.o dwarfout.o dwarf2out.o xcoffout.o bitmap.o alias.o \
  integrate.o jump.o cse.o loop.o unroll.o flow.o stupid.o combine.o \
  regclass.o local-alloc.o global.o reload.o reload1.o caller-save.o \
- insn-peep.o reorg.o sched.o final.o recog.o reg-stack.o \
+ insn-peep.o reorg.o $(SCHED_PREFIX)sched.o final.o recog.o reg-stack.o \
  insn-opinit.o insn-recog.o insn-extract.o insn-output.o insn-emit.o \
  profile.o insn-attrtab.o $(out_object_file) getpwd.o convert.o $(EXTRA_OBJS)
 
@@ -1169,11 +1173,11 @@ ld: collect2
 	ln collect2$(exeext) ld$(exeext) > /dev/null 2>&1 \
 	   || cp collect2$(exeext) ld$(exeext)
 
-collect2 : collect2.o cplus-dem.o underscore.o version.o \
+collect2: collect2.o tlink.o hash.o cplus-dem.o underscore.o version.o \
 	choose-temp.o $(LIBDEPS)
 # Don't try modifying collect2 (aka ld) in place--it might be linking this.
 	-rm -f collect2$(exeext)
-	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o $@ collect2.o \
+	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o $@ collect2.o tlink.o hash.o \
 	  cplus-dem.o underscore.o version.o choose-temp.o $(LIBS)
 
 collect2.o : collect2.c $(CONFIG_H) gstab.h obstack.h demangle.h
@@ -1181,6 +1185,8 @@ collect2.o : collect2.c $(CONFIG_H) gstab.h obstack.h demangle.h
 	-DTARGET_MACHINE=\"$(target_alias)\" $(MAYBE_USE_COLLECT2) \
 	-c `echo $(srcdir)/collect2.c | sed 's,^\./,,'`
 
+tlink.o: tlink.c demangle.h hash.h $(CONFIG_H)
+hash.o: hash.c hash.h
 cplus-dem.o: cplus-dem.c demangle.h
 
 underscore.c: stamp-under ; @true
@@ -1321,7 +1327,11 @@ caller-save.o : caller-save.c $(CONFIG_H) $(RTL_H) flags.h \
 reorg.o : reorg.c $(CONFIG_H) $(RTL_H) conditions.h hard-reg-set.h \
    $(BASIC_BLOCK_H) regs.h insn-config.h insn-attr.h insn-flags.h recog.h \
    flags.h output.h
-sched.o : $(SCHED_PREFIX)sched.c $(CONFIG_H) $(RTL_H) $(BASIC_BLOCK_H) regs.h hard-reg-set.h \
+alias.o : alias.c $(CONFIG_H) $(RTL_H) flags.h hard-reg-set.h regs.h \
+   insn-codes.h
+regmove.o : regmove.c $(CONFIG_H) $(RTL_H) insn-config.h recog.h output.h \
+  reload.h regs.h hard-reg-set.h flags.h expr.h insn-flags.h
+$(SCHED_PREFIX)sched.o : $(SCHED_PREFIX)sched.c $(CONFIG_H) $(RTL_H) $(BASIC_BLOCK_H) regs.h hard-reg-set.h \
    flags.h insn-config.h insn-attr.h
 final.o : final.c $(CONFIG_H) $(RTL_H) $(TREE_H) flags.h regs.h \
    recog.h conditions.h insn-config.h insn-attr.h except.h real.h output.h \

@@ -92,6 +92,9 @@ struct induction
 				   would probably lose. */
   unsigned auto_inc_opt : 1;	/* 1 if this giv had its increment output next
 				   to it to try to form an auto-inc address. */
+  unsigned unrolled : 1;	/* 1 if new register has been allocated in
+				   unrolled loop.  */
+  unsigned shared : 1;
   int lifetime;			/* Length of life of this giv */
   int times_used;		/* # times this giv is used. */
   rtx derive_adjustment;	/* If nonzero, is an adjustment to be
@@ -178,3 +181,13 @@ rtx final_biv_value PROTO((struct iv_class *, rtx, rtx));
 rtx final_giv_value PROTO((struct induction *, rtx, rtx));
 void emit_unrolled_add PROTO((rtx, rtx, rtx));
 int back_branch_in_range_p PROTO((rtx, rtx, rtx));
+
+#ifdef HAIFA
+/* variables for interaction between unroll.c and loop.c, for
+   the insertion of branch-on-count instruction. */
+extern int *loop_unroll_factor;
+extern rtx *loop_start_value;
+extern int *loop_unroll_iter;
+extern int loop_number();
+#endif  /* HAIFA */
+

@@ -304,6 +304,34 @@ extern int flag_shared_data;
 extern int flag_schedule_insns;
 extern int flag_schedule_insns_after_reload;
 
+#ifdef HAIFA
+/* The following flags have effect only for scheduling before register
+   allocation:
+
+   flag_schedule_interblock means schedule insns accross basic blocks.
+   flag_schedule_speculative means allow speculative motion of non-load insns.
+   flag_schedule_speculative_load means allow speculative motion of some
+   load insns.
+   flag_schedule_speculative_load_dangerous allows speculative motion of more
+   load insns.
+   flag_schedule_reverse_before_reload means try to reverse original order
+   of insns (S).
+   flag_schedule_reverse_after_reload means try to reverse original order
+   of insns (R).  */
+
+extern int flag_schedule_interblock;
+extern int flag_schedule_speculative;
+extern int flag_schedule_speculative_load;
+extern int flag_schedule_speculative_load_dangerous;
+extern int flag_schedule_reverse_before_reload;
+extern int flag_schedule_reverse_after_reload;
+
+/* flag_on_branch_count_reg means try to replace add-1,compare,branch tupple
+   by a cheaper branch, on a count register. */
+extern int flag_branch_on_count_reg;
+#endif  /* HAIFA */
+
+
 /* Nonzero means put things in delayed-branch slots if supported. */
 
 extern int flag_delayed_branch;
@@ -369,6 +397,19 @@ extern int flag_gnu_linker;
 
 /* Tag all structures with __attribute__(packed) */
 extern int flag_pack_struct;
+
+/* 1 if alias checking is enabled: symbols do not alias each other
+   and parameters do not alias the current stack frame.  */
+extern int flag_alias_check;
+
+/* This flag is only tested if alias checking is enabled.
+   0 if pointer arguments may alias each other.  True in C.
+   1 if pointer arguments may not alias each other but may alias
+   global variables.
+   2 if pointer arguments may not alias each other and may not
+   alias global variables.  True in Fortran.
+   The value is ignored if flag_alias_check is 0.  */
+extern int flag_argument_noalias;
 
 /* Emit code to check for stack overflow; also may cause large objects
    to be allocated dynamically.  */
