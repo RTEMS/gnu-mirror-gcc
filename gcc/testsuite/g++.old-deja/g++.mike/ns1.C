@@ -1,11 +1,11 @@
-namespace Foo { // WARNING - namespaces mostly broken
-  bar() {
+namespace Foo {
+  int bar() {
     return 0;
   }
 }
 
-using namespace Foo; // ERROR - using not implemented
+using namespace Foo;
 
-main() {
+int main() {
   bar();
 }

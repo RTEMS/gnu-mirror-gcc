@@ -1,9 +1,10 @@
 // Build don't link: 
 // GROUPS passed old-abort
-#include <String.h>
+#include <string>
 
+int
 main(void) {
 
-  String a[] = {"Hello"};
+  string a[] = {"Hello"};
 
 }

@@ -1,9 +1,9 @@
-namespace N { // WARNING - namespaces mostly broken
+namespace N {
   int i;
 };
 
-using namespace N; // ERROR - using not implemented
+using namespace N;
 
-main() {
+int main() {
   return i;
 }

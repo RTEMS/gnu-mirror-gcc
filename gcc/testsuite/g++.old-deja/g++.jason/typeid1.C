@@ -3,9 +3,9 @@
 
 struct foo { double f(int); };
 
-main() {
+int main() {
   double f (int);
-  const type_info &r = typeid (f);
+  const std::type_info &r = typeid (f);
   cout << typeid(f).name() << endl;
   cout << typeid(foo::f).name() << endl;
 }

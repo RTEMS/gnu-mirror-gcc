@@ -1,7 +1,7 @@
 // prms-id: 658
 
 #include <ostream.h>
-#include <bool.h>
+
 extern "C" void abort();
 
 /* We may not find the libg++ <bool.h>.  */
@@ -35,7 +35,7 @@ private:
     char _c;
 };
 
-main()
+int main()
 {
     Char r, s;
 

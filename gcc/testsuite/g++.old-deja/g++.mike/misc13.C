@@ -1,5 +1,5 @@
 // GROUPS passed vtable
-extern "C" printf(...);
+extern "C" int printf(...);
 enum { vf_request, vf_event } want;
 
 int errs = 0;
@@ -39,7 +39,7 @@ ivHandler *bar2() {
   return &a;
 }
 
-main() {
+int main() {
   want=vf_request;
   bar()->request();
   want=vf_event;

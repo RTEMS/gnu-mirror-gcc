@@ -1,6 +1,6 @@
 // PRMS id: 6863
 
-extern "C" printf(const char *, ...);
+extern "C" int printf(const char *, ...);
 extern "C" void abort();
 
 enum ENUM {E1=0, E2 };
@@ -25,7 +25,7 @@ extern AAA arr1[];
 
 AAA arr1[] = {(int)E1 };
 
-main()
+int main()
 {
   return 0;
 }

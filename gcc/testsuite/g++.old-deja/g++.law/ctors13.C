@@ -4,9 +4,9 @@
 
 class A {
    A() {}    // private constructor// ERROR - .*
-}; // WARNING - all member functions are private
+};
 
-main() {
+int main() {
   A* a = new A();// ERROR - .*
   if (a) {
      cout << "a != NULL\n";

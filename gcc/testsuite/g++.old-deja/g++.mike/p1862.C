@@ -1,5 +1,5 @@
 // GROUPS vtable
-extern "C" printf (const char *, ...);
+extern "C" int printf (const char *, ...);
 
 class A
 {
@@ -45,7 +45,7 @@ public:
   }
 };
 
-main()
+int main()
 {
   C1 *one = new C1;
   

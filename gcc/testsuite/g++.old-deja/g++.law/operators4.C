@@ -5,7 +5,8 @@
 // Subject:  delete [size] pointer; Problem
 // Message-ID: <92Sep3.220137edt.30@jarvis.csri.toronto.edu>
 
-#include <Complex.h>
+#include <complex>
+typedef complex<double> Complex;
 #include <stdio.h>
 
 class Vector {
@@ -21,7 +22,7 @@ void foo(int s)
   Vector junk(s);
 }
 
-main()
+int main()
 {
   Vector* test;
   for (int i=0;i<40;i++) // was 100000

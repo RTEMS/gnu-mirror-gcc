@@ -1,7 +1,7 @@
 // I hate this type of test case.  I'm not sure how to code it better.
 // See the PR for what this tests.
 // prms-id: 7325
-// execution test fails *-*-*
+// execution test - XFAIL *-*-*
 
 int fail = 0;
 
@@ -48,7 +48,7 @@ void g ()
   A::match_this = 0;
 }
 
-main() {
+int main() {
   f();
   g();
   return fail;

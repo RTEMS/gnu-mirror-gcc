@@ -1,7 +1,7 @@
 // GROUPS passed groff
 /* This should compile properly with the new overloading scheme.  */
 
-extern "C" void printf (char *, ...);
+extern "C" void printf (const char *, ...);
 extern "C" void exit (int);
 
 int win = 0;
@@ -20,7 +20,7 @@ public:
   void *lookup(const char *) {}
 };
 
-main()
+int main()
 {
   char buf[2048];
   dictionary exceptions;

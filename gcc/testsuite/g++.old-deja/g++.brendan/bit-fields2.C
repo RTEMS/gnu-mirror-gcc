@@ -5,9 +5,9 @@
 	    int i:8;
 	} s;
 	
-	main()
+	int main()
 	{
-	    int &ir = s.i;
-	    int *ip = &s.i;// ERROR - .* , XFAIL *-*-*
+	    int &ir = s.i;	// ERROR - address of bitfield
+	    int *ip = &s.i;	// ERROR - address of bitfield
 	    ir = 10;
 	}

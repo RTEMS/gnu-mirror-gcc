@@ -30,10 +30,6 @@
 #pragma interface
 
 
-// $Source: /egcs/carton/cvsfiles/egcs/gcc/testsuite/g++.old-deja/g++.jason/2371.C,v $
-// $Author: law $
-// $Revision: 1.1 $
-// $Date: 1997/08/19 07:35:23 $
 
 
 
@@ -61,10 +57,6 @@
 #pragma interface
 
 
-// $Source: /egcs/carton/cvsfiles/egcs/gcc/testsuite/g++.old-deja/g++.jason/2371.C,v $
-// $Author: law $
-// $Revision: 1.1 $
-// $Date: 1997/08/19 07:35:23 $
 
 
 
@@ -431,10 +423,6 @@ SetLS<T>::contains(const T& item) const
 # 14 "SetLS.cc" 2
 
 
-// $Source: /egcs/carton/cvsfiles/egcs/gcc/testsuite/g++.old-deja/g++.jason/2371.C,v $
-// $Author: law $
-// $Revision: 1.1 $
-// $Date: 1997/08/19 07:35:23 $
 
 # 1 "/projects/gnu-cygnus/gnu-cygnus-14/mips/lib/gcc-lib/decstation/cygnus-reno-1/g++-include/iostream.h" 1 3
 //    This is part of the iostream library, providing -*- C++ -*- input/output.
@@ -514,7 +502,7 @@ operator<<(ostream& o, const SLS& s)
 SLS gsls;
 const SLS gcsls;
 
-foo()
+int foo()
 {
     const unsigned SIZE = 20;
 
@@ -575,7 +563,7 @@ foo()
 }
 
 // Dummy function so it'll run
-main()
+int main()
 {
   cout << "PASS" << endl;
 }

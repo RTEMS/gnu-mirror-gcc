@@ -1,5 +1,5 @@
 // GROUPS passed
-extern "C" printf(...);
+extern "C" int printf(...);
 extern "C" void exit(int);
 
 class A {
@@ -18,7 +18,7 @@ public:
   }
 };
 
-main() {
+int main() {
   B b;
   A *ap = &b;
   ap->~A();  // This should call the destructor virtually.

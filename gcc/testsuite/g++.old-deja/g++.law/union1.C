@@ -1,6 +1,5 @@
 // Build don't link: 
 // GROUPS passed unions
-// excess errors test - XFAIL *-*-*
 // anon-union file
 // From: "Terry R. Coley" <terry@wag.caltech.edu>
 // Date:     Tue, 25 Aug 1992 17:33:29 -0700
@@ -25,6 +24,6 @@ op_to_charp BINOPS[] = { {"+", PLUS},
                          {"/", DIV},
                          {"^", POWR} };
 
-main() {
+int main() {
   int dummy;
 }

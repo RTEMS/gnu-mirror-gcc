@@ -1,7 +1,7 @@
 // PRMS Id: 5286
 // Bug: g++ forgets side-effects of object in call to nonexistent destructor.
 
-void * operator new (__SIZE_TYPE__ s, void * p) { return p; }
+#include <new>
 
 int r;
 
@@ -12,7 +12,7 @@ template <class T> struct A {
   ~A() { p[--i].~T(); r = i; }
 };
 
-main()
+int main()
 {
   { A<int> a; }
 

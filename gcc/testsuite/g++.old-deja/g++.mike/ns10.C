@@ -1,10 +1,9 @@
-// excess errors test - XFAIL *-*-*
 namespace Foo {
-  bar() {
+  int bar() {
     return 0;
   }
 }
 
-main() {
+int main() {
   return Foo::bar();
 }

@@ -11,13 +11,15 @@
 inline int max(int a, int b) {return a > b ? a : b;}; // ERROR - candidate
 inline double max(double a, double b) {return a > b ? a : b;}; // ERROR - candidate
 
-main() {
+int main() {
    static void foo(int i, int j, double x, double y) ;// ERROR - .*
 
    foo(4, -37, 14.39, 14.38);
 }
 
-static void foo(int i, int j, double x, double y) { // ERROR - extern
+// 971006 we no longer give an error for this since we emit a hard error
+// about the declaration above
+static void foo(int i, int j, double x, double y) { 
 
    cout << "Max(int): " << max(i,j) << " Max(double): " <<
 max(x,y) << '\n';

@@ -2,7 +2,7 @@
 // Build don't link:
 // Special g++ Options:
 
-typedef unsigned long size_t;
+typedef __SIZE_TYPE__ size_t;
 
 struct A {
   int operator?:(int a, int b);	   // WARNING - 
@@ -10,8 +10,8 @@ struct A {
   static int operator+(A,A);	   // ERROR - must be nonstatic
   int operator+(int a, int b = 1); // ERROR - two errors on this line
   int operator++(char);		   // ERROR - must take 'int'
-  void operator delete (void *);   // ERROR - overloaded
-  void operator delete (void *, unsigned long);	// ERROR - overloaded
+  void operator delete (void *);   
+  void operator delete (void *, unsigned long);	
 };
 
 struct B {

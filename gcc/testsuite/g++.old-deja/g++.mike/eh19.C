@@ -4,19 +4,19 @@
 class test1 {
 public:
   class fehler{public:fehler(){};};
-  func(int a) {
+  void func(int a) {
     if( a == 0 )
       throw fehler();
   }
 };
 
-main() {
+int main() {
   test1 var;
 
   try {
     var.func(1);
     var.func(0);
-  } catch(test1::fehler())		// ERROR - cannot have function type
+  } catch(test1::fehler())		// function type promoted to pointer
     {
       ;
     }
