@@ -97,7 +97,7 @@
 ;; separately.
 
 (define_attr "type"
-  "ild,fld,ldsym,ist,fst,ibr,fbr,jsr,iadd,ilog,shift,icmov,fcmov,icmp,imul,\
+  "ild,fld,ldsym,ist,fst,ibr,callpal,fbr,jsr,iadd,ilog,shift,icmov,fcmov,icmp,imul,\
 fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi,none"
   (const_string "iadd"))
 
@@ -171,7 +171,7 @@ fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi,none"
 	  (match_operand:SI 1 "nonimmediate_operand" "r,m,*f,m")))]
   "! TARGET_FIX"
   "@
-   addl %1,$31,%0
+   addl $31,%1,%0
    ldl %0,%1
    cvtlq %1,%0
    lds %0,%1\;cvtlq %0,%0"
@@ -184,7 +184,7 @@ fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi,none"
 	  (match_operand:SI 1 "nonimmediate_operand" "r,m,*f,*f,m")))]
   "TARGET_FIX"
   "@
-   addl %1,$31,%0
+   addl $31,%1,%0
    ldl %0,%1
    ftois %1,%0
    cvtlq %1,%0
@@ -1733,7 +1733,7 @@ fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi,none"
   "ext%M2l %r1,%3,%0"
   [(set_attr "type" "shift")])
 
-;; Combine has some strange notion of preserving existing undefined behaviour
+;; Combine has some strange notion of preserving existing undefined behavior
 ;; in shifts larger than a word size.  So capture these patterns that it
 ;; should have turned into zero_extracts.
 
@@ -2134,7 +2134,7 @@ fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi,none"
 
 (define_expand "abstf2"
   [(parallel [(set (match_operand:TF 0 "register_operand" "")
-		   (neg:TF (match_operand:TF 1 "reg_or_0_operand" "")))
+		   (abs:TF (match_operand:TF 1 "reg_or_0_operand" "")))
 	      (use (match_dup 2))])]
   "TARGET_HAS_XFLOATING_LIBS"
 {
@@ -3222,7 +3222,7 @@ fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi,none"
 		 (match_operand:HI 2 "reg_or_8bit_operand" "rI")))]
   "TARGET_MAX"
   "maxuw4 %r1,%2,%0"
-  [(set_attr "type" "shift")])
+  [(set_attr "type" "mvi")])
 
 (define_expand "smaxdi3"
   [(set (match_dup 3)
@@ -4727,20 +4727,19 @@ fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi,none"
    (use (reg:DI 26))
    (clobber (reg:DI 27))]
   "TARGET_ABI_OPEN_VMS"
-  "*
 {
   switch (which_alternative)
     {
     case 0:
-   	return \"mov %2,$27\;jsr $26,0\;ldq $27,0($29)\";
+   	return "mov %2,$27\;jsr $26,0\;ldq $27,0($29)";
     case 1:
 	operands [2] = alpha_use_linkage (operands [0], cfun->decl, 1, 0);
 	operands [3] = alpha_use_linkage (operands [0], cfun->decl, 0, 0);
-   	return \"ldq $26,%3\;ldq $27,%2\;jsr $26,%0\;ldq $27,0($29)\";
+   	return "ldq $26,%3\;ldq $27,%2\;jsr $26,%0\;ldq $27,0($29)";
     default:
       abort();
     }
-}"
+}
   [(set_attr "type" "jsr")
    (set_attr "length" "12,16")])
 
@@ -4866,7 +4865,7 @@ fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi,none"
   [(unspec_volatile [(const_int 0)] UNSPECV_IMB)]
   ""
   "call_pal 0x86"
-  [(set_attr "type" "ibr")])
+  [(set_attr "type" "callpal")])
 
 ;; BUGCHK is documented common to OSF/1 and VMS PALcode.
 ;; NT does not document anything at 0x81 -- presumably it would generate
@@ -4876,7 +4875,7 @@ fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi,none"
   [(trap_if (const_int 1) (const_int 0))]
   "!TARGET_ABI_WINDOWS_NT"
   "call_pal 0x81"
-  [(set_attr "type" "ibr")])
+  [(set_attr "type" "callpal")])
 
 ;; For userland, we load the thread pointer from the TCB.
 ;; For the kernel, we load the per-cpu private value.
@@ -4891,7 +4890,7 @@ fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi,none"
   else
     return "call_pal 0x9e";
 }
-  [(set_attr "type" "ibr")])
+  [(set_attr "type" "callpal")])
 
 ;; For completeness, and possibly a __builtin function, here's how to
 ;; set the thread pointer.  Since we don't describe enough of this
@@ -4913,7 +4912,7 @@ fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi,none"
   else
     return "call_pal 0x9f";
 }
-  [(set_attr "type" "ibr")])
+  [(set_attr "type" "callpal")])
 
 ;; Finally, we have the basic data motion insns.  The byte and word insns
 ;; are done via define_expand.  Start with the floating-point insns, since
@@ -6460,6 +6459,56 @@ fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi,none"
     FAIL;
 })
 
+(define_expand "movstrdi"
+  [(parallel [(set (match_operand:BLK 0 "memory_operand" "")
+		   (match_operand:BLK 1 "memory_operand" ""))
+	      (use (match_operand:DI 2 "immediate_operand" ""))
+	      (use (match_operand:DI 3 "immediate_operand" ""))
+	      (use (match_dup 4))
+	      (clobber (reg:DI 25))
+	      (clobber (reg:DI 16))
+	      (clobber (reg:DI 17))
+	      (clobber (reg:DI 18))
+	      (clobber (reg:DI 19))
+	      (clobber (reg:DI 20))
+	      (clobber (reg:DI 26))
+	      (clobber (reg:DI 27))])]
+  "TARGET_ABI_OPEN_VMS"
+{
+  operands[4] = gen_rtx_SYMBOL_REF (Pmode, "OTS$MOVE");
+  alpha_need_linkage (XSTR (operands[4], 0), 0);
+})
+
+(define_insn "*movstrdi_1"
+  [(set (match_operand:BLK 0 "memory_operand" "=m,=m")
+	(match_operand:BLK 1 "memory_operand" "m,m"))
+   (use (match_operand:DI 2 "nonmemory_operand" "r,i"))
+   (use (match_operand:DI 3 "immediate_operand" ""))
+   (use (match_operand:DI 4 "call_operand" "i,i"))
+   (clobber (reg:DI 25))
+   (clobber (reg:DI 16))
+   (clobber (reg:DI 17))
+   (clobber (reg:DI 18))
+   (clobber (reg:DI 19))
+   (clobber (reg:DI 20))
+   (clobber (reg:DI 26))
+   (clobber (reg:DI 27))]
+  "TARGET_ABI_OPEN_VMS"
+{
+  operands [5] = alpha_use_linkage (operands [4], cfun->decl, 0, 1);
+  switch (which_alternative)
+    {
+    case 0:
+	return "lda $16,%0\;bis $31,%2,$17\;lda $18,%1\;ldq $26,%5\;lda $25,3($31)\;jsr $26,%4\;ldq $27,0($29)";
+    case 1:
+	return "lda $16,%0\;lda $17,%2($31)\;lda $18,%1\;ldq $26,%5\;lda $25,3($31)\;jsr $26,%4\;ldq $27,0($29)";
+    default:
+      abort();
+    }
+}
+  [(set_attr "type" "multi")
+   (set_attr "length" "28")])
+
 (define_expand "clrstrqi"
   [(parallel [(set (match_operand:BLK 0 "memory_operand" "")
 		   (const_int 0))
@@ -6472,6 +6521,51 @@ fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi,none"
   else
     FAIL;
 })
+
+(define_expand "clrstrdi"
+  [(parallel [(set (match_operand:BLK 0 "memory_operand" "")
+		   (const_int 0))
+	      (use (match_operand:DI 1 "immediate_operand" ""))
+	      (use (match_operand:DI 2 "immediate_operand" ""))
+	      (use (match_dup 3))
+	      (clobber (reg:DI 25))
+	      (clobber (reg:DI 16))
+	      (clobber (reg:DI 17))
+	      (clobber (reg:DI 26))
+	      (clobber (reg:DI 27))])]
+  "TARGET_ABI_OPEN_VMS"
+{
+  operands[3] = gen_rtx_SYMBOL_REF (Pmode, "OTS$ZERO");
+  alpha_need_linkage (XSTR (operands[3], 0), 0);
+})
+
+(define_insn "*clrstrdi_1"
+  [(set (match_operand:BLK 0 "memory_operand" "=m,=m")
+		   (const_int 0))
+   (use (match_operand:DI 1 "nonmemory_operand" "r,i"))
+   (use (match_operand:DI 2 "immediate_operand" ""))
+   (use (match_operand:DI 3 "call_operand" "i,i"))
+   (clobber (reg:DI 25))
+   (clobber (reg:DI 16))
+   (clobber (reg:DI 17))
+   (clobber (reg:DI 26))
+   (clobber (reg:DI 27))]
+  "TARGET_ABI_OPEN_VMS"
+{
+  operands [4] = alpha_use_linkage (operands [3], cfun->decl, 0, 1);
+  switch (which_alternative)
+    {
+    case 0:
+	return "lda $16,%0\;bis $31,%1,$17\;ldq $26,%4\;lda $25,2($31)\;jsr $26,%3\;ldq $27,0($29)";
+    case 1:
+	return "lda $16,%0\;lda $17,%1($31)\;ldq $26,%4\;lda $25,2($31)\;jsr $26,%3\;ldq $27,0($29)";
+    default:
+      abort();
+    }
+}
+  [(set_attr "type" "multi")
+   (set_attr "length" "24")])
+
 
 ;; Subroutine of stack space allocation.  Perform a stack probe.
 (define_expand "probe_stack"
@@ -6571,7 +6665,7 @@ fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi,none"
   ""
 {
   operands[2] = gen_label_rtx ();
-  ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+  (*targetm.asm_out.internal_label) (asm_out_file, "L",
 			     CODE_LABEL_NUMBER (operands[2]));
 
   return "stq $31,-8192(%1)\;subq %0,1,%0\;lda %1,-8192(%1)\;bne %0,%l2";
@@ -6934,12 +7028,12 @@ fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi,none"
      and leave the LRU eviction counter pointing to that block.  */
   static const char * const alt[2][2] = {
     { 
-      "lds $f31,%a0",		/* read, evict next */
+      "ldq $31,%a0",		/* read, evict next */
       "ldl $31,%a0",		/* read, evict last */
     },
     {
       "ldt $f31,%a0",		/* write, evict next */
-      "ldq $31,%a0",		/* write, evict last */
+      "lds $f31,%a0",		/* write, evict last */
     }
   };
 
@@ -7596,9 +7690,9 @@ fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi,none"
 })
 
 (define_insn "*pkwb"
-  [(set (match_operand:V8QI 0 "register_operand" "")
+  [(set (match_operand:V8QI 0 "register_operand" "=r")
 	(vec_concat:V8QI
-	  (truncate:V4QI (match_operand:V4HI 1 "register_operand" ""))
+	  (truncate:V4QI (match_operand:V4HI 1 "register_operand" "r"))
 	  (match_operand:V4QI 2 "const0_operand" "")))]
   "TARGET_MAX"
   "pkwb %r1,%0"
@@ -7918,20 +8012,19 @@ fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi,none"
    (use (reg:DI 26))
    (clobber (reg:DI 27))]
   "TARGET_ABI_OPEN_VMS"
-  "*
 {
   switch (which_alternative)
     {
     case 0:
-   	return \"mov %3,$27\;jsr $26,0\;ldq $27,0($29)\";
+   	return "mov %3,$27\;jsr $26,0\;ldq $27,0($29)";
     case 1:
 	operands [3] = alpha_use_linkage (operands [1], cfun->decl, 1, 0);
 	operands [4] = alpha_use_linkage (operands [1], cfun->decl, 0, 0);
-   	return \"ldq $26,%4\;ldq $27,%3\;jsr $26,%1\;ldq $27,0($29)\";
+   	return "ldq $26,%4\;ldq $27,%3\;jsr $26,%1\;ldq $27,0($29)";
     default:
       abort();
     }
-}"
+}
   [(set_attr "type" "jsr")
    (set_attr "length" "12,16")])
 

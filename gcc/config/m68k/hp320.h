@@ -171,9 +171,7 @@ Boston, MA 02111-1307, USA.  */
 #undef ASM_OUTPUT_SKIP
 #undef ASM_OUTPUT_COMMON
 #undef ASM_OUTPUT_LOCAL
-#undef ASM_FORMAT_PRIVATE_NAME
 #undef FUNCTION_PROFILER
-#undef ASM_OUTPUT_INTERNAL_LABEL
 #undef GLOBAL_ASM_OP
 #undef IMMEDIATE_PREFIX
 #undef REGISTER_PREFIX
@@ -249,20 +247,7 @@ Boston, MA 02111-1307, USA.  */
   assemble_name ((FILE), (NAME)),		\
   fprintf ((FILE), ",%u,2\n", (ROUNDED)))
 
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)	\
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 12),	\
-  sprintf ((OUTPUT), "%s___%d", (NAME), (LABELNO)))
-
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)	\
-do{  if (PREFIX[0] == 'L' && PREFIX[1] == 'I')		\
-    fprintf(FILE, "\tset %s%d,.+2\n", PREFIX, NUM);	\
-  else							\
-    fprintf (FILE, "%s%d:\n", PREFIX, NUM);		\
-} while(0)
+#define ASM_PN_FORMAT "%s___%lu"
 
 #define ASM_OUTPUT_ADDR_VEC_ELT(FILE, VALUE)  \
   fprintf (FILE, "\tlong L%d\n", VALUE)
@@ -300,7 +285,7 @@ do {					\
       if (CODE == 'f')						\
         {							\
           char dstr[30];					\
-          REAL_VALUE_TO_DECIMAL (VALUE, "%.9g", dstr);		\
+      	  real_to_decimal (dstr, &(VALUE), sizeof (dstr), 9, 0); \
           fprintf ((FILE), "&0f%s", dstr);			\
         }							\
       else							\
@@ -317,7 +302,7 @@ do {					\
 #undef ASM_OUTPUT_DOUBLE_OPERAND
 #define ASM_OUTPUT_DOUBLE_OPERAND(FILE,VALUE)				\
  do { char dstr[30];							\
-      REAL_VALUE_TO_DECIMAL (VALUE, "%.20g", dstr);			\
+      real_to_decimal (dstr, &(VALUE), sizeof (dstr), 0, 1);		\
       fprintf (FILE, "&0f%s", dstr);					\
     } while (0)
 
@@ -326,7 +311,7 @@ do {					\
 #undef ASM_OUTPUT_LONG_DOUBLE_OPERAND
 #define ASM_OUTPUT_LONG_DOUBLE_OPERAND(FILE,VALUE)			\
  do { char dstr[30];							\
-      REAL_VALUE_TO_DECIMAL (VALUE, "%.20g", dstr);			\
+      real_to_decimal (dstr, &(VALUE), sizeof (dstr), 0, 1);		\
       fprintf (FILE, "&0f%s", dstr);					\
     } while (0)
 
@@ -351,15 +336,11 @@ do {					\
     { REAL_VALUE_TYPE r;  long l;					\
       REAL_VALUE_FROM_CONST_DOUBLE (r, X);				\
       PRINT_OPERAND_FLOAT (CODE, FILE, r, l); }				\
-  else if (GET_CODE (X) == CONST_DOUBLE && GET_MODE (X) == DFmode)	\
-    { REAL_VALUE_TYPE r;  char dstr[30];				\
-      REAL_VALUE_FROM_CONST_DOUBLE (r, X);				\
-      REAL_VALUE_TO_DECIMAL (r, "%.20g", dstr);				\
-      fprintf (FILE, "&0f%s", dstr); }					\
-  else if (GET_CODE (X) == CONST_DOUBLE && GET_MODE (X) == XFmode)	\
-    { REAL_VALUE_TYPE r;  char dstr[30];				\
-      REAL_VALUE_FROM_CONST_DOUBLE (r, X);				\
-      REAL_VALUE_TO_DECIMAL (r, "%.20g", dstr);				\
+  else if (GET_CODE (X) == CONST_DOUBLE					\
+	   && (GET_MODE (X) == DFmode || GET_MODE (X) == XFmode))	\
+    { char dstr[30];							\
+      real_to_decimal (dstr, CONST_DOUBLE_REAL_VALUE (X),		\
+		       sizeof (dstr), 0, 1);				\
       fprintf (FILE, "&0f%s", dstr); }					\
   else { putc ('&', FILE); output_addr_const (FILE, X); }}
 #endif
