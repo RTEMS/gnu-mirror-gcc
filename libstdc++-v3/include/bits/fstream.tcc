@@ -179,7 +179,6 @@ namespace std
     {
       int_type __ret = traits_type::eof();
       const bool __testin = this->_M_mode & ios_base::in;
-      const bool __testout = this->_M_mode & ios_base::out;
       if (__testin && !_M_writing)
 	{
 	  // Check for pback madness, and if so swich back to the
@@ -256,9 +255,9 @@ namespace std
 		      // codecvt::max_length() is bogus.
 		      if (_M_ext_end - _M_ext_buf + __rlen > _M_ext_buf_size)
 			{
-			  __throw_ios_failure("basic_filebuf::underflow "
+			  __throw_ios_failure(__N("basic_filebuf::underflow "
 					      "codecvt::max_length() "
-					      "is not valid");
+					      "is not valid"));
 			}
 		      streamsize __elen = _M_file.xsgetn(_M_ext_end, __rlen);
 		      if (__elen == 0)
@@ -310,15 +309,15 @@ namespace std
 	      // However, reaching it while looping on partial means that
 	      // the file has got an incomplete character.
 	      if (__r == codecvt_base::partial)
-		__throw_ios_failure("basic_filebuf::underflow "
-				    "incomplete character in file");
+		__throw_ios_failure(__N("basic_filebuf::underflow "
+				    "incomplete character in file"));
 	    }
 	  else if (__r == codecvt_base::error)
-	    __throw_ios_failure("basic_filebuf::underflow "
-				"invalid byte sequence in file");
+	    __throw_ios_failure(__N("basic_filebuf::underflow "
+				"invalid byte sequence in file"));
 	  else
-	    __throw_ios_failure("basic_filebuf::underflow "
-				"error reading the file");	    
+	    __throw_ios_failure(__N("basic_filebuf::underflow "
+				"error reading the file"));	    
 	}
       return __ret;
     }
@@ -398,7 +397,7 @@ namespace std
 	      // and output.
 	      if (_M_convert_to_external(this->pbase(),
 					 this->pptr() - this->pbase())
-		  && (!__testeof || (__testeof && !_M_file.sync())))
+		  && (!__testeof || !_M_file.sync()))
 		{
 		  _M_set_buffer(0);
 		  __ret = traits_type::not_eof(__c);
@@ -438,12 +437,12 @@ namespace std
     _M_convert_to_external(_CharT* __ibuf, streamsize __ilen)
     {
       // Sizes of external and pending output.
-      streamsize __elen = 0;
-      streamsize __plen = 0;
+      streamsize __elen;
+      streamsize __plen;
       if (__check_facet(_M_codecvt).always_noconv())
 	{
-	  __elen += _M_file.xsputn(reinterpret_cast<char*>(__ibuf), __ilen);
-	  __plen += __ilen;
+	  __elen = _M_file.xsputn(reinterpret_cast<char*>(__ibuf), __ilen);
+	  __plen = __ilen;
 	}
       else
 	{
@@ -467,19 +466,14 @@ namespace std
 	      __blen = __ilen;
 	    }
 	  else
-	    {
-	      // Result == error.
-	      __blen = 0;
-	    }
+	    __throw_ios_failure(__N("basic_filebuf::_M_convert_to_external "
+				    "conversion error"));
 	  
-	  if (__blen)
-	    {
-	      __elen += _M_file.xsputn(__buf, __blen);
-	      __plen += __blen;
-	    }
+	  __elen = _M_file.xsputn(__buf, __blen);
+	  __plen = __blen;
 	  
 	  // Try once more for partial conversions.
-	  if (__r == codecvt_base::partial)
+	  if (__r == codecvt_base::partial && __elen == __plen)
 	    {
 	      const char_type* __iresume = __iend;
 	      streamsize __rlen = this->pptr() - __iend;
@@ -489,12 +483,15 @@ namespace std
 	      if (__r != codecvt_base::error)
 		{
 		  __rlen = __bend - __buf;
-		  __elen += _M_file.xsputn(__buf, __rlen);
-		  __plen += __rlen;
+		  __elen = _M_file.xsputn(__buf, __rlen);
+		  __plen = __rlen;
 		}
+	      else
+		__throw_ios_failure(__N("basic_filebuf::_M_convert_to_external "
+					"conversion error"));
 	    }
 	}
-      return __elen && __elen == __plen;
+      return __elen == __plen;
     }
 
    template<typename _CharT, typename _Traits>

@@ -1,6 +1,6 @@
 /* Convert tree expression to rtl instructions, for GNU compiler.
    Copyright (C) 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1924,6 +1924,9 @@ emit_group_load (rtx dst, rtx orig_src, tree type ATTRIBUTE_UNUSED, int ssize)
 	  emit_move_insn (mem, src);
 	  tmps[i] = adjust_address (mem, mode, (int) bytepos);
 	}
+      else if (CONSTANT_P (src) && GET_MODE (dst) != BLKmode
+	       && XVECLEN (dst, 0) > 1)
+	tmps[i] = simplify_gen_subreg (mode, src, GET_MODE(dst), bytepos);
       else if (CONSTANT_P (src)
 	       || (GET_CODE (src) == REG && GET_MODE (src) == mode))
 	tmps[i] = src;
@@ -4621,10 +4624,7 @@ store_constructor (tree exp, rtx target, int cleared, HOST_WIDE_INT size)
 				       highest_pow2_factor (offset));
 	    }
 
-	  /* If the constructor has been cleared, setting RTX_UNCHANGING_P
-	     on the MEM might lead to scheduling the clearing after the
-	     store.  */
-	  if (TREE_READONLY (field) && !cleared)
+	  if (TREE_READONLY (field))
 	    {
 	      if (GET_CODE (to_rtx) == MEM)
 		to_rtx = copy_rtx (to_rtx);
@@ -8020,7 +8020,7 @@ expand_expr_real (tree exp, rtx target, enum machine_mode tmode,
       /* First try to do it with a special MIN or MAX instruction.
 	 If that does not win, use a conditional jump to select the proper
 	 value.  */
-      this_optab = (TREE_UNSIGNED (type)
+      this_optab = (unsignedp
 		    ? (code == MIN_EXPR ? umin_optab : umax_optab)
 		    : (code == MIN_EXPR ? smin_optab : smax_optab));
 
@@ -8054,18 +8054,16 @@ expand_expr_real (tree exp, rtx target, enum machine_mode tmode,
 	  && ! can_compare_p (GE, mode, ccp_jump))
 	{
 	  if (code == MAX_EXPR)
-	    do_jump_by_parts_greater_rtx (mode, TREE_UNSIGNED (type),
-					  target, op1, NULL_RTX, op0);
+	    do_jump_by_parts_greater_rtx (mode, unsignedp, target, op1,
+					  NULL_RTX, op0);
 	  else
-	    do_jump_by_parts_greater_rtx (mode, TREE_UNSIGNED (type),
-					  op1, target, NULL_RTX, op0);
+	    do_jump_by_parts_greater_rtx (mode, unsignedp, op1, target,
+					  NULL_RTX, op0);
 	}
       else
 	{
-	  int unsignedp = TREE_UNSIGNED (TREE_TYPE (TREE_OPERAND (exp, 1)));
 	  do_compare_rtx_and_jump (target, op1, code == MAX_EXPR ? GE : LE,
-				   unsignedp, mode, NULL_RTX, NULL_RTX,
-				   op0);
+				   unsignedp, mode, NULL_RTX, NULL_RTX, op0);
 	}
       emit_move_insn (target, op1);
       emit_label (op0);
@@ -9074,7 +9072,8 @@ is_aligning_offset (tree offset, tree exp)
      power of 2 and which is larger than BIGGEST_ALIGNMENT.  */
   if (TREE_CODE (offset) != BIT_AND_EXPR
       || !host_integerp (TREE_OPERAND (offset, 1), 1)
-      || compare_tree_int (TREE_OPERAND (offset, 1), BIGGEST_ALIGNMENT) <= 0
+      || compare_tree_int (TREE_OPERAND (offset, 1), 
+			   BIGGEST_ALIGNMENT / BITS_PER_UNIT) <= 0
       || !exact_log2 (tree_low_cst (TREE_OPERAND (offset, 1), 1) + 1) < 0)
     return 0;
 
