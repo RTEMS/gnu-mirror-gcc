@@ -189,10 +189,17 @@ namespace std
     __basic_file* __ret = NULL;
     if (!this->is_open() && __file)
       {
- 	_M_cfile = __file;
- 	_M_cfile_created = false;
-	this->sync();
-  	__ret = this;
+	int __err;
+	errno = 0;	
+	do
+	  __err = this->sync();
+	while (__err && errno == EINTR);
+	if (!__err)
+	  {
+	    _M_cfile = __file;
+	    _M_cfile_created = false;
+	    __ret = this;
+	  }
       }
     return __ret;
   }
@@ -202,12 +209,12 @@ namespace std
   {
     __basic_file* __ret = NULL;
     const char* __c_mode = __gnu_internal::fopen_mode(__mode);
-    if (__c_mode && !this->is_open() 
-	&& (_M_cfile = fdopen(__fd, __c_mode)))
+    if (__c_mode && !this->is_open() && (_M_cfile = fdopen(__fd, __c_mode)))
       {
+	char* __buf = NULL;
 	_M_cfile_created = true;
 	if (__fd == 0)
-	  setvbuf(_M_cfile, reinterpret_cast<char*>(NULL), _IONBF, 0);
+	  setvbuf(_M_cfile, __buf, _IONBF, 0);
 	__ret = this;
       }
     return __ret;
@@ -240,7 +247,11 @@ namespace std
   
   int 
   __basic_file<char>::fd() 
-  { return fileno(_M_cfile) ; }
+  { return fileno(_M_cfile); }
+  
+  __c_file*
+  __basic_file<char>::file() 
+  { return _M_cfile; }
   
   __basic_file<char>* 
   __basic_file<char>::close()
@@ -248,12 +259,23 @@ namespace std
     __basic_file* __ret = static_cast<__basic_file*>(NULL);
     if (this->is_open())
       {
+	// In general, no need to zero errno in advance if checking
+	// for error first. However, C89/C99 (at variance with IEEE
+	// 1003.1, f.i.) do not mandate that fclose/fflush must set
+	// errno upon error.
+	int __err;
+	errno = 0;
 	if (_M_cfile_created)
-	  fclose(_M_cfile);
+	  do
+	    __err = fclose(_M_cfile);
+	  while (__err && errno == EINTR);
 	else
-	  this->sync();
+	  do
+	    __err = this->sync();
+	  while (__err && errno == EINTR);
+	if (!__err)
+	  __ret = this;
 	_M_cfile = 0;
-	__ret = this;
       }
     return __ret;
   }
