@@ -1,0 +1,16 @@
+Fri Sep  5 00:18:17 1997  Jeffrey A Law  (law@cygnus.com)
+
+	* Makefile.in (clean): Don't remove config.cache.
+	(distclean): Do it here instead.
+
+Tue Aug 26 20:14:08 1997  Robert Lipe  (robertl@dgii.com)
+
+	* hostnm_.c: Include errno.h
+
+Mon Aug 25 23:26:05 1997  H.J. Lu  (hjl@gnu.ai.mit.edu)
+
+	* Makefile.in (mostlyclean, clean): Check if Makefile exists
+	before using it. Remove stamp-*.
+	(stamp-libi77, stamp-libf77, stamp-libu77): New.
+	(stamp-lib): Only depend on stamp-libi77 stamp-libf77
+	stamp-libu77
