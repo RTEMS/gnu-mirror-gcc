@@ -29,6 +29,8 @@ Boston, MA 02111-1307, USA.  */
 #include "toplev.h"
 #include "langhooks.h"
 #include "langhooks-def.h"
+#include "diagnostic.h"
+#include "cxx-pretty-print.h"
 
 enum c_language_kind c_language = clk_cxx;
 
@@ -38,6 +40,7 @@ static bool cxx_warn_unused_global_decl (tree);
 static tree cp_expr_size (tree);
 static size_t cp_tree_size (enum tree_code);
 static bool cp_var_mod_type_p (tree);
+static void cxx_initialize_diagnostics (diagnostic_context *);
 
 #undef LANG_HOOKS_NAME
 #define LANG_HOOKS_NAME "GNU C++"
@@ -51,6 +54,8 @@ static bool cp_var_mod_type_p (tree);
 #define LANG_HOOKS_CLEAR_BINDING_STACK pop_everything
 #undef LANG_HOOKS_INIT_OPTIONS
 #define LANG_HOOKS_INIT_OPTIONS c_common_init_options
+#undef LANG_HOOKS_INITIALIZE_DIAGNOSTICS
+#define LANG_HOOKS_INITIALIZE_DIAGNOSTICS cxx_initialize_diagnostics
 #undef LANG_HOOKS_HANDLE_OPTION
 #define LANG_HOOKS_HANDLE_OPTION c_common_handle_option
 #undef LANG_HOOKS_HANDLE_FILENAME
@@ -77,8 +82,6 @@ static bool cp_var_mod_type_p (tree);
 #define LANG_HOOKS_MAYBE_BUILD_CLEANUP cxx_maybe_build_cleanup
 #undef LANG_HOOKS_TRUTHVALUE_CONVERSION
 #define LANG_HOOKS_TRUTHVALUE_CONVERSION c_common_truthvalue_conversion
-#undef LANG_HOOKS_INSERT_DEFAULT_ATTRIBUTES
-#define LANG_HOOKS_INSERT_DEFAULT_ATTRIBUTES cxx_insert_default_attributes
 #undef LANG_HOOKS_UNSAFE_FOR_REEVAL
 #define LANG_HOOKS_UNSAFE_FOR_REEVAL c_common_unsafe_for_reeval
 #undef LANG_HOOKS_SET_DECL_ASSEMBLER_NAME
@@ -103,12 +106,19 @@ static bool cp_var_mod_type_p (tree);
 #define LANG_HOOKS_WARN_UNUSED_GLOBAL_DECL cxx_warn_unused_global_decl
 #undef LANG_HOOKS_WRITE_GLOBALS
 #define LANG_HOOKS_WRITE_GLOBALS lhd_do_nothing
+#undef LANG_HOOKS_DECL_UNINIT
+#define LANG_HOOKS_DECL_UNINIT c_decl_uninit
 
 
 #undef LANG_HOOKS_FUNCTION_INIT
 #define LANG_HOOKS_FUNCTION_INIT cxx_push_function_context
 #undef LANG_HOOKS_FUNCTION_FINAL
 #define LANG_HOOKS_FUNCTION_FINAL cxx_pop_function_context
+
+#undef LANG_HOOKS_RTL_EXPAND_START
+#define LANG_HOOKS_RTL_EXPAND_START cxx_expand_function_start
+#undef LANG_HOOKS_RTL_EXPAND_STMT
+#define LANG_HOOKS_RTL_EXPAND_STMT expand_stmt
 
 /* Attribute hooks.  */
 #undef LANG_HOOKS_COMMON_ATTRIBUTE_TABLE
@@ -153,13 +163,10 @@ static bool cp_var_mod_type_p (tree);
 #undef LANG_HOOKS_EXPR_SIZE
 #define LANG_HOOKS_EXPR_SIZE cp_expr_size
 
-#undef LANG_HOOKS_PREPARE_ASSEMBLE_VARIABLE 
-#define LANG_HOOKS_PREPARE_ASSEMBLE_VARIABLE prepare_assemble_variable
-
+#undef LANG_HOOKS_CALLGRAPH_ANALYZE_EXPR
+#define LANG_HOOKS_CALLGRAPH_ANALYZE_EXPR cxx_callgraph_analyze_expr
 #undef LANG_HOOKS_CALLGRAPH_EXPAND_FUNCTION
 #define LANG_HOOKS_CALLGRAPH_EXPAND_FUNCTION expand_body
-#undef LANG_HOOKS_CALLGRAPH_LOWER_FUNCTION
-#define LANG_HOOKS_CALLGRAPH_LOWER_FUNCTION lower_function
 
 #undef LANG_HOOKS_MAKE_TYPE
 #define LANG_HOOKS_MAKE_TYPE cxx_make_type
@@ -177,6 +184,8 @@ static bool cp_var_mod_type_p (tree);
 #define LANG_HOOKS_INCOMPLETE_TYPE_ERROR cxx_incomplete_type_error
 #undef LANG_HOOKS_TYPE_PROMOTES_TO
 #define LANG_HOOKS_TYPE_PROMOTES_TO cxx_type_promotes_to
+#undef LANG_HOOKS_REGISTER_BUILTIN_TYPE
+#define LANG_HOOKS_REGISTER_BUILTIN_TYPE c_register_builtin_type
 
 /* Each front end provides its own hooks, for toplev.c.  */
 const struct lang_hooks lang_hooks = LANG_HOOKS_INITIALIZER;
@@ -364,7 +373,7 @@ cp_var_mod_type_p (tree type)
 {
   /* If TYPE is a pointer-to-member, it is variably modified if either
      the class or the member are variably modified.  */
-  if (TYPE_PTRMEM_P (type) || TYPE_PTRMEMFUNC_P (type))
+  if (TYPE_PTR_TO_MEMBER_P (type))
     return (variably_modified_type_p (TYPE_PTRMEM_CLASS_TYPE (type))
 	    || variably_modified_type_p (TYPE_PTRMEM_POINTED_TO_TYPE (type)));
 
@@ -372,3 +381,24 @@ cp_var_mod_type_p (tree type)
   return false;
 }
 
+/* Stub routine to tell people that this doesn't work yet.  */
+void
+c_reset_state (void)
+{
+  sorry ("inter-module optimisations not implemented yet");
+}
+
+/* Construct a C++-aware pretty-printer for CONTEXT.  It is assumed
+   that CONTEXT->printer is an already constructed basic pretty_printer.  */
+static void
+cxx_initialize_diagnostics (diagnostic_context *context)
+{
+  pretty_printer *base = context->printer;
+  cxx_pretty_printer *pp = xmalloc (sizeof (cxx_pretty_printer));
+  memcpy (pp_base (pp), base, sizeof (pretty_printer));
+  pp_cxx_pretty_printer_init (pp);
+  context->printer = (pretty_printer *) pp;
+
+  /* It is safe to free this object because it was previously malloc()'d.  */
+  free (base);
+}

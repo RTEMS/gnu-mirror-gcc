@@ -757,6 +757,10 @@ http://clisp.cons.org/~haible/gccinclude-glibc-2.2-compat.diff
    This is a bit cleaner than defining typedefs for all the
    instantiations you might need.
 
+   Note: explicit template specializations must be declared in the same
+   namespace as the original template. This means you cannot use a
+   namespace alias when declaring an explicit specialization.
+
    Extensions to the library have [101]their own page.
      _________________________________________________________________
 
@@ -981,7 +985,7 @@ References
   97. ../ext/howto.html#5
   98. http://gcc.gnu.org/ml/libstdc++/1999/msg00080.html
   99. http://gcc.gnu.org/ml/libstdc++/1999/msg00084.html
- 100. http://www.sgi.com/Technology/STL/
+ 100. http://www.sgi.com/tech/stl/
  101. ../ext/howto.html
  102. ../17_intro/howto.html#3
  103. ../23_containers/howto.html#3

@@ -232,7 +232,7 @@ flush_quick_stack (void)
 
       decl = find_stack_slot (stack_index, type);
       if (decl != node)
-	  expand_assignment (decl, node, 0, 0);
+	  expand_assignment (decl, node, 0);
       stack_index += 1 + TYPE_IS_WIDE (type);
     }
 }
@@ -986,7 +986,7 @@ expand_java_arraystore (tree rhs_type_node)
   expand_assignment (build_java_arrayaccess (array,
 					     rhs_type_node,
 					     index),
-		     rhs_node, 0, 0);
+		     rhs_node, 0);
 }
 
 /* Expand the evaluation of ARRAY[INDEX]. build_java_check_indexed_type makes 
@@ -1273,7 +1273,7 @@ expand_iinc (unsigned int local_var_index, int ival, int pc)
     local_var = find_local_variable (local_var_index, int_type_node, pc);
     constant_value = build_int_2 (ival, ival < 0 ? -1 : 0);
     res = fold (build (PLUS_EXPR, int_type_node, local_var, constant_value));
-    expand_assignment (local_var, res, 0, 0);
+    expand_assignment (local_var, res, 0);
 }
 
       
@@ -1710,6 +1710,8 @@ build_class_init (tree clas, tree expr)
              optimizing class initialization. */
 	  if (!STATIC_CLASS_INIT_OPT_P ())
 	    DECL_BIT_INDEX(*init_test_decl) = -1;
+	  /* Don't emit any symbolic debugging info for this decl.  */
+	  DECL_IGNORED_P (*init_test_decl) = 1;
 	}
 
       init = build (CALL_EXPR, void_type_node,
@@ -2334,23 +2336,25 @@ expand_java_field_op (int is_static, int is_putting, int field_ref_index)
       if (FIELD_FINAL (field_decl))
 	{
 	  if (DECL_CONTEXT (field_decl) != current_class)
-	    error_with_decl (field_decl,
-		     "assignment to final field `%s' not in field's class");
+            error ("%Hassignment to final field '%D' not in field's class",
+                   &DECL_SOURCE_LOCATION (field_decl), field_decl);
 	  else if (FIELD_STATIC (field_decl))
 	    {
 	      if (!DECL_CLINIT_P (current_function_decl))
-		warning_with_decl (field_decl, 
-             "assignment to final static field `%s' not in class initializer");
+		warning ("assignment to final static field `%s' not in "
+                         "class initializer",
+                         &DECL_SOURCE_LOCATION (field_decl), field_decl);
 	    }
 	  else
 	    {
 	      tree cfndecl_name = DECL_NAME (current_function_decl);
 	      if (! DECL_CONSTRUCTOR_P (current_function_decl)
 		  && !ID_FINIT_P (cfndecl_name))
-		warning_with_decl (field_decl, "assignment to final field `%s' not in constructor");
+                warning ("%Hassignment to final field '%D' not in constructor",
+                         &DECL_SOURCE_LOCATION (field_decl),  field_decl);
 	    }
 	}
-      expand_assignment (field_ref, new_value, 0, 0);
+      expand_assignment (field_ref, new_value, 0);
     }
   else
     push_value (field_ref);
@@ -2461,7 +2465,7 @@ java_expand_expr (tree exp, rtx target, enum machine_mode tmode,
 	expand_decl (array_decl);
 	tmp = expand_assignment (array_decl,
 				 build_new_array (element_type, length),
-				 1, 0);
+				 1);
 	if (TREE_CONSTANT (init)
 	    && ilength >= 10 && JPRIMITIVE_TYPE_P (element_type))
 	  {
@@ -2480,7 +2484,7 @@ java_expand_expr (tree exp, rtx target, enum machine_mode tmode,
 	expand_assignment (build (COMPONENT_REF, TREE_TYPE (data_fld),
 				  build_java_indirect_ref (array_type, 
 					  array_decl, flag_check_references), 
-				  data_fld), init, 0, 0);
+				  data_fld), init, 0);
 	return tmp;
       }
     case BLOCK:
@@ -3091,7 +3095,7 @@ process_jvm_instruction (int PC, const unsigned char* byte_ops,
     type = TREE_TYPE (value);				\
     decl = find_local_variable (var, type, oldpc);	\
     set_local_type (var, type );			\
-    expand_assignment (decl, value, 0, 0);		\
+    expand_assignment (decl, value, 0);			\
   }
 
 #define STORE(OPERAND_TYPE, OPERAND_VALUE) \

@@ -37,9 +37,13 @@ exception statement from your version. */
 
 
 package gnu.java.awt.peer.gtk;
+
+import java.awt.AWTEvent;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.TextField;
 import java.awt.event.KeyEvent;
-import java.awt.peer.*;
-import java.awt.*;
+import java.awt.peer.TextFieldPeer;
 
 public class GtkTextFieldPeer extends GtkTextComponentPeer
   implements TextFieldPeer
@@ -48,7 +52,6 @@ public class GtkTextFieldPeer extends GtkTextComponentPeer
 //    native void create (ComponentPeer parent, String text);
 
   native void create ();
-  native void createHooks ();
 
   native void gtkEntryGetSize (int cols, int dims[]);
 
@@ -101,7 +104,7 @@ public class GtkTextFieldPeer extends GtkTextComponentPeer
 
   public void setFont (Font f)
   {
-    gtkSetFont(((GtkFontPeer)f.getPeer()).getXLFD(), f.getSize());
+    gtkSetFont(f.getName(), f.getSize());
   }
 
   public void handleEvent (AWTEvent e)

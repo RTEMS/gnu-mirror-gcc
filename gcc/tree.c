@@ -51,28 +51,11 @@ extern int _obstack_allocated_p (struct obstack *h, void *obj);
 
 #ifdef GATHER_STATISTICS
 /* Statistics-gathering stuff.  */
-typedef enum
-{
-  d_kind,
-  t_kind,
-  b_kind,
-  s_kind,
-  r_kind,
-  e_kind,
-  c_kind,
-  id_kind,
-  perm_list_kind,
-  temp_list_kind,
-  vec_kind,
-  x_kind,
-  lang_decl,
-  lang_type,
-  all_kinds
-} tree_node_kind;
 
 int tree_node_counts[(int) all_kinds];
 int tree_node_sizes[(int) all_kinds];
 
+/* Keep in sync with tree.h:enum tree_node_kind.  */
 static const char * const tree_node_kind_names[] = {
   "decls",
   "types",
@@ -511,7 +494,7 @@ real_value_from_int_cst (tree type ATTRIBUTE_UNUSED, tree i)
 
   /* Clear all bits of the real value type so that we can later do
      bitwise comparisons to see if two values are the same.  */
-  memset ((char *) &d, 0, sizeof d);
+  memset (&d, 0, sizeof d);
 
   if (! TREE_UNSIGNED (TREE_TYPE (i)))
     REAL_VALUE_FROM_INT (d, TREE_INT_CST_LOW (i), TREE_INT_CST_HIGH (i),
@@ -1478,8 +1461,6 @@ first_rtl_op (enum tree_code code)
       return 0;
     case WITH_CLEANUP_EXPR:
       return 2;
-    case METHOD_CALL_EXPR:
-      return 3;
     default:
       return TREE_CODE_LENGTH (code);
     }
@@ -2397,6 +2378,17 @@ build (enum tree_code code, tree tt, ...)
   va_end (p);
 
   TREE_CONSTANT (t) = constant;
+  
+  if (code == CALL_EXPR && !TREE_SIDE_EFFECTS (t))
+    {
+      /* Calls have side-effects, except those to const or
+	 pure functions.  */
+      tree fn = get_callee_fndecl (t);
+
+      if (!fn || (!DECL_IS_PURE (fn) && !TREE_READONLY (fn)))
+	TREE_SIDE_EFFECTS (t) = 1;
+    }
+
   return t;
 }
 
@@ -2868,7 +2860,8 @@ get_qualified_type (tree type, int type_quals)
      preserve the TYPE_NAME, since there is code that depends on this.  */
   for (t = TYPE_MAIN_VARIANT (type); t; t = TYPE_NEXT_VARIANT (t))
     if (TYPE_QUALS (t) == type_quals && TYPE_NAME (t) == TYPE_NAME (type)
-        && TYPE_CONTEXT (t) == TYPE_CONTEXT (type))
+        && TYPE_CONTEXT (t) == TYPE_CONTEXT (type)
+	&& attribute_list_equal (TYPE_ATTRIBUTES (t), TYPE_ATTRIBUTES (type)))
       return t;
 
   return NULL_TREE;
@@ -3004,7 +2997,7 @@ type_hash_add (unsigned int hashcode, tree type)
   struct type_hash *h;
   void **loc;
 
-  h = (struct type_hash *) ggc_alloc (sizeof (struct type_hash));
+  h = ggc_alloc (sizeof (struct type_hash));
   h->hash = hashcode;
   h->type = type;
   loc = htab_find_slot_with_hash (type_hash_table, h, hashcode, INSERT);
@@ -3545,7 +3538,7 @@ iterative_hash_expr (tree t, hashval_t val)
       else
 	abort ();
     }
-  else if (IS_EXPR_CODE_CLASS (class) || class == 'r')
+  else if (IS_EXPR_CODE_CLASS (class))
     {
       val = iterative_hash_object (code, val);
 
@@ -3842,7 +3835,7 @@ build_function_type (tree value_type, tree arg_types)
   return t;
 }
 
-/* Build a function type.  The RETURN_TYPE is the type retured by the
+/* Build a function type.  The RETURN_TYPE is the type returned by the
    function.  If additional arguments are provided, they are
    additional argument types.  The list of argument types must always
    be terminated by NULL_TREE.  */
@@ -3868,6 +3861,45 @@ build_function_type_list (tree return_type, ...)
   return args;
 }
 
+/* Build a METHOD_TYPE for a member of BASETYPE.  The RETTYPE (a TYPE)
+   and ARGTYPES (a TREE_LIST) are the return type and arguments types
+   for the method.  An implicit additional parameter (of type
+   pointer-to-BASETYPE) is added to the ARGTYPES.  */
+
+tree
+build_method_type_directly (tree basetype,
+			    tree rettype,
+			    tree argtypes)
+{
+  tree t;
+  tree ptype;
+  int hashcode;
+
+  /* Make a node of the sort we want.  */
+  t = make_node (METHOD_TYPE);
+
+  TYPE_METHOD_BASETYPE (t) = TYPE_MAIN_VARIANT (basetype);
+  TREE_TYPE (t) = rettype;
+  ptype = build_pointer_type (basetype);
+
+  /* The actual arglist for this function includes a "hidden" argument
+     which is "this".  Put it into the list of argument types.  */
+  argtypes = tree_cons (NULL_TREE, ptype, argtypes);
+  TYPE_ARG_TYPES (t) = argtypes;
+
+  /* If we already have such a type, use the old one and free this one.
+     Note that it also frees up the above cons cell if found.  */
+  hashcode = TYPE_HASH (basetype) + TYPE_HASH (rettype) +
+    type_hash_list (argtypes);
+
+  t = type_hash_canon (hashcode, t);
+
+  if (!COMPLETE_TYPE_P (t))
+    layout_type (t);
+
+  return t;
+}
+
 /* Construct, lay out and return the type of methods belonging to class
    BASETYPE and whose arguments and values are described by TYPE.
    If that type exists already, reuse it.
@@ -3876,33 +3908,12 @@ build_function_type_list (tree return_type, ...)
 tree
 build_method_type (tree basetype, tree type)
 {
-  tree t;
-  unsigned int hashcode;
-
-  /* Make a node of the sort we want.  */
-  t = make_node (METHOD_TYPE);
-
   if (TREE_CODE (type) != FUNCTION_TYPE)
     abort ();
 
-  TYPE_METHOD_BASETYPE (t) = TYPE_MAIN_VARIANT (basetype);
-  TREE_TYPE (t) = TREE_TYPE (type);
-
-  /* The actual arglist for this function includes a "hidden" argument
-     which is "this".  Put it into the list of argument types.  */
-
-  TYPE_ARG_TYPES (t)
-    = tree_cons (NULL_TREE,
-		 build_pointer_type (basetype), TYPE_ARG_TYPES (type));
-
-  /* If we already have such a type, use the old one and free this one.  */
-  hashcode = TYPE_HASH (basetype) + TYPE_HASH (type);
-  t = type_hash_canon (hashcode, t);
-
-  if (!COMPLETE_TYPE_P (t))
-    layout_type (t);
-
-  return t;
+  return build_method_type_directly (basetype, 
+				     TREE_TYPE (type),
+				     TYPE_ARG_TYPES (type));
 }
 
 /* Construct, lay out and return the type of offsets to a value
@@ -4370,26 +4381,30 @@ decl_type_context (tree decl)
   tree context = DECL_CONTEXT (decl);
 
   while (context)
-    {
-      if (TREE_CODE (context) == NAMESPACE_DECL)
+    switch (TREE_CODE (context))
+      {
+      case NAMESPACE_DECL:
+      case TRANSLATION_UNIT_DECL:
 	return NULL_TREE;
 
-      if (TREE_CODE (context) == RECORD_TYPE
-	  || TREE_CODE (context) == UNION_TYPE
-	  || TREE_CODE (context) == QUAL_UNION_TYPE)
+      case RECORD_TYPE:
+      case UNION_TYPE:
+      case QUAL_UNION_TYPE:
 	return context;
-
-      if (TREE_CODE (context) == TYPE_DECL
-	  || TREE_CODE (context) == FUNCTION_DECL)
+	
+      case TYPE_DECL:
+      case FUNCTION_DECL:
 	context = DECL_CONTEXT (context);
-
-      else if (TREE_CODE (context) == BLOCK)
+	break;
+	
+      case BLOCK:
 	context = BLOCK_SUPERCONTEXT (context);
-
-      else
-	/* Unhandled CONTEXT!?  */
+	break;
+	
+      default:
 	abort ();
-    }
+      }
+
   return NULL_TREE;
 }
 
@@ -4442,19 +4457,19 @@ dump_tree_statistics (void)
 
   fprintf (stderr, "\n??? tree nodes created\n\n");
 #ifdef GATHER_STATISTICS
-  fprintf (stderr, "Kind                  Nodes     Bytes\n");
-  fprintf (stderr, "-------------------------------------\n");
+  fprintf (stderr, "Kind                   Nodes      Bytes\n");
+  fprintf (stderr, "---------------------------------------\n");
   total_nodes = total_bytes = 0;
   for (i = 0; i < (int) all_kinds; i++)
     {
-      fprintf (stderr, "%-20s %6d %9d\n", tree_node_kind_names[i],
+      fprintf (stderr, "%-20s %7d %10d\n", tree_node_kind_names[i],
 	       tree_node_counts[i], tree_node_sizes[i]);
       total_nodes += tree_node_counts[i];
       total_bytes += tree_node_sizes[i];
     }
-  fprintf (stderr, "-------------------------------------\n");
-  fprintf (stderr, "%-20s %6d %9d\n", "Total", total_nodes, total_bytes);
-  fprintf (stderr, "-------------------------------------\n");
+  fprintf (stderr, "---------------------------------------\n");
+  fprintf (stderr, "%-20s %7d %10d\n", "Total", total_nodes, total_bytes);
+  fprintf (stderr, "---------------------------------------\n");
 #else
   fprintf (stderr, "(No per-node statistics)\n");
 #endif
@@ -4532,7 +4547,7 @@ get_file_function_name_long (const char *type)
 	file = input_filename;
 
       len = strlen (file);
-      q = (char *) alloca (9 * 2 + len);
+      q = alloca (9 * 2 + len + 1);
       memcpy (q, file, len + 1);
       clean_symbol_name (q);
 
@@ -4542,8 +4557,7 @@ get_file_function_name_long (const char *type)
       p = q;
     }
 
-  buf = (char *) alloca (sizeof (FILE_FUNCTION_FORMAT) + strlen (p)
-			 + strlen (type));
+  buf = alloca (sizeof (FILE_FUNCTION_FORMAT) + strlen (p) + strlen (type));
 
   /* Set up the name of the file-level functions we may need.
      Use a global object (which is already required to be unique over
@@ -4638,7 +4652,7 @@ get_set_constructor_bytes (tree init, unsigned char *buffer, int wd_size)
   int bit_size = wd_size * set_word_size;
   int bit_pos = 0;
   unsigned char *bytep = buffer;
-  char *bit_buffer = (char *) alloca (bit_size);
+  char *bit_buffer = alloca (bit_size);
   tree non_const_bits = get_set_constructor_bits (init, bit_buffer, bit_size);
 
   for (i = 0; i < wd_size; i++)
@@ -4770,6 +4784,16 @@ build_common_tree_nodes (int signed_char)
   long_long_integer_type_node = make_signed_type (LONG_LONG_TYPE_SIZE);
   long_long_unsigned_type_node = make_unsigned_type (LONG_LONG_TYPE_SIZE);
 
+  /* Define a boolean type.  This type only represents boolean values but
+     may be larger than char depending on the value of BOOL_TYPE_SIZE.
+     Front ends which want to override this size (i.e. Java) can redefine
+     boolean_type_node before calling build_common_tree_nodes_2.  */
+  boolean_type_node = make_unsigned_type (BOOL_TYPE_SIZE);
+  TREE_SET_CODE (boolean_type_node, BOOLEAN_TYPE);
+  TYPE_MAX_VALUE (boolean_type_node) = build_int_2 (1, 0);
+  TREE_TYPE (TYPE_MAX_VALUE (boolean_type_node)) = boolean_type_node;
+  TYPE_PRECISION (boolean_type_node) = 1;
+
   intQI_type_node = make_signed_type (GET_MODE_BITSIZE (QImode));
   intHI_type_node = make_signed_type (GET_MODE_BITSIZE (HImode));
   intSI_type_node = make_signed_type (GET_MODE_BITSIZE (SImode));
@@ -4799,6 +4823,9 @@ build_common_tree_nodes_2 (int short_double)
   bitsize_zero_node = bitsize_int (0);
   bitsize_one_node = bitsize_int (1);
   bitsize_unit_node = bitsize_int (BITS_PER_UNIT);
+
+  boolean_false_node = TYPE_MIN_VALUE (boolean_type_node);
+  boolean_true_node = TYPE_MAX_VALUE (boolean_type_node);
 
   void_type_node = make_node (VOID_TYPE);
   layout_type (void_type_node);
@@ -4830,6 +4857,11 @@ build_common_tree_nodes_2 (int short_double)
   long_double_type_node = make_node (REAL_TYPE);
   TYPE_PRECISION (long_double_type_node) = LONG_DOUBLE_TYPE_SIZE;
   layout_type (long_double_type_node);
+
+  float_ptr_type_node = build_pointer_type (float_type_node);
+  double_ptr_type_node = build_pointer_type (double_type_node);
+  long_double_ptr_type_node = build_pointer_type (long_double_type_node);
+  integer_ptr_type_node = build_pointer_type (integer_type_node);
 
   complex_integer_type_node = make_node (COMPLEX_TYPE);
   TREE_TYPE (complex_integer_type_node) = integer_type_node;
@@ -4894,6 +4926,7 @@ build_common_tree_nodes_2 (int short_double)
   V2DF_type_node = make_vector (V2DFmode, double_type_node, 0);
   V16QI_type_node = make_vector (V16QImode, intQI_type_node, 0);
   V1DI_type_node = make_vector (V1DImode, intDI_type_node, 0);
+  V4DF_type_node = make_vector (V4DFmode, double_type_node, 0);
 }
 
 /* Returns a vector tree node given a vector mode, the inner type, and

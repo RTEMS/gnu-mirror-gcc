@@ -942,7 +942,7 @@ static void retry_incomplete_types (void);
 #endif
 
 /* Pseudo-ops for pushing the current section onto the section stack (and
-   simultaneously changing to a new section) and for poping back to the
+   simultaneously changing to a new section) and for popping back to the
    section we were in immediately before this one.  Note that most svr4
    assemblers only maintain a one level stack... you can push all the
    sections you want, but you can only pop out one level.  (The sparc
@@ -2036,9 +2036,9 @@ output_reg_number (rtx rtl)
 
   if (regno >= DWARF_FRAME_REGISTERS)
     {
-      warning_with_decl (dwarf_last_decl,
-			 "internal regno botch: `%s' has regno = %d\n",
-			 regno);
+      warning ("%Hinternal regno botch: '%D' has regno = %d\n",
+               &DECL_SOURCE_LOCATION (dwarf_last_decl), dwarf_last_decl,
+               regno);
       regno = 0;
     }
   dw2_assemble_integer (4, GEN_INT (DBX_REGISTER_NUMBER (regno)));
@@ -3517,8 +3517,8 @@ dienum_push (void)
     {
       pending_siblings_allocated += PENDING_SIBLINGS_INCREMENT;
       pending_sibling_stack
-	= (unsigned *) xrealloc (pending_sibling_stack,
-				 pending_siblings_allocated * sizeof(unsigned));
+	= xrealloc (pending_sibling_stack,
+		    pending_siblings_allocated * sizeof(unsigned));
     }
 
   pending_siblings++;
@@ -4043,7 +4043,7 @@ output_compile_unit_die (void *arg)
     stmt_list_attribute (LINE_BEGIN_LABEL);
 
   {
-    const char *wd = getpwd ();
+    const char *wd = get_src_pwd ();
     if (wd)
       comp_dir_attribute (wd);
   }
@@ -4066,7 +4066,7 @@ output_string_type_die (void *arg)
   sibling_attribute ();
   equate_type_number_to_die_number (type);
   member_attribute (TYPE_CONTEXT (type));
-  /* this is a fixed length string */
+  /* This is a fixed length string.  */
   byte_size_attribute (type);
 }
 
@@ -4406,8 +4406,8 @@ pend_type (tree type)
     {
       pending_types_allocated += PENDING_TYPES_INCREMENT;
       pending_types_list
-	= (tree *) xrealloc (pending_types_list,
-			     sizeof (tree) * pending_types_allocated);
+	= xrealloc (pending_types_list,
+		    sizeof (tree) * pending_types_allocated);
     }
   pending_types_list[pending_types++] = type;
 
@@ -4533,8 +4533,8 @@ add_incomplete_type (tree type)
     {
       incomplete_types_allocated += INCOMPLETE_TYPES_INCREMENT;
       incomplete_types_list
-	= (tree *) xrealloc (incomplete_types_list,
-			     sizeof (tree) * incomplete_types_allocated);
+	= xrealloc (incomplete_types_list,
+		    sizeof (tree) * incomplete_types_allocated);
     }
 
   incomplete_types_list[incomplete_types++] = type;
@@ -5226,13 +5226,13 @@ output_decl (tree decl, tree containing_scope)
 
 	    if (fn_arg_types)
 	      {
-	      /* this is the prototyped case, check for ...  */
+	      /* This is the prototyped case, check for....  */
 	      if (TREE_VALUE (tree_last (fn_arg_types)) != void_type_node)
 	        output_die (output_unspecified_parameters_die, decl);
 	      }
 	    else
 	      {
-		/* this is unprototyped, check for undefined (just declaration) */
+		/* This is unprototyped, check for undefined (just declaration).  */
 		if (!DECL_INITIAL (decl))
 		  output_die (output_unspecified_parameters_die, decl);
 	      }
@@ -5851,8 +5851,7 @@ lookup_filename (const char *file_name)
     {
       ft_entries_allocated += FT_ENTRIES_INCREMENT;
       filename_table
-	= (filename_entry *)
-	  xrealloc (filename_table,
+	= xrealloc (filename_table,
 		    ft_entries_allocated * sizeof (filename_entry));
     }
 
@@ -6035,23 +6034,19 @@ dwarfout_init (const char *main_input_filename)
   /* Allocate the initial hunk of the pending_sibling_stack.  */
 
   pending_sibling_stack
-    = (unsigned *)
-	xmalloc (PENDING_SIBLINGS_INCREMENT * sizeof (unsigned));
+    = xmalloc (PENDING_SIBLINGS_INCREMENT * sizeof (unsigned));
   pending_siblings_allocated = PENDING_SIBLINGS_INCREMENT;
   pending_siblings = 1;
 
   /* Allocate the initial hunk of the filename_table.  */
 
-  filename_table
-    = (filename_entry *)
-	xmalloc (FT_ENTRIES_INCREMENT * sizeof (filename_entry));
+  filename_table = xmalloc (FT_ENTRIES_INCREMENT * sizeof (filename_entry));
   ft_entries_allocated = FT_ENTRIES_INCREMENT;
   ft_entries = 0;
 
   /* Allocate the initial hunk of the pending_types_list.  */
 
-  pending_types_list
-    = (tree *) xmalloc (PENDING_TYPES_INCREMENT * sizeof (tree));
+  pending_types_list = xmalloc (PENDING_TYPES_INCREMENT * sizeof (tree));
   pending_types_allocated = PENDING_TYPES_INCREMENT;
   pending_types = 0;
 
@@ -6119,7 +6114,7 @@ dwarfout_init (const char *main_input_filename)
 	  ASM_OUTPUT_PUSH_SECTION (asm_out_file, DEBUG_SFNAMES_SECTION);
 	  ASM_OUTPUT_LABEL (asm_out_file, SFNAMES_BEGIN_LABEL);
 	  {
-	    const char *pwd = getpwd ();
+	    const char *pwd = get_src_pwd ();
 	    char *dirname;
 
 	    if (!pwd)

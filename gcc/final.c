@@ -658,8 +658,8 @@ compute_alignments (void)
 
   max_labelno = max_label_num ();
   min_labelno = get_first_label_num ();
-  label_align = (struct label_alignment *)
-    xcalloc (max_labelno - min_labelno + 1, sizeof (struct label_alignment));
+  label_align = xcalloc (max_labelno - min_labelno + 1,
+			 sizeof (struct label_alignment));
 
   /* If not optimizing or optimizing for size, don't assign any alignments.  */
   if (! optimize || optimize_size)
@@ -766,7 +766,7 @@ shorten_branches (rtx first ATTRIBUTE_UNUSED)
   /* Compute maximum UID and allocate label_align / uid_shuid.  */
   max_uid = get_max_uid ();
 
-  uid_shuid = (int *) xmalloc (max_uid * sizeof *uid_shuid);
+  uid_shuid = xmalloc (max_uid * sizeof *uid_shuid);
 
   if (max_labelno != max_label_num ())
     {
@@ -779,8 +779,8 @@ shorten_branches (rtx first ATTRIBUTE_UNUSED)
       n_labels = max_labelno - min_labelno + 1;
       n_old_labels = old - min_labelno + 1;
 
-      label_align = (struct label_alignment *) xrealloc
-	(label_align, n_labels * sizeof (struct label_alignment));
+      label_align = xrealloc (label_align,
+			      n_labels * sizeof (struct label_alignment));
 
       /* Range of labels grows monotonically in the function.  Abort here
          means that the initialization of array got lost.  */
@@ -875,20 +875,20 @@ shorten_branches (rtx first ATTRIBUTE_UNUSED)
 #ifdef HAVE_ATTR_length
 
   /* Allocate the rest of the arrays.  */
-  insn_lengths = (int *) xmalloc (max_uid * sizeof (*insn_lengths));
+  insn_lengths = xmalloc (max_uid * sizeof (*insn_lengths));
   insn_lengths_max_uid = max_uid;
   /* Syntax errors can lead to labels being outside of the main insn stream.
      Initialize insn_addresses, so that we get reproducible results.  */
   INSN_ADDRESSES_ALLOC (max_uid);
 
-  varying_length = (char *) xcalloc (max_uid, sizeof (char));
+  varying_length = xcalloc (max_uid, sizeof (char));
 
   /* Initialize uid_align.  We scan instructions
      from end to start, and keep in align_tab[n] the last seen insn
      that does an alignment of at least n+1, i.e. the successor
      in the alignment chain for an insn that does / has a known
      alignment of n.  */
-  uid_align = (rtx *) xcalloc (max_uid, sizeof *uid_align);
+  uid_align = xcalloc (max_uid, sizeof *uid_align);
 
   for (i = MAX_CODE_ALIGN; --i >= 0;)
     align_tab[i] = NULL_RTX;
@@ -1349,8 +1349,9 @@ final_start_function (rtx first ATTRIBUTE_UNUSED, FILE *file,
     }
 #endif
 
-  last_linenum = 0;
-  last_filename = 0;
+  last_filename = locator_file (prologue_locator);
+  last_linenum = locator_line (prologue_locator);
+
   high_block_linenum = high_function_linenum = last_linenum;
 
   (*debug_hooks->begin_prologue) (last_linenum, last_filename);
@@ -1417,9 +1418,8 @@ profile_function (FILE *file ATTRIBUTE_UNUSED)
 # define NO_PROFILE_COUNTERS	0
 #endif
 #if defined(ASM_OUTPUT_REG_PUSH)
-#if defined(STRUCT_VALUE_INCOMING_REGNUM) || defined(STRUCT_VALUE_REGNUM)
   int sval = current_function_returns_struct;
-#endif
+  rtx svrtx = targetm.calls.struct_value_rtx (TREE_TYPE (current_function_decl), 1);
 #if defined(STATIC_CHAIN_INCOMING_REGNUM) || defined(STATIC_CHAIN_REGNUM)
   int cxt = current_function_needs_context;
 #endif
@@ -1436,16 +1436,9 @@ profile_function (FILE *file ATTRIBUTE_UNUSED)
 
   function_section (current_function_decl);
 
-#if defined(STRUCT_VALUE_INCOMING_REGNUM) && defined(ASM_OUTPUT_REG_PUSH)
-  if (sval)
-    ASM_OUTPUT_REG_PUSH (file, STRUCT_VALUE_INCOMING_REGNUM);
-#else
-#if defined(STRUCT_VALUE_REGNUM) && defined(ASM_OUTPUT_REG_PUSH)
-  if (sval)
-    {
-      ASM_OUTPUT_REG_PUSH (file, STRUCT_VALUE_REGNUM);
-    }
-#endif
+#if defined(ASM_OUTPUT_REG_PUSH)
+  if (sval && GET_CODE (svrtx) == REG)
+    ASM_OUTPUT_REG_PUSH (file, REGNO (svrtx));
 #endif
 
 #if defined(STATIC_CHAIN_INCOMING_REGNUM) && defined(ASM_OUTPUT_REG_PUSH)
@@ -1474,16 +1467,9 @@ profile_function (FILE *file ATTRIBUTE_UNUSED)
 #endif
 #endif
 
-#if defined(STRUCT_VALUE_INCOMING_REGNUM) && defined(ASM_OUTPUT_REG_PUSH)
-  if (sval)
-    ASM_OUTPUT_REG_POP (file, STRUCT_VALUE_INCOMING_REGNUM);
-#else
-#if defined(STRUCT_VALUE_REGNUM) && defined(ASM_OUTPUT_REG_PUSH)
-  if (sval)
-    {
-      ASM_OUTPUT_REG_POP (file, STRUCT_VALUE_REGNUM);
-    }
-#endif
+#if defined(ASM_OUTPUT_REG_PUSH)
+  if (sval && GET_CODE (svrtx) == REG)
+    ASM_OUTPUT_REG_POP (file, REGNO (svrtx));
 #endif
 }
 
@@ -1565,11 +1551,11 @@ final (rtx first, FILE *file, int optimize, int prescan)
 	  max_line = NOTE_LINE_NUMBER (insn);
     }
 
-  line_note_exists = (char *) xcalloc (max_line + 1, sizeof (char));
+  line_note_exists = xcalloc (max_line + 1, sizeof (char));
 
   for (insn = first; insn; insn = NEXT_INSN (insn))
     {
-      if (INSN_UID (insn) > max_uid)       /* find largest UID */
+      if (INSN_UID (insn) > max_uid)       /* Find largest UID.  */
 	max_uid = INSN_UID (insn);
       if (GET_CODE (insn) == NOTE && NOTE_LINE_NUMBER (insn) > 0)
 	line_note_exists[NOTE_LINE_NUMBER (insn)] = 1;
@@ -2054,7 +2040,7 @@ final_scan_insn (rtx insn, FILE *file, int optimize ATTRIBUTE_UNUSED,
 	if (asm_noperands (body) >= 0)
 	  {
 	    unsigned int noperands = asm_noperands (body);
-	    rtx *ops = (rtx *) alloca (noperands * sizeof (rtx));
+	    rtx *ops = alloca (noperands * sizeof (rtx));
 	    const char *string;
 
 	    /* There's no telling what that did to the condition codes.  */
@@ -2485,9 +2471,6 @@ final_scan_insn (rtx insn, FILE *file, int optimize ATTRIBUTE_UNUSED,
 
 	/* Emit information for vtable gc.  */
 	note = find_reg_note (insn, REG_VTABLE_REF, NULL_RTX);
-	if (note)
-	  assemble_vtable_entry (XEXP (XEXP (note, 0), 0),
-				 INTVAL (XEXP (XEXP (note, 0), 1)));
 
 	current_output_insn = debug_insn = 0;
       }
@@ -3864,8 +3847,8 @@ debug_queue_symbol (tree decl)
   if (symbol_queue_index >= symbol_queue_size)
     {
       symbol_queue_size += 10;
-      symbol_queue = (tree *) xrealloc (symbol_queue,
-                                        symbol_queue_size * sizeof (tree));
+      symbol_queue = xrealloc (symbol_queue,
+			       symbol_queue_size * sizeof (tree));
     }
 
   symbol_queue[symbol_queue_index++] = decl;

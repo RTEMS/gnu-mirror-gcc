@@ -2388,9 +2388,7 @@ may_trap_p (rtx x)
 	  || (GET_MODE_CLASS (GET_MODE (x)) == MODE_FLOAT
 	      && flag_trapping_math))
 	return 1;
-      /* This was const0_rtx, but by not using that,
-	 we can link this file into other programs.  */
-      if (GET_CODE (XEXP (x, 1)) == CONST_INT && INTVAL (XEXP (x, 1)) == 0)
+      if (XEXP (x, 1) == const0_rtx)
 	return 1;
       break;
 
@@ -2795,26 +2793,25 @@ rtx_referenced_p (rtx x, rtx body)
   return for_each_rtx (&body, rtx_referenced_p_1, x);
 }
 
-/* If INSN is a jump to jumptable insn rturn true and store the label (which
-   INSN jumps to) to *LABEL and the tablejump insn to *TABLE.
-   LABEL and TABLE may be NULL.  */
+/* If INSN is a tablejump return true and store the label (before jump table) to
+   *LABELP and the jump table to *TABLEP.  LABELP and TABLEP may be NULL.  */
 
 bool
-tablejump_p (rtx insn, rtx *label, rtx *table)
+tablejump_p (rtx insn, rtx *labelp, rtx *tablep)
 {
-  rtx l, t;
+  rtx label, table;
 
-  if (onlyjump_p (insn)
-      && (l = JUMP_LABEL (insn)) != NULL_RTX
-      && (t = NEXT_INSN (l)) != NULL_RTX
-      && GET_CODE (t) == JUMP_INSN
-      && (GET_CODE (PATTERN (t)) == ADDR_VEC
-	  || GET_CODE (PATTERN (t)) == ADDR_DIFF_VEC))
+  if (GET_CODE (insn) == JUMP_INSN
+      && (label = JUMP_LABEL (insn)) != NULL_RTX
+      && (table = next_active_insn (label)) != NULL_RTX
+      && GET_CODE (table) == JUMP_INSN
+      && (GET_CODE (PATTERN (table)) == ADDR_VEC
+	  || GET_CODE (PATTERN (table)) == ADDR_DIFF_VEC))
     {
-      if (label)
-	*label = l;
-      if (table)
-	*table = t;
+      if (labelp)
+	*labelp = label;
+      if (tablep)
+	*tablep = table;
       return true;
     }
   return false;
@@ -3312,7 +3309,7 @@ subreg_offset_representable_p (unsigned int xregno, enum machine_mode xmode,
 #endif
 
   /* The XMODE value can be seen as a vector of NREGS_XMODE
-     values.  The subreg must represent an lowpart of given field.
+     values.  The subreg must represent a lowpart of given field.
      Compute what field it is.  */
   offset -= subreg_lowpart_offset (ymode,
 				   mode_for_size (GET_MODE_BITSIZE (xmode)

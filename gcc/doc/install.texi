@@ -268,6 +268,10 @@ requirements.
 Necessary to uncompress GCC @command{tar} files when source code is
 obtained via FTP mirror sites.
 
+@item GNU make version 3.79.1 (or later)
+
+You must have GNU make installed to build GCC.
+
 @item GNU tar version 1.12 (or later)
 
 Necessary (only on some platforms) to untar the source code.  Many
@@ -540,8 +544,8 @@ beneath a user's home directory tree, some shells will not expand
 @var{dirname} correctly if it contains the @samp{~} metacharacter; use
 @env{$HOME} instead.
 
-These additional options control where certain parts of the distribution
-are installed.  Normally you should not need to use these options.
+The following standard @command{autoconf} options are supported.  Normally you
+should not need to use these options.
 @table @code
 @item --exec-prefix=@var{dirname}
 Specify the toplevel installation directory for architecture-dependent
@@ -554,7 +558,11 @@ Specify the installation directory for the executables called by users
 
 @item --libdir=@var{dirname}
 Specify the installation directory for object code libraries and
-internal parts of GCC@.  The default is @file{@var{exec-prefix}/lib}.
+internal data files of GCC@.  The default is @file{@var{exec-prefix}/lib}.
+
+@item --libexecdir=@var{dirname}
+Specify the installation directory for internal executables of GCC@.
+  The default is @file{@var{exec-prefix}/libexec}.
 
 @item --with-slibdir=@var{dirname}
 Specify the installation directory for the shared libgcc library.  The
@@ -734,7 +742,7 @@ The following systems are the only ones where it makes a difference
 whether you use the GNU assembler.  On any other system,
 @option{--with-gnu-as} has no effect.
 
-@itemize bullet
+@itemize @bullet
 @item @samp{hppa1.0-@var{any}-@var{any}}
 @item @samp{hppa1.1-@var{any}-@var{any}}
 @item @samp{i386-@var{any}-sysv}
@@ -759,13 +767,14 @@ than the one found by the standard rules to find an assembler, which
 are:
 @itemize @bullet
 @item
-Check the
-@file{@var{exec_prefix}/lib/gcc-lib/@var{target}/@var{version}}
-directory, where @var{exec_prefix} defaults to @var{prefix} which
-defaults to @file{/usr/local} unless overridden by the
-@option{--prefix=@var{pathname}} switch described above. @var{target} is the
-target system triple, such as @samp{sparc-sun-solaris2.7}, and
-@var{version} denotes the GCC version, such as 3.0.
+Check the @file{@var{libexec}/gcc/@var{target}/@var{version}}
+directory, where @var{libexec} defaults to
+@file{@var{exec-prefix}/libexec} and @var{exec-prefix} defaults to
+@var{prefix} which defaults to @file{/usr/local} unless overridden by
+the @option{--prefix=@var{pathname}} switch described
+above. @var{target} is the target system triple, such as
+@samp{sparc-sun-solaris2.7}, and @var{version} denotes the GCC
+version, such as 3.0.
 @item
 Check operating system specific directories (e.g.@: @file{/usr/ccs/bin} on
 Sun Solaris 2).
@@ -952,9 +961,9 @@ to do so.
 @item --enable-version-specific-runtime-libs
 Specify
 that runtime libraries should be installed in the compiler specific
-subdirectory (@file{@var{libsubdir}}) rather than the usual places.  In
-addition, @samp{libstdc++}'s include files will be installed in
-@file{@var{libsubdir}/include/g++} unless you overruled it by using
+subdirectory (@file{@var{libdir}/gcc}) rather than the usual places.  In
+addition, @samp{libstdc++}'s include files will be installed into
+@file{@var{libdir}} unless you overruled it by using
 @option{--with-gxx-include-dir=@var{dirname}}.  Using this option is
 particularly useful if you intend to use several versions of GCC in
 parallel. This is currently supported by @samp{libf2c} and
@@ -1037,10 +1046,12 @@ compiler and may only work properly if you are building the compiler
 with GCC@.  This is on by default when building from CVS or snapshots,
 but off for releases.  More control over the checks may be had by
 specifying @var{list}; the categories of checks available are
-@samp{misc}, @samp{tree}, @samp{gc}, @samp{rtl}, @samp{rtlflag} and
-@samp{gcac}.  The
-default when @var{list} is not specified is @samp{misc,tree,gc,rtlflag}; the
-checks @samp{rtl} and @samp{gcac} are very expensive.
+@samp{misc}, @samp{tree}, @samp{gc}, @samp{rtl}, @samp{rtlflag},
+@samp{fold}, @samp{gcac} and @samp{valgrind}.  The check @samp{valgrind}
+requires the external @command{valgrind} simulator, available from
+@uref{http://developer.kde.org/~sewardj/}.  The default when @var{list} is
+not specified is @samp{misc,tree,gc,rtlflag}; the checks @samp{rtl},
+@samp{gcac} and @samp{valgrind} are very expensive.
 
 @item --enable-coverage
 @item --enable-coverage=@var{level}
@@ -1116,6 +1127,14 @@ building a cross compiler, if @file{@var{prefix}/@var{target}/sys-include}
 doesn't pre-exist.  If @file{@var{prefix}/@var{target}/sys-include} does
 pre-exist, the @var{dir} argument may be omitted.  @command{fixincludes}
 will be run on these files to make them compatible with GCC.
+
+@item --without-headers
+Tells GCC not use any target headers from a libc when building a cross
+compiler.  When crossing to GNU/Linux, you need the headers so gcc
+can build the exception handling for libgcc.
+See @uref{http://www.objsw.com/CrossGCC/,,CrossGCC} for more information
+on this option.
+
 @item --with-libs
 @itemx --with-libs=``@var{dir1} @var{dir2} @dots{} @var{dirN}''
 Deprecated in favor of @option{--with-sysroot}.
@@ -1437,8 +1456,8 @@ These are part of the full distribution, but if you downloaded the
 separately.
 
 Second, you must have the testing tools installed.  This includes
-@uref{http://www.gnu.org/software/dejagnu/,,DejaGnu} 1.4.2 (or later),
-Tcl, and Expect; the DejaGnu site has links to these.
+@uref{http://www.gnu.org/software/dejagnu/,,DejaGnu} 1.4.1 or 1.4.3
+and later, Tcl, and Expect; the DejaGnu site has links to these.
 
 If the directories where @command{runtest} and @command{expect} were
 installed are not in the @env{PATH}, you may need to set the following
@@ -1589,15 +1608,17 @@ We strongly recommend to install into a target directory where there is
 no previous version of GCC present.
 
 That step completes the installation of GCC; user level binaries can
-be found in @file{@var{prefix}/bin} where @var{prefix} is the value you
-specified with the @option{--prefix} to configure (or @file{/usr/local}
-by default).  (If you specified @option{--bindir}, that directory will
-be used instead; otherwise, if you specified @option{--exec-prefix},
-@file{@var{exec-prefix}/bin} will be used.)  Headers for the C++ and
-Java libraries are installed in @file{@var{prefix}/include}; libraries
-in @file{@var{libdir}} (normally @file{@var{prefix}/lib}); internal
-parts of the compiler in @file{@var{libdir}/gcc-lib}; documentation in
-info format in @file{@var{infodir}} (normally @file{@var{prefix}/info}).
+be found in @file{@var{prefix}/bin} where @var{prefix} is the value
+you specified with the @option{--prefix} to configure (or
+@file{/usr/local} by default).  (If you specified @option{--bindir},
+that directory will be used instead; otherwise, if you specified
+@option{--exec-prefix}, @file{@var{exec-prefix}/bin} will be used.)
+Headers for the C++ and Java libraries are installed in
+@file{@var{prefix}/include}; libraries in @file{@var{libdir}}
+(normally @file{@var{prefix}/lib}); internal parts of the compiler in
+@file{@var{libdir}/gcc} and @file{@var{libexecdir}/gcc}; documentation
+in info format in @file{@var{infodir}} (normally
+@file{@var{prefix}/info}).
 
 When installing cross-compilers, GCC's executables
 are not only installed into @file{@var{bindir}}, that
@@ -1883,9 +1904,13 @@ GNU Compiler Collection on your machine.
 @item
 @uref{#ia64-*-linux,,ia64-*-linux}
 @item
+@uref{#ia64-*-hpux*,,ia64-*-hpux*}
+@item
 @uref{#*-ibm-aix*,,*-ibm-aix*}
 @item
 @uref{#ip2k-*-elf,,ip2k-*-elf}
+@item
+@uref{#iq2000-*-elf,,iq2000-*-elf}
 @item
 @uref{#m32r-*-elf,,m32r-*-elf}
 @item
@@ -2017,9 +2042,6 @@ or you can use a copy of GCC 2.95.3 or higher built on Tru64 UNIX V4.0:
 As of GNU binutils 2.11.2, neither GNU @command{as} nor GNU @command{ld}
 are supported on Tru64 UNIX, so you must not configure GCC with
 @option{--with-gnu-as} or @option{--with-gnu-ld}.
-
-The @option{--enable-threads} options isn't supported yet.  A patch is
-in preparation for a future release.
 
 GCC writes a @samp{.verstamp} directive to the assembler output file
 unless it is built as a cross-compiler.  It gets the version to use from
@@ -2504,7 +2526,8 @@ GNU systems.  This configuration is being superseded.
 @end html
 @heading @anchor{ix86-*-linux*}i?86-*-linux*
 
-You will need binutils 2.9.1.0.15 or newer for exception handling to work.
+As of GCC 3.3, binutils 2.13.1 or later is required for this platform.
+See @uref{http://gcc.gnu.org/PR10877,,bug 10877} for more information.
 
 If you receive Signal 11 errors when building on GNU/Linux, then it is
 possible you have a hardware problem.  Further information on this can be
@@ -2605,6 +2628,18 @@ This primarily affects C++ programs and programs that create shared libraries.
 GCC 3.1 or later is recommended for compiling linux, the kernel.
 As of version 3.1 GCC is believed to be fully ABI compliant, and hence no
 more major ABI changes are expected.
+
+@html
+<hr />
+@end html
+@heading @anchor{ia64-*-hpux*}ia64-*-hpux*
+Building GCC on this target requires the GNU Assembler. The bundled HP
+assembler will not work. To prevent GCC from using the wrong assembler,
+the option @option{--with-gnu-as} may be necessary.
+
+The GCC libunwind library has not been ported to HPUX. This means that for
+GCC versions 3.2.3 and earlier, @option{--enable-libunwind-exceptions}
+is required to build GCC. For GCC 3.3 and later, this is the default.
 
 @html
 <hr />
@@ -2726,6 +2761,13 @@ This configuration is intended for embedded systems.
 There are no standard Unix configurations.
 
 Use @samp{configure --target=ip2k-elf --enable-languages=c} to configure GCC@.
+
+@html
+<hr />
+@end html
+@heading @anchor{iq2000-*-elf}iq2000-*-elf
+Vitesse IQ2000 processors.  These are used in embedded
+applications.  There are no standard Unix configurations.
 
 @html
 <hr />
@@ -3079,8 +3121,17 @@ GCC you first have to install a pre-built compiler, see our
 
 The Solaris 2 @command{/bin/sh} will often fail to configure
 @file{libstdc++-v3}, @file{boehm-gc} or @file{libjava}.  We therefore
-recommend to set @env{CONFIG_SHELL} to @command{/bin/ksh} in your
-environment.
+recommend to use the following sequence of commands to bootstrap and
+install GCC:
+
+@smallexample
+   % CONFIG_SHELL=/bin/ksh
+   % export CONFIG_SHELL
+@end smallexample
+
+and then proceed as described in @uref{build.html,,the build instructions},
+where we strongly recommend using GNU make and specifying an absolute path
+to invoke @var{srcdir}/configure.
 
 Solaris 2 comes with a number of optional OS packages.  Some of these
 are needed to use GCC fully, namely @code{SUNWarc},
@@ -3098,6 +3149,10 @@ Trying to use the linker and other tools in
 @file{/usr/ucb} to install GCC has been observed to cause trouble.
 For example, the linker may hang indefinitely.  The fix is to remove
 @file{/usr/ucb} from your @env{PATH}.
+
+The build process works more smoothly with the legacy Sun tools so, if you
+have @file{/usr/xpg4/bin} in your @env{PATH}, we recommend that you place
+@file{/usr/bin} before @file{/usr/xpg4/bin} for the duration of the build.
 
 All releases of GNU binutils prior to 2.11.2 have known bugs on this
 platform.  We recommend the use of GNU binutils 2.11.2 or the vendor
@@ -3175,7 +3230,7 @@ back it out.
 @item
 Copy the original, unpatched Solaris 7
 @command{/usr/ccs/bin/as} into
-@command{/usr/local/lib/gcc-lib/sparc-sun-solaris2.7/3.1/as},
+@command{/usr/local/libexec/gcc/sparc-sun-solaris2.7/3.4/as},
 adjusting the latter name to fit your local conventions and software
 version numbers.
 

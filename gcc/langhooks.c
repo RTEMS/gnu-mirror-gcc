@@ -32,6 +32,8 @@ Boston, MA 02111-1307, USA.  */
 #include "flags.h"
 #include "langhooks.h"
 #include "langhooks-def.h"
+#include "ggc.h"
+#include "diagnostic.h"
 
 /* Do nothing; in many cases the default hook.  */
 
@@ -136,6 +138,11 @@ lhd_warn_unused_global_decl (tree decl)
   return true;
 }
 
+/* Number for making the label on the next
+   static variable internal to a function.  */
+
+static GTY(()) int var_labelno;
+
 /* Set the DECL_ASSEMBLER_NAME for DECL.  */
 void
 lhd_set_decl_assembler_name (tree decl)
@@ -149,12 +156,28 @@ lhd_set_decl_assembler_name (tree decl)
 	  && (TREE_STATIC (decl)
 	      || DECL_EXTERNAL (decl)
 	      || TREE_PUBLIC (decl))))
-    /* By default, assume the name to use in assembly code is the
-       same as that used in the source language.  (That's correct
-       for C, and GCC used to set DECL_ASSEMBLER_NAME to the same
-       value as DECL_NAME in build_decl, so this choice provides
-       backwards compatibility with existing front-ends.  */
-    SET_DECL_ASSEMBLER_NAME (decl, DECL_NAME (decl));
+    {
+      /* By default, assume the name to use in assembly code is the
+	 same as that used in the source language.  (That's correct
+	 for C, and GCC used to set DECL_ASSEMBLER_NAME to the same
+	 value as DECL_NAME in build_decl, so this choice provides
+	 backwards compatibility with existing front-ends.  
+
+         Can't use just the variable's own name for a variable whose
+	 scope is less than the whole compilation.  Concatenate a
+	 distinguishing number.  */
+      if (!TREE_PUBLIC (decl) && DECL_CONTEXT (decl))
+	{
+	  const char *name = IDENTIFIER_POINTER (DECL_NAME (decl));
+	  char *label;
+	  
+	  ASM_FORMAT_PRIVATE_NAME (label, name, var_labelno);
+	  var_labelno++;
+	  SET_DECL_ASSEMBLER_NAME (decl, get_identifier (label));
+	}
+      else
+	SET_DECL_ASSEMBLER_NAME (decl, DECL_NAME (decl));
+    }
   else
     /* Nobody should ever be asking for the DECL_ASSEMBLER_NAME of
        these DECLs -- unless they're in language-dependent code, in
@@ -183,6 +206,13 @@ tree
 lhd_type_promotes_to (tree type ATTRIBUTE_UNUSED)
 {
   abort ();
+}
+
+/* Registration of machine- or os-specific builtin types.  */
+void
+lhd_register_builtin_type (tree type ATTRIBUTE_UNUSED, 
+			   const char* name ATTRIBUTE_UNUSED)
+{
 }
 
 /* Invalid use of an incomplete type.  */
@@ -408,6 +438,14 @@ lhd_expr_size (tree exp)
   else
     return size_in_bytes (TREE_TYPE (exp));
 }
+/* lang_hooks.decl_uninit: Find out if a variable is uninitialized based
+   on DECL_INITIAL.  */
+
+bool
+lhd_decl_uninit (tree t ATTRIBUTE_UNUSED)
+{
+  return false;
+}
 
 /* lang_hooks.tree_size: Determine the size of a tree with code C,
    which is a language-specific tree code in category 'x'.  The
@@ -439,7 +477,7 @@ write_global_declarations (void)
 
   tree globals = (*lang_hooks.decls.getdecls) ();
   int len = list_length (globals);
-  tree *vec = (tree *) xmalloc (sizeof (tree) * len);
+  tree *vec = xmalloc (sizeof (tree) * len);
   int i;
   tree decl;
 
@@ -456,3 +494,53 @@ write_global_declarations (void)
     /* Clean up.  */
   free (vec);
 }
+
+/* Called to perform language-specific initialization of CTX.  */
+void
+lhd_initialize_diagnostics (struct diagnostic_context *ctx ATTRIBUTE_UNUSED)
+{
+}
+
+/* The default function to print out name of current function that caused
+   an error.  */
+void
+lhd_print_error_function (diagnostic_context *context, const char *file)
+{
+  if (diagnostic_last_function_changed (context))
+    {
+      const char *old_prefix = context->printer->prefix;
+      char *new_prefix = file ? file_name_as_prefix (file) : NULL;
+
+      pp_set_prefix (context->printer, new_prefix);
+
+      if (current_function_decl == NULL)
+	pp_printf (context->printer, "At top level:");
+      else
+	{
+	  if (TREE_CODE (TREE_TYPE (current_function_decl)) == METHOD_TYPE)
+	    pp_printf
+	      (context->printer, "In member function `%s':",
+	       (*lang_hooks.decl_printable_name) (current_function_decl, 2));
+	  else
+	    pp_printf
+	      (context->printer, "In function `%s':",
+	       (*lang_hooks.decl_printable_name) (current_function_decl, 2));
+	}
+      pp_newline (context->printer);
+
+      diagnostic_set_last_function (context);
+      pp_flush (context->printer);
+      context->printer->prefix = old_prefix;
+      free ((char*) new_prefix);
+    }
+}
+
+tree
+lhd_callgraph_analyze_expr (tree *tp ATTRIBUTE_UNUSED,
+			    int *walk_subtrees ATTRIBUTE_UNUSED,
+			    tree decl ATTRIBUTE_UNUSED)
+{
+  return NULL;
+}
+
+#include "gt-langhooks.h"

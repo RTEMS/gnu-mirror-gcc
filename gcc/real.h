@@ -322,18 +322,23 @@ extern void real_ldexp (REAL_VALUE_TYPE *, const REAL_VALUE_TYPE *, int);
 
 /* **** End of software floating point emulator interface macros **** */
 
-/* Constant real values 0, 1, 2, -1, -2 and 0.5.  */
+/* Constant real values 0, 1, 2, 3, 10, -1, -2, 0.5 and 1/3.  */
 
 extern REAL_VALUE_TYPE dconst0;
 extern REAL_VALUE_TYPE dconst1;
 extern REAL_VALUE_TYPE dconst2;
+extern REAL_VALUE_TYPE dconst3;
+extern REAL_VALUE_TYPE dconst10;
 extern REAL_VALUE_TYPE dconstm1;
 extern REAL_VALUE_TYPE dconstm2;
 extern REAL_VALUE_TYPE dconsthalf;
+extern REAL_VALUE_TYPE dconstthird;
+extern REAL_VALUE_TYPE dconstpi;
+extern REAL_VALUE_TYPE dconste;
 
 /* Function to return a real value (not a tree node)
    from a given integer constant.  */
-REAL_VALUE_TYPE real_value_from_int_cst (union tree_node *, union tree_node *);
+REAL_VALUE_TYPE real_value_from_int_cst (tree, tree);
 
 /* Given a CONST_DOUBLE in FROM, store into TO the value it represents.  */
 #define REAL_VALUE_FROM_CONST_DOUBLE(to, from) \

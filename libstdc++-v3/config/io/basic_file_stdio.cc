@@ -50,6 +50,10 @@
 #include <poll.h>
 #endif
 
+#ifdef _GLIBCXX_HAVE_SYS_UIO_H
+#include <sys/uio.h>
+#endif
+
 #if defined(_GLIBCXX_HAVE_S_ISREG) || defined(_GLIBCXX_HAVE_S_IFREG)
 # include <sys/stat.h>
 # ifdef _GLIBCXX_HAVE_S_ISREG
@@ -83,33 +87,33 @@ namespace std
     if (!__testi && __testo && !__testt && !__testa)
       {
 	strcpy(__c_mode, "w");
-	__p_mode = (O_WRONLY | O_CREAT);
+	__p_mode = O_WRONLY | O_CREAT;
       }
     if (!__testi && __testo && !__testt && __testa)
       {
 	strcpy(__c_mode, "a");
-	__p_mode |=  O_WRONLY | O_CREAT | O_APPEND;
+	__p_mode = O_WRONLY | O_CREAT | O_APPEND;
       }
     if (!__testi && __testo && __testt && !__testa)
       {
 	strcpy(__c_mode, "w");
-	__p_mode |=  O_WRONLY | O_CREAT | O_TRUNC;
+	__p_mode = O_WRONLY | O_CREAT | O_TRUNC;
       }
 
     if (__testi && !__testo && !__testt && !__testa)
       {
 	strcpy(__c_mode, "r");
-	__p_mode |=  O_RDONLY;
+	__p_mode = O_RDONLY;
       }
     if (__testi && __testo && !__testt && !__testa)
       {
 	strcpy(__c_mode, "r+");
-	__p_mode |=  O_RDWR | O_CREAT;
+	__p_mode = O_RDWR | O_CREAT;
       }
     if (__testi && __testo && __testt && !__testa)
       {
 	strcpy(__c_mode, "w+");
-	__p_mode |=  O_RDWR | O_CREAT | O_TRUNC;
+	__p_mode = O_RDWR | O_CREAT | O_TRUNC;
       }
     if (__testb)
       strcat(__c_mode, "b");
@@ -222,6 +226,40 @@ namespace std
     do
       __ret = write(this->fd(), __s, __n);
     while (__ret == -1L && errno == EINTR);
+    return __ret;
+  }
+
+  streamsize 
+  __basic_file<char>::xsputn_2(const char* __s1, streamsize __n1,
+			       const char* __s2, streamsize __n2)
+  {
+    streamsize __ret = 0;
+#ifdef _GLIBCXX_HAVE_WRITEV
+    struct iovec __iov[2];
+    __iov[0].iov_base = const_cast<char*>(__s1);
+    __iov[0].iov_len = __n1;
+    __iov[1].iov_base = const_cast<char*>(__s2);
+    __iov[1].iov_len = __n2;
+
+    do
+      __ret = writev(this->fd(), __iov, 2);
+    while (__ret == -1L && errno == EINTR);
+#else
+    if (__n1)
+      do
+	__ret = write(this->fd(), __s1, __n1);
+      while (__ret == -1L && errno == EINTR);
+
+    if (__ret == __n1)
+      {
+	do
+	  __ret = write(this->fd(), __s2, __n2);
+	while (__ret == -1L && errno == EINTR);
+	
+	if (__ret != -1L)
+	  __ret += __n1;
+      }
+#endif
     return __ret;
   }
 

@@ -57,6 +57,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "langhooks.h"
 #include "predict.h"
 #include "optabs.h"
+#include "target.h"
 
 /* Assume that case vectors are not pc-relative.  */
 #ifndef CASE_VECTOR_PC_RELATIVE
@@ -252,8 +253,7 @@ struct nesting GTY(())
 
 /* Allocate and return a new `struct nesting'.  */
 
-#define ALLOC_NESTING() \
- (struct nesting *) ggc_alloc (sizeof (struct nesting))
+#define ALLOC_NESTING() ggc_alloc (sizeof (struct nesting))
 
 /* Pop the nesting stack element by element until we pop off
    the element which is at the top of STACK.
@@ -434,25 +434,7 @@ using_eh_for_cleanups (void)
 void
 init_stmt_for_function (void)
 {
-  cfun->stmt = ((struct stmt_status *)ggc_alloc (sizeof (struct stmt_status)));
-
-  /* We are not currently within any block, conditional, loop or case.  */
-  block_stack = 0;
-  stack_block_stack = 0;
-  loop_stack = 0;
-  case_stack = 0;
-  cond_stack = 0;
-  nesting_stack = 0;
-  nesting_depth = 0;
-
-  current_block_start_count = 0;
-
-  /* No gotos have been expanded yet.  */
-  goto_fixup_chain = 0;
-
-  /* We are not processing a ({...}) grouping.  */
-  expr_stmts_for_value = 0;
-  clear_last_expr ();
+  cfun->stmt = ggc_alloc_cleared (sizeof (struct stmt_status));
 }
 
 /* Record the current file and line.  Called from emit_line_note.  */
@@ -588,7 +570,7 @@ expand_label (tree label)
 
   if (stack_block_stack != 0)
     {
-      p = (struct label_chain *) ggc_alloc (sizeof (struct label_chain));
+      p = ggc_alloc (sizeof (struct label_chain));
       p->next = stack_block_stack->data.block.label_chain;
       stack_block_stack->data.block.label_chain = p;
       p->label = label;
@@ -851,8 +833,7 @@ expand_fixup (tree tree_label, rtx rtl_label, rtx last_insn)
   if (block != end_block)
     {
       /* Ok, a fixup is needed.  Add a fixup to the list of such.  */
-      struct goto_fixup *fixup
-	= (struct goto_fixup *) ggc_alloc (sizeof (struct goto_fixup));
+      struct goto_fixup *fixup = ggc_alloc (sizeof (struct goto_fixup));
       /* In case an old stack level is restored, make sure that comes
 	 after any pending stack adjust.  */
       /* ?? If the fixup isn't to come at the present position,
@@ -988,8 +969,8 @@ fixup_gotos (struct nesting *thisblock, rtx stack_level,
 	      && INSN_UID (first_insn) > INSN_UID (f->before_jump)
 	      && ! DECL_ERROR_ISSUED (f->target))
 	    {
-	      error_with_decl (f->target,
-			       "label `%s' used before containing binding contour");
+	      error ("%Hlabel '%D' used before containing binding contour",
+                     &DECL_SOURCE_LOCATION (f->target), f->target);
 	      /* Prevent multiple errors for one label.  */
 	      DECL_ERROR_ISSUED (f->target) = 1;
 	    }
@@ -1471,13 +1452,13 @@ expand_asm_operands (tree string, tree outputs, tree inputs,
   tree t;
   int i;
   /* Vector of RTX's of evaluated output operands.  */
-  rtx *output_rtx = (rtx *) alloca (noutputs * sizeof (rtx));
-  int *inout_opnum = (int *) alloca (noutputs * sizeof (int));
-  rtx *real_output_rtx = (rtx *) alloca (noutputs * sizeof (rtx));
+  rtx *output_rtx = alloca (noutputs * sizeof (rtx));
+  int *inout_opnum = alloca (noutputs * sizeof (int));
+  rtx *real_output_rtx = alloca (noutputs * sizeof (rtx));
   enum machine_mode *inout_mode
-    = (enum machine_mode *) alloca (noutputs * sizeof (enum machine_mode));
+    = alloca (noutputs * sizeof (enum machine_mode));
   const char **constraints
-    = (const char **) alloca ((noutputs + ninputs) * sizeof (const char *));
+    = alloca ((noutputs + ninputs) * sizeof (const char *));
   int old_generating_concat_p = generating_concat_p;
 
   /* An ASM with no outputs needs to be treated as volatile, for now.  */
@@ -1994,13 +1975,14 @@ resolve_asm_operand_names (tree string, tree outputs, tree inputs)
 {
   char *buffer;
   char *p;
+  const char *c;
   tree t;
 
   /* Substitute [<name>] in input constraint strings.  There should be no
      named operands in output constraints.  */
   for (t = inputs; t ; t = TREE_CHAIN (t))
     {
-      const char *c = TREE_STRING_POINTER (TREE_VALUE (TREE_PURPOSE (t)));
+      c = TREE_STRING_POINTER (TREE_VALUE (TREE_PURPOSE (t)));
       if (strchr (c, '[') != NULL)
 	{
 	  p = buffer = xstrdup (c);
@@ -2012,31 +1994,48 @@ resolve_asm_operand_names (tree string, tree outputs, tree inputs)
 	}
     }
 
-  if (strchr (TREE_STRING_POINTER (string), '[') == NULL)
-    return string;
-
-  /* Assume that we will not need extra space to perform the substitution.
-     This because we get to remove '[' and ']', which means we cannot have
-     a problem until we have more than 999 operands.  */
-
-  p = buffer = xstrdup (TREE_STRING_POINTER (string));
-  while ((p = strchr (p, '%')) != NULL)
+  /* Now check for any needed substitutions in the template.  */
+  c = TREE_STRING_POINTER (string);
+  while ((c = strchr (c, '%')) != NULL)
     {
-      if (p[1] == '[')
-	p += 1;
-      else if (ISALPHA (p[1]) && p[2] == '[')
-	p += 2;
+      if (c[1] == '[')
+	break;
+      else if (ISALPHA (c[1]) && c[2] == '[')
+	break;
       else
 	{
-	  p += 1;
+	  c += 1;
 	  continue;
 	}
-
-      p = resolve_operand_name_1 (p, outputs, inputs);
     }
 
-  string = build_string (strlen (buffer), buffer);
-  free (buffer);
+  if (c)
+    {
+      /* OK, we need to make a copy so we can perform the substitutions.
+	 Assume that we will not need extra space--we get to remove '['
+	 and ']', which means we cannot have a problem until we have more
+	 than 999 operands.  */
+      buffer = xstrdup (TREE_STRING_POINTER (string));
+      p = buffer + (c - TREE_STRING_POINTER (string));
+      
+      while ((p = strchr (p, '%')) != NULL)
+	{
+	  if (p[1] == '[')
+	    p += 1;
+	  else if (ISALPHA (p[1]) && p[2] == '[')
+	    p += 2;
+	  else
+	    {
+	      p += 1;
+	      continue;
+	    }
+
+	  p = resolve_operand_name_1 (p, outputs, inputs);
+	}
+
+      string = build_string (strlen (buffer), buffer);
+      free (buffer);
+    }
 
   return string;
 }
@@ -2136,17 +2135,13 @@ expand_expr_stmt_value (tree exp, int want_value, int maybe_last)
      except for last statement in ({...}) where they may be useful.  */
   if (! want_value
       && (expr_stmts_for_value == 0 || ! maybe_last)
-      && exp != error_mark_node)
+      && exp != error_mark_node
+      && warn_unused_value)
     {
-      if (! TREE_SIDE_EFFECTS (exp))
-	{
-	  if (warn_unused_value
-	      && !(TREE_CODE (exp) == CONVERT_EXPR
-		   && VOID_TYPE_P (TREE_TYPE (exp))))
-	    warning ("%Hstatement with no effect", &emit_locus);
-	}
-      else if (warn_unused_value)
+      if (TREE_SIDE_EFFECTS (exp))
 	warn_if_unused_value (exp);
+      else if (!VOID_TYPE_P (TREE_TYPE (exp)))
+	warning ("%Hstatement with no effect", &emit_locus);
     }
 
   /* If EXP is of function type and we are expanding statements for
@@ -2225,7 +2220,6 @@ warn_if_unused_value (tree exp)
     case INIT_EXPR:
     case TARGET_EXPR:
     case CALL_EXPR:
-    case METHOD_CALL_EXPR:
     case RTL_EXPR:
     case TRY_CATCH_EXPR:
     case WITH_CLEANUP_EXPR:
@@ -2944,18 +2938,19 @@ expand_value_return (rtx val)
   if (return_reg != val)
     {
       tree type = TREE_TYPE (DECL_RESULT (current_function_decl));
-#ifdef PROMOTE_FUNCTION_RETURN
-      int unsignedp = TREE_UNSIGNED (type);
-      enum machine_mode old_mode
-	= DECL_MODE (DECL_RESULT (current_function_decl));
-      enum machine_mode mode
-	= promote_mode (type, old_mode, &unsignedp, 1);
+      if (targetm.calls.promote_function_return (TREE_TYPE (current_function_decl)))
+      {
+	int unsignedp = TREE_UNSIGNED (type);
+	enum machine_mode old_mode
+	  = DECL_MODE (DECL_RESULT (current_function_decl));
+	enum machine_mode mode
+	  = promote_mode (type, old_mode, &unsignedp, 1);
 
-      if (mode != old_mode)
-	val = convert_modes (mode, old_mode, val, unsignedp);
-#endif
+	if (mode != old_mode)
+	  val = convert_modes (mode, old_mode, val, unsignedp);
+      }
       if (GET_CODE (return_reg) == PARALLEL)
-	emit_group_load (return_reg, val, int_size_in_bytes (type));
+	emit_group_load (return_reg, val, type, int_size_in_bytes (type));
       else
 	emit_move_insn (return_reg, val);
     }
@@ -3083,7 +3078,7 @@ expand_return (tree retval)
       int n_regs = (bytes + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
       unsigned int bitsize
 	= MIN (TYPE_ALIGN (TREE_TYPE (retval_rhs)), BITS_PER_WORD);
-      rtx *result_pseudos = (rtx *) alloca (sizeof (rtx) * n_regs);
+      rtx *result_pseudos = alloca (sizeof (rtx) * n_regs);
       rtx result_reg, src = NULL_RTX, dst = NULL_RTX;
       rtx result_val = expand_expr (retval_rhs, NULL_RTX, VOIDmode, 0);
       enum machine_mode tmpmode, result_reg_mode;
@@ -3258,7 +3253,7 @@ tail_recursion_args (tree actuals, tree formals)
 
   /* Compute all the actuals.  */
 
-  argvec = (rtx *) alloca (i * sizeof (rtx));
+  argvec = alloca (i * sizeof (rtx));
 
   for (a = actuals, i = 0; a; a = TREE_CHAIN (a), i++)
     argvec[i] = expand_expr (TREE_VALUE (a), NULL_RTX, VOIDmode, 0);
@@ -3639,7 +3634,7 @@ warn_about_unused_variables (tree vars)
 	  && ! TREE_USED (decl)
 	  && ! DECL_IN_SYSTEM_HEADER (decl)
 	  && DECL_NAME (decl) && ! DECL_ARTIFICIAL (decl))
-	warning_with_decl (decl, "unused variable `%s'");
+	warning ("%Hunused variable '%D'", &DECL_SOURCE_LOCATION (decl), decl);
 }
 
 /* Generate RTL code to terminate a binding contour.
@@ -3699,8 +3694,8 @@ expand_end_bindings (tree vars, int mark_ends, int dont_jump_in)
 	     that must be an error, because gotos without fixups
 	     come from outside all saved stack-levels.  */
 	  if (TREE_ADDRESSABLE (chain->label))
-	    error_with_decl (chain->label,
-			     "label `%s' used before containing binding contour");
+	    error ("%Hlabel '%D' used before containing binding contour",
+                   &DECL_SOURCE_LOCATION (chain->label), chain->label);
 	}
     }
 
@@ -3984,13 +3979,13 @@ expand_decl_init (tree decl)
       if (code == INTEGER_TYPE || code == REAL_TYPE || code == ENUMERAL_TYPE
 	  || code == POINTER_TYPE || code == REFERENCE_TYPE)
 	expand_assignment (decl, convert (TREE_TYPE (decl), integer_zero_node),
-			   0, 0);
+			   0);
       emit_queue ();
     }
   else if (DECL_INITIAL (decl) && TREE_CODE (DECL_INITIAL (decl)) != TREE_LIST)
     {
       emit_line_note (DECL_SOURCE_LOCATION (decl));
-      expand_assignment (decl, DECL_INITIAL (decl), 0, 0);
+      expand_assignment (decl, DECL_INITIAL (decl), 0);
       emit_queue ();
     }
 
@@ -4593,7 +4588,7 @@ add_case_node (tree low, tree high, tree label, tree *duplicate)
 
   /* Add this label to the chain, and succeed.  */
 
-  r = (struct case_node *) ggc_alloc (sizeof (struct case_node));
+  r = ggc_alloc (sizeof (struct case_node));
   r->low = low;
 
   /* If the bounds are equal, turn this into the one-value case.  */
@@ -5026,8 +5021,7 @@ check_for_full_enumeration_handling (tree type)
       /* We deliberately use calloc here, not cmalloc, so that we can suppress
 	 this optimization if we don't have enough memory rather than
 	 aborting, as xmalloc would do.  */
-      && (cases_seen =
-	  (unsigned char *) really_call_calloc (bytes_needed, 1)) != NULL)
+      && (cases_seen = really_call_calloc (bytes_needed, 1)) != NULL)
     {
       HOST_WIDE_INT i;
       tree v = TYPE_VALUES (type);
@@ -5427,7 +5421,8 @@ expand_end_case_type (tree orig_index, tree orig_type)
 	 because we can optimize it.  */
 
       else if (count < case_values_threshold ()
-	       || compare_tree_int (range, 10 * count) > 0
+	       || compare_tree_int (range,
+				    (optimize_size ? 3 : 10) * count) > 0
 	       /* RANGE may be signed, and really large ranges will show up
 		  as negative numbers.  */
 	       || compare_tree_int (range, 0) < 0
@@ -5541,8 +5536,8 @@ expand_end_case_type (tree orig_index, tree orig_type)
 	  /* Get table of labels to jump to, in order of case index.  */
 
 	  ncases = tree_low_cst (range, 0) + 1;
-	  labelvec = (rtx *) alloca (ncases * sizeof (rtx));
-	  memset ((char *) labelvec, 0, ncases * sizeof (rtx));
+	  labelvec = alloca (ncases * sizeof (rtx));
+	  memset (labelvec, 0, ncases * sizeof (rtx));
 
 	  for (n = thiscase->data.case_stmt.case_list; n; n = n->right)
 	    {

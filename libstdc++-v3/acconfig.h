@@ -35,13 +35,16 @@
 #undef _GLIBCXX_CONCEPT_CHECKS
 
 // Define if the atan2f function exists.
-#undef _GLIBCXX_HAVE_ATAN2F 
+#undef HAVE_ATAN2F 
 
 // Define if the atan2l function exists.
-#undef _GLIBCXX_HAVE_ATAN2L
+#undef HAVE_ATAN2L
+
+// Define if the tanl function exists.
+#undef HAVE_TANL
 
 // Define if the copysignf function exists.
-#undef _GLIBCXX_HAVE_COPYSIGNF
+#undef HAVE_COPYSIGNF
 
 // Define to use symbol versioning in the shared library.
 #undef _GLIBCXX_SYMVER
@@ -86,6 +89,9 @@
 
 // Define if you have the expl function.
 #undef HAVE_EXPL
+
+// Define if you have the hypot function.
+#undef HAVE_HYPOT
 
 // Define if you have the hypotf function.
 #undef HAVE_HYPOTF
@@ -143,6 +149,9 @@
 
 // Define if S_IFREG is available in <sys/stat.h>.
 #undef HAVE_S_IFREG
+
+// Define if writev is available in <sys/uio.h>.
+#undef HAVE_WRITEV
 
 // Define if LC_MESSAGES is available in <locale.h>.
 #undef HAVE_LC_MESSAGES

@@ -37,8 +37,8 @@
  *  in your programs, rather than any of the "st[dl]_*.h" implementation files.
  */
 
-#ifndef _FSTREAM
-#define _FSTREAM 1
+#ifndef _GLIBCXX_FSTREAM
+#define _GLIBCXX_FSTREAM 1
 
 #pragma GCC system_header
 
@@ -176,6 +176,32 @@ namespace std
 
       // Cached codecvt facet.
       const __codecvt_type* 	_M_codecvt;
+
+      /**
+       *  @if maint
+       *  Buffer for external characters. Used for input when
+       *  codecvt::always_noconv() == false. When valid, this corresponds
+       *  to eback().
+       *  @endif
+      */ 
+      char*			_M_ext_buf;
+
+      /**
+       *  @if maint
+       *  Size of buffer held by _M_ext_buf.
+       *  @endif
+      */ 
+      streamsize		_M_ext_buf_size;
+
+      /**
+       *  @if maint
+       *  Pointers into the buffer held by _M_ext_buf that delimit a
+       *  subsequence of bytes that have been read but not yet converted.
+       *  When valid, _M_ext_next corresponds to egptr().
+       *  @endif
+      */ 
+      const char*		_M_ext_next;
+      char*			_M_ext_end;
 
       /**
        *  @if maint
@@ -365,7 +391,7 @@ namespace std
 	// NB: _M_file.sync() will be called within.
 	if (this->pbase() < this->pptr())
 	  {
-	    int_type __tmp = this->overflow();
+	    const int_type __tmp = this->overflow();
 	    if (traits_type::eq_int_type(__tmp, traits_type::eof()))
 	      __ret = -1;
 	    else
@@ -407,8 +433,7 @@ namespace std
 
       // [documentation is inherited]
       virtual streamsize
-      xsputn(const char_type* __s, streamsize __n)
-      { return __streambuf_type::xsputn(__s, __n); }
+      xsputn(const char_type* __s, streamsize __n);
 
       /**
        *  @if maint
@@ -821,11 +846,8 @@ namespace std
     };
 } // namespace std
 
-#ifdef _GLIBCXX_NO_TEMPLATE_EXPORT
-# define export
-#endif
-#ifdef  _GLIBCXX_FULLY_COMPLIANT_HEADERS
+#ifndef _GLIBCXX_EXPORT_TEMPLATE
 # include <bits/fstream.tcc>
 #endif
 
-#endif
+#endif /* _GLIBCXX_FSTREAM */
