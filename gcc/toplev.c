@@ -66,6 +66,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "reload.h"
 #include "dwarf2asm.h"
 #include "integrate.h"
+#include "real.h"
 #include "debug.h"
 #include "target.h"
 #include "langhooks.h"
@@ -345,8 +346,8 @@ int use_gnu_debug_info_extensions = 0;
 int optimize = 0;
 
 /* Nonzero means optimize for size.  -Os.
-   The only valid values are zero and non-zero. When optimize_size is
-   non-zero, optimize defaults to 2, but certain individual code
+   The only valid values are zero and nonzero. When optimize_size is
+   nonzero, optimize defaults to 2, but certain individual code
    bloating optimizations are disabled.  */
 
 int optimize_size = 0;
@@ -373,11 +374,6 @@ int profile_flag = 0;
 /* Nonzero if generating code to profile program flow graph arcs.  */
 
 int profile_arc_flag = 0;
-
-/* Nonzero if we should not attempt to generate thread-safe
-   code to profile program flow graph arcs.  */
-
-int flag_unsafe_profile_arcs = 0;
 
 /* Nonzero if generating info for gcov to calculate line test coverage.  */
 
@@ -862,19 +858,10 @@ int flag_peephole2 = 0;
 /* This will try to guess branch probabilities.  */
 int flag_guess_branch_prob = 0;
 
-/* -fbounded-pointers causes gcc to compile pointers as composite
-   objects occupying three words: the pointer value, the base address
-   of the referent object, and the address immediately beyond the end
-   of the referent object.  The base and extent allow us to perform
-   runtime bounds checking.  -fbounded-pointers implies -fcheck-bounds.  */
-int flag_bounded_pointers = 0;
-
 /* -fcheck-bounds causes gcc to generate array bounds checks.
-   For C, C++: defaults to value of flag_bounded_pointers.
-   For ObjC: defaults to off.
+   For C, C++, ObjC: defaults to off.
    For Java: defaults to on.
-   For Fortran: defaults to off.
-   For CHILL: defaults to off.  */
+   For Fortran: defaults to off.  */
 int flag_bounds_check = 0;
 
 /* This will attempt to merge constant section constants, if 1 only
@@ -910,6 +897,10 @@ int align_labels_log;
 int align_labels_max_skip;
 int align_functions;
 int align_functions_log;
+
+/* Like align_functions_log above, but used by front-ends to force the
+   minimum function alignment.  Zero means no alignment is forced.  */
+int force_align_functions_log;
 
 /* Table of supported debugging formats.  */
 static const struct
@@ -975,11 +966,6 @@ static const param_info lang_independent_params[] = {
 #undef DEFPARAM
   { NULL, 0, NULL }
 };
-
-/* A default for same.  */
-#ifndef USER_LABEL_PREFIX
-#define USER_LABEL_PREFIX ""
-#endif
 
 /* Table of language-independent -f options.
    STRING is the option name.  VARIABLE is the address of the variable.
@@ -1104,8 +1090,6 @@ static const lang_independent_options f_options[] =
    N_("Support synchronous non-call exceptions") },
   {"profile-arcs", &profile_arc_flag, 1,
    N_("Insert arc based program profiling code") },
-  {"unsafe-profile-arcs", &flag_unsafe_profile_arcs, 1,
-   N_("Avoid thread safety profiling overhead") },
   {"test-coverage", &flag_test_coverage, 1,
    N_("Create data files needed by gcov") },
   {"branch-probabilities", &flag_branch_probabilities, 1,
@@ -1190,10 +1174,8 @@ static const lang_independent_options f_options[] =
    N_("Allow math optimizations that may violate IEEE or ANSI standards") },
   {"signaling-nans", &flag_signaling_nans, 1,
    N_("Disable optimizations observable by IEEE signaling NaNs") },
-  {"bounded-pointers", &flag_bounded_pointers, 1,
-   N_("Compile pointers as triples: value, base & end") },
   {"bounds-check", &flag_bounds_check, 1,
-   N_("Generate code to check bounds before dereferencing pointers and arrays") },
+   N_("Generate code to check bounds before indexing arrays") },
   {"single-precision-constant", &flag_single_precision_constant, 1,
    N_("Convert floating point constant to single precision constant") },
   {"time-report", &time_report, 1,
@@ -1511,6 +1493,11 @@ int warn_missing_noreturn;
 
 int warn_deprecated_decl = 1;
 
+/* Nonzero means warn about constructs which might not be
+   strict-aliasing safe.  */
+
+int warn_strict_aliasing;
+
 /* Likewise for -W.  */
 
 static const lang_independent_options W_options[] =
@@ -1556,7 +1543,9 @@ static const lang_independent_options W_options[] =
   {"deprecated-declarations", &warn_deprecated_decl, 1,
    N_("Warn about uses of __attribute__((deprecated)) declarations") },
   {"missing-noreturn", &warn_missing_noreturn, 1,
-   N_("Warn about functions which might be candidates for attribute noreturn") }
+   N_("Warn about functions which might be candidates for attribute noreturn") },
+  {"strict-aliasing", &warn_strict_aliasing, 1,
+   N_ ("Warn about code which might break the strict aliasing rules") }
 };
 
 void
@@ -1640,7 +1629,7 @@ read_integral_parameter (p, pname, defval)
   return atoi (p);
 }
 
-/* This calls abort and is used to avoid problems when abort if a macro.
+/* This calls abort and is used to avoid problems when abort is a macro.
    It is used when we need to pass the address of abort.  */
 
 void
@@ -1700,7 +1689,7 @@ static void
 crash_signal (signo)
      int signo;
 {
-  internal_error ("internal error: %s", strsignal (signo));
+  internal_error ("%s", strsignal (signo));
 }
 
 /* Strip off a legitimate source ending from the input string NAME of
@@ -1897,7 +1886,7 @@ close_dump_file (index, func, insns)
 /* Do any final processing required for the declarations in VEC, of
    which there are LEN.  We write out inline functions and variables
    that have been deferred until this point, but which are required.
-   Returns non-zero if anything was put out.  */
+   Returns nonzero if anything was put out.  */
 
 int
 wrapup_global_declarations (vec, len)
@@ -2160,14 +2149,11 @@ compile_file ()
 
     wrapup_global_declarations (vec, len);
 
-    /* This must occur after the loop to output deferred functions.  Else
-       the profiler initializer would not be emitted if all the functions
-       in this compilation unit were deferred.
-
-       output_func_start_profiler can not cause any additional functions or
-       data to need to be output, so it need not be in the deferred function
-       loop above.  */
-    output_func_start_profiler ();
+    if (profile_arc_flag)
+      /* This must occur after the loop to output deferred functions.
+         Else the profiler initializer would not be emitted if all the
+         functions in this compilation unit were deferred.  */
+      create_profiler ();
 
     check_global_declarations (vec, len);
 
@@ -2193,8 +2179,6 @@ compile_file ()
   /* Output some stuff at end of file if nec.  */
 
   dw2_output_indirect_constants ();
-
-  end_final (aux_base_name);
 
   if (profile_arc_flag || flag_test_coverage || flag_branch_probabilities)
     {
@@ -2506,7 +2490,7 @@ rest_of_compilation (decl)
 	      free_bb_for_insn ();
 	    }
 
-	  current_function_nothrow = nothrow_function_p ();
+	  set_nothrow_function_flags ();
 	  if (current_function_nothrow)
 	    /* Now we know that this can't throw; set the flag for the benefit
 	       of other functions later in this translation unit.  */
@@ -2583,7 +2567,9 @@ rest_of_compilation (decl)
   delete_unreachable_blocks ();
 
   /* Turn NOTE_INSN_PREDICTIONs into branch predictions.  */
+  timevar_push (TV_BRANCH_PROB);
   note_prediction_to_br_prob ();
+  timevar_pop (TV_BRANCH_PROB);
 
   /* We may have potential sibling or tail recursion sites.  Select one
      (of possibly multiple) methods of performing the call.  */
@@ -3528,7 +3514,7 @@ rest_of_compilation (decl)
   shorten_branches (get_insns ());
   timevar_pop (TV_SHORTEN_BRANCH);
 
-  current_function_nothrow = nothrow_function_p ();
+  set_nothrow_function_flags ();
   if (current_function_nothrow)
     /* Now we know that this can't throw; set the flag for the benefit
        of other functions later in this translation unit.  */
@@ -4013,7 +3999,7 @@ decode_f_option (arg)
   else if (!strcmp (arg, "no-stack-limit"))
     stack_limit_rtx = NULL_RTX;
   else if (!strcmp (arg, "preprocessed"))
-    /* Recognise this switch but do nothing.  This prevents warnings
+    /* Recognize this switch but do nothing.  This prevents warnings
        about an unrecognized switch if cpplib has not been linked in.  */
     ;
   else
@@ -4736,7 +4722,7 @@ general_init (argv0)
    minimal options processing.  Outputting diagnostics is OK, but GC
    and identifier hashtables etc. are not initialized yet.
 
-   Return non-zero to suppress compiler back end initialization.  */
+   Return nonzero to suppress compiler back end initialization.  */
 static void
 parse_options_and_default_flags (argc, argv)
      int argc;
@@ -5184,7 +5170,7 @@ backend_init ()
   expand_dummy_function_end ();
 }
 
-/* Language-dependent initialization.  Returns non-zero on success.  */
+/* Language-dependent initialization.  Returns nonzero on success.  */
 static int
 lang_dependent_init (name)
      const char *name;

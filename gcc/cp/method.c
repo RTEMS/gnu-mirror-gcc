@@ -34,6 +34,7 @@ Boston, MA 02111-1307, USA.  */
 #include "toplev.h"
 #include "ggc.h"
 #include "tm_p.h"
+#include "target.h"
 
 /* Various flags to control the mangling process.  */
 
@@ -350,7 +351,7 @@ make_thunk (function, delta, vcall_index)
 }
 
 /* Emit the definition of a C++ multiple inheritance vtable thunk.  If
-   EMIT_P is non-zero, the thunk is emitted immediately.  */
+   EMIT_P is nonzero, the thunk is emitted immediately.  */
 
 void
 use_thunk (thunk_fndecl, emit_p)
@@ -408,8 +409,8 @@ use_thunk (thunk_fndecl, emit_p)
   BLOCK_VARS (DECL_INITIAL (thunk_fndecl)) 
     = DECL_ARGUMENTS (thunk_fndecl);
 
-#ifdef ASM_OUTPUT_MI_THUNK
-  if (!vcall_offset)
+  if (targetm.asm_out.output_mi_vcall_thunk
+      || (targetm.asm_out.output_mi_thunk && !vcall_offset))
     {
       const char *fnname;
       current_function_decl = thunk_fndecl;
@@ -419,18 +420,32 @@ use_thunk (thunk_fndecl, emit_p)
       init_function_start (thunk_fndecl, input_filename, lineno);
       current_function_is_thunk = 1;
       assemble_start_function (thunk_fndecl, fnname);
-      ASM_OUTPUT_MI_THUNK (asm_out_file, thunk_fndecl, delta, function);
+      if (targetm.asm_out.output_mi_vcall_thunk)
+	{
+	  HOST_WIDE_INT vcall_value;
+
+	  if (vcall_offset)
+	    vcall_value = tree_low_cst (vcall_offset, /*pos=*/0);
+	  else
+	    vcall_value = 0;
+	  targetm.asm_out.output_mi_vcall_thunk (asm_out_file, 
+						 thunk_fndecl, delta, 
+						 vcall_value,
+						 function);
+	}
+      else
+	targetm.asm_out.output_mi_thunk (asm_out_file, thunk_fndecl, 
+					 delta, function);
       assemble_end_function (thunk_fndecl, fnname);
       current_function_decl = 0;
       cfun = 0;
       TREE_ASM_WRITTEN (thunk_fndecl) = 1;
     }
   else
-#endif /* ASM_OUTPUT_MI_THUNK */
     {
-      /* If we don't have the necessary macro for efficient thunks, generate
-	 a thunk function that just makes a call to the real function.
-	 Unfortunately, this doesn't work for varargs.  */
+      /* If we don't have the necessary code for efficient thunks,
+	 generate a thunk function that just makes a call to the real
+	 function.  Unfortunately, this doesn't work for varargs.  */
 
       tree a, t;
 
@@ -536,7 +551,6 @@ do_build_copy_constructor (fndecl)
       int n_bases = CLASSTYPE_N_BASECLASSES (current_class_type);
       tree binfos = TYPE_BINFO_BASETYPES (current_class_type);
       tree member_init_list = NULL_TREE;
-      tree base_init_list = NULL_TREE;
       int cvquals = cp_type_quals (TREE_TYPE (parm));
       int i;
 
@@ -550,10 +564,12 @@ do_build_copy_constructor (fndecl)
 	{
 	  tree binfo = TREE_VALUE (t);
 	  
-	  base_init_list = tree_cons (binfo,
-				      build_base_path (PLUS_EXPR, parm,
-						       binfo, 1),
-				      base_init_list);
+	  member_init_list 
+	    = tree_cons (binfo,
+			 build_tree_list (NULL_TREE,
+					  build_base_path (PLUS_EXPR, parm,
+							   binfo, 1)),
+			 member_init_list);
 	}
 
       for (i = 0; i < n_bases; ++i)
@@ -562,10 +578,12 @@ do_build_copy_constructor (fndecl)
 	  if (TREE_VIA_VIRTUAL (binfo))
 	    continue; 
 
-	  base_init_list = tree_cons (binfo,
-				      build_base_path (PLUS_EXPR, parm,
-						       binfo, 1),
-				      base_init_list);
+	  member_init_list 
+	    = tree_cons (binfo,
+			 build_tree_list (NULL_TREE,
+					  build_base_path (PLUS_EXPR, parm,
+							   binfo, 1)),
+			 member_init_list);
 	}
 
       for (; fields; fields = TREE_CHAIN (fields))
@@ -609,9 +627,7 @@ do_build_copy_constructor (fndecl)
 	  member_init_list
 	    = tree_cons (field, init, member_init_list);
 	}
-      member_init_list = nreverse (member_init_list);
-      base_init_list = nreverse (base_init_list);
-      emit_base_init (member_init_list, base_init_list);
+      finish_mem_initializers (member_init_list);
     }
 }
 
@@ -668,7 +684,7 @@ do_build_assign_ref (fndecl)
 	  tree comp, init, t;
 	  tree field = fields;
 
-	  if (TREE_CODE (field) != FIELD_DECL)
+	  if (TREE_CODE (field) != FIELD_DECL || DECL_ARTIFICIAL (field))
 	    continue;
 
 	  if (CP_TYPE_CONST_P (TREE_TYPE (field)))
@@ -704,7 +720,7 @@ do_build_assign_ref (fndecl)
 
 	  comp = build (COMPONENT_REF, TREE_TYPE (field), comp, field);
 	  init = build (COMPONENT_REF,
-	                build_qualified_type (TREE_TYPE (field), cvquals),
+	                cp_build_qualified_type (TREE_TYPE (field), cvquals),
 	                init, field);
 
 	  if (DECL_NAME (field))
@@ -749,7 +765,7 @@ synthesize_method (fndecl)
      during the generation of the implicit body points at the place
      where the attempt to generate the function occurs, giving the
      user a hint as to why we are attempting to generate the
-     function. */
+     function.  */
   DECL_SOURCE_LINE (fndecl) = lineno;
   DECL_SOURCE_FILE (fndecl) = input_filename;
 
@@ -824,7 +840,7 @@ synthesize_exception_spec (type, extractor, client)
       tree type = TREE_TYPE (fields);
       tree fn;
       
-      if (TREE_CODE (fields) != FIELD_DECL)
+      if (TREE_CODE (fields) != FIELD_DECL || DECL_ARTIFICIAL (fields))
         continue;
       while (TREE_CODE (type) == ARRAY_TYPE)
   	type = TREE_TYPE (type);

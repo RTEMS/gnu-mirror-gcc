@@ -57,6 +57,13 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #ifndef TARGET_ASM_GLOBALIZE_LABEL
 #define TARGET_ASM_GLOBALIZE_LABEL default_globalize_label
 #endif
+#ifndef TARGET_ASM_INTERNAL_LABEL
+#define TARGET_ASM_INTERNAL_LABEL default_internal_label
+#endif
+
+#ifndef TARGET_ASM_ASSEMBLE_VISIBILITY
+#define TARGET_ASM_ASSEMBLE_VISIBILITY default_assemble_visibility
+#endif
 
 #define TARGET_ASM_FUNCTION_PROLOGUE default_function_pro_epilogue
 #define TARGET_ASM_FUNCTION_EPILOGUE default_function_pro_epilogue
@@ -99,6 +106,14 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 # endif
 #endif
 
+#ifndef TARGET_ASM_OUTPUT_MI_THUNK
+#define TARGET_ASM_OUTPUT_MI_THUNK NULL
+#endif
+
+#ifndef TARGET_ASM_OUTPUT_MI_VCALL_THUNK
+#define TARGET_ASM_OUTPUT_MI_VCALL_THUNK NULL
+#endif
+
 #if defined(TARGET_ASM_CONSTRUCTOR) && defined(TARGET_ASM_DESTRUCTOR)
 #define TARGET_HAVE_CTORS_DTORS true
 #else
@@ -116,6 +131,18 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #ifndef TARGET_HAVE_TLS
 #define TARGET_HAVE_TLS false
+#endif
+
+#ifndef TARGET_HAVE_SRODATA_SECTION
+#define TARGET_HAVE_SRODATA_SECTION false
+#endif
+
+#ifndef TARGET_TERMINATE_DW2_EH_FRAME_INFO
+#ifdef EH_FRAME_SECTION_NAME
+#define TARGET_TERMINATE_DW2_EH_FRAME_INFO false
+#else
+#define TARGET_TERMINATE_DW2_EH_FRAME_INFO true
+#endif
 #endif
 
 #ifndef TARGET_ASM_EXCEPTION_SECTION
@@ -145,6 +172,8 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 			TARGET_ASM_UNALIGNED_INT_OP,		\
 			TARGET_ASM_INTEGER,			\
 			TARGET_ASM_GLOBALIZE_LABEL,		\
+			TARGET_ASM_INTERNAL_LABEL,		\
+			TARGET_ASM_ASSEMBLE_VISIBILITY,		\
 			TARGET_ASM_FUNCTION_PROLOGUE,		\
 			TARGET_ASM_FUNCTION_END_PROLOGUE,	\
 			TARGET_ASM_FUNCTION_BEGIN_EPILOGUE,	\
@@ -156,7 +185,9 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 			TARGET_ASM_SELECT_RTX_SECTION,		\
 			TARGET_ASM_UNIQUE_SECTION,		\
 			TARGET_ASM_CONSTRUCTOR,			\
-			TARGET_ASM_DESTRUCTOR}
+			TARGET_ASM_DESTRUCTOR,                  \
+                        TARGET_ASM_OUTPUT_MI_THUNK,             \
+                        TARGET_ASM_OUTPUT_MI_VCALL_THUNK }
 
 /* Scheduler hooks.  All of these default to null pointers, which
    haifa-sched.c looks for and handles.  */
@@ -222,9 +253,17 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #define TARGET_BINDS_LOCAL_P default_binds_local_p
 #endif
 
+#ifndef TARGET_VALID_POINTER_MODE
+#define TARGET_VALID_POINTER_MODE default_valid_pointer_mode
+#endif
+
 /* In hook.c.  */
 #define TARGET_CANNOT_MODIFY_JUMPS_P hook_void_bool_false
+#define TARGET_FUNCTION_OK_FOR_SIBCALL hook_tree_tree_bool_false
+
+#ifndef TARGET_IN_SMALL_DATA_P
 #define TARGET_IN_SMALL_DATA_P hook_tree_bool_false
+#endif
 
 #ifndef TARGET_ENCODE_SECTION_INFO
 #define TARGET_ENCODE_SECTION_INFO hook_tree_int_void
@@ -247,13 +286,17 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
   TARGET_EXPAND_BUILTIN,			\
   TARGET_SECTION_TYPE_FLAGS,			\
   TARGET_CANNOT_MODIFY_JUMPS_P,			\
+  TARGET_FUNCTION_OK_FOR_SIBCALL,		\
   TARGET_IN_SMALL_DATA_P,			\
   TARGET_BINDS_LOCAL_P,				\
   TARGET_ENCODE_SECTION_INFO,			\
   TARGET_STRIP_NAME_ENCODING,			\
+  TARGET_VALID_POINTER_MODE,                    \
   TARGET_HAVE_NAMED_SECTIONS,			\
   TARGET_HAVE_CTORS_DTORS,			\
-  TARGET_HAVE_TLS				\
+  TARGET_HAVE_TLS,				\
+  TARGET_HAVE_SRODATA_SECTION,			\
+  TARGET_TERMINATE_DW2_EH_FRAME_INFO		\
 }
 
 #include "hooks.h"
