@@ -325,6 +325,12 @@ define this macro only if you need to completely redefine the command
 line for invoking the linker and there is no other way to accomplish
 the effect you need.
 
+@findex LINK_ELIMINATE_DUPLICATE_LDIRECTORIES
+@item LINK_ELIMINATE_DUPLICATE_LDIRECTORIES
+A nonzero value causes collect2 to remove duplicate -L<directory> search
+directories from linking commands.  Do not give it a nonzero value if
+removing duplicate search directories changes the linker's semantics.
+
 @findex MULTILIB_DEFAULTS
 @item MULTILIB_DEFAULTS
 Define this macro as a C expression for the initializer of an array of
@@ -4351,12 +4357,13 @@ macro, a reasonable default is used.
 @findex TARGET_MEM_FUNCTIONS
 @cindex @code{bcopy}, implicit usage
 @cindex @code{memcpy}, implicit usage
+@cindex @code{memmove}, implicit usage
 @cindex @code{bzero}, implicit usage
 @cindex @code{memset}, implicit usage
 @item TARGET_MEM_FUNCTIONS
 Define this macro if GCC should generate calls to the ISO C
-(and System V) library functions @code{memcpy} and @code{memset}
-rather than the BSD functions @code{bcopy} and @code{bzero}.
+(and System V) library functions @code{memcpy}, @code{memmove} and
+@code{memset} rather than the BSD functions @code{bcopy} and @code{bzero}.
 
 @findex LIBGCC_NEEDS_DOUBLE
 @item LIBGCC_NEEDS_DOUBLE
@@ -5483,22 +5490,6 @@ definition.
 
 On systems that use SDB, it is necessary to output certain commands;
 see @file{attasm.h}.
-
-@findex ASM_IDENTIFY_GCC
-@item ASM_IDENTIFY_GCC (@var{file})
-A C statement to output assembler commands which will identify
-the object file as having been compiled with GCC (or another
-GNU compiler).
-
-If you don't define this macro, the string @samp{gcc_compiled.:}
-is output.  This string is calculated to define a symbol which,
-on BSD systems, will never be defined for any other reason.
-GDB checks for the presence of this symbol when reading the
-symbol table of an executable.
-
-On non-BSD systems, you must arrange communication with GDB in
-some other fashion.  If GDB is not used on your system, you can
-define this macro with an empty body.
 
 @findex ASM_COMMENT_START
 @item ASM_COMMENT_START

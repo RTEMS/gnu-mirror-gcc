@@ -51,6 +51,11 @@ Boston, MA 02111-1307, USA.  */
   fprintf (FILE,							\
 	   "\t.stabs \"\",%d,0,0,L$text_end0000\nL$text_end0000:\n", N_SO)
 
+/* The HP supplied NM will print out the subspace names for each symbol it
+   finds, which can cause false matches when looking for ctors/dtors.  The
+   "-p" argument changes the output to not include subspace names.  */
+#define NM_FLAGS "-p -n"
+
 /* HPUX has a program 'chatr' to list the dependencies of dynamically
    linked executables and shared libraries.  */
 #define LDD_SUFFIX "chatr"
@@ -127,7 +132,7 @@ do {								\
       fputs ("\t.NSUBSPA $CODE$,QUAD=0,ALIGN=8,ACCESS=44,CODE_ONLY\n", FILE); \
     else if (TARGET_GAS)						\
       fprintf (FILE,							\
-	       "\t.SUBSPA .%s\n", name);				\
+	       "\t.SUBSPA .%.30s\n", name);				\
   }
     
 #define ASM_DECLARE_FUNCTION_NAME(FILE, NAME, DECL) \
@@ -270,23 +275,24 @@ do {  \
   if (DECL && TREE_CODE (DECL) == FUNCTION_DECL)		\
     {								\
       fputs ("\t.SPACE $TEXT$\n", FILE);			\
-      fprintf (FILE,						\
-	       "\t.SUBSPA %s%s%s,QUAD=0,ALIGN=8,ACCESS=44,CODE_ONLY,SORT=24\n",\
-	       TARGET_GAS ? "" : "$", NAME, TARGET_GAS ? "" : "$"); \
+      if (TARGET_GAS)						\
+	fprintf (FILE,						\
+	       "\t.NSUBSPA %.31s,QUAD=0,ALIGN=8,ACCESS=44,CODE_ONLY,SORT=24\n", NAME);\
+      else							\
+	fprintf (FILE,						\
+	       "\t.NSUBSPA $%.29s$,QUAD=0,ALIGN=8,ACCESS=44,CODE_ONLY,SORT=24\n", NAME);\
     }								\
-  else if (DECL && DECL_READONLY_SECTION (DECL, RELOC))		\
+  else if (!RELOC && DECL && DECL_READONLY_SECTION (DECL, RELOC))\
     {								\
       fputs ("\t.SPACE $TEXT$\n", FILE);			\
       fprintf (FILE,						\
-	       "\t.SUBSPA %s%s%s,QUAD=0,ALIGN=8,ACCESS=44,SORT=16\n", \
-	       TARGET_GAS ? "" : "$", NAME, TARGET_GAS ? "" : "$"); \
+	       "\t.NSUBSPA $LIT$,QUAD=0,ALIGN=8,ACCESS=44,SORT=16\n");\
     }								\
   else								\
     {								\
       fputs ("\t.SPACE $PRIVATE$\n", FILE);			\
       fprintf (FILE,						\
-	       "\t.SUBSPA %s%s%s,QUAD=1,ALIGN=8,ACCESS=31,SORT=16\n", \
-	       TARGET_GAS ? "" : "$", NAME, TARGET_GAS ? "" : "$"); \
+	       "\t.NSUBSPA $DATA$,QUAD=1,ALIGN=8,ACCESS=31,SORT=16\n");\
     }
 
 /* FIXME: HPUX ld generates incorrect GOT entries for "T" fixups
@@ -378,6 +384,12 @@ do {						\
 /* The .align directive in the HP assembler allows up to a 32 alignment.  */
 #define MAX_OFILE_ALIGNMENT 32768
 
+/* This has been disabled for now.  As best as I call tell we are not
+   following the proper conventions for secondary definitions as we
+   do not emit a duplicate symbol with '_' prefix for each secondary
+   definition.  This appears to be the cause of HP's tools core
+   dumping and the dynamic linker reporting undefined symbols.  */
+#if 0
 #ifdef HAVE_GAS_WEAK
 #define MAKE_DECL_ONE_ONLY(DECL) (DECL_WEAK (DECL) = 1)
 
@@ -395,3 +407,9 @@ do {						\
          } \
   } while (0)
 #endif
+#endif
+
+/* SOM does not support the init_priority C++ attribute.  */
+#undef SUPPORTS_INIT_PRIORITY
+#define SUPPORTS_INIT_PRIORITY 0
+

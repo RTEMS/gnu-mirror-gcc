@@ -351,9 +351,6 @@ read_token (t)
       t->yychar = STRING;
       break;
 
-      /* This token should not be generated in C++ mode.  */
-    case CPP_OSTRING:
-
       /* These tokens should not survive translation phase 4.  */
     case CPP_HASH:
     case CPP_PASTE:
@@ -704,12 +701,7 @@ see_typename ()
   if (yychar == IDENTIFIER)
     {
       lastiddecl = lookup_name (yylval.ttype, -2);
-      if (lastiddecl == 0)
-	{
-	  if (flag_labels_ok)
-	    lastiddecl = IDENTIFIER_LABEL_VALUE (yylval.ttype);
-	}
-      else
+      if (lastiddecl)
 	yychar = identifier_type (lastiddecl);
     }
 }
@@ -719,6 +711,8 @@ yylex ()
 {
   int yychr;
   int old_looking_for_typename = 0;
+  int just_saw_new = 0;
+  int just_saw_friend = 0;
 
   timevar_push (TV_LEX);
 
@@ -804,13 +798,13 @@ yylex ()
 	}
       /* do_aggr needs to know if the previous token was `friend'.  */
       else if (nth_token (0)->yylval.ttype == ridpointers[RID_FRIEND])
-	after_friend = 1;
+	just_saw_friend = 1;
 
       break;
 
     case NEW:
       /* do_aggr needs to know if the previous token was `new'.  */
-      after_new = 1;
+      just_saw_new = 1;
       break;
 
     case TYPESPEC:
@@ -824,7 +818,6 @@ yylex ()
 
     case AGGR:
       do_aggr ();
-      after_friend = after_new = 0;
       break;
 
     case ENUM:
@@ -835,6 +828,9 @@ yylex ()
     default:
       break;
     }
+
+  after_friend = just_saw_friend;
+  after_new = just_saw_new;
 
   /* class member lookup only applies to the first token after the object
      expression, except for explicit destructor calls.  */
@@ -1495,8 +1491,7 @@ yyerror (msgid)
 	error ("%s before %s'\\x%x'", string, ell, val);
     }
   else if (last_token == CPP_STRING
-	   || last_token == CPP_WSTRING
-	   || last_token == CPP_OSTRING)
+	   || last_token == CPP_WSTRING)
     error ("%s before string constant", string);
   else if (last_token == CPP_NUMBER
 	   || last_token == CPP_INT

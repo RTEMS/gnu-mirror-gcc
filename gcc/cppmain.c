@@ -271,9 +271,6 @@ printer_init (pfile)
   print.lineno = 0;
   print.printed = 0;
 
-  if (options->out_fname == NULL)
-    options->out_fname = "";
-  
   if (options->out_fname[0] == '\0')
     print.outf = stdout;
   else
@@ -350,7 +347,7 @@ cb_ident (pfile, str)
      const cpp_string * str;
 {
   maybe_print_line (cpp_get_line (pfile)->output_line);
-  fprintf (print.outf, "#ident \"%.*s\"\n", (int) str->len, str->text);
+  fprintf (print.outf, "#ident \"%s\"\n", str->text);
   print.lineno++;
 }
 

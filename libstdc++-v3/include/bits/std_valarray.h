@@ -32,6 +32,8 @@
 #ifndef _CPP_VALARRAY
 #define _CPP_VALARRAY 1
 
+#pragma GCC system_header
+
 #include <bits/c++config.h>
 #include <bits/std_cstddef.h>
 #include <bits/std_cmath.h>
@@ -239,7 +241,7 @@ namespace std {
   { return _M_data[__i]; }
 
   template<typename _Tp>
-  _Tp&
+  inline _Tp&
   valarray<_Tp>::operator[] (size_t __i)
   { return _M_data[__i]; }
 
