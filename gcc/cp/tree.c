@@ -35,6 +35,16 @@ Boston, MA 02111-1307, USA.  */
 #include "tree-inline.h"
 #include "target.h"
 
+/* APPLE LOCAL begin new tree dump */
+#ifdef ENABLE_DMP_TREE
+#include "dmp-tree.h"
+extern int cp_dump_tree_p PARAMS ((FILE *, const char *, tree, int));
+extern lang_dump_tree_p_t cp_prev_lang_dump_tree_p;
+extern int c_dump_tree_p PARAMS ((FILE *, const char *, tree, int));
+extern lang_dump_tree_p_t c_prev_lang_dump_tree_p;
+#endif
+/* APPLE LOCAL end new tree dump */
+
 static tree bot_manip (tree *, int *, void *);
 static tree bot_replace (tree *, int *, void *);
 static tree build_cplus_array_type_1 (tree, tree);

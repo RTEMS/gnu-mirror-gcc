@@ -180,6 +180,9 @@ struct tree_common GTY(())
   unsigned lang_flag_5 : 1;
   unsigned lang_flag_6 : 1;
   unsigned visited : 1;
+
+  /* APPLE LOCAL unavailable (Radar 2809697) ilr */
+  unsigned unavailable_flag : 1;
 };
 
 /* The following table lists the uses of each of the above flags and
@@ -270,6 +273,9 @@ struct tree_common GTY(())
            INTEGER_TYPE, ENUMERAL_TYPE, FIELD_DECL
        SAVE_EXPR_NOPLACEHOLDER in
 	   SAVE_EXPR
+       APPLE LOCAL weak import
+       IDENTIFIER_WEAK_IMPORT in
+	   IDENTIFIER
 
    asm_written_flag:
 
@@ -294,6 +300,13 @@ struct tree_common GTY(())
 
 	TREE_DEPRECATED in
 	   ..._DECL
+
+   APPLE LOCAL begin unavailable (Radar 2809697) ilr
+   unavailable_flag:
+
+	TREE_UNAVAILABLE in
+	   ..._DECL
+   APPLE LOCAL end unavailable ilr
 
    visited:
 
@@ -754,6 +767,12 @@ extern void tree_operand_check_failed (int, enum tree_code,
    deprecated feature by __attribute__((deprecated)).  */
 #define TREE_DEPRECATED(NODE) ((NODE)->common.deprecated_flag)
 
+/* APPLE LOCAL begin unavailable (Radar 2809697) ilr */
+/* Nonzero in a IDENTIFIER_NODE if the use of the name is defined as a
+   unavailable feature by __attribute__((unavailable)).  */
+#define TREE_UNAVAILABLE(NODE) ((NODE)->common.unavailable_flag)
+/* APPLE LOCAL end unavailable ilr */
+
 /* Value of expression is function invariant.  A strict subset of
    TREE_CONSTANT, such an expression is constant over any one function
    invocation, though not across different invocations.  May appear in
@@ -1100,8 +1119,8 @@ struct tree_phi_node GTY(())
 
   /* Nonzero if the PHI node was rewritten by a previous pass through the
      SSA renamer.  */
-  int rewritten;
-
+  unsigned int rewritten:1;
+  
   struct phi_arg_d GTY ((length ("((tree)&%h)->phi.capacity"))) a[1];
 };
 
@@ -2000,6 +2019,21 @@ struct tree_type GTY(())
 /* Used to indicate that this DECL has weak linkage.  */
 #define DECL_WEAK(NODE) (DECL_CHECK (NODE)->decl.weak_flag)
 
+/* APPLE LOCAL begin weak_import (Radar 2809704) ilr */
+/* Used to indicate that this DECL has weak-import linkage.  */
+#define DECL_WEAK_IMPORT(NODE) (DECL_CHECK (NODE)->decl.weak_import_flag)
+/* The same information in IDENTIFIERs.  */
+#define IDENTIFIER_WEAK_IMPORT(NODE) (IDENTIFIER_NODE_CHECK (NODE)->common.unsigned_flag)
+/* APPLE LOCAL end weak_import (Radar 2809704) ilr */
+
+/* APPLE LOCAL coalescing  */
+/* "coalesced" symbols are similar to, but have more restrictions than,
+   ELF-style "weak" symbols.  */
+#define DECL_COALESCED(NODE) (DECL_CHECK (NODE)->decl.coalesced_flag)
+
+/* APPLE LOCAL handling duplicate decls across files */
+#define DECL_DUPLICATE_DECL(NODE) (DECL_CHECK (NODE)->decl.duplicate_decl)
+
 /* Used in TREE_PUBLIC decls to indicate that copies of this DECL in
    multiple translation units should be merged.  */
 #define DECL_ONE_ONLY(NODE) (DECL_CHECK (NODE)->decl.transparent_union)
@@ -2063,6 +2097,15 @@ struct tree_type GTY(())
 /* Nonzero if an alias set has been assigned to this declaration.  */
 #define DECL_POINTER_ALIAS_SET_KNOWN_P(NODE) \
   (DECL_POINTER_ALIAS_SET (NODE) != - 1)
+
+/* APPLE LOCAL begin */
+/* In a FUNCTION_DECL for which DECL_BUILT_IN does not hold, this is
+   the approximate number of statements in this function.  There is
+   no need for this number to be exact; it is only used in various
+   heuristics regarding optimization.  */
+#define DECL_ESTIMATED_INSNS(NODE) \
+  (FUNCTION_DECL_CHECK (NODE)->decl.u1.i)
+/* APPLE LOCAL end */
 
 /* Nonzero for a decl which is at file scope.  */
 #define DECL_FILE_SCOPE_P(EXP) 					\
@@ -2142,7 +2185,14 @@ struct tree_decl GTY(())
   unsigned lang_flag_7 : 1;
 
   unsigned needs_to_live_in_memory : 1;
-  /* 15 unused bits.  */
+  /* APPLE LOCAL weak_import (Radar 2809704) ilr */
+  unsigned weak_import_flag : 1;
+  /* APPLE LOCAL coalescing  */
+  unsigned coalesced_flag : 1;
+  /* APPLE LOCAL duplicate decls in different files */
+  unsigned duplicate_decl : 1;
+  /* APPLE LOCAL unused bits */
+  /* 12 unused bits.  */
 
   union tree_decl_u1 {
     /* In a FUNCTION_DECL for which DECL_BUILT_IN holds, this is
@@ -2336,33 +2386,6 @@ enum tree_index
 
   TI_VOID_LIST_NODE,
 
-  TI_UV4SF_TYPE,
-  TI_UV4SI_TYPE,
-  TI_UV8HI_TYPE,
-  TI_UV8QI_TYPE,
-  TI_UV4HI_TYPE,
-  TI_UV2HI_TYPE,
-  TI_UV2SI_TYPE,
-  TI_UV2SF_TYPE,
-  TI_UV2DI_TYPE,
-  TI_UV1DI_TYPE,
-  TI_UV16QI_TYPE,
-
-  TI_V4SF_TYPE,
-  TI_V16SF_TYPE,
-  TI_V4SI_TYPE,
-  TI_V8HI_TYPE,
-  TI_V8QI_TYPE,
-  TI_V4HI_TYPE,
-  TI_V2HI_TYPE,
-  TI_V2SI_TYPE,
-  TI_V2SF_TYPE,
-  TI_V2DF_TYPE,
-  TI_V2DI_TYPE,
-  TI_V1DI_TYPE,
-  TI_V16QI_TYPE,
-  TI_V4DF_TYPE,
-
   TI_MAIN_IDENTIFIER,
 
   TI_MAX
@@ -2437,31 +2460,6 @@ extern GTY(()) tree global_trees[TI_MAX];
 
 #define main_identifier_node		global_trees[TI_MAIN_IDENTIFIER]
 #define MAIN_NAME_P(NODE) (IDENTIFIER_NODE_CHECK (NODE) == main_identifier_node)
-
-#define unsigned_V16QI_type_node	global_trees[TI_UV16QI_TYPE]
-#define unsigned_V4SI_type_node		global_trees[TI_UV4SI_TYPE]
-#define unsigned_V8QI_type_node		global_trees[TI_UV8QI_TYPE]
-#define unsigned_V8HI_type_node		global_trees[TI_UV8HI_TYPE]
-#define unsigned_V4HI_type_node		global_trees[TI_UV4HI_TYPE]
-#define unsigned_V2HI_type_node		global_trees[TI_UV2HI_TYPE]
-#define unsigned_V2SI_type_node		global_trees[TI_UV2SI_TYPE]
-#define unsigned_V2DI_type_node		global_trees[TI_UV2DI_TYPE]
-#define unsigned_V1DI_type_node		global_trees[TI_UV1DI_TYPE]
-
-#define V16QI_type_node			global_trees[TI_V16QI_TYPE]
-#define V4SF_type_node			global_trees[TI_V4SF_TYPE]
-#define V4SI_type_node			global_trees[TI_V4SI_TYPE]
-#define V8QI_type_node			global_trees[TI_V8QI_TYPE]
-#define V8HI_type_node			global_trees[TI_V8HI_TYPE]
-#define V4HI_type_node			global_trees[TI_V4HI_TYPE]
-#define V2HI_type_node			global_trees[TI_V2HI_TYPE]
-#define V2SI_type_node			global_trees[TI_V2SI_TYPE]
-#define V2SF_type_node			global_trees[TI_V2SF_TYPE]
-#define V2DI_type_node			global_trees[TI_V2DI_TYPE]
-#define V2DF_type_node			global_trees[TI_V2DF_TYPE]
-#define V16SF_type_node			global_trees[TI_V16SF_TYPE]
-#define V1DI_type_node			global_trees[TI_V1DI_TYPE]
-#define V4DF_type_node			global_trees[TI_V4DF_TYPE]
 
 /* An enumeration of the standard C integer types.  These must be
    ordered so that shorter types appear before longer ones, and so
@@ -2671,6 +2669,8 @@ extern tree build_pointer_type_for_mode (tree, enum machine_mode);
 extern tree build_pointer_type (tree);
 extern tree build_reference_type_for_mode (tree, enum machine_mode);
 extern tree build_reference_type (tree);
+extern tree build_vector_type_for_mode (tree, enum machine_mode);
+extern tree build_vector_type (tree innertype, int nunits);
 extern tree build_type_no_quals (tree);
 extern tree build_index_type (tree);
 extern tree build_index_2_type (tree, tree);
@@ -2681,7 +2681,9 @@ extern tree build_method_type_directly (tree, tree, tree);
 extern tree build_method_type (tree, tree);
 extern tree build_offset_type (tree, tree);
 extern tree build_complex_type (tree);
+extern tree build_vector_type (tree, int);
 extern tree array_type_nelts (tree);
+extern bool in_array_bounds_p (tree, tree);
 
 extern tree value_member (tree, tree);
 extern tree purpose_member (tree, tree);
@@ -2783,6 +2785,10 @@ enum attribute_flags
      name indicates known behavior, and should be silently ignored if they
      are not in fact compatible with the function type.  */
   ATTR_FLAG_BUILT_IN = 16
+  /* APPLE LOCAL begin weak_import (Radar 2809704) ilr */
+  /* The attributes are being applied to a function definition.  */
+  ,ATTR_FLAG_FUNCTION_DEF = 16
+  /* APPLE LOCAL end weak_import ilr */
 };
 
 /* Default versions of target-overridable functions.  */
@@ -3367,6 +3373,8 @@ extern tree nondestructive_fold_unary_to_constant (enum tree_code, tree, tree);
 extern tree nondestructive_fold_binary_to_constant (enum tree_code, tree, tree, tree);
 extern tree fold_read_from_constant_string (tree);
 extern tree int_const_binop (enum tree_code, tree, tree, int);
+extern enum tree_code invert_tree_comparison (enum tree_code);
+extern enum tree_code swap_tree_comparison (enum tree_code);
 
 /* In builtins.c */
 extern tree fold_builtin (tree);
