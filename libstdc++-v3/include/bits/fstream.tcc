@@ -1,6 +1,6 @@
 // File based streams -*- C++ -*-
 
-// Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002
+// Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003
 // Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
@@ -103,7 +103,11 @@ namespace std
 	      
 	      if ((__mode & ios_base::ate)
 		  && this->seekoff(0, ios_base::end, __mode) < 0)
-		this->close();
+		{
+		  // 27.8.1.3,4
+		  this->close();
+		  return __ret;
+		}
 
 	      __ret = this;
 	    }
@@ -208,21 +212,26 @@ namespace std
 	    }
 	  else
 	    {	 
- 	      // At the beginning of the buffer, need to make a
-	      // putback position available.
-	      this->seekoff(-1, ios_base::cur);
-	      this->underflow();
- 	      if (!__testeof)
+   	      // At the beginning of the buffer, need to make a
+  	      // putback position available.
+ 	      // But the seek may fail (f.i., at the beginning of
+ 	      // a file, see libstdc++/9439) and in that case
+ 	      // we return traits_type::eof()
+ 	      if (this->seekoff(-1, ios_base::cur) >= 0)
  		{
-		  if (!traits_type::eq(__c, *_M_in_cur))
-		    {
-		      _M_pback_create();
-		      *_M_in_cur = __c;
-		    }
- 		  __ret = __i;
+ 		  this->underflow();
+ 		  if (!__testeof)
+  		    {
+ 		      if (!traits_type::eq(__c, *_M_in_cur))
+ 			{
+ 			  _M_pback_create();
+ 			  *_M_in_cur = __c;
+ 			}
+ 		      __ret = __i;
+  		    }
+ 		  else
+ 		    __ret = traits_type::not_eof(__i);
  		}
- 	      else
- 		__ret = traits_type::not_eof(__i);
  	    }
 	}
       _M_last_overflowed = false;	
@@ -280,9 +289,15 @@ namespace std
 	  const char_type* __iend;
 	  __res_type __r = __cvt.out(_M_state_cur, __ibuf, __ibuf + __ilen, 
 		 		     __iend, __buf, __buf + __blen, __bend);
-	  // Result == ok, partial, noconv
-	  if (__r != codecvt_base::error)
+
+	  if (__r == codecvt_base::ok || __r == codecvt_base::partial)
 	    __blen = __bend - __buf;
+	  // Similarly to the always_noconv case above.
+	  else if (__r == codecvt_base::noconv)
+	    {
+	      __buf = reinterpret_cast<char*>(__ibuf);
+	      __blen = __ilen;
+	    }
 	  // Result == error
 	  else 
 	    __blen = 0;
@@ -430,7 +445,8 @@ namespace std
 	      //in
 	      else if (__testget && __way == ios_base::cur)
 		__computed_off += _M_in_cur - _M_filepos;
-	  
+
+	      // Return pos_type(off_type(-1)) in case of failure.	  
 	      __ret = _M_file.seekoff(__computed_off, __way, __mode);
 	      _M_set_indeterminate();
 	    }
@@ -438,8 +454,14 @@ namespace std
 	  // state, ie _M_file._offset == -1
 	  else
 	    {
-	      __ret = _M_file.seekoff(__off, ios_base::cur, __mode);
-	      __ret += max(_M_out_cur, _M_in_cur) - _M_filepos;
+ 	      pos_type __tmp =
+ 		_M_file.seekoff(__off, ios_base::cur, __mode);
+ 	      if (__tmp >= 0)
+		{
+		  // Seek successful.
+		  __ret = __tmp;
+		  __ret += max(_M_out_cur, _M_in_cur) - _M_filepos;
+		}
 	    }
 	}
       _M_last_overflowed = false;	
@@ -471,10 +493,7 @@ namespace std
       bool __testbeg = gptr() == eback() && pptr() == pbase();
 
       if (__testbeg && _M_buf_locale != __loc)
-	{
-	  _M_buf_locale = __loc;
-	  _M_buf_locale_init = true;
-	}
+	_M_buf_locale = __loc;
 
       // NB this may require the reconversion of previously
       // converted chars. This in turn may cause the reconstruction
@@ -486,6 +505,7 @@ namespace std
   // Inhibit implicit instantiations for required instantiations,
   // which are defined via explicit instantiations elsewhere.  
   // NB:  This syntax is a GNU extension.
+#if _GLIBCPP_EXTERN_TEMPLATE
   extern template class basic_filebuf<char>;
   extern template class basic_ifstream<char>;
   extern template class basic_ofstream<char>;
@@ -496,6 +516,7 @@ namespace std
   extern template class basic_ifstream<wchar_t>;
   extern template class basic_ofstream<wchar_t>;
   extern template class basic_fstream<wchar_t>;
+#endif
 #endif
 } // namespace std
 

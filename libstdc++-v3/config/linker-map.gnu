@@ -1,6 +1,6 @@
 ## Linker script for GNU ld 2.11.94+ only.
 ##
-## Copyright (C) 2002 Free Software Foundation, Inc.
+## Copyright (C) 2002, 2003 Free Software Foundation, Inc.
 ##
 ## This file is part of the libstdc++ version 3 distribution.
 ##
@@ -50,24 +50,73 @@ GLIBCPP_3.2 {
       std::[A-Zd-k]*;
       std::length_error*;
       std::logic_error*;
-      std::locale::[A-Za-z]*;
+      std::locale::[A-Za-e]*;
+      std::locale::facet::[A-Za-z]*;
+      std::locale::facet::_M*;
+      std::locale::facet::_S_c_locale;
+      std::locale::facet::_S_clone_c_locale*;
+      std::locale::facet::_S_create_c_locale*;
+      std::locale::facet::_S_destroy_c_locale*;
+      std::locale::[A-Zg-z]*;
       std::locale::_[A-Ra-z]*;
       std::locale::_S_classic;
       std::locale::_S_global;
       std::locale::_S_num_categories;
       std::locale::_S_normalize_category*;
       std::locale::_[T-Za-z]*;
-      std::[A-Zm-z]*;
+      std::[A-Zm]*;
+      std::n[a-t]*;
+      std::num_put_[cw];
+      std::numeric*;
+      std::numpunct*;
+      std::num_get*;
+      std::num_get_[cw];
+      std::n[v-z]*;
+      std::ostrstream*;
+      std::overflow_error*;
+      std::out_of_range*;
+      std::[A-Zp-z]*;
       std::__throw_*;
       std::__basic_file*;
-      std::__num_base*;
-      std::__timepunct*;
       std::__numeric_limits_base*;
+      std::__timepunct*;
       std::_S_bit_count;
       std::_S_first_one
     };
 
+     _ZNSo*;
+   
     # Names not in an 'extern' block are mangled names.
+    _ZNSt7num_putIcSt19ostreambuf_iteratorIcSt11char_traitsIcEEEC*;
+    _ZNSt7num_putIcSt19ostreambuf_iteratorIcSt11char_traitsIcEEED*;
+    _ZNSt7num_putIwSt19ostreambuf_iteratorIwSt11char_traitsIwEEEC*;
+    _ZNSt7num_putIwSt19ostreambuf_iteratorIwSt11char_traitsIwEEED*;
+
+    _ZNKSt7num_putI[cw]St19ostreambuf_iteratorI[cw]St11char_traitsI[cw]EEE6do_put*;
+
+    _ZNKSt7num_putI[cw]St19ostreambuf_iteratorI[cw]St11char_traitsI[cw]EEE3put*;
+    _ZNSt7num_putI[cw]St19ostreambuf_iteratorI[cw]St11char_traitsI[cw]EEE2idE;
+
+    _ZNKSt7num_putIcSt19ostreambuf_iteratorIcSt11char_traitsIcEEE14_M_convert_intI[lmxy]EES3_S3_RSt8ios_basecccT_;
+
+    _ZNKSt7num_putIwSt19ostreambuf_iteratorIwSt11char_traitsIwEEE14_M_convert_intI[lmxy]EES3_S3_RSt8ios_basewccT_;
+
+    _ZNKSt7num_putIcSt19ostreambuf_iteratorIcSt11char_traitsIcEEE16_M_convert_floatI[de]EES3_S3_RSt8ios_baseccT_;
+
+    _ZNKSt7num_putIwSt19ostreambuf_iteratorIwSt11char_traitsIwEEE16_M_convert_floatI[de]EES3_S3_RSt8ios_basewcT_;
+
+    _ZNKSt7num_putI[cw]St19ostreambuf_iteratorI[cw]St11char_traitsI[cw]EEE12_M_widen_int*;
+
+    _ZNKSt7num_putI[cw]St19ostreambuf_iteratorI[cw]St11char_traitsI[cw]EEE14_M_widen_float*;
+
+    _ZNKSt7num_putI[cw]St19ostreambuf_iteratorI[cw]St11char_traitsI[cw]EEE9_M_insert*;
+
+    _ZSt9use_facetISt7num_putI[cw]St19ostreambuf_iteratorI[cw]St11char_traitsI[cw]EEEERKT_RKSt6locale;
+
+    # __num_base
+    _ZNSt10__num_base13_S_format_intERKSt8ios_basePccc;
+    _ZNSt10__num_base15_S_format_floatERKSt8ios_basePcci;
+    _ZNSt10__num_base8_S_atomsE;
 
     # std::string minus binary operator plus
     _ZNKSs*;
@@ -99,6 +148,9 @@ GLIBCPP_3.2 {
 
     # std::locale destructors
     _ZNSt6localeD*;
+	
+    # std::locale::facet destructors
+    _ZNSt6locale5facetD*;
 	 
     # std::codecvt<char> members.
     _ZNKSt7codecvtIcc11__mbstate_tE*;
@@ -204,8 +256,6 @@ GLIBCPP_3.2.1 {
   _ZStplIcSt11char_traitsIcESaIcEESbIT_T0_T1_ERKS6_S8_;
   _ZStplIwSt11char_traitsIwESaIwEESbIT_T0_T1_ERKS6_S8_;
 
-  _ZNSt24__default_alloc_templateILb1ELi0EE12_S_force_newE;
-
   # stub functions from libmath
   sinf;
   sinl;
@@ -242,6 +292,38 @@ GLIBCPP_3.2.1 {
 
 } GLIBCPP_3.2;
 
+GLIBCPP_3.2.2 {
+
+  _ZNSt24__default_alloc_templateILb1ELi0EE12_S_force_newE;
+
+} GLIBCPP_3.2.1;
+
+GLIBCPP_3.2.3 {
+
+  global:
+
+    extern "C++"
+    {
+      # Needed only when generic cpu's atomicity.h is in use.
+      __gnu_cxx::_Atomic_add_mutex;
+      __gnu_cxx::_Atomic_add_mutex_once;
+      __gnu_cxx::__gthread_atomic_add_mutex_once;
+	
+      std::__num_base::_S_atoms_in;
+      std::__num_base::_S_atoms_out
+    };
+
+    _ZNKSt7num_putI[wc]St19ostreambuf_iteratorI[wc]St11char_traitsI[wc]EEE6_M_pad*;
+
+    _ZNKSt7num_putI[cw]St19ostreambuf_iteratorI[cw]St11char_traitsI[cw]EEE14_M_convert_intI[yxml]EES3_S3_RSt8ios_base[cw]T_;
+
+    _ZNKSt7num_putI[wc]St19ostreambuf_iteratorI[wc]St11char_traitsI[wc]EEE14_M_group_float*;
+
+  _ZNKSt7num_putI[wc]St19ostreambuf_iteratorI[wc]St11char_traitsI[wc]EEE12_M_group_int*;
+
+} GLIBCPP_3.2.2;
+
+
 # Symbols in the support library (libsupc++) have their own tag.
 CXXABI_1.2 {
 
@@ -253,24 +335,6 @@ CXXABI_1.2 {
     __cxa_call_unexpected;
     __cxa_current_exception_type;
     __cxa_demangle;
-    __cxa_dyn_string_append_char;
-    __cxa_dyn_string_append_cstr;
-    __cxa_dyn_string_append;
-    __cxa_dyn_string_clear;
-    __cxa_dyn_string_copy_cstr;
-    __cxa_dyn_string_copy;
-    __cxa_dyn_string_delete;
-    __cxa_dyn_string_eq;
-    __cxa_dyn_string_init;
-    __cxa_dyn_string_insert_char;
-    __cxa_dyn_string_insert_cstr;
-    __cxa_dyn_string_insert;
-    __cxa_dyn_string_new;
-    __cxa_dyn_string_prepend_cstr;
-    __cxa_dyn_string_prepend;
-    __cxa_dyn_string_release;
-    __cxa_dyn_string_resize;
-    __cxa_dyn_string_substring;
     __cxa_end_catch;
     __cxa_free_exception;
     __cxa_get_globals;
@@ -294,6 +358,26 @@ CXXABI_1.2 {
 
     # __gnu_cxx::_verbose_terminate_handler()
     _ZN9__gnu_cxx27__verbose_terminate_handlerEv;
+
+    # XXX Should not be exported.
+    __cxa_dyn_string_append_char;
+    __cxa_dyn_string_append_cstr;
+    __cxa_dyn_string_append;
+    __cxa_dyn_string_clear;
+    __cxa_dyn_string_copy_cstr;
+    __cxa_dyn_string_copy;
+    __cxa_dyn_string_delete;
+    __cxa_dyn_string_eq;
+    __cxa_dyn_string_init;
+    __cxa_dyn_string_insert_char;
+    __cxa_dyn_string_insert_cstr;
+    __cxa_dyn_string_insert;
+    __cxa_dyn_string_new;
+    __cxa_dyn_string_prepend_cstr;
+    __cxa_dyn_string_prepend;
+    __cxa_dyn_string_release;
+    __cxa_dyn_string_resize;
+    __cxa_dyn_string_substring;
 
   local:
     *;
