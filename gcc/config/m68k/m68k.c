@@ -29,7 +29,6 @@ Boston, MA 02111-1307, USA.  */
 #include "real.h"
 #include "insn-config.h"
 #include "conditions.h"
-#include "insn-flags.h"
 #include "output.h"
 #include "insn-attr.h"
 #include "recog.h"
@@ -3334,7 +3333,7 @@ const_uint32_operand (op, mode)
   return (GET_CODE (op) == CONST_INT
 	  && (INTVAL (op) >= 0 && INTVAL (op) <= 0xffffffffL));
 #else
-  return ((GET_CODE (op) == CONST_INT && INTVAL (op) >= 0)
+  return (GET_CODE (op) == CONST_INT
 	  || (GET_CODE (op) == CONST_DOUBLE && CONST_DOUBLE_HIGH (op) == 0));
 #endif
 }

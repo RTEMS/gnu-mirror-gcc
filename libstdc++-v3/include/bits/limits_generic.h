@@ -1,6 +1,6 @@
 // The template and inlines for the -*- C++ -*- numeric_limits classes.
 
-// Copyright (C) 2000 Free Software Foundation, Inc.
+// Copyright (C) 2000-2001 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -37,6 +37,8 @@
 
 #ifndef _CPP_NUMERIC_LIMITS
 #define _CPP_NUMERIC_LIMITS 1
+
+#pragma GCC system_header
 
 #include <bits/c++config.h>
 #include <bits/std_cfloat.h>
@@ -115,8 +117,8 @@ namespace std {
         static bool max() throw()
         { return true; }
 
-        static const int digits = 8;
-        static const int digits10 = 2;
+        static const int digits = 1;
+        static const int digits10 = 0;
         static const bool is_signed = false;
         static const bool is_integer = true;
         static const bool is_exact = true;
@@ -146,9 +148,9 @@ namespace std {
         static bool denorm_min() throw()
         { return static_cast<bool>(0); }
 
-        static const bool is_iec559 = true;
+        static const bool is_iec559 = false;
         static const bool is_bounded = true;
-        static const bool is_modulo = true;
+        static const bool is_modulo = false;
 
         static const bool traps = false;
         static const bool tinyness_before = false;

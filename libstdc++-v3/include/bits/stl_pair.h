@@ -1,3 +1,32 @@
+// Pair implementation -*- C++ -*-
+
+// Copyright (C) 2001 Free Software Foundation, Inc.
+//
+// This file is part of the GNU ISO C++ Library.  This library is free
+// software; you can redistribute it and/or modify it under the
+// terms of the GNU General Public License as published by the
+// Free Software Foundation; either version 2, or (at your option)
+// any later version.
+
+// This library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License along
+// with this library; see the file COPYING.  If not, write to the Free
+// Software Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307,
+// USA.
+
+// As a special exception, you may use this file as part of a free software
+// library without restriction.  Specifically, if other files instantiate
+// templates or use macros or inline functions from this file, or you compile
+// this file and link it with other files to produce an executable, this
+// file does not by itself cause the resulting executable to be covered by
+// the GNU General Public License.  This exception does not however
+// invalidate any other reasons why the executable file might be covered by
+// the GNU General Public License.
+
 /*
  *
  * Copyright (c) 1994
@@ -31,7 +60,8 @@
 #ifndef __SGI_STL_INTERNAL_PAIR_H
 #define __SGI_STL_INTERNAL_PAIR_H
 
-__STL_BEGIN_NAMESPACE
+namespace std
+{
 
 template <class _T1, class _T2>
 struct pair {
@@ -40,13 +70,16 @@ struct pair {
 
   _T1 first;
   _T2 second;
+#ifdef _GLIBCPP_RESOLVE_LIB_DEFECTS
+//265.  std::pair::pair() effects overly restrictive
+  pair() : first(), second() {}
+#else
   pair() : first(_T1()), second(_T2()) {}
+#endif
   pair(const _T1& __a, const _T2& __b) : first(__a), second(__b) {}
 
-#ifdef __STL_MEMBER_TEMPLATES
   template <class _U1, class _U2>
   pair(const pair<_U1, _U2>& __p) : first(__p.first), second(__p.second) {}
-#endif
 };
 
 template <class _T1, class _T2>
@@ -61,8 +94,6 @@ inline bool operator<(const pair<_T1, _T2>& __x, const pair<_T1, _T2>& __y)
   return __x.first < __y.first || 
          (!(__y.first < __x.first) && __x.second < __y.second); 
 }
-
-#ifdef __STL_FUNCTION_TMPL_PARTIAL_ORDER
 
 template <class _T1, class _T2>
 inline bool operator!=(const pair<_T1, _T2>& __x, const pair<_T1, _T2>& __y) {
@@ -84,12 +115,10 @@ inline bool operator>=(const pair<_T1, _T2>& __x, const pair<_T1, _T2>& __y) {
   return !(__x < __y);
 }
 
-#endif /* __STL_FUNCTION_TMPL_PARTIAL_ORDER */
-
 template <class _T1, class _T2>
 #ifdef _GLIBCPP_RESOLVE_LIB_DEFECTS
 //181.  make_pair() unintended behavior
-inline pair<_T1, _T2> make_pair(const _T1 __x, const _T2 __y)
+inline pair<_T1, _T2> make_pair(_T1 __x, _T2 __y)
 #else
 inline pair<_T1, _T2> make_pair(const _T1& __x, const _T2& __y)
 #endif
@@ -97,7 +126,7 @@ inline pair<_T1, _T2> make_pair(const _T1& __x, const _T2& __y)
   return pair<_T1, _T2>(__x, __y);
 }
 
-__STL_END_NAMESPACE
+} // namespace std
 
 #endif /* __SGI_STL_INTERNAL_PAIR_H */
 

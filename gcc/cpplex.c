@@ -629,10 +629,11 @@ unescaped_terminator_p (pfile, dest)
 }
 
 /* Parses a string, character constant, or angle-bracketed header file
-   name.  Handles embedded trigraphs and escaped newlines.
+   name.  Handles embedded trigraphs and escaped newlines.  The stored
+   string is guaranteed NUL-terminated, but it is not guaranteed that
+   this is the first NUL since embedded NULs are preserved.
 
-   Multi-line strings are allowed, but they are deprecated within
-   directives.  */
+   Multi-line strings are allowed, but they are deprecated.  */
 static void
 parse_string (pfile, token, terminator)
      cpp_reader *pfile;
@@ -651,14 +652,21 @@ parse_string (pfile, token, terminator)
   for (;;)
     {
       if (buffer->cur == buffer->rlimit)
+	c = EOF;
+      else
+	c = *buffer->cur++;
+
+    have_char:
+      /* We need space for the terminating NUL.  */
+      if (dest >= limit)
+	limit = _cpp_next_chunk (pool, 0, &dest);
+
+      if (c == EOF)
 	{
-	  c = EOF;
 	  unterminated (pfile, terminator);
 	  break;
 	}
-      c = *buffer->cur++;
 
-    have_char:
       /* Handle trigraphs, escaped newlines etc.  */
       if (c == '?' || c == '\\')
 	c = skip_escaped_newlines (buffer, c);
@@ -686,15 +694,13 @@ parse_string (pfile, token, terminator)
 	      break;
 	    }
 
+	  cpp_pedwarn (pfile, "multi-line string literals are deprecated");
 	  if (pfile->mlstring_pos.line == 0)
-	    {
-	      pfile->mlstring_pos = pfile->lexer_pos;
-	      if (CPP_PEDANTIC (pfile))
-		cpp_pedwarn (pfile, "multi-line string constant");
-	    }
+	    pfile->mlstring_pos = pfile->lexer_pos;
 	      
-	  handle_newline (buffer, c);  /* Stores to read_ahead.  */
-	  c = '\n';
+	  c = handle_newline (buffer, c);
+	  *dest++ = '\n';
+	  goto have_char;
 	}
       else if (c == '\0')
 	{
@@ -702,25 +708,16 @@ parse_string (pfile, token, terminator)
 	    cpp_warning (pfile, "null character(s) preserved in literal");
 	}
 
-      /* No terminating null for strings - they could contain nulls.  */
-      if (dest >= limit)
-	limit = _cpp_next_chunk (pool, 0, &dest);
       *dest++ = c;
-
-      /* If we had a new line, the next character is in read_ahead.  */
-      if (c != '\n')
-	continue;
-      c = buffer->read_ahead;
-      if (c != EOF)
-	goto have_char;
     }
 
   /* Remember the next character.  */
   buffer->read_ahead = c;
+  *dest = '\0';
 
   token->val.str.text = POOL_FRONT (pool);
   token->val.str.len = dest - token->val.str.text;
-  POOL_COMMIT (pool, token->val.str.len);
+  POOL_COMMIT (pool, token->val.str.len + 1);
 }
 
 /* The stored comment includes the comment start and any terminator.  */
@@ -876,9 +873,11 @@ _cpp_lex_token (pfile, result)
   switch (c)
     {
     case EOF:
-      /* Non-empty files should end in a newline.  Ignore for command
-	 line and _Pragma buffers.  */
-      if (pfile->lexer_pos.col != 0 && !buffer->from_stage3)
+      /* Non-empty files should end in a newline.  Checking "bol" too
+	  prevents multiple warnings when hitting the EOF more than
+	  once, like in a directive.  Don't warn for command line and
+	  _Pragma buffers.  */
+      if (pfile->lexer_pos.col != 0 && !bol && !buffer->from_stage3)
 	cpp_pedwarn (pfile, "no newline at end of file");
       pfile->state.next_bol = 1;
       pfile->skipping = 0;	/* In case missing #endif.  */
@@ -994,7 +993,7 @@ _cpp_lex_token (pfile, result)
 	ACCEPT_CHAR (CPP_DIV_EQ);
       if (c != '/' && c != '*')
 	break;
-
+      
       if (c == '*')
 	{
 	  if (skip_block_comment (pfile))
@@ -1021,7 +1020,7 @@ _cpp_lex_token (pfile, result)
 	    }
 
 	  /* Skip_line_comment updates buffer->read_ahead.  */
-	  if (skip_line_comment (pfile))
+	  if (skip_line_comment (pfile) && CPP_OPTION (pfile, warn_comments))
 	    cpp_warning_with_line (pfile, pfile->lexer_pos.line,
 				   pfile->lexer_pos.col,
 				   "multi-line comment");
@@ -1174,38 +1173,36 @@ _cpp_lex_token (pfile, result)
 
       result->type = CPP_HASH;
     do_hash:
-      if (bol)
+      if (!bol)
+	break;
+      /* 6.10.3 paragraph 11: If there are sequences of preprocessing
+	 tokens within the list of arguments that would otherwise act
+	 as preprocessing directives, the behavior is undefined.
+
+	 This implementation will report a hard error, terminate the
+	 macro invocation, and proceed to process the directive.  */
+      if (pfile->state.parsing_args)
 	{
-	  if (pfile->state.parsing_args)
-	    {
-	      /* 6.10.3 paragraph 11: If there are sequences of
-		 preprocessing tokens within the list of arguments that
-		 would otherwise act as preprocessing directives, the
-		 behavior is undefined.
+	  if (pfile->state.parsing_args == 2)
+	    cpp_error (pfile,
+		       "directives may not be used inside a macro argument");
 
-		 This implementation will report a hard error, terminate
-		 the macro invocation, and proceed to process the
-		 directive.  */
-	      cpp_error (pfile,
-			 "directives may not be used inside a macro argument");
+	  /* Put a '#' in lookahead, return CPP_EOF for parse_arg.  */
+	  buffer->extra_char = buffer->read_ahead;
+	  buffer->read_ahead = '#';
+	  pfile->state.next_bol = 1;
+	  result->type = CPP_EOF;
 
-	      /* Put a '#' in lookahead, return CPP_EOF for parse_arg.  */
-	      buffer->extra_char = buffer->read_ahead;
-	      buffer->read_ahead = '#';
-	      pfile->state.next_bol = 1;
-	      result->type = CPP_EOF;
-
-	      /* Get whitespace right - newline_in_args sets it.  */
-	      if (pfile->lexer_pos.col == 1)
-		result->flags &= ~(PREV_WHITE | AVOID_LPASTE);
-	    }
-	  else
-	    {
-	      /* This is the hash introducing a directive.  */
-	      if (_cpp_handle_directive (pfile, result->flags & PREV_WHITE))
-		goto done_directive; /* bol still 1.  */
-	      /* This is in fact an assembler #.  */
-	    }
+	  /* Get whitespace right - newline_in_args sets it.  */
+	  if (pfile->lexer_pos.col == 1)
+	    result->flags &= ~(PREV_WHITE | AVOID_LPASTE);
+	}
+      else
+	{
+	  /* This is the hash introducing a directive.  */
+	  if (_cpp_handle_directive (pfile, result->flags & PREV_WHITE))
+	    goto done_directive; /* bol still 1.  */
+	  /* This is in fact an assembler #.  */
 	}
       break;
 
@@ -1246,29 +1243,8 @@ _cpp_lex_token (pfile, result)
     case '}': result->type = CPP_CLOSE_BRACE; break;
     case ';': result->type = CPP_SEMICOLON; break;
 
-    case '@':
-      if (CPP_OPTION (pfile, objc))
-	{
-	  /* In Objective C, '@' may begin keywords or strings, like
-	     @keyword or @"string".  It would be nice to call
-	     get_effective_char here and test the result.  However, we
-	     would then need to pass 2 characters to parse_identifier,
-	     making it ugly and slowing down its main loop.  Instead,
-	     we assume we have an identifier, and recover if not.  */
-	  result->type = CPP_NAME;
-	  result->val.node = parse_identifier (pfile, c);
-	  if (result->val.node->length != 1)
-	    break;
-
-	  /* OK, so it wasn't an identifier.  Maybe a string?  */
-	  if (buffer->read_ahead == '"')
-	    {
-	      c = '"';
-	      ACCEPT_CHAR (CPP_OSTRING);
-	      goto make_string;
-	    }
-	}
-      goto random_char;
+      /* @ is a punctuator in Objective C.  */
+    case '@': result->type = CPP_ATSIGN; break;
 
     random_char:
     default:
@@ -1321,7 +1297,8 @@ cpp_spell_token (pfile, token, buffer)
 	unsigned char c;
 
 	if (token->flags & DIGRAPH)
-	  spelling = digraph_spellings[token->type - CPP_FIRST_DIGRAPH];
+	  spelling
+	    = digraph_spellings[(int) token->type - (int) CPP_FIRST_DIGRAPH];
 	else if (token->flags & NAMED_OP)
 	  goto spell_ident;
 	else
@@ -1345,7 +1322,6 @@ cpp_spell_token (pfile, token, buffer)
 	  {
 	  case CPP_STRING:	left = '"';  right = '"';  tag = '\0'; break;
 	  case CPP_WSTRING:	left = '"';  right = '"';  tag = 'L';  break;
-	  case CPP_OSTRING:	left = '"';  right = '"';  tag = '@';  break;
 	  case CPP_CHAR:	left = '\''; right = '\''; tag = '\0'; break;
     	  case CPP_WCHAR:	left = '\''; right = '\''; tag = 'L';  break;
 	  case CPP_HEADER_NAME:	left = '<';  right = '>';  tag = '\0'; break;
@@ -1413,7 +1389,8 @@ cpp_output_token (token, fp)
 	const unsigned char *spelling;
 
 	if (token->flags & DIGRAPH)
-	  spelling = digraph_spellings[token->type - CPP_FIRST_DIGRAPH];
+	  spelling
+	    = digraph_spellings[(int) token->type - (int) CPP_FIRST_DIGRAPH];
 	else if (token->flags & NAMED_OP)
 	  goto spell_ident;
 	else
@@ -1435,7 +1412,6 @@ cpp_output_token (token, fp)
 	  {
 	  case CPP_STRING:	left = '"';  right = '"';  tag = '\0'; break;
 	  case CPP_WSTRING:	left = '"';  right = '"';  tag = 'L';  break;
-	  case CPP_OSTRING:	left = '"';  right = '"';  tag = '@';  break;
 	  case CPP_CHAR:	left = '\''; right = '\''; tag = '\0'; break;
     	  case CPP_WCHAR:	left = '\''; right = '\''; tag = 'L';  break;
 	  case CPP_HEADER_NAME:	left = '<';  right = '>';  tag = '\0'; break;
@@ -1484,26 +1460,6 @@ _cpp_equiv_tokens (a, b)
   return 0;
 }
 
-#if 0
-/* Compare two token lists.  */
-int
-_cpp_equiv_toklists (a, b)
-     const struct toklist *a, *b;
-{
-  unsigned int i, count;
-
-  count = a->limit - a->first;
-  if (count != (b->limit - b->first))
-    return 0;
-
-  for (i = 0; i < count; i++)
-    if (! _cpp_equiv_tokens (&a->first[i], &b->first[i]))
-      return 0;
-
-  return 1;
-}
-#endif
-
 /* Determine whether two tokens can be pasted together, and if so,
    what the resulting token is.  Returns CPP_EOF if the tokens cannot
    be pasted, or the appropriate type for the merged token if they
@@ -1523,8 +1479,8 @@ cpp_can_paste (pfile, token1, token2, digraph)
   if (token2->flags & NAMED_OP)
     b = CPP_NAME;
 
-  if (a <= CPP_LAST_EQ && b == CPP_EQ)
-    return a + (CPP_EQ_EQ - CPP_EQ);
+  if ((int) a <= (int) CPP_LAST_EQ && b == CPP_EQ)
+    return (enum cpp_ttype) ((int) a + ((int) CPP_EQ_EQ - (int) CPP_EQ));
 
   switch (a)
     {
@@ -1603,13 +1559,6 @@ cpp_can_paste (pfile, token1, token2, digraph)
 	return CPP_NUMBER;
       break;
 
-    case CPP_OTHER:
-      if (CPP_OPTION (pfile, objc) && token1->val.c == '@')
-	{
-	  if (b == CPP_NAME)	return CPP_NAME;
-	  if (b == CPP_STRING)	return CPP_OSTRING;
-	}
-
     default:
       break;
     }
@@ -1637,12 +1586,12 @@ cpp_avoid_paste (pfile, token1, token2)
 
   c = EOF;
   if (token2->flags & DIGRAPH)
-    c = digraph_spellings[b - CPP_FIRST_DIGRAPH][0];
+    c = digraph_spellings[(int) b - (int) CPP_FIRST_DIGRAPH][0];
   else if (token_spellings[b].category == SPELL_OPERATOR)
     c = token_spellings[b].name[0];
 
   /* Quickly get everything that can paste with an '='.  */
-  if (a <= CPP_LAST_EQ && c == '=')
+  if ((int) a <= (int) CPP_LAST_EQ && c == '=')
     return 1;
 
   switch (a)

@@ -1,5 +1,5 @@
 /* String pool for GCC.
-   Copyright (C) 2000 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -338,6 +338,25 @@ maybe_get_identifier (text)
     return str->data;  /* N.B. str->data might be null here, if the
 			  string has been used but not as an identifier.  */
   return NULL_TREE;
+}
+
+/* Look up an identifier with the name TEXT, replace its identifier
+   node with NODE, and return the old identifier node.  This is used
+   by languages which need to enable and disable keywords based on
+   context; e.g. see remember_protocol_qualifiers in objc/objc-act.c.  */
+tree
+set_identifier (text, node)
+     const char *text;
+     tree node;
+{
+  struct str_header *str;
+  tree old;
+  size_t length = strlen (text);
+
+  str = alloc_string (text, length, INSERT);
+  old = str->data;	/* might be null */
+  str->data = node;
+  return old;
 }
 
 /* Report some basic statistics about the string pool.  */

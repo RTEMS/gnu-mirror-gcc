@@ -35,6 +35,9 @@ compilation is specified by a string called a "spec".  */
 #include "config.h"
 #include "system.h"
 #include <signal.h>
+#if ! defined( SIGCHLD ) && defined( SIGCLD )
+#  define SIGCHLD SIGCLD
+#endif
 #include "obstack.h"
 #include "intl.h"
 #include "prefix.h"
@@ -233,7 +236,6 @@ static void add_prefix		PARAMS ((struct path_prefix *, const char *,
 					 const char *, int, int, int *));
 static void translate_options	PARAMS ((int *, const char *const **));
 static char *skip_whitespace	PARAMS ((char *));
-static void record_temp_file	PARAMS ((const char *, int, int));
 static void delete_if_ordinary	PARAMS ((const char *));
 static void delete_temp_files	PARAMS ((void));
 static void delete_failure_queue PARAMS ((void));
@@ -251,12 +253,9 @@ static int used_arg		PARAMS ((const char *, int));
 static int default_arg		PARAMS ((const char *, int));
 static void set_multilib_dir	PARAMS ((void));
 static void print_multilib_info	PARAMS ((void));
-static void pfatal_with_name	PARAMS ((const char *)) ATTRIBUTE_NORETURN;
 static void perror_with_name	PARAMS ((const char *));
 static void pfatal_pexecute	PARAMS ((const char *, const char *))
   ATTRIBUTE_NORETURN;
-static void error		PARAMS ((const char *, ...))
-  ATTRIBUTE_PRINTF_1;
 static void notice		PARAMS ((const char *, ...))
   ATTRIBUTE_PRINTF_1;
 static void display_help 	PARAMS ((void));
@@ -360,6 +359,7 @@ or with constant text in a single argument.
 	and substitute the full name found.
  %eSTR  Print STR as an error message.  STR is terminated by a newline.
         Use this when inconsistent options are detected.
+ %nSTR  Print STR as an notice.  STR is terminated by a newline.
  %x{OPTION}	Accumulate an option for %X.
  %X	Output the accumulated linker options specified by compilations.
  %Y	Output the accumulated assembler options specified by compilations.
@@ -599,7 +599,7 @@ static const char *cpp_options =
  %{!no-gcc:-D__GNUC__=%v1 -D__GNUC_MINOR__=%v2 -D__GNUC_PATCHLEVEL__=%v3}\
  %{!undef:%{!ansi:%{!std=*:%p}%{std=gnu*:%p}} %P} %{trigraphs}\
  %c %{Os:-D__OPTIMIZE_SIZE__} %{O*:%{!O0:-D__OPTIMIZE__}}\
- %{ffast-math:-D__FAST_MATH__}\
+ %{fno-inline|O0|!O*:-D__NO_INLINE__} %{ffast-math:-D__FAST_MATH__}\
  %{fshort-wchar:-U__WCHAR_TYPE__ -D__WCHAR_TYPE__=short\\ unsigned\\ int}\
  %{ffreestanding:-D__STDC_HOSTED__=0} %{fno-hosted:-D__STDC_HOSTED__=0}\
  %{!ffreestanding:%{!fno-hosted:-D__STDC_HOSTED__=1}}\
@@ -615,10 +615,10 @@ static const char *cc1_options =
  %1 %{!Q:-quiet} -dumpbase %B %{d*} %{m*} %{a*}\
  %{g*} %{O*} %{W*} %{w} %{pedantic*} %{std*} %{ansi}\
  %{traditional} %{v:-version} %{pg:-p} %{p} %{f*}\
- %{aux-info*} %{Qn:-fno-ident} %{--help:--help}\
+ %{Qn:-fno-ident} %{--help:--help}\
  %{--target-help:--target-help}\
  %{!fsyntax-only:%{S:%W{o*}%{!o*:-o %b.s}}}\
- %{fsyntax-only:-o %j}";
+ %{fsyntax-only:-o %j} %{-param*}";
 
 static const char *asm_options =
 "%a %Y %{c:%W{o*}%{!o*:-o %w%b%O}}%{!c:-o %d%w%u%O}";
@@ -673,7 +673,8 @@ static struct user_specs *user_specs_head, *user_specs_tail;
   || !strcmp (STR, "imacros") || !strcmp (STR, "aux-info") \
   || !strcmp (STR, "idirafter") || !strcmp (STR, "iprefix") \
   || !strcmp (STR, "iwithprefix") || !strcmp (STR, "iwithprefixbefore") \
-  || !strcmp (STR, "isystem") || !strcmp (STR, "specs") \
+  || !strcmp (STR, "isystem") || !strcmp (STR, "-param") \
+  || !strcmp (STR, "specs") \
   || !strcmp (STR, "MF") || !strcmp (STR, "MT") || !strcmp (STR, "MQ"))
 
 #ifndef WORD_SWITCH_TAKES_ARG
@@ -728,19 +729,20 @@ static struct compiler default_compilers[] =
      were not present when we built the driver, we will hit these copies
      and be given a more meaningful error than "file not used since
      linking is not done".  */
-  {".m",  "#Objective-C"}, {".mi",  "#Objective-C"},
-  {".cc", "#C++"}, {".cxx", "#C++"}, {".cpp", "#C++"}, {".cp", "#C++"},
-  {".c++", "#C++"}, {".C", "#C++"}, {".ii", "#C++"},
-  {".ads", "#Ada"}, {".adb", "#Ada"}, {".ada", "#Ada"},
-  {".f", "#Fortran"}, {".for", "#Fortran"}, {".fpp", "#Fortran"},
-  {".F", "#Fortran"}, {".FOR", "#Fortran"}, {".FPP", "#Fortran"},
-  {".r", "#Ratfor"},
-  {".p", "#Pascal"}, {".pas", "#Pascal"},
-  {".ch", "#Chill"}, {".chi", "#Chill"},
-  {".java", "#Java"}, {".class", "#Java"},
-  {".zip", "#Java"}, {".jar", "#Java"},
+  {".m",  "#Objective-C", 0}, {".mi",  "#Objective-C", 0},
+  {".cc", "#C++", 0}, {".cxx", "#C++", 0}, {".cpp", "#C++", 0},
+  {".cp", "#C++", 0}, {".c++", "#C++", 0}, {".C", "#C++", 0},
+  {".ii", "#C++", 0},
+  {".ads", "#Ada", 0}, {".adb", "#Ada", 0}, {".ada", "#Ada", 0},
+  {".f", "#Fortran", 0}, {".for", "#Fortran", 0}, {".fpp", "#Fortran", 0},
+  {".F", "#Fortran", 0}, {".FOR", "#Fortran", 0}, {".FPP", "#Fortran", 0},
+  {".r", "#Ratfor", 0},
+  {".p", "#Pascal", 0}, {".pas", "#Pascal", 0},
+  {".ch", "#Chill", 0}, {".chi", "#Chill", 0},
+  {".java", "#Java", 0}, {".class", "#Java", 0},
+  {".zip", "#Java", 0}, {".jar", "#Java", 0},
   /* Next come the entries for C.  */
-  {".c", "@c"},
+  {".c", "@c", 0},
   {"@c",
    /* cc1 has an integrated ISO C preprocessor.  We should invoke the
       external preprocessor if -save-temps or -traditional is given.  */
@@ -755,27 +757,27 @@ static struct compiler default_compilers[] =
 		    cc1 -fpreprocessed %{!pipe:%g.i} %(cc1_options)}\
 	    %{!traditional:%{!ftraditional:%{!traditional-cpp:\
 		cc1 -lang-c %{ansi:-std=c89} %(cpp_options) %(cc1_options)}}}}\
-        %{!fsyntax-only:%(invoke_as)}}}}"},
+        %{!fsyntax-only:%(invoke_as)}}}}", 0},
   {"-",
    "%{!E:%e-E required when input is from standard input}\
-    %(trad_capable_cpp) -lang-c %{ansi:-std=c89} %(cpp_options)"},
-  {".h", "@c-header"},
+    %(trad_capable_cpp) -lang-c %{ansi:-std=c89} %(cpp_options)", 0},
+  {".h", "@c-header", 0},
   {"@c-header",
    "%{!E:%eCompilation of header file requested} \
-    %(trad_capable_cpp) -lang-c %{ansi:-std=c89} %(cpp_options)"},
-  {".i", "@cpp-output"},
+    %(trad_capable_cpp) -lang-c %{ansi:-std=c89} %(cpp_options)", 0},
+  {".i", "@cpp-output", 0},
   {"@cpp-output",
-   "%{!M:%{!MM:%{!E:cc1 -fpreprocessed %i %(cc1_options) %{!fsyntax-only:%(invoke_as)}}}}"},
-  {".s", "@assembler"},
+   "%{!M:%{!MM:%{!E:cc1 -fpreprocessed %i %(cc1_options) %{!fsyntax-only:%(invoke_as)}}}}", 0},
+  {".s", "@assembler", 0},
   {"@assembler",
-   "%{!M:%{!MM:%{!E:%{!S:as %(asm_options) %i %A }}}}"},
-  {".S", "@assembler-with-cpp"},
+   "%{!M:%{!MM:%{!E:%{!S:as %(asm_options) %i %A }}}}", 0},
+  {".S", "@assembler-with-cpp", 0},
   {"@assembler-with-cpp",
    "%(trad_capable_cpp) -lang-asm %(cpp_options)\
-	%{!M:%{!MM:%{!E:%(invoke_as)}}}"},
+	%{!M:%{!MM:%{!E:%(invoke_as)}}}", 0},
 #include "specs.h"
   /* Mark end of table */
-  {0, 0}
+  {0, 0, 0}
 };
 
 /* Number of elements in default_compilers, not counting the terminator.  */
@@ -862,6 +864,7 @@ struct option_map option_map[] =
    {"--optimize", "-O", "oj"},
    {"--output", "-o", "a"},
    {"--output-class-directory", "-foutput-class-dir=", "ja"},
+   {"--param", "--param", "a"},
    {"--pedantic", "-pedantic", 0},
    {"--pedantic-errors", "-pedantic-errors", 0},
    {"--pipe", "-pipe", 0},
@@ -1272,15 +1275,15 @@ init_gcc_specs (obstack, shared_name, static_name)
   char buffer[128];
 
   /* If we see -shared-libgcc, then use the shared version.  */
-  sprintf (buffer, "%%{shared-libgcc:%s}", shared_name);
+  sprintf (buffer, "%%{shared-libgcc:%s %s}", shared_name, static_name);
   obstack_grow (obstack, buffer, strlen (buffer));
-  /* If we see -static-libgcc, then use the shared version.  */
+  /* If we see -static-libgcc, then use the static version.  */
   sprintf (buffer, "%%{static-libgcc:%s}", static_name);
   obstack_grow (obstack, buffer, strlen (buffer));
   /* Otherwise, if we see -shared, then use the shared version.  */
   sprintf (buffer,
-	   "%%{!shared-libgcc:%%{!static-libgcc:%%{shared:%s}}}", 
-	   shared_name);
+	   "%%{!shared-libgcc:%%{!static-libgcc:%%{shared:%s %s}}}", 
+	   shared_name, static_name);
   obstack_grow (obstack, buffer, strlen (buffer));
   /* Otherwise, use the static version.  */
   sprintf (buffer, 
@@ -1401,6 +1404,15 @@ init_spec ()
 
     obstack_1grow (&obstack, '\0');
     libgcc_spec = obstack_finish (&obstack);
+  }
+#endif
+#ifdef USE_AS_TRADITIONAL_FORMAT
+  /* Prepend "--traditional-format" to whatever asm_spec we had before.  */
+  {
+    static char tf[] = "--traditional-format ";
+    obstack_grow (&obstack, tf, sizeof(tf) - 1);
+    obstack_grow0 (&obstack, asm_spec, strlen (asm_spec));
+    asm_spec = obstack_finish (&obstack);
   }
 #endif
 
@@ -1875,7 +1887,7 @@ static struct temp_file *failure_delete_queue;
    FAIL_DELETE nonzero means delete it if a compilation step fails;
    otherwise delete it in any case.  */
 
-static void
+void
 record_temp_file (filename, always_delete, fail_delete)
      const char *filename;
      int always_delete;
@@ -2798,7 +2810,7 @@ struct infile
 
 static struct infile *infiles;
 
-static int n_infiles;
+int n_infiles;
 
 /* This counts the number of libraries added by lang_specific_driver, so that
    we can tell if there were any user supplied any files or libraries.  */
@@ -2807,7 +2819,7 @@ static int added_libraries;
 
 /* And a vector of corresponding output files is made up later.  */
 
-static const char **outfiles;
+const char **outfiles;
 
 /* Used to track if none of the -B paths are used.  */
 static int warn_B;
@@ -2848,7 +2860,7 @@ convert_filename (name, do_exe)
     }
 #endif
 
-#ifdef HAVE_EXECUTABLE_SUFFIX
+#if defined(HAVE_EXECUTABLE_SUFFIX) && !defined(NO_AUTO_EXE_SUFFIX)
   /* If there is no filetype, make it the executable suffix (which includes
      the ".").  But don't get confused if we have just "-o".  */
   if (! do_exe || EXECUTABLE_SUFFIX[0] == 0 || (len == 2 && name[0] == '-'))
@@ -2919,9 +2931,9 @@ display_help ()
 "), stdout);
 
   printf (_("\
-\nOptions starting with -g, -f, -m, -O or -W are automatically passed on to\n\
-the various sub-processes invoked by %s.  In order to pass other options\n\
-on to these processes the -W<letter> options must be used.\n\
+\nOptions starting with -g, -f, -m, -O, -W, or --param are automatically\n\
+ passed on to the various sub-processes invoked by %s.  In order to pass\n\
+ other options on to these processes the -W<letter> options must be used.\n\
 "), programname);
 
   /* The rest of the options are displayed by invocations of the various
@@ -4196,6 +4208,21 @@ do_spec_1 (spec, inswitch, soft_matched_part)
 	      return -1;
 	    }
 	    break;
+	  case 'n':
+	    /* %nfoo means report an notice with `foo' on stderr.  */
+	    {
+	      const char *q = p;
+	      char *buf;
+	      while (*p != 0 && *p != '\n')
+		p++;
+	      buf = (char *) alloca (p - q + 1);
+	      strncpy (buf, q, p - q);
+	      buf[p - q] = 0;
+	      notice ("%s\n", buf);
+	      if (*p)
+		p++;
+	    }
+	    break;
 
 	  case 'j':
 	    {
@@ -4263,7 +4290,8 @@ do_spec_1 (spec, inswitch, soft_matched_part)
 		      && t->unique == (c != 'g'))
 		    break;
 
-		/* Make a new association if needed.  %u and %j require one.  */
+		/* Make a new association if needed.  %u and %j
+		   require one.  */
 		if (t == 0 || c == 'u' || c == 'j')
 		  {
 		    if (t == 0)
@@ -4273,7 +4301,13 @@ do_spec_1 (spec, inswitch, soft_matched_part)
 			temp_names = t;
 		      }
 		    t->length = suffix_length;
-		    t->suffix = save_string (suffix, suffix_length);
+		    if (saved_suffix)
+		      {
+			t->suffix = saved_suffix;
+			saved_suffix = NULL;
+		      }
+		    else
+		      t->suffix = save_string (suffix, suffix_length);
 		    t->unique = (c != 'g');
 		    temp_filename = make_temp_file (t->suffix);
 		    temp_filename_length = strlen (temp_filename);
@@ -4493,7 +4527,7 @@ do_spec_1 (spec, inswitch, soft_matched_part)
 
 		len = strlen (multilib_dir);
 		obstack_blank (&obstack, len + 1);
-		p = obstack_next_free (&obstack) - len;
+		p = obstack_next_free (&obstack) - (len + 1);
 
 		*p++ = '_';
 		for (q = multilib_dir; *q ; ++q, ++p)
@@ -5256,19 +5290,19 @@ give_switch (switchnum, omit_first_word, include_blanks)
 	  if (suffix_subst)
 	    {
 	      unsigned length = strlen (arg);
+	      int dot = 0;
 
 	      while (length-- && !IS_DIR_SEPARATOR (arg[length]))
 		if (arg[length] == '.')
 		  {
 		    ((char *)arg)[length] = 0;
+		    dot = 1;
 		    break;
 		  }
 	      do_spec_1 (arg, 1, NULL_PTR);
-	      if (!arg[length])
-		{
-		  ((char *)arg)[length] = '.';
-		  do_spec_1 (suffix_subst, 1, NULL_PTR);
-		}
+	      if (dot)
+		((char *)arg)[length] = '.';
+	      do_spec_1 (suffix_subst, 1, NULL_PTR);
 	    }
 	  else
 	    do_spec_1 (arg, 1, NULL_PTR);
@@ -5461,6 +5495,11 @@ main (argc, argv)
 #ifdef SIGPIPE
   if (signal (SIGPIPE, SIG_IGN) != SIG_IGN)
     signal (SIGPIPE, fatal_error);
+#endif
+#ifdef SIGCHLD
+  /* We *MUST* set SIGCHLD to SIG_DFL so that the wait4() call will
+     receive the signal.  A different setting is inheritable */
+  signal (SIGCHLD, SIG_DFL);
 #endif
 
   argbuf_length = 10;
@@ -5772,8 +5811,23 @@ main (argc, argv)
   if (verbose_flag)
     {
       int n;
+      const char *thrmod;
 
       notice ("Configured with: %s\n", configuration_arguments);
+
+#ifdef THREAD_MODEL_SPEC
+      /* We could have defined THREAD_MODEL_SPEC to "%*" by default,
+	 but there's no point in doing all this processing just to get
+	 thread_model back.  */
+      obstack_init (&obstack);
+      do_spec_1 (THREAD_MODEL_SPEC, 0, thread_model);
+      obstack_1grow (&obstack, '\0');
+      thrmod = obstack_finish (&obstack);
+#else
+      thrmod = thread_model;
+#endif
+
+      notice ("Thread model: %s\n", thrmod);
 
       /* compiler_version is truncated at the first space when initialized
 	 from version string, so truncate version_string at the first space
@@ -6006,7 +6060,7 @@ save_string (s, len)
   return result;
 }
 
-static void
+void
 pfatal_with_name (name)
      const char *name;
 {
@@ -6074,7 +6128,7 @@ fatal VPARAMS ((const char *msgid, ...))
   exit (1);
 }
 
-static void
+void
 error VPARAMS ((const char *msgid, ...))
 {
 #ifndef ANSI_PROTOTYPES

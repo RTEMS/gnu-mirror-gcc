@@ -61,32 +61,10 @@ namespace std
   // Definitions for locale::id of standard facets. 
   locale::id ctype<char>::id;
   locale::id codecvt<char, char, mbstate_t>::id;
-  locale::id num_get<char>::id;
-  locale::id num_put<char>::id;
-  locale::id numpunct<char>::id;
-  locale::id collate<char>::id;
-  locale::id time_get<char>::id;
-  locale::id time_put<char>::id;
-  locale::id money_get<char>::id;
-  locale::id money_put<char>::id;
-  locale::id moneypunct<char, false>::id;
-  locale::id moneypunct<char, true>::id;
-  locale::id messages<char>::id;
 
 #ifdef _GLIBCPP_USE_WCHAR_T  
   locale::id ctype<wchar_t>::id;
   locale::id codecvt<wchar_t, char, mbstate_t>::id;
-  locale::id num_get<wchar_t>::id;
-  locale::id num_put<wchar_t>::id;
-  locale::id numpunct<wchar_t>::id;
-  locale::id collate<wchar_t>::id;
-  locale::id time_get<wchar_t>::id;
-  locale::id time_put<wchar_t>::id;
-  locale::id money_get<wchar_t>::id;
-  locale::id money_put<wchar_t>::id;
-  locale::id moneypunct<wchar_t, false>::id;
-  locale::id moneypunct<wchar_t, true>::id;
-  locale::id messages<wchar_t>::id;
 #endif
 
   // Definitions for static const data members of locale::id
@@ -371,7 +349,7 @@ namespace std
     catch (...) 
       { 
 	_M_impl->_M_remove_reference(); 
-	throw; 
+	__throw_exception_again;
       }
   }
 
@@ -398,7 +376,7 @@ namespace std
 	  _M_impl = new _Impl(__s, 1);
       }
     else
-      throw runtime_error("attempt to create locale from NULL name");
+      __throw_runtime_error("attempt to create locale from NULL name");
   }
 
   locale::locale(const locale& __base, const char* __s, category __cat)
@@ -490,7 +468,7 @@ namespace std
 	      }
 	    _S_classic = _S_global = 0;
 	    // XXX MT
-	    throw;
+	    __throw_exception_again;
 	  }
       }
     return *__classic_locale;
@@ -499,7 +477,7 @@ namespace std
   locale::category
   locale::_S_normalize_category(category __cat) 
   {
-    int __ret;
+    int __ret = 0;
     if (__cat == none || (__cat & all) && !(__cat & ~all))
       __ret = __cat;
     else
@@ -531,7 +509,7 @@ namespace std
 	    __ret = all;
 	    break;
 	  default:
-	    throw runtime_error("bad locale category");
+	    __throw_runtime_error("bad locale category");
 	  }
       }
     return __ret;
@@ -605,11 +583,10 @@ namespace std
   { return __c; }
   
   const char* 
-  ctype<char>::do_widen(const char* __low, const char* __high, 
-			char* __dest) const
+  ctype<char>::do_widen(const char* __lo, const char* __hi, char* __dest) const
   {
-    memcpy(__dest, __low, __high - __low);
-    return __high;
+    memcpy(__dest, __lo, __hi - __lo);
+    return __hi;
   }
   
   char
@@ -617,11 +594,11 @@ namespace std
   { return __c; }
   
   const char* 
-  ctype<char>::do_narrow(const char* __low, const char* __high, 
+  ctype<char>::do_narrow(const char* __lo, const char* __hi, 
 			 char /*__dfault*/, char* __dest) const
   {
-    memcpy(__dest, __low, __high - __low);
-    return __high;
+    memcpy(__dest, __lo, __hi - __lo);
+    return __hi;
   }
 
   ctype_byname<char>::ctype_byname(const char* /*__s*/, size_t __refs)
@@ -698,9 +675,9 @@ namespace std
 
       // Stage 2: extract characters.
       __cache_type const* __fmt = __cache_type::_S_get(__io);
-      bool __valid = __beg != __end;
+
       // Fail quickly if !__valid
-      if (!__valid)
+      if (__beg == __end)
         {
           __err |= (ios_base::eofbit | ios_base::failbit);
           return;
@@ -716,14 +693,19 @@ namespace std
       // Check first for sign
       bool __testsign = false;
       if ((__c == __lits[__cache_type::_S_minus])
-          || (__c == __lits[__cache_type::_S_plus]))
+	  || (__c == __lits[__cache_type::_S_plus]))
         {
+          __testsign = true;
           __xtrc[__pos++] = __c;
           ++__beg;
-          __testsign = true;
-          // whitespace may follow a sign
-          while ((__beg != __end) && (isspace(*__beg)))
-            ++__beg;
+	  __c = * __beg;
+
+          // Whitespace may follow a sign
+          while ((__beg != __end) && (isspace(__c)))
+	    {
+	      ++__beg;
+	      __c = *__beg;
+	    }
 
           // There had better be more to come...
           if (__beg == __end)
@@ -734,20 +716,19 @@ namespace std
             }
         }
 
-      bool __testzero = false;    // Has there been a leading zero?
-
-      // Now check if first character is a zero
-      __c = *__beg;
+      // Now check if first character is a zero.
+      bool __testzero = false;    
       if (__c == __lits[__cache_type::_S_digits])
         {
            __testzero = true;
            ++__beg;
+	   __c = *__beg;
 
            // We have to check for __beg == __end here. If so,
            // a plain '0' (possibly with a sign) can be got rid of now
            if (__beg == __end)
              {
-               __xtrc[__pos++] = __c;
+               __xtrc[__pos++] = __lits[__cache_type::_S_digits];
                __xtrc[__pos] = '\0';
                __err |= ios_base::eofbit;
                return;
@@ -758,11 +739,11 @@ namespace std
           if (!__fp && __base != 10 && __base != 8)
             {
               // Here, __base == 0 or 16
-              __c = *__beg;
               if ((__c == __lits[__cache_type::_S_x])
                  || (__c == __lits[__cache_type::_S_X]))
                 {
                   ++__beg;
+		  __c = *__beg;
                   __base = 16;
                   __testzero = false; // "0x" is not a leading zero
                 }
@@ -773,9 +754,10 @@ namespace std
           // Remove any more leading zeros
           while (__beg != __end)
             {
-              if (*__beg == __lits[__cache_type::_S_digits])
+              if (__c == __lits[__cache_type::_S_digits])
                 {
                   ++__beg;
+		  __c = *__beg;
                   __testzero = true;
                 }
               else
@@ -789,44 +771,45 @@ namespace std
       // We may need to know if anything is found here. A leading zero
       // (removed by now) would count.
       bool __testunits = __testzero;
-      while (__valid && __beg != __end)
+      while (__beg != __end)
         {
-          __valid = false;
-          __c = *__beg;
-          const char* __p = strchr(__fmt->_S_literals, __c);
+          const char* __p = strchr(__lits, __c);
 
           // NB: strchr returns true for __c == 0x0
-          if (__p && __c)
-            {
-              // Try first for acceptable digit; record it if found
-              if ((__p >= &__lits[__cache_type::_S_digits]
-                    && __p < &__lits[__cache_type::_S_digits + __base])
-                   || (__p >= &__lits[__cache_type::_S_udigits]
-                       && __p < &__lits[__cache_type::_S_udigits + __base]))
-                {
-                  __xtrc[__pos++] = __c;
-                  ++__sep_pos;
-                  __valid = true;
-                  __testunits = true;
-                }
-            }
-          else if (__c == __fmt->_M_thousands_sep
-                   && __fmt->_M_use_grouping)
-            {
+          if (__p && __c
+	      &&((__p >= &__lits[__cache_type::_S_digits]
+		  && __p < &__lits[__cache_type::_S_digits + __base])
+		 || (__p >= &__lits[__cache_type::_S_udigits]
+		     && __p < &__lits[__cache_type::_S_udigits + __base])))
+	    {
+	      // Try first for acceptable digit; record it if found.
+	      __xtrc[__pos++] = __c;
+	      ++__sep_pos;
+	      __testunits = true;
+	      ++__beg;
+	      __c = *__beg;
+	    }
+          else if (__c == __fmt->_M_thousands_sep && __fmt->_M_use_grouping)
+	    {
               // NB: Thousands separator at the beginning of a string
               // is a no-no, as is two consecutive thousands
-              // separators
+              // separators.
               if (__sep_pos)
                 {
                   __grp += static_cast<char>(__sep_pos);
                   __sep_pos = 0;
-                  __valid = true;
+		  ++__beg;
+		  __c = *__beg;
                 }
               else
-                __err |= ios_base::failbit;
+		{
+		  __err |= ios_base::failbit;
+		  break;
+		}
             }
-          if (__valid)
-            ++__beg;
+	  else
+	    // Not a valid input item.
+	    break;
         }
 
       // Digit grouping is checked. If _M_groupings() doesn't
@@ -874,7 +857,6 @@ namespace std
       // That's it for integer types. Remaining code is for floating point
       if (__fp && __beg != __end)
         {
-          __c = *__beg;
           // Check first for decimal point. There MUST be one if
           // __testunits is false.
           bool __testdec = false;    // Is there a decimal point
@@ -883,12 +865,13 @@ namespace std
             {
               __xtrc[__pos++] = '.';
               ++__beg;
+	      __c = *__beg;
+
               // Now we get any digits after the decimal point
               // There MUST be some if __testunits is false.
               while (__beg != __end)
                 {
-                  __c = *__beg;
-                  const char* __p = strchr(__fmt->_S_literals, __c);
+                  const char* __p = strchr(__lits, __c);
                   if ((__p >= &__lits[__cache_type::_S_digits]
                         && __p < &__lits[__cache_type::_S_digits + __base])
                        || (__p >= &__lits[__cache_type::_S_udigits]
@@ -896,6 +879,7 @@ namespace std
                     {
                       __xtrc[__pos++] = __c;
                       ++__beg;
+		      __c = *__beg;
                       __testdec = true;
                     }
                   else
@@ -914,25 +898,28 @@ namespace std
           // Now we may find an exponent
           if (__beg != __end)
             {
-              __c = *__beg;
               if ((__c == __lits[__cache_type::_S_ee])
                    || (__c == __lits[__cache_type::_S_Ee]))
                 {
                   __xtrc[__pos++] = __c;
                   ++__beg;
+		  __c = *__beg;
+
                   // Now there may be a sign
                   if (__beg != __end)
                     {
-                      __c = *__beg;
                       if ((__c == __lits[__cache_type::_S_minus])
                           || (__c == __lits[__cache_type::_S_plus]))
                         {
                           __xtrc[__pos++] = __c;
                           ++__beg;
+			  __c = *__beg;
                           // whitespace may follow a sign
-                          while ((__beg != __end) && (isspace(*__beg)))
-                            ++__beg;
-
+                          while ((__beg != __end) && (isspace(__c)))
+			    {
+			      ++__beg;
+			      __c = *__beg;
+			    }
                         }
                     }
                   // And now there must be some digits
@@ -944,8 +931,7 @@ namespace std
                     }
                   while (__beg != __end)
                     {
-                      __c = *__beg;
-                      const char* __p = strchr(__fmt->_S_literals, __c);
+                      const char* __p = strchr(__lits, __c);
                       if ((__p >= &__lits[__cache_type::_S_digits]
                             && __p < &__lits[__cache_type::_S_digits + __base])
                            || (__p >= &__lits[__cache_type::_S_udigits]
@@ -953,6 +939,7 @@ namespace std
                         {
                           __xtrc[__pos++] = __c;
                           ++__beg;
+			  __c = *__beg;
                         }
                       else
                         break;
@@ -1122,14 +1109,14 @@ namespace std
   { return towupper(__c); }
 
   const wchar_t*
-  ctype<wchar_t>::do_toupper(wchar_t* __low, const wchar_t* __high) const
+  ctype<wchar_t>::do_toupper(wchar_t* __lo, const wchar_t* __hi) const
   {
-    while (__low < __high)
+    while (__lo < __hi)
       {
-        *__low = towupper(*__low);
-        ++__low;
+        *__lo = towupper(*__lo);
+        ++__lo;
       }
-    return __high;
+    return __hi;
   }
   
   wchar_t
@@ -1137,14 +1124,14 @@ namespace std
   { return towlower(__c); }
   
   const wchar_t*
-  ctype<wchar_t>::do_tolower(wchar_t* __low, const wchar_t* __high) const
+  ctype<wchar_t>::do_tolower(wchar_t* __lo, const wchar_t* __hi) const
   {
-    while (__low < __high)
+    while (__lo < __hi)
       {
-        *__low = towlower(*__low);
-        ++__low;
+        *__lo = towlower(*__lo);
+        ++__lo;
       }
-    return __high;
+    return __hi;
   }
 
   bool
@@ -1154,29 +1141,29 @@ namespace std
   
   const wchar_t* 
   ctype<wchar_t>::
-  do_is(const wchar_t* __low, const wchar_t* __high, mask* __m) const
+  do_is(const wchar_t* __lo, const wchar_t* __hi, mask* __m) const
   {
-    while (__low < __high && !this->is(*__m, *__low))
-      ++__low;
-    return __low;
+    while (__lo < __hi && !this->is(*__m, *__lo))
+      ++__lo;
+    return __lo;
   }
   
   const wchar_t* 
   ctype<wchar_t>::
-  do_scan_is(mask __m, const wchar_t* __low, const wchar_t* __high) const
+  do_scan_is(mask __m, const wchar_t* __lo, const wchar_t* __hi) const
   {
-    while (__low < __high && !this->is(__m, *__low))
-      ++__low;
-    return __low;
+    while (__lo < __hi && !this->is(__m, *__lo))
+      ++__lo;
+    return __lo;
   }
 
   const wchar_t*
   ctype<wchar_t>::
-  do_scan_not(mask __m, const char_type* __low, const char_type* __high) const
+  do_scan_not(mask __m, const char_type* __lo, const char_type* __hi) const
   {
-    while (__low < __high && this->is(__m, *__low) != 0)
-      ++__low;
-    return __low;
+    while (__lo < __hi && this->is(__m, *__lo) != 0)
+      ++__lo;
+    return __lo;
   }
 
   wchar_t
@@ -1186,12 +1173,12 @@ namespace std
   
   const char* 
   ctype<wchar_t>::
-  do_widen(const char* __low, const char* __high, wchar_t* __dest) const
+  do_widen(const char* __lo, const char* __hi, wchar_t* __dest) const
   {
     mbstate_t __state;
     memset(static_cast<void*>(&__state), 0, sizeof(mbstate_t));
-    mbsrtowcs(__dest, &__low, __high - __low, &__state);
-    return __high;
+    mbsrtowcs(__dest, &__lo, __hi - __lo, &__state);
+    return __hi;
   }
 
   char
@@ -1204,16 +1191,16 @@ namespace std
 
   const wchar_t*
   ctype<wchar_t>::
-  do_narrow(const wchar_t* __low, const wchar_t* __high, char __dfault, 
+  do_narrow(const wchar_t* __lo, const wchar_t* __hi, char __dfault, 
 	    char* __dest) const
   {
     mbstate_t __state;
     memset(static_cast<void*>(&__state), 0, sizeof(mbstate_t));
-    size_t __len = __high - __low;
-    size_t __conv = wcsrtombs(__dest, &__low, __len, &__state);
+    size_t __len = __hi - __lo;
+    size_t __conv = wcsrtombs(__dest, &__lo, __len, &__state);
     if (__conv == __len)
       *__dest = __dfault;
-    return __high;
+    return __hi;
   }
 
   ctype_byname<wchar_t>::
@@ -1255,9 +1242,4 @@ namespace std
   : messages<wchar_t> (__refs) { }
 #endif //  _GLIBCPP_USE_WCHAR_T
 } // namespace std
-
-
-
-
-
 

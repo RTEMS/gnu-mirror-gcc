@@ -1,5 +1,6 @@
 /* Definitions of target machine for GNU compiler.  Iris version 5.
-   Copyright (C) 1993, 1995, 1996, 1998, 2000 Free Software Foundation, Inc.
+   Copyright (C) 1993, 1995, 1996, 1998, 2000,
+   2001 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -51,9 +52,9 @@ Boston, MA 02111-1307, USA.  */
 #undef	WCHAR_TYPE_SIZE
 #undef	MAX_WCHAR_TYPE_SIZE
 
-#define WCHAR_TYPE	"long int"
-#define WCHAR_TYPE_SIZE	LONG_TYPE_SIZE
-#define MAX_WCHAR_TYPE_SIZE	MAX_LONG_TYPE_SIZE
+#define WCHAR_TYPE     "int"
+#define WCHAR_TYPE_SIZE        INT_TYPE_SIZE
+#define MAX_WCHAR_TYPE_SIZE    MAX_INT_TYPE_SIZE
 
 #define WORD_SWITCH_TAKES_ARG(STR)			\
  (DEFAULT_WORD_SWITCH_TAKES_ARG (STR)			\
@@ -153,6 +154,10 @@ do {						\
   assemble_name (FILE, NAME);			\
   fputs (" .text\n", FILE);			\
 } while (0)
+
+/* To get unaligned data, we have to turn off auto alignment.  */
+#define UNALIGNED_SHORT_ASM_OP		"\t.align 0\n\t.half\t"
+#define UNALIGNED_INT_ASM_OP		"\t.align 0\n\t.word\t"
 
 /* Also do this for libcalls.  */
 #define ASM_OUTPUT_EXTERNAL_LIBCALL(FILE, FUN)	\
