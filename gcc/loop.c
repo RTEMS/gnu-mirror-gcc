@@ -3277,7 +3277,7 @@ loop_invariant_p (loop, x)
 	 These have always been created by the unroller and are set in
 	 the loop, hence are never invariant. */
 
-      if (REGNO (x) >= regs->num)
+      if (REGNO (x) >= (unsigned) regs->num)
 	return 0;
 
       if (regs->array[REGNO (x)].set_in_loop < 0)
@@ -4204,7 +4204,15 @@ emit_prefetch_instructions (loop)
 		 non-constant INIT_VAL to have the same mode as REG, which
 		 in this case we know to be Pmode.  */
 	      if (GET_MODE (init_val) != Pmode && !CONSTANT_P (init_val))
-		init_val = convert_to_mode (Pmode, init_val, 0);
+		{
+		  rtx seq;
+
+		  start_sequence ();
+		  init_val = convert_to_mode (Pmode, init_val, 0);
+		  seq = get_insns ();
+		  end_sequence ();
+		  loop_insn_emit_before (loop, 0, loop_start, seq);
+		}
 	      loop_iv_add_mult_emit_before (loop, init_val,
 					    info[i].giv->mult_val,
 					    add_val, reg, 0, loop_start);
@@ -8624,11 +8632,12 @@ maybe_eliminate_biv (loop, bl, eliminate_p, threshold, insn_count)
       enum rtx_code code = GET_CODE (p);
       basic_block where_bb = 0;
       rtx where_insn = threshold >= insn_count ? 0 : p;
+      rtx note;
 
       /* If this is a libcall that sets a giv, skip ahead to its end.  */
       if (GET_RTX_CLASS (code) == 'i')
 	{
-	  rtx note = find_reg_note (p, REG_LIBCALL, NULL_RTX);
+	  note = find_reg_note (p, REG_LIBCALL, NULL_RTX);
 
 	  if (note)
 	    {
@@ -8646,6 +8655,8 @@ maybe_eliminate_biv (loop, bl, eliminate_p, threshold, insn_count)
 		}
 	    }
 	}
+
+      /* Closely examine the insn if the biv is mentioned.  */
       if ((code == INSN || code == JUMP_INSN || code == CALL_INSN)
 	  && reg_mentioned_p (reg, PATTERN (p))
 	  && ! maybe_eliminate_biv_1 (loop, PATTERN (p), p, bl,
@@ -8657,6 +8668,12 @@ maybe_eliminate_biv (loop, bl, eliminate_p, threshold, insn_count)
 		     bl->regno, INSN_UID (p));
 	  break;
 	}
+
+      /* If we are eliminating, kill REG_EQUAL notes mentioning the biv.  */
+      if (eliminate_p
+	  && (note = find_reg_note (p, REG_EQUAL, NULL_RTX)) != NULL_RTX
+	  && reg_mentioned_p (reg, XEXP (note, 0)))
+	remove_note (p, note);
     }
 
   if (p == loop->end)
