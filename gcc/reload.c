@@ -669,13 +669,13 @@ static enum reg_class
 find_valid_class (m1, n, dest_regno)
      enum machine_mode m1 ATTRIBUTE_UNUSED;
      int n;
-     unsigned int dest_regno;
+     unsigned int dest_regno ATTRIBUTE_UNUSED;
 {
   int best_cost = -1;
   int class;
   int regno;
   enum reg_class best_class = NO_REGS;
-  enum reg_class dest_class = REGNO_REG_CLASS (dest_regno);
+  enum reg_class dest_class ATTRIBUTE_UNUSED = REGNO_REG_CLASS (dest_regno);
   unsigned int best_size = 0;
   int cost;
 
@@ -2644,7 +2644,7 @@ find_reloads (insn, replace, ind_levels, live_known, reload_reg_p)
       else if (constraints[i][0] == 'p'
 	       || EXTRA_ADDRESS_CONSTRAINT (constraints[i][0]))
 	{
-	  find_reloads_address (VOIDmode, (rtx*) 0,
+	  find_reloads_address (recog_data.operand_mode[i], (rtx*) 0,
 				recog_data.operand[i],
 				recog_data.operand_loc[i],
 				i, operand_type[i], ind_levels, insn);
@@ -5621,7 +5621,7 @@ find_reloads_address_1 (mode, x, context, loc, opnum, type, ind_levels, insn)
 	     needless copies if SUBREG_REG is multi-word.  */
 	  if (REGNO (SUBREG_REG (x)) < FIRST_PSEUDO_REGISTER)
 	    {
-	      int regno = subreg_regno (x);
+	      int regno ATTRIBUTE_UNUSED = subreg_regno (x);
 
 	      if (! (context ? REGNO_OK_FOR_INDEX_P (regno)
 		     : REGNO_MODE_OK_FOR_BASE_P (regno, mode)))

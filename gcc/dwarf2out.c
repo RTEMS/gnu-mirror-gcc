@@ -203,6 +203,7 @@ typedef struct dw_fde_struct
   const char *dw_fde_end;
   dw_cfi_ref dw_fde_cfi;
   unsigned funcdef_number;
+  unsigned all_throwers_are_sibcalls : 1;
   unsigned nothrow : 1;
   unsigned uses_eh_lsda : 1;
 }
@@ -1952,11 +1953,12 @@ output_call_frame_info (for_eh)
       fde = &fde_table[i];
 
       /* Don't emit EH unwind info for leaf functions that don't need it.  */
-      if (!flag_asynchronous_unwind_tables && for_eh && fde->nothrow
-	  && !  fde->uses_eh_lsda)
+      if (!flag_asynchronous_unwind_tables && for_eh
+	  && (fde->nothrow || fde->all_throwers_are_sibcalls)
+	  && !fde->uses_eh_lsda)
 	continue;
 
-      ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, FDE_LABEL, for_eh + i * 2);
+      (*targetm.asm_out.internal_label) (asm_out_file, FDE_LABEL, for_eh + i * 2);
       ASM_GENERATE_INTERNAL_LABEL (l1, FDE_AFTER_SIZE_LABEL, for_eh + i * 2);
       ASM_GENERATE_INTERNAL_LABEL (l2, FDE_END_LABEL, for_eh + i * 2);
       dw2_asm_output_delta (for_eh ? 4 : DWARF_OFFSET_SIZE, l2, l1,
@@ -2041,10 +2043,8 @@ output_call_frame_info (for_eh)
       ASM_OUTPUT_LABEL (asm_out_file, l2);
     }
 
-#ifndef EH_FRAME_SECTION_NAME
-  if (for_eh)
+  if (for_eh && targetm.terminate_dw2_eh_frame_info)
     dw2_asm_output_data (4, 0, "End of Table");
-#endif
 #ifdef MIPS_DEBUGGING_INFO
   /* Work around Irix 6 assembler bug whereby labels at the end of a section
      get a value of 0.  Putting .align 0 after the label fixes it.  */
@@ -2115,6 +2115,7 @@ dwarf2out_begin_prologue (line, file)
   fde->funcdef_number = current_function_funcdef_no;
   fde->nothrow = current_function_nothrow;
   fde->uses_eh_lsda = cfun->uses_eh_lsda;
+  fde->all_throwers_are_sibcalls = cfun->all_throwers_are_sibcalls;
 
   args_size = old_args_size = 0;
 
@@ -2178,6 +2179,11 @@ dwarf2out_frame_finish ()
 
 /* And now, the subset of the debugging information support code necessary
    for emitting location expressions.  */
+
+/* We need some way to distinguish DW_OP_addr with a direct symbol
+   relocation from DW_OP_addr with a dtp-relative symbol relocation.  */
+#define INTERNAL_DW_OP_tls_addr		(0x100 + DW_OP_addr)
+
 
 typedef struct dw_val_struct *dw_val_ref;
 typedef struct die_struct *dw_die_ref;
@@ -2304,6 +2310,7 @@ dwarf_stack_op_name (op)
   switch (op)
     {
     case DW_OP_addr:
+    case INTERNAL_DW_OP_tls_addr:
       return "DW_OP_addr";
     case DW_OP_deref:
       return "DW_OP_deref";
@@ -2593,6 +2600,16 @@ dwarf_stack_op_name (op)
       return "DW_OP_xderef_size";
     case DW_OP_nop:
       return "DW_OP_nop";
+    case DW_OP_push_object_address:
+      return "DW_OP_push_object_address";
+    case DW_OP_call2:
+      return "DW_OP_call2";
+    case DW_OP_call4:
+      return "DW_OP_call4";
+    case DW_OP_call_ref:
+      return "DW_OP_call_ref";
+    case DW_OP_GNU_push_tls_address:
+      return "DW_OP_GNU_push_tls_address";
     default:
       return "OP_<unknown>";
     }
@@ -2650,6 +2667,7 @@ size_of_loc_descr (loc)
   switch (loc->dw_loc_opc)
     {
     case DW_OP_addr:
+    case INTERNAL_DW_OP_tls_addr:
       size += DWARF2_ADDR_SIZE;
       break;
     case DW_OP_const1u:
@@ -2734,6 +2752,15 @@ size_of_loc_descr (loc)
     case DW_OP_deref_size:
     case DW_OP_xderef_size:
       size += 1;
+      break;
+    case DW_OP_call2:
+      size += 2;
+      break;
+    case DW_OP_call4:
+      size += 4;
+      break;
+    case DW_OP_call_ref:
+      size += DWARF2_ADDR_SIZE;
       break;
     default:
       break;
@@ -2884,6 +2911,17 @@ output_loc_operands (loc)
     case DW_OP_xderef_size:
       dw2_asm_output_data (1, val1->v.val_int, NULL);
       break;
+
+    case INTERNAL_DW_OP_tls_addr:
+#ifdef ASM_OUTPUT_DWARF_DTPREL
+      ASM_OUTPUT_DWARF_DTPREL (asm_out_file, DWARF2_ADDR_SIZE,
+			       val1->v.val_addr);
+      fputc ('\n', asm_out_file);
+#else
+      abort ();
+#endif
+      break;
+
     default:
       /* Other codes have no operands.  */
       break;
@@ -3314,10 +3352,6 @@ struct file_table
 /* Filenames referenced by this compilation unit.  */
 static struct file_table file_table;
 
-/* Local pointer to the name of the main input file.  Initialized in
-   dwarf2out_init.  */
-static const char *primary_filename;
-
 /* A pointer to the base of a table of references to DIE's that describe
    declarations.  The table is indexed by DECL_UID() which is a unique
    number identifying each decl.  */
@@ -3587,7 +3621,8 @@ static unsigned int simple_decl_align_in_bits PARAMS ((tree));
 static unsigned HOST_WIDE_INT simple_type_size_in_bits PARAMS ((tree));
 static HOST_WIDE_INT field_byte_offset	PARAMS ((tree));
 static void add_AT_location_description	PARAMS ((dw_die_ref,
-						 enum dwarf_attribute, rtx));
+						 enum dwarf_attribute,
+						 dw_loc_descr_ref));
 static void add_data_member_location_attribute PARAMS ((dw_die_ref, tree));
 static void add_const_value_attribute	PARAMS ((dw_die_ref, rtx));
 static rtx rtl_for_decl_location	PARAMS ((tree));
@@ -8012,6 +8047,42 @@ loc_descriptor_from_tree (loc, addressp)
 	       : 0);
 
     case VAR_DECL:
+      if (DECL_THREAD_LOCAL (loc))
+	{
+	  rtx rtl;
+
+#ifndef ASM_OUTPUT_DWARF_DTPREL
+	  /* If this is not defined, we have no way to emit the data.  */
+	  return 0;
+#endif
+
+	  /* The way DW_OP_GNU_push_tls_address is specified, we can only
+	     look up addresses of objects in the current module.  */
+	  if (! (*targetm.binds_local_p) (loc))
+	    return 0;
+
+	  rtl = rtl_for_decl_location (loc);
+	  if (rtl == NULL_RTX)
+	    return 0;
+
+	  if (GET_CODE (rtl) != MEM)
+	    return 0;
+	  rtl = XEXP (rtl, 0);
+	  if (! CONSTANT_P (rtl))
+	    return 0;
+
+	  ret = new_loc_descr (INTERNAL_DW_OP_tls_addr, 0, 0);
+	  ret->dw_loc_oprnd1.val_class = dw_val_class_addr;
+	  ret->dw_loc_oprnd1.v.val_addr = rtl;
+
+	  ret1 = new_loc_descr (DW_OP_GNU_push_tls_address, 0, 0);
+	  add_loc_descr (&ret, ret1);
+
+	  indirect_p = 1;
+	  break;
+	}
+      /* FALLTHRU */
+
     case PARM_DECL:
       {
 	rtx rtl = rtl_for_decl_location (loc);
@@ -8494,14 +8565,12 @@ field_byte_offset (decl)
    whole parameters.  Note that the location attributes for struct fields are
    generated by the routine `data_member_location_attribute' below.  */
 
-static void
-add_AT_location_description (die, attr_kind, rtl)
+static inline void
+add_AT_location_description (die, attr_kind, descr)
      dw_die_ref die;
      enum dwarf_attribute attr_kind;
-     rtx rtl;
+     dw_loc_descr_ref descr;
 {
-  dw_loc_descr_ref descr = loc_descriptor (rtl);
-
   if (descr != 0)
     add_AT_loc (die, attr_kind, descr);
 }
@@ -8926,6 +8995,13 @@ rtl_for_decl_location (decl)
   if (rtl)
     rtl = ASM_SIMPLIFY_DWARF_ADDR (rtl);
 #endif
+
+  /* If we don't look past the constant pool, we risk emitting a
+     reference to a constant pool entry that isn't referenced from
+     code, and thus is not emitted.  */
+  if (rtl)
+    rtl = avoid_constant_pool_reference (rtl);
+
   return rtl;
 }
 
@@ -8946,6 +9022,7 @@ add_location_or_const_value_attribute (die, decl)
      tree decl;
 {
   rtx rtl;
+  dw_loc_descr_ref descr;
 
   if (TREE_CODE (decl) == ERROR_MARK)
     return;
@@ -8956,16 +9033,11 @@ add_location_or_const_value_attribute (die, decl)
   if (rtl == NULL_RTX)
     return;
 
-  /* If we don't look past the constant pool, we risk emitting a
-     reference to a constant pool entry that isn't referenced from
-     code, and thus is not emitted.  */
-  rtl = avoid_constant_pool_reference (rtl);
-
   switch (GET_CODE (rtl))
     {
     case ADDRESSOF:
-      /* The address of a variable that was optimized away; don't emit
-	 anything.  */
+      /* The address of a variable that was optimized away;
+	 don't emit anything.  */
       break;
 
     case CONST_INT:
@@ -8980,12 +9052,24 @@ add_location_or_const_value_attribute (die, decl)
       break;
 
     case MEM:
-    case REG:
-    case SUBREG:
-    case CONCAT:
-      add_AT_location_description (die, DW_AT_location, rtl);
+      if (TREE_CODE (decl) == VAR_DECL && DECL_THREAD_LOCAL (decl))
+	{
+	  /* Need loc_descriptor_from_tree since that's where we know
+	     how to handle TLS variables.  Want the object's address
+	     since the top-level DW_AT_location assumes such.  See
+	     the confusion in loc_descriptor for reference.  */
+	  descr = loc_descriptor_from_tree (decl, 1);
+	}
+      else
+	{
+	case REG:
+	case SUBREG:
+	case CONCAT:
+	  descr = loc_descriptor (rtl);
+	}
+      add_AT_location_description (die, DW_AT_location, descr);
       break;
-
+	
     default:
       abort ();
     }
@@ -9117,7 +9201,8 @@ add_bound_info (subrange_die, bound_attr, bound)
 
 	  add_AT_flag (decl_die, DW_AT_artificial, 1);
 	  add_type_attribute (decl_die, TREE_TYPE (bound), 1, 0, ctx);
-	  add_AT_location_description (decl_die, DW_AT_location, loc);
+	  add_AT_location_description (decl_die, DW_AT_location,
+				       loc_descriptor (loc));
 	  add_AT_die_ref (subrange_die, bound_attr, decl_die);
 	}
 
@@ -10322,7 +10407,7 @@ gen_subprogram_die (decl, context_die)
 	 is not part of the state saved/restored for inline functions.  */
       if (current_function_needs_context)
 	add_AT_location_description (subr_die, DW_AT_static_link,
-				     lookup_static_chain (decl));
+			     loc_descriptor (lookup_static_chain (decl)));
 #endif
     }
 
@@ -11837,7 +11922,7 @@ dwarf2out_source_line (line, filename)
       else if (DECL_SECTION_NAME (current_function_decl))
 	{
 	  dw_separate_line_info_ref line_info;
-	  ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, SEPARATE_LINE_CODE_LABEL,
+	  (*targetm.asm_out.internal_label) (asm_out_file, SEPARATE_LINE_CODE_LABEL,
 				     separate_line_info_table_in_use);
 
 	  /* expand the line info table if necessary */
@@ -11863,7 +11948,7 @@ dwarf2out_source_line (line, filename)
 	{
 	  dw_line_info_ref line_info;
 
-	  ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, LINE_CODE_LABEL,
+	  (*targetm.asm_out.internal_label) (asm_out_file, LINE_CODE_LABEL,
 				     line_info_table_in_use);
 
 	  /* Expand the line info table if necessary.  */
@@ -11971,12 +12056,9 @@ dwarf2out_init (main_input_filename)
 {
   init_file_table ();
 
-  /* Remember the name of the primary input file.  */
-  primary_filename = main_input_filename;
-
-  /* Add it to the file table first, under the assumption that we'll
-     be emitting line number data for it first, which avoids having
-     to add an initial DW_LNS_set_file.  */
+  /* Add the name of the primary input file to the file table first,
+     under the assumption that we'll be emitting line number data for
+     it first, which avoids having to add an initial DW_LNS_set_file.  */
   lookup_filename (main_input_filename);
 
   /* Allocate the initial hunk of the decl_die_table.  */
@@ -12180,7 +12262,7 @@ dwarf2out_finish (input_filename)
 
   /* Output a terminator label for the .text section.  */
   text_section ();
-  ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, TEXT_END_LABEL, 0);
+  (*targetm.asm_out.internal_label) (asm_out_file, TEXT_END_LABEL, 0);
 
   /* Output the source line correspondence table.  We must do this
      even if there is no line information.  Otherwise, on an empty

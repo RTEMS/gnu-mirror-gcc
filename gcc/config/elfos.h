@@ -60,15 +60,11 @@ Boston, MA 02111-1307, USA.  */
 
 /* System V Release 4 uses DWARF debugging info.  */
 
-#ifndef DWARF_DEBUGGING_INFO
 #define DWARF_DEBUGGING_INFO 1
-#endif
 
 /* All ELF targets can support DWARF-2.  */
 
-#ifndef DWARF2_DEBUGGING_INFO
 #define DWARF2_DEBUGGING_INFO 1
-#endif
 
 /* The GNU tools operate better with dwarf2, and it is required by some
    psABI's.  Since we don't have any native tools to be compatible with,
@@ -112,20 +108,6 @@ Boston, MA 02111-1307, USA.  */
 #define ASM_OUTPUT_SKIP(FILE, SIZE) \
   fprintf (FILE, "%s%u\n", SKIP_ASM_OP, (SIZE))
 
-/* This is how to output an internal numbered label where
-   PREFIX is the class of label and NUM is the number within the class.
-
-   For most svr4 systems, the convention is that any symbol which begins
-   with a period is not put into the linker symbol table by the assembler.  */
-
-#undef  ASM_OUTPUT_INTERNAL_LABEL
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE, PREFIX, NUM)		\
-  do								\
-    {								\
-      fprintf (FILE, ".%s%u:\n", PREFIX, (unsigned) (NUM));	\
-    }								\
-  while (0)
-
 /* This is how to store into the string LABEL
    the symbol_ref name of an internal numbered label where
    PREFIX is the class of label and NUM is the number within the class.
@@ -163,7 +145,7 @@ Boston, MA 02111-1307, USA.  */
   do									\
     {									\
       ASM_OUTPUT_BEFORE_CASE_LABEL (FILE, PREFIX, NUM, JUMPTABLE)	\
-	ASM_OUTPUT_INTERNAL_LABEL (FILE, PREFIX, NUM);			\
+	(*targetm.asm_out.internal_label) (FILE, PREFIX, NUM);			\
     }									\
   while (0)
 
