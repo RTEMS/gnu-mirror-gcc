@@ -731,6 +731,14 @@ dtors_section ()							\
 #undef HANDLE_SYSV_PRAGMA
 #define HANDLE_SYSV_PRAGMA 1
 
+/* Though OpenServer support .weak in COFF, g++ doesn't play nice with it
+ * so we'll punt on it for now
+ */
+#define SUPPORTS_WEAK (TARGET_ELF)
+#define ASM_WEAKEN_LABEL(FILE,NAME) \
+  do { fputs ("\t.weak\t", FILE); assemble_name (FILE, NAME);		\
+	fputc ('\n', FILE); } while (0)
+
 #undef SCCS_DIRECTIVE
 #define SCCS_DIRECTIVE 1
 
@@ -907,6 +915,11 @@ dtors_section ()							\
 	{ "elf", -MASK_COFF },
 
 #define NO_DOLLAR_IN_LABEL
+
+/* Implicit library calls should use memcpy, not bcopy, etc.  They are 
+   faster on OpenServer libraries. */
+
+#define TARGET_MEM_FUNCTIONS
 
 /*
 Here comes some major hackery to get the crt stuff to compile properly.

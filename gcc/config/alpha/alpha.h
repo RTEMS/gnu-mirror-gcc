@@ -483,7 +483,7 @@ extern void override_options ();
    Alpha we'll get better performance by aligning on an octaword
    boundary.  */
 
-#define ALIGN_LABEL_AFTER_BARRIER(FILE)	\
+#define LABEL_ALIGN_AFTER_BARRIER(FILE)	\
   (optimize > 0 && write_symbols != SDB_DEBUG ? 4 : 0)
 
 /* No data type wants to be aligned rounder than this.  */
@@ -1180,6 +1180,10 @@ extern struct rtx_def *alpha_builtin_saveregs ();
 extern struct rtx_def *alpha_compare_op0, *alpha_compare_op1;
 extern int alpha_compare_fp_p;
 
+/* Define the information needed to modify the epilogue for EH.  */
+
+extern struct rtx_def *alpha_eh_epilogue_sp_ofs;
+
 /* Make (or fake) .linkage entry for function call.
    IS_LOCAL is 0 if name is used in call, 1 if name is used in definition.  */
 extern void alpha_need_linkage ();
@@ -1291,6 +1295,7 @@ do {						\
 
 #define INITIALIZE_TRAMPOLINE(TRAMP, FNADDR, CXT) \
   alpha_initialize_trampoline (TRAMP, FNADDR, CXT, 16, 24, 8)
+extern void alpha_initialize_trampoline ();
 
 /* A C expression whose value is RTL representing the value of the return
    address for the frame COUNT steps up from the current frame.
@@ -1299,6 +1304,9 @@ do {						\
 
 #define RETURN_ADDR_RTX  alpha_return_addr
 extern struct rtx_def *alpha_return_addr ();
+
+/* Before the prologue, RA lives in $26. */
+#define INCOMING_RETURN_ADDR_RTX  gen_rtx_REG (Pmode, 26)
 
 /* Initialize data used by insn expanders.  This is called from insn_emit,
    once for every function before code is generated.  */
@@ -1582,9 +1590,11 @@ do {									\
 
 #define MOVE_MAX 8
 
-/* Controls how many units are moved by expr.c before resorting to movstr.
-   Without byte/word accesses, we want no more than one; with, several single
-   byte accesses are better.   */
+/* If a memory-to-memory move would take MOVE_RATIO or more simple
+   move-instruction pairs, we will do a movstr or libcall instead.
+
+   Without byte/word accesses, we want no more than four instructions;
+   with, several single byte accesses are better.   */
 
 #define MOVE_RATIO  (TARGET_BWX ? 7 : 2)
 
@@ -1678,6 +1688,12 @@ do {									\
 
 /* The EV4 is dual issue; EV5/EV6 are quad issue.  */
 #define ISSUE_RATE  (alpha_cpu == PROCESSOR_EV4 ? 2 : 4)
+
+/* Describe the fact that MULTI instructions are multiple instructions
+   and so to assume they don't pair with anything.  */
+#define MD_SCHED_VARIABLE_ISSUE(DUMP, SCHED_VERBOSE, INSN, CAN_ISSUE_MORE) \
+  if (recog_memoized (INSN) < 0 || get_attr_type (INSN) == TYPE_MULTI)	   \
+     (CAN_ISSUE_MORE) = 0
 
 /* Compute the cost of computing a constant rtl expression RTX
    whose rtx-code is CODE.  The body of this macro is a portion

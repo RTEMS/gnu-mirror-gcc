@@ -70,15 +70,19 @@ Boston, MA 02111-1307, USA.  */
 %{mcpu=rios2: -D_ARCH_PWR2} \
 %{mcpu=rsc: -D_ARCH_PWR} \
 %{mcpu=rsc1: -D_ARCH_PWR} \
+%{mcpu=401: -D_ARCH_PPC} \
 %{mcpu=403: -D_ARCH_PPC} \
 %{mcpu=505: -D_ARCH_PPC} \
 %{mcpu=601: -D_ARCH_PPC -D_ARCH_PWR} \
 %{mcpu=602: -D_ARCH_PPC} \
 %{mcpu=603: -D_ARCH_PPC} \
 %{mcpu=603e: -D_ARCH_PPC} \
+%{mcpu=ec603e: -D_ARCH_PPC} \
 %{mcpu=604: -D_ARCH_PPC} \
+%{mcpu=604e: -D_ARCH_PPC} \
 %{mcpu=620: -D_ARCH_PPC} \
 %{mcpu=821: -D_ARCH_PPC} \
+%{mcpu=823: -D_ARCH_PPC} \
 %{mcpu=860: -D_ARCH_PPC}"
 
 #ifndef CPP_DEFAULT_SPEC
@@ -119,15 +123,19 @@ Boston, MA 02111-1307, USA.  */
 %{mcpu=rios2: -mpwrx} \
 %{mcpu=rsc: -mpwr} \
 %{mcpu=rsc1: -mpwr} \
+%{mcpu=401: -mppc} \
 %{mcpu=403: -mppc} \
 %{mcpu=505: -mppc} \
 %{mcpu=601: -m601} \
 %{mcpu=602: -mppc} \
 %{mcpu=603: -mppc} \
 %{mcpu=603e: -mppc} \
+%{mcpu=ec603e: -mppc} \
 %{mcpu=604: -mppc} \
+%{mcpu=604e: -mppc} \
 %{mcpu=620: -mppc} \
 %{mcpu=821: -mppc} \
+%{mcpu=823: -mppc} \
 %{mcpu=860: -mppc}"
 
 #ifndef ASM_DEFAULT_SPEC
@@ -465,9 +473,16 @@ extern int rs6000_debug_arg;		/* debug argument handling */
    defined, is executed once just after all the command options have
    been parsed.
 
+   Don't use this macro to turn on various extra optimizations for
+   `-O'.  That is what `OPTIMIZATION_OPTIONS' is for.
+
    On the RS/6000 this is used to define the target cpu type.  */
 
 #define OVERRIDE_OPTIONS rs6000_override_options (TARGET_CPU_DEFAULT)
+
+/* Define this to change the optimizations performed by default.  */
+#define OPTIMIZATION_OPTIONS(LEVEL,SIZE) optimization_options(LEVEL,SIZE)
+
 
 /* Show we can debug even without a frame pointer.  */
 #define CAN_DEBUG_WITHOUT_FP
@@ -704,9 +719,10 @@ extern int rs6000_debug_arg;		/* debug argument handling */
 	fp13 - fp2	(not saved; incoming fp arg registers)
 	fp1		(not saved; return value)
  	fp31 - fp14	(saved; order given to save least number)
-	cr1, cr6, cr7	(not saved or special)
+	cr7, cr6	(not saved or special)
+	cr1		(not saved, but used for FP operations)
 	cr0		(not saved, but used for arithmetic operations)
-	cr2, cr3, cr4	(saved)
+	cr4, cr3, cr2	(saved)
         r0		(not saved; cannot be base reg)
 	r9		(not saved; best for TImode)
 	r11, r10, r8-r4	(not saved; highest used first to make less conflict)
@@ -724,7 +740,7 @@ extern int rs6000_debug_arg;		/* debug argument handling */
    33,							\
    63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51,	\
    50, 49, 48, 47, 46, 					\
-   69, 74, 75, 68, 70, 71, 72,				\
+   75, 74, 69, 68, 72, 71, 70,				\
    0,							\
    9, 11, 10, 8, 7, 6, 5, 4,				\
    3,							\
@@ -3265,6 +3281,7 @@ extern struct rtx_def *rs6000_longcall_ref ();
 extern int function_arg_padding ();
 extern void toc_section ();
 extern void private_data_section ();
+extern void rs6000_fatal_bad_address ();
 
 /* See nonlocal_goto_receiver for when this must be set.  */
 

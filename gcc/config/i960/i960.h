@@ -122,7 +122,8 @@ Boston, MA 02111-1307, USA.  */
   fprintf (asm_out_file, "\t.type\t0x%x;", A)
 
 /* Handle pragmas for compatibility with Intel's compilers.  */
-#define HANDLE_PRAGMA(FILE, NODE) process_pragma (FILE, NODE)
+#define HANDLE_PRAGMA(GET, UNGET, NAME) process_pragma (GET, UNGET, NAME)
+extern int process_pragma ();
 
 /* Run-time compilation parameters selecting different hardware subsets.  */
 
@@ -1108,9 +1109,10 @@ extern struct rtx_def *legitimize_address ();
 #define LOAD_EXTEND_OP(MODE) ZERO_EXTEND
 
 /* Nonzero if access to memory by bytes is no faster than for words.
-   Defining this results in worse code on the i960.  */
+   Value changed to 1 after reports of poor bitfield code with g++.
+   Indications are that code is usually as good, sometimes better. */   
 
-#define SLOW_BYTE_ACCESS 0
+#define SLOW_BYTE_ACCESS 1
 
 /* We assume that the store-condition-codes instructions store 0 for false
    and some other value for true.  This is the value stored for true.  */
@@ -1193,7 +1195,7 @@ extern struct rtx_def *gen_compare_reg ();
   case CONST:								\
   case LABEL_REF:							\
   case SYMBOL_REF:							\
-    return (TARGET_FLAG_C_SERIES ? 6 : 8);				\
+    return (TARGET_C_SERIES ? 6 : 8);					\
   case CONST_DOUBLE:							\
     if ((RTX) == CONST0_RTX (DFmode) || (RTX) == CONST0_RTX (SFmode)	\
 	|| (RTX) == CONST1_RTX (DFmode) || (RTX) == CONST1_RTX (SFmode))\

@@ -36,10 +36,6 @@ Boston, MA 02111-1307, USA.  */
 
 extern int target_flags;
 
-/* Global registers known to hold the value zero.  */
-extern struct rtx_def *zero_dreg;
-extern struct rtx_def *zero_areg;
-
 /* Macros used in the machine description to test the flags.  */
 
 /* Macro to define tables used to set the flags.
@@ -182,7 +178,7 @@ extern struct rtx_def *zero_areg;
    If HARD_REGNO_MODE_OK could produce different values for MODE1 and MODE2,
    for any hard reg, then this must be 0 for correct output.  */
 #define MODES_TIEABLE_P(MODE1, MODE2) \
-  (MODE1 == MODE2 || GET_MODE_SIZE (MODE1) <= 4 && GET_MODE_SIZE (MODE2) <= 4)
+  (MODE1 == MODE2 || (GET_MODE_SIZE (MODE1) <= 4 && GET_MODE_SIZE (MODE2) <= 4))
 
 /* 4 data, and effectively 3 address registers is small as far as I'm
    concerned.  */
@@ -775,6 +771,8 @@ extern struct rtx_def *legitimize_address ();
 /* Provide the costs of a rtl expression.  This is in the body of a
    switch on CODE.  */
 #define RTX_COSTS(RTX,CODE,OUTER_CODE) \
+  case UMOD:		\
+  case UDIV:		\
   case MOD:		\
   case DIV:		\
     return 8;		\
@@ -953,6 +951,33 @@ do { char dstr[30];					\
 #define PREFERRED_DEBUGGING_TYPE DBX_DEBUG
 
 #define DBX_REGISTER_NUMBER(REGNO) REGNO
+
+/* GDB always assumes the current function's frame begins at the value
+   of the stack pointer upon entry to the current function.  Accessing
+   local variables and parameters passed on the stack is done using the
+   base of the frame + an offset provided by GCC.
+
+   For functions which have frame pointers this method works fine;
+   the (frame pointer) == (stack pointer at function entry) and GCC provides
+   an offset relative to the frame pointer.
+
+   This loses for functions without a frame pointer; GCC provides an offset
+   which is relative to the stack pointer after adjusting for the function's
+   frame size.  GDB would prefer the offset to be relative to the value of
+   the stack pointer at the function's entry.  Yuk!  */
+#define DEBUGGER_AUTO_OFFSET(X) \
+  ((GET_CODE (X) == PLUS ? INTVAL (XEXP (X, 1)) : 0) \
+    + (frame_pointer_needed \
+       ? 0 : -initial_offset (FRAME_POINTER_REGNUM, STACK_POINTER_REGNUM)))
+
+#define DEBUGGER_ARG_OFFSET(OFFSET, X) \
+  ((GET_CODE (X) == PLUS ? OFFSET : 0) \
+    + (frame_pointer_needed \
+       ? 0 : -initial_offset (ARG_POINTER_REGNUM, STACK_POINTER_REGNUM)))
+
+/* We need to prepend underscores.  */
+#define ASM_OUTPUT_DWARF2_ADDR_CONST(FILE,ADDR) \
+  fprintf ((FILE), "\t%s\t_%s", UNALIGNED_WORD_ASM_OP, (ADDR))
 
 /* Define to use software floating point emulator for REAL_ARITHMETIC and
    decimal <-> binary conversion. */

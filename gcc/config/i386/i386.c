@@ -100,7 +100,36 @@ struct processor_costs pentiumpro_cost = {
   17					/* cost of a divide/mod */
 };
 
+struct processor_costs k6_cost = {
+  1,					/* cost of an add instruction */
+  1,					/* cost of a lea instruction */
+  1,					/* variable shift costs */
+  1,					/* constant shift costs */
+  2,					/* cost of starting a multiply */
+  0,					/* cost of multiply per each bit set */
+  18					/* cost of a divide/mod */
+};
+
 struct processor_costs *ix86_cost = &pentium_cost;
+
+/* Processor feature/optimization bitmasks.  */
+#define m_386 (1<<PROCESSOR_I386)
+#define m_486 (1<<PROCESSOR_I486)
+#define m_PENT (1<<PROCESSOR_PENTIUM)
+#define m_PPRO (1<<PROCESSOR_PENTIUMPRO)
+#define m_K6  (1<<PROCESSOR_K6)
+
+const int x86_use_leave = m_386 | m_K6;
+const int x86_push_memory = m_386 | m_K6;
+const int x86_zero_extend_with_and = m_486 | m_PENT;
+const int x86_movx = m_386 | m_PPRO | m_K6;
+const int x86_double_with_add = ~m_386;
+const int x86_use_bit_test = m_386;
+const int x86_unroll_strlen = m_486 | m_PENT | m_PPRO;
+const int x86_use_q_reg = m_PENT | m_PPRO | m_K6;
+const int x86_use_any_reg = m_486;
+const int x86_cmove = m_PPRO;
+const int x86_deep_branch = m_PPRO| m_K6;
 
 #define AT_BP(mode) (gen_rtx_MEM ((mode), frame_pointer_rtx))
 
@@ -213,7 +242,8 @@ override_options ()
 	   {PROCESSOR_I686_STRING, PROCESSOR_PENTIUMPRO, &pentiumpro_cost,
 	      0, 0},
 	   {PROCESSOR_PENTIUMPRO_STRING, PROCESSOR_PENTIUMPRO,
-	      &pentiumpro_cost, 0, 0}};
+	      &pentiumpro_cost, 0, 0},
+      	   {PROCESSOR_K6_STRING, PROCESSOR_K6, &k6_cost, 0, 0}};
 
   int ptt_size = sizeof (processor_target_table) / sizeof (struct ptt);
 
@@ -279,7 +309,7 @@ override_options ()
       {
 	ix86_cpu = processor_target_table[j].processor;
 	ix86_cost = processor_target_table[j].cost;
-	if (i > j && (int) ix86_arch >= (int) PROCESSOR_PENTIUMPRO)
+	if (i > j && (int) ix86_arch >= (int) PROCESSOR_K6)
 	  error ("-mcpu=%s does not support -march=%s",
 		 ix86_cpu_string, ix86_arch_string);
 
@@ -1586,6 +1616,7 @@ standard_80387_constant_p (x)
   /* Note that on the 80387, other constants, such as pi,
      are much slower to load as standard constants
      than to load from doubles in memory!  */
+  /* ??? Not true on K6: all constants are equal cost.  */
 #endif
 
   return 0;
@@ -2180,6 +2211,10 @@ ix86_prologue (do_rtl)
  	  }
       }
 
+#ifdef SUBTARGET_PROLOGUE
+  SUBTARGET_PROLOGUE;
+#endif  
+
   if (pic_reg_used)
     load_pic_register (do_rtl);
 
@@ -2503,6 +2538,37 @@ do {									\
     }									\
 } while (0)
 
+static int
+legitimate_pic_address_disp_p (disp)
+     register rtx disp;
+{
+  if (GET_CODE (disp) != CONST)
+    return 0;
+  disp = XEXP (disp, 0);
+
+  if (GET_CODE (disp) == PLUS)
+    {
+      if (GET_CODE (XEXP (disp, 1)) != CONST_INT)
+	return 0;
+      disp = XEXP (disp, 0);
+    }
+
+  if (GET_CODE (disp) != UNSPEC
+      || XVECLEN (disp, 0) != 1)
+    return 0;
+
+  /* Must be @GOT or @GOTOFF.  */
+  if (XINT (disp, 1) != 6
+      && XINT (disp, 1) != 7)
+    return 0;
+
+  if (GET_CODE (XVECEXP (disp, 0, 0)) != SYMBOL_REF
+      && GET_CODE (XVECEXP (disp, 0, 0)) != LABEL_REF)
+    return 0;
+
+  return 1;
+}
+
 int
 legitimate_address_p (mode, addr, strict)
      enum machine_mode mode;
@@ -2664,20 +2730,10 @@ legitimate_address_p (mode, addr, strict)
 	}
     }
 
-  /* Validate displacement
-     Constant pool addresses must be handled special.  They are
-     considered legitimate addresses, but only if not used with regs.
-     When printed, the output routines know to print the reference with the
-     PIC reg, even though the PIC reg doesn't appear in the RTL. */
+  /* Validate displacement.  */
   if (disp)
     {
-      if (GET_CODE (disp) == SYMBOL_REF
-	  && CONSTANT_POOL_ADDRESS_P (disp)
-	  && base == 0
-	  && indx == 0)
-	;
-
-      else if (!CONSTANT_ADDRESS_P (disp))
+      if (!CONSTANT_ADDRESS_P (disp))
 	{
 	  ADDR_INVALID ("Displacement is not valid.\n", disp);
 	  return FALSE;
@@ -2689,20 +2745,32 @@ legitimate_address_p (mode, addr, strict)
 	  return FALSE;
 	}
 
-      else if (flag_pic && SYMBOLIC_CONST (disp)
-	       && base != pic_offset_table_rtx
-	       && (indx != pic_offset_table_rtx || scale != NULL_RTX))
+      if (flag_pic && SYMBOLIC_CONST (disp))
 	{
-	  ADDR_INVALID ("Displacement is an invalid pic reference.\n", disp);
-	  return FALSE;
+	  if (! legitimate_pic_address_disp_p (disp))
+	    {
+	      ADDR_INVALID ("Displacement is an invalid PIC construct.\n",
+			    disp);
+	      return FALSE;
+	    }
+
+	  if (base != pic_offset_table_rtx
+	      && (indx != pic_offset_table_rtx || scale != NULL_RTX))
+	    {
+	      ADDR_INVALID ("PIC displacement against invalid base.\n", disp);
+	      return FALSE;
+	    }
 	}
 
-      else if (HALF_PIC_P () && HALF_PIC_ADDRESS_P (disp)
-	       && (base != NULL_RTX || indx != NULL_RTX))
+      else if (HALF_PIC_P ())
 	{
-	  ADDR_INVALID ("Displacement is an invalid half-pic reference.\n",
-			disp);
-	  return FALSE;
+	  if (! HALF_PIC_ADDRESS_P (disp)
+	      || (base != NULL_RTX || indx != NULL_RTX))
+	    {
+	      ADDR_INVALID ("Displacement is an invalid half-pic reference.\n",
+			    disp);
+	      return FALSE;
+	    }
 	}
     }
 
@@ -2716,29 +2784,20 @@ legitimate_address_p (mode, addr, strict)
 /* Return a legitimate reference for ORIG (an address) using the
    register REG.  If REG is 0, a new pseudo is generated.
 
-   There are three types of references that must be handled:
+   There are two types of references that must be handled:
 
    1. Global data references must load the address from the GOT, via
       the PIC reg.  An insn is emitted to do this load, and the reg is
       returned.
 
-   2. Static data references must compute the address as an offset
-      from the GOT, whose base is in the PIC reg.  An insn is emitted to
-      compute the address into a reg, and the reg is returned.  Static
-      data objects have SYMBOL_REF_FLAG set to differentiate them from
-      global data objects.
-
-   3. Constant pool addresses must be handled special.  They are
-      considered legitimate addresses, but only if not used with regs.
-      When printed, the output routines know to print the reference with the
-      PIC reg, even though the PIC reg doesn't appear in the RTL.
+   2. Static data references, constant pool addresses, and code labels
+      compute the address as an offset from the GOT, whose base is in
+      the PIC reg.  Static data objects have SYMBOL_REF_FLAG set to
+      differentiate them from global data objects.  The returned
+      address is the PIC reg + an unspec constant.
 
    GO_IF_LEGITIMATE_ADDRESS rejects symbolic references unless the PIC
-   reg also appears in the address (except for constant pool references,
-   noted above).
-
-   "switch" statements also require special handling when generating
-   PIC code.  See comments by the `casesi' insn in i386.md for details.  */
+   reg also appears in the address.  */
 
 rtx
 legitimize_pic_address (orig, reg)
@@ -2747,60 +2806,99 @@ legitimize_pic_address (orig, reg)
 {
   rtx addr = orig;
   rtx new = orig;
+  rtx base;
 
-  if (GET_CODE (addr) == SYMBOL_REF || GET_CODE (addr) == LABEL_REF)
+  if (GET_CODE (addr) == LABEL_REF
+      || (GET_CODE (addr) == SYMBOL_REF
+	  && (CONSTANT_POOL_ADDRESS_P (addr)
+	      || SYMBOL_REF_FLAG (addr))))
     {
-      if (GET_CODE (addr) == SYMBOL_REF && CONSTANT_POOL_ADDRESS_P (addr))
-	reg = new = orig;
-      else
-	{
-	  if (reg == 0)
-	    reg = gen_reg_rtx (Pmode);
+      /* This symbol may be referenced via a displacement from the PIC
+	 base address (@GOTOFF).  */
 
-	  if ((GET_CODE (addr) == SYMBOL_REF && SYMBOL_REF_FLAG (addr))
-	      || GET_CODE (addr) == LABEL_REF)
-	    new = gen_rtx (PLUS, Pmode, pic_offset_table_rtx, orig);
-	  else
-	    new = gen_rtx_MEM (Pmode,
-			   gen_rtx (PLUS, Pmode, pic_offset_table_rtx, orig));
-
-	  emit_move_insn (reg, new);
-	}
       current_function_uses_pic_offset_table = 1;
-      return reg;
-    }
+      new = gen_rtx_UNSPEC (VOIDmode, gen_rtvec (1, addr), 7);
+      new = gen_rtx_CONST (VOIDmode, new);
+      new = gen_rtx_PLUS (Pmode, pic_offset_table_rtx, new);
 
-  else if (GET_CODE (addr) == CONST || GET_CODE (addr) == PLUS)
-    {
-      rtx base;
-
-      if (GET_CODE (addr) == CONST)
+      if (reg != 0)
 	{
-	  addr = XEXP (addr, 0);
-	  if (GET_CODE (addr) != PLUS)
-	    abort ();
+	  emit_move_insn (reg, new);
+	  new = reg;
 	}
+    }
+  else if (GET_CODE (addr) == SYMBOL_REF)
+    {
+      /* This symbol must be referenced via a load from the
+	 Global Offset Table (@GOT). */
 
-      if (XEXP (addr, 0) == pic_offset_table_rtx)
-	return orig;
+      current_function_uses_pic_offset_table = 1;
+      new = gen_rtx_UNSPEC (VOIDmode, gen_rtvec (1, addr), 6);
+      new = gen_rtx_CONST (VOIDmode, new);
+      new = gen_rtx_PLUS (Pmode, pic_offset_table_rtx, new);
+      new = gen_rtx_MEM (Pmode, new);
+      RTX_UNCHANGING_P (new) = 1;
 
       if (reg == 0)
 	reg = gen_reg_rtx (Pmode);
-
-      base = legitimize_pic_address (XEXP (addr, 0), reg);
-      addr = legitimize_pic_address (XEXP (addr, 1),
-				     base == reg ? NULL_RTX : reg);
-
-      if (GET_CODE (addr) == CONST_INT)
-	return plus_constant (base, INTVAL (addr));
-
-      if (GET_CODE (addr) == PLUS && CONSTANT_P (XEXP (addr, 1)))
+      emit_move_insn (reg, new);
+      new = reg;
+    }      
+  else
+    {
+      if (GET_CODE (addr) == CONST)
 	{
-	  base = gen_rtx (PLUS, Pmode, base, XEXP (addr, 0));
-	  addr = XEXP (addr, 1);
+	  addr = XEXP (addr, 0);
+	  if (GET_CODE (addr) == UNSPEC)
+	    {
+	      /* Check that the unspec is one of the ones we generate?  */
+	    }
+	  else if (GET_CODE (addr) != PLUS)
+	    abort();
 	}
+      if (GET_CODE (addr) == PLUS)
+	{
+	  rtx op0 = XEXP (addr, 0), op1 = XEXP (addr, 1);
 
-      return gen_rtx (PLUS, Pmode, base, addr);
+	  /* Check first to see if this is a constant offset from a @GOTOFF
+	     symbol reference.  */
+	  if ((GET_CODE (op0) == LABEL_REF
+	       || (GET_CODE (op0) == SYMBOL_REF
+		   && (CONSTANT_POOL_ADDRESS_P (op0)
+		       || SYMBOL_REF_FLAG (op0))))
+	      && GET_CODE (op1) == CONST_INT)
+	    {
+	      current_function_uses_pic_offset_table = 1;
+	      new = gen_rtx_UNSPEC (VOIDmode, gen_rtvec (1, op0), 7);
+	      new = gen_rtx_PLUS (VOIDmode, new, op1);
+	      new = gen_rtx_CONST (VOIDmode, new);
+	      new = gen_rtx_PLUS (Pmode, pic_offset_table_rtx, new);
+
+	      if (reg != 0)
+		{
+		  emit_move_insn (reg, new);
+		  new = reg;
+		}
+	    }
+	  else
+	    {
+	      base = legitimize_pic_address (XEXP (addr, 0), reg);
+	      new  = legitimize_pic_address (XEXP (addr, 1),
+					     base == reg ? NULL_RTX : reg);
+
+	      if (GET_CODE (new) == CONST_INT)
+		new = plus_constant (base, INTVAL (new));
+	      else
+		{
+		  if (GET_CODE (new) == PLUS && CONSTANT_P (XEXP (new, 1)))
+		    {
+		      base = gen_rtx_PLUS (Pmode, base, XEXP (new, 0));
+		      new = XEXP (new, 1);
+		    }
+		  new = gen_rtx_PLUS (Pmode, base, new);
+		}
+	    }
+	}
     }
   return new;
 }
@@ -2815,7 +2913,7 @@ emit_pic_move (operands, mode)
   rtx temp = reload_in_progress ? operands[0] : gen_reg_rtx (Pmode);
 
   if (GET_CODE (operands[0]) == MEM && SYMBOLIC_CONST (operands[1]))
-    operands[1] = force_reg (SImode, operands[1]);
+    operands[1] = force_reg (Pmode, operands[1]);
   else
     operands[1] = legitimize_pic_address (operands[1], temp);
 }
@@ -2866,8 +2964,8 @@ legitimize_address (x, oldx, mode)
       && (log = (unsigned)exact_log2 (INTVAL (XEXP (x, 1)))) < 4)
     {
       changed = 1;
-      x = gen_rtx (MULT, Pmode, force_reg (Pmode, XEXP (x, 0)),
-		   GEN_INT (1 << log));
+      x = gen_rtx_MULT (Pmode, force_reg (Pmode, XEXP (x, 0)),
+			GEN_INT (1 << log));
     }
 
   if (GET_CODE (x) == PLUS)
@@ -3028,31 +3126,14 @@ output_pic_addr_const (file, x, code)
       break;
 
     case SYMBOL_REF:
-    case LABEL_REF:
-      if (GET_CODE (x) == SYMBOL_REF)
-	assemble_name (file, XSTR (x, 0));
-      else
-	{
-	  ASM_GENERATE_INTERNAL_LABEL (buf, "L",
-				       CODE_LABEL_NUMBER (XEXP (x, 0)));
-	  assemble_name (asm_out_file, buf);
-	}
-
-      if (code == 'X')
-	; /* No suffix, dammit. */
-      else if (GET_CODE (x) == SYMBOL_REF && CONSTANT_POOL_ADDRESS_P (x))
-	fprintf (file, "@GOTOFF(%%ebx)");
-      else if (code == 'P')
-	fprintf (file, "@PLT");
-      else if (GET_CODE (x) == LABEL_REF)
-	fprintf (file, "@GOTOFF");
-      else if (! SYMBOL_REF_FLAG (x))
-	fprintf (file, "@GOT");
-      else
-	fprintf (file, "@GOTOFF");
-
+      assemble_name (file, XSTR (x, 0));
+      if (code == 'P' && ! SYMBOL_REF_FLAG (x))
+	fputs ("@PLT", file);
       break;
 
+    case LABEL_REF:
+      x = XEXP (x, 0);
+      /* FALLTHRU */
     case CODE_LABEL:
       ASM_GENERATE_INTERNAL_LABEL (buf, "L", CODE_LABEL_NUMBER (x));
       assemble_name (asm_out_file, buf);
@@ -3090,17 +3171,17 @@ output_pic_addr_const (file, x, code)
       if (GET_CODE (XEXP (x, 0)) == CONST_INT)
 	{
 	  output_pic_addr_const (file, XEXP (x, 0), code);
-	  if (INTVAL (XEXP (x, 1)) >= 0)
-	    fprintf (file, "+");
+	  fprintf (file, "+");
 	  output_pic_addr_const (file, XEXP (x, 1), code);
 	}
-      else
+      else if (GET_CODE (XEXP (x, 1)) == CONST_INT)
 	{
 	  output_pic_addr_const (file, XEXP (x, 1), code);
-	  if (INTVAL (XEXP (x, 0)) >= 0)
-	    fprintf (file, "+");
+	  fprintf (file, "+");
 	  output_pic_addr_const (file, XEXP (x, 0), code);
 	}
+      else
+	abort ();
       break;
 
     case MINUS:
@@ -3109,11 +3190,140 @@ output_pic_addr_const (file, x, code)
       output_pic_addr_const (file, XEXP (x, 1), code);
       break;
 
+     case UNSPEC:
+       if (XVECLEN (x, 0) != 1)
+ 	abort ();
+       output_pic_addr_const (file, XVECEXP (x, 0, 0), code);
+       switch (XINT (x, 1))
+ 	{
+ 	case 6:
+ 	  fputs ("@GOT", file);
+ 	  break;
+ 	case 7:
+ 	  fputs ("@GOTOFF", file);
+ 	  break;
+ 	case 8:
+ 	  fputs ("@PLT", file);
+ 	  break;
+ 	default:
+ 	  output_operand_lossage ("invalid UNSPEC as operand");
+ 	  break;
+ 	}
+       break;
+
     default:
       output_operand_lossage ("invalid expression as operand");
     }
 }
 
+static void
+put_jump_code (code, reverse, file)
+     enum rtx_code code;
+     int reverse;
+     FILE *file;
+{
+  int flags = cc_prev_status.flags;
+  int ieee = (TARGET_IEEE_FP && (flags & CC_IN_80387));
+  const char *suffix;
+
+  if (flags & CC_Z_IN_NOT_C)
+    switch (code)
+      {
+      case EQ:
+	fputs (reverse ? "c" : "nc", file);
+	return;
+
+      case NE:
+	fputs (reverse ? "nc" : "c", file);
+	return;
+
+      default:
+	abort ();
+      }
+  if (ieee)
+    {
+      switch (code)
+	{
+	case LE:
+	  suffix = reverse ? "ae" : "b";
+	  break;
+	case GT:
+	case LT:
+	case GE:
+	  suffix = reverse ? "ne" : "e";
+	  break;
+	case EQ:
+	  suffix = reverse ? "ne" : "e";
+	  break;
+	case NE:
+	  suffix = reverse ? "e" : "ne";
+	  break;
+	default:
+	  abort ();
+	}
+      fputs (suffix, file);
+      return;
+    }
+  if (flags & CC_TEST_AX)
+    abort();
+  if ((flags & CC_NO_OVERFLOW) && (code == LE || code == GT))
+    abort ();
+  if (reverse)
+    code = reverse_condition (code);
+  switch (code)
+    {
+    case EQ:
+      suffix = "e";
+      break;
+
+    case NE:
+      suffix = "ne";
+      break;
+
+    case GT:
+      suffix = flags & CC_IN_80387 ? "a" : "g";
+      break;
+
+    case GTU:
+      suffix = "a";
+      break;
+
+    case LT:
+      if (flags & CC_NO_OVERFLOW)
+	suffix = "s";
+      else
+	suffix = flags & CC_IN_80387 ? "b" : "l";
+      break;
+
+    case LTU:
+      suffix = "b";
+      break;
+
+    case GE:
+      if (flags & CC_NO_OVERFLOW)
+	suffix = "ns";
+      else
+	suffix = flags & CC_IN_80387 ? "ae" : "ge";
+      break;
+
+    case GEU:
+      suffix = "ae";
+      break;
+
+    case LE:
+      suffix = flags & CC_IN_80387 ? "be" : "le";
+      break;
+
+    case LEU:
+      suffix = "be";
+      break;
+
+    default:
+      abort ();
+    }
+  fputs (suffix, file);
+}
+
 /* Append the correct conditional move suffix which corresponds to CODE.  */
 
 static void
@@ -3230,12 +3440,13 @@ put_condition_code (code, reverse_cc, mode, file)
    C -- print opcode suffix for set/cmov insn.
    c -- like C, but print reversed condition
    F -- print opcode suffix for fcmov insn.
-   f -- like C, but print reversed condition
+   f -- like F, but print reversed condition
+   D -- print the opcode suffix for a jump
+   d -- like D, but print reversed condition
    R -- print the prefix for register names.
    z -- print the opcode suffix for the size of the current operand.
    * -- print a star (in certain assembler syntax)
    w -- print the operand as if it's a "word" (HImode) even if it isn't.
-   c -- don't print special prefixes before constant operands.
    J -- print the appropriate jump operand.
    s -- print a shift double count, followed by the assemblers argument
 	delimiter.
@@ -3371,6 +3582,14 @@ print_operand (file, x, code)
 	      fputs (AS2C (,) + 1, file);
 	    }
 
+	  return;
+
+	case 'D':
+	  put_jump_code (GET_CODE (x), 0, file);
+	  return;
+
+	case 'd':
+	  put_jump_code (GET_CODE (x), 1, file);
 	  return;
 
 	  /* This is used by the conditional move instructions.  */
@@ -3781,7 +4000,12 @@ split_di (operands, num, lo_half, hi_half)
   while (num--)
     {
       rtx op = operands[num];
-      if (GET_CODE (op) == REG)
+      if (! reload_completed)
+	{
+	  lo_half[num] = gen_lowpart (SImode, op);
+	  hi_half[num] = gen_highpart (SImode, op);
+	}
+      else if (GET_CODE (op) == REG)
 	{
 	  lo_half[num] = gen_rtx_REG (SImode, REGNO (op));
 	  hi_half[num] = gen_rtx_REG (SImode, REGNO (op) + 1);
@@ -5289,4 +5513,68 @@ output_int_conditional_move (which_alternative, operands)
     }
 
   return "";
+}
+
+int
+x86_adjust_cost (insn, link, dep_insn, cost)
+     rtx insn, link, dep_insn;
+     int cost;
+{
+  rtx next_inst;
+
+  if (GET_CODE (dep_insn) == CALL_INSN || GET_CODE (insn) == JUMP_INSN)
+    return 0;
+
+  if (GET_CODE (dep_insn) == INSN
+      && GET_CODE (PATTERN (dep_insn)) == SET
+      && GET_CODE (SET_DEST (PATTERN (dep_insn))) == REG
+      && GET_CODE (insn) == INSN
+      && GET_CODE (PATTERN (insn)) == SET
+      && !reg_overlap_mentioned_p (SET_DEST (PATTERN (dep_insn)),
+				   SET_SRC (PATTERN (insn))))
+    return 0;	/* ??? */
+
+
+  switch (ix86_cpu)
+    {
+    case PROCESSOR_PENTIUM:
+      if (cost != 0 && is_fp_insn (insn) && is_fp_insn (dep_insn)
+	  && !is_fp_dest (dep_insn))
+	return 0;
+
+      if (agi_dependent (insn, dep_insn))
+	return 3;
+
+      if (GET_CODE (insn) == INSN
+	  && GET_CODE (PATTERN (insn)) == SET
+	  && SET_DEST (PATTERN (insn)) == cc0_rtx
+	  && (next_inst = next_nonnote_insn (insn))
+	  && GET_CODE (next_inst) == JUMP_INSN)
+	/* compare probably paired with jump */
+	return 0;
+      break;
+
+    case PROCESSOR_K6:
+    default:
+      if (!is_fp_dest (dep_insn))
+	{
+	  if(!agi_dependent (insn, dep_insn))
+	    return 0;
+	  if (TARGET_486)
+	    return 2;
+	}
+      else
+	if (is_fp_store (insn) && is_fp_insn (dep_insn)
+	    && NEXT_INSN (insn) && NEXT_INSN (NEXT_INSN (insn))
+	    && NEXT_INSN (NEXT_INSN (NEXT_INSN (insn)))
+	    && (GET_CODE (NEXT_INSN (insn)) == INSN)
+	    && (GET_CODE (NEXT_INSN (NEXT_INSN (insn))) == JUMP_INSN)
+	    && (GET_CODE (NEXT_INSN (NEXT_INSN (NEXT_INSN (insn)))) == NOTE)
+	    && (NOTE_LINE_NUMBER (NEXT_INSN (NEXT_INSN (NEXT_INSN (insn))))
+		== NOTE_INSN_LOOP_END))
+	  return 3;
+      break;
+    }
+
+  return cost;
 }

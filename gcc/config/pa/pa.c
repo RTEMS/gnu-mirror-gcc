@@ -1086,10 +1086,12 @@ emit_move_sequence (operands, mode, scratch_reg)
   register rtx operand1 = operands[1];
   register rtx tem;
 
-  if (reload_in_progress && GET_CODE (operand0) == REG
+  if (scratch_reg
+      && reload_in_progress && GET_CODE (operand0) == REG
       && REGNO (operand0) >= FIRST_PSEUDO_REGISTER)
     operand0 = reg_equiv_mem[REGNO (operand0)];
-  else if (reload_in_progress && GET_CODE (operand0) == SUBREG
+  else if (scratch_reg
+	   && reload_in_progress && GET_CODE (operand0) == SUBREG
 	   && GET_CODE (SUBREG_REG (operand0)) == REG
 	   && REGNO (SUBREG_REG (operand0)) >= FIRST_PSEUDO_REGISTER)
     {
@@ -1097,10 +1099,12 @@ emit_move_sequence (operands, mode, scratch_reg)
       operand0 = alter_subreg (operand0);
     }
 
-  if (reload_in_progress && GET_CODE (operand1) == REG
+  if (scratch_reg
+      && reload_in_progress && GET_CODE (operand1) == REG
       && REGNO (operand1) >= FIRST_PSEUDO_REGISTER)
     operand1 = reg_equiv_mem[REGNO (operand1)];
-  else if (reload_in_progress && GET_CODE (operand1) == SUBREG
+  else if (scratch_reg
+	   && reload_in_progress && GET_CODE (operand1) == SUBREG
 	   && GET_CODE (SUBREG_REG (operand1)) == REG
 	   && REGNO (SUBREG_REG (operand1)) >= FIRST_PSEUDO_REGISTER)
     {
@@ -1108,11 +1112,11 @@ emit_move_sequence (operands, mode, scratch_reg)
       operand1 = alter_subreg (operand1);
     }
 
-  if (reload_in_progress && GET_CODE (operand0) == MEM
+  if (scratch_reg && reload_in_progress && GET_CODE (operand0) == MEM
       && ((tem = find_replacement (&XEXP (operand0, 0)))
 	  != XEXP (operand0, 0)))
     operand0 = gen_rtx_MEM (GET_MODE (operand0), tem);
-  if (reload_in_progress && GET_CODE (operand1) == MEM
+  if (scratch_reg && reload_in_progress && GET_CODE (operand1) == MEM
       && ((tem = find_replacement (&XEXP (operand1, 0)))
 	  != XEXP (operand1, 0)))
     operand1 = gen_rtx_MEM (GET_MODE (operand1), tem);
@@ -3563,7 +3567,7 @@ pa_adjust_insn_length (insn, length)
      also need adjustment.  */
   else if (GET_CODE (insn) == JUMP_INSN
 	   && simplejump_p (insn)
-	   && GET_MODE (PATTERN (insn)) == DImode)
+	   && GET_MODE (insn) == SImode)
     return 4;
   /* Millicode insn with an unfilled delay slot.  */
   else if (GET_CODE (insn) == INSN
@@ -6056,18 +6060,52 @@ pa_reorg (insns)
 	      if (GET_CODE (pattern) == ADDR_VEC)
 		{
 		  /* Emit the jump itself.  */
-		  tmp = gen_switch_jump (XEXP (XVECEXP (pattern, 0, i), 0));
+		  tmp = gen_jump (XEXP (XVECEXP (pattern, 0, i), 0));
 		  tmp = emit_jump_insn_after (tmp, location);
 		  JUMP_LABEL (tmp) = XEXP (XVECEXP (pattern, 0, i), 0);
+		  /* It is easy to rely on the branch table markers
+		     during assembly output to trigger the correct code
+		     for a switch table jump with an unfilled delay slot,
+
+		     However, that requires state and assumes that we look
+		     at insns in order.
+
+		     We can't make such assumptions when computing the length
+		     of instructions.  Ugh.  We could walk the insn chain to
+		     determine if this instruction is in a branch table, but
+		     that can get rather expensive, particularly during the
+		     branch shortening phase of the compiler.
+
+		     So instead we mark this jump as being special.  This is
+		     far from ideal and knows that no code after this will
+		     muck around with the mode of the JUMP_INSN itself.  */
+		  PUT_MODE (tmp, SImode);
 		  LABEL_NUSES (JUMP_LABEL (tmp))++;
 		  location = NEXT_INSN (location);
 		}
 	      else
 		{
 		  /* Emit the jump itself.  */
-		  tmp = gen_switch_jump (XEXP (XVECEXP (pattern, 1, i), 0));
+		  tmp = gen_jump (XEXP (XVECEXP (pattern, 1, i), 0));
 		  tmp = emit_jump_insn_after (tmp, location);
 		  JUMP_LABEL (tmp) = XEXP (XVECEXP (pattern, 1, i), 0);
+		  /* It is easy to rely on the branch table markers
+		     during assembly output to trigger the correct code
+		     for a switch table jump with an unfilled delay slot,
+
+		     However, that requires state and assumes that we look
+		     at insns in order.
+
+		     We can't make such assumptions when computing the length
+		     of instructions.  Ugh.  We could walk the insn chain to
+		     determine if this instruction is in a branch table, but
+		     that can get rather expensive, particularly during the
+		     branch shortening phase of the compiler.
+
+		     So instead we mark this jump as being special.  This is
+		     far from ideal and knows that no code after this will
+		     muck around with the mode of the JUMP_INSN itself.  */
+		  PUT_MODE (tmp, SImode);
 		  LABEL_NUSES (JUMP_LABEL (tmp))++;
 		  location = NEXT_INSN (location);
 		}

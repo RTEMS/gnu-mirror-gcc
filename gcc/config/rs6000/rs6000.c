@@ -201,6 +201,9 @@ rs6000_override_options (default_cpu)
 	 {"rios2", PROCESSOR_RIOS2,
 	    MASK_POWER | MASK_MULTIPLE | MASK_STRING | MASK_POWER2,
 	    POWERPC_MASKS | MASK_NEW_MNEMONICS},
+	 {"401", PROCESSOR_PPC403,
+	    MASK_POWERPC | MASK_SOFT_FLOAT | MASK_NEW_MNEMONICS,
+	    POWER_MASKS | POWERPC_OPT_MASKS | MASK_POWERPC64},
 	 {"403", PROCESSOR_PPC403,
 	    MASK_POWERPC | MASK_SOFT_FLOAT | MASK_NEW_MNEMONICS | MASK_STRICT_ALIGN,
 	    POWER_MASKS | POWERPC_OPT_MASKS | MASK_POWERPC64},
@@ -219,6 +222,9 @@ rs6000_override_options (default_cpu)
 	 {"603e", PROCESSOR_PPC603,
 	    MASK_POWERPC | MASK_PPC_GFXOPT | MASK_NEW_MNEMONICS,
 	    POWER_MASKS | MASK_PPC_GPOPT | MASK_POWERPC64},
+	 {"ec603e", PROCESSOR_PPC603,
+	    MASK_POWERPC | MASK_SOFT_FLOAT | MASK_NEW_MNEMONICS,
+	    POWER_MASKS | POWERPC_OPT_MASKS | MASK_POWERPC64},
 	 {"604", PROCESSOR_PPC604,
 	    MASK_POWERPC | MASK_PPC_GFXOPT | MASK_NEW_MNEMONICS,
 	    POWER_MASKS | MASK_PPC_GPOPT | MASK_POWERPC64},
@@ -339,6 +345,20 @@ rs6000_override_options (default_cpu)
 
 #ifdef SUBTARGET_OVERRIDE_OPTIONS
   SUBTARGET_OVERRIDE_OPTIONS;
+#endif
+}
+
+void
+optimization_options (level, size)
+     int level;
+     int size ATTRIBUTE_UNUSED;
+{
+#if 0
+#ifdef HAIFA
+  /* When optimizing, enable use of BCT instruction.  */
+  if (level >= 1)
+      flag_branch_on_count_reg = 1;
+#endif
 #endif
 }
 
@@ -1299,14 +1319,18 @@ function_arg_padding (mode, type)
    
    Windows NT wants anything >= 8 bytes to be double word aligned.
 
-   V.4 wants long longs to be double word aligned.  */
+   V.4 wants long longs to be double word aligned.
+
+   FP emulation: double precision passed, returned, and same alignment
+   as long long.  */
 
 int
 function_arg_boundary (mode, type)
      enum machine_mode mode;
      tree type;
 {
-  if ((DEFAULT_ABI == ABI_V4 || DEFAULT_ABI == ABI_SOLARIS) && mode == DImode)
+  if ((DEFAULT_ABI == ABI_V4 || DEFAULT_ABI == ABI_SOLARIS)
+      && ((mode == DImode) || (TARGET_SOFT_FLOAT && mode == DFmode)))
     return 64;
 
   if (DEFAULT_ABI != ABI_NT || TARGET_64BIT)
@@ -2182,10 +2206,7 @@ secondary_reload_class (class, mode, in)
      enum machine_mode mode ATTRIBUTE_UNUSED;
      rtx in;
 {
-  int regno = true_regnum (in);
-
-  if (regno >= FIRST_PSEUDO_REGISTER)
-    regno = -1;
+  int regno;
 
   /* We can not copy a symbolic operand directly into anything other than
      BASE_REGS for TARGET_ELF.  So indicate that a register from BASE_REGS
@@ -2196,6 +2217,25 @@ secondary_reload_class (class, mode, in)
 	  || GET_CODE (in) == LABEL_REF
 	  || GET_CODE (in) == CONST))
     return BASE_REGS;
+
+  if (GET_CODE (in) == REG)
+    {
+      regno = REGNO (in);
+      if (regno >= FIRST_PSEUDO_REGISTER)
+	{
+	  regno = true_regnum (in);
+	  if (regno >= FIRST_PSEUDO_REGISTER)
+	    regno = -1;
+	}
+    }
+  else if (GET_CODE (in) == SUBREG)
+    {
+      regno = true_regnum (in);
+      if (regno >= FIRST_PSEUDO_REGISTER)
+	regno = -1;
+    }
+  else
+    regno = -1;
 
   /* We can place anything into GENERAL_REGS and can put GENERAL_REGS
      into anything.  */
@@ -3255,6 +3295,10 @@ rs6000_makes_calls ()
 	old SP->| back chain to caller's caller		|
 		+---------------------------------------+
 
+   The required alignment for AIX configurations is two words (i.e., 8
+   or 16 bytes).
+
+
    V.4 stack frames look like:
 
 	SP---->	+---------------------------------------+
@@ -3280,6 +3324,13 @@ rs6000_makes_calls ()
 		+---------------------------------------+
 	old SP->| back chain to caller's caller		|
 		+---------------------------------------+
+
+   The required alignment for V.4 is 16 bytes, or 8 bytes if -meabi is
+   given.  (But note below and in sysv4.h that we require only 8 and
+   may round up the size of our stack frame anyways.  The historical
+   reason is early versions of powerpc-linux which didn't properly
+   align the stack at program startup.  A happy side-effect is that
+   -mno-eabi libraries can be used with -meabi programs.)
 
 
    A PowerPC Windows/NT frame looks like:
@@ -3324,7 +3375,17 @@ rs6000_makes_calls ()
    order to support __builtin_return_address, the save area for the
    link register needs to be in a known place, so we use -4 off of the
    old SP.  To support calls through pointers, we also allocate a
-   fixed slot to store the TOC, -8 off the old SP.  */
+   fixed slot to store the TOC, -8 off the old SP.
+
+   The required alignment for NT is 16 bytes.
+
+
+   The EABI configuration defaults to the V.4 layout, unless
+   -mcall-aix is used, in which case the AIX layout is used.  However,
+   the stack alignment requirements may differ.  If -mno-eabi is not
+   given, the required stack alignment is 8 bytes; if -mno-eabi is
+   given, the required alignment is 16 bytes.  (But see V.4 comment
+   above.)  */
 
 #ifndef ABI_STACK_BOUNDARY
 #define ABI_STACK_BOUNDARY STACK_BOUNDARY
@@ -3531,10 +3592,10 @@ rs6000_stack_info ()
     info_ptr->fpmem_offset = 0;  
 
   /* Zero offsets if we're not saving those registers */
-  if (!info_ptr->fp_size)
+  if (info_ptr->fp_size == 0)
     info_ptr->fp_save_offset = 0;
 
-  if (!info_ptr->gp_size)
+  if (info_ptr->gp_size == 0)
     info_ptr->gp_save_offset = 0;
 
   if (!info_ptr->lr_save_p)
@@ -4160,8 +4221,9 @@ output_epilog (file, size)
 		     + (regs_ever_live[71] != 0) * 0x10
 		     + (regs_ever_live[72] != 0) * 0x8, reg_names[12]);
 
-      /* If this is V.4, unwind the stack pointer after all of the loads have been done */
-      if (sp_offset)
+      /* If this is V.4, unwind the stack pointer after all of the loads
+	 have been done */
+      if (sp_offset != 0)
 	asm_fprintf (file, "\t{cal|la} %s,%d(%s)\n",
 		     reg_names[1], sp_offset, reg_names[1]);
       else if (sp_reg != 1)
@@ -4225,7 +4287,9 @@ output_epilog (file, size)
       /* Language type.  Unfortunately, there doesn't seem to be any
 	 official way to get this info, so we use language_string.  C
 	 is 0.  C++ is 9.  No number defined for Obj-C, so use the
-	 value for C for now.  */
+	 value for C for now.  There is no official value for Java,
+         although IBM appears to be using 13.  There is no official value
+	 for Chill, so we've choosen 44 pseudo-randomly.  */
       if (! strcmp (language_string, "GNU C")
 	  || ! strcmp (language_string, "GNU Obj-C"))
 	i = 0;
@@ -4237,6 +4301,10 @@ output_epilog (file, size)
 	i = 2;
       else if (! strcmp (language_string, "GNU C++"))
 	i = 9;
+      else if (! strcmp (language_string, "GNU Java"))
+	i = 13;
+      else if (! strcmp (language_string, "GNU CHILL"))
+	i = 44;
       else
 	abort ();
       fprintf (file, "%d,", i);
@@ -5323,3 +5391,10 @@ rs6000_encode_section_info (decl)
 }
 
 #endif /* USING_SVR4_H */
+
+void
+rs6000_fatal_bad_address (op)
+  rtx op;
+{
+  fatal_insn ("bad address", op);
+}

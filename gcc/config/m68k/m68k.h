@@ -155,8 +155,9 @@ extern int target_flags;
     { "soft-float", - (MASK_FPA|MASK_SKY|MASK_68040_ONLY|MASK_68881)},	\
     { "68020-40", -(MASK_5200|MASK_68060|MASK_68040_ONLY)},		\
     { "68020-40", (MASK_BITFIELD|MASK_68881|MASK_68020|MASK_68040)},	\
-    { "68020-60", -(MASK_5200|MASK_68040|MASK_68040_ONLY)},		\
-    { "68020-60", (MASK_BITFIELD|MASK_68881|MASK_68020|MASK_68060)},	\
+    { "68020-60", -(MASK_5200|MASK_68040_ONLY)},			\
+    { "68020-60", (MASK_BITFIELD|MASK_68881|MASK_68020|MASK_68040	\
+		   |MASK_68060)},					\
     { "68030", - (MASK_5200|MASK_68060|MASK_68040|MASK_68040_ONLY)},	\
     { "68030", (MASK_68020|MASK_BITFIELD)},				\
     { "68040", - (MASK_5200|MASK_68060)},				\
@@ -856,6 +857,9 @@ extern enum reg_class regno_reg_class[];
 
 /* Offset of first parameter from the argument pointer register value.  */
 #define FIRST_PARM_OFFSET(FNDECL) 8
+
+/* Offset of the CFA from the argument pointer register value.  */
+#define ARG_POINTER_CFA_OFFSET 8
 
 /* Value is the number of byte of arguments automatically
    popped when returning from a subroutine call.

@@ -38,6 +38,8 @@
 ;;	3	builtin_longjmp
 ;;	4	trapb
 ;;	5	prologue_stack_probe_loop
+;;	6	realign
+;;	7	exception_receiver
 
 ;; Processor type -- this attribute must exactly match the processor_type
 ;; enumeration in alpha.h.
@@ -51,8 +53,12 @@
 ;; separately.
 
 (define_attr "type"
-  "ild,fld,ldsym,ist,fst,ibr,fbr,jsr,iadd,ilog,shift,icmov,fcmov,icmp,imul,fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof"
+  "ild,fld,ldsym,ist,fst,ibr,fbr,jsr,iadd,ilog,shift,icmov,fcmov,icmp,imul,fadd,fmul,fcpys,fdiv,fsqrt,misc,mvi,ftoi,itof,multi"
   (const_string "iadd"))
+
+;; Describe a user's asm statement.
+(define_asm_attributes
+  [(set_attr "type" "multi")])
 
 ;; Define the operand size an insn operates on.  Used primarily by mul
 ;; and div operations that have size dependant timings.
@@ -1495,6 +1501,29 @@
   "ext%M2l %r1,%3,%0"
   [(set_attr "type" "shift")])
 
+;; Combine has some strange notion of preserving existing undefined behaviour
+;; in shifts larger than a word size.  So capture these patterns that it 
+;; should have turned into zero_extracts.
+
+(define_insn ""
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(and (lshiftrt:DI (match_operand:DI 1 "reg_or_0_operand" "rJ")
+		(ashift:DI (match_operand:DI 2 "reg_or_8bit_operand" "rI")
+			   (const_int 3)))
+	     (match_operand:DI 3 "mode_mask_operand" "n")))]
+  ""
+  "ext%U3l %1,%2,%0"
+  [(set_attr "type" "shift")])
+
+(define_insn ""
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(lshiftrt:DI (match_operand:DI 1 "reg_or_0_operand" "rJ")
+	  (ashift:DI (match_operand:DI 2 "reg_or_8bit_operand" "rI")
+		     (const_int 3))))]
+  ""
+  "extql %1,%2,%0"
+  [(set_attr "type" "shift")])
+
 (define_insn "extqh"
   [(set (match_operand:DI 0 "register_operand" "=r")
 	(ashift:DI
@@ -1794,26 +1823,12 @@
 ;; instruction.  To allow combine et al to do useful things, we keep the
 ;; operation as a unit until after reload, at which point we split the
 ;; instructions.
+;;
+;; Note that we (attempt to) only consider this optimization when the
+;; ultimate destination is memory.  If we will be doing further integer
+;; processing, it is cheaper to do the truncation in the int regs.
 
-(define_split
-  [(set (match_operand:SI 0 "register_operand" "")
-	(fix:SI (match_operand:DF 1 "reg_or_fp0_operand" "")))
-   (clobber (match_scratch:DI 2 ""))]
-  "TARGET_FP && reload_completed"
-  [(set (match_dup 2) (fix:DI (match_dup 1)))
-   (set (match_dup 0) (unspec:SI [(match_dup 2)] 5))]
-  "")
-
-;; Due to issues with CLASS_CANNOT_CHANGE_SIZE, we cannot use a subreg here.
-(define_split
-  [(set (match_operand:SI 0 "register_operand" "")
-	(fix:SI (match_operand:DF 1 "reg_or_fp0_operand" "")))]
-  "TARGET_FP && reload_completed"
-  [(set (match_dup 2) (fix:DI (match_dup 1)))
-   (set (match_dup 0) (unspec:SI [(match_dup 2)] 5))]
-  "operands[2] = gen_rtx_REG (DImode, REGNO (operands[0]));")
-
-(define_insn ""
+(define_insn "*cvtql"
   [(set (match_operand:SI 0 "register_operand" "=f")
 	(unspec:SI [(match_operand:DI 1 "reg_or_fp0_operand" "fG")] 5))]
   "TARGET_FP"
@@ -1821,30 +1836,46 @@
   [(set_attr "type" "fadd")
    (set_attr "trap" "yes")])
 
-(define_insn "fix_truncdfsi2_tp"
-  [(set (match_operand:SI 0 "register_operand" "=&f")
-	(fix:SI (match_operand:DF 1 "reg_or_fp0_operand" "fG")))
-   (clobber (match_scratch:DI 2 "=&f"))]
+(define_split
+  [(set (match_operand:SI 0 "memory_operand" "")
+	(subreg:SI (fix:DI (match_operand:DF 1 "reg_or_fp0_operand" "")) 0))
+   (clobber (match_scratch:DI 2 ""))
+   (clobber (match_scratch:SI 3 ""))]
+  "TARGET_FP && reload_completed"
+  [(set (match_dup 2) (fix:DI (match_dup 1)))
+   (set (match_dup 3) (unspec:SI [(match_dup 2)] 5))
+   (set (match_dup 0) (match_dup 3))]
+  "")
+
+(define_split
+  [(set (match_operand:SI 0 "memory_operand" "")
+	(subreg:SI (fix:DI (match_operand:DF 1 "reg_or_fp0_operand" "")) 0))
+   (clobber (match_scratch:DI 2 ""))]
+  "TARGET_FP && reload_completed"
+  [(set (match_dup 2) (fix:DI (match_dup 1)))
+   (set (match_dup 3) (unspec:SI [(match_dup 2)] 5))
+   (set (match_dup 0) (match_dup 3))]
+  ;; Due to REG_CANNOT_CHANGE_SIZE issues, we cannot simply use SUBREG.
+  "operands[3] = gen_rtx_REG (SImode, REGNO (operands[2]));")
+
+(define_insn ""
+  [(set (match_operand:SI 0 "memory_operand" "=m")
+	(subreg:SI (fix:DI (match_operand:DF 1 "reg_or_fp0_operand" "fG")) 0))
+   (clobber (match_scratch:DI 2 "=&f"))
+   (clobber (match_scratch:SI 3 "=&f"))]
   "TARGET_FP && alpha_tp == ALPHA_TP_INSN"
   "#"
   [(set_attr "type" "fadd")
    (set_attr "trap" "yes")])
 
 (define_insn ""
-  [(set (match_operand:SI 0 "register_operand" "=f")
-	(fix:SI (match_operand:DF 1 "reg_or_fp0_operand" "fG")))]
+  [(set (match_operand:SI 0 "memory_operand" "=m")
+	(subreg:SI (fix:DI (match_operand:DF 1 "reg_or_fp0_operand" "fG")) 0))
+   (clobber (match_scratch:DI 2 "=f"))]
   "TARGET_FP && alpha_tp != ALPHA_TP_INSN"
   "#"
   [(set_attr "type" "fadd")
    (set_attr "trap" "yes")])
-
-(define_expand "fix_truncdfsi2"
-  [(set (match_operand:SI 0 "register_operand" "=f")
-	(fix:SI (match_operand:DF 1 "reg_or_fp0_operand" "fG")))]
-  "TARGET_FP"
-  "{ if (alpha_tp == ALPHA_TP_INSN)
-       { emit_insn(gen_fix_truncdfsi2_tp(operands[0], operands[1])); DONE; }
-   }")
 
 (define_insn ""
   [(set (match_operand:DI 0 "register_operand" "=&f")
@@ -1865,52 +1896,49 @@
 ;; Likewise between SFmode and SImode.
 
 (define_split
-  [(set (match_operand:SI 0 "register_operand" "")
-	(fix:SI (float_extend:DF
-		 (match_operand:SF 1 "reg_or_fp0_operand" ""))))
+  [(set (match_operand:SI 0 "memory_operand" "")
+	(subreg:SI (fix:DI (float_extend:DF
+		 (match_operand:SF 1 "reg_or_fp0_operand" ""))) 0))
+   (clobber (match_scratch:DI 2 ""))
+   (clobber (match_scratch:SI 3 ""))]
+  "TARGET_FP && reload_completed"
+  [(set (match_dup 2) (fix:DI (float_extend:DF (match_dup 1))))
+   (set (match_dup 3) (unspec:SI [(match_dup 2)] 5))
+   (set (match_dup 0) (match_dup 3))]
+  "")
+
+(define_split
+  [(set (match_operand:SI 0 "memory_operand" "")
+	(subreg:SI (fix:DI (float_extend:DF
+		 (match_operand:SF 1 "reg_or_fp0_operand" ""))) 0))
    (clobber (match_scratch:DI 2 ""))]
   "TARGET_FP && reload_completed"
   [(set (match_dup 2) (fix:DI (float_extend:DF (match_dup 1))))
-   (set (match_dup 0) (unspec:SI [(match_dup 2)] 5))]
-  "")
+   (set (match_dup 3) (unspec:SI [(match_dup 2)] 5))
+   (set (match_dup 0) (match_dup 3))]
+  ;; Due to REG_CANNOT_CHANGE_SIZE issues, we cannot simply use SUBREG.
+  "operands[3] = gen_rtx_REG (SImode, REGNO (operands[2]));")
 
-;; Due to issues with CLASS_CANNOT_CHANGE_SIZE, we cannot use a subreg here.
-(define_split
-  [(set (match_operand:SI 0 "register_operand" "")
-	(fix:SI (float_extend:DF
-		 (match_operand:SF 1 "reg_or_fp0_operand" ""))))]
-  "TARGET_FP && reload_completed"
-  [(set (match_dup 2) (fix:DI (float_extend:DF (match_dup 1))))
-   (set (match_dup 0) (unspec:SI [(match_dup 2)] 5))]
-  "operands[2] = gen_rtx_REG (DImode, REGNO (operands[0]));")
-
-(define_insn "fix_truncsfsi2_tp"
-  [(set (match_operand:SI 0 "register_operand" "=&f")
-	(fix:SI (float_extend:DF
-		 (match_operand:SF 1 "reg_or_fp0_operand" "fG"))))
-   (clobber (match_scratch:DI 2 "=&f"))]
+(define_insn ""
+  [(set (match_operand:SI 0 "memory_operand" "=m")
+	(subreg:SI (fix:DI (float_extend:DF
+		 (match_operand:SF 1 "reg_or_fp0_operand" "fG"))) 0))
+   (clobber (match_scratch:DI 2 "=&f"))
+   (clobber (match_scratch:SI 3 "=&f"))]
   "TARGET_FP && alpha_tp == ALPHA_TP_INSN"
   "#"
   [(set_attr "type" "fadd")
    (set_attr "trap" "yes")])
 
 (define_insn ""
-  [(set (match_operand:SI 0 "register_operand" "=f")
-	(fix:SI (float_extend:DF
-		 (match_operand:SF 1 "reg_or_fp0_operand" "fG"))))]
+  [(set (match_operand:SI 0 "memory_operand" "=m")
+	(subreg:SI (fix:DI (float_extend:DF
+		 (match_operand:SF 1 "reg_or_fp0_operand" "fG"))) 0))
+   (clobber (match_scratch:DI 2 "=f"))]
   "TARGET_FP && alpha_tp != ALPHA_TP_INSN"
   "#"
   [(set_attr "type" "fadd")
    (set_attr "trap" "yes")])
-
-(define_expand "fix_truncsfsi2"
-  [(set (match_operand:SI 0 "register_operand" "=f")
-	(fix:SI (float_extend:DF
-		 (match_operand:SF 1 "reg_or_fp0_operand" "fG"))))]
-  "TARGET_FP"
-  "{ if (alpha_tp == ALPHA_TP_INSN)
-       { emit_insn(gen_fix_truncsfsi2_tp(operands[0], operands[1])); DONE; }
-   }")
 
 (define_insn ""
   [(set (match_operand:DI 0 "register_operand" "=&f")
@@ -2262,7 +2290,7 @@
 
 (define_insn ""
   [(set (match_operand:SI 0 "register_operand" "=r,r,r,r")
-	(if_then_else:DI
+	(if_then_else:SI
 	 (match_operator 2 "signed_comparison_operator"
 			 [(match_operand:DI 3 "reg_or_0_operand" "rJ,rJ,J,J")
 			  (match_operand:DI 4 "reg_or_0_operand" "J,J,rJ,rJ")])
@@ -2460,7 +2488,7 @@
 
 (define_insn "sminqi3"
   [(set (match_operand:QI 0 "register_operand" "=r")
-	(smin:SI (match_operand:QI 1 "reg_or_0_operand" "%rJ")
+	(smin:QI (match_operand:QI 1 "reg_or_0_operand" "%rJ")
 		 (match_operand:QI 2 "reg_or_8bit_operand" "rI")))]
   "TARGET_MAX"
   "minsb8 %r1,%2,%0"
@@ -2468,7 +2496,7 @@
 
 (define_insn "uminqi3"
   [(set (match_operand:QI 0 "register_operand" "=r")
-	(umin:SI (match_operand:QI 1 "reg_or_0_operand" "%rJ")
+	(umin:QI (match_operand:QI 1 "reg_or_0_operand" "%rJ")
 		 (match_operand:QI 2 "reg_or_8bit_operand" "rI")))]
   "TARGET_MAX"
   "minub8 %r1,%2,%0"
@@ -2476,7 +2504,7 @@
 
 (define_insn "smaxqi3"
   [(set (match_operand:QI 0 "register_operand" "=r")
-	(smax:SI (match_operand:QI 1 "reg_or_0_operand" "%rJ")
+	(smax:QI (match_operand:QI 1 "reg_or_0_operand" "%rJ")
 		 (match_operand:QI 2 "reg_or_8bit_operand" "rI")))]
   "TARGET_MAX"
   "maxsb8 %r1,%2,%0"
@@ -2484,7 +2512,7 @@
 
 (define_insn "umaxqi3"
   [(set (match_operand:QI 0 "register_operand" "=r")
-	(umax:SI (match_operand:QI 1 "reg_or_0_operand" "%rJ")
+	(umax:QI (match_operand:QI 1 "reg_or_0_operand" "%rJ")
 		 (match_operand:QI 2 "reg_or_8bit_operand" "rI")))]
   "TARGET_MAX"
   "maxub8 %r1,%2,%0"
@@ -2492,7 +2520,7 @@
 
 (define_insn "sminhi3"
   [(set (match_operand:HI 0 "register_operand" "=r")
-	(smin:SI (match_operand:HI 1 "reg_or_0_operand" "%rJ")
+	(smin:HI (match_operand:HI 1 "reg_or_0_operand" "%rJ")
 		 (match_operand:HI 2 "reg_or_8bit_operand" "rI")))]
   "TARGET_MAX"
   "minsw4 %r1,%2,%0"
@@ -2500,7 +2528,7 @@
 
 (define_insn "uminhi3"
   [(set (match_operand:HI 0 "register_operand" "=r")
-	(umin:SI (match_operand:HI 1 "reg_or_0_operand" "%rJ")
+	(umin:HI (match_operand:HI 1 "reg_or_0_operand" "%rJ")
 		 (match_operand:HI 2 "reg_or_8bit_operand" "rI")))]
   "TARGET_MAX"
   "minuw4 %r1,%2,%0"
@@ -2508,7 +2536,7 @@
 
 (define_insn "smaxhi3"
   [(set (match_operand:HI 0 "register_operand" "=r")
-	(smax:SI (match_operand:HI 1 "reg_or_0_operand" "%rJ")
+	(smax:HI (match_operand:HI 1 "reg_or_0_operand" "%rJ")
 		 (match_operand:HI 2 "reg_or_8bit_operand" "rI")))]
   "TARGET_MAX"
   "maxsw4 %r1,%2,%0"
@@ -2516,7 +2544,7 @@
 
 (define_insn "umaxhi3"
   [(set (match_operand:HI 0 "register_operand" "=r")
-	(umax:SI (match_operand:HI 1 "reg_or_0_operand" "%rJ")
+	(umax:HI (match_operand:HI 1 "reg_or_0_operand" "%rJ")
 		 (match_operand:HI 2 "reg_or_8bit_operand" "rI")))]
   "TARGET_MAX"
   "maxuw4 %r1,%2,%0"
@@ -3197,7 +3225,7 @@
 
 (define_expand "movsicc"
   [(set (match_operand:SI 0 "register_operand" "")
-	(if_then_else:DI (match_operand 1 "comparison_operator" "")
+	(if_then_else:SI (match_operand 1 "comparison_operator" "")
 			 (match_operand:SI 2 "reg_or_8bit_operand" "")
 			 (match_operand:SI 3 "reg_or_8bit_operand" "")))]
   ""
@@ -3811,12 +3839,6 @@
   "jmp $31,(%0),0"
   [(set_attr "type" "ibr")])
 
-(define_insn "nop"
-  [(const_int 0)]
-  ""
-  "nop"
-  [(set_attr "type" "ilog")])
-
 (define_expand "tablejump"
   [(use (match_operand:SI 0 "register_operand" ""))
    (use (match_operand:SI 1 "" ""))]
@@ -4320,24 +4342,31 @@
     {
       if (TARGET_BUILD_CONSTANTS)
 	{
-#if HOST_BITS_PER_WIDE_INT == 64
-	  HOST_WIDE_INT i;
+	  HOST_WIDE_INT i0, i1;
 
 	  if (GET_CODE (operands[1]) == CONST_INT)
-	    i = INTVAL (operands[1]);
+	    {
+	      i0 = INTVAL (operands[1]);
+	      i1 = -(i0 < 0);
+	    }
 	  else if (GET_CODE (operands[1]) == CONST_DOUBLE)
-	    i = CONST_DOUBLE_LOW (operands[1]);
+	    {
+#if HOST_BITS_PER_WIDE_INT >= 64
+	      i0 = CONST_DOUBLE_LOW (operands[1]);
+	      i1 = -(i0 < 0);
+#else
+	      i0 = CONST_DOUBLE_LOW (operands[1]);
+	      i1 = CONST_DOUBLE_HIGH (operands[1]);
+#endif
+	    }
 	  else
 	    abort();
 	  
-          tem = alpha_emit_set_long_const (operands[0], i);
+          tem = alpha_emit_set_long_const (operands[0], i0, i1);
           if (rtx_equal_p (tem, operands[0]))
 	    DONE;
           else
 	    operands[1] = tem;
-#else
-          abort();
-#endif
 	}
       else
 	{
@@ -5102,7 +5131,8 @@
 
   return \"\";
 }"
-  [(set_attr "length" "16")])
+  [(set_attr "length" "16")
+   (set_attr "type" "multi")])
 
 (define_expand "prologue"
   [(clobber (const_int 0))]
@@ -5120,6 +5150,22 @@
   [(clobber (const_int 0))]
   ""
   "alpha_expand_epilogue (); DONE;")
+
+(define_expand "eh_epilogue"
+  [(use (match_operand:DI 0 "register_operand" "r"))
+   (use (match_operand:DI 1 "register_operand" "r"))
+   (use (match_operand:DI 2 "register_operand" "r"))]
+  "! TARGET_OPEN_VMS"
+  "
+{
+  alpha_eh_epilogue_sp_ofs = operands[1];
+  if (GET_CODE (operands[2]) != REG || REGNO (operands[2]) != 26)
+    {
+      rtx ra = gen_rtx_REG (Pmode, 26);
+      emit_move_insn (ra, operands[2]);
+      operands[2] = ra;
+    }
+}")
 
 (define_expand "builtin_longjmp"
   [(unspec_volatile [(match_operand 0 "register_operand" "r")] 3)]
@@ -5149,13 +5195,22 @@
   [(unspec_volatile [(match_operand 0 "" "")] 2)]
   "! TARGET_OPEN_VMS && ! TARGET_WINDOWS_NT && TARGET_AS_CAN_SUBTRACT_LABELS"
   "\\n$LSJ%=:\;ldgp $29,$LSJ%=-%l0($27)"
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "multi")])
 
 (define_insn ""
   [(unspec_volatile [(match_operand 0 "" "")] 2)]
   "! TARGET_OPEN_VMS && ! TARGET_WINDOWS_NT"
-  "br $27,$LSJ%=\\n$LSJ%=:\;ldgp $29,0($27)"
-  [(set_attr "length" "12")])
+  "br $29,$LSJ%=\\n$LSJ%=:\;ldgp $29,0($29)"
+  [(set_attr "length" "12")
+   (set_attr "type" "multi")])
+
+(define_insn "exception_receiver"
+  [(unspec_volatile [(const_int 0)] 7)]
+  "! TARGET_OPEN_VMS && ! TARGET_WINDOWS_NT"
+  "br $29,$LSJ%=\\n$LSJ%=:\;ldgp $29,0($29)"
+  [(set_attr "length" "12")
+   (set_attr "type" "multi")])
 
 (define_expand "nonlocal_goto_receiver"
   [(unspec_volatile [(const_int 0)] 1)
@@ -5187,7 +5242,8 @@
    (clobber (reg:DI 0))]
   "TARGET_OPEN_VMS"
   "lda $0,OTS$HOME_ARGS\;ldq $0,8($0)\;jsr $0,OTS$HOME_ARGS"
-  [(set_attr "length" "16")])
+  [(set_attr "length" "16")
+   (set_attr "type" "multi")])
 
 ;; Close the trap shadow of preceeding instructions.  This is generated
 ;; by alpha_reorg.
@@ -5197,6 +5253,31 @@
   ""
   "trapb"
   [(set_attr "type" "misc")])
+
+;; No-op instructions used by machine-dependant reorg to preserve
+;; alignment for instruction issue.
+
+(define_insn "nop"
+  [(const_int 0)]
+  ""
+  "nop"
+  [(set_attr "type" "ilog")])
+
+(define_insn "fnop"
+  [(const_int 1)]
+  "TARGET_FP"
+  "fnop"
+  [(set_attr "type" "fcpys")])
+
+(define_insn "unop"
+  [(const_int 2)]
+  ""
+  "unop")
+
+(define_insn "realign"
+  [(unspec_volatile [(match_operand 0 "immediate_operand" "i")] 6)]
+  ""
+  ".align %0 #realign")
 
 ;; Peepholes go at the end.
 

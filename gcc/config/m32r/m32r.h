@@ -434,7 +434,7 @@ if (GET_MODE_CLASS (MODE) == MODE_INT		\
 #define FIXED_REGISTERS \
 { 0, 0, 0, 0, 0, 0, 0, 0,	\
   0, 0, 0, 0, 0, 0, 0, 1,	\
-  1, 0 }
+  1, 1 }
 
 
 /* 1 for registers not available across function calls.
@@ -1663,8 +1663,13 @@ do {							\
   fprintf (FILE, "%s%s", USER_LABEL_PREFIX, real_name);	\
 } while (0)           
 
-/* For the m32r if -Os, don't force line number label to begin
-   at the beginning of the word.  */
+/* If -Os, don't force line number labels to begin at the beginning of
+   the word; we still want the assembler to try to put things in parallel,
+   should that be possible.
+   For m32r/d, instructions are never in parallel (other than with a nop)
+   and the simulator and stub both handle a breakpoint in the middle of
+   a word so don't ever force line number labels to begin at the beginning
+   of a word.  */
 
 #undef	ASM_OUTPUT_SOURCE_LINE
 #define ASM_OUTPUT_SOURCE_LINE(file, line)				\
@@ -1676,7 +1681,9 @@ do									\
     assemble_name (file,						\
 		   XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0));\
     fprintf (file,							\
-	     (optimize_size) ? "\n\t.debugsym .LM%d\n" : "\n.LM%d:\n",	\
+	     (optimize_size || TARGET_M32R)				\
+	     ? "\n\t.debugsym .LM%d\n"					\
+	     : "\n.LM%d:\n",						\
 	     sym_lineno);						\
     sym_lineno += 1;							\
   }									\
@@ -1980,6 +1987,7 @@ enum m32r_function_type
 { "cmp_int16_operand",		{ CONST_INT }},				\
 { "call_address_operand",	{ SYMBOL_REF, LABEL_REF, CONST }},	\
 { "small_insn_p",		{ INSN, CALL_INSN, JUMP_INSN }},	\
+{ "m32r_block_immediate_operand",{ CONST_INT }},			\
 { "large_insn_p",		{ INSN, CALL_INSN, JUMP_INSN }},
 
 /* Functions declared in m32r.c */
@@ -2071,3 +2079,7 @@ extern char *emit_cond_move			PROTO((Rtx *, Rtx));
 
 /* Needed by a peephole optimisation.  */
 #define PRESERVE_DEATH_INFO_REGNO_P(regno) (regno < FIRST_PSEUDO_REGISTER)
+
+extern char * m32r_output_block_move PROTO((Rtx, Rtx *));
+extern int    m32r_block_immediate_operand PROTO((Rtx, int));
+extern void   m32r_expand_block_move PROTO((Rtx *));
