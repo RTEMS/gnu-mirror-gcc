@@ -1,6 +1,6 @@
 ## Process this file with automake to produce Makefile.in.
 
-AUTOMAKE_OPTIONS = foreign no-installinfo
+AUTOMAKE_OPTIONS = foreign
 
 if TESTSUBDIR
 SUBDIRS = $(DIRLTDL) testsuite gcj include
@@ -23,10 +23,10 @@ toolexecdir = $(exec_prefix)/$(target_alias)
 toolexeclibdir = $(toolexecdir)/lib$(MULTISUBDIR)
 endif
 
-if NO_X
-cond_x_ltlibrary =
-else
+if XLIB_AWT
 cond_x_ltlibrary = libgcjx.la
+else
+cond_x_ltlibrary =
 endif
 
 toolexeclib_LTLIBRARIES = libgcj.la $(cond_x_ltlibrary)
@@ -57,9 +57,9 @@ if CANADIAN
 if NULL_TARGET
 ## In this case, gcj is found outside the build tree.  However, zip is
 ## found in the build tree.
-ZIP = $(MULTIBUILDTOP)../$(COMPPATH)/fastjar/fastjar$(EXEEXT)
+ZIP = $(MULTIBUILDTOP)../$(COMPPATH)/fastjar/jar$(EXEEXT)
 else
-ZIP = fastjar
+ZIP = jar
 endif
 GCJH = gcjh
 else # CANADIAN
@@ -68,7 +68,7 @@ else # CANADIAN
 ## definition of GCJ won't work; instead we resort to this ugly
 ## definition that gives us absolute paths.
 GCJH = $(MULTIBUILDTOP)../$(COMPPATH)/gcc/gcjh$(EXEEXT)
-ZIP = $(MULTIBUILDTOP)../$(COMPPATH)/fastjar/fastjar$(EXEEXT)
+ZIP = $(MULTIBUILDTOP)../$(COMPPATH)/fastjar/jar$(EXEEXT)
 endif # CANADIAN
 
 ## The compiler with whatever flags we want for both -c and -C
@@ -87,18 +87,15 @@ LTCXXCOMPILE = $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(INCLUDES) $(
 
 JAVAC = $(GCJ_WITH_FLAGS) -C
 
-EH_COMMON_INCLUDE = @EH_COMMON_INCLUDE@
+GCC_UNWIND_INCLUDE = @GCC_UNWIND_INCLUDE@
 
 WARNINGS = -W -Wall
 ## We need _GNU_SOURCE defined for some Linux builds.  It doesn't hurt
 ## to always define it.
-## Note that we need -fasynchronous-exceptions because gcc is
-## currently broken with respect to exception handling in leaf
-## functions.
-AM_CXXFLAGS = -fno-rtti -fvtable-thunks -fasynchronous-exceptions \
+AM_CXXFLAGS = -fno-rtti -fnon-call-exceptions \
 ## Some systems don't allow `$' in identifiers by default, so we force it.
 	-fdollars-in-identifiers \
-	@LIBGCJ_CXXFLAGS@ @EXCEPTIONSPEC@ @X_CFLAGS@ $(WARNINGS) -D_GNU_SOURCE
+	@LIBGCJ_CXXFLAGS@ @X_CFLAGS@ $(WARNINGS) -D_GNU_SOURCE
 if USING_GCC
 AM_CFLAGS = @LIBGCJ_CFLAGS@ $(WARNINGS)
 else
@@ -106,13 +103,13 @@ AM_CFLAGS = @LIBGCJ_CFLAGS@
 endif
 
 JCFLAGS = -g
-JC1FLAGS = -g @LIBGCJ_JAVAFLAGS@
+JC1FLAGS = @LIBGCJ_JAVAFLAGS@ $(GCJFLAGS)
 
 LIBFFIINCS = -I$(top_srcdir)/../libffi/include -I$(MULTIBUILDTOP)../libffi/include
 
 INCLUDES = -I$(top_srcdir) -Iinclude -I$(top_srcdir)/include \
 	$(GCINCS) $(THREADINCS) $(INCLTDL) \
-	$(EH_COMMON_INCLUDE) $(ZINCS) $(LIBFFIINCS)
+	$(GCC_UNWIND_INCLUDE) $(ZINCS) $(LIBFFIINCS)
 
 
 ## ################################################################
@@ -131,9 +128,6 @@ javao_files = $(java_source_files:.java=.lo) \
 	$(built_java_source_files:.java=.lo)
 x_javao_files = $(x_java_source_files:.java=.lo)
 
-## Extract the libffi object file names.
-libffi_files = `$(AR) t ../libffi/.libs/libffi.a 2>/dev/null | sed 's/\.o/\.lo/g' | sed 's/^/..\/libffi\//g'`
-
 libgcj_la_SOURCES = prims.cc posix.cc jni.cc exception.cc \
 	resolve.cc defineclass.cc interpret.cc name-finder.cc \
 	$(nat_source_files)
@@ -142,12 +136,11 @@ EXTRA_libgcj_la_SOURCES = boehm.cc nogc.cc posix-threads.cc no-threads.cc \
 libgcj_la_DEPENDENCIES = libgcj.jar $(javao_files) \
 	$(c_files) $(GCOBJS) $(THREADOBJS) $(LIBLTDL)
 
+libgcj_la_LIBADD = $(javao_files) $(c_files) $(GCOBJS) \
+	$(THREADOBJS)
 # Include THREADLIBS here to ensure that the correct version of
 # certain linuxthread functions get linked:
-libgcj_la_LIBADD = $(javao_files) $(c_files) $(GCOBJS) \
-	$(THREADOBJS) $(THREADLIBS) $(libffi_files) $(LIBLTDL)
-libgcj_la_LDFLAGS = -L$(here)/../libstdc++-v3/libsupc++ -lsupc++ \
-	-rpath $(toolexeclibdir) \
+libgcj_la_LDFLAGS = -rpath $(toolexeclibdir) $(THREADLIBS) $(LIBLTDL) \
 ## The mysterious backslash is consumed by make.
 	-version-info `grep -v '^\#' $(srcdir)/libtool-version`
 libgcj_la_LINK = $(LIBLINK)
@@ -157,7 +150,6 @@ EXTRA_libgcjx_la_SOURCES = $(x_java_source_files)
 libgcjx_la_DEPENDENCIES = libgcj.jar $(x_javao_files)
 libgcjx_la_LIBADD = $(x_javao_files)
 libgcjx_la_LDFLAGS = @X_PRE_LIBS@ @X_LIBS@ -lX11 @X_EXTRA_LIBS@ \
-        -L$(here)/../libstdc++-v3/libsupc++ -lsupc++ \
         -rpath $(toolexeclibdir) \
 ## The mysterious backslash is consumed by make.
         -version-info `grep -v '^\#' $(srcdir)/libtool-version`
@@ -262,6 +254,21 @@ $(c_files): java/lang/fdlibm.h java/lang/ieeefp.h java/lang/mprec.h
 $(javao_files) $(x_javao_files): %.lo: %.java
 	$(GCJCOMPILE) -o $@ $<
 
+## Pass the list of object files to libtool in a temporary file to 
+## avoid tripping platform command line length limits.
+libgcj.la: $(libgcj_la_OBJECTS) $(libgcj_la_DEPENDENCIES)
+	@echo $(libgcj_la_OBJECTS) > libgcj.objectlist;
+	@echo $(libgcj_la_LIBADD) >> libgcj.objectlist;
+	$(libgcj_la_LINK) -objectlist libgcj.objectlist \
+	../libffi/libfficonvenience.la \
+	-rpath $(toolexeclibdir) $(libgcj_la_LDFLAGS) $(LIBS)
+
+libgcjx.la: $(libgcjx_la_OBJECTS) $(libgcjx_la_DEPENDENCIES)
+	@echo $(libgcjx_la_OBJECTS) > libgcjx.objectlist;
+	@echo $(libgcjx_la_LIBADD) >> libgcjx.objectlist;
+	$(libgcjx_la_LINK) -objectlist libgcjx.objectlist \
+	-rpath $(toolexeclibdir) $(libgcjx_la_LDFLAGS) $(LIBS)
+
 ## ################################################################
 
 ##
@@ -351,6 +358,9 @@ java/io/ObjectOutputStream$$PutField.h: libgcj.jar
 ## Headers we maintain by hand and which we want to install.
 extra_headers = java/lang/Object.h java/lang/Class.h
 
+$(extra_headers):
+	@:
+
 ## Install the headers.  It is fairly ugly that we have to do this by
 ## hand.
 install-data-local:
@@ -416,7 +426,7 @@ EXTRA_jv_convert_SOURCES = $(convert_source_files)
 ## need this because we are explicitly using libtool to link using the
 ## `.la' file.
 jv_convert_LDFLAGS = --main=gnu.gcj.convert.Convert \
-	-rpath $(toolexeclibdir)
+	-rpath $(toolexeclibdir) -shared-libgcc
 jv_convert_LINK = $(GCJLINK)
 ## We explicitly link in the libraries we need.  This way we don't
 ## need -nodefaultlibs, so we can still rely on gcj picking up the
@@ -434,7 +444,7 @@ gij_SOURCES = gij.cc
 ## We need -nodefaultlibs because we want to avoid gcj's `-lgcj'.  We
 ## need this because we are explicitly using libtool to link using the
 ## `.la' file.
-gij_LDFLAGS = -rpath $(toolexeclibdir)
+gij_LDFLAGS = -rpath $(toolexeclibdir) -shared-libgcc
 gij_LINK = $(GCJLINK)
 ## We explicitly link in the libraries we need.  This way we don't
 ## need -nodefaultlibs, so we can still rely on gcj picking up the
@@ -857,7 +867,6 @@ java/lang/UnsupportedOperationException.java \
 java/lang/VerifyError.java \
 java/lang/VirtualMachineError.java \
 java/lang/Void.java \
-java/io/BlockDataException.java	\
 java/io/BufferedInputStream.java \
 java/io/BufferedOutputStream.java \
 java/io/BufferedReader.java \
@@ -981,9 +990,11 @@ java/util/StringTokenizer.java \
 java/util/TimeZone.java	\
 java/util/Timer.java \
 java/util/TimerTask.java \
+java/util/TreeMap.java \
+java/util/TreeSet.java \
 java/util/TooManyListenersException.java \
-java/util/Vector.java
-#java/util/WeakHashmap.java
+java/util/Vector.java \
+java/util/WeakHashMap.java
 
 
 ## List of all .java files to be compiled.  Please keep this list
@@ -1206,6 +1217,7 @@ java/util/zip/ZipOutputStream.java \
 $(awt_java_source_files) \
 $(convert_source_files)
 
+
 java_source_files = $(special_java_source_files) $(ordinary_java_source_files)
 
 ## Math library: C, not C++
@@ -1423,7 +1435,7 @@ AM_MAKEFLAGS = \
 	"RANLIB=$(RANLIB)" \
 	"DESTDIR=$(DESTDIR)"
 
-CONFIG_STATUS_DEPENDENCIES = $(libgcj_basedir)/configure.host
+CONFIG_STATUS_DEPENDENCIES = $(srcdir)/configure.host
 
 MAKEOVERRIDES=
 

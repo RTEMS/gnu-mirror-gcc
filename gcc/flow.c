@@ -133,7 +133,6 @@ Boston, MA 02111-1307, USA.  */
 #include "except.h"
 #include "toplev.h"
 #include "recog.h"
-#include "insn-flags.h"
 #include "expr.h"
 #include "ssa.h"
 
@@ -199,7 +198,6 @@ struct basic_block_def entry_exit_blocks[2]
     NULL,			/* aux */
     ENTRY_BLOCK,		/* index */
     0,				/* loop_depth */
-    -1, -1,			/* eh_beg, eh_end */
     0				/* count */
   },
   {
@@ -214,7 +212,6 @@ struct basic_block_def entry_exit_blocks[2]
     NULL,			/* aux */
     EXIT_BLOCK,			/* index */
     0,				/* loop_depth */
-    -1, -1,			/* eh_beg, eh_end */
     0				/* count */
   }
 };
@@ -270,8 +267,14 @@ static rtx tail_recursion_label_list;
 /* Holds information for tracking conditional register life information.  */
 struct reg_cond_life_info
 {
-  /* An EXPR_LIST of conditions under which a register is dead.  */
+  /* A boolean expression of conditions under which a register is dead.  */
   rtx condition;
+  /* Conditions under which a register is dead at the basic block end.  */
+  rtx orig_condition;
+
+  /* A boolean expression of conditions under which a register has been
+     stored into.  */
+  rtx stores;
 
   /* ??? Could store mask of bytes that are dead, so that we could finally
      track lifetimes of multi-word registers accessed via subregs.  */
@@ -352,16 +355,12 @@ static void clear_edges			PARAMS ((void));
 static void make_edges			PARAMS ((rtx));
 static void make_label_edge		PARAMS ((sbitmap *, basic_block,
 						 rtx, int));
-static void make_eh_edge		PARAMS ((sbitmap *, eh_nesting_info *,
-						 basic_block, rtx, int));
+static void make_eh_edge		PARAMS ((sbitmap *, basic_block, rtx));
 static void mark_critical_edges		PARAMS ((void));
-static void move_stray_eh_region_notes	PARAMS ((void));
-static void record_active_eh_regions	PARAMS ((rtx));
 
 static void commit_one_edge_insertion	PARAMS ((edge));
 
 static void delete_unreachable_blocks	PARAMS ((void));
-static void delete_eh_regions		PARAMS ((void));
 static int can_delete_note_p		PARAMS ((rtx));
 static void expunge_block		PARAMS ((basic_block));
 static int can_delete_label_p		PARAMS ((rtx));
@@ -518,7 +517,6 @@ find_basic_blocks (f, nregs, file)
   compute_bb_for_insn (max_uid);
 
   /* Discover the edges of our cfg.  */
-  record_active_eh_regions (f);
   make_edges (label_value_list);
 
   /* Do very simple cleanup now, for the benefit of code that runs between
@@ -580,46 +578,45 @@ count_basic_blocks (f)
   register rtx insn;
   register RTX_CODE prev_code;
   register int count = 0;
-  int eh_region = 0;
-  int call_had_abnormal_edge = 0;
+  int saw_abnormal_edge = 0;
 
   prev_code = JUMP_INSN;
   for (insn = f; insn; insn = NEXT_INSN (insn))
     {
-      register RTX_CODE code = GET_CODE (insn);
+      enum rtx_code code = GET_CODE (insn);
 
       if (code == CODE_LABEL
 	  || (GET_RTX_CLASS (code) == 'i'
 	      && (prev_code == JUMP_INSN
 		  || prev_code == BARRIER
-		  || (prev_code == CALL_INSN && call_had_abnormal_edge))))
-	count++;
+		  || saw_abnormal_edge)))
+	{
+	  saw_abnormal_edge = 0;
+	  count++;
+	}
 
-      /* Record whether this call created an edge.  */
+      /* Record whether this insn created an edge.  */
       if (code == CALL_INSN)
 	{
-	  rtx note = find_reg_note (insn, REG_EH_REGION, NULL_RTX);
-	  int region = (note ? INTVAL (XEXP (note, 0)) : 1);
+	  rtx note;
 
-	  call_had_abnormal_edge = 0;
+	  /* If there is a nonlocal goto label and the specified
+	     region number isn't -1, we have an edge.  */
+	  if (nonlocal_goto_handler_labels
+	      && ((note = find_reg_note (insn, REG_EH_REGION, NULL_RTX)) == 0
+		  || INTVAL (XEXP (note, 0)) >= 0))
+	    saw_abnormal_edge = 1;
 
-	  /* If there is an EH region or rethrow, we have an edge.  */
-	  if ((eh_region && region > 0)
-	      || find_reg_note (insn, REG_EH_RETHROW, NULL_RTX))
-	    call_had_abnormal_edge = 1;
-	  else if (nonlocal_goto_handler_labels && region >= 0)
-	    /* If there is a nonlocal goto label and the specified
-	       region number isn't -1, we have an edge. (0 means
-	       no throw, but might have a nonlocal goto).  */
-	    call_had_abnormal_edge = 1;
+	  else if (can_throw_internal (insn))
+	    saw_abnormal_edge = 1;
 	}
+      else if (flag_non_call_exceptions
+	       && code == INSN
+	       && can_throw_internal (insn))
+	saw_abnormal_edge = 1;
 
       if (code != NOTE)
 	prev_code = code;
-      else if (NOTE_LINE_NUMBER (insn) == NOTE_INSN_EH_REGION_BEG)
-	++eh_region;
-      else if (NOTE_LINE_NUMBER (insn) == NOTE_INSN_EH_REGION_END)
-	--eh_region;
     }
 
   /* The rest of the compiler works a bit smoother when we don't have to
@@ -653,9 +650,6 @@ find_label_refs (f, lvl)
 	   Make a special exception for labels followed by an ADDR*VEC,
 	   as this would be a part of the tablejump setup code.
 
-	   Make a special exception for the eh_return_stub_label, which
-	   we know isn't part of any otherwise visible control flow.
-
 	   Make a special exception to registers loaded with label
 	   values just before jump insns that use them.  */
 
@@ -664,9 +658,7 @@ find_label_refs (f, lvl)
 	    {
 	      rtx lab = XEXP (note, 0), next;
 
-	      if (lab == eh_return_stub_label)
-		;
-	      else if ((next = next_nonnote_insn (lab)) != NULL
+	      if ((next = next_nonnote_insn (lab)) != NULL
 		       && GET_CODE (next) == JUMP_INSN
 		       && (GET_CODE (PATTERN (next)) == ADDR_VEC
 			   || GET_CODE (PATTERN (next)) == ADDR_DIFF_VEC))
@@ -696,7 +688,6 @@ find_basic_blocks_1 (f)
   register rtx insn, next;
   int i = 0;
   rtx bb_note = NULL_RTX;
-  rtx eh_list = NULL_RTX;
   rtx lvl = NULL_RTX;
   rtx trll = NULL_RTX;
   rtx head = NULL_RTX;
@@ -720,22 +711,11 @@ find_basic_blocks_1 (f)
 	  {
 	    int kind = NOTE_LINE_NUMBER (insn);
 
-	    /* Keep a LIFO list of the currently active exception notes.  */
-	    if (kind == NOTE_INSN_EH_REGION_BEG)
-	      eh_list = alloc_INSN_LIST (insn, eh_list);
-	    else if (kind == NOTE_INSN_EH_REGION_END)
-	      {
-		rtx t = eh_list;
-
-		eh_list = XEXP (eh_list, 1);
-		free_INSN_LIST_node (t);
-	      }
-
 	    /* Look for basic block notes with which to keep the
 	       basic_block_info pointers stable.  Unthread the note now;
 	       we'll put it back at the right place in create_basic_block.
 	       Or not at all if we've already found a note in this block.  */
-	    else if (kind == NOTE_INSN_BASIC_BLOCK)
+	    if (kind == NOTE_INSN_BASIC_BLOCK)
 	      {
 		if (bb_note == NULL_RTX)
 		  bb_note = insn;
@@ -819,8 +799,7 @@ find_basic_blocks_1 (f)
 	  {
 	    /* Record whether this call created an edge.  */
 	    rtx note = find_reg_note (insn, REG_EH_REGION, NULL_RTX);
-	    int region = (note ? INTVAL (XEXP (note, 0)) : 1);
-	    int call_has_abnormal_edge = 0;
+	    int region = (note ? INTVAL (XEXP (note, 0)) : 0);
 
 	    if (GET_CODE (PATTERN (insn)) == CALL_PLACEHOLDER)
 	      {
@@ -833,19 +812,10 @@ find_basic_blocks_1 (f)
 		  trll = alloc_EXPR_LIST (0, XEXP (PATTERN (insn), 3), trll);
 	      }
 
-	    /* If there is an EH region or rethrow, we have an edge.  */
-	    if ((eh_list && region > 0)
-		|| find_reg_note (insn, REG_EH_RETHROW, NULL_RTX))
-	      call_has_abnormal_edge = 1;
-	    else if (nonlocal_goto_handler_labels && region >= 0)
-	      /* If there is a nonlocal goto label and the specified
-		 region number isn't -1, we have an edge. (0 means
-		 no throw, but might have a nonlocal goto).  */
-	      call_has_abnormal_edge = 1;
-
 	    /* A basic block ends at a call that can either throw or
 	       do a non-local goto.  */
-	    if (call_has_abnormal_edge)
+	    if ((nonlocal_goto_handler_labels && region >= 0)
+		|| can_throw_internal (insn))
 	      {
 	      new_bb_inclusive:
 		if (head == NULL_RTX)
@@ -861,18 +831,21 @@ find_basic_blocks_1 (f)
 	  }
 	  /* Fall through.  */
 
-	default:
-	  if (GET_RTX_CLASS (code) == 'i')
-	    {
-	      if (head == NULL_RTX)
-		head = insn;
-	      end = insn;
-	    }
+	case INSN:
+	  /* Non-call exceptions generate new blocks just like calls.  */
+	  if (flag_non_call_exceptions && can_throw_internal (insn))
+	    goto new_bb_inclusive;
+
+	  if (head == NULL_RTX)
+	    head = insn;
+	  end = insn;
 	  break;
+
+	default:
+	  abort ();
 	}
 
-      if (GET_RTX_CLASS (code) == 'i'
-	  && GET_CODE (insn) != JUMP_INSN)
+      if (GET_CODE (insn) == INSN || GET_CODE (insn) == CALL_INSN)
 	{
 	  rtx note;
 
@@ -880,9 +853,6 @@ find_basic_blocks_1 (f)
 
 	     Make a special exception for labels followed by an ADDR*VEC,
 	     as this would be a part of the tablejump setup code.
-
-	     Make a special exception for the eh_return_stub_label, which
-	     we know isn't part of any otherwise visible control flow.
 
 	     Make a special exception to registers loaded with label
 	     values just before jump insns that use them.  */
@@ -892,9 +862,7 @@ find_basic_blocks_1 (f)
 	      {
 		rtx lab = XEXP (note, 0), next;
 
-		if (lab == eh_return_stub_label)
-		  ;
-		else if ((next = next_nonnote_insn (lab)) != NULL
+		if ((next = next_nonnote_insn (lab)) != NULL
 			 && GET_CODE (next) == JUMP_INSN
 			 && (GET_CODE (PATTERN (next)) == ADDR_VEC
 			     || GET_CODE (PATTERN (next)) == ADDR_DIFF_VEC))
@@ -925,12 +893,9 @@ find_basic_blocks_1 (f)
 /* Tidy the CFG by deleting unreachable code and whatnot.  */
 
 void
-cleanup_cfg (f)
-     rtx f;
+cleanup_cfg ()
 {
   delete_unreachable_blocks ();
-  move_stray_eh_region_notes ();
-  record_active_eh_regions (f);
   try_merge_blocks ();
   mark_critical_edges ();
 
@@ -1083,7 +1048,6 @@ make_edges (label_value_list)
      rtx label_value_list;
 {
   int i;
-  eh_nesting_info *eh_nest_info = init_eh_nesting_info ();
   sbitmap *edge_cache = NULL;
 
   /* Assume no computed jump; revise as we create edges.  */
@@ -1119,9 +1083,13 @@ make_edges (label_value_list)
 	{
 	  rtx tmp;
 
+	  /* Recognize exception handling placeholders.  */
+	  if (GET_CODE (PATTERN (insn)) == RESX)
+	    make_eh_edge (edge_cache, bb, insn);
+
 	  /* Recognize a non-local goto as a branch outside the
 	     current function.  */
-	  if (find_reg_note (insn, REG_NON_LOCAL_GOTO, NULL_RTX))
+	  else if (find_reg_note (insn, REG_NON_LOCAL_GOTO, NULL_RTX))
 	    ;
 
 	  /* ??? Recognize a tablejump and do the right thing.  */
@@ -1196,37 +1164,15 @@ make_edges (label_value_list)
 		   EDGE_ABNORMAL | EDGE_ABNORMAL_CALL);
 
       /* If this is a CALL_INSN, then mark it as reaching the active EH
-	 handler for this CALL_INSN.  If we're handling asynchronous
+	 handler for this CALL_INSN.  If we're handling non-call
 	 exceptions then any insn can reach any of the active handlers.
 
 	 Also mark the CALL_INSN as reaching any nonlocal goto handler.  */
 
-      else if (code == CALL_INSN || asynchronous_exceptions)
+      else if (code == CALL_INSN || flag_non_call_exceptions)
 	{
-	  /* Add any appropriate EH edges.  We do this unconditionally
-	     since there may be a REG_EH_REGION or REG_EH_RETHROW note
-	     on the call, and this needn't be within an EH region.  */
-	  make_eh_edge (edge_cache, eh_nest_info, bb, insn, bb->eh_end);
-
-	  /* If we have asynchronous exceptions, do the same for *all*
-	     exception regions active in the block.  */
-	  if (asynchronous_exceptions
-	      && bb->eh_beg != bb->eh_end)
-	    {
-	      if (bb->eh_beg >= 0)
-		make_eh_edge (edge_cache, eh_nest_info, bb,
-			      NULL_RTX, bb->eh_beg);
-
-	      for (x = bb->head; x != bb->end; x = NEXT_INSN (x))
-		if (GET_CODE (x) == NOTE
-		    && (NOTE_LINE_NUMBER (x) == NOTE_INSN_EH_REGION_BEG
-		        || NOTE_LINE_NUMBER (x) == NOTE_INSN_EH_REGION_END))
-		  {
-		    int region = NOTE_EH_HANDLER (x);
-		    make_eh_edge (edge_cache, eh_nest_info, bb,
-				  NULL_RTX, region);
-		  }
-	    }
+	  /* Add any appropriate EH edges.  */
+	  make_eh_edge (edge_cache, bb, insn);
 
 	  if (code == CALL_INSN && nonlocal_goto_handler_labels)
 	    {
@@ -1247,14 +1193,6 @@ make_edges (label_value_list)
 	    }
 	}
 
-      /* We know something about the structure of the function __throw in
-	 libgcc2.c.  It is the only function that ever contains eh_stub
-	 labels.  It modifies its return address so that the last block
-	 returns to one of the eh_stub labels within it.  So we have to
-	 make additional edges in the flow graph.  */
-      if (i + 1 == n_basic_blocks && eh_return_stub_label != 0)
-	make_label_edge (edge_cache, bb, eh_return_stub_label, EDGE_EH);
-
       /* Find out if we can drop through to the next block.  */
       insn = next_nonnote_insn (insn);
       if (!insn || (i + 1 == n_basic_blocks && force_fallthru))
@@ -1269,7 +1207,6 @@ make_edges (label_value_list)
 	}
     }
 
-  free_eh_nesting_info (eh_nest_info);
   if (edge_cache)
     sbitmap_vector_free (edge_cache);
 }
@@ -1357,115 +1294,21 @@ make_label_edge (edge_cache, src, label, flags)
 /* Create the edges generated by INSN in REGION.  */
 
 static void
-make_eh_edge (edge_cache, eh_nest_info, src, insn, region)
+make_eh_edge (edge_cache, src, insn)
      sbitmap *edge_cache;
-     eh_nesting_info *eh_nest_info;
      basic_block src;
      rtx insn;
-     int region;
 {
-  handler_info **handler_list;
-  int num, is_call;
+  int is_call = (GET_CODE (insn) == CALL_INSN ? EDGE_ABNORMAL_CALL : 0);
+  rtx handlers, i;
 
-  is_call = (insn && GET_CODE (insn) == CALL_INSN ? EDGE_ABNORMAL_CALL : 0);
-  num = reachable_handlers (region, eh_nest_info, insn, &handler_list);
-  while (--num >= 0)
-    {
-      make_label_edge (edge_cache, src, handler_list[num]->handler_label,
-		       EDGE_ABNORMAL | EDGE_EH | is_call);
-    }
-}
+  handlers = reachable_handlers (insn);
 
-/* EH_REGION notes appearing between basic blocks is ambiguous, and even
-   dangerous if we intend to move basic blocks around.  Move such notes
-   into the following block.  */
+  for (i = handlers; i; i = XEXP (i, 1))
+    make_label_edge (edge_cache, src, XEXP (i, 0),
+		     EDGE_ABNORMAL | EDGE_EH | is_call);
 
-static void
-move_stray_eh_region_notes ()
-{
-  int i;
-  basic_block b1, b2;
-
-  if (n_basic_blocks < 2)
-    return;
-
-  b2 = BASIC_BLOCK (n_basic_blocks - 1);
-  for (i = n_basic_blocks - 2; i >= 0; --i, b2 = b1)
-    {
-      rtx insn, next, list = NULL_RTX;
-
-      b1 = BASIC_BLOCK (i);
-      for (insn = NEXT_INSN (b1->end); insn != b2->head; insn = next)
-	{
-	  next = NEXT_INSN (insn);
-	  if (GET_CODE (insn) == NOTE
-	      && (NOTE_LINE_NUMBER (insn) == NOTE_INSN_EH_REGION_BEG
-	          || NOTE_LINE_NUMBER (insn) == NOTE_INSN_EH_REGION_END))
-	    {
-	      /* Unlink from the insn chain.  */
-	      NEXT_INSN (PREV_INSN (insn)) = next;
-	      PREV_INSN (next) = PREV_INSN (insn);
-
-	      /* Queue it.  */
-	      NEXT_INSN (insn) = list;
-	      list = insn;
-	    }
-	}
-
-      if (list == NULL_RTX)
-	continue;
-
-      /* Find where to insert these things.  */
-      insn = b2->head;
-      if (GET_CODE (insn) == CODE_LABEL)
-	insn = NEXT_INSN (insn);
-
-      while (list)
-	{
-	  next = NEXT_INSN (list);
-	  add_insn_after (list, insn);
-	  list = next;
-	}
-    }
-}
-
-/* Recompute eh_beg/eh_end for each basic block.  */
-
-static void
-record_active_eh_regions (f)
-     rtx f;
-{
-  rtx insn, eh_list = NULL_RTX;
-  int i = 0;
-  basic_block bb = BASIC_BLOCK (0);
-
-  for (insn = f; insn; insn = NEXT_INSN (insn))
-    {
-      if (bb->head == insn)
-	bb->eh_beg = (eh_list ? NOTE_EH_HANDLER (XEXP (eh_list, 0)) : -1);
-
-      if (GET_CODE (insn) == NOTE)
-	{
-	  int kind = NOTE_LINE_NUMBER (insn);
-	  if (kind == NOTE_INSN_EH_REGION_BEG)
-	    eh_list = alloc_INSN_LIST (insn, eh_list);
-	  else if (kind == NOTE_INSN_EH_REGION_END)
-	    {
-	      rtx t = XEXP (eh_list, 1);
-	      free_INSN_LIST_node (eh_list);
-	      eh_list = t;
-	    }
-	}
-
-      if (bb->end == insn)
-	{
-	  bb->eh_end = (eh_list ? NOTE_EH_HANDLER (XEXP (eh_list, 0)) : -1);
-	  i += 1;
-	  if (i == n_basic_blocks)
-	    break;
-	  bb = BASIC_BLOCK (i);
-	}
-    }
+  free_INSN_LIST_list (&handlers);
 }
 
 /* Identify critical edges and set the bits appropriately.  */
@@ -2090,7 +1933,6 @@ static void
 delete_unreachable_blocks ()
 {
   basic_block *worklist, *tos;
-  int deleted_handler;
   edge e;
   int i, n;
 
@@ -2128,10 +1970,9 @@ delete_unreachable_blocks ()
 	  }
     }
 
-  /* Delete all unreachable basic blocks.  Count down so that we don't
-     interfere with the block renumbering that happens in flow_delete_block.  */
-
-  deleted_handler = 0;
+  /* Delete all unreachable basic blocks.  Count down so that we
+     don't interfere with the block renumbering that happens in
+     flow_delete_block.  */
 
   for (i = n - 1; i >= 0; --i)
     {
@@ -2141,44 +1982,12 @@ delete_unreachable_blocks ()
 	/* This block was found.  Tidy up the mark.  */
 	b->aux = NULL;
       else
-	deleted_handler |= flow_delete_block (b);
+	flow_delete_block (b);
     }
 
   tidy_fallthru_edges ();
 
-  /* If we deleted an exception handler, we may have EH region begin/end
-     blocks to remove as well.  */
-  if (deleted_handler)
-    delete_eh_regions ();
-
   free (worklist);
-}
-
-/* Find EH regions for which there is no longer a handler, and delete them.  */
-
-static void
-delete_eh_regions ()
-{
-  rtx insn;
-
-  update_rethrow_references ();
-
-  for (insn = get_insns (); insn; insn = NEXT_INSN (insn))
-    if (GET_CODE (insn) == NOTE)
-      {
-	if ((NOTE_LINE_NUMBER (insn) == NOTE_INSN_EH_REGION_BEG)
-	    || (NOTE_LINE_NUMBER (insn) == NOTE_INSN_EH_REGION_END))
-	  {
-	    int num = NOTE_EH_HANDLER (insn);
-	    /* A NULL handler indicates a region is no longer needed,
-	       as long as its rethrow label isn't used.  */
-	    if (get_first_handler (num) == NULL && ! rethrow_used (num))
-	      {
-		NOTE_LINE_NUMBER (insn) = NOTE_INSN_DELETED;
-		NOTE_SOURCE_FILE (insn) = 0;
-	      }
-	  }
-      }
 }
 
 /* Return true if NOTE is not one of the ones that must be kept paired,
@@ -2254,26 +2063,7 @@ flow_delete_block (b)
   never_reached_warning (insn);
 
   if (GET_CODE (insn) == CODE_LABEL)
-    {
-      rtx x, *prev = &exception_handler_labels;
-
-      for (x = exception_handler_labels; x; x = XEXP (x, 1))
-	{
-	  if (XEXP (x, 0) == insn)
-	    {
-	      /* Found a match, splice this label out of the EH label list.  */
-	      *prev = XEXP (x, 1);
-	      XEXP (x, 1) = NULL_RTX;
-	      XEXP (x, 0) = NULL_RTX;
-
-	      /* Remove the handler from all regions */
-	      remove_handler (insn);
-	      deleted_handler = 1;
-	      break;
-	    }
-	  prev = &XEXP (x, 1);
-	}
-    }
+    maybe_remove_eh_handler (insn);
 
   /* Include any jump table following the basic block.  */
   end = b->end;
@@ -2671,7 +2461,6 @@ merge_blocks (e, b, c)
   else
     {
       edge tmp_edge;
-      basic_block d;
       int c_has_outgoing_fallthru;
       int b_has_incoming_fallthru;
 
@@ -2699,37 +2488,22 @@ merge_blocks (e, b, c)
 	  break;
       b_has_incoming_fallthru = (tmp_edge != NULL);
 
-      /* If B does not have an incoming fallthru, and the exception regions
-	 match, then it can be moved immediately before C without introducing
-	 or modifying jumps.
-
-	 C can not be the first block, so we do not have to worry about
+      /* If B does not have an incoming fallthru, then it can be moved
+	 immediately before C without introducing or modifying jumps.
+	 C cannot be the first block, so we do not have to worry about
 	 accessing a non-existent block.  */
-      d = BASIC_BLOCK (c->index - 1);
-      if (! b_has_incoming_fallthru
-	  && d->eh_end == b->eh_beg
-	  && b->eh_end == c->eh_beg)
+      if (! b_has_incoming_fallthru)
 	return merge_blocks_move_predecessor_nojumps (b, c);
 
-      /* Otherwise, we're going to try to move C after B.  Make sure the
-	 exception regions match.
+      /* Otherwise, we're going to try to move C after B.  If C does
+	 not have an outgoing fallthru, then it can be moved
+	 immediately after B without introducing or modifying jumps.  */
+      if (! c_has_outgoing_fallthru)
+	return merge_blocks_move_successor_nojumps (b, c);
 
-	 If B is the last basic block, then we must not try to access the
-	 block structure for block B + 1.  Luckily in that case we do not
-	 need to worry about matching exception regions.  */
-      d = (b->index + 1 < n_basic_blocks ? BASIC_BLOCK (b->index + 1) : NULL);
-      if (b->eh_end == c->eh_beg
-	  && (d == NULL || c->eh_end == d->eh_beg))
-	{
-	  /* If C does not have an outgoing fallthru, then it can be moved
-	     immediately after B without introducing or modifying jumps.  */
-	  if (! c_has_outgoing_fallthru)
-	    return merge_blocks_move_successor_nojumps (b, c);
-
-	  /* Otherwise, we'll need to insert an extra jump, and possibly
-	     a new block to contain it.  */
-	  /* ??? Not implemented yet.  */
-	}
+      /* Otherwise, we'll need to insert an extra jump, and possibly
+	 a new block to contain it.  */
+      /* ??? Not implemented yet.  */
 
       return 0;
     }
@@ -2814,7 +2588,14 @@ tidy_fallthru_edge (e, b, c)
 	  NOTE_SOURCE_FILE (q) = 0;
 	}
       else
-	q = PREV_INSN (q);
+	{
+	  q = PREV_INSN (q);
+
+	  /* We don't want a block to end on a line-number note since that has
+	     the potential of changing the code between -g and not -g.  */
+	  while (GET_CODE (q) == NOTE && NOTE_LINE_NUMBER (q) >= 0)
+	    q = PREV_INSN (q);
+	}
 
       b->end = q;
     }
@@ -2854,6 +2635,7 @@ tidy_fallthru_edges ()
 	 merge the flags for the duplicate edges.  So we do not want to
 	 check that the edge is not a FALLTHRU edge.  */
       if ((s = b->succ) != NULL
+	  && ! (s->flags & EDGE_COMPLEX)
 	  && s->succ_next == NULL
 	  && s->dest == c
 	  /* If the jump insn has side effects, we can't tidy the edge.  */
@@ -2944,6 +2726,21 @@ life_analysis (f, file, flags)
     dump_flow_info (file);
 
   free_basic_block_vars (1);
+
+#ifdef ENABLE_CHECKING
+  {
+    rtx insn;
+
+    /* Search for any REG_LABEL notes whih reference deleted labels.  */
+    for (insn = get_insns (); insn; insn = NEXT_INSN (insn))
+      {
+	rtx inote = find_reg_note (insn, REG_LABEL, NULL_RTX);
+
+	if (inote && GET_CODE (inote) == NOTE_INSN_DELETED_LABEL)
+	  abort ();
+      }
+  }
+#endif
 }
 
 /* A subroutine of verify_wide_reg, called through for_each_rtx.
@@ -3362,13 +3159,43 @@ mark_regs_live_at_end (set)
     if (global_regs[i] || EPILOGUE_USES (i))
       SET_REGNO_REG_SET (set, i);
 
-  /* Mark all call-saved registers that we actaully used.  */
   if (HAVE_epilogue && reload_completed)
     {
+      /* Mark all call-saved registers that we actually used.  */
       for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
 	if (regs_ever_live[i] && ! call_used_regs[i] && ! LOCAL_REGNO (i))
 	  SET_REGNO_REG_SET (set, i);
     }
+
+#ifdef EH_RETURN_DATA_REGNO
+  /* Mark the registers that will contain data for the handler.  */
+  if (reload_completed && current_function_calls_eh_return)
+    for (i = 0; ; ++i)
+      {
+	unsigned regno = EH_RETURN_DATA_REGNO(i);
+	if (regno == INVALID_REGNUM)
+	  break;
+	SET_REGNO_REG_SET (set, regno);
+      }
+#endif
+#ifdef EH_RETURN_STACKADJ_RTX
+  if ((! HAVE_epilogue || ! reload_completed)
+      && current_function_calls_eh_return)
+    {
+      rtx tmp = EH_RETURN_STACKADJ_RTX;
+      if (tmp && REG_P (tmp))
+	mark_reg (tmp, set);
+    }
+#endif
+#ifdef EH_RETURN_HANDLER_RTX
+  if ((! HAVE_epilogue || ! reload_completed)
+      && current_function_calls_eh_return)
+    {
+      rtx tmp = EH_RETURN_HANDLER_RTX;
+      if (tmp && REG_P (tmp))
+	mark_reg (tmp, set);
+    }
+#endif
 
   /* Mark function return value.  */
   diddle_return_value (mark_reg, set);
@@ -3402,13 +3229,19 @@ calculate_global_regs_live (blocks_in, blocks_out, flags)
      int flags;
 {
   basic_block *queue, *qhead, *qtail, *qend;
-  regset tmp, new_live_at_end;
-  regset_head tmp_head;
+  regset tmp, new_live_at_end, call_used;
+  regset_head tmp_head, call_used_head;
   regset_head new_live_at_end_head;
   int i;
 
   tmp = INITIALIZE_REG_SET (tmp_head);
   new_live_at_end = INITIALIZE_REG_SET (new_live_at_end_head);
+  call_used = INITIALIZE_REG_SET (call_used_head);
+
+  /* Inconveniently, this is only redily available in hard reg set form.  */
+  for (i = 0; i < FIRST_PSEUDO_REGISTER; ++i)
+    if (call_used_regs[i])
+      SET_REGNO_REG_SET (call_used, i);
 
   /* Create a worklist.  Allocate an extra slot for ENTRY_BLOCK, and one
      because the `head == tail' style test for an empty queue doesn't
@@ -3462,7 +3295,18 @@ calculate_global_regs_live (blocks_in, blocks_out, flags)
       for (e = bb->succ; e; e = e->succ_next)
 	{
 	  basic_block sb = e->dest;
-	  IOR_REG_SET (new_live_at_end, sb->global_live_at_start);
+
+	  /* Call-clobbered registers die across exception and call edges.  */
+	  /* ??? Abnormal call edges ignored for the moment, as this gets
+	     confused by sibling call edges, which crashes reg-stack.  */
+	  if (e->flags & EDGE_EH)
+	    {
+	      bitmap_operation (tmp, sb->global_live_at_start,
+				call_used, BITMAP_AND_COMPL);
+	      IOR_REG_SET (new_live_at_end, tmp);
+	    }
+	  else
+	    IOR_REG_SET (new_live_at_end, sb->global_live_at_start);
 	}
 
       /* The all-important stack pointer must always be live.  */
@@ -3611,6 +3455,7 @@ calculate_global_regs_live (blocks_in, blocks_out, flags)
 
   FREE_REG_SET (tmp);
   FREE_REG_SET (new_live_at_end);
+  FREE_REG_SET (call_used);
 
   if (blocks_out)
     {
@@ -3696,14 +3541,26 @@ propagate_block_delete_insn (bb, insn)
   /* If the insn referred to a label, and that label was attached to
      an ADDR_VEC, it's safe to delete the ADDR_VEC.  In fact, it's
      pretty much mandatory to delete it, because the ADDR_VEC may be
-     referencing labels that no longer exist.  */
+     referencing labels that no longer exist.
 
-  if (inote)
+     INSN may reference a deleted label, particularly when a jump
+     table has been optimized into a direct jump.  There's no
+     real good way to fix up the reference to the deleted label
+     when the label is deleted, so we just allow it here.
+
+     After dead code elimination is complete, we do search for
+     any REG_LABEL notes which reference deleted labels as a
+     sanity check.  */
+
+  if (inote && GET_CODE (inote) == CODE_LABEL)
     {
       rtx label = XEXP (inote, 0);
       rtx next;
 
-      if (LABEL_NUSES (label) == 1
+      /* The label may be forced if it has been put in the constant
+	 pool.  If that is the only use we must discard the table
+	 jump following it, but not the label itself.  */
+      if (LABEL_NUSES (label) == 1 + LABEL_PRESERVE_P (label)
 	  && (next = next_nonnote_insn (label)) != NULL
 	  && GET_CODE (next) == JUMP_INSN
 	  && (GET_CODE (PATTERN (next)) == ADDR_VEC
@@ -3799,10 +3656,7 @@ propagate_one_insn (pbi, insn)
       pbi->cc0_live = 0;
 
       if (libcall_is_dead)
-	{
-	  prev = propagate_block_delete_libcall (pbi->bb, insn, note);
-	  insn = NEXT_INSN (prev);
-	}
+	prev = propagate_block_delete_libcall (pbi->bb, insn, note);
       else
 	propagate_block_delete_insn (pbi->bb, insn);
 
@@ -4069,6 +3923,8 @@ init_propagate_block_info (bb, live, local_set, cond_local_set, flags)
 	       else
 		 cond = cond_true;
 	       rcli->condition = cond;
+	       rcli->stores = const0_rtx;
+	       rcli->orig_condition = cond;
 
 	       splay_tree_insert (pbi->reg_cond_dead, i,
 				  (splay_tree_value) rcli);
@@ -4090,7 +3946,8 @@ init_propagate_block_info (bb, live, local_set, cond_local_set, flags)
       && (flags & PROP_SCAN_DEAD_CODE)
       && (bb->succ == NULL
 	  || (bb->succ->succ_next == NULL
-	      && bb->succ->dest == EXIT_BLOCK_PTR)))
+	      && bb->succ->dest == EXIT_BLOCK_PTR
+	      && ! current_function_calls_eh_return)))
     {
       rtx insn;
       for (insn = bb->end; insn != bb->head; insn = PREV_INSN (insn))
@@ -4285,27 +4142,28 @@ insn_dead_p (pbi, x, call_ok, notes)
 	  /* Walk the set of memory locations we are currently tracking
 	     and see if one is an identical match to this memory location.
 	     If so, this memory write is dead (remember, we're walking
-	     backwards from the end of the block to the start).  */
-	  temp = pbi->mem_set_list;
-	  while (temp)
-	    {
-	      rtx mem = XEXP (temp, 0);
+	     backwards from the end of the block to the start).  Since
+	     rtx_equal_p does not check the alias set or flags, we also
+	     must have the potential for them to conflict (anti_dependence). */
+	  for (temp = pbi->mem_set_list; temp != 0; temp = XEXP (temp, 1))
+	    if (anti_dependence (r, XEXP (temp, 0)))
+	      {
+		rtx mem = XEXP (temp, 0);
 
-	      if (rtx_equal_p (mem, r))
-		return 1;
+		if (rtx_equal_p (mem, r))
+		  return 1;
 #ifdef AUTO_INC_DEC
-	      /* Check if memory reference matches an auto increment. Only
-		 post increment/decrement or modify are valid.  */
-	      if (GET_MODE (mem) == GET_MODE (r)
-	          && (GET_CODE (XEXP (mem, 0)) == POST_DEC
-	              || GET_CODE (XEXP (mem, 0)) == POST_INC
-	              || GET_CODE (XEXP (mem, 0)) == POST_MODIFY)
-		  && GET_MODE (XEXP (mem, 0)) == GET_MODE (r)
-		  && rtx_equal_p (XEXP (XEXP (mem, 0), 0), XEXP (r, 0)))
-		return 1;
+		/* Check if memory reference matches an auto increment. Only
+		   post increment/decrement or modify are valid.  */
+		if (GET_MODE (mem) == GET_MODE (r)
+		    && (GET_CODE (XEXP (mem, 0)) == POST_DEC
+			|| GET_CODE (XEXP (mem, 0)) == POST_INC
+			|| GET_CODE (XEXP (mem, 0)) == POST_MODIFY)
+		    && GET_MODE (XEXP (mem, 0)) == GET_MODE (r)
+		    && rtx_equal_p (XEXP (XEXP (mem, 0), 0), XEXP (r, 0)))
+		  return 1;
 #endif
-	      temp = XEXP (temp, 1);
-	    }
+	      }
 	}
       else
 	{
@@ -4655,7 +4513,7 @@ mark_set_1 (pbi, code, reg, cond, insn, flags)
      int flags;
 {
   int regno_first = -1, regno_last = -1;
-  int not_dead = 0;
+  unsigned long not_dead = 0;
   int i;
 
   /* Modifying just one hardware register of a multi-reg value or just a
@@ -4686,7 +4544,7 @@ mark_set_1 (pbi, code, reg, cond, insn, flags)
 	     || GET_CODE (reg) == STRICT_LOW_PART);
       if (GET_CODE (reg) == MEM)
 	break;
-      not_dead = REGNO_REG_SET_P (pbi->reg_live, REGNO (reg));
+      not_dead = (unsigned long) REGNO_REG_SET_P (pbi->reg_live, REGNO (reg));
       /* Fall through.  */
 
     case REG:
@@ -4734,7 +4592,8 @@ mark_set_1 (pbi, code, reg, cond, insn, flags)
 		    + UNITS_PER_WORD - 1) / UNITS_PER_WORD)
 		  < ((GET_MODE_SIZE (inner_mode)
 		      + UNITS_PER_WORD - 1) / UNITS_PER_WORD))
-		not_dead = REGNO_REG_SET_P (pbi->reg_live, regno_first);
+		not_dead = (unsigned long) REGNO_REG_SET_P (pbi->reg_live,
+							    regno_first);
 
 	      reg = SUBREG_REG (reg);
 	    }
@@ -4830,7 +4689,7 @@ mark_set_1 (pbi, code, reg, cond, insn, flags)
 	{
 	  for (i = regno_first; i <= regno_last; ++i)
 	    if (! mark_regno_cond_dead (pbi, i, cond))
-	      not_dead = 1;
+	      not_dead |= ((unsigned long) 1) << (i - regno_first);
 	}
 #endif
 
@@ -4943,7 +4802,6 @@ mark_set_1 (pbi, code, reg, cond, insn, flags)
 
       /* Mark the register as being dead.  */
       if (some_was_live
-	  && ! not_dead
 	  /* The stack pointer is never dead.  Well, not strictly true,
 	     but it's very difficult to tell from here.  Hopefully
 	     combine_stack_adjustments will fix up the most egregious
@@ -4951,7 +4809,8 @@ mark_set_1 (pbi, code, reg, cond, insn, flags)
 	  && regno_first != STACK_POINTER_REGNUM)
 	{
 	  for (i = regno_first; i <= regno_last; ++i)
-	    CLEAR_REGNO_REG_SET (pbi->reg_live, i);
+	    if (!(not_dead & (((unsigned long) 1) << (i - regno_first))))
+	      CLEAR_REGNO_REG_SET (pbi->reg_live, i);
 	}
     }
   else if (GET_CODE (reg) == REG)
@@ -5010,6 +4869,8 @@ mark_regno_cond_dead (pbi, regno, cond)
 	     which it is dead.  */
 	  rcli = (struct reg_cond_life_info *) xmalloc (sizeof (*rcli));
 	  rcli->condition = cond;
+	  rcli->stores = cond;
+	  rcli->orig_condition = const0_rtx;
 	  splay_tree_insert (pbi->reg_cond_dead, regno,
 			     (splay_tree_value) rcli);
 
@@ -5025,10 +4886,21 @@ mark_regno_cond_dead (pbi, regno, cond)
 	  rcli = (struct reg_cond_life_info *) node->value;
 	  ncond = rcli->condition;
 	  ncond = ior_reg_cond (ncond, cond, 1);
+	  if (rcli->stores == const0_rtx)
+	    rcli->stores = cond;
+	  else if (rcli->stores != const1_rtx)
+	    rcli->stores = ior_reg_cond (rcli->stores, cond, 1);
 
-	  /* If the register is now unconditionally dead,
-	     remove the entry in the splay_tree.  */
-	  if (ncond == const1_rtx)
+	  /* If the register is now unconditionally dead, remove the entry
+	     in the splay_tree.  A register is unconditionally dead if the
+	     dead condition ncond is true.  A register is also unconditionally
+	     dead if the sum of all conditional stores is an unconditional
+	     store (stores is true), and the dead condition is identically the
+	     same as the original dead condition initialized at the end of
+	     the block.  This is a pointer compare, not an rtx_equal_p
+	     compare.  */
+	  if (ncond == const1_rtx
+	      || (ncond == rcli->orig_condition && rcli->stores == const1_rtx))
 	    splay_tree_remove (pbi->reg_cond_dead, regno);
 	  else
 	    {
@@ -5074,6 +4946,8 @@ flush_reg_cond_reg_1 (node, data)
   /* Splice out portions of the expression that refer to regno.  */
   rcli = (struct reg_cond_life_info *) node->value;
   rcli->condition = elim_reg_cond (rcli->condition, regno);
+  if (rcli->stores != const0_rtx && rcli->stores != const1_rtx)
+    rcli->stores = elim_reg_cond (rcli->stores, regno);
 
   /* If the entire condition is now false, signal the node to be removed.  */
   if (rcli->condition == const0_rtx)
@@ -5280,6 +5154,17 @@ and_reg_cond (old, x, add)
 	}
       if (! add)
 	return old;
+
+      /* If X is identical to one of the existing terms of the AND,
+	 then just return what we already have.  */
+      /* ??? There really should be some sort of recursive check here in
+	 case there are nested ANDs.  */
+      if ((GET_CODE (XEXP (old, 0)) == GET_CODE (x)
+	   && REGNO (XEXP (XEXP (old, 0), 0)) == REGNO (XEXP (x, 0)))
+	  || (GET_CODE (XEXP (old, 1)) == GET_CODE (x)
+	      && REGNO (XEXP (XEXP (old, 1), 0)) == REGNO (XEXP (x, 0))))
+	return old;
+
       return gen_rtx_AND (0, old, x);
 
     case NOT:
@@ -5604,35 +5489,37 @@ mark_used_reg (pbi, reg, cond, insn)
      rtx cond ATTRIBUTE_UNUSED;
      rtx insn;
 {
-  int regno = REGNO (reg);
-  int some_was_live = REGNO_REG_SET_P (pbi->reg_live, regno);
-  int some_was_dead = ! some_was_live;
-  int some_not_set;
-  int n;
+  unsigned int regno_first, regno_last, i;
+  int some_was_live, some_was_dead, some_not_set;
 
-  /* A hard reg in a wide mode may really be multiple registers.
-     If so, mark all of them just like the first.  */
-  if (regno < FIRST_PSEUDO_REGISTER)
+  regno_last = regno_first = REGNO (reg);
+  if (regno_first < FIRST_PSEUDO_REGISTER)
+    regno_last += HARD_REGNO_NREGS (regno_first, GET_MODE (reg)) - 1;
+
+  /* Find out if any of this register is live after this instruction.  */
+  some_was_live = some_was_dead = 0;
+  for (i = regno_first; i <= regno_last; ++i)
     {
-      n = HARD_REGNO_NREGS (regno, GET_MODE (reg));
-      while (--n > 0)
-	{
-	  int needed_regno = REGNO_REG_SET_P (pbi->reg_live, regno + n);
-	  some_was_live |= needed_regno;
-	  some_was_dead |= ! needed_regno;
-	}
+      int needed_regno = REGNO_REG_SET_P (pbi->reg_live, i);
+      some_was_live |= needed_regno;
+      some_was_dead |= ! needed_regno;
     }
+
+  /* Find out if any of the register was set this insn.  */
+  some_not_set = 0;
+  for (i = regno_first; i <= regno_last; ++i)
+    some_not_set |= ! REGNO_REG_SET_P (pbi->new_set, i);
 
   if (pbi->flags & (PROP_LOG_LINKS | PROP_AUTOINC))
     {
       /* Record where each reg is used, so when the reg is set we know
 	 the next insn that uses it.  */
-      pbi->reg_next_use[regno] = insn;
+      pbi->reg_next_use[regno_first] = insn;
     }
 
   if (pbi->flags & PROP_REG_INFO)
     {
-      if (regno < FIRST_PSEUDO_REGISTER)
+      if (regno_first < FIRST_PSEUDO_REGISTER)
 	{
 	  /* If this is a register we are going to try to eliminate,
 	     don't mark it live here.  If we are successful in
@@ -5646,39 +5533,26 @@ mark_used_reg (pbi, reg, cond, insn)
 	     register to itself.  This should be fixed.  In the mean
 	     time, hack around it.  */
 
-	  if (! (TEST_HARD_REG_BIT (elim_reg_set, regno)
-	         && (regno == FRAME_POINTER_REGNUM
-		     || regno == ARG_POINTER_REGNUM)))
-	    {
-	      int n = HARD_REGNO_NREGS (regno, GET_MODE (reg));
-	      do
-		regs_ever_live[regno + --n] = 1;
-	      while (n > 0);
-	    }
+	  if (! (TEST_HARD_REG_BIT (elim_reg_set, regno_first)
+	         && (regno_first == FRAME_POINTER_REGNUM
+		     || regno_first == ARG_POINTER_REGNUM)))
+	    for (i = regno_first; i <= regno_last; ++i)
+	      regs_ever_live[i] = 1;
 	}
       else
 	{
 	  /* Keep track of which basic block each reg appears in.  */
 
 	  register int blocknum = pbi->bb->index;
-	  if (REG_BASIC_BLOCK (regno) == REG_BLOCK_UNKNOWN)
-	    REG_BASIC_BLOCK (regno) = blocknum;
-	  else if (REG_BASIC_BLOCK (regno) != blocknum)
-	    REG_BASIC_BLOCK (regno) = REG_BLOCK_GLOBAL;
+	  if (REG_BASIC_BLOCK (regno_first) == REG_BLOCK_UNKNOWN)
+	    REG_BASIC_BLOCK (regno_first) = blocknum;
+	  else if (REG_BASIC_BLOCK (regno_first) != blocknum)
+	    REG_BASIC_BLOCK (regno_first) = REG_BLOCK_GLOBAL;
 
 	  /* Count (weighted) number of uses of each reg.  */
-	  REG_N_REFS (regno) += (optimize_size ? 1
-				 : pbi->bb->loop_depth + 1);
+	  REG_N_REFS (regno_first)
+	    += (optimize_size ? 1 : pbi->bb->loop_depth + 1);
 	}
-    }
-
-  /* Find out if any of the register was set this insn.  */
-  some_not_set = ! REGNO_REG_SET_P (pbi->new_set, regno);
-  if (regno < FIRST_PSEUDO_REGISTER)
-    {
-      n = HARD_REGNO_NREGS (regno, GET_MODE (reg));
-      while (--n > 0)
-	some_not_set |= ! REGNO_REG_SET_P (pbi->new_set, regno + n);
     }
 
   /* Record and count the insns in which a reg dies.  If it is used in
@@ -5691,120 +5565,102 @@ mark_used_reg (pbi, reg, cond, insn)
     {
       /* Check for the case where the register dying partially
 	 overlaps the register set by this insn.  */
-      if (regno < FIRST_PSEUDO_REGISTER
-	  && HARD_REGNO_NREGS (regno, GET_MODE (reg)) > 1)
-	{
-	  n = HARD_REGNO_NREGS (regno, GET_MODE (reg));
-	  while (--n >= 0)
-	    some_was_live |= REGNO_REG_SET_P (pbi->new_set, regno + n);
-	}
+      if (regno_first != regno_last)
+	for (i = regno_first; i <= regno_last; ++i)
+	  some_was_live |= REGNO_REG_SET_P (pbi->new_set, i);
 
       /* If none of the words in X is needed, make a REG_DEAD note.
 	 Otherwise, we must make partial REG_DEAD notes.  */
       if (! some_was_live)
 	{
 	  if ((pbi->flags & PROP_DEATH_NOTES)
-	      && ! find_regno_note (insn, REG_DEAD, regno))
+	      && ! find_regno_note (insn, REG_DEAD, regno_first))
 	    REG_NOTES (insn)
 	      = alloc_EXPR_LIST (REG_DEAD, reg, REG_NOTES (insn));
 
 	  if (pbi->flags & PROP_REG_INFO)
-	    REG_N_DEATHS (regno)++;
+	    REG_N_DEATHS (regno_first)++;
 	}
       else
 	{
 	  /* Don't make a REG_DEAD note for a part of a register
 	     that is set in the insn.  */
-
-	  n = regno + HARD_REGNO_NREGS (regno, GET_MODE (reg)) - 1;
-	  for (; n >= regno; n--)
-	    if (! REGNO_REG_SET_P (pbi->reg_live, n)
-		&& ! dead_or_set_regno_p (insn, n))
+	  for (i = regno_first; i <= regno_last; ++i)
+	    if (! REGNO_REG_SET_P (pbi->reg_live, i)
+		&& ! dead_or_set_regno_p (insn, i))
 	      REG_NOTES (insn)
 		= alloc_EXPR_LIST (REG_DEAD,
-				   gen_rtx_REG (reg_raw_mode[n], n),
+				   gen_rtx_REG (reg_raw_mode[i], i),
 				   REG_NOTES (insn));
 	}
     }
 
-  SET_REGNO_REG_SET (pbi->reg_live, regno);
-  if (regno < FIRST_PSEUDO_REGISTER)
+  /* Mark the register as being live.  */
+  for (i = regno_first; i <= regno_last; ++i)
     {
-      n = HARD_REGNO_NREGS (regno, GET_MODE (reg));
-      while (--n > 0)
-	SET_REGNO_REG_SET (pbi->reg_live, regno + n);
-    }
+      SET_REGNO_REG_SET (pbi->reg_live, i);
 
 #ifdef HAVE_conditional_execution
-  /* If this is a conditional use, record that fact.  If it is later
-     conditionally set, we'll know to kill the register.  */
-  if (cond != NULL_RTX)
-    {
-      splay_tree_node node;
-      struct reg_cond_life_info *rcli;
-      rtx ncond;
-
-      if (some_was_live)
+      /* If this is a conditional use, record that fact.  If it is later
+	 conditionally set, we'll know to kill the register.  */
+      if (cond != NULL_RTX)
 	{
-	  node = splay_tree_lookup (pbi->reg_cond_dead, regno);
-	  if (node == NULL)
-	    {
-	      /* The register was unconditionally live previously.
-		 No need to do anything.  */
-	    }
-	  else
-	    {
-	      /* The register was conditionally live previously.
-		 Subtract the new life cond from the old death cond.  */
-	      rcli = (struct reg_cond_life_info *) node->value;
-	      ncond = rcli->condition;
-	      ncond = and_reg_cond (ncond, not_reg_cond (cond), 1);
+	  splay_tree_node node;
+	  struct reg_cond_life_info *rcli;
+	  rtx ncond;
 
-	      /* If the register is now unconditionally live, remove the
-		 entry in the splay_tree.  */
-	      if (ncond == const0_rtx)
+	  if (some_was_live)
+	    {
+	      node = splay_tree_lookup (pbi->reg_cond_dead, i);
+	      if (node == NULL)
 		{
-		  rcli->condition = NULL_RTX;
-		  splay_tree_remove (pbi->reg_cond_dead, regno);
+		  /* The register was unconditionally live previously.
+		     No need to do anything.  */
 		}
 	      else
 		{
-		  rcli->condition = ncond;
-		  SET_REGNO_REG_SET (pbi->reg_cond_reg, REGNO (XEXP (cond, 0)));
+		  /* The register was conditionally live previously.
+		     Subtract the new life cond from the old death cond.  */
+		  rcli = (struct reg_cond_life_info *) node->value;
+		  ncond = rcli->condition;
+		  ncond = and_reg_cond (ncond, not_reg_cond (cond), 1);
+
+		  /* If the register is now unconditionally live,
+		     remove the entry in the splay_tree.  */
+		  if (ncond == const0_rtx)
+		    splay_tree_remove (pbi->reg_cond_dead, i);
+		  else
+		    {
+		      rcli->condition = ncond;
+		      SET_REGNO_REG_SET (pbi->reg_cond_reg,
+					 REGNO (XEXP (cond, 0)));
+		    }
 		}
 	    }
-	}
-      else
-	{
-	  /* The register was not previously live at all.  Record
-	     the condition under which it is still dead.  */
-	  rcli = (struct reg_cond_life_info *) xmalloc (sizeof (*rcli));
-	  rcli->condition = not_reg_cond (cond);
-	  splay_tree_insert (pbi->reg_cond_dead, regno,
-			     (splay_tree_value) rcli);
+	  else
+	    {
+	      /* The register was not previously live at all.  Record
+		 the condition under which it is still dead.  */
+	      rcli = (struct reg_cond_life_info *) xmalloc (sizeof (*rcli));
+	      rcli->condition = not_reg_cond (cond);
+	      rcli->stores = const0_rtx;
+	      rcli->orig_condition = const0_rtx;
+	      splay_tree_insert (pbi->reg_cond_dead, i,
+				 (splay_tree_value) rcli);
 
-	  SET_REGNO_REG_SET (pbi->reg_cond_reg, REGNO (XEXP (cond, 0)));
+	      SET_REGNO_REG_SET (pbi->reg_cond_reg, REGNO (XEXP (cond, 0)));
+	    }
 	}
-    }
-  else if (some_was_live)
-    {
-      splay_tree_node node;
-      struct reg_cond_life_info *rcli;
-
-      node = splay_tree_lookup (pbi->reg_cond_dead, regno);
-      if (node != NULL)
+      else if (some_was_live)
 	{
-	  /* The register was conditionally live previously, but is now
-	     unconditionally so.  Remove it from the conditionally dead
-	     list, so that a conditional set won't cause us to think
+	  /* The register may have been conditionally live previously, but
+	     is now unconditionally live.  Remove it from the conditionally
+	     dead list, so that a conditional set won't cause us to think
 	     it dead.  */
-	  rcli = (struct reg_cond_life_info *) node->value;
-	  rcli->condition = NULL_RTX;
-	  splay_tree_remove (pbi->reg_cond_dead, regno);
+	  splay_tree_remove (pbi->reg_cond_dead, i);
 	}
-    }
-
 #endif
+    }
 }
 
 /* Scan expression X and store a 1-bit in NEW_LIVE for each reg it uses.
@@ -6447,8 +6303,6 @@ dump_bb (bb, outf)
 
   fprintf (outf, ";; Basic block %d, loop depth %d, count %d",
 	   bb->index, bb->loop_depth, bb->count);
-  if (bb->eh_beg != -1 || bb->eh_end != -1)
-    fprintf (outf, ", eh regions %d/%d", bb->eh_beg, bb->eh_end);
   putc ('\n', outf);
 
   fputs (";; Predecessors: ", outf);

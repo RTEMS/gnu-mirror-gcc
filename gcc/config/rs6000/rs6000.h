@@ -1180,6 +1180,7 @@ typedef struct rs6000_stack {
   int cr_save_offset;		/* offset to save CR from initial SP */
   int toc_save_offset;		/* offset to save the TOC pointer */
   int varargs_save_offset;	/* offset to save the varargs registers */
+  int ehrd_offset;		/* offset to EH return data */
   int reg_size;			/* register size (4 or 8) */
   int varargs_size;		/* size to hold V.4 args passed in regs */
   int vars_size;		/* variable save area size */
@@ -1422,9 +1423,8 @@ typedef struct rs6000_args
 /* Define intermediate macro to compute the size (in registers) of an argument
    for the RS/6000.  */
 
-#define RS6000_ARG_SIZE(MODE, TYPE, NAMED)				\
-(! (NAMED) ? 0								\
- : (MODE) != BLKmode							\
+#define RS6000_ARG_SIZE(MODE, TYPE)					\
+((MODE) != BLKmode							\
  ? (GET_MODE_SIZE (MODE) + (UNITS_PER_WORD - 1)) / UNITS_PER_WORD	\
  : ((unsigned HOST_WIDE_INT) int_size_in_bytes (TYPE) 			\
     + (UNITS_PER_WORD - 1)) / UNITS_PER_WORD)
@@ -1540,6 +1540,10 @@ typedef struct rs6000_args
 #define EXPAND_BUILTIN_VA_ARG(valist, type) \
   rs6000_va_arg (valist, type)
 
+/* Define this macro to be a nonzero value if the location where a function
+   argument is passed depends on whether or not it is a named argument.  */
+#define STRICT_ARGUMENT_NAMING 1
+
 /* This macro generates the assembly code for function entry.
    FILE is a stdio stream to output the code to.
    SIZE is an int: how many units of temporary storage to allocate.
@@ -1569,8 +1573,11 @@ typedef struct rs6000_args
    and frame pointer registers are already be assumed to be used as
    needed.  */
 
-#define	EPILOGUE_USES(REGNO)	\
-  (reload_completed && (REGNO) == LINK_REGISTER_REGNUM)
+#define	EPILOGUE_USES(REGNO)					\
+  ((reload_completed && (REGNO) == LINK_REGISTER_REGNUM)	\
+   || (current_function_calls_eh_return				\
+       && TARGET_AIX						\
+       && (REGNO) == TOC_REGISTER))
 
 /* This macro generates the assembly code for function exit,
    on machines that need it.  If FUNCTION_EPILOGUE is not defined
@@ -1772,26 +1779,28 @@ typedef struct rs6000_args
    After reload, it makes no difference, since pseudo regs have
    been eliminated by then.  */
 
-#ifndef REG_OK_STRICT
+#ifdef REG_OK_STRICT
+# define REG_OK_STRICT_FLAG 1
+#else
+# define REG_OK_STRICT_FLAG 0
+#endif
 
 /* Nonzero if X is a hard reg that can be used as an index
-   or if it is a pseudo reg.  */
-#define REG_OK_FOR_INDEX_P(X)			\
-  (REGNO (X) <= 31 || REGNO (X) == 67 || REGNO (X) >= FIRST_PSEUDO_REGISTER)
+   or if it is a pseudo reg in the non-strict case.  */
+#define INT_REG_OK_FOR_INDEX_P(X, STRICT)			\
+  ((! (STRICT)							\
+    && (REGNO (X) <= 31						\
+	|| REGNO (X) == ARG_POINTER_REGNUM			\
+	|| REGNO (X) >= FIRST_PSEUDO_REGISTER))			\
+   || ((STRICT) && REGNO_OK_FOR_INDEX_P (REGNO (X))))
 
 /* Nonzero if X is a hard reg that can be used as a base reg
-   or if it is a pseudo reg.  */
-#define REG_OK_FOR_BASE_P(X)					 \
-  (REGNO (X) > 0 && REG_OK_FOR_INDEX_P (X))
+   or if it is a pseudo reg in the non-strict case.  */
+#define INT_REG_OK_FOR_BASE_P(X, STRICT)			\
+  (REGNO (X) > 0 && INT_REG_OK_FOR_INDEX_P (X, (STRICT)))
 
-#else
-
-/* Nonzero if X is a hard reg that can be used as an index.  */
-#define REG_OK_FOR_INDEX_P(X) REGNO_OK_FOR_INDEX_P (REGNO (X))
-/* Nonzero if X is a hard reg that can be used as a base reg.  */
-#define REG_OK_FOR_BASE_P(X) REGNO_OK_FOR_BASE_P (REGNO (X))
-
-#endif
+#define REG_OK_FOR_INDEX_P(X) INT_REG_OK_FOR_INDEX_P (X, REG_OK_STRICT_FLAG)
+#define REG_OK_FOR_BASE_P(X)  INT_REG_OK_FOR_BASE_P (X, REG_OK_STRICT_FLAG)
 
 /* GO_IF_LEGITIMATE_ADDRESS recognizes an RTL expression
    that is a valid memory address for an instruction.
@@ -1828,68 +1837,51 @@ typedef struct rs6000_args
    && (GET_CODE (X) == SYMBOL_REF || GET_CODE (X) == CONST)		\
    && small_data_operand (X, MODE))
 
-#define LEGITIMATE_ADDRESS_INTEGER_P(X,OFFSET)				\
+#define LEGITIMATE_ADDRESS_INTEGER_P(X, OFFSET)				\
  (GET_CODE (X) == CONST_INT						\
   && (unsigned HOST_WIDE_INT) (INTVAL (X) + (OFFSET) + 0x8000) < 0x10000)
 
-#define LEGITIMATE_OFFSET_ADDRESS_P(MODE,X)		\
- (GET_CODE (X) == PLUS					\
-  && GET_CODE (XEXP (X, 0)) == REG			\
-  && REG_OK_FOR_BASE_P (XEXP (X, 0))			\
-  && LEGITIMATE_ADDRESS_INTEGER_P (XEXP (X, 1), 0)	\
-  && (((MODE) != DFmode && (MODE) != DImode)		\
-      || (TARGET_32BIT					\
-	  ? LEGITIMATE_ADDRESS_INTEGER_P (XEXP (X, 1), 4) \
-	  : ! (INTVAL (XEXP (X, 1)) & 3)))		\
-  && ((MODE) != TImode					\
-      || (TARGET_32BIT					\
-	  ? LEGITIMATE_ADDRESS_INTEGER_P (XEXP (X, 1), 12) \
-	  : (LEGITIMATE_ADDRESS_INTEGER_P (XEXP (X, 1), 8) \
+#define LEGITIMATE_OFFSET_ADDRESS_P(MODE, X, STRICT)		\
+ (GET_CODE (X) == PLUS						\
+  && GET_CODE (XEXP (X, 0)) == REG				\
+  && INT_REG_OK_FOR_BASE_P (XEXP (X, 0), (STRICT))		\
+  && LEGITIMATE_ADDRESS_INTEGER_P (XEXP (X, 1), 0)		\
+  && (((MODE) != DFmode && (MODE) != DImode)			\
+      || (TARGET_32BIT						\
+	  ? LEGITIMATE_ADDRESS_INTEGER_P (XEXP (X, 1), 4) 	\
+	  : ! (INTVAL (XEXP (X, 1)) & 3)))			\
+  && ((MODE) != TImode						\
+      || (TARGET_32BIT						\
+	  ? LEGITIMATE_ADDRESS_INTEGER_P (XEXP (X, 1), 12) 	\
+	  : (LEGITIMATE_ADDRESS_INTEGER_P (XEXP (X, 1), 8) 	\
 	     && ! (INTVAL (XEXP (X, 1)) & 3)))))
 
-#define LEGITIMATE_INDEXED_ADDRESS_P(X)		\
- (GET_CODE (X) == PLUS				\
-  && GET_CODE (XEXP (X, 0)) == REG		\
-  && GET_CODE (XEXP (X, 1)) == REG		\
-  && ((REG_OK_FOR_BASE_P (XEXP (X, 0))		\
-       && REG_OK_FOR_INDEX_P (XEXP (X, 1)))	\
-      || (REG_OK_FOR_BASE_P (XEXP (X, 1))	\
-	  && REG_OK_FOR_INDEX_P (XEXP (X, 0)))))
+#define LEGITIMATE_INDEXED_ADDRESS_P(X, STRICT)			\
+ (GET_CODE (X) == PLUS						\
+  && GET_CODE (XEXP (X, 0)) == REG				\
+  && GET_CODE (XEXP (X, 1)) == REG				\
+  && ((INT_REG_OK_FOR_BASE_P (XEXP (X, 0), (STRICT))		\
+       && INT_REG_OK_FOR_INDEX_P (XEXP (X, 1), (STRICT)))	\
+      || (INT_REG_OK_FOR_BASE_P (XEXP (X, 1), (STRICT))		\
+	  && INT_REG_OK_FOR_INDEX_P (XEXP (X, 0), (STRICT)))))
 
-#define LEGITIMATE_INDIRECT_ADDRESS_P(X)	\
-  (GET_CODE (X) == REG && REG_OK_FOR_BASE_P (X))
+#define LEGITIMATE_INDIRECT_ADDRESS_P(X, STRICT)		\
+  (GET_CODE (X) == REG && INT_REG_OK_FOR_BASE_P (X, (STRICT)))
 
-#define LEGITIMATE_LO_SUM_ADDRESS_P(MODE, X)		\
-  (TARGET_ELF						\
-   && ! flag_pic && ! TARGET_TOC			\
-   && (MODE) != DImode					\
-   && (MODE) != TImode					\
-   && (TARGET_HARD_FLOAT || (MODE) != DFmode)		\
-   && GET_CODE (X) == LO_SUM				\
-   && GET_CODE (XEXP (X, 0)) == REG			\
-   && REG_OK_FOR_BASE_P (XEXP (X, 0))			\
+#define LEGITIMATE_LO_SUM_ADDRESS_P(MODE, X, STRICT)		\
+  (TARGET_ELF							\
+   && ! flag_pic && ! TARGET_TOC				\
+   && (MODE) != DImode						\
+   && (MODE) != TImode						\
+   && (TARGET_HARD_FLOAT || (MODE) != DFmode)			\
+   && GET_CODE (X) == LO_SUM					\
+   && GET_CODE (XEXP (X, 0)) == REG				\
+   && INT_REG_OK_FOR_BASE_P (XEXP (X, 0), (STRICT))		\
    && CONSTANT_P (XEXP (X, 1)))
 
-#define GO_IF_LEGITIMATE_ADDRESS(MODE, X, ADDR)		\
-{ if (LEGITIMATE_INDIRECT_ADDRESS_P (X))		\
-    goto ADDR;						\
-  if ((GET_CODE (X) == PRE_INC || GET_CODE (X) == PRE_DEC) \
-      && TARGET_UPDATE					\
-      && LEGITIMATE_INDIRECT_ADDRESS_P (XEXP (X, 0)))	\
-    goto ADDR;						\
-  if (LEGITIMATE_SMALL_DATA_P (MODE, X))		\
-    goto ADDR;						\
-  if (LEGITIMATE_CONSTANT_POOL_ADDRESS_P (X))		\
-    goto ADDR;						\
-  if (LEGITIMATE_OFFSET_ADDRESS_P (MODE, X))		\
-    goto ADDR;						\
-  if ((MODE) != TImode					\
-      && (TARGET_HARD_FLOAT || TARGET_POWERPC64 || (MODE) != DFmode) \
-      && (TARGET_POWERPC64 || (MODE) != DImode)		\
-      && LEGITIMATE_INDEXED_ADDRESS_P (X))		\
-    goto ADDR;						\
-  if (LEGITIMATE_LO_SUM_ADDRESS_P (MODE, X))		\
-    goto ADDR;						\
+#define GO_IF_LEGITIMATE_ADDRESS(MODE, X, ADDR)			\
+{ if (rs6000_legitimate_address (MODE, X, REG_OK_STRICT_FLAG))	\
+    goto ADDR;							\
 }
 
 /* Try machine-dependent ways of modifying an illegitimate address
@@ -2641,6 +2633,10 @@ do {									\
 #define INCOMING_RETURN_ADDR_RTX   gen_rtx_REG (Pmode, LINK_REGISTER_REGNUM)
 #define DWARF_FRAME_RETURN_COLUMN  DWARF_FRAME_REGNUM (LINK_REGISTER_REGNUM)
 
+/* Describe how we implement __builtin_eh_return.  */
+#define EH_RETURN_DATA_REGNO(N) ((N) < 4 ? (N) + 3 : INVALID_REGNUM)
+#define EH_RETURN_STACKADJ_RTX  gen_rtx_REG (Pmode, 10)
+
 /* Define results of standard character escape sequences.  */
 #define TARGET_BELL 007
 #define TARGET_BS 010
@@ -2683,6 +2679,7 @@ do {									\
   {"got_operand", {SYMBOL_REF, CONST, LABEL_REF}},			   \
   {"got_no_const_operand", {SYMBOL_REF, LABEL_REF}},			   \
   {"easy_fp_constant", {CONST_DOUBLE}},					   \
+  {"zero_fp_constant", {CONST_DOUBLE}},					   \
   {"reg_or_mem_operand", {SUBREG, MEM, REG}},				   \
   {"lwa_operand", {SUBREG, MEM, REG}},					   \
   {"volatile_mem_operand", {MEM}},					   \
@@ -2718,7 +2715,8 @@ do {									\
   {"trap_comparison_operator", {EQ, NE, LE, LT, GE,			   \
 				GT, LEU, LTU, GEU, GTU}},		   \
   {"boolean_operator", {AND, IOR, XOR}},				   \
-  {"boolean_or_operator", {IOR, XOR}},
+  {"boolean_or_operator", {IOR, XOR}},					   \
+  {"min_max_operator", {SMIN, SMAX, UMIN, UMAX}},
 
 /* uncomment for disabling the corresponding default options */
 /* #define  MACHINE_no_sched_interblock */

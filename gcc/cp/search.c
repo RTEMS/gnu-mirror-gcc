@@ -649,8 +649,8 @@ lookup_field_1 (type, name)
 	;
       else if (DECL_NAME (field) == name)
 	{
-	  if ((TREE_CODE(field) == VAR_DECL || TREE_CODE(field) == CONST_DECL)
-	      && DECL_ASSEMBLER_NAME (field) != NULL)
+	  if (TREE_CODE(field) == VAR_DECL 
+	      && (TREE_STATIC (field) || DECL_EXTERNAL (field)))
 	    GNU_xref_ref(current_function_decl,
 			 IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (field)));
 	  return field;
@@ -842,7 +842,7 @@ dfs_access_in_type (binfo, data)
 	 access to the DECL.  The CONST_DECL for an enumeration
 	 constant will not have DECL_LANG_SPECIFIC, and thus no
 	 DECL_ACCESS.  */
-      if (DECL_LANG_SPECIFIC (decl))
+      if (DECL_LANG_SPECIFIC (decl) && !DECL_DISCRIMINATOR_P (decl))
 	{
 	  tree decl_access = purpose_member (type, DECL_ACCESS (decl));
 	  if (decl_access)
@@ -1382,11 +1382,27 @@ lookup_field_r (binfo, data)
      we ignore all non-types we find.  */
   if (lfi->want_type && TREE_CODE (nval) != TYPE_DECL)
     {
-      nval = purpose_member (lfi->name, CLASSTYPE_TAGS (type));
-      if (nval)
-	nval = TYPE_MAIN_DECL (TREE_VALUE (nval));
-      else 
-	return NULL_TREE;
+      if (lfi->name == TYPE_IDENTIFIER (type))
+	{
+	  /* If the aggregate has no user defined constructors, we allow
+	     it to have fields with the same name as the enclosing type.
+	     If we are looking for that name, find the corresponding
+	     TYPE_DECL.  */
+	  for (nval = TREE_CHAIN (nval); nval; nval = TREE_CHAIN (nval))
+	    if (DECL_NAME (nval) == lfi->name
+		&& TREE_CODE (nval) == TYPE_DECL)
+	      break;
+	}
+      else
+	nval = NULL_TREE;
+      if (!nval)
+	{
+	  nval = purpose_member (lfi->name, CLASSTYPE_TAGS (type));
+	  if (nval)
+	    nval = TYPE_MAIN_DECL (TREE_VALUE (nval));
+	  else 
+	    return NULL_TREE;
+	}
     }
 
   /* You must name a template base class with a template-id.  */
@@ -2006,6 +2022,46 @@ look_for_overrides (type, fndecl)
   return found;
 }
 
+/* Look in TYPE for virtual functions with the same signature as FNDECL.
+   This differs from get_matching_virtual in that it will only return
+   a function from TYPE.  */
+
+tree
+look_for_overrides_here (type, fndecl)
+     tree type, fndecl;
+{
+  int ix;
+
+  if (DECL_MAYBE_IN_CHARGE_DESTRUCTOR_P (fndecl))
+    ix = CLASSTYPE_DESTRUCTOR_SLOT;
+  else
+    ix = lookup_fnfields_1 (type, DECL_NAME (fndecl));
+  if (ix >= 0)
+    {
+      tree fns = TREE_VEC_ELT (CLASSTYPE_METHOD_VEC (type), ix);
+  
+      for (; fns; fns = OVL_NEXT (fns))
+        {
+          tree fn = OVL_CURRENT (fns);
+
+          if (!DECL_VIRTUAL_P (fn))
+            /* Not a virtual.  */;
+          else if (DECL_CONTEXT (fn) != type)
+            /* Introduced with a using declaration.  */;
+	  else if (DECL_STATIC_FUNCTION_P (fndecl))
+	    {
+	      tree btypes = TYPE_ARG_TYPES (TREE_TYPE (fn));
+	      tree dtypes = TYPE_ARG_TYPES (TREE_TYPE (fndecl));
+  	      if (compparms (TREE_CHAIN (btypes), dtypes))
+		return fn;
+            }
+          else if (same_signature_p (fndecl, fn))
+	    return fn;
+	}
+    }
+  return NULL_TREE;
+}
+
 /* Look in TYPE for virtual functions overridden by FNDECL. Check both
    TYPE itself and its bases. */
 
@@ -2013,58 +2069,25 @@ static int
 look_for_overrides_r (type, fndecl)
      tree type, fndecl;
 {
-  int ix;
-  
-  if (DECL_DESTRUCTOR_P (fndecl))
-    ix = CLASSTYPE_DESTRUCTOR_SLOT;
-  else
-    ix = lookup_fnfields_1 (type, DECL_NAME (fndecl));
-  if (ix >= 0)
+  tree fn = look_for_overrides_here (type, fndecl);
+  if (fn)
     {
-      tree fns = TREE_VEC_ELT (CLASSTYPE_METHOD_VEC (type), ix);
-      tree dtypes = TYPE_ARG_TYPES (TREE_TYPE (fndecl));
-      tree thistype = DECL_STATIC_FUNCTION_P (fndecl)
-                      ? NULL_TREE : TREE_TYPE (TREE_VALUE (dtypes));
-  
-      for (; fns; fns = OVL_NEXT (fns))
-        {
-          tree fn = OVL_CURRENT (fns);
-          tree btypes = TYPE_ARG_TYPES (TREE_TYPE (fn));
-          
-          if (!DECL_VIRTUAL_P (fn))
-            /*  Not a virtual */;
-          else if (DECL_CONTEXT (fn) != type)
-            /*  Introduced with a using declaration */;
-	  else if (thistype == NULL_TREE)
-	    {
-	      if (compparms (TREE_CHAIN (btypes), dtypes))
-                {
-                  /* A static member function cannot match an inherited
-                     virtual member function.  */
-                  cp_error_at ("`%#D' cannot be declared", fndecl);
-                  cp_error_at ("  since `%#D' declared in base class", fn);
-                  return 1;
-                }
-            }
-          else
-            {
-              if (/* The first parameter is the `this' parameter,
-	             which has POINTER_TYPE, and we can therefore
-	             safely use TYPE_QUALS, rather than
-		     CP_TYPE_QUALS.  */
-	          (TYPE_QUALS (TREE_TYPE (TREE_VALUE (btypes)))
-	           == TYPE_QUALS (thistype))
-	          && compparms (TREE_CHAIN (btypes), TREE_CHAIN (dtypes)))
-                {
-                  /* It's definitely virtual, even if not explicitly set.  */
-                  DECL_VIRTUAL_P (fndecl) = 1;
-	          check_final_overrider (fndecl, fn);
-	      
-	          return 1;
-	        }
-	    }
+      if (DECL_STATIC_FUNCTION_P (fndecl))
+	{
+	  /* A static member function cannot match an inherited
+	     virtual member function.  */
+	  cp_error_at ("`%#D' cannot be declared", fndecl);
+	  cp_error_at ("  since `%#D' declared in base class", fn);
 	}
+      else
+	{
+	  /* It's definitely virtual, even if not explicitly set.  */
+	  DECL_VIRTUAL_P (fndecl) = 1;
+	  check_final_overrider (fndecl, fn);
+	}
+      return 1;
     }
+
   /* We failed to find one declared in this class. Look in its bases.  */
   return look_for_overrides (type, fndecl);
 }
@@ -2388,9 +2411,7 @@ init_vbase_pointers (type, decl_ptr)
   if (TYPE_USES_VIRTUAL_BASECLASSES (type))
     {
       struct vbase_info vi;
-      int old_flag = flag_this_is_variable;
       tree binfo = TYPE_BINFO (type);
-      flag_this_is_variable = -2;
 
       /* Find all the virtual base classes, marking them for later
 	 initialization.  */
@@ -2408,7 +2429,6 @@ init_vbase_pointers (type, decl_ptr)
 		marked_vtable_pathp,
 		NULL);
 
-      flag_this_is_variable = old_flag;
       return vi.inits;
     }
 
@@ -2507,8 +2527,7 @@ expand_upcast_fixups (binfo, addr, orig_addr, vbase, vbase_addr, t,
       *vbase_offsets = delta;
     }
 
-  for (virtuals = BINFO_VIRTUALS (binfo), 
-	 n = first_vfun_index (BINFO_TYPE (binfo));
+  for (virtuals = BINFO_VIRTUALS (binfo), n = 0;
        virtuals;
        virtuals = TREE_CHAIN (virtuals), ++n)
     {

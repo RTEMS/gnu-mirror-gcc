@@ -70,12 +70,11 @@ namespace std
     use_facet(const locale& __loc)
     {
       typedef locale::_Impl::__vec_facet        __vec_facet;
-      locale::id& __id = _Facet::id;         
-      size_t __i = __id._M_index;
+      size_t __i = _Facet::id._M_index;
       __vec_facet* __facet = __loc._M_impl->_M_facets;
       const locale::facet* __fp = (*__facet)[__i]; 
       if (__fp == 0 || __i >= __facet->size())
-        throw bad_cast();
+        __throw_bad_cast();
       return static_cast<const _Facet&>(*__fp);
     }
 
@@ -84,8 +83,7 @@ namespace std
     has_facet(const locale& __loc) throw()
     {
       typedef locale::_Impl::__vec_facet        __vec_facet;
-      locale::id& __id = _Facet::id;         
-      size_t __i = __id._M_index;
+      size_t __i = _Facet::id._M_index;
       __vec_facet* __facet = __loc._M_impl->_M_facets;
       return (__i < __facet->size() && (*__facet)[__i] != 0);
     }
@@ -110,47 +108,44 @@ namespace std
       size_t __pos = 0;
       do
         {
-          {
-            int __ti = 0;
-            for (;__ti < __remain &&
-                   __pos == __targets[__matches[__ti]].size(); ++__ti)
-              { }
-            if (__ti == __remain)
-              {
-                if (__pos == 0) __remain = 0;
-                return __s;
-              }
-          }
+	  int __ti = 0;
+	  while (__ti < __remain && __pos == __targets[__matches[__ti]].size())
+	    ++__ti;
+	  if (__ti == __remain)
+	    {
+	      if (__pos == 0) __remain = 0;
+	      return __s;
+	    }
           if (__s == __end)
             __eof = true;
           bool __matched = false;
-          for (int __ti = 0; __ti < __remain; )
+          for (int __ti2 = 0; __ti2 < __remain; )
             {
-              const __string_type& __target = __targets[__matches[__ti]];
+              const __string_type& __target = __targets[__matches[__ti2]];
               if (__pos < __target.size())
                 {
                   if (__eof || __target[__pos] != *__s)
                     {
-                      __matches[__ti] = __matches[--__remain];
+                      __matches[__ti2] = __matches[--__remain];
                       continue;
                     }
                   __matched = true;
                 }
-              ++__ti;
+              ++__ti2;
             }
           if (__matched)
             {
               ++__s;
               ++__pos;
             }
-          for (int __ti = 0; __ti < __remain;)
+          for (int __ti3 = 0; __ti3 < __remain;)
             {
-              if (__pos > __targets[__matches[__ti]].size())
+              if (__pos > __targets[__matches[__ti3]].size())
                 {
-                  __matches[__ti] = __matches[--__remain];
+                  __matches[__ti3] = __matches[--__remain];
                   continue;
                 }
-              ++__ti;
+              ++__ti3;
             }
         }
       while (__remain);
@@ -194,15 +189,15 @@ namespace std
       switch (__ev)
         {
         case ios_base::erase_event:
-          delete static_cast<_Format_cache<_CharT>*> (__p); __p = 0;
+          delete static_cast<_Format_cache<_CharT>*>(__p);
+	  __p = 0;
           break;
         case ios_base::copyfmt_event:
           // If just stored zero, the callback would get registered again.
-          try {
-            __p = new _Format_cache<_CharT>;
-          }
-          catch(...) {
-          }
+          try 
+	    { __p = new _Format_cache<_CharT>; }
+          catch(...) 
+	    { }
           break;
         case ios_base::imbue_event:
           static_cast<_Format_cache<_CharT>*>(__p)->_M_valid = false;
@@ -576,7 +571,7 @@ namespace std
       // Stage 2: convert and store results.
       char* __sanity;
       errno = 0;
-#ifdef _GLIBCPP_HAVE_STRTOF
+#ifdef _GLIBCPP_USE_C99
       float __f = strtof(__xtrc, &__sanity);
 #else
       float __f = static_cast<float>(strtod(__xtrc, &__sanity));
@@ -616,7 +611,7 @@ namespace std
       return __beg;
     }
 
-#if defined(_GLIBCPP_HAVE_STRTOLD) && !defined(__hpux)
+#if defined(_GLIBCPP_USE_C99) && !defined(__hpux)
   template<typename _CharT, typename _InIter>
     _InIter
     num_get<_CharT, _InIter>::
@@ -722,8 +717,8 @@ namespace std
 
   template <typename _CharT, typename _RaIter>
     _RaIter
-    __pad(_RaIter __s, _CharT __fill, int __padding,
-            random_access_iterator_tag)
+    __pad(_RaIter __s, _CharT __fill, int __padding, 
+	  random_access_iterator_tag)
     {
       fill_n(__s, __fill);
       return __s + __padding;
@@ -741,8 +736,8 @@ namespace std
     inline _OutIter
     __pad(_OutIter __s, _CharT __fill, int __padding)
     {
-      return __pad(__s, __fill, __padding,
-                     iterator_traits<_OutIter>::iterator_category());
+      return __pad(__s, __fill, __padding, 
+		   typename iterator_traits<_OutIter>::iterator_category());
     }
 
   template <typename _CharT, typename _OutIter>
@@ -969,7 +964,7 @@ namespace std
 #endif
 
   // Generic helper function
-  template<typename _CharT, typename _OutIter>
+  template<typename _CharT, typename _Traits, typename _OutIter>
     _OutIter
     __output_float(_OutIter __s, ios_base& __io, _CharT __fill,
                     const char* __sptr, size_t __slen)
@@ -979,10 +974,10 @@ namespace std
     }
 
   // Partial specialization for ostreambuf_iterator.
-  template<typename _CharT>
-    ostreambuf_iterator<_CharT>
-    __output_float(ostreambuf_iterator<_CharT> __s, ios_base& __io, 
-		    _CharT __fill, const char* __sptr, size_t __slen)
+  template<typename _CharT, typename _Traits>
+    ostreambuf_iterator<_CharT, _Traits>
+    __output_float(ostreambuf_iterator<_CharT, _Traits> __s, ios_base& __io, 
+		   _CharT __fill, const char* __sptr, size_t __slen)
     {
       size_t __padding = __io.width() > streamsize(__slen) ?
                          __io.width() -__slen : 0;
@@ -1042,7 +1037,7 @@ namespace std
       if (__prec > __max_prec)
         __prec = __max_prec;
       // The *2 provides for signs, exp, 'E', and pad.
-      char __sbuf[__max_prec*2];
+      char __sbuf[__max_prec * 2];
       size_t __slen;
       // Long enough for the max format spec.
       char __fbuf[16];
@@ -1066,7 +1061,7 @@ namespace std
       if (__prec > __max_prec)
         __prec = __max_prec;
       // The *2 provides for signs, exp, 'E', and pad.
-      char __sbuf[__max_prec*2];
+      char __sbuf[__max_prec * 2];
       size_t __slen;
       // Long enough for the max format spec.
       char __fbuf[16];
@@ -1098,7 +1093,7 @@ namespace std
       }
       catch (...) {
         __io.flags(__fmt);
-        throw;
+        __throw_exception_again;
       }
     }
 

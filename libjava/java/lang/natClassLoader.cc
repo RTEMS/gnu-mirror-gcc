@@ -48,15 +48,6 @@ details.  */
 
 /////////// java.lang.ClassLoader native methods ////////////
 
-java::lang::ClassLoader *
-java::lang::ClassLoader::getSystemClassLoader (void)
-{
-  JvSynchronize sync (&ClassLoaderClass);
-  if (! system)
-    system = gnu::gcj::runtime::VMClassLoader::getVMClassLoader ();
-  return system;
-}
-
 java::lang::Class *
 java::lang::ClassLoader::defineClass0 (jstring name,
 				       jbyteArray data, 
@@ -79,7 +70,9 @@ java::lang::ClassLoader::defineClass0 (jstring name,
     {
       _Jv_Utf8Const *   name2 = _Jv_makeUtf8Const (name);
 
-      _Jv_VerifyClassName (name2);
+      if (! _Jv_VerifyClassName (name2))
+	JvThrow (new java::lang::ClassFormatError 
+		 (JvNewStringLatin1 ("erroneous class name")));
 
       klass->name = name2;
     }
@@ -176,11 +169,10 @@ java::lang::ClassLoader::markClassErrorState0 (java::lang::Class *klass)
   klass->notifyAll ();
 }
 
-
-/** this is the only native method in VMClassLoader, so 
-    we define it here. */
+// This is the findClass() implementation for the System classloader. It is 
+// the only native method in VMClassLoader, so we define it here.
 jclass
-gnu::gcj::runtime::VMClassLoader::findSystemClass (jstring name)
+gnu::gcj::runtime::VMClassLoader::findClass (jstring name)
 {
   _Jv_Utf8Const *name_u = _Jv_makeUtf8Const (name);
   jclass klass = _Jv_FindClassInCache (name_u, 0);
@@ -209,6 +201,12 @@ gnu::gcj::runtime::VMClassLoader::findSystemClass (jstring name)
 	    klass = _Jv_FindClassInCache (name_u, 0);
 	}
     }
+    
+  // Now try loading using the interpreter.
+  if (! klass)
+    {
+      klass = java::net::URLClassLoader::findClass (name);
+    }   
 
   return klass;
 }
@@ -400,7 +398,8 @@ _Jv_UnregisterClass (jclass the_class)
 void
 _Jv_RegisterInitiatingLoader (jclass klass, java::lang::ClassLoader *loader)
 {
-  _Jv_LoaderInfo *info = new _Jv_LoaderInfo; // non-gc alloc!
+  // non-gc alloc!
+  _Jv_LoaderInfo *info = (_Jv_LoaderInfo *) _Jv_Malloc (sizeof(_Jv_LoaderInfo));
   jint hash = HASH_UTF(klass->name);
 
   _Jv_MonitorEnter (&ClassClass);
@@ -409,7 +408,6 @@ _Jv_RegisterInitiatingLoader (jclass klass, java::lang::ClassLoader *loader)
   info->next   = initiated_classes[hash];
   initiated_classes[hash] = info;
   _Jv_MonitorExit (&ClassClass);
-  
 }
 
 // This function is called many times during startup, before main() is
