@@ -1,3 +1,40 @@
+Thu Jun 24 22:30:22 1999  "Philippe De Muyter" <phdm@macqel.be>
+
+	* setenv.c (sys/types.h, stdio.h): Files included.
+	* xstrdup.c (sys/types.h): File included.
+
+1999-06-21  Andreas Schwab  <schwab@issan.cs.uni-dortmund.de>
+
+	* configure.in (checkfuncs): Add gettimeofday.
+	* config.in, configure: Regenerated.
+
+Mon Jun 21 05:56:01 1999  Mumit Khan  <khan@xraylith.wisc.edu>
+
+	* configure.in (*-*-uwin*): UWIN has sys_{errlist,nerr} even if
+	the test fails.
+	* configure: Regenerate.
+
+1999-06-10  Mike Stump  <mrs@wrs.com>
+
+	* Makefile.in (setenv.o): Add config.h dep for setenv.o to fix
+	parallel builds.
+
+1999-05-28  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
+
+	* putenv.c: Include ansidecl.h to define `const'.
+	* setenv.c: Likewise.
+
+Wed May 26 03:58:20 1999  "Melissa O'Neill" <oneill@cs.sfu.ca>
+
+	* Makefile.in (CFILES): Add putenv.c and setenv.c.
+	* configure.in (funcs): Add putenv and setenv.
+	(AC_CHECK_FUNCS): Check for putenv and setenv.
+	* configure: Rebuilt.
+	* putenv.c setenv.c: New files.
+
+	* getcwd.c (getcwd): If pathname is NULL, then obtain SIZE
+	bytes of space using malloc.
+
 Mon May 17 01:42:34 1999  Stu Grossman  <grossman@babylon-5.cygnus.com>
 
 	* cplus-dem.c (demangle_fund_type (near 'I' case)): Don't advance
