@@ -1,5 +1,5 @@
 /* Prototypes for exported functions defined in m68hc11.c
-   Copyright (C) 1999, 2000 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2001 Free Software Foundation, Inc.
    Contributed by Stephane Carrez (stcarrez@worldnet.fr)
 
 This file is part of GNU CC.
@@ -53,14 +53,14 @@ extern void m68hc11_encode_section_info PARAMS((tree));
 #endif
 
 #ifdef RTX_CODE
-#if GCC_VERSION > 2095
 extern rtx m68hc11_compare_op0;
 extern rtx m68hc11_compare_op1;
-#endif
 
 extern rtx m68hc11_soft_tmp_reg;
 extern rtx iy_reg;
 extern rtx d_reg;
+
+extern void m68hc11_initialize_trampoline PARAMS((rtx, rtx, rtx));
 
 extern rtx m68hc11_expand_compare_and_branch PARAMS((enum rtx_code,
                                                      rtx, rtx, rtx));
@@ -73,6 +73,7 @@ extern int m68hc11_go_if_legitimate_address PARAMS((rtx,
 extern int m68hc11_legitimize_address PARAMS((rtx*, rtx, enum machine_mode));
 
 extern void m68hc11_notice_update_cc PARAMS((rtx, rtx));
+extern void m68hc11_notice_keep_cc PARAMS((rtx));
 
 extern void m68hc11_reorg PARAMS((rtx));
 
@@ -140,8 +141,6 @@ extern int hard_reg_operand PARAMS((rtx, enum machine_mode));
 extern int soft_reg_operand PARAMS((rtx, enum machine_mode));
 extern int reg_or_some_mem_operand PARAMS((rtx, enum machine_mode));
 
-extern enum reg_class limit_reload_class PARAMS((enum machine_mode, enum reg_class));
-
 #if defined TREE_CODE
 extern void m68hc11_init_cumulative_args PARAMS((CUMULATIVE_ARGS*,
                                                  tree,
@@ -165,10 +164,8 @@ extern void m68hc11_function_epilogue PARAMS((FILE*,int));
 
 #endif /* TREE_CODE */
 
-#if GCC_VERSION > 2095
 extern HOST_WIDE_INT m68hc11_min_offset;
 extern HOST_WIDE_INT m68hc11_max_offset;
-#endif
 #endif /* HAVE_MACHINE_MODES */
 #endif /* RTX_CODE */
 

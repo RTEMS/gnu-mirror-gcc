@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler.  Vax version.
    Copyright (C) 1987, 1988, 1991, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000 Free Software Foundation, Inc.
+   1999, 2000, 2001 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -865,6 +865,10 @@ enum reg_class { NO_REGS, ALL_REGS, LIM_REG_CLASSES };
    is done just by pretending it is already truncated.  */
 #define TRULY_NOOP_TRUNCATION(OUTPREC, INPREC) 1
 
+/* When a prototype says `char' or `short', really pass an `int'.
+   (On the vax, this is required for system-library compatibility.)  */
+#define PROMOTE_PROTOTYPES 1
+
 /* Specify the machine mode that pointers have.
    After generation of rtl, the compiler makes no further distinction
    between pointers and any other objects of this machine mode.  */
@@ -982,7 +986,30 @@ enum reg_class { NO_REGS, ALL_REGS, LIM_REG_CLASSES };
 	CC_STATUS_INIT;						\
       else if (GET_CODE (SET_DEST (EXP)) != ZERO_EXTRACT	\
 	       && GET_CODE (SET_DEST (EXP)) != PC)		\
-	{ cc_status.flags = 0;					\
+	{							\
+	  cc_status.flags = 0;					\
+	  /* The integer operations below don't set carry or	\
+	     set it in an incompatible way.  That's ok though	\
+	     as the Z bit is all we need when doing unsigned	\
+	     comparisons on the result of these insns (since	\
+	     they're always with 0).  Set CC_NO_OVERFLOW to	\
+	     generate the correct unsigned branches.  */	\
+	  switch (GET_CODE (SET_SRC (EXP)))			\
+	    {							\
+	    case NEG:						\
+	      if (GET_MODE_CLASS (GET_MODE (EXP)) == MODE_FLOAT)\
+	 	break;						\
+	    case AND:						\
+	    case IOR:						\
+	    case XOR:						\
+	    case NOT:						\
+	    case MEM:						\
+	    case REG:						\
+	      cc_status.flags = CC_NO_OVERFLOW;			\
+	      break;						\
+	    default:						\
+	      break;						\
+	    }							\
 	  cc_status.value1 = SET_DEST (EXP);			\
 	  cc_status.value2 = SET_SRC (EXP); } }			\
   else if (GET_CODE (EXP) == PARALLEL				\
@@ -1018,8 +1045,17 @@ enum reg_class { NO_REGS, ALL_REGS, LIM_REG_CLASSES };
 /* Control the assembler format that we output.  */
 
 /* Output at beginning of assembler file.  */
+/* When debugging, we want to output an extra dummy label so that gas
+   can distinguish between D_float and G_float prior to processing the
+   .stabs directive identifying type double.  */
 
-#define ASM_FILE_START(FILE) fprintf (FILE, "#NO_APP\n");
+#define ASM_FILE_START(FILE) \
+  do {								\
+    fputs (ASM_APP_OFF, FILE);					\
+    if (write_symbols == DBX_DEBUG)				\
+      fprintf (FILE, "___vax_%c_doubles:\n", ASM_DOUBLE_CHAR);	\
+  } while (0)
+
 
 /* Output to assembler file text saying following lines
    may contain character constants, extra white space, comments, etc.  */
@@ -1207,17 +1243,6 @@ do { char dstr[30];							\
 #define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)	\
 ( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),	\
   sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO)))
-
-/* When debugging, we want to output an extra dummy label so that gas
-   can distinguish between D_float and G_float prior to processing the
-   .stabs directive identifying type double.  */
-
-#define ASM_IDENTIFY_LANGUAGE(FILE)	\
-  do {								\
-    output_lang_identify (FILE);				\
-    if (write_symbols == DBX_DEBUG)				\
-      fprintf (FILE, "___vax_%c_doubles:\n", ASM_DOUBLE_CHAR);	\
-  } while (0)
 
 /* Output code to add DELTA to the first argument, and then jump to FUNCTION.
    Used for C++ multiple inheritance.

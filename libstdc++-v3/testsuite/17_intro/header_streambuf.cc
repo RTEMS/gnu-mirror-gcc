@@ -20,8 +20,8 @@
 
 // 17.4.1.2 Headers, streambuf
 
-#include <streambuf>            // { dg-do compile }
-#include <debug_assert.h>
+#include <streambuf>
+#include <testsuite_hooks.h>
 
 
 int main(void)

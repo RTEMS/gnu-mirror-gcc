@@ -31,8 +31,6 @@
 // ISO C++ 14882: 18.2.2  Implementation properties: C library
 //
 
-// Note: This is not a conforming implementation.
-
 #ifndef _CPP_CLIMITS
 #define _CPP_CLIMITS	1
 
@@ -40,8 +38,3 @@
 #include <limits.h>
 
 #endif
-
-
-
-
-

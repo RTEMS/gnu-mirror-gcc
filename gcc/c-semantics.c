@@ -75,6 +75,11 @@ add_stmt (t)
   /* When we expand a statement-tree, we must know whether or not the
      statements are full-expresions.  We record that fact here.  */
   STMT_IS_FULL_EXPR_P (last_tree) = stmts_are_full_exprs_p ();
+
+  /* Keep track of the number of statements in this function.  */
+  if (current_function_decl)
+    ++DECL_NUM_STMTS (current_function_decl);
+
   return t;
 }
 
@@ -313,7 +318,7 @@ emit_local_var (decl)
      tree decl;
 {
   /* Create RTL for this variable.  */
-  if (!DECL_RTL (decl))
+  if (!DECL_RTL_SET_P (decl))
     {
       if (DECL_C_HARD_REGISTER (decl))
 	/* The user specified an assembler name for this variable.
@@ -626,11 +631,12 @@ void
 genrtl_scope_stmt (t)
      tree t;
 {
+  tree block = SCOPE_STMT_BLOCK (t);
+
   if (!SCOPE_NO_CLEANUPS_P (t))
     {
       if (SCOPE_BEGIN_P (t))
-	expand_start_bindings_and_block (2 * SCOPE_NULLIFIED_P (t),
-					 SCOPE_STMT_BLOCK (t));
+	expand_start_bindings_and_block (2 * SCOPE_NULLIFIED_P (t), block);
       else if (SCOPE_END_P (t))
 	expand_end_bindings (NULL_TREE, !SCOPE_NULLIFIED_P (t), 0);
     }
@@ -640,7 +646,27 @@ genrtl_scope_stmt (t)
 			    (SCOPE_BEGIN_P (t) 
 			     ? NOTE_INSN_BLOCK_BEG
 			     : NOTE_INSN_BLOCK_END));
-      NOTE_BLOCK (note) = SCOPE_STMT_BLOCK (t);
+      NOTE_BLOCK (note) = block;
+    }
+
+  /* If we're at the end of a scope that contains inlined nested
+     functions, we have to decide whether or not to write them out.  */
+  if (block && SCOPE_END_P (t))
+    {
+      tree fn;
+
+      for (fn = BLOCK_VARS (block); fn; fn = TREE_CHAIN (fn))
+	{
+	  if (TREE_CODE (fn) == FUNCTION_DECL 
+	      && DECL_CONTEXT (fn) == current_function_decl
+	      && !TREE_ASM_WRITTEN (fn)
+	      && TREE_ADDRESSABLE (fn))
+	    {
+	      push_function_context ();
+	      output_inline_function (fn);
+	      pop_function_context ();
+	    }
+	}
     }
 }
 

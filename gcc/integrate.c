@@ -29,7 +29,6 @@ Boston, MA 02111-1307, USA.  */
 #include "regs.h"
 #include "flags.h"
 #include "insn-config.h"
-#include "insn-flags.h"
 #include "expr.h"
 #include "output.h"
 #include "recog.h"
@@ -40,6 +39,7 @@ Boston, MA 02111-1307, USA.  */
 #include "toplev.h"
 #include "intl.h"
 #include "loop.h"
+#include "params.h"
 
 #include "obstack.h"
 #define	obstack_chunk_alloc	xmalloc
@@ -81,22 +81,14 @@ static void set_block_abstract_flags	PARAMS ((tree, int));
 static void process_reg_param		PARAMS ((struct inline_remap *, rtx,
 						 rtx));
 void set_decl_abstract_flags		PARAMS ((tree, int));
-static rtx expand_inline_function_eh_labelmap PARAMS ((rtx));
 static void mark_stores                 PARAMS ((rtx, rtx, void *));
 static void save_parm_insns		PARAMS ((rtx, rtx));
 static void copy_insn_list              PARAMS ((rtx, struct inline_remap *,
 						 rtx));
+static void copy_insn_notes		PARAMS ((rtx, struct inline_remap *,
+						 int));
 static int compare_blocks               PARAMS ((const PTR, const PTR));
 static int find_block                   PARAMS ((const PTR, const PTR));
-
-/* The maximum number of instructions accepted for inlining a
-   function.  Increasing values mean more agressive inlining.
-   This affects currently only functions explicitly marked as
-   inline (or methods defined within the class definition for C++).
-   The default value of 10000 is arbitrary but high to match the
-   previously unlimited gcc capabilities.  */
-
-int inline_max_insns = 10000;
 
 /* Used by copy_rtx_and_substitute; this indicates whether the function is
    called for the purpose of inlining or some other purpose (i.e. loop
@@ -135,17 +127,19 @@ function_cannot_inline_p (fndecl)
   tree last = tree_last (TYPE_ARG_TYPES (TREE_TYPE (fndecl)));
 
   /* For functions marked as inline increase the maximum size to
-     inline_max_insns (-finline-limit-<n>).  For regular functions
+     MAX_INLINE_INSNS (-finline-limit-<n>).  For regular functions
      use the limit given by INTEGRATE_THRESHOLD.  */
 
   int max_insns = (DECL_INLINE (fndecl))
-		   ? (inline_max_insns
+		   ? (MAX_INLINE_INSNS
 		      + 8 * list_length (DECL_ARGUMENTS (fndecl)))
 		   : INTEGRATE_THRESHOLD (fndecl);
 
   register int ninsns = 0;
   register tree parms;
-  rtx result;
+
+  if (DECL_UNINLINABLE (fndecl))
+    return N_("function cannot be inline");
 
   /* No inlines with varargs.  */
   if ((last && TREE_VALUE (last) != void_type_node)
@@ -157,6 +151,9 @@ function_cannot_inline_p (fndecl)
 
   if (current_function_calls_setjmp)
     return N_("function using setjmp cannot be inline");
+
+  if (current_function_calls_eh_return)
+    return N_("function uses __builtin_eh_return");
 
   if (current_function_contains_functions)
     return N_("function with nested functions cannot be inline");
@@ -227,23 +224,13 @@ function_cannot_inline_p (fndecl)
   if (current_function_has_nonlocal_goto)
     return N_("function with nonlocal goto cannot be inline");
 
-  /* This is a hack, until the inliner is taught about eh regions at
-     the start of the function.  */
-  for (insn = get_insns ();
-       insn
-	 && ! (GET_CODE (insn) == NOTE
-	       && NOTE_LINE_NUMBER (insn) == NOTE_INSN_FUNCTION_BEG);
-       insn = NEXT_INSN (insn))
-    {
-      if (insn && GET_CODE (insn) == NOTE
-	  && NOTE_LINE_NUMBER (insn) == NOTE_INSN_EH_REGION_BEG)
-	return N_("function with complex parameters cannot be inline");
-    }
-
   /* We can't inline functions that return a PARALLEL rtx.  */
-  result = DECL_RTL (DECL_RESULT (fndecl));
-  if (result && GET_CODE (result) == PARALLEL)
-    return N_("inline functions not supported for this return value type");
+  if (DECL_RTL_SET_P (DECL_RESULT (fndecl)))
+    {
+      rtx result = DECL_RTL (DECL_RESULT (fndecl));
+      if (GET_CODE (result) == PARALLEL)
+	return N_("inline functions not supported for this return value type");
+    }
 
   /* If the function has a target specific attribute attached to it,
      then we assume that we should not inline it.  This can be overriden
@@ -354,7 +341,7 @@ copy_decl_for_inlining (decl, from_fn, to_fn)
   DECL_ABSTRACT_ORIGIN (copy) = DECL_ORIGIN (decl);
 
   /* The new variable/label has no RTL, yet.  */
-  DECL_RTL (copy) = NULL_RTX;
+  SET_DECL_RTL (copy, NULL_RTX);
 
   /* These args would always appear unused, if not for this.  */
   TREE_USED (copy) = 1;
@@ -551,17 +538,6 @@ process_reg_param (map, loc, copy)
   map->reg_map[REGNO (loc)] = copy;
 }
 
-/* Used by duplicate_eh_handlers to map labels for the exception table */
-static struct inline_remap *eif_eh_map;
-
-static rtx
-expand_inline_function_eh_labelmap (label)
-     rtx label;
-{
-  int index = CODE_LABEL_NUMBER (label);
-  return get_label_from_map (eif_eh_map, index);
-}
-
 /* Compare two BLOCKs for qsort.  The key we sort on is the
    BLOCK_ABSTRACT_ORIGIN of the blocks.  */
 
@@ -637,6 +613,7 @@ expand_inline_function (fndecl, parms, target, ignore, type,
   rtvec arg_vector = (rtvec) inl_f->original_arg_vector;
   rtx static_chain_value = 0;
   int inl_max_uid;
+  int eh_region_offset;
 
   /* The pointer used to track the true location of the memory used
      for MAP->LABEL_MAP.  */
@@ -769,7 +746,7 @@ expand_inline_function (fndecl, parms, target, ignore, type,
 
   /* Allocate the structures we use to remap things.  */
 
-  map = (struct inline_remap *) xmalloc (sizeof (struct inline_remap));
+  map = (struct inline_remap *) xcalloc (1, sizeof (struct inline_remap));
   map->fndecl = fndecl;
 
   VARRAY_TREE_INIT (map->block_map, 10, "block_map");
@@ -781,6 +758,7 @@ expand_inline_function (fndecl, parms, target, ignore, type,
   real_label_map
     = (rtx *) xmalloc ((max_labelno) * sizeof (rtx));
   map->label_map = real_label_map;
+  map->local_return_label = NULL_RTX;
 
   inl_max_uid = (inl_f->emit->x_cur_insn_uid + 1);
   map->insn_map = (rtx *) xcalloc (inl_max_uid, sizeof (rtx));
@@ -894,9 +872,6 @@ expand_inline_function (fndecl, parms, target, ignore, type,
 	     incoming arg rtx values are expanded now so that we can be
 	     sure we have enough slots in the const equiv map since the
 	     store_expr call can easily blow the size estimate.  */
-	  if (DECL_FRAME_SIZE (fndecl) != 0)
-	    copy_rtx_and_substitute (virtual_stack_vars_rtx, map, 0);
-
 	  if (DECL_SAVED_INSNS (fndecl)->args_size != 0)
 	    copy_rtx_and_substitute (virtual_incoming_args_rtx, map, 0);
 	}
@@ -957,7 +932,8 @@ expand_inline_function (fndecl, parms, target, ignore, type,
      REG_FUNCTION_RETURN_VALUE_P.  */
 
   map->inline_target = 0;
-  loc = DECL_RTL (DECL_RESULT (fndecl));
+  loc = (DECL_RTL_SET_P (DECL_RESULT (fndecl)) 
+	 ? DECL_RTL (DECL_RESULT (fndecl)) : NULL_RTX);
 
   if (TYPE_MODE (type) == VOIDmode)
     /* There is no return value to worry about.  */
@@ -1098,6 +1074,11 @@ expand_inline_function (fndecl, parms, target, ignore, type,
   else
     abort ();
 
+  /* Remap the exception handler data pointer from one to the other.  */
+  temp = get_exception_pointer (inl_f);
+  if (temp)
+    map->reg_map[REGNO (temp)] = get_exception_pointer (cfun);
+
   /* Initialize label_map.  get_label_from_map will actually make
      the labels.  */
   memset ((char *) &map->label_map[min_labelno], 0,
@@ -1143,6 +1124,19 @@ expand_inline_function (fndecl, parms, target, ignore, type,
 
   /* Now copy the insns one by one.  */
   copy_insn_list (insns, map, static_chain_value);
+
+  /* Duplicate the EH regions.  This will create an offset from the
+     region numbers in the function we're inlining to the region
+     numbers in the calling function.  This must wait until after
+     copy_insn_list, as we need the insn map to be complete.  */
+  eh_region_offset = duplicate_eh_regions (inl_f, map);
+
+  /* Now copy the REG_NOTES for those insns.  */
+  copy_insn_notes (insns, map, eh_region_offset);
+
+  /* If the insn sequence required one, emit the return label.  */
+  if (map->local_return_label)
+    emit_label (map->local_return_label);
 
   /* Restore the stack pointer if we saved it above.  */
   if (inl_f->calls_alloca)
@@ -1228,7 +1222,6 @@ copy_insn_list (insns, map, static_chain_value)
   register int i;
   rtx insn;
   rtx temp;
-  rtx local_return_label = NULL_RTX;
 #ifdef HAVE_cc0
   rtx cc0_insn = 0;
 #endif
@@ -1257,12 +1250,6 @@ copy_insn_list (insns, map, static_chain_value)
 	       be ignored since we are changing (REG n) into
 	       inline_target.  */
 	    break;
-
-	  /* If the inline fn needs eh context, make sure that
-	     the current fn has one.  */
-	  if (GET_CODE (pattern) == USE
-	      && find_reg_note (insn, REG_EH_CONTEXT, 0) != 0)
-	    get_eh_context ();
 
 	  /* Ignore setting a function value that we don't want to use.  */
 	  if (map->inline_target == 0
@@ -1389,13 +1376,11 @@ copy_insn_list (insns, map, static_chain_value)
 	  break;
 
 	case JUMP_INSN:
-	  if (GET_CODE (PATTERN (insn)) == RETURN
-	      || (GET_CODE (PATTERN (insn)) == PARALLEL
-		  && GET_CODE (XVECEXP (PATTERN (insn), 0, 0)) == RETURN))
+	  if (map->integrating && returnjump_p (insn))
 	    {
-	      if (local_return_label == 0)
-		local_return_label = gen_label_rtx ();
-	      pattern = gen_jump (local_return_label);
+	      if (map->local_return_label == 0)
+		map->local_return_label = gen_label_rtx ();
+	      pattern = gen_jump (map->local_return_label);
 	    }
 	  else
 	    pattern = copy_rtx_and_substitute (PATTERN (insn), map, 0);
@@ -1526,31 +1511,9 @@ copy_insn_list (insns, map, static_chain_value)
 	      copy = emit_note (NOTE_SOURCE_FILE (insn),
 				NOTE_LINE_NUMBER (insn));
 	      if (copy
-		  && (NOTE_LINE_NUMBER (copy) == NOTE_INSN_EH_REGION_BEG
-		      || NOTE_LINE_NUMBER (copy) == NOTE_INSN_EH_REGION_END))
-		{
-		  rtx label
-		    = get_label_from_map (map, NOTE_EH_HANDLER (copy));
-
-		  /* We have to duplicate the handlers for the original.  */
-		  if (NOTE_LINE_NUMBER (copy) == NOTE_INSN_EH_REGION_BEG)
-		    {
-		      /* We need to duplicate the handlers for the EH region
-			 and we need to indicate where the label map is */
-		      eif_eh_map = map;
-		      duplicate_eh_handlers (NOTE_EH_HANDLER (copy),
-					     CODE_LABEL_NUMBER (label),
-					     expand_inline_function_eh_labelmap);
-		    }
-
-		  /* We have to forward these both to match the new exception
-		     region.  */
-		  NOTE_EH_HANDLER (copy) = CODE_LABEL_NUMBER (label);
-		}
-	      else if (copy
-		       && (NOTE_LINE_NUMBER (copy) == NOTE_INSN_BLOCK_BEG
-			   || NOTE_LINE_NUMBER (copy) == NOTE_INSN_BLOCK_END)
-		       && NOTE_BLOCK (insn))
+		  && (NOTE_LINE_NUMBER (copy) == NOTE_INSN_BLOCK_BEG
+		      || NOTE_LINE_NUMBER (copy) == NOTE_INSN_BLOCK_END)
+		  && NOTE_BLOCK (insn))
 		{
 		  tree *mapped_block_p;
 
@@ -1566,6 +1529,11 @@ copy_insn_list (insns, map, static_chain_value)
 		  else
 		    NOTE_BLOCK (copy) = *mapped_block_p;
 		}
+	      else if (copy
+		       && NOTE_LINE_NUMBER (copy) == NOTE_INSN_EXPECTED_VALUE)
+		NOTE_EXPECTED_VALUE (copy)
+		  = copy_rtx_and_substitute (NOTE_EXPECTED_VALUE (insn),
+					     map, 0);
 	    }
 	  else
 	    copy = 0;
@@ -1580,35 +1548,65 @@ copy_insn_list (insns, map, static_chain_value)
 
       map->insn_map[INSN_UID (insn)] = copy;
     }
+}
 
-  /* Now copy the REG_NOTES.  Increment const_age, so that only constants
-     from parameters can be substituted in.  These are the only ones that
-     are valid across the entire function.  */
+/* Copy the REG_NOTES.  Increment const_age, so that only constants
+   from parameters can be substituted in.  These are the only ones
+   that are valid across the entire function.  */
+
+static void
+copy_insn_notes (insns, map, eh_region_offset)
+     rtx insns;
+     struct inline_remap *map;
+     int eh_region_offset;
+{
+  rtx insn, new_insn;
+
   map->const_age++;
   for (insn = insns; insn; insn = NEXT_INSN (insn))
-    if (INSN_P (insn)
-	&& map->insn_map[INSN_UID (insn)]
-	&& REG_NOTES (insn))
-      {
-	rtx next, note = copy_rtx_and_substitute (REG_NOTES (insn), map, 0);
+    {
+      if (! INSN_P (insn))
+	continue;
 
-	/* We must also do subst_constants, in case one of our parameters
-	   has const type and constant value.  */
-	subst_constants (&note, NULL_RTX, map, 0);
-	apply_change_group ();
-	REG_NOTES (map->insn_map[INSN_UID (insn)]) = note;
+      new_insn = map->insn_map[INSN_UID (insn)];
+      if (! new_insn)
+	continue;
 
-	/* Finally, delete any REG_LABEL notes from the chain.  */
-	for (; note; note = next)
-	  {
-	    next = XEXP (note, 1);
-	    if (REG_NOTE_KIND (note) == REG_LABEL)
-	      remove_note (map->insn_map[INSN_UID (insn)], note);
-	  }
-      }
+      if (REG_NOTES (insn))
+        {
+	  rtx next, note = copy_rtx_and_substitute (REG_NOTES (insn), map, 0);
 
-  if (local_return_label)
-    emit_label (local_return_label);
+	  /* We must also do subst_constants, in case one of our parameters
+	     has const type and constant value.  */
+	  subst_constants (&note, NULL_RTX, map, 0);
+	  apply_change_group ();
+	  REG_NOTES (new_insn) = note;
+
+	  /* Delete any REG_LABEL notes from the chain.  Remap any
+             REG_EH_REGION notes.  */
+	  for (; note; note = next)
+	    {
+	      next = XEXP (note, 1);
+	      if (REG_NOTE_KIND (note) == REG_LABEL)
+	        remove_note (new_insn, note);
+	      else if (REG_NOTE_KIND (note) == REG_EH_REGION)
+	        XEXP (note, 0) = GEN_INT (INTVAL (XEXP (note, 0))
+					  + eh_region_offset);
+	    }
+        }
+
+      if (GET_CODE (insn) == CALL_INSN
+	  && GET_CODE (PATTERN (insn)) == CALL_PLACEHOLDER)
+	{
+	  int i;
+	  for (i = 0; i < 3; i++)
+	    copy_insn_notes (XEXP (PATTERN (insn), i), map, eh_region_offset);
+	}
+
+      if (GET_CODE (insn) == JUMP_INSN
+	  && GET_CODE (PATTERN (insn)) == RESX)
+	XINT (PATTERN (new_insn), 0) += eh_region_offset;
+    }
 }
 
 /* Given a chain of PARM_DECLs, ARGS, copy each decl into a VAR_DECL,
@@ -1639,7 +1637,7 @@ integrate_parm_decls (args, map, arg_vector)
 	 subst_constants.  */
       subst_constants (&new_decl_rtl, NULL_RTX, map, 1);
       apply_change_group ();
-      DECL_RTL (decl) = new_decl_rtl;
+      SET_DECL_RTL (decl, new_decl_rtl);
     }
 }
 
@@ -1669,15 +1667,19 @@ integrate_decl_tree (let, map)
 
       d = copy_decl_for_inlining (t, map->fndecl, current_function_decl);
 
-      if (DECL_RTL (t) != 0)
+      if (DECL_RTL_SET_P (t))
 	{
-	  DECL_RTL (d) = copy_rtx_and_substitute (DECL_RTL (t), map, 1);
+	  rtx r;
+
+	  SET_DECL_RTL (d, copy_rtx_and_substitute (DECL_RTL (t), map, 1));
 
 	  /* Fully instantiate the address with the equivalent form so that the
 	     debugging information contains the actual register, instead of the
 	     virtual register.   Do this by not passing an insn to
 	     subst_constants.  */
-	  subst_constants (&DECL_RTL (d), NULL_RTX, map, 1);
+	  r = DECL_RTL (d);
+	  subst_constants (&r, NULL_RTX, map, 1);
+	  SET_DECL_RTL (d, r);
 	  apply_change_group ();
 	}
 
@@ -1749,15 +1751,7 @@ copy_rtx_and_substitute (orig, map, for_lhs)
 	{
 	  /* Some hard registers are also mapped,
 	     but others are not translated.  */
-	  if (map->reg_map[regno] != 0
-	      /* We shouldn't usually have reg_map set for return
-		 register, but it may happen if we have leaf-register
-		 remapping and the return register is used in one of
-		 the calling sequences of a call_placeholer.  In this
-		 case, we'll end up with a reg_map set for this
-		 register, but we don't want to use for registers
-		 marked as return values.  */
-	      && ! REG_FUNCTION_VALUE_P (orig))
+	  if (map->reg_map[regno] != 0)
 	    return map->reg_map[regno];
 
 	  /* If this is the virtual frame pointer, make space in current
@@ -1875,9 +1869,9 @@ copy_rtx_and_substitute (orig, map, for_lhs)
 	  if (map->integrating && regno < FIRST_PSEUDO_REGISTER
 	      && LEAF_REGISTERS[regno] && LEAF_REG_REMAP (regno) != regno)
 	    {
-	      temp = gen_rtx_REG (mode, regno);
-	      map->reg_map[regno] = temp;
-	      return temp;
+	      if (!map->leaf_reg_map[regno][mode])
+		map->leaf_reg_map[regno][mode] = gen_rtx_REG (mode, regno);
+	      return map->leaf_reg_map[regno][mode]; 
 	    }
 #endif
 	  else
@@ -2044,12 +2038,6 @@ copy_rtx_and_substitute (orig, map, for_lhs)
 			 (GET_MODE (orig),
 			  copy_rtx_and_substitute (constant, map, for_lhs)),
 			 0);
-	}
-      else if (SYMBOL_REF_NEED_ADJUST (orig))
-	{
-	  eif_eh_map = map;
-	  return rethrow_symbol_map (orig,
-				     expand_inline_function_eh_labelmap);
 	}
 
       return orig;
@@ -2853,6 +2841,10 @@ output_inline_function (fndecl)
   /* If requested, suppress debugging information.  */
   if (f->no_debugging_symbols)
     write_symbols = NO_DEBUG;
+
+  /* Do any preparation, such as emitting abstract debug info for the inline
+     before it gets mangled by optimization.  */
+  note_outlining_of_inline_function (fndecl);
 
   /* Compile this function all the way down to assembly code.  */
   rest_of_compilation (fndecl);

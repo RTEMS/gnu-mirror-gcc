@@ -73,18 +73,19 @@ CXXCPP = @CXXCPP@
 DIRLTDL = @DIRLTDL@
 DIVIDESPEC = @DIVIDESPEC@
 DLLTOOL = @DLLTOOL@
-EH_COMMON_INCLUDE = @EH_COMMON_INCLUDE@
 EXCEPTIONSPEC = @EXCEPTIONSPEC@
 EXEEXT = @EXEEXT@
-FORCELIBGCCSPEC = @FORCELIBGCCSPEC@
+GCC_UNWIND_INCLUDE = @GCC_UNWIND_INCLUDE@
 GCDEPS = @GCDEPS@
 GCINCS = @GCINCS@
 GCJ = @GCJ@
 GCJFLAGS = @GCJFLAGS@
+GCJVERSION = @GCJVERSION@
 GCLIBS = @GCLIBS@
 GCOBJS = @GCOBJS@
 GCSPEC = @GCSPEC@
 GCTESTSPEC = @GCTESTSPEC@
+ICONV_LDFLAGS = @ICONV_LDFLAGS@
 INCLTDL = @INCLTDL@
 JC1GCSPEC = @JC1GCSPEC@
 LIBDATASTARTSPEC = @LIBDATASTARTSPEC@
@@ -93,6 +94,7 @@ LIBGCJTESTSPEC = @LIBGCJTESTSPEC@
 LIBGCJ_CFLAGS = @LIBGCJ_CFLAGS@
 LIBGCJ_CXXFLAGS = @LIBGCJ_CXXFLAGS@
 LIBGCJ_JAVAFLAGS = @LIBGCJ_JAVAFLAGS@
+LIBICONV = @LIBICONV@
 LIBLTDL = @LIBLTDL@
 LIBTOOL = @LIBTOOL@
 LN_S = @LN_S@
@@ -119,12 +121,12 @@ ZLIBSPEC = @ZLIBSPEC@
 ZLIBTESTSPEC = @ZLIBTESTSPEC@
 here = @here@
 libgcj_basedir = @libgcj_basedir@
+mkinstalldirs = @mkinstalldirs@
 
-AUTOMAKE_OPTIONS = foreign no-installinfo
+AUTOMAKE_OPTIONS = foreign
 
 gcjdir = $(includedir)/gcj
 gcj_HEADERS = array.h cni.h field.h javaprims.h method.h
-mkinstalldirs = $(SHELL) $(top_srcdir)/../mkinstalldirs
 CONFIG_HEADER = ../include/config.h
 CONFIG_CLEAN_FILES = 
 HEADERS =  $(gcj_HEADERS)
@@ -218,8 +220,6 @@ check-am: all-am
 check: check-am
 installcheck-am:
 installcheck: installcheck-am
-install-info-am: 
-install-info: install-info-am
 install-exec-am:
 install-exec: install-exec-am
 
@@ -270,10 +270,10 @@ maintainer-clean: maintainer-clean-am
 
 .PHONY: uninstall-gcjHEADERS install-gcjHEADERS tags mostlyclean-tags \
 distclean-tags clean-tags maintainer-clean-tags distdir info-am info \
-dvi-am dvi check check-am installcheck-am installcheck install-info-am \
-install-info install-exec-am install-exec install-data-am install-data \
-install-am install uninstall-am uninstall all-redirect all-am all \
-installdirs mostlyclean-generic distclean-generic clean-generic \
+dvi-am dvi check check-am installcheck-am installcheck install-exec-am \
+install-exec install-data-am install-data install-am install \
+uninstall-am uninstall all-redirect all-am all installdirs \
+mostlyclean-generic distclean-generic clean-generic \
 maintainer-clean-generic clean mostlyclean distclean maintainer-clean
 
 

@@ -1,5 +1,5 @@
 /* Register renaming for the GNU compiler.
-   Copyright (C) 2000 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001 Free Software Foundation, Inc.
 
    This file is part of GNU CC.
 
@@ -112,6 +112,11 @@ note_sets (x, set, data)
     return;
   regno = REGNO (x);
   nregs = HARD_REGNO_NREGS (regno, GET_MODE (x));
+
+  /* There must not be pseudos at this point.  */
+  if (regno + nregs > FIRST_PSEUDO_REGISTER)
+    abort ();
+
   while (nregs-- > 0)
     SET_HARD_REG_BIT (*pset, regno + nregs);
 }
@@ -132,6 +137,11 @@ clear_dead_regs (pset, kind, notes)
 	rtx reg = XEXP (note, 0);
 	unsigned int regno = REGNO (reg);
 	int nregs = HARD_REGNO_NREGS (regno, GET_MODE (reg));
+
+	/* There must not be pseudos at this point.  */
+	if (regno + nregs > FIRST_PSEUDO_REGISTER)
+	  abort ();
+
 	while (nregs-- > 0)
 	  CLEAR_HARD_REG_BIT (*pset, regno + nregs);
       }
@@ -219,9 +229,14 @@ regrename_optimize ()
       /* Don't clobber traceback for noreturn functions.  */
       if (frame_pointer_needed)
 	{
-	  SET_HARD_REG_BIT (unavailable, FRAME_POINTER_REGNUM);
+	  int i;
+	  
+	  for (i = HARD_REGNO_NREGS (FRAME_POINTER_REGNUM, Pmode); i--;)
+	    SET_HARD_REG_BIT (unavailable, FRAME_POINTER_REGNUM + i);
+	  
 #if FRAME_POINTER_REGNUM != HARD_FRAME_POINTER_REGNUM
-	  SET_HARD_REG_BIT (unavailable, HARD_FRAME_POINTER_REGNUM);
+	  for (i = HARD_REGNO_NREGS (HARD_FRAME_POINTER_REGNUM, Pmode); i--;)
+	    SET_HARD_REG_BIT (unavailable, HARD_FRAME_POINTER_REGNUM + i);
 #endif
 	}
 
@@ -233,8 +248,7 @@ regrename_optimize ()
 	  struct du_chain *this = all_chains;
 	  struct du_chain *tmp, *last;
 	  HARD_REG_SET this_unavailable;
-	  int reg = REGNO (*this->loc), treg;
-	  int nregs = HARD_REGNO_NREGS (reg, GET_MODE (*this->loc));
+	  int reg = REGNO (*this->loc);
 	  int i;
 
 	  all_chains = this->next_chain;
@@ -282,9 +296,10 @@ regrename_optimize ()
 
 	  /* Now potential_regs is a reasonable approximation, let's
 	     have a closer look at each register still in there.  */
-	  for (treg = 0; treg < FIRST_PSEUDO_REGISTER; treg++)
+	  for (new_reg = 0; new_reg < FIRST_PSEUDO_REGISTER; new_reg++)
 	    {
-	      new_reg = treg;
+	      int nregs = HARD_REGNO_NREGS (new_reg, GET_MODE (*this->loc));
+
 	      for (i = nregs - 1; i >= 0; --i)
 	        if (TEST_HARD_REG_BIT (this_unavailable, new_reg + i)
 		    || fixed_regs[new_reg + i]
@@ -292,6 +307,12 @@ regrename_optimize ()
 		    /* Can't use regs which aren't saved by the prologue.  */
 		    || (! regs_ever_live[new_reg + i]
 			&& ! call_used_regs[new_reg + i])
+#ifdef LEAF_REGISTERS
+		    /* We can't use a non-leaf register if we're in a 
+		       leaf function.  */
+		    || (current_function_is_leaf 
+			&& !LEAF_REGISTERS[new_reg + i])
+#endif
 #ifdef HARD_REGNO_RENAME_OK
 		    || ! HARD_REGNO_RENAME_OK (reg + i, new_reg + i)
 #endif

@@ -20,15 +20,11 @@
 
 // 17.4.1.2 Headers, istream
 
-#include <istream>              // { dg-do compile }
-#include <debug_assert.h>
+#include <istream>
+#include <testsuite_hooks.h>
 
 
 int main(void)
 {
   return 0;
 }
-
-
-
-

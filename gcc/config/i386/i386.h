@@ -294,13 +294,6 @@ extern const int x86_partial_reg_dependency, x86_memory_mismatch_stall;
     N_("Use push instructions to save outgoing arguments") },		      \
   { "no-accumulate-outgoing-args",-MASK_ACCUMULATE_OUTGOING_ARGS,	      \
     N_("Do not use push instructions to save outgoing arguments") },	      \
-  { "mmx",			 MASK_MMX, N_("Support MMX builtins") },      \
-  { "no-mmx",			-MASK_MMX,				      \
-    N_("Do not support MMX builtins") },				      \
-  { "sse",			 MASK_SSE,				      \
-    N_("Support MMX and SSE builtins") },				      \
-  { "no-sse",			-MASK_SSE,				      \
-    N_("Do not support MMX and SSE builtins") },			      \
   { "128bit-long-double",	 MASK_128BIT_LONG_DOUBLE,		      \
     N_("sizeof(long double) is 16.") },					      \
   { "96bit-long-double",	-MASK_128BIT_LONG_DOUBLE,		      \
@@ -381,10 +374,14 @@ extern int ix86_arch;
 #ifndef CC1_CPU_SPEC
 #define CC1_CPU_SPEC "\
 %{!mcpu*: \
-%{m386:-mcpu=i386} \
-%{m486:-mcpu=i486} \
-%{mpentium:-mcpu=pentium} \
-%{mpentiumpro:-mcpu=pentiumpro}}"
+%{m386:-mcpu=i386 \
+%n`-m386' is deprecated. Use `-march=i386' or `-mcpu=i386' instead.\n} \
+%{m486:-mcpu=i486 \
+%n`-m486' is deprecated. Use `-march=i486' or `-mcpu=i486' instead.\n} \
+%{mpentium:-mcpu=pentium \
+%n`-mpentium' is deprecated. Use `-march=pentium' or `-mcpu=pentium' instead.\n} \
+%{mpentiumpro:-mcpu=pentiumpro \
+%n`-mpentiumpro' is deprecated. Use `-march=pentiumpro' or `-mcpu=pentiumpro' instead.\n}}"
 #endif
 
 #ifndef CPP_CPU_DEFAULT_SPEC
@@ -513,6 +510,13 @@ extern int ix86_arch;
 /* Boundary (in *bits*) on which the stack pointer preferrs to be
    aligned; the compiler cannot rely on having this alignment.  */
 #define PREFERRED_STACK_BOUNDARY ix86_preferred_stack_boundary
+
+/* As of July 2001, many runtimes to not align the stack properly when
+   entering main.  This causes expand_main_function to forcably align
+   the stack, which results in aligned frames for functions called from
+   main, though it does nothing for the alignment of main itself.  */
+#define FORCE_PREFERRED_STACK_BOUNDARY_IN_MAIN \
+  (ix86_preferred_stack_boundary > STACK_BOUNDARY)
 
 /* Allocation boundary for the code of a function. */
 #define FUNCTION_BOUNDARY \
@@ -899,11 +903,11 @@ extern int ix86_arch;
    should always be returned in memory.  You should instead use
    `DEFAULT_PCC_STRUCT_RETURN' to indicate this.  */
 
-#define RETURN_IN_MEMORY(TYPE)							\
-  ((TYPE_MODE (TYPE) == BLKmode)						\
-   || (VECTOR_MODE_P (TYPE_MODE (TYPE)) && int_size_in_bytes (TYPE) == 8)	\
-   || (int_size_in_bytes (TYPE) > 12 && TYPE_MODE (TYPE) != TImode		\
-       && ! VECTOR_MODE_P (TYPE_MODE (TYPE))))
+#define RETURN_IN_MEMORY(TYPE)						\
+  ((TYPE_MODE (TYPE) == BLKmode)					\
+   || (VECTOR_MODE_P (TYPE_MODE (TYPE)) && int_size_in_bytes (TYPE) == 8)\
+   || (int_size_in_bytes (TYPE) > 12 && TYPE_MODE (TYPE) != TImode	\
+       && TYPE_MODE (TYPE) != TFmode && ! VECTOR_MODE_P (TYPE_MODE (TYPE))))
 
 
 /* Define the classes of registers for register constraints in the
@@ -2633,6 +2637,22 @@ extern int const svr4_dbx_register_map[FIRST_PSEUDO_REGISTER];
 /* Before the prologue, the top of the frame is at 4(%esp).  */
 #define INCOMING_FRAME_SP_OFFSET 4
 
+/* Describe how we implement __builtin_eh_return.  */
+#define EH_RETURN_DATA_REGNO(N)       ((N) < 2 ? (N) : INVALID_REGNUM)
+#define EH_RETURN_STACKADJ_RTX        gen_rtx_REG (Pmode, 2)
+
+/* Select a format to encode pointers in exception handling data.  CODE
+   is 0 for data, 1 for code labels, 2 for function pointers.  GLOBAL is
+   true if the symbol may be affected by dynamic relocations.
+
+   ??? All x86 object file formats are capable of representing this.
+   After all, the relocation needed is the same as for the call insn.
+   Whether or not a particular assembler allows us to enter such, I
+   guess we'll have to see.  */
+#define ASM_PREFERRED_EH_DATA_FORMAT(CODE,GLOBAL)       		\
+  (flag_pic ? (GLOBAL ? DW_EH_PE_indirect : 0) | DW_EH_PE_pcrel		\
+   : DW_EH_PE_absptr)
+
 /* This is how to output the definition of a user-level label named NAME,
    such as the label on a static function or variable NAME.  */
 
@@ -2644,7 +2664,7 @@ extern int const svr4_dbx_register_map[FIRST_PSEUDO_REGISTER];
 #define ASM_OUTPUT_DOUBLE(FILE,VALUE)					\
 do { long l[2];								\
      REAL_VALUE_TO_TARGET_DOUBLE (VALUE, l);				\
-     fprintf (FILE, "%s\t0x%lx,0x%lx\n", ASM_LONG, l[0], l[1]);		\
+     fprintf (FILE, "%s0x%lx,0x%lx\n", ASM_LONG, l[0], l[1]);		\
    } while (0)
 
 /* This is how to output a `long double' extended real constant. */
@@ -2654,9 +2674,9 @@ do { long l[2];								\
 do { long l[4];						\
      REAL_VALUE_TO_TARGET_LONG_DOUBLE (VALUE, l);	\
      if (TARGET_128BIT_LONG_DOUBLE)			\
-       fprintf (FILE, "%s\t0x%lx,0x%lx,0x%lx,0x0\n", ASM_LONG, l[0], l[1], l[2]); \
+       fprintf (FILE, "%s0x%lx,0x%lx,0x%lx,0x0\n", ASM_LONG, l[0], l[1], l[2]); \
      else \
-       fprintf (FILE, "%s\t0x%lx,0x%lx,0x%lx\n", ASM_LONG, l[0], l[1], l[2]); \
+       fprintf (FILE, "%s0x%lx,0x%lx,0x%lx\n", ASM_LONG, l[0], l[1], l[2]); \
    } while (0)
 
 /* This is how to output an assembler line defining a `float' constant.  */
@@ -2664,7 +2684,7 @@ do { long l[4];						\
 #define ASM_OUTPUT_FLOAT(FILE,VALUE)			\
 do { long l;						\
      REAL_VALUE_TO_TARGET_SINGLE (VALUE, l);		\
-     fprintf ((FILE), "%s\t0x%lx\n", ASM_LONG, l);	\
+     fprintf ((FILE), "%s0x%lx\n", ASM_LONG, l);	\
    } while (0)
 
 /* Store in OUTPUT a string (made with alloca) containing
@@ -2678,22 +2698,29 @@ do { long l;						\
 /* This is how to output an assembler line defining an `int' constant.  */
 
 #define ASM_OUTPUT_INT(FILE,VALUE)  \
-( fprintf (FILE, "%s\t", ASM_LONG),		\
+( fputs (ASM_LONG, FILE),			\
   output_addr_const (FILE,(VALUE)),		\
   putc('\n',FILE))
 
 /* Likewise for `char' and `short' constants.  */
-/* is this supposed to do align too?? */
 
 #define ASM_OUTPUT_SHORT(FILE,VALUE)  \
-( fprintf (FILE, "%s\t", ASM_SHORT),		\
+( fputs (ASM_SHORT, FILE),			\
   output_addr_const (FILE,(VALUE)),		\
   putc('\n',FILE))
 
 #define ASM_OUTPUT_CHAR(FILE,VALUE)  \
-( fprintf (FILE, "%s", ASM_BYTE_OP),		\
+( fputs (ASM_BYTE_OP, FILE),			\
   output_addr_const (FILE, (VALUE)),		\
   putc ('\n', FILE))
+
+/* Given that x86 natively supports unaligned data, it's reasonable to
+   assume that all x86 assemblers don't auto-align data.  Thus the 
+   unaligned output macros required by dwarf2 frame unwind information
+   degenerate to the macros used above.  */
+#define UNALIGNED_SHORT_ASM_OP		ASM_SHORT
+#define UNALIGNED_INT_ASM_OP		ASM_LONG
+#define INT_ASM_OP			ASM_LONG
 
 /* This is how to output an assembler line for a numeric constant byte.  */
 
@@ -2716,7 +2743,7 @@ do { long l;						\
      */
 
 #define ASM_OUTPUT_ADDR_VEC_ELT(FILE, VALUE)  \
-  fprintf (FILE, "%s %s%d\n", ASM_LONG, LPREFIX, VALUE)
+  fprintf (FILE, "%s%s%d\n", ASM_LONG, LPREFIX, VALUE)
 
 /* This is how to output an element of a case-vector that is relative.
    We don't use these on the 386 yet, because the ATT assembler can't do
@@ -2724,7 +2751,7 @@ do { long l;						\
  */
 
 #define ASM_OUTPUT_ADDR_DIFF_ELT(FILE, BODY, VALUE, REL) \
-  fprintf (FILE, "\t%s\t%s%d-%s%d\n",ASM_LONG, LPREFIX, VALUE, LPREFIX, REL)
+  fprintf (FILE, "%s%s%d-%s%d\n",ASM_LONG, LPREFIX, VALUE, LPREFIX, REL)
 
 /* A C statement that outputs an address constant appropriate to 
    for DWARF debugging.  */

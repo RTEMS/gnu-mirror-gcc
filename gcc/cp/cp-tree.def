@@ -171,6 +171,9 @@ DEFTREECODE (TYPEOF_TYPE, "typeof_type", 't', 0)
    This is not an alias, but is later expanded into multiple aliases.  */
 DEFTREECODE (USING_DECL, "using_decl", 'd', 0)
 
+/* A using directive. The operand is USING_STMT_NAMESPACE. */     
+DEFTREECODE (USING_STMT, "using_directive", 'e', 1)
+
 /* An un-parsed default argument.  Looks like an IDENTIFIER_NODE.  */
 DEFTREECODE (DEFAULT_ARG, "default_arg", 'x', 2)
 
@@ -236,7 +239,12 @@ DEFTREECODE (START_CATCH_STMT, "start_catch_stmt", 'e', 0)
 DEFTREECODE (CTOR_INITIALIZER, "ctor_initializer", 'e', 2)
 DEFTREECODE (RETURN_INIT, "return_init", 'e', 2)
 DEFTREECODE (TRY_BLOCK, "try_block", 'e', 2)
+DEFTREECODE (EH_SPEC_BLOCK, "eh_spec_block", 'e', 2)
 DEFTREECODE (HANDLER, "handler", 'e', 2)
+
+/* A MUST_NOT_THROW_EXPR wraps an expression that may not
+   throw, and must call terminate if it does.  */
+DEFTREECODE (MUST_NOT_THROW_EXPR, "must_not_throw_expr", 'e', 1)
 
 DEFTREECODE (TAG_DEFN, "tag_defn", 'e', 0)
 

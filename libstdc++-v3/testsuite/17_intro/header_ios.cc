@@ -20,15 +20,11 @@
 
 // 17.4.1.2 Headers, ios
 
-#include <ios>                  // { dg-do compile }
-#include <debug_assert.h>
+#include <ios>
+#include <testsuite_hooks.h>
 
 
 int main(void)
 {
   return 0;
 }
-
-
-
-

@@ -36,9 +36,7 @@ Boston, MA 02111-1307, USA.  */
 #include "real.h"
 #include "insn-config.h"
 #include "conditions.h"
-#include "insn-flags.h"
 #include "insn-attr.h"
-#include "insn-codes.h"
 #include "recog.h"
 #include "toplev.h"
 #include "output.h"
@@ -6279,6 +6277,20 @@ compute_frame_size (size)
 	}
     }
 
+  /* We need to restore these for the handler.  */
+  if (current_function_calls_eh_return)
+    {
+      int i;
+      for (i = 0; ; ++i)
+	{
+	  regno = EH_RETURN_DATA_REGNO (i);
+	  if (regno == INVALID_REGNUM)
+	    break;
+	  gp_reg_size += GET_MODE_SIZE (gpr_mode);
+	  mask |= 1L << (regno - GP_REG_FIRST);
+	}
+    }
+
   /* Calculate space needed for fp registers.  */
   if (TARGET_FLOAT64 || TARGET_SINGLE_FLOAT)
     {
@@ -7115,13 +7127,22 @@ mips_expand_prologue ()
 
       for (i = 0; i < num; i++)
 	{
-	  rtx pattern = RTVEC_ELT (adjust, i);
+	  rtx insn, pattern;
+
+	  pattern = RTVEC_ELT (adjust, i);
 	  if (GET_CODE (pattern) != SET
 	      || GET_CODE (SET_SRC (pattern)) != ASHIFT)
 	    abort_with_insn (pattern, "Insn is not a shift");
-
 	  PUT_CODE (SET_SRC (pattern), ASHIFTRT);
-	  emit_insn (pattern);
+
+	  insn = emit_insn (pattern);
+
+	  /* Global life information isn't valid at this point, so we
+	     can't check whether these shifts are actually used.  Mark
+	     them MAYBE_DEAD so that flow2 will remove them, and not
+	     complain about dead code in the prologue.  */
+	  REG_NOTES(insn) = gen_rtx_EXPR_LIST (REG_MAYBE_DEAD, NULL_RTX,
+					       REG_NOTES (insn));
 	}
     }
 
@@ -7557,13 +7578,27 @@ mips_expand_epilogue ()
       if (tsize > 32767 && TARGET_MIPS16)
 	abort ();
 
+      if (current_function_calls_eh_return)
+	{
+	  rtx eh_ofs = EH_RETURN_STACKADJ_RTX;
+	  if (Pmode == DImode)
+	    emit_insn (gen_adddi3 (eh_ofs, eh_ofs, tsize_rtx));
+	  else
+	    emit_insn (gen_addsi3 (eh_ofs, eh_ofs, tsize_rtx));
+	  tsize_rtx = eh_ofs;
+	}
+
       emit_insn (gen_blockage ());
-      if (Pmode == DImode && tsize != 0)
-	emit_insn (gen_adddi3 (stack_pointer_rtx, stack_pointer_rtx,
-			       tsize_rtx));
-      else if (tsize != 0)
-	emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
-			       tsize_rtx));
+
+      if (tsize != 0 || current_function_calls_eh_return)
+	{
+	  if (Pmode == DImode)
+	    emit_insn (gen_adddi3 (stack_pointer_rtx, stack_pointer_rtx,
+				   tsize_rtx));
+	  else
+	    emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
+				   tsize_rtx));
+	}
     }
 
   /* The mips16 loads the return address into $7, not $31.  */

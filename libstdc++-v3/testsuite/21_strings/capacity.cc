@@ -22,7 +22,7 @@
 
 #include <string>
 #include <cstdio>
-#include <debug_assert.h>
+#include <testsuite_hooks.h>
 
 template<typename T>
   struct A { };
@@ -175,5 +175,3 @@ int main()
 
   return 0;
 }
-
-
