@@ -790,7 +790,12 @@ reload (first, global)
 	      i = REGNO (SET_DEST (set));
 	      if (i > LAST_VIRTUAL_REGISTER)
 		{
-		  if (GET_CODE (x) == MEM)
+		  /* It can happen that a REG_EQUIV note contains a MEM
+		     that is not a legitimate memory operand.  As later
+		     stages of reload assume that all addresses found
+		     in the reg_equiv_* arrays were originally legitimate,
+		     we ignore such REG_EQUIV notes.  */
+		  if (memory_operand (x, VOIDmode))
 		    {
 		      /* Always unshare the equivalence, so we can
 			 substitute into this insn without touching the
@@ -1277,6 +1282,11 @@ reload (first, global)
   obstack_free (&reload_obstack, reload_startobj);
   unused_insn_chains = 0;
   fixup_abnormal_edges ();
+
+  /* Replacing pseudos with their memory equivalents might have
+     created shared rtx.  Subsequent passes would get confused
+     by this, so unshare everything here.  */
+  unshare_all_rtl_again (first);
 
   return failure;
 }

@@ -28,6 +28,10 @@ Boston, MA 02111-1307, USA.  */
 #ifndef GCC_CP_TREE_H
 #define GCC_CP_TREE_H
 
+#ifndef __GNUC__
+#error "You should be using 'make bootstrap' -- see installation instructions"
+#endif
+
 #include "c-common.h"
 
 /* Usage of TREE_LANG_FLAG_?:
@@ -318,8 +322,6 @@ typedef struct ptrmem_cst
   set_namespace_binding ((NODE), current_namespace, (VAL))
 
 #define CLEANUP_P(NODE)         TREE_LANG_FLAG_0 (TRY_BLOCK_CHECK (NODE))
-#define CLEANUP_DECL(NODE)      TREE_OPERAND (CLEANUP_STMT_CHECK (NODE), 0)
-#define CLEANUP_EXPR(NODE)      TREE_OPERAND (CLEANUP_STMT_CHECK (NODE), 1)
 
 /* Returns nonzero iff TYPE1 and TYPE2 are the same type, in the usual
    sense of `same'.  */
@@ -1590,7 +1592,7 @@ struct lang_type
 #define CLEAR_BINFO_MARKED(NODE)		\
   (TREE_VIA_VIRTUAL (NODE)			\
    ? CLEAR_CLASSTYPE_MARKED (BINFO_TYPE (NODE))	\
-   : (TREE_LANG_FLAG_0 (NODE) = 0))
+   : (void)(TREE_LANG_FLAG_0 (NODE) = 0))
 
 /* Nonzero means that this class is on a path leading to a new vtable.  */
 #define BINFO_VTABLE_PATH_MARKED(NODE)		\
@@ -4056,8 +4058,6 @@ extern int types_overlap_p			PARAMS ((tree, tree));
 extern tree get_vbase				PARAMS ((tree, tree));
 extern tree get_dynamic_cast_base_type          PARAMS ((tree, tree));
 extern void type_access_control			PARAMS ((tree, tree));
-extern void skip_type_access_control            PARAMS ((void));
-extern void reset_type_access_control           PARAMS ((void));
 extern int accessible_p                         PARAMS ((tree, tree));
 extern tree lookup_field			PARAMS ((tree, tree, int, int));
 extern int lookup_fnfields_1                    PARAMS ((tree, tree));
@@ -4165,6 +4165,7 @@ extern tree finish_qualified_call_expr          PARAMS ((tree, tree));
 extern tree finish_unary_op_expr                PARAMS ((enum tree_code, tree));
 extern tree finish_id_expr                      PARAMS ((tree));
 extern void save_type_access_control		PARAMS ((tree));
+extern void reset_type_access_control           PARAMS ((void));
 extern void decl_type_access_control		PARAMS ((tree));
 extern int begin_function_definition            PARAMS ((tree, tree));
 extern tree begin_constructor_declarator        PARAMS ((tree, tree));
@@ -4349,6 +4350,7 @@ extern tree pfn_from_ptrmemfunc                 PARAMS ((tree));
 extern tree type_after_usual_arithmetic_conversions PARAMS ((tree, tree));
 extern tree composite_pointer_type              PARAMS ((tree, tree, tree, tree,
 						       const char*));
+extern tree merge_types				PARAMS ((tree, tree));
 extern tree check_return_expr                   PARAMS ((tree));
 #define cp_build_binary_op(code, arg1, arg2) \
   build_binary_op(code, arg1, arg2, 1)

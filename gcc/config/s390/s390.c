@@ -1,5 +1,5 @@
 /* Subroutines used for code generation on IBM S/390 and zSeries
-   Copyright (C) 1999, 2000, 2001 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
    Contributed by Hartmut Penner (hpenner@de.ibm.com) and
                   Ulrich Weigand (uweigand@de.ibm.com).
 
@@ -1169,14 +1169,23 @@ s390_plus_operand (op, mode)
    SCRATCH may be used as scratch register.  */
 
 void
-s390_expand_plus_operand (target, src, scratch)
+s390_expand_plus_operand (target, src, scratch_in)
      register rtx target;
      register rtx src;
-     register rtx scratch;
+     register rtx scratch_in;
 {
-  /* src must be a PLUS; get its two operands.  */
-  rtx sum1, sum2;
+  rtx sum1, sum2, scratch;
 
+  /* ??? reload apparently does not ensure that the scratch register
+     and the target do not overlap.  We absolutely require this to be
+     the case, however.  Therefore the reload_in[sd]i patterns ask for
+     a double-sized scratch register, and if one part happens to be
+     equal to the target, we use the other one.  */
+  scratch = gen_rtx_REG (Pmode, REGNO (scratch_in));
+  if (rtx_equal_p (scratch, target))
+    scratch = gen_rtx_REG (Pmode, REGNO (scratch_in) + 1);
+
+  /* src must be a PLUS; get its two operands.  */
   if (GET_CODE (src) != PLUS || GET_MODE (src) != Pmode)
     abort ();
 
@@ -2459,7 +2468,7 @@ s390_split_branches (void)
 static void 
 s390_chunkify_pool (void)
 {
-  int *ltorg_uids, max_ltorg, chunk, last_addr;
+  int *ltorg_uids, max_ltorg, chunk, last_addr, next_addr;
   rtx insn;
 
   /* Do we need to chunkify the literal pool?  */
@@ -2498,12 +2507,15 @@ s390_chunkify_pool (void)
 	}
     }
 
-  ltorg_uids[max_ltorg] = insn_current_address + 1;
+  ltorg_uids[max_ltorg] = -1;
 
   /* Find and mark all labels that are branched into 
      from an insn belonging to a different chunk.  */
 
   chunk = last_addr = 0;
+  next_addr = ltorg_uids[chunk] == -1 ? insn_current_address + 1
+	      : INSN_ADDRESSES (ltorg_uids[chunk]);
+
   for (insn = get_insns (); insn; insn = NEXT_INSN (insn))
     {
       if (GET_CODE (insn) == JUMP_INSN) 
@@ -2528,8 +2540,8 @@ s390_chunkify_pool (void)
 	      if (label)
 		{
 	          if (INSN_ADDRESSES (INSN_UID (label)) <= last_addr
-	              || INSN_ADDRESSES (INSN_UID (label)) > ltorg_uids[chunk])
-	            SYMBOL_REF_USED (label) = 1;
+	              || INSN_ADDRESSES (INSN_UID (label)) > next_addr)
+		    SYMBOL_REF_USED (label) = 1;
 		}
             } 
           else if (GET_CODE (pat) == ADDR_VEC
@@ -2542,7 +2554,7 @@ s390_chunkify_pool (void)
 	          rtx label = XEXP (XVECEXP (pat, diff_p, i), 0);
 
 	          if (INSN_ADDRESSES (INSN_UID (label)) <= last_addr
-	              || INSN_ADDRESSES (INSN_UID (label)) > ltorg_uids[chunk])
+	              || INSN_ADDRESSES (INSN_UID (label)) > next_addr)
 		    SYMBOL_REF_USED (label) = 1;
 	        }
             }
@@ -2550,7 +2562,9 @@ s390_chunkify_pool (void)
 
       if (INSN_UID (insn) == ltorg_uids[chunk]) 
         {
-	  last_addr = ltorg_uids[chunk++];
+	  last_addr = INSN_ADDRESSES (ltorg_uids[chunk++]);
+	  next_addr = ltorg_uids[chunk] == -1 ? insn_current_address + 1
+		      : INSN_ADDRESSES (ltorg_uids[chunk]);
         }
     }
 

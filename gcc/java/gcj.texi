@@ -240,16 +240,16 @@ compatibility with tools like @code{javac} is imported, we recommend
 always using @code{-I} instead of the other options for manipulating the
 class path.
 
-@item --CLASSPATH=@var{path}
-This sets the class path to @var{path}, a colon-separated list of paths
-(on Windows-based systems, a semicolon-separate list of paths). Using
-this option causes the built in path to be suppressed.
-
 @item --classpath=@var{path}
 This sets the class path to @var{path}, a colon-separated list of paths
-(on Windows-based systems, a semicolon-separate list of paths).  This
-differs from the @code{--classpath} option in that it does not suppress
-the built-in system path.
+(on Windows-based systems, a semicolon-separate list of paths).
+This does not override the builtin (``boot'') search path.
+
+@item --CLASSPATH=@var{path}
+Deprecated synonym for @code{--classpath}.
+
+@item --bootclasspath=@var{path}
+Where to find the standard builtin classes, such as @code{java.lang.String}.
 
 @item CLASSPATH
 This is an environment variable which holds a list of paths.
@@ -262,21 +262,14 @@ The final class path is constructed like so:
 First come all directories specified via @code{-I}.
 
 @item
-If @option{--CLASSPATH} is specified, its value is appended and processing
-stops.  That is, @option{--CLASSPATH} suppresses all the options mentioned
-later in this list.
+If @option{--classpath} is specified, its value is appended.
+Otherwise, if the @code{CLASSPATH} environment variable is specified,
+then its value is appended.
+Otherwise, the current directory (@code{"."}) is appended.
 
 @item
-If @option{--classpath} is specified, its value is appended and the
-@code{CLASSPATH} environment variable is suppressed.
-
-@item
-If the @code{CLASSPATH} environment variable is specified (and was not
-suppressed by @option{--classpath} or @option{--CLASSPATH}), then its
-value is appended.
-
-@item
-Finally, the built-in system directory, @file{libgcj.jar}, is appended.
+Finally, if @code{--bootclasspath} was specified, append its value.
+Otherwise, append the built-in system directory, @file{libgcj.jar}.
 @end itemize
 
 The classfile built by @code{gcj} for the class @code{java.lang.Object}
@@ -392,9 +385,20 @@ directory.
 
 @item -fno-bounds-check
 By default, @code{gcj} generates code which checks the bounds of all
-array indexing operations.  With this option, these checks are omitted.
-Note that this can result in unpredictable behavior if the code in
-question actually does violate array bounds constraints.
+array indexing operations.  With this option, these checks are omitted, which
+can improve performance for code that uses arrays extensively.  Note that this 
+can result in unpredictable behavior if the code in question actually does 
+violate array bounds constraints.  It is safe to use this option if you are 
+sure that your code will never throw an @code{ArrayIndexOutOfBoundsException}.
+
+@item -fno-store-check
+Don't generate array store checks.  When storing objects into arrays, a runtime
+check is normally generated in order to ensure that the object is assignment
+compatible with the component type of the array (which may not be known
+at compile-time).  With this option, these checks are omitted.  This can 
+improve performance for code which stores objects into arrays frequently.
+It is safe to use this option if you are sure your code will never throw an 
+@code{ArrayStoreException}.
 
 @item -fjni
 With @code{gcj} there are two options for writing native methods: CNI

@@ -2222,6 +2222,7 @@ copy_loop_body (loop, copy_start, copy_end, map, exit_label, last_iteration,
 	  pattern = copy_rtx_and_substitute (PATTERN (insn), map, 0);
 	  copy = emit_call_insn (pattern);
 	  REG_NOTES (copy) = initial_reg_note_copy (REG_NOTES (insn), map);
+	  SIBLING_CALL_P (copy) = SIBLING_CALL_P (insn);
 
 	  /* Because the USAGE information potentially contains objects other
 	     than hard registers, we need to copy it.  */
@@ -3744,7 +3745,18 @@ loop_iterations (loop)
 	  for (biv_inc = bl->biv; biv_inc; biv_inc = biv_inc->next_iv)
 	    {
 	      if (loop_insn_first_p (v->insn, biv_inc->insn))
-		offset -= INTVAL (biv_inc->add_val);
+		{
+		  if (REG_P (biv_inc->add_val))
+		    {
+		      if (loop_dump_stream)
+			fprintf (loop_dump_stream,
+				 "Loop iterations: Basic induction var add_val is REG %d.\n",
+				 REGNO (biv_inc->add_val));
+			return 0;
+		    }
+
+		  offset -= INTVAL (biv_inc->add_val);
+		}
 	    }
 	}
       if (loop_dump_stream)

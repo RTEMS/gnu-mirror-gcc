@@ -196,7 +196,7 @@ static mem_attrs *get_mem_attrs		PARAMS ((HOST_WIDE_INT, tree, rtx,
 						 rtx, unsigned int,
 						 enum machine_mode));
 static tree component_ref_for_mem_expr	PARAMS ((tree));
-static rtx gen_const_vector_0 PARAMS ((enum mode_class, enum machine_mode));
+static rtx gen_const_vector_0		PARAMS ((enum machine_mode));
 
 /* Probability of the conditional branch currently proceeded by try_split.
    Set to -1 otherwise.  */
@@ -2066,6 +2066,7 @@ offset_address (memref, offset, pow2)
       new = simplify_gen_binary (PLUS, Pmode, addr, offset);
     }
 
+  update_temp_slot_address (XEXP (memref, 0), new);
   new = change_address_1 (memref, VOIDmode, new, 1);
 
   /* Update the alignment to reflect the offset.  Reset the offset, which
@@ -2380,6 +2381,109 @@ reset_used_decls (blk)
   /* Now process sub-blocks.  */
   for (t = BLOCK_SUBBLOCKS (blk); t; t = TREE_CHAIN (t))
     reset_used_decls (t);
+}
+
+/* Similar to `copy_rtx' except that if MAY_SHARE is present, it is
+   placed in the result directly, rather than being copied.  MAY_SHARE is
+   either a MEM of an EXPR_LIST of MEMs.  */
+
+rtx
+copy_most_rtx (orig, may_share)
+     rtx orig;
+     rtx may_share;
+{
+  rtx copy;
+  int i, j;
+  RTX_CODE code;
+  const char *format_ptr;
+
+  if (orig == may_share
+      || (GET_CODE (may_share) == EXPR_LIST
+	  && in_expr_list_p (may_share, orig)))
+    return orig;
+
+  code = GET_CODE (orig);
+
+  switch (code)
+    {
+    case REG:
+    case QUEUED:
+    case CONST_INT:
+    case CONST_DOUBLE:
+    case CONST_VECTOR:
+    case SYMBOL_REF:
+    case CODE_LABEL:
+    case PC:
+    case CC0:
+      return orig;
+    default:
+      break;
+    }
+
+  copy = rtx_alloc (code);
+  PUT_MODE (copy, GET_MODE (orig));
+  copy->in_struct = orig->in_struct;
+  copy->volatil = orig->volatil;
+  copy->unchanging = orig->unchanging;
+  copy->integrated = orig->integrated;
+  copy->frame_related = orig->frame_related;
+
+  format_ptr = GET_RTX_FORMAT (GET_CODE (copy));
+
+  for (i = 0; i < GET_RTX_LENGTH (GET_CODE (copy)); i++)
+    {
+      switch (*format_ptr++)
+	{
+	case 'e':
+	  XEXP (copy, i) = XEXP (orig, i);
+	  if (XEXP (orig, i) != NULL && XEXP (orig, i) != may_share)
+	    XEXP (copy, i) = copy_most_rtx (XEXP (orig, i), may_share);
+	  break;
+
+	case 'u':
+	  XEXP (copy, i) = XEXP (orig, i);
+	  break;
+
+	case 'E':
+	case 'V':
+	  XVEC (copy, i) = XVEC (orig, i);
+	  if (XVEC (orig, i) != NULL)
+	    {
+	      XVEC (copy, i) = rtvec_alloc (XVECLEN (orig, i));
+	      for (j = 0; j < XVECLEN (copy, i); j++)
+		XVECEXP (copy, i, j)
+		  = copy_most_rtx (XVECEXP (orig, i, j), may_share);
+	    }
+	  break;
+
+	case 'w':
+	  XWINT (copy, i) = XWINT (orig, i);
+	  break;
+
+	case 'n':
+	case 'i':
+	  XINT (copy, i) = XINT (orig, i);
+	  break;
+
+	case 't':
+	  XTREE (copy, i) = XTREE (orig, i);
+	  break;
+
+	case 's':
+	case 'S':
+	  XSTR (copy, i) = XSTR (orig, i);
+	  break;
+
+	case '0':
+	  /* Copy this through the wide int field; that's safest.  */
+	  X0WINT (copy, i) = X0WINT (orig, i);
+	  break;
+
+	default:
+	  abort ();
+	}
+    }
+  return copy;
 }
 
 /* Mark ORIG as in use, and return a copy of it if it was already in use.
@@ -4800,12 +4904,10 @@ mark_emit_status (es)
   ggc_mark_rtx (es->x_first_insn);
 }
 
-/* Generate the constant 0.  The first argument is MODE_VECTOR_INT for
-   integers or MODE_VECTOR_FLOAT for floats.  */
+/* Generate the constant 0.  */
 
 static rtx
-gen_const_vector_0 (type, mode)
-     enum mode_class type;
+gen_const_vector_0 (mode)
      enum machine_mode mode;
 {
   rtx tem;
@@ -4973,14 +5075,12 @@ init_emit_once (line_numbers)
   for (mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_INT);
        mode != VOIDmode;
        mode = GET_MODE_WIDER_MODE (mode))
-    const_tiny_rtx[0][(int) mode]
-      = gen_const_vector_0 (MODE_VECTOR_INT, mode);
+    const_tiny_rtx[0][(int) mode] = gen_const_vector_0 (mode);
 
   for (mode = GET_CLASS_NARROWEST_MODE (MODE_VECTOR_FLOAT);
        mode != VOIDmode;
        mode = GET_MODE_WIDER_MODE (mode))
-    const_tiny_rtx[0][(int) mode]
-      = gen_const_vector_0 (MODE_VECTOR_FLOAT, mode);
+    const_tiny_rtx[0][(int) mode] = gen_const_vector_0 (mode);
 
   for (i = (int) CCmode; i < (int) MAX_MACHINE_MODE; ++i)
     if (GET_MODE_CLASS ((enum machine_mode) i) == MODE_CC)

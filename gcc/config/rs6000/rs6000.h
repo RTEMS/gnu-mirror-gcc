@@ -762,7 +762,7 @@ extern int rs6000_altivec_abi;
 #define XER_REGNO    76
 #define FIRST_ALTIVEC_REGNO	77
 #define LAST_ALTIVEC_REGNO	108
-#define TOTAL_ALTIVEC_REGS	(LAST_ALTIVEC_REGNO - FIRST_ALTIVEC_REGNO)
+#define TOTAL_ALTIVEC_REGS	(LAST_ALTIVEC_REGNO - FIRST_ALTIVEC_REGNO + 1)
 #define VRSAVE_REGNO		109
 
 /* List the order in which to allocate registers.  Each register must be
@@ -1717,6 +1717,14 @@ typedef struct rs6000_args
 #define EXPAND_BUILTIN_VA_ARG(valist, type) \
   rs6000_va_arg (valist, type)
 
+/* For AIX, the rule is that structures are passed left-aligned in
+   their stack slot.  However, GCC does not presently do this:
+   structures which are the same size as integer types are passed
+   right-aligned, as if they were in fact integers.  This only
+   matters for structures of size 1 or 2, or 4 when TARGET_64BIT.
+   ABI_V4 does not use std_expand_builtin_va_arg.  */
+#define PAD_VARARGS_DOWN (TYPE_MODE (type) != BLKmode)
+
 /* Define this macro to be a nonzero value if the location where a function
    argument is passed depends on whether or not it is a named argument.  */
 #define STRICT_ARGUMENT_NAMING 1
@@ -2426,7 +2434,7 @@ extern int toc_initialized;
 #define ASM_OUTPUT_DEF_FROM_DECLS(FILE,decl,target)	\
 do {							\
   const char * alias = XSTR (XEXP (DECL_RTL (decl), 0), 0); \
-  char * name = IDENTIFIER_POINTER (target);		\
+  const char * name = IDENTIFIER_POINTER (target);	\
   if (TREE_CODE (decl) == FUNCTION_DECL			\
       && DEFAULT_ABI == ABI_AIX)			\
     {							\

@@ -2221,8 +2221,12 @@ maybe_make_one_only (decl)
 
   make_decl_one_only (decl);
 
-  if (TREE_CODE (decl) == VAR_DECL && DECL_LANG_SPECIFIC (decl))
-    DECL_COMDAT (decl) = 1;
+  if (TREE_CODE (decl) == VAR_DECL)
+    {
+      DECL_COMDAT (decl) = 1;
+      /* Mark it needed so we don't forget to emit it.  */
+      TREE_SYMBOL_REFERENCED (DECL_ASSEMBLER_NAME (decl)) = 1;
+    }
 }
 
 /* Returns the virtual function with which the vtable for TYPE is
@@ -5263,7 +5267,13 @@ handle_class_head (aggr, scope, id, defn_p, new_type_p)
 		     && TREE_CODE (context) != BOUND_TEMPLATE_TEMPLATE_PARM);
       if (*new_type_p)
 	push_scope (context);
-  
+
+      if (TREE_CODE (TREE_TYPE (decl)) == RECORD_TYPE)
+	/* It is legal to define a class with a different class key,
+	   and this changes the default member access.  */
+	CLASSTYPE_DECLARED_CLASS (TREE_TYPE (decl))
+	  = aggr == class_type_node;
+	
       if (!xrefd_p && PROCESSING_REAL_TEMPLATE_DECL_P ())
 	decl = push_template_decl (decl);
     }

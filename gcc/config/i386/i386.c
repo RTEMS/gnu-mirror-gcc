@@ -3880,9 +3880,7 @@ ix86_save_reg (regno, maybe_eh_return)
      int regno;
      int maybe_eh_return;
 {
-  if (flag_pic
-      && ! TARGET_64BIT
-      && regno == PIC_OFFSET_TABLE_REGNUM
+  if (regno == PIC_OFFSET_TABLE_REGNUM
       && (current_function_uses_pic_offset_table
 	  || current_function_uses_const_pool
 	  || current_function_calls_eh_return))
@@ -5731,11 +5729,14 @@ print_operand (file, x, code)
 	case 'z':
 	  /* 387 opcodes don't get size suffixes if the operands are
 	     registers.  */
-
 	  if (STACK_REG_P (x))
 	    return;
 
-	  /* this is the size of op from size of operand */
+	  /* Likewise if using Intel opcodes.  */
+	  if (ASSEMBLER_DIALECT == ASM_INTEL)
+	    return;
+
+	  /* This is the size of op from size of operand.  */
 	  switch (GET_MODE_SIZE (GET_MODE (x)))
 	    {
 	    case 2:
