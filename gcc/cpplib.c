@@ -477,7 +477,7 @@ do_undef (pfile)
       if (pfile->cb.undef)
 	(*pfile->cb.undef) (pfile, node);
 
-      if (node->flags & NODE_BUILTIN)
+      if (node->flags & NODE_WARN)
 	cpp_warning (pfile, "undefining \"%s\"", node->name);
 
       _cpp_free_definition (node);
@@ -1879,7 +1879,7 @@ _cpp_init_stacks (pfile)
   obstack_init (pfile->buffer_ob);
 
   /* Register the directives.  */
-  for (i = 0; i < N_DIRECTIVES; i++)
+  for (i = 0; i < (unsigned int) N_DIRECTIVES; i++)
     {
       node = cpp_lookup (pfile, dtable[i].name, dtable[i].length);
       node->directive_index = i + 1;

@@ -4663,9 +4663,9 @@ tree_check_failed (node, code, file, line, function)
      int line;
      const char *function;
 {
-  error ("Tree check: expected %s, have %s",
-	 tree_code_name[code], tree_code_name[TREE_CODE (node)]);
-  fancy_abort (file, line, function);
+  internal_error ("Tree check: expected %s, have %s in %s, at %s:%d",
+		  tree_code_name[code], tree_code_name[TREE_CODE (node)],
+		  function, trim_filename (file), line);
 }
 
 /* Similar to above, except that we check for a class of tree
@@ -4679,10 +4679,10 @@ tree_class_check_failed (node, cl, file, line, function)
      int line;
      const char *function;
 {
-  error ("Tree check: expected class '%c', have '%c' (%s)",
-	 cl, TREE_CODE_CLASS (TREE_CODE (node)),
-	 tree_code_name[TREE_CODE (node)]);
-  fancy_abort (file, line, function);
+  internal_error
+    ("Tree check: expected class '%c', have '%c' (%s) in %s, at %s:%d",
+     cl, TREE_CODE_CLASS (TREE_CODE (node)),
+     tree_code_name[TREE_CODE (node)], function, trim_filename (file), line);
 }
 
 #endif /* ENABLE_TREE_CHECKING */
@@ -4832,7 +4832,16 @@ build_common_tree_nodes_2 (short_double)
   {
     tree t;
     BUILD_VA_LIST_TYPE (t);
-    va_list_type_node = build_type_copy (t);
+
+    /* Many back-ends define record types without seting TYPE_NAME.
+       If we copied the record type here, we'd keep the original
+       record type without a name.  This breaks name mangling.  So,
+       don't copy record types and let c_common_nodes_and_builtins()
+       declare the type to be __builtin_va_list.  */
+    if (TREE_CODE (t) != RECORD_TYPE)
+      t = build_type_copy (t);
+
+    va_list_type_node = t;
   }
 
   V4SF_type_node = make_node (VECTOR_TYPE);

@@ -27,7 +27,9 @@
 #ifndef _CPP_DEQUE
 #define _CPP_DEQUE 1
 
-#include <bits/stl_range_errors.h>
+#pragma GCC system_header
+
+#include <bits/functexcept.h>
 #include <bits/stl_algobase.h>
 #include <bits/stl_alloc.h>
 #include <bits/stl_construct.h>

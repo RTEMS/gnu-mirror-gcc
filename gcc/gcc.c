@@ -360,6 +360,7 @@ or with constant text in a single argument.
 	and substitute the full name found.
  %eSTR  Print STR as an error message.  STR is terminated by a newline.
         Use this when inconsistent options are detected.
+ %nSTR  Print STR as an notice.  STR is terminated by a newline.
  %x{OPTION}	Accumulate an option for %X.
  %X	Output the accumulated linker options specified by compilations.
  %Y	Output the accumulated assembler options specified by compilations.
@@ -2848,7 +2849,7 @@ convert_filename (name, do_exe)
     }
 #endif
 
-#ifdef HAVE_EXECUTABLE_SUFFIX
+#if defined(HAVE_EXECUTABLE_SUFFIX) && !defined(NO_AUTO_EXE_SUFFIX)
   /* If there is no filetype, make it the executable suffix (which includes
      the ".").  But don't get confused if we have just "-o".  */
   if (! do_exe || EXECUTABLE_SUFFIX[0] == 0 || (len == 2 && name[0] == '-'))
@@ -4196,6 +4197,21 @@ do_spec_1 (spec, inswitch, soft_matched_part)
 	      return -1;
 	    }
 	    break;
+	  case 'n':
+	    /* %nfoo means report an notice with `foo' on stderr.  */
+	    {
+	      const char *q = p;
+	      char *buf;
+	      while (*p != 0 && *p != '\n')
+		p++;
+	      buf = (char *) alloca (p - q + 1);
+	      strncpy (buf, q, p - q);
+	      buf[p - q] = 0;
+	      notice ("%s\n", buf);
+	      if (*p)
+		p++;
+	    }
+	    break;
 
 	  case 'j':
 	    {
@@ -4493,7 +4509,7 @@ do_spec_1 (spec, inswitch, soft_matched_part)
 
 		len = strlen (multilib_dir);
 		obstack_blank (&obstack, len + 1);
-		p = obstack_next_free (&obstack) - len;
+		p = obstack_next_free (&obstack) - (len + 1);
 
 		*p++ = '_';
 		for (q = multilib_dir; *q ; ++q, ++p)
@@ -5462,6 +5478,9 @@ main (argc, argv)
   if (signal (SIGPIPE, SIG_IGN) != SIG_IGN)
     signal (SIGPIPE, fatal_error);
 #endif
+  /* We *MUST* set SIGCHLD to SIG_DFL so that the wait4() call will
+     receive the signal.  A different setting is inheritable */
+  signal (SIGCHLD, SIG_DFL);
 
   argbuf_length = 10;
   argbuf = (const char **) xmalloc (argbuf_length * sizeof (const char *));

@@ -31,11 +31,10 @@
 // ISO C++ 14882: 27.8  File-based streams
 //
 
-#include <bits/basic_file.h>
 #include <unistd.h>
 
-namespace std {
-
+namespace std 
+{
   // Generic definitions for __basic_file
   template<typename _CharT>
     __basic_file<_CharT>::__basic_file(__c_lock* /*__lock*/) 
@@ -256,14 +255,4 @@ namespace std {
   template<typename _CharT>
     void 
     __basic_file<_CharT>::imbue(void* /*__v*/) { }
-
-  // Need to instantiate base class here for type-info bits, etc
-  template struct __basic_file_base<char>;
-  template class __basic_file<char>;
-#ifdef _GLIBCPP_USE_WCHAR_T
-  template struct __basic_file_base<wchar_t>;
-  template class __basic_file<wchar_t>;
-#endif
 }  // namespace std
-
-

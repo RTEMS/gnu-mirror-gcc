@@ -337,7 +337,11 @@ AC_DEFUN(GLIBCPP_CHECK_MATH_DECL_1, [
     AC_CACHE_VAL(glibcpp_cv_func_$1_use, [
       AC_LANG_SAVE
       AC_LANG_CPLUSPLUS
-      AC_TRY_COMPILE([#include <math.h>], 
+      AC_TRY_COMPILE([#include <math.h>
+		      #ifdef HAVE_IEEEFP_H
+		      #include <ieeefp.h>
+		      #endif
+		     ], 
                      [ $1(0);], 
                      [glibcpp_cv_func_$1_use=yes], [glibcpp_cv_func_$1_use=no])
       AC_LANG_RESTORE
@@ -1137,7 +1141,8 @@ AC_DEFUN(GLIBCPP_ENABLE_CSTDIO, [
   case x${enable_cstdio_flag} in
     xlibio)
       CSTDIO_H=config/c_io_libio.h
-      CSTDIO_CC=config/c_io_libio.cc
+      BASIC_FILE_H=config/basic_file_libio.h
+      BASIC_FILE_CC=config/basic_file_libio.cc
       AC_MSG_RESULT(libio)
 
       # see if we are on a system with libio native (ie, linux)
@@ -1193,7 +1198,8 @@ AC_DEFUN(GLIBCPP_ENABLE_CSTDIO, [
     xstdio | x | xno | xnone | xyes)
       # default
       CSTDIO_H=config/c_io_stdio.h
-      CSTDIO_CC=config/c_io_stdio.cc
+      BASIC_FILE_H=config/basic_file_stdio.h
+      BASIC_FILE_CC=config/basic_file_stdio.cc
       AC_MSG_RESULT(stdio)
 
       # We're not using stdio.
@@ -1208,7 +1214,8 @@ AC_DEFUN(GLIBCPP_ENABLE_CSTDIO, [
       ;;
   esac
   AC_LINK_FILES($CSTDIO_H, include/bits/c++io.h)
-  AC_LINK_FILES($CSTDIO_CC, src/c++io.cc)
+  AC_LINK_FILES($BASIC_FILE_H, include/bits/basic_file_model.h)
+  AC_LINK_FILES($BASIC_FILE_CC, src/basic_file.cc)
 
   # 2000-08-04 bkoz hack
   CCODECVT_C=config/c_io_libio_codecvt.c
@@ -1570,14 +1577,14 @@ AC_MSG_RESULT($version_specific_libs)
 
 # Default case for install directory for include files.
 if test x"$version_specific_libs" = x"no" \
-   && test x"$gxx_include_dir"=x"no"; then
+   && test x"$gxx_include_dir" = x"no"; then
   gxx_include_dir='$(prefix)'/include/g++-${libstdcxx_interface}
 fi
 
 # Calculate glibcpp_toolexecdir, glibcpp_toolexeclibdir
 # Install a library built with a cross compiler in tooldir, not libdir.
 if test x"$glibcpp_toolexecdir" = x"no"; then 
-  if test x"$with_cross_host" = x"yes"; then
+  if test -n "$with_cross_host" && test x"$with_cross_host" != x"no"; then
     glibcpp_toolexecdir='$(exec_prefix)/$(target_alias)'
     glibcpp_toolexeclibdir='$(toolexecdir)/lib$(MULTISUBDIR)'
   else

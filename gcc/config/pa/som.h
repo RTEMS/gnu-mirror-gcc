@@ -26,6 +26,12 @@ Boston, MA 02111-1307, USA.  */
    from other embedded stabs implementations.  */
 #undef DBX_USE_BINCL
 
+#undef ASM_IDENTIFY_GCC
+#define ASM_IDENTIFY_GCC(FILE)
+
+#undef ASM_IDENTIFY_GCC_AFTER_SOURCE
+#define ASM_IDENTIFY_GCC_AFTER_SOURCE(FILE)
+
 /* We make the first line stab special to avoid adding several
    gross hacks to GAS.  */
 #undef  ASM_OUTPUT_SOURCE_LINE
@@ -378,6 +384,12 @@ do {						\
 /* The .align directive in the HP assembler allows up to a 32 alignment.  */
 #define MAX_OFILE_ALIGNMENT 32768
 
+/* This has been disabled for now.  As best as I call tell we are not
+   following the proper conventions for secondary definitions as we
+   do not emit a duplicate symbol with '_' prefix for each secondary
+   definition.  This appears to be the cause of HP's tools core
+   dumping and the dynamic linker reporting undefined symbols.  */
+#if 0
 #ifdef HAVE_GAS_WEAK
 #define MAKE_DECL_ONE_ONLY(DECL) (DECL_WEAK (DECL) = 1)
 
@@ -394,4 +406,5 @@ do {						\
            fputs (",DATA\n", FILE); \
          } \
   } while (0)
+#endif
 #endif

@@ -4276,6 +4276,20 @@
     }
 }")
 
+(define_insn "*call_osf_1_noreturn"
+  [(call (mem:DI (match_operand:DI 0 "call_operand" "c,R,i"))
+	 (match_operand 1 "" ""))
+   (clobber (reg:DI 27))
+   (clobber (reg:DI 26))]
+  "! TARGET_WINDOWS_NT && ! TARGET_OPEN_VMS
+   && find_reg_note (insn, REG_NORETURN, NULL_RTX)"
+  "@
+   jsr $26,($27),0
+   bsr $26,$%0..ng
+   jsr $26,%0"
+  [(set_attr "type" "jsr")
+   (set_attr "length" "*,*,8")])
+      
 (define_insn "*call_osf_1"
   [(call (mem:DI (match_operand:DI 0 "call_operand" "c,R,i"))
 	 (match_operand 1 "" ""))
@@ -4717,7 +4731,7 @@
    st%, %R1,%0"
   [(set_attr "type" "ilog,iadd,iadd,ild,ist,fcpys,fld,fst")])
 
-(define_insn "*movsf_fix"
+(define_insn "*movsi_fix"
   [(set (match_operand:SI 0 "nonimmediate_operand" "=r,r,r,r,m,*f,*f,m,r,*f")
 	(match_operand:SI 1 "input_operand" "rJ,K,L,m,rJ,*fJ,m,*f,*f,r"))]
   "! TARGET_WINDOWS_NT && ! TARGET_OPEN_VMS && TARGET_FIX

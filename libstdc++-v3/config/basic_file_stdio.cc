@@ -1,6 +1,6 @@
-// Methods and support infrastructure for exceptions -*- C++ -*-
+// Wrapper of C-language FILE struct -*- C++ -*-
 
-// Copyright (C) 2000 Free Software Foundation, Inc.
+// Copyright (C) 2000, 2001 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -28,52 +28,15 @@
 // the GNU General Public License.
 
 //
-// ISO C++ 14882: 15 Exception handling
+// ISO C++ 14882: 27.8  File-based streams
 //
 
-// This file declares functions whose only purpose is to throw an
-// exception. They help break a circularity between <string> and
-// <stdexcept>. See src/stdexcept.cc, where these functions are
-// defined.
+#include <bits/basic_file.h>
 
-// XXX: These functions serve a similar purpose to those in
-// stl/bits/stl_range_errors.h . Eventually the two approaches should
-// be merged. 
-
-#ifndef _CPP_EXCEPTION_SUPPORT_H
-#define _CPP_EXCEPTION_SUPPORT_H	1
-
-namespace std {
-
-#if _GLIBCPP_USE_EXCEPTIONS
-  // Internal functions for string implementation.
-  extern void __out_of_range(const char *__str);
-  extern void __length_error(const char *__str);
-  
-# define __OUTOFRANGE(__cond) \
-  do { if (__cond) __out_of_range(#__cond); } while (0)
-# define __LENGTHERROR(__cond) \
-  do { if (__cond) __length_error(#__cond); } while (0)
-#else
-# include <bits/std_cassert.h>
-# define __OUTOFRANGE(__cond) assert(!(__cond))
-# define __LENGTHERROR(__cond) assert(!(__cond))
+namespace std 
+{
+  template class __basic_file<char>;
+#ifdef _GLIBCPP_USE_WCHAR_T
+  template class __basic_file<wchar_t>;
 #endif
-
-} // namespace std
-
-#endif	/* _CPP_EXCEPTION_SUPPORT_H */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+}  // namespace std

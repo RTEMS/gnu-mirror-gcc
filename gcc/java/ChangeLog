@@ -1,3 +1,94 @@
+2001-03-07  Tom Tromey  <tromey@redhat.com>
+
+	* config-lang.in (lang_requires): Define.
+
+Fri Feb 23 15:28:39 2001  Richard Kenner  <kenner@vlsi1.ultra.nyu.edu>
+
+	* decl.c (set_block): Set NAMES and BLOCKS from BLOCK.
+
+2001-02-20  Alexandre Petit-Bianco  <apbianco@redhat.com>
+
+	* parse.y (check_inner_class_access): Moved declaration of local
+	`enclosing_decl_type' to the right location.
+
+2001-02-19  Bryce McKinlay  <bryce@albatross.co.nz>
+
+	* parse.y (parser_check_super_interface): Don't call 
+	check_pkg_class_access for an inner interface.
+	(parser_check_super): Don't call check_pkg_class_access for inner 
+	class.
+	(do_resolve_class): Simplify enclosing type loop. Don't call 
+	check_pkg_class_access if CL and DECL are not set.
+	(find_in_imports_on_demand): Set DECL if class_type needed to be
+	loaded. Don't call check_pkg_class_access for an inner class.
+	(check_inner_class_access): Rewritten to implement member access
+	rules as per spec 6.6.1.
+	(check_pkg_class_access): Handle the empty package correctly.
+	(in_same_package): New function. Determine if two classes are in the
+	same package.
+	
+2001-02-18  Bryce McKinlay  <bryce@albatross.co.nz>
+
+	* typeck.c (build_java_array_type): Don't try to poke a public `clone'
+	method into array types.
+	* parse.y (patch_method_invocation): Bypass access check on clone call
+	to array instance.
+
+2001-02-15  Alexandre Petit-Bianco  <apbianco@redhat.com>
+
+	* expr.c (build_instanceof): Check for arrays when trying fold to
+	false.
+
+2001-02-15  Bryce McKinlay  <bryce@albatross.co.nz>
+
+	* Make-lang.in (jvspec.o): Modify rule to match that of cp/g++spec.o.
+
+2001-02-14  Tom Tromey  <tromey@redhat.com>
+            Alexandre Petit-Bianco  <apbianco@redhat.com>
+
+	Fix for PR java/1261.
+	* typeck.c (build_java_array_type): Add public `clone' method to
+	arrays.
+	* parse.y (resolve_qualified_expression_name): Use current_class
+	when checking for inaccessibility.
+	(patch_method_invocation): Fixed error message when accessibility
+	denied.  Added `from_super' argument.
+
+2001-02-14  Alexandre Petit-Bianco  <apbianco@redhat.com>
+
+	* parse.y (resolve_class): Don't build a fake decl. Use the one
+	already built.
+	* typeck.c (build_java_array_type): Build and assign decl to array
+	type.
+
+2001-02-14  Alexandre Petit-Bianco  <apbianco@redhat.com>
+
+	* parse.y (not_accessible_p): Changed leading comment. Added extra
+	`where' argument. Use it to enforce protected access rules.
+	(resolve_qualified_expression_name): Added extra argument to
+	not_accessible_p.
+	(patch_method_invocation): Use argument `primary' to provide
+	not_accessible_p with an extra argument.
+	(lookup_method_invoke): Added extra argument to not_accessible_p.
+	(search_applicable_method_list): Likewise.
+
+2001-02-13  Alexandre Petit-Bianco  <apbianco@redhat.com>
+
+	* parse.y (resolve_qualified_expression_name): Try to resolve as
+	an inner class access only if `decl' is a TYPE_DECL.
+
+2001-02-13  Alexandre Petit-Bianco  <apbianco@cygnus.com>
+
+	* decl.c (classdollar_identifier_node): Initialize.
+	* java-tree.h (enum java_tree_index): New entry 
+	`JTI_CLASSDOLLAR_IDENTIFIER_NODE.'
+	(classdollar_identifier_node): New macro.
+	(ID_CLASSDOLLAR_P): Likewise.
+	* parse.y (build_dot_class_method): Use `classdollar_identifier_node.'
+	(build_dot_class_method_invocation): Likewise.
+	(find_applicable_accessible_methods_list): `class$' can't be
+	inherited.
+
 2001-02-09  Raja R Harinath  <harinath@cs.umn.edu>
 
 	* Make-lang.in (java/mangle_name.o): Add 'make' prereqs.
