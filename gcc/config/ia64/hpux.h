@@ -47,7 +47,16 @@ do {							\
 	    builtin_define("_HPUX_SOURCE");		\
 	    builtin_define("__STDC_EXT__");		\
 	  }						\
+	if (TARGET_ILP32)				\
+	  builtin_define("_ILP32");			\
 } while (0)
+
+#undef CPP_SPEC
+#define CPP_SPEC \
+  "%{mt|pthread:-D_REENTRANT -D_THREAD_SAFE -D_POSIX_C_SOURCE=199506L}"
+/* aCC defines also -DRWSTD_MULTI_THREAD, -DRW_MULTI_THREAD.  These
+   affect only aCC's C++ library (Rogue Wave-derived) which we do not
+   use, and they violate the user's name space.  */
 
 #undef  ASM_EXTRA_SPEC
 #define ASM_EXTRA_SPEC "%{milp32:-milp32} %{mlp64:-mlp64}"
@@ -56,12 +65,6 @@ do {							\
 
 #undef STARTFILE_SPEC
 #define STARTFILE_SPEC "%{!shared:%{static:crt0%O%s}}"
-
-#ifndef CROSS_COMPILE
-#define STARTFILE_PREFIX_SPEC \
-  "%{mlp64: /usr/ccs/lib/hpux64/} \
-   %{!mlp64: /usr/ccs/lib/hpux32/}"
-#endif
 
 #undef LINK_SPEC
 #define LINK_SPEC \
@@ -74,6 +77,7 @@ do {							\
 #undef  LIB_SPEC
 #define LIB_SPEC \
   "%{!shared: \
+     %{mt|pthread:-lpthread} \
      %{p:%{!mlp64:-L/usr/lib/hpux32/libp} \
 	 %{mlp64:-L/usr/lib/hpux64/libp} -lprof} \
      %{pg:%{!mlp64:-L/usr/lib/hpux32/libp} \
@@ -140,6 +144,10 @@ do {								\
 #undef TARGET_HPUX_LD
 #define TARGET_HPUX_LD	1
 
+/* The HPUX dynamic linker objects to weak symbols with no
+   definitions, so do not use them in gthr-posix.h.  */
+#define GTHREAD_USE_WEAK 0
+
 /* Put out the needed function declarations at the end.  */
 
 #define ASM_FILE_END(STREAM) ia64_hpux_asm_file_end(STREAM)
@@ -149,6 +157,10 @@ do {								\
 
 #undef DTORS_SECTION_ASM_OP
 #define DTORS_SECTION_ASM_OP  "\t.section\t.fini_array,\t\"aw\",\"fini_array\""
+
+/* The init_array/fini_array technique does not permit the use of
+   initialization priorities.  */
+#define SUPPORTS_INIT_PRIORITY 0
 
 #undef READONLY_DATA_SECTION_ASM_OP
 #define READONLY_DATA_SECTION_ASM_OP "\t.section\t.rodata,\t\"a\",\t\"progbits\""
@@ -167,3 +179,18 @@ do {								\
 
 #undef TEXT_SECTION_ASM_OP
 #define TEXT_SECTION_ASM_OP "\t.section\t.text,\t\"ax\",\t\"progbits\""
+
+/* It is illegal to have relocations in shared segments on HPUX.
+   Pretend flag_pic is always set.  */
+#undef  TARGET_ASM_SELECT_SECTION
+#define TARGET_ASM_SELECT_SECTION  ia64_rwreloc_select_section
+#undef  TARGET_ASM_UNIQUE_SECTION
+#define TARGET_ASM_UNIQUE_SECTION  ia64_rwreloc_unique_section
+#undef  TARGET_ASM_SELECT_RTX_SECTION
+#define TARGET_ASM_SELECT_RTX_SECTION  ia64_rwreloc_select_rtx_section
+#undef  TARGET_SECTION_TYPE_FLAGS
+#define TARGET_SECTION_TYPE_FLAGS  ia64_rwreloc_section_type_flags
+
+/* HP-UX does not support thread-local storage.  */
+#undef TARGET_HAVE_TLS
+#define TARGET_HAVE_TLS false
