@@ -47,6 +47,14 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #undef abort
 #endif
 
+/* APPLE LOCAL begin libcc_kext */
+#ifdef LIBCC_KEXT
+/* Make aborts into panics (kernel panics presumably) */
+#define abort() panic()
+extern void panic (void);
+#endif
+/* APPLE LOCAL end libcc_kext */
+
 #ifdef HAVE_GAS_HIDDEN
 #define ATTRIBUTE_HIDDEN  __attribute__ ((__visibility__ ("hidden")))
 #else
@@ -1485,10 +1493,13 @@ __fixunssfSI (SFtype a)
 #  define NAME __powitf2
 # endif
 
+/* APPLE LOCAL begin mainline 2005-03-30 */
+#undef int
+#undef unsigned
 TYPE
-NAME (TYPE x, Wtype m)
+NAME (TYPE x, int m)
 {
-  UWtype n = m < 0 ? -m : m;
+  unsigned int n = m < 0 ? -m : m;
   TYPE y = n % 2 ? x : 1;
   while (n >>= 1)
     {
@@ -1498,6 +1509,7 @@ NAME (TYPE x, Wtype m)
     }
   return m < 0 ? 1/y : y;
 }
+/* APPLE LOCAL end mainline 2005-03-30 */
 
 #endif
 
