@@ -19,10 +19,6 @@
 #   cpu_include_dir        CPU-specific directory, defaults to cpu/generic
 #                              if cpu/target_cpu doesn't exist.  This is
 #                              used to set the next two:
-#   ATOMICITYH             location of atomicity.h,
-#                              defaults to cpu_include_dir
-#   CPULIMITSH             location of cpu_limits.h,
-#                              defaults to cpu_include_dir
 #
 #   os_include_dir         OS-specific directory, defaults to os/generic.
 #
@@ -30,6 +26,12 @@
 #
 #   c_compatibility        if "C" compatibility headers are necessary,
 #                              defaults to no.
+#
+#   abi_baseline_triplet   directory name for ABI compat testing,
+#                              defaults to target (as per config.guess)
+#
+#   ATOMICITYH             location of atomicity.h,
+#                              defaults to cpu_include_dir
 #
 # It possibly modifies the following variables:
 #
@@ -54,6 +56,8 @@ else
     cpu_include_dir="cpu/generic"
 fi
 
+abi_baseline_triplet=${target}
+
 c_model=c_std
 c_compatibility=no
 
@@ -67,12 +71,12 @@ case "${target_cpu}" in
   alpha*)
     cpu_include_dir="cpu/alpha"
     ;;
-  arm*)
+  arm* | strongarm* | xscale* )
     cpu_include_dir="cpu/arm"
     ;;
   i486 | i586 | i686 | i786)
+    # add athlons here maybe
     cpu_include_dir="cpu/i486"
-    CPULIMITSH="cpu/i386"
     ;;
   m68k | m680[246]0)
     cpu_include_dir="cpu/m68k"
@@ -91,11 +95,8 @@ case "${target_cpu}" in
   s390 | s390x)
     cpu_include_dir="cpu/s390"
     ;;
-  sparc64 | ultrasparc)
-    cpu_include_dir="cpu/sparc/sparc64"
-    ;;
-  sparc*)
-    cpu_include_dir="cpu/sparc/sparc32"
+  sparc* | ultrasparc)
+    cpu_include_dir="cpu/sparc"
     ;;
   x86_64*)
     cpu_include_dir="cpu/x86-64"
@@ -103,7 +104,7 @@ case "${target_cpu}" in
 esac
 
 
-# Now look for the two files usually tied to a CPU model, and make default
+# Now look for the file(s) usually tied to a CPU model, and make default
 # choices for those if they haven't been explicitly set already.
 _cpu_incdir_fullpath=${glibcpp_srcdir}/config/${cpu_include_dir}
 if test x${ATOMICITYH+set} != xset; then
@@ -111,13 +112,6 @@ if test x${ATOMICITYH+set} != xset; then
     ATOMICITYH=$cpu_include_dir
   else
     ATOMICITYH="cpu/generic"
-  fi
-fi
-if test x${CPULIMITSH+set} != xset; then
-  if test -f ${_cpu_incdir_fullpath}/cpu_limits.h; then
-    CPULIMITSH=$cpu_include_dir
-  else
-    CPULIMITSH="cpu/generic"
   fi
 fi
 unset _cpu_incdir_fullpath
@@ -144,7 +138,8 @@ case "${target_os}" in
   aix*)
     ATOMICITYH="cpu/generic"
     ;;
-  bsd* | freebsd* )
+  bsd*)
+    # Plain BSD attempts to share FreeBSD files.
     os_include_dir="os/bsd/freebsd"
     ;;
   cygwin*)
@@ -153,12 +148,16 @@ case "${target_os}" in
   *djgpp*)      # leading * picks up "msdosdjgpp"
     os_include_dir="os/djgpp"
     ;;
+  freebsd*)
+    os_include_dir="os/bsd/freebsd"
+    # The FreeBSD ABI is expressed in the major version number only.
+    abi_baseline_triplet=`echo ${target} | sed 's,\(\.[0-9]*\)*$,,'`
+    ;;
   gnu* | linux*)
     os_include_dir="os/gnu-linux"
     ;;
   hpux*)
     os_include_dir="os/hpux"
-    CPULIMITSH="os/hpux"
     ;;
   irix[1-6] | irix[1-5].* | irix6.[0-4]*)
     # This is known to work on at least IRIX 5.2 and 6.3.
@@ -200,9 +199,6 @@ esac
 # Set any OS-dependent and CPU-dependent bits.
 # THIS TABLE IS SORTED.  KEEP IT THAT WAY.
 case "${target}" in
-  alpha*-*-*osf5*)
-    CPULIMITSH="os/osf/osf5.0"
-    ;;
   mips*-*-linux*)
     ATOMICITYH="cpu/mips"
     ;;
