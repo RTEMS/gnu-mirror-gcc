@@ -1,0 +1,14 @@
+if [ "${srcdir}" = "." ] ; then
+  if [ "${with_target_subdir}" != "." ] ; then
+    topsrcdir=${with_multisrctop}../../..
+  else
+    topsrcdir=${with_multisrctop}../..
+  fi
+else
+  topsrcdir=${srcdir}/../..
+fi
+
+if [ ! -d ${topsrcdir}/gcc ] ; then
+  echo "CHECK = check-iostream check-iostdio" >>${package_makefile_frag}
+fi
+

@@ -1,0 +1,6 @@
+*** Major changes in libio for egcs:
+
+* Better support for Linux.
+
+* Dejagnu testsuite.
+

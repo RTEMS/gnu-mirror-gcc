@@ -1,0 +1,2 @@
+# Copyright (C) 1993, 1998 Free Software Foundation
+check: $(CHECK)
