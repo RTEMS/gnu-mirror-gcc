@@ -25,7 +25,7 @@
 #include <ostream>
 #include <sstream>
 #include <locale>
-#include <debug_assert.h>
+#include <testsuite_hooks.h>
 
 std::string str_01;
 std::string str_02("true false 0 1 110001");
@@ -529,21 +529,4 @@ int main()
   return 0;
 }
 
-
-
-
-
 // paul miller was right on with riddim warfare!
-
-
-
-
-
-
-
-
-
-
-
-
-

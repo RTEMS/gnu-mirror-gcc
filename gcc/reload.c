@@ -91,7 +91,6 @@ a register with any other reload.  */
 #include "rtl.h"
 #include "tm_p.h"
 #include "insn-config.h"
-#include "insn-codes.h"
 #include "recog.h"
 #include "reload.h"
 #include "regs.h"
@@ -2750,7 +2749,7 @@ find_reloads (insn, replace, ind_levels, live_known, reload_reg_p)
 	  register char *p = constraints[i];
 	  register int win = 0;
 	  int did_match = 0;
-	  /* 0 => this operand can be reloaded somehow for this alternative */
+	  /* 0 => this operand can be reloaded somehow for this alternative.  */
 	  int badop = 1;
 	  /* 0 => this operand can be reloaded if the alternative allows regs.  */
 	  int winreg = 0;
@@ -3143,7 +3142,7 @@ find_reloads (insn, replace, ind_levels, live_known, reload_reg_p)
 			|| (REGNO (operand) >= FIRST_PSEUDO_REGISTER
 			    && reg_renumber[REGNO (operand)] < 0)))
 		  win = 1;
-		/* Drop through into 'r' case */
+		/* Drop through into 'r' case.  */
 
 	      case 'r':
 		this_alternative[i]
@@ -3771,7 +3770,11 @@ find_reloads (insn, replace, ind_levels, live_known, reload_reg_p)
 	    if (GET_CODE (operand) == REG)
 	      {
 		if (modified[i] != RELOAD_WRITE)
-		  emit_insn_before (gen_rtx_USE (VOIDmode, operand), insn);
+		  /* We mark the USE with QImode so that we recognize
+		     it as one that can be safely deleted at the end
+		     of reload.  */
+		  PUT_MODE (emit_insn_before (gen_rtx_USE (VOIDmode, operand),
+					      insn), QImode);
 		if (modified[i] != RELOAD_READ)
 		  emit_insn_after (gen_rtx_CLOBBER (VOIDmode, operand), insn);
 	      }
@@ -4257,7 +4260,11 @@ find_reloads_toplev (x, opnum, type, ind_levels, is_set_dest, insn,
 		 this substitution.  We have to emit a USE of the pseudo so
 		 that delete_output_reload can see it.  */
 	      if (replace_reloads && recog_data.operand[opnum] != x)
-		emit_insn_before (gen_rtx_USE (VOIDmode, x), insn);
+		/* We mark the USE with QImode so that we recognize it
+		   as one that can be safely deleted at the end of
+		   reload.  */
+		PUT_MODE (emit_insn_before (gen_rtx_USE (VOIDmode, x), insn),
+			  QImode);
 	      x = mem;
 	      i = find_reloads_address (GET_MODE (x), &x, XEXP (x, 0), &XEXP (x, 0),
 					opnum, type, ind_levels, insn);
@@ -4488,7 +4495,7 @@ find_reloads_address (mode, memrefloc, ad, loc, opnum, type, ind_levels, insn)
       regno = REGNO (ad);
 
       /* If the register is equivalent to an invariant expression, substitute
-	 the invariant, and eliminate any eliminable register references. */
+	 the invariant, and eliminate any eliminable register references.  */
       tem = reg_equiv_constant[regno];
       if (tem != 0
 	  && (tem = eliminate_regs (tem, mode, insn))
@@ -4530,7 +4537,12 @@ find_reloads_address (mode, memrefloc, ad, loc, opnum, type, ind_levels, insn)
 		      && ! rtx_equal_p (tem, reg_equiv_mem[regno]))
 		    {
 		      *loc = tem;
-		      emit_insn_before (gen_rtx_USE (VOIDmode, ad), insn);
+		      /* We mark the USE with QImode so that we
+			 recognize it as one that can be safely
+			 deleted at the end of reload.  */
+		      PUT_MODE (emit_insn_before (gen_rtx_USE (VOIDmode, ad),
+						  insn), QImode);
+
 		      /* This doesn't really count as replacing the address
 			 as a whole, since it is still a memory access.  */
 		    }
@@ -4861,7 +4873,11 @@ subst_reg_equivs (ad, insn)
 	    if (! rtx_equal_p (mem, reg_equiv_mem[regno]))
 	      {
 		subst_reg_equivs_changed = 1;
-		emit_insn_before (gen_rtx_USE (VOIDmode, ad), insn);
+		/* We mark the USE with QImode so that we recognize it
+		   as one that can be safely deleted at the end of
+		   reload.  */
+		PUT_MODE (emit_insn_before (gen_rtx_USE (VOIDmode, ad), insn),
+			  QImode);
 		return mem;
 	      }
 	  }
@@ -5688,7 +5704,12 @@ find_reloads_subreg_address (x, force_replace, opnum, type,
 		 this substitution.  We have to emit a USE of the pseudo so
 		 that delete_output_reload can see it.  */
 	      if (replace_reloads && recog_data.operand[opnum] != x)
-		emit_insn_before (gen_rtx_USE (VOIDmode, SUBREG_REG (x)), insn);
+		/* We mark the USE with QImode so that we recognize it
+		   as one that can be safely deleted at the end of
+		   reload.  */
+		PUT_MODE (emit_insn_before (gen_rtx_USE (VOIDmode,
+							 SUBREG_REG (x)),
+					    insn), QImode);
 	      x = tem;
 	    }
 	}

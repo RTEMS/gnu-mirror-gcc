@@ -32,7 +32,6 @@ Boston, MA 02111-1307, USA.  */
 #include "real.h"
 #include "insn-config.h"
 #include "conditions.h"
-#include "insn-flags.h"
 #include "output.h"
 #include "insn-attr.h"
 #include "flags.h"
@@ -4823,7 +4822,13 @@ arm_reload_in_hi (operands)
 	}
     }
 
-  scratch = gen_rtx_REG (SImode, REGNO (operands[2]));
+  /* If the scratch overlaps the output, use the top half of the DImode
+     register we allocated.  */
+  if (REGNO (operands[2]) == REGNO (operands[0]))
+    scratch = gen_rtx_REG (SImode, REGNO (operands[2]) + 1);
+  else
+    scratch = gen_rtx_REG (SImode, REGNO (operands[2]));
+
   emit_insn (gen_zero_extendqisi2 (scratch,
 				   gen_rtx_MEM (QImode,
 						plus_constant (base,
@@ -5455,7 +5460,11 @@ add_minipool_backward_ref (fix)
      than the one we are trying to add.  */
   Mnode *        min_mp = NULL;
   /* This can be negative, since it is only a constraint.  */
-  HOST_WIDE_INT  min_address = fix->address - fix->backwards;
+  /* If the object to be inserted into the pool is larger than
+     a single word, we need to take into account that all words
+     must be reachable. */
+  HOST_WIDE_INT  min_address = fix->address - fix->backwards 
+    + (fix->fix_size - 4);
   Mnode *        mp;
 
   /* If we can't reach the current pool from this insn, or if we can't
@@ -7046,6 +7055,8 @@ output_return_instruction (operand, really_return, reverse)
      load a single register.  On other architectures, the cost is the same.
      In 26 bit mode we have to use LDM in order to be able to restore the CPSR.  */
   if ((live_regs_mask  == (1 << LR_REGNUM))
+      && ! TARGET_INTERWORK
+      && ! IS_INTERRUPT (func_type)
       && (! really_return || TARGET_APCS_32))
     {
       if (! really_return)

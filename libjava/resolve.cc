@@ -1,6 +1,6 @@
 // resolve.cc - Code for linking and resolving classes and pool entries.
 
-/* Copyright (C) 1999, 2000  Free Software Foundation
+/* Copyright (C) 1999, 2000, 2001  Free Software Foundation
 
    This file is part of libgcj.
 
@@ -31,6 +31,17 @@ details.  */
 #include <java/lang/ClassNotFoundException.h>
 #include <java/lang/IncompatibleClassChangeError.h>
 #include <java/lang/reflect/Modifier.h>
+
+void
+_Jv_ResolveField (_Jv_Field *field, java::lang::ClassLoader *loader)
+{
+  if (! field->isResolved ())
+    {
+      _Jv_Utf8Const *sig = (_Jv_Utf8Const*)field->type;
+      field->type = _Jv_FindClassFromSignature (sig->data, loader);
+      field->flags &= ~_Jv_FIELD_UNRESOLVED_FLAG;
+    }
+}
 
 #ifdef INTERPRETER
 
@@ -361,17 +372,6 @@ _Jv_SearchMethodInClass (jclass cls, jclass klass,
   return 0;
 }
 
-void
-_Jv_ResolveField (_Jv_Field *field, java::lang::ClassLoader *loader)
-{
-  if (! field->isResolved ())
-    {
-      _Jv_Utf8Const *sig = (_Jv_Utf8Const*)field->type;
-      field->type = _Jv_FindClassFromSignature (sig->data, loader);
-      field->flags &= ~_Jv_FIELD_UNRESOLVED_FLAG;
-    }
-}
-
 /** FIXME: this is a terribly inefficient algorithm!  It would improve
     things if compiled classes to know vtable offset, and _Jv_Method had
     a field for this.
@@ -698,9 +698,7 @@ _Jv_PrepareClass(jclass klass)
   clz->vtable_method_count = vtable_count;
 
   /* allocate vtable structure */
-  _Jv_VTable *vtable = (_Jv_VTable*) 
-    _Jv_AllocBytesChecked (sizeof (_Jv_VTable) 
-			   + (sizeof (void*) * (vtable_count)));
+  _Jv_VTable *vtable = _Jv_VTable::new_vtable (vtable_count);
   vtable->clas = clz;
   vtable->gc_descr = _Jv_BuildGCDescr(clz);
 
@@ -714,9 +712,8 @@ _Jv_PrepareClass(jclass klass)
 
     /* copy super class' vtable entries. */
     if (effective_superclass && effective_superclass->vtable)
-      memcpy ((void*)&vtable->method[0],
-	      (void*)&effective_superclass->vtable->method[0],
-	      sizeof (void*) * effective_superclass->vtable_method_count);
+      for (int i = 0; i < effective_superclass->vtable_method_count; ++i)
+	vtable->set_method (i, effective_superclass->vtable->get_method (i));
   }
 
   /* now, install our own vtable entries, reprise... */
@@ -737,9 +734,9 @@ _Jv_PrepareClass(jclass klass)
 	    throw_internal_error ("vtable problem...");
 
 	  if (clz->interpreted_methods[i] == 0)
-	    vtable->method[index] = (void*)&_Jv_abstractMethodError;
+	    vtable->set_method(index, (void*)&_Jv_abstractMethodError);
 	  else
-	    vtable->method[index] = this_meth->ncode;
+	    vtable->set_method(index, this_meth->ncode);
 	}
     }
 

@@ -22,7 +22,7 @@
 
 #include <string>
 #include <stdexcept>
-#include <debug_assert.h>
+#include <testsuite_hooks.h>
 
 bool test01(void)
 {
@@ -194,9 +194,5 @@ bool test01(void)
 int main()
 { 
   test01();
+  return 0;
 }
-
-
-
-
-

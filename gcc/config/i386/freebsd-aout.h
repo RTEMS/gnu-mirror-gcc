@@ -34,6 +34,13 @@ Boston, MA 02111-1307, USA.  */
 #define TARGET_DEFAULT \
   (MASK_80387 | MASK_IEEE_FP | MASK_FLOAT_RETURNS | MASK_NO_FANCY_MATH_387)
 
+/* The macro defined in i386.h doesn't work with the old gas of
+   FreeBSD 2.x.  The definition in sco.h and sol2.h appears to work,
+   but it turns out that, even though the assembler doesn't complain,
+   we get incorrect results.  Fortunately, the definition in
+   defaults.h works.  */
+#undef ASM_PREFERRED_EH_DATA_FORMAT
+
 #undef CPP_PREDEFINES
 #define CPP_PREDEFINES "-Dunix -D__FreeBSD__\
  -Asystem=unix -Asystem=bsd -Asystem=FreeBSD"
@@ -245,8 +252,3 @@ do {                                                                    \
 
 /* Define this so we can compile MS code for use with WINE.  */
 #define HANDLE_PRAGMA_PACK_PUSH_POP
-
-/* This is the pseudo-op used to generate a 32-bit word of data with a
-   specific value in some section.  */
-
-#define INT_ASM_OP "\t.long\t"

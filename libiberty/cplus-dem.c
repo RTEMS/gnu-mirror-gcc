@@ -5050,7 +5050,7 @@ main (argc, argv)
   char *result;
   int c;
   const char *valid_symbols;
-  enum demangling_styles style;
+  enum demangling_styles style = auto_demangling;
 
   program_name = argv[0];
 
@@ -5148,7 +5148,7 @@ main (argc, argv)
 		skip_first = i;
 
 	      mbuffer[i] = 0;
-	      flags |= style;
+	      flags |= (int) style;
 	      result = cplus_demangle (mbuffer + skip_first, flags);
 	      if (result)
 		{

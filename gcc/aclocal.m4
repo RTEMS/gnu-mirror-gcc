@@ -1,4 +1,17 @@
-Fdnl See whether we can include both string.h and strings.h.
+dnl See if stdbool.h properly defines bool and true/false.
+AC_DEFUN(gcc_AC_HEADER_STDBOOL,
+[AC_CACHE_CHECK([for working stdbool.h],
+  ac_cv_header_stdbool_h,
+[AC_TRY_COMPILE([#include <stdbool.h>],
+[bool foo = false;],
+ac_cv_header_stdbool_h=yes, ac_cv_header_stdbool_h=no)])
+if test $ac_cv_header_stdbool_h = yes; then
+  AC_DEFINE(HAVE_STDBOOL_H, 1,
+  [Define if you have a working <stdbool.h> header file.])
+fi
+])
+
+dnl See whether we can include both string.h and strings.h.
 AC_DEFUN(gcc_AC_HEADER_STRING,
 [AC_CACHE_CHECK([whether string.h and strings.h may both be included],
   gcc_cv_header_string,
@@ -42,14 +55,23 @@ changequote([, ])dnl
 gcc_AC_CHECK_DECL($ac_func,
   [AC_DEFINE_UNQUOTED($ac_tr_decl, 1) $2],
   [AC_DEFINE_UNQUOTED($ac_tr_decl, 0) $3],
+dnl It is possible that the include files passed in here are local headers
+dnl which supply a backup declaration for the relevant prototype based on
+dnl the definition of (or lack of) the HAVE_DECL_ macro.  If so, this test
+dnl will always return success.  E.g. see libiberty.h's handling of
+dnl `basename'.  To avoid this, we define the relevant HAVE_DECL_ macro to
+dnl 1 so that any local headers used do not provide their own prototype
+dnl during this test.
+#undef $ac_tr_decl
+#define $ac_tr_decl 1
   $4
 )
 done
 dnl Automatically generate config.h entries via autoheader.
 if test x = y ; then
   patsubst(translit([$1], [a-z], [A-Z]), [\w+],
-    AC_DEFINE([HAVE_DECL_\&], 1,
-      [Define to 1 if we found this declaration otherwise define to 0.]))dnl
+    [AC_DEFINE([HAVE_DECL_\&], 1,
+      [Define to 1 if we found this declaration otherwise define to 0.])])dnl
 fi
 ])
 
@@ -184,7 +206,20 @@ switch (0) case 0: case (sizeof(long double) >= sizeof(double)):;],
 gcc_cv_c_long_double=yes, gcc_cv_c_long_double=no)
 fi])
 if test $gcc_cv_c_long_double = yes; then
-  AC_DEFINE(HAVE_LONG_DOUBLE)
+  AC_DEFINE(HAVE_LONG_DOUBLE, 1, 
+      [Define if your compiler supports the \`long double' type.])
+fi
+])
+
+dnl Check whether _Bool is built-in.
+AC_DEFUN(gcc_AC_C__BOOL,
+[AC_CACHE_CHECK(for built-in _Bool, gcc_cv_c__bool,
+[AC_TRY_COMPILE(,
+[_Bool foo;],
+gcc_cv_c__bool=yes, gcc_cv_c__bool=no)
+])
+if test $gcc_cv_c__bool = yes; then
+  AC_DEFINE(HAVE__BOOL, 1, [Define if the \`_Bool' type is built-in.])
 fi
 ])
 
@@ -1102,7 +1137,9 @@ if test -n "[$]$1"; then
 [changequote(<<,>>)dnl
   ac_prog_version=`<<$>>$1 $3 2>&1 |
                    sed -n 's/^.*patsubst(<<$4>>,/,\/).*$/\1/p'`
+changequote([,])dnl
   echo "configure:__oline__: version of $2 is $ac_prog_version" >&AC_FD_CC
+changequote(<<,>>)dnl
   case $ac_prog_version in
     '')     gcc_cv_prog_$2_modern=no;;
     <<$5>>)
@@ -1114,4 +1151,74 @@ changequote([,])dnl
 else
   gcc_cv_prog_$2_modern=no
 fi
+])
+
+#serial AM2
+
+dnl From Bruno Haible.
+
+AC_DEFUN([AM_ICONV],
+[
+  dnl Some systems have iconv in libc, some have it in libiconv (OSF/1 and
+  dnl those with the standalone portable GNU libiconv installed).
+
+  AC_ARG_WITH([libiconv-prefix],
+[  --with-libiconv-prefix=DIR  search for libiconv in DIR/include and DIR/lib], [
+    for dir in `echo "$withval" | tr : ' '`; do
+      if test -d $dir/include; then CPPFLAGS="$CPPFLAGS -I$dir/include"; fi
+      if test -d $dir/lib; then LDFLAGS="$LDFLAGS -L$dir/lib"; fi
+    done
+   ])
+
+  AC_CACHE_CHECK(for iconv, am_cv_func_iconv, [
+    am_cv_func_iconv="no, consider installing GNU libiconv"
+    am_cv_lib_iconv=no
+    AC_TRY_LINK([#include <stdlib.h>
+#include <iconv.h>],
+      [iconv_t cd = iconv_open("","");
+       iconv(cd,NULL,NULL,NULL,NULL);
+       iconv_close(cd);],
+      am_cv_func_iconv=yes)
+    if test "$am_cv_func_iconv" != yes; then
+      am_save_LIBS="$LIBS"
+      LIBS="$LIBS -liconv"
+      AC_TRY_LINK([#include <stdlib.h>
+#include <iconv.h>],
+        [iconv_t cd = iconv_open("","");
+         iconv(cd,NULL,NULL,NULL,NULL);
+         iconv_close(cd);],
+        am_cv_lib_iconv=yes
+        am_cv_func_iconv=yes)
+      LIBS="$am_save_LIBS"
+    fi
+  ])
+  if test "$am_cv_func_iconv" = yes; then
+    AC_DEFINE(HAVE_ICONV, 1, [Define if you have the iconv() function.])
+    AC_MSG_CHECKING([for iconv declaration])
+    AC_CACHE_VAL(am_cv_proto_iconv, [
+      AC_TRY_COMPILE([
+#include <stdlib.h>
+#include <iconv.h>
+extern
+#ifdef __cplusplus
+"C"
+#endif
+#if defined(__STDC__) || defined(__cplusplus)
+size_t iconv (iconv_t cd, char * *inbuf, size_t *inbytesleft, char * *outbuf, size_t *outbytesleft);
+#else
+size_t iconv();
+#endif
+], [], am_cv_proto_iconv_arg1="", am_cv_proto_iconv_arg1="const")
+      am_cv_proto_iconv="extern size_t iconv (iconv_t cd, $am_cv_proto_iconv_arg1 char * *inbuf, size_t *inbytesleft, char * *outbuf, size_t *outbytesleft);"])
+    am_cv_proto_iconv=`echo "[$]am_cv_proto_iconv" | tr -s ' ' | sed -e 's/( /(/'`
+    AC_MSG_RESULT([$]{ac_t:-
+         }[$]am_cv_proto_iconv)
+    AC_DEFINE_UNQUOTED(ICONV_CONST, $am_cv_proto_iconv_arg1,
+      [Define as const if the declaration of iconv() needs const.])
+  fi
+  LIBICONV=
+  if test "$am_cv_lib_iconv" = yes; then
+    LIBICONV="-liconv"
+  fi
+  AC_SUBST(LIBICONV)
 ])

@@ -31,7 +31,7 @@
 
 #include <istream>
 #include <sstream>
-#include <debug_assert.h>
+#include <testsuite_hooks.h>
 
 void test01()
 {
@@ -85,16 +85,3 @@ int main()
   test02();
   return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

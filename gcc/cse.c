@@ -3910,15 +3910,15 @@ fold_rtx (x, insn)
       if (const_arg0 == 0 || const_arg1 == 0)
 	{
 	  struct table_elt *p0, *p1;
-	  rtx true = const_true_rtx, false = const0_rtx;
+	  rtx true_rtx = const_true_rtx, false_rtx = const0_rtx;
 	  enum machine_mode mode_arg1;
 
 #ifdef FLOAT_STORE_FLAG_VALUE
 	  if (GET_MODE_CLASS (mode) == MODE_FLOAT)
 	    {
-	      true = (CONST_DOUBLE_FROM_REAL_VALUE
+	      true_rtx = (CONST_DOUBLE_FROM_REAL_VALUE
 		      (FLOAT_STORE_FLAG_VALUE (mode), mode));
-	      false = CONST0_RTX (mode);
+	      false_rtx = CONST0_RTX (mode);
 	    }
 #endif
 
@@ -3952,9 +3952,9 @@ fold_rtx (x, insn)
 		      || GET_CODE (folded_arg0) == CONST))
 		{
 		  if (code == EQ)
-		    return false;
+		    return false_rtx;
 		  else if (code == NE)
-		    return true;
+		    return true_rtx;
 		}
 
 	      /* See if the two operands are the same.  */
@@ -3978,12 +3978,12 @@ fold_rtx (x, insn)
 		      return ((code == EQ || code == LE || code == GE
 			       || code == LEU || code == GEU || code == UNEQ
 			       || code == UNLE || code == UNGE || code == ORDERED)
-			      ? true : false);
+			      ? true_rtx : false_rtx);
 		   /* Take care for the FP compares we can resolve.  */
 		   if (code == UNEQ || code == UNLE || code == UNGE)
-		     return true;
+		     return true_rtx;
 		   if (code == LTGT || code == LT || code == GT)
-		     return false;
+		     return false_rtx;
 		}
 
 	      /* If FOLDED_ARG0 is a register, see if the comparison we are
@@ -4008,7 +4008,7 @@ fold_rtx (x, insn)
 			      || (GET_CODE (folded_arg1) == REG
 				  && (REG_QTY (REGNO (folded_arg1)) == ent->comparison_qty))))
 			return (comparison_dominates_p (ent->comparison_code, code)
-				? true : false);
+				? true_rtx : false_rtx);
 		    }
 		}
 	    }
@@ -4032,30 +4032,30 @@ fold_rtx (x, insn)
 	      int has_sign = (HOST_BITS_PER_WIDE_INT >= sign_bitnum
 			      && (INTVAL (inner_const)
 				  & ((HOST_WIDE_INT) 1 << sign_bitnum)));
-	      rtx true = const_true_rtx, false = const0_rtx;
+	      rtx true_rtx = const_true_rtx, false_rtx = const0_rtx;
 
 #ifdef FLOAT_STORE_FLAG_VALUE
 	      if (GET_MODE_CLASS (mode) == MODE_FLOAT)
 		{
-		  true = (CONST_DOUBLE_FROM_REAL_VALUE
+		  true_rtx = (CONST_DOUBLE_FROM_REAL_VALUE
 			  (FLOAT_STORE_FLAG_VALUE (mode), mode));
-		  false = CONST0_RTX (mode);
+		  false_rtx = CONST0_RTX (mode);
 		}
 #endif
 
 	      switch (code)
 		{
 		case EQ:
-		  return false;
+		  return false_rtx;
 		case NE:
-		  return true;
+		  return true_rtx;
 		case LT:  case LE:
 		  if (has_sign)
-		    return true;
+		    return true_rtx;
 		  break;
 		case GT:  case GE:
 		  if (has_sign)
-		    return false;
+		    return false_rtx;
 		  break;
 		default:
 		  break;
@@ -5060,18 +5060,16 @@ cse_insn (insn, libcall_insn)
       sets[i].src_in_memory = hash_arg_in_memory;
 
       /* If SRC is a MEM, there is a REG_EQUIV note for SRC, and DEST is
-	 a pseudo that is set more than once, do not record SRC.  Using
-	 SRC as a replacement for anything else will be incorrect in that
-	 situation.  Note that this usually occurs only for stack slots,
-	 in which case all the RTL would be referring to SRC, so we don't
-	 lose any optimization opportunities by not having SRC in the
-	 hash table.  */
+	 a pseudo, do not record SRC.  Using SRC as a replacement for
+	 anything else will be incorrect in that situation.  Note that
+	 this usually occurs only for stack slots, in which case all the
+	 RTL would be referring to SRC, so we don't lose any optimization
+	 opportunities by not having SRC in the hash table.  */
 
       if (GET_CODE (src) == MEM
-	  && find_reg_note (insn, REG_EQUIV, src) != 0
+	  && find_reg_note (insn, REG_EQUIV, NULL_RTX) != 0
 	  && GET_CODE (dest) == REG
-	  && REGNO (dest) >= FIRST_PSEUDO_REGISTER
-	  && REG_N_SETS (REGNO (dest)) != 1)
+	  && REGNO (dest) >= FIRST_PSEUDO_REGISTER)
 	sets[i].src_volatile = 1;
 
 #if 0
@@ -5513,31 +5511,17 @@ cse_insn (insn, libcall_insn)
 	     check for this separately here.  We will delete such an
 	     insn below.
 
-	     Tablejump insns contain a USE of the table, so simply replacing
-	     the operand with the constant won't match.  This is simply an
-	     unconditional branch, however, and is therefore valid.  Just
-	     insert the substitution here and we will delete and re-emit
-	     the insn later.  */
-
+	     For other cases such as a table jump or conditional jump
+	     where we know the ultimate target, go ahead and replace the
+	     operand.  While that may not make a valid insn, we will
+	     reemit the jump below (and also insert any necessary
+	     barriers).  */
 	  if (n_sets == 1 && dest == pc_rtx
 	      && (trial == pc_rtx
 		  || (GET_CODE (trial) == LABEL_REF
 		      && ! condjump_p (insn))))
 	    {
-	      if (trial == pc_rtx)
-		{
-		  SET_SRC (sets[i].rtl) = trial;
-		  cse_jumps_altered = 1;
-		  break;
-		}
-
-	      PATTERN (insn) = gen_jump (XEXP (trial, 0));
-	      INSN_CODE (insn) = -1;
-
-	      if (NEXT_INSN (insn) != 0
-		  && GET_CODE (NEXT_INSN (insn)) != BARRIER)
-		emit_barrier_after (insn);
-
+	      SET_SRC (sets[i].rtl) = trial;
 	      cse_jumps_altered = 1;
 	      break;
 	    }
@@ -5799,13 +5783,17 @@ cse_insn (insn, libcall_insn)
 	}
 
       /* If this SET is now setting PC to a label, we know it used to
-	 be a conditional or computed branch.  So we see if we can follow
-	 it.  If it was a computed branch, delete it and re-emit.  */
+	 be a conditional or computed branch.  */
       else if (dest == pc_rtx && GET_CODE (src) == LABEL_REF)
 	{
-	  /* If this is not in the format for a simple branch and
-	     we are the only SET in it, re-emit it.  */
-	  if (! simplejump_p (insn) && n_sets == 1)
+	  /* We reemit the jump in as many cases as possible just in
+	     case the form of an unconditional jump is significantly
+	     different than a computed jump or conditional jump.
+
+	     If this insn has multiple sets, then reemitting the
+	     jump is nontrivial.  So instead we just force rerecognition
+	     and hope for the best.  */
+	  if (n_sets == 1)
 	    {
 	      rtx new = emit_jump_insn_before (gen_jump (XEXP (src, 0)), insn);
 	      JUMP_LABEL (new) = XEXP (src, 0);
@@ -5813,11 +5801,6 @@ cse_insn (insn, libcall_insn)
 	      insn = new;
 	    }
 	  else
-	    /* Otherwise, force rerecognition, since it probably had
-	       a different pattern before.
-	       This shouldn't really be necessary, since whatever
-	       changed the source value above should have done this.
-	       Until the right place is found, might as well do this here.  */
 	    INSN_CODE (insn) = -1;
 
 	  never_reached_warning (insn);
@@ -6465,7 +6448,8 @@ cse_process_notes (x, object)
       return x;
 
     case MEM:
-      XEXP (x, 0) = cse_process_notes (XEXP (x, 0), x);
+      validate_change (x, &XEXP (x, 0),
+		       cse_process_notes (XEXP (x, 0), x), 0);
       return x;
 
     case EXPR_LIST:
