@@ -67,11 +67,11 @@ Boston, MA 02111-1307, USA.  */
 
    For more on data type definitions, see `dbxout_type'.  */
 
-/* Include these first, because they may define MIN and MAX.  */
+#include "config.h"
+
 #include <stdio.h>
 #include <errno.h>
 
-#include "config.h"
 #include "tree.h"
 #include "rtl.h"
 #include "flags.h"
@@ -501,7 +501,9 @@ dbxout_start_new_source_file (filename)
   n->file_number = next_file_number++;
   n->next_type_number = 1;
   current_file = n;
-  fprintf (asmfile, "%s \"%s\",%d,0,0,0\n", ASM_STABS_OP, filename, N_BINCL);
+  fprintf (asmfile, "%s ", ASM_STABS_OP);
+  output_quoted_string (asmfile, filename);
+  fprintf (asmfile, ",%d,0,0,0\n", N_BINCL);
 #endif
 }
 
@@ -1868,6 +1870,10 @@ dbxout_symbol (decl, local)
 #endif
 
       dbxout_symbol_location (decl, type, 0, DECL_RTL (decl));
+      break;
+      
+    default:
+      break;
     }
 }
 

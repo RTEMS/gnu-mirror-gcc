@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler.  Sun 68000/68020 version.
-   Copyright (C) 1987, 88, 93, 94, 95, 96, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1987, 88, 93-97, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -135,9 +135,9 @@ extern int target_flags;
     { "68020", (MASK_68020|MASK_BITFIELD)},				\
     { "c68020", (MASK_68020|MASK_BITFIELD)},				\
     { "68000", - (MASK_5200|MASK_68060|MASK_68040|MASK_68040_ONLY	\
-		|MASK_68020|MASK_BITFIELD)},				\
+		|MASK_68020|MASK_BITFIELD|MASK_68881)},			\
     { "c68000", - (MASK_5200|MASK_68060|MASK_68040|MASK_68040_ONLY	\
-		|MASK_68020|MASK_BITFIELD)},				\
+		|MASK_68020|MASK_BITFIELD|MASK_68881)},			\
     { "bitfield", MASK_BITFIELD},					\
     { "nobitfield", - MASK_BITFIELD},					\
     { "rtd", MASK_RTD},							\
@@ -169,10 +169,13 @@ extern int target_flags;
     { "5200", (MASK_5200)},						\
     { "68851", 0},							\
     { "no-68851", 0},							\
-    { "68302", - (MASK_5200|MASK_68060|MASK_68040|MASK_68020|MASK_BITFIELD)}, \
-    { "68332", - (MASK_5200|MASK_68060|MASK_68040|MASK_BITFIELD)},	\
+    { "68302", - (MASK_5200|MASK_68060|MASK_68040|MASK_68040_ONLY	\
+		  |MASK_68020|MASK_BITFIELD|MASK_68881)},		\
+    { "68332", - (MASK_5200|MASK_68060|MASK_68040|MASK_68040_ONLY	\
+		  |MASK_BITFIELD)},					\
     { "68332", MASK_68020},						\
-    { "cpu32", - (MASK_5200|MASK_68060|MASK_68040|MASK_BITFIELD)},	\
+    { "cpu32", - (MASK_5200|MASK_68060|MASK_68040|MASK_68040_ONLY	\
+		  |MASK_BITFIELD)},					\
     { "cpu32", MASK_68020},						\
     { "align-int", MASK_ALIGN_INT },					\
     { "no-align-int", -MASK_ALIGN_INT },				\
@@ -277,8 +280,8 @@ extern int target_flags;
 
 /* No data type wants to be aligned rounder than this. 
    Most published ABIs say that ints should be aligned on 16 bit
-   boundries, but cpus with 32 bit busses get better performance
-   aligned on 32 bit boundries.  Coldfires without a misalignment
+   boundaries, but cpus with 32 bit busses get better performance
+   aligned on 32 bit boundaries.  Coldfires without a misalignment
    module require 32 bit alignment. */
 #define BIGGEST_ALIGNMENT (TARGET_ALIGN_INT ? 32 : 16)
 
@@ -375,7 +378,7 @@ extern int target_flags;
    and are not available for the register allocator.
    On the 68000, only the stack pointer is such.  */
 
-/* fpa0 is also reserved so that it can be used to move shit back and
+/* fpa0 is also reserved so that it can be used to move data back and
    forth between high fpa regs and everything else. */
 
 #define FIXED_REGISTERS        \
@@ -718,7 +721,7 @@ extern enum reg_class regno_reg_class[];
    (C) == 'J' ? (VALUE) >= -0x8000 && (VALUE) <= 0x7FFF : \
    (C) == 'K' ? (VALUE) < -0x80 || (VALUE) >= 0x80 : \
    (C) == 'L' ? (VALUE) < 0 && (VALUE) >= -8 : \
-   (C) == 'M' ? (VALUE) < -0x100 && (VALUE) >= 0x100 : \
+   (C) == 'M' ? (VALUE) < -0x100 || (VALUE) >= 0x100 : \
    (C) == 'N' ? (VALUE) >= 24 && (VALUE) <= 31 : \
    (C) == 'O' ? (VALUE) == 16 : \
    (C) == 'P' ? (VALUE) >= 8 && (VALUE) <= 15 : 0)
@@ -1052,11 +1055,20 @@ while(0)
     }
 #else /* !__mcf5200__ */
 #if defined(MACHINE_STATE_m68010_up)
+#ifdef __HPUX_ASM__
+/* HPUX assembler does not accept %ccr.  */
+#define MACHINE_STATE_SAVE(id)		\
+    {					\
+      asm ("move.w %cc,-(%sp)");	\
+      asm ("movm.l &0xc0c0,-(%sp)");	\
+    }
+#else /* ! __HPUX_ASM__ */
 #define MACHINE_STATE_SAVE(id)		\
     {					\
       asm ("move.w %ccr,-(%sp)");	\
       asm ("movm.l &0xc0c0,-(%sp)");	\
     }
+#endif /* __HPUX_ASM__ */
 #else /* !MACHINE_STATE_m68010_up */
 #define MACHINE_STATE_SAVE(id)		\
     {					\
@@ -1069,23 +1081,23 @@ while(0)
 #if defined(__mcf5200__)
 #define MACHINE_STATE_SAVE(id)		\
     {					\
-      asm ("subl 20,sp");		\
-      asm ("movml d0/d1/a0/a1,sp@(4)");	\
-      asm ("movew cc,d0");		\
-      asm ("movml d0,sp@");		\
+      asm ("subl %#20,%/sp" : );	\
+      asm ("movml %/d0/%/d1/%/a0/%/a1,%/sp@(4)" : ); \
+      asm ("movew %/cc,%/d0" : );	\
+      asm ("movml %/d0,%/sp@" : );	\
     }
 #else /* !__mcf5200__ */
 #if defined(MACHINE_STATE_m68010_up)
 #define MACHINE_STATE_SAVE(id)		\
     {					\
-      asm ("movew cc,sp@-");		\
-      asm ("moveml d0/d1/a0/a1,sp@-");	\
+      asm ("movew %/cc,%/sp@-" : );	\
+      asm ("moveml %/d0/%/d1/%/a0/%/a1,%/sp@-" : ); \
     }
 #else /* !MACHINE_STATE_m68010_up */
 #define MACHINE_STATE_SAVE(id)		\
     {					\
-      asm ("movew sr,sp@-");		\
-      asm ("moveml d0/d1/a0/a1,sp@-");	\
+      asm ("movew %/sr,%/sp@-" : );	\
+      asm ("moveml %/d0/%/d1/%/a0/%/a1,%/sp@-" : ); \
     }
 #endif /* MACHINE_STATE_m68010_up */
 #endif /* __mcf5200__ */
@@ -1103,26 +1115,35 @@ while(0)
       asm ("add.l 20,%sp");		\
     }
 #else /* !__mcf5200__ */
+#ifdef __HPUX_ASM__
+/* HPUX assembler does not accept %ccr.  */
+#define MACHINE_STATE_RESTORE(id)	\
+    {					\
+      asm ("movm.l (%sp)+,&0x0303");	\
+      asm ("move.w (%sp)+,%cc");	\
+    }
+#else /* ! __HPUX_ASM__ */
 #define MACHINE_STATE_RESTORE(id)	\
     {					\
       asm ("movm.l (%sp)+,&0x0303");	\
       asm ("move.w (%sp)+,%ccr");	\
     }
+#endif /* __HPUX_ASM__ */
 #endif /* __mcf5200__ */
 #else /* !MOTOROLA */
 #if defined(__mcf5200__)
 #define MACHINE_STATE_RESTORE(id)	\
     {					\
-      asm ("movml sp@,d0");		\
-      asm ("movew d0,cc");		\
-      asm ("movml sp@(4),d0/d1/a0/a1");	\
-      asm ("addl 20,sp");		\
+      asm ("movml %/sp@,%/d0" : );	\
+      asm ("movew %/d0,%/cc" : );	\
+      asm ("movml %/sp@(4),%/d0/%/d1/%/a0/%/a1" : ); \
+      asm ("addl %#20,%/sp" : );	\
     }
 #else /* !__mcf5200__ */
 #define MACHINE_STATE_RESTORE(id)	\
     {					\
-      asm ("moveml sp@+,d0/d1/a0/a1");	\
-      asm ("movew sp@+,cc");		\
+      asm ("moveml %/sp@+,%/d0/%/d1/%/a0/%/a1" : ); \
+      asm ("movew %/sp@+,%/cc" : );	\
     }
 #endif /* __mcf5200__ */
 #endif /* MOTOROLA */
@@ -1205,7 +1226,11 @@ while(0)
 
 /* Emit RTL insns to initialize the variable parts of a trampoline.
    FNADDR is an RTX for the address of the function's pure code.
-   CXT is an RTX for the static chain value for the function.  */
+   CXT is an RTX for the static chain value for the function.
+
+   We generate a two-instructions program at address TRAMP :
+	movea.l &CXT,%a0
+	jmp FNADDR					*/
 
 #define INITIALIZE_TRAMPOLINE(TRAMP, FNADDR, CXT)			\
 {									\
@@ -1770,6 +1795,18 @@ __transfer_from_trampoline ()					\
    18 to 25, not 16 to 23 as they do in the compiler.  */
 
 #define DBX_REGISTER_NUMBER(REGNO) ((REGNO) < 16 ? (REGNO) : (REGNO) + 2)
+
+/* Before the prologue, RA is at 0(%sp).  */
+#define INCOMING_RETURN_ADDR_RTX \
+  gen_rtx (MEM, VOIDmode, gen_rtx (REG, VOIDmode, STACK_POINTER_REGNUM))
+
+/* We must not use the DBX register numbers for the DWARF 2 CFA column
+   numbers because that maps to numbers beyond FIRST_PSEUDO_REGISTER.
+   Instead use the identity mapping.  */
+#define DWARF_FRAME_REGNUM(REG) REG
+
+/* Before the prologue, the top of the frame is at 4(%sp).  */
+#define INCOMING_FRAME_SP_OFFSET 4
 
 /* This is how to output the definition of a user-level label named NAME,
    such as the label on a static function or variable NAME.  */

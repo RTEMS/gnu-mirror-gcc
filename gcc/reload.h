@@ -1,5 +1,5 @@
 /* Communication between reload.c and reload1.c.
-   Copyright (C) 1987, 91, 92, 93, 94, 95, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1987, 91-95, 97, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -33,6 +33,17 @@ Boston, MA 02111-1307, USA.  */
 #if defined(SECONDARY_INPUT_RELOAD_CLASS) || defined(SECONDARY_OUTPUT_RELOAD_CLASS)
 #define HAVE_SECONDARY_RELOADS
 #endif
+
+/* If MEMORY_MOVE_COST isn't defined, give it a default here.  */
+#ifndef MEMORY_MOVE_COST
+#ifdef HAVE_SECONDARY_RELOADS
+#define MEMORY_MOVE_COST(MODE,CLASS,IN) \
+  (4 + memory_move_secondary_cost ((MODE), (CLASS), (IN)))
+#else
+#define MEMORY_MOVE_COST(MODE,CLASS,IN) 4
+#endif
+#endif
+extern int memory_move_secondary_cost PROTO ((enum machine_mode, enum reg_class, int));
 
 /* See reload.c and reload1.c for comments on these variables.  */
 
@@ -145,11 +156,6 @@ extern void clear_secondary_mem PROTO((void));
    reload TO.  */
 extern void transfer_replacements PROTO((int, int));
 
-/* Return 1 if ADDR is a valid memory address for mode MODE,
-   and check that each pseudo reg has the proper kind of
-   hard reg.  */
-extern int strict_memory_address_p PROTO((enum machine_mode, rtx));
-
 /* Like rtx_equal_p except that it allows a REG and a SUBREG to match
    if they are the same hard reg, and has special hacks for
    autoincrement and autodecrement.  */
@@ -212,7 +218,7 @@ extern int regno_clobbered_p PROTO((int, rtx));
 extern void init_reload PROTO((void));
 
 /* The reload pass itself.  */
-extern int reload STDIO_PROTO((rtx, int, FILE *));
+extern int reload PROTO((rtx, int, FILE *));
 
 /* Mark the slots in regs_ever_live for the hard regs
    used by pseudo-reg number REGNO.  */

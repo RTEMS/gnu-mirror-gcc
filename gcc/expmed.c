@@ -1,6 +1,6 @@
 /* Medium-level subroutines: convert bit-field store and extract
    and shifts, multiplies and divides to rtl instructions.
-   Copyright (C) 1987, 88, 89, 92-6, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1987, 88, 89, 92-97, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -21,6 +21,7 @@ Boston, MA 02111-1307, USA.  */
 
 
 #include "config.h"
+#include <stdio.h>
 #include "rtl.h"
 #include "tree.h"
 #include "flags.h"
@@ -747,6 +748,8 @@ store_split_bit_field (op0, bitsize, bitpos, value, align)
 					       ? GET_MODE (value)
 					       : word_mode, value));
     }
+  else if (GET_CODE (value) == ADDRESSOF)
+    value = copy_to_reg (value);
 
   while (bitsdone < bitsize)
     {
@@ -899,6 +902,8 @@ extract_bit_field (str_rtx, bitsize, bitnum, unsignedp,
       int inner_size = GET_MODE_BITSIZE (GET_MODE (SUBREG_REG (op0)));
 
       offset += SUBREG_WORD (op0);
+
+      inner_size = MIN (inner_size, BITS_PER_WORD);
 
       if (BYTES_BIG_ENDIAN && (outer_size < inner_size))
 	{
@@ -1069,7 +1074,7 @@ extract_bit_field (str_rtx, bitsize, bitnum, unsignedp,
 	{
 	  int xbitpos = bitpos, xoffset = offset;
 	  rtx bitsize_rtx, bitpos_rtx;
-	  rtx last = get_last_insn();
+	  rtx last = get_last_insn ();
 	  rtx xop0 = op0;
 	  rtx xtarget = target;
 	  rtx xspec_target = spec_target;
@@ -1084,9 +1089,8 @@ extract_bit_field (str_rtx, bitsize, bitnum, unsignedp,
 	      volatile_ok = 1;
 
 	      /* Is the memory operand acceptable?  */
-	      if (flag_force_mem
-		  || ! ((*insn_operand_predicate[(int) CODE_FOR_extzv][1])
-			(xop0, GET_MODE (xop0))))
+	      if (! ((*insn_operand_predicate[(int) CODE_FOR_extzv][1])
+		     (xop0, GET_MODE (xop0))))
 		{
 		  /* No, load into a reg and extract from there.  */
 		  enum machine_mode bestmode;
@@ -1134,7 +1138,7 @@ extract_bit_field (str_rtx, bitsize, bitnum, unsignedp,
 	  /* If op0 is a register, we need it in MAXMODE (which is usually
 	     SImode). to make it acceptable to the format of extzv.  */
 	  if (GET_CODE (xop0) == SUBREG && GET_MODE (xop0) != maxmode)
-	    abort ();
+	    goto extzv_loses;
 	  if (GET_CODE (xop0) == REG && GET_MODE (xop0) != maxmode)
 	    xop0 = gen_rtx (SUBREG, maxmode, xop0, 0);
 
@@ -1210,7 +1214,7 @@ extract_bit_field (str_rtx, bitsize, bitnum, unsignedp,
 	{
 	  int xbitpos = bitpos, xoffset = offset;
 	  rtx bitsize_rtx, bitpos_rtx;
-	  rtx last = get_last_insn();
+	  rtx last = get_last_insn ();
 	  rtx xop0 = op0, xtarget = target;
 	  rtx xspec_target = spec_target;
 	  rtx xspec_target_subreg = spec_target_subreg;
@@ -1268,7 +1272,7 @@ extract_bit_field (str_rtx, bitsize, bitnum, unsignedp,
 	  /* If op0 is a register, we need it in MAXMODE (which is usually
 	     SImode) to make it acceptable to the format of extv.  */
 	  if (GET_CODE (xop0) == SUBREG && GET_MODE (xop0) != maxmode)
-	    abort ();
+	    goto extv_loses;
 	  if (GET_CODE (xop0) == REG && GET_MODE (xop0) != maxmode)
 	    xop0 = gen_rtx (SUBREG, maxmode, xop0, 0);
 
@@ -2831,6 +2835,14 @@ expand_divmod (rem_flag, code, mode, op0, op1, target, unsignedp)
     {
       op0 = convert_modes (compute_mode, mode, op0, unsignedp);
       op1 = convert_modes (compute_mode, mode, op1, unsignedp);
+
+      /* convert_modes may have placed op1 into a register, so we
+	 must recompute the following.  */
+      op1_is_constant = GET_CODE (op1) == CONST_INT;
+      op1_is_pow2 = (op1_is_constant
+		     && ((EXACT_POWER_OF_2_OR_ZERO_P (INTVAL (op1))
+			  || (! unsignedp
+			      && EXACT_POWER_OF_2_OR_ZERO_P (-INTVAL (op1)))))) ;
     }
 
   /* If one of the operands is a volatile MEM, copy it into a register.  */
@@ -3631,6 +3643,9 @@ expand_divmod (rem_flag, code, mode, op0, op1, target, unsignedp)
 	    emit_label (label);
 	  }
 	return gen_lowpart (mode, rem_flag ? remainder : quotient);
+	
+      default:
+	abort ();
       }
 
   if (quotient == 0)
@@ -3946,6 +3961,8 @@ emit_store_flag (target, code, op0, op1, mode, unsignedp, normalizep)
     case LTU:
       if (op1 == const1_rtx)
 	op1 = const0_rtx, code = EQ;
+      break;
+    default:
       break;
     }
 

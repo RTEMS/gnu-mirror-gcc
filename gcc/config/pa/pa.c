@@ -1,5 +1,5 @@
 /* Subroutines for insn-output.c for HPPA.
-   Copyright (C) 1992, 1993, 1994, 1995, 1996 Free Software Foundation, Inc.
+   Copyright (C) 1992, 93, 94, 95, 96, 97, 1998 Free Software Foundation, Inc.
    Contributed by Tim Moore (moore@cs.utah.edu), based on sparc.c
 
 This file is part of GNU CC.
@@ -19,8 +19,8 @@ along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
-#include <stdio.h>
 #include "config.h"
+#include <stdio.h>
 #include "rtl.h"
 #include "regs.h"
 #include "hard-reg-set.h"
@@ -36,6 +36,9 @@ Boston, MA 02111-1307, USA.  */
 #include "c-tree.h"
 #include "expr.h"
 #include "obstack.h"
+
+static void restore_unscaled_index_insn_codes		PROTO((rtx));
+static void record_unscaled_index_insn_codes		PROTO((rtx));
 
 /* Save the operands last given to a compare for use when we
    generate a scc or bcc insn.  */
@@ -77,6 +80,13 @@ struct deferred_plabel
 } *deferred_plabels = 0;
 int n_deferred_plabels = 0;
 
+/* Array indexed by INSN_UIDs holding the INSN_CODE of an insn which
+   uses an unscaled indexed address before delay slot scheduling.  */
+static int *unscaled_index_insn_codes;
+
+/* Upper bound for the array.  */
+static int max_unscaled_index_insn_codes_uid;
+
 void
 override_options ()
 {
@@ -111,17 +121,17 @@ override_options ()
 
   if (flag_pic && (TARGET_NO_SPACE_REGS || TARGET_FAST_INDIRECT_CALLS))
    {
-      warning ("PIC code generation is not compatable with fast indirect calls\n");
+      warning ("PIC code generation is not compatible with fast indirect calls\n");
    }
 
   if (flag_pic && profile_flag)
     {
-      warning ("PIC code generation is not compatable with profiling\n");
+      warning ("PIC code generation is not compatible with profiling\n");
     }
 
   if (TARGET_SPACE && (flag_pic || profile_flag))
     {
-      warning ("Out of line entry/exit sequences are not compatable\n");
+      warning ("Out of line entry/exit sequences are not compatible\n");
       warning ("with PIC or profiling\n");
     }
 
@@ -282,7 +292,8 @@ move_operand (op, mode)
 
   /* Since move_operand is only used for source operands, we can always
      allow scaled indexing!  */
-  if (GET_CODE (op) == PLUS
+  if (! TARGET_DISABLE_INDEXING
+      && GET_CODE (op) == PLUS
       && ((GET_CODE (XEXP (op, 0)) == MULT
 	   && GET_CODE (XEXP (XEXP (op, 0), 0)) == REG
 	   && GET_CODE (XEXP (XEXP (op, 0), 1)) == CONST_INT
@@ -1051,6 +1062,7 @@ emit_move_sequence (operands, mode, scratch_reg)
 {
   register rtx operand0 = operands[0];
   register rtx operand1 = operands[1];
+  register rtx tem;
 
   if (reload_in_progress && GET_CODE (operand0) == REG
       && REGNO (operand0) >= FIRST_PSEUDO_REGISTER)
@@ -1073,6 +1085,15 @@ emit_move_sequence (operands, mode, scratch_reg)
       SUBREG_REG (operand1) = reg_equiv_mem[REGNO (SUBREG_REG (operand1))];
       operand1 = alter_subreg (operand1);
     }
+
+  if (reload_in_progress && GET_CODE (operand0) == MEM
+      && ((tem = find_replacement (&XEXP (operand0, 0)))
+	  != XEXP (operand0, 0)))
+    operand0 = gen_rtx (MEM, GET_MODE (operand0), tem);
+  if (reload_in_progress && GET_CODE (operand1) == MEM
+      && ((tem = find_replacement (&XEXP (operand1, 0)))
+	  != XEXP (operand1, 0)))
+    operand1 = gen_rtx (MEM, GET_MODE (operand1), tem);
 
   /* Handle secondary reloads for loads/stores of FP registers from
      REG+D addresses where D does not fit in 5 bits, including 
@@ -1869,7 +1890,7 @@ find_addr_reg (addr)
    OPERANDS[4] is the size as a CONST_INT
    OPERANDS[3] is a register for temporary storage.
    OPERANDS[5] is the alignment safe to use, as a CONST_INT. 
-   OPERNADS[6] is another temporary register.   */
+   OPERANDS[6] is another temporary register.   */
 
 char *
 output_block_move (operands, size_is_constant)
@@ -2562,6 +2583,9 @@ output_function_prologue (file, size)
     total_code_bytes = -1;
 
   remove_useless_addtr_insns (get_insns (), 0);
+
+  /* Restore INSN_CODEs for insn which use unscaled indexed addresses.  */
+  restore_unscaled_index_insn_codes (get_insns ());
 }
 
 void
@@ -2911,6 +2935,11 @@ output_function_epilogue (file, size)
     fputs ("\tnop\n", file);
 
   fputs ("\t.EXIT\n\t.PROCEND\n", file);
+
+  /* Free up stuff we don't need anymore.  */
+  if (unscaled_index_insn_codes)
+    free (unscaled_index_insn_codes);
+  max_unscaled_index_insn_codes_uid = 0;
 }
 
 void
@@ -4190,6 +4219,15 @@ secondary_reload_class (class, mode, in)
   else
     regno = -1;
 
+  /* If we have something like (mem (mem (...)), we can safely assume the
+     inner MEM will end up in a general register after reloading, so there's
+     no need for a secondary reload.  */
+  if (GET_CODE (in) == MEM
+      && GET_CODE (XEXP (in, 0)) == MEM)
+    return NO_REGS;
+
+  /* Handle out of range displacement for integer mode loads/stores of
+     FP registers.  */
   if (((regno >= FIRST_PSEUDO_REGISTER || regno == -1)
        && GET_MODE_CLASS (mode) == MODE_INT
        && FP_REG_CLASS_P (class))
@@ -4218,6 +4256,7 @@ secondary_reload_class (class, mode, in)
 			|| GET_CODE (XEXP (tmp, 0)) == LABEL_REF)
 		       && GET_CODE (XEXP (tmp, 1)) == CONST_INT);
         break;
+
       default:
         is_symbolic = 0;
         break;
@@ -4269,7 +4308,7 @@ struct rtx_def *
 hppa_builtin_saveregs (arglist)
      tree arglist;
 {
-  rtx offset;
+  rtx offset, dest;
   tree fntype = TREE_TYPE (current_function_decl);
   int argadj = ((!(TYPE_ARG_TYPES (fntype) != 0
 		   && (TREE_VALUE (tree_last (TYPE_ARG_TYPES (fntype)))
@@ -4282,11 +4321,28 @@ hppa_builtin_saveregs (arglist)
     offset = current_function_arg_offset_rtx;
 
   /* Store general registers on the stack. */
-  move_block_from_reg (23,
-		       gen_rtx (MEM, BLKmode,
-				plus_constant
-				(current_function_internal_arg_pointer, -16)),
-		       4, 4 * UNITS_PER_WORD);
+  dest = gen_rtx (MEM, BLKmode,
+		  plus_constant (current_function_internal_arg_pointer, -16));
+  move_block_from_reg (23, dest, 4, 4 * UNITS_PER_WORD);
+
+  /* move_block_from_reg will emit code to store the argument registers
+     individually as scalar stores.
+
+     However, other insns may later load from the same addresses for
+     a structure load (passing a struct to a varargs routine).
+
+     The alias code assumes that such aliasing can never happen, so we
+     have to keep memory referencing insns from moving up beyond the
+     last argument register store.  So we emit a blockage insn here.  */
+  emit_insn (gen_blockage ());
+
+  if (flag_check_memory_usage)
+    emit_library_call (chkr_set_right_libfunc, 1, VOIDmode, 3,
+		       dest, ptr_mode,
+		       GEN_INT (4 * UNITS_PER_WORD), TYPE_MODE (sizetype),
+		       GEN_INT (MEMORY_USE_RW),
+		       TYPE_MODE (integer_type_node));
+
   return copy_to_reg (expand_binop (Pmode, add_optab,
 				    current_function_internal_arg_pointer,
 				    offset, 0, 0, OPTAB_LIB_WIDEN));
@@ -5745,10 +5801,14 @@ output_parallel_addb (operands, length)
     }
 }
 
-/* Return nonzero if INSN (a jump insn) immediately follows a call.  This
-   is used to discourage creating parallel movb/addb insns since a jump
-   which immediately follows a call can execute in the delay slot of the
-   call.  */
+/* Return nonzero if INSN (a jump insn) immediately follows a call to
+   a named function.  This is used to discourage creating parallel movb/addb
+   insns since a jump which immediately follows a call can execute in the
+   delay slot of the call.
+
+   It is also used to avoid filling the delay slot of a jump which
+   immediately follows a call since the jump can usually be eliminated
+   completely by modifying RP in the delay slot of the call.  */
    
 following_call (insn)
      rtx insn;
@@ -5760,7 +5820,8 @@ following_call (insn)
 
   /* Check for CALL_INSNs and millicode calls.  */
   if (insn
-      && (GET_CODE (insn) == CALL_INSN
+      && ((GET_CODE (insn) == CALL_INSN
+	   && get_attr_type (insn) != TYPE_DYNCALL)
 	  || (GET_CODE (insn) == INSN
 	      && GET_CODE (PATTERN (insn)) != SEQUENCE
 	      && GET_CODE (PATTERN (insn)) != USE
@@ -5769,6 +5830,97 @@ following_call (insn)
     return 1;
 
   return 0;
+}
+
+/* Restore any INSN_CODEs for insns with unscaled indexed addresses since
+   the INSN_CODE might be clobberd by rerecognition triggered by reorg.  */
+
+static void
+restore_unscaled_index_insn_codes (insns)
+     rtx insns;
+{
+  rtx insn;
+
+  for (insn = insns; insn; insn = NEXT_INSN (insn))
+    {
+      if (INSN_UID (insn) < max_unscaled_index_insn_codes_uid
+	  && unscaled_index_insn_codes[INSN_UID (insn)] != -1)
+	INSN_CODE (insn) = unscaled_index_insn_codes[INSN_UID (insn)];
+    }
+}
+
+/* Severe braindamage:
+
+   On the PA, address computations within MEM expressions are not
+   commutative because of the implicit space register selection
+   from the base register (instead of the entire effective address).
+
+   Because of this mis-feature we have to know which register in a reg+reg
+   address is the base and which is the index.
+
+   Before reload, the base can be identified by REGNO_POINTER_FLAG.  We use
+   this to force base + index addresses to match a different insn than
+   index + base addresses.
+
+   We assume that no pass during or after reload creates new unscaled indexed
+   addresses, so any unscaled indexed address we find after reload must have
+   at one time been recognized a base + index or index + base and we accept
+   any register as a base register.
+
+   This scheme assumes that no pass during/after reload will rerecognize an
+   insn with an unscaled indexed address.  This failed due to a reorg call
+   to rerecognize certain insns.
+
+   So, we record if an insn uses an unscaled indexed address and which
+   register is the base (via recording of the INSN_CODE for such insns).
+
+   Just before we output code for the function, we make sure all the insns
+   using unscaled indexed addresses have the same INSN_CODE as they did
+   immediately before delay slot scheduling.
+
+   This is extremely gross.  Long term, I'd like to be able to look at
+   REG_POINTER_FLAG to handle these kinds of problems.  */
+ 
+static void
+record_unscaled_index_insn_codes (insns)
+     rtx insns;
+{
+  rtx insn;
+
+  max_unscaled_index_insn_codes_uid = get_max_uid ();
+  unscaled_index_insn_codes
+    = (int *)xmalloc (max_unscaled_index_insn_codes_uid * sizeof (int));
+  memset (unscaled_index_insn_codes, -1,
+	  max_unscaled_index_insn_codes_uid * sizeof (int));
+
+  for (insn = insns; insn; insn = NEXT_INSN (insn))
+    {
+      rtx set = single_set (insn);
+      rtx mem = NULL_RTX;
+
+      /* Ignore anything that isn't a normal SET.  */
+      if (set == NULL_RTX)
+	continue;
+
+      /* No insns can have more than one MEM.  */
+      if (GET_CODE (SET_SRC (set)) == MEM)
+	mem = SET_SRC (set);
+
+      if (GET_CODE (SET_DEST (set)) == MEM)
+	mem = SET_DEST (set);
+	
+      /* If neither operand is a mem, then there's nothing to do.  */
+      if (mem == NULL_RTX)
+	continue;
+
+      if (GET_CODE (XEXP (mem, 0)) != PLUS)
+	continue;
+
+      /* If both are REGs (or SUBREGs), then record the insn code for
+	 this insn.  */
+      if (REG_P (XEXP (XEXP (mem, 0), 0)) && REG_P (XEXP (XEXP (mem, 0), 1)))
+        unscaled_index_insn_codes[INSN_UID (insn)] = INSN_CODE (insn);
+    }
 }
 
 /* We use this hook to perform a PA specific optimization which is difficult
@@ -5795,12 +5947,23 @@ following_call (insn)
    The jump instructions within the table are special; we must be able 
    to identify them during assembly output (if the jumps don't get filled
    we need to emit a nop rather than nullifying the delay slot)).  We
-   identify jumps in switch tables by marking the SET with DImode.  */
+   identify jumps in switch tables by marking the SET with DImode. 
+
+   We also surround the jump table itself with BEGIN_BRTAB and END_BRTAB
+   insns.  This serves two purposes, first it prevents jump.c from
+   noticing that the last N entries in the table jump to the instruction
+   immediately after the table and deleting the jumps.  Second, those
+   insns mark where we should emit .begin_brtab and .end_brtab directives
+   when using GAS (allows for better link time optimizations).  */
 
 pa_reorg (insns)
      rtx insns;
 {
   rtx insn;
+
+  /* Keep track of which insns have unscaled indexed addresses, and which
+     register is the base address in such insns.  */
+  record_unscaled_index_insn_codes (insns);
 
   remove_useless_addtr_insns (insns, 1);
 
@@ -5809,25 +5972,25 @@ pa_reorg (insns)
   /* This is fairly cheap, so always run it if optimizing.  */
   if (optimize > 0 && !TARGET_BIG_SWITCH)
     {
-      /* Find and explode all ADDR_VEC insns.  */
+      /* Find and explode all ADDR_VEC or ADDR_DIFF_VEC insns.  */
       insns = get_insns ();
       for (insn = insns; insn; insn = NEXT_INSN (insn))
 	{
 	  rtx pattern, tmp, location;
 	  unsigned int length, i;
 
-	  /* Find an ADDR_VEC insn to explode.  */
+	  /* Find an ADDR_VEC or ADDR_DIFF_VEC insn to explode.  */
 	  if (GET_CODE (insn) != JUMP_INSN
-	      || GET_CODE (PATTERN (insn)) != ADDR_VEC)
+	      || (GET_CODE (PATTERN (insn)) != ADDR_VEC
+		  && GET_CODE (PATTERN (insn)) != ADDR_DIFF_VEC))
 	    continue;
 
-	  /* If needed, emit marker for the beginning of the branch table.  */
-	  if (TARGET_GAS)
-	    emit_insn_before (gen_begin_brtab (), insn);
+	  /* Emit marker for the beginning of the branch table.  */
+	  emit_insn_before (gen_begin_brtab (), insn);
 
 	  pattern = PATTERN (insn);
 	  location = PREV_INSN (insn);
-          length = XVECLEN (pattern, 0);
+          length = XVECLEN (pattern, GET_CODE (pattern) == ADDR_DIFF_VEC);
 
 	  for (i = 0; i < length; i++)
 	    {
@@ -5838,31 +6001,40 @@ pa_reorg (insns)
 	      emit_label_after (tmp, location);
 	      location = NEXT_INSN (location);
 
-	      /* Emit the jump itself.  */
-	      tmp = gen_switch_jump (XEXP (XVECEXP (pattern, 0, i), 0));
-	      tmp = emit_jump_insn_after (tmp, location);
-	      JUMP_LABEL (tmp) = XEXP (XVECEXP (pattern, 0, i), 0);
-	      LABEL_NUSES (JUMP_LABEL (tmp))++;
-	      location = NEXT_INSN (location);
+	      if (GET_CODE (pattern) == ADDR_VEC)
+		{
+		  /* Emit the jump itself.  */
+		  tmp = gen_switch_jump (XEXP (XVECEXP (pattern, 0, i), 0));
+		  tmp = emit_jump_insn_after (tmp, location);
+		  JUMP_LABEL (tmp) = XEXP (XVECEXP (pattern, 0, i), 0);
+		  LABEL_NUSES (JUMP_LABEL (tmp))++;
+		  location = NEXT_INSN (location);
+		}
+	      else
+		{
+		  /* Emit the jump itself.  */
+		  tmp = gen_switch_jump (XEXP (XVECEXP (pattern, 1, i), 0));
+		  tmp = emit_jump_insn_after (tmp, location);
+		  JUMP_LABEL (tmp) = XEXP (XVECEXP (pattern, 1, i), 0);
+		  LABEL_NUSES (JUMP_LABEL (tmp))++;
+		  location = NEXT_INSN (location);
+		}
 
 	      /* Emit a BARRIER after the jump.  */
 	      emit_barrier_after (location);
 	      location = NEXT_INSN (location);
 	    }
 
-	  /* If needed, emit marker for the end of the branch table.  */
-	  if (TARGET_GAS)
-	    {
-	      emit_insn_before (gen_end_brtab (), location);
-	      location = NEXT_INSN (location);
-	      emit_barrier_after (location);
-	    }
+	  /* Emit marker for the end of the branch table.  */
+	  emit_insn_before (gen_end_brtab (), location);
+	  location = NEXT_INSN (location);
+	  emit_barrier_after (location);
 
-	  /* Delete the ADDR_VEC.  */
+	  /* Delete the ADDR_VEC or ADDR_DIFF_VEC.  */
 	  delete_insn (insn);
 	}
     }
-  else if (TARGET_GAS)
+  else
     {
       /* Sill need an end_brtab insn.  */
       insns = get_insns ();
@@ -5870,11 +6042,12 @@ pa_reorg (insns)
 	{
 	  /* Find an ADDR_VEC insn.  */
 	  if (GET_CODE (insn) != JUMP_INSN
-	      || GET_CODE (PATTERN (insn)) != ADDR_VEC)
+	      || (GET_CODE (PATTERN (insn)) != ADDR_VEC
+		  && GET_CODE (PATTERN (insn)) != ADDR_DIFF_VEC))
 	    continue;
 
 	  /* Now generate markers for the beginning and end of the
-	     branc table.  */
+	     branch table.  */
 	  emit_insn_before (gen_begin_brtab (), insn);
 	  emit_insn_after (gen_end_brtab (), insn);
 	}
@@ -5931,7 +6104,7 @@ pa_combine_instructions (insns)
 
   /* This can get expensive since the basic algorithm is on the
      order of O(n^2) (or worse).  Only do it for -O2 or higher
-     levels of optimizaton.  */
+     levels of optimization.  */
   if (optimize < 2)
     return;
 
