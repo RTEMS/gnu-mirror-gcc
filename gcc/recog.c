@@ -1086,7 +1086,7 @@ register_operand (op, mode)
 #ifdef CANNOT_CHANGE_MODE_CLASS
       if (GET_CODE (sub) == REG
 	  && REGNO (sub) < FIRST_PSEUDO_REGISTER
-	  && REG_CANNOT_CHANGE_MODE_P (REGNO (sub), mode, GET_MODE (sub))
+	  && REG_CANNOT_CHANGE_MODE_P (REGNO (sub), GET_MODE (sub), mode)
 	  && GET_MODE_CLASS (GET_MODE (sub)) != MODE_COMPLEX_INT
 	  && GET_MODE_CLASS (GET_MODE (sub)) != MODE_COMPLEX_FLOAT)
 	return 0;
@@ -2515,12 +2515,25 @@ constrain_operands (strict)
 		break;
 
 	      case 'm':
-		if (GET_CODE (op) == MEM
-		    /* Before reload, accept what reload can turn into mem.  */
-		    || (strict < 0 && CONSTANT_P (op))
-		    /* During reload, accept a pseudo  */
-		    || (reload_in_progress && GET_CODE (op) == REG
-			&& REGNO (op) >= FIRST_PSEUDO_REGISTER))
+		/* Memory operands must be valid, to the extent
+		   required by STRICT.  */
+		if (GET_CODE (op) == MEM)
+		  {
+		    if (strict > 0
+			&& !strict_memory_address_p (GET_MODE (op),
+						     XEXP (op, 0)))
+		      break;
+		    if (strict == 0
+			&& !memory_address_p (GET_MODE (op), XEXP (op, 0)))
+		      break;
+		    win = 1;
+		  }
+		/* Before reload, accept what reload can turn into mem.  */
+		else if (strict < 0 && CONSTANT_P (op))
+		  win = 1;
+		/* During reload, accept a pseudo  */
+		else if (reload_in_progress && GET_CODE (op) == REG
+			 && REGNO (op) >= FIRST_PSEUDO_REGISTER)
 		  win = 1;
 		break;
 
@@ -2742,62 +2755,43 @@ reg_fits_class_p (operand, class, offset, mode)
   return 0;
 }
 
-/* Split single instruction.  Helper function for split_all_insns.
-   Return last insn in the sequence if successful, or NULL if unsuccessful.  */
+/* Split single instruction.  Helper function for split_all_insns and
+   split_all_insns_noflow.  Return last insn in the sequence if successful,
+   or NULL if unsuccessful.  */
+
 static rtx
 split_insn (insn)
      rtx insn;
 {
-  rtx set;
-  if (!INSN_P (insn))
-    ;
-  /* Don't split no-op move insns.  These should silently
-     disappear later in final.  Splitting such insns would
-     break the code that handles REG_NO_CONFLICT blocks.  */
+  /* Split insns here to get max fine-grain parallelism.  */
+  rtx first = PREV_INSN (insn);
+  rtx last = try_split (PATTERN (insn), insn, 1);
 
-  else if ((set = single_set (insn)) != NULL && set_noop_p (set))
-    {
-      /* Nops get in the way while scheduling, so delete them
-         now if register allocation has already been done.  It
-         is too risky to try to do this before register
-         allocation, and there are unlikely to be very many
-         nops then anyways.  */
-      if (reload_completed)
-	delete_insn_and_edges (insn);
-    }
-  else
-    {
-      /* Split insns here to get max fine-grain parallelism.  */
-      rtx first = PREV_INSN (insn);
-      rtx last = try_split (PATTERN (insn), insn, 1);
+  if (last == insn)
+    return NULL_RTX;
 
-      if (last != insn)
+  /* try_split returns the NOTE that INSN became.  */
+  PUT_CODE (insn, NOTE);
+  NOTE_SOURCE_FILE (insn) = 0;
+  NOTE_LINE_NUMBER (insn) = NOTE_INSN_DELETED;
+
+  /* ??? Coddle to md files that generate subregs in post-reload
+     splitters instead of computing the proper hard register.  */
+  if (reload_completed && first != last)
+    {
+      first = NEXT_INSN (first);
+      for (;;)
 	{
-	  /* try_split returns the NOTE that INSN became.  */
-	  PUT_CODE (insn, NOTE);
-	  NOTE_SOURCE_FILE (insn) = 0;
-	  NOTE_LINE_NUMBER (insn) = NOTE_INSN_DELETED;
-
-	  /* ??? Coddle to md files that generate subregs in post-
-	     reload splitters instead of computing the proper
-	     hard register.  */
-	  if (reload_completed && first != last)
-	    {
-	      first = NEXT_INSN (first);
-	      while (1)
-		{
-		  if (INSN_P (first))
-		    cleanup_subreg_operands (first);
-		  if (first == last)
-		    break;
-		  first = NEXT_INSN (first);
-		}
-	    }
-	  return last;
+	  if (INSN_P (first))
+	    cleanup_subreg_operands (first);
+	  if (first == last)
+	    break;
+	  first = NEXT_INSN (first);
 	}
     }
-  return NULL_RTX;
+  return last;
 }
+
 /* Split all insns in the function.  If UPD_LIFE, update life info after.  */
 
 void
@@ -2805,12 +2799,12 @@ split_all_insns (upd_life)
      int upd_life;
 {
   sbitmap blocks;
-  int changed;
+  bool changed;
   basic_block bb;
 
   blocks = sbitmap_alloc (last_basic_block);
   sbitmap_zero (blocks);
-  changed = 0;
+  changed = false;
 
   FOR_EACH_BB_REVERSE (bb)
     {
@@ -2819,38 +2813,70 @@ split_all_insns (upd_life)
 
       for (insn = bb->head; !finish ; insn = next)
 	{
-	  rtx last;
-
 	  /* Can't use `next_real_insn' because that might go across
 	     CODE_LABELS and short-out basic blocks.  */
 	  next = NEXT_INSN (insn);
 	  finish = (insn == bb->end);
-	  last = split_insn (insn);
-	  if (last)
+	  if (INSN_P (insn))
 	    {
-	      /* The split sequence may include barrier, but the
-		 BB boundary we are interested in will be set to previous
-		 one.  */
+	      rtx set = single_set (insn);
 
-	      while (GET_CODE (last) == BARRIER)
-		last = PREV_INSN (last);
-	      SET_BIT (blocks, bb->index);
-	      changed = 1;
-	      insn = last;
+	      /* Don't split no-op move insns.  These should silently
+		 disappear later in final.  Splitting such insns would
+		 break the code that handles REG_NO_CONFLICT blocks.  */
+	      if (set && set_noop_p (set))
+		{
+		  /* Nops get in the way while scheduling, so delete them
+		     now if register allocation has already been done.  It
+		     is too risky to try to do this before register
+		     allocation, and there are unlikely to be very many
+		     nops then anyways.  */
+		  if (reload_completed)
+		    {
+		      /* If the no-op set has a REG_UNUSED note, we need
+			 to update liveness information.  */
+		      if (find_reg_note (insn, REG_UNUSED, NULL_RTX))
+			{
+			  SET_BIT (blocks, bb->index);
+			  changed = true;
+			}
+		      /* ??? Is life info affected by deleting edges?  */
+		      delete_insn_and_edges (insn);
+		    }
+		}
+	      else
+		{
+		  rtx last = split_insn (insn);
+		  if (last)
+		    {
+		      /* The split sequence may include barrier, but the
+			 BB boundary we are interested in will be set to
+			 previous one.  */
+
+		      while (GET_CODE (last) == BARRIER)
+			last = PREV_INSN (last);
+		      SET_BIT (blocks, bb->index);
+		      changed = true;
+		    }
+		}
 	    }
 	}
     }
 
   if (changed)
     {
+      int old_last_basic_block = last_basic_block;
+
       find_many_sub_basic_blocks (blocks);
+
+      if (old_last_basic_block != last_basic_block && upd_life)
+	blocks = sbitmap_resize (blocks, last_basic_block, 1);
     }
 
   if (changed && upd_life)
-    {
-      count_or_remove_death_notes (blocks, 1);
-      update_life_info (blocks, UPDATE_LIFE_LOCAL, PROP_DEATH_NOTES);
-    }
+    update_life_info (blocks, UPDATE_LIFE_GLOBAL_RM_NOTES,
+		      PROP_DEATH_NOTES | PROP_REG_INFO);
+
 #ifdef ENABLE_CHECKING
   verify_flow_info ();
 #endif
@@ -2869,9 +2895,28 @@ split_all_insns_noflow ()
   for (insn = get_insns (); insn; insn = next)
     {
       next = NEXT_INSN (insn);
-      split_insn (insn);
+      if (INSN_P (insn))
+	{
+	  /* Don't split no-op move insns.  These should silently
+	     disappear later in final.  Splitting such insns would
+	     break the code that handles REG_NO_CONFLICT blocks.  */
+	  rtx set = single_set (insn);
+	  if (set && set_noop_p (set))
+	    {
+	      /* Nops get in the way while scheduling, so delete them
+		 now if register allocation has already been done.  It
+		 is too risky to try to do this before register
+		 allocation, and there are unlikely to be very many
+		 nops then anyways.
+
+		 ??? Should we use delete_insn when the CFG isn't valid?  */
+	      if (reload_completed)
+		delete_insn_and_edges (insn);
+	    }
+	  else
+	    split_insn (insn);
+	}
     }
-  return;
 }
 
 #ifdef HAVE_peephole2
