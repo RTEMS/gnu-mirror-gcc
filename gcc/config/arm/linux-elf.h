@@ -34,6 +34,8 @@ Boston, MA 02111-1307, USA.  */
 #undef  TARGET_DEFAULT
 #define TARGET_DEFAULT (ARM_FLAG_APCS_32 | ARM_FLAG_MMU_TRAPS)
 
+#define SUBTARGET_CPU_DEFAULT TARGET_CPU_arm6
+
 #define SUBTARGET_EXTRA_LINK_SPEC " -m armelf_linux -p"
 
 #undef  MULTILIB_DEFAULTS
@@ -123,3 +125,6 @@ Boston, MA 02111-1307, USA.  */
 
 #undef  CC1_SPEC
 #define CC1_SPEC "%{profile:-p}"
+
+#define LINK_GCC_C_SEQUENCE_SPEC \
+  "%{static:--start-group} %G %L %{static:--end-group}%{!static:%G}"
