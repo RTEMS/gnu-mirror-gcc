@@ -133,12 +133,25 @@ extern int target_flags;
 
 #define TARGET_DWARF2_ASM	(target_flags & MASK_DWARF2_ASM)
 
+/* If the assembler supports thread-local storage, assume that the
+   system does as well.  If a particular target system has an
+   assembler that supports TLS -- but the rest of the system does not
+   support TLS -- that system should explicit define TARGET_HAVE_TLS
+   to false in its own configuration file.  */
+#if !defined(TARGET_HAVE_TLS) && defined(HAVE_AS_TLS)
+#define TARGET_HAVE_TLS true
+#endif
+
 extern int ia64_tls_size;
 #define TARGET_TLS14		(ia64_tls_size == 14)
 #define TARGET_TLS22		(ia64_tls_size == 22)
 #define TARGET_TLS64		(ia64_tls_size == 64)
 
 #define TARGET_HPUX_LD		0
+
+#ifndef HAVE_AS_LTOFFX_LDXMOV_RELOCS
+#define HAVE_AS_LTOFFX_LDXMOV_RELOCS 0
+#endif
 
 /* This macro defines names of command options to set and clear bits in
    `target_flags'.  Its definition is an initializer with a subgrouping for
@@ -432,7 +445,7 @@ while (0)
    64 predicate registers, 8 branch registers, one frame pointer,
    and several "application" registers.  */
 
-#define FIRST_PSEUDO_REGISTER 335
+#define FIRST_PSEUDO_REGISTER 334
 
 /* Ranges for the various kinds of registers.  */
 #define ADDL_REGNO_P(REGNO) ((unsigned HOST_WIDE_INT) (REGNO) <= 3)
@@ -441,9 +454,7 @@ while (0)
 #define PR_REGNO_P(REGNO) ((REGNO) >= 256 && (REGNO) <= 319)
 #define BR_REGNO_P(REGNO) ((REGNO) >= 320 && (REGNO) <= 327)
 #define GENERAL_REGNO_P(REGNO) \
-  (GR_REGNO_P (REGNO)							\
-   || (REGNO) == FRAME_POINTER_REGNUM					\
-   || (REGNO) == RETURN_ADDRESS_POINTER_REGNUM)
+  (GR_REGNO_P (REGNO) || (REGNO) == FRAME_POINTER_REGNUM)
 
 #define GR_REG(REGNO) ((REGNO) + 0)
 #define FR_REG(REGNO) ((REGNO) + 128)
@@ -453,11 +464,11 @@ while (0)
 #define IN_REG(REGNO) ((REGNO) + 112)
 #define LOC_REG(REGNO) ((REGNO) + 32)
 
-#define AR_CCV_REGNUM	330
-#define AR_UNAT_REGNUM  331
-#define AR_PFS_REGNUM	332
-#define AR_LC_REGNUM	333
-#define AR_EC_REGNUM	334
+#define AR_CCV_REGNUM	329
+#define AR_UNAT_REGNUM  330
+#define AR_PFS_REGNUM	331
+#define AR_LC_REGNUM	332
+#define AR_EC_REGNUM	333
 
 #define IN_REGNO_P(REGNO) ((REGNO) >= IN_REG (0) && (REGNO) <= IN_REG (7))
 #define LOC_REGNO_P(REGNO) ((REGNO) >= LOC_REG (0) && (REGNO) <= LOC_REG (79))
@@ -520,8 +531,8 @@ while (0)
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	\
   /* Branch registers.  */				\
   0, 0, 0, 0, 0, 0, 0, 0,				\
-  /*FP RA CCV UNAT PFS LC EC */				\
-     1, 1,  1,   1,  1, 0, 1				\
+  /*FP CCV UNAT PFS LC EC */				\
+     1,  1,   1,  1, 0, 1				\
  }
 
 /* Like `FIXED_REGISTERS' but has 1 for each register that is clobbered
@@ -555,8 +566,8 @@ while (0)
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	\
   /* Branch registers.  */				\
   1, 0, 0, 0, 0, 0, 1, 1,				\
-  /*FP RA CCV UNAT PFS LC EC */				\
-     1, 1,  1,   1,  1, 0, 1				\
+  /*FP CCV UNAT PFS LC EC */				\
+     1,  1,   1,  1, 0, 1				\
 }
 
 /* Like `CALL_USED_REGISTERS' but used to overcome a historical
@@ -593,8 +604,8 @@ while (0)
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	\
   /* Branch registers.  */				\
   1, 0, 0, 0, 0, 0, 1, 1,				\
-  /*FP RA CCV UNAT PFS LC EC */				\
-     0, 0,  1,   0,  1, 0, 0				\
+  /*FP CCV UNAT PFS LC EC */				\
+     0,  1,   0,  1, 0, 0				\
 }
 
 
@@ -740,7 +751,7 @@ while (0)
   /* Special branch registers.  */					   \
   R_BR (0),								   \
   /* Other fixed registers.  */						   \
-  FRAME_POINTER_REGNUM, RETURN_ADDRESS_POINTER_REGNUM,			   \
+  FRAME_POINTER_REGNUM, 						   \
   AR_CCV_REGNUM, AR_UNAT_REGNUM, AR_PFS_REGNUM, AR_LC_REGNUM,		   \
   AR_EC_REGNUM		  						   \
 }
@@ -869,11 +880,11 @@ enum reg_class
   /* AR_M_REGS.  */					\
   { 0x00000000, 0x00000000, 0x00000000, 0x00000000,	\
     0x00000000, 0x00000000, 0x00000000, 0x00000000,	\
-    0x00000000, 0x00000000, 0x0C00 },			\
+    0x00000000, 0x00000000, 0x0600 },			\
   /* AR_I_REGS.  */					\
   { 0x00000000, 0x00000000, 0x00000000, 0x00000000,	\
     0x00000000, 0x00000000, 0x00000000, 0x00000000,	\
-    0x00000000, 0x00000000, 0x7000 },			\
+    0x00000000, 0x00000000, 0x3800 },			\
   /* ADDL_REGS.  */					\
   { 0x0000000F, 0x00000000, 0x00000000, 0x00000000,	\
     0x00000000, 0x00000000, 0x00000000, 0x00000000,	\
@@ -881,7 +892,7 @@ enum reg_class
   /* GR_REGS.  */					\
   { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,	\
     0x00000000, 0x00000000, 0x00000000, 0x00000000,	\
-    0x00000000, 0x00000000, 0x0300 },			\
+    0x00000000, 0x00000000, 0x0100 },			\
   /* FR_REGS.  */					\
   { 0x00000000, 0x00000000, 0x00000000, 0x00000000,	\
     0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,	\
@@ -889,15 +900,15 @@ enum reg_class
   /* GR_AND_BR_REGS.  */				\
   { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,	\
     0x00000000, 0x00000000, 0x00000000, 0x00000000,	\
-    0x00000000, 0x00000000, 0x03FF },			\
+    0x00000000, 0x00000000, 0x01FF },			\
   /* GR_AND_FR_REGS.  */				\
   { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,	\
     0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,	\
-    0x00000000, 0x00000000, 0x0300 },			\
+    0x00000000, 0x00000000, 0x0100 },			\
   /* ALL_REGS.  */					\
   { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,	\
     0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,	\
-    0xFFFFFFFF, 0xFFFFFFFF, 0x7FFF },			\
+    0xFFFFFFFF, 0xFFFFFFFF, 0x3FFF },			\
 }
 
 /* A C expression whose value is a register class containing hard register
@@ -1011,8 +1022,9 @@ enum reg_class
 /* In FP regs, we can't change FP values to integer values and vice
    versa, but we can change e.g. DImode to SImode.  */
 
-#define CANNOT_CHANGE_MODE_CLASS(FROM, TO) 	\
-  (GET_MODE_CLASS (FROM) != GET_MODE_CLASS (TO) ? FR_REGS : NO_REGS)
+#define CANNOT_CHANGE_MODE_CLASS(FROM, TO, CLASS) 	\
+  (GET_MODE_CLASS (FROM) != GET_MODE_CLASS (TO)		\
+   ? reg_classes_intersect_p (CLASS, FR_REGS) : 0)
 
 /* A C expression that defines the machine-dependent operand constraint
    letters (`I', `J', `K', .. 'P') that specify particular ranges of
@@ -1114,7 +1126,7 @@ enum reg_class
    DYNAMIC_CHAIN_ADDRESS and SETUP_FRAME_ADDRESS (for the reg stack flush).  */
 
 #define RETURN_ADDR_RTX(COUNT, FRAME) \
-  ((COUNT) == 0 ? return_address_pointer_rtx : const0_rtx)
+  ia64_return_addr_rtx (COUNT, FRAME)
 
 /* A C expression whose value is RTL representing the location of the incoming
    return address at the beginning of any function, before the prologue.  This
@@ -1175,13 +1187,6 @@ enum reg_class
       REGNO_POINTER_ALIGN (ARG_POINTER_REGNUM) = 64;	\
   } while (0)
 
-/* The register number for the return address register.  For IA-64, this
-   is not actually a pointer as the name suggests, but that's a name that
-   gen_rtx_REG already takes care to keep unique.  We modify
-   return_address_pointer_rtx in ia64_expand_prologue to reference the
-   final output regnum.  */
-#define RETURN_ADDRESS_POINTER_REGNUM 329
-
 /* Register numbers used for passing a function's static chain pointer.  */
 /* ??? The ABI sez the static chain should be passed as a normal parameter.  */
 #define STATIC_CHAIN_REGNUM 15
@@ -1205,7 +1210,6 @@ enum reg_class
   {ARG_POINTER_REGNUM,	 HARD_FRAME_POINTER_REGNUM},			\
   {FRAME_POINTER_REGNUM, STACK_POINTER_REGNUM},				\
   {FRAME_POINTER_REGNUM, HARD_FRAME_POINTER_REGNUM},			\
-  {RETURN_ADDRESS_POINTER_REGNUM, BR_REG (0)},				\
 }
 
 /* A C expression that returns nonzero if the compiler is allowed to try to
@@ -1285,6 +1289,13 @@ enum reg_class
 #define FUNCTION_ARG_PASS_BY_REFERENCE(CUM, MODE, TYPE, NAMED) \
   ia64_function_arg_pass_by_reference (&CUM, MODE, TYPE, NAMED)
 
+/* Nonzero if we do not know how to pass TYPE solely in registers.  */
+
+#define MUST_PASS_IN_STACK(MODE, TYPE) \
+  ((TYPE) != 0							\
+   && (TREE_CODE (TYPE_SIZE (TYPE)) != INTEGER_CST		\
+       || TREE_ADDRESSABLE (TYPE)))
+
 /* A C type for declaring a variable that is used as the first argument of
    `FUNCTION_ARG' and other related values.  For some target machines, the type
    `int' suffices and can hold the number of bytes of argument so far.  */
@@ -1349,7 +1360,7 @@ do {									\
    On many machines, no registers can be used for this purpose since all
    function arguments are pushed on the stack.  */
 #define FUNCTION_ARG_REGNO_P(REGNO) \
-(((REGNO) >= GR_ARG_FIRST && (REGNO) < (GR_ARG_FIRST + MAX_ARGUMENT_SLOTS)) \
+(((REGNO) >= AR_ARG_FIRST && (REGNO) < (AR_ARG_FIRST + MAX_ARGUMENT_SLOTS)) \
  || ((REGNO) >= FR_ARG_FIRST && (REGNO) < (FR_ARG_FIRST + MAX_ARGUMENT_SLOTS)))
 
 /* Implement `va_arg'.  */
@@ -1808,61 +1819,6 @@ do {									\
 #define ASM_APP_OFF "#NO_APP\n"
 
 
-/* Output of Data.  */
-
-/* This is how to output an assembler line defining a `char' constant
-   to an xdata segment.  */
-
-#define ASM_OUTPUT_XDATA_CHAR(FILE, SECTION, VALUE)			\
-do {									\
-  fprintf (FILE, "\t.xdata1\t\"%s\", ", SECTION);			\
-  output_addr_const (FILE, (VALUE));					\
-  fprintf (FILE, "\n");							\
-} while (0)
-
-/* This is how to output an assembler line defining a `short' constant
-   to an xdata segment.  */
-
-#define ASM_OUTPUT_XDATA_SHORT(FILE, SECTION, VALUE)			\
-do {									\
-  fprintf (FILE, "\t.xdata2\t\"%s\", ", SECTION);			\
-  output_addr_const (FILE, (VALUE));					\
-  fprintf (FILE, "\n");							\
-} while (0)
-
-/* This is how to output an assembler line defining an `int' constant
-   to an xdata segment.  We also handle symbol output here.  */
-
-/* ??? For ILP32, also need to handle function addresses here.  */
-
-#define ASM_OUTPUT_XDATA_INT(FILE, SECTION, VALUE)			\
-do {									\
-  fprintf (FILE, "\t.xdata4\t\"%s\", ", SECTION);			\
-  output_addr_const (FILE, (VALUE));					\
-  fprintf (FILE, "\n");							\
-} while (0)
-
-/* This is how to output an assembler line defining a `long' constant
-   to an xdata segment.  We also handle symbol output here.  */
-
-#define ASM_OUTPUT_XDATA_DOUBLE_INT(FILE, SECTION, VALUE)		\
-do {									\
-  int need_closing_paren = 0;						\
-  fprintf (FILE, "\t.xdata8\t\"%s\", ", SECTION);			\
-  if (!(TARGET_NO_PIC || TARGET_AUTO_PIC)				\
-      && GET_CODE (VALUE) == SYMBOL_REF)				\
-    {									\
-      fprintf (FILE, SYMBOL_REF_FLAG (VALUE) ? "@fptr(" : "@segrel(");	\
-      need_closing_paren = 1;						\
-    }									\
-  output_addr_const (FILE, VALUE);					\
-  if (need_closing_paren)						\
-    fprintf (FILE, ")");						\
-  fprintf (FILE, "\n");							\
-} while (0)
-
-
-
 /* Output of Uninitialized Variables.  */
 
 /* This is all handled by svr4.h.  */
@@ -1984,8 +1940,8 @@ do {									\
   "p60", "p61", "p62", "p63",						\
   /* Branch registers.  */						\
   "b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7",			\
-  /* Frame pointer.  Return address.  */				\
-  "sfp", "retaddr", "ar.ccv", "ar.unat", "ar.pfs", "ar.lc", "ar.ec",	\
+  /* Frame pointer.  Application registers.  */				\
+  "sfp", "ar.ccv", "ar.unat", "ar.pfs", "ar.lc", "ar.ec",	\
 }
 
 /* If defined, a C initializer for an array of structures containing a name and
@@ -2132,8 +2088,13 @@ do {									\
 
 /* ??? Depends on the pointer size.  */
 
-#define ASM_OUTPUT_ADDR_DIFF_ELT(STREAM, BODY, VALUE, REL) \
-  fprintf (STREAM, "\tdata8 @pcrel(.L%d)\n", VALUE)
+#define ASM_OUTPUT_ADDR_DIFF_ELT(STREAM, BODY, VALUE, REL)	\
+  do {								\
+  if (TARGET_ILP32)						\
+    fprintf (STREAM, "\tdata4 @pcrel(.L%d)\n", VALUE);		\
+  else								\
+    fprintf (STREAM, "\tdata8 @pcrel(.L%d)\n", VALUE);		\
+  } while (0)
 
 /* This is how to output an element of a case-vector that is absolute.
    (Ia64 does not use such vectors, but we must define this macro anyway.)  */
@@ -2152,7 +2113,8 @@ do {									\
    true if the symbol may be affected by dynamic relocations.  */
 #define ASM_PREFERRED_EH_DATA_FORMAT(CODE,GLOBAL)	\
   (((CODE) == 1 ? DW_EH_PE_textrel : DW_EH_PE_datarel)	\
-   | ((GLOBAL) ? DW_EH_PE_indirect : 0) | DW_EH_PE_udata8)
+   | ((GLOBAL) ? DW_EH_PE_indirect : 0)			\
+   | (TARGET_ILP32 ? DW_EH_PE_udata4 : DW_EH_PE_udata8))
 
 /* Handle special EH pointer encodings.  Absolute, pc-relative, and
    indirect are handled automatically.  */
@@ -2322,7 +2284,7 @@ do {									\
 /* An alias for a machine mode name.  This is the machine mode that elements of
    a jump-table should have.  */
 
-#define CASE_VECTOR_MODE Pmode
+#define CASE_VECTOR_MODE ptr_mode
 
 /* Define as C expression which evaluates to nonzero if the tablejump
    instruction expects the table to contain offsets from the address of the
@@ -2494,4 +2456,5 @@ enum fetchop_code {
 #undef  PROFILE_BEFORE_PROLOGUE
 #define PROFILE_BEFORE_PROLOGUE 1
 
+#define FUNCTION_OK_FOR_SIBCALL(DECL) ia64_function_ok_for_sibcall (DECL)
 /* End of ia64.h */
