@@ -70,8 +70,6 @@ static hashval_t size_htab_hash (const void *);
 static int size_htab_eq (const void *, const void *);
 static tree fold_convert_const (enum tree_code, tree, tree);
 static tree fold_convert (tree, tree);
-static enum tree_code invert_tree_comparison (enum tree_code);
-static enum tree_code swap_tree_comparison (enum tree_code);
 static int comparison_to_compcode (enum tree_code);
 static enum tree_code compcode_to_comparison (int);
 static int truth_value_p (enum tree_code);
@@ -1987,7 +1985,7 @@ pedantic_non_lvalue (tree x)
    of the given code.  It is not safe to do this for floating-point
    comparisons, except for NE_EXPR and EQ_EXPR.  */
 
-static enum tree_code
+enum tree_code
 invert_tree_comparison (enum tree_code code)
 {
   switch (code)
@@ -2012,7 +2010,7 @@ invert_tree_comparison (enum tree_code code)
 /* Similar, but return the comparison that results if the operands are
    swapped.  This is safe for floating-point.  */
 
-static enum tree_code
+enum tree_code
 swap_tree_comparison (enum tree_code code)
 {
   switch (code)
@@ -5367,12 +5365,22 @@ fold (tree expr)
   tree tem;
   tree type = TREE_TYPE (expr);
   tree arg0 = NULL_TREE, arg1 = NULL_TREE;
-  enum tree_code code = TREE_CODE (t);
-  int kind = TREE_CODE_CLASS (code);
-
+  /* APPLE LOCAL begin AltiVec */
+  enum tree_code code;
+  int kind, invert;
+  /* APPLE LOCAL end AltiVec */
   /* WINS will be nonzero when the switch is done
      if all operands are constant.  */
   int wins = 1;
+
+  /* APPLE LOCAL begin AltiVec */
+  /* Fold constant comma expressions.  */
+  while (TREE_CODE (t) == COMPOUND_EXPR && TREE_CONSTANT (t))
+    t = TREE_OPERAND (t, 1);
+    
+  code = TREE_CODE (t);
+  kind = TREE_CODE_CLASS (code);
+  /* APPLE LOCAL end AltiVec */
 
   /* Don't try to process an RTL_EXPR since its operands aren't trees.
      Likewise for a SAVE_EXPR that's already been evaluated.  */
@@ -6063,6 +6071,34 @@ fold (tree expr)
 				  TREE_OPERAND (arg0, 0),
 				  build_real (type, c1)));
 	    }
+          /* Convert a + (b*c + d*e) into (a + b*c) + d*e */
+          if (flag_unsafe_math_optimizations
+              && TREE_CODE (arg1) == PLUS_EXPR
+              && TREE_CODE (arg0) != MULT_EXPR)
+            {
+              tree tree10 = TREE_OPERAND (arg1, 0);
+              tree tree11 = TREE_OPERAND (arg1, 1);
+              if (TREE_CODE (tree11) == MULT_EXPR)
+                {
+                  tree tree0;
+                  tree0 = fold (build (PLUS_EXPR, type, arg0, tree10));
+                  return fold (build (PLUS_EXPR, type, tree0, tree11));
+                }
+            }
+          /* Convert (b*c + d*e) + a into b*c + (d*e +a) */
+          if (flag_unsafe_math_optimizations
+              && TREE_CODE (arg0) == PLUS_EXPR
+              && TREE_CODE (arg1) != MULT_EXPR)
+            {
+              tree tree00 = TREE_OPERAND (arg0, 0);
+              tree tree01 = TREE_OPERAND (arg0, 1);
+              if (TREE_CODE (tree01) == MULT_EXPR)
+                {
+                  tree tree0;
+                  tree0 = fold (build (PLUS_EXPR, type, tree01, arg1));
+                  return fold (build (PLUS_EXPR, type, tree00, tree0));
+                }
+            }
 	}
 
      bit_rotate:

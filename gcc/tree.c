@@ -94,7 +94,8 @@ struct type_hash GTY(())
 };
 
 /* Initial size of the hash table (rounded to next prime).  */
-#define TYPE_HASH_INITIAL_SIZE 1000
+/* APPLE LOCAL fsf candidate */
+#define TYPE_HASH_INITIAL_SIZE 4111
 
 /* Now here is the hash table.  When recording a type, it is added to
    the slot whose index is the hash code.  Note that the hash table is
@@ -464,6 +465,8 @@ build_vector (tree type, tree vals)
     {
       tree value = TREE_VALUE (link);
 
+      /* APPLE LOCAL AltiVec */
+      TREE_VALUE (link) = fold (value);
       over1 |= TREE_OVERFLOW (value);
       over2 |= TREE_CONSTANT_OVERFLOW (value);
     }
@@ -2471,6 +2474,8 @@ build2_stat (enum tree_code code, tree tt, tree arg0, tree arg1 MEM_STAT_DECL)
   /* Expressions without side effects may be constant if their
      arguments are as well.  */
   constant = (TREE_CODE_CLASS (code) == '<'
+	      /* APPLE LOCAL Altivec */
+	      || TREE_CODE_CLASS (code) == 'e'
 	      || TREE_CODE_CLASS (code) == '2');
   read_only = 1;
   side_effects = TREE_SIDE_EFFECTS (t);
@@ -5026,6 +5031,27 @@ finish_vector_type (tree t)
   }
 }
 
+static tree
+make_or_reuse_type (unsigned size, int unsignedp)
+{
+  if (size == INT_TYPE_SIZE)
+    return unsignedp ? unsigned_type_node : integer_type_node;
+  if (size == CHAR_TYPE_SIZE)
+    return unsignedp ? unsigned_char_type_node : signed_char_type_node;
+  if (size == SHORT_TYPE_SIZE)
+    return unsignedp ? short_unsigned_type_node : short_integer_type_node;
+  if (size == LONG_TYPE_SIZE)
+    return unsignedp ? long_unsigned_type_node : long_integer_type_node;
+  if (size == LONG_LONG_TYPE_SIZE)
+    return (unsignedp ? long_long_unsigned_type_node
+            : long_long_integer_type_node);
+
+  if (unsignedp)
+    return make_unsigned_type (size);
+  else
+    return make_signed_type (size);
+}
+
 /* Create nodes for all integer types (and error_mark_node) using the sizes
    of C datatypes.  The caller should call set_sizetype soon after calling
    this function to select one of the types as sizetype.  */
@@ -5068,17 +5094,19 @@ build_common_tree_nodes (int signed_char)
   TREE_TYPE (TYPE_MAX_VALUE (boolean_type_node)) = boolean_type_node;
   TYPE_PRECISION (boolean_type_node) = 1;
 
-  intQI_type_node = make_signed_type (GET_MODE_BITSIZE (QImode));
-  intHI_type_node = make_signed_type (GET_MODE_BITSIZE (HImode));
-  intSI_type_node = make_signed_type (GET_MODE_BITSIZE (SImode));
-  intDI_type_node = make_signed_type (GET_MODE_BITSIZE (DImode));
-  intTI_type_node = make_signed_type (GET_MODE_BITSIZE (TImode));
-
-  unsigned_intQI_type_node = make_unsigned_type (GET_MODE_BITSIZE (QImode));
-  unsigned_intHI_type_node = make_unsigned_type (GET_MODE_BITSIZE (HImode));
-  unsigned_intSI_type_node = make_unsigned_type (GET_MODE_BITSIZE (SImode));
-  unsigned_intDI_type_node = make_unsigned_type (GET_MODE_BITSIZE (DImode));
-  unsigned_intTI_type_node = make_unsigned_type (GET_MODE_BITSIZE (TImode));
+  /* Fill in the rest of the sized types.  Reuse existing type nodes
+     when possible.  */
+  intQI_type_node = make_or_reuse_type (GET_MODE_BITSIZE (QImode), 0);
+  intHI_type_node = make_or_reuse_type (GET_MODE_BITSIZE (HImode), 0);
+  intSI_type_node = make_or_reuse_type (GET_MODE_BITSIZE (SImode), 0);
+  intDI_type_node = make_or_reuse_type (GET_MODE_BITSIZE (DImode), 0);
+  intTI_type_node = make_or_reuse_type (GET_MODE_BITSIZE (TImode), 0);
+  
+  unsigned_intQI_type_node = make_or_reuse_type (GET_MODE_BITSIZE (QImode), 1);
+  unsigned_intHI_type_node = make_or_reuse_type (GET_MODE_BITSIZE (HImode), 1);
+  unsigned_intSI_type_node = make_or_reuse_type (GET_MODE_BITSIZE (SImode), 1);
+  unsigned_intDI_type_node = make_or_reuse_type (GET_MODE_BITSIZE (DImode), 1);
+  unsigned_intTI_type_node = make_or_reuse_type (GET_MODE_BITSIZE (TImode), 1);
   
   access_public_node = get_identifier ("public");
   access_protected_node = get_identifier ("protected");
@@ -5170,40 +5198,6 @@ build_common_tree_nodes_2 (int short_double)
 
     va_list_type_node = t;
   }
-
-  unsigned_V4SI_type_node
-    = make_vector (V4SImode, unsigned_intSI_type_node, 1);
-  unsigned_V2HI_type_node
-    = make_vector (V2HImode, unsigned_intHI_type_node, 1);
-  unsigned_V2SI_type_node
-    = make_vector (V2SImode, unsigned_intSI_type_node, 1);
-  unsigned_V2DI_type_node
-    = make_vector (V2DImode, unsigned_intDI_type_node, 1);
-  unsigned_V4HI_type_node
-    = make_vector (V4HImode, unsigned_intHI_type_node, 1);
-  unsigned_V8QI_type_node
-    = make_vector (V8QImode, unsigned_intQI_type_node, 1);
-  unsigned_V8HI_type_node
-    = make_vector (V8HImode, unsigned_intHI_type_node, 1);
-  unsigned_V16QI_type_node
-    = make_vector (V16QImode, unsigned_intQI_type_node, 1);
-  unsigned_V1DI_type_node
-    = make_vector (V1DImode, unsigned_intDI_type_node, 1);
-
-  V16SF_type_node = make_vector (V16SFmode, float_type_node, 0);
-  V4SF_type_node = make_vector (V4SFmode, float_type_node, 0);
-  V4SI_type_node = make_vector (V4SImode, intSI_type_node, 0);
-  V2HI_type_node = make_vector (V2HImode, intHI_type_node, 0);
-  V2SI_type_node = make_vector (V2SImode, intSI_type_node, 0);
-  V2DI_type_node = make_vector (V2DImode, intDI_type_node, 0);
-  V4HI_type_node = make_vector (V4HImode, intHI_type_node, 0);
-  V8QI_type_node = make_vector (V8QImode, intQI_type_node, 0);
-  V8HI_type_node = make_vector (V8HImode, intHI_type_node, 0);
-  V2SF_type_node = make_vector (V2SFmode, float_type_node, 0);
-  V2DF_type_node = make_vector (V2DFmode, double_type_node, 0);
-  V16QI_type_node = make_vector (V16QImode, intQI_type_node, 0);
-  V1DI_type_node = make_vector (V1DImode, intDI_type_node, 0);
-  V4DF_type_node = make_vector (V4DFmode, double_type_node, 0);
 }
 
 /* HACK.  GROSS.  This is absolutely disgusting.  I wish there was a
@@ -5252,21 +5246,36 @@ reconstruct_complex_type (tree type, tree bottom)
   return outer;
 }
 
-/* Returns a vector tree node given a vector mode, the inner type, and
-   the signness.  */
-
+/* Returns a vector tree node given a vector mode, the inner type.  */
 tree
-make_vector (enum machine_mode mode, tree innertype, int unsignedp)
+build_vector_type_for_mode (tree innertype, enum machine_mode mode)
 {
   tree t;
-
   t = make_node (VECTOR_TYPE);
   TREE_TYPE (t) = innertype;
   TYPE_MODE (t) = mode;
-  TREE_UNSIGNED (TREE_TYPE (t)) = unsignedp;
   finish_vector_type (t);
-
   return t;
+}
+
+/* Similarly, but takes inner type and units.  */
+
+tree
+build_vector_type (tree innertype, int nunits)
+{
+  enum machine_mode innermode = TYPE_MODE (innertype);
+  enum machine_mode mode;
+
+  if (GET_MODE_CLASS (innermode) == MODE_FLOAT)
+    mode = MIN_MODE_VECTOR_FLOAT;
+  else
+    mode = MIN_MODE_VECTOR_INT;
+
+  for (; mode != VOIDmode ; mode = GET_MODE_WIDER_MODE (mode))
+    if (GET_MODE_NUNITS (mode) == nunits && GET_MODE_INNER (mode) == innermode)
+      return build_vector_type_for_mode (innertype, mode);
+
+  return NULL_TREE;
 }
 
 /* Given an initializer INIT, return TRUE if INIT is zero or some
@@ -5349,6 +5358,34 @@ is_essa_node (tree t)
   return false;
 }
 
+/* Checks whether IDX is in array bounds for ARRAY.  */
+
+bool
+in_array_bounds_p (tree array, tree idx)
+{
+  tree dom = TYPE_DOMAIN (TREE_TYPE (array));
+  tree min, max;
+
+  if (TREE_CODE (idx) != INTEGER_CST)
+    return false;
+	    
+  if (!dom)
+    return false;
+
+  min = TYPE_MIN_VALUE (dom);
+  max = TYPE_MAX_VALUE (dom);
+  if (!min
+      || !max
+      || TREE_CODE (min) != INTEGER_CST
+      || TREE_CODE (max) != INTEGER_CST)
+    return false;
+
+  if (tree_int_cst_lt (idx, min)
+      || tree_int_cst_lt (max, idx))
+    return false;
+
+  return true;
+}
 
 /* Return true if T (assumed to be a DECL) must be assigned a memory
    location.  */
