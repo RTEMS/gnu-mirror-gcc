@@ -1,5 +1,5 @@
 /* Print RTL for GNU C Compiler.
-   Copyright (C) 1987, 1988, 1992 Free Software Foundation, Inc.
+   Copyright (C) 1987, 1988, 1992, 1997 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -47,6 +47,8 @@ char spaces[] = "                                                               
 
 static int sawclose = 0;
 
+static int indent;
+
 /* Names for patterns.  Non-zero only when linked with insn-output.c.  */
 
 extern char **insn_name_ptr;
@@ -57,7 +59,6 @@ static void
 print_rtx (in_rtx)
      register rtx in_rtx;
 {
-  static int indent;
   register int i, j;
   register char *format_ptr;
   register int is_insn;
@@ -223,6 +224,25 @@ print_rtx (in_rtx)
   sawclose = 1;
 }
 
+/* Print an rtx on the current line of FILE.  Initially indent IND
+   characters.  */
+
+void
+print_inline_rtx (outf, x, ind)
+     FILE *outf;
+     rtx x;
+{
+  int oldsaw = sawclose;
+  int oldindent = indent;
+
+  sawclose = 0;
+  indent = ind;
+  outfile = outf;
+  print_rtx (x);
+  sawclose = oldsaw;
+  indent = oldindent;
+}
+
 /* Call this function from the debugger to see what X looks like.  */
 
 void
@@ -274,7 +294,7 @@ debug_rtx_list (x, n)
    The found insn is returned to enable further debugging analysis.  */
 
 rtx
-debug_rtx_find(x, uid)
+debug_rtx_find (x, uid)
      rtx x;
      int uid;
 {
@@ -329,4 +349,17 @@ print_rtl (outf, rtx_first)
       default:
 	print_rtx (rtx_first);
       }
+}
+
+/* Like print_rtx, except specify a file.  */
+
+void
+print_rtl_single (outf, x)
+     FILE *outf;
+     rtx x;
+{
+  outfile = outf;
+  sawclose = 0;
+  print_rtx (x);
+  putc ('\n', outf);
 }

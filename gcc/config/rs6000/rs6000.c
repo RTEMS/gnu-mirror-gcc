@@ -1,5 +1,5 @@
 /* Subroutines used for code generation on IBM RS/6000.
-   Copyright (C) 1991, 93, 94, 95, 96, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1991, 93, 94, 95, 96, 97, 1998 Free Software Foundation, Inc.
    Contributed by Richard Kenner (kenner@vlsi1.ultra.nyu.edu)
 
 This file is part of GNU CC.
@@ -673,28 +673,47 @@ num_insns_constant (op, mode)
       return num_insns_constant_wide ((HOST_WIDE_INT)l);
     }
 
-  else if (GET_CODE (op) == CONST_DOUBLE && TARGET_32BIT)
-    return (num_insns_constant_wide (CONST_DOUBLE_LOW (op))
-	    + num_insns_constant_wide (CONST_DOUBLE_HIGH (op)));
-
-  else if (GET_CODE (op) == CONST_DOUBLE && TARGET_64BIT)
+  else if (GET_CODE (op) == CONST_DOUBLE)
     {
-      HOST_WIDE_INT low  = CONST_DOUBLE_LOW (op);
-      HOST_WIDE_INT high = CONST_DOUBLE_HIGH (op);
+      HOST_WIDE_INT low;
+      HOST_WIDE_INT high;
+      long l[2];
+      REAL_VALUE_TYPE rv;
+      int endian = (WORDS_BIG_ENDIAN == 0);
 
-      if (high == 0 && (low & 0x80000000) == 0)
-	return num_insns_constant_wide (low);
+      if (mode == VOIDmode || mode == DImode)
+	{
+	  high = CONST_DOUBLE_HIGH (op);
+	  low  = CONST_DOUBLE_LOW (op);
+	}
+      else
+	{
+	  REAL_VALUE_FROM_CONST_DOUBLE (rv, op);
+	  REAL_VALUE_TO_TARGET_DOUBLE (rv, l);
+	  high = l[endian];
+	  low  = l[1 - endian];
+	}
 
-      else if (((high & 0xffffffff) == 0xffffffff)
-	       && ((low & 0x80000000) != 0))
-	return num_insns_constant_wide (low);
-
-      else if (low == 0)
-	return num_insns_constant_wide (high) + 1;
+      if (TARGET_32BIT)
+	return (num_insns_constant_wide (low)
+		+ num_insns_constant_wide (high));
 
       else
-	return (num_insns_constant_wide (high)
-		+ num_insns_constant_wide (low) + 1);
+	{
+	  if (high == 0 && (low & 0x80000000) == 0)
+	    return num_insns_constant_wide (low);
+
+	  else if (((high & 0xffffffff) == 0xffffffff)
+		   && ((low & 0x80000000) != 0))
+	    return num_insns_constant_wide (low);
+
+	  else if (low == 0)
+	    return num_insns_constant_wide (high) + 1;
+
+	  else
+	    return (num_insns_constant_wide (high)
+		    + num_insns_constant_wide (low) + 1);
+	}
     }
 
   else
@@ -1148,6 +1167,33 @@ init_cumulative_args (cum, fntype, libname, incoming)
     }
 }
 
+/* If defined, a C expression which determines whether, and in which
+   direction, to pad out an argument with extra space.  The value
+   should be of type `enum direction': either `upward' to pad above
+   the argument, `downward' to pad below, or `none' to inhibit
+   padding.
+
+   For the AIX ABI structs are always stored left shifted in their
+   argument slot.  */
+
+enum direction
+function_arg_padding (mode, type)
+     enum machine_mode mode;
+     tree type;
+{
+  if (type != 0 && AGGREGATE_TYPE_P (type))
+    return upward;
+
+  /* This is the default definition.  */
+  return (! BYTES_BIG_ENDIAN
+          ? upward
+          : ((mode == BLKmode
+              ? (type && TREE_CODE (TYPE_SIZE (type)) == INTEGER_CST
+                 && int_size_in_bytes (type) < (PARM_BOUNDARY / BITS_PER_UNIT))
+              : GET_MODE_BITSIZE (mode) < PARM_BOUNDARY)
+             ? downward : upward));
+}
+
 /* If defined, a C expression that gives the alignment boundary, in bits,
    of an argument with the specified mode and type.  If it is not defined, 
    PARM_BOUNDARY is used for all arguments.
@@ -1330,9 +1376,11 @@ function_arg (cum, mode, type, named)
 				const0_rtx)));
     }
 
-  /* Long longs won't be split between register and stack */
+  /* Long longs won't be split between register and stack;
+     FP arguments get passed on the stack if they didn't get a register.  */
   else if ((DEFAULT_ABI == ABI_V4 || DEFAULT_ABI == ABI_SOLARIS) &&
-	   align_words + RS6000_ARG_SIZE (mode, type, named) > GP_ARG_NUM_REG)
+	   (align_words + RS6000_ARG_SIZE (mode, type, named) > GP_ARG_NUM_REG
+	    || (GET_MODE_CLASS (mode) == MODE_FLOAT && TARGET_HARD_FLOAT)))
     {
       return NULL_RTX;
     }
@@ -1438,11 +1486,14 @@ setup_incoming_varargs (cum, mode, type, pretend_size, no_rtl)
 	     "setup_vararg: words = %2d, fregno = %2d, nargs = %4d, proto = %d, mode = %4s, no_rtl= %d\n",
 	     cum->words, cum->fregno, cum->nargs_prototype, cum->prototype, GET_MODE_NAME (mode), no_rtl);
 
-  if ((DEFAULT_ABI == ABI_V4 || DEFAULT_ABI == ABI_SOLARIS) && !no_rtl)
+  if (DEFAULT_ABI == ABI_V4 || DEFAULT_ABI == ABI_SOLARIS)
     {
       rs6000_sysv_varargs_p = 1;
-      save_area = plus_constant (frame_pointer_rtx, RS6000_VARARGS_OFFSET);
+      if (! no_rtl)
+	save_area = plus_constant (frame_pointer_rtx, RS6000_VARARGS_OFFSET);
     }
+  else
+    rs6000_sysv_varargs_p = 0;
 
   if (cum->words < 8)
     {
@@ -2119,7 +2170,7 @@ rs6000_got_register (value)
 }
 
 
-/* Replace all occurances of register FROM with an new pseduo register in an insn X.
+/* Replace all occurrences of register FROM with an new pseudo register in an insn X.
    Store the pseudo register used in REG.
    This is only safe during FINALIZE_PIC, since the registers haven't been setup
    yet.  */
@@ -2194,7 +2245,7 @@ void
 rs6000_finalize_pic ()
 {
   /* Loop through all of the insns, replacing the special GOT_TOC_REGNUM
-     with an appropriate pseduo register.  If we find we need GOT/TOC,
+     with an appropriate pseudo register.  If we find we need GOT/TOC,
      add the appropriate init code.  */
   if (flag_pic && (DEFAULT_ABI == ABI_V4 || DEFAULT_ABI == ABI_SOLARIS))
     {
@@ -2236,7 +2287,7 @@ rs6000_finalize_pic ()
 }
 
 
-/* Search for any occurrance of the GOT_TOC register marker that should
+/* Search for any occurrence of the GOT_TOC register marker that should
    have been eliminated, but may have crept back in.  */
 
 void
@@ -2261,6 +2312,7 @@ struct machine_function
   int save_toc_p;
   int fpmem_size;
   int fpmem_offset;
+  rtx pic_offset_table_rtx;
 };
 
 /* Functions to save and restore rs6000_fpmem_size.
@@ -2278,6 +2330,7 @@ rs6000_save_machine_status (p)
   machine->sysv_varargs_p = rs6000_sysv_varargs_p;
   machine->fpmem_size     = rs6000_fpmem_size;
   machine->fpmem_offset   = rs6000_fpmem_offset;
+  machine->pic_offset_table_rtx = pic_offset_table_rtx;
 }
 
 void
@@ -2289,6 +2342,7 @@ rs6000_restore_machine_status (p)
   rs6000_sysv_varargs_p = machine->sysv_varargs_p;
   rs6000_fpmem_size     = machine->fpmem_size;
   rs6000_fpmem_offset   = machine->fpmem_offset;
+  pic_offset_table_rtx  = machine->pic_offset_table_rtx;
 
   free (machine);
   p->machine = (struct machine_function *)0;
@@ -2315,8 +2369,10 @@ rs6000_init_expanders ()
 
 #if TARGET_ELF
 #define SMALL_DATA_RELOC ((rs6000_sdata == SDATA_EABI) ? "sda21" : "sdarel")
+#define SMALL_DATA_REG ((rs6000_sdata == SDATA_EABI) ? 0 : 13)
 #else
 #define SMALL_DATA_RELOC "sda21"
+#define SMALL_DATA_REG 0
 #endif
 
 void
@@ -2515,7 +2571,8 @@ print_operand (file, x, code)
 	  else
 	    output_address (plus_constant (XEXP (x, 0), 4));
 	  if (small_data_operand (x, GET_MODE (x)))
-	    fprintf (file, "@%s(%s)", SMALL_DATA_RELOC, reg_names[0]);
+	    fprintf (file, "@%s(%s)", SMALL_DATA_RELOC,
+		     reg_names[SMALL_DATA_REG]);
 	}
       return;
 			    
@@ -2743,7 +2800,8 @@ print_operand (file, x, code)
 	  else
 	    output_address (plus_constant (XEXP (x, 0), 8));
 	  if (small_data_operand (x, GET_MODE (x)))
-	    fprintf (file, "@%s(%s)", SMALL_DATA_RELOC, reg_names[0]);
+	    fprintf (file, "@%s(%s)", SMALL_DATA_RELOC,
+		     reg_names[SMALL_DATA_REG]);
 	}
       return;
 			    
@@ -2792,7 +2850,8 @@ print_operand (file, x, code)
 	  else
 	    output_address (plus_constant (XEXP (x, 0), 12));
 	  if (small_data_operand (x, GET_MODE (x)))
-	    fprintf (file, "@%s(%s)", SMALL_DATA_RELOC, reg_names[0]);
+	    fprintf (file, "@%s(%s)", SMALL_DATA_RELOC,
+		     reg_names[SMALL_DATA_REG]);
 	}
       return;
 			    
@@ -2834,7 +2893,8 @@ print_operand_address (file, x)
     {
       output_addr_const (file, x);
       if (small_data_operand (x, GET_MODE (x)))
-	fprintf (file, "@%s(%s)", SMALL_DATA_RELOC, reg_names[0]);
+	fprintf (file, "@%s(%s)", SMALL_DATA_RELOC,
+		 reg_names[SMALL_DATA_REG]);
 
 #ifdef TARGET_NO_TOC
       else if (TARGET_NO_TOC)
@@ -3168,7 +3228,8 @@ rs6000_stack_info ()
 
   else if (abi == ABI_V4 || abi == ABI_NT || abi == ABI_SOLARIS)
     info_ptr->push_p = (total_raw_size > info_ptr->fixed_size
-			|| info_ptr->lr_save_p);
+			|| (abi == ABI_NT ? info_ptr->lr_save_p
+			    : info_ptr->calls_p));
 
   else
     info_ptr->push_p = (frame_pointer_needed
@@ -4408,28 +4469,33 @@ output_function_profiler (file, labelno)
       if (flag_pic == 1)
 	{
 	  fprintf (file, "\tbl _GLOBAL_OFFSET_TABLE_@local-4\n");
+	  fprintf (file, "\t%s %s,4(%s)\n",
+		   (TARGET_NEW_MNEMONICS) ? "stw" : "st",
+		   reg_names[0], reg_names[1]);
 	  fprintf (file, "\tmflr %s\n", reg_names[11]);
 	  fprintf (file, "\t%s %s,", (TARGET_NEW_MNEMONICS) ? "lwz" : "l",
-		   reg_names[11]);
+		   reg_names[0]);
 	  assemble_name (file, buf);
 	  fprintf (file, "@got(%s)\n", reg_names[11]);
 	}
 #if TARGET_ELF
       else if (flag_pic > 1 || TARGET_RELOCATABLE)
 	{
-	  fprintf (file, "\tstw %s,4(%s)\n", reg_names[0], reg_names[1]);
-	  fprintf (file, "%s\n", MINIMAL_TOC_SECTION_ASM_OP);
-	  assemble_name (file, buf);
-	  fprintf (file, "X = .-.LCTOC1\n");
-	  fprintf (file, "\t.long ");
-	  assemble_name (file, buf);
-	  fputs ("\n\t.previous\n", file);
+	  fprintf (file, "\t%s %s,4(%s)\n",
+		   (TARGET_NEW_MNEMONICS) ? "stw" : "st",
+		   reg_names[0], reg_names[1]);
 	  rs6000_pic_func_labelno = rs6000_pic_labelno;
 	  rs6000_output_load_toc_table (file, 11);
 	  fprintf (file, "\t%s %s,", (TARGET_NEW_MNEMONICS) ? "lwz" : "l",
 		   reg_names[11]);
 	  assemble_name (file, buf);
 	  fprintf (file, "X(%s)\n", reg_names[11]);
+	  fprintf (file, "%s\n", MINIMAL_TOC_SECTION_ASM_OP);
+	  assemble_name (file, buf);
+	  fprintf (file, "X = .-.LCTOC1\n");
+	  fprintf (file, "\t.long ");
+	  assemble_name (file, buf);
+	  fputs ("\n\t.previous\n", file);
 	}
 #endif
       else if (TARGET_NEW_MNEMONICS)
@@ -4438,7 +4504,7 @@ output_function_profiler (file, labelno)
 	  assemble_name (file, buf);
 	  fprintf (file, "@ha\n");
 	  fprintf (file, "\tstw %s,4(%s)\n", reg_names[0], reg_names[1]);
-	  fprintf (file, "\taddi %s,%s,", reg_names[11], reg_names[11]);
+	  fprintf (file, "\taddi %s,%s,", reg_names[0], reg_names[11]);
 	  assemble_name (file, buf);
 	  fputs ("@l\n", file);
 	}

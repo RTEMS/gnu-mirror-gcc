@@ -2,7 +2,7 @@
    hosting on Windows NT 3.x, using a Unix style C library and tools,
    as distinct from winnt.h, which is used to build GCC for use with a
    windows style library and tool set and uses the Microsoft tools.
-   Copyright (C) 1995, 1996, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1995, 1996, 1997, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -20,7 +20,6 @@ You should have received a copy of the GNU General Public License
 along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA. */
-
 
 #define YES_UNDERSCORES
 
@@ -41,6 +40,9 @@ Boston, MA 02111-1307, USA. */
   -D__cdecl=__attribute__((__cdecl__)) \
   -Asystem(winnt) -Acpu(i386) -Amachine(i386)"
 
+#undef CPP_SPEC
+#define CPP_SPEC "-remap %(cpp_cpu) %[cpp_cpu] %{posix:-D_POSIX_SOURCE}"
+
 /* We have to dynamic link to get to the system DLLs.  All of libc, libm and
    the Unix stuff is in cygwin.dll.  The import library is called
    'libcygwin.a'.  For Windows applications, include more libraries, but
@@ -48,7 +50,8 @@ Boston, MA 02111-1307, USA. */
    ld, but that doesn't work just yet.  */
 
 #undef LIB_SPEC
-#define LIB_SPEC "-lcygwin %{mwindows:-luser32 -lgdi32 -lcomdlg32} -lkernel32"
+#define LIB_SPEC "-lcygwin %{mwindows:-luser32 -lgdi32 -lcomdlg32} -lkernel32 \
+  -ladvapi32 -lshell32"
 
 #define LINK_SPEC "%{mwindows:--subsystem windows}"
 
@@ -146,6 +149,27 @@ do									\
 while (0)
 #endif
 
+/* This macro gets just the user-specified name out of the string in a
+   SYMBOL_REF.  Discard trailing @[NUM] encoded by ENCODE_SECTION_INFO.   */
+
+#undef  STRIP_NAME_ENCODING
+#define STRIP_NAME_ENCODING(VAR,SYMBOL_NAME)				\
+do {									\
+  char *_p;								\
+  char *_name = ((SYMBOL_NAME) + ((SYMBOL_NAME)[0] == '*'));		\
+  for (_p = _name; *_p && *_p != '@'; ++_p)				\
+    ;									\
+  if (*_p == '@')							\
+    {									\
+      int _len = _p - _name;						\
+      (VAR) = (char *) alloca (_len + 1);				\
+      strncpy ((VAR), _name, _len);					\
+      (VAR)[_len] = '\0';						\
+    }									\
+  else									\
+    (VAR) = _name;							\
+} while (0)
+      
 /* Emit code to check the stack when allocating more that 4000
    bytes in one go. */
 
@@ -199,3 +223,9 @@ do {								\
 	     TREE_CODE (DECL) == FUNCTION_DECL			\
 	     ? "discard" : "same_size");			\
 } while (0)
+
+#undef ASM_COMMENT_START
+#define ASM_COMMENT_START " #"
+
+/* Don't assume anything about the header files. */
+#define NO_IMPLICIT_EXTERN_C

@@ -1,5 +1,5 @@
 /* Optimize jump instructions, for GNU compiler.
-   Copyright (C) 1987, 88, 89, 91-96, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1987, 88, 89, 91-97, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -52,12 +52,14 @@ Boston, MA 02111-1307, USA.  */
    from other passes as well.  */
 
 #include "config.h"
+#include <stdio.h>
 #include "rtl.h"
 #include "flags.h"
 #include "hard-reg-set.h"
 #include "regs.h"
 #include "insn-config.h"
 #include "insn-flags.h"
+#include "recog.h"
 #include "expr.h"
 #include "real.h"
 #include "except.h"
@@ -115,6 +117,7 @@ static void delete_computation		PROTO((rtx));
 static void delete_from_jump_chain	PROTO((rtx));
 static int delete_labelref_insn		PROTO((rtx, rtx, int));
 static void redirect_tablejump		PROTO((rtx, rtx));
+static rtx find_insert_position         PROTO((rtx, rtx));
 
 /* Delete no-op jumps and optimize jumps to jumps
    and jumps around jumps.
@@ -760,10 +763,8 @@ jump_optimize (f, cross_jump, noop_moves, after_regscan)
 	      && GET_CODE (temp3) == INSN
 	      && (temp4 = single_set (temp3)) != 0
 	      && GET_CODE (temp1 = SET_DEST (temp4)) == REG
-#ifdef SMALL_REGISTER_CLASSES
 	      && (! SMALL_REGISTER_CLASSES
 		  || REGNO (temp1) >= FIRST_PSEUDO_REGISTER)
-#endif
 	      && (temp2 = next_active_insn (insn)) != 0
 	      && GET_CODE (temp2) == INSN
 	      && (temp4 = single_set (temp2)) != 0
@@ -898,11 +899,8 @@ jump_optimize (f, cross_jump, noop_moves, after_regscan)
 	      && GET_CODE (temp2) == INSN
 	      && (temp4 = single_set (temp2)) != 0
 	      && GET_CODE (temp1 = SET_DEST (temp4)) == REG
-#ifdef SMALL_REGISTER_CLASSES
 	      && (! SMALL_REGISTER_CLASSES
 		  || REGNO (temp1) >= FIRST_PSEUDO_REGISTER)
-#endif
-
 	      && (temp3 = prev_active_insn (insn)) != 0
 	      && GET_CODE (temp3) == INSN
 	      && (temp4 = single_set (temp3)) != 0
@@ -988,10 +986,8 @@ jump_optimize (f, cross_jump, noop_moves, after_regscan)
 	      && (temp1 = single_set (temp)) != 0
 	      && (temp2 = SET_DEST (temp1), GET_CODE (temp2) == REG)
 	      && GET_MODE_CLASS (GET_MODE (temp2)) == MODE_INT
-#ifdef SMALL_REGISTER_CLASSES
 	      && (! SMALL_REGISTER_CLASSES
 		  || REGNO (temp2) >= FIRST_PSEUDO_REGISTER)
-#endif
 	      && GET_CODE (SET_SRC (temp1)) != REG
 	      && GET_CODE (SET_SRC (temp1)) != SUBREG
 	      && GET_CODE (SET_SRC (temp1)) != CONST_INT
@@ -1001,11 +997,12 @@ jump_optimize (f, cross_jump, noop_moves, after_regscan)
 	    {
 	      rtx new = gen_reg_rtx (GET_MODE (temp2));
 
-	      if (validate_change (temp, &SET_DEST (temp1), new, 0))
+	      if ((temp3 = find_insert_position (insn, temp))
+		  && validate_change (temp, &SET_DEST (temp1), new, 0))
 		{
 		  next = emit_insn_after (gen_move_insn (temp2, new), insn);
 		  emit_insn_after_with_line_notes (PATTERN (temp), 
-						   PREV_INSN (insn), temp);
+						   PREV_INSN (temp3), temp);
 		  delete_insn (temp);
 		  reallabelprev = prev_active_insn (JUMP_LABEL (insn));
 		}
@@ -1031,10 +1028,8 @@ jump_optimize (f, cross_jump, noop_moves, after_regscan)
 	      && (temp1 = single_set (temp)) != 0
 	      && (temp2 = SET_DEST (temp1), GET_CODE (temp2) == REG)
 	      && GET_MODE_CLASS (GET_MODE (temp2)) == MODE_INT
-#ifdef SMALL_REGISTER_CLASSES
 	      && (! SMALL_REGISTER_CLASSES
 		  || REGNO (temp2) >= FIRST_PSEUDO_REGISTER)
-#endif
 	      && ! side_effects_p (SET_SRC (temp1))
 	      && ! may_trap_p (SET_SRC (temp1))
 	      && rtx_cost (SET_SRC (temp1), SET) < 10
@@ -1046,14 +1041,19 @@ jump_optimize (f, cross_jump, noop_moves, after_regscan)
 	    {
 	      rtx new = gen_reg_rtx (GET_MODE (temp2));
 
-	      if (validate_change (temp, &SET_DEST (temp1), new, 0))
+	      if ((temp5 = find_insert_position (insn, temp))
+		  && (temp6 = find_insert_position (insn, temp3))
+		  && validate_change (temp, &SET_DEST (temp1), new, 0))
 		{
+		  /* Use the earliest of temp5 and temp6. */
+		  if (temp5 != insn)
+		    temp6 = temp5;
 		  next = emit_insn_after (gen_move_insn (temp2, new), insn);
 		  emit_insn_after_with_line_notes (PATTERN (temp),
-						   PREV_INSN (insn), temp);
+						   PREV_INSN (temp6), temp);
 		  emit_insn_after_with_line_notes
 		    (replace_rtx (PATTERN (temp3), temp2, new),
-		     PREV_INSN (insn), temp3);
+		     PREV_INSN (temp6), temp3);
 		  delete_insn (temp);
 		  delete_insn (temp3);
 		  reallabelprev = prev_active_insn (JUMP_LABEL (insn));
@@ -1093,10 +1093,8 @@ jump_optimize (f, cross_jump, noop_moves, after_regscan)
 	      && (temp4 = single_set (temp3)) != 0
 	      && (temp2 = SET_DEST (temp4), GET_CODE (temp2) == REG)
 	      && GET_MODE_CLASS (GET_MODE (temp2)) == MODE_INT
-#ifdef SMALL_REGISTER_CLASSES
 	      && (! SMALL_REGISTER_CLASSES
 		  || REGNO (temp2) >= FIRST_PSEUDO_REGISTER)
-#endif
 	      && rtx_equal_p (SET_DEST (temp4), temp2)
 	      && ! side_effects_p (SET_SRC (temp4))
 	      && ! may_trap_p (SET_SRC (temp4))
@@ -1104,13 +1102,18 @@ jump_optimize (f, cross_jump, noop_moves, after_regscan)
 	    {
 	      rtx new = gen_reg_rtx (GET_MODE (temp2));
 
-	      if (validate_change (temp3, &SET_DEST (temp4), new, 0))
+	      if ((temp5 = find_insert_position (insn, temp))
+		  && (temp6 = find_insert_position (insn, temp3))
+		  && validate_change (temp3, &SET_DEST (temp4), new, 0))
 		{
+		  /* Use the earliest of temp5 and temp6. */
+		  if (temp5 != insn)
+		    temp6 = temp5;
 		  next = emit_insn_after (gen_move_insn (temp2, new), insn);
 		  emit_insn_after_with_line_notes (PATTERN (temp),
-						   PREV_INSN (insn), temp);
+						   PREV_INSN (temp6), temp);
 		  emit_insn_after_with_line_notes (PATTERN (temp3),
-						   PREV_INSN (insn), temp3);
+						   PREV_INSN (temp6), temp3);
 		  delete_insn (temp);
 		  delete_insn (temp3);
 		  reallabelprev = prev_active_insn (JUMP_LABEL (insn));
@@ -1147,10 +1150,8 @@ jump_optimize (f, cross_jump, noop_moves, after_regscan)
 	      && GET_CODE (temp) == INSN
 	      && GET_CODE (PATTERN (temp)) == SET
 	      && GET_CODE (temp1 = SET_DEST (PATTERN (temp))) == REG
-#ifdef SMALL_REGISTER_CLASSES
 	      && (! SMALL_REGISTER_CLASSES
 		  || REGNO (temp1) >= FIRST_PSEUDO_REGISTER)
-#endif
 	      && (GET_CODE (temp2 = SET_SRC (PATTERN (temp))) == REG
 		  || GET_CODE (temp2) == SUBREG
 		  /* ??? How about floating point constants?  */
@@ -1159,8 +1160,11 @@ jump_optimize (f, cross_jump, noop_moves, after_regscan)
 		 There is no point in using the old value of TEMP1 if
 		 it is a register, since cse will alias them.  It can
 		 lose if the old value were a hard register since CSE
-		 won't replace hard registers.  */
-	      && (((temp3 = reg_set_last (temp1, insn)) != 0)
+		 won't replace hard registers.  Avoid using TEMP3 if
+		 small register classes and it is a hard register.  */
+	      && (((temp3 = reg_set_last (temp1, insn)) != 0
+		   && ! (SMALL_REGISTER_CLASSES && GET_CODE (temp3) == REG
+			 && REGNO (temp3) < FIRST_PSEUDO_REGISTER))
 		  /* Make the latter case look like  x = x; if (...) x = b;  */
 		  || (temp3 = temp1, 1))
 	      /* INSN must either branch to the insn after TEMP or the insn
@@ -2335,6 +2339,8 @@ duplicate_loop_exit_test (loop_start)
 	      || find_reg_note (insn, REG_LIBCALL, NULL_RTX))
 	    return 0;
 	  break;
+	default:
+	  break;
 	}
     }
 
@@ -3085,6 +3091,9 @@ comparison_dominates_p (code1, code2)
       if (code2 == GEU || code2 == NE)
 	return 1;
       break;
+      
+    default:
+      break;
     }
 
   return 0;
@@ -3405,8 +3414,11 @@ mark_jump_label (x, insn, cross_jump)
 
 	for (i = 0; i < XVECLEN (x, eltnum); i++)
 	  mark_jump_label (XVECEXP (x, eltnum, i), NULL_RTX, cross_jump);
-	return;
       }
+      return;
+      
+    default:
+      break;
     }
 
   fmt = GET_RTX_FORMAT (code);
@@ -4174,6 +4186,9 @@ rtx_renumbered_equal_p (x, y)
 
     case SYMBOL_REF:
       return XSTR (x, 0) == XSTR (y, 0);
+
+    default:
+      break;
     }
 
   /* (MULT:SI x y) and (MULT:HI x y) are NOT equivalent.  */
@@ -4463,7 +4478,10 @@ thread_jumps (f, max_reg, flag_before_loop)
 	  if (rtx_equal_for_thread_p (b1op0, b2op0, b2)
 	      && rtx_equal_for_thread_p (b1op1, b2op1, b2)
 	      && (comparison_dominates_p (code1, code2)
-		  || comparison_dominates_p (code1, reverse_condition (code2))))
+		  || (comparison_dominates_p (code1, reverse_condition (code2))
+		      && can_reverse_comparison_p (XEXP (SET_SRC (PATTERN (b1)),
+							 0),
+						   b1))))
 	    {
 	      t1 = prev_nonnote_insn (b1);
 	      t2 = prev_nonnote_insn (b2);
@@ -4641,6 +4659,9 @@ rtx_equal_for_thread_p (x, y, yinsn)
 
     case SYMBOL_REF:
       return XSTR (x, 0) == XSTR (y, 0);
+      
+    default:
+      break;
     }
 
   if (x == y)
@@ -4701,4 +4722,46 @@ rtx_equal_for_thread_p (x, y, yinsn)
 	}
     }
   return 1;
+}
+
+
+/* Return the insn that NEW can be safely inserted in front of starting at
+   the jump insn INSN.  Return 0 if it is not safe to do this jump
+   optimization.  Note that NEW must contain a single set. */
+
+static rtx
+find_insert_position (insn, new)
+     rtx insn;
+     rtx new;
+{
+  int i;
+  rtx prev;
+
+  /* If NEW does not clobber, it is safe to insert NEW before INSN. */
+  if (GET_CODE (PATTERN (new)) != PARALLEL)
+    return insn;
+
+  for (i = XVECLEN (PATTERN (new), 0) - 1; i >= 0; i--)
+    if (GET_CODE (XVECEXP (PATTERN (new), 0, i)) == CLOBBER
+	&& reg_overlap_mentioned_p (XEXP (XVECEXP (PATTERN (new), 0, i), 0),
+				    insn))
+      break;
+
+  if (i < 0)
+    return insn;
+
+  /* There is a good chance that the previous insn PREV sets the thing
+     being clobbered (often the CC in a hard reg).  If PREV does not
+     use what NEW sets, we can insert NEW before PREV. */
+
+  prev = prev_active_insn (insn);
+  for (i = XVECLEN (PATTERN (new), 0) - 1; i >= 0; i--)
+    if (GET_CODE (XVECEXP (PATTERN (new), 0, i)) == CLOBBER
+	&& reg_overlap_mentioned_p (XEXP (XVECEXP (PATTERN (new), 0, i), 0),
+				    insn)
+	&& ! modified_in_p (XEXP (XVECEXP (PATTERN (new), 0, i), 0),
+			    prev))
+      return 0;
+
+  return reg_mentioned_p (SET_DEST (single_set (new)), prev) ? 0 : prev;
 }

@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler, for IBM RS/6000.
-   Copyright (C) 1992, 93, 94, 95, 96, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1992, 93, 94, 95, 96, 97, 1998 Free Software Foundation, Inc.
    Contributed by Richard Kenner (kenner@vlsi1.ultra.nyu.edu)
 
 This file is part of GNU CC.
@@ -52,7 +52,7 @@ Boston, MA 02111-1307, USA.  */
 
 #define CPP_SPEC "%{posix: -D_POSIX_SOURCE} %(cpp_cpu)"
 
-/* Common CPP definitions used by CPP_SPEC amonst the various targets
+/* Common CPP definitions used by CPP_SPEC among the various targets
    for handling -mcpu=xxx switches.  */
 #define CPP_CPU_SPEC \
 "%{!mcpu*: \
@@ -101,7 +101,7 @@ Boston, MA 02111-1307, USA.  */
 #define CPP_SYSV_DEFAULT_SPEC ""
 #endif
 
-/* Common ASM definitions used by ASM_SPEC amonst the various targets
+/* Common ASM definitions used by ASM_SPEC among the various targets
    for handling -mcpu=xxx switches.  */
 #define ASM_CPU_SPEC \
 "%{!mcpu*: \
@@ -242,7 +242,7 @@ extern int target_flags;
    if there are more than 16K unique variables/constant in a single module.
 
    This is at the cost of having 2 extra loads and one extra store per
-   function, and one less allocatable register.  */
+   function, and one less allocable register.  */
 #define MASK_MINIMAL_TOC	0x00000200
 
 /* Nonzero for the 64bit model: ints, longs, and pointers are 64 bits.  */
@@ -424,7 +424,7 @@ extern enum processor_type rs6000_cpu;
 	extern char *m88k_short_data;
 	#define TARGET_OPTIONS { { "short-data-", &m88k_short_data } }  */
 
-/* This is meant to be overriden in target specific files.  */
+/* This is meant to be overridden in target specific files.  */
 #ifndef SUBTARGET_OPTIONS
 #define	SUBTARGET_OPTIONS
 #endif
@@ -604,6 +604,7 @@ extern int rs6000_debug_arg;		/* debug argument handling */
   ((TREE_CODE (STRUCT) == RECORD_TYPE			\
     || TREE_CODE (STRUCT) == UNION_TYPE			\
     || TREE_CODE (STRUCT) == QUAL_UNION_TYPE)		\
+   && TYPE_FIELDS (STRUCT) != 0				\
    && DECL_MODE (TYPE_FIELDS (STRUCT)) == DFmode	\
    ? MAX (MAX ((COMPUTED), (SPECIFIED)), BIGGEST_ALIGNMENT) \
    : MAX ((COMPUTED), (SPECIFIED)))
@@ -908,7 +909,7 @@ extern int rs6000_debug_arg;		/* debug argument handling */
    Also, cr0 is the only condition code register that can be used in
    arithmetic insns, so make a separate class for it.
 
-   There is a special 'registrer' (76), which is not a register, but a
+   There is a special 'register' (76), which is not a register, but a
    placeholder for memory allocated to convert between floating point and
    integral types.  This works around a problem where if we allocate memory
    with allocate_stack_{local,temp} and the function is an inline function, the
@@ -1459,6 +1460,15 @@ typedef struct rs6000_args
 
 #define FUNCTION_ARG_PASS_BY_REFERENCE(CUM, MODE, TYPE, NAMED) \
   function_arg_pass_by_reference(&CUM, MODE, TYPE, NAMED)
+
+/* If defined, a C expression which determines whether, and in which
+   direction, to pad out an argument with extra space.  The value
+   should be of type `enum direction': either `upward' to pad above
+   the argument, `downward' to pad below, or `none' to inhibit
+   padding.  */
+
+#define FUNCTION_ARG_PADDING(MODE, TYPE) \
+  function_arg_padding (MODE, TYPE)
 
 /* If defined, a C expression that gives the alignment boundary, in bits,
    of an argument with the specified mode and type.  If it is not defined,
@@ -2041,10 +2051,14 @@ typedef struct rs6000_args
 /* Define if the object format being used is COFF or a superset.  */
 #define OBJECT_FORMAT_COFF
 
-/* Define the magic numbers that we recognize as COFF.  */
+/* Define the magic numbers that we recognize as COFF.
+   AIX 4.3 adds U803XTOCMAGIC (0757) for 64-bit executables, but collect2.c
+   does not include these files in the right order to conditionally define
+   the value in the macro.  */
 
 #define MY_ISCOFF(magic) \
-  ((magic) == U802WRMAGIC || (magic) == U802ROMAGIC || (magic) == U802TOCMAGIC)
+  ((magic) == U802WRMAGIC || (magic) == U802ROMAGIC \
+   || (magic) == U802TOCMAGIC || (magic) == 0757)
 
 /* This is the only version of nm that collect2 can work with.  */
 #define REAL_NM_FILE_NAME "/usr/ucb/nm"
@@ -2903,12 +2917,17 @@ do {									\
 #define ASM_OUTPUT_ASCII(FILE, P, N)  output_ascii ((FILE), (P), (N))
 
 /* This is how to output code to push a register on the stack.
-   It need not be very fast code.  */
+   It need not be very fast code.
+
+   On the rs6000, we must keep the backchain up to date.  In order
+   to simplify things, always allocate 16 bytes for a push (System V
+   wants to keep stack aligned to a 16 byte boundary).  */
 
 #define ASM_OUTPUT_REG_PUSH(FILE,REGNO)					\
 do {									\
   extern char *reg_names[];						\
-  asm_fprintf (FILE, "\{tstu|stwu} %s,-4(%s)\n", reg_names[REGNO],	\
+  asm_fprintf (FILE, "\t{stu|stwu} %s,-16(%s)\n\t{st|stw} %s,8(%s)\n",	\
+	       reg_names[1], reg_names[1], reg_names[REGNO],		\
 	       reg_names[1]);						\
 } while (0)
 
@@ -2918,7 +2937,7 @@ do {									\
 #define ASM_OUTPUT_REG_POP(FILE,REGNO)					\
 do {									\
   extern char *reg_names[];						\
-  asm_fprintf (FILE, "\t{l|lwz} %s,0(%s)\n\t{ai|addic} %s,%s,4\n",	\
+  asm_fprintf (FILE, "\t{l|lwz} %s,8(%s)\n\t{ai|addic} %s,%s,16\n",	\
 	       reg_names[REGNO], reg_names[1], reg_names[1],		\
 	       reg_names[1]);						\
 } while (0)
@@ -3065,7 +3084,7 @@ do {									\
 
 /* indicate that issue rate is defined for this machine
    (no need to use the default) */
-#define MACHINE_issue_rate
+#define ISSUE_RATE get_issue_rate ()
 
 /* General flags.  */
 extern int flag_pic;

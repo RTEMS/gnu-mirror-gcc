@@ -21,15 +21,21 @@ Boston, MA 02111-1307, USA.  */
 
 
 #include "config.h"
+#include <stdio.h>
 #include "rtl.h"
 #include "tree.h"
 #include "flags.h"
 #include "expr.h"
 #include "cp-tree.h"
 
+static tree extract_aggr_init PROTO((tree, tree));
+static tree extract_scalar_init PROTO((tree, tree));
+static rtx cplus_expand_expr PROTO((tree, rtx, enum machine_mode,
+				    enum expand_modifier));
+
 /* Hook used by expand_expr to expand language-specific tree codes.  */
 
-rtx
+static rtx
 cplus_expand_expr (exp, target, tmode, modifier)
      tree exp;
      rtx target;
@@ -106,7 +112,7 @@ cplus_expand_expr (exp, target, tmode, modifier)
 	       parameter value.  */
 	    mark_addressable (slot);
 	    if (TREE_PERMANENT (args))
-	      args = tree_cons (0, build1 (ADDR_EXPR, type, slot),
+	      args = expr_tree_cons (0, build1 (ADDR_EXPR, type, slot),
 				TREE_CHAIN (args));
 	    else
 	      TREE_VALUE (args) = build1 (ADDR_EXPR, type, slot);

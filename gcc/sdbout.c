@@ -1,5 +1,5 @@
 /* Output sdb-format symbol table information from GNU compiler.
-   Copyright (C) 1988, 92, 93, 94, 95, 96, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1988, 92-97, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -44,9 +44,9 @@ AT&T C compiler.  From the example below I would conclude the following:
 
 #ifdef SDB_DEBUGGING_INFO
 
+#include <stdio.h>
 #include "tree.h"
 #include "rtl.h"
-#include <stdio.h>
 #include "regs.h"
 #include "defaults.h"
 #include "flags.h"
@@ -531,10 +531,14 @@ plain_type_1 (type, level)
 	  {
 	    char *name = IDENTIFIER_POINTER (DECL_NAME (TYPE_NAME (type)));
 
+	    if (!strcmp (name, "char"))
+	      return T_CHAR;
 	    if (!strcmp (name, "unsigned char"))
 	      return T_UCHAR;
 	    if (!strcmp (name, "signed char"))
 	      return T_CHAR;
+	    if (!strcmp (name, "int"))
+	      return T_INT;
 	    if (!strcmp (name, "unsigned int"))
 	      return T_UINT;
 	    if (!strcmp (name, "short int"))
@@ -547,12 +551,12 @@ plain_type_1 (type, level)
 	      return T_ULONG;
 	  }
 
+	if (size == INT_TYPE_SIZE)
+	  return (TREE_UNSIGNED (type) ? T_UINT : T_INT);
 	if (size == CHAR_TYPE_SIZE)
 	  return (TREE_UNSIGNED (type) ? T_UCHAR : T_CHAR);
 	if (size == SHORT_TYPE_SIZE)
 	  return (TREE_UNSIGNED (type) ? T_USHORT : T_SHORT);
-	if (size == INT_TYPE_SIZE)
-	  return (TREE_UNSIGNED (type) ? T_UINT : T_INT);
 	if (size == LONG_TYPE_SIZE)
 	  return (TREE_UNSIGNED (type) ? T_ULONG : T_LONG);
 	if (size == LONG_LONG_TYPE_SIZE)	/* better than nothing */
@@ -570,6 +574,9 @@ plain_type_1 (type, level)
 #ifdef EXTENDED_SDB_BASIC_TYPES
 	if (precision == LONG_DOUBLE_TYPE_SIZE)
 	  return T_LNGDBL;
+#else
+	if (precision == LONG_DOUBLE_TYPE_SIZE)
+	  return T_DOUBLE;	/* better than nothing */
 #endif
 	return 0;
       }
@@ -584,6 +591,8 @@ plain_type_1 (type, level)
 	if (sdb_n_dims < SDB_MAX_DIM)
 	  sdb_dims[sdb_n_dims++]
 	    = (TYPE_DOMAIN (type)
+	       && TREE_CODE (TYPE_MAX_VALUE (TYPE_DOMAIN (type))) == INTEGER_CST
+	       && TREE_CODE (TYPE_MIN_VALUE (TYPE_DOMAIN (type))) == INTEGER_CST
 	       ? (TREE_INT_CST_LOW (TYPE_MAX_VALUE (TYPE_DOMAIN (type)))
 		  - TREE_INT_CST_LOW (TYPE_MIN_VALUE (TYPE_DOMAIN (type))) + 1)
 	       : 0);
@@ -1056,8 +1065,9 @@ sdbout_field_types (type)
      tree type;
 {
   tree tail;
+
   for (tail = TYPE_FIELDS (type); tail; tail = TREE_CHAIN (tail))
-    if (TREE_CODE (TREE_TYPE (tail)) == POINTER_TYPE)
+    if (POINTER_TYPE_P (TREE_TYPE (tail)))
       sdbout_one_type (TREE_TYPE (TREE_TYPE (tail)));
     else
       sdbout_one_type (TREE_TYPE (tail));

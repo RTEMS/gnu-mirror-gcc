@@ -1,5 +1,5 @@
 /* Compiler driver program that can handle many languages.
-   Copyright (C) 1987, 89, 92-96, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1987, 89, 92-97, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -31,17 +31,18 @@ CC recognizes how to compile each input file by suffixes in the file names.
 Once it knows which kind of compilation to perform, the procedure for
 compilation is specified by a string called a "spec".  */
 
+#include "config.h"
+
 #include <sys/types.h>
 #include <ctype.h>
 #include <signal.h>
 #include <sys/stat.h>
 #include <errno.h>
 
-#ifndef NO_SYS_FILE_H
+#ifdef HAVE_SYS_FILE_H
 #include <sys/file.h>   /* May get R_OK, etc. on some systems.  */
 #endif
 
-#include "config.h"
 #include "obstack.h"
 #include "gansidecl.h"
 
@@ -62,6 +63,7 @@ compilation is specified by a string called a "spec".  */
 extern int pexecute PROTO ((const char *, char * const *, const char *,
 			    const char *, char **, char **, int));
 extern int pwait PROTO ((int, int *, int));
+extern char *update_path PROTO((char *, char *));
 /* Flag arguments to pexecute.  */
 #define PEXECUTE_FIRST   1
 #define PEXECUTE_LAST    2
@@ -143,13 +145,13 @@ extern int errno;
 
 #ifndef HAVE_STRERROR
 extern int sys_nerr;
-#if defined(bsd4_4)
-extern const char *const sys_errlist[];
-#else
 extern char *sys_errlist[];
-#endif
 #else
 extern char *strerror();
+#endif
+
+#ifndef HAVE_KILL
+#define kill(p,s) raise(s)
 #endif
 
 /* If a stage of compilation returns an exit status >= 1,
@@ -238,7 +240,8 @@ static struct compiler *lookup_compiler PROTO((char *, int, char *));
 static char *build_search_list	PROTO((struct path_prefix *, char *, int));
 static void putenv_from_prefixes PROTO((struct path_prefix *, char *));
 static char *find_a_file	PROTO((struct path_prefix *, char *, int));
-static void add_prefix		PROTO((struct path_prefix *, char *, int, int, int *));
+static void add_prefix		PROTO((struct path_prefix *, char *, char *,
+				       int, int, int *));
 static char *skip_whitespace	PROTO((char *));
 static void record_temp_file	PROTO((char *, int, int));
 static void delete_if_ordinary	PROTO((char *));
@@ -263,6 +266,7 @@ static void print_multilib_info	PROTO((void));
 static void pfatal_with_name	PROTO((char *));
 static void perror_with_name	PROTO((char *));
 static void pfatal_pexecute	PROTO((char *, char *));
+static void snapshot_warning	PROTO((void));
 #ifdef HAVE_VPRINTF
 static void fatal		PVPROTO((char *, ...));
 static void error		PVPROTO((char *, ...));
@@ -580,13 +584,14 @@ static int n_compilers;
 static struct compiler default_compilers[] =
 {
   /* Add lists of suffixes of known languages here.  If those languages
-     were no present when we built the driver, we will hit these copies
-     and given a more meaningful error than "file not used since
+     were not present when we built the driver, we will hit these copies
+     and be given a more meaningful error than "file not used since
      linking is not done".  */
   {".cc", "#C++"}, {".cxx", "#C++"}, {".cpp", "#C++"}, {".c++", "#C++"},
   {".C", "#C++"}, {".ads", "#Ada"}, {".adb", "#Ada"}, {".ada", "#Ada"},
   {".f", "#Fortran"}, {".for", "#Fortran"}, {".F", "#Fortran"},
   {".fpp", "#Fortran"},
+  {".p", "#Pascal"}, {".pas", "#Pascal"},
   /* Next come the entries for C.  */
   {".c", "@c"},
   {"@c",
@@ -1160,7 +1165,8 @@ set_spec (name, spec)
   if (!specs)
     {
       struct spec_list *next = (struct spec_list *)0;
-      for (i = (sizeof (static_specs) / sizeof (static_specs[0])) - 1; i >= 0; i--)
+      for (i = (sizeof (static_specs) / sizeof (static_specs[0])) - 1;
+	   i >= 0; i--)
 	{
 	  sl = &static_specs[i];
 	  sl->next = next;
@@ -1350,9 +1356,8 @@ store_arg (arg, delete_always, delete_failure)
      int delete_always, delete_failure;
 {
   if (argbuf_index + 1 == argbuf_length)
-    {
-      argbuf = (char **) xrealloc (argbuf, (argbuf_length *= 2) * sizeof (char *));
-    }
+    argbuf
+      = (char **) xrealloc (argbuf, (argbuf_length *= 2) * sizeof (char *));
 
   argbuf[argbuf_index++] = arg;
   argbuf[argbuf_index] = 0;
@@ -1420,17 +1425,20 @@ read_specs (filename, main_p)
       if (*p == '%' && !main_p)
 	{
 	  p1 = p;
-	  while (*p && *p != '\n') p++;
-	  p++;			/* skip \n */
+	  while (*p && *p != '\n')
+	    p++;
+
+	  p++;			/* Skip '\n' */
 
 	  if (!strncmp (p1, "%include", sizeof ("%include")-1)
-	      && (p1[ sizeof ("%include")-1 ] == ' '
-		  || p1[ sizeof ("%include")-1 ] == '\t'))
+	      && (p1[sizeof "%include" - 1] == ' '
+		  || p1[sizeof "%include" - 1] == '\t'))
 	    {
 	      char *new_filename;
 
 	      p1 += sizeof ("%include");
-	      while (*p1 == ' ' || *p1 == '\t') p1++;
+	      while (*p1 == ' ' || *p1 == '\t')
+		p1++;
 
 	      if (*p1++ != '<' || p[-2] != '>')
 		fatal ("specs %%include syntax malformed after %d characters",
@@ -1441,13 +1449,13 @@ read_specs (filename, main_p)
 	      read_specs (new_filename ? new_filename : p1, FALSE);
 	      continue;
 	    }
-	  else if (!strncmp (p1, "%include_noerr", sizeof ("%include_noerr")-1)
-	      && (p1[ sizeof ("%include_noerr")-1 ] == ' '
-		  || p1[ sizeof ("%include_noerr")-1 ] == '\t'))
+	  else if (!strncmp (p1, "%include_noerr", sizeof "%include_noerr" - 1)
+		   && (p1[sizeof "%include_noerr" - 1] == ' '
+		       || p1[sizeof "%include_noerr" - 1] == '\t'))
 	    {
 	      char *new_filename;
 
-	      p1 += sizeof ("%include_noerr");
+	      p1 += sizeof "%include_noerr";
 	      while (*p1 == ' ' || *p1 == '\t') p1++;
 
 	      if (*p1++ != '<' || p[-2] != '>')
@@ -1462,36 +1470,44 @@ read_specs (filename, main_p)
 		fprintf (stderr, "Could not find specs file %s\n", p1);
 	      continue;
 	    }
-	  else if (!strncmp (p1, "%rename", sizeof ("%rename")-1)
-		   && (p1[ sizeof ("%rename")-1 ] == ' '
-		       || p1[ sizeof ("%rename")-1 ] == '\t'))
+	  else if (!strncmp (p1, "%rename", sizeof "%rename" - 1)
+		   && (p1[sizeof "%rename" - 1] == ' '
+		       || p1[sizeof "%rename" - 1] == '\t'))
 	    {
 	      int name_len;
 	      struct spec_list *sl;
 
 	      /* Get original name */
-	      p1 += sizeof ("%rename");
-	      while (*p1 == ' ' || *p1 == '\t') p1++;
-	      if (!isalpha (*p1))
+	      p1 += sizeof "%rename";
+	      while (*p1 == ' ' || *p1 == '\t')
+		p1++;
+
+	      if (! isalpha (*p1))
 		fatal ("specs %%rename syntax malformed after %d characters",
 		       p1 - buffer);
 
 	      p2 = p1;
-	      while (*p2 && !isspace (*p2)) p2++;
+	      while (*p2 && !isspace (*p2))
+		p2++;
+
 	      if (*p2 != ' ' && *p2 != '\t')
 		fatal ("specs %%rename syntax malformed after %d characters",
 		       p2 - buffer);
 
 	      name_len = p2 - p1;
 	      *p2++ = '\0';
-	      while (*p2 == ' ' || *p2 == '\t') p2++;
-	      if (!isalpha (*p2))
+	      while (*p2 == ' ' || *p2 == '\t')
+		p2++;
+
+	      if (! isalpha (*p2))
 		fatal ("specs %%rename syntax malformed after %d characters",
 		       p2 - buffer);
 
 	      /* Get new spec name */
 	      p3 = p2;
-	      while (*p3 && !isspace (*p3)) p3++;
+	      while (*p3 && !isspace (*p3))
+		p3++;
+
 	      if (p3 != p-1)
 		fatal ("specs %%rename syntax malformed after %d characters",
 		       p3 - buffer);
@@ -1504,7 +1520,7 @@ read_specs (filename, main_p)
 	      if (!sl)
 		fatal ("specs %s spec was not found to be renamed", p1);
 
-	      if (!strcmp (p1, p2))
+	      if (strcmp (p1, p2) == 0)
 		continue;
 
 	      if (verbose_flag)
@@ -1530,22 +1546,30 @@ read_specs (filename, main_p)
 
       /* Find the colon that should end the suffix.  */
       p1 = p;
-      while (*p1 && *p1 != ':' && *p1 != '\n') p1++;
+      while (*p1 && *p1 != ':' && *p1 != '\n')
+	p1++;
+
       /* The colon shouldn't be missing.  */
       if (*p1 != ':')
 	fatal ("specs file malformed after %d characters", p1 - buffer);
+
       /* Skip back over trailing whitespace.  */
       p2 = p1;
-      while (p2 > buffer && (p2[-1] == ' ' || p2[-1] == '\t')) p2--;
+      while (p2 > buffer && (p2[-1] == ' ' || p2[-1] == '\t'))
+	p2--;
+
       /* Copy the suffix to a string.  */
       suffix = save_string (p, p2 - p);
       /* Find the next line.  */
       p = skip_whitespace (p1 + 1);
       if (p[1] == 0)
 	fatal ("specs file malformed after %d characters", p - buffer);
+
       p1 = p;
       /* Find next blank line.  */
-      while (*p1 && !(*p1 == '\n' && p1[1] == '\n')) p1++;
+      while (*p1 && !(*p1 == '\n' && p1[1] == '\n'))
+	p1++;
+
       /* Specs end at the blank line and do not include the newline.  */
       spec = save_string (p, p1 - p);
       p = p1;
@@ -1558,9 +1582,9 @@ read_specs (filename, main_p)
 	  if (in[0] == '\\' && in[1] == '\n')
 	    in += 2;
 	  else if (in[0] == '#')
-	    {
-	      while (*in && *in != '\n') in++;
-	    }
+	    while (*in && *in != '\n')
+	      in++;
+
 	  else
 	    *out++ = *in++;
 	}
@@ -1578,7 +1602,9 @@ read_specs (filename, main_p)
 	  /* Add this pair to the vector.  */
 	  compilers
 	    = ((struct compiler *)
-	       xrealloc (compilers, (n_compilers + 2) * sizeof (struct compiler)));
+	       xrealloc (compilers,
+			 (n_compilers + 2) * sizeof (struct compiler)));
+
 	  compilers[n_compilers].suffix = suffix;
 	  bzero ((char *) compilers[n_compilers].spec,
 		 sizeof compilers[n_compilers].spec);
@@ -1651,10 +1677,12 @@ record_temp_file (filename, always_delete, fail_delete)
       for (temp = always_delete_queue; temp; temp = temp->next)
 	if (! strcmp (name, temp->name))
 	  goto already1;
+
       temp = (struct temp_file *) xmalloc (sizeof (struct temp_file));
       temp->next = always_delete_queue;
       temp->name = name;
       always_delete_queue = temp;
+
     already1:;
     }
 
@@ -1664,10 +1692,12 @@ record_temp_file (filename, always_delete, fail_delete)
       for (temp = failure_delete_queue; temp; temp = temp->next)
 	if (! strcmp (name, temp->name))
 	  goto already2;
+
       temp = (struct temp_file *) xmalloc (sizeof (struct temp_file));
       temp->next = failure_delete_queue;
       temp->name = name;
       failure_delete_queue = temp;
+
     already2:;
     }
 }
@@ -1686,7 +1716,9 @@ delete_if_ordinary (name)
   fflush (stdout);
   i = getchar ();
   if (i != '\n')
-    while ((c = getchar ()) != '\n' && c != EOF) ;
+    while ((c = getchar ()) != '\n' && c != EOF)
+      ;
+
   if (i == 'y' || i == 'Y')
 #endif /* DEBUG */
     if (stat (name, &st) >= 0 && S_ISREG (st.st_mode))
@@ -1802,7 +1834,7 @@ build_search_list (paths, prefix, check_dir_p)
       int len = strlen (pprefix->prefix);
 
       if (machine_suffix
-	  && (!check_dir_p
+	  && (! check_dir_p
 	      || is_directory (pprefix->prefix, machine_suffix, 0)))
 	{
 	  if (!first_time)
@@ -1815,10 +1847,10 @@ build_search_list (paths, prefix, check_dir_p)
 
       if (just_machine_suffix
 	  && pprefix->require_machine_suffix == 2
-	  && (!check_dir_p
+	  && (! check_dir_p
 	      || is_directory (pprefix->prefix, just_machine_suffix, 0)))
 	{
-	  if (!first_time)
+	  if (! first_time)
 	    obstack_1grow (&collect_obstack, PATH_SEPARATOR);
 	    
 	  first_time = FALSE;
@@ -1827,15 +1859,16 @@ build_search_list (paths, prefix, check_dir_p)
 			just_suffix_len);
 	}
 
-      if (!pprefix->require_machine_suffix)
+      if (! pprefix->require_machine_suffix)
 	{
-	  if (!first_time)
+	  if (! first_time)
 	    obstack_1grow (&collect_obstack, PATH_SEPARATOR);
 
 	  first_time = FALSE;
 	  obstack_grow (&collect_obstack, pprefix->prefix, len);
 	}
     }
+
   obstack_1grow (&collect_obstack, '\0');
   return obstack_finish (&collect_obstack);
 }
@@ -1873,7 +1906,10 @@ find_a_file (pprefix, name, mode)
 
   /* Determine the filename to execute (special case for absolute paths).  */
 
-  if (*name == '/' || *name == DIR_SEPARATOR)
+  if (*name == '/' || *name == DIR_SEPARATOR
+      /* Check for disk name on MS-DOS-based systems.  */
+      || (DIR_SEPARATOR == '\\' && name[1] == ':'
+	  && (name[2] == DIR_SEPARATOR || name[2] == '/')))
     {
       if (access (name, mode))
 	{
@@ -1947,7 +1983,7 @@ find_a_file (pprefix, name, mode)
 
 	/* Certain prefixes can't be used without the machine suffix
 	   when the machine or version is explicitly specified.  */
-	if (!pl->require_machine_suffix)
+	if (! pl->require_machine_suffix)
 	  {
 	    /* Some systems have a suffix for executable files.
 	       So try appending that first.  */
@@ -1986,14 +2022,17 @@ find_a_file (pprefix, name, mode)
    through this prefix.  WARN should point to an int
    which will be set to 1 if this entry is used.
 
+   COMPONENT is the value to be passed to update_path.
+
    REQUIRE_MACHINE_SUFFIX is 1 if this prefix can't be used without
    the complete value of machine_suffix.
    2 means try both machine_suffix and just_machine_suffix.  */
 
 static void
-add_prefix (pprefix, prefix, first, require_machine_suffix, warn)
+add_prefix (pprefix, prefix, component, first, require_machine_suffix, warn)
      struct path_prefix *pprefix;
      char *prefix;
+     char *component;
      int first;
      int require_machine_suffix;
      int *warn;
@@ -2001,7 +2040,7 @@ add_prefix (pprefix, prefix, first, require_machine_suffix, warn)
   struct prefix_list *pl, **prev;
   int len;
 
-  if (!first && pprefix->plist)
+  if (! first && pprefix->plist)
     {
       for (pl = pprefix->plist; pl->next; pl = pl->next)
 	;
@@ -2012,6 +2051,7 @@ add_prefix (pprefix, prefix, first, require_machine_suffix, warn)
 
   /* Keep track of the longest prefix */
 
+  prefix = update_path (prefix, component);
   len = strlen (prefix);
   if (len > pprefix->max_len)
     pprefix->max_len = len;
@@ -2051,6 +2091,7 @@ unused_prefix_warnings (pprefix)
 	  /* Prevent duplicate warnings.  */
 	  *pl->used_flag_ptr = 1;
 	}
+
       pl = pl->next;
     }
 }
@@ -2071,6 +2112,7 @@ free_path_prefix (pprefix)
       free (temp->prefix);
       free ((char *) temp);
     }
+
   pprefix->plist = (struct prefix_list *) 0;
 }
 
@@ -2117,7 +2159,7 @@ execute ()
   for (n_commands = 1, i = 0; i < argbuf_index; i++)
     if (strcmp (argbuf[i], "|") == 0)
       {				/* each command.  */
-#if defined (__MSDOS__) || (defined (_WIN32) && ! defined (__CYGWIN32__)) || defined (OS2)
+#if defined (__MSDOS__) || (defined (_WIN32) && ! defined (__CYGWIN32__)) || defined (OS2) || defined (VMS)
         fatal ("-pipe not supported");
 #endif
 	argbuf[i] = 0;	/* termination of command args.  */
@@ -2154,7 +2196,9 @@ execute ()
       fflush (stderr);
       i = getchar ();
       if (i != '\n')
-	while (getchar () != '\n') ;
+	while (getchar () != '\n')
+	  ;
+
       if (i != 'y' && i != 'Y')
 	return 0;
 #endif /* DEBUG */
@@ -2362,8 +2406,8 @@ process_command (argc, argv)
 
   if (gcc_exec_prefix)
     {
-      add_prefix (&exec_prefixes, gcc_exec_prefix, 0, 0, NULL_PTR);
-      add_prefix (&startfile_prefixes, gcc_exec_prefix, 0, 0, NULL_PTR);
+      add_prefix (&exec_prefixes, gcc_exec_prefix, "GCC", 0, 0, NULL_PTR);
+      add_prefix (&startfile_prefixes, gcc_exec_prefix, "GCC", 0, 0, NULL_PTR);
     }
 
   /* COMPILER_PATH and LIBRARY_PATH have values
@@ -2390,7 +2434,7 @@ process_command (argc, argv)
 		}
 	      else
 		nstore[endp-startp] = 0;
-	      add_prefix (&exec_prefixes, nstore, 0, 0, NULL_PTR);
+	      add_prefix (&exec_prefixes, nstore, 0, 0, 0, NULL_PTR);
 	      if (*endp == 0)
 		break;
 	      endp = startp = endp + 1;
@@ -2421,7 +2465,8 @@ process_command (argc, argv)
 		}
 	      else
 		nstore[endp-startp] = 0;
-	      add_prefix (&startfile_prefixes, nstore, 0, 0, NULL_PTR);
+	      add_prefix (&startfile_prefixes, nstore, NULL_PTR,
+			  0, 0, NULL_PTR);
 	      if (*endp == 0)
 		break;
 	      endp = startp = endp + 1;
@@ -2453,7 +2498,8 @@ process_command (argc, argv)
 		}
 	      else
 		nstore[endp-startp] = 0;
-	      add_prefix (&startfile_prefixes, nstore, 0, 0, NULL_PTR);
+	      add_prefix (&startfile_prefixes, nstore, NULL_PTR,
+			  0, 0, NULL_PTR);
 	      if (*endp == 0)
 		break;
 	      endp = startp = endp + 1;
@@ -2468,7 +2514,7 @@ process_command (argc, argv)
 
 #ifdef LANG_SPECIFIC_DRIVER
   /* Do language-specific adjustment/addition of flags.  */
-  lang_specific_driver (&fatal, &argc, &argv);
+  lang_specific_driver (fatal, &argc, &argv);
 #endif
 
   /* Scan argv twice.  Here, the first time, just count how many switches
@@ -2487,7 +2533,7 @@ process_command (argc, argv)
 	}
       else if (! strcmp (argv[i], "-dumpversion"))
 	{
-	  printf ("%s\n", version_string);
+	  printf ("%s\n", spec_version);
 	  exit (0);
 	}
       else if (! strcmp (argv[i], "-dumpmachine"))
@@ -2650,10 +2696,12 @@ process_command (argc, argv)
 		  value = argv[++i];
 		else
 		  value = p + 1;
-		add_prefix (&exec_prefixes, value, 1, 0, &warn_B);
-		add_prefix (&startfile_prefixes, value, 1, 0, &warn_B);
-		add_prefix (&include_prefixes, concat (value, "include", NULL_PTR),
-			    1, 0, NULL_PTR);
+		add_prefix (&exec_prefixes, value, NULL_PTR, 1, 0, &warn_B);
+		add_prefix (&startfile_prefixes, value, NULL_PTR,
+			    1, 0, &warn_B);
+		add_prefix (&include_prefixes, concat (value, "include",
+						       NULL_PTR),
+			    NULL_PTR, 1, 0, NULL_PTR);
 
 		/* As a kludge, if the arg is "[foo/]stageN/", just add
 		   "[foo/]include" to the include prefix.  */
@@ -2669,14 +2717,14 @@ process_command (argc, argv)
 			  || value[len - 1] == DIR_SEPARATOR))
 		    {
 		      if (len == 7)
-			add_prefix (&include_prefixes, "include",
+			add_prefix (&include_prefixes, "include", NULL_PTR,
 				    1, 0, NULL_PTR);
 		      else
 			{
 			  char *string = xmalloc (len + 1);
 			  strncpy (string, value, len-7);
 			  strcpy (string+len-7, "include");
-			  add_prefix (&include_prefixes, string,
+			  add_prefix (&include_prefixes, string, NULL_PTR,
 				      1, 0, NULL_PTR);
 			}
 		    }
@@ -2702,6 +2750,36 @@ process_command (argc, argv)
 		spec_version = p + 1;
 	      compiler_version = spec_version;
 	      warn_std_ptr = &warn_std;
+
+	      /* Validate the version number.  Use the same checks
+		 done when inserting it into a spec.
+
+		 The format of the version string is
+		 ([^0-9]*-)?[0-9]+[.][0-9]+([.][0-9]+)?([- ].*)?  */
+	      {
+		char *v = compiler_version;
+
+		/* Ignore leading non-digits.  i.e. "foo-" in "foo-2.7.2".  */
+		while (! isdigit (*v))
+		  v++;
+
+		if (v > compiler_version && v[-1] != '-')
+		  fatal ("invalid version number format");
+
+		/* Set V after the first period.  */
+		while (isdigit (*v))
+		  v++;
+
+		if (*v != '.')
+		  fatal ("invalid version number format");
+
+		v++;
+		while (isdigit (*v))
+		  v++;
+
+		if (*v != 0 && *v != ' ' && *v != '.' && *v != '-')
+		  fatal ("invalid version number format");
+	      }
 	      break;
 
 	    case 'c':
@@ -2749,12 +2827,16 @@ process_command (argc, argv)
   /* Use 2 as fourth arg meaning try just the machine as a suffix,
      as well as trying the machine and the version.  */
 #ifndef OS2
-  add_prefix (&exec_prefixes, standard_exec_prefix, 0, 2, warn_std_ptr);
-  add_prefix (&exec_prefixes, standard_exec_prefix_1, 0, 2, warn_std_ptr);
+  add_prefix (&exec_prefixes, standard_exec_prefix, "BINUTILS",
+	      0, 2, warn_std_ptr);
+  add_prefix (&exec_prefixes, standard_exec_prefix_1, "BINUTILS",
+	      0, 2, warn_std_ptr);
 #endif
 
-  add_prefix (&startfile_prefixes, standard_exec_prefix, 0, 1, warn_std_ptr);
-  add_prefix (&startfile_prefixes, standard_exec_prefix_1, 0, 1, warn_std_ptr);
+  add_prefix (&startfile_prefixes, standard_exec_prefix, "BINUTILS",
+	      0, 1, warn_std_ptr);
+  add_prefix (&startfile_prefixes, standard_exec_prefix_1, "BINUTILS",
+	      0, 1, warn_std_ptr);
 
   tooldir_prefix = concat (tooldir_base_prefix, spec_machine, 
 			   dir_separator_str, NULL_PTR);
@@ -2777,11 +2859,11 @@ process_command (argc, argv)
 	  add_prefix (&exec_prefixes,
 		      concat (gcc_exec_tooldir_prefix, "bin", 
 			      dir_separator_str, NULL_PTR),
-		      0, 0, NULL_PTR);
+		      NULL_PTR, 0, 0, NULL_PTR);
 	  add_prefix (&startfile_prefixes,
 		      concat (gcc_exec_tooldir_prefix, "lib", 
 			      dir_separator_str, NULL_PTR),
-		      0, 0, NULL_PTR);
+		      NULL_PTR, 0, 0, NULL_PTR);
 	}
 
       tooldir_prefix = concat (standard_exec_prefix, spec_machine,
@@ -2791,10 +2873,10 @@ process_command (argc, argv)
 
   add_prefix (&exec_prefixes, 
               concat (tooldir_prefix, "bin", dir_separator_str, NULL_PTR),
-	      0, 0, NULL_PTR);
+	      "BINUTILS", 0, 0, NULL_PTR);
   add_prefix (&startfile_prefixes,
 	      concat (tooldir_prefix, "lib", dir_separator_str, NULL_PTR),
-	      0, 0, NULL_PTR);
+	      "BINUTILS", 0, 0, NULL_PTR);
 
   /* More prefixes are enabled in main, after we read the specs file
      and determine whether this is cross-compilation or not.  */
@@ -2853,23 +2935,23 @@ process_command (argc, argv)
 	  for (j = 4; argv[i][j]; j++)
 	    if (argv[i][j] == ',')
 	      {
-		infiles[n_infiles].language = 0;
+		infiles[n_infiles].language = "*";
 		infiles[n_infiles++].name
 		  = save_string (argv[i] + prev, j - prev);
 		prev = j + 1;
 	      }
 	  /* Record the part after the last comma.  */
-	  infiles[n_infiles].language = 0;
+	  infiles[n_infiles].language = "*";
 	  infiles[n_infiles++].name = argv[i] + prev;
 	}
       else if (strcmp (argv[i], "-Xlinker") == 0)
 	{
-	  infiles[n_infiles].language = 0;
+	  infiles[n_infiles].language = "*";
 	  infiles[n_infiles++].name = argv[++i];
 	}
       else if (strncmp (argv[i], "-l", 2) == 0)
 	{
-	  infiles[n_infiles].language = 0;
+	  infiles[n_infiles].language = "*";
 	  infiles[n_infiles++].name = argv[i];
 	}
       else if (strcmp (argv[i], "-specs") == 0)
@@ -4302,6 +4384,10 @@ main (argc, argv)
     signal (SIGPIPE, fatal_error);
 #endif
 
+  /* If this is a test release of GCC, issue a warning.  */
+  if (version_string[0] == 't' && version_string[1] == 'e')
+    snapshot_warning ();
+
   argbuf_length = 10;
   argbuf = (char **) xmalloc (argbuf_length * sizeof (char *));
 
@@ -4416,16 +4502,18 @@ main (argc, argv)
   if (*cross_compile == '0')
     {
 #ifdef MD_EXEC_PREFIX
-      add_prefix (&exec_prefixes, md_exec_prefix, 0, 0, NULL_PTR);
-      add_prefix (&startfile_prefixes, md_exec_prefix, 0, 0, NULL_PTR);
+      add_prefix (&exec_prefixes, md_exec_prefix, "GCC", 0, 0, NULL_PTR);
+      add_prefix (&startfile_prefixes, md_exec_prefix, "GCC", 0, 0, NULL_PTR);
 #endif
 
 #ifdef MD_STARTFILE_PREFIX
-      add_prefix (&startfile_prefixes, md_startfile_prefix, 0, 0, NULL_PTR);
+      add_prefix (&startfile_prefixes, md_startfile_prefix, "GCC",
+		  0, 0, NULL_PTR);
 #endif
 
 #ifdef MD_STARTFILE_PREFIX_1
-      add_prefix (&startfile_prefixes, md_startfile_prefix_1, 0, 0, NULL_PTR);
+      add_prefix (&startfile_prefixes, md_startfile_prefix_1, "GCC",
+		  0, 0, NULL_PTR);
 #endif
 
       /* If standard_startfile_prefix is relative, base it on
@@ -4433,29 +4521,37 @@ main (argc, argv)
 	 as a unit.  If GCC_EXEC_PREFIX is defined, base
 	 standard_startfile_prefix on that as well.  */
       if (*standard_startfile_prefix == '/'
-	  || *standard_startfile_prefix == DIR_SEPARATOR)
-	add_prefix (&startfile_prefixes, standard_startfile_prefix, 0, 0,
-		    NULL_PTR);
+	  || *standard_startfile_prefix == DIR_SEPARATOR
+	  || *standard_startfile_prefix == '$'
+#ifdef __MSDOS__
+	  /* Check for disk name on MS-DOS-based systems.  */
+          || (standard_startfile_prefix[1] == ':'
+	      && (standard_startfile_prefix[2] == DIR_SEPARATOR
+		  || standard_startfile_prefix[2] == '/'))
+#endif
+	  )
+	add_prefix (&startfile_prefixes, standard_startfile_prefix, "BINUTILS",
+		    0, 0, NULL_PTR);
       else
 	{
 	  if (gcc_exec_prefix)
 	    add_prefix (&startfile_prefixes,
 			concat (gcc_exec_prefix, machine_suffix,
 				standard_startfile_prefix, NULL_PTR),
-			0, 0, NULL_PTR);
+			NULL_PTR, 0, 0, NULL_PTR);
 	  add_prefix (&startfile_prefixes,
 		      concat (standard_exec_prefix,
 			      machine_suffix,
 			      standard_startfile_prefix, NULL_PTR),
-		      0, 0, NULL_PTR);
+		      NULL_PTR, 0, 0, NULL_PTR);
 	}		       
 
-      add_prefix (&startfile_prefixes, standard_startfile_prefix_1, 0, 0,
-		  NULL_PTR);
-      add_prefix (&startfile_prefixes, standard_startfile_prefix_2, 0, 0,
-		  NULL_PTR);
+      add_prefix (&startfile_prefixes, standard_startfile_prefix_1,
+		  "BINUTILS", 0, 0, NULL_PTR);
+      add_prefix (&startfile_prefixes, standard_startfile_prefix_2,
+		  "BINUTILS", 0, 0, NULL_PTR);
 #if 0 /* Can cause surprises, and one can use -B./ instead.  */
-      add_prefix (&startfile_prefixes, "./", 0, 1, NULL_PTR);
+      add_prefix (&startfile_prefixes, "./", NULL_PTR, 0, 1, NULL_PTR);
 #endif
     }
   else
@@ -4464,7 +4560,7 @@ main (argc, argv)
 	add_prefix (&startfile_prefixes,
 		    concat (gcc_exec_prefix, machine_suffix,
 			    standard_startfile_prefix, NULL_PTR),
-		    0, 0, NULL_PTR);
+		    "BINUTILS", 0, 0, NULL_PTR);
     }
 
   /* If we have a GCC_EXEC_PREFIX envvar, modify it for cpp's sake.  */
@@ -4729,7 +4825,7 @@ main (argc, argv)
 
 /* Find the proper compilation spec for the file name NAME,
    whose length is LENGTH.  LANGUAGE is the specified language,
-   or 0 if none specified.  */
+   or 0 if this file is to be passed to the linker.  */
 
 static struct compiler *
 lookup_compiler (name, length, language)
@@ -4739,19 +4835,19 @@ lookup_compiler (name, length, language)
 {
   struct compiler *cp;
 
-  /* Look for the language, if one is spec'd.  */
+  /* If this was specified by the user to be a linker input, indicate that. */
+  if (language != 0 && language[0] == '*')
+    return 0;
+
+  /* Otherwise, look for the language, if one is spec'd.  */
   if (language != 0)
     {
       for (cp = compilers + n_compilers - 1; cp >= compilers; cp--)
-	{
-	  if (language != 0)
-	    {
-	      if (cp->suffix[0] == '@'
-		  && !strcmp (cp->suffix + 1, language))
-		return cp;
-	    }
-	}
+	if (cp->suffix[0] == '@' && !strcmp (cp->suffix + 1, language))
+	  return cp;
+
       error ("language %s not recognized", language);
+      return 0;
     }
 
   /* Look for a suffix.  */
@@ -4759,23 +4855,24 @@ lookup_compiler (name, length, language)
     {
       if (/* The suffix `-' matches only the file name `-'.  */
 	  (!strcmp (cp->suffix, "-") && !strcmp (name, "-"))
-	  ||
-	  (strlen (cp->suffix) < length
-	   /* See if the suffix matches the end of NAME.  */
+	  || (strlen (cp->suffix) < length
+	      /* See if the suffix matches the end of NAME.  */
 #ifdef OS2
-	   && (!strcmp (cp->suffix,
-			name + length - strlen (cp->suffix))
-	    || !strpbrk (cp->suffix, "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	     && !strcasecmp (cp->suffix,
-			  name + length - strlen (cp->suffix)))))
+	      && ((!strcmp (cp->suffix,
+			   name + length - strlen (cp->suffix))
+		   || !strpbrk (cp->suffix, "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+		  && !strcasecmp (cp->suffix,
+				  name + length - strlen (cp->suffix)))
 #else
-	   && !strcmp (cp->suffix,
-		       name + length - strlen (cp->suffix))))
+	      && !strcmp (cp->suffix,
+			  name + length - strlen (cp->suffix))
 #endif
+	 ))
 	{
 	  if (cp->spec[0][0] == '@')
 	    {
 	      struct compiler *new;
+
 	      /* An alias entry maps a suffix to a language.
 		 Search for the language; pass 0 for NAME and LENGTH
 		 to avoid infinite recursion if language not found.
@@ -4787,6 +4884,7 @@ lookup_compiler (name, length, language)
 		     (char *) new->spec, sizeof new->spec);
 	      return new;
 	    }
+
 	  /* A non-alias entry: return it.  */
 	  return cp;
 	}
@@ -4901,6 +4999,8 @@ pfatal_pexecute (errmsg_fmt, errmsg_arg)
      char *errmsg_fmt;
      char *errmsg_arg;
 {
+  int save_errno = errno;
+
   if (errmsg_arg)
     {
       /* Space for trailing '\0' is in %s.  */
@@ -4909,7 +5009,7 @@ pfatal_pexecute (errmsg_fmt, errmsg_arg)
       errmsg_fmt = msg;
     }
 
-  fatal ("%s: %s", errmsg_fmt, my_strerror (errno));
+  fatal ("%s: %s", errmsg_fmt, my_strerror (save_errno));
 }
 
 /* More 'friendly' abort that prints the line and file.
@@ -5076,7 +5176,7 @@ validate_switches (start)
 }
 
 /* Check whether a particular argument was used.  The first time we
-   canonialize the switches to keep only the ones we care about.  */
+   canonicalize the switches to keep only the ones we care about.  */
 
 static int
 used_arg (p, len)
@@ -5439,5 +5539,63 @@ print_multilib_info ()
 	}
 
       ++p;
+    }
+}
+
+/* If a snapshot, warn the user that this version of gcc is for testing and
+   developing only. If we can find a home directory, we can restrict the
+   warning to once per day.  Otherwise always issue it.  */
+
+#define TIMESTAMP_FILE ".gcc-test-time"
+#define ONE_DAY (24*60*60)
+
+static void
+snapshot_warning ()
+{
+  char *home;
+  int print_p = 1;
+
+  /* Every function here but `time' is called elsewhere in this file, 
+     but we only can be sure we have it for Unix and the Windows systems,
+     so conditionalize this on those.
+
+     ??? This should use autoconf at some point.  */
+
+#if defined(unix) || defined(__CYGWIN32__) || defined(_MINGW32__)
+
+  home = getenv ("HOME");
+  if (home != 0)
+    {
+      char *file_name
+	= (char *) alloca (strlen (home) + 1 + sizeof (TIMESTAMP_FILE));
+      struct stat statbuf;
+      time_t now = time (NULL);
+      int s;
+
+      sprintf (file_name, "%s/%s", home, TIMESTAMP_FILE);
+      s = stat (file_name, &statbuf);
+      if (s == 0
+	  && (statbuf.st_mtime + ONE_DAY > now))
+	print_p = 0;
+      else
+	{
+	  FILE *f = fopen (file_name, "w");
+
+	  if (f != 0)
+	    {
+	      fputc ('\n', f);
+	      fclose (f);
+	    }
+	}
+    }
+#endif
+
+  if (print_p)
+    {
+      fprintf (stderr, "*** This is a development snapshot of GCC.\n");
+      fprintf (stderr,
+	       "*** It is not a reliable release, and the GCC developers\n");
+      fprintf (stderr,
+	       "*** warn you not to use it for anything except to test it.\n");
     }
 }

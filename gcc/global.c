@@ -19,8 +19,8 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 
-#include <stdio.h>
 #include "config.h"
+#include <stdio.h>
 #include "rtl.h"
 #include "flags.h"
 #include "basic-block.h"
@@ -277,6 +277,7 @@ int
 global_alloc (file)
      FILE *file;
 {
+  int retval;
 #ifdef ELIMINABLE_REGS
   static struct {int from, to; } eliminables[] = ELIMINABLE_REGS;
 #endif
@@ -486,8 +487,11 @@ global_alloc (file)
 
   allocno_row_words = (max_allocno + INT_BITS - 1) / INT_BITS;
 
-  conflicts = (INT_TYPE *) alloca (max_allocno * allocno_row_words
-				   * sizeof (INT_TYPE));
+  /* We used to use alloca here, but the size of what it would try to
+     allocate would occasionally cause it to exceed the stack limit and
+     cause unpredictable core dumps.  Some examples were > 2Mb in size.  */
+  conflicts = (INT_TYPE *) xmalloc (max_allocno * allocno_row_words
+				    * sizeof (INT_TYPE));
   bzero ((char *) conflicts,
 	 max_allocno * allocno_row_words * sizeof (INT_TYPE));
 
@@ -577,7 +581,10 @@ global_alloc (file)
 	 for the sake of debugging information.  */
   if (n_basic_blocks > 0)
 #endif
-    return reload (get_insns (), 1, file);
+    retval = reload (get_insns (), 1, file);
+
+  free (conflicts);
+  return retval;
 }
 
 /* Sort predicate for ordering the allocnos.
