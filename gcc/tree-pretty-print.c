@@ -242,6 +242,9 @@ dump_generic_node (pretty_printer *buffer, tree node, int spc, int flags,
       && stmt_ann (node))
     dump_vops (buffer, node, spc, flags);
 
+  if (is_stmt && (flags & TDF_STMT_ADDR))
+    pp_printf (buffer, "<&0x%x> ", (unsigned int)node);
+
   if (dumping_stmts
       && (flags & TDF_LINENO)
       && EXPR_HAS_LOCATION (node))
@@ -285,8 +288,26 @@ dump_generic_node (pretty_printer *buffer, tree node, int spc, int flags,
 	}
       break;
 
-    case TREE_VEC:
+    case TREE_BINFO:
       dump_generic_node (buffer, BINFO_TYPE (node), spc, flags, false);
+
+    case TREE_VEC:
+      {
+	size_t i;
+	if (TREE_VEC_LENGTH (node) > 0)
+	  {
+	    size_t len = TREE_VEC_LENGTH (node);
+	    for (i = 0; i < len - 1; i++)
+	      {	    
+		dump_generic_node (buffer, TREE_VEC_ELT (node, i), spc, flags,
+				   false);
+		pp_character (buffer, ',');
+		pp_space (buffer);
+	      }
+	    dump_generic_node (buffer, TREE_VEC_ELT (node, len - 1), spc, 
+			       flags, false);
+	  }
+      }
       break;
 
     case BLOCK:

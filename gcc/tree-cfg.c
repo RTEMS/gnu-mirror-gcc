@@ -790,7 +790,7 @@ main_block_label (tree label)
   return label_for_bb[bb->index];
 }
 
-/* Cleanup redundant labels.  This is a three-steo process:
+/* Cleanup redundant labels.  This is a three-step process:
      1) Find the leading label for each block.
      2) Redirect all references to labels to the leading labels.
      3) Cleanup all useless labels.  */
@@ -1843,69 +1843,6 @@ remove_bb (basic_block bb)
   remove_phi_nodes_and_edges_for_unreachable_block (bb);
 }
 
-
-/* Examine BB to determine if it is a forwarding block (a block which only
-   transfers control to a new destination).  If BB is a forwarding block,
-   then return the edge leading to the ultimate destination.  */
-
-edge
-tree_block_forwards_to (basic_block bb)
-{
-  block_stmt_iterator bsi;
-  bb_ann_t ann = bb_ann (bb);
-  tree stmt;
-
-  /* If this block is not forwardable, then avoid useless work.  */
-  if (! ann->forwardable)
-    return NULL;
-
-  /* Set this block to not be forwardable.  This prevents infinite loops since
-     any block currently under examination is considered non-forwardable.  */
-  ann->forwardable = 0;
-
-  /* No forwarding is possible if this block is a special block (ENTRY/EXIT),
-     this block has more than one successor, this block's single successor is
-     reached via an abnormal edge, this block has phi nodes, or this block's
-     single successor has phi nodes.  */
-  if (bb == EXIT_BLOCK_PTR
-      || bb == ENTRY_BLOCK_PTR
-      || EDGE_COUNT (bb->succs) != 1
-      || EDGE_SUCC (bb, 0)->dest == EXIT_BLOCK_PTR
-      || (EDGE_SUCC (bb, 0)->flags & EDGE_ABNORMAL) != 0
-      || phi_nodes (bb)
-      || phi_nodes (EDGE_SUCC (bb, 0)->dest))
-    return NULL;
-
-  /* Walk past any labels at the start of this block.  */
-  for (bsi = bsi_start (bb); !bsi_end_p (bsi); bsi_next (&bsi))
-    {
-      stmt = bsi_stmt (bsi);
-      if (TREE_CODE (stmt) != LABEL_EXPR)
-	break;
-    }
-
-  /* If we reached the end of this block we may be able to optimize this
-     case.  */
-  if (bsi_end_p (bsi))
-    {
-      edge dest;
-
-      /* Recursive call to pick up chains of forwarding blocks.  */
-      dest = tree_block_forwards_to (EDGE_SUCC (bb, 0)->dest);
-
-      /* If none found, we forward to bb->succs[0] at minimum.  */
-      if (!dest)
-	dest = EDGE_SUCC (bb, 0);
-
-      ann->forwardable = 1;
-      return dest;
-    }
-
-  /* No forwarding possible.  */
-  return NULL;
-}
-
-
 /* Try to remove superfluous control structures.  */
 
 static bool
@@ -2713,6 +2650,26 @@ stmt_for_bsi (tree stmt)
   gcc_unreachable ();
 }
 
+/* Mark statement T as modified, and update it.  */
+static inline void
+update_new_stmt (tree t)
+{
+  if (TREE_CODE (t) == STATEMENT_LIST)
+    {
+      tree_stmt_iterator i;
+      tree stmt;
+      for (i = tsi_start (t); !tsi_end_p (i); tsi_next (&i))
+        {
+	  stmt = tsi_stmt (i);
+	  if (stmt_modified_p (stmt))
+	    get_stmt_operands (stmt);
+	}
+    }
+  else
+    if (stmt_modified_p (t))
+      get_stmt_operands (t);
+}
+
 /* Insert statement (or statement list) T before the statement
    pointed-to by iterator I.  M specifies how to update iterator I
    after insertion (see enum bsi_iterator_update).  */
@@ -2721,8 +2678,8 @@ void
 bsi_insert_before (block_stmt_iterator *i, tree t, enum bsi_iterator_update m)
 {
   set_bb_for_stmt (t, i->bb);
+  update_new_stmt (t);
   tsi_link_before (&i->tsi, t, m);
-  modify_stmt (t);
 }
 
 
@@ -2734,8 +2691,8 @@ void
 bsi_insert_after (block_stmt_iterator *i, tree t, enum bsi_iterator_update m)
 {
   set_bb_for_stmt (t, i->bb);
+  update_new_stmt (t);
   tsi_link_after (&i->tsi, t, m);
-  modify_stmt (t);
 }
 
 
@@ -2747,7 +2704,9 @@ bsi_remove (block_stmt_iterator *i)
 {
   tree t = bsi_stmt (*i);
   set_bb_for_stmt (t, NULL);
+  delink_stmt_imm_use (t);
   tsi_delink (&i->tsi);
+  mark_stmt_modified (t);
 }
 
 
@@ -2811,7 +2770,7 @@ bsi_replace (const block_stmt_iterator *bsi, tree stmt, bool preserve_eh_info)
     }
 
   *bsi_stmt_ptr (*bsi) = stmt;
-  modify_stmt (stmt);
+  update_new_stmt (stmt);
 }
 
 
@@ -3757,7 +3716,10 @@ tree_make_forwarder_block (edge fallthru)
 
 /* Return true if basic block BB does nothing except pass control
    flow to another block and that we can safely insert a label at
-   the start of the successor block.  */
+   the start of the successor block.
+
+   As a precondition, we require that BB be not equal to
+   ENTRY_BLOCK_PTR.  */
 
 static bool
 tree_forwarder_block_p (basic_block bb)
@@ -3771,16 +3733,24 @@ tree_forwarder_block_p (basic_block bb)
   if (! bb_ann (bb)->forwardable)
     return false;
 
-  /* BB must have a single outgoing normal edge.  Otherwise it can not be
-     a forwarder block.  */
+  /* BB must have a single outgoing edge.  */
   if (EDGE_COUNT (bb->succs) != 1
+      /* BB can not have any PHI nodes.  This could potentially be
+	 relaxed early in compilation if we re-rewrote the variables
+	 appearing in any PHI nodes in forwarder blocks.  */
+      || phi_nodes (bb)
+      /* BB may not be a predecessor of EXIT_BLOCK_PTR.  */
       || EDGE_SUCC (bb, 0)->dest == EXIT_BLOCK_PTR
-      || (EDGE_SUCC (bb, 0)->flags & EDGE_ABNORMAL)
-      || bb == ENTRY_BLOCK_PTR)
+      /* BB may not have an abnormal outgoing edge.  */
+      || (EDGE_SUCC (bb, 0)->flags & EDGE_ABNORMAL))
     {
       bb_ann (bb)->forwardable = 0;
       return false; 
     }
+
+#if ENABLE_CHECKING
+  gcc_assert (bb != ENTRY_BLOCK_PTR);
+#endif
 
   /* Successors of the entry block are not forwarders.  */
   FOR_EACH_EDGE (e, ei, ENTRY_BLOCK_PTR->succs)
@@ -3789,15 +3759,6 @@ tree_forwarder_block_p (basic_block bb)
 	bb_ann (bb)->forwardable = 0;
 	return false;
       }
-
-  /* BB can not have any PHI nodes.  This could potentially be relaxed
-     early in compilation if we re-rewrote the variables appearing in
-     any PHI nodes in forwarder blocks.  */
-  if (phi_nodes (bb))
-    {
-      bb_ann (bb)->forwardable = 0;
-      return false; 
-    }
 
   /* Now walk through the statements.  We can ignore labels, anything else
      means this is not a forwarder block.  */
@@ -3884,12 +3845,7 @@ thread_jumps (void)
 	       tree_forwarder_block_p (dest);
 	       last = EDGE_SUCC (dest, 0),
 	       dest = EDGE_SUCC (dest, 0)->dest)
-	    {
-	      if (EDGE_SUCC (dest, 0)->dest == EXIT_BLOCK_PTR)
-		break;
-
-	      bb_ann (dest)->forwardable = 0;
-	    }
+	    bb_ann (dest)->forwardable = 0;
 
 	  /* Reset the forwardable marks to 1.  */
 	  for (tmp = e->dest;
