@@ -86,12 +86,33 @@ const char *_Jv_Jar_Class_Path;
 property_pair *_Jv_Environment_Properties;
 #endif
 
-// The name of this executable.
-static char *_Jv_execName;
-
 // Stash the argv pointer to benefit native libraries that need it.
 const char **_Jv_argv;
 int _Jv_argc;
+
+// Argument support.
+int
+_Jv_GetNbArgs (void)
+{
+  // _Jv_argc is 0 if not explicitly initialized.
+  return _Jv_argc;
+}
+
+const char *
+_Jv_GetSafeArg (int index)
+{
+  if (index >=0 && index < _Jv_GetNbArgs ())
+    return _Jv_argv[index];
+  else
+    return "";
+}
+
+void
+_Jv_SetArgs (int argc, const char **argv)
+{
+  _Jv_argc = argc;
+  _Jv_argv = argv;
+}
 
 #ifdef ENABLE_JVMPI
 // Pointer to JVMPI notification functions.
@@ -100,6 +121,20 @@ void (*_Jv_JVMPI_Notify_THREAD_START) (JVMPI_Event *event);
 void (*_Jv_JVMPI_Notify_THREAD_END) (JVMPI_Event *event);
 #endif
 
+
+/* Unblock a signal.  Unless we do this, the signal may only be sent
+   once.  */
+static void 
+unblock_signal (int signum)
+{
+#ifdef _POSIX_VERSION
+  sigset_t sigs;
+
+  sigemptyset (&sigs);
+  sigaddset (&sigs, signum);
+  sigprocmask (SIG_UNBLOCK, &sigs, NULL);
+#endif
+}
 
 extern "C" void _Jv_ThrowSignal (jthrowable) __attribute ((noreturn));
 
@@ -118,6 +153,7 @@ static java::lang::NullPointerException *nullp;
 
 SIGNAL_HANDLER (catch_segv)
 {
+  unblock_signal (SIGSEGV);
   MAKE_THROW_FRAME (nullp);
   _Jv_ThrowSignal (nullp);
 }
@@ -128,6 +164,7 @@ static java::lang::ArithmeticException *arithexception;
 #ifdef HANDLE_FPE
 SIGNAL_HANDLER (catch_fpe)
 {
+  unblock_signal (SIGFPE);
 #ifdef HANDLE_DIVIDE_OVERFLOW
   HANDLE_DIVIDE_OVERFLOW;
 #else
@@ -707,22 +744,6 @@ static JArray<jstring> *arg_vec;
 // The primary thread.
 static java::lang::Thread *main_thread;
 
-char *
-_Jv_ThisExecutable (void)
-{
-  return _Jv_execName;
-}
-
-void
-_Jv_ThisExecutable (const char *name)
-{
-  if (name)
-    {
-      _Jv_execName = (char *) _Jv_Malloc (strlen (name) + 1);
-      strcpy (_Jv_execName, name);
-    }
-}
-
 #ifndef DISABLE_GETENV_PROPERTIES
 
 static char *
@@ -955,23 +976,9 @@ void
 _Jv_RunMain (jclass klass, const char *name, int argc, const char **argv, 
 	     bool is_jar)
 {
-  _Jv_argv = argv;
-  _Jv_argc = argc;
+  _Jv_SetArgs (argc, argv);
 
   java::lang::Runtime *runtime = NULL;
-
-
-#ifdef DISABLE_MAIN_ARGS
-  _Jv_ThisExecutable ("[Embedded App]");
-#else
-#ifdef HAVE_PROC_SELF_EXE
-  char exec_name[20];
-  sprintf (exec_name, "/proc/%d/exe", getpid ());
-  _Jv_ThisExecutable (exec_name);
-#else
-  _Jv_ThisExecutable (argv[0]);
-#endif /* HAVE_PROC_SELF_EXE */
-#endif /* DISABLE_MAIN_ARGS */
 
   try
     {
