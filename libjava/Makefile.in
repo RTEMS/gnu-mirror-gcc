@@ -75,11 +75,11 @@ DIVIDESPEC = @DIVIDESPEC@
 DLLTOOL = @DLLTOOL@
 EXCEPTIONSPEC = @EXCEPTIONSPEC@
 EXEEXT = @EXEEXT@
-FORCELIBGCCSPEC = @FORCELIBGCCSPEC@
 GCDEPS = @GCDEPS@
 GCINCS = @GCINCS@
 GCJ = @GCJ@
 GCJFLAGS = @GCJFLAGS@
+GCJVERSION = @GCJVERSION@
 GCLIBS = @GCLIBS@
 GCOBJS = @GCOBJS@
 GCSPEC = @GCSPEC@
@@ -119,7 +119,7 @@ ZLIBTESTSPEC = @ZLIBTESTSPEC@
 here = @here@
 libgcj_basedir = @libgcj_basedir@
 
-AUTOMAKE_OPTIONS = foreign no-installinfo
+AUTOMAKE_OPTIONS = foreign
 @TESTSUBDIR_TRUE@SUBDIRS = \
 @TESTSUBDIR_TRUE@$(DIRLTDL) testsuite gcj include
 @TESTSUBDIR_FALSE@SUBDIRS = \
@@ -130,9 +130,9 @@ AUTOMAKE_OPTIONS = foreign no-installinfo
 @USE_LIBDIR_FALSE@$(toolexecdir)/lib$(MULTISUBDIR)
 @USE_LIBDIR_FALSE@toolexecdir = \
 @USE_LIBDIR_FALSE@$(exec_prefix)/$(target_alias)
-@NO_X_TRUE@cond_x_ltlibrary = \
-@NO_X_FALSE@cond_x_ltlibrary = \
-@NO_X_FALSE@libgcjx.la
+@XLIB_AWT_TRUE@cond_x_ltlibrary = \
+@XLIB_AWT_TRUE@libgcjx.la
+@XLIB_AWT_FALSE@cond_x_ltlibrary = \
 
 toolexeclib_LTLIBRARIES = libgcj.la $(cond_x_ltlibrary)
 toolexeclib_DATA = libgcj.spec
@@ -181,7 +181,7 @@ AM_CXXFLAGS = -fno-rtti -fvtable-thunks -fasynchronous-exceptions \
 @USING_GCC_FALSE@@LIBGCJ_CFLAGS@
 
 JCFLAGS = -g
-JC1FLAGS = -g @LIBGCJ_JAVAFLAGS@
+JC1FLAGS = @LIBGCJ_JAVAFLAGS@ $(GCJFLAGS)
 
 LIBFFIINCS = -I$(top_srcdir)/../libffi/include -I$(MULTIBUILDTOP)../libffi/include
 
@@ -198,7 +198,7 @@ javao_files = $(java_source_files:.java=.lo) \
 
 x_javao_files = $(x_java_source_files:.java=.lo)
 
-libffi_files = `$(AR) t ../libffi/.libs/libffi.a 2>/dev/null | sed 's/\.o/\.lo/g' | sed 's/^/..\/libffi\//g'`
+libffi_files = `find ../libffi/ \-name '*.lo'`
 
 libgcj_la_SOURCES = prims.cc posix.cc jni.cc exception.cc \
 	resolve.cc defineclass.cc interpret.cc name-finder.cc \
@@ -211,13 +211,13 @@ libgcj_la_DEPENDENCIES = libgcj.jar $(javao_files) \
 	$(c_files) $(GCOBJS) $(THREADOBJS) $(LIBLTDL)
 
 
+libgcj_la_LIBADD = $(javao_files) $(c_files) $(GCOBJS) \
+	$(THREADOBJS) $(libffi_files)
+
 # Include THREADLIBS here to ensure that the correct version of
 # certain linuxthread functions get linked:
-libgcj_la_LIBADD = $(javao_files) $(c_files) $(GCOBJS) \
-	$(THREADOBJS) $(THREADLIBS) $(libffi_files) $(LIBLTDL)
-
 libgcj_la_LDFLAGS = -L$(here)/../libstdc++-v3/libsupc++ -lsupc++ \
-	-rpath $(toolexeclibdir) \
+	-rpath $(toolexeclibdir) $(THREADLIBS) $(LIBLTDL) \
 	-version-info `grep -v '^\#' $(srcdir)/libtool-version`
 
 libgcj_la_LINK = $(LIBLINK)
@@ -258,7 +258,7 @@ CONVERT_DIR = gnu/gcj/convert
 jv_convert_SOURCES = 
 EXTRA_jv_convert_SOURCES = $(convert_source_files)
 jv_convert_LDFLAGS = --main=gnu.gcj.convert.Convert \
-	-rpath $(toolexeclibdir)
+	-rpath $(toolexeclibdir) -shared-libgcc
 
 jv_convert_LINK = $(GCJLINK)
 jv_convert_LDADD = $(convert_source_files:.java=.lo) libgcj.la \
@@ -269,7 +269,7 @@ jv_convert_DEPENDENCIES = $(convert_source_files:.java=.lo) \
 
 
 gij_SOURCES = gij.cc
-gij_LDFLAGS = -rpath $(toolexeclibdir)
+gij_LDFLAGS = -rpath $(toolexeclibdir) -shared-libgcc
 gij_LINK = $(GCJLINK)
 gij_LDADD = libgcj.la $(GCLIBS) $(THREADLIBS) $(ZLIBS) -L$(here)/.libs
 gij_DEPENDENCIES = $(GCDEPS) $(THREADDEPS) $(ZDEPS) libgcj.la libgcj.spec
@@ -619,7 +619,6 @@ java/lang/UnsupportedOperationException.java \
 java/lang/VerifyError.java \
 java/lang/VirtualMachineError.java \
 java/lang/Void.java \
-java/io/BlockDataException.java	\
 java/io/BufferedInputStream.java \
 java/io/BufferedOutputStream.java \
 java/io/BufferedReader.java \
@@ -743,10 +742,12 @@ java/util/StringTokenizer.java \
 java/util/TimeZone.java	\
 java/util/Timer.java \
 java/util/TimerTask.java \
+java/util/TreeMap.java \
+java/util/TreeSet.java \
 java/util/TooManyListenersException.java \
-java/util/Vector.java
+java/util/Vector.java \
+java/util/WeakHashMap.java
 
-#java/util/WeakHashmap.java
 
 ordinary_java_source_files = $(core_java_source_files) \
 gnu/gcj/RawData.java \
@@ -1468,7 +1469,7 @@ DEP_FILES =  .deps/$(srcdir)/$(CONVERT_DIR)/gen-from-JIS.P \
 .deps/java/beans/beancontext/BeanContextServiceRevokedListener.P \
 .deps/java/beans/beancontext/BeanContextServices.P \
 .deps/java/beans/beancontext/BeanContextServicesListener.P \
-.deps/java/io/BlockDataException.P .deps/java/io/BufferedInputStream.P \
+.deps/java/io/BufferedInputStream.P \
 .deps/java/io/BufferedOutputStream.P .deps/java/io/BufferedReader.P \
 .deps/java/io/BufferedWriter.P .deps/java/io/ByteArrayInputStream.P \
 .deps/java/io/ByteArrayOutputStream.P .deps/java/io/CharArrayReader.P \
@@ -1721,10 +1722,11 @@ DEP_FILES =  .deps/$(srcdir)/$(CONVERT_DIR)/gen-from-JIS.P \
 .deps/java/util/SortedSet.P .deps/java/util/Stack.P \
 .deps/java/util/StringTokenizer.P .deps/java/util/TimeZone.P \
 .deps/java/util/Timer.P .deps/java/util/TimerTask.P \
-.deps/java/util/TooManyListenersException.P .deps/java/util/Vector.P \
-.deps/java/util/jar/Attributes.P .deps/java/util/jar/JarEntry.P \
-.deps/java/util/jar/JarException.P .deps/java/util/jar/JarFile.P \
-.deps/java/util/jar/JarInputStream.P \
+.deps/java/util/TooManyListenersException.P .deps/java/util/TreeMap.P \
+.deps/java/util/TreeSet.P .deps/java/util/Vector.P \
+.deps/java/util/WeakHashMap.P .deps/java/util/jar/Attributes.P \
+.deps/java/util/jar/JarEntry.P .deps/java/util/jar/JarException.P \
+.deps/java/util/jar/JarFile.P .deps/java/util/jar/JarInputStream.P \
 .deps/java/util/jar/JarOutputStream.P .deps/java/util/jar/Manifest.P \
 .deps/java/util/natGregorianCalendar.P .deps/java/util/zip/Adler32.P \
 .deps/java/util/zip/CRC32.P .deps/java/util/zip/CheckedInputStream.P \
@@ -1868,12 +1870,6 @@ uninstall-toolexeclibLTLIBRARIES:
 	  $(LIBTOOL)  --mode=uninstall rm -f $(DESTDIR)$(toolexeclibdir)/$$p; \
 	done
 
-libgcj.la: $(libgcj_la_OBJECTS) $(libgcj_la_DEPENDENCIES)
-	$(libgcj_la_LINK) -rpath $(toolexeclibdir) $(libgcj_la_LDFLAGS) $(libgcj_la_OBJECTS) $(libgcj_la_LIBADD) $(LIBS)
-
-libgcjx.la: $(libgcjx_la_OBJECTS) $(libgcjx_la_DEPENDENCIES)
-	$(libgcjx_la_LINK) -rpath $(toolexeclibdir) $(libgcjx_la_LDFLAGS) $(libgcjx_la_OBJECTS) $(libgcjx_la_LIBADD) $(LIBS)
-
 mostlyclean-binPROGRAMS:
 
 clean-binPROGRAMS:
@@ -1993,7 +1989,7 @@ uninstall-toolexeclibDATA:
 @SET_MAKE@
 
 all-recursive install-data-recursive install-exec-recursive \
-installdirs-recursive install-recursive uninstall-recursive install-info-recursive \
+installdirs-recursive install-recursive uninstall-recursive  \
 check-recursive installcheck-recursive info-recursive dvi-recursive:
 	@set fnord $(MAKEFLAGS); amf=$$2; \
 	dot_seen=no; \
@@ -2194,8 +2190,6 @@ check-am: all-am
 check: check-recursive
 installcheck-am:
 installcheck: installcheck-recursive
-install-info-am: 
-install-info: install-info-recursive
 install-exec-am: install-toolexeclibLIBRARIES \
 		install-toolexeclibLTLIBRARIES install-binPROGRAMS \
 		install-binSCRIPTS install-toolexeclibDATA
@@ -2298,12 +2292,11 @@ maintainer-clean-recursive tags tags-recursive mostlyclean-tags \
 distclean-tags clean-tags maintainer-clean-tags distdir \
 mostlyclean-depend distclean-depend clean-depend \
 maintainer-clean-depend info-am info dvi-am dvi check check-am \
-installcheck-am installcheck install-info-am install-info \
-install-exec-am install-exec install-data-local install-data-am \
-install-data install-am install uninstall-am uninstall all-redirect \
-all-am all installdirs-am installdirs mostlyclean-generic \
-distclean-generic clean-generic maintainer-clean-generic clean \
-mostlyclean distclean maintainer-clean
+installcheck-am installcheck install-exec-am install-exec \
+install-data-local install-data-am install-data install-am install \
+uninstall-am uninstall all-redirect all-am all installdirs-am \
+installdirs mostlyclean-generic distclean-generic clean-generic \
+maintainer-clean-generic clean mostlyclean distclean maintainer-clean
 
 
 install-exec-hook:
@@ -2367,6 +2360,16 @@ $(c_files): java/lang/fdlibm.h java/lang/ieeefp.h java/lang/mprec.h
 
 $(javao_files) $(x_javao_files): %.lo: %.java
 	$(GCJCOMPILE) -o $@ $<
+
+libgcj.la: $(libgcj_la_OBJECTS) $(libgcj_la_DEPENDENCIES)
+	@echo $(libgcj_la_OBJECTS) > libgcj.objectlist;
+	@echo $(libgcj_la_LIBADD) >> libgcj.objectlist;
+	$(libgcj_la_LINK) -objectlist libgcj.objectlist -rpath $(toolexeclibdir) $(libgcj_la_LDFLAGS) $(LIBS)
+
+libgcjx.la: $(libgcjx_la_OBJECTS) $(libgcjx_la_DEPENDENCIES)
+	@echo $(libgcjx_la_OBJECTS) > libgcjx.objectlist;
+	@echo $(libgcjx_la_LIBADD) >> libgcjx.objectlist;
+	$(libgcjx_la_LINK) -objectlist libgcjx.objectlist -rpath $(toolexeclibdir) $(libgcjx_la_LDFLAGS) $(LIBS)
 
 .class.h:
 	$(GCJH) -classpath $(top_builddir) $(basename $<)

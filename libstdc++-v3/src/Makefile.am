@@ -21,7 +21,7 @@
 ## Software Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307,
 ## USA.
 
-## $Id: Makefile.am,v 1.70 2001/02/07 01:54:21 bkoz Exp $
+## $Id: Makefile.am,v 1.71.2.3 2001/02/28 06:45:36 bkoz Exp $
 
 AUTOMAKE_OPTIONS = 1.3 gnits
 MAINT_CHARSET = latin1
@@ -73,7 +73,6 @@ base_headers = \
 	bits/valarray_array.h bits/valarray_array.tcc bits/valarray_meta.h \
 	bits/std_valarray.h bits/mask_array.h bits/slice.h bits/slice_array.h \
 	bits/gslice.h bits/gslice_array.h bits/indirect_array.h \
-	bits/exception_support.h \
 	bits/std_fstream.h bits/std_iomanip.h \
 	bits/ios_base.h bits/fpos.h bits/basic_ios.h bits/basic_ios.tcc \
 	bits/std_ios.h bits/std_iosfwd.h bits/std_iostream.h \
@@ -88,7 +87,7 @@ base_headers = \
 	bits/std_iterator.h bits/std_list.h \
 	bits/std_map.h bits/std_memory.h bits/std_numeric.h \
 	bits/std_queue.h bits/std_set.h bits/std_stack.h \
-	bits/std_stdexcept.h bits/std_vector.h \
+	bits/std_stdexcept.h bits/functexcept.h bits/std_vector.h \
 	bits/stl_algo.h bits/stl_algobase.h bits/stl_alloc.h \
 	bits/stl_deque.h bits/stl_function.h \
 	bits/stl_heap.h bits/stl_iterator.h bits/stl_list.h bits/stl_map.h \
@@ -97,7 +96,7 @@ base_headers = \
 	bits/stl_relops.h bits/stl_set.h \
 	bits/stl_stack.h bits/stl_tempbuf.h \
 	bits/stl_tree.h bits/stl_uninitialized.h bits/stl_vector.h \
-	bits/type_traits.h bits/stl_range_errors.h bits/std_algorithm.h \
+	bits/type_traits.h bits/std_algorithm.h \
 	bits/concept_checks.h bits/container_concepts.h \
 	bits/sequence_concepts.h bits/stl_config.h bits/stl_construct.h
 
@@ -161,15 +160,15 @@ endif
 build_headers = \
 	bits/std_limits.h \
 	bits/c++config.h bits/c++io.h bits/c++locale.h bits/c++threads.h \
+	bits/basic_file_model.h \
 	bits/atomicity.h bits/os_defines.h \
 	bits/ctype_base.h bits/ctype_noninline.h bits/ctype_inline.h 
 
 sources = \
 	limitsMEMBERS.cc \
-	complex_io.cc \
-	stdexcept.cc bitset.cc \
+	stdexcept.cc functexcept.cc bitset.cc \
         globals.cc \
-	c++io.cc ios.cc strstream.cc \
+	basic_file.cc ios.cc complex_io.cc strstream.cc \
 	c++locale.cc locale.cc localename.cc codecvt.cc \
 	locale-inst.cc stl-inst.cc misc-inst.cc valarray-inst.cc string-inst.cc
 
@@ -344,9 +343,11 @@ AM_CXXFLAGS = \
 LTCXXCOMPILE = $(LIBTOOL) --tag CXX --mode=compile $(CXX) $(INCLUDES) \
 	       $(AM_CPPFLAGS) $(CPPFLAGS) $(CXXFLAGS) $(AM_CXXFLAGS) 
 
-# 3) We have a problem when building the shared libstdc++ object if
-# the rules automake generates would be used.  We cannot allow CXX to
-# be used in libtool since this would add -lstdc++ to the link line
-# which of course is problematic at this point.
-CXXLINK = $(LIBTOOL) --mode=link "$(CC)" \
+# 3) We'd have a problem when building the shared libstdc++ object if
+# the rules automake generates would be used.  We cannot allow g++ to
+# be used since this would add -lstdc++ to the link line which of
+# course is problematic at this point.  So, we get the top-level
+# directory to configure libstdc++-v3 to use gcc as the C++
+# compilation driver.
+CXXLINK = $(LIBTOOL) --tag CXX --mode=link $(CXX) \
 	  @OPT_LDFLAGS@ @SECTION_LDFLAGS@ $(AM_CXXFLAGS) $(LDFLAGS) -o $@

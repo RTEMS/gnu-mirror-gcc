@@ -649,8 +649,8 @@ lookup_field_1 (type, name)
 	;
       else if (DECL_NAME (field) == name)
 	{
-	  if ((TREE_CODE(field) == VAR_DECL || TREE_CODE(field) == CONST_DECL)
-	      && DECL_ASSEMBLER_NAME (field) != NULL)
+	  if (TREE_CODE(field) == VAR_DECL 
+	      && (TREE_STATIC (field) || DECL_EXTERNAL (field)))
 	    GNU_xref_ref(current_function_decl,
 			 IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (field)));
 	  return field;
@@ -842,7 +842,7 @@ dfs_access_in_type (binfo, data)
 	 access to the DECL.  The CONST_DECL for an enumeration
 	 constant will not have DECL_LANG_SPECIFIC, and thus no
 	 DECL_ACCESS.  */
-      if (DECL_LANG_SPECIFIC (decl))
+      if (DECL_LANG_SPECIFIC (decl) && !DECL_DISCRIMINATOR_P (decl))
 	{
 	  tree decl_access = purpose_member (type, DECL_ACCESS (decl));
 	  if (decl_access)
@@ -2046,22 +2046,13 @@ look_for_overrides_r (type, fndecl)
                   return 1;
                 }
             }
-          else
+          else if (same_signature_p (fndecl, fn))
             {
-              if (/* The first parameter is the `this' parameter,
-	             which has POINTER_TYPE, and we can therefore
-	             safely use TYPE_QUALS, rather than
-		     CP_TYPE_QUALS.  */
-	          (TYPE_QUALS (TREE_TYPE (TREE_VALUE (btypes)))
-	           == TYPE_QUALS (thistype))
-	          && compparms (TREE_CHAIN (btypes), TREE_CHAIN (dtypes)))
-                {
-                  /* It's definitely virtual, even if not explicitly set.  */
-                  DECL_VIRTUAL_P (fndecl) = 1;
-	          check_final_overrider (fndecl, fn);
-	      
-	          return 1;
-	        }
+	      /* It's definitely virtual, even if not explicitly set.  */
+	      DECL_VIRTUAL_P (fndecl) = 1;
+	      check_final_overrider (fndecl, fn);
+
+	      return 1;
 	    }
 	}
     }
@@ -2388,9 +2379,7 @@ init_vbase_pointers (type, decl_ptr)
   if (TYPE_USES_VIRTUAL_BASECLASSES (type))
     {
       struct vbase_info vi;
-      int old_flag = flag_this_is_variable;
       tree binfo = TYPE_BINFO (type);
-      flag_this_is_variable = -2;
 
       /* Find all the virtual base classes, marking them for later
 	 initialization.  */
@@ -2408,7 +2397,6 @@ init_vbase_pointers (type, decl_ptr)
 		marked_vtable_pathp,
 		NULL);
 
-      flag_this_is_variable = old_flag;
       return vi.inits;
     }
 

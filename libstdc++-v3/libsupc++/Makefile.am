@@ -68,7 +68,7 @@ INCLUDES = \
 	 $(LIBSUPCXX_INCLUDES)
 
 headers = \
-	cxxabi.h exception new typeinfo
+	exception new typeinfo cxxabi.h exception_defines.h 
 
 sources = \
 	del_op.cc \
@@ -92,8 +92,6 @@ libsupc__convenience_la_SOURCES = $(sources)
 glibcppinstalldir = @gxx_include_dir@
 glibcppinstall_HEADERS = $(headers)
 
-# Flags to force separate libtool library to be static only.
-LIBTOOL = @LIBTOOL@ --tag disable-shared
 LIBSUPCXX_CXXFLAGS = -prefer-pic
 
 # AM_CXXFLAGS needs to be in each subdirectory so that it can be
@@ -133,15 +131,12 @@ LTCXXCOMPILE = $(LIBTOOL) --tag CXX --tag disable-shared \
                --mode=compile $(CXX) $(INCLUDES) \
 	       $(AM_CPPFLAGS) $(CPPFLAGS) $(CXXFLAGS) $(AM_CXXFLAGS) 
 
-# 3) We have a problem when building the shared libstdc++ object if
-# the rules automake generates would be used.  We cannot allow CXX to
-# be used in libtool since this would add -lstdc++ to the link line
-# which of course is problematic at this point.
-CXXLINK = $(LIBTOOL) --mode=link "$(CC)" \
-	  @OPT_LDFLAGS@ @SECTION_LDFLAGS@ $(AM_CXXFLAGS) $(LDFLAGS) -o $@
-
-
-
-
-
-
+# 3) We'd have a problem when building the shared libstdc++ object if
+# the rules automake generates would be used.  We cannot allow g++ to
+# be used since this would add -lstdc++ to the link line which of
+# course is problematic at this point.  So, we get the top-level
+# directory to configure libstdc++-v3 to use gcc as the C++
+# compilation driver.
+CXXLINK = $(LIBTOOL) --tag CXX --tag disable-shared \
+          --mode=link $(CXX) \
+          @OPT_LDFLAGS@ @SECTION_LDFLAGS@ $(AM_CXXFLAGS) $(LDFLAGS) -o $@

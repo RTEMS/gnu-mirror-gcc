@@ -290,8 +290,12 @@ java::lang::Class::getSignature (JArray<jclass> *param_types,
   java::lang::StringBuffer *buf = new java::lang::StringBuffer ();
   buf->append((jchar) '(');
   jclass *v = elements (param_types);
-  for (int i = 0; i < param_types->length; ++i)
-    v[i]->getSignature(buf);
+  // A NULL param_types means "no parameters".
+  if (param_types != NULL)
+    {
+      for (int i = 0; i < param_types->length; ++i)
+	v[i]->getSignature(buf);
+    }
   buf->append((jchar) ')');
   if (is_constructor)
     buf->append((jchar) 'V');
@@ -903,11 +907,8 @@ _Jv_LookupInterfaceMethodIdx (jclass klass, jclass iface, int method_idx)
 jboolean
 _Jv_IsAssignableFrom (jclass target, jclass source)
 {
-  if (source == target
-      || (target == &ObjectClass && !source->isPrimitive())
-      || (source->ancestors != NULL 
-          && source->ancestors[source->depth - target->depth] == target))
-     return true;
+  if (source == target)
+    return true;
      
   // If target is array, so must source be.  
   if (target->isArray ())
@@ -939,9 +940,15 @@ _Jv_IsAssignableFrom (jclass target, jclass source)
 	      && cl_idt->cls.itable[offset] == target)
 	    return true;
 	}
+      return false;
     }
-    
-  return false;
+     
+  if ((target == &ObjectClass && !source->isPrimitive())
+      || (source->ancestors != NULL 
+	  && source->ancestors[source->depth - target->depth] == target))
+    return true;
+      
+ return false;
 }
 
 // Interface type checking, the slow way. Returns TRUE if IFACE is a 

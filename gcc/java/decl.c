@@ -47,7 +47,7 @@ static tree push_jvm_slot PARAMS ((int, tree));
 static tree lookup_name_current_level PARAMS ((tree));
 static tree push_promoted_type PARAMS ((const char *, tree));
 static struct binding_level *make_binding_level PARAMS ((void));
-static boolean emit_init_test_initialization PARAMS ((struct hash_entry *,
+static bool emit_init_test_initialization PARAMS ((struct hash_entry *,
 						      hash_table_key));
 static tree create_primitive_vtable PARAMS ((const char *));
 static tree check_local_named_variable PARAMS ((tree, tree, int, int *));
@@ -116,7 +116,7 @@ push_jvm_slot (index, decl)
      tmp = DECL_LOCAL_SLOT_CHAIN (tmp);
     }
   if (rtl != NULL)
-    DECL_RTL (decl) = rtl;
+    SET_DECL_RTL (decl, rtl);
   else
     {
       if (index >= DECL_MAX_LOCALS (current_function_decl))
@@ -276,18 +276,6 @@ struct binding_level
     /* The binding level which this one is contained in (inherits from).  */
     struct binding_level *level_chain;
 
-    /* 1 means make a BLOCK for this level regardless of all else.
-       2 for temporary binding contours created by the compiler.  */
-    char keep;
-
-    /* Nonzero means make a BLOCK if this level has any subblocks.  */
-    char keep_if_subblocks;
-
-    /* Nonzero if this level can safely have additional
-       cleanup-needing variables added to it.  */
-    char more_cleanups_ok;
-    char have_cleanups;
-
     /* The bytecode PC that marks the end of this level. */
     int end_pc;
     /* The bytecode PC that marks the start of this level. */
@@ -323,7 +311,7 @@ static struct binding_level *global_binding_level;
 
 static struct binding_level clear_binding_level
   = {NULL_TREE, NULL_TREE, NULL_TREE, NULL_TREE,
-       NULL_BINDING_LEVEL, 0, 0, 0, 0, LARGEST_PC, 0};
+       NULL_BINDING_LEVEL, LARGEST_PC, 0};
 
 #if 0
 /* A list (chain of TREE_LIST nodes) of all LABEL_DECLs in the function
@@ -338,15 +326,6 @@ static tree shadowed_labels;
 #endif
 
 int flag_traditional;
-
-/* Nonzero means unconditionally make a BLOCK for the next level pushed.  */
-
-static int keep_next_level_flag;
-
-/* Nonzero means make a BLOCK for the next level pushed
-   if it has subblocks.  */
-
-static int keep_next_if_subblocks;
 
 tree java_global_trees[JTI_MAX];
   
@@ -398,7 +377,7 @@ builtin_function (name, type, function_code, class, library_name)
   DECL_EXTERNAL (decl) = 1;
   TREE_PUBLIC (decl) = 1;
   if (library_name)
-    DECL_ASSEMBLER_NAME (decl) = get_identifier (library_name);
+    SET_DECL_ASSEMBLER_NAME (decl, get_identifier (library_name));
   make_decl_rtl (decl, NULL_PTR);
   pushdecl (decl);
   DECL_BUILT_IN_CLASS (decl) = class;
@@ -602,6 +581,7 @@ init_decl_processing ()
   super_identifier_node = get_identifier ("super");
   continue_identifier_node = get_identifier ("continue");
   access0_identifier_node = get_identifier ("access$0");
+  classdollar_identifier_node = get_identifier ("class$");
 
   /* for lack of a better place to put this stub call */
   init_expr_processing();
@@ -634,12 +614,6 @@ init_decl_processing ()
   for (t = TYPE_FIELDS (object_type_node); t != NULL_TREE; t = TREE_CHAIN (t))
     FIELD_PRIVATE (t) = 1;
   FINISH_RECORD (object_type_node);
-
-  class_dtable_decl = build_dtable_decl (class_type_node);
-  TREE_STATIC (class_dtable_decl) = 1;
-  DECL_ARTIFICIAL (class_dtable_decl) = 1;
-  DECL_IGNORED_P (class_dtable_decl) = 1;
-  rest_of_decl_compilation (class_dtable_decl, (char*) 0, 1, 0);
 
   field_type_node = make_node (RECORD_TYPE);
   field_ptr_type_node = build_pointer_type (field_type_node);
@@ -1204,10 +1178,6 @@ pushlevel (unused)
   *newlevel = clear_binding_level;
   newlevel->level_chain = current_binding_level;
   current_binding_level = newlevel;
-  newlevel->keep = keep_next_level_flag;
-  keep_next_level_flag = 0;
-  newlevel->keep_if_subblocks = keep_next_if_subblocks;
-  keep_next_if_subblocks = 0;
 #if defined(DEBUG_JAVA_BINDING_LEVELS)
   newlevel->binding_depth = binding_depth;
   indent ();
@@ -1268,8 +1238,6 @@ poplevel (keep, reverse, functionbody)
 #endif
 #endif /* defined(DEBUG_JAVA_BINDING_LEVELS) */
 
-  keep |= current_binding_level->keep;
-
   /* Get the decls in the order they were written.
      Usually current_binding_level->names is in reverse order.
      But parameter decls were previously put in forward order.  */
@@ -1314,8 +1282,7 @@ poplevel (keep, reverse, functionbody)
   block_previously_created = (current_binding_level->this_block != 0);
   if (block_previously_created)
     block = current_binding_level->this_block;
-  else if (keep || functionbody
-	   || (current_binding_level->keep_if_subblocks && subblocks != 0))
+  else if (keep || functionbody)
     block = make_node (BLOCK);
   if (block != 0)
     {
@@ -1544,6 +1511,10 @@ set_block (block)
      register tree block;
 {
   current_binding_level->this_block = block;
+  current_binding_level->names = chainon (current_binding_level->names,
+					  BLOCK_VARS (block));
+  current_binding_level->blocks = chainon (current_binding_level->blocks,
+					   BLOCK_SUBBLOCKS (block));
 }
 
 /* integrate_decl_tree calls this function. */
@@ -1598,7 +1569,7 @@ give_name_to_locals (jcf)
 	{
 	  tree decl = TREE_VEC_ELT (decl_map, slot);
 	  DECL_NAME (decl) = name;
-	  DECL_ASSEMBLER_NAME (decl) = name;
+	  SET_DECL_ASSEMBLER_NAME (decl, name);
 	  if (TREE_CODE (decl) != PARM_DECL || TREE_TYPE (decl) != type)
 	    warning ("bad type in parameter debug info");
 	}
@@ -1665,7 +1636,7 @@ give_name_to_locals (jcf)
 	      sprintf (buffer, "ARG_%d", arg_i);
 	      DECL_NAME (parm) = get_identifier (buffer);
 	    }
-	  DECL_ASSEMBLER_NAME (parm) = DECL_NAME (parm);
+	  SET_DECL_ASSEMBLER_NAME (parm, DECL_NAME (parm));
 	}
     }
 }
@@ -1685,7 +1656,7 @@ build_result_decl (fndecl)
 /* Called for every element in DECL_FUNCTION_INIT_TEST_TABLE in order
    to emit initialization code for each test flag.  */
 
-static boolean
+static bool
 emit_init_test_initialization (entry, key)
   struct hash_entry *entry;
   hash_table_key key ATTRIBUTE_UNUSED;

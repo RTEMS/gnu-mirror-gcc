@@ -833,15 +833,25 @@ dbxout_type_methods (type)
 	{
 	  /* This is the "mangled" name of the method.
 	     It encodes the argument types.  */
-	  const char *debug_name =
-	    IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (fndecl));
+	  const char *debug_name;
 	  int show_arg_types = 0;
+
+	  /* Skip methods that aren't FUNCTION_DECLs.  (In C++, these
+	     include TEMPLATE_DECLs.)  The debugger doesn't know what
+	     to do with such entities anyhow.  */
+	  if (TREE_CODE (fndecl) != FUNCTION_DECL)
+	    continue;
+
+	  debug_name =
+	    IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (fndecl));
 
 	  CONTIN;
 
 	  last = fndecl;
 
-	  if (DECL_IGNORED_P (fndecl))
+	  /* Also ignore abstract methods; those are only interesting to
+	     the DWARF backends.  */
+	  if (DECL_IGNORED_P (fndecl) || DECL_ABSTRACT (fndecl))
 	    continue;
 
 	  if (flag_minimal_debug)
@@ -1969,7 +1979,7 @@ dbxout_symbol (decl, local)
 	  /* else it is something we handle like a normal variable.  */
 	}
 
-      DECL_RTL (decl) = eliminate_regs (DECL_RTL (decl), 0, NULL_RTX);
+      SET_DECL_RTL (decl, eliminate_regs (DECL_RTL (decl), 0, NULL_RTX));
 #ifdef LEAF_REG_REMAP
       if (current_function_uses_only_leaf_regs)
 	leaf_renumber_regs_insn (DECL_RTL (decl));
@@ -2305,7 +2315,7 @@ dbxout_parms (parms)
 	   so that the debugging output will be accurate.  */
 	DECL_INCOMING_RTL (parms)
 	  = eliminate_regs (DECL_INCOMING_RTL (parms), 0, NULL_RTX);
-	DECL_RTL (parms) = eliminate_regs (DECL_RTL (parms), 0, NULL_RTX);
+	SET_DECL_RTL (parms, eliminate_regs (DECL_RTL (parms), 0, NULL_RTX));
 #ifdef LEAF_REG_REMAP
 	if (current_function_uses_only_leaf_regs)
 	  {

@@ -84,10 +84,6 @@ static void init_operators PARAMS ((void));
 
 #include "cpplib.h"
 
-/* Pending language change.
-   Positive is push count, negative is pop count.  */
-int pending_lang_change = 0;
-
 extern int yychar;		/*  the lookahead symbol		*/
 extern YYSTYPE yylval;		/*  the semantic value of the		*/
 				/*  lookahead symbol			*/
@@ -317,7 +313,7 @@ operator_name_info_t assignment_operator_name_info[(int) LAST_CPLUS_TREE_CODE];
 
 /* Initialize data structures that keep track of operator names.  */
 
-#define DEF_OPERATOR(NAME, C, NM, OM, AR, AP) \
+#define DEF_OPERATOR(NAME, C, M, AR, AP) \
  CONSTRAINT (C, sizeof "operator " + sizeof NAME <= 256);
 #include "operators.def"
 #undef DEF_OPERATOR
@@ -329,7 +325,7 @@ init_operators ()
   char buffer[256];
   struct operator_name_info_t *oni;
 
-#define DEF_OPERATOR(NAME, CODE, NEW_MANGLING, OLD_MANGLING, ARITY, ASSN_P) \
+#define DEF_OPERATOR(NAME, CODE, MANGLING, ARITY, ASSN_P)		    \
   sprintf (buffer, ISALPHA (NAME[0]) ? "operator %s" : "operator%s", NAME); \
   identifier = get_identifier (buffer);					    \
   IDENTIFIER_OPNAME_P (identifier) = 1;					    \
@@ -339,7 +335,7 @@ init_operators ()
 	 : &operator_name_info[(int) CODE]);				    \
   oni->identifier = identifier;						    \
   oni->name = NAME;							    \
-  oni->mangled_name = NEW_MANGLING;
+  oni->mangled_name = MANGLING;
 
 #include "operators.def"
 #undef DEF_OPERATOR

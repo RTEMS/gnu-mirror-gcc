@@ -163,8 +163,8 @@ static void write_type PARAMS ((tree));
 static int write_CV_qualifiers_for_type PARAMS ((tree));
 static void write_builtin_type PARAMS ((tree));
 static void write_function_type PARAMS ((tree));
-static void write_bare_function_type PARAMS ((tree, int));
-static void write_method_parms PARAMS ((tree, int));
+static void write_bare_function_type PARAMS ((tree, int, tree));
+static void write_method_parms PARAMS ((tree, int, tree));
 static void write_class_enum_type PARAMS ((tree));
 static void write_template_args PARAMS ((tree));
 static void write_expression PARAMS ((tree));
@@ -653,7 +653,8 @@ write_encoding (decl)
 				(!DECL_CONSTRUCTOR_P (decl)
 				 && !DECL_DESTRUCTOR_P (decl)
 				 && !DECL_CONV_FN_P (decl)
-				 && decl_is_template_id (decl, NULL)));
+				 && decl_is_template_id (decl, NULL)),
+				decl);
     }
 }
 
@@ -1153,16 +1154,17 @@ discriminator_for_local_entity (entity)
   /* Assume this is the only local entity with this name.  */
   discriminator = 0;
 
-  /* For now, we don't discriminate amongst local variables.  */
-  if (TREE_CODE (entity) != TYPE_DECL)
-    return 0;
-
-  /* Scan the list of local classes.  */
-  entity = TREE_TYPE (entity);
-  for (type = &VARRAY_TREE (local_classes, 0); *type != entity; ++type)
-    if (TYPE_IDENTIFIER (*type) == TYPE_IDENTIFIER (entity)
-	&& TYPE_CONTEXT (*type) == TYPE_CONTEXT (entity))
-      ++discriminator;
+  if (DECL_DISCRIMINATOR_P (entity) && DECL_LANG_SPECIFIC (entity))
+    discriminator = DECL_DISCRIMINATOR (entity);
+  else if (TREE_CODE (entity) == TYPE_DECL)
+    {
+      /* Scan the list of local classes.  */
+      entity = TREE_TYPE (entity);
+      for (type = &VARRAY_TREE (local_classes, 0); *type != entity; ++type)
+        if (TYPE_IDENTIFIER (*type) == TYPE_IDENTIFIER (entity)
+            && TYPE_CONTEXT (*type) == TYPE_CONTEXT (entity))
+	  ++discriminator;
+    }  
 
   return discriminator;
 }
@@ -1194,10 +1196,7 @@ write_discriminator (discriminator)
   if (discriminator > 0)
     {
       write_char ('_');
-      /* The number is omitted for discriminator == 1.  Beyond 1, the
-	 numbering starts at 0.  */
-      if (discriminator > 1)
-	write_unsigned_number (discriminator - 2);
+      write_unsigned_number (discriminator - 1);
     }
 }
 
@@ -1530,20 +1529,23 @@ write_function_type (type)
        extern "C" function_t f; // Vice versa.
 
      See [dcl.link].  */
-  write_bare_function_type (type, /*include_return_type_p=*/1);
+  write_bare_function_type (type, /*include_return_type_p=*/1, 
+			    /*decl=*/NULL);
   write_char ('E');
 }
 
-/* Non-terminal <bare-function-type>.  NODE is a FUNCTION_DECL or a
+/* Non-terminal <bare-function-type>.  TYPE is a FUNCTION_TYPE or
    METHOD_TYPE.  If INCLUDE_RETURN_TYPE is non-zero, the return value
-   is mangled before the parameter types.
+   is mangled before the parameter types.  If non-NULL, DECL is
+   FUNCTION_DECL for the function whose type is being emitted.
 
      <bare-function-type> ::= </signature/ type>+  */
 
 static void
-write_bare_function_type (type, include_return_type_p)
+write_bare_function_type (type, include_return_type_p, decl)
      tree type;
      int include_return_type_p;
+     tree decl;
 {
   MANGLE_TRACE_TREE ("bare-function-type", type);
 
@@ -1553,19 +1555,25 @@ write_bare_function_type (type, include_return_type_p)
 
   /* Now mangle the types of the arguments.  */
   write_method_parms (TYPE_ARG_TYPES (type), 
-		      TREE_CODE (type) == METHOD_TYPE);
+		      TREE_CODE (type) == METHOD_TYPE,
+		      decl);
 }
 
 /* Write the mangled representation of a method parameter list of
-   types given in PARM_LIST.  If METHOD_P is non-zero, the function is 
-   considered a non-static method, and the this parameter is omitted.  */
+   types given in PARM_TYPES.  If METHOD_P is non-zero, the function is 
+   considered a non-static method, and the this parameter is omitted.
+   If non-NULL, DECL is the FUNCTION_DECL for the function whose
+   parameters are being emitted.  */
 
 static void
-write_method_parms (parm_list, method_p)
-     tree parm_list;
+write_method_parms (parm_types, method_p, decl)
+     tree decl;
+     tree parm_types;
      int method_p;
 {
-  tree first_parm;
+  tree first_parm_type;
+  tree parm_decl = decl ? DECL_ARGUMENTS (decl) : NULL_TREE;
+
   /* Assume this parameter type list is variable-length.  If it ends
      with a void type, then it's not.  */
   int varargs_p = 1;
@@ -1573,28 +1581,39 @@ write_method_parms (parm_list, method_p)
   /* If this is a member function, skip the first arg, which is the
      this pointer.  
        "Member functions do not encode the type of their implicit this
-       parameter."  */
+       parameter."  
+  
+     Similarly, there's no need to mangle artificial parameters, like
+     the VTT parameters for constructors and destructors.  */
   if (method_p)
-    parm_list = TREE_CHAIN (parm_list);
-
-  for (first_parm = parm_list; 
-       parm_list; 
-       parm_list = TREE_CHAIN (parm_list))
     {
-      tree parm = TREE_VALUE (parm_list);
+      parm_types = TREE_CHAIN (parm_types);
+      parm_decl = parm_decl ? TREE_CHAIN (parm_decl) : NULL_TREE;
 
+      while (parm_decl && DECL_ARTIFICIAL (parm_decl))
+	{
+	  parm_types = TREE_CHAIN (parm_types);
+	  parm_decl = TREE_CHAIN (parm_decl);
+	}
+    }
+
+  for (first_parm_type = parm_types; 
+       parm_types; 
+       parm_types = TREE_CHAIN (parm_types))
+    {
+      tree parm = TREE_VALUE (parm_types);
       if (parm == void_type_node)
 	{
 	  /* "Empty parameter lists, whether declared as () or
 	     conventionally as (void), are encoded with a void parameter
 	     (v)."  */
-	  if (parm_list == first_parm)
+	  if (parm_types == first_parm_type)
 	    write_type (parm);
 	  /* If the parm list is terminated with a void type, it's
 	     fixed-length.  */
 	  varargs_p = 0;
 	  /* A void type better be the last one.  */
-	  my_friendly_assert (TREE_CHAIN (parm_list) == NULL, 20000523);
+	  my_friendly_assert (TREE_CHAIN (parm_types) == NULL, 20000523);
 	}
       else
 	write_type (parm);
@@ -2048,6 +2067,19 @@ mangle_decl_string (decl)
 
   if (TREE_CODE (decl) == TYPE_DECL)
     write_type (TREE_TYPE (decl));
+  else if (/* The names of `extern "C"' functions are not mangled.  */
+	   (TREE_CODE (decl) == FUNCTION_DECL 
+	    /* But overloaded operator names *are* mangled.  */
+	    && !DECL_OVERLOADED_OPERATOR_P (decl)
+	    /* If there's no DECL_LANG_SPECIFIC, it's a function built
+	       by language-independent code, which never builds
+	       functions with C++ linkage.  */
+	    && (!DECL_LANG_SPECIFIC (decl) 
+		|| DECL_EXTERN_C_FUNCTION_P (decl)))
+	   /* The names of global variables aren't mangled either.  */
+	   || (TREE_CODE (decl) == VAR_DECL
+	       && CP_DECL_CONTEXT (decl) == global_namespace))
+    write_string (IDENTIFIER_POINTER (DECL_NAME (decl)));
   else
     {
       write_mangled_name (decl);
@@ -2068,11 +2100,13 @@ mangle_decl_string (decl)
 
 /* Create an identifier for the external mangled name of DECL.  */
 
-tree
+void
 mangle_decl (decl)
      tree decl;
 {
-  return get_identifier (mangle_decl_string (decl));
+  tree id = get_identifier (mangle_decl_string (decl));
+
+  SET_DECL_ASSEMBLER_NAME (decl, id);
 }
 
 /* Generate the mangled representation of TYPE.  */
