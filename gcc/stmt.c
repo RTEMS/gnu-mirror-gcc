@@ -1107,18 +1107,26 @@ n_occurrences (c, s)
 }
 
 /* Generate RTL for an asm statement (explicit assembler code).
-   BODY is a STRING_CST node containing the assembler code text,
-   or an ADDR_EXPR containing a STRING_CST.  */
+   STRING is a STRING_CST node containing the assembler code text,
+   or an ADDR_EXPR containing a STRING_CST.  VOL nonzero means the
+   insn is volatile; don't optimize it.  */
 
 void
-expand_asm (body)
-     tree body;
+expand_asm (string, vol)
+     tree string;
+     int vol;
 {
-  if (TREE_CODE (body) == ADDR_EXPR)
-    body = TREE_OPERAND (body, 0);
+  rtx body;
 
-  emit_insn (gen_rtx_ASM_INPUT (VOIDmode,
-				TREE_STRING_POINTER (body)));
+  if (TREE_CODE (string) == ADDR_EXPR)
+    string = TREE_OPERAND (string, 0);
+
+  body = gen_rtx_ASM_INPUT (VOIDmode, TREE_STRING_POINTER (string));
+
+  MEM_VOLATILE_P (body) = vol;
+
+  emit_insn (body);
+  
   clear_last_expr ();
 }
 
@@ -1597,6 +1605,7 @@ expand_asm_operands (string, outputs, inputs, clobbers, vol, filename, line)
       bool is_inout;
       bool allows_reg;
       bool allows_mem;
+      rtx op;
 
       if (!parse_output_constraint (&constraints[i], i, ninputs,
 				    noutputs, &allows_mem, &allows_reg,
@@ -1620,24 +1629,28 @@ expand_asm_operands (string, outputs, inputs, clobbers, vol, filename, line)
 	  || ! allows_reg
 	  || is_inout)
 	{
-	  output_rtx[i] = expand_expr (val, NULL_RTX, VOIDmode, EXPAND_WRITE);
+	  op = expand_expr (val, NULL_RTX, VOIDmode, EXPAND_WRITE);
+	  if (GET_CODE (op) == MEM)
+	    op = validize_mem (op);
 
-	  if (! allows_reg && GET_CODE (output_rtx[i]) != MEM)
+	  if (! allows_reg && GET_CODE (op) != MEM)
 	    error ("output number %d not directly addressable", i);
-	  if ((! allows_mem && GET_CODE (output_rtx[i]) == MEM)
-	      || GET_CODE (output_rtx[i]) == CONCAT)
+	  if ((! allows_mem && GET_CODE (op) == MEM)
+	      || GET_CODE (op) == CONCAT)
 	    {
-	      real_output_rtx[i] = protect_from_queue (output_rtx[i], 1);
-	      output_rtx[i] = gen_reg_rtx (GET_MODE (output_rtx[i]));
+	      real_output_rtx[i] = protect_from_queue (op, 1);
+	      op = gen_reg_rtx (GET_MODE (op));
 	      if (is_inout)
-		emit_move_insn (output_rtx[i], real_output_rtx[i]);
+		emit_move_insn (op, real_output_rtx[i]);
 	    }
 	}
       else
 	{
-	  output_rtx[i] = assign_temp (type, 0, 0, 1);
-	  TREE_VALUE (tail) = make_tree (type, output_rtx[i]);
+	  op = assign_temp (type, 0, 0, 1);
+	  op = validize_mem (op);
+	  TREE_VALUE (tail) = make_tree (type, op);
 	}
+      output_rtx[i] = op;
 
       generating_concat_p = old_generating_concat_p;
 
@@ -1689,6 +1702,8 @@ expand_asm_operands (string, outputs, inputs, clobbers, vol, filename, line)
       /* Never pass a CONCAT to an ASM.  */
       if (GET_CODE (op) == CONCAT)
 	op = force_reg (GET_MODE (op), op);
+      else if (GET_CODE (op) == MEM)
+	op = validize_mem (op);
 
       if (asm_operand_ok (op, constraint) <= 0)
 	{
@@ -1698,7 +1713,10 @@ expand_asm_operands (string, outputs, inputs, clobbers, vol, filename, line)
 	    warning ("asm operand %d probably doesn't match constraints",
 		     i + noutputs);
 	  else if (CONSTANT_P (op))
-	    op = force_const_mem (TYPE_MODE (type), op);
+	    {
+	      op = force_const_mem (TYPE_MODE (type), op);
+	      op = validize_mem (op);
+	    }
 	  else if (GET_CODE (op) == REG
 		   || GET_CODE (op) == SUBREG
 		   || GET_CODE (op) == ADDRESSOF
@@ -1708,7 +1726,7 @@ expand_asm_operands (string, outputs, inputs, clobbers, vol, filename, line)
 						     (TYPE_QUALS (type)
 						      | TYPE_QUAL_CONST));
 	      rtx memloc = assign_temp (qual_type, 1, 1, 1);
-
+	      memloc = validize_mem (memloc);
 	      emit_move_insn (memloc, op);
 	      op = memloc;
 	    }
