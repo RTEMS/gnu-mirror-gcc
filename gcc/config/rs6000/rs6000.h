@@ -379,7 +379,8 @@ enum processor_type
    PROCESSOR_PPC7400,
    PROCESSOR_PPC7450,
    PROCESSOR_PPC8540,
-   PROCESSOR_POWER4
+   PROCESSOR_POWER4,
+   PROCESSOR_POWER5
 };
 
 extern enum processor_type rs6000_cpu;
@@ -536,19 +537,6 @@ extern enum rs6000_nop_insertion rs6000_sched_insert_nops;
 #else
 #define TARGET_ALIGN_NATURAL 0
 #endif
-
-/* Set a default value for DEFAULT_SCHED_COSTLY_DEP used by target hook
-   is_costly_dependence.  */ 
-#define DEFAULT_SCHED_COSTLY_DEP                           \
-  (rs6000_cpu == PROCESSOR_POWER4 ? store_to_load_dep_costly : no_dep_costly)
-
-/* Define if the target has restricted dispatch slot instructions.  */
-#define DEFAULT_RESTRICTED_INSNS_PRIORITY (rs6000_cpu == PROCESSOR_POWER4 ? 1 : 0)
-
-/* Set a default value for post scheduling nop insertion scheme
-   (used by taget hook sched_finish).  */
-#define DEFAULT_SCHED_FINISH_NOP_INSERTION_SCHEME          \
-  (rs6000_cpu == PROCESSOR_POWER4 ? sched_finish_regroup_exact : sched_finish_none)
 
 #define TARGET_LONG_DOUBLE_128 (rs6000_long_double_type_size == 128)
 #define TARGET_ALTIVEC_ABI rs6000_altivec_abi
@@ -1471,12 +1459,22 @@ enum reg_class
     ? GENERAL_REGS					\
     : (CLASS)))
 
+#define DISPARAGE_RELOAD_CLASS(X, CLASS)			\
+  (GET_CODE (X) == REG						\
+   && REGNO (X) < FIRST_PSEUDO_REGISTER				\
+   && SECONDARY_MEMORY_NEEDED (GET_MODE_CLASS (GET_MODE (X)),	\
+			       CLASS, GET_MODE (X))		\
+   ? 6 : 0)
+
 /* Return the register class of a scratch register needed to copy IN into
    or out of a register in CLASS in MODE.  If it can be done directly,
    NO_REGS is returned.  */
 
-#define SECONDARY_RELOAD_CLASS(CLASS,MODE,IN) \
-  secondary_reload_class (CLASS, MODE, IN)
+#define SECONDARY_INPUT_RELOAD_CLASS(CLASS, MODE, IN) \
+  secondary_reload_class (CLASS, MODE, IN, 1)
+
+#define SECONDARY_OUTPUT_RELOAD_CLASS(CLASS, MODE, IN) \
+  secondary_reload_class (CLASS, MODE, IN, 0)
 
 /* If we are copying between FP or AltiVec registers and anything
    else, we need a memory location.  */
@@ -1525,6 +1523,9 @@ extern enum rs6000_abi rs6000_current_abi;	/* available for use by subtarget */
 /* Define this if pushing a word on the stack
    makes the stack pointer a smaller address.  */
 #define STACK_GROWS_DOWNWARD
+
+/* Offsets recorded in opcodes are a multiple of this alignment factor.  */
+#define DWARF_CIE_DATA_ALIGNMENT (-((int) (TARGET_32BIT ? 4 : 8)))
 
 /* Define this if the nominal address of the stack frame
    is at the high-address end of the local variables;
@@ -1767,19 +1768,19 @@ typedef struct rs6000_args
    for a call to a function whose data type is FNTYPE.
    For a library call, FNTYPE is 0.  */
 
-#define INIT_CUMULATIVE_ARGS(CUM,FNTYPE,LIBNAME,INDIRECT) \
-  init_cumulative_args (&CUM, FNTYPE, LIBNAME, FALSE, FALSE)
+#define INIT_CUMULATIVE_ARGS(CUM, FNTYPE, LIBNAME, INDIRECT, N_NAMED_ARGS) \
+  init_cumulative_args (&CUM, FNTYPE, LIBNAME, FALSE, FALSE, N_NAMED_ARGS)
 
 /* Similar, but when scanning the definition of a procedure.  We always
    set NARGS_PROTOTYPE large so we never return an EXPR_LIST.  */
 
-#define INIT_CUMULATIVE_INCOMING_ARGS(CUM,FNTYPE,LIBNAME) \
-  init_cumulative_args (&CUM, FNTYPE, LIBNAME, TRUE, FALSE)
+#define INIT_CUMULATIVE_INCOMING_ARGS(CUM, FNTYPE, LIBNAME) \
+  init_cumulative_args (&CUM, FNTYPE, LIBNAME, TRUE, FALSE, 1000)
 
 /* Like INIT_CUMULATIVE_ARGS' but only used for outgoing libcalls.  */
 
 #define INIT_CUMULATIVE_LIBCALL_ARGS(CUM, MODE, LIBNAME) \
-  init_cumulative_args (&CUM, NULL_TREE, LIBNAME, FALSE, TRUE)
+  init_cumulative_args (&CUM, NULL_TREE, LIBNAME, FALSE, TRUE, 0)
 
 /* Update the data in CUM to advance over an argument
    of mode MODE and data type TYPE.
@@ -1843,13 +1844,6 @@ typedef struct rs6000_args
 
 #define FUNCTION_ARG_BOUNDARY(MODE, TYPE) \
   function_arg_boundary (MODE, TYPE)
-
-/* Define to nonzero if complex arguments should be split into their
-   corresponding components.
-
-   This should be set for Linux and Darwin as well, but we can't break
-   the ABIs at the moment.  For now, only AIX gets fixed.  */
-#define SPLIT_COMPLEX_ARGS (DEFAULT_ABI == ABI_AIX)
 
 /* Implement `va_start' for varargs and stdarg.  */
 #define EXPAND_BUILTIN_VA_START(valist, nextarg) \
@@ -2666,6 +2660,8 @@ extern char rs6000_reg_names[][8];	/* register names (0 vs. %r0).  */
   {"lwa_operand", {SUBREG, MEM, REG}},					   \
   {"volatile_mem_operand", {MEM}},					   \
   {"offsettable_mem_operand", {MEM}},					   \
+  {"invalid_gpr_mem", {MEM}},						   \
+  {"base_reg_operand", {REG}},						   \
   {"mem_or_easy_const_operand", {SUBREG, MEM, CONST_DOUBLE}},		   \
   {"add_operand", {SUBREG, REG, CONST_INT}},				   \
   {"non_add_cint_operand", {CONST_INT}},				   \

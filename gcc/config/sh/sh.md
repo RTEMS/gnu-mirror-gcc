@@ -2194,7 +2194,7 @@
 	parts[0] = gen_reg_rtx (SImode);
 	parts[1] = gen_reg_rtx (SImode);
 	emit_insn (gen_rotlsi3_16 (parts[2-choice], operands[1]));
-	parts[choice-1] = operands[1];
+	emit_move_insn (parts[choice-1], operands[1]);
 	emit_insn (gen_ashlsi3 (parts[0], parts[0], GEN_INT (8)));
 	emit_insn (gen_lshrsi3 (parts[1], parts[1], GEN_INT (8)));
 	emit_insn (gen_iorsi3 (operands[0], parts[0], parts[1]));
@@ -6467,7 +6467,7 @@
   ""
   "
 {
-  sh_expand_epilogue ();
+  sh_expand_epilogue (1);
   if (TARGET_SHCOMPACT)
     {
       rtx insn, set;
@@ -6863,8 +6863,9 @@
 
 (define_insn "tls_global_dynamic"
   [(set (match_operand:SI 0 "register_operand" "=&z")
-	(unspec:SI [(match_operand:SI 1 "" "")]
-		    UNSPEC_TLSGD))
+	(call (unspec:SI [(match_operand:SI 1 "" "")]
+			  UNSPEC_TLSGD)
+	      (const_int 0)))
    (use (reg:PSI FPSCR_REG))
    (use (reg:SI PIC_REG))
    (clobber (reg:SI PR_REG))
@@ -6891,8 +6892,9 @@ mov.l\\t1f,r4\\n\\
 
 (define_insn "tls_local_dynamic"
   [(set (match_operand:SI 0 "register_operand" "=&z")
-	(unspec:SI [(match_operand:SI 1 "" "")]
-		    UNSPEC_TLSLDM))
+	(call (unspec:SI [(match_operand:SI 1 "" "")]
+			  UNSPEC_TLSLDM)
+	      (const_int 0)))
    (use (reg:PSI FPSCR_REG))
    (use (reg:SI PIC_REG))
    (clobber (reg:SI PR_REG))
@@ -7346,7 +7348,7 @@ mov.l\\t1f,r0\\n\\
   ""
   "
 {
-  sh_expand_epilogue ();
+  sh_expand_epilogue (0);
   emit_jump_insn (gen_return ());
   DONE;
 }")
