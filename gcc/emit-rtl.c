@@ -190,6 +190,7 @@ static mem_attrs *get_mem_attrs		PARAMS ((HOST_WIDE_INT, tree, rtx,
 						 enum machine_mode));
 static tree component_ref_for_mem_expr	PARAMS ((tree));
 static rtx gen_const_vector_0		PARAMS ((enum machine_mode));
+static void copy_rtx_if_shared_1	PARAMS ((rtx *orig));
 
 /* Probability of the conditional branch currently proceeded by try_split.
    Set to -1 otherwise.  */
@@ -925,7 +926,11 @@ subreg_hard_regno (x, check_mode)
     abort ();
   if (check_mode && ! HARD_REGNO_MODE_OK (base_regno, GET_MODE (reg)))
     abort ();
-
+#ifdef ENABLE_CHECKING
+  if (!subreg_offset_representable_p (REGNO (reg), GET_MODE (reg),
+			  	      SUBREG_BYTE (x), mode))
+    abort ();
+#endif
   /* Catch non-congruent offsets too.  */
   byte_offset = SUBREG_BYTE (x);
   if ((byte_offset % GET_MODE_SIZE (mode)) != 0)
@@ -1800,11 +1805,14 @@ set_mem_attributes_minus_bitpos (ref, t, objectp, bitpos)
       else if (TREE_CODE (t) == ARRAY_REF)
 	{
 	  tree off_tree = size_zero_node;
+	  /* We can't modify t, because we use it at the end of the
+	     function.  */
+	  tree t2 = t;
 
 	  do
 	    {
-	      tree index = TREE_OPERAND (t, 1);
-	      tree array = TREE_OPERAND (t, 0);
+	      tree index = TREE_OPERAND (t2, 1);
+	      tree array = TREE_OPERAND (t2, 0);
 	      tree domain = TYPE_DOMAIN (TREE_TYPE (array));
 	      tree low_bound = (domain ? TYPE_MIN_VALUE (domain) : 0);
 	      tree unit_size = TYPE_SIZE_UNIT (TREE_TYPE (TREE_TYPE (array)));
@@ -1822,7 +1830,7 @@ set_mem_attributes_minus_bitpos (ref, t, objectp, bitpos)
 		 component to one.  */
 	      if (! TREE_CONSTANT (index)
 		  && contains_placeholder_p (index))
-		index = build (WITH_RECORD_EXPR, TREE_TYPE (index), index, t);
+		index = build (WITH_RECORD_EXPR, TREE_TYPE (index), index, t2);
 	      if (! TREE_CONSTANT (unit_size)
 		  && contains_placeholder_p (unit_size))
 		unit_size = build (WITH_RECORD_EXPR, sizetype,
@@ -1834,28 +1842,28 @@ set_mem_attributes_minus_bitpos (ref, t, objectp, bitpos)
 					    index,
 					    unit_size)),
 			       off_tree));
-	      t = TREE_OPERAND (t, 0);
+	      t2 = TREE_OPERAND (t2, 0);
 	    }
-	  while (TREE_CODE (t) == ARRAY_REF);
+	  while (TREE_CODE (t2) == ARRAY_REF);
 
-	  if (DECL_P (t))
+	  if (DECL_P (t2))
 	    {
-	      expr = t;
+	      expr = t2;
 	      offset = NULL;
 	      if (host_integerp (off_tree, 1))
 		{
 		  HOST_WIDE_INT ioff = tree_low_cst (off_tree, 1);
 		  HOST_WIDE_INT aoff = (ioff & -ioff) * BITS_PER_UNIT;
-		  align = DECL_ALIGN (t);
+		  align = DECL_ALIGN (t2);
 		  if (aoff && aoff < align)
 	            align = aoff;
 		  offset = GEN_INT (ioff);
 		  apply_bitpos = bitpos;
 		}
 	    }
-	  else if (TREE_CODE (t) == COMPONENT_REF)
+	  else if (TREE_CODE (t2) == COMPONENT_REF)
 	    {
-	      expr = component_ref_for_mem_expr (t);
+	      expr = component_ref_for_mem_expr (t2);
 	      if (host_integerp (off_tree, 1))
 		{
 		  offset = GEN_INT (tree_low_cst (off_tree, 1));
@@ -1865,10 +1873,10 @@ set_mem_attributes_minus_bitpos (ref, t, objectp, bitpos)
 		 the size we got from the type?  */
 	    }
 	  else if (flag_argument_noalias > 1
-		   && TREE_CODE (t) == INDIRECT_REF
-		   && TREE_CODE (TREE_OPERAND (t, 0)) == PARM_DECL)
+		   && TREE_CODE (t2) == INDIRECT_REF
+		   && TREE_CODE (TREE_OPERAND (t2, 0)) == PARM_DECL)
 	    {
-	      expr = t;
+	      expr = t2;
 	      offset = NULL;
 	    }
 	}
@@ -2565,14 +2573,28 @@ rtx
 copy_rtx_if_shared (orig)
      rtx orig;
 {
-  rtx x = orig;
+  copy_rtx_if_shared_1 (&orig);
+  return orig;
+}
+
+static void
+copy_rtx_if_shared_1 (orig1)
+     rtx *orig1;
+{
+  rtx x;
   int i;
   enum rtx_code code;
+  rtx *last_ptr;
   const char *format_ptr;
   int copied = 0;
+  int length;
+
+  /* Repeat is used to turn tail-recursion into iteration.  */
+repeat:
+  x = *orig1;
 
   if (x == 0)
-    return 0;
+    return;
 
   code = GET_CODE (x);
 
@@ -2591,7 +2613,7 @@ copy_rtx_if_shared (orig)
     case CC0:
     case SCRATCH:
       /* SCRATCH must be shared because they represent distinct values.  */
-      return x;
+      return;
 
     case CONST:
       /* CONST can be shared if it contains a SYMBOL_REF.  If it contains
@@ -2599,7 +2621,7 @@ copy_rtx_if_shared (orig)
       if (GET_CODE (XEXP (x, 0)) == PLUS
 	  && GET_CODE (XEXP (XEXP (x, 0), 0)) == SYMBOL_REF
 	  && GET_CODE (XEXP (XEXP (x, 0), 1)) == CONST_INT)
-	return x;
+	return;
       break;
 
     case INSN:
@@ -2608,7 +2630,7 @@ copy_rtx_if_shared (orig)
     case NOTE:
     case BARRIER:
       /* The chain of insns is not being copied.  */
-      return x;
+      return;
 
     case MEM:
       /* A MEM is allowed to be shared if its address is constant.
@@ -2620,7 +2642,7 @@ copy_rtx_if_shared (orig)
 	 because it looks safe and profitable in one context, but
 	 in some other context it creates unrecognizable RTL.  */
       if (CONSTANT_ADDRESS_P (XEXP (x, 0)))
-	return x;
+	return;
 
       break;
 
@@ -2650,13 +2672,17 @@ copy_rtx_if_shared (orig)
      must be copied if X was copied.  */
 
   format_ptr = GET_RTX_FORMAT (code);
-
-  for (i = 0; i < GET_RTX_LENGTH (code); i++)
+  length = GET_RTX_LENGTH (code);
+  last_ptr = NULL;
+  
+  for (i = 0; i < length; i++)
     {
       switch (*format_ptr++)
 	{
 	case 'e':
-	  XEXP (x, i) = copy_rtx_if_shared (XEXP (x, i));
+          if (last_ptr)
+            copy_rtx_if_shared_1 (last_ptr);
+	  last_ptr = &XEXP (x, i);
 	  break;
 
 	case 'E':
@@ -2664,16 +2690,29 @@ copy_rtx_if_shared (orig)
 	    {
 	      int j;
 	      int len = XVECLEN (x, i);
-
+              
+              /* Copy the vector iff I copied the rtx and the length is nonzero. */
 	      if (copied && len > 0)
 		XVEC (x, i) = gen_rtvec_v (len, XVEC (x, i)->elem);
+              
+              /* Call recsusively on all inside the vector. */
 	      for (j = 0; j < len; j++)
-		XVECEXP (x, i, j) = copy_rtx_if_shared (XVECEXP (x, i, j));
+                {
+		  if (last_ptr)
+		    copy_rtx_if_shared_1 (last_ptr);
+                  last_ptr = &XVECEXP (x, i, j);
+                }
 	    }
 	  break;
 	}
     }
-  return x;
+  *orig1 = x;
+  if (last_ptr)
+    {
+      orig1 = last_ptr;
+      goto repeat;
+    }
+  return;
 }
 
 /* Clear all the USED bits in X to allow copy_rtx_if_shared to be used
@@ -2686,7 +2725,10 @@ reset_used_flags (x)
   int i, j;
   enum rtx_code code;
   const char *format_ptr;
+  int length;
 
+  /* Repeat is used to turn tail-recursion into iteration.  */
+repeat:
   if (x == 0)
     return;
 
@@ -2724,11 +2766,18 @@ reset_used_flags (x)
   RTX_FLAG (x, used) = 0;
 
   format_ptr = GET_RTX_FORMAT (code);
-  for (i = 0; i < GET_RTX_LENGTH (code); i++)
+  length = GET_RTX_LENGTH (code);
+  
+  for (i = 0; i < length; i++)
     {
       switch (*format_ptr++)
 	{
 	case 'e':
+          if (i == length-1)
+            {
+              x = XEXP (x, i);
+	      goto repeat;
+            }
 	  reset_used_flags (XEXP (x, i));
 	  break;
 
@@ -3203,6 +3252,8 @@ try_split (pat, trial, last)
   rtx tem;
   rtx note, seq;
   int probability;
+  rtx insn_last, insn;
+  int njumps = 0;
 
   if (any_condjump_p (trial)
       && (note = find_reg_note (trial, REG_BR_PROB, 0)))
@@ -3221,172 +3272,147 @@ try_split (pat, trial, last)
       after = NEXT_INSN (after);
     }
 
-  if (seq)
+  if (!seq)
+    return trial;
+
+  /* Avoid infinite loop if any insn of the result matches
+     the original pattern.  */
+  insn_last = seq;
+  while (1)
     {
-      /* Sometimes there will be only one insn in that list, this case will
-	 normally arise only when we want it in turn to be split (SFmode on
-	 the 29k is an example).  */
-      if (NEXT_INSN (seq) != NULL_RTX)
+      if (INSN_P (insn_last)
+	  && rtx_equal_p (PATTERN (insn_last), pat))
+	return trial;
+      if (!NEXT_INSN (insn_last))
+	break;
+      insn_last = NEXT_INSN (insn_last);
+    }
+
+  /* Mark labels.  */
+  for (insn = insn_last; insn ; insn = PREV_INSN (insn))
+    {
+      if (GET_CODE (insn) == JUMP_INSN)
 	{
-	  rtx insn_last, insn;
-	  int njumps = 0;
-
-	  /* Avoid infinite loop if any insn of the result matches
-	     the original pattern.  */
-	  insn_last = seq;
-	  while (1)
+	  mark_jump_label (PATTERN (insn), insn, 0);
+	  njumps++;
+	  if (probability != -1
+	      && any_condjump_p (insn)
+	      && !find_reg_note (insn, REG_BR_PROB, 0))
 	    {
-	      if (INSN_P (insn_last)
-		  && rtx_equal_p (PATTERN (insn_last), pat))
-		return trial;
-	      if (NEXT_INSN (insn_last) == NULL_RTX)
-		break;
-	      insn_last = NEXT_INSN (insn_last);
+	      /* We can preserve the REG_BR_PROB notes only if exactly
+		 one jump is created, otherwise the machine description
+		 is responsible for this step using
+		 split_branch_probability variable.  */
+	      if (njumps != 1)
+		abort ();
+	      REG_NOTES (insn)
+		= gen_rtx_EXPR_LIST (REG_BR_PROB,
+				     GEN_INT (probability),
+				     REG_NOTES (insn));
 	    }
+	}
+    }
 
-	  /* Mark labels.  */
+  /* If we are splitting a CALL_INSN, look for the CALL_INSN
+     in SEQ and copy our CALL_INSN_FUNCTION_USAGE to it.  */
+  if (GET_CODE (trial) == CALL_INSN)
+    {
+      for (insn = insn_last; insn ; insn = PREV_INSN (insn))
+	if (GET_CODE (insn) == CALL_INSN)
+	  {
+	    CALL_INSN_FUNCTION_USAGE (insn)
+	      = CALL_INSN_FUNCTION_USAGE (trial);
+	    SIBLING_CALL_P (insn) = SIBLING_CALL_P (trial);
+	  }
+    }
+
+  /* Copy notes, particularly those related to the CFG.  */
+  for (note = REG_NOTES (trial); note; note = XEXP (note, 1))
+    {
+      switch (REG_NOTE_KIND (note))
+	{
+	case REG_EH_REGION:
+	  insn = insn_last;
+	  while (insn != NULL_RTX)
+	    {
+	      if (GET_CODE (insn) == CALL_INSN
+		  || (flag_non_call_exceptions
+		      && may_trap_p (PATTERN (insn))))
+		REG_NOTES (insn)
+		  = gen_rtx_EXPR_LIST (REG_EH_REGION,
+				       XEXP (note, 0),
+				       REG_NOTES (insn));
+	      insn = PREV_INSN (insn);
+	    }
+	  break;
+
+	case REG_NORETURN:
+	case REG_SETJMP:
+	case REG_ALWAYS_RETURN:
+	  insn = insn_last;
+	  while (insn != NULL_RTX)
+	    {
+	      if (GET_CODE (insn) == CALL_INSN)
+		REG_NOTES (insn)
+		  = gen_rtx_EXPR_LIST (REG_NOTE_KIND (note),
+				       XEXP (note, 0),
+				       REG_NOTES (insn));
+	      insn = PREV_INSN (insn);
+	    }
+	  break;
+
+	case REG_NON_LOCAL_GOTO:
 	  insn = insn_last;
 	  while (insn != NULL_RTX)
 	    {
 	      if (GET_CODE (insn) == JUMP_INSN)
-		{
-		  mark_jump_label (PATTERN (insn), insn, 0);
-		  njumps++;
-		  if (probability != -1
-		      && any_condjump_p (insn)
-		      && !find_reg_note (insn, REG_BR_PROB, 0))
-		    {
-		      /* We can preserve the REG_BR_PROB notes only if exactly
-			 one jump is created, otherwise the machine description
-			 is responsible for this step using
-			 split_branch_probability variable.  */
-		      if (njumps != 1)
-			abort ();
-		      REG_NOTES (insn)
-			= gen_rtx_EXPR_LIST (REG_BR_PROB,
-					     GEN_INT (probability),
-					     REG_NOTES (insn));
-		    }
-		}
-
+		REG_NOTES (insn)
+		  = gen_rtx_EXPR_LIST (REG_NOTE_KIND (note),
+				       XEXP (note, 0),
+				       REG_NOTES (insn));
 	      insn = PREV_INSN (insn);
 	    }
+	  break;
 
-	  /* If we are splitting a CALL_INSN, look for the CALL_INSN
-	     in SEQ and copy our CALL_INSN_FUNCTION_USAGE to it.  */
-	  if (GET_CODE (trial) == CALL_INSN)
-	    {
-	      insn = insn_last;
-	      while (insn != NULL_RTX)
-		{
-		  if (GET_CODE (insn) == CALL_INSN)
-		    CALL_INSN_FUNCTION_USAGE (insn)
-		      = CALL_INSN_FUNCTION_USAGE (trial);
-
-		  insn = PREV_INSN (insn);
-		}
-	    }
-
-	  /* Copy notes, particularly those related to the CFG.  */
-	  for (note = REG_NOTES (trial); note; note = XEXP (note, 1))
-	    {
-	      switch (REG_NOTE_KIND (note))
-		{
-		case REG_EH_REGION:
-		  insn = insn_last;
-		  while (insn != NULL_RTX)
-		    {
-		      if (GET_CODE (insn) == CALL_INSN
-			  || (flag_non_call_exceptions
-			      && may_trap_p (PATTERN (insn))))
-			REG_NOTES (insn)
-			  = gen_rtx_EXPR_LIST (REG_EH_REGION,
-					       XEXP (note, 0),
-					       REG_NOTES (insn));
-		      insn = PREV_INSN (insn);
-		    }
-		  break;
-
-		case REG_NORETURN:
-		case REG_SETJMP:
-		case REG_ALWAYS_RETURN:
-		  insn = insn_last;
-		  while (insn != NULL_RTX)
-		    {
-		      if (GET_CODE (insn) == CALL_INSN)
-			REG_NOTES (insn)
-			  = gen_rtx_EXPR_LIST (REG_NOTE_KIND (note),
-					       XEXP (note, 0),
-					       REG_NOTES (insn));
-		      insn = PREV_INSN (insn);
-		    }
-		  break;
-
-		case REG_NON_LOCAL_GOTO:
-		  insn = insn_last;
-		  while (insn != NULL_RTX)
-		    {
-		      if (GET_CODE (insn) == JUMP_INSN)
-			REG_NOTES (insn)
-			  = gen_rtx_EXPR_LIST (REG_NOTE_KIND (note),
-					       XEXP (note, 0),
-					       REG_NOTES (insn));
-		      insn = PREV_INSN (insn);
-		    }
-		  break;
-
-		default:
-		  break;
-		}
-	    }
-
-	  /* If there are LABELS inside the split insns increment the
-	     usage count so we don't delete the label.  */
-	  if (GET_CODE (trial) == INSN)
-	    {
-	      insn = insn_last;
-	      while (insn != NULL_RTX)
-		{
-		  if (GET_CODE (insn) == INSN)
-		    mark_label_nuses (PATTERN (insn));
-
-		  insn = PREV_INSN (insn);
-		}
-	    }
-
-	  tem = emit_insn_after_scope (seq, trial, INSN_SCOPE (trial));
-
-	  delete_insn (trial);
-	  if (has_barrier)
-	    emit_barrier_after (tem);
-
-	  /* Recursively call try_split for each new insn created; by the
-	     time control returns here that insn will be fully split, so
-	     set LAST and continue from the insn after the one returned.
-	     We can't use next_active_insn here since AFTER may be a note.
-	     Ignore deleted insns, which can be occur if not optimizing.  */
-	  for (tem = NEXT_INSN (before); tem != after; tem = NEXT_INSN (tem))
-	    if (! INSN_DELETED_P (tem) && INSN_P (tem))
-	      tem = try_split (PATTERN (tem), tem, 1);
+	default:
+	  break;
 	}
-      /* Avoid infinite loop if the result matches the original pattern.  */
-      else if (rtx_equal_p (PATTERN (seq), pat))
-	return trial;
-      else
-	{
-	  PATTERN (trial) = PATTERN (seq);
-	  INSN_CODE (trial) = -1;
-	  try_split (PATTERN (trial), trial, last);
-	}
-
-      /* Return either the first or the last insn, depending on which was
-	 requested.  */
-      return last
-		? (after ? PREV_INSN (after) : last_insn)
-		: NEXT_INSN (before);
     }
 
-  return trial;
+  /* If there are LABELS inside the split insns increment the
+     usage count so we don't delete the label.  */
+  if (GET_CODE (trial) == INSN)
+    {
+      insn = insn_last;
+      while (insn != NULL_RTX)
+	{
+	  if (GET_CODE (insn) == INSN)
+	    mark_label_nuses (PATTERN (insn));
+
+	  insn = PREV_INSN (insn);
+	}
+    }
+
+  tem = emit_insn_after_scope (seq, trial, INSN_SCOPE (trial));
+
+  delete_insn (trial);
+  if (has_barrier)
+    emit_barrier_after (tem);
+
+  /* Recursively call try_split for each new insn created; by the
+     time control returns here that insn will be fully split, so
+     set LAST and continue from the insn after the one returned.
+     We can't use next_active_insn here since AFTER may be a note.
+     Ignore deleted insns, which can be occur if not optimizing.  */
+  for (tem = NEXT_INSN (before); tem != after; tem = NEXT_INSN (tem))
+    if (! INSN_DELETED_P (tem) && INSN_P (tem))
+      tem = try_split (PATTERN (tem), tem, 1);
+
+  /* Return either the first or the last insn, depending on which was
+     requested.  */
+  return last
+    ? (after ? PREV_INSN (after) : last_insn)
+    : NEXT_INSN (before);
 }
 
 /* Make and return an INSN rtx, initializing all its slots.
