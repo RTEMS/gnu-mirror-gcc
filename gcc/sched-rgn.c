@@ -63,6 +63,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "toplev.h"
 #include "recog.h"
 #include "cfglayout.h"
+#include "params.h"
 #include "sched-int.h"
 #include "target.h"
 
@@ -82,9 +83,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #define INSN_REF_COUNT(INSN)	(h_i_d[INSN_UID (INSN)].ref_count)
 #define FED_BY_SPEC_LOAD(insn)	(h_i_d[INSN_UID (insn)].fed_by_spec_load)
 #define IS_LOAD_INSN(insn)	(h_i_d[INSN_UID (insn)].is_load_insn)
-
-#define MAX_RGN_BLOCKS 10
-#define MAX_RGN_INSNS 100
 
 /* nr_inter/spec counts interblock/speculative motion for the function.  */
 static int nr_inter, nr_spec;
@@ -156,7 +154,7 @@ static int *containing_rgn;
 void debug_regions (void);
 static void find_single_block_region (void);
 static void find_rgns (struct edge_list *);
-static int too_large (int, int *, int *);
+static bool too_large (int, int *, int *);
 
 extern void debug_live (int, int);
 
@@ -351,7 +349,7 @@ is_cfg_nonregular (void)
 	    rtx note = find_reg_note (insn, REG_LABEL, NULL_RTX);
 
 	    if (note
-		&& ! (GET_CODE (NEXT_INSN (insn)) == JUMP_INSN
+		&& ! (JUMP_P (NEXT_INSN (insn))
 		      && find_reg_note (NEXT_INSN (insn), REG_LABEL,
 					XEXP (note, 0))))
 	      return 1;
@@ -551,19 +549,18 @@ find_single_block_region (void)
 }
 
 /* Update number of blocks and the estimate for number of insns
-   in the region.  Return 1 if the region is "too large" for interblock
-   scheduling (compile time considerations), otherwise return 0.  */
+   in the region.  Return true if the region is "too large" for interblock
+   scheduling (compile time considerations).  */
 
-static int
+static bool
 too_large (int block, int *num_bbs, int *num_insns)
 {
   (*num_bbs)++;
-  (*num_insns) += (INSN_LUID (BB_END (BASIC_BLOCK (block))) -
-		   INSN_LUID (BB_HEAD (BASIC_BLOCK (block))));
-  if ((*num_bbs > MAX_RGN_BLOCKS) || (*num_insns > MAX_RGN_INSNS))
-    return 1;
-  else
-    return 0;
+  (*num_insns) += (INSN_LUID (BB_END (BASIC_BLOCK (block)))
+		   - INSN_LUID (BB_HEAD (BASIC_BLOCK (block))));
+
+  return ((*num_bbs > PARAM_VALUE (PARAM_MAX_SCHED_REGION_BLOCKS))
+	  || (*num_insns > PARAM_VALUE (PARAM_MAX_SCHED_REGION_INSNS)));
 }
 
 /* Update_loop_relations(blk, hdr): Check if the loop headed by max_hdr[blk]
@@ -1138,6 +1135,9 @@ compute_trg_info (int trg)
   int check_block, update_idx;
   int i, j, k, fst_edge, nxt_edge;
 
+  el.nr_members = 0;
+  el.first_member = 0;
+
   /* Define some of the fields for the target bb as well.  */
   sp = candidate_table + trg;
   sp->is_valid = 1;
@@ -1308,7 +1308,7 @@ check_live_1 (int src, rtx x)
       return 0;
     }
 
-  if (GET_CODE (reg) != REG)
+  if (!REG_P (reg))
     return 1;
 
   regno = REGNO (reg);
@@ -1385,7 +1385,7 @@ update_live_1 (int src, rtx x)
       return;
     }
 
-  if (GET_CODE (reg) != REG)
+  if (!REG_P (reg))
     return;
 
   /* Global registers are always live, so the code below does not apply
@@ -1503,7 +1503,7 @@ find_conditional_protection (rtx insn, int load_insn_bb)
 	  && IS_REACHABLE (INSN_BB (next), load_insn_bb)
 	  && load_insn_bb != INSN_BB (next)
 	  && GET_MODE (link) == VOIDmode
-	  && (GET_CODE (next) == JUMP_INSN
+	  && (JUMP_P (next)
 	      || find_conditional_protection (next, load_insn_bb)))
 	return 1;
     }
@@ -1535,7 +1535,7 @@ is_conditionally_protected (rtx load_insn, int bb_src, int bb_trg)
 
       /* Must be a DEF-USE dependence upon non-branch.  */
       if (GET_MODE (link) != VOIDmode
-	  || GET_CODE (insn1) == JUMP_INSN)
+	  || JUMP_P (insn1))
 	continue;
 
       /* Must exist a path: region-entry -> ... -> bb_trg -> ... load_insn.  */
@@ -1761,7 +1761,7 @@ init_ready_list (struct ready_list *ready)
 
 	  if (targetm.sched.adjust_priority)
 	    INSN_PRIORITY (insn) =
-	      (*targetm.sched.adjust_priority) (insn, INSN_PRIORITY (insn));
+	      targetm.sched.adjust_priority (insn, INSN_PRIORITY (insn));
 	}
       target_n_insns++;
     }
@@ -1788,10 +1788,10 @@ init_ready_list (struct ready_list *ready)
 	    if (!CANT_MOVE (insn)
 		&& (!IS_SPECULATIVE_INSN (insn)
 		    || ((((!targetm.sched.use_dfa_pipeline_interface
-			   || !(*targetm.sched.use_dfa_pipeline_interface) ())
+			   || !targetm.sched.use_dfa_pipeline_interface ())
 			  && insn_issue_delay (insn) <= 3)
 			 || (targetm.sched.use_dfa_pipeline_interface
-			     && (*targetm.sched.use_dfa_pipeline_interface) ()
+			     && targetm.sched.use_dfa_pipeline_interface ()
 			     && (recog_memoized (insn) < 0
 			         || min_insn_conflict_delay (curr_state,
 							     insn, insn) <= 3)))
@@ -1803,7 +1803,7 @@ init_ready_list (struct ready_list *ready)
 
 		  if (targetm.sched.adjust_priority)
 		    INSN_PRIORITY (insn) =
-		      (*targetm.sched.adjust_priority) (insn, INSN_PRIORITY (insn));
+		      targetm.sched.adjust_priority (insn, INSN_PRIORITY (insn));
 		}
 	  }
       }
@@ -1815,7 +1815,7 @@ init_ready_list (struct ready_list *ready)
 static int
 can_schedule_ready_p (rtx insn)
 {
-  if (GET_CODE (insn) == JUMP_INSN)
+  if (JUMP_P (insn))
     last_was_jump = 1;
 
   /* An interblock motion?  */
@@ -1887,12 +1887,12 @@ new_ready (rtx next)
 	  || (IS_SPECULATIVE_INSN (next)
 	      && (0
 		  || (targetm.sched.use_dfa_pipeline_interface
-		      && (*targetm.sched.use_dfa_pipeline_interface) ()
+		      && targetm.sched.use_dfa_pipeline_interface ()
 		      && recog_memoized (next) >= 0
 		      && min_insn_conflict_delay (curr_state, next,
 						  next) > 3)
 		  || ((!targetm.sched.use_dfa_pipeline_interface
-		       || !(*targetm.sched.use_dfa_pipeline_interface) ())
+		       || !targetm.sched.use_dfa_pipeline_interface ())
 		      && insn_issue_delay (next) > 3)
 		  || !check_live (next, INSN_BB (next))
 		  || !is_exception_free (next, INSN_BB (next), target_bb)))))
@@ -2045,9 +2045,9 @@ add_branch_dependences (rtx head, rtx tail)
 
   insn = tail;
   last = 0;
-  while (GET_CODE (insn) == CALL_INSN
-	 || GET_CODE (insn) == JUMP_INSN
-	 || (GET_CODE (insn) == INSN
+  while (CALL_P (insn)
+	 || JUMP_P (insn)
+	 || (NONJUMP_INSN_P (insn)
 	     && (GET_CODE (PATTERN (insn)) == USE
 		 || GET_CODE (PATTERN (insn)) == CLOBBER
 		 || can_throw_internal (insn)
@@ -2056,9 +2056,9 @@ add_branch_dependences (rtx head, rtx tail)
 #endif
 		 || (!reload_completed
 		     && sets_likely_spilled (PATTERN (insn)))))
-	 || GET_CODE (insn) == NOTE)
+	 || NOTE_P (insn))
     {
-      if (GET_CODE (insn) != NOTE)
+      if (!NOTE_P (insn))
 	{
 	  if (last != 0 && !find_insn_list (insn, LOG_LINKS (last)))
 	    {
@@ -2293,7 +2293,7 @@ debug_dependencies (void)
 		   BB_TO_BLOCK (bb), bb);
 
 	  if (targetm.sched.use_dfa_pipeline_interface
-	      && (*targetm.sched.use_dfa_pipeline_interface) ())
+	      && targetm.sched.use_dfa_pipeline_interface ())
 	    {
 	      fprintf (sched_dump, ";;   %7s%6s%6s%6s%6s%6s%14s\n",
 		       "insn", "code", "bb", "dep", "prio", "cost",
@@ -2318,14 +2318,18 @@ debug_dependencies (void)
 		{
 		  int n;
 		  fprintf (sched_dump, ";;   %6d ", INSN_UID (insn));
-		  if (GET_CODE (insn) == NOTE)
+		  if (NOTE_P (insn))
 		    {
 		      n = NOTE_LINE_NUMBER (insn);
 		      if (n < 0)
 			fprintf (sched_dump, "%s\n", GET_NOTE_INSN_NAME (n));
 		      else
-			fprintf (sched_dump, "line %d, file %s\n", n,
-				 NOTE_SOURCE_FILE (insn));
+			{
+			  expanded_location xloc;
+			  NOTE_EXPANDED_LOCATION (xloc, insn);
+			  fprintf (sched_dump, "line %d, file %s\n",
+				   xloc.line, xloc.file);
+			}
 		    }
 		  else
 		    fprintf (sched_dump, " {%s}\n", GET_RTX_NAME (GET_CODE (insn)));
@@ -2333,7 +2337,7 @@ debug_dependencies (void)
 		}
 
 	      if (targetm.sched.use_dfa_pipeline_interface
-		  && (*targetm.sched.use_dfa_pipeline_interface) ())
+		  && targetm.sched.use_dfa_pipeline_interface ())
 		{
 		  fprintf (sched_dump,
 			   ";;   %s%5d%6d%6d%6d%6d%6d   ",

@@ -1,5 +1,5 @@
 /* JTable.java -- 
-   Copyright (C) 2002 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2004  Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -38,30 +38,28 @@ exception statement from your version. */
 
 package javax.swing;
 
-import java.awt.Color;
-import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Rectangle;
-import java.util.Hashtable;
 import java.util.Vector;
+
 import javax.accessibility.Accessible;
-import javax.swing.event.ChangeEvent;
 import javax.swing.event.CellEditorListener;
+import javax.swing.event.ChangeEvent;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.event.TableColumnModelEvent;
 import javax.swing.event.TableColumnModelListener;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
-import javax.swing.table.JTableHeader;
-import javax.swing.table.TableModel;
-import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableColumnModel;
+import javax.swing.table.TableModel;
 
 public class JTable extends JComponent
   implements TableModelListener, Scrollable, TableColumnModelListener,
              ListSelectionListener, CellEditorListener, Accessible
 {
+  private static final long serialVersionUID = 3876025080382781659L;
+  
   public static final int AUTO_RESIZE_ALL_COLUMNS = 4;
   public static final int AUTO_RESIZE_LAST_COLUMN = 3;
   public static final int AUTO_RESIZE_NEXT_COLUMN = 1;

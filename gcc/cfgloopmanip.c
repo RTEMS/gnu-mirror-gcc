@@ -29,8 +29,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "cfglayout.h"
 #include "output.h"
 
-static struct loop * duplicate_loop (struct loops *, struct loop *,
-				     struct loop *);
 static void duplicate_subloops (struct loops *, struct loop *, struct loop *);
 static void copy_loops_to (struct loops *, struct loop **, int,
 			   struct loop *);
@@ -41,7 +39,7 @@ static bool rpe_enum_p (basic_block, void *);
 static int find_path (edge, basic_block **);
 static bool alp_enum_p (basic_block, void *);
 static void add_loop (struct loops *, struct loop *);
-static void fix_loop_placements (struct loop *);
+static void fix_loop_placements (struct loops *, struct loop *);
 static bool fix_bb_placement (struct loops *, basic_block);
 static void fix_bb_placements (struct loops *, basic_block);
 static void place_new_loop (struct loops *, struct loop *);
@@ -49,6 +47,8 @@ static void scale_loop_frequencies (struct loop *, int, int);
 static void scale_bbs_frequencies (basic_block *, int, int, int);
 static basic_block create_preheader (struct loop *, int);
 static void fix_irreducible_loops (basic_block);
+
+#define RDIV(X,Y) (((X) + (Y) / 2) / (Y))
 
 /* Splits basic block BB after INSN, returns created edge.  Updates loops
    and dominators.  */
@@ -411,7 +411,7 @@ remove_path (struct loops *loops, edge e)
   /* Fix placements of basic blocks inside loops and the placement of
      loops in the loop tree.  */
   fix_bb_placements (loops, from);
-  fix_loop_placements (from->loop_father);
+  fix_loop_placements (loops, from->loop_father);
 
   return true;
 }
@@ -458,7 +458,7 @@ scale_bbs_frequencies (basic_block *bbs, int nbbs, int num, int den)
   for (i = 0; i < nbbs; i++)
     {
       bbs[i]->frequency = (bbs[i]->frequency * num) / den;
-      bbs[i]->count = (bbs[i]->count * num) / den;
+      bbs[i]->count = RDIV (bbs[i]->count * num, den);
       for (e = bbs[i]->succ; e; e = e->succ_next)
 	e->count = (e->count * num) /den;
     }
@@ -486,7 +486,7 @@ scale_loop_frequencies (struct loop *loop, int num, int den)
 
 struct loop *
 loopify (struct loops *loops, edge latch_edge, edge header_edge, 
-	 basic_block switch_bb)
+	 basic_block switch_bb, bool redirect_all_edges)
 {
   basic_block succ_bb = latch_edge->dest;
   basic_block pred_bb = header_edge->src;
@@ -513,12 +513,17 @@ loopify (struct loops *loops, edge latch_edge, edge header_edge,
   loop_redirect_edge (latch_edge, loop->header);
   loop_redirect_edge (BRANCH_EDGE (switch_bb), succ_bb);
 
-  loop_redirect_edge (header_edge, switch_bb);
-  loop_redirect_edge (FALLTHRU_EDGE (switch_bb), loop->header); 
-
-  /* Update dominators.  */
-  set_immediate_dominator (CDI_DOMINATORS, switch_bb, pred_bb);
-  set_immediate_dominator (CDI_DOMINATORS, loop->header, switch_bb);
+  /* During loop versioning, one of the switch_bb edge is already properly
+     set. Do not redirect it again unless redirect_all_edges is true.  */
+  if (redirect_all_edges)
+    {
+      loop_redirect_edge (header_edge, switch_bb);
+      loop_redirect_edge (FALLTHRU_EDGE (switch_bb), loop->header); 
+     
+      /* Update dominators.  */
+      set_immediate_dominator (CDI_DOMINATORS, switch_bb, pred_bb);
+      set_immediate_dominator (CDI_DOMINATORS, loop->header, switch_bb);
+    }
 
   set_immediate_dominator (CDI_DOMINATORS, succ_bb, switch_bb);
 
@@ -666,7 +671,7 @@ fix_loop_placement (struct loop *loop)
    It is used in case when we removed some edges coming out of LOOP, which
    may cause the right placement of LOOP inside loop tree to change.  */
 static void
-fix_loop_placements (struct loop *loop)
+fix_loop_placements (struct loops *loops, struct loop *loop)
 {
   struct loop *outer;
 
@@ -675,6 +680,13 @@ fix_loop_placements (struct loop *loop)
       outer = loop->outer;
       if (!fix_loop_placement (loop))
         break;
+
+      /* Changing the placement of a loop in the loop tree may alter the
+	 validity of condition 2) of the description of fix_bb_placement
+	 for its preheader, because the successor is the header and belongs
+	 to the loop.  So call fix_bb_placements to fix up the placement
+	 of the preheader and (possibly) of its predecessors.  */
+      fix_bb_placements (loops, loop_preheader_edge (loop)->src);
       loop = outer;
     }
 }
@@ -692,7 +704,7 @@ place_new_loop (struct loops *loops, struct loop *loop)
 
 /* Copies copy of LOOP as subloop of TARGET loop, placing newly
    created loop into LOOPS structure.  */
-static struct loop *
+struct loop *
 duplicate_loop (struct loops *loops, struct loop *loop, struct loop *target)
 {
   struct loop *cloop;
@@ -812,7 +824,6 @@ can_duplicate_loop_p (struct loop *loop)
   return ret;
 }
 
-#define RDIV(X,Y) (((X) + (Y) / 2) / (Y))
 
 /* Duplicates body of LOOP to given edge E NDUPL times.  Takes care of updating
    LOOPS structure and dominators.  E's destination must be LOOP header for
@@ -971,6 +982,9 @@ duplicate_loop_to_header_edge (struct loop *loop, edge e, struct loops *loops,
       /* Copy bbs.  */
       copy_bbs (bbs, n, new_bbs, spec_edges, 2, new_spec_edges, loop);
 
+      for (i = 0; i < n; i++)
+	new_bbs[i]->rbi->copy_number = j + 1;
+
       /* Note whether the blocks and edges belong to an irreducible loop.  */
       if (add_irreducible_flag)
 	{
@@ -1049,6 +1063,8 @@ duplicate_loop_to_header_edge (struct loop *loop, edge e, struct loops *loops,
       int n_dom_bbs,j;
 
       bb = bbs[i];
+      bb->rbi->copy_number = 0;
+
       n_dom_bbs = get_dominated_by (CDI_DOMINATORS, bb, &dom_bbs);
       for (j = 0; j < n_dom_bbs; j++)
 	{
@@ -1156,8 +1172,7 @@ create_preheader (struct loop *loop, int flags)
     }
 
   if (dump_file)
-    fprintf (dump_file, "Created preheader block for loop %i\n",
-	     loop->num);
+    fprintf (dump_file, "Created preheader block for loop %i\n", loop->num);
 
   return dummy;
 }
@@ -1248,7 +1263,7 @@ create_loop_notes (void)
 #ifdef ENABLE_CHECKING
   /* Verify that there really are no loop notes.  */
   for (insn = get_insns (); insn; insn = NEXT_INSN (insn))
-    if (GET_CODE (insn) == NOTE
+    if (NOTE_P (insn)
 	&& NOTE_LINE_NUMBER (insn) == NOTE_INSN_LOOP_BEG)
       abort ();
 #endif
@@ -1289,11 +1304,11 @@ create_loop_notes (void)
 		     front of the jump.  */
 		  insn = PREV_INSN (BB_HEAD (first[loop->num]));
 		  if (insn
-		      && GET_CODE (insn) == BARRIER)
+		      && BARRIER_P (insn))
 		    insn = PREV_INSN (insn);
 		  
 		  if (insn
-		      && GET_CODE (insn) == JUMP_INSN
+		      && JUMP_P (insn)
 		      && any_uncondjump_p (insn)
 		      && onlyjump_p (insn))
 		    {
@@ -1314,7 +1329,7 @@ create_loop_notes (void)
 		  /* Position the note correctly wrto barrier.  */
 		  insn = BB_END (last[loop->num]);
 		  if (NEXT_INSN (insn)
-		      && GET_CODE (NEXT_INSN (insn)) == BARRIER)
+		      && BARRIER_P (NEXT_INSN (insn)))
 		    insn = NEXT_INSN (insn);
 		  
 		  end = BB_END (last[loop->num]);

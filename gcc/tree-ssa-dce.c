@@ -59,11 +59,12 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "tree.h"
 #include "diagnostic.h"
 #include "tree-flow.h"
-#include "tree-simple.h"
+#include "tree-gimple.h"
 #include "tree-dump.h"
 #include "tree-pass.h"
 #include "timevar.h"
 #include "flags.h"
+#include "function.h"
 
 static struct stmt_stats
 {
@@ -109,7 +110,7 @@ static inline void mark_operand_necessary (tree);
 
 static bool need_to_preserve_store (tree);
 static void mark_stmt_if_obviously_necessary (tree, bool);
-static void find_obviously_necessary_stmts (bool);
+static void find_obviously_necessary_stmts (struct edge_list *);
 
 static void mark_control_dependent_edges_necessary (basic_block, struct edge_list *);
 static void propagate_necessity (struct edge_list *);
@@ -286,9 +287,11 @@ static void
 mark_stmt_if_obviously_necessary (tree stmt, bool aggressive)
 {
   def_optype defs;
-  vdef_optype vdefs;
+  v_may_def_optype v_may_defs;
+  v_must_def_optype v_must_defs;
   stmt_ann_t ann;
   size_t i;
+  tree op;
 
   /* Statements that are implicitly live.  Most function calls, asm and return
      statements are required.  Labels and BIND_EXPR nodes are kept because
@@ -318,8 +321,8 @@ mark_stmt_if_obviously_necessary (tree stmt, bool aggressive)
       return;
 
     case MODIFY_EXPR:
-      if (TREE_CODE (TREE_OPERAND (stmt, 1)) == CALL_EXPR
-	  && TREE_SIDE_EFFECTS (TREE_OPERAND (stmt, 1)))
+      op = get_call_expr_in (stmt);
+      if (op && TREE_SIDE_EFFECTS (op))
 	{
 	  mark_stmt_necessary (stmt, true);
 	  return;
@@ -387,11 +390,22 @@ mark_stmt_if_obviously_necessary (tree stmt, bool aggressive)
         }
     }
 
-  vdefs = VDEF_OPS (ann);
-  for (i = 0; i < NUM_VDEFS (vdefs); i++)
+  v_may_defs = V_MAY_DEF_OPS (ann);
+  for (i = 0; i < NUM_V_MAY_DEFS (v_may_defs); i++)
     {
-      tree vdef = VDEF_RESULT (vdefs, i);
-      if (need_to_preserve_store (vdef))
+      tree v_may_def = V_MAY_DEF_RESULT (v_may_defs, i);
+      if (need_to_preserve_store (v_may_def))
+	{
+	  mark_stmt_necessary (stmt, true);
+	  return;
+        }
+    }
+    
+  v_must_defs = V_MUST_DEF_OPS (ann);
+  for (i = 0; i < NUM_V_MUST_DEFS (v_must_defs); i++)
+    {
+      tree v_must_def = V_MUST_DEF_OP (v_must_defs, i);
+      if (need_to_preserve_store (v_must_def))
 	{
 	  mark_stmt_necessary (stmt, true);
 	  return;
@@ -404,21 +418,23 @@ mark_stmt_if_obviously_necessary (tree stmt, bool aggressive)
 /* Find obviously necessary statements.  These are things like most function
    calls, and stores to file level variables.
 
-   If AGGRESSIVE is false, control statements are conservatively marked as
-   necessary.  */
+   If EL is NULL, control statements are conservatively marked as
+   necessary.  Otherwise it contains the list of edges used by control
+   dependence analysis.  */
 
 static void
-find_obviously_necessary_stmts (bool aggressive)
+find_obviously_necessary_stmts (struct edge_list *el)
 {
   basic_block bb;
   block_stmt_iterator i;
+  edge e;
 
   FOR_EACH_BB (bb)
     {
       tree phi;
 
       /* Check any PHI nodes in the block.  */
-      for (phi = phi_nodes (bb); phi; phi = TREE_CHAIN (phi))
+      for (phi = phi_nodes (bb); phi; phi = PHI_CHAIN (phi))
 	{
 	  NECESSARY (phi) = 0;
 
@@ -438,13 +454,29 @@ find_obviously_necessary_stmts (bool aggressive)
 	{
 	  tree stmt = bsi_stmt (i);
 	  NECESSARY (stmt) = 0;
-	  mark_stmt_if_obviously_necessary (stmt, aggressive);
+	  mark_stmt_if_obviously_necessary (stmt, el != NULL);
 	}
 
       /* Mark this basic block as `not visited'.  A block will be marked
 	 visited when the edges that it is control dependent on have been
 	 marked.  */
       bb->flags &= ~BB_VISITED;
+    }
+
+  /* Prevent the possibly infinite loops from being removed.  Provided
+     that mark_maybe_infinite_loops was run, this happens automatically,
+     since fake builtin call statements were inserted on back edges
+     of loops for that it is not able to prove that they stop.  */
+  if (el && !cfun->marked_maybe_inf_loops)
+    {
+      mark_dfs_back_edges ();
+
+      FOR_EACH_BB (bb)
+	{
+	  for (e = bb->succ; e; e = e->succ_next)
+	    if (e->flags & EDGE_DFS_BACK)
+	      mark_control_dependent_edges_necessary (e->dest, el);
+	}
     }
 }
 
@@ -456,6 +488,14 @@ mark_control_dependent_edges_necessary (basic_block bb, struct edge_list *el)
 {
   int edge_number;
 
+#ifdef ENABLE_CHECKING
+  if (bb == EXIT_BLOCK_PTR)
+    abort ();
+#endif
+
+  if (bb == ENTRY_BLOCK_PTR)
+    return;
+
   EXECUTE_IF_CONTROL_DEPENDENT (bb->index, edge_number,
     {
       tree t;
@@ -466,7 +506,7 @@ mark_control_dependent_edges_necessary (basic_block bb, struct edge_list *el)
       SET_BIT (last_stmt_necessary, cd_bb->index);
 
       t = last_stmt (cd_bb);
-      if (is_ctrl_stmt (t))
+      if (t && is_ctrl_stmt (t))
 	mark_stmt_necessary (t, true);
     });
 }
@@ -544,10 +584,10 @@ propagate_necessity (struct edge_list *el)
       else
 	{
 	  /* Propagate through the operands.  Examine all the USE, VUSE and
-	     VDEF operands in this statement.  Mark all the statements which
-	     feed this statement's uses as necessary.  */
+	     V_MAY_DEF operands in this statement.  Mark all the statements 
+	     which feed this statement's uses as necessary.  */
 	  vuse_optype vuses;
-	  vdef_optype vdefs;
+	  v_may_def_optype v_may_defs;
 	  use_optype uses;
 	  stmt_ann_t ann;
 	  size_t k;
@@ -563,12 +603,13 @@ propagate_necessity (struct edge_list *el)
 	  for (k = 0; k < NUM_VUSES (vuses); k++)
 	    mark_operand_necessary (VUSE_OP (vuses, k));
 
-	  /* The operands of VDEF expressions are also needed as they
+	  /* The operands of V_MAY_DEF expressions are also needed as they
 	     represent potential definitions that may reach this
-	     statement (VDEF operands allow us to follow def-def links).  */
-	  vdefs = VDEF_OPS (ann);
-	  for (k = 0; k < NUM_VDEFS (vdefs); k++)
-	    mark_operand_necessary (VDEF_OP (vdefs, k));
+	     statement (V_MAY_DEF operands allow us to follow def-def 
+	     links).  */
+	  v_may_defs = V_MAY_DEF_OPS (ann);
+	  for (k = 0; k < NUM_V_MAY_DEFS (v_may_defs); k++)
+	    mark_operand_necessary (V_MAY_DEF_OP (v_may_defs, k));
 	}
     }
 }
@@ -603,11 +644,9 @@ eliminate_unnecessary_stmts (void)
 	    remove_dead_stmt (&i, bb);
 	  else
 	    {
-	      if (TREE_CODE (t) == CALL_EXPR)
-		notice_special_calls (t);
-	      else if (TREE_CODE (t) == MODIFY_EXPR
-		       && TREE_CODE (TREE_OPERAND (t, 1)) == CALL_EXPR)
-		notice_special_calls (TREE_OPERAND (t, 1));
+	      tree call = get_call_expr_in (t);
+	      if (call)
+		notice_special_calls (call);
 	      bsi_next (&i);
 	    }
 	}
@@ -629,7 +668,7 @@ remove_dead_phis (basic_block bb)
 
       if (! NECESSARY (phi))
 	{
-	  tree next = TREE_CHAIN (phi);
+	  tree next = PHI_CHAIN (phi);
 
 	  if (dump_file && (dump_flags & TDF_DETAILS))
 	    {
@@ -645,7 +684,7 @@ remove_dead_phis (basic_block bb)
       else
 	{
 	  prev = phi;
-	  phi = TREE_CHAIN (phi);
+	  phi = PHI_CHAIN (phi);
 	}
     }
 }
@@ -697,6 +736,9 @@ remove_dead_stmt (block_stmt_iterator *i, basic_block bb)
       redirect_edge_and_branch (bb->succ, post_dom_bb);
       PENDING_STMT (bb->succ) = NULL;
 
+      /* Dominators are wrong now.  */
+      free_dominance_info (CDI_DOMINATORS);
+
       /* The edge is no longer associated with a conditional, so it does
 	 not have TRUE/FALSE flags.  */
       bb->succ->flags &= ~(EDGE_TRUE_VALUE | EDGE_FALSE_VALUE);
@@ -743,6 +785,7 @@ print_stats (void)
 	       stats.removed_phis, stats.total_phis, (int) percg);
     }
 }
+
 
 /* Initialization for this pass.  Set up the used data structures.  */
 
@@ -764,7 +807,7 @@ tree_dce_init (bool aggressive)
       sbitmap_zero (last_stmt_necessary);
     }
 
-  processed = sbitmap_alloc (highest_ssa_version + 1);
+  processed = sbitmap_alloc (num_ssa_names + 1);
   sbitmap_zero (processed);
 
   VARRAY_TREE_INIT (worklist, 64, "work list");
@@ -797,6 +840,8 @@ tree_dce_done (bool aggressive)
    In aggressive mode, control dependences are taken into account, which
    results in more dead code elimination, but at the cost of some time.
 
+   If NO_CFG_CHANGES is true, avoid changing cfg.
+
    FIXME: Aggressive mode before PRE doesn't work currently because
 	  the dominance info is not invalidated after DCE1.  This is
 	  not an issue right now because we only run aggressive DCE
@@ -804,9 +849,12 @@ tree_dce_done (bool aggressive)
 	  start experimenting with pass ordering.  */
 
 static void
-perform_tree_ssa_dce (bool aggressive)
+perform_tree_ssa_dce (bool aggressive, bool no_cfg_changes)
 {
   struct edge_list *el = NULL;
+
+  if (no_cfg_changes && aggressive)
+    abort ();
 
   tree_dce_init (aggressive);
 
@@ -820,7 +868,7 @@ perform_tree_ssa_dce (bool aggressive)
       timevar_pop (TV_CONTROL_DEPENDENCES);
     }
 
-  find_obviously_necessary_stmts (aggressive);
+  find_obviously_necessary_stmts (el);
 
   propagate_necessity (el);
 
@@ -829,7 +877,8 @@ perform_tree_ssa_dce (bool aggressive)
   if (aggressive)
     free_dominance_info (CDI_POST_DOMINATORS);
 
-  cleanup_tree_cfg ();
+  if (!no_cfg_changes)
+    cleanup_tree_cfg ();
 
   /* Debugging dumps.  */
   if (dump_file)
@@ -839,19 +888,29 @@ perform_tree_ssa_dce (bool aggressive)
     }
 
   tree_dce_done (aggressive);
+
+  free_edge_list (el);
+}
+
+/* Cleanup the dead code, but avoid cfg changes.  */
+
+void
+tree_ssa_dce_no_cfg_changes (void)
+{
+  perform_tree_ssa_dce (false, true);
 }
 
 /* Pass entry points.  */
 static void
 tree_ssa_dce (void)
 {
-  perform_tree_ssa_dce (/*aggressive=*/false);
+  perform_tree_ssa_dce (/*aggressive=*/false, false);
 }
 
 static void
 tree_ssa_cd_dce (void)
 {
-  perform_tree_ssa_dce (/*aggressive=*/optimize >= 2);
+  perform_tree_ssa_dce (/*aggressive=*/optimize >= 2, false);
 }
 
 static bool
@@ -892,4 +951,3 @@ struct tree_opt_pass pass_cd_dce =
   TODO_ggc_collect | TODO_verify_ssa | TODO_verify_flow
 					/* todo_flags_finish */
 };
-
