@@ -19,6 +19,9 @@
 # If the first parameter is --list, a list of the generated files and
 # their dependencies will be printed; --help prints this message.
 #
+# If the first parameter is --silent, this script prints nothing other
+# than error messages; the second parameter is then interpreted as above.
+#
 # Examples:
 #
 # contrib/gcc_update -r gcc_latest_snapshot
@@ -29,7 +32,7 @@
 # contrib/gcc_update --list
 #
 #
-# (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004 Free Software Foundation
+# (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005 Free Software Foundation
 # Originally by Gerald Pfeifer <pfeifer@dbai.tuwien.ac.at>, August 1998.
 #
 # This script is Free Software, and it can be copied, distributed and
@@ -51,6 +54,15 @@ UPDATE_OPTIONS=-Pd
 # Arrange for the value of $0 to be available for functions
 self=$0
 
+# This function prints its arguments to standard output unless
+# "silent" is set.
+unset silent
+chat () {
+    if [ -z "$silent" ]; then
+        echo "$@"
+    fi
+}
+
 # This function prints a list of all generated files, along with their
 # dependencies.  Note that only one target is supported per line: the
 # colon is stripped from the output.
@@ -69,10 +81,6 @@ gcc/fixinc/fixincl.x: gcc/fixinc/fixincl.tpl gcc/fixinc/inclhack.def
 gcc/f/intdoc.texi: gcc/f/intdoc.in gcc/f/intdoc.c gcc/f/intrin.h gcc/f/intrin.def
 gcc/cp/cfns.h: gcc/cp/cfns.gperf
 gcc/java/keyword.h: gcc/java/keyword.gperf
-gcc/ada/gnat_ug_unx.texi: gcc/ada/gnat_ug.texi gcc/ada/xgnatug.adb gcc/ada/ug_words
-gcc/ada/gnat_ug_vms.texi: gcc/ada/gnat_ug.texi gcc/ada/xgnatug.adb gcc/ada/ug_words
-gcc/ada/gnat_ug_vxw.texi: gcc/ada/gnat_ug.texi gcc/ada/xgnatug.adb gcc/ada/ug_words
-gcc/ada/gnat_ug_wnt.texi: gcc/ada/gnat_ug.texi gcc/ada/xgnatug.adb gcc/ada/ug_words
 # testsuite
 # Without this, _Pragma3.c can have a false negative.
 gcc/testsuite/gcc.dg/cpp/_Pragma3.c: gcc/testsuite/gcc.dg/cpp/mi1c.h
@@ -118,7 +126,7 @@ touch_files () {
     echo ':' >> Makefile.$$
     echo '	@for f in $? $@; do test -f $$f || exit 0; done; \' >> Makefile.$$
     echo '	echo Touching $@...; \' >> Makefile.$$
-    echo '	echo Touching $@... 1>&2; \' >> Makefile.$$
+    chat '	echo Touching $@... 1>&2; \' >> Makefile.$$
     echo '	touch $@' >> Makefile.$$
     files_and_dependencies | sed 's,[^ ]* ,,;s,$, :,' >> Makefile.$$
     while ${MAKE-make} -s -f Makefile.$$ all | grep . > /dev/null; do
@@ -132,21 +140,21 @@ touch_files () {
 # this script.  By re-execing it, we ensure that the appropriate
 # dependencies and rules will be used.
 touch_files_reexec () {
-    echo "Adjusting file timestamps"
-    exec ${CONFIG_SHELL-/bin/sh} $self --touch
+    chat "Adjusting file timestamps"
+    exec ${CONFIG_SHELL-/bin/sh} $self ${silent+"--silent"} --touch
 }
 
 # This functions applies a patch to an existing tree.
 apply_patch () {
-    if [ -f $1 ]; then
+    if [ -f "$1" ]; then
 	echo "Applying patch file $1"
-	case "$1" in
+	case $1 in
 	*gz)
-	    gzip -d -c $1 | patch -p1 ;;
+	    gzip -d -c "$1" | patch -p1 ;;
 	*bz2)
-	    bzip2 -d -c $1 | patch -p1 ;;
+	    bzip2 -d -c "$1" | patch -p1 ;;
 	*)
-	    cat $1 | patch -p1 ;;
+	    patch -p1 < "$1";;
 	esac
     fi
     touch_files_reexec
@@ -157,6 +165,13 @@ if [ ! -f gcc/version.c ]; then
     echo "This does not seem to be a GCC tree!"
     exit
 fi
+
+case "$1" in
+--silent)
+    silent=t
+    shift
+    ;;
+esac
 
 case "$1" in
 # First of all, check whether we are going to process a patch.
@@ -212,8 +227,8 @@ else
     set -- $UPDATE_OPTIONS ${1+"$@"}
 fi
 
-echo "Updating CVS tree"
-$GCC_CVS -q update ${1+"$@"}
+chat "Updating CVS tree"
+$GCC_CVS -q ${silent+-Q} update -r gcc-3_4-branch ${1+"$@"}
 if [ $? -ne 0 ]; then
     (touch_files_reexec)
     echo "CVS update of full tree failed." >&2

@@ -1,6 +1,6 @@
 /* Register to Stack convert for GNU compiler.
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -1060,9 +1060,20 @@ move_for_stack_reg (rtx insn, stack regstack, rtx pat)
 	    if (regstack->reg[i] == REGNO (src))
 	      break;
 
-	  /* The source must be live, and the dest must be dead.  */
-	  if (i < 0 || get_hard_regnum (regstack, dest) >= FIRST_STACK_REG)
+	  /* The destination must be dead, or life analysis is borked.  */
+	  if (get_hard_regnum (regstack, dest) >= FIRST_STACK_REG)
 	    abort ();
+
+	  /* If the source is not live, this is yet another case of
+	     uninitialized variables.  Load up a NaN instead.  */
+	  if (i < 0)
+	    {
+	      PATTERN (insn) = pat
+	        = gen_rtx_SET (VOIDmode,
+			       FP_MODE_REG (REGNO (dest), SFmode), nan);
+	      INSN_CODE (insn) = -1;
+	      return move_for_stack_reg (insn, regstack, pat);
+	    }
 
 	  /* It is possible that the dest is unused after this insn.
 	     If so, just pop the src.  */
