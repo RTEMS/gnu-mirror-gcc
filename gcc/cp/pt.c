@@ -4588,7 +4588,7 @@ tsubst_friend_function (decl, args)
       tree template_id, arglist, fns;
       tree new_args;
       tree tmpl;
-      tree ns = CP_DECL_CONTEXT (TYPE_MAIN_DECL (current_class_type));
+      tree ns = decl_namespace_context (TYPE_MAIN_DECL (current_class_type));
       
       /* Friend functions are looked up in the containing namespace scope.
          We must enter that scope, to avoid finding member functions of the
@@ -4798,23 +4798,28 @@ tsubst_friend_class (friend_tmpl, args)
   tree tmpl;
 
   /* First, we look for a class template.  */
-  tmpl = lookup_name (DECL_NAME (friend_tmpl), /*prefer_type=*/0); 
-  
-  /* But, if we don't find one, it might be because we're in a
-     situation like this:
-
-       template <class T>
-       struct S {
-         template <class U>
-	 friend struct S;
-       };
-
-     Here, in the scope of (say) S<int>, `S' is bound to a TYPE_DECL
-     for `S<int>', not the TEMPLATE_DECL.  */
-  if (!tmpl || !DECL_CLASS_TEMPLATE_P (tmpl))
+  if (DECL_CONTEXT (friend_tmpl))
+    tmpl = friend_tmpl;
+  else
     {
-      tmpl = lookup_name (DECL_NAME (friend_tmpl), /*prefer_type=*/1);
-      tmpl = maybe_get_template_decl_from_type_decl (tmpl);
+      tmpl = lookup_name (DECL_NAME (friend_tmpl), /*prefer_type=*/0); 
+
+      /* But, if we don't find one, it might be because we're in a
+	 situation like this:
+
+	   template <class T>
+	   struct S {
+	     template <class U>
+	     friend struct S;
+	   };
+
+	 Here, in the scope of (say) S<int>, `S' is bound to a TYPE_DECL
+	 for `S<int>', not the TEMPLATE_DECL.  */
+      if (!tmpl || !DECL_CLASS_TEMPLATE_P (tmpl))
+	{
+	  tmpl = lookup_name (DECL_NAME (friend_tmpl), /*prefer_type=*/1);
+	  tmpl = maybe_get_template_decl_from_type_decl (tmpl);
+	}
     }
 
   if (tmpl && DECL_CLASS_TEMPLATE_P (tmpl))
@@ -6028,15 +6033,6 @@ tsubst_decl (t, args, type, complain)
 	DECL_INITIAL (r) = NULL_TREE;
 	SET_DECL_RTL (r, NULL_RTX);
 	DECL_SIZE (r) = DECL_SIZE_UNIT (r) = 0;
-
-	/* For __PRETTY_FUNCTION__ we have to adjust the initializer.  */
-	if (DECL_PRETTY_FUNCTION_P (r))
-	  {
-	    const char *const name = (*decl_printable_name)
-	      			(current_function_decl, 2);
-	    DECL_INITIAL (r) = cp_fname_init (name);
-	    TREE_TYPE (r) = TREE_TYPE (DECL_INITIAL (r));
-	  }
 
 	/* Even if the original location is out of scope, the newly
 	   substituted one is not.  */
@@ -7318,10 +7314,6 @@ tsubst_expr (t, args, complain, in_decl)
 	  {
 	    init = DECL_INITIAL (decl);
 	    decl = tsubst (decl, args, complain, in_decl);
-	    if (DECL_PRETTY_FUNCTION_P (decl))
-	      init = DECL_INITIAL (decl);
-	    else
-	      init = tsubst_expr (init, args, complain, in_decl);
 	    if (decl != error_mark_node)
 	      {
                 if (TREE_CODE (decl) != TYPE_DECL)
@@ -7337,6 +7329,17 @@ tsubst_expr (t, args, complain, in_decl)
 	        if (TREE_CODE (decl) == VAR_DECL)
 	          DECL_TEMPLATE_INSTANTIATED (decl) = 1;
 	        maybe_push_decl (decl);
+		if (DECL_PRETTY_FUNCTION_P (decl))
+		  {
+		    /* For __PRETTY_FUNCTION__ we have to adjust the
+		       initializer.  */
+		    const char *const name
+		      = (*decl_printable_name) (current_function_decl, 2);
+		    init = cp_fname_init (name);
+		    TREE_TYPE (decl) = TREE_TYPE (init);
+		  }
+		else
+		  init = tsubst_expr (init, args, complain, in_decl);
 	        cp_finish_decl (decl, init, NULL_TREE, 0);
 	      }
 	  }

@@ -1,3 +1,36 @@
+2002-04-21  Joseph S. Myers  <jsm28@cam.ac.uk>
+
+	* gnat_rm.texi: Use @ifnottex instead of @ifinfo.
+
+2002-04-21  Florian Weimer  <fw@deneb.enyo.de>
+
+	* gnat_ug.texi: New file.
+
+	* gnat_rm.texi: Do not include texiplus.texi.  Include fdl.texi
+	instead of gfdl.texi
+
+	* xgnatug.adb, ug_words: New files.
+
+	* Makefile.in (doc, dvi): New targets.  Build gnat_ug_*,
+        gnat_rm and gnat-style manuals.
+
+	* adaint.c (__gnat_tmp_name): Remove buffer overflow bug on
+        GNU/Linux.
+
+2002-04-16  Mark Mitchell  <mark@codesourcery.com>
+
+	* trans.c (tree_transform): Add has_scope argument to
+	expand_start_stmt_expr.
+
+2002-04-04  Laurent Guerby  <guerby@acm.org>
+
+	* make.adb: Implement -margs, remove restriction about file name placement.
+	* makeusg.adb: Documentation update.
+
+2002-03-11  Richard Henderson  <rth@redhat.com>
+
+	* Makefile.in (.NOTPARALLEL): Add fake tag.
+
 2002-02-07  Richard Henderson  <rth@redhat.com>
 
 	* adaint.c (__gnat_to_gm_time): First arg is int, not time_t.
