@@ -1,6 +1,6 @@
 /* Data flow analysis for GNU compiler.
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -414,8 +414,8 @@ life_analysis (f, file, flags)
      FILE *file;
      int flags;
 {
-  int i;
 #ifdef ELIMINABLE_REGS
+  int i;
   static const struct {const int from, to; } eliminables[] = ELIMINABLE_REGS;
 #endif
 
@@ -433,9 +433,7 @@ life_analysis (f, file, flags)
 
 
 #ifdef CANNOT_CHANGE_MODE_CLASS
-  if (flags & PROP_REG_INFO)
-    for (i=0; i < NUM_MACHINE_MODES; ++i)
-      INIT_REG_SET (&subregs_of_mode[i]);
+  bitmap_initialize (&subregs_of_mode, 1);
 #endif
 
   if (! optimize)
@@ -1473,8 +1471,11 @@ initialize_uninitialized_subregs ()
 	      for_each_rtx (&i, find_regno_partial, &param);
 	      if (param.retval != NULL_RTX)
 		{
-		  insn = gen_move_insn (param.retval,
-				        CONST0_RTX (GET_MODE (param.retval)));
+		  start_sequence ();
+		  emit_move_insn (param.retval,
+				  CONST0_RTX (GET_MODE (param.retval)));
+		  insn = get_insns ();
+		  end_sequence ();
 		  insert_insn_on_edge (insn, e);
 		  did_something = 1;
 		}
@@ -1756,8 +1757,10 @@ propagate_one_insn (pbi, insn)
 
       if (GET_CODE (insn) == CALL_INSN)
 	{
-	  int i;
+	  regset live_at_end;
+	  bool sibcall_p;
 	  rtx note, cond;
+	  int i;
 
 	  cond = NULL_RTX;
 	  if (GET_CODE (PATTERN (insn)) == COND_EXEC)
@@ -1782,12 +1785,23 @@ propagate_one_insn (pbi, insn)
 	      mark_set_1 (pbi, CLOBBER, XEXP (XEXP (note, 0), 0),
 			  cond, insn, pbi->flags);
 
-	  /* Calls change all call-used and global registers.  */
+	  /* Calls change all call-used and global registers; sibcalls do not
+	     clobber anything that must be preserved at end-of-function,
+	     except for return values.  */
+
+	  sibcall_p = SIBLING_CALL_P (insn);
+	  live_at_end = EXIT_BLOCK_PTR->global_live_at_start;
 	  for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
-	    if (TEST_HARD_REG_BIT (regs_invalidated_by_call, i))
+	    if (TEST_HARD_REG_BIT (regs_invalidated_by_call, i)
+		&& ! (sibcall_p
+		      && REGNO_REG_SET_P (live_at_end, i)
+		      && ! refers_to_regno_p (i, i+1,
+					      current_function_return_rtx,
+					      (rtx *) 0)))
 	      {
+		enum rtx_code code = global_regs[i] ? SET : CLOBBER;
 		/* We do not want REG_UNUSED notes for these registers.  */
-		mark_set_1 (pbi, CLOBBER, regno_reg_rtx[i], cond, insn,
+		mark_set_1 (pbi, code, regno_reg_rtx[i], cond, insn,
 			    pbi->flags & ~(PROP_DEATH_NOTES | PROP_REG_INFO));
 	      }
 	}
@@ -2279,14 +2293,22 @@ insn_dead_p (pbi, x, call_ok, notes)
     }
 
   /* A CLOBBER of a pseudo-register that is dead serves no purpose.  That
-     is not necessarily true for hard registers.  */
-  else if (code == CLOBBER && GET_CODE (XEXP (x, 0)) == REG
-	   && REGNO (XEXP (x, 0)) >= FIRST_PSEUDO_REGISTER
-	   && ! REGNO_REG_SET_P (pbi->reg_live, REGNO (XEXP (x, 0))))
-    return 1;
+     is not necessarily true for hard registers until after reload.  */
+  else if (code == CLOBBER)
+    {
+      if (GET_CODE (XEXP (x, 0)) == REG
+	  && (REGNO (XEXP (x, 0)) >= FIRST_PSEUDO_REGISTER
+	      || reload_completed)
+	  && ! REGNO_REG_SET_P (pbi->reg_live, REGNO (XEXP (x, 0))))
+	return 1;
+    }
 
-  /* We do not check other CLOBBER or USE here.  An insn consisting of just
-     a CLOBBER or just a USE should not be deleted.  */
+  /* ??? A base USE is a historical relic.  It ought not be needed anymore.
+     Instances where it is still used are either (1) temporary and the USE
+     escaped the pass, (2) cruft and the USE need not be emitted anymore,
+     or (3) hiding bugs elsewhere that are not properly representing data
+     flow.  */
+
   return 0;
 }
 
@@ -2800,10 +2822,18 @@ mark_set_1 (pbi, code, reg, cond, insn, flags)
 		     in ASM_OPERANDs.  If these registers get replaced,
 		     we might wind up changing the semantics of the insn,
 		     even if reload can make what appear to be valid
-		     assignments later.  */
+		     assignments later.
+
+		     We don't build a LOG_LINK for global registers to
+		     or from a function call.  We don't want to let
+		     combine think that it knows what is going on with
+		     global registers.  */
 		  if (y && (BLOCK_NUM (y) == blocknum)
 		      && (regno_first >= FIRST_PSEUDO_REGISTER
-			  || asm_noperands (PATTERN (y)) < 0))
+			  || (asm_noperands (PATTERN (y)) < 0
+			      && ! ((GET_CODE (insn) == CALL_INSN
+				     || GET_CODE (y) == CALL_INSN)
+				    && global_regs[regno_first]))))
 		    LOG_LINKS (y) = alloc_INSN_LIST (insn, LOG_LINKS (y));
 		}
 	    }
@@ -3823,8 +3853,9 @@ mark_used_regs (pbi, x, cond, insn)
 #ifdef CANNOT_CHANGE_MODE_CLASS
       if (GET_CODE (SUBREG_REG (x)) == REG
 	  && REGNO (SUBREG_REG (x)) >= FIRST_PSEUDO_REGISTER)
-	SET_REGNO_REG_SET (&subregs_of_mode[GET_MODE (x)],
-			   REGNO (SUBREG_REG (x)));
+	bitmap_set_bit (&subregs_of_mode, REGNO (SUBREG_REG (x))
+					  * MAX_MACHINE_MODE
+					  + GET_MODE (x));
 #endif
 
       /* While we're here, optimize this case.  */
@@ -3872,8 +3903,9 @@ mark_used_regs (pbi, x, cond, insn)
 	    if (GET_CODE (testreg) == SUBREG
 		&& GET_CODE (SUBREG_REG (testreg)) == REG
 		&& REGNO (SUBREG_REG (testreg)) >= FIRST_PSEUDO_REGISTER)
-	      SET_REGNO_REG_SET (&subregs_of_mode[GET_MODE (testreg)],
-				 REGNO (SUBREG_REG (testreg)));
+	      bitmap_set_bit (&subregs_of_mode, REGNO (SUBREG_REG (testreg))
+						* MAX_MACHINE_MODE
+						+ GET_MODE (testreg));
 #endif
 
 	    /* Modifying a single register in an alternate mode
