@@ -1,4 +1,30 @@
+// Copyright (C) 2004 Free Software Foundation, Inc.
 //
+// This file is part of the GNU ISO C++ Library.  This library is free
+// software; you can redistribute it and/or modify it under the
+// terms of the GNU General Public License as published by the
+// Free Software Foundation; either version 2, or (at your option)
+// any later version.
+
+// This library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License along
+// with this library; see the file COPYING.  If not, write to the Free
+// Software Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307,
+// USA.
+
+// As a special exception, you may use this file as part of a free software
+// library without restriction.  Specifically, if other files instantiate
+// templates or use macros or inline functions from this file, or you compile
+// this file and link it with other files to produce an executable, this
+// file does not by itself cause the resulting executable to be covered by
+// the GNU General Public License.  This exception does not however
+// invalidate any other reasons why the executable file might be covered by
+// the GNU General Public License.
+
 // (C) Copyright Jeremy Siek 2000. Permission to copy, use, modify,
 // sell and distribute this software is granted provided this
 // copyright notice appears in all copies. This software is provided
@@ -36,6 +62,12 @@ inline void __function_requires()
   void (_Concept::*__x)() _IsUnused = &_Concept::__constraints;
 }
 
+// No definition: if this is referenced, there's a problem with
+// the instantiating type not being one of the required integer types.
+// Unfortunately, this results in a link-time error, not a compile-time error.
+void __error_type_must_be_an_integer_type();
+void __error_type_must_be_an_unsigned_integer_type();
+void __error_type_must_be_a_signed_integer_type();
 
 // ??? Should the "concept_checking*" structs begin with more than _ ?
 #define _GLIBCXX_CLASS_REQUIRES(_type_var, _ns, _concept) \
@@ -87,8 +119,8 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
 
   template <class _Tp>
   struct _IntegerConcept {
-    void __constraints() { 
-      this->__error_type_must_be_an_integer_type();
+    void __constraints() {
+      __error_type_must_be_an_integer_type();
     }
   };
   template <> struct _IntegerConcept<short> { void __constraints() {} };
@@ -103,8 +135,8 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
 
   template <class _Tp>
   struct _SignedIntegerConcept {
-    void __constraints() { 
-      this->__error_type_must_be_a_signed_integer_type();
+    void __constraints() {
+      __error_type_must_be_a_signed_integer_type();
     }
   };
   template <> struct _SignedIntegerConcept<short> { void __constraints() {} };
@@ -114,8 +146,8 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
 
   template <class _Tp>
   struct _UnsignedIntegerConcept {
-    void __constraints() { 
-      this->__error_type_must_be_an_unsigned_integer_type();
+    void __constraints() {
+      __error_type_must_be_an_unsigned_integer_type();
     }
   };
   template <> struct _UnsignedIntegerConcept<unsigned short>
@@ -312,7 +344,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
 
   template <class _Func, class _Arg>
   struct _UnaryFunctionConcept<_Func, void, _Arg> {
-    void __constraints() { 
+    void __constraints() {
       __f(__arg);                       // require operator()
     }
     _Func __f;
@@ -322,7 +354,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
   template <class _Func, class _Return, class _First, class _Second>
   struct _BinaryFunctionConcept
   {
-    void __constraints() { 
+    void __constraints() {
       __r = __f(__first, __second);     // require operator()
     }
     _Func __f;
@@ -366,7 +398,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
   // use this when functor is used inside a container class like std::set
   template <class _Func, class _First, class _Second>
   struct _Const_BinaryPredicateConcept {
-    void __constraints() { 
+    void __constraints() {
       __const_constraints(__f);
     }
     void __const_constraints(const _Func& __fun) {
@@ -560,7 +592,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
     typedef typename _Container::reference _Reference;
     typedef typename _Container::iterator _Iterator;
     typedef typename _Container::pointer _Pointer;
-    
+
     void __constraints() {
       __function_requires< _ContainerConcept<_Container> >();
       __function_requires< _AssignableConcept<_Value_type> >();
@@ -582,7 +614,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
       typedef typename _ForwardContainer::const_iterator _Const_iterator;
       __function_requires< _ForwardIteratorConcept<_Const_iterator> >();
     }
-  };  
+  };
 
   template <class _ForwardContainer>
   struct _Mutable_ForwardContainerConcept
@@ -593,7 +625,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
       typedef typename _ForwardContainer::iterator _Iterator;
       __function_requires< _Mutable_ForwardIteratorConcept<_Iterator> >();
     }
-  };  
+  };
 
   template <class _ReversibleContainer>
   struct _ReversibleContainerConcept
@@ -693,7 +725,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
       __function_requires< _Mutable_ForwardContainerConcept<_Sequence> >();
       __function_requires< _DefaultConstructibleConcept<_Sequence> >();
 
-      _Sequence 
+      _Sequence
         __c(__n) _IsUnused,
         __c2(__n, __t) _IsUnused,
         __c3(__first, __last) _IsUnused;
@@ -758,7 +790,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
       __function_requires< _ForwardContainerConcept<_AssociativeContainer> >();
       __function_requires<
         _DefaultConstructibleConcept<_AssociativeContainer> >();
-    
+
       __i = __c.find(__k);
       __r = __c.equal_range(__k);
       __c.erase(__k);
@@ -789,9 +821,9 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
     void __constraints() {
       __function_requires<
         _AssociativeContainerConcept<_UniqueAssociativeContainer> >();
-    
+
       _UniqueAssociativeContainer __c(__first, __last);
-      
+
       __pos_flag = __c.insert(__t);
       __c.insert(__first, __last);
     }
@@ -808,7 +840,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
         _AssociativeContainerConcept<_MultipleAssociativeContainer> >();
 
       _MultipleAssociativeContainer __c(__first, __last);
-      
+
       __pos = __c.insert(__t);
       __c.insert(__first, __last);
 
@@ -855,7 +887,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
       __function_requires<
         _ReversibleContainerConcept<_SortedAssociativeContainer> >();
 
-      _SortedAssociativeContainer 
+      _SortedAssociativeContainer
         __c(__kc) _IsUnused,
         __c2(__first, __last) _IsUnused,
         __c3(__first, __last, __kc) _IsUnused;
@@ -863,7 +895,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
       __p = __c.upper_bound(__k);
       __p = __c.lower_bound(__k);
       __r = __c.equal_range(__k);
-      
+
       __c.insert(__p, __t);
     }
     void __const_constraints(const _SortedAssociativeContainer& __c) {
