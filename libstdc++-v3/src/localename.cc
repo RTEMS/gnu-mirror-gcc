@@ -144,7 +144,7 @@ namespace std
 	  }
       }
     else
-      __throw_runtime_error("locale::locale NULL not valid");
+      __throw_runtime_error(__N("locale::locale NULL not valid"));
   }
 
   locale::locale(const locale& __base, const char* __s, category __cat)
@@ -193,11 +193,11 @@ namespace std
 	for (size_t __i = 0; __i < _M_facets_size; ++__i)
 	  _M_facets[__i] = 0;
 	_M_caches = new const facet*[_M_facets_size];
-	for (size_t __i = 0; __i < _M_facets_size; ++__i)
-	  _M_caches[__i] = 0;
+	for (size_t __j = 0; __j < _M_facets_size; ++__j)
+	  _M_caches[__j] = 0;
 	_M_names = new char*[_S_categories_size];
-	for (size_t __i = 0; __i < _S_categories_size; ++__i)
-	  _M_names[__i] = 0;
+	for (size_t __k = 0; __k < _S_categories_size; ++__k)
+	  _M_names[__k] = 0;
 
 	// Name all the categories.
 	const size_t __len = std::strlen(__s);
