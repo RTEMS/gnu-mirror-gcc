@@ -28,6 +28,10 @@ Boston, MA 02111-1307, USA.  */
 #ifndef GCC_CP_TREE_H
 #define GCC_CP_TREE_H
 
+#ifndef __GNUC__
+#error "You should be using 'make bootstrap' -- see installation instructions"
+#endif
+
 #include "c-common.h"
 
 /* Usage of TREE_LANG_FLAG_?:
@@ -318,8 +322,6 @@ typedef struct ptrmem_cst
   set_namespace_binding ((NODE), current_namespace, (VAL))
 
 #define CLEANUP_P(NODE)         TREE_LANG_FLAG_0 (TRY_BLOCK_CHECK (NODE))
-#define CLEANUP_DECL(NODE)      TREE_OPERAND (CLEANUP_STMT_CHECK (NODE), 0)
-#define CLEANUP_EXPR(NODE)      TREE_OPERAND (CLEANUP_STMT_CHECK (NODE), 1)
 
 /* Returns nonzero iff TYPE1 and TYPE2 are the same type, in the usual
    sense of `same'.  */
@@ -727,8 +729,8 @@ struct saved_scope
   tree x_previous_class_type;
   tree x_previous_class_values;
   tree x_saved_tree;
-  tree incomplete;
   tree lookups;
+  tree last_parms;
 
   HOST_WIDE_INT x_processing_template_decl;
   int x_processing_specialization;
@@ -790,10 +792,6 @@ struct saved_scope
    cache miss).  */
 
 #define previous_class_values scope_chain->x_previous_class_values
-
-/* A list of the declarations with incomplete type at namespace scope.  */
-
-#define namespace_scope_incomplete scope_chain->incomplete
 
 /* A list of private types mentioned, for deferred access checking.  */
 
@@ -1590,7 +1588,7 @@ struct lang_type
 #define CLEAR_BINFO_MARKED(NODE)		\
   (TREE_VIA_VIRTUAL (NODE)			\
    ? CLEAR_CLASSTYPE_MARKED (BINFO_TYPE (NODE))	\
-   : (TREE_LANG_FLAG_0 (NODE) = 0))
+   : (void)(TREE_LANG_FLAG_0 (NODE) = 0))
 
 /* Nonzero means that this class is on a path leading to a new vtable.  */
 #define BINFO_VTABLE_PATH_MARKED(NODE)		\
@@ -1629,12 +1627,10 @@ struct lang_type
 #define SET_BINFO_PUSHDECLS_MARKED(NODE) SET_BINFO_VTABLE_PATH_MARKED (NODE)
 #define CLEAR_BINFO_PUSHDECLS_MARKED(NODE) CLEAR_BINFO_VTABLE_PATH_MARKED (NODE)
 
-/* Nonzero if this BINFO is a primary base class.
+/* Nonzero if this BINFO is a primary base class.  Note, this can be
+   set for non-canononical virtual bases. For a virtual primary base
+   you might also need to check whether it is canonical.  */
 
-   In the TYPE_BINFO hierarchy, this flag is never set for a base
-   class of a non-primary virtual base.  This flag is only valid for
-   paths (given by BINFO_INHERITANCE_CHAIN) that really exist in the
-   final object.  */
 #define BINFO_PRIMARY_P(NODE) \
   (BINFO_PRIMARY_BASE_OF (NODE) != NULL_TREE)
 
@@ -3748,7 +3744,8 @@ extern void finish_function_body		PARAMS ((tree));
 extern tree finish_function			PARAMS ((int));
 extern tree start_method			PARAMS ((tree, tree, tree));
 extern tree finish_method			PARAMS ((tree));
-extern void hack_incomplete_structures		PARAMS ((tree));
+extern void maybe_register_incomplete_var       PARAMS ((tree));
+extern void complete_vars			PARAMS ((tree));
 extern void finish_stmt				PARAMS ((void));
 extern void print_other_binding_stack		PARAMS ((struct binding_level *));
 extern void revert_static_member_fn             PARAMS ((tree));
@@ -4056,8 +4053,6 @@ extern int types_overlap_p			PARAMS ((tree, tree));
 extern tree get_vbase				PARAMS ((tree, tree));
 extern tree get_dynamic_cast_base_type          PARAMS ((tree, tree));
 extern void type_access_control			PARAMS ((tree, tree));
-extern void skip_type_access_control            PARAMS ((void));
-extern void reset_type_access_control           PARAMS ((void));
 extern int accessible_p                         PARAMS ((tree, tree));
 extern tree lookup_field			PARAMS ((tree, tree, int, int));
 extern int lookup_fnfields_1                    PARAMS ((tree, tree));
@@ -4093,8 +4088,6 @@ extern tree dfs_walk_real                      PARAMS ((tree,
 extern tree dfs_unmark                          PARAMS ((tree, void *));
 extern tree markedp                             PARAMS ((tree, void *));
 extern tree unmarkedp                           PARAMS ((tree, void *));
-extern tree dfs_skip_nonprimary_vbases_unmarkedp PARAMS ((tree, void *));
-extern tree dfs_skip_nonprimary_vbases_markedp  PARAMS ((tree, void *));
 extern tree dfs_unmarked_real_bases_queue_p     PARAMS ((tree, void *));
 extern tree dfs_marked_real_bases_queue_p       PARAMS ((tree, void *));
 extern tree dfs_skip_vbases                     PARAMS ((tree, void *));
@@ -4165,6 +4158,7 @@ extern tree finish_qualified_call_expr          PARAMS ((tree, tree));
 extern tree finish_unary_op_expr                PARAMS ((enum tree_code, tree));
 extern tree finish_id_expr                      PARAMS ((tree));
 extern void save_type_access_control		PARAMS ((tree));
+extern void reset_type_access_control           PARAMS ((void));
 extern void decl_type_access_control		PARAMS ((tree));
 extern int begin_function_definition            PARAMS ((tree, tree));
 extern tree begin_constructor_declarator        PARAMS ((tree, tree));
@@ -4349,6 +4343,7 @@ extern tree pfn_from_ptrmemfunc                 PARAMS ((tree));
 extern tree type_after_usual_arithmetic_conversions PARAMS ((tree, tree));
 extern tree composite_pointer_type              PARAMS ((tree, tree, tree, tree,
 						       const char*));
+extern tree merge_types				PARAMS ((tree, tree));
 extern tree check_return_expr                   PARAMS ((tree));
 #define cp_build_binary_op(code, arg1, arg2) \
   build_binary_op(code, arg1, arg2, 1)

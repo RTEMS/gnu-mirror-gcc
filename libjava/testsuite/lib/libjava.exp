@@ -292,18 +292,20 @@ proc libjava_arguments {{mode compile}} {
     verbose "LD_LIBRARY_PATH = $env(LD_LIBRARY_PATH)"
 
     # Set the CLASSPATH environment variable
-    verbose "CLASSPATH is .:$srcdir/$subdir:$objdir:$objdir/../libgcj.jar"
+    verbose "CLASSPATH is .:$srcdir/$subdir:$objdir:$objdir/../libgcj-3.1.jar"
     global env
-    set env(CLASSPATH) ".:$srcdir/$subdir:$objdir:$objdir/../libgcj.jar"
+    set env(CLASSPATH) ".:$srcdir/$subdir:$objdir:$objdir/../libgcj-3.1.jar"
 
-    global wrapper_file wrap_compile_flags;
-    lappend args "additional_flags=$wrap_compile_flags";
-    lappend args "libs=$wrapper_file";
-    lappend args "libs=$libjava";
-    lappend args "libs=$libgc";
-    lappend args "libs=$libqthreads"
-    lappend args "libs=$libz"
-    lappend args debug
+    if {$mode == "link"} {
+	global wrapper_file wrap_compile_flags;
+	lappend args "additional_flags=$wrap_compile_flags";
+	lappend args "libs=$wrapper_file";
+	lappend args "libs=$libjava";
+	lappend args "libs=$libgc";
+	lappend args "libs=$libqthreads"
+	lappend args "libs=$libz"
+	lappend args debug
+    }
 
     if { [target_info needs_status_wrapper]!="" && [info exists gluefile] } {
 	lappend args "libs=${gluefile}"

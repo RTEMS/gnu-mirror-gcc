@@ -16,8 +16,17 @@ details.  */
 
 #undef __INSIDE_CYGWIN__
 #include <winsock.h>
+#include <gcj/cni.h>
+#include <java/util/Properties.h>
 
 extern void _Jv_platform_initialize (void);
-extern void _Jv_platform_gettimeofday (struct timeval *);
+extern void _Jv_platform_initProperties (java::util::Properties*);
+extern jlong _Jv_platform_gettimeofday ();
+
+inline void
+_Jv_platform_close_on_exec (jint)
+{
+  // Ignore.
+}
 
 #endif /* __JV_WIN32_H__ */

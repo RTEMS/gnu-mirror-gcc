@@ -59,6 +59,9 @@
          <li><a href="#3_2">[removed]</a>
          <li><a href="#3_3">[removed]</a>
          <li><a href="#3_4">I can't use 'long long' on Solaris</a>
+         <li><a href="#3_5"><code>_XOPEN_SOURCE</code> /
+                            <code>_GNU_SOURCE</code> / etc is always defined</a>
+         <li><a href="#3_6">OS X ctype.h is broken!  How can I hack it?</a>
       </ol>
 
    <li><a href="#4_0">Known Bugs and Non-Bugs</a>
@@ -66,18 +69,19 @@
          <li><a href="#4_1">What works already?</a>
          <li><a href="#4_2">Bugs in gcc/g++ (not libstdc++-v3)</a>
          <li><a href="#4_3">Bugs in the C++ language/lib specification</a>
-         <li><a href="#4_4">Things in libstdc++ that look like bugs</a>
-           <ul>
-             <li><a href="#4_4_iostreamclear">reopening a stream fails</a>
-             <li><a href="#4_4_Weff">-Weffc++ complains too much</a>
-             <li><a href="#4_4_rel_ops">&quot;ambiguous overloads&quot;
-                                 after including an old-style header</a>
-             <li><a href="#4_4_interface">The g++-3 headers are
-                                 <strong>not ours</strong></a>
-             <li><a href="#4_4_glibc">compilation errors from streambuf.h</a>
-             <li><a href="#4_4_checks">errors about <em>*Cconcept</em> and
-                                 <em>constraints</em> in the STL...</a>
-           </ul>
+         <li><a href="#4_4">Things in libstdc++ that only look like bugs</a><ul>
+           <li><a href="#4_4_iostreamclear">reopening a stream fails</a>
+           <li><a href="#4_4_Weff">-Weffc++ complains too much</a>
+           <li><a href="#4_4_rel_ops">&quot;ambiguous overloads&quot;
+                               after including an old-style header</a>
+           <li><a href="#4_4_interface">The g++-3 headers are
+                               <strong>not ours</strong></a>
+           <li><a href="#4_4_glibc">compilation errors from streambuf.h</a>
+           <li><a href="#4_4_checks">errors about <em>*Cconcept</em> and
+                               <em>constraints</em> in the STL...</a>
+           <li><a href="#4_4_dlsym">program crashes when using library code
+                               in a dynamically-loaded library</a>
+         </ul>
          <li><a href="#4_5">Aw, that's easy to fix!</a>
       </ol>
 
@@ -109,7 +113,7 @@
          library reaches stable plateaus, it is captured in a snapshot
          and released.  The current release is
          <a href="http://gcc.gnu.org/libstdc++/download.html">the
-         thirteenth snapshot</a>.  For those who want to see exactly how
+         fourteenth snapshot</a>.  For those who want to see exactly how
          far the project has come, or just want the latest
          bleeding-edge code, the up-to-date source is available over
          anonymous CVS, and can even be browsed over the Web (see below). 
@@ -165,7 +169,7 @@
 
 <hr>
    <h2><a name="1_4">1.4 How do I get libstdc++?</a></h2>
-      <p>The thirteenth (and latest) snapshot of libstdc++-v3 is
+      <p>The fourteenth (and latest) snapshot of libstdc++-v3 is
          <a href="http://gcc.gnu.org/libstdc++/download.html">available via
          ftp</a>.
       </p>
@@ -429,6 +433,52 @@ which is no longer available, thanks deja...-->
       </p>
 
 <hr>
+   <h2><a name="3_5">3.5 <code>_XOPEN_SOURCE</code> / <code>_GNU_SOURCE</code>
+                         / etc is always defined</a></h2>
+      <p>On Solaris, g++ (but not gcc) always defines the preprocessor
+         macro <code>_XOPEN_SOURCE</code>.  On GNU/Linux, the same happens
+         with <code>_GNU_SOURCE</code>.  (This is not an exhaustive list;
+         other macros and other platforms are also affected.)
+      </p>
+      <p>These macros are typically used in C library headers, guarding new
+         versions of functions from their older versions.  The C++ standard
+         library includes the C standard library, but it requires the C90
+         version, which for backwards-compatability reasons is often not the
+         default for many vendors.
+      </p>
+      <p>More to the point, the C++ standard requires behavior which is only
+         available on certain platforms after certain symbols are defined.
+         Usually the issue involves I/O-related typedefs.  In order to
+         ensure correctness, the compiler simply predefines those symbols.
+      </p>
+      <p>Note that it's not enough to #define them only when the library is
+         being built (during installation).  Since we don't have an 'export'
+         keyword, much of the library exists as headers, which means that
+         the symbols must also be defined as your programs are parsed and
+         compiled.
+      </p>
+      <p>To see which symbols are defined, look for CPLUSPLUS_CPP_SPEC in
+         the gcc config headers for your target (and try changing them to
+         see what happens when building complicated code).  You can also run
+         <code>&quot;g++ -E -dM - &lt; /dev/null&quot;</code> to display
+         a list of predefined macros for any particular installation.
+      </p>
+      <p>This has been discussed on the mailing lists
+         <a href="http://gcc.gnu.org/cgi-bin/htsearch?method=and&format=builtin-long&sort=score&words=_XOPEN_SOURCE+Solaris">quite a bit</a>.
+      </p>
+      <p>This method is something of a wart.  We'd like to find a cleaner
+         solution, but nobody yet has contributed the time.
+      </p>
+
+<hr>
+   <h2><a name="3_6">3.6 OS X ctype.h is broken!  How can I hack it?</a></h2>
+      <p>This is a long-standing bug in the OS X support.  Fortunately,
+         the patch is quite simple, and well-known.
+         <a href="http://gcc.gnu.org/ml/gcc/2002-03/msg00817.html"> Here's a
+         link to the solution.</a>
+      </p>
+
+<hr>
 <h1><a name="4_0">4.0 Known Bugs and Non-Bugs</a></h1>
    <em>Note that this section can get rapdily outdated -- such is the
    nature of an open-source project.  For the latest information, join
@@ -462,39 +512,13 @@ which is no longer available, thanks deja...-->
 <!-- Yeah, I meant that "verbatim clip" thing literally... :-)  -->
 
 <pre>
-New in 3.0.96:
+New in 3.0.97:
 ---
 - more doxygen documentation.
-- extensions moved out of namespace std
-- HPUX long long support
-- more string optimizations
-- support for NetBSD cross compiles
-- concept_check merge from boost
-- header simplification
-- named locale bug shakeout
-- thread testsuite
-
-New in 3.0.95:
----
-- add S390, m68k, x86-64 support.
-- doxygen documentation has been extended, including man pages.
-- verbose terminate handling has been added.
-- some libsupc++ tweaks
-- warnings for deprecated headers now active.
-- dejagnu testsuite preliminary documentation.
-- dejagnu testsuite default.
-- dejagnu testsuite cross compiler, multilib safe.
-- long long iostreams on by default, rework of ISO C99 support.
-- iterator re-write and testsuites.
-- container testsuites.
-- allocator revamp and testsuites.
-- more concept-checking work.
-- basic_string optimization and MT fixes.
-- new limits implementation.
-- update -fno-exceptions code, verify it works.
-- full named locale support fpr all facets, choice of gnu,
-  ieee_1003.1-200x (POSIX 2), or generic models. Full support depends
-  on target OS and underlying "C" library support.
+- more named locale bug fixes
+- support for symbol versioning when using GNU ld &gt;= 2.12
+- wide-io
+- tuning for executable size
 </pre>
 
 
@@ -543,7 +567,7 @@ New in 3.0.95:
       </p>
 
 <hr>
-   <h2><a name="4_4">4.4 Things in libstdc++ that look like bugs</a></h2>
+   <h2><a name="4_4">4.4 Things in libstdc++ that only look like bugs</a></h2>
       <p>There are things which are not bugs in the compiler (4.2) nor
          the language specification (4.3), but aren't really bugs in
          libstdc++, either.  Really!  Please do not report these as bugs.
@@ -652,6 +676,24 @@ http://clisp.cons.org/~haible/gccinclude-glibc-2.2-compat.diff
            checks, is available
            <a href="../19_diagnostics/howto.html#3">here</a>.
         </p>
+      </a>
+      <a name="4_4_dlsym">
+        <p><strong>dlopen/dlsym</strong>
+           If you are using the C++ library across dynamically-loaded
+           objects, make certain that you are passing the correct options
+           when compiling and linking:
+           <pre>
+    // compile the library components
+    g++ -fPIC -c a.cc
+    g++ -fPIC -c b.cc
+    ...
+    g++ -fPIC -c z.cc
+
+    // create the library
+    g++ -fPIC -shared -rdynamic -o libfoo.so a.o b.o ... z.o
+
+    // link the executable
+    g++ -fPIC -rdynamic -o foo ... -L. -lfoo -ldl</pre></p>
       </a>
 
 <hr>

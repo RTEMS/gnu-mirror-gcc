@@ -21,7 +21,7 @@ details.  */
 #undef HANDLE_FPE
 
 #define SIGNAL_HANDLER(_name)	\
-static void _Jv_##_name (int, siginfo_t *, void *_p)
+static void _Jv_##_name (int, siginfo_t *_sip, void *_p)
 
 class java::lang::Throwable;
 
@@ -41,6 +41,72 @@ do									\
   _sc->sc_pc += 4;							\
 }									\
 while (0)
+
+#elif defined(__ia64__)
+
+#define MAKE_THROW_FRAME(_exception)					\
+do									\
+{									\
+  /* IA-64 either leaves PC pointing at a faulting instruction or the	\
+   following instruction, depending on the signal.  SEGV always does	\
+   the former, so we adjust the saved PC to point to the following	\
+   instruction; this is what the handler in libgcc expects.  */		\
+  /* Note that we are lying to the unwinder here, which expects the	\
+   faulting pc, not pc+1.  But we claim the unwind information can't	\
+   be changed by such a ld or st instruction, so it doesn't matter. */	\
+  struct sigcontext *_sc = (struct sigcontext *)_p;			\
+  _sc->sc_ip++;								\
+}									\
+while (0)
+#elif defined(__sparc__)
+/* We could do the unwind of the signal frame quickly by hand here like
+   sparc-signal.h does under Solaris, but that makes debugging unwind
+   failures almost impossible.  */
+#if !defined(__arch64__)
+#define MAKE_THROW_FRAME(_exception)					\
+do									\
+{									\
+  /* Sparc-32 leaves PC pointing at a faulting instruction		\
+   always.  So we adjust the saved PC to point to the following		\
+   instruction; this is what the handler in libgcc expects.  */		\
+  /* Note that we are lying to the unwinder here, which expects the	\
+   faulting pc, not pc+1.  But we claim the unwind information can't	\
+   be changed by such a ld or st instruction, so it doesn't matter. */	\
+  struct sig_regs {							\
+    unsigned int psr, pc, npc, y, u_regs[16];				\
+  } *regp;								\
+  unsigned int insn;							\
+  __asm__ __volatile__("ld [%%i7 + 8], %0" : "=r" (insn));		\
+  /* mov __NR_sigaction, %g1; Old signal stack layout */		\
+  if (insn == 0x821020d8)						\
+    regp = (struct sig_regs *) _sip;					\
+  else									\
+    /* mov __NR_rt_sigaction, %g1; New signal stack layout */		\
+    regp = (struct sig_regs *) (_sip + 1);				\
+  regp->pc = regp->npc;							\
+  regp->npc += 4;							\
+}									\
+while (0)
+#else
+#define MAKE_THROW_FRAME(_exception)					\
+do									\
+{									\
+  /* Sparc-64 leaves PC pointing at a faulting instruction		\
+   always.  So we adjust the saved PC to point to the following		\
+   instruction; this is what the handler in libgcc expects.  */		\
+  /* Note that we are lying to the unwinder here, which expects the	\
+   faulting pc, not pc+1.  But we claim the unwind information can't	\
+   be changed by such a ld or st instruction, so it doesn't matter. */	\
+  struct pt_regs {							\
+    unsigned long u_regs[16];						\
+    unsigned long tstate, tpc, tnpc;					\
+    unsigned int y, fprs;						\
+  } *regp = (struct pt_regs *) (_sip + 1);				\
+  regp->tpc = regp->tnpc;						\
+  regp->tnpc += 4;							\
+}									\
+while (0)
+#endif
 #else
 #define MAKE_THROW_FRAME(_exception)		\
 do						\
@@ -50,6 +116,7 @@ do						\
 while (0)
 #endif
 
+#if !(defined(__ia64__) || defined(__sparc__))
 #define INIT_SEGV						\
 do								\
   {								\
@@ -82,4 +149,41 @@ while (0)
  * go away once all systems have pthreads libraries that are
  * compiled with full unwind info.  */
 
+#else  /* __ia64__ || __sparc__ */
+
+// FIXME: We shouldn't be using libc_sigaction here, since it should
+// be glibc private.  But using syscall here would mean translating to
+// the kernel's struct sigaction and argument sequence, which we
+// shouldn't either.  The right solution is to call sigaction and to
+// make sure that we can unwind correctly through the pthread signal
+// wrapper.
+extern "C" int __libc_sigaction (int __sig, 
+		      __const struct sigaction *__restrict __act,
+                      struct sigaction *__restrict __oact) throw ();
+
+#define INIT_SEGV						\
+do								\
+  {								\
+    nullp = new java::lang::NullPointerException ();    	\
+    struct sigaction act;					\
+    act.sa_sigaction = _Jv_catch_segv;      			\
+    sigemptyset (&act.sa_mask);					\
+    act.sa_flags = SA_SIGINFO;	       				\
+    __libc_sigaction (SIGSEGV, &act, NULL);			\
+  }								\
+while (0)  
+
+#define INIT_FPE						\
+do								\
+  { 								\
+    arithexception = new java::lang::ArithmeticException 	\
+      (JvNewStringLatin1 ("/ by zero"));			\
+    struct sigaction act;					\
+    act.sa_sigaction = _Jv_catch_fpe;				\
+    sigemptyset (&act.sa_mask);					\
+    act.sa_flags = SA_SIGINFO;		       			\
+    __libc_sigaction (SIGFPE, &act, NULL);			\
+  }								\
+while (0)  
+#endif /* __ia64__ || __sparc__ */
 #endif /* JAVA_SIGNAL_H */

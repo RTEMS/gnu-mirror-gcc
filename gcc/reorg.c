@@ -511,7 +511,8 @@ emit_delay_sequence (insn, list, length)
 
 	    case REG_LABEL:
 	      /* Keep the label reference count up to date.  */
-	      LABEL_NUSES (XEXP (note, 0)) ++;
+	      if (GET_CODE (XEXP (note, 0)) == CODE_LABEL)
+		LABEL_NUSES (XEXP (note, 0)) ++;
 	      break;
 
 	    default:
@@ -1085,9 +1086,14 @@ get_branch_condition (insn, target)
 	       || (GET_CODE (XEXP (src, 2)) == LABEL_REF
 		   && XEXP (XEXP (src, 2), 0) == target))
 	   && XEXP (src, 1) == pc_rtx)
-    return gen_rtx_fmt_ee (reverse_condition (GET_CODE (XEXP (src, 0))),
-			   GET_MODE (XEXP (src, 0)),
-			   XEXP (XEXP (src, 0), 0), XEXP (XEXP (src, 0), 1));
+    {
+      enum rtx_code rev;
+      rev = reversed_comparison_code (XEXP (src, 0), insn);
+      if (rev != UNKNOWN)
+	return gen_rtx_fmt_ee (rev, GET_MODE (XEXP (src, 0)),
+			       XEXP (XEXP (src, 0), 0),
+			       XEXP (XEXP (src, 0), 1));
+    }
 
   return 0;
 }
@@ -2732,12 +2738,13 @@ fill_slots_from_thread (insn, condition, thread, opposite_thread, likely,
 			 temporarily increment the use count on any referenced
 			 label lest it be deleted by delete_related_insns.  */
 		      note = find_reg_note (trial, REG_LABEL, 0);
-		      if (note)
+		      /* REG_LABEL could be NOTE_INSN_DELETED_LABEL too.  */
+		      if (note && GET_CODE (XEXP (note, 0)) == CODE_LABEL)
 			LABEL_NUSES (XEXP (note, 0))++;
 
 		      delete_related_insns (trial);
 
-		      if (note)
+		      if (note && GET_CODE (XEXP (note, 0)) == CODE_LABEL)
 			LABEL_NUSES (XEXP (note, 0))--;
 		    }
 		  else
@@ -3683,10 +3690,6 @@ dbr_schedule (first, file)
 
   /* It is not clear why the line below is needed, but it does seem to be.  */
   unfilled_firstobj = (rtx *) obstack_alloc (&unfilled_slots_obstack, 0);
-
-  /* Reposition the prologue and epilogue notes in case we moved the
-     prologue/epilogue insns.  */
-  reposition_prologue_and_epilogue_notes (first);
 
   if (file)
     {

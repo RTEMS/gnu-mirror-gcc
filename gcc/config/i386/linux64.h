@@ -1,5 +1,5 @@
 /* Definitions for AMD x86-64 running Linux-based GNU systems with ELF format.
-   Copyright (C) 2001 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2002 Free Software Foundation, Inc.
    Contributed by Jan Hubicka <jh@suse.cz>, based on linux.h.
 
 This file is part of GNU CC.
@@ -25,7 +25,7 @@ Boston, MA 02111-1307, USA.  */
 #define TARGET_VERSION fprintf (stderr, " (x86-64 Linux/ELF)");
 
 #undef CPP_PREDEFINES
-#define CPP_PREDEFINES "-D__ELF__ -Dunix -Dlinux -Asystem(posix)"
+#define CPP_PREDEFINES "-D__ELF__ -Dunix -D__gnu_linux__ -Dlinux -Asystem(posix)"
 
 #undef CPP_SPEC
 #define CPP_SPEC "%(cpp_cpu) %{fPIC:-D__PIC__ -D__pic__} %{fpic:-D__PIC__ -D__pic__} %{posix:-D_POSIX_SOURCE} %{pthread:-D_REENTRANT} %{!m32:-D__LONG_MAX__=9223372036854775807L}"
@@ -39,10 +39,31 @@ Boston, MA 02111-1307, USA.  */
    done.  */
 
 #undef	LINK_SPEC
-#define LINK_SPEC "%{!m32:-m elf_x86_64} %{m32:-m elf_i386} %{shared:-shared} \
+#define LINK_SPEC "%{!m32:-m elf_x86_64 -Y P,/usr/lib64} %{m32:-m elf_i386} \
+  %{shared:-shared} \
   %{!shared: \
     %{!static: \
       %{rdynamic:-export-dynamic} \
-      %{!dynamic-linker:-dynamic-linker /lib64/ld-linux-x86-64.so.2}} \
-      %{static:-static}}"
+      %{m32:%{!dynamic-linker:-dynamic-linker /lib/ld-linux.so.2}} \
+      %{!m32:%{!dynamic-linker:-dynamic-linker /lib64/ld-linux-x86-64.so.2}}} \
+    %{static:-static}}"
 
+#undef  STARTFILE_SPEC
+#define STARTFILE_SPEC \
+  "%{m32:%{!shared: \
+       %{pg:gcrt1.o%s} %{!pg:%{p:gcrt1.o%s} \
+       %{!p:%{profile:gcrt1.o%s} %{!profile:crt1.o%s}}}} \
+     crti.o%s %{static:crtbeginT.o%s}\
+     %{!static:%{!shared:crtbegin.o%s} %{shared:crtbeginS.o%s}}} \
+   %{!m32:%{!shared: \
+       %{pg:/usr/lib64/gcrt1.o%s} %{!pg:%{p:/usr/lib64/gcrt1.o%s} \
+       %{!p:%{profile:/usr/lib64/gcrt1.o%s} %{!profile:/usr/lib64/crt1.o%s}}}}\
+     /usr/lib64/crti.o%s %{static:crtbeginT.o%s} \
+     %{!static:%{!shared:crtbegin.o%s} %{shared:crtbeginS.o%s}}}"
+
+#undef  ENDFILE_SPEC
+#define ENDFILE_SPEC "\
+  %{m32:%{!shared:crtend.o%s} %{shared:crtendS.o%s} crtn.o%s} \
+  %{!m32:%{!shared:crtend.o%s} %{shared:crtendS.o%s} /usr/lib64/crtn.o%s}"
+
+#define MULTILIB_DEFAULTS { "m64" }

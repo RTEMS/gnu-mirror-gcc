@@ -1506,8 +1506,8 @@ write_CV_qualifiers_for_type (type)
                     ::= m   # unsigned long
                     ::= x   # long long, __int64
                     ::= y   # unsigned long long, __int64  
-                    ::= n   # __int128            [not supported]
-                    ::= o   # unsigned __int128   [not supported] 
+                    ::= n   # __int128
+                    ::= o   # unsigned __int128
                     ::= f   # float
                     ::= d   # double
                     ::= e   # long double, __float80 
@@ -1552,15 +1552,23 @@ write_builtin_type (type)
 		write_char (integer_type_codes[itk]);
 		break;
 	      }
-	  
+
 	  if (itk == itk_none)
 	    {
 	      tree t = type_for_mode (TYPE_MODE (type), TREE_UNSIGNED (type));
 	      if (type == t)
-		/* Couldn't find this type.  */
-		abort ();
-	      type = t;
-	      goto iagain;
+		{
+		  if (TYPE_PRECISION (type) == 128)
+		    write_char (TREE_UNSIGNED (type) ? 'o' : 'n');
+		  else
+		    /* Couldn't find this type.  */
+		    abort ();
+		}
+	      else
+		{
+		  type = t;
+		  goto iagain;
+		}
 	    }
 	}
       break;
@@ -1780,6 +1788,16 @@ write_expression (expr)
       code = TREE_CODE (expr);
     }
 
+  /* Skip NOP_EXPRs.  They can occur when (say) a pointer argument
+     is converted (via qualification conversions) to another
+     type.  */
+  while (TREE_CODE (expr) == NOP_EXPR
+	 || TREE_CODE (expr) == NON_LVALUE_EXPR)
+    {
+      expr = TREE_OPERAND (expr, 0);
+      code = TREE_CODE (expr);
+    }
+
   /* Handle template parameters. */
   if (code == TEMPLATE_TYPE_PARM 
       || code == TEMPLATE_TEMPLATE_PARM
@@ -1798,15 +1816,6 @@ write_expression (expr)
   else
     {
       int i;
-
-      /* Skip NOP_EXPRs.  They can occur when (say) a pointer argument
-	 is converted (via qualification conversions) to another
-	 type.  */
-      while (TREE_CODE (expr) == NOP_EXPR)
-	{
-	  expr = TREE_OPERAND (expr, 0);
-	  code = TREE_CODE (expr);
-	}
 
       /* When we bind a variable or function to a non-type template
 	 argument with reference type, we create an ADDR_EXPR to show
