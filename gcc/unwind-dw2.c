@@ -40,7 +40,7 @@
 #include "unwind-pe.h"
 #include "unwind-dw2-fde.h"
 #include "gthr.h"
-
+#include "unwind-dw2.h"
 
 #ifndef __USING_SJLJ_EXCEPTIONS__
 
@@ -49,12 +49,6 @@
 #else
 #undef STACK_GROWS_DOWNWARD
 #define STACK_GROWS_DOWNWARD 1
-#endif
-
-/* A target can override (perhaps for backward compatibility) how
-   many dwarf2 columns are unwound.  */
-#ifndef DWARF_FRAME_REGISTERS
-#define DWARF_FRAME_REGISTERS FIRST_PSEUDO_REGISTER
 #endif
 
 /* Dwarf frame registers used for pre gcc 3.0 compiled glibc.  */
@@ -87,58 +81,6 @@ struct _Unwind_Context
 /* Byte size of every register managed by these routines.  */
 static unsigned char dwarf_reg_size_table[DWARF_FRAME_REGISTERS+1];
 
-
-/* The result of interpreting the frame unwind info for a frame.
-   This is all symbolic at this point, as none of the values can
-   be resolved until the target pc is located.  */
-typedef struct
-{
-  /* Each register save state can be described in terms of a CFA slot,
-     another register, or a location expression.  */
-  struct frame_state_reg_info
-  {
-    struct {
-      union {
-	_Unwind_Word reg;
-	_Unwind_Sword offset;
-	const unsigned char *exp;
-      } loc;
-      enum {
-	REG_UNSAVED,
-	REG_SAVED_OFFSET,
-	REG_SAVED_REG,
-	REG_SAVED_EXP
-      } how;
-    } reg[DWARF_FRAME_REGISTERS+1];
-
-    /* Used to implement DW_CFA_remember_state.  */
-    struct frame_state_reg_info *prev;
-  } regs;
-
-  /* The CFA can be described in terms of a reg+offset or a
-     location expression.  */
-  _Unwind_Sword cfa_offset;
-  _Unwind_Word cfa_reg;
-  const unsigned char *cfa_exp;
-  enum {
-    CFA_UNSET,
-    CFA_REG_OFFSET,
-    CFA_EXP
-  } cfa_how;
-
-  /* The PC described by the current frame state.  */
-  void *pc;
-
-  /* The information we care about from the CIE/FDE.  */
-  _Unwind_Personality_Fn personality;
-  _Unwind_Sword data_align;
-  _Unwind_Word code_align;
-  unsigned char retaddr_column;
-  unsigned char fde_encoding;
-  unsigned char lsda_encoding;
-  unsigned char saw_z;
-  void *eh_ptr;
-} _Unwind_FrameState;
 
 /* Read unaligned data from the instruction buffer.  */
 
@@ -320,7 +262,7 @@ extract_cie_info (const struct dwarf_cie *cie, struct _Unwind_Context *context,
 		  _Unwind_FrameState *fs)
 {
   const unsigned char *aug = cie->augmentation;
-  const unsigned char *p = aug + strlen (aug) + 1;
+  const unsigned char *p = aug + strlen ((const char *)aug) + 1;
   const unsigned char *ret = NULL;
   _Unwind_Word utmp;
 
@@ -337,7 +279,10 @@ extract_cie_info (const struct dwarf_cie *cie, struct _Unwind_Context *context,
      data alignment and return address column.  */
   p = read_uleb128 (p, &fs->code_align);
   p = read_sleb128 (p, &fs->data_align);
-  fs->retaddr_column = *p++;
+  if (cie->version == 1)
+    fs->retaddr_column = *p++;
+  else
+    p = read_uleb128 (p, &fs->retaddr_column);
   fs->lsda_encoding = DW_EH_PE_omit;
 
   /* If the augmentation starts with 'z', then a uleb128 immediately
@@ -863,12 +808,15 @@ execute_cfa_program (const unsigned char *insn_ptr,
 
 	case DW_CFA_restore_extended:
 	  insn_ptr = read_uleb128 (insn_ptr, &reg);
+	  /* FIXME, this is wrong; the CIE might have said that the
+	     register was saved somewhere.  */
 	  fs->regs.reg[DWARF_REG_TO_UNWIND_COLUMN(reg)].how = REG_UNSAVED;
 	  break;
 
 	case DW_CFA_undefined:
 	case DW_CFA_same_value:
 	  insn_ptr = read_uleb128 (insn_ptr, &reg);
+	  fs->regs.reg[DWARF_REG_TO_UNWIND_COLUMN(reg)].how = REG_UNSAVED;
 	  break;
 
 	case DW_CFA_nop:
@@ -1326,6 +1274,12 @@ uw_install_context_1 (struct _Unwind_Context *current,
 		      struct _Unwind_Context *target)
 {
   long i;
+  _Unwind_SpTmp sp_slot;
+
+  /* If the target frame does not have a saved stack pointer,
+     then set up the target's CFA.  */
+  if (!_Unwind_GetGRPtr (target, __builtin_dwarf_sp_column ()))
+	_Unwind_SetSpColumn (target, target->cfa, &sp_slot);
 
   for (i = 0; i < DWARF_FRAME_REGISTERS; ++i)
     {
@@ -1336,25 +1290,22 @@ uw_install_context_1 (struct _Unwind_Context *current,
 	memcpy (c, t, dwarf_reg_size_table[i]);
     }
 
-#ifdef EH_RETURN_STACKADJ_RTX
-  {
-    void *target_cfa;
+  /* If the current frame doesn't have a saved stack pointer, then we
+     need to rely on EH_RETURN_STACKADJ_RTX to get our target stack
+     pointer value reloaded.  */
+  if (!_Unwind_GetGRPtr (current, __builtin_dwarf_sp_column ()))
+    {
+      void *target_cfa;
 
-    /* If the last frame records a saved stack pointer, use it.  */
-    if (_Unwind_GetGRPtr (target, __builtin_dwarf_sp_column ()))
       target_cfa = _Unwind_GetPtr (target, __builtin_dwarf_sp_column ());
-    else
-      target_cfa = target->cfa;
 
-    /* We adjust SP by the difference between CURRENT and TARGET's CFA.  */
-    if (STACK_GROWS_DOWNWARD)
-      return target_cfa - current->cfa + target->args_size;
-    else
-      return current->cfa - target_cfa - target->args_size;
-  }
-#else
+      /* We adjust SP by the difference between CURRENT and TARGET's CFA.  */
+      if (STACK_GROWS_DOWNWARD)
+	return target_cfa - current->cfa + target->args_size;
+      else
+	return current->cfa - target_cfa - target->args_size;
+    }
   return 0;
-#endif
 }
 
 static inline _Unwind_Ptr

@@ -1241,7 +1241,7 @@ decide_unroll_stupid (struct loop *loop, int flags)
 
   loop->lpt_decision.decision = LPT_UNROLL_STUPID;
   loop->lpt_decision.times = i - 1;
-      
+
   if (dump_file)
     fprintf (dump_file,
 	     ";; Decided to unroll the loop stupidly, %d times.\n",
