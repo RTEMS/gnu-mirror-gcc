@@ -1,0 +1,19 @@
+2004-04-29  Robert Bowdidge <bowdidge@apple.com>
+	Radar 3628023
+        * build_gcc: correctly lipo gcov
+
+2004-04-29  Devang Patel  <dpatel@apple.com>
+
+	Merge lno-branch as of 2004:04:18 00:00 into
+	apple-ppc-branch.
+
+2004-04-22  Devang Patel  <dpatel@apple.com>
+
+	Radar 3401402 and 3511029
+        * build_gcc: Add support to build darwin driver.
+
+2004-04-21  Robert Bowdidge <bowdidge@apple.com>
+
+	* build_gcc: Add --disable-libmudflap to the list of options to
+        configure.  Option needed to keep gcc building on recent internal
+	builds of the OS. [Radar 3630321]
