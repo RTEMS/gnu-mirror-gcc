@@ -98,7 +98,7 @@ namespace std
   
     void
     _M_deallocate(_Tp* __p, size_t __n)
-      { if (__p) _M_data_allocator.deallocate(__p, __n); }
+    { if (__p) _M_data_allocator.deallocate(__p, __n); }
   };
   
   /// @if maint Specialization for instanceless allocators.  @endif
@@ -195,8 +195,8 @@ namespace std
     typedef __gnu_cxx::__normal_iterator<pointer, vector_type> 	iterator;
     typedef __gnu_cxx::__normal_iterator<const_pointer, vector_type>
                                                           const_iterator;
-    typedef reverse_iterator<const_iterator>              const_reverse_iterator;
-    typedef reverse_iterator<iterator>                    reverse_iterator;
+    typedef std::reverse_iterator<const_iterator>    const_reverse_iterator;
+    typedef std::reverse_iterator<iterator>                reverse_iterator;
     typedef value_type& 					reference;
     typedef const value_type& 				const_reference;
     typedef size_t 					size_type;
@@ -447,7 +447,7 @@ namespace std
     */
     size_type
     capacity() const
-      { return size_type(const_iterator(_M_end_of_storage) - begin()); }
+    { return size_type(const_iterator(_M_end_of_storage) - begin()); }
   
     /**
      *  Returns true if the %vector is empty.  (Thus begin() would equal end().)
@@ -631,7 +631,7 @@ namespace std
     */
     iterator
     insert(iterator __position)
-      { return insert(__position, value_type()); }
+    { return insert(__position, value_type()); }
   #endif
   
     /**
@@ -648,7 +648,7 @@ namespace std
     */
     void
     insert (iterator __pos, size_type __n, const value_type& __x)
-      { _M_fill_insert(__pos, __n, __x); }
+    { _M_fill_insert(__pos, __n, __x); }
   
     /**
      *  @brief  Inserts a range into the %vector.
