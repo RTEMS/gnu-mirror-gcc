@@ -4321,7 +4321,7 @@ In Standard C++, objects defined at namespace scope are guaranteed to be
 initialized in an order in strict accordance with that of their definitions
 @emph{in a given translation unit}.  No guarantee is made for initializations
 across translation units.  However, GNU C++ allows users to control the
-order of initialization of objects defined at namespace socpe with the
+order of initialization of objects defined at namespace scope with the
 @code{init_priority} attribute by specifying a relative @var{priority},
 a constant integral expression currently bounded between 101 and 65535
 inclusive.  Lower numbers indicate a higher priority.
@@ -4389,6 +4389,12 @@ it is required for backwards compatibility @xref{Backwards Compatibility}.
 
 The named return value extension has been deprecated, and will be
 removed from g++ at some point.
+
+The use of initializer lists with new expressions has been deprecated,
+and will be removed from g++ at some point.
+
+Floating point and complex template constant parameters are deprecated,
+and will be removed from g++ at some point.
 
 @node Backwards Compatibility
 @section Backwards Compatibility

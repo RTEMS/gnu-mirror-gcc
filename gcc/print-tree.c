@@ -441,7 +441,7 @@ print_node (file, prefix, node, indent)
 
       print_lang_decl (file, node, indent);
 
-      if (DECL_RTL (node) != 0)
+      if (DECL_RTL_SET_P (node))
 	{
 	  indent_to (file, indent + 4);
 	  print_rtl (file, DECL_RTL (node));
@@ -641,7 +641,7 @@ print_node (file, prefix, node, indent)
 		    EXPR_WFL_FILENAME (node) : "(no file info)"),
 		   EXPR_WFL_LINENO (node), EXPR_WFL_COLNO (node));
 	}
-      print_node (file, "chain", BLOCK_CHAIN (node), indent + 4);
+      print_node (file, "chain", TREE_CHAIN (node), indent + 4);
       break;
 
     case 'c':

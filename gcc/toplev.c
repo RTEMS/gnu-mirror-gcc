@@ -63,6 +63,7 @@ Boston, MA 02111-1307, USA.  */
 #include "timevar.h"
 #include "diagnostic.h"
 #include "ssa.h"
+#include "params.h"
 
 #ifndef ACCUMULATE_OUTGOING_ARGS
 #define ACCUMULATE_OUTGOING_ARGS 0
@@ -389,6 +390,9 @@ int optimize_size = 0;
 int errorcount = 0;
 int warningcount = 0;
 int sorrycount = 0;
+
+/* Nonzero if we should exit after parsing options.  */
+static int exit_after_options = 0;
 
 /* The FUNCTION_DECL for the function currently being compiled,
    or 0 if between functions.  */
@@ -958,6 +962,14 @@ int flag_leading_underscore = -1;
 /* The user symbol prefix after having resolved same.  */
 const char *user_label_prefix;
 
+static const param_info lang_independent_params[] = {
+#define DEFPARAM(ENUM, OPTION, HELP, DEFAULT) \
+  { OPTION, DEFAULT },
+#include "params.def"
+#undef DEFPARAM
+  { NULL, 0 }
+};
+
 /* A default for same.  */
 #ifndef USER_LABEL_PREFIX
 #define USER_LABEL_PREFIX ""
@@ -1046,9 +1058,9 @@ lang_independent_options f_options[] =
   {"pretend-float", &flag_pretend_float, 1,
    "Pretend that host and target use the same FP format"},
   {"schedule-insns", &flag_schedule_insns, 1,
-   "Reschedule instructions to avoid pipeline stalls"},
+   "Reschedule instructions before register allocation"},
   {"schedule-insns2", &flag_schedule_insns_after_reload, 1,
-  "Run two passes of the instruction scheduler"},
+   "Reschedule instructions after register allocation"},
   {"sched-interblock",&flag_schedule_interblock, 1,
    "Enable scheduling across basic blocks" },
   {"sched-spec",&flag_schedule_speculative, 1,
@@ -2014,7 +2026,7 @@ check_global_declarations (vec, len)
 	/* Cancel the RTL for this decl so that, if debugging info
 	   output for global variables is still to come,
 	   this one will be omitted.  */
-	DECL_RTL (decl) = NULL;
+	SET_DECL_RTL (decl, NULL_RTX);
 
       /* Warn about any function
 	 declared static but not defined.
@@ -2520,7 +2532,7 @@ compile_file (name)
     {
       int i;
 
-      for (i = 0; i < DFI_MAX; ++i)
+      for (i = 0; i < (int) DFI_MAX; ++i)
 	if (dump_file[i].initialized && dump_file[i].graph_dump_p)
 	  {
 	    char seq[16];
@@ -2584,7 +2596,8 @@ rest_of_decl_compilation (decl, asmspec, top_level, at_end)
       || TREE_CODE (decl) == FUNCTION_DECL)
     {
       timevar_push (TV_VARCONST);
-      make_decl_rtl (decl, asmspec);
+      if (asmspec)
+	make_decl_rtl (decl, asmspec);
       /* Initialized extern variable exists to be replaced
 	 with its value, or represents something that will be
 	 output in another file.  */
@@ -2610,14 +2623,15 @@ rest_of_decl_compilation (decl, asmspec, top_level, at_end)
     {
       if (decode_reg_name (asmspec) >= 0)
 	{
-	  DECL_RTL (decl) = 0;
+	  SET_DECL_RTL (decl, NULL_RTX);
 	  make_decl_rtl (decl, asmspec);
 	}
       else
 	{
 	  error ("invalid register name `%s' for register variable", asmspec);
 	  DECL_REGISTER (decl) = 0;
-	  make_decl_rtl (decl, NULL);
+	  if (!top_level)
+	    expand_decl (decl);
 	}
     }
 #if defined (DBX_DEBUGGING_INFO) || defined (XCOFF_DEBUGGING_INFO)
@@ -2684,23 +2698,45 @@ note_deferral_of_defined_inline_function (decl)
   /* Generate the DWARF info for the "abstract" instance of a function
      which we may later generate inlined and/or out-of-line instances
      of.  */
-  if (write_symbols == DWARF_DEBUG && DECL_INLINE (decl))
+  if (write_symbols == DWARF_DEBUG
+      && (DECL_INLINE (decl) || DECL_ABSTRACT (decl))
+      && ! DECL_ABSTRACT_ORIGIN (decl))
     {
       /* The front-end may not have set CURRENT_FUNCTION_DECL, but the
 	 DWARF code expects it to be set in this case.  Intuitively,
 	 DECL is the function we just finished defining, so setting
 	 CURRENT_FUNCTION_DECL is sensible.  */
       tree saved_cfd = current_function_decl;
+      int was_abstract = DECL_ABSTRACT (decl);
       current_function_decl = decl;
 
       /* Let the DWARF code do its work.  */
       set_decl_abstract_flags (decl, 1);
       dwarfout_file_scope_decl (decl, 0);
-      set_decl_abstract_flags (decl, 0);
+      if (! was_abstract)
+	set_decl_abstract_flags (decl, 0);
 
       /* Reset CURRENT_FUNCTION_DECL.  */
       current_function_decl = saved_cfd;
     }
+#endif
+}
+
+/* FNDECL is an inline function which is about to be emitted out of line.
+   Do any preparation, such as emitting abstract debug info for the inline
+   before it gets mangled by optimization.  */
+
+void
+note_outlining_of_inline_function (fndecl)
+     tree fndecl;
+{
+#ifdef DWARF2_DEBUGGING_INFO
+  /* The DWARF 2 backend tries to reduce debugging bloat by not emitting
+     the abstract description of inline functions until something tries to
+     reference them.  Force it out now, before optimizations mangle the
+     block tree.  */
+  if (write_symbols == DWARF2_DEBUG)
+    dwarf2out_abstract_function (fndecl);
 #endif
 }
 
@@ -3992,7 +4028,7 @@ decode_d_option (arg)
     switch (c = *arg++)
       {
       case 'a':
-	for (i = 0; i < DFI_MAX; ++i)
+	for (i = 0; i < (int) DFI_MAX; ++i)
 	  dump_file[i].enabled = 1;
 	break;
       case 'A':
@@ -4023,7 +4059,7 @@ decode_d_option (arg)
 
       default:
 	matched = 0;
-	for (i = 0; i < DFI_MAX; ++i)
+	for (i = 0; i < (int) DFI_MAX; ++i)
 	  if (c == dump_file[i].debug_switch)
 	    {
 	      dump_file[i].enabled = 1;
@@ -4066,8 +4102,12 @@ decode_f_option (arg)
 
   if ((option_value = skip_leading_substring (arg, "inline-limit-"))
       || (option_value = skip_leading_substring (arg, "inline-limit=")))
-    inline_max_insns =
-      read_integral_parameter (option_value, arg - 2, inline_max_insns);
+    {
+      int val =
+      read_integral_parameter (option_value, arg - 2,
+                               MAX_INLINE_INSNS);
+      set_param_value ("max-inline-insns", val);
+    }
 #ifdef INSN_SCHEDULING
   else if ((option_value = skip_leading_substring (arg, "sched-verbose=")))
     fix_sched_param ("verbose", option_value);
@@ -4338,19 +4378,53 @@ independent_decode_option (argc, argv)
   if (!strcmp (arg, "-help"))
     {
       display_help ();
-      exit (0);
+      exit_after_options = 1;
     }
 
   if (!strcmp (arg, "-target-help"))
     {
       display_target_options ();
-      exit (0);
+      exit_after_options = 1;
     }
 
   if (!strcmp (arg, "-version"))
     {
       print_version (stderr, "");
-      exit (0);
+      exit_after_options = 1;
+    }
+
+  /* Handle '--param <name>=<value>'.  */
+  if (strcmp (arg, "-param") == 0)
+    {
+      char *equal;
+
+      if (argc == 1)
+      {
+        error ("-param option missing argument");
+        return 1;
+      }
+
+      /* Get the '<name>=<value' parameter.  */
+      arg = argv[1];
+      /* Look for the `='.  */
+      equal = strchr (arg, '=');
+      if (!equal)
+      error ("invalid --param option: %s", arg);
+      else
+      {
+        int val;
+
+        /* Zero out the `=' sign so that we get two separate strings.  */
+        *equal = '\0';
+        /* Figure out what value is specified.  */
+        val = read_integral_parameter (equal + 1, NULL, INVALID_PARAM_VAL);
+        if (val != INVALID_PARAM_VAL)
+          set_param_value (arg, val);
+        else
+          error ("invalid parameter value `%s'", equal + 1);
+      }
+
+      return 2;
     }
 
   if (*arg == 'Y')
@@ -4594,6 +4668,9 @@ main (argc, argv)
   /* Initialize the diagnostics reporting machinery.  */
   initialize_diagnostics ();
 
+  /* Register the language-independent parameters.  */
+  add_params (lang_independent_params, LAST_PARAM);
+
   /* Perform language-specific options intialization.  */
   if (lang_hooks.init_options)
     (*lang_hooks.init_options) ();
@@ -4762,6 +4839,9 @@ main (argc, argv)
   /* All command line options have been processed.  */
   if (lang_hooks.post_options)
     (*lang_hooks.post_options) ();
+
+  if (exit_after_options)
+    exit (0);
 
   /* Reflect any language-specific diagnostic option setting.  */
   reshape_diagnostic_buffer ();

@@ -1741,7 +1741,7 @@ unshare_all_rtl (fndecl, insn)
 
   /* Make sure that virtual parameters are not shared.  */
   for (decl = DECL_ARGUMENTS (fndecl); decl; decl = TREE_CHAIN (decl))
-    DECL_RTL (decl) = copy_rtx_if_shared (DECL_RTL (decl));
+    SET_DECL_RTL (decl, copy_rtx_if_shared (DECL_RTL (decl)));
 
   /* Make sure that virtual stack slots are not shared.  */
   unshare_all_decls (DECL_INITIAL (fndecl));
@@ -1816,7 +1816,8 @@ unshare_all_decls (blk)
 
   /* Copy shared decls.  */
   for (t = BLOCK_VARS (blk); t; t = TREE_CHAIN (t))
-    DECL_RTL (t) = copy_rtx_if_shared (DECL_RTL (t));
+    if (DECL_RTL_SET_P (t))
+      SET_DECL_RTL (t, copy_rtx_if_shared (DECL_RTL (t)));
 
   /* Now process sub-blocks.  */
   for (t = BLOCK_SUBBLOCKS (blk); t; t = TREE_CHAIN (t))
@@ -1833,7 +1834,8 @@ reset_used_decls (blk)
 
   /* Mark decls.  */
   for (t = BLOCK_VARS (blk); t; t = TREE_CHAIN (t))
-    reset_used_flags (DECL_RTL (t));
+    if (DECL_RTL_SET_P (t))
+      reset_used_flags (DECL_RTL (t));
 
   /* Now process sub-blocks.  */
   for (t = BLOCK_SUBBLOCKS (blk); t; t = TREE_CHAIN (t))
@@ -4139,9 +4141,9 @@ init_emit_once (line_numbers)
 	const_tiny_rtx[i][(int) mode] = GEN_INT (i);
     }
 
-  for (mode = CCmode; mode < MAX_MACHINE_MODE; ++mode)
-    if (GET_MODE_CLASS (mode) == MODE_CC)
-      const_tiny_rtx[0][(int) mode] = const0_rtx;
+  for (i = (int) CCmode; i < (int) MAX_MACHINE_MODE; ++i)
+    if (GET_MODE_CLASS ((enum machine_mode) i) == MODE_CC)
+      const_tiny_rtx[0][i] = const0_rtx;
 
   const_tiny_rtx[0][(int) BImode] = const0_rtx;
   if (STORE_FLAG_VALUE == 1)

@@ -136,7 +136,7 @@ Boston, MA 02111-1307, USA.  */
      does not have a BV_FN; it is just an offset.
 
      The BV_OVERRIDING_BASE is the binfo for the final overrider for
-     this function.  (This binfo's BINFO_TYPE will always be the same
+     this function.  (That binfo's BINFO_TYPE will always be the same
      as the DECL_CLASS_CONTEXT for the function.)
 
    BINFO_VTABLE
@@ -260,11 +260,6 @@ extern int flag_huge_objects;
    the functions declared in the derived class (but not in any base
    class).  */
 #define all_overridden_vfuns_in_vtables_p() (1)
-
-/* Nonzero if we use access type_info objects directly, and use the
-   cross-vendor layout for them. Zero if we use an accessor function
-   to get the type_info object address.  */
-#define new_abi_rtti_p() (1)
 
 /* Nonzero if primary and secondary vtables are combined into a single
    vtable.  */
@@ -881,6 +876,7 @@ struct cp_language_function
   tree x_current_class_ref;
   tree x_eh_spec_try_block;
   tree x_in_charge_parm;
+  tree x_vtt_parm;
 
   tree *x_vcalls_possible_p;
 
@@ -927,9 +923,14 @@ struct cp_language_function
 #define current_eh_spec_try_block cp_function_chain->x_eh_spec_try_block
 
 /* The `__in_chrg' parameter for the current function.  Only used for
-   destructors.  */
+   constructors and destructors.  */
 
 #define current_in_charge_parm cp_function_chain->x_in_charge_parm
+
+/* The `__vtt_parm' parameter for the current function.  Only used for
+   constructors and destructors.  */
+
+#define current_vtt_parm cp_function_chain->x_vtt_parm
 
 /* In destructors, this is a pointer to a condition in an
    if-statement.  If the pointed-to value is boolean_true_node, then
@@ -1115,15 +1116,6 @@ extern int flag_ansi;
 
 extern int flag_default_inline;
 
-/* The name-mangling scheme to use.  Versions of gcc before 2.8 use
-   version 0.  */
-extern int name_mangling_version;
-
-/* Nonzero if squashed mangling is to be performed.
-   This uses the B and K codes to reference previously seen class types
-   and class qualifiers.       */
-extern int flag_do_squangling;
-
 /* Nonzero means generate separate instantiation control files and juggle
    them at link time.  */
 extern int flag_use_repository;
@@ -1249,7 +1241,18 @@ enum languages { lang_c, lang_cplusplus, lang_java };
    ? (ENTRY)								\
    : DECL_INITIAL (TREE_OPERAND ((ENTRY), 0)))
 
-#define FUNCTION_ARG_CHAIN(NODE) (TREE_CHAIN (TYPE_ARG_TYPES (TREE_TYPE (NODE))))
+#define FUNCTION_ARG_CHAIN(NODE) \
+  (TREE_CHAIN (TYPE_ARG_TYPES (TREE_TYPE (NODE))))
+
+/* Given a FUNCTION_DECL, returns the first TREE_LIST out of TYPE_ARG_TYPES
+   which refers to a user-written parameter.  */
+#define FUNCTION_FIRST_USER_PARMTYPE(NODE) \
+  (skip_artificial_parms_for (NODE, TYPE_ARG_TYPES (TREE_TYPE (NODE))))
+
+/* Similarly, but for DECL_ARGUMENTS.  */
+#define FUNCTION_FIRST_USER_PARM(NODE) \
+  (skip_artificial_parms_for (NODE, DECL_ARGUMENTS (NODE)))
+
 #define PROMOTES_TO_AGGR_TYPE(NODE,CODE)	\
   (((CODE) == TREE_CODE (NODE)			\
        && IS_AGGR_TYPE (TREE_TYPE (NODE)))	\
@@ -1456,7 +1459,7 @@ struct lang_type
 #define CLASSTYPE_CONSTRUCTORS(NODE) \
   (TREE_VEC_ELT (CLASSTYPE_METHOD_VEC (NODE), CLASSTYPE_CONSTRUCTOR_SLOT))
 
-/* A FUNCTION_DECL for the destructor for NODE.  These are te
+/* A FUNCTION_DECL for the destructor for NODE.  These are the
    destructors that take an in-charge parameter.  */
 #define CLASSTYPE_DESTRUCTORS(NODE) \
   (TREE_VEC_ELT (CLASSTYPE_METHOD_VEC (NODE), CLASSTYPE_DESTRUCTOR_SLOT))
@@ -1808,7 +1811,7 @@ struct lang_decl_flags
   unsigned static_function : 1;
   unsigned pure_virtual : 1;
   unsigned has_in_charge_parm_p : 1;
-  unsigned uninlinable : 1;
+  unsigned has_vtt_parm_p : 1;
 
   unsigned deferred : 1;
   unsigned use_template : 2;
@@ -1825,7 +1828,7 @@ struct lang_decl_flags
   unsigned assignment_operator_p : 1;
   unsigned anticipated_p : 1;
   unsigned generate_with_vtable_p : 1;
-  unsigned dummy : 1;
+  /* One unused bit.  */
 
   union {
     /* In a FUNCTION_DECL, VAR_DECL, TYPE_DECL, or TEMPLATE_DECL, this
@@ -1852,6 +1855,12 @@ struct lang_decl_flags
 
 struct unparsed_text;
 
+struct lang_decl_inlined_fns
+{
+  size_t num_fns;
+  tree fns[1];
+};
+
 struct lang_decl
 {
   struct lang_decl_flags decl_flags;
@@ -1865,6 +1874,9 @@ struct lang_decl
   /* In a FUNCTION_DECL, this is DECL_CLONED_FUNCTION.  */
   tree cloned_function;
 
+  /* In a FUNCTION_DECL, this is a list of trees inlined into its body.  */
+  struct lang_decl_inlined_fns *inlined_fns;
+
   union
   {
     tree sorted_fields;
@@ -1876,9 +1888,6 @@ struct lang_decl
     /* In an overloaded operator, this is the value of
        DECL_OVERLOADED_OPERATOR_P.  */
     enum tree_code operator_code;
-    /* In a maybe-in-charge constructor or destructor, this is
-       DECL_VTT_PARM.  */
-    tree vtt_parm;
   } u2;
 };
 
@@ -1906,7 +1915,7 @@ struct lang_decl
    here because on most RISC machines, a variable's address
    is not, by itself, a legitimate address.  */
 #define DECL_IN_MEMORY_P(NODE) \
-  (DECL_RTL (NODE) != NULL_RTX && GET_CODE (DECL_RTL (NODE)) == MEM)
+  (DECL_RTL_SET_P (NODE) && GET_CODE (DECL_RTL (NODE)) == MEM)
 
 /* For FUNCTION_DECLs: return the language in which this decl
    was declared.  */
@@ -1978,17 +1987,13 @@ struct lang_decl
 #define DECL_CLONED_FUNCTION(NODE) \
   (DECL_LANG_SPECIFIC (NODE)->cloned_function)
 
-/* In a maybe-in-charge constructor or destructor, this is the VTT
-   parameter.  It's not actually on the DECL_ARGUMENTS list.  */
-#define DECL_VTT_PARM(NODE) \
-  (DECL_LANG_SPECIFIC (NODE)->u2.vtt_parm)
+/* List of FUNCION_DECLs inlined into this function's body.  */
+#define DECL_INLINED_FNS(NODE) \
+  (DECL_LANG_SPECIFIC (NODE)->inlined_fns)
 
-/* If there's a DECL_VTT_PARM, this is a magic variable that indicates
-   whether or not the VTT parm should be used.  In a subobject
-   constructor, `true' is substituted for this value; in a complete
-   object constructor, `false' is substituted instead.  */
-#define DECL_USE_VTT_PARM(NODE) \
-  (TREE_CHAIN (DECL_VTT_PARM (NODE)))
+/* Non-zero if the VTT parm has been added to NODE.  */
+#define DECL_HAS_VTT_PARM_P(NODE) \
+  (DECL_LANG_SPECIFIC (NODE)->decl_flags.has_vtt_parm_p)
 
 /* Non-zero if NODE is a FUNCTION_DECL for which a VTT parameter is
    required.  */
@@ -2476,10 +2481,6 @@ extern int flag_new_for_scope;
 
 /* Record whether a typedef for type `int' was actually `signed int'.  */
 #define C_TYPEDEF_EXPLICITLY_SIGNED(exp) DECL_LANG_FLAG_1 ((exp))
-
-/* In a FUNCTION_DECL, nonzero if the function cannot be inlined.  */
-#define DECL_UNINLINABLE(NODE) \
-  (DECL_LANG_SPECIFIC (NODE)->decl_flags.uninlinable)
 
 /* Returns non-zero if DECL has external linkage, as specified by the
    language standard.  (This predicate may hold even when the
@@ -3420,10 +3421,6 @@ extern varray_type local_classes;
 
 /* Things for handling inline functions.  */
 
-/* Negative values means we know `this' to be of static type.  */
-
-extern int flag_this_is_variable;
-
 /* Nonzero means do emit exported implementations of functions even if
    they can be inlined.  */
 
@@ -3734,6 +3731,7 @@ extern void pop_lang_context			PARAMS ((void));
 extern tree instantiate_type			PARAMS ((tree, tree, enum instantiate_type_flags));
 extern void print_class_statistics		PARAMS ((void));
 extern void build_self_reference		PARAMS ((void));
+extern int same_signature_p			PARAMS ((tree, tree));
 extern void warn_hidden				PARAMS ((tree));
 extern tree get_enclosing_class			PARAMS ((tree));
 int is_base_of_enclosing_class			PARAMS ((tree, tree));
@@ -3931,8 +3929,7 @@ extern int copy_assignment_arg_p		PARAMS ((tree, int));
 extern void cplus_decl_attributes		PARAMS ((tree, tree, tree));
 extern tree constructor_name_full		PARAMS ((tree));
 extern tree constructor_name			PARAMS ((tree));
-extern void setup_vtbl_ptr			PARAMS ((tree, tree));
-extern void defer_fn		PARAMS ((tree));
+extern void defer_fn            		PARAMS ((tree));
 extern tree get_temp_name			PARAMS ((tree));
 extern void finish_anon_union			PARAMS ((tree));
 extern tree finish_table			PARAMS ((tree, tree, tree, int));
@@ -4097,6 +4094,7 @@ extern tree make_thunk				PARAMS ((tree, tree, tree, int));
 extern void use_thunk				PARAMS ((tree, int));
 extern void synthesize_method			PARAMS ((tree));
 extern tree implicitly_declare_fn               PARAMS ((special_function_kind, tree, int));
+extern tree skip_artificial_parms_for		PARAMS ((tree, tree));
 
 /* In optimize.c */
 extern void optimize_function                   PARAMS ((tree));
@@ -4322,7 +4320,7 @@ extern void prep_stmt                           PARAMS ((tree));
 extern void do_pushlevel                        PARAMS ((void));
 extern tree do_poplevel                         PARAMS ((void));
 extern void finish_mem_initializers             PARAMS ((tree));
-
+extern void setup_vtbl_ptr			PARAMS ((tree, tree));
 extern void clear_out_block                     PARAMS ((void));
 extern tree begin_global_stmt_expr              PARAMS ((void));
 extern tree finish_global_stmt_expr             PARAMS ((tree));

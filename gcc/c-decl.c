@@ -1260,6 +1260,10 @@ set_block (block)
      register tree block;
 {
   current_binding_level->this_block = block;
+  current_binding_level->names = chainon (current_binding_level->names,
+					  BLOCK_VARS (block));
+  current_binding_level->blocks = chainon (current_binding_level->blocks,
+					   BLOCK_SUBBLOCKS (block));
 }
 
 void
@@ -1841,7 +1845,7 @@ duplicate_decls (newdecl, olddecl, different_binding_level)
 	}
 
       /* Keep the old rtl since we can safely use it.  */
-      DECL_RTL (newdecl) = DECL_RTL (olddecl);
+      COPY_DECL_RTL (olddecl, newdecl);
 
       /* Merge the type qualifiers.  */
       if (TREE_CODE (olddecl) == FUNCTION_DECL
@@ -1961,12 +1965,27 @@ duplicate_decls (newdecl, olddecl, different_binding_level)
 
   if (TREE_CODE (newdecl) == FUNCTION_DECL)
     {
-      /* If either decl says `inline', this fn is inline,
-	 unless its definition was passed already.  */
-      if (DECL_INLINE (newdecl) && DECL_INITIAL (olddecl) == 0)
-	DECL_INLINE (olddecl) = 1;
+      /* If we're redefining a function previously defined as extern
+	 inline, make sure we emit debug info for the inline before we
+	 throw it away, in case it was inlined into a function that hasn't
+	 been written out yet.  */
+      if (new_is_definition && DECL_INITIAL (olddecl) && TREE_USED (olddecl))
+	{
+	  note_outlining_of_inline_function (olddecl);
 
-      DECL_INLINE (newdecl) = DECL_INLINE (olddecl);
+	  /* The new defn must not be inline.  */
+	  DECL_INLINE (newdecl) = 0;
+	  DECL_UNINLINABLE (newdecl) = 1;
+	}
+      else
+	{
+	  /* If either decl says `inline', this fn is inline,
+	     unless its definition was passed already.  */
+	  if (DECL_INLINE (newdecl) && DECL_INITIAL (olddecl) == 0)
+	    DECL_INLINE (olddecl) = 1;
+
+	  DECL_INLINE (newdecl) = DECL_INLINE (olddecl);
+	}
 
       if (DECL_BUILT_IN (olddecl))
 	{
@@ -3436,7 +3455,7 @@ start_decl (declarator, declspecs, initialized, attributes, prefix_attributes)
       /* But not if this is a duplicate decl
 	 and we preserved the rtl from the previous one
 	 (which may or may not happen).  */
-      && DECL_RTL (tem) == 0
+      && !DECL_RTL_SET_P (tem)
       && !DECL_CONTEXT (tem))
     {
       if (TREE_TYPE (tem) != error_mark_node
@@ -3579,7 +3598,7 @@ finish_decl (decl, init, asmspec_tree)
   if (TREE_CODE (decl) == FUNCTION_DECL && asmspec)
     {
       DECL_BUILT_IN_CLASS (decl) = NOT_BUILT_IN;
-      DECL_RTL (decl) = 0;
+      SET_DECL_RTL (decl, NULL_RTX);
       DECL_ASSEMBLER_NAME (decl) = get_identifier (asmspec);
     }
 
@@ -3902,9 +3921,9 @@ grokdeclarator (declarator, declspecs, decl_context, initialized)
       if (TREE_CODE (id) == IDENTIFIER_NODE && C_IS_RESERVED_WORD (id))
 	{
 	  enum rid i = C_RID_CODE (id);
-	  if (i <= RID_LAST_MODIFIER)
+	  if ((int) i <= (int) RID_LAST_MODIFIER)
 	    {
-	      if (i == RID_LONG && specbits & (1<<i))
+	      if (i == RID_LONG && (specbits & (1 << (int) i)))
 		{
 		  if (longlong)
 		    error ("`long long long' is too long for GCC");
@@ -3916,9 +3935,9 @@ grokdeclarator (declarator, declspecs, decl_context, initialized)
 		      longlong = 1;
 		    }
 		}
-	      else if (specbits & (1 << i))
+	      else if (specbits & (1 << (int) i))
 		pedwarn ("duplicate `%s'", IDENTIFIER_POINTER (id));
-	      specbits |= 1 << i;
+	      specbits |= 1 << (int) i;
 	      goto found;
 	    }
 	}

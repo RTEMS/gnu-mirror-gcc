@@ -3083,17 +3083,25 @@ find_best_addr (insn, loc, mode)
 #endif
 }
 
-/* Given an operation (CODE, *PARG1, *PARG2), where code is a comparison
-   operation (EQ, NE, GT, etc.), follow it back through the hash table and
-   what values are being compared.
+/* This routine accepts a comparison as input and attempts to return a
+   comparision that is cheaper to compute.
 
-   *PARG1 and *PARG2 are updated to contain the rtx representing the values
-   actually being compared.  For example, if *PARG1 was (cc0) and *PARG2
-   was (const_int 0), *PARG1 and *PARG2 will be set to the objects that were
-   compared to produce cc0.
+   On input, *PARG1 and *PARG2 should be set to the first and second
+   arguments to the comparison, respectively.  CODE is the comparision
+   code.  For example, if the comparison is:
 
-   The return value is the comparison operator and is either the code of
-   A or the code corresponding to the inverse of the comparison.  */
+     (ne:SI (reg:CC 24 cc)
+            (const_int 0 [0x0])))
+
+   The CODE should be NE, *PARG1 should be `(reg:CC 24 cc)' and 
+   *PARG2 should be `(const_int 0)'.
+
+   Upon return, *PARG1 and and *PARG2 may have new values, indicating
+   arguments to a cheaper comparison.  *PMODE1 and *PMODE2 will be the
+   modes that should be used for those arguments.  The return value
+   itself will be the comparison code that should be used to compare
+   *PARG1 and *PARG2 in order to obtain a value equivalent to that
+   given by the original comparison.  */
 
 static enum rtx_code
 find_comparison_args (code, parg1, parg2, pmode1, pmode2)
@@ -3184,30 +3192,38 @@ find_comparison_args (code, parg1, parg2, pmode1, pmode2)
 	  if (! exp_equiv_p (p->exp, p->exp, 1, 0))
 	    continue;
 
-	  if (GET_CODE (p->exp) == COMPARE
-	      /* Another possibility is that this machine has a compare insn
-		 that includes the comparison code.  In that case, ARG1 would
-		 be equivalent to a comparison operation that would set ARG1 to
-		 either STORE_FLAG_VALUE or zero.  If this is an NE operation,
-		 ORIG_CODE is the actual comparison being done; if it is an EQ,
-		 we must reverse ORIG_CODE.  On machine with a negative value
-		 for STORE_FLAG_VALUE, also look at LT and GE operations.  */
-	      || ((code == NE
-		   || (code == LT
-		       && GET_MODE_CLASS (inner_mode) == MODE_INT
-		       && (GET_MODE_BITSIZE (inner_mode)
-			   <= HOST_BITS_PER_WIDE_INT)
-		       && (STORE_FLAG_VALUE
-			   & ((HOST_WIDE_INT) 1
-			      << (GET_MODE_BITSIZE (inner_mode) - 1))))
+	  /* `(COMPARE A B) != 0)' is equivalent to `(COMPARE A B)'.
+	     If CODE is EQ, rather than NE, then we are out of luck;
+	     there is no way to reverse the sense of a COMPARE.  */
+	  if (code == NE && GET_CODE (p->exp) == COMPARE)
+	    {
+	      x = p->exp;
+	      break;
+	    }
+	  /* Another possibility is that this machine has a compare
+	     insn that includes the comparison code.  In that case,
+	     ARG1 would be equivalent to a comparison operation that
+	     would set ARG1 to either STORE_FLAG_VALUE or zero.  If
+	     this is an NE operation, ORIG_CODE is the actual
+	     comparison being done; if it is an EQ, we must reverse
+	     ORIG_CODE.  On machine with a negative value for
+	     STORE_FLAG_VALUE, also look at LT and GE operations.  */
+	  else if ((code == NE
+		    || (code == LT
+			&& GET_MODE_CLASS (inner_mode) == MODE_INT
+			&& (GET_MODE_BITSIZE (inner_mode)
+			    <= HOST_BITS_PER_WIDE_INT)
+			&& (STORE_FLAG_VALUE
+			    & ((HOST_WIDE_INT) 1
+			       << (GET_MODE_BITSIZE (inner_mode) - 1))))
 #ifdef FLOAT_STORE_FLAG_VALUE
-		   || (code == LT
-		       && GET_MODE_CLASS (inner_mode) == MODE_FLOAT
-		       && (REAL_VALUE_NEGATIVE
-			   (FLOAT_STORE_FLAG_VALUE (GET_MODE (arg1)))))
+		    || (code == LT
+			&& GET_MODE_CLASS (inner_mode) == MODE_FLOAT
+			&& (REAL_VALUE_NEGATIVE
+			    (FLOAT_STORE_FLAG_VALUE (GET_MODE (arg1)))))
 #endif
-		   )
-		  && GET_RTX_CLASS (GET_CODE (p->exp)) == '<'))
+		    )
+		   && GET_RTX_CLASS (GET_CODE (p->exp)) == '<')
 	    {
 	      x = p->exp;
 	      break;
@@ -3910,15 +3926,15 @@ fold_rtx (x, insn)
       if (const_arg0 == 0 || const_arg1 == 0)
 	{
 	  struct table_elt *p0, *p1;
-	  rtx true = const_true_rtx, false = const0_rtx;
+	  rtx true_rtx = const_true_rtx, false_rtx = const0_rtx;
 	  enum machine_mode mode_arg1;
 
 #ifdef FLOAT_STORE_FLAG_VALUE
 	  if (GET_MODE_CLASS (mode) == MODE_FLOAT)
 	    {
-	      true = (CONST_DOUBLE_FROM_REAL_VALUE
+	      true_rtx = (CONST_DOUBLE_FROM_REAL_VALUE
 		      (FLOAT_STORE_FLAG_VALUE (mode), mode));
-	      false = CONST0_RTX (mode);
+	      false_rtx = CONST0_RTX (mode);
 	    }
 #endif
 
@@ -3952,9 +3968,9 @@ fold_rtx (x, insn)
 		      || GET_CODE (folded_arg0) == CONST))
 		{
 		  if (code == EQ)
-		    return false;
+		    return false_rtx;
 		  else if (code == NE)
-		    return true;
+		    return true_rtx;
 		}
 
 	      /* See if the two operands are the same.  */
@@ -3978,12 +3994,12 @@ fold_rtx (x, insn)
 		      return ((code == EQ || code == LE || code == GE
 			       || code == LEU || code == GEU || code == UNEQ
 			       || code == UNLE || code == UNGE || code == ORDERED)
-			      ? true : false);
+			      ? true_rtx : false_rtx);
 		   /* Take care for the FP compares we can resolve.  */
 		   if (code == UNEQ || code == UNLE || code == UNGE)
-		     return true;
+		     return true_rtx;
 		   if (code == LTGT || code == LT || code == GT)
-		     return false;
+		     return false_rtx;
 		}
 
 	      /* If FOLDED_ARG0 is a register, see if the comparison we are
@@ -4008,7 +4024,7 @@ fold_rtx (x, insn)
 			      || (GET_CODE (folded_arg1) == REG
 				  && (REG_QTY (REGNO (folded_arg1)) == ent->comparison_qty))))
 			return (comparison_dominates_p (ent->comparison_code, code)
-				? true : false);
+				? true_rtx : false_rtx);
 		    }
 		}
 	    }
@@ -4032,30 +4048,30 @@ fold_rtx (x, insn)
 	      int has_sign = (HOST_BITS_PER_WIDE_INT >= sign_bitnum
 			      && (INTVAL (inner_const)
 				  & ((HOST_WIDE_INT) 1 << sign_bitnum)));
-	      rtx true = const_true_rtx, false = const0_rtx;
+	      rtx true_rtx = const_true_rtx, false_rtx = const0_rtx;
 
 #ifdef FLOAT_STORE_FLAG_VALUE
 	      if (GET_MODE_CLASS (mode) == MODE_FLOAT)
 		{
-		  true = (CONST_DOUBLE_FROM_REAL_VALUE
+		  true_rtx = (CONST_DOUBLE_FROM_REAL_VALUE
 			  (FLOAT_STORE_FLAG_VALUE (mode), mode));
-		  false = CONST0_RTX (mode);
+		  false_rtx = CONST0_RTX (mode);
 		}
 #endif
 
 	      switch (code)
 		{
 		case EQ:
-		  return false;
+		  return false_rtx;
 		case NE:
-		  return true;
+		  return true_rtx;
 		case LT:  case LE:
 		  if (has_sign)
-		    return true;
+		    return true_rtx;
 		  break;
 		case GT:  case GE:
 		  if (has_sign)
-		    return false;
+		    return false_rtx;
 		  break;
 		default:
 		  break;

@@ -1,5 +1,5 @@
 /* Simple garbage collection for the GNU compiler.
-   Copyright (C) 1999, 2000 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2001 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -48,7 +48,7 @@ static void ggc_mark_rtx_varray_ptr PARAMS ((void *));
 static void ggc_mark_tree_varray_ptr PARAMS ((void *));
 static void ggc_mark_tree_hash_table_ptr PARAMS ((void *));
 static void ggc_mark_trees PARAMS ((void));
-static boolean ggc_mark_tree_hash_table_entry PARAMS ((struct hash_entry *,
+static bool ggc_mark_tree_hash_table_entry PARAMS ((struct hash_entry *,
 						       hash_table_key));
 
 /* Maintain global roots that are preserved during GC.  */
@@ -277,9 +277,6 @@ ggc_mark_rtx_children (r)
 	    case 'V': case 'E':
 	      ggc_mark_rtvec (XVEC (r, i));
 	      break;
-	    case 'S': case 's':
-	      ggc_mark_if_gcable (XSTR (r, i));
-	      break;
 	    }
 	}
     }
@@ -379,7 +376,8 @@ ggc_mark_trees ()
 	  ggc_mark_tree (DECL_ASSEMBLER_NAME (t));
 	  ggc_mark_tree (DECL_SECTION_NAME (t));
 	  ggc_mark_tree (DECL_MACHINE_ATTRIBUTES (t));
-	  ggc_mark_rtx (DECL_RTL (t));
+	  if (DECL_RTL_SET_P (t))
+	    ggc_mark_rtx (DECL_RTL (t));
 	  ggc_mark_rtx (DECL_LIVE_RANGE_RTL (t));
 	  ggc_mark_tree (DECL_VINDEX (t));
 	  lang_mark_tree (t);
@@ -465,7 +463,7 @@ ggc_mark_tree_varray (v)
 
 /* Mark the hash table-entry HE.  It's key field is really a tree.  */
 
-static boolean
+static bool
 ggc_mark_tree_hash_table_entry (he, k)
      struct hash_entry *he;
      hash_table_key k ATTRIBUTE_UNUSED;
