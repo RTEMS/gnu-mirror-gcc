@@ -305,6 +305,7 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #define TARGET_FUNCTION_ATTRIBUTE_INLINABLE_P hook_bool_tree_false
 #define TARGET_MS_BITFIELD_LAYOUT_P hook_bool_tree_false
 #define TARGET_RTX_COSTS hook_bool_rtx_int_int_intp_false
+#define TARGET_MANGLE_FUNDAMENTAL_TYPE hook_constcharptr_tree_null
 
 #ifndef TARGET_INIT_LIBFUNCS
 #define TARGET_INIT_LIBFUNCS hook_void_void
@@ -317,6 +318,11 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #ifndef TARGET_ENCODE_SECTION_INFO
 #define TARGET_ENCODE_SECTION_INFO default_encode_section_info
 #endif
+
+/* APPLE LOCAL begin AltiVec */
+#define TARGET_EXPAND_MACRO_P hook_bool_constcpp_tokenp_false
+#define TARGET_CAST_EXPR_AS_VECTOR_INIT false
+/* APPLE LOCAL end AltiVec */
 
 #define TARGET_FIXED_CONDITION_CODE_REGS hook_bool_uintp_uintp_false
 
@@ -347,6 +353,9 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #define TARGET_SETUP_INCOMING_VARARGS default_setup_incoming_varargs
 #define TARGET_STRICT_ARGUMENT_NAMING hook_bool_CUMULATIVE_ARGS_false
 #define TARGET_PRETEND_OUTGOING_VARARGS_NAMED default_pretend_outgoing_varargs_named
+/* APPLE LOCAL begin Altivec */
+#define TARGET_SKIP_VEC_ARGS default_skip_vec_args
+/* APPLE LOCAL end Altivec */
 
 #define TARGET_CALLS {						\
    TARGET_PROMOTE_FUNCTION_ARGS,				\
@@ -359,6 +368,9 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
    TARGET_SETUP_INCOMING_VARARGS,				\
    TARGET_STRICT_ARGUMENT_NAMING,				\
    TARGET_PRETEND_OUTGOING_VARARGS_NAMED,			\
+   /* APPLE LOCAL begin Altivec */				\
+   TARGET_SKIP_VEC_ARGS,					\
+   /* APPLE LOCAL end Altivec */				\
    }
 
 /* The whole shebang.  */
@@ -376,6 +388,7 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
   TARGET_MS_BITFIELD_LAYOUT_P,			\
   TARGET_INIT_BUILTINS,				\
   TARGET_EXPAND_BUILTIN,			\
+  TARGET_MANGLE_FUNDAMENTAL_TYPE,		\
   TARGET_INIT_LIBFUNCS,				\
   TARGET_SECTION_TYPE_FLAGS,			\
   TARGET_CANNOT_MODIFY_JUMPS_P,			\
@@ -410,6 +423,10 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
   TARGET_TERMINATE_DW2_EH_FRAME_INFO,		\
   TARGET_ASM_FILE_START_APP_OFF,		\
   TARGET_ASM_FILE_START_FILE_DIRECTIVE,		\
+  /* APPLE LOCAL begin AltiVec */		\
+  TARGET_EXPAND_MACRO_P,				\
+  TARGET_CAST_EXPR_AS_VECTOR_INIT,		\
+  /* APPLE LOCAL end AltiVec */			\
   TARGET_CALLS,					\
 }
 
