@@ -118,7 +118,7 @@ static void link_roots (struct dom_info *, TBB, TBB);
 static void calc_idoms (struct dom_info *, enum cdi_direction);
 void debug_dominance_info (enum cdi_direction);
 
-/* Keeps track of the*/
+/* Keeps track of the numbers of nodes in dominance trees.  */
 static unsigned n_bbs_in_dom_tree[2];
 
 /* Helper macro for allocating and initializing an array,
@@ -783,7 +783,7 @@ verify_dominators (enum cdi_direction dir)
 /* Determine immediate dominator (or postdominator, according to DIR) of BB,
    assuming that dominators of other blocks are correct.  We also use it to
    recompute the dominators in a restricted area, by iterating it until it
-   reaches a fixpoint.  */
+   reaches a fixed point.  */
 
 basic_block
 recount_dominator (enum cdi_direction dir, basic_block bb)

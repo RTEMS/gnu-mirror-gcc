@@ -193,6 +193,8 @@ struct rtx_def GTY((chain_next ("RTX_NEXT (&%h)"),
      1 in a CALL_INSN if it is a sibling call.
      1 in a SET that is for a return.
      In a CODE_LABEL, part of the two-bit alternate entry field.  */
+  /* APPLE LOCAL weak import
+     SYMBOL_REF_WEAK_IMPORT in a SYMBOL_REF.  */
   unsigned int jump : 1;
   /* In a CODE_LABEL, part of the two-bit alternate entry field.
      1 in a MEM if it cannot trap.  */
@@ -240,12 +242,14 @@ struct rtx_def GTY((chain_next ("RTX_NEXT (&%h)"),
      1 in a SYMBOL_REF, means that emit_library_call
      has used it as the function.  */
   unsigned int used : 1;
+  /* FIXME.  This should be unused now that we do inlinining on trees,
+     but it is now being used for MEM_SCALAR_P.  It should be renamed,
+     or some other field should be overloaded.  */
+  unsigned integrated : 1;
   /* 1 in an INSN or a SET if this rtx is related to the call frame,
      either changing how we compute the frame address or saving and
      restoring registers in the prologue and epilogue.
-     1 in a MEM if the MEM refers to a scalar, rather than a member of
-     an aggregate.
-     1 in a REG if the register is a pointer.
+     1 in a REG or MEM if it is a pointer.
      1 in a SYMBOL_REF if it addresses something in the per-function
      constant string pool.  */
   unsigned frame_related : 1;
@@ -850,6 +854,11 @@ enum reg_note
      computed goto.  */
   REG_NON_LOCAL_GOTO,
 
+  /* Indicates that a jump crosses between hot and cold sections
+     in a (partitioned) assembly or .o file, and therefore should not be
+     reduced to a simpler jump by optimizations.  */
+  REG_CROSSING_JUMP,
+
   /* This kind of note is generated at each to `setjmp',
      and similar functions that can return twice.  */
   REG_SETJMP,
@@ -1011,6 +1020,10 @@ enum insn_note
   /* Record a prediction.  Uses NOTE_PREDICTION.  */
   NOTE_INSN_PREDICTION,
 
+  /* Record that the current basic block is unlikely to be executed and
+     should be moved to the UNLIKELY_EXECUTED_TEXT_SECTION.  */
+  NOTE_INSN_UNLIKELY_EXECUTED_CODE,
+
   /* The location of a variable.  */
   NOTE_INSN_VAR_LOCATION,
 
@@ -1129,6 +1142,10 @@ enum label_kind
 #define REG_POINTER(RTX)						\
   (RTL_FLAG_CHECK1("REG_POINTER", (RTX), REG)->frame_related)
 
+/* 1 if RTX is a mem that holds a pointer value.  */
+#define MEM_POINTER(RTX)						\
+  (RTL_FLAG_CHECK1("MEM_POINTER", (RTX), MEM)->frame_related)
+
 /* 1 if the given register REG corresponds to a hard register.  */
 #define HARD_REGISTER_P(REG) (HARD_REGISTER_NUM_P (REGNO (REG)))
 
@@ -1180,6 +1197,9 @@ extern unsigned int subreg_regno_offset	(unsigned int, enum machine_mode,
 extern bool subreg_offset_representable_p (unsigned int, enum machine_mode,
 					   unsigned int, enum machine_mode);
 extern unsigned int subreg_regno (rtx);
+extern unsigned HOST_WIDE_INT nonzero_bits (rtx, enum machine_mode);
+extern unsigned int num_sign_bit_copies (rtx, enum machine_mode);
+
 
 /* 1 if RTX is a subreg containing a reg that is already known to be
    sign- or zero-extended from the mode of the subreg to the mode of
@@ -1244,7 +1264,7 @@ do {									\
 /* 1 if RTX is a mem that refers to a scalar.  If zero, RTX may or may
    not refer to a scalar.  */
 #define MEM_SCALAR_P(RTX)						\
-  (RTL_FLAG_CHECK1("MEM_SCALAR_P", (RTX), MEM)->frame_related)
+  (RTL_FLAG_CHECK1("MEM_SCALAR_P", (RTX), MEM)->integrated)
 
 /* 1 if RTX is a mem that cannot trap.  */
 #define MEM_NOTRAP_P(RTX) \
@@ -1390,6 +1410,12 @@ do {						\
 #define SYMBOL_REF_WEAK(RTX)						\
   (RTL_FLAG_CHECK1("SYMBOL_REF_WEAK", (RTX), SYMBOL_REF)->return_val)
 
+/* APPLE LOCAL begin weak import */
+/* 1 means a SYMBOL_REF is weak import. */
+#define SYMBOL_REF_WEAK_IMPORT(RTX)					\
+  (RTL_FLAG_CHECK1("SYMBOL_REF_WEAK", (RTX), SYMBOL_REF)->jump)
+/* APPLE LOCAL end weak import */
+
 /* The tree (decl or constant) associated with the symbol, or null.  */
 #define SYMBOL_REF_DECL(RTX)	X0TREE ((RTX), 2)
 
@@ -1518,12 +1544,6 @@ do {						\
 #ifndef USE_STORE_PRE_DECREMENT
 #define USE_STORE_PRE_DECREMENT(MODE)   HAVE_PRE_DECREMENT
 #endif
-
-/* Determine if the insn is a PHI node.  */
-#define PHI_NODE_P(X)				\
-  ((X) && GET_CODE (X) == INSN			\
-   && GET_CODE (PATTERN (X)) == SET		\
-   && GET_CODE (SET_SRC (PATTERN (X))) == PHI)
 
 /* Nonzero if we need to distinguish between the return value of this function
    and the return value of a function called by this function.  This helps
@@ -1589,9 +1609,6 @@ extern rtx gen_rtx_REG_offset (rtx, enum machine_mode, unsigned int, int);
 extern rtx gen_label_rtx (void);
 extern int subreg_hard_regno (rtx, int);
 extern rtx gen_lowpart_common (enum machine_mode, rtx);
-extern rtx gen_lowpart_general (enum machine_mode, rtx);
-extern rtx (*gen_lowpart) (enum machine_mode mode, rtx x);
-
 
 /* In cse.c */
 extern rtx gen_lowpart_if_possible (enum machine_mode, rtx);
@@ -1639,6 +1656,9 @@ extern rtx simplify_subtraction (rtx);
 
 /* In function.c  */
 extern rtx assign_stack_local (enum machine_mode, HOST_WIDE_INT, int);
+/* APPLE LOCAL next declaration */
+extern rtx assign_stack_local_with_alias (enum machine_mode, 
+					  HOST_WIDE_INT, int);
 extern rtx assign_stack_temp (enum machine_mode, HOST_WIDE_INT, int);
 extern rtx assign_stack_temp_for_type (enum machine_mode,
 				       HOST_WIDE_INT, int, tree);
@@ -1745,8 +1765,10 @@ extern rtx simplify_binary_operation (enum rtx_code, enum machine_mode, rtx,
 				      rtx);
 extern rtx simplify_ternary_operation (enum rtx_code, enum machine_mode,
 				       enum machine_mode, rtx, rtx, rtx);
+extern rtx simplify_const_relational_operation (enum rtx_code,
+						enum machine_mode, rtx, rtx);
 extern rtx simplify_relational_operation (enum rtx_code, enum machine_mode,
-					  rtx, rtx);
+					  enum machine_mode, rtx, rtx);
 extern rtx simplify_gen_binary (enum rtx_code, enum machine_mode, rtx, rtx);
 extern rtx simplify_gen_unary (enum rtx_code, enum machine_mode, rtx,
 			       enum machine_mode);
@@ -1823,7 +1845,6 @@ extern int reg_overlap_mentioned_p (rtx, rtx);
 extern rtx set_of (rtx, rtx);
 extern void note_stores (rtx, void (*) (rtx, rtx, void *), void *);
 extern void note_uses (rtx *, void (*) (rtx *, void *), void *);
-extern rtx reg_set_last (rtx, rtx);
 extern int dead_or_set_p (rtx, rtx);
 extern int dead_or_set_regno_p (rtx, unsigned int);
 extern rtx find_reg_note (rtx, enum reg_note, rtx);
@@ -2228,7 +2249,7 @@ extern void init_loop (void);
 #ifdef BUFSIZ
 extern void loop_optimize (rtx, FILE *, int);
 #endif
-extern void branch_target_load_optimize (rtx, bool);
+extern void branch_target_load_optimize (bool);
 
 /* In function.c */
 extern void reposition_prologue_and_epilogue_notes (rtx);
@@ -2310,8 +2331,6 @@ extern void cannot_change_mode_set_regs (HARD_REG_SET *,
 extern bool invalid_mode_change_p (unsigned int, enum reg_class,
 				   enum machine_mode);
 
-extern int delete_null_pointer_checks (rtx);
-
 /* In regmove.c */
 #ifdef BUFSIZ
 extern void regmove_optimize (rtx, int, FILE *);
@@ -2331,7 +2350,7 @@ extern int local_alloc (void);
 
 /* In reg-stack.c */
 #ifdef BUFSIZ
-extern bool reg_to_stack (rtx, FILE *);
+extern bool reg_to_stack (FILE *);
 #endif
 
 /* In calls.c */
@@ -2402,6 +2421,8 @@ extern rtx addr_side_effect_eval (rtx, int, int);
 extern bool memory_modified_in_insn_p (rtx, rtx);
 extern rtx find_base_term (rtx);
 extern rtx gen_hard_reg_clobber (enum machine_mode, unsigned int);
+extern rtx get_reg_known_value (unsigned int);
+extern bool get_reg_known_equiv_p (unsigned int);
 
 /* In sibcall.c */
 typedef enum {
@@ -2433,11 +2454,20 @@ extern bool expensive_function_p (int);
 /* In tracer.c */
 extern void tracer (void);
 
+/* In loop-unswitch.c  */
+extern rtx reversed_condition (rtx);
+extern rtx compare_and_jump_seq (rtx, rtx, enum rtx_code, rtx, int, rtx);
+
+/* In loop-iv.c  */
+extern rtx canon_condition (rtx);
+extern void simplify_using_condition (rtx, rtx *, struct bitmap_head_def *);
+
 /* In var-tracking.c */
 extern void variable_tracking_main (void);
 
 /* In stor-layout.c.  */
-extern void get_mode_bounds (enum machine_mode, int, rtx *, rtx *);
+extern void get_mode_bounds (enum machine_mode, int, enum machine_mode,
+			     rtx *, rtx *);
 
 /* In loop-unswitch.c  */
 extern rtx reversed_condition (rtx);
@@ -2449,5 +2479,30 @@ extern void simplify_using_condition (rtx, rtx *, struct bitmap_head_def *);
 
 /* In ra.c.  */
 extern void reg_alloc (void);
+
+/* In modulo-sched.c.  */
+#ifdef BUFSIZ
+extern void sms_schedule (FILE *);
+#endif
+
+struct rtl_hooks
+{
+  rtx (*gen_lowpart) (enum machine_mode, rtx);
+  rtx (*reg_nonzero_bits) (rtx, enum machine_mode, rtx, enum machine_mode,
+			   unsigned HOST_WIDE_INT, unsigned HOST_WIDE_INT *);
+  rtx (*reg_num_sign_bit_copies) (rtx, enum machine_mode, rtx, enum machine_mode,
+				  unsigned int, unsigned int *);
+
+  /* Whenever you add entries here, make sure you adjust hosthooks-def.h.  */
+};
+
+/* Each pass can provide its own.  */
+extern struct rtl_hooks rtl_hooks;
+
+/* ... but then it has to restore these.  */
+extern const struct rtl_hooks general_rtl_hooks;
+
+/* Keep this for the nonce.  */
+#define gen_lowpart rtl_hooks.gen_lowpart
 
 #endif /* ! GCC_RTL_H */

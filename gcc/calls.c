@@ -134,7 +134,7 @@ static void initialize_argument_information (int, struct arg_data *,
 					     struct args_size *, int, tree,
 					     tree, CUMULATIVE_ARGS *, int,
 					     rtx *, int *, int *, int *,
-					     bool *, bool);
+					     bool *, bool, tree);
 static void compute_argument_addresses (struct arg_data *, rtx, int);
 static rtx rtx_for_function_call (tree, tree);
 static void load_register_parameters (struct arg_data *, int, rtx *, int,
@@ -259,8 +259,9 @@ calls_function_1 (tree exp, int which)
       break;
     }
 
-  /* Only expressions and blocks can contain calls.  */
-  if (! IS_EXPR_CODE_CLASS (class) && class != 'b')
+  /* Only expressions and blocks can contain calls.
+     Blocks were handled above.  */
+  if (! IS_EXPR_CODE_CLASS (class))
     return 0;
 
   for (i = 0; i < length; i++)
@@ -296,10 +297,7 @@ prepare_call_address (rtx funexp, rtx static_chain_value,
     {
 #ifndef NO_FUNCTION_CSE
       if (optimize && ! flag_no_function_cse)
-#ifdef NO_RECURSIVE_FUNCTION_CSE
-	if (fndecl != current_function_decl)
-#endif
-	  funexp = force_reg (Pmode, funexp);
+	funexp = force_reg (Pmode, funexp);
 #endif
     }
 
@@ -381,7 +379,14 @@ emit_call_1 (rtx funexp, tree fntree, tree fndecl ATTRIBUTE_UNUSED,
      and we don't want to load it into a register as an optimization,
      because prepare_call_address already did it if it should be done.  */
   if (GET_CODE (funexp) != SYMBOL_REF)
+/* APPLE LOCAL use R12 as register for indirect calls */
+/* This improves codegen (computation of value will be into R12) and
+   makes indirect sibcalls possible by ensuring a volatile reg is used. */
+#ifdef MAGIC_INDIRECT_CALL_REG
+    funexp = gen_rtx_REG (SImode, MAGIC_INDIRECT_CALL_REG);
+#else
     funexp = memory_address (FUNCTION_MODE, funexp);
+#endif
 
 #if defined (HAVE_sibcall_pop) && defined (HAVE_sibcall_value_pop)
   if ((ecf_flags & ECF_SIBCALL)
@@ -655,21 +660,8 @@ special_function_p (tree fndecl, int flags)
       else if (tname[0] == 'l' && tname[1] == 'o'
 	       && ! strcmp (tname, "longjmp"))
 	flags |= ECF_LONGJMP;
-
-      else if ((tname[0] == 'f' && tname[1] == 'o'
-		&& ! strcmp (tname, "fork"))
-	       /* Linux specific: __clone.  check NAME to insist on the
-		  leading underscores, to avoid polluting the ISO / POSIX
-		  namespace.  */
-	       || (name[0] == '_' && name[1] == '_'
-		   && ! strcmp (tname, "clone"))
-	       || (tname[0] == 'e' && tname[1] == 'x' && tname[2] == 'e'
-		   && tname[3] == 'c' && (tname[4] == 'l' || tname[4] == 'v')
-		   && (tname[5] == '\0'
-		       || ((tname[5] == 'p' || tname[5] == 'e')
-			   && tname[6] == '\0'))))
-	flags |= ECF_FORK_OR_EXEC;
     }
+
   return flags;
 }
 
@@ -728,12 +720,11 @@ flags_from_decl_or_type (tree exp)
 	flags |= ECF_NOTHROW;
 
       if (TREE_READONLY (exp) && ! TREE_THIS_VOLATILE (exp))
-	flags |= ECF_LIBCALL_BLOCK;
+	flags |= ECF_LIBCALL_BLOCK | ECF_CONST;
 
       flags = special_function_p (exp, flags);
     }
-
-  if (TREE_READONLY (exp) && ! TREE_THIS_VOLATILE (exp))
+  else if (TYPE_P (exp) && TYPE_READONLY (exp) && ! TREE_THIS_VOLATILE (exp))
     flags |= ECF_CONST;
 
   if (TREE_THIS_VOLATILE (exp))
@@ -1046,7 +1037,8 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
 				 int reg_parm_stack_space,
 				 rtx *old_stack_level, int *old_pending_adj,
 				 int *must_preallocate, int *ecf_flags,
-				 bool *may_tailcall, bool call_from_thunk_p)
+				 bool *may_tailcall, bool call_from_thunk_p,
+				 tree type_arg_types)
 {
   /* 1 if scanning parms front to back, -1 if scanning back to front.  */
   int inc;
@@ -1056,6 +1048,12 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
 
   int i;
   tree p;
+
+   /* APPLE LOCAL begin Altivec */
+  int pass, last_pass;
+  int save_i, save_inc;
+  int stdarg;
+   /* APPLE LOCAL end Altivec */
 
   args_size->constant = 0;
   args_size->var = 0;
@@ -1075,12 +1073,30 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
       i = 0, inc = 1;
     }
 
-  /* I counts args in order (to be) pushed; ARGPOS counts in order written.  */
-  for (p = actparms, argpos = 0; p; p = TREE_CHAIN (p), i += inc, argpos++)
+   /* APPLE LOCAL begin Altivec */
+  stdarg = (type_arg_types != 0 
+	    && TREE_VALUE (tree_last (type_arg_types)) != void_type_node);
+  last_pass = 1;
+  save_i = i;
+  save_inc = inc;
+  for (pass = 1; pass <= last_pass; pass++)
+  {
+    i = save_i;
+    inc = save_inc;
+   /* APPLE LOCAL end Altivec */
+    /* I counts args in order (to be) pushed; ARGPOS counts in order written.  */
+    for (p = actparms, argpos = 0; p; p = TREE_CHAIN (p), i += inc, argpos++)
     {
       tree type = TREE_TYPE (TREE_VALUE (p));
       int unsignedp;
       enum machine_mode mode;
+
+      /* APPLE LOCAL begin Altivec */
+      /* In 1st iteration over actual arguments, only consider non-vectors. 
+	 During 2nd iteration, finish off with vector parameters. */
+      if (!stdarg && targetm.calls.skip_vec_args (type, pass, &last_pass))
+	continue;
+      /* APPLE LOCAL end Altivec */
 
       args[i].tree_value = TREE_VALUE (p);
 
@@ -1145,6 +1161,13 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
 		  && ! REG_P (DECL_RTL (TREE_OPERAND (args[i].tree_value, 1))))
 		args[i].tree_value = TREE_OPERAND (args[i].tree_value, 1);
 
+	      /* We can't use sibcalls if a callee-copied argument is stored
+		 in the current function's frame.  */
+	      if (!call_from_thunk_p
+		  && (!DECL_P (args[i].tree_value)
+		      || !TREE_STATIC (args[i].tree_value)))
+		*may_tailcall = false;
+
 	      args[i].tree_value = build1 (ADDR_EXPR,
 					   build_pointer_type (type),
 					   args[i].tree_value);
@@ -1204,7 +1227,7 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
 	}
 
       mode = TYPE_MODE (type);
-      unsignedp = TREE_UNSIGNED (type);
+      unsignedp = TYPE_UNSIGNED (type);
 
       if (targetm.calls.promote_function_args (fndecl ? TREE_TYPE (fndecl) : 0))
 	mode = promote_mode (type, mode, &unsignedp, 1);
@@ -1256,8 +1279,8 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
 
       /* Compute the stack-size of this argument.  */
       if (args[i].reg == 0 || args[i].partial != 0
-	  || reg_parm_stack_space > 0
-	  || args[i].pass_on_stack)
+	   || reg_parm_stack_space > 0
+	   || args[i].pass_on_stack)
 	locate_and_pad_parm (mode, type,
 #ifdef STACK_PARMS_IN_REG_PARM_AREA
 			     1,
@@ -1287,6 +1310,9 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
       FUNCTION_ARG_ADVANCE (*args_so_far, TYPE_MODE (type), type,
 			    argpos < n_named_args);
     }
+  /* APPLE LOCAL begin Altivec */
+  }
+  /* APPLE LOCAL end Altivec */
 }
 
 /* Update ARGS_SIZE to contain the total size for the argument block.
@@ -1417,7 +1443,7 @@ precompute_arguments (int flags, int num_actuals, struct arg_data *args)
 	    args[i].value
 	      = convert_modes (args[i].mode, mode,
 			       args[i].value, args[i].unsignedp);
-#ifdef PROMOTE_FOR_CALL_ONLY
+#if defined(PROMOTE_FUNCTION_MODE) && !defined(PROMOTE_MODE)
 	    /* CSE will replace this only if it contains args[i].value
 	       pseudo, so convert it down to the declared mode using
 	       a SUBREG.  */
@@ -1684,10 +1710,17 @@ load_register_parameters (struct arg_data *args, int num_actuals,
 	    {
 	      rtx mem = validize_mem (args[i].value);
 
-#ifdef BLOCK_REG_PADDING
 	      /* Handle a BLKmode that needs shifting.  */
 	      if (nregs == 1 && size < UNITS_PER_WORD
-		  && args[i].locate.where_pad == downward)
+#ifdef BLOCK_REG_PADDING
+		  && args[i].locate.where_pad == downward
+#else
+		  && BYTES_BIG_ENDIAN 
+		  /* APPLE LOCAL begin fix to regression caused by PR 14262 */
+		  && !args[i].pass_on_stack
+		  /* APPLE LOCAL end fix to regression caused by PR 14262 */
+#endif
+		 )
 		{
 		  rtx tem = operand_subword_force (mem, 0, args[i].mode);
 		  rtx ri = gen_rtx_REG (word_mode, REGNO (reg));
@@ -1702,7 +1735,6 @@ load_register_parameters (struct arg_data *args, int num_actuals,
 		    emit_move_insn (ri, x);
 		}
 	      else
-#endif
 		move_block_to_reg (REGNO (reg), mem, nregs, args[i].mode);
 	    }
 
@@ -2014,12 +2046,18 @@ expand_call (tree exp, rtx target, int ignore)
   tree actparms = TREE_OPERAND (exp, 1);
   /* RTX for the function to be called.  */
   rtx funexp;
+  /* APPLE LOCAL use R12 as register for indirect calls */
+  /* A single rtx to be shared among multiple chains for indirect sibcalls */
+  rtx funexp_keep = NULL_RTX;
   /* Sequence of insns to perform a normal "call".  */
   rtx normal_call_insns = NULL_RTX;
   /* Sequence of insns to perform a tail "call".  */
   rtx tail_call_insns = NULL_RTX;
   /* Data type of the function.  */
   tree funtype;
+  /* APPLE LOCAL objc stret methods */
+  /* Return type of the function.  */
+  tree saved_return_type;
   tree type_arg_types;
   /* Declaration of the function being called,
      or 0 if the function is computed (not known by name).  */
@@ -2238,9 +2276,19 @@ expand_call (tree exp, rtx target, int ignore)
     abort ();
   funtype = TREE_TYPE (funtype);
 
+  /* APPLE LOCAL objc stret methods */
+  /* Set the return type of the function to the type of the call expression,
+     in case that's different from the function declaration.
+     (This is the case when calling _objc_msgSend_stret, for example,
+     which is declared to return id, but actually returns a struct.)
+     But save the original return type first, so it can be restored later
+     in case it's needed.  */
+  saved_return_type = TREE_TYPE (funtype);
+  TREE_TYPE (funtype) = TREE_TYPE (exp);
+
   /* Munge the tree to split complex arguments into their imaginary
      and real parts.  */
-  if (SPLIT_COMPLEX_ARGS)
+  if (targetm.calls.split_complex_arg)
     {
       type_arg_types = split_complex_types (TYPE_ARG_TYPES (funtype));
       actparms = split_complex_values (actparms);
@@ -2330,7 +2378,8 @@ expand_call (tree exp, rtx target, int ignore)
 				   &args_so_far, reg_parm_stack_space,
 				   &old_stack_level, &old_pending_adj,
 				   &must_preallocate, &flags,
-				   &try_tail_call, CALL_FROM_THUNK_P (exp));
+				   &try_tail_call, CALL_FROM_THUNK_P (exp),
+				   type_arg_types);
 
   if (args_size.var)
     {
@@ -2396,9 +2445,23 @@ expand_call (tree exp, rtx target, int ignore)
 	 It does not seem worth the effort since few optimizable
 	 sibling calls will return a structure.  */
       || structure_value_addr != NULL_RTX
+/* APPLE LOCAL begin indirect sibcalls */
+#ifndef MAGIC_INDIRECT_CALL_REG
+/* The register holding the address is now always R12, so
+   we can consider indirect calls as sibcall candidates on ppc. */
+      /* If the register holding the address is a callee saved
+	 register, then we lose.  We have no way to prevent that,
+	 so we only allow calls to named functions.  */
+      /* ??? This could be done by having the insn constraints
+	 use a register class that is all call-clobbered.  Any
+	 reload insns generated to fix things up would appear
+	 before the sibcall_epilogue.  */
+      || fndecl == NULL_TREE
+#endif
+/* APPLE LOCAL end indirect sibcalls */
       /* Check whether the target is able to optimize the call
 	 into a sibcall.  */
-      || !(*targetm.function_ok_for_sibcall) (fndecl, exp)
+      || !targetm.function_ok_for_sibcall (fndecl, exp)
       /* Functions that do not return exactly once may not be sibcall
          optimized.  */
       || (flags & (ECF_RETURNS_TWICE | ECF_LONGJMP | ECF_NORETURN))
@@ -2416,7 +2479,7 @@ expand_call (tree exp, rtx target, int ignore)
 	  != RETURN_POPS_ARGS (current_function_decl,
 			       TREE_TYPE (current_function_decl),
 			       current_function_args_size))
-      || !(*lang_hooks.decls.ok_for_sibcall) (fndecl))
+      || !lang_hooks.decls.ok_for_sibcall (fndecl))
     try_tail_call = 0;
 
   if (try_tail_call)
@@ -2465,18 +2528,6 @@ expand_call (tree exp, rtx target, int ignore)
     }
 
 
-  if (profile_arc_flag && (flags & ECF_FORK_OR_EXEC))
-    {
-      /* A fork duplicates the profile information, and an exec discards
-	 it.  We can't rely on fork/exec to be paired.  So write out the
-	 profile information we have gathered so far, and clear it.  */
-      /* ??? When Linux's __clone is called with CLONE_VM set, profiling
-	 is subject to race conditions, just as with multithreaded
-	 programs.  */
-
-      emit_library_call (gcov_flush_libfunc, LCT_ALWAYS_RETURN, VOIDmode, 0);
-    }
-
   /* Ensure current function's preferred stack boundary is at least
      what we need.  We don't have to increase alignment for recursive
      functions.  */
@@ -2489,6 +2540,14 @@ expand_call (tree exp, rtx target, int ignore)
   preferred_unit_stack_boundary = preferred_stack_boundary / BITS_PER_UNIT;
 
   function_call_count++;
+
+  /* APPLE LOCAL indirect sibcalls */
+  /* Do this before creating the chains, to avoid a branch within them.
+     The paired chains both branch to the same label, but only one
+     chain has a definition of that label, because of the way the
+     infrastructure works. */
+  if ( !fndecl )
+    funexp_keep = rtx_for_function_call (fndecl, addr);
 
   /* We want to make two insn chains; one for a sibling call, the other
      for a normal call.  We will select one of the two chains after
@@ -2812,7 +2871,11 @@ expand_call (tree exp, rtx target, int ignore)
 	 be deferred during the evaluation of the arguments.  */
       NO_DEFER_POP;
 
-      funexp = rtx_for_function_call (fndecl, addr);
+      /* APPLE LOCAL indirect sibcalls */
+      if ( !fndecl )
+	funexp = funexp_keep;
+      else
+	funexp = rtx_for_function_call (fndecl, addr);
 
       /* Figure out the register where the value, if any, will come back.  */
       valreg = 0;
@@ -2950,6 +3013,24 @@ expand_call (tree exp, rtx target, int ignore)
 	next_arg_reg = FUNCTION_ARG (args_so_far, VOIDmode,
 				     void_type_node, 1);
 
+      /* APPLE LOCAL begin indirect calls in R12 */
+#ifdef MAGIC_INDIRECT_CALL_REG
+      /* For indirect calls, put the callee address in R12.  This is necessary
+	 for ObjC methods.  This could be handled by patterns in rs6000.md,
+	 as in 2.95, but it is better to put this copy in the RTL so the
+	 optimizer can see it, and sometimes get rid of it, and the scheduler
+	 can move it around.  Right now none of these good things seems to
+	 happen, but this should be fixable.  (But note FSF won't like
+	 putting it here.)  */
+      if (!fndecl)
+	{
+	  rtx magic_reg = gen_rtx_REG (SImode, MAGIC_INDIRECT_CALL_REG);
+	  emit_move_insn (magic_reg, funexp);
+	  use_reg (&call_fusage, magic_reg);
+	}
+#endif
+      /* APPLE LOCAL end indirect calls in R12 */
+
       /* All arguments and registers used for the call must be set up by
 	 now!  */
 
@@ -2962,6 +3043,11 @@ expand_call (tree exp, rtx target, int ignore)
 		   adjusted_args_size.constant, struct_value_size,
 		   next_arg_reg, valreg, old_inhibit_defer_pop, call_fusage,
 		   flags, & args_so_far);
+
+      /* APPLE LOCAL objc stret methods */
+      /* Restore the function's original return type
+	 in case it's needed later on.  */
+      TREE_TYPE (funtype) = saved_return_type;
 
       /* If call is cse'able, make appropriate pair of reg-notes around it.
 	 Test valreg so we don't crash; may safely ignore `const'
@@ -3185,7 +3271,7 @@ expand_call (tree exp, rtx target, int ignore)
 	  && GET_MODE (target) != TYPE_MODE (TREE_TYPE (exp)))
 	{
 	  tree type = TREE_TYPE (exp);
-	  int unsignedp = TREE_UNSIGNED (type);
+	  int unsignedp = TYPE_UNSIGNED (type);
 	  int offset = 0;
 
 	  /* If we don't promote as expected, something is wrong.  */
@@ -3323,6 +3409,24 @@ expand_call (tree exp, rtx target, int ignore)
 	    abort ();
 	}
 
+      /* APPLE LOCAL begin sibcall optimization stomped CW frames (radar 3007352) */
+      /* GCC for PPC on Darwin has always rounded 'current_function_args_size' up to a multiple of 16.
+	 CodeWarrior doesn't.
+	 A father() that passes, say, 40 bytes of parameters to daughter() will have eight bytes of
+	 padding if compiled with GCC, and zero bytes of padding if compiled with CW.
+	 If a GCC-compiled daughter() in turn sibcalls to granddaughter() with, say, 44 bytes of parameters,
+	 GCC will generate a store of that extra parameter into padding of the father() parameter area.
+	 Alas, if father() was compild by CW, father() will not have the parameter area padding,
+	 and something in the father() stackframe will be stomped.
+	 Parameter areas are guaranteed to be a minimum of 32 bytes.  See Radar 3007352.  */
+      if ( ( ! sibcall_failure)
+	   && args_size.constant > 32
+	   && args_size.constant > cfun->unrounded_args_size)
+	{
+	  sibcall_failure = 1;
+	}
+      /* APPLE LOCAL end sibcall optimization stomped CW frames (radar 3007352) */
+
       /* If something prevents making this a sibling call,
 	 zero out the sequence.  */
       if (sibcall_failure)
@@ -3405,6 +3509,17 @@ split_complex_values (tree values)
 {
   tree p;
 
+  /* Before allocating memory, check for the common case of no complex.  */
+  for (p = values; p; p = TREE_CHAIN (p))
+    {
+      tree type = TREE_TYPE (TREE_VALUE (p));
+      if (type && TREE_CODE (type) == COMPLEX_TYPE
+	  && targetm.calls.split_complex_arg (type))
+        goto found;
+    }
+  return values;
+
+ found:
   values = copy_list (values);
 
   for (p = values; p; p = TREE_CHAIN (p))
@@ -3416,7 +3531,8 @@ split_complex_values (tree values)
       if (!complex_type)
 	continue;
 
-      if (TREE_CODE (complex_type) == COMPLEX_TYPE)
+      if (TREE_CODE (complex_type) == COMPLEX_TYPE
+	  && targetm.calls.split_complex_arg (complex_type))
 	{
 	  tree subtype;
 	  tree real, imag, next;
@@ -3447,13 +3563,25 @@ split_complex_types (tree types)
 {
   tree p;
 
+  /* Before allocating memory, check for the common case of no complex.  */
+  for (p = types; p; p = TREE_CHAIN (p))
+    {
+      tree type = TREE_VALUE (p);
+      if (TREE_CODE (type) == COMPLEX_TYPE
+	  && targetm.calls.split_complex_arg (type))
+        goto found;
+    }
+  return types;
+
+ found:
   types = copy_list (types);
 
   for (p = types; p; p = TREE_CHAIN (p))
     {
       tree complex_type = TREE_VALUE (p);
 
-      if (TREE_CODE (complex_type) == COMPLEX_TYPE)
+      if (TREE_CODE (complex_type) == COMPLEX_TYPE
+	  && targetm.calls.split_complex_arg (complex_type))
 	{
 	  tree next, imag;
 
@@ -3575,7 +3703,7 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
      decide where in memory it should come back.  */
   if (outmode != VOIDmode)
     {
-      tfom = (*lang_hooks.types.type_for_mode) (outmode, 0);
+      tfom = lang_hooks.types.type_for_mode (outmode, 0);
       if (aggregate_value_p (tfom, 0))
 	{
 #ifdef PCC_STATIC_STRUCT_RETURN
@@ -3720,13 +3848,13 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
 	    slot = val;
 	  else if (must_copy)
 	    {
-	      slot = assign_temp ((*lang_hooks.types.type_for_mode) (mode, 0),
+	      slot = assign_temp (lang_hooks.types.type_for_mode (mode, 0),
 				  0, 1, 1);
 	      emit_move_insn (slot, val);
 	    }
 	  else
 	    {
-	      tree type = (*lang_hooks.types.type_for_mode) (mode, 0);
+	      tree type = lang_hooks.types.type_for_mode (mode, 0);
 
 	      slot
 		= gen_rtx_MEM (mode,

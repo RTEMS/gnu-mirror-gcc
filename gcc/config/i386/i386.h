@@ -34,6 +34,9 @@ Boston, MA 02111-1307, USA.  */
    ADDR_BEG, ADDR_END, PRINT_IREG, PRINT_SCALE, PRINT_B_I_S, and many
    that start with ASM_ or end in ASM_OP.  */
 
+/* APPLE LOCAL fat builds */
+#define DEFAULT_TARGET_ARCH "i386"
+
 /* Define the specific costs for a given cpu */
 
 struct processor_costs {
@@ -207,6 +210,9 @@ extern int target_flags;
 #endif
 #endif
 
+#define HAS_LONG_COND_BRANCH 1
+#define HAS_LONG_UNCOND_BRANCH 1
+
 /* Avoid adding %gs:0 in TLS references; use %gs:address directly.  */
 #define TARGET_TLS_DIRECT_SEG_REFS (target_flags & MASK_TLS_DIRECT_SEG_REFS)
 
@@ -219,6 +225,7 @@ extern int target_flags;
 #define TARGET_PENTIUM4 (ix86_tune == PROCESSOR_PENTIUM4)
 #define TARGET_K8 (ix86_tune == PROCESSOR_K8)
 #define TARGET_ATHLON_K8 (TARGET_K8 || TARGET_ATHLON)
+#define TARGET_NOCONA (ix86_tune == PROCESSOR_NOCONA)
 
 #define TUNEMASK (1 << ix86_tune)
 extern const int x86_use_leave, x86_push_memory, x86_zero_extend_with_and;
@@ -606,6 +613,8 @@ extern int x86_prefetch_sse;
 	builtin_define ("__tune_k8__");				\
       else if (TARGET_PENTIUM4)					\
 	builtin_define ("__tune_pentium4__");			\
+      else if (TARGET_NOCONA)					\
+	builtin_define ("__tune_nocona__");			\
 								\
       if (TARGET_MMX)						\
 	builtin_define ("__MMX__");				\
@@ -673,6 +682,11 @@ extern int x86_prefetch_sse;
 	{							\
 	  builtin_define ("__pentium4");			\
 	  builtin_define ("__pentium4__");			\
+	}							\
+      else if (ix86_arch == PROCESSOR_NOCONA)			\
+	{							\
+	  builtin_define ("__nocona");				\
+	  builtin_define ("__nocona__");			\
 	}							\
     }								\
   while (0)
@@ -774,7 +788,8 @@ extern int x86_prefetch_sse;
 #define PARM_BOUNDARY BITS_PER_WORD
 
 /* Boundary (in *bits*) on which stack pointer should be aligned.  */
-#define STACK_BOUNDARY BITS_PER_WORD
+/* APPLE LOCAL compiler should obey -mpreferred-stack-boundary (radar 3232990) */
+#define STACK_BOUNDARY ((ix86_preferred_stack_boundary > 128) ? 128 : ix86_preferred_stack_boundary)
 
 /* Boundary (in *bits*) on which the stack pointer prefers to be
    aligned; the compiler cannot rely on having this alignment.  */
@@ -825,7 +840,8 @@ extern int x86_prefetch_sse;
 #define BIGGEST_FIELD_ALIGNMENT 32
 #endif
 #else
-#define ADJUST_FIELD_ALIGN(FIELD, COMPUTED) \
+/* APPLE LOCAL Macintosh alignment */
+#define ADJUST_FIELD_ALIGN(FIELD, COMPUTED, FIRST_FIELD_P) \
    x86_field_alignment (FIELD, COMPUTED)
 #endif
 
@@ -1068,6 +1084,10 @@ do {									\
     (VALID_SSE_REG_MODE (MODE) && TARGET_SSE ? 1			\
      : VALID_MMX_REG_MODE (MODE) && TARGET_MMX ? 1			\
      : VALID_MMX_REG_MODE_3DNOW (MODE) && TARGET_3DNOW ? 1 : 0)
+
+/* ??? Shouldn't be needed...  */
+#define UNITS_PER_SIMD_WORD \
+    (TARGET_SSE ? 16 : TARGET_MMX || TARGET_3DNOW ? 8 : 0)
 
 #define VALID_FP_MODE_P(MODE)						\
     ((MODE) == SFmode || (MODE) == DFmode || (MODE) == XFmode		\
@@ -2485,7 +2505,10 @@ enum ix86_builtins
   IX86_BUILTIN_MONITOR,
   IX86_BUILTIN_MWAIT,
 
-  IX86_BUILTIN_MAX
+  /* APPLE LOCAL begin constant cfstrings */
+  IX86_BUILTIN_MAX,
+  TARGET_BUILTIN_MAX = IX86_BUILTIN_MAX
+  /* APPLE LOCAL end constant cfstrings */
 };
 
 /* Max number of args passed in registers.  If this is more than 3, we will
@@ -2635,12 +2658,6 @@ do {							\
    faster than one with a register address.  */
 
 #define NO_FUNCTION_CSE
-
-/* Define this macro if it is as good or better for a function to call
-   itself with an explicit address than to call an address kept in a
-   register.  */
-
-#define NO_RECURSIVE_FUNCTION_CSE
 
 /* Given a comparison code (EQ, NE, etc.) and the first operand of a COMPARE,
    return the mode to be used for the comparison.
@@ -2660,9 +2677,7 @@ do {							\
 
 /* A C expression whose value is reversed condition code of the CODE for
    comparison done in CC_MODE mode.  */
-#define REVERSE_CONDITION(CODE, MODE) \
-  ((MODE) != CCFPmode && (MODE) != CCFPUmode ? reverse_condition (CODE) \
-   : reverse_condition_maybe_unordered (CODE))
+#define REVERSE_CONDITION(CODE, MODE) ix86_reverse_condition ((CODE), (MODE))
 
 
 /* Control the assembler format that we output, to the extent
@@ -2946,6 +2961,7 @@ enum processor_type
   PROCESSOR_ATHLON,
   PROCESSOR_PENTIUM4,
   PROCESSOR_K8,
+  PROCESSOR_NOCONA,
   PROCESSOR_max
 };
 
