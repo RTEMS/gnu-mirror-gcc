@@ -1,6 +1,6 @@
 /* Subroutines for insn-output.c for HPPA.
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
-   2002 Free Software Foundation, Inc.
+   2002, 2003 Free Software Foundation, Inc.
    Contributed by Tim Moore (moore@cs.utah.edu), based on sparc.c
 
 This file is part of GNU CC.
@@ -121,6 +121,10 @@ static void pa_globalize_label PARAMS ((FILE *, const char *))
      ATTRIBUTE_UNUSED;
 static void pa_asm_output_mi_thunk PARAMS ((FILE *, tree, HOST_WIDE_INT,
 					    HOST_WIDE_INT, tree));
+#if !defined(USE_COLLECT2)
+static void pa_asm_out_constructor PARAMS ((rtx, int));
+static void pa_asm_out_destructor PARAMS ((rtx, int));
+#endif
 static void copy_fp_args PARAMS ((rtx)) ATTRIBUTE_UNUSED;
 static int length_fp_args PARAMS ((rtx)) ATTRIBUTE_UNUSED;
 static struct deferred_plabel *get_plabel PARAMS ((const char *))
@@ -202,6 +206,13 @@ static size_t n_deferred_plabels = 0;
 #define TARGET_ASM_OUTPUT_MI_THUNK pa_asm_output_mi_thunk
 #undef TARGET_ASM_CAN_OUTPUT_MI_THUNK
 #define TARGET_ASM_CAN_OUTPUT_MI_THUNK default_can_output_mi_thunk_no_vcall
+
+#if !defined(USE_COLLECT2)
+#undef TARGET_ASM_CONSTRUCTOR
+#define TARGET_ASM_CONSTRUCTOR pa_asm_out_constructor
+#undef TARGET_ASM_DESTRUCTOR
+#define TARGET_ASM_DESTRUCTOR pa_asm_out_destructor
+#endif
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -3196,26 +3207,6 @@ pa_output_function_prologue (file, size)
 
   fputs ("\n\t.ENTRY\n", file);
 
-  /* If we're using GAS and SOM, and not using the portable runtime model,
-     or function sections, then we don't need to accumulate the total number
-     of code bytes.  */
-  if ((TARGET_GAS && TARGET_SOM && ! TARGET_PORTABLE_RUNTIME)
-      || flag_function_sections)
-    total_code_bytes = 0;
-  else if (INSN_ADDRESSES_SET_P ())
-    {
-      unsigned long old_total = total_code_bytes;
-
-      total_code_bytes += INSN_ADDRESSES (INSN_UID (get_last_nonnote_insn ()));
-      total_code_bytes += FUNCTION_BOUNDARY / BITS_PER_UNIT;
-
-      /* Be prepared to handle overflows.  */
-      if (old_total > total_code_bytes)
-	total_code_bytes = -1;
-    }
-  else
-    total_code_bytes = -1;
-
   remove_useless_addtr_insns (get_insns (), 0);
 }
 
@@ -3537,6 +3528,7 @@ pa_output_function_epilogue (file, size)
      FILE *file;
      HOST_WIDE_INT size ATTRIBUTE_UNUSED;
 {
+  int last_address = 0;
   rtx insn = get_last_insn ();
 
   /* hppa_expand_epilogue does the dirty work now.  We just need
@@ -3559,9 +3551,36 @@ pa_output_function_epilogue (file, size)
   /* If insn is a CALL_INSN, then it must be a call to a volatile
      function (otherwise there would be epilogue insns).  */
   if (insn && GET_CODE (insn) == CALL_INSN)
-    fputs ("\tnop\n", file);
+    {
+      fputs ("\tnop\n", file);
+      last_address += 4;
+    }
 
   fputs ("\t.EXIT\n\t.PROCEND\n", file);
+
+  /* Finally, update the total number of code bytes output so far.  */
+  if ((TARGET_PORTABLE_RUNTIME || !TARGET_GAS || !TARGET_SOM)
+      && !flag_function_sections)
+    {
+      if (INSN_ADDRESSES_SET_P ())
+	{
+	  unsigned long old_total = total_code_bytes;
+
+	  insn = get_last_nonnote_insn ();
+	  last_address += INSN_ADDRESSES (INSN_UID (insn));
+	  if (INSN_P (insn))
+	    last_address += insn_default_length (insn);
+
+	  total_code_bytes += last_address;
+	  total_code_bytes += FUNCTION_BOUNDARY / BITS_PER_UNIT;
+
+	  /* Be prepared to handle overflows.  */
+	  if (old_total > total_code_bytes)
+	    total_code_bytes = -1;
+	}
+      else
+	total_code_bytes = -1;
+    }
 }
 
 void
@@ -6330,7 +6349,7 @@ output_millicode_call (insn, call_dest)
       xoperands[1] = gen_label_rtx ();
       output_asm_insn ("ldo %0-%1(%2),%2", xoperands);
       ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
-				 CODE_LABEL_NUMBER (xoperands[3]));
+				 CODE_LABEL_NUMBER (xoperands[1]));
     }
   else
     /* ??? This branch may not reach its target.  */
@@ -6668,7 +6687,7 @@ output_call (insn, call_dest, sibcall)
 	  xoperands[1] = gen_label_rtx ();
 	  output_asm_insn ("ldo %0-%1(%%r2),%%r2", xoperands);
 	  ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
-				     CODE_LABEL_NUMBER (xoperands[3]));
+				     CODE_LABEL_NUMBER (xoperands[1]));
 	}
       else
 	/* ??? This branch may not reach its target.  */
@@ -6902,6 +6921,46 @@ fmpyaddoperands (operands)
   /* Passed.  Operands are suitable for fmpyadd.  */
   return 1;
 }
+
+#if !defined(USE_COLLECT2)
+static void
+pa_asm_out_constructor (symbol, priority)
+     rtx symbol;
+     int priority;
+{
+  if (!function_label_operand (symbol, VOIDmode))
+    hppa_encode_label (symbol);
+
+#ifdef CTORS_SECTION_ASM_OP
+  default_ctor_section_asm_out_constructor (symbol, priority);
+#else
+# ifdef TARGET_ASM_NAMED_SECTION
+  default_named_section_asm_out_constructor (symbol, priority);
+# else
+  default_stabs_asm_out_constructor (symbol, priority);
+# endif
+#endif
+}
+
+static void
+pa_asm_out_destructor (symbol, priority)
+     rtx symbol;
+     int priority;
+{
+  if (!function_label_operand (symbol, VOIDmode))
+    hppa_encode_label (symbol);
+
+#ifdef DTORS_SECTION_ASM_OP
+  default_dtor_section_asm_out_destructor (symbol, priority);
+#else
+# ifdef TARGET_ASM_NAMED_SECTION
+  default_named_section_asm_out_destructor (symbol, priority);
+# else
+  default_stabs_asm_out_destructor (symbol, priority);
+# endif
+#endif
+}
+#endif
 
 /* Returns 1 if the 6 operands specified in OPERANDS are suitable for
    use in fmpysub instructions.  */

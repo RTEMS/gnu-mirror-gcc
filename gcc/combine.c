@@ -5256,8 +5256,8 @@ simplify_set (x)
 #ifdef CANNOT_CHANGE_MODE_CLASS
       && ! (GET_CODE (dest) == REG && REGNO (dest) < FIRST_PSEUDO_REGISTER
 	    && REG_CANNOT_CHANGE_MODE_P (REGNO (dest),
-					 GET_MODE (src), 
-					 GET_MODE (SUBREG_REG (src))))
+					 GET_MODE (SUBREG_REG (src)), 
+					 GET_MODE (src)))
 #endif
       && (GET_CODE (dest) == REG
 	  || (GET_CODE (dest) == SUBREG
@@ -6734,7 +6734,7 @@ make_compound_operation (x, in_code)
 	      || (GET_MODE_SIZE (mode) >
 		  GET_MODE_SIZE (GET_MODE (XEXP (tem, 0)))))
 	    {
-	      if (! INTEGRAL_MODE_P (mode))
+	      if (! SCALAR_INT_MODE_P (mode))
 		break;
 	      tem = gen_rtx_fmt_e (GET_CODE (tem), mode, XEXP (tem, 0));
 	    }
