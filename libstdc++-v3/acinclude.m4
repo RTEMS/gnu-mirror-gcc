@@ -593,10 +593,19 @@ dnl
 dnl Check whether LFS support is available.
 dnl
 AC_DEFUN(GLIBCXX_CHECK_LFS, [
+  AC_LANG_SAVE
+  AC_LANG_CPLUSPLUS
+  ac_save_CXXFLAGS="$CXXFLAGS"
+  CXXFLAGS="$CXXFLAGS -fno-exceptions"	
   AC_CACHE_VAL(glibcxx_cv_LFS, [
     AC_TRY_LINK(
-      [#include <unistd.h>],
-      [fopen64("t", "w");
+      [#include <unistd.h>
+       #include <stdio.h>
+      ],
+      [FILE* fp;
+       fopen64("t", "w");
+       fseeko64(fp, 0, SEEK_CUR);
+       ftello64(fp);
        lseek64(1, 0, SEEK_CUR);],	
       [glibcxx_cv_LFS=yes],
       [glibcxx_cv_LFS=no])
@@ -604,6 +613,8 @@ AC_DEFUN(GLIBCXX_CHECK_LFS, [
   if test $glibcxx_cv_LFS = yes; then
     AC_DEFINE(_GLIBCXX_USE_LFS)
   fi
+  CXXFLAGS="$ac_save_CXXFLAGS"
+  AC_LANG_RESTORE
 ])
 
 
@@ -858,6 +869,10 @@ AC_DEFUN(GLIBCXX_ENABLE_C99, [
                  [isunordered(0.0,0.0);],, [ac_c99_math=no])
   AC_MSG_RESULT($ac_c99_math)
 
+  if test x"$ac_c99_math" = x"yes"; then
+    AC_DEFINE(_GLIBCXX_USE_C99_MATH)
+  fi
+
   # Check for the existence in <stdio.h> of vscanf, et. al.
   ac_c99_stdio=yes;
   AC_MSG_CHECKING([for ISO C99 support in <stdio.h>])
@@ -933,6 +948,10 @@ AC_DEFUN(GLIBCXX_ENABLE_C99, [
     enable_c99=no;
   fi;
   AC_MSG_RESULT($enable_c99)
+
+  if test x"$ac_99_math" = x"yes"; then
+    AC_DEFINE(_GLIBCXX_USE_C99_MATH)
+  fi
 
   # Option parsed, now set things appropriately
   if test x"$enable_c99" = x"yes"; then
@@ -1336,33 +1355,6 @@ AC_DEFUN(GLIBCXX_ENABLE_HOSTED, [
   GLIBCXX_CONDITIONAL(GLIBCXX_HOSTED, test $is_hosted = yes)
   AC_DEFINE_UNQUOTED(_GLIBCXX_HOSTED, $hosted_define,
     [Define to 1 if a full hosted library is built, or 0 if freestanding.])
-])
-
-
-dnl
-dnl Check for libunwind exception handling support.  If enabled, then
-dnl we assume that the _Unwind_* functions that make up the Unwind ABI
-dnl (_Unwind_RaiseException, _Unwind_Resume, etc.) are defined by
-dnl libunwind instead of libgcc, and that libstdc++ has a dependency
-dnl on libunwind as well as libgcc.
-dnl
-dnl --enable-libunwind-exceptions forces the use of libunwind.
-dnl --disable-libunwind-exceptions assumes there is no libunwind.
-dnl
-dnl Substs:
-dnl  LIBUNWIND_FLAG
-dnl
-AC_DEFUN(GLIBCXX_ENABLE_LIBUNWIND_EXCEPTIONS, [
-  AC_MSG_CHECKING([for use of libunwind])
-  GLIBCXX_ENABLE(libunwind-exceptions,no,,
-    [force use of libunwind for exceptions])
-  AC_MSG_RESULT($use_libunwind_exceptions)
-  if test $enable_libunwind_exceptions = yes; then
-    LIBUNWIND_FLAG="-lunwind"
-  else
-    LIBUNWIND_FLAG=""
-  fi
-  AC_SUBST(LIBUNWIND_FLAG)
 ])
 
 

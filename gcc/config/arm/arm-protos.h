@@ -24,11 +24,11 @@
 #define GCC_ARM_PROTOS_H
 
 extern void arm_override_options (void);
-extern int use_return_insn (int);
+extern int use_return_insn (int, rtx);
 extern int arm_regno_class (int);
 extern void arm_finalize_pic (int);
 extern int arm_volatile_func (void);
-extern const char *arm_output_epilogue (int);
+extern const char *arm_output_epilogue (rtx);
 extern void arm_expand_prologue (void);
 extern HOST_WIDE_INT arm_get_frame_size	(void);
 extern const char *arm_strip_name_encoding (const char *);
@@ -95,6 +95,10 @@ extern int cirrus_general_operand (rtx, enum machine_mode);
 extern int cirrus_register_operand (rtx, enum machine_mode);
 extern int cirrus_shift_const (rtx, enum machine_mode);
 extern int cirrus_memory_offset (rtx);
+extern int arm_no_early_store_addr_dep (rtx, rtx);
+extern int arm_no_early_alu_shift_dep (rtx, rtx);
+extern int arm_no_early_alu_shift_value_dep (rtx, rtx);
+extern int arm_no_early_mul_dep (rtx, rtx);
 
 extern int symbol_mentioned_p (rtx);
 extern int label_mentioned_p (rtx);
@@ -136,6 +140,7 @@ extern void arm_final_prescan_insn (rtx);
 extern int arm_go_if_legitimate_address (enum machine_mode, rtx);
 extern int arm_debugger_arg_offset (int, rtx);
 extern int arm_is_longcall_p (rtx, int, int);
+extern int arm_emit_extendsi (enum rtx_code, rtx, rtx);
 extern int    arm_emit_vector_const (FILE *, rtx);
 extern const char * arm_output_load_gr (rtx *);
 
