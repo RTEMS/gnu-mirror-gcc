@@ -524,7 +524,7 @@ dbxout_typedefs (syms)
 	  tree type = TREE_TYPE (syms);
 	  if (TYPE_NAME (type)
 	      && TREE_CODE (TYPE_NAME (type)) == TYPE_DECL
-	      && COMPLETE_TYPE_P (type)
+	      && COMPLETE_OR_VOID_TYPE_P (type)
 	      && ! TREE_ASM_WRITTEN (TYPE_NAME (type)))
 	    dbxout_symbol (TYPE_NAME (type), 0);
 	}
@@ -796,6 +796,11 @@ dbxout_type_fields (type)
      field that we can support.  */
   for (tem = TYPE_FIELDS (type); tem; tem = TREE_CHAIN (tem))
     {
+
+     /* If on of the nodes is an error_mark or its type is then return early. */
+     if (tem == error_mark_node || TREE_TYPE (tem) == error_mark_node)
+	return;
+
       /* Omit here local type decls until we know how to support them.  */
       if (TREE_CODE (tem) == TYPE_DECL
 	  /* Omit fields whose position or size are variable or too large to
@@ -1621,9 +1626,7 @@ dbxout_type (type, full)
 				* BITS_PER_UNIT);
 		putc (',', asmfile);
 		CHARS (1);
-		print_wide_int (tree_low_cst (DECL_SIZE
-					      (TYPE_NAME
-					       (BINFO_TYPE (child))),
+		print_wide_int (tree_low_cst (TYPE_SIZE (BINFO_TYPE (child)),
 					      0)
 				* BITS_PER_UNIT);
 		putc (';', asmfile);

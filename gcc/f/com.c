@@ -639,15 +639,16 @@ static GTY(()) tree shadowed_labels;
 
 /* Return the subscript expression, modified to do range-checking.
 
-   `array' is the array to be checked against.
+   `array' is the array type to be checked against.
    `element' is the subscript expression to check.
    `dim' is the dimension number (starting at 0).
    `total_dims' is the total number of dimensions (0 for CHARACTER substring).
+   `item' is the array decl or NULL_TREE.
 */
 
 static tree
 ffecom_subscript_check_ (tree array, tree element, int dim, int total_dims,
-			 const char *array_name)
+			 const char *array_name, tree item)
 {
   tree low = TYPE_MIN_VALUE (TYPE_DOMAIN (array));
   tree high = TYPE_MAX_VALUE (TYPE_DOMAIN (array));
@@ -713,6 +714,10 @@ ffecom_subscript_check_ (tree array, tree element, int dim, int total_dims,
                                    high));
         }
     }
+
+  /* If the array index is safe at compile-time, return element.  */
+  if (integer_nonzerop (cond))
+    return element;
 
   {
     int len;
@@ -808,13 +813,10 @@ ffecom_subscript_check_ (tree array, tree element, int dim, int total_dims,
   TREE_SIDE_EFFECTS (die) = 1;
   die = convert (void_type_node, die);
 
-  element = ffecom_3 (COND_EXPR,
-		      TREE_TYPE (element),
-		      cond,
-		      element,
-		      die);
+  if (integer_zerop (cond) && item)
+    ffe_mark_addressable (item);
 
-  return element;
+  return ffecom_3 (COND_EXPR, TREE_TYPE (element), cond, element, die);
 }
 
 /* Return the computed element of an array reference.
@@ -900,7 +902,7 @@ ffecom_arrayref_ (tree item, ffebld expr, int want_ptr)
 	  element = ffecom_expr_ (dims[i], NULL, NULL, NULL, FALSE, TRUE);
 	  if (flag_bounds_check)
 	    element = ffecom_subscript_check_ (array, element, i, total_dims,
-					       array_name);
+					       array_name, item);
 	  if (element == error_mark_node)
 	    return element;
 
@@ -946,7 +948,7 @@ ffecom_arrayref_ (tree item, ffebld expr, int want_ptr)
 	  element = ffecom_expr_ (dims[i], NULL, NULL, NULL, FALSE, TRUE);
 	  if (flag_bounds_check)
 	    element = ffecom_subscript_check_ (array, element, i, total_dims,
-					       array_name);
+					       array_name, item);
 	  if (element == error_mark_node)
 	    return element;
 
@@ -2045,7 +2047,7 @@ ffecom_char_args_x_ (tree *xitem, tree *length, ffebld expr, bool with_null)
 		end_tree = ffecom_expr (end);
 		if (flag_bounds_check)
 		  end_tree = ffecom_subscript_check_ (array, end_tree, 1, 0,
-						      char_name);
+						      char_name, NULL_TREE);
 		end_tree = convert (ffecom_f2c_ftnlen_type_node,
 				    end_tree);
 
@@ -2063,7 +2065,7 @@ ffecom_char_args_x_ (tree *xitem, tree *length, ffebld expr, bool with_null)
 	    start_tree = ffecom_expr (start);
 	    if (flag_bounds_check)
 	      start_tree = ffecom_subscript_check_ (array, start_tree, 0, 0,
-						    char_name);
+						    char_name, NULL_TREE);
 	    start_tree = convert (ffecom_f2c_ftnlen_type_node,
 				  start_tree);
 
@@ -2096,7 +2098,7 @@ ffecom_char_args_x_ (tree *xitem, tree *length, ffebld expr, bool with_null)
 		end_tree = ffecom_expr (end);
 		if (flag_bounds_check)
 		  end_tree = ffecom_subscript_check_ (array, end_tree, 1, 0,
-						      char_name);
+						      char_name, NULL_TREE);
 		end_tree = convert (ffecom_f2c_ftnlen_type_node,
 				    end_tree);
 
@@ -7445,7 +7447,7 @@ ffecom_sym_transform_ (ffesymbol s)
 		assert (et != NULL_TREE);
 
 		if (! TREE_STATIC (et))
-		  put_var_into_stack (et);
+		  put_var_into_stack (et, /*rescan=*/true);
 
 		offset = ffestorag_modulo (est)
 		  + ffestorag_offset (ffesymbol_storage (s))
@@ -8091,8 +8093,8 @@ ffecom_sym_transform_ (ffesymbol s)
 	  DECL_EXTERNAL (t) = 1;
 	  TREE_PUBLIC (t) = 1;
 
-	  t = start_decl (t, FALSE);
-	  finish_decl (t, NULL_TREE, FALSE);
+	  t = start_decl (t, ffe_is_globals ());
+	  finish_decl (t, NULL_TREE, ffe_is_globals ());
 
 	  if ((g != NULL)
 	      && ((ffeglobal_type (g) == FFEGLOBAL_typeSUBR)
@@ -10593,6 +10595,78 @@ ffecom_constantunion (ffebldConstantUnion *cu, ffeinfoBasictype bt,
   return item;
 }
 
+/* Transform constant-union to tree, with the type known.  */
+
+tree
+ffecom_constantunion_with_type (ffebldConstantUnion *cu,
+		      tree tree_type, ffebldConst ct)
+{
+  tree item;
+
+  int val;
+
+  switch (ct)
+  {
+#if FFETARGET_okINTEGER1
+	  case  FFEBLD_constINTEGER1:
+         	  val = ffebld_cu_val_integer1 (*cu);
+		  item = build_int_2 (val, (val < 0) ? -1 : 0);
+		  break;
+#endif
+#if FFETARGET_okINTEGER2
+	  case  FFEBLD_constINTEGER2:
+		  val = ffebld_cu_val_integer2 (*cu);
+		  item = build_int_2 (val, (val < 0) ? -1 : 0);
+		  break;
+#endif
+#if FFETARGET_okINTEGER3
+	  case  FFEBLD_constINTEGER3:
+		  val = ffebld_cu_val_integer3 (*cu);
+		  item = build_int_2 (val, (val < 0) ? -1 : 0);
+		  break;
+#endif
+#if FFETARGET_okINTEGER4
+	  case  FFEBLD_constINTEGER4:
+		  val = ffebld_cu_val_integer4 (*cu);
+		  item = build_int_2 (val, (val < 0) ? -1 : 0);
+		  break;
+#endif
+#if FFETARGET_okLOGICAL1
+	  case  FFEBLD_constLOGICAL1:
+		  val = ffebld_cu_val_logical1 (*cu);
+		  item = build_int_2 (val, (val < 0) ? -1 : 0);
+		  break;
+#endif
+#if FFETARGET_okLOGICAL2
+          case  FFEBLD_constLOGICAL2:
+		  val = ffebld_cu_val_logical2 (*cu);
+		  item = build_int_2 (val, (val < 0) ? -1 : 0);
+		  break;
+#endif
+#if FFETARGET_okLOGICAL3
+	  case  FFEBLD_constLOGICAL3:
+		  val = ffebld_cu_val_logical3 (*cu);
+		  item = build_int_2 (val, (val < 0) ? -1 : 0);
+		  break;
+#endif
+#if FFETARGET_okLOGICAL4
+	  case  FFEBLD_constLOGICAL4:
+		  val = ffebld_cu_val_logical4 (*cu);
+		  item = build_int_2 (val, (val < 0) ? -1 : 0);
+		  break;
+#endif
+	  default:
+		  assert ("constant type not supported"==NULL);
+		  return error_mark_node;
+		  break;
+  }
+
+  TREE_TYPE (item) = tree_type;
+
+  TREE_CONSTANT (item) = 1;
+
+  return item;
+}
 /* Transform expression into constant tree.
 
    If the expression can be transformed into a tree that is constant,
@@ -14223,7 +14297,7 @@ ffe_mark_addressable (exp)
 	      }
 	    assert ("address of register var requested" == NULL);
 	  }
-	put_var_into_stack (x);
+	put_var_into_stack (x, /*rescan=*/true);
 
 	/* drops in */
       case FUNCTION_DECL:
