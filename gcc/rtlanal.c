@@ -353,7 +353,7 @@ get_related_value (x)
    into the jump table.  If the offset cannot be determined, then return
    NULL_RTX.
 
-   If EARLIEST is non-zero, it is a pointer to a place where the earliest
+   If EARLIEST is nonzero, it is a pointer to a place where the earliest
    insn used in locating the offset was found.  */
 
 rtx
@@ -541,7 +541,7 @@ global_reg_mentioned_p_1 (loc, data)
   return 0;
 }
 
-/* Returns non-zero if X mentions a global register.  */
+/* Returns nonzero if X mentions a global register.  */
 
 int
 global_reg_mentioned_p (x)
@@ -874,13 +874,10 @@ int
 reg_set_p (reg, insn)
      rtx reg, insn;
 {
-  rtx body = insn;
-
   /* We can be passed an insn or part of one.  If we are passed an insn,
      check if a side-effect of the insn clobbers REG.  */
-  if (INSN_P (insn))
-    {
-      if (FIND_REG_INC_NOTE (insn, reg)
+  if (INSN_P (insn)
+      && (FIND_REG_INC_NOTE (insn, reg)
 	  || (GET_CODE (insn) == CALL_INSN
 	      /* We'd like to test call_used_regs here, but rtlanal.c can't
 		 reference that variable due to its use in genattrtab.  So
@@ -891,11 +888,8 @@ reg_set_p (reg, insn)
 	      && ((GET_CODE (reg) == REG
 		   && REGNO (reg) < FIRST_PSEUDO_REGISTER)
 		  || GET_CODE (reg) == MEM
-		  || find_reg_fusage (insn, CLOBBER, reg))))
-	return 1;
-
-      body = PATTERN (insn);
-    }
+		  || find_reg_fusage (insn, CLOBBER, reg)))))
+    return 1;
 
   return set_of (reg, insn) != NULL_RTX;
 }
@@ -1798,7 +1792,7 @@ dead_or_set_regno_p (insn, test_regno)
 
   if (GET_CODE (pattern) == SET)
     {
-      rtx dest = SET_DEST (PATTERN (insn));
+      rtx dest = SET_DEST (pattern);
 
       /* A value is totally replaced if it is the destination or the
 	 destination is a SUBREG of REGNO that does not change the number of
@@ -2786,7 +2780,7 @@ computed_jump_p (insn)
    sub-expression (including X itself).  F is also passed the DATA.
    If F returns -1, do not traverse sub-expressions, but continue
    traversing the rest of the tree.  If F ever returns any other
-   non-zero value, stop the traversal, and return the value returned
+   nonzero value, stop the traversal, and return the value returned
    by F.  Otherwise, return 0.  This function does not traverse inside
    tree structure that contains RTX_EXPRs, or into sub-expressions
    whose format code is `0' since it is not known whether or not those
@@ -3039,7 +3033,7 @@ insns_safe_to_move_p (from, to, new_to)
   return 0;
 }
 
-/* Return non-zero if IN contains a piece of rtl that has the address LOC */
+/* Return nonzero if IN contains a piece of rtl that has the address LOC */
 int
 loc_mentioned_in_p (loc, in)
      rtx *loc, in;

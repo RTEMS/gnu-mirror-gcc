@@ -41,6 +41,8 @@ package java.net;
  * InetSocketAddress instances represent socket addresses
  * in the java.nio package. They encapsulate a InetAddress and
  * a port number.
+ *
+ * @since 1.4
  */
 
 public class InetSocketAddress extends SocketAddress
@@ -48,14 +50,37 @@ public class InetSocketAddress extends SocketAddress
     InetAddress addr;
     int port;
     
+    /**
+     * Constructs an InetSocketAddress instance.
+     * 
+     * @param addr Address of the socket
+     * @param port Port if the socket
+     *
+     * @exception IllegalArgumentException If the port number is illegel
+     */
     public InetSocketAddress(InetAddress addr, int port)
+	throws IllegalArgumentException
     {
+	if (port < 0 || port > 65535)
+          throw new IllegalArgumentException();
+  
 	this.addr = addr;
 	this.port = port;
     }
 
+    /**
+     * Constructs an InetSocketAddress instance.
+     * 
+     * @param port Port if the socket
+     *
+     * @exception IllegalArgumentException If the port number is illegal
+     */
     public InetSocketAddress(int port)
+	throws IllegalArgumentException
     {
+	if (port < 0 || port > 65535)
+          throw new IllegalArgumentException();
+
 	this.port = port;
 	try {
 	    this.addr = InetAddress.getLocalHost();
@@ -64,8 +89,20 @@ public class InetSocketAddress extends SocketAddress
     }
 
 
+    /**
+     * Constructs an InetSocketAddress instance.
+     *
+     * @param addr Address of the socket
+     * @param port Port if the socket
+     *
+     * @exception IllegalArgumentException If the port number is illegal
+     */
     public InetSocketAddress(String hostname, int port)
+	throws IllegalArgumentException
     {
+	if (port < 0 || port > 65535)
+          throw new IllegalArgumentException();
+
 	this.port = port;
 	try {
 	    this.addr = InetAddress.getByName(hostname);
@@ -77,7 +114,7 @@ public class InetSocketAddress extends SocketAddress
      * Test if obj is a InetSocketAddress and
      * has the same address & port
      */
-    public boolean equals(Object obj)
+    public final boolean equals(Object obj)
     {
 	if (obj instanceof InetSocketAddress)
 	    {
@@ -87,17 +124,17 @@ public class InetSocketAddress extends SocketAddress
 	return false;
     }
 
-    public InetAddress getAddress()
+    public final InetAddress getAddress()
     {
 	return addr;
     }
 
-    public String getHostName()
+    public final String getHostName()
     {
 	return addr.getHostName();
     }
 
-    public int getPort()
+    public final int getPort()
     {
 	return port;
     }
@@ -105,7 +142,7 @@ public class InetSocketAddress extends SocketAddress
     /**
      * TODO: see what sun does here.
      */
-    public int hashCode()
+    public final int hashCode()
     {
 	return port + addr.hashCode();
     }
@@ -113,7 +150,7 @@ public class InetSocketAddress extends SocketAddress
     /**
      * TODO: see what sun does here.
      */
-    public boolean isUnresolved()
+    public final boolean isUnresolved()
     {
 	return addr == null;
     }

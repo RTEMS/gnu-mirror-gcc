@@ -36,10 +36,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "langhooks.h"
 #include "target.h"
 
-#if !defined FUNCTION_OK_FOR_SIBCALL
-#define FUNCTION_OK_FOR_SIBCALL(DECL) 1
-#endif
-
 /* Decide whether a function's arguments should be processed
    from first to last or from last to first.
 
@@ -91,7 +87,7 @@ struct arg_data
   /* Number of registers to use.  0 means put the whole arg in registers.
      Also 0 if not passed in registers.  */
   int partial;
-  /* Non-zero if argument must be passed on stack.
+  /* Nonzero if argument must be passed on stack.
      Note that some arguments may be passed on the stack
      even though pass_on_stack is zero, just because FUNCTION_ARG says so.
      pass_on_stack identifies arguments that *cannot* go in registers.  */
@@ -126,7 +122,7 @@ struct arg_data
   struct args_size alignment_pad;
 };
 
-/* A vector of one char per byte of stack space.  A byte if non-zero if
+/* A vector of one char per byte of stack space.  A byte if nonzero if
    the corresponding stack location has been used.
    This vector is used to prevent a function call within an argument from
    clobbering any stack already set up.  */
@@ -967,11 +963,8 @@ save_fixed_argument_area (reg_parm_stack_space, argblock,
       if (save_mode == BLKmode)
 	{
 	  save_area = assign_stack_temp (BLKmode, num_to_save, 0);
-	  /* Cannot use emit_block_move here because it can be done by a
-	     library call which in turn gets into this place again and deadly
-	     infinite recursion happens.  */
-	  move_by_pieces (validize_mem (save_area), stack_area, num_to_save,
-			  PARM_BOUNDARY);
+	  emit_block_move (validize_mem (save_area), stack_area,
+			   GEN_INT (num_to_save), BLOCK_OP_CALL_PARM);
 	}
       else
 	{
@@ -1008,11 +1001,9 @@ restore_fixed_argument_area (save_area, argblock, high_to_save, low_to_save)
   if (save_mode != BLKmode)
     emit_move_insn (stack_area, save_area);
   else
-    /* Cannot use emit_block_move here because it can be done by a library
-       call which in turn gets into this place again and deadly infinite
-       recursion happens.  */
-    move_by_pieces (stack_area, validize_mem (save_area),
-		    high_to_save - low_to_save + 1, PARM_BOUNDARY);
+    emit_block_move (stack_area, validize_mem (save_area),
+		     GEN_INT (high_to_save - low_to_save + 1),
+		     BLOCK_OP_CALL_PARM);
 }
 #endif /* REG_PARM_STACK_SPACE */
 
@@ -1700,10 +1691,8 @@ rtx_for_function_call (fndecl, exp)
   else
     /* Generate an rtx (probably a pseudo-register) for the address.  */
     {
-      rtx funaddr;
       push_temp_slots ();
-      funaddr = funexp
-	= expand_expr (TREE_OPERAND (exp, 0), NULL_RTX, VOIDmode, 0);
+      funexp = expand_expr (TREE_OPERAND (exp, 0), NULL_RTX, VOIDmode, 0);
       pop_temp_slots ();	/* FUNEXP can't be BLKmode.  */
       emit_queue ();
     }
@@ -1970,7 +1959,7 @@ combine_pending_stack_adjustment_and_call (unadjusted_args_size,
 /* Scan X expression if it does not dereference any argument slots
    we already clobbered by tail call arguments (as noted in stored_args_map
    bitmap).
-   Return non-zero if X expression dereferences such argument slots,
+   Return nonzero if X expression dereferences such argument slots,
    zero otherwise.  */
 
 static int
@@ -2033,7 +2022,7 @@ check_sibcall_argument_overlap_1 (x)
 /* Scan sequence after INSN if it does not dereference any argument slots
    we already clobbered by tail call arguments (as noted in stored_args_map
    bitmap).  Add stack slots for ARG to stored_args_map bitmap afterwards.
-   Return non-zero if sequence after INSN dereferences such argument slots,
+   Return nonzero if sequence after INSN dereferences such argument slots,
    zero otherwise.  */
 
 static int
@@ -2450,17 +2439,12 @@ expand_call (exp, target, ignore)
 	 It does not seem worth the effort since few optimizable
 	 sibling calls will return a structure.  */
       || structure_value_addr != NULL_RTX
-      /* If the register holding the address is a callee saved
-	 register, then we lose.  We have no way to prevent that,
-	 so we only allow calls to named functions.  */
-      /* ??? This could be done by having the insn constraints
-	 use a register class that is all call-clobbered.  Any
-	 reload insns generated to fix things up would appear
-	 before the sibcall_epilogue.  */
-      || fndecl == NULL_TREE
+      /* Check whether the target is able to optimize the call
+	 into a sibcall.  */
+      || !(*targetm.function_ok_for_sibcall) (fndecl, exp)
       || (flags & (ECF_RETURNS_TWICE | ECF_LONGJMP))
-      || TREE_THIS_VOLATILE (fndecl)
-      || !FUNCTION_OK_FOR_SIBCALL (fndecl)
+      /* Functions that do not return may not be sibcall optimized.  */
+      || TYPE_VOLATILE (TREE_TYPE (TREE_OPERAND (exp, 0)))
       /* If this function requires more stack slots than the current
 	 function, we cannot change it into a sibling call.  */
       || args_size.constant > current_function_args_size
@@ -2592,7 +2576,7 @@ expand_call (exp, target, ignore)
 	 is subject to race conditions, just as with multithreaded
 	 programs.  */
 
-      emit_library_call (gen_rtx_SYMBOL_REF (Pmode, "__bb_fork_func"),
+      emit_library_call (gen_rtx_SYMBOL_REF (Pmode, "__gcov_flush"),
 		      	 LCT_ALWAYS_RETURN,
 			 VOIDmode, 0);
     }
@@ -3317,9 +3301,9 @@ expand_call (exp, target, ignore)
 		if (save_mode != BLKmode)
 		  emit_move_insn (stack_area, args[i].save_area);
 		else
-		  emit_block_move (stack_area,
-				   validize_mem (args[i].save_area),
-				   GEN_INT (args[i].size.constant));
+		  emit_block_move (stack_area, args[i].save_area,
+				   GEN_INT (args[i].size.constant),
+				   BLOCK_OP_CALL_PARM);
 	      }
 
 	  highest_outgoing_arg_in_use = initial_highest_arg_in_use;
@@ -3689,6 +3673,14 @@ emit_library_call_value_1 (retval, orgfun, value, fn_type, outmode, nargs, p)
 	    }
 	  flags &= ~(ECF_CONST | ECF_PURE | ECF_LIBCALL_BLOCK);
 
+	  /* If this was a CONST function, it is now PURE since
+	     it now reads memory.  */
+	  if (flags & ECF_CONST)
+	    {
+	      flags &= ~ECF_CONST;
+	      flags |= ECF_PURE;
+	    }
+
 	  if (GET_MODE (val) == MEM && ! must_copy)
 	    slot = val;
 	  else if (must_copy)
@@ -3909,8 +3901,8 @@ emit_library_call_value_1 (retval, orgfun, value, fn_type, outmode, nargs, p)
 	    {
 	      save_area = assign_stack_temp (BLKmode, num_to_save, 0);
 	      set_mem_align (save_area, PARM_BOUNDARY);
-	      emit_block_move (validize_mem (save_area), stack_area,
-			       GEN_INT (num_to_save));
+	      emit_block_move (save_area, stack_area, GEN_INT (num_to_save),
+			       BLOCK_OP_CALL_PARM);
 	    }
 	  else
 	    {
@@ -3978,8 +3970,9 @@ emit_library_call_value_1 (retval, orgfun, value, fn_type, outmode, nargs, p)
 		}
 	    }
 
-	  emit_push_insn (val, mode, NULL_TREE, NULL_RTX, 0, partial, reg, 0,
-			  argblock, GEN_INT (argvec[argnum].offset.constant),
+	  emit_push_insn (val, mode, NULL_TREE, NULL_RTX, PARM_BOUNDARY,
+			  partial, reg, 0, argblock,
+			  GEN_INT (argvec[argnum].offset.constant),
 			  reg_parm_stack_space, ARGS_SIZE_RTX (alignment_pad));
 
 	  /* Now mark the segment we just used.  */
@@ -4152,9 +4145,9 @@ emit_library_call_value_1 (retval, orgfun, value, fn_type, outmode, nargs, p)
 	    emit_move_insn (value, mem_value);
 	}
       else if (value != 0)
-	emit_move_insn (value, hard_libcall_value (outmode));
+	emit_move_insn (value, valreg);
       else
-	value = hard_libcall_value (outmode);
+	value = valreg;
     }
 
   if (ACCUMULATE_OUTGOING_ARGS)
@@ -4180,8 +4173,9 @@ emit_library_call_value_1 (retval, orgfun, value, fn_type, outmode, nargs, p)
 	  if (save_mode != BLKmode)
 	    emit_move_insn (stack_area, save_area);
 	  else
-	    emit_block_move (stack_area, validize_mem (save_area),
-			     GEN_INT (high_to_save - low_to_save + 1));
+	    emit_block_move (stack_area, save_area,
+			     GEN_INT (high_to_save - low_to_save + 1),
+			     BLOCK_OP_CALL_PARM);
 	}
 #endif
 
@@ -4283,7 +4277,7 @@ emit_library_call_value VPARAMS((rtx orgfun, rtx value,
 
    FNDECL is the declaration of the function we are calling.
 
-   Return non-zero if this arg should cause sibcall failure,
+   Return nonzero if this arg should cause sibcall failure,
    zero otherwise.  */
 
 static int
@@ -4358,7 +4352,8 @@ store_one_arg (arg, argblock, flags, variable_size, reg_parm_stack_space)
 		  arg->save_area = assign_temp (nt, 0, 1, 1);
 		  preserve_temp_slots (arg->save_area);
 		  emit_block_move (validize_mem (arg->save_area), stack_area,
-				   expr_size (arg->tree_value));
+				   expr_size (arg->tree_value),
+				   BLOCK_OP_CALL_PARM);
 		}
 	      else
 		{
@@ -4479,8 +4474,8 @@ store_one_arg (arg, argblock, flags, variable_size, reg_parm_stack_space)
 
       /* This isn't already where we want it on the stack, so put it there.
 	 This can either be done with push or copy insns.  */
-      emit_push_insn (arg->value, arg->mode, TREE_TYPE (pval), NULL_RTX, 0,
-		      partial, reg, used - size, argblock,
+      emit_push_insn (arg->value, arg->mode, TREE_TYPE (pval), NULL_RTX, 
+		      PARM_BOUNDARY, partial, reg, used - size, argblock,
 		      ARGS_SIZE_RTX (arg->offset), reg_parm_stack_space,
 		      ARGS_SIZE_RTX (arg->alignment_pad));
 
@@ -4493,6 +4488,7 @@ store_one_arg (arg, argblock, flags, variable_size, reg_parm_stack_space)
     {
       /* BLKmode, at least partly to be pushed.  */
 
+      unsigned int parm_align;
       int excess;
       rtx size_rtx;
 
@@ -4514,7 +4510,25 @@ store_one_arg (arg, argblock, flags, variable_size, reg_parm_stack_space)
 	     emit_push_insn for BLKmode is careful to avoid it.  */
 	  excess = (arg->size.constant - int_size_in_bytes (TREE_TYPE (pval))
 		    + partial * UNITS_PER_WORD);
-	  size_rtx = expr_size (pval);
+	  size_rtx = expand_expr (size_in_bytes (TREE_TYPE (pval)),
+				  NULL_RTX, TYPE_MODE (sizetype), 0);
+	}
+
+      /* Some types will require stricter alignment, which will be
+	 provided for elsewhere in argument layout.  */
+      parm_align = MAX (PARM_BOUNDARY, TYPE_ALIGN (TREE_TYPE (pval)));
+
+      /* When an argument is padded down, the block is aligned to
+	 PARM_BOUNDARY, but the actual argument isn't.  */
+      if (FUNCTION_ARG_PADDING (arg->mode, TREE_TYPE (pval)) == downward)
+	{
+	  if (arg->size.var)
+	    parm_align = BITS_PER_UNIT;
+	  else if (excess)
+	    {
+	      int excess_align = (excess & -excess) * BITS_PER_UNIT;
+	      parm_align = MIN (parm_align, excess_align);
+	    }
 	}
 
       if ((flags & ECF_SIBCALL) && GET_CODE (arg->value) == MEM)
@@ -4574,18 +4588,16 @@ store_one_arg (arg, argblock, flags, variable_size, reg_parm_stack_space)
           {
 	    rtx size_rtx1 = GEN_INT (reg_parm_stack_space - arg->offset.constant);
 	    emit_push_insn (arg->value, arg->mode, TREE_TYPE (pval), size_rtx1,
-		            TYPE_ALIGN (TREE_TYPE (pval)), partial, reg,
-			    excess, argblock, ARGS_SIZE_RTX (arg->offset),
-			    reg_parm_stack_space,
+		            parm_align, partial, reg, excess, argblock,
+			    ARGS_SIZE_RTX (arg->offset), reg_parm_stack_space,
 		            ARGS_SIZE_RTX (arg->alignment_pad));
 	  }
 	}
 	
 
       emit_push_insn (arg->value, arg->mode, TREE_TYPE (pval), size_rtx,
-		      TYPE_ALIGN (TREE_TYPE (pval)), partial, reg, excess,
-		      argblock, ARGS_SIZE_RTX (arg->offset),
-		      reg_parm_stack_space,
+		      parm_align, partial, reg, excess, argblock,
+		      ARGS_SIZE_RTX (arg->offset), reg_parm_stack_space,
 		      ARGS_SIZE_RTX (arg->alignment_pad));
 
       /* Unless this is a partially-in-register argument, the argument is now
