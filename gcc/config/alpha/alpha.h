@@ -186,6 +186,9 @@ extern enum alpha_fp_trap_mode alpha_fptm;
 #ifndef TARGET_PROFILING_NEEDS_GP
 #define TARGET_PROFILING_NEEDS_GP 0
 #endif
+#ifndef TARGET_LD_BUGGY_LDGP
+#define TARGET_LD_BUGGY_LDGP 0
+#endif
 
 /* Macro to define tables used to set the flags.
    This is a list in braces of pairs in braces,
@@ -494,7 +497,7 @@ extern const char *alpha_mlat_string;	/* For -mmemory-latency= */
 #define STACK_BOUNDARY 64
 
 /* Allocation boundary (in *bits*) for the code of a function.  */
-#define FUNCTION_BOUNDARY 128
+#define FUNCTION_BOUNDARY 32
 
 /* Alignment of field after `int : 0' in a structure.  */
 #define EMPTY_FIELD_BOUNDARY 64
@@ -504,22 +507,6 @@ extern const char *alpha_mlat_string;	/* For -mmemory-latency= */
 
 /* A bitfield declared as `int' forces `int' alignment for the struct.  */
 #define PCC_BITFIELD_TYPE_MATTERS 1
-
-/* Align loop starts for optimal branching.  
-
-   ??? Kludge this and the next macro for the moment by not doing anything if
-   we don't optimize and also if we are writing ECOFF symbols to work around
-   a bug in DEC's assembler. */
-
-#define LOOP_ALIGN(LABEL) \
-  (optimize > 0 && write_symbols != SDB_DEBUG ? 4 : 0)
-
-/* This is how to align an instruction for optimal branching.  On
-   Alpha we'll get better performance by aligning on an octaword
-   boundary.  */
-
-#define LABEL_ALIGN_AFTER_BARRIER(FILE)	\
-  (optimize > 0 && write_symbols != SDB_DEBUG ? 4 : 0)
 
 /* No data type wants to be aligned rounder than this.  */
 #define BIGGEST_ALIGNMENT 128
@@ -1213,11 +1200,11 @@ extern struct alpha_compare alpha_compare;
 
 struct machine_function
 {
-  /* An offset to apply to the stack pointer when unwinding from EH.  */
-  struct rtx_def *eh_epilogue_sp_ofs;
-
   /* If non-null, this rtx holds the return address for the function.  */
   struct rtx_def *ra_rtx;
+
+  /* If non-null, this rtx holds a saved copy of the GP for the function.  */
+  struct rtx_def *gp_save_rtx;
 };
 
 /* Make (or fake) .linkage entry for function call.
@@ -1342,6 +1329,13 @@ do {						\
 /* Before the prologue, RA lives in $26. */
 #define INCOMING_RETURN_ADDR_RTX  gen_rtx_REG (Pmode, 26)
 #define DWARF_FRAME_RETURN_COLUMN DWARF_FRAME_REGNUM (26)
+
+/* Describe how we implement __builtin_eh_return.  */
+#define EH_RETURN_DATA_REGNO(N)	((N) < 4 ? (N) + 16 : INVALID_REGNUM)
+#define EH_RETURN_STACKADJ_RTX	gen_rtx_REG (Pmode, 28)
+#define EH_RETURN_HANDLER_RTX \
+  gen_rtx_MEM (Pmode, plus_constant (stack_pointer_rtx, \
+				     current_function_outgoing_args_size))
 
 /* Addressing modes, and classification of registers for them.  */
 
@@ -1925,15 +1919,6 @@ do {									\
       }
 
 /* Control the assembler format that we output.  */
-
-/* We don't emit these labels, so as to avoid getting linker errors about
-   missing exception handling info.  If we emit a gcc_compiled. label into
-   text, and the file has no code, then the DEC assembler gives us a zero
-   sized text section with no associated exception handling info.  The
-   DEC linker sees this text section, and gives a warning saying that
-   the exception handling info is missing.  */
-#define ASM_IDENTIFY_GCC(x)
-#define ASM_IDENTIFY_LANGUAGE(x)
 
 /* Output to assembler file text saying following lines
    may contain character constants, extra white space, comments, etc.  */

@@ -37,7 +37,7 @@
 namespace std {
 
   template<typename _CharT, typename _Traits>
-    basic_streambuf<_CharT, _Traits>::int_type
+    typename basic_streambuf<_CharT, _Traits>::int_type
     basic_streambuf<_CharT, _Traits>::
     sbumpc()
     {
@@ -54,7 +54,7 @@ namespace std {
     }
 
   template<typename _CharT, typename _Traits>
-    basic_streambuf<_CharT, _Traits>::int_type
+    typename basic_streambuf<_CharT, _Traits>::int_type
     basic_streambuf<_CharT, _Traits>::
     sputbackc(char_type __c) 
     {
@@ -72,7 +72,7 @@ namespace std {
     }
   
   template<typename _CharT, typename _Traits>
-    basic_streambuf<_CharT, _Traits>::int_type
+    typename basic_streambuf<_CharT, _Traits>::int_type
     basic_streambuf<_CharT, _Traits>::
     sungetc()
     {
@@ -93,7 +93,7 @@ namespace std {
   // buffers will still be valid. (This happens if setp is used to set
   // the internal buffer to say some externally-allocated sequence.)
   template<typename _CharT, typename _Traits>
-    basic_streambuf<_CharT, _Traits>::int_type
+    typename basic_streambuf<_CharT, _Traits>::int_type
     basic_streambuf<_CharT, _Traits>::
     sputc(char_type __c)
     {
@@ -131,10 +131,13 @@ namespace std {
 	  if (__ret < __n)
 	    {
 	      int_type __c = this->uflow();  
-	      if (traits_type::eq_int_type(__c, traits_type::eof()))
+	      if (__c != traits_type::eof())
+		{
+		  traits_type::assign(*__s++, traits_type::to_char_type(__c));
+		  ++__ret;
+		}
+	      else
 		break;
-	      traits_type::assign(*__s++, traits_type::to_char_type(__c));
-	      ++__ret;
 	    }
 	}
       return __ret;
@@ -166,12 +169,14 @@ namespace std {
 
 	  if (__ret < __n)
 	    {
-	      int_type __c = traits_type::to_int_type(*__s);
-	      int_type __overfc = this->overflow(__c);
-	      if (traits_type::eq_int_type(__overfc, traits_type::eof()))
+	      int_type __c = this->overflow(traits_type::to_int_type(*__s));
+	      if (__c != traits_type::eof())
+		{
+		  ++__ret;
+		  ++__s;
+		}
+	      else
 		break;
-	      ++__ret;
-	      ++__s;
 	    }
 	}
       return __ret;
@@ -215,15 +220,11 @@ namespace std {
       }
       catch(exception& __fail) {
 	if ((__ios.exceptions() & ios_base::failbit) != 0)
-	  throw;
+	  __throw_exception_again;
       }
       return __ret;
     }
 } // namespace std
 
 #endif // _CPP_BITS_STREAMBUF_TCC
-
-
-
-
 

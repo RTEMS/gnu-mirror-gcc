@@ -1,6 +1,6 @@
 // natString.cc - Implementation of java.lang.String native methods.
 
-/* Copyright (C) 1998, 1999, 2000  Free Software Foundation
+/* Copyright (C) 1998, 1999, 2000, 2001  Free Software Foundation
 
    This file is part of libgcj.
 
@@ -29,6 +29,7 @@ details.  */
 #include <gnu/gcj/convert/BytesToUnicode.h>
 #include <jvm.h>
 
+static void unintern (jobject);
 static jstring* strhash = NULL;
 static int strhash_count = 0;  /* Number of slots used in strhash. */
 static int strhash_size = 0;  /* Number of slots available in strhash.
@@ -45,6 +46,10 @@ static int strhash_size = 0;  /* Number of slots available in strhash.
 #define DELETED_STRING ((jstring)(~0))
 #define SET_STRING_IS_INTERNED(STR) /* nothing */
 
+#define UNMASK_PTR(Ptr) (((unsigned long) (Ptr)) & ~0x01)
+#define MASK_PTR(Ptr) (((unsigned long) (Ptr)) | 0x01)
+#define PTR_MASKED(Ptr) (((unsigned long) (Ptr)) & 0x01)
+
 /* Find a slot where the string with elements DATA, length LEN,
    and hash HASH should go in the strhash table of interned strings. */
 jstring*
@@ -57,11 +62,12 @@ _Jv_StringFindSlot (jchar* data, jint len, jint hash)
 
   int index = start_index;
   /* step must be non-zero, and relatively prime with strhash_size. */
-  int step = 8 * hash + 7;
+  jint step = (hash ^ (hash >> 16)) | 1;
   for (;;)
     {
       jstring* ptr = &strhash[index];
-      if (*ptr == NULL)
+      jstring value = (jstring) UNMASK_PTR (*ptr);
+      if (value == NULL)
 	{
 	  if (deleted_index >= 0)
 	    return (&strhash[deleted_index]);
@@ -70,8 +76,8 @@ _Jv_StringFindSlot (jchar* data, jint len, jint hash)
 	}
       else if (*ptr == DELETED_STRING)
 	deleted_index = index;
-      else if ((*ptr)->length() == len
-	       && memcmp(JvGetStringChars(*ptr), data, 2*len) == 0)
+      else if (value->length() == len
+	       && memcmp(JvGetStringChars(value), data, 2*len) == 0)
 	return (ptr);
       index = (index + step) & (strhash_size - 1);
       JvAssert (index != start_index);
@@ -115,16 +121,18 @@ java::lang::String::rehash()
   if (strhash == NULL)
     {
       strhash_size = 1024;
-      strhash = (jstring *) _Jv_AllocBytes (strhash_size * sizeof (jstring));
+      strhash = (jstring *) _Jv_AllocBytesChecked (strhash_size
+						   * sizeof (jstring));
       memset (strhash, 0, strhash_size * sizeof (jstring));
     }
   else
     {
       int i = strhash_size;
       jstring* ptr = strhash + i;
-      strhash_size *= 2;
-      strhash = (jstring *) _Jv_AllocBytes (strhash_size * sizeof (jstring));
-      memset (strhash, 0, strhash_size * sizeof (jstring));
+      int nsize = strhash_size * 2;
+      jstring *next = (jstring *) _Jv_AllocBytesChecked (nsize
+							 * sizeof (jstring));
+      memset (next, 0, nsize * sizeof (jstring));
 
       while (--i >= 0)
 	{
@@ -134,19 +142,23 @@ java::lang::String::rehash()
 
 	  /* This is faster equivalent of
 	   * *__JvGetInternSlot(*ptr) = *ptr; */
-	  jint hash = (*ptr)->hashCode();
-	  jint index = hash & (strhash_size - 1);
-	  jint step = 8 * hash + 7;
+	  jstring val = (jstring) UNMASK_PTR (*ptr);
+	  jint hash = val->hashCode();
+	  jint index = hash & (nsize - 1);
+	  jint step = (hash ^ (hash >> 16)) | 1;
 	  for (;;)
 	    {
-	      if (strhash[index] == NULL)
+	      if (next[index] == NULL)
 		{
-		  strhash[index] = *ptr;
+		  next[index] = *ptr;
 		  break;
 		}
-	      index = (index + step) & (strhash_size - 1);
+	      index = (index + step) & (nsize - 1);
 	    }
 	}
+
+      strhash_size = nsize;
+      strhash = next;
     }
 }
 
@@ -154,30 +166,61 @@ jstring
 java::lang::String::intern()
 {
   JvSynchronize sync (&StringClass);
-  if (4 * strhash_count >= 3 * strhash_size)
+  if (3 * strhash_count >= 2 * strhash_size)
     rehash();
   jstring* ptr = _Jv_StringGetSlot(this);
   if (*ptr != NULL && *ptr != DELETED_STRING)
-    return *ptr;
-  SET_STRING_IS_INTERNED(this);
+    {
+      // See description in unintern() to understand this.
+      *ptr = (jstring) MASK_PTR (*ptr);
+      return (jstring) UNMASK_PTR (*ptr);
+    }
+  jstring str = this->data == this ? this
+    : _Jv_NewString(JvGetStringChars(this), this->length());
+  SET_STRING_IS_INTERNED(str);
   strhash_count++;
-  *ptr = this;
+  *ptr = str;
   // When string is GC'd, clear the slot in the hash table.
-  // _Jv_RegisterFinalizer ((void *) this, unintern);
-  return this;
+  _Jv_RegisterFinalizer ((void *) str, unintern);
+  return str;
 }
 
 /* Called by String fake finalizer. */
-void
-java::lang::String::unintern (jobject obj)
+static void
+unintern (jobject obj)
 {
   JvSynchronize sync (&StringClass);
   jstring str = reinterpret_cast<jstring> (obj);
   jstring* ptr = _Jv_StringGetSlot(str);
   if (*ptr == NULL || *ptr == DELETED_STRING)
     return;
-  *ptr = DELETED_STRING;
-  strhash_count--;
+
+  // We assume the lowest bit of the pointer is free for our nefarious
+  // manipulations.  What we do is set it to `0' (implicitly) when
+  // interning the String.  If we subsequently re-intern the same
+  // String, then we set the bit.  When finalizing, if the bit is set
+  // then we clear it and re-register the finalizer.  We know this is
+  // a safe approach because both the intern() and unintern() acquire
+  // the class lock; this bit can't be manipulated when the lock is
+  // not held.  So if we are finalizing and the bit is clear then we
+  // know all references are gone and we can clear the entry in the
+  // hash table.  The naive approach of simply clearing the pointer
+  // here fails in the case where a request to intern a new string
+  // with the same contents is made between the time the intern()d
+  // string is found to be unreachable and when the finalizer is
+  // actually run.  In this case we could clear a pointer to a valid
+  // string, and future intern() calls for that particular value would
+  // spuriously fail.
+  if (PTR_MASKED (*ptr))
+    {
+      *ptr = (jstring) UNMASK_PTR (*ptr);
+      _Jv_RegisterFinalizer ((void *) obj, unintern);
+    }
+  else
+    {
+      *ptr = DELETED_STRING;
+      strhash_count--;
+    }
 }
 
 jstring
@@ -222,17 +265,21 @@ _Jv_NewStringUtf8Const (Utf8Const* str)
       chrs = JvGetStringChars(jstr);
     }
 
+  jint hash = 0;
   while (data < limit)
-    *chrs++ = UTF8_GET(data, limit);
+    {
+      jchar ch = UTF8_GET(data, limit);
+      hash = (31 * hash) + ch;
+      *chrs++ = ch;
+    }
   chrs -= length;
 
   JvSynchronize sync (&StringClass);
-  if (4 * strhash_count >= 3 * strhash_size)
+  if (3 * strhash_count >= 2 * strhash_size)
     java::lang::String::rehash();
-  int hash = str->hash;
   jstring* ptr = _Jv_StringFindSlot (chrs, length, hash);
   if (*ptr != NULL && *ptr != DELETED_STRING)
-    return *ptr;
+    return (jstring) UNMASK_PTR (*ptr);
   strhash_count++;
   if (jstr == NULL)
     {
@@ -242,6 +289,8 @@ _Jv_NewStringUtf8Const (Utf8Const* str)
     }
   *ptr = jstr;
   SET_STRING_IS_INTERNED(jstr);
+  // When string is GC'd, clear the slot in the hash table.
+  _Jv_RegisterFinalizer ((void *) jstr, unintern);
   return jstr;
 }
 

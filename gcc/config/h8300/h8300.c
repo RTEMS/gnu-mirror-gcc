@@ -30,7 +30,6 @@ Boston, MA 02111-1307, USA.  */
 #include "real.h"
 #include "insn-config.h"
 #include "conditions.h"
-#include "insn-flags.h"
 #include "output.h"
 #include "insn-attr.h"
 #include "flags.h"
@@ -509,7 +508,7 @@ ok_for_bclr (value)
   return small_power_of_two ((~value) & 0xff);
 }
 
-/* Return true is OP is a valid source operand for an integer move
+/* Return true if OP is a valid source operand for an integer move
    instruction.  */
 
 int
@@ -2239,7 +2238,7 @@ get_shift_alg (shift_type, shift_mode, count, info)
 	{
 	  if (count == 15 && shift_type == SHIFT_ASHIFTRT)
 	    {
-	      info->special = "shll\t%t0,%t0\n\tsubx\t%t0,%t0\n\tmov.b\t%t0,%s0";
+	      info->special = "shll\t%t0\n\tsubx\t%t0,%t0\n\tmov.b\t%t0,%s0";
 	      info->cc_valid_p = 0;
 	      return SHIFT_SPECIAL;
 	    }

@@ -1,3 +1,38 @@
+2001-08-19  Release Manager
+
+	* GCC 3.0.1 Released.
+
+2001-08-19  Release Manager
+
+	* GCC 3.0.1 Released.
+
+20010617 Release Manager
+
+        * GCC 3.0 Released.
+
+2001-06-11  Zack Weinberg  <zackw@stanford.edu>
+
+	* Makefile.in.in: Take --defines switch off of xgettext   
+	command line.                                           
+	* POTFILES.in: Massive update, removing all dead files and
+	adding approximately 300 files which had been left out.
+	Clarify comments on what should and should not appear here.
+
+	* gcc.pot, cat-id-tbl.c: Regenerate.
+
+2001-05-23  Zack Weinberg  <zackw@stanford.edu>
+
+	* POTFILES.in: Remove frame-dwarf2.c, frame.c, and frame.h.
+
+2001-05-16  Zack Weinberg  <zackw@stanford.edu>
+
+	* POTFILES.in: Remove assert.h.
+
+2001-05-13  Mark Mitchell  <mark@codesourcery.com>
+
+	* Makefile.in.in (STAMP): New macro.
+	Replace all uses of `touch' with $(STAMP).
+
 2001-01-30  Gerald Pfeifer  <pfeifer@dbai.tuwien.ac.at>
 
 	* Makefile.in.in (distclean): Also remove *.gmo during `make
