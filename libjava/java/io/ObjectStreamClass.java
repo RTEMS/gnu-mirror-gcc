@@ -2,42 +2,47 @@
    about serialized objects.
    Copyright (C) 1998, 1999, 2000, 2001, 2003  Free Software Foundation, Inc.
 
-   This file is part of GNU Classpath.
+This file is part of GNU Classpath.
 
-   GNU Classpath is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2, or (at your option)
-   any later version.
+GNU Classpath is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2, or (at your option)
+any later version.
  
-   GNU Classpath is distributed in the hope that it will be useful, but
-   WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   General Public License for more details.
+GNU Classpath is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
 
-   You should have received a copy of the GNU General Public License
-   along with GNU Classpath; see the file COPYING.  If not, write to the
-   Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA.
+You should have received a copy of the GNU General Public License
+along with GNU Classpath; see the file COPYING.  If not, write to the
+Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+02111-1307 USA.
 
-   Linking this library statically or dynamically with other modules is
-   making a combined work based on this library.  Thus, the terms and
-   conditions of the GNU General Public License cover the whole
-   combination.
+Linking this library statically or dynamically with other modules is
+making a combined work based on this library.  Thus, the terms and
+conditions of the GNU General Public License cover the whole
+combination.
 
-   As a special exception, the copyright holders of this library give you
-   permission to link this library with independent modules to produce an
-   executable, regardless of the license terms of these independent
-   modules, and to copy and distribute the resulting executable under
-   terms of your choice, provided that you also meet, for each linked
-   independent module, the terms and conditions of the license of that
-   module.  An independent module is a module which is not derived from
-   or based on this library.  If you modify this library, you may extend
-   this exception to your version of the library, but you are not
-   obligated to do so.  If you do not wish to do so, delete this
-   exception statement from your version. */
+As a special exception, the copyright holders of this library give you
+permission to link this library with independent modules to produce an
+executable, regardless of the license terms of these independent
+modules, and to copy and distribute the resulting executable under
+terms of your choice, provided that you also meet, for each linked
+independent module, the terms and conditions of the license of that
+module.  An independent module is a module which is not derived from
+or based on this library.  If you modify this library, you may extend
+this exception to your version of the library, but you are not
+obligated to do so.  If you do not wish to do so, delete this
+exception statement from your version. */
 
 
 package java.io;
+
+import gnu.java.io.NullOutputStream;
+import gnu.java.lang.reflect.TypeSignature;
+import gnu.java.security.action.SetAccessibleAction;
+import gnu.java.security.provider.Gnu;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -55,10 +60,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Hashtable;
 import java.util.Vector;
-import gnu.java.io.NullOutputStream;
-import gnu.java.lang.reflect.TypeSignature;
-import gnu.java.security.provider.Gnu;
-
 
 public class ObjectStreamClass implements Serializable
 {
@@ -104,16 +105,16 @@ public class ObjectStreamClass implements Serializable
       }
   }
 
-
   /**
    * Returns the name of the class that this
    * <code>ObjectStreamClass</code> represents.
+   *
+   * @return the name of the class.
    */
   public String getName()
   {
     return name;
   }
-
 
   /**
    * Returns the class that this <code>ObjectStreamClass</code>
@@ -129,31 +130,33 @@ public class ObjectStreamClass implements Serializable
     return clazz;
   }
 
-
   /**
    * Returns the serial version stream-unique identifier for the class
    * represented by this <code>ObjectStreamClass</code>.  This SUID is
    * either defined by the class as <code>static final long
    * serialVersionUID</code> or is calculated as specified in
    * Javasoft's "Object Serialization Specification" XXX: add reference
+   *
+   * @return the serial version UID.
    */
   public long getSerialVersionUID()
   {
     return uid;
   }
 
-
-  // Returns the serializable (non-static and non-transient) Fields
-  // of the class represented by this ObjectStreamClass.  The Fields
-  // are sorted by name.
-  // XXX doc
+  /**
+   * Returns the serializable (non-static and non-transient) Fields
+   * of the class represented by this ObjectStreamClass.  The Fields
+   * are sorted by name.
+   *
+   * @return the fields.
+   */
   public ObjectStreamField[] getFields()
   {
     ObjectStreamField[] copy = new ObjectStreamField[ fields.length ];
     System.arraycopy(fields, 0, copy, 0, fields.length);
     return copy;
   }
-
 
   // XXX doc
   // Can't do binary search since fields is sorted by name and
@@ -165,7 +168,6 @@ public class ObjectStreamClass implements Serializable
 	return fields[i];
     return null;
   }
-
 
   /**
    * Returns a textual representation of this
@@ -180,7 +182,6 @@ public class ObjectStreamClass implements Serializable
   {
     return "java.io.ObjectStreamClass< " + name + ", " + uid + " >";
   }
-
 
   // Returns true iff the class that this ObjectStreamClass represents
   // has the following method:
@@ -327,7 +328,7 @@ public class ObjectStreamClass implements Serializable
 	i = 0; j = 0; k = 0;
 	while (i < fields.length && j < exportedFields.length)
 	  {
-	    int comp = fields[i].getName().compareTo(exportedFields[j].getName());
+	    int comp = fields[i].compareTo(exportedFields[j]);
 
 	    if (comp < 0)
 	      {
@@ -344,10 +345,27 @@ public class ObjectStreamClass implements Serializable
 		newFieldList[k] = exportedFields[j];
 		newFieldList[k].setPersistent(true);
 		newFieldList[k].setToSet(false);
+		try
+		  {
+		    newFieldList[k].lookupField(clazz);
+		    newFieldList[k].checkFieldType();
+		  }
+		catch (NoSuchFieldException _)
+		  {
+		  }
 		j++;
 	      }
 	    else
 	      {
+		try
+		  {
+		    exportedFields[j].lookupField(clazz);
+		    exportedFields[j].checkFieldType();
+		  }
+		catch (NoSuchFieldException _)
+		  {
+		  }
+
 		if (!fields[i].getType().equals(exportedFields[j].getType()))
 		  throw new InvalidClassException
 		    ("serialPersistentFields must be compatible with" +
@@ -453,14 +471,8 @@ outer:
 		    }
 		}
 		final Method m = methods[i];
-		AccessController.doPrivileged(new PrivilegedAction()
-		{
-		    public Object run()
-		    {
-			m.setAccessible(true);
-			return null;
-		    }
-		});
+		SetAccessibleAction setAccessible = new SetAccessibleAction(m);
+		AccessController.doPrivileged(setAccessible);
 		return m;
 	    }
 	}
@@ -526,6 +538,8 @@ outer:
   // clazz.
   private void setFields(Class cl)
   {
+    SetAccessibleAction setAccessible = new SetAccessibleAction();
+
     if (!isSerializable() || isExternalizable())
       {
 	fields = NO_FIELDS;
@@ -534,17 +548,11 @@ outer:
 
     try
       {
-	final Field serialPersistentFields =
+	final Field f =
 	  cl.getDeclaredField("serialPersistentFields");
-	AccessController.doPrivileged(new PrivilegedAction()
-	{
-	    public Object run()
-	    {
-		serialPersistentFields.setAccessible(true);
-		return null;
-	    }
-	});
-	int modifiers = serialPersistentFields.getModifiers();
+	setAccessible.setMember(f);
+	AccessController.doPrivileged(setAccessible);
+	int modifiers = f.getModifiers();
 
 	if (Modifier.isStatic(modifiers)
 	    && Modifier.isFinal(modifiers)
@@ -554,6 +562,19 @@ outer:
 	    if (fields != null)
 	      {
 		Arrays.sort (fields);
+		// Retrieve field reference.
+		for (int i=0; i < fields.length; i++)
+		  {
+		    try
+		      {
+			fields[i].lookupField(cl);
+		      }
+		    catch (NoSuchFieldException _)
+		      {
+			fields[i].setToSet(false);
+		      }
+		  }
+		
 		calculateOffsets();
 		return;
 	      }
@@ -587,14 +608,8 @@ outer:
       if (all_fields[from] != null)
 	{
 	  final Field f = all_fields[from];
-	  AccessController.doPrivileged(new PrivilegedAction()
-	  {
-	      public Object run()
-	      {
-		  f.setAccessible(true);
-		  return null;
-	      }
-	  });
+	  setAccessible.setMember(f);
+	  AccessController.doPrivileged(setAccessible);
 	  fields[to] = new ObjectStreamField(all_fields[from]);
 	  to++;
 	}
@@ -621,14 +636,8 @@ outer:
 	// may not be public AND we only want the serialVersionUID of this
 	// class, not a superclass or interface.
 	final Field suid = cl.getDeclaredField("serialVersionUID");
-	AccessController.doPrivileged(new PrivilegedAction()
-	{
-	    public Object run()
-	    {
-		suid.setAccessible(true);
-		return null;
-	    }
-	});
+	SetAccessibleAction setAccessible = new SetAccessibleAction(suid);
+	AccessController.doPrivileged(setAccessible);
 	int modifiers = suid.getModifiers();
 
 	if (Modifier.isStatic(modifiers)
@@ -798,8 +807,56 @@ outer:
 
     fieldsArray = new ObjectStreamField[ o.length ];
     System.arraycopy(o, 0, fieldsArray, 0, o.length);
-    
+
     return fieldsArray;
+  }
+
+  /**
+   * Returns a new instance of the Class this ObjectStreamClass corresponds
+   * to.
+   * Note that this should only be used for Externalizable classes.
+   *
+   * @return A new instance.
+   */
+  Externalizable newInstance() throws InvalidClassException
+  {
+    synchronized(this)
+    {
+	if (constructor == null)
+	{
+	    try
+	    {
+		final Constructor c = clazz.getConstructor(new Class[0]);
+
+		AccessController.doPrivileged(new PrivilegedAction()
+		{
+		    public Object run()
+		    {
+			c.setAccessible(true);
+			return null;
+		    }
+		});
+
+		constructor = c;
+	    }
+	    catch(NoSuchMethodException x)
+	    {
+		throw new InvalidClassException(clazz.getName(),
+		    "No public zero-argument constructor");
+	    }
+	}
+    }
+
+    try
+    {
+	return (Externalizable)constructor.newInstance(null);
+    }
+    catch(Throwable t)
+    {
+	throw (InvalidClassException)
+	    new InvalidClassException(clazz.getName(),
+		     "Unable to instantiate").initCause(t);
+    }
   }
 
   public static final ObjectStreamField[] NO_FIELDS = {};
@@ -831,6 +888,7 @@ outer:
   boolean realClassIsExternalizable;
   ObjectStreamField[] fieldMapping;
   Class firstNonSerializableParent;
+  private Constructor constructor;  // default constructor for Externalizable
 
   boolean isProxyClass = false;
 

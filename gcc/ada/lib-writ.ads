@@ -181,6 +181,9 @@ package Lib.Writ is
    --              format will be correct and complete. Note that NO is
    --              always present if CE is present.
    --
+   --         DB   Detect_Blocking pragma is in effect for all units in
+   --              this file.
+   --
    --         FD   Configuration pragmas apply to all the units in this
    --              file specifying a possibly non-standard floating point
    --              format (VAX float with Long_Float using D_Float)
@@ -256,7 +259,7 @@ package Lib.Writ is
    --  has been able to determine with respect to restrictions violations.
    --  The format is:
 
-   --    R <<restriction-characters>> space <<restriction-param-id-entries>>
+   --    R <<restriction-characters>> <<restriction-param-id-entries>>
 
    --      The first parameter is a string of characters that records
    --      information regarding restrictions that do not take parameter
@@ -283,8 +286,9 @@ package Lib.Writ is
    --      has "v", which is not permitted, since these restrictions
    --      are partition-wide.
 
-   --  Following a space, the second parameter refers to restriction
-   --  identifiers for which a parameter is given.
+   --  The second parameter, which immediately follows the first (with
+   --  no separating space) gives restriction information for identifiers
+   --  for which a parameter is given.
 
    --      The parameter is a string of entries, one for each value in
    --      Restrict.All_Parameter_Restrictions. Each entry has two
