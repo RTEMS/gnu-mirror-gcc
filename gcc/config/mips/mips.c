@@ -1,6 +1,6 @@
 /* Subroutines for insn-output.c for MIPS
    Copyright (C) 1989, 1990, 1991, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2005 Free Software Foundation, Inc.
    Contributed by A. Lichnewsky, lich@inria.inria.fr.
    Changes by Michael Meissner, meissner@osf.org.
    64 bit r4000 support by Ian Lance Taylor, ian@cygnus.com, and
@@ -644,8 +644,10 @@ const struct mips_cpu_info mips_cpu_info_table[] = {
 #define TARGET_ASM_UNALIGNED_HI_OP "\t.align 0\n\t.half\t"
 #undef TARGET_ASM_UNALIGNED_SI_OP
 #define TARGET_ASM_UNALIGNED_SI_OP "\t.align 0\n\t.word\t"
+/* The IRIX 6 O32 assembler gives an error for `align 0; .dword', contrary
+   to the documentation, so disable it.  */
 #undef TARGET_ASM_UNALIGNED_DI_OP
-#define TARGET_ASM_UNALIGNED_DI_OP "\t.align 0\n\t.dword\t"
+#define TARGET_ASM_UNALIGNED_DI_OP NULL
 #endif
 
 #undef TARGET_ASM_FUNCTION_PROLOGUE
@@ -4321,9 +4323,11 @@ mips_arg_info (cum, mode, type, named, info)
 	 is a double, but $f14 if it is a single.  Otherwise, on a
 	 32-bit double-float machine, each FP argument must start in a
 	 new register pair.  */
-      even_reg_p = ((mips_abi == ABI_O64 && mode == SFmode) || FP_INC > 1);
+      even_reg_p = (GET_MODE_SIZE (mode) > UNITS_PER_HWFPVALUE
+		    || (mips_abi == ABI_O64 && mode == SFmode)
+		    || FP_INC > 1);
     }
-  else if (!TARGET_64BIT)
+  else if (!TARGET_64BIT || LONG_DOUBLE_TYPE_SIZE == 128)
     {
       if (GET_MODE_CLASS (mode) == MODE_INT
 	  || GET_MODE_CLASS (mode) == MODE_FLOAT)
@@ -4635,7 +4639,7 @@ mips_setup_incoming_varargs (cum, mode, type, no_rtl)
 	      rtx ptr = plus_constant (virtual_incoming_args_rtx, off);
 	      emit_move_insn (gen_rtx_MEM (mode, ptr),
 			      gen_rtx_REG (mode, FP_ARG_FIRST + i));
-	      off += UNITS_PER_FPVALUE;
+	      off += UNITS_PER_HWFPVALUE;
 	    }
 	}
     }
@@ -4711,6 +4715,15 @@ mips_va_start (valist, nextarg)
      rtx nextarg;
 {
   const CUMULATIVE_ARGS *cum = &current_function_args_info;
+
+  /* ARG_POINTER_REGNUM is initialized to STACK_POINTER_BOUNDARY, but
+     since the stack is aligned for a pair of argument-passing slots,
+     and the beginning of a variable argument list may be an odd slot,
+     we have to decrease its alignment.  */
+  if (cfun && cfun->emit->regno_pointer_align)
+    while (((current_function_pretend_args_size * BITS_PER_UNIT)
+	    & (REGNO_POINTER_ALIGN (ARG_POINTER_REGNUM) - 1)) != 0)
+      REGNO_POINTER_ALIGN (ARG_POINTER_REGNUM) /= 2;
 
   if (mips_abi == ABI_EABI)
     {
@@ -4909,9 +4922,9 @@ mips_va_arg (valist, type)
 	      off = build (COMPONENT_REF, TREE_TYPE (f_foff), valist, f_foff);
 
 	      /* When floating-point registers are saved to the stack,
-		 each one will take up UNITS_PER_FPVALUE bytes, regardless
+		 each one will take up UNITS_PER_HWFPVALUE bytes, regardless
 		 of the float's precision.  */
-	      rsize = UNITS_PER_FPVALUE;
+	      rsize = UNITS_PER_HWFPVALUE;
 	    }
 	  else
 	    {
@@ -4930,7 +4943,7 @@ mips_va_arg (valist, type)
 	     bytes (= PARM_BOUNDARY bits).  RSIZE can sometimes be smaller
 	     than that, such as in the combination -mgp64 -msingle-float
 	     -fshort-double.  Doubles passed in registers will then take
-	     up UNITS_PER_FPVALUE bytes, but those passed on the stack
+	     up UNITS_PER_HWFPVALUE bytes, but those passed on the stack
 	     take up UNITS_PER_WORD bytes.  */
 	  osize = MAX (rsize, UNITS_PER_WORD);
 
@@ -5007,7 +5020,10 @@ mips_va_arg (valist, type)
 	 that alignments <= UNITS_PER_WORD are preserved by the va_arg
 	 increment mechanism.  */
 
-      if (TARGET_64BIT)
+      if ((mips_abi == ABI_N32 || mips_abi == ABI_64)
+	  && TYPE_ALIGN (type) > 64)
+	align = 16;
+      else if (TARGET_64BIT)
 	align = 8;
       else if (TYPE_ALIGN (type) > 32)
 	align = 8;
@@ -5365,6 +5381,10 @@ override_options ()
   else
     mips16 = 0;
 
+#ifdef MIPS_TFMODE_FORMAT
+  real_format_for_mode[TFmode - QFmode] = &MIPS_TFMODE_FORMAT;
+#endif
+  
   mips_print_operand_punct['?'] = 1;
   mips_print_operand_punct['#'] = 1;
   mips_print_operand_punct['&'] = 1;
@@ -6542,26 +6562,84 @@ copy_file_data (to, from)
     fatal_io_error ("can't close temp file");
 }
 
-/* Emit either a label, .comm, or .lcomm directive, and mark that the symbol
-   is used, so that we don't emit an .extern for it in mips_asm_file_end.  */
+/* Implement ASM_OUTPUT_ALIGNED_DECL_COMMON.  This is usually the same as
+   the elfos.h version, but we also need to handle -muninit-const-in-rodata
+   and the limitations of the SGI o32 assembler.  */
 
 void
-mips_declare_object (stream, name, init_string, final_string, size)
+mips_output_aligned_decl_common (stream, decl, name, size, align)
      FILE *stream;
+     tree decl;
      const char *name;
-     const char *init_string;
-     const char *final_string;
-     int size;
+     unsigned HOST_WIDE_INT size;
+     unsigned int align;
 {
-  fputs (init_string, stream);		/* "", "\t.comm\t", or "\t.lcomm\t" */
+  const char *format;
+
+  /* If the target wants uninitialized const declarations in
+     .rdata then don't put them in .comm.   */
+  if (TARGET_EMBEDDED_DATA && TARGET_UNINIT_CONST_IN_RODATA
+      && TREE_CODE (decl) == VAR_DECL && TREE_READONLY (decl)
+      && (DECL_INITIAL (decl) == 0 || DECL_INITIAL (decl) == error_mark_node))
+    {
+      if (TREE_PUBLIC (decl) && DECL_NAME (decl))
+	targetm.asm_out.globalize_label (stream, name);
+
+      readonly_data_section ();
+      ASM_OUTPUT_ALIGN (stream, floor_log2 (align / BITS_PER_UNIT));
+
+      format = ACONCAT ((":\n\t.space\t", HOST_WIDE_INT_PRINT_UNSIGNED,
+			 "\n", NULL));
+      mips_declare_object (stream, name, "", format, size);
+    }
+#ifdef TARGET_IRIX6
+    /* The SGI o32 assembler doesn't accept an alignment, so round up
+       the size instead.  */
+  else if (mips_abi == ABI_32 && !TARGET_GAS)
+    {
+      size += (align / BITS_PER_UNIT) - 1;
+      size -= size % (align / BITS_PER_UNIT);
+      format = ACONCAT ((",", HOST_WIDE_INT_PRINT_UNSIGNED, "\n", NULL));
+      mips_declare_object (stream, name, "\n\t.comm\t", format, size);
+    }
+#endif
+  else
+    {
+      format = ACONCAT ((",", HOST_WIDE_INT_PRINT_UNSIGNED, ",%u\n", NULL));
+      mips_declare_object (stream, name, "\n\t.comm\t", format,
+			   size, align / BITS_PER_UNIT);
+    }
+}
+
+/* Emit either a label, .comm, or .lcomm directive.  When using assembler
+   macros, mark the symbol as written so that mips_file_end won't emit an
+   .extern for it.  STREAM is the output file, NAME is the name of the
+   symbol, INIT_STRING is the string that should be written before the
+   symbol and FINAL_STRING is the string that shoulbe written after it.
+   FINAL_STRING is a printf() format that consumes the remaining arguments.  */
+
+void
+mips_declare_object VPARAMS ((FILE *stream, const char *name,
+			      const char *init_string,
+			      const char *final_string, ...))
+{
+  VA_OPEN (ap, final_string);
+  VA_FIXEDARG (ap, FILE *, stream);
+  VA_FIXEDARG (ap, const char *, name);
+  VA_FIXEDARG (ap, const char *, init_string);
+  VA_FIXEDARG (ap, const char *, final_string);
+
+  fputs (init_string, stream);
   assemble_name (stream, name);
-  fprintf (stream, final_string, size);	/* ":\n", ",%u\n", ",%u\n" */
+  vfprintf (stream, final_string, ap);
 
   if (TARGET_GP_OPT)
     {
       tree name_tree = get_identifier (name);
       TREE_ASM_WRITTEN (name_tree) = 1;
     }
+
+  VA_CLOSE (ap);
 }
 
 /* Return the bytes needed to compute the frame pointer from the current
@@ -7085,7 +7163,7 @@ save_restore_insns (store_p, large_reg, large_offset)
       /* Pick which pointer to use as a base register.  */
       fp_offset = cfun->machine->frame.fp_sp_offset;
       end_offset = fp_offset - (cfun->machine->frame.fp_reg_size
-				- UNITS_PER_FPVALUE);
+				- UNITS_PER_HWFPVALUE);
 
       if (fp_offset < 0 || end_offset < 0)
 	internal_error
@@ -7140,7 +7218,7 @@ save_restore_insns (store_p, large_reg, large_offset)
 	    else
 	      emit_move_insn (reg_rtx, mem_rtx);
 
-	    fp_offset -= UNITS_PER_FPVALUE;
+	    fp_offset -= UNITS_PER_HWFPVALUE;
 	  }
     }
 }
@@ -7437,20 +7515,7 @@ mips_expand_prologue ()
 	      break;
 	    }
 	  else
-	    {
-	      int words;
-
-	      if (GET_CODE (entry_parm) != REG)
-	        abort ();
-
-	      /* passed in a register, so will get homed automatically */
-	      if (GET_MODE (entry_parm) == BLKmode)
-		words = (int_size_in_bytes (passed_type) + 3) / 4;
-	      else
-		words = (GET_MODE_SIZE (GET_MODE (entry_parm)) + 3) / 4;
-
-	      regno = REGNO (entry_parm) + words - 1;
-	    }
+	    regno = GP_ARG_FIRST + args_so_far.num_gprs;
 	}
       else
 	{
@@ -8271,11 +8336,26 @@ mips_function_value (valtype, func, mode)
     }
   mclass = GET_MODE_CLASS (mode);
 
-  if (mclass == MODE_FLOAT && GET_MODE_SIZE (mode) <= UNITS_PER_FPVALUE)
+  if (mclass == MODE_FLOAT && GET_MODE_SIZE (mode) <= UNITS_PER_HWFPVALUE)
     reg = FP_RETURN;
 
+  else if (mclass == MODE_FLOAT && mode == TFmode)
+    /* long doubles are really split between f0 and f2, not f1.  Eek.
+       Use DImode for each component, since GCC wants integer modes
+       for subregs.  */
+    return gen_rtx_PARALLEL
+      (VOIDmode,
+       gen_rtvec (2,
+		  gen_rtx_EXPR_LIST (VOIDmode,
+				     gen_rtx_REG (DImode, FP_RETURN),
+				     GEN_INT (0)),
+		  gen_rtx_EXPR_LIST (VOIDmode,
+				     gen_rtx_REG (DImode, FP_RETURN + 2),
+				     GEN_INT (GET_MODE_SIZE (mode) / 2))));
+       
+
   else if (mclass == MODE_COMPLEX_FLOAT
-	   && GET_MODE_SIZE (mode) <= UNITS_PER_FPVALUE * 2)
+	   && GET_MODE_SIZE (mode) <= UNITS_PER_HWFPVALUE * 2)
     {
       enum machine_mode cmode = GET_MODE_INNER (mode);
 
@@ -8416,19 +8496,20 @@ function_arg_pass_by_reference (cum, mode, type, named)
    We can't allow 64-bit float registers to change from a 32-bit
    mode to a 64-bit mode.  */
 
-enum reg_class
-mips_cannot_change_mode_class (from, to)
+bool
+mips_cannot_change_mode_class (from, to, class)
      enum machine_mode from, to;
+     enum reg_class class;
 {
   if (GET_MODE_SIZE (from) != GET_MODE_SIZE (to))
     {
       if (TARGET_BIG_ENDIAN)
-        return FP_REGS;
+	return reg_classes_intersect_p (FP_REGS, class);
       if (TARGET_FLOAT64)
-        return HI_AND_FP_REGS;
-      return HI_REG;
+	return reg_classes_intersect_p (HI_AND_FP_REGS, class);
+      return reg_classes_intersect_p (HI_REG, class);
     }
-  return NO_REGS;
+  return false;
 }
 
 /* This function returns the register class required for a secondary
