@@ -30,7 +30,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "flags.h"
 #include "function.h"
 #include "tree-inline.h"
-#include "tree-simple.h"
+#include "tree-gimple.h"
 #include "tree-flow.h"
 #include "tree-mudflap.h"
 #include "tree-dump.h"
@@ -344,7 +344,7 @@ mf_varname_tree (tree decl)
       {
         const char *funcname = NULL;
         if (DECL_NAME (current_function_decl))
-          funcname = (*lang_hooks.decl_printable_name) (current_function_decl, 1);
+          funcname = lang_hooks.decl_printable_name (current_function_decl, 1);
         if (funcname == NULL)
           funcname = "anonymous fn";
 
@@ -369,7 +369,7 @@ mf_varname_tree (tree decl)
       }
 
     if (declname == NULL)
-      declname = (*lang_hooks.decl_printable_name) (decl, 3);
+      declname = lang_hooks.decl_printable_name (decl, 3);
 
     if (declname == NULL)
       declname = "<unnamed variable>";
@@ -415,7 +415,7 @@ mf_file_function_line_tree (location_t *locus)
     colon = line = "";
 
   /* Add (FUNCTION).  */
-  name = (*lang_hooks.decl_printable_name) (current_function_decl, 1);
+  name = lang_hooks.decl_printable_name (current_function_decl, 1);
   if (name)
     {
       op = " (";
@@ -563,40 +563,27 @@ mf_xform_derefs_1 (tree_stmt_iterator *iter, tree *tp,
     {
     case ARRAY_REF:
       {
-        /* Omit checking if we can statically determine that the access is
-           valid.  For non-addressable local arrays this is not optional,
-           since we won't have called __mf_register for the object.  */
-        tree op0, op1;
+	/* Omit checking if we can statically determine that the access is
+	   valid.  For non-addressable local arrays this is not optional,
+	   since we won't have called __mf_register for the object.  */
+	tree op0, op1;
 
-        op0 = TREE_OPERAND (t, 0);
-        op1 = TREE_OPERAND (t, 1);
-        while (TREE_CODE (op1) == INTEGER_CST)
-          {
-            tree dom = TYPE_DOMAIN (TREE_TYPE (op0));
+	op0 = TREE_OPERAND (t, 0);
+	op1 = TREE_OPERAND (t, 1);
+	while (in_array_bounds_p (op0, op1))
+	  {
+	    /* If we're looking at a non-external VAR_DECL, then the 
+	       access must be ok.  */
+	    if (TREE_CODE (op0) == VAR_DECL && !DECL_EXTERNAL (op0))
+	      return;
 
-            /* Test for index in range.  Break if not.  */
-            if (!dom)
-              break;
-            if (!TYPE_MIN_VALUE (dom) || !really_constant_p (TYPE_MIN_VALUE (dom)))
-              break;
-            if (!TYPE_MAX_VALUE (dom) || !really_constant_p (TYPE_MAX_VALUE (dom)))
-              break;
-            if (tree_int_cst_lt (op1, TYPE_MIN_VALUE (dom))
-                || tree_int_cst_lt (TYPE_MAX_VALUE (dom), op1))
-              break;
+	    /* Only continue if we're still looking at an array.  */
+	    if (TREE_CODE (op0) != ARRAY_REF)
+	      break;
 
-            /* If we're looking at a non-external VAR_DECL, then the 
-               access must be ok.  */
-            if (TREE_CODE (op0) == VAR_DECL && !DECL_EXTERNAL (op0))
-              return;
-
-            /* Only continue if we're still looking at an array.  */
-            if (TREE_CODE (op0) != ARRAY_REF)
-              break;
-
-            op1 = TREE_OPERAND (op0, 1);
-            op0 = TREE_OPERAND (op0, 0);
-          }
+	    op1 = TREE_OPERAND (op0, 1);
+	    op0 = TREE_OPERAND (op0, 0);
+	  }
       
         /* If we got here, we couldn't statically the check.  */
         ptr_type = build_pointer_type (type);
@@ -740,12 +727,16 @@ mx_register_decls (tree decl, tree *stmt_list)
   while (decl != NULL_TREE)
     {
       /* Eligible decl?  */
-      if ((TREE_CODE (decl) == VAR_DECL || TREE_CODE (decl) == PARM_DECL) &&
-          (! TREE_STATIC (decl)) && /* auto variable */
-          (! DECL_EXTERNAL (decl)) && /* not extern variable */
-          (COMPLETE_OR_VOID_TYPE_P (TREE_TYPE (decl))) && /* complete type */
-          (! mf_marked_p (decl)) && /* not already processed */
-          (TREE_ADDRESSABLE (decl))) /* has address taken */
+      if ((TREE_CODE (decl) == VAR_DECL || TREE_CODE (decl) == PARM_DECL)
+	  /* It must be a non-external, automatic variable.  */
+	  && ! DECL_EXTERNAL (decl)
+	  && ! TREE_STATIC (decl)
+	  /* The decl must have its address taken.  */
+	  && TREE_ADDRESSABLE (decl)
+	  /* The type of the variable must be complete.  */
+	  && COMPLETE_OR_VOID_TYPE_P (TREE_TYPE (decl))
+	  /* Don't process the same decl twice.  */
+	  && ! mf_marked_p (decl))
         {
           tree size = NULL_TREE, variable_name;
           tree unregister_fncall, unregister_fncall_params;
@@ -859,7 +850,7 @@ mx_register_decls (tree decl, tree *stmt_list)
           /* Add the __mf_register call at the current appending point.  */
           if (tsi_end_p (initially_stmts))
             internal_error ("mudflap ran off end of BIND_EXPR body");
-          tsi_link_before (& initially_stmts, register_fncall, TSI_SAME_STMT);
+          tsi_link_before (&initially_stmts, register_fncall, TSI_SAME_STMT);
 
           /* Accumulate the FINALLY piece. */
           append_to_statement_list (unregister_fncall, &finally_stmts);
