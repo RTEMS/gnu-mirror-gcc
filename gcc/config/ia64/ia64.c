@@ -51,6 +51,7 @@ Boston, MA 02111-1307, USA.  */
 #include "hashtab.h"
 #include "langhooks.h"
 #include "cfglayout.h"
+#include "tree-gimple.h"
 
 /* This is used for communication between ASM_OUTPUT_LABEL and
    ASM_OUTPUT_LABELREF.  */
@@ -163,7 +164,6 @@ struct ia64_frame_info
 /* Current frame information calculated by ia64_compute_frame_size.  */
 static struct ia64_frame_info current_frame_info;
 
-static int ia64_use_dfa_pipeline_interface (void);
 static int ia64_first_cycle_multipass_dfa_lookahead (void);
 static void ia64_dependencies_evaluation_hook (rtx, rtx);
 static void ia64_init_dfa_pre_cycle_insn (void);
@@ -189,6 +189,8 @@ static rtx gen_fr_restore_x (rtx, rtx, rtx);
 static enum machine_mode hfa_element_mode (tree, int);
 static void ia64_setup_incoming_varargs (CUMULATIVE_ARGS *, enum machine_mode,
 					 tree, int *, int);
+static bool ia64_pass_by_reference (CUMULATIVE_ARGS *, enum machine_mode,
+				    tree, bool);
 static bool ia64_function_ok_for_sibcall (tree, tree);
 static bool ia64_return_in_memory (tree, tree);
 static bool ia64_rtx_costs (rtx, int, int, int *);
@@ -261,7 +263,11 @@ static void ia64_hpux_add_extern_decl (tree decl)
      ATTRIBUTE_UNUSED;
 static void ia64_hpux_file_end (void)
      ATTRIBUTE_UNUSED;
+static void ia64_init_libfuncs (void)
+     ATTRIBUTE_UNUSED;
 static void ia64_hpux_init_libfuncs (void)
+     ATTRIBUTE_UNUSED;
+static void ia64_sysv4_init_libfuncs (void)
      ATTRIBUTE_UNUSED;
 static void ia64_vms_init_libfuncs (void)
      ATTRIBUTE_UNUSED;
@@ -269,6 +275,7 @@ static void ia64_vms_init_libfuncs (void)
 static tree ia64_handle_model_attribute (tree *, tree, tree, int, bool *);
 static void ia64_encode_section_info (tree, rtx, int);
 static rtx ia64_struct_value_rtx (tree, int);
+static tree ia64_gimplify_va_arg (tree, tree, tree *, tree *);
 
 
 /* Table of valid machine attributes.  */
@@ -336,7 +343,7 @@ static const struct attribute_spec ia64_attribute_table[] =
 #define TARGET_SCHED_DEPENDENCIES_EVALUATION_HOOK ia64_dependencies_evaluation_hook
 
 #undef TARGET_SCHED_USE_DFA_PIPELINE_INTERFACE
-#define TARGET_SCHED_USE_DFA_PIPELINE_INTERFACE ia64_use_dfa_pipeline_interface
+#define TARGET_SCHED_USE_DFA_PIPELINE_INTERFACE hook_int_void_1
 
 #undef TARGET_SCHED_FIRST_CYCLE_MULTIPASS_DFA_LOOKAHEAD
 #define TARGET_SCHED_FIRST_CYCLE_MULTIPASS_DFA_LOOKAHEAD ia64_first_cycle_multipass_dfa_lookahead
@@ -355,6 +362,8 @@ static const struct attribute_spec ia64_attribute_table[] =
 
 #undef TARGET_FUNCTION_OK_FOR_SIBCALL
 #define TARGET_FUNCTION_OK_FOR_SIBCALL ia64_function_ok_for_sibcall
+#undef TARGET_PASS_BY_REFERENCE
+#define TARGET_PASS_BY_REFERENCE ia64_pass_by_reference
 
 #undef TARGET_ASM_OUTPUT_MI_THUNK
 #define TARGET_ASM_OUTPUT_MI_THUNK ia64_output_mi_thunk
@@ -397,11 +406,18 @@ static const struct attribute_spec ia64_attribute_table[] =
 #define TARGET_STRUCT_VALUE_RTX ia64_struct_value_rtx
 #undef TARGET_RETURN_IN_MEMORY
 #define TARGET_RETURN_IN_MEMORY ia64_return_in_memory
-
 #undef TARGET_SETUP_INCOMING_VARARGS
 #define TARGET_SETUP_INCOMING_VARARGS ia64_setup_incoming_varargs
 #undef TARGET_STRICT_ARGUMENT_NAMING
 #define TARGET_STRICT_ARGUMENT_NAMING hook_bool_CUMULATIVE_ARGS_true
+#undef TARGET_MUST_PASS_IN_STACK
+#define TARGET_MUST_PASS_IN_STACK must_pass_in_stack_var_size
+
+#undef TARGET_GIMPLIFY_VA_ARG_EXPR
+#define TARGET_GIMPLIFY_VA_ARG_EXPR ia64_gimplify_va_arg
+
+#undef TARGET_UNWIND_EMIT
+#define TARGET_UNWIND_EMIT process_for_unwind_directive
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -949,8 +965,6 @@ general_xfmode_operand (rtx op, enum machine_mode mode)
 {
   if (! general_operand (op, mode))
     return 0;
-  if (GET_CODE (op) == MEM && GET_CODE (XEXP (op, 0)) == ADDRESSOF)
-    return 0;
   return 1;
 }
 
@@ -960,8 +974,6 @@ int
 destination_xfmode_operand (rtx op, enum machine_mode mode)
 {
   if (! destination_operand (op, mode))
-    return 0;
-  if (GET_CODE (op) == MEM && GET_CODE (XEXP (op, 0)) == ADDRESSOF)
     return 0;
   return 1;
 }
@@ -1104,7 +1116,10 @@ ia64_encode_section_info (tree decl, rtx rtl, int first)
 {
   default_encode_section_info (decl, rtl, first);
 
+  /* Careful not to prod global register variables.  */
   if (TREE_CODE (decl) == VAR_DECL
+      && GET_CODE (DECL_RTL (decl)) == MEM
+      && GET_CODE (XEXP (DECL_RTL (decl), 0)) == SYMBOL_REF
       && (TREE_STATIC (decl) || DECL_EXTERNAL (decl)))
     ia64_encode_addr_area (decl, XEXP (rtl, 0));
 }
@@ -1628,17 +1643,16 @@ spill_xfmode_operand (rtx in, int force)
       && GET_MODE (SUBREG_REG (in)) == TImode
       && GET_CODE (SUBREG_REG (in)) == REG)
     {
-      rtx mem = gen_mem_addressof (SUBREG_REG (in), NULL_TREE, /*rescan=*/true);
-      return gen_rtx_MEM (XFmode, copy_to_reg (XEXP (mem, 0)));
+      rtx memt = assign_stack_temp (TImode, 16, 0);
+      emit_move_insn (memt, SUBREG_REG (in));
+      return adjust_address (memt, XFmode, 0);
     }
   else if (force && GET_CODE (in) == REG)
     {
-      rtx mem = gen_mem_addressof (in, NULL_TREE, /*rescan=*/true);
-      return gen_rtx_MEM (XFmode, copy_to_reg (XEXP (mem, 0)));
+      rtx memx = assign_stack_temp (XFmode, 16, 0);
+      emit_move_insn (memx, in);
+      return memx;
     }
-  else if (GET_CODE (in) == MEM
-	   && GET_CODE (XEXP (in, 0)) == ADDRESSOF)
-    return change_address (in, XFmode, copy_to_reg (XEXP (in, 0)));
   else
     return in;
 }
@@ -1666,7 +1680,7 @@ ia64_expand_compare (enum rtx_code code, enum machine_mode mode)
   /* HPUX TFmode compare requires a library call to _U_Qfcmp, which takes a
      magic number as its third argument, that indicates what to do.
      The return value is an integer to be compared against zero.  */
-  else if (TARGET_HPUX && GET_MODE (op0) == TFmode)
+  else if (GET_MODE (op0) == TFmode)
     {
       enum qfcmp_magic {
 	QCMP_INV = 1,	/* Raise FP_INVALID on SNaN as a side effect.  */
@@ -1677,7 +1691,7 @@ ia64_expand_compare (enum rtx_code code, enum machine_mode mode)
       } magic;
       enum rtx_code ncode;
       rtx ret, insns;
-      if (GET_MODE (op1) != TFmode)
+      if (!cmptf_libfunc || GET_MODE (op1) != TFmode)
 	abort ();
       switch (code)
 	{
@@ -1687,6 +1701,7 @@ ia64_expand_compare (enum rtx_code code, enum machine_mode mode)
 	case NE:        magic = QCMP_EQ;                  ncode = EQ; break;
 	  /* isunordered() from C99.  */
 	case UNORDERED: magic = QCMP_UNORD;               ncode = NE; break;
+	case ORDERED:   magic = QCMP_UNORD;               ncode = EQ; break;
 	  /* Relational operators raise FP_INVALID when given
 	     an SNaN operand.  */
 	case LT:        magic = QCMP_LT        |QCMP_INV; ncode = NE; break;
@@ -3468,6 +3483,11 @@ ia64_initialize_trampoline (rtx addr, rtx fnaddr, rtx static_chain)
 	}
     }
 
+  /* Make sure addresses are Pmode even if we are in ILP32 mode. */
+  addr = convert_memory_address (Pmode, addr);
+  fnaddr = convert_memory_address (Pmode, fnaddr);
+  static_chain = convert_memory_address (Pmode, static_chain);
+
   /* Load up our iterator.  */
   addr_reg = gen_reg_rtx (Pmode);
   emit_move_insn (addr_reg, addr);
@@ -3740,8 +3760,12 @@ ia64_function_arg (CUMULATIVE_ARGS *cum, enum machine_mode mode, tree type,
 	}
 
       /* If we ended up using just one location, just return that one loc, but
-	 change the mode back to the argument mode.  */
-      if (i == 1)
+	 change the mode back to the argument mode.  However, we can't do this
+	 when hfa_mode is XFmode and mode is TImode.  In that case, we would
+	 return a TImode reference to an FP reg, but FP regs can't hold TImode.
+	 We need the PARALLEL to make this work.  This can happen for a union
+	 containing a single __float80 member.  */
+      if (i == 1 && ! (hfa_mode == XFmode && mode == TImode))
 	return gen_rtx_REG (mode, REGNO (XEXP (loc[0], 0)));
       else
 	return gen_rtx_PARALLEL (mode, gen_rtvec_v (i, loc));
@@ -3924,10 +3948,10 @@ ia64_function_arg_advance (CUMULATIVE_ARGS *cum, enum machine_mode mode,
 /* Variable sized types are passed by reference.  */
 /* ??? At present this is a GCC extension to the IA-64 ABI.  */
 
-int
-ia64_function_arg_pass_by_reference (CUMULATIVE_ARGS *cum ATTRIBUTE_UNUSED,
-				     enum machine_mode mode ATTRIBUTE_UNUSED,
-				     tree type, int named ATTRIBUTE_UNUSED)
+static bool
+ia64_pass_by_reference (CUMULATIVE_ARGS *cum ATTRIBUTE_UNUSED,
+			enum machine_mode mode ATTRIBUTE_UNUSED,
+			tree type, bool named ATTRIBUTE_UNUSED)
 {
   return type && TREE_CODE (TYPE_SIZE (type)) != INTEGER_CST;
 }
@@ -3946,20 +3970,15 @@ ia64_function_ok_for_sibcall (tree decl, tree exp ATTRIBUTE_UNUSED)
 
 /* Implement va_arg.  */
 
-rtx
-ia64_va_arg (tree valist, tree type)
+static tree
+ia64_gimplify_va_arg (tree valist, tree type, tree *pre_p, tree *post_p)
 {
-  tree t;
-
   /* Variable sized types are passed by reference.  */
-  if (TREE_CODE (TYPE_SIZE (type)) != INTEGER_CST)
+  if (pass_by_reference (NULL, TYPE_MODE (type), type, false))
     {
-      rtx addr = force_reg (ptr_mode,
-	    std_expand_builtin_va_arg (valist, build_pointer_type (type)));
-#ifdef POINTERS_EXTEND_UNSIGNED
-      addr = convert_memory_address (Pmode, addr);
-#endif
-      return gen_rtx_MEM (ptr_mode, addr);
+      tree ptrtype = build_pointer_type (type);
+      tree addr = std_gimplify_va_arg_expr (valist, ptrtype, pre_p, post_p);
+      return build_fold_indirect_ref (addr);
     }
 
   /* Aggregate arguments with alignment larger than 8 bytes start at
@@ -3969,16 +3988,15 @@ ia64_va_arg (tree valist, tree type)
   if ((TREE_CODE (type) == REAL_TYPE || TREE_CODE (type) == INTEGER_TYPE)
       ? int_size_in_bytes (type) > 8 : TYPE_ALIGN (type) > 8 * BITS_PER_UNIT)
     {
-      t = build (PLUS_EXPR, TREE_TYPE (valist), valist,
-		 build_int_2 (2 * UNITS_PER_WORD - 1, 0));
+      tree t = build (PLUS_EXPR, TREE_TYPE (valist), valist,
+		      build_int_2 (2 * UNITS_PER_WORD - 1, 0));
       t = build (BIT_AND_EXPR, TREE_TYPE (t), t,
 		 build_int_2 (-2 * UNITS_PER_WORD, -1));
       t = build (MODIFY_EXPR, TREE_TYPE (valist), valist, t);
-      TREE_SIDE_EFFECTS (t) = 1;
-      expand_expr (t, const0_rtx, VOIDmode, EXPAND_NORMAL);
+      gimplify_and_add (t, pre_p);
     }
 
-  return std_expand_builtin_va_arg (valist, type);
+  return std_gimplify_va_arg_expr (valist, type, pre_p, post_p);
 }
 
 /* Return 1 if function return value returned in memory.  Return 0 if it is
@@ -6326,14 +6344,22 @@ ia64_dfa_new_cycle (FILE *dump, int verbose, rtx insn, int last_clock,
 	}
       else if (reload_completed)
 	setup_clocks_p = TRUE;
-      memcpy (curr_state, prev_cycle_state, dfa_state_size);
-      state_transition (curr_state, dfa_stop_insn);
-      state_transition (curr_state, dfa_pre_cycle_insn);
-      state_transition (curr_state, NULL);
+      if (GET_CODE (PATTERN (last_scheduled_insn)) == ASM_INPUT
+	  || asm_noperands (PATTERN (last_scheduled_insn)) >= 0)
+	state_reset (curr_state);
+      else
+	{
+	  memcpy (curr_state, prev_cycle_state, dfa_state_size);
+	  state_transition (curr_state, dfa_stop_insn);
+	  state_transition (curr_state, dfa_pre_cycle_insn);
+	  state_transition (curr_state, NULL);
+	}
     }
   else if (reload_completed)
     setup_clocks_p = TRUE;
-  if (setup_clocks_p && ia64_tune == PROCESSOR_ITANIUM)
+  if (setup_clocks_p && ia64_tune == PROCESSOR_ITANIUM
+      && GET_CODE (PATTERN (insn)) != ASM_INPUT
+      && asm_noperands (PATTERN (insn)) < 0)
     {
       enum attr_itanium_class c = ia64_safe_itanium_class (insn);
 
@@ -6947,7 +6973,8 @@ bundling (FILE *dump, int verbose, rtx prev_head_insn, rtx tail)
 		 guarantee issuing all insns on the same cycle for
 		 Itanium 1, we need to issue 2 nops after the first M
 		 insn (MnnMII where n is a nop insn).  */
-	      || (type == TYPE_M && ia64_tune == PROCESSOR_ITANIUM
+	      || ((type == TYPE_M || type == TYPE_A)
+		  && ia64_tune == PROCESSOR_ITANIUM
 		  && !bundle_end_p && pos == 1))
 	    issue_nops_and_insn (curr_state, 2, insn, bundle_end_p,
 				 only_bundle_end_p);
@@ -7198,7 +7225,9 @@ bundling (FILE *dump, int verbose, rtx prev_head_insn, rtx tail)
 		      = gen_bundle_selector (const2_rtx); /* -> MFI */
 		  break;
 		}
-	      else if (recog_memoized (last) != CODE_FOR_insn_group_barrier)
+	      else if (recog_memoized (last) != CODE_FOR_insn_group_barrier
+		       && (ia64_safe_itanium_class (last)
+			   != ITANIUM_CLASS_IGNORE))
 		n++;
 	    /* Some check of correctness: the stop is not at the
 	       bundle start, there are no more 3 insns in the bundle,
@@ -7365,15 +7394,6 @@ final_emit_insn_group_barriers (FILE *dump ATTRIBUTE_UNUSED)
 }
 
 
-
-/* If the following function returns TRUE, we will use the the DFA
-   insn scheduler.  */
-
-static int
-ia64_use_dfa_pipeline_interface (void)
-{
-  return 1;
-}
 
 /* If the following function returns TRUE, we will use the the DFA
    insn scheduler.  */
@@ -7657,11 +7677,12 @@ ia64_reorg (void)
       insn = get_last_insn ();
       if (! INSN_P (insn))
         insn = prev_active_insn (insn);
-      if (GET_CODE (insn) == INSN
-	  && GET_CODE (PATTERN (insn)) == UNSPEC_VOLATILE
-	  && XINT (PATTERN (insn), 1) == UNSPECV_INSN_GROUP_BARRIER)
-	{
-	  saw_stop = 1;
+      /* Skip over insns that expand to nothing.  */
+      while (GET_CODE (insn) == INSN && get_attr_empty (insn) == EMPTY_YES)
+        {
+	  if (GET_CODE (PATTERN (insn)) == UNSPEC_VOLATILE
+	      && XINT (PATTERN (insn), 1) == UNSPECV_INSN_GROUP_BARRIER)
+	    saw_stop = 1;
 	  insn = prev_active_insn (insn);
 	}
       if (GET_CODE (insn) == CALL_INSN)
@@ -8163,8 +8184,9 @@ ia64_init_builtins (void)
     (*lang_hooks.types.register_builtin_type) (long_double_type_node,
 					       "__float128");
 
-#define def_builtin(name, type, code) \
-  builtin_function ((name), (type), (code), BUILT_IN_MD, NULL, NULL_TREE)
+#define def_builtin(name, type, code)					\
+  lang_hooks.builtin_function ((name), (type), (code), BUILT_IN_MD,	\
+			       NULL, NULL_TREE)
 
   def_builtin ("__sync_val_compare_and_swap_si", si_ftype_psi_si_si,
 	       IA64_BUILTIN_VAL_COMPARE_AND_SWAP_SI);
@@ -8717,7 +8739,7 @@ ia64_hpux_file_end (void)
   for (p = extern_func_head; p; p = p->next)
     {
       tree decl = p->decl;
-      tree id = DECL_NAME (decl);
+      tree id = DECL_ASSEMBLER_NAME (decl);
 
       if (!id)
 	abort ();
@@ -8737,19 +8759,51 @@ ia64_hpux_file_end (void)
   extern_func_head = 0;
 }
 
+/* Set SImode div/mod functions, init_integral_libfuncs only initializes
+   modes of word_mode and larger.  Rename the TFmode libfuncs using the
+   HPUX conventions. __divtf3 is used for XFmode. We need to keep it for
+   backward compatibility. */
+
+static void
+ia64_init_libfuncs (void)
+{
+  set_optab_libfunc (sdiv_optab, SImode, "__divsi3");
+  set_optab_libfunc (udiv_optab, SImode, "__udivsi3");
+  set_optab_libfunc (smod_optab, SImode, "__modsi3");
+  set_optab_libfunc (umod_optab, SImode, "__umodsi3");
+
+  set_optab_libfunc (add_optab, TFmode, "_U_Qfadd");
+  set_optab_libfunc (sub_optab, TFmode, "_U_Qfsub");
+  set_optab_libfunc (smul_optab, TFmode, "_U_Qfmpy");
+  set_optab_libfunc (sdiv_optab, TFmode, "_U_Qfdiv");
+  set_optab_libfunc (neg_optab, TFmode, "_U_Qfneg");
+
+  set_conv_libfunc (sext_optab, TFmode, SFmode, "_U_Qfcnvff_sgl_to_quad");
+  set_conv_libfunc (sext_optab, TFmode, DFmode, "_U_Qfcnvff_dbl_to_quad");
+  set_conv_libfunc (sext_optab, TFmode, XFmode, "_U_Qfcnvff_f80_to_quad");
+  set_conv_libfunc (trunc_optab, SFmode, TFmode, "_U_Qfcnvff_quad_to_sgl");
+  set_conv_libfunc (trunc_optab, DFmode, TFmode, "_U_Qfcnvff_quad_to_dbl");
+  set_conv_libfunc (trunc_optab, XFmode, TFmode, "_U_Qfcnvff_quad_to_f80");
+
+  set_conv_libfunc (sfix_optab, SImode, TFmode, "_U_Qfcnvfxt_quad_to_sgl");
+  set_conv_libfunc (sfix_optab, DImode, TFmode, "_U_Qfcnvfxt_quad_to_dbl");
+  set_conv_libfunc (ufix_optab, SImode, TFmode, "_U_Qfcnvfxut_quad_to_sgl");
+  set_conv_libfunc (ufix_optab, DImode, TFmode, "_U_Qfcnvfxut_quad_to_dbl");
+
+  set_conv_libfunc (sfloat_optab, TFmode, SImode, "_U_Qfcnvxf_sgl_to_quad");
+  set_conv_libfunc (sfloat_optab, TFmode, DImode, "_U_Qfcnvxf_dbl_to_quad");
+}
+
 /* Rename all the TFmode libfuncs using the HPUX conventions.  */
 
 static void
 ia64_hpux_init_libfuncs (void)
 {
-  set_optab_libfunc (add_optab, TFmode, "_U_Qfadd");
-  set_optab_libfunc (sub_optab, TFmode, "_U_Qfsub");
-  set_optab_libfunc (smul_optab, TFmode, "_U_Qfmpy");
-  set_optab_libfunc (sdiv_optab, TFmode, "_U_Qfdiv");
+  ia64_init_libfuncs ();
+
   set_optab_libfunc (smin_optab, TFmode, "_U_Qfmin");
   set_optab_libfunc (smax_optab, TFmode, "_U_Qfmax");
   set_optab_libfunc (abs_optab, TFmode, "_U_Qfabs");
-  set_optab_libfunc (neg_optab, TFmode, "_U_Qfneg");
 
   /* ia64_expand_compare uses this.  */
   cmptf_libfunc = init_one_libfunc ("_U_Qfcmp");
@@ -8761,21 +8815,6 @@ ia64_hpux_init_libfuncs (void)
   set_optab_libfunc (ge_optab, TFmode, 0);
   set_optab_libfunc (lt_optab, TFmode, 0);
   set_optab_libfunc (le_optab, TFmode, 0);
-
-  set_conv_libfunc (sext_optab,   TFmode, SFmode, "_U_Qfcnvff_sgl_to_quad");
-  set_conv_libfunc (sext_optab,   TFmode, DFmode, "_U_Qfcnvff_dbl_to_quad");
-  set_conv_libfunc (sext_optab,   TFmode, XFmode, "_U_Qfcnvff_f80_to_quad");
-  set_conv_libfunc (trunc_optab,  SFmode, TFmode, "_U_Qfcnvff_quad_to_sgl");
-  set_conv_libfunc (trunc_optab,  DFmode, TFmode, "_U_Qfcnvff_quad_to_dbl");
-  set_conv_libfunc (trunc_optab,  XFmode, TFmode, "_U_Qfcnvff_quad_to_f80");
-
-  set_conv_libfunc (sfix_optab,   SImode, TFmode, "_U_Qfcnvfxt_quad_to_sgl");
-  set_conv_libfunc (sfix_optab,   DImode, TFmode, "_U_Qfcnvfxt_quad_to_dbl");
-  set_conv_libfunc (ufix_optab,   SImode, TFmode, "_U_Qfcnvfxut_quad_to_sgl");
-  set_conv_libfunc (ufix_optab,   DImode, TFmode, "_U_Qfcnvfxut_quad_to_dbl");
-
-  set_conv_libfunc (sfloat_optab, TFmode, SImode, "_U_Qfcnvxf_sgl_to_quad");
-  set_conv_libfunc (sfloat_optab, TFmode, DImode, "_U_Qfcnvxf_dbl_to_quad");
 }
 
 /* Rename the division and modulus functions in VMS.  */
@@ -8791,6 +8830,28 @@ ia64_vms_init_libfuncs (void)
   set_optab_libfunc (smod_optab, DImode, "OTS$REM_L");
   set_optab_libfunc (umod_optab, SImode, "OTS$REM_UI");
   set_optab_libfunc (umod_optab, DImode, "OTS$REM_UL");
+}
+
+/* Rename the TFmode libfuncs available from soft-fp in glibc using
+   the HPUX conventions.  */
+
+static void
+ia64_sysv4_init_libfuncs (void)
+{
+  ia64_init_libfuncs ();
+
+  /* These functions are not part of the HPUX TFmode interface.  We
+     use them instead of _U_Qfcmp, which doesn't work the way we
+     expect.  */
+  set_optab_libfunc (eq_optab, TFmode, "_U_Qfeq");
+  set_optab_libfunc (ne_optab, TFmode, "_U_Qfne");
+  set_optab_libfunc (gt_optab, TFmode, "_U_Qfgt");
+  set_optab_libfunc (ge_optab, TFmode, "_U_Qfge");
+  set_optab_libfunc (lt_optab, TFmode, "_U_Qflt");
+  set_optab_libfunc (le_optab, TFmode, "_U_Qfle");
+
+  /* We leave out _U_Qfmin, _U_Qfmax and _U_Qfabs since soft-fp in
+     glibc doesn't have them.  */
 }
 
 /* Switch to the section to which we should output X.  The only thing
@@ -8878,6 +8939,7 @@ ia64_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
   reload_completed = 1;
   epilogue_completed = 1;
   no_new_pseudos = 1;
+  reset_block_changes ();
 
   /* Set things up as ia64_expand_prologue might.  */
   last_scratch_gr_reg = 15;

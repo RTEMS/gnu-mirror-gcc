@@ -58,9 +58,8 @@ Boston, MA 02111-1307, USA.  */
 #define ASM_SPEC SH_ASM_SPEC
 #undef SUBTARGET_ASM_ISA_SPEC
 #define SUBTARGET_ASM_ISA_SPEC "\
-%{m5-compact:--isa=SHcompact} %{m5-compact-nofpu:--isa=SHcompact} \
-%{m5-32media:--isa=SHmedia --abi=32} %{m5-32media-nofpu:--isa=SHmedia --abi=32} \
-%{m5-64media:--isa=SHmedia --abi=64} %{m5-64media-nofpu:--isa=SHmedia --abi=64}"
+%{m5-compact*:--isa=SHcompact} %{m5-32media*:--isa=SHmedia --abi=32} \
+%{m5-64media*:--isa=SHmedia --abi=64}" ASM_ISA_DEFAULT_SPEC
 
 #undef LINK_SPEC
 #define LINK_SPEC SH_LINK_SPEC
@@ -95,7 +94,7 @@ while (0)
 #define DBX_OUTPUT_MAIN_SOURCE_FILE_END(FILE, FILENAME)			\
 do {									\
   text_section ();							\
-  fprintf ((FILE), "\t.stabs \"\",%d,0,0,Letext\nLetext:\n", N_SO);	\
+  asm_fprintf ((FILE), "\t.stabs \"\",%d,0,0,%LLetext\n%LLetext:\n", N_SO); \
 } while (0)
 
 #undef STARTFILE_SPEC

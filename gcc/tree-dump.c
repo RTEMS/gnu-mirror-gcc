@@ -1,5 +1,5 @@
 /* Tree-dumping functionality for intermediate representation.
-   Copyright (C) 1999, 2000, 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2002, 2003, 2004 Free Software Foundation, Inc.
    Written by Mark Mitchell <mark@codesourcery.com>
 
 This file is part of GCC.
@@ -29,6 +29,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "toplev.h"
 #include "tree-dump.h"
 #include "langhooks.h"
+#include "tree-iterator.h"
 
 static unsigned int queue (dump_info_p, tree, int);
 static void dump_index (dump_info_p, unsigned int);
@@ -250,13 +251,13 @@ dequeue_and_dump (dump_info_p di)
   if (dni->binfo_p)
     {
       unsigned ix;
-      tree bases = BINFO_BASETYPES (t);
+      tree bases = BINFO_BASE_BINFOS (t);
       unsigned n_bases = bases ? TREE_VEC_LENGTH (bases): 0;
-      tree accesses = BINFO_BASEACCESSES (t);
+      tree accesses = BINFO_BASE_ACCESSES (t);
 
       dump_child ("type", BINFO_TYPE (t));
 
-      if (TREE_VIA_VIRTUAL (t))
+      if (BINFO_VIRTUAL_P (t))
 	dump_string (di, "virt");
 
       dump_int (di, "bases", n_bases);
@@ -314,6 +315,7 @@ dequeue_and_dump (dump_info_p di)
     }
   else if (DECL_P (t))
     {
+      expanded_location xloc;
       /* All declarations have names.  */
       if (DECL_NAME (t))
 	dump_child ("name", DECL_NAME (t));
@@ -324,18 +326,19 @@ dequeue_and_dump (dump_info_p di)
       queue_and_dump_type (di, t);
       dump_child ("scpe", DECL_CONTEXT (t));
       /* And a source position.  */
-      if (DECL_SOURCE_FILE (t))
+      xloc = expand_location (DECL_SOURCE_LOCATION (t));
+      if (xloc.file)
 	{
-	  const char *filename = strrchr (DECL_SOURCE_FILE (t), '/');
+	  const char *filename = strrchr (xloc.file, '/');
 	  if (!filename)
-	    filename = DECL_SOURCE_FILE (t);
+	    filename = xloc.file;
 	  else
 	    /* Skip the slash.  */
 	    ++filename;
 
 	  dump_maybe_newline (di);
 	  fprintf (di->stream, "srcp: %s:%-6d ", filename,
-		   DECL_SOURCE_LINE (t));
+		   xloc.line);
 	  di->column += 6 + strlen (filename) + 8;
 	}
       /* And any declaration can be compiler-generated.  */
@@ -347,7 +350,7 @@ dequeue_and_dump (dump_info_p di)
   else if (code_class == 't')
     {
       /* All types have qualifiers.  */
-      int quals = (*lang_hooks.tree_dump.type_quals) (t);
+      int quals = lang_hooks.tree_dump.type_quals (t);
 
       if (quals != TYPE_UNQUALIFIED)
 	{
@@ -378,7 +381,7 @@ dequeue_and_dump (dump_info_p di)
   /* Give the language-specific code a chance to print something.  If
      it's completely taken care of things, don't bother printing
      anything more ourselves.  */
-  if ((*lang_hooks.tree_dump.dump_tree) (di, t))
+  if (lang_hooks.tree_dump.dump_tree (di, t))
     goto done;
 
   /* Now handle the various kinds of nodes.  */
@@ -397,6 +400,18 @@ dequeue_and_dump (dump_info_p di)
       dump_child ("chan", TREE_CHAIN (t));
       break;
 
+    case STATEMENT_LIST:
+      {
+	tree_stmt_iterator it;
+	for (i = 0, it = tsi_start (t); !tsi_end_p (it); tsi_next (&it), i++)
+	  {
+	    char buffer[32];
+	    sprintf (buffer, "%u", i);
+	    dump_child (buffer, tsi_stmt (it));
+	  }
+      }
+      break;
+
     case TREE_VEC:
       dump_int (di, "lngt", TREE_VEC_LENGTH (t));
       for (i = 0; i < TREE_VEC_LENGTH (t); ++i)
@@ -410,7 +425,7 @@ dequeue_and_dump (dump_info_p di)
     case INTEGER_TYPE:
     case ENUMERAL_TYPE:
       dump_int (di, "prec", TYPE_PRECISION (t));
-      if (TREE_UNSIGNED (t))
+      if (TYPE_UNSIGNED (t))
 	dump_string (di, "unsigned");
       dump_child ("min", TYPE_MIN_VALUE (t));
       dump_child ("max", TYPE_MAX_VALUE (t));
@@ -515,6 +530,8 @@ dequeue_and_dump (dump_info_p di)
     case INDIRECT_REF:
     case CLEANUP_POINT_EXPR:
     case SAVE_EXPR:
+    case REALPART_EXPR:
+    case IMAGPART_EXPR:
       /* These nodes are unary, but do not have code class `1'.  */
       dump_child ("op 0", TREE_OPERAND (t, 0));
       break;
@@ -523,9 +540,7 @@ dequeue_and_dump (dump_info_p di)
     case TRUTH_ORIF_EXPR:
     case INIT_EXPR:
     case MODIFY_EXPR:
-    case COMPONENT_REF:
     case COMPOUND_EXPR:
-    case ARRAY_REF:
     case PREDECREMENT_EXPR:
     case PREINCREMENT_EXPR:
     case POSTDECREMENT_EXPR:
@@ -533,6 +548,20 @@ dequeue_and_dump (dump_info_p di)
       /* These nodes are binary, but do not have code class `2'.  */
       dump_child ("op 0", TREE_OPERAND (t, 0));
       dump_child ("op 1", TREE_OPERAND (t, 1));
+      break;
+
+    case COMPONENT_REF:
+      dump_child ("op 0", TREE_OPERAND (t, 0));
+      dump_child ("op 1", TREE_OPERAND (t, 1));
+      dump_child ("op 2", TREE_OPERAND (t, 2));
+      break;
+
+    case ARRAY_REF:
+    case ARRAY_RANGE_REF:
+      dump_child ("op 0", TREE_OPERAND (t, 0));
+      dump_child ("op 1", TREE_OPERAND (t, 1));
+      dump_child ("op 2", TREE_OPERAND (t, 2));
+      dump_child ("op 3", TREE_OPERAND (t, 3));
       break;
 
     case COND_EXPR:
@@ -604,6 +633,19 @@ dump_node (tree t, int flags, FILE *stream)
   dump_queue_p dq;
   dump_queue_p next_dq;
 
+/* APPLE LOCAL begin MERGE FIXME */
+#if 0
+  /* MERGE FIX ME */
+  /* APPLE LOCAL begin new tree dump  --ilr */
+  /* The -fdmp-xxxx options indicate that we are to use dmp_tree() as
+     opposed to the dump format provided here.  */
+  if (flags & TDF_DMP_TREE)
+    if ((*lang_hooks.dmp_tree3) (stream, t, flags))
+      return;
+  /* APPLE LOCAL end new tree dump  --ilr */
+#endif
+/* APPLE LOCAL end MERGE FIXME */
+
   /* Initialize the dump-information structure.  */
   di.stream = stream;
   di.index = 0;
@@ -643,7 +685,8 @@ struct dump_file_info
 
 /* Table of tree dump switches. This must be consistent with the
    TREE_DUMP_INDEX enumeration in tree.h */
-static struct dump_file_info dump_files[TDI_end] =
+/* APPLE LOCAL new tree dump  --ilr */
+static struct dump_file_info dump_files[TDI_end*2] =
 {
   {NULL, NULL, 0, 0},
   {".tu", "translation-unit", 0, 0},
@@ -652,7 +695,7 @@ static struct dump_file_info dump_files[TDI_end] =
   {".generic", "tree-generic", 0, 0},
   {".nested", "tree-nested", 0, 0},
   {".inlined", "tree-inlined", 0, 0},
-  {".dot", "tree-dot", 0, 0},
+  {".vcg", "tree-vcg", 0, 0},
   {".xml", "call-graph", 0, 0},
   {NULL, "tree-all", 0, 0},
 };

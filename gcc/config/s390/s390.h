@@ -95,7 +95,7 @@ extern int target_flags;
 #define MASK_64BIT                 0x10
 #define MASK_ZARCH                 0x20
 #define MASK_MVCLE                 0x40
-#define MASK_TPF                   0x80
+#define MASK_TPF_PROFILING         0x80
 #define MASK_NO_FUSED_MADD         0x100
 
 #define TARGET_HARD_FLOAT          (target_flags & MASK_HARD_FLOAT)
@@ -106,7 +106,7 @@ extern int target_flags;
 #define TARGET_64BIT               (target_flags & MASK_64BIT)
 #define TARGET_ZARCH               (target_flags & MASK_ZARCH)
 #define TARGET_MVCLE               (target_flags & MASK_MVCLE)
-#define TARGET_TPF                 (target_flags & MASK_TPF)
+#define TARGET_TPF_PROFILING       (target_flags & MASK_TPF_PROFILING)
 #define TARGET_NO_FUSED_MADD       (target_flags & MASK_NO_FUSED_MADD)
 #define TARGET_FUSED_MADD	   (! TARGET_NO_FUSED_MADD)
 
@@ -135,8 +135,8 @@ extern int target_flags;
   { "esa",           -32, N_("ESA/390 architecture")},                   \
   { "mvcle",          64, N_("mvcle use")},                              \
   { "no-mvcle",      -64, N_("mvc&ex")},                                 \
-  { "tpf",           128, N_("enable tpf OS code")},                     \
-  { "no-tpf",       -128, N_("disable tpf OS code")},                    \
+  { "tpf-trace",     128, N_("enable tpf OS tracing code")},             \
+  { "no-tpf-trace", -128, N_("disable tpf OS tracing code")},            \
   { "no-fused-madd", 256, N_("disable fused multiply/add instructions")},\
   { "fused-madd",   -256, N_("enable fused multiply/add instructions")}, \
   { "", TARGET_DEFAULT, 0 } }
@@ -208,9 +208,7 @@ extern int target_flags;
 #define MAX_BITS_PER_WORD 64
 
 /* Function arguments and return values are promoted to word size.  */
-#define PROMOTE_FOR_CALL_ONLY
-
-#define PROMOTE_MODE(MODE, UNSIGNEDP, TYPE)		\
+#define PROMOTE_FUNCTION_MODE(MODE, UNSIGNEDP, TYPE)		\
 if (INTEGRAL_MODE_P (MODE) &&	        	    	\
     GET_MODE_SIZE (MODE) < UNITS_PER_WORD) { 		\
   (MODE) = Pmode;					\
@@ -301,7 +299,8 @@ if (INTEGRAL_MODE_P (MODE) &&	        	    	\
 #define CC_REG_P(X)		(REG_P (X) && CC_REGNO_P (REGNO (X)))
 #define FRAME_REG_P(X)		(REG_P (X) && FRAME_REGNO_P (REGNO (X)))
 
-#define BASE_REGISTER 13
+#define SIBCALL_REGNUM 1
+#define BASE_REGNUM 13
 #define RETURN_REGNUM 14
 #define CC_REGNUM 33
 
@@ -352,32 +351,7 @@ if (INTEGRAL_MODE_P (MODE) &&	        	    	\
   1, 1, 1, 1, 					\
   1, 1, 1 }
 
-#define CONDITIONAL_REGISTER_USAGE				\
-do								\
-  {								\
-    int i;							\
-								\
-    if (flag_pic)						\
-      {								\
-	fixed_regs[PIC_OFFSET_TABLE_REGNUM] = 1;		\
-	call_used_regs[PIC_OFFSET_TABLE_REGNUM] = 1;		\
-      }								\
-    if (TARGET_CPU_ZARCH)					\
-      {								\
-	fixed_regs[RETURN_REGNUM] = 0;				\
-	call_used_regs[RETURN_REGNUM] = 0;			\
-      }								\
-    if (TARGET_64BIT)						\
-      {								\
-        for (i = 24; i < 32; i++)				\
-	    call_used_regs[i] = call_really_used_regs[i] = 0;	\
-      }								\
-    else							\
-      {								\
-        for (i = 18; i < 20; i++)				\
-	    call_used_regs[i] = call_really_used_regs[i] = 0;	\
-      }								\
- } while (0)
+#define CONDITIONAL_REGISTER_USAGE s390_conditional_register_usage ()
 
 /* Preferred register allocation order.  */
 #define REG_ALLOC_ORDER                                         \
@@ -691,9 +665,6 @@ CUMULATIVE_ARGS;
 #define FUNCTION_ARG(CUM, MODE, TYPE, NAMED)   \
   s390_function_arg (&CUM, MODE, TYPE, NAMED)
 
-#define FUNCTION_ARG_PASS_BY_REFERENCE(CUM, MODE, TYPE, NAMED) \
-  s390_function_arg_pass_by_reference (MODE, TYPE)
-
 #define FUNCTION_ARG_PARTIAL_NREGS(CUM, MODE, TYPE, NAMED) 0
 
 /* Arguments can be placed in general registers 2 to 6,
@@ -733,10 +704,6 @@ CUMULATIVE_ARGS;
 #define EXPAND_BUILTIN_VA_START(valist, nextarg) \
   s390_va_start (valist, nextarg)
 
-#define EXPAND_BUILTIN_VA_ARG(valist, type) \
-  s390_va_arg (valist, type)
-
-
 /* Trampolines for nested functions.  */
 
 #define TRAMPOLINE_SIZE (TARGET_64BIT ? 36 : 20)
@@ -746,12 +713,6 @@ CUMULATIVE_ARGS;
 
 #define TRAMPOLINE_TEMPLATE(FILE)                                       \
    s390_trampoline_template (FILE)
-
-
-/* Library calls.  */
-
-/* We should use memcpy, not bcopy.  */
-#define TARGET_MEM_FUNCTIONS
 
 
 /* Addressing modes, and classification of registers for them.  */
@@ -1016,8 +977,10 @@ do {									\
   {"consttable_operand", { SYMBOL_REF, LABEL_REF, CONST, 		\
 			   CONST_INT, CONST_DOUBLE }},			\
   {"s390_plus_operand", { PLUS }},					\
-  {"s390_alc_comparison", { LTU, GTU, LEU, GEU }},			\
-  {"s390_slb_comparison", { LTU, GTU, LEU, GEU }},
+  {"s390_alc_comparison", { ZERO_EXTEND, SIGN_EXTEND, 			\
+			    LTU, GTU, LEU, GEU }},			\
+  {"s390_slb_comparison", { ZERO_EXTEND, SIGN_EXTEND,			\
+			    LTU, GTU, LEU, GEU }},
 
 /* Specify the machine mode that this machine uses for the index in the
    tablejump instruction.  */
@@ -1038,8 +1001,5 @@ do {									\
 /* A function address in a call instruction is a byte address (for
    indexing purposes) so give the MEM rtx a byte's mode.  */
 #define FUNCTION_MODE QImode
-
-/* This macro definition sets up a default value for `main' to return.  */
-#define DEFAULT_MAIN_RETURN  c_expand_return (integer_zero_node)
 
 #endif

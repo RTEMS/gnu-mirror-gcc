@@ -100,7 +100,6 @@ extern void sh_expand_binop_v2sf (enum rtx_code, rtx, rtx, rtx);
 extern int sh_expand_t_scc (enum rtx_code code, rtx target);
 #ifdef TREE_CODE
 extern void sh_va_start (tree, rtx);
-extern rtx sh_va_arg (tree, tree);
 #endif /* TREE_CODE */
 #endif /* RTX_CODE */
 
@@ -109,7 +108,7 @@ extern int sh_handle_pragma (int (*)(void), void (*)(int), const char *);
 extern struct rtx_def *get_fpscr_rtx (void);
 extern int sh_media_register_for_return (void);
 extern void sh_expand_prologue (void);
-extern void sh_expand_epilogue (void);
+extern void sh_expand_epilogue (bool);
 extern int sh_need_epilogue (void);
 extern void sh_set_return_address (rtx, rtx);
 extern int initial_elimination_offset (int, int);
@@ -141,5 +140,20 @@ extern rtx sh_function_arg (CUMULATIVE_ARGS *, enum machine_mode, tree, int);
 extern void sh_function_arg_advance (CUMULATIVE_ARGS *, enum machine_mode, tree, int);
 extern int sh_pass_in_reg_p (CUMULATIVE_ARGS *, enum machine_mode, tree);
 extern const char *sh_pch_valid_p (const void *data_p, size_t sz);
+extern bool sh_promote_prototypes (tree);
 
 #endif /* ! GCC_SH_PROTOS_H */
+
+#ifdef SYMBIAN
+extern bool         sh_symbian_dllimport_name_p       (const char *);
+extern const char * sh_symbian_strip_name_encoding    (const char *);
+extern bool         sh_symbian_dllexport_name_p       (const char *);
+extern int          symbian_import_export_class       (tree, int);
+#ifdef TREE_CODE
+extern bool         sh_symbian_dllexport_p            (tree);
+extern tree         sh_symbian_handle_dll_attribute   (tree *, tree, tree, int, bool *);
+#ifdef RTX_CODE
+extern void         sh_symbian_encode_section_info    (tree, rtx, int);
+#endif
+#endif
+#endif /* SYMBIAN */

@@ -26,7 +26,7 @@ Boston, MA 02111-1307, USA.  */
 #include "toplev.h"
 #include "tree.h"
 #include "tree-inline.h"
-#include "tree-simple.h"
+#include "tree-gimple.h"
 #include "rtl.h"
 #include "insn-config.h"
 #include "integrate.h"
@@ -157,11 +157,6 @@ lhd_warn_unused_global_decl (tree decl)
   return true;
 }
 
-/* Number for making the label on the next
-   static variable internal to a function.  */
-
-static GTY(()) int var_labelno;
-
 /* Set the DECL_ASSEMBLER_NAME for DECL.  */
 void
 lhd_set_decl_assembler_name (tree decl)
@@ -184,18 +179,17 @@ lhd_set_decl_assembler_name (tree decl)
 
          Can't use just the variable's own name for a variable whose
 	 scope is less than the whole compilation.  Concatenate a
-	 distinguishing number.  */
-      if (!TREE_PUBLIC (decl) && DECL_CONTEXT (decl))
+	 distinguishing number - we use the DECL_UID.  */
+      if (TREE_PUBLIC (decl) || DECL_CONTEXT (decl) == NULL_TREE)
+	SET_DECL_ASSEMBLER_NAME (decl, DECL_NAME (decl));
+      else
 	{
 	  const char *name = IDENTIFIER_POINTER (DECL_NAME (decl));
 	  char *label;
-	  
-	  ASM_FORMAT_PRIVATE_NAME (label, name, var_labelno);
-	  var_labelno++;
+
+	  ASM_FORMAT_PRIVATE_NAME (label, name, DECL_UID (decl));
 	  SET_DECL_ASSEMBLER_NAME (decl, get_identifier (label));
 	}
-      else
-	SET_DECL_ASSEMBLER_NAME (decl, DECL_NAME (decl));
     }
   else
     /* Nobody should ever be asking for the DECL_ASSEMBLER_NAME of
@@ -209,15 +203,6 @@ bool
 lhd_can_use_bit_fields_p (void)
 {
   return true;
-}
-
-/* Provide a default routine to clear the binding stack.  This is used
-   by languages that don't need to do anything special.  */
-void
-lhd_clear_binding_stack (void)
-{
-  while (! (*lang_hooks.decls.global_bindings_p) ())
-    poplevel (0, 0, 0);
 }
 
 /* Type promotion for variable arguments.  */
@@ -273,8 +258,7 @@ lhd_expand_expr (tree t ATTRIBUTE_UNUSED, rtx r ATTRIBUTE_UNUSED,
   abort ();
 }
 
-/* This is the default expand_decl function.  */
-/* The default language-specific function for expanding a DECL_STMT.  After
+/* The default language-specific function for expanding a decl.  After
    the language-independent cases are handled, this function will be
    called.  If this function is not defined, it is assumed that
    declarations other than those for variables and labels do not require
@@ -365,16 +349,6 @@ lhd_tree_inlining_add_pending_fn_decls (void *vafnp ATTRIBUTE_UNUSED, tree pfn)
   return pfn;
 }
 
-/* lang_hooks.tree_inlining.tree_chain_matters_p indicates whether the
-   TREE_CHAIN of a language-specific tree node is relevant, i.e.,
-   whether it should be walked, copied and preserved across copies.  */
-
-int
-lhd_tree_inlining_tree_chain_matters_p (tree t ATTRIBUTE_UNUSED)
-{
-  return 0;
-}
-
 /* lang_hooks.tree_inlining.auto_var_in_fn_p is called to determine
    whether VT is an automatic variable defined in function FT.  */
 
@@ -388,28 +362,6 @@ lhd_tree_inlining_auto_var_in_fn_p (tree var, tree fn)
 	      || TREE_CODE (var) == RESULT_DECL));
 }
 
-/* lang_hooks.tree_inlining.copy_res_decl_for_inlining should return a
-   declaration for the result RES of function FN to be inlined into
-   CALLER.  NDP points to an integer that should be set in case a new
-   declaration wasn't created (presumably because RES was of aggregate
-   type, such that a TARGET_EXPR is used for the result).  TEXPS is a
-   pointer to a varray with the stack of TARGET_EXPRs seen while
-   inlining functions into caller; the top of TEXPS is supposed to
-   match RES.  */
-
-tree
-lhd_tree_inlining_copy_res_decl_for_inlining (tree res, tree fn, tree caller,
-					      void *dm ATTRIBUTE_UNUSED,
-					      int *ndp ATTRIBUTE_UNUSED,
-					      tree return_slot_addr ATTRIBUTE_UNUSED)
-{
-  if (return_slot_addr)
-    return build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (return_slot_addr)),
-		   return_slot_addr);
-  else
-    return copy_decl_for_inlining (res, fn, caller);
-}
-
 /* lang_hooks.tree_inlining.anon_aggr_type_p determines whether T is a
    type node representing an anonymous aggregate (union, struct, etc),
    i.e., one whose members are in the same scope as the union itself.  */
@@ -419,6 +371,39 @@ lhd_tree_inlining_anon_aggr_type_p (tree t ATTRIBUTE_UNUSED)
 {
   return 0;
 }
+
+/* APPLE LOCAL begin new tree dump */
+/* Do nothing language hooks for dmp_tree().  */
+void 
+lhd_dump_tree_do_nothing (FILE *file ATTRIBUTE_UNUSED,
+			  tree node ATTRIBUTE_UNUSED,
+			  int indent ATTRIBUTE_UNUSED,
+			  int after_id ATTRIBUTE_UNUSED)
+{
+}
+
+int
+lhd_dump_tree_blank_line_do_nothing (tree previous_node ATTRIBUTE_UNUSED,
+				     tree current_node ATTRIBUTE_UNUSED)
+{
+  return 0;
+}
+
+int
+lhd_dump_tree_lineno_do_nothing (FILE *file ATTRIBUTE_UNUSED,
+				 tree node ATTRIBUTE_UNUSED)
+{
+  return 0;
+}
+
+int 
+lhd_dmp_tree3_do_nothing (FILE *file ATTRIBUTE_UNUSED,
+			  tree node ATTRIBUTE_UNUSED,
+			  int flags ATTRIBUTE_UNUSED)
+{
+  return 0;
+}
+/* APPLE LOCAL end new tree dump */
 
 /* lang_hooks.tree_inlining.start_inlining and end_inlining perform any
    language-specific bookkeeping necessary for processing
@@ -520,7 +505,7 @@ write_global_declarations (void)
      Really output inline functions that must actually be callable
      and have not been output so far.  */
 
-  tree globals = (*lang_hooks.decls.getdecls) ();
+  tree globals = lang_hooks.decls.getdecls ();
   int len = list_length (globals);
   tree *vec = xmalloc (sizeof (tree) * len);
   int i;
@@ -565,11 +550,11 @@ lhd_print_error_function (diagnostic_context *context, const char *file)
 	  if (TREE_CODE (TREE_TYPE (current_function_decl)) == METHOD_TYPE)
 	    pp_printf
 	      (context->printer, "In member function `%s':",
-	       (*lang_hooks.decl_printable_name) (current_function_decl, 2));
+	       lang_hooks.decl_printable_name (current_function_decl, 2));
 	  else
 	    pp_printf
 	      (context->printer, "In function `%s':",
-	       (*lang_hooks.decl_printable_name) (current_function_decl, 2));
+	       lang_hooks.decl_printable_name (current_function_decl, 2));
 	}
 
       diagnostic_set_last_function (context);
@@ -592,5 +577,3 @@ lhd_make_node (enum tree_code code)
 {
   return make_node (code);
 }
-
-#include "gt-langhooks.h"

@@ -28,7 +28,7 @@
 #include "function.h"
 #include "tree-dump.h"
 #include "tree-inline.h"
-#include "tree-simple.h"
+#include "tree-gimple.h"
 #include "tree-iterator.h"
 #include "tree-flow.h"
 #include "cgraph.h"
@@ -133,15 +133,19 @@ create_tmp_var_for (struct nesting_info *info, tree type, const char *prefix)
   tree tmp_var;
 
 #if defined ENABLE_CHECKING
-  /* If the type is an array or a type which must be created by the
-     frontend, something is wrong.  */
-  if (TREE_CODE (type) == ARRAY_TYPE || TREE_ADDRESSABLE (type))
+  /* If the type is of variable size or a type which must be created by the
+     frontend, something is wrong.  Note that we explicitly allow
+     incomplete types here, since we create them ourselves here.  */
+  if (TREE_ADDRESSABLE (type)
+      || (TYPE_SIZE_UNIT (type)
+	  && TREE_CODE (TYPE_SIZE_UNIT (type)) != INTEGER_CST))
     abort ();
 #endif
 
   tmp_var = create_tmp_var_raw (type, prefix);
   DECL_CONTEXT (tmp_var) = info->context;
   TREE_CHAIN (tmp_var) = info->new_local_var_chain;
+  DECL_SEEN_IN_BIND_EXPR_P (tmp_var) = 1;
   info->new_local_var_chain = tmp_var;
 
   return tmp_var;
@@ -153,8 +157,11 @@ static tree
 build_addr (tree exp)
 {
   tree base = exp;
-  while (TREE_CODE (base) == COMPONENT_REF || TREE_CODE (base) == ARRAY_REF)
+
+  while (TREE_CODE (base) == REALPART_EXPR || TREE_CODE (base) == IMAGPART_EXPR
+	 || handled_component_p (base))
     base = TREE_OPERAND (base, 0);
+
   if (DECL_P (base))
     TREE_ADDRESSABLE (base) = 1;
 
@@ -302,15 +309,16 @@ get_chain_decl (struct nesting_info *info)
 
       /* Note that this variable is *not* entered into any BIND_EXPR;
 	 the construction of this variable is handled specially in
-	 expand_function_start and initialize_inlined_parameters.  */
-      decl = create_tmp_var_raw (type, "CHAIN");
+	 expand_function_start and initialize_inlined_parameters.
+	 Note also that it's represented as a parameter.  This is more
+	 close to the truth, since the initial value does come from 
+	 the caller.  */
+      decl = build_decl (PARM_DECL, create_tmp_var_name ("CHAIN"), type);
+      DECL_ARTIFICIAL (decl) = 1;
+      DECL_IGNORED_P (decl) = 1;
+      TREE_USED (decl) = 1;
       DECL_CONTEXT (decl) = info->context;
-      decl->decl.seen_in_bind_expr = 1;
-
-      /* The initialization of CHAIN is not visible to the tree-ssa
-	 analyzers and optimizers.  Thus we do not want to issue
-	 warnings for CHAIN.  */
-      TREE_NO_WARNING (decl) = 1;
+      DECL_ARG_TYPE (decl) = type;
 
       /* Tell tree-inline.c that we never write to this variable, so
 	 it can copy-prop the replacement value immediately.  */
@@ -391,7 +399,8 @@ get_trampoline_type (void)
 
   /* If we won't be able to guarantee alignment simply via TYPE_ALIGN,
      then allocate extra space so that we can do dynamic alignment.  */
-  if (align > STACK_BOUNDARY)
+  /* APPLE LOCAL STACK_BOUNDARY must be a signed expression on Darwin/x86 */
+  if (align > (unsigned int) STACK_BOUNDARY)
     {
       size += ((align/BITS_PER_UNIT) - 1) & -(STACK_BOUNDARY/BITS_PER_UNIT);
       align = STACK_BOUNDARY;
@@ -469,7 +478,7 @@ get_nl_goto_field (struct nesting_info *info)
 
       /* For __builtin_nonlocal_goto, we need N words.  The first is the
 	 frame pointer, the rest is for the target's stack pointer save
-	 area.  The number of words is controled by STACK_SAVEAREA_MODE;
+	 area.  The number of words is controlled by STACK_SAVEAREA_MODE;
 	 not the best interface, but it'll do for now.  */
       if (Pmode == ptr_mode)
 	type = ptr_type_node;
@@ -545,6 +554,7 @@ walk_stmts (struct walk_stmt_info *wi, tree *tp)
       break;
     case CATCH_EXPR:
       walk_stmts (wi, &CATCH_BODY (t));
+      break;
     case EH_FILTER_EXPR:
       walk_stmts (wi, &EH_FILTER_FAILURE (t));
       break;
@@ -652,7 +662,7 @@ get_static_chain (struct nesting_info *info, tree target_context,
 	  tree field = get_chain_field (i);
 
 	  x = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (x)), x);
-	  x = build (COMPONENT_REF, TREE_TYPE (field), x, field);
+	  x = build (COMPONENT_REF, TREE_TYPE (field), x, field, NULL_TREE);
 	  x = init_tmp_var (info, x, tsi);
 	}
     }
@@ -686,14 +696,14 @@ get_frame_field (struct nesting_info *info, tree target_context,
 	  tree field = get_chain_field (i);
 
 	  x = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (x)), x);
-	  x = build (COMPONENT_REF, TREE_TYPE (field), x, field);
+	  x = build (COMPONENT_REF, TREE_TYPE (field), x, field, NULL_TREE);
 	  x = init_tmp_var (info, x, tsi);
 	}
 
       x = build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (x)), x);
     }
 
-  x = build (COMPONENT_REF, TREE_TYPE (field), x, field);
+  x = build (COMPONENT_REF, TREE_TYPE (field), x, field, NULL_TREE);
   return x;
 }
 
@@ -747,7 +757,10 @@ convert_nonlocal_reference (tree *tp, int *walk_subtrees, void *data)
     case GOTO_EXPR:
       /* Don't walk non-local gotos for now.  */
       if (TREE_CODE (GOTO_DESTINATION (t)) != LABEL_DECL)
-	*walk_subtrees = 1;
+	{
+	  *walk_subtrees = 1;
+	  wi->val_only = true;
+	}
       break;
 
     case LABEL_DECL:
@@ -766,7 +779,7 @@ convert_nonlocal_reference (tree *tp, int *walk_subtrees, void *data)
 
 	wi->val_only = false;
 	walk_tree (&TREE_OPERAND (t, 0), convert_nonlocal_reference, wi, NULL);
-	wi->val_only = save_val_only;
+	wi->val_only = true;
 
 	if (save_sub != TREE_OPERAND (t, 0))
 	  {
@@ -783,9 +796,51 @@ convert_nonlocal_reference (tree *tp, int *walk_subtrees, void *data)
       }
       break;
 
+    case REALPART_EXPR:
+    case IMAGPART_EXPR:
+    case COMPONENT_REF:
+    case ARRAY_REF:
+    case ARRAY_RANGE_REF:
+    case BIT_FIELD_REF:
+      /* Go down this entire nest and just look at the final prefix and
+	 anything that describes the references.  Otherwise, we lose track
+	 of whether a NOP_EXPR or VIEW_CONVERT_EXPR needs a simple value.  */
+      wi->val_only = true;
+      for (; handled_component_p (t)
+	   || TREE_CODE (t) == REALPART_EXPR || TREE_CODE (t) == IMAGPART_EXPR;
+	   tp = &TREE_OPERAND (t, 0), t = *tp)
+	{
+	  if (TREE_CODE (t) == COMPONENT_REF)
+	    walk_tree (&TREE_OPERAND (t, 2), convert_nonlocal_reference, wi,
+		       NULL);
+	  else if (TREE_CODE (t) == ARRAY_REF
+		   || TREE_CODE (t) == ARRAY_RANGE_REF)
+	    {
+	      walk_tree (&TREE_OPERAND (t, 1), convert_nonlocal_reference, wi,
+			 NULL);
+	      walk_tree (&TREE_OPERAND (t, 2), convert_nonlocal_reference, wi,
+			 NULL);
+	      walk_tree (&TREE_OPERAND (t, 3), convert_nonlocal_reference, wi,
+			 NULL);
+	    }
+	  else if (TREE_CODE (t) == BIT_FIELD_REF)
+	    {
+	      walk_tree (&TREE_OPERAND (t, 1), convert_nonlocal_reference, wi,
+			 NULL);
+	      walk_tree (&TREE_OPERAND (t, 2), convert_nonlocal_reference, wi,
+			 NULL);
+	    }
+	}
+      wi->val_only = false;
+      walk_tree (tp, convert_nonlocal_reference, wi, NULL);
+      break;
+
     default:
       if (!DECL_P (t) && !TYPE_P (t))
-	*walk_subtrees = 1;
+	{
+	  *walk_subtrees = 1;
+          wi->val_only = true;
+	}
       break;
     }
 
@@ -889,9 +944,51 @@ convert_local_reference (tree *tp, int *walk_subtrees, void *data)
       tsi_link_after (&wi->tsi, x, TSI_SAME_STMT);
       break;
 
+    case REALPART_EXPR:
+    case IMAGPART_EXPR:
+    case COMPONENT_REF:
+    case ARRAY_REF:
+    case ARRAY_RANGE_REF:
+    case BIT_FIELD_REF:
+      /* Go down this entire nest and just look at the final prefix and
+	 anything that describes the references.  Otherwise, we lose track
+	 of whether a NOP_EXPR or VIEW_CONVERT_EXPR needs a simple value.  */
+      wi->val_only = true;
+      for (; handled_component_p (t)
+	   || TREE_CODE (t) == REALPART_EXPR || TREE_CODE (t) == IMAGPART_EXPR;
+	   tp = &TREE_OPERAND (t, 0), t = *tp)
+	{
+	  if (TREE_CODE (t) == COMPONENT_REF)
+	    walk_tree (&TREE_OPERAND (t, 2), convert_local_reference, wi,
+		       NULL);
+	  else if (TREE_CODE (t) == ARRAY_REF
+		   || TREE_CODE (t) == ARRAY_RANGE_REF)
+	    {
+	      walk_tree (&TREE_OPERAND (t, 1), convert_local_reference, wi,
+			 NULL);
+	      walk_tree (&TREE_OPERAND (t, 2), convert_local_reference, wi,
+			 NULL);
+	      walk_tree (&TREE_OPERAND (t, 3), convert_local_reference, wi,
+			 NULL);
+	    }
+	  else if (TREE_CODE (t) == BIT_FIELD_REF)
+	    {
+	      walk_tree (&TREE_OPERAND (t, 1), convert_local_reference, wi,
+			 NULL);
+	      walk_tree (&TREE_OPERAND (t, 2), convert_local_reference, wi,
+			 NULL);
+	    }
+	}
+      wi->val_only = false;
+      walk_tree (tp, convert_local_reference, wi, NULL);
+      break;
+
     default:
       if (!DECL_P (t) && !TYPE_P (t))
-	*walk_subtrees = 1;
+	{
+	  *walk_subtrees = 1;
+	  wi->val_only = true;
+	}
       break;
     }
 
@@ -927,7 +1024,7 @@ convert_nl_goto_reference (tree *tp, int *walk_subtrees, void *data)
   /* The original user label may also be use for a normal goto, therefore
      we must create a new label that will actually receive the abnormal
      control transfer.  This new label will be marked LABEL_NONLOCAL; this
-     mark will trigger proper behaviour in the cfg, as well as cause the
+     mark will trigger proper behavior in the cfg, as well as cause the
      (hairy target-specific) non-local goto receiver code to be generated
      when we expand rtl.  */
   new_label = create_artificial_label ();
@@ -1100,7 +1197,8 @@ convert_call_expr (tree *tp, int *walk_subtrees, void *data)
 
     case RETURN_EXPR:
     case MODIFY_EXPR:
-      /* Only return and modify may contain calls.  */
+    case WITH_SIZE_EXPR:
+      /* Only return modify and with_size_expr may contain calls.  */
       *walk_subtrees = 1;
       break;
 
@@ -1182,7 +1280,7 @@ finalize_nesting_tree_1 (struct nesting_info *root)
 	    x = p;
 
 	  y = build (COMPONENT_REF, TREE_TYPE (field),
-		     root->frame_decl, field);
+		     root->frame_decl, field, NULL_TREE);
 	  x = build (MODIFY_EXPR, TREE_TYPE (field), y, x);
 	  append_to_statement_list (x, &stmt_list);
 	}
@@ -1192,9 +1290,8 @@ finalize_nesting_tree_1 (struct nesting_info *root)
      from chain_decl.  */
   if (root->chain_field)
     {
-      tree x;
-      x = build (COMPONENT_REF, TREE_TYPE (root->chain_field),
-		 root->frame_decl, root->chain_field);
+      tree x = build (COMPONENT_REF, TREE_TYPE (root->chain_field),
+		      root->frame_decl, root->chain_field, NULL_TREE);
       x = build (MODIFY_EXPR, TREE_TYPE (x), x, get_chain_decl (root));
       append_to_statement_list (x, &stmt_list);
     }
@@ -1221,7 +1318,7 @@ finalize_nesting_tree_1 (struct nesting_info *root)
 	  arg = tree_cons (NULL, x, arg);
 
 	  x = build (COMPONENT_REF, TREE_TYPE (field),
-		     root->frame_decl, field);
+		     root->frame_decl, field, NULL_TREE);
 	  x = build_addr (x);
 	  arg = tree_cons (NULL, x, arg);
 
@@ -1256,7 +1353,7 @@ finalize_nesting_tree_1 (struct nesting_info *root)
       sf->has_nonlocal_label = 1;
     }
 
-  /* Make sure all new local variables get insertted into the
+  /* Make sure all new local variables get inserted into the
      proper BIND_EXPR.  */
   if (root->new_local_var_chain)
     declare_tmp_vars (root->new_local_var_chain,
