@@ -282,6 +282,7 @@ package body ALI is
          loop
             if C = CR or else C = LF then
                Skip_Line;
+               C := Nextc;
 
             elsif C = EOF then
                return;
@@ -601,6 +602,8 @@ package body ALI is
    --  Start of processing for Scan_ALI
 
    begin
+      First_Sdep_Entry := Sdep.Last + 1;
+
       --  Acquire lines to be ignored
 
       if Read_Xref then
@@ -786,6 +789,7 @@ package body ALI is
                Fatal_Error;
             else
                Skip_Line;
+               C := Nextc;
             end if;
          else
             Fatal_Error;
@@ -810,6 +814,12 @@ package body ALI is
             if C = 'C' then
                Checkc ('E');
                ALIs.Table (Id).Compile_Errors := True;
+
+            --  Processing for DB
+
+            elsif C = 'D' then
+               Checkc ('B');
+               Detect_Blocking := True;
 
             --  Processing for FD/FG/FI
 
@@ -946,6 +956,7 @@ package body ALI is
                Fatal_Error;
             else
                Skip_Line;
+               C := Nextc;
             end if;
          else
             Fatal_Error;
@@ -990,10 +1001,6 @@ package body ALI is
                      Fatal_Error;
                end case;
             end loop;
-
-            --  Skip separating space
-
-            Checkc (' ');
 
             --  Acquire information for parameter restrictions
 
@@ -1172,6 +1179,7 @@ package body ALI is
          Units.Table (Units.Last).First_Arg       := First_Arg;
          Units.Table (Units.Last).Elab_Position   := 0;
          Units.Table (Units.Last).Interface       := ALIs.Table (Id).Interface;
+         Units.Table (Units.Last).Body_Needed_For_SAL := False;
 
          if Debug_Flag_U then
             Write_Str (" ----> reading unit ");
@@ -1813,6 +1821,8 @@ package body ALI is
                   ----------------------------------
 
                   procedure Read_Instantiation_Reference is
+                     Local_File_Num : Sdep_Id := Current_File_Num;
+
                   begin
                      Xref.Increment_Last;
 
@@ -1826,12 +1836,12 @@ package body ALI is
                         if Nextc = '|' then
                            XR.File_Num :=
                              Sdep_Id (N + Nat (First_Sdep_Entry) - 1);
-                           Current_File_Num := XR.File_Num;
+                           Local_File_Num := XR.File_Num;
                            P := P + 1;
                            N := Get_Nat;
 
                         else
-                           XR.File_Num := Current_File_Num;
+                           XR.File_Num := Local_File_Num;
                         end if;
 
                         XR.Line  := N;

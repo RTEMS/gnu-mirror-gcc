@@ -1,6 +1,7 @@
 /* { dg-do compile } */
 /* { dg-options "-O1 -fdump-tree-dom3" } */
 
+extern void abort (void);
 typedef unsigned int size_t;
 struct rtx_def;
 typedef struct rtx_def *rtx;
@@ -34,8 +35,9 @@ blah (unsigned int regno)
     return reg_base_value[regno];
 }
 
-/* If we have a cast to a struct rtx_def * *, then we failed to
-   eliminate some useless typecasting.  */
-/* { dg-final { scan-tree-dump-times "\\(struct rtx_def \\* \\*\\)" 0 "dom3"} } */
+/* If we have more than 1 cast to a struct rtx_def * *, then we failed to
+   eliminate some useless typecasting.  The first type cast is needed
+   to convert the unsigned int regno parameter into a struct rtx_def **.  */
+/* { dg-final { scan-tree-dump-times "\\(struct rtx_def \\* \\*\\)" 1 "dom3"} } */
                                                                                 
 

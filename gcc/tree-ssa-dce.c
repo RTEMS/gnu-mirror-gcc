@@ -55,11 +55,12 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "tm_p.h"
 #include "hard-reg-set.h"
 #include "basic-block.h"
+#include "function.h"
 
 #include "tree.h"
 #include "diagnostic.h"
 #include "tree-flow.h"
-#include "tree-simple.h"
+#include "tree-gimple.h"
 #include "tree-dump.h"
 #include "tree-pass.h"
 #include "timevar.h"
@@ -95,7 +96,14 @@ bitmap *control_dependence_map;
 /* Execute CODE for each edge (given number EDGE_NUMBER within the CODE)
    for which the block with index N is control dependent.  */
 #define EXECUTE_IF_CONTROL_DEPENDENT(N, EDGE_NUMBER, CODE)		      \
-  EXECUTE_IF_SET_IN_BITMAP (control_dependence_map[N], 0, EDGE_NUMBER, CODE)
+  {									      \
+    bitmap_iterator bi;							      \
+									      \
+    EXECUTE_IF_SET_IN_BITMAP (control_dependence_map[N], 0, EDGE_NUMBER, bi)  \
+      {									      \
+	CODE;								      \
+      }									      \
+  }
 
 /* Local function prototypes.  */
 static inline void set_control_dependence_map_bit (basic_block, int);
@@ -107,9 +115,8 @@ static inline basic_block find_pdom (basic_block);
 static inline void mark_stmt_necessary (tree, bool);
 static inline void mark_operand_necessary (tree);
 
-static bool need_to_preserve_store (tree);
 static void mark_stmt_if_obviously_necessary (tree, bool);
-static void find_obviously_necessary_stmts (bool);
+static void find_obviously_necessary_stmts (struct edge_list *);
 
 static void mark_control_dependent_edges_necessary (basic_block, struct edge_list *);
 static void propagate_necessity (struct edge_list *);
@@ -128,8 +135,7 @@ set_control_dependence_map_bit (basic_block bb, int edge_index)
 {
   if (bb == ENTRY_BLOCK_PTR)
     return;
-  if (bb == EXIT_BLOCK_PTR)
-    abort ();
+  gcc_assert (bb != EXIT_BLOCK_PTR);
   bitmap_set_bit (control_dependence_map[bb->index], edge_index);
 }
 
@@ -161,10 +167,7 @@ find_control_dependence (struct edge_list *el, int edge_index)
   basic_block current_block;
   basic_block ending_block;
 
-#ifdef ENABLE_CHECKING
-  if (INDEX_EDGE_PRED_BB (el, edge_index) == EXIT_BLOCK_PTR)
-    abort ();
-#endif
+  gcc_assert (INDEX_EDGE_PRED_BB (el, edge_index) != EXIT_BLOCK_PTR);
 
   if (INDEX_EDGE_PRED_BB (el, edge_index) == ENTRY_BLOCK_PTR)
     ending_block = ENTRY_BLOCK_PTR->next_bb;
@@ -193,9 +196,9 @@ find_control_dependence (struct edge_list *el, int edge_index)
 static inline basic_block
 find_pdom (basic_block block)
 {
-  if (block == ENTRY_BLOCK_PTR)
-    abort ();
-  else if (block == EXIT_BLOCK_PTR)
+  gcc_assert (block != ENTRY_BLOCK_PTR);
+
+  if (block == EXIT_BLOCK_PTR)
     return EXIT_BLOCK_PTR;
   else
     {
@@ -213,21 +216,18 @@ find_pdom (basic_block block)
 static inline void
 mark_stmt_necessary (tree stmt, bool add_to_worklist)
 {
-#ifdef ENABLE_CHECKING
-  if (stmt == NULL
-      || stmt == error_mark_node
-      || (stmt && DECL_P (stmt)))
-    abort ();
-#endif
+  gcc_assert (stmt);
+  gcc_assert (stmt != error_mark_node);
+  gcc_assert (!DECL_P (stmt));
 
   if (NECESSARY (stmt))
     return;
 
-  if (tree_dump_file && (tree_dump_flags & TDF_DETAILS))
+  if (dump_file && (dump_flags & TDF_DETAILS))
     {
-      fprintf (tree_dump_file, "Marking useful stmt: ");
-      print_generic_stmt (tree_dump_file, stmt, TDF_SLIM);
-      fprintf (tree_dump_file, "\n");
+      fprintf (dump_file, "Marking useful stmt: ");
+      print_generic_stmt (dump_file, stmt, TDF_SLIM);
+      fprintf (dump_file, "\n");
     }
 
   NECESSARY (stmt) = 1;
@@ -243,10 +243,7 @@ mark_operand_necessary (tree op)
   tree stmt;
   int ver;
 
-#ifdef ENABLE_CHECKING
-  if (op == NULL)
-    abort ();
-#endif
+  gcc_assert (op);
 
   ver = SSA_NAME_VERSION (op);
   if (TEST_BIT (processed, ver))
@@ -254,10 +251,7 @@ mark_operand_necessary (tree op)
   SET_BIT (processed, ver);
 
   stmt = SSA_NAME_DEF_STMT (op);
-#ifdef ENABLE_CHECKING
-  if (stmt == NULL)
-    abort ();
-#endif
+  gcc_assert (stmt);
 
   if (NECESSARY (stmt)
       || IS_EMPTY_STMT (stmt))
@@ -265,14 +259,6 @@ mark_operand_necessary (tree op)
 
   NECESSARY (stmt) = 1;
   VARRAY_PUSH_TREE (worklist, stmt);
-}
-
-/* Return true if a store to a variable needs to be preserved.  */
-
-static inline bool
-need_to_preserve_store (tree var)
-{
-  return (needs_to_live_in_memory (get_base_decl (var)));
 }
 
 
@@ -285,10 +271,11 @@ need_to_preserve_store (tree var)
 static void
 mark_stmt_if_obviously_necessary (tree stmt, bool aggressive)
 {
-  def_optype defs;
-  vdef_optype vdefs;
+  v_may_def_optype v_may_defs;
+  v_must_def_optype v_must_defs;
   stmt_ann_t ann;
-  size_t i;
+  tree op, def;
+  ssa_op_iter iter;
 
   /* Statements that are implicitly live.  Most function calls, asm and return
      statements are required.  Labels and BIND_EXPR nodes are kept because
@@ -318,8 +305,8 @@ mark_stmt_if_obviously_necessary (tree stmt, bool aggressive)
       return;
 
     case MODIFY_EXPR:
-      if (TREE_CODE (TREE_OPERAND (stmt, 1)) == CALL_EXPR
-	  && TREE_SIDE_EFFECTS (TREE_OPERAND (stmt, 1)))
+      op = get_call_expr_in (stmt);
+      if (op && TREE_SIDE_EFFECTS (op))
 	{
 	  mark_stmt_necessary (stmt, true);
 	  return;
@@ -365,10 +352,11 @@ mark_stmt_if_obviously_necessary (tree stmt, bool aggressive)
     }
 
   ann = stmt_ann (stmt);
-  /* If the statement has volatile operands, it needs to be preserved.  Same
-     for statements that can alter control flow in unpredictable ways.  */
-  if (ann->has_volatile_ops
-      || is_ctrl_altering_stmt (stmt))
+
+  /* If the statement has volatile operands, it needs to be preserved.
+     Same for statements that can alter control flow in unpredictable
+     ways.  */
+  if (ann->has_volatile_ops || is_ctrl_altering_stmt (stmt))
     {
       mark_stmt_necessary (stmt, true);
       return;
@@ -376,26 +364,86 @@ mark_stmt_if_obviously_necessary (tree stmt, bool aggressive)
 
   get_stmt_operands (stmt);
 
-  defs = DEF_OPS (ann);
-  for (i = 0; i < NUM_DEFS (defs); i++)
+  FOR_EACH_SSA_TREE_OPERAND (def, stmt, iter, SSA_OP_DEF)
     {
-      tree def = DEF_OP (defs, i);
-      if (need_to_preserve_store (def))
+      if (is_global_var (SSA_NAME_VAR (def)))
 	{
 	  mark_stmt_necessary (stmt, true);
 	  return;
         }
     }
 
-  vdefs = VDEF_OPS (ann);
-  for (i = 0; i < NUM_VDEFS (vdefs); i++)
+  /* Check virtual definitions.  If we get here, the only virtual
+     definitions we should see are those generated by assignment
+     statements.  */
+  v_may_defs = V_MAY_DEF_OPS (ann);
+  v_must_defs = V_MUST_DEF_OPS (ann);
+  if (NUM_V_MAY_DEFS (v_may_defs) > 0 || NUM_V_MUST_DEFS (v_must_defs) > 0)
     {
-      tree vdef = VDEF_RESULT (vdefs, i);
-      if (need_to_preserve_store (vdef))
+      tree lhs;
+
+      gcc_assert (TREE_CODE (stmt) == MODIFY_EXPR);
+
+      /* Note that we must not check the individual virtual operands
+	 here.  In particular, if this is an aliased store, we could
+	 end up with something like the following (SSA notation
+	 redacted for brevity):
+
+	 	foo (int *p, int i)
+		{
+		  int x;
+		  p_1 = (i_2 > 3) ? &x : p_1;
+
+		  # x_4 = V_MAY_DEF <x_3>
+		  *p_1 = 5;
+
+		  return 2;
+		}
+
+	 Notice that the store to '*p_1' should be preserved, if we
+	 were to check the virtual definitions in that store, we would
+	 not mark it needed.  This is because 'x' is not a global
+	 variable.
+
+	 Therefore, we check the base address of the LHS.  If the
+	 address is a pointer, we check if its name tag or type tag is
+	 a global variable.  Otherwise, we check if the base variable
+	 is a global.  */
+      lhs = TREE_OPERAND (stmt, 0);
+      if (REFERENCE_CLASS_P (lhs))
+	lhs = get_base_address (lhs);
+
+      if (lhs == NULL_TREE)
 	{
+	  /* If LHS is NULL, it means that we couldn't get the base
+	     address of the reference.  In which case, we should not
+	     remove this store.  */
 	  mark_stmt_necessary (stmt, true);
-	  return;
-        }
+	}
+      else if (DECL_P (lhs))
+	{
+	  /* If the store is to a global symbol, we need to keep it.  */
+	  if (is_global_var (lhs))
+	    mark_stmt_necessary (stmt, true);
+	}
+      else if (INDIRECT_REF_P (lhs))
+	{
+	  tree ptr = TREE_OPERAND (lhs, 0);
+	  struct ptr_info_def *pi = SSA_NAME_PTR_INFO (ptr);
+	  tree nmt = (pi) ? pi->name_mem_tag : NULL_TREE;
+	  tree tmt = var_ann (SSA_NAME_VAR (ptr))->type_mem_tag;
+
+	  /* If either the name tag or the type tag for PTR is a
+	     global variable, then the store is necessary.  */
+	  if ((nmt && is_global_var (nmt))
+	      || (tmt && is_global_var (tmt)))
+	    {
+	      mark_stmt_necessary (stmt, true);
+	      return;
+	    }
+	}
+      else
+	gcc_unreachable ();
     }
 
   return;
@@ -404,21 +452,23 @@ mark_stmt_if_obviously_necessary (tree stmt, bool aggressive)
 /* Find obviously necessary statements.  These are things like most function
    calls, and stores to file level variables.
 
-   If AGGRESSIVE is false, control statements are conservatively marked as
-   necessary.  */
+   If EL is NULL, control statements are conservatively marked as
+   necessary.  Otherwise it contains the list of edges used by control
+   dependence analysis.  */
 
 static void
-find_obviously_necessary_stmts (bool aggressive)
+find_obviously_necessary_stmts (struct edge_list *el)
 {
   basic_block bb;
   block_stmt_iterator i;
+  edge e;
 
   FOR_EACH_BB (bb)
     {
       tree phi;
 
       /* Check any PHI nodes in the block.  */
-      for (phi = phi_nodes (bb); phi; phi = TREE_CHAIN (phi))
+      for (phi = phi_nodes (bb); phi; phi = PHI_CHAIN (phi))
 	{
 	  NECESSARY (phi) = 0;
 
@@ -429,7 +479,7 @@ find_obviously_necessary_stmts (bool aggressive)
 	     Thus, we only need to mark PHIs for real variables which
 	     need their result preserved as being inherently necessary.  */
 	  if (is_gimple_reg (PHI_RESULT (phi))
-	      && need_to_preserve_store (PHI_RESULT (phi)))
+	      && is_global_var (SSA_NAME_VAR (PHI_RESULT (phi))))
 	    mark_stmt_necessary (phi, true);
         }
 
@@ -438,13 +488,26 @@ find_obviously_necessary_stmts (bool aggressive)
 	{
 	  tree stmt = bsi_stmt (i);
 	  NECESSARY (stmt) = 0;
-	  mark_stmt_if_obviously_necessary (stmt, aggressive);
+	  mark_stmt_if_obviously_necessary (stmt, el != NULL);
 	}
 
       /* Mark this basic block as `not visited'.  A block will be marked
 	 visited when the edges that it is control dependent on have been
 	 marked.  */
       bb->flags &= ~BB_VISITED;
+    }
+
+  if (el)
+    {
+      /* Prevent the loops from being removed.  We must keep the infinite loops,
+	 and we currently do not have a means to recognize the finite ones.  */
+      FOR_EACH_BB (bb)
+	{
+	  edge_iterator ei;
+	  FOR_EACH_EDGE (e, ei, bb->succs)
+	    if (e->flags & EDGE_DFS_BACK)
+	      mark_control_dependent_edges_necessary (e->dest, el);
+	}
     }
 }
 
@@ -456,6 +519,11 @@ mark_control_dependent_edges_necessary (basic_block bb, struct edge_list *el)
 {
   int edge_number;
 
+  gcc_assert (bb != EXIT_BLOCK_PTR);
+
+  if (bb == ENTRY_BLOCK_PTR)
+    return;
+
   EXECUTE_IF_CONTROL_DEPENDENT (bb->index, edge_number,
     {
       tree t;
@@ -466,7 +534,7 @@ mark_control_dependent_edges_necessary (basic_block bb, struct edge_list *el)
       SET_BIT (last_stmt_necessary, cd_bb->index);
 
       t = last_stmt (cd_bb);
-      if (is_ctrl_stmt (t))
+      if (t && is_ctrl_stmt (t))
 	mark_stmt_necessary (t, true);
     });
 }
@@ -483,8 +551,8 @@ propagate_necessity (struct edge_list *el)
   tree i;
   bool aggressive = (el ? true : false); 
 
-  if (tree_dump_file && (tree_dump_flags & TDF_DETAILS))
-    fprintf (tree_dump_file, "\nProcessing worklist:\n");
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    fprintf (dump_file, "\nProcessing worklist:\n");
 
   while (VARRAY_ACTIVE_SIZE (worklist) > 0)
     {
@@ -492,11 +560,11 @@ propagate_necessity (struct edge_list *el)
       i = VARRAY_TOP_TREE (worklist);
       VARRAY_POP (worklist);
 
-      if (tree_dump_file && (tree_dump_flags & TDF_DETAILS))
+      if (dump_file && (dump_flags & TDF_DETAILS))
 	{
-	  fprintf (tree_dump_file, "processing: ");
-	  print_generic_stmt (tree_dump_file, i, TDF_SLIM);
-	  fprintf (tree_dump_file, "\n");
+	  fprintf (dump_file, "processing: ");
+	  print_generic_stmt (dump_file, i, TDF_SLIM);
+	  fprintf (dump_file, "\n");
 	}
 
       if (aggressive)
@@ -544,31 +612,20 @@ propagate_necessity (struct edge_list *el)
       else
 	{
 	  /* Propagate through the operands.  Examine all the USE, VUSE and
-	     VDEF operands in this statement.  Mark all the statements which
-	     feed this statement's uses as necessary.  */
-	  vuse_optype vuses;
-	  vdef_optype vdefs;
-	  use_optype uses;
-	  stmt_ann_t ann;
-	  size_t k;
+	     V_MAY_DEF operands in this statement.  Mark all the statements 
+	     which feed this statement's uses as necessary.  */
+	  ssa_op_iter iter;
+	  tree use;
 
 	  get_stmt_operands (i);
-	  ann = stmt_ann (i);
 
-	  uses = USE_OPS (ann);
-	  for (k = 0; k < NUM_USES (uses); k++)
-	    mark_operand_necessary (USE_OP (uses, k));
-
-	  vuses = VUSE_OPS (ann);
-	  for (k = 0; k < NUM_VUSES (vuses); k++)
-	    mark_operand_necessary (VUSE_OP (vuses, k));
-
-	  /* The operands of VDEF expressions are also needed as they
+	  /* The operands of V_MAY_DEF expressions are also needed as they
 	     represent potential definitions that may reach this
-	     statement (VDEF operands allow us to follow def-def links).  */
-	  vdefs = VDEF_OPS (ann);
-	  for (k = 0; k < NUM_VDEFS (vdefs); k++)
-	    mark_operand_necessary (VDEF_OP (vdefs, k));
+	     statement (V_MAY_DEF operands allow us to follow def-def 
+	     links).  */
+
+	  FOR_EACH_SSA_TREE_OPERAND (use, i, iter, SSA_OP_ALL_USES)
+	    mark_operand_necessary (use);
 	}
     }
 }
@@ -582,8 +639,8 @@ eliminate_unnecessary_stmts (void)
   basic_block bb;
   block_stmt_iterator i;
 
-  if (tree_dump_file && (tree_dump_flags & TDF_DETAILS))
-    fprintf (tree_dump_file, "\nEliminating unnecessary statements:\n");
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    fprintf (dump_file, "\nEliminating unnecessary statements:\n");
 
   clear_special_calls ();
   FOR_EACH_BB (bb)
@@ -603,11 +660,9 @@ eliminate_unnecessary_stmts (void)
 	    remove_dead_stmt (&i, bb);
 	  else
 	    {
-	      if (TREE_CODE (t) == CALL_EXPR)
-		notice_special_calls (t);
-	      else if (TREE_CODE (t) == MODIFY_EXPR
-		       && TREE_CODE (TREE_OPERAND (t, 1)) == CALL_EXPR)
-		notice_special_calls (TREE_OPERAND (t, 1));
+	      tree call = get_call_expr_in (t);
+	      if (call)
+		notice_special_calls (call);
 	      bsi_next (&i);
 	    }
 	}
@@ -629,13 +684,13 @@ remove_dead_phis (basic_block bb)
 
       if (! NECESSARY (phi))
 	{
-	  tree next = TREE_CHAIN (phi);
+	  tree next = PHI_CHAIN (phi);
 
-	  if (tree_dump_file && (tree_dump_flags & TDF_DETAILS))
+	  if (dump_file && (dump_flags & TDF_DETAILS))
 	    {
-	      fprintf (tree_dump_file, "Deleting : ");
-	      print_generic_stmt (tree_dump_file, phi, TDF_SLIM);
-	      fprintf (tree_dump_file, "\n");
+	      fprintf (dump_file, "Deleting : ");
+	      print_generic_stmt (dump_file, phi, TDF_SLIM);
+	      fprintf (dump_file, "\n");
 	    }
 
 	  remove_phi_node (phi, prev, bb);
@@ -645,7 +700,7 @@ remove_dead_phis (basic_block bb)
       else
 	{
 	  prev = phi;
-	  phi = TREE_CHAIN (phi);
+	  phi = PHI_CHAIN (phi);
 	}
     }
 }
@@ -658,11 +713,11 @@ remove_dead_stmt (block_stmt_iterator *i, basic_block bb)
 {
   tree t = bsi_stmt (*i);
 
-  if (tree_dump_file && (tree_dump_flags & TDF_DETAILS))
+  if (dump_file && (dump_flags & TDF_DETAILS))
     {
-      fprintf (tree_dump_file, "Deleting : ");
-      print_generic_stmt (tree_dump_file, t, TDF_SLIM);
-      fprintf (tree_dump_file, "\n");
+      fprintf (dump_file, "Deleting : ");
+      print_generic_stmt (dump_file, t, TDF_SLIM);
+      fprintf (dump_file, "\n");
     }
 
   stats.removed++;
@@ -676,12 +731,8 @@ remove_dead_stmt (block_stmt_iterator *i, basic_block bb)
   if (is_ctrl_stmt (t))
     {
       basic_block post_dom_bb;
-      edge e;
-#ifdef ENABLE_CHECKING
       /* The post dominance info has to be up-to-date.  */
-      if (dom_computed[CDI_POST_DOMINATORS] != DOM_OK)
-	abort ();
-#endif
+      gcc_assert (dom_computed[CDI_POST_DOMINATORS] == DOM_OK);
       /* Get the immediate post dominator of bb.  */
       post_dom_bb = get_immediate_dominator (CDI_POST_DOMINATORS, bb);
       /* Some blocks don't have an immediate post dominator.  This can happen
@@ -693,18 +744,31 @@ remove_dead_stmt (block_stmt_iterator *i, basic_block bb)
 	  return;
 	}
 
-      /* Remove all outgoing edges, and add an edge to the post dominator.  */
-      for (e = bb->succ; e != NULL;)
-	{
-	  edge tmp = e;
-	  e = e->succ_next;
-	  remove_edge (tmp);
-	}
-      make_edge (bb, post_dom_bb,
-		 (post_dom_bb == EXIT_BLOCK_PTR ? 0 : EDGE_FALLTHRU));
+      /* Redirect the first edge out of BB to reach POST_DOM_BB.  */
+      redirect_edge_and_branch (EDGE_SUCC (bb, 0), post_dom_bb);
+      PENDING_STMT (EDGE_SUCC (bb, 0)) = NULL;
+      EDGE_SUCC (bb, 0)->probability = REG_BR_PROB_BASE;
+      EDGE_SUCC (bb, 0)->count = bb->count;
+
+      /* The edge is no longer associated with a conditional, so it does
+	 not have TRUE/FALSE flags.  */
+      EDGE_SUCC (bb, 0)->flags &= ~(EDGE_TRUE_VALUE | EDGE_FALSE_VALUE);
+
+      /* If the edge reaches any block other than the exit, then it is a
+	 fallthru edge; if it reaches the exit, then it is not a fallthru
+	 edge.  */
+      if (post_dom_bb != EXIT_BLOCK_PTR)
+	EDGE_SUCC (bb, 0)->flags |= EDGE_FALLTHRU;
+      else
+	EDGE_SUCC (bb, 0)->flags &= ~EDGE_FALLTHRU;
+
+      /* Remove the remaining the outgoing edges.  */
+      while (EDGE_COUNT (bb->succs) != 1)
+        remove_edge (EDGE_SUCC (bb, 1));
     }
 
   bsi_remove (i);
+  release_defs (t);
 }
 
 /* Print out removed statement statistics.  */
@@ -712,12 +776,12 @@ remove_dead_stmt (block_stmt_iterator *i, basic_block bb)
 static void
 print_stats (void)
 {
-  if (tree_dump_file && (tree_dump_flags & (TDF_STATS|TDF_DETAILS)))
+  if (dump_file && (dump_flags & (TDF_STATS|TDF_DETAILS)))
     {
       float percg;
 
       percg = ((float) stats.removed / (float) stats.total) * 100;
-      fprintf (tree_dump_file, "Removed %d of %d statements (%d%%)\n",
+      fprintf (dump_file, "Removed %d of %d statements (%d%%)\n",
 	       stats.removed, stats.total, (int) percg);
 
       if (stats.total_phis == 0)
@@ -725,7 +789,7 @@ print_stats (void)
       else
 	percg = ((float) stats.removed_phis / (float) stats.total_phis) * 100;
 
-      fprintf (tree_dump_file, "Removed %d of %d PHI nodes (%d%%)\n",
+      fprintf (dump_file, "Removed %d of %d PHI nodes (%d%%)\n",
 	       stats.removed_phis, stats.total_phis, (int) percg);
     }
 }
@@ -750,7 +814,7 @@ tree_dce_init (bool aggressive)
       sbitmap_zero (last_stmt_necessary);
     }
 
-  processed = sbitmap_alloc (highest_ssa_version + 1);
+  processed = sbitmap_alloc (num_ssa_names + 1);
   sbitmap_zero (processed);
 
   VARRAY_TREE_INIT (worklist, 64, "work list");
@@ -804,9 +868,11 @@ perform_tree_ssa_dce (bool aggressive)
       el = create_edge_list ();
       find_all_control_dependences (el);
       timevar_pop (TV_CONTROL_DEPENDENCES);
+
+      mark_dfs_back_edges ();
     }
 
-  find_obviously_necessary_stmts (aggressive);
+  find_obviously_necessary_stmts (el);
 
   propagate_necessity (el);
 
@@ -818,14 +884,15 @@ perform_tree_ssa_dce (bool aggressive)
   cleanup_tree_cfg ();
 
   /* Debugging dumps.  */
-  if (tree_dump_file)
+  if (dump_file)
     {
-      dump_function_to_file (current_function_decl,
-			     tree_dump_file, tree_dump_flags);
+      dump_function_to_file (current_function_decl, dump_file, dump_flags);
       print_stats ();
     }
 
   tree_dce_done (aggressive);
+
+  free_edge_list (el);
 }
 
 /* Pass entry points.  */
@@ -851,32 +918,38 @@ struct tree_opt_pass pass_dce =
 {
   "dce",				/* name */
   gate_dce,				/* gate */
+  NULL, NULL,				/* IPA analysis */
   tree_ssa_dce,				/* execute */
+  NULL, NULL,				/* IPA modification */
   NULL,					/* sub */
   NULL,					/* next */
   0,					/* static_pass_number */
   TV_TREE_DCE,				/* tv_id */
-  PROP_cfg | PROP_ssa,			/* properties_required */
+  PROP_cfg | PROP_ssa | PROP_alias,	/* properties_required */
   0,					/* properties_provided */
   0,					/* properties_destroyed */
   0,					/* todo_flags_start */
-  TODO_ggc_collect | TODO_verify_ssa	/* todo_flags_finish */
+  TODO_ggc_collect | TODO_verify_ssa,	/* todo_flags_finish */
+  0					/* letter */
 };
 
 struct tree_opt_pass pass_cd_dce =
 {
   "cddce",				/* name */
   gate_dce,				/* gate */
+  NULL, NULL,				/* IPA analysis */
   tree_ssa_cd_dce,			/* execute */
+  NULL, NULL,				/* IPA modification */
   NULL,					/* sub */
   NULL,					/* next */
   0,					/* static_pass_number */
   TV_TREE_CD_DCE,			/* tv_id */
-  PROP_cfg | PROP_ssa,			/* properties_required */
+  PROP_cfg | PROP_ssa | PROP_alias,	/* properties_required */
   0,					/* properties_provided */
   0,					/* properties_destroyed */
   0,					/* todo_flags_start */
-  TODO_ggc_collect | TODO_verify_ssa | TODO_verify_flow
+  TODO_ggc_collect | TODO_verify_ssa | TODO_verify_flow,
 					/* todo_flags_finish */
+  0					/* letter */
 };
 

@@ -80,7 +80,7 @@ package body Bld is
    Expression_Value  : String_Access := new String (1 .. 10);
    Expression_Last   : Natural := 0;
 
-   --  The following variables indicates if the suffixs and the languages
+   --  The following variables indicates if the suffixes and the languages
    --  are statically specified and, if they are, their values.
 
    C_Suffix          : String_Access := new String (1 .. 10);
@@ -222,6 +222,7 @@ package body Bld is
    Deps_Projects_String : aliased String := "DEPS_PROJECT";
    Exec_String          : aliased String := "EXEC";
    Exec_Dir_String      : aliased String := "EXEC_DIR";
+   Fldflags_String      : aliased String := "FLDFLAGS";
    Gnatmake_String      : aliased String := "GNATMAKE";
    Languages_String     : aliased String := "LANGUAGES";
    Ld_Flags_String      : aliased String := "LD_FLAGS";
@@ -251,6 +252,7 @@ package body Bld is
       Deps_Projects_String'Access,
       Exec_String         'Access,
       Exec_Dir_String     'Access,
+      Fldflags_String     'Access,
       Gnatmake_String     'Access,
       Languages_String    'Access,
       Ld_Flags_String     'Access,
@@ -1426,7 +1428,8 @@ package body Bld is
                     (Pkg = No_Name
                        or else Pkg = Snames.Name_Naming
                        or else Pkg = Snames.Name_Compiler
-                       or else Pkg = Name_Ide);
+                       or else Pkg = Name_Ide
+                       or else Pkg = Snames.Name_Linker);
 
                   if Put_Declaration then
                      --  Some attributes are converted into reserved variables
@@ -1504,11 +1507,11 @@ package body Bld is
                            --  being an absolute directory name.
 
                            Put (Project_Name &
-                                ".src_dirs:=$(shell gprcmd extend $(");
-                           Put (Project_Name);
-                           Put (".base_dir) '$(");
+                                ".src_dirs:=$(foreach name,$(");
                            Put_Attribute (Project, Pkg, Item_Name, No_Name);
-                           Put_Line (")')");
+                           Put ("),$(shell gprcmd extend $(");
+                           Put (Project_Name);
+                           Put_Line (".base_dir) '""$(name)""'))");
 
                         elsif Item_Name = Snames.Name_Source_Files then
 
@@ -1959,10 +1962,42 @@ package body Bld is
                                  end if;
                               end if;
                            end;
+
                         else
                            --  Other attribute are of no interest; suppress
                            --  their declarations.
 
+                           Put_Declaration := False;
+                        end if;
+
+                     elsif Pkg = Snames.Name_Linker then
+                        if Item_Name = Snames.Name_Linker_Options then
+
+                           --  Only add linker options if this is not the
+                           --  root project.
+
+                           Put ("ifeq ($(");
+                           Put (Project_Name);
+                           Put (".root),False)");
+                           New_Line;
+
+                           --  Add linker options to FLDFLAGS in reverse order
+
+                           Put ("   FLDFLAGS:=$(shell gprcmd linkopts $(");
+                           Put (Project_Name);
+                           Put (".base_dir) $(");
+                           Put_Attribute
+                             (Project, Pkg, Item_Name, No_Name);
+                           Put (")) $(FLDFLAGS)");
+                           New_Line;
+
+                           Put ("endif");
+                           New_Line;
+
+                        --  Other attributes are of no interest. Suppress
+                        --  their declarations.
+
+                        else
                            Put_Declaration := False;
                         end if;
                      end if;
@@ -2349,11 +2384,12 @@ package body Bld is
             Last : Natural := Included_Directory_Path'Last;
 
          begin
-            --  Remove a possible directory separator at the end of the
-            --  directory.
+            --  Remove possible directory separator at end of the directory
 
             if Last >= Included_Directory_Path'First
-              and then Included_Directory_Path (Last) = Directory_Separator
+              and then (Included_Directory_Path (Last) = Directory_Separator
+                          or else
+                        Included_Directory_Path (Last) = '/')
             then
                Last := Last - 1;
             end if;
@@ -2366,7 +2402,7 @@ package body Bld is
             if not Is_Absolute_Path (Included_Directory_Path) then
                Put ("$(");
                Put (Including_Project_Name);
-               Put (".base_dir)" & Directory_Separator);
+               Put (".base_dir)/");
             end if;
 
             Put (Included_Directory_Path
@@ -2686,11 +2722,27 @@ package body Bld is
 
                --  Set defaults to some variables
 
+               --  CFLAGS and CXXFLAGS are set by default to nothing.
+               --  Their initial values have been saved, If they are not set
+               --  by this project file, then they will be reset to their
+               --  initial values. This is to avoid "inheritance" of these
+               --  flags from an imported project file.
+
+               Put_Line ("CFLAGS:=");
+               Put_Line ("CXXFLAGS:=");
+
                IO.Mark (Src_Files_Init);
                Put_Line ("src_files.specified:=FALSE");
 
                IO.Mark (Src_List_File_Init);
                Put_Line ("src_list_file.specified:=FALSE");
+
+               --  Default language is Ada, but variable LANGUAGES may have
+               --  been changed by an imported Makefile. So, we set it
+               --  to "ada"; if attribute Languages is defined in the project
+               --  file, it will be redefined.
+
+               Put_Line ("LANGUAGES:=ada");
 
                --  <PROJECT>.src_dirs is set by default to the project
                --  directory.
@@ -2752,7 +2804,7 @@ package body Bld is
 
                There_Are_Cases := Last_Case /= Last_Case_Construction;
 
-               --  If the suffixs and the languages have not been specified,
+               --  If the suffixes and the languages have not been specified,
                --  give them the default values.
 
                if C_Suffix_Static and then C_Suffix_Last = 0 then
@@ -2869,7 +2921,7 @@ package body Bld is
                         end if;
 
                         --  If we still don't know the language, and all
-                        --  suffixs are static, then it cannot any of the
+                        --  suffixes are static, then it cannot any of the
                         --  processed languages.
 
                         if Source_Kind = Unknown
@@ -3069,11 +3121,14 @@ package body Bld is
                   end if;
                end if;
 
-               --  Add source dirs of this project file to variable SRC_DIRS
+               --  Add source dirs of this project file to variable SRC_DIRS.
+               --  Put them in front, and remove duplicates.
 
-               Put ("SRC_DIRS:=$(SRC_DIRS) $(");
+               Put ("SRC_DIRS:=$(");
                Put (Uname);
-               Put (".src_dirs)");
+               Put (".src_dirs) $(filter-out $(");
+               Put (Uname);
+               Put (".src_dirs),$(SRC_DIRS))");
                New_Line;
 
                --  Set OBJ_DIR to the object directory
@@ -3337,6 +3392,19 @@ package body Bld is
 
                   end if;
                end;
+
+               --  If CFLAGS/CXXFLAGS have not been set, set them back to
+               --  their initial values.
+
+               Put_Line ("ifeq ($(CFLAGS),)");
+               Put_Line ("   CFLAGS:=$(CFLAGS.saved)");
+               Put_Line ("endif");
+               New_Line;
+
+               Put_Line ("ifeq ($(CXXFLAGS),)");
+               Put_Line ("   CXXFLAGS:=$(CXXFLAGS.saved)");
+               Put_Line ("endif");
+               New_Line;
 
                --  If this is the main Makefile, include Makefile.Generic
 
