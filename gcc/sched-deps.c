@@ -41,8 +41,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "params.h"
 #include "cselib.h"
 
-extern char *reg_known_equiv_p;
-extern rtx *reg_known_value;
 
 static regset_head reg_pending_sets_head;
 static regset_head reg_pending_clobbers_head;
@@ -101,10 +99,12 @@ deps_may_trap_p (mem)
 {
   rtx addr = XEXP (mem, 0);
 
-  if (REG_P (addr)
-      && REGNO (addr) >= FIRST_PSEUDO_REGISTER
-      && reg_known_value[REGNO (addr)])
-    addr = reg_known_value[REGNO (addr)];
+  if (REG_P (addr) && REGNO (addr) >= FIRST_PSEUDO_REGISTER)
+    {
+      rtx t = get_reg_known_value (REGNO (addr));
+      if (t)
+	addr = t;
+    }
   return rtx_addr_can_trap_p (addr);
 }
 
@@ -628,10 +628,12 @@ sched_analyze_1 (deps, x, insn)
 	  /* Pseudos that are REG_EQUIV to something may be replaced
 	     by that during reloading.  We need only add dependencies for
 	     the address in the REG_EQUIV note.  */
-	  if (!reload_completed
-	      && reg_known_equiv_p[regno]
-	      && GET_CODE (reg_known_value[regno]) == MEM)
-	    sched_analyze_2 (deps, XEXP (reg_known_value[regno], 0), insn);
+	  if (!reload_completed && get_reg_known_equiv_p (regno))
+	    {
+	      rtx t = get_reg_known_value (regno);
+	      if (GET_CODE (t) == MEM)
+	        sched_analyze_2 (deps, XEXP (t, 0), insn);
+	    }
 
 	  /* Don't let it cross a call after scheduling if it doesn't
 	     already cross one.  */
@@ -763,10 +765,12 @@ sched_analyze_2 (deps, x, insn)
 	    /* Pseudos that are REG_EQUIV to something may be replaced
 	       by that during reloading.  We need only add dependencies for
 	       the address in the REG_EQUIV note.  */
-	    if (!reload_completed
-		&& reg_known_equiv_p[regno]
-		&& GET_CODE (reg_known_value[regno]) == MEM)
-	      sched_analyze_2 (deps, XEXP (reg_known_value[regno], 0), insn);
+	    if (!reload_completed && get_reg_known_equiv_p (regno))
+	      {
+		rtx t = get_reg_known_value (regno);
+		if (GET_CODE (t) == MEM)
+		  sched_analyze_2 (deps, XEXP (t, 0), insn);
+	      }
 
 	    /* If the register does not already cross any calls, then add this
 	       insn to the sched_before_next_call list so that it will still
@@ -977,12 +981,17 @@ sched_analyze_insn (deps, x, insn, loop_notes)
       else
 	{
 	  rtx pending, pending_mem;
-	  regset_head tmp;
-	  INIT_REG_SET (&tmp);
+	  regset_head tmp_uses, tmp_sets;
+	  INIT_REG_SET (&tmp_uses);
+	  INIT_REG_SET (&tmp_sets);
 
-	  (*current_sched_info->compute_jump_reg_dependencies) (insn, &tmp);
-	  IOR_REG_SET (reg_pending_uses, &tmp);
-	  CLEAR_REG_SET (&tmp);
+	  (*current_sched_info->compute_jump_reg_dependencies)
+	    (insn, &deps->reg_conditional_sets, &tmp_uses, &tmp_sets);
+	  IOR_REG_SET (reg_pending_uses, &tmp_uses);
+	  IOR_REG_SET (reg_pending_sets, &tmp_sets);
+
+	  CLEAR_REG_SET (&tmp_uses);
+	  CLEAR_REG_SET (&tmp_sets);
 
 	  /* All memory writes and volatile reads must happen before the
 	     jump.  Non-volatile reads must happen before the jump iff
@@ -1079,6 +1088,7 @@ sched_analyze_insn (deps, x, insn, loop_notes)
 	}
 
       flush_pending_lists (deps, insn, true, true);
+      CLEAR_REG_SET (&deps->reg_conditional_sets);
       reg_pending_barrier = false;
     }
   else
@@ -1110,6 +1120,7 @@ sched_analyze_insn (deps, x, insn, loop_notes)
 	      add_dependence_list (insn, reg_last->clobbers, REG_DEP_OUTPUT);
 	      add_dependence_list (insn, reg_last->uses, REG_DEP_ANTI);
 	      reg_last->sets = alloc_INSN_LIST (insn, reg_last->sets);
+	      SET_REGNO_REG_SET (&deps->reg_conditional_sets, i);
 	    });
 	}
       else
@@ -1158,6 +1169,7 @@ sched_analyze_insn (deps, x, insn, loop_notes)
 	      reg_last->sets = alloc_INSN_LIST (insn, reg_last->sets);
 	      reg_last->uses_length = 0;
 	      reg_last->clobbers_length = 0;
+	      CLEAR_REGNO_REG_SET (&deps->reg_conditional_sets, i);
 	    });
 	}
 
@@ -1484,6 +1496,7 @@ init_deps (deps)
   deps->reg_last = (struct deps_reg *)
     xcalloc (max_reg, sizeof (struct deps_reg));
   INIT_REG_SET (&deps->reg_last_in_use);
+  INIT_REG_SET (&deps->reg_conditional_sets);
 
   deps->pending_read_insns = 0;
   deps->pending_read_mems = 0;
@@ -1526,6 +1539,7 @@ free_deps (deps)
 	free_INSN_LIST_list (&reg_last->clobbers);
     });
   CLEAR_REG_SET (&deps->reg_last_in_use);
+  CLEAR_REG_SET (&deps->reg_conditional_sets);
 
   free (deps->reg_last);
 }
