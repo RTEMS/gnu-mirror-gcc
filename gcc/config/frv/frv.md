@@ -405,10 +405,10 @@
      DEFINE_AUTOMATON).
 
      All define_reservations and define_cpu_units should have unique
-     names which can not be "nothing".
+     names which cannot be "nothing".
 
    o (exclusion_set string string) means that each CPU function unit
-     in the first string can not be reserved simultaneously with each
+     in the first string cannot be reserved simultaneously with each
      unit whose name is in the second string and vise versa.  CPU
      units in the string are separated by commas. For example, it is
      useful for description CPU with fully pipelined floating point
@@ -416,18 +416,18 @@
      floating point insns or only double floating point insns.
 
    o (presence_set string string) means that each CPU function unit in
-     the first string can not be reserved unless at least one of units
+     the first string cannot be reserved unless at least one of units
      whose names are in the second string is reserved.  This is an
      asymmetric relation.  CPU units in the string are separated by
      commas.  For example, it is useful for description that slot1 is
      reserved after slot0 reservation for a VLIW processor.
 
    o (absence_set string string) means that each CPU function unit in
-     the first string can not be reserved only if each unit whose name
+     the first string cannot be reserved only if each unit whose name
      is in the second string is not reserved.  This is an asymmetric
      relation (actually exclusion set is analogous to this one but it
      is symmetric).  CPU units in the string are separated by commas.
-     For example, it is useful for description that slot0 can not be
+     For example, it is useful for description that slot0 cannot be
      reserved after slot1 or slot2 reservation for a VLIW processor.
 
    o (define_bypass number out_insn_names in_insn_names) names bypass with
@@ -450,7 +450,7 @@
      case, you describe common part and use one its name (the 1st
      parameter) in regular expression in define_insn_reservation.  All
      define_reservations, define results and define_cpu_units should
-     have unique names which can not be "nothing".
+     have unique names which cannot be "nothing".
 
    o (define_insn_reservation name default_latency condition regexpr)
      describes reservation of cpu functional units (the 3nd operand)
@@ -1312,12 +1312,12 @@
    (set_attr "type" "gload,fload")])
 
 (define_insn "*movqi_internal"
-  [(set (match_operand:QI 0 "move_destination_operand" "=d,d,m,m,?f,?f,?d,?m,f")
-	(match_operand:QI 1 "move_source_operand"       "L,d,d,O, d, f, f, f,GO"))]
+  [(set (match_operand:QI 0 "move_destination_operand" "=d,d,m,m,?f,?f,?d,?m,f,d,f")
+	(match_operand:QI 1 "move_source_operand"       "L,d,d,O, d, f, f, f,GO,!m,!m"))]
   "register_operand(operands[0], QImode) || reg_or_0_operand (operands[1], QImode)"
   "* return output_move_single (operands, insn);"
   [(set_attr "length" "4")
-   (set_attr "type" "int,int,gstore,gstore,movgf,fsconv,movfg,fstore,movgf")])
+   (set_attr "type" "int,int,gstore,gstore,movgf,fsconv,movfg,fstore,movgf,gload,fload")])
 
 (define_expand "movhi"
   [(set (match_operand:HI 0 "general_operand" "")
@@ -1341,12 +1341,12 @@
    (set_attr "type" "gload,fload")])
 
 (define_insn "*movhi_internal"
-  [(set (match_operand:HI 0 "move_destination_operand" "=d,d,d,m,m,?f,?f,?d,?m,f")
-	(match_operand:HI 1 "move_source_operand"       "L,n,d,d,O, d, f, f, f,GO"))]
+  [(set (match_operand:HI 0 "move_destination_operand" "=d,d,d,m,m,?f,?f,?d,?m,f,d,f")
+	(match_operand:HI 1 "move_source_operand"       "L,n,d,d,O, d, f, f, f,GO,!m,!m"))]
   "register_operand(operands[0], HImode) || reg_or_0_operand (operands[1], HImode)"
   "* return output_move_single (operands, insn);"
-  [(set_attr "length" "4,8,4,4,4,4,4,4,4,4")
-   (set_attr "type" "int,multi,int,gstore,gstore,movgf,fsconv,movfg,fstore,movgf")])
+  [(set_attr "length" "4,8,4,4,4,4,4,4,4,4,4,4")
+   (set_attr "type" "int,multi,int,gstore,gstore,movgf,fsconv,movfg,fstore,movgf,gload,fload")])
 
 ;; Split 2 word load of constants into sethi/setlo instructions
 (define_split
@@ -1402,6 +1402,14 @@
 ;; The resulting sequences for loading constants into FPRs are preferable
 ;; even when we're not generating PIC code.
 
+;; However, if we don't accept input from memory at all in the generic
+;; movsi pattern, reloads for asm instructions that reference pseudos
+;; that end up assigned to memory will fail to match, because we
+;; recognize them right after they're emitted, and we don't
+;; re-recognize them again after the substitution for memory.  So keep
+;; a memory constraint available, just make sure reload won't be
+;; tempted to use it.
+
 (define_insn "*movsi_load"
   [(set (match_operand:SI 0 "register_operand" "=d,f")
 	(match_operand:SI 1 "frv_load_operand" "m,m"))]
@@ -1436,12 +1444,12 @@
    (set_attr "length" "4")])
 
 (define_insn "*movsi_internal"
-  [(set (match_operand:SI 0 "move_destination_operand" "=d,d,d,m,m,z,d,d,f,f,m,?f,?z")
-	(match_operand:SI 1 "move_source_operand"      "L,n,d,d,O,d,z,f,d,f,f,GO,GO"))]
+  [(set (match_operand:SI 0 "move_destination_operand" "=d,d,d,m,m,z,d,d,f,f,m,?f,?z,d,f")
+	(match_operand:SI 1 "move_source_operand"      "L,n,d,d,O,d,z,f,d,f,f,GO,GO,!m,!m"))]
   "register_operand (operands[0], SImode) || reg_or_0_operand (operands[1], SImode)"
   "* return output_move_single (operands, insn);"
-  [(set_attr "length" "4,8,4,4,4,4,4,4,4,4,4,4,4")
-   (set_attr "type" "int,multi,int,gstore,gstore,spr,spr,movfg,movgf,fsconv,fstore,movgf,spr")])
+  [(set_attr "length" "4,8,4,4,4,4,4,4,4,4,4,4,4,4,4")
+   (set_attr "type" "int,multi,int,gstore,gstore,spr,spr,movfg,movgf,fsconv,fstore,movgf,spr,gload,fload")])
 
 ;; Split 2 word load of constants into sethi/setlo instructions
 (define_insn_and_split "*movsi_2word"
@@ -1835,7 +1843,7 @@
 ;; Argument 2 is the length
 ;; Argument 3 is the alignment
 
-(define_expand "movstrsi"
+(define_expand "movmemsi"
   [(parallel [(set (match_operand:BLK 0 "" "")
 		   (match_operand:BLK 1 "" ""))
 	      (use (match_operand:SI 2 "" ""))
@@ -1854,7 +1862,7 @@
 ;; Argument 1 is the length
 ;; Argument 2 is the alignment
 
-(define_expand "clrstrsi"
+(define_expand "clrmemsi"
   [(parallel [(set (match_operand:BLK 0 "" "")
 		   (const_int 0))
 	      (use (match_operand:SI 1 "" ""))
@@ -2788,7 +2796,7 @@
   [(set_attr "length" "8")
    (set_attr "type" "multi")])
 
-;; Patterns for addsi3/subdi3 after spliting
+;; Patterns for addsi3/subdi3 after splitting
 (define_insn "adddi3_lower"
   [(set (match_operand:SI 0 "integer_register_operand" "=d")
 	(plus:SI (match_operand:SI 1 "integer_register_operand" "d")
@@ -5260,7 +5268,7 @@
     operands[2] = const0_rtx;
 
   if (TARGET_FDPIC)
-    frv_expand_fdpic_call (operands, 0);
+    frv_expand_fdpic_call (operands, false, false);
   else
     emit_call_insn (gen_call_internal (addr, operands[1], operands[2], lr));
 
@@ -5308,7 +5316,7 @@
 	 (match_operand 1 "" ""))
    (clobber (match_operand:SI 2 "lr_operand" "=l"))]
   "TARGET_FDPIC"
-  "calll %M0"
+  "call%i0l %M0"
   [(set_attr "length" "4")
    (set_attr "type" "jumpl")])
 
@@ -5324,6 +5332,65 @@
    call%i0l %M0"
   [(set_attr "length" "4")
    (set_attr "type" "call,jumpl")])
+
+(define_expand "sibcall"
+  [(use (match_operand:QI 0 "" ""))
+   (use (match_operand 1 "" ""))
+   (use (match_operand 2 "" ""))
+   (use (match_operand 3 "" ""))]
+  ""
+  "
+{
+  rtx addr;
+
+  if (GET_CODE (operands[0]) != MEM)
+    abort ();
+
+  addr = XEXP (operands[0], 0);
+  if (! sibcall_operand (addr, Pmode))
+    addr = force_reg (Pmode, addr);
+
+  if (! operands[2])
+    operands[2] = const0_rtx;
+
+  if (TARGET_FDPIC)
+    frv_expand_fdpic_call (operands, false, true);
+  else
+    emit_call_insn (gen_sibcall_internal (addr, operands[1], operands[2]));
+
+  DONE;
+}")
+  
+;; It might seem that these sibcall patterns are missing references to
+;; LR, but they're not necessary because sibcall_epilogue will make
+;; sure LR is restored, and having LR here will set
+;; regs_ever_used[REG_LR], forcing it to be saved on the stack, and
+;; then restored in sibcalls and regular return code paths, even if
+;; the function becomes a leaf function after tail-call elimination.
+
+;; We must not use a call-saved register here.  `W' limits ourselves
+;; to gr14 or gr15, but since we're almost running out of constraint
+;; letters, and most other call-clobbered registers are often used for
+;; argument-passing, this will do.
+(define_insn "sibcall_internal"
+  [(call (mem:QI (match_operand:SI 0 "sibcall_operand" "WNOP"))
+	 (match_operand 1 "" ""))
+   (use (match_operand 2 "" ""))
+   (return)]
+  "! TARGET_FDPIC"
+  "jmp%i0l %M0"
+  [(set_attr "length" "4")
+   (set_attr "type" "jumpl")])
+
+(define_insn "sibcall_fdpicdi"
+  [(call (mem:QI (match_operand:DI 0 "fdpic_fptr_operand" "W"))
+	 (match_operand 1 "" ""))
+   (return)]
+  "TARGET_FDPIC"
+  "jmp%i0l %M0"
+  [(set_attr "length" "4")
+   (set_attr "type" "jumpl")])
+
 
 ;; Subroutine call instruction returning a value.  Operand 0 is the hard
 ;; register in which the value is returned.  There are three more operands, the
@@ -5355,7 +5422,7 @@
     operands[3] = const0_rtx;
 
   if (TARGET_FDPIC)
-    frv_expand_fdpic_call (operands, 1);
+    frv_expand_fdpic_call (operands, true, false);
   else
     emit_call_insn (gen_call_value_internal (operands[0], addr, operands[2],
 					     operands[3], lr));
@@ -5382,7 +5449,7 @@
 	      (match_operand 2 "" "")))
    (clobber (match_operand:SI 3 "lr_operand" "=l"))]
   "TARGET_FDPIC"
-  "calll %M1"
+  "call%i1l %M1"
   [(set_attr "length" "4")
    (set_attr "type" "jumpl")])
 
@@ -5399,6 +5466,56 @@
    call%i1l %M1"
   [(set_attr "length" "4")
    (set_attr "type" "call,jumpl")])
+
+(define_expand "sibcall_value"
+  [(use (match_operand 0 "" ""))
+   (use (match_operand:QI 1 "" ""))
+   (use (match_operand 2 "" ""))
+   (use (match_operand 3 "" ""))
+   (use (match_operand 4 "" ""))]
+  ""
+  "
+{
+  rtx addr;
+
+  if (GET_CODE (operands[1]) != MEM)
+    abort ();
+
+  addr = XEXP (operands[1], 0);
+  if (! sibcall_operand (addr, Pmode))
+    addr = force_reg (Pmode, addr);
+
+  if (! operands[3])
+    operands[3] = const0_rtx;
+
+  if (TARGET_FDPIC)
+    frv_expand_fdpic_call (operands, true, true);
+  else
+    emit_call_insn (gen_sibcall_value_internal (operands[0], addr, operands[2],
+						operands[3]));
+  DONE;
+}")
+
+(define_insn "sibcall_value_internal"
+  [(set (match_operand 0 "register_operand" "=d")
+	(call (mem:QI (match_operand:SI 1 "sibcall_operand" "WNOP"))
+		      (match_operand 2 "" "")))
+   (use (match_operand 3 "" ""))
+   (return)]
+  "! TARGET_FDPIC"
+  "jmp%i1l %M1"
+  [(set_attr "length" "4")
+   (set_attr "type" "jumpl")])
+
+(define_insn "sibcall_value_fdpicdi"
+  [(set (match_operand 0 "register_operand" "=d")
+	(call (mem:QI (match_operand:DI 1 "fdpic_fptr_operand" "W"))
+	      (match_operand 2 "" "")))
+   (return)]
+  "TARGET_FDPIC"
+  "jmp%i1l %M1"
+  [(set_attr "length" "4")
+   (set_attr "type" "jumpl")])
 
 ;; return instruction generated instead of jmp to epilog
 (define_expand "return"
@@ -5429,6 +5546,54 @@
     jmpl @(%0,%.)"
   [(set_attr "length" "4")
    (set_attr "type" "jump,jumpl")])
+
+(define_insn "*return_true"
+  [(set (pc)
+	(if_then_else (match_operator:CC 0 "signed_relational_operator"
+					 [(match_operand 1 "icc_operand" "t")
+					  (const_int 0)])
+		      (return)
+		      (pc)))]
+  "direct_return_p ()"
+  "b%c0lr %1,%#"
+  [(set_attr "length" "4")
+   (set_attr "type" "jump")])
+
+(define_insn "*return_false"
+  [(set (pc)
+	(if_then_else (match_operator:CC 0 "signed_relational_operator"
+					 [(match_operand 1 "icc_operand" "t")
+					  (const_int 0)])
+		      (pc)
+		      (return)))]
+  "direct_return_p ()"
+  "b%C0lr %1,%#"
+  [(set_attr "length" "4")
+   (set_attr "type" "jump")])
+
+(define_insn "*return_unsigned_true"
+  [(set (pc)
+	(if_then_else (match_operator:CC_UNS 0 "unsigned_relational_operator"
+					     [(match_operand 1 "icc_operand" "t")
+					      (const_int 0)])
+		      (return)
+		      (pc)))]
+  "direct_return_p ()"
+  "b%c0lr %1,%#"
+  [(set_attr "length" "4")
+   (set_attr "type" "jump")])
+
+(define_insn "*return_unsigned_false"
+  [(set (pc)
+	(if_then_else (match_operator:CC_UNS 0 "unsigned_relational_operator"
+					     [(match_operand 1 "icc_operand" "t")
+					      (const_int 0)])
+		      (pc)
+		      (return)))]
+  "direct_return_p ()"
+  "b%C0lr %1,%#"
+  [(set_attr "length" "4")
+   (set_attr "type" "jump")])
 
 ;; A version of addsi3 for deallocating stack space at the end of the
 ;; epilogue.  The addition is done in parallel with an (unspec_volatile),
@@ -5634,7 +5799,7 @@
   ""
   "
 {
-  frv_expand_epilogue (FALSE);
+  frv_expand_epilogue (true);
   DONE;
 }")
 
@@ -5650,7 +5815,7 @@
   ""
   "
 {
-  frv_expand_epilogue (TRUE);
+  frv_expand_epilogue (false);
   DONE;
 }")
 
@@ -7554,7 +7719,7 @@
 
   insn = emit_insn (gen_symGOT2reg_i (operands[0], operands[1], operands[2], operands[3]));
 
-  RTX_UNCHANGING_P (SET_SRC (PATTERN (insn))) = 1;
+  MEM_READONLY_P (SET_SRC (PATTERN (insn))) = 1;
 
   REG_NOTES (insn) = gen_rtx_EXPR_LIST (REG_EQUAL, operands[1],
 					REG_NOTES (insn));

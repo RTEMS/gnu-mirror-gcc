@@ -157,6 +157,9 @@ extern int regno_clobbered_at_setjmp (int);
 /* Tell assembler to switch to text section.  */
 extern void text_section (void);
 
+/* Tell assembler to switch to unlikely-to-be-executed text section.  */
+extern void unlikely_text_section (void);
+
 /* Tell assembler to switch to data section.  */
 extern void data_section (void);
 
@@ -166,6 +169,9 @@ extern void readonly_data_section (void);
 
 /* Determine if we're in the text section.  */
 extern int in_text_section (void);
+
+/* Determine if we're in the unlikely-to-be-executed text section.  */
+extern int in_unlikely_text_section (void);
 
 #ifdef CTORS_SECTION_ASM_OP
 extern void ctors_section (void);
@@ -393,11 +399,6 @@ extern const char *weak_global_object_name;
 
 extern int current_function_is_leaf;
 
-/* Nonzero if function being compiled doesn't contain any instructions
-   that can throw an exception.  This is set prior to final.  */
-
-extern int current_function_nothrow;
-
 /* Nonzero if function being compiled doesn't modify the stack pointer
    (ignoring the prologue and epilogue).  This is only valid after
    life_analysis has run.  */
@@ -500,6 +501,8 @@ extern void default_elf_select_section_1 (tree, int,
 					  unsigned HOST_WIDE_INT, int);
 extern void default_unique_section (tree, int);
 extern void default_unique_section_1 (tree, int, int);
+extern void default_function_rodata_section (tree);
+extern void default_no_function_rodata_section (tree);
 extern void default_select_rtx_section (enum machine_mode, rtx,
 					unsigned HOST_WIDE_INT);
 extern void default_elf_select_rtx_section (enum machine_mode, rtx,
@@ -509,6 +512,7 @@ extern const char *default_strip_name_encoding (const char *);
 extern bool default_binds_local_p (tree);
 extern bool default_binds_local_p_1 (tree, int);
 extern void default_globalize_label (FILE *, const char *);
+extern void default_emit_unwind_label (FILE *, tree, int, int);
 extern void default_internal_label (FILE *, const char *, unsigned long);
 extern void default_file_start (void);
 extern void file_end_indicate_exec_stack (void);
