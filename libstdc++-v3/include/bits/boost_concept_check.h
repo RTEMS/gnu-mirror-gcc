@@ -36,6 +36,12 @@ inline void __function_requires()
   void (_Concept::*__x)() _IsUnused = &_Concept::__constraints;
 }
 
+// No definition: if this is referenced, there's a problem with
+// the instantiating type not being one of the required integer types.
+// Unfortunately, this results in a link-time error, not a compile-time error.
+void __error_type_must_be_an_integer_type();
+void __error_type_must_be_an_unsigned_integer_type();
+void __error_type_must_be_a_signed_integer_type();
 
 // ??? Should the "concept_checking*" structs begin with more than _ ?
 #define _GLIBCXX_CLASS_REQUIRES(_type_var, _ns, _concept) \
@@ -87,8 +93,8 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
 
   template <class _Tp>
   struct _IntegerConcept {
-    void __constraints() { 
-      this->__error_type_must_be_an_integer_type();
+    void __constraints() {
+      __error_type_must_be_an_integer_type();
     }
   };
   template <> struct _IntegerConcept<short> { void __constraints() {} };
@@ -103,8 +109,8 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
 
   template <class _Tp>
   struct _SignedIntegerConcept {
-    void __constraints() { 
-      this->__error_type_must_be_a_signed_integer_type();
+    void __constraints() {
+      __error_type_must_be_a_signed_integer_type();
     }
   };
   template <> struct _SignedIntegerConcept<short> { void __constraints() {} };
@@ -114,8 +120,8 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
 
   template <class _Tp>
   struct _UnsignedIntegerConcept {
-    void __constraints() { 
-      this->__error_type_must_be_an_unsigned_integer_type();
+    void __constraints() {
+      __error_type_must_be_an_unsigned_integer_type();
     }
   };
   template <> struct _UnsignedIntegerConcept<unsigned short>
@@ -312,7 +318,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
 
   template <class _Func, class _Arg>
   struct _UnaryFunctionConcept<_Func, void, _Arg> {
-    void __constraints() { 
+    void __constraints() {
       __f(__arg);                       // require operator()
     }
     _Func __f;
@@ -322,7 +328,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
   template <class _Func, class _Return, class _First, class _Second>
   struct _BinaryFunctionConcept
   {
-    void __constraints() { 
+    void __constraints() {
       __r = __f(__first, __second);     // require operator()
     }
     _Func __f;
@@ -366,7 +372,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
   // use this when functor is used inside a container class like std::set
   template <class _Func, class _First, class _Second>
   struct _Const_BinaryPredicateConcept {
-    void __constraints() { 
+    void __constraints() {
       __const_constraints(__f);
     }
     void __const_constraints(const _Func& __fun) {
@@ -560,7 +566,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
     typedef typename _Container::reference _Reference;
     typedef typename _Container::iterator _Iterator;
     typedef typename _Container::pointer _Pointer;
-    
+
     void __constraints() {
       __function_requires< _ContainerConcept<_Container> >();
       __function_requires< _AssignableConcept<_Value_type> >();
@@ -582,7 +588,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
       typedef typename _ForwardContainer::const_iterator _Const_iterator;
       __function_requires< _ForwardIteratorConcept<_Const_iterator> >();
     }
-  };  
+  };
 
   template <class _ForwardContainer>
   struct _Mutable_ForwardContainerConcept
@@ -593,7 +599,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
       typedef typename _ForwardContainer::iterator _Iterator;
       __function_requires< _Mutable_ForwardIteratorConcept<_Iterator> >();
     }
-  };  
+  };
 
   template <class _ReversibleContainer>
   struct _ReversibleContainerConcept
@@ -693,7 +699,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
       __function_requires< _Mutable_ForwardContainerConcept<_Sequence> >();
       __function_requires< _DefaultConstructibleConcept<_Sequence> >();
 
-      _Sequence 
+      _Sequence
         __c(__n) _IsUnused,
         __c2(__n, __t) _IsUnused,
         __c3(__first, __last) _IsUnused;
@@ -758,7 +764,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
       __function_requires< _ForwardContainerConcept<_AssociativeContainer> >();
       __function_requires<
         _DefaultConstructibleConcept<_AssociativeContainer> >();
-    
+
       __i = __c.find(__k);
       __r = __c.equal_range(__k);
       __c.erase(__k);
@@ -789,9 +795,9 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
     void __constraints() {
       __function_requires<
         _AssociativeContainerConcept<_UniqueAssociativeContainer> >();
-    
+
       _UniqueAssociativeContainer __c(__first, __last);
-      
+
       __pos_flag = __c.insert(__t);
       __c.insert(__first, __last);
     }
@@ -808,7 +814,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
         _AssociativeContainerConcept<_MultipleAssociativeContainer> >();
 
       _MultipleAssociativeContainer __c(__first, __last);
-      
+
       __pos = __c.insert(__t);
       __c.insert(__first, __last);
 
@@ -855,7 +861,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
       __function_requires<
         _ReversibleContainerConcept<_SortedAssociativeContainer> >();
 
-      _SortedAssociativeContainer 
+      _SortedAssociativeContainer
         __c(__kc) _IsUnused,
         __c2(__first, __last) _IsUnused,
         __c3(__first, __last, __kc) _IsUnused;
@@ -863,7 +869,7 @@ struct _Aux_require_same<_Tp,_Tp> { typedef _Tp _Type; };
       __p = __c.upper_bound(__k);
       __p = __c.lower_bound(__k);
       __r = __c.equal_range(__k);
-      
+
       __c.insert(__p, __t);
     }
     void __const_constraints(const _SortedAssociativeContainer& __c) {

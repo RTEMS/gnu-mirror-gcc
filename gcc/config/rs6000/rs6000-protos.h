@@ -28,7 +28,7 @@
 #ifdef RTX_CODE
 
 #ifdef TREE_CODE
-extern void init_cumulative_args (CUMULATIVE_ARGS *, tree, rtx, int, int);
+extern void init_cumulative_args (CUMULATIVE_ARGS *, tree, rtx, int, int, int);
 extern void rs6000_va_start (tree, rtx);
 #endif /* TREE_CODE */
 
@@ -104,7 +104,7 @@ extern int registers_ok_for_quad_peep (rtx, rtx);
 extern int addrs_ok_for_quad_peep (rtx, rtx);
 extern bool gpr_or_gpr_p (rtx, rtx);
 extern enum reg_class secondary_reload_class (enum reg_class,
-					      enum machine_mode, rtx);
+					      enum machine_mode, rtx, int);
 extern int ccr_bit (rtx, int);
 extern int extract_MB (rtx);
 extern int extract_ME (rtx);
@@ -115,6 +115,7 @@ extern enum rtx_code rs6000_reverse_condition (enum machine_mode,
 extern void rs6000_emit_sCOND (enum rtx_code, rtx);
 extern void rs6000_emit_cbranch (enum rtx_code, rtx);
 extern char * output_cbranch (rtx, const char *, int, rtx);
+extern char * output_e500_flip_gt_bit (rtx, rtx);
 extern rtx rs6000_emit_set_const (rtx, enum machine_mode, rtx, int);
 extern int rs6000_emit_cmove (rtx, rtx, rtx, rtx);
 extern void rs6000_emit_minmax (rtx, enum rtx_code, rtx, rtx);
@@ -144,6 +145,7 @@ extern rtx rs6000_machopic_legitimize_pic_address (rtx orig,
 #endif /* RTX_CODE */
 
 #ifdef TREE_CODE
+extern unsigned int rs6000_special_round_type_align (tree, int, int);
 extern void function_arg_advance (CUMULATIVE_ARGS *, enum machine_mode,
 					  tree, int);
 extern int function_arg_boundary (enum machine_mode, tree);
