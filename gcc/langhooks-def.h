@@ -90,7 +90,7 @@ tree lhd_tree_inlining_convert_parm_for_inlining PARAMS ((tree, tree, tree));
 #define LANG_HOOKS_CLEAR_BINDING_STACK	lhd_clear_binding_stack
 #define LANG_HOOKS_INIT_OPTIONS		lhd_do_nothing
 #define LANG_HOOKS_DECODE_OPTION	lhd_decode_option
-#define LANG_HOOKS_POST_OPTIONS		hook_void_bool_false
+#define LANG_HOOKS_POST_OPTIONS		hook_bool_void_false
 #define LANG_HOOKS_GET_ALIAS_SET	lhd_get_alias_set
 #define LANG_HOOKS_EXPAND_CONSTANT	lhd_return_tree
 #define LANG_HOOKS_EXPAND_EXPR		lhd_expand_expr
@@ -140,6 +140,8 @@ tree lhd_tree_inlining_convert_parm_for_inlining PARAMS ((tree, tree, tree));
   lhd_tree_inlining_copy_res_decl_for_inlining
 #define LANG_HOOKS_TREE_INLINING_ANON_AGGR_TYPE_P \
   lhd_tree_inlining_anon_aggr_type_p
+#define LANG_HOOKS_TREE_INLINING_VAR_MOD_TYPE_P \
+  hook_bool_tree_false
 #define LANG_HOOKS_TREE_INLINING_START_INLINING \
   lhd_tree_inlining_start_inlining
 #define LANG_HOOKS_TREE_INLINING_END_INLINING \
@@ -156,6 +158,7 @@ tree lhd_tree_inlining_convert_parm_for_inlining PARAMS ((tree, tree, tree));
   LANG_HOOKS_TREE_INLINING_AUTO_VAR_IN_FN_P, \
   LANG_HOOKS_TREE_INLINING_COPY_RES_DECL_FOR_INLINING, \
   LANG_HOOKS_TREE_INLINING_ANON_AGGR_TYPE_P, \
+  LANG_HOOKS_TREE_INLINING_VAR_MOD_TYPE_P, \
   LANG_HOOKS_TREE_INLINING_START_INLINING, \
   LANG_HOOKS_TREE_INLINING_END_INLINING, \
   LANG_HOOKS_TREE_INLINING_CONVERT_PARM_FOR_INLINING \

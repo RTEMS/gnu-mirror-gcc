@@ -23,6 +23,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "toplev.h"
 #include "rtl.h"
 #include "tm_p.h"
@@ -562,12 +564,7 @@ print_value (buf, x, verbose)
       break;
     case CONST_DOUBLE:
       if (FLOAT_MODE_P (GET_MODE (x)))
-	{
-	  REAL_VALUE_TYPE r;
-
-	  REAL_VALUE_FROM_CONST_DOUBLE (r, x);
-	  REAL_VALUE_TO_DECIMAL(r, "%.6e", t);
-	}
+	real_to_decimal (t, CONST_DOUBLE_REAL_VALUE (x), sizeof (t), 0, 1);
       else
 	sprintf (t, "<0x%lx,0x%lx>", (long) XWINT (x, 2), (long) XWINT (x, 3));
       cur = safe_concat (buf, cur, t);

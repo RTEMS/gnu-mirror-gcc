@@ -54,25 +54,12 @@
   /* Note it is OK to use GCC extensions such as long long in a compiler front end.
      This is because the GCC front ends are built using GCC. */
 
-/* Standard/OS headers.  */
-
-#include <stdlib.h>
-#include <unistd.h>
-#include "safe-ctype.h"
-#include <errno.h>
-#include <stdarg.h>
-#include <limits.h>
-#include <string.h>
-
-#include <fcntl.h>
-#include <getopt.h>
-#include <stdio.h>
-
 /* GCC headers.  */
 
 #include "config.h"
-#include "ansidecl.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "flags.h"
 #include "output.h"
@@ -199,7 +186,7 @@ tree_code_if_start (tree exp, unsigned char* filename, int lineno)
                  exp, 
                  build1 (CONVERT_EXPR, TREE_TYPE (exp), integer_zero_node));
   emit_line_note ((const char *)filename, lineno); /* Output the line number information.  */
-  expand_start_cond (cond_exp, /* Exit-able if non zero.  */ 0);
+  expand_start_cond (cond_exp, /* Exit-able if nonzero.  */ 0);
 }
 
 /* Output the code for the else of an if statement.  The else occurred
@@ -849,6 +836,12 @@ lookup_objc_ivar (tree id ATTRIBUTE_UNUSED)
 }
 
 /* Dummy routines called from c code. Save copying c-decl.c, c-common.c etc.  */
+
+tree
+objc_is_id (tree arg ATTRIBUTE_UNUSED)
+{
+  return 0;
+}
 
 void
 check_function_format (int *status ATTRIBUTE_UNUSED,

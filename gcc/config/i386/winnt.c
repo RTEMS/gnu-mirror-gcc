@@ -22,6 +22,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "regs.h"
 #include "hard-reg-set.h"
@@ -78,6 +80,15 @@ ix86_handle_dll_attribute (node, name, args, flags, no_add_attrs)
 	}
     }
 
+  /* `extern' needn't be specified with dllimport.
+     Specify `extern' now and hope for the best.  Sigh.  */
+  else if (TREE_CODE (*node) == VAR_DECL
+	   && is_attribute_p ("dllimport", name))
+    {
+      DECL_EXTERNAL (*node) = 1;
+      TREE_PUBLIC (*node) = 1;
+    }
+
   return NULL_TREE;
 }
 
@@ -126,7 +137,7 @@ associated_type (decl)
   return t;
 }
 
-/* Return non-zero if DECL is a dllexport'd object.  */
+/* Return nonzero if DECL is a dllexport'd object.  */
 
 int
 i386_pe_dllexport_p (decl)
@@ -153,7 +164,7 @@ i386_pe_dllexport_p (decl)
   return 0;
 }
 
-/* Return non-zero if DECL is a dllimport'd object.  */
+/* Return nonzero if DECL is a dllimport'd object.  */
 
 int
 i386_pe_dllimport_p (decl)
@@ -184,22 +195,24 @@ i386_pe_dllimport_p (decl)
   return 0;
 }
 
-/* Return non-zero if SYMBOL is marked as being dllexport'd.  */
+/* Return nonzero if SYMBOL is marked as being dllexport'd.  */
 
 int
 i386_pe_dllexport_name_p (symbol)
      const char *symbol;
 {
-  return symbol[0] == '@' && symbol[1] == 'e' && symbol[2] == '.';
+  return symbol[0] == DLL_IMPORT_EXPORT_PREFIX
+         && symbol[1] == 'e' && symbol[2] == '.';
 }
 
-/* Return non-zero if SYMBOL is marked as being dllimport'd.  */
+/* Return nonzero if SYMBOL is marked as being dllimport'd.  */
 
 int
 i386_pe_dllimport_name_p (symbol)
      const char *symbol;
 {
-  return symbol[0] == '@' && symbol[1] == 'i' && symbol[2] == '.';
+  return symbol[0] == DLL_IMPORT_EXPORT_PREFIX
+         && symbol[1] == 'i' && symbol[2] == '.';
 }
 
 /* Mark a DECL as being dllexport'd.
@@ -228,7 +241,7 @@ i386_pe_mark_dllexport (decl)
     return; /* already done */
 
   newname = alloca (strlen (oldname) + 4);
-  sprintf (newname, "@e.%s", oldname);
+  sprintf (newname, "%ce.%s", DLL_IMPORT_EXPORT_PREFIX, oldname);
 
   /* We pass newname through get_identifier to ensure it has a unique
      address.  RTL processing can sometimes peek inside the symbol ref
@@ -302,18 +315,8 @@ i386_pe_mark_dllimport (decl)
       return;
     }
 
-  /* `extern' needn't be specified with dllimport.
-     Specify `extern' now and hope for the best.  Sigh.  */
-  if (TREE_CODE (decl) == VAR_DECL
-      /* ??? Is this test for vtables needed?  */
-      && !DECL_VIRTUAL_P (decl))
-    {
-      DECL_EXTERNAL (decl) = 1;
-      TREE_PUBLIC (decl) = 1;
-    }
-
   newname = alloca (strlen (oldname) + 11);
-  sprintf (newname, "@i._imp__%s", oldname);
+  sprintf (newname, "%ci._imp__%s", DLL_IMPORT_EXPORT_PREFIX, oldname);
 
   /* We pass newname through get_identifier to ensure it has a unique
      address.  RTL processing can sometimes peek inside the symbol ref
@@ -400,8 +403,8 @@ i386_pe_encode_section_info (decl, first)
     i386_pe_mark_dllimport (decl);
   /* It might be that DECL has already been marked as dllimport, but a
      subsequent definition nullified that.  The attribute is gone but
-     DECL_RTL still has @i._imp__foo.  We need to remove that. Ditto
-     for the DECL_NON_ADDR_CONST_P flag.  */
+     DECL_RTL still has (DLL_IMPORT_EXPORT_PREFIX)i._imp__foo.  We need
+     to remove that. Ditto for the DECL_NON_ADDR_CONST_P flag.  */
   else if ((TREE_CODE (decl) == FUNCTION_DECL
 	    || TREE_CODE (decl) == VAR_DECL)
 	   && DECL_RTL (decl) != NULL_RTX
@@ -429,7 +432,7 @@ const char *
 i386_pe_strip_name_encoding (str)
      const char *str;
 {
-  if (*str == '@')
+  if (*str == DLL_IMPORT_EXPORT_PREFIX)
     str += 3;
   if (*str == '*')
     str += 1;
@@ -584,7 +587,7 @@ i386_pe_asm_named_section (name, flags)
 /* Mark a function appropriately.  This should only be called for
    functions for which we are not emitting COFF debugging information.
    FILE is the assembler output file, NAME is the name of the
-   function, and PUBLIC is non-zero if the function is globally
+   function, and PUBLIC is nonzero if the function is globally
    visible.  */
 
 void

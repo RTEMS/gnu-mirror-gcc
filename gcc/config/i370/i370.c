@@ -24,6 +24,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "tree.h"
 #include "regs.h"
@@ -109,6 +111,7 @@ static void i370_output_function_epilogue PARAMS ((FILE *, HOST_WIDE_INT));
 static int mvs_hash_alias PARAMS ((const char *));
 #endif
 static void i370_encode_section_info PARAMS ((tree, int));
+static void i370_internal_label PARAMS ((FILE *, const char *, unsigned long));
 
 /* ===================================================== */
 /* defines and functions specific to the HLASM assembler */
@@ -312,9 +315,23 @@ static const unsigned char ebcasc[256] =
 #define TARGET_ASM_FUNCTION_EPILOGUE i370_output_function_epilogue
 #undef TARGET_ENCODE_SECTION_INFO
 #define TARGET_ENCODE_SECTION_INFO i370_encode_section_info
+#undef TARGET_ASM_INTERNAL_LABEL
+#define  TARGET_ASM_INTERNAL_LABEL i370_internal_label
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
+/* Set global variables as needed for the options enabled.  */
+
+void
+override_options ()
+{
+  /* We're 370 floating point, not IEEE floating point.  */
+  memset (real_format_for_mode, 0, sizeof real_format_for_mode);
+  real_format_for_mode[SFmode - QFmode] = &i370_single_format;
+  real_format_for_mode[DFmode - QFmode] = &i370_double_format;
+}
+
+
 /* Map characters from one character set to another.
    C is the character to be translated.  */
 
@@ -1444,7 +1461,7 @@ i370_globalize_label (stream, name)
    -- subtracts stackframe size from the stack pointer.
    -- stores backpointer to old caller stack.
   
-   XXX hack alert -- if the global var int leaf_function is non-zero, 
+   XXX hack alert -- if the global var int leaf_function is nonzero, 
    then this is a leaf, and it might be possible to optimize the prologue
    into doing even less, e.g. not grabbing a new stackframe or maybe just a
    partial stack frame.
@@ -1585,3 +1602,14 @@ i370_encode_section_info (decl, first)
     SYMBOL_REF_FLAG (XEXP (DECL_RTL (decl), 0)) = 1;
 }
 
+static void
+i370_internal_label (stream, prefix, labelno)
+     FILE *stream;
+     const char *prefix;
+     unsigned long labelno;
+{
+  if (!strcmp (prefix, "L"))
+    mvs_add_label(labelno);
+
+  default_internal_label (stream, prefix, labelno);
+}

@@ -123,7 +123,7 @@ struct file_name_map_list;
   OP(CPP_SCOPE,		"::")			\
   OP(CPP_DEREF_STAR,	"->*")			\
   OP(CPP_DOT_STAR,	".*")			\
-  OP(CPP_ATSIGN,	"@")  /* used in Objective C */ \
+  OP(CPP_ATSIGN,	"@")  /* used in Objective-C */ \
 \
   TK(CPP_NAME,		SPELL_IDENT)	/* word */			\
   TK(CPP_NUMBER,	SPELL_NUMBER)	/* 34_be+ta  */			\
@@ -443,6 +443,7 @@ extern const char *progname;
 #define NODE_DIAGNOSTIC (1 << 3)	/* Possible diagnostic when lexed.  */
 #define NODE_WARN	(1 << 4)	/* Warn if redefined or undefined.  */
 #define NODE_DISABLED	(1 << 5)	/* A disabled macro.  */
+#define NODE_MACRO_ARG	(1 << 6)	/* Used during #define processing. */
 
 /* Different flavors of hash node.  */
 enum node_type
@@ -477,18 +478,18 @@ enum builtin_type
 struct cpp_hashnode
 {
   struct ht_identifier ident;
-  unsigned short arg_index;		/* Macro argument index.  */
-  unsigned char directive_index;	/* Index into directive table.  */
+  char directive_index;			/* Index into directive table.
+					   If negative, a NODE_OPERATOR. */
   unsigned char rid_code;		/* Rid code - for front ends.  */
   ENUM_BITFIELD(node_type) type : 8;	/* CPP node type.  */
   unsigned char flags;			/* CPP flags.  */
 
-  union
+  union _cpp_hashnode_value
   {
     cpp_macro *macro;			/* If a macro.  */
     struct answer *answers;		/* Answers to an assertion.  */
-    enum cpp_ttype operator;		/* Code for a named operator.  */
     enum builtin_type builtin;		/* Code for a builtin macro.  */
+    unsigned short arg_index;		/* Macro argument index.  */
   } value;
 };
 
@@ -532,7 +533,7 @@ extern int cpp_handle_option PARAMS ((cpp_reader *, int, char **));
    too.  If there was an error opening the file, it returns NULL.
 
    If you want cpplib to manage its own hashtable, pass in a NULL
-   pointer.  Otherise you should pass in an initialised hash table
+   pointer.  Otherise you should pass in an initialized hash table
    that cpplib will share; this technique is used by the C front
    ends.  */
 extern const char *cpp_read_main_file PARAMS ((cpp_reader *, const char *,
@@ -659,7 +660,7 @@ cpp_num cpp_num_sign_extend PARAMS ((cpp_num, size_t));
 #define DL_ICE			0x04
 /* Extracts a diagnostic level from an int.  */
 #define DL_EXTRACT(l)		(l & 0xf)
-/* Non-zero if a diagnostic level is one of the warnings.  */
+/* Nonzero if a diagnostic level is one of the warnings.  */
 #define DL_WARNING_P(l)		(DL_EXTRACT (l) >= DL_WARNING \
 				 && DL_EXTRACT (l) <= DL_PEDWARN)
 

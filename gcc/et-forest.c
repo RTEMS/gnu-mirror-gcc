@@ -25,6 +25,8 @@ Boston, MA 02111-1307, USA.
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "et-forest.h"
 
 struct et_forest_occurrence;
@@ -664,7 +666,7 @@ et_forest_enumerate_sons (forest, node, array)
 
   /* Parent is the rightmost node of the left successor.
      Look for all occurences having no right succesor
-     and lookup the sons. */
+     and lookup the sons.  */
   while (occ != stop)
     {
       splay (occ);

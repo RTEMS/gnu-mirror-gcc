@@ -22,6 +22,8 @@
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "tm_p.h"
 #include "insn-config.h"
@@ -738,7 +740,7 @@ scan_rtx (insn, loc, class, action, type, earlyclobber)
     }
 }
 
-/* Build def/use chain */
+/* Build def/use chain.  */
 
 static struct du_chain *
 build_def_use (bb)
@@ -1243,7 +1245,7 @@ copy_value (dest, src, vd)
     return;
 
   /* Do not propagate copies to the stack pointer, as that can leave
-     memory accesses with no scheduling dependancy on the stack update.  */
+     memory accesses with no scheduling dependency on the stack update.  */
   if (dr == STACK_POINTER_REGNUM)
     return;
 
@@ -1313,10 +1315,8 @@ mode_change_ok (orig_mode, new_mode, regno)
   if (GET_MODE_SIZE (orig_mode) < GET_MODE_SIZE (new_mode))
     return false;
 
-#ifdef CLASS_CANNOT_CHANGE_MODE
-  if (TEST_HARD_REG_BIT (reg_class_contents[CLASS_CANNOT_CHANGE_MODE], regno)
-      && CLASS_CANNOT_CHANGE_MODE_P (orig_mode, new_mode))
-    return false;
+#ifdef CANNOT_CHANGE_MODE_CLASS
+  return !REG_CANNOT_CHANGE_MODE_P (regno, orig_mode, new_mode);
 #endif
 
   return true;
@@ -1330,7 +1330,7 @@ mode_change_ok (orig_mode, new_mode, regno)
 static rtx
 maybe_mode_change (orig_mode, copy_mode, new_mode, regno, copy_regno)
      enum machine_mode orig_mode, copy_mode, new_mode;
-     unsigned int regno, copy_regno;
+     unsigned int regno, copy_regno ATTRIBUTE_UNUSED;
 {
   if (orig_mode == new_mode)
     return gen_rtx_raw_REG (new_mode, regno);

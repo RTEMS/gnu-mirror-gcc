@@ -356,8 +356,8 @@ template <typename _Alloc>
     typedef _Bit_iterator                iterator;
     typedef _Bit_const_iterator          const_iterator;
   
-    typedef reverse_iterator<const_iterator> const_reverse_iterator;
-    typedef reverse_iterator<iterator> reverse_iterator;
+    typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
+    typedef std::reverse_iterator<iterator> reverse_iterator;
   
     typedef typename _Bvector_base<_Alloc>::allocator_type allocator_type;
     allocator_type get_allocator() const {
@@ -410,7 +410,7 @@ template <typename _Alloc>
     template <class _ForwardIterator>
     void _M_initialize_range(_ForwardIterator __first, _ForwardIterator __last,
                              forward_iterator_tag) {
-      size_type __n = distance(__first, __last);
+      size_type __n = std::distance(__first, __last);
       _M_initialize(__n);
       copy(__first, __last, _M_start);
     }
@@ -430,14 +430,14 @@ template <typename _Alloc>
                          _ForwardIterator __first, _ForwardIterator __last,
                          forward_iterator_tag) {
       if (__first != __last) {
-        size_type __n = distance(__first, __last);
+        size_type __n = std::distance(__first, __last);
         if (capacity() - size() >= __n) {
           copy_backward(__position, end(), _M_finish + difference_type(__n));
           copy(__first, __last, __position);
           _M_finish += difference_type(__n);
         }
         else {
-          size_type __len = size() + max(size(), __n);
+          size_type __len = size() + std::max(size(), __n);
           _Bit_type * __q = _M_bit_alloc(__len);
           iterator __i = copy(begin(), __position, iterator(__q, 0));
           __i = copy(__first, __last, __i);
@@ -592,7 +592,7 @@ template <typename _Alloc>
     template <class _ForwardIterator>
     void _M_assign_aux(_ForwardIterator __first, _ForwardIterator __last,
                        forward_iterator_tag) {
-      size_type __len = distance(__first, __last);
+      size_type __len = std::distance(__first, __last);
       if (__len < size())
         erase(copy(__first, __last, begin()), end());
       else {
@@ -604,7 +604,9 @@ template <typename _Alloc>
     }    
   
     void reserve(size_type __n) {
-      if (capacity() < __n) {
+      if (__n > this->max_size())
+	__throw_length_error("vector::reserve");
+      if (this->capacity() < __n) {
         _Bit_type * __q = _M_bit_alloc(__n);
         _M_finish = copy(begin(), end(), iterator(__q, 0));
         _M_deallocate();
@@ -675,7 +677,7 @@ template <typename _Alloc>
         _M_finish += difference_type(__n);
       }
       else {
-        size_type __len = size() + max(size(), __n);
+        size_type __len = size() + std::max(size(), __n);
         _Bit_type * __q = _M_bit_alloc(__len);
         iterator __i = copy(begin(), __position, iterator(__q, 0));
         fill_n(__i, __n, __x);

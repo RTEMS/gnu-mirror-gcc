@@ -22,6 +22,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "c-tree.h"
 #include "c-common.h"
@@ -174,6 +176,13 @@ is_class_name (arg)
   return 0;
 }
 
+tree
+objc_is_id (arg)
+    tree arg ATTRIBUTE_UNUSED;
+{
+  return 0;
+}
+
 void
 objc_check_decl (decl)
      tree decl ATTRIBUTE_UNUSED;
@@ -191,12 +200,6 @@ objc_comptypes (lhs, rhs, reflexive)
 
 tree
 objc_message_selector ()
-{
-  return 0;
-}
-
-int
-recognize_objc_keyword ()
 {
   return 0;
 }

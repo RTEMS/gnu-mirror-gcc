@@ -21,6 +21,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "c-tree.h"
 #include "tree-dump.h"
@@ -153,7 +155,7 @@ c_dump_tree (dump_info, t)
 
     case RETURN_STMT:
       dump_stmt (di, t);
-      dump_child ("expr", RETURN_EXPR (t));
+      dump_child ("expr", RETURN_STMT_EXPR (t));
       dump_next_stmt (di, t);
       break;
 

@@ -76,6 +76,8 @@ extern int mvs_function_name_length;
   { "no-char-instructions", -1, N_("Do not generate char instructions")}, \
   { "", TARGET_DEFAULT, 0} }
 
+#define OVERRIDE_OPTIONS  override_options ()
+
 /* To use IBM supplied macro function prologue and epilogue, define the
    following to 1.  Should only be needed if IBM changes the definition
    of their prologue and epilogue.  */
@@ -654,12 +656,6 @@ enum reg_class
 
 /* Addressing modes, and classification of registers for them.  */
 
-/* #define HAVE_POST_INCREMENT */
-/* #define HAVE_POST_DECREMENT */
-
-/* #define HAVE_PRE_DECREMENT */
-/* #define HAVE_PRE_INCREMENT */
-
 /* These assume that REGNO is a hard or pseudo reg number.  They give
    nonzero only if REGNO is a hard reg of the suitable class or a pseudo
    reg currently allocated to a suitable hard reg.
@@ -1096,18 +1092,6 @@ enum reg_class
 #define ASM_GENERATE_INTERNAL_LABEL(LABEL, PREFIX, NUM)			\
   sprintf (LABEL, "*%s%d", PREFIX, NUM)
 
-/* Generate internal label.  Since we can branch here from off page, we
-   must reload the base register.  */
-
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE, PREFIX, NUM) 			\
-{									\
-  if (!strcmp (PREFIX,"L"))						\
-    {									\
-      mvs_add_label(NUM);						\
-    }									\
-  fprintf (FILE, "%s%d\tEQU\t*\n", PREFIX, NUM);			\
-}
-
 /* Generate case label.  For HLASM we can change to the data CSECT
    and put the vectors out of the code body. The assembler just
    concatenates CSECTs with the same name.  */
@@ -1256,15 +1240,7 @@ enum reg_class
   ASM_OUTPUT_SKIP (FILE,SIZE);						\
 }
 
-/* Store in OUTPUT a string (made with alloca) containing an
-   assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)  		\
-{									\
-  (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10);			\
-  sprintf ((OUTPUT), "%s%d", (NAME), (LABELNO));			\
-}
+#define ASM_PN_FORMAT "%s%lu"
 
 /* Print operand XV (an rtx) in assembler syntax to file FILE.
    CODE is a letter or dot (`z' in `%z0') or 0 if no letter was specified.
@@ -1369,21 +1345,21 @@ enum reg_class
 	else								\
 	  { 								\
             char buf[50];						\
-            REAL_VALUE_TYPE rval;					\
-            REAL_VALUE_FROM_CONST_DOUBLE(rval, XV);			\
-            REAL_VALUE_TO_DECIMAL (rval, HOST_WIDE_INT_PRINT_DEC, buf);	\
 	    if (GET_MODE (XV) == SFmode)				\
 	      {								\
 		mvs_page_lit += 4;					\
+		real_to_decimal (buf, CONST_DOUBLE_REAL_VALUE (XV),	\
+				 sizeof (buf), 0, 1);			\
 		fprintf (FILE, "=E'%s'", buf);				\
 	      }								\
-	    else							\
-	    if (GET_MODE (XV) == DFmode)				\
+	    else if (GET_MODE (XV) == DFmode)				\
 	      {								\
 		mvs_page_lit += 8;					\
+		real_to_decimal (buf, CONST_DOUBLE_REAL_VALUE (XV),	\
+				 sizeof (buf), 0, 1);			\
 		fprintf (FILE, "=D'%s'", buf);				\
 	      }								\
-	    else /* VOIDmode !?!? strange but true ...  */		\
+	    else /* VOIDmode */						\
 	      {								\
 		mvs_page_lit += 8;					\
 		fprintf (FILE, "=XL8'%08X%08X'", 			\
@@ -1663,21 +1639,21 @@ enum reg_class
 	else								\
 	  { 								\
             char buf[50];						\
-            REAL_VALUE_TYPE rval;					\
-            REAL_VALUE_FROM_CONST_DOUBLE(rval, XV);			\
-            REAL_VALUE_TO_DECIMAL (rval, HOST_WIDE_INT_PRINT_DEC, buf);	\
 	    if (GET_MODE (XV) == SFmode)				\
 	      {								\
 		mvs_page_lit += 4;					\
+		real_to_decimal (buf, CONST_DOUBLE_REAL_VALUE (XV),	\
+				 sizeof (buf), 0, 1);			\
 		fprintf (FILE, "=E'%s'", buf);				\
 	      }								\
-	    else							\
-	    if (GET_MODE (XV) == DFmode)				\
+	    else if (GET_MODE (XV) == DFmode)				\
 	      {								\
 		mvs_page_lit += 8;					\
+		real_to_decimal (buf, CONST_DOUBLE_REAL_VALUE (XV),	\
+				 sizeof (buf), 0, 1);			\
 		fprintf (FILE, "=D'%s'", buf);				\
 	      }								\
-	    else /* VOIDmode !?!? strange but true ...  */		\
+	    else /* VOIDmode */						\
 	      {								\
 		mvs_page_lit += 8;					\
 		fprintf (FILE, "=XL8'%08X%08X'", 			\
@@ -1835,19 +1811,6 @@ abort(); \
 
 /* #define ASM_OUTPUT_LABELREF(FILE, NAME) */	/* use gas -- defaults.h */
 
-/* Generate internal label.  Since we can branch here from off page, we
-   must reload the base register.  Note that internal labels are generated
-   for loops, goto's and case labels.  */
-#undef ASM_OUTPUT_INTERNAL_LABEL
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE, PREFIX, NUM) 			\
-{									\
-  if (!strcmp (PREFIX,"L"))						\
-    {									\
-      mvs_add_label(NUM);						\
-    }									\
-  fprintf (FILE, ".%s%d:\n", PREFIX, NUM); 				\
-}
-
 /* let config/svr4.h define this ...
  *  #define ASM_OUTPUT_CASE_LABEL(FILE, PREFIX, NUM, TABLE)
  *    fprintf (FILE, "%s%d:\n", PREFIX, NUM)
@@ -1884,11 +1847,7 @@ abort(); \
 #undef SHIFT_DOUBLE_OMITS_COUNT
 #define SHIFT_DOUBLE_OMITS_COUNT 0
 
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)  \
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),    \
-  sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO)))
- 
- /* Implicit library calls should use memcpy, not bcopy, etc.  */
+/* Implicit library calls should use memcpy, not bcopy, etc.  */
 #define TARGET_MEM_FUNCTIONS
  
 /* Output before read-only data.  */
