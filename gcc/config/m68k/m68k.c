@@ -1,5 +1,5 @@
 /* Subroutines for insn-output.c for Motorola 68000 family.
-   Copyright (C) 1987, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001
+   Copyright (C) 1987, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2003
    Free Software Foundation, Inc.
 
 This file is part of GNU CC.
@@ -461,7 +461,7 @@ m68k_output_function_prologue (stream, size)
 	}
       if (dwarf2out_do_frame ())
 	{
-	  cfa_store_offset += fsize;
+	  cfa_store_offset += fsize + 4;
 	  cfa_offset = cfa_store_offset;
 	  dwarf2out_def_cfa ("", STACK_POINTER_REGNUM, cfa_offset);
 	}
@@ -1737,6 +1737,7 @@ output_move_const_into_data_reg (operands)
       return "moveq %1,%0";
 #endif
     case NOTB :
+      CC_STATUS_INIT;
       operands[1] = GEN_INT (i ^ 0xff);
 #if defined (MOTOROLA) && !defined (CRDS)
       return "moveq%.l %1,%0\n\tnot%.b %0";
@@ -1744,6 +1745,7 @@ output_move_const_into_data_reg (operands)
       return "moveq %1,%0\n\tnot%.b %0";
 #endif	 
     case NOTW :
+      CC_STATUS_INIT;
       operands[1] = GEN_INT (i ^ 0xffff);
 #if defined (MOTOROLA) && !defined (CRDS)
       return "moveq%.l %1,%0\n\tnot%.w %0";
@@ -1751,6 +1753,7 @@ output_move_const_into_data_reg (operands)
       return "moveq %1,%0\n\tnot%.w %0";
 #endif	 
     case NEGW :
+      CC_STATUS_INIT;
 #if defined (MOTOROLA) && !defined (CRDS)
       return "moveq%.l %#-128,%0\n\tneg%.w %0";
 #else
@@ -3868,14 +3871,30 @@ m68k_output_mi_thunk (file, thunk, delta, vcall_offset, function)
   const char *fmt;
 
   if (delta > 0 && delta <= 8)
+#ifdef MOTOROLA
     asm_fprintf (file, "\taddq.l %I%d,4(%Rsp)\n", (int) delta);
+#else
+    asm_fprintf (file, "\taddql %I%d,%Rsp@(4)\n", (int) delta);
+#endif
   else if (delta < 0 && delta >= -8)
+#ifdef MOTOROLA
     asm_fprintf (file, "\tsubq.l %I%d,4(%Rsp)\n", (int) -delta);
+#else
+    asm_fprintf (file, "\tsubql %I%d,%Rsp@(4)\n", (int) -delta);
+#endif
   else
     {
+#ifdef MOTOROLA
       asm_fprintf (file, "\tadd.l %I");
+#else
+      asm_fprintf (file, "\taddl %I");
+#endif
       fprintf (file, HOST_WIDE_INT_PRINT_DEC, delta);
+#ifdef MOTOROLA
       asm_fprintf (file, ",4(%Rsp)\n");
+#else
+      asm_fprintf (file, ",%Rsp@(4)\n");
+#endif
     }
 
   xops[0] = DECL_RTL (function);
@@ -3901,7 +3920,7 @@ m68k_output_mi_thunk (file, thunk, delta, vcall_offset, function)
 #ifdef USE_GAS
 	  fmt = "bra.l %0";
 #else
-	  fmt = "jbra %0,a1";
+	  fmt = "jra %0,a1";
 #endif
 #endif
 	}
@@ -3915,7 +3934,7 @@ m68k_output_mi_thunk (file, thunk, delta, vcall_offset, function)
       fmt = "jmp %0";
 #endif
 #else
-      fmt = "jbra %0";
+      fmt = "jra %0";
 #endif
     }
 
