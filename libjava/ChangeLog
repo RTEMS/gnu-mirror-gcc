@@ -1,3 +1,201 @@
+2005-03-24  Anthony Green  <green@redhat.com>
+
+	* gnu/gcj/tools/gcj_dbtool/Main.java: Accept libdir argument with
+	-p option.
+	(usage): Add [LIBDIR] to help output.
+	* gnu/gcj/tools/gcj_dbtool/natMain.cc: New file.
+	* Makefile.am (AM_CXXFLAGS): Define
+	LIBGCJ_DEFAULT_DATABASE_PATH_TAIL.
+	(db_pathtail): New macro.
+
+2005-03-23  Sven de Marothy  <sven@physto.se>
+
+	PR libgcj/2641, PR libgcj/9854, PR libgcj/14892, PR libgcj/18083,
+	PR libgcj/11085:
+	* java/util/Calendar.java
+	(set): Use starting day of week when one is needed if none is given.
+	* java/text/SimpleDateFormat.java
+	(parse): Handle 1-12 and 1-24 timestamps correctly.
+	* java/util/GregorianCalendar.java
+	(computeTime, computeFields): HOUR should be in 0-11 format.
+	(nonLeniencyCheck): Adjust leniency checking to that fact.
+	(getLinearDay): Should be private.
+
+2005-03-22  Mohan Embar  <gnustuff@thisiscool.com>
+	    David Daney  <ddaney@avtrex.com>
+
+	* gnu/java/net/natPlainSocketImplWin32.cc (read): Handle
+	count == 0 case.
+
+2005-03-22  Mohan Embar  <gnustuff@thisiscool.com>
+
+	* Makefile.am ($(db_name)): Add $(EXEEXT) suffix to
+	gcj-dbtool dependency
+	* Makefile.in: Regenerated
+
+2005-03-22  Tom Tromey  <tromey@redhat.com>
+
+	* gnu/gcj/tools/gcj_dbtool/Main.java (usage): Fixed output.
+
+2005-03-21  Tom Tromey  <tromey@redhat.com>
+
+	* java/lang/VMCompiler.java (static block): Also catch
+	BufferUnderflowException.
+
+2005-03-16  Tom Tromey  <tromey@redhat.com>
+
+	* link.cc (ensure_class_linked): Removed #ifdef.
+	(print_class_loaded): Likewise.
+	(wait_for_state): Likewise.
+	* java/lang/Class.h (_Jv_IsInterpretedClass): Always declare.
+	* include/jvm.h (_Jv_IsInterpretedClass): Moved from...
+	* include/java-interp.h: ... here.
+
+2005-03-16  Tom Tromey  <tromey@redhat.com>
+
+	* gnu/java/lang/MainThread.java (run): Load main class using
+	system class loader.
+
+2005-03-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libgcj/20251
+	* Makefile.am (libjawt_la_LIBADD): Add -L$(here)/.libs.
+	* Makefile.in: Rebuilt.
+
+2005-03-15  David Daney  <ddaney@avtrex.com>
+
+	* gnu/java/net/natPlainSocketImplPosix.cc (read_helper): Handle
+	count == 0 case.
+
+2005-03-15  David Daney  <ddaney@avtrex.com>
+
+	* java/io/BufferedInputStream.java (available): Use 'in' instead
+	of 'super' for underlying stream access.
+	(close): Ditto.
+	(read(byte[], int, int)): Ditto.
+	(refill): Ditto.
+	(skip): Call skip on underlying stream when possible. 
+
+2005-03-14  David Daney  <ddaney@avtrex.com>
+
+	* configure.host: Don't use -mxgot for MIPS builds.
+	
+2005-03-10  Tom Tromey  <tromey@redhat.com>
+
+	* gnu/gcj/tools/gcj_dbtool/Main.java (main): Handle '-p'.
+	(usage): Document '-p'.
+	* Makefile.in: Rebuilt.
+	* Makefile.am (dbexecdir): New variable.
+	(db_name): Likewise.
+	(dbexec_DATA): Likewise.
+	($(db_name)): New target.
+	(AM_CXXFLAGS): Define LIBGCJ_DEFAULT_DATABASE.
+	* java/lang/natRuntime.cc (insertSystemProperties): Set default
+	system database.
+
+2005-03-10  Chris Burdess  <dog@bluezoo.org>
+
+	* gnu/xml/dom/ls/SAXEventSink.java: Ignore element declarations if
+	not currently parsing the DTD.
+
+2005-03-10  Andrew Haley  <aph@redhat.com>
+
+	* gnu/java/nio/channels/FileChannelImpl.java (smallTransferFrom):
+	New.
+	(smallTransferTo): New.
+	(transferFrom): Loop around smallTransferFrom, copying pageSize
+	bytes each time.
+	(transferTo): Likewise.
+
+2005-03-09  David Daney  <ddaney@avtrex.com>
+
+	PR libgcj/20389
+	Merge BufferedInputStream from GNU Classpath.
+	* java/io/BufferedInputStream.java (marktarget): Field removed.
+	(CHUNKSIZE): Field removed.
+	(bufferSize): New field.
+	(BufferedInputStream): Initialize fields.
+	(close): Invalidate mark and buffer indexes.
+	(mark):  Rewritten.
+	(read()): Move mark handling code to refill.
+	(read(byte[], int, int)): Ditto.
+	(skip): Ditto and simplify EOF testing.
+	(refill): Rewritten.
+	* java/io/InputStreamReader.java (refill): Removed mark and reset
+	of internal BufferedInputStream.
+
+2005-03-09  Tom Tromey  <tromey@redhat.com>
+
+	* java/lang/natVMClassLoader.cc (defineClass): Reference
+	'systemClassLoader' field directly.
+	* java/lang/natRuntime.cc (_load): Reference 'systemClassLoader'
+	field directly.
+	* java/lang/natClassLoader.cc (_Jv_RegisterInitiatingLoader):
+	Reference 'systemClassLoader' field directly.
+	(_Jv_UnregisterInitiatingLoader): Likewise.
+	(_Jv_FindClass): Likewise.
+
+2005-03-09  Tom Tromey  <tromey@redhat.com>
+
+	* java/net/URLClassLoader.java (addURLImpl): Reset 'thisString'.
+	(toString): Synchronize.
+
+2005-03-07  Tom Tromey  <tromey@redhat.com>
+
+	* gnu/gcj/tools/gcj_dbtool/Main.java (main): Recognize '-f'.
+	(usage): Document '-f'.
+
+2005-02-13  Anthony Green  <green@redhat.com>
+
+	* jni/gtk-peer/gtk_jawt.c (classpath_jawt_get_drawable,
+	classpath_jawt_lock, classpath_jawt_unlock): New functions.
+	* jawt.c (_Jv_AWTLock, _Jv_AWTUnlock): New functions.
+	(_Jv_GetDrawingSurface): Set visualID.
+	(_Jv_FreeDrawingSurfaceInfo): Clear visualID.
+	(JAWT_GetAWT): Set Lock and Unlock.
+	* include/jawt_md.h (struct _JAWT_X11DrawingSurfaceInfo): Add visualID.
+	* include/jawt.h (JAWT_VERSION_1_4, JAWT_LOCK_ERROR,
+	JAWT_LOCK_CLIP_CHANGED, JAWT_LOCK_BOUNDS_CHANGED,
+	JAWT_LOCK_SURFACE_CHANGED): New macros.
+	(struct _JAWT): Add Lock and Unlock.
+
+2005-03-07  Tom Tromey  <tromey@redhat.com>
+
+	* java/lang/VMCompiler.java (md5Digest): New field.
+	(compileClass): Clone md5Digest instead of looking up a new one.
+
+2005-03-06  Tom Tromey  <tromey@redhat.com>
+
+	PR java/20215:
+	* include/jvm.h (_Jv_Linker::find_field_helper): Updated.
+	* link.cc (find_field_helper): Added 'type' argument.
+	(find_field): Updated.
+
+2005-03-06  Roger Sayle  <roger@eyesopen.com>
+
+	PR libgcj/20155
+	* Makefile.am (libgcj0_convenience.la): Revert last change.
+	* Makefile.in: Regenerate.
+
+2005-03-05  Roger Sayle  <roger@eyesopen.com>
+	    Alexandre Oliva  <aoliva@redhat.com>
+	    Kelley Cook  <kcook@gcc.gnu.org>
+
+	PR libgcj/20155
+	* Makefile.am (libgcj0_convenience.la): New rule to create a file
+	of the object files to link to avoid exceeding the command line
+	length limits on some platforms.
+	(clean-local): Clean up objectlist files.
+	* Makefile.in: Regenerate.
+
+2005-03-02  Thomas Fitzsimmons  <fitzsim@redhat.com>
+
+	PR libgcj/20292
+	* testsuite/libjava.jni/jni.exp
+	(gcj_jni_invocation_compile_c_to_binary): Add -I. -I.. to compile
+	flags.
+	(gcj_jni_invocation_test_one): Add -L../.libs to cxx flags.
+
 2005-02-24  David Gilbert  <david.gilbert@object-refinery.com>
 
 	* java/awt/font/TextAttribute.java: changed names to lower case;
