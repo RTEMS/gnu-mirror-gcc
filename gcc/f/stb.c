@@ -3773,10 +3773,12 @@ ffestb_halt1_ (ffelexToken ft, ffebld expr, ffelexToken t)
     case FFELEX_typeSEMICOLON:
       ffesta_confirmed ();
       if (!ffesta_is_inhibited ())
-	if (ffesta_first_kw == FFESTR_firstSTOP)
-	  ffestc_R842 (expr, ft);
-	else
-	  ffestc_R843 (expr, ft);
+	{
+	  if (ffesta_first_kw == FFESTR_firstSTOP)
+	    ffestc_R842 (expr, ft);
+	  else
+	    ffestc_R843 (expr, ft);
+	}
       return (ffelexHandler) ffesta_zero (t);
 
     default:
@@ -9212,14 +9214,14 @@ ffestb_R10014_ (ffelexToken t)
 	}
       if (ffestb_local_.format.sign)
 	{
-	  for (i = 0; i < ffelex_token_length (t); ++i)
+	  for (i = ffelex_token_length (t) + 1; i > 0; --i)
 	    ffestb_local_.format.pre.u.signed_val *= 10;
 	  ffestb_local_.format.pre.u.signed_val += strtoul (ffelex_token_text (t),
 							    NULL, 10);
 	}
       else
 	{
-	  for (i = 0; i < ffelex_token_length (t); ++i)
+	  for (i = ffelex_token_length (t) + 1; i > 0; --i)
 	    ffestb_local_.format.pre.u.unsigned_val *= 10;
 	  ffestb_local_.format.pre.u.unsigned_val += strtoul (ffelex_token_text (t),
 							      NULL, 10);
@@ -10103,7 +10105,7 @@ ffestb_R10016_ (ffelexToken t)
 	  ffebad_finish ();
 	  return (ffelexHandler) ffestb_R10016_;
 	}
-      for (i = 0; i < ffelex_token_length (t); ++i)
+      for (i = ffelex_token_length (t) + 1; i > 0; --i)
 	ffestb_local_.format.post.u.unsigned_val *= 10;
       ffestb_local_.format.post.u.unsigned_val += strtoul (ffelex_token_text (t),
 							   NULL, 10);
@@ -10203,7 +10205,7 @@ ffestb_R10018_ (ffelexToken t)
 	  ffebad_finish ();
 	  return (ffelexHandler) ffestb_R10018_;
 	}
-      for (i = 0; i < ffelex_token_length (t); ++i)
+      for (i = ffelex_token_length (t) + 1; i > 0; --i)
 	ffestb_local_.format.dot.u.unsigned_val *= 10;
       ffestb_local_.format.dot.u.unsigned_val += strtoul (ffelex_token_text (t),
 							  NULL, 10);
@@ -10330,7 +10332,7 @@ ffestb_R100110_ (ffelexToken t)
 	  ffebad_finish ();
 	  return (ffelexHandler) ffestb_R100110_;
 	}
-      for (i = 0; i < ffelex_token_length (t); ++i)
+      for (i = ffelex_token_length (t) + 1; i > 0; --i)
 	ffestb_local_.format.exp.u.unsigned_val *= 10;
       ffestb_local_.format.exp.u.unsigned_val += strtoul (ffelex_token_text (t),
 							  NULL, 10);
@@ -15553,11 +15555,13 @@ ffestb_R90910_ (ffelexToken ft, ffebld expr, ffelexToken t)
     case FFELEX_typeCOMMA:
     case FFELEX_typeCLOSE_PAREN:
       if (expr == NULL)
-	if (ffestb_local_.read.context == FFEEXPR_contextFILEFORMAT)
-	  ffestp_file.read.read_spec[ffestb_local_.read.ix]
-	    .value_is_label = TRUE;
-	else
-	  break;
+	{
+	  if (ffestb_local_.read.context == FFEEXPR_contextFILEFORMAT)
+	    ffestp_file.read.read_spec[ffestb_local_.read.ix]
+	      .value_is_label = TRUE;
+	  else
+	    break;
+	}
       ffestp_file.read.read_spec[ffestb_local_.read.ix].value_present
 	= TRUE;
       ffestp_file.read.read_spec[ffestb_local_.read.ix].value
@@ -16169,11 +16173,13 @@ ffestb_R9109_ (ffelexToken ft, ffebld expr, ffelexToken t)
     case FFELEX_typeCOMMA:
     case FFELEX_typeCLOSE_PAREN:
       if (expr == NULL)
-	if (ffestb_local_.write.context == FFEEXPR_contextFILEFORMAT)
-	  ffestp_file.write.write_spec[ffestb_local_.write.ix]
-	    .value_is_label = TRUE;
-	else
-	  break;
+	{
+	  if (ffestb_local_.write.context == FFEEXPR_contextFILEFORMAT)
+	    ffestp_file.write.write_spec[ffestb_local_.write.ix]
+	      .value_is_label = TRUE;
+	  else
+	    break;
+	}
       ffestp_file.write.write_spec[ffestb_local_.write.ix].value_present
 	= TRUE;
       ffestp_file.write.write_spec[ffestb_local_.write.ix].value
