@@ -39,12 +39,15 @@ do {							\
 	builtin_define_std("unix");			\
 	builtin_define("__IA64__");			\
 	builtin_define("_LONGLONG");			\
+	builtin_define("_INCLUDE_LONGLONG");		\
 	builtin_define("_UINT128_T");			\
 	if (c_dialect_cxx () || !flag_iso)		\
 	  {						\
 	    builtin_define("_HPUX_SOURCE");		\
 	    builtin_define("__STDC_EXT__");		\
 	  }						\
+	if (TARGET_ILP32)				\
+	  builtin_define("_ILP32");			\
 } while (0)
 
 #undef CPP_SPEC
@@ -83,7 +86,7 @@ do {							\
 #ifndef CROSS_COMPILE
 #undef LIBGCC_SPEC
 #define LIBGCC_SPEC \
-  "%{shared-libgcc:%{!mlp64:-lgcc_s_hpux32}%{mlp64:-lgcc_s_hpux64} -lgcc} \
+  "%{shared-libgcc:%{!mlp64:-lgcc_s}%{mlp64:-lgcc_s_hpux64} -lgcc} \
    %{!shared-libgcc:-lgcc}"
 #endif
 
@@ -91,6 +94,8 @@ do {							\
 #define SUBTARGET_SWITCHES \
   { "ilp32",    MASK_ILP32,     "Generate ILP32 code" }, \
   { "lp64",    -MASK_ILP32,     "Generate LP64 code" },
+
+#define MULTILIB_DEFAULTS { "milp32" }
 
 /* A C expression whose value is zero if pointers that need to be extended
    from being `POINTER_SIZE' bits wide to `Pmode' are sign-extended and
@@ -187,6 +192,10 @@ do {								\
 #define TARGET_ASM_SELECT_RTX_SECTION  ia64_rwreloc_select_rtx_section
 #undef  TARGET_SECTION_TYPE_FLAGS
 #define TARGET_SECTION_TYPE_FLAGS  ia64_rwreloc_section_type_flags
+
+/* HP-UX does not support thread-local storage.  */
+#undef TARGET_HAVE_TLS
+#define TARGET_HAVE_TLS false
 
 /* ia64 HPUX has the float and long double forms of math functions.  */
 #undef TARGET_C99_FUNCTIONS

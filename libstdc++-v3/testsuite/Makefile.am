@@ -32,9 +32,12 @@ AM_RUNTESTFLAGS =
 testsuite_flags_script=${glibcxx_builddir}/scripts/testsuite_flags
 CXX=`${testsuite_flags_script} --build-cxx`
 
+GLIBGCC_DIR=`$(CC) -print-libgcc-file-name | sed 's,/[^/]*$$,,'`
+GLIBCXX_DIR=${glibcxx_builddir}/src/.libs
+
 CXXLINK = \
-	LD_RUN_PATH=$${LD_RUN_PATH:+$$LD_RUN_PATH:}${glibcxx_builddir}/src/.libs\
 	$(LIBTOOL) --tag=CXX --mode=link $(CXX) \
+	-R $(GLIBGCC_DIR) -R $(GLIBCXX_DIR) \
 	$(AM_CXXFLAGS) $(CXXFLAGS) $(LDFLAGS) -o $@
 
 # Generated lists of files to run.  All of these names are valid make
@@ -97,12 +100,14 @@ if GLIBCXX_TEST_ABI
 # Use 'new-abi-baseline' to create an initial symbol file.  Then run
 # 'check-abi' to test for changes against that file.
 check-abi: abi_check baseline_symbols current_symbols.txt
-	-@(./abi_check --check ./current_symbols.txt ${baseline_file} \
-	2>&1 | tee libstdc++-abi.sum)
+	-@./abi_check --check ./current_symbols.txt ${baseline_file} \
+	  2>&1 | tee libstdc++-abi.sum
+	-@cp libstdc++-abi.sum libstdc++-abi.log
 
 check-abi-verbose: abi_check baseline_symbols current_symbols.txt
-	-@(./abi_check --check-verbose ./current_symbols.txt ${baseline_file} \
-	2>&1 | tee libstdc++-abi.sum)
+	-@./abi_check --check-verbose ./current_symbols.txt ${baseline_file} \
+	  2>&1 | tee libstdc++-abi.sum
+	-@cp libstdc++-abi.sum libstdc++-abi.log
 
 else
 check-abi:
