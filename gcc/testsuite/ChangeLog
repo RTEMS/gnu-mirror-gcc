@@ -1,3 +1,200 @@
+2001-03-22  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.old-deja/g++.other/mangle3.C: New test.
+
+2001-03-25  Joseph S. Myers  <jsm28@cam.ac.uk>
+
+	* gcc.c-torture/execute/20010325-1.c: New test.
+
+2001-03-22  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.old-deja/g++.other/anon8.C: New test.
+
+2001-03-17  Richard Henderson  <rth@redhat.com>
+
+	* g++.old-deja/g++.other/eh4.C: Add expected error text.
+
+2001-03-15  Geoff Keating  <geoff@redhat.com>
+
+	* gcc.c-torture/execute/memcheck/memcheck.exp: Don't try to run these
+	tests on AIX.
+
+2001-03-15  Gabriel Dos Reis  <gdr@codesourcery.com>
+
+	* g++.old-deja/g++.other/eh4.C: New test.
+	
+2001-03-14  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.old-deja/g++.other/regstack.C: New test.
+
+2001-03-11  Nicola Pero <n.pero@mi.flashnet.it>
+
+	* objc/execute/va_method.m: Added.
+	* objc/execute/IMP.m: Added.
+	* objc/execute/_cmd.m: Added.
+	* objc/execute/accessing_ivars.m: Added.
+	* objc/execute/class-1.m: Added.
+	* objc/execute/class-10.m: Added.
+	* objc/execute/class-11.m: Added.
+	* objc/execute/class-12.m: Added.
+	* objc/execute/class-13.m: Added.
+	* objc/execute/class-14.m: Added.
+	* objc/execute/class-2.m: Added.
+	* objc/execute/class-3.m: Added.
+	* objc/execute/class-4.m: Added.
+	* objc/execute/class-5.m: Added.
+	* objc/execute/class-6.m: Added.
+	* objc/execute/class-7.m: Added.
+	* objc/execute/class-8.m: Added.
+	* objc/execute/class-9.m: Added.
+	* objc/execute/class-tests-1.h
+	* objc/execute/class-tests-2.h
+	* objc/execute/compatibility_alias.m: Added.
+	* objc/execute/encode-1.m: Added.
+	* objc/execute/formal_protocol-1.m: Added.
+	* objc/execute/formal_protocol-2.m: Added.
+	* objc/execute/formal_protocol-3.m: Added.
+	* objc/execute/formal_protocol-4.m: Added.
+	* objc/execute/formal_protocol-5.m: Added.
+	* objc/execute/formal_protocol-6.m: Added.
+	* objc/execute/formal_protocol-7.m: Added.
+	* objc/execute/informal_protocol.m: Added.
+	* objc/execute/initialize.m: Added.
+	* objc/execute/load.m: Added.
+	* objc/execute/many_args_method.m: Added.
+	* objc/execute/nested-3.m: Added.
+	* objc/execute/no_clash.m: Added.
+	* objc/execute/private.m: Added.
+	* objc/execute/redefining_self.m: Added.
+	* objc/execute/root_methods.m: Added.
+	* objc/execute/selector-1.m: Added.
+	* objc/execute/static-1.m: Added.
+	* objc/execute/static-2.m: Added.
+	* objc/execute/va_method.m: Added.
+
+2001-03-06  Ovidiu Predescu  <ovidiu@cup.hp.com>
+
+	* objc/execute/nested-1.m: Added. New test from Nicola Pero.
+
+	* objc/execute/nested-2.m: Likewise.
+
+	* objc/execute/protocol.m (main): Added. Patch from Nicola Pero.
+
+2001-03-06  Zack Weinberg  <zackw@stanford.edu>
+
+        * objc/execute/string1.m, objc/execute/string2.m: Compare the
+        result of -cString against what we expect it to be; don't just
+        print it out for no one to read.
+
+	* objc/execute/string3.m, objc/execute/string4.m: New tests.
+	Based on testcases provided by Nicola Pero.
+
+2001-03-06  Zack Weinberg  <zackw@stanford.edu>
+
+	* gcc.dg/20000724-1.c: Don't use multiline strings.
+
+2001-03-03  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* gcc.dg/cpp/macro7.c: New test.
+
+2001-03-03  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* gcc.dg/cpp/multiline.c: Update.
+
+2001-03-03  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.other/ref4.C: New test.
+
+2001-03-02  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.other/pod1.C: New test.
+
+2001-03-02  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.ext/overload1.C: New test.
+
+2001-03-01  Zack Weinberg  <zackw@stanford.edu>
+
+	* objc/execute/bycopy-3.m: New test.
+
+2001-03-01  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.other/using1.C: New test.
+
+2001-03-01  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.other/using9.C: New test.
+
+2001-02-28  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.ext/realpt1.C: Deprecate.
+
+2001-02-28  Geoffrey Keating  <geoffk@redhat.com>
+
+        * g++.dg/vtgc1.C: Update for new ABI.
+
+2001-02-27  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.abi/vtable3.h: Check vcall offsets too.
+
+2001-02-24  Franz Sirl  <Franz.Sirl-kernel@lauterbach.com>
+
+	* gcc.c-torture/execute/20010224-1.c: New test.
+
+2001-02-23  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.c-torture/execute/20010222-1.c: New test.
+
+2001-02-22  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.old-deja/g++.other/inline20.C: New test.
+
+2001-02-21  Gabriel Dos Reis  <gdr@merlin.codesourcery.com>
+
+	* g++.old-deja/g++.other/lookup22.C: New test.
+
+2001-02-18  Kriang Lerdsuwanakij  <lerdsuwa@users.sourceforge.net>
+
+	* g++.old-deja/g++.other/inline19.c: Remove XFAIL.
+
+2001-02-16  Zack Weinberg  <zackw@stanford.edu>
+
+	* g77.dg: New directory.
+	* g77.dg/20010216-1.f: New test case.
+	* g77.dg/dg.exp: New driver.
+	* lib/g77-dg.exp: New driver library.
+
+2001-02-16  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.old-deja/g++.other/init16.C: Update the test so that it does
+	not need <string> and also tests the initialization at runtime.
+
+2001-02-16  Gabriel Dos Reis  <gdr@codesourcery.com>
+
+	* g++.old-deja/g++.other/decl9.C: New test.
+
+2001-02-14  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.pt/deduct6.C: New test.
+
+2001-02-14  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.pt/deduct5.C: New test.
+
+2001-02-14  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.other/warn5.C: New test.
+
+2001-02-14  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.robertl/eb63.C: Remove new initializer list
+	case.
+	* g++.old-deja/g++.ext/arrnew.C: Deprecate.
+
+2001-02-14  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.pt/spec40.C: New test.
+
 2001-02-12  Jakub Jelinek  <jakub@redhat.com>
 
 	* gcc.c-torture/compile/20010209-1.c: New test.
@@ -301,9 +498,9 @@ Wed Jan 31 12:23:32 2001  J"orn Rennecke <amylaar@redhat.com>
 
 2001-01-15  Neil Booth  <neil@daikokuya.demon.co.uk>
 
-        * gcc.dg/cpp/if-2.c: Comment out occasionally bogus test; we 
+        * gcc.dg/cpp/if-2.c: Comment out occasionally bogus test; we
         have an equivalent working one below it.
-	  
+
 2001-01-14  Jeffrey Oldham  <oldham@codesourcery.com>
 
 	* g++.old-deja/g++.ext/instantiate2.C: Add explanatory comment.
@@ -393,7 +590,7 @@ Wed Jan 31 12:23:32 2001  J"orn Rennecke <amylaar@redhat.com>
 2001-01-10  Alan Lehotsky  <lehotsky@tiac.net>
 
 	* gcc.dg/20000926-1.c: Parameterize for machines with 16-bit ints.
-	
+
 2001-01-10  Nathan Sidwell  <nathan@codesourcery.com>
 
 	* g++.old-deja/g++.pt/error3.C: New test.
@@ -418,8 +615,8 @@ Wed Jan 31 12:23:32 2001  J"orn Rennecke <amylaar@redhat.com>
 	* gcc.c-torture/execute/921202-1.c: Use STACK_SIZE to avoid
 	problems on small machines.
 	* gcc.c-torture/execute/920730-1.c: Use values from <limits.h> to
-	parameterize. 
-	
+	parameterize.
+
 2001-01-09  Jeffrey Oldham  <oldham@codesourcery.com>
 
 	* g++.old-deja/g++.ext/instantiate2.C: ERROR line should fail for
@@ -604,7 +801,7 @@ Thu Jan  4 13:54:11 2001  Richard Kenner  <kenner@vlsi1.ultra.nyu.edu>
 2001-01-03  Jeffrey Oldham  <oldham@codesourcery.com>
 
 	* lib/target-supports.exp (check_alias_available): Modified to
-	indicate aliases not supported if only weak aliases are supported. 
+	indicate aliases not supported if only weak aliases are supported.
 
 2001-01-03  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
 

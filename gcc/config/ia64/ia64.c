@@ -1214,7 +1214,10 @@ find_gr_spill (try_locals)
   if (try_locals)
     {
       regno = current_frame_info.n_local_regs;
-      if (regno < 80)
+      /* If there is a frame pointer, then we can't use loc79, because
+	 that is HARD_FRAME_POINTER_REGNUM.  In particular, see the
+	 reg_name switching code in ia64_expand_prologue.  */
+      if (regno < (80 - frame_pointer_needed))
 	{
 	  current_frame_info.n_local_regs = regno + 1;
 	  return LOC_REG (0) + regno;
@@ -1317,7 +1320,13 @@ ia64_compute_frame_size (size)
       break;
   current_frame_info.n_local_regs = regno - LOC_REG (0) + 1;
 
-  if (cfun->machine->n_varargs > 0)
+  /* For functions marked with the syscall_linkage attribute, we must mark
+     all eight input registers as in use, so that locals aren't visible to
+     the caller.  */
+
+  if (cfun->machine->n_varargs > 0
+      || lookup_attribute ("syscall_linkage",
+			   TYPE_ATTRIBUTES (TREE_TYPE (current_function_decl))))
     current_frame_info.n_input_regs = 8;
   else
     {
@@ -1381,10 +1390,15 @@ ia64_compute_frame_size (size)
   if (frame_pointer_needed)
     {
       current_frame_info.reg_fp = find_gr_spill (1);
-      /* We should have gotten at least LOC79, since that's what
-	 HARD_FRAME_POINTER_REGNUM is.  */
+      /* If we did not get a register, then we take LOC79.  This is guaranteed
+	 to be free, even if regs_ever_live is already set, because this is
+	 HARD_FRAME_POINTER_REGNUM.  This requires incrementing n_local_regs,
+	 as we don't count loc79 above.  */
       if (current_frame_info.reg_fp == 0)
-	abort ();
+	{
+	  current_frame_info.reg_fp = LOC_REG (79);
+	  current_frame_info.n_local_regs++;
+	}
     }
 
   if (! current_function_is_leaf)
@@ -1868,6 +1882,10 @@ ia64_expand_prologue ()
   /* Set the frame pointer register name.  The regnum is logically loc79,
      but of course we'll not have allocated that many locals.  Rather than
      worrying about renumbering the existing rtxs, we adjust the name.  */
+  /* ??? This code means that we can never use one local register when
+     there is a frame pointer.  loc79 gets wasted in this case, as it is
+     renamed to a register that will never be used.  See also the try_locals
+     code in find_gr_spill.  */
   if (current_frame_info.reg_fp)
     {
       const char *tmp = reg_names[HARD_FRAME_POINTER_REGNUM];
@@ -2429,6 +2447,10 @@ ia64_hard_regno_rename_ok (from, to)
   /* Retain even/oddness on predicate register pairs.  */
   if (PR_REGNO_P (from) && PR_REGNO_P (to))
     return (from & 1) == (to & 1);
+
+  /* Reg 4 contains the saved gp; we can't reliably rename this.  */
+  if (from == GR_REG (4) && current_function_calls_setjmp)
+    return 0;
 
   return 1;
 }
@@ -5643,6 +5665,15 @@ ia64_sched_reorder (dump, sched_verbose, ready, pn_ready, reorder_type)
       dump_current_packet (dump);
     }
 
+  if (reorder_type == 0)
+    {
+      if (sched_data.cur == 6)
+	rotate_two_bundles (sched_verbose ? dump : NULL);
+      else if (sched_data.cur >= 3)
+	rotate_one_bundle (sched_verbose ? dump : NULL);
+      sched_data.first_slot = sched_data.cur;
+    }
+
   /* First, move all USEs, CLOBBERs and other crud out of the way.  */
   highest = ready[n_ready - 1];
   for (insnp = ready; insnp < e_ready; insnp++)
@@ -5714,15 +5745,6 @@ ia64_sched_reorder (dump, sched_verbose, ready, pn_ready, reorder_type)
 	  if (deleted != nr_need_stop)
 	    abort ();
 	}
-    }
-
-  if (reorder_type == 0)
-    {
-      if (sched_data.cur == 6)
-	rotate_two_bundles (sched_verbose ? dump : NULL);
-      else if (sched_data.cur >= 3)
-	rotate_one_bundle (sched_verbose ? dump : NULL);
-      sched_data.first_slot = sched_data.cur;
     }
 
   return itanium_reorder (sched_verbose ? dump : NULL,
@@ -6030,10 +6052,10 @@ ia64_epilogue_uses (regno)
      registers are marked as live at all function exits.  This prevents the
      register allocator from using the input registers, which in turn makes it
      possible to restart a system call after an interrupt without having to
-     save/restore the input registers.  */
+     save/restore the input registers.  This also prevents kernel data from
+     leaking to application code.  */
 
   if (IN_REGNO_P (regno)
-      && (regno < IN_REG (current_function_args_info.words))
       && lookup_attribute ("syscall_linkage",
 			   TYPE_ATTRIBUTES (TREE_TYPE (current_function_decl))))
     return 1;

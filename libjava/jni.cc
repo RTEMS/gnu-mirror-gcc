@@ -1068,8 +1068,13 @@ _Jv_JNI_GetAnyFieldID (JNIEnv *env, jclass clazz,
 
       // FIXME: what if field_class == NULL?
 
+      java::lang::ClassLoader *loader = clazz->getClassLoader ();
       while (clazz != NULL)
 	{
+	  // We acquire the class lock so that fields aren't resolved
+	  // while we are running.
+	  JvSynchronize sync (clazz);
+
 	  jint count = (is_static
 			? JvNumStaticFields (clazz)
 			: JvNumInstanceFields (clazz));
@@ -1078,12 +1083,11 @@ _Jv_JNI_GetAnyFieldID (JNIEnv *env, jclass clazz,
 			    : JvGetFirstInstanceField (clazz));
 	  for (jint i = 0; i < count; ++i)
 	    {
-	      // The field is resolved as a side effect of class
-	      // initialization.
-	      JvAssert (field->isResolved ());
-
 	      _Jv_Utf8Const *f_name = field->getNameUtf8Const(clazz);
 
+	      // The field might be resolved or it might not be.  It
+	      // is much simpler to always resolve it.
+	      _Jv_ResolveField (field, loader);
 	      if (_Jv_equalUtf8Consts (f_name, a_name)
 		  && field->getClass() == field_class)
 		return field;
@@ -1612,7 +1616,10 @@ add_char (char *buf, jchar c, int *here)
       buf[(*here)++] = '_';
       buf[(*here)++] = '3';
     }
-  else if (c == '/')
+
+  // Also check for `.' here because we might be passed an internal
+  // qualified class name like `foo.bar'.
+  else if (c == '/' || c == '.')
     buf[(*here)++] = '_';
   else if ((c >= '0' && c <= '9')
       || (c >= 'a' && c <= 'z')

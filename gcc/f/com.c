@@ -4519,21 +4519,21 @@ ffecom_expr_intrinsic_ (ffebld expr, tree dest_tree,
 
     case FFEINTRIN_impBTEST:
       {
-	ffetargetLogical1 true;
-	ffetargetLogical1 false;
+	ffetargetLogical1 target_true;
+	ffetargetLogical1 target_false;
 	tree true_tree;
 	tree false_tree;
 
-	ffetarget_logical1 (&true, TRUE);
-	ffetarget_logical1 (&false, FALSE);
-	if (true == 1)
+	ffetarget_logical1 (&target_true, TRUE);
+	ffetarget_logical1 (&target_false, FALSE);
+	if (target_true == 1)
 	  true_tree = convert (tree_type, integer_one_node);
 	else
-	  true_tree = convert (tree_type, build_int_2 (true, 0));
-	if (false == 0)
+	  true_tree = convert (tree_type, build_int_2 (target_true, 0));
+	if (target_false == 0)
 	  false_tree = convert (tree_type, integer_zero_node);
 	else
-	  false_tree = convert (tree_type, build_int_2 (false, 0));
+	  false_tree = convert (tree_type, build_int_2 (target_false, 0));
 
 	return
 	  ffecom_3 (COND_EXPR, tree_type,
@@ -7096,12 +7096,12 @@ ffecom_member_phase2_ (ffestorag mst, ffestorag st)
   TREE_ASM_WRITTEN (t) = 1;
   TREE_USED (t) = 1;
 
-  DECL_RTL (t)
-    = gen_rtx (MEM, TYPE_MODE (type),
-	       plus_constant (XEXP (DECL_RTL (mt), 0),
-			      ffestorag_modulo (mst)
-			      + ffestorag_offset (st)
-			      - ffestorag_offset (mst)));
+  SET_DECL_RTL (t,
+		gen_rtx (MEM, TYPE_MODE (type),
+			 plus_constant (XEXP (DECL_RTL (mt), 0),
+					ffestorag_modulo (mst)
+					+ ffestorag_offset (st)
+					- ffestorag_offset (mst))));
 
   t = start_decl (t, FALSE);
 
@@ -13554,7 +13554,7 @@ builtin_function (const char *name, tree type, int function_code,
   DECL_EXTERNAL (decl) = 1;
   TREE_PUBLIC (decl) = 1;
   if (library_name)
-    DECL_ASSEMBLER_NAME (decl) = get_identifier (library_name);
+    SET_DECL_ASSEMBLER_NAME (decl, get_identifier (library_name));
   make_decl_rtl (decl, NULL_PTR);
   pushdecl (decl);
   DECL_BUILT_IN_CLASS (decl) = class;
@@ -13686,7 +13686,7 @@ duplicate_decls (tree newdecl, tree olddecl)
 	}
 
       /* Keep the old rtl since we can safely use it.  */
-      DECL_RTL (newdecl) = DECL_RTL (olddecl);
+      COPY_DECL_RTL (newdecl, olddecl);
 
       /* Merge the type qualifiers.  */
       if (DECL_BUILT_IN_NONANSI (olddecl) && TREE_THIS_VOLATILE (olddecl)
@@ -14330,7 +14330,7 @@ start_decl (tree decl, bool is_top_level)
   if (!top_level
   /* But not if this is a duplicate decl and we preserved the rtl from the
      previous one (which may or may not happen).  */
-      && DECL_RTL (tem) == 0)
+      && !DECL_RTL_SET_P (tem))
     {
       if (TYPE_SIZE (TREE_TYPE (tem)) != 0)
 	expand_decl (tem);
@@ -15174,6 +15174,10 @@ set_block (block)
      register tree block;
 {
   current_binding_level->this_block = block;
+  current_binding_level->names = chainon (current_binding_level->names,
+					  BLOCK_VARS (block));
+  current_binding_level->blocks = chainon (current_binding_level->blocks,
+					   BLOCK_SUBBLOCKS (block));
 }
 
 /* ~~gcc/tree.h *should* declare this, because toplev.c references it.  */

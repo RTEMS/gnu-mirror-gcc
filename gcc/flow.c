@@ -2814,7 +2814,14 @@ tidy_fallthru_edge (e, b, c)
 	  NOTE_SOURCE_FILE (q) = 0;
 	}
       else
-	q = PREV_INSN (q);
+	{
+	  q = PREV_INSN (q);
+
+	  /* We don't want a block to end on a line-number note since that has
+	     the potential of changing the code between -g and not -g.  */
+	  while (GET_CODE (q) == NOTE && NOTE_LINE_NUMBER (q) >= 0)
+	    q = PREV_INSN (q);
+	}
 
       b->end = q;
     }
@@ -4285,27 +4292,28 @@ insn_dead_p (pbi, x, call_ok, notes)
 	  /* Walk the set of memory locations we are currently tracking
 	     and see if one is an identical match to this memory location.
 	     If so, this memory write is dead (remember, we're walking
-	     backwards from the end of the block to the start).  */
-	  temp = pbi->mem_set_list;
-	  while (temp)
-	    {
-	      rtx mem = XEXP (temp, 0);
+	     backwards from the end of the block to the start).  Since
+	     rtx_equal_p does not check the alias set or flags, we also
+	     must have the potential for them to conflict (anti_dependence). */
+	  for (temp = pbi->mem_set_list; temp != 0; temp = XEXP (temp, 1))
+	    if (anti_dependence (r, XEXP (temp, 0)))
+	      {
+		rtx mem = XEXP (temp, 0);
 
-	      if (rtx_equal_p (mem, r))
-		return 1;
+		if (rtx_equal_p (mem, r))
+		  return 1;
 #ifdef AUTO_INC_DEC
-	      /* Check if memory reference matches an auto increment. Only
-		 post increment/decrement or modify are valid.  */
-	      if (GET_MODE (mem) == GET_MODE (r)
-	          && (GET_CODE (XEXP (mem, 0)) == POST_DEC
-	              || GET_CODE (XEXP (mem, 0)) == POST_INC
-	              || GET_CODE (XEXP (mem, 0)) == POST_MODIFY)
-		  && GET_MODE (XEXP (mem, 0)) == GET_MODE (r)
-		  && rtx_equal_p (XEXP (XEXP (mem, 0), 0), XEXP (r, 0)))
-		return 1;
+		/* Check if memory reference matches an auto increment. Only
+		   post increment/decrement or modify are valid.  */
+		if (GET_MODE (mem) == GET_MODE (r)
+		    && (GET_CODE (XEXP (mem, 0)) == POST_DEC
+			|| GET_CODE (XEXP (mem, 0)) == POST_INC
+			|| GET_CODE (XEXP (mem, 0)) == POST_MODIFY)
+		    && GET_MODE (XEXP (mem, 0)) == GET_MODE (r)
+		    && rtx_equal_p (XEXP (XEXP (mem, 0), 0), XEXP (r, 0)))
+		  return 1;
 #endif
-	      temp = XEXP (temp, 1);
-	    }
+	      }
 	}
       else
 	{
@@ -4655,7 +4663,7 @@ mark_set_1 (pbi, code, reg, cond, insn, flags)
      int flags;
 {
   int regno_first = -1, regno_last = -1;
-  int not_dead = 0;
+  unsigned long not_dead = 0;
   int i;
 
   /* Modifying just one hardware register of a multi-reg value or just a
@@ -4686,7 +4694,7 @@ mark_set_1 (pbi, code, reg, cond, insn, flags)
 	     || GET_CODE (reg) == STRICT_LOW_PART);
       if (GET_CODE (reg) == MEM)
 	break;
-      not_dead = REGNO_REG_SET_P (pbi->reg_live, REGNO (reg));
+      not_dead = (unsigned long) REGNO_REG_SET_P (pbi->reg_live, REGNO (reg));
       /* Fall through.  */
 
     case REG:
@@ -4734,7 +4742,8 @@ mark_set_1 (pbi, code, reg, cond, insn, flags)
 		    + UNITS_PER_WORD - 1) / UNITS_PER_WORD)
 		  < ((GET_MODE_SIZE (inner_mode)
 		      + UNITS_PER_WORD - 1) / UNITS_PER_WORD))
-		not_dead = REGNO_REG_SET_P (pbi->reg_live, regno_first);
+		not_dead = (unsigned long) REGNO_REG_SET_P (pbi->reg_live,
+							    regno_first);
 
 	      reg = SUBREG_REG (reg);
 	    }
@@ -4830,7 +4839,7 @@ mark_set_1 (pbi, code, reg, cond, insn, flags)
 	{
 	  for (i = regno_first; i <= regno_last; ++i)
 	    if (! mark_regno_cond_dead (pbi, i, cond))
-	      not_dead = 1;
+	      not_dead |= ((unsigned long) 1) << (i - regno_first);
 	}
 #endif
 
@@ -4943,7 +4952,6 @@ mark_set_1 (pbi, code, reg, cond, insn, flags)
 
       /* Mark the register as being dead.  */
       if (some_was_live
-	  && ! not_dead
 	  /* The stack pointer is never dead.  Well, not strictly true,
 	     but it's very difficult to tell from here.  Hopefully
 	     combine_stack_adjustments will fix up the most egregious
@@ -4951,7 +4959,8 @@ mark_set_1 (pbi, code, reg, cond, insn, flags)
 	  && regno_first != STACK_POINTER_REGNUM)
 	{
 	  for (i = regno_first; i <= regno_last; ++i)
-	    CLEAR_REGNO_REG_SET (pbi->reg_live, i);
+	    if (!(not_dead & (((unsigned long) 1) << (i - regno_first))))
+	      CLEAR_REGNO_REG_SET (pbi->reg_live, i);
 	}
     }
   else if (GET_CODE (reg) == REG)

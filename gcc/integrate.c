@@ -40,6 +40,7 @@ Boston, MA 02111-1307, USA.  */
 #include "toplev.h"
 #include "intl.h"
 #include "loop.h"
+#include "params.h"
 
 #include "obstack.h"
 #define	obstack_chunk_alloc	xmalloc
@@ -89,15 +90,6 @@ static void copy_insn_list              PARAMS ((rtx, struct inline_remap *,
 static int compare_blocks               PARAMS ((const PTR, const PTR));
 static int find_block                   PARAMS ((const PTR, const PTR));
 
-/* The maximum number of instructions accepted for inlining a
-   function.  Increasing values mean more agressive inlining.
-   This affects currently only functions explicitly marked as
-   inline (or methods defined within the class definition for C++).
-   The default value of 10000 is arbitrary but high to match the
-   previously unlimited gcc capabilities.  */
-
-int inline_max_insns = 10000;
-
 /* Used by copy_rtx_and_substitute; this indicates whether the function is
    called for the purpose of inlining or some other purpose (i.e. loop
    unrolling).  This affects how constant pool references are handled.
@@ -135,17 +127,19 @@ function_cannot_inline_p (fndecl)
   tree last = tree_last (TYPE_ARG_TYPES (TREE_TYPE (fndecl)));
 
   /* For functions marked as inline increase the maximum size to
-     inline_max_insns (-finline-limit-<n>).  For regular functions
+     MAX_INLINE_INSNS (-finline-limit-<n>).  For regular functions
      use the limit given by INTEGRATE_THRESHOLD.  */
 
   int max_insns = (DECL_INLINE (fndecl))
-		   ? (inline_max_insns
+		   ? (MAX_INLINE_INSNS
 		      + 8 * list_length (DECL_ARGUMENTS (fndecl)))
 		   : INTEGRATE_THRESHOLD (fndecl);
 
   register int ninsns = 0;
   register tree parms;
-  rtx result;
+
+  if (DECL_UNINLINABLE (fndecl))
+    return N_("function cannot be inline");
 
   /* No inlines with varargs.  */
   if ((last && TREE_VALUE (last) != void_type_node)
@@ -241,9 +235,12 @@ function_cannot_inline_p (fndecl)
     }
 
   /* We can't inline functions that return a PARALLEL rtx.  */
-  result = DECL_RTL (DECL_RESULT (fndecl));
-  if (result && GET_CODE (result) == PARALLEL)
-    return N_("inline functions not supported for this return value type");
+  if (DECL_RTL_SET_P (DECL_RESULT (fndecl)))
+    {
+      rtx result = DECL_RTL (DECL_RESULT (fndecl));
+      if (GET_CODE (result) == PARALLEL)
+	return N_("inline functions not supported for this return value type");
+    }
 
   /* If the function has a target specific attribute attached to it,
      then we assume that we should not inline it.  This can be overriden
@@ -354,7 +351,7 @@ copy_decl_for_inlining (decl, from_fn, to_fn)
   DECL_ABSTRACT_ORIGIN (copy) = DECL_ORIGIN (decl);
 
   /* The new variable/label has no RTL, yet.  */
-  DECL_RTL (copy) = NULL_RTX;
+  SET_DECL_RTL (copy, NULL_RTX);
 
   /* These args would always appear unused, if not for this.  */
   TREE_USED (copy) = 1;
@@ -957,7 +954,8 @@ expand_inline_function (fndecl, parms, target, ignore, type,
      REG_FUNCTION_RETURN_VALUE_P.  */
 
   map->inline_target = 0;
-  loc = DECL_RTL (DECL_RESULT (fndecl));
+  loc = (DECL_RTL_SET_P (DECL_RESULT (fndecl)) 
+	 ? DECL_RTL (DECL_RESULT (fndecl)) : NULL_RTX);
 
   if (TYPE_MODE (type) == VOIDmode)
     /* There is no return value to worry about.  */
@@ -1639,7 +1637,7 @@ integrate_parm_decls (args, map, arg_vector)
 	 subst_constants.  */
       subst_constants (&new_decl_rtl, NULL_RTX, map, 1);
       apply_change_group ();
-      DECL_RTL (decl) = new_decl_rtl;
+      SET_DECL_RTL (decl, new_decl_rtl);
     }
 }
 
@@ -1669,15 +1667,19 @@ integrate_decl_tree (let, map)
 
       d = copy_decl_for_inlining (t, map->fndecl, current_function_decl);
 
-      if (DECL_RTL (t) != 0)
+      if (DECL_RTL_SET_P (t))
 	{
-	  DECL_RTL (d) = copy_rtx_and_substitute (DECL_RTL (t), map, 1);
+	  rtx r;
+
+	  SET_DECL_RTL (d, copy_rtx_and_substitute (DECL_RTL (t), map, 1));
 
 	  /* Fully instantiate the address with the equivalent form so that the
 	     debugging information contains the actual register, instead of the
 	     virtual register.   Do this by not passing an insn to
 	     subst_constants.  */
-	  subst_constants (&DECL_RTL (d), NULL_RTX, map, 1);
+	  r = DECL_RTL (d);
+	  subst_constants (&r, NULL_RTX, map, 1);
+	  SET_DECL_RTL (d, r);
 	  apply_change_group ();
 	}
 
@@ -2853,6 +2855,10 @@ output_inline_function (fndecl)
   /* If requested, suppress debugging information.  */
   if (f->no_debugging_symbols)
     write_symbols = NO_DEBUG;
+
+  /* Do any preparation, such as emitting abstract debug info for the inline
+     before it gets mangled by optimization.  */
+  note_outlining_of_inline_function (fndecl);
 
   /* Compile this function all the way down to assembly code.  */
   rest_of_compilation (fndecl);

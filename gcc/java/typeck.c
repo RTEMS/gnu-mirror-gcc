@@ -406,7 +406,9 @@ build_java_array_type (element_type, length)
   el_name = TYPE_NAME (el_name);
   if (TREE_CODE (el_name) == TYPE_DECL)
     el_name = DECL_NAME (el_name);
-  TYPE_NAME (t) = identifier_subst (el_name, "", '.', '.', "[]");
+  TYPE_NAME (t) = build_decl (TYPE_DECL,
+                             identifier_subst (el_name, "", '.', '.', "[]"),
+                             t);
 
   set_java_signature (t, sig);
   set_super_info (0, t, object_type_node, 0);
@@ -420,6 +422,7 @@ build_java_array_type (element_type, length)
   DECL_CONTEXT (fld) = t;
   FIELD_PUBLIC (fld) = 1;
   FIELD_FINAL (fld) = 1;
+  TREE_READONLY (fld) = 1;
 
   atype = build_prim_array_type (element_type, length);
   arfld = build_decl (FIELD_DECL, get_identifier ("data"), atype);

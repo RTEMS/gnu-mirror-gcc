@@ -66,8 +66,11 @@ typedef struct vtbl_init_data_s
 {
   /* The base for which we're building initializers.  */
   tree binfo;
-  /* The binfo for the most-derived type.  */
+  /* The type of the most-derived type.  */
   tree derived;
+  /* The binfo for the dynamic type. This will be TYPE_BINFO (derived),
+     unless ctor_vtbl_p is true.  */
+  tree rtti_binfo;
   /* The negative-index vtable initializers built up so far.  These
      are in order from least negative index to most negative index.  */
   tree inits;
@@ -119,7 +122,6 @@ static void delete_duplicate_fields PARAMS ((tree));
 static void finish_struct_bits PARAMS ((tree));
 static int alter_access PARAMS ((tree, tree, tree));
 static void handle_using_decl PARAMS ((tree, tree));
-static int same_signature_p PARAMS ((tree, tree));
 static int strictly_overrides PARAMS ((tree, tree));
 static void mark_overriders PARAMS ((tree, tree));
 static void check_for_override PARAMS ((tree, tree));
@@ -131,7 +133,7 @@ static void maybe_warn_about_overly_private_class PARAMS ((tree));
 static int field_decl_cmp PARAMS ((const tree *, const tree *));
 static int method_name_cmp PARAMS ((const tree *, const tree *));
 static tree add_implicitly_declared_members PARAMS ((tree, int, int, int));
-static tree fixed_type_or_null PARAMS ((tree, int *));
+static tree fixed_type_or_null PARAMS ((tree, int *, int *));
 static tree resolve_address_of_overloaded_function PARAMS ((tree, tree, int,
 							  int, int, tree));
 static void build_vtable_entry_ref PARAMS ((tree, tree, tree));
@@ -183,7 +185,7 @@ static void accumulate_vtbl_inits PARAMS ((tree, tree, tree, tree, tree));
 static tree dfs_accumulate_vtbl_inits PARAMS ((tree, tree, tree, tree,
 					       tree));
 static void set_vindex PARAMS ((tree, int *));
-static void build_rtti_vtbl_entries PARAMS ((tree, tree, vtbl_init_data *));
+static void build_rtti_vtbl_entries PARAMS ((tree, vtbl_init_data *));
 static void build_vcall_and_vbase_vtbl_entries PARAMS ((tree, 
 							vtbl_init_data *));
 static void force_canonical_binfo_r PARAMS ((tree, tree, tree, tree));
@@ -200,7 +202,7 @@ static tree *build_vtt_inits PARAMS ((tree, tree, tree *, tree *));
 static tree dfs_build_secondary_vptr_vtt_inits PARAMS ((tree, void *));
 static tree dfs_ctor_vtable_bases_queue_p PARAMS ((tree, void *data));
 static tree dfs_fixup_binfo_vtbls PARAMS ((tree, void *));
-static tree get_matching_base PARAMS ((tree, tree));
+static tree get_original_base PARAMS ((tree, tree));
 static tree dfs_get_primary_binfo PARAMS ((tree, void*));
 static int record_subobject_offset PARAMS ((tree, tree, splay_tree));
 static int check_subobject_offset PARAMS ((tree, tree, splay_tree));
@@ -381,6 +383,9 @@ build_vbase_path (code, type, expr, path, nonnull)
      convert back to the type we want.  Until that is done, we only optimize
      if the complete type is the same type as expr has.  */
   fixed_type_p = resolves_to_fixed_type_p (expr, &nonnull);
+  if (fixed_type_p < 0)
+    /* Virtual base layout is not fixed, even in ctors and dtors. */
+    fixed_type_p = 0;
 
   if (!fixed_type_p && TREE_SIDE_EFFECTS (expr))
     expr = save_expr (expr);
@@ -755,6 +760,7 @@ get_vtable_decl (type, complete)
     }
   
   decl = build_vtable (type, name, void_type_node);
+  SET_DECL_ASSEMBLER_NAME (decl, name);
   decl = pushdecl_top_level (decl);
   my_friendly_assert (IDENTIFIER_GLOBAL_VALUE (name) == decl,
 		      20000517);
@@ -1305,17 +1311,9 @@ add_method (type, method, error_p)
 				  fn, method);
 		    }
 		}
-
-	      /* Since this is an ordinary function in a
-		 non-template class, it's mangled name can be used
-		 as a unique identifier.  This technique is only
-		 an optimization; we would get the same results if
-		 we just used decls_match here.  */
-	      if (DECL_ASSEMBLER_NAME (fn) 
-		  != DECL_ASSEMBLER_NAME (method))
-		continue;
 	    }
-	  else if (!decls_match (fn, method))
+
+	  if (!decls_match (fn, method))
 	    continue;
 
 	  /* There has already been a declaration of this method
@@ -1459,6 +1457,9 @@ alter_access (t, fdecl, access)
 
   if (!DECL_LANG_SPECIFIC (fdecl))
     retrofit_lang_decl (fdecl);
+
+  if (DECL_DISCRIMINATOR_P (fdecl))
+    abort ();
 
   elem = purpose_member (t, DECL_ACCESS (fdecl));
   if (elem)
@@ -2457,7 +2458,7 @@ layout_vtable_decl (binfo, n)
 /* True iff FNDECL and BASE_FNDECL (both non-static member functions)
    have the same signature.  */
 
-static int
+int
 same_signature_p (fndecl, base_fndecl)
      tree fndecl, base_fndecl;
 {
@@ -3589,10 +3590,9 @@ check_field_decls (t, access_decls, empty_p,
       if (DECL_MUTABLE_P (x) || TYPE_HAS_MUTABLE_P (type))
 	CLASSTYPE_HAS_MUTABLE (t) = 1;
 
-      if (! pod_type_p (type)
-	  /* For some reason, pointers to members are POD types themselves,
-	     but are not allowed in POD structs.  Silly.  */
-	  || TYPE_PTRMEM_P (type) || TYPE_PTRMEMFUNC_P (type))
+      if (! pod_type_p (type))
+        /* DR 148 now allows pointers to members (which are POD themselves),
+           to be allowed in POD structs.  */
 	CLASSTYPE_NON_POD_P (t) = 1;
 
       /* If any field is const, the structure type is pseudo-const.  */
@@ -3689,7 +3689,7 @@ build_vtbl_or_vbase_field (name, assembler_name, type, class_type, fcontext,
 
   /* Build the FIELD_DECL.  */
   field = build_decl (FIELD_DECL, name, type);
-  DECL_ASSEMBLER_NAME (field) = assembler_name;
+  SET_DECL_ASSEMBLER_NAME (field, assembler_name);
   DECL_VIRTUAL_P (field) = 1;
   DECL_ARTIFICIAL (field) = 1;
   DECL_FIELD_CONTEXT (field) = class_type;
@@ -4116,7 +4116,8 @@ check_methods (t)
       GNU_xref_member (current_class_name, x);
 
       /* If this was an evil function, don't keep it in class.  */
-      if (IDENTIFIER_ERROR_LOCUS (DECL_ASSEMBLER_NAME (x)))
+      if (DECL_ASSEMBLER_NAME_SET_P (x) 
+	  && IDENTIFIER_ERROR_LOCUS (DECL_ASSEMBLER_NAME (x)))
 	continue;
 
       check_for_override (x, t);
@@ -4177,16 +4178,15 @@ build_clone (fn, name)
   clone = copy_decl (fn);
   /* Remember where this function came from.  */
   DECL_CLONED_FUNCTION (clone) = fn;
+  DECL_ABSTRACT_ORIGIN (clone) = fn;
   /* Reset the function name.  */
   DECL_NAME (clone) = name;
-  DECL_ASSEMBLER_NAME (clone) = DECL_NAME (clone);
+  SET_DECL_ASSEMBLER_NAME (clone, NULL_TREE);
   /* There's no pending inline data for this function.  */
   DECL_PENDING_INLINE_INFO (clone) = NULL;
   DECL_PENDING_INLINE_P (clone) = 0;
   /* And it hasn't yet been deferred.  */
   DECL_DEFERRED_FN (clone) = 0;
-  /* There's no magic VTT parameter in the clone.  */
-  DECL_VTT_PARM (clone) = NULL_TREE;
 
   /* The base-class destructor is not virtual.  */
   if (name == base_dtor_identifier)
@@ -4211,10 +4211,12 @@ build_clone (fn, name)
       parmtypes = TREE_CHAIN (parmtypes);
       /* Skip the in-charge parameter.  */
       parmtypes = TREE_CHAIN (parmtypes);
+      /* And the VTT parm, in a complete [cd]tor.  */
+      if (DECL_HAS_VTT_PARM_P (fn)
+	  && ! DECL_NEEDS_VTT_PARM_P (clone))
+	parmtypes = TREE_CHAIN (parmtypes);
        /* If this is subobject constructor or destructor, add the vtt
 	 parameter.  */
-      if (DECL_NEEDS_VTT_PARM_P (clone))
-	parmtypes = hash_tree_chain (vtt_parm_type, parmtypes);
       TREE_TYPE (clone) 
 	= build_cplus_method_type (basetype,
 				   TREE_TYPE (TREE_TYPE (clone)),
@@ -4224,8 +4226,8 @@ build_clone (fn, name)
 						     exceptions);
     }
 
-  /* Copy the function parameters.  But, DECL_ARGUMENTS aren't
-     function parameters; instead, those are the template parameters.  */
+  /* Copy the function parameters.  But, DECL_ARGUMENTS on a TEMPLATE_DECL
+     aren't function parameters; those are the template parameters.  */
   if (TREE_CODE (clone) != TEMPLATE_DECL)
     {
       DECL_ARGUMENTS (clone) = copy_list (DECL_ARGUMENTS (clone));
@@ -4236,16 +4238,17 @@ build_clone (fn, name)
 	    = TREE_CHAIN (TREE_CHAIN (DECL_ARGUMENTS (clone)));
 	  DECL_HAS_IN_CHARGE_PARM_P (clone) = 0;
 	}
-
-      /* Add the VTT parameter.  */
-      if (DECL_NEEDS_VTT_PARM_P (clone))
+      /* And the VTT parm, in a complete [cd]tor.  */
+      if (DECL_HAS_VTT_PARM_P (fn))
 	{
-	  tree parm;
-
-	  parm = build_artificial_parm (vtt_parm_identifier,
-					vtt_parm_type);
-	  TREE_CHAIN (parm) = TREE_CHAIN (DECL_ARGUMENTS (clone));
-	  TREE_CHAIN (DECL_ARGUMENTS (clone)) = parm;
+	  if (DECL_NEEDS_VTT_PARM_P (clone))
+	    DECL_HAS_VTT_PARM_P (clone) = 1;
+	  else
+	    {
+	      TREE_CHAIN (DECL_ARGUMENTS (clone))
+		= TREE_CHAIN (TREE_CHAIN (DECL_ARGUMENTS (clone)));
+	      DECL_HAS_VTT_PARM_P (clone) = 0;
+	    }
 	}
 
       for (parms = DECL_ARGUMENTS (clone); parms; parms = TREE_CHAIN (parms))
@@ -4255,11 +4258,8 @@ build_clone (fn, name)
 	}
     }
 
-  /* Mangle the function name.  */
-  set_mangled_name_for_decl (clone);
-
   /* Create the RTL for this function.  */
-  DECL_RTL (clone) = NULL_RTX;
+  SET_DECL_RTL (clone, NULL_RTX);
   rest_of_decl_compilation (clone, NULL, /*top_level=*/1, at_eof);
   
   /* Make it easy to find the CLONE given the FN.  */
@@ -4319,10 +4319,16 @@ clone_function_decl (fn, update_method_vec_p)
 	 version.  We clone the deleting version first because that
 	 means it will go second on the TYPE_METHODS list -- and that
 	 corresponds to the correct layout order in the virtual
-	 function table.  */
-      clone = build_clone (fn, deleting_dtor_identifier);
-      if (update_method_vec_p)
-	add_method (DECL_CONTEXT (clone), clone, /*error_p=*/0);
+	 function table.  
+
+         For a non-virtual destructor, we do not build a deleting
+	 destructor.  */
+      if (DECL_VIRTUAL_P (fn))
+	{
+	  clone = build_clone (fn, deleting_dtor_identifier);
+	  if (update_method_vec_p)
+	    add_method (DECL_CONTEXT (clone), clone, /*error_p=*/0);
+	}
       clone = build_clone (fn, complete_dtor_identifier);
       if (update_method_vec_p)
 	add_method (DECL_CONTEXT (clone), clone, /*error_p=*/0);
@@ -4330,6 +4336,9 @@ clone_function_decl (fn, update_method_vec_p)
       if (update_method_vec_p)
 	add_method (DECL_CONTEXT (clone), clone, /*error_p=*/0);
     }
+
+  /* Note that this is an abstract function that is never emitted.  */
+  DECL_ABSTRACT (fn) = 1;
 }
 
 /* For each of the constructors and destructors in T, create an
@@ -5197,14 +5206,9 @@ finish_struct_1 (t)
   /* Complete the rtl for any static member objects of the type we're
      working on.  */
   for (x = TYPE_FIELDS (t); x; x = TREE_CHAIN (x))
-    {
-      if (TREE_CODE (x) == VAR_DECL && TREE_STATIC (x)
-	  && TREE_TYPE (x) == t)
-	{
-	  DECL_MODE (x) = TYPE_MODE (t);
-	  make_decl_rtl (x, NULL);
-	}
-    }
+    if (TREE_CODE (x) == VAR_DECL && TREE_STATIC (x)
+	&& TREE_TYPE (x) == t)
+      DECL_MODE (x) = TYPE_MODE (t);
 
   /* Done with FIELDS...now decide whether to sort these for
      faster lookups later.
@@ -5364,9 +5368,10 @@ finish_struct (t, attributes)
    before this function is called.  */
 
 static tree
-fixed_type_or_null (instance, nonnull)
+fixed_type_or_null (instance, nonnull, cdtorp)
      tree instance;
      int *nonnull;
+     int *cdtorp;
 {
   switch (TREE_CODE (instance))
     {
@@ -5394,31 +5399,31 @@ fixed_type_or_null (instance, nonnull)
 	    *nonnull = 1;
 	  return TREE_TYPE (instance);
 	}
-      return fixed_type_or_null (TREE_OPERAND (instance, 0), nonnull);
+      return fixed_type_or_null (TREE_OPERAND (instance, 0), nonnull, cdtorp);
 
     case RTL_EXPR:
       return NULL_TREE;
 
     case PLUS_EXPR:
     case MINUS_EXPR:
+      if (TREE_CODE (TREE_OPERAND (instance, 0)) == ADDR_EXPR)
+	return fixed_type_or_null (TREE_OPERAND (instance, 0), nonnull, cdtorp);
       if (TREE_CODE (TREE_OPERAND (instance, 1)) == INTEGER_CST)
 	/* Propagate nonnull.  */
-	fixed_type_or_null (TREE_OPERAND (instance, 0), nonnull);
-      if (TREE_CODE (TREE_OPERAND (instance, 0)) == ADDR_EXPR)
-	return fixed_type_or_null (TREE_OPERAND (instance, 0), nonnull);
+	fixed_type_or_null (TREE_OPERAND (instance, 0), nonnull, cdtorp);
       return NULL_TREE;
 
     case NOP_EXPR:
     case CONVERT_EXPR:
-      return fixed_type_or_null (TREE_OPERAND (instance, 0), nonnull);
+      return fixed_type_or_null (TREE_OPERAND (instance, 0), nonnull, cdtorp);
 
     case ADDR_EXPR:
       if (nonnull)
 	*nonnull = 1;
-      return fixed_type_or_null (TREE_OPERAND (instance, 0), nonnull);
+      return fixed_type_or_null (TREE_OPERAND (instance, 0), nonnull, cdtorp);
 
     case COMPONENT_REF:
-      return fixed_type_or_null (TREE_OPERAND (instance, 1), nonnull);
+      return fixed_type_or_null (TREE_OPERAND (instance, 1), nonnull, cdtorp);
 
     case VAR_DECL:
     case FIELD_DECL:
@@ -5438,21 +5443,25 @@ fixed_type_or_null (instance, nonnull)
 	    *nonnull = 1;
 	  return TREE_TYPE (instance);
 	}
-      else if (nonnull)
-	{
-	  if (instance == current_class_ptr
-	      && flag_this_is_variable <= 0)
-	    {
-	      /* Normally, 'this' must be non-null.  */
-	      if (flag_this_is_variable == 0)
-		*nonnull = 1;
-
-	      /* <0 means we're in a constructor and we know our type.  */
-	      if (flag_this_is_variable < 0)
-		return TREE_TYPE (TREE_TYPE (instance));
-	    }
-	  else if (TREE_CODE (TREE_TYPE (instance)) == REFERENCE_TYPE)
-	    /* Reference variables should be references to objects.  */
+      else if (instance == current_class_ptr)
+        {
+          if (nonnull)
+            *nonnull = 1;
+        
+          /* if we're in a ctor or dtor, we know our type. */
+          if (DECL_LANG_SPECIFIC (current_function_decl)
+              && (DECL_CONSTRUCTOR_P (current_function_decl)
+                  || DECL_DESTRUCTOR_P (current_function_decl)))
+            {
+              if (cdtorp)
+                *cdtorp = 1;
+              return TREE_TYPE (TREE_TYPE (instance));
+            }
+        }
+      else if (TREE_CODE (TREE_TYPE (instance)) == REFERENCE_TYPE)
+        {
+          /* Reference variables should be references to objects.  */
+          if (nonnull)
 	    *nonnull = 1;
 	}
       return NULL_TREE;
@@ -5464,7 +5473,9 @@ fixed_type_or_null (instance, nonnull)
 
 /* Return non-zero if the dynamic type of INSTANCE is known, and equivalent
    to the static type.  We also handle the case where INSTANCE is really
-   a pointer.
+   a pointer. Return negative if this is a ctor/dtor. There the dynamic type
+   is known, but this might not be the most derived base of the original object,
+   and hence virtual bases may not be layed out according to this type.
 
    Used to determine whether the virtual function table is needed
    or not.
@@ -5479,12 +5490,16 @@ resolves_to_fixed_type_p (instance, nonnull)
      int *nonnull;
 {
   tree t = TREE_TYPE (instance);
-  tree fixed = fixed_type_or_null (instance, nonnull);
+  int cdtorp = 0;
+  
+  tree fixed = fixed_type_or_null (instance, nonnull, &cdtorp);
   if (fixed == NULL_TREE)
     return 0;
   if (POINTER_TYPE_P (t))
     t = TREE_TYPE (t);
-  return same_type_ignoring_top_level_qualifiers_p (t, fixed);
+  if (!same_type_ignoring_top_level_qualifiers_p (t, fixed))
+    return 0;
+  return cdtorp ? -1 : 1;
 }
 
 
@@ -6802,36 +6817,36 @@ build_vtt (t)
 				 
   /* Now, build the VTT object itself.  */
   vtt = build_vtable (t, get_vtt_name (t), type);
+  SET_DECL_ASSEMBLER_NAME (vtt, DECL_NAME (vtt));
   pushdecl_top_level (vtt);
   initialize_array (vtt, inits);
 }
 
-/* The type corresponding to BINFO is a base class of T, but BINFO is
-   in the base class hierarchy of a class derived from T.  Return the
-   base, in T's hierarchy, that corresponds to BINFO.  */
+/* The type corresponding to BASE_BINFO is a base of the type of BINFO, but
+   from within some heirarchy which is inherited from the type of BINFO.
+   Return BASE_BINFO's equivalent binfo from the hierarchy dominated by
+   BINFO.  */
 
 static tree
-get_matching_base (binfo, t)
+get_original_base (base_binfo, binfo)
+     tree base_binfo;
      tree binfo;
-     tree t;
 {
   tree derived;
-  int i;
-
-  if (same_type_p (BINFO_TYPE (binfo), t))
+  int ix;
+  
+  if (same_type_p (BINFO_TYPE (base_binfo), BINFO_TYPE (binfo)))
     return binfo;
-
-  if (TREE_VIA_VIRTUAL (binfo))
-    return binfo_for_vbase (BINFO_TYPE (binfo), t);
-
-  derived = get_matching_base (BINFO_INHERITANCE_CHAIN (binfo), t);
-  for (i = 0; i < BINFO_N_BASETYPES (derived); ++i)
-    if (same_type_p (BINFO_TYPE (BINFO_BASETYPE (derived, i)),
-		     BINFO_TYPE (binfo)))
-      return BINFO_BASETYPE (derived, i);
-
-  my_friendly_abort (20000628);
-  return NULL_TREE;
+  if (TREE_VIA_VIRTUAL (base_binfo))
+    return binfo_for_vbase (BINFO_TYPE (base_binfo), BINFO_TYPE (binfo));
+  derived = get_original_base (BINFO_INHERITANCE_CHAIN (base_binfo), binfo);
+  
+  for (ix = 0; ix != BINFO_N_BASETYPES (derived); ix++)
+    if (same_type_p (BINFO_TYPE (base_binfo),
+                     BINFO_TYPE (BINFO_BASETYPE (derived, ix))))
+      return BINFO_BASETYPE (derived, ix);
+  my_friendly_abort (20010223);
+  return NULL;
 }
 
 /* Recursively build the VTT-initializer for BINFO (which is in the
@@ -7323,6 +7338,7 @@ build_vtbl_initializer (binfo, orig_binfo, t, rtti_binfo, non_fn_entries_p)
   memset (&vid, 0, sizeof (vid));
   vid.binfo = binfo;
   vid.derived = t;
+  vid.rtti_binfo = rtti_binfo;
   vid.last_init = &vid.inits;
   vid.primary_vtbl_p = (binfo == TYPE_BINFO (t));
   vid.ctor_vtbl_p = !same_type_p (BINFO_TYPE (rtti_binfo), t);
@@ -7330,7 +7346,7 @@ build_vtbl_initializer (binfo, orig_binfo, t, rtti_binfo, non_fn_entries_p)
   vid.index = ssize_int (-3);
 
   /* Add entries to the vtable for RTTI.  */
-  build_rtti_vtbl_entries (binfo, rtti_binfo, &vid);
+  build_rtti_vtbl_entries (binfo, &vid);
 
   /* Create an array for keeping track of the functions we've
      processed.  When we see multiple functions with the same
@@ -7360,7 +7376,8 @@ build_vtbl_initializer (binfo, orig_binfo, t, rtti_binfo, non_fn_entries_p)
       tree fn;
       tree pfn;
       tree init;
-
+      int generate_with_vtable_p = BV_GENERATE_THUNK_WITH_VTABLE_P (v);
+      
       /* Pull the offset for `this', and the function to call, out of
 	 the list.  */
       delta = BV_DELTA (v);
@@ -7370,8 +7387,17 @@ build_vtbl_initializer (binfo, orig_binfo, t, rtti_binfo, non_fn_entries_p)
 	  vcall_index = BV_VCALL_INDEX (v);
 	  my_friendly_assert (vcall_index != NULL_TREE, 20000621);
 	}
+      else if (vid.ctor_vtbl_p && BV_VCALL_INDEX (v))
+        {
+          /* In the original, we did not need to use the vcall index, even
+             though there was one, but in a ctor vtable things might be
+             different (a primary virtual base might have moved). Be
+             conservative and use a vcall adjusting thunk.  */
+	  vcall_index = BV_VCALL_INDEX (v);
+          generate_with_vtable_p = 1;
+        }
       else
-	vcall_index = NULL_TREE;
+        vcall_index = NULL_TREE;
 
       fn = BV_FN (v);
       my_friendly_assert (TREE_CODE (delta) == INTEGER_CST, 19990727);
@@ -7389,7 +7415,7 @@ build_vtbl_initializer (binfo, orig_binfo, t, rtti_binfo, non_fn_entries_p)
       TREE_CONSTANT (pfn) = 1;
       /* Enter it in the vtable.  */
       init = build_vtable_entry (delta, vcall_index, pfn,
-				 BV_GENERATE_THUNK_WITH_VTABLE_P (v));
+				 generate_with_vtable_p);
       /* And add it to the chain of initializers.  */
       vfun_inits = tree_cons (NULL_TREE, init, vfun_inits);
     }
@@ -7600,6 +7626,7 @@ add_vcall_offset_vtbl_entries_1 (binfo, vid)
   tree base_virtuals;
   tree orig_virtuals;
   tree binfo_inits;
+  int lost_primary = 0;
   /* If BINFO is a primary base, this is the least derived class of
      BINFO that is not a primary base.  */
   tree non_primary_binfo;
@@ -7621,6 +7648,21 @@ add_vcall_offset_vtbl_entries_1 (binfo, vid)
 	 care about its vtable offsets.  */
       if (TREE_VIA_VIRTUAL (non_primary_binfo))
 	{
+	  if (vid->ctor_vtbl_p)
+	    {
+    	      tree probe;
+	  
+	      for (probe = vid->binfo;
+	           probe != non_primary_binfo;
+	           probe = get_primary_binfo (probe))
+	        {
+                  if (BINFO_LOST_PRIMARY_P (probe))
+                    {
+                      lost_primary = 1;
+                      break;
+                    }
+	        }
+            }
 	  non_primary_binfo = vid->binfo;
 	  break;
 	}
@@ -7630,6 +7672,12 @@ add_vcall_offset_vtbl_entries_1 (binfo, vid)
 	break;
       non_primary_binfo = b;
     }
+
+  if (vid->ctor_vtbl_p)
+    /* For a ctor vtable we need the equivalent binfo within the hierarchy
+       where rtti_binfo is the most derived type.  */
+    non_primary_binfo = get_original_base
+          (non_primary_binfo, TYPE_BINFO (BINFO_TYPE (vid->rtti_binfo)));
 
   /* Make entries for the rest of the virtuals.  */
   for (base_virtuals = BINFO_VIRTUALS (binfo),
@@ -7645,6 +7693,7 @@ add_vcall_offset_vtbl_entries_1 (binfo, vid)
       tree base;
       tree base_binfo;
       size_t i;
+      tree vcall_offset;
 
       /* Find the declaration that originally caused this function to
 	 be present.  */
@@ -7669,10 +7718,15 @@ add_vcall_offset_vtbl_entries_1 (binfo, vid)
 	  tree derived_entry;
 
 	  derived_entry = VARRAY_TREE (vid->fns, i);
-	  if (same_signature_p (BV_FN (derived_entry), fn))
+	  if (same_signature_p (BV_FN (derived_entry), fn)
+	      /* We only use one vcall offset for virtual destructors,
+		 even though there are two virtual table entries.  */
+	      || (DECL_DESTRUCTOR_P (BV_FN (derived_entry))
+		  && DECL_DESTRUCTOR_P (fn)))
 	    {
-	      BV_VCALL_INDEX (derived_virtuals) 
-		= BV_VCALL_INDEX (derived_entry);
+	      if (!vid->ctor_vtbl_p)
+  	        BV_VCALL_INDEX (derived_virtuals) 
+		  = BV_VCALL_INDEX (derived_entry);
 	      break;
 	    }
 	}
@@ -7685,12 +7739,16 @@ add_vcall_offset_vtbl_entries_1 (binfo, vid)
       base_binfo = get_binfo (base, vid->derived, /*protect=*/0);
 
       /* Compute the vcall offset.  */
-      *vid->last_init 
-	= (build_tree_list 
-	   (NULL_TREE,
-	    fold (build1 (NOP_EXPR, vtable_entry_type,
-			  size_diffop (BINFO_OFFSET (base_binfo),
-				       BINFO_OFFSET (vid->vbase))))));
+      vcall_offset = BINFO_OFFSET (vid->vbase);
+      if (lost_primary)
+        vcall_offset = size_binop (PLUS_EXPR, vcall_offset,
+                                   BINFO_OFFSET (vid->binfo));
+      vcall_offset = size_diffop (BINFO_OFFSET (base_binfo),
+		                  vcall_offset);
+      vcall_offset = fold (build1 (NOP_EXPR, vtable_entry_type,
+    			           vcall_offset));
+      
+      *vid->last_init = build_tree_list (NULL_TREE, vcall_offset);
       vid->last_init = &TREE_CHAIN (*vid->last_init);
 
       /* Keep track of the vtable index where this vcall offset can be
@@ -7710,12 +7768,11 @@ add_vcall_offset_vtbl_entries_1 (binfo, vid)
 
 /* Return vtbl initializers for the RTTI entries coresponding to the
    BINFO's vtable.  The RTTI entries should indicate the object given
-   by RTTI_BINFO.  */
+   by VID->rtti_binfo.  */
 
 static void
-build_rtti_vtbl_entries (binfo, rtti_binfo, vid)
+build_rtti_vtbl_entries (binfo, vid)
      tree binfo;
-     tree rtti_binfo;
      vtbl_init_data *vid;
 {
   tree b;
@@ -7726,7 +7783,7 @@ build_rtti_vtbl_entries (binfo, rtti_binfo, vid)
   tree init;
 
   basetype = BINFO_TYPE (binfo);
-  t = BINFO_TYPE (rtti_binfo);
+  t = BINFO_TYPE (vid->rtti_binfo);
 
   /* For a COM object there is no RTTI entry.  */
   if (CLASSTYPE_COM_INTERFACE (basetype))
@@ -7744,37 +7801,18 @@ build_rtti_vtbl_entries (binfo, rtti_binfo, vid)
       my_friendly_assert (BINFO_PRIMARY_BASE_OF (primary_base) == b, 20010127);
       b = primary_base;
     }
-  offset = size_diffop (BINFO_OFFSET (rtti_binfo), BINFO_OFFSET (b));
+  offset = size_diffop (BINFO_OFFSET (vid->rtti_binfo), BINFO_OFFSET (b));
 
-  /* The second entry is, in the case of the new ABI, the address of
-     the typeinfo object, or, in the case of the old ABI, a function
-     which returns a typeinfo object.  */
-  if (new_abi_rtti_p ())
-    {
-      if (flag_rtti)
-	decl = build_unary_op (ADDR_EXPR, get_tinfo_decl (t), 0);
-      else
-	decl = integer_zero_node;
-
-      /* Convert the declaration to a type that can be stored in the
-	 vtable.  */
-      init = build1 (NOP_EXPR, vfunc_ptr_type_node, decl);
-      TREE_CONSTANT (init) = 1;
-    }
+  /* The second entry is the address of the typeinfo object.  */
+  if (flag_rtti)
+    decl = build_unary_op (ADDR_EXPR, get_tinfo_decl (t), 0);
   else
-    {
-      if (flag_rtti)
-	decl = get_tinfo_decl (t);
-      else
-	decl = abort_fndecl;
-
-      /* Convert the declaration to a type that can be stored in the
-	 vtable.  */
-      init = build1 (ADDR_EXPR, vfunc_ptr_type_node, decl);
-      TREE_CONSTANT (init) = 1;
-      init = build_vtable_entry (offset, NULL_TREE, init, 
-				 /*generate_with_vtable_p=*/0);
-    }
+    decl = integer_zero_node;
+  
+  /* Convert the declaration to a type that can be stored in the
+     vtable.  */
+  init = build1 (NOP_EXPR, vfunc_ptr_type_node, decl);
+  TREE_CONSTANT (init) = 1;
   *vid->last_init = build_tree_list (NULL_TREE, init);
   vid->last_init = &TREE_CHAIN (*vid->last_init);
 
@@ -7793,7 +7831,7 @@ build_rtti_vtbl_entries (binfo, rtti_binfo, vid)
 
 /* Build an entry in the virtual function table.  DELTA is the offset
    for the `this' pointer.  VCALL_INDEX is the vtable index containing
-   the vcall offset; zero if none.  ENTRY is the virtual function
+   the vcall offset; NULL_TREE if none.  ENTRY is the virtual function
    table entry itself.  It's TREE_TYPE must be VFUNC_PTR_TYPE_NODE,
    but it may not actually be a virtual function table pointer.  (For
    example, it might be the address of the RTTI object, under the new

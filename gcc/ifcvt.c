@@ -1242,9 +1242,17 @@ noce_process_if_block (test_bb, then_bb, else_bb, join_bb)
 	 that case don't do anything and let the code below delete INSN_A.  */
       if (insn_b && else_bb)
 	{
+	  rtx note;
+
 	  if (else_bb && insn_b == else_bb->end)
 	    else_bb->end = PREV_INSN (insn_b);
 	  reorder_insns (insn_b, insn_b, PREV_INSN (if_info.cond_earliest));
+
+	  /* If there was a REG_EQUAL note, delete it since it may have been
+	     true due to this insn being after a jump.  */
+	  if ((note = find_reg_note (insn_b, REG_EQUAL, NULL_RTX)) != 0)
+	    remove_note (insn_b, note);
+
 	  insn_b = NULL_RTX;
 	}
       /* If we have "x = b; if (...) x = a;", and x has side-effects, then
@@ -1854,6 +1862,15 @@ dead_or_predicable (test_bb, merge_bb, other_bb, new_dest, reversep)
      int reversep;
 {
   rtx head, end, jump, earliest, old_dest;
+
+  /* No code movement can occur if we'd be scrogging EH regions.
+     Within MERGE_BB, ensure that we've not got stray EH_BEG or EH_END
+     notes within the block.  Between the blocks, checking that the end
+     region numbers match ensures that we won't disrupt the nesting
+     between regions.  */
+  if (merge_bb->eh_beg != merge_bb->eh_end
+      || merge_bb->eh_end != test_bb->eh_end)
+    return FALSE;
 
   jump = test_bb->end;
 

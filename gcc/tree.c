@@ -182,9 +182,43 @@ void (*lang_unsave_expr_now) PARAMS ((tree));
 /* If non-null, these are language-specific helper functions for
    unsafe_for_reeval.  Return negative to not handle some tree.  */
 int (*lang_unsafe_for_reeval) PARAMS ((tree));
+
+/* Set the DECL_ASSEMBLER_NAME for a node.  If it is the sort of thing
+   that the assembler should talk about, set DECL_ASSEMBLER_NAME to an
+   appropriate IDENTIFIER_NODE.  Otherwise, set it to the
+   ERROR_MARK_NODE to ensure that the assembler does not talk about
+   it.  */
+void (*lang_set_decl_assembler_name)     PARAMS ((tree));
 
 tree global_trees[TI_MAX];
 tree integer_types[itk_none];
+
+/* Set the DECL_ASSEMBLER_NAME for DECL.  */
+void
+set_decl_assembler_name (decl)
+     tree decl;
+{
+  /* The language-independent code should never use the
+     DECL_ASSEMBLER_NAME for lots of DECLs.  Only FUNCTION_DECLs and
+     VAR_DECLs for variables with static storage duration need a real
+     DECL_ASSEMBLER_NAME.  */
+  if (TREE_CODE (decl) == FUNCTION_DECL
+      || (TREE_CODE (decl) == VAR_DECL 
+	  && (TREE_STATIC (decl) 
+	      || DECL_EXTERNAL (decl) 
+	      || TREE_PUBLIC (decl))))
+    /* By default, assume the name to use in assembly code is the
+       same as that used in the source language.  (That's correct
+       for C, and GCC used to set DECL_ASSEMBLER_NAME to the same
+       value as DECL_NAME in build_decl, so this choice provides
+       backwards compatibility with existing front-ends.  */
+    SET_DECL_ASSEMBLER_NAME (decl, DECL_NAME (decl));
+  else
+    /* Nobody should ever be asking for the DECL_ASSEMBLER_NAME of
+       these DECLs -- unless they're in language-dependent code, in
+       which case lang_set_decl_assembler_name should handle things.  */
+    abort ();
+}
 
 /* Init the principal obstacks.  */
 
@@ -199,6 +233,9 @@ init_obstacks ()
   ggc_add_root (&type_hash_table, 1, sizeof type_hash_table, mark_type_hash);
   ggc_add_tree_root (global_trees, TI_MAX);
   ggc_add_tree_root (integer_types, itk_none);
+
+  /* Set lang_set_decl_set_assembler_name to a default value.  */
+  lang_set_decl_assembler_name = set_decl_assembler_name;
 }
 
 void
@@ -2557,7 +2594,6 @@ build_decl (code, name, type)
    as the type can suppress useless errors in the use of this variable.  */
 
   DECL_NAME (t) = name;
-  DECL_ASSEMBLER_NAME (t) = name;
   TREE_TYPE (t) = type;
 
   if (code == VAR_DECL || code == PARM_DECL || code == RESULT_DECL)
@@ -3518,10 +3554,10 @@ simple_cst_equal (t1, t2)
 	 as being equivalent to anything.  */
       if ((TREE_CODE (TREE_OPERAND (t1, 0)) == VAR_DECL
 	   && DECL_NAME (TREE_OPERAND (t1, 0)) == NULL_TREE
-	   && DECL_RTL (TREE_OPERAND (t1, 0)) == 0)
+	   && !DECL_RTL_SET_P (TREE_OPERAND (t1, 0)))
 	  || (TREE_CODE (TREE_OPERAND (t2, 0)) == VAR_DECL
 	      && DECL_NAME (TREE_OPERAND (t2, 0)) == NULL_TREE
-	      && DECL_RTL (TREE_OPERAND (t2, 0)) == 0))
+	      && !DECL_RTL_SET_P (TREE_OPERAND (t2, 0))))
 	cmp = 1;
       else
 	cmp = simple_cst_equal (TREE_OPERAND (t1, 0), TREE_OPERAND (t2, 0));
@@ -4663,9 +4699,9 @@ tree_check_failed (node, code, file, line, function)
      int line;
      const char *function;
 {
-  error ("Tree check: expected %s, have %s",
-	 tree_code_name[code], tree_code_name[TREE_CODE (node)]);
-  fancy_abort (file, line, function);
+  internal_error ("Tree check: expected %s, have %s in %s, at %s:%d",
+		  tree_code_name[code], tree_code_name[TREE_CODE (node)],
+		  function, trim_filename (file), line);
 }
 
 /* Similar to above, except that we check for a class of tree
@@ -4679,10 +4715,10 @@ tree_class_check_failed (node, cl, file, line, function)
      int line;
      const char *function;
 {
-  error ("Tree check: expected class '%c', have '%c' (%s)",
-	 cl, TREE_CODE_CLASS (TREE_CODE (node)),
-	 tree_code_name[TREE_CODE (node)]);
-  fancy_abort (file, line, function);
+  internal_error
+    ("Tree check: expected class '%c', have '%c' (%s) in %s, at %s:%d",
+     cl, TREE_CODE_CLASS (TREE_CODE (node)),
+     tree_code_name[TREE_CODE (node)], function, trim_filename (file), line);
 }
 
 #endif /* ENABLE_TREE_CHECKING */
@@ -4832,7 +4868,16 @@ build_common_tree_nodes_2 (short_double)
   {
     tree t;
     BUILD_VA_LIST_TYPE (t);
-    va_list_type_node = build_type_copy (t);
+
+    /* Many back-ends define record types without seting TYPE_NAME.
+       If we copied the record type here, we'd keep the original
+       record type without a name.  This breaks name mangling.  So,
+       don't copy record types and let c_common_nodes_and_builtins()
+       declare the type to be __builtin_va_list.  */
+    if (TREE_CODE (t) != RECORD_TYPE)
+      t = build_type_copy (t);
+
+    va_list_type_node = t;
   }
 
   V4SF_type_node = make_node (VECTOR_TYPE);
