@@ -1,7 +1,8 @@
 ;; -*- Mode: Scheme -*-
 ;;   Machine description for GNU compiler,
 ;;   for ATMEL AVR micro controllers.
-;;   Copyright (C) 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+;;   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2004, 2005
+;;   Free Software Foundation, Inc.
 ;;   Contributed by Denis Chertykov (denisc@overta.ru)
 
 ;; This file is part of GCC.
@@ -349,8 +350,8 @@
 		   (match_operand:BLK 1 "memory_operand" ""))
 	      (use (match_operand:HI 2 "const_int_operand" ""))
 	      (use (match_operand:HI 3 "const_int_operand" ""))
-	      (clobber (match_dup 4))
-	      (clobber (match_dup 5))
+	      (clobber (match_scratch:HI 4 ""))
+	      (clobber (match_scratch:HI 5 ""))
 	      (clobber (match_dup 6))])]
   ""
   "{
@@ -364,13 +365,10 @@
   mode = cnt8 ? QImode : HImode;
   operands[2] = copy_to_mode_reg (mode,
                                   gen_int_mode (INTVAL (operands[2]), mode));
-  operands[4] = operands[2];
   addr0 = copy_to_mode_reg (Pmode, XEXP (operands[0], 0));
   addr1 = copy_to_mode_reg (Pmode, XEXP (operands[1], 0));
 
-  operands[5] = addr0;
-  operands[6] = addr1;
-
+  operands[6] = gen_rtx_SCRATCH (mode);
   operands[0] = gen_rtx (MEM, BLKmode, addr0);
   operands[1] = gen_rtx (MEM, BLKmode, addr1);
 }")
@@ -380,9 +378,9 @@
 	(mem:BLK (match_operand:HI 1 "register_operand" "e")))
    (use (match_operand:QI 2 "register_operand" "r"))
    (use (match_operand:QI 3 "const_int_operand" "i"))
-   (clobber (match_dup 2))
-   (clobber (match_dup 0))
-   (clobber (match_dup 1))]
+   (clobber (match_scratch:HI 4 "=0"))
+   (clobber (match_scratch:HI 5 "=1"))
+   (clobber (match_scratch:QI 6 "=2"))]
   ""
   "ld __tmp_reg__,%a1+
 	st %a0+,__tmp_reg__
@@ -396,9 +394,9 @@
 	(mem:BLK (match_operand:HI 1 "register_operand" "e,e")))
    (use (match_operand:HI 2 "register_operand" "!w,d"))
    (use (match_operand:HI 3 "const_int_operand" ""))
-   (clobber (match_dup 2))
-   (clobber (match_dup 0))
-   (clobber (match_dup 1))]
+   (clobber (match_scratch:HI 4 "=0,0"))
+   (clobber (match_scratch:HI 5 "=1,1"))
+   (clobber (match_scratch:HI 6 "=2,2"))]
   ""
   "*{
      if (which_alternative==0)
@@ -424,7 +422,7 @@
 		   (const_int 0))
 	      (use (match_operand:HI 1 "const_int_operand" ""))
 	      (use (match_operand:HI 2 "const_int_operand" "n"))
-	      (clobber (match_dup 3))
+	      (clobber (match_scratch:HI 3 ""))
 	      (clobber (match_dup 4))])]
   ""
   "{
@@ -437,13 +435,10 @@
 
   cnt8 = byte_immediate_operand (operands[1], GET_MODE (operands[1]));
   mode = cnt8 ? QImode : HImode;
+  operands[4] = gen_rtx_SCRATCH (mode);
   operands[1] = copy_to_mode_reg (mode,
                                   gen_int_mode (INTVAL (operands[1]), mode));
-  operands[3] = operands[1];
-
   addr0 = copy_to_mode_reg (Pmode, XEXP (operands[0], 0));
-  operands[4] = addr0;
-  
   operands[0] = gen_rtx (MEM, BLKmode, addr0);
 }")
 
@@ -452,8 +447,8 @@
 	(const_int 0))
    (use (match_operand:QI 1 "register_operand" "r"))
    (use (match_operand:QI 2 "const_int_operand" "n"))
-   (clobber (match_dup 1))
-   (clobber (match_dup 0))]
+   (clobber (match_scratch:HI 3 "=0"))
+   (clobber (match_scratch:QI 4 "=1"))]
   ""
   "st %a0+,__zero_reg__
         dec %1
@@ -466,8 +461,8 @@
 	(const_int 0))
    (use (match_operand:HI 1 "register_operand" "!w,d"))
    (use (match_operand:HI 2 "const_int_operand" "n,n"))
-   (clobber (match_dup 1))
-   (clobber (match_dup 0))]
+   (clobber (match_scratch:HI 3 "=0,0"))
+   (clobber (match_scratch:HI 4 "=1,1"))]
   ""
   "*{
      if (which_alternative==0)
@@ -1172,31 +1167,31 @@
 ;; arithmetic shift left
 
 (define_insn "ashlqi3"
-  [(set (match_operand:QI 0 "register_operand"           "=r,r,r,!d,r,r")
-	(ashift:QI (match_operand:QI 1 "register_operand" "0,0,0,0,0,0")
-		   (match_operand:QI 2 "general_operand"  "r,P,K,n,n,Qm")))]
+  [(set (match_operand:QI 0 "register_operand"           "=r,r,r,r,!d,r,r")
+	(ashift:QI (match_operand:QI 1 "register_operand" "0,0,0,0,0,0,0")
+		   (match_operand:QI 2 "general_operand"  "r,L,P,K,n,n,Qm")))]
   ""
   "* return ashlqi3_out (insn, operands, NULL);"
-  [(set_attr "length" "5,1,2,4,6,9")
-   (set_attr "cc" "clobber,set_czn,set_czn,set_czn,set_czn,clobber")])
+  [(set_attr "length" "5,0,1,2,4,6,9")
+   (set_attr "cc" "clobber,none,set_czn,set_czn,set_czn,set_czn,clobber")])
 
 (define_insn "ashlhi3"
-  [(set (match_operand:HI 0 "register_operand"           "=r,r,r,r,r,r")
-	(ashift:HI (match_operand:HI 1 "register_operand" "0,0,r,0,0,0")
-		   (match_operand:QI 2 "general_operand"  "r,P,O,K,n,Qm")))]
+  [(set (match_operand:HI 0 "register_operand"           "=r,r,r,r,r,r,r")
+	(ashift:HI (match_operand:HI 1 "register_operand" "0,0,0,r,0,0,0")
+		   (match_operand:QI 2 "general_operand"  "r,L,P,O,K,n,Qm")))]
   ""
   "* return ashlhi3_out (insn, operands, NULL);"
-  [(set_attr "length" "6,2,2,4,10,10")
-   (set_attr "cc" "clobber,set_n,clobber,set_n,clobber,clobber")])
+  [(set_attr "length" "6,0,2,2,4,10,10")
+   (set_attr "cc" "clobber,none,set_n,clobber,set_n,clobber,clobber")])
 
 (define_insn "ashlsi3"
-  [(set (match_operand:SI 0 "register_operand"           "=r,r,r,r,r,r")
-	(ashift:SI (match_operand:SI 1 "register_operand" "0,0,r,0,0,0")
-		   (match_operand:QI 2 "general_operand"  "r,P,O,K,n,Qm")))]
+  [(set (match_operand:SI 0 "register_operand"           "=r,r,r,r,r,r,r")
+	(ashift:SI (match_operand:SI 1 "register_operand" "0,0,0,r,0,0,0")
+		   (match_operand:QI 2 "general_operand"  "r,L,P,O,K,n,Qm")))]
   ""
   "* return ashlsi3_out (insn, operands, NULL);"
-  [(set_attr "length" "8,4,4,8,10,12")
-   (set_attr "cc" "clobber,set_n,clobber,set_n,clobber,clobber")])
+  [(set_attr "length" "8,0,4,4,8,10,12")
+   (set_attr "cc" "clobber,none,set_n,clobber,set_n,clobber,clobber")])
 
 ;; Optimize if a scratch register from LD_REGS happens to be available.
 
@@ -1212,14 +1207,14 @@
      FAIL;")
 
 (define_insn "*ashlhi3_const"
-  [(set (match_operand:HI 0 "register_operand"            "=r,r,r,r")
-	(ashift:HI (match_operand:HI 1 "register_operand"  "0,r,0,0")
-		   (match_operand:QI 2 "const_int_operand" "P,O,K,n")))
-   (clobber (match_scratch:QI 3 "=X,X,X,&d"))]
+  [(set (match_operand:HI 0 "register_operand"            "=r,r,r,r,r")
+	(ashift:HI (match_operand:HI 1 "register_operand"  "0,0,r,0,0")
+		   (match_operand:QI 2 "const_int_operand" "L,P,O,K,n")))
+   (clobber (match_scratch:QI 3 "=X,X,X,X,&d"))]
   "reload_completed"
   "* return ashlhi3_out (insn, operands, NULL);"
-  [(set_attr "length" "2,2,4,10")
-   (set_attr "cc" "set_n,clobber,set_n,clobber")])
+  [(set_attr "length" "0,2,2,4,10")
+   (set_attr "cc" "none,set_n,clobber,set_n,clobber")])
 
 (define_peephole2
   [(match_scratch:QI 3 "d")
@@ -1233,44 +1228,44 @@
      FAIL;")
 
 (define_insn "*ashlsi3_const"
-  [(set (match_operand:SI 0 "register_operand"            "=r,r,r")
-	(ashift:SI (match_operand:SI 1 "register_operand"  "0,r,0")
-		   (match_operand:QI 2 "const_int_operand" "P,O,n")))
-   (clobber (match_scratch:QI 3 "=X,X,&d"))]
+  [(set (match_operand:SI 0 "register_operand"            "=r,r,r,r")
+	(ashift:SI (match_operand:SI 1 "register_operand"  "0,0,r,0")
+		   (match_operand:QI 2 "const_int_operand" "L,P,O,n")))
+   (clobber (match_scratch:QI 3 "=X,X,X,&d"))]
   "reload_completed"
   "* return ashlsi3_out (insn, operands, NULL);"
-  [(set_attr "length" "4,4,10")
-   (set_attr "cc" "set_n,clobber,clobber")])
+  [(set_attr "length" "0,4,4,10")
+   (set_attr "cc" "none,set_n,clobber,clobber")])
 
 ;; >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >>
 ;; arithmetic shift right
 
 (define_insn "ashrqi3"
-  [(set (match_operand:QI 0 "register_operand" "=r,r,r,r,r")
-	(ashiftrt:QI (match_operand:QI 1 "register_operand" "0,0,0,0,0")
-		     (match_operand:QI 2 "general_operand" "r,P,K,n,Qm")))]
+  [(set (match_operand:QI 0 "register_operand" "=r,r,r,r,r,r")
+	(ashiftrt:QI (match_operand:QI 1 "register_operand" "0,0,0,0,0,0")
+		     (match_operand:QI 2 "general_operand"  "r,L,P,K,n,Qm")))]
   ""
   "* return ashrqi3_out (insn, operands, NULL);"
-  [(set_attr "length" "5,1,2,5,9")
-   (set_attr "cc" "clobber,clobber,clobber,clobber,clobber")])
+  [(set_attr "length" "5,0,1,2,5,9")
+   (set_attr "cc" "clobber,none,clobber,clobber,clobber,clobber")])
 
 (define_insn "ashrhi3"
-  [(set (match_operand:HI 0 "register_operand"             "=r,r,r,r,r,r")
-	(ashiftrt:HI (match_operand:HI 1 "register_operand" "0,0,r,0,0,0")
-		     (match_operand:QI 2 "general_operand"  "r,P,O,K,n,Qm")))]
+  [(set (match_operand:HI 0 "register_operand"             "=r,r,r,r,r,r,r")
+	(ashiftrt:HI (match_operand:HI 1 "register_operand" "0,0,0,r,0,0,0")
+		     (match_operand:QI 2 "general_operand"  "r,L,P,O,K,n,Qm")))]
   ""
   "* return ashrhi3_out (insn, operands, NULL);"
-  [(set_attr "length" "6,2,4,4,10,10")
-   (set_attr "cc" "clobber,clobber,set_n,clobber,clobber,clobber")])
+  [(set_attr "length" "6,0,2,4,4,10,10")
+   (set_attr "cc" "clobber,none,clobber,set_n,clobber,clobber,clobber")])
 
 (define_insn "ashrsi3"
-  [(set (match_operand:SI 0 "register_operand"             "=r,r,r,r,r,r")
-	(ashiftrt:SI (match_operand:SI 1 "register_operand" "0,0,r,0,0,0")
-		     (match_operand:QI 2 "general_operand"  "r,P,O,K,n,Qm")))]
+  [(set (match_operand:SI 0 "register_operand"             "=r,r,r,r,r,r,r")
+	(ashiftrt:SI (match_operand:SI 1 "register_operand" "0,0,0,r,0,0,0")
+		     (match_operand:QI 2 "general_operand"  "r,L,P,O,K,n,Qm")))]
   ""
   "* return ashrsi3_out (insn, operands, NULL);"
-  [(set_attr "length" "8,4,6,8,10,12")
-   (set_attr "cc" "clobber,clobber,set_n,clobber,clobber,clobber")])
+  [(set_attr "length" "8,0,4,6,8,10,12")
+   (set_attr "cc" "clobber,none,clobber,set_n,clobber,clobber,clobber")])
 
 ;; Optimize if a scratch register from LD_REGS happens to be available.
 
@@ -1286,14 +1281,14 @@
      FAIL;")
 
 (define_insn "*ashrhi3_const"
-  [(set (match_operand:HI 0 "register_operand"              "=r,r,r,r")
-	(ashiftrt:HI (match_operand:HI 1 "register_operand"  "0,r,0,0")
-		     (match_operand:QI 2 "const_int_operand" "P,O,K,n")))
-   (clobber (match_scratch:QI 3 "=X,X,X,&d"))]
+  [(set (match_operand:HI 0 "register_operand"              "=r,r,r,r,r")
+	(ashiftrt:HI (match_operand:HI 1 "register_operand"  "0,0,r,0,0")
+		     (match_operand:QI 2 "const_int_operand" "L,P,O,K,n")))
+   (clobber (match_scratch:QI 3 "=X,X,X,X,&d"))]
   "reload_completed"
   "* return ashrhi3_out (insn, operands, NULL);"
-  [(set_attr "length" "2,4,4,10")
-   (set_attr "cc" "clobber,set_n,clobber,clobber")])
+  [(set_attr "length" "0,2,4,4,10")
+   (set_attr "cc" "none,clobber,set_n,clobber,clobber")])
 
 (define_peephole2
   [(match_scratch:QI 3 "d")
@@ -1307,44 +1302,44 @@
      FAIL;")
 
 (define_insn "*ashrsi3_const"
-  [(set (match_operand:SI 0 "register_operand"              "=r,r,r")
-	(ashiftrt:SI (match_operand:SI 1 "register_operand"  "0,r,0")
-		     (match_operand:QI 2 "const_int_operand" "P,O,n")))
-   (clobber (match_scratch:QI 3 "=X,X,&d"))]
+  [(set (match_operand:SI 0 "register_operand"              "=r,r,r,r")
+	(ashiftrt:SI (match_operand:SI 1 "register_operand"  "0,0,r,0")
+		     (match_operand:QI 2 "const_int_operand" "L,P,O,n")))
+   (clobber (match_scratch:QI 3 "=X,X,X,&d"))]
   "reload_completed"
   "* return ashrsi3_out (insn, operands, NULL);"
-  [(set_attr "length" "4,4,10")
-   (set_attr "cc" "clobber,set_n,clobber")])
+  [(set_attr "length" "0,4,4,10")
+   (set_attr "cc" "none,clobber,set_n,clobber")])
 
 ;; >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >> >>
 ;; logical shift right
 
 (define_insn "lshrqi3"
-  [(set (match_operand:QI 0 "register_operand"             "=r,r,r,!d,r,r")
-	(lshiftrt:QI (match_operand:QI 1 "register_operand" "0,0,0,0,0,0")
-		     (match_operand:QI 2 "general_operand"  "r,P,K,n,n,Qm")))]
+  [(set (match_operand:QI 0 "register_operand"             "=r,r,r,r,!d,r,r")
+	(lshiftrt:QI (match_operand:QI 1 "register_operand" "0,0,0,0,0,0,0")
+		     (match_operand:QI 2 "general_operand"  "r,L,P,K,n,n,Qm")))]
   ""
   "* return lshrqi3_out (insn, operands, NULL);"
-  [(set_attr "length" "5,1,2,4,6,9")
-   (set_attr "cc" "clobber,set_czn,set_czn,set_czn,set_czn,clobber")])
+  [(set_attr "length" "5,0,1,2,4,6,9")
+   (set_attr "cc" "clobber,none,set_czn,set_czn,set_czn,set_czn,clobber")])
 
 (define_insn "lshrhi3"
-  [(set (match_operand:HI 0 "register_operand"             "=r,r,r,r,r,r")
-	(lshiftrt:HI (match_operand:HI 1 "register_operand" "0,0,r,0,0,0")
-		     (match_operand:QI 2 "general_operand"  "r,P,O,K,n,Qm")))]
+  [(set (match_operand:HI 0 "register_operand"             "=r,r,r,r,r,r,r")
+	(lshiftrt:HI (match_operand:HI 1 "register_operand" "0,0,0,r,0,0,0")
+		     (match_operand:QI 2 "general_operand"  "r,L,P,O,K,n,Qm")))]
   ""
   "* return lshrhi3_out (insn, operands, NULL);"
-  [(set_attr "length" "6,2,2,4,10,10")
-   (set_attr "cc" "clobber,clobber,clobber,clobber,clobber,clobber")])
+  [(set_attr "length" "6,0,2,2,4,10,10")
+   (set_attr "cc" "clobber,none,clobber,clobber,clobber,clobber,clobber")])
 
 (define_insn "lshrsi3"
-  [(set (match_operand:SI 0 "register_operand"             "=r,r,r,r,r,r")
-	(lshiftrt:SI (match_operand:SI 1 "register_operand" "0,0,r,0,0,0")
-		     (match_operand:QI 2 "general_operand"  "r,P,O,K,n,Qm")))]
+  [(set (match_operand:SI 0 "register_operand"             "=r,r,r,r,r,r,r")
+	(lshiftrt:SI (match_operand:SI 1 "register_operand" "0,0,0,r,0,0,0")
+		     (match_operand:QI 2 "general_operand"  "r,L,P,O,K,n,Qm")))]
   ""
   "* return lshrsi3_out (insn, operands, NULL);"
-  [(set_attr "length" "8,4,4,8,10,12")
-   (set_attr "cc" "clobber,clobber,clobber,clobber,clobber,clobber")])
+  [(set_attr "length" "8,0,4,4,8,10,12")
+   (set_attr "cc" "clobber,none,clobber,clobber,clobber,clobber,clobber")])
 
 ;; Optimize if a scratch register from LD_REGS happens to be available.
 
@@ -1360,14 +1355,14 @@
      FAIL;")
 
 (define_insn "*lshrhi3_const"
-  [(set (match_operand:HI 0 "register_operand"              "=r,r,r,r")
-	(lshiftrt:HI (match_operand:HI 1 "register_operand"  "0,r,0,0")
-		     (match_operand:QI 2 "const_int_operand" "P,O,K,n")))
-   (clobber (match_scratch:QI 3 "=X,X,X,&d"))]
+  [(set (match_operand:HI 0 "register_operand"              "=r,r,r,r,r")
+	(lshiftrt:HI (match_operand:HI 1 "register_operand"  "0,0,r,0,0")
+		     (match_operand:QI 2 "const_int_operand" "L,P,O,K,n")))
+   (clobber (match_scratch:QI 3 "=X,X,X,X,&d"))]
   "reload_completed"
   "* return lshrhi3_out (insn, operands, NULL);"
-  [(set_attr "length" "2,2,4,10")
-   (set_attr "cc" "clobber,clobber,clobber,clobber")])
+  [(set_attr "length" "0,2,2,4,10")
+   (set_attr "cc" "none,clobber,clobber,clobber,clobber")])
 
 (define_peephole2
   [(match_scratch:QI 3 "d")
@@ -1381,14 +1376,14 @@
      FAIL;")
 
 (define_insn "*lshrsi3_const"
-  [(set (match_operand:SI 0 "register_operand"              "=r,r,r")
-	(lshiftrt:SI (match_operand:SI 1 "register_operand"  "0,r,0")
-		     (match_operand:QI 2 "const_int_operand" "P,O,n")))
-   (clobber (match_scratch:QI 3 "=X,X,&d"))]
+  [(set (match_operand:SI 0 "register_operand"              "=r,r,r,r")
+	(lshiftrt:SI (match_operand:SI 1 "register_operand"  "0,0,r,0")
+		     (match_operand:QI 2 "const_int_operand" "L,P,O,n")))
+   (clobber (match_scratch:QI 3 "=X,X,X,&d"))]
   "reload_completed"
   "* return lshrsi3_out (insn, operands, NULL);"
-  [(set_attr "length" "4,4,10")
-   (set_attr "cc" "clobber,clobber,clobber")])
+  [(set_attr "length" "0,4,4,10")
+   (set_attr "cc" "none,clobber,clobber,clobber")])
 
 ;; abs(x) abs(x) abs(x) abs(x) abs(x) abs(x) abs(x) abs(x) abs(x) abs(x) abs(x)
 ;; abs
