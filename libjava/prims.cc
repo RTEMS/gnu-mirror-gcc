@@ -61,10 +61,14 @@ details.  */
 #include <gnu/gcj/runtime/VMClassLoader.h>
 #include <gnu/gcj/runtime/FinalizerThread.h>
 #include <gnu/gcj/runtime/FirstThread.h>
+#include <execution.h>
 
 #ifdef USE_LTDL
 #include <ltdl.h>
 #endif
+
+// Execution engine for compiled code.
+_Jv_CompiledEngine _Jv_soleCompiledEngine;
 
 // We allocate a single OutOfMemoryError exception which we keep
 // around for use if we run out of memory.
@@ -389,16 +393,15 @@ jvmpi_notify_alloc(jclass klass, jint size, jobject obj)
 # define jvmpi_notify_alloc(klass,size,obj) /* do nothing */
 #endif
 
-// Allocate a new object of class KLASS.  SIZE is the size of the object
-// to allocate.  You might think this is redundant, but it isn't; some
-// classes, such as String, aren't of fixed size.
+// Allocate a new object of class KLASS.
 // First a version that assumes that we have no finalizer, and that
 // the class is already initialized.
 // If we know that JVMPI is disabled, this can be replaced by a direct call
 // to the allocator for the appropriate GC.
 jobject
-_Jv_AllocObjectNoInitNoFinalizer (jclass klass, jint size)
+_Jv_AllocObjectNoInitNoFinalizer (jclass klass)
 {
+  jint size = klass->size ();
   jobject obj = (jobject) _Jv_AllocObj (size, klass);
   jvmpi_notify_alloc (klass, size, obj);
   return obj;
@@ -406,9 +409,10 @@ _Jv_AllocObjectNoInitNoFinalizer (jclass klass, jint size)
 
 // And now a version that initializes if necessary.
 jobject
-_Jv_AllocObjectNoFinalizer (jclass klass, jint size)
+_Jv_AllocObjectNoFinalizer (jclass klass)
 {
   _Jv_InitClass (klass);
+  jint size = klass->size ();
   jobject obj = (jobject) _Jv_AllocObj (size, klass);
   jvmpi_notify_alloc (klass, size, obj);
   return obj;
@@ -416,10 +420,10 @@ _Jv_AllocObjectNoFinalizer (jclass klass, jint size)
 
 // And now the general version that registers a finalizer if necessary.
 jobject
-_Jv_AllocObject (jclass klass, jint size)
+_Jv_AllocObject (jclass klass)
 {
-  jobject obj = _Jv_AllocObjectNoFinalizer (klass, size);
-
+  jobject obj = _Jv_AllocObjectNoFinalizer (klass);
+  
   // We assume that the compiler only generates calls to this routine
   // if there really is an interesting finalizer.
   // Unfortunately, we still have to the dynamic test, since there may
@@ -432,14 +436,62 @@ _Jv_AllocObject (jclass klass, jint size)
   return obj;
 }
 
+// Allocate a String, including variable length storage.
+jstring
+_Jv_AllocString(jsize len)
+{
+  using namespace java::lang;
+
+  jsize sz = sizeof(java::lang::String) + len * sizeof(jchar);
+
+  // We assert that for strings allocated this way, the data field
+  // will always point to the object itself.  Thus there is no reason
+  // for the garbage collector to scan any of it.
+  // Furthermore, we're about to overwrite the string data, so
+  // initialization of the object is not an issue.
+
+  // String needs no initialization, and there is no finalizer, so
+  // we can go directly to the collector's allocator interface.
+  jstring obj = (jstring) _Jv_AllocPtrFreeObj(sz, &String::class$);
+
+  obj->data = obj;
+  obj->boffset = sizeof(java::lang::String);
+  obj->count = len;
+  obj->cachedHashCode = 0;
+  
+#ifdef ENABLE_JVMPI
+  // Service JVMPI request.
+
+  if (__builtin_expect (_Jv_JVMPI_Notify_OBJECT_ALLOC != 0, false))
+    {
+      JVMPI_Event event;
+
+      event.event_type = JVMPI_EVENT_OBJECT_ALLOC;
+      event.env_id = NULL;
+      event.u.obj_alloc.arena_id = 0;
+      event.u.obj_alloc.class_id = (jobjectID) &String::class$;
+      event.u.obj_alloc.is_array = 0;
+      event.u.obj_alloc.size = sz;
+      event.u.obj_alloc.obj_id = (jobjectID) obj;
+
+      _Jv_DisableGC ();
+      (*_Jv_JVMPI_Notify_OBJECT_ALLOC) (&event);
+      _Jv_EnableGC ();
+    }
+#endif  
+  
+  return obj;
+}
+
 // A version of the above that assumes the object contains no pointers,
 // and requires no finalization.  This can't happen if we need pointers
 // to locks.
 #ifdef JV_HASH_SYNCHRONIZATION
 jobject
-_Jv_AllocPtrFreeObject (jclass klass, jint size)
+_Jv_AllocPtrFreeObject (jclass klass)
 {
   _Jv_InitClass (klass);
+  jint size = klass->size ();
 
   jobject obj = (jobject) _Jv_AllocPtrFreeObj (size, klass);
 
@@ -707,7 +759,7 @@ JvConvertArgv (int argc, const char **argv)
 {
   if (argc < 0)
     argc = 0;
-  jobjectArray ar = JvNewObjectArray(argc, &StringClass, NULL);
+  jobjectArray ar = JvNewObjectArray(argc, &java::lang::String::class$, NULL);
   jobject *ptr = elements(ar);
   jbyteArray bytes = NULL;
   for (int i = 0;  i < argc;  i++)
@@ -1180,7 +1232,7 @@ _Jv_CheckAccess (jclass self_klass, jclass other_klass, jint flags)
   return ((self_klass == other_klass)
 	  || ((flags & Modifier::PUBLIC) != 0)
 	  || (((flags & Modifier::PROTECTED) != 0)
-	      && other_klass->isAssignableFrom (self_klass))
+	      && _Jv_IsAssignableFromSlow (other_klass, self_klass))
 	  || (((flags & Modifier::PRIVATE) == 0)
 	      && _Jv_ClassNameSamePackage (self_klass->name,
 					   other_klass->name)));

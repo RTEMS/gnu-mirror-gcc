@@ -244,6 +244,8 @@ extern GTY(()) struct JCF * current_jcf;
    before static field references.  */
 extern int always_initialize_class_p;
 
+extern int flag_verify_invocations;
+
 typedef struct CPool constant_pool;
 
 #define CONSTANT_ResolvedFlag 16
@@ -332,6 +334,7 @@ enum java_tree_index
   JTI_CLINIT_IDENTIFIER_NODE,      
   JTI_FINIT_IDENTIFIER_NODE,      
   JTI_INSTINIT_IDENTIFIER_NODE,
+  JTI_VERIFY_IDENTIFIER_NODE,       
   JTI_VOID_SIGNATURE_NODE,       
   JTI_LENGTH_IDENTIFIER_NODE,  
   JTI_FINALIZE_IDENTIFIER_NODE,
@@ -349,7 +352,6 @@ enum java_tree_index
   JTI_DOUBLE_ZERO_NODE,
   JTI_INTEGER_TWO_NODE,
   JTI_INTEGER_FOUR_NODE,
-  JTI_EMPTY_STMT_NODE,
 
   JTI_METHODTABLE_TYPE,
   JTI_METHODTABLE_PTR_TYPE,
@@ -375,6 +377,8 @@ enum java_tree_index
   JTI_OTABLE_PTR_TYPE,
   JTI_ATABLE_TYPE,
   JTI_ATABLE_PTR_TYPE,
+  JTI_ITABLE_TYPE,
+  JTI_ITABLE_PTR_TYPE,
   JTI_SYMBOL_TYPE,
   JTI_SYMBOLS_ARRAY_TYPE,
   JTI_SYMBOLS_ARRAY_PTR_TYPE,
@@ -386,6 +390,7 @@ enum java_tree_index
   JTI_ALLOC_NO_FINALIZER_NODE,
   JTI_SOFT_INSTANCEOF_NODE,
   JTI_SOFT_CHECKCAST_NODE,
+  JTI_SOFT_CHECK_ASSIGNMENT_NODE,
   JTI_SOFT_INITCLASS_NODE,
   JTI_SOFT_NEWARRAY_NODE,
   JTI_SOFT_ANEWARRAY_NODE,
@@ -396,6 +401,7 @@ enum java_tree_index
   JTI_SOFT_MONITORENTER_NODE,
   JTI_SOFT_MONITOREXIT_NODE,
   JTI_SOFT_LOOKUPINTERFACEMETHOD_NODE,
+  JTI_SOFT_LOOKUPINTERFACEMETHODBYNAME_NODE,
   JTI_SOFT_LOOKUPJNIMETHOD_NODE,
   JTI_SOFT_GETJNIENVNEWFRAME_NODE,
   JTI_SOFT_JNIPOPSYSTEMFRAME_NODE,
@@ -529,6 +535,8 @@ extern GTY(()) tree java_global_trees[JTI_MAX];
 /* FIXME "instinit$" and "finit$" should be merged  */
 #define instinit_identifier_node \
   java_global_trees[JTI_INSTINIT_IDENTIFIER_NODE]  /* "instinit$" */
+#define verify_identifier_node \
+  java_global_trees[JTI_VERIFY_IDENTIFIER_NODE]  /* "__verify" */
 #define void_signature_node \
   java_global_trees[JTI_VOID_SIGNATURE_NODE]       /* "()V" */
 #define length_identifier_node \
@@ -562,8 +570,6 @@ extern GTY(()) tree java_global_trees[JTI_MAX];
   java_global_trees[JTI_INTEGER_TWO_NODE]
 #define integer_four_node \
   java_global_trees[JTI_INTEGER_FOUR_NODE]
-#define empty_stmt_node \
-  java_global_trees[JTI_EMPTY_STMT_NODE]
 
 /* The type for struct methodtable. */
 #define methodtable_type \
@@ -608,10 +614,14 @@ extern GTY(()) tree java_global_trees[JTI_MAX];
   java_global_trees[JTI_OTABLE_TYPE]
 #define atable_type \
   java_global_trees[JTI_ATABLE_TYPE]
+#define itable_type \
+  java_global_trees[JTI_ITABLE_TYPE]
 #define otable_ptr_type \
   java_global_trees[JTI_OTABLE_PTR_TYPE]
 #define atable_ptr_type \
   java_global_trees[JTI_ATABLE_PTR_TYPE]
+#define itable_ptr_type \
+  java_global_trees[JTI_ITABLE_PTR_TYPE]
 #define symbol_type \
   java_global_trees[JTI_SYMBOL_TYPE]
 #define symbols_array_type \
@@ -633,6 +643,8 @@ extern GTY(()) tree java_global_trees[JTI_MAX];
   java_global_trees[JTI_ALLOC_NO_FINALIZER_NODE]
 #define soft_instanceof_node \
   java_global_trees[JTI_SOFT_INSTANCEOF_NODE]
+#define soft_check_assignment_node \
+  java_global_trees[JTI_SOFT_CHECK_ASSIGNMENT_NODE]
 #define soft_checkcast_node \
   java_global_trees[JTI_SOFT_CHECKCAST_NODE]
 #define soft_initclass_node \
@@ -655,6 +667,8 @@ extern GTY(()) tree java_global_trees[JTI_MAX];
   java_global_trees[JTI_SOFT_MONITOREXIT_NODE]
 #define soft_lookupinterfacemethod_node \
   java_global_trees[JTI_SOFT_LOOKUPINTERFACEMETHOD_NODE]
+#define soft_lookupinterfacemethodbyname_node \
+  java_global_trees[JTI_SOFT_LOOKUPINTERFACEMETHODBYNAME_NODE]
 #define soft_lookupjnimethod_node \
   java_global_trees[JTI_SOFT_LOOKUPJNIMETHOD_NODE]
 #define soft_getjnienvnewframe_node \
@@ -929,6 +943,8 @@ union lang_tree_node
 /* True if NODE is a variable that is out of scope.  */
 #define LOCAL_VAR_OUT_OF_SCOPE_P(NODE) \
     (DECL_LANG_SPECIFIC (NODE)->u.v.freed)
+#define LOCAL_SLOT_P(NODE) \
+    (DECL_LANG_SPECIFIC (NODE)->u.v.local_slot)
 /* Create a DECL_LANG_SPECIFIC if necessary. */
 #define MAYBE_CREATE_VAR_LANG_DECL_SPECIFIC(T)			\
   if (DECL_LANG_SPECIFIC (T) == NULL)				\
@@ -989,6 +1005,7 @@ struct lang_decl_func GTY(())
   unsigned int invisible : 1;	/* Set for methods we generate
 				   internally but which shouldn't be
 				   written to the .class file.  */
+  unsigned int dummy:1;		
 };
 
 struct treetreehash_entry GTY(())
@@ -996,6 +1013,12 @@ struct treetreehash_entry GTY(())
   tree key;
   tree value;
 };
+
+typedef struct type_assertion GTY(())
+{
+  tree source_type;
+  tree target_type;
+} type_assertion;
 
 extern tree java_treetreehash_find (htab_t, tree);
 extern tree * java_treetreehash_new (htab_t, tree);
@@ -1014,7 +1037,8 @@ struct lang_decl_var GTY(())
   tree owner;
   unsigned int final_iud : 1;	/* Final initialized upon declaration */
   unsigned int cif : 1;		/* True: decl is a class initialization flag */
-  unsigned int freed;		/* Decl is no longer in scope.  */
+  unsigned int freed : 1;		/* Decl is no longer in scope.  */
+  unsigned int local_slot : 1;	/* Decl is a temporary in the stack frame.  */
 };
 
 /* This is what 'lang_decl' really points to.  */
@@ -1047,6 +1071,9 @@ struct lang_decl GTY(())
 #define TYPE_II_STMT_LIST(T)     (TYPE_LANG_SPECIFIC (T)->ii_block)
 /* The decl of the synthetic method `class$' used to handle `.class'
    for non primitive types when compiling to bytecode. */
+
+#define TYPE_DUMMY(T)		(TYPE_LANG_SPECIFIC(T)->dummy_class)
+
 #define TYPE_DOT_CLASS(T)        (TYPE_LANG_SPECIFIC (T)->dot_class)
 #define TYPE_PACKAGE_LIST(T)     (TYPE_LANG_SPECIFIC (T)->package_list)
 #define TYPE_IMPORT_LIST(T)      (TYPE_LANG_SPECIFIC (T)->import_list)
@@ -1064,10 +1091,16 @@ struct lang_decl GTY(())
 #define TYPE_OTABLE_SYMS_DECL(T) (TYPE_LANG_SPECIFIC (T)->otable_syms_decl)
 #define TYPE_OTABLE_DECL(T)      (TYPE_LANG_SPECIFIC (T)->otable_decl)
 
+#define TYPE_ITABLE_METHODS(T)   (TYPE_LANG_SPECIFIC (T)->itable_methods)
+#define TYPE_ITABLE_SYMS_DECL(T) (TYPE_LANG_SPECIFIC (T)->itable_syms_decl)
+#define TYPE_ITABLE_DECL(T)      (TYPE_LANG_SPECIFIC (T)->itable_decl)
+
 #define TYPE_CTABLE_DECL(T)      (TYPE_LANG_SPECIFIC (T)->ctable_decl)
 #define TYPE_CATCH_CLASSES(T)    (TYPE_LANG_SPECIFIC (T)->catch_classes)
+#define TYPE_VERIFY_METHOD(T)    (TYPE_LANG_SPECIFIC (T)->verify_method)
 
 #define TYPE_TO_RUNTIME_MAP(T)   (TYPE_LANG_SPECIFIC (T)->type_to_runtime_map)
+#define TYPE_ASSERTIONS(T)   	 (TYPE_LANG_SPECIFIC (T)->type_assertions)
 
 struct lang_type GTY(())
 {
@@ -1096,18 +1129,29 @@ struct lang_type GTY(())
   tree atable_decl;		/* The static address table.  */
   tree atable_syms_decl;
 
+  tree itable_methods;          /* List of interfaces methods referred
+				   to by this class.  */
+  tree itable_decl;		/* The interfaces table.  */
+  tree itable_syms_decl;
+
   tree ctable_decl;             /* The table of classes for the runtime
 				   type matcher.  */
   tree catch_classes;
+
+  tree verify_method;		/* The verify method for this class.
+				   Used in split verification.  */
 
   htab_t GTY ((param_is (struct treetreehash_entry))) type_to_runtime_map;   
                                 /* The mapping of classes to exception region
 				   markers.  */
 
+  htab_t GTY ((param_is (struct type_assertion))) type_assertions;
+
   unsigned pic:1;		/* Private Inner Class. */
   unsigned poic:1;		/* Protected Inner Class. */
   unsigned strictfp:1;		/* `strictfp' class.  */
   unsigned assertions:1;	/* Any method uses `assert'.  */
+  unsigned dummy_class:1;		/* Not a real class, just a placeholder.  */
 };
 
 #define JCF_u4 unsigned long
@@ -1117,6 +1161,9 @@ struct lang_type GTY(())
 #define SEARCH_INTERFACE      1
 #define SEARCH_SUPER          2
 #define SEARCH_VISIBLE        4
+
+/* Defined in java-except.h  */
+struct eh_range;
 
 extern void java_parse_file (int);
 extern bool java_mark_addressable (tree);
@@ -1149,6 +1196,7 @@ extern tree unmangle_classname (const char *name, int name_length);
 extern tree parse_signature_string (const unsigned char *, int);
 extern tree get_type_from_signature (tree);
 extern void layout_class (tree);
+extern int get_interface_method_index (tree, tree);
 extern tree layout_class_method (tree, tree, tree, tree);
 extern void layout_class_methods (tree);
 extern tree build_class_ref (tree);
@@ -1177,6 +1225,7 @@ extern void set_java_signature (tree, tree);
 extern tree build_static_field_ref (tree);
 extern tree build_address_of (tree);
 extern tree find_local_variable (int index, tree type, int pc);
+extern void update_aliases (tree decl, int index, int pc);
 extern tree find_stack_slot (int index, tree type);
 extern tree build_prim_array_type (tree, HOST_WIDE_INT);
 extern tree build_java_array_type (tree, HOST_WIDE_INT);
@@ -1234,14 +1283,15 @@ extern int interface_of_p (tree, tree);
 extern int inherits_from_p (tree, tree);
 extern int common_enclosing_context_p (tree, tree);
 extern int enclosing_context_p (tree, tree);
-extern void complete_start_java_method (tree);
 extern tree build_result_decl (tree);
 extern void emit_handlers (void);
+extern void set_method_index (tree decl, tree method_index);
+extern tree get_method_index (tree decl);
 extern void make_class_data (tree);
 extern void register_class (void);
 extern int alloc_name_constant (int, tree);
 extern void emit_register_classes (void);
-extern tree emit_symbol_table (tree, tree, tree, tree, tree);
+extern tree emit_symbol_table (tree, tree, tree, tree, tree, int);
 extern void lang_init_source (int);
 extern void write_classfile (tree);
 extern char *print_int_node (tree);
@@ -1252,6 +1302,8 @@ extern void java_layout_seen_class_methods (void);
 extern void check_for_initialization (tree, tree);
 
 extern tree pushdecl_top_level (tree);
+extern tree pushdecl_function_level (tree);
+extern tree java_replace_reference (tree, bool);
 extern int alloc_class_constant (tree);
 extern void init_expr_processing (void);
 extern void push_super_field (tree, tree);
@@ -1271,6 +1323,7 @@ extern void push_type (tree);
 extern void load_type_state (tree);
 extern void add_interface (tree, tree);
 extern tree force_evaluation_order (tree);
+extern tree java_create_object (tree);
 extern int verify_constant_pool (struct JCF *);
 extern void start_java_method (tree);
 extern void end_java_method (void);
@@ -1338,8 +1391,13 @@ extern void compile_resource_data (const char *name, const char *buffer, int);
 extern void compile_resource_file (const char *, const char *);
 extern void write_resource_constructor (void);
 extern void init_resource_processing (void);
-
-extern void start_complete_expand_method (tree);
+extern tree build_java_empty_stmt (void);
+extern tree add_stmt_to_compound (tree, tree, tree);
+extern tree java_add_stmt (tree);
+extern tree java_add_local_var (tree decl);
+extern tree *get_stmts (void);
+extern void register_exception_range(struct eh_range *, int, int);
+extern void finish_method (tree);
 extern void java_expand_body (tree);
 
 extern int get_symbol_table_index (tree, tree *);
@@ -1352,6 +1410,8 @@ extern void gen_indirect_dispatch_tables (tree type);
 #define DECL_FINAL(DECL) DECL_LANG_FLAG_3 (DECL)
 
 /* Access flags etc for a method (a FUNCTION_DECL): */
+
+#define METHOD_DUMMY(DECL) (DECL_LANG_SPECIFIC (DECL)->u.f.dummy)
 
 #define METHOD_PUBLIC(DECL) DECL_LANG_FLAG_1 (FUNCTION_DECL_CHECK (DECL))
 #define METHOD_PRIVATE(DECL) TREE_PRIVATE (FUNCTION_DECL_CHECK (DECL))
@@ -1802,7 +1862,8 @@ enum
 
   JV_STATE_PRELOADING = 1,	/* Can do _Jv_FindClass.  */
   JV_STATE_LOADING = 3,		/* Has super installed.  */
-  JV_STATE_LOADED = 5,		/* Is complete.  */
+  JV_STATE_READ = 4,		/* Has been completely defined.  */
+  JV_STATE_LOADED = 5,		/* Has Miranda methods defined.  */
 
   JV_STATE_COMPILED = 6,	/* This was a compiled class.  */
 
@@ -1816,4 +1877,28 @@ enum
 };
 
 #undef DEBUG_JAVA_BINDING_LEVELS
+
+/* In an EXPR_WITH_FILE_LOCATION node.  */
+#define EXPR_WFL_EMIT_LINE_NOTE(NODE) \
+  (EXPR_WITH_FILE_LOCATION_CHECK (NODE)->common.public_flag)
+#undef EXPR_WFL_NODE
+#define EXPR_WFL_NODE(NODE) \
+  TREE_OPERAND (EXPR_WITH_FILE_LOCATION_CHECK (NODE), 0)
+#undef EXPR_WFL_FILENAME_NODE
+#define EXPR_WFL_FILENAME_NODE(NODE) \
+  TREE_OPERAND (EXPR_WITH_FILE_LOCATION_CHECK (NODE), 1)
+#define EXPR_WFL_FILENAME(NODE) \
+  IDENTIFIER_POINTER (EXPR_WFL_FILENAME_NODE (NODE))
+/* ??? Java uses this in all expressions.  */
+#define EXPR_WFL_LINECOL(NODE) (EXPR_CHECK (NODE)->exp.complexity)
+#define EXPR_WFL_LINENO(NODE) (EXPR_WFL_LINECOL (NODE) >> 12)
+#define EXPR_WFL_COLNO(NODE) (EXPR_WFL_LINECOL (NODE) & 0xfff)
+#define EXPR_WFL_SET_LINECOL(NODE, LINE, COL) \
+  (EXPR_WFL_LINECOL(NODE) = ((LINE) << 12) | ((COL) & 0xfff))
+
+extern tree build_expr_wfl              PARAMS ((tree, const char *, int, int));
+
+extern void java_genericize		PARAMS ((tree));
+extern int java_gimplify_expr		PARAMS ((tree *, tree *, tree *));
+
 #endif /* ! GCC_JAVA_TREE_H */

@@ -111,6 +111,9 @@ static JCF_u2 last_access;
 #define METHOD_IS_NATIVE(Method) \
    ((Method) & ACC_NATIVE)
 
+#define METHOD_IS_PRIVATE(Class, Method) \
+  (((Method) & ACC_PRIVATE) != 0)
+
 /* We keep a linked list of all method names we have seen.  This lets
    us determine if a method name and a field name are in conflict.  */
 struct method_name
@@ -119,6 +122,7 @@ struct method_name
   int length;
   unsigned char *signature;
   int sig_length;
+  int is_native;
   struct method_name *next;
 };
 
@@ -634,7 +638,7 @@ name_is_method_p (const unsigned char *name, int length)
   return 0;
 }
 
-/* If there is already a method named NAME, whose signature is not
+/* If there is already a native method named NAME, whose signature is not
    SIGNATURE, then return true.  Otherwise return false.  */
 static int
 overloaded_jni_method_exists_p (const unsigned char *name, int length,
@@ -644,7 +648,8 @@ overloaded_jni_method_exists_p (const unsigned char *name, int length,
 
   for (p = method_name_list; p != NULL; p = p->next)
     {
-      if (p->length == length
+      if (p->is_native
+          && p->length == length
 	  && ! memcmp (p->name, name, length)
 	  && (p->sig_length != sig_length
 	      || memcmp (p->signature, signature, sig_length)))
@@ -851,6 +856,7 @@ print_method_info (FILE *stream, JCF* jcf, int name_index, int sig_index,
       nn->next = method_name_list;
       nn->sig_length = JPOOL_UTF_LENGTH (jcf, sig_index);
       nn->signature = xmalloc (nn->sig_length);
+      nn->is_native = METHOD_IS_NATIVE (flags);
       memcpy (nn->signature, JPOOL_UTF_DATA (jcf, sig_index),
 	      nn->sig_length);
       method_name_list = nn;
@@ -879,7 +885,7 @@ print_method_info (FILE *stream, JCF* jcf, int name_index, int sig_index,
       fputs ("  ", out);
       if ((flags & ACC_STATIC))
 	fputs ("static ", out);
-      else if (! METHOD_IS_FINAL (jcf->access_flags, flags))
+      else if (! METHOD_IS_PRIVATE (jcf->access_flags, flags))
 	{
 	  /* Don't print `virtual' if we have a constructor.  */
 	  if (! is_init)

@@ -1,6 +1,6 @@
 // defineclass.cc - defining a class from .class format.
 
-/* Copyright (C) 1999, 2000, 2001, 2002, 2003  Free Software Foundation
+/* Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004  Free Software Foundation
 
    This file is part of libgcj.
 
@@ -25,6 +25,7 @@ details.  */
 #include <stdlib.h>
 #include <java-cpool.h>
 #include <gcj/cni.h>
+#include <execution.h>
 
 #include <java/lang/Class.h>
 #include <java/lang/Float.h>
@@ -96,7 +97,10 @@ struct _Jv_ClassReader {
   unsigned int      *offsets;
 
   // the class to define (see java-interp.h)
-  _Jv_InterpClass   *def;
+  jclass	   def;
+  
+  // the classes associated interpreter data.
+  _Jv_InterpClass  *def_interp;
 
   /* check that the given number of input bytes are available */
   inline void check (int num)
@@ -221,7 +225,11 @@ struct _Jv_ClassReader {
     bytes  = (unsigned char*) (elements (data)+offset);
     len    = length;
     pos    = 0;
-    def    = (_Jv_InterpClass*) klass;
+    def    = klass;
+    def->size_in_bytes = -1;
+    def->vtable_method_count = -1;
+    def->engine = &_Jv_soleInterpreterEngine;
+    def_interp = (_Jv_InterpClass *) def->aux_info;
   }
 
   /** and here goes the parser members defined out-of-line */
@@ -330,10 +338,9 @@ _Jv_ClassReader::parse ()
   if (pos != len)
     throw_class_format_error ("unused data before end of file");
 
-  // tell everyone we're done.
-  def->state = JV_STATE_LOADED;
+  // Tell everyone we're done.
+  def->state = JV_STATE_READ;
   def->notifyAll ();
-
 }
 
 void _Jv_ClassReader::read_constpool ()
@@ -772,9 +779,9 @@ _Jv_ClassReader::prepare_pool_entry (int index, unsigned char this_tag)
 			   name_index, type_index);
 
 	  if (this_tag == JV_CONSTANT_Fieldref)
-	    _Jv_VerifyFieldSignature (pool_data[type_index].utf8);
+	    verify_field_signature (pool_data[type_index].utf8);
 	  else
-	    _Jv_VerifyMethodSignature (pool_data[type_index].utf8);
+	    verify_method_signature (pool_data[type_index].utf8);
 
 	  _Jv_Utf8Const* name = pool_data[name_index].utf8;
 
@@ -943,23 +950,25 @@ _Jv_ClassReader::handleClassBegin
   def->notifyAll ();
 }
 
-///// implements the checks described in sect. 5.3.5.3
+///// Implements the checks described in sect. 5.3.5.3
 void
 _Jv_ClassReader::checkExtends (jclass sub, jclass super)
 {
   using namespace java::lang::reflect;
 
-  // having an interface or a final class as a superclass is no good
+  _Jv_Linker::wait_for_state (super, JV_STATE_LOADING);
+
+  // Having an interface or a final class as a superclass is no good.
   if ((super->accflags & (Modifier::INTERFACE | Modifier::FINAL)) != 0)
     {
       throw_incompatible_class_change_error (sub->getName ());
     }
 
-  // if the super class is not public, we need to check some more
+  // If the super class is not public, we need to check some more.
   if ((super->accflags & Modifier::PUBLIC) == 0)
     {
-      // With package scope, the classes must have the same
-      // class loader.
+      // With package scope, the classes must have the same class
+      // loader.
       if (   sub->loader != super->loader
 	  || !_Jv_ClassNameSamePackage (sub->name, super->name))
 	{
@@ -967,7 +976,7 @@ _Jv_ClassReader::checkExtends (jclass sub, jclass super)
 	}
     } 
 
-  for (; super != 0; super = super->superclass)
+  for (; super != 0; super = super->getSuperclass ())
     {
       if (super == sub)
 	throw_class_circularity_error (sub->getName ());
@@ -1047,10 +1056,10 @@ void _Jv_ClassReader::handleFieldsBegin (int count)
   def->fields = (_Jv_Field*) 
     _Jv_AllocBytes (count * sizeof (_Jv_Field));
   def->field_count = count;
-  def->field_initializers = (_Jv_ushort*)
+  def_interp->field_initializers = (_Jv_ushort*)
     _Jv_AllocBytes (count * sizeof (_Jv_ushort));
   for (int i = 0; i < count; i++)
-    def->field_initializers[i] = (_Jv_ushort) 0;
+    def_interp->field_initializers[i] = (_Jv_ushort) 0;
 }
 
 void _Jv_ClassReader::handleField (int field_no,
@@ -1065,11 +1074,7 @@ void _Jv_ClassReader::handleField (int field_no,
   _Jv_Field *field = &def->fields[field_no];
   _Jv_Utf8Const *field_name = pool_data[name].utf8;
 
-#ifndef COMPACT_FIELDS
   field->name      = field_name;
-#else
-  field->nameIndex = name;
-#endif
 
   // Ignore flags we don't know about.  
   field->flags = flags & Modifier::ALL_FLAGS;
@@ -1103,7 +1108,7 @@ void _Jv_ClassReader::handleField (int field_no,
     }
 
   if (verify)
-    _Jv_VerifyFieldSignature (sig);
+    verify_field_signature (sig);
 
   // field->type is really a jclass, but while it is still
   // unresolved we keep an _Jv_Utf8Const* instead.
@@ -1133,7 +1138,7 @@ void _Jv_ClassReader::handleConstantValueAttribute (int field_index,
     throw_class_format_error ("field has multiple ConstantValue attributes");
 
   field->flags |= _Jv_FIELD_CONSTANT_VALUE;
-  def->field_initializers[field_index] = value;
+  def_interp->field_initializers[field_index] = value;
 
   /* type check the initializer */
   
@@ -1153,7 +1158,7 @@ void _Jv_ClassReader::handleFieldsEnd ()
   int low            = 0;
   int high           = def->field_count-1;
   _Jv_Field  *fields = def->fields;
-  _Jv_ushort *inits  = def->field_initializers;
+  _Jv_ushort *inits  = def_interp->field_initializers;
 
   // this is kind of a raw version of quicksort.
   while (low < high)
@@ -1195,13 +1200,13 @@ _Jv_ClassReader::handleMethodsBegin (int count)
 {
   def->methods = (_Jv_Method *) _Jv_AllocBytes (sizeof (_Jv_Method) * count);
 
-  def->interpreted_methods
+  def_interp->interpreted_methods
     = (_Jv_MethodBase **) _Jv_AllocBytes (sizeof (_Jv_MethodBase *)
 					  * count);
 
   for (int i = 0; i < count; i++)
     {
-      def->interpreted_methods[i] = 0;
+      def_interp->interpreted_methods[i] = 0;
       def->methods[i].index = (_Jv_ushort) -1;
     }
 
@@ -1240,7 +1245,7 @@ void _Jv_ClassReader::handleMethod
       else
 	verify_identifier (method->name);
 
-      _Jv_VerifyMethodSignature (method->signature);
+      verify_method_signature (method->signature);
 
       for (int i = 0; i < mth_index; ++i)
 	{
@@ -1270,7 +1275,6 @@ void _Jv_ClassReader::handleCodeAttribute
   _Jv_InterpMethod *method = 
     (_Jv_InterpMethod*) (_Jv_AllocBytes (size));
 
-  method->deferred	 = NULL;
   method->max_stack      = max_stack;
   method->max_locals     = max_locals;
   method->code_length    = code_length;
@@ -1284,7 +1288,7 @@ void _Jv_ClassReader::handleCodeAttribute
 	  (void*) (bytes+code_start),
 	  code_length);
 
-  def->interpreted_methods[method_index] = method;
+  def_interp->interpreted_methods[method_index] = method;
 
   if ((method->self->accflags & java::lang::reflect::Modifier::STATIC))
     {
@@ -1301,7 +1305,7 @@ void _Jv_ClassReader::handleExceptionTableEntry
    int start_pc, int end_pc, int handler_pc, int catch_type)
 {
   _Jv_InterpMethod *method = reinterpret_cast<_Jv_InterpMethod *>
-    (def->interpreted_methods[method_index]);
+    (def_interp->interpreted_methods[method_index]);
   _Jv_InterpException *exc = method->exceptions ();
 
   exc[exc_index].start_pc.i     = start_pc;
@@ -1319,7 +1323,7 @@ void _Jv_ClassReader::handleMethodsEnd ()
       _Jv_Method *method = &def->methods[i];
       if ((method->accflags & Modifier::NATIVE) != 0)
 	{
-	  if (def->interpreted_methods[i] != 0)
+	  if (def_interp->interpreted_methods[i] != 0)
 	    throw_class_format_error ("code provided for native method");
 	  else
 	    {
@@ -1328,8 +1332,7 @@ void _Jv_ClassReader::handleMethodsEnd ()
 	      m->defining_class = def;
 	      m->self = method;
 	      m->function = NULL;
-	      def->interpreted_methods[i] = m;
-	      m->deferred = NULL;
+	      def_interp->interpreted_methods[i] = m;
 
 	      if ((method->accflags & Modifier::STATIC))
 		{
@@ -1344,12 +1347,12 @@ void _Jv_ClassReader::handleMethodsEnd ()
 	}
       else if ((method->accflags & Modifier::ABSTRACT) != 0)
 	{
-	  if (def->interpreted_methods[i] != 0)
+	  if (def_interp->interpreted_methods[i] != 0)
 	    throw_class_format_error ("code provided for abstract method");
 	}
       else
 	{
-	  if (def->interpreted_methods[i] == 0)
+	  if (def_interp->interpreted_methods[i] == 0)
 	    throw_class_format_error ("method with no code");
 	}
     }
@@ -1621,7 +1624,7 @@ _Jv_VerifyClassName (_Jv_Utf8Const *name)
 }
 
 /* Returns true, if NAME1 and NAME2 represent classes in the same
-   package.  */
+   package.  Neither NAME2 nor NAME2 may name an array type.  */
 bool
 _Jv_ClassNameSamePackage (_Jv_Utf8Const *name1, _Jv_Utf8Const *name2)
 {

@@ -1,6 +1,6 @@
 // javaprims.h - Main external header file for libgcj.  -*- c++ -*-
 
-/* Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003  Free Software Foundation
+/* Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004  Free Software Foundation
 
    This file is part of libgcj.
 
@@ -83,6 +83,7 @@ extern "Java"
       class LineNumberInputStream;
       class LineNumberReader;
       class MemberComparator;
+      class MyIOException;
       class NotActiveException;
       class NotSerializableException;
       class ObjectInput;
@@ -211,6 +212,7 @@ extern "Java"
       class UnsupportedClassVersionError;
       class UnsupportedOperationException;
       class VMClassLoader;
+      class VMCompiler;
       class VMSecurityManager;
       class VMThrowable;
       class VerifyError;
@@ -450,17 +452,17 @@ struct _Jv_JNIEnv;
 typedef struct _Jv_Field *jfieldID;
 typedef struct _Jv_Method *jmethodID;
 
-extern "C" jobject _Jv_AllocObject (jclass, jint) __attribute__((__malloc__));
-extern "C" jobject _Jv_AllocObjectNoFinalizer (jclass, jint) __attribute__((__malloc__));
-extern "C" jobject _Jv_AllocObjectNoInitNoFinalizer (jclass, jint) __attribute__((__malloc__));
+extern "C" jobject _Jv_AllocObject (jclass) __attribute__((__malloc__));
+extern "C" jobject _Jv_AllocObjectNoFinalizer (jclass) __attribute__((__malloc__));
+extern "C" jobject _Jv_AllocObjectNoInitNoFinalizer (jclass) __attribute__((__malloc__));
 #ifdef JV_HASH_SYNCHRONIZATION
-  extern "C" jobject _Jv_AllocPtrFreeObject (jclass, jint)
+  extern "C" jobject _Jv_AllocPtrFreeObject (jclass)
   			    __attribute__((__malloc__));
 #else
   // Collector still needs to scan sync_info
-  static inline jobject _Jv_AllocPtrFreeObject (jclass klass, jint sz)
+  static inline jobject _Jv_AllocPtrFreeObject (jclass klass)
   {
-    return _Jv_AllocObject(klass, sz);
+    return _Jv_AllocObject(klass);
   }
 #endif
 extern "C" jboolean _Jv_IsInstanceOf(jobject, jclass);

@@ -1,6 +1,6 @@
 // jni.cc - JNI implementation, including the jump table.
 
-/* Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003  Free Software Foundation
+/* Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004  Free Software Foundation
 
    This file is part of libgcj.
 
@@ -560,11 +560,12 @@ static jint
 					       NULL);
 
       jclass *elts = elements (argtypes);
-      elts[0] = &StringClass;
+      elts[0] = &java::lang::String::class$;
 
       Constructor *cons = clazz->getConstructor (argtypes);
 
-      jobjectArray values = JvNewObjectArray (1, &StringClass, NULL);
+      jobjectArray values = JvNewObjectArray (1, &java::lang::String::class$,
+					      NULL);
       jobject *velts = elements (values);
       velts[0] = JvNewStringUTF (message);
 
@@ -633,7 +634,7 @@ static jobject
       if (clazz->isInterface() || Modifier::isAbstract(clazz->getModifiers()))
 	env->ex = new java::lang::InstantiationException ();
       else
-	obj = JvAllocObject (clazz);
+	obj = _Jv_AllocObject (clazz);
     }
   catch (jthrowable t)
     {
@@ -1198,7 +1199,7 @@ static jfieldID
 
 	      // The field might be resolved or it might not be.  It
 	      // is much simpler to always resolve it.
-	      _Jv_ResolveField (field, loader);
+	      _Jv_Linker::resolve_field (field, loader);
 	      if (_Jv_equalUtf8Consts (f_name, a_name)
 		  && field->getClass() == field_class)
 		return field;
