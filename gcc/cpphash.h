@@ -29,7 +29,9 @@ struct directive;		/* Deliberately incomplete.  */
 struct pending_option;
 struct op;
 
+#ifndef HAVE_UCHAR
 typedef unsigned char uchar;
+#endif
 #define U (const uchar *)  /* Intended use: U"string" */
 
 #define BITS_PER_CPPCHAR_T (CHAR_BIT * sizeof (cppchar_t))
@@ -211,6 +213,11 @@ struct lexer_state
 {
   /* Nonzero if first token on line is CPP_HASH.  */
   unsigned char in_directive;
+
+  /* Nonzero if in a directive that will handle padding tokens itself.
+     #include needs this to avoid problems with computed include and
+     spacing between tokens.  */
+  unsigned char directive_wants_padding;
 
   /* True if we are skipping a failed conditional group.  */
   unsigned char skipping;
