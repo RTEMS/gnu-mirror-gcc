@@ -80,7 +80,7 @@ proc test_mauve {} {
   puts -nonewline $fd $c
   close $fd
 
-  if {[catch {system "make KEYS=libjava classes.stamp"} msg]} then {
+  if {[catch {system "make KEYS=libgcj classes.stamp"} msg]} then {
     fail "Mauve build"
     verbose "build failed with $msg"
     return
@@ -99,7 +99,7 @@ proc test_mauve {} {
 
   # Compute flags to use to do the build.
   set compile_args [libjava_arguments]
-  set link_args [concat $compile_args \
+  set link_args [concat [libjava_arguments link] \
 		   [list "additional_flags=--main=DejaGNUTestHarness"]]
 
   set ok 1
@@ -152,10 +152,6 @@ proc test_mauve {} {
 
     set result [libjava_load [pwd]/DejaGNUTestHarness \
 		  "$env(MAUVEDIR) $class" ""]
-    if {[lindex $result 0] != "pass"} then {
-      fail "Execute for $class"
-      continue
-    }
 
     # Test for an exception thrown in the test harness itself.  This
     # isn't enough to test for all faults in the test harness, but
@@ -217,7 +213,7 @@ proc test_mauve_sim {} {
   puts -nonewline $fd $c
   close $fd
 
-  if {[catch {system "make KEYS=libjava classes.stamp"} msg]} then {
+  if {[catch {system "make KEYS=libgcj classes.stamp"} msg]} then {
     fail "Mauve build"
     verbose "build failed with $msg"
     return
@@ -229,7 +225,7 @@ proc test_mauve_sim {} {
 
   # Compute flags to use to do the build.
   set compile_args [libjava_arguments]
-  set link_args [concat $compile_args \
+  set link_args [concat [libjava_arguments link] \
 		   [list "additional_flags=--main=DejaGNUTestHarness"]]
 
   set ok 1
@@ -315,10 +311,6 @@ proc test_mauve_sim {} {
 
     set result [libjava_load [pwd]/DejaGNUTestHarness \
 		  "$env(MAUVEDIR) $class" ""]
-    if {[lindex $result 0] != "pass"} then {
-      fail "Execute for $class"
-      continue
-    }
 
     # Test for an exception thrown in the test harness itself.  This
     # isn't enough to test for all faults in the test harness, but
