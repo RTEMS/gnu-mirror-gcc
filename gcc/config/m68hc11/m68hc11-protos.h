@@ -1,5 +1,5 @@
 /* Prototypes for exported functions defined in m68hc11.c
-   Copyright (C) 1999, 2000 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2001 Free Software Foundation, Inc.
    Contributed by Stephane Carrez (stcarrez@worldnet.fr)
 
 This file is part of GNU CC.
@@ -39,6 +39,8 @@ extern int m68hc11_block_profiler PARAMS((FILE*,int));
 extern void m68hc11_asm_file_start PARAMS((FILE*, char*));
 
 #ifdef TREE_CODE
+extern void m68hc11_initialize_trampoline PARAMS((rtx, rtx, rtx));
+
 extern void m68hc11_function_arg_advance PARAMS((CUMULATIVE_ARGS*,
                                                  enum machine_mode,
                                                  tree,
@@ -73,6 +75,7 @@ extern int m68hc11_go_if_legitimate_address PARAMS((rtx,
 extern int m68hc11_legitimize_address PARAMS((rtx*, rtx, enum machine_mode));
 
 extern void m68hc11_notice_update_cc PARAMS((rtx, rtx));
+extern void m68hc11_notice_keep_cc PARAMS((rtx));
 
 extern void m68hc11_reorg PARAMS((rtx));
 
@@ -139,8 +142,6 @@ extern int non_push_operand PARAMS((rtx, enum machine_mode));
 extern int hard_reg_operand PARAMS((rtx, enum machine_mode));
 extern int soft_reg_operand PARAMS((rtx, enum machine_mode));
 extern int reg_or_some_mem_operand PARAMS((rtx, enum machine_mode));
-
-extern enum reg_class limit_reload_class PARAMS((enum machine_mode, enum reg_class));
 
 #if defined TREE_CODE
 extern void m68hc11_init_cumulative_args PARAMS((CUMULATIVE_ARGS*,

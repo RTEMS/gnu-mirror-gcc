@@ -32,7 +32,6 @@ Boston, MA 02111-1307, USA.  */
 #include "real.h"
 #include "insn-config.h"
 #include "conditions.h"
-#include "insn-flags.h"
 #include "output.h"
 #include "insn-attr.h"
 #include "flags.h"
@@ -7046,6 +7045,8 @@ output_return_instruction (operand, really_return, reverse)
      load a single register.  On other architectures, the cost is the same.
      In 26 bit mode we have to use LDM in order to be able to restore the CPSR.  */
   if ((live_regs_mask  == (1 << LR_REGNUM))
+      && ! TARGET_INTERWORK
+      && ! IS_INTERRUPT (func_type)
       && (! really_return || TARGET_APCS_32))
     {
       if (! really_return)

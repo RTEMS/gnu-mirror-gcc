@@ -30,7 +30,6 @@ Boston, MA 02111-1307, USA.  */
 #include "real.h"
 #include "insn-config.h"
 #include "conditions.h"
-#include "insn-flags.h"
 #include "output.h"
 #include "insn-attr.h"
 #include "flags.h"
@@ -509,7 +508,7 @@ ok_for_bclr (value)
   return small_power_of_two ((~value) & 0xff);
 }
 
-/* Return true is OP is a valid source operand for an integer move
+/* Return true if OP is a valid source operand for an integer move
    instruction.  */
 
 int

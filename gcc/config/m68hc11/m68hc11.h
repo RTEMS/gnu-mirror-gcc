@@ -77,7 +77,8 @@ Note:
 "%{mshort:-D__HAVE_SHORT_INT__ -D__INT__=16 -D__INT_MAX__=32767}\
  %{!mshort:-D__INT__=32 -D__INT_MAX__=2147483647}\
  %{m68hc12:-Dmc6812 -DMC6812 -Dmc68hc12}\
- %{!m68hc12:-Dmc6811 -DMC6811 -Dmc68hc11}"
+ %{!m68hc12:-Dmc6811 -DMC6811 -Dmc68hc11}\
+ %{fshort-double:-D__HAVE_SHORT_DOUBLE__}"
 #endif
 
 #undef STARTFILE_SPEC
@@ -234,6 +235,25 @@ extern const char *m68hc11_soft_reg_count;
    `-O'.  That is what `OPTIMIZATION_OPTIONS' is for.  */
 
 #define OVERRIDE_OPTIONS	m68hc11_override_options ();
+
+
+/* Define cost parameters for a given processor variant.  */
+struct processor_costs {
+  int add;		/* cost of an add instruction */
+  int logical;          /* cost of a logical instruction */
+  int shift_var;
+  int shiftQI_const[8];
+  int shiftHI_const[16];
+  int multQI;
+  int multHI;
+  int multSI;
+  int divQI;
+  int divHI;
+  int divSI;
+};
+
+/* Costs for the current processor.  */
+extern struct processor_costs *m68hc11_cost;
 
 
 /* target machine storage layout */
@@ -722,6 +742,9 @@ enum reg_class
 #define Y_REGNO_P(REGNO)        ((REGNO) == HARD_Y_REGNUM)
 #define Y_REG_P(X)              (REG_P (X) && Y_REGNO_P (REGNO (X)))
 
+#define Z_REGNO_P(REGNO)        ((REGNO) == HARD_Z_REGNUM)
+#define Z_REG_P(X)              (REG_P (X) && Z_REGNO_P (REGNO (X)))
+
 #define SP_REGNO_P(REGNO)       ((REGNO) == HARD_SP_REGNUM)
 #define SP_REG_P(X)             (REG_P (X) && SP_REGNO_P (REGNO (X)))
 
@@ -795,9 +818,6 @@ extern enum reg_class m68hc11_tmp_regs_class;
     (C) == 'z' ? Z_REGS : NO_REGS)
 
 #define PREFERRED_RELOAD_CLASS(X,CLASS)	preferred_reload_class(X,CLASS)
-
-
-#define LIMIT_RELOAD_CLASS(MODE, CLASS) limit_reload_class(MODE,CLASS)
 
 #define SMALL_REGISTER_CLASSES 1
 
@@ -943,7 +963,7 @@ extern int m68hc11_sp_correction;
 #define ARG_POINTER_REGNUM		SOFT_AP_REGNUM
 
 /* Register in which static-chain is passed to a function.  */
-#define STATIC_CHAIN_REGNUM	        SOFT_REG_FIRST
+#define STATIC_CHAIN_REGNUM	        SOFT_Z_REGNUM
 
 
 /* Definitions for register eliminations.
@@ -985,8 +1005,6 @@ extern int m68hc11_sp_correction;
 
 #define INITIAL_ELIMINATION_OFFSET(FROM, TO, OFFSET)			\
     { OFFSET = m68hc11_initial_elimination_offset (FROM, TO); }
-
-/* LONGJMP_RESTORE_FROM_STACK */
 
 
 /* Passing Function Arguments on the Stack.  */
@@ -1194,21 +1212,17 @@ typedef struct m68hc11_args
     asm ("puly");	       \
   }
 
-/* Output assembler code for a block containing the constant parts
-   of a trampoline, leaving space for the variable parts.  */
-#define TRAMPOLINE_TEMPLATE(FILE) { \
-  fprintf (FILE, "\t.bogus\t\t; TRAMPOLINE_TEMPLATE unimplemented\n"); }
-
 /* Length in units of the trampoline for entering a nested function.  */
-#define TRAMPOLINE_SIZE		0
+#define TRAMPOLINE_SIZE		(TARGET_M6811 ? 11 : 9)
 
 /* A C statement to initialize the variable parts of a trampoline.
    ADDR is an RTX for the address of the trampoline; FNADDR is an
    RTX for the address of the nested function; STATIC_CHAIN is an
    RTX for the static chain value that should be passed to the
    function when it is called.  */
-#define INITIALIZE_TRAMPOLINE(TRAMP, FNADDR, CXT) { \
-	}
+#define INITIALIZE_TRAMPOLINE(TRAMP, FNADDR, CXT) \
+  m68hc11_initialize_trampoline ((TRAMP), (FNADDR), (CXT))
+
 
 
 /* If defined, a C expression whose value is nonzero if IDENTIFIER
@@ -1487,22 +1501,54 @@ extern unsigned char m68hc11_reg_valid_for_index[FIRST_PSEUDO_REGISTER];
 
 /* Compute the cost of computing a constant rtl expression RTX whose rtx-code
    is CODE.  The body of this macro is a portion of a switch statement.  If
-   the code is computed here, return it with a return statement. Otherwise,
-   break from the switch.  */
-#define CONST_COSTS(RTX,CODE,OUTER_CODE) \
- case CONST_INT:			 \
-    if (RTX == const0_rtx) return 0;	 \
- case CONST:				 \
-    return 0;                            \
- case LABEL_REF:			 \
- case SYMBOL_REF:			 \
-   return 1;				 \
- case CONST_DOUBLE:			 \
+   the code is computed here, return it with a return statement.  Otherwise,
+   break from the switch.
+
+   Constants are cheap.  Moving them in registers must be avoided
+   because most instructions do not handle two register operands.  */
+#define CONST_COSTS(RTX,CODE,OUTER_CODE)			\
+ case CONST_INT:						\
+     /* Logical and arithmetic operations with a constant  */	\
+     /* operand are better because they are not supported  */	\
+     /* with two registers.  */					\
+     /* 'clr' is slow */					\
+   if ((OUTER_CODE) == SET && (RTX) == const0_rtx)		\
+     /* After reload, the reload_cse pass checks the cost */    \
+     /* to change a SET into a PLUS.  Make const0 cheap.  */    \
+     return 1 - reload_completed;				\
+   else								\
+     return 0;							\
+ case CONST:							\
+ case LABEL_REF:						\
+ case SYMBOL_REF:						\
+   if ((OUTER_CODE) == SET)					\
+      return 1 - reload_completed;				\
+   return 0;							\
+ case CONST_DOUBLE:						\
    return 0;
 
-#define DEFAULT_RTX_COSTS(X,CODE,OUTER_CODE)		\
-    return m68hc11_rtx_costs (X, CODE, OUTER_CODE);
-
+#define RTX_COSTS(X,CODE,OUTER_CODE)				\
+ case ROTATE:							\
+ case ROTATERT:							\
+ case ASHIFT:							\
+ case LSHIFTRT:							\
+ case ASHIFTRT:							\
+ case MINUS:							\
+ case PLUS:							\
+ case AND:							\
+ case XOR:							\
+ case IOR:							\
+ case UDIV:							\
+ case DIV:							\
+ case MOD:							\
+ case MULT:							\
+ case NEG:							\
+ case SIGN_EXTEND:						\
+ case NOT:							\
+ case COMPARE:							\
+ case ZERO_EXTEND:						\
+ case IF_THEN_ELSE:						\
+   return m68hc11_rtx_costs (X, CODE, OUTER_CODE);
 
 /* An expression giving the cost of an addressing mode that contains
    ADDRESS.  If not defined, the cost is computed from the ADDRESS

@@ -218,7 +218,7 @@ build_default_init (type)
        anything with a CONSTRUCTOR for arrays here, as that would imply
        copy-initialization.  */
     return NULL_TREE;
-  else if (AGGREGATE_TYPE_P (type))
+  else if (AGGREGATE_TYPE_P (type) && !TYPE_PTRMEMFUNC_P (type))
     {
       /* This is a default initialization of an aggregate, but not one of
 	 non-POD class type.  We cleverly notice that the initialization
@@ -696,10 +696,7 @@ sort_base_init (t, base_init_list, rbase_ptr, vbase_ptr)
 
    If there is a need for a call to a constructor, we must surround
    that call with a pushlevel/poplevel pair, since we are technically
-   at the PARM level of scope.
-
-   Note that emit_base_init does *not* initialize virtual base
-   classes.  That is done specially, elsewhere.  */
+   at the PARM level of scope.  */
 
 void
 emit_base_init (mem_init_list, base_init_list)
@@ -863,7 +860,7 @@ expand_virtual_init (binfo, decl)
       tree vtt_parm;
 
       /* Compute the value to use, when there's a VTT.  */
-      vtt_parm = DECL_VTT_PARM (current_function_decl);
+      vtt_parm = current_vtt_parm;
       vtbl2 = build (PLUS_EXPR, 
 		     TREE_TYPE (vtt_parm), 
 		     vtt_parm,
@@ -875,7 +872,8 @@ expand_virtual_init (binfo, decl)
 	 the vtt_parm in the case of the non-subobject constructor.  */
       vtbl = build (COND_EXPR, 
 		    TREE_TYPE (vtbl), 
-		    DECL_USE_VTT_PARM (current_function_decl),
+		    build (EQ_EXPR, boolean_type_node,
+			   current_in_charge_parm, integer_zero_node),
 		    vtbl2, 
 		    vtbl);
     }
@@ -2221,7 +2219,8 @@ build_java_class_ref (type)
     for (field = TYPE_FIELDS (type); field; field = TREE_CHAIN (field))
       if (DECL_NAME (field) == CL_suffix)
 	{
-	  name = mangle_decl (field);
+	  mangle_decl (field);
+	  name = DECL_ASSEMBLER_NAME (field);
 	  break;
 	}
     if (!field)
@@ -2294,6 +2293,9 @@ build_new_1 (exp)
      beginning of the storage allocated for an array-new expression in
      order to store the number of elements.  */
   tree cookie_size = NULL_TREE;
+  /* True if the function we are calling is a placement allocation
+     function.  */
+  bool placement_allocation_fn_p;
 
   placement = TREE_OPERAND (exp, 0);
   type = TREE_OPERAND (exp, 1);
@@ -2419,8 +2421,25 @@ build_new_1 (exp)
   if (alloc_call == error_mark_node)
     return error_mark_node;
 
-  if (alloc_call == NULL_TREE)
-    abort ();
+  /* The ALLOC_CALL should be a CALL_EXPR, and the first operand
+     should be the address of a known FUNCTION_DECL.  */
+  my_friendly_assert (TREE_CODE (alloc_call) == CALL_EXPR, 20000521);
+  t = TREE_OPERAND (alloc_call, 0);
+  my_friendly_assert (TREE_CODE (t) == ADDR_EXPR, 20000521);
+  t = TREE_OPERAND (t, 0);
+  my_friendly_assert (TREE_CODE (t) == FUNCTION_DECL, 20000521);
+  /* Now, check to see if this function is actually a placement
+     allocation function.  This can happen even when PLACEMENT is NULL
+     because we might have something like:
+
+       struct S { void* operator new (size_t, int i = 0); };
+
+     A call to `new S' will get this allocation function, even though
+     there is no explicit placement argument.  If there is more than
+     one argument, or there are variable arguments, then this is a
+     placement allocation function.  */
+  placement_allocation_fn_p 
+    = (type_num_arguments (TREE_TYPE (t)) > 1 || varargs_function_p (t));
 
   /*        unless an allocation function is declared with an empty  excep-
      tion-specification  (_except.spec_),  throw(), it indicates failure to
@@ -2537,7 +2556,8 @@ build_new_1 (exp)
 	  flags |= LOOKUP_SPECULATIVELY;
 
 	  cleanup = build_op_delete_call (dcode, alloc_node, size, flags,
-					  alloc_call);
+					  (placement_allocation_fn_p 
+					   ? alloc_call : NULL_TREE));
 
 	  /* Ack!  First we allocate the memory.  Then we set our sentry
 	     variable to true, and expand a cleanup that deletes the memory
@@ -2781,7 +2801,7 @@ get_temp_regvar (type, init)
   if (building_stmt_tree ())
     add_decl_stmt (decl);
   if (!building_stmt_tree ())
-    DECL_RTL (decl) = assign_temp (type, 2, 0, 1);
+    SET_DECL_RTL (decl, assign_temp (type, 2, 0, 1));
   finish_expr_stmt (build_modify_expr (decl, INIT_EXPR, init));
 
   return decl;
@@ -3156,7 +3176,6 @@ build_delete (type, addr, auto_delete, flags, use_global_delete)
 {
   tree member;
   tree expr;
-  tree ref;
 
   if (addr == error_mark_node)
     return error_mark_node;
@@ -3185,7 +3204,6 @@ build_delete (type, addr, auto_delete, flags, use_global_delete)
 
       /* throw away const and volatile on target type of addr */
       addr = convert_force (build_pointer_type (type), addr, 0);
-      ref = build_indirect_ref (addr, NULL_PTR);
     }
   else if (TREE_CODE (type) == ARRAY_TYPE)
     {
@@ -3210,8 +3228,6 @@ build_delete (type, addr, auto_delete, flags, use_global_delete)
 	addr = save_expr (addr);
 
       addr = convert_force (build_pointer_type (type), addr, 0);
-
-      ref = build_indirect_ref (addr, NULL_PTR);
     }
 
   my_friendly_assert (IS_AGGR_TYPE (type), 220);
@@ -3235,16 +3251,39 @@ build_delete (type, addr, auto_delete, flags, use_global_delete)
       tree do_delete = NULL_TREE;
       tree ifexp;
 
+      /* For `::delete x', we must not use the deleting destructor
+	 since then we would not be sure to get the global `operator
+	 delete'.  */
       if (use_global_delete && auto_delete == sfk_deleting_destructor)
 	{
+	  /* We will use ADDR multiple times so we must save it.  */
+	  addr = save_expr (addr);
 	  /* Delete the object. */
 	  do_delete = build_builtin_delete_call (addr);
 	  /* Otherwise, treat this like a complete object destructor
 	     call.  */
 	  auto_delete = sfk_complete_destructor;
 	}
+      /* If the destructor is non-virtual, there is no deleting
+	 variant.  Instead, we must explicitly call the appropriate
+	 `operator delete' here.  */
+      else if (!DECL_VIRTUAL_P (CLASSTYPE_DESTRUCTORS (type))
+	       && auto_delete == sfk_deleting_destructor)
+	{
+	  /* We will use ADDR multiple times so we must save it.  */
+	  addr = save_expr (addr);
+	  /* Build the call.  */
+	  do_delete = build_op_delete_call (DELETE_EXPR,
+					    addr,
+					    c_sizeof_nowarn (type),
+					    LOOKUP_NORMAL,
+					    NULL_TREE);
+	  /* Call the complete object destructor.  */
+	  auto_delete = sfk_complete_destructor;
+	}
 
-      expr = build_dtor_call (ref, auto_delete, flags);
+      expr = build_dtor_call (build_indirect_ref (addr, NULL_PTR),
+			      auto_delete, flags);
       if (do_delete)
 	expr = build (COMPOUND_EXPR, void_type_node, expr, do_delete);
 
@@ -3268,6 +3307,7 @@ build_delete (type, addr, auto_delete, flags, use_global_delete)
       int i, n_baseclasses = CLASSTYPE_N_BASECLASSES (type);
       tree base_binfo = n_baseclasses > 0 ? TREE_VEC_ELT (binfos, 0) : NULL_TREE;
       tree exprstmt = NULL_TREE;
+      tree ref = build_indirect_ref (addr, NULL_PTR);
 
       /* Set this again before we call anything, as we might get called
 	 recursively.  */

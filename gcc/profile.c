@@ -38,7 +38,6 @@ Boston, MA 02111-1307, USA.  */
 #include "rtl.h"
 #include "tree.h"
 #include "flags.h"
-#include "insn-flags.h"
 #include "insn-config.h"
 #include "output.h"
 #include "regs.h"
@@ -1108,7 +1107,6 @@ output_func_start_profiler ()
   TREE_PUBLIC (fndecl) = 1;
 #endif
 
-  DECL_ASSEMBLER_NAME (fndecl) = fnname;
   DECL_RESULT (fndecl) = build_decl (RESULT_DECL, NULL_TREE, void_type_node);
 
   fndecl = pushdecl (fndecl);
