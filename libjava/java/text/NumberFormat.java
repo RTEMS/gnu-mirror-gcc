@@ -38,8 +38,8 @@ exception statement from your version. */
 
 package java.text;
 
-import java.io.InvalidObjectException;
 import java.io.IOException;
+import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Currency;
@@ -310,7 +310,7 @@ public abstract class NumberFormat extends Format implements Cloneable
     try
       {
 	res = ResourceBundle.getBundle("gnu.java.locale.LocaleInformation",
-				       loc);
+		loc, ClassLoader.getSystemClassLoader());
       }
     catch (MissingResourceException x)
       {

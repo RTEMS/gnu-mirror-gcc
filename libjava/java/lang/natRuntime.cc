@@ -1,6 +1,6 @@
 // natRuntime.cc - Implementation of native side of Runtime class.
 
-/* Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003  Free Software Foundation
+/* Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004  Free Software Foundation
 
    This file is part of libgcj.
 
@@ -388,8 +388,11 @@ java::lang::Runtime::insertSystemProperties (java::util::Properties *newprops)
 	newprops->put(JvNewStringLatin1 (Prop), JvNewStringLatin1 (Val))
 
   // A mixture of the Java Product Versioning Specification
-  // (introduced in 1.2), and earlier versioning properties.
-  SET ("java.version", GCJVERSION);
+  // (introduced in 1.2), and earlier versioning properties.  Some
+  // programs rely on seeing values that they expect, so we claim to
+  // be a 1.4-ish VM for their sake.
+  SET ("java.version", "1.4.2");
+  SET ("java.runtime.version", "1.4.2");
   SET ("java.vendor", "Free Software Foundation, Inc.");
   SET ("java.vendor.url", "http://gcc.gnu.org/java/");
   SET ("java.class.version", "46.0");
@@ -399,7 +402,7 @@ java::lang::Runtime::insertSystemProperties (java::util::Properties *newprops)
   SET ("java.vm.version", __VERSION__);
   SET ("java.vm.vendor", "Free Software Foundation, Inc.");
   SET ("java.vm.name", "GNU libgcj");
-  SET ("java.specification.version", "1.3");
+  SET ("java.specification.version", "1.4");
   SET ("java.specification.name", "Java(tm) Platform API Specification");
   SET ("java.specification.vendor", "Sun Microsystems Inc.");
 
@@ -591,6 +594,9 @@ java::lang::Runtime::insertSystemProperties (java::util::Properties *newprops)
 
   // The name used to invoke this process (argv[0] in C).
   SET ("gnu.gcj.progname", _Jv_GetSafeArg (0));
+
+  // The java extensions directory.
+  SET ("java.ext.dirs", JAVA_EXT_DIRS);
 
   // Allow platform specific settings and overrides.
   _Jv_platform_initProperties (newprops);

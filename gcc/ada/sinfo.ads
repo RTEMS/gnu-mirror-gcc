@@ -1383,7 +1383,7 @@ package Sinfo is
    --    This is used to clarify output from the packed array cases.
 
    --  Procedure_To_Call (Node4-Sem)
-   --    Present in N_Allocator. N_Free_Statement, and N_Return_Statement
+   --    Present in N_Allocator, N_Free_Statement, and N_Return_Statement
    --    nodes. References the entity for the declaration of the procedure
    --    to be called to accomplish the required operation (i.e. for the
    --    Allocate procedure in the case of N_Allocator and N_Return_Statement
@@ -1898,8 +1898,8 @@ package Sinfo is
       --  directly in the tree as a subtype mark. The N_Subtype_Indication
       --  node is used only if a constraint is present.
 
-      --  Note: [For Ada 0Y (AI-231)]: Because Ada 0Y extends this rule with
-      --  the null-exclusion part (see AI-231), we had to introduce a new
+      --  Note: [For Ada 2005 (AI-231)]: Because Ada 2005 extends this rule
+      --  with the null-exclusion part (see AI-231), we had to introduce a new
       --  attribute in all the parents of subtype_indication nodes to indicate
       --  if the null-exclusion is present.
 
@@ -2340,8 +2340,8 @@ package Sinfo is
       --  with an appropriate message), it is possible for anonymous arrays
       --  to appear as component definitions. The semantics and back end handle
       --  this case properly, and the expander in fact generates such cases.
-      --  Access_Definition is an optional field that gives support to Ada 0Y
-      --  (AI-230). The parser generates nodes that have either the
+      --  Access_Definition is an optional field that gives support to
+      --  Ada 2005 (AI-230). The parser generates nodes that have either the
       --  Subtype_Indication field or else the Access_Definition field.
 
       --  N_Component_Definition
@@ -2705,6 +2705,9 @@ package Sinfo is
 
       --  ACCESS_DEFINITION ::=
       --    [NULL_EXCLUSION] access [GENERAL_ACCESS_MODIFIER] SUBTYPE_MARK
+      --  | ACCESS_TO_SUBPROGRAM_DEFINITION
+
+      --  Note: access to subprograms are an Ada 2005 (AI-254) extension
 
       --  N_Access_Definition
       --  Sloc points to ACCESS
@@ -2712,6 +2715,7 @@ package Sinfo is
       --  All_Present (Flag15)
       --  Constant_Present (Flag17)
       --  Subtype_Mark (Node4)
+      --  Access_To_Subprogram_Definition (Node3) (set to Empty if not present)
 
       -----------------------------------------
       -- 3.10.1  Incomplete Type Declaration --
@@ -3059,11 +3063,11 @@ package Sinfo is
       --  list of selector names in the record aggregate case, or a list of
       --  discrete choices in the array aggregate case or an N_Others_Choice
       --  node (which appears as a singleton list). Box_Present gives support
-      --  to Ada 0Y (AI-287).
+      --  to Ada 2005 (AI-287).
 
-      ------------------------------------
-      --  4.3.1  Commponent Choice List --
-      ------------------------------------
+      -----------------------------------
+      -- 4.3.1  Commponent Choice List --
+      -----------------------------------
 
       --  COMPONENT_CHOICE_LIST ::=
       --    component_SELECTOR_NAME {| component_SELECTOR_NAME}
@@ -4242,7 +4246,7 @@ package Sinfo is
 
       --  PRIVATE_TYPE_DECLARATION ::=
       --    type DEFINING_IDENTIFIER [DISCRIMINANT_PART]
-      --      is [abstract] tagged] [limited] private;
+      --      is [[abstract] tagged] [limited] private;
 
       --  Note: TAGGED is not permitted in Ada 83 mode
 
@@ -4327,7 +4331,7 @@ package Sinfo is
       --  | DEFINING_IDENTIFIER : ACCESS_DEFINITION renames object_NAME;
 
       --  Note: Access_Definition is an optional field that gives support to
-      --  Ada 0Y (AI-230). The parser generates nodes that have either the
+      --  Ada 2005 (AI-230). The parser generates nodes that have either the
       --  Subtype_Indication field or else the Access_Definition field.
 
       --  N_Object_Renaming_Declaration
@@ -5147,7 +5151,7 @@ package Sinfo is
       --  No_Entities_Ref_In_Spec (Flag8-Sem)
 
       --  Note: Limited_Present and Limited_View_Installed give support to
-      --        Ada 0Y (AI-50217).
+      --        Ada 2005 (AI-50217).
       --  Similarly, Private_Present gives support to AI-50262.
 
       ----------------------
@@ -6929,6 +6933,9 @@ package Sinfo is
    function Access_Definition
      (N : Node_Id) return Node_Id;    -- Node3
 
+   function Access_To_Subprogram_Definition
+     (N : Node_Id) return Node_Id;    -- Node3
+
    function Access_Types_To_Process
      (N : Node_Id) return Elist_Id;   -- Elist2
 
@@ -7719,6 +7726,9 @@ package Sinfo is
      (N : Node_Id; Val : Node_Id);            -- Node2
 
    procedure Set_Access_Definition
+     (N : Node_Id; Val : Node_Id);            -- Node3
+
+   procedure Set_Access_To_Subprogram_Definition
      (N : Node_Id; Val : Node_Id);            -- Node3
 
    procedure Set_Access_Types_To_Process
@@ -8514,6 +8524,7 @@ package Sinfo is
    pragma Inline (Accept_Handler_Records);
    pragma Inline (Accept_Statement);
    pragma Inline (Access_Definition);
+   pragma Inline (Access_To_Subprogram_Definition);
    pragma Inline (Access_Types_To_Process);
    pragma Inline (Actions);
    pragma Inline (Activation_Chain_Entity);
@@ -8775,6 +8786,7 @@ package Sinfo is
    pragma Inline (Set_Accept_Handler_Records);
    pragma Inline (Set_Accept_Statement);
    pragma Inline (Set_Access_Definition);
+   pragma Inline (Set_Access_To_Subprogram_Definition);
    pragma Inline (Set_Access_Types_To_Process);
    pragma Inline (Set_Actions);
    pragma Inline (Set_Activation_Chain_Entity);

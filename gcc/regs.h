@@ -19,6 +19,8 @@ along with GCC; see the file COPYING.  If not, write to the Free
 Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 02111-1307, USA.  */
 
+#ifndef GCC_REGS_H
+#define GCC_REGS_H
 
 #include "varray.h"
 #include "hard-reg-set.h"
@@ -65,8 +67,6 @@ typedef struct reg_info_def
 } reg_info;
 
 extern varray_type reg_n_info;
-
-extern bitmap_head subregs_of_mode;
 
 /* Indexed by n, gives number of times (REG n) is used or set.  */
 
@@ -161,6 +161,10 @@ extern char regs_ever_live[FIRST_PSEUDO_REGISTER];
 
 extern char regs_asm_clobbered[FIRST_PSEUDO_REGISTER];
 
+/* Vector indexed by machine mode saying whether there are regs of that mode.  */
+
+extern bool have_regs_of_mode [MAX_MACHINE_MODE];
+
 /* For each hard register, the widest mode object that it can contain.
    This will be a MODE_INT mode if the register can hold integers.  Otherwise
    it will be a MODE_FLOAT or a MODE_CC mode, whichever is valid for the
@@ -227,3 +231,5 @@ extern void allocate_reg_info (size_t, int, int);
 
 /* Specify number of hard registers given machine mode occupy.  */
 extern unsigned char hard_regno_nregs[FIRST_PSEUDO_REGISTER][MAX_MACHINE_MODE];
+
+#endif /* GCC_REGS_H */

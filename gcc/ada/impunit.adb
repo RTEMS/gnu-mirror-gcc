@@ -122,7 +122,7 @@ package body Impunit is
      "a-nlelfu",    -- Ada.Numerics.Long_Elementary_Functions
      "a-nllcef",    -- Ada.Long_Long_Complex_Elementary_Functions
      "a-nllefu",    -- Ada.Numerics.Long_Long_Elementary_Functions
-     "a-nltcty",    -- Ada.Numerics.Long_Long_Complex_Types
+     "a-nllcty",    -- Ada.Numerics.Long_Long_Complex_Types
      "a-nscefu",    -- Ada.Short_Complex_Elementary_Functions
      "a-nscoty",    -- Ada.Numerics.Short_Complex_Types
      "a-nselfu",    -- Ada.Numerics.Short_Elementary_Functions
@@ -224,8 +224,7 @@ package body Impunit is
      "g-memdum",    -- GNAT.Memory_Dump
      "g-moreex",    -- GNAT.Most_Recent_Exception
      "g-os_lib",    -- GNAT.Os_Lib
-     "g-pehage",    -- GNAT.Perfect_Hash.Generators
-     "g-perhas",    -- GNAT.Perfect_Hash
+     "g-pehage",    -- GNAT.Perfect_Hash_Generators
      "g-regexp",    -- GNAT.Regexp
      "g-regist",    -- GNAT.Registry
      "g-regpat",    -- GNAT.Regpat

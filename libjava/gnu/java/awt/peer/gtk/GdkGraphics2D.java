@@ -1,5 +1,5 @@
 /* GdkGraphics2D.java
-   Copyright (C) 2003 Free Software Foundation, Inc.
+   Copyright (C) 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -48,7 +48,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import java.text.AttributedCharacterIterator;
-import java.util.Map;
 import java.util.Stack;
 import java.lang.Integer;
 import gnu.java.awt.ClasspathToolkit;
@@ -88,7 +87,7 @@ public class GdkGraphics2D extends Graphics2D
 
   private Stack stateStack;
   
-  native private int[] initState (GtkComponentPeer component);
+  native private void initState (GtkComponentPeer component);
   native private void initState (int width, int height);
   native private void copyState (GdkGraphics2D g);
   native public void dispose ();
@@ -169,10 +168,10 @@ public class GdkGraphics2D extends Graphics2D
   GdkGraphics2D (GtkComponentPeer component)
   {
     this.component = component;
-    int rgb[] = initState (component);
+    initState (component);
 
-    setColor (new Color (rgb[0], rgb[1], rgb[2]));
-    setBackground (new Color (rgb[3], rgb[4], rgb[5]));
+    setColor (component.awtComponent.getForeground ());
+    setBackground (component.awtComponent.getBackground ());
     setPaint (getColor());
     setFont (new Font("SansSerif", Font.PLAIN, 12));
     setTransform (new AffineTransform ());
@@ -201,7 +200,7 @@ public class GdkGraphics2D extends Graphics2D
     // draw current buffered image to the pixmap associated 
     // with it.
     
-    drawImage (bimage, new AffineTransform (1,0,0,1,0,0), null);
+    drawImage (bimage, new AffineTransform (1,0,0,1,0,0), bg, null);
   }
 
 
@@ -439,6 +438,69 @@ public class GdkGraphics2D extends Graphics2D
       }
   }
 
+
+  private boolean drawImage(Image img, 
+                            AffineTransform xform,
+                            Color bgcolor,			    
+                            ImageObserver obs)
+  {
+    if (img instanceof GtkOffScreenImage &&
+        img.getGraphics () instanceof GdkGraphics2D &&            
+        (xform == null 
+         || xform.getType () == AffineTransform.TYPE_IDENTITY 
+         || xform.getType () == AffineTransform.TYPE_TRANSLATION)
+        ) 
+      {
+        // we are being asked to flush a double buffer from Gdk
+        GdkGraphics2D g2 = (GdkGraphics2D) img.getGraphics ();
+        gdkDrawDrawable (g2, (int)xform.getTranslateX(), (int)xform.getTranslateY());
+        
+        if (isBufferedImageGraphics ()) 
+          updateBufferedImage();   
+	 
+        return true;
+      }
+    else
+      {
+      
+        // In this case, xform is an AffineTransform that transforms bounding
+        // box of the specified image from image space to user space. However
+        // when we pass this transform to cairo, cairo will use this transform
+        // to map "user coordinates" to "pixel" coordinates, which is the 
+        // other way around. Therefore to get the "user -> pixel" transform 
+        // that cairo wants from "image -> user" transform that we currently
+        // have, we will need to invert the transformation matrix.
+	
+        AffineTransform invertedXform = new AffineTransform();
+
+        try
+          {             
+	      invertedXform = xform.createInverse();
+             if (img instanceof BufferedImage)
+               {
+                   // draw an image which has actually been loaded 
+                   // into memory fully
+                   
+		     BufferedImage b = (BufferedImage) img;
+                   return drawRaster (b.getColorModel (), 
+                                      b.getData (), 
+                                      invertedXform,
+                                      bgcolor);
+               }
+             else
+               {
+                   // begin progressive loading in a separate thread
+                   new PainterThread (this, img, invertedXform, bgcolor);
+                   return false;
+               }	       
+          }
+        catch (NoninvertibleTransformException e)
+          {
+              throw new ImagingOpException("Unable to invert transform " 
+                                           + xform.toString());
+          } 	      
+      }
+  }
 
 
   //////////////////////////////////////////////////
@@ -760,13 +822,13 @@ public class GdkGraphics2D extends Graphics2D
 
   public void setClip (int x, int y, int width, int height)
   {
-    clip = new Rectangle2D.Double ((double)x, (double)y, 
-                                   (double)width, (double)height);
-    setClip(clip);
+    setClip(new Rectangle2D.Double ((double)x, (double)y, 
+                                    (double)width, (double)height));
   }
   
   public void setClip (Shape s)
   {
+    clip = s;
     if (s != null)
       {
         cairoNewPath ();
@@ -965,7 +1027,8 @@ public class GdkGraphics2D extends Graphics2D
   }
 
   private boolean drawRaster (ColorModel cm, Raster r, 
-                              AffineTransform imageToUser)
+                              AffineTransform imageToUser, 
+                              Color bgcolor)
   {
     if (r == null)
       return false;
@@ -1012,6 +1075,18 @@ public class GdkGraphics2D extends Graphics2D
         pixels = pixels2;
       }
     
+    // change all transparent pixels in the image to the 
+    // specified bgcolor
+            
+    if (bgcolor != null) 
+      {
+        for (int i = 0; i < pixels.length; i++) 
+          {
+            if (cm.getAlpha (pixels[i]) == 0) 
+              pixels[i] = bgcolor.getRGB ();	    
+          }
+      } 
+
     stateSave ();
     translate (x, y);
     drawPixels (pixels, r.getWidth (), r.getHeight (), r.getWidth (), i2u);
@@ -1026,7 +1101,7 @@ public class GdkGraphics2D extends Graphics2D
   public void drawRenderedImage(RenderedImage image,
                                 AffineTransform xform)
   {
-    drawRaster (image.getColorModel(), image.getData(), xform);
+    drawRaster (image.getColorModel(), image.getData(), xform, bg);
   }
   
   public void drawRenderableImage(RenderableImage image,
@@ -1039,60 +1114,7 @@ public class GdkGraphics2D extends Graphics2D
                            AffineTransform xform,
                            ImageObserver obs)
   {
-    if (img instanceof GtkOffScreenImage &&
-        img.getGraphics () instanceof GdkGraphics2D &&            
-        (xform == null 
-         || xform.getType () == AffineTransform.TYPE_IDENTITY 
-         || xform.getType () == AffineTransform.TYPE_TRANSLATION)
-        ) 
-      {
-        // we are being asked to flush a double buffer from Gdk
-        GdkGraphics2D g2 = (GdkGraphics2D) img.getGraphics ();
-        gdkDrawDrawable (g2, (int)xform.getTranslateX(), (int)xform.getTranslateY());
-        
-        if (isBufferedImageGraphics ()) 
-          updateBufferedImage();   
-	 
-        return true;
-      }
-    else
-      {
-      
-        // In this case, xform is an AffineTransform that transforms bounding
-        // box of the specified image from image space to user space. However
-        // when we pass this transform to cairo, cairo will use this transform
-        // to map "user coordinates" to "pixel" coordinates, which is the 
-        // other way around. Therefore to get the "user -> pixel" transform 
-        // that cairo wants from "image -> user" transform that we currently
-        // have, we will need to invert the transformation matrix.
-	
-        AffineTransform invertedXform = new AffineTransform();
-
-        try
-          {             
-	      invertedXform = xform.createInverse();
-             if (img instanceof BufferedImage)
-               {
-                   // draw an image which has actually been loaded 
-                   // into memory fully
-                   BufferedImage b = (BufferedImage) img;
-                   return drawRaster (b.getColorModel (), 
-                                      b.getData (), 
-                                      invertedXform);
-               }
-             else
-               {
-                   // begin progressive loading in a separate thread
-                   new PainterThread (this, img, invertedXform);
-                   return false;
-               }	       
-          }
-        catch (NoninvertibleTransformException e)
-          {
-              throw new ImagingOpException("Unable to invert transform " 
-                                           + xform.toString());
-          } 	      
-      }
+    return drawImage(img, xform, bg, obs); 
   }
 
   public void drawImage(BufferedImage image,
@@ -1101,13 +1123,13 @@ public class GdkGraphics2D extends Graphics2D
                         int y)
   {
     Image filtered = op.filter(image, null);
-    drawImage(filtered, new AffineTransform(1f,0f,0f,1f,x,y), null);
+    drawImage(filtered, new AffineTransform(1f,0f,0f,1f,x,y), bg, null);
   }
 
   public boolean drawImage (Image img, int x, int y, 
                             ImageObserver observer)
   {
-    return drawImage(img, new AffineTransform(1f,0f,0f,1f,x,y), observer);    
+    return drawImage(img, new AffineTransform(1f,0f,0f,1f,x,y), bg, observer);    
   }
 
 
@@ -1130,11 +1152,14 @@ public class GdkGraphics2D extends Graphics2D
     Image image;
     ColorModel defaultModel;
     AffineTransform xform;
+    Color bgcolor;
 
-    public PainterThread (GdkGraphics2D g, Image im, AffineTransform xf)
+    public PainterThread (GdkGraphics2D g, Image im, 
+                          AffineTransform xf, Color bg)
     {
       image = im;
       xform = xf;
+      bgcolor = bg;
       this.gr = (GdkGraphics2D) g.create ();
       new Thread (this).start ();
     }
@@ -1184,6 +1209,18 @@ public class GdkGraphics2D extends Graphics2D
         else
           pixels2 = pixels;
 
+        // change all transparent pixels in the image to the 
+        // specified bgcolor
+            
+        if (bgcolor != null) 
+          {
+            for (int i = 0; i < pixels2.length; i++) 
+              {
+                if (model.getAlpha (pixels2[i]) == 0) 
+                pixels2[i] = bgcolor.getRGB ();	    
+              }
+          } 
+
         double[] xf = new double[6];
         xform.getMatrix(xf);        
         gr.drawPixels (pixels2, w, h, scansize, xf);
@@ -1222,7 +1259,18 @@ public class GdkGraphics2D extends Graphics2D
 
   public void setComposite(Composite comp)
   {
-    throw new java.lang.UnsupportedOperationException ();
+    if (comp instanceof AlphaComposite)
+      {
+        AlphaComposite a = (AlphaComposite) comp;
+        cairoSetOperator(a.getRule());
+        Color c = getColor();
+        setColor(new Color(c.getRed(),
+                           c.getGreen(),
+                           c.getBlue(),
+                           (int) (a.getAlpha() * ((float) c.getAlpha()))));
+      }
+    else
+      throw new java.lang.UnsupportedOperationException ();
   }
 
   public void setRenderingHint(RenderingHints.Key hintKey,
@@ -1347,40 +1395,27 @@ public class GdkGraphics2D extends Graphics2D
                             Color bgcolor, ImageObserver observer)
   {
    
-    // FIXME: change all the transparent pixels in the image to
-    // bgcolor.
+    double scaleX =  width / (double) img.getWidth (observer);           
+    double scaleY =  height / (double) img.getHeight (observer);
 
-    return drawImage (img, x, y, width, height, observer);
+    return drawImage (img, 
+                      new AffineTransform(scaleX, 0f, 0f, scaleY, x, y),
+                      bgcolor,
+                      observer);
+
   }
 
   public boolean drawImage (Image img, int x, int y, int width, int height, 
                             ImageObserver observer)
   {
 
-    double scaleX =  width / (double) img.getWidth (observer);           
-    double scaleY =  height / (double) img.getHeight (observer);
-
-    return drawImage (img, 
-                      new AffineTransform(scaleX, 0f, 0f, scaleY, x, y),
-                      observer);
+    return drawImage (img, x, y, width, height, bg, observer);
 
   }
 
   public boolean drawImage (Image img, int dx1, int dy1, int dx2, int dy2, 
                             int sx1, int sy1, int sx2, int sy2, 
                             Color bgcolor, ImageObserver observer)
-  {
-  
-    // FIXME: change all transparent pixels in the image to 
-    // bgcolor
-       
-    return drawImage (img, dx1, dy1, dx2, dy2, 
-                      sx1, sy1, sx2, sy2, observer);	
-  }
-
-  public boolean drawImage (Image img, int dx1, int dy1, int dx2, int dy2, 
-                            int sx1, int sy1, int sx2, int sy2, 
-                            ImageObserver observer) 
   {
   
     Image subImage;	
@@ -1420,8 +1455,18 @@ public class GdkGraphics2D extends Graphics2D
       }
 
     return drawImage(subImage, new AffineTransform(scaleX, 0, 0,
-                                                  scaleY, dx1, dy1), 
-                                                  observer);
+                                                   scaleY, dx1, dy1), 
+                                                   bgcolor,
+                                                   observer);
+  }
+
+  public boolean drawImage (Image img, int dx1, int dy1, int dx2, int dy2, 
+                            int sx1, int sy1, int sx2, int sy2, 
+                            ImageObserver observer) 
+  {
+
+    return drawImage (img, dx1, dy1, dx2, dy2, 
+                      sx1, sy1, sx2, sy2, bg, observer);	  
   }
 
   public void drawOval(int x, int y, int width, int height)
@@ -1432,14 +1477,28 @@ public class GdkGraphics2D extends Graphics2D
   public void drawRoundRect(int x, int y, int width, int height, 
                             int arcWidth, int arcHeight)
   {
-    int x1 = x + arcWidth, x2 = x + width - arcWidth;
-    int y1 = y + arcHeight, y2 = y + height - arcHeight;
-    fillRect (x1, y, x2 - x1, height);
-    fillRect (x, y1, width, y2 - y1);
-    fillArc (x, y, arcWidth, arcHeight, 90, 90);
-    fillArc (x1, y, arcWidth, arcHeight, 0, 90);
-    fillArc (x2, y2, arcWidth, arcHeight, 270, 90);
-    fillArc (x, y2, arcWidth, arcHeight, 180, 90);
+    if (arcWidth > width)
+      arcWidth = width;
+    if (arcHeight > height)
+      arcHeight = height;
+
+    int xx = x + width - arcWidth;
+    int yy = y + height - arcHeight;
+
+    drawArc (x, y, arcWidth, arcHeight, 90, 90);
+    drawArc (xx, y, arcWidth, arcHeight, 0, 90);
+    drawArc (xx, yy, arcWidth, arcHeight, 270, 90);
+    drawArc (x, yy, arcWidth, arcHeight, 180, 90);
+
+    int y1 = y + arcHeight / 2;
+    int y2 = y + height - arcHeight / 2;
+    drawLine (x, y1, x, y2);
+    drawLine (x + width, y1, x + width, y2);
+
+    int x1 = x + arcWidth / 2;
+    int x2 = x + width - arcWidth / 2;
+    drawLine (x1, y, x2, y);
+    drawLine (x1, y + height, x2, y + height);
   }
 
   public void drawString (String str, int x, int y)
@@ -1481,14 +1540,21 @@ public class GdkGraphics2D extends Graphics2D
   public void fillRoundRect (int x, int y, int width, int height, 
                              int arcWidth, int arcHeight)
   {
-    int x1 = x + arcWidth, x2 = x + width - arcWidth;
-    int y1 = y + arcHeight, y2 = y + height - arcHeight;
-    fillRect (x1, y, x2 - x1, height);
-    fillRect (x, y1, width, y2 - y1);
+    if (arcWidth > width)
+      arcWidth = width;
+    if (arcHeight > height)
+      arcHeight = height;
+
+    int xx = x + width - arcWidth;
+    int yy = y + height - arcHeight;
+
     fillArc (x, y, arcWidth, arcHeight, 90, 90);
-    fillArc (x1, y, arcWidth, arcHeight, 0, 90);
-    fillArc (x2, y2, arcWidth, arcHeight, 270, 90);
-    fillArc (x, y2, arcWidth, arcHeight, 180, 90);
+    fillArc (xx, y, arcWidth, arcHeight, 0, 90);
+    fillArc (xx, yy, arcWidth, arcHeight, 270, 90);
+    fillArc (x, yy, arcWidth, arcHeight, 180, 90);
+
+    fillRect (x, y + arcHeight / 2, width, height - arcHeight + 1);
+    fillRect (x + arcWidth / 2, y, width - arcWidth + 1, height);
   }
 
   public Font getFont ()

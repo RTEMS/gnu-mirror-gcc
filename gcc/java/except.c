@@ -40,7 +40,6 @@ The Free Software Foundation is independent of Sun Microsystems, Inc.  */
 #include "toplev.h"
 
 static void expand_start_java_handler (struct eh_range *);
-static void expand_end_java_handler (struct eh_range *);
 static struct eh_range *find_handler_in_range (int, struct eh_range *,
 					       struct eh_range *);
 static void link_handler (struct eh_range *, struct eh_range *);
@@ -170,6 +169,7 @@ link_handler (struct eh_range *range, struct eh_range *outer)
 				     TREE_VALUE (range->handlers));
       h->next_sibling = NULL;
       h->expanded = 0;
+      h->stmt = NULL;
       /* Restart both from the top to avoid having to make this
 	 function smart about reentrancy.  */
       link_handler (h, &whole_range);
@@ -287,13 +287,13 @@ add_handler (int start_pc, int end_pc, tree handler, tree type)
   h->handlers = build_tree_list (type, handler);
   h->next_sibling = NULL;
   h->expanded = 0;
+  h->stmt = NULL;
 
   if (prev == NULL)
     whole_range.first_child = h;
   else
     prev->next_sibling = h;
 }
-
 
 /* if there are any handlers for this range, issue start of region */
 static void
@@ -304,8 +304,9 @@ expand_start_java_handler (struct eh_range *range)
   fprintf (stderr, "expand start handler pc %d --> %d\n",
 	   current_pc, range->end_pc);
 #endif /* defined(DEBUG_JAVA_BINDING_LEVELS) */
+  pushlevel (0);
+  register_exception_range (range,  range->start_pc, range->end_pc);
   range->expanded = 1;
-  expand_eh_region_start ();
 }
 
 tree
@@ -348,7 +349,7 @@ prepare_eh_table_type (tree type)
       DECL_INITIAL (decl) = build_class_ref (type);
       layout_decl (decl, 0);
       pushdecl (decl);
-      exp = build1 (ADDR_EXPR, ptr_type_node, decl);
+      exp = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (decl)), decl);
     }
   else
     {
@@ -370,6 +371,8 @@ prepare_eh_table_type (tree type)
 		   TYPE_CATCH_CLASSES (output_class));
     }
 
+  exp = convert (ptr_type_node, exp);
+
   *slot = tree_cons (type, exp, NULL_TREE);
 
   return exp;
@@ -379,8 +382,11 @@ static int
 expand_catch_class (void **entry, void *x ATTRIBUTE_UNUSED)
 {
   struct treetreehash_entry *ite = (struct treetreehash_entry *) *entry;
-  tree decl = TREE_OPERAND (TREE_VALUE ((tree)ite->value), 0);
-  rest_of_decl_compilation (decl, (char*) 0, global_bindings_p (), 0);
+  tree addr = TREE_VALUE ((tree)ite->value);
+  tree decl;
+  STRIP_NOPS (addr);
+  decl = TREE_OPERAND (addr, 0);
+  rest_of_decl_compilation (decl, global_bindings_p (), 0);
   return true;
 }
   
@@ -406,9 +412,9 @@ build_exception_object_ref (tree type)
 
   /* Java only passes object via pointer and doesn't require adjusting.
      The java object is immediately before the generic exception header.  */
-  obj = build (EXC_PTR_EXPR, build_pointer_type (type));
-  obj = build (MINUS_EXPR, TREE_TYPE (obj), obj,
-	       TYPE_SIZE_UNIT (TREE_TYPE (obj)));
+  obj = build0 (EXC_PTR_EXPR, build_pointer_type (type));
+  obj = build2 (MINUS_EXPR, TREE_TYPE (obj), obj,
+		TYPE_SIZE_UNIT (TREE_TYPE (obj)));
   obj = build1 (INDIRECT_REF, type, obj);
 
   return obj;
@@ -416,12 +422,11 @@ build_exception_object_ref (tree type)
 
 /* If there are any handlers for this range, isssue end of range,
    and then all handler blocks */
-static void
+void
 expand_end_java_handler (struct eh_range *range)
 {  
   tree handler = range->handlers;
-  force_poplevels (range->start_pc);
-  expand_start_all_catch ();
+
   for ( ; handler != NULL_TREE; handler = TREE_CHAIN (handler))
     {
       /* For bytecode we treat exceptions a little unusually.  A
@@ -433,12 +438,17 @@ expand_end_java_handler (struct eh_range *range)
       tree type = TREE_PURPOSE (handler);
       if (type == NULL)
 	type = throwable_type_node;
+      type = prepare_eh_table_type (type);
 
-      expand_start_catch (prepare_eh_table_type (type));
-      expand_goto (TREE_VALUE (handler));
-      expand_end_catch ();
+      {
+	tree catch_expr = build2 (CATCH_EXPR, void_type_node, type,
+				  build1 (GOTO_EXPR, void_type_node,
+					  TREE_VALUE (handler)));
+	tree try_catch_expr = build2 (TRY_CATCH_EXPR, void_type_node,
+				      *get_stmts (), catch_expr);	
+	*get_stmts () = try_catch_expr;
+      }
     }
-  expand_end_all_catch ();
 #if defined(DEBUG_JAVA_BINDING_LEVELS)
   indent ();
   fprintf (stderr, "expand end handler pc %d <-- %d\n",
@@ -481,19 +491,3 @@ maybe_start_try (int start_pc, int end_pc)
   check_start_handlers (range, start_pc);
 }
 
-/* Emit any end-of-try-range ending at end_pc and starting before
-   start_pc. */
-
-void
-maybe_end_try (int start_pc, int end_pc)
-{
-  if (! doing_eh (1))
-    return;
-
-  while (current_range != NULL_EH_RANGE && current_range->end_pc <= end_pc
-	 && current_range->start_pc >= start_pc)
-    {
-      expand_end_java_handler (current_range);
-      current_range = current_range->outer;
-    }
-}

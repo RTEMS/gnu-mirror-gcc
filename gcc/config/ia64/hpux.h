@@ -46,6 +46,7 @@ do {							\
 	  {						\
 	    builtin_define("_HPUX_SOURCE");		\
 	    builtin_define("__STDC_EXT__");		\
+	    builtin_define("__STDCPP__");		\
 	  }						\
 	if (TARGET_ILP32)				\
 	  builtin_define("_ILP32");			\
@@ -194,10 +195,6 @@ do {								\
 #define TARGET_ASM_SELECT_RTX_SECTION  ia64_rwreloc_select_rtx_section
 #undef  TARGET_SECTION_TYPE_FLAGS
 #define TARGET_SECTION_TYPE_FLAGS  ia64_rwreloc_section_type_flags
-
-/* HP-UX does not support thread-local storage.  */
-#undef TARGET_HAVE_TLS
-#define TARGET_HAVE_TLS false
 
 /* ia64 HPUX has the float and long double forms of math functions.  */
 #undef TARGET_C99_FUNCTIONS

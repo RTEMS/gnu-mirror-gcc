@@ -30,7 +30,8 @@ AM_RUNTESTFLAGS =
 
 ## CXX is actually a "C" compiler. These are real C++ programs.
 testsuite_flags_script=${glibcxx_builddir}/scripts/testsuite_flags
-CXX=`${testsuite_flags_script} --build-cxx`
+CXX         = $(shell ${testsuite_flags_script} --build-cxx)
+AM_CXXFLAGS = $(shell ${testsuite_flags_script} --cxxflags)
 
 GLIBGCC_DIR=`$(CC) -print-libgcc-file-name | sed 's,/[^/]*$$,,'`
 GLIBCXX_DIR=${glibcxx_builddir}/src/.libs
@@ -38,18 +39,14 @@ GLIBCXX_DIR=${glibcxx_builddir}/src/.libs
 CXXLINK = \
 	$(LIBTOOL) --tag=CXX --mode=link $(CXX) \
 	-R $(GLIBGCC_DIR) -R $(GLIBCXX_DIR) \
-	$(AM_CXXFLAGS) $(CXXFLAGS) $(LDFLAGS) -o $@
-
-# Generated lists of files to run.  All of these names are valid make
-# targets, if you wish to generate a list manually.
-lists_of_files = \
-   testsuite_files \
-   testsuite_files_interactive \
-   testsuite_files_performance
+	$(AM_CXXFLAGS) $(CXXFLAGS) $(LDFLAGS) -lv3test -L. -o $@
 
 ## Build support library.
 noinst_LIBRARIES = libv3test.a
-libv3test_a_SOURCES = testsuite_hooks.cc testsuite_allocator.cc
+libv3test_a_SOURCES = \
+	testsuite_abi.cc \
+	testsuite_allocator.cc \
+	testsuite_hooks.cc 
 
 ## Build support utilities.
 if GLIBCXX_TEST_ABI
@@ -58,8 +55,9 @@ else
 noinst_PROGRAMS =
 endif
 abi_check_SOURCES = abi_check.cc
+abi_check_DEPENDENCIES = libv3test.a
 
-all-local: stamp_wchar testsuite_files
+all-local: stamp_wchar stamp_thread testsuite_files
 
 # Enable wchar_t tests if capable.
 if GLIBCXX_TEST_WCHAR_T
@@ -68,6 +66,22 @@ stamp_wchar:
 else
 stamp_wchar:
 endif
+
+# Enable thread tests if capable.
+if GLIBCXX_TEST_THREAD
+stamp_thread:
+	touch testsuite_thread
+else
+stamp_thread:
+endif
+
+# Generated lists of files to run.  All of these names are valid make
+# targets, if you wish to generate a list manually.
+lists_of_files = \
+   testsuite_files \
+   testsuite_files_interactive \
+   testsuite_files_performance
+
 
 # We need more things in site.exp, but automake completely controls the
 # creation of that file; there's no way to append to it without messing up
@@ -177,4 +191,4 @@ check-script check-script-install check-performance
 
 # By adding these files here, automake will remove them for 'make clean'
 CLEANFILES = *.txt *.tst *.exe core* filebuf_* tmp* ostream_* *.log *.sum \
-	     testsuite_* site.exp abi_check baseline_symbols
+	     testsuite_* site.exp abi_check baseline_symbols *TEST*

@@ -1,5 +1,5 @@
 /* Code to test for "definitive [un]assignment".
-   Copyright (C) 1999, 2000, 2001, 2003 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2001, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -191,6 +191,50 @@ get_variable_decl (tree exp)
 	    return op1;
 	}
     }
+  else if (TREE_CODE (exp) == INDIRECT_REF)
+    {
+      /* For indirect dispatch, look for an expression of the form 
+      (indirect_ref (+ (array_ref otable <N>) this)).  
+      FIXME: it would probably be better to generate a JAVA_FIELD_REF
+      expression that gets converted to OTABLE access at
+      gimplification time.  */
+      exp = TREE_OPERAND (exp, 0);
+      if (TREE_CODE (exp) == PLUS_EXPR)
+	{
+	  tree op0 = TREE_OPERAND (exp, 0);
+	  STRIP_NOPS (op0);
+	  if (TREE_CODE (op0) == ARRAY_REF)
+	    {
+	      tree table = TREE_OPERAND (op0, 0);
+	      if (TREE_CODE (table) == VAR_DECL
+		  && DECL_LANG_SPECIFIC (table)
+		  && DECL_OWNER (table) 
+		  && TYPE_OTABLE_DECL (DECL_OWNER (table)) == table)
+		{
+		  HOST_WIDE_INT index 
+		    = TREE_INT_CST_LOW (TREE_OPERAND (op0, 1));
+		  tree otable_methods 
+		    = TYPE_OTABLE_METHODS (DECL_OWNER (table));
+		  tree element;
+		  for (element = otable_methods; 
+		       element; 
+		       element = TREE_CHAIN (element))
+		    {
+		      if (index == 1)
+			{
+			  tree purpose = TREE_PURPOSE (element);
+			  if (TREE_CODE (purpose) == FIELD_DECL)
+			    return purpose;
+			  else
+			    return NULL_TREE;
+			}
+		      --index;
+		    }
+		}
+	    }
+	}
+    }
+
   return NULL_TREE;
 }
 
@@ -210,7 +254,8 @@ check_final_reassigned (tree decl, words before)
      assigned must be reported as errors */
   if (DECL_FINAL (decl) && index != -2
       && (index < loop_current_locals /* I.e. -1, or outside current loop. */
-	  || ! UNASSIGNED_P (before, index)))
+          || (DECL_LOCAL_FINAL_IUD (decl) ? ASSIGNED_P (before, index)
+              : ! UNASSIGNED_P (before, index))))
     {
       final_assign_error (DECL_NAME (decl));
     }
@@ -337,27 +382,6 @@ check_bool_init (tree exp, words before, words when_false, words when_true)
     case TRUTH_NOT_EXPR:
       check_bool_init (TREE_OPERAND (exp, 0), before, when_true, when_false);
       return;
-    case MODIFY_EXPR:
-      {
-	tree tmp = TREE_OPERAND (exp, 0);
-	if ((tmp = get_variable_decl (tmp)) != NULL_TREE)
-	  {
-	    int index;
-	    check_bool_init (TREE_OPERAND (exp, 1), before,
-			     when_false, when_true);
-	    check_final_reassigned (tmp, before);
-	    index = DECL_BIT_INDEX (tmp);
-	    if (index >= 0)
-	      {
-		SET_ASSIGNED (when_false, index);
-		SET_ASSIGNED (when_true, index);
-		CLEAR_UNASSIGNED (when_false, index);
-		CLEAR_UNASSIGNED (when_true, index);
-	      }
-	    break;
-	  }
-      }
-      goto do_default;
 
     case BIT_AND_EXPR:
     case BIT_IOR_EXPR:
@@ -390,8 +414,8 @@ check_bool_init (tree exp, words before, words when_false, words when_true)
 	  COPY (when_true, before);
 	}
       break;
+
     default:
-    do_default:
       check_init (exp, before);
       COPY (when_false, before);
       COPY (when_true, before);
@@ -531,6 +555,7 @@ check_init (tree exp, words before)
 	     definitely assigned when once we checked the whole
 	     function. */
 	  if (! STATIC_CLASS_INIT_OPT_P () /* FIXME */
+	      && ! DECL_FINAL (tmp)
 	      && index >= start_current_locals
 	      && index == num_current_locals - 1)
 	    {
@@ -770,7 +795,7 @@ check_init (tree exp, words before)
       break;
 
     case NOP_EXPR:
-      if (exp == empty_stmt_node)
+      if (IS_EMPTY_STMT (exp))
 	break;
       /* ... else fall through ... */
     case UNARY_PLUS_EXPR:
@@ -846,6 +871,12 @@ check_init (tree exp, words before)
     case FLOOR_MOD_EXPR:
     case ROUND_MOD_EXPR:
     case EXACT_DIV_EXPR:
+    case UNLT_EXPR:
+    case UNLE_EXPR:
+    case UNGT_EXPR:
+    case UNGE_EXPR:
+    case UNEQ_EXPR:
+    case LTGT_EXPR:
     binop:
       check_init (TREE_OPERAND (exp, 0), before);
       /* Avoid needless recursion, especially for COMPOUND_EXPR. */
@@ -889,11 +920,15 @@ check_init (tree exp, words before)
 	location_t saved_location = input_location;
 	tree saved_wfl = wfl;
 	tree body = EXPR_WFL_NODE (exp);
-	if (body == empty_stmt_node)
+	if (IS_EMPTY_STMT (body))
 	  break;
 	wfl = exp;
+#ifdef USE_MAPPED_LOCATION
+	input_location = EXPR_LOCATION (exp);
+#else
 	input_filename = EXPR_WFL_FILENAME (exp);
 	input_line = EXPR_WFL_LINENO (exp);
+#endif
 	check_init (body, before);
 	input_location = saved_location;
 	wfl = saved_wfl;
