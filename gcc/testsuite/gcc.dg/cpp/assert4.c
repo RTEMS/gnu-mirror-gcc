@@ -78,7 +78,7 @@
 # error
 #endif
 
-#if defined __unix__
+#if defined __unix__ && !defined __CYGWIN__ 
 # if !#system(unix)
 #  error
 # endif
@@ -118,7 +118,7 @@
 # error
 #endif
 
-#if defined __WINNT__
+#if defined __WINNT__ || defined __CYGWIN__ 
 # if !#system(winnt)
 #  error
 # endif
@@ -360,10 +360,19 @@
 #endif
 
 #if defined __powerpc__
-# if !#cpu(powerpc) || !#machine(powerpc)
-#  error
+# if defined __powerpc64__
+#  if (#cpu(powerpc) || #machine(powerpc) \
+       || !#cpu(powerpc64) || !#machine(powerpc64))
+#   error
+#  endif
+# else
+#  if (!#cpu(powerpc) || !#machine(powerpc) \
+       || #cpu(powerpc64) || #machine(powerpc64))
+#   error
+#  endif
 # endif
-#elif #cpu(powerpc) || #machine(powerpc)
+#elif (#cpu(powerpc) || #machine(powerpc) \
+       || #cpu(powerpc64) || #machine(powerpc64))
 # error
 #endif
 
