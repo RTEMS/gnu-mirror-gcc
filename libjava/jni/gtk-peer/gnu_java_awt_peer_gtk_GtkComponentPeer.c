@@ -136,7 +136,7 @@ JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkComponentPeer_requestFocus
   ptr = NSA_GET_PTR (env, obj);
   
   gdk_threads_enter ();
-  gtk_widget_grab_focus (GTK_WIDGET (ptr));
+  // gtk_widget_grab_focus (GTK_WIDGET (ptr));
   gdk_threads_leave ();
 }
 
@@ -260,11 +260,11 @@ JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkComponentPeer_setNativeBoun
   widget = GTK_WIDGET (ptr);
   if (GTK_IS_VIEWPORT (widget->parent))
     {
-      gtk_widget_set_usize (widget, width, height);
+      gtk_widget_set_size_request (widget, width, height);
     }
   else
     {
-      gtk_widget_set_usize (widget, width, height);
+      gtk_widget_set_size_request (widget, width, height);
       gtk_layout_move (GTK_LAYOUT (widget->parent), widget, x, y);
     }
 
@@ -378,6 +378,38 @@ Java_gnu_java_awt_peer_gtk_GtkComponentPeer_gtkWidgetSetForeground
   gtk_widget_modify_fg (widget, GTK_STATE_PRELIGHT, &color);
 
   gdk_threads_leave ();
+}
+
+JNIEXPORT void JNICALL
+Java_gnu_java_awt_peer_gtk_GtkComponentPeer_gtkSetFont
+  (JNIEnv *env, jobject obj, jstring name, jint style, jint size)
+{
+  const char *font_name;
+  void *ptr;
+  PangoFontDescription *font_desc;
+
+  ptr = NSA_GET_PTR (env, obj);
+
+  font_name = (*env)->GetStringUTFChars (env, name, NULL);
+
+  gdk_threads_enter();
+
+  font_desc = pango_font_description_from_string (font_name);
+  pango_font_description_set_size (font_desc, size * PANGO_SCALE);
+
+  if (style & AWT_STYLE_BOLD)
+    pango_font_description_set_weight (font_desc, PANGO_WEIGHT_BOLD);
+
+  if (style & AWT_STYLE_ITALIC)
+    pango_font_description_set_style (font_desc, PANGO_STYLE_OBLIQUE);
+
+  gtk_widget_modify_font (GTK_WIDGET(ptr), font_desc);
+
+  pango_font_description_free (font_desc);
+
+  gdk_threads_leave();
+
+  (*env)->ReleaseStringUTFChars (env, name, font_name);
 }
 
 void
@@ -599,12 +631,13 @@ filter_expose_event_handler (GtkWidget *widget, GdkEvent *event, jobject peer)
 JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkComponentPeer_addExposeFilter
   (JNIEnv *env, jobject obj)
 {
-  void *ptr = NSA_GET_PTR (env, obj);
-  jobject *gref = NSA_GET_GLOBAL_REF (env, obj);
-  g_assert (gref);
   GtkObject *filterobj;
   GtkWidget *vbox, *layout;
   GList *children;
+  void *ptr = NSA_GET_PTR (env, obj);
+  jobject *gref = NSA_GET_GLOBAL_REF (env, obj);
+
+  g_assert (gref);
 
   gdk_threads_enter ();
 
@@ -642,12 +675,13 @@ JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkComponentPeer_addExposeFilt
 JNIEXPORT void JNICALL Java_gnu_java_awt_peer_gtk_GtkComponentPeer_removeExposeFilter
   (JNIEnv *env, jobject obj)
 {
-  void *ptr = NSA_GET_PTR (env, obj);
-  jobject *gref = NSA_GET_GLOBAL_REF (env, obj);
-  g_assert (gref);
   GtkObject *filterobj;
   GtkWidget *vbox, *layout;
   GList *children;
+  void *ptr = NSA_GET_PTR (env, obj);
+  jobject *gref = NSA_GET_GLOBAL_REF (env, obj);
+
+  g_assert (gref);
 
   gdk_threads_enter ();
 

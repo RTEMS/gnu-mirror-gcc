@@ -1,5 +1,5 @@
-/* MenuPeer.java -- Interface for menu peers
-   Copyright (C) 1999 Free Software Foundation, Inc.
+/* GdkGraphicsEnvironment.java -- information about the graphics environment
+   Copyright (C) 2004 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -36,13 +36,52 @@ obligated to do so.  If you do not wish to do so, delete this
 exception statement from your version. */
 
 
-package java.awt.peer;
+package gnu.java.awt.peer.gtk;
 
-import java.awt.MenuItem;
+import java.awt.*;
+import java.awt.GraphicsEnvironment;
+import java.awt.image.BufferedImage;
+import java.util.Locale;
 
-public interface MenuPeer extends MenuItemPeer
+
+public class GdkGraphicsEnvironment extends GraphicsEnvironment
 {
-  void addItem (MenuItem item);
-  void delItem (int index);
-}
+  
+  public GdkGraphicsEnvironment ()
+  {
+  	super();
+  }
+
+  public GraphicsDevice[] getScreenDevices ()
+  {
+    throw new java.lang.UnsupportedOperationException ();
+  }
+
+  public GraphicsDevice getDefaultScreenDevice ()
+  {
+    throw new java.lang.UnsupportedOperationException ();
+  }
+
+  public Graphics2D createGraphics (BufferedImage image)
+  {
+    return new GdkGraphics2D (image);
+  }
+
+  public Font[] getAllFonts ()
+  {
+    throw new java.lang.UnsupportedOperationException ();
+  }
+
+  public String[] getAvailableFontFamilyNames ()
+  {
+    throw new java.lang.UnsupportedOperationException ();
+  }
+
+  public String[] getAvailableFontFamilyNames (Locale l)
+  {
+    throw new java.lang.UnsupportedOperationException ();
+  }
+
+
+} // class GdkGraphicsEnvironment
 
