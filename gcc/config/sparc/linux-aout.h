@@ -1,5 +1,5 @@
-/* Definitions for SPARC running Linux with a.out
-   Copyright (C) 1996 Free Software Foundation, Inc.
+/* Definitions for SPARC running Linux-based GNU systems with a.out.
+   Copyright (C) 1996, 1997 Free Software Foundation, Inc.
    Contributed by Eddie C. Dost (ecd@skynet.be)
 
 This file is part of GNU CC.
@@ -28,18 +28,13 @@ Boston, MA 02111-1307, USA.  */
 #undef HAVE_ATEXIT
 #define HAVE_ATEXIT
 
-/* Linux uses ctype from glibc.a. I am not sure how complete it is.
+/* GNU/Linux uses ctype from glibc.a. I am not sure how complete it is.
    For now, we play safe. It may change later. */
 
 #if 0
 #undef MULTIBYTE_CHARS
 #define MULTIBYTE_CHARS 1
 #endif
-
-/* There are conflicting reports about whether this system uses
-   a different assembler syntax.  wilson@cygnus.com says # is right.  */
-#undef COMMENT_BEGIN
-#define COMMENT_BEGIN "#"
 
 /* We need that too. */
 #define HANDLE_SYSV_PRAGMA
@@ -60,7 +55,7 @@ Boston, MA 02111-1307, USA.  */
 #define STARTFILE_SPEC  "%{pg:gcrt0.o%s} %{!pg:%{p:gcrt0.o%s} %{!p:crt0.o%s}} %{static:-static}"
 
 #undef TARGET_VERSION
-#define TARGET_VERSION fprintf (stderr, " (sparc Linux/a.out)");
+#define TARGET_VERSION fprintf (stderr, " (sparc GNU/Linux with a.out)");
 
 #undef SIZE_TYPE
 #define SIZE_TYPE "unsigned int"
@@ -75,10 +70,11 @@ Boston, MA 02111-1307, USA.  */
 #define WCHAR_TYPE_SIZE BITS_PER_WORD
 
 #undef CPP_PREDEFINES
-#define CPP_PREDEFINES "-Dunix -Dsparc -Dlinux -Asystem(unix) -Asystem(posix) -Acpu(sparc) -Amachine(sparc)"
+#define CPP_PREDEFINES "-Dunix -Dsparc -Dlinux -Asystem(unix) -Asystem(posix)"
 
-#undef CPP_SPEC
-#define CPP_SPEC "%{fPIC:-D__PIC__ -D__pic__} %{fpic:-D__PIC__ -D__pic__} %{msparclite:-D__sparclite__} %{mv8:-D__sparc_v8__} %{msupersparc:-D__supersparc__ -D__sparc_v8__} %{posix:-D_POSIX_SOURCE}"
+#undef CPP_SUBTARGET_SPEC
+#define CPP_SUBTARGET_SPEC \
+"%{fPIC:-D__PIC__ -D__pic__} %{fpic:-D__PIC__ -D__pic__} %{posix:-D_POSIX_SOURCE}"
 
 /* Don't default to pcc-struct-return, because gcc is the only compiler,
    and we want to retain compatibility with older gcc versions.  */
@@ -88,9 +84,8 @@ Boston, MA 02111-1307, USA.  */
 
 #if 1
 /* We no longer link with libc_p.a or libg.a by default. If you
- * want to profile or debug the Linux C library, please add
- * -lc_p or -ggdb to LDFLAGS at the link time, respectively.
- */
+   want to profile or debug the GNU/Linux C library, please add
+   -lc_p or -ggdb to LDFLAGS at the link time, respectively.  */
 #define LIB_SPEC \
 "%{mieee-fp:-lieee} %{p:-lgmon} %{pg:-lgmon} %{!ggdb:-lc} %{ggdb:-lg}"
 #else    
@@ -110,7 +105,7 @@ Boston, MA 02111-1307, USA.  */
 
 #if 0
 /* Define for support of TFmode long double and REAL_ARITHMETIC.
-   Sparc ABI says that long double is 4 words. Linux does not support
+   Sparc ABI says that long double is 4 words. GNU/Linux does not support
    long double yet.  */
 #define LONG_DOUBLE_TYPE_SIZE 128
 #endif

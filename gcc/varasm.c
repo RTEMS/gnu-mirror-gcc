@@ -1,5 +1,5 @@
 /* Output variables, constants and external declarations, for GNU compiler.
-   Copyright (C) 1987, 88, 89, 92-6, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1987, 88, 89, 92-97, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -26,10 +26,10 @@ Boston, MA 02111-1307, USA.  */
    We also output the assembler code for constants stored in memory
    and are responsible for combining constants with the same value.  */
 
+#include "config.h"
 #include <stdio.h>
 #include <setjmp.h>
 /* #include <stab.h> */
-#include "config.h"
 #include "rtl.h"
 #include "tree.h"
 #include "flags.h"
@@ -59,6 +59,18 @@ Boston, MA 02111-1307, USA.  */
 #ifndef ASM_STABS_OP
 #define ASM_STABS_OP ".stabs"
 #endif
+
+/* Define the prefix to use when check_memory_usage_flag is enable.  */
+#ifdef NO_DOLLAR_IN_LABEL
+#ifdef NO_DOT_IN_LABEL
+#define CHKR_PREFIX "chkr_prefix_"
+#else /* !NO_DOT_IN_LABEL */
+#define CHKR_PREFIX "chkr."
+#endif 
+#else /* !NO_DOLLAR_IN_LABEL */
+#define CHKR_PREFIX "chkr$"
+#endif
+#define CHKR_PREFIX_SIZE (sizeof (CHKR_PREFIX) - 1)
 
 /* This macro gets just the user-specified name
    out of the string in a SYMBOL_REF.  On most machines,
@@ -157,6 +169,9 @@ static void output_constructor		PROTO((tree, int));
 static enum in_section { no_section, in_text, in_data, in_named
 #ifdef BSS_SECTION_ASM_OP
   , in_bss
+#endif
+#ifdef EH_FRAME_SECTION_ASM_OP
+  , in_eh_frame
 #endif
 #ifdef EXTRA_SECTIONS
   , EXTRA_SECTIONS
@@ -267,10 +282,6 @@ named_section (decl, name, reloc)
 
   if (in_section != in_named || strcmp (name, in_named_name))
     {
-      in_named_name = obstack_alloc (&permanent_obstack, strlen (name) + 1);
-      strcpy (in_named_name, name);
-      in_section = in_named;
-    
 #ifdef ASM_OUTPUT_SECTION_NAME
       ASM_OUTPUT_SECTION_NAME (asm_out_file, decl, name, reloc);
 #else
@@ -279,6 +290,10 @@ named_section (decl, name, reloc)
 	 already have flagged this as an error.  */
       abort ();
 #endif
+
+      in_named_name = obstack_alloc (&permanent_obstack, strlen (name) + 1);
+      strcpy (in_named_name, name);
+      in_section = in_named;
     }
 }
 
@@ -389,6 +404,18 @@ asm_output_aligned_bss (file, decl, name, size, align)
 
 #endif /* BSS_SECTION_ASM_OP */
 
+#ifdef EH_FRAME_SECTION_ASM_OP
+void
+eh_frame_section ()
+{
+  if (in_section != in_eh_frame)
+    {
+      fprintf (asm_out_file, "%s\n", EH_FRAME_SECTION_ASM_OP);
+      in_section = in_eh_frame;
+    }
+} 
+#endif
+
 /* Switch to the section for function DECL.
 
    If DECL is NULL_TREE, switch to the text section.
@@ -449,15 +476,15 @@ variable_section (decl, reloc)
 void
 exception_section ()
 {
+#if defined (EXCEPTION_SECTION)
+  EXCEPTION_SECTION ();
+#else
 #ifdef ASM_OUTPUT_SECTION_NAME
   named_section (NULL_TREE, ".gcc_except_table", 0);
 #else
   if (flag_pic)
     data_section ();
   else
-#if defined (EXCEPTION_SECTION)
-    EXCEPTION_SECTION ();
-#else
     readonly_data_section ();
 #endif
 #endif
@@ -472,6 +499,7 @@ make_function_rtl (decl)
      tree decl;
 {
   char *name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl));
+  char *new_name = name;
 
   if (output_bytecode)
     {
@@ -494,6 +522,20 @@ make_function_rtl (decl)
       ASM_FORMAT_PRIVATE_NAME (label, name, var_labelno);
       name = obstack_copy0 (saveable_obstack, label, strlen (label));
       var_labelno++;
+    }
+  else
+    {
+      /* When -fprefix-function-name is used, every function name is
+         prefixed.  Even static functions are prefixed because they
+         could be declared latter.  Note that a nested function name
+         is not prefixed.  */
+      if (flag_prefix_function_name)
+        {
+          new_name = (char *) alloca (strlen (name) + CHKR_PREFIX_SIZE + 1);
+          strcpy (new_name, CHKR_PREFIX);
+          strcpy (new_name + CHKR_PREFIX_SIZE, name);
+          name = obstack_copy0 (saveable_obstack, new_name, strlen (new_name));
+        }
     }
 
   if (DECL_RTL (decl) == 0)
@@ -759,6 +801,20 @@ make_decl_rtl (decl, asmspec, top_level)
 
 	  if (name == 0)
 	    abort ();
+
+	  /* When -fprefix-function-name is used, the functions
+	     names are prefixed.  Only nested function names are not
+	     prefixed.  */
+	  if (flag_prefix_function_name && TREE_CODE (decl) == FUNCTION_DECL)
+	    {
+	      char *new_name;
+	      new_name = (char *) alloca (strlen (name) + CHKR_PREFIX_SIZE 
+	      				  + 1);
+	      strcpy (new_name, CHKR_PREFIX);
+	      strcpy (new_name + CHKR_PREFIX_SIZE, name);
+	      name = obstack_copy0 (saveable_obstack,
+	      			   new_name, strlen (new_name));
+	    }
 
 	  DECL_RTL (decl) = gen_rtx (MEM, DECL_MODE (decl),
 				     gen_rtx (SYMBOL_REF, Pmode, name));
@@ -1372,11 +1428,16 @@ assemble_variable (decl, top_level, at_end, dont_output_data)
 	      }
 	    else
 	      {
+#ifdef ASM_OUTPUT_ALIGNED_DECL_COMMON
+		ASM_OUTPUT_ALIGNED_DECL_COMMON (asm_out_file, decl, name, size,
+						   DECL_ALIGN (decl));
+#else
 #ifdef ASM_OUTPUT_ALIGNED_COMMON
 		ASM_OUTPUT_ALIGNED_COMMON (asm_out_file, name, size,
 					   DECL_ALIGN (decl));
 #else
 		ASM_OUTPUT_COMMON (asm_out_file, name, size, rounded);
+#endif
 #endif
 	      }
 	}
@@ -1416,11 +1477,16 @@ assemble_variable (decl, top_level, at_end, dont_output_data)
 	      }
 	    else
 	      {
+#ifdef ASM_OUTPUT_ALIGNED_DECL_LOCAL
+		ASM_OUTPUT_ALIGNED_DECL_LOCAL (asm_out_file, decl, name, size,
+						  DECL_ALIGN (decl));
+#else
 #ifdef ASM_OUTPUT_ALIGNED_LOCAL
 		ASM_OUTPUT_ALIGNED_LOCAL (asm_out_file, name, size,
 					  DECL_ALIGN (decl));
 #else
 		ASM_OUTPUT_LOCAL (asm_out_file, name, size, rounded);
+#endif
 #endif
 	      }
 	}
@@ -1759,6 +1825,9 @@ assemble_name (file, name)
   tree id;
 
   STRIP_NAME_ENCODING (real_name, name);
+  if (flag_prefix_function_name 
+      && ! bcmp (real_name, CHKR_PREFIX, CHKR_PREFIX_SIZE))
+    real_name = real_name + CHKR_PREFIX_SIZE;
 
   id = maybe_get_identifier (real_name);
   if (id)
@@ -1819,10 +1888,15 @@ assemble_static_space (size)
     }
   else
     {
+#ifdef ASM_OUTPUT_ALIGNED_DECL_LOCAL
+      ASM_OUTPUT_ALIGNED_DECL_LOCAL (asm_out_file, NULL_TREE, name, size,
+				  BIGGEST_ALIGNMENT);
+#else
 #ifdef ASM_OUTPUT_ALIGNED_LOCAL
       ASM_OUTPUT_ALIGNED_LOCAL (asm_out_file, name, size, BIGGEST_ALIGNMENT);
 #else
       ASM_OUTPUT_LOCAL (asm_out_file, name, size, rounded);
+#endif
 #endif
     }
   return x;
@@ -2133,7 +2207,7 @@ immed_double_const (i0, i1, mode)
 
   push_obstacks_nochange ();
   rtl_in_saveable_obstack ();
-  r = gen_rtx (CONST_DOUBLE, mode, 0, i0, i1);
+  r = gen_rtx (CONST_DOUBLE, mode, NULL_RTX, i0, i1);
   pop_obstacks ();
 
   /* Don't touch const_double_chain in nested function; see force_const_mem.
@@ -2171,8 +2245,7 @@ immed_real_const_1 (d, mode)
 
   /* Detect special cases.  */
 
-  /* Avoid REAL_VALUES_EQUAL here in order to distinguish minus zero.  */
-  if (!bcmp ((char *) &dconst0, (char *) &d, sizeof d))
+  if (REAL_VALUES_IDENTICAL (dconst0, d))
     return CONST0_RTX (mode);
   /* Check for NaN first, because some ports (specifically the i386) do not
      emit correct ieee-fp code by default, and thus will generate a core
@@ -2462,6 +2535,9 @@ const_hash (exp)
     case CONVERT_EXPR:
     case NON_LVALUE_EXPR:
       return const_hash (TREE_OPERAND (exp, 0)) * 7 + 2;
+      
+    default:
+      abort ();
     }
 
   /* Compute hashing function */
@@ -2533,6 +2609,9 @@ compare_constant_1 (exp, p)
       if (flag_writable_strings)
 	return 0;
 
+      if (*p++ != TYPE_MODE (TREE_TYPE (exp)))
+	return 0;
+
       strp = TREE_STRING_POINTER (exp);
       len = TREE_STRING_LENGTH (exp);
       if (bcmp ((char *) &TREE_STRING_LENGTH (exp), p,
@@ -2567,6 +2646,11 @@ compare_constant_1 (exp, p)
 	  register tree link;
 	  int length = list_length (CONSTRUCTOR_ELTS (exp));
 	  tree type;
+	  int have_purpose = 0;
+
+	  for (link = CONSTRUCTOR_ELTS (exp); link; link = TREE_CHAIN (link))
+	    if (TREE_PURPOSE (link))
+	      have_purpose = 1;
 
 	  if (bcmp ((char *) &length, p, sizeof length))
 	    return 0;
@@ -2574,7 +2658,9 @@ compare_constant_1 (exp, p)
 	  p += sizeof length;
 
 	  /* For record constructors, insist that the types match.
-	     For arrays, just verify both constructors are for arrays.  */
+	     For arrays, just verify both constructors are for arrays. 
+	     Then insist that either both or none have any TREE_PURPOSE
+	     values.  */
 	  if (TREE_CODE (TREE_TYPE (exp)) == RECORD_TYPE)
 	    type = TREE_TYPE (exp);
 	  else
@@ -2585,10 +2671,16 @@ compare_constant_1 (exp, p)
 
 	  p += sizeof type;
 
+	  if (bcmp ((char *) &have_purpose, p, sizeof have_purpose))
+	    return 0;
+
+	  p += sizeof have_purpose;
+
 	  /* For arrays, insist that the size in bytes match.  */
 	  if (TREE_CODE (TREE_TYPE (exp)) == ARRAY_TYPE)
 	    {
-	      int size = int_size_in_bytes (TREE_TYPE (exp));
+	      HOST_WIDE_INT size = int_size_in_bytes (TREE_TYPE (exp));
+
 	      if (bcmp ((char *) &size, p, sizeof size))
 		return 0;
 
@@ -2605,6 +2697,30 @@ compare_constant_1 (exp, p)
 	      else
 		{
 		  tree zero = 0;
+
+		  if (bcmp ((char *) &zero, p, sizeof zero))
+		    return 0;
+
+		  p += sizeof zero;
+		}
+
+	      if (TREE_PURPOSE (link)
+		  && TREE_CODE (TREE_PURPOSE (link)) == FIELD_DECL)
+		{
+		  if (bcmp ((char *) &TREE_PURPOSE (link), p,
+			    sizeof TREE_PURPOSE (link)))
+		    return 0;
+
+		  p += sizeof TREE_PURPOSE (link);
+		}
+	      else if (TREE_PURPOSE (link))
+		{
+		  if ((p = compare_constant_1 (TREE_PURPOSE (link), p)) == 0)
+		    return 0;
+		}
+	      else if (have_purpose)
+		{
+		  int zero = 0;
 
 		  if (bcmp ((char *) &zero, p, sizeof zero))
 		    return 0;
@@ -2646,6 +2762,9 @@ compare_constant_1 (exp, p)
     case CONVERT_EXPR:
     case NON_LVALUE_EXPR:
       return compare_constant_1 (TREE_OPERAND (exp, 0), p);
+
+    default:
+      abort ();
     }
 
   /* Compare constant contents.  */
@@ -2708,6 +2827,7 @@ record_constant_1 (exp)
       if (flag_writable_strings)
 	return;
 
+      obstack_1grow (&permanent_obstack, TYPE_MODE (TREE_TYPE (exp)));
       strp = TREE_STRING_POINTER (exp);
       len = TREE_STRING_LENGTH (exp);
       obstack_grow (&permanent_obstack, (char *) &TREE_STRING_LENGTH (exp),
@@ -2735,21 +2855,30 @@ record_constant_1 (exp)
 	  register tree link;
 	  int length = list_length (CONSTRUCTOR_ELTS (exp));
 	  tree type;
+	  int have_purpose = 0;
+
+	  for (link = CONSTRUCTOR_ELTS (exp); link; link = TREE_CHAIN (link))
+	    if (TREE_PURPOSE (link))
+	      have_purpose = 1;
 
 	  obstack_grow (&permanent_obstack, (char *) &length, sizeof length);
 
 	  /* For record constructors, insist that the types match.
-	     For arrays, just verify both constructors are for arrays.  */
+	     For arrays, just verify both constructors are for arrays. 
+	     Then insist that either both or none have any TREE_PURPOSE
+	     values.  */
 	  if (TREE_CODE (TREE_TYPE (exp)) == RECORD_TYPE)
 	    type = TREE_TYPE (exp);
 	  else
 	    type = 0;
 	  obstack_grow (&permanent_obstack, (char *) &type, sizeof type);
+	  obstack_grow (&permanent_obstack, (char *) &have_purpose,
+			sizeof have_purpose);
 
 	  /* For arrays, insist that the size in bytes match.  */
 	  if (TREE_CODE (TREE_TYPE (exp)) == ARRAY_TYPE)
 	    {
-	      int size = int_size_in_bytes (TREE_TYPE (exp));
+	      HOST_WIDE_INT size = int_size_in_bytes (TREE_TYPE (exp));
 	      obstack_grow (&permanent_obstack, (char *) &size, sizeof size);
 	    }
 
@@ -2760,6 +2889,21 @@ record_constant_1 (exp)
 	      else
 		{
 		  tree zero = 0;
+
+		  obstack_grow (&permanent_obstack,
+				(char *) &zero, sizeof zero);
+		}
+
+	      if (TREE_PURPOSE (link)
+		  && TREE_CODE (TREE_PURPOSE (link)) == FIELD_DECL)
+		obstack_grow (&permanent_obstack,
+			      (char *) &TREE_PURPOSE (link),
+			      sizeof TREE_PURPOSE (link));
+	      else if (TREE_PURPOSE (link))
+		record_constant_1 (TREE_PURPOSE (link));
+	      else if (have_purpose)
+		{
+		  int zero = 0;
 
 		  obstack_grow (&permanent_obstack,
 				(char *) &zero, sizeof zero);
@@ -3199,14 +3343,20 @@ init_const_rtx_hash_table ()
 /* Save and restore status for a nested function.  */
 
 void
-save_varasm_status (p)
+save_varasm_status (p, context)
      struct function *p;
+     tree context;
 {
   p->const_rtx_hash_table = const_rtx_hash_table;
   p->const_rtx_sym_hash_table = const_rtx_sym_hash_table;
   p->first_pool = first_pool;
   p->last_pool = last_pool;
   p->pool_offset = pool_offset;
+  p->const_double_chain = const_double_chain;
+
+  /* If we are pushing to toplevel, we can't reuse const_double_chain.  */
+  if (context == NULL_TREE)
+    const_double_chain = 0;
 }
 
 void
@@ -3218,6 +3368,7 @@ restore_varasm_status (p)
   first_pool = p->first_pool;
   last_pool = p->last_pool;
   pool_offset = p->pool_offset;
+  const_double_chain = p->const_double_chain;
 }
 
 enum kind { RTX_DOUBLE, RTX_INT };
@@ -3320,6 +3471,9 @@ decode_rtx_const (mode, x, value)
 	   for the sake of addresses of library routines.
 	   For a LABEL_REF, compare labels.  */
 	value->un.addr.base = XEXP (value->un.addr.base, 0);
+	
+      default:
+	break;
       }
 }
 
@@ -3750,6 +3904,13 @@ mark_constants (x)
 	find_pool_constant (x)->mark = 1;
       return;
     }
+  /* Never search inside a CONST_DOUBLE, because CONST_DOUBLE_MEM may be
+     a MEM, but does not constitute a use of that MEM.  This is particularly
+     important inside a nested function, because CONST_DOUBLE_MEM may be
+     a reference to a MEM in the parent's constant pool.  See the comment
+     in force_const_mem.  */
+  else if (GET_CODE (x) == CONST_DOUBLE)
+    return;
 
   /* Insns may appear inside a SEQUENCE.  Only check the patterns of
      insns, not any notes that may be attached.  We don't want to mark
@@ -3846,7 +4007,7 @@ output_addressed_constants (exp)
       }
       break;
 
-    case ERROR_MARK:
+    default:
       break;
     }
   return reloc;
@@ -3982,6 +4143,9 @@ output_constant (exp, size)
       else
 	error ("unknown set constructor type");
       return;
+
+    default:
+      break; /* ??? */
     }
 
   if (size > 0)
@@ -4349,7 +4513,7 @@ output_constructor (exp, size)
 		    }
 
 		  /* Now get the bits from the appropriate constant word.  */
-		  if (shift < HOST_BITS_PER_INT)
+		  if (shift < HOST_BITS_PER_WIDE_INT)
 		    value = TREE_INT_CST_LOW (val);
 		  else if (shift < 2 * HOST_BITS_PER_WIDE_INT)
 		    {

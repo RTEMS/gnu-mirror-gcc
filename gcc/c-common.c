@@ -1,5 +1,5 @@
 /* Subroutines shared by all languages that are variants of C.
-   Copyright (C) 1992, 93, 94, 95, 96, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1992, 93, 94, 95, 96, 97, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -19,12 +19,12 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
+#include <stdio.h>
 #include "tree.h"
 #include "c-lex.h"
 #include "c-tree.h"
 #include "flags.h"
 #include "obstack.h"
-#include <stdio.h>
 #include <ctype.h>
 
 #ifndef WCHAR_TYPE_SIZE
@@ -45,11 +45,71 @@ enum attrs {A_PACKED, A_NOCOMMON, A_COMMON, A_NORETURN, A_CONST, A_T_UNION,
 	    A_CONSTRUCTOR, A_DESTRUCTOR, A_MODE, A_SECTION, A_ALIGNED,
 	    A_UNUSED, A_FORMAT, A_FORMAT_ARG, A_WEAK, A_ALIAS};
 
+enum format_type { printf_format_type, scanf_format_type,
+		   strftime_format_type };
+
 static void declare_hidden_char_array	PROTO((char *, char *));
 static void add_attribute		PROTO((enum attrs, char *,
 					       int, int, int));
 static void init_attributes		PROTO((void));
+static void record_function_format	PROTO((tree, tree, enum format_type,
+					       int, int));
 static void record_international_format	PROTO((tree, tree, int));
+
+/* Keep a stack of if statements.  The value recorded is the number of
+   compound statements seen up to the if keyword.  */
+static int *if_stack;
+
+/* Amount of space in the if statement stack.  */
+static int if_stack_space = 0;
+
+/* Stack pointer.  */
+static int if_stack_pointer = 0;
+
+void
+c_expand_start_cond (cond, exitflag, compstmt_count)
+     tree cond;
+     int exitflag;
+     int compstmt_count;
+{
+  /* Make sure there is enough space on the stack.  */
+  if (if_stack_space == 0)
+    {
+      if_stack_space = 10;
+      if_stack = (int *)xmalloc (10 * sizeof (int));
+    }
+  else if (if_stack_space == if_stack_pointer)
+    {
+      if_stack_space += 10;
+      if_stack = (int *)xrealloc (if_stack, if_stack_space * sizeof (int));
+    }
+  
+  /* Record this if statement.  */
+  if_stack[if_stack_pointer++] = compstmt_count;
+
+  expand_start_cond (cond, exitflag);
+}
+
+void
+c_expand_end_cond ()
+{
+  if_stack_pointer--;
+  expand_end_cond ();
+}
+
+void
+c_expand_start_else ()
+{
+  if (warn_parentheses
+      && if_stack_pointer > 1
+      && if_stack[if_stack_pointer - 1] == if_stack[if_stack_pointer - 2])
+    warning ("suggest explicit braces to avoid ambiguous `else'");
+  
+  /* This if statement can no longer cause a dangling else.  */
+  if_stack[if_stack_pointer - 1]--;
+
+  expand_start_else ();
+}
 
 /* Make bindings for __FUNCTION__ and __PRETTY_FUNCTION__.  */
 
@@ -268,7 +328,7 @@ init_attributes ()
   add_attribute (A_COMMON, "common", 0, 0, 1);
   add_attribute (A_NORETURN, "noreturn", 0, 0, 1);
   add_attribute (A_NORETURN, "volatile", 0, 0, 1);
-  add_attribute (A_UNUSED, "unused", 0, 0, 1);
+  add_attribute (A_UNUSED, "unused", 0, 0, 0);
   add_attribute (A_CONST, "const", 0, 0, 1);
   add_attribute (A_T_UNION, "transparent_union", 0, 0, 0);
   add_attribute (A_CONSTRUCTOR, "constructor", 0, 0, 1);
@@ -385,8 +445,11 @@ decl_attributes (node, attributes, prefix_attributes)
 	  break;
 
 	case A_UNUSED:
-	  if (TREE_CODE (decl) == PARM_DECL || TREE_CODE (decl) == VAR_DECL
-	      || TREE_CODE (decl) == FUNCTION_DECL)
+	  if (is_type)
+	    TREE_USED (type) = 1;
+	  else if (TREE_CODE (decl) == PARM_DECL 
+		   || TREE_CODE (decl) == VAR_DECL
+		   || TREE_CODE (decl) == FUNCTION_DECL)
 	    TREE_USED (decl) = 1;
 	  else
 	    warning ("`%s' attribute ignored", IDENTIFIER_POINTER (name));
@@ -558,13 +621,13 @@ decl_attributes (node, attributes, prefix_attributes)
 
 	case A_FORMAT:
 	  {
-	    tree format_type = TREE_VALUE (args);
+	    tree format_type_id = TREE_VALUE (args);
 	    tree format_num_expr = TREE_VALUE (TREE_CHAIN (args));
 	    tree first_arg_num_expr
 	      = TREE_VALUE (TREE_CHAIN (TREE_CHAIN (args)));
 	    int format_num;
 	    int first_arg_num;
-	    int is_scan;
+	    enum format_type format_type;
 	    tree argument;
 	    int arg_num;
 	
@@ -575,26 +638,27 @@ decl_attributes (node, attributes, prefix_attributes)
 		continue;
 	      }
 	
-	    if (TREE_CODE (format_type) == IDENTIFIER_NODE
-		&& (!strcmp (IDENTIFIER_POINTER (format_type), "printf")
-		    || !strcmp (IDENTIFIER_POINTER (format_type),
-				"__printf__")))
-	      is_scan = 0;
-	    else if (TREE_CODE (format_type) == IDENTIFIER_NODE
-		     && (!strcmp (IDENTIFIER_POINTER (format_type), "scanf")
-			 || !strcmp (IDENTIFIER_POINTER (format_type),
-				     "__scanf__")))
-	      is_scan = 1;
-	    else if (TREE_CODE (format_type) == IDENTIFIER_NODE)
+	    if (TREE_CODE (format_type_id) != IDENTIFIER_NODE)
 	      {
-		error ("`%s' is an unrecognized format function type",
-		       IDENTIFIER_POINTER (format_type));
+		error ("unrecognized format specifier");
 		continue;
 	      }
 	    else
 	      {
-		error ("unrecognized format specifier");
-		continue;
+		char *p = IDENTIFIER_POINTER (format_type_id);
+		
+		if (!strcmp (p, "printf") || !strcmp (p, "__printf__"))
+		  format_type = printf_format_type;
+		else if (!strcmp (p, "scanf") || !strcmp (p, "__scanf__"))
+		  format_type = scanf_format_type;
+		else if (!strcmp (p, "strftime")
+			 || !strcmp (p, "__strftime__"))
+		  format_type = strftime_format_type;
+		else
+		  {
+		    error ("`%s' is an unrecognized format function type", p);
+		    continue;
+		  }
 	      }
 
 	    /* Strip any conversions from the string index and first arg number
@@ -660,7 +724,7 @@ decl_attributes (node, attributes, prefix_attributes)
 
 	    record_function_format (DECL_NAME (decl),
 				    DECL_ASSEMBLER_NAME (decl),
-				    is_scan, format_num, first_arg_num);
+				    format_type, format_num, first_arg_num);
 	    break;
 	  }
 
@@ -860,37 +924,64 @@ typedef struct {
   /* Type of argument if length modifier `L' is used.
      If NULL, then this modifier is not allowed.  */
   tree *bigllen;
+  /* Type of argument if length modifier `Z' is used.
+     If NULL, then this modifier is not allowed.  */
+  tree *zlen;
   /* List of other modifier characters allowed with these options.  */
   char *flag_chars;
 } format_char_info;
 
 static format_char_info print_char_table[] = {
-  { "di",	0,	T_I,	T_I,	T_L,	T_LL,	T_LL,	"-wp0 +"	},
-  { "oxX",	0,	T_UI,	T_UI,	T_UL,	T_ULL,	T_ULL,	"-wp0#"		},
-  { "u",	0,	T_UI,	T_UI,	T_UL,	T_ULL,	T_ULL,	"-wp0"		},
-/* Two GNU extensions.  */
-  { "Z",	0,	T_ST,	NULL,	NULL,	NULL,	NULL,	"-wp0"		},
-  { "m",	0,	T_V,	NULL,	NULL,	NULL,	NULL,	"-wp"		},
-  { "feEgG",	0,	T_D,	NULL,	NULL,	NULL,	T_LD,	"-wp0 +#"	},
-  { "c",	0,	T_I,	NULL,	T_W,	NULL,	NULL,	"-w"		},
-  { "C",	0,	T_W,	NULL,	NULL,	NULL,	NULL,	"-w"		},
-  { "s",	1,	T_C,	NULL,	T_W,	NULL,	NULL,	"-wp"		},
-  { "S",	1,	T_W,	NULL,	NULL,	NULL,	NULL,	"-wp"		},
-  { "p",	1,	T_V,	NULL,	NULL,	NULL,	NULL,	"-w"		},
-  { "n",	1,	T_I,	T_S,	T_L,	T_LL,	NULL,	""		},
+  { "di",	0,	T_I,	T_I,	T_L,	T_LL,	T_LL,	T_ST,	"-wp0 +"	},
+  { "oxX",	0,	T_UI,	T_UI,	T_UL,	T_ULL,	T_ULL,	T_ST,	"-wp0#"		},
+  { "u",	0,	T_UI,	T_UI,	T_UL,	T_ULL,	T_ULL,	T_ST,	"-wp0"		},
+/* A GNU extension.  */
+  { "m",	0,	T_V,	NULL,	NULL,	NULL,	NULL,	NULL,	"-wp"		},
+  { "feEgGaA",	0,	T_D,	NULL,	NULL,	NULL,	T_LD,	NULL,	"-wp0 +#"	},
+  { "c",	0,	T_I,	NULL,	T_W,	NULL,	NULL,	NULL,	"-w"		},
+  { "C",	0,	T_W,	NULL,	NULL,	NULL,	NULL,	NULL,	"-w"		},
+  { "s",	1,	T_C,	NULL,	T_W,	NULL,	NULL,	NULL,	"-wp"		},
+  { "S",	1,	T_W,	NULL,	NULL,	NULL,	NULL,	NULL,	"-wp"		},
+  { "p",	1,	T_V,	NULL,	NULL,	NULL,	NULL,	NULL,	"-w"		},
+  { "n",	1,	T_I,	T_S,	T_L,	T_LL,	NULL,	NULL,	""		},
   { NULL }
 };
 
 static format_char_info scan_char_table[] = {
-  { "di",	1,	T_I,	T_S,	T_L,	T_LL,	T_LL,	"*"	},
-  { "ouxX",	1,	T_UI,	T_US,	T_UL,	T_ULL,	T_ULL,	"*"	},	
-  { "efgEG",	1,	T_F,	NULL,	T_D,	NULL,	T_LD,	"*"	},
-  { "sc",	1,	T_C,	NULL,	T_W,	NULL,	NULL,	"*a"	},
-  { "[",	1,	T_C,	NULL,	NULL,	NULL,	NULL,	"*a"	},
-  { "C",	1,	T_W,	NULL,	NULL,	NULL,	NULL,	"*"	},
-  { "S",	1,	T_W,	NULL,	NULL,	NULL,	NULL,	"*"	},
-  { "p",	2,	T_V,	NULL,	NULL,	NULL,	NULL,	"*"	},
-  { "n",	1,	T_I,	T_S,	T_L,	T_LL,	NULL,	""	},
+  { "di",	1,	T_I,	T_S,	T_L,	T_LL,	T_LL,	NULL,	"*"	},
+  { "ouxX",	1,	T_UI,	T_US,	T_UL,	T_ULL,	T_ULL,	NULL,	"*"	},	
+  { "efgEGaA",	1,	T_F,	NULL,	T_D,	NULL,	T_LD,	NULL,	"*"	},
+  { "sc",	1,	T_C,	NULL,	T_W,	NULL,	NULL,	NULL,	"*a"	},
+  { "[",	1,	T_C,	NULL,	NULL,	NULL,	NULL,	NULL,	"*a"	},
+  { "C",	1,	T_W,	NULL,	NULL,	NULL,	NULL,	NULL,	"*"	},
+  { "S",	1,	T_W,	NULL,	NULL,	NULL,	NULL,	NULL,	"*"	},
+  { "p",	2,	T_V,	NULL,	NULL,	NULL,	NULL,	NULL,	"*"	},
+  { "n",	1,	T_I,	T_S,	T_L,	T_LL,	NULL,	NULL,	""	},
+  { NULL }
+};
+
+/* Handle format characters recognized by glibc's strftime.c.
+   '2' - MUST do years as only two digits
+   '3' - MAY do years as only two digits (depending on locale)
+   'E' - E modifier is acceptable
+   'O' - O modifier is acceptable to Standard C
+   'o' - O modifier is acceptable as a GNU extension
+   'G' - other GNU extensions  */
+
+static format_char_info time_char_table[] = {
+  { "y", 		0, NULL, NULL, NULL, NULL, NULL, NULL, "2EO-_0w" },
+  { "D", 		0, NULL, NULL, NULL, NULL, NULL, NULL, "2" },
+  { "g", 		0, NULL, NULL, NULL, NULL, NULL, NULL, "2O-_0w" },
+  { "cx", 		0, NULL, NULL, NULL, NULL, NULL, NULL, "3E" },
+  { "%RTXnrt",		0, NULL, NULL, NULL, NULL, NULL, NULL, "" },
+  { "P",		0, NULL, NULL, NULL, NULL, NULL, NULL, "G" },
+  { "HIMSUWdemw",	0, NULL, NULL, NULL, NULL, NULL, NULL, "-_0Ow" },
+  { "Vju",		0, NULL, NULL, NULL, NULL, NULL, NULL, "-_0Oow" },
+  { "Gklsz",		0, NULL, NULL, NULL, NULL, NULL, NULL, "-_0OGw" },
+  { "ABZa",		0, NULL, NULL, NULL, NULL, NULL, NULL, "^#" },
+  { "p",		0, NULL, NULL, NULL, NULL, NULL, NULL, "#" },
+  { "bh",		0, NULL, NULL, NULL, NULL, NULL, NULL, "^" },
+  { "CY",		0, NULL, NULL, NULL, NULL, NULL, NULL, "-_0EOw" },
   { NULL }
 };
 
@@ -899,7 +990,7 @@ typedef struct function_format_info
   struct function_format_info *next;  /* next structure on the list */
   tree name;			/* identifier such as "printf" */
   tree assembler_name;		/* optional mangled identifier (for C++) */
-  int is_scan;			/* TRUE if *scanf */
+  enum format_type format_type;	/* type of format (printf, scanf, etc.) */
   int format_num;		/* number of format argument */
   int first_arg_num;		/* number of first arg (zero for varargs) */
 } function_format_info;
@@ -931,15 +1022,26 @@ static void check_format_info		PROTO((function_format_info *, tree));
 void
 init_function_format_info ()
 {
-  record_function_format (get_identifier ("printf"), NULL_TREE, 0, 1, 2);
-  record_function_format (get_identifier ("fprintf"), NULL_TREE, 0, 2, 3);
-  record_function_format (get_identifier ("sprintf"), NULL_TREE, 0, 2, 3);
-  record_function_format (get_identifier ("scanf"), NULL_TREE, 1, 1, 2);
-  record_function_format (get_identifier ("fscanf"), NULL_TREE, 1, 2, 3);
-  record_function_format (get_identifier ("sscanf"), NULL_TREE, 1, 2, 3);
-  record_function_format (get_identifier ("vprintf"), NULL_TREE, 0, 1, 0);
-  record_function_format (get_identifier ("vfprintf"), NULL_TREE, 0, 2, 0);
-  record_function_format (get_identifier ("vsprintf"), NULL_TREE, 0, 2, 0);
+  record_function_format (get_identifier ("printf"), NULL_TREE,
+			  printf_format_type, 1, 2);
+  record_function_format (get_identifier ("fprintf"), NULL_TREE,
+			  printf_format_type, 2, 3);
+  record_function_format (get_identifier ("sprintf"), NULL_TREE,
+			  printf_format_type, 2, 3);
+  record_function_format (get_identifier ("scanf"), NULL_TREE,
+			  scanf_format_type, 1, 2);
+  record_function_format (get_identifier ("fscanf"), NULL_TREE,
+			  scanf_format_type, 2, 3);
+  record_function_format (get_identifier ("sscanf"), NULL_TREE,
+			  scanf_format_type, 2, 3);
+  record_function_format (get_identifier ("vprintf"), NULL_TREE,
+			  printf_format_type, 1, 0);
+  record_function_format (get_identifier ("vfprintf"), NULL_TREE,
+			  printf_format_type, 2, 0);
+  record_function_format (get_identifier ("vsprintf"), NULL_TREE,
+			  printf_format_type, 2, 0);
+  record_function_format (get_identifier ("strftime"), NULL_TREE,
+			  strftime_format_type, 3, 0);
 
   record_international_format (get_identifier ("gettext"), NULL_TREE, 1);
   record_international_format (get_identifier ("dgettext"), NULL_TREE, 2);
@@ -948,19 +1050,19 @@ init_function_format_info ()
 
 /* Record information for argument format checking.  FUNCTION_IDENT is
    the identifier node for the name of the function to check (its decl
-   need not exist yet).  IS_SCAN is true for scanf-type format checking;
-   false indicates printf-style format checking.  FORMAT_NUM is the number
+   need not exist yet).
+   FORMAT_TYPE specifies the type of format checking.  FORMAT_NUM is the number
    of the argument which is the format control string (starting from 1).
    FIRST_ARG_NUM is the number of the first actual argument to check
    against the format string, or zero if no checking is not be done
    (e.g. for varargs such as vfprintf).  */
 
-void
-record_function_format (name, assembler_name, is_scan,
+static void
+record_function_format (name, assembler_name, format_type,
 			format_num, first_arg_num)
       tree name;
       tree assembler_name;
-      int is_scan;
+      enum format_type format_type;
       int format_num;
       int first_arg_num;
 {
@@ -983,7 +1085,7 @@ record_function_format (name, assembler_name, is_scan,
       info->assembler_name = assembler_name;
     }
 
-  info->is_scan = is_scan;
+  info->format_type = format_type;
   info->format_num = format_num;
   info->first_arg_num = first_arg_num;
 }
@@ -1077,7 +1179,6 @@ check_format_info (info, params)
   tree first_fillin_param;
   char *format_chars;
   format_char_info *fci;
-  static char message[132];
   char flag_chars[8];
   int has_operand_number = 0;
 
@@ -1186,7 +1287,7 @@ check_format_info (info, params)
 	}
       flag_chars[0] = 0;
       suppressed = wide = precise = FALSE;
-      if (info->is_scan)
+      if (info->format_type == scanf_format_type)
 	{
 	  suppressed = *format_chars == '*';
 	  if (suppressed)
@@ -1194,7 +1295,47 @@ check_format_info (info, params)
 	  while (isdigit (*format_chars))
 	    ++format_chars;
 	}
-      else
+      else if (info->format_type == strftime_format_type)
+        {
+	  while (*format_chars != 0 && index ("_-0^#", *format_chars) != 0)
+	    {
+	      if (pedantic)
+		warning ("ANSI C does not support the strftime `%c' flag",
+			 *format_chars);
+	      if (index (flag_chars, *format_chars) != 0)
+		{
+		  warning ("repeated `%c' flag in format",
+			   *format_chars);
+		  ++format_chars;
+		}
+	      else
+		{
+		  i = strlen (flag_chars);
+		  flag_chars[i++] = *format_chars++;
+		  flag_chars[i] = 0;
+		}
+	    }
+	  while (isdigit ((unsigned char) *format_chars))
+	    {
+	      wide = TRUE;
+              ++format_chars;
+	    }
+	  if (wide && pedantic)
+	    warning ("ANSI C does not support strftime format width");
+	  if (*format_chars == 'E' || *format_chars == 'O')
+	    {
+	      i = strlen (flag_chars);
+	      flag_chars[i++] = *format_chars++;
+	      flag_chars[i] = 0;
+	      if (*format_chars == 'E' || *format_chars == 'O')
+	        {
+		  warning ("multiple E/O modifiers in format");
+		  while (*format_chars == 'E' || *format_chars == 'O')
+		    ++format_chars;
+		}
+	    }
+	}
+      else if (info->format_type == printf_format_type)
 	{
 	  /* See if we have a number followed by a dollar sign.  If we do,
 	     it is an operand number, so set PARAMS to that operand.  */
@@ -1227,14 +1368,13 @@ check_format_info (info, params)
 	  while (*format_chars != 0 && index (" +#0-", *format_chars) != 0)
 	    {
 	      if (index (flag_chars, *format_chars) != 0)
+		warning ("repeated `%c' flag in format", *format_chars++);
+	      else
 		{
-		  sprintf (message, "repeated `%c' flag in format",
-			   *format_chars);
-		  warning (message);
+		  i = strlen (flag_chars);
+		  flag_chars[i++] = *format_chars++;
+		  flag_chars[i] = 0;
 		}
-	      i = strlen (flag_chars);
-	      flag_chars[i++] = *format_chars++;
-	      flag_chars[i] = 0;
 	    }
 	  /* "If the space and + flags both appear, 
 	     the space flag will be ignored."  */
@@ -1271,12 +1411,7 @@ check_format_info (info, params)
 		      &&
 		      (TYPE_MAIN_VARIANT (TREE_TYPE (cur_param))
 		       != unsigned_type_node))
-		    {
-		      sprintf (message,
-			       "field width is not type int (arg %d)",
-			       arg_num);
-		      warning (message);
-		    }
+		    warning ("field width is not type int (arg %d)", arg_num);
 		}
 	    }
 	  else
@@ -1310,12 +1445,8 @@ check_format_info (info, params)
 		      ++arg_num;
 		      if (TYPE_MAIN_VARIANT (TREE_TYPE (cur_param))
 			  != integer_type_node)
-		        {
-		          sprintf (message,
-				   "field width is not type int (arg %d)",
-				   arg_num);
-		          warning (message);
-		        }
+			warning ("field width is not type int (arg %d)",
+				 arg_num);
 		    }
 		}
 	      else
@@ -1325,81 +1456,106 @@ check_format_info (info, params)
 		}
 	    }
 	}
-      if (*format_chars == 'h' || *format_chars == 'l')
-	length_char = *format_chars++;
-      else if (*format_chars == 'q' || *format_chars == 'L')
-	{
-	  length_char = *format_chars++;
-	  if (pedantic)
-	    pedwarn ("ANSI C does not support the `%c' length modifier",
-		     length_char);
-	}
-      else
-	length_char = 0;
-      if (length_char == 'l' && *format_chars == 'l')
-	{
-	  length_char = 'q', format_chars++;
-	  if (pedantic)
-	    pedwarn ("ANSI C does not support the `ll' length modifier");
-	}
+
       aflag = 0;
-      if (*format_chars == 'a')
+
+      if (info->format_type != strftime_format_type)
 	{
-	  aflag = 1;
-	  format_chars++;
-	}
-      if (suppressed && length_char != 0)
-	{
-	  sprintf (message,
-		   "use of `*' and `%c' together in format",
-		   length_char);
-	  warning (message);
+	  if (*format_chars == 'h' || *format_chars == 'l')
+	    length_char = *format_chars++;
+	  else if (*format_chars == 'q' || *format_chars == 'L')
+	    {
+	      length_char = *format_chars++;
+	      if (pedantic)
+		warning ("ANSI C does not support the `%c' length modifier",
+			 length_char);
+	    }
+	  else if (*format_chars == 'Z')
+	    {
+	      length_char = *format_chars++;
+	      if (pedantic)
+		warning ("ANSI C does not support the `Z' length modifier");
+	    }
+	  else
+	    length_char = 0;
+	  if (length_char == 'l' && *format_chars == 'l')
+	    {
+	      length_char = 'q', format_chars++;
+	      if (pedantic)
+		warning ("ANSI C does not support the `ll' length modifier");
+	    }
+	  if (*format_chars == 'a' && info->format_type == scanf_format_type)
+	    {
+	      if (format_chars[1] == 's' || format_chars[1] == 'S'
+		  || format_chars[1] == '[')
+		{
+		  /* `a' is used as a flag.  */
+		  aflag = 1;
+		  format_chars++;
+		}
+	    }
+	  if (suppressed && length_char != 0)
+	    warning ("use of `*' and `%c' together in format", length_char);
 	}
       format_char = *format_chars;
-      if (format_char == 0 || format_char == '%')
+      if (format_char == 0
+	  || (info->format_type != strftime_format_type && format_char == '%'))
 	{
 	  warning ("conversion lacks type at end of format");
 	  continue;
 	}
       format_chars++;
-      fci = info->is_scan ? scan_char_table : print_char_table;
+      switch (info->format_type)
+	{
+	case printf_format_type:
+	  fci = print_char_table;
+	  break;
+	case scanf_format_type:
+	  fci = scan_char_table;
+	  break;
+	case strftime_format_type:
+	  fci = time_char_table;
+	  break;
+	default:
+	  abort ();
+	}
       while (fci->format_chars != 0
 	     && index (fci->format_chars, format_char) == 0)
 	  ++fci;
       if (fci->format_chars == 0)
 	{
 	  if (format_char >= 040 && format_char < 0177)
-	    sprintf (message,
-		     "unknown conversion type character `%c' in format",
+	    warning ("unknown conversion type character `%c' in format",
 		     format_char);
 	  else
-	    sprintf (message,
-		     "unknown conversion type character 0x%x in format",
+	    warning ("unknown conversion type character 0x%x in format",
 		     format_char);
-	  warning (message);
 	  continue;
 	}
+      if (pedantic)
+	{
+	  if (index (fci->flag_chars, 'G') != 0)
+	    warning ("ANSI C does not support `%%%c'", format_char);
+	  if (index (fci->flag_chars, 'o') != 0
+	      && index (flag_chars, 'O') != 0)
+	    warning ("ANSI C does not support `%%O%c'", format_char);
+	}
       if (wide && index (fci->flag_chars, 'w') == 0)
-	{
-	  sprintf (message, "width used with `%c' format",
-		   format_char);
-	  warning (message);
-	}
+	warning ("width used with `%c' format", format_char);
+      if (index (fci->flag_chars, '2') != 0)
+	warning ("`%%%c' yields only last 2 digits of year", format_char);
+      else if (index (fci->flag_chars, '3') != 0)
+	warning ("`%%%c' yields only last 2 digits of year in some locales",
+		 format_char);
       if (precise && index (fci->flag_chars, 'p') == 0)
-	{
-	  sprintf (message, "precision used with `%c' format",
-		   format_char);
-	  warning (message);
-	}
+	warning ("precision used with `%c' format", format_char);
       if (aflag && index (fci->flag_chars, 'a') == 0)
 	{
-	  sprintf (message, "`a' flag used with `%c' format",
-		   format_char);
-	  warning (message);
+	  warning ("`a' flag used with `%c' format", format_char);
 	  /* To simplify the following code.  */
 	  aflag = 0;
 	}
-      if (info->is_scan && format_char == '[')
+      if (info->format_type == scanf_format_type && format_char == '[')
 	{
 	  /* Skip over scan set, in case it happens to have '%' in it.  */
 	  if (*format_chars == '^')
@@ -1411,39 +1567,29 @@ check_format_info (info, params)
 	  while (*format_chars && *format_chars != ']')
 	    ++format_chars;
 	  if (*format_chars != ']')
-	      /* The end of the format string was reached.  */
-	      warning ("no closing `]' for `%%[' format");
+	    /* The end of the format string was reached.  */
+	    warning ("no closing `]' for `%%[' format");
 	}
       if (suppressed)
 	{
 	  if (index (fci->flag_chars, '*') == 0)
-	    {
-	      sprintf (message,
-		       "suppression of `%c' conversion in format",
-		       format_char);
-	      warning (message);
-	    }
+	    warning ("suppression of `%c' conversion in format", format_char);
 	  continue;
 	}
       for (i = 0; flag_chars[i] != 0; ++i)
 	{
 	  if (index (fci->flag_chars, flag_chars[i]) == 0)
-	    {
-	      sprintf (message, "flag `%c' used with type `%c'",
-		       flag_chars[i], format_char);
-	      warning (message);
-	    }
+	    warning ("flag `%c' used with type `%c'",
+		     flag_chars[i], format_char);
 	}
+      if (info->format_type == strftime_format_type)
+	continue;
       if (precise && index (flag_chars, '0') != 0
 	  && (format_char == 'd' || format_char == 'i'
 	      || format_char == 'o' || format_char == 'u'
 	      || format_char == 'x' || format_char == 'x'))
-	{
-	  sprintf (message,
-		   "`0' flag ignored with precision specifier and `%c' format",
-		   format_char);
-	  warning (message);
-	}
+	warning ("`0' flag ignored with precision specifier and `%c' format",
+		 format_char);
       switch (length_char)
 	{
 	default: wanted_type = fci->nolen ? *(fci->nolen) : 0; break;
@@ -1451,14 +1597,11 @@ check_format_info (info, params)
 	case 'l': wanted_type = fci->llen ? *(fci->llen) : 0; break;
 	case 'q': wanted_type = fci->qlen ? *(fci->qlen) : 0; break;
 	case 'L': wanted_type = fci->bigllen ? *(fci->bigllen) : 0; break;
+	case 'Z': wanted_type = fci->zlen ? *fci->zlen : 0; break;
 	}
       if (wanted_type == 0)
-	{
-	  sprintf (message,
-		   "use of `%c' length character with `%c' type character",
-		   length_char, format_char);
-	  warning (message);
-	}
+	warning ("use of `%c' length character with `%c' type character",
+		 length_char, format_char);
 
       /*
        ** XXX -- should kvetch about stuff such as
@@ -1485,6 +1628,8 @@ check_format_info (info, params)
       ++arg_num;
       cur_type = TREE_TYPE (cur_param);
 
+      STRIP_NOPS (cur_param);
+
       /* Check the types of any additional pointer arguments
 	 that precede the "real" argument.  */
       for (i = 0; i < fci->pointer_count + aflag; ++i)
@@ -1492,19 +1637,34 @@ check_format_info (info, params)
 	  if (TREE_CODE (cur_type) == POINTER_TYPE)
 	    {
 	      cur_type = TREE_TYPE (cur_type);
+
+	      if (TREE_CODE (cur_param) == ADDR_EXPR)
+		cur_param = TREE_OPERAND (cur_param, 0);
+	      else
+		cur_param = 0;
+
 	      continue;
 	    }
 	  if (TREE_CODE (cur_type) != ERROR_MARK)
-	    {
-	      sprintf (message,
-		       "format argument is not a %s (arg %d)",
-		       ((fci->pointer_count + aflag == 1)
-			? "pointer" : "pointer to a pointer"),
-		       arg_num);
-	      warning (message);
-	    }
+	    warning ("format argument is not a %s (arg %d)",
+		     ((fci->pointer_count + aflag == 1)
+		      ? "pointer" : "pointer to a pointer"),
+		     arg_num);
 	  break;
 	}
+
+      /* See if this is an attempt to write into a const type with
+	 scanf.  */
+      if (info->format_type == scanf_format_type
+	  && i == fci->pointer_count + aflag
+	  && wanted_type != 0
+	  && TREE_CODE (cur_type) != ERROR_MARK
+	  && (TYPE_READONLY (cur_type)
+	      || (cur_param != 0
+		  && (TREE_CODE_CLASS (TREE_CODE (cur_param)) == 'c'
+		      || (TREE_CODE_CLASS (TREE_CODE (cur_param)) == 'd'
+			  && TREE_READONLY (cur_param))))))
+	warning ("writing into constant object (arg %d)", arg_num);
 
       /* Check the type of the "real" argument, if there's a type we want.  */
       if (i == fci->pointer_count + aflag && wanted_type != 0
@@ -1564,11 +1724,7 @@ check_format_info (info, params)
 	    that = IDENTIFIER_POINTER (DECL_NAME (TYPE_NAME (cur_type)));
 
 	  if (strcmp (this, that) != 0)
-	    {
-	      sprintf (message, "%s format, %s arg (arg %d)",
-			this, that, arg_num);
-	      warning (message);
-	    }
+	    warning ("%s format, %s arg (arg %d)", this, that, arg_num);
 	}
     }
 }
@@ -1672,7 +1828,7 @@ convert_and_check (type, expr)
 		 || TREE_UNSIGNED (type)
 		 || ! int_fits_type_p (expr, unsigned_type (type)))
 	        && skip_evaluation == 0)
-		warning ("overflow in implicit constant conversion");
+	      warning ("overflow in implicit constant conversion");
 	}
       else
 	unsigned_conversion_warning (t, expr);
@@ -1856,7 +2012,7 @@ void
 binary_op_error (code)
      enum tree_code code;
 {
-  register char *opname = "unknown";
+  register char *opname;
 
   switch (code)
     {
@@ -1909,6 +2065,8 @@ binary_op_error (code)
     case LROTATE_EXPR:
     case RROTATE_EXPR:
       opname = "rotate"; break;
+    default:
+      opname = "unknown"; break;
     }
   error ("invalid operands to binary %s", opname);
 }
@@ -1994,6 +2152,8 @@ shorten_compare (op0_ptr, op1_ptr, restype_ptr, rescode_ptr)
 	  break;
 	case GE_EXPR:
 	  code = LE_EXPR;
+	  break;
+	default:
 	  break;
 	}
       *rescode_ptr = code;
@@ -2125,6 +2285,9 @@ shorten_compare (op0_ptr, op1_ptr, restype_ptr, rescode_ptr)
 		primop1 = TYPE_MAX_VALUE (type);
 		val = 0;
 		break;
+
+	      default:
+		break;
 	      }
 	  type = unsigned_type (type);
 	}
@@ -2222,6 +2385,10 @@ shorten_compare (op0_ptr, op1_ptr, restype_ptr, rescode_ptr)
 						     primop0))))
 		warning ("unsigned value < 0 is always 0");
 	      value = boolean_false_node;
+	      break;
+
+	    default:
+	      break;
 	    }
 
 	  if (value != 0)
@@ -2408,6 +2575,9 @@ truthvalue_conversion (expr)
     case MODIFY_EXPR:
       if (warn_parentheses && C_EXP_ORIGINAL_CODE (expr) == MODIFY_EXPR)
 	warning ("suggest parentheses around assignment used as truth value");
+      break;
+      
+    default:
       break;
     }
 

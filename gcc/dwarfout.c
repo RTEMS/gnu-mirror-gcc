@@ -33,9 +33,6 @@ Boston, MA 02111-1307, USA.  */
 #include "output.h"
 #include "defaults.h"
 
-/* #define NDEBUG 1 */
-#include "assert.h"
-
 #if defined(DWARF_TIMESTAMPS)
 #if defined(POSIX)
 #include <time.h>
@@ -49,10 +46,36 @@ extern time_t time ();
 #endif /* !defined(POSIX) */
 #endif /* defined(DWARF_TIMESTAMPS) */
 
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+
+#ifdef HAVE_STRING_H
+#include <string.h>
+#else
+#ifdef HAVE_STRINGS_H
+#include <strings.h>
+#endif
+#endif
+
+/* We cannot use <assert.h> in GCC source, since that would include
+   GCC's assert.h, which may not be compatible with the host compiler.  */
+#undef assert
+#ifdef NDEBUG
+# define assert(e)
+#else
+# define assert(e) do { if (! (e)) abort (); } while (0)
+#endif
+
 extern char *getpwd ();
 
+#ifdef NEED_DECLARATION_INDEX
 extern char *index ();
+#endif
+
+#ifdef NEED_DECLARATION_RINDEX
 extern char *rindex ();
+#endif
 
 /* IMPORTANT NOTE: Please see the file README.DWARF for important details
    regarding the GNU implementation of Dwarf.  */
@@ -357,7 +380,7 @@ static inline void low_pc_attribute	PROTO((char *));
 static inline void high_pc_attribute	PROTO((char *));
 static inline void body_begin_attribute	PROTO((char *));
 static inline void body_end_attribute	PROTO((char *));
-static inline void langauge_attribute	PROTO((unsigned));
+static inline void language_attribute	PROTO((unsigned));
 static inline void member_attribute	PROTO((tree));
 static inline void string_length_attribute PROTO((tree));
 static inline void comp_dir_attribute	PROTO((char *));
@@ -417,7 +440,7 @@ static void output_block		PROTO((tree, int));
 static void output_decls_for_scope	PROTO((tree, int));
 static void output_decl			PROTO((tree, tree));
 static void shuffle_filename_entry	PROTO((filename_entry *));
-static void geneate_new_sfname_entry	PROTO((void));
+static void generate_new_sfname_entry	PROTO((void));
 static unsigned lookup_filename		PROTO((char *));
 static void generate_srcinfo_entry	PROTO((unsigned, unsigned));
 static void generate_macinfo_entry	PROTO((char *, char *));
@@ -531,153 +554,153 @@ static void generate_macinfo_entry	PROTO((char *, char *));
 */
 
 #ifndef TEXT_BEGIN_LABEL
-#define TEXT_BEGIN_LABEL	".L_text_b"
+#define TEXT_BEGIN_LABEL	"*.L_text_b"
 #endif
 #ifndef TEXT_END_LABEL
-#define TEXT_END_LABEL		".L_text_e"
+#define TEXT_END_LABEL		"*.L_text_e"
 #endif
 
 #ifndef DATA_BEGIN_LABEL
-#define DATA_BEGIN_LABEL	".L_data_b"
+#define DATA_BEGIN_LABEL	"*.L_data_b"
 #endif
 #ifndef DATA_END_LABEL
-#define DATA_END_LABEL		".L_data_e"
+#define DATA_END_LABEL		"*.L_data_e"
 #endif
 
 #ifndef DATA1_BEGIN_LABEL
-#define DATA1_BEGIN_LABEL	".L_data1_b"
+#define DATA1_BEGIN_LABEL	"*.L_data1_b"
 #endif
 #ifndef DATA1_END_LABEL
-#define DATA1_END_LABEL		".L_data1_e"
+#define DATA1_END_LABEL		"*.L_data1_e"
 #endif
 
 #ifndef RODATA_BEGIN_LABEL
-#define RODATA_BEGIN_LABEL	".L_rodata_b"
+#define RODATA_BEGIN_LABEL	"*.L_rodata_b"
 #endif
 #ifndef RODATA_END_LABEL
-#define RODATA_END_LABEL	".L_rodata_e"
+#define RODATA_END_LABEL	"*.L_rodata_e"
 #endif
 
 #ifndef RODATA1_BEGIN_LABEL
-#define RODATA1_BEGIN_LABEL	".L_rodata1_b"
+#define RODATA1_BEGIN_LABEL	"*.L_rodata1_b"
 #endif
 #ifndef RODATA1_END_LABEL
-#define RODATA1_END_LABEL	".L_rodata1_e"
+#define RODATA1_END_LABEL	"*.L_rodata1_e"
 #endif
 
 #ifndef BSS_BEGIN_LABEL
-#define BSS_BEGIN_LABEL		".L_bss_b"
+#define BSS_BEGIN_LABEL		"*.L_bss_b"
 #endif
 #ifndef BSS_END_LABEL
-#define BSS_END_LABEL		".L_bss_e"
+#define BSS_END_LABEL		"*.L_bss_e"
 #endif
 
 #ifndef LINE_BEGIN_LABEL
-#define LINE_BEGIN_LABEL	".L_line_b"
+#define LINE_BEGIN_LABEL	"*.L_line_b"
 #endif
 #ifndef LINE_LAST_ENTRY_LABEL
-#define LINE_LAST_ENTRY_LABEL	".L_line_last"
+#define LINE_LAST_ENTRY_LABEL	"*.L_line_last"
 #endif
 #ifndef LINE_END_LABEL
-#define LINE_END_LABEL		".L_line_e"
+#define LINE_END_LABEL		"*.L_line_e"
 #endif
 
 #ifndef DEBUG_BEGIN_LABEL
-#define DEBUG_BEGIN_LABEL	".L_debug_b"
+#define DEBUG_BEGIN_LABEL	"*.L_debug_b"
 #endif
 #ifndef SFNAMES_BEGIN_LABEL
-#define SFNAMES_BEGIN_LABEL	".L_sfnames_b"
+#define SFNAMES_BEGIN_LABEL	"*.L_sfnames_b"
 #endif
 #ifndef SRCINFO_BEGIN_LABEL
-#define SRCINFO_BEGIN_LABEL	".L_srcinfo_b"
+#define SRCINFO_BEGIN_LABEL	"*.L_srcinfo_b"
 #endif
 #ifndef MACINFO_BEGIN_LABEL
-#define MACINFO_BEGIN_LABEL	".L_macinfo_b"
+#define MACINFO_BEGIN_LABEL	"*.L_macinfo_b"
 #endif
 
 #ifndef DIE_BEGIN_LABEL_FMT
-#define DIE_BEGIN_LABEL_FMT	".L_D%u"
+#define DIE_BEGIN_LABEL_FMT	"*.L_D%u"
 #endif
 #ifndef DIE_END_LABEL_FMT
-#define DIE_END_LABEL_FMT	".L_D%u_e"
+#define DIE_END_LABEL_FMT	"*.L_D%u_e"
 #endif
 #ifndef PUB_DIE_LABEL_FMT
-#define PUB_DIE_LABEL_FMT	".L_P%u"
+#define PUB_DIE_LABEL_FMT	"*.L_P%u"
 #endif
 #ifndef INSN_LABEL_FMT
-#define INSN_LABEL_FMT		".L_I%u_%u"
+#define INSN_LABEL_FMT		"*.L_I%u_%u"
 #endif
 #ifndef BLOCK_BEGIN_LABEL_FMT
-#define BLOCK_BEGIN_LABEL_FMT	".L_B%u"
+#define BLOCK_BEGIN_LABEL_FMT	"*.L_B%u"
 #endif
 #ifndef BLOCK_END_LABEL_FMT
-#define BLOCK_END_LABEL_FMT	".L_B%u_e"
+#define BLOCK_END_LABEL_FMT	"*.L_B%u_e"
 #endif
 #ifndef SS_BEGIN_LABEL_FMT
-#define SS_BEGIN_LABEL_FMT	".L_s%u"
+#define SS_BEGIN_LABEL_FMT	"*.L_s%u"
 #endif
 #ifndef SS_END_LABEL_FMT
-#define SS_END_LABEL_FMT	".L_s%u_e"
+#define SS_END_LABEL_FMT	"*.L_s%u_e"
 #endif
 #ifndef EE_BEGIN_LABEL_FMT
-#define EE_BEGIN_LABEL_FMT	".L_e%u"
+#define EE_BEGIN_LABEL_FMT	"*.L_e%u"
 #endif
 #ifndef EE_END_LABEL_FMT
-#define EE_END_LABEL_FMT	".L_e%u_e"
+#define EE_END_LABEL_FMT	"*.L_e%u_e"
 #endif
 #ifndef MT_BEGIN_LABEL_FMT
-#define MT_BEGIN_LABEL_FMT	".L_t%u"
+#define MT_BEGIN_LABEL_FMT	"*.L_t%u"
 #endif
 #ifndef MT_END_LABEL_FMT
-#define MT_END_LABEL_FMT	".L_t%u_e"
+#define MT_END_LABEL_FMT	"*.L_t%u_e"
 #endif
 #ifndef LOC_BEGIN_LABEL_FMT
-#define LOC_BEGIN_LABEL_FMT	".L_l%u"
+#define LOC_BEGIN_LABEL_FMT	"*.L_l%u"
 #endif
 #ifndef LOC_END_LABEL_FMT
-#define LOC_END_LABEL_FMT	".L_l%u_e"
+#define LOC_END_LABEL_FMT	"*.L_l%u_e"
 #endif
 #ifndef BOUND_BEGIN_LABEL_FMT
-#define BOUND_BEGIN_LABEL_FMT	".L_b%u_%u_%c"
+#define BOUND_BEGIN_LABEL_FMT	"*.L_b%u_%u_%c"
 #endif
 #ifndef BOUND_END_LABEL_FMT
-#define BOUND_END_LABEL_FMT	".L_b%u_%u_%c_e"
+#define BOUND_END_LABEL_FMT	"*.L_b%u_%u_%c_e"
 #endif
 #ifndef DERIV_BEGIN_LABEL_FMT
-#define DERIV_BEGIN_LABEL_FMT	".L_d%u"
+#define DERIV_BEGIN_LABEL_FMT	"*.L_d%u"
 #endif
 #ifndef DERIV_END_LABEL_FMT
-#define DERIV_END_LABEL_FMT	".L_d%u_e"
+#define DERIV_END_LABEL_FMT	"*.L_d%u_e"
 #endif
 #ifndef SL_BEGIN_LABEL_FMT
-#define SL_BEGIN_LABEL_FMT	".L_sl%u"
+#define SL_BEGIN_LABEL_FMT	"*.L_sl%u"
 #endif
 #ifndef SL_END_LABEL_FMT
-#define SL_END_LABEL_FMT	".L_sl%u_e"
+#define SL_END_LABEL_FMT	"*.L_sl%u_e"
 #endif
 #ifndef BODY_BEGIN_LABEL_FMT
-#define BODY_BEGIN_LABEL_FMT	".L_b%u"
+#define BODY_BEGIN_LABEL_FMT	"*.L_b%u"
 #endif
 #ifndef BODY_END_LABEL_FMT
-#define BODY_END_LABEL_FMT	".L_b%u_e"
+#define BODY_END_LABEL_FMT	"*.L_b%u_e"
 #endif
 #ifndef FUNC_END_LABEL_FMT
-#define FUNC_END_LABEL_FMT	".L_f%u_e"
+#define FUNC_END_LABEL_FMT	"*.L_f%u_e"
 #endif
 #ifndef TYPE_NAME_FMT
-#define TYPE_NAME_FMT		".L_T%u"
+#define TYPE_NAME_FMT		"*.L_T%u"
 #endif
 #ifndef DECL_NAME_FMT
-#define DECL_NAME_FMT		".L_E%u"
+#define DECL_NAME_FMT		"*.L_E%u"
 #endif
 #ifndef LINE_CODE_LABEL_FMT
-#define LINE_CODE_LABEL_FMT	".L_LC%u"
+#define LINE_CODE_LABEL_FMT	"*.L_LC%u"
 #endif
 #ifndef SFNAMES_ENTRY_LABEL_FMT
-#define SFNAMES_ENTRY_LABEL_FMT	".L_F%u"
+#define SFNAMES_ENTRY_LABEL_FMT	"*.L_F%u"
 #endif
 #ifndef LINE_ENTRY_LABEL_FMT
-#define LINE_ENTRY_LABEL_FMT	".L_LE%u"
+#define LINE_ENTRY_LABEL_FMT	"*.L_LE%u"
 #endif
 
 /* Definitions of defaults for various types of primitive assembly language
@@ -2367,7 +2390,7 @@ location_or_const_value_attribute (decl)
      shouldn't be happening.  All PARM_DECL nodes should get valid non-NULL
      DECL_INCOMING_RTL values, but integrate.c doesn't currently generate
      these values for inlined instances of inline function parameters, so
-     when we see such cases, we are just SOL (shit-out-of-luck) for the time
+     when we see such cases, we are just out-of-luck for the time
      being (until integrate.c gets fixed).
   */
 
@@ -2403,6 +2426,11 @@ location_or_const_value_attribute (decl)
 
   switch (GET_CODE (rtl))
     {
+    case ADDRESSOF:
+      /* The address of a variable that was optimized away; don't emit
+	 anything.  */
+      break;
+
     case CONST_INT:
     case CONST_DOUBLE:
     case CONST_STRING:
@@ -3661,6 +3689,8 @@ output_compile_unit_die (arg)
     language_attribute (LANG_ADA83);
   else if (strcmp (language_string, "GNU F77") == 0)
     language_attribute (LANG_FORTRAN77);
+  else if (strcmp (language_string, "GNU Pascal") == 0)
+    language_attribute (LANG_PASCAL83);
   else if (flag_traditional)
     language_attribute (LANG_C);
   else
@@ -4172,7 +4202,22 @@ output_type (type, containing_scope)
   type = type_main_variant (type);
 
   if (TREE_ASM_WRITTEN (type))
-    return;
+    {
+      if (finalizing && AGGREGATE_TYPE_P (type))
+	{
+	  register tree member;
+
+	  /* Some of our nested types might not have been defined when we
+	     were written out before; force them out now.  */
+
+	  for (member = TYPE_FIELDS (type); member;
+	       member = TREE_CHAIN (member))
+	    if (TREE_CODE (member) == TYPE_DECL
+		&& ! TREE_ASM_WRITTEN (TREE_TYPE (member)))
+	      output_type (TREE_TYPE (member), containing_scope);
+	}
+      return;
+    }
 
   /* If this is a nested type whose containing class hasn't been
      written out yet, writing it out will cover this one, too.  */
@@ -5142,7 +5187,7 @@ dwarfout_file_scope_decl (decl, set_finalizing)
 	 a return type or a formal parameter type of some function.  */
 
       if (debug_info_level <= DINFO_LEVEL_TERSE)
-	if (DECL_NAME (decl) != NULL
+	if (! TYPE_DECL_IS_STUB (decl)
 	    || ! TYPE_USED_FOR_FUNCTION (TREE_TYPE (decl)))
           return;
 
@@ -5494,7 +5539,10 @@ dwarfout_start_new_source_file (filename)
 
   sprintf (label, SFNAMES_ENTRY_LABEL_FMT, lookup_filename (filename));
   sprintf (type_and_offset, "0x%08x+%s-%s",
-	   ((unsigned) MACINFO_start << 24), label, SFNAMES_BEGIN_LABEL);
+	   ((unsigned) MACINFO_start << 24),
+	   /* Hack: skip leading '*' .  */
+	   (*label == '*') + label,
+	   (*SFNAMES_BEGIN_LABEL == '*') + SFNAMES_BEGIN_LABEL);
   generate_macinfo_entry (type_and_offset, "");
 }
 
