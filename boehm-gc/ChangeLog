@@ -1,3 +1,21 @@
+2003-02-11  Andreas Tobler  <a.tobler@schweiz.ch>
+
+	* include/private/gcconfig.h: undefine MPROTECT_VDB for MACOSX
+
+2003-01-27  Alexandre Oliva  <aoliva@redhat.com>
+
+	* configure.in (toolexecdir, toolexeclibdir): Set and AC_SUBST.
+	Remove USE_LIBDIR conditional.
+	* Makefile.am (toolexecdir, toolexeclibdir): Don't override.
+	* Makefile.in, configure: Rebuilt.
+
+2002-12-31  Tom Tromey  <tromey@redhat.com>
+
+	For PR libgcj/8933:
+	* include/Makefile.in: Rebuilt.
+	* include/Makefile.am (noinst_HEADERS): Renamed from
+	include_HEADERS.
+
 2002-11-19  Rainer Orth  <ro@TechFak.Uni-Bielefeld.DE>
 
 	* ltconfig (osf[345]): Append $major to soname_spec.

@@ -58,12 +58,12 @@
 @end ifnothtml
 
 @c Part 2 Summary Description and Copyright
-@macro copyrightnotice
+@copying
 Copyright @copyright{} 1988, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
 @sp 1
 Permission is granted to copy, distribute and/or modify this document
-under the terms of the GNU Free Documentation License, Version 1.1 or
+under the terms of the GNU Free Documentation License, Version 1.2 or
 any later version published by the Free Software Foundation; with no
 Invariant Sections, the Front-Cover texts being (a) (see below), and
 with the Back-Cover Texts being (b) (see below).  A copy of the
@@ -79,9 +79,9 @@ Free Documentation License}''.
      You have freedom to copy and modify this GNU Manual, like GNU
      software.  Copies published by the Free Software Foundation raise
      funds for GNU development.
-@end macro
+@end copying
 @ifinfo
-@copyrightnotice{}
+@insertcopying
 @end ifinfo
 
 @c Part 3 Titlepage and Copyright
@@ -93,7 +93,7 @@ Free Documentation License}''.
 @c The following two commands start the copyright page.
 @page
 @vskip 0pt plus 1filll
-@copyrightnotice{}
+@insertcopying
 @end titlepage
 
 @c Part 4 Top node and Master Menu
@@ -197,7 +197,7 @@ not yet been merged into the main part of this manual.
 @ifhtml
 @uref{./index.html,,Return to the GCC Installation page}
 
-@copyrightnotice{}
+@insertcopying
 @end ifhtml
 @end ifset
 
@@ -559,12 +559,8 @@ whether you use the GNU assembler.  On any other system,
 @item @samp{hppa1.0-@var{any}-@var{any}}
 @item @samp{hppa1.1-@var{any}-@var{any}}
 @item @samp{i386-@var{any}-sysv}
-@item @samp{i386-@var{any}-isc}
-@item @samp{i860-@var{any}-bsd}
 @item @samp{m68k-bull-sysv}
 @item @samp{m68k-hp-hpux}
-@item @samp{m68k-sony-bsd}
-@item @samp{m68k-altos-sysv}
 @item @samp{m68000-hp-hpux}
 @item @samp{m68000-att-sysv}
 @item @samp{@var{any}-lynx-lynxos}
@@ -720,8 +716,8 @@ Specify which cpu variant the
 compiler should generate code for by default.  This is currently
 only supported on some ports, specifically arm, powerpc, and
 SPARC@.  If configure does not recognize the model name (e.g.@: arm700,
-603e, or ultrasparc) you provide, please check the configure script
-for a complete list of supported models.
+603e, or ultrasparc) you provide, please check the
+@file{gcc/config.gcc} script for a complete list of supported models.
 
 @item --enable-altivec
 Specify that the target supports AltiVec vector enhancements.  This
@@ -822,8 +818,8 @@ option.  This option has no effect on the other hosts.
 
 @item --nfp
 Specify that the machine does not have a floating point unit.  This
-option only applies to @samp{m68k-sun-sunos@var{n}} and
-@samp{m68k-isi-bsd}.  On any other system, @option{--nfp} has no effect.
+option only applies to @samp{m68k-sun-sunos@var{n}}.  On any other
+system, @option{--nfp} has no effect.
 
 @item --enable-checking
 @itemx --enable-checking=@var{list}
@@ -983,7 +979,7 @@ parser sources, releases contain the Bison-generated files and you do
 not need Bison installed to build them.
 
 When building from CVS or snapshots, or if you modify Texinfo
-documentation, you need version 4.1 or later of Texinfo installed if you
+documentation, you need version 4.2 or later of Texinfo installed if you
 want Info documentation to be regenerated.  Releases contain Info
 documentation pre-built for the unmodified documentation in the release.
 
@@ -1195,67 +1191,56 @@ These are part of the full distribution, but if you downloaded the
 separately.
 
 Second, you must have the testing tools installed.  This includes
-a @uref{http://www.gnu.org/software/dejagnu/,,current version of DejaGnu};
-dejagnu 1.3 is not sufficient.
-It also includes Tcl and Expect; the DejaGnu site has links to these.
+@uref{http://www.gnu.org/software/dejagnu/,,DejaGnu} 1.4.2 (or later),
+Tcl, and Expect; the DejaGnu site has links to these.
 
-Now you may need specific preparations:
-
-@itemize @bullet
-
-@item
-The following environment variables may need to be set appropriately, as in
-the following example (which assumes that DejaGnu has been installed
-under @file{/usr/local}):
+If the directories where @command{runtest} and @command{expect} were
+installed are not in the @env{PATH}, you may need to set the following
+environment variables appropriately, as in the following example (which
+assumes that DejaGnu has been installed under @file{/usr/local}):
 
 @example
      TCL_LIBRARY = /usr/local/share/tcl8.0
      DEJAGNULIBS = /usr/local/share/dejagnu
 @end example
 
-On systems such as Cygwin, these paths are required to be actual
+(On systems such as Cygwin, these paths are required to be actual
 paths, not mounts or links; presumably this is due to some lack of
-portability in the DejaGnu code.
+portability in the DejaGnu code.)
 
-If the directories where @command{runtest} and @command{expect} were
-installed are in the @env{PATH}, it should not be necessary to set these
-environment variables.
-
-@end itemize
 
 Finally, you can run the testsuite (which may take a long time):
 @example
      cd @var{objdir}; make -k check
 @end example
 
-The testing process will try to test as many components in the GCC
-distribution as possible, including the C, C++, Objective-C and Fortran
-compilers as well as the C++ and Java runtime libraries.
-
-While running the testsuite, DejaGnu might emit messages resembling
+This will test various components of GCC, such as compiler
+front ends and runtime libraries.  While running the testsuite, DejaGnu
+might emit some harmless messages resembling
 @samp{WARNING: Couldn't find the global config file.} or 
-@samp{WARNING: Couldn't find tool init file}.
-These messages are harmless and do not affect the validity of the tests.
+@samp{WARNING: Couldn't find tool init file} that can be ignored.
 
 @section How can I run the test suite on selected tests?
 
-As a first possibility to cut down the number of tests that are run it is
-possible to use @samp{make check-gcc} or @samp{make check-g++}
-in the @file{gcc} subdirectory of the object directory.  To further cut down the
-tests the following is possible:
+In order to run sets of tests selectively, there are targets
+@samp{make check-gcc} and @samp{make check-g++}
+in the @file{gcc} subdirectory of the object directory.  You can also
+just run @samp{make check} in a subdirectory of the object directory.
+
+
+A more selective way to just run all @command{gcc} execute tests in the
+testsuite is to use
 
 @example
     make check-gcc RUNTESTFLAGS="execute.exp @var{other-options}"
 @end example
 
-This will run all @command{gcc} execute tests in the testsuite.
+Likewise, in order to run only the @command{g++} ``old-deja'' tests in
+the testsuite with filenames matching @samp{9805*}, you would use
 
 @example
     make check-g++ RUNTESTFLAGS="old-deja.exp=9805* @var{other-options}"
 @end example
-
-This will run the @command{g++} ``old-deja'' tests in the testsuite where the filename
-matches @samp{9805*}.
 
 The @file{*.exp} files are located in the testsuite directories of the GCC
 source, the most important ones being @file{compile.exp},
@@ -1264,9 +1249,6 @@ To get a list of the possible @file{*.exp} files, pipe the
 output of @samp{make check} into a file and look at the
 @samp{Running @dots{}  .exp} lines.
 
-To run only the tests for a library, run @samp{make check} from the
-the library's testsuite in a subdirectory of the object directory:
-@file{libstdc++-v3/testsuite} or @file{libcgj/testsuite}.
 
 @section Additional testing for Java Class Libraries
 
@@ -1277,13 +1259,18 @@ testsuite at @file{libjava/testsuite/libjava.mauve/mauve}, or by
 specifying the location of that tree when invoking @samp{make}, as in
 @samp{make MAUVEDIR=~/mauve check}.
 
+@uref{http://www-124.ibm.com/developerworks/oss/cvs/jikes/~checkout~/jacks/jacks.html,,Jacks}
+is a free test suite that tests Java compiler front ends.  This suite
+can be run as part of libgcj testing by placing the Jacks tree within
+the libjava testsuite at @file{libjava/testsuite/libjava.jacks/jacks}.
+
 @section How to interpret test results
 
-After the testsuite has run you'll find various @file{*.sum} and @file{*.log}
+The result of running the testsuite are various @file{*.sum} and @file{*.log}
 files in the testsuite subdirectories.  The @file{*.log} files contain a
 detailed log of the compiler invocations and the corresponding
-results, the @file{*.sum} files summarize the results.  These summaries list
-all the tests that have been run with a corresponding status code:
+results, the @file{*.sum} files summarize the results.  These summaries 
+contain status codes for all tests: 
 
 @itemize @bullet
 @item
@@ -1323,12 +1310,7 @@ make sure it is in your @env{PATH}.  The file @file{your_commentary.txt} is
 prepended to the testsuite summary and should contain any special
 remarks you have on your results or your build environment.  Please
 do not edit the testsuite result block or the subject line, as these
-messages are automatically parsed and presented at the
-@uref{http://gcc.gnu.org/testresults/,,GCC testresults} web
-page.  Here you can also gather information on how specific tests
-behave on different platforms and compare them with your results.  A
-few failing testcases are possible even on released versions and you
-should look here first if you think your results are unreasonable.
+messages may be automatically processed.
 
 @html
 <hr />
@@ -1367,6 +1349,34 @@ Java libraries are installed in @file{@var{prefix}/include}; libraries
 in @file{@var{libdir}} (normally @file{@var{prefix}/lib}); internal
 parts of the compiler in @file{@var{libdir}/gcc-lib}; documentation in
 info format in @file{@var{infodir}} (normally @file{@var{prefix}/info}).
+
+When installing cross-compilers, GCC's executables
+are not only installed into @file{@var{bindir}}, that
+is, @file{@var{exec-prefix}/bin}, but additionally into
+@file{@var{exec-prefix}/@var{target-alias}/bin}, if that directory
+exists.  Typically, such @dfn{tooldirs} hold target-specific
+binutils, including assembler and linker.
+
+Installation into a temporary staging area or into a @command{chroot}
+jail can be achieved with the command
+
+@example
+make DESTDIR=@var{path-to-rootdir} install
+@end example
+
+@noindent where @var{path-to-rootdir} is the absolute path of
+a directory relative to which all installation paths will be
+interpreted.  Note that the directory specified by @code{DESTDIR}
+need not exist yet; it will be created if necessary.
+
+There is a subtle point with tooldirs and @code{DESTDIR}:
+If you relocate a cross-compiler installation with
+e.g.@: @samp{DESTDIR=@var{rootdir}}, then the directory
+@file{@var{rootdir}/@var{exec-prefix}/@var{target-alias}/bin} will
+be filled with duplicated GCC executables only if it already exists,
+it will not be created otherwise.  This is regarded as a feature,
+not as a bug, because it gives slightly more control to the packagers
+using the @code{DESTDIR} feature.
 
 If you built a released version of GCC using @samp{make bootstrap} then please
 quickly review the build status page for your release, available from
@@ -1434,7 +1444,7 @@ If you find a bug, please report it following our
 @uref{../bugs.html,,bug reporting guidelines}.
 
 If you want to print the GCC manuals, do @samp{cd @var{objdir}; make
-dvi}.  You will need to have @command{texi2dvi} (version at least 4.1)
+dvi}.  You will need to have @command{texi2dvi} (version at least 4.2)
 and @TeX{} installed.  This creates a number of @file{.dvi} files in
 subdirectories of @file{@var{objdir}}; these may be converted for
 printing with programs such as @command{dvips}.  You can also
@@ -1514,7 +1524,7 @@ Solaris 2 (SPARC, Intel)---@uref{http://www.sunfreeware.com/,,Sunfreeware}.
 SGI---@uref{http://freeware.sgi.com/,,SGI Freeware}.
 
 @item
-Windows 95, 98, and NT:
+Microsoft Windows:
 @itemize
 @item
 The @uref{http://sources.redhat.com/cygwin/,,Cygwin} project;
@@ -1904,9 +1914,9 @@ can also be obtained from:
 @item
 @uref{http://www.openavr.org,,http://www.openavr.org}
 @item
-@uref{http://home.overta.ru/users/denisc,,http://home.overta.ru/users/denisc}
+@uref{http://home.overta.ru/users/denisc/,,http://home.overta.ru/users/denisc/}
 @item
-@uref{http://www.amelek.gda.pl/avr,,http://www.amelek.gda.pl/avr}
+@uref{http://www.amelek.gda.pl/avr/,,http://www.amelek.gda.pl/avr/}
 @end itemize
 
 We @emph{strongly} recommend using binutils 2.13 or newer.
@@ -2039,7 +2049,7 @@ and tested on @samp{i386-*-freebsd4.5} and @samp{alpha-*-freebsd5.0}.
 The static
 library may be incorrectly built (symbols are missing at link time).
 There is a rare timing-based startup hang (probably involves an
-assupmtion about the thread library).  Multi-threaded boehm-gc (required for
+assumption about the thread library).  Multi-threaded boehm-gc (required for
 libjava) exposes severe threaded signal-handling bugs on FreeBSD before
 4.5-RELEASE.  The alpha port may not fully bootstrap without some manual
 intervention: @command{gcjh} will crash with a floating-point exception while
@@ -2154,11 +2164,16 @@ bootstrap}.
 GCC 3.0 and up support HP-UX 11.  On 64-bit capable systems, there
 are two distinct ports.  The @samp{hppa2.0w-hp-hpux11*} port generates
 code for the 32-bit pa-risc runtime architecture.  It uses the HP
-linker and is currently the default selected by config.guess.  The
-optional @samp{hppa64-hp-hpux11*} port generates 64-bit code for the
-pa-risc 2.0 architecture.  It must be explicitly selected using the
-@samp{--host=hppa64-hp-hpux11*} configure option.  Different prefixes
-must be used if both ports are to be installed on the same system.
+linker.  The @samp{hppa64-hp-hpux11*} port generates 64-bit code for the
+pa-risc 2.0 architecture.  The script config.guess now selects the port
+type based on the type compiler detected during configuration.  You must
+set your @env{PATH} or define @env{CC} so that configure finds an appropriate
+compiler for the initial bootstrap.  Different prefixes must be used if
+both ports are to be installed on the same system.
+
+GCC 2.95.x is not supported under HP-UX 11 and cannot be used to
+compile GCC 3.0 and up.  Refer to @uref{binaries.html,,binaries} for
+information about obtaining precompiled GCC binaries for HP-UX.
 
 You must use GNU binutils 2.11 or above with the 32-bit port.  Thread
 support is not currently implemented, so @option{--enable-threads} does
@@ -2169,17 +2184,30 @@ not work.  See:
 @item @uref{http://gcc.gnu.org/ml/gcc-bugs/2002-01/msg00663.html}
 @end itemize
 
-GCC 2.95.x is not supported under HP-UX 11 and cannot be used to
-compile GCC 3.0 and up.  Refer to @uref{binaries.html,,binaries} for
-information about obtaining precompiled GCC binaries for HP-UX.
+GCC 3.3 and later support weak symbols on the 32-bit port using SOM
+secondary definition symbols.  This feature is not enabled for earlier
+versions of HP-UX since there have been bugs in the linker support for
+secondary symbols.  The HP linker patches @code{PHSS_26559} and
+@code{PHSS_24304} for HP-UX 11.00 and 11.11, respectively, correct the
+problem of linker core dumps creating C++ libraries.  Earlier patches
+may work but they have not been tested.
 
-GNU binutils 2.13 or later is recommended with the 64-bit port.
-The HP assembler has many limitations and is not recommended.  For
-example, it does not support weak symbols or alias definitions.
-As a result, explicit template instantiations are required when
-using C++.  Either the HP or GNU linker can be used but it may be
-necessary to use the GNU linker when dwarf2 exception support is
-implemented.
+GCC 3.3 nows uses the ELF DT_INIT_ARRAY and DT_FINI_ARRAY capability
+to run initializers and finalizers on the 64-bit port.  The feature
+requires CVS binutils as of January 2, 2003, or a subsequent release
+to correct a problem arising from HP's non-standard use of the .init
+and .fini sections.  The 32-bit port uses the linker @option{+init}
+and @option{+fini} options.  As with the support for secondary symbols,
+there have been bugs in the order in which these options are executed
+by the HP linker.  So, again a recent linker patch is recommended.
+
+The HP assembler has many limitations and is not recommended for either
+the 32 or 64-bit ports.  For example, it does not support weak symbols
+or alias definitions.  As a result, explicit template instantiations
+are required when using C++.  You also can't generate debugging information
+when using the HP assembler.  Either the HP or GNU linker can be used
+with the 64-bit port but it may be necessary to use the GNU linker
+when dwarf2 exception support is implemented.
 
 There are several possible approaches to building the distribution.
 Binutils can be built first using the HP tools.  Then, the GCC
@@ -2208,23 +2236,20 @@ have a higher-quality port for this machine soon.
 @end html
 @heading @anchor{*-*-linux-gnu}*-*-linux-gnu
 
+Versions of libstdc++-v3 starting with 3.2.1 require bugfixes present
+in glibc 2.2.5 and later.  More information is available in the
+libstdc++-v3 documentation.
+
 If you use glibc 2.2 (or 2.1.9x), GCC 2.95.2 won't install
 out-of-the-box.  You'll get compile errors while building @samp{libstdc++}.
 The patch @uref{glibc-2.2.patch,,glibc-2.2.patch}, that is to be
 applied in the GCC source tree, fixes the compatibility problems.
 
-@html
-@end html
-
-@html
-<p>
-@end html
-
 Currently Glibc 2.2.3 (and older releases) and GCC 3.0 are out of sync
 since the latest exception handling changes for GCC@.  Compiling glibc
 with GCC 3.0 will give a binary incompatible glibc and therefore cause
-lots of problems and might make your system completly unusable.  This
-will definitly need fixes in glibc but might also need fixes in GCC@.  We
+lots of problems and might make your system completely unusable.  This
+will definitely need fixes in glibc but might also need fixes in GCC@.  We
 strongly advise to wait for glibc 2.2.4 and to read the release notes of
 glibc 2.2.4 whether patches for GCC 3.0 are needed.  You can use glibc
 2.2.3 with GCC 3.0, just do not try to recompile it.
@@ -2309,7 +2334,7 @@ additional OpenServer-specific flags.
 
 Systems based on OpenServer before 5.0.4 (@samp{uname -X}
 will tell you what you're running) require TLS597 from
-@uref{ftp://ftp.sco.com/TLS/,,ftp://ftp.sco.com/TLS/}
+@uref{ftp://stage.caldera.com/TLS/,,ftp://stage.caldera.com/TLS/}
 for C++ constructors and destructors to work right.
 
 The system linker in (at least) 5.0.4 and 5.0.5 will sometimes
@@ -2318,8 +2343,8 @@ code.  This can be seen as execution testsuite failures when using
 @option{-fPIC} on @file{921215-1.c}, @file{931002-1.c}, @file{nestfunc-1.c}, and @file{gcov-1.c}.
 For 5.0.5, an updated linker that will cure this problem is
 available.  You must install both
-@uref{ftp://ftp.sco.com/Supplements/rs505a/,,ftp://ftp.sco.com/Supplements/rs505a/}
-and @uref{ftp://ftp.sco.com/SLS/,,OSS499A}.
+@uref{ftp://ftp.sco.com/pub/openserver5/rs505a,,ftp://ftp.sco.com/pub/openserver5/rs505a}
+and @uref{ftp://ftp.sco.com/pub/openserver5,,OSS499A}.
 
 The dynamic linker in OpenServer 5.0.5 (earlier versions may show
 the same problem) aborts on certain G77-compiled programs.  It's particularly
@@ -2867,7 +2892,7 @@ GCC 3.0 does not support Darwin, but 3.1 and later releases will work.
 Pre-installed versions of Mac OS X may not include any developer tools,
 meaning that you will not be able to build GCC from source.  Tool
 binaries are available at
-@uref{http://www.opensource.apple.com/projects/darwin} (free
+@uref{http://www.opensource.apple.com/projects/darwin/} (free
 registration required).
 
 Versions of the assembler prior to ``cctools-364'' cannot handle the
@@ -2909,7 +2934,7 @@ or newer for a working GCC@.
 @end html
 @heading @anchor{powerpc-*-netbsd*}powerpc-*-netbsd*
 PowerPC system in big endian mode running NetBSD@.  To build the
-documentation you will need Texinfo version 4.1 (NetBSD 1.5.1 included
+documentation you will need Texinfo version 4.2 (NetBSD 1.5.1 included
 Texinfo version 3.12).
 
 @html
