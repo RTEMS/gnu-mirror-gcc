@@ -6459,6 +6459,15 @@ expand_expr_real_1 (tree exp, rtx target, enum machine_mode tmode,
   int ignore;
   tree context;
 
+  /* Handle ERROR_MARK before anybody tries to access its type.  */
+  if (TREE_CODE (exp) == ERROR_MARK || TREE_CODE (type) == ERROR_MARK)
+    {
+      op0 = CONST0_RTX (tmode);
+      if (op0 != 0)
+	return op0;
+      return const0_rtx;
+    }
+
   mode = TYPE_MODE (type);
   /* Use subtarget as the target for operand 0 of a binary operation.  */
   subtarget = get_subtarget (target);
