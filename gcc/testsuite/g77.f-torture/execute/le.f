@@ -1,0 +1,9 @@
+      if (t .neqv. .true.) call abort
+      if (t .neqv. .true.) call abort
+      if (t .neqv. .false.) call abort
+      if (t .neqv. .true.) call abort
+      if (t .neqv. .true.) call abort
+      if (t .neqv. .true.) call abort
+      if (t .neqv. .false.) call abort
+      if (t .neqv. .true.) call abort
+      if (t .neqv. .false.) call abort

@@ -1,0 +1,15 @@
+   Contributed by James Craig Burley (burley@gnu.org).
+And AND
+Eq EQ
+Eqv EQV
+False FALSE
+GE GE
+GT GT
+LE LE
+LT LT
+NE NE
+NEqv NEQV
+Not NOT
+Or OR
+True TRUE
+XOr XOR
