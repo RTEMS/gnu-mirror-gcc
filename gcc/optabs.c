@@ -1,5 +1,5 @@
 /* Expand the basic unary and binary arithmetic operations, for GNU compiler.
-   Copyright (C) 1987, 88, 92, 93, 94, 95, 1996 Free Software Foundation, Inc.
+   Copyright (C) 1987, 88, 92-97, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -20,6 +20,7 @@ Boston, MA 02111-1307, USA.  */
 
 
 #include "config.h"
+#include <stdio.h>
 #include "rtl.h"
 #include "tree.h"
 #include "flags.h"
@@ -124,7 +125,6 @@ rtx sjpopnthrow_libfunc;
 rtx terminate_libfunc;
 rtx setjmp_libfunc;
 rtx longjmp_libfunc;
-rtx get_dynamic_handler_chain_libfunc;
 
 rtx eqhf2_libfunc;
 rtx nehf2_libfunc;
@@ -208,6 +208,12 @@ rtx fixunsxfti_libfunc;
 rtx fixunstfsi_libfunc;
 rtx fixunstfdi_libfunc;
 rtx fixunstfti_libfunc;
+
+rtx chkr_check_addr_libfunc;
+rtx chkr_set_right_libfunc;
+rtx chkr_copy_bitmap_libfunc;
+rtx chkr_check_exec_libfunc;
+rtx chkr_check_str_libfunc;
 
 /* Indexed by the rtx-code for a conditional (eg. EQ, LT,...)
    gives the gen_function to make a branch to test that condition.  */
@@ -2954,6 +2960,9 @@ emit_float_lib_cmp (x, y, comparison)
       case LE:
 	libfunc = lehf2_libfunc;
 	break;
+
+      default:
+	break;
       }
   else if (mode == SFmode)
     switch (comparison)
@@ -2980,6 +2989,9 @@ emit_float_lib_cmp (x, y, comparison)
 
       case LE:
 	libfunc = lesf2_libfunc;
+	break;
+
+      default:
 	break;
       }
   else if (mode == DFmode)
@@ -3008,6 +3020,9 @@ emit_float_lib_cmp (x, y, comparison)
       case LE:
 	libfunc = ledf2_libfunc;
 	break;
+
+      default:
+	break;
       }
   else if (mode == XFmode)
     switch (comparison)
@@ -3035,6 +3050,9 @@ emit_float_lib_cmp (x, y, comparison)
       case LE:
 	libfunc = lexf2_libfunc;
 	break;
+
+      default:
+	break;
       }
   else if (mode == TFmode)
     switch (comparison)
@@ -3061,6 +3079,9 @@ emit_float_lib_cmp (x, y, comparison)
 
       case LE:
 	libfunc = letf2_libfunc;
+	break;
+
+      default:
 	break;
       }
   else
@@ -3160,15 +3181,14 @@ emit_conditional_move (target, code, op0, op1, cmode, op2, op3, mode,
   if (cmode == VOIDmode)
     cmode = GET_MODE (op0);
 
-  if ((CONSTANT_P (op2) && ! CONSTANT_P (op3))
-      || (GET_CODE (op2) == CONST_INT && GET_CODE (op3) != CONST_INT))
+  if (((CONSTANT_P (op2) && ! CONSTANT_P (op3))
+       || (GET_CODE (op2) == CONST_INT && GET_CODE (op3) != CONST_INT))
+      && (GET_MODE_CLASS (GET_MODE (op1)) != MODE_FLOAT
+	  || TARGET_FLOAT_FORMAT != IEEE_FLOAT_FORMAT || flag_fast_math))
     {
       tem = op2;
       op2 = op3;
       op3 = tem;
-      /* ??? This may not be appropriate (consider IEEE).  Perhaps we should
-	 call can_reverse_comparison_p here and bail out if necessary.
-	 It's not clear whether we need to do this canonicalization though.  */
       code = reverse_condition (code);
     }
 
@@ -4284,7 +4304,6 @@ init_optabs ()
   setjmp_libfunc = gen_rtx (SYMBOL_REF, Pmode, "setjmp");
   longjmp_libfunc = gen_rtx (SYMBOL_REF, Pmode, "longjmp");
 #endif
-  get_dynamic_handler_chain_libfunc = gen_rtx (SYMBOL_REF, Pmode, "__get_dynamic_handler_chain");
 
   eqhf2_libfunc = gen_rtx (SYMBOL_REF, Pmode, "__eqhf2");
   nehf2_libfunc = gen_rtx (SYMBOL_REF, Pmode, "__nehf2");
@@ -4368,6 +4387,13 @@ init_optabs ()
   fixunstfsi_libfunc = gen_rtx (SYMBOL_REF, Pmode, "__fixunstfsi");
   fixunstfdi_libfunc = gen_rtx (SYMBOL_REF, Pmode, "__fixunstfdi");
   fixunstfti_libfunc = gen_rtx (SYMBOL_REF, Pmode, "__fixunstfti");
+
+  /* For check-memory-usage.  */
+  chkr_check_addr_libfunc = gen_rtx (SYMBOL_REF, VOIDmode, "chkr_check_addr");
+  chkr_set_right_libfunc = gen_rtx (SYMBOL_REF, VOIDmode, "chkr_set_right");
+  chkr_copy_bitmap_libfunc = gen_rtx (SYMBOL_REF, VOIDmode, "chkr_copy_bitmap");
+  chkr_check_exec_libfunc = gen_rtx (SYMBOL_REF, VOIDmode, "chkr_check_exec");
+  chkr_check_str_libfunc = gen_rtx (SYMBOL_REF, VOIDmode, "chkr_check_str");
 
 #ifdef INIT_TARGET_OPTABS
   /* Allow the target to add more libcalls or rename some, etc.  */
