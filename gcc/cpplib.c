@@ -1,6 +1,6 @@
 /* CPP Library. (Directive handling.)
    Copyright (C) 1986, 1987, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
    Contributed by Per Bothner, 1994-95.
    Based on CCCP program by Paul Rubin, June 1986
    Adapted to ANSI C, Richard Stallman, Jan 1987
@@ -407,6 +407,7 @@ _cpp_handle_directive (pfile, indented)
 	     skipping or not, we should lex angle-bracketed headers
 	     correctly, and maybe output some diagnostics.  */
 	  pfile->state.angled_headers = dir->flags & INCL;
+	  pfile->state.directive_wants_padding = dir->flags & INCL;
 	  if (! CPP_OPTION (pfile, preprocessed))
 	    directive_diagnostics (pfile, dir, indented);
 	  if (pfile->state.skipping && !(dir->flags & COND))
@@ -575,7 +576,7 @@ glue_header_name (pfile)
   buffer = (unsigned char *) xmalloc (capacity);
   for (;;)
     {
-      token = cpp_get_token (pfile);
+      token = get_token_no_padding (pfile);
 
       if (token->type == CPP_GREATER || token->type == CPP_EOF)
 	break;
@@ -627,7 +628,7 @@ parse_include (pfile)
     dir = pfile->directive->name;
 
   /* Allow macro expansion.  */
-  header = cpp_get_token (pfile);
+  header = get_token_no_padding (pfile);
   if (header->type != CPP_STRING && header->type != CPP_HEADER_NAME)
     {
       if (header->type != CPP_LESS)
@@ -1093,7 +1094,7 @@ do_pragma (pfile)
      cpp_reader *pfile;
 {
   const struct pragma_entry *p = NULL;
-  const cpp_token *token;
+  const cpp_token *token, *pragma_token = pfile->cur_token;
   unsigned int count = 1;
 
   pfile->state.prevent_expansion++;
@@ -1113,16 +1114,18 @@ do_pragma (pfile)
 	}
     }
 
-  /* FIXME.  This is an awful kludge to get the front ends to update
-     their notion of line number for diagnostic purposes.  The line
-     number should be passed to the handler and they should do it
-     themselves.  Stand-alone CPP must ignore us, otherwise it will
-     prefix the directive with spaces, hence the 1.  Ugh.  */
-  if (pfile->cb.line_change)
-    (*pfile->cb.line_change)(pfile, token, 1);
-
   if (p)
-    (*p->u.handler) (pfile);
+    {
+      /* Since the handler below doesn't get the line number, that it
+	 might need for diagnostics, make sure it has the right
+	 numbers in place.  */
+      if (pfile->cb.line_change)
+	(*pfile->cb.line_change) (pfile, pragma_token, false);
+      (*p->u.handler) (pfile);
+      if (pfile->cb.line_change)
+	(*pfile->cb.line_change) (pfile, pfile->cur_token, false);
+      
+    }
   else if (pfile->cb.def_pragma)
     {
       _cpp_backup_tokens (pfile, count);
