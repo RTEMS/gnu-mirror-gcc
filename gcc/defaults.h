@@ -1,5 +1,5 @@
 /* Definitions of various defaults for tm.h macros.
-   Copyright (C) 1992, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003
+   Copyright (C) 1992, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004
    Free Software Foundation, Inc.
    Contributed by Ron Guilmette (rfg@monkeys.com)
 
@@ -137,6 +137,12 @@ do { fputs (integer_asm_op (POINTER_SIZE / UNITS_PER_WORD, TRUE), FILE); \
 	fprintf (FILE, "\n");						\
   } while (0)
 #endif
+#endif
+
+/* Decide whether to defer emitting the assembler output for an equate
+   of two values.  The default is to not defer output.  */
+#ifndef TARGET_DEFERRED_OUTPUT_DEFS
+#define TARGET_DEFERRED_OUTPUT_DEFS(DECL,TARGET) false
 #endif
 
 /* This is how to output the definition of a user-level label named
