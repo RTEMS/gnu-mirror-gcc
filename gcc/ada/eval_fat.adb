@@ -40,8 +40,8 @@ package body Eval_Fat is
 
    type Radix_Power_Table is array (Int range 1 .. 4) of Int;
 
-   Radix_Powers : constant Radix_Power_Table
-     := (Radix**1, Radix**2, Radix**3, Radix**4);
+   Radix_Powers : constant Radix_Power_Table :=
+                    (Radix ** 1, Radix ** 2, Radix ** 3, Radix ** 4);
 
    function Float_Radix return T renames Ureal_2;
    --  Radix expressed in real form
@@ -82,9 +82,6 @@ package body Eval_Fat is
 
    function Machine_Emin (RT : R) return Int;
    --  Return value of the Machine_Emin attribute
-
-   function Machine_Mantissa (RT : R) return Nat;
-   --  Return value of the Machine_Mantissa attribute
 
    --------------
    -- Adjacent --
@@ -385,14 +382,10 @@ package body Eval_Fat is
       Calculate_Fraction_And_Exponent : begin
          Uintp_Mark := Mark;
 
-         --  Put back sign before applying the rounding.
-
-         if UR_Is_Negative (X) then
-            Fraction := -Fraction;
-         end if;
-
          --  Determine correct rounding based on the remainder
-         --  which is in N and the divisor D.
+         --  which is in N and the divisor D. The rounding is
+         --  performed on the absolute value of X, so Ceiling
+         --  and Floor need to check for the sign of X explicitly.
 
          case Mode is
             when Round_Even =>
@@ -419,11 +412,14 @@ package body Eval_Fat is
                end if;
 
             when Ceiling =>
-               if N > Uint_0 then
+               if N > Uint_0 and then not UR_Is_Negative (X) then
                   Fraction := Fraction + 1;
                end if;
 
-            when Floor   => null;
+            when Floor   =>
+               if N > Uint_0 and then UR_Is_Negative (X) then
+                  Fraction := Fraction + 1;
+               end if;
          end case;
 
          --  The result must be normalized to [1.0/Radix, 1.0),
@@ -432,6 +428,12 @@ package body Eval_Fat is
          if Fraction = Most_Significant_Digit * Radix then
             Fraction := Most_Significant_Digit;
             Exponent := Exponent + 1;
+         end if;
+
+         --  Put back sign after applying the rounding.
+
+         if UR_Is_Negative (X) then
+            Fraction := -Fraction;
          end if;
 
          Release_And_Save (Uintp_Mark, Fraction, Exponent);
@@ -705,6 +707,16 @@ package body Eval_Fat is
 
       return Mant;
    end Machine_Mantissa;
+
+   -------------------
+   -- Machine_Radix --
+   -------------------
+
+   function Machine_Radix (RT : R) return Nat is
+      pragma Warnings (Off, RT);
+   begin
+      return Radix;
+   end Machine_Radix;
 
    -----------
    -- Model --

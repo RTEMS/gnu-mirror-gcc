@@ -65,7 +65,7 @@
 #include <bits/stl_iterator_base_types.h>
 #include <bits/stl_iterator_base_funcs.h>
 
-namespace __gnu_norm
+namespace _GLIBCXX_STD
 {
   /**
    *  @if maint
@@ -359,15 +359,15 @@ namespace __gnu_norm
       get_allocator() const
       { return *static_cast<const _Alloc*>(&this->_M_impl); }
 
-      typedef _Deque_iterator<_Tp,_Tp&,_Tp*>             iterator;
-      typedef _Deque_iterator<_Tp,const _Tp&,const _Tp*> const_iterator;
+      typedef _Deque_iterator<_Tp, _Tp&, _Tp*>             iterator;
+      typedef _Deque_iterator<_Tp, const _Tp&, const _Tp*> const_iterator;
 
       _Deque_base(const allocator_type& __a, size_t __num_elements)
-	: _M_impl(__a)
+      : _M_impl(__a)
       { _M_initialize_map(__num_elements); }
 
       _Deque_base(const allocator_type& __a)
-	: _M_impl(__a)
+      : _M_impl(__a)
       { }
 
       ~_Deque_base();
@@ -377,14 +377,15 @@ namespace __gnu_norm
       //standard container and at the same time makes use of the EBO
       //for empty allocators.
       struct _Deque_impl
-	: public _Alloc {
+      : public _Alloc
+      {
 	_Tp** _M_map;
 	size_t _M_map_size;
 	iterator _M_start;
 	iterator _M_finish;
 
 	_Deque_impl(const _Alloc& __a)
-	  : _Alloc(__a), _M_map(0), _M_map_size(0), _M_start(), _M_finish()
+	: _Alloc(__a), _M_map(0), _M_map_size(0), _M_start(), _M_finish()
 	{ }
       };
 
@@ -418,14 +419,16 @@ namespace __gnu_norm
     };
 
   template<typename _Tp, typename _Alloc>
-  _Deque_base<_Tp,_Alloc>::~_Deque_base()
-  {
-    if (this->_M_impl._M_map)
+    _Deque_base<_Tp, _Alloc>::
+    ~_Deque_base()
     {
-      _M_destroy_nodes(this->_M_impl._M_start._M_node, this->_M_impl._M_finish._M_node + 1);
-      _M_deallocate_map(this->_M_impl._M_map, this->_M_impl._M_map_size);
+      if (this->_M_impl._M_map)
+	{
+	  _M_destroy_nodes(this->_M_impl._M_start._M_node,
+			   this->_M_impl._M_finish._M_node + 1);
+	  _M_deallocate_map(this->_M_impl._M_map, this->_M_impl._M_map_size);
+	}
     }
-  }
 
   /**
    *  @if maint
@@ -439,12 +442,14 @@ namespace __gnu_norm
   */
   template<typename _Tp, typename _Alloc>
     void
-    _Deque_base<_Tp,_Alloc>::_M_initialize_map(size_t __num_elements)
+    _Deque_base<_Tp, _Alloc>::
+    _M_initialize_map(size_t __num_elements)
     {
-      size_t __num_nodes = __num_elements / __deque_buf_size(sizeof(_Tp)) + 1;
+      const size_t __num_nodes = (__num_elements / __deque_buf_size(sizeof(_Tp))
+				  + 1);
 
       this->_M_impl._M_map_size = std::max((size_t) _S_initial_map_size,
-				   __num_nodes + 2);
+					   size_t(__num_nodes + 2));
       this->_M_impl._M_map = _M_allocate_map(this->_M_impl._M_map_size);
 
       // For "small" maps (needing less than _M_map_size nodes), allocation
@@ -452,7 +457,8 @@ namespace __gnu_norm
       // the beginning of _M_map, but for small maps it may be as far in as
       // _M_map+3.
 
-      _Tp** __nstart = this->_M_impl._M_map + (this->_M_impl._M_map_size - __num_nodes) / 2;
+      _Tp** __nstart = (this->_M_impl._M_map
+			+ (this->_M_impl._M_map_size - __num_nodes) / 2);
       _Tp** __nfinish = __nstart + __num_nodes;
 
       try
@@ -468,13 +474,15 @@ namespace __gnu_norm
       this->_M_impl._M_start._M_set_node(__nstart);
       this->_M_impl._M_finish._M_set_node(__nfinish - 1);
       this->_M_impl._M_start._M_cur = _M_impl._M_start._M_first;
-      this->_M_impl._M_finish._M_cur = this->_M_impl._M_finish._M_first + __num_elements
-	                 % __deque_buf_size(sizeof(_Tp));
+      this->_M_impl._M_finish._M_cur = (this->_M_impl._M_finish._M_first
+					+ __num_elements
+					% __deque_buf_size(sizeof(_Tp)));
     }
 
   template<typename _Tp, typename _Alloc>
     void
-    _Deque_base<_Tp,_Alloc>::_M_create_nodes(_Tp** __nstart, _Tp** __nfinish)
+    _Deque_base<_Tp, _Alloc>::
+    _M_create_nodes(_Tp** __nstart, _Tp** __nfinish)
     {
       _Tp** __cur;
       try
@@ -491,7 +499,8 @@ namespace __gnu_norm
 
   template<typename _Tp, typename _Alloc>
     void
-    _Deque_base<_Tp,_Alloc>::_M_destroy_nodes(_Tp** __nstart, _Tp** __nfinish)
+    _Deque_base<_Tp, _Alloc>::
+    _M_destroy_nodes(_Tp** __nstart, _Tp** __nfinish)
     {
       for (_Tp** __n = __nstart; __n < __nfinish; ++__n)
 	_M_deallocate_node(*__n);
@@ -591,14 +600,14 @@ namespace __gnu_norm
 
     public:
       typedef _Tp                                value_type;
-      typedef value_type*                        pointer;
-      typedef const value_type*                  const_pointer;
+      typedef typename _Alloc::pointer           pointer;
+      typedef typename _Alloc::const_pointer     const_pointer;
+      typedef typename _Alloc::reference         reference;
+      typedef typename _Alloc::const_reference   const_reference;
       typedef typename _Base::iterator           iterator;
       typedef typename _Base::const_iterator     const_iterator;
       typedef std::reverse_iterator<const_iterator>   const_reverse_iterator;
       typedef std::reverse_iterator<iterator>         reverse_iterator;
-      typedef value_type&                        reference;
-      typedef const value_type&                  const_reference;
       typedef size_t                             size_type;
       typedef ptrdiff_t                          difference_type;
       typedef typename _Base::allocator_type     allocator_type;
@@ -668,7 +677,8 @@ namespace __gnu_norm
        */
       deque(const deque& __x)
       : _Base(__x.get_allocator(), __x.size())
-      { std::uninitialized_copy(__x.begin(), __x.end(), this->_M_impl._M_start); }
+      { std::__uninitialized_copy_a(__x.begin(), __x.end(), this->_M_impl._M_start,
+				    this->get_allocator()); }
 
       /**
        *  @brief  Builds a %deque from a range.
@@ -700,7 +710,8 @@ namespace __gnu_norm
        *  way.  Managing the pointer is the user's responsibilty.
        */
       ~deque()
-      { std::_Destroy(this->_M_impl._M_start, this->_M_impl._M_finish); }
+      { std::_Destroy(this->_M_impl._M_start, this->_M_impl._M_finish,
+		      this->get_allocator()); }
 
       /**
        *  @brief  %Deque assignment operator.
@@ -918,7 +929,10 @@ namespace __gnu_norm
        */
       reference
       at(size_type __n)
-      { _M_range_check(__n); return (*this)[__n]; }
+      {
+	_M_range_check(__n);
+	return (*this)[__n];
+      }
 
       /**
        *  @brief  Provides access to the data contained in the %deque.
@@ -991,7 +1005,7 @@ namespace __gnu_norm
       {
 	if (this->_M_impl._M_start._M_cur != this->_M_impl._M_start._M_first)
 	  {
-	    std::_Construct(this->_M_impl._M_start._M_cur - 1, __x);
+	    this->_M_impl.construct(this->_M_impl._M_start._M_cur - 1, __x);
 	    --this->_M_impl._M_start._M_cur;
 	  }
 	else
@@ -1009,9 +1023,10 @@ namespace __gnu_norm
       void
       push_back(const value_type& __x)
       {
-	if (this->_M_impl._M_finish._M_cur != this->_M_impl._M_finish._M_last - 1)
+	if (this->_M_impl._M_finish._M_cur
+	    != this->_M_impl._M_finish._M_last - 1)
 	  {
-	    std::_Construct(this->_M_impl._M_finish._M_cur, __x);
+	    this->_M_impl.construct(this->_M_impl._M_finish._M_cur, __x);
 	    ++this->_M_impl._M_finish._M_cur;
 	  }
 	else
@@ -1029,9 +1044,10 @@ namespace __gnu_norm
       void
       pop_front()
       {
-	if (this->_M_impl._M_start._M_cur != this->_M_impl._M_start._M_last - 1)
+	if (this->_M_impl._M_start._M_cur
+	    != this->_M_impl._M_start._M_last - 1)
 	  {
-	    std::_Destroy(this->_M_impl._M_start._M_cur);
+	    this->_M_impl.destroy(this->_M_impl._M_start._M_cur);
 	    ++this->_M_impl._M_start._M_cur;
 	  }
 	else
@@ -1049,10 +1065,11 @@ namespace __gnu_norm
       void
       pop_back()
       {
-	if (this->_M_impl._M_finish._M_cur != this->_M_impl._M_finish._M_first)
+	if (this->_M_impl._M_finish._M_cur
+	    != this->_M_impl._M_finish._M_first)
 	  {
 	    --this->_M_impl._M_finish._M_cur;
-	    std::_Destroy(this->_M_impl._M_finish._M_cur);
+	    this->_M_impl.destroy(this->_M_impl._M_finish._M_cur);
 	  }
 	else
 	  _M_pop_back_aux();
@@ -1418,7 +1435,8 @@ namespace __gnu_norm
       void
       _M_reserve_map_at_front (size_type __nodes_to_add = 1)
       {
-	if (__nodes_to_add > size_type(this->_M_impl._M_start._M_node - this->_M_impl._M_map))
+	if (__nodes_to_add > size_type(this->_M_impl._M_start._M_node
+				       - this->_M_impl._M_map))
 	  _M_reallocate_map(__nodes_to_add, true);
       }
 
@@ -1496,6 +1514,6 @@ namespace __gnu_norm
     inline void
     swap(deque<_Tp,_Alloc>& __x, deque<_Tp,_Alloc>& __y)
     { __x.swap(__y); }
-} // namespace __gnu_norm
+} // namespace std
 
 #endif /* _DEQUE_H */

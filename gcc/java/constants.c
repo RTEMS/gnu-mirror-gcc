@@ -1,5 +1,6 @@
 /* Handle the constant pool of the Java(TM) Virtual Machine.
-   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2003, 2004 Free Software Foundation, Inc.
+   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2003, 2004
+   Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -320,10 +321,10 @@ static GTY(()) tree tag_nodes[13];
 static tree
 get_tag_node (int tag)
 {
-  /* A Cache for build_int_2 (CONSTANT_XXX, 0). */
+  /* A Cache for build_int_cst (CONSTANT_XXX, 0). */
 
   if (tag_nodes[tag] == NULL_TREE)
-    tag_nodes[tag] = build_int_2 (tag, 0);
+    tag_nodes[tag] = build_int_cst (NULL_TREE, tag);
   return tag_nodes[tag];
 }
 
@@ -386,29 +387,35 @@ alloc_class_constant (tree clas)
 				IDENTIFIER_LENGTH(class_name))));
 }
 
-/* Return a reference to the data array of the current constant pool. */
+/* Return the decl of the data array of the current constant pool. */
 
 static tree
 build_constant_data_ref (void)
 {
-  tree cpool_data_ref = NULL_TREE;
+  tree decl = TYPE_CPOOL_DATA_REF (output_class);
 
-  if (TYPE_CPOOL_DATA_REF (output_class))
-    cpool_data_ref = TYPE_CPOOL_DATA_REF (output_class);
-
-  if (cpool_data_ref == NULL_TREE)
+  if (decl == NULL_TREE)
     {
-      tree decl;
+      tree type;
       tree decl_name = mangled_classname ("_CD_", output_class);
-      decl = build_decl (VAR_DECL, decl_name,
-			 build_array_type (ptr_type_node,
-					   one_elt_array_domain_type));
+
+      /* Build a type with unspecified bounds.  The will make sure
+	 that targets do the right thing with whatever size we end
+	 up with at the end.  Using bounds that are too small risks
+	 assuming the data is in the small data section.  */
+      type = build_array_type (ptr_type_node, NULL_TREE);
+
+      /* We need to lay out the type ourselves, since build_array_type
+	 thinks the type is incomplete.  */
+      layout_type (type);
+
+      decl = build_decl (VAR_DECL, decl_name, type);
       TREE_STATIC (decl) = 1;
-      make_decl_rtl (decl, NULL);
-      TYPE_CPOOL_DATA_REF (output_class) = cpool_data_ref
-	= build1 (ADDR_EXPR, ptr_type_node, decl);
+      make_decl_rtl (decl);
+      TYPE_CPOOL_DATA_REF (output_class) = decl;
     }
-  return cpool_data_ref;
+
+  return decl;
 }
 
 /* Get the pointer value at the INDEX'th element of the constant pool. */
@@ -416,11 +423,10 @@ build_constant_data_ref (void)
 tree
 build_ref_from_constant_pool (int index)
 {
-  tree t = build_constant_data_ref ();
-  index *= int_size_in_bytes (ptr_type_node);
-  t = fold (build (PLUS_EXPR, ptr_type_node,
-                              t, build_int_2 (index, 0)));
-  return build1 (INDIRECT_REF, ptr_type_node, t);
+  tree d = build_constant_data_ref ();
+  tree i = build_int_cst (NULL_TREE, index);
+  return build4 (ARRAY_REF, TREE_TYPE (TREE_TYPE (d)), d, i,
+		 NULL_TREE, NULL_TREE);
 }
 
 /* Build an initializer for the constants field of the current constant pool.
@@ -446,23 +452,21 @@ build_constants_constructor (void)
     }
   if (outgoing_cpool->count > 0)
     {
-      tree index_type;
       tree data_decl, tags_decl, tags_type;
-      tree max_index = build_int_2 (outgoing_cpool->count - 1, 0);
-      TREE_TYPE (max_index) = sizetype;
-      index_type = build_index_type (max_index);
+      tree max_index = build_int_cst (sizetype, outgoing_cpool->count - 1);
+      tree index_type = build_index_type (max_index);
 
       /* Add dummy 0'th element of constant pool. */
       tags_list = tree_cons (NULL_TREE, get_tag_node (0), tags_list);
       data_list = tree_cons (NULL_TREE, null_pointer_node, data_list);
   
-      data_decl = TREE_OPERAND (build_constant_data_ref (), 0);
+      data_decl = build_constant_data_ref ();
       TREE_TYPE (data_decl) = build_array_type (ptr_type_node, index_type), 
       DECL_INITIAL (data_decl) = build_constructor (TREE_TYPE (data_decl),
 						    data_list);
       DECL_SIZE (data_decl) = TYPE_SIZE (TREE_TYPE (data_decl));
       DECL_SIZE_UNIT (data_decl) = TYPE_SIZE_UNIT (TREE_TYPE (data_decl));
-      rest_of_decl_compilation (data_decl, (char *) 0, 1, 0);
+      rest_of_decl_compilation (data_decl, 1, 0);
       data_value = build_address_of (data_decl);
 
       tags_type = build_array_type (unsigned_byte_type_node, index_type);
@@ -471,7 +475,7 @@ build_constants_constructor (void)
 			      tags_type);
       TREE_STATIC (tags_decl) = 1;
       DECL_INITIAL (tags_decl) = build_constructor (tags_type, tags_list);
-      rest_of_decl_compilation (tags_decl, (char*) 0, 1, 0);
+      rest_of_decl_compilation (tags_decl, 1, 0);
       tags_value = build_address_of (tags_decl);
     }
   else
@@ -480,7 +484,8 @@ build_constants_constructor (void)
       tags_value = null_pointer_node;
     }
   START_RECORD_CONSTRUCTOR (cons, constants_type_node);
-  PUSH_FIELD_VALUE (cons, "size", build_int_2 (outgoing_cpool->count, 0));
+  PUSH_FIELD_VALUE (cons, "size",
+		    build_int_cst (NULL_TREE, outgoing_cpool->count));
   PUSH_FIELD_VALUE (cons, "tags", tags_value);
   PUSH_FIELD_VALUE (cons, "data", data_value);
   FINISH_RECORD_CONSTRUCTOR (cons);

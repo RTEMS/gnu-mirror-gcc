@@ -13,9 +13,6 @@
 // Include I/O support for 'long long' and 'unsigned long long'.
 #undef _GLIBCXX_USE_LONG_LONG
 
-// Include support for 'long double'.
-#undef _GLIBCXX_USE_LONG_DOUBLE
-
 // Define if C99 math functions (like fpclassify) should be exposed.
 #undef _GLIBCXX_USE_C99_MATH
 
@@ -47,6 +44,9 @@
 
 // Define if LFS support is available.
 #undef _GLIBCXX_USE_LFS
+
+// Define if a fully dynamic basic_string is wanted.
+#undef _GLIBCXX_FULLY_DYNAMIC_STRING
 
 // Define if NLS translations are to be used.
 #undef _GLIBCXX_USE_NLS

@@ -61,11 +61,11 @@
 #ifndef _DEQUE_TCC
 #define _DEQUE_TCC 1
 
-namespace __gnu_norm
+namespace _GLIBCXX_STD
 {
   template <typename _Tp, typename _Alloc>
-    deque<_Tp,_Alloc>&
-    deque<_Tp,_Alloc>::
+    deque<_Tp, _Alloc>&
+    deque<_Tp, _Alloc>::
     operator=(const deque& __x)
     {
       const size_type __len = size();
@@ -85,8 +85,8 @@ namespace __gnu_norm
     }
 
   template <typename _Tp, typename _Alloc>
-    typename deque<_Tp,_Alloc>::iterator
-    deque<_Tp,_Alloc>::
+    typename deque<_Tp, _Alloc>::iterator
+    deque<_Tp, _Alloc>::
     insert(iterator position, const value_type& __x)
     {
       if (position._M_cur == this->_M_impl._M_start._M_cur)
@@ -106,13 +106,13 @@ namespace __gnu_norm
     }
 
   template <typename _Tp, typename _Alloc>
-    typename deque<_Tp,_Alloc>::iterator
-    deque<_Tp,_Alloc>::
+    typename deque<_Tp, _Alloc>::iterator
+    deque<_Tp, _Alloc>::
     erase(iterator __position)
     {
       iterator __next = __position;
       ++__next;
-      size_type __index = __position - this->_M_impl._M_start;
+      const size_type __index = __position - this->_M_impl._M_start;
       if (__index < (size() >> 1))
 	{
 	  std::copy_backward(this->_M_impl._M_start, __position, __next);
@@ -127,11 +127,12 @@ namespace __gnu_norm
     }
 
   template <typename _Tp, typename _Alloc>
-    typename deque<_Tp,_Alloc>::iterator
-    deque<_Tp,_Alloc>::
+    typename deque<_Tp, _Alloc>::iterator
+    deque<_Tp, _Alloc>::
     erase(iterator __first, iterator __last)
     {
-      if (__first == this->_M_impl._M_start && __last == this->_M_impl._M_finish)
+      if (__first == this->_M_impl._M_start
+	  && __last == this->_M_impl._M_finish)
 	{
 	  clear();
 	  return this->_M_impl._M_finish;
@@ -139,20 +140,24 @@ namespace __gnu_norm
       else
 	{
 	  const difference_type __n = __last - __first;
-	  const difference_type __elems_before = __first - this->_M_impl._M_start;
+	  const difference_type __elems_before = (__first
+						  - this->_M_impl._M_start);
 	  if (static_cast<size_type>(__elems_before) < (size() - __n) / 2)
 	    {
 	      std::copy_backward(this->_M_impl._M_start, __first, __last);
 	      iterator __new_start = this->_M_impl._M_start + __n;
-	      std::_Destroy(this->_M_impl._M_start, __new_start);
-	      _M_destroy_nodes(this->_M_impl._M_start._M_node, __new_start._M_node);
+	      std::_Destroy(this->_M_impl._M_start, __new_start,
+			    this->get_allocator());
+	      _M_destroy_nodes(this->_M_impl._M_start._M_node,
+			       __new_start._M_node);
 	      this->_M_impl._M_start = __new_start;
 	    }
 	  else
 	    {
 	      std::copy(__last, this->_M_impl._M_finish, __first);
 	      iterator __new_finish = this->_M_impl._M_finish - __n;
-	      std::_Destroy(__new_finish, this->_M_impl._M_finish);
+	      std::_Destroy(__new_finish, this->_M_impl._M_finish,
+			    this->get_allocator());
 	      _M_destroy_nodes(__new_finish._M_node + 1,
 			       this->_M_impl._M_finish._M_node + 1);
 	      this->_M_impl._M_finish = __new_finish;
@@ -163,25 +168,32 @@ namespace __gnu_norm
 
   template <typename _Tp, typename _Alloc>
     void
-    deque<_Tp,_Alloc>::
+    deque<_Tp, _Alloc>::
     clear()
     {
       for (_Map_pointer __node = this->_M_impl._M_start._M_node + 1;
            __node < this->_M_impl._M_finish._M_node;
            ++__node)
 	{
-	  std::_Destroy(*__node, *__node + _S_buffer_size());
+	  std::_Destroy(*__node, *__node + _S_buffer_size(),
+			this->get_allocator());
 	  _M_deallocate_node(*__node);
 	}
 
       if (this->_M_impl._M_start._M_node != this->_M_impl._M_finish._M_node)
 	{
-	  std::_Destroy(this->_M_impl._M_start._M_cur, this->_M_impl._M_start._M_last);
-	  std::_Destroy(this->_M_impl._M_finish._M_first, this->_M_impl._M_finish._M_cur);
+	  std::_Destroy(this->_M_impl._M_start._M_cur,
+			this->_M_impl._M_start._M_last,
+			this->get_allocator());
+	  std::_Destroy(this->_M_impl._M_finish._M_first,
+			this->_M_impl._M_finish._M_cur,
+			this->get_allocator());
 	  _M_deallocate_node(this->_M_impl._M_finish._M_first);
 	}
       else
-        std::_Destroy(this->_M_impl._M_start._M_cur, this->_M_impl._M_finish._M_cur);
+        std::_Destroy(this->_M_impl._M_start._M_cur,
+		      this->_M_impl._M_finish._M_cur,
+		      this->get_allocator());
 
       this->_M_impl._M_finish = this->_M_impl._M_start;
     }
@@ -189,12 +201,12 @@ namespace __gnu_norm
   template <typename _Tp, class _Alloc>
     template <typename _InputIterator>
       void
-      deque<_Tp,_Alloc>
+      deque<_Tp, _Alloc>
       ::_M_assign_aux(_InputIterator __first, _InputIterator __last,
 		      input_iterator_tag)
       {
         iterator __cur = begin();
-        for ( ; __first != __last && __cur != end(); ++__cur, ++__first)
+        for (; __first != __last && __cur != end(); ++__cur, ++__first)
           *__cur = *__first;
         if (__first == __last)
           erase(__cur, end());
@@ -204,7 +216,7 @@ namespace __gnu_norm
 
   template <typename _Tp, typename _Alloc>
     void
-    deque<_Tp,_Alloc>::
+    deque<_Tp, _Alloc>::
     _M_fill_insert(iterator __pos, size_type __n, const value_type& __x)
     {
       if (__pos._M_cur == this->_M_impl._M_start._M_cur)
@@ -212,12 +224,15 @@ namespace __gnu_norm
 	  iterator __new_start = _M_reserve_elements_at_front(__n);
 	  try
 	    {
-	      std::uninitialized_fill(__new_start, this->_M_impl._M_start, __x);
+	      std::__uninitialized_fill_a(__new_start, this->_M_impl._M_start,
+					  __x,
+					  this->get_allocator());
 	      this->_M_impl._M_start = __new_start;
 	    }
 	  catch(...)
 	    {
-	      _M_destroy_nodes(__new_start._M_node, this->_M_impl._M_start._M_node);
+	      _M_destroy_nodes(__new_start._M_node,
+			       this->_M_impl._M_start._M_node);
 	      __throw_exception_again;
 	    }
 	}
@@ -226,7 +241,9 @@ namespace __gnu_norm
 	  iterator __new_finish = _M_reserve_elements_at_back(__n);
 	  try
 	    {
-	      std::uninitialized_fill(this->_M_impl._M_finish, __new_finish, __x);
+	      std::__uninitialized_fill_a(this->_M_impl._M_finish,
+					  __new_finish, __x,
+					  this->get_allocator());
 	      this->_M_impl._M_finish = __new_finish;
 	    }
 	  catch(...)
@@ -242,7 +259,7 @@ namespace __gnu_norm
 
   template <typename _Tp, typename _Alloc>
     void
-    deque<_Tp,_Alloc>::
+    deque<_Tp, _Alloc>::
     _M_fill_initialize(const value_type& __value)
     {
       _Map_pointer __cur;
@@ -251,14 +268,16 @@ namespace __gnu_norm
           for (__cur = this->_M_impl._M_start._M_node;
 	       __cur < this->_M_impl._M_finish._M_node;
 	       ++__cur)
-            std::uninitialized_fill(*__cur, *__cur + _S_buffer_size(), __value);
-          std::uninitialized_fill(this->_M_impl._M_finish._M_first,
-				  this->_M_impl._M_finish._M_cur,
-				  __value);
+            std::__uninitialized_fill_a(*__cur, *__cur + _S_buffer_size(),
+					__value, this->get_allocator());
+          std::__uninitialized_fill_a(this->_M_impl._M_finish._M_first,
+				      this->_M_impl._M_finish._M_cur,
+				      __value, this->get_allocator());
         }
       catch(...)
         {
-          std::_Destroy(this->_M_impl._M_start, iterator(*__cur, __cur));
+          std::_Destroy(this->_M_impl._M_start, iterator(*__cur, __cur),
+			this->get_allocator());
           __throw_exception_again;
         }
     }
@@ -266,14 +285,14 @@ namespace __gnu_norm
   template <typename _Tp, typename _Alloc>
     template <typename _InputIterator>
       void
-      deque<_Tp,_Alloc>::
+      deque<_Tp, _Alloc>::
       _M_range_initialize(_InputIterator __first, _InputIterator __last,
                           input_iterator_tag)
       {
         this->_M_initialize_map(0);
         try
           {
-            for ( ; __first != __last; ++__first)
+            for (; __first != __last; ++__first)
               push_back(*__first);
           }
         catch(...)
@@ -286,7 +305,7 @@ namespace __gnu_norm
   template <typename _Tp, typename _Alloc>
     template <typename _ForwardIterator>
       void
-      deque<_Tp,_Alloc>::
+      deque<_Tp, _Alloc>::
       _M_range_initialize(_ForwardIterator __first, _ForwardIterator __last,
                           forward_iterator_tag)
       {
@@ -302,14 +321,19 @@ namespace __gnu_norm
             {
               _ForwardIterator __mid = __first;
               std::advance(__mid, _S_buffer_size());
-              std::uninitialized_copy(__first, __mid, *__cur_node);
+              std::__uninitialized_copy_a(__first, __mid, *__cur_node,
+					  this->get_allocator());
               __first = __mid;
             }
-            std::uninitialized_copy(__first, __last, this->_M_impl._M_finish._M_first);
+            std::__uninitialized_copy_a(__first, __last,
+					this->_M_impl._M_finish._M_first,
+					this->get_allocator());
           }
         catch(...)
           {
-            std::_Destroy(this->_M_impl._M_start, iterator(*__cur_node, __cur_node));
+            std::_Destroy(this->_M_impl._M_start,
+			  iterator(*__cur_node, __cur_node),
+			  this->get_allocator());
             __throw_exception_again;
           }
       }
@@ -317,7 +341,7 @@ namespace __gnu_norm
   // Called only if _M_impl._M_finish._M_cur == _M_impl._M_finish._M_last - 1.
   template <typename _Tp, typename _Alloc>
     void
-    deque<_Tp,_Alloc>::
+    deque<_Tp, _Alloc>::
     _M_push_back_aux(const value_type& __t)
     {
       value_type __t_copy = __t;
@@ -325,8 +349,9 @@ namespace __gnu_norm
       *(this->_M_impl._M_finish._M_node + 1) = this->_M_allocate_node();
       try
         {
-          std::_Construct(this->_M_impl._M_finish._M_cur, __t_copy);
-          this->_M_impl._M_finish._M_set_node(this->_M_impl._M_finish._M_node + 1);
+          this->_M_impl.construct(this->_M_impl._M_finish._M_cur, __t_copy);
+          this->_M_impl._M_finish._M_set_node(this->_M_impl._M_finish._M_node
+					      + 1);
           this->_M_impl._M_finish._M_cur = this->_M_impl._M_finish._M_first;
         }
       catch(...)
@@ -339,7 +364,7 @@ namespace __gnu_norm
   // Called only if _M_impl._M_start._M_cur == _M_impl._M_start._M_first.
   template <typename _Tp, typename _Alloc>
     void
-    deque<_Tp,_Alloc>::
+    deque<_Tp, _Alloc>::
     _M_push_front_aux(const value_type& __t)
     {
       value_type __t_copy = __t;
@@ -347,9 +372,10 @@ namespace __gnu_norm
       *(this->_M_impl._M_start._M_node - 1) = this->_M_allocate_node();
       try
         {
-          this->_M_impl._M_start._M_set_node(this->_M_impl._M_start._M_node - 1);
+          this->_M_impl._M_start._M_set_node(this->_M_impl._M_start._M_node
+					     - 1);
           this->_M_impl._M_start._M_cur = this->_M_impl._M_start._M_last - 1;
-          std::_Construct(this->_M_impl._M_start._M_cur, __t_copy);
+          this->_M_impl.construct(this->_M_impl._M_start._M_cur, __t_copy);
         }
       catch(...)
         {
@@ -361,24 +387,25 @@ namespace __gnu_norm
 
   // Called only if _M_impl._M_finish._M_cur == _M_impl._M_finish._M_first.
   template <typename _Tp, typename _Alloc>
-    void deque<_Tp,_Alloc>::
+    void deque<_Tp, _Alloc>::
     _M_pop_back_aux()
     {
       _M_deallocate_node(this->_M_impl._M_finish._M_first);
       this->_M_impl._M_finish._M_set_node(this->_M_impl._M_finish._M_node - 1);
       this->_M_impl._M_finish._M_cur = this->_M_impl._M_finish._M_last - 1;
-      std::_Destroy(this->_M_impl._M_finish._M_cur);
+      this->_M_impl.destroy(this->_M_impl._M_finish._M_cur);
     }
 
-  // Called only if _M_impl._M_start._M_cur == _M_impl._M_start._M_last - 1.  Note that
-  // if the deque has at least one element (a precondition for this member
-  // function), and if _M_impl._M_start._M_cur == _M_impl._M_start._M_last, then the deque
-  // must have at least two nodes.
+  // Called only if _M_impl._M_start._M_cur == _M_impl._M_start._M_last - 1.
+  // Note that if the deque has at least one element (a precondition for this
+  // member function), and if
+  //   _M_impl._M_start._M_cur == _M_impl._M_start._M_last,
+  // then the deque must have at least two nodes.
   template <typename _Tp, typename _Alloc>
-    void deque<_Tp,_Alloc>::
+    void deque<_Tp, _Alloc>::
     _M_pop_front_aux()
     {
-      std::_Destroy(this->_M_impl._M_start._M_cur);
+      this->_M_impl.destroy(this->_M_impl._M_start._M_cur);
       _M_deallocate_node(this->_M_impl._M_start._M_first);
       this->_M_impl._M_start._M_set_node(this->_M_impl._M_start._M_node + 1);
       this->_M_impl._M_start._M_cur = this->_M_impl._M_start._M_first;
@@ -387,7 +414,7 @@ namespace __gnu_norm
   template <typename _Tp, typename _Alloc>
     template <typename _InputIterator>
       void
-      deque<_Tp,_Alloc>::
+      deque<_Tp, _Alloc>::
       _M_range_insert_aux(iterator __pos,
                           _InputIterator __first, _InputIterator __last,
                           input_iterator_tag)
@@ -396,23 +423,25 @@ namespace __gnu_norm
   template <typename _Tp, typename _Alloc>
     template <typename _ForwardIterator>
       void
-      deque<_Tp,_Alloc>::
+      deque<_Tp, _Alloc>::
       _M_range_insert_aux(iterator __pos,
                           _ForwardIterator __first, _ForwardIterator __last,
                           forward_iterator_tag)
       {
-        size_type __n = std::distance(__first, __last);
+        const size_type __n = std::distance(__first, __last);
         if (__pos._M_cur == this->_M_impl._M_start._M_cur)
 	  {
 	    iterator __new_start = _M_reserve_elements_at_front(__n);
 	    try
 	      {
-		std::uninitialized_copy(__first, __last, __new_start);
+		std::__uninitialized_copy_a(__first, __last, __new_start,
+					    this->get_allocator());
 		this->_M_impl._M_start = __new_start;
 	      }
 	    catch(...)
 	      {
-		_M_destroy_nodes(__new_start._M_node, this->_M_impl._M_start._M_node);
+		_M_destroy_nodes(__new_start._M_node,
+				 this->_M_impl._M_start._M_node);
 		__throw_exception_again;
 	      }
 	  }
@@ -421,7 +450,9 @@ namespace __gnu_norm
 	    iterator __new_finish = _M_reserve_elements_at_back(__n);
 	    try
 	      {
-		std::uninitialized_copy(__first, __last, this->_M_impl._M_finish);
+		std::__uninitialized_copy_a(__first, __last,
+					    this->_M_impl._M_finish,
+					    this->get_allocator());
 		this->_M_impl._M_finish = __new_finish;
 	      }
 	    catch(...)
@@ -437,7 +468,7 @@ namespace __gnu_norm
 
   template <typename _Tp, typename _Alloc>
     typename deque<_Tp, _Alloc>::iterator
-    deque<_Tp,_Alloc>::
+    deque<_Tp, _Alloc>::
     _M_insert_aux(iterator __pos, const value_type& __x)
     {
       difference_type __index = __pos - this->_M_impl._M_start;
@@ -470,11 +501,11 @@ namespace __gnu_norm
 
   template <typename _Tp, typename _Alloc>
     void
-    deque<_Tp,_Alloc>::
+    deque<_Tp, _Alloc>::
     _M_insert_aux(iterator __pos, size_type __n, const value_type& __x)
     {
       const difference_type __elems_before = __pos - this->_M_impl._M_start;
-      size_type __length = this->size();
+      const size_type __length = this->size();
       value_type __x_copy = __x;
       if (__elems_before < difference_type(__length / 2))
 	{
@@ -485,25 +516,30 @@ namespace __gnu_norm
 	    {
 	      if (__elems_before >= difference_type(__n))
 		{
-		  iterator __start_n = this->_M_impl._M_start + difference_type(__n);
-		  std::uninitialized_copy(this->_M_impl._M_start, __start_n,
-					  __new_start);
+		  iterator __start_n = (this->_M_impl._M_start
+					+ difference_type(__n));
+		  std::__uninitialized_copy_a(this->_M_impl._M_start,
+					      __start_n, __new_start,
+					      this->get_allocator());
 		  this->_M_impl._M_start = __new_start;
 		  std::copy(__start_n, __pos, __old_start);
 		  fill(__pos - difference_type(__n), __pos, __x_copy);
 		}
 	      else
 		{
-		  std::__uninitialized_copy_fill(this->_M_impl._M_start, __pos,
-						 __new_start,
-						 this->_M_impl._M_start, __x_copy);
+		  std::__uninitialized_copy_fill(this->_M_impl._M_start,
+						 __pos, __new_start,
+						 this->_M_impl._M_start,
+						 __x_copy,
+						 this->get_allocator());
 		  this->_M_impl._M_start = __new_start;
 		  std::fill(__old_start, __pos, __x_copy);
 		}
 	    }
 	  catch(...)
 	    {
-	      _M_destroy_nodes(__new_start._M_node, this->_M_impl._M_start._M_node);
+	      _M_destroy_nodes(__new_start._M_node,
+			       this->_M_impl._M_start._M_node);
 	      __throw_exception_again;
 	    }
 	}
@@ -518,9 +554,12 @@ namespace __gnu_norm
 	    {
 	      if (__elems_after > difference_type(__n))
 		{
-		  iterator __finish_n = this->_M_impl._M_finish - difference_type(__n);
-		  std::uninitialized_copy(__finish_n, this->_M_impl._M_finish,
-					  this->_M_impl._M_finish);
+		  iterator __finish_n = (this->_M_impl._M_finish
+					 - difference_type(__n));
+		  std::__uninitialized_copy_a(__finish_n,
+					      this->_M_impl._M_finish,
+					      this->_M_impl._M_finish,
+					      this->get_allocator());
 		  this->_M_impl._M_finish = __new_finish;
 		  std::copy_backward(__pos, __finish_n, __old_finish);
 		  std::fill(__pos, __pos + difference_type(__n), __x_copy);
@@ -530,7 +569,8 @@ namespace __gnu_norm
 		  std::__uninitialized_fill_copy(this->_M_impl._M_finish,
 						 __pos + difference_type(__n),
 						 __x_copy, __pos,
-						 this->_M_impl._M_finish);
+						 this->_M_impl._M_finish,
+						 this->get_allocator());
 		  this->_M_impl._M_finish = __new_finish;
 		  std::fill(__pos, __old_finish, __x_copy);
 		}
@@ -547,13 +587,13 @@ namespace __gnu_norm
   template <typename _Tp, typename _Alloc>
     template <typename _ForwardIterator>
       void
-      deque<_Tp,_Alloc>::
+      deque<_Tp, _Alloc>::
       _M_insert_aux(iterator __pos,
                     _ForwardIterator __first, _ForwardIterator __last,
                     size_type __n)
       {
         const difference_type __elemsbefore = __pos - this->_M_impl._M_start;
-        size_type __length = size();
+        const size_type __length = size();
         if (static_cast<size_type>(__elemsbefore) < __length / 2)
 	  {
 	    iterator __new_start = _M_reserve_elements_at_front(__n);
@@ -563,9 +603,11 @@ namespace __gnu_norm
 	      {
 		if (__elemsbefore >= difference_type(__n))
 		  {
-		    iterator __start_n = this->_M_impl._M_start + difference_type(__n);
-		    std::uninitialized_copy(this->_M_impl._M_start, __start_n,
-					    __new_start);
+		    iterator __start_n = (this->_M_impl._M_start
+					  + difference_type(__n));
+		    std::__uninitialized_copy_a(this->_M_impl._M_start,
+						__start_n, __new_start,
+						this->get_allocator());
 		    this->_M_impl._M_start = __new_start;
 		    std::copy(__start_n, __pos, __old_start);
 		    std::copy(__first, __last, __pos - difference_type(__n));
@@ -574,15 +616,18 @@ namespace __gnu_norm
 		  {
 		    _ForwardIterator __mid = __first;
 		    std::advance(__mid, difference_type(__n) - __elemsbefore);
-		    std::__uninitialized_copy_copy(this->_M_impl._M_start, __pos,
-						   __first, __mid, __new_start);
+		    std::__uninitialized_copy_copy(this->_M_impl._M_start,
+						   __pos, __first, __mid,
+						   __new_start,
+						   this->get_allocator());
 		    this->_M_impl._M_start = __new_start;
 		    std::copy(__mid, __last, __old_start);
 		  }
 	      }
 	    catch(...)
 	      {
-		_M_destroy_nodes(__new_start._M_node, this->_M_impl._M_start._M_node);
+		_M_destroy_nodes(__new_start._M_node,
+				 this->_M_impl._M_start._M_node);
 		__throw_exception_again;
 	      }
 	  }
@@ -597,10 +642,12 @@ namespace __gnu_norm
             {
               if (__elemsafter > difference_type(__n))
 		{
-		  iterator __finish_n = this->_M_impl._M_finish - difference_type(__n);
-		  std::uninitialized_copy(__finish_n,
-					  this->_M_impl._M_finish,
-					  this->_M_impl._M_finish);
+		  iterator __finish_n = (this->_M_impl._M_finish
+					 - difference_type(__n));
+		  std::__uninitialized_copy_a(__finish_n,
+					      this->_M_impl._M_finish,
+					      this->_M_impl._M_finish,
+					      this->get_allocator());
 		  this->_M_impl._M_finish = __new_finish;
 		  std::copy_backward(__pos, __finish_n, __old_finish);
 		  std::copy(__first, __last, __pos);
@@ -611,7 +658,8 @@ namespace __gnu_norm
 		  std::advance(__mid, __elemsafter);
 		  std::__uninitialized_copy_copy(__mid, __last, __pos,
 						 this->_M_impl._M_finish,
-						 this->_M_impl._M_finish);
+						 this->_M_impl._M_finish,
+						 this->get_allocator());
 		  this->_M_impl._M_finish = __new_finish;
 		  std::copy(__first, __mid, __pos);
 		}
@@ -627,10 +675,10 @@ namespace __gnu_norm
 
   template <typename _Tp, typename _Alloc>
     void
-    deque<_Tp,_Alloc>::
+    deque<_Tp, _Alloc>::
     _M_new_elements_at_front(size_type __new_elems)
     {
-      size_type __new_nodes
+      const size_type __new_nodes
 	= (__new_elems + _S_buffer_size() - 1) / _S_buffer_size();
       _M_reserve_map_at_front(__new_nodes);
       size_type __i;
@@ -649,11 +697,11 @@ namespace __gnu_norm
 
   template <typename _Tp, typename _Alloc>
     void
-    deque<_Tp,_Alloc>::
+    deque<_Tp, _Alloc>::
     _M_new_elements_at_back(size_type __new_elems)
     {
-      size_type __new_nodes
-          = (__new_elems + _S_buffer_size() - 1) / _S_buffer_size();
+      const size_type __new_nodes
+	= (__new_elems + _S_buffer_size() - 1) / _S_buffer_size();
       _M_reserve_map_at_back(__new_nodes);
       size_type __i;
       try
@@ -671,12 +719,12 @@ namespace __gnu_norm
 
   template <typename _Tp, typename _Alloc>
     void
-    deque<_Tp,_Alloc>::
+    deque<_Tp, _Alloc>::
     _M_reallocate_map(size_type __nodes_to_add, bool __add_at_front)
     {
-      size_type __old_num_nodes
+      const size_type __old_num_nodes
 	= this->_M_impl._M_finish._M_node - this->_M_impl._M_start._M_node + 1;
-      size_type __new_num_nodes = __old_num_nodes + __nodes_to_add;
+      const size_type __new_num_nodes = __old_num_nodes + __nodes_to_add;
 
       _Map_pointer __new_nstart;
       if (this->_M_impl._M_map_size > 2 * __new_num_nodes)
@@ -714,6 +762,6 @@ namespace __gnu_norm
       this->_M_impl._M_start._M_set_node(__new_nstart);
       this->_M_impl._M_finish._M_set_node(__new_nstart + __old_num_nodes - 1);
     }
-} // namespace __gnu_norm
+} // namespace std
 
 #endif

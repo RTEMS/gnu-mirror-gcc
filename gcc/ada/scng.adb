@@ -26,7 +26,6 @@
 
 with Csets;    use Csets;
 with Err_Vars; use Err_Vars;
-with Hostparm; use Hostparm;
 with Namet;    use Namet;
 with Opt;      use Opt;
 with Scans;    use Scans;
@@ -302,7 +301,14 @@ package body Scng is
          if Style_Check and Style_Check_Max_Line_Length then
             Style.Check_Line_Terminator (Len);
 
-         elsif Len > Hostparm.Max_Line_Length then
+         --  If style checking is inactive, check maximum line length against
+         --  standard value. Note that we take this from Opt.Max_Line_Length
+         --  rather than Hostparm.Max_Line_Length because we do not want to
+         --  impose any limit during scanning of configuration pragma files,
+         --  and Opt.Max_Line_Length (normally set to Hostparm.Max_Line_Length)
+         --  is reset to Column_Number'Max during scanning of such files.
+
+         elsif Len > Opt.Max_Line_Length then
             Error_Long_Line;
          end if;
       end Check_End_Of_Line;
@@ -359,7 +365,7 @@ package body Scng is
       begin
          Error_Msg
            ("this line is too long",
-            Current_Line_Start + Hostparm.Max_Line_Length);
+            Current_Line_Start + Source_Ptr (Opt.Max_Line_Length));
       end Error_Long_Line;
 
       -------------------------------
@@ -437,9 +443,9 @@ package body Scng is
             Error_Msg_S ("digit expected");
          end Error_Digit_Expected;
 
-         -------------------
-         --  Scan_Integer --
-         -------------------
+         ------------------
+         -- Scan_Integer --
+         ------------------
 
          procedure Scan_Integer is
             C : Character;
@@ -1050,7 +1056,7 @@ package body Scng is
                         exit;
 
                      elsif C in Upper_Half_Character then
-                        if Ada_83 then
+                        if Ada_Version = Ada_83 then
                            Error_Bad_String_Char;
                         end if;
 
@@ -1598,7 +1604,7 @@ package body Scng is
 
                   if Source (Scan_Ptr) not in Graphic_Character then
                      if Source (Scan_Ptr) in Upper_Half_Character then
-                        if Ada_83 then
+                        if Ada_Version = Ada_83 then
                            Error_Illegal_Character;
                         end if;
 
@@ -2056,7 +2062,8 @@ package body Scng is
          --  Here is where we check if it was a keyword
 
          if Get_Name_Table_Byte (Token_Name) /= 0
-           and then (Ada_95 or else Token_Name not in Ada_95_Reserved_Words)
+           and then (Ada_Version >= Ada_95
+                       or else Token_Name not in Ada_95_Reserved_Words)
          then
             Token := Token_Type'Val (Get_Name_Table_Byte (Token_Name));
 

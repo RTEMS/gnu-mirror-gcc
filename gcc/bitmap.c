@@ -131,7 +131,7 @@ bitmap_element_allocate (bitmap head)
 					  obstack_chunk_free);
 	    }
 
-	  element = obstack_alloc (&bitmap_obstack, sizeof (bitmap_element));
+	  element = XOBNEW (&bitmap_obstack, bitmap_element);
 	}
     }
   else
@@ -142,7 +142,7 @@ bitmap_element_allocate (bitmap head)
           bitmap_ggc_free = element->next;
 	}
       else
-	element = ggc_alloc (sizeof (bitmap_element));
+	element = GGC_NEW (bitmap_element);
     }
 
   memset (element->bits, 0, sizeof (element->bits));
@@ -414,7 +414,9 @@ bitmap_first_set_bit (bitmap a)
 #else
   for (word_num = 0; word_num < BITMAP_ELEMENT_WORDS; ++word_num)
     if ((word = ptr->bits[word_num]) != 0)
-      break;
+      goto word_found;
+  gcc_unreachable ();
+ word_found:
 #endif
 
   /* Binary search for the first set bit.  */
@@ -469,7 +471,9 @@ bitmap_last_set_bit (bitmap a)
 #else
   for (word_num = BITMAP_ELEMENT_WORDS; word_num-- > 0; )
     if ((word = ptr->bits[word_num]) != 0)
-      break;
+      goto word_found;
+  gcc_unreachable ();
+ word_found:
 #endif
 
   /* Binary search for the last set bit.  */
@@ -604,7 +608,7 @@ bitmap_operation (bitmap to, bitmap from1, bitmap from2,
       switch (operation)
 	{
 	default:
-	  abort ();
+	  gcc_unreachable ();
 
 	case BITMAP_AND:
 	  DOIT (&);
@@ -712,7 +716,7 @@ bitmap
 bitmap_initialize (bitmap head, int using_obstack)
 {
   if (head == NULL && ! using_obstack)
-    head = ggc_alloc (sizeof (*head));
+    head = GGC_NEW (struct bitmap_head_def);
 
   head->first = head->current = 0;
   head->using_obstack = using_obstack;
@@ -775,13 +779,14 @@ bitmap_print (FILE *file, bitmap head, const char *prefix, const char *suffix)
 {
   const char *comma = "";
   int i;
+  bitmap_iterator bi;
 
   fputs (prefix, file);
-  EXECUTE_IF_SET_IN_BITMAP (head, 0, i,
-			    {
-			      fprintf (file, "%s%d", comma, i);
-			      comma = ", ";
-			    });
+  EXECUTE_IF_SET_IN_BITMAP (head, 0, i, bi)
+    {
+      fprintf (file, "%s%d", comma, i);
+      comma = ", ";
+    }
   fputs (suffix, file);
 }
 

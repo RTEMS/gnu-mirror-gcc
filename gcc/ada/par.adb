@@ -395,6 +395,11 @@ function Par (Configuration_Pragmas : Boolean) return List_Id is
    SS_Whtm           : constant SS_Rec := SS_Rec'(F, F, F, F, F, F, T, F);
    SS_Unco           : constant SS_Rec := SS_Rec'(F, F, F, F, F, F, F, T);
 
+   Goto_List : Elist_Id;
+   --  List of goto nodes appearing in the current compilation. Used to
+   --  recognize natural loops and convert them into bona fide loops for
+   --  optimization purposes.
+
    Label_List : Elist_Id;
    --  List of label nodes for labels appearing in the current compilation.
    --  Used by Par.Labl to construct the corresponding implicit declarations.
@@ -557,8 +562,6 @@ function Par (Configuration_Pragmas : Boolean) return List_Id is
       --  variable, then the caller can change it to an appropriate missing
       --  begin message if indeed the BEGIN is missing.
 
-      function P_Access_Definition                    return Node_Id;
-      function P_Access_Type_Definition               return Node_Id;
       function P_Array_Type_Definition                return Node_Id;
       function P_Basic_Declarative_Items              return List_Id;
       function P_Constraint_Opt                       return Node_Id;
@@ -576,6 +579,17 @@ function Par (Configuration_Pragmas : Boolean) return List_Id is
       function P_Subtype_Mark_Resync                  return Node_Id;
       function P_Unknown_Discriminant_Part_Opt        return Boolean;
 
+      function P_Access_Definition
+        (Null_Exclusion_Present : Boolean) return Node_Id;
+      --  Ada 2005 (AI-231/AI-254): The caller parses the null-exclusion part
+      --  and indicates if it was present
+
+      function P_Access_Type_Definition
+        (Header_Already_Parsed : Boolean := False) return Node_Id;
+      --  Ada 2005 (AI-254): The formal is used to indicate if the caller has
+      --  parsed the null_exclusion part. In this case the caller has also
+      --  removed the ACCESS token
+
       procedure P_Component_Items (Decls : List_Id);
       --  Scan out one or more component items and append them to the
       --  given list. Only scans out more than one declaration in the
@@ -588,12 +602,12 @@ function Par (Configuration_Pragmas : Boolean) return List_Id is
       --  declaration of this type for details.
 
       function P_Null_Exclusion return Boolean;
-      --  Ada 0Y (AI-231): Parse the null-excluding part. True indicates
+      --  Ada 2005 (AI-231): Parse the null-excluding part. True indicates
       --  that the null-excluding part was present.
 
       function P_Subtype_Indication
         (Not_Null_Present : Boolean := False) return Node_Id;
-      --  Ada 0Y (AI-231): The flag Not_Null_Present indicates that the
+      --  Ada 2005 (AI-231): The flag Not_Null_Present indicates that the
       --  null-excluding part has been scanned out and it was present.
 
       function Init_Expr_Opt (P : Boolean := False) return Node_Id;
@@ -615,7 +629,7 @@ function Par (Configuration_Pragmas : Boolean) return List_Id is
          Not_Null_Present : Boolean := False) return Node_Id;
       --  This version of P_Subtype_Indication is called when the caller has
       --  already scanned out the subtype mark which is passed as a parameter.
-      --  Ada 0Y (AI-231): The flag Not_Null_Present indicates that the
+      --  Ada 2005 (AI-231): The flag Not_Null_Present indicates that the
       --  null-excluding part has been scanned out and it was present.
 
       function P_Subtype_Mark_Attribute (Type_Node : Node_Id) return Node_Id;
@@ -1251,6 +1265,7 @@ begin
          SIS_Entry_Active := False;
          Last_Resync_Point := No_Location;
 
+         Goto_List  := New_Elmt_List;
          Label_List := New_Elmt_List;
 
          --  If in multiple unit per file mode, skip past ignored unit
@@ -1267,7 +1282,6 @@ begin
                                        Operating_Mode;
 
                Save_Style_Check : constant Boolean := Style_Check;
-
 
             begin
                Operating_Mode := Check_Syntax;

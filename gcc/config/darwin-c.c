@@ -30,6 +30,8 @@ Boston, MA 02111-1307, USA.  */
 #include "c-incpath.h"
 #include "toplev.h"
 #include "tm_p.h"
+#include "cppdefault.h"
+#include "prefix.h"
 
 /* Pragmas.  */
 
@@ -44,7 +46,8 @@ static void push_field_alignment (int);
 static void pop_field_alignment (void);
 static const char *find_subframework_file (const char *, const char *);
 static void add_system_framework_path (char *);
-static const char *find_subframework_header (cpp_reader *pfile, const char *header);
+static const char *find_subframework_header (cpp_reader *pfile, const char *header,
+					     cpp_dir **dirp);
 
 typedef struct align_stack
 {
@@ -166,11 +169,13 @@ static int max_frameworks = 0;
 /* Remember which frameworks have been seen, so that we can ensure
    that all uses of that framework come from the same framework.  DIR
    is the place where the named framework NAME, which is of length
-   LEN, was found.  */
+   LEN, was found.  We copy the directory name from NAME, as it will be
+   freed by others.  */
 
 static void
 add_framework (const char *name, size_t len, cpp_dir *dir)
 {
+  char *dir_name;
   int i;
   for (i = 0; i < num_frameworks; ++i)
     {
@@ -183,10 +188,14 @@ add_framework (const char *name, size_t len, cpp_dir *dir)
   if (i >= max_frameworks)
     {
       max_frameworks = i*2;
+      max_frameworks += i == 0;
       frameworks_in_use = xrealloc (frameworks_in_use,
 				    max_frameworks*sizeof(*frameworks_in_use));
     }
-  frameworks_in_use[num_frameworks].name = name;
+  dir_name = xmalloc (len + 1);
+  memcpy (dir_name, name, len);
+  dir_name[len] = '\0';
+  frameworks_in_use[num_frameworks].name = dir_name;
   frameworks_in_use[num_frameworks].len = len;
   frameworks_in_use[num_frameworks].dir = dir;
   ++num_frameworks;
@@ -272,7 +281,8 @@ framework_construct_pathname (const char *fname, cpp_dir *dir)
 
       if (stat (frname, &st) == 0)
 	{
-	  add_framework (fname, fname_len, dir);
+	  if (fast_dir == 0)
+	    add_framework (fname, fname_len, dir);
 	  return frname;
 	}
     }
@@ -311,7 +321,7 @@ find_subframework_file (const char *fname, const char *pname)
   bufptr = strstr (pname, dot_framework);
 
   /* If the parent header is not of any framework, then this header
-     can not be part of any subframework.  */
+     cannot be part of any subframework.  */
   if (!bufptr)
     return 0;
 
@@ -409,8 +419,48 @@ static const char *framework_defaults [] =
   {
     "/System/Library/Frameworks",
     "/Library/Frameworks",
-    "/Local/Library/Frameworks",
   };
+
+/* Register the GNU objective-C runtime include path if STDINC.  */
+
+void
+darwin_register_objc_includes (const char *sysroot, const char *iprefix,
+			       int stdinc)
+{
+  const char *fname;
+  size_t len;
+  /* We do not do anything if we do not want the standard includes. */
+  if (!stdinc)
+    return;
+  
+  fname = GCC_INCLUDE_DIR "-gnu-runtime";
+  
+  /* Register the GNU OBJC runtime include path if we are compiling  OBJC
+    with GNU-runtime.  */
+
+  if (c_dialect_objc () && !flag_next_runtime)
+    {
+      char *str;
+      /* See if our directory starts with the standard prefix.
+	 "Translate" them, i.e. replace /usr/local/lib/gcc... with
+	 IPREFIX and search them first.  */
+      if (iprefix && (len = cpp_GCC_INCLUDE_DIR_len) != 0 && !sysroot
+	  && !strncmp (fname, cpp_GCC_INCLUDE_DIR, len))
+	{
+	  str = concat (iprefix, fname + len, NULL);
+          /* FIXME: wrap the headers for C++awareness.  */
+	  add_path (str, SYSTEM, /*c++aware=*/false, false);
+	}
+      
+      /* Should this directory start with the sysroot?  */
+      if (sysroot)
+	str = concat (sysroot, fname, NULL);
+      else
+	str = update_path (fname, "");
+      
+      add_path (str, SYSTEM, /*c++aware=*/false, false);
+    }
+}
 
 
 /* Register all the system framework paths if STDINC is true and setup
@@ -418,7 +468,8 @@ static const char *framework_defaults [] =
    frameworks had been registered.  */
 
 void
-darwin_register_frameworks (int stdinc)
+darwin_register_frameworks (const char *sysroot ATTRIBUTE_UNUSED,
+			    const char *iprefix ATTRIBUTE_UNUSED, int stdinc)
 {
   if (stdinc)
     {
@@ -442,10 +493,10 @@ darwin_register_frameworks (int stdinc)
    fails to find a header.  We search each file in the include stack,
    using FUNC, starting from the most deeply nested include and
    finishing with the main input file.  We stop searching when FUNC
-   returns non-zero.  */
+   returns nonzero.  */
 
 static const char*
-find_subframework_header (cpp_reader *pfile, const char *header)
+find_subframework_header (cpp_reader *pfile, const char *header, cpp_dir **dirp)
 {
   const char *fname = header;
   struct cpp_buffer *b;
@@ -457,10 +508,15 @@ find_subframework_header (cpp_reader *pfile, const char *header)
     {
       n = find_subframework_file (fname, cpp_get_path (cpp_get_file (b)));
       if (n)
-	return n;
+	{
+	  /* Logically, the place where we found the subframework is
+	     the place where we found the Framework that contains the
+	     subframework.  This is useful for tracking wether or not
+	     we are in a system header.  */
+	  *dirp = cpp_get_dir (cpp_get_file (b));
+	  return n;
+	}
     }
 
   return 0;
 }
-
-struct target_c_incpath_s target_c_incpath = C_INCPATH_INIT;

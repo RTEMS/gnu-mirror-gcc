@@ -38,10 +38,11 @@ exception statement from your version. */
 
 package java.text;
 
-import java.util.Iterator;
+import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Hashtable;
-import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
@@ -219,30 +220,12 @@ AttributedString(AttributedCharacterIterator aci, int begin_index,
   // Get the valid attribute list
   Set all_attribs = aci.getAllAttributeKeys();
   if (attributes != null)
-    {
-      Set valid_attribs = new HashSet();
-      Iterator iter = all_attribs.iterator();
-      while (iter.hasNext())
-        {
-          Object obj = iter.next();
-
-          int i;
-          for (i = 0; i < attributes.length; i++)
-            if (obj.equals(attributes[0]))
-              break;
-
-          if (i == attributes.length)
-            continue;
-
-          valid_attribs.add(obj);
-        }
-
-      all_attribs = valid_attribs;
-    } 
+    all_attribs.retainAll(Arrays.asList(attributes));
 
   // Loop through and extract the attributes
   char c = aci.setIndex(begin_index);
 
+  ArrayList accum = new ArrayList();
   do
     { 
       sb.append(c);
@@ -291,16 +274,16 @@ AttributedString(AttributedCharacterIterator aci, int begin_index,
           Map new_map = new Hashtable();
           new_map.put(attrib, attrib_obj);
 
-          // Add it to the attribute list.  Yes this is a bad way to do things.
-          AttributeRange[] new_list = new AttributeRange[attribs.length + 1];
-          System.arraycopy(attribs, 0, new_list, 0, attribs.length);
-          attribs = new_list;
-          attribs[attribs.length - 1] = new AttributeRange(new_map, rs, rl);
+          // Add it to the attribute list.
+	  accum.add(new AttributeRange(new_map, rs, rl));
         }
 
       c = aci.next();
     }
   while(c != CharacterIterator.DONE);
+
+  attribs = new AttributeRange[accum.size()];
+  attribs = (AttributeRange[]) accum.toArray(attribs);
 
   sci = new StringCharacterIterator(sb.toString());
 }
@@ -320,7 +303,7 @@ AttributedString(AttributedCharacterIterator aci, int begin_index,
 public void
 addAttribute(AttributedCharacterIterator.Attribute attrib, Object value)
 {
-  addAttribute(attrib, value, 0, sci.getEndIndex() - 1);
+  addAttribute(attrib, value, 0, sci.getEndIndex());
 }
 
 /*************************************************************************/
@@ -389,8 +372,7 @@ addAttributes(Map attributes, int begin_index, int end_index)
 public AttributedCharacterIterator
 getIterator()
 {
-  return(new AttributedStringIterator(sci, attribs, 0, sci.getEndIndex() - 1,
-                                      null));
+  return(new AttributedStringIterator(sci, attribs, 0, sci.getEndIndex(), null));
 }
 
 /*************************************************************************/
@@ -409,7 +391,7 @@ getIterator()
 public AttributedCharacterIterator
 getIterator(AttributedCharacterIterator.Attribute[] attributes)
 {
-  return(getIterator(attributes, 0, sci.getEndIndex() - 1));
+  return(getIterator(attributes, 0, sci.getEndIndex()));
 }
 
 /*************************************************************************/
