@@ -57,6 +57,7 @@ extern int got_no_const_operand (rtx, enum machine_mode);
 extern int num_insns_constant (rtx, enum machine_mode);
 extern int easy_fp_constant (rtx, enum machine_mode);
 extern int easy_vector_constant (rtx, enum machine_mode);
+extern rtx gen_easy_vector_constant_add_self (rtx);
 extern const char *output_vec_const_move (rtx *);
 extern int zero_fp_constant (rtx, enum machine_mode);
 extern int zero_constant (rtx, enum machine_mode);
@@ -101,7 +102,7 @@ extern int includes_rshift_p (rtx, rtx);
 extern int includes_rldic_lshift_p (rtx, rtx);
 extern int includes_rldicr_lshift_p (rtx, rtx);
 extern int registers_ok_for_quad_peep (rtx, rtx);
-extern int addrs_ok_for_quad_peep (rtx, rtx);
+extern int mems_ok_for_quad_peep (rtx, rtx);
 extern bool gpr_or_gpr_p (rtx, rtx);
 extern enum reg_class secondary_reload_class (enum reg_class,
 					      enum machine_mode, rtx);
@@ -115,6 +116,7 @@ extern enum rtx_code rs6000_reverse_condition (enum machine_mode,
 extern void rs6000_emit_sCOND (enum rtx_code, rtx);
 extern void rs6000_emit_cbranch (enum rtx_code, rtx);
 extern char * output_cbranch (rtx, const char *, int, rtx);
+extern char * output_e500_flip_gt_bit (rtx, rtx);
 extern rtx rs6000_emit_set_const (rtx, enum machine_mode, rtx, int);
 extern int rs6000_emit_cmove (rtx, rtx, rtx, rtx);
 extern void rs6000_emit_minmax (rtx, enum rtx_code, rtx, rtx);
@@ -127,16 +129,20 @@ extern int mfcr_operation (rtx, enum machine_mode);
 extern int mtcrf_operation (rtx, enum machine_mode);
 extern int lmw_operation (rtx, enum machine_mode);
 extern struct rtx_def *create_TOC_reference (rtx);
+/* APPLE LOCAL RTX_COST for multiply */
+extern int rs6000_rtx_mult_cost (rtx);
 extern void rs6000_split_multireg_move (rtx, rtx);
 extern void rs6000_emit_move (rtx, rtx, enum machine_mode);
 extern rtx rs6000_legitimize_address (rtx, rtx, enum machine_mode);
-extern rtx rs6000_legitimize_reload_address (rtx, enum machine_mode,
+/* APPLE LOCAL pass reload addr by address */
+extern rtx rs6000_legitimize_reload_address (rtx *, enum machine_mode,
 			    int, int, int, int *);
 extern int rs6000_legitimate_address (enum machine_mode, rtx, int);
 extern bool rs6000_mode_dependent_address (rtx);
 extern rtx rs6000_return_addr (int, rtx);
 extern void rs6000_output_symbol_ref (FILE*, rtx);
 extern HOST_WIDE_INT rs6000_initial_elimination_offset (int, int);
+extern bool rs6000_legitimate_offset_address_p (enum machine_mode, rtx, int);
 
 extern rtx rs6000_machopic_legitimize_pic_address (rtx orig, 
                             enum machine_mode mode, rtx reg);
@@ -198,14 +204,25 @@ extern int rs6000_register_move_cost (enum machine_mode,
 extern int rs6000_memory_move_cost (enum machine_mode, enum reg_class, int);
 extern bool rs6000_tls_referenced_p (rtx);
 extern int rs6000_tls_symbol_ref (rtx, enum machine_mode);
+extern void rs6000_output_dwarf_dtprel (FILE*, int, rtx);
+extern int rs6000_hard_regno_nregs (int, enum machine_mode);
+extern void rs6000_conditional_register_usage (void);
 
 /* Declare functions in rs6000-c.c */
 
 extern void rs6000_pragma_longcall (struct cpp_reader *);
 extern void rs6000_cpu_cpp_builtins (struct cpp_reader *);
 
+/* APPLE LOCAL begin AltiVec */
+extern struct cpp_hashnode *rs6000_macro_to_expand (struct cpp_reader *,
+						    const struct cpp_token *);
+/* APPLE LOCAL end AltiVec */
+
 #if TARGET_MACHO
-char *output_call (rtx, rtx *, int, int);
+void add_compiler_stub PARAMS ((tree, tree, int));
+void output_compiler_stub PARAMS ((void));
+extern char* output_call PARAMS ((rtx, rtx *, int, int));
 #endif
 
+extern bool rs6000_hard_regno_mode_ok_p[][FIRST_PSEUDO_REGISTER];
 #endif  /* rs6000-protos.h */

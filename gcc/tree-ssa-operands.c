@@ -78,7 +78,6 @@ static void append_vdef (tree, tree, voperands_t);
 static void add_call_clobber_ops (tree, voperands_t);
 static void add_call_read_ops (tree, voperands_t);
 static void add_stmt_operand (tree *, tree, int, voperands_t);
-static int get_call_flags (tree);
 
 
 struct freelist_d GTY((chain_next ("%h.next")))
@@ -571,6 +570,14 @@ append_vdef (tree var, tree stmt, voperands_t prev_vops)
   VARRAY_PUSH_TREE (build_vdefs, source);
 }
 
+/* APPLE LOCAL begin AV if-conversion -dpatel  */
+/* External entry point which by-passes the previous vops mechanism.  */
+void
+add_vdef (tree var, tree stmt)
+{
+  append_vdef (var, stmt, NULL);
+}
+/* APPLE LOCAL end AV if-conversion -dpatel  */
 
 /* Add VAR to the list of virtual uses for STMT.  If PREV_VOPS
    is not NULL, the existing entries are preserved and no new entries are
@@ -636,24 +643,6 @@ add_vuse (tree var, tree stmt)
 }
 
 
-
-/* Return the ECF_ flags associated with the function called by the
-   CALL_EXPR node EXPR.  */
-
-static int
-get_call_flags (tree expr)
-{
-  tree callee;
-
-#if defined ENABLE_CHECKING
-  if (TREE_CODE (expr) != CALL_EXPR)
-    abort ();
-#endif
-
-  callee = get_callee_fndecl (expr);
-  return (callee) ? flags_from_decl_or_type (callee) : 0;
-}
-
 /* Get the operands of statement STMT.  Note that repeated calls to
    get_stmt_operands for the same statement will do nothing until the
    statement is marked modified by a call to modify_stmt().  */
@@ -676,13 +665,13 @@ get_stmt_operands (tree stmt)
   if (TREE_CODE (stmt) == ERROR_MARK)
     return;
 
+  ann = get_stmt_ann (stmt);
+
   /* If the statement has not been modified, the operands are still valid.  */
-  if (!stmt_modified_p (stmt))
+  if (!ann->modified)
     return;
 
   timevar_push (TV_TREE_OPS);
-
-  ann = get_stmt_ann (stmt);
 
   /* Initially assume that the statement has no volatile operands.
      Statements marked with 'has_volatile_ops' are not processed by the
@@ -708,7 +697,18 @@ get_stmt_operands (tree stmt)
   switch (code)
     {
     case MODIFY_EXPR:
-      get_expr_operands (stmt, &TREE_OPERAND (stmt, 1), opf_none, &prev_vops);
+      /* APPLE LOCAL begin AV if-conversion --dpatel  */
+      if (TREE_CODE (TREE_OPERAND (stmt, 1)) == COND_EXPR)
+ 	{
+ 	  tree t_stmt = TREE_OPERAND (stmt, 1);
+ 	  get_expr_operands (stmt, &COND_EXPR_COND (t_stmt), opf_none, &prev_vops);
+ 	  get_expr_operands (stmt, &TREE_OPERAND (t_stmt, 1), opf_none, &prev_vops);
+ 	  get_expr_operands (stmt, &TREE_OPERAND (t_stmt, 2), opf_none, &prev_vops);
+ 	}
+      else
+	/* APPLE LOCAL end AV if-conversion --dpatel  */
+ 	get_expr_operands (stmt, &TREE_OPERAND (stmt, 1), opf_none, &prev_vops);
+
       get_expr_operands (stmt, &TREE_OPERAND (stmt, 0), opf_is_def, &prev_vops);
       break;
 
@@ -769,9 +769,9 @@ get_stmt_operands (tree stmt)
 	    get_expr_operands (stmt, &TREE_VALUE (link), 0, &prev_vops);
 	  }
 
+	/* Clobber memory for asm ("" : : : "memory");  */
 	for (link = ASM_CLOBBERS (stmt); link; link = TREE_CHAIN (link))
-	  if (!strcmp (TREE_STRING_POINTER (TREE_VALUE (link)), "memory")
-	      && bitmap_first_set_bit (call_clobbered_vars) >= 0)
+	  if (!strcmp (TREE_STRING_POINTER (TREE_VALUE (link)), "memory"))
 	    add_call_clobber_ops (stmt, &prev_vops);
       }
       break;
@@ -843,7 +843,7 @@ get_expr_operands (tree stmt, tree *expr_p, int flags, voperands_t prev_vops)
   /* Expressions that make no memory references.  */
   if (class == 'c'
       || class == 't'
-      || class == 'b'
+      || code == BLOCK
       || code == FUNCTION_DECL
       || code == EXC_PTR_EXPR
       || code == FILTER_EXPR
@@ -1030,7 +1030,7 @@ get_expr_operands (tree stmt, tree *expr_p, int flags, voperands_t prev_vops)
   if (code == CALL_EXPR)
     {
       tree op;
-      int call_flags = get_call_flags (expr);
+      int call_flags = call_expr_flags (expr);
 
       /* Find uses in the called function.  */
       get_expr_operands (stmt, &TREE_OPERAND (expr, 0), opf_none, prev_vops);
@@ -1042,12 +1042,11 @@ get_expr_operands (tree stmt, tree *expr_p, int flags, voperands_t prev_vops)
 
       if (bitmap_first_set_bit (call_clobbered_vars) >= 0)
 	{
+	  /* A 'pure' or a 'const' functions never call clobber anything. 
+	     A 'noreturn' function might, but since we don't return anyway 
+	     there is no point in recording that.  */ 
 	  if (!(call_flags
-		& (ECF_PURE
-		   | ECF_CONST
-		   | ECF_NORETURN
-		   | ECF_MALLOC
-		   | ECF_MAY_BE_ALLOCA)))
+		& (ECF_PURE | ECF_CONST | ECF_NORETURN)))
 	    add_call_clobber_ops (stmt, prev_vops);
 	  else if (!(call_flags & (ECF_CONST | ECF_NORETURN)))
 	    add_call_read_ops (stmt, prev_vops);
@@ -1070,18 +1069,30 @@ get_expr_operands (tree stmt, tree *expr_p, int flags, voperands_t prev_vops)
     }
 
   /* Assignments.  */
+      /* APPLE LOCAL begin AV if-conversion --dpatel  */
   if (code == MODIFY_EXPR)
     {
-      get_expr_operands (stmt, &TREE_OPERAND (expr, 1), opf_none, prev_vops);
+      if (TREE_CODE (TREE_OPERAND (expr, 1)) == COND_EXPR)
+ 	{
+ 	  tree t = TREE_OPERAND (expr, 1);
+	  get_expr_operands (stmt, &COND_EXPR_COND (t), opf_none, prev_vops);
+ 	  get_expr_operands (stmt, &TREE_OPERAND (t, 1), opf_none, prev_vops);
+ 	  get_expr_operands (stmt, &TREE_OPERAND (t, 2), opf_none, prev_vops);
+	}
+      else
+	/* APPLE LOCAL end AV if-conversion --dpatel  */
+	get_expr_operands (stmt, &TREE_OPERAND (expr, 1), opf_none, prev_vops);
       get_expr_operands (stmt, &TREE_OPERAND (expr, 0), opf_is_def, prev_vops);
       return;
     }
 
-  /* VA_ARG_EXPR nodes read and modify the argument pointer.  Add it to
-     VOPS to avoid optimizations messing it up.  */
+
+  /* Mark VA_ARG_EXPR nodes as making volatile references.  FIXME,
+     this is needed because we currently do not gimplify VA_ARG_EXPR
+     properly.  */
   if (code == VA_ARG_EXPR)
     {
-      add_stmt_operand (&TREE_OPERAND (expr, 0), stmt, opf_is_def, prev_vops);
+      stmt_ann (stmt)->has_volatile_ops = true;
       return;
     }
 
@@ -1133,6 +1144,8 @@ add_stmt_operand (tree *var_p, tree stmt, int flags, voperands_t prev_vops)
   var_ann_t v_ann;
 
   var = *var_p;
+  if (!var)
+    return;
   STRIP_NOPS (var);
 
   s_ann = stmt_ann (stmt);
@@ -1329,6 +1342,35 @@ add_call_read_ops (tree stmt, voperands_t prev_vops)
 	  tree var = referenced_var (i);
 	  add_stmt_operand (&var, stmt, opf_none, prev_vops);
 	});
+    }
+}
+
+/* Copies virtual operands from SRC to DST.  */
+
+void
+copy_virtual_operands (tree dst, tree src)
+{
+  vuse_optype vuses = STMT_VUSE_OPS (src);
+  vdef_optype vdefs = STMT_VDEF_OPS (src);
+  vuse_optype *vuses_new = &stmt_ann (dst)->vuse_ops;
+  vdef_optype *vdefs_new = &stmt_ann (dst)->vdef_ops;
+  unsigned i;
+
+  if (vuses)
+    {
+      *vuses_new = allocate_vuse_optype (NUM_VUSES (vuses));
+      for (i = 0; i < NUM_VUSES (vuses); i++)
+	*VUSE_OP_PTR (*vuses_new, i) = VUSE_OP (vuses, i);
+    }
+
+  if (vdefs)
+    {
+      *vdefs_new = allocate_vdef_optype (NUM_VDEFS (vdefs));
+      for (i = 0; i < NUM_VDEFS (vdefs); i++)
+	{
+	  *VDEF_OP_PTR (*vdefs_new, i) = VDEF_OP (vdefs, i);
+	  *VDEF_RESULT_PTR (*vdefs_new, i) = VDEF_RESULT (vdefs, i);
+	}
     }
 }
 
