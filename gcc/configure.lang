@@ -1,9 +1,9 @@
 # configure.lang for GNU CC
 # This script is run by configure for configuration of language
-# subdirectories which conform to the old GCC configure mechansim
+# subdirectories which conform to the old GCC configure mechanism
 # for such subdirectories.
 
-# Copyright (C) 1997 Free Software Foundation, Inc.
+# Copyright (C) 1997, 1998 Free Software Foundation, Inc.
 
 #This file is part of GNU CC.
 
@@ -27,7 +27,7 @@ savesrcdir=$srcdir
 for subdir in . $oldstyle_subdirs
 do
 	# We only want to do this in language subdirs, but we have to handle
-	# the case of $subdirs = "".
+	# the case of $oldstyle_subdirs = "".
 	if [ $subdir = . ]
 	then
 		continue
@@ -69,17 +69,12 @@ do
 		rm -f .gdbinit
 		echo "dir ." > .gdbinit
 		echo "dir ${srcdir}" >> .gdbinit
+		echo "dir ${mainsrcdir}" >> .gdbinit
 		if [ x$gdb_needs_out_file_path = xyes ]
 		then
-			echo "dir ${srcdir}/config/"`dirname ${out_file}` >> .gdbinit
+			echo "dir ${mainsrcdir}/config/"`dirname ${out_file}` >> .gdbinit
 		fi
-		if [ "x$subdirs" != x ]; then
-			for s in $subdirs
-			do
-				echo "dir ${srcdir}/$s" >> .gdbinit
-			done
-		fi
-		echo "source ${srcdir}/.gdbinit" >> .gdbinit
+		echo "source ${mainsrcdir}/.gdbinit" >> .gdbinit
 		;;
 	esac
 
@@ -185,7 +180,7 @@ $program_transform_name/" \
 	rm Makefile.sed
 	echo 's|||' > Makefile.sed
 	echo "s|^target=.*$|target=${target}|" >> Makefile.sed
-	echo "s|^target_alias=.*$|target=${target_alias}|" >> Makefile.sed
+	echo "s|^target_alias=.*$|target_alias=${target_alias}|" >> Makefile.sed
 	echo "s|^xmake_file=.*$|xmake_file=${dep_host_xmake_file}|" >> Makefile.sed
 	echo "s|^tmake_file=.*$|tmake_file=${dep_tmake_file}|" >> Makefile.sed
 	echo "s|^version=.*$|version=${version}|" >> Makefile.sed

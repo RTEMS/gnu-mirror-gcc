@@ -1,5 +1,5 @@
-/* Definitions for Intel 386 running Linux with ELF format
-   Copyright (C) 1994, 1995, 1996, 1997 Free Software Foundation, Inc.
+/* Definitions for Intel 386 running Linux-based GNU systems with ELF format.
+   Copyright (C) 1994, 1995, 1996, 1997, 1998 Free Software Foundation, Inc.
    Contributed by Eric Youngdale.
    Modified for stabs-in-ELF by H.J. Lu.
 
@@ -30,12 +30,15 @@ Boston, MA 02111-1307, USA.  */
 #include <linux.h>	/* some common stuff */
 
 #undef TARGET_VERSION
-#define TARGET_VERSION fprintf (stderr, " (i386 Linux/ELF)");
+#define TARGET_VERSION fprintf (stderr, " (i386 GNU/Linux with ELF)");
 
 /* The svr4 ABI for the i386 says that records and unions are returned
    in memory.  */
 #undef DEFAULT_PCC_STRUCT_RETURN
 #define DEFAULT_PCC_STRUCT_RETURN 1
+
+#undef ASM_COMMENT_START
+#define ASM_COMMENT_START "#"
 
 /* This is how to output an element of a case-vector that is relative.
    This is only used for PIC code.  See comments by the `casesi' insn in
@@ -160,7 +163,7 @@ Boston, MA 02111-1307, USA.  */
 #undef CC1_SPEC
 #define CC1_SPEC "%(cc1_cpu) %{profile:-p}"
 
-/* Provide a LINK_SPEC appropriate for Linux.  Here we provide support
+/* Provide a LINK_SPEC appropriate for GNU/Linux.  Here we provide support
    for the special GCC options -static and -shared, which allow us to
    link things in one of these three modes by applying the appropriate
    combinations of options at link-time. We like to support here for

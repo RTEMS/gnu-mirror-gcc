@@ -1,5 +1,5 @@
 /* Lexical analyzer for C and Objective C.
-   Copyright (C) 1987, 88, 89, 92, 94, 95, 1996 Free Software Foundation, Inc.
+   Copyright (C) 1987, 88, 89, 92, 94-97, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -18,12 +18,12 @@ along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
+#include "config.h"
 
 #include <stdio.h>
 #include <errno.h>
 #include <setjmp.h>
 
-#include "config.h"
 #include "rtl.h"
 #include "tree.h"
 #include "input.h"
@@ -34,6 +34,13 @@ Boston, MA 02111-1307, USA.  */
 #include "c-pragma.h"
 
 #include <ctype.h>
+
+/* MULTIBYTE_CHARS support only works for native compilers.
+   ??? Ideally what we want is to model widechar support after
+   the current floating point support.  */
+#ifdef CROSS_COMPILE
+#undef MULTIBYTE_CHARS
+#endif
 
 #ifdef MULTIBYTE_CHARS
 #include <stdlib.h>
@@ -118,6 +125,8 @@ char *token_buffer;	/* Pointer to token buffer.
 			   Actual allocated length is maxtoken + 2.
 			   This is not static because objc-parse.y uses it.  */
 
+static int indent_level = 0;        /* Number of { minus number of }. */
+
 /* Nonzero if end-of-file has been seen on input.  */
 static int end_of_file;
 
@@ -126,6 +135,9 @@ static int end_of_file;
 static int nextchar = -1;
 #endif
 
+static int skip_which_space		PROTO((int));
+static char *extend_token_buffer	PROTO((char *));
+static int readescape			PROTO((int *));
 int check_newline ();
 
 /* Do not insert generated code into the source, instead, include it.
@@ -321,7 +333,6 @@ yyprint (file, yychar, yylval)
       break;
     }
 }
-
 
 /* If C is not whitespace, return C.
    Otherwise skip whitespace and return first nonwhite char read.  */
@@ -413,7 +424,6 @@ extend_token_buffer (p)
 
   return token_buffer + offset;
 }
-
 
 #if !USE_CPPLIB
 #define GET_DIRECTIVE_LINE() get_directive_line (finput)
@@ -560,7 +570,12 @@ check_newline ()
 	      token = yylex ();
 	      if (token != IDENTIFIER)
 		goto skipline;
-	      if (HANDLE_PRAGMA (yylval.ttype))
+	      if (nextchar >= 0)
+		c = nextchar, nextchar = -1;
+	      else
+		c = GETC ();
+	      ungetc (c, finput);
+	      if (HANDLE_PRAGMA (finput, yylval.ttype))
 		{
 		  c = GETC ();
 		  return c;
@@ -747,6 +762,7 @@ linenum:
 	      input_file_stack->line = old_lineno;
 	      p->next = input_file_stack;
 	      p->name = input_filename;
+	      p->indent_level = indent_level;
 	      input_file_stack = p;
 	      input_file_stack_tick++;
 	      debug_start_source_file (input_filename);
@@ -758,6 +774,14 @@ linenum:
 	      if (input_file_stack->next)
 		{
 		  struct file_stack *p = input_file_stack;
+		  if (indent_level != p->indent_level)
+		    {
+		      warning_with_file_and_line 
+			(p->name, old_lineno,
+			 "This file contains more `%c's than `%c's.",
+			 indent_level > p->indent_level ? '{' : '}',
+			 indent_level > p->indent_level ? '}' : '{');
+		    }
 		  input_file_stack = p->next;
 		  free (p);
 		  input_file_stack_tick++;
@@ -816,20 +840,13 @@ linenum:
 
   /* skip the rest of this line.  */
  skipline:
+#if !USE_CPPLIB
+  if (c != '\n' && c != EOF && nextchar >= 0)
+    c = nextchar, nextchar = -1;
+#endif
   while (c != '\n' && c != EOF)
     c = GETC();
   return c;
-}
-
-void
-lang_init ()
-{
-#if !USE_CPPLIB
-  /* the beginning of the file is a new line; check for # */
-  /* With luck, we discover the real source file's name from that
-     and put it in input_filename.  */
-  UNGETC (check_newline ());
-#endif
 }
 
 #ifdef HANDLE_SYSV_PRAGMA
@@ -1462,8 +1479,8 @@ yylex ()
 	if (floatflag != NOT_FLOAT)
 	  {
 	    tree type = double_type_node;
-	    int exceeds_double = 0;
 	    int imag = 0;
+	    int conversion_errno = 0;
 	    REAL_VALUE_TYPE value;
 	    jmp_buf handler;
 
@@ -1492,7 +1509,6 @@ yylex ()
 	      }
 
 	    *p = 0;
-	    errno = 0;
 
 	    /* Convert string to a double, checking for overflow.  */
 	    if (setjmp (handler))
@@ -1562,7 +1578,9 @@ yylex ()
 		      error ("both `f' and `l' in floating constant");
 
 		    type = float_type_node;
+		    errno = 0;
 		    value = REAL_VALUE_ATOF (copy, TYPE_MODE (type));
+		    conversion_errno = errno;
 		    /* A diagnostic is required here by some ANSI C testsuites.
 		       This is not pedwarn, become some people don't want
 		       an error for this.  */
@@ -1572,13 +1590,17 @@ yylex ()
 		else if (lflag)
 		  {
 		    type = long_double_type_node;
+		    errno = 0;
 		    value = REAL_VALUE_ATOF (copy, TYPE_MODE (type));
+		    conversion_errno = errno;
 		    if (REAL_VALUE_ISINF (value) && pedantic)
 		      warning ("floating point number exceeds range of `long double'");
 		  }
 		else
 		  {
+		    errno = 0;
 		    value = REAL_VALUE_ATOF (copy, TYPE_MODE (type));
+		    conversion_errno = errno;
 		    if (REAL_VALUE_ISINF (value) && pedantic)
 		      warning ("floating point number exceeds range of `double'");
 		  }
@@ -1586,17 +1608,12 @@ yylex ()
 		set_float_handler (NULL_PTR);
 	    }
 #ifdef ERANGE
-	    if (errno == ERANGE && !flag_traditional && pedantic)
-	      {
-  		/* ERANGE is also reported for underflow,
-  		   so test the value to distinguish overflow from that.  */
-		if (REAL_VALUES_LESS (dconst1, value)
-		    || REAL_VALUES_LESS (value, dconstm1))
-		  {
-		    warning ("floating point number exceeds range of `double'");
-		    exceeds_double = 1;
-		  }
-	      }
+	    /* ERANGE is also reported for underflow,
+	       so test the value to distinguish overflow from that.  */
+	    if (conversion_errno == ERANGE && !flag_traditional && pedantic
+		&& (REAL_VALUES_LESS (dconst1, value)
+		    || REAL_VALUES_LESS (value, dconstm1)))
+	      warning ("floating point number exceeds range of `double'");
 #endif
 
 	    /* If the result is not a number, assume it must have been
@@ -1659,20 +1676,15 @@ yylex ()
 		c = GETC();
 	      }
 
-	    /* If the constant is not long long and it won't fit in an
-	       unsigned long, or if the constant is long long and won't fit
-	       in an unsigned long long, then warn that the constant is out
-	       of range.  */
+	    /* If the constant won't fit in an unsigned long long,
+	       then warn that the constant is out of range.  */
 
 	    /* ??? This assumes that long long and long integer types are
 	       a multiple of 8 bits.  This better than the original code
 	       though which assumed that long was exactly 32 bits and long
 	       long was exactly 64 bits.  */
 
-	    if (spec_long_long)
-	      bytes = TYPE_PRECISION (long_long_integer_type_node) / 8;
-	    else
-	      bytes = TYPE_PRECISION (long_integer_type_node) / 8;
+	    bytes = TYPE_PRECISION (long_long_integer_type_node) / 8;
 
 	    warn = overflow;
 	    for (i = bytes; i < TOTAL_PARTS; i++)
@@ -1739,11 +1751,11 @@ yylex ()
 		else if (! spec_unsigned && !spec_long_long
 			 && int_fits_type_p (yylval.ttype, long_integer_type_node))
 		  ansi_type = long_integer_type_node;
-		else if (! spec_long_long)
+		else if (! spec_long_long
+			 && int_fits_type_p (yylval.ttype,
+					     long_unsigned_type_node))
 		  ansi_type = long_unsigned_type_node;
 		else if (! spec_unsigned
-			 /* Verify value does not overflow into sign bit.  */
-			 && TREE_INT_CST_HIGH (yylval.ttype) >= 0
 			 && int_fits_type_p (yylval.ttype,
 					     long_long_integer_type_node))
 		  ansi_type = long_long_integer_type_node;
@@ -1765,8 +1777,9 @@ yylex ()
 		  warning ("width of integer constant may change on other systems with -traditional");
 	      }
 
-	    if (!flag_traditional && !int_fits_type_p (yylval.ttype, type)
-		&& !warn)
+	    if (pedantic && !flag_traditional && !spec_long_long && !warn
+		&& (TYPE_PRECISION (long_integer_type_node)
+		    < TYPE_PRECISION (type)))
 	      pedwarn ("integer constant out of range");
 
 	    if (base == 10 && ! spec_unsigned && TREE_UNSIGNED (type))
@@ -1997,15 +2010,9 @@ yylex ()
 	    bzero (widep + (len * WCHAR_BYTES), WCHAR_BYTES);
 #else
 	    {
-	      union { long l; char c[sizeof (long)]; } u;
-	      int big_endian;
 	      char *wp, *cp;
 
-	      /* Determine whether host is little or big endian.  */
-	      u.l = 1;
-	      big_endian = u.c[sizeof (long) - 1];
-	      wp = widep + (big_endian ? WCHAR_BYTES - 1 : 0);
-
+	      wp = widep + (BYTES_BIG_ENDIAN ? WCHAR_BYTES - 1 : 0);
 	      bzero (widep, (p - token_buffer) * WCHAR_BYTES);
 	      for (cp = token_buffer + 1; cp < p; cp++)
 		*wp = *cp, wp += WCHAR_BYTES;
@@ -2133,13 +2140,13 @@ yylex ()
 	      break;
 	    case '<':
 	      if (c1 == '%')
-		{ value = '{'; goto done; }
+		{ value = '{'; indent_level++; goto done; }
 	      if (c1 == ':')
 		{ value = '['; goto done; }
 	      break;
 	    case '%':
 	      if (c1 == '>')
-		{ value = '}'; goto done; }
+		{ value = '}'; indent_level--; goto done; }
 	      break;
 	    }
 	UNGETC (c1);
@@ -2154,6 +2161,16 @@ yylex ()
     case 0:
       /* Don't make yyparse think this is eof.  */
       value = 1;
+      break;
+
+    case '{':
+      indent_level++;
+      value = c;
+      break;
+
+    case '}':
+      indent_level--;
+      value = c;
       break;
 
     default:

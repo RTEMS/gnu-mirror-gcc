@@ -162,7 +162,6 @@ extern void gen_aux_info_record                 PROTO((tree, int, int, int));
 extern void declare_function_name               PROTO((void));
 extern void decl_attributes                     PROTO((tree, tree, tree));
 extern void init_function_format_info		PROTO((void));
-extern void record_function_format		PROTO((tree, tree, int, int, int));
 extern void check_function_format		PROTO((tree, tree, tree));
 /* Print an error message for invalid operands to arith operation CODE.
    NOP_EXPR is used as a special case (see truthvalue_conversion).  */
@@ -177,7 +176,7 @@ extern tree convert_and_check			PROTO((tree, tree));
 extern void overflow_warning			PROTO((tree));
 extern void unsigned_conversion_warning		PROTO((tree, tree));
 /* Read the rest of the current #-directive line.  */
-extern char *get_directive_line                 STDIO_PROTO((FILE *));
+extern char *get_directive_line                 PROTO((FILE *));
 /* Subroutine of build_binary_op, used for comparison operations.
    See if the operands have both been converted from subword integer types
    and, if so, perhaps change them both back to their original type.  */
@@ -288,12 +287,9 @@ extern void pending_xref_error                  PROTO((void));
 extern void pop_c_function_context              PROTO((void));
 extern void pop_label_level                     PROTO((void));
 extern tree poplevel                            PROTO((int, int, int));
-extern void print_lang_decl                     STDIO_PROTO((FILE *, tree,
-							     int));
-extern void print_lang_identifier               STDIO_PROTO((FILE *, tree,
-							     int));
-extern void print_lang_type                     STDIO_PROTO((FILE *, tree,
-							     int));
+extern void print_lang_decl                     PROTO((FILE *, tree, int));
+extern void print_lang_identifier               PROTO((FILE *, tree, int));
+extern void print_lang_type                     PROTO((FILE *, tree, int));
 extern void push_c_function_context             PROTO((void));
 extern void push_label_level                    PROTO((void));
 extern void push_parm_decl                      PROTO((tree));

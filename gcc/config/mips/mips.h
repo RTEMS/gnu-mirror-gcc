@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler.  MIPS version.
-   Copyright (C) 1989, 90-6, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1989, 90-97, 1998 Free Software Foundation, Inc.
    Contributed by A. Lichnewsky (lich@inria.inria.fr).
    Changed by Michael Meissner	(meissner@osf.org).
    64 bit r4000 support by Ian Lance Taylor (ian@cygnus.com) and
@@ -28,11 +28,8 @@ Boston, MA 02111-1307, USA.  */
 extern char    *asm_file_name;
 extern char	call_used_regs[];
 extern int	current_function_calls_alloca;
-extern int	flag_omit_frame_pointer;
-extern int	frame_pointer_needed;
 extern char    *language_string;
 extern int	may_call_alloca;
-extern int	optimize;
 extern char   **save_argv;
 extern int	target_flags;
 extern char    *version_string;
@@ -64,6 +61,7 @@ enum delay_type {
 enum processor_type {
   PROCESSOR_DEFAULT,
   PROCESSOR_R3000,
+  PROCESSOR_R3900,
   PROCESSOR_R6000,
   PROCESSOR_R4000,
   PROCESSOR_R4100,
@@ -77,21 +75,20 @@ enum processor_type {
 /* Recast the cpu class to be the cpu attribute.  */
 #define mips_cpu_attr ((enum attr_cpu)mips_cpu)
 
-/* Which ABI to use.  This is only used by the Irix 6 port currently.  */
+/* Which ABI to use.  These are constants because abi64.h must check their
+   value at preprocessing time.  */
 
-enum mips_abi_type {
-  ABI_32,
-  ABI_N32,
-  ABI_64,
-  ABI_EABI
-};
+#define ABI_32  0
+#define ABI_N32 1
+#define ABI_64  2
+#define ABI_EABI 3
 
 #ifndef MIPS_ABI_DEFAULT
 /* We define this away so that there is no extra runtime cost if the target
    doesn't support multiple ABIs.  */
 #define mips_abi ABI_32
 #else
-extern enum mips_abi_type mips_abi;
+extern int mips_abi;
 #endif
 
 /* Whether to emit abicalls code sequences or not.  */
@@ -153,13 +150,28 @@ extern struct rtx_def *mips_load_reg3;	/* 3rd reg to check for load delay */
 extern struct rtx_def *mips_load_reg4;	/* 4th reg to check for load delay */
 extern struct rtx_def *embedded_pic_fnaddr_rtx;	/* function address */
 
-/* Functions within mips.c that we reference.  */
+/* Functions within mips.c that we reference.  Some of these return  type
+   HOST_WIDE_INT, so define that here.  This is a copy of code in machmode.h.
+
+   ??? It would be good to try to put this as common code someplace.  */
+
+#ifndef HOST_BITS_PER_WIDE_INT
+
+#if HOST_BITS_PER_LONG > HOST_BITS_PER_INT
+#define HOST_BITS_PER_WIDE_INT HOST_BITS_PER_LONG
+#define HOST_WIDE_INT long
+#else
+#define HOST_BITS_PER_WIDE_INT HOST_BITS_PER_INT
+#define HOST_WIDE_INT int
+#endif
+
+#endif
 
 extern void		abort_with_insn ();
 extern int		arith32_operand ();
 extern int		arith_operand ();
 extern int		cmp_op ();
-extern long		compute_frame_size ();
+extern HOST_WIDE_INT	compute_frame_size ();
 extern int		epilogue_reg_mentioned_p ();
 extern void		expand_block_move ();
 extern int		equality_op ();
@@ -180,7 +192,7 @@ extern void		mips_asm_file_end ();
 extern void		mips_asm_file_start ();
 extern int		mips_const_double_ok ();
 extern void		mips_count_memory_refs ();
-extern int		mips_debugger_offset ();
+extern HOST_WIDE_INT	mips_debugger_offset ();
 extern void		mips_declare_object ();
 extern int		mips_epilogue_delay_slots ();
 extern void		mips_expand_epilogue ();
@@ -204,7 +216,7 @@ extern int		reg_or_0_operand ();
 extern int		simple_epilogue_p ();
 extern int		simple_memory_operand ();
 extern int		small_int ();
-extern void		trace();
+extern void		trace ();
 extern int		uns_arith_operand ();
 extern struct rtx_def *	embedded_pic_offset ();
 
@@ -276,6 +288,7 @@ extern void		text_section ();
 #define MASK_SINGLE_FLOAT 0x00020000	/* Only single precision FPU.  */
 #define MASK_MAD	0x00040000	/* Generate mad/madu as on 4650.  */
 #define MASK_4300_MUL_FIX 0x00080000    /* Work-around early Vr4300 CPU bug */
+#define MASK_MIPS3900	0x00100000	/* like -mips1 only 3900 */
 
 					/* Dummy switches used only in spec's*/
 #define MASK_MIPS_TFILE	0x00000000	/* flag for mips-tfile usage */
@@ -291,7 +304,6 @@ extern void		text_section ();
 #define MASK_DEBUG_G	0x00800000	/* don't support 64 bit arithmetic */
 #define MASK_DEBUG_H	0x00400000	/* allow ints in FP registers */
 #define MASK_DEBUG_I	0x00200000	/* unused */
-#define MASK_DEBUG_J	0x00100000	/* unused */
 
 					/* r4000 64 bit sizes */
 #define TARGET_INT64		(target_flags & MASK_INT64)
@@ -301,6 +313,9 @@ extern void		text_section ();
 
 					/* Mips vs. GNU linker */
 #define TARGET_SPLIT_ADDRESSES	(target_flags & MASK_SPLIT_ADDR)
+
+/* generate mips 3900 insns */
+#define TARGET_MIPS3900         (target_flags & MASK_MIPS3900)
 
 					/* Mips vs. GNU assembler */
 #define TARGET_GAS		(target_flags & MASK_GAS)
@@ -318,7 +333,6 @@ extern void		text_section ();
 #define TARGET_DEBUG_G_MODE	(target_flags & MASK_DEBUG_G)
 #define TARGET_DEBUG_H_MODE	(target_flags & MASK_DEBUG_H)
 #define TARGET_DEBUG_I_MODE	(target_flags & MASK_DEBUG_I)
-#define TARGET_DEBUG_J_MODE	(target_flags & MASK_DEBUG_J)
 
 					/* Reg. Naming in .s ($21 vs. $a0) */
 #define TARGET_NAME_REGS	(target_flags & MASK_NAME_REGS)
@@ -425,6 +439,7 @@ extern void		text_section ();
   {"fix4300",             MASK_4300_MUL_FIX},				\
   {"no-fix4300",         -MASK_4300_MUL_FIX},				\
   {"4650",		  MASK_MAD | MASK_SINGLE_FLOAT},		\
+  {"3900",		  MASK_MIPS3900},                               \
   {"debug",		  MASK_DEBUG},					\
   {"debuga",		  MASK_DEBUG_A},				\
   {"debugb",		  MASK_DEBUG_B},				\
@@ -435,7 +450,6 @@ extern void		text_section ();
   {"debugg",		  MASK_DEBUG_G},				\
   {"debugh",		  MASK_DEBUG_H},				\
   {"debugi",		  MASK_DEBUG_I},				\
-  {"debugj",		  MASK_DEBUG_J},				\
   {"",			  (TARGET_DEFAULT				\
 			   | TARGET_CPU_DEFAULT				\
 			   | TARGET_ENDIAN_DEFAULT)}			\
@@ -507,10 +521,16 @@ extern void		text_section ();
 /* This is meant to be redefined in the host dependent files.  */
 #define SUBTARGET_TARGET_OPTIONS
 
+#define GENERATE_BRANCHLIKELY  (TARGET_MIPS3900 || (mips_isa >= 2))
+#define GENERATE_MULT3         (TARGET_MIPS3900)
+#define GENERATE_MADD          (TARGET_MIPS3900)
+
+
+
 /* Macros to decide whether certain features are available or not,
    depending on the instruction set architecture level.  */
 
-#define BRANCH_LIKELY_P()	(mips_isa >= 2)
+#define BRANCH_LIKELY_P()	GENERATE_BRANCHLIKELY
 #define HAVE_SQRT_P()		(mips_isa >= 2)
 
 /* CC1_SPEC causes -mips3 and -mips4 to set -mfp64 and -mgp64; -mips1 or
@@ -664,7 +684,7 @@ while (0)
 /* GAS_ASM_SPEC is passed when using gas, rather than the MIPS
    assembler.  */
 
-#define GAS_ASM_SPEC "%{mcpu=*} %{m4650} %{mmad:-m4650} %{v}"
+#define GAS_ASM_SPEC "%{mcpu=*} %{m4650} %{mmad:-m4650} %{m3900} %{v}"
 
 /* TARGET_ASM_SPEC is used to select either MIPS_AS_ASM_SPEC or
    GAS_ASM_SPEC as the default, depending upon the value of
@@ -791,6 +811,7 @@ while (0)
 %{mfp64:%{msingle-float:%emay not use both -mfp64 and -msingle-float}} \
 %{mfp64:%{m4650:%emay not use both -mfp64 and -m4650}} \
 %{m4650:-mcpu=r4650} \
+%{m3900:-mips1 -mcpu=r3900 -mfp32 -mgp32} \
 %{G*} %{EB:-meb} %{EL:-mel} %{EB:%{EL:%emay not use both -EB and -EL}} \
 %{pic-none:   -mno-half-pic} \
 %{pic-lib:    -mhalf-pic} \
@@ -817,6 +838,16 @@ while (0)
 #define SUBTARGET_CPP_SPEC ""
 #endif
 
+/* If we're using 64bit longs, then we have to define __LONG_MAX__
+   correctly.  Similarly for 64bit ints and __INT_MAX__.  */
+#ifndef LONG_MAX_SPEC
+#if ((TARGET_DEFAULT | TARGET_CPU_DEFAULT) & MASK_LONG64)
+#define LONG_MAX_SPEC "%{!mno-long64:-D__LONG_MAX__=9223372036854775807L}"
+#else
+#define LONG_MAX_SPEC "%{mlong64:-D__LONG_MAX__=9223372036854775807L}"
+#endif
+#endif
+
 /* CPP_SPEC is the set of arguments to pass to the preprocessor.  */
 
 #ifndef CPP_SPEC
@@ -838,6 +869,7 @@ while (0)
 %{mabi=eabi:-D__mips_eabi} \
 %{EB:-UMIPSEL -U_MIPSEL -U__MIPSEL -U__MIPSEL__ -D_MIPSEB -D__MIPSEB -D__MIPSEB__ %{!ansi:-DMIPSEB}} \
 %{EL:-UMIPSEB -U_MIPSEB -U__MIPSEB -U__MIPSEB__ -D_MIPSEL -D__MIPSEL -D__MIPSEL__ %{!ansi:-DMIPSEL}} \
+%(long_max_spec) \
 %(subtarget_cpp_spec) "
 #endif
 
@@ -855,6 +887,7 @@ while (0)
   { "subtarget_cc1_spec", SUBTARGET_CC1_SPEC },				\
   { "subtarget_cpp_spec", SUBTARGET_CPP_SPEC },				\
   { "subtarget_cpp_size_spec", SUBTARGET_CPP_SIZE_SPEC },		\
+  { "long_max_spec", LONG_MAX_SPEC },					\
   { "mips_as_asm_spec", MIPS_AS_ASM_SPEC },				\
   { "gas_asm_spec", GAS_ASM_SPEC },					\
   { "target_asm_spec", TARGET_ASM_SPEC },				\
@@ -948,12 +981,11 @@ while (0)
 #define DBX_REGISTER_NUMBER(REGNO) mips_dbx_regno[ (REGNO) ]
 
 /* The mapping from gcc register number to DWARF 2 CFA column number.
-   This mapping does not allow for tracking DBX register 0, since column 0
-   is used for the frame address, but since register 0 is fixed this is
-   not really a problem.  */
+   This mapping does not allow for tracking register 0, since SGI's broken
+   dwarf reader thinks column 0 is used for the frame address, but since
+   register 0 is fixed this is not a problem.  */
 #define DWARF_FRAME_REGNUM(REG)				\
-  (REG == GP_REG_FIRST + 31 ? DWARF_FRAME_RETURN_COLUMN	\
-   : DBX_REGISTER_NUMBER (REG))
+  (REG == GP_REG_FIRST + 31 ? DWARF_FRAME_RETURN_COLUMN : REG)
 
 /* The DWARF 2 CFA column which tracks the return address.  */
 #define DWARF_FRAME_RETURN_COLUMN (FP_REG_LAST + 1)
@@ -1113,9 +1145,10 @@ do {							\
    the frame pointer to be the stack pointer after the initial
    adjustment.  */
 
-#define DEBUGGER_AUTO_OFFSET(X)		mips_debugger_offset (X, 0)
-#define DEBUGGER_ARG_OFFSET(OFFSET, X)	mips_debugger_offset (X, OFFSET)
-
+#define DEBUGGER_AUTO_OFFSET(X)  \
+  mips_debugger_offset (X, (HOST_WIDE_INT) 0)
+#define DEBUGGER_ARG_OFFSET(OFFSET, X)  \
+  mips_debugger_offset (X, (HOST_WIDE_INT) OFFSET)
 
 /* Tell collect that the object format is ECOFF */
 #ifndef OBJECT_FORMAT_ROSE
@@ -1430,7 +1463,7 @@ do {							\
 
    On the MIPS, all general registers are one word long.  Except on
    the R4000 with the FR bit set, the floating point uses register
-   pairs, with the second register not being allocatable.  */
+   pairs, with the second register not being allocable.  */
 
 #define HARD_REGNO_NREGS(REGNO, MODE)					\
   (! FP_REG_P (REGNO)							\
@@ -2331,6 +2364,13 @@ typedef struct mips_args {
 
 #define TRAMPOLINE_ALIGNMENT (TARGET_LONG64 ? 64 : 32)
 
+/* INITIALIZE_TRAMPOLINE calls this library function to flush
+   program and data caches.  */
+
+#ifndef CACHE_FLUSH_FUNC
+#define CACHE_FLUSH_FUNC "_flush_cache"
+#endif
+
 /* A C statement to initialize the variable parts of a trampoline. 
    ADDR is an RTX for the address of the trampoline; FNADDR is an
    RTX for the address of the nested function; STATIC_CHAIN is an
@@ -2354,7 +2394,7 @@ typedef struct mips_args {
   /* Flush both caches.  We need to flush the data cache in case	    \
      the system has a write-back cache.  */				    \
   /* ??? Should check the return value for errors.  */			    \
-  emit_library_call (gen_rtx (SYMBOL_REF, Pmode, "_flush_cache"),	    \
+  emit_library_call (gen_rtx (SYMBOL_REF, Pmode, CACHE_FLUSH_FUNC),	    \
 		     0, VOIDmode, 3, addr, Pmode,			    \
 		     GEN_INT (TRAMPOLINE_SIZE), TYPE_MODE (integer_type_node),\
 		     GEN_INT (3), TYPE_MODE (integer_type_node));	    \
@@ -2969,7 +3009,8 @@ while (0)
       enum machine_mode xmode = GET_MODE (X);				\
       if (xmode == SFmode || xmode == DFmode)				\
 	{								\
-	  if (mips_cpu == PROCESSOR_R3000)				\
+	  if (mips_cpu == PROCESSOR_R3000				\
+              || mips_cpu == PROCESSOR_R3900)				\
 	    return COSTS_N_INSNS (2);					\
 	  else if (mips_cpu == PROCESSOR_R6000)				\
 	    return COSTS_N_INSNS (3);					\
@@ -2992,6 +3033,7 @@ while (0)
       if (xmode == SFmode)						\
 	{								\
 	  if (mips_cpu == PROCESSOR_R3000				\
+	      || mips_cpu == PROCESSOR_R3900				\
 	      || mips_cpu == PROCESSOR_R5000)				\
 	    return COSTS_N_INSNS (4);					\
 	  else if (mips_cpu == PROCESSOR_R6000)				\
@@ -3003,6 +3045,7 @@ while (0)
       if (xmode == DFmode)						\
 	{								\
 	  if (mips_cpu == PROCESSOR_R3000				\
+	      || mips_cpu == PROCESSOR_R3900				\
 	      || mips_cpu == PROCESSOR_R5000)				\
 	    return COSTS_N_INSNS (5);					\
 	  else if (mips_cpu == PROCESSOR_R6000)				\
@@ -3013,6 +3056,8 @@ while (0)
 									\
       if (mips_cpu == PROCESSOR_R3000)					\
 	return COSTS_N_INSNS (12);					\
+      else if (mips_cpu == PROCESSOR_R3900)				\
+	return COSTS_N_INSNS (2);					\
       else if (mips_cpu == PROCESSOR_R6000)				\
 	return COSTS_N_INSNS (17);					\
       else if (mips_cpu == PROCESSOR_R5000)				\
@@ -3027,7 +3072,8 @@ while (0)
       enum machine_mode xmode = GET_MODE (X);				\
       if (xmode == SFmode)						\
 	{								\
-	  if (mips_cpu == PROCESSOR_R3000)				\
+	  if (mips_cpu == PROCESSOR_R3000				\
+              || mips_cpu == PROCESSOR_R3900)				\
 	    return COSTS_N_INSNS (12);					\
 	  else if (mips_cpu == PROCESSOR_R6000)				\
 	    return COSTS_N_INSNS (15);					\
@@ -3037,7 +3083,8 @@ while (0)
 									\
       if (xmode == DFmode)						\
 	{								\
-	  if (mips_cpu == PROCESSOR_R3000)				\
+	  if (mips_cpu == PROCESSOR_R3000				\
+              || mips_cpu == PROCESSOR_R3900)				\
 	    return COSTS_N_INSNS (19);					\
 	  else if (mips_cpu == PROCESSOR_R6000)				\
 	    return COSTS_N_INSNS (16);					\
@@ -3049,7 +3096,8 @@ while (0)
 									\
   case UDIV:								\
   case UMOD:								\
-    if (mips_cpu == PROCESSOR_R3000)					\
+    if (mips_cpu == PROCESSOR_R3000					\
+        || mips_cpu == PROCESSOR_R3900)					\
       return COSTS_N_INSNS (35);					\
     else if (mips_cpu == PROCESSOR_R6000)				\
       return COSTS_N_INSNS (38);					\
@@ -3152,8 +3200,9 @@ while (0)
    : 12)
 
 /* ??? Fix this to be right for the R8000.  */
-#define MEMORY_MOVE_COST(MODE) \
-  ((mips_cpu == PROCESSOR_R4000 || mips_cpu == PROCESSOR_R6000) ? 6 : 4)
+#define MEMORY_MOVE_COST(MODE,CLASS,TO_P) \
+  (((mips_cpu == PROCESSOR_R4000 || mips_cpu == PROCESSOR_R6000) ? 6 : 4) \
+   + memory_move_secondary_cost ((MODE), (CLASS), (TO_P)))
 
 /* A C expression for the cost of a branch instruction.  A value of
    1 is the default; other values are interpreted relative to that.  */
@@ -3570,7 +3619,7 @@ while (0)
 #define ASM_OUTPUT_SOURCE_LINE(STREAM, LINE)				\
   mips_output_lineno (STREAM, LINE)
 
-/* The MIPS implementation uses some labels for it's own purpose.  The
+/* The MIPS implementation uses some labels for its own purpose.  The
    following lists what labels are created, and are all formed by the
    pattern $L[a-z].*.  The machine independent portion of GCC creates
    labels matching:  $L[A-Z][0-9]+ and $L[0-9]+.
