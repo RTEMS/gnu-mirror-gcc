@@ -94,6 +94,8 @@ inline_forbidden_p (nodep, walk_subtrees, fn)
 	     arguments.  */
 	case BUILT_IN_VA_START:
 	case BUILT_IN_STDARG_START:
+	case BUILT_IN_NEXT_ARG:
+	case BUILT_IN_VA_END:
 #if 0
 	  /* Functions that need information about the address of the
              caller can't (shouldn't?) be inlined.  */
@@ -213,7 +215,8 @@ c_cannot_inline_tree_fn (fnp)
 	return 0;
     }
     
-  if (walk_tree (&DECL_SAVED_TREE (fn), inline_forbidden_p, fn, NULL))
+  if (walk_tree_without_duplicates
+	(&DECL_SAVED_TREE (fn), inline_forbidden_p, fn))
     goto cannot_inline;
 
   return 0;
