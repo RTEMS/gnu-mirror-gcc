@@ -1496,10 +1496,8 @@ build_member_call (type, name, parmlist)
   decl = maybe_dummy_object (type, &basetype_path);
 
   /* Convert 'this' to the specified type to disambiguate conversion
-     to the function's context.  Apparently Standard C++ says that we
-     shouldn't do this.  */
+     to the function's context.  */
   if (decl == current_class_ref
-      && ! pedantic
       && ACCESSIBLY_UNIQUELY_DERIVED_P (type, current_class_type))
     {
       tree olddecl = current_class_ptr;
@@ -1819,9 +1817,7 @@ resolve_offset_ref (exp)
   if (TREE_CODE (member) == FIELD_DECL
       && (base == current_class_ref || is_dummy_object (base)))
     {
-      tree expr;
-
-      basetype = DECL_CONTEXT (member);
+      tree binfo = TYPE_BINFO (current_class_type);
 
       /* Try to get to basetype from 'this'; if that doesn't work,
          nothing will.  */
@@ -1829,30 +1825,15 @@ resolve_offset_ref (exp)
 
       /* First convert to the intermediate base specified, if appropriate.  */
       if (TREE_CODE (exp) == OFFSET_REF && TREE_CODE (type) == OFFSET_TYPE)
-	base = build_scoped_ref (base, TYPE_OFFSET_BASETYPE (type));
-
-      /* Don't check access on the conversion; we might be after a member
-	 promoted by an access- or using-declaration, and we have already
-	 checked access for the member itself.  */
-      basetype = lookup_base (TREE_TYPE (base), basetype, ba_ignore, NULL);
-      expr = build_base_path (PLUS_EXPR, base, basetype, 1);
-
-      if (expr == error_mark_node)
-	return error_mark_node;
-
-      type = TREE_TYPE (member);
-      if (TREE_CODE (type) != REFERENCE_TYPE)
 	{
-	  int quals = cp_type_quals (type) | cp_type_quals (TREE_TYPE (expr));
-
-	  if (DECL_MUTABLE_P (member))
-	    quals &= ~TYPE_QUAL_CONST;
-	  
-	  type = cp_build_qualified_type (type, quals);
+	  binfo = binfo_or_else (TYPE_OFFSET_BASETYPE (type),
+				 current_class_type);
+	  if (!binfo)
+	    return error_mark_node;
+	  base = build_base_path (PLUS_EXPR, base, binfo, 1);
 	}
-      
-      expr = build (COMPONENT_REF, type, expr, member);
-      return convert_from_reference (expr);
+
+      return build_component_ref (base, member, binfo, 1);
     }
 
   /* Ensure that we have an object.  */
@@ -2206,6 +2187,7 @@ build_new_1 (exp)
   tree full_type;
   tree nelts = NULL_TREE;
   tree alloc_call, alloc_expr, alloc_node;
+  tree alloc_fn;
   tree cookie_expr, init_expr;
   int has_array = 0;
   enum tree_code code;
@@ -2260,7 +2242,7 @@ build_new_1 (exp)
 
   size = size_in_bytes (true_type);
   if (has_array)
-    size = fold (cp_build_binary_op (MULT_EXPR, size, nelts));
+    size = size_binop (MULT_EXPR, size, convert (sizetype, nelts));
 
   if (TREE_CODE (true_type) == VOID_TYPE)
     {
@@ -2288,7 +2270,7 @@ build_new_1 (exp)
     use_cookie = 0;
   /* When using placement new, users may not realize that they need
      the extra storage.  We require that the operator called be
-     the global placement operator delete[].  */
+     the global placement operator new[].  */
   else if (placement && !TREE_CHAIN (placement) 
 	   && same_type_p (TREE_TYPE (TREE_VALUE (placement)),
 			   ptr_type_node))
@@ -2346,13 +2328,14 @@ build_new_1 (exp)
   if (alloc_call == error_mark_node)
     return error_mark_node;
 
-  /* The ALLOC_CALL should be a CALL_EXPR, and the first operand
-     should be the address of a known FUNCTION_DECL.  */
-  my_friendly_assert (TREE_CODE (alloc_call) == CALL_EXPR, 20000521);
-  t = TREE_OPERAND (alloc_call, 0);
-  my_friendly_assert (TREE_CODE (t) == ADDR_EXPR, 20000521);
-  t = TREE_OPERAND (t, 0);
-  my_friendly_assert (TREE_CODE (t) == FUNCTION_DECL, 20000521);
+  /* The ALLOC_CALL should be a CALL_EXPR -- or a COMPOUND_EXPR whose
+     right-hand-side is ultimately a CALL_EXPR -- and the first
+     operand should be the address of a known FUNCTION_DECL.  */
+  t = alloc_call;
+  while (TREE_CODE (t) == COMPOUND_EXPR) 
+    t = TREE_OPERAND (t, 1);
+  alloc_fn = get_callee_fndecl (t);
+  my_friendly_assert (alloc_fn != NULL_TREE, 20020325);
   /* Now, check to see if this function is actually a placement
      allocation function.  This can happen even when PLACEMENT is NULL
      because we might have something like:
@@ -2364,7 +2347,8 @@ build_new_1 (exp)
      one argument, or there are variable arguments, then this is a
      placement allocation function.  */
   placement_allocation_fn_p 
-    = (type_num_arguments (TREE_TYPE (t)) > 1 || varargs_function_p (t));
+    = (type_num_arguments (TREE_TYPE (alloc_fn)) > 1 
+       || varargs_function_p (alloc_fn));
 
   /*        unless an allocation function is declared with an empty  excep-
      tion-specification  (_except.spec_),  throw(), it indicates failure to
@@ -2376,11 +2360,7 @@ build_new_1 (exp)
 
      So check for a null exception spec on the op new we just called.  */
 
-  /* The ADDR_EXPR.  */
-  t = TREE_OPERAND (alloc_call, 0);
-  /* The function.  */
-  t = TREE_OPERAND (t, 0);
-  nothrow = TYPE_NOTHROW_P (TREE_TYPE (t));
+  nothrow = TYPE_NOTHROW_P (TREE_TYPE (alloc_fn));
   check_new = (flag_check_new || nothrow) && ! use_java_new;
 
   alloc_expr = alloc_call;
@@ -2473,13 +2453,22 @@ build_new_1 (exp)
 	  tree cleanup;
 	  int flags = (LOOKUP_NORMAL 
 		       | (globally_qualified_p * LOOKUP_GLOBAL));
+	  tree delete_node;
+
+	  if (use_cookie)
+	    /* Subtract the padding back out to get to the pointer returned
+	       from operator new.  */
+	    delete_node = fold (build (MINUS_EXPR, TREE_TYPE (alloc_node),
+				       alloc_node, cookie_size));
+	  else
+	    delete_node = alloc_node;
 
 	  /* The Standard is unclear here, but the right thing to do
              is to use the same method for finding deallocation
              functions that we use for finding allocation functions.  */
 	  flags |= LOOKUP_SPECULATIVELY;
 
-	  cleanup = build_op_delete_call (dcode, alloc_node, size, flags,
+	  cleanup = build_op_delete_call (dcode, delete_node, size, flags,
 					  (placement_allocation_fn_p 
 					   ? alloc_call : NULL_TREE));
 
@@ -3199,6 +3188,14 @@ build_delete (type, addr, auto_delete, flags, use_global_delete)
 					    NULL_TREE);
 	  /* Call the complete object destructor.  */
 	  auto_delete = sfk_complete_destructor;
+	}
+      else if (auto_delete == sfk_deleting_destructor
+	       && TYPE_GETS_REG_DELETE (type))
+	{
+	  /* Make sure we have access to the member op delete, even though
+	     we'll actually be calling it from the destructor.  */
+	  build_op_delete_call (DELETE_EXPR, addr, c_sizeof_nowarn (type),
+				LOOKUP_NORMAL, NULL_TREE);
 	}
 
       expr = build_dtor_call (build_indirect_ref (addr, NULL),

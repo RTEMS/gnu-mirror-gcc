@@ -36,7 +36,6 @@
 #include <istream>
 #include <ostream>
 #include <vector>
-#include <memory>      // for auto_ptr
 #ifdef _GLIBCPP_USE_WCHAR_T  
 # include <cwctype>     // for towupper, etc.
 #endif
@@ -64,7 +63,7 @@ namespace std
   const size_t 			locale::_S_num_categories;
   const size_t 			locale::_S_num_facets;
 
-  // Definitions for locale::id of standard facets. 
+  // Definitions for locale::id of standard facets that are specialized.
   locale::id ctype<char>::id;
   locale::id codecvt<char, char, mbstate_t>::id;
 
@@ -501,7 +500,7 @@ namespace std
     {
       size_t __i = ctype<char>::id._M_index;
       const locale::_Impl* __tmp = __loc._M_impl;
-      return static_cast<const ctype<char>&>(* (*(__tmp->_M_facets))[__i]);
+      return static_cast<const ctype<char>&>(*(__tmp->_M_facets[__i]));
     }
 
 #ifdef _GLIBCPP_USE_WCHAR_T
@@ -511,16 +510,11 @@ namespace std
     {
       size_t __i = ctype<wchar_t>::id._M_index;
       const locale::_Impl* __tmp = __loc._M_impl;
-      return static_cast<const ctype<wchar_t>&>(* (*(__tmp->_M_facets))[__i]);
+      return static_cast<const ctype<wchar_t>&>(*(__tmp->_M_facets[__i]));
     }
 #endif
 
-
   const char __num_base::_S_atoms[] = "0123456789eEabcdfABCDF";
-
-  const double __num_base::_S_scale_hex = log(10.0)/log(16.0);
-
-  const double __num_base::_S_scale_oct = log(10.0)/log(8.0);
 
   bool
   __num_base::_S_format_float(const ios_base& __io, char* __fptr, char __mod,

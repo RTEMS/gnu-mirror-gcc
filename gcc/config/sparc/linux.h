@@ -1,5 +1,5 @@
 /* Definitions for SPARC running Linux-based GNU systems with ELF.
-   Copyright (C) 1996, 1997, 1998, 1999, 2000 Free Software Foundation, Inc.
+   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2002 Free Software Foundation, Inc.
    Contributed by Eddie C. Dost (ecd@skynet.be)
 
 This file is part of GNU CC.
@@ -62,7 +62,8 @@ Boston, MA 02111-1307, USA.  */
 
 #undef  ENDFILE_SPEC
 #define ENDFILE_SPEC \
-  "%{!shared:crtend.o%s} %{shared:crtendS.o%s} crtn.o%s"
+  "%{ffast-math|funsafe-math-optimizations:crtfastmath.o%s} \
+   %{!shared:crtend.o%s} %{shared:crtendS.o%s} crtn.o%s"
 
 /* This is for -profile to use -lc_p instead of -lc.  */
 #undef	CC1_SPEC
@@ -97,10 +98,8 @@ Boston, MA 02111-1307, USA.  */
 #undef WCHAR_TYPE_SIZE
 #define WCHAR_TYPE_SIZE 32
 
-#undef MAX_WCHAR_TYPE_SIZE
-    
 #undef CPP_PREDEFINES
-#define CPP_PREDEFINES "-D__ELF__ -Dunix -D__sparc__ -Dlinux -Asystem=unix -Asystem=posix"
+#define CPP_PREDEFINES "-D__ELF__ -Dunix -D__sparc__ -D__gnu_linux__ -Dlinux -Asystem=unix -Asystem=posix"
 
 #undef CPP_SUBTARGET_SPEC
 #ifdef USE_GNULIBC_1
@@ -186,7 +185,7 @@ Boston, MA 02111-1307, USA.  */
 #undef ASM_SPEC
 #define ASM_SPEC \
   "%{V} %{v:%{!V:-V}} %{!Qn:-Qy} %{n} %{T} %{Ym,*} %{Wa,*:%*} -s %{fpic:-K PIC} \
-   %{fPIC:-K PIC} %(asm_relax)"
+   %{fPIC:-K PIC} %(asm_cpu) %(asm_relax)"
 
 /* Same as sparc.h */
 #undef DBX_REGISTER_NUMBER
@@ -203,6 +202,9 @@ do {									\
 
 #undef COMMON_ASM_OP
 #define COMMON_ASM_OP "\t.common\t"
+
+#undef  LOCAL_LABEL_PREFIX
+#define LOCAL_LABEL_PREFIX  "."
 
 /* This is how to output a definition of an internal numbered label where
    PREFIX is the class of label and NUM is the number within the class.  */
@@ -247,3 +249,9 @@ do {									\
 #define LINK_EH_SPEC "%{!static:--eh-frame-hdr} "
 #endif
 
+/* Don't be different from other Linux platforms in this regard.  */
+#define HANDLE_PRAGMA_PACK_PUSH_POP
+
+/* We use GNU ld so undefine this so that attribute((init_priority)) works.  */
+#undef CTORS_SECTION_ASM_OP
+#undef DTORS_SECTION_ASM_OP
