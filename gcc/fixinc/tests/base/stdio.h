@@ -7,8 +7,8 @@
     This had to be done to correct non-standard usages in the
     original, manufacturer supplied header file.  */
 
-#ifndef FIXINC_STDIO_STDARG_H_CHECK
-#define FIXINC_STDIO_STDARG_H_CHECK 1
+#ifndef FIXINC_WRAP_STDIO_H_STDIO_STDARG_H
+#define FIXINC_WRAP_STDIO_H_STDIO_STDARG_H 1
 
 #define __need___va_list
 #include <stdarg.h>
@@ -22,6 +22,13 @@ extern int getopt(int, char *const[], const char *);
 #if defined( HPUX11_VSNPRINTF_CHECK )
 extern int vsnprintf(char *, _hpux_size_t, const char *, __gnuc_va_list);
 #endif  /* HPUX11_VSNPRINTF_CHECK */
+
+
+#if defined( HPUX11_SNPRINTF_CHECK )
+extern int snprintf(char *, size_t, const char *, ...);
+extern int snprintf(char *, _hpux_size_t, const char *, ...);
+extern int snprintf(char *, _hpux_size_t, const char *, ...);
+#endif  /* HPUX11_SNPRINTF_CHECK */
 
 
 #if defined( IRIX_STDIO_DUMMY_VA_LIST_CHECK )
@@ -80,4 +87,4 @@ extern char *tempnam( const char *, const char *);
 void f (char * __restrict__ x);
 #endif  /* UNICOSMK_RESTRICT_CHECK */
 
-#endif  /* FIXINC_STDIO_STDARG_H_CHECK */
+#endif  /* FIXINC_WRAP_STDIO_H_STDIO_STDARG_H */
