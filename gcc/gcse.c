@@ -1,6 +1,6 @@
 /* Global common subexpression elimination/Partial redundancy elimination
    and global constant/copy propagation for GNU compiler.
-   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003
+   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004
    Free Software Foundation, Inc.
 
 This file is part of GCC.
@@ -4874,6 +4874,20 @@ bypass_block (basic_block bb, rtx setcc, rtx jump)
 	  else
 	    dest = NULL;
 
+	  /* Avoid unification of the edge with other edges from original
+	     branch.  We would end up emitting the instruction on "both"
+	     edges.  */
+	    
+	  if (dest && setcc && !CC0_P (SET_DEST (PATTERN (setcc))))
+	    {
+	      edge e2;
+	      for (e2 = e->src->succ; e2; e2 = e2->succ_next)
+		if (e2->dest == dest)
+		  break;
+	      if (e2)
+		dest = NULL;
+	    }
+
 	  old_dest = e->dest;
 	  if (dest != NULL
 	      && dest != old_dest
@@ -5952,7 +5966,7 @@ delete_null_pointer_checks_1 (unsigned int *block_reg, sbitmap *nonnull_avin,
 
       /* Scan each insn in the basic block looking for memory references and
 	 register sets.  */
-      stop_insn = NEXT_INSN (BB_HEAD (current_block));
+      stop_insn = NEXT_INSN (BB_END (current_block));
       for (insn = BB_HEAD (current_block);
 	   insn != stop_insn;
 	   insn = NEXT_INSN (insn))
@@ -6054,8 +6068,10 @@ delete_null_pointer_checks_1 (unsigned int *block_reg, sbitmap *nonnull_avin,
 
       something_changed = 1;
       delete_insn (last_insn);
+#ifdef HAVE_cc0
       if (compare_and_branch == 2)
 	delete_insn (earliest);
+#endif
       purge_dead_edges (bb);
 
       /* Don't check this block again.  (Note that BB_END is

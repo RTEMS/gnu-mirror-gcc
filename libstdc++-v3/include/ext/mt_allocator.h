@@ -1,6 +1,6 @@
 // MT-optimized allocator -*- C++ -*-
 
-// Copyright (C) 2003 Free Software Foundation, Inc.
+// Copyright (C) 2003, 2004 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -35,6 +35,7 @@
 #ifndef _MT_ALLOCATOR_H
 #define _MT_ALLOCATOR_H 1
 
+#include <bits/c++config.h>
 #include <new>
 #include <memory>
 #include <cstdlib>
@@ -225,7 +226,7 @@ namespace __gnu_cxx
 
     public:
       pointer
-      allocate(size_t __n, std::allocator<void>::const_pointer __h = 0)
+      allocate(size_t __n, std::allocator<void>::const_pointer = 0)
       {
         /*
          * Requests larger than _S_max_bytes are handled by
