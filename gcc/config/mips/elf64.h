@@ -22,11 +22,10 @@ Boston, MA 02111-1307, USA.  */
 
 #undef  OBJECT_FORMAT_COFF
 #undef  EXTENDED_COFF
-#define OBJECT_FORMAT_ELF
 
 #undef  SDB_DEBUGGING_INFO
-#define DBX_DEBUGGING_INFO
-#define DWARF2_DEBUGGING_INFO
+#define DBX_DEBUGGING_INFO 1
+#define DWARF2_DEBUGGING_INFO 1
 
 #undef  PREFERRED_DEBUGGING_TYPE
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
@@ -202,3 +201,6 @@ void FN ()                                                            \
 
 #undef  ENDFILE_SPEC
 #define ENDFILE_SPEC "crtend%O%s crtn%O%s"
+
+/* We support #pragma.  */
+#define HANDLE_SYSV_PRAGMA 1
