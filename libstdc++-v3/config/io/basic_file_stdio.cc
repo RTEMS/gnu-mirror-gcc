@@ -1,6 +1,6 @@
 // Wrapper of C-language FILE struct -*- C++ -*-
 
-// Copyright (C) 2000, 2001, 2002 Free Software Foundation, Inc.
+// Copyright (C) 2000, 2001, 2002, 2004 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -33,6 +33,67 @@
 
 #include <bits/basic_file.h>
 #include <fcntl.h>
+#include <unistd.h>
+
+#ifdef _GLIBCPP_HAVE_SYS_IOCTL_H
+#define BSD_COMP /* Get FIONREAD on Solaris2. */
+#include <sys/ioctl.h>
+#endif
+
+// Pick up FIONREAD on Solaris 2.5.
+#ifdef _GLIBCPP_HAVE_SYS_FILIO_H
+#include <sys/filio.h>
+#endif
+
+#ifdef _GLIBCPP_HAVE_POLL
+#include <poll.h>
+#endif
+
+#if defined(_GLIBCPP_HAVE_S_ISREG) || defined(_GLIBCPP_HAVE_S_IFREG)
+# include <sys/stat.h>
+# ifdef _GLIBCPP_HAVE_S_ISREG
+#  define _GLIBCPP_ISREG(x) S_ISREG(x)
+# else
+#  define _GLIBCPP_ISREG(x) (((x) & S_IFMT) == S_IFREG)
+# endif
+#endif
+
+namespace __gnu_internal
+{
+  // Map ios_base::openmode flags to a string for use in fopen().
+  // Table of valid combinations as given in [lib.filebuf.members]/2.
+  static const char*
+  fopen_mode(std::ios_base::openmode mode)
+  {
+    enum 
+      {
+	in     = std::ios_base::in,
+	out    = std::ios_base::out,
+	trunc  = std::ios_base::trunc,
+	app    = std::ios_base::app,
+	binary = std::ios_base::binary
+      };
+    
+    switch (mode & (in|out|trunc|app|binary))
+      {
+      case (   out                 ): return "w";  
+      case (   out      |app       ): return "a";  
+      case (   out|trunc           ): return "w";  
+      case (in                     ): return "r";  
+      case (in|out                 ): return "r+"; 
+      case (in|out|trunc           ): return "w+"; 
+	
+      case (   out          |binary): return "wb"; 
+      case (   out      |app|binary): return "ab"; 
+      case (   out|trunc    |binary): return "wb"; 
+      case (in              |binary): return "rb"; 
+      case (in|out          |binary): return "r+b";
+      case (in|out|trunc    |binary): return "w+b";
+	
+      default: return 0; // invalid
+      }
+  }
+} // namespace __gnu_internal
 
 namespace std 
 {
@@ -42,52 +103,16 @@ namespace std
 
   __basic_file<char>::~__basic_file()
   { this->close(); }
-      
-  void 
-  __basic_file<char>::_M_open_mode(ios_base::openmode __mode, int& __p_mode, 
-				   int&, char* __c_mode)
-  {  
-    bool __testb = __mode & ios_base::binary;
-    bool __testi = __mode & ios_base::in;
-    bool __testo = __mode & ios_base::out;
-    bool __testt = __mode & ios_base::trunc;
-    bool __testa = __mode & ios_base::app;
-      
-    // Set __c_mode for use in fopen.
-    // Set __p_mode for use in open.
-    if (!__testi && __testo && !__testt && !__testa)
-      {
-	strcpy(__c_mode, "w");
-	__p_mode = (O_WRONLY | O_CREAT);
-      }
-    if (!__testi && __testo && !__testt && __testa)
-      {
-	strcpy(__c_mode, "a");
-	__p_mode |=  O_WRONLY | O_CREAT | O_APPEND;
-      }
-    if (!__testi && __testo && __testt && !__testa)
-      {
-	strcpy(__c_mode, "w");
-	__p_mode |=  O_WRONLY | O_CREAT | O_TRUNC;
-      }
 
-    if (__testi && !__testo && !__testt && !__testa)
-      {
-	strcpy(__c_mode, "r");
-	__p_mode |=  O_RDONLY | O_NONBLOCK;
-      }
-    if (__testi && __testo && !__testt && !__testa)
-      {
-	strcpy(__c_mode, "r+");
-	__p_mode |=  O_RDWR | O_CREAT;
-      }
-    if (__testi && __testo && __testt && !__testa)
-      {
-	strcpy(__c_mode, "w+");
-	__p_mode |=  O_RDWR | O_CREAT | O_TRUNC;
-      }
-    if (__testb)
-      strcat(__c_mode, "b");
+  // Preserved for binary compatibility only.
+  // Do not use.  Gone in 3.4.
+  void 
+  __basic_file<char>::_M_open_mode(ios_base::openmode __mode, int&, int&,
+				   char* __c_mode)
+  {
+    const char* r = __gnu_internal::fopen_mode(__mode);
+    if (r)
+      strcpy(__c_mode, r);
   }
   
   __basic_file<char>*
@@ -108,12 +133,9 @@ namespace std
 			       bool __del) 
   {
     __basic_file* __ret = NULL;
-    int __p_mode = 0;
-    int __rw_mode = 0;
-    char __c_mode[4];
-    
-    _M_open_mode(__mode, __p_mode, __rw_mode, __c_mode);
-    if (!this->is_open() && (_M_cfile = fdopen(__fd, __c_mode)))
+    const char* __c_mode = __gnu_internal::fopen_mode(__mode);
+    if (__c_mode && !this->is_open() 
+	&& (_M_cfile = fdopen(__fd, __c_mode)))
       {
 	// Iff __del is true, then close will fclose the fd.
 	_M_cfile_created = __del;
@@ -139,22 +161,12 @@ namespace std
 			   int /*__prot*/)
   {
     __basic_file* __ret = NULL;
-    int __p_mode = 0;
-    int __rw_mode = 0;
-    char __c_mode[4];
-      
-    _M_open_mode(__mode, __p_mode, __rw_mode, __c_mode);
-
-    if (!this->is_open())
+    const char* __c_mode = __gnu_internal::fopen_mode(__mode);
+    if (__c_mode && !this->is_open())
       {
 	if ((_M_cfile = fopen(__name, __c_mode)))
 	  {
 	    _M_cfile_created = true;
-
-	    // Set input to nonblocking for fifos.
-	    if (__mode & ios_base::in)
-	      fcntl(this->fd(), F_SETFL, O_NONBLOCK);
-
 	    __ret = this;
 	  }
       }
@@ -175,12 +187,12 @@ namespace std
     __basic_file* __retval = static_cast<__basic_file*>(NULL);
     if (this->is_open())
       {
-	fflush(_M_cfile);
-	if ((_M_cfile_created && fclose(_M_cfile) == 0) || !_M_cfile_created)
-	  {
-	    _M_cfile = 0;
-	    __retval = this;
-	  }
+	if (_M_cfile_created)
+	  fclose(_M_cfile);
+	else
+	  fflush(_M_cfile);
+	_M_cfile = 0;
+	__retval = this;
       }
     return __retval;
   }
@@ -197,18 +209,54 @@ namespace std
   __basic_file<char>::seekoff(streamoff __off, ios_base::seekdir __way, 
 			      ios_base::openmode /*__mode*/)
   { 
-    fseek(_M_cfile, __off, __way); 
-    return ftell(_M_cfile); 
+    if (!fseek(_M_cfile, __off, __way))
+      return ftell(_M_cfile); 
+    else
+      // Fseek failed.
+      return -1L;
   }
 
   streamoff
   __basic_file<char>::seekpos(streamoff __pos, ios_base::openmode /*__mode*/)
   { 
-    fseek(_M_cfile, __pos, ios_base::beg); 
-    return ftell(_M_cfile); 
+    if (!fseek(_M_cfile, __pos, ios_base::beg))
+      return ftell(_M_cfile);
+    else
+      // Fseek failed.
+      return -1L;
   }
   
   int 
   __basic_file<char>::sync() 
   { return fflush(_M_cfile); }
+
+  streamsize
+  __basic_file<char>::showmanyc_helper()
+  {
+#ifdef FIONREAD
+    // Pipes and sockets.    
+    int __num = 0;
+    int __r = ioctl(this->fd(), FIONREAD, &__num);
+    if (!__r && __num >= 0)
+      return __num; 
+#endif    
+
+#ifdef _GLIBCPP_HAVE_POLL
+    // Cheap test.
+    struct pollfd __pfd[1];
+    __pfd[0].fd = this->fd();
+    __pfd[0].events = POLLIN;
+    if (poll(__pfd, 1, 0) <= 0)
+      return 0;
+#endif   
+
+#if defined(_GLIBCPP_HAVE_S_ISREG) || defined(_GLIBCPP_HAVE_S_IFREG)
+    // Regular files.
+    struct stat __buffer;
+    int __ret = fstat(this->fd(), &__buffer);
+    if (!__ret && _GLIBCPP_ISREG(__buffer.st_mode))
+      return __buffer.st_size - ftell(_M_cfile);
+#endif
+    return 0;
+  }
 }  // namespace std

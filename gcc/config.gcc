@@ -1,5 +1,5 @@
 # GCC build-, host- and target-specific configuration file.
-# Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
+# Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
 
 #This file is part of GCC.
 
@@ -212,14 +212,62 @@ target_gtfiles=
 
 # Obsolete configurations.
 case $machine in
-   m88k-*-aout*     \
- | m88k-*-openbsd*  \
- | m88k-*-sysv4*    \
- | mips-sni-sysv4   \
- | mn10200-*-*      \
- | ns32k-*-openbsd* \
- | romp-*-openbsd*  \
- | vax-*-vms* \
+   m88k-*-*			\
+ | mn10200-*-*			\
+ | romp-*-*			\
+ | alpha*-*-interix*		\
+ | alpha*-*-linux*libc1*	\
+ | alpha*-*-linux*ecoff*	\
+ | arm*-*-aout*			\
+ | arm*-*-conix*		\
+ | arm*-*-oabi			\
+ | strongarm-*-coff*		\
+ | hppa1.0-*-osf*		\
+ | hppa1.0-*-bsd*		\
+ | hppa1.[01]-*-hpux[789]*	\
+ | hppa*-*-hiux*		\
+ | hppa*-*-lites*		\
+ | i?86-*-win32			\
+ | m68000-hp-bsd*		\
+ | m68000-sun-sunos*		\
+ | m68000-att-sysv*		\
+ | m68k-atari-sysv*		\
+ | m68k-motorola-sysv*		\
+ | m68k-ncr-sysv*		\
+ | m68k-plexus-sysv*		\
+ | m68k-tti-*			\
+ | m68k-crds-unos*		\
+ | m68k-cbm-sysv*		\
+ | m68k-ccur-rtu*		\
+ | m68k-hp-bsd*			\
+ | m68k-sun-mach*		\
+ | m68k-sun-sunos*		\
+ | m68k-*-linux*aout*		\
+ | m68k-*-linux*libc1*		\
+ | m68k-*-psos*			\
+ | mips*-*-ecoff*		\
+ | mips-sni-sysv4		\
+ | mips64orion-*-rtems*		\
+ | ns32k-*-openbsd*		\
+ | powerpc*-*-sysv*		\
+ | powerpc*-*-linux*libc1*	\
+ | rs6000-ibm-aix[123]*		\
+ | rs6000-bull-bosx		\
+ | rs6000-*-mach*		\
+ | sparc-*-aout*		\
+ | sparc-*-netbsd*aout*		\
+ | sparc-*-bsd*			\
+ | sparc-*-chorusos*		\
+ | sparc-*-linux*aout*		\
+ | sparc-*-linux*libc1*		\
+ | sparc-*-lynxos*		\
+ | sparc-hal-solaris2*		\
+ | sparc-*-sunos[34]*		\
+ | sparclet-*-aout*		\
+ | sparclite-*-aout*		\
+ | sparc86x-*-aout*		\
+ | v850-*-rtems*		\
+ | vax-*-vms*			\
  )
     if test "x$enable_obsolete" != xyes; then
       echo "*** Configuration $machine is obsolete." >&2
@@ -250,11 +298,11 @@ xscale-*-*)
 	;;
 i[34567]86-*-*)
 	cpu_type=i386
-	extra_headers="mmintrin.h xmmintrin.h"
+	extra_headers="mmintrin.h xmmintrin.h emmintrin.h pmmintrin.h"
 	;;
 x86_64-*-*)
 	cpu_type=i386
-	extra_headers="mmintrin.h xmmintrin.h"
+	extra_headers="mmintrin.h xmmintrin.h emmintrin.h pmmintrin.h"
 	;;
 ia64-*-*)
 	extra_headers=ia64intrin.h
@@ -367,7 +415,18 @@ case $machine in
 	xm_defines=POSIX
 	gas=yes
 	gnu_ld=yes
+
+	# NetBSD 2.0 and later get POSIX threads enabled by default.
+	# Allow them to be explicitly enabled on any other version.
 	case x${enable_threads} in
+	x)
+		case $machine in
+		*-*-netbsd[2-9]* | *-*-netbsdelf[2-9]*)
+			thread_file='posix'
+			tm_defines="${tm_defines} NETBSD_ENABLE_PTHREADS"
+			;;
+		esac
+		;;
 	xyes | xposix)
 		thread_file='posix'
 		tm_defines="${tm_defines} NETBSD_ENABLE_PTHREADS"
@@ -733,7 +792,7 @@ frv-*-elf)
 	;;
 h8300-*-rtems*)
 	xm_defines=POSIX
-	tmake_file="h8300/t-h8300 t-rtems"
+	tmake_file="h8300/t-h8300 t-rtems h8300/t-rtems"
 	tm_file="h8300/h8300.h h8300/rtems.h rtems.h"
 	if test x$enable_threads = xyes; then
 	  thread_file='rtems'
@@ -753,7 +812,7 @@ hppa*64*-*-linux* | parisc*64*-*-linux*)
 	gas=yes gnu_ld=yes
 	;;
 hppa*-*-linux* | parisc*-*-linux*)
-	target_cpu_default="MASK_PA_11"
+	target_cpu_default="MASK_PA_11 | MASK_NO_SPACE_REGS"
 	tm_file="${tm_file} dbxelf.h elfos.h svr4.h linux.h pa/pa-linux.h \
 		 pa/pa32-regs.h pa/pa32-linux.h"
 	tmake_file="t-slibgcc-elf-ver t-linux pa/t-linux"
@@ -779,8 +838,11 @@ hppa1.1-*-rtems*)
 	xm_defines=POSIX
 	target_cpu_default="(MASK_JUMP_IN_DELAY | MASK_PORTABLE_RUNTIME | MASK_GAS | MASK_NO_SPACE_REGS | MASK_SOFT_FLOAT)"
 	tm_file="${tm_file} pa/pa32-regs.h dbxelf.h elfos.h pa/elf.h pa/pa-pro-end.h libgloss.h pa/rtems.h rtems.h"
-	tmake_file="pa/t-bsd pa/t-pro"
+	tmake_file="pa/t-bsd pa/t-pro t-rtems"
 	xmake_file="pa/x-ada"
+	if test x$enable_threads = xyes; then
+	  thread_file='rtems'
+	fi
 	;;
 hppa1.0-*-osf*)
 	tm_file="${tm_file} pa/pa32-regs.h pa/som.h pa/pa-osf.h"
@@ -894,20 +956,17 @@ hppa*64*-*-hpux11*)
 	tmake_file="pa/t-pa64 pa/t-pa-hpux"
 	xmake_file="pa/x-ada"
 	target_cpu_default="(MASK_PA_11|MASK_PA_20|MASK_GAS)"
-
+	extra_parts="crtbegin.o crtend.o crtbeginS.o crtendS.o crtbeginT.o"
 	if test x$gnu_ld = xyes
 	then
 		target_cpu_default="${target_cpu_default}|MASK_GNU_LD"
 	fi
-#	if [ x$enable_threads = x ]; then
-#	    enable_threads=$have_pthread_h
-#	fi
-#	if [ x$enable_threads = xyes ]; then
-#		thread_file='dce'
-#		tmake_file="${tmake_file} pa/t-dce-thr"
-#	fi
+	case x${enable_threads} in
+	xyes | xposix )
+		thread_file=posix 
+		;;
+	esac
 	install_headers_dir=install-headers-cpio
-	use_collect2=yes
 	;;
 hppa1.1-*-hpux11* | hppa2*-*-hpux11*)
 	target_cpu_default="MASK_PA_11"
@@ -915,13 +974,11 @@ hppa1.1-*-hpux11* | hppa2*-*-hpux11*)
 	xm_defines=POSIX
 	tmake_file="pa/t-pa pa/t-pa-hpux pa/t-hpux-shlib"
 	xmake_file="pa/x-ada"
-#	if test x$enable_threads = x; then
-#	    enable_threads=$have_pthread_h
-#	fi
-#	if test x$enable_threads = xyes; then
-#		thread_file='dce'
-#		tmake_file="${tmake_file} pa/t-dce-thr"
-#	fi
+	case x${enable_threads} in
+	xyes | xposix )
+		thread_file=posix 
+		;;
+	esac
 	install_headers_dir=install-headers-cpio
 	use_collect2=yes
 	;;
@@ -930,13 +987,11 @@ hppa1.0-*-hpux11*)
 	xm_defines=POSIX
 	tmake_file="pa/t-pa pa/t-pa-hpux pa/t-hpux-shlib"
 	xmake_file="pa/x-ada"
-#	if test x$enable_threads = x; then
-#	    enable_threads=$have_pthread_h
-#	fi
-#	if test x$enable_threads = xyes; then
-#		thread_file='dce'
-#		tmake_file="${tmake_file} pa/t-dce-thr"
-#	fi
+	case x${enable_threads} in
+	xyes | xposix )
+		thread_file=posix 
+		;;
+	esac
 	install_headers_dir=install-headers-cpio
 	use_collect2=yes
 	;;
@@ -1183,15 +1238,13 @@ i[34567]86-*-rtems*)
 i[34567]86-*-sco3.2v5*)	# 80386 running SCO Open Server 5
 	xm_defines=POSIX
 	install_headers_dir=install-headers-cpio
-	tm_file="${tm_file} i386/unix.h i386/att.h i386/sco5.h"
+	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h i386/sco5.h"
 	if test x$gas = xyes
 	then
 		tm_file="usegas.h ${tm_file}"
-		tmake_file=i386/t-sco5gas
-	else
-		tmake_file=i386/t-sco5
 	fi
-	extra_parts="crti.o crtbegin.o crtend.o crtbeginS.o crtendS.o"
+	tmake_file=i386/t-sco5
+	extra_parts="crtbegin.o crtend.o"
 	;;
 i[34567]86-*-solaris2*)
 	xm_defines="POSIX SMALL_ARG_MAX"
@@ -1425,14 +1478,19 @@ ia64*-*-linux*)
 	tmake_file="t-slibgcc-elf-ver t-linux ia64/t-ia64 ia64/t-glibc"
 	target_cpu_default="MASK_GNU_AS|MASK_GNU_LD"
 	extra_parts="crtbegin.o crtend.o crtbeginS.o crtendS.o crtfastmath.o"
+	if test x"$use_libunwind_exceptions" = xyes; then
+	  tmake_file="$tmake_file t-libunwind"
+	fi
 	;;
 ia64*-*-hpux*)
 	tm_file="${tm_file} dbxelf.h elfos.h svr4.h ia64/sysv4.h ia64/hpux.h ia64/hpux_longdouble.h"
 	tmake_file="ia64/t-ia64 ia64/t-hpux"
 	target_cpu_default="MASK_GNU_AS"
-	if test x$enable_threads = xyes; then
-		thread_file='posix'
-	fi
+	case x$enable_threads in
+	xyes | xposix )
+		thread_file=posix
+		;;
+	esac
 	use_collect2=no
 	c_target_objs="ia64-c.o"
 	cxx_target_objs="ia64-c.o"
@@ -1441,7 +1499,7 @@ ip2k-*-elf)
 	;;
 m32r-*-elf*)
 	tm_file="dbxelf.h elfos.h svr4.h ${tm_file}"
-	extra_parts="crtinit.o crtfini.o"
+	extra_parts="crtinit.o crtfini.o m32rx/crtinit.o m32rx/crtfini.o"
 	;;
 # m68hc11 and m68hc12 share the same machine description.
 m68hc11-*-*|m6811-*-*)
@@ -1679,8 +1737,6 @@ m68k-*-linux*)		# Motorola m68k's running GNU/Linux
 				# aka the GNU/Linux C library 6.
 	tm_file=m68k/linux.h
 	tmake_file="t-slibgcc-elf-ver t-linux m68k/t-linux"
-	extra_parts="crtbegin.o crtbeginS.o crtend.o crtendS.o"
-	gnu_ld=yes
 	;;
 m68k-*-psos*)
 	tmake_file=m68k/t-m68kbare
@@ -1692,7 +1748,7 @@ m68k-*-rtemscoff*)	# would otherwise be caught by m68k-*-rtems*
 	;;
 m68k-*-rtems*)
 	xm_defines=POSIX
-	tmake_file="m68k/t-m68kbare t-rtems m68k/t-crtstuff"
+	tmake_file="m68k/t-m68kbare m68k/t-crtstuff t-rtems m68k/t-rtems"
 	tm_file="m68k/m68k-none.h m68k/m68kelf.h dbxelf.h elfos.h m68k/m68kemb.h m68k/m68020-elf.h m68k/rtemself.h rtems.h"
 	extra_parts="crtbegin.o crtend.o"
 	if test x$enable_threads = xyes; then
@@ -1727,7 +1783,7 @@ mips-sgi-irix6*o32)		# SGI System V.4., IRIX 6, O32 ABI
 		tm_file="mips/iris5.h mips/iris5gas.h mips/iris6-o32-gas.h"
 		if test x$stabs = xyes
 		then
-			tm_file="${tm_file} dbx.h"
+			tm_file="${tm_file} dbx.h mips/dbxmdebug.h"
 		fi
 		tmake_file=mips/t-iris5-gas
 	else
@@ -1801,7 +1857,7 @@ mips-sgi-irix5*)		# SGI System V.4., IRIX 5
 		tm_file="mips/iris5.h mips/iris5gas.h"
 		if test x$stabs = xyes
 		then
-			tm_file="${tm_file} dbx.h"
+			tm_file="${tm_file} dbx.h mips/dbxmdebug.h"
 		fi
 		tmake_file=mips/t-iris5-gas
 	else
@@ -1909,7 +1965,7 @@ mips64orion-*-rtems*)
 mips*-*-rtems*)
 	xm_defines=POSIX
 	tm_file="${tm_file} mips/elf.h mips/rtems.h rtems.h"
-	tmake_file="mips/t-elf t-rtems"
+	tmake_file="mips/t-elf t-rtems mips/t-rtems"
 	if test x$enable_threads = xyes; then
 	  thread_file='rtems'
 	fi
@@ -2055,7 +2111,7 @@ powerpc-*-eabi*)
 powerpc-*-rtems*)
 	xm_defines=POSIX
 	tm_file="${tm_file} dbxelf.h elfos.h svr4.h freebsd-spec.h rs6000/sysv4.h rs6000/eabi.h rs6000/rtems.h rtems.h"
-	tmake_file="rs6000/t-ppcgas t-rtems rs6000/t-ppccomm"
+	tmake_file="rs6000/t-rtems t-rtems rs6000/t-ppccomm"
 	if test x$enable_threads = xyes; then
 	  thread_file='rtems'
 	fi
@@ -2249,7 +2305,7 @@ sh-*-rtems*)
 	fi
 	;;
 sh-*-linux* | sh[2346lbe]*-*-linux*)
-	tmake_file="sh/t-sh sh/t-elf sh/t-linux"
+	tmake_file="sh/t-sh sh/t-elf t-slibgcc-elf-ver t-linux"
 	case $machine in
 	sh*be-*-* | sh*eb-*-*) ;;
 	*)
@@ -2257,6 +2313,7 @@ sh-*-linux* | sh[2346lbe]*-*-linux*)
 		tmake_file="${tmake_file} sh/t-le"
 		;;
 	esac
+	tmake_file="${tmake_file} sh/t-linux"
 	tm_file="${tm_file} dbxelf.h elfos.h svr4.h sh/elf.h sh/linux.h"
 	gas=yes gnu_ld=yes
 	case $machine in
@@ -2466,7 +2523,7 @@ sparc-*-solaris2*)
 			tm_file="${tm_file} sparc/sol26-sld.h"
 		fi
 		;;
-	*-*-solaris2.[789])
+	*-*-solaris2.[789] | *-*-solaris2.1[0-9])
 		tm_file="sparc/biarch64.h ${tm_file} sparc/sol2-bi.h"
 		if test x$gnu_ld = xyes; then
 			tm_file="${tm_file} sparc/sol2-gld-bi.h"
@@ -2703,7 +2760,7 @@ xtensa-*-elf*)
 	;;
 xtensa-*-linux*)
 	tm_file="${tm_file} dbxelf.h elfos.h svr4.h linux.h xtensa/linux.h"
-	tmake_file="t-linux xtensa/t-xtensa"
+	tmake_file="t-slibgcc-elf-ver t-linux xtensa/t-xtensa"
 	;;
 *)
 	echo "*** Configuration $machine not supported" 1>&2
