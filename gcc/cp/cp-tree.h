@@ -28,6 +28,10 @@ Boston, MA 02111-1307, USA.  */
 #ifndef GCC_CP_TREE_H
 #define GCC_CP_TREE_H
 
+#ifndef __GNUC__
+#error "You should be using 'make bootstrap' -- see installation instructions"
+#endif
+
 #include "c-common.h"
 
 /* Usage of TREE_LANG_FLAG_?:
