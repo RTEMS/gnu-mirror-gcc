@@ -1191,7 +1191,7 @@ find_interesting_uses_cond (struct ivopts_data *data, tree stmt, tree *cond_p)
 /* Returns true if expression EXPR is obviously invariant in LOOP,
    i.e. if all its operands are defined outside of the LOOP.  */
 
-static bool
+bool
 expr_invariant_in_loop_p (struct loop *loop, tree expr)
 {
   basic_block def_bb;
@@ -1373,26 +1373,13 @@ fail:
 static void
 find_invariants_stmt (struct ivopts_data *data, tree stmt)
 {
-  use_optype uses = NULL;
-  unsigned i, n;
+  ssa_op_iter iter;
+  use_operand_p use_p;
   tree op;
 
-  if (TREE_CODE (stmt) == PHI_NODE)
-    n = PHI_NUM_ARGS (stmt);
-  else
+  FOR_EACH_PHI_OR_STMT_USE (use_p, stmt, iter, SSA_OP_USE)
     {
-      get_stmt_operands (stmt);
-      uses = STMT_USE_OPS (stmt);
-      n = NUM_USES (uses);
-    }
-
-  for (i = 0; i < n; i++)
-    {
-      if (TREE_CODE (stmt) == PHI_NODE)
-	op = PHI_ARG_DEF (stmt, i);
-      else
-	op = USE_OP (uses, i);
-
+      op = USE_FROM_PTR (use_p);
       record_invariant (data, op, false);
     }
 }
@@ -1404,8 +1391,8 @@ find_interesting_uses_stmt (struct ivopts_data *data, tree stmt)
 {
   struct iv *iv;
   tree op, lhs, rhs;
-  use_optype uses = NULL;
-  unsigned i, n;
+  ssa_op_iter iter;
+  use_operand_p use_p;
 
   find_invariants_stmt (data, stmt);
 
@@ -1473,20 +1460,9 @@ find_interesting_uses_stmt (struct ivopts_data *data, tree stmt)
 	return;
     }
 
-  if (TREE_CODE (stmt) == PHI_NODE)
-    n = PHI_NUM_ARGS (stmt);
-  else
+  FOR_EACH_PHI_OR_STMT_USE (use_p, stmt, iter, SSA_OP_USE)
     {
-      uses = STMT_USE_OPS (stmt);
-      n = NUM_USES (uses);
-    }
-
-  for (i = 0; i < n; i++)
-    {
-      if (TREE_CODE (stmt) == PHI_NODE)
-	op = PHI_ARG_DEF (stmt, i);
-      else
-	op = USE_OP (uses, i);
+      op = USE_FROM_PTR (use_p);
 
       if (TREE_CODE (op) != SSA_NAME)
 	continue;
@@ -4012,6 +3988,7 @@ rewrite_address_base (block_stmt_iterator *bsi, tree *op, tree with)
       new_name = make_ssa_name (new_var, copy);
     }
   TREE_OPERAND (copy, 0) = new_name;
+  update_stmt (copy);
   bsi_insert_before (bsi, copy, BSI_SAME_STMT);
   with = new_name;
 
@@ -4074,7 +4051,7 @@ rewrite_use_compare (struct ivopts_data *data,
       *use->op_p = build2 (compare, boolean_type_node,
 			  var_at_stmt (data->current_loop,
 				       cand, use->stmt), op);
-      modify_stmt (use->stmt);
+      update_stmt (use->stmt);
       return;
     }
 
@@ -4141,24 +4118,13 @@ protect_loop_closed_ssa_form_use (edge exit, use_operand_p op_p)
 static void
 protect_loop_closed_ssa_form (edge exit, tree stmt)
 {
-  use_optype uses;
-  vuse_optype vuses;
-  v_may_def_optype v_may_defs;
-  unsigned i;
+  ssa_op_iter iter;
+  use_operand_p use_p;
 
   get_stmt_operands (stmt);
-
-  uses = STMT_USE_OPS (stmt);
-  for (i = 0; i < NUM_USES (uses); i++)
-    protect_loop_closed_ssa_form_use (exit, USE_OP_PTR (uses, i));
-
-  vuses = STMT_VUSE_OPS (stmt);
-  for (i = 0; i < NUM_VUSES (vuses); i++)
-    protect_loop_closed_ssa_form_use (exit, VUSE_OP_PTR (vuses, i));
-
-  v_may_defs = STMT_V_MAY_DEF_OPS (stmt);
-  for (i = 0; i < NUM_V_MAY_DEFS (v_may_defs); i++)
-    protect_loop_closed_ssa_form_use (exit, V_MAY_DEF_OP_PTR (v_may_defs, i));
+  
+  FOR_EACH_SSA_USE_OPERAND (use_p, stmt, iter, SSA_OP_ALL_USES)
+    protect_loop_closed_ssa_form_use (exit, use_p);
 }
 
 /* STMTS compute a value of a phi argument OP on EXIT of a loop.  Arrange things
@@ -4175,19 +4141,24 @@ compute_phi_arg_on_exit (edge exit, tree stmts, tree op)
   if (EDGE_COUNT (exit->dest->preds) > 1)
     split_loop_exit_edge (exit);
 
-  if (TREE_CODE (stmts) == STATEMENT_LIST)
-    {
-      for (tsi = tsi_start (stmts); !tsi_end_p (tsi); tsi_next (&tsi))
-	protect_loop_closed_ssa_form (exit, tsi_stmt (tsi));
-    }
-  else
-    protect_loop_closed_ssa_form (exit, stmts);
-
   /* Ensure there is label in exit->dest, so that we can
      insert after it.  */
   tree_block_label (exit->dest);
   bsi = bsi_after_labels (exit->dest);
-  bsi_insert_after (&bsi, stmts, BSI_CONTINUE_LINKING);
+
+  if (TREE_CODE (stmts) == STATEMENT_LIST)
+    {
+      for (tsi = tsi_start (stmts); !tsi_end_p (tsi); tsi_next (&tsi))
+        {
+	  bsi_insert_after (&bsi, tsi_stmt (tsi), BSI_NEW_STMT);
+	  protect_loop_closed_ssa_form (exit, bsi_stmt (bsi));
+	}
+    }
+  else
+    {
+      bsi_insert_after (&bsi, stmts, BSI_NEW_STMT);
+      protect_loop_closed_ssa_form (exit, bsi_stmt (bsi));
+    }
 
   if (!op)
     return;
@@ -4306,7 +4277,7 @@ rewrite_use (struct ivopts_data *data,
       default:
 	gcc_unreachable ();
     }
-  modify_stmt (use->stmt);
+  update_stmt (use->stmt);
 }
 
 /* Rewrite the uses using the selected induction variables.  */

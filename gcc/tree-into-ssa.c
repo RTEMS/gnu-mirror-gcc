@@ -347,7 +347,7 @@ ssa_mark_phi_uses (struct dom_walk_data *walk_data, basic_block bb)
    for every variable in the function.  For every statement S in block
    BB:
 
-   1- Variables defined by S in DEF_OPS(S) are marked in the bitmap
+   1- Variables defined by S in the DEFS of S are marked in the bitmap
       WALK_DATA->GLOBAL_DATA->KILLS.
 
    2- If S uses a variable VAR and there is no preceding kill of VAR,
@@ -374,7 +374,7 @@ mark_def_sites (struct dom_walk_data *walk_data,
   /* Mark all the blocks that have definitions for each variable in the
      VARS_TO_RENAME bitmap.  */
   stmt = bsi_stmt (bsi);
-  get_stmt_operands (stmt);
+  update_stmt_if_modified (stmt);
 
   /* If a variable is used before being set, then the variable is live
      across a block boundary, so mark it live-on-entry to BB.  */
@@ -434,7 +434,7 @@ ssa_mark_def_sites (struct dom_walk_data *walk_data,
   /* Mark all the blocks that have definitions for each variable in the
      names_to_rename bitmap.  */
   stmt = bsi_stmt (bsi);
-  get_stmt_operands (stmt);
+  update_stmt_if_modified (stmt);
 
   /* If a variable is used before being set, then the variable is live
      across a block boundary, so mark it live-on-entry to BB.  */

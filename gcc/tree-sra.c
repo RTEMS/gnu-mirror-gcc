@@ -887,9 +887,7 @@ sra_walk_function (const struct sra_walk_fns *fns)
 
 	/* If the statement has no virtual operands, then it doesn't
 	   make any structure references that we care about.  */
-	if (NUM_V_MAY_DEFS (V_MAY_DEF_OPS (ann)) == 0
-	    && NUM_VUSES (VUSE_OPS (ann)) == 0
-	    && NUM_V_MUST_DEFS (V_MUST_DEF_OPS (ann)) == 0)
+	if (ZERO_SSA_OPERANDS (stmt, (SSA_OP_VIRTUAL_DEFS | SSA_OP_VUSE)))
 	  continue;
 
 	switch (TREE_CODE (stmt))
@@ -1401,7 +1399,7 @@ mark_all_v_defs (tree stmt)
   tree sym;
   ssa_op_iter iter;
 
-  get_stmt_operands (stmt);
+  update_stmt_if_modified (stmt);
 
   FOR_EACH_SSA_TREE_OPERAND (sym, stmt, iter, SSA_OP_VIRTUAL_DEFS)
     {
@@ -1719,7 +1717,7 @@ scalarize_use (struct sra_elt *elt, tree *expr_p, block_stmt_iterator *bsi,
       if (is_output)
 	mark_all_v_defs (stmt);
       *expr_p = elt->replacement;
-      modify_stmt (stmt);
+      update_stmt (stmt);
     }
   else
     {
@@ -1767,7 +1765,7 @@ scalarize_copy (struct sra_elt *lhs_elt, struct sra_elt *rhs_elt,
 
       TREE_OPERAND (stmt, 0) = lhs_elt->replacement;
       TREE_OPERAND (stmt, 1) = rhs_elt->replacement;
-      modify_stmt (stmt);
+      update_stmt (stmt);
     }
   else if (lhs_elt->use_block_copy || rhs_elt->use_block_copy)
     {

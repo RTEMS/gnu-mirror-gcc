@@ -31,13 +31,10 @@ typedef struct def_operand_ptr GTY(())
 } def_operand_p;
 
 /* This represents a pointer to a USE operand.  */
-typedef struct use_operand_ptr GTY(())
-{
-  tree * GTY((skip(""))) use;
-} use_operand_p;
+typedef ssa_imm_use_t *use_operand_p;
 
+#define NULL_USE_OPERAND_P 		NULL
 extern def_operand_p NULL_DEF_OPERAND_P;
-extern use_operand_p NULL_USE_OPERAND_P;
 
 /* This represents the DEF operands of a stmt.  */
 typedef struct def_optype_d GTY(())
@@ -48,20 +45,24 @@ typedef struct def_optype_d GTY(())
 
 typedef def_optype_t *def_optype;
 
+/* Operand type which uses a pointer to a tree ihn an immediate use.  */
+typedef ssa_imm_use_t use_operand_type_t;
+
 /* This represents the USE operands of a stmt.  */
 typedef struct use_optype_d GTY(())
 {
   unsigned num_uses; 
-  struct use_operand_ptr GTY((length("%h.num_uses"))) uses[1];
+  struct ssa_imm_use_d GTY((length("%h.num_uses"))) uses[1];
 } use_optype_t;
 
 typedef use_optype_t *use_optype;
 
-/* Operand type which stores a def and a use tree.  */
+/* Operand type which stores a def, a use, and an immediate use.  */
 typedef struct v_may_def_operand_type GTY(())
 {
   tree def;
   tree use;
+  ssa_imm_use_t imm_use;
 } v_may_def_operand_type_t;
 
 /* This represents the MAY_DEFS for a stmt.  */
@@ -74,11 +75,18 @@ typedef struct v_may_def_optype_d GTY(())
 
 typedef v_may_def_optype_t *v_may_def_optype;
 
+/* Operand type which stores a tree and an immeidate_use.  */
+typedef struct vuse_operand_type GTY(())
+{
+  tree use;
+  ssa_imm_use_t imm_use;
+} vuse_operand_type_t;
+
 /* This represents the VUSEs for a stmt.  */
 typedef struct vuse_optype_d GTY(()) 
 {
   unsigned num_vuses; 
-  tree GTY((length ("%h.num_vuses"))) vuses[1];
+  struct vuse_operand_type GTY((length ("%h.num_vuses"))) vuses[1];
 } vuse_optype_t;
 
 typedef vuse_optype_t *vuse_optype;
@@ -109,9 +117,10 @@ typedef stmt_operands_t *stmt_operands_p;
 
 #define USE_FROM_PTR(OP)	get_use_from_ptr (OP)
 #define DEF_FROM_PTR(OP)	get_def_from_ptr (OP)
-#define SET_USE(OP, V)		((*((OP).use)) = (V))
+#define SET_USE(OP, V)		set_ssa_use_from_ptr (OP, V)
 #define SET_DEF(OP, V)		((*((OP).def)) = (V))
 
+#define USE_STMT(OP)		(OP)->stmt
 
 #define USE_OPS(ANN)		get_use_ops (ANN)
 #define STMT_USE_OPS(STMT)	get_use_ops (stmt_ann (STMT))
@@ -179,14 +188,27 @@ typedef stmt_operands_t *stmt_operands_p;
 				PHI_ARG_DEF_PTR ((PHI), 		\
 					     phi_arg_from_edge ((PHI),(E)))
 
+#define PHI_ARG_INDEX_FROM_USE(USE)	phi_arg_index_from_use (USE)
 
 extern void init_ssa_operands (void);
 extern void fini_ssa_operands (void);
-extern void get_stmt_operands (tree);
+extern void update_stmt_operands (tree);
+extern bool verify_imm_links (FILE *f, tree var);
+
 extern void copy_virtual_operands (tree, tree);
 extern void create_ssa_artficial_load_stmt (stmt_operands_p, tree);
 
+extern void dump_immediate_uses (FILE *file);
+extern void dump_immediate_uses_for (FILE *file, tree var);
+extern void debug_immediate_uses (void);
+extern void debug_immediate_uses_for (tree var);
 
+enum ssa_op_iter_type {
+  ssa_op_iter_tree,
+  ssa_op_iter_use,
+  ssa_op_iter_def,
+  ssa_op_iter_maydef
+};
 /* This structure is used in the operand iterator loops.  It contains the 
    items required to determine which operand is retrieved next.  During
    optimization, this structure is scalarized, and any unused fields are 
@@ -208,6 +230,10 @@ typedef struct ssa_operand_iterator_d
   int v_must_i;
   stmt_operands_p ops;
   bool done;
+  enum ssa_op_iter_type iter_type;
+  int phi_i;
+  int num_phi;
+  tree phi_stmt;
 } ssa_op_iter;
 
 /* These flags are used to determine which operands are returned during 
@@ -224,6 +250,7 @@ typedef struct ssa_operand_iterator_d
 #define SSA_OP_VIRTUAL_DEFS	(SSA_OP_VMAYDEF | SSA_OP_VMUSTDEF)
 #define SSA_OP_ALL_USES		(SSA_OP_VIRTUAL_USES | SSA_OP_USE)
 #define SSA_OP_ALL_DEFS		(SSA_OP_VIRTUAL_DEFS | SSA_OP_DEF)
+#define SSA_OP_ALL_VIRTUALS	(SSA_OP_VIRTUAL_USES | SSA_OP_VIRTUAL_DEFS)
 #define SSA_OP_ALL_OPERANDS	(SSA_OP_ALL_USES | SSA_OP_ALL_DEFS)
 
 /* This macro executes a loop over the operands of STMT specified in FLAG, 
@@ -257,5 +284,31 @@ typedef struct ssa_operand_iterator_d
   for (op_iter_init_maydef (&(ITER), STMT, &(USEVAR), &(DEFVAR));	\
        !op_iter_done (&(ITER));					\
        op_iter_next_maydef (&(USEVAR), &(DEFVAR), &(ITER)))
+
+#define SINGLE_SSA_TREE_OPERAND(STMT, FLAGS)			\
+  single_ssa_tree_operand (STMT, FLAGS)
+                                                                                
+#define SINGLE_SSA_USE_OPERAND(STMT, FLAGS)			\
+  single_ssa_use_operand (STMT, FLAGS)
+                                                                                
+#define SINGLE_SSA_DEF_OPERAND(STMT, FLAGS)			\
+  single_ssa_def_operand (STMT, FLAGS)
+                                                                                
+#define ZERO_SSA_OPERANDS(STMT, FLAGS) 	zero_ssa_operands (STMT, FLAGS)
+#define NUM_SSA_OPERANDS(STMT, FLAGS)	num_ssa_operands (STMT, FLAGS)
+										#define FOR_EACH_PHI_ARG (USEVAR, STMT, ITER, FLAGS)		\
+  for ((USEVAR) = op_iter_init_phiuse (&(ITER), STMT, FLAGS);	\
+       !op_iter_done (&(ITER));					\
+       (USEVAR) = op_iter_next_use (&(ITER)))
+
+#define SINGLE_PHI_DEF (STMT, FLAGS)	single_phi_def (STMT, FLAGS)
+
+
+#define FOR_EACH_PHI_OR_STMT_USE(USEVAR, STMT, ITER, FLAGS)	\
+  for ((USEVAR) = (TREE_CODE (STMT) == PHI_NODE 		\
+		   ? op_iter_init_phiuse (&(ITER), STMT, FLAGS)	\
+		   : op_iter_init_use (&(ITER), STMT, FLAGS));	\
+       !op_iter_done (&(ITER));					\
+       (USEVAR) = op_iter_next_use (&(ITER)))
 
 #endif  /* GCC_TREE_SSA_OPERANDS_H  */
