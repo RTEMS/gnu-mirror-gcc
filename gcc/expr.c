@@ -2004,12 +2004,17 @@ emit_group_load (dst, orig_src, ssize)
 	}
       else if (GET_CODE (src) == CONCAT)
 	{
-	  if (bytepos == 0
-	      && bytelen == GET_MODE_SIZE (GET_MODE (XEXP (src, 0))))
-	    tmps[i] = XEXP (src, 0);
-	  else if (bytepos == (HOST_WIDE_INT) GET_MODE_SIZE (GET_MODE (XEXP (src, 0)))
-		   && bytelen == GET_MODE_SIZE (GET_MODE (XEXP (src, 1))))
-	    tmps[i] = XEXP (src, 1);
+	  if ((bytepos == 0
+	       && bytelen == GET_MODE_SIZE (GET_MODE (XEXP (src, 0))))
+	      || (bytepos == (HOST_WIDE_INT) GET_MODE_SIZE (GET_MODE (XEXP (src, 0)))
+		  && bytelen == GET_MODE_SIZE (GET_MODE (XEXP (src, 1)))))
+	    {
+	      tmps[i] = XEXP (src, bytepos != 0);
+	      if (! CONSTANT_P (tmps[i])
+		  && (GET_CODE (tmps[i]) != REG || GET_MODE (tmps[i]) != mode))
+		tmps[i] = extract_bit_field (tmps[i], bytelen * BITS_PER_UNIT,
+					     0, 1, NULL_RTX, mode, mode, ssize);
+	    }
 	  else if (bytepos == 0)
 	    {
 	      rtx mem = assign_stack_temp (GET_MODE (src),
@@ -2095,7 +2100,7 @@ emit_group_store (orig_dst, src, ssize)
       emit_group_load (dst, temp, ssize);
       return;
     }
-  else if (GET_CODE (dst) != MEM)
+  else if (GET_CODE (dst) != MEM && GET_CODE (dst) != CONCAT)
     {
       dst = gen_reg_rtx (GET_MODE (orig_dst));
       /* Make life a bit easier for combine.  */
@@ -2108,6 +2113,7 @@ emit_group_store (orig_dst, src, ssize)
       HOST_WIDE_INT bytepos = INTVAL (XEXP (XVECEXP (src, 0, i), 1));
       enum machine_mode mode = GET_MODE (tmps[i]);
       unsigned int bytelen = GET_MODE_SIZE (mode);
+      rtx dest = dst;
 
       /* Handle trailing fragments that run over the size of the struct.  */
       if (ssize >= 0 && bytepos + (HOST_WIDE_INT) bytelen > ssize)
@@ -2121,14 +2127,27 @@ emit_group_store (orig_dst, src, ssize)
 	  bytelen = ssize - bytepos;
 	}
 
+      if (GET_CODE (dst) == CONCAT)
+	{
+	  if (bytepos + bytelen <= GET_MODE_SIZE (GET_MODE (XEXP (dst, 0))))
+	    dest = XEXP (dst, 0);
+	  else if (bytepos >= GET_MODE_SIZE (GET_MODE (XEXP (dst, 0))))
+	    {
+	      bytepos -= GET_MODE_SIZE (GET_MODE (XEXP (dst, 0)));
+	      dest = XEXP (dst, 1);
+	    }
+	  else
+	    abort ();
+	}
+
       /* Optimize the access just a bit.  */
-      if (GET_CODE (dst) == MEM
-	  && MEM_ALIGN (dst) >= GET_MODE_ALIGNMENT (mode)
+      if (GET_CODE (dest) == MEM
+	  && MEM_ALIGN (dest) >= GET_MODE_ALIGNMENT (mode)
 	  && bytepos * BITS_PER_UNIT % GET_MODE_ALIGNMENT (mode) == 0
 	  && bytelen == GET_MODE_SIZE (mode))
-	emit_move_insn (adjust_address (dst, mode, bytepos), tmps[i]);
+	emit_move_insn (adjust_address (dest, mode, bytepos), tmps[i]);
       else
-	store_bit_field (dst, bytelen * BITS_PER_UNIT, bytepos * BITS_PER_UNIT,
+	store_bit_field (dest, bytelen * BITS_PER_UNIT, bytepos * BITS_PER_UNIT,
 			 mode, tmps[i], ssize);
     }
 
@@ -5827,20 +5846,21 @@ highest_pow2_factor (exp)
   switch (TREE_CODE (exp))
     {
     case INTEGER_CST:
-      /* If the integer is expressable in a HOST_WIDE_INT, we can find the
-	 lowest bit that's a one.  If the result is zero, return
-	 BIGGEST_ALIGNMENT.  We need to handle this case since we can find it
-	 in a COND_EXPR, a MIN_EXPR, or a MAX_EXPR.  If the constant overlows,
-	 we have an erroneous program, so return BIGGEST_ALIGNMENT to avoid any
+      /* We can find the lowest bit that's a one.  If the low
+	 HOST_BITS_PER_WIDE_INT bits are zero, return BIGGEST_ALIGNMENT.
+	 We need to handle this case since we can find it in a COND_EXPR,
+	 a MIN_EXPR, or a MAX_EXPR.  If the constant overlows, we have an
+	 erroneous program, so return BIGGEST_ALIGNMENT to avoid any
 	 later ICE.  */
-      if (TREE_CONSTANT_OVERFLOW (exp)
-	  || integer_zerop (exp))
+      if (TREE_CONSTANT_OVERFLOW (exp))
 	return BIGGEST_ALIGNMENT;
-      else if (host_integerp (exp, 0))
+      else
 	{
-	  c0 = tree_low_cst (exp, 0);
-	  c0 = c0 < 0 ? - c0 : c0;
-	  return c0 & -c0;
+	  /* Note: tree_low_cst is intentionally not used here,
+	     we don't care about the upper bits.  */
+	  c0 = TREE_INT_CST_LOW (exp);
+	  c0 &= -c0;
+	  return c0 ? c0 : BIGGEST_ALIGNMENT;
 	}
       break;
 
@@ -6626,7 +6646,8 @@ expand_expr (exp, target, tmode, modifier)
  	    && GET_MODE_SIZE (mode) == 1
 	    && modifier != EXPAND_WRITE)
  	  return
-	    GEN_INT (TREE_STRING_POINTER (string)[TREE_INT_CST_LOW (index)]);
+	    GEN_INT (trunc_int_for_mode (TREE_STRING_POINTER (string)
+					 [TREE_INT_CST_LOW (index)], mode));
 
 	op0 = expand_expr (exp1, NULL_RTX, VOIDmode, EXPAND_SUM);
 	op0 = memory_address (mode, op0);
@@ -6676,7 +6697,8 @@ expand_expr (exp, target, tmode, modifier)
 	    && GET_MODE_CLASS (mode) == MODE_INT
 	    && GET_MODE_SIZE (mode) == 1)
 	  return
-	    GEN_INT (TREE_STRING_POINTER (array)[TREE_INT_CST_LOW (index)]);
+	    GEN_INT (trunc_int_for_mode (TREE_STRING_POINTER (array)
+					 [TREE_INT_CST_LOW (index)], mode));
 
 	/* If this is a constant index into a constant array,
 	   just get the value from the array.  Handle both the cases when
@@ -6736,9 +6758,9 @@ expand_expr (exp, target, tmode, modifier)
 
 		    if (GET_MODE_CLASS (mode) == MODE_INT
 			&& GET_MODE_SIZE (mode) == 1)
-		      return (GEN_INT
-			      (TREE_STRING_POINTER
-			       (init)[TREE_INT_CST_LOW (index)]));
+		      return GEN_INT (trunc_int_for_mode
+				      (TREE_STRING_POINTER (init)
+				       [TREE_INT_CST_LOW (index)], mode));
 		  }
 	      }
 	  }
@@ -7464,7 +7486,8 @@ expand_expr (exp, target, tmode, modifier)
 	      rtx constant_part;
 
 	      op0 = expand_expr (TREE_OPERAND (exp, 0), subtarget, VOIDmode,
-				 EXPAND_SUM);
+				 (modifier == EXPAND_INITIALIZER
+				 ? EXPAND_INITIALIZER : EXPAND_SUM));
 	      if (! CONSTANT_P (op0))
 		{
 		  op1 = expand_expr (TREE_OPERAND (exp, 1), NULL_RTX,
@@ -7610,23 +7633,20 @@ expand_expr (exp, target, tmode, modifier)
 	 indexed address, for machines that support that.  */
 
       if (modifier == EXPAND_SUM && mode == ptr_mode
-	  && TREE_CODE (TREE_OPERAND (exp, 1)) == INTEGER_CST
-	  && GET_MODE_BITSIZE (mode) <= HOST_BITS_PER_WIDE_INT)
+	  && host_integerp (TREE_OPERAND (exp, 1), 0))
 	{
 	  op0 = expand_expr (TREE_OPERAND (exp, 0), subtarget, VOIDmode,
 			     EXPAND_SUM);
 
-	  /* Apply distributive law if OP0 is x+c.  */
-	  if (GET_CODE (op0) == PLUS
-	      && GET_CODE (XEXP (op0, 1)) == CONST_INT)
-	    return
-	      gen_rtx_PLUS
-		(mode,
-		 gen_rtx_MULT
-		 (mode, XEXP (op0, 0),
-		  GEN_INT (TREE_INT_CST_LOW (TREE_OPERAND (exp, 1)))),
-		 GEN_INT (TREE_INT_CST_LOW (TREE_OPERAND (exp, 1))
-			  * INTVAL (XEXP (op0, 1))));
+	  /* If we knew for certain that this is arithmetic for an array
+	     reference, and we knew the bounds of the array, then we could
+	     apply the distributive law across (PLUS X C) for constant C.
+	     Without such knowledge, we risk overflowing the computation
+	     when both X and C are large, but X+C isn't.  */
+	  /* ??? Could perhaps special-case EXP being unsigned and C being
+	     positive.  In that case we are certain that X+C is no smaller
+	     than X and so the transformed expression will overflow iff the
+	     original would have.  */
 
 	  if (GET_CODE (op0) != REG)
 	    op0 = force_operand (op0, NULL_RTX);
@@ -7635,7 +7655,7 @@ expand_expr (exp, target, tmode, modifier)
 
 	  return
 	    gen_rtx_MULT (mode, op0,
-			  GEN_INT (TREE_INT_CST_LOW (TREE_OPERAND (exp, 1))));
+			  GEN_INT (tree_low_cst (TREE_OPERAND (exp, 1), 0)));
 	}
 
       if (! safe_from_p (subtarget, TREE_OPERAND (exp, 1), 1))
@@ -7736,6 +7756,7 @@ expand_expr (exp, target, tmode, modifier)
          expensive divide.  If not, combine will rebuild the original
          computation.  */
       if (flag_unsafe_math_optimizations && optimize && !optimize_size
+	  && TREE_CODE (type) == REAL_TYPE
 	  && !real_onep (TREE_OPERAND (exp, 0)))
         return expand_expr (build (MULT_EXPR, type, TREE_OPERAND (exp, 0),
 				   build (RDIV_EXPR, type,
@@ -7945,8 +7966,25 @@ expand_expr (exp, target, tmode, modifier)
 	  temp = expand_expr (TREE_OPERAND (exp, 0), original_target,
 			      VOIDmode, 0);
 
+	  /* If temp is constant, we can just compute the result.  */
+	  if (GET_CODE (temp) == CONST_INT)
+	    {
+	      if (INTVAL (temp) != 0)
+	        emit_move_insn (target, const1_rtx);
+	      else
+	        emit_move_insn (target, const0_rtx);
+
+	      return target;
+	    }
+
 	  if (temp != original_target)
-	    temp = copy_to_reg (temp);
+	    {
+	      enum machine_mode mode1 = GET_MODE (temp);
+	      if (mode1 == VOIDmode)
+		mode1 = tmode != VOIDmode ? tmode : mode;
+	      
+	      temp = copy_to_mode_reg (mode1, temp);
+	    }
 
 	  op1 = gen_label_rtx ();
 	  emit_cmp_and_jump_insns (temp, const0_rtx, EQ, NULL_RTX,
@@ -8317,63 +8355,45 @@ expand_expr (exp, target, tmode, modifier)
 	   knows that it should fix up those uses.  */
 	TREE_USED (slot) = 1;
 
+	/* If we have already expanded the slot, so don't do
+	   it again.  (mrs)  */
+	if (DECL_RTL_SET_P (slot))
+	  {
+	    target = DECL_RTL (slot);
+	    if (TREE_OPERAND (exp, 1) == NULL_TREE)
+	      return target;
+	  }
+
 	if (target == 0)
 	  {
-	    if (DECL_RTL_SET_P (slot))
-	      {
-		target = DECL_RTL (slot);
-		/* If we have already expanded the slot, so don't do
-		   it again.  (mrs)  */
-		if (TREE_OPERAND (exp, 1) == NULL_TREE)
-		  return target;
-	      }
-	    else
-	      {
-		target = assign_temp (type, 2, 0, 1);
-		/* All temp slots at this level must not conflict.  */
-		preserve_temp_slots (target);
-		SET_DECL_RTL (slot, target);
-		if (TREE_ADDRESSABLE (slot))
-		  put_var_into_stack (slot);
+	    target = assign_temp (type, 2, 0, 1);
+	    /* All temp slots at this level must not conflict.  */
+	    preserve_temp_slots (target);
+	    SET_DECL_RTL (slot, target);
+	    if (TREE_ADDRESSABLE (slot))
+	      put_var_into_stack (slot);
 
-		/* Since SLOT is not known to the called function
-		   to belong to its stack frame, we must build an explicit
-		   cleanup.  This case occurs when we must build up a reference
-		   to pass the reference as an argument.  In this case,
-		   it is very likely that such a reference need not be
-		   built here.  */
-
-		if (TREE_OPERAND (exp, 2) == 0)
-		  TREE_OPERAND (exp, 2) = maybe_build_cleanup (slot);
-		cleanups = TREE_OPERAND (exp, 2);
-	      }
+	    /* Since SLOT is not known to the called function
+	       to belong to its stack frame, we must build an explicit
+	       cleanup.  This case occurs when we must build up a reference
+	       to pass the reference as an argument.  In this case,
+	       it is very likely that such a reference need not be
+	       built here.  */
+	    if (TREE_OPERAND (exp, 2) == 0)
+	      TREE_OPERAND (exp, 2) = maybe_build_cleanup (slot);
+	    cleanups = TREE_OPERAND (exp, 2);
 	  }
 	else
 	  {
 	    /* This case does occur, when expanding a parameter which
 	       needs to be constructed on the stack.  The target
-	       is the actual stack address that we want to initialize.
-	       The function we call will perform the cleanup in this case.  */
-
-	    /* If we have already assigned it space, use that space,
-	       not target that we were passed in, as our target
-	       parameter is only a hint.  */
-	    if (DECL_RTL_SET_P (slot))
-	      {
-		target = DECL_RTL (slot);
-		/* If we have already expanded the slot, so don't do
-                   it again.  (mrs)  */
-		if (TREE_OPERAND (exp, 1) == NULL_TREE)
-		  return target;
-	      }
-	    else
-	      {
-		SET_DECL_RTL (slot, target);
-		/* If we must have an addressable slot, then make sure that
-		   the RTL that we just stored in slot is OK.  */
-		if (TREE_ADDRESSABLE (slot))
-		  put_var_into_stack (slot);
-	      }
+	       is the actual stack address that we want to
+	       initialize.  */
+	    SET_DECL_RTL (slot, target);
+	    /* If we must have an addressable slot, then make sure that
+	       the RTL that we just stored in slot is OK.  */
+	    if (TREE_ADDRESSABLE (slot))
+	      put_var_into_stack (slot);
 	  }
 
 	exp1 = TREE_OPERAND (exp, 3) = TREE_OPERAND (exp, 1);

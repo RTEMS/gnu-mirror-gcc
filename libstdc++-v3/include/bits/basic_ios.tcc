@@ -64,8 +64,8 @@ namespace std
       // associated with imbue()
 
       // Alloc any new word array first, so if it fails we have "rollback".
-      _Words* __words = (__rhs._M_word_limit <= _S_local_words) ?
-	_M_word_array : new _Words[__rhs._M_word_limit];
+      _Words* __words = (__rhs._M_word_size <= _S_local_word_size) ?
+	_M_local_word : new _Words[__rhs._M_word_size];
 
       // XXX This is the only reason _Callback_list was defined
       // inline. The suspicion is that this increased compilation
@@ -78,17 +78,23 @@ namespace std
       if (__cb) 
 	__cb->_M_add_reference();
       _M_call_callbacks(erase_event);
-      if (_M_words != _M_word_array) 
-	delete [] _M_words;
+      if (_M_word != _M_local_word) 
+	{
+	  delete [] _M_word;
+	  _M_word = 0;
+	}
       _M_dispose_callbacks();
 
       _M_callbacks = __cb;  // NB: Don't want any added during above.
-      for (int __i = 0; __i < __rhs._M_word_limit; ++__i)
-	__words[__i] = __rhs._M_words[__i];
-      if (_M_words != _M_word_array) 
-	delete [] _M_words;
-      _M_words = __words;
-      _M_word_limit = __rhs._M_word_limit;
+      for (int __i = 0; __i < __rhs._M_word_size; ++__i)
+	__words[__i] = __rhs._M_word[__i];
+      if (_M_word != _M_local_word) 
+	{
+	  delete [] _M_word;
+	  _M_word = 0;
+	}
+      _M_word = __words;
+      _M_word_size = __rhs._M_word_size;
 
       this->flags(__rhs.flags());
       this->width(__rhs.width());
@@ -144,17 +150,20 @@ namespace std
       _M_cache_facets(_M_ios_locale);
       _M_tie = 0;
 
-      // NB: The 27.4.4.1 Postconditions Table only specifies
-      // requirements after basic_ios::init() has been called. As part
-      // of this, fill() must return widen(' '), which needs an imbued
-      // ctype facet of char_type to return without throwing an
-      // exception. This is not a required facet, so streams with
-      // char_type != [char, wchar_t] will not have it by
-      // default. However, because fill()'s signature is const, this
-      // data member cannot be lazily initialized.  Thus, thoughts of
-      // using a non-const helper function in ostream inserters is
-      // really besides the point.
-      _M_fill = this->widen(' ');
+      // NB: The 27.4.4.1 Postconditions Table specifies requirements
+      // after basic_ios::init() has been called. As part of this,
+      // fill() must return widen(' ') any time after init() has been
+      // called, which needs an imbued ctype facet of char_type to
+      // return without throwing an exception. Unfortunately,
+      // ctype<char_type> is not necessarily a required facet, so
+      // streams with char_type != [char, wchar_t] will not have it by
+      // default. Because of this, the correct value for _M_fill is
+      // constructed on the first call of fill(). That way,
+      // unformatted input and output with non-required basic_ios
+      // instantiations is possible even without imbuing the expected
+      // ctype<char_type> facet.
+      _M_fill = 0;
+      _M_fill_init = false;
 
       _M_exception = goodbit;
       _M_streambuf = __sb;
