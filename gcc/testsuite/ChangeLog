@@ -1,3 +1,105 @@
+2001-03-03  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* gcc.dg/cpp/macro7.c: New test.
+
+2001-03-03  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* gcc.dg/cpp/multiline.c: Update.
+
+2001-03-03  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.other/ref4.C: New test.
+
+2001-03-02  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.other/pod1.C: New test.
+
+2001-03-02  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.ext/overload1.C: New test.
+
+2001-03-01  Zack Weinberg  <zackw@stanford.edu>
+
+	* objc/execute/bycopy-3.m: New test.
+
+2001-03-01  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.other/using1.C: New test.
+
+2001-03-01  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.other/using9.C: New test.
+
+2001-02-28  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.ext/realpt1.C: Deprecate.
+
+2001-02-28  Geoffrey Keating  <geoffk@redhat.com>
+
+        * g++.dg/vtgc1.C: Update for new ABI.
+
+2001-02-27  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.abi/vtable3.h: Check vcall offsets too.
+
+2001-02-24  Franz Sirl  <Franz.Sirl-kernel@lauterbach.com>
+
+	* gcc.c-torture/execute/20010224-1.c: New test.
+
+2001-02-23  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.c-torture/execute/20010222-1.c: New test.
+
+2001-02-22  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.old-deja/g++.other/inline20.C: New test.
+
+2001-02-21  Gabriel Dos Reis  <gdr@merlin.codesourcery.com>
+
+	* g++.old-deja/g++.other/lookup22.C: New test.
+
+2001-02-18  Kriang Lerdsuwanakij  <lerdsuwa@users.sourceforge.net>
+
+	* g++.old-deja/g++.other/inline19.c: Remove XFAIL.
+
+2001-02-16  Zack Weinberg  <zackw@stanford.edu>
+
+	* g77.dg: New directory.
+	* g77.dg/20010216-1.f: New test case.
+	* g77.dg/dg.exp: New driver.
+	* lib/g77-dg.exp: New driver library.
+
+2001-02-16  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.old-deja/g++.other/init16.C: Update the test so that it does
+	not need <string> and also tests the initialization at runtime.
+
+2001-02-16  Gabriel Dos Reis  <gdr@codesourcery.com>
+
+	* g++.old-deja/g++.other/decl9.C: New test.
+
+2001-02-14  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.pt/deduct6.C: New test.
+
+2001-02-14  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.pt/deduct5.C: New test.
+
+2001-02-14  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.other/warn5.C: New test.
+
+2001-02-14  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.robertl/eb63.C: Remove new initializer list
+	case.
+	* g++.old-deja/g++.ext/arrnew.C: Deprecate.
+
+2001-02-14  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* g++.old-deja/g++.pt/spec40.C: New test.
+
 2001-02-12  Jakub Jelinek  <jakub@redhat.com>
 
 	* gcc.c-torture/compile/20010209-1.c: New test.
@@ -301,9 +403,9 @@ Wed Jan 31 12:23:32 2001  J"orn Rennecke <amylaar@redhat.com>
 
 2001-01-15  Neil Booth  <neil@daikokuya.demon.co.uk>
 
-        * gcc.dg/cpp/if-2.c: Comment out occasionally bogus test; we 
+        * gcc.dg/cpp/if-2.c: Comment out occasionally bogus test; we
         have an equivalent working one below it.
-	  
+
 2001-01-14  Jeffrey Oldham  <oldham@codesourcery.com>
 
 	* g++.old-deja/g++.ext/instantiate2.C: Add explanatory comment.
@@ -393,7 +495,7 @@ Wed Jan 31 12:23:32 2001  J"orn Rennecke <amylaar@redhat.com>
 2001-01-10  Alan Lehotsky  <lehotsky@tiac.net>
 
 	* gcc.dg/20000926-1.c: Parameterize for machines with 16-bit ints.
-	
+
 2001-01-10  Nathan Sidwell  <nathan@codesourcery.com>
 
 	* g++.old-deja/g++.pt/error3.C: New test.
@@ -418,8 +520,8 @@ Wed Jan 31 12:23:32 2001  J"orn Rennecke <amylaar@redhat.com>
 	* gcc.c-torture/execute/921202-1.c: Use STACK_SIZE to avoid
 	problems on small machines.
 	* gcc.c-torture/execute/920730-1.c: Use values from <limits.h> to
-	parameterize. 
-	
+	parameterize.
+
 2001-01-09  Jeffrey Oldham  <oldham@codesourcery.com>
 
 	* g++.old-deja/g++.ext/instantiate2.C: ERROR line should fail for
@@ -604,7 +706,7 @@ Thu Jan  4 13:54:11 2001  Richard Kenner  <kenner@vlsi1.ultra.nyu.edu>
 2001-01-03  Jeffrey Oldham  <oldham@codesourcery.com>
 
 	* lib/target-supports.exp (check_alias_available): Modified to
-	indicate aliases not supported if only weak aliases are supported. 
+	indicate aliases not supported if only weak aliases are supported.
 
 2001-01-03  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
 

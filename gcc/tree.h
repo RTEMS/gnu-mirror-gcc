@@ -239,8 +239,6 @@ struct tree_common
            INTEGER_TYPE, ENUMERAL_TYPE, FIELD_DECL
        DECL_BUILT_IN_NONANSI in
            FUNCTION_DECL
-       TREE_PARMLIST in
-           TREE_PARMLIST (C++)
        SAVE_EXPR_NOPLACEHOLDER in
 	   SAVE_EXPR
 
@@ -274,7 +272,8 @@ struct tree_common
 /* The tree-code says what kind of node it is.
    Codes are defined in tree.def.  */
 #define TREE_CODE(NODE) ((enum tree_code) (NODE)->common.code)
-#define TREE_SET_CODE(NODE, VALUE) ((NODE)->common.code = (int) (VALUE))
+#define TREE_SET_CODE(NODE, VALUE) \
+((NODE)->common.code = (ENUM_BITFIELD(tree_code)) (VALUE))
 
 /* When checking is enabled, errors will be generated if a tree node
    is accessed incorrectly. The macros abort with a fatal error.  */
@@ -823,7 +822,7 @@ struct tree_exp
 #define BLOCK_SUPERCONTEXT(NODE) (BLOCK_CHECK (NODE)->block.supercontext)
 /* Note: when changing this, make sure to find the places
    that use chainon or nreverse.  */
-#define BLOCK_CHAIN(NODE) TREE_CHAIN (NODE)
+#define BLOCK_CHAIN(NODE) TREE_CHAIN (BLOCK_CHECK (NODE))
 #define BLOCK_ABSTRACT_ORIGIN(NODE) (BLOCK_CHECK (NODE)->block.abstract_origin)
 #define BLOCK_ABSTRACT(NODE) (BLOCK_CHECK (NODE)->block.abstract_flag)
 
@@ -1461,6 +1460,9 @@ struct tree_type
    where it is called.  */
 #define DECL_INLINE(NODE) (FUNCTION_DECL_CHECK (NODE)->decl.inline_flag)
 
+/* In a FUNCTION_DECL, nonzero if the function cannot be inlined.  */
+#define DECL_UNINLINABLE(NODE) (FUNCTION_DECL_CHECK (NODE)->decl.uninlinable)
+
 /* Nonzero in a FUNCTION_DECL means this is a built-in function
    that is not specified by ansi C and that users are supposed to be allowed
    to redefine for any purpose whatever.  */
@@ -1632,7 +1634,8 @@ struct tree_decl
   unsigned pointer_depth : 2;
   unsigned non_addressable : 1;
   unsigned user_align : 1;
-  /* Three unused bits.  */
+  unsigned uninlinable : 1;
+  /* Two unused bits.  */
 
   unsigned lang_flag_0 : 1;
   unsigned lang_flag_1 : 1;
@@ -1914,6 +1917,13 @@ extern tree get_identifier		PARAMS ((const char *));
    NULL_TREE.  */
 
 extern tree maybe_get_identifier	PARAMS ((const char *));
+
+/* Look up an identifier with the name TEXT, replace its identifier
+   node with NODE, and return the old identifier node.  This is used
+   by languages which need to enable and disable keywords based on
+   context; e.g. see remember_protocol_qualifiers in objc/objc-act.c.  */
+
+extern tree set_identifier		PARAMS ((const char *, tree));
 
 /* Construct various types of nodes.  */
 

@@ -170,13 +170,13 @@ instead of in the original English.
 @sp 1
 @c The version number appears five times more in this file.
 
-@center for gcc-2.97
+@center for gcc-3.0
 @page
 @vskip 0pt plus 1filll
 Copyright @copyright{} 1988, 1989, 1992, 1993, 1994, 1995, 1996, 1998,
 1999, 2000, 2001  Free Software Foundation, Inc.
 @sp 2
-For GCC Version 2.97@*
+For GCC Version 3.0@*
 @sp 1
 Published by the Free Software Foundation @*
 59 Temple Place - Suite 330@*
@@ -213,19 +213,19 @@ instead of in the original English.
 @ifset USING
 This manual documents how to run, install and port the GNU
 compiler, as well as its new features and incompatibilities, and how to
-report bugs.  It corresponds to GCC version 2.97.
+report bugs.  It corresponds to GCC version 3.0.
 @end ifset
 @end ifset
 
 @ifclear INTERNALS
 This manual documents how to run and install the GNU compiler,
 as well as its new features and incompatibilities, and how to report
-bugs.  It corresponds to GCC version 2.97.
+bugs.  It corresponds to GCC version 3.0.
 @end ifclear
 @ifclear USING
 This manual documents how to port the GNU compiler,
 as well as its new features and incompatibilities, and how to report
-bugs.  It corresponds to GCC version 2.97.
+bugs.  It corresponds to GCC version 3.0.
 @end ifclear
 
 @menu
@@ -397,7 +397,7 @@ as @dfn{AMD1}; the amended standard is sometimes known as @dfn{C94} or
 A new edition of the ISO C standard was published in 1999 as ISO/IEC
 9899:1999, and is commonly known as @dfn{C99}.  GCC has incomplete
 support for this standard version; see
-@uref{http://gcc.gnu.org/c99status.html} for details.  To select this
+@uref{http://gcc.gnu.org/gcc-3.0/c99status.html} for details.  To select this
 standard, use @samp{-std=c99} or @samp{-std=iso9899:1999}.  (While in
 development, drafts of this standard version were referred to as
 @dfn{C9X}.)
@@ -4228,6 +4228,12 @@ files on your machine.  If you do not define this macro, GCC will use
 Define this macro to be a C string representing the suffix for executable
 files on your machine.  If you do not define this macro, GCC will use
 the null string as the suffix for object files.
+
+@findex NO_AUTO_EXE_SUFFIX
+@item NO_AUTO_EXE_SUFFIX
+Define this macro if executable files on your machine have a suffix, but 
+the compiler driver should not automatically append it to the output file
+name, if user hasn't specified one.
 
 @findex HOST_BIT_BUCKET
 @item HOST_BIT_BUCKET

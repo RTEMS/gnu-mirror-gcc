@@ -686,12 +686,9 @@ parse_string (pfile, token, terminator)
 	      break;
 	    }
 
+	  cpp_pedwarn (pfile, "multi-line string literals are deprecated");
 	  if (pfile->mlstring_pos.line == 0)
-	    {
-	      pfile->mlstring_pos = pfile->lexer_pos;
-	      if (CPP_PEDANTIC (pfile))
-		cpp_pedwarn (pfile, "multi-line string constant");
-	    }
+	    pfile->mlstring_pos = pfile->lexer_pos;
 	      
 	  handle_newline (buffer, c);  /* Stores to read_ahead.  */
 	  c = '\n';
@@ -1174,38 +1171,36 @@ _cpp_lex_token (pfile, result)
 
       result->type = CPP_HASH;
     do_hash:
-      if (bol)
+      if (!bol)
+	break;
+      /* 6.10.3 paragraph 11: If there are sequences of preprocessing
+	 tokens within the list of arguments that would otherwise act
+	 as preprocessing directives, the behavior is undefined.
+
+	 This implementation will report a hard error, terminate the
+	 macro invocation, and proceed to process the directive.  */
+      if (pfile->state.parsing_args)
 	{
-	  if (pfile->state.parsing_args)
-	    {
-	      /* 6.10.3 paragraph 11: If there are sequences of
-		 preprocessing tokens within the list of arguments that
-		 would otherwise act as preprocessing directives, the
-		 behavior is undefined.
+	  if (pfile->state.parsing_args == 2)
+	    cpp_error (pfile,
+		       "directives may not be used inside a macro argument");
 
-		 This implementation will report a hard error, terminate
-		 the macro invocation, and proceed to process the
-		 directive.  */
-	      cpp_error (pfile,
-			 "directives may not be used inside a macro argument");
+	  /* Put a '#' in lookahead, return CPP_EOF for parse_arg.  */
+	  buffer->extra_char = buffer->read_ahead;
+	  buffer->read_ahead = '#';
+	  pfile->state.next_bol = 1;
+	  result->type = CPP_EOF;
 
-	      /* Put a '#' in lookahead, return CPP_EOF for parse_arg.  */
-	      buffer->extra_char = buffer->read_ahead;
-	      buffer->read_ahead = '#';
-	      pfile->state.next_bol = 1;
-	      result->type = CPP_EOF;
-
-	      /* Get whitespace right - newline_in_args sets it.  */
-	      if (pfile->lexer_pos.col == 1)
-		result->flags &= ~(PREV_WHITE | AVOID_LPASTE);
-	    }
-	  else
-	    {
-	      /* This is the hash introducing a directive.  */
-	      if (_cpp_handle_directive (pfile, result->flags & PREV_WHITE))
-		goto done_directive; /* bol still 1.  */
-	      /* This is in fact an assembler #.  */
-	    }
+	  /* Get whitespace right - newline_in_args sets it.  */
+	  if (pfile->lexer_pos.col == 1)
+	    result->flags &= ~(PREV_WHITE | AVOID_LPASTE);
+	}
+      else
+	{
+	  /* This is the hash introducing a directive.  */
+	  if (_cpp_handle_directive (pfile, result->flags & PREV_WHITE))
+	    goto done_directive; /* bol still 1.  */
+	  /* This is in fact an assembler #.  */
 	}
       break;
 
@@ -1321,7 +1316,8 @@ cpp_spell_token (pfile, token, buffer)
 	unsigned char c;
 
 	if (token->flags & DIGRAPH)
-	  spelling = digraph_spellings[token->type - CPP_FIRST_DIGRAPH];
+	  spelling
+	    = digraph_spellings[(int) token->type - (int) CPP_FIRST_DIGRAPH];
 	else if (token->flags & NAMED_OP)
 	  goto spell_ident;
 	else
@@ -1413,7 +1409,8 @@ cpp_output_token (token, fp)
 	const unsigned char *spelling;
 
 	if (token->flags & DIGRAPH)
-	  spelling = digraph_spellings[token->type - CPP_FIRST_DIGRAPH];
+	  spelling
+	    = digraph_spellings[(int) token->type - (int) CPP_FIRST_DIGRAPH];
 	else if (token->flags & NAMED_OP)
 	  goto spell_ident;
 	else
@@ -1523,8 +1520,8 @@ cpp_can_paste (pfile, token1, token2, digraph)
   if (token2->flags & NAMED_OP)
     b = CPP_NAME;
 
-  if (a <= CPP_LAST_EQ && b == CPP_EQ)
-    return a + (CPP_EQ_EQ - CPP_EQ);
+  if ((int) a <= (int) CPP_LAST_EQ && b == CPP_EQ)
+    return (enum cpp_ttype) ((int) a + ((int) CPP_EQ_EQ - (int) CPP_EQ));
 
   switch (a)
     {
@@ -1637,12 +1634,12 @@ cpp_avoid_paste (pfile, token1, token2)
 
   c = EOF;
   if (token2->flags & DIGRAPH)
-    c = digraph_spellings[b - CPP_FIRST_DIGRAPH][0];
+    c = digraph_spellings[(int) b - (int) CPP_FIRST_DIGRAPH][0];
   else if (token_spellings[b].category == SPELL_OPERATOR)
     c = token_spellings[b].name[0];
 
   /* Quickly get everything that can paste with an '='.  */
-  if (a <= CPP_LAST_EQ && c == '=')
+  if ((int) a <= (int) CPP_LAST_EQ && c == '=')
     return 1;
 
   switch (a)

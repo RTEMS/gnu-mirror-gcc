@@ -2046,22 +2046,13 @@ look_for_overrides_r (type, fndecl)
                   return 1;
                 }
             }
-          else
+          else if (same_signature_p (fndecl, fn))
             {
-              if (/* The first parameter is the `this' parameter,
-	             which has POINTER_TYPE, and we can therefore
-	             safely use TYPE_QUALS, rather than
-		     CP_TYPE_QUALS.  */
-	          (TYPE_QUALS (TREE_TYPE (TREE_VALUE (btypes)))
-	           == TYPE_QUALS (thistype))
-	          && compparms (TREE_CHAIN (btypes), TREE_CHAIN (dtypes)))
-                {
-                  /* It's definitely virtual, even if not explicitly set.  */
-                  DECL_VIRTUAL_P (fndecl) = 1;
-	          check_final_overrider (fndecl, fn);
-	      
-	          return 1;
-	        }
+	      /* It's definitely virtual, even if not explicitly set.  */
+	      DECL_VIRTUAL_P (fndecl) = 1;
+	      check_final_overrider (fndecl, fn);
+
+	      return 1;
 	    }
 	}
     }
@@ -2388,9 +2379,7 @@ init_vbase_pointers (type, decl_ptr)
   if (TYPE_USES_VIRTUAL_BASECLASSES (type))
     {
       struct vbase_info vi;
-      int old_flag = flag_this_is_variable;
       tree binfo = TYPE_BINFO (type);
-      flag_this_is_variable = -2;
 
       /* Find all the virtual base classes, marking them for later
 	 initialization.  */
@@ -2408,7 +2397,6 @@ init_vbase_pointers (type, decl_ptr)
 		marked_vtable_pathp,
 		NULL);
 
-      flag_this_is_variable = old_flag;
       return vi.inits;
     }
 
