@@ -1,6 +1,6 @@
-// Low-level functions for atomic operations: Sparc64 version  -*- C++ -*-
+// 2002-07-25 Benjamin Kosnik <bkoz@redhat.com>
 
-// Copyright (C) 1999, 2000, 2001 Free Software Foundation, Inc.
+// Copyright (C) 2002 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -27,44 +27,36 @@
 // invalidate any other reasons why the executable file might be covered by
 // the GNU General Public License.
 
-#ifndef _BITS_ATOMICITY_H
-#define _BITS_ATOMICITY_H	1
+// 27.8.1.11 - Template class basic_fstream
+// NB: This file is for testing basic_fstream with NO OTHER INCLUDES.
 
-typedef long _Atomic_word;
+#include <fstream>
+#include <testsuite_hooks.h>
 
-static inline _Atomic_word
-__attribute__ ((__unused__))
-__exchange_and_add (volatile _Atomic_word *__mem, int __val)
+// { dg-do compile }
+
+// libstdc++/7216
+void test01()
 {
-  _Atomic_word __tmp1, __tmp2;
-
-  __asm__ __volatile__("1:	ldx	[%2], %0\n\t"
-		       "	add	%0, %3, %1\n\t"
-		       "	casx	[%2], %0, %1\n\t"
-		       "	sub	%0, %1, %0\n\t"
-		       "	brnz,pn	%0, 1b\n\t"
-		       "	 nop"
-		       : "=&r" (__tmp1), "=&r" (__tmp2)
-		       : "r" (__mem), "r" (__val)
-		       : "memory");
-  return __tmp2;
+  // Check for required typedefs
+  typedef std::fstream test_type;
+  typedef test_type::char_type char_type;
+  typedef test_type::traits_type traits_type;
+  typedef test_type::int_type int_type;
+  typedef test_type::pos_type pos_type;
+  typedef test_type::off_type off_type;
 }
 
-static inline void
-__attribute__ ((__unused__))
-__atomic_add (volatile _Atomic_word* __mem, int __val)
+namespace test 
 {
-  _Atomic_word __tmp1, __tmp2;
+  using namespace std;
+  typedef short type_t;
+  template class basic_fstream<type_t, char_traits<type_t> >;
+  template class basic_fstream<gnu_char, char_traits<gnu_char> >;
+} // test
 
-  __asm__ __volatile__("1:	ldx	[%2], %0\n\t"
-		       "	add	%0, %3, %1\n\t"
-		       "	casx	[%2], %0, %1\n\t"
-		       "	sub	%0, %1, %0\n\t"
-		       "	brnz,pn	%0, 1b\n\t"
-		       "	 nop"
-		       : "=&r" (__tmp1), "=&r" (__tmp2)
-		       : "r" (__mem), "r" (__val)
-		       : "memory");
+int main() 
+{
+  test01();
+  return 0;
 }
-
-#endif /* atomicity.h */
