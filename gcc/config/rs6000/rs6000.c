@@ -230,7 +230,7 @@ int toc_initialized;
 char toc_label_name[10];
 
 /* Alias set for saves and restores from the rs6000 stack.  */
-static int rs6000_sr_alias_set;
+static GTY(()) int rs6000_sr_alias_set;
 
 /* Call distance, overridden by -mlongcall and #pragma longcall(1).
    The only place that looks at this is rs6000_set_default_type_attributes;
@@ -2315,6 +2315,26 @@ input_operand (rtx op, enum machine_mode mode)
     return 1;
 
   return 0;
+}
+
+
+/* Darwin, AIX increases natural record alignment to doubleword if the first
+   field is an FP double while the FP fields remain word aligned.  */
+
+unsigned int
+rs6000_special_round_type_align (tree type, int computed, int specified)
+{
+  tree field = TYPE_FIELDS (type);
+
+  /* Skip all the static variables only if ABI is greater than
+     1 or equal to 0.   */
+  while (field != NULL && TREE_CODE (field) == VAR_DECL)
+    field = TREE_CHAIN (field);
+
+  if (field == NULL || field == type || DECL_MODE (field) != DFmode)
+    return MAX (computed, specified);
+
+  return MAX (MAX (computed, specified), 64);
 }
 
 /* Return 1 for an operand in small memory on V.4/eabi.  */
@@ -11106,13 +11126,14 @@ rs6000_emit_eh_reg_restore (rtx source, rtx scratch)
     emit_move_insn (gen_rtx_REG (Pmode, LINK_REGISTER_REGNUM), operands[0]);
 }
 
+static GTY(()) int set = -1;
+
 int   
 get_TOC_alias_set (void)
 {
-    static int set = -1;
-    if (set == -1)
-      set = new_alias_set ();
-    return set;
+  if (set == -1)
+    set = new_alias_set ();
+  return set;
 }   
 
 /* This returns nonzero if the current function uses the TOC.  This is

@@ -1,3 +1,58 @@
+2004-01-20  Kelley Cook  <kcook@gcc.gnu.org>
+
+	* Make-lang.in: Replace $(docdir) with doc.
+	(c++.info, c++.srcinfo): Dummy entry.
+	(c++.man, c++.srcman): New rules.
+	(c++.install-man): Revamp rule.
+
+2004-01-19  Kelley Cook  <kcook@gcc.gnu.org>
+
+	* Make-lang.in (CXX_INSTALL_NAME, GXX_INSTALL_NAME, 
+	CXX_TARGET_INSTALL_NAME, GXX_TARGET_INSTALL_NAME): Define via a
+	immediate $(shell) instead of deferred backquote.
+
+2004-01-19  Mark Mitchell  <mark@codesourcery.com>
+
+	PR c++/13651
+	* parser.c (cp_parser_postfix_expression): When encountering
+	incomplete type on left-hand side of "->" or ".", treat the entire
+	expression as erroneous.
+
+2004-01-19  Mark Mitchell  <mark@codesourcery.com>
+
+	PR c++/13592
+	* call.c (build_field_call): Remove.
+	(n_build_method_call): Likewise.
+	(build_method_call): Likewise.
+	(build_new_method_call): Do not call build_field_call.
+	* class.c (n_build_method_call): Remove.
+	(print_class_statistics): Do not print it.
+	* cp-tree.h (build_method_call): Remove declaration.
+	(finish_object_call_expr): Likewise.
+	(build_new_1): Do not use build_method_call.
+	* parser.c (cp_parser_postfix_expression): Use finish_call_expr
+	when the function appearing on the right-hand-side of "." or "->"
+	is not actually a function.
+	* pt.c (tsubst_copy_and_build): Likewise.
+	* semantics.c (finish_object_call_expr): Remove.
+
+2004-01-18  Mark Mitchell  <mark@codesourcery.com>
+
+	PR c++/13710
+	* pt.c (tsubst): Use finish_typeof.
+
+2004-01-18  Jason Merrill  <jason@redhat.com>
+
+	PR c++/11725
+	* except.c (build_throw): In a template, set
+	current_function_returns_abnormally.
+
+2004-01-17  Fred Fish  <fnf@intrinsity.com>
+
+	PR c++/11895
+	* decl.c (reshape_init): Handle VECTOR_TYPE like ARRAY_TYPE,
+	except don't call array_type_nelts() with a VECTOR_TYPE.
+
 2004-01-16  Jan Hubicka  <jh@suse.cz>
 
 	* mangle.c (write_mangled_name): Remove inline modifier.

@@ -1,6 +1,6 @@
 /* Subroutines for insn-output.c for SPARC.
    Copyright (C) 1987, 1988, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Michael Tiemann (tiemann@cygnus.com)
    64-bit SPARC-V9 support by Michael Tiemann, Jim Wilson, and Doug Evans,
    at Cygnus Support.
@@ -4539,7 +4539,7 @@ sparc_nonflat_function_epilogue (FILE *file,
 		     ? "\treturn\t%i7+12\n"
 		     : "\treturn\t%i7+8\n", file);
 	      final_scan_insn (XEXP (current_function_epilogue_delay_list, 0),
-			       file, 1, 0, 0);
+			       file, 1, 0, 0, NULL);
 	    }
 	  else
 	    {
@@ -4564,7 +4564,7 @@ sparc_nonflat_function_epilogue (FILE *file,
 	      insn = emit_jump_insn (insn);
 
 	      sparc_emitting_epilogue = true;
-	      final_scan_insn (insn, file, 1, 0, 1);
+	      final_scan_insn (insn, file, 1, 0, 1, NULL);
 	      sparc_emitting_epilogue = false;
 	    }
 	}
@@ -4586,7 +4586,7 @@ sparc_nonflat_function_epilogue (FILE *file,
 	abort ();
       fprintf (file, "\t%s\n", ret);
       final_scan_insn (XEXP (current_function_epilogue_delay_list, 0),
-		       file, 1, 0, 1);
+		       file, 1, 0, 1, NULL);
     }
   /* Output 'nop' instead of 'sub %sp,-0,%sp' when no frame, so as to
 	 avoid generating confusing assembly language output.  */
@@ -4629,7 +4629,7 @@ output_sibcall (rtx insn, rtx call_operand)
 	  if (! delay)
 	    abort ();
 
-	  final_scan_insn (delay, asm_out_file, 1, 0, 1);
+	  final_scan_insn (delay, asm_out_file, 1, 0, 1, NULL);
 	  PATTERN (delay) = gen_blockage ();
 	  INSN_CODE (delay) = -1;
 	  delay_slot = 0;
@@ -4659,7 +4659,7 @@ output_sibcall (rtx insn, rtx call_operand)
 	  if (! delay)
 	    abort ();
 
-	  final_scan_insn (delay, asm_out_file, 1, 0, 1);
+	  final_scan_insn (delay, asm_out_file, 1, 0, 1, NULL);
 	  PATTERN (delay) = gen_blockage ();
 	  INSN_CODE (delay) = -1;
 	  delay_slot = 0;
@@ -5353,13 +5353,34 @@ function_arg (const struct sparc_args *cum, enum machine_mode mode,
       reg = gen_rtx_REG (mode, regno);
       return reg;
     }
+    
+  if (type && TREE_CODE (type) == RECORD_TYPE)
+    {
+      /* Structures up to 16 bytes in size are passed in arg slots on the
+	 stack and are promoted to registers where possible.  */
 
+      if (int_size_in_bytes (type) > 16)
+	abort (); /* shouldn't get here */
+
+      return function_arg_record_value (type, mode, slotno, named, regbase);
+    }
+  else if (type && TREE_CODE (type) == UNION_TYPE)
+    {
+      enum machine_mode mode;
+      int bytes = int_size_in_bytes (type);
+
+      if (bytes > 16)
+	abort ();
+
+      mode = mode_for_size (bytes * BITS_PER_UNIT, MODE_INT, 0);
+      reg = gen_rtx_REG (mode, regno);
+    }
   /* v9 fp args in reg slots beyond the int reg slots get passed in regs
      but also have the slot allocated for them.
      If no prototype is in scope fp values in register slots get passed
      in two places, either fp regs and int regs or fp regs and memory.  */
-  if ((GET_MODE_CLASS (mode) == MODE_FLOAT
-       || GET_MODE_CLASS (mode) == MODE_COMPLEX_FLOAT)
+  else if ((GET_MODE_CLASS (mode) == MODE_FLOAT
+	    || GET_MODE_CLASS (mode) == MODE_COMPLEX_FLOAT)
       && SPARC_FP_REG_P (regno))
     {
       reg = gen_rtx_REG (mode, regno);
@@ -5422,27 +5443,6 @@ function_arg (const struct sparc_args *cum, enum machine_mode mode,
 	      return gen_rtx_PARALLEL (mode, gen_rtvec (2, v0, v1));
 	    }
 	}
-    }
-  else if (type && TREE_CODE (type) == RECORD_TYPE)
-    {
-      /* Structures up to 16 bytes in size are passed in arg slots on the
-	 stack and are promoted to registers where possible.  */
-
-      if (int_size_in_bytes (type) > 16)
-	abort (); /* shouldn't get here */
-
-      return function_arg_record_value (type, mode, slotno, named, regbase);
-    }
-  else if (type && TREE_CODE (type) == UNION_TYPE)
-    {
-      enum machine_mode mode;
-      int bytes = int_size_in_bytes (type);
-
-      if (bytes > 16)
-	abort ();
-
-      mode = mode_for_size (bytes * BITS_PER_UNIT, MODE_INT, 0);
-      reg = gen_rtx_REG (mode, regno);
     }
   else
     {
@@ -7916,7 +7916,7 @@ sparc_flat_function_epilogue (FILE *file, HOST_WIDE_INT size)
 	{
 	  if (size)
 	    abort ();
-	  final_scan_insn (XEXP (epilogue_delay, 0), file, 1, -2, 1);
+	  final_scan_insn (XEXP (epilogue_delay, 0), file, 1, -2, 1, NULL);
 	}
 
       else if (size > 4096)
@@ -8478,6 +8478,8 @@ sparc_elf_asm_named_section (const char *name, unsigned int flags)
     fputs (",#alloc", asm_out_file);
   if (flags & SECTION_WRITE)
     fputs (",#write", asm_out_file);
+  if (flags & SECTION_TLS)
+    fputs (",#tls", asm_out_file);
   if (flags & SECTION_CODE)
     fputs (",#execinstr", asm_out_file);
 
