@@ -88,22 +88,20 @@ inline_forbidden_p (nodep, walk_subtrees, fn)
       if (setjmp_call_p (t))
 	return node;
 
-      switch (DECL_FUNCTION_CODE (t))
-	{
-	  /* We cannot inline functions that take a variable number of
-	     arguments.  */
-	case BUILT_IN_VA_START:
-	case BUILT_IN_STDARG_START:
-#if 0
-	  /* Functions that need information about the address of the
-             caller can't (shouldn't?) be inlined.  */
-	case BUILT_IN_RETURN_ADDRESS:
-#endif
-	  return node;
+      if (DECL_BUILT_IN (t))
+	switch (DECL_FUNCTION_CODE (t))
+	  {
+	    /* We cannot inline functions that take a variable number of
+	       arguments.  */
+	  case BUILT_IN_VA_START:
+	  case BUILT_IN_STDARG_START:
+	  case BUILT_IN_NEXT_ARG:
+	  case BUILT_IN_VA_END:
+	    return node;
 
-	default:
-	  break;
-	}
+	  default:
+	    break;
+	  }
 
       break;
 
@@ -213,7 +211,8 @@ c_cannot_inline_tree_fn (fnp)
 	return 0;
     }
     
-  if (walk_tree (&DECL_SAVED_TREE (fn), inline_forbidden_p, fn, NULL))
+  if (walk_tree_without_duplicates
+	(&DECL_SAVED_TREE (fn), inline_forbidden_p, fn))
     goto cannot_inline;
 
   return 0;
