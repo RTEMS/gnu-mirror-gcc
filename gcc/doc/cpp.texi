@@ -1972,6 +1972,10 @@ unsigned on the target machine.  It exists to cause the standard header
 file @file{limits.h} to work correctly.  You should not use this macro
 yourself; instead, refer to the standard macros defined in @file{limits.h}.
 
+@item __WCHAR_UNSIGNED__
+Like @code{__CHAR_UNSIGNED__}, this macro is defined if and only if the
+data type @code{wchar_t} is unsigned and the front-end is in C++ mode.
+
 @item __REGISTER_PREFIX__
 This macro expands to a single token (not a string constant) which is
 the prefix applied to CPU register names in assembly language for this
@@ -2002,14 +2006,35 @@ typedefs, respectively.  They exist to make the standard header files
 these macros directly; instead, include the appropriate headers and use
 the typedefs.
 
+@item __CHAR_BIT__
+Defined to the number of bits used in the representation of the
+@code{char} data type.  It exists to make the standard header given
+numerical limits work correctly.  You should not use
+this macro directly; instead, include the appropriate headers.
+
+@item __SCHAR_MAX__
+@itemx __WCHAR_MAX__
+@itemx __SHRT_MAX__
+@itemx __INT_MAX__
+@itemx __LONG_MAX__
+@itemx __LONG_LONG_MAX__
+Defined to the maximum value of the @code{signed char}, @code{wchar_t}, 
+@code{signed short},
+@code{signed int}, @code{signed long}, and @code{signed long long} types
+respectively.  They exist to make the standard header given numerical limits
+work correctly.  You should not use these macros directly; instead, include
+the appropriate headers.
+
 @item __USING_SJLJ_EXCEPTIONS__
 This macro is defined, with value 1, if the compiler uses the old
 mechanism based on @code{setjmp} and @code{longjmp} for exception
 handling.
 
 @item __NEXT_RUNTIME__
-This macro is defined, with value 1, when the NeXT runtime
-(as in @option{-fnext-runtime}) is in use for Objective-C.
+This macro is defined, with value 1, if (and only if) the NeXT runtime
+(as in @option{-fnext-runtime}) is in use for Objective-C.  If the GNU
+runtime is used, this macro is not defined, so that you can use this
+macro to determine which runtime (NeXT or GNU) is being used.
 @end table
 
 @node System-specific Predefined Macros
@@ -3581,11 +3606,11 @@ including extensions, with the exception that the effects of
 __STDC__ is not defined.
 
 @item
-If you use digraphs the behaviour is undefined.
+If you use digraphs the behavior is undefined.
 
 @item
 If a line that looks like a directive appears within macro arguments,
-the behaviour is undefined.
+the behavior is undefined.
 
 @end itemize
 

@@ -74,7 +74,7 @@ typedef pthread_mutex_t __gthread_mutex_t;
 #pragma weak pthread_mutex_unlock
 
 #ifdef _LIBOBJC
-/* Objective C.  */
+/* Objective-C.  */
 #pragma weak pthread_cond_broadcast
 #pragma weak pthread_cond_destroy
 #pragma weak pthread_cond_init
@@ -422,13 +422,6 @@ static inline int
 __gthread_key_create (__gthread_key_t *key, void (*dtor) (void *))
 {
   return pthread_keycreate (key, dtor);
-}
-
-static inline int
-__gthread_key_dtor (UNUSED (__gthread_key_t key), UNUSED (void *ptr))
-{
-  /* Nothing needed.  */
-  return 0;
 }
 
 static inline int

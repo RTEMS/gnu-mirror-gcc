@@ -348,7 +348,7 @@ typedef void* __gthread_mutex_t;
 #if __MINGW32_MAJOR_VERSION >= 1 || \
   (__MINGW32_MAJOR_VERSION == 0 && __MINGW32_MINOR_VERSION > 2)
 #define MINGW32_SUPPORTS_MT_EH 1
-/* Mingw runtime >= v0.3 provides a magic variable that is set to non-zero
+/* Mingw runtime >= v0.3 provides a magic variable that is set to nonzero
    if -mthreads option was specified, or 0 otherwise. This is to get around
    the lack of weak symbols in PE-COFF.  */
 extern int _CRT_MT;
@@ -396,13 +396,6 @@ __gthread_key_create (__gthread_key_t *key, void (*dtor) (void *))
   return __gthr_win32_key_create (key, dtor);
 }
 
-static inline int
-__gthread_key_dtor (__gthread_key_t key, void *ptr)
-{
-  /* Nothing needed.  */
-  return 0;
-}
-  
  static inline int
 __gthread_key_delete (__gthread_key_t key)
 {
@@ -509,15 +502,6 @@ __gthread_key_create (__gthread_key_t *key, void (*dtor) (void *))
   else
     status = (int) GetLastError ();
   return status;
-}
-
-/* Currently, this routine is called only for Mingw runtime, and if
-   -mthreads option is chosen to link in the thread support DLL.  */
-static inline int
-__gthread_key_dtor (__gthread_key_t key, void *ptr)
-{
-  /* Nothing needed.  */
-  return 0;
 }
 
 static inline int
