@@ -337,6 +337,13 @@ struct c_lang_decl {
   (((struct c_lang_decl *) DECL_LANG_SPECIFIC (FUNCTION_DECL_CHECK (NODE))) \
    ->saved_tree)
 
+/* In a FUNCTION_DECL for which DECL_BUILT_IN does not hold, this is
+     the approximate number of statements in this function.  There is
+     no need for this number to be exact; it is only used in various
+     heuristics regarding optimization.  */
+#define DECL_NUM_STMTS(NODE) \
+  (FUNCTION_DECL_CHECK (NODE)->decl.u1.i)
+
 extern void c_mark_lang_decl                    PARAMS ((struct c_lang_decl *));
 
 /* The variant of the C language being processed.  Each C language
@@ -414,11 +421,6 @@ extern int flag_no_builtin;
    -ansi sets this.  */
 
 extern int flag_no_nonansi_builtin;
-
-/* If non-NULL, dump the tree structure for the entire translation
-   unit to this file.  */
-
-extern const char *flag_dump_translation_unit;
 
 /* Nonzero means warn about suggesting putting in ()'s.  */
 
@@ -526,17 +528,7 @@ extern tree build_va_arg			PARAMS ((tree, tree));
 
 extern void c_common_lang_init			PARAMS ((void));
 
-/* Nonzero if the type T promotes to itself.
-   ANSI C states explicitly the list of types that promote;
-   in particular, short promotes to int even if they have the same width.  */
-#define C_PROMOTING_INTEGER_TYPE_P(t)				\
-  (TREE_CODE ((t)) == INTEGER_TYPE				\
-   && (TYPE_MAIN_VARIANT (t) == char_type_node			\
-       || TYPE_MAIN_VARIANT (t) == signed_char_type_node	\
-       || TYPE_MAIN_VARIANT (t) == unsigned_char_type_node	\
-       || TYPE_MAIN_VARIANT (t) == short_integer_type_node	\
-       || TYPE_MAIN_VARIANT (t) == short_unsigned_type_node))
-
+extern bool c_promoting_integer_type_p		PARAMS ((tree));
 extern int self_promoting_args_p		PARAMS ((tree));
 extern tree simple_type_promotes_to		PARAMS ((tree));
 extern tree strip_array_types                   PARAMS ((tree));
@@ -805,6 +797,20 @@ extern int c_unsafe_for_reeval			PARAMS ((tree));
 
 /* In dump.c */
 
+/* Different tree dump places. */
+enum tree_dump_index
+{
+  TDI_all,			/* dump the whole translation unit */
+  TDI_original,			/* dump each function before optimizing it */
+  TDI_optimized,			/* dump each function after optimizing it */
+  TDI_class,			/* dump class heirarchy */
+  TDI_end
+};
+
+/* Bit masks to control tree dumping. */
+#define TDF_ADDRESS	(1 << 0)	/* dump node addresses */
+#define TDF_SLIM	(1 << 1)	/* don't go wild following links */
+
 typedef struct dump_info *dump_info_p;
 
 /* A callback function used dump language-specific parts of tree
@@ -815,7 +821,12 @@ typedef int (*dump_tree_fn) PARAMS ((dump_info_p, tree));
 
 extern dump_tree_fn lang_dump_tree;
 
-extern void dump_node_to_file                   PARAMS ((tree, const char *));
+extern int dump_flag			PARAMS ((dump_info_p, int, tree));
+extern int dump_enabled_p		PARAMS ((enum tree_dump_index));
+extern FILE *dump_begin			PARAMS ((enum tree_dump_index, int *));
+extern void dump_end			PARAMS ((enum tree_dump_index, FILE *));
+extern void dump_node			PARAMS ((tree, int, FILE *));
+extern int dump_switch_p                PARAMS ((const char *));
 
 /* Information recorded about each file examined during compilation.  */
 

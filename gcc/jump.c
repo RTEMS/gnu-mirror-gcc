@@ -59,7 +59,6 @@ Boston, MA 02111-1307, USA.  */
 #include "hard-reg-set.h"
 #include "regs.h"
 #include "insn-config.h"
-#include "insn-flags.h"
 #include "insn-attr.h"
 #include "recog.h"
 #include "function.h"
@@ -212,15 +211,6 @@ jump_optimize_1 (f, cross_jump, noop_moves, after_regscan,
   cross_jump_death_matters = (cross_jump == 2);
   max_uid = init_label_info (f) + 1;
 
-  /* If we are performing cross jump optimizations, then initialize
-     tables mapping UIDs to EH regions to avoid incorrect movement
-     of insns from one EH region to another.  */
-  if (flag_exceptions && cross_jump)
-    init_insn_eh_region (f, max_uid);
-
-  if (! mark_labels_only)
-    delete_barrier_successors (f);
-
   /* Leave some extra room for labels and duplicate exit test insns
      we make.  */
   max_jump_chain = max_uid * 14 / 10;
@@ -236,8 +226,6 @@ jump_optimize_1 (f, cross_jump, noop_moves, after_regscan,
     if (GET_CODE (XEXP (insn, 0)) == CODE_LABEL)
       LABEL_NUSES (XEXP (insn, 0))++;
 
-  check_exception_handler_labels ();
-
   /* Keep track of labels used for marking handlers for exception
      regions; they cannot usually be deleted.  */
 
@@ -250,8 +238,7 @@ jump_optimize_1 (f, cross_jump, noop_moves, after_regscan,
   if (mark_labels_only)
     goto end;
 
-  if (! minimal)
-    exception_optimize ();
+  delete_barrier_successors (f);
 
   last_insn = delete_unreferenced_labels (f);
 
@@ -420,6 +407,28 @@ jump_optimize_1 (f, cross_jump, noop_moves, after_regscan,
 
 	      if (temp2 == temp)
 		{
+		  /* Ensure that we jump to the later of the two labels.  
+		     Consider:
+
+			if (test) goto L2;
+			goto L1;
+			...
+		      L1:
+			(clobber return-reg)
+		      L2:
+			(use return-reg)
+
+		     If we leave the goto L1, we'll incorrectly leave
+		     return-reg dead for TEST true.  */
+
+		  temp2 = next_active_insn (JUMP_LABEL (insn));
+		  if (!temp2)
+		    temp2 = get_last_insn ();
+		  if (GET_CODE (temp2) != CODE_LABEL)
+		    temp2 = prev_label (temp2);
+		  if (temp2 != JUMP_LABEL (temp))
+		    redirect_jump (temp, temp2, 1);
+
 		  delete_jump (insn);
 		  changed = 1;
 		  continue;
@@ -808,7 +817,24 @@ delete_barrier_successors (f)
 
 	  while (insn != 0 && GET_CODE (insn) != CODE_LABEL)
 	    {
-	      if (GET_CODE (insn) == NOTE
+	      if (GET_CODE (insn) == JUMP_INSN)
+		{
+		  /* Detect when we're deleting a tablejump; get rid of
+		     the jump table as well.  */
+		  rtx next1 = next_nonnote_insn (insn);
+		  rtx next2 = next1 ? next_nonnote_insn (next1) : 0;
+		  if (next2 && GET_CODE (next1) == CODE_LABEL
+		      && GET_CODE (next2) == JUMP_INSN
+		      && (GET_CODE (PATTERN (next2)) == ADDR_VEC
+			  || GET_CODE (PATTERN (next2)) == ADDR_DIFF_VEC))
+		    {
+		      delete_insn (insn);
+		      insn = next2;
+		    }
+		  else
+		    insn = delete_insn (insn);
+		}
+	      else if (GET_CODE (insn) == NOTE
 		  && NOTE_LINE_NUMBER (insn) != NOTE_INSN_FUNCTION_END)
 		insn = NEXT_INSN (insn);
 	      else
@@ -859,6 +885,17 @@ mark_all_labels (f, cross_jump)
 	    mark_all_labels (XEXP (PATTERN (insn), 0), cross_jump);
 	    mark_all_labels (XEXP (PATTERN (insn), 1), cross_jump);
 	    mark_all_labels (XEXP (PATTERN (insn), 2), cross_jump);
+
+	    /* Canonicalize the tail recursion label attached to the
+	       CALL_PLACEHOLDER insn.  */
+	    if (XEXP (PATTERN (insn), 3))
+	      {
+		rtx label_ref = gen_rtx_LABEL_REF (VOIDmode,
+						   XEXP (PATTERN (insn), 3));
+		mark_jump_label (label_ref, insn, cross_jump, 0);
+		XEXP (PATTERN (insn), 3) = XEXP (label_ref, 0);
+	      }
+
 	    continue;
 	  }
 
@@ -1421,13 +1458,6 @@ find_cross_jump (e1, e2, minimum, f1, f2)
       if (i2 == 0 || GET_CODE (i1) != GET_CODE (i2))
 	break;
 
-      /* Avoid moving insns across EH regions if either of the insns
-	 can throw.  */
-      if (flag_exceptions
-	  && (asynchronous_exceptions || GET_CODE (i1) == CALL_INSN)
-	  && !in_same_eh_region (i1, i2))
-	break;
-
       p1 = PATTERN (i1);
       p2 = PATTERN (i2);
 
@@ -1699,7 +1729,7 @@ jump_back_p (insn, target)
 	  && rtx_renumbered_equal_p (XEXP (cinsn, 1), XEXP (ctarget, 1)));
 }
 
-/* Given a comparison (CODE ARG0 ARG1), inside a insn, INSN, return an code
+/* Given a comparison (CODE ARG0 ARG1), inside an insn, INSN, return a code
    of reversed comparison if it is possible to do so.  Otherwise return UNKNOWN.
    UNKNOWN may be returned in case we are having CC_MODE compare and we don't
    know whether it's source is floating point or integer comparison.  Machine
@@ -1734,7 +1764,7 @@ reversed_comparison_code_parts (code, arg0, arg1, insn)
 	}
 #endif
 
-  /* Try few special cases based on the comparison code.  */
+  /* Try a few special cases based on the comparison code.  */
   switch (code)
     {
       case GEU:
@@ -2542,7 +2572,6 @@ mark_jump_label (x, insn, cross_jump, in_mem)
       {
 	rtx label = XEXP (x, 0);
 	rtx olabel = label;
-	rtx note;
 	rtx next;
 
 	/* Ignore remaining references to unreachable labels that
@@ -2588,32 +2617,36 @@ mark_jump_label (x, insn, cross_jump, in_mem)
 	  {
 	    if (GET_CODE (insn) == JUMP_INSN)
 	      JUMP_LABEL (insn) = label;
-
-	    /* If we've changed OLABEL and we had a REG_LABEL note
-	       for it, update it as well.  */
-	    else if (label != olabel
-		     && (note = find_reg_note (insn, REG_LABEL, olabel)) != 0)
-	      XEXP (note, 0) = label;
-
-	    /* Otherwise, add a REG_LABEL note for LABEL unless there already
-	       is one.  */
-	    else if (! find_reg_note (insn, REG_LABEL, label))
+	    else
 	      {
-		/* This code used to ignore labels which refered to dispatch
-		   tables to avoid flow.c generating worse code.
+		/* If we've changed the label, update notes accordingly.  */
+		if (label != olabel)
+		  {
+		    rtx note;
 
-		   However, in the presense of global optimizations like
-		   gcse which call find_basic_blocks without calling
-		   life_analysis, not recording such labels will lead
-		   to compiler aborts because of inconsistencies in the
-		   flow graph.  So we go ahead and record the label.
+		    /* We may have a REG_LABEL note to indicate that this
+		       instruction uses the label.  */
+		    note = find_reg_note (insn, REG_LABEL, olabel);
+		    if (note)
+		      XEXP (note, 0) = label;
 
-		   It may also be the case that the optimization argument
-		   is no longer valid because of the more accurate cfg
-		   we build in find_basic_blocks -- it no longer pessimizes
-		   code when it finds a REG_LABEL note.  */
-		REG_NOTES (insn) = gen_rtx_INSN_LIST (REG_LABEL, label,
-						      REG_NOTES (insn));
+		    /* We may also have a REG_EQUAL note to indicate that
+		       a register is being set to the address of the
+		       label.  */
+		    note = find_reg_note (insn, REG_EQUAL, NULL_RTX);
+		    if (note 
+			&& GET_CODE (XEXP (note, 0)) == LABEL_REF
+			&& XEXP (XEXP (note, 0), 0) == olabel)
+		      XEXP (XEXP (note, 0), 0) = label;
+		  }
+
+		/* Add a REG_LABEL note for LABEL unless there already
+		   is one.  All uses of a label, except for labels
+		   that are the targets of jumps, must have a
+		   REG_LABEL note.  */
+		if (! find_reg_note (insn, REG_LABEL, label))
+		  REG_NOTES (insn) = gen_rtx_INSN_LIST (REG_LABEL, label,
+							REG_NOTES (insn));
 	      }
 	  }
 	return;
@@ -2882,16 +2915,15 @@ delete_insn (insn)
      to special NOTEs instead.  When not optimizing, leave them alone.  */
   if (was_code_label && LABEL_NAME (insn) != 0)
     {
-      if (! optimize)
-	dont_really_delete = 1;
-      else if (! dont_really_delete)
+      if (optimize)
 	{
 	  const char *name = LABEL_NAME (insn);
 	  PUT_CODE (insn, NOTE);
 	  NOTE_LINE_NUMBER (insn) = NOTE_INSN_DELETED_LABEL;
 	  NOTE_SOURCE_FILE (insn) = name;
-	  dont_really_delete = 1;
 	}
+
+      dont_really_delete = 1;
     }
   else
     /* Mark this insn as deleted.  */
@@ -3800,7 +3832,7 @@ static int modified_mem;
 static void
 mark_modified_reg (dest, x, data)
      rtx dest;
-     rtx x ATTRIBUTE_UNUSED;
+     rtx x;
      void *data ATTRIBUTE_UNUSED;
 {
   int regno;
@@ -3818,7 +3850,13 @@ mark_modified_reg (dest, x, data)
   regno = REGNO (dest);
   if (regno >= FIRST_PSEUDO_REGISTER)
     modified_regs[regno] = 1;
-  else
+  /* Don't consider a hard condition code register as modified,
+     if it is only being set.  thread_jumps will check if it is set
+     to the same value.  */
+  else if (GET_MODE_CLASS (GET_MODE (dest)) != MODE_CC
+	   || GET_CODE (x) != SET
+	   || ! rtx_equal_p (dest, SET_DEST (x))
+	   || HARD_REGNO_NREGS (regno, GET_MODE (dest)) != 1)
     for (i = 0; i < HARD_REGNO_NREGS (regno, GET_MODE (dest)); i++)
       modified_regs[regno + i] = 1;
 }

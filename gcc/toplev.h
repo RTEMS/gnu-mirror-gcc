@@ -42,6 +42,7 @@ extern void debug_end_source_file	PARAMS ((unsigned));
 extern void debug_define		PARAMS ((unsigned, const char *));
 extern void debug_undef			PARAMS ((unsigned, const char *));
 extern int debug_ignore_block		PARAMS ((union tree_node *));
+extern const char *trim_filename	PARAMS ((const char *));
 extern void internal_error		PARAMS ((const char *, ...))
 					       ATTRIBUTE_PRINTF_1
 					       ATTRIBUTE_NORETURN;
@@ -130,11 +131,14 @@ extern int wrapup_global_declarations   PARAMS ((union tree_node **, int));
 extern void check_global_declarations   PARAMS ((union tree_node **, int));
 extern void note_deferral_of_defined_inline_function
 					PARAMS ((union tree_node *));
+extern void note_outlining_of_inline_function
+					PARAMS ((union tree_node *));
 extern int errorcount;
 extern int warningcount;
 extern int sorrycount;
 
 extern const char *progname;
+extern const char *dump_base_name;
 
 /* Language-specific hooks.  Can be NULL unless otherwise specified.  */
 struct lang_hooks
@@ -152,7 +156,12 @@ struct lang_hooks
      single option (typically starting with -f or -W or +).  It should
      return the number of command-line arguments it uses if it handles
      the option, or 0 and not complain if it does not recognise the
-     option.  This hook cannot be NULL.  */
+     option.  If this function returns a negative number, then its
+     absolute value is the number of command-line arguments used, but,
+     in addition, no language-independent option processing should be
+     done for this option.
+
+     This hook cannot be NULL.  */
   int (*decode_option) PARAMS ((int, char **));
 
   /* Called when all command line options have been processed.  */

@@ -258,7 +258,7 @@ cp_convert_to_pointer (type, expr, force)
       if (TYPE_PTRMEMFUNC_P (type))
 	return build_ptrmemfunc (TYPE_PTRMEMFUNC_FN_TYPE (type), expr, 0);
 
-      if (flag_new_abi && TYPE_PTRMEM_P (type))
+      if (TYPE_PTRMEM_P (type))
 	/* Under the new ABI, a NULL pointer-to-member is represented
 	   by -1, not by zero.  */
 	expr = build_int_2 (-1, -1);
@@ -597,6 +597,20 @@ convert_from_reference (val)
     return build_indirect_ref (val, NULL_PTR);
   return val;
 }
+
+/* Implicitly convert the lvalue EXPR to another lvalue of type TOTYPE,
+   preserving cv-qualification.  */
+
+tree
+convert_lvalue (totype, expr)
+     tree totype, expr;
+{
+  totype = cp_build_qualified_type (totype, TYPE_QUALS (TREE_TYPE (expr)));
+  totype = build_reference_type (totype);
+  expr = convert_to_reference (totype, expr, CONV_IMPLICIT, LOOKUP_NORMAL,
+			       NULL_TREE);
+  return convert_from_reference (expr);
+}
 
 /* Call this when we know (for any reason) that expr is not, in fact,
    zero.  This routine is like convert_pointer_to, but it pays
@@ -922,8 +936,13 @@ convert_to_void (expr, implicit)
         tree new_op1 = convert_to_void (op1, implicit);
         
         if (new_op1 != op1)
-          expr = build (COMPOUND_EXPR, TREE_TYPE (new_op1),
-                        TREE_OPERAND (expr, 0), new_op1);
+	  {
+	    tree t = build (COMPOUND_EXPR, TREE_TYPE (new_op1),
+			    TREE_OPERAND (expr, 0), new_op1);
+	    TREE_SIDE_EFFECTS (t) = TREE_SIDE_EFFECTS (expr);
+	    expr = t;
+	  }
+
         break;
       }
     
@@ -1258,7 +1277,7 @@ type_promotes_to (type)
       else
 	type = totype;
     }
-  else if (C_PROMOTING_INTEGER_TYPE_P (type))
+  else if (c_promoting_integer_type_p (type))
     {
       /* Retain unsignedness if really not getting bigger.  */
       if (TREE_UNSIGNED (type)

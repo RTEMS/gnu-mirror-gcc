@@ -8,7 +8,7 @@
    <META NAME="GENERATOR" CONTENT="vi and eight fingers">
    <TITLE>libstdc++-v3 HOWTO:  Chapter 23</TITLE>
 <LINK REL=StyleSheet HREF="../lib3styles.css">
-<!-- $Id: howto.html,v 1.4 2000/12/03 23:47:48 jsm28 Exp $ -->
+<!-- $Id: howto.html,v 1.1.4.4 2001/06/08 20:09:28 ljrittle Exp $ -->
 </HEAD>
 <BODY>
 
@@ -25,6 +25,7 @@
    <LI><A HREF="#1">Making code unaware of the container/array difference</A>
    <LI><A HREF="#2">Variable-sized bitmasks</A>
    <LI><A HREF="#3">Containers and multithreading</A>
+   <LI><A HREF="#4">&quot;Hinting&quot; during insertion</A>
 </UL>
 
 <HR>
@@ -45,10 +46,8 @@
       algorithms are only given endpoints to work with.  For the container
       classes, these are iterators (usually <TT>begin()</TT> and
       <TT>end()</TT>, but not always).  For builtin arrays, these are
-      the address of the first element and the past-the-end element.
-      <!-- a good explanation of the past-the-end rules is in order,
-           probably a link somewhere
-      -->
+      the address of the first element and the
+      <A HREF="../24_iterators/howto.html#2">past-the-end</A> element.
    </P>
    <P>Some very simple wrapper functions can hide all of that from the
       rest of the code.  For example, a pair of functions called
@@ -86,7 +85,7 @@
    </P>
    <P>Second, the line
       <PRE>
-    inline unsigned int lengthof (T (&)[sz]) { return sz; } </PRE>
+    inline unsigned int lengthof (T (&amp;)[sz]) { return sz; } </PRE>
       looks just weird!  Hint:  unused parameters can be left nameless.
    </P>
    <P>Return <A HREF="#top">to top of page</A> or
@@ -134,7 +133,7 @@
       some extra space, of course.  (If you plan to write code like the 
       incorrect example above, where the bitset is a local variable, then you
       may have to talk your compiler into allowing that much stack space;
-      there may be zero spae overhead, but it's all allocated inside the
+      there may be zero space overhead, but it's all allocated inside the
       object.)
    </P>
    <P><B>A container&lt;bool&gt;.&nbsp;&nbsp;</B>  The Committee made provision
@@ -187,17 +186,42 @@
    <P>This section will mention some of the problems in designing MT
       programs that use Standard containers.  For information on other
       aspects of multithreading (e.g., the library as a whole), see
-      the Received Wisdom on Chapter 17.
+      the Received Wisdom on Chapter 17.  This section only applies
+      when gcc and libstdc++-v3 were configured with --enable-threads.
    </P>
-   <P>An excellent page to read when working with templatized containers
-      and threads is
-      <A HREF="http://www.sgi.com/Technology/STL/thread_safety.html">SGI's
-      http://www.sgi.com/Technology/STL/thread_safety.html</A>.  The
+   <P>Two excellent pages to read when working with templatized containers
+      and threads are
+      <A HREF="http://www.sgi.com/tech/stl/thread_safety.html">SGI's
+      http://www.sgi.com/tech/stl/thread_safety.html</A> and
+      <A HREF="http://www.sgi.com/tech/stl/Allocators.html">SGI's
+      http://www.sgi.com/tech/stl/Allocators.html</A>.  The
       libstdc++-v3 uses the same definition of thread safety
       when discussing design.  A key point that beginners may miss is the
-      fourth major paragraph (&quot;For most clients,&quot;...), pointing
+      fourth major paragraph of the first page mentioned above
+      (&quot;For most clients,&quot;...), pointing
       out that locking must nearly always be done outside the container,
       by client code (that'd be you, not us *grin*).
+      <EM>However, please take caution when considering the discussion
+      about the user-level configuration of the mutex lock
+      implementation inside the STL container-memory allocator on that
+      page.  For the sake of this discussion, libstdc++-v3 configures
+      the SGI STL implementation, not you.  We attempt to configure
+      the mutex lock as is best for your platform.  In particular,
+      past advice was for people using g++ to explicitly define
+      _PTHREADS on the command line to get a thread-safe STL.  This
+      is no longer required for your port.  It may or may not be
+      a good idea for your port.  Extremely big caution: if you
+      compile some of your application code against the STL with one
+      set of threading flags and macros and another portion of the
+      code with different flags and macros that influence the
+      selection of the mutex lock, you may well end up with multiple
+      locking mechanisms in use which don't impact each other in the
+      manner that they should.  Everything might link and all code
+      might have been built with a perfectly reasonable thread model
+      but you may have two internal ABIs in play within the
+      application.  This might produce races, memory leaks and fatal
+      crashes.  In any multithreaded application using STL, this
+      is the first thing to study well before blaming the allocator.</EM>
    </P>
    <P>You didn't read it, did you?  *sigh*  I'm serious, go read the
       SGI page.  It's really good and doesn't take long, and makes most
@@ -222,12 +246,85 @@
       a catch-all general template solution would probably be more trouble
       than it's worth.
    </P>
-
    <P>Return <A HREF="#top">to top of page</A> or
       <A HREF="../faq/index.html">to the FAQ</A>.
    </P>
 
-
+<HR>
+<H2><A NAME="4">&quot;Hinting&quot; during insertion</A></H2>
+   <P>Section [23.1.2], Table 69, of the C++ standard lists this function
+      for all of the associative containers (map, set, etc):
+      <PRE>
+      a.insert(p,t);</PRE>
+      where 'p' is an iterator into the container 'a', and 't' is the item
+      to insert.  The standard says that &quot;iterator p is a hint
+      pointing to where the insert should start to search,&quot; but
+      specifies nothing more.  (LWG Issue #233, currently in review,
+      addresses this topic, but I will ignore it here because it is not yet
+      finalized.)
+   </P>
+   <P>Here we'll describe how the hinting works in the libstdc++-v3
+      implementation, and what you need to do in order to take advantage of
+      it.  (Insertions can change from logarithmic complexity to amortized
+      constant time, if the hint is properly used.)  Also, since the current
+      implementation is based on the SGI STL one, these points may hold true
+      for other library implementations also, since the HP/SGI code is used
+      in a lot of places.
+   </P>
+   <P>In the following text, the phrases <EM>greater than</EM> and <EM>less
+      than</EM> refer to the results of the strict weak ordering imposed on
+      the container by its comparison object, which defaults to (basically)
+      &quot;&lt;&quot;.  Using those phrases is semantically sloppy, but I
+      didn't want to get bogged down in syntax.  I assume that if you are
+      intelligent enough to use your own comparison objects, you are also
+      intelligent enough to assign &quot;greater&quot; and &quot;lesser&quot;
+      their new meanings in the next paragraph.  *grin*
+   </P>
+   <P>If the <TT>hint</TT> parameter ('p' above) is equivalent to:
+     <UL>
+      <LI><TT>begin()</TT>, then the item being inserted should have a key
+          less than all the other keys in the container.  The item will
+          be inserted at the beginning of the container, becoming the new
+          entry at <TT>begin()</TT>.
+      <LI><TT>end()</TT>, then the item being inserted should have a key
+          greater than all the other keys in the container.  The item will
+          be inserted at the end of the container, becoming the new entry
+          at <TT>end()</TT>.
+      <LI>neither <TT>begin()</TT> nor <TT>end()</TT>, then:  Let <TT>h</TT>
+          be the entry in the container pointed to by <TT>hint</TT>, that
+          is, <TT>h = *hint</TT>.  Then the item being inserted should have
+          a key less than that of <TT>h</TT>, and greater than that of the
+          item preceeding <TT>h</TT>.  The new item will be inserted
+          between <TT>h</TT> and <TT>h</TT>'s predecessor.
+     </UL>
+   </P>
+   <P>If the conditions are not met, then the hint is not used, and the
+      insertion proceeds as if you had called <TT> a.insert(t) </TT>
+      instead.  (<STRONG>Note </STRONG> that GCC releases prior to 3.0.2
+      had a bug in the case with <TT>hint == begin()</TT>.  You should not
+      use a hint argument in those releases.)
+(Was it just with map or with all the rbtree-using containers?  Still need
+to check that.)
+   </P>
+   <P>This behavior goes well with other container's <TT>insert()</TT>
+      functions which take an iterator:  if used, the new item will be
+      inserted before the iterator passed as an argument, same as the other
+      containers.  The exception
+      (in a sense) is with a hint of <TT>end()</TT>:  the new item will
+      actually be inserted after <TT>end()</TT>, but it also becomes the
+      new <TT>end()</TT>.
+   </P>
+   <P><STRONG>Note </STRONG> also that the hint in this implementation is a
+      one-shot.  The insertion-with-hint routines check the immediately
+      surrounding entries to ensure that the new item would in fact belong
+      there.  If the hint does not point to the correct place, then no
+      further local searching is done; the search begins from scratch in
+      logarithmic time.  (Further local searching would only increase the
+      time required when the hint is too far off.)
+   </P>
+   <P>Return <A HREF="#top">to top of page</A> or
+      <A HREF="../faq/index.html">to the FAQ</A>.
+   </P>
 
 
 <!-- ####################################################### -->
@@ -235,9 +332,8 @@
 <HR>
 <P CLASS="fineprint"><EM>
 Comments and suggestions are welcome, and may be sent to
-<A HREF="mailto:pme@sources.redhat.com">Phil Edwards</A> or
-<A HREF="mailto:gdr@gcc.gnu.org">Gabriel Dos Reis</A>.
-<BR> $Id: howto.html,v 1.4 2000/12/03 23:47:48 jsm28 Exp $
+<A HREF="mailto:libstdc++@gcc.gnu.org">the mailing list</A>.
+<BR> $Id: howto.html,v 1.1.4.4 2001/06/08 20:09:28 ljrittle Exp $
 </EM></P>
 
 
