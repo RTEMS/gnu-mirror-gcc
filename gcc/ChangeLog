@@ -1,3 +1,169 @@
+2003-12-23  Zack Weinberg  <zack@codesourcery.com>
+	    Nathan Sidwell  <nathan@codesourcery.com>
+	    Mark Mitchell  <mark@codesourcery.com>
+
+	* collect2.c (windows.h): Include.
+	(dup2): Remove.
+	(handler): Change prototype.
+	(unhandled_filter): New funciton.
+	(install_handlers): Likewise.
+	(disable_break): Likewise.
+	(enable_break): Likewise.
+	(main): Call install_handlers rather than signal directly.
+	(collect_execute): Use pexec.
+	(scan_prog_file): Likewise.
+	(scan_libraries): Likewise.
+
+2003-12-19  Paul Brook  <paul@codesourcery.com>
+
+	* config/arm/arm.md: Add load1 and load_byte "type" attrs.  Modify
+	insn patterns to match.
+	* config/arm/arm-generic.md: Ditto.
+	* config/arm/cirrus.md: Ditto.
+	* config/arm/fpa.md: Ditto.
+	* config/amm/iwmmxt.md: Ditto.
+	* config/arm/arm1026ejs.md: Ditto.
+	* config/arm/arm1135jfs.md: Ditto.  Add insn_reservation and bypasses
+	for 11_loadb.
+
+2003-12-18  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* config/arm/arm-protos.h (arm_no_early_alu_shift_value_dep): Declare.
+	* config/arm/arm.c (arm_adjust_cost): Check shift cost for
+	TYPE_ALU_SHIFT and TYPE_ALU_SHIFT_REG.
+	(arm_no_early_store_addr_dep, arm_no_early_alu_shift_dep,
+	arm_no_early_mul_dep): Correctly deal with conditional execution,
+	parallels and single shift operations.
+	(arm_no_early_alu_shift_value_dep): Define.
+	* arm.md (attr type): Replace 'normal' with 'alu',
+	'alu_shift' and 'alu_shift_reg'.
+	(attr core_cycles): Adjust.
+	(*addsi3_carryin_shift, andsi_not_shiftsi_si, *arm_shiftsi3,
+	*shiftsi3_compare0, *notsi_shiftsi, *notsi_shiftsi_compare0,
+	*not_shiftsi_compare0_scratch, *cmpsi_shiftsi, *cmpsi_shiftsi_swp,
+	*cmpsi_neg_shiftsi, *arith_shiftsi, *arith_shiftsi_compare0,
+	*arith_shiftsi_compare0_scratch, *sub_shiftsi,
+	*sub_shiftsi_compare0, *sub_shiftsi_compare0_scratch,
+	*if_shift_move, *if_move_shift, *if_shift_shift): Set type
+	attribute appropriately.
+	* config/arm/arm1026ejs.md (alu_op): Adjust.
+	(alu_shift_op, alu_shift_reg_op): New.
+	* config/arm/arm1136.md: Add better bypasses for early
+	registers. Remove load[234] and store[234] bypasses.
+	(11_alu_op): Adjust.
+	(11_alu_shift_op, 11_alu_shift_reg_op): New.
+
+2003-12-15  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* config/arm/arm-protos.h (arm_no_early_store_addr_dep,
+	arm_no_early_alu_shift_dep, arm_no_early_mul_dep): Declare.
+	* config/arm/arm.c (arm_no_early_store_addr_dep,
+	arm_no_early_alu_shift_dep, arm_no_early_mul_dep): Define.
+	* config/arm/arm1026ejs.md: Add load-store bypass.
+	* config/arm/arm1136jfs.md (11_alu_op): Take 2 cycles.
+	Add bypasses between instructions.
+
+2003-12-10  Paul Brook  <paul@codesourcery.com>
+
+	* config/arm/arm.c (arm_fpu_model): New variable.
+	(arm_fload_abi): New variable.
+	(target_fpe_name): Rename from target_fp_name.
+	(target_fpu_name): New variable.
+	(arm_is_cirrus): Remove.
+	(fpu_desc): New struct.
+	(all_fpus): Define.
+	(pf_model_for_fpu): Define.
+	(all_loat_abis): Define.
+	(arm_override_options): Set fp arch flags based on -mfpu=
+	and -float-abi=.
+	(FIRST_FPA_REGNUM): Rename from FIRST_ARM_FP_REGNUM.
+	(LAST_FPA_REGNUM): Rename from LAST_ARM_FP_REGNUM.
+	(*): Use new TARGET_* flags.
+	* config/arm/arm.h (TARGET_ANY_HARD_FLOAT): Remove.
+	(TARGET_HARD_FLOAT): No longer implies TARGET_FPA.
+	(TARGET_SOFT_FLOAT): Ditto.
+	(TARGET_SOFT_FLOAT_ABI): New.
+	(TARGET_MAVERICK): Rename from TARGET_CIRRUS.  No longer implies
+	TARGET_HARD_FLOAT.
+	(TARGET_VFP): No longer implies TARGET_HARD_FLOAT.
+	(TARGET_OPTIONS): Add -mfpu=.
+	(FIRST_FPA_REGNUM): Rename from FIRST_ARM_FP_REGNUM.
+	(LAST_FPA_REGNUM): Rename from LAST_ARM_FP_REGNUM.
+	(arm_pf_model): Define.
+	(arm_float_abi_type): Define.
+	(fputype): Add FPUTYPE_VFP.  Change SOFT_FPA->NONE
+	* config/arm/arm.md: Use new TARGET_* flags.
+	* config/arm/cirrus.md: Ditto.
+	* config/arm/fpa.md: Ditto.
+	* config/arm/elf.h (ASM_SPEC): Pass -mfloat-abi= and -mfpu=.
+	* config/arm/semi.h (ASM_SPEC): Ditto.
+	* config/arm/netbsd-elf.h (SUBTARGET_ASM_FLOAT_SPEC): Specify vfp.
+	(FPUTYPE_DEFAULT): Set to VFP.
+	* doc/invoke.texi: Document -mfpu= and -mfloat-abi=.
+
+2003-11-22  Phil Edwards  <phil@codesourcery.com>
+
+	PR target/12476
+	* config/arm/arm.c (arm_output_mi_thunk):  In Thumb mode, use
+	'bx' instead of 'b' to avoid branch range restrictions.  Output
+	the thunk immediately before the thunked-to function.
+	* config/arm/arm.h (ARM_DECLARE_FUNCTION_NAME):  Do not emit
+	.thumb_func if a thunk is being generated.  Emit .code 16 along
+	with .thumb_func if a thunk is not being generated.
+
+2003-11-15  Nicolas Pitre <nico@cam.org>
+
+	* config/arm/arm.md (ashldi3, arm_ashldi3_1bit, ashrdi3,
+	arm_ashrdi3_1bit, lshrdi3, arm_lshrdi3_1bit): New patterns.
+	* config/arm/iwmmxt.md (ashrdi3_iwmmxt): Renamed from ashrdi3.
+	(lshrdi3_iwmmxt): Renamed from lshrdi3.
+	* config/arm/arm.c (IWMMXT_BUILTIN2): Renamed argument accordingly.
+
+2003-11-12  Steve Woodford  <scw@wasabisystems.com>
+	    Ian Lance Taylor  <ian@wasabisystems.com>
+
+	* config/arm/lib1funcs.asm (ARM_DIV_BODY, ARM_MOD_BODY): Add new
+	code for __ARM_ARCH__ >= 5 && ! defined (__OPTIMIZE_SIZE__).
+
+2003-11-05  Phil Edwards  <phil@codesourcery.com>
+
+	* config/arm/arm.md (insn):  Add new V6 instruction names.
+	(generic_sched):  New attr.
+	* config/arm/arm-generic.md:  Use generic_sched here.
+	* config/arm/arm1026ejs.md:  Do not model fetch/issue/decode
+	stages of pipeline.  Adjust latency counts accordingly.
+	* config/arm/arm1136jfs.md:  New file.
+
+2003-11-05  Mark Mitchell  <mark@codesourcery.com>
+
+	* calls.c (initialize_argument_information): Add CALL_FROM_THUNK_P
+	parameter.  Use it instead of current_function_is_thunk.
+	* function.h (struct function): Update documentation for is_thunk.
+	* tree.h (CALL_FROM_THUNK_P): New macro.
+	* config/alpha/alpha.c (alpha_sa_mask): Do not check
+	no_new_pseudos when testing current_function_is_thunk.
+	* config/rs6000/rs6000.c (rs6000_ra_ever_killed): Likeiwse.
+
+2003-10-28  Mark Mitchell  <mark@codesourcery.com>
+
+	* config/arm/arm.h (processor_type): New enumeration type.
+	(CPP_ARCH_DEFAULT_SPEC): Set appropriately for ARM 926EJ-S,
+	ARM1026EJ-S, ARM1136J-S, and ARM1136JF-S processor cores.
+	(CPP_CPU_ARCH_SPEC): Likewise.
+	* config/arm/arm.c (arm_tune): New variable.
+	(all_cores): Use cores.def.
+	(all_architectures): Add representative processor.
+	(arm_override_options): Restructure way in which tuning
+	information is deduced.
+	* arm.md: Update "insn" and "type" attributes throughout.
+	(insn): New attribute.
+	(type): Compute "mult" from "insn" attribute.  Add load2,
+	load3, load4 alternatives.
+	(arm automaton): Move to arm-generic.md.
+	* config/arm/arm-cores.def: New file.
+	* config/arm/arm-generic.md: Likewise.
+	* config/arm/arm1026ejs.md: Likewise.
+
 2003-10-26  Daniel Berlin  <dberlin@dberlin.org>
 
 	* ggc-zone.c:  New file, zone allocating collector.
@@ -455,7 +621,6 @@
 	* c-pch.c (struct c_pch_validity): Add pch_init field.
 	(pch_init): Set it.
 	(c_common_valid_pch): Check it.
-	(get_ident): Bump the PCH version number.
 
 2003-10-22  David Taylor <dtaylor@emc.com>
 

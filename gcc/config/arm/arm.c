@@ -251,17 +251,32 @@ int making_const_table;
    stored from the compare operation.  */
 rtx arm_compare_op0, arm_compare_op1;
 
-/* What type of floating point are we tuning for?  */
+/* The processor for which instructions should be scheduled.  */
+enum processor_type arm_tune = arm_none;
+
+/* Which floating point model to use.  */
+enum arm_fp_model arm_fp_model;
+
+/* Which floating point hardware is available.  */
+enum fputype arm_fpu_arch;
+
+/* Which floating point hardware to schedule for.  */
 enum fputype arm_fpu_tune;
 
-/* What type of floating point instructions are available?  */
-enum fputype arm_fpu_arch;
+/* Whether to use floating point hardware.  */
+enum float_abi_type arm_float_abi;
 
 /* What program mode is the cpu running in? 26-bit mode or 32-bit mode.  */
 enum prog_mode_type arm_prgmode;
 
-/* Set by the -mfp=... option.  */
-const char * target_fp_name = NULL;
+/* Set by the -mfpu=... option.  */
+const char * target_fpu_name = NULL;
+
+/* Set by the -mfpe=... option.  */
+const char * target_fpe_name = NULL;
+
+/* Set by the -mfloat-abi=... option.  */
+const char * target_float_abi_name = NULL;
 
 /* Used to parse -mstructure_size_boundary command line option.  */
 const char * structure_size_string = NULL;
@@ -328,9 +343,6 @@ int arm_tune_xscale = 0;
 /* Nonzero if this chip is an ARM6 or an ARM7.  */
 int arm_is_6_or_7 = 0;
 
-/* Nonzero if this chip is a Cirrus/DSP.  */
-int arm_is_cirrus = 0;
-
 /* Nonzero if generating Thumb instructions.  */
 int thumb_code = 0;
 
@@ -374,6 +386,7 @@ static const char * const arm_condition_codes[] =
 struct processors
 {
   const char *const name;
+  enum processor_type core;
   const unsigned long flags;
 };
 
@@ -382,83 +395,32 @@ struct processors
 static const struct processors all_cores[] =
 {
   /* ARM Cores */
-  
-  {"arm2",	FL_CO_PROC | FL_MODE26 },
-  {"arm250",	FL_CO_PROC | FL_MODE26 },
-  {"arm3",	FL_CO_PROC | FL_MODE26 },
-  {"arm6",	FL_CO_PROC | FL_MODE26 | FL_MODE32 },
-  {"arm60",	FL_CO_PROC | FL_MODE26 | FL_MODE32 },
-  {"arm600",	FL_CO_PROC | FL_MODE26 | FL_MODE32 },
-  {"arm610",	             FL_MODE26 | FL_MODE32 },
-  {"arm620",	FL_CO_PROC | FL_MODE26 | FL_MODE32 },
-  {"arm7",	FL_CO_PROC | FL_MODE26 | FL_MODE32 },
-  /* arm7m doesn't exist on its own, but only with D, (and I), but
-     those don't alter the code, so arm7m is sometimes used.  */
-  {"arm7m",	FL_CO_PROC | FL_MODE26 | FL_MODE32 | FL_FAST_MULT },
-  {"arm7d",	FL_CO_PROC | FL_MODE26 | FL_MODE32 },
-  {"arm7dm",	FL_CO_PROC | FL_MODE26 | FL_MODE32 | FL_FAST_MULT },
-  {"arm7di",	FL_CO_PROC | FL_MODE26 | FL_MODE32 },
-  {"arm7dmi",	FL_CO_PROC | FL_MODE26 | FL_MODE32 | FL_FAST_MULT },
-  {"arm70",	FL_CO_PROC | FL_MODE26 | FL_MODE32 },
-  {"arm700",	FL_CO_PROC | FL_MODE26 | FL_MODE32 },
-  {"arm700i",	FL_CO_PROC | FL_MODE26 | FL_MODE32 },
-  {"arm710",	             FL_MODE26 | FL_MODE32 },
-  {"arm720",	             FL_MODE26 | FL_MODE32 },
-  {"arm710c",	             FL_MODE26 | FL_MODE32 },
-  {"arm7100",	             FL_MODE26 | FL_MODE32 },
-  {"arm7500",	             FL_MODE26 | FL_MODE32 },
-  /* Doesn't have an external co-proc, but does have embedded fpa.  */
-  {"arm7500fe",	FL_CO_PROC | FL_MODE26 | FL_MODE32 },
-  /* V4 Architecture Processors */
-  {"arm7tdmi",	FL_CO_PROC |             FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB },
-  {"arm710t",	                         FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB },
-  {"arm720t",	                         FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB },
-  {"arm740t",	                         FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB },
-  {"arm8",	             FL_MODE26 | FL_MODE32 | FL_FAST_MULT | FL_ARCH4 |            FL_LDSCHED },
-  {"arm810",	             FL_MODE26 | FL_MODE32 | FL_FAST_MULT | FL_ARCH4 |            FL_LDSCHED },
-  {"arm9",	                         FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_LDSCHED },
-  {"arm920",	                         FL_MODE32 | FL_FAST_MULT | FL_ARCH4 |            FL_LDSCHED },
-  {"arm920t",	                         FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_LDSCHED },
-  {"arm940t",	                         FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_LDSCHED },
-  {"arm9tdmi",	                         FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_LDSCHED },
-  {"arm9e",	       	      		 FL_MODE32 | FL_FAST_MULT | FL_ARCH4 |            FL_LDSCHED },
-  {"ep9312",	   			 FL_MODE32 | FL_FAST_MULT | FL_ARCH4 |            FL_LDSCHED |             FL_CIRRUS },
-  {"strongarm",	             FL_MODE26 | FL_MODE32 | FL_FAST_MULT | FL_ARCH4 |            FL_LDSCHED | FL_STRONG },
-  {"strongarm110",           FL_MODE26 | FL_MODE32 | FL_FAST_MULT | FL_ARCH4 |            FL_LDSCHED | FL_STRONG },
-  {"strongarm1100",          FL_MODE26 | FL_MODE32 | FL_FAST_MULT | FL_ARCH4 |            FL_LDSCHED | FL_STRONG },
-  {"strongarm1110",          FL_MODE26 | FL_MODE32 | FL_FAST_MULT | FL_ARCH4 |            FL_LDSCHED | FL_STRONG },
-  /* V5 Architecture Processors */
-  {"arm10tdmi",	                         FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_LDSCHED             | FL_ARCH5 },
-  {"arm1020t",	                         FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_LDSCHED             | FL_ARCH5 },
-  {"arm926ejs",                          FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB                          | FL_ARCH5 | FL_ARCH5E },
-  {"arm1026ejs",                         FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB                          | FL_ARCH5 | FL_ARCH5E },
-  {"xscale",                             FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_LDSCHED | FL_STRONG | FL_ARCH5 | FL_ARCH5E | FL_XSCALE },
-  {"iwmmxt",                             FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_LDSCHED | FL_STRONG | FL_ARCH5 | FL_ARCH5E | FL_XSCALE | FL_IWMMXT },
-  /* V6 Architecture Processors */
-  {"arm1136js",                          FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB                          | FL_ARCH5 | FL_ARCH5E | FL_ARCH6J },
-  {"arm1136jfs",                         FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB                          | FL_ARCH5 | FL_ARCH5E | FL_ARCH6J | FL_VFPV2 },
-  {NULL, 0}
+#define ARM_CORE(NAME, FLAGS) \
+  {#NAME, arm_none, FLAGS},
+#include "arm-cores.def"
+#undef ARM_CORE
+  {NULL, arm_none, 0}
 };
 
 static const struct processors all_architectures[] =
 {
   /* ARM Architectures */
   
-  { "armv2",     FL_CO_PROC | FL_MODE26 },
-  { "armv2a",    FL_CO_PROC | FL_MODE26 },
-  { "armv3",     FL_CO_PROC | FL_MODE26 | FL_MODE32 },
-  { "armv3m",    FL_CO_PROC | FL_MODE26 | FL_MODE32 | FL_FAST_MULT },
-  { "armv4",     FL_CO_PROC | FL_MODE26 | FL_MODE32 | FL_FAST_MULT | FL_ARCH4 },
+  { "armv2",     arm2,       FL_CO_PROC | FL_MODE26 },
+  { "armv2a",    arm2,       FL_CO_PROC | FL_MODE26 },
+  { "armv3",     arm6,       FL_CO_PROC | FL_MODE26 | FL_MODE32 },
+  { "armv3m",    arm7m,      FL_CO_PROC | FL_MODE26 | FL_MODE32 | FL_FAST_MULT },
+  { "armv4",     arm7tdmi,   FL_CO_PROC | FL_MODE26 | FL_MODE32 | FL_FAST_MULT | FL_ARCH4 },
   /* Strictly, FL_MODE26 is a permitted option for v4t, but there are no
      implementations that support it, so we will leave it out for now.  */
-  { "armv4t",    FL_CO_PROC |             FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB },
-  { "armv5",     FL_CO_PROC |             FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_ARCH5 },
-  { "armv5t",    FL_CO_PROC |             FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_ARCH5 },
-  { "armv5te",   FL_CO_PROC |             FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_ARCH5 | FL_ARCH5E },
-  { "armv6j",    FL_CO_PROC |             FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_ARCH5 | FL_ARCH5E | FL_ARCH6J },
-  { "ep9312",				  FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_LDSCHED | FL_CIRRUS },
-  {"iwmmxt",                             FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_LDSCHED | FL_STRONG | FL_ARCH5 | FL_ARCH5E | FL_XSCALE | FL_IWMMXT },
-  { NULL, 0 }
+  { "armv4t",    arm7tdmi,   FL_CO_PROC |             FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB },
+  { "armv5",     arm10tdmi,  FL_CO_PROC |             FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_ARCH5 },
+  { "armv5t",    arm10tdmi,  FL_CO_PROC |             FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_ARCH5 },
+  { "armv5te",   arm1026ejs, FL_CO_PROC |             FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_ARCH5 | FL_ARCH5E },
+  { "armv6j",    arm1136js,  FL_CO_PROC |             FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_ARCH5 | FL_ARCH5E | FL_ARCH6J },
+  { "ep9312",	 ep9312, 			      FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_LDSCHED | FL_CIRRUS },
+  {"iwmmxt",     iwmmxt,                              FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_LDSCHED | FL_STRONG | FL_ARCH5 | FL_ARCH5E | FL_XSCALE | FL_IWMMXT },
+  { NULL, arm_none, 0 }
 };
 
 /* This is a magic structure.  The 'string' field is magically filled in
@@ -472,6 +434,57 @@ struct arm_cpu_select arm_select[] =
   { NULL,	"-march=",	all_architectures },
   { NULL,	"-mtune=",	all_cores }
 };
+
+struct fpu_desc
+{
+  const char * name;
+  enum fputype fpu;
+};
+
+
+/* Available values for for -mfpu=.  */
+
+static const struct fpu_desc all_fpus[] =
+{
+  {"fpa",	FPUTYPE_FPA},
+  {"fpe2",	FPUTYPE_FPA_EMU2},
+  {"fpe3",	FPUTYPE_FPA_EMU2},
+  {"maverick",	FPUTYPE_MAVERICK},
+  {"vfp",	FPUTYPE_VFP}
+};
+
+
+/* Floating point models used by the different hardware.
+   See fputype in arm.h.  */
+
+static const enum fputype fp_model_for_fpu[] =
+{
+  /* No FP hardware.  */
+  ARM_FP_MODEL_UNKNOWN,		/* FPUTYPE_NONE  */
+  ARM_FP_MODEL_FPA,		/* FPUTYPE_FPA  */
+  ARM_FP_MODEL_FPA,		/* FPUTYPE_FPA_EMU2  */
+  ARM_FP_MODEL_FPA,		/* FPUTYPE_FPA_EMU3  */
+  ARM_FP_MODEL_MAVERICK,	/* FPUTYPE_MAVERICK  */
+  ARM_FP_MODEL_VFP		/* FPUTYPE_VFP  */
+};
+
+
+struct float_abi
+{
+  const char * name;
+  enum float_abi_type abi_type;
+};
+
+
+/* Available values for -mfloat-abi=.  */
+
+static const struct float_abi all_float_abis[] =
+{
+  {"soft",	ARM_FLOAT_ABI_SOFT},
+  {"softfp",	ARM_FLOAT_ABI_SOFTFP},
+  {"hard",	ARM_FLOAT_ABI_HARD}
+};
+
 
 /* Return the number of bits set in VALUE.  */
 static unsigned
@@ -494,7 +507,7 @@ void
 arm_override_options (void)
 {
   unsigned i;
-  
+
   /* Set up the flags based on the cpu/architecture selected by the user.  */
   for (i = ARRAY_SIZE (arm_select); i--;)
     {
@@ -507,9 +520,19 @@ arm_override_options (void)
           for (sel = ptr->processors; sel->name != NULL; sel++)
             if (streq (ptr->string, sel->name))
               {
-		if (i == 2)
-		  tune_flags = sel->flags;
-		else
+		/* Determine the processor core for which we should
+		   tune code-generation.  */
+		if (/* -mcpu= is a sensible default.  */
+		    i == 0
+		    /* If -march= is used, and -mcpu= has not been used,
+		       assume that we should tune for a representative
+		       CPU from that architecture.  */
+		    || i == 1
+		    /* -mtune= overrides -mcpu= and -march=.  */
+		    || i == 2)
+		  arm_tune = (enum processor_type) (sel - ptr->processors);
+
+		if (i != 2)
 		  {
 		    /* If we have been given an architecture and a processor
 		       make sure that they are compatible.  We only generate
@@ -583,7 +606,7 @@ arm_override_options (void)
 	abort ();
 
       insn_flags = sel->flags;
-      
+
       /* Now check to see if the user has specified some command line
 	 switch that require certain abilities from the cpu.  */
       sought = 0;
@@ -653,12 +676,16 @@ arm_override_options (void)
 
 	  insn_flags = sel->flags;
 	}
+      if (arm_tune == arm_none)
+	arm_tune = (enum processor_type) (sel - all_cores);
     }
   
-  /* If tuning has not been specified, tune for whichever processor or
-     architecture has been selected.  */
-  if (tune_flags == 0)
-    tune_flags = insn_flags;
+  /* The processor for which we shoudl tune should now have been
+     chosen.  */
+  if (arm_tune == arm_none)
+    abort ();
+  
+  tune_flags = all_cores[(int)arm_tune].flags;
 
   /* Make sure that the processor choice does not conflict with any of the
      other command line choices.  */
@@ -759,54 +786,94 @@ arm_override_options (void)
   arm_is_6_or_7     = (((tune_flags & (FL_MODE26 | FL_MODE32))
 		       && !(tune_flags & FL_ARCH4))) != 0;
   arm_tune_xscale       = (tune_flags & FL_XSCALE) != 0;
-  arm_is_cirrus	    = (tune_flags & FL_CIRRUS) != 0;
   arm_arch_iwmmxt   = (insn_flags & FL_IWMMXT) != 0;
 
   if (TARGET_IWMMXT && (! TARGET_ATPCS))
     target_flags |= ARM_FLAG_ATPCS;    
 
-  if (arm_is_cirrus)
+  arm_fp_model = ARM_FP_MODEL_UNKNOWN;
+  if (target_fpu_name == NULL && target_fpe_name != NULL)
     {
-      arm_fpu_tune = FPUTYPE_MAVERICK;
-
-      /* Ignore -mhard-float if -mcpu=ep9312.  */
-      if (TARGET_HARD_FLOAT)
-	target_flags ^= ARM_FLAG_SOFT_FLOAT;
-    }
-  else
-    /* Default value for floating point code... if no co-processor
-       bus, then schedule for emulated floating point.  Otherwise,
-       assume the user has an FPA.
-       Note: this does not prevent use of floating point instructions,
-       -msoft-float does that.  */
-    arm_fpu_tune = (tune_flags & FL_CO_PROC) ? FPUTYPE_FPA : FPUTYPE_FPA_EMU3;
-  
-  if (target_fp_name)
-    {
-      if (streq (target_fp_name, "2"))
-	arm_fpu_arch = FPUTYPE_FPA_EMU2;
-      else if (streq (target_fp_name, "3"))
-	arm_fpu_arch = FPUTYPE_FPA_EMU3;
+      if (streq (target_fpe_name, "2"))
+	target_fpu_name = "fpe2";
+      else if (streq (target_fpe_name, "3"))
+	target_fpu_name = "fpe3";
       else
-	error ("invalid floating point emulation option: -mfpe-%s",
-	       target_fp_name);
+	error ("invalid floating point emulation option: -mfpe=%s",
+	       target_fpe_name);
+    }
+  if (target_fpu_name != NULL)
+    {
+      /* The user specified a FPU.  */
+      for (i = 0; i < ARRAY_SIZE (all_fpus); i++)
+	{
+	  if (streq (all_fpus[i].name, target_fpu_name))
+	    {
+	      arm_fpu_arch = all_fpus[i].fpu;
+	      arm_fpu_tune = arm_fpu_arch;
+	      arm_fp_model = fp_model_for_fpu[arm_fpu_arch];
+	      break;
+	    }
+	}
+      if (arm_fp_model == ARM_FP_MODEL_UNKNOWN)
+	error ("invalid floating point option: -mfpu=%s", target_fpu_name);
     }
   else
-    arm_fpu_arch = FPUTYPE_DEFAULT;
-  
-  if (TARGET_FPE)
     {
-      if (arm_fpu_tune == FPUTYPE_FPA_EMU3)
-	arm_fpu_tune = FPUTYPE_FPA_EMU2;
-      else if (arm_fpu_tune == FPUTYPE_MAVERICK)
-	warning ("-mfpe switch not supported by ep9312 target cpu - ignored.");
-      else if (arm_fpu_tune != FPUTYPE_FPA)
-	arm_fpu_tune = FPUTYPE_FPA_EMU2;
+#ifdef FPUTYPE_DEFAULT
+      /* Use the default is it is specified for this platform.  */
+      arm_fpu_arch = FPUTYPE_DEFAULT;
+      arm_fpu_tune = FPUTYPE_DEFAULT;
+#else
+      /* Pick one based on CPU type.  */
+      if ((insn_flags & FL_VFP) != 0)
+	arm_fpu_arch = FPUTYPE_VFP;
+      else if (insn_flags & FL_CIRRUS)
+	arm_fpu_arch = FPUTYPE_MAVERICK;
+      else
+	arm_fpu_arch = FPUTYPE_FPA_EMU2;
+#endif
+      if (tune_flags & FL_CO_PROC && arm_fpu_arch == FPUTYPE_FPA_EMU2)
+	arm_fpu_tune = FPUTYPE_FPA;
+      else
+	arm_fpu_tune = arm_fpu_arch;
+      arm_fp_model = fp_model_for_fpu[arm_fpu_arch];
+      if (arm_fp_model == ARM_FP_MODEL_UNKNOWN)
+	abort ();
     }
+
+  if (target_float_abi_name != NULL)
+    {
+      /* The user specified a FP ABI.  */
+      for (i = 0; i < ARRAY_SIZE (all_float_abis); i++)
+	{
+	  if (streq (all_float_abis[i].name, target_float_abi_name))
+	    arm_float_abi = all_float_abis[i].abi_type;
+	}
+      if (i == ARRAY_SIZE (all_float_abis))
+	error ("invalud floating point abi: -ffloat-abi=%s",
+	       target_float_abi_name);
+    }
+  else
+    {
+      /* Use soft-float target flag.  */
+      if (target_flags & ARM_FLAG_SOFT_FLOAT)
+	arm_float_abi = ARM_FLOAT_ABI_SOFT;
+      else
+	arm_float_abi = ARM_FLOAT_ABI_HARD;
+    }
+
+  if (arm_float_abi == ARM_FLOAT_ABI_SOFTFP)
+    sorry ("-mfloat-abi=softfp");
+  /* If soft-float is specified then don't use FPU.  */
+  if (TARGET_SOFT_FLOAT)
+    arm_fpu_arch = FPUTYPE_NONE;
   
   /* For arm2/3 there is no need to do any scheduling if there is only
      a floating point emulator, or we are doing software floating-point.  */
-  if ((TARGET_SOFT_FLOAT || arm_fpu_tune != FPUTYPE_FPA)
+  if ((TARGET_SOFT_FLOAT
+       || arm_fpu_tune == FPUTYPE_FPA_EMU2
+       || arm_fpu_tune == FPUTYPE_FPA_EMU3)
       && (tune_flags & FL_MODE32) == 0)
     flag_schedule_insns = flag_schedule_insns_after_reload = 0;
   
@@ -1067,8 +1134,8 @@ use_return_insn (int iscond)
 
   /* Can't be done if any of the FPA regs are pushed,
      since this also requires an insn.  */
-  if (TARGET_HARD_FLOAT)
-    for (regno = FIRST_ARM_FP_REGNUM; regno <= LAST_ARM_FP_REGNUM; regno++)
+  if (TARGET_HARD_FLOAT && TARGET_FPA)
+    for (regno = FIRST_FPA_REGNUM; regno <= LAST_FPA_REGNUM; regno++)
       if (regs_ever_live[regno] && !call_used_regs[regno])
 	return 0;
 
@@ -1972,15 +2039,14 @@ arm_return_in_memory (tree type)
 int
 arm_float_words_big_endian (void)
 {
-  if (TARGET_CIRRUS)
+  if (TARGET_MAVERICK)
     return 0;
 
   /* For FPA, float words are always big-endian.  For VFP, floats words
      follow the memory system mode.  */
 
-  if (TARGET_HARD_FLOAT)
+  if (TARGET_FPA)
     {
-      /* FIXME: TARGET_HARD_FLOAT currently implies FPA.  */
       return 1;
     }
 
@@ -2769,12 +2835,12 @@ arm_legitimate_index_p (enum machine_mode mode, rtx index, int strict_p)
   HOST_WIDE_INT range;
   enum rtx_code code = GET_CODE (index);
 
-  if (TARGET_HARD_FLOAT && GET_MODE_CLASS (mode) == MODE_FLOAT)
+  if (TARGET_HARD_FLOAT && TARGET_FPA && GET_MODE_CLASS (mode) == MODE_FLOAT)
     return (code == CONST_INT && INTVAL (index) < 1024
 	    && INTVAL (index) > -1024
 	    && (INTVAL (index) & 3) == 0);
 
-  if (TARGET_CIRRUS
+  if (TARGET_HARD_FLOAT && TARGET_MAVERICK
       && (GET_MODE_CLASS (mode) == MODE_FLOAT || mode == DImode))
     return (code == CONST_INT
 	    && INTVAL (index) < 255
@@ -3523,7 +3589,8 @@ arm_adjust_cost (rtx insn, rtx link, rtx dep, int cost)
 	 operand for INSN.  If we have a shifted input operand and the
 	 instruction we depend on is another ALU instruction, then we may
 	 have to account for an additional stall.  */
-      if (shift_opnum != 0 && attr_type == TYPE_NORMAL)
+      if (shift_opnum != 0
+	  && (attr_type == TYPE_ALU_SHIFT || attr_type == TYPE_ALU_SHIFT_REG))
 	{
 	  rtx shifted_operand;
 	  int opno;
@@ -4200,7 +4267,7 @@ nonimmediate_di_operand (rtx op, enum machine_mode mode)
   return FALSE;
 }
 
-/* Return TRUE for a valid operand of a DFmode operation when -msoft-float.
+/* Return TRUE for a valid operand of a DFmode operation when soft-float.
    Either: REG, SUBREG, CONST_DOUBLE or MEM(DImode_address).
    Note that this disallows MEM(REG+REG), but allows
    MEM(PRE/POST_INC/DEC(REG)).  */
@@ -5549,7 +5616,7 @@ arm_select_cc_mode (enum rtx_code op, rtx x, rtx y)
 	case LE:
 	case GT:
 	case GE:
-	  if (TARGET_CIRRUS)
+	  if (TARGET_HARD_FLOAT && TARGET_MAVERICK)
 	    return CCFPmode;
 	  return CCFPEmode;
 
@@ -8462,7 +8529,7 @@ arm_output_epilogue (int really_return)
 
       if (arm_fpu_arch == FPUTYPE_FPA_EMU2)
 	{
-	  for (reg = LAST_ARM_FP_REGNUM; reg >= FIRST_ARM_FP_REGNUM; reg--)
+	  for (reg = LAST_FPA_REGNUM; reg >= FIRST_FPA_REGNUM; reg--)
 	    if (regs_ever_live[reg] && !call_used_regs[reg])
 	      {
 		floats_offset += 12;
@@ -8472,9 +8539,9 @@ arm_output_epilogue (int really_return)
 	}
       else
 	{
-	  int start_reg = LAST_ARM_FP_REGNUM;
+	  int start_reg = LAST_FPA_REGNUM;
 
-	  for (reg = LAST_ARM_FP_REGNUM; reg >= FIRST_ARM_FP_REGNUM; reg--)
+	  for (reg = LAST_FPA_REGNUM; reg >= FIRST_FPA_REGNUM; reg--)
 	    {
 	      if (regs_ever_live[reg] && !call_used_regs[reg])
 		{
@@ -8575,16 +8642,16 @@ arm_output_epilogue (int really_return)
 
       if (arm_fpu_arch == FPUTYPE_FPA_EMU2)
 	{
-	  for (reg = FIRST_ARM_FP_REGNUM; reg <= LAST_ARM_FP_REGNUM; reg++)
+	  for (reg = FIRST_FPA_REGNUM; reg <= LAST_FPA_REGNUM; reg++)
 	    if (regs_ever_live[reg] && !call_used_regs[reg])
 	      asm_fprintf (f, "\tldfe\t%r, [%r], #12\n",
 			   reg, SP_REGNUM);
 	}
       else
 	{
-	  int start_reg = FIRST_ARM_FP_REGNUM;
+	  int start_reg = FIRST_FPA_REGNUM;
 
-	  for (reg = FIRST_ARM_FP_REGNUM; reg <= LAST_ARM_FP_REGNUM; reg++)
+	  for (reg = FIRST_FPA_REGNUM; reg <= LAST_FPA_REGNUM; reg++)
 	    {
 	      if (regs_ever_live[reg] && !call_used_regs[reg])
 		{
@@ -8995,7 +9062,7 @@ arm_compute_initial_elimination_offset (unsigned int from, unsigned int to)
       /* If the hard floating point registers are going to be
 	 used then they must be saved on the stack as well.
          Each register occupies 12 bytes of stack space.  */
-      for (reg = FIRST_ARM_FP_REGNUM; reg <= LAST_ARM_FP_REGNUM; reg++)
+      for (reg = FIRST_FPA_REGNUM; reg <= LAST_FPA_REGNUM; reg++)
 	if (regs_ever_live[reg] && ! call_used_regs[reg])
 	  call_saved_registers += 12;
 
@@ -9140,7 +9207,7 @@ arm_get_frame_size (void)
   /* Space for saved FPA registers.  */
   if (! IS_VOLATILE (func_type))
     {
-      for (regno = FIRST_ARM_FP_REGNUM; regno <= LAST_ARM_FP_REGNUM; regno++)
+      for (regno = FIRST_FPA_REGNUM; regno <= LAST_FPA_REGNUM; regno++)
       if (regs_ever_live[regno] && ! call_used_regs[regno])
 	entry_size += 12;
     }
@@ -9341,7 +9408,7 @@ arm_expand_prologue (void)
 	 function.  */
       if (arm_fpu_arch == FPUTYPE_FPA_EMU2)
 	{
-	  for (reg = LAST_ARM_FP_REGNUM; reg >= FIRST_ARM_FP_REGNUM; reg--)
+	  for (reg = LAST_FPA_REGNUM; reg >= FIRST_FPA_REGNUM; reg--)
 	    if (regs_ever_live[reg] && !call_used_regs[reg])
 	      {
 		insn = gen_rtx_PRE_DEC (XFmode, stack_pointer_rtx);
@@ -9353,9 +9420,9 @@ arm_expand_prologue (void)
 	}
       else
 	{
-	  int start_reg = LAST_ARM_FP_REGNUM;
+	  int start_reg = LAST_FPA_REGNUM;
 
-	  for (reg = LAST_ARM_FP_REGNUM; reg >= FIRST_ARM_FP_REGNUM; reg--)
+	  for (reg = LAST_FPA_REGNUM; reg >= FIRST_FPA_REGNUM; reg--)
 	    {
 	      if (regs_ever_live[reg] && !call_used_regs[reg])
 		{
@@ -10333,8 +10400,8 @@ arm_hard_regno_mode_ok (unsigned int regno, enum machine_mode mode)
   /* The only registers left are the FPA registers
      which we only allow to hold FP values.  */
   return GET_MODE_CLASS (mode) == MODE_FLOAT
-    && regno >= FIRST_ARM_FP_REGNUM
-    && regno <= LAST_ARM_FP_REGNUM;
+    && regno >= FIRST_FPA_REGNUM
+    && regno <= LAST_FPA_REGNUM;
 }
 
 int
@@ -10557,13 +10624,13 @@ static const struct builtin_description bdesc_2arg[] =
   IWMMXT_BUILTIN2 (lshrv2si3_di,    WSRLW)
   IWMMXT_BUILTIN2 (lshrv2si3,       WSRLWI)
   IWMMXT_BUILTIN2 (lshrdi3_di,      WSRLD)
-  IWMMXT_BUILTIN2 (lshrdi3,         WSRLDI)
+  IWMMXT_BUILTIN2 (lshrdi3_iwmmxt,  WSRLDI)
   IWMMXT_BUILTIN2 (ashrv4hi3_di,    WSRAH)
   IWMMXT_BUILTIN2 (ashrv4hi3,       WSRAHI)
   IWMMXT_BUILTIN2 (ashrv2si3_di,    WSRAW)
   IWMMXT_BUILTIN2 (ashrv2si3,       WSRAWI)
   IWMMXT_BUILTIN2 (ashrdi3_di,      WSRAD)
-  IWMMXT_BUILTIN2 (ashrdi3,         WSRADI)
+  IWMMXT_BUILTIN2 (ashrdi3_iwmmxt,  WSRADI)
   IWMMXT_BUILTIN2 (rorv4hi3_di,     WRORH)
   IWMMXT_BUILTIN2 (rorv4hi3,        WRORHI)
   IWMMXT_BUILTIN2 (rorv2si3_di,     WRORW)
@@ -13044,6 +13111,8 @@ arm_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
 		     HOST_WIDE_INT vcall_offset ATTRIBUTE_UNUSED,
 		     tree function)
 {
+  static int thunk_label = 0;
+  char label[256];
   int mi_delta = delta;
   const char *const mi_op = mi_delta < 0 ? "sub" : "add";
   int shift = 0;
@@ -13051,6 +13120,14 @@ arm_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
                     ? 1 : 0);
   if (mi_delta < 0)
     mi_delta = - mi_delta;
+  if (TARGET_THUMB)
+    {
+      int labelno = thunk_label++;
+      ASM_GENERATE_INTERNAL_LABEL (label, "LTHUMBFUNC", labelno);
+      fputs ("\tldr\tr12, ", file);
+      assemble_name (file, label);
+      fputc ('\n', file);
+    }
   while (mi_delta != 0)
     {
       if ((mi_delta & (3 << shift)) == 0)
@@ -13064,11 +13141,22 @@ arm_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
           shift += 8;
         }
     }
-  fputs ("\tb\t", file);
-  assemble_name (file, XSTR (XEXP (DECL_RTL (function), 0), 0));
-  if (NEED_PLT_RELOC)
-    fputs ("(PLT)", file);
-  fputc ('\n', file);
+  if (TARGET_THUMB)
+    {
+      fprintf (file, "\tbx\tr12\n");
+      ASM_OUTPUT_ALIGN (file, 2);
+      assemble_name (file, label);
+      fputs (":\n", file);
+      assemble_integer (XEXP (DECL_RTL (function), 0), 4, BITS_PER_WORD, 1);
+    }
+  else
+    {
+      fputs ("\tb\t", file);
+      assemble_name (file, XSTR (XEXP (DECL_RTL (function), 0), 0));
+      if (NEED_PLT_RELOC)
+        fputs ("(PLT)", file);
+      fputc ('\n', file);
+    }
 }
 
 int
@@ -13131,3 +13219,117 @@ arm_output_load_gr (operands)
 
   return "";
 }
+
+/* Return non-zero if the CONSUMER instruction (a store) does not need
+   PRODUCER's value to calculate the address.  */
+
+int
+arm_no_early_store_addr_dep (rtx producer, rtx consumer)
+{
+  rtx value = PATTERN (producer);
+  rtx addr = PATTERN (consumer);
+
+  if (GET_CODE (value) == COND_EXEC)
+    value = COND_EXEC_CODE (value);
+  if (GET_CODE (value) == PARALLEL)
+    value = XVECEXP (value, 0, 0);
+  value = XEXP (value, 0);
+  if (GET_CODE (addr) == COND_EXEC)
+    addr = COND_EXEC_CODE (addr);
+  if (GET_CODE (addr) == PARALLEL)
+    addr = XVECEXP (addr, 0, 0);
+  addr = XEXP (addr, 0);
+  
+  return !reg_overlap_mentioned_p (value, addr);
+}
+
+/* Return non-zero if the CONSUMER instruction (an ALU op) does not
+   have an early register shift value or amount dependency on the
+   result of PRODUCER.  */
+
+int
+arm_no_early_alu_shift_dep (rtx producer, rtx consumer)
+{
+  rtx value = PATTERN (producer);
+  rtx op = PATTERN (consumer);
+  rtx early_op;
+
+  if (GET_CODE (value) == COND_EXEC)
+    value = COND_EXEC_CODE (value);
+  if (GET_CODE (value) == PARALLEL)
+    value = XVECEXP (value, 0, 0);
+  value = XEXP (value, 0);
+  if (GET_CODE (op) == COND_EXEC)
+    op = COND_EXEC_CODE (op);
+  if (GET_CODE (op) == PARALLEL)
+    op = XVECEXP (op, 0, 0);
+  op = XEXP (op, 1);
+  
+  early_op = XEXP (op, 0);
+  /* This is either an actual independent shift, or a shift applied to
+     the first operand of another operation.  We want the whole shift
+     operation.  */
+  if (GET_CODE (early_op) == REG)
+    early_op = op;
+
+  return !reg_overlap_mentioned_p (value, early_op);
+}
+
+/* Return non-zero if the CONSUMER instruction (an ALU op) does not
+   have an early register shift value dependency on the result of
+   PRODUCER.  */
+
+int
+arm_no_early_alu_shift_value_dep (rtx producer, rtx consumer)
+{
+  rtx value = PATTERN (producer);
+  rtx op = PATTERN (consumer);
+  rtx early_op;
+
+  if (GET_CODE (value) == COND_EXEC)
+    value = COND_EXEC_CODE (value);
+  if (GET_CODE (value) == PARALLEL)
+    value = XVECEXP (value, 0, 0);
+  value = XEXP (value, 0);
+  if (GET_CODE (op) == COND_EXEC)
+    op = COND_EXEC_CODE (op);
+  if (GET_CODE (op) == PARALLEL)
+    op = XVECEXP (op, 0, 0);
+  op = XEXP (op, 1);
+  
+  early_op = XEXP (op, 0);
+
+  /* This is either an actual independent shift, or a shift applied to
+     the first operand of another operation.  We want the value being
+     shifted, in either case.  */
+  if (GET_CODE (early_op) != REG)
+    early_op = XEXP (early_op, 0);
+  
+  return !reg_overlap_mentioned_p (value, early_op);
+}
+
+/* Return non-zero if the CONSUMER (a mul or mac op) does not
+   have an early register mult dependency on the result of
+   PRODUCER.  */
+
+int
+arm_no_early_mul_dep (rtx producer, rtx consumer)
+{
+  rtx value = PATTERN (producer);
+  rtx op = PATTERN (consumer);
+
+  if (GET_CODE (value) == COND_EXEC)
+    value = COND_EXEC_CODE (value);
+  if (GET_CODE (value) == PARALLEL)
+    value = XVECEXP (value, 0, 0);
+  value = XEXP (value, 0);
+  if (GET_CODE (op) == COND_EXEC)
+    op = COND_EXEC_CODE (op);
+  if (GET_CODE (op) == PARALLEL)
+    op = XVECEXP (op, 0, 0);
+  op = XEXP (op, 1);
+  
+  return (GET_CODE (op) == PLUS
+	  && !reg_overlap_mentioned_p (value, XEXP (op, 0)));
+}
+
