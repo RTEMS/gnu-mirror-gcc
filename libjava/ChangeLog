@@ -1,3 +1,38 @@
+2002-03-03  Bryce McKinlay  <bryce@waitaki.otago.ac.nz>
+
+	* Makefile.am: Use -bootclasspath, not -CLASSPATH.
+	* Makefile.in: Rebuilt.
+
+2002-03-03 Mark Wielaard <mark@klomp.org>
+
+	* java/util/Timer (TaskQueue.stop): set elements to zero.
+
+2002-02-28  Anthony Green  <green@redhat.com>
+
+	* java/lang/reflect/natMethod.cc (result): Add void* element.
+	(_Jv_CallAnyMethodA): Handle FFI_TYPE_POINTER arguments.  Move
+	constructor test.
+
+2002-02-26  Tom Tromey  <tromey@redhat.com>
+
+	* java/lang/natSystem.cc (init_properties): Use __VERSION__.
+	* gij.cc (version): Use __VERSION__.
+	* include/config.h.in: Rebuilt.
+	* acconfig.h (GCJVERSION): Removed.
+	* configure: Rebuilt.
+	* configure.in (GCJVERSION): Removed.
+
+2002-02-26  Andreas Schwab  <schwab@suse.de>
+
+	* acinclude.m4 (LIB_AC_PROG_CXX): Use glibjava_CXX instead of
+	glibcpp_CXX, since libjava uses even another CXX.
+	* aclocal.m4, configure: Regenerated.
+
+2002-02-26  Tom Tromey  <tromey@redhat.com>
+
+	* java/lang/natPosixProcess.cc (startProcess): Use FD_CLOEXEC, not
+	`1'.
+
 2002-02-25  Bryce McKinlay  <bryce@waitaki.otago.ac.nz>
 
 	* Makefile.am (GCJCOMPILE): Use -fCLASSPATH not -fclasspath. Fixes
