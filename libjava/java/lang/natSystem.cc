@@ -90,7 +90,7 @@ java::lang::System::arraycopy (jobject src, jint src_offset,
 			       jint count)
 {
   if (! src || ! dst)
-    _Jv_Throw (new NullPointerException);
+    throw new NullPointerException;
 
   jclass src_c = src->getClass();
   jclass dst_c = dst->getClass();
@@ -100,14 +100,14 @@ java::lang::System::arraycopy (jobject src, jint src_offset,
   if (! src_c->isArray() || ! dst_c->isArray()
       || src_comp->isPrimitive() != dst_comp->isPrimitive()
       || (src_comp->isPrimitive() && src_comp != dst_comp))
-    _Jv_Throw (new ArrayStoreException);
+    throw new ArrayStoreException;
 
   __JArray *src_a = (__JArray *) src;
   __JArray *dst_a = (__JArray *) dst;
   if (src_offset < 0 || dst_offset < 0 || count < 0
       || src_offset + count > src_a->length
       || dst_offset + count > dst_a->length)
-    _Jv_Throw (new ArrayIndexOutOfBoundsException);
+    throw new ArrayIndexOutOfBoundsException;
 
   // Do-nothing cases.
   if ((src == dst && src_offset == dst_offset)
@@ -149,7 +149,7 @@ java::lang::System::arraycopy (jobject src, jint src_offset,
 	{
 	  if (*src_elts
 	      && ! dst_comp->isAssignableFrom((*src_elts)->getClass()))
-	    _Jv_Throw (new ArrayStoreException);
+	    throw new ArrayStoreException;
 	  *dst_elts++ = *src_elts++;
 	}
     }
@@ -249,9 +249,11 @@ java::lang::System::getSystemTimeZone (void)
 
   mktime(tim = localtime(&current_time));
 #ifdef STRUCT_TM_HAS_GMTOFF
-  tzoffset = -(tim->tm_gmtoff);	// tm_gmtoff is secs EAST of UTC.
+  // tm_gmtoff is secs EAST of UTC.
+  tzoffset = -(tim->tm_gmtoff) + tim->tm_isdst * 3600L;
 #elif HAVE_TIMEZONE
-  tzoffset = timezone;		// timezone is secs WEST of UTC.
+  // timezone is secs WEST of UTC.
+  tzoffset = timezone;	
 #else
   // FIXME: there must be another global if neither tm_gmtoff nor timezone
   // is available, esp. if tzname is valid.

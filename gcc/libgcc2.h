@@ -25,15 +25,12 @@ Boston, MA 02111-1307, USA.  */
 typedef void (*__terminate_func_ptr)(void) __attribute__ ((__noreturn__));
 
 extern int __gcc_bcmp (const unsigned char *, const unsigned char *, size_t);
-extern void *__builtin_saveregs (void);
-extern void __dummy (void);
 extern void __clear_cache (char *, char *);
 extern void __pure_virtual (void) __attribute__ ((__noreturn__));
 extern void __terminate (void) __attribute__ ((__noreturn__));
 extern __terminate_func_ptr __terminate_set_func (__terminate_func_ptr);
 extern void __default_terminate (void) __attribute__ ((__noreturn__));
 extern void *__throw_type_match (void *, void *, void *);
-extern void __empty (void);
 extern void *__get_eh_context (void);
 extern void **__get_eh_info (void);
 extern void ***__get_dynamic_handler_chain (void);
@@ -97,7 +94,9 @@ typedef unsigned int USItype	__attribute__ ((mode (SI)));
 /* These typedefs are usually forbidden on archs with UNITS_PER_WORD 2 */
 typedef		 int DItype	__attribute__ ((mode (DI)));
 typedef unsigned int UDItype	__attribute__ ((mode (DI)));
-#if MIN_UNITS_PER_WORD > 4
+/* We cannot represent a TItype constant on a machine with 32-bit
+   HOST_WIDE_INTs, so it doesn't make sense to define these types.  */
+#if MIN_UNITS_PER_WORD > 4 && HOST_BITS_PER_WIDE_INT >= 64
 /* These typedefs are usually forbidden on archs with UNITS_PER_WORD 4 */
 typedef		 int TItype	__attribute__ ((mode (TI)));
 typedef unsigned int UTItype	__attribute__ ((mode (TI)));
@@ -156,7 +155,9 @@ typedef int word_type __attribute__ ((mode (__word__)));
 #define float bogus_type
 #define double bogus_type
 
-#if MIN_UNITS_PER_WORD > 4
+/* We can only support a Wtype that fits within a HOST_WIDE_INT.  Otherwise,
+   DWtype overflows the tree and RTL types.  */
+#if MIN_UNITS_PER_WORD > 4 && HOST_BITS_PER_WIDE_INT >= 64
 #define W_TYPE_SIZE (8 * BITS_PER_UNIT)
 #define Wtype	DItype
 #define UWtype	UDItype

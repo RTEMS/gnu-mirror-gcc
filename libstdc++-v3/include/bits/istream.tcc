@@ -44,24 +44,16 @@ namespace std {
 	  if (!__noskipws && (__in.flags() & ios_base::skipws))
 	    {	  
 	      const __int_type __eof = traits_type::eof();
-	      __int_type __c = __int_type(0);
-	      __streambuf_type* __sb = __in.rdbuf();
 	      const __ctype_type* __ctype = __in._M_get_fctype_ios();
-	      bool __testsp = true;
-	      bool __testeof = false;
+	      __streambuf_type* __sb = __in.rdbuf();
+	      __int_type __c = __sb->sgetc();
 	      
-	      while (!__testeof && __testsp)
-		{
-		  __c = __sb->sbumpc();
-		  __testeof = __c == __eof;
-		  __testsp = __ctype->is(ctype_base::space, __c);
-		}
-	      
-	      if (!__testeof && !__testsp)
-		__sb->sputbackc(__c);
+	      while (__c != __eof && __ctype->is(ctype_base::space, __c))
+		__c = __sb->snextc();
+
 #ifdef _GLIBCPP_RESOLVE_LIB_DEFECTS
 //195.  Should basic_istream::sentry's constructor ever set eofbit? 
-	      else
+	      if (__c == __eof)
 		__in.setstate(ios_base::eofbit);
 #endif
 	    }
@@ -81,20 +73,7 @@ namespace std {
     basic_istream<_CharT, _Traits>::
     operator>>(__istream_type& (*__pf)(__istream_type&))
     {
-      sentry __cerb(*this, false);
-      if (__cerb) 
-	{
-	  try {
-	    __pf(*this);
-	  }
-	  catch(exception& __fail){
-	    // 27.6.1.2.1 Common requirements.
-	    // Turn this on without causing an ios::failure to be thrown.
-	    this->setstate(ios_base::badbit);
-	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
-	  }
-	}
+      __pf(*this);
       return *this;
     }
 
@@ -103,20 +82,7 @@ namespace std {
     basic_istream<_CharT, _Traits>::
     operator>>(__ios_type& (*__pf)(__ios_type&))
     {
-      sentry __cerb(*this, false);
-      if (__cerb) 
-	{
-	  try {
-	    __pf(*this);
-	  }
-	  catch(exception& __fail){
-	    // 27.6.1.2.1 Common requirements.
-	    // Turn this on without causing an ios::failure to be thrown.
-	    this->setstate(ios_base::badbit);
-	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
-	  }
-	}
+      __pf(*this);
       return *this;
     }
   
@@ -125,20 +91,7 @@ namespace std {
     basic_istream<_CharT, _Traits>::
     operator>>(ios_base& (*__pf)(ios_base&))
     {
-      sentry __cerb(*this, false);
-      if (__cerb) 
-	{
-	  try {
-	    __pf(*this);
-	  }
-	  catch(exception& __fail){
-	    // 27.6.1.2.1 Common requirements.
-	    // Turn this on without causing an ios::failure to be thrown.
-	    this->setstate(ios_base::badbit);
-	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
-	  }
-	}
+      __pf(*this);
       return *this;
     }
   
@@ -151,7 +104,7 @@ namespace std {
       if (__cerb) 
 	{
 	  try {
-	    iostate __err = iostate(ios_base::goodbit);
+	    ios_base::iostate __err = ios_base::iostate(ios_base::goodbit);
 	    _M_fnumget->get(*this, 0, *this, __err, __n);
 	    this->setstate(__err);
 	  }
@@ -160,7 +113,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return *this;
@@ -175,7 +128,7 @@ namespace std {
       if (__cerb) 
 	{
 	  try {
-	    iostate __err = iostate(ios_base::goodbit);
+	    ios_base::iostate __err = ios_base::iostate(ios_base::goodbit);
 	    _M_fnumget->get(*this, 0, *this, __err, __n);
 	    this->setstate(__err);
 	  }
@@ -184,7 +137,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return *this;
@@ -199,7 +152,7 @@ namespace std {
       if (__cerb) 
 	{
 	  try {
-	    iostate __err = iostate(ios_base::goodbit);
+	    ios_base::iostate __err = ios_base::iostate(ios_base::goodbit);
 	    _M_fnumget->get(*this, 0, *this, __err, __n);
 	    this->setstate(__err);
 	  }
@@ -208,7 +161,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return *this;
@@ -223,7 +176,7 @@ namespace std {
       if (__cerb) 
 	{
 	  try {
-	    iostate __err = iostate(ios_base::goodbit);
+	    ios_base::iostate __err = ios_base::iostate(ios_base::goodbit);
 	    _M_fnumget->get(*this, 0, *this, __err, __n);
 	    this->setstate(__err);
 	  }
@@ -232,7 +185,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return *this;
@@ -247,7 +200,7 @@ namespace std {
       if (__cerb) 
 	{
 	  try {
-	    iostate __err = iostate(ios_base::goodbit);
+	    ios_base::iostate __err = ios_base::iostate(ios_base::goodbit);
 	    _M_fnumget->get(*this, 0, *this, __err, __n);
 	    this->setstate(__err);
 	  }
@@ -256,7 +209,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return *this;
@@ -271,7 +224,7 @@ namespace std {
       if (__cerb) 
 	{
 	  try {
-	    iostate __err = iostate(ios_base::goodbit);
+	    ios_base::iostate __err = ios_base::iostate(ios_base::goodbit);
 	    _M_fnumget->get(*this, 0, *this, __err, __n);
 	    this->setstate(__err);
 	  }
@@ -280,7 +233,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return *this;
@@ -295,7 +248,7 @@ namespace std {
       if (__cerb) 
 	{
 	  try {
-	    iostate __err = iostate(ios_base::goodbit);
+	    ios_base::iostate __err = ios_base::iostate(ios_base::goodbit);
 	    _M_fnumget->get(*this, 0, *this, __err, __n);
 	    this->setstate(__err);
 	  }
@@ -304,7 +257,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return *this;
@@ -320,7 +273,7 @@ namespace std {
       if (__cerb) 
 	{
 	  try {
-	    iostate __err = iostate(ios_base::goodbit);
+	    ios_base::iostate __err = ios_base::iostate(ios_base::goodbit);
 	    _M_fnumget->get(*this, 0, *this, __err, __n);
 	    this->setstate(__err);
 	  }
@@ -329,7 +282,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return *this;
@@ -344,7 +297,7 @@ namespace std {
       if (__cerb) 
 	{
 	  try {
-	    iostate __err = iostate(ios_base::goodbit);
+	    ios_base::iostate __err = ios_base::iostate(ios_base::goodbit);
 	    _M_fnumget->get(*this, 0, *this, __err, __n);
 	    this->setstate(__err);
 	  }
@@ -353,7 +306,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return *this;
@@ -369,7 +322,7 @@ namespace std {
       if (__cerb) 
 	{
 	  try {
-	    iostate __err = iostate(ios_base::goodbit);
+	    ios_base::iostate __err = ios_base::iostate(ios_base::goodbit);
 	    _M_fnumget->get(*this, 0, *this, __err, __n);
 	    this->setstate(__err);
 	  }
@@ -378,7 +331,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return *this;
@@ -393,7 +346,7 @@ namespace std {
       if (__cerb) 
 	{
 	  try {
-	    iostate __err = iostate(ios_base::goodbit);
+	    ios_base::iostate __err = ios_base::iostate(ios_base::goodbit);
 	    _M_fnumget->get(*this, 0, *this, __err, __n);
 	    this->setstate(__err);
 	  }
@@ -402,7 +355,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return *this;
@@ -417,7 +370,7 @@ namespace std {
       if (__cerb) 
 	{
 	  try {
-	    iostate __err = iostate(ios_base::goodbit);
+	    ios_base::iostate __err = ios_base::iostate(ios_base::goodbit);
 	    _M_fnumget->get(*this, 0, *this, __err, __n);
 	    this->setstate(__err);
 	  }
@@ -426,7 +379,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return *this;
@@ -441,7 +394,7 @@ namespace std {
       if (__cerb) 
 	{
 	  try {
-	    iostate __err = iostate(ios_base::goodbit);
+	    ios_base::iostate __err = ios_base::iostate(ios_base::goodbit);
 	    _M_fnumget->get(*this, 0, *this, __err, __n);
 	    this->setstate(__err);
 	  }
@@ -450,7 +403,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return *this;
@@ -495,7 +448,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return __c;
@@ -527,7 +480,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return *this;
@@ -568,7 +521,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       *__s = char_type(NULL);
@@ -664,7 +617,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       *__s = char_type(NULL);
@@ -708,7 +661,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return *this;
@@ -732,7 +685,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	} 
       return __c;
@@ -776,7 +729,7 @@ namespace std {
 		// Turn this on without causing an ios::failure to be thrown.
 		this->setstate(ios_base::badbit);
 		if ((this->exceptions() & ios_base::badbit) != 0)
-		  throw;
+		  __throw_exception_again;
 	      }
 	    }
 	}
@@ -813,7 +766,7 @@ namespace std {
 		// Turn this on without causing an ios::failure to be thrown.
 		this->setstate(ios_base::badbit);
 		if ((this->exceptions() & ios_base::badbit) != 0)
-		  throw;
+		  __throw_exception_again;
 	      }
 	    }
 	}
@@ -841,7 +794,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       else
@@ -869,7 +822,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       else
@@ -899,7 +852,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return __ret;
@@ -923,7 +876,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return __ret;
@@ -950,7 +903,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return *this;
@@ -976,7 +929,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    this->setstate(ios_base::badbit);
 	    if ((this->exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       return *this;
@@ -988,7 +941,7 @@ namespace std {
     operator>>(basic_istream<_CharT, _Traits>& __in, _CharT& __c)
     {
       typedef basic_istream<_CharT, _Traits> 		__istream_type;
-      __istream_type::sentry __cerb(__in, false);
+      typename __istream_type::sentry __cerb(__in, false);
       if (__cerb)
 	{
 	  try {
@@ -999,7 +952,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    __in.setstate(ios_base::badbit);
 	    if ((__in.exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       else
@@ -1016,16 +969,16 @@ namespace std {
       typedef typename _Traits::int_type 		int_type;
       typedef _CharT                     		char_type;
       typedef ctype<_CharT>     			__ctype_type;
-      int_type __extracted = 0;
+      streamsize __extracted = 0;
 
-      __istream_type::sentry __cerb(__in, false);
+      typename __istream_type::sentry __cerb(__in, false);
       if (__cerb)
 	{
 	  try {
 	    // Figure out how many characters to extract.
-	    int_type __num = static_cast<int_type>(__in.width());
-	    if (__num <= 0)
-	      __num = basic_string<_CharT, _Traits>::npos;
+	    streamsize __num = __in.width();
+	    if (__num == 0)
+	      __num = numeric_limits<streamsize>::max();
 
 	    __streambuf_type* __sb = __in.rdbuf();
 	    const __ctype_type* __ctype = __in._M_get_fctype_ios();
@@ -1059,7 +1012,7 @@ namespace std {
 	    // Turn this on without causing an ios::failure to be thrown.
 	    __in.setstate(ios_base::badbit);
 	    if ((__in.exceptions() & ios_base::badbit) != 0)
-	      throw;
+	      __throw_exception_again;
 	  }
 	}
       if (!__extracted)
@@ -1113,9 +1066,9 @@ namespace std {
       typedef typename __istream_type::__ctype_type 	__ctype_type;
       typedef basic_string<_CharT, _Traits, _Alloc> 	__string_type;
       typedef typename __string_type::size_type		__size_type;
-      __int_type __extracted = 0;
+      __size_type __extracted = 0;
 
-      __istream_type::sentry __cerb(__in, false);
+      typename __istream_type::sentry __cerb(__in, false);
       if (__cerb) 
 	{
 	  __str.erase();
@@ -1166,7 +1119,7 @@ namespace std {
 
       __size_type __extracted = 0;
       bool __testdelim = false;
-      __istream_type::sentry __cerb(__in, true);
+      typename __istream_type::sentry __cerb(__in, true);
       if (__cerb) 
 	{
 	  __str.erase();
@@ -1206,17 +1159,4 @@ namespace std {
 // Local Variables:
 // mode:C++
 // End:
-
-
-
-
-
-
-
-
-
-
-
-
-
 

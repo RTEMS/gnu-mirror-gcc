@@ -1213,9 +1213,6 @@ extern struct alpha_compare alpha_compare;
 
 struct machine_function
 {
-  /* An offset to apply to the stack pointer when unwinding from EH.  */
-  struct rtx_def *eh_epilogue_sp_ofs;
-
   /* If non-null, this rtx holds the return address for the function.  */
   struct rtx_def *ra_rtx;
 };
@@ -1342,6 +1339,13 @@ do {						\
 /* Before the prologue, RA lives in $26. */
 #define INCOMING_RETURN_ADDR_RTX  gen_rtx_REG (Pmode, 26)
 #define DWARF_FRAME_RETURN_COLUMN DWARF_FRAME_REGNUM (26)
+
+/* Describe how we implement __builtin_eh_return.  */
+#define EH_RETURN_DATA_REGNO(N)	((N) < 4 ? (N) + 16 : INVALID_REGNUM)
+#define EH_RETURN_STACKADJ_RTX	gen_rtx_REG (Pmode, 28)
+#define EH_RETURN_HANDLER_RTX \
+  gen_rtx_MEM (Pmode, plus_constant (stack_pointer_rtx, \
+				     current_function_outgoing_args_size))
 
 /* Addressing modes, and classification of registers for them.  */
 
@@ -1925,15 +1929,6 @@ do {									\
       }
 
 /* Control the assembler format that we output.  */
-
-/* We don't emit these labels, so as to avoid getting linker errors about
-   missing exception handling info.  If we emit a gcc_compiled. label into
-   text, and the file has no code, then the DEC assembler gives us a zero
-   sized text section with no associated exception handling info.  The
-   DEC linker sees this text section, and gives a warning saying that
-   the exception handling info is missing.  */
-#define ASM_IDENTIFY_GCC(x)
-#define ASM_IDENTIFY_LANGUAGE(x)
 
 /* Output to assembler file text saying following lines
    may contain character constants, extra white space, comments, etc.  */

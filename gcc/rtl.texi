@@ -496,6 +496,13 @@ once.  Stored in the @code{used} field.
 In a @code{symbol_ref}, this is used as a flag for machine-specific purposes.
 Stored in the @code{volatil} field and printed as @samp{/v}.
 
+@findex SYMBOL_REF_WEAK
+@cindex @code{symbol_ref} and @samp{/i}
+@cindex @code{integrated}, in @code{symbol_ref}
+@item SYMBOL_REF_WEAK (@var{x})
+In a @code{symbol_ref}, indicates that @var{x} has been declared weak.
+Stored in the @code{integrated} field and printed as @samp{/i}.
+
 @findex LABEL_OUTSIDE_LOOP_P
 @cindex @code{label_ref} and @samp{/s}
 @cindex @code{in_struct}, in @code{label_ref}
@@ -2490,14 +2497,15 @@ recorded as a @code{jump_insn}.
 accessed in the same way and in addition contain a field
 @code{JUMP_LABEL} which is defined once jump optimization has completed.
 
-For simple conditional and unconditional jumps, this field contains the
-@code{code_label} to which this insn will (possibly conditionally)
+For simple conditional and unconditional jumps, this field contains
+the @code{code_label} to which this insn will (possibly conditionally)
 branch.  In a more complex jump, @code{JUMP_LABEL} records one of the
-labels that the insn refers to; the only way to find the others
-is to scan the entire body of the insn.
+labels that the insn refers to; the only way to find the others is to
+scan the entire body of the insn.  In an @code{addr_vec},
+@code{JUMP_LABEL} is @code{NULL_RTX}.
 
-Return insns count as jumps, but since they do not refer to any labels,
-they have zero in the @code{JUMP_LABEL} field.
+Return insns count as jumps, but since they do not refer to any
+labels, their @code{JUMP_LABEL} is @code{NULL_RTX}.
 
 @findex call_insn
 @item call_insn
@@ -2511,12 +2519,25 @@ unpredictably.
 accessed in the same way and in addition contain a field
 @code{CALL_INSN_FUNCTION_USAGE}, which contains a list (chain of
 @code{expr_list} expressions) containing @code{use} and @code{clobber}
-expressions that denote hard registers used or clobbered by the called
-function.  A register specified in a @code{clobber} in this list is
-modified @emph{after} the execution of the @code{call_insn}, while a
-register in a @code{clobber} in the body of the @code{call_insn} is
-clobbered before the insn completes execution.  @code{clobber}
-expressions in this list augment registers specified in
+expressions that denote hard registers and @code{MEM}s used or
+clobbered by the called function.
+
+A @code{MEM} generally points to a stack slots in which arguments passed
+to the libcall by reference (@pxref{Register Arguments,
+FUNCTION_ARG_PASS_BY_REFERENCE}) are stored.  If the argument is
+caller-copied (@pxref{Register Arguments, FUNCTION_ARG_CALLEE_COPIES}),
+the stack slot will be mentioned in @code{CLOBBER} and @code{USE}
+entries; if it's callee-copied, only a @code{USE} will appear, and the
+@code{MEM} may point to addresses that are not stack slots.  These
+@code{MEM}s are used only in libcalls, because, unlike regular function
+calls, @code{CONST_CALL}s (which libcalls generally are, @pxref{Flags,
+CONST_CALL_P}) aren't assumed to read and write all memory, so flow
+would consider the stores dead and remove them.  Note that, since a
+libcall must never return values in memory (@pxref{Aggregate Return,
+RETURN_IN_MEMORY}), there will never be a @code{CLOBBER} for a memory
+address holding a return value.
+
+@code{CLOBBER}ed registers in this list augment registers specified in
 @code{CALL_USED_REGISTERS} (@pxref{Register Basics}).
 
 @findex code_label

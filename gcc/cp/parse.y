@@ -733,6 +733,7 @@ datadef:
 	| error ';'
 	| error '}'
 	| ';'
+	| bad_decl
 	;
 
 ctor_initializer_opt:
@@ -1290,11 +1291,14 @@ new_initializer:
 		}
 	/* GNU extension so people can use initializer lists.  Note that
 	   this alters the meaning of `new int = 1', which was previously
-	   syntactically valid but semantically invalid.  */
+	   syntactically valid but semantically invalid.  
+           This feature is now deprecated and will be removed in a future
+           release.  */
 	| '=' init
 		{
 		  if (pedantic)
 		    pedwarn ("ISO C++ forbids initialization of new expression with `='");
+		  cp_deprecated ("new initializer lists extension");
 		  if (TREE_CODE ($2) != TREE_LIST
 		      && TREE_CODE ($2) != CONSTRUCTOR)
 		    $$ = build_tree_list (NULL_TREE, $2);
@@ -1324,8 +1328,8 @@ cast_expr:
 		  tree init = build_nt (CONSTRUCTOR, NULL_TREE,
 					nreverse ($3)); 
 		  if (pedantic)
-		    pedwarn ("ISO C++ forbids constructor-expressions");
-		  /* Indicate that this was a GNU C constructor expression.  */
+		    pedwarn ("ISO C++ forbids compound literals");
+		  /* Indicate that this was a C99 compound literal.  */
 		  TREE_HAS_CONSTRUCTOR (init) = 1;
 
 		  $$ = reparse_absdcl_as_casts ($$, init);
@@ -2225,7 +2229,8 @@ structsp:
 		{ $<ttype>$ = current_enum_type;
 		  current_enum_type = start_enum ($2); }
 	  enumlist_opt '}'
-		{ $$.t = finish_enum (current_enum_type);
+		{ $$.t = current_enum_type;
+		  finish_enum (current_enum_type);
 		  $$.new_type_flag = 1;
 		  current_enum_type = $<ttype>4;
 		  check_for_missing_semicolon ($$.t); }
@@ -2233,7 +2238,8 @@ structsp:
 		{ $<ttype>$ = current_enum_type;
 		  current_enum_type = start_enum (make_anon_name ()); }
 	  enumlist_opt '}'
-                { $$.t = finish_enum (current_enum_type);
+                { $$.t = current_enum_type;
+		  finish_enum (current_enum_type);
 		  $$.new_type_flag = 1;
 		  current_enum_type = $<ttype>3;
 		  check_for_missing_semicolon ($$.t); }
@@ -2579,6 +2585,8 @@ component_decl:
 		  $$ = finish_member_class_template ($2.t); 
 		  finish_template_decl ($1);
 		}
+	| bad_decl
+		{ $$ = NULL_TREE; }
 	;
 
 component_decl_1:
@@ -3748,6 +3756,26 @@ bad_parm:
 		    cp_error ("  perhaps you want `typename %E' to make it a type", $$);
 		  $$ = build_tree_list (integer_type_node, $$);
 		}
+	;
+
+bad_decl:
+          IDENTIFIER template_arg_list_ignore IDENTIFIER arg_list_ignore ';'
+		{
+                  cp_error("'%D' is used as a type, but is not defined as a type.", $1);
+                  $3 = error_mark_node;
+		}
+        ;
+
+template_arg_list_ignore:
+          '<' template_arg_list_opt template_close_bracket
+		{ }
+	| /* empty */
+	;
+
+arg_list_ignore:
+          '(' nonnull_exprlist ')'
+		{ }
+	| /* empty */
 	;
 
 exception_specification_opt:
