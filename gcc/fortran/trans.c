@@ -1,29 +1,29 @@
 /* Code translation -- generate GCC trees from gfc_code.
-   Copyright (C) 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Paul Brook
 
-This file is part of GNU G95.
+This file is part of GCC.
 
-GNU G95 is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2, or (at your option)
-any later version.
+GCC is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2, or (at your option) any later
+version.
 
-GNU G95 is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+GCC is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU G95; see the file COPYING.  If not, write to
-the Free Software Foundation, 59 Temple Place - Suite 330,
-Boston, MA 02111-1307, USA.  */
+along with GCC; see the file COPYING.  If not, write to the Free
+Software Foundation, 59 Temple Place - Suite 330, Boston, MA
+02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
 #include "tree.h"
-#include "tree-simple.h"
+#include "tree-gimple.h"
 #include <stdio.h>
 #include "ggc.h"
 #include "toplev.h"
@@ -63,7 +63,7 @@ gfc_advance_chain (tree t, int n)
 }
 
 
-/* Wrap a node in a TREE_LIST node and add it th the end of a list.  */
+/* Wrap a node in a TREE_LIST node and add it to the end of a list.  */
 
 tree
 gfc_chainon_list (tree list, tree add)
@@ -146,7 +146,17 @@ gfc_add_modify_expr (stmtblock_t * pblock, tree lhs, tree rhs)
 {
   tree tmp;
 
-  tmp = fold (build_v (MODIFY_EXPR, lhs, rhs));
+#ifdef ENABLE_CHECKING
+  /* Make sure that the types of the rhs and the lhs are the same
+     for scalar assignments.  We should probably have something
+     similar for aggregates, but right now removing that check just
+     breaks everything.  */
+  if (TREE_TYPE (rhs) != TREE_TYPE (lhs)
+      && !AGGREGATE_TYPE_P (TREE_TYPE (lhs)))
+    abort ();
+#endif
+
+  tmp = fold (build2_v (MODIFY_EXPR, lhs, rhs));
   gfc_add_expr_to_block (pblock, tmp);
 }
 
@@ -215,7 +225,10 @@ gfc_finish_block (stmtblock_t * stmtblock)
   tree expr;
   tree block;
 
-  expr = rationalize_compound_expr (stmtblock->head);
+  expr = stmtblock->head;
+  if (!expr)
+    expr = build_empty_stmt ();
+
   stmtblock->head = NULL_TREE;
 
   if (stmtblock->has_scope)
@@ -225,7 +238,7 @@ gfc_finish_block (stmtblock_t * stmtblock)
       if (decl)
 	{
 	  block = poplevel (1, 0, 0);
-	  expr = build_v (BIND_EXPR, decl, expr, block);
+	  expr = build3_v (BIND_EXPR, decl, expr, block);
 	}
       else
 	poplevel (0, 0, 0);
@@ -303,7 +316,7 @@ gfc_build_array_ref (tree base, tree offset)
   if (DECL_P (base))
     TREE_ADDRESSABLE (base) = 1;
 
-  return build (ARRAY_REF, type, base, offset);
+  return build4 (ARRAY_REF, type, base, offset, NULL_TREE, NULL_TREE);
 }
 
 
@@ -317,7 +330,8 @@ gfc_build_function_call (tree fndecl, tree arglist)
   tree call;
 
   fn = gfc_build_addr_expr (NULL, fndecl);
-  call = build (CALL_EXPR, TREE_TYPE (TREE_TYPE (fndecl)), fn, arglist, NULL);
+  call = build3 (CALL_EXPR, TREE_TYPE (TREE_TYPE (fndecl)), 
+		 fn, arglist, NULL);
   TREE_SIDE_EFFECTS (call) = 1;
 
   return call;
@@ -352,7 +366,7 @@ gfc_trans_runtime_check (tree cond, tree msg, stmtblock_t * pblock)
   tmp = gfc_build_addr_expr (pchar_type_node, gfc_strconst_current_filename);
   args = gfc_chainon_list (args, tmp);
 
-  tmp = build_int_2 (input_line, 0);
+  tmp = build_int_cst (NULL_TREE, input_line);
   args = gfc_chainon_list (args, tmp);
 
   tmp = gfc_build_function_call (gfor_fndecl_runtime_error, args);
@@ -366,18 +380,18 @@ gfc_trans_runtime_check (tree cond, tree msg, stmtblock_t * pblock)
     }
   else
     {
-      /* Tell the compiler that this isn't likley.  */
+      /* Tell the compiler that this isn't likely.  */
       tmp = gfc_chainon_list (NULL_TREE, cond);
       tmp = gfc_chainon_list (tmp, integer_zero_node);
       cond = gfc_build_function_call (built_in_decls[BUILT_IN_EXPECT], tmp);
 
-      tmp = build_v (COND_EXPR, cond, body, build_empty_stmt ());
+      tmp = build3_v (COND_EXPR, cond, body, build_empty_stmt ());
       gfc_add_expr_to_block (pblock, tmp);
     }
 }
 
 
-/* Add a statement to a bock.  */
+/* Add a statement to a block.  */
 
 void
 gfc_add_expr_to_block (stmtblock_t * block, tree expr)
@@ -387,10 +401,23 @@ gfc_add_expr_to_block (stmtblock_t * block, tree expr)
   if (expr == NULL_TREE || IS_EMPTY_STMT (expr))
     return;
 
-  expr = fold (expr);
+  if (TREE_CODE (expr) != STATEMENT_LIST)
+    expr = fold (expr);
+
   if (block->head)
-    block->head = build_v (COMPOUND_EXPR, block->head, expr);
+    {
+      if (TREE_CODE (block->head) != STATEMENT_LIST)
+	{
+	  tree tmp;
+
+	  tmp = block->head;
+	  block->head = NULL_TREE;
+	  append_to_statement_list (tmp, &block->head);
+	}
+      append_to_statement_list (expr, &block->head);
+    }
   else
+    /* Don't bother creating a list if we only have a single statement.  */
     block->head = expr;
 }
 
@@ -409,13 +436,18 @@ gfc_add_block_to_block (stmtblock_t * block, stmtblock_t * append)
 
 
 /* Get the current locus.  The structure may not be complete, and should
-   only be used with gfc_set_current_locus.  */
+   only be used with gfc_set_backend_locus.  */
 
 void
 gfc_get_backend_locus (locus * loc)
 {
-  loc->line = input_line - 1;
-  loc->file = gfc_current_backend_file;
+  loc->lb = gfc_getmem (sizeof (gfc_linebuf));    
+#ifdef USE_MAPPED_LOCATION
+  loc->lb->location = input_location; // FIXME adjust??
+#else
+  loc->lb->linenum = input_line - 1;
+#endif
+  loc->lb->file = gfc_current_backend_file;
 }
 
 
@@ -424,9 +456,13 @@ gfc_get_backend_locus (locus * loc)
 void
 gfc_set_backend_locus (locus * loc)
 {
-  input_line = loc->line + 1;
-  gfc_current_backend_file = loc->file;
-  input_filename = loc->file->filename;
+  gfc_current_backend_file = loc->lb->file;
+#ifdef USE_MAPPED_LOCATION
+  input_location = loc->lb->location;
+#else
+  input_line = loc->lb->linenum;
+  input_filename = loc->lb->file->filename;
+#endif
 }
 
 
@@ -443,7 +479,7 @@ gfc_trans_code (gfc_code * code)
 
   gfc_start_block (&block);
 
-  /* Translate statements one by one to SIMPLE trees until we reach
+  /* Translate statements one by one to GIMPLE trees until we reach
      the end of this gfc_code branch.  */
   for (; code; code = code->next)
     {
@@ -487,6 +523,10 @@ gfc_trans_code (gfc_code * code)
 
 	case EXEC_GOTO:
 	  res = gfc_trans_goto (code);
+	  break;
+
+	case EXEC_ENTRY:
+	  res = gfc_trans_entry (code);
 	  break;
 
 	case EXEC_PAUSE:
@@ -591,7 +631,11 @@ gfc_trans_code (gfc_code * code)
 
       if (res != NULL_TREE && ! IS_EMPTY_STMT (res))
 	{
-	  annotate_with_locus (res, input_location);
+	  if (TREE_CODE (res) == STATEMENT_LIST)
+	    annotate_all_with_locus (&res, input_location);
+	  else
+	    SET_EXPR_LOCATION (res, input_location);
+
 	  /* Add the new statemment to the block.  */
 	  gfc_add_expr_to_block (&block, res);
 	}
@@ -611,6 +655,12 @@ gfc_generate_code (gfc_namespace * ns)
   gfc_symbol *main_program = NULL;
   symbol_attribute attr;
 
+  if (ns->is_block_data)
+    {
+      gfc_generate_block_data (ns);
+      return;
+    }
+
   /* Main program subroutine.  */
   if (!ns->proc_name)
     {
@@ -623,6 +673,9 @@ gfc_generate_code (gfc_namespace * ns)
       attr.subroutine = 1;
       attr.access = ACCESS_PUBLIC;
       main_program->attr = attr;
+      /* Set the location to the first line of code.  */
+      if (ns->code)
+	main_program->declared_at = ns->code->loc;
       ns->proc_name = main_program;
       gfc_commit_symbols ();
     }
@@ -648,7 +701,7 @@ gfc_generate_module_code (gfc_namespace * ns)
       if (!n->proc_name)
         continue;
 
-      gfc_build_function_decl (n->proc_name);
+      gfc_create_function_decl (n);
     }
 
   for (n = ns->contained; n; n = n->sibling)
