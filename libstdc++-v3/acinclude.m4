@@ -937,6 +937,8 @@ dnl Define HAVE_MBSTATE_T if mbstate_t is not in wchar.h
 dnl
 dnl GLIBCPP_CHECK_WCHAR_T_SUPPORT
 AC_DEFUN(GLIBCPP_CHECK_WCHAR_T_SUPPORT, [
+  dnl Wide characters disabled by default.
+  enable_wchar_t=no
 
   dnl Test wchar.h for mbstate_t, which is needed for char_traits and
   dnl others even if wchar_t support is not on.
@@ -982,7 +984,7 @@ AC_DEFUN(GLIBCPP_CHECK_WCHAR_T_SUPPORT, [
     ac_wfuncs=no)
   
     dnl Checks for names injected into std:: by the c_std headers.
-    AC_CHECK_FUNCS(btowc wctob fgetwc fgetwc fgetws fputwc fputws fwide \
+    AC_CHECK_FUNCS(btowc wctob fgetwc fgetws fputwc fputws fwide \
     fwprintf fwscanf swprintf swscanf vfwprintf vfwscanf vswprintf vswscanf \
     vwprintf vwscanf wprintf wscanf getwc getwchar mbsinit mbrlen mbrtowc \
     mbsrtowcs wcsrtombs putwc putwchar ungetwc wcrtomb wcstod wcstof wcstol \
@@ -1027,18 +1029,15 @@ AC_DEFUN(GLIBCPP_CHECK_WCHAR_T_SUPPORT, [
   
     dnl At the moment, only enable wchar_t specializations if all the
     dnl above support is present.
-    AC_MSG_CHECKING([for enabled wchar_t specializations])
     if test x"$ac_isoC99_wchar_t" = xyes &&
        test x"$ac_XPG2_wchar_t" = xyes; then
-      AC_DEFINE(_GLIBCPP_USE_WCHAR_T)
-      AC_MSG_RESULT("yes")
-    else
-      AC_MSG_RESULT("no")
+       AC_DEFINE(_GLIBCPP_USE_WCHAR_T)
+       enable_wchar_t=yes 
     fi
-  else
-    dnl Wide characters disabled by the user. 
-    AC_MSG_WARN([wchar_t support disabled.])
   fi
+  AC_MSG_CHECKING([for enabled wchar_t specializations])
+  AC_MSG_RESULT($enable_wchar_t)	
+  AM_CONDITIONAL(GLIBCPP_TEST_WCHAR_T, test "$enable_wchar_t" = yes)	
 ])
 
 
@@ -1227,6 +1226,7 @@ AC_DEFUN(GLIBCPP_ENABLE_CLOCALE, [
       CMESSAGES_CC=config/locale/generic/messages_members.cc
       CMONEY_CC=config/locale/generic/monetary_members.cc
       CNUMERIC_CC=config/locale/generic/numeric_members.cc
+      CTIME_H=config/locale/generic/time_members.h
       CTIME_CC=config/locale/generic/time_members.cc
       CLOCALE_INTERNAL_H=config/locale/generic/c++locale_internal.h
       ;;
@@ -1261,6 +1261,7 @@ AC_DEFUN(GLIBCPP_ENABLE_CLOCALE, [
       CMESSAGES_CC=config/locale/gnu/messages_members.cc
       CMONEY_CC=config/locale/gnu/monetary_members.cc
       CNUMERIC_CC=config/locale/gnu/numeric_members.cc
+      CTIME_H=config/locale/gnu/time_members.h
       CTIME_CC=config/locale/gnu/time_members.cc
       CLOCALE_INTERNAL_H=config/locale/gnu/c++locale_internal.h
       ;;
@@ -1277,6 +1278,7 @@ AC_DEFUN(GLIBCPP_ENABLE_CLOCALE, [
       CMESSAGES_CC=config/locale/ieee_1003.1-2001/messages_members.cc
       CMONEY_CC=config/locale/generic/monetary_members.cc
       CNUMERIC_CC=config/locale/generic/numeric_members.cc
+      CTIME_H=config/locale/generic/time_members.h
       CTIME_CC=config/locale/generic/time_members.cc
       CLOCALE_INTERNAL_H=config/locale/generic/c++locale_internal.h
       ;;
@@ -1298,6 +1300,7 @@ AC_DEFUN(GLIBCPP_ENABLE_CLOCALE, [
   AC_SUBST(CLOCALE_H)
   AC_SUBST(CCODECVT_H)
   AC_SUBST(CMESSAGES_H)
+  AC_SUBST(CTIME_H)
   AC_LINK_FILES($CLOCALE_CC, src/c++locale.cc)
   AC_LINK_FILES($CCODECVT_CC, src/codecvt_members.cc)
   AC_LINK_FILES($CCOLLATE_CC, src/collate_members.cc)
@@ -1919,11 +1922,12 @@ if test x"$glibcpp_toolexecdir" = x"no"; then
   if test -n "$with_cross_host" &&
      test x"$with_cross_host" != x"no"; then
     glibcpp_toolexecdir='$(exec_prefix)/$(target_alias)'
-    glibcpp_toolexeclibdir='$(toolexecdir)/lib$(MULTISUBDIR)'
+    glibcpp_toolexeclibdir='$(toolexecdir)/lib'
   else
     glibcpp_toolexecdir='$(libdir)/gcc-lib/$(target_alias)'
-    glibcpp_toolexeclibdir='$(libdir)$(MULTISUBDIR)'
+    glibcpp_toolexeclibdir='$(libdir)'
   fi
+  glibcpp_toolexeclibdir=$glibcpp_toolexeclibdir/`$CC -print-multi-os-directory`
 fi
 
 AC_MSG_CHECKING([for install location])
