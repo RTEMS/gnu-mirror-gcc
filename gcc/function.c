@@ -3045,10 +3045,7 @@ purge_addressof_1 (loc, insn, force, store, ht)
       rtx sub, insns;
 
       if (GET_CODE (XEXP (x, 0)) != MEM)
-	{
-	  put_addressof_into_stack (x, ht);
-	  return true;
-	}
+	put_addressof_into_stack (x, ht);
 
       /* We must create a copy of the rtx because it was created by
 	 overwriting a REG rtx which is always shared.  */
@@ -4539,6 +4536,12 @@ assign_parms (fndecl)
 
 	  if (nregs > 0)
 	    {
+#if defined (REG_PARM_STACK_SPACE) && !defined (MAYBE_REG_PARM_STACK_SPACE)
+	      /* When REG_PARM_STACK_SPACE is nonzero, stack space for
+		 split parameters was allocated by our caller, so we
+		 won't be pushing it in the prolog.  */
+	      if (REG_PARM_STACK_SPACE (fndecl) == 0)
+#endif
 	      current_function_pretend_args_size
 		= (((nregs * UNITS_PER_WORD) + (PARM_BOUNDARY / BITS_PER_UNIT) - 1)
 		   / (PARM_BOUNDARY / BITS_PER_UNIT)
@@ -7646,19 +7649,8 @@ thread_prologue_and_epilogue_insns (f)
 		 that with a conditional return instruction.  */
 	      else if (condjump_p (jump))
 		{
-		  rtx ret, *loc;
-
-		  ret = SET_SRC (PATTERN (jump));
-		  if (GET_CODE (XEXP (ret, 1)) == LABEL_REF)
-		    loc = &XEXP (ret, 1);
-		  else
-		    loc = &XEXP (ret, 2);
-		  ret = gen_rtx_RETURN (VOIDmode);
-
-		  if (! validate_change (jump, loc, ret, 0))
+		  if (! redirect_jump (jump, 0, 0))
 		    continue;
-		  if (JUMP_LABEL (jump))
-		    LABEL_NUSES (JUMP_LABEL (jump))--;
 
 		  /* If this block has only one successor, it both jumps
 		     and falls through to the fallthru block, so we can't
