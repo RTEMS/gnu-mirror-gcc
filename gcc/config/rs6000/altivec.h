@@ -1,5 +1,5 @@
 /* PowerPC AltiVec include file.
-   Copyright (C) 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Aldy Hernandez (aldyh@redhat.com).
 
    This file is part of GCC.
@@ -117,6 +117,8 @@ extern int __altivec_link_error_invalid_argument ();
 #define vec_vxor vec_xor
 
 #ifdef __cplusplus
+
+extern "C++" {
 
 /* Prototypes for builtins that take literals and must always be
    inlined.  */
@@ -4697,22 +4699,8 @@ vec_vsubuhs (vector unsigned short a1, vector signed short a2)
   return (vector unsigned short) __builtin_altivec_vsubuhs ((vector signed short) a1, (vector signed short) a2);
 }
 
-/* vec_vsubuhs */
-
 inline vector unsigned short
-vec_vsubsuhs (vector signed short a1, vector unsigned short a2)
-{
-  return (vector unsigned short) __builtin_altivec_vsubuhs ((vector signed short) a1, (vector signed short) a2);
-}
-
-inline vector unsigned short
-vec_vsubsuhs (vector unsigned short a1, vector signed short a2)
-{
-  return (vector unsigned short) __builtin_altivec_vsubuhs ((vector signed short) a1, (vector signed short) a2);
-}
-
-inline vector unsigned short
-vec_vsubsuhs (vector unsigned short a1, vector unsigned short a2)
+vec_vsubuhs (vector unsigned short a1, vector unsigned short a2)
 {
   return (vector unsigned short) __builtin_altivec_vsubuhs ((vector signed short) a1, (vector signed short) a2);
 }
@@ -4728,19 +4716,19 @@ vec_vsubsbs (vector signed char a1, vector signed char a2)
 /* vec_vsububs */
 
 inline vector unsigned char
-vec_vsubsubs (vector signed char a1, vector unsigned char a2)
+vec_vsububs (vector signed char a1, vector unsigned char a2)
 {
   return (vector unsigned char) __builtin_altivec_vsububs ((vector signed char) a1, (vector signed char) a2);
 }
 
 inline vector unsigned char
-vec_vsubsubs (vector unsigned char a1, vector signed char a2)
+vec_vsububs (vector unsigned char a1, vector signed char a2)
 {
   return (vector unsigned char) __builtin_altivec_vsububs ((vector signed char) a1, (vector signed char) a2);
 }
 
 inline vector unsigned char
-vec_vsubsubs (vector unsigned char a1, vector unsigned char a2)
+vec_vsububs (vector unsigned char a1, vector unsigned char a2)
 {
   return (vector unsigned char) __builtin_altivec_vsububs ((vector signed char) a1, (vector signed char) a2);
 }
@@ -6116,6 +6104,8 @@ struct __vec_step_help<vector float>
 };
 
 #define vec_step(t)  __vec_step_help<typeof(t)>::_S_elem
+
+}//extern "C++"
 
 #else /* not C++ */
 
@@ -8532,6 +8522,7 @@ __ch (__bin_args_eq (vector float, (a1), vector float, (a2)), \
 #define vec_any_numeric(a1) __builtin_altivec_vcmpeqfp_p (__CR6_EQ_REV, (a1), (a1))
 
 #define vec_any_out(a1, a2) __builtin_altivec_vcmpbfp_p (__CR6_EQ_REV, (a1), (a2))
+
 
 #endif /* __cplusplus */
 
