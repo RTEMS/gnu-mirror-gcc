@@ -38,10 +38,12 @@ exception statement from your version. */
 
 package java.beans;
 
-import gnu.java.beans.*;
-import java.util.*;
-import java.lang.reflect.*;
-import gnu.java.lang.*;
+import gnu.java.beans.BeanInfoEmbryo;
+import gnu.java.beans.ExplicitBeanInfo;
+import gnu.java.beans.IntrospectionIncubator;
+import java.util.Hashtable;
+import java.util.Vector;
+import gnu.java.lang.ClassHelper;
 
 /**
  * Introspector is the class that does the bulk of the
@@ -63,7 +65,7 @@ import gnu.java.lang.*;
  * When you call getBeanInfo(class c), the Introspector
  * first searches for BeanInfo class to see if you
  * provided any explicit information.  It searches for a
- * class named <bean class name>BeanInfo in different
+ * class named &lt;bean class name&gt;BeanInfo in different
  * packages, first searching the bean class's package
  * and then moving on to search the beanInfoSearchPath.<P>
  *
@@ -111,14 +113,14 @@ import gnu.java.lang.*;
  *     type &lt;type&gt;.  There may also be a
  *     <CODE>public &lt;type&gt;[] getXXX()</CODE> and a
  *     <CODE>public void setXXX(&lt;type&gt;)</CODE>
- *     method as well.</CODE></LI>
+ *     method as well.</LI>
  * <LI>If there is a
  *     <CODE>public void setXXX(int,&lt;type&gt;)</CODE>
  *     method, then it is a write-only indexed property of
  *     type &lt;type&gt;.  There may also be a
  *     <CODE>public &lt;type&gt;[] getXXX()</CODE> and a
  *     <CODE>public void setXXX(&lt;type&gt;)</CODE>
- *     method as well.</CODE></LI>
+ *     method as well.</LI>
  * <LI>If there is a
  *     <CODE>public &lt;type&gt; getXXX()</CODE> method,
  *     then XXX is a read-only property of type

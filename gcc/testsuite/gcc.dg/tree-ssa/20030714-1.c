@@ -1,12 +1,12 @@
 /* { dg-do compile } */
-/* { dg-options "-O1 -fdump-tree-dom2" } */
+/* { dg-options "-O1 -fdump-tree-dom3" } */
    
 struct rtx_def;
 typedef struct rtx_def *rtx;
 enum rtx_code
 {
   REG,
-  LAST_AND_UNUSED_RTX_CODE
+  LAST_AND_UNUSED_RTX_CODE = 256
 };
 typedef union rtunion_def rtunion;
 struct rtx_def
@@ -19,12 +19,12 @@ find_base_value (src)
      rtx src;
 {
   rtx temp;
-  rtx src_0;
-  rtx src_1;
+  rtx src_0, src_2;
+  rtx src_1, src_3;
 
-  if ((src_0->code == REG) && (({src_0;})->frame_related))
+  if ((src_0->code == REG) && (({src_2;})->frame_related))
     return find_base_value (src_0);
-  if ((src_1->code == REG) && (({ src_1;})->frame_related))
+  if ((src_1->code == REG) && (({ src_3;})->frame_related))
     return find_base_value (src_1);
   if (src_0->code == REG)
     find_base_value (src_0);
@@ -34,11 +34,10 @@ find_base_value (src)
 
 
 /* There should be six IF conditionals.  */
-/* { dg-final { scan-tree-dump-times "if " 6 "dom2"} } */
+/* { dg-final { scan-tree-dump-times "if " 6 "dom3"} } */
 
 /* There should be no casts to short unsigned int.  */
-/* { dg-final { scan-tree-dump-times "\\(short unsigned int\\)" 0 "dom2"} } */
+/* { dg-final { scan-tree-dump-times "\\(short unsigned int\\)" 0 "dom3"} } */
 
 /* There should be three loads of ->code.  */
-/* { dg-final { scan-tree-dump-times "->code" 3 "dom2"} } */
-                                                                                
+/* { dg-final { scan-tree-dump-times "->code" 3 "dom3"} } */

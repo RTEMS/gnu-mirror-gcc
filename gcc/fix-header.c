@@ -1,6 +1,6 @@
 /* fix-header.c - Make C header file suitable for C++.
    Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the
@@ -83,6 +83,14 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
 static void v_fatal (const char *, va_list)
      ATTRIBUTE_PRINTF (1,0) ATTRIBUTE_NORETURN;
 static void fatal (const char *, ...) ATTRIBUTE_PRINTF_1 ATTRIBUTE_NORETURN;
+
+#ifdef TARGET_EXTRA_INCLUDES
+static void hook_void_int(int u ATTRIBUTE_UNUSED) { }
+
+struct target_c_incpath_s target_c_incpath = { hook_void_int };
+#endif
+
+struct line_maps line_table;
 
 sstring buf;
 
@@ -267,7 +275,8 @@ tan\0tanh\0" },
      sigfillset sigismember sigpending sigprocmask sigsuspend"
      because these need sigset_t or struct sigaction.
      Most systems that provide them will also declare them.  */
-  { "signal.h", ANSI_SYMBOL, "kill\0raise\0" },
+  { "signal.h", ANSI_SYMBOL, "raise\0" },
+  { CONTINUED, POSIX1_SYMBOL, "kill\0" },
 
   { "stdio.h", ANSI_SYMBOL,
       "clearerr\0fclose\0feof\0ferror\0fflush\0fgetc\0fgetpos\0\
@@ -286,9 +295,10 @@ tmpnam\0ungetc\0" },
      Should perhaps also add NULL */
   { "stdlib.h", ANSI_SYMBOL,
       "abort\0abs\0atexit\0atof\0atoi\0atol\0bsearch\0calloc\0\
-exit\0free\0getenv\0labs\0malloc\0putenv\0qsort\0rand\0realloc\0\
+exit\0free\0getenv\0labs\0malloc\0qsort\0rand\0realloc\0\
 srand\0strtod\0strtol\0strtoul\0system\0" },
   { CONTINUED, ANSI_SYMBOL|MACRO_SYMBOL, "EXIT_FAILURE\0EXIT_SUCCESS\0" },
+  { CONTINUED, POSIX1_SYMBOL, "putenv\0" },
 
   { "string.h", ANSI_SYMBOL, "memchr\0memcmp\0memcpy\0memmove\0memset\0\
 strcat\0strchr\0strcmp\0strcoll\0strcpy\0strcspn\0strerror\0\
@@ -337,7 +347,8 @@ WTERMSIG\0WNOHANG\0WNOTRACED\0" },
       "cfgetispeed\0cfgetospeed\0cfsetispeed\0cfsetospeed\0tcdrain\0tcflow\0tcflush\0tcgetattr\0tcsendbreak\0tcsetattr\0" },
 
   { "time.h", ANSI_SYMBOL,
-      "asctime\0clock\0ctime\0difftime\0gmtime\0localtime\0mktime\0strftime\0time\0tzset\0" },
+      "asctime\0clock\0ctime\0difftime\0gmtime\0localtime\0mktime\0strftime\0time\0" },
+  { CONTINUED, POSIX1_SYMBOL, "tzset\0" },
 
   { "unistd.h", POSIX1_SYMBOL,
       "_exit\0access\0alarm\0chdir\0chown\0close\0ctermid\0cuserid\0\
@@ -593,7 +604,8 @@ read_scan_file (char *in_fname, int argc, char **argv)
 
   obstack_init (&scan_file_obstack);
 
-  scan_in = cpp_create_reader (CLK_GNUC89, NULL);
+  linemap_init (&line_table);
+  scan_in = cpp_create_reader (CLK_GNUC89, NULL, &line_table);
   cb = cpp_get_callbacks (scan_in);
   cb->file_change = cb_file_change;
 
@@ -604,9 +616,8 @@ read_scan_file (char *in_fname, int argc, char **argv)
   options->inhibit_errors = 1;
   cpp_post_options (scan_in);
 
-  if (!cpp_find_main_file (scan_in, in_fname))
+  if (!cpp_read_main_file (scan_in, in_fname))
     exit (FATAL_EXIT_CODE);
-  cpp_push_main_file (scan_in);
 
   cpp_change_file (scan_in, LC_RENAME, "<built-in>");
   cpp_init_builtins (scan_in, true);
@@ -623,12 +634,12 @@ read_scan_file (char *in_fname, int argc, char **argv)
 	      if (argv[i][2] != '\0')
 		{
 		  strings_processed = 1;
-		  add_path (xstrdup (argv[i] + 2), BRACKET, false);
+		  add_path (xstrdup (argv[i] + 2), BRACKET, false, false);
 		}
 	      else if (i + 1 != argc)
 		{
 		  strings_processed = 2;
-		  add_path (xstrdup (argv[i + 1]), BRACKET, false);
+		  add_path (xstrdup (argv[i + 1]), BRACKET, false, false);
 		}
 	    }
 	  else if (argv[i][1] == 'D')
@@ -1306,7 +1317,7 @@ static void
 fatal (const char *str, ...)
 {
   va_list ap;
-  
+
   va_start (ap, str);
   v_fatal (str, ap);
   va_end (ap);

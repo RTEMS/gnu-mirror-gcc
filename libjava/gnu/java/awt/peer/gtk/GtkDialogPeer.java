@@ -41,8 +41,10 @@ package gnu.java.awt.peer.gtk;
 import java.awt.AWTEvent;
 import java.awt.Component;
 import java.awt.Dialog;
-import java.awt.Insets;
+import java.awt.Graphics;
 import java.awt.peer.DialogPeer;
+import java.awt.Rectangle;
+import java.awt.event.PaintEvent;
 
 public class GtkDialogPeer extends GtkWindowPeer
   implements DialogPeer
@@ -51,17 +53,33 @@ public class GtkDialogPeer extends GtkWindowPeer
   {
     super (dialog);
   }
-
-  void initializeInsets ()
+  
+  public Graphics getGraphics ()
   {
-    synchronized (latestInsets)
-      {
-	insets = new Insets (latestInsets.top,
-			     latestInsets.left,
-			     latestInsets.bottom,
-			     latestInsets.right);
-      }
+    Graphics g;
+    if (GtkToolkit.useGraphics2D ())
+      g = new GdkGraphics2D (this);
+    else
+      g = new GdkGraphics (this);
+    g.translate (-insets.left, -insets.top);
+    return g;
+  }  
+  
+  protected void postMouseEvent(int id, long when, int mods, int x, int y, 
+				int clickCount, boolean popupTrigger)
+  {
+    super.postMouseEvent (id, when, mods, 
+			  x + insets.left, y + insets.top, 
+			  clickCount, popupTrigger);
   }
+
+  protected void postExposeEvent (int x, int y, int width, int height)
+  {
+    q.postEvent (new PaintEvent (awtComponent, PaintEvent.PAINT,
+				 new Rectangle (x + insets.left, 
+						y + insets.top, 
+						width, height)));
+  }  
 
   void create ()
   {

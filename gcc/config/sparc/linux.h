@@ -1,5 +1,5 @@
 /* Definitions for SPARC running Linux-based GNU systems with ELF.
-   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2002, 2003
+   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2002, 2003, 2004
    Free Software Foundation, Inc.
    Contributed by Eddie C. Dost (ecd@skynet.be)
 
@@ -219,9 +219,6 @@ do {									\
    SPARC ABI says that long double is 4 words.  */
 #define LONG_DOUBLE_TYPE_SIZE (TARGET_LONG_DOUBLE_128 ? 128 : 64)
 
-/* Constant which presents upper bound of the above value.  */
-#define MAX_LONG_DOUBLE_TYPE_SIZE 128
-
 /* Define this to set long double type size to use in libgcc2.c, which can
    not depend on target_flags.  */
 #ifdef __LONG_DOUBLE_128__
@@ -229,6 +226,9 @@ do {									\
 #else
 #define LIBGCC2_LONG_DOUBLE_TYPE_SIZE 64
 #endif
+
+#undef DITF_CONVERSION_LIBFUNCS
+#define DITF_CONVERSION_LIBFUNCS 1
 
 #if !defined(USE_GNULIBC_1) && defined(HAVE_LD_EH_FRAME_HDR)
 #define LINK_EH_SPEC "%{!static:--eh-frame-hdr} "
@@ -250,9 +250,20 @@ do {									\
 
 #define TARGET_ASM_FILE_END file_end_indicate_exec_stack
 
+/* Determine whether the the entire c99 runtime is present in the
+   runtime library.  */
+#define TARGET_C99_FUNCTIONS 1
+
+#define TARGET_HAS_F_SETLKW
+
 #undef LINK_GCC_C_SEQUENCE_SPEC
 #define LINK_GCC_C_SEQUENCE_SPEC \
   "%{static:--start-group} %G %L %{static:--end-group}%{!static:%G}"
+
+/* Use --as-needed -lgcc_s for eh support.  */
+#ifdef HAVE_LD_AS_NEEDED
+#define USE_LD_AS_NEEDED 1
+#endif
 
 /* Do code reading to identify a signal frame, and set the frame
    state data appropriately.  See unwind-dw2.c for the structs.  */

@@ -136,10 +136,7 @@ lang_specific_driver (int *in_argc, const char *const **in_argv,
 	    {
 	      library = -1;
 	    }
-	  else if (strcmp (argv[i], "-lm") == 0
-		   || strcmp (argv[i], "-lmath") == 0
-		   || strcmp (argv[i], MATH_LIBRARY) == 0
-		  )
+	  else if (strcmp (argv[i], MATH_LIBRARY) == 0)
 	    {
 	      args[i] |= MATHLIB;
 	      need_math = 0;
@@ -302,13 +299,6 @@ lang_specific_driver (int *in_argc, const char *const **in_argv,
     {
       arglist[j++] = saw_profile_flag ? LIBSTDCXX_PROFILE : LIBSTDCXX;
       added_libraries++;
-#ifdef USE_LIBUNWIND_EXCEPTIONS
-# ifndef LIBUNWIND
-#  define LIBUNWIND "-lunwind"
-# endif
-      arglist[j++] = LIBUNWIND;
-      added_libraries++;
-#endif
     }
   if (saw_math)
     arglist[j++] = saw_math;

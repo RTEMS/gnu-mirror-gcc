@@ -1,5 +1,6 @@
 /* Target macros for the FRV port of GCC.
-   Copyright (C) 1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004
+   Free Software Foundation, Inc.
    Contributed by Red Hat Inc.
 
    This file is part of GCC.
@@ -61,6 +62,32 @@
    Defined in svr4.h.  */
 #undef WORD_SWITCH_TAKES_ARG
 
+/* -fpic and -fPIC used to imply the -mlibrary-pic multilib, but with
+    FDPIC which multilib to use depends on whether FDPIC is in use or
+    not.  The trick we use is to introduce -multilib-library-pic as a
+    pseudo-flag that selects the library-pic multilib, and map fpic
+    and fPIC to it only if fdpic is not selected.  Also, if fdpic is
+    selected and no PIC/PIE options are present, we imply -fPIE.
+    Otherwise, if -fpic or -fPIC are enabled and we're optimizing for
+    speed, or if we have -On with n>=3, enable inlining of PLTs.  As
+    for -mgprel-ro, we want to enable it by default, but not for -fpic or
+    -fpie.  */
+
+#define DRIVER_SELF_SPECS SUBTARGET_DRIVER_SELF_SPECS \
+"%{mno-pack:\
+   %{!mhard-float:-msoft-float}\
+   %{!mmedia:-mno-media}}\
+ %{!mfdpic:%{fpic|fPIC: -multilib-library-pic}}\
+ %{mfdpic:%{!fpic:%{!fpie:%{!fPIC:%{!fPIE:\
+   	    %{!fno-pic:%{!fno-pie:%{!fno-PIC:%{!fno-PIE:-fPIE}}}}}}}} \
+	  %{!mno-inline-plt:%{O*:%{!O0:%{!Os:%{fpic|fPIC:-minline-plt} \
+                    %{!fpic:%{!fPIC:%{!O:%{!O1:%{!O2:-minline-plt}}}}}}}}} \
+	  %{!mno-gprel-ro:%{!fpic:%{!fpie:-mgprel-ro}}}} \
+"
+#ifndef SUBTARGET_DRIVER_SELF_SPECS
+# define SUBTARGET_DRIVER_SELF_SPECS
+#endif
+
 /* A C string constant that tells the GCC driver program options to pass to
    the assembler.  It can also specify how to translate options you give to GNU
    CC into options for GCC to pass to the assembler.  See the file `sun3.h'
@@ -82,6 +109,7 @@
     %{mmedia} %{mno-media} \
     %{mmuladd} %{mno-muladd} \
     %{mpack} %{mno-pack} \
+    %{mno-fdpic:-mnopic} %{mfdpic} \
     %{fpic|fpie: -mpic} %{fPIC|fPIE: -mPIC} %{mlibrary-pic}}"
 
 /* Another C string constant used much like `LINK_SPEC'.  The difference
@@ -123,7 +151,7 @@
 %{mcpu=tomcat: %(cpp_fr500)} \
 %{mcpu=simple: %(cpp_simple)} \
 %{!mcpu*: %(cpp_cpu_default)} \
-%{mno-media: -D__FRV_ACC__=0 %{msoft-float: -D__FRV_FPR__=0}} \
+%{mno-media: -U__FRV_ACC__ -D__FRV_ACC__=0 %{msoft-float: -U__FRV_FPR__ -D__FRV_FPR__=0}} \
 %{mhard-float: -D__FRV_HARD_FLOAT__} \
 %{msoft-float: -U__FRV_HARD_FLOAT__} \
 %{mgpr-32: -U__FRV_GPR__ -D__FRV_GPR__=32} \
@@ -175,7 +203,7 @@
 -D__FRV_GPR__=32 \
 -D__FRV_FPR__=0 \
 -D__FRV_ACC__=0 \
-%{mmedia: -D__FRV_ACC__=8} \
+%{mmedia: -U__FRV_ACC__ -D__FRV_ACC__=8} \
 %{mhard-float|mmedia: -D__FRV_FPR__=64}"
 
 #define MASK_DEFAULT_FRV	\
@@ -221,6 +249,7 @@
 #define LINK_SPEC "\
 %{h*} %{v:-V} \
 %{b} %{Wl,*:%*} \
+%{mfdpic:-melf32frvfd -z text} \
 %{static:-dn -Bstatic} \
 %{shared:-Bdynamic} \
 %{symbolic:-Bsymbolic} \
@@ -281,6 +310,9 @@
     {						\
       builtin_define ("__frv__");		\
       builtin_assert ("machine=frv");		\
+						\
+      if (TARGET_FDPIC)				\
+	builtin_define ("__FRV_FDPIC__");	\
     }						\
   while (0)
 
@@ -316,6 +348,7 @@ extern int target_flags;
 #define MASK_LIBPIC	     0x00000100	/* -fpic that can be linked w/o pic */
 #define MASK_ACC_4	     0x00000200	/* Only use four media accumulators */
 #define MASK_PACK	     0x00000400 /* Set to enable packed output */
+#define MASK_LINKED_FP	     0x00002000 /* Follow ABI linkage requirements.  */
 
 			 		/* put debug masks up high */
 #define MASK_DEBUG_ARG	     0x40000000	/* debug argument handling */
@@ -330,6 +363,9 @@ extern int target_flags;
 #define MASK_NO_VLIW_BRANCH  0x00200000	/* disable repacking branches */
 #define MASK_NO_MULTI_CE     0x00100000	/* disable multi-level cond exec */
 #define MASK_NO_NESTED_CE    0x00080000	/* disable nested cond exec */
+#define MASK_FDPIC           0x00040000	/* Follow the new uClinux ABI.  */
+#define MASK_INLINE_PLT      0x00020000 /* Inline FDPIC PLTs.  */
+#define MASK_GPREL_RO	     0x00010000 /* Use GPREL for read-only data.  */
 
 #define MASK_DEFAULT		MASK_DEFAULT_ALLOC_CC
 
@@ -355,7 +391,11 @@ extern int target_flags;
 #define TARGET_NO_VLIW_BRANCH	((target_flags & MASK_NO_VLIW_BRANCH) != 0)
 #define TARGET_NO_MULTI_CE	((target_flags & MASK_NO_MULTI_CE) != 0)
 #define TARGET_NO_NESTED_CE	((target_flags & MASK_NO_NESTED_CE) != 0)
+#define TARGET_FDPIC	        ((target_flags & MASK_FDPIC) != 0)
+#define TARGET_INLINE_PLT	((target_flags & MASK_INLINE_PLT) != 0)
+#define TARGET_GPREL_RO		((target_flags & MASK_GPREL_RO) != 0)
 #define TARGET_PACK		((target_flags & MASK_PACK) != 0)
+#define TARGET_LINKED_FP	((target_flags & MASK_LINKED_FP) != 0)
 
 #define TARGET_GPR_64		(! TARGET_GPR_32)
 #define TARGET_FPR_64		(! TARGET_FPR_32)
@@ -435,6 +475,7 @@ extern int target_flags;
  { "no-media",		 -MASK_MEDIA,		"Do not use media insns" }, \
  { "muladd",		  MASK_MULADD,		"Use multiply add/subtract instructions" }, \
  { "no-muladd",		 -MASK_MULADD,		"Do not use multiply add/subtract insns" }, \
+ { "ultilib-library-pic", 0,			"Link with the library-pic libraries" }, \
  { "library-pic",	  MASK_LIBPIC,		"PIC support for building libraries" }, \
  { "acc-4",		  MASK_ACC_4,		"Use 4 media accumulators" }, \
  { "acc-8",		 -MASK_ACC_4,		"Use 8 media accumulators" }, \
@@ -459,6 +500,14 @@ extern int target_flags;
  { "no-multi-cond-exec",  MASK_NO_MULTI_CE,	"Enable optimizing &&/|| in conditional execution" }, \
  { "nested-cond-exec",	 -MASK_NO_NESTED_CE,	"Enable nested conditional execution optimizations" }, \
  { "no-nested-cond-exec" ,MASK_NO_NESTED_CE,	"Disable nested conditional execution optimizations" }, \
+ { "linked-fp",		  MASK_LINKED_FP,	"Follow the EABI linkage requirements" }, \
+ { "no-linked-fp",	 -MASK_LINKED_FP,	"Don't follow the EABI linkage requirements" }, \
+ { "fdpic",	          MASK_FDPIC,		"Enable file descriptor PIC mode" }, \
+ { "no-fdpic",	         -MASK_FDPIC,		"Disable file descriptor PIC mode" }, \
+ { "inline-plt",	  MASK_INLINE_PLT,	"Enable inlining of PLT in function calls" }, \
+ { "no-inline-plt",	 -MASK_INLINE_PLT,	"Disable inlining of PLT in function calls" }, \
+ { "gprel-ro",		  MASK_GPREL_RO,	"Enable use of GPREL for read-only data in FDPIC" }, \
+ { "no-gprel-ro",	 -MASK_GPREL_RO,	"Disable use of GPREL for read-only data in FDPIC" }, \
  { "tomcat-stats",	  0, 			"Cause gas to print tomcat statistics" }, \
  { "",			  MASK_DEFAULT,		"" }}			    \
 
@@ -538,7 +587,7 @@ extern int target_flags;
 /* Define this macro if debugging can be performed even without a frame
    pointer.  If this macro is defined, GCC will turn on the
    `-fomit-frame-pointer' option whenever `-O' is specified.  */
-/* Frv needs a specific frame layout that includes the frame pointer */
+/* Frv needs a specific frame layout that includes the frame pointer.  */
 
 #define CAN_DEBUG_WITHOUT_FP
 
@@ -763,8 +812,12 @@ extern int target_flags;
 #define GPR_FP          (GPR_FIRST + 2)         /* Frame pointer */
 #define GPR_SP          (GPR_FIRST + 1)         /* Stack pointer */
 						/* small data register */
-#define SDA_BASE_REG    ((unsigned)(flag_pic ? PIC_REGNO : (GPR_FIRST+16)))
-#define PIC_REGNO       (GPR_FIRST + 17)        /* PIC register */
+#define SDA_BASE_REG    ((unsigned)(TARGET_FDPIC ? -1 : flag_pic ? PIC_REGNO : (GPR_FIRST + 16)))
+#define PIC_REGNO       (GPR_FIRST + (TARGET_FDPIC?15:17))        /* PIC register.  */
+#define FDPIC_FPTR_REGNO  (GPR_FIRST + 14)        /* uClinux PIC function pointer register.  */
+#define FDPIC_REGNO   (GPR_FIRST + 15)        /* uClinux PIC register.  */
+
+#define OUR_FDPIC_REG	get_hard_reg_initial_val (SImode, FDPIC_REGNO)
 
 #define FPR_FIRST       64			/* First FP reg */
 #define FPR_LAST        127			/* Last  FP reg */
@@ -878,7 +931,7 @@ extern int target_flags;
 #define LAST_ARG_REGNUM		(FIRST_ARG_REGNUM + FRV_NUM_ARG_REGS - 1)
 
 /* Registers used by the exception handling functions.  These should be
-   registers that are not otherwised used by the calling sequence.  */
+   registers that are not otherwise used by the calling sequence.  */
 #define FIRST_EH_REGNUM		14
 #define LAST_EH_REGNUM		15
 
@@ -1212,6 +1265,9 @@ enum reg_class
   CR_REGS,
   LCR_REG,
   LR_REG,
+  FDPIC_REGS,
+  FDPIC_FPTR_REGS,
+  FDPIC_CALL_REGS,
   SPR_REGS,
   QUAD_ACC_REGS,
   EVEN_ACC_REGS,
@@ -1246,6 +1302,9 @@ enum reg_class
    "CR_REGS",								\
    "LCR_REG",								\
    "LR_REG",								\
+   "FDPIC_REGS",							\
+   "FDPIC_FPTR_REGS",							\
+   "FDPIC_CALL_REGS",							\
    "SPR_REGS",								\
    "QUAD_ACC_REGS",							\
    "EVEN_ACC_REGS",							\
@@ -1281,6 +1340,9 @@ enum reg_class
   { 0x00000000,0x00000000,0x00000000,0x00000000,0x0000ff00,0x0}, /* CR_REGS  */\
   { 0x00000000,0x00000000,0x00000000,0x00000000,0x00000000,0x4}, /* LCR_REGS */\
   { 0x00000000,0x00000000,0x00000000,0x00000000,0x00000000,0x2}, /* LR_REGS  */\
+  { 0x00008000,0x00000000,0x00000000,0x00000000,0x00000000,0x0}, /* FDPIC_REGS */\
+  { 0x00004000,0x00000000,0x00000000,0x00000000,0x00000000,0x0}, /* FDPIC_FPTR_REGS */\
+  { 0x0000c000,0x00000000,0x00000000,0x00000000,0x00000000,0x0}, /* FDPIC_CALL_REGS */\
   { 0x00000000,0x00000000,0x00000000,0x00000000,0x00000000,0x6}, /* SPR_REGS */\
   { 0x00000000,0x00000000,0x00000000,0x00000000,0x00ff0000,0x0}, /* QUAD_ACC */\
   { 0x00000000,0x00000000,0x00000000,0x00000000,0x00ff0000,0x0}, /* EVEN_ACC */\
@@ -1489,9 +1551,9 @@ extern enum reg_class reg_class_from_letter[];
    input and `r' on the output.  The next alternative specifies `m' on the
    input and a register class that does not include r0 on the output.  */
 
-/* Small data references */
+/* 12-bit relocations.  */
 #define EXTRA_CONSTRAINT_FOR_Q(VALUE)					\
-  (small_data_symbolic_operand (VALUE, GET_MODE (VALUE)))
+  (got12_operand (VALUE, GET_MODE (VALUE)))
 
 /* Double word memory ops that take one instruction.  */
 #define EXTRA_CONSTRAINT_FOR_R(VALUE)					\
@@ -1798,58 +1860,10 @@ struct machine_function GTY(())
 #define RETURN_POPS_ARGS(FUNDECL, FUNTYPE, STACK_SIZE) 0
 
 
-/* Function Arguments in Registers.  */
-
-/* Nonzero if we do not know how to pass TYPE solely in registers.
-   We cannot do so in the following cases:
-
-   - if the type has variable size
-   - if the type is marked as addressable (it is required to be constructed
-     into the stack)
-   - if the type is a structure or union.  */
-
-#define MUST_PASS_IN_STACK(MODE,TYPE)                           \
-   (((MODE) == BLKmode)                                         \
-    || ((TYPE) != 0                                             \
-         && (TREE_CODE (TYPE_SIZE (TYPE)) != INTEGER_CST        \
-             || TREE_CODE (TYPE) == RECORD_TYPE                 \
-             || TREE_CODE (TYPE) == UNION_TYPE                  \
-             || TREE_CODE (TYPE) == QUAL_UNION_TYPE             \
-             || TREE_ADDRESSABLE (TYPE))))
-
 /* The number of register assigned to holding function arguments.  */
 
 #define FRV_NUM_ARG_REGS        6
 
-/* A C expression that controls whether a function argument is passed in a
-   register, and which register.
-
-   The arguments are CUM, of type CUMULATIVE_ARGS, which summarizes (in a way
-   defined by INIT_CUMULATIVE_ARGS and FUNCTION_ARG_ADVANCE) all of the previous
-   arguments so far passed in registers; MODE, the machine mode of the argument;
-   TYPE, the data type of the argument as a tree node or 0 if that is not known
-   (which happens for C support library functions); and NAMED, which is 1 for an
-   ordinary argument and 0 for nameless arguments that correspond to `...' in the
-   called function's prototype.
-
-   The value of the expression should either be a `reg' RTX for the hard
-   register in which to pass the argument, or zero to pass the argument on the
-   stack.
-
-   For machines like the VAX and 68000, where normally all arguments are
-   pushed, zero suffices as a definition.
-
-   The usual way to make the ANSI library `stdarg.h' work on a machine where
-   some arguments are usually passed in registers, is to cause nameless
-   arguments to be passed on the stack instead.  This is done by making
-   `FUNCTION_ARG' return 0 whenever NAMED is 0.
-
-   You may use the macro `MUST_PASS_IN_STACK (MODE, TYPE)' in the definition of
-   this macro to determine if this argument is of a type that must be passed in
-   the stack.  If `REG_PARM_STACK_SPACE' is not defined and `FUNCTION_ARG'
-   returns nonzero for such an argument, the compiler will abort.  If
-   `REG_PARM_STACK_SPACE' is defined, the argument will be computed in the
-   stack and then loaded into a register.  */
 #define FUNCTION_ARG(CUM, MODE, TYPE, NAMED)                    \
   frv_function_arg (&CUM, MODE, TYPE, NAMED, FALSE)
 
@@ -1887,19 +1901,6 @@ struct machine_function GTY(())
 
 /* extern int frv_function_arg_partial_nregs (CUMULATIVE_ARGS, int, Tree, int);  */
 
-/* A C expression that indicates when an argument must be passed by reference.
-   If nonzero for an argument, a copy of that argument is made in memory and a
-   pointer to the argument is passed instead of the argument itself.  The
-   pointer is passed in whatever way is appropriate for passing a pointer to
-   that type.
-
-   On machines where `REG_PARM_STACK_SPACE' is not defined, a suitable
-   definition of this macro might be
-        #define FUNCTION_ARG_PASS_BY_REFERENCE(CUM, MODE, TYPE, NAMED)  \
-          MUST_PASS_IN_STACK (MODE, TYPE)  */
-#define FUNCTION_ARG_PASS_BY_REFERENCE(CUM, MODE, TYPE, NAMED)		\
-  frv_function_arg_pass_by_reference (&CUM, MODE, TYPE, NAMED)
-
 /* If defined, a C expression that indicates when it is the called function's
    responsibility to make a copy of arguments passed by invisible reference.
    Normally, the caller makes a copy and passes the address of the copy to the
@@ -1910,12 +1911,6 @@ struct machine_function GTY(())
    otherwise a copy must be made.  */
 #define FUNCTION_ARG_CALLEE_COPIES(CUM, MODE, TYPE, NAMED)		\
   frv_function_arg_callee_copies (&CUM, MODE, TYPE, NAMED)
-
-/* If defined, a C expression that indicates when it is more desirable to keep
-   an argument passed by invisible reference as a reference, rather than
-   copying it to a pseudo register.  */
-#define FUNCTION_ARG_KEEP_AS_REFERENCE(CUM, MODE, TYPE, NAMED)		\
-  frv_function_arg_keep_as_reference (&CUM, MODE, TYPE, NAMED)
 
 /* A C type for declaring a variable that is used as the first argument of
    `FUNCTION_ARG' and other related values.  For some target machines, the type
@@ -1945,7 +1940,7 @@ struct machine_function GTY(())
    being processed.  Thus, each time this macro is called, either LIBNAME or
    FNTYPE is nonzero, but never both of them at once.  */
 
-#define INIT_CUMULATIVE_ARGS(CUM, FNTYPE, LIBNAME, FNDECL) \
+#define INIT_CUMULATIVE_ARGS(CUM, FNTYPE, LIBNAME, FNDECL, N_NAMED_ARGS) \
   frv_init_cumulative_args (&CUM, FNTYPE, LIBNAME, FNDECL, FALSE)
 
 /* Like `INIT_CUMULATIVE_ARGS' but overrides it for the purposes of finding the
@@ -1999,8 +1994,9 @@ struct machine_function GTY(())
    (Actually, on most machines, scalar values are returned in the same place
    regardless of mode).
 
-   If `PROMOTE_FUNCTION_RETURN' is defined, you must apply the same promotion
-   rules specified in `PROMOTE_MODE' if VALTYPE is a scalar type.
+   If `TARGET_PROMOTE_FUNCTION_RETURN' is defined to return true, you
+   must apply the same promotion rules specified in `PROMOTE_MODE' if
+   VALTYPE is a scalar type.
 
    If the precise function being called is known, FUNC is a tree node
    (`FUNCTION_DECL') for it; otherwise, FUNC is a null pointer.  This makes it
@@ -2008,10 +2004,10 @@ struct machine_function GTY(())
    functions when all their calls are known.
 
    `FUNCTION_VALUE' is not used for return vales with aggregate data types,
-   because these are returned in another way.  See `STRUCT_VALUE_REGNUM' and
-   related macros, below.  */
+   because these are returned in another way.  See
+   `TARGET_STRUCT_VALUE_RTX' and related macros, below.  */
 #define FUNCTION_VALUE(VALTYPE, FUNC) \
-  gen_rtx (REG, TYPE_MODE (VALTYPE), RETURN_VALUE_REGNUM)
+  gen_rtx_REG (TYPE_MODE (VALTYPE), RETURN_VALUE_REGNUM)
 
 /* A C expression to create an RTX representing the place where a library
    function returns a value of mode MODE.
@@ -2022,7 +2018,7 @@ struct machine_function GTY(())
 
    The definition of `LIBRARY_VALUE' need not be concerned aggregate data
    types, because none of the library functions returns such types.  */
-#define LIBCALL_VALUE(MODE) gen_rtx (REG, MODE, RETURN_VALUE_REGNUM)
+#define LIBCALL_VALUE(MODE) gen_rtx_REG (MODE, RETURN_VALUE_REGNUM)
 
 /* A C expression that is nonzero if REGNO is the number of a hard register in
    which the values of called function may come back.
@@ -2041,9 +2037,9 @@ struct machine_function GTY(())
 
 /* How Large Values are Returned.  */
 
-/* If the structure value address is passed in a register, then
-   `STRUCT_VALUE_REGNUM' should be the number of that register.  */
-#define STRUCT_VALUE_REGNUM (GPR_FIRST + 3)
+/* The number of the register that is used to to pass the structure
+   value address.  */
+#define FRV_STRUCT_VALUE_REGNUM (GPR_FIRST + 3)
 
 
 /* Function Entry and Exit.  */
@@ -2081,49 +2077,6 @@ struct machine_function GTY(())
 
 /* Implementing the Varargs Macros.  */
 
-/* If defined, is a C expression that produces the machine-specific code for a
-   call to `__builtin_saveregs'.  This code will be moved to the very beginning
-   of the function, before any parameter access are made.  The return value of
-   this function should be an RTX that contains the value to use as the return
-   of `__builtin_saveregs'.
-
-   If this macro is not defined, the compiler will output an ordinary call to
-   the library function `__builtin_saveregs'.  */
-
-#define EXPAND_BUILTIN_SAVEREGS() frv_expand_builtin_saveregs ()
-
-/* This macro offers an alternative to using `__builtin_saveregs' and defining
-   the macro `EXPAND_BUILTIN_SAVEREGS'.  Use it to store the anonymous register
-   arguments into the stack so that all the arguments appear to have been
-   passed consecutively on the stack.  Once this is done, you can use the
-   standard implementation of varargs that works for machines that pass all
-   their arguments on the stack.
-
-   The argument ARGS_SO_FAR is the `CUMULATIVE_ARGS' data structure, containing
-   the values that obtain after processing of the named arguments.  The
-   arguments MODE and TYPE describe the last named argument--its machine mode
-   and its data type as a tree node.
-
-   The macro implementation should do two things: first, push onto the stack
-   all the argument registers *not* used for the named arguments, and second,
-   store the size of the data thus pushed into the `int'-valued variable whose
-   name is supplied as the argument PRETEND_ARGS_SIZE.  The value that you
-   store here will serve as additional offset for setting up the stack frame.
-
-   Because you must generate code to push the anonymous arguments at compile
-   time without knowing their data types, `SETUP_INCOMING_VARARGS' is only
-   useful on machines that have just a single category of argument register and
-   use it uniformly for all data types.
-
-   If the argument SECOND_TIME is nonzero, it means that the arguments of the
-   function are being analyzed for the second time.  This happens for an inline
-   function, which is not actually compiled until the end of the source file.
-   The macro `SETUP_INCOMING_VARARGS' should not generate any instructions in
-   this case.  */
-#define SETUP_INCOMING_VARARGS(ARGS_SO_FAR, MODE, TYPE, PRETEND_ARGS_SIZE, SECOND_TIME) \
-  frv_setup_incoming_varargs (& ARGS_SO_FAR, (int) MODE, TYPE, 	\
-			      & PRETEND_ARGS_SIZE, SECOND_TIME)
-
 /* Implement the stdarg/varargs va_start macro.  STDARG_P is nonzero if this
    is stdarg.h instead of varargs.h.  VALIST is the tree of the va_list
    variable to initialize.  NEXTARG is the machine independent notion of the
@@ -2132,12 +2085,6 @@ struct machine_function GTY(())
 
 #define EXPAND_BUILTIN_VA_START(VALIST, NEXTARG)		\
   (frv_expand_builtin_va_start(VALIST, NEXTARG))
-
-/* Implement the stdarg/varargs va_arg macro.  VALIST is the variable of type
-   va_list as a tree, TYPE is the type passed to va_arg.  */
-
-#define EXPAND_BUILTIN_VA_ARG(VALIST, TYPE)				\
-  (frv_expand_builtin_va_arg (VALIST, TYPE))
 
 
 /* Trampolines for Nested Functions.  */
@@ -2149,7 +2096,7 @@ struct machine_function GTY(())
 
    If you don't define this macro, the value of `BIGGEST_ALIGNMENT' is used for
    aligning trampolines.  */
-#define TRAMPOLINE_ALIGNMENT 32
+#define TRAMPOLINE_ALIGNMENT (TARGET_FDPIC ? 64 : 32)
 
 /* A C statement to initialize the variable parts of a trampoline.  ADDR is an
    RTX for the address of the trampoline; FNADDR is an RTX for the address of
@@ -2176,8 +2123,11 @@ struct machine_function GTY(())
 #define TRAMPOLINE_TEMPLATE_NAME "__trampoline_template"
 #endif
 
+#define Twrite _write
+
+#if ! __FRV_FDPIC__
 #define TRANSFER_FROM_TRAMPOLINE					\
-extern int _write (int, const void *, unsigned);			\
+extern int Twrite (int, const void *, unsigned);			\
 									\
 void									\
 __trampoline_setup (short * addr, int size, int fnaddr, int sc)		\
@@ -2189,7 +2139,7 @@ __trampoline_setup (short * addr, int size, int fnaddr, int sc)		\
 									\
   if (size < 20)							\
     {									\
-      _write (2, "__trampoline_setup bad size\n",			\
+      Twrite (2, "__trampoline_setup bad size\n",			\
 	      sizeof ("__trampoline_setup bad size\n") - 1);		\
       exit (-1);							\
     }									\
@@ -2218,6 +2168,67 @@ __asm__("\n"								\
 	"\tsethi #0, gr6\n"						\
 	"\tsethi #0, gr7\n"						\
 	"\tjmpl @(gr0,gr6)\n");
+#else
+#define TRANSFER_FROM_TRAMPOLINE					\
+extern int Twrite (int, const void *, unsigned);			\
+									\
+void									\
+__trampoline_setup (addr, size, fnaddr, sc)				\
+     short * addr;							\
+     int size;								\
+     int fnaddr;							\
+     int sc;								\
+{									\
+  extern short __trampoline_template[];					\
+  short * from = &__trampoline_template[0];				\
+  int i;								\
+  short **desc = (short **)addr;					\
+  short * to = addr + 4;						\
+									\
+  if (size != 32)							\
+    {									\
+      Twrite (2, "__trampoline_setup bad size\n",			\
+	      sizeof ("__trampoline_setup bad size\n") - 1);		\
+      exit (-1);							\
+    }									\
+									\
+  /* Create a function descriptor with the address of the code below
+     and NULL as the FDPIC value.  We don't need the real GOT value
+     here, since we don't use it, so we use NULL, that is just as
+     good.  */								\
+  desc[0] = to;								\
+  desc[1] = NULL;							\
+  size -= 8;								\
+									\
+  to[0] = from[0];							\
+  to[1] = (short)(fnaddr);						\
+  to[2] = from[2];							\
+  to[3] = (short)(sc);							\
+  to[4] = from[4];							\
+  to[5] = (short)(fnaddr >> 16);					\
+  to[6] = from[6];							\
+  to[7] = (short)(sc >> 16);						\
+  to[8] = from[8];							\
+  to[9] = from[9];							\
+  to[10] = from[10];							\
+  to[11] = from[11];							\
+									\
+  for (i = 0; i < size; i++)						\
+    __asm__ volatile ("dcf @(%0,%1)\n\tici @(%0,%1)" :: "r" (to), "r" (i)); \
+}									\
+									\
+__asm__("\n"								\
+	"\t.globl " TRAMPOLINE_TEMPLATE_NAME "\n"			\
+	"\t.text\n"							\
+	TRAMPOLINE_TEMPLATE_NAME ":\n"					\
+	"\tsetlos #0, gr6\n"	/* Jump register.  */			\
+	"\tsetlos #0, gr7\n"	/* Static chain.  */			\
+	"\tsethi #0, gr6\n"						\
+	"\tsethi #0, gr7\n"						\
+	"\tldd @(gr6,gr0),gr14\n"					\
+	"\tjmpl @(gr14,gr0)\n"						\
+	);
+#endif
 
 
 /* Addressing Modes.  */
@@ -2302,7 +2313,8 @@ __asm__("\n"								\
 #define GO_IF_LEGITIMATE_ADDRESS(MODE, X, LABEL)			\
   do									\
     {									\
-      if (frv_legitimate_address_p (MODE, X, REG_OK_STRICT_P, FALSE))	\
+      if (frv_legitimate_address_p (MODE, X, REG_OK_STRICT_P,		\
+ 				    FALSE, FALSE))			\
 	goto LABEL;							\
     }									\
   while (0)
@@ -2331,40 +2343,7 @@ __asm__("\n"								\
    will reload one or both registers only if neither labeling works.  */
 #define REG_OK_FOR_INDEX_P(X) REG_OK_FOR_BASE_P (X)
 
-/* A C compound statement that attempts to replace X with a valid memory
-   address for an operand of mode MODE.  WIN will be a C statement label
-   elsewhere in the code; the macro definition may use
-
-        GO_IF_LEGITIMATE_ADDRESS (MODE, X, WIN);
-
-   to avoid further processing if the address has become legitimate.
-
-   X will always be the result of a call to `break_out_memory_refs', and OLDX
-   will be the operand that was given to that function to produce X.
-
-   The code generated by this macro should not alter the substructure of X.  If
-   it transforms X into a more legitimate form, it should assign X (which will
-   always be a C variable) a new value.
-
-   It is not necessary for this macro to come up with a legitimate address.
-   The compiler has standard ways of doing so in all cases.  In fact, it is
-   safe for this macro to do nothing.  But often a machine-dependent strategy
-   can generate better code.  */
-
-/* On the FRV, we use it to convert small data and pic references into using
-   the appropriate pointer in the address.  */
-#define LEGITIMIZE_ADDRESS(X, OLDX, MODE, WIN)			\
-  do								\
-    {								\
-      rtx newx = frv_legitimize_address (X, OLDX, MODE);	\
-								\
-      if (newx)							\
-	{							\
-	  (X) = newx;						\
-	  goto WIN;						\
-	}							\
-    }								\
-  while (0)
+#define FIND_BASE_TERM frv_find_base_term
 
 /* A C statement or compound statement with a conditional `goto LABEL;'
    executed if memory address X (an RTX) can have different meanings depending
@@ -2423,7 +2402,7 @@ __asm__("\n"								\
         #define REVERSIBLE_CC_MODE(MODE)  ((MODE) != CCFPEmode)  */
 
 /* On frv, don't consider floating point comparisons to be reversible.  In
-   theory, fp equality comparisons can be reversible */
+   theory, fp equality comparisons can be reversible.  */
 #define REVERSIBLE_CC_MODE(MODE) ((MODE) == CCmode || (MODE) == CC_UNSmode)
 
 /* Frv CCR_MODE's are not reversible.  */
@@ -2489,10 +2468,6 @@ __asm__("\n"								\
 /* Define this macro if it is as good or better to call a constant function
    address than to call an address kept in a register.  */
 #define NO_FUNCTION_CSE
-
-/* Define this macro if it is as good or better for a function to call itself
-   with an explicit address than to call an address kept in a register.  */
-#define NO_RECURSIVE_FUNCTION_CSE
 
 
 /* Dividing the output into sections.  */
@@ -2593,7 +2568,7 @@ fixup_section (void)							\
   (   GET_CODE (X) == CONST_INT						\
    || GET_CODE (X) == CONST_DOUBLE					\
    || (GET_CODE (X) == HIGH && GET_CODE (XEXP (X, 0)) == CONST_INT)	\
-   || GET_CODE (X) == CONSTANT_P_RTX)
+   || got12_operand (X, VOIDmode))					\
 
 
 /* The Overall Framework of an Assembler File.  */
@@ -2925,11 +2900,6 @@ do {                                                                    \
   (*targetm.asm_out.internal_label) (STREAM, PREFIX, NUM);                      \
 } while (0)
 
-/* Define this to determine whether case statement labels are relative to
-   the start of the case statement or not.  */
-
-#define CASE_VECTOR_PC_RELATIVE (flag_pic)
-
 
 /* Assembler Commands for Exception Regions.  */
 
@@ -3048,10 +3018,11 @@ do {                                                                    \
   { "int12_operand",			{ CONST_INT }},			\
   { "int_2word_operand",		{ CONST_INT, CONST_DOUBLE,	\
 					  SYMBOL_REF, LABEL_REF, CONST }}, \
-  { "pic_register_operand",		{ REG }},			\
-  { "pic_symbolic_operand",		{ SYMBOL_REF, LABEL_REF, CONST }}, \
-  { "small_data_register_operand",	{ REG }},			\
-  { "small_data_symbolic_operand",	{ SYMBOL_REF, CONST }},		\
+  { "fdpic_operand",			{ REG }},			\
+  { "fdpic_fptr_operand",		{ REG }},			\
+  { "ldd_address_operand",		{ REG, SUBREG, PLUS }},		\
+  { "got12_operand",			{ CONST }},			\
+  { "const_unspec_operand",		{ CONST }},			\
   { "icc_operand",			{ REG }},			\
   { "fcc_operand",			{ REG }},			\
   { "cc_operand",			{ REG }},			\
@@ -3068,8 +3039,10 @@ do {                                                                    \
   { "odd_fpr_operand",			{ REG, SUBREG }},		\
   { "dbl_memory_one_insn_operand",	{ MEM }},			\
   { "dbl_memory_two_insn_operand",	{ MEM }},			\
-  { "call_operand",			{ REG, SUBREG, PLUS, CONST_INT,	\
-					  SYMBOL_REF, LABEL_REF, CONST }}, \
+  { "call_operand",			{ REG, SUBREG, CONST_INT,	\
+					  CONST, SYMBOL_REF }}, 	\
+  { "sibcall_operand",			{ REG, SUBREG, CONST_INT,	\
+					  CONST }}, 			\
   { "upper_int16_operand",		{ CONST_INT }},			\
   { "uint16_operand",			{ CONST_INT }},			\
   { "relational_operator",		{ EQ, NE, LE, LT, GE, GT,	\
@@ -3353,5 +3326,10 @@ enum frv_builtins
 
 extern GTY(()) rtx frv_compare_op0;			/* operand save for */
 extern GTY(()) rtx frv_compare_op1;			/* comparison generation */
+
+#ifdef __FRV_FDPIC__
+#define CRT_GET_RFIB_DATA(dbase) \
+  ({ extern void *_GLOBAL_OFFSET_TABLE_; (dbase) = &_GLOBAL_OFFSET_TABLE_; })
+#endif
 
 #endif /* __FRV_H__ */

@@ -1,5 +1,6 @@
 /* Output routines for graphical representation.
-   Copyright (C) 1998, 1999, 2000, 2001, 2003 Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999, 2000, 2001, 2003, 2004
+   Free Software Foundation, Inc.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1998.
 
 This file is part of GCC.
@@ -55,7 +56,7 @@ start_fct (FILE *fp)
     case vcg:
       fprintf (fp, "\
 graph: { title: \"%s\"\nfolding: 1\nhidden: 2\nnode: { title: \"%s.0\" }\n",
-	       current_function_name, current_function_name);
+	       current_function_name (), current_function_name ());
       break;
     case no_graph:
       break;
@@ -71,7 +72,7 @@ start_bb (FILE *fp, int bb)
       fprintf (fp, "\
 graph: {\ntitle: \"%s.BB%d\"\nfolding: 1\ncolor: lightblue\n\
 label: \"basic block %d",
-	       current_function_name, bb, bb);
+	       current_function_name (), bb, bb);
       break;
     case no_graph:
       break;
@@ -113,8 +114,8 @@ node_data (FILE *fp, rtx tmp_rtx)
 	case vcg:
 	  fprintf (fp, "\
 edge: { sourcename: \"%s.0\" targetname: \"%s.%d\" }\n",
-		   current_function_name,
-		   current_function_name, XINT (tmp_rtx, 0));
+		   current_function_name (),
+		   current_function_name (), XINT (tmp_rtx, 0));
 	  break;
 	case no_graph:
 	  break;
@@ -126,12 +127,12 @@ edge: { sourcename: \"%s.0\" targetname: \"%s.%d\" }\n",
     case vcg:
       fprintf (fp, "node: {\n  title: \"%s.%d\"\n  color: %s\n  \
 label: \"%s %d\n",
-	       current_function_name, XINT (tmp_rtx, 0),
-	       GET_CODE (tmp_rtx) == NOTE ? "lightgrey"
-	       : GET_CODE (tmp_rtx) == INSN ? "green"
-	       : GET_CODE (tmp_rtx) == JUMP_INSN ? "darkgreen"
-	       : GET_CODE (tmp_rtx) == CALL_INSN ? "darkgreen"
-	       : GET_CODE (tmp_rtx) == CODE_LABEL ?  "\
+	       current_function_name (), XINT (tmp_rtx, 0),
+	       NOTE_P (tmp_rtx) ? "lightgrey"
+	       : NONJUMP_INSN_P (tmp_rtx) ? "green"
+	       : JUMP_P (tmp_rtx) ? "darkgreen"
+	       : CALL_P (tmp_rtx) ? "darkgreen"
+	       : LABEL_P (tmp_rtx) ?  "\
 darkgrey\n  shape: ellipse" : "white",
 	       GET_RTX_NAME (GET_CODE (tmp_rtx)), XINT (tmp_rtx, 0));
       break;
@@ -140,7 +141,7 @@ darkgrey\n  shape: ellipse" : "white",
     }
 
   /* Print the RTL.  */
-  if (GET_CODE (tmp_rtx) == NOTE)
+  if (NOTE_P (tmp_rtx))
     {
       const char *name = "";
       if (NOTE_LINE_NUMBER (tmp_rtx) < 0)
@@ -178,8 +179,8 @@ draw_edge (FILE *fp, int from, int to, int bb_edge, int class)
 	color = "color: green ";
       fprintf (fp,
 	       "edge: { sourcename: \"%s.%d\" targetname: \"%s.%d\" %s",
-	       current_function_name, from,
-	       current_function_name, to, color);
+	       current_function_name (), from,
+	       current_function_name (), to, color);
       if (class)
 	fprintf (fp, "class: %d ", class);
       fputs ("}\n", fp);
@@ -209,7 +210,7 @@ end_fct (FILE *fp)
     {
     case vcg:
       fprintf (fp, "node: { title: \"%s.999999\" label: \"END\" }\n}\n",
-	       current_function_name);
+	       current_function_name ());
       break;
     case no_graph:
       break;
@@ -260,14 +261,14 @@ print_rtl_graph_with_bb (const char *base, const char *suffix, rtx rtx_first)
       FOR_EACH_BB_REVERSE (bb)
 	{
 	  rtx x;
-	  start[INSN_UID (bb->head)] = bb->index;
-	  end[INSN_UID (bb->end)] = bb->index;
-	  for (x = bb->head; x != NULL_RTX; x = NEXT_INSN (x))
+	  start[INSN_UID (BB_HEAD (bb))] = bb->index;
+	  end[INSN_UID (BB_END (bb))] = bb->index;
+	  for (x = BB_HEAD (bb); x != NULL_RTX; x = NEXT_INSN (x))
 	    {
 	      in_bb_p[INSN_UID (x)]
 		= (in_bb_p[INSN_UID (x)] == NOT_IN_BB)
 		 ? IN_ONE_BB : IN_MULTIPLE_BB;
-	      if (x == bb->end)
+	      if (x == BB_END (bb))
 		break;
 	    }
 	}
@@ -286,9 +287,9 @@ print_rtl_graph_with_bb (const char *base, const char *suffix, rtx rtx_first)
 
 	  if (start[INSN_UID (tmp_rtx)] < 0 && end[INSN_UID (tmp_rtx)] < 0)
 	    {
-	      if (GET_CODE (tmp_rtx) == BARRIER)
+	      if (BARRIER_P (tmp_rtx))
 		continue;
-	      if (GET_CODE (tmp_rtx) == NOTE
+	      if (NOTE_P (tmp_rtx)
 		  && (1 || in_bb_p[INSN_UID (tmp_rtx)] == NOT_IN_BB))
 		continue;
 	    }
@@ -321,7 +322,7 @@ print_rtl_graph_with_bb (const char *base, const char *suffix, rtx rtx_first)
 		{
 		  if (e->dest != EXIT_BLOCK_PTR)
 		    {
-		      rtx block_head = e->dest->head;
+		      rtx block_head = BB_HEAD (e->dest);
 
 		      draw_edge (fp, INSN_UID (tmp_rtx),
 				 INSN_UID (block_head),
@@ -347,7 +348,7 @@ print_rtl_graph_with_bb (const char *base, const char *suffix, rtx rtx_first)
 	    {
 	      /* Don't print edges to barriers.  */
 	      if (next_insn == 0
-		  || GET_CODE (next_insn) != BARRIER)
+		  || !BARRIER_P (next_insn))
 		draw_edge (fp, XINT (tmp_rtx, 0),
 			   next_insn ? INSN_UID (next_insn) : 999999, 0, 0);
 	      else
@@ -358,8 +359,8 @@ print_rtl_graph_with_bb (const char *base, const char *suffix, rtx rtx_first)
 		  do
 		    next_insn = NEXT_INSN (next_insn);
 		  while (next_insn
-			 && (GET_CODE (next_insn) == NOTE
-			     || GET_CODE (next_insn) == BARRIER));
+			 && (NOTE_P (next_insn)
+			     || BARRIER_P (next_insn)));
 
 		  draw_edge (fp, XINT (tmp_rtx, 0),
 			     next_insn ? INSN_UID (next_insn) : 999999, 0, 3);

@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---           Copyright (C) 1995-2003 Ada Core Technologies, Inc.            --
+--           Copyright (C) 1995-2004 Ada Core Technologies, Inc.            --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -32,11 +32,22 @@
 ------------------------------------------------------------------------------
 
 with System.Case_Util;
+with System.CRTL;
 with System.Soft_Links;
 with Unchecked_Conversion;
 with System; use System;
 
 package body GNAT.OS_Lib is
+
+   OpenVMS : Boolean;
+   --  Note: OpenVMS should be a constant, but it cannot be, because it
+   --        prevents bootstrapping on some platforms.
+
+   On_Windows : constant Boolean := Directory_Separator = '\';
+
+   pragma Import (Ada, OpenVMS, "system__openvms");
+   --  Needed to avoid doing useless checks when non on a VMS platform (see
+   --  Normalize_Pathname).
 
    package SSL renames System.Soft_Links;
 
@@ -82,8 +93,7 @@ package body GNAT.OS_Lib is
 
    function To_Path_String_Access
      (Path_Addr : Address;
-      Path_Len  : Integer)
-      return      String_Access;
+      Path_Len  : Integer) return String_Access;
    --  Converts a C String to an Ada String. We could do this making use of
    --  Interfaces.C.Strings but we prefer not to import that entire package
 
@@ -143,8 +153,7 @@ package body GNAT.OS_Lib is
    -----------------------------
 
    function Argument_String_To_List
-     (Arg_String : String)
-      return       Argument_List_Access
+     (Arg_String : String) return Argument_List_Access
    is
       Max_Args : constant Integer := Arg_String'Length;
       New_Argv : Argument_List (1 .. Max_Args);
@@ -397,8 +406,7 @@ package body GNAT.OS_Lib is
 
          function Copy_Attributes
            (From, To : System.Address;
-            Mode     : Integer)
-            return     Integer;
+            Mode     : Integer) return Integer;
          pragma Import (C, Copy_Attributes, "__gnat_copy_attribs");
          --  Mode = 0 - copy only time stamps.
          --  Mode = 1 - copy time stamps and read/write/execute attributes
@@ -558,8 +566,7 @@ package body GNAT.OS_Lib is
 
       function Copy_Attributes
         (From, To : System.Address;
-         Mode     : Integer)
-         return     Integer;
+         Mode     : Integer) return Integer;
       pragma Import (C, Copy_Attributes, "__gnat_copy_attribs");
       --  Mode = 0 - copy only time stamps.
       --  Mode = 1 - copy time stamps and read/write/execute attributes
@@ -611,13 +618,11 @@ package body GNAT.OS_Lib is
 
    function Create_File
      (Name  : C_File_Name;
-      Fmode : Mode)
-      return  File_Descriptor
+      Fmode : Mode) return File_Descriptor
    is
       function C_Create_File
         (Name  : C_File_Name;
-         Fmode : Mode)
-         return  File_Descriptor;
+         Fmode : Mode) return File_Descriptor;
       pragma Import (C, C_Create_File, "__gnat_open_create");
 
    begin
@@ -626,8 +631,7 @@ package body GNAT.OS_Lib is
 
    function Create_File
      (Name  : String;
-      Fmode : Mode)
-      return  File_Descriptor
+      Fmode : Mode) return File_Descriptor
    is
       C_Name : String (1 .. Name'Length + 1);
 
@@ -643,13 +647,11 @@ package body GNAT.OS_Lib is
 
    function Create_New_File
      (Name  : C_File_Name;
-      Fmode : Mode)
-      return  File_Descriptor
+      Fmode : Mode) return File_Descriptor
    is
       function C_Create_New_File
         (Name  : C_File_Name;
-         Fmode : Mode)
-         return  File_Descriptor;
+         Fmode : Mode) return File_Descriptor;
       pragma Import (C, C_Create_New_File, "__gnat_open_new");
 
    begin
@@ -658,8 +660,7 @@ package body GNAT.OS_Lib is
 
    function Create_New_File
      (Name  : String;
-      Fmode : Mode)
-      return  File_Descriptor
+      Fmode : Mode) return File_Descriptor
    is
       C_Name : String (1 .. Name'Length + 1);
 
@@ -668,6 +669,23 @@ package body GNAT.OS_Lib is
       C_Name (C_Name'Last)      := ASCII.NUL;
       return Create_New_File (C_Name (C_Name'First)'Address, Fmode);
    end Create_New_File;
+
+   -----------------------------
+   -- Create_Output_Text_File --
+   -----------------------------
+
+   function Create_Output_Text_File (Name  : String) return File_Descriptor is
+      function C_Create_File
+        (Name  : C_File_Name) return File_Descriptor;
+      pragma Import (C, C_Create_File, "__gnat_create_output_file");
+
+      C_Name : String (1 .. Name'Length + 1);
+
+   begin
+      C_Name (1 .. Name'Length) := Name;
+      C_Name (C_Name'Last)      := ASCII.NUL;
+      return C_Create_File (C_Name (C_Name'First)'Address);
+   end Create_Output_Text_File;
 
    ----------------------
    -- Create_Temp_File --
@@ -679,8 +697,7 @@ package body GNAT.OS_Lib is
    is
       function Open_New_Temp
         (Name  : System.Address;
-         Fmode : Mode)
-         return  File_Descriptor;
+         Fmode : Mode) return File_Descriptor;
       pragma Import (C, Open_New_Temp, "__gnat_open_new_temp");
 
    begin
@@ -1103,16 +1120,13 @@ package body GNAT.OS_Lib is
    ----------------------
 
    function Is_Absolute_Path (Name : String) return Boolean is
-      function Is_Absolute_Path (Name : Address) return Integer;
+      function Is_Absolute_Path
+        (Name   : Address;
+         Length : Integer) return Integer;
       pragma Import (C, Is_Absolute_Path, "__gnat_is_absolute_path");
 
-      F_Name : String (1 .. Name'Length + 1);
-
    begin
-      F_Name (1 .. Name'Length) := Name;
-      F_Name (F_Name'Last)      := ASCII.NUL;
-
-      return Is_Absolute_Path (F_Name'Address) /= 0;
+      return Is_Absolute_Path (Name'Address, Name'Length) /= 0;
    end Is_Absolute_Path;
 
    ------------------
@@ -1225,8 +1239,7 @@ package body GNAT.OS_Lib is
    -------------------------
 
    function Locate_Exec_On_Path
-     (Exec_Name : String)
-      return      String_Access
+     (Exec_Name : String) return String_Access
    is
       function Locate_Exec_On_Path (C_Exec_Name : Address) return Address;
       pragma Import (C, Locate_Exec_On_Path, "__gnat_locate_exec_on_path");
@@ -1262,8 +1275,7 @@ package body GNAT.OS_Lib is
 
    function Locate_Regular_File
      (File_Name : C_File_Name;
-      Path      : C_File_Name)
-      return      String_Access
+      Path      : C_File_Name) return String_Access
    is
       function Locate_Regular_File
         (C_File_Name, Path_Val : Address) return Address;
@@ -1291,8 +1303,7 @@ package body GNAT.OS_Lib is
 
    function Locate_Regular_File
      (File_Name : String;
-      Path      : String)
-      return      String_Access
+      Path      : String) return String_Access
    is
       C_File_Name : String (1 .. File_Name'Length + 1);
       C_Path      : String (1 .. Path'Length + 1);
@@ -1313,8 +1324,7 @@ package body GNAT.OS_Lib is
 
    function Non_Blocking_Spawn
      (Program_Name : String;
-      Args         : Argument_List)
-      return         Process_Id
+      Args         : Argument_List) return Process_Id
    is
       Junk : Integer;
       Pid  : Process_Id;
@@ -1428,8 +1438,7 @@ package body GNAT.OS_Lib is
      (Name           : String;
       Directory      : String  := "";
       Resolve_Links  : Boolean := True;
-      Case_Sensitive : Boolean := True)
-      return           String
+      Case_Sensitive : Boolean := True) return String
    is
       Max_Path : Integer;
       pragma Import (C, Max_Path, "__gnat_max_path_len");
@@ -1465,13 +1474,11 @@ package body GNAT.OS_Lib is
       function Readlink
         (Path   : System.Address;
          Buf    : System.Address;
-         Bufsiz : Integer)
-         return   Integer;
+         Bufsiz : Integer) return Integer;
       pragma Import (C, Readlink, "__gnat_readlink");
 
       function To_Canonical_File_Spec
-        (Host_File : System.Address)
-         return      System.Address;
+        (Host_File : System.Address) return System.Address;
       pragma Import
         (C, To_Canonical_File_Spec, "__gnat_to_canonical_file_spec");
 
@@ -1550,6 +1557,8 @@ package body GNAT.OS_Lib is
          S1 : String := S;
          --  We may need to fold S to lower case, so we need a variable
 
+         Last : Natural;
+
       begin
          --  Interix has the non standard notion of disk drive
          --  indicated by two '/' followed by a capital letter
@@ -1569,25 +1578,53 @@ package body GNAT.OS_Lib is
             begin
                Result (1) := '/';
                Result (2 .. Result'Last) := S;
+               Last := Result'Last;
 
                if Fold_To_Lower_Case then
                   System.Case_Util.To_Lower (Result);
                end if;
 
-               return Result;
+               --  Remove trailing directory separator, if any
 
+               if Last > 1 and then
+                 (Result (Last) = '/' or else
+                  Result (Last) = Directory_Separator)
+               then
+                  Last := Last - 1;
+               end if;
+
+               return Result (1 .. Last);
             end;
 
          else
-
             if Fold_To_Lower_Case then
                System.Case_Util.To_Lower (S1);
             end if;
 
-            return S1;
+            --  Remove trailing directory separator, if any
 
+            Last := S1'Last;
+
+            if Last > 1
+              and then (S1 (Last) = '/'
+                          or else
+                        S1 (Last) = Directory_Separator)
+            then
+               --  Special case for Windows: C:\
+
+               if Last = 3
+                 and then S1 (1) /= Directory_Separator
+                 and then S1 (2) = ':'
+               then
+                  null;
+
+               else
+                  Last := Last - 1;
+               end if;
+            end if;
+
+            return S1 (1 .. Last);
          end if;
-
       end Final_Value;
 
    --  Start of processing for Normalize_Pathname
@@ -1645,15 +1682,23 @@ package body GNAT.OS_Lib is
          end loop;
       end if;
 
-      --  Resolving logical names from VMS.
-      --  If we have a Unix path on VMS such as /temp/..., and TEMP is a
-      --  logical name, we need to resolve this logical name.
-      --  As we have no means to know if we are on VMS, we need to do that
-      --  for absolute paths starting with '/'.
-      --  We find the directory, change to it, get the current directory,
-      --  and change the directory to this value.
+      --  Resolve directory names for VMS and Windows
 
-      if Path_Buffer (1) = '/' then
+      --  On VMS, if we have a Unix path such as /temp/..., and TEMP is a
+      --  logical name, we need to resolve this logical name.
+
+      --  On Windows, if we have an absolute path starting with a directory
+      --  separator, we need to have the drive letter appended in front.
+
+      --  For both platforms, Get_Current_Dir will return a suitable
+      --  directory name (logical names resolved on VMS, path starting with
+      --  a drive letter on Windows). So we find the directory, change to it,
+      --  call Get_Current_Dir and change the directory to the returned value.
+      --  Then, of course, we return to the previous directory.
+
+      if (OpenVMS or On_Windows)
+        and then Path_Buffer (1) = Directory_Separator
+      then
          declare
             Cur_Dir : String := Get_Directory ("");
             --  Save the current directory, so that we can change dir back to
@@ -1666,21 +1711,21 @@ package body GNAT.OS_Lib is
             --  set to ASCII.NUL to call chdir.
 
             Pos : Positive := End_Path;
-            --  Position of the last directory separator ('/')
+            --  Position of the last directory separator
 
             Status : Integer;
             --  Value returned by chdir
 
          begin
-            --  Look for the last '/'
+            --  Look for the last directory separator
 
-            while Path (Pos) /= '/' loop
+            while Path (Pos) /= Directory_Separator loop
                Pos := Pos - 1;
             end loop;
 
-            --  Get the previous character that is not a '/'
+            --  Get the previous character that is not a directory separator
 
-            while Pos > 1 and then Path (Pos) = '/' loop
+            while Pos > 1 and then Path (Pos) = Directory_Separator loop
                Pos := Pos - 1;
             end loop;
 
@@ -1909,26 +1954,21 @@ package body GNAT.OS_Lib is
 
    function Open_Read
      (Name  : C_File_Name;
-      Fmode : Mode)
-      return  File_Descriptor
+      Fmode : Mode) return File_Descriptor
    is
       function C_Open_Read
         (Name  : C_File_Name;
-         Fmode : Mode)
-         return  File_Descriptor;
+         Fmode : Mode) return File_Descriptor;
       pragma Import (C, C_Open_Read, "__gnat_open_read");
-
    begin
       return C_Open_Read (Name, Fmode);
    end Open_Read;
 
    function Open_Read
      (Name  : String;
-      Fmode : Mode)
-      return  File_Descriptor
+      Fmode : Mode) return File_Descriptor
    is
       C_Name : String (1 .. Name'Length + 1);
-
    begin
       C_Name (1 .. Name'Length) := Name;
       C_Name (C_Name'Last)      := ASCII.NUL;
@@ -1941,31 +1981,40 @@ package body GNAT.OS_Lib is
 
    function Open_Read_Write
      (Name  : C_File_Name;
-      Fmode : Mode)
-      return  File_Descriptor
+      Fmode : Mode) return File_Descriptor
    is
       function C_Open_Read_Write
         (Name  : C_File_Name;
-         Fmode : Mode)
-         return  File_Descriptor;
+         Fmode : Mode) return File_Descriptor;
       pragma Import (C, C_Open_Read_Write, "__gnat_open_rw");
-
    begin
       return C_Open_Read_Write (Name, Fmode);
    end Open_Read_Write;
 
    function Open_Read_Write
      (Name  : String;
-      Fmode : Mode)
-      return  File_Descriptor
+      Fmode : Mode) return File_Descriptor
    is
       C_Name : String (1 .. Name'Length + 1);
-
    begin
       C_Name (1 .. Name'Length) := Name;
       C_Name (C_Name'Last)      := ASCII.NUL;
       return Open_Read_Write (C_Name (C_Name'First)'Address, Fmode);
    end Open_Read_Write;
+
+   ----------
+   -- Read --
+   ----------
+
+   function Read
+     (FD   : File_Descriptor;
+      A    : System.Address;
+      N    : Integer) return Integer
+   is
+   begin
+      return Integer (System.CRTL.read
+        (System.CRTL.int (FD), System.CRTL.chars (A), System.CRTL.int (N)));
+   end Read;
 
    -----------------
    -- Rename_File --
@@ -1978,9 +2027,7 @@ package body GNAT.OS_Lib is
    is
       function rename (From, To : Address) return Integer;
       pragma Import (C, rename, "rename");
-
       R : Integer;
-
    begin
       R := rename (Old_Name, New_Name);
       Success := (R = 0);
@@ -1993,14 +2040,11 @@ package body GNAT.OS_Lib is
    is
       C_Old_Name : String (1 .. Old_Name'Length + 1);
       C_New_Name : String (1 .. New_Name'Length + 1);
-
    begin
       C_Old_Name (1 .. Old_Name'Length) := Old_Name;
       C_Old_Name (C_Old_Name'Last)      := ASCII.NUL;
-
       C_New_Name (1 .. New_Name'Length) := New_Name;
       C_New_Name (C_New_Name'Last)      := ASCII.NUL;
-
       Rename_File (C_Old_Name'Address, C_New_Name'Address, Success);
    end Rename_File;
 
@@ -2031,12 +2075,10 @@ package body GNAT.OS_Lib is
 
    function Spawn
      (Program_Name : String;
-      Args         : Argument_List)
-      return         Integer
+      Args         : Argument_List) return Integer
    is
       Junk   : Process_Id;
       Result : Integer;
-
    begin
       Spawn_Internal (Program_Name, Args, Result, Junk, Blocking => True);
       return Result;
@@ -2173,8 +2215,7 @@ package body GNAT.OS_Lib is
 
    function To_Path_String_Access
      (Path_Addr : Address;
-      Path_Len  : Integer)
-      return      String_Access
+      Path_Len  : Integer) return String_Access
    is
       subtype Path_String is String (1 .. Path_Len);
       type    Path_String_Access is access Path_String;
@@ -2212,5 +2253,19 @@ package body GNAT.OS_Lib is
       Pid := Portable_Wait (Status'Address);
       Success := (Status = 0);
    end Wait_Process;
+
+   -----------
+   -- Write --
+   -----------
+
+   function Write
+     (FD   : File_Descriptor;
+      A    : System.Address;
+      N    : Integer) return Integer
+   is
+   begin
+      return Integer (System.CRTL.write
+        (System.CRTL.int (FD), System.CRTL.chars (A), System.CRTL.int (N)));
+   end Write;
 
 end GNAT.OS_Lib;

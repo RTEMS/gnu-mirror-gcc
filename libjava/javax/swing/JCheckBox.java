@@ -1,5 +1,5 @@
 /* JCheckBox.java -- 
-   Copyright (C) 2002 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2004 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -47,6 +47,8 @@ import javax.accessibility.AccessibleContext;
  */
 public class JCheckBox extends JToggleButton
 {
+  private static final long serialVersionUID = -5246739313864538930L;
+  
     public JCheckBox()
     {
 	this(null, null);
@@ -70,6 +72,8 @@ public class JCheckBox extends JToggleButton
     public JCheckBox(String text, Icon icon)
     {
 	super(text, icon);
+        paint_border = false;
+        content_area_filled = false;
     }
 
     
@@ -81,8 +85,9 @@ public class JCheckBox extends JToggleButton
   
     public String getUIClassID()
     {
-	//Returns a string that specifies the name of the L&F class that renders this component.  
-	return "JCheckBox";
+	//Returns a string that specifies the name of the Look and Feel
+	//class that renders this component.  
+	return "CheckBoxUI";
     }
   
     protected  String paramString()

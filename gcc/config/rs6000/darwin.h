@@ -1,5 +1,5 @@
 /* Target definitions for PowerPC running Darwin (Mac OS X).
-   Copyright (C) 1997, 2000, 2001, 2003 Free Software Foundation, Inc.
+   Copyright (C) 1997, 2000, 2001, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Apple Computer Inc.
 
    This file is part of GCC.
@@ -94,17 +94,31 @@ do {									\
 
 
 #define CC1_SPEC "\
-%{gused: -feliminate-unused-debug-symbols %<gused }\
+%{gused: -g -feliminate-unused-debug-symbols %<gused }\
+%{gfull: -g -fno-eliminate-unused-debug-symbols %<gfull }\
+%{g: %{!gfull: -feliminate-unused-debug-symbols %<gfull }}\
 %{static: %{Zdynamic: %e conflicting code gen style switches are used}}\
 %{!static:%{!mdynamic-no-pic:-fPIC}}"
 
+/* It's virtually impossible to predict all the possible combinations
+   of -mcpu and -maltivec and whatnot, so just supply
+   -force_cpusubtype_ALL if any are seen.  Radar 3492132 against the
+   assembler is asking for a .machine directive so we could get this
+   really right.  */
 #define ASM_SPEC "-arch ppc \
   %{Zforce_cpusubtype_ALL:-force_cpusubtype_ALL} \
-  %{!Zforce_cpusubtype_ALL:%{maltivec:-force_cpusubtype_ALL}}"
+  %{!Zforce_cpusubtype_ALL:%{maltivec|mcpu=*|mpowerpc64:-force_cpusubtype_ALL}}"
 
 #undef SUBTARGET_EXTRA_SPECS
 #define SUBTARGET_EXTRA_SPECS			\
   { "darwin_arch", "ppc" },
+
+/* The "-faltivec" option should have been called "-maltivec" all along.  */
+#define SUBTARGET_OPTION_TRANSLATE_TABLE				\
+  { "-faltivec", "-maltivec -include altivec.h" },	\
+  { "-fno-altivec", "-mno-altivec" },	\
+  { "-Waltivec-long-deprecated",	"-mwarn-altivec-long" }, \
+  { "-Wno-altivec-long-deprecated", "-mno-warn-altivec-long" }
 
 /* Make both r2 and r3 available for allocation.  */
 #define FIXED_R2 0
@@ -133,8 +147,10 @@ do {									\
 
 /* These are used by -fbranch-probabilities */
 #define HOT_TEXT_SECTION_NAME "__TEXT,__text,regular,pure_instructions"
+#define NORMAL_TEXT_SECTION_NAME "__TEXT,__text,regular,pure_instructions"
 #define UNLIKELY_EXECUTED_TEXT_SECTION_NAME \
-                              "__TEXT,__text2,regular,pure_instructions"
+                              "__TEXT,__unlikely,regular,pure_instructions"
+#define SECTION_FORMAT_STRING ".section %s\n\t.align 2\n"
 
 /* Define cutoff for using external functions to save floating point.
    Currently on Darwin, always use inline stores.  */
@@ -290,26 +306,19 @@ do {									\
 
 /* Darwin increases natural record alignment to doubleword if the first
    field is an FP double while the FP fields remain word aligned.  */
-#define ROUND_TYPE_ALIGN(STRUCT, COMPUTED, SPECIFIED)	\
-  ((TREE_CODE (STRUCT) == RECORD_TYPE			\
-    || TREE_CODE (STRUCT) == UNION_TYPE			\
-    || TREE_CODE (STRUCT) == QUAL_UNION_TYPE)		\
-   && TYPE_FIELDS (STRUCT) != 0				\
-   && TARGET_ALIGN_NATURAL == 0                         \
-   && DECL_MODE (TYPE_FIELDS (STRUCT)) == DFmode	\
-   ? MAX (MAX ((COMPUTED), (SPECIFIED)), 64)		\
-   : (TARGET_ALTIVEC && TREE_CODE (STRUCT) == VECTOR_TYPE) \
-   ? MAX (MAX ((COMPUTED), (SPECIFIED)), 128)           \
+#define ROUND_TYPE_ALIGN(STRUCT, COMPUTED, SPECIFIED)			\
+  ((TREE_CODE (STRUCT) == RECORD_TYPE					\
+    || TREE_CODE (STRUCT) == UNION_TYPE					\
+    || TREE_CODE (STRUCT) == QUAL_UNION_TYPE)				\
+   && TARGET_ALIGN_NATURAL == 0                         		\
+   ? rs6000_special_round_type_align (STRUCT, COMPUTED, SPECIFIED)	\
+   : (TARGET_ALTIVEC && TREE_CODE (STRUCT) == VECTOR_TYPE) 		\
+   ? MAX (MAX ((COMPUTED), (SPECIFIED)), 128)          			 \
    : MAX ((COMPUTED), (SPECIFIED)))
 
 /* XXX: Darwin supports neither .quad, or .llong, but it also doesn't
    support 64 bit PowerPC either, so this just keeps things happy.  */
 #define DOUBLE_INT_ASM_OP "\t.quad\t"
-
-/* Get HOST_WIDE_INT and CONST_INT to be 32 bits, for compile time
-   space/speed.  */
-#undef MAX_LONG_TYPE_SIZE
-#define MAX_LONG_TYPE_SIZE 32
 
 /* For binary compatibility with 2.95; Darwin C APIs use bool from
    stdbool.h, which was an int-sized enum in 2.95.  */
@@ -317,3 +326,18 @@ do {									\
 
 #undef REGISTER_TARGET_PRAGMAS
 #define REGISTER_TARGET_PRAGMAS DARWIN_REGISTER_TARGET_PRAGMAS
+
+#ifdef IN_LIBGCC2
+#include <stdbool.h>
+#endif
+
+#define MD_FALLBACK_FRAME_STATE_FOR(CONTEXT, FS, SUCCESS)		\
+  {									\
+    extern bool _Unwind_fallback_frame_state_for			\
+      (struct _Unwind_Context *context, _Unwind_FrameState *fs);	\
+									\
+    if (_Unwind_fallback_frame_state_for (CONTEXT, FS))			\
+      goto SUCCESS;							\
+  }
+
+#define HAS_MD_FALLBACK_FRAME_STATE_FOR 1

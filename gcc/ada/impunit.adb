@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---           Copyright (C) 2000-2003 Free Software Foundation, Inc.         --
+--           Copyright (C) 2000-2004 Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -53,6 +53,7 @@ package body Impunit is
      "a-chlat1",    -- Ada.Characters.Latin_1
      "a-comlin",    -- Ada.Command_Line
      "a-decima",    -- Ada.Decimal
+     "a-direct",    -- Ada.Directories
      "a-direio",    -- Ada.Direct_IO
      "a-dynpri",    -- Ada.Dynamic_Priorities
      "a-except",    -- Ada.Exceptions
@@ -121,7 +122,7 @@ package body Impunit is
      "a-nlelfu",    -- Ada.Numerics.Long_Elementary_Functions
      "a-nllcef",    -- Ada.Long_Long_Complex_Elementary_Functions
      "a-nllefu",    -- Ada.Numerics.Long_Long_Elementary_Functions
-     "a-nltcty",    -- Ada.Numerics.Long_Long_Complex_Types
+     "a-nllcty",    -- Ada.Numerics.Long_Long_Complex_Types
      "a-nscefu",    -- Ada.Short_Complex_Elementary_Functions
      "a-nscoty",    -- Ada.Numerics.Short_Complex_Types
      "a-nselfu",    -- Ada.Numerics.Short_Elementary_Functions
@@ -229,6 +230,7 @@ package body Impunit is
      "g-regist",    -- GNAT.Registry
      "g-regpat",    -- GNAT.Regpat
      "g-semaph",    -- GNAT.Semaphores
+     "g-sestin",    -- GNAT.Secondary_Stack_Info
      "g-signal",    -- GNAT.Signals
      "g-socket",    -- GNAT.Sockets
      "g-souinf",    -- GNAT.Source_Info
@@ -296,6 +298,8 @@ package body Impunit is
      "s-assert",    -- System.Assertions
      "s-memory",    -- System.Memory
      "s-parint",    -- System.Partition_Interface
+     "s-restri",    -- System.Restrictions
+     "s-rident",    -- System.Rident
      "s-tasinf",    -- System.Task_Info
      "s-wchcnv",    -- System.Wch_Cnv
      "s-wchcon");   -- System.Wch_Con

@@ -1,5 +1,5 @@
 /* Define builtin-in macros for the C family front ends.
-   Copyright (C) 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -23,6 +23,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "coretypes.h"
 #include "tm.h"
 #include "tree.h"
+#include "version.h"
 #include "flags.h"
 #include "real.h"
 #include "c-common.h"
@@ -31,6 +32,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "except.h"		/* For USING_SJLJ_EXCEPTIONS.  */
 #include "toplev.h"
 #include "tm_p.h"		/* Target prototypes.  */
+#include "target.h"
 
 #ifndef TARGET_OS_CPP_BUILTINS
 # define TARGET_OS_CPP_BUILTINS()
@@ -193,6 +195,16 @@ builtin_define_float_constants (const char *name_prefix, const char *fp_suffix, 
     if (i < n)
       *p++ = "08ce"[n - i];
     sprintf (p, "p%d", fmt->emax * fmt->log2_b);
+    if (fmt->pnan < fmt->p)
+      {
+	/* This is an IBM extended double format made up of two IEEE
+	   doubles.  The value of the long double is the sum of the
+	   values of the two parts.  The most significant part is
+	   required to be the value of the long double rounded to the
+	   nearest double.  Rounding means we need a slightly smaller
+	   value for LDBL_MAX.  */
+	buf[4 + fmt->pnan / 4] = "7bde"[fmt->pnan % 4];
+      }
   }
   sprintf (name, "__%s_MAX__", name_prefix);
   builtin_define_with_hex_fp_value (name, type, decimal_dig, buf, fp_suffix);
@@ -308,9 +320,25 @@ c_cpp_builtins (cpp_reader *pfile)
   if (flag_exceptions)
     cpp_define (pfile, "__EXCEPTIONS");
 
-  /* represents the C++ ABI version, always defined so it can be used while
+  /* Represents the C++ ABI version, always defined so it can be used while
      preprocessing C and assembler.  */
-  cpp_define (pfile, "__GXX_ABI_VERSION=102");
+  if (flag_abi_version == 0)
+    /* Use a very large value so that:
+
+         #if __GXX_ABI_VERSION >= <value for version X>
+
+       will work whether the user explicitly says "-fabi-version=x" or
+       "-fabi-version=0".  Do not use INT_MAX because that will be
+       different from system to system.  */
+    builtin_define_with_int_value ("__GXX_ABI_VERSION", 999999);
+  else if (flag_abi_version == 1)
+    /* Due to an historical accident, this version had the value
+       "102".  */
+    builtin_define_with_int_value ("__GXX_ABI_VERSION", 102);
+  else
+    /* Newer versions have values 1002, 1003, ....  */
+    builtin_define_with_int_value ("__GXX_ABI_VERSION", 
+				   1000 + flag_abi_version);
 
   /* libgcc needs to know this.  */
   if (USING_SJLJ_EXCEPTIONS)
@@ -375,12 +403,19 @@ c_cpp_builtins (cpp_reader *pfile)
   if (!flag_signed_char)
     cpp_define (pfile, "__CHAR_UNSIGNED__");
 
-  if (c_dialect_cxx () && TREE_UNSIGNED (wchar_type_node))
+  if (c_dialect_cxx () && TYPE_UNSIGNED (wchar_type_node))
     cpp_define (pfile, "__WCHAR_UNSIGNED__");
 
   /* Make the choice of ObjC runtime visible to source code.  */
   if (c_dialect_objc () && flag_next_runtime)
     cpp_define (pfile, "__NEXT_RUNTIME__");
+
+  /* Show the availability of some target pragmas.  */
+  if (flag_mudflap || targetm.handle_pragma_redefine_extname)
+    cpp_define (pfile, "__PRAGMA_REDEFINE_EXTNAME");
+
+  if (targetm.handle_pragma_extern_prefix)
+    cpp_define (pfile, "__PRAGMA_EXTERN_PREFIX");
 
   /* A straightforward target hook doesn't work, because of problems
      linking that hook's body when part of non-C front ends.  */
@@ -555,8 +590,8 @@ builtin_define_type_max (const char *macro, tree type, int is_long)
     default:    abort ();
     }
 
-  value = values[idx + TREE_UNSIGNED (type)];
-  suffix = suffixes[is_long * 2 + TREE_UNSIGNED (type)];
+  value = values[idx + TYPE_UNSIGNED (type)];
+  suffix = suffixes[is_long * 2 + TYPE_UNSIGNED (type)];
 
   buf = alloca (strlen (macro) + 1 + strlen (value) + strlen (suffix) + 1);
   sprintf (buf, "%s=%s%s", macro, value, suffix);

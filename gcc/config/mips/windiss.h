@@ -1,5 +1,5 @@
 /* Support for GCC on MIPS using WindISS simulator.
-   Copyright (C) 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by CodeSourcery, LLC. 
 
 This file is part of GCC.
@@ -45,7 +45,6 @@ Boston, MA 02111-1307, USA.  */
 %{mips16:%{!mno-mips16:-mips16}} %{mno-mips16:-no-mips16} \
 %(subtarget_asm_optimizing_spec) \
 %(subtarget_asm_debugging_spec) \
-%{membedded-pic} \
 %{mabi=32:-32}%{mabi=n32:-n32}%{mabi=64:-64}%{mabi=n64:-64} \
 %{mabi=eabi} %{mabi=o64} %{!mabi*: %(asm_abi_default_spec)} \
 %{mgp32} %{mgp64} %{march=*} %{mxgot:-xgot} \
@@ -89,7 +88,7 @@ Boston, MA 02111-1307, USA.  */
 #undef ENDFILE_SPEC
 #define ENDFILE_SPEC "crtend.o%s"
 
-/* We have no shared libraries.  These two shouldn't be necessary. */
+/* We have no shared libraries.  These two shouldn't be necessary.  */
 #undef LINK_SHLIB_SPEC
 #define LINK_SHLIB_SPEC ""
 #undef LINK_EH_SPEC

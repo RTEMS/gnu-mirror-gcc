@@ -1,5 +1,5 @@
 /* Subroutines used for code generation on the Argonaut ARC cpu.
-   Copyright (C) 1994, 1995, 1997, 1998, 1999, 2000, 2001, 2002, 2003
+   Copyright (C) 1994, 1995, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004
    Free Software Foundation, Inc.
 
 This file is part of GCC.
@@ -96,8 +96,14 @@ static void arc_output_function_prologue (FILE *, HOST_WIDE_INT);
 static void arc_output_function_epilogue (FILE *, HOST_WIDE_INT);
 static void arc_file_start (void);
 static void arc_internal_label (FILE *, const char *, unsigned long);
+static void arc_setup_incoming_varargs (CUMULATIVE_ARGS *, enum machine_mode,
+					tree, int *, int);
 static bool arc_rtx_costs (rtx, int, int, int *);
 static int arc_address_cost (rtx);
+static void arc_external_libcall (rtx);
+static bool arc_return_in_memory (tree, tree);
+static bool arc_pass_by_reference (CUMULATIVE_ARGS *, enum machine_mode,
+				   tree, bool);
 
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_ALIGNED_HI_OP
@@ -117,11 +123,31 @@ static int arc_address_cost (rtx);
 #define TARGET_ATTRIBUTE_TABLE arc_attribute_table
 #undef TARGET_ASM_INTERNAL_LABEL
 #define TARGET_ASM_INTERNAL_LABEL arc_internal_label
+#undef TARGET_ASM_EXTERNAL_LIBCALL
+#define TARGET_ASM_EXTERNAL_LIBCALL arc_external_libcall
 
 #undef TARGET_RTX_COSTS
 #define TARGET_RTX_COSTS arc_rtx_costs
 #undef TARGET_ADDRESS_COST
 #define TARGET_ADDRESS_COST arc_address_cost
+
+#undef TARGET_PROMOTE_FUNCTION_ARGS
+#define TARGET_PROMOTE_FUNCTION_ARGS hook_bool_tree_true
+#undef TARGET_PROMOTE_FUNCTION_RETURN
+#define TARGET_PROMOTE_FUNCTION_RETURN hook_bool_tree_true
+#undef TARGET_PROMOTE_PROTOTYPES
+#define TARGET_PROMOTE_PROTOTYPES hook_bool_tree_true
+
+#undef TARGET_RETURN_IN_MEMORY
+#define TARGET_RETURN_IN_MEMORY arc_return_in_memory
+#undef TARGET_PASS_BY_REFERENCE
+#define TARGET_PASS_BY_REFERENCE arc_pass_by_reference
+
+#undef TARGET_SETUP_INCOMING_VARARGS
+#define TARGET_SETUP_INCOMING_VARARGS arc_setup_incoming_varargs
+
+#undef TARGET_SCHED_USE_DFA_PIPELINE_INTERFACE
+#define TARGET_SCHED_USE_DFA_PIPELINE_INTERFACE hook_int_void_1
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -690,11 +716,11 @@ const_uint32_operand (rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
 int
 proper_comparison_operator (rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
 {
-  enum rtx_code code = GET_CODE (op);
-
-  if (GET_RTX_CLASS (code) != '<')
+  enum rtx_code code;
+  if (!COMPARISON_P (op))
     return 0;
 
+  code = GET_CODE (op);
   if (GET_MODE (XEXP (op, 0)) == CCZNmode)
     return (code == EQ || code == NE);
   if (GET_MODE (XEXP (op, 0)) == CCZNCmode)
@@ -761,7 +787,7 @@ arc_double_limm_p (rtx value)
    aligned.  So we round the space up if necessary, and leave it to va_start
    to compensate.  */
 
-void
+static void
 arc_setup_incoming_varargs (CUMULATIVE_ARGS *cum,
                             enum machine_mode mode,
                             tree type ATTRIBUTE_UNUSED,
@@ -1047,7 +1073,7 @@ arc_compute_function_type (tree decl)
    SIZE is the size needed for local variables.  */
 
 unsigned int
-arc_compute_frame_size (int size /* # of var. bytes allocated. */)
+arc_compute_frame_size (int size /* # of var. bytes allocated.  */)
 {
   int regno;
   unsigned int total_size, var_size, args_size, pretend_size, extra_size;
@@ -1303,7 +1329,7 @@ arc_output_function_epilogue (FILE *file, HOST_WIDE_INT size)
       /* ??? If stack intactness is important, always emit now.  */
       if (MUST_SAVE_RETURN_ADDR && epilogue_delay != NULL_RTX)
 	{
-	  final_scan_insn (XEXP (epilogue_delay, 0), file, 1, -2, 1);
+	  final_scan_insn (XEXP (epilogue_delay, 0), file, 1, -2, 1, NULL);
 	  epilogue_delay = NULL_RTX;
 	}
 
@@ -1335,7 +1361,8 @@ arc_output_function_epilogue (FILE *file, HOST_WIDE_INT size)
 	{
 	  if (epilogue_delay)
 	    {
-	      final_scan_insn (XEXP (epilogue_delay, 0), file, 1, -2, 1);
+	      final_scan_insn (XEXP (epilogue_delay, 0), file, 1, -2, 1,
+			       NULL);
 	    }
 	}
 
@@ -1360,7 +1387,7 @@ arc_output_function_epilogue (FILE *file, HOST_WIDE_INT size)
 	    abort ();
 	  if (restored < size)
 	    abort ();
-	  final_scan_insn (XEXP (epilogue_delay, 0), file, 1, -2, 1);
+	  final_scan_insn (XEXP (epilogue_delay, 0), file, 1, -2, 1, NULL);
 	}
       else if (frame_pointer_needed && !fp_restored_p)
 	{
@@ -2269,78 +2296,6 @@ arc_va_start (tree valist, rtx nextarg)
   std_expand_builtin_va_start (valist, nextarg);
 }
 
-rtx
-arc_va_arg (tree valist, tree type)
-{
-  rtx addr_rtx;
-  tree addr, incr;
-  tree type_ptr = build_pointer_type (type);
-
-  /* All aggregates are passed by reference.  All scalar types larger
-     than 8 bytes are passed by reference.  */
-
-  if (AGGREGATE_TYPE_P (type) || int_size_in_bytes (type) > 8)
-    {
-      tree type_ptr_ptr = build_pointer_type (type_ptr);
-
-      addr = build (INDIRECT_REF, type_ptr,
-		    build (NOP_EXPR, type_ptr_ptr, valist));
-
-      incr = build (PLUS_EXPR, TREE_TYPE (valist),
-		    valist, build_int_2 (UNITS_PER_WORD, 0));
-    }
-  else
-    {
-      HOST_WIDE_INT align, rounded_size;
-
-      /* Compute the rounded size of the type.  */
-      align = PARM_BOUNDARY / BITS_PER_UNIT;
-      rounded_size = (((TREE_INT_CST_LOW (TYPE_SIZE (type)) / BITS_PER_UNIT
-			+ align - 1) / align) * align);
-
-      /* Align 8 byte operands.  */
-      addr = valist;
-      if (TYPE_ALIGN (type) > BITS_PER_WORD)
-	{
-	  /* AP = (TYPE *)(((int)AP + 7) & -8)  */
-
-	  addr = build (NOP_EXPR, integer_type_node, valist);
-	  addr = fold (build (PLUS_EXPR, integer_type_node, addr,
-			      build_int_2 (7, 0)));
-	  addr = fold (build (BIT_AND_EXPR, integer_type_node, addr,
-			      build_int_2 (-8, 0)));
-	  addr = fold (build (NOP_EXPR, TREE_TYPE (valist), addr));
-	}
-
-      /* The increment is always rounded_size past the aligned pointer.  */
-      incr = fold (build (PLUS_EXPR, TREE_TYPE (addr), addr,
-			  build_int_2 (rounded_size, 0)));
-
-      /* Adjust the pointer in big-endian mode.  */
-      if (BYTES_BIG_ENDIAN)
-	{
-	  HOST_WIDE_INT adj;
-	  adj = TREE_INT_CST_LOW (TYPE_SIZE (type)) / BITS_PER_UNIT;
-	  if (rounded_size > align)
-	    adj = rounded_size;
-
-	  addr = fold (build (PLUS_EXPR, TREE_TYPE (addr), addr,
-			      build_int_2 (rounded_size - adj, 0)));
-	}
-    }
-
-  /* Evaluate the data address.  */
-  addr_rtx = expand_expr (addr, NULL_RTX, Pmode, EXPAND_NORMAL);
-  addr_rtx = copy_to_reg (addr_rtx);
-  
-  /* Compute new value for AP.  */
-  incr = build (MODIFY_EXPR, TREE_TYPE (valist), valist, incr);
-  TREE_SIDE_EFFECTS (incr) = 1;
-  expand_expr (incr, const0_rtx, VOIDmode, EXPAND_NORMAL);
-
-  return addr_rtx;
-}
-
 /* This is how to output a definition of an internal numbered label where
    PREFIX is the class of label and NUM is the number within the class.  */
 
@@ -2350,3 +2305,58 @@ arc_internal_label (FILE *stream, const char *prefix, unsigned long labelno)
   arc_ccfsm_at_label (prefix, labelno);
   default_internal_label (stream, prefix, labelno);
 }
+
+/* Worker function for TARGET_ASM_EXTERNAL_LIBCALL.  */
+
+static void
+arc_external_libcall (rtx fun ATTRIBUTE_UNUSED)
+{
+#if 0
+/* On the ARC we want to have libgcc's for multiple cpus in one binary.
+   We can't use `assemble_name' here as that will call ASM_OUTPUT_LABELREF
+   and we'll get another suffix added on if -mmangle-cpu.  */
+  if (TARGET_MANGLE_CPU_LIBGCC)
+    {
+      fprintf (FILE, "\t.rename\t_%s, _%s%s\n",
+	       XSTR (SYMREF, 0), XSTR (SYMREF, 0),
+	       arc_mangle_suffix);
+    }
+#endif
+}
+
+/* Worker function for TARGET_RETURN_IN_MEMORY.  */
+
+static bool
+arc_return_in_memory (tree type, tree fntype ATTRIBUTE_UNUSED)
+{
+  if (AGGREGATE_TYPE_P (type))
+    return true;
+  else
+    {
+      HOST_WIDE_INT size = int_size_in_bytes (type);
+      return (size == -1 || size > 8);
+    }
+}
+
+/* For ARC, All aggregates and arguments greater than 8 bytes are
+   passed by reference.  */
+
+static bool
+arc_pass_by_reference (CUMULATIVE_ARGS *ca ATTRIBUTE_UNUSED,
+		       enum machine_mode mode, tree type,
+		       bool named ATTRIBUTE_UNUSED)
+{
+  unsigned HOST_WIDE_INT size;
+
+  if (type)
+    {
+      if (AGGREGATE_TYPE_P (type))
+	return true;
+      size = int_size_in_bytes (type);
+    }
+  else
+    size = GET_MODE_SIZE (mode);
+
+  return size > 8;
+}
+

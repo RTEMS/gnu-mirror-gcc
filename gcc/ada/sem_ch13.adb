@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2003, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2004, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -30,7 +30,6 @@ with Einfo;    use Einfo;
 with Errout;   use Errout;
 with Exp_Tss;  use Exp_Tss;
 with Exp_Util; use Exp_Util;
-with Hostparm; use Hostparm;
 with Lib;      use Lib;
 with Nlists;   use Nlists;
 with Nmake;    use Nmake;
@@ -46,6 +45,7 @@ with Snames;   use Snames;
 with Stand;    use Stand;
 with Sinfo;    use Sinfo;
 with Table;
+with Targparm; use Targparm;
 with Ttypes;   use Ttypes;
 with Tbuild;   use Tbuild;
 with Urealp;   use Urealp;
@@ -265,8 +265,14 @@ package body Sem_Ch13 is
          U_Ent := Ent;
 
       elsif Ekind (Ent) = E_Incomplete_Type then
+
+         --  The attribute applies to the full view, set the entity
+         --  of the attribute definition accordingly.
+
          Ent := Underlying_Type (Ent);
          U_Ent := Ent;
+         Set_Entity (Nam, Ent);
+
       else
          U_Ent := Underlying_Type (Ent);
       end if;
@@ -1104,8 +1110,10 @@ package body Sem_Ch13 is
                            and then
                         Size /= System_Storage_Unit * 8
                      then
+                        Error_Msg_Uint_1 := UI_From_Int (System_Storage_Unit);
                         Error_Msg_N
-                          ("size for primitive object must be power of 2", N);
+                          ("size for primitive object must be a power of 2"
+                            & " and at least ^", N);
                      end if;
                   end if;
 
@@ -1392,6 +1400,10 @@ package body Sem_Ch13 is
             function Has_Good_Profile (Subp : Entity_Id) return Boolean;
             --  Return true if the entity is a procedure with an
             --  appropriate profile for the write attribute.
+
+            ----------------------
+            -- Has_Good_Profile --
+            ----------------------
 
             function Has_Good_Profile (Subp : Entity_Id) return Boolean is
                F     : Entity_Id;
@@ -2082,7 +2094,6 @@ package body Sem_Ch13 is
                --  tag to get an explicit position.
 
                elsif Nkind (Component_Name (CC)) = N_Attribute_Reference then
-
                   if Attribute_Name (Component_Name (CC)) = Name_Tag then
                      Error_Msg_N ("position of tag cannot be specified", CC);
                   else
@@ -2694,8 +2705,19 @@ package body Sem_Ch13 is
                   end if;
                end if;
 
-            when N_Integer_Literal   |
-                 N_Real_Literal      |
+            when N_Integer_Literal   =>
+
+               --  If this is a rewritten unchecked conversion, in a system
+               --  where Address is an integer type, always use the base type
+               --  for a literal value. This is user-friendly and prevents
+               --  order-of-elaboration issues with instances of unchecked
+               --  conversion.
+
+               if Nkind (Original_Node (Nod)) = N_Function_Call then
+                  Set_Etype (Nod, Base_Type (Etype (Nod)));
+               end if;
+
+            when N_Real_Literal      |
                  N_String_Literal    |
                  N_Character_Literal =>
                return;
@@ -3035,8 +3057,7 @@ package body Sem_Ch13 is
 
    function Minimum_Size
      (T      : Entity_Id;
-      Biased : Boolean := False)
-      return   Nat
+      Biased : Boolean := False) return Nat
    is
       Lo     : Uint    := No_Uint;
       Hi     : Uint    := No_Uint;
@@ -3064,10 +3085,19 @@ package body Sem_Ch13 is
       then
          return 0;
 
-      --  Access types
+         --  Access types. Normally an access type cannot have a size smaller
+         --  than the size of System.Address. The exception is on VMS, where
+         --  we have short and long addresses, and it is possible for an access
+         --  type to have a short address size (and thus be less than the size
+         --  of System.Address itself). We simply skip the check for VMS, and
+         --  leave the back end to do the check.
 
       elsif Is_Access_Type (T) then
-         return System_Address_Size;
+         if OpenVMS_On_Target then
+            return 0;
+         else
+            return System_Address_Size;
+         end if;
 
       --  Floating-point types
 
@@ -3253,7 +3283,7 @@ package body Sem_Ch13 is
       -- Build_Spec --
       ----------------
 
-      function  Build_Spec return Node_Id is
+      function Build_Spec return Node_Id is
       begin
          Subp_Id := Make_Defining_Identifier (Loc, Sname);
 
@@ -3327,7 +3357,7 @@ package body Sem_Ch13 is
       -- Build_Spec --
       ----------------
 
-      function  Build_Spec return Node_Id is
+      function Build_Spec return Node_Id is
       begin
          Subp_Id := Make_Defining_Identifier (Loc, Sname);
 
@@ -3393,11 +3423,7 @@ package body Sem_Ch13 is
    -- Rep_Item_Too_Early --
    ------------------------
 
-   function Rep_Item_Too_Early
-     (T     : Entity_Id;
-      N     : Node_Id)
-      return  Boolean
-   is
+   function Rep_Item_Too_Early (T : Entity_Id; N : Node_Id) return Boolean is
    begin
       --  Cannot apply rep items that are not operational items
       --  to generic types
@@ -3446,8 +3472,7 @@ package body Sem_Ch13 is
    function Rep_Item_Too_Late
      (T     : Entity_Id;
       N     : Node_Id;
-      FOnly : Boolean := False)
-      return  Boolean
+      FOnly : Boolean := False) return Boolean
    is
       S           : Entity_Id;
       Parent_Type : Entity_Id;
@@ -3618,6 +3643,10 @@ package body Sem_Ch13 is
                function Same_Rep return Boolean;
                --  CD1 and CD2 are either components or discriminants. This
                --  function tests whether the two have the same representation
+
+               --------------
+               -- Same_Rep --
+               --------------
 
                function Same_Rep return Boolean is
                begin
@@ -3850,15 +3879,32 @@ package body Sem_Ch13 is
          end if;
       end if;
 
-      --  Generate N_Validate_Unchecked_Conversion node for back end if
-      --  the back end needs to perform special validation checks. At the
-      --  current time, only the JVM version requires such checks.
+      --  If unchecked conversion to access type, and access type is
+      --  declared in the same unit as the unchecked conversion, then
+      --  set the No_Strict_Aliasing flag (no strict aliasing is
+      --  implicit in this situation).
 
-      if Java_VM then
-         Vnode :=
-           Make_Validate_Unchecked_Conversion (Sloc (N));
-         Set_Source_Type (Vnode, Source);
-         Set_Target_Type (Vnode, Target);
+      if Is_Access_Type (Target) and then
+        In_Same_Source_Unit (Target, N)
+      then
+         Set_No_Strict_Aliasing (Implementation_Base_Type (Target));
+      end if;
+
+      --  Generate N_Validate_Unchecked_Conversion node for back end in
+      --  case the back end needs to perform special validation checks.
+
+      --  Shouldn't this be in exp_ch13, since the check only gets done
+      --  if we have full expansion and the back end is called ???
+
+      Vnode :=
+        Make_Validate_Unchecked_Conversion (Sloc (N));
+      Set_Source_Type (Vnode, Source);
+      Set_Target_Type (Vnode, Target);
+
+      --  If the unchecked conversion node is in a list, just insert before
+      --  it. If not we have some strange case, not worth bothering about.
+
+      if Is_List_Member (N) then
          Insert_After (N, Vnode);
       end if;
    end Validate_Unchecked_Conversion;

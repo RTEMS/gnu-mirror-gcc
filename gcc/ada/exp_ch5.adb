@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2003, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2004, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -32,12 +32,14 @@ with Exp_Ch7;  use Exp_Ch7;
 with Exp_Ch11; use Exp_Ch11;
 with Exp_Dbug; use Exp_Dbug;
 with Exp_Pakd; use Exp_Pakd;
+with Exp_Tss;  use Exp_Tss;
 with Exp_Util; use Exp_Util;
 with Hostparm; use Hostparm;
 with Nlists;   use Nlists;
 with Nmake;    use Nmake;
 with Opt;      use Opt;
 with Restrict; use Restrict;
+with Rident;   use Rident;
 with Rtsfind;  use Rtsfind;
 with Sinfo;    use Sinfo;
 with Sem;      use Sem;
@@ -48,6 +50,7 @@ with Sem_Res;  use Sem_Res;
 with Sem_Util; use Sem_Util;
 with Snames;   use Snames;
 with Stand;    use Stand;
+with Stringt;  use Stringt;
 with Tbuild;   use Tbuild;
 with Ttypes;   use Ttypes;
 with Uintp;    use Uintp;
@@ -75,8 +78,7 @@ package body Exp_Ch5 is
       L_Type : Entity_Id;
       R_Type : Entity_Id;
       Ndim   : Pos;
-      Rev    : Boolean)
-      return   Node_Id;
+      Rev    : Boolean) return Node_Id;
    --  N is an assignment statement which assigns an array value. This routine
    --  expands the assignment into a loop (or nested loops for the case of a
    --  multi-dimensional array) to do the assignment component by component.
@@ -95,30 +97,20 @@ package body Exp_Ch5 is
    --  either because the target is not byte aligned, or there is a change
    --  of representation.
 
-   function Maybe_Bit_Aligned_Large_Component (N : Node_Id) return Boolean;
-   --  This function is used in processing the assignment of a record or
-   --  indexed component. The back end can handle such assignments fine
-   --  if the objects involved are small (64-bits) or are both aligned on
-   --  a byte boundary (starts on a byte, and ends on a byte). However,
-   --  problems arise for large components that are not byte aligned,
-   --  since the assignment may clobber other components that share bit
-   --  positions in the starting or ending bytes, and in the case of
-   --  components not starting on a byte boundary, the back end cannot
-   --  even manage to extract the value. This function is used to detect
-   --  such situations, so that the assignment can be handled component-wise.
-   --  A value of False means that either the object is known to be greater
-   --  than 64 bits, or that it is known to be byte aligned (and occupy an
-   --  integral number of bytes. True is returned if the object is known to
-   --  be greater than 64 bits, and is known to be unaligned. As implied
-   --  by the name, the result is conservative, in that if the compiler
-   --  cannot determine these conditions at compile time, True is returned.
-
    function Make_Tag_Ctrl_Assignment (N : Node_Id) return List_Id;
-   --  Generate the necessary code for controlled and Tagged assignment,
+   --  Generate the necessary code for controlled and tagged assignment,
    --  that is to say, finalization of the target before, adjustement of
    --  the target after and save and restore of the tag and finalization
    --  pointers which are not 'part of the value' and must not be changed
    --  upon assignment. N is the original Assignment node.
+
+   function Possible_Bit_Aligned_Component (N : Node_Id) return Boolean;
+   --  This function is used in processing the assignment of a record or
+   --  indexed component. The argument N is either the left hand or right
+   --  hand side of an assignment, and this function determines if there
+   --  is a record component reference where the record may be bit aligned
+   --  in a manner that causes trouble for the back end (see description
+   --  of Exp_Util.Component_May_Be_Bit_Aligned for further details).
 
    ------------------------------
    -- Change_Of_Representation --
@@ -126,7 +118,6 @@ package body Exp_Ch5 is
 
    function Change_Of_Representation (N : Node_Id) return Boolean is
       Rhs : constant Node_Id := Expression (N);
-
    begin
       return
         Nkind (Rhs) = N_Type_Conversion
@@ -171,6 +162,10 @@ package body Exp_Ch5 is
       --  This switch is set to True if the array move must be done using
       --  an explicit front end generated loop.
 
+      procedure Apply_Dereference (Arg : in out Node_Id);
+      --  If the argument is an access to an array, and the assignment is
+      --  converted into a procedure call, apply explicit dereference.
+
       function Has_Address_Clause (Exp : Node_Id) return Boolean;
       --  Test if Exp is a reference to an array whose declaration has
       --  an address clause, or it is a slice of such an array.
@@ -186,15 +181,19 @@ package body Exp_Ch5 is
       --  an object. Such objects can be aliased to parameters (unlike local
       --  array references).
 
-      function Possible_Unaligned_Slice (Arg : Node_Id) return Boolean;
-      --  Returns True if Arg (either the left or right hand side of the
-      --  assignment) is a slice that could be unaligned wrt the array type.
-      --  This is true if Arg is a component of a packed record, or is
-      --  a record component to which a component clause applies. This
-      --  is a little pessimistic, but the result of an unnecessary
-      --  decision that something is possibly unaligned is only to
-      --  generate a front end loop, which is not so terrible.
-      --  It would really be better if backend handled this ???
+      -----------------------
+      -- Apply_Dereference --
+      -----------------------
+
+      procedure Apply_Dereference (Arg : in out Node_Id) is
+         Typ : constant Entity_Id := Etype (Arg);
+      begin
+         if Is_Access_Type (Typ) then
+            Rewrite (Arg, Make_Explicit_Dereference (Loc,
+              Prefix => Relocate_Node (Arg)));
+            Analyze_And_Resolve (Arg, Designated_Type (Typ));
+         end if;
+      end Apply_Dereference;
 
       ------------------------
       -- Has_Address_Clause --
@@ -232,60 +231,6 @@ package body Exp_Ch5 is
             or else (Nkind (Exp) = N_Slice
                        and then Is_Non_Local_Array (Prefix (Exp)));
       end Is_Non_Local_Array;
-
-      ------------------------------
-      -- Possible_Unaligned_Slice --
-      ------------------------------
-
-      function Possible_Unaligned_Slice (Arg : Node_Id) return Boolean is
-      begin
-         --  No issue if this is not a slice, or else strict alignment
-         --  is not required in any case.
-
-         if Nkind (Arg) /= N_Slice
-           or else not Target_Strict_Alignment
-         then
-            return False;
-         end if;
-
-         --  No issue if the component type is a byte or byte aligned
-
-         declare
-            Array_Typ : constant Entity_Id := Etype (Arg);
-            Comp_Typ  : constant Entity_Id := Component_Type (Array_Typ);
-            Pref      : constant Node_Id   := Prefix (Arg);
-
-         begin
-            if Known_Alignment (Array_Typ) then
-               if Alignment (Array_Typ) = 1 then
-                  return False;
-               end if;
-
-            elsif Known_Component_Size (Array_Typ) then
-               if Component_Size (Array_Typ) = 1 then
-                  return False;
-               end if;
-
-            elsif Known_Esize (Comp_Typ) then
-               if Esize (Comp_Typ) <= System_Storage_Unit then
-                  return False;
-               end if;
-            end if;
-
-            --  No issue if this is not a selected component
-
-            if Nkind (Pref) /= N_Selected_Component then
-               return False;
-            end if;
-
-            --  Else we test for a possibly unaligned component
-
-            return
-              Is_Packed (Etype (Pref))
-                or else
-              Present (Component_Clause (Entity (Selector_Name (Pref))));
-         end;
-      end Possible_Unaligned_Slice;
 
       --  Determine if Lhs, Rhs are formal arrays or nonlocal arrays
 
@@ -372,9 +317,9 @@ package body Exp_Ch5 is
 
       --  We require a loop if the left side is possibly bit unaligned
 
-      elsif Maybe_Bit_Aligned_Large_Component (Lhs)
+      elsif Possible_Bit_Aligned_Component (Lhs)
               or else
-            Maybe_Bit_Aligned_Large_Component (Rhs)
+            Possible_Bit_Aligned_Component (Rhs)
       then
          Loop_Required := True;
 
@@ -498,9 +443,12 @@ package body Exp_Ch5 is
       --  statement, a length check has already been emitted to verify that
       --  the range of the left-hand side is empty.
 
+      --  Note that this code is not executed if we had an assignment of
+      --  a string literal to a non-bit aligned component of a record, a
+      --  case which cannot be handled by the backend
+
       elsif Nkind (Rhs) = N_String_Literal then
-         if Ekind (R_Type) = E_String_Literal_Subtype
-           and then String_Literal_Length (R_Type) = 0
+         if String_Length (Strval (Rhs)) = 0
            and then Is_Bit_Packed_Array (L_Type)
          then
             Rewrite (N, Make_Null_Statement (Loc));
@@ -516,8 +464,8 @@ package body Exp_Ch5 is
 
       elsif Is_Bit_Packed_Array (L_Type)
         or else Is_Bit_Packed_Array (R_Type)
-        or else Possible_Unaligned_Slice (Lhs)
-        or else Possible_Unaligned_Slice (Rhs)
+        or else Is_Possibly_Unaligned_Slice (Lhs)
+        or else Is_Possibly_Unaligned_Slice (Rhs)
       then
          Loop_Required := True;
 
@@ -531,7 +479,29 @@ package body Exp_Ch5 is
          end if;
       end if;
 
-      --  Come here to compelete the analysis
+      --  If the right-hand side is a string literal, introduce a temporary
+      --  for it, for use in the generated loop that will follow.
+
+      if Nkind (Rhs) = N_String_Literal then
+         declare
+            Temp : constant Entity_Id :=
+                     Make_Defining_Identifier (Loc, Name_T);
+            Decl : Node_Id;
+
+         begin
+            Decl :=
+              Make_Object_Declaration (Loc,
+                 Defining_Identifier => Temp,
+                 Object_Definition => New_Occurrence_Of (L_Type, Loc),
+                 Expression => Relocate_Node (Rhs));
+
+            Insert_Action (N, Decl);
+            Rewrite (Rhs, New_Occurrence_Of (Temp, Loc));
+            R_Type := Etype (Temp);
+         end;
+      end if;
+
+      --  Come here to complete the analysis
 
       --    Loop_Required: Set to True if we know that a loop is required
       --                   regardless of overlap considerations.
@@ -712,17 +682,50 @@ package body Exp_Ch5 is
          --  Cases where either Forwards_OK or Backwards_OK is true
 
          if Forwards_OK (N) or else Backwards_OK (N) then
-            Rewrite (N,
-              Expand_Assign_Array_Loop
-                (N, Larray, Rarray, L_Type, R_Type, Ndim,
-                 Rev => not Forwards_OK (N)));
+            if Controlled_Type (Component_Type (L_Type))
+              and then Base_Type (L_Type) = Base_Type (R_Type)
+              and then Ndim = 1
+              and then not No_Ctrl_Actions (N)
+            then
+               declare
+                  Proc : constant Entity_Id :=
+                           TSS (Base_Type (L_Type), TSS_Slice_Assign);
+                  Actuals : List_Id;
+
+               begin
+                  Apply_Dereference (Larray);
+                  Apply_Dereference (Rarray);
+                  Actuals := New_List (
+                    Duplicate_Subexpr (Larray,   Name_Req => True),
+                    Duplicate_Subexpr (Rarray,   Name_Req => True),
+                    Duplicate_Subexpr (Left_Lo,  Name_Req => True),
+                    Duplicate_Subexpr (Left_Hi,  Name_Req => True),
+                    Duplicate_Subexpr (Right_Lo, Name_Req => True),
+                    Duplicate_Subexpr (Right_Hi, Name_Req => True));
+
+                  Append_To (Actuals,
+                    New_Occurrence_Of (
+                      Boolean_Literals (not Forwards_OK (N)), Loc));
+
+                  Rewrite (N,
+                    Make_Procedure_Call_Statement (Loc,
+                      Name => New_Reference_To (Proc, Loc),
+                      Parameter_Associations => Actuals));
+               end;
+
+            else
+               Rewrite (N,
+                 Expand_Assign_Array_Loop
+                   (N, Larray, Rarray, L_Type, R_Type, Ndim,
+                    Rev => not Forwards_OK (N)));
+            end if;
 
          --  Case of both are false with No_Implicit_Conditionals
 
-         elsif Restrictions (No_Implicit_Conditionals) then
+         elsif Restriction_Active (No_Implicit_Conditionals) then
             declare
-               T : constant Entity_Id := Make_Defining_Identifier (Loc,
-                                           Chars => Name_T);
+                  T : constant Entity_Id :=
+                        Make_Defining_Identifier (Loc, Chars => Name_T);
 
             begin
                Rewrite (N,
@@ -814,19 +817,56 @@ package body Exp_Ch5 is
                    Right_Opnd => Cright_Lo);
             end if;
 
-            Rewrite (N,
-              Make_Implicit_If_Statement (N,
-                Condition => Condition,
+            if Controlled_Type (Component_Type (L_Type))
+              and then Base_Type (L_Type) = Base_Type (R_Type)
+              and then Ndim = 1
+              and then not No_Ctrl_Actions (N)
+            then
 
-                Then_Statements => New_List (
-                  Expand_Assign_Array_Loop
-                   (N, Larray, Rarray, L_Type, R_Type, Ndim,
-                    Rev => False)),
+               --  Call TSS procedure for array assignment, passing the
+               --  the explicit bounds of right- and left-hand side.
 
-                Else_Statements => New_List (
-                  Expand_Assign_Array_Loop
-                   (N, Larray, Rarray, L_Type, R_Type, Ndim,
-                    Rev => True))));
+               declare
+                  Proc    : constant Node_Id :=
+                              TSS (Base_Type (L_Type), TSS_Slice_Assign);
+                  Actuals : List_Id;
+
+               begin
+                  Apply_Dereference (Larray);
+                  Apply_Dereference (Rarray);
+                  Actuals := New_List (
+                    Duplicate_Subexpr (Larray,   Name_Req => True),
+                    Duplicate_Subexpr (Rarray,   Name_Req => True),
+                    Duplicate_Subexpr (Left_Lo,  Name_Req => True),
+                    Duplicate_Subexpr (Left_Hi,  Name_Req => True),
+                    Duplicate_Subexpr (Right_Lo, Name_Req => True),
+                    Duplicate_Subexpr (Right_Hi, Name_Req => True));
+
+                  Append_To (Actuals,
+                     Make_Op_Not (Loc,
+                       Right_Opnd => Condition));
+
+                  Rewrite (N,
+                    Make_Procedure_Call_Statement (Loc,
+                      Name => New_Reference_To (Proc, Loc),
+                      Parameter_Associations => Actuals));
+               end;
+
+            else
+               Rewrite (N,
+                 Make_Implicit_If_Statement (N,
+                   Condition => Condition,
+
+                   Then_Statements => New_List (
+                     Expand_Assign_Array_Loop
+                      (N, Larray, Rarray, L_Type, R_Type, Ndim,
+                       Rev => False)),
+
+                   Else_Statements => New_List (
+                     Expand_Assign_Array_Loop
+                      (N, Larray, Rarray, L_Type, R_Type, Ndim,
+                       Rev => True))));
+            end if;
          end if;
 
          Analyze (N, Suppress => All_Checks);
@@ -871,8 +911,7 @@ package body Exp_Ch5 is
       L_Type : Entity_Id;
       R_Type : Entity_Id;
       Ndim   : Pos;
-      Rev    : Boolean)
-      return   Node_Id
+      Rev    : Boolean) return Node_Id
    is
       Loc  : constant Source_Ptr := Sloc (N);
 
@@ -1026,9 +1065,9 @@ package body Exp_Ch5 is
       --  clobbering of other components sharing bits in the first or
       --  last byte of the component to be assigned.
 
-      elsif Maybe_Bit_Aligned_Large_Component (Lhs)
+      elsif Possible_Bit_Aligned_Component (Lhs)
               or
-            Maybe_Bit_Aligned_Large_Component (Rhs)
+            Possible_Bit_Aligned_Component (Rhs)
       then
          null;
 
@@ -1502,6 +1541,19 @@ package body Exp_Ch5 is
            (Expression (Rhs), Designated_Type (Etype (Lhs)));
       end if;
 
+      --  Ada 2005 (AI-231): Generate conversion to the null-excluding
+      --  type to force the corresponding run-time check
+
+      if Is_Access_Type (Typ)
+        and then
+          ((Is_Entity_Name (Lhs) and then Can_Never_Be_Null (Entity (Lhs)))
+             or else Can_Never_Be_Null (Etype (Lhs)))
+      then
+         Rewrite (Rhs, Convert_To (Etype (Lhs),
+                                   Relocate_Node (Rhs)));
+         Analyze_And_Resolve (Rhs, Etype (Lhs));
+      end if;
+
       --  If we are assigning an access type and the left side is an
       --  entity, then make sure that Is_Known_Non_Null properly
       --  reflects the state of the entity after the assignment
@@ -1629,7 +1681,7 @@ package body Exp_Ch5 is
                --  This is skipped if we have no finalization
 
                if Expand_Ctrl_Actions
-                 and then not Restrictions (No_Finalization)
+                 and then not Restriction_Active (No_Finalization)
                then
                   L := New_List (
                     Make_Block_Statement (Loc,
@@ -2234,8 +2286,8 @@ package body Exp_Ch5 is
          and then List_Length (Else_Statements (N)) = 1
       then
          declare
-            Then_Stm : Node_Id := First (Then_Statements (N));
-            Else_Stm : Node_Id := First (Else_Statements (N));
+            Then_Stm : constant Node_Id := First (Then_Statements (N));
+            Else_Stm : constant Node_Id := First (Else_Statements (N));
 
          begin
             if Nkind (Then_Stm) = N_Return_Statement
@@ -2980,12 +3032,7 @@ package body Exp_Ch5 is
 
       Res       : List_Id;
       Tag_Tmp   : Entity_Id;
-      Prev_Tmp  : Entity_Id;
-      Next_Tmp  : Entity_Id;
-      Ctrl_Ref  : Node_Id;
-      Ctrl_Ref2 : Node_Id   := Empty;
-      Prev_Tmp2 : Entity_Id := Empty;  -- prevent warning
-      Next_Tmp2 : Entity_Id := Empty;  -- prevent warning
+      Original_Size, Range_Type, Opaque_Type : Entity_Id;
 
    begin
       Res := New_List;
@@ -3023,8 +3070,6 @@ package body Exp_Ch5 is
              With_Detach => New_Reference_To (Standard_False, Loc)));
       end if;
 
-      Next_Tmp := Make_Defining_Identifier (Loc, New_Internal_Name ('C'));
-
       --  Save the Tag in a local variable Tag_Tmp
 
       if Save_Tag then
@@ -3046,102 +3091,263 @@ package body Exp_Ch5 is
          Tag_Tmp := Empty;
       end if;
 
-      --  Save the Finalization Pointers in local variables Prev_Tmp and
-      --  Next_Tmp. For objects with Has_Controlled_Component set, these
-      --  pointers are in the Record_Controller and if it is also
-      --  Is_Controlled, we need to save the object pointers as well.
+      --  We really need a comment here ???
 
       if Ctrl_Act then
-         Ctrl_Ref := Duplicate_Subexpr_No_Checks (L);
 
-         if Has_Controlled_Component (T) then
-            Ctrl_Ref :=
-              Make_Selected_Component (Loc,
-                Prefix => Ctrl_Ref,
-                Selector_Name =>
-                  New_Reference_To (Controller_Component (T), Loc));
+         --  subtype G is Storage_Offset range 1 .. Expr'Size
+
+         Original_Size :=
+           Make_Defining_Identifier (Loc,
+             New_Internal_Name ('S'));
+
+         Append_To (Res,
+           Make_Object_Declaration (Loc,
+             Defining_Identifier => Original_Size,
+             Constant_Present    => True,
+             Object_Definition   => New_Occurrence_Of (
+               RTE (RE_Storage_Offset), Loc),
+             Expression          =>
+               Make_Op_Divide (Loc,
+                 Left_Opnd =>
+                   Make_Attribute_Reference (Loc,
+                     Prefix =>
+                       Duplicate_Subexpr_No_Checks (L),
+                     Attribute_Name => Name_Size),
+                 Right_Opnd => Make_Integer_Literal (Loc,
+                     Intval => System_Storage_Unit))));
+
+         Range_Type :=
+           Make_Defining_Identifier (Loc,
+             New_Internal_Name ('G'));
+
+         Append_To (Res,
+           Make_Subtype_Declaration (Loc,
+             Defining_Identifier => Range_Type,
+             Subtype_Indication =>
+               Make_Subtype_Indication (Loc,
+                 Subtype_Mark =>
+                   New_Reference_To (RTE (RE_Storage_Offset), Loc),
+                 Constraint   => Make_Range_Constraint (Loc,
+                   Range_Expression =>
+                     Make_Range (Loc,
+                       Low_Bound  => Make_Integer_Literal (Loc, 1),
+                       High_Bound => New_Occurrence_Of (
+                         Original_Size, Loc))))));
+
+         --  subtype S is Storage_Array (G)
+
+         Append_To (Res,
+           Make_Subtype_Declaration (Loc,
+             Defining_Identifier =>
+               Make_Defining_Identifier (Loc,
+                 New_Internal_Name ('S')),
+             Subtype_Indication  =>
+               Make_Subtype_Indication (Loc,
+                 Subtype_Mark =>
+                   New_Reference_To (RTE (RE_Storage_Array), Loc),
+                 Constraint =>
+                   Make_Index_Or_Discriminant_Constraint (Loc,
+                     Constraints =>
+                       New_List (New_Reference_To (Range_Type, Loc))))));
+
+         --  type A is access S
+
+         Opaque_Type := Make_Defining_Identifier (Loc,
+           New_Internal_Name ('A'));
+         Append_To (Res,
+           Make_Full_Type_Declaration (Loc,
+             Defining_Identifier => Opaque_Type,
+             Type_Definition     =>
+               Make_Access_To_Object_Definition (Loc,
+                 Subtype_Indication =>
+                   New_Occurrence_Of (
+                     Defining_Identifier (Last (Res)), Loc))));
+
+         --  Give a label name to this declare block, and add comments here???
+
+         declare
+            Prev_Ref : Node_Id;
+
+            First_After_Root : Node_Id := Empty;
+            --  Index of first byte to be copied (used to skip
+            --  Root_Controlled in controlled objects).
+
+            Last_Before_Hole : Node_Id := Empty;
+            --  Index of last byte to be copied before outermost record
+            --  controller data.
+
+            Hole_Length      : Node_Id := Empty;
+            --  Length of record controller data (Prev and Next pointers)
+
+            First_After_Hole : Node_Id := Empty;
+            --  Index of first byte to be copied after outermost record
+            --  controller data.
+
+            function Build_Slice
+              (Rec    : Entity_Id;
+               Lo, Hi : Node_Id) return Node_Id;
+            --  Function specs must have comments, saying what all the
+            --  parameters are and what the function does ???
+
+            -----------------
+            -- Build_Slice --
+            -----------------
+
+            function Build_Slice
+              (Rec    : Node_Id;
+               Lo, Hi : Node_Id) return Node_Id
+            is
+               Lo_Bound, Hi_Bound : Node_Id;
+
+               Opaque : constant Node_Id :=
+                          Unchecked_Convert_To (Opaque_Type,
+                            Make_Attribute_Reference (Loc,
+                              Prefix         => Rec,
+                              Attribute_Name => Name_Address));
+               --  Comment required, what is this???
+
+            begin
+               --  Comments required in this body ???
+
+               if No (Lo) then
+                  Lo_Bound := Make_Integer_Literal (Loc, 1);
+               else
+                  Lo_Bound := Lo;
+               end if;
+
+               if No (Hi) then
+                  Hi_Bound := Make_Attribute_Reference (Loc,
+                    Prefix => New_Occurrence_Of (Range_Type, Loc),
+                    Attribute_Name => Name_Last);
+               else
+                  Hi_Bound := Hi;
+               end if;
+
+               return Make_Slice (Loc,
+                 Prefix =>
+                   Opaque,
+                 Discrete_Range => Make_Range (Loc,
+                   Lo_Bound, Hi_Bound));
+            end Build_Slice;
+
+         --  Start of processing for ??? (name of block)
+
+         begin
+            First_After_Root := Make_Integer_Literal (Loc, 1);
+
+            --  Comment ???
 
             if Is_Controlled (T) then
-               Ctrl_Ref2 := Duplicate_Subexpr_No_Checks (L);
+               First_After_Root :=
+                 Make_Op_Add (Loc,
+                   First_After_Root,
+                   Make_Op_Divide (Loc,
+                     Make_Attribute_Reference (Loc,
+                       Prefix =>
+                         New_Occurrence_Of (RTE (RE_Root_Controlled), Loc),
+                       Attribute_Name => Name_Size),
+                     Make_Integer_Literal (Loc, System_Storage_Unit)));
             end if;
-         end if;
 
-         Prev_Tmp := Make_Defining_Identifier (Loc, New_Internal_Name ('B'));
+            if Has_Controlled_Component (T) then
 
-         Append_To (Res,
-           Make_Object_Declaration (Loc,
-             Defining_Identifier => Prev_Tmp,
+               --  The record controller Prev and Next pointers must be left
+               --  intact in the target object, not copied. Compute the bounds
+               --  of the hole to be skipped in copying the objecct.
 
-             Object_Definition =>
-               New_Reference_To (RTE (RE_Finalizable_Ptr), Loc),
+               Prev_Ref :=
+                 Make_Selected_Component (Loc,
+                   Prefix =>
+                     Make_Selected_Component (Loc,
+                       Prefix => Duplicate_Subexpr_No_Checks (L),
+                       Selector_Name =>
+                         New_Reference_To (Controller_Component (T), Loc)),
+                   Selector_Name =>  Make_Identifier (Loc, Name_Prev));
 
-             Expression =>
-               Make_Selected_Component (Loc,
-                 Prefix =>
-                   Unchecked_Convert_To (RTE (RE_Finalizable), Ctrl_Ref),
-                 Selector_Name => Make_Identifier (Loc, Name_Prev))));
+               --  Last index before hole
 
-         Next_Tmp := Make_Defining_Identifier (Loc, New_Internal_Name ('C'));
+               Last_Before_Hole :=
+                 Make_Defining_Identifier (Loc,
+                   New_Internal_Name ('L'));
 
-         Append_To (Res,
-           Make_Object_Declaration (Loc,
-             Defining_Identifier => Next_Tmp,
+               Append_To (Res,
+                 Make_Object_Declaration (Loc,
+                   Defining_Identifier => Last_Before_Hole,
+                   Object_Definition   => New_Occurrence_Of (
+                     RTE (RE_Storage_Offset), Loc),
+                   Constant_Present    => True,
+                   Expression          => Make_Op_Add (Loc,
+                       Make_Attribute_Reference (Loc,
+                         Prefix => Prev_Ref,
+                         Attribute_Name => Name_Position),
+                       Make_Attribute_Reference (Loc,
+                         Prefix => New_Copy_Tree (Prefix (Prev_Ref)),
+                         Attribute_Name => Name_Position))));
 
-             Object_Definition =>
-               New_Reference_To (RTE (RE_Finalizable_Ptr), Loc),
+               --  Hole length
 
-             Expression =>
-               Make_Selected_Component (Loc,
-                 Prefix =>
-                   Unchecked_Convert_To (RTE (RE_Finalizable),
-                     New_Copy_Tree (Ctrl_Ref)),
-                 Selector_Name => Make_Identifier (Loc, Name_Next))));
+               Hole_Length :=
+                 Make_Op_Multiply (Loc,
+                   Make_Integer_Literal (Loc, Uint_2),
+                     Make_Op_Divide (Loc,
+                       Make_Attribute_Reference (Loc,
+                         Prefix =>
+                           New_Copy_Tree (Prev_Ref),
+                         Attribute_Name =>
+                           Name_Size),
+                     Make_Integer_Literal (Loc, System_Storage_Unit)));
 
-         if Present (Ctrl_Ref2) then
-            Prev_Tmp2 :=
-              Make_Defining_Identifier (Loc, New_Internal_Name ('B'));
+               --  First index after hole
 
-            Append_To (Res,
-              Make_Object_Declaration (Loc,
-                Defining_Identifier => Prev_Tmp2,
+               First_After_Hole :=
+                 Make_Defining_Identifier (Loc,
+                   New_Internal_Name ('F'));
 
-                Object_Definition =>
-                  New_Reference_To (RTE (RE_Finalizable_Ptr), Loc),
+               Append_To (Res,
+                 Make_Object_Declaration (Loc,
+                   Defining_Identifier => First_After_Hole,
+                   Object_Definition   => New_Occurrence_Of (
+                     RTE (RE_Storage_Offset), Loc),
+                   Constant_Present    => True,
+                   Expression          =>
+                     Make_Op_Add (Loc,
+                       Make_Op_Add (Loc,
+                         New_Occurrence_Of (Last_Before_Hole, Loc),
+                         Hole_Length),
+                       Make_Integer_Literal (Loc, 1))));
 
-                Expression =>
-                  Make_Selected_Component (Loc,
-                    Prefix =>
-                      Unchecked_Convert_To (RTE (RE_Finalizable), Ctrl_Ref2),
-                    Selector_Name => Make_Identifier (Loc, Name_Prev))));
+               Last_Before_Hole := New_Occurrence_Of (Last_Before_Hole, Loc);
+               First_After_Hole := New_Occurrence_Of (First_After_Hole, Loc);
+            end if;
 
-            Next_Tmp2 :=
-              Make_Defining_Identifier (Loc, New_Internal_Name ('C'));
+            --  More comments needed everywhere ???
 
-            Append_To (Res,
-              Make_Object_Declaration (Loc,
-                Defining_Identifier => Next_Tmp2,
+            Append_To (Res, Make_Assignment_Statement (Loc,
+              Name       => Build_Slice (Duplicate_Subexpr_No_Checks (L),
+                                         First_After_Root,
+                                         Last_Before_Hole),
 
-                Object_Definition =>
-                  New_Reference_To (RTE (RE_Finalizable_Ptr), Loc),
+              Expression => Build_Slice (Expression (N),
+                                         First_After_Root,
+                                         New_Copy_Tree (Last_Before_Hole))));
 
-                Expression =>
-                  Make_Selected_Component (Loc,
-                    Prefix =>
-                      Unchecked_Convert_To (RTE (RE_Finalizable),
-                        New_Copy_Tree (Ctrl_Ref2)),
-                    Selector_Name => Make_Identifier (Loc, Name_Next))));
-         end if;
 
-      --  If not controlled type, then Prev_Tmp and Ctrl_Ref unused
+            if Present (First_After_Hole) then
+               Remove_Side_Effects (Expression (N));
+               Append_To (Res, Make_Assignment_Statement (Loc,
+                 Name       => Build_Slice (Duplicate_Subexpr_No_Checks (L),
+                                            First_After_Hole,
+                                            Empty),
+                 Expression => Build_Slice (New_Copy_Tree (Expression (N)),
+                                            New_Copy_Tree (First_After_Hole),
+                                            Empty)));
+            end if;
+         end;
 
       else
-         Prev_Tmp := Empty;
-         Ctrl_Ref := Empty;
+         Append_To (Res, Relocate_Node (N));
       end if;
-
-      --  Do the Assignment
-
-      Append_To (Res, Relocate_Node (N));
 
       --  Restore the Tag
 
@@ -3155,55 +3361,8 @@ package body Exp_Ch5 is
              Expression => New_Reference_To (Tag_Tmp, Loc)));
       end if;
 
-      --  Restore the finalization pointers
-
-      if Ctrl_Act then
-         Append_To (Res,
-           Make_Assignment_Statement (Loc,
-             Name =>
-               Make_Selected_Component (Loc,
-                 Prefix =>
-                   Unchecked_Convert_To (RTE (RE_Finalizable),
-                     New_Copy_Tree (Ctrl_Ref)),
-                 Selector_Name => Make_Identifier (Loc, Name_Prev)),
-             Expression => New_Reference_To (Prev_Tmp, Loc)));
-
-         Append_To (Res,
-           Make_Assignment_Statement (Loc,
-             Name =>
-               Make_Selected_Component (Loc,
-                 Prefix =>
-                   Unchecked_Convert_To (RTE (RE_Finalizable),
-                     New_Copy_Tree (Ctrl_Ref)),
-                 Selector_Name => Make_Identifier (Loc, Name_Next)),
-             Expression => New_Reference_To (Next_Tmp, Loc)));
-
-         if Present (Ctrl_Ref2) then
-            Append_To (Res,
-              Make_Assignment_Statement (Loc,
-                Name =>
-                  Make_Selected_Component (Loc,
-                    Prefix =>
-                      Unchecked_Convert_To (RTE (RE_Finalizable),
-                        New_Copy_Tree (Ctrl_Ref2)),
-                    Selector_Name => Make_Identifier (Loc, Name_Prev)),
-                Expression => New_Reference_To (Prev_Tmp2, Loc)));
-
-            Append_To (Res,
-              Make_Assignment_Statement (Loc,
-                Name =>
-                  Make_Selected_Component (Loc,
-                    Prefix =>
-                      Unchecked_Convert_To (RTE (RE_Finalizable),
-                        New_Copy_Tree (Ctrl_Ref2)),
-                    Selector_Name => Make_Identifier (Loc, Name_Next)),
-                Expression => New_Reference_To (Next_Tmp2, Loc)));
-         end if;
-      end if;
-
-      --  Adjust the target after the assignment when controlled. (not in
-      --  the init proc since it is an initialization more than an
-      --  assignment)
+      --  Adjust the target after the assignment when controlled (not in the
+      --  init proc since it is an initialization more than an assignment).
 
       if Ctrl_Act then
          Append_List_To (Res,
@@ -3217,15 +3376,17 @@ package body Exp_Ch5 is
       return Res;
 
    exception
+      --  Could use comment here ???
+
       when RE_Not_Available =>
          return Empty_List;
    end Make_Tag_Ctrl_Assignment;
 
-   ---------------------------------------
-   -- Maybe_Bit_Aligned_Large_Component --
-   ---------------------------------------
+   ------------------------------------
+   -- Possible_Bit_Aligned_Component --
+   ------------------------------------
 
-   function Maybe_Bit_Aligned_Large_Component (N : Node_Id) return Boolean is
+   function Possible_Bit_Aligned_Component (N : Node_Id) return Boolean is
    begin
       case Nkind (N) is
 
@@ -3250,7 +3411,7 @@ package body Exp_Ch5 is
                --  indexing from a possibly unaligned component.
 
                else
-                  return Maybe_Bit_Aligned_Large_Component (P);
+                  return Possible_Bit_Aligned_Component (P);
                end if;
             end;
 
@@ -3267,34 +3428,10 @@ package body Exp_Ch5 is
                --  unless it is forced to do so. In the clear means we need
                --  only the recursive test on the prefix.
 
-               if No (Component_Clause (Comp)) then
-                  return Maybe_Bit_Aligned_Large_Component (P);
-
-               --  Otherwise we have a component clause, which means that
-               --  the Esize and Normalized_First_Bit fields are set and
-               --  contain static values known at compile time.
-
+               if Component_May_Be_Bit_Aligned (Comp) then
+                  return True;
                else
-                  --  If we know the size is 64 bits or less we are fine
-                  --  since the back end always handles small fields right.
-
-                  if Esize (Comp) <= 64 then
-                     return False;
-
-                  --  Otherwise if the component is not byte aligned, we
-                  --  know we have the nasty unaligned case.
-
-                  elsif Normalized_First_Bit (Comp) /= Uint_0
-                    or else Esize (Comp) mod System_Storage_Unit /= Uint_0
-                  then
-                     return True;
-
-                  --  If we are large and byte aligned, then OK at this level
-                  --  but we still need to test our prefix recursively.
-
-                  else
-                     return Maybe_Bit_Aligned_Large_Component (P);
-                  end if;
+                  return Possible_Bit_Aligned_Component (P);
                end if;
             end;
 
@@ -3306,6 +3443,6 @@ package body Exp_Ch5 is
             return False;
 
       end case;
-   end Maybe_Bit_Aligned_Large_Component;
+   end Possible_Bit_Aligned_Component;
 
 end Exp_Ch5;

@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2003 Free Software Foundation, Inc.          --
+--          Copyright (C) 1992-2004 Free Software Foundation, Inc.          --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -89,16 +89,18 @@ procedure Load is
 
    function Same_File_Name_Except_For_Case
      (Expected_File_Name : File_Name_Type;
-      Actual_File_Name   : File_Name_Type)
-      return               Boolean;
+      Actual_File_Name   : File_Name_Type) return Boolean;
    --  Given an actual file name and an expected file name (the latter being
    --  derived from the unit name), determine if they are the same except for
    --  possibly different casing of letters.
 
+   ------------------------------------
+   -- Same_File_Name_Except_For_Case --
+   ------------------------------------
+
    function Same_File_Name_Except_For_Case
      (Expected_File_Name : File_Name_Type;
-      Actual_File_Name   : File_Name_Type)
-      return               Boolean
+      Actual_File_Name   : File_Name_Type) return Boolean
    is
    begin
       Get_Name_String (Actual_File_Name);
@@ -148,7 +150,9 @@ begin
    --  Next step, make sure that the unit name matches the file name
    --  and issue a warning message if not. We only output this for the
    --  main unit, since for other units it is more serious and is
-   --  caught in a separate test below.
+   --  caught in a separate test below. We also inhibit the message in
+   --  multiple unit per file mode, because in this case the relation
+   --  between file name and unit name is broken.
 
    File_Name :=
      Get_File_Name
@@ -156,6 +160,7 @@ begin
         Subunit => Nkind (Unit (Cunit (Cur_Unum))) = N_Subunit);
 
    if Cur_Unum = Main_Unit
+     and then Multiple_Unit_Index = 0
      and then File_Name /= Unit_File_Name (Cur_Unum)
      and then (File_Names_Case_Sensitive
                 or not Same_File_Name_Except_For_Case
@@ -336,7 +341,6 @@ begin
       if Unum /= No_Unit then
          Set_Library_Unit (Curunit, Cunit (Unum));
       end if;
-
    end if;
 
    --  Now we load with'ed units, with style/validity checks turned off
@@ -350,7 +354,6 @@ begin
 
    Context_Node := First (Context_Items (Curunit));
    while Present (Context_Node) loop
-
       if Nkind (Context_Node) = N_With_Clause then
          With_Node := Context_Node;
          Spec_Name := Get_Unit_Name (With_Node);

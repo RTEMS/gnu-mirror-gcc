@@ -17,7 +17,6 @@ details.  */
 
 #include <gnu/java/net/PlainDatagramSocketImpl.h>
 #include <java/io/IOException.h>
-#include <java/io/InterruptedIOException.h>
 #include <java/net/BindException.h>
 #include <java/net/SocketException.h>
 #include <java/net/InetAddress.h>
@@ -203,7 +202,7 @@ gnu::java::net::PlainDatagramSocketImpl::peekData(::java::net::DatagramPacket *p
   union SockAddr u;
   socklen_t addrlen = sizeof(u);
   jbyte *dbytes = elements (p->getData()) + p->getOffset();
-  jint maxlen = p->getData()->length - p->getOffset();
+  jint maxlen = p->maxlen - p->getOffset();
   ssize_t retlen = 0;
 
   if (timeout > 0)
@@ -241,7 +240,7 @@ gnu::java::net::PlainDatagramSocketImpl::peekData(::java::net::DatagramPacket *p
 
   p->setAddress (new ::java::net::InetAddress (raddr, NULL));
   p->setPort (rport);
-  p->setLength ((jint) retlen);
+  p->length = (jint) retlen;
   return rport;
 
 error:
@@ -274,6 +273,8 @@ gnu::java::net::PlainDatagramSocketImpl::close ()
 void
 gnu::java::net::PlainDatagramSocketImpl::send (::java::net::DatagramPacket *p)
 {
+  JvSynchronize lock (SEND_LOCK);
+
   // FIXME: Deal with Multicast and if the socket is connected.
   jint rport = p->getPort();
   union SockAddr u;
@@ -314,11 +315,13 @@ gnu::java::net::PlainDatagramSocketImpl::send (::java::net::DatagramPacket *p)
 void
 gnu::java::net::PlainDatagramSocketImpl::receive (::java::net::DatagramPacket *p)
 {
+  JvSynchronize lock (RECEIVE_LOCK);
+
   // FIXME: Deal with Multicast and if the socket is connected.
   union SockAddr u;
   socklen_t addrlen = sizeof(u);
   jbyte *dbytes = elements (p->getData()) + p->getOffset();
-  jint maxlen = p->getData()->length - p->getOffset();
+  jint maxlen = p->maxlen - p->getOffset();
   ssize_t retlen = 0;
 
   if (timeout > 0)
@@ -359,7 +362,7 @@ gnu::java::net::PlainDatagramSocketImpl::receive (::java::net::DatagramPacket *p
 
   p->setAddress (new ::java::net::InetAddress (raddr, NULL));
   p->setPort (rport);
-  p->setLength ((jint) retlen);
+  p->length = (jint) retlen;
   return;
 
  error:

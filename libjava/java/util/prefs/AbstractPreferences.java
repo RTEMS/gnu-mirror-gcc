@@ -38,13 +38,14 @@ exception statement from your version. */
 
 package java.util.prefs;
 
+import gnu.java.util.prefs.NodeWriter;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Iterator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.TreeSet;
-import gnu.java.util.prefs.NodeWriter;
 
 /**
  * Partial implementation of a Preference node.
@@ -118,7 +119,7 @@ public abstract class AbstractPreferences extends Preferences {
             throw new IllegalArgumentException("Illegal name argument '"
                                                + name
                                                + "' (parent is "
-                                               + parent == null ? "" : "not "
+                                               + (parent == null ? "" : "not ")
                                                + "null)");
         this.parent = parent;
         this.name = name;
@@ -180,6 +181,16 @@ public abstract class AbstractPreferences extends Preferences {
         return (isUserNode() ? "User":"System")
                + " Preference Node: "
                + absolutePath();
+    }
+
+    /**
+     * Returns all known unremoved children of this node.
+     *
+     * @return All known unremoved children of this node
+     */
+    protected final AbstractPreferences[] cachedChildren()
+    {
+      return (AbstractPreferences[]) childCache.values().toArray();
     }
 
     /**

@@ -1,5 +1,5 @@
 /* Graph coloring register allocator
-   Copyright (C) 2001, 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Michael Matz <matz@suse.de>
    and Daniel Berlin <dan@cgsoftware.com>.
 
@@ -352,7 +352,7 @@ choose_spill_colors (void)
 	    && HARD_REGNO_MODE_OK (c, PSEUDO_REGNO_MODE (web->regno)))
 	  {
 	    int i, size;
-	    size = HARD_REGNO_NREGS (c, PSEUDO_REGNO_MODE (web->regno));
+	    size = hard_regno_nregs[c][PSEUDO_REGNO_MODE (web->regno)];
 	    for (i = 1; i < size
 		 && TEST_HARD_REG_BIT (avail, c + i); i++);
 	    if (i == size)
@@ -444,8 +444,8 @@ rewrite_program (bitmap new_deaths)
 		end_sequence ();
 		emit_insn_before (insns, insn);
 
-	        if (bb->head == insn)
-		  bb->head = NEXT_INSN (prev);
+	        if (BB_HEAD (bb) == insn)
+		  BB_HEAD (bb) = NEXT_INSN (prev);
 		for (insn = PREV_INSN (insn); insn != prev;
 		     insn = PREV_INSN (insn))
 		  {
@@ -492,8 +492,8 @@ rewrite_program (bitmap new_deaths)
 	      if (insns)
 		{
 		  emit_insn_after (insns, insn);
-		  if (bb->end == insn)
-		    bb->end = PREV_INSN (following);
+		  if (BB_END (bb) == insn)
+		    BB_END (bb) = PREV_INSN (following);
 		  for (insn = insns; insn != following; insn = NEXT_INSN (insn))
 		    {
 		      set_block_for_insn (insn, bb);
@@ -562,7 +562,7 @@ slots_overlap_p (rtx s1, rtx s2)
   if (GET_CODE (s1) != GET_CODE (s2))
     return 0;
 
-  if (GET_CODE (s1) == REG && GET_CODE (s2) == REG)
+  if (REG_P (s1) && REG_P (s2))
     {
       if (REGNO (s1) != REGNO (s2))
 	return 0;
@@ -570,14 +570,14 @@ slots_overlap_p (rtx s1, rtx s2)
 	return 0;
       return 1;
     }
-  if (GET_CODE (s1) != MEM || GET_CODE (s2) != MEM)
+  if (!MEM_P (s1) || GET_CODE (s2) != MEM)
     abort ();
   s1 = XEXP (s1, 0);
   s2 = XEXP (s2, 0);
-  if (GET_CODE (s1) != PLUS || GET_CODE (XEXP (s1, 0)) != REG
+  if (GET_CODE (s1) != PLUS || !REG_P (XEXP (s1, 0))
       || GET_CODE (XEXP (s1, 1)) != CONST_INT)
     return 1;
-  if (GET_CODE (s2) != PLUS || GET_CODE (XEXP (s2, 0)) != REG
+  if (GET_CODE (s2) != PLUS || !REG_P (XEXP (s2, 0))
       || GET_CODE (XEXP (s2, 1)) != CONST_INT)
     return 1;
   base1 = XEXP (s1, 0);
@@ -637,7 +637,7 @@ insert_stores (bitmap new_deaths)
 
       /* If we reach a basic block border, which has more than one
 	 outgoing edge, we simply forget all already emitted stores.  */
-      if (GET_CODE (insn) == BARRIER
+      if (BARRIER_P (insn)
 	  || JUMP_P (insn) || can_throw_internal (insn))
 	{
 	  last_slot = NULL_RTX;
@@ -685,8 +685,8 @@ insert_stores (bitmap new_deaths)
 		  if (insns)
 		    {
 		      emit_insn_after (insns, insn);
-		      if (bb->end == insn)
-			bb->end = PREV_INSN (following);
+		      if (BB_END (bb) == insn)
+			BB_END (bb) = PREV_INSN (following);
 		      for (ni = insns; ni != following; ni = NEXT_INSN (ni))
 			{
 			  set_block_for_insn (ni, bb);
@@ -722,7 +722,7 @@ insert_stores (bitmap new_deaths)
 	    slots = NULL;
 	  else
 	    {
-	      if (1 || GET_CODE (SET_SRC (set)) == MEM)
+	      if (1 || MEM_P (SET_SRC (set)))
 	        delete_overlapping_slots (&slots, SET_SRC (set));
 	    }
 	}
@@ -742,9 +742,9 @@ spill_same_color_p (struct web *web1, struct web *web2)
     return 0;
 
   size1 = web1->type == PRECOLORED
-          ? 1 : HARD_REGNO_NREGS (c1, PSEUDO_REGNO_MODE (web1->regno));
+          ? 1 : hard_regno_nregs[c1][PSEUDO_REGNO_MODE (web1->regno)];
   size2 = web2->type == PRECOLORED
-          ? 1 : HARD_REGNO_NREGS (c2, PSEUDO_REGNO_MODE (web2->regno));
+          ? 1 : hard_regno_nregs[c2][PSEUDO_REGNO_MODE (web2->regno)];
   if (c1 >= c2 + size2 || c2 >= c1 + size1)
     return 0;
   return 1;
@@ -779,7 +779,7 @@ update_spill_colors (HARD_REG_SET *in_use, struct web *web, int add)
   if ((c = alias (find_web_for_subweb (web))->color) < 0
       || c == an_unusable_color)
     return;
-  size = HARD_REGNO_NREGS (c, GET_MODE (web->orig_x));
+  size = hard_regno_nregs[c][GET_MODE (web->orig_x)];
   if (SUBWEB_P (web))
     {
       c += subreg_regno_offset (c, GET_MODE (SUBREG_REG (web->orig_x)),
@@ -810,7 +810,7 @@ spill_is_free (HARD_REG_SET *in_use, struct web *web)
   if (c == an_unusable_color)
     return 1;
   size = web->type == PRECOLORED
-         ? 1 : HARD_REGNO_NREGS (c, PSEUDO_REGNO_MODE (web->regno));
+         ? 1 : hard_regno_nregs[c][PSEUDO_REGNO_MODE (web->regno)];
   for (; size--;)
     if (TEST_HARD_REG_BIT (*in_use, c + size))
       return 0;
@@ -941,8 +941,8 @@ emit_loads (struct rewrite_info *ri, int nl_first_reload, rtx last_block_insn)
 	  rtx foll = NEXT_INSN (after);
 	  bb = BLOCK_FOR_INSN (after);
 	  emit_insn_after (ni, after);
-	  if (bb->end == after)
-	    bb->end = PREV_INSN (foll);
+	  if (BB_END (bb) == after)
+	    BB_END (bb) = PREV_INSN (foll);
 	  for (ni = NEXT_INSN (after); ni != foll; ni = NEXT_INSN (ni))
 	    {
 	      set_block_for_insn (ni, bb);
@@ -954,8 +954,8 @@ emit_loads (struct rewrite_info *ri, int nl_first_reload, rtx last_block_insn)
 	  rtx prev = PREV_INSN (before);
 	  bb = BLOCK_FOR_INSN (before);
 	  emit_insn_before (ni, before);
-	  if (bb->head == before)
-	    bb->head = NEXT_INSN (prev);
+	  if (BB_HEAD (bb) == before)
+	    BB_HEAD (bb) = NEXT_INSN (prev);
 	  for (; ni != before; ni = NEXT_INSN (ni))
 	    {
 	      set_block_for_insn (ni, bb);
@@ -1130,6 +1130,8 @@ rewrite_program2 (bitmap new_deaths)
 	  struct ra_insn_info info;
 	  unsigned int n;
 
+	  memset (&info, 0, sizeof info);
+
 	  if (INSN_P (insn) && BLOCK_FOR_INSN (insn) != last_bb)
 	    {
 	      int index = BLOCK_FOR_INSN (insn)->index + 2;
@@ -1250,7 +1252,7 @@ rewrite_program2 (bitmap new_deaths)
 	     XXX Note, that sometimes reload barfs when we emit insns between
 	     a call and the insn which copies the return register into a
 	     pseudo.  */
-	  if (GET_CODE (insn) == CALL_INSN)
+	  if (CALL_P (insn))
 	    ri.need_load = 1;
 	  else if (INSN_P (insn))
 	    for (n = 0; n < info.num_uses; n++)
@@ -1337,7 +1339,7 @@ rewrite_program2 (bitmap new_deaths)
 		  web->one_load = 0;
 	      }
 
-	  if (GET_CODE (insn) == CODE_LABEL)
+	  if (LABEL_P (insn))
 	    break;
 	}
 
@@ -1513,7 +1515,7 @@ detect_web_parts_to_rebuild (void)
      And because we sometimes delete insn referring to hardregs (when
      they became useless because they setup a rematerializable pseudo, which
      then was rematerialized), some of those uses will go away with the next
-     df_analyse().  This means we even _must_ delete those uses from
+     df_analyze().  This means we even _must_ delete those uses from
      the live_at_end[] bitmaps.  For simplicity we simply delete
      all of them.  */
   for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
@@ -1534,10 +1536,10 @@ detect_web_parts_to_rebuild (void)
 		      BITMAP_AND_COMPL);
   live_at_end += 2;
 
-  if (rtl_dump_file && (debug_new_regalloc & DUMP_REBUILD) != 0)
+  if (dump_file && (debug_new_regalloc & DUMP_REBUILD) != 0)
     {
       ra_debug_msg (DUMP_REBUILD, "need to check these uses:\n");
-      dump_sbitmap_file (rtl_dump_file, last_check_uses);
+      dump_sbitmap_file (dump_file, last_check_uses);
     }
   sbitmap_free (already_webs);
   BITMAP_XFREE (uses_as_bitmap);
@@ -1875,7 +1877,7 @@ remove_suspicious_death_notes (void)
 	    rtx note = *pnote;
 	    if ((REG_NOTE_KIND (note) == REG_DEAD
 		 || REG_NOTE_KIND (note) == REG_UNUSED)
-		&& (GET_CODE (XEXP (note, 0)) == REG
+		&& (REG_P (XEXP (note, 0))
 		    && bitmap_bit_p (regnos_coalesced_to_hardregs,
 				     REGNO (XEXP (note, 0)))))
 	      *pnote = XEXP (note, 1);

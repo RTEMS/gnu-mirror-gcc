@@ -44,14 +44,16 @@ import java.rmi.registry.LocateRegistry;
 
 public final class Naming {
 
-/** <pre>
+/**
  * Looks for the remote object that is associated with the named service.
  * Name and location is given in form of a URL without a scheme:
- * 
- *   //host:port/service-name
+ *
+ * <pre>
+ * //host:port/service-name
+ * </pre>
  *  
  * The port is optional.
- * </pre>
+ * 
  * @param name the service name and location
  * @return Remote-object that implements the named service
  * @throws NotBoundException if no object implements the service
@@ -62,7 +64,14 @@ public static Remote lookup(String name) throws NotBoundException, MalformedURLE
 	// hack to accept "rmi://host:port/service" strings
 	if(name.startsWith("rmi:")){ name = name.substring(4); }
 	URL u = new URL("http:" + name);
-	return (getRegistry(u).lookup(u.getFile().substring(1)));
+	String filename = u.getFile();
+
+	// If the filename begins with a slash we must cut it for
+	// name resolution.
+	if (filename.charAt(0) == '/')
+		return (getRegistry(u).lookup(filename.substring(1)));
+	else
+		return (getRegistry(u).lookup(filename));
 }
 
 /**
@@ -75,7 +84,13 @@ public static Remote lookup(String name) throws NotBoundException, MalformedURLE
  */
 public static void bind(String name, Remote obj) throws AlreadyBoundException, MalformedURLException, RemoteException {
 	URL u = new URL("http:" + name);
-	getRegistry(u).bind(u.getFile().substring(1), obj);
+	String filename = u.getFile();
+	// If the filename begins with a slash we must cut it for
+	// name resolution.
+	if (filename.charAt(0) == '/')
+		getRegistry(u).bind(filename.substring(1), obj);
+	else
+		getRegistry(u).bind(filename, obj);
 }
 
 /**
@@ -87,7 +102,13 @@ public static void bind(String name, Remote obj) throws AlreadyBoundException, M
  */
 public static void unbind(String name) throws RemoteException, NotBoundException, MalformedURLException {
 	URL u = new URL("http:" + name);
-	getRegistry(u).unbind(u.getFile().substring(1));
+	String filename = u.getFile();
+	// If the filename begins with a slash we must cut it for
+	// name resolution.
+	if (filename.charAt(0) == '/')
+		getRegistry(u).unbind(filename.substring(1));
+	else
+		getRegistry(u).unbind(filename);
 }
 
 /**
@@ -100,7 +121,13 @@ public static void unbind(String name) throws RemoteException, NotBoundException
  */
 public static void rebind(String name, Remote obj) throws RemoteException, MalformedURLException {
 	URL u = new URL("http:" + name);
-	getRegistry(u).rebind(u.getFile().substring(1), obj);
+	String filename = u.getFile();
+	// If the filename begins with a slash we must cut it for
+	// name resolution.
+	if (filename.charAt(0) == '/')
+		getRegistry(u).rebind(filename.substring(1), obj);
+	else
+		getRegistry(u).rebind(filename, obj);
 }
 
 /**

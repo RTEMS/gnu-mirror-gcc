@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---           Copyright (C) 2001-2003 Ada Core Technologies, Inc.            --
+--           Copyright (C) 2001-2004 Ada Core Technologies, Inc.            --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -34,7 +34,6 @@
 with Ada.Streams;                use Ada.Streams;
 with Ada.Exceptions;             use Ada.Exceptions;
 with Ada.Unchecked_Conversion;
-with Ada.Unchecked_Deallocation;
 
 with Interfaces.C.Strings;
 
@@ -778,17 +777,6 @@ package body GNAT.Sockets is
       end if;
    end Finalize;
 
-   ----------
-   -- Free --
-   ----------
-
-   procedure Free (Stream : in out Stream_Access) is
-      procedure Do_Free is new Ada.Unchecked_Deallocation
-        (Ada.Streams.Root_Stream_Type'Class, Stream_Access);
-   begin
-      Do_Free (Stream);
-   end Free;
-
    ---------
    -- Get --
    ---------
@@ -1415,7 +1403,8 @@ package body GNAT.Sockets is
 
    begin
       Ada.Exceptions.Raise_Exception
-        (Socket_Error'Identity, Image (Error) & Socket_Error_Message (Error));
+        (Socket_Error'Identity,
+         Image (Error) & C.Strings.Value (Socket_Error_Message (Error)));
    end Raise_Socket_Error;
 
    ----------
@@ -2141,8 +2130,18 @@ package body GNAT.Sockets is
       MS : Timeval_Unit;
 
    begin
-      S  := Timeval_Unit (Val - 0.5);
-      MS := Timeval_Unit (1_000_000 * (Val - Selector_Duration (S)));
+      --  If zero, set result as zero (otherwise it gets rounded down to -1)
+
+      if Val = 0.0 then
+         S  := 0;
+         MS := 0;
+
+      --  Normal case where we do round down
+      else
+         S  := Timeval_Unit (Val - 0.5);
+         MS := Timeval_Unit (1_000_000 * (Val - Selector_Duration (S)));
+      end if;
+
       return (S, MS);
    end To_Timeval;
 

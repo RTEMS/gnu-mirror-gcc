@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1999-2003 Free Software Foundation, Inc.          --
+--          Copyright (C) 1999-2004 Free Software Foundation, Inc.          --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -68,7 +68,6 @@
 
 with Rident; use Rident;
 with Types;  use Types;
-with Uintp;  use Uintp;
 
 package Targparm is
 
@@ -102,24 +101,25 @@ package Targparm is
    --  If a pragma Polling (On) appears, then the flag Opt.Polling_Required
    --  is set to True.
 
+   --  If a pragma Detect_Blocking appears, then the flag Opt.Detect_Blocking
+   --  is set to True.
+
    --  if a pragma Suppress_Exception_Locations appears, then the flag
    --  Opt.Exception_Locations_Suppressed is set to True.
 
-   --  The only other pragma allowed is a pragma Restrictions that gives the
-   --  simple name of a restriction for which partition consistency is always
-   --  required (see definition of Rident.Partition_Restrictions).
+   --  If a pragma Profile with a valid profile argument appears, then
+   --  the appropriate restrictions and policy flags are set.
 
-   Restrictions_On_Target :
-     array (Partition_Restrictions) of Boolean := (others => False);
-   --  Element is set True if a pragma Restrictions for the corresponding
-   --  identifier appears in system.ads. Note that only partition restriction
-   --  identifiers are permitted as arguments for pragma Restrictions for
-   --  pragmas appearing at the start of system.ads.
+   --  The only other pragma allowed is a pragma Restrictions that specifies
+   --  a restriction that will be imposed on all units in the partition. Note
+   --  that in this context, only one restriction can be specified in a single
+   --  pragma, and the pragma must appear on its own on a single source line.
 
-   Restriction_Parameters_On_Target :
-     array (Restriction_Parameter_Id) of Uint := (others => No_Uint);
-   --  Element is set to specified value if a pragma Restrictions for the
-   --  corresponding restriction parameter value is set.
+   Restrictions_On_Target : Restrictions_Info;
+   --  Records restrictions specified by system.ads. Only the Set and Value
+   --  members are modified. The Violated and Count fields are never modified.
+   --  Note that entries can be set either by a pragma Restrictions or by
+   --  a pragma Profile.
 
    -------------------
    -- Run Time Name --
@@ -322,12 +322,6 @@ package Targparm is
    --
    --    The variable __gnat_exit_status is generated within the binder file
    --    instead of being imported from the run-time library.
-   --
-   --    No -Ldir switches are added for the linker step
-   --
-   --    No standard switches are added after user file entries to the
-   --    linker line. All such switches must be explicit. In other words
-   --    the option -nostdlib is implicit with a configurable run-time.
 
    Suppress_Standard_Library_On_Target : Boolean;
    --  If this flag is True, then the standard library is not included by

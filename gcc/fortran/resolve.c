@@ -1,23 +1,23 @@
 /* Perform type resolution on the various stuctures.
-   Copyright (C) 2001, 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
-This file is part of GNU G95.
+This file is part of GCC.
 
-GNU G95 is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2, or (at your option)
-any later version.
+GCC is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2, or (at your option) any later
+version.
 
-GNU G95 is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+GCC is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU G95; see the file COPYING.  If not, write to
-the Free Software Foundation, 59 Temple Place - Suite 330,
-Boston, MA 02111-1307, USA.  */
+along with GCC; see the file COPYING.  If not, write to the Free
+Software Foundation, 59 Temple Place - Suite 330,Boston, MA
+02111-1307, USA.  */
 
 #include "config.h"
 #include "gfortran.h"
@@ -2064,7 +2064,7 @@ gfc_resolve_expr (gfc_expr * e)
 
 
 /* Resolve the expressions in an iterator structure and require that they all
-   be of integer type. */
+   be of integer type.  */
 
 try
 gfc_resolve_iterator (gfc_iterator * iter)
@@ -2586,13 +2586,6 @@ validate_case_label_expr (gfc_expr * e, gfc_expr * case_expr)
 
   if (e == NULL) return SUCCESS;
 
-  if (e->expr_type != EXPR_CONSTANT)
-    {
-      gfc_error ("Expression in CASE statement at %L must be a constant",
-		 &e->where);
-      return FAILURE;
-    }
-
   if (e->ts.type != case_ts.type)
     {
       gfc_error ("Expression in CASE statement at %L must be of type %s",
@@ -2939,8 +2932,9 @@ resolve_branch (gfc_st_label * label, gfc_code * code)
 	  break;
 
       if (stack == NULL)
-	gfc_error ("GOTO at %L cannot jump to END of construct at %L",
-		   &found->loc, &code->loc);
+	gfc_notify_std (GFC_STD_F95_DEL,
+			"Obsolete: GOTO at %L jumps to END of construct at %L",
+			&code->loc, &found->loc);
     }
 }
 
@@ -3364,8 +3358,8 @@ gfc_resolve_forall (gfc_code *code, gfc_namespace *ns, int forall_save)
 }
 
 
-/* Resolve lists of blocks found in IF, SELECT CASE, WHERE, FORALL and DO code
-   nodes.  */
+/* Resolve lists of blocks found in IF, SELECT CASE, WHERE, FORALL ,GOTO and
+   DO code nodes.  */
 
 static void resolve_code (gfc_code *, gfc_namespace *);
 
@@ -3399,6 +3393,10 @@ resolve_blocks (gfc_code * b, gfc_namespace * ns)
 	      ("WHERE/ELSEWHERE clause at %L requires a LOGICAL array",
 	       &b->expr->where);
 	  break;
+
+        case EXEC_GOTO:
+          resolve_branch (b->label, b);
+          break;
 
 	case EXEC_SELECT:
 	case EXEC_FORALL:
@@ -3454,7 +3452,6 @@ resolve_code (gfc_code * code, gfc_namespace * ns)
 	{
 	case EXEC_NOP:
 	case EXEC_CYCLE:
-	case EXEC_IOLENGTH:
 	case EXEC_PAUSE:
 	case EXEC_STOP:
 	case EXEC_EXIT:
@@ -3468,7 +3465,11 @@ resolve_code (gfc_code * code, gfc_namespace * ns)
 	  break;
 
 	case EXEC_GOTO:
-	  resolve_branch (code->label, code);
+          if (code->expr != NULL && code->expr->ts.type != BT_INTEGER)
+            gfc_error ("ASSIGNED GOTO statement at %L requires an INTEGER "
+                       "variable", &code->expr->where);
+          else
+            resolve_branch (code->label, code);
 	  break;
 
 	case EXEC_RETURN:
@@ -3506,6 +3507,15 @@ resolve_code (gfc_code * code, gfc_namespace * ns)
 	    }
 
 	  gfc_check_assign (code->expr, code->expr2, 1);
+	  break;
+
+	case EXEC_LABEL_ASSIGN:
+          if (code->label->defined == ST_LABEL_UNKNOWN)
+            gfc_error ("Label %d referenced at %L is never defined",
+                       code->label->value, &code->label->where);
+          if (t == SUCCESS && code->expr->ts.type != BT_INTEGER)
+	    gfc_error ("ASSIGN statement at %L requires an INTEGER "
+		       "variable", &code->expr->where);
 	  break;
 
 	case EXEC_POINTER_ASSIGN:
@@ -3609,6 +3619,14 @@ resolve_code (gfc_code * code, gfc_namespace * ns)
 
 	case EXEC_INQUIRE:
 	  if (gfc_resolve_inquire (code->ext.inquire) == FAILURE)
+	      break;
+
+	  resolve_branch (code->ext.inquire->err, code);
+	  break;
+
+	case EXEC_IOLENGTH:
+	  assert(code->ext.inquire != NULL);
+	  if (gfc_resolve_inquire (code->ext.inquire) == FAILURE)
 	    break;
 
 	  resolve_branch (code->ext.inquire->err, code);
@@ -3669,6 +3687,9 @@ resolve_symbol (gfc_symbol * sym)
   /* Zero if we are checking a formal namespace.  */
   static int formal_ns_flag = 1;
   int formal_ns_save, check_constant, mp_flag;
+  int i;
+  const char *whynot;
+
 
   if (sym->attr.flavor == FL_UNKNOWN)
     {
@@ -3693,7 +3714,7 @@ resolve_symbol (gfc_symbol * sym)
   if (sym->ts.type == BT_UNKNOWN)
     {
       if (sym->attr.flavor == FL_VARIABLE || sym->attr.flavor == FL_PARAMETER)
-	gfc_set_default_type (sym, 0, NULL);
+	gfc_set_default_type (sym, 1, NULL);
 
       if (sym->attr.flavor == FL_PROCEDURE && sym->attr.function)
 	{
@@ -3710,21 +3731,35 @@ resolve_symbol (gfc_symbol * sym)
 	}
     }
 
+  /* Assumed size arrays and assumed shape arrays must be dummy
+     arguments.  */ 
+
   if (sym->as != NULL
       && (sym->as->type == AS_ASSUMED_SIZE
 	  || sym->as->type == AS_ASSUMED_SHAPE)
       && sym->attr.dummy == 0)
     {
-      gfc_error("Assumed %s array at %L must be a dummy argument",
-		sym->as->type == AS_ASSUMED_SIZE ? "size" : "shape",
-                &sym->declared_at);
+      gfc_error ("Assumed %s array at %L must be a dummy argument",
+		 sym->as->type == AS_ASSUMED_SIZE ? "size" : "shape",
+                 &sym->declared_at);
       return;
     }
 
-  /* Make sure that character string variables with assumed length are
-     dummy argument.  */
+  /* A parameter array's shape needs to be constant.  */
 
-  if (sym->attr.flavor == FL_VARIABLE && sym->ts.type == BT_CHARACTER
+  if (sym->attr.flavor == FL_PARAMETER && sym->as != NULL 
+      && !gfc_is_compile_time_shape (sym->as))
+    {
+      gfc_error ("Parameter array '%s' at %L cannot be automatic "
+		 "or assumed shape", sym->name, &sym->declared_at);
+	  return;
+    }
+
+  /* Make sure that character string variables with assumed length are
+     dummy arguments.  */
+
+  if (sym->attr.flavor == FL_VARIABLE && !sym->attr.result
+      && sym->ts.type == BT_CHARACTER
       && sym->ts.cl->length == NULL && sym->attr.dummy == 0)
     {
       gfc_error ("Entity with assumed character length at %L must be a "
@@ -3816,6 +3851,50 @@ resolve_symbol (gfc_symbol * sym)
 	}
     }
 
+  if (sym->attr.flavor == FL_VARIABLE)
+    {
+      /* Can the sybol have an initializer?  */
+      whynot = NULL;
+      if (sym->attr.allocatable)
+	whynot = "Allocatable";
+      else if (sym->attr.external)
+	whynot = "External";
+      else if (sym->attr.dummy)
+	whynot = "Dummy";
+      else if (sym->attr.intrinsic)
+	whynot = "Intrinsic";
+      else if (sym->attr.result)
+	whynot = "Function Result";
+      else if (sym->attr.dimension && !sym->attr.pointer)
+	{
+	  /* Don't allow initialization of automatic arrays.  */
+	  for (i = 0; i < sym->as->rank; i++)
+	    {
+	      if (sym->as->lower[i] == NULL
+		  || sym->as->lower[i]->expr_type != EXPR_CONSTANT
+		  || sym->as->upper[i] == NULL
+		  || sym->as->upper[i]->expr_type != EXPR_CONSTANT)
+		{
+		  whynot = "Automatic array";
+		  break;
+		}
+	    }
+	}
+
+      /* Reject illegal initializers.  */
+      if (sym->value && whynot)
+	{
+	  gfc_error ("%s '%s' at %L cannot have an initializer",
+		     whynot, sym->name, &sym->declared_at);
+	  return;
+	}
+
+      /* Assign default initializer.  */
+      if (sym->ts.type == BT_DERIVED && !(sym->value || whynot))
+	sym->value = gfc_default_initializer (&sym->ts);
+    }
+
+
   /* Make sure that intrinsic exist */
   if (sym->attr.intrinsic
       && ! gfc_intrinsic_name(sym->name, 0)
@@ -3878,7 +3957,7 @@ check_data_variable (gfc_data_variable * var, locus * where)
   mpz_t size;
   mpz_t offset;
   try t;
-  int mark = 0;
+  ar_type mark = AR_UNKNOWN;
   int i;
   mpz_t section_index[GFC_MAX_DIMENSIONS];
   gfc_ref *ref;
@@ -3900,22 +3979,34 @@ check_data_variable (gfc_data_variable * var, locus * where)
     {
       ref = e->ref;
 
-      /* Find the inner most reference.  */
-      while (ref->next)
-        ref = ref->next;
+      /* Find the array section reference.  */
+      for (ref = e->ref; ref; ref = ref->next)
+	{
+	  if (ref->type != REF_ARRAY)
+	    continue;
+	  if (ref->u.ar.type == AR_ELEMENT)
+	    continue;
+	  break;
+	}
+      assert (ref);
 
       /* Set marks asscording to the reference pattern.  */
-      if (ref->u.ar.type == AR_FULL)
-        mark = 1;
-      else if (ref->u.ar.type == AR_SECTION)
-        {
+      switch (ref->u.ar.type)
+	{
+	case AR_FULL:
+	  mark = AR_FULL;
+	  break;
+
+	case AR_SECTION:
           ar = &ref->u.ar;
           /* Get the start position of array section.  */
           gfc_get_section_index (ar, section_index, &offset);
-          mark = 2;
-        }
-      else
-        mark = 3;
+          mark = AR_SECTION;
+	  break;
+
+	default:
+	  abort();
+	}
 
       if (gfc_array_size (e, &size) == FAILURE)
 	{
@@ -3943,19 +4034,19 @@ check_data_variable (gfc_data_variable * var, locus * where)
 	break;
 
       /* Assign initial value to symbol.  */
-      gfc_assign_data_value (var->expr, values.vnode->expr, mark, offset);
+      gfc_assign_data_value (var->expr, values.vnode->expr, offset);
 
-      if (mark == 1)
+      if (mark == AR_FULL)
         mpz_add_ui (offset, offset, 1);
 
       /* Modify the array section indexes and recalculate the offset for
          next element.  */
-      else if (mark == 2)
-        gfc_modify_index_and_calculate_offset (section_index, ar, &offset);
+      else if (mark == AR_SECTION)
+        gfc_advance_section (section_index, ar, &offset);
 
       mpz_sub_ui (size, size, 1);
     }
-  if (mark == 2)
+  if (mark == AR_SECTION)
     {
       for (i = 0; i < ar->dimen; i++)
         mpz_clear (section_index[i]);

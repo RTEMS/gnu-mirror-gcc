@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2003 Free Software Foundation, Inc.               --
+--          Copyright (C) 2003-2004 Free Software Foundation, Inc.          --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -55,7 +55,7 @@ with Table;
 procedure Gnatsym is
 
    Empty_String : aliased String := "";
-   Empty : constant String_Access := Empty_String'Unchecked_Access;
+   Empty        : constant String_Access := Empty_String'Unchecked_Access;
    --  To initialize variables Reference and Version_String
 
    Copyright_Displayed : Boolean := False;
@@ -111,7 +111,7 @@ procedure Gnatsym is
          Write_Eol;
          Write_Str ("GNATSYMB ");
          Write_Str (Gnat_Version_String);
-         Write_Str (" Copyright 2003 Free Software Foundation, Inc");
+         Write_Str (" Copyright 2003-2004 Free Software Foundation, Inc");
          Write_Eol;
          Copyright_Displayed := True;
       end if;
@@ -124,7 +124,7 @@ procedure Gnatsym is
    procedure Parse_Cmd_Line is
    begin
       loop
-         case GNAT.Command_Line.Getopt ("c C q r: s: v V:") is
+         case GNAT.Command_Line.Getopt ("c C q r: R s: v V:") is
             when ASCII.NUL =>
                exit;
 
@@ -140,6 +140,9 @@ procedure Gnatsym is
             when 'r' =>
                Reference_Symbol_File_Name :=
                  new String'(GNAT.Command_Line.Parameter);
+
+            when 'R' =>
+               Symbol_Policy := Restricted;
 
             when 's' =>
                Symbol_File_Name := new String'(GNAT.Command_Line.Parameter);
@@ -183,10 +186,11 @@ procedure Gnatsym is
    begin
       Write_Line ("gnatsym [options] object_file {object_file}");
       Write_Eol;
-      Write_Line ("   -c       Compliant policy");
-      Write_Line ("   -C       Controlled policy");
+      Write_Line ("   -c       Compliant symbol policy");
+      Write_Line ("   -C       Controlled symbol policy");
       Write_Line ("   -q       Quiet mode");
       Write_Line ("   -r<ref>  Reference symbol file name");
+      Write_Line ("   -R       Restricted symbol policy");
       Write_Line ("   -s<sym>  Symbol file name");
       Write_Line ("   -v       Verbose mode");
       Write_Line ("   -V<ver>  Version");
@@ -224,8 +228,7 @@ begin
          Write_Line ("""");
       end if;
 
-      --  Initialize the symbol file and, if specified, read the reference
-      --  file.
+      --  Initialize symbol file and, if specified, read reference file
 
       Symbols.Initialize
         (Symbol_File   => Symbol_File_Name.all,

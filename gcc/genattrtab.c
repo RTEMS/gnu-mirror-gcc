@@ -1,6 +1,6 @@
 /* Generate code from machine description to compute values of attributes.
    Copyright (C) 1991, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2002, 2003 Free Software Foundation, Inc.
+   1999, 2000, 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Richard Kenner (kenner@vlsi1.ultra.nyu.edu)
 
 This file is part of GCC.
@@ -90,14 +90,14 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
       independent of the insn code.
    `in_struct' (ATTR_CURR_SIMPLIFIED_P): This rtx is fully simplified
       for the insn code currently being processed (see optimize_attrs).
-   `integrated' (ATTR_PERMANENT_P): This rtx is permanent and unique
+   `return_val' (ATTR_PERMANENT_P): This rtx is permanent and unique
       (see attr_rtx).
    `volatil' (ATTR_EQ_ATTR_P): During simplify_by_exploding the value of an
       EQ_ATTR rtx is true if !volatil and false if volatil.  */
 
 #define ATTR_IND_SIMPLIFIED_P(RTX) (RTX_FLAG((RTX), unchanging))
 #define ATTR_CURR_SIMPLIFIED_P(RTX) (RTX_FLAG((RTX), in_struct))
-#define ATTR_PERMANENT_P(RTX) (RTX_FLAG((RTX), integrated))
+#define ATTR_PERMANENT_P(RTX) (RTX_FLAG((RTX), return_val))
 #define ATTR_EQ_ATTR_P(RTX) (RTX_FLAG((RTX), volatil))
 
 #if 0
@@ -549,7 +549,7 @@ attr_hash_add_string (int hashcode, char *str)
    In some cases we cannot uniquify; then we return an ordinary
    impermanent rtx with ATTR_PERMANENT_P clear.
 
-   Args are like gen_rtx, but without the mode:
+   Args are as follows:
 
    rtx attr_rtx (code, [element1, ..., elementn])  */
 
@@ -565,7 +565,7 @@ attr_rtx_1 (enum rtx_code code, va_list p)
      Use that entry if one is found; otherwise create a new RTL and add it
      to the table.  */
 
-  if (GET_RTX_CLASS (code) == '1')
+  if (GET_RTX_CLASS (code) == RTX_UNARY)
     {
       rtx arg0 = va_arg (p, rtx);
 
@@ -591,9 +591,10 @@ attr_rtx_1 (enum rtx_code code, va_list p)
 	  XEXP (rt_val, 0) = arg0;
 	}
     }
-  else if (GET_RTX_CLASS (code) == 'c'
-	   || GET_RTX_CLASS (code) == '2'
-	   || GET_RTX_CLASS (code) == '<')
+  else if (GET_RTX_CLASS (code) == RTX_BIN_ARITH
+  	   || GET_RTX_CLASS (code) == RTX_COMM_ARITH
+  	   || GET_RTX_CLASS (code) == RTX_COMPARE
+  	   || GET_RTX_CLASS (code) == RTX_COMM_COMPARE)
     {
       rtx arg0 = va_arg (p, rtx);
       rtx arg1 = va_arg (p, rtx);
@@ -837,7 +838,6 @@ attr_copy_rtx (rtx orig)
   switch (code)
     {
     case REG:
-    case QUEUED:
     case CONST_INT:
     case CONST_DOUBLE:
     case CONST_VECTOR:
@@ -1026,7 +1026,6 @@ check_attr_test (rtx exp, int is_const, int lineno)
       XEXP (exp, 0) = check_attr_test (XEXP (exp, 0), is_const, lineno);
       break;
 
-    case MATCH_INSN:
     case MATCH_OPERAND:
       if (is_const)
 	fatal ("RTL operator \"%s\" not valid in constant attribute test",
@@ -1155,7 +1154,7 @@ check_attr_value (rtx exp, struct attr_desc *attr)
 	  have_error = 1;
 	  break;
 	}
-      /* FALLTHRU */
+      /* Fall through.  */
 
     case IOR:
     case AND:
@@ -2218,7 +2217,6 @@ encode_units_mask (rtx x)
       return attr_rtx (CONST_STRING, attr_printf (MAX_DIGITS, "%d", j));
 
     case REG:
-    case QUEUED:
     case CONST_INT:
     case CONST_DOUBLE:
     case CONST_VECTOR:
@@ -4174,7 +4172,6 @@ clear_struct_flag (rtx x)
   switch (code)
     {
     case REG:
-    case QUEUED:
     case CONST_INT:
     case CONST_DOUBLE:
     case CONST_VECTOR:
@@ -4571,9 +4568,14 @@ write_test_expr (rtx exp, int flags)
   switch (code)
     {
     /* Binary operators.  */
+    case GEU: case GTU:
+    case LEU: case LTU:
+      printf ("(unsigned) ");
+      /* Fall through.  */
+
     case EQ: case NE:
-    case GE: case GT: case GEU: case GTU:
-    case LE: case LT: case LEU: case LTU:
+    case GE: case GT:
+    case LE: case LT:
       comparison_operator = 1;
 
     case PLUS:   case MINUS:  case MULT:     case DIV:      case MOD:
@@ -4793,10 +4795,6 @@ write_test_expr (rtx exp, int flags)
       else
 	printf ("%s (operands[%d], %smode)",
 		XSTR (exp, 1), XINT (exp, 0), GET_MODE_NAME (GET_MODE (exp)));
-      break;
-
-    case MATCH_INSN:
-      printf ("%s (insn)", XSTR (exp, 0));
       break;
 
     /* Constant integer.  */
@@ -5523,6 +5521,11 @@ write_eligible_delay (const char *kind)
   printf ("\n");
   printf ("  if (slot >= %d)\n", max_slots);
   printf ("    abort ();\n");
+  printf ("\n");
+  /* Allow dbr_schedule to pass labels, etc.  This can happen if try_split
+     converts a compound instruction into a loop.  */
+  printf ("  if (!INSN_P (candidate_insn))\n");
+  printf ("    return 0;\n");
   printf ("\n");
 
   /* If more than one delay type, find out which type the delay insn is.  */

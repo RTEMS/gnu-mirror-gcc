@@ -9,8 +9,8 @@
 # gccflags="-O3 -fomit-frame-pointer -funroll-all-loops -finline-functions"
 # gnatflags="-gnatN"
 
-gccflags=""
-gnatflags="-q -gnatws"
+gccflags="-O2"
+gnatflags="-gnatws"
 
 target_run () {
 $*
@@ -47,7 +47,12 @@ if [ "$dir" = "$testdir" ]; then
   exit 1
 fi
 
+target_gnatchop () {
+  gnatchop --GCC="$GCC_DRIVER" $*
+}
+
 target_gnatmake () {
+  echo gnatmake --GCC=\"$GCC\" $gnatflags $gccflags $* -largs $EXTERNAL_OBJECTS --GCC=\"$GCC\"
   gnatmake --GCC="$GCC" $gnatflags $gccflags $* -largs $EXTERNAL_OBJECTS --GCC="$GCC"
 }
 
@@ -66,10 +71,12 @@ rm -f $dir/acats.sum $dir/acats.log
 
 display "		=== acats configuration ==="
 
+target=`$GCC -dumpmachine`
+
 display target gcc is $GCC
 display `$GCC -v 2>&1`
 display host=`gcc -dumpmachine`
-display target=`$GCC -dumpmachine`
+display target=$target
 display `type gnatmake`
 gnatls -v >> $dir/acats.log
 display ""
@@ -83,9 +90,32 @@ cd $dir/support
 
 cp $testdir/support/*.ada $testdir/support/*.a $testdir/support/*.tst $dir/support
 
+# Find out the size in bit of an address on the target
+target_gnatmake $testdir/support/impbit.adb >> $dir/acats.log 2>&1
+target_run $dir/support/impbit > $dir/support/impbit.out 2>&1
+target_bit=`cat $dir/support/impbit.out`
+echo target_bit="$target_bit" >> $dir/acats.log
+
+# Find out a suitable asm statement
+# Adapted from configure.ac gcc_cv_as_dwarf2_debug_line
+case "$target" in
+  ia64*-*-* | s390*-*-*)
+    target_insn="nop 0"
+    ;;
+  mmix-*-*)
+    target_insn="swym 0"
+    ;;
+  *)
+    target_insn="nop"
+    ;;
+esac
+echo target_insn="$target_insn" >> $dir/acats.log
+
 sed -e "s,ACATS4GNATDIR,$dir,g" \
   < $testdir/support/impdef.a > $dir/support/impdef.a
 sed -e "s,ACATS4GNATDIR,$dir,g" \
+  -e "s,ACATS4GNATBIT,$target_bit,g" \
+  -e "s,ACATS4GNATINSN,$target_insn,g" \
   < $testdir/support/macro.dfs > $dir/support/MACRO.DFS
 sed -e "s,ACATS4GNATDIR,$dir,g" \
   < $testdir/support/tsttests.dat > $dir/support/TSTTESTS.DAT
@@ -101,7 +131,7 @@ mkdir -p $dir/run
 cp -pr $testdir/tests $dir/
 
 for i in $dir/support/*.ada $dir/support/*.a; do 
-   gnatchop $i >> $dir/acats.log 2>&1
+   host_gnatchop $i >> $dir/acats.log 2>&1
 done
 
 # These tools are used to preprocess some ACATS sources
@@ -139,10 +169,10 @@ if [ $? -ne 0 ]; then
    exit 1
 fi
 
-gnatchop *.adt >> $dir/acats.log 2>&1
+target_gnatchop *.adt >> $dir/acats.log 2>&1
 
-target_gnatmake -c -gnato -gnatE *.ads > /dev/null 2>&1
-target_gnatmake -c -gnato -gnatE *.adb
+target_gnatmake -c -gnato -gnatE *.ads >> $dir/acats.log 2>&1
+target_gnatmake -c -gnato -gnatE *.adb >> $dir/acats.log 2>&1
 
 display " done."
 display ""
@@ -186,9 +216,16 @@ for chapter in $chapters; do
          extraflags="$extraflags -gnatE"
       fi
       test=$dir/tests/$chapter/$i
-      mkdir $test
-      cd $test
-      gnatchop -c -w `ls ${test}*.a ${test}*.ada ${test}*.adt ${test}*.am ${test}*.dep 2> /dev/null` >> $dir/acats.log 2>&1
+      mkdir $test && cd $test >> $dir/acats.log 2>&1
+
+      if [ $? -ne 0 ]; then
+         display "FAIL:	$i"
+         failed="${failed}${i} "
+         clean_dir
+         continue
+      fi
+
+      target_gnatchop -c -w `ls ${test}*.a ${test}*.ada ${test}*.adt ${test}*.am ${test}*.dep 2> /dev/null` >> $dir/acats.log 2>&1
       ls ${i}?.adb > ${i}.lst 2> /dev/null
       ls ${i}*m.adb >> ${i}.lst 2> /dev/null
       ls ${i}.adb >> ${i}.lst 2> /dev/null

@@ -18,6 +18,12 @@ program testcmplx
    z = c
    if (z .ne. (3.0, 4.0)) call abort
 
+   ! dcmplx intrinsic
+   x = 3
+   y = 4
+   z = dcmplx (x, y)
+   if (z .ne. (3.0, 4.0)) call abort
+
    ! conjucates and aimag
    c = (1.0, 2.0)
    c = conjg (c)
@@ -36,4 +42,7 @@ program testcmplx
    if (c + d .ne. ( 6, 5)) call abort
    if (c - d .ne. (-4, 1)) call abort
    if (c * d .ne. (-1, 17)) call abort
+
+   ! test for constant folding
+   if ((35.,-10.)**0.NE.(1.,0.)) call abort
 end program

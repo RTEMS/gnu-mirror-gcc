@@ -1,21 +1,21 @@
 /* Iterator routines for manipulating GENERIC and GIMPLE tree statements.
-   Copyright (C) 2003 Free Software Foundation, Inc.
+   Copyright (C) 2003, 2004 Free Software Foundation, Inc.
    Contributed by Andrew MacLeod  <amacleod@redhat.com>
 
-This file is part of GNU CC.
+This file is part of GCC.
 
-GNU CC is free software; you can redistribute it and/or modify
+GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2, or (at your option)
 any later version.
 
-GNU CC is distributed in the hope that it will be useful,
+GCC is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU CC; see the file COPYING.  If not, write to
+along with GCC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
@@ -23,7 +23,7 @@ Boston, MA 02111-1307, USA.  */
 #include "system.h"
 #include "coretypes.h"
 #include "tree.h"
-#include "tree-simple.h"
+#include "tree-gimple.h"
 #include "tree-iterator.h"
 #include "ggc.h"
 
@@ -40,14 +40,12 @@ alloc_stmt_list (void)
   if (list)
     {
       stmt_list_cache = TREE_CHAIN (list);
-      TREE_CHAIN (list) = NULL;
-      TREE_SIDE_EFFECTS (list) = 0;
+      memset (list, 0, sizeof(struct tree_common));
+      TREE_SET_CODE (list, STATEMENT_LIST);
     }
   else
-    {
-      list = make_node (STATEMENT_LIST);
-      TREE_TYPE (list) = void_type_node;
-    }
+    list = make_node (STATEMENT_LIST);
+  TREE_TYPE (list) = void_type_node;
   return list;
 }
 
@@ -72,8 +70,6 @@ tsi_link_before (tree_stmt_iterator *i, tree t, enum tsi_iterator_update mode)
   /* Die on looping.  */
   if (t == i->container)
     abort ();
-
-  TREE_SIDE_EFFECTS (i->container) = 1;
 
   if (TREE_CODE (t) == STATEMENT_LIST)
     {
@@ -100,6 +96,8 @@ tsi_link_before (tree_stmt_iterator *i, tree t, enum tsi_iterator_update mode)
       head->stmt = t;
       tail = head;
     }
+
+  TREE_SIDE_EFFECTS (i->container) = 1;
 
   cur = i->ptr;
 
@@ -151,8 +149,6 @@ tsi_link_after (tree_stmt_iterator *i, tree t, enum tsi_iterator_update mode)
   if (t == i->container)
     abort ();
 
-  TREE_SIDE_EFFECTS (i->container) = 1;
-
   if (TREE_CODE (t) == STATEMENT_LIST)
     {
       head = STATEMENT_LIST_HEAD (t);
@@ -178,6 +174,8 @@ tsi_link_after (tree_stmt_iterator *i, tree t, enum tsi_iterator_update mode)
       head->stmt = t;
       tail = head;
     }
+
+  TREE_SIDE_EFFECTS (i->container) = 1;
 
   cur = i->ptr;
 

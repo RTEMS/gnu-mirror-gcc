@@ -1,5 +1,5 @@
 /* Process source files and output type information.
-   Copyright (C) 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -308,6 +308,16 @@ create_array (type_p t, const char *len)
   return v;
 }
 
+/* Return an options structure with name NAME and info INFO.  */
+options_p
+create_option (const char *name, void *info)
+{
+  options_p o = xmalloc (sizeof (*o));
+  o->name = name;
+  o->info = info;
+  return o;
+}
+
 /* Add a variable named S of type T with options O defined at POS,
    to `variables'.  */
 
@@ -450,6 +460,7 @@ adjust_field_rtx_def (type_p t, options_p opt ATTRIBUTE_UNUSED)
 	    break;
 
 	  case NOTE_INSN_EXPECTED_VALUE:
+	  case NOTE_INSN_VAR_LOCATION:
 	    note_flds->name = "rtx";
 	    note_flds->type = rtx_tp;
 	    break;
@@ -633,17 +644,6 @@ adjust_field_tree_exp (type_p t, options_p opt ATTRIBUTE_UNUSED)
 {
   pair_p flds;
   options_p nodot;
-  size_t i;
-  static const struct {
-    const char *name;
-    int first_rtl;
-    int num_rtl;
-  } data[] = {
-    { "SAVE_EXPR", 2, 1 },
-    { "GOTO_SUBROUTINE_EXPR", 0, 2 },
-    { "RTL_EXPR", 0, 2 },
-    { "WITH_CLEANUP_EXPR", 2, 1 },
-  };
 
   if (t->kind != TYPE_ARRAY)
     {
@@ -674,44 +674,6 @@ adjust_field_tree_exp (type_p t, options_p opt ATTRIBUTE_UNUSED)
     flds->opt->name = "default";
     flds->opt->info = "";
   }
-
-  for (i = 0; i < ARRAY_SIZE (data); i++)
-    {
-      pair_p old_flds = flds;
-      pair_p subfields = NULL;
-      int r_index;
-      const char *sname;
-
-      for (r_index = 0;
-	   r_index < data[i].first_rtl + data[i].num_rtl;
-	   r_index++)
-	{
-	  pair_p old_subf = subfields;
-	  subfields = xmalloc (sizeof (*subfields));
-	  subfields->next = old_subf;
-	  subfields->name = xasprintf ("[%d]", r_index);
-	  if (r_index < data[i].first_rtl)
-	    subfields->type = t->u.a.p;
-	  else
-	    subfields->type = create_pointer (find_structure ("rtx_def", 0));
-	  subfields->line.file = __FILE__;
-	  subfields->line.line = __LINE__;
-	  subfields->opt = nodot;
-	}
-
-      flds = xmalloc (sizeof (*flds));
-      flds->next = old_flds;
-      flds->name = "";
-      sname = xasprintf ("tree_exp_%s", data[i].name);
-      new_structure (sname, 0, &lexer_line, subfields, NULL);
-      flds->type = find_structure (sname, 0);
-      flds->line.file = __FILE__;
-      flds->line.line = __LINE__;
-      flds->opt = xmalloc (sizeof (*flds->opt));
-      flds->opt->next = nodot;
-      flds->opt->name = "tag";
-      flds->opt->info = data[i].name;
-    }
 
   new_structure ("tree_exp_subunion", 1, &lexer_line, flds, nodot);
   return find_structure ("tree_exp_subunion", 1);
@@ -864,7 +826,7 @@ note_yacc_type (options_p o, pair_p fields, pair_p typeinfo,
 }
 
 static void process_gc_options (options_p, enum gc_used_enum,
-				int *, int *, int *);
+				int *, int *, int *, type_p *);
 static void set_gc_used_type (type_p, enum gc_used_enum, type_p *);
 static void set_gc_used (pair_p);
 
@@ -872,7 +834,7 @@ static void set_gc_used (pair_p);
 
 static void
 process_gc_options (options_p opt, enum gc_used_enum level, int *maybe_undef,
-		    int *pass_param, int *length)
+		    int *pass_param, int *length, type_p *nested_ptr)
 {
   options_p o;
   for (o = opt; o; o = o->next)
@@ -884,6 +846,8 @@ process_gc_options (options_p opt, enum gc_used_enum level, int *maybe_undef,
       *pass_param = 1;
     else if (strcmp (o->name, "length") == 0)
       *length = 1;
+    else if (strcmp (o->name, "nested_ptr") == 0)
+      *nested_ptr = ((const struct nested_ptr_data *) o->info)->type;
 }
 
 /* Set the gc_used field of T to LEVEL, and handle the types it references.  */
@@ -903,18 +867,24 @@ set_gc_used_type (type_p t, enum gc_used_enum level, type_p param[NUM_PARAM])
       {
 	pair_p f;
 	int dummy;
+	type_p dummy2;
 
-	process_gc_options (t->u.s.opt, level, &dummy, &dummy, &dummy);
+	process_gc_options (t->u.s.opt, level, &dummy, &dummy, &dummy,
+			    &dummy2);
 
 	for (f = t->u.s.fields; f; f = f->next)
 	  {
 	    int maybe_undef = 0;
 	    int pass_param = 0;
 	    int length = 0;
+	    type_p nested_ptr = NULL;
 	    process_gc_options (f->opt, level, &maybe_undef, &pass_param,
-				&length);
+				&length, &nested_ptr);
 
-	    if (length && f->type->kind == TYPE_POINTER)
+	    if (nested_ptr && f->type->kind == TYPE_POINTER)
+	      set_gc_used_type (nested_ptr, GC_POINTED_TO, 
+				pass_param ? param : NULL);
+	    else if (length && f->type->kind == TYPE_POINTER)
 	      set_gc_used_type (f->type->u.p, GC_USED, NULL);
 	    else if (maybe_undef && f->type->kind == TYPE_POINTER)
 	      set_gc_used_type (f->type->u.p, GC_MAYBE_POINTED_TO, NULL);
@@ -980,7 +950,7 @@ static outf_p output_files;
 
 /* The output header file that is included into pretty much every
    source file.  */
-outf_p header_file;
+static outf_p header_file;
 
 /* Number of files specified in gtfiles.  */
 #define NUM_GT_FILES (ARRAY_SIZE (all_files) - 1)
@@ -1004,7 +974,7 @@ static outf_p
 create_file (const char *name, const char *oname)
 {
   static const char *const hdr[] = {
-    "   Copyright (C) 2003 Free Software Foundation, Inc.\n",
+    "   Copyright (C) 2004 Free Software Foundation, Inc.\n",
     "\n",
     "This file is part of GCC.\n",
     "\n",
@@ -1085,11 +1055,13 @@ open_base_files (void)
     /* The order of files here matters very much.  */
     static const char *const ifiles [] = {
       "config.h", "system.h", "coretypes.h", "tm.h", "varray.h", 
-      "hashtab.h", "splay-tree.h", "bitmap.h", "tree.h", "rtl.h",
+      "hashtab.h", "splay-tree.h", "bitmap.h", "input.h", "tree.h", "rtl.h",
       "function.h", "insn-config.h", "expr.h", "hard-reg-set.h",
       "basic-block.h", "cselib.h", "insn-addr.h", "optabs.h",
       "libfuncs.h", "debug.h", "ggc.h", "cgraph.h",
-      "tree-alias-type.h", "tree-flow.h",
+      "tree-alias-type.h", "tree-flow.h", "reload.h",
+      "cpp-id-data.h",
+      "tree-chrec.h",
       NULL
     };
     const char *const *ifp;
@@ -1397,7 +1369,8 @@ struct walk_type_data
   int used_length;
   type_p orig_s;
   const char *reorder_fn;
-  int needs_cast_p;
+  bool needs_cast_p;
+  bool fn_wants_lvalue;
 };
 
 /* Print a mangled name representing T to OF.  */
@@ -1498,8 +1471,9 @@ walk_type (type_p t, struct walk_type_data *d)
   int use_param_num = -1;
   int use_params_p = 0;
   options_p oo;
+  const struct nested_ptr_data *nested_ptr_d = NULL;
 
-  d->needs_cast_p = 0;
+  d->needs_cast_p = false;
   for (oo = d->opt; oo; oo = oo->next)
     if (strcmp (oo->name, "length") == 0)
       length = (const char *)oo->info;
@@ -1512,6 +1486,8 @@ walk_type (type_p t, struct walk_type_data *d)
       use_params_p = 1;
     else if (strcmp (oo->name, "desc") == 0)
       desc = (const char *)oo->info;
+    else if (strcmp (oo->name, "nested_ptr") == 0)
+      nested_ptr_d = (const struct nested_ptr_data *) oo->info;
     else if (strcmp (oo->name, "dot") == 0)
       ;
     else if (strcmp (oo->name, "tag") == 0)
@@ -1612,7 +1588,53 @@ walk_type (type_p t, struct walk_type_data *d)
 		break;
 	      }
 
-	    d->process_field (t->u.p, d);
+	    if (nested_ptr_d)
+	      {
+		const char *oldprevval2 = d->prev_val[2];
+
+		if (! UNION_OR_STRUCT_P (nested_ptr_d->type))
+		  {
+		    error_at_line (d->line,
+				   "field `%s' has invalid "
+				   "option `nested_ptr'\n",
+				   d->val);
+		    return;
+		  }
+
+		d->prev_val[2] = d->val;
+		oprintf (d->of, "%*s{\n", d->indent, "");
+		d->indent += 2;
+		d->val = xasprintf ("x%d", d->counter++);
+		oprintf (d->of, "%*s%s %s * %s%s =\n", d->indent, "",
+			 (nested_ptr_d->type->kind == TYPE_UNION 
+			  ? "union" : "struct"), 
+			 nested_ptr_d->type->u.s.tag, 
+			 d->fn_wants_lvalue ? "" : "const ",
+			 d->val);
+		oprintf (d->of, "%*s", d->indent + 2, "");
+		output_escaped_param (d, nested_ptr_d->convert_from,
+				      "nested_ptr");
+		oprintf (d->of, ";\n");
+
+		d->process_field (nested_ptr_d->type, d);
+
+		if (d->fn_wants_lvalue)
+		  {
+		    oprintf (d->of, "%*s%s = ", d->indent, "",
+			     d->prev_val[2]);
+		    d->prev_val[2] = d->val;
+		    output_escaped_param (d, nested_ptr_d->convert_to,
+					  "nested_ptr");
+		    oprintf (d->of, ";\n");
+		  }
+
+		d->indent -= 2;
+		oprintf (d->of, "%*s}\n", d->indent, "");
+		d->val = d->prev_val[2];
+		d->prev_val[2] = oldprevval2;
+	      }
+	    else
+	      d->process_field (t->u.p, d);
 	  }
 	else
 	  {
@@ -1784,6 +1806,7 @@ walk_type (type_p t, struct walk_type_data *d)
 	    d->line = &f->line;
 	    d->val = newval = xasprintf ("%s%s%s", oldval, dot, f->name);
 	    d->opt = f->opt;
+	    d->used_length = false;
 
 	    if (union_p && use_param_p && d->param == NULL)
 	      oprintf (d->of, "%*sabort();\n", d->indent, "");
@@ -1912,8 +1935,8 @@ write_types_process_field (type_p f, const struct walk_type_data *d)
 */
 
 static void
-write_func_for_structure  (type_p orig_s, type_p s, type_p *param,
-			   const struct write_types_data *wtd)
+write_func_for_structure (type_p orig_s, type_p s, type_p *param,
+			  const struct write_types_data *wtd)
 {
   const char *fn = s->u.s.line.file;
   int i;
@@ -1948,7 +1971,7 @@ write_func_for_structure  (type_p orig_s, type_p s, type_p *param,
   d.bitmap = s->u.s.bitmap;
   d.param = param;
   d.prev_val[0] = "*x";
-  d.prev_val[1] = "not valid postage";  /* guarantee an error */
+  d.prev_val[1] = "not valid postage";  /* Guarantee an error.  */
   d.prev_val[3] = "x";
   d.val = "(*x)";
 
@@ -2176,7 +2199,7 @@ write_types_local_process_field (type_p f, const struct walk_type_data *d)
 /* For S, a structure that's part of ORIG_S, and using parameters
    PARAM, write out a routine that:
    - Is of type gt_note_pointers
-   - If calls PROCESS_FIELD on each field of S or its substructures.
+   - Calls PROCESS_FIELD on each field of S or its substructures.
 */
 
 static void
@@ -2201,9 +2224,10 @@ write_local_func_for_structure (type_p orig_s, type_p s, type_p *param)
   d.bitmap = s->u.s.bitmap;
   d.param = param;
   d.prev_val[0] = d.prev_val[2] = "*x";
-  d.prev_val[1] = "not valid postage";  /* guarantee an error */
+  d.prev_val[1] = "not valid postage";  /* Guarantee an error.  */
   d.prev_val[3] = "x";
   d.val = "(*x)";
+  d.fn_wants_lvalue = true;
 
   oprintf (d.of, "\n");
   oprintf (d.of, "void\n");
@@ -2307,7 +2331,7 @@ write_local (type_p structures, type_p param_structs)
 /* Write out the 'enum' definition for gt_types_enum.  */
 
 static void
-write_enum_defn  (type_p structures, type_p param_structs)
+write_enum_defn (type_p structures, type_p param_structs)
 {
   type_p s;
 
@@ -2915,10 +2939,14 @@ main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
   do_scalar_typedef ("uint8", &pos);
   do_scalar_typedef ("jword", &pos);
   do_scalar_typedef ("JCF_u2", &pos);
+#ifdef USE_MAPPED_LOCATION
+  do_scalar_typedef ("location_t", &pos);
+  do_scalar_typedef ("source_locus", &pos);
+#endif
+  do_scalar_typedef ("void", &pos);
 
-  do_typedef ("PTR", create_pointer (create_scalar_type ("void",
-							 strlen ("void"))),
-	      &pos);
+  do_typedef ("PTR", create_pointer (resolve_typedef ("void", &pos)), &pos);
+
   do_typedef ("HARD_REG_SET", create_array (
 	      create_scalar_type ("unsigned long", strlen ("unsigned long")),
 	      "2"), &pos);
@@ -2937,6 +2965,12 @@ main(int argc ATTRIBUTE_UNUSED, char **argv ATTRIBUTE_UNUSED)
         }
       if (!dupflag)
         parse_file (all_files[i]);
+#ifndef USE_MAPPED_LOCATION
+      /* temporary kludge - gengtype doesn't handle conditionals.
+	 Manually add source_locus *after* we've processed input.h. */
+      if (i == 0)
+	do_typedef ("source_locus", create_pointer (resolve_typedef ("location_t", &pos)), &pos);
+#endif
     }
 
   if (hit_error != 0)

@@ -1,5 +1,5 @@
 /* Java(TM) language-specific utility routines.
-   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003
+   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004
    Free Software Foundation, Inc.
 
 This file is part of GCC.
@@ -67,6 +67,7 @@ static bool java_dump_tree (void *, tree);
 static void dump_compound_expr (dump_info_p, tree);
 static bool java_decl_ok_for_sibcall (tree);
 static tree java_get_callee_fndecl (tree);
+static void java_clear_binding_stack (void);
 
 #ifndef TARGET_OBJECT_SUFFIX
 # define TARGET_OBJECT_SUFFIX ".o"
@@ -224,8 +225,6 @@ struct language_function GTY(())
 #define LANG_HOOKS_UNSAFE_FOR_REEVAL java_unsafe_for_reeval
 #undef LANG_HOOKS_MARK_ADDRESSABLE
 #define LANG_HOOKS_MARK_ADDRESSABLE java_mark_addressable
-#undef LANG_HOOKS_EXPAND_EXPR
-#define LANG_HOOKS_EXPAND_EXPR java_expand_expr
 #undef LANG_HOOKS_TRUTHVALUE_CONVERSION
 #define LANG_HOOKS_TRUTHVALUE_CONVERSION java_truthvalue_conversion
 #undef LANG_HOOKS_DUP_LANG_SPECIFIC_DECL
@@ -266,8 +265,8 @@ struct language_function GTY(())
 #undef LANG_HOOKS_CALLGRAPH_EXPAND_FUNCTION
 #define LANG_HOOKS_CALLGRAPH_EXPAND_FUNCTION java_expand_body
 
-#undef LANG_HOOKS_RTL_EXPAND_STMT
-#define LANG_HOOKS_RTL_EXPAND_STMT java_expand_stmt
+#undef LANG_HOOKS_CLEAR_BINDING_STACK
+#define LANG_HOOKS_CLEAR_BINDING_STACK java_clear_binding_stack
 
 /* Each front end provides its own.  */
 const struct lang_hooks lang_hooks = LANG_HOOKS_INITIALIZER;
@@ -351,6 +350,22 @@ java_handle_option (size_t scode, const char *arg, int value)
 
     case OPT_fassert:
       flag_assert = value;
+      break;
+
+    case OPT_fenable_assertions_:
+      add_enable_assert (arg, value);
+      break;
+
+    case OPT_fenable_assertions:
+      add_enable_assert ("", value);
+      break;
+
+    case OPT_fdisable_assertions_:
+      add_enable_assert (arg, !value);
+      break;
+
+    case OPT_fdisable_assertions:
+      add_enable_assert ("", !value);
       break;
 
     case OPT_fassume_compiled_:
@@ -462,6 +477,11 @@ java_init (void)
 
   if (flag_inline_functions)
     flag_inline_trees = 1;
+
+  /* FIXME: Indirect dispatch isn't yet compatible with static class
+     init optimization.  */
+  if (flag_indirect_dispatch)
+    always_initialize_class_p = true;
 
   /* Force minimum function alignment if g++ uses the least significant
      bit of function pointers to store the virtual bit. This is required
@@ -669,7 +689,8 @@ java_print_error_function (diagnostic_context *context ATTRIBUTE_UNUSED,
    2, function prototypes are fully resolved and can be printed when
    reporting errors.  */
 
-void lang_init_source (int level)
+void
+lang_init_source (int level)
 {
   inhibit_error_function_printing = (level == 1);
 }
@@ -923,7 +944,7 @@ merge_init_test_initialization (void **entry, void *x)
   
   However, what if the method that is suppoed to do the initialization
   is itself inlined in the caller?  When expanding the called method
-  we'll assume that the class initalization has already been done,
+  we'll assume that the class initialization has already been done,
   because the DECL_INITIAL of the init_test_decl is set.
   
   To fix this we remove the DECL_INITIAL (in the caller scope) of all
@@ -962,11 +983,9 @@ inline_init_test_initialization (void **entry, void *x)
     (DECL_FUNCTION_INIT_TEST_TABLE (current_function_decl), ite->key);
   if (! h)
     return true;
-
   splay_tree_insert (decl_map,
 		     (splay_tree_key) ite->value,
 		     (splay_tree_value) h);
-
   return true;
 }
 
@@ -1097,7 +1116,7 @@ java_dump_tree (void *dump_info, tree t)
 static bool
 java_decl_ok_for_sibcall (tree decl)
 {
-  return decl != NULL && DECL_CONTEXT (decl) == current_class;
+  return decl != NULL && DECL_CONTEXT (decl) == output_class;
 }
 
 /* Given a call_expr, try to figure out what its target might be.  In
@@ -1108,7 +1127,7 @@ java_decl_ok_for_sibcall (tree decl)
 static tree
 java_get_callee_fndecl (tree call_expr)
 {
-  tree method, table, element;
+  tree method, table, element, atable_methods;
 
   HOST_WIDE_INT index;
 
@@ -1119,10 +1138,14 @@ java_get_callee_fndecl (tree call_expr)
   if (TREE_CODE (method) != ARRAY_REF)
     return NULL;
   table = TREE_OPERAND (method, 0);
-  if (table != atable_decl)
+  if (! DECL_LANG_SPECIFIC(table)
+      || !DECL_OWNER (table) 
+      || TYPE_ATABLE_DECL (DECL_OWNER (table)) != table)
     return NULL;
-  index = TREE_INT_CST_LOW (TREE_OPERAND (method, 1));
 
+  atable_methods = TYPE_ATABLE_METHODS (DECL_OWNER (table));
+  index = TREE_INT_CST_LOW (TREE_OPERAND (method, 1));
+  
   /* FIXME: Replace this for loop with a hash table lookup.  */
   for (element = atable_methods; element; element = TREE_CHAIN (element))
     {
@@ -1137,8 +1160,17 @@ java_get_callee_fndecl (tree call_expr)
 	}
       --index;
     }
-  
+
   return NULL;
+}
+
+
+/* Clear the binding stack.  */
+static void
+java_clear_binding_stack (void)
+{
+  while (!global_bindings_p ())
+    poplevel (0, 0, 0);
 }
 
 #include "gt-java-lang.h"

@@ -1,5 +1,6 @@
 /* java.util.GregorianCalendar
-   Copyright (C) 1998, 1999, 2001, 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999, 2001, 2002, 2003, 2004
+   Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -89,7 +90,8 @@ public class GregorianCalendar extends Calendar
    */
   private static ResourceBundle getBundle(Locale locale) 
   {
-    return ResourceBundle.getBundle(bundleName, locale);
+    return ResourceBundle.getBundle(bundleName, locale,
+      ClassLoader.getSystemClassLoader());
   }
 
   /**
@@ -402,7 +404,11 @@ public class GregorianCalendar extends Calendar
       {
 	hour = fields[HOUR];
         if (isSet[AM_PM] && fields[AM_PM] == PM)
-	  hour += 12;
+	  if (hour != 12) /* not Noon */
+            hour += 12;
+	/* Fix the problem of the status of 12:00 AM (midnight). */
+	if (isSet[AM_PM] && fields[AM_PM] == AM && hour == 12)
+	  hour = 0;
       }
 
     int minute = isSet[MINUTE] ? fields[MINUTE] : 0;
@@ -437,8 +443,15 @@ public class GregorianCalendar extends Calendar
       ? fields[ZONE_OFFSET] : zone.getRawOffset();
 
     int dayOfYear = daysOfYear[0] + daysOfYear[1];
-    int month = (dayOfYear * 5 + 3) / (31 + 30 + 31 + 30 + 31);
-    int day = (6 + (dayOfYear * 5 + 3) % (31 + 30 + 31 + 30 + 31)) / 5;
+    // This formula isn't right, so check for month as a quick fix.
+    // It doesn't compensate for leap years and puts day 30 in month 1
+    // instead of month 0.
+    int month = isSet[MONTH]
+	? fields[MONTH] : (dayOfYear * 5 + 3) / (31 + 30 + 31 + 30 + 31);
+    // This formula isn't right, so check for day as a quick fix.  It
+    // doesn't compensate for leap years, either.
+    int day = isSet[DAY_OF_MONTH] ? fields[DAY_OF_MONTH]
+	: (6 + (dayOfYear * 5 + 3) % (31 + 30 + 31 + 30 + 31)) / 5;
     int weekday = ((int) (time / (24 * 60 * 60 * 1000L)) + THURSDAY) % 7;
     if (weekday <= 0)
       weekday += 7;
@@ -606,7 +619,7 @@ public class GregorianCalendar extends Calendar
 	calculateDay(++day, gregorian);
       }
 
-    fields[DAY_OF_WEEK_IN_MONTH] = (fields[DAY_OF_MONTH] + 12) / 7;
+    fields[DAY_OF_WEEK_IN_MONTH] = (fields[DAY_OF_MONTH] + 6) / 7;
 
     // which day of the week are we (0..6), relative to getFirstDayOfWeek
     int relativeWeekday = (7 + fields[DAY_OF_WEEK] - getFirstDayOfWeek()) % 7;

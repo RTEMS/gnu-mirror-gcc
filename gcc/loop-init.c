@@ -1,5 +1,5 @@
 /* Loop optimizer initialization routines.
-   Copyright (C) 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -31,13 +31,17 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 /* Initialize loop optimizer.  */
 
 struct loops *
-rtl_loop_optimizer_init (FILE *dumpfile)
+loop_optimizer_init (FILE *dumpfile)
 {
   struct loops *loops = xcalloc (1, sizeof (struct loops));
   edge e;
+  static bool first_time = true;
 
-  /* Initialize structures for layout changes.  */
-  cfg_layout_initialize ();
+  if (first_time)
+    {
+      first_time = false;
+      init_set_costs ();
+    }
 
   /* Avoid annoying special cases of edges going to exit
      block.  */
@@ -49,16 +53,10 @@ rtl_loop_optimizer_init (FILE *dumpfile)
 
   if (flow_loops_find (loops, LOOP_TREE) <= 1)
     {
-      basic_block bb;
-
       /* No loops.  */
       flow_loops_free (loops);
       free (loops);
-      /* Make chain.  */
-      FOR_EACH_BB (bb)
-	if (bb->next_bb != EXIT_BLOCK_PTR)
-	  bb->rbi->next = bb->next_bb;
-      cfg_layout_finalize ();
+
       return NULL;
     }
 
@@ -81,7 +79,7 @@ rtl_loop_optimizer_init (FILE *dumpfile)
   flow_loops_dump (loops, dumpfile, NULL, 1);
 
 #ifdef ENABLE_CHECKING
-  verify_dominators (loops->cfg.dom);
+  verify_dominators (CDI_DOMINATORS);
   verify_loop_structure (loops);
 #endif
 
@@ -90,15 +88,16 @@ rtl_loop_optimizer_init (FILE *dumpfile)
 
 /* Finalize loop optimizer.  */
 void
-rtl_loop_optimizer_finalize (struct loops *loops, FILE *dumpfile)
+loop_optimizer_finalize (struct loops *loops, FILE *dumpfile)
 {
-  basic_block bb;
+  unsigned i;
 
-  /* Finalize layout changes.  */
-  /* Make chain.  */
-  FOR_EACH_BB (bb)
-    if (bb->next_bb != EXIT_BLOCK_PTR)
-      bb->rbi->next = bb->next_bb;
+  if (!loops)
+    return;
+
+  for (i = 1; i < loops->num; i++)
+    if (loops->parray[i])
+      free_simple_loop_desc (loops->parray[i]);
 
   /* Another dump.  */
   flow_loops_dump (loops, dumpfile, NULL, 1);
@@ -106,9 +105,6 @@ rtl_loop_optimizer_finalize (struct loops *loops, FILE *dumpfile)
   /* Clean up.  */
   flow_loops_free (loops);
   free (loops);
-
-  /* Finalize changes.  */
-  cfg_layout_finalize ();
 
   /* Checking.  */
 #ifdef ENABLE_CHECKING

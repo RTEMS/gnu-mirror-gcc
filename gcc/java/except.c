@@ -1,5 +1,5 @@
 /* Handle exceptions for GNU compiler for the Java(TM) language.
-   Copyright (C) 1997, 1998, 1999, 2000, 2002, 2003
+   Copyright (C) 1997, 1998, 1999, 2000, 2002, 2003, 2004
    Free Software Foundation, Inc.
 
 This file is part of GCC.
@@ -40,7 +40,6 @@ The Free Software Foundation is independent of Sun Microsystems, Inc.  */
 #include "toplev.h"
 
 static void expand_start_java_handler (struct eh_range *);
-static void expand_end_java_handler (struct eh_range *);
 static struct eh_range *find_handler_in_range (int, struct eh_range *,
 					       struct eh_range *);
 static void link_handler (struct eh_range *, struct eh_range *);
@@ -305,13 +304,8 @@ expand_start_java_handler (struct eh_range *range)
   fprintf (stderr, "expand start handler pc %d --> %d\n",
 	   current_pc, range->end_pc);
 #endif /* defined(DEBUG_JAVA_BINDING_LEVELS) */
-  {
-    tree new = build (TRY_CATCH_EXPR, void_type_node, NULL, NULL);
-    TREE_SIDE_EFFECTS (new) = 1;
-    java_add_stmt (build_java_empty_stmt ());
-    range->stmt = java_add_stmt (new);
-  }
-		     
+  pushlevel (0);
+  register_exception_range (range,  range->start_pc, range->end_pc);
   range->expanded = 1;
 }
 
@@ -319,6 +313,7 @@ tree
 prepare_eh_table_type (tree type)
 {
   tree exp;
+  tree *slot;
   const char *name;
   char *buf;
   tree decl;
@@ -331,8 +326,16 @@ prepare_eh_table_type (tree type)
    * rewritten to point to the appropriate class.  */
 
   if (type == NULL_TREE)
-    exp = NULL_TREE;
-  else if (is_compiled_class (type) && !flag_indirect_dispatch)
+    return NULL_TREE;
+
+  if (TYPE_TO_RUNTIME_MAP (output_class) == NULL)
+    TYPE_TO_RUNTIME_MAP (output_class) = java_treetreehash_create (10, 1);
+  
+  slot = java_treetreehash_new (TYPE_TO_RUNTIME_MAP (output_class), type);
+  if (*slot != NULL)
+    return TREE_VALUE (*slot);
+
+  if (is_compiled_class (type) && !flag_indirect_dispatch)
     {
       name = IDENTIFIER_POINTER (DECL_NAME (TYPE_NAME (type)));
       buf = alloca (strlen (name) + 5);
@@ -346,9 +349,7 @@ prepare_eh_table_type (tree type)
       DECL_INITIAL (decl) = build_class_ref (type);
       layout_decl (decl, 0);
       pushdecl (decl);
-      rest_of_decl_compilation (decl, (char*) 0, global_bindings_p (), 0);
-      make_decl_rtl (decl, (char*) 0);
-      exp = build1 (ADDR_EXPR, ptr_type_node, decl);
+      exp = build1 (ADDR_EXPR, build_pointer_type (TREE_TYPE (decl)), decl);
     }
   else
     {
@@ -364,14 +365,42 @@ prepare_eh_table_type (tree type)
       TREE_THIS_VOLATILE (decl) = 0;
       layout_decl (decl, 0);
       pushdecl (decl);
-      rest_of_decl_compilation (decl, (char*) 0, global_bindings_p (), 0);
-      make_decl_rtl (decl, (char*) 0);
       exp = build1 (ADDR_EXPR, build_pointer_type (utf8const_ptr_type), decl);
-      catch_classes = tree_cons (NULL, make_catch_class_record (exp, utf8_ref), catch_classes);
+      TYPE_CATCH_CLASSES (output_class) = 
+	tree_cons (NULL, make_catch_class_record (exp, utf8_ref), 
+		   TYPE_CATCH_CLASSES (output_class));
     }
+
+  exp = convert (ptr_type_node, exp);
+
+  *slot = tree_cons (type, exp, NULL_TREE);
+
   return exp;
 }
 
+static int
+expand_catch_class (void **entry, void *x ATTRIBUTE_UNUSED)
+{
+  struct treetreehash_entry *ite = (struct treetreehash_entry *) *entry;
+  tree addr = TREE_VALUE ((tree)ite->value);
+  tree decl;
+  STRIP_NOPS (addr);
+  decl = TREE_OPERAND (addr, 0);
+  rest_of_decl_compilation (decl, (char*) 0, global_bindings_p (), 0);
+  return true;
+}
+  
+/* For every class in the TYPE_TO_RUNTIME_MAP, expand the
+   corresponding object that is used by the runtime type matcher.  */
+
+void
+java_expand_catch_classes (tree this_class)
+{
+  if (TYPE_TO_RUNTIME_MAP (this_class))
+    htab_traverse 
+      (TYPE_TO_RUNTIME_MAP (this_class),
+       expand_catch_class, NULL);
+}
 
 /* Build a reference to the jthrowable object being carried in the
    exception header.  */
@@ -393,13 +422,11 @@ build_exception_object_ref (tree type)
 
 /* If there are any handlers for this range, isssue end of range,
    and then all handler blocks */
-static void
+void
 expand_end_java_handler (struct eh_range *range)
 {  
   tree handler = range->handlers;
-  tree compound = NULL;
 
-  force_poplevels (range->start_pc);  
   for ( ; handler != NULL_TREE; handler = TREE_CHAIN (handler))
     {
       /* For bytecode we treat exceptions a little unusually.  A
@@ -409,53 +436,18 @@ expand_end_java_handler (struct eh_range *range)
 	 extra (and difficult) work to get this to look like a
 	 gcc-style finally clause.  */
       tree type = TREE_PURPOSE (handler);
-
       if (type == NULL)
 	type = throwable_type_node;
+      type = prepare_eh_table_type (type);
 
-      if (compound)
-	{
-	  /* If we already have a COMPOUND there is more than one
-	     catch handler for this try block.  Wrap the
-	     TRY_CATCH_EXPR in operand 1 of COMPOUND with another
-	     TRY_CATCH_EXPR.  */
-	  tree inner_try_expr = TREE_OPERAND (compound, 1);
-	  tree catch_expr 
-	    = build (CATCH_EXPR, void_type_node, type,
-		     build (GOTO_EXPR, void_type_node, TREE_VALUE (handler)));
-	  tree try_expr
-	    = build (TRY_CATCH_EXPR, void_type_node,
-		     inner_try_expr, catch_expr);
-	  TREE_OPERAND (compound, 1) = try_expr;
-	}
-      else
-	{
-	  tree *stmts = get_stmts ();
-	  tree outer;
-	  tree try_expr;
-	  compound = range->stmt;
-	  outer = TREE_OPERAND (compound, 0);
-	  try_expr = TREE_OPERAND (compound, 1);
-	  /* On the left of COMPOUND is the expresion to be evaluated
-	     before the try handler is entered; on the right is a
-	     TRY_FINALLY_EXPR with no operands as yet.  In the current
-	     statement list is an expression that we're going to move
-	     inside the try handler.  We'll create a new COMPOUND_EXPR
-	     with the outer context on the left and the TRY_FINALLY_EXPR
-	     on the right, then nullify both operands of COMPOUND, which
-	     becomes the final expression in OUTER.  This new compound
-	     expression replaces the current statement list.  */
-	  TREE_OPERAND (try_expr, 0) = *stmts;
-	  TREE_OPERAND (try_expr, 1)
-	    = build (CATCH_EXPR, void_type_node, type,
-		     build (GOTO_EXPR, void_type_node, TREE_VALUE (handler)));
-	  TREE_SIDE_EFFECTS (try_expr) = 1;
-	  TREE_OPERAND (compound, 0) = build_java_empty_stmt ();
-	  TREE_OPERAND (compound, 1) = build_java_empty_stmt ();
-	  compound 
-	    = build (COMPOUND_EXPR, TREE_TYPE (try_expr), outer, try_expr);
-	  *stmts = compound;
-	}
+      {
+	tree catch_expr 
+	  = build (CATCH_EXPR, void_type_node, type,
+		   build (GOTO_EXPR, void_type_node, TREE_VALUE (handler)));
+	tree try_catch_expr = build (TRY_CATCH_EXPR, void_type_node,
+				     *get_stmts (), catch_expr);	
+	*get_stmts () = try_catch_expr;
+      }
     }
 #if defined(DEBUG_JAVA_BINDING_LEVELS)
   indent ();
@@ -499,19 +491,3 @@ maybe_start_try (int start_pc, int end_pc)
   check_start_handlers (range, start_pc);
 }
 
-/* Emit any end-of-try-range ending at end_pc and starting before
-   start_pc. */
-
-void
-maybe_end_try (int start_pc, int end_pc)
-{
-  if (! doing_eh (1))
-    return;
-
-  while (current_range != NULL_EH_RANGE && current_range->end_pc <= end_pc
-	 && current_range->start_pc >= start_pc)
-    {
-      expand_end_java_handler (current_range);
-      current_range = current_range->outer;
-    }
-}

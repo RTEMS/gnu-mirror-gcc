@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2003, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2004, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -332,8 +332,7 @@ package Atree is
 
    function New_Node
      (New_Node_Kind : Node_Kind;
-      New_Sloc      : Source_Ptr)
-      return          Node_Id;
+      New_Sloc      : Source_Ptr) return Node_Id;
    --  Allocates a completely new node with the given node type and source
    --  location values. All other fields are set to their standard defaults:
    --
@@ -351,8 +350,7 @@ package Atree is
 
    function New_Entity
      (New_Node_Kind : Node_Kind;
-      New_Sloc      : Source_Ptr)
-      return          Entity_Id;
+      New_Sloc      : Source_Ptr) return Entity_Id;
    --  Similar to New_Node, except that it is used only for entity nodes
    --  and returns an extended node.
 
@@ -427,8 +425,7 @@ package Atree is
      (Source    : Node_Id;
       Map       : Elist_Id := No_Elist;
       New_Sloc  : Source_Ptr := No_Location;
-      New_Scope : Entity_Id := Empty)
-      return      Node_Id;
+      New_Scope : Entity_Id := Empty) return Node_Id;
    --  Given a node that is the root of a subtree, Copy_Tree copies the entire
    --  syntactic subtree, including recursively any descendents whose parent
    --  field references a copied node (descendents not linked to a copied node
@@ -498,7 +495,7 @@ package Atree is
    function Extend_Node (Node : Node_Id) return Entity_Id;
    --  This function returns a copy of its input node with an extension
    --  added. The fields of the extension are set to Empty. Due to the way
-   --  extensions are handled (as two consecutive array elements), it may
+   --  extensions are handled (as four consecutive array elements), it may
    --  be necessary to reallocate the node, so that the returned value is
    --  not the same as the input value, but where possible the returned
    --  value will be the same as the input value (i.e. the extension will
@@ -1473,25 +1470,25 @@ package Atree is
       pragma Inline (Flag151);
 
       function Flag152 (N : Node_Id) return Boolean;
-      pragma Inline (Flag151);
+      pragma Inline (Flag152);
 
       function Flag153 (N : Node_Id) return Boolean;
-      pragma Inline (Flag151);
+      pragma Inline (Flag153);
 
       function Flag154 (N : Node_Id) return Boolean;
-      pragma Inline (Flag151);
+      pragma Inline (Flag154);
 
       function Flag155 (N : Node_Id) return Boolean;
-      pragma Inline (Flag151);
+      pragma Inline (Flag155);
 
       function Flag156 (N : Node_Id) return Boolean;
-      pragma Inline (Flag151);
+      pragma Inline (Flag156);
 
       function Flag157 (N : Node_Id) return Boolean;
-      pragma Inline (Flag151);
+      pragma Inline (Flag157);
 
       function Flag158 (N : Node_Id) return Boolean;
-      pragma Inline (Flag151);
+      pragma Inline (Flag158);
 
       function Flag159 (N : Node_Id) return Boolean;
       pragma Inline (Flag159);

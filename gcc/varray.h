@@ -1,5 +1,5 @@
 /* Virtual array support.
-   Copyright (C) 1998, 1999, 2000, 2002, 2003
+   Copyright (C) 1998, 1999, 2000, 2002, 2003, 2004
    Free Software Foundation, Inc.
    Contributed by Cygnus Solutions.
 
@@ -109,7 +109,7 @@ typedef union varray_data_tag GTY (()) {
 				tag ("VARRAY_DATA_HINT")))	hint[1];
   unsigned HOST_WIDE_INT  GTY ((length ("%0.num_elements"),
 				tag ("VARRAY_DATA_UHINT")))	uhint[1];
-  PTR			  GTY ((length ("%0.num_elements"), use_param (""),
+  PTR			  GTY ((length ("%0.num_elements"), use_param,
 				tag ("VARRAY_DATA_GENERIC")))	generic[1];
   PTR			  GTY ((length ("%0.num_elements"), skip (""),
 				tag ("VARRAY_DATA_GENERIC_NOGC")))	generic_nogc[1];
@@ -123,11 +123,11 @@ typedef union varray_data_tag GTY (()) {
 				tag ("VARRAY_DATA_TREE")))	tree[1];
   struct bitmap_head_def *GTY ((length ("%0.num_elements"),
 				tag ("VARRAY_DATA_BITMAP")))	bitmap[1];
-  struct reg_info_def	 *GTY ((length ("%0.num_elements"), skip (""),
+  struct reg_info_def	 *GTY ((length ("%0.num_elements"), skip,
 				tag ("VARRAY_DATA_REG")))	reg[1];
   struct const_equiv_data GTY ((length ("%0.num_elements"),
 			tag ("VARRAY_DATA_CONST_EQUIV")))	const_equiv[1];
-  struct basic_block_def *GTY ((length ("%0.num_elements"),
+  struct basic_block_def *GTY ((length ("%0.num_elements"), skip,
 				tag ("VARRAY_DATA_BB")))	bb[1];
   struct elt_list	 *GTY ((length ("%0.num_elements"),
 				tag ("VARRAY_DATA_TE")))	te[1];
@@ -219,6 +219,9 @@ extern varray_type varray_init (size_t, enum varray_data_enum, const char *);
 #define VARRAY_EDGE_INIT(va, num, name) \
   va = varray_init (num, VARRAY_DATA_EDGE, name)
 
+#define VARRAY_DG_INIT(va, num, name) \
+  va = varray_init (num, VARRAY_DATA_DG, name)
+
 #define VARRAY_TREE_PTR_INIT(va, num, name) \
   va = varray_init (num, VARRAY_DATA_TREE_PTR, name)
 
@@ -242,18 +245,33 @@ extern varray_type varray_grow (varray_type, size_t);
 extern void varray_clear (varray_type);
 extern void varray_copy (varray_type v1, varray_type v2);
 
+extern void dump_varray_statistics (void);
+
 /* Check for VARRAY_xxx macros being in bound.  */
 #if defined ENABLE_CHECKING && (GCC_VERSION >= 2007)
 extern void varray_check_failed (varray_type, size_t, const char *, int,
 				 const char *) ATTRIBUTE_NORETURN;
+extern void varray_underflow (varray_type, const char *, int, const char *)
+     ATTRIBUTE_NORETURN;
 #define VARRAY_CHECK(VA, N, T) __extension__			\
 (*({ varray_type const _va = (VA);				\
      const size_t _n = (N);					\
      if (_n >= _va->num_elements)				\
        varray_check_failed (_va, _n, __FILE__, __LINE__, __FUNCTION__);	\
      &_va->data.T[_n]; }))
+
+#define VARRAY_POP(VA) do {					\
+  varray_type const _va = (VA);					\
+  if (_va->elements_used == 0)					\
+    varray_underflow (_va, __FILE__, __LINE__, __FUNCTION__);	\
+  else								\
+    _va->elements_used--;					\
+} while (0)
+
 #else
 #define VARRAY_CHECK(VA, N, T) ((VA)->data.T[N])
+/* Pop the top element of VA.  */
+#define VARRAY_POP(VA) do { ((VA)->elements_used--); } while (0)
 #endif
 
 /* Push X onto VA.  T is the name of the field in varray_data
@@ -266,14 +284,6 @@ extern void varray_check_failed (varray_type, size_t, const char *, int,
       (VA)->data.T[(VA)->elements_used++] = (X);	\
     }							\
   while (0)
-
-/* Pop the top element of VA.  */
-#define VARRAY_POP(VA) \
-  ((VA)->elements_used--)
-
-/* Return the top element of VA.  */
-#define VARRAY_TOP(VA, T) \
-  ((VA)->data.T[(VA)->elements_used - 1])
 
 #define VARRAY_CHAR(VA, N)		VARRAY_CHECK (VA, N, c)
 #define VARRAY_UCHAR(VA, N)		VARRAY_CHECK (VA, N, uc)
@@ -297,6 +307,7 @@ extern void varray_check_failed (varray_type, size_t, const char *, int,
 #define VARRAY_BB(VA, N)		VARRAY_CHECK (VA, N, bb)
 #define VARRAY_ELT_LIST(VA, N)		VARRAY_CHECK (VA, N, te)
 #define VARRAY_EDGE(VA, N)		VARRAY_CHECK (VA, N, e)
+#define VARRAY_DG(VA, N)		VARRAY_CHECK (VA, N, dg)
 #define VARRAY_TREE_PTR(VA, N)		VARRAY_CHECK (VA, N, tp)
 
 /* Push a new element on the end of VA, extending it if necessary.  */
@@ -321,9 +332,12 @@ extern void varray_check_failed (varray_type, size_t, const char *, int,
 #define VARRAY_PUSH_CONST_EQUIV(VA, X)	VARRAY_PUSH (VA, const_equiv, X)
 #define VARRAY_PUSH_BB(VA, X)		VARRAY_PUSH (VA, bb, X)
 #define VARRAY_PUSH_EDGE(VA, X)		VARRAY_PUSH (VA, e, X)
+#define VARRAY_PUSH_DG(VA, X)		VARRAY_PUSH (VA, dg, X)
 #define VARRAY_PUSH_TREE_PTR(VA, X)	VARRAY_PUSH (VA, tp, X)
 
 /* Return the last element of VA.  */
+#define VARRAY_TOP(VA, T) VARRAY_CHECK(VA, (VA)->elements_used - 1, T)
+
 #define VARRAY_TOP_CHAR(VA)		VARRAY_TOP (VA, c)
 #define VARRAY_TOP_UCHAR(VA)	        VARRAY_TOP (VA, uc)
 #define VARRAY_TOP_SHORT(VA)	        VARRAY_TOP (VA, s)
@@ -346,5 +360,62 @@ extern void varray_check_failed (varray_type, size_t, const char *, int,
 #define VARRAY_TOP_BB(VA)		VARRAY_TOP (VA, bb)
 #define VARRAY_TOP_EDGE(VA)		VARRAY_TOP (VA, e)
 #define VARRAY_TOP_TREE_PTR(VA)		VARRAY_TOP (VA, tp)
+
+
+
+
+static inline int index_in_varray_tree (tree, varray_type);
+static inline bool tree_is_in_varray_tree_p (tree, varray_type);
+
+static inline int index_in_varray_int (int, varray_type);
+static inline bool int_is_in_varray_int_p (int, varray_type);
+
+/* Determines the index of T in the varray_tree VT.  */
+
+static inline int
+index_in_varray_tree (tree t, 
+		      varray_type vt)
+{
+  unsigned int i;
+  
+  for (i = 0; i < VARRAY_ACTIVE_SIZE (vt); i++)
+    if (t == VARRAY_TREE (vt, i))
+      return i;
+  
+  return -1;
+}
+
+/* Determines whether T is in the varray_tree VT.  */
+
+static inline bool
+tree_is_in_varray_tree_p (tree t, 
+			  varray_type vt)
+{
+  return index_in_varray_tree (t, vt) != -1;
+}
+
+/* Determines the index of T in the varray_int VT.  */
+
+static inline int
+index_in_varray_int (int t, 
+		     varray_type vt)
+{
+  unsigned int i;
+  
+  for (i = 0; i < VARRAY_ACTIVE_SIZE (vt); i++)
+    if (t == VARRAY_INT (vt, i))
+      return i;
+  
+  return -1;
+}
+
+/* Determines whether T is in the varray_int VT.  */
+
+static inline bool
+int_is_in_varray_int_p (int t, 
+			varray_type vt)
+{
+  return index_in_varray_int (t, vt) != -1;
+}
 
 #endif /* ! GCC_VARRAY_H */

@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2003, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2004, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -41,6 +41,7 @@ with Nlists;   use Nlists;
 with Nmake;    use Nmake;
 with Opt;      use Opt;
 with Restrict; use Restrict;
+with Rident;   use Rident;
 with Sem;      use Sem;
 with Sem_Ch8;  use Sem_Ch8;
 with Sem_Eval; use Sem_Eval;
@@ -326,9 +327,9 @@ package body Exp_Util is
       end if;
    end Build_Runtime_Call;
 
-   -----------------------------
-   --  Build_Task_Array_Image --
-   -----------------------------
+   ----------------------------
+   -- Build_Task_Array_Image --
+   ----------------------------
 
    --  This function generates the body for a function that constructs the
    --  image string for a task that is an array component. The function is
@@ -604,7 +605,7 @@ package body Exp_Util is
       --  If Discard_Names or No_Implicit_Heap_Allocations are in effect,
       --  generate a dummy declaration only.
 
-      if Restrictions (No_Implicit_Heap_Allocations)
+      if Restriction_Active (No_Implicit_Heap_Allocations)
         or else Global_Discard_Names
       then
          T_Id := Make_Defining_Identifier (Loc, New_Internal_Name ('J'));
@@ -623,12 +624,14 @@ package body Exp_Util is
          if Nkind (Id_Ref) = N_Identifier
            or else Nkind (Id_Ref) = N_Defining_Identifier
          then
-            --  For a simple variable, the image of the task is the name
-            --  of the variable.
+            --  For a simple variable, the image of the task is built from
+            --  the name of the variable. To avoid possible conflict with
+            --  the anonymous type created for a single protected object,
+            --  add a numeric suffix.
 
             T_Id :=
               Make_Defining_Identifier (Loc,
-                New_External_Name (Chars (Id_Ref), 'T'));
+                New_External_Name (Chars (Id_Ref), 'T', 1));
 
             Get_Name_String (Chars (Id_Ref));
 
@@ -897,6 +900,52 @@ package body Exp_Util is
 
       return Build_Task_Image_Function (Loc, Decls, Stats, Res);
    end Build_Task_Record_Image;
+
+   ----------------------------------
+   -- Component_May_Be_Bit_Aligned --
+   ----------------------------------
+
+   function Component_May_Be_Bit_Aligned (Comp : Entity_Id) return Boolean is
+   begin
+      --  If no component clause, then everything is fine, since the
+      --  back end never bit-misaligns by default, even if there is
+      --  a pragma Packed for the record.
+
+      if No (Component_Clause (Comp)) then
+         return False;
+      end if;
+
+      --  It is only array and record types that cause trouble
+
+      if not Is_Record_Type (Etype (Comp))
+        and then not Is_Array_Type (Etype (Comp))
+      then
+         return False;
+
+      --  If we know that we have a small (64 bits or less) record
+      --  or bit-packed array, then everything is fine, since the
+      --  back end can handle these cases correctly.
+
+      elsif Esize (Comp) <= 64
+        and then (Is_Record_Type (Etype (Comp))
+                   or else Is_Bit_Packed_Array (Etype (Comp)))
+      then
+         return False;
+
+      --  Otherwise if the component is not byte aligned, we
+      --  know we have the nasty unaligned case.
+
+      elsif Normalized_First_Bit (Comp) /= Uint_0
+        or else Esize (Comp) mod System_Storage_Unit /= Uint_0
+      then
+         return True;
+
+      --  If we are large and byte aligned, then OK at this level
+
+      else
+         return False;
+      end if;
+   end Component_May_Be_Bit_Aligned;
 
    -------------------------------
    -- Convert_To_Actual_Subtype --
@@ -1273,8 +1322,44 @@ package body Exp_Util is
    ----------------------
 
    procedure Force_Evaluation (Exp : Node_Id; Name_Req : Boolean := False) is
+      Component_In_Lhs : Boolean := False;
+      Par              : Node_Id;
+
    begin
-      Remove_Side_Effects (Exp, Name_Req, Variable_Ref => True);
+      --  Loop to determine whether there is a component reference in
+      --  the left hand side if this appears on the left side of an
+      --  assignment statement. Needed to determine if form of result
+      --  must be a variable.
+
+      Par := Exp;
+      while Present (Par)
+        and then
+         (Nkind (Par) = N_Selected_Component
+            or else
+          Nkind (Par) = N_Indexed_Component)
+      loop
+         if Nkind (Parent (Par)) = N_Assignment_Statement
+           and then Par = Name (Parent (Par))
+         then
+            Component_In_Lhs := True;
+            exit;
+         else
+            Par := Parent (Par);
+         end if;
+      end loop;
+
+      --  If the expression is a selected component, it is being evaluated
+      --  as part of a discriminant check. If it is part of a left-hand
+      --  side, this is the last use of its value and it is safe to create
+      --  a renaming for it, rather than a temporary. In addition, if it
+      --  is not an addressable field, creating a temporary may be a problem
+      --  for gigi, or might drop the value of the assignment. Therefore,
+      --  if the expression is on the lhs of an assignment, remove side
+      --  effects without requiring a temporary, and create a renaming.
+      --  (See remove_side_effects for details).
+
+      Remove_Side_Effects
+        (Exp, Name_Req, Variable_Ref => not Component_In_Lhs);
    end Force_Evaluation;
 
    ------------------------
@@ -1963,6 +2048,7 @@ package body Exp_Util is
                N_Compilation_Unit_Aux                   |
                N_Component_Clause                       |
                N_Component_Declaration                  |
+               N_Component_Definition                   |
                N_Component_List                         |
                N_Constrained_Array_Definition           |
                N_Decimal_Fixed_Point_Definition         |
@@ -2304,27 +2390,20 @@ package body Exp_Util is
 
    function Is_Possibly_Unaligned_Slice (P : Node_Id) return Boolean is
    begin
+      --  ??? GCC3 will eventually handle strings with arbitrary alignments,
+      --  but for now the following check must be disabled.
+
+      --  if get_gcc_version >= 3 then
+      --     return False;
+      --  end if;
+
+      --  For renaming case, go to renamed object
+
       if Is_Entity_Name (P)
         and then Is_Object (Entity (P))
         and then Present (Renamed_Object (Entity (P)))
       then
          return Is_Possibly_Unaligned_Slice (Renamed_Object (Entity (P)));
-      end if;
-
-      --  We only need to worry if the target has strict alignment, unless
-      --  it is a nested record component with a component clause, which
-      --  Gigi does not handle well. This patch should disappear with GCC 3.0
-      --  and it is not clear why it is needed even when the representation
-      --  clause is a confirming one, but in its absence gigi complains that
-      --  the slice is not addressable.???
-
-      if not Target_Strict_Alignment then
-         if Nkind (P) /= N_Slice
-           or else Nkind (Prefix (P)) /= N_Selected_Component
-           or else Nkind (Prefix (Prefix (P))) /= N_Selected_Component
-         then
-            return False;
-         end if;
       end if;
 
       --  The reference must be a slice
@@ -2333,34 +2412,115 @@ package body Exp_Util is
          return False;
       end if;
 
+      --  Always assume the worst for a nested record component with a
+      --  component clause, which gigi/gcc does not appear to handle well.
+      --  It is not clear why this special test is needed at all ???
+
+      if Nkind (Prefix (P)) = N_Selected_Component
+        and then Nkind (Prefix (Prefix (P))) = N_Selected_Component
+        and then
+          Present (Component_Clause (Entity (Selector_Name (Prefix (P)))))
+      then
+         return True;
+      end if;
+
+      --  We only need to worry if the target has strict alignment
+
+      if not Target_Strict_Alignment then
+         return False;
+      end if;
+
       --  If it is a slice, then look at the array type being sliced
 
       declare
-         Pref : constant Node_Id   := Prefix (P);
-         Typ  : constant Entity_Id := Etype (Prefix (P));
+         Sarr : constant Node_Id := Prefix (P);
+         --  Prefix of the slice, i.e. the array being sliced
+
+         Styp : constant Entity_Id := Etype (Prefix (P));
+         --  Type of the array being sliced
+
+         Pref : Node_Id;
+         Ptyp : Entity_Id;
 
       begin
-         --  The worrisome case is one where we don't know the alignment
-         --  of the array, or we know it and it is greater than 1 (if the
-         --  alignment is one, then obviously it cannot be misaligned).
+         --  The problems arise if the array object that is being sliced
+         --  is a component of a record or array, and we cannot guarantee
+         --  the alignment of the array within its containing object.
 
-         if Known_Alignment (Typ) and then Alignment (Typ) = 1 then
-            return False;
-         end if;
+         --  To investigate this, we look at successive prefixes to see
+         --  if we have a worrisome indexed or selected component.
 
-         --  The only way we can be unaligned is if the array being sliced
-         --  is a component of a record, and either the record is packed,
-         --  or the component has a component clause, or the record has
-         --  a specified alignment (that might be too small).
+         Pref := Sarr;
+         loop
+            --  Case of array is part of an indexed component reference
 
-         return
-            Nkind (Pref) = N_Selected_Component
-              and then
-                 (Is_Packed (Etype (Prefix (Pref)))
-                    or else
-                  Known_Alignment (Etype (Prefix (Pref)))
-                    or else
-                  Present (Component_Clause (Entity (Selector_Name (Pref)))));
+            if Nkind (Pref) = N_Indexed_Component then
+               Ptyp := Etype (Prefix (Pref));
+
+               --  The only problematic case is when the array is packed,
+               --  in which case we really know nothing about the alignment
+               --  of individual components.
+
+               if Is_Bit_Packed_Array (Ptyp) then
+                  return True;
+               end if;
+
+            --  Case of array is part of a selected component reference
+
+            elsif Nkind (Pref) = N_Selected_Component then
+               Ptyp := Etype (Prefix (Pref));
+
+               --  We are definitely in trouble if the record in question
+               --  has an alignment, and either we know this alignment is
+               --  inconsistent with the alignment of the slice, or we
+               --  don't know what the alignment of the slice should be.
+
+               if Known_Alignment (Ptyp)
+                 and then (Unknown_Alignment (Styp)
+                             or else Alignment (Styp) > Alignment (Ptyp))
+               then
+                  return True;
+               end if;
+
+               --  We are in potential trouble if the record type is packed.
+               --  We could special case when we know that the array is the
+               --  first component, but that's not such a simple case ???
+
+               if Is_Packed (Ptyp) then
+                  return True;
+               end if;
+
+               --  We are in trouble if there is a component clause, and
+               --  either we do not know the alignment of the slice, or
+               --  the alignment of the slice is inconsistent with the
+               --  bit position specified by the component clause.
+
+               declare
+                  Field : constant Entity_Id := Entity (Selector_Name (Pref));
+               begin
+                  if Present (Component_Clause (Field))
+                    and then
+                      (Unknown_Alignment (Styp)
+                        or else
+                         (Component_Bit_Offset (Field) mod
+                           (System_Storage_Unit * Alignment (Styp))) /= 0)
+                  then
+                     return True;
+                  end if;
+               end;
+
+            --  For cases other than selected or indexed components we
+            --  know we are OK, since no issues arise over alignment.
+
+            else
+               return False;
+            end if;
+
+            --  We processed an indexed component or selected component
+            --  reference that looked safe, so keep checking prefixes.
+
+            Pref := Prefix (Pref);
+         end loop;
       end;
    end Is_Possibly_Unaligned_Slice;
 
@@ -2767,13 +2927,22 @@ package body Exp_Util is
                   Make_Component_Declaration (Loc,
                     Defining_Identifier =>
                       Make_Defining_Identifier (Loc, Name_uParent),
-                    Subtype_Indication => New_Reference_To (Constr_Root, Loc)),
+                    Component_Definition =>
+                      Make_Component_Definition (Loc,
+                        Aliased_Present    => False,
+                        Subtype_Indication =>
+                          New_Reference_To (Constr_Root, Loc))),
 
                   Make_Component_Declaration (Loc,
                     Defining_Identifier =>
                       Make_Defining_Identifier (Loc,
                         Chars => New_Internal_Name ('C')),
-                    Subtype_Indication => New_Reference_To (Str_Type, Loc))),
+                    Component_Definition =>
+                      Make_Component_Definition (Loc,
+                        Aliased_Present    => False,
+                        Subtype_Indication =>
+                          New_Reference_To (Str_Type, Loc)))),
+
                 Variant_Part => Empty))));
 
       Insert_Actions (E, List_Def);
@@ -2959,10 +3128,7 @@ package body Exp_Util is
 
    function May_Generate_Large_Temp (Typ : Entity_Id) return Boolean is
    begin
-      if not Stack_Checking_Enabled then
-         return False;
-
-      elsif not Size_Known_At_Compile_Time (Typ) then
+      if not Size_Known_At_Compile_Time (Typ) then
          return False;
 
       elsif Esize (Typ) /= 0 and then Esize (Typ) <= 256 then
@@ -3200,8 +3366,7 @@ package body Exp_Util is
                  N_In        |
                  N_Not_In    |
                  N_And_Then  |
-                 N_Or_Else
-            =>
+                 N_Or_Else   =>
                return Side_Effect_Free (Left_Opnd  (N))
                  and then Side_Effect_Free (Right_Opnd (N));
 
@@ -3283,6 +3448,14 @@ package body Exp_Util is
 
             when N_Unchecked_Expression =>
                return Side_Effect_Free (Expression (N));
+
+            --  A literal is side effect free
+
+            when N_Character_Literal    |
+                 N_Integer_Literal      |
+                 N_Real_Literal         |
+                 N_String_Literal       =>
+               return True;
 
             --  We consider that anything else has side effects. This is a bit
             --  crude, but we are pretty close for most common cases, and we
@@ -3681,7 +3854,9 @@ package body Exp_Util is
       --  in stack checking mode.
 
       elsif Size_Known_At_Compile_Time (Otyp)
-        and then not May_Generate_Large_Temp (Otyp)
+        and then
+          (not Stack_Checking_Enabled
+             or else not May_Generate_Large_Temp (Otyp))
         and then not (Is_Record_Type (Otyp) and then not Is_Constrained (Otyp))
       then
          return True;
@@ -3876,6 +4051,53 @@ package body Exp_Util is
         and then Esize (Left_Typ) = Esize (Right_Typ)
         and then Esize (Left_Typ) = Esize (Result_Typ);
    end Target_Has_Fixed_Ops;
+
+   ------------------------------------------
+   -- Type_May_Have_Bit_Aligned_Components --
+   ------------------------------------------
+
+   function Type_May_Have_Bit_Aligned_Components
+     (Typ : Entity_Id) return Boolean
+   is
+   begin
+      --  Array type, check component type
+
+      if Is_Array_Type (Typ) then
+         return
+           Type_May_Have_Bit_Aligned_Components (Component_Type (Typ));
+
+      --  Record type, check components
+
+      elsif Is_Record_Type (Typ) then
+         declare
+            E : Entity_Id;
+
+         begin
+            E := First_Entity (Typ);
+            while Present (E) loop
+               if Ekind (E) = E_Component
+                 or else Ekind (E) = E_Discriminant
+               then
+                  if Component_May_Be_Bit_Aligned (E)
+                    or else
+                      Type_May_Have_Bit_Aligned_Components (Etype (E))
+                  then
+                     return True;
+                  end if;
+               end if;
+
+               Next_Entity (E);
+            end loop;
+
+            return False;
+         end;
+
+      --  Type other than array or record is always OK
+
+      else
+         return False;
+      end if;
+   end Type_May_Have_Bit_Aligned_Components;
 
    ----------------------------
    -- Wrap_Cleanup_Procedure --

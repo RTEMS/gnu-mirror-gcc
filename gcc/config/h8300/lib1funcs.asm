@@ -1,8 +1,9 @@
-;; libgcc routines for the Hitachi H8/300 CPU.
+;; libgcc routines for the Renesas H8/300 CPU.
 ;; Contributed by Steve Chamberlain <sac@cygnus.com>
-;; Optimizations by Toshiyasu Morita <toshiyasu.morita@hsa.hitachi.com>
+;; Optimizations by Toshiyasu Morita <toshiyasu.morita@renesas.com>
 
-/* Copyright (C) 1994, 2000, 2001, 2002 Free Software Foundation, Inc.
+/* Copyright (C) 1994, 2000, 2001, 2002, 2003, 2004
+   Free Software Foundation, Inc.
 
 This file is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the
@@ -71,7 +72,7 @@ Boston, MA 02111-1307, USA.  */
 #define S2P	r6
 #endif
 
-#if defined (__H8300H__) || defined (__H8300S__)
+#if defined (__H8300H__) || defined (__H8300S__) || defined (__H8300SX__)
 #define PUSHP	push.l
 #define POPP	pop.l
 
@@ -102,6 +103,13 @@ Boston, MA 02111-1307, USA.  */
 	.h8300sn
 #else
 	.h8300s
+#endif
+#endif
+#ifdef __H8300SX__
+#ifdef __NORMAL_MODE__
+	.h8300sxn
+#else
+	.h8300sx
 #endif
 #endif
 
@@ -174,30 +182,28 @@ ___ucmpsi2:
 	.section .text
 	.align 2
 divnorm:
-	mov.b	#0x0,A2L
 	or	A0H,A0H		; is divisor > 0
+	stc	ccr,A2L
 	bge	_lab1
 	not	A0H		; no - then make it +ve
 	not	A0L
 	adds	#1,A0
-	xor	#0x1,A2L	; and remember that in A2L
 _lab1:	or	A1H,A1H	; look at dividend
 	bge	_lab2
 	not	A1H		; it is -ve, make it positive
 	not	A1L
 	adds	#1,A1
-	xor	#0x1,A2L; and toggle sign of result
+	xor	#0x8,A2L; and toggle sign of result
 _lab2:	rts
 ;; Basically the same, except that the sign of the divisor determines
 ;; the sign.
 modnorm:
-	mov.b	#0x0,A2L
 	or	A0H,A0H		; is divisor > 0
+	stc	ccr,A2L
 	bge	_lab7
 	not	A0H		; no - then make it +ve
 	not	A0L
 	adds	#1,A0
-	xor	#0x1,A2L	; and remember that in A2L
 _lab7:	or	A1H,A1H	; look at dividend
 	bge	_lab8
 	not	A1H		; it is -ve, make it positive
@@ -211,7 +217,7 @@ _lab8:	rts
 ___divhi3:
 	bsr	divnorm
 	bsr	___udivhi3
-negans:	or	A2L,A2L	; should answer be negative ?
+negans:	btst	#3,A2L	; should answer be negative ?
 	beq	_lab4
 	not	A0H	; yes, so make it so
 	not	A0L
@@ -769,7 +775,7 @@ _done:
 #else /* __H8300H__ */
 
 ;
-; mulsi3 for H8/300H - based on Hitachi SH implementation
+; mulsi3 for H8/300H - based on Renesas SH implementation
 ;
 ; by Toshiyasu Morita
 ;
@@ -816,7 +822,7 @@ L_skip2:
    behavior is undefined anyways.  */
 	.global	___fixunssfsi
 ___fixunssfsi:
-	cmp.b #0x47,r0h
+	cmp.b #0x4f,r0h
 	bge Large_num
 	jmp     @___fixsfsi
 Large_num:

@@ -1,5 +1,5 @@
 /* SocketChannelImpl.java -- 
-   Copyright (C) 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -38,12 +38,12 @@ exception statement from your version. */
 
 package gnu.java.nio;
 
-import java.io.InputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import gnu.java.net.PlainSocketImpl;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.SocketTimeoutException;
@@ -53,20 +53,18 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.NoConnectionPendingException;
 import java.nio.channels.NotYetConnectedException;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
 import java.nio.channels.UnresolvedAddressException;
 import java.nio.channels.UnsupportedAddressTypeException;
-import java.nio.channels.SocketChannel;
-import java.nio.channels.Selector;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.spi.SelectorProvider;
-import gnu.classpath.Configuration;
 
 public final class SocketChannelImpl extends SocketChannel
 {
   private PlainSocketImpl impl;
   private NIOSocket socket;
-  private boolean blocking = true;
-  private boolean connectionPending = false;
+  private boolean connectionPending;
 
   SocketChannelImpl (SelectorProvider provider)
     throws IOException
@@ -74,6 +72,7 @@ public final class SocketChannelImpl extends SocketChannel
     super (provider);
     impl = new PlainSocketImpl();
     socket = new NIOSocket (impl, this);
+    configureBlocking(true);
   }
   
   SocketChannelImpl (SelectorProvider provider,
@@ -117,7 +116,6 @@ public final class SocketChannelImpl extends SocketChannel
   protected void implConfigureBlocking (boolean blocking) throws IOException
   {
     socket.setSoTimeout (blocking ? 0 : NIOConstants.DEFAULT_TIMEOUT);
-    this.blocking = blocking;
   }   
 
   public boolean connect (SocketAddress remote) throws IOException
@@ -137,23 +135,35 @@ public final class SocketChannelImpl extends SocketChannel
     if (((InetSocketAddress) remote).isUnresolved())
       throw new UnresolvedAddressException();
     
-    if (blocking)
-      {
-        // Do blocking connect.
-        socket.connect (remote);
-        return true;
-      }
-
-    // Do non-blocking connect.
     try
       {
-        socket.connect (remote, NIOConstants.DEFAULT_TIMEOUT);
-        return true;
+        socket.getPlainSocketImpl().setInChannelOperation(true);
+          // indicate that a channel is initiating the accept operation
+          // so that the socket ignores the fact that we might be in
+          // non-blocking mode.
+        
+        if (isBlocking())
+          {
+            // Do blocking connect.
+            socket.connect (remote);
+            return true;
+          }
+
+        // Do non-blocking connect.
+        try
+          {
+            socket.connect (remote, NIOConstants.DEFAULT_TIMEOUT);
+            return true;
+          }
+        catch (SocketTimeoutException e)
+          {
+            connectionPending = true;
+            return false;
+          }
       }
-    catch (SocketTimeoutException e)
+    finally
       {
-        connectionPending = true;
-        return false;
+        socket.getPlainSocketImpl().setInChannelOperation(false);
       }
   }
     
@@ -163,7 +173,7 @@ public final class SocketChannelImpl extends SocketChannel
     if (!isOpen())
       throw new ClosedChannelException();
     
-    if (!connectionPending)
+    if (!isConnected() && !connectionPending)
       throw new NoConnectionPendingException();
     
     if (isConnected())
@@ -215,7 +225,7 @@ public final class SocketChannelImpl extends SocketChannel
     int offset = 0;
     InputStream input = socket.getInputStream();
     int available = input.available();
-    int len = dst.remaining();
+    int len = dst.capacity() - dst.position();
 	
     if (available == 0)
       return 0;
@@ -239,12 +249,14 @@ public final class SocketChannelImpl extends SocketChannel
     try
       {
         begin();
+        socket.getPlainSocketImpl().setInChannelOperation(true);
         readBytes = input.read (data, offset, len);
         completed = true;
       }
     finally
       {
         end (completed);
+        socket.getPlainSocketImpl().setInChannelOperation(false);
       }
 
     if (readBytes > 0)
@@ -301,10 +313,21 @@ public final class SocketChannelImpl extends SocketChannel
         data = src.array();
       }
 
-    System.out.println ("INTERNAL: writing to socket outputstream");
-    
     OutputStream output = socket.getOutputStream();
-    output.write (data, offset, len);
+    boolean completed = false;
+
+    try
+      {
+        begin();
+        socket.getPlainSocketImpl().setInChannelOperation(true);
+        output.write (data, offset, len);
+        completed = true;
+      }
+    finally
+      {
+        end (completed);
+        socket.getPlainSocketImpl().setInChannelOperation(false);
+      }
 
     if (src.hasArray())
       {

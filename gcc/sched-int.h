@@ -1,7 +1,7 @@
 /* Instruction scheduling pass.  This file contains definitions used
    internally in the scheduler.
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2003 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -19,6 +19,16 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING.  If not, write to the Free
 Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 02111-1307, USA.  */
+
+#ifndef GCC_SCHED_INT_H
+#define GCC_SCHED_INT_H
+
+/* For state_t.  */
+#include "insn-attr.h"
+/* For regset_head.  */
+#include "basic-block.h"
+/* For reg_note.  */
+#include "rtl.h"
 
 /* Pointer to data describing the current DFA state.  */
 extern state_t curr_state;
@@ -84,7 +94,7 @@ struct deps
 
   /* Used to keep post-call pseudo/hard reg movements together with
      the call.  */
-  bool in_post_call_group_p;
+  enum { not_post_call, post_call, post_call_initial } in_post_call_group_p;
 
   /* Set to the tail insn of the outermost libcall block.
 
@@ -381,7 +391,6 @@ extern void rm_other_notes (rtx, rtx);
 extern int insn_issue_delay (rtx);
 extern int set_priorities (rtx, rtx);
 
-extern rtx sched_emit_insn (rtx);
 extern void schedule_block (int, int);
 extern void sched_init (FILE *);
 extern void sched_finish (void);
@@ -395,3 +404,5 @@ extern int insn_cost (rtx, rtx, rtx);
 extern rtx get_unit_last_insn (int);
 extern int actual_hazard_this_instance (int, int, rtx, int, int);
 extern void print_insn (char *, rtx, int);
+
+#endif /* GCC_SCHED_INT_H */

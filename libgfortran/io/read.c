@@ -120,8 +120,8 @@ convert_real (void *dest, const char *buffer, int length)
   return 0;
 }
 
-int
-convert_precsion_real (void *dest, int sign,
+static int
+convert_precision_real (void *dest, int sign,
                        char *buffer, int length, int exponent)
 {
   int w, new_dp_pos, i, slen, k, dp;
@@ -283,9 +283,14 @@ read_a (fnode * f, char *p, int length)
   int w, m, n;
 
   w = f->u.w;
+  if (w == -1) /* '(A)' edit descriptor  */
+    w = length;
+
   source = read_block (&w);
   if (source == NULL)
     return;
+  if (w > length)
+     source += (w - length);
 
   m = (w > length) ? length : w;
   memcpy (p, source, m);
@@ -628,9 +633,9 @@ read_f (fnode * f, char *dest, int length)
 
   exponent_sign = 1;
 
-  /* A digit is required at this point */
+  /* A digit (or a '.') is required at this point */
 
-  if (!isdigit (*p))
+  if (!isdigit (*p) && *p != '.')
     goto bad_float;
 
   while (w > 0)
@@ -766,7 +771,7 @@ done:
    * The only thing that can go wrong at this point is overflow or
    * underflow. */
 
-  convert_precsion_real (dest, val_sign, buffer, length, exponent);
+  convert_precision_real (dest, val_sign, buffer, length, exponent);
 
   if (buffer != scratch)
      free_mem (buffer);

@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2003, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2004, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -60,15 +60,17 @@ package Opt is
    --  GNATBIND, GNATLINK
    --  Set True if binder file to be generated in Ada rather than C
 
-   Ada_95 : Boolean := True;
-   --  GNAT
-   --  Set True if operating in Ada 95 mode
-   --  Set False if operating in Ada 83 mode
+   type Ada_Version_Type is (Ada_83, Ada_95, Ada_05);
+   --  Versions of Ada for Ada_Version below. Note that these are ordered,
+   --  so that tests like Ada_Version >= Ada_95 are legitimate and useful.
 
-   Ada_83 : Boolean := False;
+   Ada_Version_Default : Ada_Version_Type := Ada_95;
    --  GNAT
-   --  Set True if operating in Ada 83 mode
-   --  Set False if operating in Ada 95 mode
+   --  Default Ada version if no switch given
+
+   Ada_Version : Ada_Version_Type := Ada_Version_Default;
+   --  GNAT
+   --  Current Ada version for compiler
 
    Ada_Final_Suffix : constant String := "final";
    Ada_Final_Name : String_Ptr := new String'("ada" & Ada_Final_Suffix);
@@ -165,6 +167,11 @@ package Opt is
    --  Force brief error messages to standard error, even if verbose mode is
    --  set (so that main error messages go to standard output).
 
+   Build_Bind_And_Link_Full_Project : Boolean := False;
+   --  GNATMAKE
+   --  Set to True to build, bind and link all the sources of a project file
+   --  (switch -B)
+
    Check_Object_Consistency : Boolean := False;
    --  GNATBIND, GNATMAKE
    --  Set to True to check whether every object file is consistent with
@@ -242,17 +249,17 @@ package Opt is
 
    Create_Mapping_File : Boolean := False;
    --  GNATMAKE
-   --  Set to True (-C switch) to indicate that gnatmake
-   --  invokes the compiler with a mapping file (-gnatem compiler switch).
+   --  Set to True (-C switch) to indicate that gnatmake will invoke
+   --  the compiler with a mapping file (-gnatem compiler switch).
 
    subtype Debug_Level_Value is Nat range 0 .. 3;
    Debugger_Level : Debug_Level_Value := 0;
    --  GNATBIND
-   --  The value given to the -g parameter.
-   --  The default value for -g with no value is 2
-   --  This is usually ignored by GNATBIND, except in the VMS version
-   --  where it is passed as an argument to __gnat_initialize to trigger
-   --  the activation of the remote debugging interface (is this true???).
+   --  The value given to the -g parameter. The default value for -g with
+   --  no value is 2. This is usually ignored by GNATBIND, except in the
+   --  VMS version where it is passed as an argument to __gnat_initialize
+   --  to trigger the activation of the remote debugging interface.
+   --  Is this still true ???
 
    Debug_Generated_Code : Boolean := False;
    --  GNAT
@@ -260,11 +267,22 @@ package Opt is
    --  of the original source code. Causes debugging information to be
    --  written with respect to the generated code file that is written.
 
+   Default_Sec_Stack_Size : Int := -1;
+   --  GNATBIND
+   --  Set to default secondary stack size in units of kilobytes. Set by
+   --  the -Dnnn switch for the binder. A value of -1 indicates that no
+   --  default was set by the binder, and that the default should be the
+   --  initial value of System.Secondary_Stack.Default_Secondary_Stack_Size.
+
+   Detect_Blocking : Boolean := False;
+   --  GNAT
+   --  Set True to force the run time to raise Program_Error if calls to
+   --  potentially blocking operations are detected from protected actions.
+
    Display_Compilation_Progress : Boolean := False;
    --  GNATMAKE
    --  Set True (-d switch) to display information on progress while compiling
-   --  files. Internal flag to be used in conjunction with an IDE such as
-   --  Glide.
+   --  files. Internal flag to be used in conjunction with an IDE (e.g GPS).
 
    type Distribution_Stub_Mode_Type is
    --  GNAT
@@ -357,7 +375,7 @@ package Opt is
    Extensions_Allowed : Boolean := False;
    --  GNAT
    --  Set to True by switch -gnatX if GNAT specific language extensions
-   --  are allowed. For example, "with type" is a GNAT extension.
+   --  are allowed. For example, "limited with" is a GNAT extension.
 
    type External_Casing_Type is (
      As_Is,       -- External names cased as they appear in the Ada source
@@ -385,6 +403,11 @@ package Opt is
    --  casing is controlled by External_Name_Imp_Casing), and also has no
    --  effect if an explicit Link_Name is supplied (a link name is always
    --  used exactly as given).
+
+   External_Unit_Compilation_Allowed : Boolean := False;
+   --  GNATMAKE
+   --  When True (set by gnatmake switch -x), allow compilation of sources
+   --  that are not part of any project file.
 
    Float_Format : Character := ' ';
    --  GNAT
@@ -432,6 +455,13 @@ package Opt is
    --  GNAT
    --  Set True to generate full source listing with embedded errors
 
+   function get_gcc_version return Int;
+   pragma Import (C, get_gcc_version, "get_gcc_version");
+
+   GCC_Version : constant Nat := get_gcc_version;
+   --  GNATMAKE
+   --  Indicates which version of gcc is in use (2 = 2.8.1, 3 = 3.x).
+
    Global_Discard_Names : Boolean := False;
    --  GNAT, GNATBIND
    --  Set true if a pragma Discard_Names applies to the current unit
@@ -462,7 +492,7 @@ package Opt is
    --    'p'  PC (US, IBM page 437)
    --    '8'  PC (European, IBM page 850)
    --    'f'  Full upper set (all distinct)
-   --    'n'  No upper characters (Ada/83 rules)
+   --    'n'  No upper characters (Ada 83 rules)
    --    'w'  Latin-1 plus wide characters allowed in identifiers
    --
    --  The setting affects the set of letters allowed in identifiers and the
@@ -505,6 +535,10 @@ package Opt is
    --  then elaboration flag checks are to be generated in the binder
    --  generated file.
 
+   Follow_Links : Boolean := False;
+   --  GNATMAKE
+   --  Set to True (-eL) to process the project files in trusted mode
+
    Front_End_Inlining : Boolean := False;
    --  GNAT
    --  Set True to activate inlining by front-end expansion.
@@ -525,6 +559,11 @@ package Opt is
    --  GNATMAKE
    --  When True signals gnatmake to ignore compilation errors and keep
    --  processing sources until there is no more work.
+
+   Keep_Temporary_Files : Boolean := False;
+   --  GNATCMD
+   --  When True the temporary files created by the GNAT driver are not
+   --  deleted. Set by switch -dn or qualifier /KEEP_TEMPORARY_FILES.
 
    Link_Only : Boolean := False;
    --  GNATMAKE
@@ -613,6 +652,11 @@ package Opt is
    --  Set to True when either Compile_Only, Bind_Only or Link_Only is
    --  set to True.
 
+   Main_Index : Int := 0;
+   --  GNATMAKE
+   --  This is set to non-zero by gnatmake switch -eInnn to indicate that
+   --  the main program is the nnn unit in a multi-unit source file.
+
    Mapping_File_Name : String_Ptr := null;
    --  GNAT
    --  File name of mapping between unit names, file names and path names.
@@ -629,6 +673,15 @@ package Opt is
    --  extension, as set by the appropriate switch. If no switch is given,
    --  then this value is initialized by Osint to the appropriate value.
 
+   Max_Line_Length : Int := Hostparm.Max_Line_Length;
+   --  This is a copy of Max_Line_Length used by the scanner. It is usually
+   --  set to be a copy of Hostparm.Max_Line_Length, and is used to check
+   --  the maximum line length in the scanner when style checking is inactive.
+   --  The only time it is set to a different value is during the scanning of
+   --  configuration pragma files, where we want to turn off all checking and
+   --  in particular we want to allow long lines. So we reset this value to
+   --  Column_Number'Last during scanning of configuration pragma files.
+
    Maximum_Processes : Positive := 1;
    --  GNATMAKE
    --  Maximum number of processes that should be spawned to carry out
@@ -638,13 +691,13 @@ package Opt is
    --  GNATMAKE
    --  Set to True if minimal recompilation mode requested.
 
-   No_Stdlib : Boolean := False;
-   --  GNATMAKE, GNATBIND, GNATFIND, GNATXREF
-   --  Set to True if no default library search dirs added to search list.
-
-   No_Stdinc : Boolean := False;
-   --  GNAT, GNATBIND, GNATMAKE, GNATFIND, GNATXREF
-   --  Set to True if no default source search dirs added to search list.
+   Multiple_Unit_Index : Int;
+   --  GNAT
+   --  This is set non-zero if the current unit is being compiled in multiple
+   --  unit per file mode, meaning that the current unit is selected from the
+   --  sequence of units in the current source file, using the value stored
+   --  in this variable (e.g. 2 = select second unit in file). A value of
+   --  zero indicates that we are in normal (one unit per file) mode.
 
    No_Main_Subprogram : Boolean := False;
    --  GNATMAKE, GNATBIND
@@ -655,6 +708,18 @@ package Opt is
    --  GNAT, GNATBIND
    --  This flag is set True if a No_Run_Time pragma is encountered. See
    --  spec of Rtsfind for a full description of handling of this pragma.
+
+   No_Stdinc : Boolean := False;
+   --  GNAT, GNATBIND, GNATMAKE, GNATFIND, GNATXREF
+   --  Set to True if no default source search dirs added to search list
+
+   No_Stdlib : Boolean := False;
+   --  GNATMAKE, GNATBIND, GNATFIND, GNATXREF
+   --  Set to True if no default library search dirs added to search list
+
+   No_Strict_Aliasing : Boolean := False;
+   --  GNAT
+   --  Set True if pragma No_Strict_Aliasing with no parameters encountered
 
    Normalize_Scalars : Boolean := False;
    --  GNAT, GNATBIND
@@ -766,6 +831,11 @@ package Opt is
    Run_Path_Option : Boolean := True;
    --  GNATMAKE, GNATLINK
    --  Set to False when no run_path_option should be issued to the linker
+
+   Sec_Stack_Used : Boolean := False;
+   --  GNAT, GBATBIND
+   --  Set True if generated code uses the System.Secondary_Stack package.
+   --  For the binder, set if any unit uses the secondary stack package.
 
    Shared_Libgnat : Boolean;
    --  GNATBIND
@@ -1029,15 +1099,15 @@ package Opt is
    --  command line switches, or by the use of appropriate configuration
    --  pragmas in the gnat.adc file.
 
-   Ada_83_Config : Boolean;
+   Ada_Version_Config : Ada_Version_Type;
    --  GNAT
-   --  This is the value of the configuration switch for Ada 83 mode, as set
-   --  by the command line switch -gnat83, and possibly modified by the use
-   --  of configuration pragmas Ada_95 and Ada_83 in the gnat.adc file. This
-   --  switch is used to set the initial value for Ada_83 mode at the start
+   --  This is the value of the configuration switch for the Ada 83 mode, as
+   --  set by the command line switches -gnat83/95/05, and possibly modified
+   --  by the use of configuration pragmas Ada_83/Ada95/Ada05. This switch
+   --  is used to set the initial value for Ada_Version mode at the start
    --  of analysis of a unit. Note however, that the setting of this flag
    --  is ignored for internal and predefined units (which are always compiled
-   --  in Ada 95 mode).
+   --  in the most up to date version of Ada).
 
    Dynamic_Elaboration_Checks_Config : Boolean := False;
    --  GNAT
@@ -1169,7 +1239,7 @@ package Opt is
 private
 
    type Config_Switches_Type is record
-      Ada_83                         : Boolean;
+      Ada_Version                    : Ada_Version_Type;
       Dynamic_Elaboration_Checks     : Boolean;
       Exception_Locations_Suppressed : Boolean;
       Extensions_Allowed             : Boolean;

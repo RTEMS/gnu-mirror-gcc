@@ -1,5 +1,6 @@
 /* Perform optimizations on tree structure.
-   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2004
+   Free Software Foundation, Inc.
    Written by Mark Michell (mark@codesourcery.com).
 
 This file is part of GCC.
@@ -39,38 +40,11 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "langhooks.h"
 #include "diagnostic.h"
 #include "tree-dump.h"
-#include "tree-simple.h"
+#include "tree-gimple.h"
 
 /* Prototypes.  */
 
-static tree calls_setjmp_r (tree *, int *, void *);
 static void update_cloned_parm (tree, tree);
-
-/* Called from calls_setjmp_p via walk_tree.  */
-
-static tree
-calls_setjmp_r (tree *tp, int *walk_subtrees ATTRIBUTE_UNUSED,
-                void *data ATTRIBUTE_UNUSED)
-{
-  /* We're only interested in FUNCTION_DECLS.  */
-  if (TREE_CODE (*tp) != FUNCTION_DECL)
-    return NULL_TREE;
-
-  return setjmp_call_p (*tp) ? *tp : NULL_TREE;
-}
-
-/* Returns nonzero if FN calls `setjmp' or some other function that
-   can return more than once.  This function is conservative; it may
-   occasionally return a nonzero value even when FN does not actually
-   call `setjmp'.  */
-
-bool
-calls_setjmp_p (tree fn)
-{
-  return walk_tree_without_duplicates (&DECL_SAVED_TREE (fn),
-				       calls_setjmp_r,
-				       NULL) != NULL_TREE;
-}
 
 /* CLONED_PARM is a copy of CLONE, generated for a cloned constructor
    or destructor.  Update it to ensure that the source-position for
@@ -112,13 +86,9 @@ maybe_clone_body (tree fn)
   /* Emit the DWARF1 abstract instance.  */
   (*debug_hooks->deferred_inline_function) (fn);
 
-  /* Our caller does not expect collection to happen, which it might if
-     we decide to compile the function to rtl now.  Arrange for a new
-     gc context to be created if so.  */
-  function_depth++;
-
   /* We know that any clones immediately follow FN in the TYPE_METHODS
      list.  */
+  push_to_top_level ();
   for (clone = TREE_CHAIN (fn);
        clone && DECL_CLONED_FUNCTION_P (clone);
        clone = TREE_CHAIN (clone))
@@ -162,8 +132,7 @@ maybe_clone_body (tree fn)
 	update_cloned_parm (parm, clone_parm);
 
       /* Start processing the function.  */
-      push_to_top_level ();
-      start_function (NULL_TREE, clone, NULL_TREE, SF_PRE_PARSED);
+      start_preparsed_function (clone, NULL_TREE, SF_PRE_PARSED);
 
       /* Remap the parameters.  */
       decl_map = splay_tree_new (splay_tree_compare_pointers, NULL, NULL);
@@ -219,10 +188,6 @@ maybe_clone_body (tree fn)
       /* Clone the body.  */
       clone_body (clone, fn, decl_map);
 
-      /* There are as many statements in the clone as in the
-	 original.  */
-      DECL_ESTIMATED_INSNS (clone) = DECL_ESTIMATED_INSNS (fn);
-
       /* Clean up.  */
       splay_tree_delete (decl_map);
 
@@ -233,10 +198,8 @@ maybe_clone_body (tree fn)
       finish_function (0);
       BLOCK_ABSTRACT_ORIGIN (DECL_INITIAL (clone)) = DECL_INITIAL (fn);
       expand_or_defer_fn (clone);
-      pop_from_top_level ();
     }
-
-  function_depth--;
+  pop_from_top_level ();
 
   /* We don't need to process the original function any further.  */
   return 1;

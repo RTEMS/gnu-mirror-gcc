@@ -1,6 +1,6 @@
 /* RTL reader for GCC.
    Copyright (C) 1987, 1988, 1991, 1994, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003
+   2003, 2004
    Free Software Foundation, Inc.
 
 This file is part of GCC.
@@ -630,7 +630,7 @@ again:
 	  if (c != '[')
 	    fatal_expected_char (infile, '[', c);
 
-	  /* add expressions to a list, while keeping a count */
+	  /* Add expressions to a list, while keeping a count.  */
 	  obstack_init (&vector_stack);
 	  while ((c = read_skip_spaces (infile)) && c != ']')
 	    {
@@ -651,26 +651,28 @@ again:
 	break;
 
       case 'S':
-	/* 'S' is an optional string: if a closeparen follows,
-	   just store NULL for this element.  */
-	c = read_skip_spaces (infile);
-	ungetc (c, infile);
-	if (c == ')')
-	  {
-	    XSTR (return_rtx, i) = 0;
-	    break;
-	  }
-
       case 'T':
       case 's':
 	{
 	  char *stringbuf;
+	  int star_if_braced;
+
+	  c = read_skip_spaces (infile);
+	  ungetc (c, infile);
+	  if (c == ')')
+	    {
+	      /* 'S' fields are optional and should be NULL if no string
+		 was given.  Also allow normal 's' and 'T' strings to be
+		 omitted, treating them in the same way as empty strings.  */
+	      XSTR (return_rtx, i) = (format_ptr[-1] == 'S' ? NULL : "");
+	      break;
+	    }
 
 	  /* The output template slot of a DEFINE_INSN,
 	     DEFINE_INSN_AND_SPLIT, or DEFINE_PEEPHOLE automatically
 	     gets a star inserted as its first character, if it is
 	     written with a brace block instead of a string constant.  */
-	  int star_if_braced = (format_ptr[-1] == 'T');
+	  star_if_braced = (format_ptr[-1] == 'T');
 
 	  stringbuf = read_string (&rtl_obstack, infile, star_if_braced);
 

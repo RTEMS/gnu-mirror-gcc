@@ -1,5 +1,5 @@
 /* Prototypes for pa.c functions used in the md file & elsewhere.
-   Copyright (C) 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -29,7 +29,6 @@ extern int lhs_lshift_cint_operand (rtx, enum machine_mode);
 
 #ifdef TREE_CODE
 extern void hppa_va_start (tree, rtx);
-extern rtx hppa_va_arg (tree, tree);
 #endif /* TREE_CODE */
 extern rtx hppa_legitimize_address (rtx, rtx, enum machine_mode);
 
@@ -64,6 +63,7 @@ extern struct rtx_def *gen_cmp_fp (enum rtx_code, rtx, rtx);
 extern void hppa_encode_label (rtx);
 extern int arith11_operand (rtx, enum machine_mode);
 extern int adddi3_operand (rtx, enum machine_mode);
+extern int indexed_memory_operand (rtx, enum machine_mode);
 extern int symbolic_expression_p (rtx);
 extern int symbolic_memory_operand (rtx, enum machine_mode);
 extern int pa_adjust_insn_length (rtx, int);
@@ -73,16 +73,17 @@ extern int arith5_operand (rtx, enum machine_mode);
 extern int uint5_operand (rtx, enum machine_mode);
 extern int pic_label_operand (rtx, enum machine_mode);
 extern int plus_xor_ior_operator (rtx, enum machine_mode);
-extern int basereg_operand (rtx, enum machine_mode);
+extern int borx_reg_operand (rtx, enum machine_mode);
 extern int shadd_operand (rtx, enum machine_mode);
 extern int arith_operand (rtx, enum machine_mode);
 extern int read_only_operand (rtx, enum machine_mode);
-extern int move_operand (rtx, enum machine_mode);
+extern int move_dest_operand (rtx, enum machine_mode);
+extern int move_src_operand (rtx, enum machine_mode);
+extern int prefetch_operand (rtx, enum machine_mode);
 extern int and_operand (rtx, enum machine_mode);
 extern int ior_operand (rtx, enum machine_mode);
 extern int arith32_operand (rtx, enum machine_mode);
 extern int uint32_operand (rtx, enum machine_mode);
-extern int reg_or_nonsymb_mem_operand (rtx, enum machine_mode);
 extern int reg_before_reload_operand (rtx, enum machine_mode);
 extern int reg_or_0_operand (rtx, enum machine_mode);
 extern int reg_or_0_or_nonsymb_mem_operand (rtx, enum machine_mode);
@@ -132,11 +133,9 @@ extern int insn_refs_are_delayed (rtx);
 /* Prototype function used in macro CONST_OK_FOR_LETTER_P.  */
 extern int zdepi_cint_p (unsigned HOST_WIDE_INT);
 
-extern struct rtx_def *hppa_builtin_saveregs (void);
-
 extern void override_options (void);
 extern void output_ascii (FILE *, const char *, int);
-extern int compute_frame_size (int, int *);
+extern HOST_WIDE_INT compute_frame_size (HOST_WIDE_INT, int *);
 extern int and_mask_p (unsigned HOST_WIDE_INT);
 extern int cint_ok_for_move (HOST_WIDE_INT);
 extern void hppa_expand_prologue (void);
@@ -163,4 +162,5 @@ extern rtx function_value (tree, tree);
 extern int function_arg_partial_nregs (CUMULATIVE_ARGS *,
 				       enum machine_mode,
 				       tree, int);
+extern bool pa_return_in_memory (tree, tree);
 #endif /* TREE_CODE */

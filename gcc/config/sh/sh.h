@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler for Renesas / SuperH SH.
    Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003 Free Software Foundation, Inc.
+   2003, 2004 Free Software Foundation, Inc.
    Contributed by Steve Chamberlain (sac@cygnus.com).
    Improved by Jim Wilson (wilson@cygnus.com).
 
@@ -263,6 +263,19 @@ extern int target_flags;
 
 #define TARGET_SAVE_ALL_TARGET_REGS (target_flags & SAVE_ALL_TR_BIT)
 
+/* This is not used by the SH2E calling convention  */
+#define TARGET_VARARGS_PRETEND_ARGS(FUN_DECL) \
+  (TARGET_SH1 && ! TARGET_SH2E && ! TARGET_SH5 \
+   && ! (TARGET_HITACHI || sh_attr_renesas_p (FUN_DECL)))
+
+#ifndef TARGET_CPU_DEFAULT
+#define TARGET_CPU_DEFAULT SELECT_SH1
+#define SUPPORT_SH1
+#define SUPPORT_SH2E
+#define SUPPORT_SH4
+#define SUPPORT_SH4_SINGLE
+#endif
+
 #define SELECT_SH1               (SH1_BIT)
 #define SELECT_SH2               (SH2_BIT | SELECT_SH1)
 #define SELECT_SH2E              (SH_E_BIT | SH2_BIT | SH1_BIT | FPU_SINGLE_BIT)
@@ -272,48 +285,149 @@ extern int target_flags;
 #define SELECT_SH4_SINGLE_ONLY   (HARD_SH4_BIT | SELECT_SH3E)
 #define SELECT_SH4               (SH4_BIT | SH_E_BIT | HARD_SH4_BIT | SELECT_SH3)
 #define SELECT_SH4_SINGLE        (FPU_SINGLE_BIT | SELECT_SH4)
-#define SELECT_SH5_64            (SH5_BIT | SH4_BIT)
-#define SELECT_SH5_64_NOFPU      (SH5_BIT)
-#define SELECT_SH5_32            (SH5_BIT | SH4_BIT | SH_E_BIT)
-#define SELECT_SH5_32_NOFPU      (SH5_BIT | SH_E_BIT)
+#define SELECT_SH5_64MEDIA       (SH5_BIT | SH4_BIT)
+#define SELECT_SH5_64MEDIA_NOFPU (SH5_BIT)
+#define SELECT_SH5_32MEDIA       (SH5_BIT | SH4_BIT | SH_E_BIT)
+#define SELECT_SH5_32MEDIA_NOFPU (SH5_BIT | SH_E_BIT)
 #define SELECT_SH5_COMPACT       (SH5_BIT | SH4_BIT | SELECT_SH3E)
 #define SELECT_SH5_COMPACT_NOFPU (SH5_BIT | SELECT_SH3)
+
+/* Disable processor switches for which we have no suitable multilibs.  */
+#ifndef SUPPORT_SH1
+#define TARGET_SWITCH_SH1
+#ifndef SUPPORT_SH2
+#define TARGET_SWITCH_SH2
+#ifndef SUPPORT_SH3
+#define TARGET_SWITCH_SH3
+#ifndef SUPPORT_SH4_NOFPU
+#define TARGET_SWITCH_SH4_NOFPU
+#endif
+#endif
+#endif
+#endif
+
+#ifndef SUPPORT_SH2E
+#define TARGET_SWITCH_SH2E
+#ifndef SUPPORT_SH3E
+#define TARGET_SWITCH_SH3E
+#ifndef SUPPORT_SH4_SINGLE_ONLY
+#define TARGET_SWITCH_SH4_SINGLE_ONLY
+#endif
+#endif
+#endif
+
+#ifndef SUPPORT_SH4
+#define TARGET_SWITCH_SH4
+#endif
+
+#ifndef SUPPORT_SH4_SINGLE
+#define TARGET_SWITCH_SH4_SINGLE
+#endif
+
+#ifndef SUPPORT_SH5_64MEDIA
+#define TARGET_SWITCH_SH5_64MEDIA
+#endif
+
+#ifndef SUPPORT_SH5_64MEDIA_NOFPU
+#define TARGET_SWITCH_SH5_64MEDIA_NOFPU
+#endif
+
+#if !defined(SUPPORT_SH5_32MEDIA) && !defined (SUPPORT_SH5_COMPACT)
+#define TARGET_SWITCHES_SH5_32MEDIA
+#endif
+
+#if !defined(SUPPORT_SH5_32MEDIA_NOFPU) && !defined (SUPPORT_SH5_COMPACT_NOFPU)
+#define TARGET_SWITCHES_SH5_32MEDIA_NOFPU
+#endif
 
 /* Reset all target-selection flags.  */
 #define TARGET_NONE -(SH1_BIT | SH2_BIT | SH3_BIT | SH_E_BIT | SH4_BIT \
 		      | HARD_SH4_BIT | FPU_SINGLE_BIT | SH5_BIT)
 
-#define TARGET_SWITCHES  			\
-{ {"1",	        TARGET_NONE, "" },		\
-  {"1",	        SELECT_SH1, "Generate SH1 code" },		\
-  {"2",	        TARGET_NONE, "" },		\
-  {"2",	        SELECT_SH2, "Generate SH2 code" },		\
-  {"2e",        TARGET_NONE, "" },		\
-  {"2e",        SELECT_SH2E, "Generate SH2e code" },		\
-  {"3",	        TARGET_NONE, "" },		\
-  {"3",	        SELECT_SH3, "Generate SH3 code" },		\
-  {"3e",	TARGET_NONE, "" },		\
-  {"3e",	SELECT_SH3E, "Generate SH3e code" },		\
-  {"4-single-only",	TARGET_NONE, "" },	\
-  {"4-single-only",	SELECT_SH4_SINGLE_ONLY, "Generate only single-precision SH4 code" },	\
-  {"4-single",	TARGET_NONE, "" },		\
-  {"4-single",	SELECT_SH4_SINGLE, "Generate default single-precision SH4 code" },	\
-  {"4-nofpu",	TARGET_NONE, "" },		\
-  {"4-nofpu",	SELECT_SH4_NOFPU, "Generate SH4 FPU-less code" },		\
-  {"4",	        TARGET_NONE, "" },		\
-  {"4",	        SELECT_SH4, "Generate SH4 code" }, 		\
+#ifndef TARGET_SWITCH_SH1
+#define TARGET_SWITCH_SH1 \
+  {"1",		TARGET_NONE, "" }, \
+  {"1",		SELECT_SH1, "Generate SH1 code" },
+#endif
+#ifndef TARGET_SWITCH_SH2
+#define TARGET_SWITCH_SH2 \
+  {"2",		TARGET_NONE, "" }, \
+  {"2",		SELECT_SH2, "Generate SH2 code" },
+#endif
+#ifndef TARGET_SWITCH_SH2E
+#define TARGET_SWITCH_SH2E \
+  {"2e",	TARGET_NONE, "" }, \
+  {"2e",	SELECT_SH2E, "Generate SH2e code" },
+#endif
+#ifndef TARGET_SWITCH_SH3
+#define TARGET_SWITCH_SH3 \
+  {"3",		TARGET_NONE, "" }, \
+  {"3",		SELECT_SH3, "Generate SH3 code" },
+#endif
+#ifndef TARGET_SWITCH_SH3E
+#define TARGET_SWITCH_SH3E \
+  {"3e",	TARGET_NONE, "" }, \
+  {"3e",	SELECT_SH3E, "Generate SH3e code" },
+#endif
+#ifndef TARGET_SWITCH_SH4_SINGLE_ONLY
+#define TARGET_SWITCH_SH4_SINGLE_ONLY \
+  {"4-single-only",	TARGET_NONE, "" }, \
+  {"4-single-only",	SELECT_SH4_SINGLE_ONLY, "Generate only single-precision SH4 code" },
+#endif
+#ifndef TARGET_SWITCH_SH4_SINGLE
+#define TARGET_SWITCH_SH4_SINGLE \
+  {"4-single",	TARGET_NONE, "" }, \
+  {"4-single",	SELECT_SH4_SINGLE, "Generate default single-precision SH4 code" },
+#endif
+#ifndef TARGET_SWITCH_SH4_NOFPU
+#define TARGET_SWITCH_SH4_NOFPU \
+  {"4-nofpu",	TARGET_NONE, "" }, \
+  {"4-nofpu",	SELECT_SH4_NOFPU, "Generate SH4 FPU-less code" },
+#endif
+#ifndef TARGET_SWITCH_SH4
+#define TARGET_SWITCH_SH4 \
+  {"4",		TARGET_NONE, "" }, \
+  {"4",		SELECT_SH4, "Generate SH4 code" },
+#endif
+#ifndef TARGET_SWITCH_SH5_64MEDIA
+#define TARGET_SWITCH_SH5_64MEDIA \
   {"5-64media",	TARGET_NONE, "" },		\
-  {"5-64media", SELECT_SH5_64, "Generate 64-bit SHmedia code" }, \
+  {"5-64media", SELECT_SH5_64MEDIA, "Generate 64-bit SHmedia code" },
+#endif
+#ifndef TARGET_SWITCH_SH5_64MEDIA_NOFPU
+#define TARGET_SWITCH_SH5_64MEDIA_NOFPU \
   {"5-64media-nofpu", TARGET_NONE, "" },	\
-  {"5-64media-nofpu", SELECT_SH5_64_NOFPU, "Generate 64-bit FPU-less SHmedia code" }, \
+  {"5-64media-nofpu", SELECT_SH5_64MEDIA_NOFPU, "Generate 64-bit FPU-less SHmedia code" },
+#endif
+#ifndef TARGET_SWITCHES_SH5_32MEDIA
+#define TARGET_SWITCHES_SH5_32MEDIA \
   {"5-32media",	TARGET_NONE, "" },		\
-  {"5-32media", SELECT_SH5_32, "Generate 32-bit SHmedia code" }, \
-  {"5-32media-nofpu", TARGET_NONE, "" },	\
-  {"5-32media-nofpu", SELECT_SH5_32_NOFPU, "Generate 32-bit FPU-less SHmedia code" }, \
+  {"5-32media", SELECT_SH5_32MEDIA, "Generate 32-bit SHmedia code" }, \
   {"5-compact",	TARGET_NONE, "" },		\
-  {"5-compact",	SELECT_SH5_COMPACT, "Generate SHcompact code" }, \
+  {"5-compact",	SELECT_SH5_COMPACT, "Generate SHcompact code" },
+#endif
+#ifndef TARGET_SWITCHES_SH5_32MEDIA_NOFPU
+#define TARGET_SWITCHES_SH5_32MEDIA_NOFPU \
+  {"5-32media-nofpu", TARGET_NONE, "" },	\
+  {"5-32media-nofpu", SELECT_SH5_32MEDIA_NOFPU, "Generate 32-bit FPU-less SHmedia code" }, \
   {"5-compact-nofpu", TARGET_NONE, "" },	\
-  {"5-compact-nofpu", SELECT_SH5_COMPACT_NOFPU, "Generate FPU-less SHcompact code" }, \
+  {"5-compact-nofpu", SELECT_SH5_COMPACT_NOFPU, "Generate FPU-less SHcompact code" },
+#endif
+
+#define TARGET_SWITCHES \
+{ TARGET_SWITCH_SH1 \
+  TARGET_SWITCH_SH2 \
+  TARGET_SWITCH_SH2E \
+  TARGET_SWITCH_SH3 \
+  TARGET_SWITCH_SH3E \
+  TARGET_SWITCH_SH4_SINGLE_ONLY \
+  TARGET_SWITCH_SH4_SINGLE \
+  TARGET_SWITCH_SH4_NOFPU \
+  TARGET_SWITCH_SH4 \
+  TARGET_SWITCH_SH5_64MEDIA \
+  TARGET_SWITCH_SH5_64MEDIA_NOFPU \
+  TARGET_SWITCHES_SH5_32MEDIA \
+  TARGET_SWITCHES_SH5_32MEDIA_NOFPU \
   {"b",		-LITTLE_ENDIAN_BIT, "Generate code in big endian mode" },  	\
   {"bigtable", 	BIGTABLE_BIT, "Generate 32-bit offsets in switch tables" },		\
   {"dalign",  	DALIGN_BIT, "Aligns doubles at 64-bit boundaries" },		\
@@ -342,11 +456,17 @@ extern int target_flags;
 #define TARGET_ENDIAN_DEFAULT 0
 #endif
 
-#ifndef TARGET_CPU_DEFAULT
-#define TARGET_CPU_DEFAULT SELECT_SH1
+#define TARGET_DEFAULT  (TARGET_CPU_DEFAULT|TARGET_ENDIAN_DEFAULT)
+
+#ifndef SH_MULTILIB_CPU_DEFAULT
+#define SH_MULTILIB_CPU_DEFAULT "m1"
 #endif
 
-#define TARGET_DEFAULT  (TARGET_CPU_DEFAULT|TARGET_ENDIAN_DEFAULT)
+#if TARGET_ENDIAN_DEFAULT
+#define MULTILIB_DEFAULTS { "ml", SH_MULTILIB_CPU_DEFAULT }
+#else
+#define MULTILIB_DEFAULTS { "mb", SH_MULTILIB_CPU_DEFAULT }
+#endif
 
 #define CPP_SPEC " %(subtarget_cpp_spec) "
 
@@ -396,11 +516,20 @@ extern int target_flags;
 #if TARGET_CPU_DEFAULT & SH5_BIT
 #if TARGET_CPU_DEFAULT & SH_E_BIT
 #define LINK_DEFAULT_CPU_EMUL "32"
+#if TARGET_CPU_DEFAULT & SH1_BIT
+#define ASM_ISA_SPEC_DEFAULT "--isa=SHcompact"
 #else
+#define ASM_ISA_SPEC_DEFAULT "--isa=SHmedia --abi=32"
+#endif /* SH1_BIT */
+#else /* !SH_E_BIT */
 #define LINK_DEFAULT_CPU_EMUL "64"
+#define ASM_ISA_SPEC_DEFAULT "--isa=SHmedia --abi=64"
 #endif /* SH_E_BIT */
-#else
+#define ASM_ISA_DEFAULT_SPEC \
+" %{!m1:%{!m2*:%{!m3*:%{!m4*:%{!m5*:" ASM_ISA_SPEC_DEFAULT "}}}}}"
+#else /* !SH5_BIT */
 #define LINK_DEFAULT_CPU_EMUL ""
+#define ASM_ISA_DEFAULT_SPEC ""
 #endif /* SH5_BIT */
 
 #define SUBTARGET_LINK_EMUL_SUFFIX ""
@@ -516,7 +645,11 @@ do {									\
       /* Never run scheduling before reload, since that can		\
 	 break global alloc, and generates slower code anyway due	\
 	 to the pressure on R0.  */					\
-      flag_schedule_insns = 0;						\
+      /* Enable sched1 for SH4; ready queue will be reordered by	\
+	 the target hooks when pressure is high. We can not do this for \
+	 SH3 and lower as they give spill failures for R0.  */		\
+      if (!TARGET_HARD_SH4) 						\
+        flag_schedule_insns = 0;		 			\
     }									\
 									\
   if (align_loops == 0)							\
@@ -573,10 +706,8 @@ do {									\
 
 #define MAX_BITS_PER_WORD 64
 
-#define MAX_LONG_TYPE_SIZE MAX_BITS_PER_WORD
-
 /* Width in bits of an `int'.  We want just 32-bits, even if words are
-   longer. */
+   longer.  */
 #define INT_TYPE_SIZE 32
 
 /* Width in bits of a `long'.  */
@@ -1126,7 +1257,8 @@ extern char sh_additional_register_names[ADDREGNAMES_SIZE] \
 #define STATIC_CHAIN_REGNUM	(TARGET_SH5 ? 1 : 3)
 
 /* Don't default to pcc-struct-return, because we have already specified
-   exactly how to return structures in the RETURN_IN_MEMORY macro.  */
+   exactly how to return structures in the TARGET_RETURN_IN_MEMORY
+   target hook.  */
 
 #define DEFAULT_PCC_STRUCT_RETURN 0
 
@@ -1401,7 +1533,7 @@ extern enum reg_class reg_class_from_letter[];
    : 0)
 
 #define CONST_OK_FOR_J16(VALUE) \
-  (HOST_BITS_PER_WIDE_INT >= 64 && (VALUE) == (HOST_WIDE_INT) 0xffffffff \
+  ((HOST_BITS_PER_WIDE_INT >= 64 && (VALUE) == (HOST_WIDE_INT) 0xffffffff) \
    || (HOST_BITS_PER_WIDE_INT >= 64 && (VALUE) == (HOST_WIDE_INT) -1 << 32))
 #define CONST_OK_FOR_J(VALUE, STR) \
   ((STR)[1] == '1' && (STR)[2] == '6' ? CONST_OK_FOR_J16 (VALUE) \
@@ -1593,14 +1725,6 @@ extern enum reg_class reg_class_from_letter[];
    On SHcompact, the call trampoline pops arguments off the stack.  */
 #define CALL_POPS_ARGS(CUM) (TARGET_SHCOMPACT ? (CUM).stack_regs * 8 : 0)
 
-/* Nonzero if we do not know how to pass TYPE solely in registers.
-   Values that come in registers with inconvenient padding are stored
-   to memory at the function start.  */
-
-#define MUST_PASS_IN_STACK(MODE,TYPE)			\
-  ((TYPE) != 0						\
-   && (TREE_CODE (TYPE_SIZE (TYPE)) != INTEGER_CST	\
-       || TREE_ADDRESSABLE (TYPE)))
 /* Some subroutine macros specific to this machine.  */
 
 #define BASE_RETURN_VALUE_REG(MODE) \
@@ -1632,7 +1756,7 @@ extern enum reg_class reg_class_from_letter[];
    tested here has to be kept in sync with the one in explow.c:promote_mode.  */
 
 #define FUNCTION_VALUE(VALTYPE, FUNC)					\
-  gen_rtx (REG,								\
+  gen_rtx_REG (								\
 	   ((GET_MODE_CLASS (TYPE_MODE (VALTYPE)) == MODE_INT		\
 	     && GET_MODE_SIZE (TYPE_MODE (VALTYPE)) < UNITS_PER_WORD	\
 	     && (TREE_CODE (VALTYPE) == INTEGER_TYPE			\
@@ -1641,6 +1765,7 @@ extern enum reg_class reg_class_from_letter[];
 		 || TREE_CODE (VALTYPE) == CHAR_TYPE			\
 		 || TREE_CODE (VALTYPE) == REAL_TYPE			\
 		 || TREE_CODE (VALTYPE) == OFFSET_TYPE))		\
+             && sh_promote_prototypes (VALTYPE)				\
 	    ? (TARGET_SHMEDIA ? DImode : SImode) : TYPE_MODE (VALTYPE)), \
 	   BASE_RETURN_VALUE_REG (TYPE_MODE (VALTYPE)))
 
@@ -1701,8 +1826,8 @@ struct sh_args {
      used to pass arguments, if the arguments didn't have to be passed
      by reference.  */
     int byref_regs;
-  /* Set by SHCOMPACT_BYREF if the current argument is to be passed by
-     reference.  */
+  /* Set as by shcompact_byref if the current argument is to be passed
+     by reference.  */
     int byref;
 
   /* call_cookie is a bitmask used by call expanders, as well as
@@ -1819,7 +1944,7 @@ struct sh_args {
 
    For TARGET_HITACHI, the structure value pointer is passed in memory.  */
 
-#define INIT_CUMULATIVE_ARGS(CUM, FNTYPE, LIBNAME, FNDECL) \
+#define INIT_CUMULATIVE_ARGS(CUM, FNTYPE, LIBNAME, FNDECL, N_NAMED_ARGS) \
   do {								\
     (CUM).arg_count[(int) SH_ARG_INT] = 0;			\
     (CUM).arg_count[(int) SH_ARG_FLOAT] = 0;			\
@@ -1850,7 +1975,7 @@ struct sh_args {
 
 #define INIT_CUMULATIVE_LIBCALL_ARGS(CUM, MODE, LIBNAME) \
   do {								\
-    INIT_CUMULATIVE_ARGS ((CUM), NULL_TREE, (LIBNAME), 0);	\
+    INIT_CUMULATIVE_ARGS ((CUM), NULL_TREE, (LIBNAME), 0, 0);	\
     (CUM).call_cookie						\
       = (CALL_COOKIE_RET_TRAMP					\
 	 (TARGET_SHCOMPACT && GET_MODE_SIZE (MODE) > 4		\
@@ -1859,7 +1984,7 @@ struct sh_args {
 
 #define INIT_CUMULATIVE_INCOMING_ARGS(CUM, FNTYPE, LIBNAME) \
   do {								\
-    INIT_CUMULATIVE_ARGS ((CUM), (FNTYPE), (LIBNAME), 0);	\
+    INIT_CUMULATIVE_ARGS ((CUM), (FNTYPE), (LIBNAME), 0, 0);	\
     (CUM).outgoing = 0;						\
   } while (0)
 
@@ -1907,31 +2032,6 @@ struct sh_args {
                             this should be the other way round...
    foo (float a, __complex float b); a: fr5 b.real: fr4 b.imag: fr7  */
 #define FUNCTION_ARG_SCmode_WART 1
-
-/* Whether an argument must be passed by reference.  On SHcompact, we
-   pretend arguments wider than 32-bits that would have been passed in
-   registers are passed by reference, so that an SHmedia trampoline
-   loads them into the full 64-bits registers.  */
-#define FUNCTION_ARG_PASS_BY_REFERENCE(CUM,MODE,TYPE,NAMED) \
-  (MUST_PASS_IN_STACK ((MODE), (TYPE)) \
-   || SHCOMPACT_BYREF ((CUM), (MODE), (TYPE), (NAMED)))
-
-#define SHCOMPACT_BYREF(CUM, MODE, TYPE, NAMED) \
-  ((CUM).byref								\
-   = (TARGET_SHCOMPACT							\
-      && (CUM).arg_count[(int) SH_ARG_INT] < NPARM_REGS (SImode)	\
-      && (! (NAMED) || GET_SH_ARG_CLASS (MODE) == SH_ARG_INT		\
-	  || (GET_SH_ARG_CLASS (MODE) == SH_ARG_FLOAT			\
-	      && ((CUM).arg_count[(int) SH_ARG_FLOAT]			\
- 		  >= NPARM_REGS (SFmode))))				\
-      && ((MODE) == BLKmode ? int_size_in_bytes (TYPE)			\
-	  : GET_MODE_SIZE (MODE)) > 4				       	\
-      && ! SHCOMPACT_FORCE_ON_STACK ((MODE), (TYPE))			\
-      && ! SH5_WOULD_BE_PARTIAL_NREGS ((CUM), (MODE),			\
-				       (TYPE), (NAMED)))		\
-      ? ((MODE) == BLKmode ? int_size_in_bytes (TYPE)			\
-	 : GET_MODE_SIZE (MODE))					\
-      : 0)
 
 /* If an argument of size 5, 6 or 7 bytes is to be passed in a 64-bit
    register in SHcompact mode, it must be padded in the most
@@ -2037,10 +2137,6 @@ struct sh_args {
 #define EXPAND_BUILTIN_VA_START(valist, nextarg) \
   sh_va_start (valist, nextarg)
 
-/* Implement `va_arg'.  */
-#define EXPAND_BUILTIN_VA_ARG(valist, type) \
-  sh_va_arg (valist, type)
-
 /* Call the function profiler with a given profile label.
    We use two .aligns, so as to make sure that both the .long is aligned
    on a 4 byte boundary, and that the .long is a fixed distance (2 bytes)
@@ -2096,7 +2192,7 @@ struct sh_args {
 #define TRAMPOLINE_ADJUST_ADDRESS(TRAMP) do				\
 {									\
   if (TARGET_SHMEDIA)							\
-    (TRAMP) = expand_simple_binop (Pmode, PLUS, (TRAMP), GEN_INT (1),	\
+    (TRAMP) = expand_simple_binop (Pmode, PLUS, (TRAMP), const1_rtx,	\
 				   gen_reg_rtx (Pmode), 0,		\
 				   OPTAB_LIB_WIDEN);			\
 } while (0)
@@ -2560,9 +2656,9 @@ struct sh_args {
 	 prevalent.  */							\
       if (GET_MODE_SIZE (MODE) + offset - offset_base <= 64)		\
 	{								\
-	  sum = gen_rtx (PLUS, Pmode, XEXP (X, 0),			\
+	  sum = gen_rtx_PLUS (Pmode, XEXP (X, 0),			\
 			 GEN_INT (offset_base));			\
-	  X = gen_rtx (PLUS, Pmode, sum, GEN_INT (offset - offset_base));\
+	  X = gen_rtx_PLUS (Pmode, sum, GEN_INT (offset - offset_base));\
 	  push_reload (sum, NULL_RTX, &XEXP (X, 0), NULL,		\
 		       BASE_REG_CLASS, Pmode, VOIDmode, 0, 0, (OPNUM),	\
 		       (TYPE));						\
@@ -2640,9 +2736,6 @@ struct sh_args {
 #define WCHAR_TYPE_SIZE 16
 
 #define SH_ELF_WCHAR_TYPE "long int"
-
-/* Don't cse the address of the function being compiled.  */
-/*#define NO_RECURSIVE_FUNCTION_CSE 1*/
 
 /* Max number of bytes we can move from memory to memory
    in one reasonably fast instruction.  */
@@ -2875,7 +2968,7 @@ struct sh_args {
    used to use the encodings 245..260, but that doesn't make sense:
    PR_REG and PR_MEDIA_REG are actually the same register, and likewise
    the FP registers stay the same when switching between compact and media
-   mode.  Hence, we also need to use the same dwarf frame coloumns.
+   mode.  Hence, we also need to use the same dwarf frame columns.
    Likewise, we need to support unwind information for SHmedia registers
    even in compact code.  */
 #define SH_DBX_REGISTER_NUMBER(REGNO) \
@@ -3102,10 +3195,6 @@ enum mdep_reorg_phase_e
 
 extern enum mdep_reorg_phase_e mdep_reorg_phase;
 
-/* Generate calls to memcpy, memcmp and memset.  */
-
-#define TARGET_MEM_FUNCTIONS
-
 /* Handle Renesas compiler's pragmas.  */
 #define REGISTER_TARGET_PRAGMAS() do {					\
   c_register_pragma (0, "interrupt", sh_pr_interrupt);			\
@@ -3145,6 +3234,7 @@ extern int rtx_equal_function_value_matters;
   {"arith_reg_or_0_operand", {SUBREG, REG, CONST_INT, CONST_VECTOR}},	\
   {"binary_float_operator", {PLUS, MINUS, MULT, DIV}},			\
   {"binary_logical_operator", {AND, IOR, XOR}},				\
+  {"cmpsi_operand", {SUBREG, REG, CONST_INT}},				\
   {"commutative_float_operator", {PLUS, MULT}},				\
   {"equality_comparison_operator", {EQ,NE}},				\
   {"extend_reg_operand", {SUBREG, REG, TRUNCATE}},			\
@@ -3197,13 +3287,6 @@ extern int rtx_equal_function_value_matters;
     (UNSIGNEDP) = ((MODE) == SImode ? 0 : (UNSIGNEDP)),	\
     (MODE) = (TARGET_SH1 ? SImode : DImode);
 
-/* Defining PROMOTE_FUNCTION_ARGS eliminates some unnecessary zero/sign
-   extensions applied to char/short functions arguments.  Defining
-   PROMOTE_FUNCTION_RETURN does the same for function returns.  */
-
-#define PROMOTE_FUNCTION_ARGS
-#define PROMOTE_FUNCTION_RETURN
-
 #define MAX_FIXED_MODE_SIZE (TARGET_SH5 ? 128 : 64)
 
 /* ??? Define ACCUMULATE_OUTGOING_ARGS?  This is more efficient than pushing
@@ -3245,7 +3328,7 @@ extern int rtx_equal_function_value_matters;
      (TARGET_HITACHI				\
       && recog_memoized (INSN) >= 0		\
       && get_attr_fp_set (INSN) != FP_SET_NONE  \
-      ? get_attr_fp_set (INSN)                  \
+      ? (int) get_attr_fp_set (INSN)            \
       : (MODE))
 
 #define MODE_PRIORITY_TO_MODE(ENTITY, N) \
@@ -3310,10 +3393,7 @@ extern int rtx_equal_function_value_matters;
 		 & ~ CALL_COOKIE_RET_TRAMP (1)) \
 		|| current_function_has_nonlocal_label)) \
       ? (hard_reg) \
-      : gen_rtx_MEM (Pmode, TARGET_SH5 \
-			    ? (plus_constant (arg_pointer_rtx, \
-					      TARGET_SHMEDIA64 ? -8 : -4)) \
-			    : frame_pointer_rtx)) \
+      : gen_rtx_MEM (Pmode, return_address_pointer_rtx)) \
    : NULL_RTX)
 
 #endif /* ! GCC_SH_H */

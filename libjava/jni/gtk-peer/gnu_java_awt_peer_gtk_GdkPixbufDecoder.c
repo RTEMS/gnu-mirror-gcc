@@ -72,7 +72,7 @@ area_prepared (GdkPixbufLoader *loader,
     return;
 
   width = gdk_pixbuf_get_width (pixbuf); 
-  height = gdk_pixbuf_get_height (pixbuf), 
+  height = gdk_pixbuf_get_height (pixbuf);
 
   gdk_threads_leave ();
 
@@ -153,7 +153,7 @@ area_updated (GdkPixbufLoader *loader,
 }
 
 static void
-closed (GdkPixbufLoader *loader, jobject *decoder)
+closed (GdkPixbufLoader *loader __attribute__((unused)), jobject *decoder)
 {
   gdk_threads_leave ();
   (*gdk_env)->DeleteGlobalRef (gdk_env, *decoder); 

@@ -1,5 +1,6 @@
 /* Definitions for 64-bit SPARC running Linux-based GNU systems with ELF.
-   Copyright 1996, 1997, 1998, 2000, 2002, 2003 Free Software Foundation, Inc.
+   Copyright 1996, 1997, 1998, 2000, 2002, 2003, 2004
+   Free Software Foundation, Inc.
    Contributed by David S. Miller (davem@caip.rutgers.edu)
 
 This file is part of GCC.
@@ -38,7 +39,9 @@ Boston, MA 02111-1307, USA.  */
 #undef MD_EXEC_PREFIX
 #undef MD_STARTFILE_PREFIX
 
-#if TARGET_CPU_DEFAULT == TARGET_CPU_v9 || TARGET_CPU_DEFAULT == TARGET_CPU_ultrasparc
+#if TARGET_CPU_DEFAULT == TARGET_CPU_v9 \
+    || TARGET_CPU_DEFAULT == TARGET_CPU_ultrasparc \
+    || TARGET_CPU_DEFAULT == TARGET_CPU_ultrasparc3
 /* A 64 bit v9 compiler with stack-bias,
    in a Medium/Low code model environment.  */
 
@@ -113,10 +116,6 @@ Boston, MA 02111-1307, USA.  */
    SPARC ABI says that long double is 4 words.  */
 #undef LONG_DOUBLE_TYPE_SIZE
 #define LONG_DOUBLE_TYPE_SIZE (TARGET_LONG_DOUBLE_128 ? 128 : 64)
-
-/* Constant which presents upper bound of the above value.  */
-#undef MAX_LONG_DOUBLE_TYPE_SIZE
-#define MAX_LONG_DOUBLE_TYPE_SIZE 128
 
 /* Define this to set long double type size to use in libgcc2.c, which can
    not depend on target_flags.  */
@@ -224,6 +223,27 @@ Boston, MA 02111-1307, USA.  */
 "
 #endif
 
+/* Support for a compile-time default CPU, et cetera.  The rules are:
+   --with-cpu is ignored if -mcpu is specified.
+   --with-tune is ignored if -mtune is specified.
+   --with-float is ignored if -mhard-float, -msoft-float, -mfpu, or -mno-fpu
+     are specified.
+   In the SPARC_BI_ARCH compiler we cannot pass %{!mcpu=*:-mcpu=%(VALUE)}
+   here, otherwise say -mcpu=v7 would be passed even when -m64.
+   CC1_SPEC above takes care of this instead.  */
+#undef OPTION_DEFAULT_SPECS
+#if DEFAULT_ARCH32_P
+#define OPTION_DEFAULT_SPECS \
+  {"cpu", "%{!m64:%{!mcpu=*:-mcpu=%(VALUE)}}" }, \
+  {"tune", "%{!mtune=*:-mtune=%(VALUE)}" }, \
+  {"float", "%{!msoft-float:%{!mhard-float:%{!fpu:%{!no-fpu:-m%(VALUE)-float}}}}" }
+#else
+#define OPTION_DEFAULT_SPECS \
+  {"cpu", "%{!m32:%{!mcpu=*:-mcpu=%(VALUE)}}" }, \
+  {"tune", "%{!mtune=*:-mtune=%(VALUE)}" }, \
+  {"float", "%{!msoft-float:%{!mhard-float:%{!fpu:%{!no-fpu:-m%(VALUE)-float}}}}" }
+#endif
+
 #if DEFAULT_ARCH32_P
 #define MULTILIB_DEFAULTS { "m32" }
 #else
@@ -265,10 +285,6 @@ Boston, MA 02111-1307, USA.  */
 #undef DBX_REGISTER_NUMBER
 #define DBX_REGISTER_NUMBER(REGNO) (REGNO)
 
-/* System V Release 4 uses DWARF debugging info.  Buf DWARF1 doesn't do
-   64-bit anything, so we use DWARF2.  */
-
-#undef DWARF_DEBUGGING_INFO
 #define DWARF2_DEBUGGING_INFO 1
 #define DBX_DEBUGGING_INFO 1
 
@@ -312,6 +328,9 @@ do {									\
 
 /* #define DWARF_OFFSET_SIZE PTR_SIZE */
 
+#undef DITF_CONVERSION_LIBFUNCS
+#define DITF_CONVERSION_LIBFUNCS 1
+
 #if defined(HAVE_LD_EH_FRAME_HDR)
 #define LINK_EH_SPEC "%{!static:--eh-frame-hdr} "
 #endif
@@ -332,9 +351,20 @@ do {									\
 
 #define TARGET_ASM_FILE_END file_end_indicate_exec_stack
 
+/* Determine whether the the entire c99 runtime is present in the
+   runtime library.  */
+#define TARGET_C99_FUNCTIONS 1
+
+#define TARGET_HAS_F_SETLKW
+
 #undef LINK_GCC_C_SEQUENCE_SPEC
 #define LINK_GCC_C_SEQUENCE_SPEC \
   "%{static:--start-group} %G %L %{static:--end-group}%{!static:%G}"
+
+/* Use --as-needed -lgcc_s for eh support.  */
+#ifdef HAVE_LD_AS_NEEDED
+#define USE_LD_AS_NEEDED 1
+#endif
 
 /* Do code reading to identify a signal frame, and set the frame
    state data appropriately.  See unwind-dw2.c for the structs.  */

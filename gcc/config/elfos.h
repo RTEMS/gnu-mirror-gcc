@@ -58,17 +58,9 @@ Boston, MA 02111-1307, USA.  */
 #define PCC_BITFIELD_TYPE_MATTERS 1
 #endif
 
-/* Implicit library calls should use memcpy, not bcopy, etc.  */
-
-#define TARGET_MEM_FUNCTIONS
-
 /* Handle #pragma weak and #pragma pack.  */
 
 #define HANDLE_SYSV_PRAGMA 1
-
-/* System V Release 4 uses DWARF debugging info.  */
-
-#define DWARF_DEBUGGING_INFO 1
 
 /* All ELF targets can support DWARF-2.  */
 

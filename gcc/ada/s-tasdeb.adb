@@ -6,7 +6,7 @@
 --                                                                          --
 --                                  B o d y                                 --
 --                                                                          --
---          Copyright (C) 1997-2002 Free Software Foundation, Inc.          --
+--          Copyright (C) 1997-2004 Free Software Foundation, Inc.          --
 --                                                                          --
 -- GNARL is free software; you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -39,18 +39,16 @@
 --  Do not add any dependency to GNARL packages since this package is used
 --  in both normal and restricted (ravenscar) environments.
 
-with Interfaces.C;
+with System.CRTL;
 with System.Task_Primitives.Operations;
 with Unchecked_Conversion;
 
 package body System.Tasking.Debug is
 
-   use Interfaces.C;
-
    package STPO renames System.Task_Primitives.Operations;
 
    function To_Integer is new
-     Unchecked_Conversion (Task_ID, System.Address);
+     Unchecked_Conversion (Task_Id, System.Address);
 
    type Trace_Flag_Set is array (Character) of Boolean;
 
@@ -60,8 +58,7 @@ package body System.Tasking.Debug is
    -- Local Subprograms --
    -----------------------
 
-   procedure write (Fd : Integer; S : String; Count : size_t);
-   pragma Import (C, write);
+   procedure Write (Fd : Integer; S : String; Count : Integer);
 
    procedure Put (S : String);
    --  Display S on standard output.
@@ -83,7 +80,7 @@ package body System.Tasking.Debug is
    ----------------
 
    procedure List_Tasks is
-      C : Task_ID;
+      C : Task_Id;
    begin
       C := All_Tasks_List;
 
@@ -106,9 +103,9 @@ package body System.Tasking.Debug is
    -- Print_Task_Info --
    ---------------------
 
-   procedure Print_Task_Info (T : Task_ID) is
+   procedure Print_Task_Info (T : Task_Id) is
       Entry_Call : Entry_Call_Link;
-      Parent     : Task_ID;
+      Parent     : Task_Id;
 
    begin
       if T = null then
@@ -177,7 +174,7 @@ package body System.Tasking.Debug is
 
    procedure Put (S : String) is
    begin
-      write (2, S, S'Length);
+      Write (2, S, S'Length);
    end Put;
 
    --------------
@@ -186,7 +183,7 @@ package body System.Tasking.Debug is
 
    procedure Put_Line (S : String := "") is
    begin
-      write (2, S & ASCII.LF, S'Length + 1);
+      Write (2, S & ASCII.LF, S'Length + 1);
    end Put_Line;
 
    ----------------------
@@ -194,7 +191,7 @@ package body System.Tasking.Debug is
    ----------------------
 
    procedure Resume_All_Tasks (Thread_Self : OS_Interface.Thread_Id) is
-      C     : Task_ID;
+      C     : Task_Id;
       Dummy : Boolean;
       pragma Unreferenced (Dummy);
 
@@ -214,9 +211,7 @@ package body System.Tasking.Debug is
    -- Set_Trace --
    ---------------
 
-   procedure Set_Trace
-     (Flag  : Character;
-      Value : Boolean := True) is
+   procedure Set_Trace (Flag  : Character; Value : Boolean := True) is
    begin
       Trace_On (Flag) := Value;
    end Set_Trace;
@@ -235,7 +230,7 @@ package body System.Tasking.Debug is
    -----------------------
 
    procedure Suspend_All_Tasks (Thread_Self : OS_Interface.Thread_Id) is
-      C     : Task_ID;
+      C     : Task_Id;
       Dummy : Boolean;
       pragma Unreferenced (Dummy);
 
@@ -278,10 +273,11 @@ package body System.Tasking.Debug is
    -----------
 
    procedure Trace
-     (Self_Id  : Task_ID;
+     (Self_Id  : Task_Id;
       Msg      : String;
       Flag     : Character;
-      Other_Id : Task_ID := null) is
+      Other_Id : Task_Id := null)
+   is
    begin
       if Trace_On (Flag) then
          Put (To_Integer (Self_Id)'Img &
@@ -296,5 +292,17 @@ package body System.Tasking.Debug is
          Put_Line (Msg);
       end if;
    end Trace;
+
+   -----------
+   -- Write --
+   -----------
+
+   procedure Write (Fd : Integer; S : String; Count : Integer) is
+      Discard : Integer;
+      pragma Unreferenced (Discard);
+   begin
+      Discard := System.CRTL.write (Fd, S (S'First)'Address, Count);
+      --  Is it really right to ignore write errors here ???
+   end Write;
 
 end System.Tasking.Debug;

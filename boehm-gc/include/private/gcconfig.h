@@ -617,7 +617,8 @@
 #       define OS_TYPE "LINUX"
 #       define STACKBOTTOM ((ptr_t)0xf0000000)
 #       define USE_GENERIC_PUSH_REGS
-		/* We never got around to the assembly version. */
+#	     define USE_MMAP
+	      /* We never got around to the assembly version. */
 /* #       define MPROTECT_VDB - Reported to not work  9/17/01 */
 #       ifdef __ELF__
 #            define DYNAMIC_LOADING
@@ -1800,10 +1801,10 @@
 	     extern int etext[];
 #            define DATASTART ((ptr_t)((((word) (etext)) + 0xfff) & ~0xfff))
 #       endif
-#	define PREFETCH(x) \
-	  __asm__ __volatile__ ("	prefetch	%0": : "m"(*(char *)(x)))
-#	define PREFETCH_FOR_WRITE(x) \
-	  __asm__ __volatile__ ("	prefetchw	%0": : "m"(*(char *)(x)))
+#	if defined(__GNUC__) && __GNUC__ >= 3
+#	    define PREFETCH(x) __builtin_prefetch ((x), 0, 0)
+#	    define PREFETCH_FOR_WRITE(x) __builtin_prefetch ((x), 1)
+#	endif
 #   endif
 # endif
 

@@ -42,10 +42,12 @@ import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.dnd.DragGestureEvent;
 import java.awt.dnd.peer.DragSourceContextPeer;
+import java.awt.font.TextAttribute;
 import java.awt.im.InputMethodHighlight;
 import java.awt.image.ColorModel;
 import java.awt.image.ImageObserver;
 import java.awt.image.ImageProducer;
+import java.awt.GraphicsEnvironment;
 import java.awt.peer.*;
 import java.net.URL;
 import java.util.Hashtable;
@@ -55,6 +57,7 @@ import java.util.Properties;
 import gnu.java.awt.EmbeddedWindow;
 import gnu.java.awt.EmbeddedWindowSupport;
 import gnu.java.awt.peer.EmbeddedWindowPeer;
+import gnu.java.awt.peer.ClasspathFontPeer;
 import gnu.classpath.Configuration;
 import gnu.java.awt.peer.gtk.GdkPixbufDecoder;
 
@@ -65,7 +68,15 @@ import gnu.java.awt.peer.gtk.GdkPixbufDecoder;
    this class.  If getPeer() ever goes away, we can implement a hash table
    that will keep up with every window's peer, but for now this is faster. */
 
-public class GtkToolkit extends Toolkit
+/**
+ * This class accesses a system property called
+ * <tt>gnu.java.awt.peer.gtk.Graphics</tt>.  If the property is defined and
+ * equal to "Graphics2D", the cairo-based GdkGraphics2D will be used in
+ * drawing contexts. Any other value will cause the older GdkGraphics
+ * object to be used.
+ */
+
+public class GtkToolkit extends gnu.java.awt.ClasspathToolkit
   implements EmbeddedWindowSupport
 {
   GtkMainThread main;
@@ -73,7 +84,20 @@ public class GtkToolkit extends Toolkit
   static EventQueue q = new EventQueue();
   static Clipboard systemClipboard;
 
-  static 
+  static boolean useGraphics2dSet;
+  static boolean useGraphics2d;
+
+  public static boolean useGraphics2D()
+  {
+    if (useGraphics2dSet)
+      return useGraphics2d;
+    useGraphics2d = System.getProperty("gnu.java.awt.peer.gtk.Graphics", 
+                                       "Graphics").equals("Graphics2D");
+    useGraphics2dSet = true;
+    return useGraphics2d;
+  }
+
+  static
   {
     if (Configuration.INIT_LOAD_LIBRARY)
       System.loadLibrary("gtkpeer");
@@ -92,31 +116,71 @@ public class GtkToolkit extends Toolkit
   public int checkImage (Image image, int width, int height, 
 			 ImageObserver observer) 
   {
-    return ((GtkImage) image).checkImage ();
+    int status = ((GtkImage) image).checkImage ();
+
+    if (observer != null)
+      observer.imageUpdate (image, status,
+                            -1, -1,
+                            image.getWidth (observer),
+                            image.getHeight (observer));
+
+    return status;
   }
 
   public Image createImage (String filename)
   {
-    return new GtkImage (new GdkPixbufDecoder (filename), null);
+    if (useGraphics2D())
+      return GdkPixbufDecoder.createBufferedImage (filename);
+    else
+      {
+        GdkPixbufDecoder d = new GdkPixbufDecoder (filename);
+        GtkImage image = new GtkImage (d, null);
+        d.startProduction (image);
+        return image;        
+      }
   }
 
   public Image createImage (URL url)
   {
-    return new GtkImage (new GdkPixbufDecoder (url), null);
+    if (useGraphics2D())
+      return GdkPixbufDecoder.createBufferedImage (url);
+    else
+      {
+        GdkPixbufDecoder d = new GdkPixbufDecoder (url);
+        GtkImage image = new GtkImage (d, null);
+        d.startProduction (image);
+        return image;        
+      }
   }
 
   public Image createImage (ImageProducer producer) 
   {
-    return new GtkImage (producer, null);
+    if (useGraphics2D())
+      return GdkPixbufDecoder.createBufferedImage (producer);
+    else
+      {
+        GtkImage image = new GtkImage (producer, null);
+        producer.startProduction (image);
+        return image;        
+      }
   }
 
   public Image createImage (byte[] imagedata, int imageoffset,
 			    int imagelength)
   {
-    return new GtkImage (new GdkPixbufDecoder (imagedata,
-					       imageoffset,
-					       imagelength),
-			 null);
+    if (useGraphics2D())
+      return GdkPixbufDecoder.createBufferedImage (imagedata,
+                                                   imageoffset, 
+                                                   imagelength);
+    else
+      {
+        GdkPixbufDecoder d = new GdkPixbufDecoder (imagedata,
+                                                   imageoffset, 
+                                                   imagelength);
+        GtkImage image = new GtkImage (d, null);
+        d.startProduction (image);
+        return image;        
+      }
   }
 
   public ColorModel getColorModel () 
@@ -135,17 +199,20 @@ public class GtkToolkit extends Toolkit
 
   public FontMetrics getFontMetrics (Font font) 
   {
-    return new GdkFontMetrics (font);
+    if (useGraphics2D())
+      return new GdkClasspathFontPeerMetrics (font);
+    else
+      return new GdkFontMetrics (font);
   }
 
   public Image getImage (String filename) 
   {
-    return new GtkImage (new GdkPixbufDecoder (filename), null);
+    return createImage (filename);
   }
 
   public Image getImage (URL url) 
   {
-    return new GtkImage (new GdkPixbufDecoder (url), null);
+    return createImage (url);
   }
 
   public PrintJob getPrintJob (Frame frame, String jobtitle, Properties props) 
@@ -322,14 +389,64 @@ public class GtkToolkit extends Toolkit
     return new GtkEmbeddedWindowPeer (w);
   }
 
-  protected FontPeer getFontPeer (String name, int style) 
+  /** 
+   * @deprecated part of the older "logical font" system in earlier AWT
+   * implementations. Our newer Font class uses getClasspathFontPeer.
+   */
+  protected FontPeer getFontPeer (String name, int style) {
+    // All fonts get a default size of 12 if size is not specified.
+    return getFontPeer(name, style, 12);
+  }
+
+  /**
+   * Private method that allows size to be set at initialization time.
+   */
+  private FontPeer getFontPeer (String name, int style, int size) 
   {
-    try {
-      GtkFontPeer fp = new GtkFontPeer (name, style);
-      return fp;
-    } catch (MissingResourceException ex) {
-      return null;
-    }
+    GtkFontPeer fp = new GtkFontPeer (name, style, size);
+    return fp;
+  }
+
+  /**
+   * Newer method to produce a peer for a Font object, even though Sun's
+   * design claims Font should now be peerless, we do not agree with this
+   * model, hence "ClasspathFontPeer". 
+   */
+
+  public ClasspathFontPeer getClasspathFontPeer (String name, Map attrs)
+  {
+    if (useGraphics2D())
+      return new GdkClasspathFontPeer (name, attrs);
+    else
+      {
+        // Default values
+        int size = 12;
+        int style = Font.PLAIN;
+        if (name == null)
+          name = "Default";
+
+        if (attrs.containsKey (TextAttribute.WEIGHT))
+          {
+            Float weight = (Float) attrs.get (TextAttribute.WEIGHT);
+            if (weight.floatValue () >= TextAttribute.WEIGHT_BOLD.floatValue ())
+              style += Font.BOLD;
+          }
+        
+        if (attrs.containsKey (TextAttribute.POSTURE))
+          {
+            Float posture = (Float) attrs.get (TextAttribute.POSTURE);
+            if (posture.floatValue () >= TextAttribute.POSTURE_OBLIQUE.floatValue ())
+              style += Font.ITALIC;
+          }
+        
+        if (attrs.containsKey (TextAttribute.SIZE))
+          {
+            Float fsize = (Float) attrs.get (TextAttribute.SIZE);
+            size = fsize.intValue();
+          }
+ 
+        return (ClasspathFontPeer) this.getFontPeer (name, style, size);
+      }
   }
 
   protected EventQueue getSystemEventQueueImpl() 
@@ -337,9 +454,7 @@ public class GtkToolkit extends Toolkit
     return q;
   }
 
-  protected void loadSystemColors (int[] systemColors) 
-  {
-  }
+  protected native void loadSystemColors (int[] systemColors);
 
   public DragSourceContextPeer createDragSourceContextPeer(DragGestureEvent e)
   {
@@ -350,4 +465,20 @@ public class GtkToolkit extends Toolkit
   {
     throw new Error("not implemented");
   }
+
+  // ClasspathToolkit methods
+
+  public GraphicsEnvironment getLocalGraphicsEnvironment()
+  {
+    GraphicsEnvironment ge;
+    ge = new GdkGraphicsEnvironment ();  
+    return ge;
+  }
+
+  public Font createFont(int format, java.io.InputStream stream)
+  {
+    throw new java.lang.UnsupportedOperationException ();
+  }
+
+
 } // class GtkToolkit

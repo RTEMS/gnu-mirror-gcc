@@ -1,5 +1,5 @@
 /* Natural loop discovery code for GNU compiler.
-   Copyright (C) 2000, 2001, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -35,12 +35,15 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
    considered to belong to inner loop with same header.  */
 #define HEAVY_EDGE_RATIO 8
 
+#define HEADER_BLOCK(B) (* (int *) (B)->aux)
+#define LATCH_EDGE(E) (*(int *) (E)->aux)
+
 static void flow_loops_cfg_dump (const struct loops *, FILE *);
 static void flow_loop_entry_edges_find (struct loop *);
 static void flow_loop_exit_edges_find (struct loop *);
 static int flow_loop_nodes_find (basic_block, struct loop *);
 static void flow_loop_pre_header_scan (struct loop *);
-static basic_block flow_loop_pre_header_find (basic_block, dominance_info);
+static basic_block flow_loop_pre_header_find (basic_block);
 static int flow_loop_level_compute (struct loop *);
 static int flow_loops_level_compute (struct loops *);
 static void establish_preds (struct loop *);
@@ -55,7 +58,7 @@ flow_loops_cfg_dump (const struct loops *loops, FILE *file)
   int i;
   basic_block bb;
 
-  if (! loops->num || ! file || ! loops->cfg.dom)
+  if (! loops->num || ! file)
     return;
 
   FOR_EACH_BB (bb)
@@ -96,6 +99,21 @@ flow_loop_nested_p (const struct loop *outer, const struct loop *loop)
 {
   return loop->depth > outer->depth
 	 && loop->pred[outer->depth] == outer;
+}
+
+/* Returns the loop such that LOOP is nested DEPTH (indexed from zero)
+   loops within LOOP.  */
+
+struct loop *
+superloop_at_depth (struct loop *loop, unsigned depth)
+{
+  if (depth > (unsigned) loop->depth)
+    abort ();
+
+  if (depth == (unsigned) loop->depth)
+    return loop;
+
+  return loop->pred[depth];
 }
 
 /* Dump the loop information specified by LOOP to the stream FILE
@@ -212,9 +230,6 @@ flow_loops_free (struct loops *loops)
       free (loops->parray);
       loops->parray = NULL;
 
-      if (loops->cfg.dom)
-	free_dominance_info (loops->cfg.dom);
-
       if (loops->cfg.dfs_order)
 	free (loops->cfg.dfs_order);
       if (loops->cfg.rc_order)
@@ -300,7 +315,10 @@ flow_loop_exit_edges_find (struct loop *loop)
 	  basic_block dest = e->dest;
 
 	  if (!flow_bb_inside_loop_p (loop, dest))
-	    loop->exit_edges[num_exits++] = e;
+	    {
+	      e->flags |= EDGE_LOOP_EXIT;
+	      loop->exit_edges[num_exits++] = e;
+	    }
       }
     }
   free (bbs);
@@ -391,11 +409,10 @@ flow_loop_pre_header_scan (struct loop *loop)
 }
 
 /* Return the block for the pre-header of the loop with header
-   HEADER where DOM specifies the dominator information.  Return NULL if
-   there is no pre-header.  */
+   HEADER.  Return NULL if there is no pre-header.  */
 
 static basic_block
-flow_loop_pre_header_find (basic_block header, dominance_info dom)
+flow_loop_pre_header_find (basic_block header)
 {
   basic_block pre_header;
   edge e;
@@ -408,7 +425,7 @@ flow_loop_pre_header_find (basic_block header, dominance_info dom)
       basic_block node = e->src;
 
       if (node != ENTRY_BLOCK_PTR
-	  && ! dominated_by_p (dom, node, header))
+	  && ! dominated_by_p (CDI_DOMINATORS, node, header))
 	{
 	  if (pre_header == NULL)
 	    pre_header = node;
@@ -522,7 +539,7 @@ flow_loops_level_compute (struct loops *loops)
    about it specified by FLAGS.  */
 
 int
-flow_loop_scan (struct loops *loops, struct loop *loop, int flags)
+flow_loop_scan (struct loop *loop, int flags)
 {
   if (flags & LOOP_ENTRY_EDGES)
     {
@@ -541,8 +558,7 @@ flow_loop_scan (struct loops *loops, struct loop *loop, int flags)
   if (flags & LOOP_PRE_HEADER)
     {
       /* Look to see if the loop has a pre-header node.  */
-      loop->pre_header
-	= flow_loop_pre_header_find (loop->header, loops->cfg.dom);
+      loop->pre_header = flow_loop_pre_header_find (loop->header);
 
       /* Find the blocks within the extended basic block of
 	 the loop pre-header.  */
@@ -552,16 +568,49 @@ flow_loop_scan (struct loops *loops, struct loop *loop, int flags)
   return 1;
 }
 
+/* A callback to update latch and header info for basic block JUMP created
+   by redirecting an edge.  */
+
+static void
+update_latch_info (basic_block jump)
+{
+  alloc_aux_for_block (jump, sizeof (int));
+  HEADER_BLOCK (jump) = 0;
+  alloc_aux_for_edge (jump->pred, sizeof (int));
+  LATCH_EDGE (jump->pred) = 0;
+}
+
+/* A callback for make_forwarder block, to redirect all edges except for
+   MFB_KJ_EDGE to the entry part.  E is the edge for that we should decide
+   whether to redirect it.  */
+
+static edge mfb_kj_edge;
+static bool
+mfb_keep_just (edge e)
+{
+  return e != mfb_kj_edge;
+}
+
+/* A callback for make_forwarder block, to redirect the latch edges into an
+   entry part.  E is the edge for that we should decide whether to redirect
+   it.  */
+
+static bool
+mfb_keep_nonlatch (edge e)
+{
+  return LATCH_EDGE (e);
+}
+
 /* Takes care of merging natural loops with shared headers.  */
+
 static void
 canonicalize_loop_headers (void)
 {
-  dominance_info dom;
   basic_block header;
   edge e;
 
   /* Compute the dominators.  */
-  dom = calculate_dominance_info (CDI_DOMINATORS);
+  calculate_dominance_info (CDI_DOMINATORS);
 
   alloc_aux_for_blocks (sizeof (int));
   alloc_aux_for_edges (sizeof (int));
@@ -580,7 +629,7 @@ canonicalize_loop_headers (void)
 	    have_abnormal_edge = 1;
 
 	  if (latch != ENTRY_BLOCK_PTR
-	      && dominated_by_p (dom, latch, header))
+	      && dominated_by_p (CDI_DOMINATORS, latch, header))
 	    {
 	      num_latches++;
 	      LATCH_EDGE (e) = 1;
@@ -591,6 +640,8 @@ canonicalize_loop_headers (void)
       else
 	HEADER_BLOCK (header) = num_latches;
     }
+
+  free_dominance_info (CDI_DOMINATORS);
 
   if (HEADER_BLOCK (ENTRY_BLOCK_PTR->succ->dest))
     {
@@ -608,19 +659,10 @@ canonicalize_loop_headers (void)
 
   FOR_EACH_BB (header)
     {
-      int num_latch;
-      int want_join_latch;
       int max_freq, is_heavy;
-      edge heavy;
+      edge heavy, tmp_edge;
 
-      if (!HEADER_BLOCK (header))
-	continue;
-
-      num_latch = HEADER_BLOCK (header);
-
-      want_join_latch = (num_latch > 1);
-
-      if (!want_join_latch)
+      if (HEADER_BLOCK (header) <= 1)
 	continue;
 
       /* Find a heavy edge.  */
@@ -646,18 +688,32 @@ canonicalize_loop_headers (void)
 
       if (is_heavy)
 	{
-	  basic_block new_header =
-	    make_forwarder_block (header, true, true, heavy, 0);
-	  if (num_latch > 2)
-	    make_forwarder_block (new_header, true, false, NULL, 1);
+	  /* Split out the heavy edge, and create inner loop for it.  */
+	  mfb_kj_edge = heavy;
+	  tmp_edge = make_forwarder_block (header, mfb_keep_just,
+					   update_latch_info);
+	  alloc_aux_for_block (tmp_edge->dest, sizeof (int));
+	  HEADER_BLOCK (tmp_edge->dest) = 1;
+	  alloc_aux_for_edge (tmp_edge, sizeof (int));
+	  LATCH_EDGE (tmp_edge) = 0;
+	  HEADER_BLOCK (header)--;
 	}
-      else
-	make_forwarder_block (header, true, false, NULL, 1);
+
+      if (HEADER_BLOCK (header) > 1)
+	{
+	  /* Create a new latch block.  */
+	  tmp_edge = make_forwarder_block (header, mfb_keep_nonlatch,
+					   update_latch_info);
+	  alloc_aux_for_block (tmp_edge->dest, sizeof (int));
+	  HEADER_BLOCK (tmp_edge->src) = 0;
+	  HEADER_BLOCK (tmp_edge->dest) = 1;
+	  alloc_aux_for_edge (tmp_edge, sizeof (int));
+	  LATCH_EDGE (tmp_edge) = 1;
+	}
     }
 
   free_aux_for_blocks ();
   free_aux_for_edges ();
-  free_dominance_info (dom);
 }
 
 /* Find all the natural loops in the function and save in LOOPS structure and
@@ -673,7 +729,6 @@ flow_loops_find (struct loops *loops, int flags)
   int num_loops;
   edge e;
   sbitmap headers;
-  dominance_info dom;
   int *dfs_order;
   int *rc_order;
   basic_block header;
@@ -699,7 +754,7 @@ flow_loops_find (struct loops *loops, int flags)
   canonicalize_loop_headers ();
 
   /* Compute the dominators.  */
-  dom = loops->cfg.dom = calculate_dominance_info (CDI_DOMINATORS);
+  calculate_dominance_info (CDI_DOMINATORS);
 
   /* Count the number of loop headers.  This should be the
      same as the number of natural loops.  */
@@ -733,7 +788,8 @@ flow_loops_find (struct loops *loops, int flags)
 	     node (header) that dominates all the nodes in the
 	     loop.  It also has single back edge to the header
 	     from a latch node.  */
-	  if (latch != ENTRY_BLOCK_PTR && dominated_by_p (dom, latch, header))
+	  if (latch != ENTRY_BLOCK_PTR
+	      && dominated_by_p (CDI_DOMINATORS, latch, header))
 	    {
 	      /* Shared headers should be eliminated by now.  */
 	      if (more_latches)
@@ -778,7 +834,6 @@ flow_loops_find (struct loops *loops, int flags)
       flow_depth_first_order_compute (dfs_order, rc_order);
 
       /* Save CFG derived information to avoid recomputing it.  */
-      loops->cfg.dom = dom;
       loops->cfg.dfs_order = dfs_order;
       loops->cfg.rc_order = rc_order;
 
@@ -807,7 +862,7 @@ flow_loops_find (struct loops *loops, int flags)
 	      basic_block latch = e->src;
 
 	      if (latch != ENTRY_BLOCK_PTR
-		  && dominated_by_p (dom, latch, header))
+		  && dominated_by_p (CDI_DOMINATORS, latch, header))
 		{
 		  loop->latch = latch;
 		  break;
@@ -818,23 +873,22 @@ flow_loops_find (struct loops *loops, int flags)
 	  loop->num_nodes = flow_loop_nodes_find (loop->header, loop);
 	}
 
-      sbitmap_free (headers);
-
       /* Assign the loop nesting depth and enclosed loop level for each
 	 loop.  */
       loops->levels = flow_loops_level_compute (loops);
 
       /* Scan the loops.  */
       for (i = 1; i < num_loops; i++)
-	flow_loop_scan (loops, loops->parray[i], flags);
+	flow_loop_scan (loops->parray[i], flags);
 
       loops->num = num_loops;
     }
   else
     {
-      loops->cfg.dom = NULL;
-      free_dominance_info (dom);
+      free_dominance_info (CDI_DOMINATORS);
     }
+
+  sbitmap_free (headers);
 
   loops->state = 0;
 #ifdef ENABLE_CHECKING
@@ -892,6 +946,7 @@ glb_enum_p (basic_block bb, void *glb_header)
 /* Gets basic blocks of a LOOP.  Header is the 0-th block, rest is in dfs
    order against direction of edges from latch.  Specially, if
    header != latch, latch is the 1-st block.  */
+
 basic_block *
 get_loop_body (const struct loop *loop)
 {
@@ -925,6 +980,116 @@ get_loop_body (const struct loop *loop)
   return tovisit;
 }
 
+/* Fills dominance descendants inside LOOP of the basic block BB into
+   array TOVISIT from index *TV.  */
+
+static void
+fill_sons_in_loop (const struct loop *loop, basic_block bb,
+		   basic_block *tovisit, int *tv)
+{
+  basic_block son, postpone = NULL;
+
+  tovisit[(*tv)++] = bb;
+  for (son = first_dom_son (CDI_DOMINATORS, bb);
+       son;
+       son = next_dom_son (CDI_DOMINATORS, son))
+    {
+      if (!flow_bb_inside_loop_p (loop, son))
+	continue;
+
+      if (dominated_by_p (CDI_DOMINATORS, loop->latch, son))
+	{
+	  postpone = son;
+	  continue;
+	}
+      fill_sons_in_loop (loop, son, tovisit, tv);
+    }
+
+  if (postpone)
+    fill_sons_in_loop (loop, postpone, tovisit, tv);
+}
+
+/* Gets body of a LOOP (that must be different from the outermost loop)
+   sorted by dominance relation.  Additionally, if a basic block s dominates
+   the latch, then only blocks dominated by s are after it.  */
+
+basic_block *
+get_loop_body_in_dom_order (const struct loop *loop)
+{
+  basic_block *tovisit;
+  int tv;
+
+  if (!loop->num_nodes)
+    abort ();
+
+  tovisit = xcalloc (loop->num_nodes, sizeof (basic_block));
+
+  if (loop->latch == EXIT_BLOCK_PTR)
+    abort ();
+
+  tv = 0;
+  fill_sons_in_loop (loop, loop->header, tovisit, &tv);
+
+  if (tv != (int) loop->num_nodes)
+    abort ();
+
+  return tovisit;
+}
+
+/* Get body of a LOOP in breadth first sort order.  */
+
+basic_block *
+get_loop_body_in_bfs_order (const struct loop *loop)
+{
+  basic_block *blocks;
+  basic_block bb;
+  bitmap visited;
+  unsigned int i = 0;
+  unsigned int vc = 1;
+
+  if (!loop->num_nodes)
+    abort ();
+
+  if (loop->latch == EXIT_BLOCK_PTR)
+    abort ();
+
+  blocks = xcalloc (loop->num_nodes, sizeof (basic_block));
+  visited = BITMAP_XMALLOC ();
+
+  bb = loop->header;
+  while (i < loop->num_nodes)
+    {
+      edge e;
+
+      if (!bitmap_bit_p (visited, bb->index))
+	{
+	  /* This basic block is now visited */
+	  bitmap_set_bit (visited, bb->index);
+	  blocks[i++] = bb;
+	}
+
+      for (e = bb->succ; e; e = e->succ_next)
+	{
+	  if (flow_bb_inside_loop_p (loop, e->dest))
+	    {
+	      if (!bitmap_bit_p (visited, e->dest->index))
+		{
+		  bitmap_set_bit (visited, e->dest->index);
+		  blocks[i++] = e->dest;
+		}
+	    }
+	}
+
+      if (i < vc)
+	abort ();
+
+      bb = blocks[vc++];
+    }
+
+  BITMAP_XFREE (visited);
+  return blocks;
+}
+
 /* Gets exit edges of a LOOP, returning their number in N_EDGES.  */
 edge *
 get_loop_exit_edges (const struct loop *loop, unsigned int *n_edges)
@@ -952,6 +1117,27 @@ get_loop_exit_edges (const struct loop *loop, unsigned int *n_edges)
   free (body);
 
   return edges;
+}
+
+/* Counts the number of conditional branches inside LOOP.  */
+
+unsigned
+num_loop_branches (const struct loop *loop)
+{
+  unsigned i, n;
+  basic_block * body;
+
+  if (loop->latch == EXIT_BLOCK_PTR)
+    abort ();
+
+  body = get_loop_body (loop);
+  n = 0;
+  for (i = 0; i < loop->num_nodes; i++)
+    if (body[i]->succ && body[i]->succ->succ_next)
+      n++;
+  free (body);
+
+  return n;
 }
 
 /* Adds basic block BB to LOOP.  */

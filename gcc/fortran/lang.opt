@@ -1,5 +1,5 @@
 ; Options for the Fortran 95 front end.
-; Copyright (C) 2003 Free Software Foundation, Inc.
+; Copyright (C) 2003, 2004 Free Software Foundation, Inc.
 ;
 ; This file is part of GCC.
 ;
@@ -57,6 +57,10 @@ Wsurprising
 F95
 Warn about \"suspicious\" constructs
 
+Wunderflow
+F95
+Warn about underflow of numerical constant expressions
+
 Wunused-labels
 F95
 Warn when a label is unused
@@ -81,10 +85,6 @@ ffree-form
 F95
 Assume that the source file is free form
 
-fg77-calls
-F95
-Generate g77-compatible calls
-
 funderscoring
 F95
 Append underscores to externally visible names
@@ -104,6 +104,10 @@ Use 80 character line width in fixed mode
 ffixed-line-length-132
 F95 RejectNegative
 Use 132 character line width in fixed mode
+
+fmax-identifier-length=
+F95 RejectNegative Joined UInteger
+-fmax-identifier-length=<n>	Maximum identifier length.
 
 fmax-stack-var-size=
 F95 RejectNegative Joined UInteger
@@ -126,7 +130,7 @@ F95
 Copy array sections into a contiguous block on procedure entry
 
 i8
-F95 RejectNegative
+F95
 Set the default integer kind to double precision
 
 qkind=
@@ -134,7 +138,19 @@ F95 RejectNegative Joined UInteger
 -qkind=<n>	Set the kind for a real with the 'q' exponent to 'n'
 
 r8
-F95 RejectNegative
+F95
 Set the default real kind to double precision
+
+std=f95
+F95
+Conform to the ISO Fortran 95 standard.
+
+std=f2003
+F95
+Conform to the ISO Fortran 2003 standard.
+
+std=gnu
+F95
+Conform nothing in particular.
 
 ; This comment is to ensure we retain the blank line above.

@@ -45,7 +45,7 @@ public class GtkPanelPeer extends GtkContainerPeer
   implements PanelPeer
 {
   native void create ();
-  native void connectHooks ();
+  native void connectJObject ();
 
   public GtkPanelPeer (Panel p)
   {

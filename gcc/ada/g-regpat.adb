@@ -7,7 +7,7 @@
 --                                 B o d y                                  --
 --                                                                          --
 --               Copyright (C) 1986 by University of Toronto.               --
---           Copyright (C) 1996-2003 Ada Core Technologies, Inc.            --
+--           Copyright (C) 1996-2004 Ada Core Technologies, Inc.            --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -2997,9 +2997,9 @@ package body GNAT.Regpat is
       function Match_Whilem (IP : Pointer) return Boolean is
          pragma Unreferenced (IP);
 
-         Cc : Current_Curly_Access := Current_Curly;
-         N  : constant Natural     := Cc.Cur + 1;
-         Ln : Natural              := 0;
+         Cc : constant Current_Curly_Access := Current_Curly;
+         N  : constant Natural              := Cc.Cur + 1;
+         Ln : Natural                       := 0;
 
          Lastloc : constant Natural := Cc.Lastloc;
          --  Detection of 0-len.
@@ -3406,9 +3406,9 @@ package body GNAT.Regpat is
      (Expression : String;
       Data       : String;
       Matches    : out Match_Array;
-      Size       : Program_Size := 0;
-      Data_First : Integer := -1;
-      Data_Last  : Positive := Positive'Last)
+      Size       : Program_Size := Auto_Size;
+      Data_First : Integer      := -1;
+      Data_Last  : Positive     := Positive'Last)
    is
       PM            : Pattern_Matcher (Size);
       Finalize_Size : Program_Size;
@@ -3426,12 +3426,12 @@ package body GNAT.Regpat is
    -- Match --
    -----------
 
-   function  Match
+   function Match
      (Expression : String;
       Data       : String;
-      Size       : Program_Size := 0;
-      Data_First : Integer := -1;
-      Data_Last  : Positive := Positive'Last) return Natural
+      Size       : Program_Size := Auto_Size;
+      Data_First : Integer      := -1;
+      Data_Last  : Positive     := Positive'Last) return Natural
    is
       PM         : Pattern_Matcher (Size);
       Final_Size : Program_Size; -- unused
@@ -3452,9 +3452,9 @@ package body GNAT.Regpat is
    function  Match
      (Expression : String;
       Data       : String;
-      Size       : Program_Size := 0;
-      Data_First : Integer := -1;
-      Data_Last  : Positive := Positive'Last) return Boolean
+      Size       : Program_Size := Auto_Size;
+      Data_First : Integer      := -1;
+      Data_Last  : Positive     := Positive'Last) return Boolean
    is
       Matches    : Match_Array (0 .. 0);
       PM         : Pattern_Matcher (Size);

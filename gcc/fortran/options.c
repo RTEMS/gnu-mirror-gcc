@@ -1,23 +1,24 @@
 /* Parse and display command line options.
-   Copyright (C) 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2002, 2003, 2004 Free Software Foundation,
+   Inc.
    Contributed by Andy Vaught
 
-This file is part of GNU G95.
+This file is part of GCC.
 
-GNU G95 is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2, or (at your option)
-any later version.
+GCC is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2, or (at your option) any later
+version.
 
-GNU G95 is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+GCC is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU G95; see the file COPYING.  If not, write to
-the Free Software Foundation, 59 Temple Place - Suite 330,
-Boston, MA 02111-1307, USA.  */
+along with GCC; see the file COPYING.  If not, write to the Free
+Software Foundation, 59 Temple Place - Suite 330, Boston, MA
+02111-1307, USA.  */
 
 #include <string.h>
 #include <stdlib.h>
@@ -48,17 +49,18 @@ gfc_init_options (unsigned int argc ATTRIBUTE_UNUSED,
   gfc_option.module_dir = NULL;
   gfc_option.source_form = FORM_UNKNOWN;
   gfc_option.fixed_line_length = 72;
+  gfc_option.max_identifier_length = GFC_MAX_SYMBOL_LEN;
   gfc_option.verbose = 0;
 
   gfc_option.warn_aliasing = 0;
   gfc_option.warn_conversion = 0;
   gfc_option.warn_implicit_interface = 0;
   gfc_option.warn_line_truncation = 0;
+  gfc_option.warn_underflow = 1;
   gfc_option.warn_surprising = 0;
   gfc_option.warn_unused_labels = 0;
 
   gfc_option.flag_dollar_ok = 0;
-  gfc_option.flag_g77_calls = 1;
   gfc_option.flag_underscoring = 1;
   gfc_option.flag_second_underscore = 1;
   gfc_option.flag_implicit_none = 0;
@@ -72,6 +74,13 @@ gfc_init_options (unsigned int argc ATTRIBUTE_UNUSED,
   gfc_option.i8 = 0;
   gfc_option.r8 = 0;
   gfc_option.d8 = 0;
+
+  flag_argument_noalias = 2;
+
+  gfc_option.allow_std = GFC_STD_F95_OBS | GFC_STD_F95_DEL
+    | GFC_STD_F2003_OBS | GFC_STD_F2003_DEL | GFC_STD_F2003 | GFC_STD_GNU;
+  gfc_option.warn_std = GFC_STD_F95_OBS | GFC_STD_F95_DEL
+    | GFC_STD_F2003 | GFC_STD_GNU;
 
   return CL_F95;
 }
@@ -115,6 +124,7 @@ set_Wall (void)
 
   gfc_option.warn_aliasing = 1;
   gfc_option.warn_line_truncation = 1;
+  gfc_option.warn_underflow = 1;
   gfc_option.warn_surprising = 1;
   gfc_option.warn_unused_labels = 1;
 
@@ -147,7 +157,7 @@ gfc_handle_module_path_options (const char *arg)
       exit (3);
     }
 
-  gfc_option.module_dir = (char *) gfc_getmem (strlen (arg));
+  gfc_option.module_dir = (char *) gfc_getmem (strlen (arg) + 2);
   strcpy (gfc_option.module_dir, arg);
   strcat (gfc_option.module_dir, "/");
 }
@@ -190,6 +200,10 @@ gfc_handle_option (size_t scode, const char *arg, int value)
       gfc_option.warn_line_truncation = value;
       break;
 
+    case OPT_Wunderflow:
+      gfc_option.warn_underflow = value;
+      break;
+
     case OPT_Wsurprising:
       gfc_option.warn_surprising = value;
       break;
@@ -212,11 +226,6 @@ gfc_handle_option (size_t scode, const char *arg, int value)
 
     case OPT_ffree_form:
       gfc_option.source_form = FORM_FREE;
-      break;
-
-    case OPT_fg77_calls:
-      /*TODO: the non-g77 calling convention is broken beyond hope.  */
-      /*gfc_option.flag_g77_calls = value;*/
       break;
 
     case OPT_funderscoring:
@@ -259,6 +268,13 @@ gfc_handle_option (size_t scode, const char *arg, int value)
       gfc_option.fixed_line_length = 132;
       break;
 
+    case OPT_fmax_identifier_length_:
+      if (value > GFC_MAX_SYMBOL_LEN)
+	gfc_fatal_error ("Maximum supported idenitifier length is %d",
+			 GFC_MAX_SYMBOL_LEN);
+      gfc_option.max_identifier_length = value;
+      break;
+
     case OPT_qkind_:
       if (gfc_validate_kind (BT_REAL, value) < 0)
 	gfc_fatal_error ("Argument to -fqkind isn't a valid real kind");
@@ -284,6 +300,27 @@ gfc_handle_option (size_t scode, const char *arg, int value)
     case OPT_J:
     case OPT_M:
       gfc_handle_module_path_options (arg);
+    
+    case OPT_std_f95:
+      gfc_option.allow_std = GFC_STD_F95_OBS | GFC_STD_F2003_OBS
+	| GFC_STD_F2003_DEL;
+      gfc_option.warn_std = GFC_STD_F95_OBS;
+      gfc_option.max_identifier_length = 31;
+      break;
+
+    case OPT_std_f2003:
+      gfc_option.allow_std = GFC_STD_F95_OBS | GFC_STD_F2003_OBS
+	| GFC_STD_F2003;
+      gfc_option.warn_std = GFC_STD_F95_OBS | GFC_STD_F2003_OBS;
+      gfc_option.max_identifier_length = 63;
+      break;
+
+    case OPT_std_gnu:
+      gfc_option.allow_std = GFC_STD_F95_OBS | GFC_STD_F95_DEL
+	| GFC_STD_F2003_OBS | GFC_STD_F2003_DEL | GFC_STD_F2003 | GFC_STD_GNU;
+      gfc_option.warn_std = GFC_STD_F95_OBS | GFC_STD_F95_DEL
+	| GFC_STD_F2003_OBS | GFC_STD_F2003_DEL | GFC_STD_GNU;
+      break;
     }
 
   return result;

@@ -1,5 +1,5 @@
 /* Xstormy16 target functions.
-   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003
+   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004
    Free Software Foundation, Inc.
    Contributed by Red Hat, Inc.
 
@@ -46,6 +46,7 @@ Boston, MA 02111-1307, USA.  */
 #include "target-def.h"
 #include "tm_p.h"
 #include "langhooks.h"
+#include "tree-gimple.h"
 
 static rtx emit_addhi3_postreload (rtx, rtx, rtx);
 static void xstormy16_asm_out_constructor (rtx, int);
@@ -57,6 +58,7 @@ static void xstormy16_init_builtins (void);
 static rtx xstormy16_expand_builtin (tree, rtx, rtx, enum machine_mode, int);
 static bool xstormy16_rtx_costs (rtx, int, int, int *);
 static int xstormy16_address_cost (rtx);
+static bool xstormy16_return_in_memory (tree, tree);
 
 /* Define the information needed to generate branch and scc insns.  This is
    stored from the compare operation.  */
@@ -232,7 +234,7 @@ xstormy16_emit_cbranch (enum rtx_code code, rtx loc)
       op0 = tmp;
     }
 
-  condition_rtx = gen_rtx (code, mode, op0, op1);
+  condition_rtx = gen_rtx_fmt_ee (code, mode, op0, op1);
   loc_ref = gen_rtx_LABEL_REF (VOIDmode, loc);
   branch = gen_rtx_SET (VOIDmode, pc_rtx,
 			gen_rtx_IF_THEN_ELSE (VOIDmode, condition_rtx,
@@ -1227,20 +1229,10 @@ xstormy16_function_arg (CUMULATIVE_ARGS cum, enum machine_mode mode,
 {
   if (mode == VOIDmode)
     return const0_rtx;
-  if (MUST_PASS_IN_STACK (mode, type)
+  if (targetm.calls.must_pass_in_stack (mode, type)
       || cum + XSTORMY16_WORD_SIZE (type, mode) > NUM_ARGUMENT_REGISTERS)
     return 0;
   return gen_rtx_REG (mode, cum + 2);
-}
-
-/* Do any needed setup for a variadic function.  CUM has not been updated
-   for the last named argument which has type TYPE and mode MODE.  */
-void
-xstormy16_setup_incoming_varargs (CUMULATIVE_ARGS cum ATTRIBUTE_UNUSED,
-				  int int_mode ATTRIBUTE_UNUSED,
-				  tree type ATTRIBUTE_UNUSED,
-				  int *pretend_size ATTRIBUTE_UNUSED)
-{
 }
 
 /* Build the va_list type.
@@ -1294,8 +1286,9 @@ xstormy16_expand_builtin_va_start (tree valist, rtx nextarg ATTRIBUTE_UNUSED)
   f_base = TYPE_FIELDS (va_list_type_node);
   f_count = TREE_CHAIN (f_base);
   
-  base = build (COMPONENT_REF, TREE_TYPE (f_base), valist, f_base);
-  count = build (COMPONENT_REF, TREE_TYPE (f_count), valist, f_count);
+  base = build (COMPONENT_REF, TREE_TYPE (f_base), valist, f_base, NULL_TREE);
+  count = build (COMPONENT_REF, TREE_TYPE (f_count), valist, f_count,
+		 NULL_TREE);
 
   t = make_tree (TREE_TYPE (base), virtual_incoming_args_rtx);
   t = build (PLUS_EXPR, TREE_TYPE (base), t, 
@@ -1314,49 +1307,58 @@ xstormy16_expand_builtin_va_start (tree valist, rtx nextarg ATTRIBUTE_UNUSED)
    of type va_list as a tree, TYPE is the type passed to va_arg.
    Note:  This algorithm is documented in stormy-abi.  */
    
-rtx
-xstormy16_expand_builtin_va_arg (tree valist, tree type)
+static tree
+xstormy16_expand_builtin_va_arg (tree valist, tree type, tree *pre_p,
+				 tree *post_p ATTRIBUTE_UNUSED)
 {
   tree f_base, f_count;
   tree base, count;
-  rtx count_rtx, addr_rtx, r;
-  rtx lab_gotaddr, lab_fromstack;
-  tree t;
+  tree count_tmp, addr, t;
+  tree lab_gotaddr, lab_fromstack;
   int size, size_of_reg_args, must_stack;
-  tree size_tree, count_plus_size;
-  rtx count_plus_size_rtx;
-  
+  tree size_tree;
+
   f_base = TYPE_FIELDS (va_list_type_node);
   f_count = TREE_CHAIN (f_base);
   
-  base = build (COMPONENT_REF, TREE_TYPE (f_base), valist, f_base);
-  count = build (COMPONENT_REF, TREE_TYPE (f_count), valist, f_count);
+  base = build (COMPONENT_REF, TREE_TYPE (f_base), valist, f_base, NULL_TREE);
+  count = build (COMPONENT_REF, TREE_TYPE (f_count), valist, f_count,
+		 NULL_TREE);
 
-  must_stack = MUST_PASS_IN_STACK (TYPE_MODE (type), type);
+  must_stack = targetm.calls.must_pass_in_stack (TYPE_MODE (type), type);
   size_tree = round_up (size_in_bytes (type), UNITS_PER_WORD);
+  gimplify_expr (&size_tree, pre_p, NULL, is_gimple_val, fb_rvalue);
   
   size_of_reg_args = NUM_ARGUMENT_REGISTERS * UNITS_PER_WORD;
 
-  count_rtx = expand_expr (count, NULL_RTX, HImode, EXPAND_NORMAL);
-  lab_gotaddr = gen_label_rtx ();
-  lab_fromstack = gen_label_rtx ();
-  addr_rtx = gen_reg_rtx (Pmode);
+  count_tmp = get_initialized_tmp_var (count, pre_p, NULL);
+  lab_gotaddr = create_artificial_label ();
+  lab_fromstack = create_artificial_label ();
+  addr = create_tmp_var (ptr_type_node, NULL);
 
   if (!must_stack)
     {
-      count_plus_size = build (PLUS_EXPR, TREE_TYPE (count), count, size_tree);
-      count_plus_size_rtx = expand_expr (count_plus_size, NULL_RTX, HImode, EXPAND_NORMAL);
-      emit_cmp_and_jump_insns (count_plus_size_rtx, GEN_INT (size_of_reg_args),
-			       GTU, const1_rtx, HImode, 1, lab_fromstack);
-  
-      t = build (PLUS_EXPR, ptr_type_node, base, count);
-      r = expand_expr (t, addr_rtx, Pmode, EXPAND_NORMAL);
-      if (r != addr_rtx)
-	emit_move_insn (addr_rtx, r);
+      tree r;
 
-      emit_jump_insn (gen_jump (lab_gotaddr));
-      emit_barrier ();
-      emit_label (lab_fromstack);
+      t = fold_convert (TREE_TYPE (count), size_tree);
+      t = build (PLUS_EXPR, TREE_TYPE (count), count_tmp, t);
+      r = fold_convert (TREE_TYPE (count), size_int (size_of_reg_args));
+      t = build (GT_EXPR, boolean_type_node, t, r);
+      t = build (COND_EXPR, void_type_node, t,
+		 build (GOTO_EXPR, void_type_node, lab_fromstack),
+		 NULL);
+      gimplify_and_add (t, pre_p);
+  
+      t = fold_convert (ptr_type_node, count_tmp);
+      t = build (PLUS_EXPR, ptr_type_node, base, t);
+      t = build (MODIFY_EXPR, void_type_node, addr, t);
+      gimplify_and_add (t, pre_p);
+
+      t = build (GOTO_EXPR, void_type_node, lab_gotaddr);
+      gimplify_and_add (t, pre_p);
+
+      t = build (LABEL_EXPR, void_type_node, lab_fromstack);
+      gimplify_and_add (t, pre_p);
     }
   
   /* Arguments larger than a word might need to skip over some
@@ -1365,37 +1367,38 @@ xstormy16_expand_builtin_va_arg (tree valist, tree type)
   size = PUSH_ROUNDING (int_size_in_bytes (type));
   if (size > 2 || size < 0 || must_stack)
     {
-      rtx lab_notransition = gen_label_rtx ();
-      emit_cmp_and_jump_insns (count_rtx, GEN_INT (NUM_ARGUMENT_REGISTERS 
-						   * UNITS_PER_WORD),
-			       GEU, const1_rtx, HImode, 1, lab_notransition);
-      
-      t = build (MODIFY_EXPR, TREE_TYPE (count), count, 
-		 build_int_2 (NUM_ARGUMENT_REGISTERS * UNITS_PER_WORD, 0));
-      TREE_SIDE_EFFECTS (t) = 1;
-      expand_expr (t, const0_rtx, VOIDmode, EXPAND_NORMAL);
-      
-      emit_label (lab_notransition);
+      tree r, u;
+
+      r = size_int (NUM_ARGUMENT_REGISTERS * UNITS_PER_WORD);
+      u = build (MODIFY_EXPR, void_type_node, count_tmp, r);
+
+      t = fold_convert (TREE_TYPE (count), r);
+      t = build (GE_EXPR, boolean_type_node, count_tmp, t);
+      t = build (COND_EXPR, void_type_node, t, NULL, u);
+      gimplify_and_add (t, pre_p);
     }
 
-  t = build (PLUS_EXPR, sizetype, size_tree,
-	     build_int_2 ((- NUM_ARGUMENT_REGISTERS * UNITS_PER_WORD
-			   + INCOMING_FRAME_SP_OFFSET),
-			  -1));
-  t = build (PLUS_EXPR, TREE_TYPE (count), count, fold (t));
+  t = size_int (NUM_ARGUMENT_REGISTERS * UNITS_PER_WORD
+		- INCOMING_FRAME_SP_OFFSET);
+  t = fold_convert (TREE_TYPE (count), t);
+  t = build (MINUS_EXPR, TREE_TYPE (count), count_tmp, t);
+  t = build (PLUS_EXPR, TREE_TYPE (count), t,
+	     fold_convert (TREE_TYPE (count), size_tree));
+  t = fold_convert (TREE_TYPE (base), fold (t));
   t = build (MINUS_EXPR, TREE_TYPE (base), base, t);
-  r = expand_expr (t, addr_rtx, Pmode, EXPAND_NORMAL);
-  if (r != addr_rtx)
-    emit_move_insn (addr_rtx, r);
-	     
-  emit_label (lab_gotaddr);
+  t = build (MODIFY_EXPR, void_type_node, addr, t);
+  gimplify_and_add (t, pre_p);
 
-  count_plus_size = build (PLUS_EXPR, TREE_TYPE (count), count, size_tree);
-  t = build (MODIFY_EXPR, TREE_TYPE (count), count, count_plus_size);
-  TREE_SIDE_EFFECTS (t) = 1;
-  expand_expr (t, const0_rtx, VOIDmode, EXPAND_NORMAL);
+  t = build (LABEL_EXPR, void_type_node, lab_gotaddr);
+  gimplify_and_add (t, pre_p);
 
-  return addr_rtx;
+  t = fold_convert (TREE_TYPE (count), size_tree);
+  t = build (PLUS_EXPR, TREE_TYPE (count), count_tmp, t);
+  t = build (MODIFY_EXPR, TREE_TYPE (count), count, t);
+  gimplify_and_add (t, pre_p);
+  
+  addr = fold_convert (build_pointer_type (type), addr);
+  return build_fold_indirect_ref (addr);
 }
 
 /* Initialize the variable parts of a trampoline.  ADDR is an RTX for
@@ -1429,24 +1432,8 @@ xstormy16_initialize_trampoline (rtx addr, rtx fnaddr, rtx static_chain)
   emit_move_insn (reg_addr_mem, reg_fnaddr);
 }
 
-/* Create an RTX representing the place where a function returns a
-   value of data type VALTYPE.  VALTYPE is a tree node representing a
-   data type.  Write `TYPE_MODE (VALTYPE)' to get the machine mode
-   used to represent that type.  On many machines, only the mode is
-   relevant.  (Actually, on most machines, scalar values are returned
-   in the same place regardless of mode).
+/* Worker function for FUNCTION_VALUE.  */
 
-   If `PROMOTE_FUNCTION_RETURN' is defined, you must apply the same promotion
-   rules specified in `PROMOTE_MODE' if VALTYPE is a scalar type.
-
-   If the precise function being called is known, FUNC is a tree node
-   (`FUNCTION_DECL') for it; otherwise, FUNC is a null pointer.  This makes it
-   possible to use a different value-returning convention for specific
-   functions when all their calls are known.
-
-   `FUNCTION_VALUE' is not used for return vales with aggregate data types,
-   because these are returned in another way.  See `STRUCT_VALUE_REGNUM' and
-   related macros.  */
 rtx
 xstormy16_function_value (tree valtype, tree func ATTRIBUTE_UNUSED)
 {
@@ -1514,7 +1501,7 @@ xstormy16_asm_out_destructor (rtx symbol, int priority)
   const char *section = ".dtors";
   char buf[16];
 
-  /* ??? This only works reliably with the GNU linker.   */
+  /* ??? This only works reliably with the GNU linker.  */
   if (priority != DEFAULT_INIT_PRIORITY)
     {
       sprintf (buf, ".dtors.%.5u",
@@ -1536,7 +1523,7 @@ xstormy16_asm_out_constructor (rtx symbol, int priority)
   const char *section = ".ctors";
   char buf[16];
 
-  /* ??? This only works reliably with the GNU linker.   */
+  /* ??? This only works reliably with the GNU linker.  */
   if (priority != DEFAULT_INIT_PRIORITY)
     {
       sprintf (buf, ".ctors.%.5u",
@@ -1721,7 +1708,7 @@ xstormy16_expand_casesi (rtx index, rtx lower_bound, rtx range,
   emit_cmp_and_jump_insns (index, range, GTU, NULL_RTX, SImode, 1,
 			   default_label);
   int_index = gen_lowpart_common (HImode, index);
-  emit_insn (gen_ashlhi3 (int_index, int_index, GEN_INT (2)));
+  emit_insn (gen_ashlhi3 (int_index, int_index, const2_rtx));
   emit_jump_insn (gen_tablejump_pcrel (int_index, table));
 }
 
@@ -1880,8 +1867,8 @@ xstormy16_expand_arith (enum machine_mode mode, enum rtx_code code,
 	      && INTVAL (w_src1) == -(code == AND))
 	    continue;
 	  
-	  insn = gen_rtx_SET (VOIDmode, w_dest, gen_rtx (code, mode,
-							 w_src0, w_src1));
+	  insn = gen_rtx_SET (VOIDmode, w_dest, gen_rtx_fmt_ee (code, mode,
+								w_src0, w_src1));
 	  break;
 
 	case NOT:
@@ -2122,9 +2109,9 @@ xstormy16_init_builtins (void)
 	  else
 	    args = tree_cons (NULL_TREE, arg, args);
 	}
-      builtin_function (s16builtins[i].name,
-			build_function_type (ret_type, args),
-			i, BUILT_IN_MD, NULL, NULL);
+      lang_hooks.builtin_function (s16builtins[i].name,
+				   build_function_type (ret_type, args),
+				   i, BUILT_IN_MD, NULL, NULL);
     }
 }
 
@@ -2194,7 +2181,15 @@ xstormy16_expand_builtin(tree exp, rtx target,
 
   return retval;
 }
+
+/* Worker function for TARGET_RETURN_IN_MEMORY.  */
 
+static bool
+xstormy16_return_in_memory (tree type, tree fntype ATTRIBUTE_UNUSED)
+{
+  HOST_WIDE_INT size = int_size_in_bytes (type);
+  return (size == -1 || size > UNITS_PER_WORD * NUM_ARGUMENT_REGISTERS);
+}
 
 #undef TARGET_ASM_ALIGNED_HI_OP
 #define TARGET_ASM_ALIGNED_HI_OP "\t.hword\t"
@@ -2211,7 +2206,19 @@ xstormy16_expand_builtin(tree exp, rtx target,
 #undef TARGET_ADDRESS_COST
 #define TARGET_ADDRESS_COST xstormy16_address_cost
 
-#undef TARGET_BUILD_BUILTIN_VA_LIST_TYPE
-#define TARGET_BUILD_BUILTIN_VA_LIST_TYPE xstormy16_build_builtin_va_list
+#undef TARGET_BUILD_BUILTIN_VA_LIST
+#define TARGET_BUILD_BUILTIN_VA_LIST xstormy16_build_builtin_va_list
+#undef TARGET_GIMPLIFY_VA_ARG_EXPR
+#define TARGET_GIMPLIFY_VA_ARG_EXPR xstormy16_expand_builtin_va_arg
+
+#undef TARGET_PROMOTE_FUNCTION_ARGS
+#define TARGET_PROMOTE_FUNCTION_ARGS hook_bool_tree_true
+#undef TARGET_PROMOTE_FUNCTION_RETURN
+#define TARGET_PROMOTE_FUNCTION_RETURN hook_bool_tree_true
+#undef TARGET_PROMOTE_PROTOTYPES
+#define TARGET_PROMOTE_PROTOTYPES hook_bool_tree_true
+
+#undef TARGET_RETURN_IN_MEMORY
+#define TARGET_RETURN_IN_MEMORY xstormy16_return_in_memory
 
 struct gcc_target targetm = TARGET_INITIALIZER;

@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2003, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2004, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -48,6 +48,7 @@ with Sem_Cat;  use Sem_Cat;
 with Sem_Ch3;  use Sem_Ch3;
 with Sem_Ch6;  use Sem_Ch6;
 with Sem_Ch8;  use Sem_Ch8;
+with Sem_Ch10; use Sem_Ch10;
 with Sem_Ch12; use Sem_Ch12;
 with Sem_Util; use Sem_Util;
 with Sem_Warn; use Sem_Warn;
@@ -218,7 +219,7 @@ package body Sem_Ch7 is
                or else Is_Child_Unit (Spec_Id))
            and then not Unit_Requires_Body (Spec_Id)
          then
-            if Ada_83 then
+            if Ada_Version = Ada_83 then
                Error_Msg_N
                  ("optional package body (not allowed in Ada 95)?", N);
             else
@@ -299,6 +300,7 @@ package body Sem_Ch7 is
 
       Install_Visible_Declarations (Spec_Id);
       Install_Private_Declarations (Spec_Id);
+      Install_Private_With_Clauses (Spec_Id);
       Install_Composite_Operations (Spec_Id);
 
       if Ekind (Spec_Id) = E_Generic_Package then
@@ -689,6 +691,12 @@ package body Sem_Ch7 is
       --  Child and Unit are entities of compilation units. True if Child
       --  is a public child of Parent as defined in 10.1.1
 
+      procedure Inspect_Deferred_Constant_Completion;
+      --  Examines the deferred constants in the private part of the
+      --  package specification. Emits the error "constant declaration
+      --  requires initialization expression " if not completed by an
+      --  import pragma.
+
       ---------------------
       -- Clear_Constants --
       ---------------------
@@ -733,7 +741,7 @@ package body Sem_Ch7 is
       --------------------------------
 
       procedure Generate_Parent_References is
-         Decl : Node_Id := Parent (N);
+         Decl : constant Node_Id := Parent (N);
 
       begin
          if Id = Cunit_Entity (Main_Unit)
@@ -791,6 +799,41 @@ package body Sem_Ch7 is
          end if;
       end Is_Public_Child;
 
+      ------------------------------------------
+      -- Inspect_Deferred_Constant_Completion --
+      ------------------------------------------
+
+      procedure Inspect_Deferred_Constant_Completion is
+         Decl   : Node_Id;
+
+      begin
+         Decl := First (Priv_Decls);
+         while Present (Decl) loop
+
+            --  Deferred constant signature
+
+            if Nkind (Decl) = N_Object_Declaration
+              and then Constant_Present (Decl)
+              and then No (Expression (Decl))
+
+               --  No need to check internally generated constants
+
+              and then Comes_From_Source (Decl)
+
+               --  The constant is not completed. A full object declaration
+               --  or a pragma Import complete a deferred constant.
+
+              and then not Has_Completion (Defining_Identifier (Decl))
+            then
+               Error_Msg_N
+                 ("constant declaration requires initialization expression",
+                 Defining_Identifier (Decl));
+            end if;
+
+            Decl := Next (Decl);
+         end loop;
+      end Inspect_Deferred_Constant_Completion;
+
    --  Start of processing for Analyze_Package_Specification
 
    begin
@@ -842,24 +885,46 @@ package body Sem_Ch7 is
 
       Public_Child := False;
 
-      if Present (Parent_Spec (Parent (N))) then
-         Generate_Parent_References;
+      declare
+         Par       : Entity_Id;
+         Pack_Decl : Node_Id;
+         Par_Spec  : Node_Id;
 
-         declare
-            Par       : Entity_Id := Id;
-            Pack_Decl : Node_Id;
+      begin
+         Par := Id;
+         Par_Spec := Parent_Spec (Parent (N));
 
-         begin
+         --  If the package is formal package of an enclosing generic, is is
+         --  transformed into a local generic declaration, and compiled to make
+         --  its spec available. We need to retrieve the original generic to
+         --  determine whether it is a child unit, and install its parents.
+
+         if No (Par_Spec)
+           and then
+             Nkind (Original_Node (Parent (N))) = N_Formal_Package_Declaration
+         then
+            Par := Entity (Name (Original_Node (Parent (N))));
+            Par_Spec := Parent_Spec (Unit_Declaration_Node (Par));
+         end if;
+
+         if Present (Par_Spec) then
+            Generate_Parent_References;
+
             while Scope (Par) /= Standard_Standard
               and then Is_Public_Child (Id, Par)
             loop
                Public_Child := True;
                Par := Scope (Par);
                Install_Private_Declarations (Par);
+               Install_Private_With_Clauses (Par);
                Pack_Decl := Unit_Declaration_Node (Par);
                Set_Use (Private_Declarations (Specification (Pack_Decl)));
             end loop;
-         end;
+         end if;
+      end;
+
+      if Is_Compilation_Unit (Id) then
+         Install_Private_With_Clauses (Id);
       end if;
 
       --  Analyze private part if present. The flag In_Private_Part is
@@ -879,6 +944,10 @@ package body Sem_Ch7 is
          end if;
 
          Analyze_Declarations (Priv_Decls);
+
+         --  Check the private declarations for incomplete deferred constants
+
+         Inspect_Deferred_Constant_Completion;
 
          --  The first private entity is the immediate follower of the last
          --  visible entity, if there was one.
@@ -1593,7 +1662,8 @@ package body Sem_Ch7 is
             end if;
 
             Set_First_Entity (Priv, First_Entity (Full));
-            Set_Last_Entity (Priv, Last_Entity (Full));
+            Set_Last_Entity  (Priv, Last_Entity (Full));
+            Set_Has_Discriminants (Priv, Has_Discriminants (Full));
          end if;
       end Preserve_Full_Attributes;
 
@@ -1651,6 +1721,17 @@ package body Sem_Ch7 is
          --  Local entities are not immediately visible outside of the package.
 
          Set_Is_Immediately_Visible (Id, False);
+
+         --  If this is a private type with a full view (for example a local
+         --  subtype of a private type declared elsewhere), ensure that the
+         --  full view is also removed from visibility: it may be exposed when
+         --  swapping views in an instantiation.
+
+         if Is_Type (Id)
+           and then Present (Full_View (Id))
+         then
+            Set_Is_Immediately_Visible (Full_View (Id), False);
+         end if;
 
          if Is_Tagged_Type (Id) and then Ekind (Id) = E_Record_Type then
             Check_Abstract_Overriding (Id);
@@ -1871,7 +1952,7 @@ package body Sem_Ch7 is
          end;
       end if;
 
-      --  Otherwise search entity chain for entity requiring completion.
+      --  Otherwise search entity chain for entity requiring completion
 
       E := First_Entity (P);
       while Present (E) loop
@@ -1881,6 +1962,14 @@ package body Sem_Ch7 is
          --  parent, and so do not affect whether the parent needs a body.
 
          if Is_Child_Unit (E) then
+            null;
+
+         --  Ignore formal packages and their renamings
+
+         elsif Ekind (E) = E_Package
+           and then Nkind (Original_Node (Unit_Declaration_Node (E))) =
+                                                N_Formal_Package_Declaration
+         then
             null;
 
          --  Otherwise test to see if entity requires a completion

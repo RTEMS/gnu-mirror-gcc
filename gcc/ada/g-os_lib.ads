@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1995-2003 Free Software Foundation, Inc.          --
+--          Copyright (C) 1995-2004 Free Software Foundation, Inc.          --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -93,6 +93,7 @@ pragma Elaborate_Body (OS_Lib);
    -- Time/Date Stuff --
    ---------------------
 
+   type OS_Time is private;
    --  The OS's notion of time is represented by the private type OS_Time.
    --  This is the type returned by the File_Time_Stamp functions to obtain
    --  the time stamp of a specified file. Functions and a procedure (modeled
@@ -102,7 +103,8 @@ pragma Elaborate_Body (OS_Lib);
    --  cases but rather the actual (time-zone independent) time stamp of the
    --  file (of course in Unix systems, this *is* in GMT form).
 
-   type OS_Time is private;
+   Invalid_Time : constant OS_Time;
+   --  A special unique value used to flag an invalid time stamp value
 
    subtype Year_Type   is Integer range 1900 .. 2099;
    subtype Month_Type  is Integer range    1 ..   12;
@@ -110,6 +112,8 @@ pragma Elaborate_Body (OS_Lib);
    subtype Hour_Type   is Integer range    0 ..   23;
    subtype Minute_Type is Integer range    0 ..   59;
    subtype Second_Type is Integer range    0 ..   59;
+   --  Declarations similar to those in Calendar, breaking down the time
+
 
    function GM_Year    (Date : OS_Time) return Year_Type;
    function GM_Month   (Date : OS_Time) return Month_Type;
@@ -117,6 +121,7 @@ pragma Elaborate_Body (OS_Lib);
    function GM_Hour    (Date : OS_Time) return Hour_Type;
    function GM_Minute  (Date : OS_Time) return Minute_Type;
    function GM_Second  (Date : OS_Time) return Second_Type;
+   --  Functions to extract information from OS_Time value
 
    function "<"  (X, Y : OS_Time) return Boolean;
    function ">"  (X, Y : OS_Time) return Boolean;
@@ -134,6 +139,8 @@ pragma Elaborate_Body (OS_Lib);
       Hour    : out Hour_Type;
       Minute  : out Minute_Type;
       Second  : out Second_Type);
+   --  Analogous to the routine of similar name in Calendar, takes an OS_Time
+   --  and splits it into its component parts with obvious meanings.
 
    ----------------
    -- File Stuff --
@@ -175,31 +182,32 @@ pragma Elaborate_Body (OS_Lib);
 
    function Open_Read
      (Name  : String;
-      Fmode : Mode)
-      return  File_Descriptor;
+      Fmode : Mode) return File_Descriptor;
    --  Open file Name for reading, returning file descriptor File descriptor
    --  returned is Invalid_FD if file cannot be opened.
 
    function Open_Read_Write
      (Name  : String;
-      Fmode : Mode)
-      return  File_Descriptor;
+      Fmode : Mode) return File_Descriptor;
    --  Open file Name for both reading and writing, returning file
    --  descriptor. File descriptor returned is Invalid_FD if file cannot be
    --  opened.
 
    function Create_File
      (Name  : String;
-      Fmode : Mode)
-      return  File_Descriptor;
+      Fmode : Mode) return File_Descriptor;
    --  Creates new file with given name for writing, returning file descriptor
    --  for subsequent use in Write calls. File descriptor returned is
-   --  Invalid_FD if file cannot be successfully created
+   --  Invalid_FD if file cannot be successfully created.
+
+   function Create_Output_Text_File (Name  : String) return File_Descriptor;
+   --  Creates new text file with given name suitable to redirect standard
+   --  output, returning file descriptor. File descriptor returned is
+   --  Invalid_FD if file cannot be successfully created.
 
    function Create_New_File
      (Name  : String;
-      Fmode : Mode)
-      return  File_Descriptor;
+      Fmode : Mode) return File_Descriptor;
    --  Create new file with given name for writing, returning file descriptor
    --  for subsequent use in Write calls. This differs from Create_File in
    --  that it fails if the file already exists. File descriptor returned is
@@ -334,18 +342,14 @@ pragma Elaborate_Body (OS_Lib);
    function Read
      (FD   : File_Descriptor;
       A    : System.Address;
-      N    : Integer)
-      return Integer;
-   pragma Import (C, Read, "read");
+      N    : Integer) return Integer;
    --  Read N bytes to address A from file referenced by FD. Returned value
    --  is count of bytes actually read, which can be less than N at EOF.
 
    function Write
      (FD   : File_Descriptor;
       A    : System.Address;
-      N    : Integer)
-      return Integer;
-   pragma Import (C, Write, "write");
+      N    : Integer) return Integer;
    --  Write N bytes from address A to file referenced by FD. The returned
    --  value is the number of bytes written, which can be less than N if
    --  a disk full condition was detected.
@@ -359,7 +363,7 @@ pragma Elaborate_Body (OS_Lib);
      (FD     : File_Descriptor;
       offset : Long_Integer;
       origin : Integer);
-   pragma Import (C, Lseek, "lseek");
+   pragma Import (C, Lseek, "__gnat_lseek");
    --  Sets the current file pointer to the indicated offset value,
    --  relative to the current position (origin = SEEK_CUR), end of
    --  file (origin = SEEK_END), or start of file (origin = SEEK_SET).
@@ -371,16 +375,17 @@ pragma Elaborate_Body (OS_Lib);
    function File_Time_Stamp (Name : String) return OS_Time;
    --  Given the name of a file or directory, Name, obtains and returns the
    --  time stamp. This function can be used for an unopened file.
+   --  Returns Invalid_Time is Name doesn't correspond to an existing file.
 
    function File_Time_Stamp (FD : File_Descriptor) return OS_Time;
    --  Get time stamp of file from file descriptor FD
+   --  Returns Invalid_Time is FD doesn't correspond to an existing file.
 
    function Normalize_Pathname
      (Name           : String;
       Directory      : String  := "";
       Resolve_Links  : Boolean := True;
-      Case_Sensitive : Boolean := True)
-      return           String;
+      Case_Sensitive : Boolean := True) return String;
    --  Returns a file name as an absolute path name, resolving all relative
    --  directories, and symbolic links. The parameter Directory is a fully
    --  resolved path name for a directory, or the empty string (the default).
@@ -458,8 +463,7 @@ pragma Elaborate_Body (OS_Lib);
    --  span file systems and may refer to directories.
 
    function Locate_Exec_On_Path
-     (Exec_Name : String)
-      return      String_Access;
+     (Exec_Name : String) return String_Access;
    --  Try to locate an executable whose name is given by Exec_Name in the
    --  directories listed in the environment Path. If the Exec_Name doesn't
    --  have the executable suffix, it will be appended before the search.
@@ -470,8 +474,7 @@ pragma Elaborate_Body (OS_Lib);
 
    function Locate_Regular_File
      (File_Name : String;
-      Path      : String)
-      return      String_Access;
+      Path      : String) return String_Access;
    --  Try to locate a regular file whose name is given by File_Name in the
    --  directories listed in  Path. If a file is found, its full pathname is
    --  returned; otherwise, a null pointer is returned. If the File_Name given
@@ -511,25 +514,23 @@ pragma Elaborate_Body (OS_Lib);
    --  This subtype is used to document that a parameter is the address
    --  of a null-terminated string containing the name of a file.
 
+   --  All the following functions need comments ???
+
    function Open_Read
      (Name  : C_File_Name;
-      Fmode : Mode)
-      return  File_Descriptor;
+      Fmode : Mode) return File_Descriptor;
 
    function Open_Read_Write
      (Name  : C_File_Name;
-      Fmode : Mode)
-      return  File_Descriptor;
+      Fmode : Mode) return File_Descriptor;
 
    function Create_File
      (Name  : C_File_Name;
-      Fmode : Mode)
-      return  File_Descriptor;
+      Fmode : Mode) return File_Descriptor;
 
    function Create_New_File
      (Name  : C_File_Name;
-      Fmode : Mode)
-      return  File_Descriptor;
+      Fmode : Mode) return File_Descriptor;
 
    procedure Delete_File (Name : C_File_Name; Success : out Boolean);
 
@@ -550,6 +551,7 @@ pragma Elaborate_Body (OS_Lib);
       Success      : out Boolean);
 
    function File_Time_Stamp (Name : C_File_Name) return OS_Time;
+   --  Returns Invalid_Time is Name doesn't correspond to an existing file.
 
    function Is_Regular_File (Name : C_File_Name) return Boolean;
 
@@ -742,6 +744,9 @@ private
    --  It would actually be nice to use pragma Import (Intrinsic) here,
    --  but this was not properly supported till GNAT 3.15a, so that would
    --  cause bootstrap path problems. To be changed later ???
+
+   Invalid_Time : constant OS_Time := -1;
+   --  This value should match the return valud by __gnat_file_time_*
 
    pragma Inline ("<");
    pragma Inline (">");

@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2003 Free Software Foundation, Inc.          --
+--          Copyright (C) 1992-2004 Free Software Foundation, Inc.          --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -115,11 +115,9 @@ package body Sem_Ch5 is
          --  Some special bad cases of entity names
 
          elsif Is_Entity_Name (N) then
-
             if Ekind (Entity (N)) = E_In_Parameter then
                Error_Msg_N
                  ("assignment to IN mode parameter not allowed", N);
-               return;
 
             --  Private declarations in a protected object are turned into
             --  constants when compiling a protected function.
@@ -133,27 +131,38 @@ package body Sem_Ch5 is
             then
                Error_Msg_N
                  ("protected function cannot modify protected object", N);
-               return;
 
             elsif Ekind (Entity (N)) = E_Loop_Parameter then
                Error_Msg_N
                  ("assignment to loop parameter not allowed", N);
-               return;
 
+            else
+               Error_Msg_N
+                 ("left hand side of assignment must be a variable", N);
             end if;
 
-         --  For indexed components, or selected components, test prefix
+         --  For indexed components or selected components, test prefix
 
-         elsif Nkind (N) = N_Indexed_Component
-           or else Nkind (N) = N_Selected_Component
-         then
+         elsif Nkind (N) = N_Indexed_Component then
             Diagnose_Non_Variable_Lhs (Prefix (N));
-            return;
+
+         --  Another special case for assignment to discriminant.
+
+         elsif Nkind (N) = N_Selected_Component then
+            if Present (Entity (Selector_Name (N)))
+              and then Ekind (Entity (Selector_Name (N))) = E_Discriminant
+            then
+               Error_Msg_N
+                 ("assignment to discriminant not allowed", N);
+            else
+               Diagnose_Non_Variable_Lhs (Prefix (N));
+            end if;
+
+         else
+            --  If we fall through, we have no special message to issue!
+
+            Error_Msg_N ("left hand side of assignment must be a variable", N);
          end if;
-
-         --  If we fall through, we have no special message to issue!
-
-         Error_Msg_N ("left hand side of assignment must be a variable", N);
       end Diagnose_Non_Variable_Lhs;
 
       -------------------------
@@ -330,6 +339,7 @@ package body Sem_Ch5 is
       Set_Assignment_Type (Lhs, T1);
 
       Resolve (Rhs, T1);
+      Check_Unset_Reference (Rhs);
 
       --  Remaining steps are skipped if Rhs was syntactically in error
 
@@ -338,7 +348,6 @@ package body Sem_Ch5 is
       end if;
 
       T2 := Etype (Rhs);
-      Check_Unset_Reference (Rhs);
 
       if Covers (T1, T2) then
          null;
@@ -388,6 +397,20 @@ package body Sem_Ch5 is
          Propagate_Tag (Lhs, Rhs);
       end if;
 
+      --  Ada 2005 (AI-231)
+
+      if Ada_Version >= Ada_05
+        and then Nkind (Rhs) = N_Null
+        and then Is_Access_Type (T1)
+        and then not Assignment_OK (Lhs)
+        and then ((Is_Entity_Name (Lhs)
+                     and then Can_Never_Be_Null (Entity (Lhs)))
+                   or else Can_Never_Be_Null (Etype (Lhs)))
+      then
+         Error_Msg_N
+           ("(Ada 2005) NULL not allowed in null-excluding objects", Lhs);
+      end if;
+
       if Is_Scalar_Type (T1) then
          Apply_Scalar_Range_Check (Rhs, Etype (Lhs));
 
@@ -396,7 +419,6 @@ package body Sem_Ch5 is
           (Nkind (Rhs) /= N_Type_Conversion
              or else Is_Constrained (Etype (Rhs)))
       then
-
          --  Assignment verifies that the length of the Lsh and Rhs are equal,
          --  but of course the indices do not have to match. If the right-hand
          --  side is a type conversion to an unconstrained type, a length check
@@ -408,9 +430,15 @@ package body Sem_Ch5 is
          Apply_Length_Check (Rhs, Etype (Lhs));
 
       else
-         --  Discriminant checks are applied in the course of expansion.
+         --  Discriminant checks are applied in the course of expansion
+
          null;
       end if;
+
+      --  Note: modifications of the Lhs may only be recorded after
+      --  checks have been applied.
+
+      Note_Possible_Modification (Lhs);
 
       --  ??? a real accessibility check is needed when ???
 
@@ -439,8 +467,6 @@ package body Sem_Ch5 is
          Error_Msg_NE
            ("?useless assignment of & to itself", N, Entity (Lhs));
       end if;
-
-      Note_Possible_Modification (Lhs);
 
       --  Check for non-allowed composite assignment
 
@@ -597,7 +623,7 @@ package body Sem_Ch5 is
            Process_Non_Static_Choice => Non_Static_Choice_Error,
            Process_Associated_Node   => Process_Statements);
       use Case_Choices_Processing;
-      --  Instantiation of the generic choice processing package.
+      --  Instantiation of the generic choice processing package
 
       -----------------------------
       -- Non_Static_Choice_Error --
@@ -659,7 +685,7 @@ package body Sem_Ch5 is
            ("character literal as case expression is ambiguous", Exp);
          return;
 
-      elsif Ada_83
+      elsif Ada_Version = Ada_83
         and then (Is_Generic_Type (Exp_Btype)
                     or else Is_Generic_Type (Root_Type (Exp_Btype)))
       then
@@ -668,11 +694,10 @@ package body Sem_Ch5 is
          return;
       end if;
 
-      --  If the case expression is a formal object of mode in out,
-      --  then treat it as having a nonstatic subtype by forcing
-      --  use of the base type (which has to get passed to
-      --  Check_Case_Choices below).  Also use base type when
-      --  the case expression is parenthesized.
+      --  If the case expression is a formal object of mode in out, then
+      --  treat it as having a nonstatic subtype by forcing use of the base
+      --  type (which has to get passed to Check_Case_Choices below).  Also
+      --  use base type when the case expression is parenthesized.
 
       if Paren_Count (Exp) > 0
         or else (Is_Entity_Name (Exp)
@@ -681,7 +706,7 @@ package body Sem_Ch5 is
          Exp_Type := Exp_Btype;
       end if;
 
-      --  Call the instantiated Analyze_Choices which does the rest of the work
+      --  Call instantiated Analyze_Choices which does the rest of the work
 
       Analyze_Choices
         (N, Exp_Type, Case_Table, Last_Choice, Dont_Care, Others_Present);
@@ -707,7 +732,7 @@ package body Sem_Ch5 is
         and then Serious_Errors_Detected = 0
       then
          declare
-            Chosen : Node_Id := Find_Static_Alternative (N);
+            Chosen : constant Node_Id := Find_Static_Alternative (N);
             Alt    : Node_Id;
 
          begin
@@ -778,7 +803,7 @@ package body Sem_Ch5 is
          end if;
       end loop;
 
-      --  Verify that if present the condition is a Boolean expression.
+      --  Verify that if present the condition is a Boolean expression
 
       if Present (Cond) then
          Analyze_And_Resolve (Cond, Any_Boolean);
@@ -991,7 +1016,6 @@ package body Sem_Ch5 is
 
    procedure Analyze_Implicit_Label_Declaration (N : Node_Id) is
       Id : constant Node_Id := Defining_Identifier (N);
-
    begin
       Enter_Name          (Id);
       Set_Ekind           (Id, E_Label);
@@ -1002,7 +1026,6 @@ package body Sem_Ch5 is
    ------------------------------
    -- Analyze_Iteration_Scheme --
    ------------------------------
-
 
    procedure Analyze_Iteration_Scheme (N : Node_Id) is
       procedure Check_Controlled_Array_Attribute (DS : Node_Id);
@@ -1101,7 +1124,6 @@ package body Sem_Ch5 is
 
                   declare
                      H : constant Entity_Id := Homonym (Id);
-
                   begin
                      if Present (H)
                        and then Enclosing_Dynamic_Scope (H) =
@@ -1248,7 +1270,6 @@ package body Sem_Ch5 is
 
    procedure Analyze_Label (N : Node_Id) is
       pragma Warnings (Off, N);
-
    begin
       Kill_Current_Values;
    end Analyze_Label;
@@ -1329,7 +1350,6 @@ package body Sem_Ch5 is
 
    procedure Analyze_Null_Statement (N : Node_Id) is
       pragma Warnings (Off, N);
-
    begin
       null;
    end Analyze_Null_Statement;

@@ -1,5 +1,5 @@
 /* Default target hook functions.
-   Copyright (C) 2003 Free Software Foundation, Inc.
+   Copyright (C) 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -61,9 +61,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "target.h"
 #include "tm_p.h"
 #include "target-def.h"
-#include "insn-config.h"
-#include "recog.h"
-#include "ggc.h"
 
 void
 default_external_libcall (rtx fun ATTRIBUTE_UNUSED)
@@ -73,72 +70,12 @@ default_external_libcall (rtx fun ATTRIBUTE_UNUSED)
 #endif
 }
 
-bool
-default_promote_function_args (tree fntype ATTRIBUTE_UNUSED)
+enum machine_mode
+default_cc_modes_compatible (enum machine_mode m1, enum machine_mode m2)
 {
-#ifdef PROMOTE_FUNCTION_ARGS
-  return true;
-#else
-  return false;
-#endif
-}
-
-bool
-default_promote_function_return (tree fntype ATTRIBUTE_UNUSED)
-{
-#ifdef PROMOTE_FUNCTION_RETURN
-  return true;
-#else
-  return false;
-#endif
-}
-
-bool
-default_promote_prototypes (tree fntype ATTRIBUTE_UNUSED)
-{
-  if (PROMOTE_PROTOTYPES)
-    return true;
-  else
-    return false;
-}
-
-rtx
-default_struct_value_rtx (tree fntype ATTRIBUTE_UNUSED, int incoming)
-{
-  rtx rv = 0;
-  if (incoming)
-    {
-#ifdef STRUCT_VALUE_INCOMING
-      rv = STRUCT_VALUE_INCOMING;
-#else
-#ifdef STRUCT_VALUE_INCOMING_REGNUM
-      rv = gen_rtx_REG (Pmode, STRUCT_VALUE_INCOMING_REGNUM);
-#else
-#ifdef STRUCT_VALUE
-      rv = STRUCT_VALUE;
-#else
-#ifndef STRUCT_VALUE_REGNUM
-      abort();
-#else
-      rv = gen_rtx_REG (Pmode, STRUCT_VALUE_REGNUM);
-#endif
-#endif
-#endif
-#endif
-    }
-  else
-    {
-#ifdef STRUCT_VALUE
-      rv = STRUCT_VALUE;
-#else
-#ifndef STRUCT_VALUE_REGNUM
-      abort();
-#else
-      rv = gen_rtx_REG (Pmode, STRUCT_VALUE_REGNUM);
-#endif
-#endif
-    }
-  return rv;
+  if (m1 == m2)
+    return m1;
+  return VOIDmode;
 }
 
 bool
@@ -155,12 +92,8 @@ default_return_in_memory (tree type,
 rtx
 default_expand_builtin_saveregs (void)
 {
-#ifdef EXPAND_BUILTIN_SAVEREGS
-  return EXPAND_BUILTIN_SAVEREGS ();
-#else
   error ("__builtin_saveregs not supported by this target");
   return const0_rtx;
-#endif
 }
 
 void
@@ -170,58 +103,29 @@ default_setup_incoming_varargs (CUMULATIVE_ARGS *ca ATTRIBUTE_UNUSED,
 				int *pretend_arg_size ATTRIBUTE_UNUSED,
 				int second_time ATTRIBUTE_UNUSED)
 {
-#ifdef SETUP_INCOMING_VARARGS
-  SETUP_INCOMING_VARARGS ((*ca), mode, type, (*pretend_arg_size), second_time);
-#endif
+}
+
+/* The default implementation of TARGET_BUILTIN_SETJMP_FRAME_VALUE.  */
+
+rtx
+default_builtin_setjmp_frame_value (void)
+{
+  return virtual_stack_vars_rtx;
+}
+
+/* Generic hook that takes a CUMULATIVE_ARGS pointer and returns false.  */
+
+bool
+hook_bool_CUMULATIVE_ARGS_false (CUMULATIVE_ARGS *ca ATTRIBUTE_UNUSED)
+{
+  return false;
 }
 
 bool
-default_strict_argument_naming (CUMULATIVE_ARGS *ca ATTRIBUTE_UNUSED)
+default_pretend_outgoing_varargs_named (CUMULATIVE_ARGS *ca ATTRIBUTE_UNUSED)
 {
-#ifdef STRICT_ARGUMENT_NAMING
-  return STRICT_ARGUMENT_NAMING;
-#else
-  return 0;
-#endif
-}
-
-bool
-default_pretend_outgoing_varargs_named(CUMULATIVE_ARGS *ca ATTRIBUTE_UNUSED)
-{
-#ifdef PRETEND_OUTGOING_VARARGS_NAMED
-  return PRETEND_OUTGOING_VARARGS_NAMED;
-#else
-#ifdef SETUP_INCOMING_VARARGS
-  return 1;
-#else
-  return (targetm.calls.setup_incoming_varargs != default_setup_incoming_varargs);
-#endif
-#endif
-}
-
-/* A SYMBOL_REF for a local symbol.  Used by default_direct_pool_load_p.  */
-
-static GTY(()) rtx pool_symbol;
-
-/* See whether a local symbol is a valid address for MODE.  If so, assume
-   that constant pool symbols are also valid addresses, otherwise assume
-   that they aren't.
-
-   ??? This is only an approximation.  We can't test constant pool
-   symbols directly without forcing something into the constant pool.  */
-
-bool
-default_direct_pool_load_p (enum machine_mode mode)
-{
-  if (pool_symbol == 0)
-    {
-      char label[256];
-
-      ASM_GENERATE_INTERNAL_LABEL (label, "LC", 0);
-      pool_symbol = gen_rtx_SYMBOL_REF (Pmode, ggc_strdup (label));
-      SYMBOL_REF_FLAGS (pool_symbol) = SYMBOL_FLAG_LOCAL;
-    }
-  return memory_address_p (mode, pool_symbol);
+  return (targetm.calls.setup_incoming_varargs
+	  != default_setup_incoming_varargs);
 }
 
 /* Generic hook that takes a CUMULATIVE_ARGS pointer and returns true.  */
@@ -232,12 +136,68 @@ hook_bool_CUMULATIVE_ARGS_true (CUMULATIVE_ARGS * a ATTRIBUTE_UNUSED)
   return true;
 }
 
-/* Generic hook that takes a machine mode and returns true.  */
 
-bool
-hook_bool_machine_mode_true (enum machine_mode a ATTRIBUTE_UNUSED)
+/* The generic C++ ABI specifies this is a 64-bit value.  */
+tree
+default_cxx_guard_type (void)
 {
-  return true;
+  return long_long_integer_type_node;
 }
 
-#include "gt-targhooks.h"
+
+/* Returns the size of the cookie to use when allocating an array
+   whose elements have the indicated TYPE.  Assumes that it is already
+   known that a cookie is needed.  */
+
+tree
+default_cxx_get_cookie_size (tree type)
+{
+  tree cookie_size;
+
+  /* We need to allocate an additional max (sizeof (size_t), alignof
+     (true_type)) bytes.  */
+  tree sizetype_size;
+  tree type_align;
+  
+  sizetype_size = size_in_bytes (sizetype);
+  type_align = size_int (TYPE_ALIGN_UNIT (type));
+  if (INT_CST_LT_UNSIGNED (type_align, sizetype_size))
+    cookie_size = sizetype_size;
+  else
+    cookie_size = type_align;
+
+  return cookie_size;
+}
+
+/* This version of the TARGET_PASS_BY_REFERENCE hook adds no conditions
+   beyond those mandated by generic code.  */
+
+bool
+hook_pass_by_reference_false (CUMULATIVE_ARGS *c ATTRIBUTE_UNUSED,
+	enum machine_mode mode ATTRIBUTE_UNUSED, tree type ATTRIBUTE_UNUSED,
+	bool named_arg ATTRIBUTE_UNUSED)
+{
+  return false;
+}
+
+/* Return true if a parameter must be passed by reference.  This version
+   of the TARGET_PASS_BY_REFERENCE hook uses just MUST_PASS_IN_STACK.  */
+
+bool
+hook_pass_by_reference_must_pass_in_stack (CUMULATIVE_ARGS *c ATTRIBUTE_UNUSED,
+	enum machine_mode mode ATTRIBUTE_UNUSED, tree type ATTRIBUTE_UNUSED,
+	bool named_arg ATTRIBUTE_UNUSED)
+{
+  return targetm.calls.must_pass_in_stack (mode, type);
+}
+
+
+/* Emit any directives required to unwind this instruction.  */
+
+void
+default_unwind_emit (FILE * stream ATTRIBUTE_UNUSED,
+		     rtx insn ATTRIBUTE_UNUSED)
+{
+  /* Should never happen.  */
+  abort ();
+}

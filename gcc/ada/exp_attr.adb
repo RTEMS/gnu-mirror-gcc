@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2003 Free Software Foundation, Inc.          --
+--          Copyright (C) 1992-2004 Free Software Foundation, Inc.          --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -42,6 +42,7 @@ with Nmake;    use Nmake;
 with Nlists;   use Nlists;
 with Opt;      use Opt;
 with Restrict; use Restrict;
+with Rident;   use Rident;
 with Rtsfind;  use Rtsfind;
 with Sem;      use Sem;
 with Sem_Ch7;  use Sem_Ch7;
@@ -907,8 +908,9 @@ package body Exp_Attr is
          if Pent = Standard_Standard
            or else Pent = Standard_ASCII
          then
-            Name_Buffer (1 .. Library_Version'Length) := Library_Version;
-            Name_Len := Library_Version'Length;
+            Name_Buffer (1 .. Verbose_Library_Version'Length) :=
+              Verbose_Library_Version;
+            Name_Len := Verbose_Library_Version'Length;
             Rewrite (N,
               Make_String_Literal (Loc,
                 Strval => String_From_Name_Buffer));
@@ -1010,7 +1012,7 @@ package body Exp_Attr is
       --  Task_Entry_Caller or the Protected_Entry_Caller function.
 
       when Attribute_Caller => Caller : declare
-         Id_Kind    : constant Entity_Id := RTE (RO_AT_Task_ID);
+         Id_Kind    : constant Entity_Id := RTE (RO_AT_Task_Id);
          Ent        : constant Entity_Id := Entity (Pref);
          Conctype   : constant Entity_Id := Scope (Ent);
          Nest_Depth : Integer := 0;
@@ -1022,7 +1024,7 @@ package body Exp_Attr is
 
          if Is_Protected_Type (Conctype) then
             if Abort_Allowed
-              or else Restrictions (No_Entry_Queue) = False
+              or else Restriction_Active (No_Entry_Queue) = False
               or else Number_Entries (Conctype) > 1
             then
                Name :=
@@ -1180,13 +1182,8 @@ package body Exp_Attr is
                   Res := Is_Constrained (Etype (Ent));
                end if;
 
-               if Res then
-                  Rewrite (N,
-                    New_Reference_To (Standard_True, Loc));
-               else
-                  Rewrite (N,
-                    New_Reference_To (Standard_False, Loc));
-               end if;
+               Rewrite (N,
+                 New_Reference_To (Boolean_Literals (Res), Loc));
             end;
 
          --  Prefix is not an entity name. These are also cases where
@@ -1194,16 +1191,13 @@ package body Exp_Attr is
          --  and type of the prefix.
 
          else
-            if not Is_Variable (Pref)
-              or else Nkind (Pref) = N_Explicit_Dereference
-              or else Is_Constrained (Etype (Pref))
-            then
-               Rewrite (N,
-                 New_Reference_To (Standard_True, Loc));
-            else
-               Rewrite (N,
-                 New_Reference_To (Standard_False, Loc));
-            end if;
+            Rewrite (N,
+              New_Reference_To (
+                Boolean_Literals (
+                  not Is_Variable (Pref)
+                    or else Nkind (Pref) = N_Explicit_Dereference
+                    or else Is_Constrained (Etype (Pref))),
+                Loc));
          end if;
 
          Analyze_And_Resolve (N, Standard_Boolean);
@@ -1258,7 +1252,7 @@ package body Exp_Attr is
          if Is_Protected_Type (Conctyp) then
 
             if Abort_Allowed
-              or else Restrictions (No_Entry_Queue) = False
+              or else Restriction_Active (No_Entry_Queue) = False
               or else Number_Entries (Conctyp) > 1
             then
                Name := New_Reference_To (RTE (RE_Protected_Count), Loc);
@@ -1668,7 +1662,7 @@ package body Exp_Attr is
       --  For a task it returns a reference to the _task_id component of
       --  corresponding record:
 
-      --    taskV!(Prefix)._Task_Id, converted to the type Task_ID defined
+      --    taskV!(Prefix)._Task_Id, converted to the type Task_Id defined
 
       --  in Ada.Task_Identification.
 
@@ -1686,7 +1680,7 @@ package body Exp_Attr is
             Rewrite (N,
               Unchecked_Convert_To (Id_Kind, Make_Reference (Loc, Pref)));
          else
-            Id_Kind := RTE (RO_AT_Task_ID);
+            Id_Kind := RTE (RO_AT_Task_Id);
 
             Rewrite (N,
               Unchecked_Convert_To (Id_Kind, Concurrent_Ref (Pref)));
@@ -3623,8 +3617,8 @@ package body Exp_Attr is
          --     type(X)'Pos (X) >= 0
 
          --  We can't quite generate it that way because of the requirement
-         --  for the non-standard second argument of False, so we have to
-         --  explicitly create:
+         --  for the non-standard second argument of False in the resulting
+         --  rep_to_pos call, so we have to explicitly create:
 
          --     _rep_to_pos (X, False) >= 0
 
@@ -3633,7 +3627,7 @@ package body Exp_Attr is
 
          --    _rep_to_pos (X, False) >= 0
          --      and then
-         --     (X >= type(X)'First and then type(X)'Last <= X)
+         --       (X >= type(X)'First and then type(X)'Last <= X)
 
          elsif Is_Enumeration_Type (Ptyp)
            and then Present (Enum_Pos_To_Rep (Base_Type (Ptyp)))
@@ -3708,7 +3702,7 @@ package body Exp_Attr is
 
          --  But that's precisely what won't work because of possible
          --  unwanted optimization (and indeed the basic motivation for
-         --  the Valid attribute -is exactly that this test does not work.
+         --  the Valid attribute is exactly that this test does not work!)
          --  What will work is:
 
          --     Btyp!(X) >= Btyp!(type(X)'First)
@@ -4041,6 +4035,7 @@ package body Exp_Attr is
            Attribute_Digits                       |
            Attribute_Emax                         |
            Attribute_Epsilon                      |
+           Attribute_Has_Access_Values            |
            Attribute_Has_Discriminants            |
            Attribute_Large                        |
            Attribute_Machine_Emax                 |

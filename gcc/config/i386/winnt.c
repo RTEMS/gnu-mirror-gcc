@@ -1,6 +1,6 @@
 /* Subroutines for insn-output.c for Windows NT.
    Contributed by Douglas Rupp (drupp@cs.washington.edu)
-   Copyright (C) 1995, 1997, 1998, 1999, 2000, 2001, 2002, 2003
+   Copyright (C) 1995, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004
    Free Software Foundation, Inc.
 
 This file is part of GCC.
@@ -124,7 +124,7 @@ ix86_handle_dll_attribute (tree * pnode, tree name, tree args, int flags,
 	}
     }
 
-  /*  Report error if symbol is not accessible at global scope. */
+  /*  Report error if symbol is not accessible at global scope.  */
   if (!TREE_PUBLIC (node)
       && (TREE_CODE (node) == VAR_DECL
 	  || TREE_CODE (node) == FUNCTION_DECL))
@@ -171,7 +171,8 @@ associated_type (tree decl)
 	 dtor's are not affected by class status but virtual and
 	 non-virtual thunks are.  */
       if (!DECL_ARTIFICIAL (decl) || DECL_COMDAT (decl))
-	t = TREE_TYPE (TREE_VALUE (TYPE_ARG_TYPES (TREE_TYPE (decl))));
+	t = TYPE_MAIN_VARIANT
+	  (TREE_TYPE (TREE_VALUE (TYPE_ARG_TYPES (TREE_TYPE (decl)))));
     }
   else if (DECL_CONTEXT (decl)
 	   && TREE_CODE_CLASS (TREE_CODE (DECL_CONTEXT (decl))) == 't')
@@ -251,7 +252,7 @@ i386_pe_dllimport_p (tree decl)
 
       /* We ignore the dllimport attribute for inline member functions.
 	 This differs from MSVC behavior which treats it like GNUC
-	 'extern inline' extension.   */
+	 'extern inline' extension.  */
       else if (TREE_CODE (decl) == FUNCTION_DECL && DECL_INLINE (decl))
         {
 	  if (extra_warnings)
@@ -345,7 +346,7 @@ i386_pe_mark_dllexport (tree decl)
   idp = get_identifier (newname);
 
   XEXP (DECL_RTL (decl), 0) =
-    gen_rtx (SYMBOL_REF, Pmode, IDENTIFIER_POINTER (idp));
+    gen_rtx_SYMBOL_REF (Pmode, IDENTIFIER_POINTER (idp));
 }
 
 /* Mark a DECL as being dllimport'd.  */
@@ -374,7 +375,7 @@ i386_pe_mark_dllimport (tree decl)
     }
   else if (i386_pe_dllimport_name_p (oldname))
     {
-      /* Already done, but do a sanity check to prevent assembler errors. */
+      /* Already done, but do a sanity check to prevent assembler errors.  */
       if (!DECL_EXTERNAL (decl) || !TREE_PUBLIC (decl))
 	{
 	  error ("%Jfailure in redeclaration of '%D': dllimport'd "
@@ -393,9 +394,9 @@ i386_pe_mark_dllimport (tree decl)
      identical.  */
   idp = get_identifier (newname);
 
-  newrtl = gen_rtx (MEM, Pmode,
-		    gen_rtx (SYMBOL_REF, Pmode,
-			     IDENTIFIER_POINTER (idp)));
+  newrtl = gen_rtx_MEM (Pmode,
+			gen_rtx_SYMBOL_REF (Pmode,
+					    IDENTIFIER_POINTER (idp)));
   XEXP (DECL_RTL (decl), 0) = newrtl;
 
   /* Can't treat a pointer to this as a constant address */
@@ -487,16 +488,16 @@ i386_pe_encode_section_info (tree decl, rtx rtl, int first)
 {
   default_encode_section_info (decl, rtl, first);
 
-  if (TREE_CODE (decl) == FUNCTION_DECL)
+  if (first && TREE_CODE (decl) == FUNCTION_DECL)
     {
-      if (lookup_attribute ("stdcall",
-			    TYPE_ATTRIBUTES (TREE_TYPE (decl))))
-        XEXP (DECL_RTL (decl), 0) =
-	  gen_rtx (SYMBOL_REF, Pmode, gen_stdcall_suffix (decl));
-      else if (lookup_attribute ("fastcall",
-				 TYPE_ATTRIBUTES (TREE_TYPE (decl))))
-        XEXP (DECL_RTL (decl), 0) =
-	  gen_rtx (SYMBOL_REF, Pmode, gen_fastcall_suffix (decl));
+      tree type_attributes = TYPE_ATTRIBUTES (TREE_TYPE (decl));
+      rtx rtlname = XEXP (rtl, 0);
+      if (GET_CODE (rtlname) == MEM)
+	rtlname = XEXP (rtlname, 0);
+      if (lookup_attribute ("stdcall", type_attributes))
+	XSTR (rtlname, 0) = gen_stdcall_suffix (decl);
+      else if (lookup_attribute ("fastcall", type_attributes))
+	XSTR (rtlname, 0) = gen_fastcall_suffix (decl);
     }
 
   /* Mark the decl so we can tell from the rtl whether the object is
@@ -523,7 +524,7 @@ i386_pe_encode_section_info (tree decl, rtx rtl, int first)
 
       /* Remove DLL_IMPORT_PREFIX.  */
       tree idp = get_identifier (oldname + strlen (DLL_IMPORT_PREFIX));
-      rtx newrtl = gen_rtx (SYMBOL_REF, Pmode, IDENTIFIER_POINTER (idp));
+      rtx newrtl = gen_rtx_SYMBOL_REF (Pmode, IDENTIFIER_POINTER (idp));
 
       if (DECL_INITIAL (decl) || !DECL_EXTERNAL (decl))
 	warning ("%J'%D' defined locally after being "
@@ -558,7 +559,7 @@ i386_pe_strip_name_encoding (const char *str)
   return str;
 }
 
-/* Also strip the stdcall suffix.  */
+/* Also strip the fastcall prefix and stdcall suffix.  */
 
 const char *
 i386_pe_strip_name_encoding_full (const char *str)
@@ -566,6 +567,11 @@ i386_pe_strip_name_encoding_full (const char *str)
   const char *p;
   const char *name = i386_pe_strip_name_encoding (str);
 
+  /* Strip leading '@' on fastcall symbols.  */
+  if (*name == '@')
+    name++;
+
+  /* Strip trailing "@n".  */
   p = strchr (name, '@');
   if (p)
     return ggc_alloc_string (name, p - name);
@@ -597,9 +603,9 @@ void i386_pe_output_labelref (FILE *stream, const char *name)
         }
     }
   else if ((name[0] == FASTCALL_PREFIX)
-           || (strncmp (name, DLL_EXPORT_PREFIX, strlen (DLL_EXPORT_PREFIX)
+           || (strncmp (name, DLL_EXPORT_PREFIX, strlen (DLL_EXPORT_PREFIX))
 	       == 0
-	       && name[strlen (DLL_EXPORT_PREFIX)] == FASTCALL_PREFIX)))
+	       && name[strlen (DLL_EXPORT_PREFIX)] == FASTCALL_PREFIX))
     /* A fastcall symbol.  */
     {
       fprintf (stream, "%s",
@@ -667,7 +673,7 @@ i386_pe_section_type_flags (tree decl, const char *name, int reloc)
   unsigned int **slot;
 
   /* The names we put in the hashtable will always be the unique
-     versions gived to us by the stringtable, so we can just use
+     versions given to us by the stringtable, so we can just use
      their addresses as the keys.  */
   if (!htab)
     htab = htab_create (31, htab_hash_pointer, htab_eq_pointer, NULL);
@@ -763,13 +769,13 @@ i386_pe_declare_function_type (FILE *file, const char *name, int public)
 
 /* Keep a list of external functions.  */
 
-struct extern_list
+struct extern_list GTY(())
 {
   struct extern_list *next;
   const char *name;
 };
 
-static struct extern_list *extern_head;
+static GTY(()) struct extern_list *extern_head;
 
 /* Assemble an external function reference.  We need to keep a list of
    these, so that we can output the function types at the end of the
@@ -782,7 +788,7 @@ i386_pe_record_external_function (const char *name)
 {
   struct extern_list *p;
 
-  p = (struct extern_list *) xmalloc (sizeof *p);
+  p = (struct extern_list *) ggc_alloc (sizeof *p);
   p->next = extern_head;
   p->name = name;
   extern_head = p;
@@ -790,14 +796,14 @@ i386_pe_record_external_function (const char *name)
 
 /* Keep a list of exported symbols.  */
 
-struct export_list
+struct export_list GTY(())
 {
   struct export_list *next;
   const char *name;
   int is_data;		/* used to type tag exported symbols.  */
 };
 
-static struct export_list *export_head;
+static GTY(()) struct export_list *export_head;
 
 /* Assemble an export symbol entry.  We need to keep a list of
    these, so that we can output the export list at the end of the
@@ -810,7 +816,7 @@ i386_pe_record_exported_symbol (const char *name, int is_data)
 {
   struct export_list *p;
 
-  p = (struct export_list *) xmalloc (sizeof *p);
+  p = (struct export_list *) ggc_alloc (sizeof *p);
   p->next = export_head;
   p->name = name;
   p->is_data = is_data;
@@ -855,3 +861,5 @@ i386_pe_file_end (void)
 	}
     }
 }
+
+#include "gt-winnt.h"

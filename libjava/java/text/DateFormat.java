@@ -1,5 +1,6 @@
 /* DateFormat.java -- Class for formatting/parsing date/times
-   Copyright (C) 1998, 1999, 2000, 2001, 2003 Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999, 2000, 2001, 2003, 2004
+   Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -38,8 +39,13 @@ exception statement from your version. */
 
 package java.text;
 
-import java.util.*;
 import java.io.InvalidObjectException;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
+import java.util.MissingResourceException;
+import java.util.ResourceBundle;
+import java.util.TimeZone;
 
 /**
  * @author Per Bothner <bothner@cygnus.com>
@@ -191,9 +197,9 @@ public abstract class DateFormat extends Format implements Cloneable
    * object:
    * <P>
    * <ul>
-   * <li>Is not <code>null</code>.
-   * <li>Is an instance of <code>DateFormat</code>.
-   * <li>Has the same numberFormat field value as this object.
+   * <li>Is not <code>null</code>.</li>
+   * <li>Is an instance of <code>DateFormat</code>.</li>
+   * <li>Has the same numberFormat field value as this object.</li>
    * </ul>
    *
    * @param obj The object to test for equality against.
@@ -320,7 +326,7 @@ public abstract class DateFormat extends Format implements Cloneable
     try
       {
 	res = ResourceBundle.getBundle("gnu.java.locale.LocaleInformation",
-				       loc);
+				       loc, ClassLoader.getSystemClassLoader());
       }
     catch (MissingResourceException x)
       {
@@ -586,6 +592,7 @@ public abstract class DateFormat extends Format implements Cloneable
   /**
    * This method parses the specified date/time string.
    *
+   * @param source The string to parse.
    * @return The resultant date.
    *
    * @exception ParseException If the specified string cannot be parsed.
@@ -599,7 +606,8 @@ public abstract class DateFormat extends Format implements Cloneable
 	int index = pos.getErrorIndex();
 	if (index < 0)
 	  index = pos.getIndex();
-	throw new ParseException("invalid Date syntax", index);
+	throw new ParseException("invalid Date syntax in \""
+				 + source + '\"', index);
       }
     return result;
   }

@@ -1,5 +1,5 @@
 /* Functions for generic Darwin as target machine for GNU C compiler.
-   Copyright (C) 1989, 1990, 1991, 1992, 1993, 2000, 2001, 2002, 2003
+   Copyright (C) 1989, 1990, 1991, 1992, 1993, 2000, 2001, 2002, 2003, 2004
    Free Software Foundation, Inc.
    Contributed by Apple Computer Inc.
 
@@ -82,7 +82,7 @@ machopic_classify_ident (tree ident)
 		     && name[5] == '_'));
   tree temp;
 
-  /* The PIC base symbol is always defined. */
+  /* The PIC base symbol is always defined.  */
   if (! strcmp (name, "<pic base>"))
     return MACHOPIC_DEFINED_DATA;
 
@@ -221,12 +221,9 @@ static GTY(()) char * function_base;
 const char *
 machopic_function_base_name (void)
 {
-  const char *current_name;
   /* if dynamic-no-pic is on, we should not get here */
   if (MACHO_DYNAMIC_NO_PIC_P)
     abort ();
-  current_name =
-    IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (current_function_decl));
 
   if (function_base == NULL)
     function_base =
@@ -245,7 +242,7 @@ machopic_output_function_base_name (FILE *file)
 {
   const char *current_name;
 
-  /* If dynamic-no-pic is on, we should not get here. */
+  /* If dynamic-no-pic is on, we should not get here.  */
   if (MACHO_DYNAMIC_NO_PIC_P)
     abort ();
   current_name =
@@ -311,9 +308,10 @@ machopic_non_lazy_ptr_name (const char *name)
       }
     else
       {
-	buffer[bufferlen] = '_';
-	memcpy (buffer + bufferlen +1, name, namelen+1);
-        bufferlen += namelen +1;
+	strcpy (buffer + bufferlen, user_label_prefix);
+	bufferlen += strlen (user_label_prefix);
+	memcpy (buffer + bufferlen, name, namelen+1);
+        bufferlen += namelen;
       }
 
     memcpy (buffer + bufferlen, "$non_lazy_ptr", strlen("$non_lazy_ptr")+1);
@@ -386,9 +384,10 @@ machopic_stub_name (const char *name)
       }
     else
       {
-	buffer[bufferlen] = '_';
-	memcpy (buffer + bufferlen +1, name, namelen+1);
-        bufferlen += namelen +1;
+	strcpy (buffer + bufferlen, user_label_prefix);
+	bufferlen += strlen (user_label_prefix);
+	memcpy (buffer + bufferlen, name, namelen+1);
+        bufferlen += namelen;
       }
 
     if (needs_quotes)
@@ -502,6 +501,8 @@ machopic_indirect_data_reference (rtx orig, rtx reg)
       ptr_ref = gen_rtx_SYMBOL_REF (Pmode,
 				    machopic_non_lazy_ptr_name (name));
 
+     SYMBOL_REF_DECL (ptr_ref) = SYMBOL_REF_DECL (orig);
+
       ptr_ref = gen_rtx_MEM (Pmode, ptr_ref);
       RTX_UNCHANGING_P (ptr_ref) = 1;
 
@@ -586,8 +587,10 @@ machopic_indirect_call_target (rtx target)
       if (!machopic_name_defined_p (name))
 	{
 	  const char *stub_name = machopic_stub_name (name);
+	  tree decl = SYMBOL_REF_DECL (XEXP (target, 0));
 
 	  XEXP (target, 0) = gen_rtx_SYMBOL_REF (mode, stub_name);
+	  SYMBOL_REF_DECL (XEXP (target, 0)) = decl;
 	  RTX_UNCHANGING_P (target) = 1;
 	}
     }
@@ -900,10 +903,6 @@ machopic_finish (FILE *asm_out_file)
       if (! TREE_USED (temp))
 	continue;
 
-      /* If the symbol is actually defined, we don't need a stub.  */
-      if (sym_name[0] == '!' && sym_name[1] == 'T')
-	continue;
-
       sym_name = darwin_strip_name_encoding (sym_name);
 
       sym = alloca (strlen (sym_name) + 2);
@@ -912,13 +911,13 @@ machopic_finish (FILE *asm_out_file)
       else if (sym_name[0] == '-' || sym_name[0] == '+')
 	strcpy (sym, sym_name);
       else
-	sym[0] = '_', strcpy (sym + 1, sym_name);
+	sprintf (sym, "%s%s", user_label_prefix, sym_name);
 
       stub = alloca (strlen (stub_name) + 2);
       if (stub_name[0] == '*' || stub_name[0] == '&')
 	strcpy (stub, stub_name + 1);
       else
-	stub[0] = '_', strcpy (stub + 1, stub_name);
+	sprintf (stub, "%s%s", user_label_prefix, stub_name);
 
       machopic_output_stub (asm_out_file, sym, stub);
     }
@@ -1008,9 +1007,10 @@ darwin_encode_section_info (tree decl, rtx rtl, int first ATTRIBUTE_UNUSED)
   if ((TREE_CODE (decl) == FUNCTION_DECL
        || TREE_CODE (decl) == VAR_DECL)
       && !DECL_EXTERNAL (decl)
+      && (!TREE_PUBLIC (decl) || (!DECL_ONE_ONLY (decl) && !DECL_WEAK (decl)))
       && ((TREE_STATIC (decl)
 	   && (!DECL_COMMON (decl) || !TREE_PUBLIC (decl)))
-	  || (DECL_INITIAL (decl)
+	  || (!DECL_COMMON (decl) && DECL_INITIAL (decl)
 	      && DECL_INITIAL (decl) != error_mark_node)))
     defined = 1;
 
@@ -1096,37 +1096,6 @@ update_non_lazy_ptrs (const char *name)
     }
 }
 
-/* Function NAME is being defined, and its label has just been output.
-   If there's already a reference to a stub for this function, we can
-   just emit the stub label now and we don't bother emitting the stub later.  */
-
-void
-machopic_output_possible_stub_label (FILE *file, const char *name)
-{
-  tree temp;
-
-  /* Ensure we're looking at a section-encoded name.  */
-  if (name[0] != '!' || (name[1] != 't' && name[1] != 'T'))
-    return;
-
-  for (temp = machopic_stubs;
-       temp != NULL_TREE;
-       temp = TREE_CHAIN (temp))
-    {
-      const char *sym_name;
-
-      sym_name = IDENTIFIER_POINTER (TREE_VALUE (temp));
-      if (sym_name[0] == '!' && (sym_name[1] == 'T' || sym_name[1] == 't')
-	  && ! strcmp (name+2, sym_name+2))
-	{
-	  ASM_OUTPUT_LABEL (file, IDENTIFIER_POINTER (TREE_PURPOSE (temp)));
-	  /* Avoid generating a stub for this.  */
-	  TREE_USED (temp) = 0;
-	  break;
-	}
-    }
-}
-
 /* Scan the list of stubs and update any recorded names whose
    stripped name matches the argument.  */
 
@@ -1159,6 +1128,20 @@ update_stubs (const char *name)
 }
 
 void
+darwin_make_decl_one_only (tree decl)
+{
+  static const char *text_section = "__TEXT,__textcoal_nt,coalesced,no_toc";
+  static const char *data_section = "__DATA,__datacoal_nt,coalesced,no_toc";
+
+  const char *sec = TREE_CODE (decl) == FUNCTION_DECL
+    ? text_section
+    : data_section;
+  TREE_PUBLIC (decl) = 1;
+  DECL_ONE_ONLY (decl) = 1;
+  DECL_SECTION_NAME (decl) = build_string (strlen (sec), sec);
+}
+
+void
 machopic_select_section (tree exp, int reloc,
 			 unsigned HOST_WIDE_INT align ATTRIBUTE_UNUSED)
 {
@@ -1173,8 +1156,7 @@ machopic_select_section (tree exp, int reloc,
 
   if (TREE_CODE (exp) == STRING_CST
       && ((size_t) TREE_STRING_LENGTH (exp)
-	  == strlen (TREE_STRING_POINTER (exp)) + 1)
-      && ! flag_writable_strings)
+	  == strlen (TREE_STRING_POINTER (exp)) + 1))
     cstring_section ();
   else if ((TREE_CODE (exp) == INTEGER_CST || TREE_CODE (exp) == REAL_CST)
 	   && flag_merge_constants)
@@ -1325,6 +1307,129 @@ darwin_globalize_label (FILE *stream, const char *name)
     default_globalize_label (stream, name);
 }
 
+void
+darwin_asm_named_section (const char *name, unsigned int flags ATTRIBUTE_UNUSED)
+{
+  if (flag_reorder_blocks_and_partition)
+    fprintf (asm_out_file, SECTION_FORMAT_STRING, name);
+  else
+    fprintf (asm_out_file, ".section %s\n", name);
+}
+
+unsigned int
+darwin_section_type_flags (tree decl, const char *name, int reloc)
+{
+  unsigned int flags = default_section_type_flags (decl, name, reloc);
+ 
+  /* Weak or linkonce variables live in a writable section.  */
+  if (decl != 0 && TREE_CODE (decl) != FUNCTION_DECL
+      && (DECL_WEAK (decl) || DECL_ONE_ONLY (decl)))
+    flags |= SECTION_WRITE;
+  
+  return flags;
+}              
+
+void 
+darwin_unique_section (tree decl, int reloc ATTRIBUTE_UNUSED)
+{
+  /* Darwin does not use unique sections.  However, the target's
+     unique_section hook is called for linkonce symbols.  We need
+     to set an appropriate section for such symbols. */
+  if (DECL_ONE_ONLY (decl) && !DECL_SECTION_NAME (decl))
+    darwin_make_decl_one_only (decl);
+}
+
+#define HAVE_DEAD_STRIP 0
+
+static void
+no_dead_strip (FILE *file, const char *lab)
+{
+  if (HAVE_DEAD_STRIP)
+    fprintf (file, ".no_dead_strip %s\n", lab);
+}
+
+/* Emit a label for an FDE, making it global and/or weak if appropriate. 
+   The third parameter is nonzero if this is for exception handling.
+   The fourth parameter is nonzero if this is just a placeholder for an
+   FDE that we are omitting. */
+
+void 
+darwin_emit_unwind_label (FILE *file, tree decl, int for_eh, int empty)
+{
+  tree id = DECL_ASSEMBLER_NAME (decl)
+    ? DECL_ASSEMBLER_NAME (decl)
+    : DECL_NAME (decl);
+
+  const char *prefix = "_";
+  const int prefix_len = 1;
+
+  const char *base = IDENTIFIER_POINTER (id);
+  unsigned int base_len = IDENTIFIER_LENGTH (id);
+
+  const char *suffix = ".eh";
+
+  int need_quotes = name_needs_quotes (base);
+  int quotes_len = need_quotes ? 2 : 0;
+  char *lab;
+
+  if (! for_eh)
+    suffix = ".eh1";
+
+  lab = xmalloc (prefix_len + base_len + strlen (suffix) + quotes_len + 1);
+  lab[0] = '\0';
+
+  if (need_quotes)
+    strcat(lab, "\"");
+  strcat(lab, prefix);
+  strcat(lab, base);
+  strcat(lab, suffix);
+  if (need_quotes)
+    strcat(lab, "\"");
+
+  if (TREE_PUBLIC (decl))
+    fprintf (file, "%s %s\n",
+	     (DECL_VISIBILITY (decl) != VISIBILITY_HIDDEN
+	      ? ".globl"
+	      : ".private_extern"),
+	     lab);
+
+  if (DECL_ONE_ONLY (decl) && TREE_PUBLIC (decl))
+    fprintf (file, ".weak_definition %s\n", lab);
+
+  if (empty)
+    {
+      fprintf (file, "%s = 0\n", lab);
+
+      /* Mark the absolute .eh and .eh1 style labels as needed to
+	 ensure that we don't dead code strip them and keep such
+	 labels from another instantiation point until we can fix this
+	 properly with group comdat support.  */
+      no_dead_strip (file, lab);
+    }
+  else
+    fprintf (file, "%s:\n", lab);
+
+  free (lab);
+}
+
+/* Generate a PC-relative reference to a Mach-O non-lazy-symbol.  */ 
+
+void
+darwin_non_lazy_pcrel (FILE *file, rtx addr)
+{
+  const char *str;
+  const char *nlp_name;
+
+  if (GET_CODE (addr) != SYMBOL_REF)
+    abort ();
+
+  str = darwin_strip_name_encoding (XSTR (addr, 0));
+  nlp_name = machopic_non_lazy_ptr_name (str);
+  fputs ("\t.long\t", file);
+  ASM_OUTPUT_LABELREF (file, nlp_name);
+  fputs ("-.", file);
+}
+
 /* Emit an assembler directive to set visibility for a symbol.  The
    only supported visibilities are VISIBILITY_DEFAULT and
    VISIBILITY_HIDDEN; the latter corresponds to Darwin's "private
@@ -1361,8 +1466,8 @@ void
 darwin_asm_output_dwarf_delta (FILE *file, int size ATTRIBUTE_UNUSED,
 			       const char *lab1, const char *lab2)
 {
-  const char *p = lab1 + (lab1[0] == '*');
-  int islocaldiff = (p[0] == 'L');
+  int islocaldiff = (lab1[0] == '*' && lab1[1] == 'L'
+		     && lab2[0] == '*' && lab2[1] == 'L');
 
   if (islocaldiff)
     fprintf (file, "\t.set L$set$%d,", darwin_dwarf_label_counter);

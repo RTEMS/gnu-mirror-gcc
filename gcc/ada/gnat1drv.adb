@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2003 Free Software Foundation, Inc.          --
+--          Copyright (C) 1992-2004 Free Software Foundation, Inc.          --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -49,7 +49,6 @@ with Output;   use Output;
 with Prepcomp;
 with Repinfo;  use Repinfo;
 with Restrict;
-with Rident;
 with Sem;
 with Sem_Ch8;
 with Sem_Ch12;
@@ -77,9 +76,6 @@ with System.Assertions;
 procedure Gnat1drv is
    Main_Unit_Node : Node_Id;
    --  Compilation unit node for main unit
-
-   Main_Unit_Entity : Node_Id;
-   --  Compilation unit entity for main unit
 
    Main_Kind : Node_Kind;
    --  Kind of main compilation unit node.
@@ -130,8 +126,6 @@ begin
 
          S : Source_File_Index;
          N : Name_Id;
-         R : Restrict.Restriction_Id;
-         P : Restrict.Restriction_Parameter_Id;
 
       begin
          Name_Buffer (1 .. 10) := "system.ads";
@@ -159,24 +153,7 @@ begin
 
          --  Acquire configuration pragma information from Targparm
 
-         for J in Rident.Partition_Restrictions loop
-            R := Restrict.Partition_Restrictions (J);
-
-            if Targparm.Restrictions_On_Target (J) then
-               Restrict.Restrictions (R)     := True;
-               Restrict.Restrictions_Loc (R) := System_Location;
-            end if;
-         end loop;
-
-         for K in Rident.Restriction_Parameter_Id loop
-            P := Restrict.Restriction_Parameter_Id (K);
-
-            if Targparm.Restriction_Parameters_On_Target (K) /= No_Uint then
-               Restrict.Restriction_Parameters (P) :=
-                 Targparm.Restriction_Parameters_On_Target (K);
-               Restrict.Restriction_Parameters_Loc (P) := System_Location;
-            end if;
-         end loop;
+         Restrict.Restrictions := Targparm.Restrictions_On_Target;
       end;
 
       --  Set Configurable_Run_Time mode if system.ads flag set
@@ -193,7 +170,7 @@ begin
          Write_Eol;
          Write_Str ("GNAT ");
          Write_Str (Gnat_Version_String);
-         Write_Str (" Copyright 1992-2003 Free Software Foundation, Inc.");
+         Write_Str (" Copyright 1992-2004 Free Software Foundation, Inc.");
          Write_Eol;
       end if;
 
@@ -277,7 +254,6 @@ begin
       Original_Operating_Mode := Operating_Mode;
       Frontend;
       Main_Unit_Node := Cunit (Main_Unit);
-      Main_Unit_Entity := Cunit_Entity (Main_Unit);
       Main_Kind := Nkind (Unit (Main_Unit_Node));
 
       --  Check for suspicious or incorrect body present if we are doing
@@ -334,7 +310,13 @@ begin
             --  include both in a partition, this is diagnosed at bind time.
             --  In Ada 83 mode this is not a warning case.
 
+            --  Note: if weird file names are being used, we can have a
+            --  situation where the file name that supposedly contains a
+            --  body, in fact contains a spec, or we can't tell what it
+            --  contains. Skip the error message in these cases.
+
             if Src_Ind /= No_Source_File
+              and then Get_Expected_Unit_Type (Fname) = Expect_Body
               and then not Source_File_Is_Subunit (Src_Ind)
             then
                Error_Msg_Name_1 := Sname;
@@ -347,7 +329,7 @@ begin
                --  a junk spec as not needing a body when it really does).
 
                if Main_Kind = N_Package_Declaration
-                 and then Ada_83
+                 and then Ada_Version = Ada_83
                  and then Operating_Mode = Generate_Code
                  and then Distribution_Stub_Mode /= Generate_Caller_Stub_Body
                  and then not Compilation_Errors

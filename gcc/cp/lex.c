@@ -1,6 +1,6 @@
 /* Separate lexical analyzer for GNU C++.
    Copyright (C) 1987, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -31,7 +31,6 @@ Boston, MA 02111-1307, USA.  */
 #include "tree.h"
 #include "cp-tree.h"
 #include "cpplib.h"
-#include "lex.h"
 #include "flags.h"
 #include "c-pragma.h"
 #include "toplev.h"
@@ -82,62 +81,6 @@ struct impl_files
 
 static struct impl_files *impl_file_chain;
 
-
-/* Return something to represent absolute declarators containing a *.
-   TARGET is the absolute declarator that the * contains.
-   CV_QUALIFIERS is a list of modifiers such as const or volatile
-   to apply to the pointer type, represented as identifiers.
-
-   We return an INDIRECT_REF whose "contents" are TARGET
-   and whose type is the modifier list.  */
-
-tree
-make_pointer_declarator (tree cv_qualifiers, tree target)
-{
-  if (target && TREE_CODE (target) == IDENTIFIER_NODE
-      && ANON_AGGRNAME_P (target))
-    error ("type name expected before `*'");
-  target = build_nt (INDIRECT_REF, target);
-  TREE_TYPE (target) = cv_qualifiers;
-  return target;
-}
-
-/* Return something to represent absolute declarators containing a &.
-   TARGET is the absolute declarator that the & contains.
-   CV_QUALIFIERS is a list of modifiers such as const or volatile
-   to apply to the reference type, represented as identifiers.
-
-   We return an ADDR_EXPR whose "contents" are TARGET
-   and whose type is the modifier list.  */
-
-tree
-make_reference_declarator (tree cv_qualifiers, tree target)
-{
-  target = build_nt (ADDR_EXPR, target);
-  TREE_TYPE (target) = cv_qualifiers;
-  return target;
-}
-
-tree
-make_call_declarator (tree target, tree parms, tree cv_qualifiers, 
-                      tree exception_specification)
-{
-  target = build_nt (CALL_EXPR, target,
-		     tree_cons (parms, cv_qualifiers, NULL_TREE),
-		     /* The third operand is really RTL.  We
-			shouldn't put anything there.  */
-		     NULL_TREE);
-  CALL_DECLARATOR_EXCEPTION_SPEC (target) = exception_specification;
-  return target;
-}
-
-void
-set_quals_and_spec (tree call_declarator, tree cv_qualifiers, 
-                    tree exception_specification)
-{
-  CALL_DECLARATOR_QUALS (call_declarator) = cv_qualifiers;
-  CALL_DECLARATOR_EXCEPTION_SPEC (call_declarator) = exception_specification;
-}
 
 int interface_only;		/* whether or not current file is only for
 				   interface definitions.  */
@@ -207,7 +150,6 @@ init_operators (void)
   operator_name_info [(int) ABS_EXPR].name = "abs";
   operator_name_info [(int) TRUTH_AND_EXPR].name = "strict &&";
   operator_name_info [(int) TRUTH_OR_EXPR].name = "strict ||";
-  operator_name_info [(int) IN_EXPR].name = "in";
   operator_name_info [(int) RANGE_EXPR].name = "...";
   operator_name_info [(int) CONVERT_EXPR].name = "+";
 
@@ -231,7 +173,7 @@ init_operators (void)
 struct resword
 {
   const char *const word;
-  const ENUM_BITFIELD(rid) rid : 16;
+  ENUM_BITFIELD(rid) const rid : 16;
   const unsigned int disable   : 16;
 };
 
@@ -253,6 +195,7 @@ static const struct resword reswords[] =
   { "__asm__",		RID_ASM,	0 },
   { "__attribute",	RID_ATTRIBUTE,	0 },
   { "__attribute__",	RID_ATTRIBUTE,	0 },
+  { "__builtin_offsetof", RID_OFFSETOF, 0 },
   { "__builtin_va_arg",	RID_VA_ARG,	0 },
   { "__complex",	RID_COMPLEX,	0 },
   { "__complex__",	RID_COMPLEX,	0 },
@@ -392,7 +335,11 @@ cxx_init (void)
   /* We cannot just assign to input_filename because it has already
      been initialized and will be used later as an N_BINCL for stabs+
      debugging.  */
-  push_srcloc ("<internal>", 0);
+#ifdef USE_MAPPED_LOCATION
+  push_srcloc (BUILTINS_LOCATION);
+#else
+  push_srcloc ("<built-in>", 0);
+#endif
 
   init_reswords ();
   init_tree ();
@@ -403,21 +350,7 @@ cxx_init (void)
 
   current_function_decl = NULL;
 
-  class_type_node = build_int_2 (class_type, 0);
-  TREE_TYPE (class_type_node) = class_type_node;
-  ridpointers[(int) RID_CLASS] = class_type_node;
-
-  record_type_node = build_int_2 (record_type, 0);
-  TREE_TYPE (record_type_node) = record_type_node;
-  ridpointers[(int) RID_STRUCT] = record_type_node;
-
-  union_type_node = build_int_2 (union_type, 0);
-  TREE_TYPE (union_type_node) = union_type_node;
-  ridpointers[(int) RID_UNION] = union_type_node;
-
-  enum_type_node = build_int_2 (enum_type, 0);
-  TREE_TYPE (enum_type_node) = enum_type_node;
-  ridpointers[(int) RID_ENUM] = enum_type_node;
+  class_type_node = ridpointers[(int) RID_CLASS];
 
   cxx_init_decl_processing ();
 
@@ -448,18 +381,9 @@ cxx_init (void)
 void
 extract_interface_info (void)
 {
-  struct c_fileinfo *finfo = 0;
+  struct c_fileinfo *finfo;
 
-  if (flag_alt_external_templates)
-    {
-      tree til = tinst_for_decl ();
-
-      if (til)
-	finfo = get_fileinfo (EXPR_FILENAME (til));
-    }
-  if (!finfo)
-    finfo = get_fileinfo (input_filename);
-
+  finfo = get_fileinfo (input_filename);
   interface_only = finfo->interface_only;
   interface_unknown = finfo->interface_unknown;
 }
@@ -648,26 +572,18 @@ unqualified_name_lookup_error (tree name)
       if (name != ansi_opname (ERROR_MARK))
 	error ("`%D' not defined", name);
     }
-  else if (current_function_decl == 0)
-    error ("`%D' was not declared in this scope", name);
   else
     {
-      if (IDENTIFIER_NAMESPACE_VALUE (name) != error_mark_node
-	  || IDENTIFIER_ERROR_LOCUS (name) != current_function_decl)
+      error ("`%D' was not declared in this scope", name);
+      /* Prevent repeated error messages by creating a VAR_DECL with
+	 this NAME in the innermost block scope.  */
+      if (current_function_decl)
 	{
-	  static int undeclared_variable_notice;
-
-	  error ("`%D' undeclared (first use this function)", name);
-
-	  if (! undeclared_variable_notice)
-	    {
-	      error ("(Each undeclared identifier is reported only once for each function it appears in.)");
-	      undeclared_variable_notice = 1;
-	    }
+	  tree decl;
+	  decl = build_decl (VAR_DECL, name, error_mark_node);
+	  DECL_CONTEXT (decl) = current_function_decl;
+	  push_local_binding (name, decl, 0);
 	}
-      /* Prevent repeated error messages.  */
-      SET_IDENTIFIER_NAMESPACE_VALUE (name, error_mark_node);
-      SET_IDENTIFIER_ERROR_LOCUS (name, current_function_decl);
     }
 
   return error_mark_node;
@@ -747,7 +663,8 @@ retrofit_lang_decl (tree t)
     ld->u.f.u3sel = TREE_CODE (t) == FUNCTION_DECL ? 1 : 0;
 
   DECL_LANG_SPECIFIC (t) = ld;
-  if (current_lang_name == lang_name_cplusplus)
+  if (current_lang_name == lang_name_cplusplus
+      || decl_linkage (t) == lk_none)
     SET_DECL_LANGUAGE (t, lang_cplusplus);
   else if (current_lang_name == lang_name_c)
     SET_DECL_LANGUAGE (t, lang_c);
@@ -836,7 +753,7 @@ copy_type (tree type)
 tree
 cxx_make_type (enum tree_code code)
 {
-  register tree t = make_node (code);
+  tree t = make_node (code);
 
   /* Create lang_type structure.  */
   if (IS_AGGR_TYPE_CODE (code)
@@ -860,26 +777,12 @@ cxx_make_type (enum tree_code code)
     {
       SET_CLASSTYPE_INTERFACE_UNKNOWN_X (t, interface_unknown);
       CLASSTYPE_INTERFACE_ONLY (t) = interface_only;
-
-      /* Make sure this is laid out, for ease of use later.  In the
-	 presence of parse errors, the normal was of assuring this
-	 might not ever get executed, so we lay it out *immediately*.  */
-      build_pointer_type (t);
     }
   else
     /* We use TYPE_ALIAS_SET for the CLASSTYPE_MARKED bits.  But,
        TYPE_ALIAS_SET is initialized to -1 by default, so we must
        clear it here.  */
     TYPE_ALIAS_SET (t) = 0;
-
-  /* We need to allocate a TYPE_BINFO even for TEMPLATE_TYPE_PARMs
-     since they can be virtual base types, and we then need a
-     canonical binfo for them.  Ideally, this would be done lazily for
-     all types.  */
-  if (IS_AGGR_TYPE_CODE (code) || code == TEMPLATE_TYPE_PARM
-      || code == BOUND_TEMPLATE_TEMPLATE_PARM
-      || code == TYPENAME_TYPE)
-    TYPE_BINFO (t) = make_binfo (size_zero_node, t, NULL_TREE, NULL_TREE);
 
   return t;
 }

@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O1 -fdump-tree-dom2" } */
+/* { dg-options "-O2 -fdump-tree-dom3" } */
   
  
 
@@ -18,7 +18,7 @@ union tree_node
   struct tree_common common;
   struct tree_list list;
 };
-static void
+void
 simplify_condition (cond_p)
      tree *cond_p;
 {
@@ -34,4 +34,4 @@ simplify_condition (cond_p)
 
 /* There should be exactly one IF conditional.  TBAA is not able to 
    determine that 'decl' and 'cond' can't alias.  */
-/* { dg-final { scan-tree-dump-times "if " 1 "dom2"} } */
+/* { dg-final { scan-tree-dump-times "if " 1 "dom3"} } */

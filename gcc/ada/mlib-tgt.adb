@@ -7,7 +7,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---              Copyright (C) 2001-2003, Ada Core Technologies, Inc.        --
+--              Copyright (C) 2001-2004, Ada Core Technologies, Inc.        --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -81,9 +81,7 @@ package body MLib.Tgt is
       Lib_Dir      : String;
       Symbol_Data  : Symbol_Record;
       Driver_Name  : Name_Id := No_Name;
-      Lib_Address  : String  := "";
       Lib_Version  : String  := "";
-      Relocatable  : Boolean := False;
       Auto_Init    : Boolean := False)
    is
       pragma Unreferenced (Ofiles);
@@ -95,23 +93,12 @@ package body MLib.Tgt is
       pragma Unreferenced (Lib_Dir);
       pragma Unreferenced (Symbol_Data);
       pragma Unreferenced (Driver_Name);
-      pragma Unreferenced (Lib_Address);
       pragma Unreferenced (Lib_Version);
-      pragma Unreferenced (Relocatable);
       pragma Unreferenced (Auto_Init);
 
    begin
       null;
    end Build_Dynamic_Library;
-
-   -------------------------
-   -- Default_DLL_Address --
-   -------------------------
-
-   function Default_DLL_Address return String is
-   begin
-      return "";
-   end Default_DLL_Address;
 
    -------------
    -- DLL_Ext --
@@ -137,7 +124,6 @@ package body MLib.Tgt is
 
    function Is_Object_Ext (Ext : String) return Boolean is
       pragma Unreferenced (Ext);
-
    begin
       return False;
    end Is_Object_Ext;
@@ -148,7 +134,6 @@ package body MLib.Tgt is
 
    function Is_C_Ext (Ext : String) return Boolean is
       pragma Unreferenced (Ext);
-
    begin
       return False;
    end Is_C_Ext;
@@ -159,7 +144,6 @@ package body MLib.Tgt is
 
    function Is_Archive_Ext (Ext : String) return Boolean is
       pragma Unreferenced (Ext);
-
    begin
       return False;
    end Is_Archive_Ext;
@@ -179,7 +163,6 @@ package body MLib.Tgt is
 
    function Library_Exists_For (Project : Project_Id) return Boolean is
       pragma Unreferenced (Project);
-
    begin
       return False;
    end Library_Exists_For;
@@ -190,19 +173,9 @@ package body MLib.Tgt is
 
    function Library_File_Name_For (Project : Project_Id) return Name_Id is
       pragma Unreferenced (Project);
-
    begin
       return No_Name;
    end Library_File_Name_For;
-
-   --------------------------------
-   -- Linker_Library_Path_Option --
-   --------------------------------
-
-   function Linker_Library_Path_Option return String_Access is
-   begin
-      return null;
-   end Linker_Library_Path_Option;
 
    ----------------
    -- Object_Ext --

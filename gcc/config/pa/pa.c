@@ -1,6 +1,6 @@
 /* Subroutines for insn-output.c for HPPA.
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
-   2002, 2003 Free Software Foundation, Inc.
+   2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Tim Moore (moore@cs.utah.edu), based on sparc.c
 
 This file is part of GCC.
@@ -40,7 +40,6 @@ Boston, MA 02111-1307, USA.  */
 #include "reload.h"
 #include "integrate.h"
 #include "function.h"
-#include "obstack.h"
 #include "toplev.h"
 #include "ggc.h"
 #include "recog.h"
@@ -49,16 +48,8 @@ Boston, MA 02111-1307, USA.  */
 #include "target.h"
 #include "target-def.h"
 
-static int hppa_use_dfa_pipeline_interface (void);
-
 #undef TARGET_SCHED_USE_DFA_PIPELINE_INTERFACE 
-#define TARGET_SCHED_USE_DFA_PIPELINE_INTERFACE hppa_use_dfa_pipeline_interface
-
-static int
-hppa_use_dfa_pipeline_interface (void)
-{
-  return 1;
-}
+#define TARGET_SCHED_USE_DFA_PIPELINE_INTERFACE hook_int_void_1
 
 /* Return nonzero if there is a bypass for the output of 
    OUT_INSN and the fp store IN_INSN.  */
@@ -94,6 +85,8 @@ hppa_fpstore_bypass_p (rtx out_insn, rtx in_insn)
 #endif
 #endif
 
+static void copy_reg_pointer (rtx, rtx);
+static void fix_range (const char *);
 static int hppa_address_cost (rtx);
 static bool hppa_rtx_costs (rtx, int, int, int *);
 static inline rtx force_mode (enum machine_mode, rtx);
@@ -103,14 +96,14 @@ static int pa_can_combine_p (rtx, rtx, rtx, int, rtx, rtx, rtx);
 static int forward_branch_p (rtx);
 static int shadd_constant_p (int);
 static void compute_zdepwi_operands (unsigned HOST_WIDE_INT, unsigned *);
-static int compute_movstr_length (rtx);
-static int compute_clrstr_length (rtx);
+static int compute_movmem_length (rtx);
+static int compute_clrmem_length (rtx);
 static bool pa_assemble_integer (rtx, unsigned int, int);
 static void remove_useless_addtr_insns (int);
-static void store_reg (int, int, int);
-static void store_reg_modify (int, int, int);
-static void load_reg (int, int, int);
-static void set_reg_plus_d (int, int, int, int);
+static void store_reg (int, HOST_WIDE_INT, int);
+static void store_reg_modify (int, int, HOST_WIDE_INT);
+static void load_reg (int, HOST_WIDE_INT, int);
+static void set_reg_plus_d (int, int, HOST_WIDE_INT, int);
 static void pa_output_function_prologue (FILE *, HOST_WIDE_INT);
 static void update_total_code_bytes (int);
 static void pa_output_function_epilogue (FILE *, HOST_WIDE_INT);
@@ -131,6 +124,8 @@ static void pa_asm_out_constructor (rtx, int);
 static void pa_asm_out_destructor (rtx, int);
 #endif
 static void pa_init_builtins (void);
+static rtx hppa_builtin_saveregs (void);
+static tree hppa_gimplify_va_arg_expr (tree, tree, tree *, tree *);
 static void copy_fp_args (rtx) ATTRIBUTE_UNUSED;
 static int length_fp_args (rtx) ATTRIBUTE_UNUSED;
 static struct deferred_plabel *get_plabel (const char *)
@@ -148,23 +143,30 @@ static void output_deferred_plabels (void);
 #ifdef HPUX_LONG_DOUBLE_LIBRARY
 static void pa_hpux_init_libfuncs (void);
 #endif
+static rtx pa_struct_value_rtx (tree, int);
+static bool pa_pass_by_reference (CUMULATIVE_ARGS *ca, enum machine_mode,
+				  tree, bool);
+
 
 /* Save the operands last given to a compare for use when we
    generate a scc or bcc insn.  */
 rtx hppa_compare_op0, hppa_compare_op1;
 enum cmp_type hppa_branch_type;
 
-/* Which cpu we are scheduling for.  */
-enum processor_type pa_cpu;
-
-/* String to hold which cpu we are scheduling for.  */
-const char *pa_cpu_string;
-
 /* Which architecture we are generating code for.  */
 enum architecture_type pa_arch;
 
 /* String to hold which architecture we are generating code for.  */
 const char *pa_arch_string;
+
+/* String used with the -mfixed-range= option.  */
+const char *pa_fixed_range_string;
+
+/* Which cpu we are scheduling for.  */
+enum processor_type pa_cpu;
+
+/* String to hold which cpu we are scheduling for.  */
+const char *pa_cpu_string;
 
 /* Counts for the number of callee-saved general and floating point
    registers which were saved by the current function's prologue.  */
@@ -261,8 +263,100 @@ static size_t n_deferred_plabels = 0;
 #define TARGET_INIT_LIBFUNCS pa_hpux_init_libfuncs
 #endif
 
+#undef TARGET_PROMOTE_FUNCTION_RETURN
+#define TARGET_PROMOTE_FUNCTION_RETURN hook_bool_tree_true
+#undef TARGET_PROMOTE_PROTOTYPES
+#define TARGET_PROMOTE_PROTOTYPES hook_bool_tree_true
+
+#undef TARGET_STRUCT_VALUE_RTX
+#define TARGET_STRUCT_VALUE_RTX pa_struct_value_rtx
+#undef TARGET_RETURN_IN_MEMORY
+#define TARGET_RETURN_IN_MEMORY pa_return_in_memory
+#undef TARGET_MUST_PASS_IN_STACK
+#define TARGET_MUST_PASS_IN_STACK must_pass_in_stack_var_size
+#undef TARGET_PASS_BY_REFERENCE
+#define TARGET_PASS_BY_REFERENCE pa_pass_by_reference
+
+#undef TARGET_EXPAND_BUILTIN_SAVEREGS
+#define TARGET_EXPAND_BUILTIN_SAVEREGS hppa_builtin_saveregs
+#undef TARGET_GIMPLIFY_VA_ARG_EXPR
+#define TARGET_GIMPLIFY_VA_ARG_EXPR hppa_gimplify_va_arg_expr
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
+/* Parse the -mfixed-range= option string.  */
+
+static void
+fix_range (const char *const_str)
+{
+  int i, first, last;
+  char *str, *dash, *comma;
+
+  /* str must be of the form REG1'-'REG2{,REG1'-'REG} where REG1 and
+     REG2 are either register names or register numbers.  The effect
+     of this option is to mark the registers in the range from REG1 to
+     REG2 as ``fixed'' so they won't be used by the compiler.  This is
+     used, e.g., to ensure that kernel mode code doesn't use f32-f127.  */
+
+  i = strlen (const_str);
+  str = (char *) alloca (i + 1);
+  memcpy (str, const_str, i + 1);
+
+  while (1)
+    {
+      dash = strchr (str, '-');
+      if (!dash)
+	{
+	  warning ("value of -mfixed-range must have form REG1-REG2");
+	  return;
+	}
+      *dash = '\0';
+
+      comma = strchr (dash + 1, ',');
+      if (comma)
+	*comma = '\0';
+
+      first = decode_reg_name (str);
+      if (first < 0)
+	{
+	  warning ("unknown register name: %s", str);
+	  return;
+	}
+
+      last = decode_reg_name (dash + 1);
+      if (last < 0)
+	{
+	  warning ("unknown register name: %s", dash + 1);
+	  return;
+	}
+
+      *dash = '-';
+
+      if (first > last)
+	{
+	  warning ("%s-%s is an empty range", str, dash + 1);
+	  return;
+	}
+
+      for (i = first; i <= last; ++i)
+	fixed_regs[i] = call_used_regs[i] = 1;
+
+      if (!comma)
+	break;
+
+      *comma = ',';
+      str = comma + 1;
+    }
+
+  /* Check if all floating point registers have been fixed.  */
+  for (i = FP_REG_FIRST; i <= FP_REG_LAST; i++)
+    if (!fixed_regs[i])
+      break;
+
+  if (i > FP_REG_LAST)
+    target_flags |= MASK_DISABLE_FPREGS;
+}
+
 void
 override_options (void)
 {
@@ -304,7 +398,7 @@ override_options (void)
       warning ("unknown -mschedule= option (%s).\nValid options are 700, 7100, 7100LC, 7200, 7300, and 8000\n", pa_cpu_string);
     }
 
-  /* Set the instruction set architecture.  */
+  /* Set the instruction architecture.  */
   if (pa_arch_string && ! strcmp (pa_arch_string, "1.0"))
     {
       pa_arch_string = "1.0";
@@ -328,6 +422,9 @@ override_options (void)
     {
       warning ("unknown -march= option (%s).\nValid options are 1.0, 1.1, and 2.0\n", pa_arch_string);
     }
+
+  if (pa_fixed_range_string)
+    fix_range (pa_fixed_range_string);
 
   /* Unconditional branches in the delay slot are not compatible with dwarf2
      call frame information.  There is no benefit in using this optimization
@@ -379,6 +476,16 @@ pa_init_builtins (void)
   built_in_decls[(int) BUILT_IN_FPUTC_UNLOCKED] = NULL_TREE;
   implicit_built_in_decls[(int) BUILT_IN_FPUTC_UNLOCKED] = NULL_TREE;
 #endif
+}
+
+/* If FROM is a probable pointer register, mark TO as a probable
+   pointer register with the same pointer alignment as FROM.  */
+
+static void
+copy_reg_pointer (rtx to, rtx from)
+{
+  if (REG_POINTER (from))
+    mark_reg_pointer (to, REGNO_POINTER_ALIGN (REGNO (from)));
 }
 
 /* Return nonzero only if OP is a register of mode MODE,
@@ -448,21 +555,6 @@ symbolic_memory_operand (rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
 	  || GET_CODE (op) == HIGH || GET_CODE (op) == LABEL_REF);
 }
 
-/* Return 1 if the operand is either a register or a memory operand that is
-   not symbolic.  */
-
-int
-reg_or_nonsymb_mem_operand (rtx op, enum machine_mode mode)
-{
-  if (register_operand (op, mode))
-    return 1;
-
-  if (memory_operand (op, mode) && ! symbolic_memory_operand (op, mode))
-    return 1;
-
-  return 0;
-}
-
 /* Return 1 if the operand is either a register, zero, or a memory operand
    that is not symbolic.  */
 
@@ -475,10 +567,24 @@ reg_or_0_or_nonsymb_mem_operand (rtx op, enum machine_mode mode)
   if (op == CONST0_RTX (mode))
     return 1;
 
-  if (memory_operand (op, mode) && ! symbolic_memory_operand (op, mode))
-    return 1;
+  if (GET_CODE (op) == SUBREG)
+    op = SUBREG_REG (op);
 
-  return 0;
+  if (GET_CODE (op) != MEM)
+    return 0;
+
+  /* Until problems with management of the REG_POINTER flag are resolved,
+     we need to delay creating move insns with unscaled indexed addresses
+     until CSE is not expected.  */
+  if (!TARGET_NO_SPACE_REGS
+      && !cse_not_expected
+      && GET_CODE (XEXP (op, 0)) == PLUS
+      && REG_P (XEXP (XEXP (op, 0), 0))
+      && REG_P (XEXP (XEXP (op, 0), 1)))
+    return 0;
+
+  return (!symbolic_memory_operand (op, mode)
+	  && memory_address_p (mode, XEXP (op, 0)));
 }
 
 /* Return 1 if the operand is a register operand or a non-symbolic memory
@@ -499,7 +605,7 @@ reg_before_reload_operand (rtx op, enum machine_mode mode)
 
   if (reload_completed
       && memory_operand (op, mode)
-      && ! symbolic_memory_operand (op, mode))
+      && !symbolic_memory_operand (op, mode))
     return 1;
 
   return 0;
@@ -516,55 +622,102 @@ cint_ok_for_move (HOST_WIDE_INT intval)
 	  || CONST_OK_FOR_LETTER_P (intval, 'K'));
 }
 
-/* Accept anything that can be moved in one instruction into a general
-   register.  */
+/* Return 1 iff OP is an indexed memory operand.  */
 int
-move_operand (rtx op, enum machine_mode mode)
+indexed_memory_operand (rtx op, enum machine_mode mode)
+{
+  if (GET_MODE (op) != mode)
+    return 0;
+
+  /* Before reload, a (SUBREG (MEM...)) forces reloading into a register.  */
+  if (reload_completed && GET_CODE (op) == SUBREG)
+    op = SUBREG_REG (op);
+
+  if (GET_CODE (op) != MEM || symbolic_memory_operand (op, mode))
+    return 0;
+
+  op = XEXP (op, 0);
+
+  return (memory_address_p (mode, op) && IS_INDEX_ADDR_P (op));
+}
+
+/* Accept anything that can be used as a destination operand for a
+   move instruction.  We don't accept indexed memory operands since
+   they are supported only for floating point stores.  */
+int
+move_dest_operand (rtx op, enum machine_mode mode)
 {
   if (register_operand (op, mode))
     return 1;
 
-  if (GET_CODE (op) == CONSTANT_P_RTX)
+  if (GET_MODE (op) != mode)
+    return 0;
+
+  if (GET_CODE (op) == SUBREG)
+    op = SUBREG_REG (op);
+
+  if (GET_CODE (op) != MEM || symbolic_memory_operand (op, mode))
+    return 0;
+
+  op = XEXP (op, 0);
+
+  return (memory_address_p (mode, op)
+	  && !IS_INDEX_ADDR_P (op)
+	  && !IS_LO_SUM_DLT_ADDR_P (op));
+}
+
+/* Accept anything that can be used as a source operand for a move
+   instruction.  */
+int
+move_src_operand (rtx op, enum machine_mode mode)
+{
+  if (register_operand (op, mode))
     return 1;
 
   if (GET_CODE (op) == CONST_INT)
     return cint_ok_for_move (INTVAL (op));
 
+  if (GET_MODE (op) != mode)
+    return 0;
+
   if (GET_CODE (op) == SUBREG)
     op = SUBREG_REG (op);
+
   if (GET_CODE (op) != MEM)
     return 0;
 
-  op = XEXP (op, 0);
+  /* Until problems with management of the REG_POINTER flag are resolved,
+     we need to delay creating move insns with unscaled indexed addresses
+     until CSE is not expected.  */
+  if (!TARGET_NO_SPACE_REGS
+      && !cse_not_expected
+      && GET_CODE (XEXP (op, 0)) == PLUS
+      && REG_P (XEXP (XEXP (op, 0), 0))
+      && REG_P (XEXP (XEXP (op, 0), 1)))
+    return 0;
 
-  /* We consider a LO_SUM DLT reference a move_operand now since it has
-     been merged into the normal movsi/movdi patterns.  */
-  if (GET_CODE (op) == LO_SUM
-      && GET_CODE (XEXP (op, 0)) == REG
-      && REG_OK_FOR_BASE_P (XEXP (op, 0))
-      && GET_CODE (XEXP (op, 1)) == UNSPEC
-      && GET_MODE (op) == Pmode)
-    return 1;
+  return memory_address_p (mode, XEXP (op, 0));
+}
 
-  /* Since move_operand is only used for source operands, we can always
-     allow scaled indexing!  */
-  if (! TARGET_DISABLE_INDEXING
-      && GET_CODE (op) == PLUS
-      && ((GET_CODE (XEXP (op, 0)) == MULT
-	   && GET_CODE (XEXP (XEXP (op, 0), 0)) == REG
-	   && GET_CODE (XEXP (XEXP (op, 0), 1)) == CONST_INT
-	   && INTVAL (XEXP (XEXP (op, 0), 1))
-	      == (HOST_WIDE_INT) GET_MODE_SIZE (mode)
-	   && GET_CODE (XEXP (op, 1)) == REG)
-	  || (GET_CODE (XEXP (op, 1)) == MULT
-	      &&GET_CODE (XEXP (XEXP (op, 1), 0)) == REG
-	      && GET_CODE (XEXP (XEXP (op, 1), 1)) == CONST_INT
-	      && INTVAL (XEXP (XEXP (op, 1), 1))
-		 == (HOST_WIDE_INT) GET_MODE_SIZE (mode)
-	      && GET_CODE (XEXP (op, 0)) == REG)))
-    return 1;
+/* Accept anything that can be used as the source operand for a prefetch
+   instruction.  */
+int
+prefetch_operand (rtx op, enum machine_mode mode)
+{
+  if (GET_CODE (op) != MEM)
+    return 0;
 
-  return memory_address_p (mode, op);
+  /* Until problems with management of the REG_POINTER flag are resolved,
+     we need to delay creating prefetch insns with unscaled indexed addresses
+     until CSE is not expected.  */
+  if (!TARGET_NO_SPACE_REGS
+      && !cse_not_expected
+      && GET_CODE (XEXP (op, 0)) == PLUS
+      && REG_P (XEXP (XEXP (op, 0), 0))
+      && REG_P (XEXP (XEXP (op, 0), 1)))
+    return 0;
+
+  return memory_address_p (mode, XEXP (op, 0));
 }
 
 /* Accept REG and any CONST_INT that can be moved in one instruction into a
@@ -575,10 +728,7 @@ reg_or_cint_move_operand (rtx op, enum machine_mode mode)
   if (register_operand (op, mode))
     return 1;
 
-  if (GET_CODE (op) == CONST_INT)
-    return cint_ok_for_move (INTVAL (op));
-
-  return 0;
+  return (GET_CODE (op) == CONST_INT && cint_ok_for_move (INTVAL (op)));
 }
 
 int
@@ -831,6 +981,7 @@ legitimize_pic_address (rtx orig, enum machine_mode mode, rtx reg)
 
 	 So instead we just emit the raw set, which avoids the movXX
 	 expanders completely.  */
+      mark_reg_pointer (reg, BITS_PER_UNIT);
       emit_insn (gen_rtx_SET (VOIDmode, reg, orig));
       current_function_uses_pic_offset_table = 1;
       return reg;
@@ -856,11 +1007,12 @@ legitimize_pic_address (rtx orig, enum machine_mode mode, rtx reg)
 		       gen_rtx_LO_SUM (Pmode, tmp_reg,
 				       gen_rtx_UNSPEC (Pmode,
 						       gen_rtvec (1, orig),
-						       0)));
+						       UNSPEC_DLTIND14R)));
 
       current_function_uses_pic_offset_table = 1;
       MEM_NOTRAP_P (pic_ref) = 1;
       RTX_UNCHANGING_P (pic_ref) = 1;
+      mark_reg_pointer (reg, BITS_PER_UNIT);
       insn = emit_move_insn (reg, pic_ref);
 
       /* Put a REG_EQUAL note on this insn, so that it can be optimized.  */
@@ -885,7 +1037,9 @@ legitimize_pic_address (rtx orig, enum machine_mode mode, rtx reg)
 	  orig = legitimize_pic_address (XEXP (XEXP (orig, 0), 1), Pmode,
 					 base == reg ? 0 : reg);
 	}
-      else abort ();
+      else
+	abort ();
+
       if (GET_CODE (orig) == CONST_INT)
 	{
 	  if (INT_14_BITS (orig))
@@ -895,6 +1049,7 @@ legitimize_pic_address (rtx orig, enum machine_mode mode, rtx reg)
       pic_ref = gen_rtx_PLUS (Pmode, base, orig);
       /* Likewise, should we set special REG_NOTEs here?  */
     }
+
   return pic_ref;
 }
 
@@ -954,6 +1109,18 @@ hppa_legitimize_address (rtx x, rtx oldx ATTRIBUTE_UNUSED,
 			 enum machine_mode mode)
 {
   rtx orig = x;
+
+  /* We need to canonicalize the order of operands in unscaled indexed
+     addresses since the code that checks if an address is valid doesn't
+     always try both orders.  */
+  if (!TARGET_NO_SPACE_REGS
+      && GET_CODE (x) == PLUS
+      && GET_MODE (x) == Pmode
+      && REG_P (XEXP (x, 0))
+      && REG_P (XEXP (x, 1))
+      && REG_POINTER (XEXP (x, 0))
+      && !REG_POINTER (XEXP (x, 1)))
+    return gen_rtx_PLUS (Pmode, XEXP (x, 1), XEXP (x, 0));
 
   if (flag_pic)
     return legitimize_pic_address (x, mode, gen_reg_rtx (Pmode));
@@ -1033,7 +1200,7 @@ hppa_legitimize_address (rtx x, rtx oldx ATTRIBUTE_UNUSED,
   if (GET_CODE (x) == PLUS && GET_CODE (XEXP (x, 0)) == MULT
       && GET_CODE (XEXP (XEXP (x, 0), 1)) == CONST_INT
       && shadd_constant_p (INTVAL (XEXP (XEXP (x, 0), 1)))
-      && (GET_RTX_CLASS (GET_CODE (XEXP (x, 1))) == 'o'
+      && (OBJECT_P (XEXP (x, 1))
 	  || GET_CODE (XEXP (x, 1)) == SUBREG)
       && GET_CODE (XEXP (x, 1)) != CONST)
     {
@@ -1423,6 +1590,36 @@ emit_move_sequence (rtx *operands, enum machine_mode mode, rtx scratch_reg)
   register rtx operand1 = operands[1];
   register rtx tem;
 
+  /* We can only handle indexed addresses in the destination operand
+     of floating point stores.  Thus, we need to break out indexed
+     addresses from the destination operand.  */
+  if (GET_CODE (operand0) == MEM && IS_INDEX_ADDR_P (XEXP (operand0, 0)))
+    {
+      /* This is only safe up to the beginning of life analysis.  */
+      if (no_new_pseudos)
+	abort ();
+
+      tem = copy_to_mode_reg (Pmode, XEXP (operand0, 0));
+      operand0 = replace_equiv_address (operand0, tem);
+    }
+
+  /* On targets with non-equivalent space registers, break out unscaled
+     indexed addresses from the source operand before the final CSE.
+     We have to do this because the REG_POINTER flag is not correctly
+     carried through various optimization passes and CSE may substitute
+     a pseudo without the pointer set for one with the pointer set.  As
+     a result, we loose various opportunities to create insns with
+     unscaled indexed addresses.  */
+  if (!TARGET_NO_SPACE_REGS
+      && !cse_not_expected
+      && GET_CODE (operand1) == MEM
+      && GET_CODE (XEXP (operand1, 0)) == PLUS
+      && REG_P (XEXP (XEXP (operand1, 0), 0))
+      && REG_P (XEXP (XEXP (operand1, 0), 1)))
+    operand1
+      = replace_equiv_address (operand1,
+			       copy_to_mode_reg (Pmode, XEXP (operand1, 0)));
+
   if (scratch_reg
       && reload_in_progress && GET_CODE (operand0) == REG
       && REGNO (operand0) >= FIRST_PSEUDO_REGISTER)
@@ -1461,21 +1658,25 @@ emit_move_sequence (rtx *operands, enum machine_mode mode, rtx scratch_reg)
       && ((tem = find_replacement (&XEXP (operand0, 0)))
 	  != XEXP (operand0, 0)))
     operand0 = gen_rtx_MEM (GET_MODE (operand0), tem);
+
   if (scratch_reg && reload_in_progress && GET_CODE (operand1) == MEM
       && ((tem = find_replacement (&XEXP (operand1, 0)))
 	  != XEXP (operand1, 0)))
     operand1 = gen_rtx_MEM (GET_MODE (operand1), tem);
 
   /* Handle secondary reloads for loads/stores of FP registers from
-     REG+D addresses where D does not fit in 5 bits, including
+     REG+D addresses where D does not fit in 5 or 14 bits, including
      (subreg (mem (addr))) cases.  */
-  if (fp_reg_operand (operand0, mode)
+  if (scratch_reg
+      && fp_reg_operand (operand0, mode)
       && ((GET_CODE (operand1) == MEM
-	   && ! memory_address_p (DFmode, XEXP (operand1, 0)))
+	   && !memory_address_p ((GET_MODE_SIZE (mode) == 4 ? SFmode : DFmode),
+				 XEXP (operand1, 0)))
 	  || ((GET_CODE (operand1) == SUBREG
 	       && GET_CODE (XEXP (operand1, 0)) == MEM
-	       && !memory_address_p (DFmode, XEXP (XEXP (operand1, 0), 0)))))
-      && scratch_reg)
+	       && !memory_address_p ((GET_MODE_SIZE (mode) == 4
+				      ? SFmode : DFmode),
+				     XEXP (XEXP (operand1, 0), 0))))))
     {
       if (GET_CODE (operand1) == SUBREG)
 	operand1 = XEXP (operand1, 0);
@@ -1490,10 +1691,11 @@ emit_move_sequence (rtx *operands, enum machine_mode mode, rtx scratch_reg)
       if (!memory_address_p (Pmode, XEXP (operand1, 0)))
 	{
 	  emit_move_insn (scratch_reg, XEXP (XEXP (operand1, 0), 1));
-	  emit_move_insn (scratch_reg, gen_rtx_fmt_ee (GET_CODE (XEXP (operand1, 0)),
-						       Pmode,
-						       XEXP (XEXP (operand1, 0), 0),
-						       scratch_reg));
+	  emit_move_insn (scratch_reg,
+			  gen_rtx_fmt_ee (GET_CODE (XEXP (operand1, 0)),
+					  Pmode,
+					  XEXP (XEXP (operand1, 0), 0),
+					  scratch_reg));
 	}
       else
 	emit_move_insn (scratch_reg, XEXP (operand1, 0));
@@ -1501,13 +1703,17 @@ emit_move_sequence (rtx *operands, enum machine_mode mode, rtx scratch_reg)
 			      gen_rtx_MEM (mode, scratch_reg)));
       return 1;
     }
-  else if (fp_reg_operand (operand1, mode)
+  else if (scratch_reg
+	   && fp_reg_operand (operand1, mode)
 	   && ((GET_CODE (operand0) == MEM
-		&& ! memory_address_p (DFmode, XEXP (operand0, 0)))
+		&& !memory_address_p ((GET_MODE_SIZE (mode) == 4
+					? SFmode : DFmode),
+				       XEXP (operand0, 0)))
 	       || ((GET_CODE (operand0) == SUBREG)
 		   && GET_CODE (XEXP (operand0, 0)) == MEM
-		   && !memory_address_p (DFmode, XEXP (XEXP (operand0, 0), 0))))
-	   && scratch_reg)
+		   && !memory_address_p ((GET_MODE_SIZE (mode) == 4
+					  ? SFmode : DFmode),
+			   		 XEXP (XEXP (operand0, 0), 0)))))
     {
       if (GET_CODE (operand0) == SUBREG)
 	operand0 = XEXP (operand0, 0);
@@ -1538,15 +1744,15 @@ emit_move_sequence (rtx *operands, enum machine_mode mode, rtx scratch_reg)
   /* Handle secondary reloads for loads of FP registers from constant
      expressions by forcing the constant into memory.
 
-     use scratch_reg to hold the address of the memory location.
+     Use scratch_reg to hold the address of the memory location.
 
      The proper fix is to change PREFERRED_RELOAD_CLASS to return
      NO_REGS when presented with a const_int and a register class
      containing only FP registers.  Doing so unfortunately creates
      more problems than it solves.   Fix this for 2.5.  */
-  else if (fp_reg_operand (operand0, mode)
+  else if (scratch_reg
 	   && CONSTANT_P (operand1)
-	   && scratch_reg)
+	   && fp_reg_operand (operand0, mode))
     {
       rtx xoperands[2];
 
@@ -1568,14 +1774,14 @@ emit_move_sequence (rtx *operands, enum machine_mode mode, rtx scratch_reg)
     }
   /* Handle secondary reloads for SAR.  These occur when trying to load
      the SAR from memory, FP register, or with a constant.  */
-  else if (GET_CODE (operand0) == REG
+  else if (scratch_reg
+	   && GET_CODE (operand0) == REG
 	   && REGNO (operand0) < FIRST_PSEUDO_REGISTER
 	   && REGNO_REG_CLASS (REGNO (operand0)) == SHIFT_REGS
 	   && (GET_CODE (operand1) == MEM
 	       || GET_CODE (operand1) == CONST_INT
 	       || (GET_CODE (operand1) == REG
-		   && FP_REG_CLASS_P (REGNO_REG_CLASS (REGNO (operand1)))))
-	   && scratch_reg)
+		   && FP_REG_CLASS_P (REGNO_REG_CLASS (REGNO (operand1))))))
     {
       /* D might not fit in 14 bits either; for such cases load D into
 	 scratch reg.  */
@@ -1618,7 +1824,7 @@ emit_move_sequence (rtx *operands, enum machine_mode mode, rtx scratch_reg)
       emit_move_insn (operand0, scratch_reg);
       return 1;
     }
-  /* Handle most common case: storing into a register.  */
+  /* Handle the most common case: storing into a register.  */
   else if (register_operand (operand0, mode))
     {
       if (register_operand (operand1, mode)
@@ -1630,7 +1836,67 @@ emit_move_sequence (rtx *operands, enum machine_mode mode, rtx scratch_reg)
 	  /* Only `general_operands' can come here, so MEM is ok.  */
 	  || GET_CODE (operand1) == MEM)
 	{
-	  /* Run this case quickly.  */
+	  /* Various sets are created during RTL generation which don't
+	     have the REG_POINTER flag correctly set.  After the CSE pass,
+	     instruction recognition can fail if we don't consistently
+	     set this flag when performing register copies.  This should
+	     also improve the opportunities for creating insns that use
+	     unscaled indexing.  */
+	  if (REG_P (operand0) && REG_P (operand1))
+	    {
+	      if (REG_POINTER (operand1)
+		  && !REG_POINTER (operand0)
+		  && !HARD_REGISTER_P (operand0))
+		copy_reg_pointer (operand0, operand1);
+	      else if (REG_POINTER (operand0)
+		       && !REG_POINTER (operand1)
+		       && !HARD_REGISTER_P (operand1))
+		copy_reg_pointer (operand1, operand0);
+	    }
+	  
+	  /* When MEMs are broken out, the REG_POINTER flag doesn't
+	     get set.  In some cases, we can set the REG_POINTER flag
+	     from the declaration for the MEM.  */
+	  if (REG_P (operand0)
+	      && GET_CODE (operand1) == MEM
+	      && !REG_POINTER (operand0))
+	    {
+	      tree decl = MEM_EXPR (operand1);
+
+	      /* Set the register pointer flag and register alignment
+		 if the declaration for this memory reference is a
+		 pointer type.  Fortran indirect argument references
+		 are ignored.  */
+	      if (decl
+		  && !(flag_argument_noalias > 1
+		       && TREE_CODE (decl) == INDIRECT_REF
+		       && TREE_CODE (TREE_OPERAND (decl, 0)) == PARM_DECL))
+		{
+		  tree type;
+
+		  /* If this is a COMPONENT_REF, use the FIELD_DECL from
+		     tree operand 1.  */
+		  if (TREE_CODE (decl) == COMPONENT_REF)
+		    decl = TREE_OPERAND (decl, 1);
+
+		  type = TREE_TYPE (decl);
+		  if (TREE_CODE (type) == ARRAY_TYPE)
+		    type = get_inner_array_type (type);
+
+		  if (POINTER_TYPE_P (type))
+		    {
+		      int align;
+
+		      type = TREE_TYPE (type);
+		      /* Using TYPE_ALIGN_OK is rather conservative as
+			 only the ada frontend actually sets it.  */
+		      align = (TYPE_ALIGN_OK (type) ? TYPE_ALIGN (type)
+			       : BITS_PER_UNIT);
+		      mark_reg_pointer (operand0, align);
+		    }
+		}
+	    }
+
 	  emit_insn (gen_rtx_SET (VOIDmode, operand0, operand1));
 	  return 1;
 	}
@@ -1772,11 +2038,14 @@ emit_move_sequence (rtx *operands, enum machine_mode mode, rtx scratch_reg)
 		  operands[1] = force_const_mem (mode, operand1);
 		  operands[1] = legitimize_pic_address (XEXP (operands[1], 0),
 							mode, temp);
+		  operands[1] = gen_rtx_MEM (mode, operands[1]);
 		  emit_move_sequence (operands, mode, temp);
 		}
 	      else
 		{
 		  operands[1] = legitimize_pic_address (operand1, mode, temp);
+		  if (REG_P (operand0) && REG_P (operands[1]))
+		    copy_reg_pointer (operand0, operands[1]);
 		  emit_insn (gen_rtx_SET (VOIDmode, operand0, operands[1]));
 		}
 	    }
@@ -1804,9 +2073,10 @@ emit_move_sequence (rtx *operands, enum machine_mode mode, rtx scratch_reg)
 		 Don't mark hard registers though.  That loses.  */
 	      if (GET_CODE (operand0) == REG
 		  && REGNO (operand0) >= FIRST_PSEUDO_REGISTER)
-		REG_POINTER (operand0) = 1;
+		mark_reg_pointer (operand0, BITS_PER_UNIT);
 	      if (REGNO (temp) >= FIRST_PSEUDO_REGISTER)
-		REG_POINTER (temp) = 1;
+		mark_reg_pointer (temp, BITS_PER_UNIT);
+
 	      if (ishighonly)
 		set = gen_rtx_SET (mode, operand0, temp);
 	      else
@@ -1823,16 +2093,22 @@ emit_move_sequence (rtx *operands, enum machine_mode mode, rtx scratch_reg)
 	  return 1;
 	}
       else if (GET_CODE (operand1) != CONST_INT
-	       || ! cint_ok_for_move (INTVAL (operand1)))
+	       || !cint_ok_for_move (INTVAL (operand1)))
 	{
-	  rtx extend = NULL_RTX;
-	  rtx temp;
+	  rtx insn, temp;
+	  rtx op1 = operand1;
+	  HOST_WIDE_INT value = 0;
+	  HOST_WIDE_INT insv = 0;
+	  int insert = 0;
 
-	  if (TARGET_64BIT && GET_CODE (operand1) == CONST_INT
+	  if (GET_CODE (operand1) == CONST_INT)
+	    value = INTVAL (operand1);
+
+	  if (TARGET_64BIT
+	      && GET_CODE (operand1) == CONST_INT
 	      && HOST_BITS_PER_WIDE_INT > 32
 	      && GET_MODE_BITSIZE (GET_MODE (operand0)) > 32)
 	    {
-	      HOST_WIDE_INT val = INTVAL (operand1);
 	      HOST_WIDE_INT nval;
 
 	      /* Extract the low order 32 bits of the value and sign extend.
@@ -1840,19 +2116,21 @@ emit_move_sequence (rtx *operands, enum machine_mode mode, rtx scratch_reg)
 		 can use the original value as-is.  If the new value is
 		 different, we use it and insert the most-significant 32-bits
 		 of the original value into the final result.  */
-	      nval = ((val & (((HOST_WIDE_INT) 2 << 31) - 1))
+	      nval = ((value & (((HOST_WIDE_INT) 2 << 31) - 1))
 		      ^ ((HOST_WIDE_INT) 1 << 31)) - ((HOST_WIDE_INT) 1 << 31);
-	      if (val != nval)
+	      if (value != nval)
 		{
 #if HOST_BITS_PER_WIDE_INT > 32
-		  extend = GEN_INT (val >> 32);
+		  insv = value >= 0 ? value >> 32 : ~(~value >> 32);
 #endif
+		  insert = 1;
+		  value = nval;
 		  operand1 = GEN_INT (nval);
 		}
 	    }
 
 	  if (reload_in_progress || reload_completed)
-	    temp = operand0;
+	    temp = scratch_reg ? scratch_reg : operand0;
 	  else
 	    temp = gen_reg_rtx (mode);
 
@@ -1860,7 +2138,8 @@ emit_move_sequence (rtx *operands, enum machine_mode mode, rtx scratch_reg)
 	     because PLUS uses an 11-bit immediate and the insn sequence
 	     generated is not as efficient as the one using HIGH/LO_SUM.  */
 	  if (GET_CODE (operand1) == CONST_INT
-	      && GET_MODE_BITSIZE (mode) <= HOST_BITS_PER_WIDE_INT)
+	      && GET_MODE_BITSIZE (mode) <= HOST_BITS_PER_WIDE_INT
+	      && !insert)
 	    {
 	      /* Directly break constant into high and low parts.  This
 		 provides better optimization opportunities because various
@@ -1868,7 +2147,6 @@ emit_move_sequence (rtx *operands, enum machine_mode mode, rtx scratch_reg)
 		 We use a 14-bit signed low part except when the addition
 		 of 0x4000 to the high part might change the sign of the
 		 high part.  */
-	      HOST_WIDE_INT value = INTVAL (operand1);
 	      HOST_WIDE_INT low = value & 0x3fff;
 	      HOST_WIDE_INT high = value & ~ 0x3fff;
 
@@ -1892,11 +2170,60 @@ emit_move_sequence (rtx *operands, enum machine_mode mode, rtx scratch_reg)
 	      operands[1] = gen_rtx_LO_SUM (mode, temp, operand1);
 	    }
 
-	  emit_move_insn (operands[0], operands[1]);
+	  insn = emit_move_insn (operands[0], operands[1]);
 
-	  if (extend != NULL_RTX)
-	    emit_insn (gen_insv (operands[0], GEN_INT (32), const0_rtx,
-				 extend));
+	  /* Now insert the most significant 32 bits of the value
+	     into the register.  When we don't have a second register
+	     available, it could take up to nine instructions to load
+	     a 64-bit integer constant.  Prior to reload, we force
+	     constants that would take more than three instructions
+	     to load to the constant pool.  During and after reload,
+	     we have to handle all possible values.  */
+	  if (insert)
+	    {
+	      /* Use a HIGH/LO_SUM/INSV sequence if we have a second
+		 register and the value to be inserted is outside the
+		 range that can be loaded with three depdi instructions.  */
+	      if (temp != operand0 && (insv >= 16384 || insv < -16384))
+		{
+		  operand1 = GEN_INT (insv);
+
+		  emit_insn (gen_rtx_SET (VOIDmode, temp,
+					  gen_rtx_HIGH (mode, operand1)));
+		  emit_move_insn (temp, gen_rtx_LO_SUM (mode, temp, operand1));
+		  emit_insn (gen_insv (operand0, GEN_INT (32),
+				       const0_rtx, temp));
+		}
+	      else
+		{
+		  int len = 5, pos = 27;
+
+		  /* Insert the bits using the depdi instruction.  */
+		  while (pos >= 0)
+		    {
+		      HOST_WIDE_INT v5 = ((insv & 31) ^ 16) - 16;
+		      HOST_WIDE_INT sign = v5 < 0;
+
+		      /* Left extend the insertion.  */
+		      insv = (insv >= 0 ? insv >> len : ~(~insv >> len));
+		      while (pos > 0 && (insv & 1) == sign)
+			{
+			  insv = (insv >= 0 ? insv >> 1 : ~(~insv >> 1));
+			  len += 1;
+			  pos -= 1;
+			}
+
+		      emit_insn (gen_insv (operand0, GEN_INT (len),
+					   GEN_INT (pos), GEN_INT (v5)));
+
+		      len = pos > 0 && pos < 5 ? pos : 5;
+		      pos -= len;
+		    }
+		}
+	    }
+
+	  REG_NOTES (insn)
+	    = gen_rtx_EXPR_LIST (REG_EQUAL, op1, REG_NOTES (insn));
 
 	  return 1;
 	}
@@ -1972,7 +2299,7 @@ read_only_operand (rtx operand, enum machine_mode mode ATTRIBUTE_UNUSED)
 
 
 /* Return the best assembler insn template
-   for moving operands[1] into operands[0] as a fullword.   */
+   for moving operands[1] into operands[0] as a fullword.  */
 const char *
 singlemove_string (rtx *operands)
 {
@@ -2435,7 +2762,7 @@ find_addr_reg (rtx addr)
    OPERANDS[3] is a register for temporary storage.
    OPERANDS[4] is the size as a CONST_INT
    OPERANDS[5] is the alignment safe to use, as a CONST_INT.
-   OPERANDS[6] is another temporary register.   */
+   OPERANDS[6] is another temporary register.  */
 
 const char *
 output_block_move (rtx *operands, int size_is_constant ATTRIBUTE_UNUSED)
@@ -2565,7 +2892,7 @@ output_block_move (rtx *operands, int size_is_constant ATTRIBUTE_UNUSED)
    count insns rather than emit them.  */
 
 static int
-compute_movstr_length (rtx insn)
+compute_movmem_length (rtx insn)
 {
   rtx pat = PATTERN (insn);
   unsigned int align = INTVAL (XEXP (XVECEXP (pat, 0, 7), 0));
@@ -2707,7 +3034,7 @@ output_block_clear (rtx *operands, int size_is_constant ATTRIBUTE_UNUSED)
    count insns rather than emit them.  */
 
 static int
-compute_clrstr_length (rtx insn)
+compute_clrmem_length (rtx insn)
 {
   rtx pat = PATTERN (insn);
   unsigned int align = INTVAL (XEXP (XVECEXP (pat, 0, 4), 0));
@@ -2922,7 +3249,7 @@ output_ascii (FILE *file, const char *p, int size)
 {
   int i;
   int chars_output;
-  unsigned char partial_output[16];	/* Max space 4 chars can occupy.   */
+  unsigned char partial_output[16];	/* Max space 4 chars can occupy.  */
 
   /* The HP assembler can only take strings of 256 characters at one
      time.  This is a limitation on input line length, *not* the
@@ -3186,8 +3513,8 @@ remove_useless_addtr_insns (int check_notes)
 /* Global variables set by output_function_prologue().  */
 /* Size of frame.  Need to know this to emit return insns from
    leaf procedures.  */
-static int actual_fsize;
-static int local_fsize, save_fregs;
+static HOST_WIDE_INT actual_fsize, local_fsize;
+static int save_fregs;
 
 /* Emit RTL to store REG at the memory location specified by BASE+DISP.
    Handle case where DISP > 8k by using the add_high_const patterns.
@@ -3196,7 +3523,7 @@ static int local_fsize, save_fregs;
    in %r1.  There is code in expand_hppa_{prologue,epilogue} that knows this.*/
 
 static void
-store_reg (int reg, int disp, int base)
+store_reg (int reg, HOST_WIDE_INT disp, int base)
 {
   rtx insn, dest, src, basereg;
 
@@ -3207,11 +3534,33 @@ store_reg (int reg, int disp, int base)
       dest = gen_rtx_MEM (word_mode, plus_constant (basereg, disp));
       insn = emit_move_insn (dest, src);
     }
+  else if (TARGET_64BIT && !VAL_32_BITS_P (disp))
+    {
+      rtx delta = GEN_INT (disp);
+      rtx tmpreg = gen_rtx_REG (Pmode, 1);
+
+      emit_move_insn (tmpreg, delta);
+      emit_move_insn (tmpreg, gen_rtx_PLUS (Pmode, tmpreg, basereg));
+      dest = gen_rtx_MEM (word_mode, tmpreg);
+      insn = emit_move_insn (dest, src);
+      if (DO_FRAME_NOTES)
+	{
+	  REG_NOTES (insn)
+	    = gen_rtx_EXPR_LIST (REG_FRAME_RELATED_EXPR,
+		gen_rtx_SET (VOIDmode,
+			     gen_rtx_MEM (word_mode,
+					  gen_rtx_PLUS (word_mode, basereg,
+							delta)),
+                             src),
+                REG_NOTES (insn));
+	}
+    }
   else
     {
       rtx delta = GEN_INT (disp);
       rtx high = gen_rtx_PLUS (Pmode, basereg, gen_rtx_HIGH (Pmode, delta));
       rtx tmpreg = gen_rtx_REG (Pmode, 1);
+
       emit_move_insn (tmpreg, high);
       dest = gen_rtx_MEM (word_mode, gen_rtx_LO_SUM (Pmode, tmpreg, delta));
       insn = emit_move_insn (dest, src);
@@ -3236,11 +3585,11 @@ store_reg (int reg, int disp, int base)
    add MOD to BASE.  MOD must be <= 8k.  */
 
 static void
-store_reg_modify (int base, int reg, int mod)
+store_reg_modify (int base, int reg, HOST_WIDE_INT mod)
 {
   rtx insn, basereg, srcreg, delta;
 
-  if (! VAL_14_BITS_P (mod))
+  if (!VAL_14_BITS_P (mod))
     abort ();
 
   basereg = gen_rtx_REG (Pmode, base);
@@ -3283,7 +3632,7 @@ store_reg_modify (int base, int reg, int mod)
    There is code in expand_hppa_{prologue,epilogue} that knows about this.  */
 
 static void
-set_reg_plus_d (int reg, int base, int disp, int note)
+set_reg_plus_d (int reg, int base, HOST_WIDE_INT disp, int note)
 {
   rtx insn;
 
@@ -3292,25 +3641,35 @@ set_reg_plus_d (int reg, int base, int disp, int note)
       insn = emit_move_insn (gen_rtx_REG (Pmode, reg),
 			     plus_constant (gen_rtx_REG (Pmode, base), disp));
     }
+  else if (TARGET_64BIT && !VAL_32_BITS_P (disp))
+    {
+      rtx basereg = gen_rtx_REG (Pmode, base);
+      rtx delta = GEN_INT (disp);
+      rtx tmpreg = gen_rtx_REG (Pmode, 1);
+
+      emit_move_insn (tmpreg, delta);
+      insn = emit_move_insn (gen_rtx_REG (Pmode, reg),
+			     gen_rtx_PLUS (Pmode, tmpreg, basereg));
+    }
   else
     {
       rtx basereg = gen_rtx_REG (Pmode, base);
       rtx delta = GEN_INT (disp);
+      rtx tmpreg = gen_rtx_REG (Pmode, 1);
 
-      emit_move_insn (gen_rtx_REG (Pmode, 1),
+      emit_move_insn (tmpreg,
 		      gen_rtx_PLUS (Pmode, basereg,
 				    gen_rtx_HIGH (Pmode, delta)));
       insn = emit_move_insn (gen_rtx_REG (Pmode, reg),
-			     gen_rtx_LO_SUM (Pmode, gen_rtx_REG (Pmode, 1),
-					     delta));
+			     gen_rtx_LO_SUM (Pmode, tmpreg, delta));
     }
 
   if (DO_FRAME_NOTES && note)
     RTX_FRAME_RELATED_P (insn) = 1;
 }
 
-int
-compute_frame_size (int size, int *fregs_live)
+HOST_WIDE_INT
+compute_frame_size (HOST_WIDE_INT size, int *fregs_live)
 {
   int freg_saved = 0;
   int i, j;
@@ -3414,7 +3773,7 @@ pa_output_function_prologue (FILE *file, HOST_WIDE_INT size ATTRIBUTE_UNUSED)
   /* hppa_expand_prologue does the dirty work now.  We just need
      to output the assembler directives which denote the start
      of a function.  */
-  fprintf (file, "\t.CALLINFO FRAME=%d", actual_fsize);
+  fprintf (file, "\t.CALLINFO FRAME=" HOST_WIDE_INT_PRINT_DEC, actual_fsize);
   if (regs_ever_live[2])
     fputs (",CALLS,SAVE_RP", file);
   else
@@ -3455,8 +3814,9 @@ void
 hppa_expand_prologue (void)
 {
   int merge_sp_adjust_with_store = 0;
-  int size = get_frame_size ();
-  int i, offset;
+  HOST_WIDE_INT size = get_frame_size ();
+  HOST_WIDE_INT offset;
+  int i;
   rtx insn, tmpreg;
 
   gr_saved = 0;
@@ -3520,8 +3880,8 @@ hppa_expand_prologue (void)
 		 So instead use stwm to store at *sp and post-increment the
 		 stack pointer as an atomic operation.  Then increment sp to
 		 finish allocating the new frame.  */
-	      int adjust1 = 8192 - 64;
-	      int adjust2 = actual_fsize - adjust1;
+	      HOST_WIDE_INT adjust1 = 8192 - 64;
+	      HOST_WIDE_INT adjust2 = actual_fsize - adjust1;
 
 	      store_reg_modify (STACK_POINTER_REGNUM, 1, adjust1);
 	      set_reg_plus_d (STACK_POINTER_REGNUM, STACK_POINTER_REGNUM,
@@ -3753,26 +4113,39 @@ hppa_expand_prologue (void)
    Handle case where DISP > 8k by using the add_high_const patterns.  */
 
 static void
-load_reg (int reg, int disp, int base)
+load_reg (int reg, HOST_WIDE_INT disp, int base)
 {
-  rtx src, dest, basereg;
+  rtx dest = gen_rtx_REG (word_mode, reg);
+  rtx basereg = gen_rtx_REG (Pmode, base);
+  rtx src;
 
-  dest = gen_rtx_REG (word_mode, reg);
-  basereg = gen_rtx_REG (Pmode, base);
   if (VAL_14_BITS_P (disp))
+    src = gen_rtx_MEM (word_mode, plus_constant (basereg, disp));
+  else if (TARGET_64BIT && !VAL_32_BITS_P (disp))
     {
-      src = gen_rtx_MEM (word_mode, plus_constant (basereg, disp));
-      emit_move_insn (dest, src);
+      rtx delta = GEN_INT (disp);
+      rtx tmpreg = gen_rtx_REG (Pmode, 1);
+
+      emit_move_insn (tmpreg, delta);
+      if (TARGET_DISABLE_INDEXING)
+	{
+	  emit_move_insn (tmpreg, gen_rtx_PLUS (Pmode, tmpreg, basereg));
+	  src = gen_rtx_MEM (word_mode, tmpreg);
+	}
+      else
+	src = gen_rtx_MEM (word_mode, gen_rtx_PLUS (Pmode, tmpreg, basereg));
     }
   else
     {
       rtx delta = GEN_INT (disp);
       rtx high = gen_rtx_PLUS (Pmode, basereg, gen_rtx_HIGH (Pmode, delta));
       rtx tmpreg = gen_rtx_REG (Pmode, 1);
+
       emit_move_insn (tmpreg, high);
       src = gen_rtx_MEM (word_mode, gen_rtx_LO_SUM (Pmode, tmpreg, delta));
-      emit_move_insn (dest, src);
     }
+
+  emit_move_insn (dest, src);
 }
 
 /* Update the total code bytes output to the text section.  */
@@ -3858,9 +4231,10 @@ void
 hppa_expand_epilogue (void)
 {
   rtx tmpreg;
-  int offset, i;
+  HOST_WIDE_INT offset;
+  HOST_WIDE_INT ret_off = 0;
+  int i;
   int merge_sp_adjust_with_load = 0;
-  int ret_off = 0;
 
   /* We will use this often.  */
   tmpreg = gen_rtx_REG (word_mode, 1);
@@ -4521,7 +4895,7 @@ pa_adjust_insn_length (rtx insn, int length)
 	   && GET_CODE (XEXP (XVECEXP (pat, 0, 0), 1)) == MEM
 	   && GET_MODE (XEXP (XVECEXP (pat, 0, 0), 0)) == BLKmode
 	   && GET_MODE (XEXP (XVECEXP (pat, 0, 0), 1)) == BLKmode)
-    return compute_movstr_length (insn) - 4;
+    return compute_movmem_length (insn) - 4;
   /* Block clear pattern.  */
   else if (GET_CODE (insn) == INSN
 	   && GET_CODE (pat) == PARALLEL
@@ -4529,7 +4903,7 @@ pa_adjust_insn_length (rtx insn, int length)
 	   && GET_CODE (XEXP (XVECEXP (pat, 0, 0), 0)) == MEM
 	   && XEXP (XVECEXP (pat, 0, 0), 1) == const0_rtx
 	   && GET_MODE (XEXP (XVECEXP (pat, 0, 0), 0)) == BLKmode)
-    return compute_clrstr_length (insn) - 4;
+    return compute_clrmem_length (insn) - 4;
   /* Conditional branch with an unfilled delay slot.  */
   else if (GET_CODE (insn) == JUMP_INSN && ! simplejump_p (insn))
     {
@@ -4829,8 +5203,14 @@ print_operand (FILE *file, rtx x, int code)
 	    fputs (",ma", file);
 	  break;
 	case PLUS:
-	  if (GET_CODE (XEXP (XEXP (x, 0), 0)) == MULT
-	      || GET_CODE (XEXP (XEXP (x, 0), 1)) == MULT)
+	  if (GET_CODE (XEXP (XEXP (x, 0), 0)) == REG
+	      && GET_CODE (XEXP (XEXP (x, 0), 1)) == REG)
+	    {
+	      if (ASSEMBLER_DIALECT == 0)
+		fputs ("x", file);
+	    }
+	  else if (GET_CODE (XEXP (XEXP (x, 0), 0)) == MULT
+		   || GET_CODE (XEXP (XEXP (x, 0), 1)) == MULT)
 	    {
 	      if (ASSEMBLER_DIALECT == 0)
 		fputs ("x,s", file);
@@ -4905,19 +5285,32 @@ print_operand (FILE *file, rtx x, int code)
           base = XEXP (XEXP (x, 0), 0);
 	  fprintf (file, "%d(%s)", size, reg_names [REGNO (base)]);
 	  break;
-	default:
-	  if (GET_CODE (XEXP (x, 0)) == PLUS
-	      && GET_CODE (XEXP (XEXP (x, 0), 0)) == MULT)
+	case PLUS:
+	  if (GET_CODE (XEXP (XEXP (x, 0), 0)) == MULT)
 	    fprintf (file, "%s(%s)",
 		     reg_names [REGNO (XEXP (XEXP (XEXP (x, 0), 0), 0))],
 		     reg_names [REGNO (XEXP (XEXP (x, 0), 1))]);
-	  else if (GET_CODE (XEXP (x, 0)) == PLUS
-		   && GET_CODE (XEXP (XEXP (x, 0), 1)) == MULT)
+	  else if (GET_CODE (XEXP (XEXP (x, 0), 1)) == MULT)
 	    fprintf (file, "%s(%s)",
 		     reg_names [REGNO (XEXP (XEXP (XEXP (x, 0), 1), 0))],
 		     reg_names [REGNO (XEXP (XEXP (x, 0), 0))]);
+	  else if (GET_CODE (XEXP (XEXP (x, 0), 0)) == REG
+		   && GET_CODE (XEXP (XEXP (x, 0), 1)) == REG)
+	    {
+	      /* Because the REG_POINTER flag can get lost during reload,
+		 GO_IF_LEGITIMATE_ADDRESS canonicalizes the order of the
+		 index and base registers in the combined move patterns.  */
+	      rtx base = XEXP (XEXP (x, 0), 1);
+	      rtx index = XEXP (XEXP (x, 0), 0);
+
+	      fprintf (file, "%s(%s)",
+		       reg_names [REGNO (index)], reg_names [REGNO (base)]);
+	    }
 	  else
 	    output_address (XEXP (x, 0));
+	  break;
+	default:
+	  output_address (XEXP (x, 0));
 	  break;
 	}
     }
@@ -5183,6 +5576,7 @@ pa_hpux_init_libfuncs (void)
   set_optab_libfunc (ge_optab, TFmode, "_U_Qfge");
   set_optab_libfunc (lt_optab, TFmode, "_U_Qflt");
   set_optab_libfunc (le_optab, TFmode, "_U_Qfle");
+  set_optab_libfunc (unord_optab, TFmode, "_U_Qfunord");
 
   set_conv_libfunc (sext_optab,   TFmode, SFmode, "_U_Qfcnvff_sgl_to_quad");
   set_conv_libfunc (sext_optab,   TFmode, DFmode, "_U_Qfcnvff_dbl_to_quad");
@@ -5268,8 +5662,8 @@ emit_hpdiv_const (rtx *operands, int unsignedp)
 
       emit_move_insn (gen_rtx_REG (SImode, 26), operands[1]);
       emit
-	(gen_rtx
-	 (PARALLEL, VOIDmode,
+	(gen_rtx_PARALLEL
+	 (VOIDmode,
 	  gen_rtvec (6, gen_rtx_SET (VOIDmode, gen_rtx_REG (SImode, 29),
 				     gen_rtx_fmt_ee (unsignedp ? UDIV : DIV,
 						     SImode,
@@ -5529,6 +5923,37 @@ secondary_reload_class (enum reg_class class, enum machine_mode mode, rtx in)
   return NO_REGS;
 }
 
+/* In the 32-bit runtime, arguments larger than eight bytes are passed
+   by invisible reference.  As a GCC extension, we also pass anything
+   with a zero or variable size by reference.
+
+   The 64-bit runtime does not describe passing any types by invisible
+   reference.  The internals of GCC can't currently handle passing
+   empty structures, and zero or variable length arrays when they are
+   not passed entirely on the stack or by reference.  Thus, as a GCC
+   extension, we pass these types by reference.  The HP compiler doesn't
+   support these types, so hopefully there shouldn't be any compatibility
+   issues.  This may have to be revisited when HP releases a C99 compiler
+   or updates the ABI.  */
+
+static bool
+pa_pass_by_reference (CUMULATIVE_ARGS *ca ATTRIBUTE_UNUSED,
+		      enum machine_mode mode, tree type,
+		      bool named ATTRIBUTE_UNUSED)
+{
+  HOST_WIDE_INT size;
+
+  if (type)
+    size = int_size_in_bytes (type);
+  else
+    size = GET_MODE_SIZE (mode);
+
+  if (TARGET_64BIT)
+    return size <= 0;
+  else
+    return size <= 0 || size > 8;
+}
+
 enum direction
 function_arg_padding (enum machine_mode mode, tree type)
 {
@@ -5568,7 +5993,7 @@ function_arg_padding (enum machine_mode mode, tree type)
    to determine if stdargs or varargs is used and fill in an initial
    va_list.  A pointer to this constructor is returned.  */
 
-struct rtx_def *
+static rtx
 hppa_builtin_saveregs (void)
 {
   rtx offset, dest;
@@ -5644,106 +6069,60 @@ hppa_va_start (tree valist, rtx nextarg)
   std_expand_builtin_va_start (valist, nextarg);
 }
 
-rtx
-hppa_va_arg (tree valist, tree type)
+static tree
+hppa_gimplify_va_arg_expr (tree valist, tree type, tree *pre_p, tree *post_p)
 {
-  HOST_WIDE_INT size = int_size_in_bytes (type);
-  HOST_WIDE_INT ofs;
-  tree t, ptr, pptr;
-
   if (TARGET_64BIT)
     {
-      /* Every argument in PA64 is supposed to be passed by value
-	 (including large structs).  However, as a GCC extension, we
-	 pass zero and variable sized arguments by reference.  Empty
-	 structures are a GCC extension not supported by the HP
-	 compilers.  Thus, passing them by reference isn't likely
-	 to conflict with the ABI.  For variable sized arguments,
-	 GCC doesn't have the infrastructure to allocate these to
-	 registers.  */
-
-      /* Arguments with a size greater than 8 must be aligned 0 MOD 16.  */
-
-      if (size > UNITS_PER_WORD)
-        {
-          t = build (PLUS_EXPR, TREE_TYPE (valist), valist,
-                     build_int_2 (2 * UNITS_PER_WORD - 1, 0));
-          t = build (BIT_AND_EXPR, TREE_TYPE (t), t,
-                     build_int_2 (-2 * UNITS_PER_WORD, -1));
-          t = build (MODIFY_EXPR, TREE_TYPE (valist), valist, t);
-          TREE_SIDE_EFFECTS (t) = 1;
-	  expand_expr (t, const0_rtx, VOIDmode, EXPAND_NORMAL);
-        }
-
-      if (size > 0)
-	return std_expand_builtin_va_arg (valist, type);
-      else
-	{
-	  ptr = build_pointer_type (type);
-
-	  /* Args grow upward.  */
-	  t = build (POSTINCREMENT_EXPR, TREE_TYPE (valist), valist,
-		     build_int_2 (POINTER_SIZE / BITS_PER_UNIT, 0));
-	  TREE_SIDE_EFFECTS (t) = 1;
-
-	  pptr = build_pointer_type (ptr);
-	  t = build1 (NOP_EXPR, pptr, t);
-	  TREE_SIDE_EFFECTS (t) = 1;
-
-	  t = build1 (INDIRECT_REF, ptr, t);
-	  TREE_SIDE_EFFECTS (t) = 1;
-	}
+      /* Args grow upward.  We can use the generic routines.  */
+      return std_gimplify_va_arg_expr (valist, type, pre_p, post_p);
     }
   else /* !TARGET_64BIT */
     {
-      ptr = build_pointer_type (type);
+      tree ptr = build_pointer_type (type);
+      tree valist_type;
+      tree t, u;
+      unsigned int size, ofs;
+      bool indirect;
 
-      /* "Large" and variable sized types are passed by reference.  */
-      if (size > 8 || size <= 0)
+      indirect = pass_by_reference (NULL, TYPE_MODE (type), type, 0);
+      if (indirect)
 	{
-	  /* Args grow downward.  */
-	  t = build (PREDECREMENT_EXPR, TREE_TYPE (valist), valist,
-		     build_int_2 (POINTER_SIZE / BITS_PER_UNIT, 0));
-	  TREE_SIDE_EFFECTS (t) = 1;
-
-	  pptr = build_pointer_type (ptr);
-	  t = build1 (NOP_EXPR, pptr, t);
-	  TREE_SIDE_EFFECTS (t) = 1;
-
-	  t = build1 (INDIRECT_REF, ptr, t);
-	  TREE_SIDE_EFFECTS (t) = 1;
+	  type = ptr;
+	  ptr = build_pointer_type (type);
 	}
-      else
+      size = int_size_in_bytes (type);
+      valist_type = TREE_TYPE (valist);
+
+      /* Args grow down.  Not handled by generic routines.  */
+
+      u = fold_convert (valist_type, size_in_bytes (type));
+      t = build (MINUS_EXPR, valist_type, valist, u);
+
+      /* Copied from va-pa.h, but we probably don't need to align to
+	 word size, since we generate and preserve that invariant.  */
+      u = build_int_2 ((size > 4 ? -8 : -4), -1);
+      u = fold_convert (valist_type, u);
+      t = build (BIT_AND_EXPR, valist_type, t, u);
+
+      t = build (MODIFY_EXPR, valist_type, valist, t);
+
+      ofs = (8 - size) % 4;
+      if (ofs != 0)
 	{
-	  t = build (PLUS_EXPR, TREE_TYPE (valist), valist,
-		     build_int_2 (-size, -1));
-
-	  /* Copied from va-pa.h, but we probably don't need to align to
-	     word size, since we generate and preserve that invariant.  */
-	  t = build (BIT_AND_EXPR, TREE_TYPE (valist), t,
-		     build_int_2 ((size > 4 ? -8 : -4), -1));
-
-	  t = build (MODIFY_EXPR, TREE_TYPE (valist), valist, t);
-	  TREE_SIDE_EFFECTS (t) = 1;
-
-	  ofs = (8 - size) % 4;
-	  if (ofs)
-	    {
-	      t = build (PLUS_EXPR, TREE_TYPE (valist), t,
-			 build_int_2 (ofs, 0));
-	      TREE_SIDE_EFFECTS (t) = 1;
-	    }
-
-	  t = build1 (NOP_EXPR, ptr, t);
-	  TREE_SIDE_EFFECTS (t) = 1;
+	  u = fold_convert (valist_type, size_int (ofs));
+	  t = build (PLUS_EXPR, valist_type, t, u);
 	}
+
+      t = fold_convert (ptr, t);
+      t = build_fold_indirect_ref (t);
+
+      if (indirect)
+	t = build_fold_indirect_ref (t);
+
+      return t;
     }
-
-  /* Calculate!  */
-  return expand_expr (t, NULL_RTX, VOIDmode, EXPAND_NORMAL);
 }
-
-
 
 /* This routine handles all the normal conditional branch sequences we
    might need to generate.  It handles compare immediate vs compare
@@ -5958,7 +6337,7 @@ output_lbranch (rtx dest, rtx insn)
 	abort ();
 
       final_scan_insn (NEXT_INSN (insn), asm_out_file,
-		       optimize, 0, 0);
+		       optimize, 0, 0, NULL);
 
       /* Now delete the delay insn.  */
       PUT_CODE (NEXT_INSN (insn), NOTE);
@@ -6439,7 +6818,7 @@ output_dbra (rtx *operands, rtx insn, int which_alternative)
   else
     {
       /* Reload loop counter from memory, the store back to memory
-	 happens in the branch's delay slot.   */
+	 happens in the branch's delay slot.  */
       output_asm_insn ("ldw %0,%4", operands);
       if (get_attr_length (insn) == 12)
 	return "addib,%C2 %1,%4,%3\n\tstw %4,%0";
@@ -6542,7 +6921,7 @@ output_movb (rtx *operands, rtx insn, int which_alternative,
   else if (which_alternative == 2)
     {
       /* Reload loop counter from memory, the store back to memory
-	 happens in the branch's delay slot.   */
+	 happens in the branch's delay slot.  */
       if (get_attr_length (insn) == 8)
 	return "{comb|cmpb},%S2 %%r0,%1,%3\n\tstw %1,%0";
       else
@@ -6962,7 +7341,7 @@ output_call (rtx insn, rtx call_dest, int sibcall)
 	      && !sibcall)
 	    {
 	      final_scan_insn (NEXT_INSN (insn), asm_out_file,
-			       optimize, 0, 0);
+			       optimize, 0, 0, NULL);
 
 	      /* Now delete the delay insn.  */
 	      PUT_CODE (NEXT_INSN (insn), NOTE);
@@ -7010,7 +7389,8 @@ output_call (rtx insn, rtx call_dest, int sibcall)
 	      /* A non-jump insn in the delay slot.  By definition we can
 		 emit this insn before the call (and in fact before argument
 		 relocating.  */
-	      final_scan_insn (NEXT_INSN (insn), asm_out_file, optimize, 0, 0);
+	      final_scan_insn (NEXT_INSN (insn), asm_out_file, optimize, 0, 0,
+			       NULL);
 
 	      /* Now delete the delay insn.  */
 	      PUT_CODE (NEXT_INSN (insn), NOTE);
@@ -7269,7 +7649,15 @@ output_indirect_call (rtx insn, rtx call_dest)
      No need to check target flags as the length uniquely identifies
      the remaining cases.  */
   if (attr_length_indirect_call (insn) == 8)
-    return ".CALL\tARGW0=GR\n\t{bl|b,l} $$dyncall,%%r31\n\tcopy %%r31,%%r2";
+    {
+      /* The HP linker substitutes a BLE for millicode calls using
+	 the short PIC PCREL form.  Thus, we must use %r31 as the
+	 link register when generating PA 1.x code.  */
+      if (TARGET_PA_20)
+	return ".CALL\tARGW0=GR\n\tb,l $$dyncall,%%r2\n\tcopy %%r2,%%r31";
+      else
+	return ".CALL\tARGW0=GR\n\tbl $$dyncall,%%r31\n\tcopy %%r31,%%r2";
+    }
 
   /* Long millicode call, but we are not generating PIC or portable runtime
      code.  */
@@ -7844,32 +8232,33 @@ shadd_operand (rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
   return (GET_CODE (op) == CONST_INT && shadd_constant_p (INTVAL (op)));
 }
 
-/* Return 1 if OP is valid as a base register in a reg + reg address.  */
+/* Return 1 if OP is valid as a base or index register in a
+   REG+REG address.  */
 
 int
-basereg_operand (rtx op, enum machine_mode mode)
+borx_reg_operand (rtx op, enum machine_mode mode)
 {
-  /* cse will create some unscaled indexed addresses, however; it
-     generally isn't a win on the PA, so avoid creating unscaled
-     indexed addresses until after cse is finished.  */
-  if (!cse_not_expected)
+  if (GET_CODE (op) != REG)
     return 0;
 
-  /* Allow any register when TARGET_NO_SPACE_REGS is in effect since
-     we don't have to worry about the braindamaged implicit space
-     register selection from the basereg.  */
-  if (TARGET_NO_SPACE_REGS)
-    return (GET_CODE (op) == REG);
+  /* We must reject virtual registers as the only expressions that
+     can be instantiated are REG and REG+CONST.  */
+  if (op == virtual_incoming_args_rtx
+      || op == virtual_stack_vars_rtx
+      || op == virtual_stack_dynamic_rtx
+      || op == virtual_outgoing_args_rtx
+      || op == virtual_cfa_rtx)
+    return 0;
 
   /* While it's always safe to index off the frame pointer, it's not
-     always profitable, particularly when the frame pointer is being
-     eliminated.  */
-  if (! flag_omit_frame_pointer && op == frame_pointer_rtx)
-    return 1;
+     profitable to do so when the frame pointer is being eliminated.  */
+  if (!reload_completed
+      && flag_omit_frame_pointer
+      && !current_function_calls_alloca
+      && op == frame_pointer_rtx)
+    return 0;
 
-  return (GET_CODE (op) == REG
-          && REG_POINTER (op)
-          && register_operand (op, mode));
+  return register_operand (op, mode);
 }
 
 /* Return 1 if this operand is anything other than a hard register.  */
@@ -8131,7 +8520,7 @@ pa_reorg (void)
 	 markers disables output of the branch table to readonly memory,
 	 and any alignment directives that might be needed.  Possibly,
 	 the begin_brtab insn should be output before the label for the
-	 table.  This doesn matter at the moment since the tables are
+	 table.  This doesn't matter at the moment since the tables are
 	 always output in the text section.  */
       for (insn = get_insns (); insn; insn = NEXT_INSN (insn))
 	{
@@ -8478,7 +8867,7 @@ insn_refs_are_delayed (rtx insn)
    the mode is SF or DF. Then the value is returned in fr4 (32).
 
    This must perform the same promotions as PROMOTE_MODE, else
-   PROMOTE_FUNCTION_RETURN will not work correctly.
+   TARGET_PROMOTE_FUNCTION_RETURN will not work correctly.
 
    Small structures must be returned in a PARALLEL on PA64 in order
    to match the HP Compiler ABI.  */
@@ -8638,21 +9027,9 @@ function_arg (CUMULATIVE_ARGS *cum, enum machine_mode mode, tree type,
 	  /* Structures 5 to 8 bytes in size are passed in the general
 	     registers in the same manner as other non floating-point
 	     objects.  The data is right-justified and zero-extended
-	     to 64 bits.
-
-	     This is magic.  Normally, using a PARALLEL results in left
-	     justified data on a big-endian target.  However, using a
-	     single double-word register provides the required right
-	     justification for 5 to 8 byte structures.  This has nothing
-	     to do with the direction of padding specified for the argument.
-	     It has to do with how the data is widened and shifted into
-	     and from the register.
-
-	     Aside from adding load_multiple and store_multiple patterns,
-	     this is the only way that I have found to obtain right
-	     justification of BLKmode data when it has a size greater
-	     than one word.  Splitting the operation into two SImode loads
-	     or returning a DImode REG results in left justified data.  */
+	     to 64 bits.  This is opposite to the normal justification
+	     used on big endian targets and requires special treatment.
+	     We now define BLOCK_REG_PADDING to pad these objects.  */
 	  if (mode == BLKmode)
 	    {
 	      rtx loc = gen_rtx_EXPR_LIST (VOIDmode,
@@ -8788,7 +9165,6 @@ pa_select_section (tree exp, int reloc,
       && !reloc)
     readonly_data_section ();
   else if (TREE_CODE_CLASS (TREE_CODE (exp)) == 'c'
-	   && !(TREE_CODE (exp) == STRING_CST && flag_writable_strings)
 	   && !reloc)
     readonly_data_section ();
   else
@@ -8807,4 +9183,31 @@ pa_globalize_label (FILE *stream, const char *name)
     fputs (",DATA\n", stream);
   }
 }
+
+/* Worker function for TARGET_STRUCT_VALUE_RTX.  */
+
+static rtx
+pa_struct_value_rtx (tree fntype ATTRIBUTE_UNUSED,
+		     int incoming ATTRIBUTE_UNUSED)
+{
+  return gen_rtx_REG (Pmode, PA_STRUCT_VALUE_REGNUM);
+}
+
+/* Worker function for TARGET_RETURN_IN_MEMORY.  */
+
+bool
+pa_return_in_memory (tree type, tree fntype ATTRIBUTE_UNUSED)
+{
+  /* SOM ABI says that objects larger than 64 bits are returned in memory.
+     PA64 ABI says that objects larger than 128 bits are returned in memory.
+     Note, int_size_in_bytes can return -1 if the size of the object is
+     variable or larger than the maximum value that can be expressed as
+     a HOST_WIDE_INT.   It can also return zero for an empty type.  The
+     simplest way to handle variable and empty types is to pass them in
+     memory.  This avoids problems in defining the boundaries of argument
+     slots, allocating registers, etc.  */
+  return (int_size_in_bytes (type) > (TARGET_64BIT ? 16 : 8)
+	  || int_size_in_bytes (type) <= 0);
+}
+
 #include "gt-pa.h"

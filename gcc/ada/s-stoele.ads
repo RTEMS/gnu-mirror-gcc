@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 2002-2003 Free Software Foundation, Inc.          --
+--          Copyright (C) 2002-2004 Free Software Foundation, Inc.          --
 --                                                                          --
 -- This specification is derived from the Ada Reference Manual for use with --
 -- GNAT. The copyright notice above, and the license provisions that follow --
@@ -51,12 +51,8 @@ pragma Pure (Storage_Elements);
 --  and it would be unsafe to treat such functions as pure.
 
    type Storage_Offset is range
-     -(2 ** (Standard."-" (Standard'Address_Size, 1))) ..
-     +(2 ** (Standard."-" (Standard'Address_Size, 1))) - 1;
-
-   --  Note: the reason for the qualification of "-" here by Standard is
-   --  that we have a current bug in GNAT that otherwise causes a bogus
-   --  ambiguity when this unit is analyzed in an Rtsfind context.
+     -(2 ** (Integer'(Standard'Address_Size) - 1)) ..
+     +(2 ** (Integer'(Standard'Address_Size) - 1)) - Long_Long_Integer'(1);
 
    subtype Storage_Count is Storage_Offset range 0 .. Storage_Offset'Last;
 
@@ -82,7 +78,7 @@ pragma Pure (Storage_Elements);
    function "-" (Left : Address; Right : Storage_Offset) return Address;
    pragma Convention (Intrinsic, "-");
    pragma Inline_Always ("-");
-   pragma Pure_Function ("+");
+   pragma Pure_Function ("-");
 
    function "-" (Left, Right : Address) return Storage_Offset;
    pragma Convention (Intrinsic, "-");
@@ -91,8 +87,7 @@ pragma Pure (Storage_Elements);
 
    function "mod"
      (Left  : Address;
-      Right : Storage_Offset)
-      return  Storage_Offset;
+      Right : Storage_Offset) return  Storage_Offset;
    pragma Convention (Intrinsic, "mod");
    pragma Inline_Always ("mod");
    pragma Pure_Function ("mod");

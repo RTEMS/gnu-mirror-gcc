@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---           Copyright (C) 2001-2003 Free Software Foundation, Inc.         --
+--           Copyright (C) 2001-2004 Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -25,12 +25,14 @@
 ------------------------------------------------------------------------------
 
 with Gnatvsn;
+with Hostparm;
 with Opt;
 with Osint;    use Osint;
 with Output;   use Output;
 with Prj.Makr;
 with Table;
 
+with Ada.Command_Line;  use Ada.Command_Line;
 with Ada.Text_IO;       use Ada.Text_IO;
 with GNAT.Command_Line; use GNAT.Command_Line;
 with GNAT.OS_Lib;       use GNAT.OS_Lib;
@@ -66,7 +68,7 @@ procedure Gnatname is
       Table_Initial        => 10,
       Table_Increment      => 10,
       Table_Name           => "Gnatname.Excluded_Patterns");
-   --  Table to accumulate the negative patterns.
+   --  Table to accumulate the negative patterns
 
    package Foreign_Patterns is new Table.Table
      (Table_Component_Type => String_Access,
@@ -75,7 +77,7 @@ procedure Gnatname is
       Table_Initial        => 10,
       Table_Increment      => 10,
       Table_Name           => "Gnatname.Foreign_Patterns");
-   --  Table to accumulate the foreign patterns.
+   --  Table to accumulate the foreign patterns
 
    package Patterns is new Table.Table
      (Table_Component_Type => String_Access,
@@ -84,7 +86,7 @@ procedure Gnatname is
       Table_Initial        => 10,
       Table_Increment      => 10,
       Table_Name           => "Gnatname.Patterns");
-   --  Table to accumulate the name patterns.
+   --  Table to accumulate the name patterns
 
    package Source_Directories is new Table.Table
      (Table_Component_Type => String_Access,
@@ -170,7 +172,7 @@ procedure Gnatname is
          Output.Write_Str ("GNATNAME ");
          Output.Write_Str (Gnatvsn.Gnat_Version_String);
          Output.Write_Line
-           (" Copyright 2001-2003 Free Software Foundation, Inc.");
+           (" Copyright 2001-2004 Free Software Foundation, Inc.");
       end if;
    end Output_Version;
 
@@ -261,7 +263,6 @@ procedure Gnatname is
    exception
       when Invalid_Switch =>
          Fail ("invalid switch " & Full_Switch);
-
    end Scan_Args;
 
    -----------
@@ -297,6 +298,38 @@ procedure Gnatname is
 --  Start of processing for Gnatname
 
 begin
+   --  Add the directory where gnatname is invoked in front of the
+   --  path, if gnatname is invoked with directory information.
+   --  Only do this if the platform is not VMS, where the notion of path
+   --  does not really exist.
+
+   if not Hostparm.OpenVMS then
+      declare
+         Command : constant String := Command_Name;
+
+      begin
+         for Index in reverse Command'Range loop
+            if Command (Index) = Directory_Separator then
+               declare
+                  Absolute_Dir : constant String :=
+                                   Normalize_Pathname
+                                     (Command (Command'First .. Index));
+
+                  PATH         : constant String :=
+                                   Absolute_Dir &
+                  Path_Separator &
+                  Getenv ("PATH").all;
+
+               begin
+                  Setenv ("PATH", PATH);
+               end;
+
+               exit;
+            end if;
+         end loop;
+      end;
+   end if;
+
    --  Initialize tables
 
    Excluded_Patterns.Set_Last (0);

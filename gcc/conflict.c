@@ -376,7 +376,7 @@ mark_reg (rtx reg, rtx setter ATTRIBUTE_UNUSED, void *data)
     reg = SUBREG_REG (reg);
 
   /* We're only interested in regs.  */
-  if (GET_CODE (reg) != REG)
+  if (!REG_P (reg))
     return;
 
   SET_REGNO_REG_SET (set, REGNO (reg));
@@ -435,9 +435,9 @@ conflict_graph_compute (regset regs, partition p)
       AND_REG_SET (live, regs);
 
       /* Walk the instruction stream backwards.  */
-      head = bb->head;
-      insn = bb->end;
-      for (insn = bb->end; insn != head; insn = PREV_INSN (insn))
+      head = BB_HEAD (bb);
+      insn = BB_END (bb);
+      for (insn = BB_END (bb); insn != head; insn = PREV_INSN (insn))
 	{
 	  int born_reg;
 	  int live_reg;

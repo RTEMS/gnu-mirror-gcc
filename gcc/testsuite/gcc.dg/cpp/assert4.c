@@ -78,11 +78,67 @@
 # error
 #endif
 
+#if defined __unix__
+# if !#system(unix)
+#  error
+# endif
+#elif #system(unix)
+# error
+#endif
+
 #if defined __rtems__
 # if !#system(rtems)
 #  error
 # endif
 #elif #system(rtems)
+# error
+#endif
+
+#if defined __vms__
+# if !#system(vms)
+#  error
+# endif
+#elif #system(vms)
+# error
+#endif
+
+#if defined __mvs__
+# if !#system(mvs)
+#  error
+# endif
+#elif #system(mvs)
+# error
+#endif
+
+#if defined __MSDOS__
+# if !#system(msdos)
+#  error
+# endif
+#elif #system(msdos)
+# error
+#endif
+
+#if defined __WINNT__
+# if !#system(winnt)
+#  error
+# endif
+#elif #system(winnt)
+# error
+#endif
+
+#if defined __BEOS__
+# if !#system(beos)
+#  error
+# endif
+#elif #system(beos)
+# error
+#endif
+
+#if defined __netware__
+# if !#system(netware)
+#  error
+# endif
+#elif #system(netware)
 # error
 #endif
 
@@ -133,14 +189,6 @@
 #  error
 # endif
 #elif #cpu(cris) || #machine(cris)
-# error
-#endif
-
-#if defined __d30v__
-# if !#cpu(d30v) || !#machine(d30v)
-#  error
-# endif
-#elif #cpu(d30v) || #machine(d30v)
 # error
 #endif
 
@@ -211,14 +259,6 @@
 #  error
 # endif
 #elif #cpu(i860) || #machine(i860)
-# error
-#endif
-
-#if defined __i960__
-# if !#cpu(i960) || !#machine(i960)
-#  error
-# endif
-#elif #cpu(i960) || #machine(i960)
 # error
 #endif
 
@@ -304,10 +344,19 @@
 #endif
 
 #if defined __powerpc__
-# if !#cpu(powerpc) || !#machine(powerpc)
-#  error
+# if defined __powerpc64__
+#  if (#cpu(powerpc) || #machine(powerpc) \
+       || !#cpu(powerpc64) || !#machine(powerpc64))
+#   error
+#  endif
+# else
+#  if (!#cpu(powerpc) || !#machine(powerpc) \
+       || #cpu(powerpc64) || #machine(powerpc64))
+#   error
+#  endif
 # endif
-#elif #cpu(powerpc) || #machine(powerpc)
+#elif (#cpu(powerpc) || #machine(powerpc) \
+       || #cpu(powerpc64) || #machine(powerpc64))
 # error
 #endif
 

@@ -1,5 +1,5 @@
 /* Graph coloring register allocator
-   Copyright (C) 2001, 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Michael Matz <matz@suse.de>
    and Daniel Berlin <dan@cgsoftware.com>.
 
@@ -17,6 +17,14 @@
    You should have received a copy of the GNU General Public License along
    with GCC; see the file COPYING.  If not, write to the Free Software
    Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
+
+#ifndef GCC_RA_H
+#define GCC_RA_H
+
+#include "bitmap.h"
+#include "sbitmap.h"
+#include "hard-reg-set.h"
+#include "insn-modes.h"
 
 /* Double linked list to implement the per-type lists of webs
    and moves.  */
@@ -569,8 +577,8 @@ extern int flag_ra_spill_every_use;
 /* Nonzero to output all notes in the debug dumps.  */
 extern int flag_ra_dump_notes;
 
-extern inline void * ra_alloc (size_t);
-extern inline void * ra_calloc (size_t);
+extern void * ra_alloc (size_t);
+extern void * ra_calloc (size_t);
 extern int hard_regs_count (HARD_REG_SET);
 extern rtx ra_emit_move_insn (rtx, rtx);
 extern void ra_debug_msg (unsigned int, const char *, ...) ATTRIBUTE_PRINTF_2;
@@ -627,3 +635,5 @@ extern void emit_colors (struct df *);
 extern void delete_moves (void);
 extern void setup_renumber (int);
 extern void remove_suspicious_death_notes (void);
+
+#endif /* GCC_RA_H */

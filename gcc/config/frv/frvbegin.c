@@ -1,5 +1,5 @@
 /* Frv initialization file linked before all user modules
-   Copyright (C) 1999, 2000, 2003 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2003, 2004 Free Software Foundation, Inc.
     Contributed by Red Hat, Inc.
   
    This file is part of GCC.
@@ -20,7 +20,7 @@
    Boston, MA 02111-1307, USA.
 
    This file was originally taken from the file crtstuff.c in the
-   main compiler directory, and simplified. */
+   main compiler directory, and simplified.  */
 
 /* As a special exception, if you link this library with other files,
    some of which are compiled with GCC, to produce an executable,
@@ -71,17 +71,20 @@ INIT_SECTION_NEG_ONE (".dtors", "\"aw\"", "__DTOR_LIST__");
 
 INIT_SECTION (".eh_frame", "\"aw\"", "__EH_FRAME_BEGIN__");
 
+#if ! __FRV_FDPIC__
+/* In FDPIC, the linker itself generates this.  */
 /* Beginning of .rofixup section that provides a list of pointers that we
    need to adjust.  */
 
 INIT_SECTION (".rofixup", "\"a\"", "__ROFIXUP_LIST__");
+#endif /* __FRV_FDPIC__ */
 
 extern void __frv_register_eh(void) __attribute__((__constructor__));
 extern void __frv_deregister_eh(void) __attribute__((__destructor__));
 
 extern func_ptr __EH_FRAME_BEGIN__[];
 
-/* Register the exeception handling table as the first constructor */
+/* Register the exception handling table as the first constructor.  */
 void
 __frv_register_eh (void)
 {
@@ -93,7 +96,7 @@ __frv_register_eh (void)
 /* Note, do not declare __{,de}register_frame_info weak as it seems
    to interfere with the pic support.  */
 
-/* Unregister the exeception handling table as a deconstructor */
+/* Unregister the exception handling table as a deconstructor.  */
 void
 __frv_deregister_eh (void)
 {
@@ -108,7 +111,7 @@ __frv_deregister_eh (void)
   completed = 1;
 }
 
-/* Run the global destructors */
+/* Run the global destructors.  */
 void
 __do_global_dtors (void)
 {
@@ -120,7 +123,7 @@ __do_global_dtors (void)
     }
 }
 
-/* Run the global constructors */
+/* Run the global constructors.  */
 void
 __do_global_ctors (void)
 {

@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2003 Free Software Foundation, Inc.          --
+--          Copyright (C) 1992-2004 Free Software Foundation, Inc.          --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -35,6 +35,7 @@ with Ada.Streams;          use Ada.Streams;
 with Interfaces.C_Streams; use Interfaces.C_Streams;
 with System;
 with System.File_IO;
+with System.CRTL;
 with Unchecked_Conversion;
 with Unchecked_Deallocation;
 
@@ -50,6 +51,8 @@ package body Ada.Text_IO is
    function To_FCB is new Unchecked_Conversion (File_Mode, FCB.File_Mode);
    function To_TIO is new Unchecked_Conversion (FCB.File_Mode, File_Mode);
    use type FCB.File_Mode;
+
+   use type System.CRTL.size_t;
 
    -------------------
    -- AFCB_Allocate --
@@ -1675,8 +1678,12 @@ package body Ada.Text_IO is
          --  because it is too much of a nuisance to have these odd line
          --  feeds when nothing has been written to the file.
 
+         --  We also avoid this for files opened in append mode, in
+         --  accordance with (RM A.8.2(10))
+
          elsif (File /= Standard_Err and then File /= Standard_Out)
            and then (File.Line = 1 and then File.Page = 1)
+           and then Mode (File) = Out_File
          then
             New_Line (File);
          end if;

@@ -1,5 +1,5 @@
 /* Definitions of various defaults for tm.h macros.
-   Copyright (C) 1992, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003
+   Copyright (C) 1992, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004
    Free Software Foundation, Inc.
    Contributed by Ron Guilmette (rfg@monkeys.com)
 
@@ -39,12 +39,13 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #ifndef TARGET_BELL
 #  define TARGET_BELL 007
 #  define TARGET_BS 010
-#  define TARGET_TAB 011
-#  define TARGET_NEWLINE 012
-#  define TARGET_VT 013
-#  define TARGET_FF 014
 #  define TARGET_CR 015
+#  define TARGET_DIGIT0 060
 #  define TARGET_ESC 033
+#  define TARGET_FF 014
+#  define TARGET_NEWLINE 012
+#  define TARGET_TAB 011
+#  define TARGET_VT 013
 #endif
 
 /* Store in OUTPUT a string (made with alloca) containing an
@@ -80,13 +81,13 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #ifndef ASM_OUTPUT_ADDR_VEC_ELT
 #define ASM_OUTPUT_ADDR_VEC_ELT(FILE, VALUE)  \
-do { fputs (integer_asm_op (POINTER_SIZE / UNITS_PER_WORD, TRUE), FILE); \
+do { fputs (integer_asm_op (POINTER_SIZE / BITS_PER_UNIT, TRUE), FILE); \
      (*targetm.asm_out.internal_label) (FILE, "L", (VALUE));			\
      fputc ('\n', FILE);						\
    } while (0)
 #endif
 
-/* choose a reasonable default for ASM_OUTPUT_ASCII.  */
+/* Choose a reasonable default for ASM_OUTPUT_ASCII.  */
 
 #ifndef ASM_OUTPUT_ASCII
 #define ASM_OUTPUT_ASCII(MYFILE, MYSTRING, MYLENGTH) \
@@ -237,6 +238,20 @@ do { fputs (integer_asm_op (POINTER_SIZE / UNITS_PER_WORD, TRUE), FILE); \
 #endif
 #endif
 
+/* This determines whether weak symbols must be left out of a static
+   archive's table of contents.  Defining this macro to be nonzero has
+   the consequence that certain symbols will not be made weak that
+   otherwise would be.  The C++ ABI requires this macro to be zero;
+   see the documentation. */ 
+#ifndef TARGET_WEAK_NOT_IN_ARCHIVE_TOC
+#define TARGET_WEAK_NOT_IN_ARCHIVE_TOC 0
+#endif
+
+/* This determines whether or not we need linkonce unwind information */
+#ifndef TARGET_USES_WEAK_UNWIND_INFO
+#define TARGET_USES_WEAK_UNWIND_INFO 0
+#endif
+
 /* By default, there is no prefix on user-defined symbols.  */
 #ifndef USER_LABEL_PREFIX
 #define USER_LABEL_PREFIX ""
@@ -257,6 +272,24 @@ do { fputs (integer_asm_op (POINTER_SIZE / UNITS_PER_WORD, TRUE), FILE); \
 #  define TARGET_ATTRIBUTE_WEAK
 # endif
 #endif
+
+/* This determines whether this target supports hidden visibility.
+   This is a weaker condition than HAVE_GAS_HIDDEN, which probes for
+   specific assembler syntax.  */
+#ifndef TARGET_SUPPORTS_HIDDEN
+# ifdef HAVE_GAS_HIDDEN
+#  define TARGET_SUPPORTS_HIDDEN 1
+# else
+#  define TARGET_SUPPORTS_HIDDEN 0
+# endif
+#endif
+
+/* Determines whether we may use common symbols to represent one-only
+   semantics (a.k.a. "vague linkage").  */
+#ifndef USE_COMMON_FOR_ONE_ONLY
+# define USE_COMMON_FOR_ONE_ONLY 1
+#endif
+
 
 /* If the target supports init_priority C++ attribute, give
    SUPPORTS_INIT_PRIORITY a nonzero value.  */
@@ -303,11 +336,6 @@ do { fputs (integer_asm_op (POINTER_SIZE / UNITS_PER_WORD, TRUE), FILE); \
    platforms, define this to zero.  */
 #ifndef DWARF2_GENERATE_TEXT_SECTION_LABEL
 #define DWARF2_GENERATE_TEXT_SECTION_LABEL 1
-#endif
-
-/* Supply a default definition for PROMOTE_PROTOTYPES.  */
-#ifndef PROMOTE_PROTOTYPES
-#define PROMOTE_PROTOTYPES	0
 #endif
 
 /* Number of hardware registers that go into the DWARF-2 unwind info.
@@ -459,6 +487,16 @@ do { fputs (integer_asm_op (POINTER_SIZE / UNITS_PER_WORD, TRUE), FILE); \
 #define TARGET_VTABLE_DATA_ENTRY_DISTANCE 1
 #endif
 
+/* Decide whether it is safe to use a local alias for a virtual function
+   when constructing thunks.  */
+#ifndef TARGET_USE_LOCAL_THUNK_ALIAS_P
+#ifdef ASM_OUTPUT_DEF
+#define TARGET_USE_LOCAL_THUNK_ALIAS_P(DECL) 1
+#else
+#define TARGET_USE_LOCAL_THUNK_ALIAS_P(DECL) 0
+#endif
+#endif
+
 /* Select a format to encode pointers in exception handling data.  We
    prefer those that result in fewer dynamic relocations.  Assume no
    special support here and encode direct references.  */
@@ -485,7 +523,7 @@ do { fputs (integer_asm_op (POINTER_SIZE / UNITS_PER_WORD, TRUE), FILE); \
    PREFERRED_DEBUGGING_TYPE to choose a format in a system-dependent way.
 
    This is one long line cause VAXC can't handle a \-newline.  */
-#if 1 < (defined (DBX_DEBUGGING_INFO) + defined (SDB_DEBUGGING_INFO) + defined (DWARF_DEBUGGING_INFO) + defined (DWARF2_DEBUGGING_INFO) + defined (XCOFF_DEBUGGING_INFO) + defined (VMS_DEBUGGING_INFO))
+#if 1 < (defined (DBX_DEBUGGING_INFO) + defined (SDB_DEBUGGING_INFO) + defined (DWARF2_DEBUGGING_INFO) + defined (XCOFF_DEBUGGING_INFO) + defined (VMS_DEBUGGING_INFO))
 #ifndef PREFERRED_DEBUGGING_TYPE
 You Lose!  You must define PREFERRED_DEBUGGING_TYPE!
 #endif /* no PREFERRED_DEBUGGING_TYPE */
@@ -585,15 +623,31 @@ You Lose!  You must define PREFERRED_DEBUGGING_TYPE!
 #endif
 
 #ifndef HOT_TEXT_SECTION_NAME
-#define HOT_TEXT_SECTION_NAME "text.hot"
+#define HOT_TEXT_SECTION_NAME ".text.hot"
+#endif
+
+#ifndef NORMAL_TEXT_SECTION_NAME
+#define NORMAL_TEXT_SECTION_NAME ".text"
 #endif
 
 #ifndef UNLIKELY_EXECUTED_TEXT_SECTION_NAME
-#define UNLIKELY_EXECUTED_TEXT_SECTION_NAME "text.unlikely"
+#define UNLIKELY_EXECUTED_TEXT_SECTION_NAME ".text.unlikely"
+#endif
+
+#ifndef HAS_LONG_COND_BRANCH
+#define HAS_LONG_COND_BRANCH 0
+#endif
+
+#ifndef HAS_LONG_UNCOND_BRANCH
+#define HAS_LONG_UNCOND_BRANCH 0
 #endif
 
 #ifndef VECTOR_MODE_SUPPORTED_P
 #define VECTOR_MODE_SUPPORTED_P(MODE) 0
+#endif
+
+#ifndef UNITS_PER_SIMD_WORD
+#define UNITS_PER_SIMD_WORD 0
 #endif
 
 /* Determine whether __cxa_atexit, rather than atexit, is used to
@@ -679,10 +733,46 @@ You Lose!  You must define PREFERRED_DEBUGGING_TYPE!
 #define STACK_POINTER_OFFSET    0
 #endif
 
-/* How to print out a register name.  */
-#ifndef PRINT_REG
-#define PRINT_REG(RTX, CODE, FILE) \
-  fprintf ((FILE), "%s", reg_names[REGNO (RTX)])
+#ifndef LOCAL_REGNO
+#define LOCAL_REGNO(REGNO)  0
+#endif
+
+/* EXIT_IGNORE_STACK should be nonzero if, when returning from a function,
+   the stack pointer does not matter.  The value is tested only in
+   functions that have frame pointers.  */
+#ifndef EXIT_IGNORE_STACK
+#define EXIT_IGNORE_STACK 0
+#endif
+
+/* Assume that case vectors are not pc-relative.  */
+#ifndef CASE_VECTOR_PC_RELATIVE
+#define CASE_VECTOR_PC_RELATIVE 0
+#endif
+
+/* Assume that trampolines need function alignment.  */
+#ifndef TRAMPOLINE_ALIGNMENT
+#define TRAMPOLINE_ALIGNMENT FUNCTION_BOUNDARY
+#endif
+
+/* Register mappings for target machines without register windows.  */
+#ifndef INCOMING_REGNO
+#define INCOMING_REGNO(N) (N)
+#endif
+
+#ifndef OUTGOING_REGNO
+#define OUTGOING_REGNO(N) (N)
+#endif
+
+#ifndef SHIFT_COUNT_TRUNCATED
+#define SHIFT_COUNT_TRUNCATED 0
+#endif
+
+#ifndef LEGITIMIZE_ADDRESS
+#define LEGITIMIZE_ADDRESS(X, OLDX, MODE, WIN)
+#endif
+
+#ifndef REVERSIBLE_CC_MODE
+#define REVERSIBLE_CC_MODE(MODE) 0
 #endif
 
 #endif  /* ! GCC_DEFAULTS_H */
