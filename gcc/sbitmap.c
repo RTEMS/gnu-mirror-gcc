@@ -20,6 +20,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "flags.h"
 #include "hard-reg-set.h"
@@ -241,7 +243,7 @@ sbitmap_difference (dst, a, b)
 }
 
 /* Set DST to be (A and B).
-   Return non-zero if any change is made.  */
+   Return nonzero if any change is made.  */
 
 bool
 sbitmap_a_and_b_cg (dst, a, b)
@@ -277,7 +279,7 @@ sbitmap_a_and_b (dst, a, b)
 }
 
 /* Set DST to be (A xor B)).
-   Return non-zero if any change is made.  */
+   Return nonzero if any change is made.  */
 
 bool
 sbitmap_a_xor_b_cg (dst, a, b)
@@ -313,7 +315,7 @@ sbitmap_a_xor_b (dst, a, b)
 }
 
 /* Set DST to be (A or B)).
-   Return non-zero if any change is made.  */
+   Return nonzero if any change is made.  */
 
 bool
 sbitmap_a_or_b_cg (dst, a, b)
@@ -348,7 +350,7 @@ sbitmap_a_or_b (dst, a, b)
     *dstp++ = *ap++ | *bp++;
 }
 
-/* Return non-zero if A is a subset of B.  */
+/* Return nonzero if A is a subset of B.  */
 
 bool
 sbitmap_a_subset_b_p (a, b)
@@ -365,7 +367,7 @@ sbitmap_a_subset_b_p (a, b)
 }
 
 /* Set DST to be (A or (B and C)).
-   Return non-zero if any change is made.  */
+   Return nonzero if any change is made.  */
 
 bool
 sbitmap_a_or_b_and_c_cg (dst, a, b, c)
@@ -403,7 +405,7 @@ sbitmap_a_or_b_and_c (dst, a, b, c)
 }
 
 /* Set DST to be (A and (B or C)).
-   Return non-zero if any change is made.  */
+   Return nonzero if any change is made.  */
 
 bool
 sbitmap_a_and_b_or_c_cg (dst, a, b, c)

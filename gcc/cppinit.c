@@ -21,6 +21,8 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "cpplib.h"
 #include "cpphash.h"
 #include "prefix.h"
@@ -87,7 +89,7 @@ struct cpp_pending
 #endif
 
 static void path_include		PARAMS ((cpp_reader *,
-						 char *, int));
+						 const char *, int));
 static void init_library		PARAMS ((void));
 static void init_builtins		PARAMS ((cpp_reader *));
 static void mark_named_operators	PARAMS ((cpp_reader *));
@@ -150,19 +152,21 @@ END
 #undef END
 #undef TRIGRAPH_MAP
 
-/* Given a colon-separated list of file names PATH,
+/* Read ENV_VAR for a colon-separated list of file names; and
    add all the names to the search path for include files.  */
 static void
-path_include (pfile, list, path)
+path_include (pfile, env_var, path)
      cpp_reader *pfile;
-     char *list;
+     const char *env_var;
      int path;
 {
   char *p, *q, *name;
 
-  p = list;
+  GET_ENVIRONMENT (q, env_var);
+  if (!q)
+    return;
 
-  do
+  for (p = q; *q; p = q + 1)
     {
       /* Find the end of this name.  */
       q = p;
@@ -183,18 +187,12 @@ path_include (pfile, list, path)
 	}
 
       append_include_chain (pfile, name, path, path == SYSTEM);
-
-      /* Advance past this name.  */
-      if (*q == 0)
-	break;
-      p = q + 1;
     }
-  while (1);
 }
 
 /* Append DIR to include path PATH.  DIR must be allocated on the
    heap; this routine takes responsibility for freeing it.  CXX_AWARE
-   is non-zero if the header contains extern "C" guards for C++,
+   is nonzero if the header contains extern "C" guards for C++,
    otherwise it is zero.  */
 static void
 append_include_chain (pfile, dir, path, cxx_aware)
@@ -515,7 +513,7 @@ cpp_create_reader (lang)
 {
   cpp_reader *pfile;
 
-  /* Initialise this instance of the library if it hasn't been already.  */
+  /* Initialize this instance of the library if it hasn't been already.  */
   init_library ();
 
   pfile = (cpp_reader *) xcalloc (1, sizeof (cpp_reader));
@@ -543,7 +541,7 @@ cpp_create_reader (lang)
   CPP_OPTION (pfile, unsigned_char) = 0;
   CPP_OPTION (pfile, unsigned_wchar) = 1;
 
-  /* Initialise the line map.  Start at logical line 1, so we can use
+  /* Initialize the line map.  Start at logical line 1, so we can use
      a line number of zero for special states.  */
   init_line_maps (&pfile->line_maps);
   pfile->line = 1;
@@ -562,7 +560,7 @@ cpp_create_reader (lang)
   pfile->cur_run = &pfile->base_run;
   pfile->cur_token = pfile->base_run.base;
 
-  /* Initialise the base context.  */
+  /* Initialize the base context.  */
   pfile->context = &pfile->base_context;
   pfile->base_context.macro = 0;
   pfile->base_context.prev = pfile->base_context.next = 0;
@@ -574,7 +572,7 @@ cpp_create_reader (lang)
   /* The expression parser stack.  */
   _cpp_expand_op_stack (pfile);
 
-  /* Initialise the buffer obstack.  */
+  /* Initialize the buffer obstack.  */
   gcc_obstack_init (&pfile->buffer_ob);
 
   _cpp_init_includes (pfile);
@@ -583,7 +581,7 @@ cpp_create_reader (lang)
 }
 
 /* Free resources used by PFILE.  Accessing PFILE after this function
-   returns leads to undefined behaviour.  Returns the error count.  */
+   returns leads to undefined behavior.  Returns the error count.  */
 void
 cpp_destroy (pfile)
      cpp_reader *pfile;
@@ -710,7 +708,8 @@ mark_named_operators (pfile)
     {
       cpp_hashnode *hp = cpp_lookup (pfile, b->name, b->len);
       hp->flags |= NODE_OPERATOR;
-      hp->value.operator = b->value;
+      hp->is_directive = 0;
+      hp->directive_index = b->value;
     }
 }
 
@@ -755,37 +754,8 @@ static void
 init_standard_includes (pfile)
      cpp_reader *pfile;
 {
-  char *path;
   const struct default_include *p;
   const char *specd_prefix = CPP_OPTION (pfile, include_prefix);
-
-  /* Several environment variables may add to the include search path.
-     CPATH specifies an additional list of directories to be searched
-     as if specified with -I, while C_INCLUDE_PATH, CPLUS_INCLUDE_PATH,
-     etc. specify an additional list of directories to be searched as
-     if specified with -isystem, for the language indicated.  */
-
-  GET_ENVIRONMENT (path, "CPATH");
-  if (path != 0 && *path != 0)
-    path_include (pfile, path, BRACKET);
-
-  switch ((CPP_OPTION (pfile, objc) << 1) + CPP_OPTION (pfile, cplusplus))
-    {
-    case 0:
-      GET_ENVIRONMENT (path, "C_INCLUDE_PATH");
-      break;
-    case 1:
-      GET_ENVIRONMENT (path, "CPLUS_INCLUDE_PATH");
-      break;
-    case 2:
-      GET_ENVIRONMENT (path, "OBJC_INCLUDE_PATH");
-      break;
-    case 3:
-      GET_ENVIRONMENT (path, "OBJCPLUS_INCLUDE_PATH");
-      break;
-    }
-  if (path != 0 && *path != 0)
-    path_include (pfile, path, SYSTEM);
 
   /* Search "translated" versions of GNU directories.
      These have /usr/local/lib/gcc... replaced by specd_prefix.  */
@@ -808,7 +778,7 @@ init_standard_includes (pfile)
 		  && !CPP_OPTION (pfile, no_standard_cplusplus_includes)))
 	    {
 	      /* Does this dir start with the prefix?  */
-	      if (!memcmp (p->fname, default_prefix, default_len))
+	      if (!strncmp (p->fname, default_prefix, default_len))
 		{
 		  /* Yes; change prefix and add to search list.  */
 		  int flen = strlen (p->fname);
@@ -840,7 +810,7 @@ init_standard_includes (pfile)
 }
 
 /* Pushes a command line -imacro and -include file indicated by P onto
-   the buffer stack.  Returns non-zero if successful.  */
+   the buffer stack.  Returns nonzero if successful.  */
 static bool
 push_include (pfile, p)
      cpp_reader *pfile;
@@ -950,6 +920,11 @@ cpp_read_main_file (pfile, fname, table)
      const char *fname;
      hash_table *table;
 {
+  static const char *const lang_env_vars[] =
+    { "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH",
+      "OBJC_INCLUDE_PATH", "OBJCPLUS_INCLUDE_PATH" };
+  size_t lang;
+
   sanity_checks (pfile);
 
   post_options (pfile);
@@ -958,6 +933,15 @@ cpp_read_main_file (pfile, fname, table)
      finished processing the command line options, so initializing the
      hashtable is deferred until now.  */
   _cpp_init_hashtable (pfile, table);
+
+  /* Several environment variables may add to the include search path.
+     CPATH specifies an additional list of directories to be searched
+     as if specified with -I, while C_INCLUDE_PATH, CPLUS_INCLUDE_PATH,
+     etc. specify an additional list of directories to be searched as
+     if specified with -isystem, for the language indicated.  */
+  path_include (pfile, "CPATH", BRACKET);
+  lang = (CPP_OPTION (pfile, objc) << 1) + CPP_OPTION (pfile, cplusplus);
+  path_include (pfile, lang_env_vars[lang], SYSTEM);
 
   /* Set up the include search path now.  */
   if (! CPP_OPTION (pfile, no_standard_includes))
@@ -1229,7 +1213,7 @@ parse_option (input)
       md = (mn + mx) / 2;
 
       opt_len = cl_options[md].opt_len;
-      comp = memcmp (input, cl_options[md].opt_text, opt_len);
+      comp = strncmp (input, cl_options[md].opt_text, opt_len);
 
       if (comp > 0)
 	mn = md + 1;
@@ -1254,7 +1238,7 @@ parse_option (input)
 	      for (; mn < (unsigned int) N_OPTS; mn++)
 		{
 		  opt_len = cl_options[mn].opt_len;
-		  if (memcmp (input, cl_options[mn].opt_text, opt_len))
+		  if (strncmp (input, cl_options[mn].opt_text, opt_len))
 		    break;
 		  if (input[opt_len] == '\0')
 		    return mn;

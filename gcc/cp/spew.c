@@ -25,6 +25,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "input.h"
 #include "tree.h"
 #include "cp-tree.h"
@@ -86,7 +88,7 @@ struct unparsed_text GTY(())
 
   struct token_chunk *last_chunk; /* End of the token list.  */
   short last_pos;	/* Number of tokens used in the last chunk of
-			   TOKENS. */
+			   TOKENS.  */
 
   short cur_pos;	/* Current token in 'cur_chunk', when rescanning.  */
   struct token_chunk *cur_chunk;  /* Current chunk, when rescanning.  */
@@ -133,6 +135,7 @@ static struct unparsed_text * alloc_unparsed_text
 
 static void snarf_block PARAMS ((struct unparsed_text *t));
 static tree snarf_defarg PARAMS ((void));
+static void snarf_parenthesized_expression (struct unparsed_text *);
 static int frob_id PARAMS ((int, int, tree *));
 
 /* The list of inline functions being held off until we reach the end of
@@ -185,7 +188,7 @@ static int first_token;
 static GTY(()) tree defarg_fns;
 /* current default parameter */
 static GTY(()) tree defarg_parm;
-/* list of unprocessed fns met during current fn. */
+/* list of unprocessed fns met during current fn.  */
 static GTY(()) tree defarg_depfns;
 /* list of fns with circular defargs */
 static GTY(()) tree defarg_fnsdone;
@@ -386,7 +389,8 @@ feed_input (input)
 #ifdef SPEW_DEBUG
   if (spew_debug)
     fprintf (stderr, "\tfeeding %s:%d [%d tokens]\n",
-	     input->locus.file, input->locus.line, input->limit - input->pos);
+	     input->locus.file, input->locus.line,
+	     input->last_pos - input->cur_pos);
 #endif
 
   f->input = input;
@@ -476,8 +480,7 @@ next_token (t)
       return t->yychar;
     }
 
-  memcpy (t, &Teosi, sizeof (struct token));
-  return END_OF_SAVED_INPUT;
+  return 0;
 }
 
 /* Shift the next token onto the fifo.  */
@@ -668,7 +671,7 @@ do_aggr ()
 void
 see_typename ()
 {
-  /* Only types expected, not even namespaces. */
+  /* Only types expected, not even namespaces.  */
   looking_for_typename = 2;
   if (yychar < 0)
     if ((yychar = yylex ()) < 0) yychar = 0;
@@ -754,7 +757,7 @@ yylex ()
     case PTYPENAME:
     case PTYPENAME_DEFN:
       /* If we see a SCOPE next, restore the old value.
-	 Otherwise, we got what we want. */
+	 Otherwise, we got what we want.  */
       looking_for_typename = old_looking_for_typename;
       looking_for_template = 0;
       break;
@@ -832,7 +835,7 @@ yylex ()
 }
 
 /* Unget character CH from the input stream.
-   If RESCAN is non-zero, then we want to `see' this
+   If RESCAN is nonzero, then we want to `see' this
    character as the next input token.  */
 
 void
@@ -887,7 +890,7 @@ frob_id (yyc, peek, idp)
           case NSNAME:
           case PTYPENAME:
 	    /* If this got special lookup, remember it.  In these
-	       cases, we know it can't be a declarator-id. */
+	       cases, we know it can't be a declarator-id.  */
             if (got_scope || got_object)
               *idp = trrr;
             /* FALLTHROUGH */
@@ -1067,6 +1070,30 @@ alloc_unparsed_text (locus, decl, interface)
   return r;
 }
 
+/* Accumulate the tokens that make up a parenthesized expression in T,
+   having already read the opening parenthesis.  */
+
+static void
+snarf_parenthesized_expression (struct unparsed_text *t)
+{
+  int yyc;
+  int level = 1;
+
+  while (1)
+    {
+      yyc = next_token (space_for_token (t));
+      if (yyc == '(')
+	++level;
+      else if (yyc == ')' && --level == 0)
+	break;
+      else if (yyc == 0)
+	{
+	  error ("%Hend of file read inside definition", &t->locus);
+	  break;
+	}
+    }
+}
+
 /* Subroutine of snarf_method, deals with actual absorption of the block.  */
 
 static void
@@ -1145,6 +1172,8 @@ snarf_block (t)
 	  else if (look_for_semicolon && blev == 0)
 	    break;
 	}
+      else if (yyc == '(' && blev == 0)
+	snarf_parenthesized_expression (t);
       else if (yyc == 0)
 	{
 	  error ("%Hend of file read inside definition", &t->locus);
@@ -1168,6 +1197,14 @@ snarf_method (decl)
 						: (interface_only ? 0 : 2)));
 
   snarf_block (meth);
+  /* Add three END_OF_SAVED_INPUT tokens.  We used to provide an
+     infinite stream of END_OF_SAVED_INPUT tokens -- but that can
+     cause the compiler to get stuck in an infinite loop when
+     encountering invalid code.  We need more than one because the
+     parser sometimes peeks ahead several tokens.  */
+  memcpy (space_for_token (meth), &Teosi, sizeof (struct token));
+  memcpy (space_for_token (meth), &Teosi, sizeof (struct token));
+  memcpy (space_for_token (meth), &Teosi, sizeof (struct token));
 
   /* Happens when we get two declarations of the same function in the
      same scope.  */
@@ -1178,7 +1215,7 @@ snarf_method (decl)
 #ifdef SPEW_DEBUG
   if (spew_debug)
     fprintf (stderr, "\tsaved method of %d tokens from %s:%d\n",
-	     meth->limit, starting.file, starting.line);
+	     meth->last_pos, starting.file, starting.line);
 #endif
 
   DECL_PENDING_INLINE_INFO (decl) = meth;
@@ -1226,12 +1263,20 @@ snarf_defarg ()
 
   /* Unget the last token.  */
   push_token (remove_last_token (buf));
+  /* Add three END_OF_SAVED_INPUT tokens.  We used to provide an
+     infinite stream of END_OF_SAVED_INPUT tokens -- but that can
+     cause the compiler to get stuck in an infinite loop when
+     encountering invalid code.  We need more than one because the
+     parser sometimes peeks ahead several tokens.  */
+  memcpy (space_for_token (buf), &Teosi, sizeof (struct token));
+  memcpy (space_for_token (buf), &Teosi, sizeof (struct token));
+  memcpy (space_for_token (buf), &Teosi, sizeof (struct token));
 
  done:
 #ifdef SPEW_DEBUG
   if (spew_debug)
     fprintf (stderr, "\tsaved defarg of %d tokens from %s:%d\n",
-	     buf->limit, starting.file, starting.line);
+	     buf->last_pos, starting.file, starting.line);
 #endif
 
   arg = make_node (DEFAULT_ARG);
@@ -1372,7 +1417,7 @@ do_pending_defargs ()
               /* No need to say what else is dependent, as they will be
                  picked up in another pass.  */
 
-              /* Immediately repeat, but marked so that we break the loop. */
+              /* Immediately repeat, but marked so that we break the loop.  */
               defarg_fns = current;
               TREE_PURPOSE (current) = error_mark_node;
             }
@@ -1384,7 +1429,7 @@ do_pending_defargs ()
 }
 
 /* After parsing all the default arguments, we must clear any that remain,
-   which will be part of a circular dependency. */
+   which will be part of a circular dependency.  */
 void
 done_pending_defargs ()
 {

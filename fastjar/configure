@@ -1680,7 +1680,7 @@ EOF
 
 fi
 
-for ac_hdr in fcntl.h unistd.h sys/param.h stdlib.h
+for ac_hdr in fcntl.h unistd.h sys/param.h stdlib.h limits.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
@@ -1789,14 +1789,59 @@ EOF
 fi
 
 
+# mkdir takes a single argument on some systems.
+echo $ac_n "checking if mkdir takes one argument""... $ac_c" 1>&6
+echo "configure:1795: checking if mkdir takes one argument" >&5
+if eval "test \"`echo '$''{'gcc_cv_mkdir_takes_one_arg'+set}'`\" = set"; then
+  echo $ac_n "(cached) $ac_c" 1>&6
+else
+  cat > conftest.$ac_ext <<EOF
+#line 1800 "configure"
+#include "confdefs.h"
+
+#include <sys/types.h>
+#ifdef HAVE_SYS_STAT_H
+# include <sys/stat.h>
+#endif
+#ifdef HAVE_UNISTD_H
+# include <unistd.h>
+#endif
+#ifdef HAVE_DIRECT_H
+# include <direct.h>
+#endif
+int main() {
+mkdir ("foo", 0);
+; return 0; }
+EOF
+if { (eval echo configure:1817: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+  rm -rf conftest*
+  gcc_cv_mkdir_takes_one_arg=no
+else
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  gcc_cv_mkdir_takes_one_arg=yes
+fi
+rm -f conftest*
+fi
+
+echo "$ac_t""$gcc_cv_mkdir_takes_one_arg" 1>&6
+if test $gcc_cv_mkdir_takes_one_arg = yes ; then
+   cat >> confdefs.h <<\EOF
+#define MKDIR_TAKES_ONE_ARG 1
+EOF
+
+fi
+
+
 echo $ac_n "checking size of char""... $ac_c" 1>&6
-echo "configure:1794: checking size of char" >&5
+echo "configure:1839: checking size of char" >&5
 if eval "test \"`echo '$''{'ac_cv_sizeof_char'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
-  for ac_size in 4 8 1 2 16  ; do # List sizes in rough order of prevalence.
+  for ac_size in 4 8 1 2 16 12  ; do # List sizes in rough order of prevalence.
   cat > conftest.$ac_ext <<EOF
-#line 1800 "configure"
+#line 1845 "configure"
 #include "confdefs.h"
 #include "confdefs.h"
 #include <sys/types.h>
@@ -1806,7 +1851,7 @@ int main() {
 switch (0) case 0: case (sizeof (char) == $ac_size):;
 ; return 0; }
 EOF
-if { (eval echo configure:1810: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:1855: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_sizeof_char=$ac_size
 else
@@ -1829,13 +1874,13 @@ EOF
 
 
 echo $ac_n "checking size of short""... $ac_c" 1>&6
-echo "configure:1833: checking size of short" >&5
+echo "configure:1878: checking size of short" >&5
 if eval "test \"`echo '$''{'ac_cv_sizeof_short'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
-  for ac_size in 4 8 1 2 16  ; do # List sizes in rough order of prevalence.
+  for ac_size in 4 8 1 2 16 12  ; do # List sizes in rough order of prevalence.
   cat > conftest.$ac_ext <<EOF
-#line 1839 "configure"
+#line 1884 "configure"
 #include "confdefs.h"
 #include "confdefs.h"
 #include <sys/types.h>
@@ -1845,7 +1890,7 @@ int main() {
 switch (0) case 0: case (sizeof (short) == $ac_size):;
 ; return 0; }
 EOF
-if { (eval echo configure:1849: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:1894: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_sizeof_short=$ac_size
 else
@@ -1868,13 +1913,13 @@ EOF
 
 
 echo $ac_n "checking size of int""... $ac_c" 1>&6
-echo "configure:1872: checking size of int" >&5
+echo "configure:1917: checking size of int" >&5
 if eval "test \"`echo '$''{'ac_cv_sizeof_int'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
-  for ac_size in 4 8 1 2 16  ; do # List sizes in rough order of prevalence.
+  for ac_size in 4 8 1 2 16 12  ; do # List sizes in rough order of prevalence.
   cat > conftest.$ac_ext <<EOF
-#line 1878 "configure"
+#line 1923 "configure"
 #include "confdefs.h"
 #include "confdefs.h"
 #include <sys/types.h>
@@ -1884,7 +1929,7 @@ int main() {
 switch (0) case 0: case (sizeof (int) == $ac_size):;
 ; return 0; }
 EOF
-if { (eval echo configure:1888: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:1933: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_sizeof_int=$ac_size
 else
@@ -1907,13 +1952,13 @@ EOF
 
 
 echo $ac_n "checking size of long""... $ac_c" 1>&6
-echo "configure:1911: checking size of long" >&5
+echo "configure:1956: checking size of long" >&5
 if eval "test \"`echo '$''{'ac_cv_sizeof_long'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
-  for ac_size in 4 8 1 2 16  ; do # List sizes in rough order of prevalence.
+  for ac_size in 4 8 1 2 16 12  ; do # List sizes in rough order of prevalence.
   cat > conftest.$ac_ext <<EOF
-#line 1917 "configure"
+#line 1962 "configure"
 #include "confdefs.h"
 #include "confdefs.h"
 #include <sys/types.h>
@@ -1923,7 +1968,7 @@ int main() {
 switch (0) case 0: case (sizeof (long) == $ac_size):;
 ; return 0; }
 EOF
-if { (eval echo configure:1927: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:1972: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_sizeof_long=$ac_size
 else
@@ -1946,13 +1991,13 @@ EOF
 
 
 echo $ac_n "checking size of long long""... $ac_c" 1>&6
-echo "configure:1950: checking size of long long" >&5
+echo "configure:1995: checking size of long long" >&5
 if eval "test \"`echo '$''{'ac_cv_sizeof_long_long'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
-  for ac_size in 4 8 1 2 16  ; do # List sizes in rough order of prevalence.
+  for ac_size in 4 8 1 2 16 12  ; do # List sizes in rough order of prevalence.
   cat > conftest.$ac_ext <<EOF
-#line 1956 "configure"
+#line 2001 "configure"
 #include "confdefs.h"
 #include "confdefs.h"
 #include <sys/types.h>
@@ -1962,7 +2007,7 @@ int main() {
 switch (0) case 0: case (sizeof (long long) == $ac_size):;
 ; return 0; }
 EOF
-if { (eval echo configure:1966: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:2011: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_sizeof_long_long=$ac_size
 else
@@ -1985,77 +2030,140 @@ EOF
 
 
 
-echo $ac_n "checking byte ordering""... $ac_c" 1>&6
-echo "configure:1990: checking byte ordering" >&5
-if eval "test \"`echo '$''{'ac_cv_c_compile_endian'+set}'`\" = set"; then
+echo $ac_n "checking whether byte ordering is bigendian""... $ac_c" 1>&6
+echo "configure:2035: checking whether byte ordering is bigendian" >&5
+if eval "test \"`echo '$''{'ac_cv_c_bigendian'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
-  ac_cv_c_compile_endian=unknown
-
-ac_ext=c
-# CFLAGS is not in ac_cpp because -g, -O, etc. are not valid cpp options.
-ac_cpp='$CPP $CPPFLAGS'
-ac_compile='${CC-cc} -c $CFLAGS $CPPFLAGS conftest.$ac_ext 1>&5'
-ac_link='${CC-cc} -o conftest${ac_exeext} $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS 1>&5'
-cross_compiling=$ac_cv_prog_cc_cross
-
+  ac_cv_c_bigendian=unknown
+# See if sys/param.h defines the BYTE_ORDER macro.
 cat > conftest.$ac_ext <<EOF
-#line 2004 "configure"
+#line 2042 "configure"
 #include "confdefs.h"
+#include <sys/types.h>
+#include <sys/param.h>
+int main() {
 
-#ifdef HAVE_LIMITS_H
-# include <limits.h>
+#if !BYTE_ORDER || !BIG_ENDIAN || !LITTLE_ENDIAN
+ bogus endian macros
 #endif
-/* This structure must have no internal padding.  */
-  struct {
-    char prefix[sizeof "\nendian:" - 1];
-    short word;
-    char postfix[2];
- } tester = {
-    "\nendian:",
-#if SIZEOF_SHORT == 4
-    ('A' << (CHAR_BIT * 3)) | ('B' << (CHAR_BIT * 2)) |
-#endif
-    ('A' << CHAR_BIT) | 'B',
-    'X', '\n'
-};
+; return 0; }
 EOF
-if { (eval echo configure:2024: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
-  od -c conftest.o |
-    sed 's/^[0-7]*[ 	]*/ /
-	  s/\*/./g
-	  s/ \\n/*/g
-	  s/ [0-9][0-9][0-9]/./g
-	  s/  \\[^ ]/./g' |
-    tr -d '
- ' | tr -s '*' '
-' | fold | sed '$a\
-' > conftest.dmp
-  if   grep 'endian:AB' conftest.dmp >/dev/null 2>&1; then
-    ac_cv_c_compile_endian=big-endian
-  elif grep 'endian:BA' conftest.dmp >/dev/null 2>&1; then
-    ac_cv_c_compile_endian=little-endian
+if { (eval echo configure:2053: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+  rm -rf conftest*
+  # It does; now see whether it defined to BIG_ENDIAN or not.
+cat > conftest.$ac_ext <<EOF
+#line 2057 "configure"
+#include "confdefs.h"
+#include <sys/types.h>
+#include <sys/param.h>
+int main() {
+
+#if BYTE_ORDER != BIG_ENDIAN
+ not big endian
+#endif
+; return 0; }
+EOF
+if { (eval echo configure:2068: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+  rm -rf conftest*
+  ac_cv_c_bigendian=yes
+else
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  ac_cv_c_bigendian=no
+fi
+rm -f conftest*
+else
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+fi
+rm -f conftest*
+if test $ac_cv_c_bigendian = unknown; then
+if test "$cross_compiling" = yes; then
+   echo $ac_n "cross-compiling... " 2>&6 
+else
+  cat > conftest.$ac_ext <<EOF
+#line 2088 "configure"
+#include "confdefs.h"
+main () {
+  /* Are we little or big endian?  From Harbison&Steele.  */
+  union
+  {
+    long l;
+    char c[sizeof (long)];
+  } u;
+  u.l = 1;
+  exit (u.c[sizeof (long) - 1] == 1);
+}
+EOF
+if { (eval echo configure:2101: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext} && (./conftest; exit) 2>/dev/null
+then
+  ac_cv_c_bigendian=no
+else
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -fr conftest*
+  ac_cv_c_bigendian=yes
+fi
+rm -fr conftest*
+fi
+
+fi
+fi
+
+echo "$ac_t""$ac_cv_c_bigendian" 1>&6
+if test $ac_cv_c_bigendian = unknown; then
+echo $ac_n "checking to probe for byte ordering""... $ac_c" 1>&6
+echo "configure:2119: checking to probe for byte ordering" >&5
+
+cat >conftest.c <<EOF
+short ascii_mm[] = { 0x4249, 0x4765, 0x6E44, 0x6961, 0x6E53, 0x7953, 0 };
+short ascii_ii[] = { 0x694C, 0x5454, 0x656C, 0x6E45, 0x6944, 0x6E61, 0 };
+void _ascii() { char* s = (char*) ascii_mm; s = (char*) ascii_ii; }
+short ebcdic_ii[] = { 0x89D3, 0xE3E3, 0x8593, 0x95C5, 0x89C4, 0x9581, 0 };
+short ebcdic_mm[] = { 0xC2C9, 0xC785, 0x95C4, 0x8981, 0x95E2, 0xA8E2, 0 };
+void _ebcdic() { char* s = (char*) ebcdic_mm; s = (char*) ebcdic_ii; }
+int main() { _ascii (); _ebcdic (); return 0; }
+EOF
+ if test -f conftest.c ; then
+     if ${CC-cc} ${CFLAGS} conftest.c -o conftest.o && test -f conftest.o ; then
+        if test `grep -l BIGenDianSyS conftest.o` ; then
+           echo $ac_n ' big endian probe OK, ' 1>&6
+           ac_cv_c_bigendian=yes
+        fi
+        if test `grep -l LiTTleEnDian conftest.o` ; then
+           echo $ac_n ' little endian probe OK, ' 1>&6
+           if test $ac_cv_c_bigendian = yes ; then
+            ac_cv_c_bigendian=unknown;
+           else
+            ac_cv_c_bigendian=no
+           fi
+        fi
+        echo $ac_n 'guessing bigendian ...  ' >&6
+     fi
   fi
+echo "$ac_t""$ac_cv_c_bigendian" 1>&6
 fi
-rm -rf conftest*
-ac_ext=c
-# CFLAGS is not in ac_cpp because -g, -O, etc. are not valid cpp options.
-ac_cpp='$CPP $CPPFLAGS'
-ac_compile='${CC-cc} -c $CFLAGS $CPPFLAGS conftest.$ac_ext 1>&5'
-ac_link='${CC-cc} -o conftest${ac_exeext} $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS 1>&5'
-cross_compiling=$ac_cv_prog_cc_cross
-
-
-fi
-
-echo "$ac_t""$ac_cv_c_compile_endian" 1>&6
-if test $ac_cv_c_compile_endian = unknown; then
-  { echo "configure: error: *** unable to determine endianness" 1>&2; exit 1; }
-elif test $ac_cv_c_compile_endian = big-endian; then
+if test $ac_cv_c_bigendian = yes; then
   cat >> confdefs.h <<\EOF
-#define WORDS_BIG_ENDIAN 1
+#define WORDS_BIGENDIAN 1
 EOF
 
+  cat >> confdefs.h <<\EOF
+#define HOST_WORDS_BIG_ENDIAN 1
+EOF
+
+  BYTEORDER=4321
+else
+  BYTEORDER=1234
+fi
+cat >> confdefs.h <<EOF
+#define BYTEORDER $BYTEORDER
+EOF
+
+if test $ac_cv_c_bigendian = unknown; then
+  { echo "configure: error: unknown endianess - sorry" 1>&2; exit 1; }
 fi
 
 
@@ -2072,7 +2180,7 @@ ZINCS=
 use_zlib=maybe
 if test "$with_system_zlib" = yes; then
    echo $ac_n "checking for deflate in -lz""... $ac_c" 1>&6
-echo "configure:2076: checking for deflate in -lz" >&5
+echo "configure:2184: checking for deflate in -lz" >&5
 ac_lib_var=`echo z'_'deflate | sed 'y%./+-%__p_%'`
 if eval "test \"`echo '$''{'ac_cv_lib_$ac_lib_var'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -2080,7 +2188,7 @@ else
   ac_save_LIBS="$LIBS"
 LIBS="-lz  $LIBS"
 cat > conftest.$ac_ext <<EOF
-#line 2084 "configure"
+#line 2192 "configure"
 #include "confdefs.h"
 /* Override any gcc2 internal prototype to avoid an error.  */
 /* We use char because int might match the return type of a gcc2
@@ -2091,7 +2199,7 @@ int main() {
 deflate()
 ; return 0; }
 EOF
-if { (eval echo configure:2095: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+if { (eval echo configure:2203: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
   rm -rf conftest*
   eval "ac_cv_lib_$ac_lib_var=yes"
 else
@@ -2124,6 +2232,16 @@ if test "$use_zlib" = no; then
 fi
 
 
+
+
+# Get the version trigger filename from the toplevel
+if test "${with_gcc_version_trigger+set}" = set; then
+   gcc_version_trigger=$with_gcc_version_trigger
+else
+   gcc_version_trigger=${srcdir}/version.c
+fi
+gcc_version_full=`grep version_string ${gcc_version_trigger} | sed -e 's/.*"\([^"]*\)".*/\1/'`
+gcc_version=`echo ${gcc_version_full} | sed -e 's/\([^ ]*\) .*/\1/'`
 
 
 trap '' 1 2 15
@@ -2284,6 +2402,7 @@ s%@CPP@%$CPP%g
 s%@ZLIBS@%$ZLIBS%g
 s%@ZDEPS@%$ZDEPS%g
 s%@ZINCS@%$ZINCS%g
+s%@gcc_version@%$gcc_version%g
 
 CEOF
 EOF

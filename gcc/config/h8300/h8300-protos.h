@@ -32,6 +32,8 @@ extern const char *emit_a_rotate PARAMS ((enum rtx_code, rtx *));
 extern const char *output_simode_bld PARAMS ((int, rtx[]));
 extern void print_operand_address PARAMS ((FILE *, rtx));
 extern int const_costs PARAMS ((rtx, enum rtx_code, enum rtx_code));
+extern int h8300_and_costs PARAMS ((rtx));
+extern int h8300_shift_costs PARAMS ((rtx));
 extern void print_operand PARAMS ((FILE *, rtx, int));
 extern void final_prescan_insn PARAMS ((rtx, rtx *, int));
 extern int do_movsi PARAMS ((rtx[]));
@@ -60,6 +62,9 @@ extern int bit_memory_operand PARAMS ((rtx, enum machine_mode));
 extern int bit_operator PARAMS ((rtx, enum machine_mode));
 extern int nshift_operator PARAMS ((rtx, enum machine_mode));
 
+extern int h8300_eightbit_constant_address_p PARAMS ((rtx));
+extern int h8300_tiny_constant_address_p PARAMS ((rtx));
+
 /* Used in builtins.c */
 extern rtx h8300_return_addr_rtx PARAMS ((int, rtx));
 #endif /* RTX_CODE */
@@ -75,7 +80,7 @@ extern int h8300_tiny_data_p PARAMS ((tree));
 extern void h8300_init_once PARAMS ((void));
 extern void asm_file_start PARAMS ((FILE *));
 extern void asm_file_end PARAMS ((FILE *));
-extern int initial_offset PARAMS ((int, int));
+extern int h8300_initial_elimination_offset PARAMS ((int, int));
 
 #ifdef GCC_C_PRAGMA_H
 extern void h8300_pr_interrupt PARAMS ((cpp_reader *));

@@ -457,7 +457,7 @@ namespace std
 		  if (__w->_M_right == 0 
 		      || __w->_M_right->_M_color == _M_black) 
 		    {
-		      if (__w->_M_left) __w->_M_left->_M_color = _M_black;
+		      __w->_M_left->_M_color = _M_black;
 		      __w->_M_color = _M_red;
 		      _Rb_tree_rotate_right(__w, __root);
 		      __w = __x_parent->_M_right;
@@ -494,7 +494,7 @@ namespace std
 		{
 		  if (__w->_M_left == 0 || __w->_M_left->_M_color == _M_black) 
 		    {
-		      if (__w->_M_right) __w->_M_right->_M_color = _M_black;
+		      __w->_M_right->_M_color = _M_black;
 		      __w->_M_color = _M_red;
 		      _Rb_tree_rotate_left(__w, __root);
 		      __w = __x_parent->_M_left;
@@ -702,8 +702,8 @@ namespace std
       typedef _Rb_tree_iterator<value_type, const_reference, const_pointer> 
       const_iterator;
 
-      typedef reverse_iterator<const_iterator> const_reverse_iterator;
-      typedef reverse_iterator<iterator> reverse_iterator;
+      typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
+      typedef std::reverse_iterator<iterator> reverse_iterator;
 
     private:
       iterator 
@@ -1181,7 +1181,7 @@ namespace std
     _Rb_tree<_Key,_Val,_KeyOfValue,_Compare,_Alloc>::erase(const _Key& __x)
     {
       pair<iterator,iterator> __p = equal_range(__x);
-      size_type __n = distance(__p.first, __p.second);
+      size_type __n = std::distance(__p.first, __p.second);
       erase(__p.first, __p.second);
       return __n;
     }
@@ -1306,7 +1306,7 @@ namespace std
     count(const _Key& __k) const
     {
       pair<const_iterator, const_iterator> __p = equal_range(__k);
-      size_type __n = distance(__p.first, __p.second);
+      size_type __n = std::distance(__p.first, __p.second);
       return __n;
     }
 

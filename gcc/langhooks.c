@@ -21,6 +21,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "toplev.h"
 #include "tree.h"
 #include "c-tree.h"
@@ -260,7 +262,7 @@ lhd_decl_printable_name (decl, verbosity)
    completely handled within this function, it should set *SUBTREES to
    0, so that generic handling isn't attempted.  For language-specific
    tree codes, generic handling would abort(), so make sure it is set
-   properly.  Both SUBTREES and *SUBTREES is guaranteed to be non-zero
+   properly.  Both SUBTREES and *SUBTREES is guaranteed to be nonzero
    when the function is called.  */
 
 tree
@@ -354,13 +356,17 @@ lhd_tree_inlining_auto_var_in_fn_p (var, fn)
 
 tree
 lhd_tree_inlining_copy_res_decl_for_inlining (res, fn, caller,
-					      dm, ndp, texps)
+					      dm, ndp, return_slot_addr)
      tree res, fn, caller;
      void *dm ATTRIBUTE_UNUSED;
      int *ndp ATTRIBUTE_UNUSED;
-     void *texps ATTRIBUTE_UNUSED;
+     tree return_slot_addr ATTRIBUTE_UNUSED;
 {
-  return copy_decl_for_inlining (res, fn, caller);
+  if (return_slot_addr)
+    return build1 (INDIRECT_REF, TREE_TYPE (TREE_TYPE (return_slot_addr)),
+		   return_slot_addr);
+  else
+    return copy_decl_for_inlining (res, fn, caller);
 }
 
 /* lang_hooks.tree_inlining.anon_aggr_type_p determines whether T is a
@@ -376,7 +382,7 @@ lhd_tree_inlining_anon_aggr_type_p (t)
 
 /* lang_hooks.tree_inlining.start_inlining and end_inlining perform any
    language-specific bookkeeping necessary for processing
-   FN. start_inlining returns non-zero if inlining should proceed, zero if
+   FN. start_inlining returns nonzero if inlining should proceed, zero if
    not.
 
    For instance, the C++ version keeps track of template instantiations to
@@ -408,7 +414,7 @@ lhd_tree_inlining_convert_parm_for_inlining (parm, value, fndecl)
 }
 
 /* lang_hooks.tree_dump.dump_tree:  Dump language-specific parts of tree
-   nodes.  Returns non-zero if it does not want the usual dumping of the
+   nodes.  Returns nonzero if it does not want the usual dumping of the
    second argument.  */
 
 int

@@ -2,22 +2,21 @@
 
 // Copyright (C) 2001, 2002 Free Software Foundation
 //
-// This file is part of GNU CC.
-//
-// GNU CC is free software; you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2, or (at your option)
+// This file is part of the GNU ISO C++ Library.  This library is free
+// software; you can redistribute it and/or modify it under the
+// terms of the GNU General Public License as published by the
+// Free Software Foundation; either version 2, or (at your option)
 // any later version.
-// 
-// GNU CC is distributed in the hope that it will be useful,
+
+// This library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
-// You should have received a copy of the GNU General Public License
-// along with GNU CC; see the file COPYING.  If not, write to
-// the Free Software Foundation, 59 Temple Place - Suite 330,
-// Boston, MA 02111-1307, USA.
+
+// You should have received a copy of the GNU General Public License along
+// with this library; see the file COPYING.  If not, write to the Free
+// Software Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307,
+// USA.
 
 // As a special exception, you may use this file as part of a free software
 // library without restriction.  Specifically, if other files instantiate
@@ -60,7 +59,7 @@ namespace std
   : _Base(), _M_alloc_fun(0), _M_free_fun(0), _M_dynamic(true), 
     _M_frozen(false), _M_constant(false)
   {
-    streamsize n = max(initial_capacity, streamsize(16));
+    streamsize n = std::max(initial_capacity, streamsize(16));
     
     char* buf = _M_alloc(n);
     if (buf) 
@@ -149,7 +148,7 @@ namespace std
     if (pptr() == epptr() && _M_dynamic && !_M_frozen && !_M_constant) 
       {
 	ptrdiff_t old_size = epptr() - pbase();
-	ptrdiff_t new_size = max(2 * old_size, ptrdiff_t(1));
+	ptrdiff_t new_size = std::max(2 * old_size, ptrdiff_t(1));
 	
 	char* buf = _M_alloc(new_size);
 	if (buf) 
@@ -169,7 +168,7 @@ namespace std
 
 	    if (reposition_get)
 	      setg(buf, buf + old_get_offset, buf + 
-		   max(old_get_offset, old_size));
+		   std::max(old_get_offset, old_size));
 
 	    _M_free(old_buffer);
 	  }

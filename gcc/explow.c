@@ -22,6 +22,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "toplev.h"
 #include "rtl.h"
 #include "tree.h"
@@ -405,10 +407,8 @@ convert_memory_address (to_mode, x)
       break;
 
     case SYMBOL_REF:
-      temp = gen_rtx_SYMBOL_REF (to_mode, XSTR (x, 0));
-      SYMBOL_REF_FLAG (temp) = SYMBOL_REF_FLAG (x);
-      CONSTANT_POOL_ADDRESS_P (temp) = CONSTANT_POOL_ADDRESS_P (x);
-      STRING_POOL_ADDRESS_P (temp) = STRING_POOL_ADDRESS_P (x);
+      temp = shallow_copy_rtx (x);
+      PUT_MODE (temp, to_mode);
       return temp;
       break;
 
@@ -660,8 +660,7 @@ maybe_set_unchanging (ref, t)
      first case, and decls with TREE_CONSTANT initializers in the second.  */
   if ((TREE_READONLY (t) && DECL_P (t)
        && (TREE_CODE (t) == PARM_DECL
-	   || DECL_INITIAL (t) == NULL_TREE
-	   || TREE_CONSTANT (DECL_INITIAL (t))))
+	   || (DECL_INITIAL (t) && TREE_CONSTANT (DECL_INITIAL (t)))))
       || TREE_CODE_CLASS (TREE_CODE (t)) == 'c')
     RTX_UNCHANGING_P (ref) = 1;
 }
@@ -823,7 +822,7 @@ copy_to_suggested_reg (x, target, mode)
    PUNSIGNEDP points to the signedness of the type and may be adjusted
    to show what signedness to use on extension operations.
 
-   FOR_CALL is non-zero if this call is promoting args for a call.  */
+   FOR_CALL is nonzero if this call is promoting args for a call.  */
 
 enum machine_mode
 promote_mode (type, mode, punsignedp, for_call)
@@ -1087,7 +1086,7 @@ emit_stack_restore (save_level, sa, after)
       sa = validize_mem (sa);
       /* These clobbers prevent the scheduler from moving
 	 references to variable arrays below the code
-	 that deletes (pops) the arrays. */
+	 that deletes (pops) the arrays.  */
       emit_insn (gen_rtx_CLOBBER (VOIDmode,
 		    gen_rtx_MEM (BLKmode, 
 			gen_rtx_SCRATCH (VOIDmode))));
@@ -1233,7 +1232,7 @@ allocate_dynamic_stack_space (size, target, known_align)
      always know its final value at this point in the compilation (it
      might depend on the size of the outgoing parameter lists, for
      example), so we must align the value to be returned in that case.
-     (Note that STACK_DYNAMIC_OFFSET will have a default non-zero value if
+     (Note that STACK_DYNAMIC_OFFSET will have a default nonzero value if
      STACK_POINTER_OFFSET or ACCUMULATE_OUTGOING_ARGS are defined).
      We must also do an alignment operation on the returned value if
      the stack pointer alignment is less strict that BIGGEST_ALIGNMENT.
@@ -1716,4 +1715,3 @@ rtx_to_tree_code (code)
 }
 
 #include "gt-explow.h"
-

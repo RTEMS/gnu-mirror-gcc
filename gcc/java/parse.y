@@ -48,6 +48,8 @@ definitions and other extensions.  */
 %{
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include <dirent.h>
 #include "tree.h"
 #include "rtl.h"
@@ -68,10 +70,6 @@ definitions and other extensions.  */
 #include "ggc.h"
 #include "debug.h"
 #include "tree-inline.h"
-
-#ifndef DIR_SEPARATOR
-#define DIR_SEPARATOR '/'
-#endif
 
 /* Local function prototypes */
 static char *java_accstring_lookup PARAMS ((int));
@@ -394,12 +392,6 @@ static GTY(()) tree java_lang_id;
 /* The generated `inst$' identifier used for generated enclosing
    instance/field access functions.  */
 static GTY(()) tree inst_id;
-
-/* The "java.lang.Cloneable" qualified name.  */
-static GTY(()) tree java_lang_cloneable;
-
-/* The "java.io.Serializable" qualified name.  */
-static GTY(()) tree java_io_serializable;
 
 /* Context and flag for static blocks */
 static GTY(()) tree current_static_block;
@@ -1004,12 +996,7 @@ variable_declarator_id:
 		{yyerror ("Invalid declaration"); DRECOVER(vdi);}
 |	variable_declarator_id OSB_TK error
 		{
-		  tree node = java_lval.node;
-		  if (node && (TREE_CODE (node) == INTEGER_CST
-			       || TREE_CODE (node) == EXPR_WITH_FILE_LOCATION))
-		    yyerror ("Can't specify array dimension in a declaration");
-		  else
-		    yyerror ("']' expected");
+		  yyerror ("']' expected");
 		  DRECOVER(vdi);
 		}
 |	variable_declarator_id CSB_TK error
@@ -2682,7 +2669,7 @@ pop_current_osb (ctxp)
    Add mode documentation here. FIXME */
 
 /* Helper function. Create a new parser context. With
-   COPY_FROM_PREVIOUS set to a non zero value, content of the previous
+   COPY_FROM_PREVIOUS set to a nonzero value, content of the previous
    context is copied, otherwise, the new context is zeroed. The newly
    created context becomes the current one.  */
 
@@ -3449,12 +3436,11 @@ check_class_interface_creation (is_interface, flags, raw_name, qualified_name, d
     {
       const char *f;
 
-      /* Contains OS dependent assumption on path separator. FIXME */
       for (f = &input_filename [strlen (input_filename)];
-	   f != input_filename && f[0] != '/' && f[0] != DIR_SEPARATOR;
+	   f != input_filename && ! IS_DIR_SEPARATOR (f[0]);
 	   f--)
 	;
-      if (f[0] == '/' || f[0] == DIR_SEPARATOR)
+      if (IS_DIR_SEPARATOR (f[0]))
 	f++;
       if (strncmp (IDENTIFIER_POINTER (raw_name),
 		   f , IDENTIFIER_LENGTH (raw_name)) ||
@@ -5211,7 +5197,9 @@ obtain_incomplete_type (type_name)
   else
     abort ();
 
+  /* Workaround from build_pointer_type for incomplete types.  */
   BUILD_PTR_FROM_NAME (ptr, name);
+  TYPE_MODE (ptr) = ptr_mode;
   layout_type (ptr);
 
   return ptr;
@@ -5597,7 +5585,7 @@ java_complete_class ()
   /* Process imports */
   process_imports ();
 
-  /* Rever things so we have the right order */
+  /* Reverse things so we have the right order */
   ctxp->class_list = nreverse (ctxp->class_list);
   ctxp->classd_list = reverse_jdep_list (ctxp);
 
@@ -5768,7 +5756,7 @@ resolve_class (enclosing, class_type, decl, cl)
     return NULL_TREE;
   resolved_type = TREE_TYPE (resolved_type_decl);
 
-  /* 3- If we have and array, reconstruct the array down to its nesting */
+  /* 3- If we have an array, reconstruct the array down to its nesting */
   if (array_dims)
     {
       for (; array_dims; array_dims--)
@@ -5794,37 +5782,58 @@ do_resolve_class (enclosing, class_type, decl, cl)
   tree decl_result;
   htab_t circularity_hash;
 
-  /* This hash table is used to register the classes we're going
-     through when searching the current class as an inner class, in
-     order to detect circular references. Remember to free it before
-     returning the section 0- of this function. */
-  circularity_hash = htab_create (20, htab_hash_pointer, htab_eq_pointer,
-				  NULL);
-
-  /* 0- Search in the current class as an inner class.
-     Maybe some code here should be added to load the class or
-     something, at least if the class isn't an inner class and ended
-     being loaded from class file. FIXME. */
-  while (enclosing)
+  if (QUALIFIED_P (TYPE_NAME (class_type)))
     {
-      new_class_decl = resolve_inner_class (circularity_hash, cl, &enclosing,
-					    &super, class_type);
-      if (new_class_decl)
-	break;
-
-      /* If we haven't found anything because SUPER reached Object and
-	 ENCLOSING happens to be an innerclass, try the enclosing context. */
-      if ((!super || super == object_type_node) &&
-	  enclosing && INNER_CLASS_DECL_P (enclosing))
-	enclosing = DECL_CONTEXT (enclosing);
-      else
-	enclosing = NULL_TREE;
+      /* If the type name is of the form `Q . Id', then Q is either a
+	 package name or a class name.  First we try to find Q as a
+	 class and then treat Id as a member type.  If we can't find Q
+	 as a class then we fall through.  */
+      tree q, left, left_type, right;
+      breakdown_qualified (&left, &right, TYPE_NAME (class_type));
+      BUILD_PTR_FROM_NAME (left_type, left);
+      q = do_resolve_class (enclosing, left_type, decl, cl);
+      if (q)
+	{
+	  enclosing = q;
+	  saved_enclosing_type = TREE_TYPE (q);
+	  BUILD_PTR_FROM_NAME (class_type, right);
+	}
     }
 
-  htab_delete (circularity_hash);
+  if (enclosing)
+    {
+      /* This hash table is used to register the classes we're going
+	 through when searching the current class as an inner class, in
+	 order to detect circular references. Remember to free it before
+	 returning the section 0- of this function. */
+      circularity_hash = htab_create (20, htab_hash_pointer, htab_eq_pointer,
+				      NULL);
 
-  if (new_class_decl)
-    return new_class_decl;
+      /* 0- Search in the current class as an inner class.
+	 Maybe some code here should be added to load the class or
+	 something, at least if the class isn't an inner class and ended
+	 being loaded from class file. FIXME. */
+      while (enclosing)
+	{
+	  new_class_decl = resolve_inner_class (circularity_hash, cl, &enclosing,
+						&super, class_type);
+	  if (new_class_decl)
+	    break;
+
+	  /* If we haven't found anything because SUPER reached Object and
+	     ENCLOSING happens to be an innerclass, try the enclosing context. */
+	  if ((!super || super == object_type_node) &&
+	      enclosing && INNER_CLASS_DECL_P (enclosing))
+	    enclosing = DECL_CONTEXT (enclosing);
+	  else
+	    enclosing = NULL_TREE;
+	}
+
+      htab_delete (circularity_hash);
+
+      if (new_class_decl)
+	return new_class_decl;
+    }
 
   /* 1- Check for the type in single imports. This will change
      TYPE_NAME() if something relevant is found */
@@ -5853,7 +5862,7 @@ do_resolve_class (enclosing, class_type, decl, cl)
     if (find_in_imports_on_demand (saved_enclosing_type, class_type))
       return NULL_TREE;
 
-  /* If found in find_in_imports_on_demant, the type has already been
+  /* If found in find_in_imports_on_demand, the type has already been
      loaded. */
   if ((new_class_decl = IDENTIFIER_CLASS_VALUE (TYPE_NAME (class_type))))
     return new_class_decl;
@@ -5874,7 +5883,7 @@ do_resolve_class (enclosing, class_type, decl, cl)
 	  return new_class_decl;
     }
 
-  /* 5- Check an other compilation unit that bears the name of type */
+  /* 5- Check another compilation unit that bears the name of type */
   load_class (TYPE_NAME (class_type), 0);
 
   if (!cl)
@@ -6504,7 +6513,7 @@ java_check_regular_methods (class_decl)
     abort ();
 }
 
-/* Return a non zero value if the `throws' clause of METHOD (if any)
+/* Return a nonzero value if the `throws' clause of METHOD (if any)
    is incompatible with the `throws' clause of FOUND (if any).  */
 
 static void
@@ -7045,7 +7054,7 @@ find_in_imports_on_demand (enclosing_type, class_type)
     return (seen_once < 0 ? 0 : seen_once); /* It's ok not to have found */
 }
 
-/* Add package NAME to the list of package encountered so far. To
+/* Add package NAME to the list of packages encountered so far. To
    speed up class lookup in do_resolve_class, we make sure a
    particular package is added only once.  */
 
@@ -7449,6 +7458,7 @@ dump_java_tree (phase, t)
   int flags;
 
   stream = dump_begin (phase, &flags);
+  flags |= TDF_SLIM;
   if (stream)
     {
       dump_node (t, flags, stream);
@@ -7479,7 +7489,7 @@ source_end_java_method ()
      patched.  Dump it to a file if the user requested it.  */
   dump_java_tree (TDI_original, fndecl);
 
-  java_optimize_inline (fndecl); 
+  java_optimize_inline (fndecl);
 
   /* Generate function's code */
   if (BLOCK_EXPR_BODY (DECL_FUNCTION_BODY (fndecl))
@@ -8137,9 +8147,9 @@ java_expand_method_bodies (class)
 
       /* Save the function for inlining.  */
       if (flag_inline_trees)
-	DECL_SAVED_TREE (decl) = 
+	DECL_SAVED_TREE (decl) =
 	  BLOCK_EXPR_BODY (DECL_FUNCTION_BODY (decl));
-      
+
       /* It's time to assign the variable flagging static class
 	 initialization based on which classes invoked static methods
 	 are definitely initializing. This should be flagged. */
@@ -8243,7 +8253,7 @@ build_outer_field_access (id, decl)
   return resolve_expression_name (access, NULL);
 }
 
-/* Return a non zero value if NODE describes an outer field inner
+/* Return a nonzero value if NODE describes an outer field inner
    access.  */
 
 static int
@@ -8279,7 +8289,7 @@ outer_field_access_p (type, decl)
   return 0;
 }
 
-/* Return a non zero value if NODE represents an outer field inner
+/* Return a nonzero value if NODE represents an outer field inner
    access that was been already expanded. As a side effect, it returns
    the name of the field being accessed and the argument passed to the
    access function, suitable for a regeneration of the access method
@@ -9514,6 +9524,8 @@ resolve_qualified_expression_name (wfl, found_decl, where_found, type_found)
 	    }
 	  *type_found = type = QUAL_DECL_TYPE (*where_found);
 
+	  *where_found = force_evaluation_order (*where_found);
+
 	  /* If we're creating an inner class instance, check for that
 	     an enclosing instance is in scope */
 	  if (TREE_CODE (qual_wfl) == NEW_CLASS_EXPR
@@ -10407,7 +10419,7 @@ patch_method_invocation (patch, primary, where, from_super,
 	     this$0 (the immediate outer context) to
 	     access$0(access$0(...(this$0))).
 
-	     maybe_use_access_method returns a non zero value if the
+	     maybe_use_access_method returns a nonzero value if the
 	     this_arg has to be moved into the (then generated) stub
 	     argument list. In the meantime, the selected function
 	     might have be replaced by a generated stub. */
@@ -10648,7 +10660,7 @@ maybe_use_access_method (is_super_init, mdecl, this_arg)
   *mdecl = md;
   *this_arg = ta;
 
-  /* Returnin a non zero value indicates we were doing a non static
+  /* Returnin a nonzero value indicates we were doing a non static
      method invokation that is now a static invocation. It will have
      callee displace `this' to insert it in the regular argument
      list. */
@@ -10795,7 +10807,10 @@ patch_invoke (patch, method, args)
     {
       tree list;
       tree fndecl = current_function_decl;
-      tree save = save_expr (patch);
+      /* We have to call force_evaluation_order now because creating a
+	 COMPOUND_EXPR wraps the arg list in a way that makes it
+	 unrecognizable by force_evaluation_order later.  Yuk.  */
+      tree save = save_expr (force_evaluation_order (patch));
       tree type = TREE_TYPE (patch);
 
       patch = build (COMPOUND_EXPR, type, save, empty_stmt_node);
@@ -11450,17 +11465,17 @@ breakdown_qualified (left, right, source)
     tree *left, *right, source;
 {
   char *p, *base;
-  int   l = IDENTIFIER_LENGTH (source);
+  int l = IDENTIFIER_LENGTH (source);
 
   base = alloca (l + 1);
   memcpy (base, IDENTIFIER_POINTER (source), l + 1);
 
-  /* Breakdown NAME into REMAINDER . IDENTIFIER */
+  /* Breakdown NAME into REMAINDER . IDENTIFIER.  */
   p = base + l - 1;
   while (*p != '.' && p != base)
     p--;
 
-  /* We didn't find a '.'. Return an error */
+  /* We didn't find a '.'. Return an error.  */
   if (p == base)
     return 1;
 
@@ -11514,22 +11529,9 @@ java_complete_tree (node)
       && DECL_INITIAL (node) != NULL_TREE
       && !flag_emit_xref)
     {
-      tree value = DECL_INITIAL (node);
-      DECL_INITIAL (node) = NULL_TREE;
-      value = fold_constant_for_init (value, node);
-      DECL_INITIAL (node) = value;
+      tree value = fold_constant_for_init (node, node);
       if (value != NULL_TREE)
-	{
-	  /* fold_constant_for_init sometimes widens the original type
-             of the constant (i.e. byte to int). It's not desirable,
-             especially if NODE is a function argument. */
-	  if ((TREE_CODE (value) == INTEGER_CST
-	       || TREE_CODE (value) == REAL_CST)
-	      && TREE_TYPE (node) != TREE_TYPE (value))
-	    return convert (TREE_TYPE (node), value);
-	  else
-	    return value;
-	}
+	return value;
     }
   return node;
 }
@@ -12312,7 +12314,7 @@ java_complete_lhs (node)
   return node;
 }
 
-/* Complete function call's argument. Return a non zero value is an
+/* Complete function call's argument. Return a nonzero value is an
    error was found.  */
 
 static int
@@ -12915,11 +12917,14 @@ try_builtin_assignconv (wfl_op1, lhs_type, rhs)
     new_rhs = convert (lhs_type, rhs);
 
   /* Try a narrowing primitive conversion (5.1.3):
-       - expression is a constant expression of type int AND
+       - expression is a constant expression of type byte, short, char,
+         or int, AND
        - variable is byte, short or char AND
        - The value of the expression is representable in the type of the
          variable */
-  else if (rhs_type == int_type_node && TREE_CONSTANT (rhs)
+  else if ((rhs_type == byte_type_node || rhs_type == short_type_node
+	    || rhs_type == char_type_node || rhs_type == int_type_node)
+	    && TREE_CONSTANT (rhs)
 	   && (lhs_type == byte_type_node || lhs_type == char_type_node
 	       || lhs_type == short_type_node))
     {
@@ -13085,9 +13090,10 @@ valid_ref_assignconv_cast_p (source, dest, cast)
 	{
 	  /* Array */
 	  return (cast
-		  && (DECL_NAME (TYPE_NAME (source)) == java_lang_cloneable
+		  && (DECL_NAME (TYPE_NAME (source))
+		      == java_lang_cloneable_identifier_node
 		      || (DECL_NAME (TYPE_NAME (source))
-			  == java_io_serializable)));
+			  == java_io_serializable_identifier_node)));
 	}
     }
   if (TYPE_ARRAY_P (source))
@@ -13097,8 +13103,10 @@ valid_ref_assignconv_cast_p (source, dest, cast)
       /* Can't cast an array to an interface unless the interface is
 	 java.lang.Cloneable or java.io.Serializable.  */
       if (TYPE_INTERFACE_P (dest))
-	return (DECL_NAME (TYPE_NAME (dest)) == java_lang_cloneable
-		|| DECL_NAME (TYPE_NAME (dest)) == java_io_serializable);
+	return (DECL_NAME (TYPE_NAME (dest))
+		== java_lang_cloneable_identifier_node
+		|| (DECL_NAME (TYPE_NAME (dest))
+		    == java_io_serializable_identifier_node));
       else			/* Arrays */
 	{
 	  tree source_element_type = TYPE_ARRAY_ELEMENT (source);
@@ -13151,7 +13159,7 @@ do_unary_numeric_promotion (arg)
   return arg;
 }
 
-/* Return a non zero value if SOURCE can be converted into DEST using
+/* Return a nonzero value if SOURCE can be converted into DEST using
    the method invocation conversion rule (5.3).  */
 static int
 valid_method_invocation_conversion_p (dest, source)
@@ -13250,7 +13258,7 @@ java_decl_equiv (var_acc1, var_acc2)
 	  && TREE_OPERAND (var_acc1, 1) == TREE_OPERAND (var_acc2, 1));
 }
 
-/* Return a non zero value if CODE is one of the operators that can be
+/* Return a nonzero value if CODE is one of the operators that can be
    used in conjunction with the `=' operator in a compound assignment.  */
 
 static int
@@ -13481,6 +13489,11 @@ patch_binop (node, wfl_op1, wfl_op2)
          separately */
       op1 = do_unary_numeric_promotion (op1);
       op2 = do_unary_numeric_promotion (op2);
+
+      /* If the right hand side is of type `long', first cast it to
+	 `int'.  */
+      if (TREE_TYPE (op2) == long_type_node)
+	op2 = build1 (CONVERT_EXPR, int_type_node, op2);
 
       /* The type of the shift expression is the type of the promoted
          type of the left-hand operand */
@@ -13788,8 +13801,19 @@ merge_string_cste (op1, op2, after)
 	string = null_pointer;
       else if (TREE_TYPE (op2) == char_type_node)
 	{
-	  ch[0] = (char )TREE_INT_CST_LOW (op2);
-	  ch[1] = '\0';
+	  /* Convert the character into UTF-8.	*/
+	  unsigned char c = (unsigned char) TREE_INT_CST_LOW (op2);
+	  unsigned char *p = (unsigned char *) ch;
+	  if (0x01 <= c
+	      && c <= 0x7f)
+	    *p++ = c;
+	  else
+	    {
+	      *p++ = c >> 6 | 0xc0;
+	      *p++ = (c & 0x3f) | 0x80;
+	    }
+	  *p = '\0';
+ 
 	  string = ch;
 	}
       else
@@ -14951,7 +14975,7 @@ build_new_loop (loop_body)
            BODY			 end of this labeled block)
        INCREMENT		(if any)
 
-  REVERSED, if non zero, tells that the loop condition expr comes
+  REVERSED, if nonzero, tells that the loop condition expr comes
   after the body, like in the do-while loop.
 
   To obtain a loop, the loop body structure described above is
@@ -16012,8 +16036,10 @@ fold_constant_for_init (node, context)
 
   switch (code)
     {
-    case STRING_CST:
     case INTEGER_CST:
+      if (node == null_pointer_node)
+	return NULL_TREE;
+    case STRING_CST:
     case REAL_CST:
       return node;
 
@@ -16086,6 +16112,8 @@ fold_constant_for_init (node, context)
       /* Guard against infinite recursion. */
       DECL_INITIAL (node) = NULL_TREE;
       val = fold_constant_for_init (val, node);
+      if (val != NULL_TREE && TREE_CODE (val) != STRING_CST)
+	val = try_builtin_assignconv (NULL_TREE, TREE_TYPE (node), val);
       DECL_INITIAL (node) = val;
       return val;
 
@@ -16221,8 +16249,11 @@ attach_init_test_initialization_flags (entry, ptr)
   tree block = (tree)ptr;
   struct treetreehash_entry *ite = (struct treetreehash_entry *) *entry;
 
-  TREE_CHAIN (ite->value) = BLOCK_EXPR_DECLS (block);
-  BLOCK_EXPR_DECLS (block) = ite->value;
+  if (block != error_mark_node)
+    {
+      TREE_CHAIN (ite->value) = BLOCK_EXPR_DECLS (block);
+      BLOCK_EXPR_DECLS (block) = ite->value;
+    }
   return true;
 }
 

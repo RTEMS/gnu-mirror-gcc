@@ -20,6 +20,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "flags.h"
 #include "obstack.h"
@@ -706,7 +708,7 @@ bitmap_equal_p (a, b)
   bitmap_head c;
   int ret;
 
-  c.first = c.current = 0;
+  memset (&c, 0, sizeof (c)); 
   ret = ! bitmap_operation (&c, a, b, BITMAP_XOR);
   bitmap_clear (&c);
 

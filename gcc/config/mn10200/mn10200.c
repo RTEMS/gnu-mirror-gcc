@@ -22,6 +22,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "tree.h"
 #include "regs.h"
@@ -943,7 +945,7 @@ secondary_reload_class (class, mode, in, input)
 
    The basic shift methods:
 
-     * loop shifts -- emit a loop using one (or two on H8/S) bit shifts;
+     * loop shifts -- emit a loop using one (or two on H8S) bit shifts;
      this is the default.  SHIFT_LOOP
 
      * inlined shifts -- emit straight line code for the shift; this is

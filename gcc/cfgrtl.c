@@ -44,6 +44,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "rtl.h"
 #include "hard-reg-set.h"
@@ -360,13 +362,15 @@ flow_delete_block_noexpunge (b)
      and remove the associated NOTE_INSN_EH_REGION_BEG and
      NOTE_INSN_EH_REGION_END notes.  */
 
-  /* Get rid of all NOTE_INSN_PREDICTIONs hanging before the block.  */
+  /* Get rid of all NOTE_INSN_PREDICTIONs and NOTE_INSN_LOOP_CONTs
+     hanging before the block.  */
 
   for (insn = PREV_INSN (b->head); insn; insn = PREV_INSN (insn))
     {
       if (GET_CODE (insn) != NOTE)
 	break;
-      if (NOTE_LINE_NUMBER (insn) == NOTE_INSN_PREDICTION)
+      if (NOTE_LINE_NUMBER (insn) == NOTE_INSN_PREDICTION
+	  || NOTE_LINE_NUMBER (insn) == NOTE_INSN_LOOP_CONT)
 	NOTE_LINE_NUMBER (insn) = NOTE_INSN_DELETED;
     }
 
@@ -1203,7 +1207,6 @@ split_edge (edge_in)
      edge edge_in;
 {
   basic_block bb;
-  edge edge_out;
   rtx before;
 
   /* Abnormal edges cannot be split.  */
@@ -1269,7 +1272,7 @@ split_edge (edge_in)
 		    edge_in->dest->global_live_at_start);
     }
 
-  edge_out = make_single_succ_edge (bb, edge_in->dest, EDGE_FALLTHRU);
+  make_single_succ_edge (bb, edge_in->dest, EDGE_FALLTHRU);
 
   /* For non-fallthry edges, we must adjust the predecessor's
      jump instruction to target our new block.  */
@@ -1802,7 +1805,7 @@ verify_flow_info ()
 	  if (e->flags & EDGE_FALLTHRU)
 	    n_fallthru++;
 
-	  if ((e->flags & ~EDGE_DFS_BACK) == 0)
+	  if ((e->flags & ~(EDGE_DFS_BACK | EDGE_CAN_FALLTHRU)) == 0)
 	    n_branch++;
 
 	  if (e->flags & EDGE_ABNORMAL_CALL)

@@ -35,6 +35,8 @@
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "rtl.h"
 #include "hard-reg-set.h"
@@ -65,7 +67,7 @@ static int branch_ratio_cutoff;
 
 #define seen(bb) (RBI (bb)->visited || RBI (bb)->next)
 
-/* Return true if we should ignore the basic block for purposes of tracing. */
+/* Return true if we should ignore the basic block for purposes of tracing.  */
 static bool
 ignore_bb_p (bb)
      basic_block bb;

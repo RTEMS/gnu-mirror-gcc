@@ -91,7 +91,7 @@ namespace std
 	{
 	  if (!__testeof)
 	    {
-	      __size_type __len = max(_M_buf_size, _M_buf_size_opt);
+	      __size_type __len = std::max(_M_buf_size, _M_buf_size_opt);
 	      __len *= 2;
 
 	      if (__testwrite)
@@ -226,13 +226,16 @@ namespace std
   // which are defined via explicit instantiations elsewhere.  
   // NB:  This syntax is a GNU extension.
   extern template class basic_stringbuf<char>;
-  extern template class basic_stringbuf<wchar_t>;
   extern template class basic_istringstream<char>;
-  extern template class basic_istringstream<wchar_t>;
   extern template class basic_ostringstream<char>;
-  extern template class basic_ostringstream<wchar_t>;
   extern template class basic_stringstream<char>;
+
+#ifdef _GLIBCPP_USE_WCHAR_T
+  extern template class basic_stringbuf<wchar_t>;
+  extern template class basic_istringstream<wchar_t>;
+  extern template class basic_ostringstream<wchar_t>;
   extern template class basic_stringstream<wchar_t>;
+#endif
 } // namespace std
 
 #endif

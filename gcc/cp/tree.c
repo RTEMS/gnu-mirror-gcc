@@ -22,6 +22,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "cp-tree.h"
 #include "flags.h"
@@ -32,6 +34,7 @@ Boston, MA 02111-1307, USA.  */
 #include "insn-config.h"
 #include "integrate.h"
 #include "tree-inline.h"
+#include "target.h"
 
 static tree bot_manip PARAMS ((tree *, int *, void *));
 static tree bot_replace PARAMS ((tree *, int *, void *));
@@ -39,7 +42,7 @@ static tree build_cplus_array_type_1 PARAMS ((tree, tree));
 static int list_hash_eq PARAMS ((const void *, const void *));
 static hashval_t list_hash_pieces PARAMS ((tree, tree, tree));
 static hashval_t list_hash PARAMS ((const void *));
-static cp_lvalue_kind lvalue_p_1 PARAMS ((tree, int));
+static cp_lvalue_kind lvalue_p_1 PARAMS ((tree, int, int));
 static tree no_linkage_helper PARAMS ((tree *, int *, void *));
 static tree build_srcloc PARAMS ((const char *, int));
 static tree mark_local_for_remap_r PARAMS ((tree *, int *, void *));
@@ -56,12 +59,13 @@ static tree handle_init_priority_attribute PARAMS ((tree *, tree, tree, int, boo
 
 /* If REF is an lvalue, returns the kind of lvalue that REF is.
    Otherwise, returns clk_none.  If TREAT_CLASS_RVALUES_AS_LVALUES is
-   non-zero, rvalues of class type are considered lvalues.  */
+   nonzero, rvalues of class type are considered lvalues.  */
 
 static cp_lvalue_kind
-lvalue_p_1 (ref, treat_class_rvalues_as_lvalues)
+lvalue_p_1 (ref, treat_class_rvalues_as_lvalues, allow_cast_as_lvalue)
      tree ref;
      int treat_class_rvalues_as_lvalues;
+     int allow_cast_as_lvalue;
 {
   cp_lvalue_kind op1_lvalue_kind = clk_none;
   cp_lvalue_kind op2_lvalue_kind = clk_none;
@@ -84,16 +88,28 @@ lvalue_p_1 (ref, treat_class_rvalues_as_lvalues)
     case WITH_CLEANUP_EXPR:
     case REALPART_EXPR:
     case IMAGPART_EXPR:
-      /* This shouldn't be here, but there are lots of places in the compiler
-         that are sloppy about tacking on NOP_EXPRs to the same type when
-	 no actual conversion is happening.  */
-    case NOP_EXPR:
       return lvalue_p_1 (TREE_OPERAND (ref, 0),
-			 treat_class_rvalues_as_lvalues);
+			 treat_class_rvalues_as_lvalues,
+			 allow_cast_as_lvalue);
+
+    case NOP_EXPR:
+      /* If expression doesn't change the type, we consider it as an
+	 lvalue even when cast_as_lvalue extension isn't selected.
+	 That's because parts of the compiler are alleged to be sloppy
+	 about sticking in NOP_EXPR node for no good reason.  */
+      if (allow_cast_as_lvalue ||
+	  same_type_p (TYPE_MAIN_VARIANT (TREE_TYPE (ref)),
+		       TYPE_MAIN_VARIANT (TREE_TYPE (TREE_OPERAND (ref, 0)))))
+	return lvalue_p_1 (TREE_OPERAND (ref, 0),
+			   treat_class_rvalues_as_lvalues,
+			   allow_cast_as_lvalue);
+      else
+	return clk_none;
 
     case COMPONENT_REF:
       op1_lvalue_kind = lvalue_p_1 (TREE_OPERAND (ref, 0),
-				    treat_class_rvalues_as_lvalues);
+				    treat_class_rvalues_as_lvalues,
+				    allow_cast_as_lvalue);
       if (op1_lvalue_kind 
 	  /* The "field" can be a FUNCTION_DECL or an OVERLOAD in some
 	     situations.  */
@@ -134,16 +150,20 @@ lvalue_p_1 (ref, treat_class_rvalues_as_lvalues)
     case MAX_EXPR:
     case MIN_EXPR:
       op1_lvalue_kind = lvalue_p_1 (TREE_OPERAND (ref, 0),
-				    treat_class_rvalues_as_lvalues);
+				    treat_class_rvalues_as_lvalues,
+				    allow_cast_as_lvalue);
       op2_lvalue_kind = lvalue_p_1 (TREE_OPERAND (ref, 1),
-				    treat_class_rvalues_as_lvalues);
+				    treat_class_rvalues_as_lvalues,
+				    allow_cast_as_lvalue);
       break;
 
     case COND_EXPR:
       op1_lvalue_kind = lvalue_p_1 (TREE_OPERAND (ref, 1),
-				    treat_class_rvalues_as_lvalues);
+				    treat_class_rvalues_as_lvalues,
+				    allow_cast_as_lvalue);
       op2_lvalue_kind = lvalue_p_1 (TREE_OPERAND (ref, 2),
-				    treat_class_rvalues_as_lvalues);
+				    treat_class_rvalues_as_lvalues,
+				    allow_cast_as_lvalue);
       break;
 
     case MODIFY_EXPR:
@@ -151,7 +171,8 @@ lvalue_p_1 (ref, treat_class_rvalues_as_lvalues)
 
     case COMPOUND_EXPR:
       return lvalue_p_1 (TREE_OPERAND (ref, 1),
-			 treat_class_rvalues_as_lvalues);
+			 treat_class_rvalues_as_lvalues,
+			 allow_cast_as_lvalue);
 
     case TARGET_EXPR:
       return treat_class_rvalues_as_lvalues ? clk_class : clk_none;
@@ -196,7 +217,7 @@ cp_lvalue_kind
 real_lvalue_p (ref)
      tree ref;
 {
-  return lvalue_p_1 (ref, /*treat_class_rvalues_as_lvalues=*/0);
+  return lvalue_p_1 (ref, /*treat_class_rvalues_as_lvalues=*/ 0, /*cast*/ 1);
 }
 
 /* This differs from real_lvalue_p in that class rvalues are
@@ -207,7 +228,15 @@ lvalue_p (ref)
      tree ref;
 {
   return 
-    (lvalue_p_1 (ref, /*treat_class_rvalues_as_lvalues=*/1) != clk_none);
+    (lvalue_p_1 (ref, /*class rvalue ok*/ 1, /*cast*/ 1) != clk_none);
+}
+
+int
+non_cast_lvalue_p (ref)
+     tree ref;
+{
+  return 
+    (lvalue_p_1 (ref, /*class rvalue ok*/ 1, /*cast*/ 0) != clk_none);
 }
 
 /* Return nonzero if REF is an lvalue valid for this language;
@@ -218,7 +247,20 @@ lvalue_or_else (ref, string)
      tree ref;
      const char *string;
 {
-  int win = lvalue_p (ref);
+  int ret = lvalue_p_1 (ref, /* class rvalue ok */ 1, /* cast ok */ 1);
+  int win = (ret != clk_none);
+  if (! win)
+    error ("non-lvalue in %s", string);
+  return win;
+}
+
+int
+non_cast_lvalue_or_else (ref, string)
+     tree ref;
+     const char *string;
+{
+  int ret = lvalue_p_1 (ref, /* class rvalue ok */ 1, /* cast ok */ 0);
+  int win = (ret != clk_none);
   if (! win)
     error ("non-lvalue in %s", string);
   return win;
@@ -259,6 +301,7 @@ build_cplus_new (type, init)
   tree fn;
   tree slot;
   tree rval;
+  int is_ctor;
 
   /* Make sure that we're not trying to create an instance of an
      abstract class.  */
@@ -266,6 +309,11 @@ build_cplus_new (type, init)
 
   if (TREE_CODE (init) != CALL_EXPR && TREE_CODE (init) != AGGR_INIT_EXPR)
     return convert (type, init);
+
+  fn = TREE_OPERAND (init, 0);
+  is_ctor = (TREE_CODE (fn) == ADDR_EXPR
+	     && TREE_CODE (TREE_OPERAND (fn, 0)) == FUNCTION_DECL
+	     && DECL_CONSTRUCTOR_P (TREE_OPERAND (fn, 0)));
 
   slot = build (VAR_DECL, type);
   DECL_ARTIFICIAL (slot) = 1;
@@ -280,13 +328,18 @@ build_cplus_new (type, init)
      replaces every AGGR_INIT_EXPR with a copy that uses a fresh
      temporary slot.  Then, expand_expr builds up a call-expression
      using the new slot.  */
-  fn = TREE_OPERAND (init, 0);
-  rval = build (AGGR_INIT_EXPR, type, fn, TREE_OPERAND (init, 1), slot);
-  TREE_SIDE_EFFECTS (rval) = 1;
-  AGGR_INIT_VIA_CTOR_P (rval) 
-    = (TREE_CODE (fn) == ADDR_EXPR
-       && TREE_CODE (TREE_OPERAND (fn, 0)) == FUNCTION_DECL
-       && DECL_CONSTRUCTOR_P (TREE_OPERAND (fn, 0)));
+
+  /* If we don't need to use a constructor to create an object of this
+     type, don't mess with AGGR_INIT_EXPR.  */
+  if (is_ctor || TREE_ADDRESSABLE (type))
+    {
+      rval = build (AGGR_INIT_EXPR, type, fn, TREE_OPERAND (init, 1), slot);
+      TREE_SIDE_EFFECTS (rval) = 1;
+      AGGR_INIT_VIA_CTOR_P (rval) = is_ctor;
+    }
+  else
+    rval = init;
+
   rval = build_target_expr (slot, rval);
 
   return rval;
@@ -537,6 +590,11 @@ cp_build_qualified_type_real (type, type_quals, complain)
 {
   tree result;
   int bad_quals = TYPE_UNQUALIFIED;
+  /* We keep bad function qualifiers separate, so that we can decide
+     whether to implement DR 295 or not. DR 295 break existing code,
+     unfortunately. Remove this variable to implement the defect
+     report.  */
+  int bad_func_quals = TYPE_UNQUALIFIED;
 
   if (type == error_mark_node)
     return type;
@@ -552,6 +610,8 @@ cp_build_qualified_type_real (type, type_quals, complain)
 	  || TREE_CODE (type) == METHOD_TYPE))
     {
       bad_quals |= type_quals & (TYPE_QUAL_CONST | TYPE_QUAL_VOLATILE);
+      if (TREE_CODE (type) != REFERENCE_TYPE)
+	bad_func_quals |= type_quals & (TYPE_QUAL_CONST | TYPE_QUAL_VOLATILE);
       type_quals &= ~(TYPE_QUAL_CONST | TYPE_QUAL_VOLATILE);
     }
   
@@ -570,21 +630,23 @@ cp_build_qualified_type_real (type, type_quals, complain)
     /*OK*/;
   else if (!(complain & (tf_error | tf_ignore_bad_quals)))
     return error_mark_node;
+  else if (bad_func_quals && !(complain & tf_error))
+    return error_mark_node;
   else
     {
       if (complain & tf_ignore_bad_quals)
  	/* We're not going to warn about constifying things that can't
  	   be constified.  */
  	bad_quals &= ~TYPE_QUAL_CONST;
+      bad_quals |= bad_func_quals;
       if (bad_quals)
  	{
  	  tree bad_type = build_qualified_type (ptr_type_node, bad_quals);
  
- 	  if (!(complain & tf_ignore_bad_quals))
+ 	  if (!(complain & tf_ignore_bad_quals)
+	      || bad_func_quals)
  	    error ("`%V' qualifiers cannot be applied to `%T'",
 		   bad_type, type);
- 	  else if (complain & tf_warning)
- 	    warning ("ignoring `%V' qualifiers on `%T'", bad_type, type);
  	}
     }
   
@@ -602,9 +664,12 @@ cp_build_qualified_type_real (type, type_quals, complain)
 	return error_mark_node;
 
       /* See if we already have an identically qualified type.  */
-      t = get_qualified_type (type, type_quals);
-
-      /* If we didn't already have it, create it now.  */
+      for (t = TYPE_MAIN_VARIANT (type); t; t = TYPE_NEXT_VARIANT (t))
+	if (cp_type_quals (t) == type_quals 
+	    && TYPE_NAME (t) == TYPE_NAME (type)
+	    && TYPE_CONTEXT (t) == TYPE_CONTEXT (type))
+	  break;
+	  
       if (!t)
 	{
 	  /* Make a new array type, just like the old one, but with the
@@ -963,9 +1028,10 @@ really_overloaded_fn (x)
     x = TREE_OPERAND (x, 1);
   if (BASELINK_P (x))
     x = BASELINK_FUNCTIONS (x);
-  return (TREE_CODE (x) == OVERLOAD 
-	  && (OVL_CHAIN (x)
-	      || DECL_FUNCTION_TEMPLATE_P (OVL_FUNCTION (x))));
+  
+  return ((TREE_CODE (x) == OVERLOAD && OVL_CHAIN (x))
+	  || DECL_FUNCTION_TEMPLATE_P (OVL_CURRENT (x))
+	  || TREE_CODE (x) == TEMPLATE_ID_EXPR);
 }
 
 /* Return the OVERLOAD or FUNCTION_DECL inside FNS.  FNS can be an
@@ -987,7 +1053,7 @@ get_first_fn (from)
      tree from;
 {
   my_friendly_assert (is_overloaded_fn (from), 9);
-  /* A baselink is also considered an overloaded function. */
+  /* A baselink is also considered an overloaded function.  */
   if (BASELINK_P (from))
     from = BASELINK_FUNCTIONS (from);
   return OVL_CURRENT (from);
@@ -1004,7 +1070,7 @@ bound_pmf_p (t)
 	  && TYPE_PTRMEMFUNC_P (TREE_TYPE (TREE_OPERAND (t, 1))));
 }
 
-/* Return a new OVL node, concatenating it with the old one. */
+/* Return a new OVL node, concatenating it with the old one.  */
 
 tree
 ovl_cons (decl, chain)
@@ -1043,7 +1109,7 @@ is_aggr_type_2 (t1, t2)
   return IS_AGGR_TYPE (t1) && IS_AGGR_TYPE (t2);
 }
 
-/* Returns non-zero if CODE is the code for a statement.  */
+/* Returns nonzero if CODE is the code for a statement.  */
 
 int
 cp_statement_code_p (code)
@@ -1858,7 +1924,7 @@ maybe_dummy_object (type, binfop)
   if (current_class_ref && context == current_class_type
       /* Kludge: Make sure that current_class_type is actually
          correct.  It might not be if we're in the middle of
-         tsubst_default_argument. */
+         tsubst_default_argument.  */
       && same_type_p (TYPE_MAIN_VARIANT (TREE_TYPE (current_class_ref)),
 		      current_class_type))
     decl = current_class_ref;
@@ -1888,6 +1954,8 @@ pod_type_p (t)
 {
   t = strip_array_types (t);
 
+  if (t == error_mark_node)
+    return 1;
   if (INTEGRAL_TYPE_P (t))
     return 1;  /* integral, character or enumeral type */
   if (FLOAT_TYPE_P (t))
@@ -1914,6 +1982,9 @@ zero_init_p (t)
      tree t;
 {
   t = strip_array_types (t);
+
+  if (t == error_mark_node)
+    return 1;
 
   /* NULL pointers to data members are initialized with -1.  */
   if (TYPE_PTRMEM_P (t))
@@ -2030,7 +2101,7 @@ handle_init_priority_attribute (node, name, args, flags, no_add_attrs)
       /* Static objects in functions are initialized the
 	 first time control passes through that
 	 function. This is not precise enough to pin down an
-	 init_priority value, so don't allow it. */
+	 init_priority value, so don't allow it.  */
       || current_function_decl) 
     {
       error ("can only use `%s' attribute on file-scope definitions of objects of class type",
@@ -2180,6 +2251,14 @@ cp_cannot_inline_tree_fn (fnp)
 	return 1;
     }
 
+  /* Don't auto-inline anything that might not be bound within
+     this unit of translation.  */
+  if (!DECL_DECLARED_INLINE_P (fn) && !(*targetm.binds_local_p) (fn))
+    {
+      DECL_UNINLINABLE (fn) = 1;
+      return 1;
+    }
+
   if (varargs_function_p (fn))
     {
       DECL_UNINLINABLE (fn) = 1;
@@ -2245,33 +2324,32 @@ cp_auto_var_in_fn_p (var, fn)
 
 tree
 cp_copy_res_decl_for_inlining (result, fn, caller, decl_map_,
-			       need_decl, target_exprs)
+			       need_decl, return_slot_addr)
      tree result, fn, caller;
      void *decl_map_;
      int *need_decl;
-     void *target_exprs;
+     tree return_slot_addr;
 {
   splay_tree decl_map = (splay_tree)decl_map_;
-  varray_type *texps = (varray_type *)target_exprs;
   tree var;
-  int aggregate_return_p;
 
-  /* Figure out whether or not FN returns an aggregate.  */
-  aggregate_return_p = IS_AGGR_TYPE (TREE_TYPE (result));
-  *need_decl = ! aggregate_return_p;
-
-  /* If FN returns an aggregate then the caller will always create the
-     temporary (using a TARGET_EXPR) and the call will be the
-     initializing expression for the TARGET_EXPR.  If we were just to
+  /* If FN returns an aggregate then the caller will always pass the
+     address of the return slot explicitly.  If we were just to
      create a new VAR_DECL here, then the result of this function
      would be copied (bitwise) into the variable initialized by the
      TARGET_EXPR.  That's incorrect, so we must transform any
      references to the RESULT into references to the target.  */
-  if (aggregate_return_p)
+
+  /* We should have an explicit return slot iff the return type is
+     TREE_ADDRESSABLE.  See simplify_aggr_init_expr.  */
+  if (TREE_ADDRESSABLE (TREE_TYPE (result))
+      != (return_slot_addr != NULL_TREE))
+    abort ();
+
+  *need_decl = !return_slot_addr;
+  if (return_slot_addr)
     {
-      if (VARRAY_ACTIVE_SIZE (*texps) == 0)
-	abort ();
-      var = TREE_OPERAND (VARRAY_TOP_TREE (*texps), 0);
+      var = build_indirect_ref (return_slot_addr, "");
       if (! same_type_ignoring_top_level_qualifiers_p (TREE_TYPE (var),
 						       TREE_TYPE (result)))
 	abort ();
@@ -2305,7 +2383,7 @@ cp_copy_res_decl_for_inlining (result, fn, caller, decl_map_,
   return var;
 }
 
-/* Record that we're about to start inlining FN, and return non-zero if
+/* Record that we're about to start inlining FN, and return nonzero if
    that's OK.  Used for lang_hooks.tree_inlining.start_inlining.  */
 
 int
@@ -2492,7 +2570,7 @@ name_p (tree node)
 	  || TREE_CODE (node) == SCOPE_REF);
 }
 
-/* Returns non-zero if TYPE is a character type, including wchar_t.  */
+/* Returns nonzero if TYPE is a character type, including wchar_t.  */
 
 int
 char_type_p (type)

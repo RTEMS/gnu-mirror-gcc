@@ -23,6 +23,8 @@ Boston, MA 02111-1307, USA.  */
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "rtl.h"
 #include "tree.h"
 #include "flags.h"
@@ -102,7 +104,7 @@ cxx_expand_expr (exp, target, tmode, modifier)
 			  target, tmode, modifier);
 
     case OFFSET_REF:
-      /* Offset refs should not make it through to here. */
+      /* Offset refs should not make it through to here.  */
       abort ();
       return const0_rtx;
       
@@ -127,11 +129,3 @@ cxx_expand_expr (exp, target, tmode, modifier)
   /* NOTREACHED */
   return NULL;
 }
-
-int
-extract_init (decl, init)
-     tree decl ATTRIBUTE_UNUSED, init ATTRIBUTE_UNUSED;
-{
-  return 0;
-}
-

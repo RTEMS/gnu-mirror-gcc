@@ -25,6 +25,8 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "cpplib.h"
 #include "cpphash.h"
 
@@ -409,12 +411,18 @@ stringify_arg (pfile, arg)
     }
 
   /* Commit the memory, including NUL, and return the token.  */
+  if ((size_t) (BUFF_LIMIT (pfile->u_buff) - dest) < 1)
+    {
+      size_t len_so_far = dest - BUFF_FRONT (pfile->u_buff);
+      _cpp_extend_buff (pfile, &pfile->u_buff, 1);
+      dest = BUFF_FRONT (pfile->u_buff) + len_so_far;
+    }
   len = dest - BUFF_FRONT (pfile->u_buff);
   BUFF_FRONT (pfile->u_buff) = dest + 1;
   return new_string_token (pfile, dest - len, len);
 }
 
-/* Try to paste two tokens.  On success, return non-zero.  In any
+/* Try to paste two tokens.  On success, return nonzero.  In any
    case, PLHS is updated to point to the pasted token, which is
    guaranteed to not have the PASTE_LEFT flag set.  */
 static bool
@@ -436,8 +444,7 @@ paste_tokens (pfile, plhs, rhs)
      It is simpler to insert a space here, rather than modifying the
      lexer to ignore comments in some circumstances.  Simply returning
      false doesn't work, since we want to clear the PASTE_LEFT flag.  */
-  if (lhs->type == CPP_DIV
-      && (rhs->type == CPP_MULT || rhs->type == CPP_DIV))
+  if (lhs->type == CPP_DIV && rhs->type != CPP_EQ)
     *end++ = ' ';
   end = cpp_spell_token (pfile, rhs, end);
   *end = '\0';
@@ -1032,9 +1039,14 @@ expand_arg (pfile, arg)
      macro_arg *arg;
 {
   unsigned int capacity;
+  bool saved_warn_trad;
 
   if (arg->count == 0)
     return;
+
+  /* Don't warn about funlike macros when pre-expanding.  */
+  saved_warn_trad = CPP_WTRADITIONAL (pfile);
+  CPP_WTRADITIONAL (pfile) = 0;
 
   /* Loop, reading in the arguments.  */
   capacity = 256;
@@ -1062,6 +1074,8 @@ expand_arg (pfile, arg)
     }
 
   _cpp_pop_context (pfile);
+
+  CPP_WTRADITIONAL (pfile) = saved_warn_trad;
 }
 
 /* Pop the current context off the stack, re-enabling the macro if the
@@ -1233,7 +1247,7 @@ _cpp_backup_tokens (pfile, count)
 
 /* #define directive parsing and handling.  */
 
-/* Returns non-zero if a macro redefinition warning is required.  */
+/* Returns nonzero if a macro redefinition warning is required.  */
 static bool
 warn_of_redefinition (pfile, node, macro2)
      cpp_reader *pfile;
@@ -1287,15 +1301,16 @@ _cpp_free_definition (h)
 }
 
 /* Save parameter NODE to the parameter list of macro MACRO.  Returns
-   zero on success, non-zero if the parameter is a duplicate.  */
+   zero on success, nonzero if the parameter is a duplicate.  */
 bool
 _cpp_save_parameter (pfile, macro, node)
      cpp_reader *pfile;
      cpp_macro *macro;
      cpp_hashnode *node;
 {
+  unsigned int len;
   /* Constraint 6.10.3.6 - duplicate parameter names.  */
-  if (node->arg_index)
+  if (node->flags & NODE_MACRO_ARG)
     {
       cpp_error (pfile, DL_ERROR, "duplicate macro parameter \"%s\"",
 		 NODE_NAME (node));
@@ -1307,7 +1322,17 @@ _cpp_save_parameter (pfile, macro, node)
     _cpp_extend_buff (pfile, &pfile->a_buff, sizeof (cpp_hashnode *));
 
   ((cpp_hashnode **) BUFF_FRONT (pfile->a_buff))[macro->paramc++] = node;
-  node->arg_index = macro->paramc;
+  node->flags |= NODE_MACRO_ARG;
+  len = macro->paramc * sizeof (union _cpp_hashnode_value);
+  if (len > pfile->macro_buffer_len)
+    {
+      pfile->macro_buffer = (uchar *) xrealloc (pfile->macro_buffer, len);
+      pfile->macro_buffer_len = len;
+    }
+  ((union _cpp_hashnode_value *) pfile->macro_buffer)[macro->paramc - 1]
+    = node->value;
+  
+  node->value.arg_index  = macro->paramc;
   return false;
 }
 
@@ -1418,10 +1443,11 @@ lex_expansion_token (pfile, macro)
   token = _cpp_lex_direct (pfile);
 
   /* Is this a parameter?  */
-  if (token->type == CPP_NAME && token->val.node->arg_index)
+  if (token->type == CPP_NAME
+      && (token->val.node->flags & NODE_MACRO_ARG) != 0)
     {
       token->type = CPP_MACRO_ARG;
-      token->val.arg_no = token->val.node->arg_index;
+      token->val.arg_no = token->val.node->value.arg_index;
     }
   else if (CPP_WTRADITIONAL (pfile) && macro->paramc > 0
 	   && (token->type == CPP_STRING || token->type == CPP_CHAR))
@@ -1527,7 +1553,7 @@ create_iso_definition (pfile, macro)
   return true;
 }
 
-/* Parse a macro and save its expansion.  Returns non-zero on success.  */
+/* Parse a macro and save its expansion.  Returns nonzero on success.  */
 bool
 _cpp_create_definition (pfile, node)
      cpp_reader *pfile;
@@ -1571,7 +1597,11 @@ _cpp_create_definition (pfile, node)
 
   /* Clear the fast argument lookup indices.  */
   for (i = macro->paramc; i-- > 0; )
-    macro->params[i]->arg_index = 0;
+    {
+      struct cpp_hashnode *node = macro->params[i];
+      node->flags &= ~ NODE_MACRO_ARG;
+      node->value = ((union _cpp_hashnode_value *) pfile->macro_buffer)[i];
+    }
 
   if (!ok)
     return ok;

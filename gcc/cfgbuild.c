@@ -34,6 +34,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "config.h"
 #include "system.h"
+#include "coretypes.h"
+#include "tm.h"
 #include "tree.h"
 #include "rtl.h"
 #include "hard-reg-set.h"
@@ -292,7 +294,7 @@ make_edges (label_value_list, min, max, update_p)
   /* Heavy use of computed goto in machine-generated code can lead to
      nearly fully-connected CFGs.  In that case we spend a significant
      amount of time searching the edge lists for duplicates.  */
-  if (forced_labels || label_value_list)
+  if (forced_labels || label_value_list || cfun->max_jumptable_ents > 100)
     {
       edge_cache = sbitmap_vector_alloc (last_basic_block, last_basic_block);
       sbitmap_vector_zero (edge_cache, last_basic_block);

@@ -70,28 +70,15 @@ for windows/multi thread */
   && strcmp (STR, "Tbss"))
 
 
-#if 0	
-/* don't do this until we can sort out the default path issues. MK */
-#undef STANDARD_EXEC_PREFIX
-#define STANDARD_EXEC_PREFIX ""
-
-#undef STANDARD_STARTFILE_PREFIX
-#define STANDARD_STARTFILE_PREFIX ""
-
-#undef TOOLDIR_BASE_PREFIX
-#define TOOLDIR_BASE_PREFIX ""
-
-#endif /* 0 */
-
 #define STDC_0_IN_SYSTEM_HEADERS 1
 
-#define HANDLE_SYSV_PRAGMA
+#define HANDLE_SYSV_PRAGMA 1
 #undef HANDLE_PRAGMA_WEAK  /* until the link format can handle it */
 
 /* Names to predefine in the preprocessor for this target machine.  */
 
-#define DBX_DEBUGGING_INFO
-#define SDB_DEBUGGING_INFO
+#define DBX_DEBUGGING_INFO 1
+#define SDB_DEBUGGING_INFO 1
 #undef PREFERRED_DEBUGGING_TYPE
 #define PREFERRED_DEBUGGING_TYPE DBX_DEBUG
 
@@ -104,7 +91,7 @@ for windows/multi thread */
 #define WCHAR_TYPE_SIZE 16
 
 /* Our strategy for finding global constructors is a bit different, although
-   not a lot. */
+   not a lot.  */
 #define DO_GLOBAL_CTORS_BODY						\
 do {									\
   int i;								\

@@ -25,8 +25,8 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
 typedef struct ht_identifier ht_identifier;
 struct ht_identifier GTY(())
 {
-  unsigned int len;
   const unsigned char *str;
+  unsigned int len;
 };
 
 #define HT_LEN(NODE) ((NODE)->len)
@@ -65,7 +65,7 @@ struct ht
 
 extern void gcc_obstack_init PARAMS ((struct obstack *));
 
-/* Initialise the hashtable with 2 ^ order entries.  */
+/* Initialize the hashtable with 2 ^ order entries.  */
 extern hash_table *ht_create PARAMS ((unsigned int order));
 
 /* Frees all memory associated with a hash table.  */

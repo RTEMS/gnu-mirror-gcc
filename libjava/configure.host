@@ -65,6 +65,16 @@ CHECKREFSPEC=
 
 # This case statement supports per-CPU defaults.
 case "${host}" in
+  arm*-elf | strongarm*-elf | xscale*-elf)
+	with_libffi_default=no
+	PROCESS=Ecos
+	FILE=Posix
+	CHECKREFSPEC=-fcheck-references
+	EXCEPTIONSPEC=
+	enable_java_net_default=no
+	enable_getenv_properties_default=no
+	enable_main_args_default=no
+	;;
   mips-tx39-*|mipstx39-unknown-*)
 	libgcj_flags="${libgcj_flags} -G 0"
 	LDFLAGS="$LDFLAGS -Tjmr3904dram.ld"
@@ -117,6 +127,11 @@ case "${host}" in
 	enable_hash_synchronization_default=yes
 	slow_pthread_self=yes
 	;;
+  s390*-*)
+	sysdeps_dir=s390
+	libgcj_interpreter=yes
+	enable_hash_synchronization_default=yes
+	;;
   sparc-*)
         ;;
   ia64-*)
@@ -125,22 +140,10 @@ case "${host}" in
 	libgcj_interpreter=yes
 	enable_hash_synchronization_default=yes
 	;;
-  xscale*-elf)
-	with_libffi_default=no
-	PROCESS=Ecos
-	FILE=Posix
-	CHECKREFSPEC=-fcheck-references
-	EXCEPTIONSPEC=
-	enable_java_net_default=no
-	enable_getenv_properties_default=no
-	enable_main_args_default=no
-	;;
   sh-* | sh[34]*-*)
 	sysdeps_dir=sh
 	libgcj_flags="${libgcj_flags} -mieee"
 	libgcj_interpreter=yes
-	CHECKREFSPEC=-fcheck-references
-	EXCEPTIONSPEC=
 	enable_hash_synchronization_default=yes
 	;;
 esac
@@ -156,7 +159,8 @@ case "${host}" in
   s390*-linux* | \
   sparc*-linux* | \
   ia64-* | \
-  x86_64*-linux*)
+  x86_64*-linux* | \
+  sh-linux* | sh[34]*-linux*)
   	can_unwind_signal=yes
 	;;
   *-*-darwin*)
