@@ -47,8 +47,6 @@ const char * reg_names[] = REGISTER_NAMES;
 
 static FILE *outfile;
 
-static const char xspaces[] = "                                                                                                                                                                ";
-
 static int sawclose = 0;
 
 static int indent;
@@ -91,9 +89,8 @@ print_rtx (in_rtx)
       if (flag_simple)
 	fputc (' ', outfile);
       else
-	fprintf (outfile, "\n%s%s",
-		 print_rtx_head,
-		 (xspaces + (sizeof xspaces - 1 - indent * 2)));
+	fprintf (outfile, "\n%s%*s",
+		 print_rtx_head, indent * 2, "");
       sawclose = 0;
     }
 
@@ -282,9 +279,8 @@ print_rtx (in_rtx)
 	indent += 2;
 	if (sawclose)
 	  {
-	    fprintf (outfile, "\n%s%s",
-                     print_rtx_head,
-		     (xspaces + (sizeof xspaces - 1 - indent * 2)));
+	    fprintf (outfile, "\n%s%*s",
+                     print_rtx_head, indent * 2, "");
 	    sawclose = 0;
 	  }
 	fputs ("[ ", outfile);
@@ -300,9 +296,8 @@ print_rtx (in_rtx)
 	    indent -= 2;
 	  }
 	if (sawclose)
-	  fprintf (outfile, "\n%s%s",
-                   print_rtx_head,
-		   (xspaces + (sizeof xspaces - 1 - indent * 2)));
+	  fprintf (outfile, "\n%s%*s",
+                   print_rtx_head, indent * 2, "");
 
 	fputs ("] ", outfile);
 	sawclose = 1;
@@ -364,8 +359,8 @@ print_rtx (in_rtx)
       /* Print NOTE_INSN names rather than integer codes.  */
 
       case 'n':
-	if (XINT (in_rtx, i) >= NOTE_INSN_BIAS
-	    && XINT (in_rtx, i) < NOTE_INSN_MAX)
+	if (XINT (in_rtx, i) >= (int) NOTE_INSN_BIAS
+	    && XINT (in_rtx, i) < (int) NOTE_INSN_MAX)
 	  fprintf (outfile, " %s", GET_NOTE_INSN_NAME (XINT (in_rtx, i)));
 	else
 	  fprintf (outfile, " %d", XINT (in_rtx, i));

@@ -24,6 +24,7 @@ Boston, MA 02111-1307, USA.  */
 #include "system.h"
 #include "toplev.h"
 #include "rtl.h"
+#include "hard-reg-set.h"
 
 static void set_of_1		PARAMS ((rtx, rtx, void *));
 static void insn_dependent_p_1	PARAMS ((rtx, rtx, void *));
@@ -68,7 +69,9 @@ rtx_unstable_p (x)
     case REG:
       /* As in rtx_varies_p, we have to use the actual rtx, not reg number.  */
       if (x == frame_pointer_rtx || x == hard_frame_pointer_rtx
-	  || x == arg_pointer_rtx || RTX_UNCHANGING_P (x))
+	  /* The arg pointer varies if it is not a fixed register.  */
+	  || (x == arg_pointer_rtx && fixed_regs[ARG_POINTER_REGNUM])
+	  || RTX_UNCHANGING_P (x))
 	return 0;
 #ifndef PIC_OFFSET_TABLE_REG_CALL_CLOBBERED
       /* ??? When call-clobbered, the value is stable modulo the restore
@@ -144,7 +147,8 @@ rtx_varies_p (x, for_alias)
 	 eliminated the frame and/or arg pointer and are using it
 	 for pseudos.  */
       if (x == frame_pointer_rtx || x == hard_frame_pointer_rtx
-	  || x == arg_pointer_rtx)
+	  /* The arg pointer varies if it is not a fixed register.  */
+	  || (x == arg_pointer_rtx && fixed_regs[ARG_POINTER_REGNUM]))
 	return 0;
       if (x == pic_offset_table_rtx
 #ifdef PIC_OFFSET_TABLE_REG_CALL_CLOBBERED
@@ -160,8 +164,10 @@ rtx_varies_p (x, for_alias)
 
     case LO_SUM:
       /* The operand 0 of a LO_SUM is considered constant
-	 (in fact is it related specifically to operand 1).  */
-      return rtx_varies_p (XEXP (x, 1), for_alias);
+	 (in fact it is related specifically to operand 1)
+	 during alias analysis.  */
+      return (! for_alias && rtx_varies_p (XEXP (x, 0), for_alias))
+	     || rtx_varies_p (XEXP (x, 1), for_alias);
       
     case ASM_OPERANDS:
       if (MEM_VOLATILE_P (x))
@@ -202,17 +208,23 @@ rtx_addr_can_trap_p (x)
   switch (code)
     {
     case SYMBOL_REF:
+      return SYMBOL_REF_WEAK (x);
+
     case LABEL_REF:
-      /* SYMBOL_REF is problematic due to the possible presence of
-	 a #pragma weak, but to say that loads from symbols can trap is
-	 *very* costly.  It's not at all clear what's best here.  For
-	 now, we ignore the impact of #pragma weak.  */
       return 0;
 
     case REG:
       /* As in rtx_varies_p, we have to use the actual rtx, not reg number.  */
-      return ! (x == frame_pointer_rtx || x == hard_frame_pointer_rtx
-		|| x == stack_pointer_rtx || x == arg_pointer_rtx);
+      if (x == frame_pointer_rtx || x == hard_frame_pointer_rtx
+	  || x == stack_pointer_rtx
+	  /* The arg pointer varies if it is not a fixed register.  */
+	  || (x == arg_pointer_rtx && fixed_regs[ARG_POINTER_REGNUM]))
+	return 0;
+      /* All of the virtual frame registers are stack references.  */
+      if (REGNO (x) >= FIRST_VIRTUAL_REGISTER
+	  && REGNO (x) <= LAST_VIRTUAL_REGISTER)
+	return 0;
+      return 1;
 
     case CONST:
       return rtx_addr_can_trap_p (XEXP (x, 0));
@@ -227,8 +239,16 @@ rtx_addr_can_trap_p (x)
 		    && CONSTANT_P (XEXP (x, 1))));
 
     case LO_SUM:
+    case PRE_MODIFY:
       return rtx_addr_can_trap_p (XEXP (x, 1));
-      
+
+    case PRE_DEC:
+    case PRE_INC:
+    case POST_DEC:
+    case POST_INC:
+    case POST_MODIFY:
+      return rtx_addr_can_trap_p (XEXP (x, 0));
+
     default:
       break;
     }

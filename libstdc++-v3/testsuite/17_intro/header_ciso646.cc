@@ -23,7 +23,7 @@
 // { dg-do link }
 
 #include <ciso646>
-#include <debug_assert.h>
+#include <testsuite_hooks.h>
 
 
 // 2.11 Keywords
@@ -125,11 +125,3 @@ int main(void)
 
   return 0;
 }
-
-
-
-
-
-
-
-
