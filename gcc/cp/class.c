@@ -288,13 +288,15 @@ build_base_path (code, expr, binfo, nonnull)
       return error_mark_node;
     }
 
+  if (!want_pointer)
+    /* This must happen before the call to save_expr.  */
+    expr = build_unary_op (ADDR_EXPR, expr, 0);
+
   fixed_type_p = resolves_to_fixed_type_p (expr, &nonnull);
   if (fixed_type_p <= 0 && TREE_SIDE_EFFECTS (expr))
     expr = save_expr (expr);
 
-  if (!want_pointer)
-    expr = build_unary_op (ADDR_EXPR, expr, 0);
-  else if (!nonnull)
+  if (want_pointer && !nonnull)
     null_test = build (EQ_EXPR, boolean_type_node, expr, integer_zero_node);
   
   offset = BINFO_OFFSET (binfo);
@@ -1832,7 +1834,7 @@ maybe_warn_about_overly_private_class (t)
 	      return;
 		
 	    has_nonprivate_method = 1;
-	    break;
+	    /* Keep searching for a static member function.  */
 	  }
 	else if (!DECL_CONSTRUCTOR_P (fn) && !DECL_DESTRUCTOR_P (fn))
 	  has_member_fn = 1;
@@ -3841,8 +3843,6 @@ build_base_field (record_layout_info rli, tree binfo,
       DECL_SIZE_UNIT (decl) = CLASSTYPE_SIZE_UNIT (basetype);
       DECL_ALIGN (decl) = CLASSTYPE_ALIGN (basetype);
       DECL_USER_ALIGN (decl) = CLASSTYPE_USER_ALIGN (basetype);
-      /* Tell the backend not to round up to TYPE_ALIGN.  */
-      DECL_PACKED (decl) = 1;
   
       /* Try to place the field.  It may take more than one try if we
 	 have a hard time placing the field without putting two
@@ -5116,6 +5116,7 @@ layout_class_type (tree t, tree *virtuals_p)
 
       /* Record the base version of the type.  */
       CLASSTYPE_AS_BASE (t) = base_t;
+      TYPE_CONTEXT (base_t) = t;
     }
   else
     CLASSTYPE_AS_BASE (t) = t;
