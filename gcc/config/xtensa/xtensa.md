@@ -1,5 +1,5 @@
 ;; GCC machine description for Tensilica's Xtensa architecture.
-;; Copyright (C) 2001 Free Software Foundation, Inc.
+;; Copyright (C) 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 ;; Contributed by Bob Wilson (bwilson@tensilica.com) at Tensilica.
 
 ;; This file is part of GCC.
@@ -97,6 +97,7 @@
   ""
   "
 {
+  rtx srclo;
   rtx dstlo = gen_lowpart (SImode, operands[0]);
   rtx src1lo = gen_lowpart (SImode, operands[1]);
   rtx src2lo = gen_lowpart (SImode, operands[2]);
@@ -105,9 +106,21 @@
   rtx src1hi = gen_highpart (SImode, operands[1]);
   rtx src2hi = gen_highpart (SImode, operands[2]);
 
+  /* Either source can be used for overflow checking, as long as it's
+     not clobbered by the first addition.  */
+  if (!rtx_equal_p (dstlo, src1lo))
+    srclo = src1lo;
+  else if (!rtx_equal_p (dstlo, src2lo))
+    srclo = src2lo;
+  else
+    {
+      srclo = gen_reg_rtx (SImode);
+      emit_move_insn (srclo, src1lo);
+    }
+
   emit_insn (gen_addsi3 (dstlo, src1lo, src2lo));
   emit_insn (gen_addsi3 (dsthi, src1hi, src2hi));
-  emit_insn (gen_adddi_carry (dsthi, dstlo, src2lo));
+  emit_insn (gen_adddi_carry (dsthi, dstlo, srclo));
   DONE;
 }")
 
@@ -209,9 +222,9 @@
   rtx src1hi = gen_highpart (SImode, operands[1]);
   rtx src2hi = gen_highpart (SImode, operands[2]);
 
-  emit_insn (gen_subsi3 (dstlo, src1lo, src2lo));
   emit_insn (gen_subsi3 (dsthi, src1hi, src2hi));
   emit_insn (gen_subdi_carry (dsthi, src1lo, src2lo));
+  emit_insn (gen_subsi3 (dstlo, src1lo, src2lo));
   DONE;
 }")
 
@@ -929,8 +942,7 @@
 	  && !register_operand (operands[1], DImode))
 	operands[1] = force_reg (DImode, operands[1]);
 
-      if (xtensa_copy_incoming_a7 (operands, DImode))
-	DONE;
+      operands[1] = xtensa_copy_incoming_a7 (operands[1]);
     }
 }")
 
@@ -1103,8 +1115,7 @@
 	      && constantpool_mem_p (operands[1]))))
 	operands[1] = force_reg (SFmode, operands[1]);
 
-      if (xtensa_copy_incoming_a7 (operands, SFmode))
-	DONE;
+      operands[1] = xtensa_copy_incoming_a7 (operands[1]);
     }
 }")
 
@@ -1185,8 +1196,7 @@
 	  && !register_operand (operands[1], DFmode))
 	operands[1] = force_reg (DFmode, operands[1]);
 
-      if (xtensa_copy_incoming_a7 (operands, DFmode))
-	DONE;
+      operands[1] = xtensa_copy_incoming_a7 (operands[1]);
     }
 }")
 
@@ -1289,7 +1299,16 @@
 ;;  ....................
 ;;
 
-(define_insn "ashlsi3"
+(define_expand "ashlsi3"
+  [(set (match_operand:SI 0 "register_operand" "")
+	(ashift:SI (match_operand:SI 1 "register_operand" "")
+		   (match_operand:SI 2 "arith_operand" "")))]
+  ""
+{
+  operands[1] = xtensa_copy_incoming_a7 (operands[1]);
+})
+
+(define_insn "ashlsi3_internal"
   [(set (match_operand:SI 0 "register_operand" "=a,a")
 	(ashift:SI (match_operand:SI 1 "register_operand" "r,r")
 		   (match_operand:SI 2 "arith_operand" "J,r")))]
@@ -2387,7 +2406,7 @@
 ;; to set up the frame pointer.
 
 (define_insn "set_frame_ptr"
-  [(unspec_volatile [(const_int 0)] UNSPECV_SET_FP)]
+  [(set (reg:SI A7_REG) (unspec_volatile [(const_int 0)] UNSPECV_SET_FP))]
   ""
   "*
 {
@@ -2401,7 +2420,7 @@
 
 ;; Post-reload splitter to remove fp assignment when it's not needed.
 (define_split
-  [(unspec_volatile [(const_int 0)] UNSPECV_SET_FP)]
+  [(set (reg:SI A7_REG) (unspec_volatile [(const_int 0)] UNSPECV_SET_FP))]
   "reload_completed && !frame_pointer_needed"
   [(unspec [(const_int 0)] UNSPEC_NOP)]
   "")

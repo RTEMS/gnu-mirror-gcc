@@ -148,9 +148,15 @@ delete_insn (insn)
     LABEL_NUSES (JUMP_LABEL (insn))--;
 
   /* Also if deleting an insn that references a label.  */
-  else if ((note = find_reg_note (insn, REG_LABEL, NULL_RTX)) != NULL_RTX
-	   && GET_CODE (XEXP (note, 0)) == CODE_LABEL)
-    LABEL_NUSES (XEXP (note, 0))--;
+  else
+    {
+      while ((note = find_reg_note (insn, REG_LABEL, NULL_RTX)) != NULL_RTX
+	     && GET_CODE (XEXP (note, 0)) == CODE_LABEL)
+	{
+	  LABEL_NUSES (XEXP (note, 0))--;
+	  remove_note (insn, note);
+	}
+    }
 
   if (GET_CODE (insn) == JUMP_INSN
       && (GET_CODE (PATTERN (insn)) == ADDR_VEC
@@ -764,6 +770,30 @@ try_redirect_by_replacing_jump (e, target)
       barrier = next_nonnote_insn (src->end);
       if (!barrier || GET_CODE (barrier) != BARRIER)
 	emit_barrier_after (src->end);
+      else
+	{
+	  if (barrier != NEXT_INSN (src->end))
+	    {
+	      /* Move the jump before barrier so that the notes
+		 which originally were or were created before jump table are
+		 inside the basic block.  */
+	      rtx new_insn = src->end;
+	      rtx tmp;
+
+	      for (tmp = NEXT_INSN (src->end); tmp != barrier;
+		   tmp = NEXT_INSN (tmp))
+		set_block_for_insn (tmp, src);
+
+	      NEXT_INSN (PREV_INSN (new_insn)) = NEXT_INSN (new_insn);
+	      PREV_INSN (NEXT_INSN (new_insn)) = PREV_INSN (new_insn);
+
+	      NEXT_INSN (new_insn) = barrier;
+	      NEXT_INSN (PREV_INSN (barrier)) = new_insn;
+
+	      PREV_INSN (new_insn) = PREV_INSN (barrier);
+	      PREV_INSN (barrier) = new_insn;
+	    }
+	}
     }
 
   /* Keep only one edge out and set proper flags.  */
@@ -937,6 +967,37 @@ force_nonfallthru_and_redirect (e, target)
   rtx note;
   edge new_edge;
   int abnormal_edge_flags = 0;
+
+  /* In the case the last instruction is conditional jump to the next
+     instruction, first redirect the jump itself and then continue
+     by creating an basic block afterwards to redirect fallthru edge.  */
+  if (e->src != ENTRY_BLOCK_PTR && e->dest != EXIT_BLOCK_PTR
+      && any_condjump_p (e->src->end)
+      /* When called from cfglayout, fallthru edges do not
+         neccessarily go to the next block.  */
+      && e->src->next_bb == e->dest
+      && JUMP_LABEL (e->src->end) == e->dest->head)
+    {
+      rtx note;
+      edge b = unchecked_make_edge (e->src, target, 0);
+
+      if (!redirect_jump (e->src->end, block_label (target), 0))
+	abort ();
+      note = find_reg_note (e->src->end, REG_BR_PROB, NULL_RTX);
+      if (note)
+	{
+	  int prob = INTVAL (XEXP (note, 0));
+
+	  b->probability = prob;
+	  b->count = e->count * prob / REG_BR_PROB_BASE;
+	  e->probability -= e->probability;
+	  e->count -= b->count;
+	  if (e->probability < 0)
+	    e->probability = 0;
+	  if (e->count < 0)
+	    e->count = 0;
+	}
+    }
 
   if (e->flags & EDGE_ABNORMAL)
     {
@@ -1448,7 +1509,8 @@ commit_one_edge_insertion (e, watch_calls)
   else if (GET_CODE (last) == JUMP_INSN)
     abort ();
 
-  find_sub_basic_blocks (bb);
+  /* Mark the basic block for find_sub_basic_blocks.  */
+  bb->aux = &bb->aux;
 }
 
 /* Update the CFG for all queued instructions.  */
@@ -1457,6 +1519,8 @@ void
 commit_edge_insertions ()
 {
   basic_block bb;
+  sbitmap blocks;
+  bool changed = false;
 
 #ifdef ENABLE_CHECKING
   verify_flow_info ();
@@ -1470,9 +1534,26 @@ commit_edge_insertions ()
 	{
 	  next = e->succ_next;
 	  if (e->insns)
-	    commit_one_edge_insertion (e, false);
+	    {
+	      changed = true;
+	      commit_one_edge_insertion (e, false);
+	    }
 	}
     }
+
+  if (!changed)
+    return;
+
+  blocks = sbitmap_alloc (last_basic_block);
+  sbitmap_zero (blocks);
+  FOR_EACH_BB (bb)
+    if (bb->aux)
+      {
+        SET_BIT (blocks, bb->index);
+	bb->aux = NULL;
+      }
+  find_many_sub_basic_blocks (blocks);
+  sbitmap_free (blocks);
 }
 
 /* Update the CFG for all queued instructions, taking special care of inserting
@@ -1482,6 +1563,8 @@ void
 commit_edge_insertions_watch_calls ()
 {
   basic_block bb;
+  sbitmap blocks;
+  bool changed = false;
 
 #ifdef ENABLE_CHECKING
   verify_flow_info ();
@@ -1495,9 +1578,26 @@ commit_edge_insertions_watch_calls ()
 	{
 	  next = e->succ_next;
 	  if (e->insns)
-	    commit_one_edge_insertion (e, true);
+	    {
+	      changed = true;
+	      commit_one_edge_insertion (e, true);
+	    }
 	}
     }
+
+  if (!changed)
+    return;
+
+  blocks = sbitmap_alloc (last_basic_block);
+  sbitmap_zero (blocks);
+  FOR_EACH_BB (bb)
+    if (bb->aux)
+      {
+        SET_BIT (blocks, bb->index);
+	bb->aux = NULL;
+      }
+  find_many_sub_basic_blocks (blocks);
+  sbitmap_free (blocks);
 }
 
 /* Print out one basic block with live information at start and end.  */
@@ -2191,8 +2291,12 @@ purge_dead_edges (bb)
 	    continue;
 	  else if ((e->flags & EDGE_EH) && can_throw_internal (insn))
 	    /* Keep the edges that correspond to exceptions thrown by
-	       this instruction.  */
-	    continue;
+	       this instruction and rematerialize the EDGE_ABNORMAL flag
+	       we just cleared above.  */
+	    {
+	      e->flags |= EDGE_ABNORMAL;
+	      continue;
+	    }
 
 	  /* We do not need this edge.  */
 	  bb->flags |= BB_DIRTY;
