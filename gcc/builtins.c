@@ -174,7 +174,6 @@ static void simplify_builtin_next_arg (tree);
 static void simplify_builtin_va_start (tree);
 static tree simplify_builtin_sprintf (tree, int);
 
-
 /* Return the alignment in bits of EXP, a pointer valued expression.
    But don't return more than MAX_ALIGN no matter what.
    The alignment returned is, by default, the alignment of the thing that

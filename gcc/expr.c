@@ -6366,7 +6366,6 @@ expand_operands (tree exp0, tree exp1, rtx target, rtx *op0, rtx *op1,
    DECL_RTL of the VAR_DECL.  *ALT_RTL is also set if EXP is a
    COMPOUND_EXPR whose second argument is such a VAR_DECL, and so on
    recursively.  */
-
 static rtx expand_expr_real_1 (tree, rtx, enum machine_mode,
 			       enum expand_modifier, rtx *);
 
@@ -6458,6 +6457,15 @@ expand_expr_real_1 (tree exp, rtx target, enum machine_mode tmode,
   rtx subtarget, original_target;
   int ignore;
   tree context;
+
+  /* Handle ERROR_MARK before anybody tries to access its type.  */
+  if (TREE_CODE (exp) == ERROR_MARK || TREE_CODE (type) == ERROR_MARK)
+    {
+      op0 = CONST0_RTX (tmode);
+      if (op0 != 0)
+	return op0;
+      return const0_rtx;
+    }
 
   mode = TYPE_MODE (type);
   /* Use subtarget as the target for operand 0 of a binary operation.  */
@@ -6551,6 +6559,10 @@ expand_expr_real_1 (tree exp, rtx target, enum machine_mode tmode,
 	temp = gen_rtx_MEM (FUNCTION_MODE, temp);
 	return temp;
       }
+
+    case SSA_NAME:
+      return expand_expr_real_1 (SSA_NAME_VAR (exp), target, tmode, modifier,
+				 NULL);
 
     case PARM_DECL:
       if (!DECL_RTL_SET_P (exp))
@@ -7032,6 +7044,7 @@ expand_expr_real_1 (tree exp, rtx target, enum machine_mode tmode,
     case INDIRECT_REF:
       {
 	tree exp1 = TREE_OPERAND (exp, 0);
+	tree orig;
 
 	if (modifier != EXPAND_WRITE)
 	  {
@@ -7045,7 +7058,11 @@ expand_expr_real_1 (tree exp, rtx target, enum machine_mode tmode,
 	op0 = expand_expr (exp1, NULL_RTX, VOIDmode, EXPAND_SUM);
 	op0 = memory_address (mode, op0);
 	temp = gen_rtx_MEM (mode, op0);
-	set_mem_attributes (temp, exp, 0);
+
+	orig = REF_ORIGINAL (exp);
+	if (!orig)
+	  orig = exp;
+	set_mem_attributes (temp, orig, 0);
 
 	/* If we are writing to this object and its type is a record with
 	   readonly fields, we must mark it as readonly so it will

@@ -30,6 +30,12 @@
 #include "c-pragma.h"
 #include "errors.h"
 #include "tm_p.h"
+/* APPLE LOCAL begin AltiVec */
+#include "c-common.h"
+#include "cpplib.h"
+#include "cpphash.h"
+#include "target.h"
+/* APPLE LOCAL end AltiVec */
 
 /* Handle the machine specific pragma longcall.  Its syntax is
 
@@ -78,6 +84,72 @@ rs6000_pragma_longcall (cpp_reader *pfile ATTRIBUTE_UNUSED)
 #define builtin_define(TXT) cpp_define (pfile, TXT)
 #define builtin_assert(TXT) cpp_assert (pfile, TXT)
 
+/* APPLE LOCAL begin AltiVec */
+/* Keep the AltiVec keywords handy for fast comparisons.  */
+static GTY(()) cpp_hashnode *__vector_keyword;
+static GTY(()) cpp_hashnode *vector_keyword;
+static GTY(()) cpp_hashnode *__pixel_keyword;
+static GTY(()) cpp_hashnode *pixel_keyword;
+static GTY(()) cpp_hashnode *__bool_keyword;
+static GTY(()) cpp_hashnode *bool_keyword;
+static GTY(()) cpp_hashnode *_Bool_keyword;
+
+/* Called to decide whether a conditional macro should be expanded.
+   Since we have exactly one such macro (i.e, 'vector'), we do not
+   need to examine the 'tok' parameter.  */
+
+bool
+rs6000_expand_macro_p (cpp_reader *pfile,
+                      const cpp_token *tok ATTRIBUTE_UNUSED)
+{
+  bool expand_this = 0;
+  cpp_token *peek = (cpp_token *) _cpp_peek_token (pfile, 0);
+
+  if (peek->type == CPP_NAME)
+    {
+      cpp_hashnode *ident = peek->val.node;
+
+      if (ident == pixel_keyword)
+       {
+         expand_this = 1;
+         peek->val.node = __pixel_keyword;
+       }
+      else if (ident == bool_keyword || ident == _Bool_keyword)
+       {
+         expand_this = 1;
+         peek->val.node = __bool_keyword;
+       }
+      else
+       {
+         enum rid rid_code = (enum rid)(ident->rid_code);
+
+         if (rid_code == RID_UNSIGNED || rid_code == RID_LONG
+             || rid_code == RID_SHORT || rid_code == RID_SIGNED
+             || rid_code == RID_INT || rid_code == RID_CHAR
+             || rid_code == RID_FLOAT)
+           {
+             expand_this = 1;
+             /* If the next keyword is bool or pixel, it
+                will need to be expanded as well.  */
+             peek = (cpp_token *) _cpp_peek_token (pfile, 1);
+
+             if (peek->type == CPP_NAME)
+               {
+                 ident = peek->val.node;
+
+                 if (ident == pixel_keyword)
+                   peek->val.node = __pixel_keyword;
+                 else if (ident == bool_keyword || ident == _Bool_keyword)
+                   peek->val.node = __bool_keyword;
+               }
+           }
+       }
+    }
+
+  return expand_this;
+}
+/* APPLE LOCAL end AltiVec */
+
 void
 rs6000_cpu_cpp_builtins (cpp_reader *pfile)
 {
@@ -93,13 +165,38 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
     builtin_define ("_ARCH_COM");
   if (TARGET_ALTIVEC)
     {
+      /* APPLE LOCAL AltiVec */
+      struct cpp_callbacks *cb = cpp_get_callbacks (pfile);
+
       builtin_define ("__ALTIVEC__");
       builtin_define ("__VEC__=10206");
 
+      /* APPLE LOCAL begin AltiVec */
       /* Define the AltiVec syntactic elements.  */
       builtin_define ("__vector=__attribute__((altivec(vector__)))");
+      __vector_keyword = cpp_lookup (pfile, DSC ("__vector"));
+      builtin_define ("vector=__attribute__((altivec(vector__)))");
+      vector_keyword = cpp_lookup (pfile, DSC ("vector"));
+      vector_keyword->flags |= NODE_CONDITIONAL;
+
       builtin_define ("__pixel=__attribute__((altivec(pixel__))) unsigned short");
+      __pixel_keyword = cpp_lookup (pfile, DSC ("__pixel"));
+      pixel_keyword = cpp_lookup (pfile, DSC ("pixel"));
+
       builtin_define ("__bool=__attribute__((altivec(bool__))) unsigned");
+      __bool_keyword = cpp_lookup (pfile, DSC ("__bool"));
+      _Bool_keyword = cpp_lookup (pfile, DSC ("_Bool"));
+      bool_keyword = cpp_lookup (pfile, DSC ("bool"));
+
+      /* Enable context-sensitive macros.  */
+      cb->expand_macro_p = rs6000_expand_macro_p;
+      /* Enable '(vector signed int)(a, b, c, d)' vector literal notation.  */
+      targetm.cast_expr_as_vector_init = true;
+
+      /* Indicate that the compiler supports Apple AltiVec syntax, including context-
+	 sensitive keywords.  */
+      builtin_define ("__APPLE_ALTIVEC__");
+      /* APPLE LOCAL end AltiVec */
     }
   if (TARGET_SPE)
     builtin_define ("__SPE__");
@@ -131,3 +228,4 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
       break;
     }
 }
+

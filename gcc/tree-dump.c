@@ -604,6 +604,17 @@ dump_node (tree t, int flags, FILE *stream)
   dump_queue_p dq;
   dump_queue_p next_dq;
 
+#if 0
+  /* MERGE FIX ME */
+  /* APPLE LOCAL begin new tree dump  ilr */
+  /* The -fdmp-xxxx options indicate that we are to use dmp_tree() as
+     opposed to the dump format provided here.  */
+  if (flags & TDF_DMP_TREE)
+    if ((*lang_hooks.dmp_tree3) (stream, t, flags))
+      return;
+  /* APPLE LOCAL end new tree dump  ilr */
+#endif
+
   /* Initialize the dump-information structure.  */
   di.stream = stream;
   di.index = 0;
@@ -643,7 +654,8 @@ struct dump_file_info
 
 /* Table of tree dump switches. This must be consistent with the
    TREE_DUMP_INDEX enumeration in tree.h */
-static struct dump_file_info dump_files[TDI_end] =
+/* APPLE LOCAL new tree dump  ilr */
+static struct dump_file_info dump_files[TDI_end*2] =
 {
   {NULL, NULL, 0, 0},
   {".tu", "translation-unit", 0, 0},
