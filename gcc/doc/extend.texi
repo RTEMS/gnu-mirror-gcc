@@ -1,4 +1,4 @@
-@c Copyright (C) 1988,1989,1992,1993,1994,1996,1998,1999,2000,2001,2002 Free Software Foundation, Inc.
+@c Copyright (C) 1988,1989,1992,1993,1994,1996,1998,1999,2000,2001,2002,2003 Free Software Foundation, Inc.
 @c This is part of the GCC manual.
 @c For copying conditions, see the file gcc.texi.
 
@@ -2317,7 +2317,7 @@ See the ELF gABI for complete details, but the short story is
 @table @dfn
 @item default
 Default visibility is the normal case for ELF.  This value is 
-available for the visibiliy attribute to override other options
+available for the visibility attribute to override other options
 that may change the assumed visibility of symbols.
 
 @item hidden
@@ -4482,7 +4482,7 @@ provided they are of the same size (in fact, you can also cast vectors
 to and from other datatypes of the same size).
 
 You cannot operate between vectors of different lengths or different
-signness without a cast.
+signedness without a cast.
 
 A port that supports hardware vector operations, usually provides a set
 of built-in functions that can be used to operate on vectors.  For
@@ -4888,7 +4888,7 @@ type is @code{long double}.
 This is an implementation of the ISO C99 function @code{nan}.
 
 Since ISO C99 defines this function in terms of @code{strtod}, which we
-do not implement, a desription of the parsing is in order.  The string
+do not implement, a description of the parsing is in order.  The string
 is parsed as by @code{strtol}; that is, the base is recognized by
 leading @samp{0} or @samp{0x} prefixes.  The number parsed is placed
 in the significand such that the least significant bit of the number
@@ -6465,7 +6465,8 @@ empty string.
 This pragma is similar in intent to to the asm labels extension
 (@pxref{Asm Labels}) in that the system programmer wants to change
 the assembly-level ABI without changing the source-level API.  The
-preprocessor defines @code{__EXTERN_PREFIX} if the pragma is available.
+preprocessor defines @code{__PRAGMA_EXTERN_PREFIX} if the pragma is
+available.
 @end table
 
 @node Unnamed Fields
@@ -6682,7 +6683,7 @@ Add after paragraph 4
 
 @quotation
 The storage for an object of thread storage duration shall be
-staticly initialized before the first statement of the thread startup
+statically initialized before the first statement of the thread startup
 function.  An object of thread storage duration shall not require
 dynamic initialization.
 @end quotation
