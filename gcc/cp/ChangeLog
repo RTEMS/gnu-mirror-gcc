@@ -1,3 +1,47 @@
+2002-12-22  Nathan Sidwell  <nathan@codesourcery.com>
+
+	PR c++/8572
+	* cp-tree.h (grokoptypename): Add SCOPE parameter.
+	* decl2.c (grokoptypename): Add SCOPE parameter. tsubst the type
+	if in a template scope.
+	* parse.y (unoperator): Return the scope.
+	(operator_name): Adjust grokoptypename call.
+
+2002-12-22  Kriang Lerdsuwanakij  <lerdsuwa@users.sourceforge.net>
+
+	* cp-tree.h (make_unbound_class_template): Use tsubst_flags_t.
+	* decl.c (make_unbound_class_template): Adjust.  Check for tf_error.
+	* pt.c (tsubst) [OFFSET_TYPE]: Check for tf_error.
+
+2002-12-18  Kriang Lerdsuwanakij  <lerdsuwa@users.sourceforge.net>
+
+	PR c++/8099
+	* friend.c (make_friend_class): Allow partial specialization
+	when declaration is not a template friend.
+
+2002-12-18  Kriang Lerdsuwanakij  <lerdsuwa@users.sourceforge.net>
+
+	PR c++/3663
+	* pt.c (lookup_template_class): Copy TREE_PRIVATE and
+	TREE_PROTECTED to created decl nodes.
+
+2002-12-18  Mark Mitchell  <mark@codesourcery.com>
+
+	* class.c (build_base_field): Do not set DECL_PACKED on the
+	FIELD_DECL.
+
+2002-12-18  Kriang Lerdsuwanakij  <lerdsuwa@users.sourceforge.net>
+
+	* parse.y (bad_parm): Add missing argument to error function call.
+
+2002-12-18  Kriang Lerdsuwanakij  <lerdsuwa@users.sourceforge.net>
+
+	PR c++/8442
+	* decl2.c (handle_class_head): Verify if the looked up name is a
+	type or template.
+	* pt.c (convert_template_argument): Fix type or template template
+	parameter decision logic.
+
 2002-12-13  Gabriel Dos Reis  <gdr@integrable-solutions.net>
 
 	PR C++/8031
