@@ -1,5 +1,5 @@
 /* Definitions for code generation pass of GNU compiler.
-   Copyright (C) 1987, 91-96, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1987, 91-97, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -45,9 +45,27 @@ Boston, MA 02111-1307, USA.  */
    EXPAND_SUM means it is ok to return a PLUS rtx or MULT rtx.
    EXPAND_INITIALIZER is similar but also record any labels on forced_labels.
    EXPAND_CONST_ADDRESS means it is ok to return a MEM whose address
-    is a constant that is not a legitimate address.  */
+    is a constant that is not a legitimate address.
+   EXPAND_MEMORY_USE_* are explained below.  */
 enum expand_modifier {EXPAND_NORMAL, EXPAND_SUM,
-		      EXPAND_CONST_ADDRESS, EXPAND_INITIALIZER};
+		      EXPAND_CONST_ADDRESS, EXPAND_INITIALIZER,
+		      EXPAND_MEMORY_USE_WO, EXPAND_MEMORY_USE_RW,
+		      EXPAND_MEMORY_USE_BAD, EXPAND_MEMORY_USE_DONT};
+
+/* Argument for chkr_* functions.
+   MEMORY_USE_RO: the pointer reads memory.
+   MEMORY_USE_WO: the pointer writes to memory.
+   MEMORY_USE_RW: the pointer modifies memory (ie it reads and writes). An
+                  example is (*ptr)++
+   MEMORY_USE_BAD: use this if you don't know the behavior of the pointer, or
+                   if you know there are no pointers.  Using an INDIRECT_REF
+                   with MEMORY_USE_BAD will abort.
+   MEMORY_USE_TW: just test for writing, without update.  Special.
+   MEMORY_USE_DONT: the memory is neither read nor written.  This is used by
+   		   '->' and '.'.  */
+enum memory_use_mode {MEMORY_USE_BAD = 0, MEMORY_USE_RO = 1,
+		      MEMORY_USE_WO = 2, MEMORY_USE_RW = 3,
+		      MEMORY_USE_TW = 6, MEMORY_USE_DONT = 99};
 
 /* List of labels that must never be deleted.  */
 extern rtx forced_labels;
@@ -120,7 +138,7 @@ extern int target_temp_slot_level;
 
 struct args_size
 {
-  int constant;
+  HOST_WIDE_INT constant;
   tree var;
 };
 #endif
@@ -150,7 +168,7 @@ struct args_size
 ((SIZE).var == 0 ? GEN_INT ((SIZE).constant)	\
  : expand_expr (size_binop (PLUS_EXPR, (SIZE).var,			\
 			    size_int ((SIZE).constant)),		\
-		NULL_RTX, VOIDmode, 0))
+		NULL_RTX, VOIDmode, EXPAND_MEMORY_USE_BAD))
 
 /* Convert the implicit sum in a `struct args_size' into a tree.  */
 #define ARGS_SIZE_TREE(SIZE)						\
@@ -180,6 +198,11 @@ enum direction {none, upward, downward};  /* Value has this type.  */
   
 #ifndef FUNCTION_ARG_BOUNDARY
 #define FUNCTION_ARG_BOUNDARY(MODE, TYPE)	PARM_BOUNDARY
+#endif
+
+/* Provide a default value for STRICT_ARGUMENT_NAMING.  */
+#ifndef STRICT_ARGUMENT_NAMING
+#define STRICT_ARGUMENT_NAMING 0
 #endif
 
 /* Nonzero if we do not know how to pass TYPE solely in registers.
@@ -398,7 +421,6 @@ extern rtx sjpopnthrow_libfunc;
 extern rtx terminate_libfunc;
 extern rtx setjmp_libfunc;
 extern rtx longjmp_libfunc;
-extern rtx get_dynamic_handler_chain_libfunc;
 
 extern rtx eqhf2_libfunc;
 extern rtx nehf2_libfunc;
@@ -482,6 +504,13 @@ extern rtx fixunsxfti_libfunc;
 extern rtx fixunstfsi_libfunc;
 extern rtx fixunstfdi_libfunc;
 extern rtx fixunstfti_libfunc;
+
+/* For check-memory-usage.  */
+extern rtx chkr_check_addr_libfunc;
+extern rtx chkr_set_right_libfunc;
+extern rtx chkr_copy_bitmap_libfunc;
+extern rtx chkr_check_exec_libfunc;
+extern rtx chkr_check_str_libfunc;
 
 typedef rtx (*rtxfun) ();
 
@@ -656,7 +685,7 @@ extern rtx convert_to_mode PROTO((enum machine_mode, rtx, int));
 extern rtx convert_modes PROTO((enum machine_mode, enum machine_mode, rtx, int));
 
 /* Emit code to move a block Y to a block X.  */
-extern void emit_block_move PROTO((rtx, rtx, rtx, int));
+extern rtx emit_block_move PROTO((rtx, rtx, rtx, int));
 
 /* Copy all or part of a value X into registers starting at REGNO.
    The number of registers to be filled is NREGS.  */
@@ -684,7 +713,7 @@ extern void use_group_regs PROTO((rtx *, rtx));
 /* Write zeros through the storage of OBJECT.
    If OBJECT has BLKmode, SIZE is its length in bytes and ALIGN is its
    alignment.  */
-extern void clear_storage PROTO((rtx, rtx, int));
+extern rtx clear_storage PROTO((rtx, rtx, int));
 
 /* Emit insns to set X from Y.  */
 extern rtx emit_move_insn PROTO((rtx, rtx));
@@ -702,7 +731,7 @@ extern rtx gen_push_operand PROTO((void));
 #ifdef TREE_CODE
 /* Generate code to push something onto the stack, given its mode and type.  */
 extern void emit_push_insn PROTO((rtx, enum machine_mode, tree, rtx, int,
-				  int, rtx, int, rtx, rtx));
+				  int, rtx, int, rtx, rtx, int));
 
 /* Emit library call.  */
 extern void emit_library_call PVPROTO((rtx orgfun, int no_queue,
@@ -893,8 +922,6 @@ extern rtx hard_libcall_value PROTO((enum machine_mode));
 /* Given an rtx, return an rtx for a value rounded up to a multiple
    of STACK_BOUNDARY / BITS_PER_UNIT.  */
 extern rtx round_push PROTO((rtx));
-
-extern void emit_block_move PROTO((rtx, rtx, rtx, int));
 
 extern rtx store_bit_field PROTO((rtx, int, int, enum machine_mode, rtx, int, int));
 extern rtx extract_bit_field PROTO((rtx, int, int, int, rtx, enum machine_mode, enum machine_mode, int, int));

@@ -1,5 +1,5 @@
 /* Subroutines for insn-output.c for Motorola 88000.
-   Copyright (C) 1988, 92, 93, 94, 95, 1996 Free Software Foundation, Inc.
+   Copyright (C) 1988, 92, 93, 94, 95, 16, 1997 Free Software Foundation, Inc.
    Contributed by Michael Tiemann (tiemann@mcc.com)
    Currently maintained by (gcc@dg-rtp.dg.com)
 
@@ -20,13 +20,13 @@ along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
+#include "config.h"
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <time.h>
 #include <ctype.h>
 
-#include "assert.h"
-#include "config.h"
 #include "rtl.h"
 #include "regs.h"
 #include "hard-reg-set.h"
@@ -500,9 +500,10 @@ expand_block_move (dest_mem, src_mem, operands)
   int bytes = (constp ? INTVAL (operands[2]) : 0);
   int target = (int) m88k_cpu;
 
-  assert (PROCESSOR_M88100 == 0);
-  assert (PROCESSOR_M88110 == 1);
-  assert (PROCESSOR_M88000 == 2);
+  if (! (PROCESSOR_M88100 == 0
+	 && PROCESSOR_M88110 == 1
+	 && PROCESSOR_M88000 == 2))
+    abort ();
 
   if (constp && bytes <= 0)
     return;
@@ -1938,7 +1939,7 @@ m88k_begin_prologue (stream, size)
      int size;
 {
   if (TARGET_OMIT_LEAF_FRAME_POINTER && ! quiet_flag && leaf_function_p ())
-    fprintf (stderr, "$");\
+    fprintf (stderr, "$");
 
   m88k_prologue_done = 1;	/* it's ok now to put out ln directives */
 }
@@ -2585,7 +2586,7 @@ struct rtx_def *
 m88k_builtin_saveregs (arglist)
      tree arglist;
 {
-  rtx block, addr, argsize;
+  rtx block, addr, argsize, dest;
   tree fntype = TREE_TYPE (current_function_decl);
   int argadj = ((!(TYPE_ARG_TYPES (fntype) != 0
 		   && (TREE_VALUE (tree_last (TYPE_ARG_TYPES (fntype)))
@@ -2610,6 +2611,7 @@ m88k_builtin_saveregs (arglist)
 
   /* Allocate the va_list constructor */
   block = assign_stack_local (BLKmode, 3 * UNITS_PER_WORD, BITS_PER_WORD);
+  MEM_IN_STRUCT_P (block) = 1;
   RTX_UNCHANGING_P (block) = 1;
   RTX_UNCHANGING_P (XEXP (block, 0)) = 1;
 
@@ -2635,12 +2637,29 @@ m88k_builtin_saveregs (arglist)
 
   /* Now store the incoming registers.  */
   if (fixed < 8)
-      move_block_from_reg
-	(2 + fixed,
-	 change_address (addr, Pmode,
-			 plus_constant (XEXP (addr, 0),
-					fixed * UNITS_PER_WORD)),
-	 8 - fixed, UNITS_PER_WORD * (8 - fixed));
+    {
+      dest = change_address (addr, Pmode,
+			     plus_constant (XEXP (addr, 0),
+					    fixed * UNITS_PER_WORD));
+      move_block_from_reg (2 + fixed, dest, 8 - fixed,
+			   UNITS_PER_WORD * (8 - fixed));
+    }
+
+  if (flag_check_memory_usage)
+    {
+      emit_library_call (chkr_set_right_libfunc, 1, VOIDmode, 3,
+			 block, ptr_mode,
+			 GEN_INT (3 * UNITS_PER_WORD), TYPE_MODE (sizetype),
+			 GEN_INT (MEMORY_USE_RW),
+			 TYPE_MODE (integer_type_node));
+      if (fixed < 8)
+	emit_library_call (chkr_set_right_libfunc, 1, VOIDmode, 3,
+			   dest, ptr_mode,
+			   GEN_INT (UNITS_PER_WORD * (8 - fixed)),
+			   TYPE_MODE (sizetype),
+			   GEN_INT (MEMORY_USE_RW),
+			   TYPE_MODE (integer_type_node));
+    }
 
   /* Return the address of the va_list constructor, but don't put it in a
      register.  This fails when not optimizing and produces worse code when

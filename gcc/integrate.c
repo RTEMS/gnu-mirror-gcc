@@ -1,5 +1,5 @@
 /* Procedure integration for GNU CC.
-   Copyright (C) 1988, 91, 93, 94, 95, 96, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1988, 91, 93-97, 1998 Free Software Foundation, Inc.
    Contributed by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GNU CC.
@@ -20,9 +20,8 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 
-#include <stdio.h>
-
 #include "config.h"
+#include <stdio.h>
 #include "rtl.h"
 #include "tree.h"
 #include "regs.h"
@@ -31,6 +30,7 @@ Boston, MA 02111-1307, USA.  */
 #include "insn-flags.h"
 #include "expr.h"
 #include "output.h"
+#include "recog.h"
 #include "integrate.h"
 #include "real.h"
 #include "except.h"
@@ -77,6 +77,24 @@ static void set_block_abstract_flags PROTO((tree, int));
 
 void set_decl_abstract_flags	PROTO((tree, int));
 
+/* Returns the Ith entry in the label_map contained in MAP.  If the
+   Ith entry has not yet been set, return a fresh label.  This function
+   performs a lazy initialization of label_map, thereby avoiding huge memory
+   explosions when the label_map gets very large.  */
+
+rtx
+get_label_from_map (map, i)
+     struct inline_remap *map;
+     int i;
+{
+  rtx x = map->label_map[i];
+
+  if (x == NULL_RTX)
+    x = map->label_map[i] = gen_label_rtx();
+
+  return x;
+}
+
 /* Zero if the current function (whose FUNCTION_DECL is FNDECL)
    is safe and reasonable to integrate into other functions.
    Nonzero means value is a warning message with a single %s
@@ -93,9 +111,7 @@ function_cannot_inline_p (fndecl)
   register tree parms;
   rtx result;
 
-  /* No inlines with varargs.  `grokdeclarator' gives a warning
-     message about that if `inline' is specified.  This code
-     it put in to catch the volunteers.  */
+  /* No inlines with varargs.  */
   if ((last && TREE_VALUE (last) != void_type_node)
       || current_function_varargs)
     return "varargs function cannot be inline";
@@ -218,7 +234,8 @@ static rtx *insn_map;
 static tree *parmdecl_map;
 
 /* Keep track of first pseudo-register beyond those that are parms.  */
-static int max_parm_reg;
+extern int max_parm_reg;
+extern rtx *parm_reg_stack_loc;
 
 /* When an insn is being copied by copy_for_inline,
    this is nonzero if we have copied an ASM_OPERANDS.
@@ -274,6 +291,14 @@ initialize_for_inline (fndecl, min_labelno, max_labelno, max_reg, copy)
        parms = TREE_CHAIN (parms), i++)
     {
       rtx p = DECL_RTL (parms);
+      int copied_incoming = 0;
+
+      /* If we have (mem (addressof (mem ...))), use the inner MEM since
+	 otherwise the copy_rtx call below will not unshare the MEM since
+	 it shares ADDRESSOF.  */
+      if (GET_CODE (p) == MEM && GET_CODE (XEXP (p, 0)) == ADDRESSOF
+	  && GET_CODE (XEXP (XEXP (p, 0), 0)) == MEM)
+	p = XEXP (XEXP (p, 0), 0);
 
       if (GET_CODE (p) == MEM && copy)
 	{
@@ -289,7 +314,8 @@ initialize_for_inline (fndecl, min_labelno, max_labelno, max_reg, copy)
 		  && GET_CODE (DECL_INCOMING_RTL (parms)) == MEM
 		  && (XEXP (DECL_RTL (parms), 0)
 		      == XEXP (DECL_INCOMING_RTL (parms), 0))))
-	    DECL_INCOMING_RTL (parms) = new;
+	    DECL_INCOMING_RTL (parms) = new, copied_incoming = 1;
+
 	  DECL_RTL (parms) = new;
 	}
 
@@ -311,6 +337,23 @@ initialize_for_inline (fndecl, min_labelno, max_labelno, max_reg, copy)
       /* This flag is cleared later
 	 if the function ever modifies the value of the parm.  */
       TREE_READONLY (parms) = 1;
+
+      /* Copy DECL_INCOMING_RTL if not done already.  This can
+	 happen if DECL_RTL is a reg.  */
+      if (copy && ! copied_incoming)
+	{
+	  p = DECL_INCOMING_RTL (parms);
+
+	  /* If we have (mem (addressof (mem ...))), use the inner MEM since
+	     otherwise the copy_rtx call below will not unshare the MEM since
+	     it shares ADDRESSOF.  */
+	  if (GET_CODE (p) == MEM && GET_CODE (XEXP (p, 0)) == ADDRESSOF
+	      && GET_CODE (XEXP (XEXP (p, 0), 0)) == MEM)
+	    p = XEXP (XEXP (p, 0), 0);
+
+	  if (GET_CODE (p) == MEM)
+	    DECL_INCOMING_RTL (parms) = copy_rtx (p);
+	}
     }
 
   /* Assume we start out in the insns that set up the parameters.  */
@@ -334,7 +377,7 @@ initialize_for_inline (fndecl, min_labelno, max_labelno, max_reg, copy)
      the value of current_function_outgoing_args_size,
      the original argument vector,
      the original DECL_INITIAL,
-     and pointers to the table of psuedo regs, pointer flags, and alignment. */
+     and pointers to the table of pseudo regs, pointer flags, and alignment. */
 
   return gen_inline_header_rtx (NULL_RTX, NULL_RTX, min_labelno, max_labelno,
 				max_parm_reg, max_reg,
@@ -344,7 +387,8 @@ initialize_for_inline (fndecl, min_labelno, max_labelno, max_reg, copy)
 				current_function_outgoing_args_size,
 				arg_vector, (rtx) DECL_INITIAL (fndecl),
 				(rtvec) regno_reg_rtx, regno_pointer_flag,
-				regno_pointer_align);
+				regno_pointer_align,
+				(rtvec) parm_reg_stack_loc);
 }
 
 /* Subroutine for `save_for_inline{copying,nocopy}'.  Finishes up the
@@ -413,10 +457,7 @@ save_for_inline_copying (fndecl)
   int max_uid;
   rtx first_nonparm_insn;
   char *new, *new1;
-
-  /* The pointer used to track the true location of the memory used
-     for LABEL_MAP.  */
-  rtx *real_label_map = NULL_PTR;
+  rtx *new_parm_reg_stack_loc;
 
   /* Make and emit a return-label if we have not already done so. 
      Do this before recording the bounds on label numbers.  */
@@ -439,7 +480,6 @@ save_for_inline_copying (fndecl)
      for the parms, prior to elimination of virtual registers.
      These values are needed for substituting parms properly.  */
 
-  max_parm_reg = max_parm_reg_num ();
   parmdecl_map = (tree *) alloca (max_parm_reg * sizeof (tree));
 
   head = initialize_for_inline (fndecl, min_labelno, max_labelno, max_reg, 1);
@@ -519,12 +559,17 @@ save_for_inline_copying (fndecl)
   /* We used to use alloca here, but the size of what it would try to
      allocate would occasionally cause it to exceed the stack limit and
      cause unpredictable core dumps.  Some examples were > 2Mb in size.  */
-  real_label_map
-    = (rtx *) xmalloc ((max_labelno - min_labelno) * sizeof (rtx));
-  label_map = real_label_map - min_labelno;
+  label_map = (rtx *) xmalloc ((max_labelno) * sizeof (rtx));
 
   for (i = min_labelno; i < max_labelno; i++)
     label_map[i] = gen_label_rtx ();
+
+  /* Likewise for parm_reg_stack_slot.  */
+  new_parm_reg_stack_loc = (rtx *) savealloc (max_parm_reg * sizeof (rtx));
+  for (i = 0; i < max_parm_reg; i++)
+    new_parm_reg_stack_loc[i] = copy_for_inline (parm_reg_stack_loc[i]);
+
+  parm_reg_stack_loc = new_parm_reg_stack_loc;
 
   /* Record the mapping of old insns to copied insns.  */
 
@@ -664,8 +709,8 @@ save_for_inline_copying (fndecl)
 
   set_new_first_and_last_insn (first_insn, last_insn);
 
-  if (real_label_map)
-    free (real_label_map);
+  if (label_map)
+    free (label_map);
 }
 
 /* Return a copy of a chain of nodes, chained through the TREE_CHAIN field.
@@ -782,7 +827,6 @@ save_for_inline_nocopy (fndecl)
      for the parms, prior to elimination of virtual registers.
      These values are needed for substituting parms properly.  */
 
-  max_parm_reg = max_parm_reg_num ();
   parmdecl_map = (tree *) alloca (max_parm_reg * sizeof (tree));
 
   /* Make and emit a return-label if we have not already done so.  */
@@ -1140,6 +1184,8 @@ copy_for_inline (orig)
 	}
       break;
 #endif
+    default:
+      break;
     }
 
   /* Replace this rtx with a copy of itself.  */
@@ -1252,7 +1298,7 @@ expand_inline_function (fndecl, parms, target, ignore, type,
 
   /* The pointer used to track the true location of the memory used
      for MAP->LABEL_MAP.  */
-  rtx *real_label_map = NULL_PTR;
+  rtx *real_label_map = 0;
 
   /* Allow for equivalences of the pseudos we make for virtual fp and ap.  */
   max_regno = MAX_REGNUM (header) + 3;
@@ -1298,10 +1344,6 @@ expand_inline_function (fndecl, parms, target, ignore, type,
      outer function-scope level from looking like they are shadowing
      parameter declarations.  */
   pushlevel (0);
-
-  /* Make a fresh binding contour that we can easily remove.  */
-  pushlevel (0);
-  expand_start_bindings (0);
 
   /* Expand the function arguments.  Do this first so that any
      new registers get created before we allocate the maps.  */
@@ -1380,7 +1422,7 @@ expand_inline_function (fndecl, parms, target, ignore, type,
 	arg_vals[i] = copy_to_mode_reg (GET_MODE (loc), arg_vals[i]);
 
       if (arg_vals[i] != 0 && GET_CODE (arg_vals[i]) == REG
-	  && TREE_CODE (TREE_TYPE (formal)) == POINTER_TYPE)
+	  && POINTER_TYPE_P (TREE_TYPE (formal)))
 	mark_reg_pointer (arg_vals[i],
 			  (TYPE_ALIGN (TREE_TYPE (TREE_TYPE (formal)))
 			   / BITS_PER_UNIT));
@@ -1398,8 +1440,8 @@ expand_inline_function (fndecl, parms, target, ignore, type,
      allocate would occasionally cause it to exceed the stack limit and
      cause unpredictable core dumps.  */
   real_label_map
-    = (rtx *) xmalloc ((max_labelno - min_labelno) * sizeof (rtx));
-  map->label_map = real_label_map - min_labelno;
+    = (rtx *) xmalloc ((max_labelno) * sizeof (rtx));
+  map->label_map = real_label_map;
 
   map->insn_map = (rtx *) alloca (INSN_UID (header) * sizeof (rtx));
   bzero ((char *) map->insn_map, INSN_UID (header) * sizeof (rtx));
@@ -1435,8 +1477,11 @@ expand_inline_function (fndecl, parms, target, ignore, type,
   map->const_age = 0;
 
   /* Record the current insn in case we have to set up pointers to frame
-     and argument memory blocks.  */
+     and argument memory blocks.  If there are no insns yet, add a dummy
+     insn that can be used as an insertion point.  */
   map->insns_at_start = get_last_insn ();
+  if (map->insns_at_start == 0)
+    map->insns_at_start = emit_note (NULL_PTR, NOTE_INSN_DELETED);
 
   map->regno_pointer_flag = INLINE_REGNO_POINTER_FLAG (header);
   map->regno_pointer_align = INLINE_REGNO_POINTER_ALIGN (header);
@@ -1662,6 +1707,7 @@ expand_inline_function (fndecl, parms, target, ignore, type,
 			    force_operand (structure_value_addr, NULL_RTX));
 	  map->reg_map[REGNO (XEXP (loc, 0))] = temp;
 	  if ((CONSTANT_P (structure_value_addr)
+	       || GET_CODE (structure_value_addr) == ADDRESSOF
 	       || (GET_CODE (structure_value_addr) == PLUS
 		   && XEXP (structure_value_addr, 0) == virtual_stack_vars_rtx
 		   && GET_CODE (XEXP (structure_value_addr, 1)) == CONST_INT))
@@ -1738,9 +1784,15 @@ expand_inline_function (fndecl, parms, target, ignore, type,
   else
     abort ();
 
-  /* Make new label equivalences for the labels in the called function.  */
-  for (i = min_labelno; i < max_labelno; i++)
-    map->label_map[i] = gen_label_rtx ();
+  /* Make a fresh binding contour that we can easily remove.  Do this after
+     expanding our arguments so cleanups are properly scoped.  */
+  pushlevel (0);
+  expand_start_bindings (0);
+
+  /* Initialize label_map.  get_label_from_map will actually make
+     the labels.  */
+  bzero ((char *) &map->label_map [min_labelno],
+	 (max_labelno - min_labelno) * sizeof (rtx));
 
   /* Perform postincrements before actually calling the function.  */
   emit_queue ();
@@ -1933,7 +1985,8 @@ expand_inline_function (fndecl, parms, target, ignore, type,
 	  break;
 
 	case CODE_LABEL:
-	  copy = emit_label (map->label_map[CODE_LABEL_NUMBER (insn)]);
+	  copy = emit_label (get_label_from_map (map,
+						 CODE_LABEL_NUMBER (insn)));
 	  LABEL_NAME (copy) = LABEL_NAME (insn);
 	  map->const_age++;
 	  break;
@@ -1952,11 +2005,14 @@ expand_inline_function (fndecl, parms, target, ignore, type,
 	      && NOTE_LINE_NUMBER (insn) != NOTE_INSN_FUNCTION_BEG
 	      && NOTE_LINE_NUMBER (insn) != NOTE_INSN_DELETED)
 	    {
-	      copy = emit_note (NOTE_SOURCE_FILE (insn), NOTE_LINE_NUMBER (insn));
-	      if (copy && (NOTE_LINE_NUMBER (copy) == NOTE_INSN_EH_REGION_BEG
-			   || NOTE_LINE_NUMBER (copy) == NOTE_INSN_EH_REGION_END))
+	      copy = emit_note (NOTE_SOURCE_FILE (insn),
+				NOTE_LINE_NUMBER (insn));
+	      if (copy
+		  && (NOTE_LINE_NUMBER (copy) == NOTE_INSN_EH_REGION_BEG
+		      || NOTE_LINE_NUMBER (copy) == NOTE_INSN_EH_REGION_END))
 		{
-		  rtx label = map->label_map[NOTE_BLOCK_NUMBER (copy)];
+		  rtx label
+		    = get_label_from_map (map, NOTE_BLOCK_NUMBER (copy));
 
 		  /* We have to forward these both to match the new exception
 		     region.  */
@@ -2335,6 +2391,30 @@ copy_rtx_and_substitute (orig, map)
 	return gen_rtx (SUBREG, GET_MODE (orig), copy,
 			SUBREG_WORD (orig));
 
+    case ADDRESSOF:
+      copy = gen_rtx (ADDRESSOF, mode,
+		      copy_rtx_and_substitute (XEXP (orig, 0), map));
+      SET_ADDRESSOF_DECL (copy, ADDRESSOF_DECL (orig));
+      regno = ADDRESSOF_REGNO (orig);
+      if (map->reg_map[regno])
+	regno = REGNO (map->reg_map[regno]);
+      else if (regno > LAST_VIRTUAL_REGISTER)
+	{
+	  temp = XEXP (orig, 0);
+	  map->reg_map[regno] = gen_reg_rtx (GET_MODE (temp));
+	  REG_USERVAR_P (map->reg_map[regno]) = REG_USERVAR_P (temp);
+	  REG_LOOP_TEST_P (map->reg_map[regno]) = REG_LOOP_TEST_P (temp);
+	  RTX_UNCHANGING_P (map->reg_map[regno]) = RTX_UNCHANGING_P (temp);
+	  /* A reg with REG_FUNCTION_VALUE_P true will never reach here.  */
+
+	  if (map->regno_pointer_flag[regno])
+	    mark_reg_pointer (map->reg_map[regno],
+			      map->regno_pointer_align[regno]);
+	  regno = REGNO (map->reg_map[regno]);
+	}
+      ADDRESSOF_REGNO (copy) = regno;
+      return copy;
+
     case USE:
     case CLOBBER:
       /* USE and CLOBBER are ordinary, but we convert (use (subreg foo))
@@ -2347,14 +2427,15 @@ copy_rtx_and_substitute (orig, map)
       return gen_rtx (code, VOIDmode, copy);
 
     case CODE_LABEL:
-      LABEL_PRESERVE_P (map->label_map[CODE_LABEL_NUMBER (orig)])
+      LABEL_PRESERVE_P (get_label_from_map (map, CODE_LABEL_NUMBER (orig)))
 	= LABEL_PRESERVE_P (orig);
-      return map->label_map[CODE_LABEL_NUMBER (orig)];
+      return get_label_from_map (map, CODE_LABEL_NUMBER (orig));
 
     case LABEL_REF:
       copy = gen_rtx (LABEL_REF, mode,
 		      LABEL_REF_NONLOCAL_P (orig) ? XEXP (orig, 0)
-		      : map->label_map[CODE_LABEL_NUMBER (XEXP (orig, 0))]);
+		      : get_label_from_map (map, 
+					    CODE_LABEL_NUMBER (XEXP (orig, 0))));
       LABEL_OUTSIDE_LOOP_P (copy) = LABEL_OUTSIDE_LOOP_P (orig);
 
       /* The fact that this label was previously nonlocal does not mean
@@ -2512,13 +2593,26 @@ copy_rtx_and_substitute (orig, map)
 
     case SET:
       /* If this is setting fp or ap, it means that we have a nonlocal goto.
-	 Don't alter that.
+	 Adjust the setting by the offset of the area we made.
 	 If the nonlocal goto is into the current function,
 	 this will result in unnecessarily bad code, but should work.  */
       if (SET_DEST (orig) == virtual_stack_vars_rtx
 	  || SET_DEST (orig) == virtual_incoming_args_rtx)
-	return gen_rtx (SET, VOIDmode, SET_DEST (orig),
-			copy_rtx_and_substitute (SET_SRC (orig), map));
+	{
+	  /* In case a translation hasn't occurred already, make one now. */
+	  rtx junk = copy_rtx_and_substitute (SET_DEST (orig), map);
+	  rtx equiv_reg = map->reg_map[REGNO (SET_DEST (orig))];
+	  rtx equiv_loc = map->const_equiv_map[REGNO (equiv_reg)];
+	  HOST_WIDE_INT loc_offset
+	    = GET_CODE (equiv_loc) == REG ? 0 : INTVAL (XEXP (equiv_loc, 1));
+	      
+	  return gen_rtx (SET, VOIDmode, SET_DEST (orig),
+			  force_operand
+			  (plus_constant
+			   (copy_rtx_and_substitute (SET_SRC (orig), map),
+			    - loc_offset),
+			   NULL_RTX));
+	}
       break;
 
     case MEM:
@@ -2537,6 +2631,9 @@ copy_rtx_and_substitute (orig, map)
 	RTX_UNCHANGING_P (copy) = RTX_UNCHANGING_P (orig);
 
       return copy;
+      
+    default:
+      break;
     }
 
   copy = rtx_alloc (code);
@@ -2552,6 +2649,7 @@ copy_rtx_and_substitute (orig, map)
       switch (*format_ptr++)
 	{
 	case '0':
+	  XEXP (copy, i) = XEXP (orig, i);
 	  break;
 
 	case 'e':
@@ -2829,9 +2927,11 @@ subst_constants (loc, insn, map)
 	    map->equiv_sets[map->num_sets].equiv = copy_rtx (src);
 	    map->equiv_sets[map->num_sets++].dest = dest;
 	  }
-
-	return;
       }
+      return;
+
+    default:
+      break;
     }
 
   format_ptr = GET_RTX_FORMAT (code);
@@ -2951,9 +3051,13 @@ mark_stores (dest, x)
 		      : regno + HARD_REGNO_NREGS (regno, mode) - 1);
       int i;
 
-      for (i = regno; i <= last_reg; i++)
-	if (i < global_const_equiv_map_size)
-	  global_const_equiv_map[i] = 0;
+      /* Ignore virtual stack var or virtual arg register since those
+	 are handled separately.  */
+      if (regno != VIRTUAL_INCOMING_ARGS_REGNUM
+	  && regno != VIRTUAL_STACK_VARS_REGNUM)
+	for (i = regno; i <= last_reg; i++)
+	  if (i < global_const_equiv_map_size)
+	    global_const_equiv_map[i] = 0;
     }
 }
 
@@ -3199,6 +3303,8 @@ output_inline_function (fndecl)
   regno_reg_rtx = (rtx *) INLINE_REGNO_REG_RTX (head);
   regno_pointer_flag = INLINE_REGNO_POINTER_FLAG (head);
   regno_pointer_align = INLINE_REGNO_POINTER_ALIGN (head);
+  max_parm_reg = MAX_PARMREG (head);
+  parm_reg_stack_loc = (rtx *) PARMREG_STACK_LOC (head);
   
   stack_slot_list = STACK_SLOT_LIST (head);
   forced_labels = FORCED_LABELS (head);

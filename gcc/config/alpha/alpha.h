@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler, for DEC Alpha.
-   Copyright (C) 1992, 93, 94, 95, 96, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1992, 93, 94, 95, 96, 97, 1998 Free Software Foundation, Inc.
    Contributed by Richard Kenner (kenner@vlsi1.ultra.nyu.edu)
 
 This file is part of GNU CC.
@@ -80,7 +80,8 @@ Boston, MA 02111-1307, USA.  */
 
 enum processor_type
  {PROCESSOR_EV4,			/* 2106[46]{a,} */
-  PROCESSOR_EV5};			/* 21164{a,} */
+  PROCESSOR_EV5,			/* 21164{a,pc,} */
+  PROCESSOR_EV6};			/* 21264 */
 
 extern enum processor_type alpha_cpu;
 
@@ -168,14 +169,31 @@ extern enum alpha_fp_trap_mode alpha_fptm;
 #define MASK_FLOAT_VAX 512
 #define TARGET_FLOAT_VAX (target_flags & MASK_FLOAT_VAX)
 
-/* This means that the processor has byte and half word loads and stores.  */
+/* This means that the processor has byte and half word loads and stores
+   (the BWX extension).  */
 
-#define MASK_BYTE_OPS 1024
-#define TARGET_BYTE_OPS	(target_flags & MASK_BYTE_OPS)
+#define MASK_BWX 1024
+#define TARGET_BWX	(target_flags & MASK_BWX)
 
-/* This means that the processor is an EV5 or EV56.  This is defined only
-   in TARGET_CPU_DEFAULT.  */
-#define MASK_CPU_EV5 2048
+/* This means that the processor has the CIX extension.  */
+#define MASK_CIX 2048
+#define TARGET_CIX	(target_flags & MASK_CIX)
+
+/* This means that the processor has the MAX extension.  */
+#define MASK_MAX 4096
+#define TARGET_MAX	(target_flags & MASK_MAX)
+
+/* This means that the processor is an EV5, EV56, or PCA56.  This is defined
+   only in TARGET_CPU_DEFAULT.  */
+#define MASK_CPU_EV5 8192
+
+/* Likewise for EV6.  */
+#define MASK_CPU_EV6 16384
+
+/* This means we support the .arch directive in the assembler.  Only
+   defined in TARGET_CPU_DEFAULT.  */
+#define MASK_SUPPORT_ARCH 32768
+#define TARGET_SUPPORT_ARCH	(target_flags & MASK_SUPPORT_ARCH)
 
 /* Macro to define tables used to set the flags.
    This is a list in braces of pairs in braces,
@@ -196,8 +214,12 @@ extern enum alpha_fp_trap_mode alpha_fptm;
     {"build-constants", MASK_BUILD_CONSTANTS},  \
     {"float-vax", MASK_FLOAT_VAX},		\
     {"float-ieee", -MASK_FLOAT_VAX},		\
-    {"byte", MASK_BYTE_OPS},			\
-    {"no-byte", -MASK_BYTE_OPS},		\
+    {"bwx", MASK_BWX},				\
+    {"no-bwx", -MASK_BWX},			\
+    {"cix", MASK_CIX},				\
+    {"no-cix", -MASK_CIX},			\
+    {"max", MASK_MAX},				\
+    {"no-max", -MASK_MAX},			\
     {"", TARGET_DEFAULT | TARGET_CPU_DEFAULT} }
 
 #define TARGET_DEFAULT MASK_FP|MASK_FPREGS
@@ -266,6 +288,23 @@ extern void override_options ();
 
 /* Define to enable software floating point emulation. */
 #define REAL_ARITHMETIC
+
+/* The following #defines are used when compiling the routines in
+   libgcc1.c.  Since the Alpha calling conventions require single
+   precision floats to be passed in the floating-point registers
+   (rather than in the general registers) we have to build the
+   libgcc1.c routines in such a way that they know the actual types
+   of their formal arguments and the actual types of their return
+   values.  Otherwise, gcc will generate calls to the libgcc1.c
+   routines, passing arguments in the floating-point registers,
+   but the libgcc1.c routines will expect their arguments on the
+   stack (where the Alpha calling conventions require structs &
+   unions to be passed).  */
+
+#define FLOAT_VALUE_TYPE	double
+#define INTIFY(FLOATVAL)	(FLOATVAL)
+#define FLOATIFY(INTVAL)	(INTVAL)
+#define FLOAT_ARG_TYPE		double
 
 /* Define the size of `int'.  The default is the same as the word size.  */
 #define INT_TYPE_SIZE 32
@@ -386,7 +425,7 @@ extern void override_options ();
 
 /* For atomic access to objects, must have at least 32-bit alignment
    unless the machine has byte operations.  */
-#define MINIMUM_ATOMIC_ALIGNMENT (TARGET_BYTE_OPS ? 8 : 32)
+#define MINIMUM_ATOMIC_ALIGNMENT (TARGET_BWX ? 8 : 32)
 
 /* Align all constants and variables to at least a word boundary so
    we can pick up pieces of them faster.  */
@@ -455,11 +494,11 @@ extern void override_options ();
    listed once, even those in FIXED_REGISTERS.
 
    We allocate in the following order:
-   $f1			(nonsaved floating-point register)
-   $f10-$f15		(likewise)
+   $f10-$f15		(nonsaved floating-point register)
    $f22-$f30		(likewise)
    $f21-$f16		(likewise, but input args)
    $f0			(nonsaved, but return value)
+   $f1			(nonsaved, but immediate before saved)
    $f2-$f9		(saved floating-point registers)
    $1-$8		(nonsaved integer registers)
    $22-$25		(likewise)
@@ -474,11 +513,10 @@ extern void override_options ();
    $30, $31, $f31	(stack pointer and always zero/ap & fp)  */
 
 #define REG_ALLOC_ORDER		\
-  {33,					\
-   42, 43, 44, 45, 46, 47,		\
+  {42, 43, 44, 45, 46, 47,		\
    54, 55, 56, 57, 58, 59, 60, 61, 62,	\
    53, 52, 51, 50, 49, 48,		\
-   32,					\
+   32, 33,				\
    34, 35, 36, 37, 38, 39, 40, 41,	\
    1, 2, 3, 4, 5, 6, 7, 8,		\
    22, 23, 24, 25,			\
@@ -674,7 +712,7 @@ enum reg_class { NO_REGS, GENERAL_REGS, FLOAT_REGS, ALL_REGS,
 
 #define PREFERRED_RELOAD_CLASS(X, CLASS)		\
   (CONSTANT_P (X) && (X) != const0_rtx && (X) != CONST0_RTX (GET_MODE (X)) \
-   ? ((CLASS) == FLOAT_REGS ? NO_REGS : GENERAL_REGS)			\
+   ? ((CLASS) == FLOAT_REGS || (CLASS) == NO_REGS ? NO_REGS : GENERAL_REGS)\
    : (CLASS))
 
 /* Loading and storing HImode or QImode values to and from memory
@@ -694,7 +732,7 @@ enum reg_class { NO_REGS, GENERAL_REGS, FLOAT_REGS, ALL_REGS,
   && (((CLASS) == FLOAT_REGS						\
        && ((MODE) == SImode || (MODE) == HImode || (MODE) == QImode))	\
       || (((MODE) == QImode || (MODE) == HImode)			\
-	  && ! TARGET_BYTE_OPS && unaligned_memory_operand (IN, MODE)))) \
+	  && ! TARGET_BWX && unaligned_memory_operand (IN, MODE)))) \
  ? GENERAL_REGS								\
  : ((CLASS) == FLOAT_REGS && GET_CODE (IN) == MEM			\
     && GET_CODE (XEXP (IN, 0)) == AND) ? GENERAL_REGS			\
@@ -710,8 +748,9 @@ enum reg_class { NO_REGS, GENERAL_REGS, FLOAT_REGS, ALL_REGS,
        && (GET_CODE (SUBREG_REG (OUT)) == MEM				\
 	   || (GET_CODE (SUBREG_REG (OUT)) == REG			\
 	       && REGNO (SUBREG_REG (OUT)) >= FIRST_PSEUDO_REGISTER)))) \
-  && ((((MODE) == HImode || (MODE) == QImode) && ! TARGET_BYTE_OPS	\
-       || ((MODE) == SImode && (CLASS) == FLOAT_REGS))))		\
+  && ((((MODE) == HImode || (MODE) == QImode)				\
+       && (! TARGET_BWX || (CLASS) == FLOAT_REGS))			\
+      || ((MODE) == SImode && (CLASS) == FLOAT_REGS)))			\
  ? GENERAL_REGS								\
  : ((CLASS) == FLOAT_REGS && GET_CODE (OUT) == MEM			\
     && GET_CODE (XEXP (OUT, 0)) == AND) ? GENERAL_REGS			\
@@ -721,9 +760,10 @@ enum reg_class { NO_REGS, GENERAL_REGS, FLOAT_REGS, ALL_REGS,
  : NO_REGS)
 
 /* If we are copying between general and FP registers, we need a memory
-   location.  */
+   location unless the CIX extension is available.  */
 
-#define SECONDARY_MEMORY_NEEDED(CLASS1,CLASS2,MODE) ((CLASS1) != (CLASS2))
+#define SECONDARY_MEMORY_NEEDED(CLASS1,CLASS2,MODE) \
+ (! TARGET_CIX && (CLASS1) != (CLASS2))
 
 /* Specify the mode to be used for memory when a secondary memory
    location is needed.  If MODE is floating-point, use it.  Otherwise,
@@ -873,8 +913,9 @@ enum reg_class { NO_REGS, GENERAL_REGS, FLOAT_REGS, ALL_REGS,
 
 #define FUNCTION_VALUE(VALTYPE, FUNC)	\
   gen_rtx (REG,							\
-	   (INTEGRAL_MODE_P (TYPE_MODE (VALTYPE))		\
-	    && TYPE_PRECISION (VALTYPE) < BITS_PER_WORD) 	\
+	   ((INTEGRAL_TYPE_P (VALTYPE)				\
+	     && TYPE_PRECISION (VALTYPE) < BITS_PER_WORD)	\
+	    || POINTER_TYPE_P (VALTYPE))			\
 	   ? word_mode : TYPE_MODE (VALTYPE),			\
 	   ((TARGET_FPREGS					\
 	     && (TREE_CODE (VALTYPE) == REAL_TYPE		\
@@ -1237,16 +1278,11 @@ __enable_execute_stack (addr)						\
 /* A C expression whose value is RTL representing the value of the return
    address for the frame COUNT steps up from the current frame.
    FRAMEADDR is the frame pointer of the COUNT frame, or the frame pointer of
-   the COUNT-1 frame if RETURN_ADDR_IN_PREVIOUS_FRAME} is defined.
-
-   This definition for Alpha is broken, but is put in at the request of
-   Mike Stump.  */
+   the COUNT-1 frame if RETURN_ADDR_IN_PREVIOUS_FRAME} is defined.  */
 
 #define RETURN_ADDR_RTX(COUNT, FRAME)					\
-((COUNT == 0 && alpha_sa_size () == 0 && 0 /* not right. */)		\
- ? gen_rtx (REG, Pmode, 26)						\
- : gen_rtx (MEM, Pmode,							\
-	    memory_address (Pmode, FRAME)))
+  ((COUNT) == 0 ? alpha_return_addr() : const0_rtx)
+extern struct rtx_def *alpha_return_addr ();
 
 /* Addressing modes, and classification of registers for them.  */
 
@@ -1526,7 +1562,7 @@ extern void final_prescan_insn ();
 
 /* Define the value returned by a floating-point comparison instruction.  */
 
-#define FLOAT_STORE_FLAG_VALUE 0.5
+#define FLOAT_STORE_FLAG_VALUE (TARGET_FLOAT_VAX ? 0.5 : 2.0)
 
 /* Canonicalize a comparison from one we don't have to one we do have.  */
 
@@ -1707,9 +1743,13 @@ extern void final_prescan_insn ();
   fprintf (FILE, "\t.set noreorder\n");				\
   fprintf (FILE, "\t.set volatile\n");                          \
   fprintf (FILE, "\t.set noat\n");				\
-  fprintf (FILE, "\t.arch %s\n",				\
-	   (TARGET_BYTE_OPS ? "ev56"				\
-	    : alpha_cpu == PROCESSOR_EV4 ? "ev4" : "ev5"));	\
+  if (TARGET_SUPPORT_ARCH)					\
+    fprintf (FILE, "\t.arch %s\n",				\
+             alpha_cpu == PROCESSOR_EV6 ? "ev6"			\
+	     : (alpha_cpu == PROCESSOR_EV5			\
+		? (TARGET_MAX ? "pca56" : TARGET_BWX ? "ev56" : "ev5") \
+		: "ev4"));					\
+								\
   ASM_OUTPUT_SOURCE_FILENAME (FILE, main_input_filename);	\
 }
 
@@ -2244,11 +2284,12 @@ do {							\
 #else
 /* In OSF/1 v3.2c, the assembler by default does not output file names which
    causes mips-tfile to fail.  Passing -g to the assembler fixes this problem.
-   ??? Stricly speaking, we only need -g if the user specifies -g.  Passing
+   ??? Strictly speaking, we need -g only if the user specifies -g.  Passing
    it always means that we get slightly larger than necessary object files
    if the user does not specify -g.  If we don't pass -g, then mips-tfile
-   will need to be fixed to work in this case.  */
-#define ASM_SPEC "%{!mgas:-g} -nocpp %{pg}"
+   will need to be fixed to work in this case.  Pass -O0 since some
+   optimization are broken and don't help us anyway.  */
+#define ASM_SPEC "%{!mgas:-g} -nocpp %{pg} -O0"
 #endif
 
 /* Specify to run a post-processor, mips-tfile after the assembler

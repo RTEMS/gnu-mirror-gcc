@@ -1,5 +1,5 @@
 /* Compute register class preferences for pseudo-registers.
-   Copyright (C) 1987, 88, 91-96, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1987, 88, 91-97, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -24,6 +24,7 @@ Boston, MA 02111-1307, USA.  */
    and a function init_reg_sets to initialize the tables.  */
 
 #include "config.h"
+#include <stdio.h>
 #include "rtl.h"
 #include "hard-reg-set.h"
 #include "flags.h"
@@ -315,38 +316,6 @@ init_reg_sets ()
 	}
     }
 
-  /* Initialize the move cost table.  Find every subset of each class
-     and take the maximum cost of moving any subset to any other.  */
-
-  for (i = 0; i < N_REG_CLASSES; i++)
-    for (j = 0; j < N_REG_CLASSES; j++)
-      {
-	int cost = i == j ? 2 : REGISTER_MOVE_COST (i, j);
-	enum reg_class *p1, *p2;
-
-	for (p2 = &reg_class_subclasses[j][0]; *p2 != LIM_REG_CLASSES; p2++)
-	  if (*p2 != i)
-	    cost = MAX (cost, REGISTER_MOVE_COST (i, *p2));
-
-	for (p1 = &reg_class_subclasses[i][0]; *p1 != LIM_REG_CLASSES; p1++)
-	  {
-	    if (*p1 != j)
-	      cost = MAX (cost, REGISTER_MOVE_COST (*p1, j));
-
-	    for (p2 = &reg_class_subclasses[j][0];
-		 *p2 != LIM_REG_CLASSES; p2++)
-	      if (*p1 != *p2)
-		cost = MAX (cost, REGISTER_MOVE_COST (*p1, *p2));
-	  }
-
-	move_cost[i][j] = cost;
-
-	if (reg_class_subset_p (i, j))
-	  cost = 0;
-
-	may_move_cost[i][j] = cost;
-      }
-
   /* Do any additional initialization regsets may need */
   INIT_ONCE_REG_SET ();
 }
@@ -357,7 +326,7 @@ init_reg_sets ()
 static void
 init_reg_sets_1 ()
 {
-  register int i;
+  register int i, j;
 
   /* This macro allows the fixed or call-used registers
      to depend on target flags.  */
@@ -390,6 +359,38 @@ init_reg_sets_1 ()
       if (CLASS_LIKELY_SPILLED_P (REGNO_REG_CLASS (i)))
 	SET_HARD_REG_BIT (losing_caller_save_reg_set, i);
     }
+
+  /* Initialize the move cost table.  Find every subset of each class
+     and take the maximum cost of moving any subset to any other.  */
+
+  for (i = 0; i < N_REG_CLASSES; i++)
+    for (j = 0; j < N_REG_CLASSES; j++)
+      {
+	int cost = i == j ? 2 : REGISTER_MOVE_COST (i, j);
+	enum reg_class *p1, *p2;
+
+	for (p2 = &reg_class_subclasses[j][0]; *p2 != LIM_REG_CLASSES; p2++)
+	  if (*p2 != i)
+	    cost = MAX (cost, REGISTER_MOVE_COST (i, *p2));
+
+	for (p1 = &reg_class_subclasses[i][0]; *p1 != LIM_REG_CLASSES; p1++)
+	  {
+	    if (*p1 != j)
+	      cost = MAX (cost, REGISTER_MOVE_COST (*p1, j));
+
+	    for (p2 = &reg_class_subclasses[j][0];
+		 *p2 != LIM_REG_CLASSES; p2++)
+	      if (*p1 != *p2)
+		cost = MAX (cost, REGISTER_MOVE_COST (*p1, *p2));
+	  }
+
+	move_cost[i][j] = cost;
+
+	if (reg_class_subset_p (i, j))
+	  cost = 0;
+
+	may_move_cost[i][j] = cost;
+      }
 }
 
 /* Compute the table of register modes.
@@ -1540,37 +1541,51 @@ record_address_regs (x, class, scale)
 	else if (code1 == SYMBOL_REF || code1 == CONST || code1 == LABEL_REF)
 	  record_address_regs (arg0, INDEX_REG_CLASS, scale);
 
-	/* If this the sum of two registers where the first is known to be a 
-	   pointer, it must be a base register with the second an index.  */
+	/* If both operands are registers but one is already a hard register
+	   of index or base class, give the other the class that the hard
+	   register is not.  */
 
 	else if (code0 == REG && code1 == REG
-		 && REGNO_POINTER_FLAG (REGNO (arg0)))
+		 && REGNO (arg0) < FIRST_PSEUDO_REGISTER
+		 && (REG_OK_FOR_BASE_P (arg0) || REG_OK_FOR_INDEX_P (arg0)))
+	  record_address_regs (arg1,
+			       REG_OK_FOR_BASE_P (arg0)
+			       ? INDEX_REG_CLASS : BASE_REG_CLASS,
+			       scale);
+	else if (code0 == REG && code1 == REG
+		 && REGNO (arg1) < FIRST_PSEUDO_REGISTER
+		 && (REG_OK_FOR_BASE_P (arg1) || REG_OK_FOR_INDEX_P (arg1)))
+	  record_address_regs (arg0,
+			       REG_OK_FOR_BASE_P (arg1)
+			       ? INDEX_REG_CLASS : BASE_REG_CLASS,
+			       scale);
+
+	/* If one operand is known to be a pointer, it must be the base
+	   with the other operand the index.  Likewise if the other operand
+	   is a MULT.  */
+
+	else if ((code0 == REG && REGNO_POINTER_FLAG (REGNO (arg0)))
+		 || code1 == MULT)
 	  {
 	    record_address_regs (arg0, BASE_REG_CLASS, scale);
 	    record_address_regs (arg1, INDEX_REG_CLASS, scale);
 	  }
+	else if ((code1 == REG && REGNO_POINTER_FLAG (REGNO (arg1)))
+		 || code0 == MULT)
+	  {
+	    record_address_regs (arg0, INDEX_REG_CLASS, scale);
+	    record_address_regs (arg1, BASE_REG_CLASS, scale);
+	  }
 
-	/* If this is the sum of two registers and neither is known to
-	   be a pointer, count equal chances that each might be a base
+	/* Otherwise, count equal chances that each might be a base
 	   or index register.  This case should be rare.  */
 
-	else if (code0 == REG && code1 == REG
-		 && ! REGNO_POINTER_FLAG (REGNO (arg0))
-		 && ! REGNO_POINTER_FLAG (REGNO (arg1)))
+	else
 	  {
 	    record_address_regs (arg0, BASE_REG_CLASS, scale / 2);
 	    record_address_regs (arg0, INDEX_REG_CLASS, scale / 2);
 	    record_address_regs (arg1, BASE_REG_CLASS, scale / 2);
 	    record_address_regs (arg1, INDEX_REG_CLASS, scale / 2);
-	  }
-
-	/* In all other cases, the first operand is an index and the
-	   second is the base.  */
-
-	else
-	  {
-	    record_address_regs (arg0, INDEX_REG_CLASS, scale);
-	    record_address_regs (arg1, BASE_REG_CLASS, scale);
 	  }
       }
       break;

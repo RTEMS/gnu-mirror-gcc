@@ -26,13 +26,26 @@ Boston, MA 02111-1307, USA.  */
    but what kind of conversions it does will depend on the language.  */
 
 #include "config.h"
+#include <stdio.h>
 #include "tree.h"
 #include "flags.h"
 #include "cp-tree.h"
 #include "class.h"
 #include "convert.h"
 
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+
 extern tree static_aggregates;
+
+static tree build_thunk PROTO((tree, tree));
+static tree convert_fn_ptr PROTO((tree, tree));
+static tree cp_convert_to_pointer PROTO((tree, tree));
+static tree convert_to_pointer_force PROTO((tree, tree));
+static tree build_up_reference PROTO((tree, tree, int, int));
+static tree build_type_conversion_1 PROTO((tree, tree, tree, tree,
+					   int));
 
 /* Change of width--truncation and extension of integers or reals--
    is represented with NOP_EXPR.  Proper functioning of many things
@@ -566,7 +579,7 @@ convert_to_reference (reftype, expr, convtype, flags, decl)
 	  && ! CLASSTYPE_ABSTRACT_VIRTUALS (type)
 	  && (rval = build_method_call
 	      (NULL_TREE, ctor_identifier,
-	       build_tree_list (NULL_TREE, expr), TYPE_BINFO (type),
+	       build_expr_list (NULL_TREE, expr), TYPE_BINFO (type),
 	       LOOKUP_NO_CONVERSION|LOOKUP_SPECULATIVELY
 	       | LOOKUP_ONLYCONVERTING)))
 	{
@@ -576,7 +589,7 @@ convert_to_reference (reftype, expr, convtype, flags, decl)
 	    {
 	      tree t = get_temp_name (type, toplevel_bindings_p ());
 	      init = build_method_call (t, ctor_identifier,
-					build_tree_list (NULL_TREE, expr),
+					build_expr_list (NULL_TREE, expr),
 					TYPE_BINFO (type),
 					LOOKUP_NORMAL|LOOKUP_NO_CONVERSION
 					| LOOKUP_ONLYCONVERTING);
@@ -591,7 +604,7 @@ convert_to_reference (reftype, expr, convtype, flags, decl)
 	  else
 	    {
 	      init = build_method_call (NULL_TREE, ctor_identifier,
-					build_tree_list (NULL_TREE, expr),
+					build_expr_list (NULL_TREE, expr),
 					TYPE_BINFO (type),
 					LOOKUP_NORMAL|LOOKUP_NO_CONVERSION
 					|LOOKUP_ONLYCONVERTING);
@@ -698,18 +711,18 @@ convert_to_aggr (type, expr, msgp, protect)
   can_be_private = 0;
   can_be_protected = IDENTIFIER_CLASS_VALUE (name) || name == current_class_name;
 
-  parmlist = build_tree_list (NULL_TREE, expr);
-  parmtypes = tree_cons (NULL_TREE, TREE_TYPE (expr), void_list_node);
+  parmlist = build_expr_list (NULL_TREE, expr);
+  parmtypes = scratch_tree_cons (NULL_TREE, TREE_TYPE (expr), void_list_node);
 
   if (TYPE_USES_VIRTUAL_BASECLASSES (basetype))
     {
-      parmtypes = tree_cons (NULL_TREE, integer_type_node, parmtypes);
-      parmlist = tree_cons (NULL_TREE, integer_one_node, parmlist);
+      parmtypes = expr_tree_cons (NULL_TREE, integer_type_node, parmtypes);
+      parmlist = scratch_tree_cons (NULL_TREE, integer_one_node, parmlist);
     }
 
   /* The type of the first argument will be filled in inside the loop.  */
-  parmlist = tree_cons (NULL_TREE, integer_zero_node, parmlist);
-  parmtypes = tree_cons (NULL_TREE, build_pointer_type (basetype), parmtypes);
+  parmlist = expr_tree_cons (NULL_TREE, integer_zero_node, parmlist);
+  parmtypes = scratch_tree_cons (NULL_TREE, build_pointer_type (basetype), parmtypes);
 
   /* No exact conversion was found.  See if an approximate
      one will do.  */
@@ -779,7 +792,7 @@ convert_to_aggr (type, expr, msgp, protect)
 	  qsort (candidates,	/* char *base */
 		 cp - candidates, /* int nel */
 		 sizeof (struct candidate), /* int width */
-		 rank_for_overload); /* int (*compar)() */
+		 (int (*) PROTO((const void *, const void *))) rank_for_overload); /* int (*compar)() */
 
 	--cp;
 	if (cp->h.code & EVIL_CODE)
@@ -1100,10 +1113,13 @@ ocp_convert (type, expr, convtype, flags)
 	  
 	  if ((flags & LOOKUP_ONLYCONVERTING)
 	      && ! (IS_AGGR_TYPE (dtype) && DERIVED_FROM_P (type, dtype)))
-	    ctor = build_user_type_conversion (type, ctor, flags);
+	    {
+	      ctor = build_user_type_conversion (type, ctor, flags);
+	      flags |= LOOKUP_NO_CONVERSION;
+	    }
 	  if (ctor)
 	    ctor = build_method_call (NULL_TREE, ctor_identifier,
-				      build_tree_list (NULL_TREE, ctor),
+				      build_expr_list (NULL_TREE, ctor),
 				      TYPE_BINFO (type), flags);
 	  if (ctor)
 	    return build_cplus_new (type, ctor);
@@ -1123,7 +1139,7 @@ ocp_convert (type, expr, convtype, flags)
 
 	  if (TYPE_HAS_CONSTRUCTOR (complete_type (type)))
 	    ctor = build_method_call (NULL_TREE, ctor_identifier,
-				      build_tree_list (NULL_TREE, e),
+				      build_expr_list (NULL_TREE, e),
 				      TYPE_BINFO (type),
 				      (flags & LOOKUP_NORMAL)
 				      | LOOKUP_SPECULATIVELY
