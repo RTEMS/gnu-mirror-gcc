@@ -259,7 +259,6 @@ static tree maybe_build_array_element_wfl (tree);
 static int array_constructor_check_entry (tree, tree);
 static const char *purify_type_name (const char *);
 static tree fold_constant_for_init (tree, tree);
-static tree strip_out_static_field_access_decl (tree);
 static jdeplist *reverse_jdep_list (struct parser_ctxt *);
 static void static_ref_err (tree, tree, tree);
 static void parser_add_interface (tree, tree, tree);
@@ -6485,10 +6484,20 @@ check_interface_throws_clauses (tree check_class_decl, tree class_decl)
 {
   for (; class_decl != NULL_TREE; class_decl = CLASSTYPE_SUPER (class_decl))
     {
-      tree bases = TYPE_BINFO_BASETYPES (class_decl);
-      int iface_len = TREE_VEC_LENGTH (bases) - 1;
+      tree bases;
+      int iface_len;
       int i;
 
+      if (! CLASS_LOADED_P (class_decl))
+	{
+	  if (CLASS_FROM_SOURCE_P (class_decl))
+	    safe_layout_class (class_decl);
+	  else
+	    load_class (class_decl, 1);
+	}
+
+      bases = TYPE_BINFO_BASETYPES (class_decl);
+      iface_len = TREE_VEC_LENGTH (bases) - 1;
       for (i = iface_len; i > 0; --i)
 	{
 	  tree interface = BINFO_TYPE (TREE_VEC_ELT (bases, i));
@@ -6514,7 +6523,8 @@ check_interface_throws_clauses (tree check_class_decl, tree class_decl)
 		 Also, multiple inheritance with conflicting throws
 		 clauses is fine in the absence of a concrete
 		 implementation.  */
-	      if (method != NULL_TREE && !METHOD_ABSTRACT (method))
+	      if (method != NULL_TREE && !METHOD_ABSTRACT (method)
+		  && !METHOD_INVISIBLE (iface_method))
 		{
 		  tree method_wfl = DECL_FUNCTION_WFL (method);
 		  check_throws_clauses (method, method_wfl, iface_method);
@@ -9501,12 +9511,12 @@ resolve_field_access (tree qual_wfl, tree *field_decl, tree *field_type)
   return field_ref;
 }
 
-/* If NODE is an access to f static field, strip out the class
+/* If NODE is an access to a static field, strip out the class
    initialization part and return the field decl, otherwise, return
    NODE. */
 
-static tree
-strip_out_static_field_access_decl (tree node)
+tree
+extract_field_decl (tree node)
 {
   if (TREE_CODE (node) == COMPOUND_EXPR)
     {
@@ -14058,7 +14068,7 @@ patch_unaryop (tree node, tree wfl_op)
     case PREINCREMENT_EXPR:
       /* 15.14.2 Prefix Decrement Operator -- */
     case PREDECREMENT_EXPR:
-      op = decl = strip_out_static_field_access_decl (op);
+      op = decl = extract_field_decl (op);
       outer_field_flag = outer_field_expanded_access_p (op, NULL, NULL, NULL);
       /* We might be trying to change an outer field accessed using
          access method. */
