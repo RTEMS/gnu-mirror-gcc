@@ -34,6 +34,9 @@ Boston, MA 02111-1307, USA.  */
    ADDR_BEG, ADDR_END, PRINT_IREG, PRINT_SCALE, PRINT_B_I_S, and many
    that start with ASM_ or end in ASM_OP.  */
 
+/* APPLE LOCAL fat builds */
+#define DEFAULT_TARGET_ARCH "i386"
+
 /* Define the specific costs for a given cpu */
 
 struct processor_costs {
@@ -206,6 +209,11 @@ extern int target_flags;
 #endif
 #endif
 #endif
+
+/* APPLE LOCAL begin hot/cold partitioning  */
+#define HAS_LONG_COND_BRANCH 1
+#define HAS_LONG_UNCOND_BRANCH 1
+/* APPLE LOCAL end hot/cold partitioning  */
 
 /* Avoid adding %gs:0 in TLS references; use %gs:address directly.  */
 #define TARGET_TLS_DIRECT_SEG_REFS (target_flags & MASK_TLS_DIRECT_SEG_REFS)
@@ -774,7 +782,8 @@ extern int x86_prefetch_sse;
 #define PARM_BOUNDARY BITS_PER_WORD
 
 /* Boundary (in *bits*) on which stack pointer should be aligned.  */
-#define STACK_BOUNDARY BITS_PER_WORD
+/* APPLE LOCAL 3232990 - compiler should obey -mpreferred-stack-boundary */
+#define STACK_BOUNDARY ((ix86_preferred_stack_boundary > 128) ? 128 : ix86_preferred_stack_boundary)
 
 /* Boundary (in *bits*) on which the stack pointer prefers to be
    aligned; the compiler cannot rely on having this alignment.  */
@@ -825,7 +834,8 @@ extern int x86_prefetch_sse;
 #define BIGGEST_FIELD_ALIGNMENT 32
 #endif
 #else
-#define ADJUST_FIELD_ALIGN(FIELD, COMPUTED) \
+/* APPLE LOCAL Macintosh alignment */
+#define ADJUST_FIELD_ALIGN(FIELD, COMPUTED, FIRST_FIELD_P) \
    x86_field_alignment (FIELD, COMPUTED)
 #endif
 
@@ -1068,6 +1078,10 @@ do {									\
     (VALID_SSE_REG_MODE (MODE) && TARGET_SSE ? 1			\
      : VALID_MMX_REG_MODE (MODE) && TARGET_MMX ? 1			\
      : VALID_MMX_REG_MODE_3DNOW (MODE) && TARGET_3DNOW ? 1 : 0)
+
+/* ??? Shouldn't be needed...  */
+#define UNITS_PER_SIMD_WORD \
+    (TARGET_SSE ? 16 : TARGET_MMX || TARGET_3DNOW ? 8 : 0)
 
 #define VALID_FP_MODE_P(MODE)						\
     ((MODE) == SFmode || (MODE) == DFmode || (MODE) == XFmode		\

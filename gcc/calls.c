@@ -134,7 +134,7 @@ static void initialize_argument_information (int, struct arg_data *,
 					     struct args_size *, int, tree,
 					     tree, CUMULATIVE_ARGS *, int,
 					     rtx *, int *, int *, int *,
-					     bool *, bool);
+					     bool *, bool, tree);
 static void compute_argument_addresses (struct arg_data *, rtx, int);
 static rtx rtx_for_function_call (tree, tree);
 static void load_register_parameters (struct arg_data *, int, rtx *, int,
@@ -381,7 +381,14 @@ emit_call_1 (rtx funexp, tree fntree, tree fndecl ATTRIBUTE_UNUSED,
      and we don't want to load it into a register as an optimization,
      because prepare_call_address already did it if it should be done.  */
   if (GET_CODE (funexp) != SYMBOL_REF)
+/* APPLE LOCAL use R12 as register for indirect calls.  This improves
+   codegen (computation of value will be into R12) and makes
+   indirect sibcalls possible by ensuring a volatile reg is used. */
+#ifdef MAGIC_INDIRECT_CALL_REG
+    funexp = gen_rtx_REG (SImode, MAGIC_INDIRECT_CALL_REG);
+#else
     funexp = memory_address (FUNCTION_MODE, funexp);
+#endif
 
 #if defined (HAVE_sibcall_pop) && defined (HAVE_sibcall_value_pop)
   if ((ecf_flags & ECF_SIBCALL)
@@ -1046,7 +1053,8 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
 				 int reg_parm_stack_space,
 				 rtx *old_stack_level, int *old_pending_adj,
 				 int *must_preallocate, int *ecf_flags,
-				 bool *may_tailcall, bool call_from_thunk_p)
+				 bool *may_tailcall, bool call_from_thunk_p,
+				 tree type_arg_types)
 {
   /* 1 if scanning parms front to back, -1 if scanning back to front.  */
   int inc;
@@ -1056,6 +1064,12 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
 
   int i;
   tree p;
+
+   /* APPLE LOCAL begin Altivec */
+  int pass, last_pass;
+  int save_i, save_inc;
+  int stdarg;
+   /* APPLE LOCAL end Altivec */
 
   args_size->constant = 0;
   args_size->var = 0;
@@ -1075,12 +1089,30 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
       i = 0, inc = 1;
     }
 
-  /* I counts args in order (to be) pushed; ARGPOS counts in order written.  */
-  for (p = actparms, argpos = 0; p; p = TREE_CHAIN (p), i += inc, argpos++)
+   /* APPLE LOCAL begin Altivec */
+  stdarg = (type_arg_types != 0 
+	    && TREE_VALUE (tree_last (type_arg_types)) != void_type_node);
+  last_pass = 1;
+  save_i = i;
+  save_inc = inc;
+  for (pass = 1; pass <= last_pass; pass++)
+  {
+    i = save_i;
+    inc = save_inc;
+   /* APPLE LOCAL end Altivec */
+    /* I counts args in order (to be) pushed; ARGPOS counts in order written.  */
+    for (p = actparms, argpos = 0; p; p = TREE_CHAIN (p), i += inc, argpos++)
     {
       tree type = TREE_TYPE (TREE_VALUE (p));
       int unsignedp;
       enum machine_mode mode;
+
+      /* APPLE LOCAL begin Altivec */
+      /* In 1st iteration over actual arguments, only consider non-vectors. 
+	 During 2nd iteration, finish off with vector parameters. */
+      if (!stdarg && targetm.calls.skip_vec_args (type, pass, &last_pass))
+	continue;
+      /* APPLE LOCAL end Altivec */
 
       args[i].tree_value = TREE_VALUE (p);
 
@@ -1256,8 +1288,8 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
 
       /* Compute the stack-size of this argument.  */
       if (args[i].reg == 0 || args[i].partial != 0
-	  || reg_parm_stack_space > 0
-	  || args[i].pass_on_stack)
+	   || reg_parm_stack_space > 0
+	   || args[i].pass_on_stack)
 	locate_and_pad_parm (mode, type,
 #ifdef STACK_PARMS_IN_REG_PARM_AREA
 			     1,
@@ -1287,6 +1319,9 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
       FUNCTION_ARG_ADVANCE (*args_so_far, TYPE_MODE (type), type,
 			    argpos < n_named_args);
     }
+  /* APPLE LOCAL begin Altivec */
+  }
+  /* APPLE LOCAL end Altivec */
 }
 
 /* Update ARGS_SIZE to contain the total size for the argument block.
@@ -2014,12 +2049,18 @@ expand_call (tree exp, rtx target, int ignore)
   tree actparms = TREE_OPERAND (exp, 1);
   /* RTX for the function to be called.  */
   rtx funexp;
+  /* APPLE LOCAL use r12 for indirect calls */
+  /* A single rtx to be shared among multiple chains for indirect sibcalls */
+  rtx funexp_keep = NULL_RTX;
   /* Sequence of insns to perform a normal "call".  */
   rtx normal_call_insns = NULL_RTX;
   /* Sequence of insns to perform a tail "call".  */
   rtx tail_call_insns = NULL_RTX;
   /* Data type of the function.  */
   tree funtype;
+  /* APPLE LOCAL objc stret methods */
+  /* Return type of the function.  */
+  tree saved_return_type;
   tree type_arg_types;
   /* Declaration of the function being called,
      or 0 if the function is computed (not known by name).  */
@@ -2238,6 +2279,16 @@ expand_call (tree exp, rtx target, int ignore)
     abort ();
   funtype = TREE_TYPE (funtype);
 
+  /* APPLE LOCAL objc stret methods */
+  /* Set the return type of the function to the type of the call expression,
+     in case that's different from the function declaration.
+     (This is the case when calling _objc_msgSend_stret, for example,
+     which is declared to return id, but actually returns a struct.)
+     But save the original return type first, so it can be restored later
+     in case it's needed.  */
+  saved_return_type = TREE_TYPE (funtype);
+  TREE_TYPE (funtype) = TREE_TYPE (exp);
+
   /* Munge the tree to split complex arguments into their imaginary
      and real parts.  */
   if (SPLIT_COMPLEX_ARGS)
@@ -2330,7 +2381,8 @@ expand_call (tree exp, rtx target, int ignore)
 				   &args_so_far, reg_parm_stack_space,
 				   &old_stack_level, &old_pending_adj,
 				   &must_preallocate, &flags,
-				   &try_tail_call, CALL_FROM_THUNK_P (exp));
+				   &try_tail_call, CALL_FROM_THUNK_P (exp),
+				   type_arg_types);
 
   if (args_size.var)
     {
@@ -2396,6 +2448,20 @@ expand_call (tree exp, rtx target, int ignore)
 	 It does not seem worth the effort since few optimizable
 	 sibling calls will return a structure.  */
       || structure_value_addr != NULL_RTX
+/* APPLE LOCAL begin indirect sibcalls */
+#ifndef MAGIC_INDIRECT_CALL_REG
+/* The register holding the address is now always R12, so
+   we can consider indirect calls as sibcall candidates on ppc. */
+      /* If the register holding the address is a callee saved
+	 register, then we lose.  We have no way to prevent that,
+	 so we only allow calls to named functions.  */
+      /* ??? This could be done by having the insn constraints
+	 use a register class that is all call-clobbered.  Any
+	 reload insns generated to fix things up would appear
+	 before the sibcall_epilogue.  */
+      || fndecl == NULL_TREE
+#endif
+/* APPLE LOCAL end indirect sibcalls */
       /* Check whether the target is able to optimize the call
 	 into a sibcall.  */
       || !(*targetm.function_ok_for_sibcall) (fndecl, exp)
@@ -2489,6 +2555,14 @@ expand_call (tree exp, rtx target, int ignore)
   preferred_unit_stack_boundary = preferred_stack_boundary / BITS_PER_UNIT;
 
   function_call_count++;
+
+  /* APPLE LOCAL indirect sibcalls */
+  /* Do this before creating the chains, to avoid a branch within them.
+     The paired chains both branch to the same label, but only one
+     chain has a definition of that label, because of the way the
+     infrastructure works. */
+  if ( !fndecl )
+    funexp_keep = rtx_for_function_call (fndecl, addr);
 
   /* We want to make two insn chains; one for a sibling call, the other
      for a normal call.  We will select one of the two chains after
@@ -2812,7 +2886,11 @@ expand_call (tree exp, rtx target, int ignore)
 	 be deferred during the evaluation of the arguments.  */
       NO_DEFER_POP;
 
-      funexp = rtx_for_function_call (fndecl, addr);
+      /* APPLE LOCAL indirect sibcalls */
+      if ( !fndecl )
+	funexp = funexp_keep;
+      else
+	funexp = rtx_for_function_call (fndecl, addr);
 
       /* Figure out the register where the value, if any, will come back.  */
       valreg = 0;
@@ -2950,6 +3028,24 @@ expand_call (tree exp, rtx target, int ignore)
 	next_arg_reg = FUNCTION_ARG (args_so_far, VOIDmode,
 				     void_type_node, 1);
 
+      /* APPLE LOCAL begin indirect calls in R12 */
+#ifdef MAGIC_INDIRECT_CALL_REG
+      /* For indirect calls, put the callee address in R12.  This is necessary
+	 for ObjC methods.  This could be handled by patterns in rs6000.md,
+	 as in 2.95, but it is better to put this copy in the RTL so the
+	 optimizer can see it, and sometimes get rid of it, and the scheduler
+	 can move it around.  Right now none of these good things seems to
+	 happen, but this should be fixable.  (But note FSF won't like
+	 putting it here.)  */
+      if (!fndecl)
+	{
+	  rtx magic_reg = gen_rtx_REG (SImode, MAGIC_INDIRECT_CALL_REG);
+	  emit_move_insn (magic_reg, funexp);
+	  use_reg (&call_fusage, magic_reg);
+	}
+#endif
+      /* APPLE LOCAL end indirect calls in R12 */
+
       /* All arguments and registers used for the call must be set up by
 	 now!  */
 
@@ -2962,6 +3058,11 @@ expand_call (tree exp, rtx target, int ignore)
 		   adjusted_args_size.constant, struct_value_size,
 		   next_arg_reg, valreg, old_inhibit_defer_pop, call_fusage,
 		   flags, & args_so_far);
+
+      /* APPLE LOCAL objc stret methods */
+      /* Restore the function's original return type
+	 in case it's needed later on.  */
+      TREE_TYPE (funtype) = saved_return_type;
 
       /* If call is cse'able, make appropriate pair of reg-notes around it.
 	 Test valreg so we don't crash; may safely ignore `const'
@@ -3322,6 +3423,24 @@ expand_call (tree exp, rtx target, int ignore)
 					- pending_stack_adjust)
 	    abort ();
 	}
+
+      /* APPLE LOCAL begin sibcall 3007352 */
+      /* GCC for PPC on Darwin has always rounded 'current_function_args_size' up to a multiple of 16.
+	 CodeWarrior doesn't.
+	 A father() that passes, say, 40 bytes of parameters to daughter() will have eight bytes of
+	 padding if compiled with GCC, and zero bytes of padding if compiled with CW.
+	 If a GCC-compiled daughter() in turn sibcalls to granddaughter() with, say, 44 bytes of parameters,
+	 GCC will generate a store of that extra parameter into padding of the father() parameter area.
+	 Alas, if father() was compild by CW, father() will not have the parameter area padding,
+	 and something in the father() stackframe will be stomped.
+	 Parameter areas are guaranteed to be a minimum of 32 bytes.  See Radar 3007352.  */
+      if ( ( ! sibcall_failure)
+	   && args_size.constant > 32
+	   && args_size.constant > cfun->unrounded_args_size)
+	{
+	  sibcall_failure = 1;
+	}
+      /* APPLE LOCAL end sibcall 3007352 */
 
       /* If something prevents making this a sibling call,
 	 zero out the sequence.  */
