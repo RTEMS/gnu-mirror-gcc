@@ -1309,28 +1309,11 @@ __transfer_from_trampoline ()		\
 #define ASM_OUTPUT_REG_POP(FILE,REGNO)  \
   fprintf (FILE, "\tmovd tos,%s\n", reg_names[REGNO])
 
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME.  */
-
-#ifdef COLLECT
-#define ASM_OUTPUT_LABEL(STREAM,NAME) fprintf ((STREAM), "%s:\n", (NAME))
-#endif
-
 /* This is how to output a command to make the user-level label named NAME
    defined for reference from other files.  */
 
-#ifdef COLLECT
-#define TARGET_ASM_GLOBALIZE_LABEL ns32k_globalize_label
-#else
 /* Globalizing directive for a label.  */
 #define GLOBAL_ASM_OP ".globl "
-#endif
-
-/* This is how to output an internal numbered label where
-   PREFIX is the class of label and NUM is the number within the class.  */
-
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)	\
-  fprintf (FILE, "%s%d:\n", PREFIX, NUM)
 
 /* This is how to store into the string LABEL
    the symbol_ref name of an internal numbered label where
@@ -1381,14 +1364,6 @@ __transfer_from_trampoline ()		\
 ( fputs (".lcomm ", (FILE)),			\
   assemble_name ((FILE), (NAME)),		\
   fprintf ((FILE), ",%u\n", (ROUNDED)))
-
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)	\
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),	\
-  sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO)))
 
 /* Print an instruction operand X on file FILE.
    CODE is the code from the %-spec that requested printing this operand;

@@ -1,4 +1,4 @@
-/* Copyright (C) 1999, 2000  Free Software Foundation
+/* Copyright (C) 1999, 2000, 2002  Free Software Foundation
 
    This file is part of libgcj.
 
@@ -12,11 +12,14 @@ import java.net.*;
 import java.io.*;
 import java.util.jar.*;
 import java.util.zip.*;
+import java.util.Map;
 import java.util.Vector;
 import java.util.Hashtable;
+import java.security.cert.Certificate;
 
 /**
  * @author Kresten Krab Thorup <krab@gnu.org>
+ * @since 1.2
  * @date Aug 10, 1999.
  */
 
@@ -103,7 +106,8 @@ public abstract class JarURLConnection extends URLConnection
       {
 	// This is a JarURLConnection for the entire jar file.  
 
-	InputStream jar_is = new BufferedInputStream(jarFileURLConnection.getInputStream ());
+	InputStream jar_is = new BufferedInputStream(
+			jarFileURLConnection.getInputStream ());
 	return new JarInputStream(jar_is);
       }
 
@@ -128,7 +132,8 @@ public abstract class JarURLConnection extends URLConnection
     else
       {
 	// If the jar file is not local, ...
-	JarInputStream zis = new JarInputStream(jarFileURLConnection.getInputStream ());
+	JarInputStream zis = new JarInputStream(
+			jarFileURLConnection.getInputStream ());
 
 	// This is hideous, we're doing a linear search...
 	for (ZipEntry ent = zis.getNextEntry (); 
@@ -169,7 +174,8 @@ public abstract class JarURLConnection extends URLConnection
     
     if (jarfile == null)
       {
-	JarInputStream zis = new JarInputStream(jarFileURLConnection.getInputStream ());
+	JarInputStream zis = new JarInputStream(
+			jarFileURLConnection.getInputStream ());
 
 	// This is hideous, we're doing a linear search for the thing...
 	for (ZipEntry ent = zis.getNextEntry (); 
@@ -212,6 +218,20 @@ public abstract class JarURLConnection extends URLConnection
 	return null;
       }
     return (String) hdrHash.get(name.toLowerCase());
+  }
+
+  // Override default method in URLConnection.
+  public Map getHeaderFields()
+  {
+    try
+      {
+        getHeaders();
+      }
+    catch (IOException x)
+      {
+        return null;
+      }
+    return hdrHash;
   }
 
   // Override default method in URLConnection.
@@ -300,4 +320,16 @@ public abstract class JarURLConnection extends URLConnection
     hdrHash.put(key.toLowerCase(), Long.toString(len));
   }
 
+  /**
+   * Returns an array of Certificate objects for the jar file entry specified
+   * by this URL or null if there are none
+   *
+   * @return A Certificate array
+   *
+   * @exception IOException If an error occurs
+   */
+  public Certificate[] getCertificates() throws IOException
+  {
+    return getJarEntry().getCertificates();
+  }
 }

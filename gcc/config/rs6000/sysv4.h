@@ -261,6 +261,8 @@ do {									\
 	     rs6000_sdata_name, rs6000_abi_name);			\
     }									\
 									\
+  targetm.have_srodata_section = rs6000_sdata == SDATA_EABI;		\
+									\
   if (TARGET_RELOCATABLE && !TARGET_MINIMAL_TOC)			\
     {									\
       target_flags |= MASK_MINIMAL_TOC;					\
@@ -453,7 +455,7 @@ toc_section ()								\
 	    {								\
 	      toc_initialized = 1;					\
 	      fprintf (asm_out_file, "%s\n", TOC_SECTION_ASM_OP);	\
-	      ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "LCTOC", 0);	\
+	      (*targetm.asm_out.internal_label) (asm_out_file, "LCTOC", 0); \
 	      fprintf (asm_out_file, "\t.tc ");				\
 	      ASM_OUTPUT_INTERNAL_LABEL_PREFIX (asm_out_file, "LCTOC1[TC],"); \
 	      ASM_OUTPUT_INTERNAL_LABEL_PREFIX (asm_out_file, "LCTOC1"); \
@@ -598,7 +600,7 @@ extern int rs6000_pic_labelno;
       {									\
 	char buf[256];							\
 									\
-	ASM_OUTPUT_INTERNAL_LABEL (FILE, "LCL", rs6000_pic_labelno);	\
+	(*targetm.asm_out.internal_label) (FILE, "LCL", rs6000_pic_labelno); \
 									\
 	ASM_GENERATE_INTERNAL_LABEL (buf, "LCTOC", 1);			\
 	fprintf (FILE, "\t%s ", init_ptr);				\
@@ -674,7 +676,7 @@ extern int rs6000_pic_labelno;
 #define	LOCAL_LABEL_PREFIX "."
 #define	USER_LABEL_PREFIX ""
 
-/* svr4.h overrides ASM_OUTPUT_INTERNAL_LABEL.  */
+/* svr4.h overrides (*targetm.asm_out.internal_label).  */
 
 #define	ASM_OUTPUT_INTERNAL_LABEL_PREFIX(FILE,PREFIX)	\
   asm_fprintf (FILE, "%L%s", PREFIX)
@@ -778,14 +780,16 @@ extern int fixuplabelno;
 /* This is the end of what might become sysv4.h.  */
 
 /* Use DWARF 2 debugging information by default.  */
-#undef	PREFERRED_DEBUGGING_TYPE
-#define	PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
+#undef  PREFERRED_DEBUGGING_TYPE
+#define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
 
 /* Historically we have also supported stabs debugging.  */
-#define	DBX_DEBUGGING_INFO
+#define DBX_DEBUGGING_INFO 1
 
-#define	TARGET_ENCODE_SECTION_INFO  rs6000_elf_encode_section_info
-#define	TARGET_STRIP_NAME_ENCODING  rs6000_elf_strip_name_encoding
+#define TARGET_ENCODE_SECTION_INFO  rs6000_elf_encode_section_info
+#define TARGET_STRIP_NAME_ENCODING  rs6000_elf_strip_name_encoding
+#define TARGET_IN_SMALL_DATA_P  rs6000_elf_in_small_data_p
+#define TARGET_SECTION_TYPE_FLAGS  rs6000_elf_section_type_flags
 
 /* The ELF version doesn't encode [DS] or whatever at the end of symbols.  */
 

@@ -911,6 +911,9 @@ override_options ()
       {"i586", PROCESSOR_PENTIUM, 0},
       {"pentium", PROCESSOR_PENTIUM, 0},
       {"pentium-mmx", PROCESSOR_PENTIUM, PTA_MMX},
+      {"winchip-c6", PROCESSOR_I486, PTA_MMX},
+      {"winchip2", PROCESSOR_I486, PTA_MMX | PTA_3DNOW},
+      {"c3", PROCESSOR_I486, PTA_MMX | PTA_3DNOW},
       {"i686", PROCESSOR_PENTIUMPRO, 0},
       {"pentiumpro", PROCESSOR_PENTIUMPRO, 0},
       {"pentium2", PROCESSOR_PENTIUMPRO, PTA_MMX},
@@ -1592,7 +1595,11 @@ classify_argument (mode, type, classes, bit_offset)
 {
   int bytes =
     (mode == BLKmode) ? int_size_in_bytes (type) : (int) GET_MODE_SIZE (mode);
-  int words = (bytes + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
+  int words = (bytes + (bit_offset % 64) / 8 + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
+
+  /* Variable sized entities are always passed/returned in memory.  */
+  if (bytes < 0)
+    return 0;
 
   if (type && AGGREGATE_TYPE_P (type))
     {
@@ -2750,6 +2757,43 @@ ix86_va_arg (valist, type)
   return addr_rtx;
 }
 
+/* Return nonzero if OP is either a i387 or SSE fp register.  */
+int
+any_fp_register_operand (op, mode)
+     rtx op;
+     enum machine_mode mode ATTRIBUTE_UNUSED;
+{
+  return ANY_FP_REG_P (op);
+}
+
+/* Return nonzero if OP is an i387 fp register.  */
+int
+fp_register_operand (op, mode)
+     rtx op;
+     enum machine_mode mode ATTRIBUTE_UNUSED;
+{
+  return FP_REG_P (op);
+}
+
+/* Return nonzero if OP is a non-fp register_operand.  */
+int
+register_and_not_any_fp_reg_operand (op, mode)
+     rtx op;
+     enum machine_mode mode;
+{
+  return register_operand (op, mode) && !ANY_FP_REG_P (op);
+}
+
+/* Return nonzero of OP is a register operand other than an
+   i387 fp register.  */
+int
+register_and_not_fp_reg_operand (op, mode)
+     rtx op;
+     enum machine_mode mode;
+{
+  return register_operand (op, mode) && !FP_REG_P (op);
+}
+
 /* Return nonzero if OP is general operand representable on x86_64.  */
 
 int
@@ -3211,6 +3255,30 @@ nonmemory_no_elim_operand (op, mode)
     return 0;
 
   return GET_CODE (op) == CONST_INT || register_operand (op, mode);
+}
+
+/* Return false if this is any eliminable register or stack register,
+   otherwise work like register_operand.  */
+
+int
+index_register_operand (op, mode)
+     register rtx op;
+     enum machine_mode mode;
+{
+  rtx t = op;
+  if (GET_CODE (t) == SUBREG)
+    t = SUBREG_REG (t);
+  if (!REG_P (t))
+    return 0;
+  if (t == arg_pointer_rtx
+      || t == frame_pointer_rtx
+      || t == virtual_incoming_args_rtx
+      || t == virtual_stack_vars_rtx
+      || t == virtual_stack_dynamic_rtx
+      || REGNO (t) == STACK_POINTER_REGNUM)
+    return 0;
+
+  return general_operand (op, mode);
 }
 
 /* Return true if op is a Q_REGS class register.  */
@@ -3959,7 +4027,7 @@ output_set_got (dest)
   rtx xops[3];
 
   xops[0] = dest;
-  xops[1] = gen_rtx_SYMBOL_REF (Pmode, "_GLOBAL_OFFSET_TABLE_");
+  xops[1] = gen_rtx_SYMBOL_REF (Pmode, GOT_SYMBOL_NAME);
 
   if (! TARGET_DEEP_BRANCH_PREDICTION || !flag_pic)
     {
@@ -3975,7 +4043,7 @@ output_set_got (dest)
          is what will be referred to by the Mach-O PIC subsystem.  */
       ASM_OUTPUT_LABEL (asm_out_file, machopic_function_base_name ());
 #endif
-      ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+      (*targetm.asm_out.internal_label) (asm_out_file, "L",
 				 CODE_LABEL_NUMBER (XEXP (xops[2], 0)));
 
       if (flag_pic)
@@ -5952,6 +6020,33 @@ i386_dwarf_output_addr_const (file, x)
   fputc ('\n', file);
 }
 
+/* This is called from dwarf2out.c via ASM_OUTPUT_DWARF_DTPREL.
+   We need to emit DTP-relative relocations.  */
+
+void
+i386_output_dwarf_dtprel (file, size, x)
+     FILE *file;
+     int size;
+     rtx x;
+{
+  switch (size)
+    {
+    case 4:
+      fputs (ASM_LONG, file);
+      break;
+    case 8:
+#ifdef ASM_QUAD
+      fputs (ASM_QUAD, file);
+      break;
+#endif
+    default:
+      abort ();
+   }
+  
+  output_addr_const (file, x);
+  fputs ("@DTPOFF", file);
+}
+
 /* In the name of slightly smaller debug output, and to cater to
    general assembler losage, recognize PIC+GOTOFF and turn it back
    into a direct symbol reference.  */
@@ -6606,7 +6701,7 @@ print_operand (file, x, code)
       char dstr[30];
 
       REAL_VALUE_FROM_CONST_DOUBLE (r, x);
-      REAL_VALUE_TO_DECIMAL (r, "%.22e", dstr);
+      REAL_VALUE_TO_DECIMAL (r, dstr, -1);
       fprintf (file, "%s", dstr);
     }
 
@@ -6617,7 +6712,7 @@ print_operand (file, x, code)
       char dstr[30];
 
       REAL_VALUE_FROM_CONST_DOUBLE (r, x);
-      REAL_VALUE_TO_DECIMAL (r, "%.22e", dstr);
+      REAL_VALUE_TO_DECIMAL (r, dstr, -1);
       fprintf (file, "%s", dstr);
     }
 
@@ -7331,8 +7426,8 @@ ix86_output_addr_diff_elt (file, value, rel)
 	     machopic_function_base_name () + 1);
 #endif
   else
-    asm_fprintf (file, "%s%U_GLOBAL_OFFSET_TABLE_+[.-%s%d]\n",
-		 ASM_LONG, LPREFIX, value);
+    asm_fprintf (file, "%s%U%s+[.-%s%d]\n",
+		 ASM_LONG, GOT_SYMBOL_NAME, LPREFIX, value);
 }
 
 /* Generate either "mov $0, reg" or "xor reg, reg", as appropriate
@@ -8990,7 +9085,7 @@ ix86_expand_int_movcc (operands)
 		emit_insn (gen_rtx_SET (VOIDmode, out, tmp));
 	    }
 	  if (out != operands[0])
-	    emit_move_insn (operands[0], out);
+	    emit_move_insn (operands[0], copy_rtx (out));
 
 	  return 1; /* DONE */
 	}
@@ -13796,13 +13891,13 @@ x86_output_mi_thunk (file, delta, function)
 	{
 	  xops[0] = pic_offset_table_rtx;
 	  xops[1] = gen_label_rtx ();
-	  xops[2] = gen_rtx_SYMBOL_REF (Pmode, "_GLOBAL_OFFSET_TABLE_");
+	  xops[2] = gen_rtx_SYMBOL_REF (Pmode, GOT_SYMBOL_NAME);
 
 	  if (ix86_regparm > 2)
 	    abort ();
 	  output_asm_insn ("push{l}\t%0", xops);
 	  output_asm_insn ("call\t%P1", xops);
-	  ASM_OUTPUT_INTERNAL_LABEL (file, "L", CODE_LABEL_NUMBER (xops[1]));
+	  (*targetm.asm_out.internal_label) (file, "L", CODE_LABEL_NUMBER (xops[1]));
 	  output_asm_insn ("pop{l}\t%0", xops);
 	  output_asm_insn
 	    ("add{l}\t{%2+[.-%P1], %0|%0, OFFSET FLAT: %2+[.-%P1]}", xops);

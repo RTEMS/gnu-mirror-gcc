@@ -81,7 +81,7 @@ namespace std
   */
   inline size_t 
   __deque_buf_size(size_t __size) 
-    { return __size < 512 ? size_t(512 / __size) : size_t(1); }
+  { return __size < 512 ? size_t(512 / __size) : size_t(1); }
   
   
   /**
@@ -647,8 +647,8 @@ namespace std
     typedef const value_type*                  const_pointer;
     typedef typename _Base::iterator           iterator;
     typedef typename _Base::const_iterator     const_iterator;
-    typedef reverse_iterator<const_iterator>   const_reverse_iterator;
-    typedef reverse_iterator<iterator>         reverse_iterator;
+    typedef std::reverse_iterator<const_iterator>   const_reverse_iterator;
+    typedef std::reverse_iterator<iterator>         reverse_iterator;
     typedef value_type&                        reference;
     typedef const value_type&                  const_reference;
     typedef size_t                             size_type;
@@ -1160,7 +1160,7 @@ namespace std
     */
     iterator
     insert(iterator __position)
-      { return insert(__position, value_type()); }
+    { return insert(__position, value_type()); }
   #endif
   
     /**
@@ -1174,7 +1174,7 @@ namespace std
     */
     void
     insert(iterator __position, size_type __n, const value_type& __x)
-      { _M_fill_insert(__position, __n, __x); }
+    { _M_fill_insert(__position, __n, __x); }
   
     /**
      *  @brief  Inserts a range into the %deque.

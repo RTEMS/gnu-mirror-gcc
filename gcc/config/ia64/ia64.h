@@ -31,13 +31,26 @@ Boston, MA 02111-1307, USA.  */
 
 /* Run-time target specifications */
 
-#define EXTRA_SPECS \
-  { "cpp_cpu", CPP_CPU_SPEC }, \
-  { "asm_extra", ASM_EXTRA_SPEC },
+/* Target CPU builtins.  */
+#define TARGET_CPU_CPP_BUILTINS()		\
+do {						\
+	builtin_assert("cpu=ia64");		\
+	builtin_assert("machine=ia64");		\
+	builtin_define("__ia64");		\
+	builtin_define("__ia64__");		\
+	builtin_define("__itanium__");		\
+	builtin_define("__ELF__");		\
+	if (!TARGET_ILP32)			\
+	  {					\
+	    builtin_define("_LP64");		\
+	    builtin_define("__LP64__");		\
+	  }					\
+	if (TARGET_BIG_ENDIAN)			\
+	  builtin_define("__BIG_ENDIAN__");	\
+} while (0)
 
-#define CPP_CPU_SPEC " \
-  -Acpu=ia64 -Amachine=ia64 -D__ia64 -D__ia64__ %{!milp32:-D_LP64 -D__LP64__} \
-  -D__ELF__"
+#define EXTRA_SPECS \
+  { "asm_extra", ASM_EXTRA_SPEC },
 
 #define CC1_SPEC "%(cc1_cpu) "
 
@@ -113,6 +126,8 @@ extern int ia64_tls_size;
 #define TARGET_TLS14		(ia64_tls_size == 14)
 #define TARGET_TLS22		(ia64_tls_size == 22)
 #define TARGET_TLS64		(ia64_tls_size == 64)
+
+#define TARGET_HPUX_LD		0
 
 /* This macro defines names of command options to set and clear bits in
    `target_flags'.  Its definition is an initializer with a subgrouping for
@@ -207,13 +222,6 @@ extern const char *ia64_tls_size_string;
 /* #define OPTIMIZATION_OPTIONS(LEVEL,SIZE) */
 
 /* Driver configuration */
-
-/* A C string constant that tells the GNU CC driver program options to pass to
-   CPP.  It can also specify how to translate options you give to GNU CC into
-   options for GNU CC to pass to the CPP.  */
-
-#define CPP_SPEC \
-  "%{mcpu=itanium:-D__itanium__} %{mbig-endian:-D__BIG_ENDIAN__} %(cpp_cpu)"
 
 /* A C string constant that tells the GNU CC driver program options to pass to
    `cc1'.  It can also specify how to translate options you give to GNU CC into
@@ -338,7 +346,7 @@ while (0)
 #define TARGET_FLOAT_FORMAT IEEE_FLOAT_FORMAT
 
 /* By default, the C++ compiler will use function addresses in the
-   vtable entries.  Setting this non-zero tells the compiler to use
+   vtable entries.  Setting this nonzero tells the compiler to use
    function descriptors instead.  The value of this macro says how
    many words wide the descriptor is (normally 2).  It is assumed
    that the address of a function descriptor may be treated as a
@@ -965,7 +973,7 @@ enum reg_class
 
 /* Certain machines have the property that some registers cannot be copied to
    some other registers without using memory.  Define this macro on those
-   machines to be a C expression that is non-zero if objects of mode M in
+   machines to be a C expression that is nonzero if objects of mode M in
    registers of CLASS1 can only be copied to registers of class CLASS2 by
    storing a register of CLASS1 into memory and loading that memory location
    into a register of CLASS2.  */
@@ -1195,7 +1203,7 @@ enum reg_class
   {RETURN_ADDRESS_POINTER_REGNUM, BR_REG (0)},				\
 }
 
-/* A C expression that returns non-zero if the compiler is allowed to try to
+/* A C expression that returns nonzero if the compiler is allowed to try to
    replace register number FROM with register number TO.  The frame pointer
    is automatically handled.  */
 
@@ -1923,18 +1931,9 @@ do {									\
   sprintf (LABEL, "*.%s%d", PREFIX, NUM);				\
 } while (0)
 
-/* A C expression to assign to OUTVAR (which is a variable of type `char *') a
-   newly allocated string made from the string NAME and the number NUMBER, with
-   some suitable punctuation added.  */
-
 /* ??? Not sure if using a ? in the name for Intel as is safe.  */
 
-#define ASM_FORMAT_PRIVATE_NAME(OUTVAR, NAME, NUMBER)			\
-do {									\
-  (OUTVAR) = (char *) alloca (strlen (NAME) + 12);			\
-  sprintf (OUTVAR, "%s%c%ld", (NAME), (TARGET_GNU_AS ? '.' : '?'),	\
-	   (long)(NUMBER));						\
-} while (0)
+#define ASM_PN_FORMAT (TARGET_GNU_AS ? "%s.%lu" : "%s?%lu")
 
 /* A C statement to output to the stdio stream STREAM assembler code which
    defines (equates) the symbol NAME to have the value VALUE.  */
@@ -2245,13 +2244,13 @@ do {									\
 /* Define this macro if GNU CC should produce dwarf version 2 format debugging
    output in response to the `-g' option.  */
 
-#define DWARF2_DEBUGGING_INFO
+#define DWARF2_DEBUGGING_INFO 1
 
 #define DWARF2_ASM_LINE_DEBUG_INFO (TARGET_DWARF2_ASM)
 
 /* Use tags for debug info labels, so that they don't break instruction
    bundles.  This also avoids getting spurious DV warnings from the
-   assembler.  This is similar to ASM_OUTPUT_INTERNAL_LABEL, except that we
+   assembler.  This is similar to (*targetm.asm_out.internal_label), except that we
    add brackets around the label.  */
 
 #define ASM_OUTPUT_DEBUG_LABEL(FILE, PREFIX, NUM) \

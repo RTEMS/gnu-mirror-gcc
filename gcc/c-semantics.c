@@ -447,8 +447,9 @@ genrtl_do_stmt (t)
   /* Recognize the common special-case of do { ... } while (0) and do
      not emit the loop widgetry in this case.  In particular this
      avoids cluttering the rtl with dummy loop notes, which can affect
-     alignment of adjacent labels.  */
-  if (integer_zerop (cond))
+     alignment of adjacent labels.  COND can be NULL due to parse
+     errors.  */
+  if (!cond || integer_zerop (cond))
     {
       expand_start_null_loop ();
       expand_stmt (DO_BODY (t));
@@ -487,7 +488,7 @@ genrtl_return_stmt (stmt)
 {
   tree expr;
 
-  expr = RETURN_EXPR (stmt);
+  expr = RETURN_STMT_EXPR (stmt);
 
   emit_line_note (input_filename, lineno);
   if (!expr)

@@ -394,7 +394,15 @@ extern rtx convert_modes PARAMS ((enum machine_mode, enum machine_mode,
 				  rtx, int));
 
 /* Emit code to move a block Y to a block X.  */
-extern rtx emit_block_move PARAMS ((rtx, rtx, rtx));
+
+enum block_op_methods
+{
+  BLOCK_OP_NORMAL,
+  BLOCK_OP_CALL_PARM,
+  BLOCK_OP_NO_LIBCALL
+};
+
+extern rtx emit_block_move PARAMS ((rtx, rtx, rtx, enum block_op_methods));
 
 /* Copy all or part of a value X into registers starting at REGNO.
    The number of registers to be filled is NREGS.  */
@@ -607,6 +615,9 @@ extern void set_mem_expr PARAMS ((rtx, tree));
 
 /* Set the offset for MEM to OFFSET.  */
 extern void set_mem_offset PARAMS ((rtx, rtx));
+
+/* Set the size for MEM to SIZE.  */
+extern void set_mem_size PARAMS ((rtx, rtx));
 
 /* Return a memory reference like MEMREF, but with its mode changed
    to MODE and its address changed to ADDR.
