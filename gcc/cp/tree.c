@@ -218,6 +218,18 @@ real_lvalue_p (ref)
   return lvalue_p_1 (ref, /*treat_class_rvalues_as_lvalues=*/ 0, /*cast*/ 1);
 }
 
+/* Returns the kind of lvalue that REF is, in the sense of
+   [basic.lval].  This function should really be named lvalue_p; it
+   computes the C++ definition of lvalue.  */
+
+cp_lvalue_kind
+real_non_cast_lvalue_p (tree ref)
+{
+  return lvalue_p_1 (ref, 
+		     /*treat_class_rvalues_as_lvalues=*/0, 
+		     /*allow_cast_as_lvalue=*/0);
+}
+
 /* This differs from real_lvalue_p in that class rvalues are
    considered lvalues.  */
 
@@ -345,6 +357,14 @@ build_target_expr_with_type (init, type)
 
   if (TREE_CODE (init) == TARGET_EXPR)
     return init;
+  else if (CLASS_TYPE_P (type) && !TYPE_HAS_TRIVIAL_INIT_REF (type)
+	   && TREE_CODE (init) != COND_EXPR
+	   && TREE_CODE (init) != CONSTRUCTOR)
+    /* We need to build up a copy constructor call.  COND_EXPR is a special
+       case because we already have copies on the arms and we don't want
+       another one here.  A CONSTRUCTOR is aggregate initialization, which
+       is handled separately.  */
+    return force_rvalue (init);
 
   slot = build (VAR_DECL, type);
   DECL_ARTIFICIAL (slot) = 1;
@@ -362,97 +382,6 @@ get_target_expr (init)
      tree init;
 {
   return build_target_expr_with_type (init, TREE_TYPE (init));
-}
-
-/* Recursively perform a preorder search EXP for CALL_EXPRs, making
-   copies where they are found.  Returns a deep copy all nodes transitively
-   containing CALL_EXPRs.  */
-
-tree
-break_out_calls (exp)
-     tree exp;
-{
-  register tree t1, t2 = NULL_TREE;
-  register enum tree_code code;
-  register int changed = 0;
-  register int i;
-
-  if (exp == NULL_TREE)
-    return exp;
-
-  code = TREE_CODE (exp);
-
-  if (code == CALL_EXPR)
-    return copy_node (exp);
-
-  /* Don't try and defeat a save_expr, as it should only be done once.  */
-    if (code == SAVE_EXPR)
-       return exp;
-
-  switch (TREE_CODE_CLASS (code))
-    {
-    default:
-      abort ();
-
-    case 'c':  /* a constant */
-    case 't':  /* a type node */
-    case 'x':  /* something random, like an identifier or an ERROR_MARK.  */
-      return exp;
-
-    case 'd':  /* A decl node */
-#if 0                               /* This is bogus.  jason 9/21/94 */
-
-      t1 = break_out_calls (DECL_INITIAL (exp));
-      if (t1 != DECL_INITIAL (exp))
-	{
-	  exp = copy_node (exp);
-	  DECL_INITIAL (exp) = t1;
-	}
-#endif
-      return exp;
-
-    case 'b':  /* A block node */
-      {
-	/* Don't know how to handle these correctly yet.   Must do a
-	   break_out_calls on all DECL_INITIAL values for local variables,
-	   and also break_out_calls on all sub-blocks and sub-statements.  */
-	abort ();
-      }
-      return exp;
-
-    case 'e':  /* an expression */
-    case 'r':  /* a reference */
-    case 's':  /* an expression with side effects */
-      for (i = TREE_CODE_LENGTH (code) - 1; i >= 0; i--)
-	{
-	  t1 = break_out_calls (TREE_OPERAND (exp, i));
-	  if (t1 != TREE_OPERAND (exp, i))
-	    {
-	      exp = copy_node (exp);
-	      TREE_OPERAND (exp, i) = t1;
-	    }
-	}
-      return exp;
-
-    case '<':  /* a comparison expression */
-    case '2':  /* a binary arithmetic expression */
-      t2 = break_out_calls (TREE_OPERAND (exp, 1));
-      if (t2 != TREE_OPERAND (exp, 1))
-	changed = 1;
-    case '1':  /* a unary arithmetic expression */
-      t1 = break_out_calls (TREE_OPERAND (exp, 0));
-      if (t1 != TREE_OPERAND (exp, 0))
-	changed = 1;
-      if (changed)
-	{
-	  if (TREE_CODE_LENGTH (code) == 1)
-	    return build1 (code, TREE_TYPE (exp), t1);
-	  else
-	    return build (code, TREE_TYPE (exp), t1, t2);
-	}
-      return exp;
-    }
-
 }
 
 /* Construct, lay out and return the type of methods belonging to class
@@ -510,7 +439,7 @@ build_cplus_array_type_1 (elt_type, index_type)
        && index_type && TYPE_MAX_VALUE (index_type)
        && TREE_CODE (TYPE_MAX_VALUE (index_type)) != INTEGER_CST)
       || uses_template_parms (elt_type) 
-      || uses_template_parms (index_type))
+      || (index_type && uses_template_parms (index_type)))
     {
       t = make_node (ARRAY_TYPE);
       TREE_TYPE (t) = elt_type;
@@ -1737,8 +1666,10 @@ cp_tree_equal (t1, t2)
       return 0;
 
     case TEMPLATE_PARM_INDEX:
-      return TEMPLATE_PARM_IDX (t1) == TEMPLATE_PARM_IDX (t2)
-	&& TEMPLATE_PARM_LEVEL (t1) == TEMPLATE_PARM_LEVEL (t2);
+      return (TEMPLATE_PARM_IDX (t1) == TEMPLATE_PARM_IDX (t2)
+	      && TEMPLATE_PARM_LEVEL (t1) == TEMPLATE_PARM_LEVEL (t2)
+	      && same_type_p (TREE_TYPE (TEMPLATE_PARM_DECL (t1)),
+			      TREE_TYPE (TEMPLATE_PARM_DECL (t2))));
 
     case SIZEOF_EXPR:
     case ALIGNOF_EXPR:
@@ -2369,30 +2300,6 @@ cp_copy_res_decl_for_inlining (result, fn, caller, decl_map_,
     }
 
   return var;
-}
-
-/* Record that we're about to start inlining FN, and return nonzero if
-   that's OK.  Used for lang_hooks.tree_inlining.start_inlining.  */
-
-int
-cp_start_inlining (fn)
-     tree fn;
-{
-  if (DECL_TEMPLATE_INSTANTIATION (fn))
-    return push_tinst_level (fn);
-  else
-    return 1;
-}
-
-/* Record that we're done inlining FN.  Used for
-   lang_hooks.tree_inlining.end_inlining.  */
-
-void
-cp_end_inlining (fn)
-     tree fn ATTRIBUTE_UNUSED;
-{
-  if (DECL_TEMPLATE_INSTANTIATION (fn))
-    pop_tinst_level ();
 }
 
 /* Initialize tree.c.  */

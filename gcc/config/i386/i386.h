@@ -114,10 +114,11 @@ extern int target_flags;
 #define MASK_MMX		0x00002000	/* Support MMX regs/builtins */
 #define MASK_SSE		0x00004000	/* Support SSE regs/builtins */
 #define MASK_SSE2		0x00008000	/* Support SSE2 regs/builtins */
-#define MASK_3DNOW		0x00010000	/* Support 3Dnow builtins */
-#define MASK_3DNOW_A		0x00020000	/* Support Athlon 3Dnow builtins */
-#define MASK_128BIT_LONG_DOUBLE 0x00040000	/* long double size is 128bit */
-#define MASK_64BIT		0x00080000	/* Produce 64bit code */
+#define MASK_SSE3		0x00010000	/* Support SSE3 builtins */
+#define MASK_3DNOW		0x00020000	/* Support 3Dnow builtins */
+#define MASK_3DNOW_A		0x00040000	/* Support Athlon 3Dnow builtins */
+#define MASK_128BIT_LONG_DOUBLE 0x00080000	/* long double size is 128bit */
+#define MASK_64BIT		0x00100000	/* Produce 64bit code */
 
 /* Unused:			0x03f0000	*/
 
@@ -271,8 +272,9 @@ extern int x86_prefetch_sse;
 
 #define ASSEMBLER_DIALECT (ix86_asm_dialect)
 
-#define TARGET_SSE ((target_flags & (MASK_SSE | MASK_SSE2)) != 0)
+#define TARGET_SSE ((target_flags & MASK_SSE) != 0)
 #define TARGET_SSE2 ((target_flags & MASK_SSE2) != 0)
+#define TARGET_SSE3 ((target_flags & MASK_SSE3) != 0)
 #define TARGET_SSE_MATH ((ix86_fpmath & FPMATH_SSE) != 0)
 #define TARGET_MIX_SSE_I387 ((ix86_fpmath & FPMATH_SSE) \
 			     && (ix86_fpmath & FPMATH_387))
@@ -300,6 +302,8 @@ extern int x86_prefetch_sse;
   { "486",			 0, "" /*Deprecated.*/},		      \
   { "pentium",			 0, "" /*Deprecated.*/},		      \
   { "pentiumpro",		 0, "" /*Deprecated.*/},		      \
+  { "pni",			 0, "" /*Deprecated.*/},		      \
+  { "no-pni",			 0, "" /*Deprecated.*/},		      \
   { "intel-syntax",		 0, "" /*Deprecated.*/},	 	      \
   { "no-intel-syntax",		 0, "" /*Deprecated.*/},	 	      \
   { "rtd",			 MASK_RTD,				      \
@@ -366,6 +370,10 @@ extern int x86_prefetch_sse;
     N_("Support MMX, SSE and SSE2 built-in functions and code generation") }, \
   { "no-sse2",			 -MASK_SSE2,				      \
     N_("Do not support MMX, SSE and SSE2 built-in functions and code generation") },    \
+  { "sse3",			 MASK_SSE3,				      \
+    N_("Support MMX, SSE, SSE2 and SSE3 built-in functions and code generation") }, \
+  { "no-sse3",			 -MASK_SSE3,				      \
+    N_("Do not support MMX, SSE, SSE2 and SSE3 built-in functions and code generation") }, \
   { "128bit-long-double",	 MASK_128BIT_LONG_DOUBLE,		      \
     N_("sizeof(long double) is 16") },					      \
   { "96bit-long-double",	-MASK_128BIT_LONG_DOUBLE,		      \
@@ -469,6 +477,10 @@ extern int x86_prefetch_sse;
 %n`-mpentium' is deprecated. Use `-march=pentium' or `-mcpu=pentium' instead.\n} \
 %{mpentiumpro:-mcpu=pentiumpro \
 %n`-mpentiumpro' is deprecated. Use `-march=pentiumpro' or `-mcpu=pentiumpro' instead.\n}} \
+%{mpni:-msse3 \
+%n`-mpni' is deprecated. Use `-msse3' instead.\n} \
+%{mno-pni:-mno-sse3 \
+%n`-mno-pni' is deprecated. Use `-mno-sse3' instead.\n} \
 %{mintel-syntax:-masm=intel \
 %n`-mintel-syntax' is deprecated. Use `-masm=intel' instead.\n} \
 %{mno-intel-syntax:-masm=att \
@@ -487,9 +499,10 @@ extern int x86_prefetch_sse;
       if (TARGET_64BIT)						\
 	{							\
 	  builtin_assert ("cpu=x86_64");			\
-	  builtin_assert ("machine=x86_64");			\
 	  builtin_define ("__x86_64");				\
 	  builtin_define ("__x86_64__");			\
+	  builtin_define ("__amd64");				\
+	  builtin_define ("__amd64__");				\
 	}							\
       else							\
 	{							\
@@ -553,6 +566,11 @@ extern int x86_prefetch_sse;
 	builtin_define ("__SSE__");				\
       if (TARGET_SSE2)						\
 	builtin_define ("__SSE2__");				\
+      if (TARGET_SSE3)						\
+	{							\
+	  builtin_define ("__SSE3__");				\
+	  builtin_define ("__PNI__");				\
+	}							\
       if (TARGET_SSE_MATH && TARGET_SSE)			\
 	builtin_define ("__SSE_MATH__");			\
       if (TARGET_SSE_MATH && TARGET_SSE2)			\
@@ -1047,7 +1065,7 @@ do {									\
 	    && (TARGET_64BIT || !TARGET_PARTIAL_REG_STALL))	\
         || ((MODE1) == DImode && TARGET_64BIT))			\
        && ((MODE2) == HImode || (MODE2) == SImode		\
-	   || ((MODE1) == QImode				\
+	   || ((MODE2) == QImode				\
 	       && (TARGET_64BIT || !TARGET_PARTIAL_REG_STALL))	\
 	   || ((MODE2) == DImode && TARGET_64BIT))))
 
@@ -1522,6 +1540,20 @@ enum reg_class
    || ((CLASS) == SIREG)						\
    || ((CLASS) == DIREG))
 
+/* Return a class of registers that cannot change FROM mode to TO mode.
+  
+   x87 registers can't do subreg as all values are reformated to extended
+   precision.  XMM registers does not support with nonzero offsets equal
+   to 4, 8 and 12 otherwise valid for integer registers. Since we can't
+   determine these, prohibit all nonparadoxical subregs changing size.  */
+
+#define CANNOT_CHANGE_MODE_CLASS(FROM, TO, CLASS)	\
+  (GET_MODE_SIZE (TO) < GET_MODE_SIZE (FROM)		\
+   ? reg_classes_intersect_p (FLOAT_SSE_REGS, (CLASS))	\
+     || MAYBE_MMX_CLASS_P (CLASS) 			\
+   : GET_MODE_SIZE (FROM) != GET_MODE_SIZE (TO)		\
+   ? reg_classes_intersect_p (FLOAT_REGS, (CLASS)) : 0)
+
 /* A C statement that adds to CLOBBERS any hard regs the port wishes
    to automatically clobber for all asms.
 
@@ -1716,17 +1748,28 @@ typedef struct ix86_args {
 
 #define FUNCTION_ARG_PARTIAL_NREGS(CUM, MODE, TYPE, NAMED) 0
 
+/* A C expression that indicates when an argument must be passed by
+   reference.  If nonzero for an argument, a copy of that argument is
+   made in memory and a pointer to the argument is passed instead of
+   the argument itself.  The pointer is passed in whatever way is
+   appropriate for passing a pointer to that type.  */
+
+#define FUNCTION_ARG_PASS_BY_REFERENCE(CUM, MODE, TYPE, NAMED) \
+  function_arg_pass_by_reference(&CUM, MODE, TYPE, NAMED)
+
 /* If PIC, we cannot make sibling calls to global functions
    because the PLT requires %ebx live.
-   If we are returning floats on the register stack, we cannot make
-   sibling calls to functions that return floats.  (The stack adjust
-   instruction will wind up after the sibcall jump, and not be executed.) */
+   If we are returning floats on the 80387 register stack, we cannot
+   make a sibcall from a function that doesn't return a float to a
+   function that does or, conversely, from a function that does return
+   a float to a function that doesn't; the necessary stack adjustment
+   would not be executed.  */
 #define FUNCTION_OK_FOR_SIBCALL(DECL)					\
   ((DECL)								\
    && (! flag_pic || ! TREE_PUBLIC (DECL))				\
    && (! TARGET_FLOAT_RETURNS_IN_80387					\
-       || ! FLOAT_MODE_P (TYPE_MODE (TREE_TYPE (TREE_TYPE (DECL))))	\
-       || FLOAT_MODE_P (TYPE_MODE (TREE_TYPE (TREE_TYPE (cfun->decl))))))
+       || (FLOAT_MODE_P (TYPE_MODE (TREE_TYPE (TREE_TYPE (DECL))))	\
+           == FLOAT_MODE_P (TYPE_MODE (TREE_TYPE (TREE_TYPE (cfun->decl)))))))
 
 /* Perform any needed actions needed for a function that is receiving a
    variable number of arguments.
@@ -2068,9 +2111,12 @@ enum ix86_builtins
   IX86_BUILTIN_CVTPI2PS,
   IX86_BUILTIN_CVTPS2PI,
   IX86_BUILTIN_CVTSI2SS,
+  IX86_BUILTIN_CVTSI642SS,
   IX86_BUILTIN_CVTSS2SI,
+  IX86_BUILTIN_CVTSS2SI64,
   IX86_BUILTIN_CVTTPS2PI,
   IX86_BUILTIN_CVTTSS2SI,
+  IX86_BUILTIN_CVTTSS2SI64,
 
   IX86_BUILTIN_MAXPS,
   IX86_BUILTIN_MAXSS,
@@ -2116,6 +2162,7 @@ enum ix86_builtins
   IX86_BUILTIN_PADDB,
   IX86_BUILTIN_PADDW,
   IX86_BUILTIN_PADDD,
+  IX86_BUILTIN_PADDQ,
   IX86_BUILTIN_PADDSB,
   IX86_BUILTIN_PADDSW,
   IX86_BUILTIN_PADDUSB,
@@ -2123,6 +2170,7 @@ enum ix86_builtins
   IX86_BUILTIN_PSUBB,
   IX86_BUILTIN_PSUBW,
   IX86_BUILTIN_PSUBD,
+  IX86_BUILTIN_PSUBQ,
   IX86_BUILTIN_PSUBSB,
   IX86_BUILTIN_PSUBSW,
   IX86_BUILTIN_PSUBUSB,
@@ -2327,11 +2375,14 @@ enum ix86_builtins
 
   IX86_BUILTIN_CVTPI2PD,
   IX86_BUILTIN_CVTSI2SD,
+  IX86_BUILTIN_CVTSI642SD,
 
   IX86_BUILTIN_CVTSD2SI,
+  IX86_BUILTIN_CVTSD2SI64,
   IX86_BUILTIN_CVTSD2SS,
   IX86_BUILTIN_CVTSS2SD,
   IX86_BUILTIN_CVTTSD2SI,
+  IX86_BUILTIN_CVTTSD2SI64,
 
   IX86_BUILTIN_CVTPS2DQ,
   IX86_BUILTIN_CVTPS2PD,
@@ -2445,6 +2496,22 @@ enum ix86_builtins
   IX86_BUILTIN_CLFLUSH,
   IX86_BUILTIN_MFENCE,
   IX86_BUILTIN_LFENCE,
+
+  /* Prescott New Instructions.  */
+  IX86_BUILTIN_ADDSUBPS,
+  IX86_BUILTIN_HADDPS,
+  IX86_BUILTIN_HSUBPS,
+  IX86_BUILTIN_MOVSHDUP,
+  IX86_BUILTIN_MOVSLDUP,
+  IX86_BUILTIN_ADDSUBPD,
+  IX86_BUILTIN_HADDPD,
+  IX86_BUILTIN_HSUBPD,
+  IX86_BUILTIN_LOADDDUP,
+  IX86_BUILTIN_MOVDDUP,
+  IX86_BUILTIN_LDDQU,
+
+  IX86_BUILTIN_MONITOR,
+  IX86_BUILTIN_MWAIT,
 
   IX86_BUILTIN_MAX
 };
@@ -3286,6 +3353,7 @@ do {						\
   {"register_and_not_any_fp_reg_operand", {REG}},			\
   {"fp_register_operand", {REG}},					\
   {"register_and_not_fp_reg_operand", {REG}},				\
+  {"vector_move_operand", {CONST_VECTOR, SUBREG, REG, MEM}},		\
 
 /* A list of predicates that do special things with modes, and so
    should not elicit warnings for VOIDmode match_operand.  */
