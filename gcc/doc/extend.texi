@@ -2124,9 +2124,10 @@ for consistency with the @code{printf} style format string argument
 @code{my_format}.
 
 The parameter @var{archetype} determines how the format string is
-interpreted, and should be @code{printf}, @code{scanf}, @code{strftime}
-or @code{strfmon}.  (You can also use @code{__printf__},
-@code{__scanf__}, @code{__strftime__} or @code{__strfmon__}.)  The
+interpreted, and should be @code{printf}, @code{scanf}, @code{strftime},
+@code{strfmon} or @code{cmn_err}.  (You can also use @code{__printf__},
+@code{__scanf__}, @code{__strftime__}, @code{__strfmon__} or
+@code{__cmn_err__}.)  The 
 parameter @var{string-index} specifies which argument is the format
 string argument (starting from 1), while @var{first-to-check} is the
 number of the first argument to check against the format string.  For
@@ -7209,6 +7210,7 @@ for further explanation.
 * ARM Pragmas::
 * RS/6000 and PowerPC Pragmas::
 * Darwin Pragmas::
+* Solaris Pragmas::
 * Symbol-Renaming Pragmas::
 @end menu
 
@@ -7291,6 +7293,38 @@ This pragma declares variables to be possibly unused.  GCC will not
 produce warnings for the listed variables.  The effect is similar to
 that of the @code{unused} attribute, except that this pragma may appear
 anywhere within the variables' scopes.
+@end table
+
+@node Solaris Pragmas
+@subsection Solaris Pragmas
+
+The Solaris target supports @code{#pragma redefine_extname}
+(@pxref{Symbol-Renaming Pragmas}).  The x86/AMD64 Solaris 10 target also
+supports additional @code{#pragma} directives for compatibility with system
+headers.
+
+@table @code
+@item align @var{alignment} (@var{variable} [, @var{variable}]...)
+@cindex pragma, align
+
+Increase the minimum alignment of each @var{variable} to @var{alignment}.
+This is the same as GCC's @code{aligned} attribute @pxref{Variable
+Attributes}).
+
+@item fini (@var{function} [, @var{function}]...)
+@cindex pragma, fini
+
+This pragma causes each listed @var{function} to be called after
+main, or during shared module unloading, by adding a call to the
+@code{.fini} section.
+
+@item init (@var{function} [, @var{function}]...)
+@cindex pragma, init
+
+This pragma causes each listed @var{function} to be called during
+initialization (before @code{main}) or during shared module loading, by
+adding a call to the @code{.init} section.
+
 @end table
 
 @node Symbol-Renaming Pragmas

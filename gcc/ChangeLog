@@ -1,3 +1,51 @@
+2004-07-14  Daniel Jacobowitz  <dan@debian.org>
+
+	* c-format.c (enum format_type): Add cmn_err_format_type.
+	(format_char_info): Document "b" flag.
+	(cmn_err_length_specs, cmn_err_flag_specs, cmn_err_flag_pairs)
+	(cmn_err_char_table): New.
+	(format_types_orig): Add cmn_err item.
+	(check_format_info_main): Handle 'b' in flags2.
+	* doc/extend.texi: Document cmn_err format type.
+
+2004-07-14  Daniel Jacobowitz  <dan@debian.org>
+
+	* config/i386/i386.c (override_options): Move
+	SUBTARGET_OVERRIDE_OPTIONS before defaulting flag_omit_frame_pointer.
+	* config/i386/sol2-10.h (SUBTARGET_OVERRIDE_OPTIONS): Define.
+	(TARGET_SUBTARGET_DEFAULT): Define.
+
+2004-07-13  Daniel Jacobowitz  <dan@debian.org>
+
+	* config/i386/sol2-10.h: Call the target "Solaris 10".
+
+2004-07-13  Daniel Jacobowitz  <dan@debian.org>
+
+	* config.gcc (i[34567]86-*-solaris2.1[0-9]): Set tm_p_file,
+	tmake_file, c_target_objs, and cxx_target_objs.
+	* config/i386/i386.c (TARGET_INSERT_ATTRIBUTES): Define to
+	SUBTARGET_INSERT_ATTRIBUTES.
+	(ix86_attribute_table): Include "init" and "fini" if
+	TARGET_INIT_FINI_ATTRIBUTES.
+	* config/i386/sol2-10.h (SUBTARGET_INSERT_ATTRIBUTES)
+	(REGISTER_TARGET_PRAGMAS, ASM_DECLARE_FUNCTION_SIZE)
+	(TARGET_INIT_FINI_ATTRIBUTES): Define.
+	* config/i386/sol2-10-protos.h: New file.
+	* config/i386/sol2-c.c: New file.
+	* config/i386/t-sol2-10: New file.
+	* doc/extend.texi (Solaris Pragmas): New section.
+
+2004-07-12  Daniel Jacobowitz  <dan@debian.org>
+
+	* config.gcc (i[34567]86-*-solaris2*): Handle Solaris 2.10.
+	* config/i386/sol2-10.h: New file.
+	* config/i386/sol2.h (ASM_QUAD): Don't undefine for biarch targets.
+
+2004-07-10  Daniel Jacobowitz  <dan@debian.org>
+
+	* config/i386/i386.c (override_options): Pick a 64-bit CPU
+	for the default tuning if TARGET_64BIT.
+
 2004-07-06 Jan Beulich <jbeulich@novell.com>
 
 	* varasm.c (asm_output_bss): Don't declare unless BSS_SECTION_ASM_OP.
