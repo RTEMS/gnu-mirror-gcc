@@ -119,6 +119,7 @@ struct file_name_map_list;
   OP(CPP_SCOPE,		"::")			\
   OP(CPP_DEREF_STAR,	"->*")			\
   OP(CPP_DOT_STAR,	".*")			\
+  OP(CPP_ATSIGN,	"@")  /* used in Objective C */ \
 \
   TK(CPP_NAME,		SPELL_IDENT)	/* word */			\
   TK(CPP_INT,		SPELL_STRING)	/* 23 */			\
@@ -131,7 +132,6 @@ struct file_name_map_list;
 \
   TK(CPP_STRING,	SPELL_STRING)	/* "string" */			\
   TK(CPP_WSTRING,	SPELL_STRING)	/* L"string" */			\
-  TK(CPP_OSTRING,	SPELL_STRING)	/* @"string" - Objective C */	\
   TK(CPP_HEADER_NAME,	SPELL_STRING)	/* <stdio.h> in #include */	\
 \
   TK(CPP_COMMENT,	SPELL_STRING)	/* Only if output comments.  */ \
@@ -444,6 +444,7 @@ enum cpp_buffer_type {BUF_FAKE, BUF_FILE, BUF_BUILTIN,
 #define NODE_POISONED	(1 << 1)	/* Poisoned identifier.  */
 #define NODE_BUILTIN	(1 << 2)	/* Builtin macro.  */
 #define NODE_DIAGNOSTIC (1 << 3)	/* Possible diagnostic when lexed.  */
+#define NODE_WARN	(1 << 4)	/* Warn if redefined or undefined.  */
 
 /* Different flavors of hash node.  */
 enum node_type
@@ -604,6 +605,7 @@ extern void cpp_forall_identifiers	PARAMS ((cpp_reader *,
 extern void cpp_scan_buffer_nooutput	PARAMS ((cpp_reader *, int));
 extern void cpp_start_lookahead		PARAMS ((cpp_reader *));
 extern void cpp_stop_lookahead		PARAMS ((cpp_reader *, int));
+extern int  cpp_sys_macro_p		PARAMS ((cpp_reader *));
 
 /* In cppfiles.c */
 extern int cpp_included	PARAMS ((cpp_reader *, const char *));

@@ -48,14 +48,18 @@ struct JCF;
       IS_A_CLASSFILE_NAME (in IDENTIFIER_NODE)
       COMPOUND_ASSIGN_P (in EXPR (binop_*))
       LOCAL_CLASS_P (in RECORD_TYPE)
+      BLOCK_IS_IMPLICIT (in BLOCK)
+      JAVA_FILE_P (in TREE_LIST in current_file_list)
    2: RETURN_MAP_ADJUSTED (in TREE_VEC).
       QUALIFIED_P (in IDENTIFIER_NODE)
       PRIMARY_P (in EXPR_WITH_FILE_LOCATION)
       MODIFY_EXPR_FROM_INITIALIZATION_P (in MODIFY_EXPR)
       CLASS_METHOD_CHECKED_P (in RECORD_TYPE) 
+      CLASS_FILE_P (in TREE_LIST in current_file_list)
    3: IS_AN_IMPORT_ON_DEMAND_P (in IDENTIFIER_NODE)
       RESOLVE_PACKAGE_NAME_P (in EXPR_WITH_FILE_LOCATION)
       SWITCH_HAS_DEFAULT (in SWITCH_EXPR)
+      ZIP_FILE_P (in TREE_LIST in current_file_list)
    4: IS_A_COMMAND_LINE_FILENAME_P (in IDENTIFIER_NODE)
       RESOLVE_TYPE_NAME_P (in EXPR_WITH_FILE_LOCATION)
       CALL_USING_SUPER (in CALL_EXPR)
@@ -137,6 +141,8 @@ extern int compiling_from_source;
 extern int flag_assume_compiled;
 
 extern int flag_emit_class_files;
+
+extern int flag_filelist_file;
 
 /* When non zero, assume all native functions are implemented with
    JNI, not CNI.  */
@@ -270,6 +276,7 @@ enum java_tree_index
   JTI_SUPER_IDENTIFIER_NODE,  
   JTI_CONTINUE_IDENTIFIER_NODE,  
   JTI_ACCESS0_IDENTIFIER_NODE, 
+  JTI_CLASSDOLLAR_IDENTIFIER_NODE,
   JTI_ONE_ELT_ARRAY_DOMAIN_TYPE,
 
   JTI_RETURN_ADDRESS_TYPE_NODE,
@@ -331,8 +338,6 @@ enum java_tree_index
   JTI_SOFT_LREM_NODE,
 
   JTI_ACCESS_FLAGS_TYPE_NODE,
-
-  JTI_CLASS_DTABLE_DECL,
 
   JTI_NATIVECODE_PTR_ARRAY_TYPE_NODE,
 
@@ -460,6 +465,8 @@ extern tree java_global_trees[JTI_MAX];
   java_global_trees[JTI_CONTINUE_IDENTIFIER_NODE]  /* "continue" */
 #define access0_identifier_node \
   java_global_trees[JTI_ACCESS0_IDENTIFIER_NODE] /* "access$0" */
+#define classdollar_identifier_node \
+  java_global_trees[JTI_CLASSDOLLAR_IDENTIFIER_NODE] /* "class$" */
 #define one_elt_array_domain_type \
   java_global_trees[JTI_ONE_ELT_ARRAY_DOMAIN_TYPE]
 /* The type of the return address of a subroutine. */
@@ -578,9 +585,6 @@ extern tree throw_node[];
 
 #define access_flags_type_node \
   java_global_trees[JTI_ACCESS_FLAGS_TYPE_NODE]
-
-#define class_dtable_decl \
-  java_global_trees[JTI_CLASS_DTABLE_DECL]
 
 #define nativecode_ptr_array_type_node \
   java_global_trees[JTI_NATIVECODE_PTR_ARRAY_TYPE_NODE]
@@ -946,7 +950,6 @@ extern tree get_constant PARAMS ((struct JCF*, int));
 extern tree get_name_constant PARAMS ((struct JCF*, int));
 extern tree get_class_constant PARAMS ((struct JCF*, int));
 extern tree parse_signature PARAMS ((struct JCF *jcf, int sig_index));
-extern void jcf_parse PARAMS ((struct JCF*));
 extern tree add_field PARAMS ((tree, tree, tree, int));
 extern tree add_method PARAMS ((tree, int, tree, tree));
 extern tree add_method_1 PARAMS ((tree, int, tree, tree));
@@ -1104,10 +1107,11 @@ extern void safe_layout_class PARAMS ((tree));
 
 extern tree get_boehm_type_descriptor PARAMS ((tree));
 extern unsigned long java_hash_hash_tree_node PARAMS ((hash_table_key));
-extern boolean java_hash_compare_tree_node PARAMS ((hash_table_key, 
+extern bool java_hash_compare_tree_node PARAMS ((hash_table_key, 
 						    hash_table_key));
 extern void java_check_methods PARAMS ((tree));
 extern void init_jcf_parse PARAMS((void));
+extern void init_src_parse PARAMS((void));
 
 extern int cxx_keyword_p PARAMS ((const char *, int));
 extern tree java_mangle_decl PARAMS ((struct obstack *, tree));
@@ -1136,6 +1140,10 @@ struct rtx_def * java_lang_expand_expr PARAMS ((tree, rtx, enum machine_mode,
 #define METHOD_ABSTRACT(DECL) DECL_LANG_FLAG_5 (DECL)
 #define METHOD_TRANSIENT(DECL) DECL_LANG_FLAG_6 (DECL)
 
+#define JAVA_FILE_P(NODE) TREE_LANG_FLAG_2 (NODE)
+#define CLASS_FILE_P(NODE) TREE_LANG_FLAG_3 (NODE)
+#define ZIP_FILE_P(NODE) TREE_LANG_FLAG_4 (NODE)
+
 /* Other predicates on method decls  */
 
 #define DECL_CONSTRUCTOR_P(DECL) DECL_LANG_FLAG_7(DECL)
@@ -1154,6 +1162,7 @@ struct rtx_def * java_lang_expand_expr PARAMS ((tree, rtx, enum machine_mode,
 #define ID_FINIT_P(ID)  ((ID) == finit_identifier_node \
 			 || (ID) == finit_leg_identifier_node)
 #define ID_CLINIT_P(ID) ((ID) == clinit_identifier_node)
+#define ID_CLASSDOLLAR_P(ID) ((ID) == classdollar_identifier_node)
 
 /* Access flags etc for a variable/field (a FIELD_DECL): */
 
@@ -1288,8 +1297,8 @@ extern tree *type_map;
 /* True of a RECORD_TYPE of a class/interface type (not array type) */
 #define CLASS_P(TYPE) TYPE_LANG_FLAG_4 (TYPE)
 
-/* True if class TYPE was defined in a Java source file compiled. */
-#define CLASS_FROM_CURRENTLY_COMPILED_SOURCE_P(TYPE) \
+/* True if class TYPE was requested (on command line) to be compiled.*/
+#define CLASS_FROM_CURRENTLY_COMPILED_P(TYPE) \
   TYPE_LANG_FLAG_5 (TYPE)
 
 /* True if class TYPE is currently being laid out. Helps in detection
@@ -1499,6 +1508,8 @@ extern tree *type_map;
 
 #define BLOCK_EXPR_DECLS(NODE)  BLOCK_VARS(NODE)
 #define BLOCK_EXPR_BODY(NODE)   BLOCK_SUBBLOCKS(NODE)
+/* True for an implicit block surrounding declaration not at start of {...}. */
+#define BLOCK_IS_IMPLICIT(NODE) TREE_LANG_FLAG_1 (NODE)
 
 #define BUILD_MONITOR_ENTER(WHERE, ARG)				\
   {								\

@@ -1,6 +1,6 @@
 // Iostreams base classes -*- C++ -*-
 
-// Copyright (C) 1997-1999 Free Software Foundation, Inc.
+// Copyright (C) 1997, 1998, 1999, 2001 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -30,7 +30,10 @@
 #ifndef _CPP_BITS_BASICIOS_H
 #define _CPP_BITS_BASICIOS_H 1
 
+#pragma GCC system_header
+
 #include <bits/sbuf_iter.h>
+#include <bits/locale_facets.h>
 
 namespace std {
 
@@ -105,7 +108,7 @@ namespace std {
 	else
 	  _M_streambuf_state = __state | badbit;
 	if ((this->rdstate() & this->exceptions()))
-	  throw failure("basic_ios::clear(iostate) caused exception");
+	  __throw_ios_failure("basic_ios::clear(iostate) caused exception");
       }
 
       inline void 
@@ -205,10 +208,13 @@ namespace std {
 
 #ifdef _GLIBCPP_NO_TEMPLATE_EXPORT
 # define export
-//#include <bits/basic_ios.tcc>
+#include <bits/basic_ios.tcc>
 #endif
 
 #endif /* _CPP_BITS_BASICIOS_H */
+
+
+
 
 
 

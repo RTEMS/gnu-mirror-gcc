@@ -2766,7 +2766,7 @@ emit_move_insn_1 (x, y)
   enum mode_class class = GET_MODE_CLASS (mode);
   unsigned int i;
 
-  if (mode >= MAX_MACHINE_MODE)
+  if ((unsigned int) mode >= (unsigned int) MAX_MACHINE_MODE)
     abort ();
 
   if (mov_optab->handlers[(int) mode].insn_code != CODE_FOR_nothing)
@@ -4721,10 +4721,10 @@ store_constructor (exp, target, align, cleared, size)
 
 		  index = build_decl (VAR_DECL, NULL_TREE, domain);
 
-		  DECL_RTL (index) = index_r
+		  index_r
 		    = gen_reg_rtx (promote_mode (domain, DECL_MODE (index),
 						 &unsignedp, 0));
-
+		  SET_DECL_RTL (index, index_r);
 		  if (TREE_CODE (value) == SAVE_EXPR
 		      && SAVE_EXPR_RTL (value) == 0)
 		    {
@@ -5649,7 +5649,7 @@ safe_from_p (x, exp, top_p)
   switch (TREE_CODE_CLASS (TREE_CODE (exp)))
     {
     case 'd':
-      exp_rtl = DECL_RTL (exp);
+      exp_rtl = DECL_RTL_SET_P (exp) ? DECL_RTL (exp) : NULL_RTX;
       break;
 
     case 'c':
@@ -5766,7 +5766,8 @@ safe_from_p (x, exp, top_p)
 
       /* If this is a language-specific tree code, it may require
 	 special handling.  */
-      if (TREE_CODE (exp) >= LAST_AND_UNUSED_TREE_CODE
+      if ((unsigned int) TREE_CODE (exp)
+	  >= (unsigned int) LAST_AND_UNUSED_TREE_CODE
 	  && lang_safe_from_p
 	  && !(*lang_safe_from_p) (x, exp))
 	return 0;
@@ -6529,7 +6530,7 @@ expand_expr (exp, target, tmode, modifier)
 	/* If VARS have not yet been expanded, expand them now.  */
 	while (vars)
 	  {
-	    if (DECL_RTL (vars) == 0)
+	    if (!DECL_RTL_SET_P (vars))
 	      {
 		vars_need_expansion = 1;
 		expand_decl (vars);
@@ -7956,21 +7957,21 @@ expand_expr (exp, target, tmode, modifier)
 	  && (TREE_TYPE (TREE_OPERAND (TREE_OPERAND (exp, 1), 0))
 	      == TREE_TYPE (TREE_OPERAND (TREE_OPERAND (exp, 2), 0))))
 	{
-	  tree true = TREE_OPERAND (TREE_OPERAND (exp, 1), 0);
-	  tree false = TREE_OPERAND (TREE_OPERAND (exp, 2), 0);
+	  tree iftrue = TREE_OPERAND (TREE_OPERAND (exp, 1), 0);
+	  tree iffalse = TREE_OPERAND (TREE_OPERAND (exp, 2), 0);
 
-	  if ((TREE_CODE_CLASS (TREE_CODE (true)) == '2'
-	       && operand_equal_p (false, TREE_OPERAND (true, 0), 0))
-	      || (TREE_CODE_CLASS (TREE_CODE (false)) == '2'
-		  && operand_equal_p (true, TREE_OPERAND (false, 0), 0))
-	      || (TREE_CODE_CLASS (TREE_CODE (true)) == '1'
-		  && operand_equal_p (false, TREE_OPERAND (true, 0), 0))
-	      || (TREE_CODE_CLASS (TREE_CODE (false)) == '1'
-		  && operand_equal_p (true, TREE_OPERAND (false, 0), 0)))
+	  if ((TREE_CODE_CLASS (TREE_CODE (iftrue)) == '2'
+	       && operand_equal_p (iffalse, TREE_OPERAND (iftrue, 0), 0))
+	      || (TREE_CODE_CLASS (TREE_CODE (iffalse)) == '2'
+		  && operand_equal_p (iftrue, TREE_OPERAND (iffalse, 0), 0))
+	      || (TREE_CODE_CLASS (TREE_CODE (iftrue)) == '1'
+		  && operand_equal_p (iffalse, TREE_OPERAND (iftrue, 0), 0))
+	      || (TREE_CODE_CLASS (TREE_CODE (iffalse)) == '1'
+		  && operand_equal_p (iftrue, TREE_OPERAND (iffalse, 0), 0)))
 	    return expand_expr (build1 (NOP_EXPR, type,
-					build (COND_EXPR, TREE_TYPE (true),
+					build (COND_EXPR, TREE_TYPE (iftrue),
 					       TREE_OPERAND (exp, 0),
-					       true, false)),
+					       iftrue, iffalse)),
 				target, tmode, modifier);
 	}
 
@@ -8268,7 +8269,7 @@ expand_expr (exp, target, tmode, modifier)
 
 	if (target == 0)
 	  {
-	    if (DECL_RTL (slot) != 0)
+	    if (DECL_RTL_SET_P (slot))
 	      {
 		target = DECL_RTL (slot);
 		/* If we have already expanded the slot, so don't do
@@ -8281,7 +8282,7 @@ expand_expr (exp, target, tmode, modifier)
 		target = assign_temp (type, 2, 0, 1);
 		/* All temp slots at this level must not conflict.  */
 		preserve_temp_slots (target);
-		DECL_RTL (slot) = target;
+		SET_DECL_RTL (slot, target);
 		if (TREE_ADDRESSABLE (slot))
 		  put_var_into_stack (slot);
 
@@ -8307,7 +8308,7 @@ expand_expr (exp, target, tmode, modifier)
 	    /* If we have already assigned it space, use that space,
 	       not target that we were passed in, as our target
 	       parameter is only a hint.  */
-	    if (DECL_RTL (slot) != 0)
+	    if (DECL_RTL_SET_P (slot))
 	      {
 		target = DECL_RTL (slot);
 		/* If we have already expanded the slot, so don't do
@@ -8317,7 +8318,7 @@ expand_expr (exp, target, tmode, modifier)
 	      }
 	    else
 	      {
-		DECL_RTL (slot) = target;
+		SET_DECL_RTL (slot, target);
 		/* If we must have an addressable slot, then make sure that
 		   the RTL that we just stored in slot is OK.  */
 		if (TREE_ADDRESSABLE (slot))
@@ -8371,12 +8372,6 @@ expand_expr (exp, target, tmode, modifier)
 	tree lhs_type = TREE_TYPE (lhs);
 
 	temp = 0;
-
-	if (TREE_CODE (lhs) != VAR_DECL
-	    && TREE_CODE (lhs) != RESULT_DECL
-	    && TREE_CODE (lhs) != PARM_DECL
-	    && ! (TREE_CODE (lhs) == INDIRECT_REF
-		  && TYPE_READONLY (TREE_TYPE (TREE_OPERAND (lhs, 0)))))
 
 	/* Check for |= or &= of a bitfield of size one into another bitfield
 	   of size 1.  In this case, (unless we need the result of the

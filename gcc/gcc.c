@@ -35,6 +35,9 @@ compilation is specified by a string called a "spec".  */
 #include "config.h"
 #include "system.h"
 #include <signal.h>
+#if ! defined( SIGCHLD ) && defined( SIGCLD )
+#  define SIGCHLD SIGCLD
+#endif
 #include "obstack.h"
 #include "intl.h"
 #include "prefix.h"
@@ -233,7 +236,6 @@ static void add_prefix		PARAMS ((struct path_prefix *, const char *,
 					 const char *, int, int, int *));
 static void translate_options	PARAMS ((int *, const char *const **));
 static char *skip_whitespace	PARAMS ((char *));
-static void record_temp_file	PARAMS ((const char *, int, int));
 static void delete_if_ordinary	PARAMS ((const char *));
 static void delete_temp_files	PARAMS ((void));
 static void delete_failure_queue PARAMS ((void));
@@ -251,12 +253,9 @@ static int used_arg		PARAMS ((const char *, int));
 static int default_arg		PARAMS ((const char *, int));
 static void set_multilib_dir	PARAMS ((void));
 static void print_multilib_info	PARAMS ((void));
-static void pfatal_with_name	PARAMS ((const char *)) ATTRIBUTE_NORETURN;
 static void perror_with_name	PARAMS ((const char *));
 static void pfatal_pexecute	PARAMS ((const char *, const char *))
   ATTRIBUTE_NORETURN;
-static void error		PARAMS ((const char *, ...))
-  ATTRIBUTE_PRINTF_1;
 static void notice		PARAMS ((const char *, ...))
   ATTRIBUTE_PRINTF_1;
 static void display_help 	PARAMS ((void));
@@ -360,6 +359,7 @@ or with constant text in a single argument.
 	and substitute the full name found.
  %eSTR  Print STR as an error message.  STR is terminated by a newline.
         Use this when inconsistent options are detected.
+ %nSTR  Print STR as an notice.  STR is terminated by a newline.
  %x{OPTION}	Accumulate an option for %X.
  %X	Output the accumulated linker options specified by compilations.
  %Y	Output the accumulated assembler options specified by compilations.
@@ -1274,7 +1274,7 @@ init_gcc_specs (obstack, shared_name, static_name)
   /* If we see -shared-libgcc, then use the shared version.  */
   sprintf (buffer, "%%{shared-libgcc:%s}", shared_name);
   obstack_grow (obstack, buffer, strlen (buffer));
-  /* If we see -static-libgcc, then use the shared version.  */
+  /* If we see -static-libgcc, then use the static version.  */
   sprintf (buffer, "%%{static-libgcc:%s}", static_name);
   obstack_grow (obstack, buffer, strlen (buffer));
   /* Otherwise, if we see -shared, then use the shared version.  */
@@ -1875,7 +1875,7 @@ static struct temp_file *failure_delete_queue;
    FAIL_DELETE nonzero means delete it if a compilation step fails;
    otherwise delete it in any case.  */
 
-static void
+void
 record_temp_file (filename, always_delete, fail_delete)
      const char *filename;
      int always_delete;
@@ -2848,7 +2848,7 @@ convert_filename (name, do_exe)
     }
 #endif
 
-#ifdef HAVE_EXECUTABLE_SUFFIX
+#if defined(HAVE_EXECUTABLE_SUFFIX) && !defined(NO_AUTO_EXE_SUFFIX)
   /* If there is no filetype, make it the executable suffix (which includes
      the ".").  But don't get confused if we have just "-o".  */
   if (! do_exe || EXECUTABLE_SUFFIX[0] == 0 || (len == 2 && name[0] == '-'))
@@ -4196,6 +4196,21 @@ do_spec_1 (spec, inswitch, soft_matched_part)
 	      return -1;
 	    }
 	    break;
+	  case 'n':
+	    /* %nfoo means report an notice with `foo' on stderr.  */
+	    {
+	      const char *q = p;
+	      char *buf;
+	      while (*p != 0 && *p != '\n')
+		p++;
+	      buf = (char *) alloca (p - q + 1);
+	      strncpy (buf, q, p - q);
+	      buf[p - q] = 0;
+	      notice ("%s\n", buf);
+	      if (*p)
+		p++;
+	    }
+	    break;
 
 	  case 'j':
 	    {
@@ -4493,7 +4508,7 @@ do_spec_1 (spec, inswitch, soft_matched_part)
 
 		len = strlen (multilib_dir);
 		obstack_blank (&obstack, len + 1);
-		p = obstack_next_free (&obstack) - len;
+		p = obstack_next_free (&obstack) - (len + 1);
 
 		*p++ = '_';
 		for (q = multilib_dir; *q ; ++q, ++p)
@@ -5462,6 +5477,11 @@ main (argc, argv)
   if (signal (SIGPIPE, SIG_IGN) != SIG_IGN)
     signal (SIGPIPE, fatal_error);
 #endif
+#ifdef SIGCHLD
+  /* We *MUST* set SIGCHLD to SIG_DFL so that the wait4() call will
+     receive the signal.  A different setting is inheritable */
+  signal (SIGCHLD, SIG_DFL);
+#endif
 
   argbuf_length = 10;
   argbuf = (const char **) xmalloc (argbuf_length * sizeof (const char *));
@@ -6006,7 +6026,7 @@ save_string (s, len)
   return result;
 }
 
-static void
+void
 pfatal_with_name (name)
      const char *name;
 {
@@ -6074,7 +6094,7 @@ fatal VPARAMS ((const char *msgid, ...))
   exit (1);
 }
 
-static void
+void
 error VPARAMS ((const char *msgid, ...))
 {
 #ifndef ANSI_PROTOTYPES

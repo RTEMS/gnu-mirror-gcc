@@ -65,7 +65,7 @@ lvalue_p_1 (ref, treat_class_rvalues_as_lvalues)
   if (TREE_CODE (TREE_TYPE (ref)) == REFERENCE_TYPE)
     return clk_ordinary;
 
-  if (ref == current_class_ptr && flag_this_is_variable <= 0)
+  if (ref == current_class_ptr)
     return clk_none;
 
   switch (TREE_CODE (ref))
@@ -516,7 +516,7 @@ cp_build_qualified_type_real (type, type_quals, complain)
   if (type == error_mark_node)
     return type;
 
-  if (type_quals == TYPE_QUALS (type))
+  if (type_quals == CP_TYPE_QUALS (type))
     return type;
 
   /* A restrict-qualified pointer type must be a pointer (or reference)
@@ -1955,10 +1955,10 @@ cp_tree_equal (t1, t2)
 	 as being equivalent to anything.  */
       if ((TREE_CODE (TREE_OPERAND (t1, 0)) == VAR_DECL
 	   && DECL_NAME (TREE_OPERAND (t1, 0)) == NULL_TREE
-	   && DECL_RTL (TREE_OPERAND (t1, 0)) == 0)
+	   && !DECL_RTL_SET_P (TREE_OPERAND (t1, 0)))
 	  || (TREE_CODE (TREE_OPERAND (t2, 0)) == VAR_DECL
 	      && DECL_NAME (TREE_OPERAND (t2, 0)) == NULL_TREE
-	      && DECL_RTL (TREE_OPERAND (t2, 0)) == 0))
+	      && !DECL_RTL_SET_P (TREE_OPERAND (t2, 0))))
 	cmp = 1;
       else
 	cmp = cp_tree_equal (TREE_OPERAND (t1, 0), TREE_OPERAND (t2, 0));

@@ -1296,17 +1296,12 @@ add_function_candidate (candidates, fn, ctype, arglist, flags)
   tree parmnode, argnode;
   int viable = 1;
 
-  /* The `this' and `in_chrg' arguments to constructors are not considered
-     in overload resolution.  */
+  /* The `this', `in_chrg' and VTT arguments to constructors are not
+     considered in overload resolution.  */
   if (DECL_CONSTRUCTOR_P (fn))
     {
-      parmlist = TREE_CHAIN (parmlist);
-      arglist = TREE_CHAIN (arglist);
-      if (DECL_HAS_IN_CHARGE_PARM_P (fn))
-	{
-	  parmlist = TREE_CHAIN (parmlist);
-	  arglist = TREE_CHAIN (arglist);
-	}
+      parmlist = skip_artificial_parms_for (fn, parmlist);
+      arglist = skip_artificial_parms_for (fn, arglist);
     }
 
   len = list_length (arglist);
@@ -2373,10 +2368,11 @@ build_user_type_conversion_1 (totype, expr, flags)
       t = build_int_2 (0, 0);
       TREE_TYPE (t) = build_pointer_type (totype);
       args = build_tree_list (NULL_TREE, expr);
-      if (DECL_HAS_IN_CHARGE_PARM_P (OVL_CURRENT (ctors)))
-	args = tree_cons (NULL_TREE, 
-			  in_charge_arg_for_name (complete_ctor_identifier), 
-			  args);
+      if (DECL_HAS_IN_CHARGE_PARM_P (OVL_CURRENT (ctors))
+	  || DECL_HAS_VTT_PARM_P (OVL_CURRENT (ctors)))
+	/* We should never try to call the abstract or base constructor
+	   from here.  */
+	abort ();
       args = tree_cons (NULL_TREE, t, args);
     }
   for (; ctors; ctors = OVL_NEXT (ctors))
@@ -3547,6 +3543,7 @@ build_op_delete_call (code, addr, size, flags, placement)
      int flags;
 {
   tree fn, fns, fnname, fntype, argtypes, args, type;
+  int pass;
 
   if (addr == error_mark_node)
     return error_mark_node;
@@ -3595,48 +3592,45 @@ build_op_delete_call (code, addr, size, flags, placement)
       args = NULL_TREE;
     }
 
-  argtypes = tree_cons (NULL_TREE, ptr_type_node, argtypes);
-  fntype = build_function_type (void_type_node, argtypes);
-
   /* Strip const and volatile from addr.  */
   addr = cp_convert (ptr_type_node, addr);
 
-  fn = instantiate_type (fntype, fns, itf_no_attributes);
-
-  if (fn != error_mark_node)
+  /* We make two tries at finding a matching `operator delete'.  On
+     the first pass, we look for an one-operator (or placement)
+     operator delete.  If we're not doing placement delete, then on
+     the second pass we look for a two-argument delete.  */
+  for (pass = 0; pass < (placement ? 1 : 2); ++pass) 
     {
-      if (TREE_CODE (fns) == TREE_LIST)
-	/* Member functions.  */
-	enforce_access (type, fn);
-      return build_function_call (fn, tree_cons (NULL_TREE, addr, args));
+      if (pass == 0)
+	argtypes = tree_cons (NULL_TREE, ptr_type_node, argtypes);
+      else 
+	/* Normal delete; now try to find a match including the size
+	   argument.  */
+	argtypes = tree_cons (NULL_TREE, ptr_type_node,
+			      tree_cons (NULL_TREE, sizetype, 
+					 void_list_node));
+
+      fntype = build_function_type (void_type_node, argtypes);
+      fn = instantiate_type (fntype, fns, itf_no_attributes);
+
+      if (fn != error_mark_node)
+	{
+	  /* Member functions.  */
+	  if (BASELINK_P (fns))
+	    enforce_access (type, fn);
+
+	  if (pass == 0)
+	    args = tree_cons (NULL_TREE, addr, args);
+	  else
+	    args = tree_cons (NULL_TREE, addr, 
+			      build_tree_list (NULL_TREE, size));
+	  return build_function_call (fn, args);
+	}
     }
 
   /* If we are doing placement delete we do nothing if we don't find a
      matching op delete.  */
   if (placement)
-    return NULL_TREE;
-
-  /* Normal delete; now try to find a match including the size argument.  */
-  argtypes = tree_cons (NULL_TREE, ptr_type_node,
-			tree_cons (NULL_TREE, sizetype, void_list_node));
-  fntype = build_function_type (void_type_node, argtypes);
-
-  fn = instantiate_type (fntype, fns, itf_no_attributes);
-
-  if (fn != error_mark_node)
-    {
-      if (BASELINK_P (fns))
-	/* Member functions.  */
-	enforce_access (type, fn);
-      return build_function_call
-	(fn, tree_cons (NULL_TREE, addr,
-			build_tree_list (NULL_TREE, size)));
-    }
-
-  /* finish_function passes LOOKUP_SPECULATIVELY if we're in a
-     destructor, in which case the error should be deferred
-     until someone actually tries to delete one of these.  */
-  if (flags & LOOKUP_SPECULATIVELY)
     return NULL_TREE;
 
   cp_error ("no suitable `operator delete' for `%T'", type);
@@ -3673,7 +3667,8 @@ enforce_access (basetype_path, decl)
 /* Perform the conversions in CONVS on the expression EXPR. 
    FN and ARGNUM are used for diagnostics.  ARGNUM is zero based, -1
    indicates the `this' argument of a method.  INNER is non-zero when
-   being called to continue a conversion chain. */
+   being called to continue a conversion chain. It is negative when a
+   reference binding will be applied, positive otherwise. */
 
 static tree
 convert_like_real (convs, expr, fn, argnum, inner)
@@ -3728,8 +3723,11 @@ convert_like_real (convs, expr, fn, argnum, inner)
 	    TREE_TYPE (t) = build_pointer_type (DECL_CONTEXT (convfn));
 
 	    args = build_tree_list (NULL_TREE, expr);
-	    if (DECL_HAS_IN_CHARGE_PARM_P (convfn))
-	      args = tree_cons (NULL_TREE, integer_one_node, args);
+	    if (DECL_HAS_IN_CHARGE_PARM_P (convfn)
+		|| DECL_HAS_VTT_PARM_P (convfn))
+	      /* We should never try to call the abstract or base constructor
+		 from here.  */
+	      abort ();
 	    args = tree_cons (NULL_TREE, t, args);
 	  }
 	else
@@ -3749,7 +3747,8 @@ convert_like_real (convs, expr, fn, argnum, inner)
 	   conversion, but is not considered during overload resolution.
 
 	   If the target is a class, that means call a ctor.  */
-	if (IS_AGGR_TYPE (totype))
+	if (IS_AGGR_TYPE (totype)
+	    && (inner >= 0 || !real_lvalue_p (expr)))
 	  {
 	    savew = warningcount, savee = errorcount;
 	    expr = build_new_method_call
@@ -3798,7 +3797,8 @@ convert_like_real (convs, expr, fn, argnum, inner)
       break;
     };
 
-  expr = convert_like_real (TREE_OPERAND (convs, 0), expr, fn, argnum, 1);
+  expr = convert_like_real (TREE_OPERAND (convs, 0), expr, fn, argnum,
+                            TREE_CODE (convs) == REF_BIND ? -1 : 1);
   if (expr == error_mark_node)
     return error_mark_node;
 
@@ -3852,7 +3852,7 @@ convert_like_real (convs, expr, fn, argnum, inner)
 	tree ref_type = totype;
 
 	/* If necessary, create a temporary.  */
-	if (NEED_TEMPORARY_P (convs))
+	if (NEED_TEMPORARY_P (convs) || !lvalue_p (expr))
 	  {
 	    tree type = TREE_TYPE (TREE_OPERAND (convs, 0));
 	    expr = build_target_expr_with_type (expr, type);
@@ -4058,6 +4058,9 @@ build_over_call (cand, args, flags)
       arg = TREE_CHAIN (arg);
       parm = TREE_CHAIN (parm);
       if (DECL_HAS_IN_CHARGE_PARM_P (fn))
+	/* We should never try to call the abstract constructor.  */
+	abort ();
+      if (DECL_HAS_VTT_PARM_P (fn))
 	{
 	  converted_args = tree_cons
 	    (NULL_TREE, TREE_VALUE (arg), converted_args);
@@ -4162,9 +4165,7 @@ build_over_call (cand, args, flags)
 	   && DECL_COPY_CONSTRUCTOR_P (fn))
     {
       tree targ;
-      arg = TREE_CHAIN (converted_args);
-      if (DECL_HAS_IN_CHARGE_PARM_P (fn))
-	arg = TREE_CHAIN (arg);
+      arg = skip_artificial_parms_for (fn, converted_args);
       arg = TREE_VALUE (arg);
 
       /* Pull out the real argument, disregarding const-correctness.  */
@@ -4428,17 +4429,17 @@ build_new_method_call (instance, name, args, basetype_path, flags)
 	     or destructor, then we fetch the VTT directly.
 	     Otherwise, we look it up using the VTT we were given.  */
 	  vtt = IDENTIFIER_GLOBAL_VALUE (get_vtt_name (current_class_type));
-	  vtt = build_unary_op (ADDR_EXPR, vtt, /*noconvert=*/1);
-	  vtt = build (COND_EXPR, TREE_TYPE (vtt), 
-		       DECL_USE_VTT_PARM (current_function_decl),
-		       DECL_VTT_PARM (current_function_decl),
+	  vtt = decay_conversion (vtt);
+	  vtt = build (COND_EXPR, TREE_TYPE (vtt),
+		       build (EQ_EXPR, boolean_type_node,
+			      current_in_charge_parm, integer_zero_node),
+		       current_vtt_parm,
 		       vtt);
 	  if (TREE_VIA_VIRTUAL (basebinfo))
 	    basebinfo = binfo_for_vbase (basetype, current_class_type);
 	  my_friendly_assert (BINFO_SUBVTT_INDEX (basebinfo), 20010110);
 	  sub_vtt = build (PLUS_EXPR, TREE_TYPE (vtt), vtt,
 			   BINFO_SUBVTT_INDEX (basebinfo));
-	  sub_vtt = build_indirect_ref (sub_vtt, NULL);
 
 	  args = tree_cons (NULL_TREE, sub_vtt, args);
 	}
@@ -5214,9 +5215,17 @@ joust (cand1, cand2, warn)
       winner = more_specialized
         (TI_TEMPLATE (cand1->template), TI_TEMPLATE (cand2->template),
          DEDUCE_ORDER,
-         /* Never do unification on the 'this' parameter.  */
+	 /* Tell the deduction code how many real function arguments
+ 	    we saw, not counting the implicit 'this' argument.  But,
+ 	    add_function_candidate() suppresses the "this" argument
+ 	    for constructors.
+  
+  	    [temp.func.order]: The presence of unused ellipsis and default
+  	    arguments has no effect on the partial ordering of function
+  	    templates.  */
          TREE_VEC_LENGTH (cand1->convs)
-         - DECL_NONSTATIC_MEMBER_FUNCTION_P (cand1->fn));
+ 	 - (DECL_NONSTATIC_MEMBER_FUNCTION_P (cand1->fn)
+ 	    -DECL_CONSTRUCTOR_P (cand1->fn)));
       if (winner)
         return winner;
     }
@@ -5296,6 +5305,7 @@ tweak:
   if (!pedantic)
     {
       int rank1 = IDENTITY_RANK, rank2 = IDENTITY_RANK;
+      struct z_candidate *w, *l;
 
       for (i = 0; i < len; ++i)
 	{
@@ -5304,11 +5314,22 @@ tweak:
 	  if (ICS_RANK (TREE_VEC_ELT (cand2->convs, i+off2)) > rank2)
 	    rank2 = ICS_RANK (TREE_VEC_ELT (cand2->convs, i+off2));
 	}
-
       if (rank1 < rank2)
-	return 1;
+	winner = 1, w = cand1, l = cand2;
       if (rank1 > rank2)
-	return -1;
+	winner = -1, w = cand2, l = cand1;
+      if (winner)
+        {
+	  if (warn)
+	    {
+	      cp_pedwarn ("choosing `%D' over `%D'", w->fn, l->fn);
+	      cp_pedwarn (
+"  because worst conversion for the former is better than worst conversion for the latter");
+	    }
+	  else
+	    add_warning (w, l);
+          return winner;
+        }
     }
 
   my_friendly_assert (!winner, 20010121);
