@@ -100,7 +100,6 @@ Boston, MA 02111-1307, USA.  */
    name, that also takes an argument, needs to be modified so the
    prefix is different, otherwise a '*' after the shorter option will
    match with the longer one.  */
-/* Ignore -dynamic for now */
 #define TARGET_OPTION_TRANSLATE_TABLE \
   { "-all_load", "-Zall_load" },  \
   { "-allowable_client", "-Zallowable_client" },  \
@@ -111,7 +110,7 @@ Boston, MA 02111-1307, USA.  */
   { "-weak_reference_mismatches", "-Zweak_reference_mismatches" },  \
   { "-dependency-file", "-MF" }, \
   { "-dylib_file", "-Zdylib_file" }, \
-  { "-dynamic", " " },  \
+  { "-dynamic", "-Zdynamic" },  \
   { "-dynamiclib", "-Zdynamiclib" },  \
   { "-exported_symbols_list", "-Zexported_symbols_list" },  \
   { "-seg_addr_table_filename", "-Zseg_addr_table_filename" }, \
@@ -174,7 +173,7 @@ Boston, MA 02111-1307, USA.  */
 /* Machine dependent cpp options.  */
 
 #undef	CPP_SPEC
-#define CPP_SPEC "%{static:-D__STATIC__}%{!static:-D__DYNAMIC__}"
+#define CPP_SPEC "%{static:%{!dynamic:-D__STATIC__}}%{!static:-D__DYNAMIC__}"
 
 /* This is mostly a clone of the standard LINK_COMMAND_SPEC, plus
    precomp, libtool, and fat build additions.  Also we
@@ -234,6 +233,7 @@ Boston, MA 02111-1307, USA.  */
    %{Zbind_at_load:-bind_at_load} \
    %{Zarch_errors_fatal:-arch_errors_fatal} \
    %{Zdylib_file*:-dylib_file %*} \
+   %{Zdynamic:-dynamic}\
    %{Zexported_symbols_list*:-exported_symbols_list %*} \
    %{Zflat_namespace:-flat_namespace} \
    %{headerpad_max_install_names*} \
@@ -380,6 +380,10 @@ do { text_section ();							\
         || DECL_INITIAL (DECL))                                         \
       (* targetm.encode_section_info) (DECL, false);			\
     ASM_OUTPUT_LABEL (FILE, xname);                                     \
+    /* Darwin doesn't support zero-size objects, so give them a 	\
+       byte.  */							\
+    if (tree_low_cst (DECL_SIZE_UNIT (DECL), 1) == 0)			\
+      assemble_zeros (1);						\
   } while (0)
 
 #define ASM_DECLARE_FUNCTION_NAME(FILE, NAME, DECL)                     \
@@ -399,6 +403,15 @@ do { text_section ();							\
     /* Avoid generating stubs for functions we've just defined by	\
        outputting any required stub name label now.  */			\
     machopic_output_possible_stub_label (FILE, xname);			\
+  } while (0)
+
+#define ASM_DECLARE_CONSTANT_NAME(FILE, NAME, EXP, SIZE)	\
+  do {								\
+    ASM_OUTPUT_LABEL (FILE, NAME);				\
+    /* Darwin doesn't support zero-size objects, so give them a	\
+       byte.  */						\
+    if ((SIZE) == 0)						\
+      assemble_zeros (1);					\
   } while (0)
 
 /* Wrap new method names in quotes so the assembler doesn't gag.
