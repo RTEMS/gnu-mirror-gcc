@@ -1,19 +1,24 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
-<html>
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE html
+          PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+          "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
 <head>
-  <title>
-  Notes on the locale implementation.
-  </title>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+   <meta name="AUTHOR" content="bkoz@redhat.com (Benjamin Kosnik)" />
+   <meta name="KEYWORDS" content="HOWTO, libstdc++, GCC, g++, libg++, STL" />
+   <meta name="DESCRIPTION" content="Notes on the locale implementation." />
+   <title>Notes on the locale implementation.</title>
+<link rel="StyleSheet" href="../lib3styles.css" />
 </head>
 <body>
   <h1>
   Notes on the locale implementation.
   </h1>
-<I>
+<em>
 prepared by Benjamin Kosnik (bkoz@redhat.com) on August 8, 2001
-</I>
+</em>
 
-<p>
 <h2>
 1. Abstract Describes the basic locale object, including nested
 classes id, facet, and the reference-counted implementation object,
@@ -22,14 +27,12 @@ class _Impl.
 <p>
 </p>
 
-<p>
 <h2>
 2. What the standard says
-See Chapter 22 of the standard.
 </h2>
+See Chapter 22 of the standard.
 
 
-<p>
 <h2>
 3. Problems with &quot;C&quot; locales : global locales, termination.
 </h2>
@@ -40,7 +43,7 @@ design ontop of POSIX and other relevant stanards, which include the
 Single Unix (nee X/Open.)
 
 Because POSIX falls down so completely, portibility is an issue.
-<p>
+</p>
 
 <h2>
 4. Design
@@ -65,16 +68,37 @@ public:
 The only other thing of interest in this class is the memory
 management of facets. Each constructor of a facet class takes a
 std::size_t __refs argument: if __refs == 0, the facet is deleted when
-no longer used. if __refs == 1, the facet is not destroyed, even when
-it is no longer reference.
+the locale containing it is destroyed. If __refs == 1, the facet is
+not destroyed, even when it is no longer referenced.
 
 
 class id
 Provides an index for looking up specific facets.
 
 class _Impl
+The internal representation of the std::locale object.
 
-<p>
+<h2>
+5.  Relationship to traditional "C" locales.
+</h2>
+
+From Josuttis, p. 697-698, which says, that "there is only *one*
+relation (of the C++ locale mechanism) to the C locale mechanism: the
+global C locale is modified if a named C++ locale object is set as the
+global locale" (emphasis Paolo), that is:
+
+    std::locale::global(std::locale(""));
+
+affects the C functions as if the following call was made:
+
+    std::setlocale(LC_ALL, "");
+
+On the other hand, there is *no* viceversa, that is, calling setlocale
+has *no* whatsoever on the C++ locale mechanism, in particular on the
+working of locale(""), which constructs the locale object from the
+environment of the running program, that is, in practice, the set of
+LC_ALL, LANG, etc. variable of the shell.
+
 <h2>
 5.  Examples
 </h2>
@@ -85,43 +109,39 @@ class _Impl
 
 More information can be found in the following testcases:
 <ul>
-<li> testsuite/22_locale/ctype_char_members.cc 
-<li> testsuite/22_locale/ctype_wchar_t_members.cc 
+<li> testsuite/22_locale/all   </li>
 </ul>
 
-<p>
 <h2>
 6.  Unresolved Issues
 </h2>
 
 <ul>
-	<li> locale -a displays available locales on linux
+   <li> locale -a displays available locales on linux </li>
 
-	<li> locale initialization: at what point does _S_classic,
-	_S_global get initialized? Can named locales assume this
-	initialization has already taken place?
+   <li> locale initialization: at what point does _S_classic,
+   _S_global get initialized? Can named locales assume this
+   initialization has already taken place? </li>
 
-	<li> document how named locales error check when filling data
-	members. Ie, a fr_FR locale that doesn't have
-	numpunct::truename(): does it use "true"? Or is it a blank
-	string? What's the convention?
+   <li> document how named locales error check when filling data
+   members. Ie, a fr_FR locale that doesn't have
+   numpunct::truename(): does it use "true"? Or is it a blank
+   string? What's the convention? </li>
 
-	<li> explain how locale aliasing happens. When does "de_DE"
-	use "de" information? What is the rule for locales composed of
-	just an ISO language code (say, "de") and locales with both an
-	ISO language code and ISO country code (say, "de_DE").
+   <li> explain how locale aliasing happens. When does "de_DE"
+   use "de" information? What is the rule for locales composed of
+   just an ISO language code (say, "de") and locales with both an
+   ISO language code and ISO country code (say, "de_DE"). </li>
 
-	<li> what should non-required facet instantiations do?  If the
-	generic implemenation is provided, then how to end-users
-	provide specializations?
+   <li> what should non-required facet instantiations do?  If the
+   generic implemenation is provided, then how to end-users
+   provide specializations? </li>
 </ul>
 
-<p>
 <h2>
 7. Acknowledgments
 </h2>
 
-<p>
 <h2>
 8. Bibliography / Referenced Documents
 </h2>
@@ -130,20 +150,31 @@ Drepper, Ulrich, GNU libc (glibc) 2.2 manual. In particular, Chapters &quot;6. C
 
 <p>
 Drepper, Ulrich, Numerous, late-night email correspondence
+</p>
 
 <p>
 ISO/IEC 14882:1998 Programming languages - C++
+</p>
 
 <p>
 ISO/IEC 9899:1999 Programming languages - C
+</p>
 
 <p>
 Langer, Angelika and Klaus Kreft, Standard C++ IOStreams and Locales, Advanced Programmer's Guide and Reference, Addison Wesley Longman, Inc. 2000
+</p>
 
 <p>
 Stroustrup, Bjarne, Appendix D, The C++ Programming Language, Special Edition, Addison Wesley, Inc. 2000
+</p>
 
 <p>
 System Interface Definitions, Issue 6 (IEEE Std. 1003.1-200x)
 The Open Group/The Institute of Electrical and Electronics Engineers, Inc.
 http://www.opennc.org/austin/docreg.html
+</p>
+
+</body>
+</html>
+
+
