@@ -523,7 +523,9 @@ rest_of_handle_stack_regs (tree decl, rtx insns)
     {
       if (cleanup_cfg (CLEANUP_EXPENSIVE | CLEANUP_POST_REGSTACK
 		       | (flag_crossjumping ? CLEANUP_CROSSJUMP : 0))
-	  && flag_reorder_blocks)
+	  /* APPLE LOCAL begin hot/cold partitioning  */
+	  && (flag_reorder_blocks || flag_reorder_blocks_and_partition))
+	  /* APPLE LOCAL end hot/cold partitioning  */
 	{
 	  reorder_basic_blocks ();
 	  cleanup_cfg (CLEANUP_EXPENSIVE | CLEANUP_POST_REGSTACK);
@@ -719,13 +721,15 @@ rest_of_handle_reorder_blocks (tree decl, rtx insns)
 
   if (flag_sched2_use_traces && flag_schedule_insns_after_reload)
     tracer ();
-  if (flag_reorder_blocks)
+  /* APPLE LOCAL begin hot/cold partitioning  */
+  if (flag_reorder_blocks || flag_reorder_blocks_and_partition)
     reorder_basic_blocks ();
-  if (flag_reorder_blocks
+  if (flag_reorder_blocks || flag_reorder_blocks_and_partition
       || (flag_sched2_use_traces && flag_schedule_insns_after_reload))
     changed |= cleanup_cfg (CLEANUP_EXPENSIVE
 			    | (!HAVE_conditional_execution
 			       ? CLEANUP_UPDATE_LIFE : 0));
+  /* APPLE LOCAL end hot/cold partitioning  */
 
   /* On conditional execution targets we can not update the life cheaply, so
      we deffer the updating to after both cleanups.  This may lose some cases
@@ -1275,7 +1279,7 @@ rest_of_handle_loop_optimize (tree decl, rtx insns)
       reg_scan (insns, max_reg_num (), 1);
     }
   cleanup_barriers ();
-  loop_optimize (insns, dump_file, do_unroll | LOOP_BCT | do_prefetch);
+  loop_optimize (insns, dump_file, do_unroll | do_prefetch);
 
   /* Loop can create trivially dead instructions.  */
   delete_trivially_dead_insns (insns, max_reg_num ());
@@ -1294,6 +1298,12 @@ rest_of_handle_loop2 (tree decl, rtx insns)
 {
   struct loops *loops;
   basic_block bb;
+
+  if (!flag_unswitch_loops
+      && !flag_peel_loops
+      && !flag_unroll_loops
+      && !flag_branch_on_count_reg)
+    return;
 
   timevar_push (TV_LOOP);
   open_dump_file (DFI_loop2, decl);
@@ -1316,6 +1326,11 @@ rest_of_handle_loop2 (tree decl, rtx insns)
 			       (flag_peel_loops ? UAP_PEEL : 0) |
 			       (flag_unroll_loops ? UAP_UNROLL : 0) |
 			       (flag_unroll_all_loops ? UAP_UNROLL_ALL : 0));
+
+#ifdef HAVE_doloop_end
+      if (flag_branch_on_count_reg && HAVE_doloop_end)
+        doloop_optimize_loops (loops);
+#endif /* HAVE_doloop_end */
 
       loop_optimizer_finalize (loops, dump_file);
     }
@@ -1594,10 +1609,7 @@ rest_of_compilation (tree decl)
   if (flag_tracer)
     rest_of_handle_tracer (decl, insns);
 
-  if (optimize > 0
-      && (flag_unswitch_loops
-	  || flag_peel_loops
-	  || flag_unroll_loops))
+  if (optimize > 0)
     rest_of_handle_loop2 (decl, insns);
 
   if (flag_web)
@@ -1615,6 +1627,22 @@ rest_of_compilation (tree decl)
 
   if (flag_if_conversion)
     rest_of_handle_if_after_combine (decl, insns);
+
+  /* APPLE LOCAL begin hot/cold partitioning  */
+  /* The optimization to partition hot/cold basic blocks into separate
+     sections of the .o file does not work well with exception handling.
+     Don't call it if there are exceptions. */
+
+  if (flag_reorder_blocks_and_partition)
+    {
+      no_new_pseudos = 0;
+      partition_hot_cold_basic_blocks ();
+      allocate_reg_life_data ();
+      update_life_info (NULL, UPDATE_LIFE_GLOBAL_RM_NOTES, 
+			PROP_LOG_LINKS | PROP_REG_INFO | PROP_DEATH_NOTES);
+      no_new_pseudos = 1;
+    }
+  /* APPLE LOCAL end hot/cold partitioning  */
 
   if (optimize > 0 && (flag_regmove || flag_expensive_optimizations))
     rest_of_handle_regmove (decl, insns);
