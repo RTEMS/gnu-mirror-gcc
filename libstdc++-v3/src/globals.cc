@@ -48,6 +48,23 @@ namespace __gnu_cxx
 {
   using namespace std;
 
+  // Also, need locale caches for standard stream objects...
+  typedef char fake_locale_cache[sizeof(__locale_cache<char>)]
+  __attribute__ ((aligned(__alignof__(__locale_cache<char>))));
+  fake_locale_cache locale_cache_cout;
+  fake_locale_cache locale_cache_cin;
+  fake_locale_cache locale_cache_cerr;
+  fake_locale_cache locale_cache_clog;
+
+#ifdef _GLIBCPP_USE_WCHAR_T
+  typedef char fake_wlocale_cache[sizeof(__locale_cache<wchar_t>)]
+  __attribute__ ((aligned(__alignof__(__locale_cache<wchar_t>))));
+  fake_wlocale_cache locale_cache_wcout;
+  fake_wlocale_cache locale_cache_wcin;
+  fake_wlocale_cache locale_cache_wcerr;
+  fake_wlocale_cache locale_cache_wclog;
+#endif
+ 
   typedef char fake_facet_name[sizeof(char*)]
   __attribute__ ((aligned(__alignof__(char*))));
   fake_facet_name facet_name[6 + _GLIBCPP_NUM_CATEGORIES];
@@ -266,6 +283,14 @@ namespace __gnu_cxx
   _GLIBCPP_mutex_address_init ()
   { __GTHREAD_MUTEX_INIT_FUNCTION (_GLIBCPP_mutex_address); }
 #endif
+
+  // GLIBCXX_ABI.
+  struct __compat
+  {
+    static const char _S_atoms[];
+  };
+  const char __compat::_S_atoms[] = "0123456789eEabcdfABCDF";
+  _GLIBCPP_ASM_SYMVER(_ZN9__gnu_cxx8__compat8_S_atomsE, _ZNSt10__num_base8_S_atomsE, GLIBCPP_3.2)
 } // namespace __gnu_cxx
 
 namespace std
