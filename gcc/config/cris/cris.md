@@ -31,7 +31,7 @@
 ;; There are several instructions that are orthogonal in size, and seems
 ;; they could be matched by a single pattern without a specified size
 ;; for the operand that is orthogonal.  However, this did not work on
-;; gcc-2.7.2 (and problably not on gcc-2.8.1), relating to that when a
+;; gcc-2.7.2 (and probably not on gcc-2.8.1), relating to that when a
 ;; constant is substituted into an operand, the actual mode must be
 ;; deduced from the pattern.  There is reasonable hope that that has been
 ;; fixed, so FIXME: try again.
@@ -77,7 +77,7 @@
 ;; The possible values are "yes", "no" and "has_slot".  Yes/no means if
 ;; the insn is slottable or not.  Has_slot means that the insn is a
 ;; return insn or branch insn (which are not considered slottable since
-;; that is generally true).  Having the semmingly illogical value
+;; that is generally true).  Having the seemingly illogical value
 ;; "has_slot" means we do not have to add another attribute just to say
 ;; that an insn has a delay-slot, since it also infers that it is not
 ;; slottable.  Better names for the attribute were found to be longer and
@@ -1354,7 +1354,7 @@
   "movs.b %1,%0"
   [(set_attr "slottable" "yes,yes,no")])
 
-;; To do a byte->word exension, extend to dword, exept that the top half
+;; To do a byte->word extension, extend to dword, exept that the top half
 ;; of the register will be clobbered.  FIXME: Perhaps this is not needed.
 
 (define_insn "extendqihi2"
@@ -2682,17 +2682,19 @@
 
 (define_insn "*andsi_movu"
   [(set (match_operand:SI 0 "register_operand" "=r,r,r")
-	(and:SI (match_operand:SI 1 "nonimmediate_operand" "%r,Q>,m")
+	(and:SI (match_operand:SI 1 "nonimmediate_operand" "%r,Q,To")
 		(match_operand:SI 2 "const_int_operand" "n,n,n")))]
-  "INTVAL (operands[2]) == 255 || INTVAL (operands[2]) == 65535"
+  "(INTVAL (operands[2]) == 255 || INTVAL (operands[2]) == 65535)
+   && (GET_CODE (operands[1]) != MEM || ! MEM_VOLATILE_P (operands[1]))"
   "movu.%z2 %1,%0"
   [(set_attr "slottable" "yes,yes,no")])
 
 (define_insn "*andsi_clear"
-  [(set (match_operand:SI 0 "nonimmediate_operand" "=r,r,Q>,Q>,m,m")
+  [(set (match_operand:SI 0 "nonimmediate_operand" "=r,r,Q,Q,To,To")
 	(and:SI (match_operand:SI 1 "nonimmediate_operand" "%0,0,0,0,0,0")
 		(match_operand:SI 2 "const_int_operand" "P,n,P,n,P,n")))]
-  "INTVAL (operands[2]) == -65536 || INTVAL (operands[2]) == -256"
+  "(INTVAL (operands[2]) == -65536 || INTVAL (operands[2]) == -256)
+   && (GET_CODE (operands[0]) != MEM || ! MEM_VOLATILE_P (operands[0]))"
   "@
    cLear.b %0
    cLear.w %0
@@ -2770,27 +2772,17 @@
 
 (define_insn "*andhi_movu"
   [(set (match_operand:HI 0 "register_operand" "=r,r,r")
-	(and:HI (match_operand:HI 1 "nonimmediate_operand" "r,Q>,m")
+	(and:HI (match_operand:HI 1 "nonimmediate_operand" "r,Q,To")
 		(const_int 255)))]
-  ""
+  "GET_CODE (operands[1]) != MEM || ! MEM_VOLATILE_P (operands[1])"
   "mOvu.b %1,%0"
   [(set_attr "slottable" "yes,yes,no")])
 
-(define_insn "*andhi_clear_signed"
-  [(set (match_operand:HI 0 "nonimmediate_operand" "=r,Q>,m")
+(define_insn "*andhi_clear"
+  [(set (match_operand:HI 0 "nonimmediate_operand" "=r,Q,To")
 	(and:HI (match_operand:HI 1 "nonimmediate_operand" "0,0,0")
 		(const_int -256)))]
-  ""
-  "cLear.b %0"
-  [(set_attr "slottable" "yes,yes,no")
-   (set_attr "cc" "none")])
-
-;; FIXME: Either this or the pattern above should be redundant.
-(define_insn "*andhi_clear_unsigned"
-  [(set (match_operand:HI 0 "nonimmediate_operand" "=r,Q>,m")
-	(and:HI (match_operand:HI 1 "nonimmediate_operand" "0,0,0")
-		(const_int 65280)))]
-  ""
+  "GET_CODE (operands[0]) != MEM || ! MEM_VOLATILE_P (operands[0])"
   "cLear.b %0"
   [(set_attr "slottable" "yes,yes,no")
    (set_attr "cc" "none")])

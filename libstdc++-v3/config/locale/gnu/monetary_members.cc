@@ -1,6 +1,6 @@
 // std::moneypunct implementation details, GNU version -*- C++ -*-
 
-// Copyright (C) 2001, 2002, 2003 Free Software Foundation, Inc.
+// Copyright (C) 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -63,22 +63,21 @@ namespace std
       case 0:
       case 1:
 	// 1 The sign precedes the value and symbol.
+	__ret.field[0] = sign;
 	if (__space)
 	  {
 	    // Pattern starts with sign.
 	    if (__precedes)
 	      {
 		__ret.field[1] = symbol;
-		__ret.field[2] = space;
 		__ret.field[3] = value;
 	      }
 	    else
 	      {
 		__ret.field[1] = value;
-		__ret.field[2] = space;
 		__ret.field[3] = symbol;
 	      }
-	    __ret.field[0] = sign;
+	    __ret.field[2] = space;
 	  }
 	else
 	  {
@@ -93,7 +92,6 @@ namespace std
 		__ret.field[1] = value;
 		__ret.field[2] = symbol;
 	      }
-	    __ret.field[0] = sign;
 	    __ret.field[3] = none;
 	  }
 	break;
@@ -105,15 +103,14 @@ namespace std
 	    if (__precedes)
 	      {
 		__ret.field[0] = symbol;
-		__ret.field[1] = space;
 		__ret.field[2] = value;
 	      }
 	    else
 	      {
 		__ret.field[0] = value;
-		__ret.field[1] = space;
 		__ret.field[2] = symbol;
 	      }
+	    __ret.field[1] = space;
 	    __ret.field[3] = sign;
 	  }
 	else
@@ -135,78 +132,70 @@ namespace std
 	break;
       case 3:
 	// 3 The sign immediately precedes the symbol.
-	if (__space)
+	if (__precedes)
 	  {
-	    // Have space.
-	    if (__precedes)
+	    __ret.field[0] = sign;
+	    __ret.field[1] = symbol;	    
+	    if (__space)
 	      {
-		__ret.field[0] = sign;
-		__ret.field[1] = symbol;
 		__ret.field[2] = space;
 		__ret.field[3] = value;
 	      }
 	    else
 	      {
-		__ret.field[0] = value;
+		__ret.field[2] = value;		
+		__ret.field[3] = none;
+	      }
+	  }
+	else
+	  {
+	    __ret.field[0] = value;
+	    if (__space)
+	      {
 		__ret.field[1] = space;
 		__ret.field[2] = sign;
 		__ret.field[3] = symbol;
 	      }
-	  }
-	else
-	  {
-	    // Have none.
-	    if (__precedes)
-	      {
-		__ret.field[0] = sign;
-		__ret.field[1] = symbol;
-		__ret.field[2] = value;
-	      }
 	    else
 	      {
-		__ret.field[0] = value;
 		__ret.field[1] = sign;
 		__ret.field[2] = symbol;
+		__ret.field[3] = none;
 	      }
-	    __ret.field[3] = none;
 	  }
 	break;
       case 4:
-	// 4 The sign immediately follows the symbol. 
-	if (__space)
+	// 4 The sign immediately follows the symbol.
+	if (__precedes)
 	  {
-	    // Have space.
-	    if (__precedes)
+	    __ret.field[0] = symbol;
+	    __ret.field[1] = sign;
+	    if (__space)
 	      {
-		__ret.field[0] = symbol;
-		__ret.field[1] = sign;
 		__ret.field[2] = space;
 		__ret.field[3] = value;
 	      }
 	    else
 	      {
-		__ret.field[0] = value;
-		__ret.field[1] = space;
-		__ret.field[2] = symbol;
-		__ret.field[3] = sign;
+		__ret.field[2] = value;
+		__ret.field[3] = none;
 	      }
 	  }
 	else
 	  {
-	    // Have none.
-	    if (__precedes)
+	    __ret.field[0] = value;
+	    if (__space)
 	      {
-		__ret.field[0] = symbol;
-		__ret.field[1] = sign;
-		__ret.field[2] = value;
+		__ret.field[1] = space;
+		__ret.field[2] = symbol;
+		__ret.field[3] = sign;
 	      }
 	    else
 	      {
-		__ret.field[0] = value;
 		__ret.field[1] = symbol;
 		__ret.field[2] = sign;
+		__ret.field[3] = none;
 	      }
-	    __ret.field[3] = none;
 	  }
 	break;
       default:
@@ -430,6 +419,12 @@ namespace std
 	      _M_data = 0;
 	      delete __wcs_ps;
 	      delete __wcs_ns;	      
+#if __GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ > 2)
+	      __uselocale(__old);
+#else
+	      setlocale(LC_ALL, __old);
+	      free(__old);
+#endif
 	      __throw_exception_again;
 	    } 
 	  
@@ -554,6 +549,12 @@ namespace std
               _M_data = 0;
 	      delete __wcs_ps;
 	      delete __wcs_ns;	      
+#if __GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ > 2)
+	      __uselocale(__old);
+#else
+	      setlocale(LC_ALL, __old);
+	      free(__old);
+#endif
               __throw_exception_again;
 	    }
 

@@ -1,6 +1,6 @@
 // 2001-09-12 Benjamin Kosnik  <bkoz@redhat.com>
 
-// Copyright (C) 2001, 2002, 2003 Free Software Foundation
+// Copyright (C) 2001, 2002, 2003, 2004 Free Software Foundation
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -36,13 +36,8 @@ void test01()
 
   // basic construction
   locale loc_c = locale::classic();
-  locale loc_hk = __gnu_test::try_named_locale("en_HK");
-  locale loc_fr = __gnu_test::try_named_locale("fr_FR@euro");
   locale loc_de = __gnu_test::try_named_locale("de_DE@euro");
   VERIFY( loc_c != loc_de );
-  VERIFY( loc_hk != loc_fr );
-  VERIFY( loc_hk != loc_de );
-  VERIFY( loc_de != loc_fr );
 
   // cache the moneypunct facets
   typedef moneypunct<char, true> __money_true;
@@ -100,7 +95,7 @@ void test01()
   ios_base::iostate err04 = ios_base::goodbit;
   mon_get.get(is_it04, end, true, iss, err04, result4);
   VERIFY( result4 == empty );
-  VERIFY( err04 == ios_base::failbit | ios_base::eofbit );
+  VERIFY( err04 == (ios_base::failbit | ios_base::eofbit) );
 
   iss.str("working for enlightenment and peace in a mad world");
   iterator_type is_it05(iss);

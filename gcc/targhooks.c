@@ -1,5 +1,5 @@
 /* Default target hook functions.
-   Copyright (C) 2003 Free Software Foundation, Inc.
+   Copyright (C) 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -70,6 +70,14 @@ default_external_libcall (rtx fun ATTRIBUTE_UNUSED)
 #endif
 }
 
+enum machine_mode
+default_cc_modes_compatible (enum machine_mode m1, enum machine_mode m2)
+{
+  if (m1 == m2)
+    return m1;
+  return VOIDmode;
+}
+
 bool
 default_promote_function_args (tree fntype ATTRIBUTE_UNUSED)
 {
@@ -108,9 +116,6 @@ default_struct_value_rtx (tree fntype ATTRIBUTE_UNUSED, int incoming)
 #ifdef STRUCT_VALUE_INCOMING
       rv = STRUCT_VALUE_INCOMING;
 #else
-#ifdef STRUCT_VALUE_INCOMING_REGNUM
-      rv = gen_rtx_REG (Pmode, STRUCT_VALUE_INCOMING_REGNUM);
-#else
 #ifdef STRUCT_VALUE
       rv = STRUCT_VALUE;
 #else
@@ -118,7 +123,6 @@ default_struct_value_rtx (tree fntype ATTRIBUTE_UNUSED, int incoming)
       abort();
 #else
       rv = gen_rtx_REG (Pmode, STRUCT_VALUE_REGNUM);
-#endif
 #endif
 #endif
 #endif
@@ -185,20 +189,25 @@ default_strict_argument_naming (CUMULATIVE_ARGS *ca ATTRIBUTE_UNUSED)
 bool
 default_pretend_outgoing_varargs_named(CUMULATIVE_ARGS *ca ATTRIBUTE_UNUSED)
 {
-#ifdef PRETEND_OUTGOING_VARARGS_NAMED
-  return PRETEND_OUTGOING_VARARGS_NAMED;
-#else
 #ifdef SETUP_INCOMING_VARARGS
   return 1;
 #else
   return (targetm.calls.setup_incoming_varargs != default_setup_incoming_varargs);
 #endif
-#endif
 }
 
 /* Generic hook that takes a CUMULATIVE_ARGS pointer and returns true.  */
+
 bool
 hook_bool_CUMULATIVE_ARGS_true (CUMULATIVE_ARGS * a ATTRIBUTE_UNUSED)
+{
+  return true;
+}
+
+/* Generic hook that takes a machine mode and returns true.  */
+
+bool
+hook_bool_machine_mode_true (enum machine_mode a ATTRIBUTE_UNUSED)
 {
   return true;
 }

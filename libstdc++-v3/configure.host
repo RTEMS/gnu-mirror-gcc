@@ -146,7 +146,7 @@ case "${host_os}" in
   freebsd*)
     os_include_dir="os/bsd/freebsd"
     ;;
-  gnu* | linux*)
+  gnu* | linux* | kfreebsd*-gnu | knetbsd*-gnu)
     os_include_dir="os/gnu-linux"
     ;;
   hpux*)
@@ -185,6 +185,9 @@ case "${host_os}" in
     ;;
   solaris2.[789] | solaris2.1[0-9])
     os_include_dir="os/solaris/solaris2.7"
+    ;;
+  tpf)
+    os_include_dir="os/tpf"
     ;;
   vxworks)
     os_include_dir="os/vxworks"

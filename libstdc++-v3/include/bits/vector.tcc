@@ -1,6 +1,6 @@
 // Vector implementation (out of line) -*- C++ -*-
 
-// Copyright (C) 2001, 2002, 2003 Free Software Foundation, Inc.
+// Copyright (C) 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -61,7 +61,7 @@
 #ifndef _VECTOR_TCC
 #define _VECTOR_TCC 1
 
-namespace std
+namespace __gnu_norm
 {
   template<typename _Tp, typename _Alloc>
     void
@@ -69,7 +69,7 @@ namespace std
     reserve(size_type __n)
     {
       if (__n > this->max_size())
-	__throw_length_error("vector::reserve");
+	__throw_length_error(__N("vector::reserve"));
       if (this->capacity() < __n)
 	{
 	  const size_type __old_size = size();
@@ -269,50 +269,6 @@ namespace std
       }
     }
   
-  #ifdef _GLIBCXX_DEPRECATED
-  template<typename _Tp, typename _Alloc>
-    void
-    vector<_Tp,_Alloc>::
-    _M_insert_aux(iterator __position)
-    {
-      if (_M_finish != _M_end_of_storage)
-      {
-        std::_Construct(_M_finish, *(_M_finish - 1));
-        ++_M_finish;
-        std::copy_backward(__position, iterator(_M_finish - 2),
-			   iterator(_M_finish - 1));
-        *__position = value_type();
-      }
-      else
-      {
-        const size_type __old_size = size();
-        const size_type __len = __old_size != 0 ? 2 * __old_size : 1;
-        pointer __new_start = _M_allocate(__len);
-        pointer __new_finish = __new_start;
-        try
-          {
-            __new_finish = std::uninitialized_copy(iterator(_M_start), __position,
-						   __new_start);
-            std::_Construct(__new_finish);
-            ++__new_finish;
-            __new_finish = std::uninitialized_copy(__position, iterator(_M_finish),
-						   __new_finish);
-          }
-        catch(...)
-          {
-            std::_Destroy(__new_start,__new_finish);
-            _M_deallocate(__new_start,__len);
-            __throw_exception_again;
-          }
-        std::_Destroy(begin(), end());
-        _M_deallocate(_M_start, _M_end_of_storage - _M_start);
-        _M_start = __new_start;
-        _M_finish = __new_finish;
-        _M_end_of_storage = __new_start + __len;
-      }
-    }
-  #endif
-  
   template<typename _Tp, typename _Alloc>
     void
     vector<_Tp,_Alloc>::
@@ -432,7 +388,8 @@ namespace std
             {
               __new_finish = std::uninitialized_copy(iterator(this->_M_start),
 						     __position, __new_start);
-              __new_finish = std::uninitialized_copy(__first, __last, __new_finish);
+              __new_finish = std::uninitialized_copy(__first, __last, 
+						     __new_finish);
               __new_finish = std::uninitialized_copy(__position,
 						     iterator(this->_M_finish),
 						     __new_finish);
@@ -452,6 +409,6 @@ namespace std
         }
       }
     }
-} // namespace std
+} // namespace __gnu_norm
 
 #endif /* _VECTOR_TCC */

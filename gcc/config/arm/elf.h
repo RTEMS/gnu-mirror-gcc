@@ -46,7 +46,7 @@
 
 #ifndef SUBTARGET_ASM_FLOAT_SPEC
 #define SUBTARGET_ASM_FLOAT_SPEC "\
-%{mapcs-float:-mfloat} %{msoft-float:-mfpu=softfpa}"
+%{mapcs-float:-mfloat}"
 #endif
 
 #ifndef ASM_SPEC
@@ -58,6 +58,8 @@
 %{mapcs-*:-mapcs-%*} \
 %(subtarget_asm_float_spec) \
 %{mthumb-interwork:-mthumb-interwork} \
+%{msoft-float:-mfloat-abi=soft} %{mhard-float:-mfloat-abi=hard} \
+%{mfloat-abi=*} %{mfpu=*} \
 %(subtarget_extra_asm_spec)"
 #endif
 
@@ -106,7 +108,7 @@
 #endif
 
 #ifndef TARGET_DEFAULT
-#define TARGET_DEFAULT (ARM_FLAG_SOFT_FLOAT | ARM_FLAG_APCS_32 | ARM_FLAG_APCS_FRAME)
+#define TARGET_DEFAULT (ARM_FLAG_SOFT_FLOAT | ARM_FLAG_APCS_32 | ARM_FLAG_APCS_FRAME | ARM_FLAG_MMU_TRAPS)
 #endif
 
 #ifndef MULTILIB_DEFAULTS

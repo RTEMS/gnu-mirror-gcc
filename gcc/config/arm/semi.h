@@ -38,7 +38,7 @@
 #endif
 
 #ifndef TARGET_DEFAULT
-#define TARGET_DEFAULT (ARM_FLAG_APCS_32 | ARM_FLAG_APCS_FRAME)
+#define TARGET_DEFAULT (ARM_FLAG_APCS_32 | ARM_FLAG_APCS_FRAME | ARM_FLAG_MMU_TRAPS)
 #endif
 
 #ifndef SUBTARGET_EXTRA_SPECS
@@ -64,7 +64,8 @@
 %{mcpu=*:-mcpu=%*} \
 %{march=*:-march=%*} \
 %{mapcs-float:-mfloat} \
-%{msoft-float:-mfpu=softfpa} \
+%{msoft-float:-mfloat-abi=soft} %{mhard-float:mfloat-abi=hard} \
+%{mfloat-abi=*} %{mfpu=*} \
 %{mthumb-interwork:-mthumb-interwork} \
 %(subtarget_extra_asm_spec)"
 #endif

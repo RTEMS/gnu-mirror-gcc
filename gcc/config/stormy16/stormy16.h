@@ -1,5 +1,5 @@
 /* Xstormy16 cpu description.
-   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003
+   Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004
    Free Software Foundation, Inc.
    Contributed by Red Hat, Inc.
 
@@ -496,11 +496,6 @@ enum reg_class
   if (! SECOND_TIME) \
     xstormy16_setup_incoming_varargs (ARGS_SO_FAR, MODE, TYPE, & PRETEND_ARGS_SIZE)
 
-/* Build up the stdarg/varargs va_list type tree, assigning it to NODE.  If not
-   defined, it is assumed that va_list is a void * pointer.  */
-#define BUILD_VA_LIST_TYPE(NODE) \
-  ((NODE) = xstormy16_build_va_list ())
-
 /* Implement the stdarg/varargs va_start macro.  STDARG_P is nonzero if this
    is stdarg.h instead of varargs.h.  VALIST is the tree of the va_list
    variable to initialize.  NEXTARG is the machine independent notion of the
@@ -513,11 +508,6 @@ enum reg_class
    va_list as a tree, TYPE is the type passed to va_arg.  */
 #define EXPAND_BUILTIN_VA_ARG(VALIST, TYPE) \
   xstormy16_expand_builtin_va_arg (VALIST, TYPE)
-
-/* Implement the stdarg/varargs va_end macro.  VALIST is the variable of type
-   va_list as a tree.  */
-/* #define EXPAND_BUILTIN_VA_END(VALIST) */
-
 
 /* Trampolines for Nested Functions.  */
 

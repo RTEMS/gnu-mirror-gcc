@@ -471,7 +471,7 @@ namespace std
     _Words* 		_M_word;
  
     _Words& 
-    _M_grow_words(int __index);
+    _M_grow_words(int __index, bool __iword);
 
     // Members for locale and locale caching.
     locale 		_M_ios_locale;
@@ -492,15 +492,9 @@ namespace std
       Init();
       ~Init();
       
-      // NB: Allows debugger applications use of the standard streams
-      // from operator new. _S_ios_base_init must be incremented in
-      // _S_ios_create _after_ initialization is completed.
-      static bool
-      _S_initialized() { return _S_ios_base_init; }
-
     private:
-      static int 	_S_ios_base_init;
-      static bool	_S_synced_with_stdio;
+      static _Atomic_word	_S_refcount;
+      static bool		_S_synced_with_stdio;
     };
 
     // [27.4.2.2] fmtflags state functions
@@ -698,7 +692,7 @@ namespace std
     iword(int __ix)
     {
       _Words& __word = (__ix < _M_word_size) 
-			? _M_word[__ix] : _M_grow_words(__ix);
+			? _M_word[__ix] : _M_grow_words(__ix, true);
       return __word._M_iword;
     }
 
@@ -719,7 +713,7 @@ namespace std
     pword(int __ix)
     {
       _Words& __word = (__ix < _M_word_size) 
-			? _M_word[__ix] : _M_grow_words(__ix);
+			? _M_word[__ix] : _M_grow_words(__ix, false);
       return __word._M_pword;
     }
 

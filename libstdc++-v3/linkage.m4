@@ -371,7 +371,6 @@ dnl This might seem like overkill but experience has shown that it's not...
 dnl
 dnl Define HAVE_STRTOLD if "strtold" is declared and links
 dnl Define HAVE_STRTOF if "strtof" is declared and links
-dnl Define HAVE_LRAND48 if "lrand48" is declared and links
 dnl
 dnl GLIBCXX_CHECK_STDLIB_SUPPORT
 AC_DEFUN(GLIBCXX_CHECK_STDLIB_SUPPORT, [
@@ -381,7 +380,6 @@ AC_DEFUN(GLIBCXX_CHECK_STDLIB_SUPPORT, [
 
   GLIBCXX_CHECK_STDLIB_DECL_AND_LINKAGE_2(strtold)
   GLIBCXX_CHECK_STDLIB_DECL_AND_LINKAGE_2(strtof)
-  GLIBCXX_CHECK_STDLIB_DECL_AND_LINKAGE_0(lrand48)
 
   CXXFLAGS="$ac_save_CXXFLAGS"
 ])
@@ -512,7 +510,7 @@ AC_DEFUN(GLIBCXX_CHECK_COMPLEX_MATH_SUPPORT, [
   dnl always pass if libm is available, and fail if it isn't.  If it is
   dnl available, we assume we'll need it later, so add it to LIBS.
   AC_CHECK_LIB(m, main)
-  AC_REPLACE_MATHFUNCS(nan copysignf)
+  AC_REPLACE_MATHFUNCS(copysignf)
 
   dnl For __signbit to signbit conversions.
   AC_CHECK_FUNCS([__signbit], , [LIBMATHOBJS="$LIBMATHOBJS signbit.lo"])

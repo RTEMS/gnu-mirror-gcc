@@ -26,6 +26,7 @@ Boston, MA 02111-1307, USA.  */
 	builtin_define_std ("linux");		\
 	builtin_define ("_LONGLONG");		\
 	builtin_define ("__gnu_linux__");	\
+	builtin_assert ("system=linux");	\
 	builtin_assert ("system=unix");		\
 	builtin_assert ("system=posix");	\
     }						\
@@ -264,10 +265,6 @@ Boston, MA 02111-1307, USA.  */
 #undef DBX_REGISTER_NUMBER
 #define DBX_REGISTER_NUMBER(REGNO) (REGNO)
 
-/* System V Release 4 uses DWARF debugging info.  Buf DWARF1 doesn't do
-   64-bit anything, so we use DWARF2.  */
-
-#undef DWARF_DEBUGGING_INFO
 #define DWARF2_DEBUGGING_INFO 1
 #define DBX_DEBUGGING_INFO 1
 
@@ -330,6 +327,8 @@ do {									\
 #undef DTORS_SECTION_ASM_OP
 
 #define TARGET_ASM_FILE_END file_end_indicate_exec_stack
+
+#define TARGET_HAS_F_SETLKW
 
 #undef LINK_GCC_C_SEQUENCE_SPEC
 #define LINK_GCC_C_SEQUENCE_SPEC \

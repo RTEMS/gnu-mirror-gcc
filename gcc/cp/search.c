@@ -125,7 +125,7 @@ push_search_level (struct stack_level *stack, struct obstack *obstack)
 static struct search_level *
 pop_search_level (struct stack_level *obstack)
 {
-  register struct search_level *stack = pop_stack_level (obstack);
+  struct search_level *stack = pop_stack_level (obstack);
 
   return stack;
 }
@@ -422,7 +422,7 @@ get_dynamic_cast_base_type (tree subtype, tree target)
 tree
 lookup_field_1 (tree type, tree name, bool want_type)
 {
-  register tree field;
+  tree field;
 
   if (TREE_CODE (type) == TEMPLATE_TYPE_PARM
       || TREE_CODE (type) == BOUND_TEMPLATE_TEMPLATE_PARM
@@ -578,6 +578,16 @@ at_class_scope_p (void)
 {
   tree cs = current_scope ();
   return cs && TYPE_P (cs);
+}
+
+/* Returns true if the innermost active scope is a namespace scope.  */
+
+bool
+at_namespace_scope_p (void)
+{
+  /* We are in a namespace scope if we are not it a class scope or a
+     function scope.  */
+  return !current_scope();
 }
 
 /* Return the scope of DECL, as appropriate when doing name-lookup.  */
@@ -895,6 +905,7 @@ accessible_p (tree type, tree decl)
 {
   tree binfo;
   tree t;
+  tree scope;
   access_kind access;
 
   /* Nonzero if it's OK to access DECL if it has protected
@@ -904,6 +915,11 @@ accessible_p (tree type, tree decl)
   /* If this declaration is in a block or namespace scope, there's no
      access control.  */
   if (!TYPE_P (context_for_name_lookup (decl)))
+    return 1;
+
+  /* There is no need to perform access checks inside a thunk.  */
+  scope = current_scope ();
+  if (scope && DECL_THUNK_P (scope))
     return 1;
 
   /* In a template declaration, we cannot be sure whether the
@@ -948,7 +964,7 @@ accessible_p (tree type, tree decl)
 
   /* Now, loop through the classes of which we are a friend.  */
   if (!protected_ok)
-    protected_ok = friend_accessible_p (current_scope (), decl, binfo);
+    protected_ok = friend_accessible_p (scope, decl, binfo);
 
   /* Standardize the binfo that access_in_type will use.  We don't
      need to know what path was chosen from this point onwards.  */

@@ -94,7 +94,7 @@ sources = \
 	codecvt.cc \
 	complex_io.cc \
 	ctype.cc \
-	demangle.cc \
+	debug.cc \
 	functexcept.cc \
 	globals_locale.cc \
 	globals_io.cc \
@@ -103,13 +103,14 @@ sources = \
 	ios_init.cc \
 	ios_locale.cc \
 	limits.cc \
+	list.cc \
 	locale.cc \
 	locale_init.cc \
 	locale_facets.cc \
 	localename.cc \
 	stdexcept.cc \
-	stl_tree.cc \
 	strstream.cc \
+	tree.cc \
 	allocator-inst.cc \
 	concept-inst.cc \
 	fstream-inst.cc \
@@ -140,8 +141,7 @@ libstdc___la_LIBADD = \
 libstdc___la_DEPENDENCIES = ${version_dep} $(libstdc___la_LIBADD)
 
 libstdc___la_LDFLAGS = \
-	-version-info $(libtool_VERSION) ${version_arg} \
-	-lm $(LIBUNWIND_FLAG)
+	-version-info $(libtool_VERSION) ${version_arg} -lm 
 
 
 # Use special rules for the deprecated source files so that they find
