@@ -52,6 +52,7 @@ Boston, MA 02111-1307, USA.  */
 /* Global variables used to communicate with passes.  */
 int dump_flags;
 bitmap vars_to_rename;
+bool in_gimple_form;
 
 /* The root of the compilation pass tree, once constructed.  */
 static struct tree_opt_pass *all_passes;
@@ -282,6 +283,7 @@ init_tree_optimization_passes (void)
   NEXT_PASS (pass_rename_ssa_copies);
   NEXT_PASS (pass_early_warn_uninitialized);
   NEXT_PASS (pass_dce);
+  NEXT_PASS (pass_return);
   NEXT_PASS (pass_dominator);
   NEXT_PASS (pass_redundant_phi);
   NEXT_PASS (DUP_PASS (pass_dce));
@@ -293,6 +295,7 @@ init_tree_optimization_passes (void)
   NEXT_PASS (pass_del_pta);
   NEXT_PASS (pass_profile);
   NEXT_PASS (pass_lower_complex);
+  NEXT_PASS (DUP_PASS (pass_return));
   NEXT_PASS (pass_sra);
   NEXT_PASS (DUP_PASS (pass_rename_ssa_copies));
   NEXT_PASS (DUP_PASS (pass_dominator));
@@ -301,12 +304,13 @@ init_tree_optimization_passes (void)
   NEXT_PASS (pass_dse);
   NEXT_PASS (DUP_PASS (pass_forwprop));
   NEXT_PASS (DUP_PASS (pass_phiopt));
-  NEXT_PASS (pass_loop);
   NEXT_PASS (pass_ccp);
   NEXT_PASS (DUP_PASS (pass_redundant_phi));
   NEXT_PASS (pass_fold_builtins);
   NEXT_PASS (pass_split_crit_edges);
   NEXT_PASS (pass_pre);
+  NEXT_PASS (pass_scev);
+  NEXT_PASS (pass_loop);
   NEXT_PASS (DUP_PASS (pass_dominator));
   NEXT_PASS (DUP_PASS (pass_redundant_phi));
   NEXT_PASS (pass_cd_dce);
@@ -320,6 +324,19 @@ init_tree_optimization_passes (void)
   NEXT_PASS (pass_nrv);
   NEXT_PASS (pass_remove_useless_vars);
   NEXT_PASS (pass_del_cfg);
+  *p = NULL;
+
+  p = &pass_scev.sub;
+  NEXT_PASS (pass_scev_init);
+  NEXT_PASS (pass_scev_anal);
+  NEXT_PASS (pass_scev_depend);
+  NEXT_PASS (pass_scev_elim_checks);
+  NEXT_PASS (pass_scev_iv_canon);
+  NEXT_PASS (pass_scev_linear_transform);
+  NEXT_PASS (pass_ddg);
+  NEXT_PASS (pass_scev_vectorize);
+  NEXT_PASS (pass_delete_ddg);
+  NEXT_PASS (pass_scev_done);
   *p = NULL;
 
 #undef NEXT_PASS
@@ -339,9 +356,8 @@ execute_todo (unsigned int flags)
 {
   if (flags & TODO_rename_vars)
     {
-      if (bitmap_first_set_bit (vars_to_rename) >= 0)
-	rewrite_into_ssa ();
-      BITMAP_XFREE (vars_to_rename);
+      rewrite_into_ssa (false);
+      bitmap_clear (vars_to_rename);
     }
 
   if ((flags & TODO_dump_func) && dump_file)
@@ -386,7 +402,7 @@ execute_one_pass (struct tree_opt_pass *pass)
       if (dump_file)
 	{
 	  const char *dname, *aname;
-	  dname = (*lang_hooks.decl_printable_name) (current_function_decl, 2);
+	  dname = lang_hooks.decl_printable_name (current_function_decl, 2);
 	  aname = (IDENTIFIER_POINTER
 		   (DECL_ASSEMBLER_NAME (current_function_decl)));
 	  fprintf (dump_file, "\n;; Function %s (%s)\n\n", dname, aname);
@@ -396,10 +412,6 @@ execute_one_pass (struct tree_opt_pass *pass)
   /* If a timevar is present, start it.  */
   if (pass->tv_id)
     timevar_push (pass->tv_id);
-
-  /* If the pass is requesting ssa variable renaming, allocate the bitmap.  */
-  if (pass->todo_flags_finish & TODO_rename_vars)
-    vars_to_rename = BITMAP_XMALLOC ();
 
   /* Do it!  */
   if (pass->execute)
@@ -522,8 +534,18 @@ tree_rest_of_compilation (tree fndecl, bool nested_p)
 	}
     }
 
+  if (!vars_to_rename)
+    vars_to_rename = BITMAP_XMALLOC ();
+
+  /* Note that the folders should only create gimple expressions.
+     This is a hack until the new folder is ready.  */
+  in_gimple_form = true;
+
   /* Perform all tree transforms and optimizations.  */
   execute_pass_list (all_passes);
+
+  /* Note that the folders can create non-gimple expressions again.  */
+  in_gimple_form = false;
 
   /* If the function has a variably modified type, there may be
      SAVE_EXPRs in the parameter types.  Their context must be set to
@@ -543,9 +565,6 @@ tree_rest_of_compilation (tree fndecl, bool nested_p)
   /* Set up parameters and prepare for return, for the function.  */
   expand_function_start (fndecl, 0);
 
-  /* Allow language dialects to perform special processing.  */
-  (*lang_hooks.rtl_expand.start) ();
-
   /* If this function is `main', emit a call to `__main'
      to run global initializers, etc.  */
   if (DECL_NAME (fndecl)
@@ -554,7 +573,7 @@ tree_rest_of_compilation (tree fndecl, bool nested_p)
     expand_main_function ();
 
   /* Generate the RTL for this function.  */
-  (*lang_hooks.rtl_expand.stmt) (DECL_SAVED_TREE (fndecl));
+  expand_expr_stmt_value (DECL_SAVED_TREE (fndecl), 0, 0);
 
   /* We hard-wired immediate_size_expand to zero above.
      expand_function_end will decrement this variable.  So, we set the
@@ -570,9 +589,6 @@ tree_rest_of_compilation (tree fndecl, bool nested_p)
   /* The following insns belong to the top scope.  */
   record_block_change (DECL_INITIAL (current_function_decl));
   
-  /* Allow language dialects to perform special processing.  */
-  (*lang_hooks.rtl_expand.end) ();
-
   /* Generate rtl for function exit.  */
   expand_function_end ();
 

@@ -43,6 +43,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "except.h"
 #include "target.h"
 #include "params.h"
+#include "rtlhooks-def.h"
 
 /* The basic idea of common subexpression elimination is to go
    through the code, keeping a record of expressions that would
@@ -663,6 +664,12 @@ static bool dead_libcall_p (rtx, int *);
 static int cse_change_cc_mode (rtx *, void *);
 static void cse_change_cc_mode_insns (rtx, rtx, rtx);
 static enum machine_mode cse_cc_succs (basic_block, rtx, rtx, bool);
+
+
+#undef RTL_HOOKS_GEN_LOWPART
+#define RTL_HOOKS_GEN_LOWPART		gen_lowpart_if_possible
+
+static const struct rtl_hooks cse_rtl_hooks = RTL_HOOKS_INITIALIZER;
 
 /* Nonzero if X has the form (PLUS frame-pointer integer).  We check for
    virtual regs here because the simplify_*_operation routines are called
@@ -3662,6 +3669,23 @@ fold_rtx (rtx x, rtx insn)
 		|| (new_cost == old_cost && CONSTANT_P (XEXP (x, i))))
 	      break;
 
+	    /* It's not safe to substitute the operand of a conversion
+	       operator with a constant, as the conversion's identity
+	       depends upon the mode of it's operand.  This optimization
+	       is handled by the call to simplify_unary_operation.  */
+	    if (GET_RTX_CLASS (code) == RTX_UNARY
+		&& GET_MODE (replacements[j]) != mode_arg0
+		&& (code == ZERO_EXTEND
+		    || code == SIGN_EXTEND
+		    || code == TRUNCATE
+		    || code == FLOAT_TRUNCATE
+		    || code == FLOAT_EXTEND
+		    || code == FLOAT
+		    || code == FIX
+		    || code == UNSIGNED_FLOAT
+		    || code == UNSIGNED_FIX))
+	      continue;
+
 	    if (validate_change (insn, &XEXP (x, i), replacements[j], 0))
 	      break;
 
@@ -3907,31 +3931,11 @@ fold_rtx (rtx x, rtx insn)
 	    }
 	}
 
-      new = simplify_relational_operation (code,
-					   (mode_arg0 != VOIDmode
-					    ? mode_arg0
-					    : (GET_MODE (const_arg0
-							 ? const_arg0
-							 : folded_arg0)
-					       != VOIDmode)
-					    ? GET_MODE (const_arg0
-							? const_arg0
-							: folded_arg0)
-					    : GET_MODE (const_arg1
-							? const_arg1
-							: folded_arg1)),
-					   const_arg0 ? const_arg0 : folded_arg0,
-					   const_arg1 ? const_arg1 : folded_arg1);
-#ifdef FLOAT_STORE_FLAG_VALUE
-      if (new != 0 && GET_MODE_CLASS (mode) == MODE_FLOAT)
-	{
-	  if (new == const0_rtx)
-	    new = CONST0_RTX (mode);
-	  else
-	    new = (CONST_DOUBLE_FROM_REAL_VALUE
-		   (FLOAT_STORE_FLAG_VALUE (mode), mode));
-	}
-#endif
+      {
+	rtx op0 = const_arg0 ? const_arg0 : folded_arg0;
+	rtx op1 = const_arg1 ? const_arg1 : folded_arg1;
+        new = simplify_relational_operation (code, mode, mode_arg0, op0, op1);
+      }
       break;
 
     case RTX_BIN_ARITH:
@@ -4811,6 +4815,9 @@ cse_insn (rtx insn, rtx libcall_insn)
       rtx src_eqv_here;
       rtx src_const = 0;
       rtx src_related = 0;
+      /* APPLE LOCAL begin cse of ZERO/SIGN EXTEND */
+      rtx zero_sign_extended_src = NULL_RTX;
+      /* APPLE LOCAL end cse of ZERO/SIGN EXTEND */
       struct table_elt *src_const_elt = 0;
       int src_cost = MAX_COST;
       int src_eqv_cost = MAX_COST;
@@ -4945,7 +4952,35 @@ cse_insn (rtx insn, rtx libcall_insn)
          REG_NOTE.  */
 
       if (!sets[i].src_volatile)
+      /* APPLE LOCAL begin cse of ZERO/SIGN EXTEND */
+      {
 	elt = lookup (src, sets[i].src_hash, mode);
+	if (!elt 
+	    && (GET_CODE(src) == ZERO_EXTEND || GET_CODE(src) == SIGN_EXTEND) 
+	    && GET_CODE (XEXP (src, 0)) == MEM)
+	{
+	  unsigned mem_hash;
+	  rtx nsrc = XEXP (src, 0);
+	  enum machine_mode nmode = GET_MODE(nsrc);
+          do_not_record = 0;
+          hash_arg_in_memory = 0;
+	  mem_hash = HASH (nsrc, nmode);
+	  elt = lookup (nsrc, mem_hash, nmode);
+	  if (elt)
+	  {
+	    sets[i].src = nsrc;
+	    sets[i].src_hash = mem_hash;
+	    sets[i].src_volatile = do_not_record;
+	    sets[i].src_in_memory = hash_arg_in_memory;
+	    zero_sign_extended_src = src;
+	    src = nsrc;
+	    mode = GET_MODE (src) == VOIDmode ? GET_MODE (dest) : GET_MODE (src);
+	    sets[i].mode = mode;
+	    src_folded = fold_rtx (src, insn);
+	  }
+	}
+      }
+      /* APPLE LOCAL end cse of ZERO/SIGN EXTEND */
 
       sets[i].src_elt = elt;
 
@@ -4974,6 +5009,26 @@ cse_insn (rtx insn, rtx libcall_insn)
 	for (p = elt->first_same_value; p; p = p->next_same_value)
 	  if (p->is_const)
 	    {
+	      /* APPLE LOCAL begin cse of ZERO/SIGN EXTEND */
+	      /* If we're looking at a MEM under a SIGN/ZERO_EXTEND,
+		 constants match only if the high bits match.  */
+	      if (zero_sign_extended_src)
+		{
+		  rtx truncated_const, trial;
+		  truncated_const = gen_rtx_TRUNCATE (
+		    GET_MODE (XEXP (zero_sign_extended_src, 0)), 
+		    copy_rtx (p->exp));
+		  if (GET_CODE (zero_sign_extended_src) == ZERO_EXTEND)
+		    trial = gen_rtx_ZERO_EXTEND (
+			GET_MODE (zero_sign_extended_src), truncated_const);
+		  else
+		    trial = gen_rtx_SIGN_EXTEND (
+			GET_MODE (zero_sign_extended_src), truncated_const);
+		  trial = fold_rtx (trial, NULL_RTX);
+		  if (!rtx_equal_p (trial, p->exp))
+		    continue;
+		}
+	      /* APPLE LOCAL end cse of ZERO/SIGN EXTEND */
 	      src_const = p->exp;
 	      src_const_elt = elt;
 	      break;
@@ -5117,7 +5172,7 @@ cse_insn (rtx insn, rtx libcall_insn)
       /* See if a MEM has already been loaded with a widening operation;
 	 if it has, we can use a subreg of that.  Many CISC machines
 	 also have such operations, but this is only likely to be
-	 beneficial these machines.  */
+	 beneficial on these machines.  */
 
       if (flag_expensive_optimizations && src_related == 0
 	  && (GET_MODE_SIZE (mode) < UNITS_PER_WORD)
@@ -5346,6 +5401,18 @@ cse_insn (rtx insn, rtx libcall_insn)
 		   && preferable (src_related_cost, src_related_regcost,
 				  src_elt_cost, src_elt_regcost) <= 0)
 	    trial = copy_rtx (src_related), src_related_cost = MAX_COST;
+	  /* APPLE LOCAL begin cse of ZERO/SIGN EXTEND */
+	  else if (zero_sign_extended_src)
+	    {
+	      trial = GET_CODE(zero_sign_extended_src) == ZERO_EXTEND 
+		      ? gen_rtx_ZERO_EXTEND (GET_MODE(zero_sign_extended_src),
+					     copy_rtx (elt->exp))
+		      : gen_rtx_SIGN_EXTEND (GET_MODE(zero_sign_extended_src),
+					     copy_rtx (elt->exp));
+	      elt = elt->next_same_value;
+	      src_elt_cost = MAX_COST;
+	    }
+	  /* APPLE LOCAL end cse of ZERO/SIGN EXTEND */
 	  else
 	    {
 	      trial = copy_rtx (elt->exp);
@@ -5384,8 +5451,13 @@ cse_insn (rtx insn, rtx libcall_insn)
 		  && (GET_CODE (sets[i].orig_src) == REG
 		      || GET_CODE (sets[i].orig_src) == SUBREG
 		      || GET_CODE (sets[i].orig_src) == MEM))
-		simplify_replace_rtx (REG_NOTES (libcall_insn),
-				      sets[i].orig_src, copy_rtx (new));
+		{
+	          rtx note = find_reg_equal_equiv_note (libcall_insn);
+		  if (note != 0)
+		    XEXP (note, 0) = simplify_replace_rtx (XEXP (note, 0),
+							   sets[i].orig_src,
+							   copy_rtx (new));
+		}
 
 	      /* The result of apply_change_group can be ignored; see
 		 canon_reg.  */
@@ -5426,6 +5498,11 @@ cse_insn (rtx insn, rtx libcall_insn)
 	}
 
       src = SET_SRC (sets[i].rtl);
+      /* APPLE LOCAL begin cse of ZERO/SIGN EXTEND */
+      if (zero_sign_extended_src
+	  && (GET_CODE (src) == GET_CODE (zero_sign_extended_src)))
+        src = XEXP (src, 0);
+      /* APPLE LOCAL end cse of ZERO/SIGN EXTEND */
 
       /* In general, it is good to have a SET with SET_SRC == SET_DEST.
 	 However, there is an important exception:  If both are registers
@@ -5502,7 +5579,11 @@ cse_insn (rtx insn, rtx libcall_insn)
 	  && ! (GET_CODE (src_const) == CONST
 		&& GET_CODE (XEXP (src_const, 0)) == MINUS
 		&& GET_CODE (XEXP (XEXP (src_const, 0), 0)) == LABEL_REF
-		&& GET_CODE (XEXP (XEXP (src_const, 0), 1)) == LABEL_REF))
+		/* APPLE LOCAL begin cse of ZERO/SIGN EXTEND */	    
+		&& (GET_CODE (XEXP (XEXP (src_const, 0), 1)) == LABEL_REF
+		    || rtx_equal_p ((XEXP (XEXP (src_const, 0), 1)), 
+				     const0_rtx))))
+		/* APPLE LOCAL end */
 	{
 	  /* We only want a REG_EQUAL note if src_const != src.  */
 	  if (! rtx_equal_p (src, src_const))
@@ -6600,10 +6681,6 @@ cse_set_around_loop (rtx x, rtx insn, rtx loop_start)
 			  }
 			else
 			  {
-			    if (CONSTANT_P (SET_SRC (set))
-				&& ! find_reg_equal_equiv_note (insn))
-			      set_unique_reg_note (insn, REG_EQUAL,
-						   SET_SRC (set));
 			    if (control_flow_insn_p (p))
 			      /* p can cause a control flow transfer so it
 				 is the last insn of a basic block.  We can't
@@ -6879,7 +6956,7 @@ cse_main (rtx f, int nregs, int after_loop, FILE *file)
   constant_pool_entries_cost = 0;
   constant_pool_entries_regcost = 0;
   val.path_size = 0;
-  gen_lowpart = gen_lowpart_if_possible;
+  rtl_hooks = cse_rtl_hooks;
 
   init_recog ();
   init_alias_analysis ();
@@ -6999,7 +7076,7 @@ cse_main (rtx f, int nregs, int after_loop, FILE *file)
   free (uid_cuid);
   free (reg_eqv_table);
   free (val.path);
-  gen_lowpart = gen_lowpart_general;
+  rtl_hooks = general_rtl_hooks;
 
   return cse_jumps_altered || recorded_label_ref;
 }
@@ -7695,7 +7772,7 @@ cse_cc_succs (basic_block bb, rtx cc_reg, rtx cc_src, bool can_change_mode)
 				       XEXP (SET_SRC (set), 1)))
 			   
 		{
-		  comp_mode = (*targetm.cc_modes_compatible) (mode, set_mode);
+		  comp_mode = targetm.cc_modes_compatible (mode, set_mode);
 		  if (comp_mode != VOIDmode
 		      && (can_change_mode || comp_mode == mode))
 		    found = true;
@@ -7813,7 +7890,7 @@ cse_condition_code_reg (void)
   rtx cc_reg_2;
   basic_block bb;
 
-  if (! (*targetm.fixed_condition_code_regs) (&cc_regno_1, &cc_regno_2))
+  if (! targetm.fixed_condition_code_regs (&cc_regno_1, &cc_regno_2))
     return;
 
   cc_reg_1 = gen_rtx_REG (CCmode, cc_regno_1);

@@ -59,6 +59,7 @@
 #include "toplev.h"
 #include "varray.h"
 #include "flags.h"
+#include "target.h"
 
 /* Debugging support.  */
 
@@ -1307,9 +1308,9 @@ write_identifier (const char *identifier)
 
    Currently, allocating constructors are never used. 
 
-   We also need to provide mangled names for the maybe-in-charge
-   constructor, so we treat it here too.  mangle_decl_string will
-   append *INTERNAL* to that, to make sure we never emit it.  */
+   APPLE LOCAL decloning
+
+*/
 
 static void
 write_special_name_constructor (const tree ctor)
@@ -1322,6 +1323,11 @@ write_special_name_constructor (const tree ctor)
     write_string ("C1");
   else if (DECL_BASE_CONSTRUCTOR_P (ctor))
     write_string ("C2");
+  /* APPLE LOCAL begin decloning */  
+  /* This is the old-style "[unified]" constructor.  */
+  else if (DECL_MAYBE_IN_CHARGE_CONSTRUCTOR_P (ctor))
+    write_string ("C4");
+  /* APPLE LOCAL end decloning */  
   else
     abort ();
 }
@@ -1350,6 +1356,11 @@ write_special_name_destructor (const tree dtor)
     write_string ("D1");
   else if (DECL_BASE_DESTRUCTOR_P (dtor))
     write_string ("D2");
+  /* APPLE LOCAL begin decloning */  
+  else if (DECL_MAYBE_IN_CHARGE_DESTRUCTOR_P (dtor))
+    /* This is the old-style "[unified]" destructor.  */
+    write_string ("D4");
+  /* APPLE LOCAL end decloning */  
   else
     abort ();
 }
@@ -1501,12 +1512,24 @@ write_type (tree type)
 	case BOOLEAN_TYPE:
 	case INTEGER_TYPE:  /* Includes wchar_t.  */
 	case REAL_TYPE:
+	{
+	  /* Handle any target-specific fundamental types.  */
+	  const char *target_mangling
+	    = targetm.mangle_fundamental_type (type);
+
+	  if (target_mangling)
+	    {
+	      write_string (target_mangling);
+	      return;
+	    }
+
 	  /* If this is a typedef, TYPE may not be one of
 	     the standard builtin type nodes, but an alias of one.  Use
 	     TYPE_MAIN_VARIANT to get to the underlying builtin type.  */
 	  write_builtin_type (TYPE_MAIN_VARIANT (type));
 	  ++is_builtin_type;
 	  break;
+	}
 
 	case COMPLEX_TYPE:
 	  write_char ('C');
@@ -1680,11 +1703,11 @@ write_builtin_type (tree type)
 	  if (itk == itk_none)
 	    {
 	      tree t = c_common_type_for_mode (TYPE_MODE (type),
-					       TREE_UNSIGNED (type));
+					       TYPE_UNSIGNED (type));
 	      if (type == t)
 		{
 		  if (TYPE_PRECISION (type) == 128)
-		    write_char (TREE_UNSIGNED (type) ? 'o' : 'n');
+		    write_char (TYPE_UNSIGNED (type) ? 'o' : 'n');
 		  else
 		    /* Couldn't find this type.  */
 		    abort ();

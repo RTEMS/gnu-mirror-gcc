@@ -145,7 +145,9 @@ bool
 probably_never_executed_bb_p (basic_block bb)
 {
   if (profile_info && flag_branch_probabilities)
-    return ((bb->count + profile_info->runs / 2) / profile_info->runs) == 0;
+    /* APPLE LOCAL begin hot/cold partitioning */
+    return (bb->count == 0);
+    /* APPLE LOCAL end hot/cold partitioning */
   return false;
 }
 
@@ -431,7 +433,7 @@ combine_predictions_for_bb (FILE *file, basic_block bb)
   edge e, first = NULL, second = NULL;
 
   for (e = bb->succ; e; e = e->succ_next)
-    if (!(bb->succ->flags & EDGE_EH))
+    if (!(e->flags & (EDGE_EH | EDGE_FAKE)))
       {
         nedges ++;
 	if (first && !second)
@@ -449,11 +451,14 @@ combine_predictions_for_bb (FILE *file, basic_block bb)
   if (nedges != 2)
     {
       for (e = bb->succ; e; e = e->succ_next)
-	if (!(bb->succ->flags & EDGE_EH))
+	if (!(e->flags & (EDGE_EH | EDGE_FAKE)))
 	  e->probability = (REG_BR_PROB_BASE + nedges / 2) / nedges;
 	else
 	  e->probability = 0;
       bb_ann (bb)->predictions = NULL;
+      if (file)
+	fprintf (file, "%i edges in bb %i predicted to even probabilities\n",
+		 nedges, bb->index);
       return;
     }
 
@@ -612,6 +617,9 @@ predict_loops (struct loops *loops_info, bool simpleloops)
       /* Free basic blocks from get_loop_body.  */
       free (bbs);
     }
+      
+  if (simpleloops)
+    iv_analysis_done ();
 }
 
 /* Statically estimate the probability that a branch will be taken and produce
@@ -1265,7 +1273,7 @@ propagate_freq (struct loop *loop)
 
   /* For each basic block we need to visit count number of his predecessors
      we need to visit first.  */
-  FOR_EACH_BB (bb)
+  FOR_BB_BETWEEN (bb, ENTRY_BLOCK_PTR, NULL, next_bb)
     {
       if (BLOCK_INFO (bb)->tovisit)
 	{
@@ -1578,6 +1586,14 @@ choose_function_section (void)
 	 of all instances.  For now just never set frequency for these.  */
       || DECL_ONE_ONLY (current_function_decl))
     return;
+
+  /* APPLE LOCAL hot/cold partitioning  */
+  /* If we are doing the partitioning optimization, let the optimization
+     choose the correct section into which to put things.  */
+  if (flag_reorder_blocks_and_partition)
+    return;
+  /* APPLE LOCAL hot/cold partitioning  */
+
   if (cfun->function_frequency == FUNCTION_FREQUENCY_HOT)
     DECL_SECTION_NAME (current_function_decl) =
       build_string (strlen (HOT_TEXT_SECTION_NAME), HOT_TEXT_SECTION_NAME);
