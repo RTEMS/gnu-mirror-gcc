@@ -243,8 +243,25 @@ public:
   { classic_table(); }
 };
 
-// libstdc++/5280
+// Per Liboriussen <liborius@stofanet.dk>
 void test03()
+{
+  bool test = true;
+  std::ctype_base::mask maskdata[256];
+  for (int i = 0; i < 256; ++i)
+    maskdata[i] = std::ctype_base::alpha;
+  std::ctype<char>* f = new std::ctype<char>(maskdata);
+  std::locale global;
+  std::locale loc(global, f);
+  for (int i = 0; i < 256; ++i) 
+    {
+      char ch = i;
+      VERIFY( std::isalpha(ch, loc) );
+    }
+}
+
+// libstdc++/5280
+void test04()
 {
 #ifdef _GLIBCPP_HAVE_SETENV 
   // Set the global locale to non-"C".
@@ -257,9 +274,27 @@ void test03()
     {
       test01();
       test02();
+      test03();
       setenv("LANG", oldLANG ? oldLANG : "", 1);
     }
 #endif
+}
+
+// http://gcc.gnu.org/ml/libstdc++/2002-05/msg00038.html
+void test05()
+{
+  bool test = true;
+
+  const char* tentLANG = setlocale(LC_ALL, "ja_JP.eucjp");
+  if (tentLANG != NULL)
+    {
+      std::string preLANG = tentLANG;
+      test01();
+      test02();
+      test03();
+      std::string postLANG = setlocale(LC_ALL, NULL);
+      VERIFY( preLANG == postLANG );
+    }
 }
 
 int main() 
@@ -267,5 +302,7 @@ int main()
   test01();
   test02();
   test03();
+  test04();
+  test05();
   return 0;
 }
