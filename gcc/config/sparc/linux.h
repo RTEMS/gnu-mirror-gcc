@@ -26,6 +26,7 @@ Boston, MA 02111-1307, USA.  */
 	builtin_define_std ("unix");		\
 	builtin_define_std ("linux");		\
 	builtin_define ("__gnu_linux__");	\
+	builtin_assert ("system=linux");	\
 	builtin_assert ("system=unix");		\
 	builtin_assert ("system=posix");	\
     }						\
@@ -229,6 +230,9 @@ do {									\
 #define LIBGCC2_LONG_DOUBLE_TYPE_SIZE 64
 #endif
 
+#undef DITF_CONVERSION_LIBFUNCS
+#define DITF_CONVERSION_LIBFUNCS 1
+
 #if !defined(USE_GNULIBC_1) && defined(HAVE_LD_EH_FRAME_HDR)
 #define LINK_EH_SPEC "%{!static:--eh-frame-hdr} "
 #endif
@@ -248,6 +252,8 @@ do {									\
 #undef DTORS_SECTION_ASM_OP
 
 #define TARGET_ASM_FILE_END file_end_indicate_exec_stack
+
+#define TARGET_HAS_F_SETLKW
 
 #undef LINK_GCC_C_SEQUENCE_SPEC
 #define LINK_GCC_C_SEQUENCE_SPEC \

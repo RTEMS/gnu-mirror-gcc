@@ -1,5 +1,5 @@
 /* Default initializers for a generic GCC target.
-   Copyright (C) 2001, 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the
@@ -59,6 +59,10 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #endif
 #ifndef TARGET_ASM_INTERNAL_LABEL
 #define TARGET_ASM_INTERNAL_LABEL default_internal_label
+#endif
+
+#ifndef TARGET_UNWIND_EMIT
+#define TARGET_UNWIND_EMIT default_unwind_emit
 #endif
 
 #ifndef TARGET_ASM_ASSEMBLE_VISIBILITY
@@ -190,6 +194,7 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 			TARGET_ASM_INTEGER,			\
 			TARGET_ASM_GLOBALIZE_LABEL,		\
 			TARGET_ASM_INTERNAL_LABEL,		\
+			TARGET_UNWIND_EMIT,			\
 			TARGET_ASM_ASSEMBLE_VISIBILITY,		\
 			TARGET_ASM_FUNCTION_PROLOGUE,		\
 			TARGET_ASM_FUNCTION_END_PROLOGUE,	\
@@ -300,6 +305,7 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #define TARGET_INSERT_ATTRIBUTES hook_void_tree_treeptr
 #define TARGET_FUNCTION_ATTRIBUTE_INLINABLE_P hook_bool_tree_false
 #define TARGET_MS_BITFIELD_LAYOUT_P hook_bool_tree_false
+#define TARGET_ALIGN_ANON_BITFIELD hook_bool_void_false
 #define TARGET_RTX_COSTS hook_bool_rtx_int_int_intp_false
 
 #ifndef TARGET_INIT_LIBFUNCS
@@ -314,7 +320,13 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 #define TARGET_ENCODE_SECTION_INFO default_encode_section_info
 #endif
 
+#define TARGET_FIXED_CONDITION_CODE_REGS hook_bool_uintp_uintp_false
+
+#define TARGET_CC_MODES_COMPATIBLE default_cc_modes_compatible
+
 #define TARGET_MACHINE_DEPENDENT_REORG 0
+
+#define TARGET_BUILD_BUILTIN_VA_LIST std_build_builtin_va_list
 
 #define TARGET_GET_PCH_VALIDITY default_get_pch_validity
 #define TARGET_PCH_VALID_P default_pch_valid_p
@@ -325,11 +337,14 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #define TARGET_STRUCT_VALUE_RTX default_struct_value_rtx
 #define TARGET_RETURN_IN_MEMORY default_return_in_memory
+#define TARGET_RETURN_IN_MSB hook_bool_tree_false
 
 #define TARGET_EXPAND_BUILTIN_SAVEREGS default_expand_builtin_saveregs
 #define TARGET_SETUP_INCOMING_VARARGS default_setup_incoming_varargs
 #define TARGET_STRICT_ARGUMENT_NAMING default_strict_argument_naming
-#define TARGET_PRETEND_OUTGOING_VARARGS_NAMED default_pretend_outgoing_varargs_named
+#define TARGET_PRETEND_OUTGOING_VARARGS_NAMED \
+  default_pretend_outgoing_varargs_named
+#define TARGET_SPLIT_COMPLEX_ARG NULL
 
 #define TARGET_CALLS {						\
    TARGET_PROMOTE_FUNCTION_ARGS,				\
@@ -337,11 +352,44 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
    TARGET_PROMOTE_PROTOTYPES,					\
    TARGET_STRUCT_VALUE_RTX,					\
    TARGET_RETURN_IN_MEMORY,					\
+   TARGET_RETURN_IN_MSB,					\
    TARGET_EXPAND_BUILTIN_SAVEREGS,				\
    TARGET_SETUP_INCOMING_VARARGS,				\
    TARGET_STRICT_ARGUMENT_NAMING,				\
    TARGET_PRETEND_OUTGOING_VARARGS_NAMED,			\
+   TARGET_SPLIT_COMPLEX_ARG,					\
    }
+
+
+/* C++ specific.  */
+#ifndef TARGET_CXX_GUARD_TYPE
+#define TARGET_CXX_GUARD_TYPE default_cxx_guard_type
+#endif
+
+#ifndef TARGET_CXX_GUARD_MASK_BIT
+#define TARGET_CXX_GUARD_MASK_BIT hook_bool_void_false
+#endif
+
+#ifndef TARGET_CXX_GET_COOKIE_SIZE
+#define TARGET_CXX_GET_COOKIE_SIZE default_cxx_get_cookie_size
+#endif
+
+#ifndef TARGET_CXX_COOKIE_HAS_SIZE
+#define TARGET_CXX_COOKIE_HAS_SIZE hook_bool_void_false
+#endif
+
+#ifndef TARGET_CXX_CDTOR_RETURNS_THIS
+#define TARGET_CXX_CDTOR_RETURNS_THIS hook_bool_void_false
+#endif
+
+#define TARGET_CXX			\
+  {					\
+    TARGET_CXX_GUARD_TYPE,		\
+    TARGET_CXX_GUARD_MASK_BIT,		\
+    TARGET_CXX_GET_COOKIE_SIZE,		\
+    TARGET_CXX_COOKIE_HAS_SIZE,		\
+    TARGET_CXX_CDTOR_RETURNS_THIS	\
+  }
 
 /* The whole shebang.  */
 #define TARGET_INITIALIZER			\
@@ -356,6 +404,7 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
   TARGET_INSERT_ATTRIBUTES,			\
   TARGET_FUNCTION_ATTRIBUTE_INLINABLE_P,	\
   TARGET_MS_BITFIELD_LAYOUT_P,			\
+  TARGET_ALIGN_ANON_BITFIELD,			\
   TARGET_INIT_BUILTINS,				\
   TARGET_EXPAND_BUILTIN,			\
   TARGET_INIT_LIBFUNCS,				\
@@ -376,9 +425,14 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
   TARGET_RTX_COSTS,				\
   TARGET_ADDRESS_COST,				\
   TARGET_DWARF_REGISTER_SPAN,                   \
+  TARGET_FIXED_CONDITION_CODE_REGS,		\
+  TARGET_CC_MODES_COMPATIBLE,			\
   TARGET_MACHINE_DEPENDENT_REORG,		\
+  TARGET_BUILD_BUILTIN_VA_LIST,			\
   TARGET_GET_PCH_VALIDITY,			\
   TARGET_PCH_VALID_P,				\
+  TARGET_CALLS,					\
+  TARGET_CXX,					\
   TARGET_HAVE_NAMED_SECTIONS,			\
   TARGET_HAVE_CTORS_DTORS,			\
   TARGET_HAVE_TLS,				\
@@ -386,7 +440,6 @@ Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
   TARGET_TERMINATE_DW2_EH_FRAME_INFO,		\
   TARGET_ASM_FILE_START_APP_OFF,		\
   TARGET_ASM_FILE_START_FILE_DIRECTIVE,		\
-  TARGET_CALLS,					\
 }
 
 #include "hooks.h"

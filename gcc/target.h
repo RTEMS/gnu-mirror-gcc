@@ -1,5 +1,5 @@
 /* Data structure definitions for a generic GCC target.
-   Copyright (C) 2001, 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the
@@ -76,6 +76,9 @@ struct gcc_target
 
     /* Output an internal label.  */
     void (* internal_label) (FILE *, const char *, unsigned long);
+
+    /* Emit any directives required to unwind this instruction.  */
+    void (* unwind_emit) (FILE *, rtx);
 
     /* Emit an assembler directive to set visibility for the symbol
        associated with the tree decl.  */
@@ -207,7 +210,7 @@ struct gcc_target
        correspondingly starts and finishes.  The function defined by
        init_dfa_pre_cycle_insn and init_dfa_post_cycle_insn are used
        to initialize the corresponding insns.  The default values of
-       the memebers result in not changing the automaton state when
+       the members result in not changing the automaton state when
        the new simulated processor cycle correspondingly starts and
        finishes.  */
     void (* init_dfa_pre_cycle_insn) (void);
@@ -262,9 +265,8 @@ struct gcc_target
        fourth argument is the cost of the dependence as estimated by
        the scheduler.  The last argument is the distance in cycles 
        between the already scheduled insn (first parameter) and the
-       the second insn (second parameter).
-    */
-    bool (* is_costly_dependence) PARAMS ((rtx, rtx, rtx, int, int));
+       the second insn (second parameter).  */
+    bool (* is_costly_dependence) (rtx, rtx, rtx, int, int);
   } sched;
 
   /* Given two decls, merge their attributes and return the result.  */
@@ -295,6 +297,9 @@ struct gcc_target
   /* Return true if bitfields in RECORD_TYPE should follow the
      Microsoft Visual C++ bitfield layout rules.  */
   bool (* ms_bitfield_layout_p) (tree record_type);
+
+  /* Return true if anonymous bitfields affect structure alignment.  */
+  bool (* align_anon_bitfield) (void);
 
   /* Set up target-specific built-in functions.  */
   void (* init_builtins) (void);
@@ -378,9 +383,29 @@ struct gcc_target
      hook should return NULL_RTX.  */
   rtx (* dwarf_register_span) (rtx);
 
+  /* Fetch the fixed register(s) which hold condition codes, for
+     targets where it makes sense to look for duplicate assignments to
+     the condition codes.  This should return true if there is such a
+     register, false otherwise.  The arguments should be set to the
+     fixed register numbers.  Up to two condition code registers are
+     supported.  If there is only one for this target, the int pointed
+     at by the second argument should be set to -1.  */
+  bool (* fixed_condition_code_regs) (unsigned int *, unsigned int *);
+
+  /* If two condition code modes are compatible, return a condition
+     code mode which is compatible with both, such that a comparison
+     done in the returned mode will work for both of the original
+     modes.  If the condition code modes are not compatible, return
+     VOIDmode.  */
+  enum machine_mode (* cc_modes_compatible) (enum machine_mode,
+					     enum machine_mode);
+
   /* Do machine-dependent code transformations.  Called just before
      delayed-branch scheduling.  */
   void (* machine_dependent_reorg) (void);
+
+  /* Create the __builtin_va_list type.  */
+  tree (* build_builtin_va_list) (void);
 
   /* Validity-checking routines for PCH files, target-specific.
      get_pch_validity returns a pointer to the data to be stored,
@@ -390,6 +415,44 @@ struct gcc_target
   */
   void * (* get_pch_validity) (size_t *);
   const char * (* pch_valid_p) (const void *, size_t);
+
+  /* Functions relating to calls - argument passing, returns, etc.  */
+  struct calls {
+    bool (*promote_function_args) (tree fntype);
+    bool (*promote_function_return) (tree fntype);
+    bool (*promote_prototypes) (tree fntype);
+    rtx (*struct_value_rtx) (tree fndecl, int incoming);
+    bool (*return_in_memory) (tree type, tree fndecl);
+    bool (*return_in_msb) (tree type);
+    rtx (*expand_builtin_saveregs) (void);
+    /* Returns pretend_argument_size.  */
+    void (*setup_incoming_varargs) (CUMULATIVE_ARGS *ca, enum machine_mode mode,
+				    tree type, int *pretend_arg_size,
+				    int second_time);
+    bool (*strict_argument_naming) (CUMULATIVE_ARGS *ca);
+    /* Returns true if we should use SETUP_INCOMING_VARARGS and/or
+       targetm.calls.strict_argument_naming().  */
+    bool (*pretend_outgoing_varargs_named) (CUMULATIVE_ARGS *ca);
+
+    /* Given a complex type T, return true if a parameter of type T
+       should be passed as two scalars.  */
+    bool (* split_complex_arg) (tree type);
+  } calls;
+
+  /* Functions specific to the C++ frontend.  */
+  struct cxx {
+    /* Return the integer type used for guard variables.  */
+    tree (*guard_type) (void);
+    /* Return true if only the low bit of the guard should be tested.  */
+    bool (*guard_mask_bit) (void);
+    /* Returns the size of the array cookie for an array of type.  */
+    tree (*get_cookie_size) (tree);
+    /* Returns true if the element size should be stored in the
+       array cookie.  */
+    bool (*cookie_has_size) (void);
+    /* Returns true if constructors and destructors return "this".  */
+    bool (*cdtor_returns_this) (void);
+  } cxx;
 
   /* Leave the boolean fields at the end.  */
 
@@ -417,22 +480,7 @@ struct gcc_target
      at the beginning of assembly output.  */
   bool file_start_file_directive;
 
-  /* Functions relating to calls - argument passing, returns, etc.  */
-  struct calls {
-    bool (*promote_function_args) (tree fntype);
-    bool (*promote_function_return) (tree fntype);
-    bool (*promote_prototypes) (tree fntype);
-    rtx (*struct_value_rtx) (tree fndecl, int incoming);
-    bool (*return_in_memory) (tree type, tree fndecl);
-    rtx (*expand_builtin_saveregs) (void);
-    /* Returns pretend_argument_size.  */
-    void (*setup_incoming_varargs) (CUMULATIVE_ARGS *ca, enum machine_mode mode,
-				    tree type, int *pretend_arg_size, int second_time);
-    bool (*strict_argument_naming) (CUMULATIVE_ARGS *ca);
-    /* Returns true if we should use SETUP_INCOMING_VARARGS and/or
-       STRICT_ARGUMENT_NAMING.  */
-    bool (*pretend_outgoing_varargs_named) (CUMULATIVE_ARGS *ca);
-  } calls;
+  /* Leave the boolean fields at the end.  */
 };
 
 extern struct gcc_target targetm;

@@ -117,6 +117,7 @@ extern rtx expand_builtin_frob_return_addr (tree);
 extern rtx expand_builtin_dwarf_sp_column (void);
 extern void expand_builtin_eh_return (tree, tree);
 extern void expand_eh_return (void);
+extern rtx expand_builtin_extend_pointer (tree);
 extern rtx get_exception_pointer (struct function *);
 extern int duplicate_eh_regions (struct function *, struct inline_remap *);
 
@@ -144,7 +145,7 @@ extern tree (*lang_eh_runtime_type) (tree);
 
 #ifndef MUST_USE_SJLJ_EXCEPTIONS
 # if !(defined (EH_RETURN_DATA_REGNO)			\
-       && (defined (IA64_UNWIND_INFO)			\
+       && (defined (TARGET_UNWIND_INFO)			\
 	   || (DWARF2_UNWIND_INFO			\
 	       && (defined (EH_RETURN_HANDLER_RTX)	\
 		   || defined (HAVE_eh_return)))))
@@ -166,8 +167,8 @@ extern tree (*lang_eh_runtime_type) (tree);
 #  if !defined(EH_RETURN_HANDLER_RTX) && !defined(HAVE_eh_return)
     #error "EH_RETURN_HANDLER_RTX or eh_return required"
 #  endif
-#  if !defined(DWARF2_UNWIND_INFO) && !defined(IA64_UNWIND_INFO)
-    #error "{DWARF2,IA64}_UNWIND_INFO required"
+#  if !defined(DWARF2_UNWIND_INFO) && !defined(TARGET_UNWIND_INFO)
+    #error "{DWARF2,TARGET}_UNWIND_INFO required"
 #  endif
 # endif
 #else

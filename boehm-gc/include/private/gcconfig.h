@@ -62,7 +62,7 @@
 /* Determine the machine type: */
 # if defined(__arm__) || defined(__thumb__)
 #    define ARM32
-#    if !defined(LINUX)
+#    if !defined(LINUX) && !defined(NETBSD)
 #      define NOSYS
 #      define mach_type_known
 #    endif
@@ -616,6 +616,7 @@
 #   ifdef LINUX
 #       define OS_TYPE "LINUX"
 #       define STACKBOTTOM ((ptr_t)0xf0000000)
+#	define USE_MMAP
 #       define USE_GENERIC_PUSH_REGS
 		/* We never got around to the assembly version. */
 /* #       define MPROTECT_VDB - Reported to not work  9/17/01 */
@@ -1688,8 +1689,13 @@
 #   ifdef NETBSD
 #       define OS_TYPE "NETBSD"
 #       define HEURISTIC2
-       extern char etext[];
-#       define DATASTART ((ptr_t)(etext))
+#	ifdef __ELF__
+#          define DATASTART GC_data_start
+#	   define DYNAMIC_LOADING
+#	else
+           extern char etext[];
+#          define DATASTART ((ptr_t)(etext))
+#	endif
 #       define USE_GENERIC_PUSH_REGS
 #   endif
 #   ifdef LINUX

@@ -90,6 +90,9 @@ namespace __cxxabiv1
       {
 	base += padding_size;
 	reinterpret_cast <std::size_t *> (base)[-1] = element_count;
+#ifdef _GLIBCXX_ELTSIZE_IN_COOKIE
+	reinterpret_cast <std::size_t *> (base)[-2] = element_size;
+#endif
       }
     try
       {
@@ -125,6 +128,9 @@ namespace __cxxabiv1
       {
 	base += padding_size;
 	reinterpret_cast<std::size_t *>(base)[-1] = element_count;
+#ifdef _GLIBCXX_ELTSIZE_IN_COOKIE
+	reinterpret_cast <std::size_t *> (base)[-2] = element_size;
+#endif
       }
     try
       {
@@ -143,7 +149,7 @@ namespace __cxxabiv1
   }
   
   // Construct array.
-  extern "C" void
+  extern "C" __cxa_vec_ctor_return_type
   __cxa_vec_ctor(void *array_address,
 		 std::size_t element_count,
 		 std::size_t element_size,
@@ -167,10 +173,11 @@ namespace __cxxabiv1
 	}
 	__throw_exception_again;
       }
+    _GLIBCXX_CXA_VEC_CTOR_RETURN (array_address);
   }
   
   // Construct an array by copying.
-  extern "C" void
+  extern "C" __cxa_vec_ctor_return_type
   __cxa_vec_cctor(void *dest_array,
 		  void *src_array,
 		  std::size_t element_count,
@@ -197,6 +204,7 @@ namespace __cxxabiv1
 	}
 	__throw_exception_again;
       }
+    _GLIBCXX_CXA_VEC_CTOR_RETURN (dest_array);
   }
   
   // Destruct array.
@@ -282,7 +290,10 @@ namespace __cxxabiv1
 		    void (*destructor) (void *),
 		    void (*dealloc) (void *))
   {
-    char *base = static_cast<char *>(array_address);
+    if (!array_address)
+      return;
+
+    char* base = static_cast<char *>(array_address);
   
     if (padding_size)
       {
@@ -312,9 +323,12 @@ namespace __cxxabiv1
 		     void (*destructor) (void *),
 		    void (*dealloc) (void *, std::size_t))
   {
-    char *base = static_cast <char *> (array_address);
+    if (!array_address)
+      return;
+
+    char* base = static_cast <char *> (array_address);
     std::size_t size = 0;
-    
+
     if (padding_size)
       {
 	std::size_t element_count = reinterpret_cast<std::size_t *> (base)[-1];

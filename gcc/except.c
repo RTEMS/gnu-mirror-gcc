@@ -1,6 +1,6 @@
 /* Implements exception handling.
    Copyright (C) 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Mike Stump <mrs@cygnus.com>.
 
 This file is part of GCC.
@@ -189,6 +189,7 @@ struct eh_region GTY(())
     struct eh_region_u_fixup {
       tree cleanup_exp;
       struct eh_region *real_region;
+      bool resolved;
     } GTY ((tag ("ERT_FIXUP"))) fixup;
   } GTY ((desc ("%0.type"))) u;
 
@@ -411,10 +412,8 @@ init_eh (void)
       tmp = build_int_2 (FIRST_PSEUDO_REGISTER + 2 - 1, 0);
 #endif
 #else
-      /* This is 2 for builtin_setjmp, plus whatever the target requires
-	 via STACK_SAVEAREA_MODE (SAVE_NONLOCAL).  */
-      tmp = build_int_2 ((GET_MODE_SIZE (STACK_SAVEAREA_MODE (SAVE_NONLOCAL))
-			  / GET_MODE_SIZE (Pmode)) + 2 - 1, 0);
+      /* builtin_setjmp takes a pointer to 5 words.  */
+      tmp = build_int_2 (5 * BITS_PER_WORD / POINTER_SIZE - 1, 0);
 #endif
       tmp = build_index_type (tmp);
       tmp = build_array_type (ptr_type_node, tmp);
@@ -890,29 +889,49 @@ collect_eh_region_array (void)
 }
 
 static void
+resolve_one_fixup_region (struct eh_region *fixup)
+{
+  struct eh_region *cleanup, *real;
+  int j, n;
+
+  n = cfun->eh->last_region_number;
+  cleanup = 0;
+
+  for (j = 1; j <= n; ++j)
+    {
+      cleanup = cfun->eh->region_array[j];
+      if (cleanup && cleanup->type == ERT_CLEANUP
+	  && cleanup->u.cleanup.exp == fixup->u.fixup.cleanup_exp)
+	break;
+    }
+  if (j > n)
+    abort ();
+
+  real = cleanup->outer;
+  if (real && real->type == ERT_FIXUP)
+    {
+      if (!real->u.fixup.resolved)
+	resolve_one_fixup_region (real);
+      real = real->u.fixup.real_region;
+    }
+
+  fixup->u.fixup.real_region = real;
+  fixup->u.fixup.resolved = true;
+}
+
+static void
 resolve_fixup_regions (void)
 {
-  int i, j, n = cfun->eh->last_region_number;
+  int i, n = cfun->eh->last_region_number;
 
   for (i = 1; i <= n; ++i)
     {
       struct eh_region *fixup = cfun->eh->region_array[i];
-      struct eh_region *cleanup = 0;
 
-      if (! fixup || fixup->type != ERT_FIXUP)
+      if (!fixup || fixup->type != ERT_FIXUP || fixup->u.fixup.resolved)
 	continue;
 
-      for (j = 1; j <= n; ++j)
-	{
-	  cleanup = cfun->eh->region_array[j];
-	  if (cleanup && cleanup->type == ERT_CLEANUP
-	      && cleanup->u.cleanup.exp == fixup->u.fixup.cleanup_exp)
-	    break;
-	}
-      if (j > n)
-	abort ();
-
-      fixup->u.fixup.real_region = cleanup->outer;
+      resolve_one_fixup_region (fixup);
     }
 }
 
@@ -1027,7 +1046,18 @@ remove_unreachable_regions (rtx insns)
     }
 
   for (insn = insns; insn; insn = NEXT_INSN (insn))
-    reachable[uid_region_num[INSN_UID (insn)]] = true;
+    {
+      reachable[uid_region_num[INSN_UID (insn)]] = true;
+
+      if (GET_CODE (insn) == CALL_INSN
+	  && GET_CODE (PATTERN (insn)) == CALL_PLACEHOLDER)
+	for (i = 0; i < 3; i++)
+	  {
+	    rtx sub = XEXP (PATTERN (insn), i);
+	    for (; sub ; sub = NEXT_INSN (sub))
+	      reachable[uid_region_num[INSN_UID (sub)]] = true;
+	  }
+    }
 
   for (i = cfun->eh->last_region_number; i > 0; --i)
     {
@@ -2047,8 +2077,12 @@ sjlj_emit_function_enter (rtx dispatch_label)
   if (cfun->uses_eh_lsda)
     {
       char buf[20];
+      rtx sym;
+
       ASM_GENERATE_INTERNAL_LABEL (buf, "LLSDA", current_function_funcdef_no);
-      emit_move_insn (mem, gen_rtx_SYMBOL_REF (Pmode, ggc_strdup (buf)));
+      sym = gen_rtx_SYMBOL_REF (Pmode, ggc_strdup (buf));
+      SYMBOL_REF_FLAGS (sym) = SYMBOL_FLAG_LOCAL;
+      emit_move_insn (mem, sym);
     }
   else
     emit_move_insn (mem, const0_rtx);
@@ -2426,14 +2460,14 @@ void
 for_each_eh_label (void (*callback) (rtx))
 {
   htab_traverse (cfun->eh->exception_handler_label_map, for_each_eh_label_1,
-		 (void *)callback);
+		 (void *) &callback);
 }
 
 static int
 for_each_eh_label_1 (void **pentry, void *data)
 {
   struct ehl_map_entry *entry = *(struct ehl_map_entry **)pentry;
-  void (*callback) (rtx) = (void (*) (rtx)) data;
+  void (*callback) (rtx) = *(void (**) (rtx)) data;
 
   (*callback) (entry->label);
   return 1;
@@ -3053,6 +3087,26 @@ expand_eh_return (void)
 
   emit_label (around_label);
 }
+
+/* Convert a ptr_mode address ADDR_TREE to a Pmode address controlled by
+   POINTERS_EXTEND_UNSIGNED and return it.  */
+
+rtx
+expand_builtin_extend_pointer (tree addr_tree)
+{
+  rtx addr = expand_expr (addr_tree, NULL_RTX, ptr_mode, 0);
+  int extend;
+
+#ifdef POINTERS_EXTEND_UNSIGNED
+  extend = POINTERS_EXTEND_UNSIGNED;
+#else
+  /* The previous EH code did an unsigned extend by default, so we do this also
+     for consistency.  */
+  extend = 1;
+#endif
+
+  return convert_modes (word_mode, ptr_mode, addr, extend);
+}
 
 /* In the following functions, we represent entries in the action table
    as 1-based indices.  Special cases are:
@@ -3198,8 +3252,18 @@ collect_one_action_chain (htab_t ar_hash, struct eh_region *region)
       /* An exception specification adds its filter to the
 	 beginning of the chain.  */
       next = collect_one_action_chain (ar_hash, region->outer);
-      return add_action_record (ar_hash, region->u.allowed.filter,
-				next < 0 ? 0 : next);
+
+      /* If there is no next action, terminate the chain.  */
+      if (next == -1)
+	next = 0;
+      /* If all outer actions are cleanups or must_not_throw,
+	 we'll have no action record for it, since we had wanted
+	 to encode these states in the call-site record directly.
+	 Add a cleanup action to the chain to catch these.  */
+      else if (next <= 0)
+	next = add_action_record (ar_hash, 0, 0);
+      
+      return add_action_record (ar_hash, region->u.allowed.filter, next);
 
     case ERT_MUST_NOT_THROW:
       /* A must-not-throw region with no inner handlers or cleanups
@@ -3554,7 +3618,8 @@ output_function_exception_table (void)
   if (! cfun->uses_eh_lsda)
     return;
 
-#ifdef IA64_UNWIND_INFO
+#ifdef TARGET_UNWIND_INFO
+  /* TODO: Move this into target file.  */
   fputs ("\t.personality\t", asm_out_file);
   output_addr_const (asm_out_file, eh_personality_libfunc);
   fputs ("\n\t.handlerdata\n", asm_out_file);

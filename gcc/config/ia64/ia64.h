@@ -87,6 +87,10 @@ extern int target_flags;
 
 #define MASK_INLINE_INT_DIV_THR   0x00001000 /* inline div, max throughput.  */
 
+#define MASK_INLINE_SQRT_LAT      0x00002000 /* inline sqrt, min latency.  */
+
+#define MASK_INLINE_SQRT_THR      0x00004000 /* inline sqrt, max throughput. */
+
 #define MASK_DWARF2_ASM 0x40000000	/* test dwarf2 line info via gas.  */
 
 #define MASK_EARLY_STOP_BITS 0x00002000 /* tune stop bits for the model.  */
@@ -127,7 +131,23 @@ extern int target_flags;
 #define TARGET_INLINE_INT_DIV \
   (target_flags & (MASK_INLINE_INT_DIV_LAT | MASK_INLINE_INT_DIV_THR))
 
+#define TARGET_INLINE_SQRT_LAT (target_flags & MASK_INLINE_SQRT_LAT)
+
+#define TARGET_INLINE_SQRT_THR (target_flags & MASK_INLINE_SQRT_THR)
+
+#define TARGET_INLINE_SQRT \
+  (target_flags & (MASK_INLINE_SQRT_LAT | MASK_INLINE_SQRT_THR))
+
 #define TARGET_DWARF2_ASM	(target_flags & MASK_DWARF2_ASM)
+
+/* If the assembler supports thread-local storage, assume that the
+   system does as well.  If a particular target system has an
+   assembler that supports TLS -- but the rest of the system does not
+   support TLS -- that system should explicit define TARGET_HAVE_TLS
+   to false in its own configuration file.  */
+#if !defined(TARGET_HAVE_TLS) && defined(HAVE_AS_TLS)
+#define TARGET_HAVE_TLS true
+#endif
 
 extern int ia64_tls_size;
 #define TARGET_TLS14		(ia64_tls_size == 14)
@@ -186,6 +206,10 @@ extern int ia64_tls_size;
       N_("Generate inline integer division, optimize for latency") },	\
   { "inline-int-divide-max-throughput", MASK_INLINE_INT_DIV_THR,	\
       N_("Generate inline integer division, optimize for throughput") },\
+  { "inline-sqrt-min-latency", MASK_INLINE_SQRT_LAT,			\
+      N_("Generate inline square root, optimize for latency") },	\
+  { "inline-sqrt-max-throughput", MASK_INLINE_SQRT_THR,			\
+      N_("Generate inline square root, optimize for throughput") },     \
   { "dwarf2-asm", 	MASK_DWARF2_ASM,				\
       N_("Enable Dwarf 2 line debug info via GNU as")},			\
   { "no-dwarf2-asm", 	-MASK_DWARF2_ASM,				\
@@ -1304,6 +1328,13 @@ enum reg_class
 #define FUNCTION_ARG_PASS_BY_REFERENCE(CUM, MODE, TYPE, NAMED) \
   ia64_function_arg_pass_by_reference (&CUM, MODE, TYPE, NAMED)
 
+/* Nonzero if we do not know how to pass TYPE solely in registers.  */
+
+#define MUST_PASS_IN_STACK(MODE, TYPE) \
+  ((TYPE) != 0							\
+   && (TREE_CODE (TYPE_SIZE (TYPE)) != INTEGER_CST		\
+       || TREE_ADDRESSABLE (TYPE)))
+
 /* A C type for declaring a variable that is used as the first argument of
    `FUNCTION_ARG' and other related values.  For some target machines, the type
    `int' suffices and can hold the number of bytes of argument so far.  */
@@ -1319,7 +1350,7 @@ typedef struct ia64_args
 /* A C statement (sans semicolon) for initializing the variable CUM for the
    state at the beginning of the argument list.  */
 
-#define INIT_CUMULATIVE_ARGS(CUM, FNTYPE, LIBNAME, INDIRECT) \
+#define INIT_CUMULATIVE_ARGS(CUM, FNTYPE, LIBNAME, INDIRECT, N_NAMED_ARGS) \
 do {									\
   (CUM).words = 0;							\
   (CUM).int_regs = 0;							\
@@ -1368,7 +1399,7 @@ do {									\
    On many machines, no registers can be used for this purpose since all
    function arguments are pushed on the stack.  */
 #define FUNCTION_ARG_REGNO_P(REGNO) \
-(((REGNO) >= GR_ARG_FIRST && (REGNO) < (GR_ARG_FIRST + MAX_ARGUMENT_SLOTS)) \
+(((REGNO) >= AR_ARG_FIRST && (REGNO) < (AR_ARG_FIRST + MAX_ARGUMENT_SLOTS)) \
  || ((REGNO) >= FR_ARG_FIRST && (REGNO) < (FR_ARG_FIRST + MAX_ARGUMENT_SLOTS)))
 
 /* Implement `va_arg'.  */
@@ -1413,11 +1444,6 @@ do {									\
    and union return values are decided by the `RETURN_IN_MEMORY' macro.  */
 
 #define DEFAULT_PCC_STRUCT_RETURN 0
-
-/* If the structure value address is passed in a register, then
-   `STRUCT_VALUE_REGNUM' should be the number of that register.  */
-
-#define STRUCT_VALUE_REGNUM GR_REG (8)
 
 
 /* Caller-Saves Register Allocation */
@@ -2298,8 +2324,7 @@ do {									\
 
 extern int ia64_final_schedule;
 
-#define IA64_UNWIND_INFO	1
-#define IA64_UNWIND_EMIT(f,i)	process_for_unwind_directive (f,i)
+#define TARGET_UNWIND_INFO	1
 
 #define EH_RETURN_DATA_REGNO(N) ((N) < 4 ? (N) + 15 : INVALID_REGNUM)
 
