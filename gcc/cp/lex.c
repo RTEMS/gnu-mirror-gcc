@@ -239,6 +239,8 @@ struct resword
    _true_.  */
 #define D_EXT		0x01	/* GCC extension */
 #define D_ASM		0x02	/* in C99, but has a switch to turn it off */
+/* APPLE LOCAL Objective-C++ */
+#define D_OBJC		0x10	/* Objective C only */
 
 CONSTRAINT(ridbits_fit, RID_LAST_MODIFIER < sizeof(unsigned long) * CHAR_BIT);
 
@@ -266,6 +268,8 @@ static const struct resword reswords[] =
   { "__inline__",	RID_INLINE,	0 },
   { "__label__",	RID_LABEL,	0 },
   { "__null",		RID_NULL,	0 },
+   /* APPLE LOCAL private extern */
+  { "__private_extern__", RID_PRIVATE_EXTERN, 0 },
   { "__offsetof",       RID_OFFSETOF,   0 },
   { "__offsetof__",     RID_OFFSETOF,   0 },
   { "__real",		RID_REALPART,	0 },
@@ -343,7 +347,33 @@ static const struct resword reswords[] =
   { "volatile",		RID_VOLATILE,	0 },
   { "wchar_t",          RID_WCHAR,	0 },
   { "while",		RID_WHILE,	0 },
+  /* APPLE LOCAL begin Objective-C++ */
+  { "id",		RID_ID,			D_OBJC },
 
+  /* These objc keywords are recognized only immediately after
+     an '@'.  Note that some of these overlap with existing C++ keywords. */
+/*{ "class",		RID_AT_CLASS,		D_OBJC },  OVERLAP */
+  { "compatibility_alias", RID_AT_ALIAS,	D_OBJC },
+  { "defs",		RID_AT_DEFS,		D_OBJC },
+  { "encode",		RID_AT_ENCODE,		D_OBJC },
+  { "end",		RID_AT_END,		D_OBJC },
+  { "implementation",	RID_AT_IMPLEMENTATION,	D_OBJC },
+  { "interface",	RID_AT_INTERFACE,	D_OBJC },
+/*{ "private",		RID_AT_PRIVATE,		D_OBJC },  OVERLAP */
+/*{ "protected",	RID_AT_PROTECTED,	D_OBJC },  OVERLAP */
+  { "protocol",		RID_AT_PROTOCOL,	D_OBJC },
+/*{ "public",		RID_AT_PUBLIC,		D_OBJC },  OVERLAP */
+  { "selector",		RID_AT_SELECTOR,	D_OBJC },
+
+  /* These are recognized only in protocol-qualifier context
+     (see above) */
+  { "bycopy",		RID_BYCOPY,		D_OBJC },
+  { "byref",		RID_BYREF,		D_OBJC },
+  { "in",		RID_IN,			D_OBJC },
+  { "inout",		RID_INOUT,		D_OBJC },
+  { "oneway",		RID_ONEWAY,		D_OBJC },
+  { "out",		RID_OUT,		D_OBJC },
+  /* APPLE LOCAL end Objective-C++ */
 };
 
 void
@@ -354,6 +384,9 @@ init_reswords (void)
   int mask = ((flag_no_asm ? D_ASM : 0)
 	      | (flag_no_gnu_keywords ? D_EXT : 0));
 
+  /* APPLE LOCAL objc++ */
+  mask |= D_OBJC;
+
   ridpointers = ggc_calloc ((int) RID_MAX, sizeof (tree));
   for (i = 0; i < ARRAY_SIZE (reswords); i++)
     {
@@ -363,6 +396,25 @@ init_reswords (void)
       if (! (reswords[i].disable & mask))
 	C_IS_RESERVED_WORD (id) = 1;
     }
+    
+  /* APPLE LOCAL begin private extern  Radar 2872481 --ilr */
+  /* For C++ there is always a -D__private_extern__=extern on the
+     command line.  However, if -fpreprocessed was specified then
+     macros are not expanded so the -D is meaningless.  But this
+     replacement is required for C++.  There for we have to "pretend"
+     that '__private_extern__' is 'extern' and we can do this simply by
+     making the rid code for '__private_extern__' be the same as for
+     extern.  Note, we probably could always do this here since
+     '__private_extern__' is always to be treated like 'extern' for
+     c++.  But we'll be conservative and only do it when -fpreprocessed
+     is specified and depend on the macro substitution in all other
+     cases.  */
+  if (flag_preprocessed)
+    {
+      id = get_identifier ("__private_extern__");
+      C_RID_CODE (id) = RID_EXTERN;
+    }
+  /* APPLE LOCAL end private extern  Radar 2872481 --ilr */
 }
 
 static void
@@ -427,6 +479,14 @@ cxx_init (void)
   init_repo (main_input_filename);
 
   pop_srcloc();
+
+  /* APPLE LOCAL gdb only used symbols */
+#ifdef DBX_ONLY_USED_SYMBOLS
+  /* By default we want to use -gused for C++ and Objective-C++.  */
+  if (flag_debug_only_used_symbols == -1)
+    flag_debug_only_used_symbols = 1;
+#endif
+
   return true;
 }
 
@@ -627,26 +687,18 @@ unqualified_name_lookup_error (tree name)
       if (name != ansi_opname (ERROR_MARK))
 	error ("`%D' not defined", name);
     }
-  else if (current_function_decl == 0)
-    error ("`%D' was not declared in this scope", name);
   else
     {
-      if (IDENTIFIER_NAMESPACE_VALUE (name) != error_mark_node
-	  || IDENTIFIER_ERROR_LOCUS (name) != current_function_decl)
+      error ("`%D' was not declared in this scope", name);
+      /* Prevent repeated error messages by creating a VAR_DECL with
+	 this NAME in the innermost block scope.  */
+      if (current_function_decl)
 	{
-	  static int undeclared_variable_notice;
-
-	  error ("`%D' undeclared (first use this function)", name);
-
-	  if (! undeclared_variable_notice)
-	    {
-	      error ("(Each undeclared identifier is reported only once for each function it appears in.)");
-	      undeclared_variable_notice = 1;
-	    }
+	  tree decl;
+	  decl = build_decl (VAR_DECL, name, error_mark_node);
+	  DECL_CONTEXT (decl) = current_function_decl;
+	  push_local_binding (name, decl, 0);
 	}
-      /* Prevent repeated error messages.  */
-      SET_IDENTIFIER_NAMESPACE_VALUE (name, error_mark_node);
-      SET_IDENTIFIER_ERROR_LOCUS (name, current_function_decl);
     }
 
   return error_mark_node;
