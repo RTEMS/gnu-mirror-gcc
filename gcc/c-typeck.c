@@ -572,6 +572,12 @@ comptypes (type1, type2)
 	val = 1;
       break;
 
+    case VECTOR_TYPE:
+      /* The target might allow certain vector types to be compatible.  */
+      val = (*targetm.vector_opaque_p) (t1)
+	|| (*targetm.vector_opaque_p) (t2);
+      break;
+
     default:
       break;
     }
@@ -1144,7 +1150,7 @@ build_component_ref (datum, component)
 	 end does it - by giving the anonymous entities each a
 	 separate name and type, and then have build_component_ref
 	 recursively call itself.  We can't do that here.  */
-      for (; field; field = TREE_CHAIN (field))
+      do
 	{
 	  tree subdatum = TREE_VALUE (field);
 
@@ -1161,7 +1167,10 @@ build_component_ref (datum, component)
 	    warn_deprecated_use (subdatum);
 
 	  datum = ref;
+
+	  field = TREE_CHAIN (field);
 	}
+      while (field);
 
       return ref;
     }
@@ -1454,6 +1463,17 @@ build_external_ref (id, fun)
     {
       ref = DECL_INITIAL (ref);
       TREE_CONSTANT (ref) = 1;
+    }
+  else if (current_function_decl != 0
+	   && DECL_CONTEXT (current_function_decl) != 0
+	   && (TREE_CODE (ref) == VAR_DECL
+	       || TREE_CODE (ref) == PARM_DECL
+	       || TREE_CODE (ref) == FUNCTION_DECL))
+    {
+      tree context = decl_function_context (ref);
+    
+      if (context != 0 && context != current_function_decl)
+	DECL_NONLOCAL (ref) = 1;
     }
 
   return ref;
@@ -3331,7 +3351,7 @@ c_mark_addressable (exp)
 	    pedwarn ("address of register variable `%s' requested",
 		     IDENTIFIER_POINTER (DECL_NAME (x)));
 	  }
-	put_var_into_stack (x);
+	put_var_into_stack (x, /*rescan=*/true);
 
 	/* drops in */
       case FUNCTION_DECL:
@@ -4071,6 +4091,11 @@ convert_for_assignment (type, rhs, errtype, fundecl, funname, parmnum)
       rhs = build1 (NOP_EXPR, type, rhs);
       return rhs;
     }
+  /* Some types can interconvert without explicit casts.  */
+  else if (codel == VECTOR_TYPE && coder == VECTOR_TYPE
+	   && ((*targetm.vector_opaque_p) (type)
+	       || (*targetm.vector_opaque_p) (rhstype)))
+    return convert (type, rhs);
   /* Arithmetic types all interconvert, and enum is treated like int.  */
   else if ((codel == INTEGER_TYPE || codel == REAL_TYPE 
 	    || codel == ENUMERAL_TYPE || codel == COMPLEX_TYPE
@@ -4179,12 +4204,20 @@ convert_for_assignment (type, rhs, errtype, fundecl, funname, parmnum)
     {
       tree ttl = TREE_TYPE (type);
       tree ttr = TREE_TYPE (rhstype);
+      bool is_opaque_pointer;
+
+      /* Opaque pointers are treated like void pointers.  */
+      is_opaque_pointer = ((*targetm.vector_opaque_p) (type)
+                           || (*targetm.vector_opaque_p) (rhstype))
+        && TREE_CODE (ttl) == VECTOR_TYPE
+        && TREE_CODE (ttr) == VECTOR_TYPE;
 
       /* Any non-function converts to a [const][volatile] void *
 	 and vice versa; otherwise, targets must be the same.
 	 Meanwhile, the lhs target must have all the qualifiers of the rhs.  */
       if (VOID_TYPE_P (ttl) || VOID_TYPE_P (ttr)
 	  || comp_target_types (type, rhstype, 0)
+	  || is_opaque_pointer
 	  || (c_common_unsigned_type (TYPE_MAIN_VARIANT (ttl))
 	      == c_common_unsigned_type (TYPE_MAIN_VARIANT (ttr))))
 	{
@@ -4745,6 +4778,29 @@ digest_init (type, init, require_constant)
 	  return inside_init;
 	}
     }
+  /* Build a VECTOR_CST from a *constant* vector constructor.  If the
+     vector constructor is not constant (e.g. {1,2,3,foo()}) then punt
+     below and handle as a constructor.  */
+  if (code == VECTOR_TYPE
+      && comptypes (TREE_TYPE (inside_init), type)
+      && TREE_CONSTANT (inside_init))
+    return build_vector (type, TREE_OPERAND (inside_init, 1));
+
+
+  /* Build a VECTOR_CST from a *constant* vector constructor.  If the
+     vector constructor is not constant (e.g. {1,2,3,foo()}) then punt
+     below and handle as a constructor.  */
+  if (code == VECTOR_TYPE
+      && comptypes (TREE_TYPE (inside_init), type)
+      && TREE_CONSTANT (inside_init))
+    {
+      if (TREE_CODE (inside_init) == VECTOR_CST
+	  && comptypes (TYPE_MAIN_VARIANT (TREE_TYPE (inside_init)),
+			TYPE_MAIN_VARIANT (type)))
+	return inside_init;
+      else
+	return build_vector (type, TREE_OPERAND (inside_init, 1));
+    }
 
   /* Any type can be initialized
      from an expression of the same type, optionally with braces.  */
@@ -4764,6 +4820,11 @@ digest_init (type, init, require_constant)
     {
       if (code == POINTER_TYPE)
 	inside_init = default_function_array_conversion (inside_init);
+      
+      if (code == VECTOR_TYPE)
+	/* Although the types are compatible, we may require a
+	   conversion.  */
+	inside_init = convert (type, inside_init);
 
       if (require_constant && !flag_isoc99
 	  && TREE_CODE (inside_init) == COMPOUND_LITERAL_EXPR)
@@ -5156,6 +5217,9 @@ really_start_incremental_init (type)
   if (type == 0)
     type = TREE_TYPE (constructor_decl);
 
+  if ((*targetm.vector_opaque_p) (type))
+    error ("opaque vector types cannot be initialized");
+
   p->type = constructor_type;
   p->fields = constructor_fields;
   p->index = constructor_index;
@@ -5266,6 +5330,7 @@ push_init_level (implicit)
 	  && constructor_fields == 0)
 	process_init_element (pop_init_level (1));
       else if (TREE_CODE (constructor_type) == ARRAY_TYPE
+	       && constructor_max_index 
 	       && tree_int_cst_lt (constructor_max_index, constructor_index))
 	process_init_element (pop_init_level (1));
       else
@@ -5719,6 +5784,8 @@ set_init_index (first, last)
     error_init ("nonconstant array index in initializer");
   else if (TREE_CODE (constructor_type) != ARRAY_TYPE)
     error_init ("array index in non-array initializer");
+  else if (tree_int_cst_sgn (first) == -1)
+    error_init ("array index in initializer exceeds array bounds");
   else if (constructor_max_index
 	   && tree_int_cst_lt (constructor_max_index, first))
     error_init ("array index in initializer exceeds array bounds");
@@ -6618,13 +6685,18 @@ process_init_element (value)
 			        bit_position (constructor_fields),
 			        DECL_SIZE (constructor_fields));
 
-	      constructor_unfilled_fields = TREE_CHAIN (constructor_fields);
-	      /* Skip any nameless bit fields.  */
-	      while (constructor_unfilled_fields != 0
-		     && DECL_C_BIT_FIELD (constructor_unfilled_fields)
-		     && DECL_NAME (constructor_unfilled_fields) == 0)
-		constructor_unfilled_fields =
-		  TREE_CHAIN (constructor_unfilled_fields);
+	      /* If the current field was the first one not yet written out,
+		 it isn't now, so update.  */
+	      if (constructor_unfilled_fields == constructor_fields)
+		{
+		  constructor_unfilled_fields = TREE_CHAIN (constructor_fields);
+		  /* Skip any nameless bit fields.  */
+		  while (constructor_unfilled_fields != 0
+			 && DECL_C_BIT_FIELD (constructor_unfilled_fields)
+			 && DECL_NAME (constructor_unfilled_fields) == 0)
+		    constructor_unfilled_fields =
+		      TREE_CHAIN (constructor_unfilled_fields);
+		}
 	    }
 
 	  constructor_fields = TREE_CHAIN (constructor_fields);
@@ -6857,9 +6929,9 @@ simple_asm_stmt (expr)
     {
       tree stmt;
 
-      stmt = add_stmt (build_stmt (ASM_STMT, NULL_TREE, expr,
-				   NULL_TREE, NULL_TREE,
-				   NULL_TREE));
+      /* Simple asm statements are treated as volatile.  */
+      stmt = add_stmt (build_stmt (ASM_STMT, ridpointers[(int) RID_VOLATILE],
+				   expr, NULL_TREE, NULL_TREE, NULL_TREE));
       ASM_INPUT_P (stmt) = 1;
       return stmt;
     }
