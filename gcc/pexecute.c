@@ -1,6 +1,6 @@
 /* Utilities to execute a program in a subprocess (possibly linked by pipes
    with other subprocesses), and wait for it.
-   Copyright (C) 1996, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1996, 1997, 1998 Free Software Foundation, Inc.
 
 This file is part of the libiberty library.
 Libiberty is free software; you can redistribute it and/or
@@ -23,11 +23,14 @@ Boston, MA 02111-1307, USA.  */
 /* This file lives in at least two places: libiberty and gcc.
    Don't change one without the other.  */
 
+#ifdef IN_GCC
+#include "config.h"
+#endif
+
 #include <stdio.h>
 #include <errno.h>
 
 #ifdef IN_GCC
-#include "config.h"
 #include "gansidecl.h"
 /* ??? Need to find a suitable header file.  */
 #define PEXECUTE_FIRST   1
@@ -217,16 +220,23 @@ pwait (pid, status, flags)
 
 #endif /* MSDOS */
 
-#if defined (_WIN32) && !defined (__CYGWIN32__)
+#if defined (_WIN32)
 
 #include <process.h>
+#include <signal.h>
 extern int _spawnv ();
 extern int _spawnvp ();
+
+#ifdef __CYGWIN32__
+
+#define fix_argv(argvec) (argvec)
+
+#else
 
 /* This is a kludge to get around the Microsoft C spawn functions' propensity
    to remove the outermost set of double quotes from all arguments.  */
 
-const char * const *
+char * const *
 fix_argv (argvec)
      char **argvec;
 {
@@ -243,7 +253,7 @@ fix_argv (argvec)
         {
           if (temp[j] == '"')
             {
-              newtemp = xmalloc (len + 2);
+              newtemp = (char *) xmalloc (len + 2);
               strncpy (newtemp, temp, j);
               newtemp [j] = '\\';
               strncpy (&newtemp [j+1], &temp [j], len-j);
@@ -257,8 +267,10 @@ fix_argv (argvec)
         argvec[i] = temp;
       }
 
-  return (const char * const *) argvec;
+  return (char * const *) argvec;
 }
+
+#endif /* ! defined (__CYGWIN32__) */
 
 int
 pexecute (program, argv, this_pname, temp_base, errmsg_fmt, errmsg_arg, flags)
@@ -266,7 +278,8 @@ pexecute (program, argv, this_pname, temp_base, errmsg_fmt, errmsg_arg, flags)
      char * const *argv;
      const char *this_pname;
      const char *temp_base;
-     char **errmsg_fmt, **errmsg_arg;
+     char **errmsg_fmt;
+     const char **errmsg_arg;
      int flags;
 {
   int pid;
@@ -274,7 +287,7 @@ pexecute (program, argv, this_pname, temp_base, errmsg_fmt, errmsg_arg, flags)
   if ((flags & PEXECUTE_ONE) != PEXECUTE_ONE)
     abort ();
   pid = (flags & PEXECUTE_SEARCH ? _spawnvp : _spawnv)
-    (_P_NOWAIT, program, fix_argv(argv));
+    (_P_NOWAIT, program, fix_argv (argv));
   if (pid == -1)
     {
       *errmsg_fmt = install_error_msg;
@@ -290,9 +303,23 @@ pwait (pid, status, flags)
      int *status;
      int flags;
 {
+  int termstat;
+
+  pid = cwait (&termstat, pid, WAIT_CHILD);
+
   /* ??? Here's an opportunity to canonicalize the values in STATUS.
      Needed?  */
-  return _cwait (status, pid, WAIT_CHILD);
+
+  /* cwait returns the child process exit code in termstat.
+     A value of 3 indicates that the child caught a signal, but not
+     which one.  Since only SIGABRT, SIGFPE and SIGINT do anything, we
+     report SIGABRT.  */
+  if (termstat == 3)
+    *status = SIGABRT;
+  else
+    *status = (((termstat) & 0xff) << 8);
+
+  return pid;
 }
 
 #endif /* _WIN32 */
@@ -396,7 +423,7 @@ pexecute (program, argv, this_pname, temp_base, errmsg_fmt, errmsg_arg, flags)
 	  /* See if we have an argument that needs fixing.  */
 	  if (strchr(argv[i], '/'))
 	    {
-	      tmpname = xmalloc (256);
+	      tmpname = (char *) xmalloc (256);
 	      mpwify_filename (argv[i], tmpname);
 	      argv[i] = tmpname;
 	    }
@@ -421,7 +448,7 @@ pexecute (program, argv, this_pname, temp_base, errmsg_fmt, errmsg_arg, flags)
       /* See if we have an argument that needs fixing.  */
       if (strchr(argv[i], '/'))
 	{
-	  tmpname = xmalloc (256);
+	  tmpname = (char *) xmalloc (256);
 	  mpwify_filename (argv[i], tmpname);
 	  argv[i] = tmpname;
 	}
@@ -478,7 +505,7 @@ pfinish ()
 
 /* include for Unix-like environments but not for Dos-like environments */
 #if ! defined (__MSDOS__) && ! defined (OS2) && ! defined (MPW) \
-    && (defined (__CYGWIN32__) || ! defined (_WIN32))
+    && ! defined (_WIN32)
 
 #ifdef VMS
 #define vfork() (decc$$alloc_vfork_blocks() >= 0 ? \

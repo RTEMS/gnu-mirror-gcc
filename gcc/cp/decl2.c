@@ -36,10 +36,25 @@ Boston, MA 02111-1307, USA.  */
 #include "decl.h"
 #include "lex.h"
 #include "output.h"
+#include "except.h"
+#include "expr.h"
 
-extern tree get_file_function_name ();
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+
+#ifdef HAVE_STRING_H
+#include <string.h>
+#endif
+
+static tree get_sentry PROTO((tree));
+static void mark_vtable_entries PROTO((tree));
+static void import_export_template PROTO((tree));
 static void grok_function_init PROTO((tree, tree));
-void import_export_decl ();
+static int finish_vtable_vardecl PROTO((tree, tree));
+static int prune_vtable_vardecl PROTO((tree, tree));
+static void finish_sigtable_vardecl PROTO((tree, tree));
+
 extern int current_class_depth;
 
 /* A list of virtual function tables we must make sure to write out.  */
@@ -158,11 +173,10 @@ int warn_ctor_dtor_privacy = 1;
 /* True if we want to implement vtables using "thunks".
    The default is off.  */
 
-#if defined(NEW_OVER) && defined (__i386__)
-int flag_vtable_thunks = 1;
-#else
-int flag_vtable_thunks;
+#ifndef DEFAULT_VTABLE_THUNKS
+#define DEFAULT_VTABLE_THUNKS 0
 #endif
+int flag_vtable_thunks = DEFAULT_VTABLE_THUNKS;
 
 /* True if we want to deal with repository information.  */
 
@@ -246,10 +260,18 @@ int warn_pmf2ptr = 1;
 
 /* Nonzero means warn about violation of some Effective C++ style rules.  */
 
-int warn_ecpp = 0;
+int warn_ecpp;
 
-/* Nonzero means `$' can be in an identifier.
-   See cccp.c for reasons why this breaks some obscure ANSI C programs.  */
+/* Nonzero means warn where overload resolution chooses a promotion from
+   unsigned to signed over a conversion to an unsigned of the same size.  */
+
+int warn_sign_promo;
+
+/* Nonzero means warn when an old-style cast is used.  */
+
+int warn_old_style_cast;
+
+/* Nonzero means `$' can be in an identifier.  */
 
 #ifndef DOLLARS_IN_IDENTIFIERS
 #define DOLLARS_IN_IDENTIFIERS 1
@@ -301,7 +323,9 @@ int flag_memoize_lookups; int flag_save_memoized_contexts;
 
 int write_virtuals;
 
-/* Nonzero means we should attempt to elide constructors when possible.  */
+/* Nonzero means we should attempt to elide constructors when possible.
+   FIXME: This flag is obsolete, and should be torn out along with the
+   old overloading code.  */
 
 int flag_elide_constructors;
 
@@ -384,6 +408,14 @@ int flag_weak = 1;
 
 int max_tinst_depth = 17;
 
+/* The name-mangling scheme to use.  Must be 1 or greater to support
+   template functions with identical types, but different template
+   arguments.  */
+int name_mangling_version = 1;
+
+/* Nonzero means that guiding declarations are allowed.  */
+int flag_guiding_decls;
+
 /* Table of language-dependent -f options.
    STRING is the option name.  VARIABLE is the address of the variable.
    ON_VALUE is the value to store in VARIABLE
@@ -409,6 +441,7 @@ static struct { char *string; int *variable; int on_value;} lang_f_options[] =
   {"all-virtual", &flag_all_virtual, 1},
   {"memoize-lookups", &flag_memoize_lookups, 1},
   {"elide-constructors", &flag_elide_constructors, 1},
+  {"handle-exceptions", &flag_exceptions, 1},
   {"handle-signatures", &flag_handle_signatures, 1},
   {"default-inline", &flag_default_inline, 1},
   {"dollars-in-identifiers", &dollars_in_ident, 1},
@@ -442,7 +475,7 @@ lang_decode_option (p)
      char *p;
 {
   if (!strcmp (p, "-ftraditional") || !strcmp (p, "-traditional"))
-    dollars_in_ident = 1, flag_writable_strings = 1,
+    flag_writable_strings = 1,
     flag_this_is_variable = 1, flag_new_for_scope = 0;
   /* The +e options are for cfront compatibility.  They come in as
      `-+eN', to kludge around gcc.c's argument handling.  */
@@ -470,13 +503,17 @@ lang_decode_option (p)
       p += 2;
       /* Try special -f options.  */
 
+      if (!strcmp (p, "handle-exceptions")
+	  || !strcmp (p, "no-handle-exceptions"))
+	warning ("-fhandle-exceptions has been renamed to -fexceptions (and is now on by default)");
+
       if (!strcmp (p, "save-memoized"))
 	{
 	  flag_memoize_lookups = 1;
 	  flag_save_memoized_contexts = 1;
 	  found = 1;
 	}
-      if (!strcmp (p, "no-save-memoized"))
+      else if (!strcmp (p, "no-save-memoized"))
 	{
 	  flag_memoize_lookups = 0;
 	  flag_save_memoized_contexts = 0;
@@ -499,6 +536,17 @@ lang_decode_option (p)
 	  flag_implicit_templates = 0;
 	  found = 1;
 	}
+      else if (!strcmp (p, "guiding-decls"))
+	{
+	  flag_guiding_decls = 1;
+	  name_mangling_version = 0;
+	  found = 1;
+	}
+      else if (!strcmp (p, "no-guiding-decls"))
+	{
+	  flag_guiding_decls = 0;
+	  found = 1;
+	}
       else if (!strncmp (p, "template-depth-", 15))
 	{
 	  char *endp = p + 15;
@@ -514,6 +562,22 @@ lang_decode_option (p)
 	    }
 	  max_tinst_depth = atoi (p + 15);
 	template_depth_lose: ;
+	}
+      else if (!strncmp (p, "name-mangling-version-", 22))
+	{
+	  char *endp = p + 22;
+	  while (*endp)
+	    {
+	      if (*endp >= '0' && *endp <= '9')
+		endp++;
+	      else
+		{
+		  error ("Invalid option `%s'", p - 2);
+		  goto mangling_version_lose;
+		}
+	    }
+	  name_mangling_version = atoi (p + 22);
+	mangling_version_lose: ;
 	}
       else for (j = 0;
 		!found && j < sizeof (lang_f_options) / sizeof (lang_f_options[0]);
@@ -585,6 +649,10 @@ lang_decode_option (p)
 	warn_pmf2ptr = setting;
       else if (!strcmp (p, "effc++"))
 	warn_ecpp = setting;
+      else if (!strcmp (p, "sign-promo"))
+	warn_sign_promo = setting;
+      else if (!strcmp (p, "old-style-cast"))
+	warn_old_style_cast = setting;
       else if (!strcmp (p, "comment"))
 	;			/* cpp handles this one.  */
       else if (!strcmp (p, "comments"))
@@ -613,6 +681,7 @@ lang_decode_option (p)
 	    warn_uninitialized = (setting ? 2 : 0);
 	  warn_template_debugging = setting;
 	  warn_reorder = setting;
+	  warn_sign_promo = setting;
 	}
 
       else if (!strcmp (p, "overloaded-virtual"))
@@ -620,7 +689,7 @@ lang_decode_option (p)
       else return 0;
     }
   else if (!strcmp (p, "-ansi"))
-    dollars_in_ident = 0, flag_no_nonansi_builtin = 1, flag_ansi = 1,
+    flag_no_nonansi_builtin = 1, flag_ansi = 1,
     flag_no_gnu_keywords = 1, flag_operator_names = 1;
 #ifdef SPEW_DEBUG
   /* Undocumented, only ever used when you're invoking cc1plus by hand, since
@@ -1173,7 +1242,10 @@ delete_sanity (exp, size, doing_vec, use_global_delete)
       return t;
     }
 
-  t = stabilize_reference (convert_from_reference (exp));
+  t = exp;
+  if (TREE_CODE (t) == OFFSET_REF)
+    t = resolve_offset_ref (t);
+  t = stabilize_reference (convert_from_reference (t));
   type = TREE_TYPE (t);
   code = TREE_CODE (type);
 
@@ -1201,15 +1273,14 @@ delete_sanity (exp, size, doing_vec, use_global_delete)
   if (code == POINTER_TYPE)
     {
 #if 0
-      /* As of Valley Forge, you can delete a pointer to constant.  */
-      /* You can't delete a pointer to constant.  */
+      /* As of Valley Forge, you can delete a pointer to const.  */
       if (TREE_READONLY (TREE_TYPE (type)))
 	{
 	  error ("`const *' cannot be deleted");
 	  return error_mark_node;
 	}
 #endif
-      /* You also can't delete functions.  */
+      /* You can't delete functions.  */
       if (TREE_CODE (TREE_TYPE (type)) == FUNCTION_TYPE)
 	{
 	  error ("cannot delete a function");
@@ -1241,8 +1312,8 @@ delete_sanity (exp, size, doing_vec, use_global_delete)
 	{
 	  /* Only do access checking here; we'll be calling op delete
 	     from the destructor.  */
-	  tree tmp = build_opfncall (DELETE_EXPR, LOOKUP_NORMAL, t,
-				     size_zero_node, NULL_TREE);
+	  tree tmp = build_op_delete_call (DELETE_EXPR, t,
+					   size_zero_node, LOOKUP_NORMAL);
 	  if (tmp == error_mark_node)
 	    return error_mark_node;
 	}
@@ -1250,6 +1321,59 @@ delete_sanity (exp, size, doing_vec, use_global_delete)
       return build_delete (type, t, integer_three_node,
 			   LOOKUP_NORMAL, use_global_delete);
     }
+}
+
+/* Report an error if the indicated template declaration is not the
+   sort of thing that should be a member template.  */
+
+void
+check_member_template (tmpl)
+     tree tmpl;
+{
+  tree decl;
+
+  my_friendly_assert (TREE_CODE (tmpl) == TEMPLATE_DECL, 0);
+  decl = DECL_TEMPLATE_RESULT (tmpl);
+
+  if (TREE_CODE (decl) == FUNCTION_DECL) 
+    {
+      if (current_function_decl)
+	/* 14.5.2.2 [temp.mem]
+	   
+	   A local class shall not have member templates. */
+	cp_error ("declaration of of member template `%#D' in local class",
+		  decl);
+      
+      if (DECL_VIRTUAL_P (decl)) 
+	{
+	  /* 14.5.2.3 [temp.mem]
+
+	     A member function template shall not be virtual.  */
+	  cp_error 
+	    ("invalid use of `virtual' in template declaration of `%#D'",
+	     decl);
+	  DECL_VIRTUAL_P (decl) = 0;
+	}
+
+      /* The debug-information generating code doesn't know what to do
+	 with member templates.  */ 
+      DECL_IGNORED_P (tmpl) = 1;
+    } 
+  else if (TREE_CODE (decl) == TYPE_DECL &&
+	   AGGREGATE_TYPE_P (TREE_TYPE (decl)))
+    {
+      if (current_function_decl)
+	/* 14.5.2.2 [temp.mem]
+
+	   A local class shall not have member templates.  */
+	cp_error ("declaration of of member template `%#D' in local class",
+		  decl);
+
+      /* We don't handle member template classes yet. */
+      sorry ("member templates classes");
+    }
+  else
+    cp_error ("template declaration of `%#D'", decl);
 }
 
 /* Sanity check: report error if this function FUNCTION is not
@@ -1265,6 +1389,7 @@ check_classfn (ctype, function)
   tree method_vec = CLASSTYPE_METHOD_VEC (complete_type (ctype));
   tree *methods = 0;
   tree *end = 0;
+  tree templates = NULL_TREE;
 
   if (method_vec != 0)
     {
@@ -1281,6 +1406,7 @@ check_classfn (ctype, function)
 
       while (++methods != end)
 	{
+	  fndecl = *methods;
 	  if (fn_name == DECL_NAME (*methods))
 	    {
 	    got_it:
@@ -1310,16 +1436,46 @@ check_classfn (ctype, function)
 
 		      if (comptypes (TREE_TYPE (TREE_TYPE (function)),
 				     TREE_TYPE (TREE_TYPE (fndecl)), 1)
-			  && compparms (p1, p2, 3))
+			  && compparms (p1, p2, 3)
+			  && (DECL_TEMPLATE_SPECIALIZATION (function)
+			      == DECL_TEMPLATE_SPECIALIZATION (fndecl))
+			  && (!DECL_TEMPLATE_SPECIALIZATION (function)
+			      || (DECL_TI_TEMPLATE (function) 
+				  == DECL_TI_TEMPLATE (fndecl))))
 			return fndecl;
+
+		      if (is_member_template (fndecl))
+			/* This function might be an instantiation
+			   or specialization of fndecl.  */
+			templates = 
+			  scratch_tree_cons (NULL_TREE, fndecl, templates);
 		    }
 #endif
 		  fndecl = DECL_CHAIN (fndecl);
 		}
 	      break;		/* loser */
 	    }
+	  else if (TREE_CODE (fndecl) == TEMPLATE_DECL 
+		   && IDENTIFIER_TYPENAME_P (DECL_NAME (fndecl))
+		   && IDENTIFIER_TYPENAME_P (fn_name))
+	    /* The method in the class is a member template
+	       conversion operator.  We are declaring another
+	       conversion operator.  It is possible that even though
+	       the names don't match, there is some specialization
+	       occurring.  */
+	    templates = 
+	      scratch_tree_cons (NULL_TREE, fndecl, templates);
 	}
     }
+
+  if (templates)
+    /* This function might be an instantiation or a specialization.
+       We should verify that this is possible.  If it is, we must
+       somehow add the new declaration to the method vector for the
+       class.  Perhaps we should use add_method?  For now, we simply
+       return NULL_TREE, which lets the caller know that this
+       function is new, but we don't print an error message.  */
+    return NULL_TREE;
 
   if (methods != end)
     {
@@ -2063,7 +2219,7 @@ finish_anon_union (anon_union_decl)
       DECL_INITIAL (decl) = NULL_TREE;
       /* If there's a cleanup to do, it belongs in the
 	 TREE_PURPOSE of the following TREE_LIST.  */
-      elems = tree_cons (NULL_TREE, decl, elems);
+      elems = scratch_tree_cons (NULL_TREE, decl, elems);
       TREE_TYPE (elems) = type;
     }
   if (static_p)
@@ -2249,6 +2405,7 @@ coerce_delete_type (type)
       || TREE_VALUE (arg_types) != ptr_type_node)
     e2 = 1, error ("`operator delete' takes type `void *' as first parameter");
 
+#if 0
   if (arg_types
       && TREE_CHAIN (arg_types)
       && TREE_CHAIN (arg_types) != void_list_node)
@@ -2280,8 +2437,12 @@ coerce_delete_type (type)
 	arg_types = tree_cons (NULL_TREE, ptr_type_node, TREE_CHAIN (arg_types));
     }
   else e3 |= e1;
+#endif
 
-  if (e3)
+  if (e2)
+    arg_types = tree_cons (NULL_TREE, ptr_type_node,
+			   arg_types ? TREE_CHAIN (arg_types): NULL_TREE);
+  if (e2 || e1)
     type = build_function_type (void_type_node, arg_types);
 
   return type;
@@ -2312,7 +2473,11 @@ mark_vtable_entries (decl)
       tree fn = TREE_OPERAND (fnaddr, 0);
       TREE_ADDRESSABLE (fn) = 1;
       if (DECL_LANG_SPECIFIC (fn) && DECL_ABSTRACT_VIRTUAL_P (fn))
-	TREE_OPERAND (fnaddr, 0) = fn = abort_fndecl;
+	{
+	  TREE_OPERAND (fnaddr, 0) = fn = copy_node (fn);
+	  DECL_RTL (fn) = DECL_RTL (abort_fndecl);
+	  mark_used (abort_fndecl);
+	}
       if (TREE_CODE (fn) == THUNK_DECL && DECL_EXTERNAL (fn))
 	{
 	  DECL_EXTERNAL (fn) = 0;
@@ -2370,6 +2535,7 @@ import_export_vtable (decl, type, final)
 
       int found = CLASSTYPE_TEMPLATE_INSTANTIATION (type);
 
+#ifndef MULTIPLE_SYMBOL_SPACES
       if (! found && ! final)
 	{
 	  tree method;
@@ -2383,6 +2549,7 @@ import_export_vtable (decl, type, final)
 		break;
 	      }
 	}
+#endif
 
       if (final || ! found)
 	{
@@ -2431,8 +2598,9 @@ finish_prevtable_vardecl (prev, vars)
 	      && !DECL_ABSTRACT_VIRTUAL_P (method))
 	    {
 	      SET_CLASSTYPE_INTERFACE_KNOWN (ctype);
-	      CLASSTYPE_VTABLE_NEEDS_WRITING (ctype) = ! DECL_EXTERNAL (method);
-	      CLASSTYPE_INTERFACE_ONLY (ctype) = DECL_EXTERNAL (method);
+	      CLASSTYPE_VTABLE_NEEDS_WRITING (ctype)
+		= ! DECL_REALLY_EXTERN (method);
+	      CLASSTYPE_INTERFACE_ONLY (ctype) = DECL_REALLY_EXTERN (method);
 	      break;
 	    }
 	}
@@ -2508,8 +2676,8 @@ prune_vtable_vardecl (prev, vars)
 
 int
 walk_vtables (typedecl_fn, vardecl_fn)
-     register void (*typedecl_fn)();
-     register int (*vardecl_fn)();
+     register void (*typedecl_fn) PROTO ((tree, tree));
+     register int (*vardecl_fn) PROTO ((tree, tree));
 {
   tree prev, vars;
   int flag = 0;
@@ -2556,8 +2724,8 @@ finish_sigtable_vardecl (prev, vars)
 
 void
 walk_sigtables (typedecl_fn, vardecl_fn)
-     register void (*typedecl_fn)();
-     register void (*vardecl_fn)();
+     register void (*typedecl_fn) PROTO((tree, tree));
+     register void (*vardecl_fn) PROTO((tree, tree));
 {
   tree prev, vars;
 
@@ -2600,26 +2768,8 @@ import_export_decl (decl)
 	{
 	  if (TREE_CODE (decl) == FUNCTION_DECL)
 	    comdat_linkage (decl);
-	  /* Dynamically initialized vars go into common.  */
-	  else if (DECL_INITIAL (decl) == NULL_TREE
-		   || DECL_INITIAL (decl) == error_mark_node)
-	    DECL_COMMON (decl) = 1;
-	  else if (EMPTY_CONSTRUCTOR_P (DECL_INITIAL (decl)))
-	    {
-	      DECL_COMMON (decl) = 1;
-	      DECL_INITIAL (decl) = error_mark_node;
-	    }
 	  else
-	    {
-	      /* Statically initialized vars are weak or comdat, if
-                 supported.  */
-	      if (flag_weak)
-		make_decl_one_only (decl);
-	      else
-		/* we can't do anything useful; leave vars for explicit
-                   instantiation.  */
-		DECL_NOT_REALLY_EXTERN (decl) = 0;
-	    }
+	    DECL_COMDAT (decl) = 1;
 	}
       else
 	DECL_NOT_REALLY_EXTERN (decl) = 0;
@@ -2627,7 +2777,8 @@ import_export_decl (decl)
   else if (DECL_FUNCTION_MEMBER_P (decl))
     {
       tree ctype = DECL_CLASS_CONTEXT (decl);
-      if (CLASSTYPE_INTERFACE_KNOWN (ctype) && ! DECL_ARTIFICIAL (decl))
+      if (CLASSTYPE_INTERFACE_KNOWN (ctype)
+	  && (! DECL_ARTIFICIAL (decl) || DECL_VINDEX (decl)))
 	{
 	  DECL_NOT_REALLY_EXTERN (decl)
 	    = ! (CLASSTYPE_INTERFACE_ONLY (ctype)
@@ -2652,8 +2803,6 @@ import_export_decl (decl)
       else
 	comdat_linkage (decl);
     } 
-  else if (DECL_C_STATIC (decl))
-    TREE_PUBLIC (decl) = 0;
   else
     comdat_linkage (decl);
 
@@ -2685,7 +2834,6 @@ extern tree pending_templates;
 extern tree maybe_templates;
 
 extern struct obstack permanent_obstack;
-extern tree get_id_2 ();
 
 static tree
 get_sentry (base)
@@ -2726,9 +2874,6 @@ finish_file ()
 
   at_eof = 1;
 
-  if (flag_detailed_statistics)
-    dump_tree_statistics ();
-
   /* Bad parse errors.  Just forget about it.  */
   if (! global_bindings_p () || current_class_type)
     return;
@@ -2759,7 +2904,7 @@ finish_file ()
 
   for (fnname = maybe_templates; fnname; fnname = TREE_CHAIN (fnname))
     {
-      tree *args, fn, decl = TREE_VALUE (fnname);
+      tree args, fn, decl = TREE_VALUE (fnname);
 
       if (DECL_INITIAL (decl))
 	continue;
@@ -2767,7 +2912,6 @@ finish_file ()
       fn = TREE_PURPOSE (fnname);
       args = get_bindings (fn, decl);
       fn = instantiate_template (fn, args);
-      free (args);
       instantiate_decl (fn);
     }
 
@@ -2802,7 +2946,8 @@ finish_file ()
 
   /* Walk to mark the inline functions we need, then output them so
      that we can pick up any other tdecls that those routines need.  */
-  walk_vtables ((void (*)())0, finish_prevtable_vardecl);
+  walk_vtables ((void (*) PROTO ((tree, tree))) 0,
+		finish_prevtable_vardecl);
 
   for (vars = pending_statics; vars; vars = TREE_CHAIN (vars))
     {
@@ -2821,7 +2966,7 @@ finish_file ()
       rest_of_decl_compilation (TREE_VALUE (vars), 0, 1, 1);
   vars = static_aggregates;
 
-  if (static_ctors || vars || exception_table_p ())
+  if (static_ctors || vars || register_exception_table_p ())
     needs_messing_up = 1;
   if (static_dtors)
     needs_cleaning = 1;
@@ -2920,7 +3065,7 @@ finish_file ()
       push_momentary ();
       expand_start_bindings (0);
 
-      if (exception_table_p ())
+      if (register_exception_table_p ())
 	register_exception_table ();
 
       while (vars)
@@ -2973,7 +3118,7 @@ finish_file ()
 		  expand_expr (expand_vec_init (decl, TREE_VEC_ELT (init, 0),
 						TREE_VEC_ELT (init, 1),
 						TREE_VEC_ELT (init, 2), 0),
-			       const0_rtx, VOIDmode, 0);
+			       const0_rtx, VOIDmode, EXPAND_NORMAL);
 		}
 	      else
 		expand_assignment (decl, init, 0, 0);
@@ -3044,7 +3189,8 @@ finish_file ()
   start_time = get_run_time ();
 
   if (flag_handle_signatures)
-    walk_sigtables ((void (*)())0, finish_sigtable_vardecl);
+    walk_sigtables ((void (*) PROTO ((tree, tree))) 0,
+		    finish_sigtable_vardecl);
 
   for (fnname = saved_inlines; fnname; fnname = TREE_CHAIN (fnname))
     {
@@ -3070,7 +3216,8 @@ finish_file ()
 	SET_DECL_ARTIFICIAL (vars);
 	pushdecl (vars);
 
-	reconsider |= walk_vtables ((void (*)())0, finish_vtable_vardecl);
+	reconsider |= walk_vtables ((void (*) PROTO((tree, tree))) 0, 
+				    finish_vtable_vardecl);
 
 	while (*p)
 	  {
@@ -3106,11 +3253,10 @@ finish_file ()
 		    DECL_EXTERNAL (decl) = 0;
 		    reconsider = 1;
 		    /* We can't inline this function after it's been
-                       emitted, so just disable inlining.  We want a
-                       variant of output_inline_function that doesn't
-                       prevent subsequent integration...  */
-		    flag_no_inline = 1;
-		    temporary_allocation ();
+                       emitted.  We want a variant of
+                       output_inline_function that doesn't prevent
+                       subsequent integration...  */
+		    DECL_INLINE (decl) = 0;
 		    output_inline_function (decl);
 		    permanent_allocation (1);
 		  }
@@ -3126,15 +3272,8 @@ finish_file ()
   /* Now delete from the chain of variables all virtual function tables.
      We output them all ourselves, because each will be treated specially.  */
 
-  walk_vtables ((void (*)())0, prune_vtable_vardecl);
-
-  for (vars = getdecls (); vars; vars = TREE_CHAIN (vars))
-    {
-      if (TREE_CODE (vars) == FUNCTION_DECL
-	  && ! DECL_INTERFACE_KNOWN (vars)
-	  && DECL_C_STATIC (vars))
-	TREE_PUBLIC (vars) = 0;
-    }
+  walk_vtables ((void (*) PROTO((tree, tree))) 0,
+		prune_vtable_vardecl);
 
   if (write_virtuals == 2)
     {
@@ -3156,7 +3295,10 @@ finish_file ()
   varconst_time += this_time - start_time;
 
   if (flag_detailed_statistics)
-    dump_time_statistics ();
+    {
+      dump_tree_statistics ();
+      dump_time_statistics ();
+    }
 }
 
 /* This is something of the form 'A()()()()()+1' that has turned out to be an
@@ -3229,6 +3371,9 @@ reparse_absdcl_as_casts (decl, expr)
       expr = build_c_cast (type, expr);
     }
 
+  if (warn_old_style_cast)
+    warning ("use of old-style cast");
+
   return expr;
 }
 
@@ -3251,6 +3396,11 @@ build_expr_from_tree (t)
 	return do_scoped_id (TREE_OPERAND (t, 0), 0);
       else
 	return do_identifier (TREE_OPERAND (t, 0), 0);
+
+    case TEMPLATE_ID_EXPR:
+      return (lookup_template_function
+	      (build_expr_from_tree (TREE_OPERAND (t, 0)),
+	       build_expr_from_tree (TREE_OPERAND (t, 1))));
 
     case INDIRECT_REF:
       return build_x_indirect_ref
@@ -3409,7 +3559,8 @@ build_expr_from_tree (t)
       else
 	{
 	  tree name = TREE_OPERAND (t, 0);
-	  if (! really_overloaded_fn (name))
+	  if (TREE_CODE (name) == TEMPLATE_ID_EXPR
+	      || ! really_overloaded_fn (name))
 	    name = build_expr_from_tree (name);
 	  return build_x_function_call
 	    (name, build_expr_from_tree (TREE_OPERAND (t, 1)),
@@ -3438,7 +3589,7 @@ build_expr_from_tree (t)
 	chain = TREE_CHAIN (t);
 	if (chain && chain != void_type_node)
 	  chain = build_expr_from_tree (chain);
-	return tree_cons (purpose, value, chain);
+	return expr_tree_cons (purpose, value, chain);
       }
 
     case COMPONENT_REF:
@@ -3485,7 +3636,7 @@ reparse_decl_as_expr (type, decl)
 {
   decl = build_expr_from_tree (decl);
   if (type)
-    return build_functional_cast (type, build_tree_list (NULL_TREE, decl));
+    return build_functional_cast (type, build_expr_list (NULL_TREE, decl));
   else
     return decl;
 }
@@ -3697,4 +3848,23 @@ mark_used (decl)
     synthesize_method (decl);
   if (DECL_LANG_SPECIFIC (decl) && DECL_TEMPLATE_INFO (decl))
     instantiate_decl (decl);
+}
+
+/* Helper function for named_class_head_sans_basetype nonterminal.  */
+
+tree
+handle_class_head (aggr, scope, id)
+     tree aggr, scope, id;
+{
+  if (TREE_CODE (id) == TYPE_DECL)
+    return id;
+
+  if (scope)
+    cp_error ("`%T' does not have a nested type named `%D'", scope, id);
+  else
+    cp_error ("no file-scope type named `%D'", id);
+
+  id = xref_tag
+    (aggr, make_anon_name (), NULL_TREE, 1);
+  return TYPE_MAIN_DECL (id);
 }

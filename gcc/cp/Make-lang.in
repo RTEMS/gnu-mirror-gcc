@@ -1,5 +1,5 @@
 # Top level makefile fragment for GNU C++.
-#   Copyright (C) 1994, 1995 Free Software Foundation, Inc.
+#   Copyright (C) 1994, 1995, 1997 Free Software Foundation, Inc.
 
 #This file is part of GNU CC.
 
@@ -74,7 +74,7 @@ C++ c++: cc1plus
 
 g++.c: $(srcdir)/gcc.c
 	-rm -f $@
-	ln -s $(srcdir)/gcc.c $@ || cp $(srcdir)/gcc.c $@
+	$(LN) $(srcdir)/gcc.c $@
 
 g++spec.o: $(srcdir)/cp/g++spec.c
 	$(CC) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $(srcdir)/cp/g++spec.c
@@ -90,9 +90,9 @@ g++.o: $(CONFIG_H) multilib.h config.status $(lang_specs_files) g++.c
   -c g++.c
 
 # Create the compiler driver for g++.
-g++$(exeext): g++.o g++spec.o version.o choose-temp.o pexecute.o $(LIBDEPS) $(EXTRA_GCC_OBJS)
-	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o $@ g++.o g++spec.o version.o \
-	  choose-temp.o pexecute.o $(EXTRA_GCC_OBJS) $(LIBS)
+g++$(exeext): g++.o g++spec.o version.o choose-temp.o pexecute.o prefix.o $(LIBDEPS) $(EXTRA_GCC_OBJS)
+	$(CC) $(ALL_CFLAGS) $(LDFLAGS) -o $@ g++.o g++spec.o prefix.o \
+	  version.o choose-temp.o pexecute.o $(EXTRA_GCC_OBJS) $(LIBS)
 
 # Create a version of the g++ driver which calls the cross-compiler.
 g++-cross$(exeext): g++$(exeext)
@@ -101,8 +101,7 @@ g++-cross$(exeext): g++$(exeext)
 
 cxxmain.o: cplus-dem.c demangle.h
 	rm -f cxxmain.c
-	ln -s $(srcdir)/cplus-dem.c cxxmain.c > /dev/null 2>&1 \
-	 || cp $(srcdir)/cplus-dem.c cxxmain.c
+	$(LN) $(srcdir)/cplus-dem.c cxxmain.c
 	$(CC) -c -DMAIN $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) \
 	  -DVERSION=\"$(version)\" cxxmain.c
 	rm -f cxxmain.c
@@ -157,21 +156,23 @@ new2.o: cc1plus $(srcdir)/cp/new2.cc
 
 # We want to update cplib2.txt if any of the source files change...
 cplib2.txt: $(CXX_LIB2SRCS) $(CXX_EXTRA_HEADERS) cplib2.ready
-	if [ -f cc1plus ]; then \
-	  echo $(CXX_LIB2FUNCS) > cplib2.new; \
-	else \
-	  echo "" > cplib2.new; \
-	fi
+	case " $(LANGUAGES) " in \
+	*" "[cC]"++ "*) \
+	  echo $(CXX_LIB2FUNCS) > cplib2.new;; \
+	*) \
+	  echo "" > cplib2.new;; \
+	esac
 	mv -f cplib2.new cplib2.txt 
 
 # Or if it would be different.
 cplib2.ready: $(GCC_PASSES) $(LANGUAGES) $(LIBGCC2_DEPS) stmp-int-hdrs
 	@if [ -r cplib2.txt ]; then \
-	  if [ -f cc1plus ]; then \
-	    echo $(CXX_LIB2FUNCS) > cplib2.new; \
-	  else \
-	    echo "" > cplib2.new; \
-	  fi; \
+	  case " $(LANGUAGES) " in \
+	  *" "[cC]"++ "*) \
+	    echo $(CXX_LIB2FUNCS) > cplib2.new;; \
+	  *) \
+	    echo "" > cplib2.new;; \
+	  esac; \
 	  if cmp -s cplib2.new cplib2.txt; then true; else \
 	    touch cplib2.ready; \
 	  fi; \
@@ -245,6 +246,7 @@ c++.clean:
 c++.distclean:
 	-rm -f cp/config.status cp/Makefile
 	-rm -f cp/parse.output
+	-rm -f g++.c
 c++.extraclean:
 c++.maintainer-clean:
 	-rm -f cp/parse.c cp/parse.h
@@ -267,8 +269,14 @@ c++.stage4: stage4-start
 # distribution anyway.  It then copies the files to the distdir directory.
 c++.distdir:
 	mkdir tmp/cp
+	mkdir tmp/cp/inc
 	cd cp ; $(MAKE) $(FLAGS_TO_PASS) $(CXX_FLAGS_TO_PASS) parse.c hash.h
 	cd cp; \
 	for file in *[0-9a-zA-Z+]; do \
 	  ln $$file ../tmp/cp >/dev/null 2>&1 || cp $$file ../tmp/cp; \
+	done
+	cd cp/inc; \
+	for file in *[0-9a-zA-Z+]; do \
+	  ln $$file ../../tmp/cp/inc >/dev/null 2>&1 \
+	   || cp $$file ../../tmp/cp/inc; \
 	done
