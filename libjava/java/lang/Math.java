@@ -38,8 +38,9 @@ exception statement from your version. */
 
 package java.lang;
 
-import java.util.Random;
 import gnu.classpath.Configuration;
+
+import java.util.Random;
 
 /**
  * Helper class containing useful mathematical functions and constants.
@@ -50,7 +51,7 @@ import gnu.classpath.Configuration;
  *
  * @author Paul Fisher
  * @author John Keiser
- * @author Eric Blake <ebb9@email.byu.edu>
+ * @author Eric Blake (ebb9@email.byu.edu)
  * @since 1.0
  */
 public final class Math
@@ -564,7 +565,7 @@ public final class Math
 
   /**
    * Take the nearest integer to the argument.  This is equivalent to
-   * <code>(int) Math.floor(a + 0.5f). If the argument is NaN, the result
+   * <code>(int) Math.floor(a + 0.5f)</code>. If the argument is NaN, the result
    * is 0; otherwise if the argument is outside the range of int, the result
    * will be Integer.MIN_VALUE or Integer.MAX_VALUE, as appropriate.
    *

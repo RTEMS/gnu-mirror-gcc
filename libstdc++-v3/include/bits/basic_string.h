@@ -193,6 +193,15 @@ namespace std
 	_M_set_sharable()
         { this->_M_refcount = 0; }
 
+	void
+	_M_set_length_and_sharable(size_type __n)
+	{ 
+	  this->_M_set_sharable();  // One reference.
+	  this->_M_length = __n;
+	  this->_M_refdata()[__n] = _S_terminal; // grrr. (per 21.3.4)
+	  // You cannot leave those LWG people alone for a second.
+	}
+
 	_CharT*
 	_M_refdata() throw()
 	{ return reinterpret_cast<_CharT*>(this + 1); }
@@ -211,8 +220,10 @@ namespace std
 	void
 	_M_dispose(const _Alloc& __a)
 	{
+#ifndef _GLIBCXX_FULLY_DYNAMIC_STRING
 	  if (__builtin_expect(this != &_S_empty_rep(), false))
-	    if (__exchange_and_add(&this->_M_refcount, -1) <= 0)
+#endif
+	    if (__gnu_cxx::__exchange_and_add(&this->_M_refcount, -1) <= 0)
 	      _M_destroy(__a);
 	}  // XXX MT
 
@@ -222,8 +233,10 @@ namespace std
 	_CharT*
 	_M_refcopy() throw()
 	{
+#ifndef _GLIBCXX_FULLY_DYNAMIC_STRING
 	  if (__builtin_expect(this != &_S_empty_rep(), false))
-            __atomic_add(&this->_M_refcount, 1);
+#endif
+            __gnu_cxx::__atomic_add(&this->_M_refcount, 1);
 	  return _M_refdata();
 	}  // XXX MT
 
@@ -267,10 +280,12 @@ namespace std
       // For the internal use we have functions similar to `begin'/`end'
       // but they do not call _M_leak.
       iterator
-      _M_ibegin() const { return iterator(_M_data()); }
+      _M_ibegin() const
+      { return iterator(_M_data()); }
 
       iterator
-      _M_iend() const { return iterator(_M_data() + this->size()); }
+      _M_iend() const
+      { return iterator(_M_data() + this->size()); }
 
       void
       _M_leak()    // for use in begin() & non-const op[]
@@ -418,14 +433,16 @@ namespace std
        *  @param  str  Source string.
        */
       basic_string&
-      operator=(const basic_string& __str) { return this->assign(__str); }
+      operator=(const basic_string& __str) 
+      { return this->assign(__str); }
 
       /**
        *  @brief  Copy contents of @a s into this string.
        *  @param  s  Source null-terminated string.
        */
       basic_string&
-      operator=(const _CharT* __s) { return this->assign(__s); }
+      operator=(const _CharT* __s) 
+      { return this->assign(__s); }
 
       /**
        *  @brief  Set value to string of length 1.
@@ -435,7 +452,11 @@ namespace std
        *  (*this)[0] == @a c.
        */
       basic_string&
-      operator=(_CharT __c) { return this->assign(1, __c); }
+      operator=(_CharT __c) 
+      { 
+	this->assign(1, __c); 
+	return *this;
+      }
 
       // Iterators:
       /**
@@ -517,16 +538,19 @@ namespace std
       ///  Returns the number of characters in the string, not including any
       ///  null-termination.
       size_type
-      size() const { return _M_rep()->_M_length; }
+      size() const
+      { return _M_rep()->_M_length; }
 
       ///  Returns the number of characters in the string, not including any
       ///  null-termination.
       size_type
-      length() const { return _M_rep()->_M_length; }
+      length() const
+      { return _M_rep()->_M_length; }
 
       /// Returns the size() of the largest possible %string.
       size_type
-      max_size() const { return _Rep::_S_max_size; }
+      max_size() const
+      { return _Rep::_S_max_size; }
 
       /**
        *  @brief  Resizes the %string to the specified number of characters.
@@ -552,14 +576,16 @@ namespace std
        *  setting them to 0.
        */
       void
-      resize(size_type __n) { this->resize(__n, _CharT()); }
+      resize(size_type __n)
+      { this->resize(__n, _CharT()); }
 
       /**
        *  Returns the total number of characters that the %string can hold
        *  before needing to allocate more memory.
        */
       size_type
-      capacity() const { return _M_rep()->_M_capacity; }
+      capacity() const
+      { return _M_rep()->_M_capacity; }
 
       /**
        *  @brief  Attempt to preallocate enough memory for specified number of
@@ -585,13 +611,15 @@ namespace std
        *  Erases the string, making it empty.
        */
       void
-      clear() { _M_mutate(0, this->size(), 0); }
+      clear()
+      { _M_mutate(0, this->size(), 0); }
 
       /**
        *  Returns true if the %string is empty.  Equivalent to *this == "".
        */
       bool
-      empty() const { return this->size() == 0; }
+      empty() const
+      { return this->size() == 0; }
 
       // Element access:
       /**
@@ -674,7 +702,8 @@ namespace std
        *  @return  Reference to this string.
        */
       basic_string&
-      operator+=(const basic_string& __str) { return this->append(__str); }
+      operator+=(const basic_string& __str)
+      { return this->append(__str); }
 
       /**
        *  @brief  Append a C string.
@@ -682,7 +711,8 @@ namespace std
        *  @return  Reference to this string.
        */
       basic_string&
-      operator+=(const _CharT* __s) { return this->append(__s); }
+      operator+=(const _CharT* __s)
+      { return this->append(__s); }
 
       /**
        *  @brief  Append a character.
@@ -690,7 +720,8 @@ namespace std
        *  @return  Reference to this string.
        */
       basic_string&
-      operator+=(_CharT __c) { return this->append(size_type(1), __c); }
+      operator+=(_CharT __c)
+      { return this->append(size_type(1), __c); }
 
       /**
        *  @brief  Append a string to this string.
@@ -1282,47 +1313,47 @@ namespace std
       // Specializations for the common case of pointer and iterator:
       // useful to avoid the overhead of temporary buffering in _M_replace.
       basic_string&
-        replace(iterator __i1, iterator __i2, _CharT* __k1, _CharT* __k2)
-        {
-	  _GLIBCXX_DEBUG_PEDASSERT(_M_ibegin() <= __i1 && __i1 <= __i2
-				   && __i2 <= _M_iend());
-	  __glibcxx_requires_valid_range(__k1, __k2);
-	  return this->replace(__i1 - _M_ibegin(), __i2 - __i1,
-			       __k1, __k2 - __k1);
-	}
+      replace(iterator __i1, iterator __i2, _CharT* __k1, _CharT* __k2)
+      {
+	_GLIBCXX_DEBUG_PEDASSERT(_M_ibegin() <= __i1 && __i1 <= __i2
+				 && __i2 <= _M_iend());
+	__glibcxx_requires_valid_range(__k1, __k2);
+	return this->replace(__i1 - _M_ibegin(), __i2 - __i1,
+			     __k1, __k2 - __k1);
+      }
 
       basic_string&
-        replace(iterator __i1, iterator __i2,
-		const _CharT* __k1, const _CharT* __k2)
-        {
-	  _GLIBCXX_DEBUG_PEDASSERT(_M_ibegin() <= __i1 && __i1 <= __i2
-				   && __i2 <= _M_iend());
-	  __glibcxx_requires_valid_range(__k1, __k2);
-	  return this->replace(__i1 - _M_ibegin(), __i2 - __i1,
-			       __k1, __k2 - __k1);
-	}
+      replace(iterator __i1, iterator __i2,
+	      const _CharT* __k1, const _CharT* __k2)
+      {
+	_GLIBCXX_DEBUG_PEDASSERT(_M_ibegin() <= __i1 && __i1 <= __i2
+				 && __i2 <= _M_iend());
+	__glibcxx_requires_valid_range(__k1, __k2);
+	return this->replace(__i1 - _M_ibegin(), __i2 - __i1,
+			     __k1, __k2 - __k1);
+      }
 
       basic_string&
-        replace(iterator __i1, iterator __i2, iterator __k1, iterator __k2)
-        {
-	  _GLIBCXX_DEBUG_PEDASSERT(_M_ibegin() <= __i1 && __i1 <= __i2
-				   && __i2 <= _M_iend());
-	  __glibcxx_requires_valid_range(__k1, __k2);
-	  return this->replace(__i1 - _M_ibegin(), __i2 - __i1,
-			       __k1.base(), __k2 - __k1);
-	}
+      replace(iterator __i1, iterator __i2, iterator __k1, iterator __k2)
+      {
+	_GLIBCXX_DEBUG_PEDASSERT(_M_ibegin() <= __i1 && __i1 <= __i2
+				 && __i2 <= _M_iend());
+	__glibcxx_requires_valid_range(__k1, __k2);
+	return this->replace(__i1 - _M_ibegin(), __i2 - __i1,
+			     __k1.base(), __k2 - __k1);
+      }
 
       basic_string&
-        replace(iterator __i1, iterator __i2,
-		const_iterator __k1, const_iterator __k2)
-        {
-	  _GLIBCXX_DEBUG_PEDASSERT(_M_ibegin() <= __i1 && __i1 <= __i2
-				   && __i2 <= _M_iend());
-	  __glibcxx_requires_valid_range(__k1, __k2);
-	  return this->replace(__i1 - _M_ibegin(), __i2 - __i1,
-			       __k1.base(), __k2 - __k1);
-	}
-
+      replace(iterator __i1, iterator __i2,
+	      const_iterator __k1, const_iterator __k2)
+      {
+	_GLIBCXX_DEBUG_PEDASSERT(_M_ibegin() <= __i1 && __i1 <= __i2
+				 && __i2 <= _M_iend());
+	__glibcxx_requires_valid_range(__k1, __k2);
+	return this->replace(__i1 - _M_ibegin(), __i2 - __i1,
+			     __k1.base(), __k2 - __k1);
+      }
+      
     private:
       template<class _Integer>
 	basic_string&
@@ -1342,7 +1373,9 @@ namespace std
 	if (this->max_size() - (this->size() - __n1) < __n2)
 	  __throw_length_error(__N("basic_string::_M_replace_aux"));
 	_M_mutate(__pos1, __n1, __n2);
-	if (__n2)
+	if (__n2 == 1)
+	  _M_data()[__pos1] = __c;
+	else if (__n2)
 	  traits_type::assign(_M_data() + __pos1, __n2, __c);
 	return *this;
       }
@@ -1352,7 +1385,9 @@ namespace std
 		      size_type __n2)
       {
 	_M_mutate(__pos1, __n1, __n2);
-	if (__n2)
+	if (__n2 == 1)
+	  _M_data()[__pos1] = *__s;
+	else if (__n2)
 	  traits_type::copy(_M_data() + __pos1, __s, __n2);
 	return *this;
       }
@@ -1433,7 +1468,8 @@ namespace std
        *  happen.
       */
       const _CharT*
-      c_str() const { return _M_data(); }
+      c_str() const
+      { return _M_data(); }
 
       /**
        *  @brief  Return const pointer to contents.
@@ -1442,13 +1478,15 @@ namespace std
        *  happen.
       */
       const _CharT*
-      data() const { return _M_data(); }
+      data() const
+      { return _M_data(); }
 
       /**
        *  @brief  Return copy of allocator used to construct this string.
       */
       allocator_type
-      get_allocator() const { return _M_dataplus; }
+      get_allocator() const
+      { return _M_dataplus; }
 
       /**
        *  @brief  Find position of a C substring.
@@ -1947,11 +1985,14 @@ namespace std
 	      size_type __n2) const;
   };
 
-
   template<typename _CharT, typename _Traits, typename _Alloc>
     inline basic_string<_CharT, _Traits, _Alloc>::
     basic_string()
+#ifndef _GLIBCXX_FULLY_DYNAMIC_STRING
     : _M_dataplus(_S_empty_rep()._M_refdata(), _Alloc()) { }
+#else
+    : _M_dataplus(_S_construct(size_type(), _CharT(), _Alloc()), _Alloc()) { }
+#endif
 
   // operator+
   /**
@@ -1960,7 +2001,7 @@ namespace std
    *  @param rhs  Last string.
    *  @return  New string with value of @a lhs followed by @a rhs.
    */
- template<typename _CharT, typename _Traits, typename _Alloc>
+  template<typename _CharT, typename _Traits, typename _Alloc>
     basic_string<_CharT, _Traits, _Alloc>
     operator+(const basic_string<_CharT, _Traits, _Alloc>& __lhs,
 	      const basic_string<_CharT, _Traits, _Alloc>& __rhs)
