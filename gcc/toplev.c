@@ -45,7 +45,6 @@ Boston, MA 02111-1307, USA.  */
 #include "tm_p.h"
 #include "flags.h"
 #include "insn-attr.h"
-#include "insn-codes.h"
 #include "insn-config.h"
 #include "hard-reg-set.h"
 #include "recog.h"
@@ -63,6 +62,7 @@ Boston, MA 02111-1307, USA.  */
 #include "timevar.h"
 #include "diagnostic.h"
 #include "ssa.h"
+#include "params.h"
 
 #ifndef ACCUMULATE_OUTGOING_ARGS
 #define ACCUMULATE_OUTGOING_ARGS 0
@@ -163,10 +163,6 @@ static const char *decl_name PARAMS ((tree, int));
 
 static void float_signal PARAMS ((int)) ATTRIBUTE_NORETURN;
 static void crash_signal PARAMS ((int)) ATTRIBUTE_NORETURN;
-#ifdef ASM_IDENTIFY_LANGUAGE
-/* This might or might not be used in ASM_IDENTIFY_LANGUAGE. */
-static void output_lang_identify PARAMS ((FILE *)) ATTRIBUTE_UNUSED;
-#endif
 static void compile_file PARAMS ((const char *));
 static void display_help PARAMS ((void));
 static void display_target_options PARAMS ((void));
@@ -256,6 +252,7 @@ enum dump_file_index
 {
   DFI_rtl,
   DFI_sibling,
+  DFI_eh,
   DFI_jump,
   DFI_cse,
   DFI_addressof,
@@ -293,7 +290,7 @@ enum dump_file_index
 
    Remaining -d letters:
 
-	"       h      o q   u     "
+	"              o q   u     "
 	"       H  K   OPQ  TUVW YZ"
 */
 
@@ -301,6 +298,7 @@ struct dump_file_info dump_file[DFI_MAX] =
 {
   { "rtl",	'r', 0, 0, 0 },
   { "sibling",  'i', 0, 0, 0 },
+  { "eh",	'h', 0, 0, 0 },
   { "jump",	'j', 0, 0, 0 },
   { "cse",	's', 0, 0, 0 },
   { "addressof", 'F', 0, 0, 0 },
@@ -389,6 +387,9 @@ int optimize_size = 0;
 int errorcount = 0;
 int warningcount = 0;
 int sorrycount = 0;
+
+/* Nonzero if we should exit after parsing options.  */
+static int exit_after_options = 0;
 
 /* The FUNCTION_DECL for the function currently being compiled,
    or 0 if between functions.  */
@@ -718,11 +719,6 @@ int flag_pic;
 
 int flag_exceptions;
 
-/* Nonzero means use the new model for exception handling. Replaces
-   -DNEW_EH_MODEL as a compile option.  */
-
-int flag_new_exceptions = 1;
-
 /* Nonzero means generate frame unwind info table when supported.  */
 
 int flag_unwind_tables = 0;
@@ -958,6 +954,14 @@ int flag_leading_underscore = -1;
 /* The user symbol prefix after having resolved same.  */
 const char *user_label_prefix;
 
+static const param_info lang_independent_params[] = {
+#define DEFPARAM(ENUM, OPTION, HELP, DEFAULT) \
+  { OPTION, DEFAULT, HELP },
+#include "params.def"
+#undef DEFPARAM
+  { NULL, 0, NULL }
+};
+
 /* A default for same.  */
 #ifndef USER_LABEL_PREFIX
 #define USER_LABEL_PREFIX ""
@@ -1046,9 +1050,9 @@ lang_independent_options f_options[] =
   {"pretend-float", &flag_pretend_float, 1,
    "Pretend that host and target use the same FP format"},
   {"schedule-insns", &flag_schedule_insns, 1,
-   "Reschedule instructions to avoid pipeline stalls"},
+   "Reschedule instructions before register allocation"},
   {"schedule-insns2", &flag_schedule_insns_after_reload, 1,
-  "Run two passes of the instruction scheduler"},
+   "Reschedule instructions after register allocation"},
   {"sched-interblock",&flag_schedule_interblock, 1,
    "Enable scheduling across basic blocks" },
   {"sched-spec",&flag_schedule_speculative, 1,
@@ -1064,14 +1068,10 @@ lang_independent_options f_options[] =
   {"PIC", &flag_pic, 2, ""},
   {"exceptions", &flag_exceptions, 1,
    "Enable exception handling" },
-  {"new-exceptions", &flag_new_exceptions, 1,
-   "Use the new model for exception handling" },
   {"unwind-tables", &flag_unwind_tables, 1,
     "Just generate unwind tables for exception handling" },
-  {"sjlj-exceptions", &exceptions_via_longjmp, 1,
-   "Use setjmp/longjmp to handle exceptions" },
-  {"asynchronous-exceptions", &asynchronous_exceptions, 1,
-   "Support asynchronous exceptions" },
+  {"non-call-exceptions", &flag_non_call_exceptions, 1,
+   "Support synchronous non-call exceptions" },
   {"profile-arcs", &profile_arc_flag, 1,
    "Insert arc based program profiling code" },
   {"test-coverage", &flag_test_coverage, 1,
@@ -1794,21 +1794,6 @@ output_file_directive (asm_file, input_name)
 #endif
 }
 
-#ifdef ASM_IDENTIFY_LANGUAGE
-/* Routine to build language identifier for object file.  */
-
-static void
-output_lang_identify (asm_out_file)
-     FILE *asm_out_file;
-{
-  int len = strlen (lang_identify ()) + sizeof ("__gnu_compiled_") + 1;
-  char *s = (char *) alloca (len);
-
-  sprintf (s, "__gnu_compiled_%s", lang_identify ());
-  ASM_OUTPUT_LABEL (asm_out_file, s);
-}
-#endif
-
 /* Routine to open a dump file.  Return true if the dump file is enabled.  */
 
 static int
@@ -2014,7 +1999,7 @@ check_global_declarations (vec, len)
 	/* Cancel the RTL for this decl so that, if debugging info
 	   output for global variables is still to come,
 	   this one will be omitted.  */
-	DECL_RTL (decl) = NULL;
+	SET_DECL_RTL (decl, NULL_RTX);
 
       /* Warn about any function
 	 declared static but not defined.
@@ -2183,9 +2168,9 @@ compile_file (name)
   init_regs ();
   init_alias_once ();
   init_decl_processing ();
+  init_eh ();
   init_optabs ();
   init_stmt ();
-  init_eh ();
   init_loop ();
   init_reload ();
   init_function_once ();
@@ -2281,18 +2266,6 @@ compile_file (name)
 	  fprintf (asm_out_file, "\n");
 	}
 #endif
-
-      /* Output something to inform GDB that this compilation was by GCC.  */
-#ifndef ASM_IDENTIFY_GCC
-      fprintf (asm_out_file, "gcc2_compiled.:\n");
-#else
-      ASM_IDENTIFY_GCC (asm_out_file);
-#endif
-
-  /* Output something to identify which front-end produced this file.  */
-#ifdef ASM_IDENTIFY_LANGUAGE
-      ASM_IDENTIFY_LANGUAGE (asm_out_file);
-#endif
     } /* ! flag_syntax_only  */
 
 #ifndef ASM_OUTPUT_SECTION_NAME
@@ -2319,25 +2292,6 @@ compile_file (name)
   if (flag_function_sections && write_symbols != NO_DEBUG)
     warning ("-ffunction-sections may affect debugging on some targets.");
 #endif
-
-  /* ??? Note: There used to be a conditional here
-      to call assemble_zeros without fail if DBX_DEBUGGING_INFO is defined.
-      This was to guarantee separation between gcc_compiled. and
-      the first function, for the sake of dbx on Suns.
-      However, having the extra zero here confused the Emacs
-      code for unexec, and might confuse other programs too.
-      Therefore, I took out that change.
-      In future versions we should find another way to solve
-      that dbx problem.  -- rms, 23 May 93.  */
-
-  /* Don't let the first function fall at the same address
-     as gcc_compiled., if profiling.  */
-  if (profile_flag || profile_block_flag)
-    {
-      /* It's best if we can write a nop here since some
-	 assemblers don't tolerate zeros in the text section.  */
-      output_asm_insn (get_insn_template (CODE_FOR_nop, NULL), NULL_PTR);
-    }
 
   /* If dbx symbol table desired, initialize writing it
      and output the predefined types.  */
@@ -2422,14 +2376,6 @@ compile_file (name)
        loop above.  */
     output_func_start_profiler ();
 
-    /* Now that all possible functions have been output, we can dump
-       the exception table.  */
-
-#ifndef IA64_UNWIND_INFO
-    output_exception_table ();
-#endif
-    free_exception_table ();
-
     check_global_declarations (vec, len);
 
     /* Clean up.  */
@@ -2465,6 +2411,8 @@ compile_file (name)
 
   /* Output some stuff at end of file if nec.  */
 
+  dw2_output_indirect_constants ();
+
   end_final (dump_base_name);
 
   if (profile_arc_flag || flag_test_coverage || flag_branch_probabilities)
@@ -2480,6 +2428,15 @@ compile_file (name)
 
 #ifdef ASM_FILE_END
   ASM_FILE_END (asm_out_file);
+#endif
+
+  /* Attach a special .ident directive to the end of the file to identify
+     the version of GCC which compiled this code.  The format of the .ident
+     string is patterned after the ones produced by native SVR4 compilers.  */
+#ifdef IDENT_ASM_OP
+  if (!flag_no_ident)
+    fprintf (asm_out_file, "%s\"GCC: (GNU) %s\"\n",
+	     IDENT_ASM_OP, version_string);
 #endif
 
   /* Language-specific end of compilation actions.  */
@@ -2520,7 +2477,7 @@ compile_file (name)
     {
       int i;
 
-      for (i = 0; i < DFI_MAX; ++i)
+      for (i = 0; i < (int) DFI_MAX; ++i)
 	if (dump_file[i].initialized && dump_file[i].graph_dump_p)
 	  {
 	    char seq[16];
@@ -2584,7 +2541,8 @@ rest_of_decl_compilation (decl, asmspec, top_level, at_end)
       || TREE_CODE (decl) == FUNCTION_DECL)
     {
       timevar_push (TV_VARCONST);
-      make_decl_rtl (decl, asmspec);
+      if (asmspec)
+	make_decl_rtl (decl, asmspec);
       /* Initialized extern variable exists to be replaced
 	 with its value, or represents something that will be
 	 output in another file.  */
@@ -2610,14 +2568,15 @@ rest_of_decl_compilation (decl, asmspec, top_level, at_end)
     {
       if (decode_reg_name (asmspec) >= 0)
 	{
-	  DECL_RTL (decl) = 0;
+	  SET_DECL_RTL (decl, NULL_RTX);
 	  make_decl_rtl (decl, asmspec);
 	}
       else
 	{
 	  error ("invalid register name `%s' for register variable", asmspec);
 	  DECL_REGISTER (decl) = 0;
-	  make_decl_rtl (decl, NULL);
+	  if (!top_level)
+	    expand_decl (decl);
 	}
     }
 #if defined (DBX_DEBUGGING_INFO) || defined (XCOFF_DEBUGGING_INFO)
@@ -2684,23 +2643,45 @@ note_deferral_of_defined_inline_function (decl)
   /* Generate the DWARF info for the "abstract" instance of a function
      which we may later generate inlined and/or out-of-line instances
      of.  */
-  if (write_symbols == DWARF_DEBUG && DECL_INLINE (decl))
+  if (write_symbols == DWARF_DEBUG
+      && (DECL_INLINE (decl) || DECL_ABSTRACT (decl))
+      && ! DECL_ABSTRACT_ORIGIN (decl))
     {
       /* The front-end may not have set CURRENT_FUNCTION_DECL, but the
 	 DWARF code expects it to be set in this case.  Intuitively,
 	 DECL is the function we just finished defining, so setting
 	 CURRENT_FUNCTION_DECL is sensible.  */
       tree saved_cfd = current_function_decl;
+      int was_abstract = DECL_ABSTRACT (decl);
       current_function_decl = decl;
 
       /* Let the DWARF code do its work.  */
       set_decl_abstract_flags (decl, 1);
       dwarfout_file_scope_decl (decl, 0);
-      set_decl_abstract_flags (decl, 0);
+      if (! was_abstract)
+	set_decl_abstract_flags (decl, 0);
 
       /* Reset CURRENT_FUNCTION_DECL.  */
       current_function_decl = saved_cfd;
     }
+#endif
+}
+
+/* FNDECL is an inline function which is about to be emitted out of line.
+   Do any preparation, such as emitting abstract debug info for the inline
+   before it gets mangled by optimization.  */
+
+void
+note_outlining_of_inline_function (fndecl)
+     tree fndecl;
+{
+#ifdef DWARF2_DEBUGGING_INFO
+  /* The DWARF 2 backend tries to reduce debugging bloat by not emitting
+     the abstract description of inline functions until something tries to
+     reference them.  Force it out now, before optimizations mangle the
+     block tree.  */
+  if (write_symbols == DWARF2_DEBUG)
+    dwarf2out_abstract_function (fndecl);
 #endif
 }
 
@@ -2771,7 +2752,8 @@ rest_of_compilation (decl)
 	  }
 
       /* If requested, consider whether to make this function inline.  */
-      if (DECL_INLINE (decl) || flag_inline_functions)
+      if ((DECL_INLINE (decl) && !flag_no_inline) 
+	  || flag_inline_functions)
 	{
 	  timevar_push (TV_INTEGRATION);
 	  lose = function_cannot_inline_p (decl);
@@ -2808,6 +2790,11 @@ rest_of_compilation (decl)
 	    fprintf (rtl_dump_file, ";; (integrable)\n\n");
 	  close_dump_file (DFI_rtl, print_rtl, insns);
 	}
+
+      /* Convert from NOTE_INSN_EH_REGION style notes, and do other
+	 sorts of eh initialization.  Delay this until after the
+         initial rtl dump so that we can see the original nesting.  */
+      convert_from_eh_region_ranges ();
 
       /* If function is inline, and we don't yet know whether to
 	 compile it by itself, defer decision till end of compilation.
@@ -2890,9 +2877,6 @@ rest_of_compilation (decl)
   if ((rtl_dump_and_exit || flag_syntax_only) && !warn_return_type)
     goto exit_rest_of_compilation;
 
-  /* Emit code to get eh context, if needed. */
-  emit_eh_context ();
-
   /* We may have potential sibling or tail recursion sites.  Select one
      (of possibly multiple) methods of performing the call.  */
   if (flag_optimize_sibling_calls)
@@ -2903,6 +2887,19 @@ rest_of_compilation (decl)
       optimize_sibling_and_tail_recursive_calls ();
 
       close_dump_file (DFI_sibling, print_rtl, get_insns ());
+      timevar_pop (TV_JUMP);
+    }
+
+  /* Complete generation of exception handling code.  */
+  find_exception_handler_labels ();
+  if (doing_eh (0))
+    {
+      timevar_push (TV_JUMP);
+      open_dump_file (DFI_eh, decl);
+
+      finish_eh_generation ();
+
+      close_dump_file (DFI_eh, print_rtl, get_insns ());
       timevar_pop (TV_JUMP);
     }
 
@@ -2928,9 +2925,6 @@ rest_of_compilation (decl)
 
   /* Instantiate all virtual registers.  */
   instantiate_virtual_regs (current_function_decl, insns);
-
-  /* Find all the EH handlers.  */
-  find_exception_handler_labels ();
 
   open_dump_file (DFI_jump, decl);
 
@@ -2961,7 +2955,7 @@ rest_of_compilation (decl)
   if (optimize > 0)
     {
       find_basic_blocks (insns, max_reg_num (), rtl_dump_file);
-      cleanup_cfg (insns);
+      cleanup_cfg ();
 
       /* ??? Run if-conversion before delete_null_pointer_checks,
          since the later does not preserve the CFG.  This should
@@ -3031,7 +3025,7 @@ rest_of_compilation (decl)
 	  timevar_push (TV_JUMP);
 	  find_basic_blocks (insns, max_reg_num (), rtl_dump_file);
 
-	  cleanup_cfg (insns);
+	  cleanup_cfg ();
 
 	  delete_null_pointer_checks (insns);
 	  timevar_pop (TV_JUMP);
@@ -3062,7 +3056,7 @@ rest_of_compilation (decl)
       open_dump_file (DFI_ssa, decl);
 
       find_basic_blocks (insns, max_reg_num (), rtl_dump_file);
-      cleanup_cfg (insns);
+      cleanup_cfg ();
       convert_to_ssa ();
 
       close_dump_file (DFI_ssa, print_rtl_with_bb, insns);
@@ -3114,7 +3108,7 @@ rest_of_compilation (decl)
       open_dump_file (DFI_gcse, decl);
 
       find_basic_blocks (insns, max_reg_num (), rtl_dump_file);
-      cleanup_cfg (insns);
+      cleanup_cfg ();
       tem = gcse_main (insns, rtl_dump_file);
 
       /* If gcse altered any jumps, rerun jump optimizations to clean
@@ -3186,7 +3180,7 @@ rest_of_compilation (decl)
 	  timevar_push (TV_IFCVT);
 
 	  find_basic_blocks (insns, max_reg_num (), rtl_dump_file);
-	  cleanup_cfg (insns);
+	  cleanup_cfg ();
 	  if_convert (0);
 
 	  timevar_pop(TV_IFCVT);
@@ -3232,7 +3226,7 @@ rest_of_compilation (decl)
   open_dump_file (DFI_cfg, decl);
 
   find_basic_blocks (insns, max_reg_num (), rtl_dump_file);
-  cleanup_cfg (insns);
+  cleanup_cfg ();
   check_function_return_warnings ();
 
   close_dump_file (DFI_cfg, print_rtl_with_bb, insns);
@@ -3307,7 +3301,7 @@ rest_of_compilation (decl)
 
 	  timevar_push (TV_FLOW);
 	  find_basic_blocks (insns, max_reg_num (), rtl_dump_file);
-	  cleanup_cfg (insns);
+	  cleanup_cfg ();
 
 	  /* Blimey.  We've got to have the CFG up to date for the call to
 	     if_convert below.  However, the random deletion of blocks
@@ -3515,7 +3509,7 @@ rest_of_compilation (decl)
 
   if (optimize)
     {
-      cleanup_cfg (insns);
+      cleanup_cfg ();
       life_analysis (insns, rtl_dump_file, PROP_FINAL);
 
       /* This is kind of a heuristic.  We need to run combine_stack_adjustments
@@ -3650,6 +3644,12 @@ rest_of_compilation (decl)
     }
 #endif
 
+#ifndef STACK_REGS
+  /* ??? Do this before shorten branches so that we aren't creating
+     insns too late and fail sanity checks in final. */
+  convert_to_eh_region_ranges ();
+#endif
+
   /* Shorten branches.
 
      Note this must run before reg-stack because of death note (ab)use
@@ -3668,6 +3668,8 @@ rest_of_compilation (decl)
   timevar_pop (TV_REG_STACK);
 
   ggc_collect ();
+
+  convert_to_eh_region_ranges ();
 #endif
 
   current_function_nothrow = nothrow_function_p ();
@@ -3698,7 +3700,20 @@ rest_of_compilation (decl)
     final_start_function (insns, asm_out_file, optimize);
     final (insns, asm_out_file, optimize, 0);
     final_end_function (insns, asm_out_file, optimize);
+
+#ifdef IA64_UNWIND_INFO
+    /* ??? The IA-64 ".handlerdata" directive must be issued before
+       the ".endp" directive that closes the procedure descriptor.  */
+    output_function_exception_table ();
+#endif
+
     assemble_end_function (decl, fnname);
+
+#ifndef IA64_UNWIND_INFO
+    /* Otherwise, it feels unclean to switch sections in the middle.  */
+    output_function_exception_table ();
+#endif
+
     if (! quiet_flag)
       fflush (asm_out_file);
 
@@ -3817,6 +3832,17 @@ display_help ()
 
   printf (_("  -O[number]              Set optimisation level to [number]\n"));
   printf (_("  -Os                     Optimise for space rather than speed\n"));
+  for (i = sizeof (compiler_params); i--;)
+    {
+      const char *description = compiler_params[i].help;
+      const int length = 21-strlen(compiler_params[i].option);
+
+      if (description != NULL && * description != 0)
+	printf ("  --param %s=<value>%.*s%s\n",
+		compiler_params[i].option,
+		length > 0 ? length : 1, "                     ",
+		description);
+    }
   printf (_("  -pedantic               Issue warnings needed by strict compliance to ISO C\n"));
   printf (_("  -pedantic-errors        Like -pedantic except that errors are produced\n"));
   printf (_("  -w                      Suppress warnings\n"));
@@ -3992,7 +4018,7 @@ decode_d_option (arg)
     switch (c = *arg++)
       {
       case 'a':
-	for (i = 0; i < DFI_MAX; ++i)
+	for (i = 0; i < (int) DFI_MAX; ++i)
 	  dump_file[i].enabled = 1;
 	break;
       case 'A':
@@ -4023,7 +4049,7 @@ decode_d_option (arg)
 
       default:
 	matched = 0;
-	for (i = 0; i < DFI_MAX; ++i)
+	for (i = 0; i < (int) DFI_MAX; ++i)
 	  if (c == dump_file[i].debug_switch)
 	    {
 	      dump_file[i].enabled = 1;
@@ -4066,8 +4092,12 @@ decode_f_option (arg)
 
   if ((option_value = skip_leading_substring (arg, "inline-limit-"))
       || (option_value = skip_leading_substring (arg, "inline-limit=")))
-    inline_max_insns =
-      read_integral_parameter (option_value, arg - 2, inline_max_insns);
+    {
+      int val =
+      read_integral_parameter (option_value, arg - 2,
+                               MAX_INLINE_INSNS);
+      set_param_value ("max-inline-insns", val);
+    }
 #ifdef INSN_SCHEDULING
   else if ((option_value = skip_leading_substring (arg, "sched-verbose=")))
     fix_sched_param ("verbose", option_value);
@@ -4338,19 +4368,53 @@ independent_decode_option (argc, argv)
   if (!strcmp (arg, "-help"))
     {
       display_help ();
-      exit (0);
+      exit_after_options = 1;
     }
 
   if (!strcmp (arg, "-target-help"))
     {
       display_target_options ();
-      exit (0);
+      exit_after_options = 1;
     }
 
   if (!strcmp (arg, "-version"))
     {
       print_version (stderr, "");
-      exit (0);
+      exit_after_options = 1;
+    }
+
+  /* Handle '--param <name>=<value>'.  */
+  if (strcmp (arg, "-param") == 0)
+    {
+      char *equal;
+
+      if (argc == 1)
+      {
+        error ("-param option missing argument");
+        return 1;
+      }
+
+      /* Get the '<name>=<value>' parameter.  */
+      arg = argv[1];
+      /* Look for the `='.  */
+      equal = strchr (arg, '=');
+      if (!equal)
+      error ("invalid --param option: %s", arg);
+      else
+      {
+        int val;
+
+        /* Zero out the `=' sign so that we get two separate strings.  */
+        *equal = '\0';
+        /* Figure out what value is specified.  */
+        val = read_integral_parameter (equal + 1, NULL, INVALID_PARAM_VAL);
+        if (val != INVALID_PARAM_VAL)
+          set_param_value (arg, val);
+        else
+          error ("invalid parameter value `%s'", equal + 1);
+      }
+
+      return 2;
     }
 
   if (*arg == 'Y')
@@ -4594,6 +4658,9 @@ main (argc, argv)
   /* Initialize the diagnostics reporting machinery.  */
   initialize_diagnostics ();
 
+  /* Register the language-independent parameters.  */
+  add_params (lang_independent_params, LAST_PARAM);
+
   /* Perform language-specific options intialization.  */
   if (lang_hooks.init_options)
     (*lang_hooks.init_options) ();
@@ -4703,16 +4770,22 @@ main (argc, argv)
   /* Perform normal command line switch decoding.  */
   for (i = 1; i < argc;)
     {
-      unsigned int lang_processed;
-      unsigned int indep_processed;
+      int lang_processed;
+      int indep_processed;
 
       /* Give the language a chance to decode the option for itself.  */
       lang_processed = (*lang_hooks.decode_option) (argc - i, argv + i);
 
-      /* Now see if the option also has a language independent meaning.
-	 Some options are both language specific and language independent,
-	 eg --help.  */
-      indep_processed = independent_decode_option (argc - i, argv + i);
+      if (lang_processed >= 0)
+	/* Now see if the option also has a language independent meaning.
+	   Some options are both language specific and language independent,
+	   eg --help.  */
+	indep_processed = independent_decode_option (argc - i, argv + i);
+      else
+	{
+	  lang_processed = -lang_processed;
+	  indep_processed = 0;
+	}
 
       if (lang_processed || indep_processed)
 	i += MAX (lang_processed, indep_processed);
@@ -4763,6 +4836,9 @@ main (argc, argv)
   if (lang_hooks.post_options)
     (*lang_hooks.post_options) ();
 
+  if (exit_after_options)
+    exit (0);
+
   /* Reflect any language-specific diagnostic option setting.  */
   reshape_diagnostic_buffer ();
 
@@ -4787,27 +4863,6 @@ main (argc, argv)
 #ifdef OVERRIDE_OPTIONS
   /* Some machines may reject certain combinations of options.  */
   OVERRIDE_OPTIONS;
-#endif
-
-  if (exceptions_via_longjmp == 2)
-    {
-#ifdef DWARF2_UNWIND_INFO
-      exceptions_via_longjmp = ! DWARF2_UNWIND_INFO;
-#else
-#ifdef IA64_UNWIND_INFO
-      exceptions_via_longjmp = ! IA64_UNWIND_INFO;
-#else
-      exceptions_via_longjmp = 1;
-#endif
-#endif
-    }
-
-  /* Since each function gets its own handler data, we can't support the
-     new model currently, since it depend on a specific rethrow label
-     which is declared at the front of the table, and we can only
-     have one such symbol in a file.  */
-#ifdef IA64_UNWIND_INFO
-  flag_new_exceptions = 0;
 #endif
 
   /* Set up the align_*_log variables, defaulting them to 1 if they

@@ -30,7 +30,6 @@ Boston, MA 02111-1307, USA.  */
 	output_file_directive (FILE, main_input_filename);		\
 	if (target_flags & MASK_INTEL_SYNTAX)				\
 	  fputs ("\t.intel_syntax\n", FILE);				\
-	fprintf (FILE, "\t.version\t\"01.01\"\n");			\
   } while (0)
 
 #undef TARGET_VERSION
@@ -169,3 +168,83 @@ Boston, MA 02111-1307, USA.  */
     }									\
   } while (0)
 #endif
+
+#if defined(__PIC__) && defined (USE_GNULIBC_1)
+/* This is a kludge. The i386 GNU/Linux dynamic linker needs ___brk_addr,
+   __environ and atexit (). We have to make sure they are in the .dynsym
+   section. We accomplish it by making a dummy call here. This
+   code is never reached.  */
+         
+#define CRT_END_INIT_DUMMY		\
+  do					\
+    {					\
+      extern void *___brk_addr;		\
+      extern char **__environ;		\
+					\
+      ___brk_addr = __environ;		\
+      atexit (0);			\
+    }					\
+  while (0)
+#endif
+
+/* Do code reading to identify a signal frame, and set the frame
+   state data appropriately.  See unwind-dw2.c for the structs.  */
+
+#ifdef IN_LIBGCC2
+#include <signal.h>
+#include <sys/ucontext.h>
+#endif
+
+#define MD_FALLBACK_FRAME_STATE_FOR(CONTEXT, FS, SUCCESS)		\
+  do {									\
+    unsigned char *pc_ = (CONTEXT)->ra;					\
+    struct sigcontext *sc_;						\
+    long new_cfa_;							\
+									\
+    /* popl %eax ; movl $__NR_sigreturn,%eax ; int $0x80  */		\
+    if (*(unsigned short *)(pc_+0) == 0xb858				\
+	&& *(unsigned int *)(pc_+2) == 119				\
+	&& *(unsigned short *)(pc_+6) == 0x80cd)			\
+      sc_ = (CONTEXT)->cfa + 4;						\
+    /* movl $__NR_rt_sigreturn,%eax ; int $0x80  */			\
+    else if (*(unsigned char *)(pc_+0) == 0xb8				\
+	     && *(unsigned int *)(pc_+1) == 173				\
+	     && *(unsigned short *)(pc_+5) == 0x80cd)			\
+      {									\
+	struct rt_sigframe {						\
+	  int sig;							\
+	  struct siginfo *pinfo;					\
+	  void *puc;							\
+	  struct siginfo info;						\
+	  struct ucontext uc;						\
+	} *rt_ = (CONTEXT)->cfa;					\
+	sc_ = (struct sigcontext *) &rt_->uc.uc_mcontext;		\
+      }									\
+    else								\
+      break;								\
+									\
+    new_cfa_ = sc_->esp;						\
+    (FS)->cfa_how = CFA_REG_OFFSET;					\
+    (FS)->cfa_reg = 4;							\
+    (FS)->cfa_offset = new_cfa_ - (long) (CONTEXT)->cfa;		\
+									\
+    /* The SVR4 register numbering macros aren't usable in libgcc.  */	\
+    (FS)->regs.reg[0].how = REG_SAVED_OFFSET;				\
+    (FS)->regs.reg[0].loc.offset = (long)&sc_->eax - new_cfa_;		\
+    (FS)->regs.reg[3].how = REG_SAVED_OFFSET;				\
+    (FS)->regs.reg[3].loc.offset = (long)&sc_->ebx - new_cfa_;		\
+    (FS)->regs.reg[1].how = REG_SAVED_OFFSET;				\
+    (FS)->regs.reg[1].loc.offset = (long)&sc_->ecx - new_cfa_;		\
+    (FS)->regs.reg[2].how = REG_SAVED_OFFSET;				\
+    (FS)->regs.reg[2].loc.offset = (long)&sc_->edx - new_cfa_;		\
+    (FS)->regs.reg[6].how = REG_SAVED_OFFSET;				\
+    (FS)->regs.reg[6].loc.offset = (long)&sc_->esi - new_cfa_;		\
+    (FS)->regs.reg[7].how = REG_SAVED_OFFSET;				\
+    (FS)->regs.reg[7].loc.offset = (long)&sc_->edi - new_cfa_;		\
+    (FS)->regs.reg[5].how = REG_SAVED_OFFSET;				\
+    (FS)->regs.reg[5].loc.offset = (long)&sc_->ebp - new_cfa_;		\
+    (FS)->regs.reg[8].how = REG_SAVED_OFFSET;				\
+    (FS)->regs.reg[8].loc.offset = (long)&sc_->eip - new_cfa_;		\
+    (FS)->retaddr_column = 8;						\
+    goto SUCCESS;							\
+  } while (0)

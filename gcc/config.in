@@ -159,6 +159,9 @@
 /* Define if you have the kill function.  */
 #undef HAVE_KILL
 
+/* Define if you have the lstat function.  */
+#undef HAVE_LSTAT
+
 /* Define if you have the munmap function.  */
 #undef HAVE_MUNMAP
 
@@ -239,6 +242,9 @@
 
 /* Define if you have the <stab.h> header file.  */
 #undef HAVE_STAB_H
+
+/* Define if you have the <stdbool.h> header file.  */
+#undef HAVE_STDBOOL_H
 
 /* Define if you have the <stddef.h> header file.  */
 #undef HAVE_STDDEF_H
@@ -448,6 +454,9 @@
 
 /* Define to 1 if you want to enable namespaces (-fhonor-std) by default. */
 #undef ENABLE_STD_NAMESPACE
+
+/* Define 0/1 to force the choice for exception handling model. */
+#undef CONFIG_SJLJ_EXCEPTIONS
 
 
 /* Bison unconditionally undefines `const' if neither `__STDC__' nor

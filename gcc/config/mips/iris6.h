@@ -128,11 +128,6 @@ Boston, MA 02111-1307, USA.  */
 #undef MACHINE_TYPE
 #define MACHINE_TYPE "SGI running IRIX 6.x"
 
-/* The Irix 6.0.1 assembler doesn't like labels in the text section, so
-   just avoid emitting them.  */
-#define ASM_IDENTIFY_GCC(x) ((void)0)
-#define ASM_IDENTIFY_LANGUAGE(x) ((void)0)
-
 /* Irix 5 stuff that we don't need for Irix 6.  */
 /* ??? We do need this for the -mabi=32 switch though.  */
 #undef ASM_OUTPUT_UNDEF_FUNCTION
@@ -208,6 +203,10 @@ Boston, MA 02111-1307, USA.  */
 /* Irix assembler does not support the init_priority C++ attribute.  */
 #undef SUPPORTS_INIT_PRIORITY
 #define SUPPORTS_INIT_PRIORITY 0
+
+/* A linker error can empirically be avoided by removing duplicate
+   library search directories.  */
+#define LINK_ELIMINATE_DUPLICATE_LDIRECTORIES 1
 
 #define POPSECTION_ASM_OP	"\t.popsection"
 

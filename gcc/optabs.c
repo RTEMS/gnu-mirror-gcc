@@ -31,9 +31,8 @@ Boston, MA 02111-1307, USA.  */
 #include "tree.h"
 #include "tm_p.h"
 #include "flags.h"
-#include "insn-flags.h"
-#include "insn-codes.h"
 #include "function.h"
+#include "except.h"
 #include "expr.h"
 #include "recog.h"
 #include "reload.h"
@@ -2813,14 +2812,13 @@ emit_libcall_block (insns, target, result, equiv)
   /* look for any CALL_INSNs in this sequence, and attach a REG_EH_REGION
      reg note to indicate that this call cannot throw or execute a nonlocal
      goto (unless there is already a REG_EH_REGION note, in which case
-     we update it).  Also set the CONST_CALL_P flag.  */
+     we update it).  */
 
   for (insn = insns; insn; insn = NEXT_INSN (insn))
     if (GET_CODE (insn) == CALL_INSN)
       {
 	rtx note = find_reg_note (insn, REG_EH_REGION, NULL_RTX);
 
-	CONST_CALL_P (insn) = 1;
 	if (note != 0)
 	  XEXP (note, 0) = GEN_INT (-1);
 	else
@@ -4757,18 +4755,16 @@ init_optabs ()
   trunctfdf2_libfunc = init_one_libfunc ("__trunctfdf2");
 
   memcpy_libfunc = init_one_libfunc ("memcpy");
+  memmove_libfunc = init_one_libfunc ("memmove");
   bcopy_libfunc = init_one_libfunc ("bcopy");
   memcmp_libfunc = init_one_libfunc ("memcmp");
   bcmp_libfunc = init_one_libfunc ("__gcc_bcmp");
   memset_libfunc = init_one_libfunc ("memset");
   bzero_libfunc = init_one_libfunc ("bzero");
 
-  throw_libfunc = init_one_libfunc ("__throw");
-  rethrow_libfunc = init_one_libfunc ("__rethrow");
-  sjthrow_libfunc = init_one_libfunc ("__sjthrow");
-  sjpopnthrow_libfunc = init_one_libfunc ("__sjpopnthrow");
-  terminate_libfunc = init_one_libfunc ("__terminate");
-  eh_rtime_match_libfunc = init_one_libfunc ("__eh_rtime_match");
+  unwind_resume_libfunc = init_one_libfunc (USING_SJLJ_EXCEPTIONS
+					    ? "_Unwind_SjLj_Resume"
+					    : "_Unwind_Resume");
 #ifndef DONT_USE_BUILTIN_SETJMP
   setjmp_libfunc = init_one_libfunc ("__builtin_setjmp");
   longjmp_libfunc = init_one_libfunc ("__builtin_longjmp");
@@ -4776,6 +4772,9 @@ init_optabs ()
   setjmp_libfunc = init_one_libfunc ("setjmp");
   longjmp_libfunc = init_one_libfunc ("longjmp");
 #endif
+  unwind_sjlj_register_libfunc = init_one_libfunc ("_Unwind_SjLj_Register");
+  unwind_sjlj_unregister_libfunc
+    = init_one_libfunc ("_Unwind_SjLj_Unregister");
 
   eqhf2_libfunc = init_one_libfunc ("__eqhf2");
   nehf2_libfunc = init_one_libfunc ("__nehf2");

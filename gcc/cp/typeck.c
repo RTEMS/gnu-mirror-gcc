@@ -2433,6 +2433,27 @@ build_array_ref (array, idx)
       || TREE_TYPE (idx) == error_mark_node)
     return error_mark_node;
 
+  /* If ARRAY is a COMPOUND_EXPR or COND_EXPR, move our reference
+     inside it.  */
+  switch (TREE_CODE (array))
+    {
+    case COMPOUND_EXPR:
+      {
+	tree value = build_array_ref (TREE_OPERAND (array, 1), idx);
+	return build (COMPOUND_EXPR, TREE_TYPE (value),
+		      TREE_OPERAND (array, 0), value);
+      }
+
+    case COND_EXPR:
+      return build_conditional_expr
+	(TREE_OPERAND (array, 0),
+	 build_array_ref (TREE_OPERAND (array, 1), idx),
+	 build_array_ref (TREE_OPERAND (array, 2), idx));
+
+    default:
+      break;
+    }
+
   if (TREE_CODE (TREE_TYPE (array)) == ARRAY_TYPE
       && TREE_CODE (array) != INDIRECT_REF)
     {
@@ -2469,6 +2490,7 @@ build_array_ref (array, idx)
 	  if (mark_addressable (array) == 0)
 	    return error_mark_node;
 	}
+
       /* An array that is indexed by a constant value which is not within
 	 the array bounds cannot be stored in a register either; because we
 	 would get a crash in store_bit_field/extract_bit_field when trying
@@ -2872,6 +2894,11 @@ get_member_function_from_ptrfunc (instance_ptrptr, function)
 
       e3 = PFN_FROM_PTRMEMFUNC (function);
 
+      vtbl = convert_pointer_to (ptr_type_node, instance);
+      delta = cp_convert (ptrdiff_type_node,
+			  build_component_ref (function, delta_identifier,
+					       NULL_TREE, 0));
+
       /* This used to avoid checking for virtual functions if basetype
 	 has no virtual functions, according to an earlier ANSI draft.
 	 With the final ISO C++ rules, such an optimization is
@@ -2884,14 +2911,31 @@ get_member_function_from_ptrfunc (instance_ptrptr, function)
 	 load-with-sign-extend, while the second used normal load then
 	 shift to sign-extend.  An optimizer flaw, perhaps, but it's
 	 easier to make this change.  */
-      idx = cp_build_binary_op (TRUNC_DIV_EXPR, 
-				build1 (NOP_EXPR, vtable_index_type, e3),
-				TYPE_SIZE_UNIT (vtable_entry_type));
-      e1 = cp_build_binary_op (BIT_AND_EXPR,
-			       build1 (NOP_EXPR, vtable_index_type, e3),
-			       integer_one_node);
+      switch (TARGET_PTRMEMFUNC_VBIT_LOCATION)
+	{
+	case ptrmemfunc_vbit_in_pfn:
+	  idx = cp_build_binary_op (TRUNC_DIV_EXPR, 
+				    build1 (NOP_EXPR, vtable_index_type, e3),
+				    TYPE_SIZE_UNIT (vtable_entry_type));
+	  e1 = cp_build_binary_op (BIT_AND_EXPR,
+				   build1 (NOP_EXPR, vtable_index_type, e3),
+				   integer_one_node);
+	  break;
 
-      vtbl = convert_pointer_to (ptr_type_node, instance);
+	case ptrmemfunc_vbit_in_delta:
+	  idx = build1 (NOP_EXPR, vtable_index_type, e3);
+	  e1 = cp_build_binary_op (BIT_AND_EXPR,
+				   delta, integer_one_node);
+	  delta = cp_build_binary_op (RSHIFT_EXPR,
+				      build1 (NOP_EXPR, vtable_index_type,
+					      delta),
+				      integer_one_node);
+	  break;
+
+	default:
+	  abort ();
+	}
+
       delta = cp_convert (ptrdiff_type_node,
 			  build_component_ref (function, delta_identifier,
 					       NULL_TREE, 0));
@@ -4652,7 +4696,7 @@ build_unary_op (code, xarg, noconvert)
 	      if (current_class_type
 		  && TREE_OPERAND (arg, 0) == current_class_ref)
 		/* An expression like &memfn.  */
-		cp_pedwarn ("ISO C++ forbids taking the address of a non-static member function to form a pointer to member function.  Say `&%T::%D'", base, name);
+		cp_pedwarn ("ISO C++ forbids taking the address of an unqualified non-static member function to form a pointer to member function.  Say `&%T::%D'", base, name);
 	      else
 		cp_pedwarn ("ISO C++ forbids taking the address of a bound member function to form a pointer to member function.  Say `&%T::%D'", base, name);
 	    }
@@ -4886,8 +4930,7 @@ mark_addressable (exp)
       case PARM_DECL:
 	if (x == current_class_ptr)
 	  {
-	    if (! flag_this_is_variable)
-	      error ("cannot take the address of `this', which is an ravlue expression");
+            error ("cannot take the address of `this', which is an rvalue expression");
 	    TREE_ADDRESSABLE (x) = 1; /* so compiler doesn't die later */
 	    return 1;
 	  }
@@ -5965,51 +6008,25 @@ build_ptrmemfunc1 (type, delta, pfn)
 {
   tree u = NULL_TREE;
   tree delta_field;
-  tree idx_field;
-  tree pfn_or_delta2_field;
   tree pfn_field;
-  tree delta2_field;
-  tree subtype;
-  int allconstant, allsimple;
 
   /* Pull the FIELD_DECLs out of the type.  */
   pfn_field = TYPE_FIELDS (type);
   delta_field = TREE_CHAIN (pfn_field);
-  idx_field = NULL_TREE;
-  pfn_or_delta2_field = NULL_TREE;
-  delta2_field = NULL_TREE;
-  subtype = NULL_TREE;
 
   /* Make sure DELTA has the type we want.  */
   delta = convert_and_check (delta_type_node, delta);
-
-  /* Keep track of whether the initializer is a) constant, and b) can
-     be done statically.  */
-  allconstant = TREE_CONSTANT (delta);
-  allsimple = (initializer_constant_valid_p (delta, TREE_TYPE (delta)) 
-	       != NULL_TREE);
-
-  if (pfn)
-    {
-      /* A non-virtual function.  */
-      allconstant &= TREE_CONSTANT (pfn);
-      allsimple &= (initializer_constant_valid_p (pfn, TREE_TYPE (pfn)) 
-		    != NULL_TREE);
-    }
-  else
-    {
-      /* A virtual function.  */
-      allconstant &= TREE_CONSTANT (pfn);
-      allsimple &= (initializer_constant_valid_p (pfn, TREE_TYPE (pfn)) 
-		    != NULL_TREE);
-    }
 
   /* Finish creating the initializer.  */
   u = tree_cons (pfn_field, pfn,
 		 build_tree_list (delta_field, delta));
   u = build (CONSTRUCTOR, type, NULL_TREE, u);
-  TREE_CONSTANT (u) = allconstant;
-  TREE_STATIC (u) = allconstant && allsimple;
+  TREE_CONSTANT (u) = TREE_CONSTANT (pfn) && TREE_CONSTANT (delta);
+  TREE_STATIC (u) = (TREE_CONSTANT (u)
+		     && (initializer_constant_valid_p (pfn, TREE_TYPE (pfn))
+			 != NULL_TREE)
+		     && (initializer_constant_valid_p (delta, TREE_TYPE (delta)) 
+			 != NULL_TREE));
   return u;
 }
 
@@ -6036,7 +6053,7 @@ build_ptrmemfunc (type, pfn, force)
   /* Handle multiple conversions of pointer to member functions.  */
   if (TYPE_PTRMEMFUNC_P (TREE_TYPE (pfn)))
     {
-      tree delta = integer_zero_node;
+      tree delta = NULL_TREE;
       tree npfn = NULL_TREE;
       tree n;
 
@@ -6064,11 +6081,20 @@ build_ptrmemfunc (type, pfn, force)
       if (TREE_SIDE_EFFECTS (pfn))
 	pfn = save_expr (pfn);
 
+      /* Obtain the function pointer and the current DELTA.  */
+      if (TREE_CODE (pfn) == PTRMEM_CST)
+	expand_ptrmemfunc_cst (pfn, &delta, &npfn);
+      else
+	{
+	  npfn = build_component_ref (pfn, pfn_identifier, NULL_TREE, 0);
+	  delta = build_component_ref (pfn, delta_identifier, NULL_TREE, 0);
+	}
+
       /* Under the new ABI, the conversion is easy.  Just adjust
 	 the DELTA field.  */
-      npfn = build_component_ref (pfn, pfn_identifier, NULL_TREE, 0);
-      delta = build_component_ref (pfn, delta_identifier, NULL_TREE, 0);
       delta = cp_convert (ptrdiff_type_node, delta);
+      if (TARGET_PTRMEMFUNC_VBIT_LOCATION == ptrmemfunc_vbit_in_delta)
+	n = cp_build_binary_op (LSHIFT_EXPR, n, integer_one_node);
       delta = cp_build_binary_op (PLUS_EXPR, delta, n);
       return build_ptrmemfunc1 (to_type, delta, npfn);
     }
@@ -6098,12 +6124,10 @@ build_ptrmemfunc (type, pfn, force)
    integer_type_node.  */
 
 void
-expand_ptrmemfunc_cst (cst, delta, idx, pfn, delta2)
+expand_ptrmemfunc_cst (cst, delta, pfn)
      tree cst;
      tree *delta;
-     tree *idx;
      tree *pfn;
-     tree *delta2;
 {
   tree type = TREE_TYPE (cst);
   tree fn = PTRMEM_CST_MEMBER (cst);
@@ -6121,11 +6145,7 @@ expand_ptrmemfunc_cst (cst, delta, idx, pfn, delta2)
   *delta = get_delta_difference (fn_class, ptr_class, /*force=*/0);
 
   if (!DECL_VIRTUAL_P (fn))
-    {
-      *idx = NULL_TREE;
-      *pfn = convert (TYPE_PTRMEMFUNC_FN_TYPE (type), build_addr_func (fn));
-      *delta2 = NULL_TREE;
-    }
+    *pfn = convert (TYPE_PTRMEMFUNC_FN_TYPE (type), build_addr_func (fn));
   else
     {
       /* If we're dealing with a virtual function, we have to adjust 'this'
@@ -6136,49 +6156,35 @@ expand_ptrmemfunc_cst (cst, delta, idx, pfn, delta2)
       *delta = fold (build (PLUS_EXPR, TREE_TYPE (*delta),
 			    *delta, BINFO_OFFSET (binfo)));
 
-      /* Under the new ABI, we set PFN to the vtable offset, plus
-	 one, at which the function can be found.  */
-      *idx = NULL_TREE;
-      *pfn = fold (build (MULT_EXPR, integer_type_node,
-			  DECL_VINDEX (fn), 
-			  TYPE_SIZE_UNIT (vtable_entry_type)));
-      *pfn = fold (build (PLUS_EXPR, integer_type_node, *pfn,
-			  integer_one_node));
+      /* Under the new ABI, we set PFN to the vtable offset at
+	 which the function can be found, plus one (unless
+	 ptrmemfunc_vbit_in_delta, in which case delta is shifted
+	 left, and then incremented).  */
+      *pfn = DECL_VINDEX (fn);
+
+      switch (TARGET_PTRMEMFUNC_VBIT_LOCATION)
+	{
+	case ptrmemfunc_vbit_in_pfn:
+	  *pfn = fold (build (MULT_EXPR, integer_type_node, *pfn,
+			      TYPE_SIZE_UNIT (vtable_entry_type)));
+	  *pfn = fold (build (PLUS_EXPR, integer_type_node, *pfn,
+			      integer_one_node));
+	  break;
+
+	case ptrmemfunc_vbit_in_delta:
+	  *delta = fold (build (LSHIFT_EXPR, TREE_TYPE (*delta),
+				*delta, integer_one_node));
+	  *delta = fold (build (PLUS_EXPR, TREE_TYPE (*delta),
+				*delta, integer_one_node));
+	  break;
+
+	default:
+	  abort ();
+	}
+
       *pfn = fold (build1 (NOP_EXPR, TYPE_PTRMEMFUNC_FN_TYPE (type),
 			   *pfn));
-
-      /* Offset from an object of PTR_CLASS to the vptr for ORIG_CLASS.  */
-      *delta2 = fold (build (PLUS_EXPR, integer_type_node, *delta,
-			     get_vfield_offset (TYPE_BINFO (orig_class))));
     }
-}
-
-/* Return an expression for DELTA2 from the pointer-to-member function
-   given by T.  */
-
-tree
-delta2_from_ptrmemfunc (t)
-     tree t;
-{
-  my_friendly_assert (0, 20000221);
-
-  if (TREE_CODE (t) == PTRMEM_CST)
-    {
-      tree delta;
-      tree idx;
-      tree pfn;
-      tree delta2;
-      
-      expand_ptrmemfunc_cst (t, &delta, &idx, &pfn, &delta2);
-      if (delta2)
-	return delta2;
-    }
-
-  return (build_component_ref 
-	  (build_component_ref (t,
-				pfn_or_delta2_identifier, NULL_TREE,
-				0), 
-	   delta2_identifier, NULL_TREE, 0)); 
 }
 
 /* Return an expression for PFN from the pointer-to-member function
@@ -6191,11 +6197,9 @@ pfn_from_ptrmemfunc (t)
   if (TREE_CODE (t) == PTRMEM_CST)
     {
       tree delta;
-      tree idx;
       tree pfn;
-      tree delta2;
       
-      expand_ptrmemfunc_cst (t, &delta, &idx, &pfn, &delta2);
+      expand_ptrmemfunc_cst (t, &delta, &pfn);
       if (pfn)
 	return pfn;
     }

@@ -39,7 +39,6 @@ extern "Java"
   {
     namespace io
     {
-      class BlockDataException;
       class BufferedInputStream;
       class BufferedOutputStream;
       class BufferedReader;
@@ -233,10 +232,12 @@ extern "Java"
       class ArrayList;
       class Arrays;
       class Arrays$ListImpl;
+      class BasicMapEntry;
       class BitSet;
       class Calendar;
       class Collection;
       class Collections;
+      class Collections$ReverseComparator;
       class Collections$SynchronizedCollection;
       class Collections$SynchronizedIterator;
       class Collections$SynchronizedList;
@@ -302,6 +303,12 @@ extern "Java"
       class Timer$TaskQueue;
       class TimerTask;
       class TooManyListenersException;
+      class TreeMap;
+      class TreeMap$Node;
+      class TreeMap$SubMap;
+      class TreeMap$TreeIterator;
+      class TreeMap$VerifyResult;
+      class TreeSet;
       class Vector;
       class WeakHashMap;
       class WeakHashMap$Entry;
@@ -368,8 +375,7 @@ extern "C" jstring _Jv_NewStringLatin1(const char*, jsize)
 extern "C" jsize _Jv_GetStringUTFLength (jstring);
 extern "C" jsize _Jv_GetStringUTFRegion (jstring, jsize, jsize, char *);
 
-extern "C" void _Jv_Throw (void *) __attribute__ ((__noreturn__));
-extern "C" void _Jv_Sjlj_Throw (void *) __attribute__ ((__noreturn__));
+extern "C" void _Jv_Throw (jthrowable) __attribute__ ((__noreturn__));
 extern "C" void* _Jv_Malloc (jsize) __attribute__((__malloc__));
 extern "C" void* _Jv_Realloc (void *, jsize);
 extern "C" void _Jv_Free (void*);

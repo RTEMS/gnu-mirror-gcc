@@ -381,10 +381,14 @@ extern int ix86_arch;
 #ifndef CC1_CPU_SPEC
 #define CC1_CPU_SPEC "\
 %{!mcpu*: \
-%{m386:-mcpu=i386} \
-%{m486:-mcpu=i486} \
-%{mpentium:-mcpu=pentium} \
-%{mpentiumpro:-mcpu=pentiumpro}}"
+%{m386:-mcpu=i386 \
+%n`-m386' is deprecated. Use `-march' or `-mcpu' instead.\n} \
+%{m486:-mcpu=i486 \
+%n`-m486' is deprecated. Use `-march' or `-mcpu' instead.\n} \
+%{mpentium:-mcpu=pentium \
+%n`-mpentium' is deprecated. Use `-march' or `-mcpu' instead.\n} \
+%{mpentiumpro:-mcpu=pentiumpro \
+%n`-mpentiumpro' is deprecated. Use `-march' or `-mcpu' instead.\n}}"
 #endif
 
 #ifndef CPP_CPU_DEFAULT_SPEC
@@ -899,11 +903,11 @@ extern int ix86_arch;
    should always be returned in memory.  You should instead use
    `DEFAULT_PCC_STRUCT_RETURN' to indicate this.  */
 
-#define RETURN_IN_MEMORY(TYPE)							\
-  ((TYPE_MODE (TYPE) == BLKmode)						\
-   || (VECTOR_MODE_P (TYPE_MODE (TYPE)) && int_size_in_bytes (TYPE) == 8)	\
-   || (int_size_in_bytes (TYPE) > 12 && TYPE_MODE (TYPE) != TImode		\
-       && ! VECTOR_MODE_P (TYPE_MODE (TYPE))))
+#define RETURN_IN_MEMORY(TYPE)						\
+  ((TYPE_MODE (TYPE) == BLKmode)					\
+   || (VECTOR_MODE_P (TYPE_MODE (TYPE)) && int_size_in_bytes (TYPE) == 8)\
+   || (int_size_in_bytes (TYPE) > 12 && TYPE_MODE (TYPE) != TImode	\
+       && TYPE_MODE (TYPE) != TFmode && ! VECTOR_MODE_P (TYPE_MODE (TYPE))))
 
 
 /* Define the classes of registers for register constraints in the
@@ -2632,6 +2636,10 @@ extern int const svr4_dbx_register_map[FIRST_PSEUDO_REGISTER];
 
 /* Before the prologue, the top of the frame is at 4(%esp).  */
 #define INCOMING_FRAME_SP_OFFSET 4
+
+/* Describe how we implement __builtin_eh_return.  */
+#define EH_RETURN_DATA_REGNO(N)       ((N) < 2 ? (N) : INVALID_REGNUM)
+#define EH_RETURN_STACKADJ_RTX        gen_rtx_REG (Pmode, 2)
 
 /* This is how to output the definition of a user-level label named NAME,
    such as the label on a static function or variable NAME.  */

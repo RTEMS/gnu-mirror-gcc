@@ -1,5 +1,5 @@
 /* Definitions for SOM assembler support.
-   Copyright (C) 1999 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2001 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -261,34 +261,6 @@ do {  \
 #define EXTRA_SECTIONS in_readonly_data, in_ctors, in_dtors
 #endif
 
-/* Switch into a generic section.
-   This is currently only used to support section attributes.
-
-   We make the section read-only and executable for a function decl,
-   read-only for a const data decl, and writable for a non-const data decl.  */
-#define ASM_OUTPUT_SECTION_NAME(FILE, DECL, NAME, RELOC) \
-  if (DECL && TREE_CODE (DECL) == FUNCTION_DECL)		\
-    {								\
-      fputs ("\t.SPACE $TEXT$\n", FILE);			\
-      fprintf (FILE,						\
-	       "\t.SUBSPA %s%s%s,QUAD=0,ALIGN=8,ACCESS=44,CODE_ONLY,SORT=24\n",\
-	       TARGET_GAS ? "" : "$", NAME, TARGET_GAS ? "" : "$"); \
-    }								\
-  else if (DECL && DECL_READONLY_SECTION (DECL, RELOC))		\
-    {								\
-      fputs ("\t.SPACE $TEXT$\n", FILE);			\
-      fprintf (FILE,						\
-	       "\t.SUBSPA %s%s%s,QUAD=0,ALIGN=8,ACCESS=44,SORT=16\n", \
-	       TARGET_GAS ? "" : "$", NAME, TARGET_GAS ? "" : "$"); \
-    }								\
-  else								\
-    {								\
-      fputs ("\t.SPACE $PRIVATE$\n", FILE);			\
-      fprintf (FILE,						\
-	       "\t.SUBSPA %s%s%s,QUAD=1,ALIGN=8,ACCESS=31,SORT=16\n", \
-	       TARGET_GAS ? "" : "$", NAME, TARGET_GAS ? "" : "$"); \
-    }
-
 /* FIXME: HPUX ld generates incorrect GOT entries for "T" fixups
    which reference data within the $TEXT$ space (for example constant
    strings in the $LIT$ subspace).
@@ -378,20 +350,7 @@ do {						\
 /* The .align directive in the HP assembler allows up to a 32 alignment.  */
 #define MAX_OFILE_ALIGNMENT 32768
 
-#ifdef HAVE_GAS_WEAK
-#define MAKE_DECL_ONE_ONLY(DECL) (DECL_WEAK (DECL) = 1)
+/* SOM does not support the init_priority C++ attribute.  */
+#undef SUPPORTS_INIT_PRIORITY
+#define SUPPORTS_INIT_PRIORITY 0
 
-/* This is how we tell the assembler that a symbol is weak.  */
-
-#define ASM_WEAKEN_LABEL(FILE,NAME) \
-  do { fputs ("\t.weak\t", FILE); \
-       assemble_name (FILE, NAME); \
-       fputc ('\n', FILE); \
-       if (! FUNCTION_NAME_P (NAME)) \
-         { \
-           fputs ("\t.EXPORT ", FILE); \
-           assemble_name (FILE, NAME); \
-           fputs (",DATA\n", FILE); \
-         } \
-  } while (0)
-#endif

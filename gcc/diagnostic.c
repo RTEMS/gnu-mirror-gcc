@@ -34,7 +34,6 @@ Boston, MA 02111-1307, USA.  */
 #include "flags.h"
 #include "input.h"
 #include "insn-attr.h"
-#include "insn-codes.h"
 #include "insn-config.h"
 #include "toplev.h"
 #include "intl.h"
@@ -104,7 +103,6 @@ static void default_diagnostic_finalizer PARAMS ((output_buffer *,
                                                   diagnostic_context *));
 
 static void error_recursion PARAMS ((void)) ATTRIBUTE_NORETURN;
-static const char *trim_filename PARAMS ((const char *));
 
 extern int rtl_dump_and_exit;
 extern int inhibit_warnings;
@@ -1486,6 +1484,11 @@ _fatal_insn (msgid, insn, file, line, function)
      const char *function;
 {
   error ("%s", msgid);
+
+  /* The above incremented error_count, but isn't an error that we want to
+     count, so reset it here.  */
+  errorcount--;
+
   debug_rtx (insn);
   fancy_abort (file, line, function);
 }
@@ -1710,7 +1713,7 @@ error_recursion ()
    is used by fancy_abort() to print `Internal compiler error in expr.c'
    instead of `Internal compiler error in ../../GCC/gcc/expr.c'.  */
 
-static const char *
+const char *
 trim_filename (name)
      const char *name;
 {
