@@ -85,6 +85,8 @@ extern void announce_function (tree);
 extern void error_for_asm (rtx, const char *, ...) ATTRIBUTE_GCC_DIAG(2,3);
 extern void warning_for_asm (rtx, const char *, ...) ATTRIBUTE_GCC_DIAG(2,3);
 extern void warn_deprecated_use (tree);
+/* APPLE LOCAL "unavailable" attribute (radar 2809697) */
+extern void warn_unavailable_use (tree);
 
 #ifdef BUFSIZ
 extern void output_quoted_string	(FILE *, const char *);
@@ -135,6 +137,8 @@ extern int flag_unswitch_loops;
 extern int flag_cprop_registers;
 extern int time_report;
 extern int flag_tree_based_profiling;
+/* APPLE LOCAL lno */
+extern int flag_loop_optimize2;
 
 /* Things to do with target switches.  */
 extern void display_target_options (void);

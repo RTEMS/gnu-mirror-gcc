@@ -1,5 +1,6 @@
 /* Test that we don't ICE when issuing a -Wselector warning.  */
-/* { dg-options "-Wselector -fgnu-runtime" } */
+/* APPLE LOCAL Objective-C */
+/* { dg-options "-Wselector" } */
 /* { dg-do compile } */
 
 #include <objc/Object.h>
@@ -10,7 +11,8 @@
 -(void) foo
 {
   SEL a;
-  a = @selector(b1ar);
+  /* APPLE LOCAL Objective-C */
+  a = @selector(b1ar); /* { dg-warning "creating selector for nonexistent method .b1ar." } */
 }
-@end /* { dg-warning "creating selector for nonexistent method .b1ar." } */
-
+/* APPLE LOCAL Objective-C */
+@end

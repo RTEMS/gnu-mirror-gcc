@@ -1,5 +1,5 @@
-/* Check if finding multiple signatures for a method is handled gracefully.  */
-/* Author:  Ziemowit Laski <zlaski@apple.com>  */
+/* APPLE LOCAL file */
+/* Check if finding multiple signatures for a method is handled gracefully.  Author:  Ziemowit Laski <zlaski@apple.com>  */
 /* { dg-do compile } */
 
 #include <objc/Object.h>
@@ -25,3 +25,6 @@ id foo(void) {
 
   return obj;
 }
+
+/* APPLE LOCAL Objective-C */
+/* { dg-options "-Wstrict-selector-match" } */
