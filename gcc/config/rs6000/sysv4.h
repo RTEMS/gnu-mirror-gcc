@@ -1,5 +1,5 @@
 /* Target definitions for GNU compiler for PowerPC running System V.4
-   Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002
+   Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003
    Free Software Foundation, Inc.
    Contributed by Cygnus Support.
 
@@ -257,7 +257,8 @@ do {									\
 	     rs6000_sdata_name);					\
     }									\
 									\
-  if (rs6000_sdata != SDATA_NONE && DEFAULT_ABI != ABI_V4)		\
+  if ((rs6000_sdata != SDATA_NONE && DEFAULT_ABI != ABI_V4)		\
+      || (rs6000_sdata == SDATA_EABI && !TARGET_EABI))			\
     {									\
       rs6000_sdata = SDATA_NONE;					\
       error ("-msdata=%s and -mcall-%s are incompatible",		\
@@ -328,7 +329,7 @@ do {									\
 
 /* Define this to set the endianness to use in libgcc2.c, which can
    not depend on target_flags.  */
-#if !defined(_LITTLE_ENDIAN) && !defined(__sun__)
+#if !defined(__LITTLE_ENDIAN__) && !defined(__sun__)
 #define LIBGCC2_WORDS_BIG_ENDIAN 1
 #else
 #define LIBGCC2_WORDS_BIG_ENDIAN 0
@@ -381,6 +382,21 @@ do {									\
    versions, just use 64 as the stack boundary.  */
 #undef	STACK_BOUNDARY
 #define	STACK_BOUNDARY	(TARGET_ALTIVEC_ABI ? 128 : 64)
+
+/* Define this macro if you wish to preserve a certain alignment for
+   the stack pointer, greater than what the hardware enforces.  The
+   definition is a C expression for the desired alignment (measured
+   in bits).  This macro must evaluate to a value equal to or larger
+   than STACK_BOUNDARY.
+   For the SYSV ABI and variants the alignment of the stack pointer
+   is usually controlled manually in rs6000.c. However, to maintain
+   alignment across alloca () in all circumstances,
+   PREFERRED_STACK_BOUNDARY needs to be set as well.
+   This has the additional advantage of allowing a bigger maximum
+   alignment of user objects on the stack.  */
+
+#undef PREFERRED_STACK_BOUNDARY
+#define PREFERRED_STACK_BOUNDARY 128
 
 /* Real stack boundary as mandated by the appropriate ABI.  */
 #define ABI_STACK_BOUNDARY ((TARGET_EABI && !TARGET_ALTIVEC_ABI) ? 64 : 128)
@@ -683,12 +699,12 @@ do {									\
       assemble_name ((FILE), (NAME));					\
       fprintf ((FILE), ",%u,%u\n", (SIZE), (ALIGN) / BITS_PER_UNIT);	\
     }									\
+  ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "object");			\
 } while (0)
 
 /* Describe how to emit uninitialized external linkage items.  */
 #define	ASM_OUTPUT_ALIGNED_BSS(FILE, DECL, NAME, SIZE, ALIGN)		\
 do {									\
-  (*targetm.asm_out.globalize_label) (FILE, NAME);			\
   ASM_OUTPUT_ALIGNED_LOCAL (FILE, NAME, SIZE, ALIGN);			\
 } while (0)
 
@@ -1094,7 +1110,7 @@ do {						\
 /* FreeBSD support.  */
 
 #define CPP_OS_FREEBSD_SPEC	"\
-  -D__PPC__ -D__ppc__ -D__PowerPC__ -D__powerpc__ \
+  -D__ELF__ -D__PPC__ -D__ppc__ -D__PowerPC__ -D__powerpc__ \
   -Acpu=powerpc -Amachine=powerpc"
 
 #define	STARTFILE_FREEBSD_SPEC	FBSD_STARTFILE_SPEC
@@ -1103,7 +1119,17 @@ do {						\
 #define LINK_START_FREEBSD_SPEC	""
 
 #define LINK_OS_FREEBSD_SPEC "\
-  %{symbolic:-Bsymbolic}"
+  %{p:%e`-p' not supported; use `-pg' and gprof(1)} \
+    %{Wl,*:%*} \
+    %{v:-V} \
+    %{assert*} %{R*} %{rpath*} %{defsym*} \
+    %{shared:-Bshareable %{h*} %{soname*}} \
+    %{!shared: \
+      %{!static: \
+	%{rdynamic: -export-dynamic} \
+	%{!dynamic-linker: -dynamic-linker /usr/libexec/ld-elf.so.1}} \
+      %{static:-Bstatic}} \
+    %{symbolic:-Bsymbolic}"
 
 /* GNU/Linux support.  */
 #ifdef USE_GNULIBC_1
@@ -1204,6 +1230,21 @@ ncrtn.o%s"
 
 #define CPP_OS_NETBSD_SPEC "\
 -D__powerpc__ -D__NetBSD__ -D__ELF__ -D__KPRINTF_ATTRIBUTE__"
+
+/* RTEMS support.  */  
+
+#define CPP_OS_RTEMS_SPEC "\
+%{!mcpu*:  %{!Dppc*: %{!Dmpc*: -Dmpc750} } }\
+%{mcpu=403:  %{!Dppc*: %{!Dmpc*: -Dppc403}  } } \
+%{mcpu=505:  %{!Dppc*: %{!Dmpc*: -Dmpc505}  } } \
+%{mcpu=601:  %{!Dppc*: %{!Dmpc*: -Dppc601}  } } \
+%{mcpu=602:  %{!Dppc*: %{!Dmpc*: -Dppc602}  } } \
+%{mcpu=603:  %{!Dppc*: %{!Dmpc*: -Dppc603}  } } \
+%{mcpu=603e: %{!Dppc*: %{!Dmpc*: -Dppc603e} } } \
+%{mcpu=604:  %{!Dppc*: %{!Dmpc*: -Dmpc604}  } } \
+%{mcpu=750:  %{!Dppc*: %{!Dmpc*: -Dmpc750}  } } \
+%{mcpu=821:  %{!Dppc*: %{!Dmpc*: -Dmpc821}  } } \
+%{mcpu=860:  %{!Dppc*: %{!Dmpc*: -Dmpc860}  } }" 
 
 /* VxWorks support.  */
 /* VxWorks does all the library stuff itself.  */
@@ -1343,6 +1384,7 @@ ncrtn.o%s"
   { "cpp_os_gnu",		CPP_OS_GNU_SPEC },			\
   { "cpp_os_linux",		CPP_OS_LINUX_SPEC },			\
   { "cpp_os_netbsd",		CPP_OS_NETBSD_SPEC },			\
+  { "cpp_os_rtems",		CPP_OS_RTEMS_SPEC },			\
   { "cpp_os_vxworks",		CPP_OS_VXWORKS_SPEC },			\
   { "cpp_os_windiss",           CPP_OS_WINDISS_SPEC },                  \
   { "cpp_os_default",		CPP_OS_DEFAULT_SPEC },
