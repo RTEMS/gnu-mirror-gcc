@@ -26,6 +26,10 @@ Boston, MA 02111-1307, USA.  */
 /* Don't assume anything about the header files. */
 #define NO_IMPLICIT_EXTERN_C
 
+/* The GNU C++ standard library requires that these macros be defined.  */
+#undef CPLUSPLUS_CPP_SPEC
+#define CPLUSPLUS_CPP_SPEC "-D_GNU_SOURCE %(cpp)"
+
 #undef DEFAULT_VTABLE_THUNKS
 #define DEFAULT_VTABLE_THUNKS 1
 
@@ -44,15 +48,6 @@ Boston, MA 02111-1307, USA.  */
    + MASK_STACK_BIAS + MASK_APP_REGS + MASK_EPILOGUE + MASK_FPU + MASK_LONG_DOUBLE_128)
 #endif
 
-/* Output at beginning of assembler file.  */
-/* The .file command should always begin the output.  */
-#undef ASM_FILE_START
-#define ASM_FILE_START(FILE)                                            \
-  do {                                                                  \
-        output_file_directive (FILE, main_input_filename);              \
-        fprintf (FILE, "\t.version\t\"01.01\"\n");                      \
-  } while (0)
-  
 #undef ASM_CPU_DEFAULT_SPEC
 #define ASM_CPU_DEFAULT_SPEC "-Av9a"
 

@@ -56,26 +56,15 @@ cplus_expand_constant (cst)
 	  {
 	    /* Find the offset for the field.  */
 	    tree offset = byte_position (member);
-
-	    if (flag_new_abi)
-	      /* Under the new ABI, we use -1 to represent the NULL
-		 pointer; non-NULL values simply contain the offset of
-		 the data member.  */
-	      ;
-	    else
-	      /* We offset all pointer to data members by 1 so that we
-		 can distinguish between a null pointer to data member
-		 and the first data member of a structure.  */
-	      offset = size_binop (PLUS_EXPR, offset, size_one_node);
-
 	    cst = fold (build1 (NOP_EXPR, type, offset));
 	  }
 	else
 	  {
-	    tree delta, idx, pfn, delta2;
+	    tree delta;
+	    tree pfn;
 
-	    expand_ptrmemfunc_cst (cst, &delta, &idx, &pfn, &delta2);
-	    cst = build_ptrmemfunc1 (type, delta, idx, pfn, delta2);
+	    expand_ptrmemfunc_cst (cst, &delta, &pfn);
+	    cst = build_ptrmemfunc1 (type, delta, pfn);
 	  }
       }
       break;
@@ -100,6 +89,7 @@ cplus_expand_expr (exp, target, tmode, modifier)
   tree type = TREE_TYPE (exp);
   register enum machine_mode mode = TYPE_MODE (type);
   register enum tree_code code = TREE_CODE (exp);
+  rtx ret;
 
   /* No sense saving up arithmetic to be done
      if it's all in the wrong mode to form part of an address.
@@ -115,15 +105,19 @@ cplus_expand_expr (exp, target, tmode, modifier)
 			  target, tmode, modifier);
 
     case OFFSET_REF:
-      {
-	return expand_expr (default_conversion (resolve_offset_ref (exp)),
-			    target, tmode, EXPAND_NORMAL);
-      }
-
+      /* Offset refs should not make it through to here. */
+      my_friendly_abort (20010724);
+      return const0_rtx;
+      
     case THROW_EXPR:
       expand_expr (TREE_OPERAND (exp, 0), const0_rtx, VOIDmode, 0);
-      expand_internal_throw ();
       return NULL;
+
+    case MUST_NOT_THROW_EXPR:
+      expand_eh_region_start ();
+      ret = expand_expr (TREE_OPERAND (exp, 0), target, tmode, modifier);
+      expand_eh_region_end_must_not_throw (build_call (terminate_node, 0));
+      return ret;
 
     case EMPTY_CLASS_EXPR:
       /* We don't need to generate any code for an empty class.  */

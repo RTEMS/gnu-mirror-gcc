@@ -3095,11 +3095,58 @@
   [(set_attr "type" "fpmove,fpmove,move,move,move,*,load,fpload,fpstore,store")
    (set_attr "length" "1")])
 
+;; Exactly the same as above, except that all `f' cases are deleted.
+;; This is necessary to prevent reload from ever trying to use a `f' reg
+;; when -mno-fpu.
+
+(define_insn "*movsf_no_f_insn"
+  [(set (match_operand:SF 0 "nonimmediate_operand" "=r,r,r,r,r,m")
+	(match_operand:SF 1 "input_operand"    "G,Q,rR,S,m,rG"))]
+  "! TARGET_FPU
+   && (register_operand (operands[0], SFmode)
+       || register_operand (operands[1], SFmode)
+       || fp_zero_operand (operands[1], SFmode))"
+  "*
+{
+  if (GET_CODE (operands[1]) == CONST_DOUBLE
+      && (which_alternative == 1
+          || which_alternative == 2
+          || which_alternative == 3))
+    {
+      REAL_VALUE_TYPE r;
+      long i;
+
+      REAL_VALUE_FROM_CONST_DOUBLE (r, operands[1]);
+      REAL_VALUE_TO_TARGET_SINGLE (r, i);
+      operands[1] = GEN_INT (i);
+    }
+
+  switch (which_alternative)
+    {
+    case 0:
+      return \"clr\\t%0\";
+    case 1:
+      return \"sethi\\t%%hi(%a1), %0\";
+    case 2:
+      return \"mov\\t%1, %0\";
+    case 3:
+      return \"#\";
+    case 4:
+      return \"ld\\t%1, %0\";
+    case 5:
+      return \"st\\t%r1, %0\";
+    default:
+      abort();
+    }
+}"
+  [(set_attr "type" "move,move,move,*,load,store")
+   (set_attr "length" "1")])
+
 (define_insn "*movsf_lo_sum"
-  [(set (match_operand:SF 0 "register_operand" "")
-        (lo_sum:SF (match_operand:SF 1 "register_operand" "")
-                   (match_operand:SF 2 "const_double_operand" "")))]
-  "TARGET_FPU && fp_high_losum_p (operands[2])"
+  [(set (match_operand:SF 0 "register_operand" "=r")
+        (lo_sum:SF (match_operand:SF 1 "register_operand" "r")
+                   (match_operand:SF 2 "const_double_operand" "S")))]
+  "fp_high_losum_p (operands[2])"
   "*
 {
   REAL_VALUE_TYPE r;
@@ -3114,9 +3161,9 @@
    (set_attr "length" "1")])
 
 (define_insn "*movsf_high"
-  [(set (match_operand:SF 0 "register_operand" "")
-        (high:SF (match_operand:SF 1 "const_double_operand" "")))]
-  "TARGET_FPU && fp_high_losum_p (operands[1])"
+  [(set (match_operand:SF 0 "register_operand" "=r")
+        (high:SF (match_operand:SF 1 "const_double_operand" "S")))]
+  "fp_high_losum_p (operands[1])"
   "*
 {
   REAL_VALUE_TYPE r;
@@ -3133,29 +3180,11 @@
 (define_split
   [(set (match_operand:SF 0 "register_operand" "")
         (match_operand:SF 1 "const_double_operand" ""))]
-  "TARGET_FPU
-   && fp_high_losum_p (operands[1])
+  "fp_high_losum_p (operands[1])
    && (GET_CODE (operands[0]) == REG
        && REGNO (operands[0]) < 32)"
   [(set (match_dup 0) (high:SF (match_dup 1)))
    (set (match_dup 0) (lo_sum:SF (match_dup 0) (match_dup 1)))])
-
-;; Exactly the same as above, except that all `f' cases are deleted.
-;; This is necessary to prevent reload from ever trying to use a `f' reg
-;; when -mno-fpu.
-
-(define_insn "*movsf_no_f_insn"
-  [(set (match_operand:SF 0 "nonimmediate_operand" "=r,r,m")
-	(match_operand:SF 1 "input_operand"    "r,m,r"))]
-  "! TARGET_FPU
-   && (register_operand (operands[0], SFmode)
-       || register_operand (operands[1], SFmode))"
-  "@
-   mov\\t%1, %0
-   ld\\t%1, %0
-   st\\t%1, %0"
-  [(set_attr "type" "move,load,store")
-   (set_attr "length" "1")])
 
 (define_expand "movsf"
   [(set (match_operand:SF 0 "general_operand" "")
@@ -7108,8 +7137,8 @@
 			     (match_operand:SI 2 "arith_operand" "rI")])
 	 (const_int 0)))
    (set (match_operand:SI 0 "register_operand" "=r")
-	(match_dup 3))]
-  ""
+	(match_operator:SI 4 "cc_arithop" [(match_dup 1) (match_dup 2)]))]
+  "GET_CODE (operands[3]) == GET_CODE (operands[4])"
   "%A3cc\\t%1, %2, %0"
   [(set_attr "type" "compare")
    (set_attr "length" "1")])
@@ -7122,8 +7151,8 @@
 			     (match_operand:DI 2 "arith_double_operand" "rHI")])
 	 (const_int 0)))
    (set (match_operand:DI 0 "register_operand" "=r")
-	(match_dup 3))]
-  "TARGET_ARCH64"
+	(match_operator:DI 4 "cc_arithop" [(match_dup 1) (match_dup 2)]))]
+  "TARGET_ARCH64 && GET_CODE (operands[3]) == GET_CODE (operands[4])"
   "%A3cc\\t%1, %2, %0"
   [(set_attr "type" "compare")
    (set_attr "length" "1")])
@@ -7208,8 +7237,9 @@
 			     (match_operand:SI 2 "reg_or_0_operand" "rJ")])
 	 (const_int 0)))
    (set (match_operand:SI 0 "register_operand" "=r")
-	(match_dup 3))]
-  ""
+	(match_operator:SI 4 "cc_arithopn"
+			    [(not:SI (match_dup 1)) (match_dup 2)]))]
+  "GET_CODE (operands[3]) == GET_CODE (operands[4])"
   "%B3cc\\t%r2, %1, %0"
   [(set_attr "type" "compare")
    (set_attr "length" "1")])
@@ -7222,8 +7252,9 @@
 			     (match_operand:DI 2 "reg_or_0_operand" "rJ")])
 	 (const_int 0)))
    (set (match_operand:DI 0 "register_operand" "=r")
-	(match_dup 3))]
-  "TARGET_ARCH64"
+	(match_operator:DI 4 "cc_arithopn"
+			    [(not:DI (match_dup 1)) (match_dup 2)]))]
+  "TARGET_ARCH64 && GET_CODE (operands[3]) == GET_CODE (operands[4])"
   "%B3cc\\t%r2, %1, %0"
   [(set_attr "type" "compare")
    (set_attr "length" "1")])
@@ -8935,9 +8966,9 @@
 #if 0
   rtx chain = operands[0];
 #endif
-  rtx fp = operands[1];
+  rtx lab = operands[1];
   rtx stack = operands[2];
-  rtx lab = operands[3];
+  rtx fp = operands[3];
   rtx labreg;
 
   /* Trap instruction to flush all the register windows.  */
@@ -9451,8 +9482,7 @@
 	      (clobber (reg:SI 15))])
    (set (pc) (label_ref (match_operand 3 "" "")))]
   "short_branch (INSN_UID (insn), INSN_UID (operands[3]))
-   && in_same_eh_region (insn, operands[3])
-   && in_same_eh_region (insn, ins1)"
+   && (USING_SJLJ_EXCEPTIONS || ! can_throw_internal (insn))"
   "call\\t%a1, %2\\n\\tadd\\t%%o7, (%l3-.-4), %%o7")
 
 (define_peephole
@@ -9461,8 +9491,7 @@
 	      (clobber (reg:SI 15))])
    (set (pc) (label_ref (match_operand 2 "" "")))]
   "short_branch (INSN_UID (insn), INSN_UID (operands[2]))
-   && in_same_eh_region (insn, operands[2])
-   && in_same_eh_region (insn, ins1)"
+   && (USING_SJLJ_EXCEPTIONS || ! can_throw_internal (insn))"
   "call\\t%a0, %1\\n\\tadd\\t%%o7, (%l2-.-4), %%o7")
 
 (define_peephole
@@ -9473,8 +9502,7 @@
    (set (pc) (label_ref (match_operand 3 "" "")))]
   "TARGET_ARCH64
    && short_branch (INSN_UID (insn), INSN_UID (operands[3]))
-   && in_same_eh_region (insn, operands[3])
-   && in_same_eh_region (insn, ins1)"
+   && (USING_SJLJ_EXCEPTIONS || ! can_throw_internal (insn))"
   "call\\t%a1, %2\\n\\tadd\\t%%o7, (%l3-.-4), %%o7")
 
 (define_peephole
@@ -9484,8 +9512,7 @@
    (set (pc) (label_ref (match_operand 2 "" "")))]
   "TARGET_ARCH64
    && short_branch (INSN_UID (insn), INSN_UID (operands[2]))
-   && in_same_eh_region (insn, operands[2])
-   && in_same_eh_region (insn, ins1)"
+   && (USING_SJLJ_EXCEPTIONS || ! can_throw_internal (insn))"
   "call\\t%a0, %1\\n\\tadd\\t%%o7, (%l2-.-4), %%o7")
 
 (define_expand "prologue"

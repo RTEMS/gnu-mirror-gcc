@@ -31,7 +31,7 @@
 
 #include <locale>
 // NB: Don't include any other headers in this file.
-#include <debug_assert.h>
+#include <testsuite_hooks.h>
 
 class gnu_ctype: public std::ctype<char> { };
 
@@ -172,5 +172,3 @@ int main() {
   test01();
   return 0;
 }
-
-

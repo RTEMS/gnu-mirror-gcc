@@ -37,9 +37,18 @@ Boston, MA 02111-1307, USA.  */
 #include "flags.h"
 #include "function.h"
 #include "expr.h"
-#include "insn-flags.h"
 #include "basic-block.h"
+#include "except.h"
 #include "toplev.h"
+
+
+/* Turn STACK_GROWS_DOWNWARD into a boolean.  */
+#ifdef STACK_GROWS_DOWNWARD
+#undef STACK_GROWS_DOWNWARD
+#define STACK_GROWS_DOWNWARD 1
+#else
+#define STACK_GROWS_DOWNWARD 0
+#endif
 
 static int perhaps_ends_bb_p	PARAMS ((rtx));
 static int optimize_reg_copy_1	PARAMS ((rtx, rtx, rtx));
@@ -396,11 +405,11 @@ static int perhaps_ends_bb_p (insn)
       /* A CALL_INSN might be the last insn of a basic block, if it is inside
 	 an EH region or if there are nonlocal gotos.  Note that this test is
 	 very conservative.  */
-      return flag_exceptions || nonlocal_goto_handler_labels;
-
+      if (nonlocal_goto_handler_labels)
+	return 1;
+      /* FALLTHRU */
     default:
-      /* All others never end a basic block.  */
-      return 0;
+      return can_throw_internal (insn);
     }
 }
 
@@ -1050,6 +1059,12 @@ fixup_match_2 (insn, dst, src, offset, regmove_dump_file)
   return 0;
 }
 
+/* Main entry for the register move optimization.
+   F is the first instruction.
+   NREGS is one plus the highest pseudo-reg number used in the instruction.
+   REGMOVE_DUMP_FILE is a stream for output of a trace of actions taken
+   (or 0 if none should be output).  */
+
 void
 regmove_optimize (f, nregs, regmove_dump_file)
      rtx f;
@@ -1062,6 +1077,11 @@ regmove_optimize (f, nregs, regmove_dump_file)
   int pass;
   int i;
   rtx copy_src, copy_dst;
+
+  /* ??? Hack.  Regmove doesn't examine the CFG, and gets mightily
+     confused by non-call exceptions ending blocks.  */
+  if (flag_non_call_exceptions)
+    return;
 
   /* Find out where a potential flags register is live, and so that we
      can supress some optimizations in those zones.  */
@@ -1267,7 +1287,8 @@ regmove_optimize (f, nregs, regmove_dump_file)
 
 	      if (GET_CODE (dst) != REG
 		  || REGNO (dst) < FIRST_PSEUDO_REGISTER
-		  || REG_LIVE_LENGTH (REGNO (dst)) < 0)
+		  || REG_LIVE_LENGTH (REGNO (dst)) < 0
+		  || RTX_UNCHANGING_P (dst))
 		continue;
 
 	      /* If the operands already match, then there is nothing to do. */
@@ -1283,6 +1304,14 @@ regmove_optimize (f, nregs, regmove_dump_file)
 
 	      set = single_set (insn);
 	      if (! set)
+		continue;
+
+	      /* Note that single_set ignores parts of a parallel set for
+		 which one of the destinations is REG_UNUSED.  We can't
+		 handle that here, since we can wind up rewriting things
+		 such that a single register is set twice within a single
+		 parallel.  */
+	      if (reg_set_p (src, insn))
 		continue;
 
 	      /* match_no/dst must be a write-only operand, and
@@ -2225,14 +2254,6 @@ try_apply_stack_adjustment (insn, memlist, new_adjust, delta)
   struct csa_memlist *ml;
   rtx set;
 
-  /* We know INSN matches single_set_for_csa, because that's what we
-     recognized earlier.  However, if INSN is not single_set, it is
-     doing double duty as a barrier for frame pointer memory accesses,
-     which we are not recording.  Therefore, an adjust insn that is not
-     single_set may not have a positive delta applied.  */
-
-  if (delta > 0 && ! single_set (insn))
-    return 0;
   set = single_set_for_csa (insn);
   validate_change (insn, &XEXP (SET_SRC (set), 1), GEN_INT (new_adjust), 1);
 
@@ -2241,13 +2262,6 @@ try_apply_stack_adjustment (insn, memlist, new_adjust, delta)
       HOST_WIDE_INT c = ml->sp_offset - delta;
       rtx new = gen_rtx_MEM (GET_MODE (*ml->mem),
 			     plus_constant (stack_pointer_rtx, c));
-
-      /* Don't reference memory below the stack pointer.  */
-      if (c < 0)
-	{
-	  cancel_changes (0);
-	  return 0;
-	}
 
       MEM_COPY_ATTRIBUTES (new, *ml->mem);
       validate_change (ml->insn, ml->mem, new, 1);
@@ -2297,11 +2311,16 @@ record_stack_memrefs (xp, data)
 	}
       return 1;
     case REG:
-      /* ??? We want be able to handle non-memory stack pointer references
-         later.  For now just discard all insns refering to stack pointer
-         outside mem expressions.  We would probably want to teach
-	 validate_replace to simplify expressions first.  */
-      if (x == stack_pointer_rtx)
+      /* ??? We want be able to handle non-memory stack pointer
+	 references later.  For now just discard all insns refering to
+	 stack pointer outside mem expressions.  We would probably
+	 want to teach validate_replace to simplify expressions first.
+
+	 We can't just compare with STACK_POINTER_RTX because the
+	 reference to the stack pointer might be in some other mode.
+	 In particular, an explict clobber in an asm statement will
+	 result in a QImode clober.  */
+      if (REGNO (x) == STACK_POINTER_REGNUM)
 	return 1;
       break;
     default:
@@ -2358,35 +2377,63 @@ combine_stack_adjustments_for_block (bb)
 
 	      /* If not all recorded memrefs can be adjusted, or the
 		 adjustment is now too large for a constant addition,
-		 we cannot merge the two stack adjustments.  */
-	      if (! try_apply_stack_adjustment (last_sp_set, memlist,
-						last_sp_adjust + this_adjust,
-						this_adjust))
+		 we cannot merge the two stack adjustments.
+
+		 Also we need to be carefull to not move stack pointer
+		 such that we create stack accesses outside the allocated
+		 area.  We can combine an allocation into the first insn,
+		 or a deallocation into the second insn.  We can not
+		 combine an allocation followed by a deallocation.
+
+		 The only somewhat frequent ocurrence of the later is when
+		 a function allocates a stack frame but does not use it.
+		 For this case, we would need to analyze rtl stream to be
+		 sure that allocated area is really unused.  This means not
+		 only checking the memory references, but also all registers
+		 or global memory references possibly containing a stack
+		 frame address.
+
+		 Perhaps the best way to address this problem is to teach
+		 gcc not to allocate stack for objects never used.  */
+
+	      /* Combine an allocation into the first instruction.  */
+	      if (STACK_GROWS_DOWNWARD ? this_adjust <= 0 : this_adjust >= 0)
 		{
-		  free_csa_memlist (memlist);
-		  memlist = NULL;
-		  last_sp_set = insn;
-		  last_sp_adjust = this_adjust;
-		  goto processed;
+		  if (try_apply_stack_adjustment (last_sp_set, memlist,
+						  last_sp_adjust + this_adjust,
+						  this_adjust))
+		    {
+		      /* It worked!  */
+		      pending_delete = insn;
+		      last_sp_adjust += this_adjust;
+		      goto processed;
+		    }
 		}
 
-	      /* It worked!  */
-	      pending_delete = insn;
-	      last_sp_adjust += this_adjust;
-
-	      /* If, by some accident, the adjustments cancel out,
-		 delete both insns and start from scratch.  */
-	      if (last_sp_adjust == 0)
+	      /* Otherwise we have a deallocation.  Do not combine with
+		 a previous allocation.  Combine into the second insn.  */
+	      else if (STACK_GROWS_DOWNWARD
+		       ? last_sp_adjust >= 0 : last_sp_adjust <= 0)
 		{
-		  if (last_sp_set == bb->head)
-		    bb->head = NEXT_INSN (last_sp_set);
-		  flow_delete_insn (last_sp_set);
-
-		  free_csa_memlist (memlist);
-		  memlist = NULL;
-		  last_sp_set = NULL_RTX;
+		  if (try_apply_stack_adjustment (insn, memlist,
+						  last_sp_adjust + this_adjust,
+						  -last_sp_adjust))
+		    {
+		      /* It worked!  */
+		      flow_delete_insn (last_sp_set);
+		      last_sp_set = insn;
+		      last_sp_adjust += this_adjust;
+		      free_csa_memlist (memlist);
+		      memlist = NULL;
+		      goto processed;
+		    }
 		}
 
+	      /* Combination failed.  Restart processing from here.  */
+	      free_csa_memlist (memlist);
+	      memlist = NULL;
+	      last_sp_set = insn;
+	      last_sp_adjust = this_adjust;
 	      goto processed;
 	    }
 

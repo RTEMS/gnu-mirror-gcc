@@ -45,9 +45,7 @@ Boston, MA 02111-1307, USA.  */
 #include "flags.h"
 #include "except.h"
 #include "function.h"
-#include "insn-flags.h"
 #include "expr.h"
-#include "insn-codes.h"
 #include "regs.h"
 #include "hard-reg-set.h"
 #include "insn-config.h"
@@ -59,10 +57,6 @@ Boston, MA 02111-1307, USA.  */
 #include "hash.h"
 #include "ggc.h"
 #include "tm_p.h"
-
-#ifndef ACCUMULATE_OUTGOING_ARGS
-#define ACCUMULATE_OUTGOING_ARGS 0
-#endif
 
 #ifndef TRAMPOLINE_ALIGNMENT
 #define TRAMPOLINE_ALIGNMENT FUNCTION_BOUNDARY
@@ -294,8 +288,8 @@ static int contains		PARAMS ((rtx, varray_type));
 static void emit_return_into_block PARAMS ((basic_block, rtx));
 #endif
 static void put_addressof_into_stack PARAMS ((rtx, struct hash_table *));
-static boolean purge_addressof_1 PARAMS ((rtx *, rtx, int, int,
-					  struct hash_table *));
+static bool purge_addressof_1 PARAMS ((rtx *, rtx, int, int,
+				       struct hash_table *));
 static void purge_single_hard_subreg_set PARAMS ((rtx));
 #ifdef HAVE_epilogue
 static void keep_stack_depressed PARAMS ((rtx));
@@ -305,7 +299,7 @@ static struct hash_entry *insns_for_mem_newfunc PARAMS ((struct hash_entry *,
 							 struct hash_table *,
 							 hash_table_key));
 static unsigned long insns_for_mem_hash PARAMS ((hash_table_key));
-static boolean insns_for_mem_comp PARAMS ((hash_table_key, hash_table_key));
+static bool insns_for_mem_comp PARAMS ((hash_table_key, hash_table_key));
 static int insns_for_mem_walk   PARAMS ((rtx *, void *));
 static void compute_insns_for_mem PARAMS ((rtx, rtx, struct hash_table *));
 static void mark_temp_slot PARAMS ((struct temp_slot *));
@@ -1338,7 +1332,9 @@ put_var_into_stack (decl)
   context = decl_function_context (decl);
 
   /* Get the current rtl used for this object and its original mode.  */
-  reg = TREE_CODE (decl) == SAVE_EXPR ? SAVE_EXPR_RTL (decl) : DECL_RTL (decl);
+  reg = (TREE_CODE (decl) == SAVE_EXPR 
+	 ? SAVE_EXPR_RTL (decl) 
+	 : DECL_RTL_IF_SET (decl));
 
   /* No need to do anything if decl has no rtx yet
      since in that case caller is setting TREE_ADDRESSABLE
@@ -1584,11 +1580,6 @@ fixup_var_refs (var, promoted_mode, unsignedp, ht)
 	  end_sequence ();
 	}
     }
-
-  /* Scan the catch clauses for exception handling too.  */
-  push_to_full_sequence (catch_clauses, catch_clauses_last);
-  fixup_var_refs_insns (catch_clauses, var, promoted_mode, unsignedp, 0);
-  end_full_sequence (&catch_clauses, &catch_clauses_last);
 }
 
 /* REPLACEMENTS is a pointer to a list of the struct fixup_replacement and X is
@@ -2151,7 +2142,7 @@ fixup_var_refs_1 (var, promoted_mode, loc, insn, replacements)
 	    {
 	      replacement = find_fixup_replacement (replacements, var);
 	      if (replacement->new == 0)
-		replacement->new = gen_reg_rtx (GET_MODE (var));
+		replacement->new = gen_reg_rtx (promoted_mode);
 	      SUBREG_REG (x) = replacement->new;
 	      return;
 	    }
@@ -2969,7 +2960,7 @@ static rtx purge_addressof_replacements;
    the stack.  If the function returns FALSE then the replacement could not
    be made.  */
 
-static boolean
+static bool
 purge_addressof_1 (loc, insn, force, store, ht)
      rtx *loc;
      rtx insn;
@@ -2980,7 +2971,7 @@ purge_addressof_1 (loc, insn, force, store, ht)
   RTX_CODE code;
   int i, j;
   const char *fmt;
-  boolean result = true;
+  bool result = true;
 
   /* Re-start here to avoid recursion in common cases.  */
  restart:
@@ -3280,7 +3271,7 @@ insns_for_mem_hash (k)
 
 /* Return non-zero if K1 and K2 (two REGs) are the same.  */
 
-static boolean
+static bool
 insns_for_mem_comp (k1, k2)
      hash_table_key k1;
      hash_table_key k2;
@@ -3606,8 +3597,10 @@ instantiate_decls_1 (let, valid_only)
   tree t;
 
   for (t = BLOCK_VARS (let); t; t = TREE_CHAIN (t))
-    instantiate_decl (DECL_RTL (t), int_size_in_bytes (TREE_TYPE (t)),
-		      valid_only);
+    if (DECL_RTL_SET_P (t))
+      instantiate_decl (DECL_RTL (t), 
+			int_size_in_bytes (TREE_TYPE (t)),
+			valid_only);
 
   /* Process all subblocks.  */
   for (t = BLOCK_SUBBLOCKS (let); t; t = TREE_CHAIN (t))
@@ -4353,8 +4346,8 @@ assign_parms (fndecl)
 	  || TREE_CODE (parm) != PARM_DECL
 	  || passed_type == NULL)
 	{
-	  DECL_INCOMING_RTL (parm) = DECL_RTL (parm)
-	    = gen_rtx_MEM (BLKmode, const0_rtx);
+	  SET_DECL_RTL (parm, gen_rtx_MEM (BLKmode, const0_rtx));
+	  DECL_INCOMING_RTL (parm) = DECL_RTL (parm);
 	  TREE_USED (parm) = 1;
 	  continue;
 	}
@@ -4373,7 +4366,8 @@ assign_parms (fndecl)
 	 and avoid the usual things like emit_move_insn that could crash.  */
       if (nominal_mode == VOIDmode)
 	{
-	  DECL_INCOMING_RTL (parm) = DECL_RTL (parm) = const0_rtx;
+	  SET_DECL_RTL (parm, const0_rtx);
+	  DECL_INCOMING_RTL (parm) = DECL_RTL (parm);
 	  continue;
 	}
 
@@ -4669,7 +4663,7 @@ assign_parms (fndecl)
 				     size_stored / UNITS_PER_WORD,
 				     int_size_in_bytes (TREE_TYPE (parm)));
 	    }
-	  DECL_RTL (parm) = stack_parm;
+	  SET_DECL_RTL (parm, stack_parm);
 	}
       else if (! ((! optimize
 		   && ! DECL_REGISTER (parm)
@@ -4701,13 +4695,17 @@ assign_parms (fndecl)
 	     appropriately.  */
 	  if (passed_pointer)
 	    {
-	      DECL_RTL (parm)
-		= gen_rtx_MEM (TYPE_MODE (TREE_TYPE (passed_type)), parmreg);
+	      SET_DECL_RTL (parm,
+			    gen_rtx_MEM (TYPE_MODE (TREE_TYPE (passed_type)), 
+					 parmreg));
 	      set_mem_attributes (DECL_RTL (parm), parm, 1);
 	    }
 	  else
-	    DECL_RTL (parm) = parmreg;
-
+	    {
+	      SET_DECL_RTL (parm, parmreg);
+	      maybe_set_unchanging (DECL_RTL (parm), parm);
+	    }
+	      
 	  /* Copy the value into the register.  */
 	  if (nominal_mode != passed_mode
 	      || promoted_nominal_mode != promoted_mode)
@@ -4770,12 +4768,13 @@ assign_parms (fndecl)
 	      if (GET_MODE (parmreg) != GET_MODE (DECL_RTL (parm)))
 		{
 		  rtx tempreg = gen_reg_rtx (GET_MODE (DECL_RTL (parm)));
-
+		  int unsigned_p = TREE_UNSIGNED (TREE_TYPE (parm));
 		  push_to_sequence (conversion_insns);
 		  emit_move_insn (tempreg, DECL_RTL (parm));
-		  DECL_RTL (parm)
-		    = convert_to_mode (GET_MODE (parmreg), tempreg,
-				       TREE_UNSIGNED (TREE_TYPE (parm)));
+		  SET_DECL_RTL (parm,
+				convert_to_mode (GET_MODE (parmreg), 
+						 tempreg,
+						 unsigned_p));
 		  emit_move_insn (parmreg, DECL_RTL (parm));
 		  conversion_insns = get_insns();
 		  did_conversion = 1;
@@ -4783,7 +4782,7 @@ assign_parms (fndecl)
 		}
 	      else
 		emit_move_insn (parmreg, DECL_RTL (parm));
-	      DECL_RTL (parm) = parmreg;
+	      SET_DECL_RTL (parm, parmreg);
 	      /* STACK_PARM is the pointer, not the parm, and PARMREG is
 		 now the parm.  */
 	      stack_parm = 0;
@@ -5018,7 +5017,7 @@ assign_parms (fndecl)
 	      conversion_insns = get_insns ();
 	      end_sequence ();
 	    }
-	  DECL_RTL (parm) = stack_parm;
+	  SET_DECL_RTL (parm, stack_parm);
 	}
 
       /* If this "parameter" was the place where we are receiving the
@@ -5027,8 +5026,8 @@ assign_parms (fndecl)
 	{
 	  tree result = DECL_RESULT (fndecl);
 
-	  DECL_RTL (result)
-	    = gen_rtx_MEM (DECL_MODE (result), DECL_RTL (parm));
+	  SET_DECL_RTL (result,
+			gen_rtx_MEM (DECL_MODE (result), DECL_RTL (parm)));
 
 	  set_mem_attributes (DECL_RTL (result), result, 1);
 	}
@@ -5087,7 +5086,9 @@ assign_parms (fndecl)
      to include tree.h.  Do this here so it gets done when an inlined
      function gets output.  */
 
-  current_function_return_rtx = DECL_RTL (DECL_RESULT (fndecl));
+  current_function_return_rtx
+    = (DECL_RTL_SET_P (DECL_RESULT (fndecl))
+       ? DECL_RTL (DECL_RESULT (fndecl)) : NULL_RTX);
 }
 
 /* Indicate whether REGNO is an incoming argument to the current function
@@ -6250,13 +6251,61 @@ mark_varargs ()
 void
 expand_main_function ()
 {
-#if !defined (HAS_INIT_SECTION)
+#ifdef FORCE_PREFERRED_STACK_BOUNDARY_IN_MAIN
+  if (FORCE_PREFERRED_STACK_BOUNDARY_IN_MAIN)
+    {
+      int align = PREFERRED_STACK_BOUNDARY / BITS_PER_UNIT;
+      rtx tmp;
+
+      /* Forcably align the stack.  */
+#ifdef STACK_GROWS_DOWNWARD
+      tmp = expand_binop (Pmode, and_optab, stack_pointer_rtx,
+			  GEN_INT (-align), stack_pointer_rtx, 1, OPTAB_WIDEN);
+#else
+      tmp = expand_binop (Pmode, add_optab, stack_pointer_rtx,
+			  GEN_INT (align - 1), NULL_RTX, 1, OPTAB_WIDEN);
+      tmp = expand_binop (Pmode, and_optab, tmp, GEN_INT (-align),
+			  stack_pointer_rtx, 1, OPTAB_WIDEN);
+#endif
+      if (tmp != stack_pointer_rtx)
+	emit_move_insn (stack_pointer_rtx, tmp);
+      
+      /* Enlist allocate_dynamic_stack_space to pick up the pieces.  */
+      tmp = force_reg (Pmode, const0_rtx);
+      allocate_dynamic_stack_space (tmp, NULL_RTX, BIGGEST_ALIGNMENT);
+    }
+#endif
+
+#ifndef HAS_INIT_SECTION
   emit_library_call (gen_rtx_SYMBOL_REF (Pmode, NAME__MAIN), 0,
 		     VOIDmode, 0);
-#endif /* not HAS_INIT_SECTION */
+#endif
 }
 
 extern struct obstack permanent_obstack;
+
+/* The PENDING_SIZES represent the sizes of variable-sized types.
+   Create RTL for the various sizes now (using temporary variables),
+   so that we can refer to the sizes from the RTL we are generating
+   for the current function.  The PENDING_SIZES are a TREE_LIST.  The
+   TREE_VALUE of each node is a SAVE_EXPR.  */
+
+void
+expand_pending_sizes (pending_sizes)
+     tree pending_sizes;
+{
+  tree tem;
+
+  /* Evaluate now the sizes of any types declared among the arguments.  */
+  for (tem = pending_sizes; tem; tem = TREE_CHAIN (tem))
+    {
+      expand_expr (TREE_VALUE (tem), const0_rtx, VOIDmode,
+		   EXPAND_MEMORY_USE_BAD);
+      /* Flush the queue in case this parameter declaration has
+	 side-effects.  */
+      emit_queue ();
+    }
+}
 
 /* Start the RTL for a new function, and set variables used for
    emitting RTL.
@@ -6309,20 +6358,10 @@ expand_function_start (subr, parms_have_cleanups)
   else
     cleanup_label = 0;
 
-  /* Make the label for return statements to jump to, if this machine
-     does not have a one-instruction return and uses an epilogue,
-     or if it returns a structure, or if it has parm cleanups.  */
-#ifdef HAVE_return
-  if (cleanup_label == 0 && HAVE_return
-      && ! current_function_instrument_entry_exit
-      && ! current_function_returns_pcc_struct
-      && ! (current_function_returns_struct && ! optimize))
-    return_label = 0;
-  else
-    return_label = gen_label_rtx ();
-#else
+  /* Make the label for return statements to jump to.  Do not special
+     case machines with special return instructions -- they will be
+     handled later during jump, ifcvt, or epilogue creation.  */
   return_label = gen_label_rtx ();
-#endif
 
   /* Initialize rtx used to return the value.  */
   /* Do this before assign_parms so that we copy the struct value address
@@ -6354,38 +6393,49 @@ expand_function_start (subr, parms_have_cleanups)
 	}
       if (value_address)
 	{
-	  DECL_RTL (DECL_RESULT (subr))
-	    = gen_rtx_MEM (DECL_MODE (DECL_RESULT (subr)), value_address);
+	  SET_DECL_RTL (DECL_RESULT (subr),
+			gen_rtx_MEM (DECL_MODE (DECL_RESULT (subr)), 
+				     value_address));
 	  set_mem_attributes (DECL_RTL (DECL_RESULT (subr)),
 			      DECL_RESULT (subr), 1);
 	}
     }
   else if (DECL_MODE (DECL_RESULT (subr)) == VOIDmode)
     /* If return mode is void, this decl rtl should not be used.  */
-    DECL_RTL (DECL_RESULT (subr)) = 0;
-  else if (parms_have_cleanups || current_function_instrument_entry_exit)
+    SET_DECL_RTL (DECL_RESULT (subr), NULL_RTX);
+  else if (parms_have_cleanups
+	   || current_function_instrument_entry_exit
+	   || (flag_exceptions && USING_SJLJ_EXCEPTIONS))
     {
-      /* If function will end with cleanup code for parms,
-	 compute the return values into a pseudo reg,
-	 which we will copy into the true return register
-	 after the cleanups are done.  */
+      /* If function will end with cleanup code for parms, compute the
+	 return values into a pseudo reg, which we will copy into the
+	 true return register after the cleanups are done.  */
 
-      enum machine_mode mode = DECL_MODE (DECL_RESULT (subr));
+      /* In order to figure out what mode to use for the pseudo, we
+	 figure out what the mode of the eventual return register will
+	 actually be, and use that.  */
+      rtx hard_reg
+	= hard_function_value (TREE_TYPE (DECL_RESULT (subr)),
+			       subr, 1);
 
-#ifdef PROMOTE_FUNCTION_RETURN
-      tree type = TREE_TYPE (DECL_RESULT (subr));
-      int unsignedp = TREE_UNSIGNED (type);
+      /* Since we know the return value is not an aggregate, we should
+	 have a REG here.  */
+      if (!REG_P (hard_reg))
+	abort ();
 
-      mode = promote_mode (type, mode, &unsignedp, 1);
-#endif
-
-      DECL_RTL (DECL_RESULT (subr)) = gen_reg_rtx (mode);
+      /* Create the pseudo.  */
+      SET_DECL_RTL (DECL_RESULT (subr), 
+		    gen_reg_rtx (GET_MODE (hard_reg)));
+      /* Needed because we may need to move this to memory
+	 in case it's a named return value whose address is taken.  */
+      DECL_REGISTER (DECL_RESULT (subr)) = 1;
     }
   else
-    /* Scalar, returned in a register.  */
     {
-      DECL_RTL (DECL_RESULT (subr))
-	= hard_function_value (TREE_TYPE (DECL_RESULT (subr)), subr, 1);
+      /* Scalar, returned in a register.  */
+      SET_DECL_RTL (DECL_RESULT (subr),
+		    hard_function_value (TREE_TYPE (DECL_RESULT (subr)), 
+					 subr, 1));
 
       /* Mark this reg as the function's return value.  */
       if (GET_CODE (DECL_RTL (DECL_RESULT (subr))) == REG)
@@ -6491,14 +6541,7 @@ expand_function_start (subr, parms_have_cleanups)
   tail_recursion_reentry = emit_note (NULL_PTR, NOTE_INSN_DELETED);
 
   /* Evaluate now the sizes of any types declared among the arguments.  */
-  for (tem = nreverse (get_pending_sizes ()); tem; tem = TREE_CHAIN (tem))
-    {
-      expand_expr (TREE_VALUE (tem), const0_rtx, VOIDmode,
-		   EXPAND_MEMORY_USE_BAD);
-      /* Flush the queue in case this parameter declaration has
-	 side-effects.  */
-      emit_queue ();
-    }
+  expand_pending_sizes (nreverse (get_pending_sizes ()));
 
   /* Make sure there is a line number after the function entry setup code.  */
   force_next_line_note ();
@@ -6790,27 +6833,6 @@ expand_function_end (filename, line, end_bindings)
   if (end_bindings)
     expand_end_bindings (0, 0, 0);
 
-  /* Now handle any leftover exception regions that may have been
-     created for the parameters.  */
-  {
-    rtx last = get_last_insn ();
-    rtx label;
-
-    expand_leftover_cleanups ();
-
-    /* If there are any catch_clauses remaining, output them now.  */
-    emit_insns (catch_clauses);
-    catch_clauses = catch_clauses_last = NULL_RTX;
-    /* If the above emitted any code, may sure we jump around it.  */
-    if (last != get_last_insn ())
-      {
-	label = gen_label_rtx ();
-	last = emit_jump_insn_after (gen_jump (label), last);
-	last = emit_barrier_after (last);
-	emit_label (label);
-      }
-  }
-
   if (current_function_instrument_entry_exit)
     {
       rtx fun = DECL_RTL (current_function_decl);
@@ -6825,6 +6847,11 @@ expand_function_end (filename, line, end_bindings)
 						     hard_frame_pointer_rtx),
 			 Pmode);
     }
+
+  /* Let except.c know where it should emit the call to unregister
+     the function context for sjlj exceptions.  */
+  if (flag_exceptions && USING_SJLJ_EXCEPTIONS)
+    sjlj_emit_function_exit_after (get_last_insn ());
 
   /* If we had calls to alloca, and this machine needs
      an accurate stack pointer to exit the function,
@@ -6843,7 +6870,7 @@ expand_function_end (filename, line, end_bindings)
   /* If scalar return value was computed in a pseudo-reg, or was a named
      return value that got dumped to the stack, copy that to the hard
      return register.  */
-  if (DECL_RTL (DECL_RESULT (current_function_decl)) != 0)
+  if (DECL_RTL_SET_P (DECL_RESULT (current_function_decl)))
     {
       tree decl_result = DECL_RESULT (current_function_decl);
       rtx decl_rtl = DECL_RTL (decl_result);
@@ -6884,6 +6911,10 @@ expand_function_end (filename, line, end_bindings)
 
 	      convert_move (real_decl_rtl, decl_rtl, unsignedp);
 	    }
+	  else if (GET_CODE (real_decl_rtl) == PARALLEL)
+	    emit_group_load (real_decl_rtl, decl_rtl,
+			     int_size_in_bytes (TREE_TYPE (decl_result)),
+			     TYPE_ALIGN (TREE_TYPE (decl_result)));
 	  else
 	    emit_move_insn (real_decl_rtl, decl_rtl);
 
@@ -6933,15 +6964,15 @@ expand_function_end (filename, line, end_bindings)
       current_function_return_rtx = outgoing;
     }
 
+  /* If this is an implementation of throw, do what's necessary to
+     communicate between __builtin_eh_return and the epilogue.  */
+  expand_eh_return ();
+
   /* ??? This should no longer be necessary since stupid is no longer with
      us, but there are some parts of the compiler (eg reload_combine, and
      sh mach_dep_reorg) that still try and compute their own lifetime info
      instead of using the general framework.  */
   use_return_register ();
-
-  /* If this is an implementation of __throw, do what's necessary to
-     communicate between __builtin_eh_return and the epilogue.  */
-  expand_eh_return ();
 
   /* Output a return insn if we are using one.
      Otherwise, let the rtl chain end here, to drop through

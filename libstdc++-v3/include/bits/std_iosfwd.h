@@ -1,6 +1,6 @@
 // Forwarding declarations -*- C++ -*-
 
-// Copyright (C) 1997-1999 Free Software Foundation, Inc.
+// Copyright (C) 1997, 1998, 1999, 2001 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -34,18 +34,15 @@
 #ifndef _CPP_IOSFWD
 #define _CPP_IOSFWD 1
 
+#pragma GCC system_header
+
 #include <bits/c++config.h>
-#include <bits/std_cwchar.h> // For mbstate_t
 #include <bits/stringfwd.h> // For string forward declarations.
+#include <bits/fpos.h>
+#include <bits/functexcept.h>
 
 namespace std 
 {
-  // Forward declarations
-  template<> class char_traits<char>;
-#ifdef _GLIBCPP_USE_WCHAR_T
-  template<> class char_traits<wchar_t>;
-#endif
-
   template<typename _CharT, typename _Traits = char_traits<_CharT> >
     class basic_ios;
 
@@ -100,18 +97,6 @@ namespace std
   class ios_base; 
 #endif
 
-  template<class _State> struct fpos;
-#ifdef _GLIBCPP_RESOLVE_LIB_DEFECTS
-  // Can't have self-recursive types for streampos. 
-  // 21.1.3.1 char_traits sets size_type to streampos
-  // 27.4.1 
-  // And here, where streampos is typedefed to fpos<traits::state_type>
-  typedef fpos<mbstate_t> 		streampos;
-#  ifdef _GLIBCPP_USE_WCHAR_T
-  typedef fpos<mbstate_t> 		wstreampos;
-#  endif
-#endif
-
   typedef basic_ios<char> 		ios;
   typedef basic_streambuf<char> 	streambuf;
   typedef basic_istream<char> 		istream;
@@ -144,3 +129,8 @@ namespace std
 } // namespace std
 
 #endif	// _CPP_IOSFWD
+
+
+
+
+

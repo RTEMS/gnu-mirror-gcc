@@ -29,6 +29,9 @@ Boston, MA 02111-1307, USA.  */
 #include "config.h"
 #include "system.h"
 #include <signal.h>
+#if ! defined( SIGCHLD ) && defined( SIGCLD )
+#  define SIGCHLD SIGCLD
+#endif
 
 #ifdef vfork /* Autoconf may define this to fork for us. */
 # define VFORK_STRING "fork"
@@ -288,6 +291,9 @@ static void write_c_file_glob	PARAMS ((FILE *, const char *));
 static void scan_prog_file	PARAMS ((const char *, enum pass));
 #ifdef SCAN_LIBRARIES
 static void scan_libraries	PARAMS ((const char *));
+#endif
+#if LINK_ELIMINATE_DUPLICATE_LDIRECTORIES
+static int is_in_args		PARAMS ((const char *, const char **, const char **));
 #endif
 #ifdef COLLECT_EXPORT_LIST
 static int is_in_list		PARAMS ((const char *, struct id *));
@@ -586,21 +592,9 @@ is_ctor_dtor (s)
   register const char *orig_s = s;
 
   static struct names special[] = {
-#ifdef NO_DOLLAR_IN_LABEL
-#ifdef NO_DOT_IN_LABEL
     { "GLOBAL__I_", sizeof ("GLOBAL__I_")-1, 1, 0 },
     { "GLOBAL__D_", sizeof ("GLOBAL__D_")-1, 2, 0 },
     { "GLOBAL__F_", sizeof ("GLOBAL__F_")-1, 5, 0 },
-#else
-    { "GLOBAL_.I.", sizeof ("GLOBAL_.I.")-1, 1, 0 },
-    { "GLOBAL_.D.", sizeof ("GLOBAL_.D.")-1, 2, 0 },
-    { "GLOBAL_.F.", sizeof ("GLOBAL_.F.")-1, 5, 0 },
-#endif
-#else
-    { "GLOBAL_$I$", sizeof ("GLOBAL_$I$")-1, 1, 0 },
-    { "GLOBAL_$D$", sizeof ("GLOBAL_$D$")-1, 2, 0 },
-    { "GLOBAL_$F$", sizeof ("GLOBAL_$F$")-1, 5, 0 },
-#endif
     { "GLOBAL__FI_", sizeof ("GLOBAL__FI_")-1, 3, 0 },
     { "GLOBAL__FD_", sizeof ("GLOBAL__FD_")-1, 4, 0 },
 #ifdef CFRONT_LOSSAGE /* Do not collect cfront initialization functions.
@@ -867,6 +861,12 @@ main (argc, argv)
 #if defined (COLLECT2_HOST_INITIALIZATION)
   /* Perform system dependent initialization, if neccessary.  */
   COLLECT2_HOST_INITIALIZATION;
+#endif
+
+#ifdef SIGCHLD
+  /* We *MUST* set SIGCHLD to SIG_DFL so that the wait4() call will
+     receive the signal.  A different setting is inheritable */
+  signal (SIGCHLD, SIG_DFL);
 #endif
 
 /* LC_CTYPE determines the character set used by the terminal so it has be set
@@ -1180,6 +1180,13 @@ main (argc, argv)
        	    case 'L':
 	      add_prefix (&cmdline_lib_dirs, arg+2);
 	      break;
+#else 
+#if LINK_ELIMINATE_DUPLICATE_LDIRECTORIES
+	    case 'L':
+	      if (is_in_args (arg, (const char **) ld1_argv, ld1-1))
+		--ld1;
+	      break;
+#endif /* LINK_ELIMINATE_DUPLICATE_LDIRECTORIES */
 #endif
 
 	    case 'o':
@@ -1770,6 +1777,24 @@ write_list (stream, prefix, list)
       list = list->next;
     }
 }
+
+#if LINK_ELIMINATE_DUPLICATE_LDIRECTORIES
+/* Given a STRING, return nonzero if it occurs in the list in range
+   [ARGS_BEGIN,ARGS_END).  */
+
+static int
+is_in_args (string, args_begin, args_end)
+     const char *string;
+     const char **args_begin;
+     const char **args_end;
+{
+  const char **args_pointer;
+  for (args_pointer = args_begin; args_pointer != args_end; ++args_pointer)
+    if (strcmp (string, *args_pointer) == 0)
+      return 1;
+  return 0;
+}
+#endif /* LINK_ELIMINATE_DUPLICATE_LDIRECTORIES */
 
 #ifdef COLLECT_EXPORT_LIST
 /* This function is really used only on AIX, but may be useful.  */

@@ -22,7 +22,7 @@
 
 #include <cwchar> // for mbstate_t
 #include <locale>
-#include <debug_assert.h>
+#include <testsuite_hooks.h>
 
 
 // Need to explicitly set the state(mbstate_t) to zero.
@@ -121,6 +121,3 @@ int main ()
 
   return 0;
 }
-
-
-
