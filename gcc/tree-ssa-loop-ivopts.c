@@ -1191,7 +1191,7 @@ find_interesting_uses_cond (struct ivopts_data *data, tree stmt, tree *cond_p)
 /* Returns true if expression EXPR is obviously invariant in LOOP,
    i.e. if all its operands are defined outside of the LOOP.  */
 
-static bool
+bool
 expr_invariant_in_loop_p (struct loop *loop, tree expr)
 {
   basic_block def_bb;
@@ -4012,6 +4012,7 @@ rewrite_address_base (block_stmt_iterator *bsi, tree *op, tree with)
       new_name = make_ssa_name (new_var, copy);
     }
   TREE_OPERAND (copy, 0) = new_name;
+  update_stmt (copy);
   bsi_insert_before (bsi, copy, BSI_SAME_STMT);
   with = new_name;
 
@@ -4074,7 +4075,7 @@ rewrite_use_compare (struct ivopts_data *data,
       *use->op_p = build2 (compare, boolean_type_node,
 			  var_at_stmt (data->current_loop,
 				       cand, use->stmt), op);
-      modify_stmt (use->stmt);
+      update_stmt (use->stmt);
       return;
     }
 
@@ -4175,19 +4176,24 @@ compute_phi_arg_on_exit (edge exit, tree stmts, tree op)
   if (EDGE_COUNT (exit->dest->preds) > 1)
     split_loop_exit_edge (exit);
 
-  if (TREE_CODE (stmts) == STATEMENT_LIST)
-    {
-      for (tsi = tsi_start (stmts); !tsi_end_p (tsi); tsi_next (&tsi))
-	protect_loop_closed_ssa_form (exit, tsi_stmt (tsi));
-    }
-  else
-    protect_loop_closed_ssa_form (exit, stmts);
-
   /* Ensure there is label in exit->dest, so that we can
      insert after it.  */
   tree_block_label (exit->dest);
   bsi = bsi_after_labels (exit->dest);
-  bsi_insert_after (&bsi, stmts, BSI_CONTINUE_LINKING);
+
+  if (TREE_CODE (stmts) == STATEMENT_LIST)
+    {
+      for (tsi = tsi_start (stmts); !tsi_end_p (tsi); tsi_next (&tsi))
+        {
+	  bsi_insert_after (&bsi, tsi_stmt (tsi), BSI_NEW_STMT);
+	  protect_loop_closed_ssa_form (exit, bsi_stmt (bsi));
+	}
+    }
+  else
+    {
+      bsi_insert_after (&bsi, stmts, BSI_NEW_STMT);
+      protect_loop_closed_ssa_form (exit, bsi_stmt (bsi));
+    }
 
   if (!op)
     return;
@@ -4306,7 +4312,7 @@ rewrite_use (struct ivopts_data *data,
       default:
 	gcc_unreachable ();
     }
-  modify_stmt (use->stmt);
+  update_stmt (use->stmt);
 }
 
 /* Rewrite the uses using the selected induction variables.  */
