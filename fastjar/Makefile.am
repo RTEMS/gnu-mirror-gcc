@@ -41,15 +41,16 @@ AM_MAKEFLAGS = \
 	"RANLIB=$(RANLIB)" \
 	"DESTDIR=$(DESTDIR)"
 
-INCLUDES = -I. -I$(top_srcdir) $(ZINCS) -I$(top_srcdir)/../include
+AM_CPPFLAGS = -I. -I$(top_srcdir) $(ZINCS) -I$(top_srcdir)/../include
 
 LIBIBERTY = ../libiberty/libiberty.a
 
 bin_PROGRAMS = jar grepjar
-jar_SOURCES = jartool.c dostime.c compress.c pushback.c jartool.h \
-zipfile.h dostime.h compress.h pushback.h
+jar_SOURCES = jartool.c dostime.c compress.c pushback.c shift.c jartool.h \
+zipfile.h dostime.h compress.h pushback.h shift.h
 jar_LDADD = $(ZLIBS) $(LIBIBERTY)
 jar_DEPENDENCIES = $(ZDEPS) $(LIBIBERTY)
+jar_CPPFLAGS = $(AM_CPPFLAGS) -DWITH_SHIFT_DOWN
 
 grepjar_SOURCES = jargrep.c dostime.c compress.c pushback.c jartool.h \
 zipfile.h dostime.h compress.h pushback.h
@@ -70,7 +71,7 @@ EXTRA_DIST = $(man_MANS)
 TEXI2POD = perl $(srcdir)/../contrib/texi2pod.pl
 POD2MAN = pod2man --center="GNU" --release="gcc-@gcc_version@"
 
-%.1: %.pod
+.pod.1:
 	-($(POD2MAN) --section=1 $< > $(@).T$$$$ && \
 		mv -f $(@).T$$$$ $@) || \
 		(rm -f $(@).T$$$$ && exit 1)
@@ -82,3 +83,27 @@ jar.pod: $(srcdir)/fastjar.texi
 
 grepjar.pod: $(srcdir)/fastjar.texi
 	-$(TEXI2POD) -D grepjar $< > $@
+
+# GCC LOCAL CHANGE
+# The following commands allow us to release tarballs with the man pages
+# and info documentation prebuilt.  This feature is enabled via 
+# --enable-generated-files-in-srcdir in the configure script.
+
+if GENINSRC
+STAMP_GENINSRC = stamp-geninsrc
+else
+STAMP_GENINSRC =
+endif
+
+all-local: $(STAMP_GENINSRC) 
+
+stamp-geninsrc: jar.1 grepjar.1 fastjar.info
+	-cp -p $(top_builddir)/jar.1 $(srcdir)/jar.1
+	-cp -p $(top_builddir)/grepjar.1 $(srcdir)/grepjar.1
+	-cp -p $(top_builddir)/fastjar.info $(srcdir)/fastjar.info
+	touch $@
+
+CLEANFILES = stamp-geninsrc
+MAINTAINERCLEANFILES = $(srcdir)/jar.1 \
+                       $(srcdir)/grepjar.1 \
+                       $(srcdir)/fastjar.info

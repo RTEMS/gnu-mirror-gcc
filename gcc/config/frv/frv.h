@@ -109,7 +109,7 @@
     %{mmedia} %{mno-media} \
     %{mmuladd} %{mno-muladd} \
     %{mpack} %{mno-pack} \
-    %{mfdpic} \
+    %{mno-fdpic:-mnopic} %{mfdpic} \
     %{fpic|fpie: -mpic} %{fPIC|fPIE: -mPIC} %{mlibrary-pic}}"
 
 /* Another C string constant used much like `LINK_SPEC'.  The difference
@@ -151,7 +151,7 @@
 %{mcpu=tomcat: %(cpp_fr500)} \
 %{mcpu=simple: %(cpp_simple)} \
 %{!mcpu*: %(cpp_cpu_default)} \
-%{mno-media: -D__FRV_ACC__=0 %{msoft-float: -D__FRV_FPR__=0}} \
+%{mno-media: -U__FRV_ACC__ -D__FRV_ACC__=0 %{msoft-float: -U__FRV_FPR__ -D__FRV_FPR__=0}} \
 %{mhard-float: -D__FRV_HARD_FLOAT__} \
 %{msoft-float: -U__FRV_HARD_FLOAT__} \
 %{mgpr-32: -U__FRV_GPR__ -D__FRV_GPR__=32} \
@@ -203,7 +203,7 @@
 -D__FRV_GPR__=32 \
 -D__FRV_FPR__=0 \
 -D__FRV_ACC__=0 \
-%{mmedia: -D__FRV_ACC__=8} \
+%{mmedia: -U__FRV_ACC__ -D__FRV_ACC__=8} \
 %{mhard-float|mmedia: -D__FRV_FPR__=64}"
 
 #define MASK_DEFAULT_FRV	\
@@ -931,7 +931,7 @@ extern int target_flags;
 #define LAST_ARG_REGNUM		(FIRST_ARG_REGNUM + FRV_NUM_ARG_REGS - 1)
 
 /* Registers used by the exception handling functions.  These should be
-   registers that are not otherwised used by the calling sequence.  */
+   registers that are not otherwise used by the calling sequence.  */
 #define FIRST_EH_REGNUM		14
 #define LAST_EH_REGNUM		15
 
@@ -1860,58 +1860,10 @@ struct machine_function GTY(())
 #define RETURN_POPS_ARGS(FUNDECL, FUNTYPE, STACK_SIZE) 0
 
 
-/* Function Arguments in Registers.  */
-
-/* Nonzero if we do not know how to pass TYPE solely in registers.
-   We cannot do so in the following cases:
-
-   - if the type has variable size
-   - if the type is marked as addressable (it is required to be constructed
-     into the stack)
-   - if the type is a structure or union.  */
-
-#define MUST_PASS_IN_STACK(MODE,TYPE)                           \
-   (((MODE) == BLKmode)                                         \
-    || ((TYPE) != 0                                             \
-         && (TREE_CODE (TYPE_SIZE (TYPE)) != INTEGER_CST        \
-             || TREE_CODE (TYPE) == RECORD_TYPE                 \
-             || TREE_CODE (TYPE) == UNION_TYPE                  \
-             || TREE_CODE (TYPE) == QUAL_UNION_TYPE             \
-             || TREE_ADDRESSABLE (TYPE))))
-
 /* The number of register assigned to holding function arguments.  */
 
 #define FRV_NUM_ARG_REGS        6
 
-/* A C expression that controls whether a function argument is passed in a
-   register, and which register.
-
-   The arguments are CUM, of type CUMULATIVE_ARGS, which summarizes (in a way
-   defined by INIT_CUMULATIVE_ARGS and FUNCTION_ARG_ADVANCE) all of the previous
-   arguments so far passed in registers; MODE, the machine mode of the argument;
-   TYPE, the data type of the argument as a tree node or 0 if that is not known
-   (which happens for C support library functions); and NAMED, which is 1 for an
-   ordinary argument and 0 for nameless arguments that correspond to `...' in the
-   called function's prototype.
-
-   The value of the expression should either be a `reg' RTX for the hard
-   register in which to pass the argument, or zero to pass the argument on the
-   stack.
-
-   For machines like the VAX and 68000, where normally all arguments are
-   pushed, zero suffices as a definition.
-
-   The usual way to make the ANSI library `stdarg.h' work on a machine where
-   some arguments are usually passed in registers, is to cause nameless
-   arguments to be passed on the stack instead.  This is done by making
-   `FUNCTION_ARG' return 0 whenever NAMED is 0.
-
-   You may use the macro `MUST_PASS_IN_STACK (MODE, TYPE)' in the definition of
-   this macro to determine if this argument is of a type that must be passed in
-   the stack.  If `REG_PARM_STACK_SPACE' is not defined and `FUNCTION_ARG'
-   returns nonzero for such an argument, the compiler will abort.  If
-   `REG_PARM_STACK_SPACE' is defined, the argument will be computed in the
-   stack and then loaded into a register.  */
 #define FUNCTION_ARG(CUM, MODE, TYPE, NAMED)                    \
   frv_function_arg (&CUM, MODE, TYPE, NAMED, FALSE)
 
@@ -1948,19 +1900,6 @@ struct machine_function GTY(())
   frv_function_arg_partial_nregs (&CUM, MODE, TYPE, NAMED)
 
 /* extern int frv_function_arg_partial_nregs (CUMULATIVE_ARGS, int, Tree, int);  */
-
-/* A C expression that indicates when an argument must be passed by reference.
-   If nonzero for an argument, a copy of that argument is made in memory and a
-   pointer to the argument is passed instead of the argument itself.  The
-   pointer is passed in whatever way is appropriate for passing a pointer to
-   that type.
-
-   On machines where `REG_PARM_STACK_SPACE' is not defined, a suitable
-   definition of this macro might be
-        #define FUNCTION_ARG_PASS_BY_REFERENCE(CUM, MODE, TYPE, NAMED)  \
-          MUST_PASS_IN_STACK (MODE, TYPE)  */
-#define FUNCTION_ARG_PASS_BY_REFERENCE(CUM, MODE, TYPE, NAMED)		\
-  frv_function_arg_pass_by_reference (&CUM, MODE, TYPE, NAMED)
 
 /* If defined, a C expression that indicates when it is the called function's
    responsibility to make a copy of arguments passed by invisible reference.
@@ -2146,12 +2085,6 @@ struct machine_function GTY(())
 
 #define EXPAND_BUILTIN_VA_START(VALIST, NEXTARG)		\
   (frv_expand_builtin_va_start(VALIST, NEXTARG))
-
-/* Implement the stdarg/varargs va_arg macro.  VALIST is the variable of type
-   va_list as a tree, TYPE is the type passed to va_arg.  */
-
-#define EXPAND_BUILTIN_VA_ARG(VALIST, TYPE)				\
-  (frv_expand_builtin_va_arg (VALIST, TYPE))
 
 
 /* Trampolines for Nested Functions.  */
@@ -2535,10 +2468,6 @@ __asm__("\n"								\
 /* Define this macro if it is as good or better to call a constant function
    address than to call an address kept in a register.  */
 #define NO_FUNCTION_CSE
-
-/* Define this macro if it is as good or better for a function to call itself
-   with an explicit address than to call an address kept in a register.  */
-#define NO_RECURSIVE_FUNCTION_CSE
 
 
 /* Dividing the output into sections.  */
@@ -3110,8 +3039,10 @@ do {                                                                    \
   { "odd_fpr_operand",			{ REG, SUBREG }},		\
   { "dbl_memory_one_insn_operand",	{ MEM }},			\
   { "dbl_memory_two_insn_operand",	{ MEM }},			\
-  { "call_operand",			{ REG, SUBREG, PLUS, CONST_INT,	\
-					  SYMBOL_REF, LABEL_REF, CONST }}, \
+  { "call_operand",			{ REG, SUBREG, CONST_INT,	\
+					  CONST, SYMBOL_REF }}, 	\
+  { "sibcall_operand",			{ REG, SUBREG, CONST_INT,	\
+					  CONST }}, 			\
   { "upper_int16_operand",		{ CONST_INT }},			\
   { "uint16_operand",			{ CONST_INT }},			\
   { "relational_operator",		{ EQ, NE, LE, LT, GE, GT,	\

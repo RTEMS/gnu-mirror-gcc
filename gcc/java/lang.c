@@ -67,6 +67,7 @@ static bool java_dump_tree (void *, tree);
 static void dump_compound_expr (dump_info_p, tree);
 static bool java_decl_ok_for_sibcall (tree);
 static tree java_get_callee_fndecl (tree);
+static void java_clear_binding_stack (void);
 
 #ifndef TARGET_OBJECT_SUFFIX
 # define TARGET_OBJECT_SUFFIX ".o"
@@ -224,8 +225,6 @@ struct language_function GTY(())
 #define LANG_HOOKS_UNSAFE_FOR_REEVAL java_unsafe_for_reeval
 #undef LANG_HOOKS_MARK_ADDRESSABLE
 #define LANG_HOOKS_MARK_ADDRESSABLE java_mark_addressable
-#undef LANG_HOOKS_EXPAND_EXPR
-#define LANG_HOOKS_EXPAND_EXPR java_expand_expr
 #undef LANG_HOOKS_TRUTHVALUE_CONVERSION
 #define LANG_HOOKS_TRUTHVALUE_CONVERSION java_truthvalue_conversion
 #undef LANG_HOOKS_DUP_LANG_SPECIFIC_DECL
@@ -266,8 +265,8 @@ struct language_function GTY(())
 #undef LANG_HOOKS_CALLGRAPH_EXPAND_FUNCTION
 #define LANG_HOOKS_CALLGRAPH_EXPAND_FUNCTION java_expand_body
 
-#undef LANG_HOOKS_RTL_EXPAND_STMT
-#define LANG_HOOKS_RTL_EXPAND_STMT java_expand_stmt
+#undef LANG_HOOKS_CLEAR_BINDING_STACK
+#define LANG_HOOKS_CLEAR_BINDING_STACK java_clear_binding_stack
 
 /* Each front end provides its own.  */
 const struct lang_hooks lang_hooks = LANG_HOOKS_INITIALIZER;
@@ -351,6 +350,22 @@ java_handle_option (size_t scode, const char *arg, int value)
 
     case OPT_fassert:
       flag_assert = value;
+      break;
+
+    case OPT_fenable_assertions_:
+      add_enable_assert (arg, value);
+      break;
+
+    case OPT_fenable_assertions:
+      add_enable_assert ("", value);
+      break;
+
+    case OPT_fdisable_assertions_:
+      add_enable_assert (arg, !value);
+      break;
+
+    case OPT_fdisable_assertions:
+      add_enable_assert ("", !value);
       break;
 
     case OPT_fassume_compiled_:
@@ -674,7 +689,8 @@ java_print_error_function (diagnostic_context *context ATTRIBUTE_UNUSED,
    2, function prototypes are fully resolved and can be printed when
    reporting errors.  */
 
-void lang_init_source (int level)
+void
+lang_init_source (int level)
 {
   inhibit_error_function_printing = (level == 1);
 }
@@ -869,6 +885,48 @@ java_unsafe_for_reeval (tree t)
   return -1;
 }
 
+/* APPLE LOCAL begin AltiVec */
+/* Placeholders to make linking work, remove when altivec support is correct */
+
+int comptypes (tree type1, tree type2);
+
+int
+comptypes (tree type1, tree type2)
+{
+  register tree t1 = type1;
+  register tree t2 = type2;
+  if (t1 == t2 || !t1 || !t2
+      || TREE_CODE (t1) == ERROR_MARK || TREE_CODE (t2) == ERROR_MARK)
+    return 1;
+  return 0;
+}
+
+tree default_conversion (tree exp);
+
+tree
+default_conversion (tree exp)
+{
+  return exp;
+}
+
+tree lang_build_type_variant (tree type, int constp ATTRIBUTE_UNUSED, int volatilep ATTRIBUTE_UNUSED);
+
+tree
+lang_build_type_variant (tree type, int constp ATTRIBUTE_UNUSED, int volatilep ATTRIBUTE_UNUSED)
+{
+  return type;
+}
+/* APPLE LOCAL end AltiVec */
+
+/* APPLE LOCAL begin constant cfstrings */
+enum { blabla } c_language;
+const char *constant_string_class_name = "die die";
+int flag_next_runtime = 1;
+/* APPLE LOCAL end constant cfstrings */
+
+/* APPLE LOCAL disable_typechecking_for_spec_flag */
+int disable_typechecking_for_spec_flag = 0;
+
 /* Every call to a static constructor has an associated boolean
    variable which is in the outermost scope of the calling method.
    This variable is used to avoid multiple calls to the static
@@ -928,7 +986,7 @@ merge_init_test_initialization (void **entry, void *x)
   
   However, what if the method that is suppoed to do the initialization
   is itself inlined in the caller?  When expanding the called method
-  we'll assume that the class initalization has already been done,
+  we'll assume that the class initialization has already been done,
   because the DECL_INITIAL of the init_test_decl is set.
   
   To fix this we remove the DECL_INITIAL (in the caller scope) of all
@@ -1146,6 +1204,15 @@ java_get_callee_fndecl (tree call_expr)
     }
 
   return NULL;
+}
+
+
+/* Clear the binding stack.  */
+static void
+java_clear_binding_stack (void)
+{
+  while (!global_bindings_p ())
+    poplevel (0, 0, 0);
 }
 
 #include "gt-java-lang.h"

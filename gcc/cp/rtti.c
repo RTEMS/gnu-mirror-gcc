@@ -20,7 +20,6 @@ along with GCC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
-
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -120,7 +119,7 @@ init_rtti_processing (void)
   push_namespace (std_identifier);
   type_info_type_node 
     = xref_tag (class_type, get_identifier ("type_info"),
-		/*attributes=*/NULL_TREE, true, false);
+		true, false);
   pop_namespace ();
   const_type_info_type = build_qualified_type (type_info_type_node, 
 					       TYPE_QUAL_CONST);
@@ -176,7 +175,7 @@ throw_bad_cast (void)
     fn = push_throw_library_fn (fn, build_function_type (ptr_type_node,
 							 void_list_node));
   
-  return build_cxx_call (fn, NULL_TREE, NULL_TREE);
+  return build_cxx_call (fn, NULL_TREE);
 }
 
 /* Return an expression for "__cxa_bad_typeid()".  The expression
@@ -193,7 +192,7 @@ throw_bad_typeid (void)
       fn = push_throw_library_fn (fn, t);
     }
 
-  return convert_from_reference (build_cxx_call (fn, NULL_TREE, NULL_TREE));
+  return convert_from_reference (build_cxx_call (fn, NULL_TREE));
 }
 
 /* Return an lvalue expression whose type is "const std::type_info"
@@ -635,7 +634,6 @@ build_dynamic_cast_1 (tree type, tree expr)
 	      push_nested_namespace (ns);
 	      tinfo_ptr = xref_tag (class_type,
 				    get_identifier ("__class_type_info"),
-				    /*attributes=*/NULL_TREE,
 				    true, false);
 	      
 	      tinfo_ptr = build_pointer_type
@@ -653,7 +651,7 @@ build_dynamic_cast_1 (tree type, tree expr)
               pop_nested_namespace (ns);
               dynamic_cast_node = dcast_fn;
 	    }
-          result = build_cxx_call (dcast_fn, elems, elems);
+          result = build_cxx_call (dcast_fn, elems);
 
 	  if (tc == REFERENCE_TYPE)
 	    {
@@ -777,7 +775,7 @@ tinfo_base_init (tree desc, tree target)
   
       push_nested_namespace (abi_node);
       real_type = xref_tag (class_type, TINFO_REAL_NAME (desc),
-			    /*attributes=*/NULL_TREE, true, false);
+			    true, false);
       pop_nested_namespace (abi_node);
   
       if (!COMPLETE_TYPE_P (real_type))
@@ -807,7 +805,6 @@ tinfo_base_init (tree desc, tree target)
   init = tree_cons (NULL_TREE, decay_conversion (name_decl), init);
   
   init = build_constructor (NULL_TREE, nreverse (init));
-  TREE_HAS_CONSTRUCTOR (init) = 1;
   TREE_CONSTANT (init) = 1;
   TREE_INVARIANT (init) = 1;
   TREE_STATIC (init) = 1;
@@ -826,7 +823,6 @@ generic_initializer (tree desc, tree target)
   tree init = tinfo_base_init (desc, target);
   
   init = build_constructor (NULL_TREE, init);
-  TREE_HAS_CONSTRUCTOR (init) = 1;
   TREE_CONSTANT (init) = 1;
   TREE_INVARIANT (init) = 1;
   TREE_STATIC (init) = 1;
@@ -856,7 +852,6 @@ ptr_initializer (tree desc, tree target, bool *non_public_ptr)
                     init);
   
   init = build_constructor (NULL_TREE, nreverse (init));
-  TREE_HAS_CONSTRUCTOR (init) = 1;
   TREE_CONSTANT (init) = 1;
   TREE_INVARIANT (init) = 1;
   TREE_STATIC (init) = 1;
@@ -896,7 +891,6 @@ ptm_initializer (tree desc, tree target, bool *non_public_ptr)
 		    init);  
   
   init = build_constructor (NULL_TREE, nreverse (init));
-  TREE_HAS_CONSTRUCTOR (init) = 1;
   TREE_CONSTANT (init) = 1;
   TREE_INVARIANT (init) = 1;
   TREE_STATIC (init) = 1;
@@ -914,7 +908,7 @@ dfs_class_hint_mark (tree binfo, void *data)
   tree basetype = BINFO_TYPE (binfo);
   int *hint = (int *) data;
   
-  if (TREE_VIA_VIRTUAL (binfo))
+  if (BINFO_VIRTUAL_P (binfo))
     {
       if (CLASSTYPE_MARKED (basetype))
         *hint |= 1;
@@ -967,7 +961,6 @@ class_initializer (tree desc, tree target, tree trail)
   
   TREE_CHAIN (init) = trail;
   init = build_constructor (NULL_TREE, init);
-  TREE_HAS_CONSTRUCTOR (init) = 1;
   TREE_CONSTANT (init) = 1;
   TREE_INVARIANT (init) = 1;
   TREE_STATIC (init) = 1;
@@ -1039,7 +1032,7 @@ get_pseudo_ti_init (tree type, tree var_desc, bool *non_public_p)
         }
       else if (var_desc == si_class_desc_type_node)
 	{
-          tree base_binfos = BINFO_BASETYPES (TYPE_BINFO (type));
+          tree base_binfos = BINFO_BASE_BINFOS (TYPE_BINFO (type));
 	  tree base_binfo = TREE_VEC_ELT (base_binfos, 0);
 	  tree tinfo = get_tinfo_ptr (BINFO_TYPE (base_binfo));
 	  tree base_inits = tree_cons (NULL_TREE, tinfo, NULL_TREE);
@@ -1050,9 +1043,9 @@ get_pseudo_ti_init (tree type, tree var_desc, bool *non_public_p)
         {
 	  int hint = class_hint_flags (type);
 	  tree binfo = TYPE_BINFO (type);
-          int nbases = BINFO_N_BASETYPES (binfo);
-          tree base_binfos = BINFO_BASETYPES (binfo);
-	  tree base_accesses = BINFO_BASEACCESSES (binfo);
+          int nbases = BINFO_N_BASE_BINFOS (binfo);
+          tree base_binfos = BINFO_BASE_BINFOS (binfo);
+	  tree base_accesses = BINFO_BASE_ACCESSES (binfo);
           tree base_inits = NULL_TREE;
           int ix;
           
@@ -1068,7 +1061,7 @@ get_pseudo_ti_init (tree type, tree var_desc, bool *non_public_p)
               if (TREE_VEC_ELT (base_accesses, ix) == access_public_node)
                 flags |= 2;
               tinfo = get_tinfo_ptr (BINFO_TYPE (base_binfo));
-	      if (TREE_VIA_VIRTUAL (base_binfo))
+	      if (BINFO_VIRTUAL_P (base_binfo))
 		{
 		   /* We store the vtable offset at which the virtual
        		      base offset can be found.  */
@@ -1087,11 +1080,9 @@ get_pseudo_ti_init (tree type, tree var_desc, bool *non_public_p)
               base_init = tree_cons (NULL_TREE, offset, base_init);
               base_init = tree_cons (NULL_TREE, tinfo, base_init);
               base_init = build_constructor (NULL_TREE, base_init);
-	      TREE_HAS_CONSTRUCTOR (base_init) = 1;
               base_inits = tree_cons (NULL_TREE, base_init, base_inits);
             }
 	  base_inits = build_constructor (NULL_TREE, base_inits);
-	  TREE_HAS_CONSTRUCTOR (base_inits) = 1;
 	  base_inits = tree_cons (NULL_TREE, base_inits, NULL_TREE);
 	  /* Prepend the number of bases.  */
 	  base_inits = tree_cons (NULL_TREE,
@@ -1196,19 +1187,19 @@ get_pseudo_ti_desc (tree type)
 	    cxx_incomplete_type_error (NULL_TREE, type);
 	  return class_desc_type_node;
 	}
-      else if (!CLASSTYPE_N_BASECLASSES (type))
+      else if (!BINFO_N_BASE_BINFOS (TYPE_BINFO (type)))
 	return class_desc_type_node;
       else
 	{
 	  tree binfo = TYPE_BINFO (type);
-	  tree base_binfos = BINFO_BASETYPES (binfo);
-	  tree base_accesses = BINFO_BASEACCESSES (binfo);
+	  tree base_binfos = BINFO_BASE_BINFOS (binfo);
+	  tree base_accesses = BINFO_BASE_ACCESSES (binfo);
 	  tree base_binfo = TREE_VEC_ELT (base_binfos, 0);
 	  int num_bases = TREE_VEC_LENGTH (base_binfos);
 	  
 	  if (num_bases == 1
 	      && TREE_VEC_ELT (base_accesses, 0) == access_public_node
-	      && !TREE_VIA_VIRTUAL (base_binfo)
+	      && !BINFO_VIRTUAL_P (base_binfo)
 	      && integer_zerop (BINFO_OFFSET (base_binfo)))
 	    /* single non-virtual public.  */
 	    return si_class_desc_type_node;
@@ -1261,7 +1252,7 @@ get_pseudo_ti_desc (tree type)
 }
 
 /* Make sure the required builtin types exist for generating the type_info
-   varable definitions.  */
+   variable definitions.  */
 
 static void
 create_tinfo_types (void)
@@ -1387,12 +1378,11 @@ emit_support_tinfos (void)
   push_nested_namespace (abi_node);
   bltn_type = xref_tag (class_type,
 			get_identifier ("__fundamental_type_info"), 
-			/*attributes=*/NULL_TREE,
 			true, false);
   pop_nested_namespace (abi_node);
   if (!COMPLETE_TYPE_P (bltn_type))
     return;
-  dtor = TREE_VEC_ELT (CLASSTYPE_METHOD_VEC (bltn_type), 1);
+  dtor = CLASSTYPE_DESTRUCTORS (bltn_type);
   if (DECL_EXTERNAL (dtor))
     return;
   doing_runtime = 1;
