@@ -3210,7 +3210,11 @@ duplicate_decls (newdecl, olddecl)
 		   && compparms (TYPE_ARG_TYPES (TREE_TYPE (DECL_TEMPLATE_RESULT (olddecl))),
 				 TYPE_ARG_TYPES (TREE_TYPE (DECL_TEMPLATE_RESULT (newdecl))))
 		   && comp_template_parms (DECL_TEMPLATE_PARMS (newdecl),
-					   DECL_TEMPLATE_PARMS (olddecl)))
+					   DECL_TEMPLATE_PARMS (olddecl))
+		   /* Template functions can be disambiguated by
+		      return type.  */
+		   && same_type_p (TREE_TYPE (TREE_TYPE (newdecl)),
+				   TREE_TYPE (TREE_TYPE (olddecl))))
 	    {
 	      error ("new declaration `%#D'", newdecl);
 	      cp_error_at ("ambiguates old declaration `%#D'", olddecl);
@@ -5677,10 +5681,13 @@ make_typename_type (context, name, complain)
 	      return error_mark_node;
 	    }
 
-	  if (complain & tf_parsing)
-	    type_access_control (context, tmpl);
-	  else
-	    enforce_access (context, tmpl);
+	  if (complain & tf_error)
+	    {
+	      if (complain & tf_parsing)
+		type_access_control (context, tmpl);
+	      else
+		enforce_access (context, tmpl);
+	    }
 
 	  return lookup_template_class (tmpl,
 					TREE_OPERAND (fullname, 1),
@@ -5709,10 +5716,13 @@ make_typename_type (context, name, complain)
 		  return error_mark_node;
 		}
 
-	      if (complain & tf_parsing)
-		type_access_control (context, t);
-	      else
-		enforce_access (context, t);
+	      if (complain & tf_error)
+		{
+	      	  if (complain & tf_parsing)
+		    type_access_control (context, t);
+		  else
+		    enforce_access (context, t);
+		}
 
 	      if (DECL_ARTIFICIAL (t) || !(complain & tf_keep_type_decl))
 		t = TREE_TYPE (t);
@@ -5753,7 +5763,7 @@ make_typename_type (context, name, complain)
 tree
 make_unbound_class_template (context, name, complain)
      tree context, name;
-     int complain;
+     tsubst_flags_t complain;
 {
   tree t;
   tree d;
@@ -5775,15 +5785,18 @@ make_unbound_class_template (context, name, complain)
 
       if (!tmpl || !DECL_CLASS_TEMPLATE_P (tmpl))
 	{
-	  if (complain)
+	  if (complain & tf_error)
 	    error ("no class template named `%#T' in `%#T'", name, context);
 	  return error_mark_node;
 	}
       
-      if (complain & tf_parsing)
-	type_access_control (context, tmpl);
-      else
-	enforce_access (context, tmpl);
+      if (complain & tf_error)
+	{
+	  if (complain & tf_parsing)
+	    type_access_control (context, tmpl);
+	  else
+	    enforce_access (context, tmpl);
+	}
 
       return tmpl;
     }
@@ -7417,7 +7430,9 @@ start_decl (declarator, declspecs, initialized, attributes, prefix_attributes)
      wrong semantics.  If we say -fno-conserve-space, we want this to
      produce errors about redefs; to do this we force variables into the
      data segment.  */
-  DECL_COMMON (tem) = flag_conserve_space || ! TREE_PUBLIC (tem);
+  DECL_COMMON (tem) = ((TREE_CODE (tem) != VAR_DECL
+			|| !DECL_THREAD_LOCAL (tem))
+		       && (flag_conserve_space || ! TREE_PUBLIC (tem)));
 #endif
 
   if (! processing_template_decl)
