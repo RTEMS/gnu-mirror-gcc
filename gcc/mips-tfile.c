@@ -2,8 +2,8 @@
    contain debugging information specified by the GNU compiler
    in the form of comments (the mips assembler does not support
    assembly access to debug information).
-   Copyright (C) 1991, 1993, 1994. 1995 Free Software Foundation, Inc.
-   Contributed by Michael Meissner, meissner@osf.org
+   Copyright (C) 1991, 93, 94, 95, 97, 1998 Free Software Foundation, Inc.
+   Contributed by Michael Meissner (meissner@cygnus.com).
    
 This file is part of GNU CC.
 
@@ -599,12 +599,12 @@ Boston, MA 02111-1307, USA.  */
 */
 
 
+#include "config.h"
 #ifdef __STDC__
 #include <stdarg.h>
 #else
 #include <varargs.h>
 #endif
-#include "config.h"
 #include <stdio.h>
 
 #ifndef __SABER__
@@ -966,7 +966,7 @@ enum alloc_type {
    grow linearly, and which are written in the object file as sequential
    pages.  On systems with a BSD malloc that define USE_MALLOC, the
    MAX_CLUSTER_PAGES should be 1 less than a power of two, since malloc
-   adds it's overhead, and rounds up to the next power of 2.  Pages are
+   adds its overhead, and rounds up to the next power of 2.  Pages are
    linked together via a linked list.
 
    If PAGE_SIZE is > 4096, the string length in the shash_t structure
@@ -1755,10 +1755,14 @@ STATIC void	  free_thead		__proto((thead_t *));
 STATIC char	 *local_index		__proto((const char *, int));
 STATIC char	 *local_rindex		__proto((const char *, int));
 
-#ifndef __alpha
+#ifdef NEED_DECLARTION_SBRK
 extern char  *sbrk			__proto((int));
+#endif
+
+#ifdef NEED_DECLARATION_FREE
 extern void   free			__proto((PTR_T));
 #endif
+
 extern char  *mktemp			__proto((char *));
 extern long   strtol			__proto((const char *, char **, int));
 
@@ -1767,7 +1771,7 @@ extern int   optind;
 extern int   opterr;
 extern char *version_string;
 #ifndef NO_SYS_SIGLIST
-#ifndef DONT_DECLARE_SYS_SIGLIST
+#ifndef SYS_SIGLIST_DECLARED
 extern char *sys_siglist[NSIG + 1];
 #endif
 #endif
@@ -3294,14 +3298,22 @@ parse_def (name_start)
     }
 
 
-  t.extra_sizes = (tag_start != (char *) 0);
+  if (storage_class == sc_Bits)
+    {
+      t.bitfield = 1;
+      t.extra_sizes = 1;
+    }
+  else
+    t.extra_sizes = 0;
+
   if (t.num_dims > 0)
     {
-      int diff = t.num_dims - t.num_sizes;
+      int num_real_sizes = t.num_sizes - t.extra_sizes;
+      int diff = t.num_dims - num_real_sizes;
       int i = t.num_dims - 1;
       int j;
 
-      if (t.num_sizes != 1 || diff < 0)
+      if (num_real_sizes != 1 || diff < 0)
 	{
 	  error_line = __LINE__;
 	  saber_stop ();
@@ -3312,7 +3324,6 @@ parse_def (name_start)
 	 and sizes were passed, creating extra sizes for multiply
 	 dimensioned arrays if not passed.  */
 
-      t.extra_sizes = 0;
       if (diff)
 	{
 	  for (j = (sizeof (t.sizes) / sizeof (t.sizes[0])) - 1; j >= 0; j--)
@@ -3328,14 +3339,6 @@ parse_def (name_start)
 	    }
 	}
     }
-
-  else if (symbol_type == st_Member && t.num_sizes - t.extra_sizes == 1)
-    { /* Is this a bitfield?  This is indicated by a structure member
-	 having a size field that isn't an array.  */
-
-      t.bitfield = 1;
-    }
-
 
   /* Except for enumeration members & begin/ending of scopes, put the
      type word in the aux. symbol table.  */
@@ -5126,7 +5129,7 @@ out_of_bounds (indx, max, str, prog_line)
 
 
 /* Allocate a cluster of pages.  USE_MALLOC says that malloc does not
-   like sbrk's behind it's back (or sbrk isn't available).  If we use
+   like sbrk's behind its back (or sbrk isn't available).  If we use
    sbrk, we assume it gives us zeroed pages.  */
 
 #ifndef MALLOC_CHECK

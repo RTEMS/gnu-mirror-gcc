@@ -1,5 +1,5 @@
 /* Try to unroll loops, and split induction variables.
-   Copyright (C) 1992, 1993, 1994, 1995 Free Software Foundation, Inc.
+   Copyright (C) 1992, 93, 94, 95, 97, 1998 Free Software Foundation, Inc.
    Contributed by James E. Wilson, Cygnus Support/UC Berkeley.
 
 This file is part of GNU CC.
@@ -147,13 +147,14 @@ struct _factor { int factor, count; } factors[NUM_FACTORS]
 enum unroll_types { UNROLL_COMPLETELY, UNROLL_MODULO, UNROLL_NAIVE };
 
 #include "config.h"
+#include <stdio.h>
 #include "rtl.h"
 #include "insn-config.h"
 #include "integrate.h"
 #include "regs.h"
+#include "recog.h"
 #include "flags.h"
 #include "expr.h"
-#include <stdio.h>
 #include "loop.h"
 
 /* This controls which loops are unrolled, and by how much we unroll
@@ -690,8 +691,9 @@ unroll_loop (loop_end, insn_count, loop_start, end_insert_before,
       else if (GET_CODE (insn) == JUMP_INSN)
 	{
 	  if (JUMP_LABEL (insn))
-	    map->label_map[CODE_LABEL_NUMBER (JUMP_LABEL (insn))]
-	      = JUMP_LABEL (insn);
+	    set_label_in_map (map,
+			      CODE_LABEL_NUMBER (JUMP_LABEL (insn)),
+			      JUMP_LABEL (insn));
 	  else if (GET_CODE (PATTERN (insn)) == ADDR_VEC
 		   || GET_CODE (PATTERN (insn)) == ADDR_DIFF_VEC)
 	    {
@@ -703,7 +705,9 @@ unroll_loop (loop_end, insn_count, loop_start, end_insert_before,
 	      for (i = 0; i < len; i++)
 		{
 		  label = XEXP (XVECEXP (pat, diff_vec_p, i), 0);
-		  map->label_map[CODE_LABEL_NUMBER (label)] = label;
+		  set_label_in_map (map,
+				    CODE_LABEL_NUMBER (label),
+				    label);
 		}
 	    }
 	}
@@ -1042,7 +1046,7 @@ unroll_loop (loop_end, insn_count, loop_start, end_insert_before,
 
 	      for (j = 0; j < max_labelno; j++)
 		if (local_label[j])
-		  map->label_map[j] = gen_label_rtx ();
+		  set_label_in_map (map, j, gen_label_rtx ());
 
 	      for (j = FIRST_PSEUDO_REGISTER; j < max_reg_before_loop; j++)
 		if (local_regno[j])
@@ -1187,7 +1191,7 @@ unroll_loop (loop_end, insn_count, loop_start, end_insert_before,
 
       for (j = 0; j < max_labelno; j++)
 	if (local_label[j])
-	  map->label_map[j] = gen_label_rtx ();
+	  set_label_in_map (map, j, gen_label_rtx ());
 
       for (j = FIRST_PSEUDO_REGISTER; j < max_reg_before_loop; j++)
 	if (local_regno[j])
@@ -1200,8 +1204,9 @@ unroll_loop (loop_end, insn_count, loop_start, end_insert_before,
 	  insn = PREV_INSN (copy_start);
 	  pattern = PATTERN (insn);
 	  
-	  tem = map->label_map[CODE_LABEL_NUMBER
-			       (XEXP (SET_SRC (pattern), 0))];
+	  tem = get_label_from_map (map,
+				    CODE_LABEL_NUMBER
+				    (XEXP (SET_SRC (pattern), 0)));
 	  SET_SRC (pattern) = gen_rtx (LABEL_REF, VOIDmode, tem);
 
 	  /* Set the jump label so that it can be used by later loop unrolling
@@ -1426,6 +1431,7 @@ init_reg_map (map, maxregnum)
    to the iv.  This procedure reconstructs the pattern computing the iv;
    verifying that all operands are of the proper form.
 
+   PATTERN must be the result of single_set.
    The return value is the amount that the giv is incremented by.  */
 
 static rtx
@@ -1469,10 +1475,11 @@ calculate_giv_inc (pattern, src_insn, regno)
       if (GET_CODE (increment) == LO_SUM)
 	increment = XEXP (increment, 1);
       else if (GET_CODE (increment) == IOR
-	       || GET_CODE (increment) == ASHIFT)
+	       || GET_CODE (increment) == ASHIFT
+	       || GET_CODE (increment) == PLUS)
 	{
 	  /* The rs6000 port loads some constants with IOR.
-	     The alpha port loads some constants with ASHIFT.  */
+	     The alpha port loads some constants with ASHIFT and PLUS.  */
 	  rtx second_part = XEXP (increment, 1);
 	  enum rtx_code code = GET_CODE (increment);
 
@@ -1487,6 +1494,8 @@ calculate_giv_inc (pattern, src_insn, regno)
 
 	  if (code == IOR)
 	    increment = GEN_INT (INTVAL (increment) | INTVAL (second_part));
+	  else if (code == PLUS)
+	    increment = GEN_INT (INTVAL (increment) + INTVAL (second_part));
 	  else
 	    increment = GEN_INT (INTVAL (increment) << INTVAL (second_part));
 	}
@@ -1590,7 +1599,7 @@ copy_loop_body (copy_start, copy_end, map, exit_label, last_iteration,
      rtx start_label, loop_end, insert_before, copy_notes_from;
 {
   rtx insn, pattern;
-  rtx tem, copy;
+  rtx set, tem, copy;
   int dest_reg_was_split, i;
   rtx cc0_insn = 0;
   rtx final_label = 0;
@@ -1605,10 +1614,11 @@ copy_loop_body (copy_start, copy_end, map, exit_label, last_iteration,
   if (! last_iteration)
     {
       final_label = gen_label_rtx ();
-      map->label_map[CODE_LABEL_NUMBER (start_label)] = final_label;
+      set_label_in_map (map, CODE_LABEL_NUMBER (start_label),
+			final_label); 
     }
   else
-    map->label_map[CODE_LABEL_NUMBER (start_label)] = start_label;
+    set_label_in_map (map, CODE_LABEL_NUMBER (start_label), start_label);
 
   start_sequence ();
   
@@ -1634,15 +1644,15 @@ copy_loop_body (copy_start, copy_end, map, exit_label, last_iteration,
 	     Do this before splitting the giv, since that may map the
 	     SET_DEST to a new register.  */
 	  
-	  if (GET_CODE (pattern) == SET
-	      && GET_CODE (SET_DEST (pattern)) == REG
-	      && addr_combined_regs[REGNO (SET_DEST (pattern))])
+	  if ((set = single_set (insn))
+	      && GET_CODE (SET_DEST (set)) == REG
+	      && addr_combined_regs[REGNO (SET_DEST (set))])
 	    {
 	      struct iv_class *bl;
 	      struct induction *v, *tv;
-	      int regno = REGNO (SET_DEST (pattern));
+	      int regno = REGNO (SET_DEST (set));
 	      
-	      v = addr_combined_regs[REGNO (SET_DEST (pattern))];
+	      v = addr_combined_regs[REGNO (SET_DEST (set))];
 	      bl = reg_biv_class[REGNO (v->src_reg)];
 	      
 	      /* Although the giv_inc amount is not needed here, we must call
@@ -1651,7 +1661,7 @@ copy_loop_body (copy_start, copy_end, map, exit_label, last_iteration,
 		 we might accidentally delete insns generated immediately
 		 below by emit_unrolled_add.  */
 
-	      giv_inc = calculate_giv_inc (pattern, insn, regno);
+	      giv_inc = calculate_giv_inc (set, insn, regno);
 
 	      /* Now find all address giv's that were combined with this
 		 giv 'v'.  */
@@ -1725,11 +1735,11 @@ copy_loop_body (copy_start, copy_end, map, exit_label, last_iteration,
 	  
 	  dest_reg_was_split = 0;
 	  
-	  if (GET_CODE (pattern) == SET
-	      && GET_CODE (SET_DEST (pattern)) == REG
-	      && splittable_regs[REGNO (SET_DEST (pattern))])
+	  if ((set = single_set (insn))
+	      && GET_CODE (SET_DEST (set)) == REG
+	      && splittable_regs[REGNO (SET_DEST (set))])
 	    {
-	      int regno = REGNO (SET_DEST (pattern));
+	      int regno = REGNO (SET_DEST (set));
 	      
 	      dest_reg_was_split = 1;
 	      
@@ -1737,9 +1747,9 @@ copy_loop_body (copy_start, copy_end, map, exit_label, last_iteration,
 		 already computed above.  */
 
 	      if (giv_inc == 0)
-		giv_inc = calculate_giv_inc (pattern, insn, regno);
-	      giv_dest_reg = SET_DEST (pattern);
-	      giv_src_reg = SET_DEST (pattern);
+		giv_inc = calculate_giv_inc (set, insn, regno);
+	      giv_dest_reg = SET_DEST (set);
+	      giv_src_reg = SET_DEST (set);
 
 	      if (unroll_type == UNROLL_COMPLETELY)
 		{
@@ -1892,8 +1902,9 @@ copy_loop_body (copy_start, copy_end, map, exit_label, last_iteration,
 	      if (invert_exp (pattern, copy))
 		{
 		  if (! redirect_exp (&pattern,
-				      map->label_map[CODE_LABEL_NUMBER
-						     (JUMP_LABEL (insn))],
+				      get_label_from_map (map,
+							  CODE_LABEL_NUMBER
+							  (JUMP_LABEL (insn))),
 				      exit_label, copy))
 		    abort ();
 		}
@@ -1910,8 +1921,9 @@ copy_loop_body (copy_start, copy_end, map, exit_label, last_iteration,
 		  emit_label_after (lab, jmp);
 		  LABEL_NUSES (lab) = 0;
 		  if (! redirect_exp (&pattern,
-				      map->label_map[CODE_LABEL_NUMBER
-						     (JUMP_LABEL (insn))],
+				      get_label_from_map (map,
+							  CODE_LABEL_NUMBER
+							  (JUMP_LABEL (insn))),
 				      lab, copy))
 		    abort ();
 		}
@@ -1932,9 +1944,9 @@ copy_loop_body (copy_start, copy_end, map, exit_label, last_iteration,
 
 	      /* Can't use the label_map for every insn, since this may be
 		 the backward branch, and hence the label was not mapped.  */
-	      if (GET_CODE (pattern) == SET)
+	      if ((set = single_set (copy)))
 		{
-		  tem = SET_SRC (pattern);
+		  tem = SET_SRC (set);
 		  if (GET_CODE (tem) == LABEL_REF)
 		    label = XEXP (tem, 0);
 		  else if (GET_CODE (tem) == IF_THEN_ELSE)
@@ -1954,7 +1966,8 @@ copy_loop_body (copy_start, copy_end, map, exit_label, last_iteration,
 		     for a switch statement.  This label must have been mapped,
 		     so just use the label_map to get the new jump label.  */
 		  JUMP_LABEL (copy)
-		    = map->label_map[CODE_LABEL_NUMBER (JUMP_LABEL (insn))];
+		    = get_label_from_map (map, 
+					  CODE_LABEL_NUMBER (JUMP_LABEL (insn))); 
 		}
 	  
 	      /* If this is a non-local jump, then must increase the label
@@ -2032,7 +2045,8 @@ copy_loop_body (copy_start, copy_end, map, exit_label, last_iteration,
 
 	  if (insn != start_label)
 	    {
-	      copy = emit_label (map->label_map[CODE_LABEL_NUMBER (insn)]);
+	      copy = emit_label (get_label_from_map (map,
+						     CODE_LABEL_NUMBER (insn)));
 	      map->const_age++;
 	    }
 	  break;
@@ -2134,6 +2148,7 @@ back_branch_in_range_p (insn, loop_start, loop_end)
      rtx loop_start, loop_end;
 {
   rtx p, q, target_insn;
+  rtx orig_loop_end = loop_end;
 
   /* Stop before we get to the backward branch at the end of the loop.  */
   loop_end = prev_nonnote_insn (loop_end);
@@ -2145,8 +2160,10 @@ back_branch_in_range_p (insn, loop_start, loop_end)
   while (INSN_DELETED_P (insn))
     insn = NEXT_INSN (insn);
 
-  /* Check for the case where insn is the last insn in the loop.  */
-  if (insn == loop_end)
+  /* Check for the case where insn is the last insn in the loop.  Deal
+     with the case where INSN was a deleted loop test insn, in which case
+     it will now be the NOTE_LOOP_END.  */
+  if (insn == loop_end || insn == orig_loop_end)
     return 0;
 
   for (p = NEXT_INSN (insn); p != loop_end; p = NEXT_INSN (p))
@@ -2596,9 +2613,10 @@ verify_addresses (v, giv_inc, unroll_number)
   rtx last_addr = plus_constant (v->dest_reg,
 				 INTVAL (giv_inc) * (unroll_number - 1));
 
-  /* First check to see if either address would fail.  */
-  if (! validate_change (v->insn, v->location, v->dest_reg, 0)
-      || ! validate_change (v->insn, v->location, last_addr, 0))
+  /* First check to see if either address would fail.   Handle the fact
+     that we have may have a match_dup.  */
+  if (! validate_replace_rtx (*v->location, v->dest_reg, v->insn)
+      || ! validate_replace_rtx (*v->location, last_addr, v->insn))
     ret = 0;
 
   /* Now put things back the way they were before.  This will always
@@ -2676,13 +2694,17 @@ find_splittable_givs (bl, unroll_type, loop_start, loop_end, increment,
 	  && (loop_number_exit_count[uid_loop_num[INSN_UID (loop_start)]]
 	      || unroll_type == UNROLL_NAIVE)
 	  && v->giv_type != DEST_ADDR
-	  && ((REGNO_FIRST_UID (REGNO (v->dest_reg)) != INSN_UID (v->insn)
-	       /* Check for the case where the pseudo is set by a shift/add
-		  sequence, in which case the first insn setting the pseudo
-		  is the first insn of the shift/add sequence.  */
-	       && (! (tem = find_reg_note (v->insn, REG_RETVAL, NULL_RTX))
-		   || (REGNO_FIRST_UID (REGNO (v->dest_reg))
-		       != INSN_UID (XEXP (tem, 0)))))
+	  /* The next part is true if the pseudo is used outside the loop.
+	     We assume that this is true for any pseudo created after loop
+	     starts, because we don't have a reg_n_info entry for them.  */
+	  && (REGNO (v->dest_reg) >= max_reg_before_loop
+	      || (REGNO_FIRST_UID (REGNO (v->dest_reg)) != INSN_UID (v->insn)
+		  /* Check for the case where the pseudo is set by a shift/add
+		     sequence, in which case the first insn setting the pseudo
+		     is the first insn of the shift/add sequence.  */
+		  && (! (tem = find_reg_note (v->insn, REG_RETVAL, NULL_RTX))
+		      || (REGNO_FIRST_UID (REGNO (v->dest_reg))
+			  != INSN_UID (XEXP (tem, 0)))))
 	      /* Line above always fails if INSN was moved by loop opt.  */
 	      || (uid_luid[REGNO_LAST_UID (REGNO (v->dest_reg))]
 		  >= INSN_LUID (loop_end)))
@@ -2865,6 +2887,10 @@ find_splittable_givs (bl, unroll_type, loop_start, loop_end, increment,
 		  if (v->dest_reg == tem
 		      && ! verify_addresses (v, giv_inc, unroll_number))
 		    {
+		      for (v2 = v->next_iv; v2; v2 = v2->next_iv)
+			if (v2->same_insn == v)
+			  v2->same_insn = 0;
+
 		      if (loop_dump_stream)
 			fprintf (loop_dump_stream,
 				 "Invalid address for giv at insn %d\n",
@@ -2911,6 +2937,10 @@ find_splittable_givs (bl, unroll_type, loop_start, loop_end, increment,
 		     if the resulting address would be invalid.  */
 		  if (! verify_addresses (v, giv_inc, unroll_number))
 		    {
+		      for (v2 = v->next_iv; v2; v2 = v2->next_iv)
+			if (v2->same_insn == v)
+			  v2->same_insn = 0;
+
 		      if (loop_dump_stream)
 			fprintf (loop_dump_stream,
 				 "Invalid address for giv at insn %d\n",
@@ -3561,6 +3591,10 @@ remap_split_bivs (x)
       if (REGNO (x) < max_reg_before_loop
 	  && reg_iv_type[REGNO (x)] == BASIC_INDUCT)
 	return reg_biv_class[REGNO (x)]->biv->src_reg;
+      break;
+      
+    default:
+      break;
     }
 
   fmt = GET_RTX_FORMAT (code);

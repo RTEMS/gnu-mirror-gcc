@@ -1,5 +1,5 @@
 /* Definitions for Intel 386 running SCO Unix System V 3.2 Version 5.
-   Copyright (C) 1992, 1995, 1996 Free Software Foundation, Inc.
+   Copyright (C) 1992, 1995, 1996, 1997, 1998 Free Software Foundation, Inc.
    Contributed by Kean Johnston (hug@netcom.com)
 
 This file is part of GNU CC.
@@ -75,6 +75,16 @@ Boston, MA 02111-1307, USA.  */
 
 #undef GLOBAL_ASM_OP
 #define GLOBAL_ASM_OP			"\t.globl"
+
+#undef EH_FRAME_SECTION_ASM_OP
+#define EH_FRAME_SECTION_ASM_OP_COFF	"\t.section\t.ehfram, \"x\""
+#define EH_FRAME_SECTION_ASM_OP_ELF	"\t.section\t.eh_frame, \"aw\""
+#define EH_FRAME_SECTION_ASM_OP	\
+  ((TARGET_ELF) ? EH_FRAME_SECTION_ASM_OP_ELF : EH_FRAME_SECTION_ASM_OP_COFF)
+
+/* Avoid problems (long section names, forward assembler refs) with DWARF
+   exception unwinding when we're generating COFF */
+#define DWARF2_UNWIND_INFO ((TARGET_ELF) ? 1 : 0 )  
 
 #undef CONST_SECTION_ASM_OP
 #define CONST_SECTION_ASM_OP_COFF	"\t.section\t.rodata, \"x\""
@@ -273,6 +283,14 @@ do {									\
    }									\
 } while (0)
 
+/* A C statement (sans semicolon) to output to the stdio stream
+   FILE the assembler definition of uninitialized global DECL named
+   NAME whose size is SIZE bytes and alignment is ALIGN bytes.
+   Try to use asm_output_aligned_bss to implement this macro.  */
+
+#define ASM_OUTPUT_ALIGNED_BSS(FILE, DECL, NAME, SIZE, ALIGN) \
+asm_output_aligned_bss (FILE, DECL, NAME, SIZE, ALIGN)
+
 #undef ESCAPES
 #define ESCAPES \
 "\1\1\1\1\1\1\1\1btn\1fr\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\
@@ -355,6 +373,19 @@ do {									\
       if (bytes_in_chunk > 0)						\
         fprintf ((FILE), "\n");						\
 } while (0) 
+
+/* Must use data section for relocatable constants when pic.  */
+#undef SELECT_RTX_SECTION
+#define SELECT_RTX_SECTION(MODE,RTX)					\
+{									\
+  if (TARGET_ELF) {							\
+    if (flag_pic && symbolic_operand (RTX))				\
+      data_section ();							\
+    else								\
+      const_section ();							\
+  } else								\
+    readonly_data_section();						\
+}
 
 #undef ASM_OUTPUT_CASE_LABEL
 #define ASM_OUTPUT_CASE_LABEL(FILE,PREFIX,NUM,JUMPTABLE)		\
@@ -559,6 +590,7 @@ do {									\
 
 #define DWARF_DEBUGGING_INFO 1
 #define SDB_DEBUGGING_INFO   1
+#define DBX_DEBUGGING_INFO   1
 #define PREFERRED_DEBUGGING_TYPE					\
   ((TARGET_ELF) ? DWARF_DEBUG: SDB_DEBUG)
 
@@ -661,7 +693,7 @@ dtors_section ()							\
 #undef NO_IMPLICIT_EXTERN_C
 #define NO_IMPLICIT_EXTERN_C 1
 
-/* JKJ FIXME - examine the rammifications of RETURN_IN_MEMORY and
+/* JKJ FIXME - examine the ramifications of RETURN_IN_MEMORY and
    RETURN_POPS_ARGS */
 
 #undef RETURN_POPS_ARGS
@@ -737,6 +769,12 @@ dtors_section ()							\
 #define WCHAR_TYPE		"long int"
 #define WCHAR_TYPE_SIZE		BITS_PER_WORD
 
+/*
+ * New for multilib support. Set the default switches for multilib,
+ * which is -melf.
+ */
+#define MULTILIB_DEFAULTS { "melf" }
+
 
 /* Please note that these specs may look messy but they are required in
    order to emulate the SCO Development system as closely as possible.
@@ -759,20 +797,20 @@ dtors_section ()							\
    does.
 
    SCO also allows you to compile, link and generate either ELF or COFF
-   binaries. With gcc, as with the SCO compiler, the default is coff.
-   Specify -melf to gcc to produce elf binaries. -fpic will get the
+   binaries. With gcc, unlike the SCO compiler, the default is ELF.
+   Specify -mcoff to gcc to produce elf binaries. -fpic will get the
    assembler and linker to produce PIC code.
 */
 
 /* Set up assembler flags for PIC and ELF compilations */
 #undef ASM_SPEC
 #define ASM_SPEC \
- "-b %{melf:elf}%{!melf:coff \
-   %{static:%e-static only valid with -melf} \
-   %{shared:%e-shared only valid with -melf} \
-   %{symbolic:%e-symbolic only valid with -melf}} \
+ "-b %{!mcoff:elf}%{mcoff:coff \
+   %{static:%e-static not valid with -mcoff} \
+   %{shared:%e-shared not valid with -mcoff} \
+   %{symbolic:%e-symbolic not valid with -mcoff}} \
   %{Ym,*} %{Yd,*} %{Wa,*:%*} \
-  %{melf:-E%{Xa:a}%{!Xa:%{Xc:c}%{!Xc:%{Xk:k}%{!Xk:%{Xt:t}%{!Xt:a}}}},%{ansi:ansi}%{!ansi:%{posix:posix}%{!posix:%{Xpg4:xpg4}%{!Xpg4:%{Xpg4plus:XPG4PLUS}%{!Xpg4plus:%{Xods30:ods30}%{!Xods30:XPG4PLUS}}}}},ELF %{Qn:} %{!Qy:-Qn}}"
+  %{!mcoff:-E%{Xa:a}%{!Xa:%{Xc:c}%{!Xc:%{Xk:k}%{!Xk:%{Xt:t}%{!Xt:a}}}},%{ansi:ansi}%{!ansi:%{posix:posix}%{!posix:%{Xpg4:xpg4}%{!Xpg4:%{Xpg4plus:XPG4PLUS}%{!Xpg4plus:%{Xods30:ods30}%{!Xods30:XPG4PLUS}}}}},ELF %{Qn:} %{!Qy:-Qn}}"
 
 /* Use crt1.o as a startup file and crtn.o as a closing file.  */
 
@@ -790,13 +828,12 @@ dtors_section ()							\
        %{!Xc:%{Xk:values-Xk.o%s} \
         %{!Xk:%{Xt:values-Xt.o%s} \
          %{!Xt:values-Xa.o%s}}}}}} \
-  %{!melf:crtbegin.o%s} \
-  %{melf:%{static:crtbegin.o%s}%{!static:crtbeginS.o%s}}"
+  %{mcoff:crtbeginS.o%s} %{!mcoff:crtbegin.o%s}"
 
 #undef ENDFILE_SPEC
 #define ENDFILE_SPEC \
- "%{melf:%{!static:crtendS.o%s}%{static:crtend.o%s}} \
-  %{!melf:crtend.o%s} \
+ "%{!mcoff:crtend.o%s} \
+  %{mcoff:crtendS.o%s} \
   %{pg:gcrtn.o%s}%{!pg:crtn.o%s}"
 
 #undef CPP_PREDEFINES
@@ -807,8 +844,8 @@ dtors_section ()							\
 
 #undef CPP_SPEC
 #define CPP_SPEC "%(cpp_cpu) %[cpp_cpu] \
-  %{fpic:%{!melf:%e-fpic is only valid with -melf}} \
-  %{fPIC:%{!melf:%e-fPIC is only valid with -melf}} \
+  %{fpic:%{mcoff:%e-fpic is not valid with -mcoff}} \
+  %{fPIC:%{mcoff:%e-fPIC is not valid with -mcoff}} \
   -D__i386 -D__unix -D_SCO_DS=1 -D_M_I386 -D_M_XENIX -D_M_UNIX \
   %{!Xods30:-D_STRICT_NAMES} \
   %{!ansi:%{!posix:%{!Xods30:-D_SCO_XPG_VERS=4}}} \
@@ -828,9 +865,9 @@ dtors_section ()							\
                       -DM_WORDSWAP}}}} \
   %{scointl:-DM_INTERNAT -D_M_INTERNAT} \
   %{traditional:-D_KR -D_SVID -D_NO_PROTOTYPE} \
-  %{melf:-D_SCO_ELF} \
-  %{!melf:-D_M_COFF -D_SCO_COFF} \
-  %{melf:%{fpic:-D__PIC__ -D__pic__} \
+  %{!mcoff:-D_SCO_ELF} \
+  %{mcoff:-D_M_COFF -D_SCO_COFF} \
+  %{!mcoff:%{fpic:-D__PIC__ -D__pic__} \
          %{fPIC:%{!fpic:-D__PIC__ -D__pic__}}} \
   %{Xa:-D_SCO_C_DIALECT=1} \
   %{!Xa:%{Xc:-D_SCO_C_DIALECT=3} \
@@ -841,36 +878,44 @@ dtors_section ()							\
 
 #undef LINK_SPEC
 #define LINK_SPEC \
- "-b %{melf:elf}%{!melf:coff \
-   %{static:%e-static only valid with -melf} \
-   %{shared:%e-shared only valid with -melf} \
-   %{symbolic:%e-symbolic only valid with -melf} \
-   %{fpic:%e-fpic only valid with -melf} \
-   %{fPIC:%e-fPIC only valid with -melf}} \
-  -R%{Xa:a}%{!Xa:%{Xc:c}%{!Xc:%{Xk:k}%{!Xk:%{Xt:t}%{!Xt:a}}}},%{ansi:ansi}%{!ansi:%{posix:posix}%{!posix:%{Xpg4:xpg4}%{!Xpg4:%{Xpg4plus:XPG4PLUS}%{!Xpg4plus:%{Xods30:ods30}%{!Xods30:XPG4PLUS}}}}},%{melf:ELF}%{!melf:COFF} \
+ "-b %{!mcoff:elf}%{mcoff:coff \
+   %{static:%e-static not valid with -mcoff} \
+   %{shared:%e-shared not valid with -mcoff} \
+   %{symbolic:%e-symbolic not valid with -mcoff} \
+   %{fpic:%e-fpic not valid with -mcoff} \
+   %{fPIC:%e-fPIC not valid with -mcoff}} \
+  -R%{Xa:a}%{!Xa:%{Xc:c}%{!Xc:%{Xk:k}%{!Xk:%{Xt:t}%{!Xt:a}}}},%{ansi:ansi}%{!ansi:%{posix:posix}%{!posix:%{Xpg4:xpg4}%{!Xpg4:%{Xpg4plus:XPG4PLUS}%{!Xpg4plus:%{Xods30:ods30}%{!Xods30:XPG4PLUS}}}}},%{mcoff:COFF}%{!mcoff:ELF} \
   %{Wl,*%*} %{YP,*} %{YL,*} %{YU,*} \
   %{!YP,*:%{p:-YP,/usr/ccs/libp:/lib/libp:/usr/lib/libp:/usr/ccs/lib:/lib:/usr/lib} \
    %{!p:-YP,/usr/ccs/lib:/lib:/usr/lib}} \
   %{h*} %{static:-dn -Bstatic} %{shared:-G -dy %{!z*:-z text}} \
   %{symbolic:-Bsymbolic -G -dy %{!z*:-z text}} %{z*} %{R*} %{Y*} \
-  %{G:-G} %{melf:%{Qn:} %{!Qy:-Qn}}"
+  %{G:-G} %{!mcoff:%{Qn:} %{!Qy:-Qn}}"
+
+/* The SCO COFF linker gets confused on the difference between "-ofoo"
+   and "-o foo".   So we just always force a single space. */
+
+#define SWITCHES_NEED_SPACES "o"
 
 /* Library spec. If we are not building a shared library, provide the
    standard libraries, as per the SCO compiler.  */
 
 #undef LIB_SPEC
 #define LIB_SPEC \
- "%{!shared:%{!symbolic:-lcrypt -lgen -lc}}"
+ "%{shared:pic/libgcc.a%s}%{!shared:%{!symbolic:-lcrypt -lgen -lc}}"
 
 #undef LIBGCC_SPEC
 #define LIBGCC_SPEC \
- "%{!melf:-lgcc}%{melf:%{!shared:%{!symbolic:-lgcc-elf}}}"
+ "%{!shared:-lgcc}"
 
-#define MASK_ELF     		010000000000	/* Mask for elf generation */
-#define TARGET_ELF              (target_flags & MASK_ELF)
+#define MASK_COFF     		010000000000	/* Mask for elf generation */
+#define TARGET_COFF             (target_flags & MASK_COFF)
+#define TARGET_ELF              (!(target_flags & MASK_COFF))
 
 #undef SUBTARGET_SWITCHES
-#define SUBTARGET_SWITCHES { "elf", MASK_ELF },
+#define SUBTARGET_SWITCHES 		\
+	{ "coff", MASK_COFF }, 		\
+	{ "elf", -MASK_COFF },
 
 #define NO_DOLLAR_IN_LABEL
 
@@ -891,6 +936,7 @@ compiler at the end of the day. Onward we go ...
 # undef FINI_SECTION_ASM_OP
 # undef CTORS_SECTION_ASM_OP
 # undef DTORS_SECTION_ASM_OP
+# undef EH_FRAME_SECTION_ASM_OP
 # undef CTOR_LIST_BEGIN
 # undef CTOR_LIST_END
 # undef DO_GLOBAL_CTORS_BODY
@@ -902,11 +948,13 @@ compiler at the end of the day. Onward we go ...
 #  define FINI_SECTION_ASM_OP FINI_SECTION_ASM_OP_ELF
 #  define DTORS_SECTION_ASM_OP DTORS_SECTION_ASM_OP_ELF
 #  define CTORS_SECTION_ASM_OP CTORS_SECTION_ASM_OP_ELF
+#  define EH_FRAME_SECTION_ASM_OP EH_FRAME_SECTION_ASM_OP_ELF
 # else /* ! _SCO_ELF */
 #  define INIT_SECTION_ASM_OP INIT_SECTION_ASM_OP_COFF
 #  define FINI_SECTION_ASM_OP FINI_SECTION_ASM_OP_COFF
 #  define DTORS_SECTION_ASM_OP DTORS_SECTION_ASM_OP_COFF
 #  define CTORS_SECTION_ASM_OP CTORS_SECTION_ASM_OP_COFF
+#  define EH_FRAME_SECTION_ASM_OP ""
 #  define CTOR_LIST_BEGIN asm (INIT_SECTION_ASM_OP); asm ("pushl $0")
 #  define CTOR_LIST_END CTOR_LIST_BEGIN
 #  define DO_GLOBAL_CTORS_BODY						\
@@ -917,4 +965,3 @@ do {									\
 } while (0)
 # endif /* ! _SCO_ELF */
 #endif /* CRT_BEGIN !! CRT_END */
-

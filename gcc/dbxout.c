@@ -1,5 +1,5 @@
 /* Output dbx-format symbol table information from GNU compiler.
-   Copyright (C) 1987, 88, 92-96, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1987, 88, 92-97, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -67,11 +67,11 @@ Boston, MA 02111-1307, USA.  */
 
    For more on data type definitions, see `dbxout_type'.  */
 
-/* Include these first, because they may define MIN and MAX.  */
+#include "config.h"
+
 #include <stdio.h>
 #include <errno.h>
 
-#include "config.h"
 #include "tree.h"
 #include "rtl.h"
 #include "flags.h"
@@ -158,9 +158,6 @@ static int scope_labelno = 0;
 
 char *getpwd ();
 
-/* Typical USG systems don't have stab.h, and they also have
-   no use for DBX-format debugging info.  */
-
 #if defined (DBX_DEBUGGING_INFO) || defined (XCOFF_DEBUGGING_INFO)
 
 #ifdef DEBUG_SYMS_TEXT
@@ -169,16 +166,18 @@ char *getpwd ();
 #define FORCE_TEXT
 #endif
 
-#if defined (USG) || defined (NO_STAB_H) || defined (CROSS_COMPILE)
-#include "gstab.h"  /* If doing DBX on sysV, use our own stab.h.  */
+/* If there is a system stabs.h, use it.  Otherwise, use our own.  */
+
+#ifndef HAVE_STABS_H
+#include "gstab.h"
 #else
-#include <stab.h>  /* On BSD, use the system's stab.h.  */
+#include <stab.h>
 
 /* This is a GNU extension we need to reference in this file.  */
 #ifndef N_CATCH
 #define N_CATCH 0x54
 #endif
-#endif /* not USG */
+#endif
 
 #ifdef __GNU_STAB__
 #define STAB_CODE_TYPE enum __stab_debug_code
@@ -501,7 +500,9 @@ dbxout_start_new_source_file (filename)
   n->file_number = next_file_number++;
   n->next_type_number = 1;
   current_file = n;
-  fprintf (asmfile, "%s \"%s\",%d,0,0,0\n", ASM_STABS_OP, filename, N_BINCL);
+  fprintf (asmfile, "%s ", ASM_STABS_OP);
+  output_quoted_string (asmfile, filename);
+  fprintf (asmfile, ",%d,0,0,0\n", N_BINCL);
 #endif
 }
 
@@ -1868,6 +1869,10 @@ dbxout_symbol (decl, local)
 #endif
 
       dbxout_symbol_location (decl, type, 0, DECL_RTL (decl));
+      break;
+      
+    default:
+      break;
     }
 }
 
@@ -1888,7 +1893,7 @@ dbxout_symbol_location (decl, type, suffix, home)
   /* Don't mention a variable at all
      if it was completely optimized into nothingness.
      
-     If the decl was from an inline function, then it's rtl
+     If the decl was from an inline function, then its rtl
      is not identically the rtl that was used in this
      particular compilation.  */
   if (GET_CODE (home) == REG)

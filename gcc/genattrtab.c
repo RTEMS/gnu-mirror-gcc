@@ -1,5 +1,5 @@
 /* Generate code from machine description to compute values of attributes.
-   Copyright (C) 1991, 1993, 1994, 1995, 1996 Free Software Foundation, Inc.
+   Copyright (C) 1991, 93, 94, 95, 96, 97, 1998 Free Software Foundation, Inc.
    Contributed by Richard Kenner (kenner@vlsi1.ultra.nyu.edu)
 
 This file is part of GNU CC.
@@ -102,15 +102,23 @@ Boston, MA 02111-1307, USA.  */
 #else
 #include <varargs.h>
 #endif
+#include <stdio.h>
 #include "rtl.h"
 #include "insn-config.h"	/* For REGISTER_CONSTRAINTS */
-#include <stdio.h>
 
-#ifndef VMS
-#ifndef USG
-#include <sys/time.h>
-#include <sys/resource.h>
+#ifdef TIME_WITH_SYS_TIME
+# include <sys/time.h>
+# include <time.h>
+#else
+# if HAVE_SYS_TIME_H
+# include <sys/time.h>
+# else
+#  include <time.h>
 #endif
+#endif
+
+#ifdef HAVE_SYS_RESOURCE_H
+# include <sys/resource.h>
 #endif
 
 /* We must include obstack.h after <sys/time.h>, to avoid lossage with
@@ -340,6 +348,16 @@ static rtx true_rtx, false_rtx;
 
 static char *alternative_name;
 
+/* Indicate that REG_DEAD notes are valid if dead_or_set_p is ever
+   called.  */
+
+int reload_completed = 0;
+
+/* Some machines test `optimize' in macros called from rtlanal.c, so we need
+   to define it here.  */
+
+int optimize = 0;
+
 /* Simplify an expression.  Only call the routine if there is something to
    simplify.  */
 #define SIMPLIFY_TEST_EXP(EXP,INSN_CODE,INSN_INDEX)	\
@@ -359,7 +377,7 @@ static char *alternative_name;
    They won't actually be used.  */
 
 rtx frame_pointer_rtx, hard_frame_pointer_rtx, stack_pointer_rtx;
-rtx arg_pointer_rtx;
+rtx arg_pointer_rtx, pic_offset_table_rtx;
 
 static rtx attr_rtx		PVPROTO((enum rtx_code, ...));
 #ifdef HAVE_VPRINTF
@@ -393,7 +411,9 @@ static rtx zero_fn		PROTO((rtx));
 static rtx one_fn		PROTO((rtx));
 static rtx max_fn		PROTO((rtx));
 static rtx simplify_cond	PROTO((rtx, int, int));
+#if 0
 static rtx simplify_by_alternatives PROTO((rtx, int, int));
+#endif
 static rtx simplify_by_exploding PROTO((rtx));
 static int find_and_mark_used_attributes PROTO((rtx, rtx *, int *));
 static void unmark_used_attributes PROTO((rtx, struct dimension *, int));
@@ -482,6 +502,8 @@ struct attr_hash *attr_hash_table[RTL_HASH_SIZE];
 /* Here is how primitive or already-shared RTL's hash
    codes are made.  */
 #define RTL_HASH(RTL) ((HOST_WIDE_INT) (RTL) & 0777777)
+
+rtx pc_rtx;
 
 /* Add an entry to the hash table for RTL with hash code HASHCODE.  */
 
@@ -862,6 +884,9 @@ attr_copy_rtx (orig)
     case PC:
     case CC0:
       return orig;
+
+    default:
+      break;
     }
 
   copy = rtx_alloc (code);
@@ -1382,7 +1407,7 @@ make_canonical (attr, exp)
       RTX_UNCHANGING_P (exp) = 1;
       exp = check_attr_value (exp, attr);
       /* Goto COND case since this is now a COND.  Note that while the
-         new expression is rescanned, all symbol_ref notes are mared as
+         new expression is rescanned, all symbol_ref notes are marked as
 	 unchanging.  */
       goto cond;
 
@@ -1418,8 +1443,11 @@ make_canonical (attr, exp)
 	  }
 	if (allsame)
 	  return defval;
-	break;
       }
+      break;
+
+    default:
+      break;
     }
 
   return exp;
@@ -2063,7 +2091,7 @@ expand_units ()
 	  if (unit->needs_range_function)
 	    {
 	      /* Compute the blockage range function and make an attribute
-		 for writing it's value.  */
+		 for writing its value.  */
 	      newexp = operate_exp (RANGE_OP, min_blockage, max_blockage);
 	      newexp = simplify_knowing (newexp, unit->condexp);
 
@@ -2175,6 +2203,9 @@ encode_units_mask (x)
     case CC0:
     case EQ_ATTR:
       return x;
+      
+    default:
+      break;
     }
 
   /* Compare the elements.  If any pair of corresponding elements
@@ -3268,6 +3299,10 @@ simplify_test_exp (exp, insn_code, insn_index)
 	  for (ie = av->first_insn; ie; ie = ie->next)
 	    if (ie->insn_code == insn_code)
 	      return evaluate_eq_attr (exp, av->value, insn_code, insn_index);
+      break;
+      
+    default:
+      break;
     }
 
   /* We have already simplified this expression.  Simplifying it again
@@ -3620,9 +3655,10 @@ find_and_mark_used_attributes (exp, terms, nterms)
       if (! find_and_mark_used_attributes (XEXP (exp, 1), terms, nterms))
 	return 0;
       return 1;
-    }
 
-  return 0;
+    default:
+      return 0;
+    }
 }
 
 /* Clear the MEM_VOLATILE_P flag in all EQ_ATTR expressions on LIST and
@@ -3858,8 +3894,10 @@ simplify_with_current_value_aux (exp)
 			 have been selected.  */
 	}
       return simplify_with_current_value_aux (XEXP (exp, 1));
+
+    default:
+      abort ();
     }
-  abort ();
 }
 
 /* Clear the MEM_IN_STRUCT_P flag in EXP and its subexpressions.  */
@@ -3892,6 +3930,9 @@ clear_struct_flag (x)
     case EQ_ATTR:
     case ATTR_FLAG:
       return;
+      
+    default:
+      break;
     }
 
   /* Compare the elements.  If any pair of corresponding elements
@@ -3944,6 +3985,9 @@ count_sub_rtxs (x, max)
     case EQ_ATTR:
     case ATTR_FLAG:
       return 1;
+      
+    default:
+      break;
     }
 
   /* Compare the elements.  If any pair of corresponding elements
@@ -4168,6 +4212,9 @@ gen_insn (exp)
       id->vec_idx = 0;
       got_define_asm_attributes = 1;
       break;
+      
+    default:
+      abort ();
     }
 }
 
@@ -4280,7 +4327,7 @@ gen_unit (def)
   unit->condexp = insert_right_side (IOR, unit->condexp, op->condexp, -2, -2);
 }
 
-/* Given a piece of RTX, print a C expression to test it's truth value.
+/* Given a piece of RTX, print a C expression to test its truth value.
    We use AND and IOR both for logical and bit-wise operations, so 
    interpret them as logical unless they are inside a comparison expression.
    The second operand of this function will be non-zero in that case.  */
@@ -4380,6 +4427,8 @@ write_test_expr (exp, in_comparison)
 	case ASHIFTRT:
 	  printf (" >> ");
 	  break;
+	default:
+	  abort ();
         }
 
       write_test_expr (XEXP (exp, 1), in_comparison || comparison_operator);
@@ -4412,6 +4461,8 @@ write_test_expr (exp, in_comparison)
 	case NEG:
 	  printf ("-");
 	  break;
+	default:
+	  abort ();
 	}
 
       write_test_expr (XEXP (exp, 0), in_comparison);
@@ -4603,6 +4654,9 @@ walk_attr_value (exp)
 
     case ATTR_FLAG:
       return;
+
+    default:
+      break;
     }
 
   for (i = 0, fmt = GET_RTX_FORMAT (code); i < GET_RTX_LENGTH (code); i++)
@@ -5457,6 +5511,9 @@ copy_rtx_unchanging (orig)
     case SYMBOL_REF:
     case CODE_LABEL:
       return orig;
+      
+    default:
+      break;
     }
 
   copy = rtx_alloc (code);
@@ -5541,7 +5598,7 @@ main (argc, argv)
   rtx tem;
   int i;
 
-#ifdef RLIMIT_STACK
+#if defined (RLIMIT_STACK) && defined (HAVE_GETRLIMIT) && defined (HAVE_SETRLIMIT)
   /* Get rid of any avoidable limit on stack size.  */
   {
     struct rlimit rlim;
@@ -5551,7 +5608,7 @@ main (argc, argv)
     rlim.rlim_cur = rlim.rlim_max;
     setrlimit (RLIMIT_STACK, &rlim);
   }
-#endif /* RLIMIT_STACK defined */
+#endif
 
   obstack_init (rtl_obstack);
   obstack_init (hash_obstack);
@@ -5568,6 +5625,11 @@ main (argc, argv)
     }
 
   init_rtl ();
+
+  /* We don't use this, but it is referenced in rtlanal.c. 
+     Set it up correctly just in case someone tries to use it someday.  */
+  pc_rtx = rtx_alloc (PC);
+  PUT_MODE (pc_rtx, VOIDmode);
 
   /* Set up true and false rtx's */
   true_rtx = rtx_alloc (CONST_INT);
@@ -5639,6 +5701,7 @@ from the machine description file `md'.  */\n\n");
     expand_units ();
 
   printf ("#include \"config.h\"\n");
+  printf ("#include <stdio.h>\n");
   printf ("#include \"rtl.h\"\n");
   printf ("#include \"insn-config.h\"\n");
   printf ("#include \"recog.h\"\n");
