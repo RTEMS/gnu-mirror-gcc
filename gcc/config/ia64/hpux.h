@@ -25,26 +25,29 @@ Boston, MA 02111-1307, USA.  */
 
 #define TARGET_VERSION fprintf (stderr, " (IA-64) HP-UX");
 
-#undef CPP_PREDEFINES
-#define CPP_PREDEFINES "\
-  -D__IA64__ -D__hpux -D__hpux__ -Dhpux -Dunix \
-  -D__BIG_ENDIAN__ -D_LONGLONG \
-  -Asystem=hpux -Asystem=posix -Asystem=unix \
-  -D_UINT128_T"
-
-/* -D__fpreg=long double is needed to compensate for the lack of __fpreg
-   which is a primitive type in HP C but does not exist in GNU C.  Same
-   for __float80 and __float128.  These types appear in HP-UX header
-   files and so must have some definition.  */
-
-#undef CPP_SPEC
-#define CPP_SPEC "\
-  %{mcpu=itanium:-D__itanium__} \
-  %{mlp64:-D__LP64__ -D_LP64} \
-  %{!ansi:%{!std=c*:%{!std=i*: -D_HPUX_SOURCE -D__STDC_EXT__}}} \
-  -D__fpreg=long\\ double \
-  -D__float80=long\\ double \
-  -D__float128=long\\ double"
+/* Target OS builtins.  */
+/* -D__fpreg=long double is needed to compensate for
+   the lack of __fpreg which is a primative type in
+   HP C but does not exist in GNU C.  */
+#define TARGET_OS_CPP_BUILTINS()			\
+do {							\
+	builtin_assert("system=hpux");			\
+	builtin_assert("system=posix");			\
+	builtin_assert("system=unix");			\
+	builtin_define_std("hpux");			\
+	builtin_define_std("unix");			\
+	builtin_define("__IA64__");			\
+	builtin_define("_LONGLONG");			\
+	builtin_define("_UINT128_T");			\
+	builtin_define("__fpreg=long double");		\
+	builtin_define("__float80=long double");	\
+	builtin_define("__float128=long double");	\
+	if (c_language == clk_cplusplus || !flag_iso)	\
+	  {						\
+	    builtin_define("_HPUX_SOURCE");		\
+	    builtin_define("__STDC_EXT__");		\
+	  }						\
+} while (0)
 
 #undef  ASM_EXTRA_SPEC
 #define ASM_EXTRA_SPEC "%{milp32:-milp32} %{mlp64:-mlp64}"
@@ -85,10 +88,6 @@ Boston, MA 02111-1307, USA.  */
 
 #define JMP_BUF_SIZE  (8 * 76)
 
-#undef READONLY_DATA_SECTION_ASM_OP
-#define READONLY_DATA_SECTION_ASM_OP \
-  "\t.section\t.rodata,\t\"a\",\t\"progbits\""
-
 #undef BITS_BIG_ENDIAN
 #define BITS_BIG_ENDIAN 1
 
@@ -121,3 +120,41 @@ Boston, MA 02111-1307, USA.  */
 
 #undef PAD_VARARGS_DOWN
 #define PAD_VARARGS_DOWN (!AGGREGATE_TYPE_P (type))
+
+#define REGISTER_TARGET_PRAGMAS(PFILE) \
+  cpp_register_pragma (PFILE, 0, "builtin", ia64_hpux_handle_builtin_pragma)
+
+/* Tell ia64.c that we are using the HP linker and we should delay output of
+   function extern declarations so that we don't output them for functions
+   which are never used (and may not be defined).  */
+
+#undef TARGET_HPUX_LD
+#define TARGET_HPUX_LD	1
+
+/* Put out the needed function declarations at the end.  */
+
+#define ASM_FILE_END(STREAM) ia64_hpux_asm_file_end(STREAM)
+
+#undef CTORS_SECTION_ASM_OP
+#define CTORS_SECTION_ASM_OP  "\t.section\t.init_array,\t\"aw\",\"init_array\""
+
+#undef DTORS_SECTION_ASM_OP
+#define DTORS_SECTION_ASM_OP  "\t.section\t.fini_array,\t\"aw\",\"fini_array\""
+
+#undef READONLY_DATA_SECTION_ASM_OP
+#define READONLY_DATA_SECTION_ASM_OP "\t.section\t.rodata,\t\"a\",\t\"progbits\""
+
+#undef DATA_SECTION_ASM_OP
+#define DATA_SECTION_ASM_OP "\t.section\t.data,\t\"aw\",\t\"progbits\""
+
+#undef SDATA_SECTION_ASM_OP
+#define SDATA_SECTION_ASM_OP "\t.section\t.sdata,\t\"asw\",\t\"progbits\""
+
+#undef BSS_SECTION_ASM_OP
+#define BSS_SECTION_ASM_OP "\t.section\t.bss,\t\"aw\",\t\"nobits\""
+
+#undef SBSS_SECTION_ASM_OP
+#define SBSS_SECTION_ASM_OP "\t.section\t.sbss,\t\"asw\",\t\"nobits\""
+
+#undef TEXT_SECTION_ASM_OP
+#define TEXT_SECTION_ASM_OP "\t.section\t.text,\t\"ax\",\t\"progbits\""

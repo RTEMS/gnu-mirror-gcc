@@ -60,15 +60,11 @@ Boston, MA 02111-1307, USA.  */
 
 /* System V Release 4 uses DWARF debugging info.  */
 
-#ifndef DWARF_DEBUGGING_INFO
 #define DWARF_DEBUGGING_INFO 1
-#endif
 
 /* All ELF targets can support DWARF-2.  */
 
-#ifndef DWARF2_DEBUGGING_INFO
 #define DWARF2_DEBUGGING_INFO 1
-#endif
 
 /* The GNU tools operate better with dwarf2, and it is required by some
    psABI's.  Since we don't have any native tools to be compatible with,
@@ -112,20 +108,6 @@ Boston, MA 02111-1307, USA.  */
 #define ASM_OUTPUT_SKIP(FILE, SIZE) \
   fprintf (FILE, "%s%u\n", SKIP_ASM_OP, (SIZE))
 
-/* This is how to output an internal numbered label where
-   PREFIX is the class of label and NUM is the number within the class.
-
-   For most svr4 systems, the convention is that any symbol which begins
-   with a period is not put into the linker symbol table by the assembler.  */
-
-#undef  ASM_OUTPUT_INTERNAL_LABEL
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE, PREFIX, NUM)		\
-  do								\
-    {								\
-      fprintf (FILE, ".%s%u:\n", PREFIX, (unsigned) (NUM));	\
-    }								\
-  while (0)
-
 /* This is how to store into the string LABEL
    the symbol_ref name of an internal numbered label where
    PREFIX is the class of label and NUM is the number within the class.
@@ -163,7 +145,7 @@ Boston, MA 02111-1307, USA.  */
   do									\
     {									\
       ASM_OUTPUT_BEFORE_CASE_LABEL (FILE, PREFIX, NUM, JUMPTABLE)	\
-	ASM_OUTPUT_INTERNAL_LABEL (FILE, PREFIX, NUM);			\
+	(*targetm.asm_out.internal_label) (FILE, PREFIX, NUM);			\
     }									\
   while (0)
 
@@ -172,7 +154,7 @@ Boston, MA 02111-1307, USA.  */
    in each assembly file where they are referenced.  */
 
 #define ASM_OUTPUT_EXTERNAL_LIBCALL(FILE, FUN)	\
-  ASM_GLOBALIZE_LABEL (FILE, XSTR (FUN, 0))
+  (*targetm.asm_out.globalize_label) (FILE, XSTR (FUN, 0))
 
 /* This says how to output assembler code to declare an
    uninitialized external linkage data object.  Under SVR4,
@@ -291,18 +273,13 @@ Boston, MA 02111-1307, USA.  */
    function's return value.  We allow for that here.  */
 
 #ifndef ASM_DECLARE_FUNCTION_NAME
-#define ASM_DECLARE_FUNCTION_NAME(FILE, NAME, DECL)	\
-  do							\
-    {							\
-      fprintf (FILE, "%s", TYPE_ASM_OP);		\
-      assemble_name (FILE, NAME);			\
-      putc (',', FILE);					\
-      fprintf (FILE, TYPE_OPERAND_FMT, "function");	\
-      putc ('\n', FILE);				\
-      							\
-      ASM_DECLARE_RESULT (FILE, DECL_RESULT (DECL));	\
-      ASM_OUTPUT_LABEL(FILE, NAME);			\
-    }							\
+#define ASM_DECLARE_FUNCTION_NAME(FILE, NAME, DECL)		\
+  do								\
+    {								\
+      ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "function");	\
+      ASM_DECLARE_RESULT (FILE, DECL_RESULT (DECL));		\
+      ASM_OUTPUT_LABEL (FILE, NAME);				\
+    }								\
   while (0)
 #endif
 
@@ -311,26 +288,19 @@ Boston, MA 02111-1307, USA.  */
 #define ASM_DECLARE_OBJECT_NAME(FILE, NAME, DECL)		\
   do								\
     {								\
-      fprintf (FILE, "%s", TYPE_ASM_OP);			\
-      assemble_name (FILE, NAME);				\
-      putc (',', FILE);						\
-      fprintf (FILE, TYPE_OPERAND_FMT, "object");		\
-      putc ('\n', FILE);					\
-      								\
+      HOST_WIDE_INT size;					\
+								\
+      ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "object");		\
+								\
       size_directive_output = 0;				\
-      								\
       if (!flag_inhibit_size_directive				\
 	  && (DECL) && DECL_SIZE (DECL))			\
 	{							\
 	  size_directive_output = 1;				\
-	  fprintf (FILE, "%s", SIZE_ASM_OP);			\
-	  assemble_name (FILE, NAME);				\
-	  putc (',', FILE);					\
-	  fprintf (FILE, HOST_WIDE_INT_PRINT_DEC,		\
-		   int_size_in_bytes (TREE_TYPE (DECL)));	\
-	  fputc ('\n', FILE);					\
+	  size = int_size_in_bytes (TREE_TYPE (DECL));		\
+	  ASM_OUTPUT_SIZE_DIRECTIVE (FILE, NAME, size);		\
 	}							\
-      								\
+								\
       ASM_OUTPUT_LABEL (FILE, NAME);				\
     }								\
   while (0)
@@ -345,6 +315,7 @@ Boston, MA 02111-1307, USA.  */
   do								\
     {								\
       const char *name = XSTR (XEXP (DECL_RTL (DECL), 0), 0);	\
+      HOST_WIDE_INT size;					\
       								\
       if (!flag_inhibit_size_directive				\
 	  && DECL_SIZE (DECL)					\
@@ -353,12 +324,8 @@ Boston, MA 02111-1307, USA.  */
 	  && !size_directive_output)				\
 	{							\
 	  size_directive_output = 1;				\
-	  fprintf (FILE, "%s", SIZE_ASM_OP);			\
-	  assemble_name (FILE, name);				\
-	  putc (',', FILE);					\
-	  fprintf (FILE, HOST_WIDE_INT_PRINT_DEC,		\
-		   int_size_in_bytes (TREE_TYPE (DECL))); 	\
-	  fputc ('\n', FILE);					\
+	  size = int_size_in_bytes (TREE_TYPE (DECL));		\
+	  ASM_OUTPUT_SIZE_DIRECTIVE (FILE, name, size);		\
 	}							\
     }								\
   while (0)
@@ -369,23 +336,7 @@ Boston, MA 02111-1307, USA.  */
   do								\
     {								\
       if (!flag_inhibit_size_directive)				\
-	{							\
-	  char label[256];					\
-	  static int labelno;					\
-	  							\
-	  labelno++;						\
-	  							\
-	  ASM_GENERATE_INTERNAL_LABEL (label, "Lfe", labelno);	\
-	  ASM_OUTPUT_INTERNAL_LABEL (FILE, "Lfe", labelno);	\
-	  							\
-	  fprintf (FILE, "%s", SIZE_ASM_OP);			\
-	  assemble_name (FILE, (FNAME));			\
-	  fprintf (FILE, ",");					\
-	  assemble_name (FILE, label);				\
-	  fprintf (FILE, "-");					\
-	  assemble_name (FILE, (FNAME));			\
-	  putc ('\n', FILE);					\
-	}							\
+	ASM_OUTPUT_MEASURED_SIZE (FILE, FNAME);			\
     }								\
   while (0)
 #endif

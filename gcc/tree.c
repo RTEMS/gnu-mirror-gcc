@@ -27,11 +27,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
    nodes of that code.
 
    It is intended to be language-independent, but occasionally
-   calls language-dependent routines defined (for C) in typecheck.c.
-
-   The low-level allocation routines oballoc and permalloc
-   are used also for allocating many other kinds of objects
-   by all passes of the compiler.  */
+   calls language-dependent routines defined (for C) in typecheck.c.  */
 
 #include "config.h"
 #include "system.h"
@@ -48,15 +44,10 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "target.h"
 #include "langhooks.h"
 
-#define obstack_chunk_alloc xmalloc
-#define obstack_chunk_free free
 /* obstack.[ch] explicitly declined to prototype this.  */
 extern int _obstack_allocated_p PARAMS ((struct obstack *h, PTR obj));
 
-/* Objects allocated on this obstack last forever.  */
-
-struct obstack permanent_obstack;
-
+#ifdef GATHER_STATISTICS
 /* Statistics-gathering stuff.  */
 typedef enum
 {
@@ -96,9 +87,10 @@ static const char * const tree_node_kind_names[] = {
   "lang_decl kinds",
   "lang_type kinds"
 };
+#endif /* GATHER_STATISTICS */
 
 /* Unique id for next decl created.  */
-static int next_decl_uid;
+int next_decl_uid;
 /* Unique id for next type created.  */
 static int next_type_uid = 1;
 
@@ -136,43 +128,17 @@ static int type_hash_marked_p PARAMS ((const void *));
 tree global_trees[TI_MAX];
 tree integer_types[itk_none];
 
-/* Init the principal obstacks.  */
+/* Init tree.c.  */
 
 void
-init_obstacks ()
+init_ttree ()
 {
-  gcc_obstack_init (&permanent_obstack);
-
   /* Initialize the hash table of types.  */
   type_hash_table = htab_create (TYPE_HASH_INITIAL_SIZE, type_hash_hash,
 				 type_hash_eq, 0);
 }
 
 
-/* Allocate SIZE bytes in the permanent obstack
-   and return a pointer to them.  */
-
-char *
-permalloc (size)
-     int size;
-{
-  return (char *) obstack_alloc (&permanent_obstack, size);
-}
-
-/* Allocate NELEM items of SIZE bytes in the permanent obstack
-   and return a pointer to them.  The storage is cleared before
-   returning the value.  */
-
-char *
-perm_calloc (nelem, size)
-     int nelem;
-     long size;
-{
-  char *rval = (char *) obstack_alloc (&permanent_obstack, nelem * size);
-  memset (rval, 0, nelem * size);
-  return rval;
-}
-
 /* The name of the object as the assembler will see it (but before any
    translations made by ASM_OUTPUT_LABELREF).  Often this is the same
    as DECL_NAME.  It is an IDENTIFIER_NODE.  */
@@ -508,11 +474,8 @@ build_real (type, d)
   REAL_VALUE_TYPE *dp;
   int overflow = 0;
 
-  /* Check for valid float value for this type on this target machine;
-     if not, can print error message and store a valid value in D.  */
-#ifdef CHECK_FLOAT_VALUE
-  CHECK_FLOAT_VALUE (TYPE_MODE (type), d, overflow);
-#endif
+  /* ??? Used to check for overflow here via CHECK_FLOAT_TYPE.
+     Consider doing it via real_convert now.  */
 
   v = make_node (REAL_CST);
   dp = ggc_alloc (sizeof (REAL_VALUE_TYPE));
@@ -981,41 +944,6 @@ chain_member (elem, chain)
   return 0;
 }
 
-/* Return nonzero if ELEM is equal to TREE_VALUE (CHAIN) for any piece of
-   chain CHAIN.  This and the next function are currently unused, but
-   are retained for completeness.  */
-
-int
-chain_member_value (elem, chain)
-     tree elem, chain;
-{
-  while (chain)
-    {
-      if (elem == TREE_VALUE (chain))
-	return 1;
-      chain = TREE_CHAIN (chain);
-    }
-
-  return 0;
-}
-
-/* Return nonzero if ELEM is equal to TREE_PURPOSE (CHAIN)
-   for any piece of chain CHAIN.  */
-
-int
-chain_member_purpose (elem, chain)
-     tree elem, chain;
-{
-  while (chain)
-    {
-      if (elem == TREE_PURPOSE (chain))
-	return 1;
-      chain = TREE_CHAIN (chain);
-    }
-
-  return 0;
-}
-
 /* Return the length of a chain of nodes chained through TREE_CHAIN.
    We expect a null pointer to mark the end of the chain.
    This is the Lisp primitive `length'.  */
@@ -1107,31 +1035,6 @@ nreverse (t)
       prev = decl;
     }
   return prev;
-}
-
-/* Given a chain CHAIN of tree nodes,
-   construct and return a list of those nodes.  */
-
-tree
-listify (chain)
-     tree chain;
-{
-  tree result = NULL_TREE;
-  tree in_tail = chain;
-  tree out_tail = NULL_TREE;
-
-  while (in_tail)
-    {
-      tree next = tree_cons (NULL_TREE, in_tail, NULL_TREE);
-      if (out_tail)
-	TREE_CHAIN (out_tail) = next;
-      else
-	result = next;
-      out_tail = next;
-      in_tail = TREE_CHAIN (in_tail);
-    }
-
-  return result;
 }
 
 /* Return a newly created TREE_LIST node whose
@@ -2866,7 +2769,8 @@ get_qualified_type (type, type_quals)
      like the one we need to have.  If so, use that existing one.  We must
      preserve the TYPE_NAME, since there is code that depends on this.  */
   for (t = TYPE_MAIN_VARIANT (type); t; t = TYPE_NEXT_VARIANT (t))
-    if (TYPE_QUALS (t) == type_quals && TYPE_NAME (t) == TYPE_NAME (type))
+    if (TYPE_QUALS (t) == type_quals && TYPE_NAME (t) == TYPE_NAME (type)
+        && TYPE_CONTEXT (t) == TYPE_CONTEXT (type))
       return t;
 
   return NULL_TREE;
@@ -3310,24 +3214,6 @@ tree_low_cst (t, pos)
     abort ();
 }
 
-/* Return the most significant bit of the integer constant T.  */
-
-int
-tree_int_cst_msb (t)
-     tree t;
-{
-  int prec;
-  HOST_WIDE_INT h;
-  unsigned HOST_WIDE_INT l;
-
-  /* Note that using TYPE_PRECISION here is wrong.  We care about the
-     actual bits, not the (arbitrary) range of the type.  */
-  prec = GET_MODE_BITSIZE (TYPE_MODE (TREE_TYPE (t))) - 1;
-  rshift_double (TREE_INT_CST_LOW (t), TREE_INT_CST_HIGH (t), prec,
-		 2 * HOST_BITS_PER_WIDE_INT, &l, &h, 0);
-  return (l & 1) == 1;
-}
-
 /* Return an indication of the sign of the integer constant T.
    The return value is -1 if T < 0, 0 if T == 0, and 1 if T > 0.
    Note that -1 will never be returned it T's type is unsigned.  */
@@ -3418,10 +3304,8 @@ simple_cst_equal (t1, t2)
 			 TREE_STRING_LENGTH (t1)));
 
     case CONSTRUCTOR:
-      if (CONSTRUCTOR_ELTS (t1) == CONSTRUCTOR_ELTS (t2))
-	return 1;
-      else
-	abort ();
+      return simple_cst_list_equal (CONSTRUCTOR_ELTS (t1), 
+	                            CONSTRUCTOR_ELTS (t2));
 
     case SAVE_EXPR:
       return simple_cst_equal (TREE_OPERAND (t1, 0), TREE_OPERAND (t2, 0));
@@ -3681,36 +3565,6 @@ build_index_2_type (lowval, highval)
   return build_range_type (sizetype, lowval, highval);
 }
 
-/* Return nonzero iff ITYPE1 and ITYPE2 are equal (in the LISP sense).
-   Needed because when index types are not hashed, equal index types
-   built at different times appear distinct, even though structurally,
-   they are not.  */
-
-int
-index_type_equal (itype1, itype2)
-     tree itype1, itype2;
-{
-  if (TREE_CODE (itype1) != TREE_CODE (itype2))
-    return 0;
-
-  if (TREE_CODE (itype1) == INTEGER_TYPE)
-    {
-      if (TYPE_PRECISION (itype1) != TYPE_PRECISION (itype2)
-	  || TYPE_MODE (itype1) != TYPE_MODE (itype2)
-	  || simple_cst_equal (TYPE_SIZE (itype1), TYPE_SIZE (itype2)) != 1
-	  || TYPE_ALIGN (itype1) != TYPE_ALIGN (itype2))
-	return 0;
-
-      if (1 == simple_cst_equal (TYPE_MIN_VALUE (itype1),
-				 TYPE_MIN_VALUE (itype2))
-	  && 1 == simple_cst_equal (TYPE_MAX_VALUE (itype1),
-				    TYPE_MAX_VALUE (itype2)))
-	return 1;
-    }
-
-  return 0;
-}
-
 /* Construct, lay out and return the type of arrays of elements with ELT_TYPE
    and number of elements specified by the range of values of INDEX_TYPE.
    If such a type has already been constructed, reuse it.  */
@@ -3797,6 +3651,32 @@ build_function_type (value_type, arg_types)
   if (!COMPLETE_TYPE_P (t))
     layout_type (t);
   return t;
+}
+
+/* Build a function type.  The RETURN_TYPE is the type retured by the
+   function.  If additional arguments are provided, they are
+   additional argument types.  The list of argument types must always
+   be terminated by NULL_TREE.  */
+
+tree
+build_function_type_list VPARAMS ((tree return_type, ...))
+{
+  tree t, args, last;
+
+  VA_OPEN (p, return_type);
+  VA_FIXEDARG (p, tree, return_type);
+
+  t = va_arg (p, tree);
+  for (args = NULL_TREE; t != NULL_TREE; t = va_arg (p, tree))
+    args = tree_cons (NULL_TREE, t, args);
+
+  last = args;
+  args = nreverse (args);
+  TREE_CHAIN (last) = void_list_node;
+  args = build_function_type (return_type, args);
+
+  VA_CLOSE (p);
+  return args;
 }
 
 /* Construct, lay out and return the type of methods belonging to class
@@ -4333,13 +4213,10 @@ dump_tree_statistics ()
 #else
   fprintf (stderr, "(No per-node statistics)\n");
 #endif
-  print_obstack_statistics ("permanent_obstack", &permanent_obstack);
   print_type_hash_statistics ();
   (*lang_hooks.print_statistics) ();
 }
 
-#define FILE_FUNCTION_PREFIX_LEN 9
-
 #define FILE_FUNCTION_FORMAT "_GLOBAL__%s_%s"
 
 /* Appends 6 random characters to TEMPLATE to (hopefully) avoid name
@@ -4622,7 +4499,7 @@ tree_class_check_failed (node, cl, file, line, function)
 #endif /* ENABLE_TREE_CHECKING */
 
 /* For a new vector type node T, build the information necessary for
-   debuggint output.  */
+   debugging output.  */
 
 static void
 finish_vector_type (t)
@@ -4788,6 +4665,8 @@ build_common_tree_nodes_2 (short_double)
     = make_vector (V8HImode, unsigned_intHI_type_node, 1);
   unsigned_V16QI_type_node
     = make_vector (V16QImode, unsigned_intQI_type_node, 1);
+  unsigned_V1DI_type_node
+    = make_vector (V1DImode, unsigned_intDI_type_node, 1);
 
   V16SF_type_node = make_vector (V16SFmode, float_type_node, 0);
   V4SF_type_node = make_vector (V4SFmode, float_type_node, 0);
@@ -4800,6 +4679,7 @@ build_common_tree_nodes_2 (short_double)
   V2SF_type_node = make_vector (V2SFmode, float_type_node, 0);
   V2DF_type_node = make_vector (V2DFmode, double_type_node, 0);
   V16QI_type_node = make_vector (V16QImode, intQI_type_node, 0);
+  V1DI_type_node = make_vector (V1DImode, intDI_type_node, 0);
 }
 
 /* Returns a vector tree node given a vector mode, the inner type, and

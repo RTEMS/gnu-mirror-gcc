@@ -93,6 +93,7 @@ static bool arc_assemble_integer PARAMS ((rtx, unsigned int, int));
 static void arc_output_function_prologue PARAMS ((FILE *, HOST_WIDE_INT));
 static void arc_output_function_epilogue PARAMS ((FILE *, HOST_WIDE_INT));
 static void arc_encode_section_info PARAMS ((tree, int));
+static void arc_internal_label PARAMS ((FILE *, const char *, unsigned long));
 
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_ALIGNED_HI_OP
@@ -110,13 +111,15 @@ static void arc_encode_section_info PARAMS ((tree, int));
 #define TARGET_ATTRIBUTE_TABLE arc_attribute_table
 #undef TARGET_ENCODE_SECTION_INFO
 #define TARGET_ENCODE_SECTION_INFO arc_encode_section_info
+#undef TARGET_ASM_INTERNAL_LABEL
+#define  TARGET_ASM_INTERNAL_LABEL arc_internal_label
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 /* Called by OVERRIDE_OPTIONS to initialize various things.  */
 
 void
-arc_init (void)
+arc_init ()
 {
   char *tmp;
   
@@ -802,12 +805,8 @@ arc_setup_incoming_varargs (cum, mode, type, pretend_size, no_rtl)
   if (mode == BLKmode)
     abort ();
 
-  /* We must treat `__builtin_va_alist' as an anonymous arg.  */
-  if (current_function_varargs)
-    first_anon_arg = *cum;
-  else
-    first_anon_arg = *cum + ((GET_MODE_SIZE (mode) + UNITS_PER_WORD - 1)
-			     / UNITS_PER_WORD);
+  first_anon_arg = *cum + ((GET_MODE_SIZE (mode) + UNITS_PER_WORD - 1)
+			   / UNITS_PER_WORD);
 
   if (first_anon_arg < MAX_ARC_PARM_REGS && !no_rtl)
     {
@@ -1557,24 +1556,24 @@ output_shift (operands)
 	      output_asm_insn ("sr %4,[lp_end]", operands);
 	      output_asm_insn ("nop\n\tnop", operands);
 	      if (flag_pic)
-		asm_fprintf (asm_out_file, "\t%s single insn loop\n",
-			     ASM_COMMENT_START);
+		fprintf (asm_out_file, "\t%s single insn loop\n",
+			 ASM_COMMENT_START);
 	      else
-		asm_fprintf (asm_out_file, "1:\t%s single insn loop\n",
-			     ASM_COMMENT_START);
+		fprintf (asm_out_file, "1:\t%s single insn loop\n",
+			 ASM_COMMENT_START);
 	      output_asm_insn (shift_one, operands);
 	    }
 	  else 
 	    {
-	      asm_fprintf (asm_out_file, "1:\t%s begin shift loop\n",
-			   ASM_COMMENT_START);
+	      fprintf (asm_out_file, "1:\t%s begin shift loop\n",
+		       ASM_COMMENT_START);
 	      output_asm_insn ("sub.f %4,%4,1", operands);
 	      output_asm_insn ("nop", operands);
 	      output_asm_insn ("bn.nd 2f", operands);
 	      output_asm_insn (shift_one, operands);
 	      output_asm_insn ("b.nd 1b", operands);
-	      asm_fprintf (asm_out_file, "2:\t%s end shift loop\n",
-			   ASM_COMMENT_START);
+	      fprintf (asm_out_file, "2:\t%s end shift loop\n",
+		       ASM_COMMENT_START);
 	    }
 	}
     }
@@ -1752,7 +1751,7 @@ arc_print_operand (file, x, code)
 	    || GET_MODE_CLASS (GET_MODE (x)) != MODE_FLOAT)
 	  abort ();
 	REAL_VALUE_FROM_CONST_DOUBLE (d, x);
-	REAL_VALUE_TO_DECIMAL (d, "%.20e", str);
+	REAL_VALUE_TO_DECIMAL (d, str, -1);
 	fprintf (file, "%s", str);
 	return;
       }
@@ -1927,7 +1926,7 @@ record_cc_ref (insn)
    0 -> 2 final_prescan_insn, if the `target' is an unconditional branch
    1 -> 3 branch patterns, after having not output the conditional branch
    2 -> 4 branch patterns, after having not output the conditional branch
-   3 -> 0 ASM_OUTPUT_INTERNAL_LABEL, if the `target' label is reached
+   3 -> 0 (*targetm.asm_out.internal_label), if the `target' label is reached
           (the target label has CODE_LABEL_NUMBER equal to
 	  arc_ccfsm_target_label).
    4 -> 0 final_prescan_insn, if `target' unconditional branch is reached
@@ -2223,7 +2222,7 @@ arc_final_prescan_insn (insn, opvec, noperands)
 /* Record that we are currently outputting label NUM with prefix PREFIX.
    It it's the label we're looking for, reset the ccfsm machinery.
 
-   Called from ASM_OUTPUT_INTERNAL_LABEL.  */
+   Called from (*targetm.asm_out.internal_label).  */
 
 void
 arc_ccfsm_at_label (prefix, num)
@@ -2265,8 +2264,7 @@ arc_ccfsm_record_branch_deleted ()
 }
 
 void
-arc_va_start (stdarg_p, valist, nextarg)
-     int stdarg_p;
+arc_va_start (valist, nextarg)
      tree valist;
      rtx nextarg;
 {
@@ -2275,7 +2273,7 @@ arc_va_start (stdarg_p, valist, nextarg)
       && (current_function_args_info & 1))
     nextarg = plus_constant (nextarg, UNITS_PER_WORD);
 
-  std_expand_builtin_va_start (stdarg_p, valist, nextarg);
+  std_expand_builtin_va_start (valist, nextarg);
 }
 
 rtx
@@ -2363,4 +2361,17 @@ arc_encode_section_info (decl, first)
 {
   if (TREE_CODE (decl) == FUNCTION_DECL)
     SYMBOL_REF_FLAG (XEXP (DECL_RTL (decl), 0)) = 1;
+}
+
+/* This is how to output a definition of an internal numbered label where
+   PREFIX is the class of label and NUM is the number within the class.  */
+
+static void
+arc_internal_label (stream, prefix, labelno)
+     FILE *stream;
+     const char *prefix;
+     unsigned long labelno;
+{
+  arc_ccfsm_at_label (prefix, labelno);
+  default_internal_label (stream, prefix, labelno);
 }

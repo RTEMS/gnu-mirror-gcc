@@ -104,7 +104,6 @@ extern rtx ia64_function_arg PARAMS((CUMULATIVE_ARGS *, enum machine_mode,
 				     tree, int, int));
 extern rtx ia64_expand_builtin PARAMS((tree, rtx, rtx,
 				       enum machine_mode, int));
-extern void ia64_va_start PARAMS((int, tree, rtx));
 extern rtx ia64_va_arg PARAMS((tree, tree));
 extern rtx ia64_function_value PARAMS((tree, tree));
 #endif /* RTX_CODE */
@@ -145,3 +144,9 @@ extern void sbss_section PARAMS ((void));
 /* expr.h defines ARGS_SIZE_RTX and `enum direction'.  */
 extern enum direction ia64_hpux_function_arg_padding PARAMS ((enum machine_mode, tree));
 #endif /* ARGS_SIZE_RTX */
+
+#ifdef GCC_C_PRAGMA_H
+extern void ia64_hpux_handle_builtin_pragma PARAMS ((cpp_reader *));
+#endif
+
+extern void ia64_hpux_asm_file_end PARAMS ((FILE *));

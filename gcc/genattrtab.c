@@ -121,9 +121,6 @@ static struct obstack obstack1, obstack2;
 struct obstack *hash_obstack = &obstack1;
 struct obstack *temp_obstack = &obstack2;
 
-#define obstack_chunk_alloc xmalloc
-#define obstack_chunk_free free
-
 /* enough space to reserve for printing out ints */
 #define MAX_DIGITS (HOST_BITS_PER_INT * 3 / 10 + 3)
 
@@ -393,7 +390,6 @@ static void expand_units	PARAMS ((void));
 static rtx simplify_knowing	PARAMS ((rtx, rtx));
 static rtx encode_units_mask	PARAMS ((rtx));
 static void fill_attr		PARAMS ((struct attr_desc *));
-/* dpx2 compiler chokes if we specify the arg types of the args.  */
 static rtx substitute_address	PARAMS ((rtx, rtx (*) (rtx), rtx (*) (rtx)));
 static void make_length_attrs	PARAMS ((void));
 static rtx identity_fn		PARAMS ((rtx));
@@ -2566,11 +2562,10 @@ simplify_cond (exp, insn_code, insn_index)
   int len = XVECLEN (exp, 0);
   rtx *tests = (rtx *) xmalloc (len * sizeof (rtx));
   int allsame = 1;
-  char *first_spacer;
   rtx ret;
 
   /* This lets us free all storage allocated below, if appropriate.  */
-  first_spacer = (char *) obstack_finish (rtl_obstack);
+  obstack_finish (rtl_obstack);
 
   memcpy (tests, XVEC (exp, 0)->elem, len * sizeof (rtx));
 
@@ -6250,7 +6245,7 @@ from the machine description file `md'.  */\n\n");
       /* Write out information about function units.  */
       write_function_unit_info ();
       /* Output code for pipeline hazards recognition based on DFA
-	 (deterministic finite state automata. */
+	 (deterministic finite state automata.  */
       write_automata ();
     }
 

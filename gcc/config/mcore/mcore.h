@@ -1112,10 +1112,6 @@ switch_to_section (section, decl)				\
 	   (STACK_BOUNDARY / BITS_PER_UNIT))
 
   
-/* Output a label definition.  */
-#define ASM_OUTPUT_LABEL(FILE,NAME)  \
-  do { assemble_name (FILE, NAME); fputs (":\n", FILE); } while (0)
-
 /* Output a reference to a label.  */
 #undef  ASM_OUTPUT_LABELREF
 #define ASM_OUTPUT_LABELREF(STREAM, NAME)  \
@@ -1165,11 +1161,8 @@ extern long mcore_current_compilation_timestamp;
     }								\
   while (0)
 
-/* Output a globalising directive for a label.  */
-#define ASM_GLOBALIZE_LABEL(STREAM,NAME)  \
-  (fprintf (STREAM, "\t.export\t"),	  \
-   assemble_name (STREAM, NAME),	  \
-   fputc ('\n',STREAM))                   \
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP "\t.export\t"
 
 /* The prefix to add to user-visible assembler symbols. */
 #undef  USER_LABEL_PREFIX
@@ -1179,16 +1172,6 @@ extern long mcore_current_compilation_timestamp;
 #undef  ASM_GENERATE_INTERNAL_LABEL
 #define ASM_GENERATE_INTERNAL_LABEL(STRING, PREFIX, NUM)  \
   sprintf (STRING, "*.%s%ld", PREFIX, (long) NUM)
-
-/* Output an internal label definition.  */
-#undef  ASM_OUTPUT_INTERNAL_LABEL
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)	\
-  fprintf (FILE, ".%s%d:\n", PREFIX, NUM)
-
-/* Construct a private name.  */
-#define ASM_FORMAT_PRIVATE_NAME(OUTVAR,NAME,NUMBER)  \
-  ((OUTVAR) = (char *) alloca (strlen (NAME) + 10),  \
-   sprintf ((OUTVAR), "%s.%d", (NAME), (NUMBER)))
 
 /* Jump tables must be 32 bit aligned. */
 #undef  ASM_OUTPUT_CASE_LABEL

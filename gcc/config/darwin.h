@@ -35,6 +35,12 @@ Boston, MA 02111-1307, USA.  */
    leave it undefined and expect system builders to set configure args
    correctly.  */
 
+/* One of Darwin's NeXT legacies is the Mach-O format, which is partly
+   like a.out and partly like COFF, with additional features like
+   multi-architecture binary support.  */
+
+#define OBJECT_FORMAT_MACHO
+
 /* Suppress g++ attempt to link in the math library automatically.
    (Some Darwin versions have a libm, but they seem to cause problems
    for C++ executables.)  */
@@ -78,27 +84,10 @@ Boston, MA 02111-1307, USA.  */
 #undef	DEFAULT_PCC_STRUCT_RETURN
 #define DEFAULT_PCC_STRUCT_RETURN 0
 
-/* Don't warn about MacOS-style 'APPL' four-char-constants.  */
-
-#undef WARN_FOUR_CHAR_CONSTANTS
-#define WARN_FOUR_CHAR_CONSTANTS 0
-
 /* Machine dependent cpp options.  */
 
-/* The sequence here allows us to get a more specific version number
-   glued into __APPLE_CC__.  Normally this number would be updated as
-   part of submitting to a release engineering organization.  */
-
-#ifndef APPLE_CC
-#define APPLE_CC 999
-#endif
-
-#define STRINGIFY_THIS(x) # x
-#define REALLY_STRINGIFY(x) STRINGIFY_THIS(x)
-
 #undef	CPP_SPEC
-#define CPP_SPEC "-D__APPLE_CC__=" REALLY_STRINGIFY(APPLE_CC) "	\
-		  %{static:-D__STATIC__}%{!static:-D__DYNAMIC__}"
+#define CPP_SPEC "%{static:-D__STATIC__}%{!static:-D__DYNAMIC__}"
 
 /* Machine dependent libraries.  */
 
@@ -109,25 +98,19 @@ Boston, MA 02111-1307, USA.  */
 
 #undef	STARTFILE_SPEC
 #define STARTFILE_SPEC  \
-  "%{pg:%{static:-lgcrt0.o}%{!static:-lgcrt1.o}} \
-    %{!pg:%{static:-lcrt0.o}%{!static:-lcrt1.o}}"
+  "%{pg:%{static:-lgcrt0.o}%{!static:-lgcrt1.o -lcrtbegin.o}} \
+    %{!pg:%{static:-lcrt0.o}%{!static:-lcrt1.o -lcrtbegin.o}}"
+
+#undef	ENDFILE_SPEC
+#define ENDFILE_SPEC \
+  "-lcrtend.o"
 
 #undef	DOLLARS_IN_IDENTIFIERS
 #define DOLLARS_IN_IDENTIFIERS 2
 
-/* Allow #sccs (but don't do anything). */
-
-#define SCCS_DIRECTIVE
-
 /* We use Dbx symbol format.  */
 
-#define DBX_DEBUGGING_INFO
-
-/* Also enable Dwarf 2 as an option.  */
-
-#define DWARF2_DEBUGGING_INFO
-
-#define PREFERRED_DEBUGGING_TYPE DBX_DEBUG
+#define DBX_DEBUGGING_INFO 1
 
 /* When generating stabs debugging, use N_BINCL entries.  */
 
@@ -158,6 +141,9 @@ do { text_section ();							\
 #define TARGET_ASM_CONSTRUCTOR  machopic_asm_out_constructor
 #define TARGET_ASM_DESTRUCTOR   machopic_asm_out_destructor
 
+/* Always prefix with an underscore.  */
+
+#define USER_LABEL_PREFIX "_"
 
 /* Don't output a .file directive.  That is only used by the assembler for
    error reporting.  */
@@ -177,7 +163,10 @@ do { text_section ();							\
       }								\
   } while (0)
 
-/* Give ObjcC methods pretty symbol names. */
+#define ASM_OUTPUT_SKIP(FILE,SIZE)  \
+  fprintf (FILE, "\t.space %d\n", SIZE)
+
+/* Give ObjC methods pretty symbol names. */
 
 #undef	OBJC_GEN_METHOD_LABEL
 #define OBJC_GEN_METHOD_LABEL(BUF,IS_INST,CLASS_NAME,CAT_NAME,SEL_NAME,NUM) \
@@ -259,6 +248,15 @@ do { text_section ();							\
          fprintf (FILE, "_%s", xname);					     \
   } while (0)
 
+/* Output before executable code.  */
+#undef TEXT_SECTION_ASM_OP
+#define TEXT_SECTION_ASM_OP ".text"
+
+/* Output before writable data.  */
+
+#undef DATA_SECTION_ASM_OP
+#define DATA_SECTION_ASM_OP ".data"
+
 #undef	ALIGN_ASM_OP
 #define ALIGN_ASM_OP		".align"
 
@@ -285,11 +283,6 @@ do { text_section ();							\
         || DECL_INITIAL (DECL)))					\
       machopic_define_name (NAME);					\
   } while (0)
-
-/* Output nothing for #ident.  */
-
-#undef	ASM_OUTPUT_IDENT
-#define ASM_OUTPUT_IDENT(FILE, NAME)
 
 /* The maximum alignment which the object file format can support.
    For Mach-O, this is 2^15.  */
@@ -445,7 +438,7 @@ SECTION_FUNCTION (machopic_picsymbol_stub_section,	\
 		".picsymbol_stub", 0)      		\
 SECTION_FUNCTION (darwin_exception_section,		\
 		in_darwin_exception,			\
-		".section __TEXT,__gcc_except_tab", 0)	\
+		".section __DATA,__gcc_except_tab", 0)	\
 SECTION_FUNCTION (darwin_eh_frame_section,		\
 		in_darwin_eh_frame,			\
 		".section __TEXT,__eh_frame", 0)	\
@@ -508,26 +501,17 @@ objc_section_init ()				\
 	   fprintf (FILE, "\t");					\
 	   assemble_name (FILE, NAME); 					\
 	   fprintf (FILE, "=0\n");					\
-	   assemble_global (NAME);					\
+	   (*targetm.asm_out.globalize_label) (FILE, NAME);		\
 	 }								\
        } while (0)
 
-#undef ASM_GLOBALIZE_LABEL
-#define ASM_GLOBALIZE_LABEL(FILE,NAME)	\
- do { const char *const _x = (NAME); if (!!strncmp (_x, "_OBJC_", 6)) { \
-  (fputs (".globl ", FILE), assemble_name (FILE, _x), fputs ("\n", FILE)); \
- }} while (0)
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP ".globl "
+#define TARGET_ASM_GLOBALIZE_LABEL darwin_globalize_label
 
 #undef ASM_GENERATE_INTERNAL_LABEL
 #define ASM_GENERATE_INTERNAL_LABEL(LABEL,PREFIX,NUM)	\
   sprintf (LABEL, "*%s%ld", PREFIX, (long)(NUM))
-
-/* This is how to output an internal numbered label where PREFIX is
-   the class of label and NUM is the number within the class.  */
-
-#undef ASM_OUTPUT_INTERNAL_LABEL
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)	\
-  fprintf (FILE, "%s%d:\n", PREFIX, NUM)
 
 /* Since we have a separate readonly data section, define this so that
    jump tables end up in text rather than data.  */
@@ -552,7 +536,9 @@ enum machopic_addr_class {
 #define MACHOPIC_JUST_INDIRECT (flag_pic == 1)
 #define MACHOPIC_PURE          (flag_pic == 2)
 
+#undef TARGET_ENCODE_SECTION_INFO
 #define TARGET_ENCODE_SECTION_INFO  darwin_encode_section_info
+#undef TARGET_STRIP_NAME_ENCODING
 #define TARGET_STRIP_NAME_ENCODING  darwin_strip_name_encoding
 
 #define GEN_BINDER_NAME_FOR_STUB(BUF,STUB,STUB_LENGTH)		\
@@ -615,8 +601,16 @@ enum machopic_addr_class {
 
 #define TARGET_ASM_EH_FRAME_SECTION darwin_eh_frame_section
   
+#undef ASM_PREFERRED_EH_DATA_FORMAT
 #define ASM_PREFERRED_EH_DATA_FORMAT(CODE,GLOBAL)  \
-  (((CODE) == 1 || (GLOBAL) == 0) ? DW_EH_PE_pcrel : DW_EH_PE_absptr)
+  (((CODE) == 2 && (GLOBAL) == 1) \
+   ? (DW_EH_PE_pcrel | DW_EH_PE_indirect) : \
+     ((CODE) == 1 || (GLOBAL) == 0) ? DW_EH_PE_pcrel : DW_EH_PE_absptr)
+
+#define ASM_OUTPUT_DWARF_DELTA(FILE,SIZE,LABEL1,LABEL2)  \
+  darwin_asm_output_dwarf_delta (FILE, SIZE, LABEL1, LABEL2)
+
+#define TARGET_TERMINATE_DW2_EH_FRAME_INFO false
 
 #define DARWIN_REGISTER_TARGET_PRAGMAS(PFILE)				\
   do {									\
@@ -625,3 +619,8 @@ enum machopic_addr_class {
     cpp_register_pragma (PFILE, 0, "segment", darwin_pragma_ignore);	\
     cpp_register_pragma (PFILE, 0, "unused", darwin_pragma_unused);	\
   } while (0)
+
+#undef ASM_APP_ON
+#define ASM_APP_ON ""
+#undef ASM_APP_OFF
+#define ASM_APP_OFF ""

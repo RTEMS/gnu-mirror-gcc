@@ -19,8 +19,12 @@ along with GCC; see the file COPYING.  If not, write to the Free
 Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 02111-1307, USA.  */
 
+#ifndef GCC_TREE_H
+#define GCC_TREE_H
+
 #include "machmode.h"
 #include "version.h"
+#include "location.h"
 
 /* Codes of tree nodes */
 
@@ -80,7 +84,7 @@ extern const char *const built_in_class_names[4];
 /* Codes that identify the various built in functions
    so that expand_call can identify them quickly.  */
 
-#define DEF_BUILTIN(ENUM, N, C, T, LT, B, F, NA) ENUM,
+#define DEF_BUILTIN(ENUM, N, C, T, LT, B, F, NA, AT) ENUM,
 enum built_in_function
 {
 #include "builtins.def"
@@ -122,6 +126,7 @@ struct tree_common GTY(())
 {
   tree chain;
   tree type;
+  PTR GTY ((skip (""))) aux;
 
   ENUM_BITFIELD(tree_code) code : 8;
 
@@ -885,7 +890,7 @@ struct tree_exp GTY(())
   struct tree_common common;
   int complexity;
   tree GTY ((special ("tree_exp"), 
-	     length ("TREE_CODE_LENGTH (TREE_CODE ((tree) &%h))"))) 
+	     desc ("TREE_CODE ((tree) &%0)"))) 
     operands[1];
 };
 
@@ -1449,8 +1454,9 @@ struct tree_type GTY(())
    was.  If the declaration appears in several places (as for a C
    function that is declared first and then defined later), this
    information should refer to the definition.  */
-#define DECL_SOURCE_FILE(NODE) (DECL_CHECK (NODE)->decl.filename)
-#define DECL_SOURCE_LINE(NODE) (DECL_CHECK (NODE)->decl.linenum)
+#define DECL_SOURCE_LOCATION(NODE) (DECL_CHECK (NODE)->decl.locus)
+#define DECL_SOURCE_FILE(NODE) (DECL_SOURCE_LOCATION (NODE).file)
+#define DECL_SOURCE_LINE(NODE) (DECL_SOURCE_LOCATION (NODE).line)
 /* Holds the size of the datum, in bits, as a tree expression.
    Need not be constant.  */
 #define DECL_SIZE(NODE) (DECL_CHECK (NODE)->decl.size)
@@ -1770,8 +1776,7 @@ struct function;
 struct tree_decl GTY(())
 {
   struct tree_common common;
-  const char *filename;
-  int linenum;
+  location_t locus;
   unsigned int uid;
   tree size;
   ENUM_BITFIELD(machine_mode) mode : 8;
@@ -1964,6 +1969,7 @@ enum tree_index
   TI_UV2SI_TYPE,
   TI_UV2SF_TYPE,
   TI_UV2DI_TYPE,
+  TI_UV1DI_TYPE,
   TI_UV16QI_TYPE,
 
   TI_V4SF_TYPE,
@@ -1976,6 +1982,7 @@ enum tree_index
   TI_V2SF_TYPE,
   TI_V2DF_TYPE,
   TI_V2DI_TYPE,
+  TI_V1DI_TYPE,
   TI_V16QI_TYPE,
 
   TI_MAIN_IDENTIFIER,
@@ -2044,6 +2051,7 @@ extern GTY(()) tree global_trees[TI_MAX];
 #define unsigned_V4HI_type_node		global_trees[TI_UV4HI_TYPE]
 #define unsigned_V2SI_type_node		global_trees[TI_UV2SI_TYPE]
 #define unsigned_V2DI_type_node		global_trees[TI_UV2DI_TYPE]
+#define unsigned_V1DI_type_node		global_trees[TI_UV1DI_TYPE]
 
 #define V16QI_type_node			global_trees[TI_V16QI_TYPE]
 #define V4SF_type_node			global_trees[TI_V4SF_TYPE]
@@ -2056,6 +2064,7 @@ extern GTY(()) tree global_trees[TI_MAX];
 #define V2DI_type_node			global_trees[TI_V2DI_TYPE]
 #define V2DF_type_node			global_trees[TI_V2DF_TYPE]
 #define V16SF_type_node			global_trees[TI_V16SF_TYPE]
+#define V1DI_type_node			global_trees[TI_V1DI_TYPE]
 
 /* An enumeration of the standard C integer types.  These must be
    ordered so that shorter types appear before longer ones, and so
@@ -2102,8 +2111,6 @@ extern GTY(()) tree integer_types[itk_none];
    statistical reports, not code generation.  */
 extern double approx_sqrt		PARAMS ((double));
 
-extern char *permalloc			PARAMS ((int));
-extern char *expralloc			PARAMS ((int));
 extern tree decl_assembler_name		PARAMS ((tree));
 
 /* Compute the number of bytes occupied by 'node'.  This routine only
@@ -2178,6 +2185,7 @@ extern tree build_index_type		PARAMS ((tree));
 extern tree build_index_2_type		PARAMS ((tree, tree));
 extern tree build_array_type		PARAMS ((tree, tree));
 extern tree build_function_type		PARAMS ((tree, tree));
+extern tree build_function_type_list	PARAMS ((tree, ...));
 extern tree build_method_type		PARAMS ((tree, tree));
 extern tree build_offset_type		PARAMS ((tree, tree));
 extern tree build_complex_type		PARAMS ((tree));
@@ -2194,11 +2202,9 @@ extern int tree_int_cst_lt		PARAMS ((tree, tree));
 extern int tree_int_cst_compare         PARAMS ((tree, tree));
 extern int host_integerp		PARAMS ((tree, int));
 extern HOST_WIDE_INT tree_low_cst	PARAMS ((tree, int));
-extern int tree_int_cst_msb		PARAMS ((tree));
 extern int tree_int_cst_sgn		PARAMS ((tree));
 extern int tree_expr_nonnegative_p	PARAMS ((tree));
 extern int rtl_expr_nonnegative_p	PARAMS ((rtx));
-extern int index_type_equal		PARAMS ((tree, tree));
 extern tree get_inner_array_type	PARAMS ((tree));
 
 /* From expmed.c.  Since rtl.h is included after tree.h, we can't
@@ -2360,6 +2366,12 @@ extern tree build_qualified_type        PARAMS ((tree, int));
 
 extern tree build_type_copy		PARAMS ((tree));
 
+/* Finish up a builtin RECORD_TYPE. Give it a name and provide its
+   fields. Optionally specify an alignment, and then lsy it out.  */
+
+extern void finish_builtin_struct		PARAMS ((tree, const char *,
+							 tree, tree));
+
 /* Given a ..._TYPE node, calculate the TYPE_SIZE, TYPE_SIZE_UNIT,
    TYPE_ALIGN and TYPE_MODE fields.  If called more than once on one
    node, does nothing except for the first time.  */
@@ -2396,6 +2408,8 @@ typedef struct record_layout_info_s
   /* The static variables (i.e., class variables, as opposed to
      instance variables) encountered in T.  */
   tree pending_statics;
+  /* Bits remaining in the current alignment group */
+  int remaining_in_alignment;
   int packed_maybe_necessary;
 } *record_layout_info;
 
@@ -2404,8 +2418,6 @@ extern void set_lang_adjust_rli		PARAMS ((void (*) PARAMS
 extern record_layout_info start_record_layout PARAMS ((tree));
 extern tree bit_from_pos		PARAMS ((tree, tree));
 extern tree byte_from_pos		PARAMS ((tree, tree));
-extern void pos_from_byte		PARAMS ((tree *, tree *, unsigned int,
-						 tree));
 extern void pos_from_bit		PARAMS ((tree *, tree *, unsigned int,
 						 tree));
 extern void normalize_offset		PARAMS ((tree *, tree *,
@@ -2723,12 +2735,11 @@ extern int all_types_permanent;
 
 /* Declare a predefined function.  Return the declaration.  This function is
    provided by each language frontend.  */
-extern tree builtin_function			PARAMS ((const char *, tree, int,
-						       enum built_in_class,
-						       const char *));
+extern tree builtin_function		PARAMS ((const char *, tree, int,
+					       enum built_in_class,
+					       const char *, tree));
 
 /* In tree.c */
-extern char *perm_calloc			PARAMS ((int, long));
 extern void clean_symbol_name			PARAMS ((char *));
 extern tree get_file_function_name_long 	PARAMS ((const char *));
 extern tree get_set_constructor_bits		PARAMS ((tree, char *, int));
@@ -2742,7 +2753,6 @@ extern tree lhd_unsave_expr_now		PARAMS ((tree));
 
 /* In stmt.c */
 
-extern int in_control_zone_p			PARAMS ((void));
 extern void expand_fixups			PARAMS ((rtx));
 extern tree expand_start_stmt_expr		PARAMS ((int));
 extern tree expand_end_stmt_expr		PARAMS ((tree));
@@ -2799,7 +2809,6 @@ extern int pushcase_range			PARAMS ((tree, tree,
 						       tree (*) (tree, tree),
 						       tree, tree *));
 extern void using_eh_for_cleanups		PARAMS ((void));
-extern int stmt_loop_nest_empty			PARAMS ((void));
 
 /* In fold-const.c */
 
@@ -2843,9 +2852,10 @@ extern void rrotate_double	PARAMS ((unsigned HOST_WIDE_INT, HOST_WIDE_INT,
 extern int operand_equal_p	PARAMS ((tree, tree, int));
 extern tree invert_truthvalue	PARAMS ((tree));
 
-extern tree fold_builtin		PARAMS ((tree));
-
-extern tree build_range_type PARAMS ((tree, tree, tree));
+/* In builtins.c */
+extern tree fold_builtin				PARAMS ((tree));
+extern enum built_in_function builtin_mathfn_code	PARAMS ((tree));
+extern tree build_function_call_expr			PARAMS ((tree, tree));
 
 /* In alias.c */
 extern void record_component_aliases		PARAMS ((tree));
@@ -2858,6 +2868,7 @@ extern int objects_must_conflict_p		PARAMS ((tree, tree));
 struct obstack;
 
 /* In tree.c */
+extern int next_decl_uid;
 extern int really_constant_p		PARAMS ((tree));
 extern int int_fits_type_p		PARAMS ((tree, tree));
 extern int tree_log2			PARAMS ((tree));
@@ -2867,9 +2878,6 @@ extern int compare_tree_int		PARAMS ((tree,
 						 unsigned HOST_WIDE_INT));
 extern int type_list_equal		PARAMS ((tree, tree));
 extern int chain_member			PARAMS ((tree, tree));
-extern int chain_member_purpose		PARAMS ((tree, tree));
-extern int chain_member_value		PARAMS ((tree, tree));
-extern tree listify			PARAMS ((tree));
 extern tree type_hash_lookup		PARAMS ((unsigned int, tree));
 extern void type_hash_add		PARAMS ((unsigned int, tree));
 extern unsigned int type_hash_list	PARAMS ((tree));
@@ -2889,15 +2897,15 @@ extern int real_onep			PARAMS ((tree));
 extern int real_twop			PARAMS ((tree));
 extern int real_minus_onep		PARAMS ((tree));
 extern void gcc_obstack_init		PARAMS ((struct obstack *));
-extern void init_obstacks		PARAMS ((void));
+extern void init_ttree			PARAMS ((void));
 extern void build_common_tree_nodes	PARAMS ((int));
 extern void build_common_tree_nodes_2	PARAMS ((int));
+extern tree build_range_type		PARAMS ((tree, tree, tree));
 
 /* In function.c */
 extern void setjmp_protect_args		PARAMS ((void));
 extern void setjmp_protect		PARAMS ((tree));
 extern void expand_main_function	PARAMS ((void));
-extern void mark_varargs		PARAMS ((void));
 extern void init_dummy_function_start	PARAMS ((void));
 extern void expand_dummy_function_end	PARAMS ((void));
 extern void init_function_for_compilation	PARAMS ((void));
@@ -2919,7 +2927,6 @@ extern int aggregate_value_p		PARAMS ((tree));
 extern void free_temps_for_rtl_expr	PARAMS ((tree));
 extern void instantiate_virtual_regs	PARAMS ((tree, rtx));
 extern void unshare_all_rtl		PARAMS ((tree, rtx));
-extern int max_parm_reg_num		PARAMS ((void));
 extern void push_function_context	PARAMS ((void));
 extern void pop_function_context	PARAMS ((void));
 extern void push_function_context_to	PARAMS ((tree));
@@ -2992,6 +2999,7 @@ extern int div_and_round_double		PARAMS ((enum tree_code, int,
 						 HOST_WIDE_INT *,
 						 unsigned HOST_WIDE_INT *,
 						 HOST_WIDE_INT *));
+extern tree eval_subst			PARAMS ((tree, tree, tree, tree, tree));
 
 /* In stmt.c */
 extern void emit_nop			PARAMS ((void));
@@ -3003,7 +3011,6 @@ extern void expand_asm_operands		PARAMS ((tree, tree, tree, tree, int,
 						 const char *, int));
 extern int any_pending_cleanups		PARAMS ((int));
 extern void init_stmt_for_function	PARAMS ((void));
-extern int drop_through_at_end_p	PARAMS ((void));
 extern void expand_start_target_temps	PARAMS ((void));
 extern void expand_end_target_temps	PARAMS ((void));
 extern void expand_elseif		PARAMS ((tree));
@@ -3012,10 +3019,7 @@ extern void expand_decl			PARAMS ((tree));
 extern int expand_decl_cleanup		PARAMS ((tree, tree));
 extern int expand_decl_cleanup_eh	PARAMS ((tree, tree, int));
 extern void expand_anon_union_decl	PARAMS ((tree, tree, tree));
-extern void move_cleanups_up		PARAMS ((void));
 extern void expand_start_case_dummy	PARAMS ((void));
-extern void expand_end_case_dummy	PARAMS ((void));
-extern tree case_index_expr_type	PARAMS ((void));
 extern HOST_WIDE_INT all_cases_count	PARAMS ((tree, int *));
 extern void check_for_full_enumeration_handling PARAMS ((tree));
 extern void declare_nonlocal_label	PARAMS ((tree));
@@ -3067,10 +3071,23 @@ enum tree_dump_index
 {
   TDI_all,			/* dump the whole translation unit */
   TDI_class,			/* dump class hierarchy */
-  TDI_original,			/* dump each function before optimizing it */
-  TDI_optimized,		/* dump each function after optimizing it */
   TDI_inlined,			/* dump each function after inlining
 				   within it.  */
+  TDI_original,			/* dump each function before optimizing it */
+  TDI_simple,			/* dump each function before and after 
+				   simplifying it.  */
+  TDI_cfg,			/* dump the flowgraph for each function.  */
+  TDI_dot,			/* create a dot graph file for each 
+				   function's flowgraph.  */
+  TDI_ssa,                      /* dump SSA information for each function.  */
+  TDI_ccp,			/* dump SSA CCP information for each
+				   function.  */
+  TDI_pre,                      /* dump SSA PRE information for each
+				   function.  */
+  TDI_dce,                      /* dump SSA DCE information for each
+				   function.  */
+  TDI_optimized,		/* dump each function after optimizing it */
+  TDI_xml,                      /* dump function call graph.  */
   TDI_end
 };
 
@@ -3079,6 +3096,13 @@ enum tree_dump_index
    values, extend the DUMP_OPTIONS array in tree-dump.c */
 #define TDF_ADDRESS	(1 << 0)	/* dump node addresses */
 #define TDF_SLIM	(1 << 1)	/* don't go wild following links */
+#define TDF_RAW  	(1 << 2)	/* unparse the function */
+#define TDF_DETAILS	(1 << 3)	/* show how each statement is
+					   simplified */
+#define TDF_STATS	(1 << 4)	/* dump various statistics about
+					   each pass */
+#define TDF_REFS	(1 << 0)	/* dump ssa variable refs */
+#define TDF_RDEFS	(1 << 1)	/* dump reaching definitions */
 
 typedef struct dump_info *dump_info_p;
 
@@ -3088,8 +3112,11 @@ extern FILE *dump_begin			PARAMS ((enum tree_dump_index, int *));
 extern void dump_end			PARAMS ((enum tree_dump_index, FILE *));
 extern void dump_node			PARAMS ((tree, int, FILE *));
 extern int dump_switch_p                PARAMS ((const char *));
-extern const char *dump_flag_name	PARAMS ((enum tree_dump_index));
+extern void dump_enable_all_ssa         PARAMS ((void));
+const char *dump_flag_name	PARAMS ((enum tree_dump_index));
 
+extern int simplify_function_tree      PARAMS ((tree));
+extern const char *get_name            PARAMS ((tree));
 
 /* Redefine abort to report an internal error w/o coredump, and
    reporting the location of the error in the source file.  This logic
@@ -3100,3 +3127,5 @@ extern const char *dump_flag_name	PARAMS ((enum tree_dump_index));
 extern void fancy_abort PARAMS ((const char *, int, const char *))
     ATTRIBUTE_NORETURN;
 #define abort() fancy_abort (__FILE__, __LINE__, __FUNCTION__)
+
+#endif  /* GCC_TREE_H  */

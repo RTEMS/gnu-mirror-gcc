@@ -353,7 +353,7 @@ next_flags_user (insn)
   return NULL_RTX;
 }
 
-/* Reorganise the stack into ascending numbers,
+/* Reorganize the stack into ascending numbers,
    after this insn.  */
 
 static void
@@ -564,7 +564,7 @@ get_true_reg (pat)
     switch (GET_CODE (*pat))
       {
       case SUBREG:
-	/* Eliminate FP subregister accesses in favour of the
+	/* Eliminate FP subregister accesses in favor of the
 	   actual FP register in use.  */
 	{
 	  rtx subreg;
@@ -2462,7 +2462,7 @@ convert_regs_exit ()
       output_stack->top = value_reg_high - value_reg_low;
       for (reg = value_reg_low; reg <= value_reg_high; ++reg)
 	{
-	  output_stack->reg[reg - value_reg_low] = reg;
+	  output_stack->reg[value_reg_high - reg] = reg;
 	  SET_HARD_REG_BIT (output_stack->reg_set, reg);
 	}
     }

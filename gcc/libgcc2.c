@@ -1,7 +1,7 @@
 /* More subroutines needed by GCC output code on some machines.  */
 /* Compile this one with gcc.  */
 /* Copyright (C) 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001  Free Software Foundation, Inc.
+   2000, 2001, 2002  Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -43,10 +43,11 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "libgcc2.h"
 
-#if defined (L_negdi2) || defined (L_divdi3) || defined (L_moddi3)
-#if defined (L_divdi3) || defined (L_moddi3)
-static inline
+#ifdef DECLARE_LIBRARY_RENAMES
+  DECLARE_LIBRARY_RENAMES
 #endif
+
+#if defined (L_negdi2)
 DWtype
 __negdi2 (DWtype u)
 {
@@ -732,14 +733,14 @@ __divdi3 (DWtype u, DWtype v)
 
   if (uu.s.high < 0)
     c = ~c,
-    uu.ll = __negdi2 (uu.ll);
+    uu.ll = -uu.ll;
   if (vv.s.high < 0)
     c = ~c,
-    vv.ll = __negdi2 (vv.ll);
+    vv.ll = -vv.ll;
 
   w = __udivmoddi4 (uu.ll, vv.ll, (UDWtype *) 0);
   if (c)
-    w = __negdi2 (w);
+    w = -w;
 
   return w;
 }
@@ -758,13 +759,13 @@ __moddi3 (DWtype u, DWtype v)
 
   if (uu.s.high < 0)
     c = ~c,
-    uu.ll = __negdi2 (uu.ll);
+    uu.ll = -uu.ll;
   if (vv.s.high < 0)
-    vv.ll = __negdi2 (vv.ll);
+    vv.ll = -vv.ll;
 
   (void) __udivmoddi4 (uu.ll, vv.ll, &w);
   if (c)
-    w = __negdi2 (w);
+    w = -w;
 
   return w;
 }
@@ -1234,260 +1235,445 @@ __eprintf (const char *string, const char *expression,
 #endif
 #endif
 
-#ifdef L_bb
+#ifdef L_gcov
 
-struct bb_function_info {
-  long checksum;
-  int arc_count;
-  const char *name;
-};
-
-/* Structure emitted by -a  */
-struct bb
-{
-  long zero_word;
-  const char *filename;
-  gcov_type *counts;
-  long ncounts;
-  struct bb *next;
-
-  /* Older GCC's did not emit these fields.  */
-  long sizeof_bb;
-  struct bb_function_info *function_infos;
-};
-
-#ifndef inhibit_libc
-
-/* Simple minded basic block profiling output dumper for
-   systems that don't provide tcov support.  At present,
-   it requires atexit and stdio.  */
+/* Gcov profile dumper. Requires atexit and stdio.  */
 
 #undef NULL /* Avoid errors if stdio.h and our stddef.h mismatch.  */
 #include <stdio.h>
 
-#include "gbl-ctors.h"
 #include "gcov-io.h"
 #include <string.h>
-#ifdef TARGET_HAS_F_SETLKW
+#if defined (TARGET_HAS_F_SETLKW)
 #include <fcntl.h>
 #include <errno.h>
 #endif
 
-#include <gthr.h>
+/* Chain of per-object gcov structures.  */
+static struct gcov_info *gcov_list;
 
-static struct bb *bb_head;
+/* A program checksum allows us to distinguish program data for an
+   object file included in multiple programs.  */
+static unsigned gcov_crc32;
 
-int __global_counters = 0, __gthreads_active = 0;
-
-void
-__bb_exit_func (void)
+static void
+gcov_version_mismatch (struct gcov_info *ptr, unsigned version)
 {
-  FILE *da_file;
-  struct bb *ptr;
-  long n_counters_p = 0;
-  gcov_type max_counter_p = 0;
-  gcov_type sum_counters_p = 0;
+  unsigned expected = GCOV_VERSION;
+  unsigned ix;
+  char e[4], v[4];
 
-  if (bb_head == 0)
-    return;
-
-  /* Calculate overall "statistics".  */
-
-  for (ptr = bb_head; ptr != (struct bb *) 0; ptr = ptr->next)
+  for (ix = 4; ix--; expected >>= 8, version >>= 8)
     {
-      int i;
-
-      n_counters_p += ptr->ncounts;
-
-      for (i = 0; i < ptr->ncounts; i++)
-	{
-	  sum_counters_p += ptr->counts[i];
-
-	  if (ptr->counts[i] > max_counter_p)
-	    max_counter_p = ptr->counts[i];
-	}
+      e[ix] = expected;
+      v[ix] = version;
     }
+  
+  fprintf (stderr,
+	   "profiling:%s:Version mismatch - expected %.4s got %.4s\n",
+	   ptr->filename, e, v);
+}
 
-  for (ptr = bb_head; ptr != (struct bb *) 0; ptr = ptr->next)
+/* Dump the coverage counts. We merge with existing counts when
+   possible, to avoid growing the .da files ad infinitum. We use this
+   program's checksum to make sure we only accumulate whole program
+   statistics to the correct summary. An object file might be embedded
+   in two separate programs, and we must keep the two program
+   summaries separate. */
+
+static void
+gcov_exit (void)
+{
+  struct gcov_info *ptr;
+  unsigned ix, jx;
+  struct gcov_summary program;
+  gcov_type program_max_one = 0;
+  gcov_type program_max_sum = 0;
+  gcov_type program_sum = 0;
+  unsigned program_arcs = 0;
+  
+#if defined (TARGET_HAS_F_SETLKW)
+  struct flock s_flock;
+
+  s_flock.l_type = F_WRLCK;
+  s_flock.l_whence = SEEK_SET;
+  s_flock.l_start = 0;
+  s_flock.l_len = 0; /* Until EOF.  */
+  s_flock.l_pid = getpid ();
+#endif
+
+  memset (&program, 0, sizeof (program));
+  program.checksum = gcov_crc32;
+  
+  for (ptr = gcov_list; ptr; ptr = ptr->next)
     {
-      gcov_type max_counter_o = 0;
-      gcov_type sum_counters_o = 0;
-      int i;
+      FILE *da_file;
+      struct gcov_summary object;
+      struct gcov_summary local_prg;
+      int merging = 0;
+      long base;
+      const struct function_info *fn_info;
+      gcov_type *count_ptr;
+      gcov_type object_max_one = 0;
 
-      /* Calculate the per-object statistics.  */
+      ptr->wkspc = 0;
+      if (!ptr->filename)
+	continue;
 
-      for (i = 0; i < ptr->ncounts; i++)
+      for (ix = ptr->n_arc_counts, count_ptr = ptr->arc_counts; ix--;)
 	{
-	  sum_counters_o += ptr->counts[i];
+	  gcov_type count = *count_ptr++;
 
-	  if (ptr->counts[i] > max_counter_o)
-	    max_counter_o = ptr->counts[i];
+	  if (count > object_max_one)
+	    object_max_one = count;
 	}
-
-      /* open the file for appending, creating it if necessary.  */
-      da_file = fopen (ptr->filename, "ab");
-      /* Some old systems might not allow the 'b' mode modifier.
-         Therefore, try to open without it.  This can lead to a race
-         condition so that when you delete and re-create the file, the
-         file might be opened in text mode, but then, you shouldn't
-         delete the file in the first place.  */
-      if (da_file == 0)
-	da_file = fopen (ptr->filename, "a");
-      if (da_file == 0)
+      if (object_max_one > program_max_one)
+	program_max_one = object_max_one;
+      
+      memset (&local_prg, 0, sizeof (local_prg));
+      memset (&object, 0, sizeof (object));
+      
+      /* Open for modification */
+      if ((da_file = fopen (ptr->filename, "r+b")))
+	merging = 1;
+      else if ((da_file = fopen (ptr->filename, "w+b")))
+	;
+      else
 	{
-	  fprintf (stderr, "arc profiling: Can't open output file %s.\n",
-		   ptr->filename);
+	  fprintf (stderr, "profiling:%s:Cannot open\n", ptr->filename);
+	  ptr->filename = 0;
 	  continue;
 	}
 
+#if defined (TARGET_HAS_F_SETLKW)
       /* After a fork, another process might try to read and/or write
          the same file simultanously.  So if we can, lock the file to
          avoid race conditions.  */
-#if defined (TARGET_HAS_F_SETLKW)
-      {
-	struct flock s_flock;
-
-	s_flock.l_type = F_WRLCK;
-	s_flock.l_whence = SEEK_SET;
-	s_flock.l_start = 0;
-	s_flock.l_len = 1;
-	s_flock.l_pid = getpid ();
-
-	while (fcntl (fileno (da_file), F_SETLKW, &s_flock)
-	       && errno == EINTR);
-      }
+      while (fcntl (fileno (da_file), F_SETLKW, &s_flock)
+	     && errno == EINTR)
+	continue;
 #endif
-
-      if (__write_long (-123, da_file, 4) != 0)	/* magic */
+      if (merging)
 	{
-	  fprintf (stderr, "arc profiling: Error writing output file %s.\n",
-		   ptr->filename);
+	  /* Merge data from file.  */
+	  unsigned tag, length;
+	      
+	  if (gcov_read_unsigned (da_file, &tag) || tag != GCOV_DATA_MAGIC)
+	    {
+	      fprintf (stderr, "profiling:%s:Not a gcov data file\n",
+		       ptr->filename);
+	    read_fatal:;
+	      fclose (da_file);
+	      ptr->filename = 0;
+	      continue;
+	    }
+	  if (gcov_read_unsigned (da_file, &length) || length != GCOV_VERSION)
+	    {
+	      gcov_version_mismatch (ptr, length);
+	      goto read_fatal;
+	    }
+	  
+	  /* Merge execution counts for each function.  */
+	  count_ptr = ptr->arc_counts;
+	  for (ix = ptr->n_functions, fn_info = ptr->functions;
+	       ix--; fn_info++)
+	    {
+	      if (gcov_read_unsigned (da_file, &tag)
+		  || gcov_read_unsigned (da_file, &length))
+		{
+		read_error:;
+		  fprintf (stderr, "profiling:%s:Error merging\n",
+			   ptr->filename);
+		  goto read_fatal;
+		}
+
+	      /* Check function */
+	      if (tag != GCOV_TAG_FUNCTION)
+		{
+		read_mismatch:;
+		  fprintf (stderr, "profiling:%s:Merge mismatch at %s\n",
+			   ptr->filename, fn_info->name);
+		  goto read_fatal;
+		}
+	      {
+		unsigned flength, checksum;
+		
+		if (gcov_read_unsigned (da_file, &flength)
+		    || gcov_skip_string (da_file, flength)
+		    || gcov_read_unsigned (da_file, &checksum))
+		  goto read_error;
+		if (flength != strlen (fn_info->name)
+		    || checksum != fn_info->checksum)
+		  goto read_mismatch;
+	      }
+	      /* Check arc counts */
+	      if (gcov_read_unsigned (da_file, &tag)
+		  || gcov_read_unsigned (da_file, &length))
+		goto read_error;
+	      if (tag != GCOV_TAG_ARC_COUNTS
+		  || length / 8 != fn_info->n_arc_counts)
+		goto read_mismatch;
+	      {
+		gcov_type count;
+		
+		for (jx = fn_info->n_arc_counts; jx--; count_ptr++)
+		  if (gcov_read_counter (da_file, &count))
+		    goto read_error;
+		  else
+		    *count_ptr += count;
+	      }
+	    }
+
+	  /* Check object summary */
+	  if (gcov_read_unsigned (da_file, &tag)
+	      || gcov_read_unsigned (da_file, &length))
+	    goto read_error;
+	  if (tag != GCOV_TAG_OBJECT_SUMMARY)
+	    goto read_mismatch;
+	  if (gcov_read_summary (da_file, &object))
+	    goto read_error;
+
+	  /* Check program summary */
+	  while (1)
+	    {
+	      long base = ftell (da_file);
+	      
+	      if (gcov_read_unsigned (da_file, &tag)
+		  || gcov_read_unsigned (da_file, &length))
+		{
+		  if (feof (da_file))
+		    break;
+		  goto read_error;
+		}
+	      if (tag != GCOV_TAG_PROGRAM_SUMMARY
+		  && tag != GCOV_TAG_PLACEHOLDER_SUMMARY
+		  && tag != GCOV_TAG_INCORRECT_SUMMARY)
+		goto read_mismatch;
+	      if (gcov_read_summary (da_file, &local_prg))
+		goto read_error;
+	      if (local_prg.checksum != program.checksum)
+		continue;
+	      if (tag == GCOV_TAG_PLACEHOLDER_SUMMARY)
+		{
+		  fprintf (stderr,
+			   "profiling:%s:Concurrent race detected\n",
+			   ptr->filename);
+		  goto read_fatal;
+		}
+	      merging = -1;
+	      if (tag != GCOV_TAG_PROGRAM_SUMMARY)
+		break;
+	      
+	      if (program.runs
+		  && memcmp (&program, &local_prg, sizeof (program)))
+		{
+		  fprintf (stderr, "profiling:%s:Invocation mismatch\n",
+			   ptr->filename);
+		  local_prg.runs = 0;
+		}
+	      else
+		memcpy (&program, &local_prg, sizeof (program));
+	      ptr->wkspc = base;
+	      break;
+	    }
+	  fseek (da_file, 0, SEEK_SET);
+	}
+
+      object.runs++;
+      object.arcs = ptr->n_arc_counts;
+      object.arc_sum = 0;
+      if (object.arc_max_one < object_max_one)
+	object.arc_max_one = object_max_one;
+      object.arc_sum_max += object_max_one;
+      
+      /* Write out the data.  */
+      if (/* magic */
+	  gcov_write_unsigned (da_file, GCOV_DATA_MAGIC)
+	  /* version number */
+	  || gcov_write_unsigned (da_file, GCOV_VERSION))
+	{
+	write_error:;
+	  fclose (da_file);
+	  fprintf (stderr, "profiling:%s:Error writing\n", ptr->filename);
+	  ptr->filename = 0;
+	  continue;
+	}
+      
+      /* Write execution counts for each function.  */
+      count_ptr = ptr->arc_counts;
+      for (ix = ptr->n_functions, fn_info = ptr->functions; ix--; fn_info++)
+	{
+	  /* Announce function. */
+	  if (gcov_write_unsigned (da_file, GCOV_TAG_FUNCTION)
+	      || !(base = gcov_reserve_length (da_file))
+	      /* function name */
+	      || gcov_write_string (da_file, fn_info->name,
+				    strlen (fn_info->name))
+	      /* function checksum */
+	      || gcov_write_unsigned (da_file, fn_info->checksum)
+	      || gcov_write_length (da_file, base))
+	    goto write_error;
+	  
+	  /* arc counts.  */
+	  if (gcov_write_unsigned (da_file, GCOV_TAG_ARC_COUNTS)
+	      || !(base = gcov_reserve_length (da_file)))
+	    goto write_error;
+	  
+	  for (jx = fn_info->n_arc_counts; jx--;)
+	    {
+	      gcov_type count = *count_ptr++;
+	      
+	      object.arc_sum += count;
+	      if (object.arc_max_sum < count)
+		object.arc_max_sum = count;
+	      if (gcov_write_counter (da_file, count))
+		goto write_error; /* RIP Edsger Dijkstra */
+	    }
+	  if (gcov_write_length (da_file, base))
+	    goto write_error;
+	}
+
+      /* Object file summary. */
+      if (gcov_write_summary (da_file, GCOV_TAG_OBJECT_SUMMARY, &object))
+	goto write_error;
+
+      if (merging >= 0)
+	{
+	  if (fseek (da_file, 0, SEEK_END))
+	    goto write_error;
+	  ptr->wkspc = ftell (da_file);
+	  if (gcov_write_summary (da_file, GCOV_TAG_PLACEHOLDER_SUMMARY,
+				  &program))
+	    goto write_error;
+	}
+      else if (ptr->wkspc)
+	{
+	  /* Zap trailing program summary */
+	  if (fseek (da_file, ptr->wkspc, SEEK_SET))
+	    goto write_error;
+	  if (!local_prg.runs)
+	    ptr->wkspc = 0;
+	  if (gcov_write_unsigned (da_file,
+			     local_prg.runs ? GCOV_TAG_PLACEHOLDER_SUMMARY
+			     : GCOV_TAG_INCORRECT_SUMMARY))
+	    goto write_error;
+	}
+      if (fflush (da_file))
+	goto write_error;
+
+      if (fclose (da_file))
+	{
+	  fprintf (stderr, "profiling:%s:Error closing\n", ptr->filename);
+	  ptr->filename = 0;
 	}
       else
 	{
-
-	  struct bb_function_info *fn_info;
-	  gcov_type *count_ptr = ptr->counts;
-	  int i;
-	  int count_functions = 0;
-
-	  for (fn_info = ptr->function_infos; fn_info->arc_count != -1;
-	       fn_info++)
-	    count_functions++;
-
-	  /* number of functions in this block.  */
-	  __write_long (count_functions, da_file, 4);
-
-	  /* length of extra data in bytes.  */
-	  __write_long ((4 + 8 + 8) + (4 + 8 + 8), da_file, 4);
-
-	  /* overall statistics.  */
-	  /* number of counters.  */
-	  __write_long (n_counters_p, da_file, 4);
-	  /* sum of counters.  */
-	  __write_gcov_type (sum_counters_p, da_file, 8);
-	  /* maximal counter.  */
-	  __write_gcov_type (max_counter_p, da_file, 8);
-
-	  /* per-object statistics.  */
-	  /* number of counters.  */
-	  __write_long (ptr->ncounts, da_file, 4);
-	  /* sum of counters.  */
-	  __write_gcov_type (sum_counters_o, da_file, 8);
-	  /* maximal counter.  */
-	  __write_gcov_type (max_counter_o, da_file, 8);
-
-	  /* write execution counts for each function.  */
-
-	  for (fn_info = ptr->function_infos; fn_info->arc_count != -1;
-	       fn_info++)
-	    {
-	      /* new function.  */
-	      if (__write_gcov_string
-		  (fn_info->name, strlen (fn_info->name), da_file, -1) != 0)
-		{
-		  fprintf (stderr,
-			   "arc profiling: Error writing output file %s.\n",
-			   ptr->filename);
-		  break;
-		}
-
-	      if (__write_long (fn_info->checksum, da_file, 4) != 0)
-		{
-		  fprintf (stderr,
-			   "arc profiling: Error writing output file %s.\n",
-			   ptr->filename);
-		  break;
-		}
-
-	      if (__write_long (fn_info->arc_count, da_file, 4) != 0)
-		{
-		  fprintf (stderr,
-			   "arc profiling: Error writing output file %s.\n",
-			   ptr->filename);
-		  break;
-		}
-
-	      for (i = fn_info->arc_count; i > 0; i--, count_ptr++)
-		{
-		  if (__write_gcov_type (*count_ptr, da_file, 8) != 0)
-		    break;
-		}
-
-	      if (i)		/* there was an error */
-		{
-		  fprintf (stderr,
-			   "arc profiling: Error writing output file %s.\n",
-			   ptr->filename);
-		  break;
-		}
-	    }
+	  program_arcs += ptr->n_arc_counts;
+	  program_sum += object.arc_sum;
+	  if (program_max_sum < object.arc_max_sum)
+	    program_max_sum = object.arc_max_sum;
 	}
-
-      if (fclose (da_file) != 0)
-	fprintf (stderr, "arc profiling: Error closing output file %s.\n",
-		 ptr->filename);
     }
+
+  /* Generate whole program statistics.  */
+  program.runs++;
+  program.arcs = program_arcs;
+  program.arc_sum = program_sum;
+  if (program.arc_max_one < program_max_one)
+    program.arc_max_one = program_max_one;
+  if (program.arc_max_sum < program_max_sum)
+    program.arc_max_sum = program_max_sum;
+  program.arc_sum_max += program_max_one;
+  
+  /* Upate whole program statistics.  */
+  for (ptr = gcov_list; ptr; ptr = ptr->next)
+    if (ptr->filename && ptr->wkspc)
+      {
+	FILE *da_file;
+	
+	da_file = fopen (ptr->filename, "r+b");
+	if (!da_file)
+	  {
+	    fprintf (stderr, "profiling:%s:Cannot open\n", ptr->filename);
+	    continue;
+	  }
+	
+#if defined (TARGET_HAS_F_SETLKW)
+	while (fcntl (fileno (da_file), F_SETLKW, &s_flock)
+	       && errno == EINTR)
+	  continue;
+#endif
+	if (fseek (da_file, ptr->wkspc, SEEK_SET)
+ 	    || gcov_write_summary (da_file, GCOV_TAG_PROGRAM_SUMMARY, &program)
+ 	    || fflush (da_file))
+ 	  fprintf (stderr, "profiling:%s:Error writing\n", ptr->filename);
+	if (fclose (da_file))
+	  fprintf (stderr, "profiling:%s:Error closing\n", ptr->filename);
+      }
 }
 
+/* Add a new object file onto the bb chain.  Invoked automatically
+   when running an object file's global ctors.  */
+
 void
-__bb_init_func (struct bb *blocks)
+__gcov_init (struct gcov_info *info)
 {
-  /* User is supposed to check whether the first word is non-0,
-     but just in case....  */
-
-  if (blocks->zero_word)
+  if (!info->version)
     return;
+  if (info->version != GCOV_VERSION)
+    gcov_version_mismatch (info, info->version);
+  else
+    {
+      const char *ptr = info->filename;
+      unsigned crc32 = gcov_crc32;
+  
+      do
+	{
+	  unsigned ix;
+	  unsigned value = *ptr << 24;
 
-  /* Initialize destructor and per-thread data.  */
-  if (!bb_head)
-    atexit (__bb_exit_func);
+	  for (ix = 8; ix--; value <<= 1)
+	    {
+	      unsigned feedback;
 
-  /* Set up linked list.  */
-  blocks->zero_word = 1;
-  blocks->next = bb_head;
-  bb_head = blocks;
+	      feedback = (value ^ crc32) & 0x80000000 ? 0x04c11db7 : 0;
+	      crc32 <<= 1;
+	      crc32 ^= feedback;
+	    }
+	}
+      while (*ptr++);
+      
+      gcov_crc32 = crc32;
+      
+      if (!gcov_list)
+	atexit (gcov_exit);
+      
+      info->next = gcov_list;
+      gcov_list = info;
+    }
+  info->version = 0;
 }
 
 /* Called before fork or exec - write out profile information gathered so
    far and reset it to zero.  This avoids duplication or loss of the
    profile information gathered so far.  */
-void
-__bb_fork_func (void)
-{
-  struct bb *ptr;
 
-  __bb_exit_func ();
-  for (ptr = bb_head; ptr != (struct bb *) 0; ptr = ptr->next)
+void
+__gcov_flush (void)
+{
+  struct gcov_info *ptr;
+
+  gcov_exit ();
+  for (ptr = gcov_list; ptr; ptr = ptr->next)
     {
-      long i;
-      for (i = ptr->ncounts - 1; i >= 0; i--)
-	ptr->counts[i] = 0;
+      unsigned i;
+      
+      for (i = ptr->n_arc_counts; i--;)
+	ptr->arc_counts[i] = 0;
     }
 }
 
-#endif /* not inhibit_libc */
-#endif /* L_bb */
+#endif /* L_gcov */
 
 #ifdef L_clear_cache
 /* Clear part of an instruction cache.  */
@@ -1654,102 +1840,6 @@ mprotect (char *addr, int len, int prot)
 TRANSFER_FROM_TRAMPOLINE
 #endif
 
-#if defined (NeXT) && defined (__MACH__)
-
-/* Make stack executable so we can call trampolines on stack.
-   This is called from INITIALIZE_TRAMPOLINE in next.h.  */
-#ifdef NeXTStep21
- #include <mach.h>
-#else
- #include <mach/mach.h>
-#endif
-
-void
-__enable_execute_stack (char *addr)
-{
-  kern_return_t r;
-  char *eaddr = addr + TRAMPOLINE_SIZE;
-  vm_address_t a = (vm_address_t) addr;
-
-  /* turn on execute access on stack */
-  r = vm_protect (task_self (), a, TRAMPOLINE_SIZE, FALSE, VM_PROT_ALL);
-  if (r != KERN_SUCCESS)
-    {
-      mach_error("vm_protect VM_PROT_ALL", r);
-      exit(1);
-    }
-
-  /* We inline the i-cache invalidation for speed */
-
-#ifdef CLEAR_INSN_CACHE
-  CLEAR_INSN_CACHE (addr, eaddr);
-#else
-  __clear_cache ((int) addr, (int) eaddr);
-#endif
-}
-
-#endif /* defined (NeXT) && defined (__MACH__) */
-
-#ifdef __convex__
-
-/* Make stack executable so we can call trampolines on stack.
-   This is called from INITIALIZE_TRAMPOLINE in convex.h.  */
-
-#include <sys/mman.h>
-#include <sys/vmparam.h>
-#include <machine/machparam.h>
-
-void
-__enable_execute_stack (void)
-{
-  int fp;
-  static unsigned lowest = USRSTACK;
-  unsigned current = (unsigned) &fp & -NBPG;
-
-  if (lowest > current)
-    {
-      unsigned len = lowest - current;
-      mremap (current, &len, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE);
-      lowest = current;
-    }
-
-  /* Clear instruction cache in case an old trampoline is in it.  */
-  asm ("pich");
-}
-#endif /* __convex__ */
-
-#ifdef __sysV88__
-
-/* Modified from the convex -code above.  */
-
-#include <sys/param.h>
-#include <errno.h>
-#include <sys/m88kbcs.h>
-
-void
-__enable_execute_stack (void)
-{
-  int save_errno;
-  static unsigned long lowest = USRSTACK;
-  unsigned long current = (unsigned long) &save_errno & -NBPC;
-
-  /* Ignore errno being set. memctl sets errno to EINVAL whenever the
-     address is seen as 'negative'. That is the case with the stack.  */
-
-  save_errno=errno;
-  if (lowest > current)
-    {
-      unsigned len=lowest-current;
-      memctl(current,len,MCT_TEXT);
-      lowest = current;
-    }
-  else
-    memctl(current,NBPC,MCT_TEXT);
-  errno=save_errno;
-}
-
-#endif /* __sysV88__ */
-
 #ifdef __sysV68__
 
 #include <sys/signal.h>
@@ -1794,57 +1884,6 @@ __clear_insn_cache (void)
 }
 
 #endif /* __sysV68__ */
-
-#ifdef __pyr__
-
-#undef NULL /* Avoid errors if stdio.h and our stddef.h mismatch.  */
-#include <stdio.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/param.h>
-#include <sys/vmmac.h>
-
-/* Modified from the convex -code above.
-   mremap promises to clear the i-cache.  */
-
-void
-__enable_execute_stack (void)
-{
-  int fp;
-  if (mprotect (((unsigned int)&fp/PAGSIZ)*PAGSIZ, PAGSIZ,
-		PROT_READ|PROT_WRITE|PROT_EXEC))
-    {
-      perror ("mprotect in __enable_execute_stack");
-      fflush (stderr);
-      abort ();
-    }
-}
-#endif /* __pyr__ */
-
-#if defined (sony_news) && defined (SYSTYPE_BSD)
-
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/param.h>
-#include <syscall.h>
-#include <machine/sysnews.h>
-
-/* cacheflush function for NEWS-OS 4.2.
-   This function is called from trampoline-initialize code
-   defined in config/mips/mips.h.  */
-
-void
-cacheflush (char *beg, int size, int flag)
-{
-  if (syscall (SYS_sysnews, NEWS_CACHEFLUSH, beg, size, FLUSH_BCACHE))
-    {
-      perror ("cache_flush");
-      fflush (stderr);
-      abort ();
-    }
-}
-
-#endif /* sony_news */
 #endif /* L_trampoline */
 
 #ifndef __CYGWIN__

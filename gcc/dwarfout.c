@@ -1,6 +1,6 @@
 /* Output Dwarf format symbol table information from the GNU C compiler.
    Copyright (C) 1992, 1993, 1995, 1996, 1997, 1998, 2002,
-   1999, 2000, 2001 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
    Contributed by Ron Guilmette (rfg@monkeys.com) of Network Computing Devices.
 
 This file is part of GCC.
@@ -43,7 +43,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
  The generation of DWARF debugging information by the GNU version 2.x C
  compiler has now been tested rather extensively for m88k, i386, i860, and
- Sparc targets.  The DWARF output of the GNU C compiler appears to inter-
+ SPARC targets.  The DWARF output of the GNU C compiler appears to inter-
  operate well with the standard SVR4 SDB debugger on these kinds of target
  systems (but of course, there are no guarantees).
 
@@ -782,9 +782,9 @@ static void dwarfout_end_source_file	PARAMS ((unsigned));
 static void dwarfout_end_source_file_check PARAMS ((unsigned));
 static void dwarfout_begin_block	PARAMS ((unsigned, unsigned));
 static void dwarfout_end_block		PARAMS ((unsigned, unsigned));
-static void dwarfout_end_epilogue	PARAMS ((void));
+static void dwarfout_end_epilogue	PARAMS ((unsigned int, const char *));
 static void dwarfout_source_line	PARAMS ((unsigned int, const char *));
-static void dwarfout_end_prologue	PARAMS ((unsigned int));
+static void dwarfout_end_prologue	PARAMS ((unsigned int, const char *));
 static void dwarfout_end_function	PARAMS ((unsigned int));
 static void dwarfout_function_decl	PARAMS ((tree));
 static void dwarfout_global_decl	PARAMS ((tree));
@@ -935,9 +935,6 @@ static void retry_incomplete_types	PARAMS ((void));
 #ifndef FILE_ASM_OP
 #define FILE_ASM_OP		"\t.file\t"
 #endif
-#ifndef VERSION_ASM_OP
-#define VERSION_ASM_OP		"\t.version\t"
-#endif
 #ifndef SET_ASM_OP
 #define SET_ASM_OP		"\t.set\t"
 #endif
@@ -1018,7 +1015,7 @@ static void retry_incomplete_types	PARAMS ((void));
    stock m88k/svr4 assembler, both of which need to see .L at the start of
    a label in order to prevent that label from going into the linker symbol
    table).  When I get time, I'll have to fix this the right way so that we
-   will use ASM_GENERATE_INTERNAL_LABEL and ASM_OUTPUT_INTERNAL_LABEL herein,
+   will use ASM_GENERATE_INTERNAL_LABEL and (*targetm.asm_out.internal_label) herein,
    but that will require a rather massive set of changes.  For the moment,
    the following definitions out to produce the right results for all svr4
    and svr3 assemblers. -- rfg
@@ -1140,18 +1137,6 @@ static void retry_incomplete_types	PARAMS ((void));
 #endif
 #ifndef BOUND_END_LABEL_FMT
 #define BOUND_END_LABEL_FMT	"*.L_b%u_%u_%c_e"
-#endif
-#ifndef DERIV_BEGIN_LABEL_FMT
-#define DERIV_BEGIN_LABEL_FMT	"*.L_d%u"
-#endif
-#ifndef DERIV_END_LABEL_FMT
-#define DERIV_END_LABEL_FMT	"*.L_d%u_e"
-#endif
-#ifndef SL_BEGIN_LABEL_FMT
-#define SL_BEGIN_LABEL_FMT	"*.L_sl%u"
-#endif
-#ifndef SL_END_LABEL_FMT
-#define SL_END_LABEL_FMT	"*.L_sl%u_e"
 #endif
 #ifndef BODY_BEGIN_LABEL_FMT
 #define BODY_BEGIN_LABEL_FMT	"*.L_b%u"
@@ -2077,7 +2062,8 @@ output_reg_number (rtl)
 
   if (regno >= DWARF_FRAME_REGISTERS)
     {
-      warning_with_decl (dwarf_last_decl, "internal regno botch: regno = %d\n",
+      warning_with_decl (dwarf_last_decl, 
+			 "internal regno botch: `%s' has regno = %d\n",
 			 regno);
       regno = 0;
     }
@@ -2294,7 +2280,8 @@ output_bound_representation (bound, dim_num, u_or_l)
 		   || TREE_CODE (bound) == CONVERT_EXPR)
 	      bound = TREE_OPERAND (bound, 0);
 
-	    if (TREE_CODE (bound) == SAVE_EXPR)
+	    if (TREE_CODE (bound) == SAVE_EXPR 
+		&& SAVE_EXPR_RTL (bound))
 	      output_loc_descriptor
 		(eliminate_regs (SAVE_EXPR_RTL (bound), 0, NULL_RTX));
 	  }
@@ -3319,6 +3306,13 @@ member_attribute (context)
 }
 
 #if 0
+#ifndef SL_BEGIN_LABEL_FMT
+#define SL_BEGIN_LABEL_FMT	"*.L_sl%u"
+#endif
+#ifndef SL_END_LABEL_FMT
+#define SL_END_LABEL_FMT	"*.L_sl%u_e"
+#endif
+
 static inline void
 string_length_attribute (upper_bound)
      tree upper_bound;
@@ -5841,8 +5835,9 @@ dwarfout_end_block (line, blocknum)
    to their home locations).  */
 
 static void
-dwarfout_end_prologue (line)
+dwarfout_end_prologue (line, file)
      unsigned int line ATTRIBUTE_UNUSED;
+     const char *file ATTRIBUTE_UNUSED;
 {
   char label[MAX_ARTIFICIAL_LABEL_BYTES];
 
@@ -5875,7 +5870,9 @@ dwarfout_end_function (line)
    has been generated.	*/
 
 static void
-dwarfout_end_epilogue ()
+dwarfout_end_epilogue (line, file)
+     unsigned int line ATTRIBUTE_UNUSED;
+     const char *file ATTRIBUTE_UNUSED;
 {
   char label[MAX_ARTIFICIAL_LABEL_BYTES];
 
@@ -6181,6 +6178,8 @@ static void
 dwarfout_init (main_input_filename)
      const char *main_input_filename;
 {
+  warning ("support for the DWARF1 debugging format is deprecated");
+
   /* Remember the name of the primary input file.  */
 
   primary_filename = main_input_filename;

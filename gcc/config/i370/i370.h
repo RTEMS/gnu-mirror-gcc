@@ -25,7 +25,7 @@ Boston, MA 02111-1307, USA.  */
 #ifndef GCC_I370_H
 #define GCC_I370_H
 
-/* Target CPU builtins.  */			\
+/* Target CPU builtins.  */
 #define TARGET_CPU_CPP_BUILTINS()		\
   do						\
     {						\
@@ -1073,18 +1073,6 @@ enum reg_class
     }									\
 }
 
-#define ASM_GLOBALIZE_LABEL(FILE, NAME)					\
-{ 									\
-  char temp[MAX_MVS_LABEL_SIZE + 1];					\
-  if (mvs_check_alias (NAME, temp) == 2)				\
-    {									\
-      fprintf (FILE, "%s\tALIAS\tC'%s'\n", temp, NAME);			\
-    }									\
-  fputs ("\tENTRY\t", FILE);						\
-  assemble_name (FILE, NAME);						\
-  fputs ("\n", FILE);							\
-}
-
 /* MVS externals are limited to 8 characters, upper case only.
    The '_' is mapped to '@', except for MVS functions, then '#'.  */
 
@@ -1107,18 +1095,6 @@ enum reg_class
 
 #define ASM_GENERATE_INTERNAL_LABEL(LABEL, PREFIX, NUM)			\
   sprintf (LABEL, "*%s%d", PREFIX, NUM)
-
-/* Generate internal label.  Since we can branch here from off page, we
-   must reload the base register.  */
-
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE, PREFIX, NUM) 			\
-{									\
-  if (!strcmp (PREFIX,"L"))						\
-    {									\
-      mvs_add_label(NUM);						\
-    }									\
-  fprintf (FILE, "%s%d\tEQU\t*\n", PREFIX, NUM);			\
-}
 
 /* Generate case label.  For HLASM we can change to the data CSECT
    and put the vectors out of the code body. The assembler just
@@ -1268,15 +1244,7 @@ enum reg_class
   ASM_OUTPUT_SKIP (FILE,SIZE);						\
 }
 
-/* Store in OUTPUT a string (made with alloca) containing an
-   assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)  		\
-{									\
-  (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10);			\
-  sprintf ((OUTPUT), "%s%d", (NAME), (LABELNO));			\
-}
+#define ASM_PN_FORMAT "%s%lu"
 
 /* Print operand XV (an rtx) in assembler syntax to file FILE.
    CODE is a letter or dot (`z' in `%z0') or 0 if no letter was specified.
@@ -1383,7 +1351,7 @@ enum reg_class
             char buf[50];						\
             REAL_VALUE_TYPE rval;					\
             REAL_VALUE_FROM_CONST_DOUBLE(rval, XV);			\
-            REAL_VALUE_TO_DECIMAL (rval, HOST_WIDE_INT_PRINT_DEC, buf);	\
+            REAL_VALUE_TO_DECIMAL (rval, buf, -1);			\
 	    if (GET_MODE (XV) == SFmode)				\
 	      {								\
 		mvs_page_lit += 4;					\
@@ -1677,7 +1645,7 @@ enum reg_class
             char buf[50];						\
             REAL_VALUE_TYPE rval;					\
             REAL_VALUE_FROM_CONST_DOUBLE(rval, XV);			\
-            REAL_VALUE_TO_DECIMAL (rval, HOST_WIDE_INT_PRINT_DEC, buf);	\
+            REAL_VALUE_TO_DECIMAL (rval, buf, -1);			\
 	    if (GET_MODE (XV) == SFmode)				\
 	      {								\
 		mvs_page_lit += 4;					\
@@ -1845,25 +1813,7 @@ abort(); \
 
 #define ASM_DOUBLE "\t.double"     
 
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME.  */
-#define ASM_OUTPUT_LABEL(FILE,NAME)     \
-   (assemble_name (FILE, NAME), fputs (":\n", FILE))
- 
 /* #define ASM_OUTPUT_LABELREF(FILE, NAME) */	/* use gas -- defaults.h */
-
-/* Generate internal label.  Since we can branch here from off page, we
-   must reload the base register.  Note that internal labels are generated
-   for loops, goto's and case labels.  */
-#undef ASM_OUTPUT_INTERNAL_LABEL
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE, PREFIX, NUM) 			\
-{									\
-  if (!strcmp (PREFIX,"L"))						\
-    {									\
-      mvs_add_label(NUM);						\
-    }									\
-  fprintf (FILE, ".%s%d:\n", PREFIX, NUM); 				\
-}
 
 /* let config/svr4.h define this ...
  *  #define ASM_OUTPUT_CASE_LABEL(FILE, PREFIX, NUM, TABLE)
@@ -1901,14 +1851,7 @@ abort(); \
 #undef SHIFT_DOUBLE_OMITS_COUNT
 #define SHIFT_DOUBLE_OMITS_COUNT 0
 
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)  \
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),    \
-  sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO)))
- 
-/* Allow #sccs in preprocessor.  */
-#define SCCS_DIRECTIVE
-
- /* Implicit library calls should use memcpy, not bcopy, etc.  */
+/* Implicit library calls should use memcpy, not bcopy, etc.  */
 #define TARGET_MEM_FUNCTIONS
  
 /* Output before read-only data.  */
@@ -1932,11 +1875,8 @@ abort(); \
 #define ASM_OUTPUT_ALIGN(FILE,LOG) \
   if ((LOG)!=0) fprintf ((FILE), "\t.balign %d\n", 1<<(LOG))
  
-/* This is how to output a command to make the user-level label named NAME
-   defined for reference from other files.  */
-
-#define ASM_GLOBALIZE_LABEL(FILE,NAME)  \
-  (fputs (".globl ", FILE), assemble_name (FILE, NAME), fputs ("\n", FILE))
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP ".globl "
 
 /* This says how to output an assembler line
    to define a global common symbol.  */

@@ -261,6 +261,8 @@ do {									\
 	     rs6000_sdata_name, rs6000_abi_name);			\
     }									\
 									\
+  targetm.have_srodata_section = rs6000_sdata == SDATA_EABI;		\
+									\
   if (TARGET_RELOCATABLE && !TARGET_MINIMAL_TOC)			\
     {									\
       target_flags |= MASK_MINIMAL_TOC;					\
@@ -396,7 +398,6 @@ do {									\
          : MAX (COMPUTED, SPECIFIED))
 
 #undef  BIGGEST_FIELD_ALIGNMENT
-#undef  ADJUST_FIELD_ALIGN
 
 /* Use ELF style section commands.  */
 
@@ -454,7 +455,7 @@ toc_section ()								\
 	    {								\
 	      toc_initialized = 1;					\
 	      fprintf (asm_out_file, "%s\n", TOC_SECTION_ASM_OP);	\
-	      ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "LCTOC", 0);	\
+	      (*targetm.asm_out.internal_label) (asm_out_file, "LCTOC", 0); \
 	      fprintf (asm_out_file, "\t.tc ");				\
 	      ASM_OUTPUT_INTERNAL_LABEL_PREFIX (asm_out_file, "LCTOC1[TC],"); \
 	      ASM_OUTPUT_INTERNAL_LABEL_PREFIX (asm_out_file, "LCTOC1"); \
@@ -599,7 +600,7 @@ extern int rs6000_pic_labelno;
       {									\
 	char buf[256];							\
 									\
-	ASM_OUTPUT_INTERNAL_LABEL (FILE, "LCL", rs6000_pic_labelno);	\
+	(*targetm.asm_out.internal_label) (FILE, "LCL", rs6000_pic_labelno); \
 									\
 	ASM_GENERATE_INTERNAL_LABEL (buf, "LCTOC", 1);			\
 	fprintf (FILE, "\t%s ", init_ptr);				\
@@ -610,11 +611,7 @@ extern int rs6000_pic_labelno;
 	putc ('\n', FILE);						\
       }									\
 									\
-    fprintf (FILE, "%s", TYPE_ASM_OP);					\
-    assemble_name (FILE, NAME);						\
-    putc (',', FILE);							\
-    fprintf (FILE, TYPE_OPERAND_FMT, "function");			\
-    putc ('\n', FILE);							\
+    ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "function");			\
     ASM_DECLARE_RESULT (FILE, DECL_RESULT (DECL));			\
 									\
     if (DEFAULT_ABI == ABI_AIX)						\
@@ -679,20 +676,13 @@ extern int rs6000_pic_labelno;
 #define	LOCAL_LABEL_PREFIX "."
 #define	USER_LABEL_PREFIX ""
 
-/* svr4.h overrides ASM_OUTPUT_INTERNAL_LABEL.  */
+/* svr4.h overrides (*targetm.asm_out.internal_label).  */
 
 #define	ASM_OUTPUT_INTERNAL_LABEL_PREFIX(FILE,PREFIX)	\
   asm_fprintf (FILE, "%L%s", PREFIX)
 
-#define	ASM_OUTPUT_LABEL(FILE,NAME)	\
-  (assemble_name (FILE, NAME), fputs (":\n", FILE))
-
-/* This is how to output a command to make the user-level label named NAME
-   defined for reference from other files.  */
-
-#define	ASM_GLOBALIZE_LABEL(FILE,NAME)	\
-  do { fputs ("\t.globl ", FILE);	\
-       assemble_name (FILE, NAME); putc ('\n', FILE);} while (0)
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP "\t.globl "
 
 /* This says how to output assembler code to declare an
    uninitialized internal linkage data object.  Under SVR4,
@@ -715,11 +705,7 @@ do {									\
       ASM_OUTPUT_LABEL (FILE, NAME);					\
       ASM_OUTPUT_SKIP (FILE, SIZE);					\
       if (!flag_inhibit_size_directive && (SIZE) > 0)			\
-	{								\
-	  fprintf (FILE, "%s", SIZE_ASM_OP);				\
-	  assemble_name (FILE, NAME);					\
-	  fprintf (FILE, ",%d\n",  SIZE);				\
-	}								\
+	ASM_OUTPUT_SIZE_DIRECTIVE (FILE, NAME, SIZE);			\
     }									\
   else									\
     {									\
@@ -732,8 +718,36 @@ do {									\
 /* Describe how to emit uninitialized external linkage items.  */
 #define	ASM_OUTPUT_ALIGNED_BSS(FILE, DECL, NAME, SIZE, ALIGN)		\
 do {									\
-  ASM_GLOBALIZE_LABEL (FILE, NAME);					\
+  (*targetm.asm_out.globalize_label) (FILE, NAME);			\
   ASM_OUTPUT_ALIGNED_LOCAL (FILE, NAME, SIZE, ALIGN);			\
+} while (0)
+
+/* This is how to output code to push a register on the stack.
+   It need not be very fast code.
+
+   On the rs6000, we must keep the backchain up to date.  In order
+   to simplify things, always allocate 16 bytes for a push (System V
+   wants to keep stack aligned to a 16 byte boundary).  */
+
+#define	ASM_OUTPUT_REG_PUSH(FILE, REGNO)				\
+do {									\
+  if (DEFAULT_ABI == ABI_V4)						\
+    asm_fprintf (FILE,							\
+		 "\t{stu|stwu} %s,-16(%s)\n\t{st|stw} %s,12(%s)\n",	\
+		 reg_names[1], reg_names[1], reg_names[REGNO],		\
+		 reg_names[1]);						\
+} while (0)
+
+/* This is how to output an insn to pop a register from the stack.
+   It need not be very fast code.  */
+
+#define	ASM_OUTPUT_REG_POP(FILE, REGNO)					\
+do {									\
+  if (DEFAULT_ABI == ABI_V4)						\
+    asm_fprintf (FILE,							\
+		 "\t{l|lwz} %s,12(%s)\n\t{ai|addic} %s,%s,16\n",	\
+		 reg_names[REGNO], reg_names[1], reg_names[1],		\
+		 reg_names[1]);						\
 } while (0)
 
 /* Switch  Recognition by gcc.c.  Add -G xx support.  */
@@ -766,14 +780,16 @@ extern int fixuplabelno;
 /* This is the end of what might become sysv4.h.  */
 
 /* Use DWARF 2 debugging information by default.  */
-#undef	PREFERRED_DEBUGGING_TYPE
-#define	PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
+#undef  PREFERRED_DEBUGGING_TYPE
+#define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
 
 /* Historically we have also supported stabs debugging.  */
-#define	DBX_DEBUGGING_INFO
+#define DBX_DEBUGGING_INFO 1
 
-#define	TARGET_ENCODE_SECTION_INFO  rs6000_elf_encode_section_info
-#define	TARGET_STRIP_NAME_ENCODING  rs6000_elf_strip_name_encoding
+#define TARGET_ENCODE_SECTION_INFO  rs6000_elf_encode_section_info
+#define TARGET_STRIP_NAME_ENCODING  rs6000_elf_strip_name_encoding
+#define TARGET_IN_SMALL_DATA_P  rs6000_elf_in_small_data_p
+#define TARGET_SECTION_TYPE_FLAGS  rs6000_elf_section_type_flags
 
 /* The ELF version doesn't encode [DS] or whatever at the end of symbols.  */
 
@@ -808,9 +824,19 @@ do {						\
 #define	TARGET_VERSION fprintf (stderr, " (PowerPC System V.4)");
 #endif
 
-#ifndef	CPP_PREDEFINES
-#define	CPP_PREDEFINES \
-  "-DPPC -Dunix -D__svr4__ -Asystem=unix -Asystem=svr4 -Acpu=powerpc -Amachine=powerpc"
+#ifndef	TARGET_OS_CPP_BUILTINS
+#define TARGET_OS_CPP_BUILTINS()          \
+  do                                      \
+    {                                     \
+      builtin_define_std ("PPC");         \
+      builtin_define_std ("unix");        \
+      builtin_define ("__svr4__");        \
+      builtin_assert ("system=unix");     \
+      builtin_assert ("system=svr4");     \
+      builtin_assert ("cpu=powerpc");     \
+      builtin_assert ("machine=powerpc"); \
+    }                                     \
+  while (0)
 #endif
 
 /* Pass various options to the assembler.  */

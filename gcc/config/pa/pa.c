@@ -116,6 +116,8 @@ static void pa_select_section PARAMS ((tree, int, unsigned HOST_WIDE_INT))
      ATTRIBUTE_UNUSED;
 static void pa_encode_section_info PARAMS ((tree, int));
 static const char *pa_strip_name_encoding PARAMS ((const char *));
+static void pa_globalize_label PARAMS ((FILE *, const char *))
+     ATTRIBUTE_UNUSED;
 
 /* Save the operands last given to a compare for use when we
    generate a scc or bcc insn.  */
@@ -152,11 +154,11 @@ unsigned int total_code_bytes;
 struct deferred_plabel GTY(())
 {
   rtx internal_label;
-  char *name;
+  const char *name;
 };
 static GTY((length ("n_deferred_plabels"))) struct deferred_plabel *
   deferred_plabels;
-static int n_deferred_plabels = 0;
+static size_t n_deferred_plabels = 0;
 
 /* Initialize the GCC target structure.  */
 
@@ -442,7 +444,7 @@ reg_before_reload_operand (op, mode)
   return 0;
 }
 
-/* Accept any constant that can be moved in one instructions into a
+/* Accept any constant that can be moved in one instruction into a
    general register.  */
 int
 cint_ok_for_move (intval)
@@ -576,6 +578,18 @@ arith11_operand (op, mode)
 {
   return (register_operand (op, mode)
 	  || (GET_CODE (op) == CONST_INT && INT_11_BITS (op)));
+}
+
+/* Return truth value of whether OP can be used as an operand in a
+   adddi3 insn.  */
+int
+adddi3_operand (op, mode)
+     rtx op;
+     enum machine_mode mode;
+{
+  return (register_operand (op, mode)
+	  || (GET_CODE (op) == CONST_INT
+	      && (TARGET_64BIT ? INT_14_BITS (op) : INT_11_BITS (op))));
 }
 
 /* A constant integer suitable for use in a PRE_MODIFY memory
@@ -1744,9 +1758,13 @@ emit_move_sequence (operands, mode, scratch_reg)
 	  else
 	    temp = gen_reg_rtx (mode);
 
-	  if (GET_CODE (operand1) == CONST_INT)
+	  /* We don't directly split DImode constants on 32-bit targets
+	     because PLUS uses an 11-bit immediate and the insn sequence
+	     generated is not as efficient as the one using HIGH/LO_SUM.  */
+	  if (GET_CODE (operand1) == CONST_INT
+	      && GET_MODE_BITSIZE (mode) <= HOST_BITS_PER_WIDE_INT)
 	    {
-	      /* Directly break constant into low and high parts.  This
+	      /* Directly break constant into high and low parts.  This
 		 provides better optimization opportunities because various
 		 passes recognize constants split with PLUS but not LO_SUM.
 		 We use a 14-bit signed low part except when the addition
@@ -4703,7 +4721,7 @@ void
 output_deferred_plabels (file)
      FILE *file;
 {
-  int i;
+  size_t i;
   /* If we have deferred plabels, then we need to switch into the data
      section and align it to a 4 byte boundary before we output the
      deferred plabels.  */
@@ -4716,7 +4734,7 @@ output_deferred_plabels (file)
   /* Now output the deferred plabels.  */
   for (i = 0; i < n_deferred_plabels; i++)
     {
-      ASM_OUTPUT_INTERNAL_LABEL (file, "L", CODE_LABEL_NUMBER (deferred_plabels[i].internal_label));
+      (*targetm.asm_out.internal_label) (file, "L", CODE_LABEL_NUMBER (deferred_plabels[i].internal_label));
       assemble_integer (gen_rtx_SYMBOL_REF (Pmode, deferred_plabels[i].name),
 			TARGET_64BIT ? 8 : 4, TARGET_64BIT ? 64 : 32, 1);
     }
@@ -4725,10 +4743,10 @@ output_deferred_plabels (file)
 /* HP's millicode routines mean something special to the assembler.
    Keep track of which ones we have used.  */
 
-enum millicodes { remI, remU, divI, divU, mulI, mulU, end1000 };
+enum millicodes { remI, remU, divI, divU, mulI, end1000 };
 static void import_milli			PARAMS ((enum millicodes));
 static char imported[(int) end1000];
-static const char * const milli_names[] = {"remI", "remU", "divI", "divU", "mulI", "mulU"};
+static const char * const milli_names[] = {"remI", "remU", "divI", "divU", "mulI"};
 static const char import_string[] = ".IMPORT $$....,MILLICODE";
 #define MILLI_START 10
 
@@ -5071,22 +5089,33 @@ function_arg_padding (mode, type)
      enum machine_mode mode;
      tree type;
 {
-  int size;
-
-  if (mode == BLKmode)
+  if (mode == BLKmode
+      || (TARGET_64BIT && type && AGGREGATE_TYPE_P (type)))
     {
-      if (type && TREE_CODE (TYPE_SIZE (type)) == INTEGER_CST)
-	size = int_size_in_bytes (type) * BITS_PER_UNIT;
+      /* Return none if justification is not required.  */
+      if (type
+	  && TREE_CODE (TYPE_SIZE (type)) == INTEGER_CST
+	  && (int_size_in_bytes (type) * BITS_PER_UNIT) % PARM_BOUNDARY == 0)
+	return none;
+
+      /* The directions set here are ignored when a BLKmode argument larger
+	 than a word is placed in a register.  Different code is used for
+	 the stack and registers.  This makes it difficult to have a
+	 consistent data representation for both the stack and registers.
+	 For both runtimes, the justification and padding for arguments on
+	 the stack and in registers should be identical.  */
+      if (TARGET_64BIT)
+	/* The 64-bit runtime specifies left justification for aggregates.  */
+        return upward;
       else
-	return upward;		/* Don't know if this is right, but */
-				/* same as old definition.  */
+	/* The 32-bit runtime architecture specifies right justification.
+	   When the argument is passed on the stack, the argument is padded
+	   with garbage on the left.  The HP compiler pads with zeros.  */
+	return downward;
     }
-  else
-    size = GET_MODE_BITSIZE (mode);
-  if (size < PARM_BOUNDARY)
+
+  if (GET_MODE_BITSIZE (mode) < PARM_BOUNDARY)
     return downward;
-  else if (size % PARM_BOUNDARY)
-    return upward;
   else
     return none;
 }
@@ -5166,28 +5195,35 @@ hppa_builtin_saveregs ()
 }
 
 void
-hppa_va_start (stdarg_p, valist, nextarg)
-     int stdarg_p ATTRIBUTE_UNUSED;
+hppa_va_start (valist, nextarg)
      tree valist;
      rtx nextarg;
 {
   nextarg = expand_builtin_saveregs ();
-  std_expand_builtin_va_start (1, valist, nextarg);
+  std_expand_builtin_va_start (valist, nextarg);
 }
 
 rtx
 hppa_va_arg (valist, type)
      tree valist, type;
 {
-  HOST_WIDE_INT align, size, ofs;
+  HOST_WIDE_INT size = int_size_in_bytes (type);
+  HOST_WIDE_INT ofs;
   tree t, ptr, pptr;
 
   if (TARGET_64BIT)
     {
-      /* Every argument in PA64 is passed by value (including large structs).
-         Arguments with size greater than 8 must be aligned 0 MOD 16.  */
+      /* Every argument in PA64 is supposed to be passed by value
+	 (including large structs).  However, as a GCC extension, we
+	 pass zero and variable sized arguments by reference.  Empty
+	 structures are a GCC extension not supported by the HP
+	 compilers.  Thus, passing them by reference isn't likely
+	 to conflict with the ABI.  For variable sized arguments,
+	 GCC doesn't have the infrastructure to allocate these to
+	 registers.  */
 
-      size = int_size_in_bytes (type);
+      /* Arguments with a size greater than 8 must be aligned 0 MOD 16.  */
+
       if (size > UNITS_PER_WORD)
         {
           t = build (PLUS_EXPR, TREE_TYPE (valist), valist,
@@ -5196,57 +5232,75 @@ hppa_va_arg (valist, type)
                      build_int_2 (-2 * UNITS_PER_WORD, -1));
           t = build (MODIFY_EXPR, TREE_TYPE (valist), valist, t);
           TREE_SIDE_EFFECTS (t) = 1;
-          expand_expr (t, const0_rtx, VOIDmode, EXPAND_NORMAL);
+	  expand_expr (t, const0_rtx, VOIDmode, EXPAND_NORMAL);
         }
-      return std_expand_builtin_va_arg (valist, type);
-    }
 
-  /* Compute the rounded size of the type.  */
-  align = PARM_BOUNDARY / BITS_PER_UNIT;
-  size = int_size_in_bytes (type);
-
-  ptr = build_pointer_type (type);
-
-  /* "Large" types are passed by reference.  */
-  if (size > 8)
-    {
-      t = build (PREDECREMENT_EXPR, TREE_TYPE (valist), valist,
-		 build_int_2 (POINTER_SIZE / BITS_PER_UNIT, 0));
-      TREE_SIDE_EFFECTS (t) = 1;
-
-      pptr = build_pointer_type (ptr);
-      t = build1 (NOP_EXPR, pptr, t);
-      TREE_SIDE_EFFECTS (t) = 1;
-
-      t = build1 (INDIRECT_REF, ptr, t);
-      TREE_SIDE_EFFECTS (t) = 1;
-    }
-  else
-    {
-      t = build (PLUS_EXPR, TREE_TYPE (valist), valist,
-		 build_int_2 (-size, -1));
-
-      /* Copied from va-pa.h, but we probably don't need to align
-	 to word size, since we generate and preserve that invariant.  */
-      t = build (BIT_AND_EXPR, TREE_TYPE (valist), t,
-		 build_int_2 ((size > 4 ? -8 : -4), -1));
-
-      t = build (MODIFY_EXPR, TREE_TYPE (valist), valist, t);
-      TREE_SIDE_EFFECTS (t) = 1;
-
-      ofs = (8 - size) % 4;
-      if (ofs)
+      if (size > 0)
+	return std_expand_builtin_va_arg (valist, type);
+      else
 	{
-	  t = build (PLUS_EXPR, TREE_TYPE (valist), t, build_int_2 (ofs, 0));
+	  ptr = build_pointer_type (type);
+
+	  /* Args grow upward.  */
+	  t = build (POSTINCREMENT_EXPR, TREE_TYPE (valist), valist,
+		     build_int_2 (POINTER_SIZE / BITS_PER_UNIT, 0));
+	  TREE_SIDE_EFFECTS (t) = 1;
+
+	  pptr = build_pointer_type (ptr);
+	  t = build1 (NOP_EXPR, pptr, t);
+	  TREE_SIDE_EFFECTS (t) = 1;
+
+	  t = build1 (INDIRECT_REF, ptr, t);
 	  TREE_SIDE_EFFECTS (t) = 1;
 	}
+    }
+  else /* !TARGET_64BIT */
+    {
+      ptr = build_pointer_type (type);
 
-      t = build1 (NOP_EXPR, ptr, t);
-      TREE_SIDE_EFFECTS (t) = 1;
+      /* "Large" and variable sized types are passed by reference.  */
+      if (size > 8 || size <= 0)
+	{
+	  /* Args grow downward.  */
+	  t = build (PREDECREMENT_EXPR, TREE_TYPE (valist), valist,
+		     build_int_2 (POINTER_SIZE / BITS_PER_UNIT, 0));
+	  TREE_SIDE_EFFECTS (t) = 1;
+
+	  pptr = build_pointer_type (ptr);
+	  t = build1 (NOP_EXPR, pptr, t);
+	  TREE_SIDE_EFFECTS (t) = 1;
+
+	  t = build1 (INDIRECT_REF, ptr, t);
+	  TREE_SIDE_EFFECTS (t) = 1;
+	}
+      else
+	{
+	  t = build (PLUS_EXPR, TREE_TYPE (valist), valist,
+		     build_int_2 (-size, -1));
+
+	  /* Copied from va-pa.h, but we probably don't need to align to
+	     word size, since we generate and preserve that invariant.  */
+	  t = build (BIT_AND_EXPR, TREE_TYPE (valist), t,
+		     build_int_2 ((size > 4 ? -8 : -4), -1));
+
+	  t = build (MODIFY_EXPR, TREE_TYPE (valist), valist, t);
+	  TREE_SIDE_EFFECTS (t) = 1;
+
+	  ofs = (8 - size) % 4;
+	  if (ofs)
+	    {
+	      t = build (PLUS_EXPR, TREE_TYPE (valist), t,
+			 build_int_2 (ofs, 0));
+	      TREE_SIDE_EFFECTS (t) = 1;
+	    }
+
+	  t = build1 (NOP_EXPR, ptr, t);
+	  TREE_SIDE_EFFECTS (t) = 1;
+	}
     }
 
   /* Calculate!  */
-  return expand_expr (t, NULL_RTX, Pmode, EXPAND_NORMAL);
+  return expand_expr (t, NULL_RTX, VOIDmode, EXPAND_NORMAL);
 }
 
 
@@ -5443,7 +5497,7 @@ output_cbranch (operands, nullify, length, negated, insn)
 	  if (TARGET_SOM || ! TARGET_GAS)
 	    {
 	      output_asm_insn ("addil L'%l0-%l4,%%r1", xoperands);
-	      ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+	      (*targetm.asm_out.internal_label) (asm_out_file, "L",
 					 CODE_LABEL_NUMBER (xoperands[4]));
 	      output_asm_insn ("ldo R'%l0-%l4(%%r1),%%r1", xoperands);
 	    }
@@ -6050,7 +6104,7 @@ output_millicode_call (insn, call_dest)
 	    {
 	      /* Add %r1 to the offset of our target from the next insn.  */
 	      output_asm_insn ("addil L%%%0-%1,%%r1", xoperands);
-	      ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+	      (*targetm.asm_out.internal_label) (asm_out_file, "L",
 					 CODE_LABEL_NUMBER (xoperands[1]));
 	      output_asm_insn ("ldo R%%%0-%1(%%r1),%%r1", xoperands);
 	    }
@@ -6142,7 +6196,7 @@ output_millicode_call (insn, call_dest)
       xoperands[2] = gen_label_rtx ();
       output_asm_insn ("\n\t{bl|b,l} %0,%3\n\tldo %1-%2(%3),%3",
 		       xoperands);
-      ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+      (*targetm.asm_out.internal_label) (asm_out_file, "L",
 				 CODE_LABEL_NUMBER (xoperands[2]));
     }
 
@@ -6152,8 +6206,6 @@ output_millicode_call (insn, call_dest)
   NOTE_SOURCE_FILE (NEXT_INSN (insn)) = 0;
   return "";
 }
-
-extern struct obstack permanent_obstack;
 
 /* INSN is either a function call.  It may have an unconditional jump
    in its delay slot.
@@ -6255,7 +6307,7 @@ output_call (insn, call_dest, sibcall)
       /* Don't have to worry about TARGET_PORTABLE_RUNTIME here since
 	 we don't have any direct calls in that case.  */
 	{
-	  int i;
+	  size_t i;
 	  const char *name = XSTR (call_dest, 0);
 
 	  /* See if we have already put this function on the list
@@ -6283,9 +6335,7 @@ output_call (insn, call_dest, sibcall)
 
 	      i = n_deferred_plabels++;
 	      deferred_plabels[i].internal_label = gen_label_rtx ();
-	      deferred_plabels[i].name = obstack_alloc (&permanent_obstack,
-							strlen (name) + 1);
-	      strcpy (deferred_plabels[i].name, name);
+	      deferred_plabels[i].name = ggc_strdup (name);
 
 	      /* Gross.  We have just implicitly taken the address of this
 		 function, mark it as such.  */
@@ -6314,7 +6364,7 @@ output_call (insn, call_dest, sibcall)
 		{
 		  /* Add %r1 to the offset of dyncall from the next insn.  */
 		  output_asm_insn ("addil L%%$$dyncall-%1,%%r1", xoperands);
-		  ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+		  (*targetm.asm_out.internal_label) (asm_out_file, "L",
 					     CODE_LABEL_NUMBER (xoperands[1]));
 		  output_asm_insn ("ldo R%%$$dyncall-%1(%%r1),%%r1", xoperands);
 	        }
@@ -6412,7 +6462,7 @@ output_call (insn, call_dest, sibcall)
       xoperands[3] = gen_label_rtx ();
       output_asm_insn ("\n\t{bl|b,l} %0,%%r2\n\tldo %1-%3(%%r2),%%r2",
 		       xoperands);
-      ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+      (*targetm.asm_out.internal_label) (asm_out_file, "L",
 				 CODE_LABEL_NUMBER (xoperands[3]));
     }
 
@@ -6506,7 +6556,7 @@ void
 pa_asm_output_mi_thunk (file, thunk_fndecl, delta, function)
      FILE *file;
      tree thunk_fndecl;
-     int delta;
+     HOST_WIDE_INT delta;
      tree function;
 {
   const char *target_name = XSTR (XEXP (DECL_RTL (function), 0), 0);
@@ -6576,7 +6626,7 @@ pa_asm_output_mi_thunk (file, thunk_fndecl, delta, function)
     {
       data_section ();
       fprintf (file, "\t.align 4\n");
-      ASM_OUTPUT_INTERNAL_LABEL (file, "LTHN", current_thunk_number);
+      (*targetm.asm_out.internal_label) (file, "LTHN", current_thunk_number);
       fprintf (file, "\t.word P%%%s\n", target_name);
       function_section (thunk_fndecl);
     }
@@ -7433,27 +7483,32 @@ function_arg (cum, mode, type, named, incoming)
      int incoming;
 {
   int max_arg_words = (TARGET_64BIT ? 8 : 4);
+  int alignment = 0;
+  int arg_size;
   int fpr_reg_base;
   int gpr_reg_base;
   rtx retval;
 
+  if (mode == VOIDmode)
+    return NULL_RTX;
+
+  arg_size = FUNCTION_ARG_SIZE (mode, type);
+
+  /* If this arg would be passed partially or totally on the stack, then
+     this routine should return zero.  FUNCTION_ARG_PARTIAL_NREGS will
+     handle arguments which are split between regs and stack slots if
+     the ABI mandates split arguments.  */
   if (! TARGET_64BIT)
     {
-      /* If this arg would be passed partially or totally on the stack, then
-         this routine should return zero.  FUNCTION_ARG_PARTIAL_NREGS will
-         handle arguments which are split between regs and stack slots if
-         the ABI mandates split arguments.  */
-      if (cum->words + FUNCTION_ARG_SIZE (mode, type) > max_arg_words
-          || mode == VOIDmode)
+      /* The 32-bit ABI does not split arguments.  */
+      if (cum->words + arg_size > max_arg_words)
 	return NULL_RTX;
     }
   else
     {
-      int offset = 0;
-      if (FUNCTION_ARG_SIZE (mode, type) > 1 && (cum->words & 1))
-	offset = 1;
-      if (cum->words + offset >= max_arg_words
-	  || mode == VOIDmode)
+      if (arg_size > 1)
+	alignment = cum->words & 1;
+      if (cum->words + alignment >= max_arg_words)
 	return NULL_RTX;
     }
 
@@ -7461,70 +7516,60 @@ function_arg (cum, mode, type, named, incoming)
      particularly in their handling of FP registers.  We might
      be able to cleverly share code between them, but I'm not
      going to bother in the hope that splitting them up results
-     in code that is more easily understood.
+     in code that is more easily understood.  */
 
-     The 64bit code probably is very wrong for structure passing.  */
   if (TARGET_64BIT)
     {
       /* Advance the base registers to their current locations.
 
          Remember, gprs grow towards smaller register numbers while
-	 fprs grow to higher register numbers.  Also remember FP regs
-	 are always 4 bytes wide, while the size of an integer register
-	 varies based on the size of the target word.  */
+	 fprs grow to higher register numbers.  Also remember that
+	 although FP regs are 32-bit addressable, we pretend that
+	 the registers are 64-bits wide.  */
       gpr_reg_base = 26 - cum->words;
       fpr_reg_base = 32 + cum->words;
 
-      /* If the argument is more than a word long, then we need to align
-	 the base registers.  Same caveats as above.  */
-      if (FUNCTION_ARG_SIZE (mode, type) > 1)
+      /* Arguments wider than one word and small aggregates need special
+	 treatment.  */
+      if (arg_size > 1
+	  || mode == BLKmode
+	  || (type && AGGREGATE_TYPE_P (type)))
 	{
-	  if (mode != BLKmode)
-	    {
-	      /* First deal with alignment of the doubleword.  */
-	      gpr_reg_base -= (cum->words & 1);
+	  /* Double-extended precision (80-bit), quad-precision (128-bit)
+	     and aggregates including complex numbers are aligned on
+	     128-bit boundaries.  The first eight 64-bit argument slots
+	     are associated one-to-one, with general registers r26
+	     through r19, and also with floating-point registers fr4
+	     through fr11.  Arguments larger than one word are always
+	     passed in general registers.
 
-	      /* This seems backwards, but it is what HP specifies.  We need
-	         gpr_reg_base to point to the smaller numbered register of
-	         the integer register pair.  So if we have an even register
-	          number, then decrement the gpr base.  */
-	      gpr_reg_base -= ((gpr_reg_base % 2) == 0);
+	     Using a PARALLEL with a word mode register results in left
+	     justified data on a big-endian target.  */
 
-	      /* FP values behave sanely, except that each FP reg is only
-	         half of word.  */
-	      fpr_reg_base += ((fpr_reg_base % 2) == 0);
-            }
-	  else
+	  rtx loc[8];
+	  int i, offset = 0, ub = arg_size;
+
+	  /* Align the base register.  */
+	  gpr_reg_base -= alignment;
+
+	  ub = MIN (ub, max_arg_words - cum->words - alignment);
+	  for (i = 0; i < ub; i++)
 	    {
-	      rtx loc[8];
-	      int i, offset = 0, ub;
-              ub = FUNCTION_ARG_SIZE (mode, type);
-	      ub = MIN (ub,
-			MAX (0, max_arg_words - cum->words - (cum->words & 1)));
-	      gpr_reg_base -= (cum->words & 1);
-	      for (i = 0; i < ub; i++)
-		{
-		  loc[i] = gen_rtx_EXPR_LIST (VOIDmode,
-					      gen_rtx_REG (DImode,
-							   gpr_reg_base),
-					      GEN_INT (offset));
-		  gpr_reg_base -= 1;
-		  offset += 8;
-		}
-	      if (ub == 0)
-		return NULL_RTX;
-	      else if (ub == 1)
-		return XEXP (loc[0], 0);
-	      else
-		return gen_rtx_PARALLEL (mode, gen_rtvec_v (ub, loc));
+	      loc[i] = gen_rtx_EXPR_LIST (VOIDmode,
+					  gen_rtx_REG (DImode, gpr_reg_base),
+					  GEN_INT (offset));
+	      gpr_reg_base -= 1;
+	      offset += 8;
 	    }
+
+	  return gen_rtx_PARALLEL (mode, gen_rtvec_v (ub, loc));
 	}
-    }
+     }
   else
     {
       /* If the argument is larger than a word, then we know precisely
 	 which registers we must use.  */
-      if (FUNCTION_ARG_SIZE (mode, type) > 1)
+      if (arg_size > 1)
 	{
 	  if (cum->words)
 	    {
@@ -7536,6 +7581,34 @@ function_arg (cum, mode, type, named, incoming)
 	      gpr_reg_base = 25;
 	      fpr_reg_base = 34;
 	    }
+
+	  /* Structures 5 to 8 bytes in size are passed in the general
+	     registers in the same manner as other non floating-point
+	     objects.  The data is right-justified and zero-extended
+	     to 64 bits.
+
+	     This is magic.  Normally, using a PARALLEL results in left
+	     justified data on a big-endian target.  However, using a
+	     single double-word register provides the required right
+	     justication for 5 to 8 byte structures.  This has nothing
+	     to do with the direction of padding specified for the argument.
+	     It has to do with how the data is widened and shifted into
+	     and from the register.
+
+	     Aside from adding load_multiple and store_multiple patterns,
+	     this is the only way that I have found to obtain right
+	     justification of BLKmode data when it has a size greater
+	     than one word.  Splitting the operation into two SImode loads
+	     or returning a DImode REG results in left justified data.  */
+	  if (mode == BLKmode)
+	    {
+	      rtx loc[1];
+
+	      loc[0] = gen_rtx_EXPR_LIST (VOIDmode,
+					  gen_rtx_REG (DImode, gpr_reg_base),
+					  const0_rtx);
+	      return gen_rtx_PARALLEL (mode, gen_rtvec_v (1, loc));
+	    }
 	}
       else
         {
@@ -7546,19 +7619,6 @@ function_arg (cum, mode, type, named, incoming)
 	}
     }
 
-  if (TARGET_64BIT && mode == TFmode)
-    {
-      return
-	gen_rtx_PARALLEL
-	  (mode,
-	   gen_rtvec (2,
-		      gen_rtx_EXPR_LIST (VOIDmode,
-					 gen_rtx_REG (DImode, gpr_reg_base + 1),
-					 const0_rtx),
-		      gen_rtx_EXPR_LIST (VOIDmode,
-					 gen_rtx_REG (DImode, gpr_reg_base),
-					 GEN_INT (8))));
-    }
   /* Determine if the argument needs to be passed in both general and
      floating point registers.  */
   if (((TARGET_PORTABLE_RUNTIME || TARGET_64BIT || TARGET_ELF32)
@@ -7690,4 +7750,18 @@ pa_select_section (exp, reloc, align)
     data_section ();
 }
 
+static void
+pa_globalize_label (stream, name)
+     FILE *stream;
+     const char *name;
+{
+  /* We only handle DATA objects here, functions are globalized in
+     ASM_DECLARE_FUNCTION_NAME.  */
+  if (! FUNCTION_NAME_P (name))
+  {
+    fputs ("\t.EXPORT ", stream);
+    assemble_name (stream, name);
+    fputs (",DATA\n", stream);
+  }
+}
 #include "gt-pa.h"

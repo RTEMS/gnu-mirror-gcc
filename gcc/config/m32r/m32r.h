@@ -1084,7 +1084,7 @@ M32R_STACK_ALIGN (current_function_outgoing_args_size)
    pointer to them is passed in a reg if one is available (and that is what
    we're given).
    This macro is only used in this file.  */
-#define PASS_IN_REG_P(CUM, MODE, TYPE, NAMED) \
+#define PASS_IN_REG_P(CUM, MODE, TYPE) \
   (ROUND_ADVANCE_CUM ((CUM), (MODE), (TYPE)) < M32R_MAX_PARM_REGS)
 
 /* Determine where to put an argument to a function.
@@ -1102,14 +1102,7 @@ M32R_STACK_ALIGN (current_function_outgoing_args_size)
 /* On the M32R the first M32R_MAX_PARM_REGS args are normally in registers
    and the rest are pushed.  */
 #define FUNCTION_ARG(CUM, MODE, TYPE, NAMED) \
-  (PASS_IN_REG_P ((CUM), (MODE), (TYPE), (NAMED))			\
-   ? gen_rtx_REG ((MODE), ROUND_ADVANCE_CUM ((CUM), (MODE), (TYPE)))	\
-   : 0)
-
-/* ??? Quick hack to try to get varargs working the normal way.  */
-#define FUNCTION_INCOMING_ARG(CUM, MODE, TYPE, NAMED) \
-  (((! current_function_varargs || (NAMED))				\
-    && PASS_IN_REG_P ((CUM), (MODE), (TYPE), (NAMED)))			\
+  (PASS_IN_REG_P ((CUM), (MODE), (TYPE))			\
    ? gen_rtx_REG ((MODE), ROUND_ADVANCE_CUM ((CUM), (MODE), (TYPE)))	\
    : 0)
 
@@ -1667,28 +1660,8 @@ sbss_section ()								\
    no longer contain unusual constructs.  */
 #define ASM_APP_OFF ""
 
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME.  */
-/* On the M32R we need to ensure the next instruction starts on a 32 bit
-   boundary [the previous insn must either be 2 16 bit insns or 1 32 bit].  */
-#define ASM_OUTPUT_LABEL(FILE, NAME)	\
-  do					\
-    {					\
-      assemble_name (FILE, NAME);	\
-      fputs (":\n", FILE);		\
-    }					\
-  while (0)
-
-/* This is how to output a command to make the user-level label named NAME
-   defined for reference from other files.  */
-#define ASM_GLOBALIZE_LABEL(FILE, NAME)	\
-  do					\
-    {					\
-      fputs ("\t.global\t", FILE);	\
-      assemble_name (FILE, NAME);	\
-      fputs ("\n", FILE);		\
-    }					\
-  while (0)
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP "\t.global\t"
 
 /* This is how to output a reference to a user-level label named NAME.
    `assemble_name' uses this.  */
@@ -1719,17 +1692,6 @@ sbss_section ()								\
 	       sym_lineno);						\
       sym_lineno += 1;							\
     }									\
-  while (0)
-
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)	\
-  do							\
-    {							\
-      (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10);\
-      sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO));	\
-    }							\
   while (0)
 
 /* How to refer to registers in assembler output.
@@ -1879,7 +1841,7 @@ extern char m32r_punct_chars[256];
 #define ASM_OUTPUT_ALIGNED_BSS(FILE, DECL, NAME, SIZE, ALIGN)	\
   do								\
     {								\
-      ASM_GLOBALIZE_LABEL (FILE, NAME);				\
+      (*targetm.asm_out.globalize_label) (FILE, NAME);		\
       ASM_OUTPUT_ALIGNED_COMMON (FILE, NAME, SIZE, ALIGN);	\
     }								\
   while (0)
@@ -1887,13 +1849,9 @@ extern char m32r_punct_chars[256];
 /* Debugging information.  */
 
 /* Generate DBX and DWARF debugging information.  */
-#undef	DBX_DEBUGGING_INFO
-#undef	DWARF_DEBUGGING_INFO
-#undef	DWARF2_DEBUGGING_INFO
-
-#define DBX_DEBUGGING_INFO
-#define DWARF_DEBUGGING_INFO
-#define DWARF2_DEBUGGING_INFO
+#define DBX_DEBUGGING_INFO 1
+#define DWARF_DEBUGGING_INFO 1
+#define DWARF2_DEBUGGING_INFO 1
 
 /* Prefer STABS (for now).  */
 #undef  PREFERRED_DEBUGGING_TYPE

@@ -1,3 +1,60 @@
+2002-09-17  Richard Henderson  <rth@redhat.com>
+
+	* trans.c (tree_transform): Use real_ldexp not REAL_VALUE_LDEXP.
+	* config/dsp16xx/dsp16xx.md (fixuns_trunchfhi2): Use real_2expN.
+	* config/mips/mips.md (fixuns_truncdfsi2): Likewise.
+	(fixuns_truncdfdi2, fixuns_truncsfsi2, fixuns_truncsfdi2): Likewise.
+	* config/m68k/m68k.c (floating_exact_log2): Use real_exponent
+	and real_2expN instead of a loop.
+	* doc/tm.texi (REAL_VALUE_LDEXP): Remove.
+	(REAL_VALUE_RNDZINT, REAL_VALUE_UNSIGNED_RNDZINT): Remove.
+
+2002-08-25  Andre Leis <a.leis@gmx.net>
+ 	    David Billinghurst (David.Billinghurst@riotinto.com>
+
+ 	* sysdep.c (__gnat_ttyname): include <termios.h> on cygwin
+
+2002-08-13  Rainer Orth  <ro@TechFak.Uni-Bielefeld.DE>
+
+	* Make-lang.in (gnatbind$(exeext)): Link with $(SYSLIBS).
+	Remove $(CONFIG_H) dependency.
+
+2002-08-08  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* ada/Make-lang.in (ada.mostlyclean): Remove coverage files.
+
+2002-07-29  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
+
+	* adadecode.c (ada_demangle): Use xstrdup in lieu of
+	xmalloc/strcpy.
+	* misc.c (gnat_decode_option): Likewise.
+
+2002-07-15  Florian Weimer  <fw@deneb.enyo.de>
+
+	* make.adb (Add_Switch): Make Generic_Position a procedure.  The
+	function approach did not work well because of a side effect (the
+	function call could reallocate the table which was being indexed
+	using its result). Fixes ada/4851. [RESURRECTED]
+
+2002-07-01  Roger Sayle  <roger@eyesopen.com>
+
+	* ada/utils.c (builtin_function): Accept an additional parameter.
+
+2002-06-28  Andreas Jaeger  <aj@suse.de>
+
+	PR ada/7144
+	* Makefile.in: Fix typo in comment, patch by Adrian Knoth
+	<adi@thur.de>.
+
+2002-06-24  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
+
+	* Makefile.in (SHELL): Set to @SHELL@.
+
+2002-06-20  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
+
+	* utils.c (init_gigi_decls): Use ARRAY_SIZE in lieu of explicit
+	array size calculation.
+
 2002-06-04  Andreas Jaeger  <aj@suse.de>
 
 	* Make-lang.in (gnatbind): Readd rule that has been lost in last

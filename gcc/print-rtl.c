@@ -92,6 +92,12 @@ print_mem_expr (outfile, expr)
 	fprintf (outfile, ".%s",
 		 IDENTIFIER_POINTER (DECL_NAME (TREE_OPERAND (expr, 1))));
     }
+  else if (TREE_CODE (expr) == INDIRECT_REF)
+    {
+      fputs (" (*", outfile);
+      print_mem_expr (outfile, TREE_OPERAND (expr, 0));
+      fputs (")", outfile);
+    }
   else if (DECL_NAME (expr))
     fprintf (outfile, " %s", IDENTIFIER_POINTER (DECL_NAME (expr)));
   else if (TREE_CODE (expr) == RESULT_DECL)
@@ -507,10 +513,7 @@ print_rtx (in_rtx)
       fputc (']', outfile);
       break;
 
-#if 0
-    /* It would be nice to do this, but it would require real.o to
-       be linked into the MD-generator programs.  Maybe we should
-       do that.  -zw 2002-03-03  */
+#ifndef GENERATOR_FILE
     case CONST_DOUBLE:
       if (FLOAT_MODE_P (GET_MODE (in_rtx)))
 	{
@@ -518,7 +521,7 @@ print_rtx (in_rtx)
 	  char s[30];
 
 	  REAL_VALUE_FROM_CONST_DOUBLE (val, in_rtx);
-	  REAL_VALUE_TO_DECIMAL (val, "%.16g", s);
+	  REAL_VALUE_TO_DECIMAL (val, s, -1);
 	  fprintf (outfile, " [%s]", s);
 	}
       break;
@@ -526,9 +529,14 @@ print_rtx (in_rtx)
 
     case CODE_LABEL:
       fprintf (outfile, " [%d uses]", LABEL_NUSES (in_rtx));
-      if (LABEL_ALTERNATE_NAME (in_rtx))
-	fprintf (outfile, " [alternate name: %s]",
-		 LABEL_ALTERNATE_NAME (in_rtx));
+      switch (LABEL_KIND (in_rtx))
+	{
+	  case LABEL_NORMAL: break;
+	  case LABEL_STATIC_ENTRY: fputs (" [entry]", outfile); break;
+	  case LABEL_GLOBAL_ENTRY: fputs (" [global entry]", outfile); break;
+	  case LABEL_WEAK_ENTRY: fputs (" [weak entry]", outfile); break;
+	  default: abort();
+	}
       break;
 
     case CALL_PLACEHOLDER:

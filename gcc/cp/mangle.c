@@ -121,7 +121,7 @@ static tree subst_identifiers[SUBID_MAX];
 
 /* Single-letter codes for builtin integer types, defined in
    <builtin-type>.  These are indexed by integer_type_kind values.  */
-static char
+static const char
 integer_type_codes[itk_none] =
 {
   'c',  /* itk_char */
@@ -196,7 +196,7 @@ static inline void start_mangling PARAMS ((void));
 static inline const char *finish_mangling PARAMS ((void));
 static tree mangle_special_for_type PARAMS ((tree, const char *));
 
-/* Foreign language functions. */
+/* Foreign language functions.  */
 
 static void write_java_integer_type_codes PARAMS ((tree));
 
@@ -205,7 +205,7 @@ static void write_java_integer_type_codes PARAMS ((tree));
 #define write_char(CHAR)                                              \
   obstack_1grow (&G.name_obstack, (CHAR))
 
-/* Append a sized buffer to the end of the mangled representation. */
+/* Append a sized buffer to the end of the mangled representation.  */
 #define write_chars(CHAR, LEN)                                        \
   obstack_grow (&G.name_obstack, (CHAR), (LEN))
 
@@ -213,11 +213,6 @@ static void write_java_integer_type_codes PARAMS ((tree));
    representation.  */
 #define write_string(STRING)                                          \
   obstack_grow (&G.name_obstack, (STRING), strlen (STRING))
-
-/* Return the position at which the next character will be appended to
-   the mangled representation.  */
-#define mangled_position()                                              \
-  obstack_object_size (&G.name_obstack)
 
 /* Non-zero if NODE1 and NODE2 are both TREE_LIST nodes and have the
    same purpose (context, which may be a type) and value (template
@@ -230,10 +225,6 @@ static void write_java_integer_type_codes PARAMS ((tree));
         && same_type_p (TREE_PURPOSE (NODE1), TREE_PURPOSE (NODE2)))\
        || TREE_PURPOSE (NODE1) == TREE_PURPOSE (NODE2))             \
    && TREE_VALUE (NODE1) == TREE_VALUE (NODE2))
-
-/* Write out a signed quantity in base 10.  */
-#define write_signed_number(NUMBER) \
-  write_number ((NUMBER), /*unsigned_p=*/0, 10)
 
 /* Write out an unsigned quantity in base 10.  */
 #define write_unsigned_number(NUMBER) \
@@ -584,7 +575,7 @@ find_substitution (node)
     }
 
   /* Now check the list of available substitutions for this mangling
-     operation.    */
+     operation.  */
   for (i = 0; i < size; ++i)
     {
       tree candidate = VARRAY_TREE (G.substitutions, i);
@@ -1089,7 +1080,7 @@ write_number (number, unsigned_p, base)
 
 /* Write out an integral CST in decimal. Most numbers are small, and
    representable in a HOST_WIDE_INT. Occasionally we'll have numbers
-   bigger than that, which we must deal with. */
+   bigger than that, which we must deal with.  */
 
 static inline void
 write_integer_cst (cst)
@@ -1100,7 +1091,7 @@ write_integer_cst (cst)
   if (TREE_INT_CST_HIGH (cst) + (sign < 0))
     {
       /* A bignum. We do this in chunks, each of which fits in a
-	 HOST_WIDE_INT. */
+	 HOST_WIDE_INT.  */
       char buffer[sizeof (HOST_WIDE_INT) * 8 * 2];
       unsigned HOST_WIDE_INT chunk;
       unsigned chunk_digits;
@@ -1110,13 +1101,13 @@ write_integer_cst (cst)
       int done;
 
       /* HOST_WIDE_INT must be at least 32 bits, so 10^9 is
-	 representable. */
+	 representable.  */
       chunk = 1000000000;
       chunk_digits = 9;
       
       if (sizeof (HOST_WIDE_INT) >= 8)
 	{
-	  /* It is at least 64 bits, so 10^18 is representable. */
+	  /* It is at least 64 bits, so 10^18 is representable.  */
 	  chunk_digits = 18;
 	  chunk *= chunk;
 	}
@@ -1284,7 +1275,7 @@ static void
 write_discriminator (discriminator)
      int discriminator;
 {
-  /* If discriminator is zero, don't write anything.  Otherwise... */
+  /* If discriminator is zero, don't write anything.  Otherwise...  */
   if (discriminator > 0)
     {
       write_char ('_');
@@ -1819,7 +1810,7 @@ write_expression (expr)
       code = TREE_CODE (expr);
     }
 
-  /* Handle template parameters. */
+  /* Handle template parameters.  */
   if (code == TEMPLATE_TYPE_PARM 
       || code == TEMPLATE_TEMPLATE_PARM
       || code == BOUND_TEMPLATE_TEMPLATE_PARM
@@ -1833,6 +1824,12 @@ write_expression (expr)
       write_char ('L');
       write_mangled_name (expr);
       write_char ('E');
+    }
+  else if (TREE_CODE (expr) == SIZEOF_EXPR 
+	   && TYPE_P (TREE_OPERAND (expr, 0)))
+    {
+      write_string ("st");
+      write_type (TREE_OPERAND (expr, 0));
     }
   else
     {
@@ -1872,6 +1869,7 @@ write_expression (expr)
 	  write_expression (TREE_OPERAND (expr, 0));
 	  break;
 
+	  
 	/* Handle pointers-to-members specially.  */
 	case SCOPE_REF:
 	  write_type (TREE_OPERAND (expr, 0));

@@ -128,7 +128,7 @@ java_init_lex (finput, encoding)
   CPC_INITIALIZER_LIST (ctxp) = CPC_STATIC_INITIALIZER_LIST (ctxp) =
     CPC_INSTANCE_INITIALIZER_LIST (ctxp) = NULL_TREE;
 
-  memset ((PTR) ctxp->modifier_ctx, 0, 11*sizeof (ctxp->modifier_ctx[0]));
+  memset ((PTR) ctxp->modifier_ctx, 0, sizeof (ctxp->modifier_ctx));
   memset ((PTR) current_jcf, 0, sizeof (JCF));
   ctxp->current_parsed_class = NULL;
   ctxp->package = NULL_TREE;
@@ -494,8 +494,8 @@ java_read_char (lex)
 						 + (c2 & 0x3f));
 		      /* Check for valid 3-byte characters.
 			 Don't allow surrogate, \ufffe or \uffff.  */
-		      if (r >= 0x800 && r <= 0xffff
-			  && ! (r >= 0xd800 && r <= 0xdfff)
+		      if (IN_RANGE (r, 0x800, 0xffff)
+			  && ! IN_RANGE (r, 0xd800, 0xdfff)
 			  && r != 0xfffe && r != 0xffff)
 			return r;
 		    }
@@ -599,7 +599,7 @@ java_read_unicode_collapsing_terminators (lex, unicode_escape_p)
 	 return a single line terminator.  */
       int dummy;
       c = java_read_unicode (lex, &dummy);
-      if (c != '\n')
+      if (c != '\n' && c != UEOF)
 	lex->unget_value = c;
       /* In either case we must return a newline.  */
       c = '\n';
@@ -834,7 +834,7 @@ java_parse_escape_sequence ()
 }
 
 #ifndef JC1_LITE
-#define IS_ZERO(X) (ereal_cmp (X, dconst0) == 0)
+#define IS_ZERO(X) REAL_VALUES_EQUAL (X, dconst0)
 
 /* Subroutine of java_lex: converts floating-point literals to tree
    nodes.  LITERAL_TOKEN is the input literal, JAVA_LVAL is where to
@@ -1023,9 +1023,10 @@ java_lex (java_lval)
 	    }
 	  else if (JAVA_ASCII_DIGIT (c))
 	    radix = 8;
-	  else if (c == '.')
+	  else if (c == '.' || c == 'e' || c =='E')
 	    {
-	      /* Push the '.' back and prepare for a FP parsing...  */
+	      /* Push the '.', 'e', or 'E' back and prepare for a FP
+		 parsing...  */
 	      java_unget_unicode ();
 	      c = '0';
 	    }

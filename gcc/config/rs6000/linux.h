@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler,
-   for powerpc machines running Linux.
+   for PowerPC machines running Linux.
    Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001 Free Software Foundation, 
    Inc.
    Contributed by Michael Meissner (meissner@cygnus.com).
@@ -27,9 +27,17 @@ Boston, MA 02111-1307, USA.  */
 #undef MD_EXEC_PREFIX
 #undef MD_STARTFILE_PREFIX
 
-#undef CPP_PREDEFINES
-#define CPP_PREDEFINES \
- "-DPPC -D__ELF__ -Dpowerpc -Acpu=powerpc -Amachine=powerpc"
+#undef TARGET_OS_CPP_BUILTINS
+#define TARGET_OS_CPP_BUILTINS()          \
+  do                                      \
+    {                                     \
+      builtin_define_std ("PPC");         \
+      builtin_define ("__ELF__");         \
+      builtin_define_std ("powerpc");     \
+      builtin_assert ("cpu=powerpc");     \
+      builtin_assert ("machine=powerpc"); \
+    }                                     \
+  while (0)
 
 #undef	CPP_OS_DEFAULT_SPEC
 #define CPP_OS_DEFAULT_SPEC "%(cpp_os_linux)"

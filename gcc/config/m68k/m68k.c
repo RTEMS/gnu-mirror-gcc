@@ -65,6 +65,9 @@ static void m68k_coff_asm_named_section PARAMS ((const char *, unsigned int));
 #ifdef CTOR_LIST_BEGIN
 static void m68k_svr3_asm_out_constructor PARAMS ((rtx, int));
 #endif
+#ifdef HPUX_ASM
+static void m68k_hp320_internal_label PARAMS ((FILE *, const char *, unsigned long));
+#endif
 
 
 /* Alignment to use for loops and jumps */
@@ -121,6 +124,10 @@ int m68k_last_compare_had_fp_operands;
 #define TARGET_ASM_FUNCTION_PROLOGUE m68k_output_function_prologue
 #undef TARGET_ASM_FUNCTION_EPILOGUE
 #define TARGET_ASM_FUNCTION_EPILOGUE m68k_output_function_epilogue
+#ifdef HPUX_ASM
+#undef TARGET_ASM_INTERNAL_LABEL
+#define  TARGET_ASM_INTERNAL_LABEL m68k_hp320_internal_label
+#endif
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -245,163 +252,7 @@ m68k_output_function_prologue (stream, size)
     fprintf (stream, "\tmovem $0x%x,-(sp)\n", mask);
 }
 
-#else
-#if defined (DPX2) && defined (MOTOROLA)
-
-static void
-m68k_output_function_prologue (stream, size)
-     FILE *stream;
-     HOST_WIDE_INT size;
-{
-  register int regno;
-  register int mask = 0;
-  int num_saved_regs = 0, first = 1;
-  HOST_WIDE_INT fsize = ((size) + 3) & -4;
-
-  if (frame_pointer_needed)
-    {
-      /* Adding negative number is faster on the 68040.  */
-      if (fsize < 0x8000 && !TARGET_68040)
-	fprintf (stream, "\tlink %s,#%d\n",
-		 reg_names[FRAME_POINTER_REGNUM], -fsize);
-      else if (TARGET_68020)
-	fprintf (stream, "\tlink %s,#%d\n",
-		 reg_names[FRAME_POINTER_REGNUM], -fsize);
-      else
-	fprintf (stream, "\tlink %s,#0\n\tadd.l #%d,sp\n",
-		 reg_names[FRAME_POINTER_REGNUM], -fsize);
-    }
-  else if (fsize)
-    {
-      /* Adding negative number is faster on the 68040.  */
-      if (fsize + 4 < 0x8000)
-	fprintf (stream, "\tadd.w #%d,sp\n", - (fsize + 4));
-      else
-	fprintf (stream, "\tadd.l #%d,sp\n", - (fsize + 4));
-    }
-
-  for (regno = 23; regno >= 16; regno--)
-    if (regs_ever_live[regno] && ! call_used_regs[regno])
-      {
-	if (first)
-	  {
-	    fprintf (stream, "\tfmovem.x %s", reg_names[regno]);
-	    first = 0;
-	  }
-	else
-	  fprintf (stream, "/%s", reg_names[regno]);
-      }
-  if (!first)
-    fprintf (stream, ",-(sp)\n");
-
-  mask = 0;
-  for (regno = 0; regno < 16; regno++)
-    if (regs_ever_live[regno] && ! call_used_regs[regno])
-      {
-        mask |= 1 << (15 - regno);
-        num_saved_regs++;
-      }
-
-  if (frame_pointer_needed)
-    {
-      mask &= ~ (1 << (15 - FRAME_POINTER_REGNUM));
-      num_saved_regs--;
-    }
-
-  if (num_saved_regs <= 2)
-    {
-      /* Store each separately in the same order moveml uses.
-         Using two movel instructions instead of a single moveml
-         is about 15% faster for the 68020 and 68030 at no expense
-         in code size */
-
-      int i;
-
-      /* Undo the work from above.  */
-      for (i = 0; i< 16; i++)
-        if (mask & (1 << i))
-          fprintf (stream, "\tmove.l %s,-(sp)\n", reg_names[15 - i]);
-    }
-  else if (mask)
-    {
-      first = 1;
-      for (regno = 0; regno < 16; regno++)
-        if (mask & (1 << regno))
-	  {
-	    if (first)
-	      {
-		fprintf (stream, "\tmovem.l %s", reg_names[15 - regno]);
-		first = 0;
-	      }
-	    else
-	      fprintf (stream, "/%s", reg_names[15 - regno]);
-	  }
-      fprintf (stream, ",-(sp)\n");
-    }
-
-  if (flag_pic && current_function_uses_pic_offset_table)
-    {
-      fprintf (stream, "\tmove.l #__GLOBAL_OFFSET_TABLE_, %s\n",
-	       reg_names[PIC_OFFSET_TABLE_REGNUM]);
-      fprintf (stream, "\tlea.l (pc,%s.l),%s\n",
-	       reg_names[PIC_OFFSET_TABLE_REGNUM],
-	       reg_names[PIC_OFFSET_TABLE_REGNUM]);
-    }
-}
-
-#else
-#if defined (NEWS) && defined (MOTOROLA)
-
-static void
-m68k_output_function_prologue (stream, size)
-     FILE *stream;
-     HOST_WIDE_INT size;
-{
-  register int regno;
-  register int mask = 0;
-  HOST_WIDE_INT fsize = ((size) + 3) & -4;
-
-  if (frame_pointer_needed)
-    {
-      if (fsize < 0x8000)
-	fprintf (stream, "\tlink fp,#%d\n", -fsize);
-      else if (TARGET_68020)
-	fprintf (stream, "\tlink.l fp,#%d\n", -fsize);
-      else
-	fprintf (stream, "\tlink fp,#0\n\tsub.l #%d,sp\n", fsize);
-    }
-  else if (fsize)
-    {
-      int amt = fsize + 4;
-      /* Adding negative number is faster on the 68040.  */
-      if (fsize + 4 < 0x8000)
-	asm_fprintf (stream, "\tadd.w %0I%d,%Rsp\n", - amt);
-      else
-	asm_fprintf (stream, "\tadd.l %0I%d,%Rsp\n", - amt);
-    }
-
-  for (regno = 16; regno < FIRST_PSEUDO_REGISTER; regno++)
-    if (regs_ever_live[regno] && ! call_used_regs[regno])
-      mask |= 1 << (regno - 16);
-
-  if (mask != 0)
-    fprintf (stream, "\tfmovem.x #0x%x,-(sp)\n", mask & 0xff);
-
-  mask = 0;
-  for (regno = 0; regno < 16; regno++)
-    if (regs_ever_live[regno] && ! call_used_regs[regno])
-      mask |= 1 << (15 - regno);
-
-  if (frame_pointer_needed)
-    mask &= ~ (1 << (15-FRAME_POINTER_REGNUM));
-
-  if (exact_log2 (mask) >= 0)
-    fprintf (stream, "\tmove.l %s,-(sp)\n", reg_names[15 - exact_log2 (mask)]);
-  else
-    if (mask) fprintf (stream, "\tmovem.l #0x%x,-(sp)\n", mask);
-}
-
-#else  /* !CRDS && ! (NEWS && MOTOROLA) && ! (DPX2 && MOTOROLA) */
+#else  /* !CRDS */
 
 static void
 m68k_output_function_prologue (stream, size)
@@ -435,13 +286,15 @@ m68k_output_function_prologue (stream, size)
 	{
 	/* on the 68040, pea + move is faster than link.w 0 */
 #ifdef MOTOROLA
-	  asm_fprintf (stream, "\tpea (%s)\n\tmove.l %s,%s\n",
-	       reg_names[FRAME_POINTER_REGNUM], reg_names[STACK_POINTER_REGNUM],
-	       reg_names[FRAME_POINTER_REGNUM]);
+	  fprintf (stream, "\tpea (%s)\n\tmove.l %s,%s\n",
+		   reg_names[FRAME_POINTER_REGNUM],
+		   reg_names[STACK_POINTER_REGNUM],
+		   reg_names[FRAME_POINTER_REGNUM]);
 #else
-	  asm_fprintf (stream, "\tpea %s@\n\tmovel %s,%s\n",
-	       reg_names[FRAME_POINTER_REGNUM], reg_names[STACK_POINTER_REGNUM],
-	       reg_names[FRAME_POINTER_REGNUM]);
+	  fprintf (stream, "\tpea %s@\n\tmovel %s,%s\n",
+		   reg_names[FRAME_POINTER_REGNUM],
+		   reg_names[STACK_POINTER_REGNUM],
+		   reg_names[FRAME_POINTER_REGNUM]);
 #endif
 	}
       else if (fsize < 0x8000)
@@ -767,8 +620,6 @@ m68k_output_function_prologue (stream, size)
 #endif
     }
 }
-#endif   /* ! (DPX2 && MOTOROLA)  */
-#endif   /* ! (NEWS && MOTOROLA)  */
 #endif   /* !CRDS  */
 
 /* Return true if this function's epilogue can be output as RTL.  */
@@ -913,273 +764,7 @@ m68k_output_function_epilogue (stream, size)
     fprintf (stream, "\trts\n");
 }
 
-#else
-#if defined (DPX2) && defined (MOTOROLA)
-
-static void
-m68k_output_function_epilogue (stream, size)
-     FILE *stream;
-     HOST_WIDE_INT size;
-{
-  register int regno;
-  register int mask, fmask;
-  register int nregs;
-  HOST_WIDE_INT offset, foffset, fpoffset, first = 1;
-  HOST_WIDE_INT fsize = ((size) + 3) & -4;
-  int big = 0;
-  rtx insn = get_last_insn ();
-
-  /* If the last insn was a BARRIER, we don't have to write any code.  */
-  if (GET_CODE (insn) == NOTE)
-    insn = prev_nonnote_insn (insn);
-  if (insn && GET_CODE (insn) == BARRIER)
-    {
-      /* Output just a no-op so that debuggers don't get confused
-	 about which function the pc is in at this address.  */
-      fprintf (stream, "\tnop\n");
-      return;
-    }
-
-  nregs = 0;  fmask = 0; fpoffset = 0;
-  for (regno = 16; regno < 24; regno++)
-    if (regs_ever_live[regno] && ! call_used_regs[regno])
-      {
-        nregs++;
-	fmask |= 1 << (23 - regno);
-      }
-
-  foffset = fpoffset + nregs * 12;
-  nregs = 0;  mask = 0;
-  if (frame_pointer_needed)
-    regs_ever_live[FRAME_POINTER_REGNUM] = 0;
-
-  for (regno = 0; regno < 16; regno++)
-    if (regs_ever_live[regno] && ! call_used_regs[regno])
-      {
-        nregs++;
-	mask |= 1 << regno;
-      }
-
-  offset = foffset + nregs * 4;
-  if (offset + fsize >= 0x8000
-      && frame_pointer_needed
-      && (mask || fmask || fpoffset))
-    {
-      fprintf (stream, "\tmove.l #%d,a0\n", -fsize);
-      fsize = 0, big = 1;
-    }
-
-  if (nregs <= 2)
-    {
-      /* Restore each separately in the same order moveml does.
-         Using two movel instructions instead of a single moveml
-         is about 15% faster for the 68020 and 68030 at no expense
-         in code size.  */
-
-      int i;
-
-      /* Undo the work from above.  */
-      for (i = 0; i< 16; i++)
-        if (mask & (1 << i))
-          {
-            if (big)
-	      fprintf (stream, "\tmove.l -%d(%s,a0.l),%s\n",
-		       offset + fsize,
-		       reg_names[FRAME_POINTER_REGNUM],
-		       reg_names[i]);
-            else if (! frame_pointer_needed)
-	      fprintf (stream, "\tmove.l (sp)+,%s\n",
-		       reg_names[i]);
-            else
-	      fprintf (stream, "\tmove.l -%d(%s),%s\n",
-		       offset + fsize,
-		       reg_names[FRAME_POINTER_REGNUM],
-		       reg_names[i]);
-            offset = offset - 4;
-          }
-    }
-  else if (mask)
-    {
-      first = 1;
-      for (regno = 0; regno < 16; regno++)
-        if (mask & (1 << regno))
-	  {
-	    if (first && big)
-	      {
-		fprintf (stream, "\tmovem.l -%d(%s,a0.l),%s",
-			 offset + fsize,
-			 reg_names[FRAME_POINTER_REGNUM],
-			 reg_names[regno]);
-		first = 0;
-	      }
-	    else if (first && ! frame_pointer_needed)
-	      {
-		fprintf (stream, "\tmovem.l (sp)+,%s",
-			 reg_names[regno]);
-		first = 0;
-	      }
-	    else if (first)
-	      {
-		fprintf (stream, "\tmovem.l -%d(%s),%s",
-			 offset + fsize,
-			 reg_names[FRAME_POINTER_REGNUM],
-			 reg_names[regno]);
-		first = 0;
-	      }
-	    else
-	      fprintf (stream, "/%s", reg_names[regno]);
-	  }
-      fprintf (stream, "\n");
-    }
-
-  if (fmask)
-    {
-      first = 1;
-      for (regno = 16; regno < 24; regno++)
-        if (fmask & (1 << (23 - regno)))
-	  {
-	    if (first && big)
-	      {
-		fprintf (stream, "\tfmovem.x -%d(%s,a0.l),%s",
-			 foffset + fsize,
-			 reg_names[FRAME_POINTER_REGNUM],
-			 reg_names[regno]);
-		first = 0;
-	      }
-	    else if (first && ! frame_pointer_needed)
-	      {
-		fprintf (stream, "\tfmovem.x (sp)+,%s",
-			 reg_names[regno]);
-		first = 0;
-	      }
-	    else if (first)
-	      {
-		fprintf (stream, "\tfmovem.x -%d(%s),%s",
-			 foffset + fsize,
-			 reg_names[FRAME_POINTER_REGNUM],
-			 reg_names[regno]);
-		first = 0;
-	      }
-	    else
-	      fprintf (stream, "/%s", reg_names[regno]);
-	  }
-      fprintf (stream, "\n");
-    }
-
-  if (frame_pointer_needed)
-    fprintf (stream, "\tunlk %s\n",
-	     reg_names[FRAME_POINTER_REGNUM]);
-  else if (fsize)
-    {
-      if (fsize + 4 < 0x8000)
-	fprintf (stream, "\tadd.w #%d,sp\n", fsize + 4);
-      else
-	fprintf (stream, "\tadd.l #%d,sp\n", fsize + 4);
-    }
-
-  if (current_function_pops_args)
-    fprintf (stream, "\trtd #%d\n", current_function_pops_args);
-  else
-    fprintf (stream, "\trts\n");
-}
-
-#else
-#if defined (NEWS) && defined (MOTOROLA)
-
-static void
-m68k_output_function_epilogue (stream, size)
-     FILE *stream;
-     HOST_WIDE_INT size;
-{
-  register int regno;
-  register int mask, fmask;
-  register int nregs;
-  HOST_WIDE_INT offset, foffset;
-  HOST_WIDE_INT fsize = ((size) + 3) & -4;
-  int big = 0;
-
-  nregs = 0;  fmask = 0;
-  for (regno = 16; regno < FIRST_PSEUDO_REGISTER; regno++)
-    if (regs_ever_live[regno] && ! call_used_regs[regno])
-      {
-	nregs++;
-	fmask |= 1 << (23 - regno);
-      }
-
-  foffset = nregs * 12;
-  nregs = 0;  mask = 0;
-  if (frame_pointer_needed)
-    regs_ever_live[FRAME_POINTER_REGNUM] = 0;
-
-  for (regno = 0; regno < 16; regno++)
-    if (regs_ever_live[regno] && ! call_used_regs[regno])
-      {
-	nregs++;
-	mask |= 1 << regno;
-      }
-
-  offset = foffset + nregs * 4;
-  if (offset + fsize >= 0x8000
-      && frame_pointer_needed
-      && (mask || fmask))
-    {
-      fprintf (stream, "\tmove.l #%d,a0\n", -fsize);
-      fsize = 0, big = 1;
-    }
-
-  if (exact_log2 (mask) >= 0)
-    {
-      if (big)
-	fprintf (stream, "\tmove.l (-%d,fp,a0.l),%s\n",
-		 offset + fsize, reg_names[exact_log2 (mask)]);
-      else if (! frame_pointer_needed)
-	fprintf (stream, "\tmove.l (sp)+,%s\n",
-		 reg_names[exact_log2 (mask)]);
-      else
-	fprintf (stream, "\tmove.l (-%d,fp),%s\n",
-		 offset + fsize, reg_names[exact_log2 (mask)]);
-    }
-  else if (mask)
-    {
-      if (big)
-	fprintf (stream, "\tmovem.l (-%d,fp,a0.l),#0x%x\n",
-		 offset + fsize, mask);
-      else if (! frame_pointer_needed)
-	fprintf (stream, "\tmovem.l (sp)+,#0x%x\n", mask);
-      else
-	fprintf (stream, "\tmovem.l (-%d,fp),#0x%x\n",
-		 offset + fsize, mask);
-    }
-
-  if (fmask)
-    {
-      if (big)
-	fprintf (stream, "\tfmovem.x (-%d,fp,a0.l),#0x%x\n",
-		 foffset + fsize, fmask);
-      else if (! frame_pointer_needed)
-	fprintf (stream, "\tfmovem.x (sp)+,#0x%x\n", fmask);
-      else
-	fprintf (stream, "\tfmovem.x (-%d,fp),#0x%x\n",
-		 foffset + fsize, fmask);
-    }
-
-  if (frame_pointer_needed)
-    fprintf (stream, "\tunlk fp\n");
-  else if (fsize)
-    {
-      if (fsize + 4 < 0x8000)
-	fprintf (stream, "\tadd.w #%d,sp\n", fsize + 4);
-      else
-	fprintf (stream, "\tadd.l #%d,sp\n", fsize + 4);
-    }
-
-  if (current_function_pops_args)
-    fprintf (stream, "\trtd #%d\n", current_function_pops_args);
-  else
-    fprintf (stream, "\trts\n");
-}
-
-#else  /* !CRDS && ! (NEWS && MOTOROLA) && ! (DPX2 && MOTOROLA) */
+#else  /* !CRDS */
 
 static void
 m68k_output_function_epilogue (stream, size)
@@ -1202,7 +787,7 @@ m68k_output_function_epilogue (stream, size)
     {
       /* Output just a no-op so that debuggers don't get confused
 	 about which function the pc is in at this address.  */
-      asm_fprintf (stream, "\tnop\n");
+      fprintf (stream, "\tnop\n");
       return;
     }
 
@@ -1302,9 +887,9 @@ m68k_output_function_epilogue (stream, size)
 			     reg_names[FRAME_POINTER_REGNUM],
 			     reg_names[i]);
 #else
-		asm_fprintf (stream, "\tmovel %s@(-%d),%s\n",
-			     reg_names[FRAME_POINTER_REGNUM],
-			     offset + fsize, reg_names[i]);
+		fprintf (stream, "\tmovel %s@(-%d),%s\n",
+			 reg_names[FRAME_POINTER_REGNUM],
+			 offset + fsize, reg_names[i]);
 #endif
 	      }
             offset = offset - 4;
@@ -1414,14 +999,14 @@ m68k_output_function_epilogue (stream, size)
 	  else
 	    {
 #ifdef MOTOROLA
-	      asm_fprintf (stream, "\tfpmovd -%d(%s), %s\n",
-			   fpoffset + fsize,
-			   reg_names[FRAME_POINTER_REGNUM],
-			   reg_names[regno]);
+	      fprintf (stream, "\tfpmovd -%d(%s), %s\n",
+		       fpoffset + fsize,
+		       reg_names[FRAME_POINTER_REGNUM],
+		       reg_names[regno]);
 #else
-	      asm_fprintf (stream, "\tfpmoved %s@(-%d), %s\n",
-			   reg_names[FRAME_POINTER_REGNUM],
-			   fpoffset + fsize, reg_names[regno]);
+	      fprintf (stream, "\tfpmoved %s@(-%d), %s\n",
+		       reg_names[FRAME_POINTER_REGNUM],
+		       fpoffset + fsize, reg_names[regno]);
 #endif
 	    }
 	  fpoffset -= 8;
@@ -1501,9 +1086,6 @@ m68k_output_function_epilogue (stream, size)
   else
     fprintf (stream, "\trts\n");
 }
-
-#endif   /* ! (DPX2 && MOTOROLA)  */
-#endif   /* ! (NEWS && MOTOROLA)  */
 #endif   /* !CRDS  */
 
 /* Similar to general_operand, but exclude stack_pointer_rtx.  */
@@ -1758,13 +1340,13 @@ output_scc_di(op, operand1, operand2, dest)
   switch (op_code)
     {
       case EQ:
-        ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+        (*targetm.asm_out.internal_label) (asm_out_file, "L",
 				    CODE_LABEL_NUMBER (loperands[4]));
         output_asm_insn ("seq %5", loperands);
         break;
 
       case NE:
-        ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+        (*targetm.asm_out.internal_label) (asm_out_file, "L",
 				    CODE_LABEL_NUMBER (loperands[4]));
         output_asm_insn ("sne %5", loperands);
         break;
@@ -1776,15 +1358,15 @@ output_scc_di(op, operand1, operand2, dest)
 #else
         output_asm_insn ("shi %5\n\tjra %l6", loperands);
 #endif
-        ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+        (*targetm.asm_out.internal_label) (asm_out_file, "L",
 				    CODE_LABEL_NUMBER (loperands[4]));
         output_asm_insn ("sgt %5", loperands);
-        ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+        (*targetm.asm_out.internal_label) (asm_out_file, "L",
 				    CODE_LABEL_NUMBER (loperands[6]));
         break;
 
       case GTU:
-        ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+        (*targetm.asm_out.internal_label) (asm_out_file, "L",
 				    CODE_LABEL_NUMBER (loperands[4]));
         output_asm_insn ("shi %5", loperands);
         break;
@@ -1796,15 +1378,15 @@ output_scc_di(op, operand1, operand2, dest)
 #else
         output_asm_insn ("scs %5\n\tjra %l6", loperands);
 #endif
-        ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+        (*targetm.asm_out.internal_label) (asm_out_file, "L",
 				    CODE_LABEL_NUMBER (loperands[4]));
         output_asm_insn ("slt %5", loperands);
-        ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+        (*targetm.asm_out.internal_label) (asm_out_file, "L",
 				    CODE_LABEL_NUMBER (loperands[6]));
         break;
 
       case LTU:
-        ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+        (*targetm.asm_out.internal_label) (asm_out_file, "L",
 				    CODE_LABEL_NUMBER (loperands[4]));
         output_asm_insn ("scs %5", loperands);
         break;
@@ -1816,15 +1398,15 @@ output_scc_di(op, operand1, operand2, dest)
 #else
         output_asm_insn ("scc %5\n\tjra %l6", loperands);
 #endif
-        ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+        (*targetm.asm_out.internal_label) (asm_out_file, "L",
 				    CODE_LABEL_NUMBER (loperands[4]));
         output_asm_insn ("sge %5", loperands);
-        ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+        (*targetm.asm_out.internal_label) (asm_out_file, "L",
 				    CODE_LABEL_NUMBER (loperands[6]));
         break;
 
       case GEU:
-        ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+        (*targetm.asm_out.internal_label) (asm_out_file, "L",
 				    CODE_LABEL_NUMBER (loperands[4]));
         output_asm_insn ("scc %5", loperands);
         break;
@@ -1836,15 +1418,15 @@ output_scc_di(op, operand1, operand2, dest)
 #else
         output_asm_insn ("sls %5\n\tjra %l6", loperands);
 #endif
-        ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+        (*targetm.asm_out.internal_label) (asm_out_file, "L",
 				    CODE_LABEL_NUMBER (loperands[4]));
         output_asm_insn ("sle %5", loperands);
-        ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+        (*targetm.asm_out.internal_label) (asm_out_file, "L",
 				    CODE_LABEL_NUMBER (loperands[6]));
         break;
 
       case LEU:
-        ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L",
+        (*targetm.asm_out.internal_label) (asm_out_file, "L",
 				    CODE_LABEL_NUMBER (loperands[4]));
         output_asm_insn ("sls %5", loperands);
         break;
@@ -2259,7 +1841,7 @@ output_move_himode (operands)
 		   CODE_LABEL_NUMBER (XEXP (labelref, 0)));
 #endif /* not SGS */
 #else /* SGS_SWITCH_TABLES or not MOTOROLA */
-      ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "LI",
+      (*targetm.asm_out.internal_label) (asm_out_file, "LI",
 				 CODE_LABEL_NUMBER (XEXP (labelref, 0)));
 #ifdef SGS_SWITCH_TABLES
       /* Set flag saying we need to define the symbol
@@ -3144,22 +2726,18 @@ floating_exact_log2 (x)
      rtx x;
 {
   REAL_VALUE_TYPE r, r1;
-  int i;
+  int exp;
 
   REAL_VALUE_FROM_CONST_DOUBLE (r, x);
 
-  if (REAL_VALUES_LESS (r, dconst0))
+  if (REAL_VALUES_LESS (r, dconst1))
     return 0;
 
-  r1 = dconst1;
-  i = 0;
-  while (REAL_VALUES_LESS (r1, r))
-    {
-      r1 = REAL_VALUE_LDEXP (dconst1, i);
-      if (REAL_VALUES_EQUAL (r1, r))
-        return i;
-      i = i + 1;
-    }
+  exp = real_exponent (&r);
+  real_2expN (&r1, exp);
+  if (REAL_VALUES_EQUAL (r1, r))
+    return exp;
+
   return 0;
 }
 
@@ -3386,7 +2964,7 @@ print_operand (file, op, letter)
   if (letter == '.')
     {
 #if defined (MOTOROLA) && !defined (CRDS)
-      asm_fprintf (file, ".");
+      fprintf (file, ".");
 #endif
     }
   else if (letter == '#')
@@ -4238,5 +3816,19 @@ m68k_svr3_asm_out_constructor (symbol, priority)
 
   init_section ();
   output_asm_insn (output_move_simode (xop), xop);
+}
+#endif
+
+#ifdef HPUX_ASM
+static void
+m68k_hp320_internal_label (stream, prefix, labelno)
+     FILE *stream;
+     const char *prefix;
+     unsigned long labelno;
+{
+  if (prefix[0] == 'L' && prefix[1] == 'I')
+    fprintf(stream, "\tset %s%ld,.+2\n", prefix, labelno);
+  else
+    fprintf (stream, "%s%ld:\n", prefix, labelno);
 }
 #endif

@@ -141,24 +141,6 @@ Boston, MA 02111-1307, USA.  */
 /* Prefix for internally generated assembler labels.  */
 #define LPREFIX ".L"
 
-
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME.  */
-
-#undef ASM_OUTPUT_LABEL
-#define ASM_OUTPUT_LABEL(FILE, NAME)     \
-  (assemble_name (FILE, NAME), fputs (":\n", FILE))
-
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-
-#undef ASM_FORMAT_PRIVATE_NAME
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)  \
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),    \
-  sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO)))
-
-
      /* internal macro to output long */
 #define _ASM_OUTPUT_LONG(FILE, VALUE)                                   \
       fprintf (FILE, "\t.long\t0x%lX\n", VALUE);
@@ -215,8 +197,8 @@ Boston, MA 02111-1307, USA.  */
 /* This is how to output a command to make the user-level label named NAME
    defined for reference from other files.  */
 
-#define ASM_GLOBALIZE_LABEL(FILE, NAME)  \
-  (fputs (".globl ", FILE), assemble_name (FILE, NAME), fputs ("\n", FILE))
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP ".globl "
 
 /* Output code to add DELTA to the first argument, and then jump to FUNCTION.
    Used for C++ multiple inheritance.  */

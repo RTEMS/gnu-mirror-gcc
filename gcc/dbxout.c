@@ -1,6 +1,6 @@
 /* Output dbx-format symbol table information from GNU compiler.
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -340,8 +340,8 @@ const struct gcc_debug_hooks dbx_debug_hooks =
   debug_true_tree,		/* ignore_block */
   dbxout_source_line,		/* source_line */
   dbxout_source_line,		/* begin_prologue: just output line info */
-  debug_nothing_int,		/* end_prologue */
-  debug_nothing_void,		/* end_epilogue */
+  debug_nothing_int_charstar,	/* end_prologue */
+  debug_nothing_int_charstar,	/* end_epilogue */
 #ifdef DBX_FUNCTION_FIRST
   dbxout_begin_function,
 #else
@@ -370,7 +370,7 @@ const struct gcc_debug_hooks xcoff_debug_hooks =
   debug_true_tree,		/* ignore_block */
   xcoffout_source_line,
   xcoffout_begin_prologue,	/* begin_prologue */
-  debug_nothing_int,		/* end_prologue */
+  debug_nothing_int_charstar,	/* end_prologue */
   xcoffout_end_epilogue,
   debug_nothing_tree,		/* begin_function */
   xcoffout_end_function,
@@ -392,16 +392,20 @@ dbxout_function_end ()
      the system doesn't insert underscores in front of user generated
      labels.  */
   ASM_GENERATE_INTERNAL_LABEL (lscope_label_name, "Lscope", scope_labelno);
-  ASM_OUTPUT_INTERNAL_LABEL (asmfile, "Lscope", scope_labelno);
+  (*targetm.asm_out.internal_label) (asmfile, "Lscope", scope_labelno);
   scope_labelno++;
 
   /* By convention, GCC will mark the end of a function with an N_FUN
      symbol and an empty string.  */
+#ifdef DBX_OUTPUT_NFUN
+  DBX_OUTPUT_NFUN (asmfile, lscope_label_name, current_function_decl);
+#else
   fprintf (asmfile, "%s\"\",%d,0,0,", ASM_STABS_OP, N_FUN);
   assemble_name (asmfile, lscope_label_name);
   putc ('-', asmfile);
   assemble_name (asmfile, XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0));
   fprintf (asmfile, "\n");
+#endif
 }
 #endif /* DBX_DEBUGGING_INFO */
 
@@ -461,7 +465,7 @@ dbxout_init (input_file_name)
   assemble_name (asmfile, ltext_label_name);
   fputc ('\n', asmfile);
   text_section ();
-  ASM_OUTPUT_INTERNAL_LABEL (asmfile, "Ltext", 0);
+  (*targetm.asm_out.internal_label) (asmfile, "Ltext", 0);
 #endif /* no DBX_OUTPUT_MAIN_SOURCE_FILENAME */
 
 #ifdef DBX_OUTPUT_GCC_MARKER
@@ -589,7 +593,7 @@ dbxout_source_file (file, filename)
 	; /* Don't change section amid function.  */
       else
 	text_section ();
-      ASM_OUTPUT_INTERNAL_LABEL (file, "Ltext", source_label_number);
+      (*targetm.asm_out.internal_label) (file, "Ltext", source_label_number);
       source_label_number++;
 #endif
       lastfile = filename;
@@ -620,7 +624,7 @@ dbxout_begin_block (line, n)
      unsigned int line ATTRIBUTE_UNUSED;
      unsigned int n;
 {
-  ASM_OUTPUT_INTERNAL_LABEL (asmfile, "LBB", n);
+  (*targetm.asm_out.internal_label) (asmfile, "LBB", n);
 }
 
 /* Describe the end line-number of an internal block within a function.  */
@@ -630,7 +634,7 @@ dbxout_end_block (line, n)
      unsigned int line ATTRIBUTE_UNUSED;
      unsigned int n;
 {
-  ASM_OUTPUT_INTERNAL_LABEL (asmfile, "LBE", n);
+  (*targetm.asm_out.internal_label) (asmfile, "LBE", n);
 }
 
 /* Output dbx data for a function definition.

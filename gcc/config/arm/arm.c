@@ -115,12 +115,18 @@ static void	 thumb_output_function_prologue PARAMS ((FILE *, Hint));
 static int	 arm_comp_type_attributes	PARAMS ((tree, tree));
 static void	 arm_set_default_type_attributes  PARAMS ((tree));
 static int	 arm_adjust_cost		PARAMS ((rtx, rtx, rtx, int));
+static int	 count_insns_for_constant	PARAMS ((HOST_WIDE_INT, int));
+static int	 arm_get_strip_length		PARAMS ((int));
 #ifdef OBJECT_FORMAT_ELF
 static void	 arm_elf_asm_named_section	PARAMS ((const char *, unsigned int));
 #endif
 #ifndef ARM_PE
 static void	 arm_encode_section_info	PARAMS ((tree, int));
 #endif
+#ifdef AOF_ASSEMBLER
+static void	 aof_globalize_label		PARAMS ((FILE *, const char *));
+#endif
+static void	 arm_internal_label		PARAMS ((FILE *, const char *, unsigned long));
 
 #undef Hint
 #undef Mmode
@@ -143,6 +149,8 @@ static void	 arm_encode_section_info	PARAMS ((tree, int));
 #define TARGET_ASM_ALIGNED_HI_OP "\tDCW\t"
 #undef  TARGET_ASM_ALIGNED_SI_OP
 #define TARGET_ASM_ALIGNED_SI_OP "\tDCD\t"
+#undef TARGET_ASM_GLOBALIZE_LABEL
+#define TARGET_ASM_GLOBALIZE_LABEL aof_globalize_label
 #else
 #undef  TARGET_ASM_ALIGNED_SI_OP
 #define TARGET_ASM_ALIGNED_SI_OP NULL
@@ -181,14 +189,14 @@ static void	 arm_encode_section_info	PARAMS ((tree, int));
 #undef TARGET_STRIP_NAME_ENCODING
 #define TARGET_STRIP_NAME_ENCODING arm_strip_name_encoding
 
+#undef TARGET_ASM_INTERNAL_LABEL
+#define TARGET_ASM_INTERNAL_LABEL arm_internal_label
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 /* Obstack for minipool constant handling.  */
 static struct obstack minipool_obstack;
 static char *         minipool_startobj;
-
-#define obstack_chunk_alloc   xmalloc
-#define obstack_chunk_free    free
 
 /* The maximum number of insns skipped which
    will be conditionalised if possible.  */
@@ -366,7 +374,7 @@ static const struct processors all_cores[] =
   {"arm10tdmi",	                         FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_LDSCHED             | FL_ARCH5 },
   {"arm1020t",	                         FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_LDSCHED             | FL_ARCH5 },
   {"xscale",                             FL_MODE32 | FL_FAST_MULT | FL_ARCH4 | FL_THUMB | FL_LDSCHED | FL_STRONG | FL_ARCH5 | FL_ARCH5E | FL_XSCALE },
-  
+
   {NULL, 0}
 };
 
@@ -581,7 +589,7 @@ arm_override_options ()
      architecture has been selected.  */
   if (tune_flags == 0)
     tune_flags = insn_flags;
-  
+
   /* Make sure that the processor choice does not conflict with any of the
      other command line choices.  */
   if (TARGET_APCS_32 && !(insn_flags & FL_MODE32))
@@ -668,7 +676,7 @@ arm_override_options ()
   if (TARGET_APCS_FLOAT)
     warning ("passing floating point arguments in fp regs not yet supported");
   
-  /* Initialise boolean versions of the flags, for use in the arm.md file.  */
+  /* Initialize boolean versions of the flags, for use in the arm.md file.  */
   arm_fast_multiply = (insn_flags & FL_FAST_MULT) != 0;
   arm_arch4         = (insn_flags & FL_ARCH4) != 0;
   arm_arch5         = (insn_flags & FL_ARCH5) != 0;
@@ -725,7 +733,7 @@ arm_override_options ()
   if (arm_pic_register_string != NULL)
     {
       int pic_register = decode_reg_name (arm_pic_register_string);
-      
+
       if (!flag_pic)
 	warning ("-mpic-register= is useless without -fpic");
 
@@ -827,7 +835,7 @@ arm_isr_value (argument)
     if (streq (arg, ptr->arg))
       return ptr->return_value;
 
-  /* An unrecognised interrupt type.  */
+  /* An unrecognized interrupt type.  */
   return ARM_FT_UNKNOWN;
 }
 
@@ -1030,7 +1038,7 @@ arm_split_constant (code, mode, val, target, source, subtargets)
 	  && REGNO (target) != REGNO (source)))
     {
       /* After arm_reorg has been called, we can't fix up expensive
-	 constants by pushing them into memory so we must synthesise
+	 constants by pushing them into memory so we must synthesize
 	 them in-line, regardless of the cost.  This is only likely to
 	 be more costly on chips that have load delay slots and we are
 	 compiling without running the scheduler (so no splitting
@@ -1071,7 +1079,9 @@ arm_split_constant (code, mode, val, target, source, subtargets)
 }
 
 static int
-count_insns_for_constant (HOST_WIDE_INT remainder, int i)
+count_insns_for_constant (remainder, i)
+     HOST_WIDE_INT remainder;
+     int i;
 {
   HOST_WIDE_INT temp1;
   int num_insns = 0;
@@ -1750,9 +1760,20 @@ int
 arm_return_in_memory (type)
      tree type;
 {
+  HOST_WIDE_INT size;
+
   if (!AGGREGATE_TYPE_P (type))
     /* All simple types are returned in registers.  */
     return 0;
+
+  size = int_size_in_bytes (type);
+
+  if (TARGET_ATPCS)
+    {
+      /* ATPCS returns aggregate types in memory only if they are
+	 larger than a word (or are variable size).  */
+      return (size < 0 || size > UNITS_PER_WORD);
+    }
   
   /* For the arm-wince targets we choose to be compitable with Microsoft's
      ARM and Thumb compilers, which always return aggregates in memory.  */
@@ -1761,7 +1782,7 @@ arm_return_in_memory (type)
      Also catch the case where int_size_in_bytes returns -1.  In this case
      the aggregate is either huge or of varaible size, and in either case
      we will want to return it via memory and not in a register.  */
-  if (((unsigned int) int_size_in_bytes (type)) > UNITS_PER_WORD)
+  if (size < 0 || size > UNITS_PER_WORD)
     return 1;
   
   if (TREE_CODE (type) == RECORD_TYPE)
@@ -1836,6 +1857,27 @@ arm_return_in_memory (type)
 #endif /* not ARM_WINCE */  
   
   /* Return all other types in memory.  */
+  return 1;
+}
+
+/* Indicate whether or not words of a double are in big-endian order. */
+
+int
+arm_float_words_big_endian ()
+{
+
+  /* For FPA, float words are always big-endian.  For VFP, floats words
+     follow the memory system mode.  */
+
+  if (TARGET_HARD_FLOAT)
+    {
+      /* FIXME: TARGET_HARD_FLOAT currently implies FPA.  */
+      return 1;
+    }
+
+  if (TARGET_VFP)
+    return (TARGET_BIG_END ? 1 : 0);
+
   return 1;
 }
 
@@ -2169,7 +2211,7 @@ current_file_function_operand (sym_ref)
   return 0;
 }
 
-/* Return non-zero if a 32 bit "long_call" should be generated for
+/* Return nonzero if a 32 bit "long_call" should be generated for
    this call.  We generate a long_call if the function:
 
         a.  has an __attribute__((long call))
@@ -2222,7 +2264,7 @@ arm_is_longcall_p (sym_ref, call_cookie, call_symbol)
     || TARGET_LONG_CALLS;
 }
 
-/* Return non-zero if it is ok to make a tail-call to DECL.  */
+/* Return nonzero if it is ok to make a tail-call to DECL.  */
 
 int
 arm_function_ok_for_sibcall (decl)
@@ -4449,7 +4491,7 @@ arm_gen_movstrqi (operands)
   fin_dst = dst = copy_to_mode_reg (SImode, st_dst);
   fin_src = src = copy_to_mode_reg (SImode, st_src);
 
-  in_words_to_go = NUM_INTS (INTVAL (operands[2]));
+  in_words_to_go = ARM_NUM_INTS (INTVAL (operands[2]));
   out_words_to_go = INTVAL (operands[2]) / 4;
   last_bytes = INTVAL (operands[2]) & 3;
 
@@ -4874,6 +4916,19 @@ arm_gen_compare_reg (code, x, y)
 			  gen_rtx_COMPARE (mode, x, y)));
 
   return cc_reg;
+}
+
+/* Generate a sequence of insns that will generate the correct return
+   address mask depending on the physical architecture that the program
+   is running on.  */
+
+rtx
+arm_gen_return_addr_mask ()
+{
+  rtx reg = gen_reg_rtx (Pmode);
+
+  emit_insn (gen_return_addr_mask (reg));
+  return reg;
 }
 
 void
@@ -7190,7 +7245,7 @@ output_return_instruction (operand, really_return, reverse)
   int reg;
   unsigned long live_regs_mask;
   unsigned long func_type;
-  
+
   func_type = arm_current_func_type ();
 
   if (IS_NAKED (func_type))
@@ -7274,6 +7329,8 @@ output_return_instruction (operand, really_return, reverse)
 	  /* Generate the load multiple instruction to restore the registers.  */
 	  if (frame_pointer_needed)
 	    sprintf (instr, "ldm%sea\t%%|fp, {", conditional);
+	  else if (live_regs_mask & (1 << SP_REGNUM))
+	    sprintf (instr, "ldm%sfd\t%%|sp, {", conditional);
 	  else
 	    sprintf (instr, "ldm%sfd\t%%|sp!, {", conditional);
 
@@ -7331,7 +7388,7 @@ output_return_instruction (operand, really_return, reverse)
 	  really_return = 0;
 	}
     }
-  
+
   if (really_return)
     {
       switch ((int) ARM_FUNC_TYPE (func_type))
@@ -7685,7 +7742,16 @@ arm_output_epilogue (really_return)
 	    asm_fprintf (f, "\tldr\t%r, [%r], #4\n", LR_REGNUM, SP_REGNUM);
 	}
       else if (saved_regs_mask)
-	print_multi_reg (f, "ldmfd\t%r!", SP_REGNUM, saved_regs_mask);
+	{
+	  if (saved_regs_mask & (1 << SP_REGNUM))
+	    /* Note - write back to the stack register is not enabled
+	       (ie "ldmfd sp!...").  We know that the stack pointer is
+	       in the list of registers and if we add writeback the
+	       instruction becomes UNPREDICTABLE.  */
+	    print_multi_reg (f, "ldmfd\t%r", SP_REGNUM, saved_regs_mask);
+	  else
+	    print_multi_reg (f, "ldmfd\t%r!", SP_REGNUM, saved_regs_mask);
+	}
 
       if (current_function_pretend_args_size)
 	{
@@ -7808,7 +7874,7 @@ emit_multi_reg_push (mask)
     num_dwarf_regs--;
 
   /* For the body of the insn we are going to generate an UNSPEC in
-     parallel with several USEs.  This allows the insn to be recognised
+     parallel with several USEs.  This allows the insn to be recognized
      by the push_multi pattern in the arm.md file.  The insn looks
      something like this:
 
@@ -7922,7 +7988,6 @@ emit_sfm (base_reg, count)
 
   par = gen_rtx_PARALLEL (VOIDmode, rtvec_alloc (count));
   dwarf = gen_rtx_PARALLEL (VOIDmode, rtvec_alloc (count));
-  RTX_FRAME_RELATED_P (dwarf) = 1;
 
   reg = gen_rtx_REG (XFmode, base_reg++);
 
@@ -7994,11 +8059,11 @@ emit_sfm (base_reg, count)
    current stack pointer -> |    | /
                               --
 
-  For a given funciton some or all of these stack compomnents
+  For a given function some or all of these stack compomnents
   may not be needed, giving rise to the possibility of
   eliminating some of the registers.
 
-  The values returned by this function must reflect the behaviour
+  The values returned by this function must reflect the behavior
   of arm_expand_prologue() and arm_compute_save_reg_mask().
 
   The sign of the number returned reflects the direction of stack
@@ -8387,15 +8452,8 @@ arm_expand_prologue ()
 	 will prevent the scheduler from moving stores to the frame
 	 before the stack adjustment.  */
       if (frame_pointer_needed)
-	{
-	  rtx unspec = gen_rtx_UNSPEC (SImode,
-				       gen_rtvec (2, stack_pointer_rtx,
-						  hard_frame_pointer_rtx),
-				       UNSPEC_PRLG_STK);
-
-	  insn = emit_insn (gen_rtx_CLOBBER (VOIDmode,
-				      gen_rtx_MEM (BLKmode, unspec)));
-	}
+	insn = emit_insn (gen_stack_tie (stack_pointer_rtx,
+					 hard_frame_pointer_rtx));
     }
 
   /* If we are profiling, make sure no instructions are scheduled before
@@ -8571,7 +8629,7 @@ arm_print_operand (stream, x, code)
     case 'M':
       asm_fprintf (stream, "{%r-%r}",
 		   REGNO (x),
-		   REGNO (x) + NUM_REGS (GET_MODE (x)) - 1);
+		   REGNO (x) + ARM_NUM_REGS (GET_MODE (x)) - 1);
       return;
 
     case 'd':
@@ -8643,7 +8701,7 @@ arm_assemble_integer (x, size, aligned_p)
       if (NEED_GOT_RELOC && flag_pic && making_const_table &&
 	  (GET_CODE (x) == SYMBOL_REF || GET_CODE (x) == LABEL_REF))
 	{
-	  if (GET_CODE (x) == SYMBOL_REF 
+	  if (GET_CODE (x) == SYMBOL_REF
 	      && (CONSTANT_POOL_ADDRESS_P (x)
 		  || ENCODED_SHORT_CALL_ATTR_P (XSTR (x, 0))))
 	    fputs ("(GOTOFF)", asm_out_file);
@@ -8677,7 +8735,7 @@ arm_assemble_integer (x, size, aligned_p)
    0 -> 2 final_prescan_insn if the `target' is an unconditional branch
    1 -> 3 ASM_OUTPUT_OPCODE after not having output the conditional branch
    2 -> 4 ASM_OUTPUT_OPCODE after not having output the conditional branch
-   3 -> 0 ASM_OUTPUT_INTERNAL_LABEL if the `target' label is reached
+   3 -> 0 (*targetm.asm_out.internal_label) if the `target' label is reached
           (the target label has CODE_LABEL_NUMBER equal to arm_target_label).
    4 -> 0 final_prescan_insn if the `target' unconditional branch is reached
           (the target insn is arm_target_insn).
@@ -9172,7 +9230,7 @@ arm_hard_regno_mode_ok (regno, mode)
        register available to hold the upper part of the value.
        We probably we ought to ensure that the register is the
        start of an even numbered register pair.  */
-    return (NUM_REGS (mode) < 2) || (regno < LAST_LO_REGNUM);
+    return (ARM_NUM_REGS (mode) < 2) || (regno < LAST_LO_REGNUM);
 
   if (regno <= LAST_ARM_REGNUM)
     /* We allow any value to be stored in the general regisetrs.  */
@@ -9252,7 +9310,7 @@ arm_debugger_arg_offset (value, addr)
      held in the register into an offset from the frame pointer.
      We do this by searching through the insns for the function
      looking to see where this register gets its value.  If the
-     register is initialised from the frame pointer plus an offset
+     register is initialized from the frame pointer plus an offset
      then we are in luck and we can continue, otherwise we give up.
      
      This code is exercised by producing debugging information
@@ -9303,7 +9361,7 @@ arm_debugger_arg_offset (value, addr)
 }
 
 #define def_builtin(NAME, TYPE, CODE) \
-  builtin_function ((NAME), (TYPE), (CODE), BUILT_IN_MD, NULL)
+  builtin_function ((NAME), (TYPE), (CODE), BUILT_IN_MD, NULL, NULL_TREE)
 
 void
 arm_init_builtins ()
@@ -9314,10 +9372,9 @@ arm_init_builtins ()
 
   tree int_ftype_int, void_ftype_pchar;
 
-  /* void func (void *) */
+  /* void func (char *) */
   void_ftype_pchar
-    = build_function_type (void_type_node,
-			   tree_cons (NULL_TREE, pchar_type_node, endlink));
+    = build_function_type_list (void_type_node, pchar_type_node, NULL_TREE);
 
   /* int func (int) */
   int_ftype_int
@@ -9374,7 +9431,7 @@ arm_expand_builtin (exp, target, subtarget, mode, ignore)
       emit_insn (pat);
       return target;
     }
-  
+
   /* @@@ Should really do something sensible here.  */
   return NULL_RTX;
 }
@@ -9819,11 +9876,12 @@ thumb_shiftable_const (val)
   return 0;
 }
 
-/* Returns non-zero if the current function contains,
+/* Returns nonzero if the current function contains,
    or might contain a far jump.  */
 
 int
-thumb_far_jump_used_p (int in_prologue)
+thumb_far_jump_used_p (in_prologue)
+     int in_prologue;
 {
   rtx insn;
 
@@ -9888,7 +9946,7 @@ thumb_far_jump_used_p (int in_prologue)
   return 0;
 }
 
-/* Return non-zero if FUNC must be entered in ARM mode.  */
+/* Return nonzero if FUNC must be entered in ARM mode.  */
 
 int
 is_called_in_ARM_mode (func)
@@ -9924,16 +9982,12 @@ thumb_unexpanded_epilogue ()
     return "";
 
   for (regno = 0; regno <= LAST_LO_REGNUM; regno++)
-    if (regs_ever_live[regno] && !call_used_regs[regno]
-	&& !(TARGET_SINGLE_PIC_BASE && (regno == arm_pic_register)))
+    if (THUMB_REG_PUSHED_P (regno))
       live_regs_mask |= 1 << regno;
 
   for (regno = 8; regno < 13; regno++)
-    {
-      if (regs_ever_live[regno] && !call_used_regs[regno]
-	  && !(TARGET_SINGLE_PIC_BASE && (regno == arm_pic_register)))
-	high_regs_pushed++;
-    }
+    if (THUMB_REG_PUSHED_P (regno))
+      high_regs_pushed++;
 
   /* The prolog may have pushed some high registers to use as
      work registers.  eg the testuite file:
@@ -9978,8 +10032,7 @@ thumb_unexpanded_epilogue ()
 	  ("no low registers available for popping high registers");
       
       for (next_hi_reg = 8; next_hi_reg < 13; next_hi_reg++)
-	if (regs_ever_live[next_hi_reg] && !call_used_regs[next_hi_reg]
-	    && !(TARGET_SINGLE_PIC_BASE && (next_hi_reg == arm_pic_register)))
+	if (THUMB_REG_PUSHED_P (next_hi_reg))
 	  break;
 
       while (high_regs_pushed)
@@ -10008,10 +10061,7 @@ thumb_unexpanded_epilogue ()
 			       regno);
 		  
 		  for (next_hi_reg++; next_hi_reg < 13; next_hi_reg++)
-		    if (regs_ever_live[next_hi_reg]
-			&& !call_used_regs[next_hi_reg]
-			&& !(TARGET_SINGLE_PIC_BASE 
-			     && (next_hi_reg == arm_pic_register)))
+		    if (THUMB_REG_PUSHED_P (next_hi_reg))
 		      break;
 		}
 	    }
@@ -10178,14 +10228,12 @@ thumb_expand_prologue ()
 	     been pushed at the start of the prologue and so we can corrupt
 	     it now.  */
 	  for (regno = LAST_ARG_REGNUM + 1; regno <= LAST_LO_REGNUM; regno++)
-	    if (regs_ever_live[regno]
-		&& !call_used_regs[regno] /* Paranoia */
-		&& !(TARGET_SINGLE_PIC_BASE && (regno == arm_pic_register))
+	    if (THUMB_REG_PUSHED_P (regno)
 		&& !(frame_pointer_needed
 		     && (regno == THUMB_HARD_FRAME_POINTER_REGNUM)))
 	      break;
 
-	  if (regno > LAST_LO_REGNUM) /* Very unlikely */
+	  if (regno > LAST_LO_REGNUM) /* Very unlikely.  */
 	    {
 	      rtx spare = gen_rtx (REG, SImode, IP_REGNUM);
 
@@ -10300,13 +10348,13 @@ thumb_output_function_prologue (f, size)
       
 #define STUB_NAME ".real_start_of"
       
-      asm_fprintf (f, "\t.code\t16\n");
+      fprintf (f, "\t.code\t16\n");
 #ifdef ARM_PE
       if (arm_dllexport_name_p (name))
         name = arm_strip_name_encoding (name);
 #endif        
       asm_fprintf (f, "\t.globl %s%U%s\n", STUB_NAME, name);
-      asm_fprintf (f, "\t.thumb_func\n");
+      fprintf (f, "\t.thumb_func\n");
       asm_fprintf (f, "%s%U%s:\n", STUB_NAME, name);
     }
     
@@ -10316,9 +10364,9 @@ thumb_output_function_prologue (f, size)
 	{
 	  int num_pushes;
 	  
-	  asm_fprintf (f, "\tpush\t{");
+	  fprintf (f, "\tpush\t{");
 
-	  num_pushes = NUM_INTS (current_function_pretend_args_size);
+	  num_pushes = ARM_NUM_INTS (current_function_pretend_args_size);
 	  
 	  for (regno = LAST_ARG_REGNUM + 1 - num_pushes;
 	       regno <= LAST_ARG_REGNUM;
@@ -10326,7 +10374,7 @@ thumb_output_function_prologue (f, size)
 	    asm_fprintf (f, "%r%s", regno,
 			 regno == LAST_ARG_REGNUM ? "" : ", ");
 
-	  asm_fprintf (f, "}\n");
+	  fprintf (f, "}\n");
 	}
       else
 	asm_fprintf (f, "\tsub\t%r, %r, #%d\n", 
@@ -10335,8 +10383,7 @@ thumb_output_function_prologue (f, size)
     }
 
   for (regno = 0; regno <= LAST_LO_REGNUM; regno++)
-    if (regs_ever_live[regno] && !call_used_regs[regno]
-	&& !(TARGET_SINGLE_PIC_BASE && (regno == arm_pic_register)))
+    if (THUMB_REG_PUSHED_P (regno))
       live_regs_mask |= 1 << regno;
 
   if (live_regs_mask || !leaf_function_p () || thumb_far_jump_used_p (1))
@@ -10437,11 +10484,8 @@ thumb_output_function_prologue (f, size)
     thumb_pushpop (f, live_regs_mask, 1);
 
   for (regno = 8; regno < 13; regno++)
-    {
-      if (regs_ever_live[regno] && !call_used_regs[regno]
-	  && !(TARGET_SINGLE_PIC_BASE && (regno == arm_pic_register)))
-	high_regs_pushed++;
-    }
+    if (THUMB_REG_PUSHED_P (regno))
+      high_regs_pushed++;
 
   if (high_regs_pushed)
     {
@@ -10450,20 +10494,15 @@ thumb_output_function_prologue (f, size)
       int next_hi_reg;
 
       for (next_hi_reg = 12; next_hi_reg > LAST_LO_REGNUM; next_hi_reg--)
-	{
-	  if (regs_ever_live[next_hi_reg] && !call_used_regs[next_hi_reg]
-	      && !(TARGET_SINGLE_PIC_BASE
-		   && (next_hi_reg == arm_pic_register)))
-	    break;
-	}
+	if (THUMB_REG_PUSHED_P (next_hi_reg))
+	  break;
 
       pushable_regs = mask;
 
       if (pushable_regs == 0)
 	{
 	  /* Desperation time -- this probably will never happen.  */
-	  if (regs_ever_live[LAST_ARG_REGNUM]
-	      || !call_used_regs[LAST_ARG_REGNUM])
+	  if (THUMB_REG_PUSHED_P (LAST_ARG_REGNUM))
 	    asm_fprintf (f, "\tmov\t%r, %r\n", IP_REGNUM, LAST_ARG_REGNUM);
 	  mask = 1 << LAST_ARG_REGNUM;
 	}
@@ -10479,15 +10518,12 @@ thumb_output_function_prologue (f, size)
 		  high_regs_pushed--;
 		  
 		  if (high_regs_pushed)
-		    for (next_hi_reg--; next_hi_reg > LAST_LO_REGNUM;
-			 next_hi_reg--)
-		      {
-			if (regs_ever_live[next_hi_reg]
-			    && !call_used_regs[next_hi_reg]
-			    && !(TARGET_SINGLE_PIC_BASE 
-				 && (next_hi_reg == arm_pic_register)))
+		    {
+		      for (next_hi_reg--; next_hi_reg > LAST_LO_REGNUM;
+			   next_hi_reg--)
+			if (THUMB_REG_PUSHED_P (next_hi_reg))
 			  break;
-		      }
+		    }
 		  else
 		    {
 		      mask &= ~((1 << regno) - 1);
@@ -10500,8 +10536,7 @@ thumb_output_function_prologue (f, size)
 	}
 
       if (pushable_regs == 0
-	  && (regs_ever_live[LAST_ARG_REGNUM]
-	      || !call_used_regs[LAST_ARG_REGNUM]))
+	  && (THUMB_REG_PUSHED_P (LAST_ARG_REGNUM)))
 	asm_fprintf (f, "\tmov\t%r, %r\n", LAST_ARG_REGNUM, IP_REGNUM);
     }
 }
@@ -10799,7 +10834,8 @@ thumb_reload_in_hi (operands)
     that starts with the character 'c'.  */
 
 static int
-arm_get_strip_length (char c)
+arm_get_strip_length (c)
+     int c;
 {
   switch (c)
     {
@@ -10812,7 +10848,8 @@ arm_get_strip_length (char c)
    and all prefix encodings stripped from it.  */
 
 const char *
-arm_strip_name_encoding (const char * name)
+arm_strip_name_encoding (name)
+     const char * name;
 {
   int skip;
   
@@ -10820,6 +10857,30 @@ arm_strip_name_encoding (const char * name)
     name += skip;
 
   return name;
+}
+
+/* If there is a '*' anywhere in the name's prefix, then
+   emit the stripped name verbatim, otherwise prepend an
+   underscore if leading underscores are being used.  */
+
+void
+arm_asm_output_labelref (stream, name)
+     FILE * stream;
+     const char * name;
+{
+  int skip;
+  int verbatim = 0;
+
+  while ((skip = arm_get_strip_length (* name)))
+    {
+      verbatim |= (*name == '*');
+      name += skip;
+    }
+
+  if (verbatim)
+    fputs (name, stream);
+  else
+    asm_fprintf (stream, "%U%s", name);
 }
 
 rtx aof_pic_label;
@@ -10978,6 +11039,16 @@ aof_dump_imports (f)
       imports_list = imports_list->next;
     }
 }
+
+static void
+aof_globalize_label (stream, name)
+     FILE *stream;
+     const char *name;
+{
+  default_globalize_label (stream, name);
+  if (! strcmp (name, "main"))
+    arm_main_function = 1;
+}
 #endif /* AOF_ASSEMBLER */
 
 #ifdef OBJECT_FORMAT_ELF
@@ -11060,3 +11131,18 @@ arm_encode_section_info (decl, first)
     }
 }
 #endif /* !ARM_PE */
+
+static void
+arm_internal_label (stream, prefix, labelno)
+     FILE *stream;
+     const char *prefix;
+     unsigned long labelno;
+{
+  if (arm_ccfsm_state == 3 && (unsigned) arm_target_label == labelno
+      && !strcmp (prefix, "L"))
+    {
+      arm_ccfsm_state = 0;
+      arm_target_insn = NULL;
+    }
+  default_internal_label (stream, prefix, labelno);
+}

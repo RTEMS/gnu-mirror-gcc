@@ -1,0 +1,379 @@
+// Utility for libstdc++ ABI analysis -*- C++ -*-
+
+// Copyright (C) 2002 Free Software Foundation, Inc.
+//
+// This file is part of the GNU ISO C++ Library.  This library is free
+// software; you can redistribute it and/or modify it under the
+// terms of the GNU General Public License as published by the
+// Free Software Foundation; either version 2, or (at your option)
+// any later version.
+
+// This library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License along
+// with this library; see the file COPYING.  If not, write to the Free
+// Software Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307,
+// USA.
+
+// As a special exception, you may use this file as part of a free software
+// library without restriction.  Specifically, if other files instantiate
+// templates or use macros or inline functions from this file, or you compile
+// this file and link it with other files to produce an executable, this
+// file does not by itself cause the resulting executable to be covered by
+// the GNU General Public License.  This exception does not however
+// invalidate any other reasons why the executable file might be covered by
+// the GNU General Public License.
+
+// Benjamin Kosnik  <bkoz@redhat.com>
+// Blame subsequent hacks on Loren J. Rittle <ljrittle@acm.org>, Phil
+// Edwards <pme@gcc.gnu.org>, and a cast of dozens at libstdc++@gcc.gnu.org.
+
+#include <string>
+#include <ext/hash_map>
+#include <deque>
+#include <sstream>
+#include <fstream>
+#include <iostream>
+#include <cxxabi.h>
+#include <stdlib.h>    // for system(3)
+#include <unistd.h>    // for access(2)
+
+struct symbol_info
+{
+  enum category { none, function, object, error };
+  category 	type;
+  std::string 	name;
+  std::string 	name_demangled;
+  std::string 	version;
+  int 		size;
+
+  symbol_info() : type(none), size(0) { }
+
+  symbol_info(const symbol_info& other) 
+  : type(other.type), name(other.name), name_demangled(other.name_demangled), 
+  version(other.version), size(other.size) { }
+};
+
+bool 
+check_compatible(const symbol_info& lhs, const symbol_info& rhs, 
+		 bool verbose = false)
+{
+  using namespace std;
+  bool ret = true;
+  const char tab = '\t';
+
+  // Check to see if symbol_infos are compatible.
+  if (lhs.type != rhs.type)
+    {
+      ret = false;
+      if (verbose)
+	{
+	  cout << tab << "incompatible types" << endl;
+	}
+    }
+  
+  if (lhs.name != rhs.name)
+    {
+      ret = false;
+      if (verbose)
+	{
+	  cout << tab << "incompatible names" << endl;
+	}
+    }
+
+  if (lhs.size != rhs.size)
+    {
+      ret = false;
+      if (verbose)
+	{
+	  cout << tab << "incompatible sizes" << endl;
+	}
+    }
+
+  // Expect something more sophisticated eventually.
+  if (lhs.version != rhs.version)
+    {
+      ret = false;
+      if (verbose)
+	{
+	  cout << tab << "incompatible versions" << endl;
+	}
+    }
+
+  return ret;
+}
+
+template<typename _CharT, typename _Traits>
+  std::basic_ostream<_CharT, _Traits>&
+  operator<<(std::basic_ostream<_CharT, _Traits>& os, symbol_info& si)
+  {
+    using namespace std;
+    os << si.type << endl;
+    os << si.name << endl;
+    os << si.name_demangled << endl;
+    os << si.version << endl;
+    os << si.size << endl;
+    return os;
+  }
+ 
+const char*
+demangle(const std::string& mangled)
+{
+  const char* name;
+  if (mangled[0] != '_' && mangled[1] != 'Z')
+    {
+      // This is not a mangled symbol, thus has "C" linkage.
+      name = mangled.c_str();
+    }
+  else
+    {
+      // Use __cxa_demangle to demangle.
+      int status = 0;
+      name = abi::__cxa_demangle(mangled.c_str(), 0, 0, &status);
+      if (!name)
+	{
+	  switch (status)
+	    {
+	    case 0:
+	      name = "error code = 0: success";
+	      break;
+	    case -1:
+	      name = "error code = -1: memory allocation failure";
+	      break;
+	    case -2:
+	      name = "error code = -2: invalid mangled name";
+	      break;
+	    case -3:
+	      name = "error code = -3: invalid arguments";
+	      break;
+	    default:
+	      name = "error code unknown - who knows what happened";
+	    }
+	}
+    }
+  return name;
+}
+
+void 
+line_to_symbol_info(std::string& input, symbol_info& output)
+{
+  using namespace std;
+  const char delim = ':';
+  const char version_delim = '@';
+  const string::size_type npos = string::npos;
+  string::size_type n = 0;
+
+  // Set the type.
+  if (input.find("FUNC") == 0)
+    output.type = symbol_info::function;
+  else if (input.find("OBJECT") == 0)
+    output.type = symbol_info::object;
+  else
+    output.type = symbol_info::error;
+  n = input.find_first_of(delim);
+  if (n != npos)
+    input.erase(input.begin(), input.begin() + n + 1);
+
+  // Iff object, get size info.
+  if (output.type == symbol_info::object)
+    {
+      n = input.find_first_of(delim);
+      if (n != npos)
+	{
+	  string size(input.begin(), input.begin() + n);
+	  istringstream iss(size);
+	  int x;
+	  iss >> x;
+	  if (iss.good())
+	    output.size = x;
+	  input.erase(input.begin(), input.begin() + n + 1);
+	}
+    }
+
+  // Set the name.
+  n = input.find_first_of(version_delim);
+  if (n != npos)
+    {
+      // Found version string.
+      output.name = string(input.begin(), input.begin() + n);
+      n = input.find_last_of(version_delim);
+      input.erase(input.begin(), input.begin() + n + 1);
+
+      // Set version name.
+      output.version = input;
+    }
+  else
+    {
+      // No versioning info.
+      output.name = string(input.begin(), input.end());
+      input.erase(input.begin(), input.end());
+    }
+
+  // Set the demangled name.
+  output.name_demangled = demangle(output.name);
+}
+
+typedef std::deque<std::string>				symbol_names;
+typedef __gnu_cxx::hash_map<const char*, symbol_info> 	symbol_infos;
+
+void
+create_symbol_data(const char* file, symbol_infos& symbols, 
+		   symbol_names& names)
+{
+  // Parse list of symbols in file into vectors of symbol_info.
+  // For 3.2.0 on x86/linux, this usually is
+  // 947 non-weak symbols
+  // 2084 weak symbols
+  using namespace std;
+  ifstream ifs(file); 
+  if (ifs.is_open())
+    {
+      // Organize input into container of symbol_info objects.
+      const string empty;
+      string line = empty;
+      while (getline(ifs, line).good())
+	{
+	  symbol_info symbol;
+	  line_to_symbol_info(line, symbol);
+	  symbols[symbol.name.c_str()] = symbol;
+	  names.push_back(symbol.name);
+	  line = empty;
+	}
+    }
+}
+
+void
+report_symbol_info(const symbol_info& symbol, std::size_t n)
+{
+  using namespace std;
+  const char tab = '\t';
+  cout << tab << n << endl;
+  cout << tab << "symbol"<< endl;
+  cout << tab << symbol.name << endl;
+
+  // Add any other information to display here.
+  cout << tab << "demangled symbol"<< endl;
+  cout << tab << symbol.name_demangled << endl;
+
+  cout << endl;
+}
+
+
+int
+main(int argc, char** argv)
+{
+  using namespace std;
+
+  // Get arguments.  (Heading towards getopt_long, I can feel it.)
+  string argv1;
+  if (argc < 4 || (string("--help") == (argv1 = argv[1])))
+    {
+      cerr << "Usage:  abi_check --check    cur baseline\n"
+              "                  --help\n\n"
+              "Where CUR is a file containing the current results from\n"
+              "extract_symvers, and BASELINE is one from config/abi.\n"
+	   << endl;
+      exit(1);
+    }
+
+  const char* test_file = argv[2];
+  const char* baseline_file = argv[3];
+
+  // Quick sanity/setup check
+  if (access(test_file, R_OK) != 0)
+    {
+      cerr << "Cannot read symbols file " << test_file
+           << ", did you forget to build first?" << endl;
+      exit(1);
+    }
+  if (access(baseline_file, R_OK) != 0)
+    {
+      cerr << "Cannot read baseline file " << baseline_file << endl;
+      exit(1);
+    }
+
+  // Input both lists of symbols into container.
+  symbol_infos  baseline_symbols;
+  symbol_names  baseline_names;
+  symbol_infos  test_symbols;
+  symbol_names  test_names;
+  create_symbol_data(baseline_file, baseline_symbols, baseline_names);
+  create_symbol_data(test_file, test_symbols, test_names);
+
+  // More sanity checking.
+  const symbol_names::size_type baseline_size = baseline_names.size();
+  const symbol_names::size_type test_size = test_names.size();
+  if (!baseline_size || !test_size)
+    {
+      cerr << "Problems parsing the list of exported symbols." << endl;
+      exit(2);
+    }
+
+  // Sort out names.
+  // Assuming baseline_names, test_names are both unique w/ no duplicates.
+  //
+  // The pairs of names in shared_names are needed to do lookups on
+  // the hash tables of common symbols to do compares.
+  //
+  // The names added to missing_names are baseline_names not found in
+  // test_names 
+  // -> symbols that have been deleted.
+  //
+  // The names left in test_names are names not in baseline_names
+  // -> symbols that have been added.
+  typedef pair<string, string> string_pair;
+  vector<string_pair> shared_names;
+  symbol_names missing_names;
+  for (size_t i = 0; i < baseline_size; ++i)
+    {
+      symbol_names::iterator end = test_names.end();
+      symbol_names::iterator it = find(test_names.begin(), end, 
+				       baseline_names[i]);
+      if (it != end)
+	{
+	  // Found.
+	  shared_names.push_back(string_pair(baseline_names[i], *it));
+	  test_names.erase(it);
+	}
+      else
+	missing_names.push_back(baseline_names[i]);
+    }
+
+  // Check common names for detailed compatibility.
+  const vector<string_pair>::size_type shared_size = shared_names.size();
+  typedef pair<symbol_info, symbol_info> symbol_pair;
+  vector<symbol_pair> incompatible;
+  for (size_t i = 0; i < shared_size; ++i)
+    {
+      symbol_info base = baseline_symbols[shared_names[i].first.c_str()];
+      symbol_info test = test_symbols[shared_names[i].second.c_str()];
+      if (!check_compatible(base, test))
+	incompatible.push_back(symbol_pair(base, test));
+    }
+
+  // Report results.
+  cout << test_names.size() << " added symbols " << endl;
+  for (size_t j = 0; j < test_names.size() ; ++j)
+    report_symbol_info(test_symbols[test_names[j].c_str()], j + 1);
+
+  cout << missing_names.size() << " missing symbols " << endl;
+  for (size_t j = 0; j < missing_names.size() ; ++j)
+    report_symbol_info(baseline_symbols[missing_names[j].c_str()], j + 1);
+
+  cout << incompatible.size() << " incompatible symbols " << endl;
+  for (size_t j = 0; j < incompatible.size() ; ++j)
+    {
+      // First, report name.
+      const symbol_info& base = incompatible[j].first;
+      const symbol_info& test = incompatible[j].second;
+      report_symbol_info(test, j + 1);
+
+      // Second, report reason or reasons incompatible.
+      check_compatible(base, test, true);
+    }
+
+  return 0;
+}

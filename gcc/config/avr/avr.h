@@ -121,7 +121,7 @@ extern int avr_asm_only_p;
    fprintf (stderr, " (68k, MIT syntax)");
    #endif  */
 
-#define OVERRIDE_OPTIONS avr_override_options()
+#define OVERRIDE_OPTIONS avr_override_options ()
 /* `OVERRIDE_OPTIONS'
    Sometimes certain combinations of command options do not make
    sense on a particular target machine.  You can define a macro
@@ -675,7 +675,7 @@ enum reg_class {
    machines allow copying all registers to and from memory, but
    require a scratch register for stores to some memory locations
    (e.g., those with symbolic address on the RT, and those with
-   certain symbolic address on the Sparc when compiling PIC).  In
+   certain symbolic address on the SPARC when compiling PIC).  In
    some cases, both an intermediate and a scratch register are
    required.
 
@@ -731,7 +731,7 @@ enum reg_class {
 /* `SECONDARY_MEMORY_NEEDED (CLASS1, CLASS2, M)'
    Certain machines have the property that some registers cannot be
    copied to some other registers without using memory.  Define this
-   macro on those machines to be a C expression that is non-zero if
+   macro on those machines to be a C expression that is nonzero if
    objects of mode M in registers of CLASS1 can only be copied to
    registers of class CLASS2 by storing a register of CLASS1 into
    memory and loading that memory location into a register of CLASS2.
@@ -755,16 +755,16 @@ enum reg_class {
    classes that there would not be enough registers to use as spill
    registers if this were done.
 
-   Define `SMALL_REGISTER_CLASSES' to be an expression with a non-zero
-   value on these machines.  When this macro has a non-zero value, the
+   Define `SMALL_REGISTER_CLASSES' to be an expression with a nonzero
+   value on these machines.  When this macro has a nonzero value, the
    compiler allows registers explicitly used in the rtl to be used as
    spill registers but avoids extending the lifetime of these
    registers.
 
-   It is always safe to define this macro with a non-zero value, but
+   It is always safe to define this macro with a nonzero value, but
    if you unnecessarily define it, you will reduce the amount of
    optimizations that can be performed in some cases.  If you do not
-   define this macro with a non-zero value when it is required, the
+   define this macro with a nonzero value when it is required, the
    compiler will run out of spill registers and print a fatal error
    message.  For most machines, you should not define this macro at
    all.  */
@@ -999,7 +999,7 @@ enum reg_class {
 				      || (FROM) == FRAME_POINTER_REGNUM+1) \
 				     && ! FRAME_POINTER_REQUIRED	   \
 				     ))
-/* A C expression that returns non-zero if the compiler is allowed to
+/* A C expression that returns nonzero if the compiler is allowed to
    try to replace register number FROM-REG with register number
    TO-REG.  This macro need only be defined if `ELIMINABLE_REGS' is
    defined, and will usually be the constant 1, since most of the
@@ -1115,7 +1115,7 @@ enum reg_class {
    You may use the macro `MUST_PASS_IN_STACK (MODE, TYPE)' in the
    definition of this macro to determine if this argument is of a
    type that must be passed in the stack.  If `REG_PARM_STACK_SPACE'
-   is not defined and `FUNCTION_ARG' returns non-zero for such an
+   is not defined and `FUNCTION_ARG' returns nonzero for such an
    argument, the compiler will abort.  If `REG_PARM_STACK_SPACE' is
    defined, the argument will be computed in the stack and then
    loaded into a register.  */
@@ -1679,10 +1679,10 @@ do {									    \
    cost many times greater than aligned accesses, for example if they
    are emulated in a trap handler.
 
-   When this macro is non-zero, the compiler will act as if
-   `STRICT_ALIGNMENT' were non-zero when generating code for block
+   When this macro is nonzero, the compiler will act as if
+   `STRICT_ALIGNMENT' were nonzero when generating code for block
    moves.  This can cause significantly more instructions to be
-   produced.  Therefore, do not set this macro non-zero if unaligned
+   produced.  Therefore, do not set this macro nonzero if unaligned
    accesses only add a cycle or two to the time for a memory access.
 
    If the value of this macro is always zero, it need not be defined.
@@ -1754,7 +1754,7 @@ do {									    \
 #define EXTRA_SECTION_FUNCTIONS						      \
 									      \
 void									      \
-progmem_section (void)							      \
+progmem_section ()							      \
 {									      \
   if (in_section != in_progmem)						      \
     {									      \
@@ -1915,17 +1915,6 @@ do {									\
    This macro controls how the assembler definitions of uninitialized
    static variables are output.  */
 
-#define ASM_OUTPUT_LABEL(STREAM, NAME)		\
-{						\
-  assemble_name (STREAM, NAME);			\
-  fprintf (STREAM, ":\n");			\
-}
-/* A C statement (sans semicolon) to output to the stdio stream
-   STREAM the assembler definition of a label named NAME.  Use the
-   expression `assemble_name (STREAM, NAME)' to output the name
-   itself; before and after that, output the additional assembler
-   syntax for defining the name, and a newline.  */
-
 #undef TYPE_ASM_OP
 #undef SIZE_ASM_OP
 #undef WEAK_ASM_OP
@@ -1947,16 +1936,12 @@ do {									\
    is just a default.  You may need to override it in your machine-
    specific tm.h file (depending upon the particulars of your assembler).  */
 
-
-#define ASM_DECLARE_FUNCTION_NAME(FILE, NAME, DECL)	\
-do {						   	\
-     fprintf (FILE, "%s", TYPE_ASM_OP);	   		\
-     assemble_name (FILE, NAME);		   	\
-     putc (',', FILE);				   	\
-     fprintf (FILE, TYPE_OPERAND_FMT, "function");	\
-     putc ('\n', FILE);				   	\
-     ASM_OUTPUT_LABEL (FILE, NAME);		   	\
+#define ASM_DECLARE_FUNCTION_NAME(FILE, NAME, DECL)		\
+do {								\
+     ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "function");	\
+     ASM_OUTPUT_LABEL (FILE, NAME);				\
 } while (0)
+
 /* A C statement (sans semicolon) to output to the stdio stream
    STREAM any text necessary for declaring the name NAME of a
    function which is being defined.  This macro is responsible for
@@ -1970,20 +1955,7 @@ do {						   	\
 #define ASM_DECLARE_FUNCTION_SIZE(FILE, FNAME, DECL)			\
   do {									\
     if (!flag_inhibit_size_directive)					\
-      {									\
-        char label[256];						\
-	static int labelno;						\
-	labelno++;							\
-	ASM_GENERATE_INTERNAL_LABEL (label, "Lfe", labelno);		\
-	ASM_OUTPUT_INTERNAL_LABEL (FILE, "Lfe", labelno);		\
-	fprintf (FILE, "%s", SIZE_ASM_OP);				\
-	assemble_name (FILE, (FNAME));					\
-        fprintf (FILE, ",");						\
-	assemble_name (FILE, label);					\
-        fprintf (FILE, "-");						\
-	assemble_name (FILE, (FNAME));					\
-	putc ('\n', FILE);						\
-      }									\
+      ASM_OUTPUT_MEASURED_SIZE (FILE, FNAME);				\
   } while (0)
 /* A C statement (sans semicolon) to output to the stdio stream
    STREAM any text necessary for declaring the size of a function
@@ -1994,22 +1966,17 @@ do {						   	\
    If this macro is not defined, then the function size is not
    defined.  */
 
-#define ASM_DECLARE_OBJECT_NAME(FILE, NAME, DECL)			  \
-do {									  \
-      fprintf (FILE, "%s", TYPE_ASM_OP);				  \
-      assemble_name (FILE, NAME);					  \
-      putc (',', FILE);							  \
-      fprintf (FILE, TYPE_OPERAND_FMT, "object");			  \
-      putc ('\n', FILE);						  \
-      size_directive_output = 0;					  \
-      if (!flag_inhibit_size_directive && DECL_SIZE (DECL))		  \
-	{								  \
-	  size_directive_output = 1;					  \
-	  fprintf (FILE, "%s", SIZE_ASM_OP);				  \
-	  assemble_name (FILE, NAME);					  \
-	  fprintf (FILE, ",%d\n",  int_size_in_bytes (TREE_TYPE (DECL))); \
-    }									  \
-  ASM_OUTPUT_LABEL(FILE, NAME);						  \
+#define ASM_DECLARE_OBJECT_NAME(FILE, NAME, DECL)			\
+do {									\
+  ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "object");			\
+  size_directive_output = 0;						\
+  if (!flag_inhibit_size_directive && DECL_SIZE (DECL))			\
+    {									\
+      size_directive_output = 1;					\
+      ASM_OUTPUT_SIZE_DIRECTIVE (FILE, NAME,				\
+				 int_size_in_bytes (TREE_TYPE (DECL)));	\
+    }									\
+  ASM_OUTPUT_LABEL(FILE, NAME);						\
 } while (0)
 /* A C statement (sans semicolon) to output to the stdio stream
    STREAM any text necessary for declaring the name NAME of an
@@ -2024,17 +1991,18 @@ do {									  \
 #define ASM_FINISH_DECLARE_OBJECT(FILE, DECL, TOP_LEVEL, AT_END)	 \
 do {									 \
      const char *name = XSTR (XEXP (DECL_RTL (DECL), 0), 0);		 \
+     HOST_WIDE_INT size;						 \
      if (!flag_inhibit_size_directive && DECL_SIZE (DECL)		 \
          && ! AT_END && TOP_LEVEL					 \
 	 && DECL_INITIAL (DECL) == error_mark_node			 \
 	 && !size_directive_output)					 \
        {								 \
 	 size_directive_output = 1;					 \
-	 fprintf (FILE, "%s", SIZE_ASM_OP);				 \
-	 assemble_name (FILE, name);					 \
-	 fprintf (FILE, ",%d\n",  int_size_in_bytes (TREE_TYPE (DECL))); \
+	 size = int_size_in_bytes (TREE_TYPE (DECL));			 \
+	 ASM_OUTPUT_SIZE_DIRECTIVE (FILE, name, size);			 \
        }								 \
    } while (0)
+
 /* A C statement (sans semicolon) to finish up declaring a variable
    name once the compiler has processed its initializer fully and
    thus has had a chance to determine the size of an array when
@@ -2081,20 +2049,8 @@ do {									 \
    If your target assembler doesn't support the .string directive, you
    should define this to zero.  */
 
-#define ASM_GLOBALIZE_LABEL(STREAM, NAME)	\
-do {						\
-  fprintf (STREAM, ".global\t");		\
-  assemble_name (STREAM, NAME);			\
-  fprintf (STREAM, "\n");			\
-}						\
-while (0)
-     
-/* A C statement (sans semicolon) to output to the stdio stream
-   STREAM some commands that will make the label NAME global; that
-   is, available for reference from other files.  Use the expression
-   `assemble_name (STREAM, NAME)' to output the name itself; before
-   and after that, output the additional assembler syntax for making
-   that name global, and a newline.  */
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP ".global\t"
 
 #define ASM_WEAKEN_LABEL(FILE, NAME) 	\
   do					\
@@ -2147,32 +2103,13 @@ while (0)
    setting the `DECL_ONE_ONLY' flag is enough to mark a declaration to
    be emitted as one-only.  */
 
-#define ASM_OUTPUT_INTERNAL_LABEL(STREAM, PREFIX, NUM)	\
-fprintf(STREAM, ".%s%d:\n", PREFIX, NUM)
-/* A C statement to output to the stdio stream STREAM a label whose
-   name is made from the string PREFIX and the number NUM.
-
-   It is absolutely essential that these labels be distinct from the
-   labels used for user-level functions and variables.  Otherwise,
-   certain programs will have name conflicts with internal labels.
-
-   It is desirable to exclude internal labels from the symbol table
-   of the object file.  Most assemblers have a naming convention for
-   labels that should be excluded; on many systems, the letter `L' at
-   the beginning of a label has this effect.  You should find out what
-   convention your system uses, and follow it.
-
-   The usual definition of this macro is as follows:
-
-   fprintf (STREAM, "L%s%d:\n", PREFIX, NUM)  */
-
 #define ASM_GENERATE_INTERNAL_LABEL(STRING, PREFIX, NUM)	\
 sprintf (STRING, "*.%s%d", PREFIX, NUM)
 /* A C statement to store into the string STRING a label whose name
    is made from the string PREFIX and the number NUM.
 
    This string, when output subsequently by `assemble_name', should
-   produce the output that `ASM_OUTPUT_INTERNAL_LABEL' would produce
+   produce the output that `(*targetm.asm_out.internal_label)' would produce
    with the same PREFIX and NUM.
 
    If the string begins with `*', then `assemble_name' will output
@@ -2182,27 +2119,6 @@ sprintf (STRING, "*.%s%d", PREFIX, NUM)
    output the string, and may change it.  (Of course,
    `ASM_OUTPUT_LABELREF' is also part of your machine description, so
    you should know what it does on your machine.)  */
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)	\
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),	\
-  sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO)))
-
-/* A C expression to assign to OUTVAR (which is a variable of type
-   `char *') a newly allocated string made from the string NAME and
-   the number NUMBER, with some suitable punctuation added.  Use
-   `alloca' to get space for the string.
-
-   The string will be used as an argument to `ASM_OUTPUT_LABELREF' to
-   produce an assembler label for an internal static variable whose
-   name is NAME.  Therefore, the string must be such as to result in
-   valid assembler code.  The argument NUMBER is different each time
-   this macro is executed; it prevents conflicts between
-   similarly-named internal static variables in different scopes.
-
-   Ideally this string should not be a valid C identifier, to prevent
-   any conflict with the user's own symbols.  Most assemblers allow
-   periods or percent signs in assembler symbols; putting at least
-   one of these between the name and the number will suffice.  */
 
 /* `ASM_OUTPUT_WEAK_ALIAS (STREAM, NAME, VALUE)'
    A C statement to output to the stdio stream STREAM assembler code
@@ -2348,18 +2264,18 @@ sprintf (STRING, "*.%s%d", PREFIX, NUM)
    The definition should be a C statement to output to the stdio
    stream STREAM an assembler pseudo-instruction to generate a
    reference to a label.  VALUE is the number of an internal label
-   whose definition is output using `ASM_OUTPUT_INTERNAL_LABEL'.  For
+   whose definition is output using `(*targetm.asm_out.internal_label)'.  For
    example,
 
    fprintf (STREAM, "\t.word L%d\n", VALUE)  */
 
 #define ASM_OUTPUT_CASE_LABEL(STREAM, PREFIX, NUM, TABLE) \
-  progmem_section (), ASM_OUTPUT_INTERNAL_LABEL (STREAM, PREFIX, NUM)
+  progmem_section (), (*targetm.asm_out.internal_label) (STREAM, PREFIX, NUM)
 
 /* `ASM_OUTPUT_CASE_LABEL (STREAM, PREFIX, NUM, TABLE)'
    Define this if the label before a jump-table needs to be output
    specially.  The first three arguments are the same as for
-   `ASM_OUTPUT_INTERNAL_LABEL'; the fourth argument is the jump-table
+   `(*targetm.asm_out.internal_label)'; the fourth argument is the jump-table
    which follows (a `jump_insn' containing an `addr_vec' or
    `addr_diff_vec').
 
@@ -2367,7 +2283,7 @@ sprintf (STRING, "*.%s%d", PREFIX, NUM)
    the table.
 
    If this macro is not defined, these labels are output with
-   `ASM_OUTPUT_INTERNAL_LABEL'.  */
+   `(*targetm.asm_out.internal_label)'.  */
 
 /* `ASM_OUTPUT_CASE_END (STREAM, NUM, TABLE)'
    Define this if something special must be output at the end of a
@@ -2567,15 +2483,13 @@ extern int avr_case_values_threshold;
 
    Do not define this macro if it does not need to do anything.  */
 
+#define CC1PLUS_SPEC "%{!frtti:-fno-rtti} \
+    %{!fenforce-eh-specs:-fno-enforce-eh-specs} \
+    %{!fexceptions:-fno-exceptions}"
+/* A C string constant that tells the GNU CC drvier program options to
+   pass to `cc1plus'.  */
+
 #define ASM_SPEC "%{mmcu=*:-mmcu=%*}"
-/* A C string constant that tells the GNU CC driver program options to
-   pass to the assembler.  It can also specify how to translate
-   options you give to GNU CC into options for GNU CC to pass to the
-   assembler.  See the file `sun3.h' for an example of this.
-
-   Do not define this macro if it does not need to do anything.  */
-
-#define ASM_FINAL_SPEC ""
 /* A C string constant that tells the GNU CC driver program how to
    run any programs which cleanup after the normal assembler.
    Normally, this is not needed.  See the file `mips.h' for an

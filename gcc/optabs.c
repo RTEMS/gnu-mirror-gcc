@@ -108,8 +108,6 @@ static rtx ftruncify	PARAMS ((rtx));
 static optab new_optab	PARAMS ((void));
 static inline optab init_optab	PARAMS ((enum rtx_code));
 static inline optab init_optabv	PARAMS ((enum rtx_code));
-static inline int complex_part_zero_p PARAMS ((rtx, enum mode_class,
-						enum machine_mode));
 static void init_libfuncs PARAMS ((optab, int, int, const char *, int));
 static void init_integral_libfuncs PARAMS ((optab, const char *, int));
 static void init_floating_libfuncs PARAMS ((optab, const char *, int));
@@ -241,22 +239,6 @@ widen_operand (op, mode, oldmode, unsignedp, no_extend)
   return result;
 }
 
-/* Test whether either the real or imaginary part of a complex floating
-   point number is 0.0, so that it can be ignored (when compiling
-   with -funsafe-math-optimizations). */
-
-static inline int
-complex_part_zero_p (part, class, submode)
-  rtx part;
-  enum mode_class class;
-  enum machine_mode submode;
-{
-  return part == 0 ||
-	  (flag_unsafe_math_optimizations
-	   && class == MODE_COMPLEX_FLOAT
-	   && part == CONST0_RTX (submode));
-}
-
 /* Generate code to perform a straightforward complex divide.  */
 
 static int
@@ -310,7 +292,7 @@ expand_cmplxdiv_straight (real0, real1, imag0, imag1, realr, imagr, submode,
   if (divisor == 0)
     return 0;
 
-  if (complex_part_zero_p (imag0, class, submode))
+  if (imag0 == 0)
     {
       /* Mathematically, ((a)(c-id))/divisor.  */
       /* Computationally, (a+i0) / (c+id) = (ac/(cc+dd)) + i(-ad/(cc+dd)).  */
@@ -476,7 +458,7 @@ expand_cmplxdiv_wide (real0, real1, imag0, imag1, realr, imagr, submode,
 
   /* Calculate dividend.  */
 
-  if (complex_part_zero_p (imag0, class, submode))
+  if (imag0 == 0)
     {
       real_t = real0;
 
@@ -581,7 +563,7 @@ expand_cmplxdiv_wide (real0, real1, imag0, imag1, realr, imagr, submode,
 
   /* Calculate dividend.  */
 
-  if (complex_part_zero_p (imag0, class, submode))
+  if (imag0 == 0)
     {
       /* Compute a / (c+id) as a(c/d) / (c(c/d)+d) + i (-a) / (c(c/d)+d).  */
 
@@ -797,34 +779,24 @@ expand_binop (mode, binoptab, op0, op1, target, unsignedp, methods)
 	}
 
       /* In case the insn wants input operands in modes different from
-	 the result, convert the operands.  It would seem that we
-	 don't need to convert CONST_INTs, but we do, so that they're
-	 a properly sign-extended for their modes; we choose the
-	 widest mode between mode and mode[01], so that, in a widening
-	 operation, we call convert_modes with different FROM and TO
-	 modes, which ensures the value is sign-extended.  Shift
-	 operations are an exception, because the second operand needs
-	 not be extended to the mode of the result.  */
+	 those of the actual operands, convert the operands.  It would
+	 seem that we don't need to convert CONST_INTs, but we do, so
+	 that they're properly zero-extended or sign-extended for their
+	 modes; shift operations are an exception, because the second
+	 operand need not be extended to the mode of the result.  */
 
-      if (GET_MODE (op0) != mode0
-	  && mode0 != VOIDmode)
+      if (GET_MODE (op0) != mode0 && mode0 != VOIDmode)
 	xop0 = convert_modes (mode0,
 			      GET_MODE (op0) != VOIDmode
 			      ? GET_MODE (op0)
-			      : GET_MODE_SIZE (mode) > GET_MODE_SIZE (mode0)
-			      ? mode
-			      : mode0,
+			      : mode,
 			      xop0, unsignedp);
 
-      if (GET_MODE (xop1) != mode1
-	  && mode1 != VOIDmode)
+      if (GET_MODE (op1) != mode1 && mode1 != VOIDmode)
 	xop1 = convert_modes (mode1,
 			      GET_MODE (op1) != VOIDmode
 			      ? GET_MODE (op1)
-			      : (GET_MODE_SIZE (mode) > GET_MODE_SIZE (mode1)
-				 && ! shift_op)
-			      ? mode
-			      : mode1,
+			      : (shift_op ? mode1 : mode),
 			      xop1, unsignedp);
 
       /* Now, if insn's predicates don't allow our operands, put them into
@@ -1237,7 +1209,7 @@ expand_binop (mode, binoptab, op0, op1, target, unsignedp, methods)
     {
       unsigned int i;
       optab otheroptab = binoptab == add_optab ? sub_optab : add_optab;
-      int nwords = GET_MODE_BITSIZE (mode) / BITS_PER_WORD;
+      const unsigned int nwords = GET_MODE_BITSIZE (mode) / BITS_PER_WORD;
       rtx carry_in = NULL_RTX, carry_out = NULL_RTX;
       rtx xop0, xop1, xtarget;
 
@@ -1609,11 +1581,10 @@ expand_binop (mode, binoptab, op0, op1, target, unsignedp, methods)
 	  else if (res != realr)
 	    emit_move_insn (realr, res);
 
-	  if (!complex_part_zero_p (imag0, class, submode)
-	      && !complex_part_zero_p (imag1, class, submode))
+	  if (imag0 != 0 && imag1 != 0)
 	    res = expand_binop (submode, binoptab, imag0, imag1,
 				imagr, unsignedp, methods);
-	  else if (!complex_part_zero_p (imag0, class, submode))
+	  else if (imag0 != 0)
 	    res = imag0;
 	  else if (binoptab->code == MINUS)
             res = expand_unop (submode,
@@ -1633,8 +1604,7 @@ expand_binop (mode, binoptab, op0, op1, target, unsignedp, methods)
 	case MULT:
 	  /* (a+ib) * (c+id) = (ac-bd) + i(ad+cb) */
 
-	  if (!complex_part_zero_p (imag0, class, submode)
-	       && !complex_part_zero_p (imag1, class, submode))
+	  if (imag0 != 0 && imag1 != 0)
 	    {
 	      rtx temp1, temp2;
 
@@ -1697,7 +1667,7 @@ expand_binop (mode, binoptab, op0, op1, target, unsignedp, methods)
 	      else if (res != realr)
 		emit_move_insn (realr, res);
 
-	      if (!complex_part_zero_p (imag0, class, submode))
+	      if (imag0 != 0)
 		res = expand_binop (submode, binoptab,
 				    real1, imag0, imagr, unsignedp, methods);
 	      else
@@ -1716,7 +1686,7 @@ expand_binop (mode, binoptab, op0, op1, target, unsignedp, methods)
 	case DIV:
 	  /* (a+ib) / (c+id) = ((ac+bd)/(cc+dd)) + i((bc-ad)/(cc+dd)) */
 	  
-	  if (complex_part_zero_p (imag1, class, submode))
+	  if (imag1 == 0)
 	    {
 	      /* (a+ib) / (c+i0) = (a/c) + i(b/c) */
 
@@ -1923,39 +1893,86 @@ expand_vector_binop (mode, binoptab, op0, op1, target, unsignedp, methods)
      int unsignedp;
      enum optab_methods methods;
 {
-  enum machine_mode submode;
-  int elts, i;
+  enum machine_mode submode, tmode;
+  int size, elts, subsize, subbitsize, i;
   rtx t, a, b, res, seq;
   enum mode_class class;
 
   class = GET_MODE_CLASS (mode);
 
+  size =  GET_MODE_SIZE (mode);
   submode = GET_MODE_INNER (mode);
-  elts = GET_MODE_NUNITS (mode);
 
-  if (!target)
-    target = gen_reg_rtx (mode);
-
-  start_sequence ();
-
-  /* FIXME: Optimally, we should try to do this in narrower vector
-     modes if available.  E.g. When trying V8SI, try V4SI, else
-     V2SI, else decay into SI.  */
+  /* Search for the widest vector mode with the same inner mode that is
+     still narrower than MODE and that allows to open-code this operator.
+     Note, if we find such a mode and the handler later decides it can't
+     do the expansion, we'll be called recursively with the narrower mode.  */
+  for (tmode = GET_CLASS_NARROWEST_MODE (class);
+       GET_MODE_SIZE (tmode) < GET_MODE_SIZE (mode);
+       tmode = GET_MODE_WIDER_MODE (tmode))
+    {
+      if (GET_MODE_INNER (tmode) == GET_MODE_INNER (mode)
+	  && binoptab->handlers[(int) tmode].insn_code != CODE_FOR_nothing)
+	submode = tmode;
+    }
 
   switch (binoptab->code)
     {
+    case AND:
+    case IOR:
+    case XOR:
+      tmode = int_mode_for_mode (mode);
+      if (tmode != BLKmode)
+	submode = tmode;
     case PLUS:
     case MINUS:
     case MULT:
     case DIV:
+      subsize = GET_MODE_SIZE (submode);
+      subbitsize = GET_MODE_BITSIZE (submode);
+      elts = size / subsize;
+
+      /* If METHODS is OPTAB_DIRECT, we don't insist on the exact mode,
+	 but that we operate on more than one element at a time.  */
+      if (subsize == GET_MODE_UNIT_SIZE (mode) && methods == OPTAB_DIRECT)
+	return 0;
+
+      start_sequence ();
+
+      /* Errors can leave us with a const0_rtx as operand.  */
+      if (GET_MODE (op0) != mode)
+	op0 = copy_to_mode_reg (mode, op0);
+      if (GET_MODE (op1) != mode)
+	op1 = copy_to_mode_reg (mode, op1);
+
+      if (!target)
+	target = gen_reg_rtx (mode);
+
       for (i = 0; i < elts; ++i)
 	{
-	  t = simplify_gen_subreg (submode, target, mode,
-				   i * UNITS_PER_WORD);
-	  a = simplify_gen_subreg (submode, op0, mode,
-				   i * UNITS_PER_WORD);
-	  b = simplify_gen_subreg (submode, op1, mode,
-				   i * UNITS_PER_WORD);
+	  /* If this is part of a register, and not the first item in the
+	     word, we can't store using a SUBREG - that would clobber
+	     previous results.
+	     And storing with a SUBREG is only possible for the least
+	     significant part, hence we can't do it for big endian
+	     (unless we want to permute the evaluation order.  */
+	  if (GET_CODE (target) == REG
+	      && (BYTES_BIG_ENDIAN
+		  ? subsize < UNITS_PER_WORD
+		  : ((i * subsize) % UNITS_PER_WORD) != 0))
+	    t = NULL_RTX;
+	  else
+	    t = simplify_gen_subreg (submode, target, mode, i * subsize);
+	  if (CONSTANT_P (op0))
+	    a = simplify_gen_subreg (submode, op0, mode, i * subsize);
+	  else
+	    a = extract_bit_field (op0, subbitsize, i * subbitsize, unsignedp,
+				   NULL_RTX, submode, submode, size);
+	  if (CONSTANT_P (op1))
+	    b = simplify_gen_subreg (submode, op1, mode, i * subsize);
+	  else
+	    b = extract_bit_field (op1, subbitsize, i * subbitsize, unsignedp,
+				   NULL_RTX, submode, submode, size);
 
 	  if (binoptab->code == DIV)
 	    {
@@ -1973,7 +1990,11 @@ expand_vector_binop (mode, binoptab, op0, op1, target, unsignedp, methods)
 	  if (res == 0)
 	    break;
 
-	  emit_move_insn (t, res);
+	  if (t)
+	    emit_move_insn (t, res);
+	  else
+	    store_bit_field (target, subbitsize, i * subbitsize, submode, res,
+			     size);
 	}
       break;
 
@@ -1998,30 +2019,86 @@ expand_vector_unop (mode, unoptab, op0, target, unsignedp)
      rtx target;
      int unsignedp;
 {
-  enum machine_mode submode;
-  int elts, i;
+  enum machine_mode submode, tmode;
+  int size, elts, subsize, subbitsize, i;
   rtx t, a, res, seq;
 
+  size =  GET_MODE_SIZE (mode);
   submode = GET_MODE_INNER (mode);
-  elts = GET_MODE_NUNITS (mode);
+
+  /* Search for the widest vector mode with the same inner mode that is
+     still narrower than MODE and that allows to open-code this operator.
+     Note, if we find such a mode and the handler later decides it can't
+     do the expansion, we'll be called recursively with the narrower mode.  */
+  for (tmode = GET_CLASS_NARROWEST_MODE (GET_MODE_CLASS (mode));
+       GET_MODE_SIZE (tmode) < GET_MODE_SIZE (mode);
+       tmode = GET_MODE_WIDER_MODE (tmode))
+    {
+      if (GET_MODE_INNER (tmode) == GET_MODE_INNER (mode)
+	  && unoptab->handlers[(int) tmode].insn_code != CODE_FOR_nothing)
+	submode = tmode;
+    }
+  /* If there is no negate operation, try doing a subtract from zero.  */
+  if (unoptab == neg_optab && GET_MODE_CLASS (submode) == MODE_INT
+      /* Avoid infinite recursion when an
+	 error has left us with the wrong mode.  */
+      && GET_MODE (op0) == mode)
+    {    
+      rtx temp;
+      temp = expand_binop (mode, sub_optab, CONST0_RTX (mode), op0,
+                           target, unsignedp, OPTAB_DIRECT);
+      if (temp)
+	return temp;
+    }
+
+  if (unoptab == one_cmpl_optab)
+    {
+      tmode = int_mode_for_mode (mode);
+      if (tmode != BLKmode)
+	submode = tmode;
+    }
+
+  subsize = GET_MODE_SIZE (submode);
+  subbitsize = GET_MODE_BITSIZE (submode);
+  elts = size / subsize;
+
+  /* Errors can leave us with a const0_rtx as operand.  */
+  if (GET_MODE (op0) != mode)
+    op0 = copy_to_mode_reg (mode, op0);
 
   if (!target)
     target = gen_reg_rtx (mode);
 
   start_sequence ();
 
-  /* FIXME: Optimally, we should try to do this in narrower vector
-     modes if available.  E.g. When trying V8SI, try V4SI, else
-     V2SI, else decay into SI.  */
-
   for (i = 0; i < elts; ++i)
     {
-      t = simplify_gen_subreg (submode, target, mode, i * UNITS_PER_WORD);
-      a = simplify_gen_subreg (submode, op0, mode, i * UNITS_PER_WORD);
+      /* If this is part of a register, and not the first item in the
+	 word, we can't store using a SUBREG - that would clobber
+	 previous results.
+	 And storing with a SUBREG is only possible for the least
+	 significant part, hence we can't do it for big endian
+	 (unless we want to permute the evaluation order.  */
+      if (GET_CODE (target) == REG
+	  && (BYTES_BIG_ENDIAN
+	      ?  subsize < UNITS_PER_WORD
+	      : ((i * subsize) % UNITS_PER_WORD) != 0))
+	t = NULL_RTX;
+      else
+	t = simplify_gen_subreg (submode, target, mode, i * subsize);
+      if (CONSTANT_P (op0))
+	a = simplify_gen_subreg (submode, op0, mode, i * subsize);
+      else
+	a = extract_bit_field (op0, subbitsize, i * subbitsize, unsignedp,
+			       t, submode, submode, size);
 
       res = expand_unop (submode, unoptab, a, t, unsignedp);
 
-      emit_move_insn (t, res);
+      if (t)
+	emit_move_insn (t, res);
+      else
+	store_bit_field (target, subbitsize, i * subbitsize, submode, res,
+			 size);
     }
 
   seq = get_insns ();
@@ -2154,13 +2231,25 @@ expand_twoval_binop (binoptab, op0, op1, targ0, targ1, unsignedp)
       rtx pat;
       rtx xop0 = op0, xop1 = op1;
 
-      /* In case this insn wants input operands in modes different from the
-	 result, convert the operands.  */
-      if (GET_MODE (op0) != VOIDmode && GET_MODE (op0) != mode0)
-	xop0 = convert_to_mode (mode0, xop0, unsignedp);
+      /* In case the insn wants input operands in modes different from
+	 those of the actual operands, convert the operands.  It would
+	 seem that we don't need to convert CONST_INTs, but we do, so
+	 that they're properly zero-extended or sign-extended for their
+	 modes.  */
 
-      if (GET_MODE (op1) != VOIDmode && GET_MODE (op1) != mode1)
-	xop1 = convert_to_mode (mode1, xop1, unsignedp);
+      if (GET_MODE (op0) != mode0 && mode0 != VOIDmode)
+	xop0 = convert_modes (mode0,
+			      GET_MODE (op0) != VOIDmode
+			      ? GET_MODE (op0)
+			      : mode,
+			      xop0, unsignedp);
+
+      if (GET_MODE (op1) != mode1 && mode1 != VOIDmode)
+	xop1 = convert_modes (mode1,
+			      GET_MODE (op1) != VOIDmode
+			      ? GET_MODE (op1)
+			      : mode,
+			      xop1, unsignedp);
 
       /* Now, if insn doesn't accept these operands, put them into pseudos.  */
       if (! (*insn_data[icode].operand[1].predicate) (xop0, mode0))
@@ -3347,29 +3436,23 @@ prepare_cmp_insn (px, py, pcomparison, size, pmode, punsignedp, purpose)
 #endif
 	{
 #ifdef TARGET_MEM_FUNCTIONS
-	  emit_library_call (memcmp_libfunc, LCT_PURE_MAKE_BLOCK,
-			     TYPE_MODE (integer_type_node), 3,
-			     XEXP (x, 0), Pmode, XEXP (y, 0), Pmode,
-			     convert_to_mode (TYPE_MODE (sizetype), size,
-					      TREE_UNSIGNED (sizetype)),
-			     TYPE_MODE (sizetype));
+	  result = emit_library_call_value (memcmp_libfunc, NULL_RTX, LCT_PURE_MAKE_BLOCK,
+					    TYPE_MODE (integer_type_node), 3,
+					    XEXP (x, 0), Pmode, XEXP (y, 0), Pmode,
+					    convert_to_mode (TYPE_MODE (sizetype), size,
+							     TREE_UNSIGNED (sizetype)),
+					    TYPE_MODE (sizetype));
 #else
-	  emit_library_call (bcmp_libfunc, LCT_PURE_MAKE_BLOCK,
-			     TYPE_MODE (integer_type_node), 3,
-			     XEXP (x, 0), Pmode, XEXP (y, 0), Pmode,
-			     convert_to_mode (TYPE_MODE (integer_type_node),
-					      size,
-					      TREE_UNSIGNED (integer_type_node)),
-			     TYPE_MODE (integer_type_node));
+	  result = emit_library_call_value (bcmp_libfunc, NULL_RTX, LCT_PURE_MAKE_BLOCK,
+					    TYPE_MODE (integer_type_node), 3,
+					    XEXP (x, 0), Pmode, XEXP (y, 0), Pmode,
+					    convert_to_mode (TYPE_MODE (integer_type_node),
+							     size,
+							     TREE_UNSIGNED (integer_type_node)),
+					    TYPE_MODE (integer_type_node));
 #endif
 
-	  /* Immediately move the result of the libcall into a pseudo
-	     register so reload doesn't clobber the value if it needs
-	     the return register for a spill reg.  */
-	  result = gen_reg_rtx (TYPE_MODE (integer_type_node));
 	  result_mode = TYPE_MODE (integer_type_node);
-	  emit_move_insn (result,
-			  hard_libcall_value (result_mode));
 	}
       *px = result;
       *py = const0_rtx;
@@ -3394,14 +3477,8 @@ prepare_cmp_insn (px, py, pcomparison, size, pmode, punsignedp, purpose)
       if (unsignedp && ucmp_optab->handlers[(int) mode].libfunc)
 	libfunc = ucmp_optab->handlers[(int) mode].libfunc;
 
-      emit_library_call (libfunc, LCT_CONST_MAKE_BLOCK, word_mode, 2, x, mode,
-			 y, mode);
-
-      /* Immediately move the result of the libcall into a pseudo
-	 register so reload doesn't clobber the value if it needs
-	 the return register for a spill reg.  */
-      result = gen_reg_rtx (word_mode);
-      emit_move_insn (result, hard_libcall_value (word_mode));
+      result = emit_library_call_value (libfunc, NULL_RTX, LCT_CONST_MAKE_BLOCK,
+					word_mode, 2, x, mode, y, mode);
 
       /* Integer comparison returns a result that must be compared against 1,
 	 so that even if we do an unsigned compare afterward,
@@ -3917,14 +3994,8 @@ prepare_float_lib_cmp (px, py, pcomparison, pmode, punsignedp)
   if (libfunc == 0)
     abort ();
 
-  emit_library_call (libfunc, LCT_CONST_MAKE_BLOCK, word_mode, 2, x, mode, y,
-		     mode);
-
-  /* Immediately move the result of the libcall into a pseudo
-     register so reload doesn't clobber the value if it needs
-     the return register for a spill reg.  */
-  result = gen_reg_rtx (word_mode);
-  emit_move_insn (result, hard_libcall_value (word_mode));
+  result = emit_library_call_value (libfunc, NULL_RTX, LCT_CONST_MAKE_BLOCK,
+				    word_mode, 2, x, mode, y, mode);
   *px = result;
   *py = const0_rtx;
   *pmode = word_mode;
@@ -4537,10 +4608,8 @@ expand_float (to, from, unsignedp)
       emit_cmp_and_jump_insns (from, const0_rtx, GE, NULL_RTX, GET_MODE (from),
 			       0, label);
 
-      /* On SCO 3.2.1, ldexp rejects values outside [0.5, 1).
-	 Rather than setting up a dconst_dot_5, let's hope SCO
-	 fixes the bug.  */
-      offset = REAL_VALUE_LDEXP (dconst1, GET_MODE_BITSIZE (GET_MODE (from)));
+      
+      real_2expN (&offset, GET_MODE_BITSIZE (GET_MODE (from)));
       temp = expand_binop (fmode, add_optab, target,
 			   CONST_DOUBLE_FROM_REAL_VALUE (offset, fmode),
 			   target, 0, OPTAB_LIB_WIDEN);
@@ -4723,7 +4792,7 @@ expand_fix (to, from, unsignedp)
 	  rtx limit, lab1, lab2, insn;
 
 	  bitsize = GET_MODE_BITSIZE (GET_MODE (to));
-	  offset = REAL_VALUE_LDEXP (dconst1, bitsize - 1);
+	  real_2expN (&offset, bitsize - 1);
 	  limit = CONST_DOUBLE_FROM_REAL_VALUE (offset, fmode);
 	  lab1 = gen_label_rtx ();
 	  lab2 = gen_label_rtx ();
@@ -5106,6 +5175,8 @@ init_optabs ()
   sqrt_optab = init_optab (SQRT);
   sin_optab = init_optab (UNKNOWN);
   cos_optab = init_optab (UNKNOWN);
+  exp_optab = init_optab (UNKNOWN);
+  log_optab = init_optab (UNKNOWN);
   strlen_optab = init_optab (UNKNOWN);
   cbranch_optab = init_optab (UNKNOWN);
   cmov_optab = init_optab (UNKNOWN);

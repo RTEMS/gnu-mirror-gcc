@@ -30,6 +30,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "tm_p.h"
 #include "flags.h"
 #include "basic-block.h"
+#include "real.h"
 
 /* Forward declarations */
 static int global_reg_mentioned_p_1 PARAMS ((rtx *, void *));
@@ -873,13 +874,10 @@ int
 reg_set_p (reg, insn)
      rtx reg, insn;
 {
-  rtx body = insn;
-
   /* We can be passed an insn or part of one.  If we are passed an insn,
      check if a side-effect of the insn clobbers REG.  */
-  if (INSN_P (insn))
-    {
-      if (FIND_REG_INC_NOTE (insn, reg)
+  if (INSN_P (insn)
+      && (FIND_REG_INC_NOTE (insn, reg)
 	  || (GET_CODE (insn) == CALL_INSN
 	      /* We'd like to test call_used_regs here, but rtlanal.c can't
 		 reference that variable due to its use in genattrtab.  So
@@ -890,11 +888,8 @@ reg_set_p (reg, insn)
 	      && ((GET_CODE (reg) == REG
 		   && REGNO (reg) < FIRST_PSEUDO_REGISTER)
 		  || GET_CODE (reg) == MEM
-		  || find_reg_fusage (insn, CLOBBER, reg))))
-	return 1;
-
-      body = PATTERN (insn);
-    }
+		  || find_reg_fusage (insn, CLOBBER, reg)))))
+    return 1;
 
   return set_of (reg, insn) != NULL_RTX;
 }
@@ -1797,7 +1792,7 @@ dead_or_set_regno_p (insn, test_regno)
 
   if (GET_CODE (pattern) == SET)
     {
-      rtx dest = SET_DEST (PATTERN (insn));
+      rtx dest = SET_DEST (pattern);
 
       /* A value is totally replaced if it is the destination or the
 	 destination is a SUBREG of REGNO that does not change the number of
@@ -2369,6 +2364,8 @@ may_trap_p (x)
     case MOD:
     case UDIV:
     case UMOD:
+      if (HONOR_SNANS (GET_MODE (x)))
+	return 1;
       if (! CONSTANT_P (XEXP (x, 1))
 	  || (GET_MODE_CLASS (GET_MODE (x)) == MODE_FLOAT
 	      && flag_trapping_math))
@@ -2396,12 +2393,22 @@ may_trap_p (x)
 	 when COMPARE is used, though many targets do make this distinction.
 	 For instance, sparc uses CCFPE for compares which generate exceptions
 	 and CCFP for compares which do not generate exceptions.  */
-      if (GET_MODE_CLASS (GET_MODE (x)) == MODE_FLOAT)
+      if (HONOR_NANS (GET_MODE (x)))
 	return 1;
       /* But often the compare has some CC mode, so check operand
 	 modes as well.  */
-      if (GET_MODE_CLASS (GET_MODE (XEXP (x, 0))) == MODE_FLOAT
-	  || GET_MODE_CLASS (GET_MODE (XEXP (x, 1))) == MODE_FLOAT)
+      if (HONOR_NANS (GET_MODE (XEXP (x, 0)))
+	  || HONOR_NANS (GET_MODE (XEXP (x, 1))))
+	return 1;
+      break;
+
+    case EQ:
+    case NE:
+      if (HONOR_SNANS (GET_MODE (x)))
+	return 1;
+      /* Often comparison is CC mode, so check operand modes.  */
+      if (HONOR_SNANS (GET_MODE (XEXP (x, 0)))
+	  || HONOR_SNANS (GET_MODE (XEXP (x, 1))))
 	return 1;
       break;
 
@@ -3117,6 +3124,16 @@ subreg_regno_offset (xregno, xmode, offset, ymode)
 
   nregs_xmode = HARD_REGNO_NREGS (xregno, xmode);
   nregs_ymode = HARD_REGNO_NREGS (xregno, ymode);
+
+  /* If this is a big endian paradoxical subreg, which uses more actual
+     hard registers than the original register, we must return a negative
+     offset so that we find the proper highpart of the register.  */
+  if (offset == 0
+      && nregs_ymode > nregs_xmode
+      && (GET_MODE_SIZE (ymode) > UNITS_PER_WORD
+	  ? WORDS_BIG_ENDIAN : BYTES_BIG_ENDIAN))
+    return nregs_xmode - nregs_ymode;
+
   if (offset == 0 || nregs_xmode == nregs_ymode)
     return 0;
 
@@ -3237,6 +3254,7 @@ keep_with_call_p (insn)
   if (INSN_P (insn) && (set = single_set (insn)) != NULL)
     {
       if (GET_CODE (SET_DEST (set)) == REG
+	  && REGNO (SET_DEST (set)) < FIRST_PSEUDO_REGISTER
 	  && fixed_regs[REGNO (SET_DEST (set))]
 	  && general_operand (SET_SRC (set), VOIDmode))
 	return true;

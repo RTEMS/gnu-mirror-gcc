@@ -43,10 +43,6 @@ Boston, MA 02111-1307, USA.  */
 #define LIBSTDCXX_PROFILE "-lstdc++"
 #endif
 
-#ifndef LIBUNWIND
-#define LIBUNWIND "-lunwind"
-#endif
-
 void
 lang_specific_driver (in_argc, in_argv, in_added_libraries)
      int *in_argc;
@@ -277,6 +273,9 @@ lang_specific_driver (in_argc, in_argv, in_added_libraries)
       arglist[j++] = saw_profile_flag ? LIBSTDCXX_PROFILE : LIBSTDCXX;
       added_libraries++;
 #ifdef USE_LIBUNWIND_EXCEPTIONS
+# ifndef LIBUNWIND
+#  define LIBUNWIND "-lunwind"
+# endif
       arglist[j++] = LIBUNWIND;
       added_libraries++;
 #endif
@@ -300,11 +299,11 @@ lang_specific_driver (in_argc, in_argv, in_added_libraries)
   *in_added_libraries = added_libraries;
 }
 
-/* Called before linking.  Returns 0 on success and -1 on failure. */
-int lang_specific_pre_link ()  /* Not used for C++. */
+/* Called before linking.  Returns 0 on success and -1 on failure.  */
+int lang_specific_pre_link ()  /* Not used for C++.  */
 {
   return 0;
 }
 
-/* Number of extra output files that lang_specific_pre_link may generate. */
-int lang_specific_extra_outfiles = 0;  /* Not used for C++. */
+/* Number of extra output files that lang_specific_pre_link may generate.  */
+int lang_specific_extra_outfiles = 0;  /* Not used for C++.  */

@@ -1029,27 +1029,12 @@ fprintf (FILE, "$help$: . = .+8 ; space for tmp moves!\n")	\
 {"r0", "r1", "r2", "r3", "r4", "r5", "sp", "pc",     \
  "ac0", "ac1", "ac2", "ac3", "ac4", "ac5" }
 
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME.  */
-
-#define ASM_OUTPUT_LABEL(FILE,NAME)	\
-  do { assemble_name (FILE, NAME); fputs (":\n", FILE); } while (0)
-
-/* This is how to output a command to make the user-level label named NAME
-   defined for reference from other files.  */
-
-#define ASM_GLOBALIZE_LABEL(FILE,NAME)	\
-  do { fputs ("\t.globl ", FILE); assemble_name (FILE, NAME); fputs("\n", FILE); } while (0)
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP "\t.globl "
 
 /* The prefix to add to user-visible assembler symbols. */
 
 #define USER_LABEL_PREFIX "_"
-
-/* This is how to output an internal numbered label where
-   PREFIX is the class of label and NUM is the number within the class.  */
-
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)	\
-  fprintf (FILE, "%s_%d:\n", PREFIX, NUM)
 
 /* This is how to store into the string LABEL
    the symbol_ref name of an internal numbered label where
@@ -1112,14 +1097,6 @@ fprintf (FILE, "$help$: . = .+8 ; space for tmp moves!\n")	\
 ( assemble_name ((FILE), (NAME)),				\
   fprintf ((FILE), ":\t.=.+ %o\n", (ROUNDED)))
 
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)	\
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),	\
-  sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO)))
-
 /* Print operand X (an rtx) in assembler syntax to file FILE.
    CODE is a letter or dot (`z' in `%z0') or 0 if no letter was specified.
    For `%' followed by punctuation, CODE is the punctuation and X is null.
@@ -1137,7 +1114,7 @@ fprintf (FILE, "$help$: . = .+8 ; space for tmp moves!\n")	\
     { REAL_VALUE_TYPE r;						\
       char buf[30];							\
       REAL_VALUE_FROM_CONST_DOUBLE (r, X);				\
-      REAL_VALUE_TO_DECIMAL (r, "%.20e", buf);				\
+      REAL_VALUE_TO_DECIMAL (r, buf, -1);				\
       fprintf (FILE, "#%s", buf); }					\
   else { putc ('$', FILE); output_addr_const_pdp11 (FILE, X); }}
 

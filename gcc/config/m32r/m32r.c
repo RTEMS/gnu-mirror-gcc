@@ -36,7 +36,7 @@ Boston, MA 02111-1307, USA.  */
 #include "recog.h"
 #include "toplev.h"
 #include "ggc.h"
-#include "m32r-protos.h"
+#include "tm_p.h"
 #include "target.h"
 #include "target-def.h"
 
@@ -77,6 +77,7 @@ static int    m32r_issue_rate	   PARAMS ((void));
 static void m32r_select_section PARAMS ((tree, int, unsigned HOST_WIDE_INT));
 static void m32r_encode_section_info PARAMS ((tree, int));
 static const char *m32r_strip_name_encoding PARAMS ((const char *));
+static void init_idents PARAMS ((void));
 
 /* Initialize the GCC target structure.  */
 #undef TARGET_ATTRIBUTE_TABLE
@@ -271,7 +272,7 @@ static tree large_ident1;
 static tree large_ident2;
 
 static void
-init_idents PARAMS ((void))
+init_idents ()
 {
   if (small_ident1 == 0)
     {
@@ -1446,12 +1447,8 @@ m32r_setup_incoming_varargs (cum, mode, type, pretend_size, no_rtl)
   if (mode == BLKmode)
     abort ();
 
-  /* We must treat `__builtin_va_alist' as an anonymous arg.  */
-  if (current_function_varargs)
-    first_anon_arg = *cum;
-  else
-    first_anon_arg = (ROUND_ADVANCE_CUM (*cum, mode, type)
-		      + ROUND_ADVANCE_ARG (mode, type));
+  first_anon_arg = (ROUND_ADVANCE_CUM (*cum, mode, type)
+		    + ROUND_ADVANCE_ARG (mode, type));
 
   if (first_anon_arg < M32R_MAX_PARM_REGS)
     {
@@ -2321,7 +2318,7 @@ m32r_print_operand (file, x, code)
 	    || GET_MODE_CLASS (GET_MODE (x)) != MODE_FLOAT)
 	  fatal_insn ("bad insn for 'A'", x);
 	REAL_VALUE_FROM_CONST_DOUBLE (d, x);
-	REAL_VALUE_TO_DECIMAL (d, "%.20e", str);
+	REAL_VALUE_TO_DECIMAL (d, str, -1);
 	fprintf (file, "%s", str);
 	return;
       }

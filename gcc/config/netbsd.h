@@ -77,14 +77,23 @@ Boston, MA 02111-1307, USA.  */
 #endif /* NETBSD_NATIVE */
 
 
-/* Provide a LIB_SPEC appropriate for NetBSD.  Just select the appropriate
-   libc, depending on whether we're doing profiling; if `-posix' is specified,
-   link against the appropriate libposix first.  Don't include libc when
-   linking a shared library.  */
+/* Provide a LIB_SPEC appropriate for NetBSD.  Here we:
+
+   1. Select the appropriate set of libs, depending on whether we're
+      profiling.
+
+   2. Include the pthread library if -pthread is specified.
+
+   3. Include the posix library if -posix is specified.  */
 
 #undef LIB_SPEC
 #define LIB_SPEC		\
-  "%{posix:			\
+  "%{pthread:			\
+     %{!p:			\
+       %{!pg:-lpthread}}	\
+     %{p:-lpthread_p}		\
+     %{pg:-lpthread_p}}		\
+   %{posix:			\
      %{!p:			\
        %{!pg:-lposix}}		\
      %{p:-lposix_p}		\
@@ -127,11 +136,6 @@ Boston, MA 02111-1307, USA.  */
     fprintf ((STREAM), "void __fini() __asm__ (\".fini\");");		\
     fprintf ((STREAM), "void __fini() {\n\t%s();\n}\n", (FUNC));	\
   } while (0)
-
-/* Allow #sccs in preprocessor.  */
-
-#undef SCCS_DIRECTIVE
-#define SCCS_DIRECTIVE
 
 #undef TARGET_HAS_F_SETLKW
 #define TARGET_HAS_F_SETLKW

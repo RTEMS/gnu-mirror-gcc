@@ -27,11 +27,11 @@
 #include "real.h"
 #include "insn-config.h"
 #include "conditions.h"
-#include "output.h"
 #include "insn-attr.h"
 #include "flags.h"
 #include "reload.h"
 #include "tree.h"
+#include "output.h"
 #include "expr.h"
 #include "toplev.h"
 #include "obstack.h"
@@ -57,7 +57,6 @@ static int    out_set_stack_ptr    PARAMS ((FILE *, int, int));
 static RTX_CODE compare_condition  PARAMS ((rtx insn));
 static int    compare_sign_p       PARAMS ((rtx insn));
 static int    reg_was_0            PARAMS ((rtx insn, rtx op));
-void          debug_hard_reg_set   PARAMS ((HARD_REG_SET set));
 static tree   avr_handle_progmem_attribute PARAMS ((tree *, tree, tree, int, bool *));
 static tree   avr_handle_fndecl_attribute PARAMS ((tree *, tree, tree, int, bool *));
 const struct attribute_spec avr_attribute_table[];
@@ -339,7 +338,7 @@ avr_reg_class_from_letter  (c)
   return NO_REGS;
 }
 
-/* Return non-zero if FUNC is a naked function.  */
+/* Return nonzero if FUNC is a naked function.  */
 
 static int
 avr_naked_function_p (func)
@@ -443,6 +442,21 @@ initial_elimination_offset (from, to)
       offset += avr_regs_to_save (NULL);
       return get_frame_size () + 2 + 1 + offset;
     }
+}
+
+/* Return 1 if the function epilogue is just a single "ret".  */
+
+int
+avr_simple_epilogue ()
+{
+  return (! frame_pointer_needed
+	  && get_frame_size () == 0
+	  && avr_regs_to_save (NULL) == 0
+	  && ! interrupt_function_p (current_function_decl)
+	  && ! signal_function_p (current_function_decl)
+	  && ! avr_naked_function_p (current_function_decl)
+	  && ! MAIN_NAME_P (DECL_NAME (current_function_decl))
+	  && ! TREE_THIS_VOLATILE (current_function_decl));
 }
 
 /* This function checks sequence of live registers */
@@ -1142,12 +1156,12 @@ print_operand (file, x, code)
 	fatal_insn ("internal compiler error.  Unknown mode:", x);
       REAL_VALUE_FROM_CONST_DOUBLE (rv, x);
       REAL_VALUE_TO_TARGET_SINGLE (rv, val);
-      asm_fprintf (file, "0x%lx", val);
+      fprintf (file, "0x%lx", val);
     }
   else if (code == 'j')
-    asm_fprintf (file, cond_string (GET_CODE (x)));
+    fputs (cond_string (GET_CODE (x)), file);
   else if (code == 'k')
-    asm_fprintf (file, cond_string (reverse_condition (GET_CODE (x))));
+    fputs (cond_string (reverse_condition (GET_CODE (x))), file);
   else
     print_operand_address (file, x);
 }
@@ -2762,7 +2776,6 @@ frame_pointer_required_p ()
 {
   return (current_function_calls_alloca
 	  || current_function_args_info.nregs == 0
-	  || current_function_varargs
   	  || get_frame_size () > 0);
 }
 
@@ -4420,7 +4433,7 @@ adjust_insn_length (insn, len)
   return len;
 }
 
-/* Return non-zero if register REG dead after INSN */
+/* Return nonzero if register REG dead after INSN */
 
 int
 reg_unused_after (insn, reg)
@@ -4431,7 +4444,7 @@ reg_unused_after (insn, reg)
 	  || (REG_P(reg) && _reg_unused_after (insn, reg)));
 }
 
-/* Return non-zero if REG is not used after INSN.
+/* Return nonzero if REG is not used after INSN.
    We assume REG is a reload reg, and therefore does
    not live past labels.  It may live past calls or jumps though.  */
 
@@ -5237,7 +5250,7 @@ avr_function_value (type, func)
   return gen_rtx (REG, BLKmode, RET_REGISTER + 2 - offs);
 }
 
-/* Returns non-zero if the number MASK has only one bit set.  */
+/* Returns nonzero if the number MASK has only one bit set.  */
 
 int
 mask_one_bit_p (mask)
@@ -5280,23 +5293,13 @@ test_hard_reg_class (class, x)
   int regno = true_regnum (x);
   if (regno < 0)
     return 0;
-  return TEST_HARD_REG_CLASS (class, regno);
+
+  if (TEST_HARD_REG_CLASS (class, regno))
+    return 1;
+
+  return 0;
 }
 
-void
-debug_hard_reg_set (set)
-     HARD_REG_SET set;
-{
-  int i;
-  for (i=0; i < FIRST_PSEUDO_REGISTER; ++i)
-    {
-      if (TEST_HARD_REG_BIT (set, i))
-	{
-	  fprintf (stderr, "r%-2d ", i);
-	}
-    }
-  fprintf (stderr, "\n");
-}
 
 int
 jump_over_one_insn_p (insn, dest)

@@ -569,7 +569,7 @@ expand_eh_region_end_cleanup (handler)
 
   /* In case this cleanup involves an inline destructor with a try block in
      it, we need to save the EH return data registers around it.  */
-  data_save[0] = gen_reg_rtx (Pmode);
+  data_save[0] = gen_reg_rtx (ptr_mode);
   emit_move_insn (data_save[0], get_exception_pointer (cfun));
   data_save[1] = gen_reg_rtx (word_mode);
   emit_move_insn (data_save[1], get_exception_filter (cfun));
@@ -672,12 +672,12 @@ expand_start_catch (type_or_list)
 void
 expand_end_catch ()
 {
-  struct eh_region *try_region, *catch_region;
+  struct eh_region *try_region;
 
   if (! doing_eh (0))
     return;
 
-  catch_region = expand_eh_region_end ();
+  expand_eh_region_end ();
   try_region = cfun->eh->try_region;
 
   emit_jump (try_region->u.try.continue_label);
@@ -829,7 +829,7 @@ get_exception_pointer (fun)
   rtx exc_ptr = fun->eh->exc_ptr;
   if (fun == cfun && ! exc_ptr)
     {
-      exc_ptr = gen_reg_rtx (Pmode);
+      exc_ptr = gen_reg_rtx (ptr_mode);
       fun->eh->exc_ptr = exc_ptr;
     }
   return exc_ptr;
@@ -1791,7 +1791,7 @@ connect_post_landing_pads ()
 	emit_jump (outer->post_landing_pad);
       else
 	emit_library_call (unwind_resume_libfunc, LCT_THROW,
-			   VOIDmode, 1, cfun->eh->exc_ptr, Pmode);
+			   VOIDmode, 1, cfun->eh->exc_ptr, ptr_mode);
 
       seq = get_insns ();
       end_sequence ();
@@ -1864,7 +1864,7 @@ dw2_build_landing_pads ()
 	}
 
       emit_move_insn (cfun->eh->exc_ptr,
-		      gen_rtx_REG (Pmode, EH_RETURN_DATA_REGNO (0)));
+		      gen_rtx_REG (ptr_mode, EH_RETURN_DATA_REGNO (0)));
       emit_move_insn (cfun->eh->filter,
 		      gen_rtx_REG (word_mode, EH_RETURN_DATA_REGNO (1)));
 
@@ -2893,25 +2893,50 @@ can_throw_external (insn)
   return true;
 }
 
-/* True if nothing in this function can throw outside this function.  */
+/* Set current_function_nothrow and cfun->all_throwers_are_sibcalls.  */
 
-bool
-nothrow_function_p ()
+void
+set_nothrow_function_flags ()
 {
   rtx insn;
+  
+  current_function_nothrow = 1;
+
+  /* Assume cfun->all_throwers_are_sibcalls until we encounter
+     something that can throw an exception.  We specifically exempt
+     CALL_INSNs that are SIBLING_CALL_P, as these are really jumps,
+     and can't throw.  Most CALL_INSNs are not SIBLING_CALL_P, so this
+     is optimistic.  */
+
+  cfun->all_throwers_are_sibcalls = 1;
 
   if (! flag_exceptions)
-    return true;
-
+    return;
+  
   for (insn = get_insns (); insn; insn = NEXT_INSN (insn))
     if (can_throw_external (insn))
-      return false;
+      {
+	current_function_nothrow = 0;
+
+	if (GET_CODE (insn) != CALL_INSN || !SIBLING_CALL_P (insn))
+	  {
+	    cfun->all_throwers_are_sibcalls = 0;
+	    return;
+	  }
+      }
+
   for (insn = current_function_epilogue_delay_list; insn;
        insn = XEXP (insn, 1))
-    if (can_throw_external (XEXP (insn, 0)))
-      return false;
+    if (can_throw_external (insn))
+      {
+	current_function_nothrow = 0;
 
-  return true;
+	if (GET_CODE (insn) != CALL_INSN || !SIBLING_CALL_P (insn))
+	  {
+	    cfun->all_throwers_are_sibcalls = 0;
+	    return;
+	  }
+      }
 }
 
 
@@ -3600,7 +3625,7 @@ output_function_exception_table ()
       assemble_align (tt_format_size * BITS_PER_UNIT);
     }
 
-  ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "LLSDA",
+  (*targetm.asm_out.internal_label) (asm_out_file, "LLSDA",
 			     current_function_funcdef_no);
 
   /* The LSDA header.  */

@@ -46,7 +46,7 @@ Boston, MA 02111-1307, USA.  */
 #include "ggc.h"
 #include "cpplib.h"
 #include "toplev.h"
-#include "c4x-protos.h"
+#include "tm_p.h"
 #include "target.h"
 #include "target-def.h"
 
@@ -193,6 +193,7 @@ static void c4x_insert_attributes PARAMS ((tree, tree *));
 static void c4x_asm_named_section PARAMS ((const char *, unsigned int));
 static int c4x_adjust_cost PARAMS ((rtx, rtx, rtx, int));
 static void c4x_encode_section_info PARAMS ((tree, int));
+static void c4x_globalize_label PARAMS ((FILE *, const char *));
 
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_BYTE_OP
@@ -219,6 +220,9 @@ static void c4x_encode_section_info PARAMS ((tree, int));
 
 #undef TARGET_ENCODE_SECTION_INFO
 #define TARGET_ENCODE_SECTION_INFO c4x_encode_section_info
+
+#undef TARGET_ASM_GLOBALIZE_LABEL
+#define TARGET_ASM_GLOBALIZE_LABEL c4x_globalize_label
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -432,7 +436,7 @@ c4x_hard_regno_mode_ok (regno, mode)
   return 0;
 }
 
-/* Return non-zero if REGNO1 can be renamed to REGNO2.  */
+/* Return nonzero if REGNO1 can be renamed to REGNO2.  */
 int
 c4x_hard_regno_rename_ok (regno1, regno2)
      unsigned int regno1;
@@ -701,19 +705,6 @@ c4x_function_arg (cum, mode, type, named)
   else
     return NULL_RTX;
 }
-
-
-void
-c4x_va_start (stdarg_p, valist, nextarg)
-     int stdarg_p;
-     tree valist;
-     rtx nextarg;
-{
-  nextarg = plus_constant (nextarg, stdarg_p ? 0 : UNITS_PER_WORD * 2);
-
-  std_expand_builtin_va_start (stdarg_p, valist, nextarg);
-}
-
 
 /* C[34]x arguments grow in weird ways (downwards) that the standard
    varargs stuff can't handle..  */
@@ -1478,7 +1469,7 @@ c4x_check_legit_addr (mode, addr, strict)
   switch (code)
     {
       /* Register indirect with auto increment/decrement.  We don't
-	 allow SP here---push_operand should recognise an operand
+	 allow SP here---push_operand should recognize an operand
 	 being pushed on the stack.  */
 
     case PRE_DEC:
@@ -1863,7 +1854,7 @@ c4x_print_operand (file, op, letter)
     {
     case '#':			/* Delayed.  */
       if (final_sequence)
-	asm_fprintf (file, "d");
+	fprintf (file, "d");
       return;
     }
 
@@ -1872,7 +1863,7 @@ c4x_print_operand (file, op, letter)
     {
     case 'A':			/* Direct address.  */
       if (code == CONST_INT || code == SYMBOL_REF || code == CONST)
-	asm_fprintf (file, "@");
+	fprintf (file, "@");
       break;
 
     case 'H':			/* Sethi.  */
@@ -1905,9 +1896,9 @@ c4x_print_operand (file, op, letter)
 	  op1 = XEXP (XEXP (op, 0), 1);
           if (GET_CODE(op1) == CONST_INT || GET_CODE(op1) == SYMBOL_REF)
 	    {
-	      asm_fprintf (file, "\t%s\t@", TARGET_C3X ? "ldp" : "ldpk");
+	      fprintf (file, "\t%s\t@", TARGET_C3X ? "ldp" : "ldpk");
 	      output_address (XEXP (adjust_address (op, VOIDmode, 1), 0));
-	      asm_fprintf (file, "\n");
+	      fprintf (file, "\n");
 	    }
 	}
       return;
@@ -1918,9 +1909,9 @@ c4x_print_operand (file, op, letter)
 	  && (GET_CODE (XEXP (op, 0)) == CONST
 	      || GET_CODE (XEXP (op, 0)) == SYMBOL_REF))
 	{
-	  asm_fprintf (file, "%s\t@", TARGET_C3X ? "ldp" : "ldpk");
+	  fprintf (file, "%s\t@", TARGET_C3X ? "ldp" : "ldpk");
           output_address (XEXP (op, 0));
-	  asm_fprintf (file, "\n\t");
+	  fprintf (file, "\n\t");
 	}
       return;
 
@@ -1940,7 +1931,7 @@ c4x_print_operand (file, op, letter)
 
     case 'U':			/* Call/callu.  */
       if (code != SYMBOL_REF)
-	asm_fprintf (file, "u");
+	fprintf (file, "u");
       return;
 
     default:
@@ -1967,7 +1958,7 @@ c4x_print_operand (file, op, letter)
 	REAL_VALUE_TYPE r;
 	
 	REAL_VALUE_FROM_CONST_DOUBLE (r, op);
-	REAL_VALUE_TO_DECIMAL (r, "%20f", str);
+	REAL_VALUE_TO_DECIMAL (r, str, -1);
 	fprintf (file, "%s", str);
       }
       break;
@@ -1977,43 +1968,43 @@ c4x_print_operand (file, op, letter)
       break;
       
     case NE:
-      asm_fprintf (file, "ne");
+      fprintf (file, "ne");
       break;
       
     case EQ:
-      asm_fprintf (file, "eq");
+      fprintf (file, "eq");
       break;
       
     case GE:
-      asm_fprintf (file, "ge");
+      fprintf (file, "ge");
       break;
 
     case GT:
-      asm_fprintf (file, "gt");
+      fprintf (file, "gt");
       break;
 
     case LE:
-      asm_fprintf (file, "le");
+      fprintf (file, "le");
       break;
 
     case LT:
-      asm_fprintf (file, "lt");
+      fprintf (file, "lt");
       break;
 
     case GEU:
-      asm_fprintf (file, "hs");
+      fprintf (file, "hs");
       break;
 
     case GTU:
-      asm_fprintf (file, "hi");
+      fprintf (file, "hi");
       break;
 
     case LEU:
-      asm_fprintf (file, "ls");
+      fprintf (file, "ls");
       break;
 
     case LTU:
-      asm_fprintf (file, "lo");
+      fprintf (file, "lo");
       break;
 
     case SYMBOL_REF:
@@ -3375,10 +3366,10 @@ src_operand (op, mode)
       || GET_CODE (op) == CONST)
     return 0;
 
-  /* If TARGET_LOAD_DIRECT_MEMS is non-zero, disallow direct memory
+  /* If TARGET_LOAD_DIRECT_MEMS is nonzero, disallow direct memory
      access to symbolic addresses.  These operands will get forced
      into a register and the movqi expander will generate a
-     HIGH/LO_SUM pair if TARGET_EXPOSE_LDP is non-zero.  */
+     HIGH/LO_SUM pair if TARGET_EXPOSE_LDP is nonzero.  */
   if (GET_CODE (op) == MEM
       && ((GET_CODE (XEXP (op, 0)) == SYMBOL_REF
 	   || GET_CODE (XEXP (op, 0)) == LABEL_REF
@@ -4510,7 +4501,7 @@ c4x_global_label (name)
 	return;
       p = p->next;
     }
-  p = (struct name_list *) permalloc (sizeof *p);
+  p = (struct name_list *) xmalloc (sizeof *p);
   p->next = global_head;
   p->name = name;
   global_head = p;
@@ -4559,7 +4550,7 @@ c4x_external_ref (name)
 	return;
       p = p->next;
     }
-  p = (struct name_list *) permalloc (sizeof *p);
+  p = (struct name_list *) xmalloc (sizeof *p);
   p->next = extern_head;
   p->name = name;
   extern_head = p;
@@ -4923,12 +4914,12 @@ c4x_init_builtins ()
 		    build_function_type 
 		    (integer_type_node,
 		     tree_cons (NULL_TREE, double_type_node, endlink)),
-		    C4X_BUILTIN_FIX, BUILT_IN_MD, NULL);
+		    C4X_BUILTIN_FIX, BUILT_IN_MD, NULL, NULL_TREE);
   builtin_function ("ansi_ftoi",
 		    build_function_type 
 		    (integer_type_node, 
 		     tree_cons (NULL_TREE, double_type_node, endlink)),
-		    C4X_BUILTIN_FIX_ANSI, BUILT_IN_MD, NULL);
+		    C4X_BUILTIN_FIX_ANSI, BUILT_IN_MD, NULL, NULL_TREE);
   if (TARGET_C3X)
     builtin_function ("fast_imult",
 		      build_function_type
@@ -4936,24 +4927,24 @@ c4x_init_builtins ()
 		       tree_cons (NULL_TREE, integer_type_node,
 				  tree_cons (NULL_TREE,
 					     integer_type_node, endlink))),
-		      C4X_BUILTIN_MPYI, BUILT_IN_MD, NULL);
+		      C4X_BUILTIN_MPYI, BUILT_IN_MD, NULL, NULL_TREE);
   else
     {
       builtin_function ("toieee",
 		        build_function_type 
 			(double_type_node,
 			 tree_cons (NULL_TREE, double_type_node, endlink)),
-		        C4X_BUILTIN_TOIEEE, BUILT_IN_MD, NULL);
+		        C4X_BUILTIN_TOIEEE, BUILT_IN_MD, NULL, NULL_TREE);
       builtin_function ("frieee",
 		        build_function_type
 			(double_type_node, 
 			 tree_cons (NULL_TREE, double_type_node, endlink)),
-		        C4X_BUILTIN_FRIEEE, BUILT_IN_MD, NULL);
+		        C4X_BUILTIN_FRIEEE, BUILT_IN_MD, NULL, NULL_TREE);
       builtin_function ("fast_invf",
 		        build_function_type 
 			(double_type_node, 
 			 tree_cons (NULL_TREE, double_type_node, endlink)),
-		        C4X_BUILTIN_RCPF, BUILT_IN_MD, NULL);
+		        C4X_BUILTIN_RCPF, BUILT_IN_MD, NULL, NULL_TREE);
     }
 }
 
@@ -5058,3 +5049,11 @@ c4x_asm_named_section (name, flags)
   fprintf (asm_out_file, "\t.sect\t\"%s\"\n", name);
 }
 
+static void
+c4x_globalize_label (stream, name)
+     FILE *stream;
+     const char *name;
+{
+  default_globalize_label (stream, name);
+  c4x_global_label (name);
+}

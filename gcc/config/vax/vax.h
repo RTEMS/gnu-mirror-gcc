@@ -456,7 +456,8 @@ enum reg_class { NO_REGS, ALL_REGS, LIM_REG_CLASSES };
    for profiling a function entry.  */
 
 #define FUNCTION_PROFILER(FILE, LABELNO)  \
-   fprintf (FILE, "\tmovab LP%d,r0\n\tjsb mcount\n", (LABELNO));
+   fprintf (FILE, "\tmovab LP%d,%s\n\tjsb mcount\n", (LABELNO), \
+	    reg_names[0]);
 
 /* EXIT_IGNORE_STACK should be nonzero if, when returning from a function,
    the stack pointer does not matter.  The value is tested only in
@@ -501,17 +502,19 @@ enum reg_class { NO_REGS, ALL_REGS, LIM_REG_CLASSES };
    FNADDR is an RTX for the address of the function's pure code.
    CXT is an RTX for the static chain value for the function.  */
 
+/* Allow this be overriden with the correct register prefixes.  */
+#define VAX_ISTREAM_SYNC "movpsl -(sp)\n\tpushal 1(pc)\n\trei"
+
 /* We copy the register-mask from the function's pure code
    to the start of the trampoline.  */
 #define INITIALIZE_TRAMPOLINE(TRAMP, FNADDR, CXT)			\
 {									\
-  emit_insn (gen_rtx_ASM_INPUT (VOIDmode,				\
-				"movpsl -(sp)\n\tpushal 1(pc)\n\trei")); \
   emit_move_insn (gen_rtx_MEM (HImode, TRAMP),				\
 		  gen_rtx_MEM (HImode, FNADDR));			\
-  emit_move_insn (gen_rtx_MEM (SImode, plus_constant (TRAMP, 4)), CXT);\
+  emit_move_insn (gen_rtx_MEM (SImode, plus_constant (TRAMP, 4)), CXT);	\
   emit_move_insn (gen_rtx_MEM (SImode, plus_constant (TRAMP, 11)),	\
 		  plus_constant (FNADDR, 2));				\
+  emit_insn (gen_rtx_ASM_INPUT (VOIDmode, VAX_ISTREAM_SYNC));		\
 }
 
 /* Byte offset of return address in a stack frame.  The "saved PC" field
@@ -627,7 +630,7 @@ enum reg_class { NO_REGS, ALL_REGS, LIM_REG_CLASSES };
    || GET_CODE (X) == CONST_INT)
 
 
-/* Non-zero if X is an address which can be indirected.  External symbols
+/* Nonzero if X is an address which can be indirected.  External symbols
    could be in a sharable image library, so we disallow those.  */
 
 #define INDIRECTABLE_ADDRESS_P(X)  \
@@ -642,7 +645,7 @@ enum reg_class { NO_REGS, ALL_REGS, LIM_REG_CLASSES };
 
 #define INDIRECTABLE_CONSTANT_ADDRESS_P(X) CONSTANT_ADDRESS_P(X)
 
-/* Non-zero if X is an address which can be indirected.  */
+/* Nonzero if X is an address which can be indirected.  */
 #define INDIRECTABLE_ADDRESS_P(X)  \
   (CONSTANT_ADDRESS_P (X)						\
    || (GET_CODE (X) == REG && REG_OK_FOR_BASE_P (X))			\
@@ -882,32 +885,6 @@ enum reg_class { NO_REGS, ALL_REGS, LIM_REG_CLASSES };
 
 #define UDIVSI3_LIBCALL "*udiv"
 #define UMODSI3_LIBCALL "*urem"
-
-/* Check a `double' value for validity for a particular machine mode.  */
-
-/* note that it is very hard to accidentally create a number that fits in a
-   double but not in a float, since their ranges are almost the same */
-
-#define CHECK_FLOAT_VALUE(MODE, D, OVERFLOW) \
-  ((OVERFLOW) = check_float_value (MODE, &D, OVERFLOW))
-
-/* For future reference:
-   D Float: 9 bit, sign magnitude, excess 128 binary exponent
-            normalized 56 bit fraction, redundant bit not represented
-            approximately 16 decimal digits of precision
-
-   The values to use if we trust decimal to binary conversions:
-#define MAX_D_FLOAT 1.7014118346046923e+38
-#define MIN_D_FLOAT .29387358770557188e-38
-
-   G float: 12 bit, sign magnitude, excess 1024 binary exponent
-            normalized 53 bit fraction, redundant bit not represented
-            approximately 15 decimal digits precision
-
-   The values to use if we trust decimal to binary conversions:
-#define MAX_G_FLOAT .898846567431157e+308
-#define MIN_G_FLOAT .556268464626800e-308
-*/
 
 /* Tell final.c how to eliminate redundant test instructions.  */
 
@@ -1015,15 +992,17 @@ enum reg_class { NO_REGS, ALL_REGS, LIM_REG_CLASSES };
 #define DATA_SECTION_ASM_OP "\t.data"
 
 /* How to refer to registers in assembler output.
-   This sequence is indexed by compiler's hard-register-number (see above).  */
+   This sequence is indexed by compiler's hard-register-number (see above).
+   The register names will be prefixed by REGISTER_PREFIX, if any.  */
 
+#define REGISTER_PREFIX ""
 #define REGISTER_NAMES \
 {"r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", \
  "r9", "r10", "r11", "ap", "fp", "sp", "pc"}
 
 /* This is BSD, so it wants DBX format.  */
 
-#define DBX_DEBUGGING_INFO
+#define DBX_DEBUGGING_INFO 1
 
 /* Do not break .stabs pseudos into continuations.  */
 
@@ -1046,27 +1025,15 @@ enum reg_class { NO_REGS, ALL_REGS, LIM_REG_CLASSES };
 
 #define ASM_DOUBLE_CHAR (TARGET_G_FLOAT ? 'g' : 'd')
 
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME.  */
-
-#define ASM_OUTPUT_LABEL(FILE,NAME)	\
-  do { assemble_name (FILE, NAME); fputs (":\n", FILE); } while (0)
-
 /* This is how to output a command to make the user-level label named NAME
    defined for reference from other files.  */
 
-#define ASM_GLOBALIZE_LABEL(FILE,NAME)	\
-  do { fputs (".globl ", FILE); assemble_name (FILE, NAME); fputs ("\n", FILE);} while (0)
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP ".globl "
 
 /* The prefix to add to user-visible assembler symbols.  */
 
 #define USER_LABEL_PREFIX "_"
-
-/* This is how to output an internal numbered label where
-   PREFIX is the class of label and NUM is the number within the class.  */
-
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)	\
-  fprintf (FILE, "%s%d:\n", PREFIX, NUM)
 
 /* This is how to store into the string LABEL
    the symbol_ref name of an internal numbered label where
@@ -1129,27 +1096,19 @@ enum reg_class { NO_REGS, ALL_REGS, LIM_REG_CLASSES };
   assemble_name ((FILE), (NAME)),		\
   fprintf ((FILE), ",%u\n", (ROUNDED)))
 
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)	\
-( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),	\
-  sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO)))
-
 /* Output code to add DELTA to the first argument, and then jump to FUNCTION.
    Used for C++ multiple inheritance.
 	.mask	^m<r2,r3,r4,r5,r6,r7,r8,r9,r10,r11>	#conservative entry mask
 	addl2	$DELTA, 4(ap)	#adjust first argument
 	jmp	FUNCTION+2	#jump beyond FUNCTION's entry mask
  */
-#define ASM_OUTPUT_MI_THUNK(FILE, THUNK_FNDECL, DELTA, FUNCTION) \
-do {						\
-  fprintf (FILE, "\t.word 0x0ffc\n");		\
-  fprintf (FILE, "\taddl2 $%d,4(ap)\n", DELTA);	\
-  fprintf (FILE, "\tjmp ");			\
-  assemble_name (FILE,  XSTR (XEXP (DECL_RTL (FUNCTION), 0), 0)); \
-  fprintf (FILE, "+2\n");			\
+#define ASM_OUTPUT_MI_THUNK(FILE, THUNK_FNDECL, DELTA, FUNCTION)	\
+do {									\
+  fprintf (FILE, "\t.word 0x0ffc\n");					\
+  fprintf (FILE, "\taddl2 $%d,4(%sap)\n", DELTA, REGISTER_PREFIX);	\
+  fprintf (FILE, "\tjmp ");						\
+  assemble_name (FILE,  XSTR (XEXP (DECL_RTL (FUNCTION), 0), 0));	\
+  fprintf (FILE, "+2\n");						\
 } while (0)
 
 /* Print an instruction operand X on file FILE.
@@ -1208,12 +1167,12 @@ VAX operand formatting codes:
   else if (GET_CODE (X) == CONST_DOUBLE && GET_MODE (X) == SFmode)	\
     { REAL_VALUE_TYPE r; char dstr[30];					\
       REAL_VALUE_FROM_CONST_DOUBLE (r, X);				\
-      REAL_VALUE_TO_DECIMAL (r, "%.20e", dstr);				\
+      REAL_VALUE_TO_DECIMAL (r, dstr, -1);				\
       fprintf (FILE, "$0f%s", dstr); }					\
   else if (GET_CODE (X) == CONST_DOUBLE && GET_MODE (X) == DFmode)	\
     { REAL_VALUE_TYPE r; char dstr[30];					\
       REAL_VALUE_FROM_CONST_DOUBLE (r, X);				\
-      REAL_VALUE_TO_DECIMAL (r, "%.20e", dstr);				\
+      REAL_VALUE_TO_DECIMAL (r, dstr, -1);				\
       fprintf (FILE, "$0%c%s", ASM_DOUBLE_CHAR, dstr); }		\
   else { putc ('$', FILE); output_addr_const (FILE, X); }}
 

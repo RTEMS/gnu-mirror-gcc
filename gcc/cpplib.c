@@ -162,14 +162,7 @@ D(ident,	T_IDENT,	EXTENSION, IN_I)	   /*     11 */ \
 D(import,	T_IMPORT,	EXTENSION, INCL | EXPAND)  /* 0 ObjC */	\
 D(assert,	T_ASSERT,	EXTENSION, 0)		   /* 0 SVR4 */	\
 D(unassert,	T_UNASSERT,	EXTENSION, 0)		   /* 0 SVR4 */	\
-SCCS_ENTRY						   /* 0 SVR4? */
-
-/* #sccs is not always recognized.  */
-#ifdef SCCS_DIRECTIVE
-# define SCCS_ENTRY D(sccs, T_SCCS, EXTENSION, 0)
-#else
-# define SCCS_ENTRY /* nothing */
-#endif
+D(sccs,		T_SCCS,		EXTENSION, 0)		   /* 0 SVR4? */
 
 /* Use the table to generate a series of prototypes, an enum for the
    directive names, and an array of directive handlers.  */
@@ -284,9 +277,7 @@ static void
 prepare_directive_trad (pfile)
      cpp_reader *pfile;
 {
-  if (pfile->directive == &dtable[T_DEFINE])
-    CUR (pfile->context) = pfile->buffer->cur;
-  else
+  if (pfile->directive != &dtable[T_DEFINE])
     {
       bool no_expand = (pfile->directive
 			&& ! (pfile->directive->flags & EXPAND));
@@ -376,7 +367,7 @@ _cpp_handle_directive (pfile, indented)
       if (dname->val.node->directive_index)
 	dir = &dtable[dname->val.node->directive_index - 1];
     }
-  /* We do not recognise the # followed by a number extension in
+  /* We do not recognize the # followed by a number extension in
      assembler code.  */
   else if (dname->type == CPP_NUMBER && CPP_OPTION (pfile, lang) != CLK_ASM)
     {
@@ -386,10 +377,6 @@ _cpp_handle_directive (pfile, indented)
 	cpp_error (pfile, DL_PEDWARN,
 		   "style of line directive is a GCC extension");
     }
-
-  pfile->directive = dir;
-  if (CPP_OPTION (pfile, traditional))
-    prepare_directive_trad (pfile);
 
   if (dir)
     {
@@ -441,17 +428,12 @@ _cpp_handle_directive (pfile, indented)
 		   cpp_token_as_text (pfile, dname));
     }
 
-  if (dir)
-    {
-      /* If we are processing a `#define' directive and we have been
-	 requested to expand comments into macros, then re-enable
-	 saving of comments.  */
-      if (dir == &dtable[T_DEFINE])
-	pfile->state.save_comments =
-	  ! CPP_OPTION (pfile, discard_comments_in_macro_exp);
+  pfile->directive = dir;
+  if (CPP_OPTION (pfile, traditional))
+    prepare_directive_trad (pfile);
 
-      (*pfile->directive->handler) (pfile);
-    }
+  if (dir)
+    (*pfile->directive->handler) (pfile);
   else if (skip == 0)
     _cpp_backup_tokens (pfile, 1);
 
@@ -477,6 +459,9 @@ run_directive (pfile, dir_no, buf, count)
 {
   cpp_push_buffer (pfile, (const uchar *) buf, count,
 		   /* from_stage3 */ true, 1);
+  /* Disgusting hack.  */
+  if (dir_no == T_PRAGMA)
+    pfile->buffer->inc = pfile->buffer->prev->inc;
   start_directive (pfile);
   /* We don't want a leading # to be interpreted as a directive.  */
   pfile->buffer->saved_flags = 0;
@@ -485,6 +470,8 @@ run_directive (pfile, dir_no, buf, count)
     prepare_directive_trad (pfile);
   (void) (*pfile->directive->handler) (pfile);
   end_directive (pfile, 1);
+  if (dir_no == T_PRAGMA)
+    pfile->buffer->inc = NULL;
   _cpp_pop_buffer (pfile);
 }
 
@@ -501,16 +488,7 @@ lex_macro_node (pfile)
      In C++, it may not be any of the "named operators" either,
      per C++98 [lex.digraph], [lex.key].
      Finally, the identifier may not have been poisoned.  (In that case
-     the lexer has issued the error message for us.)
-
-     Note that if we're copying comments into macro expansions, we
-     could encounter comment tokens here, so eat them all up first.  */
-
-  if (! CPP_OPTION (pfile, discard_comments_in_macro_exp))
-    {
-      while (token->type == CPP_COMMENT)
-	token = _cpp_lex_token (pfile);
-    }
+     the lexer has issued the error message for us.)  */
 
   if (token->type == CPP_NAME)
     {
@@ -544,6 +522,11 @@ do_define (pfile)
 
   if (node)
     {
+      /* If we have been requested to expand comments into macros,
+	 then re-enable saving of comments.  */
+      pfile->state.save_comments =
+	! CPP_OPTION (pfile, discard_comments_in_macro_exp);
+
       if (_cpp_create_definition (pfile, node))
 	if (pfile->cb.define)
 	  (*pfile->cb.define) (pfile, pfile->directive_line, node);
@@ -566,6 +549,9 @@ do_undef (pfile)
 
       if (node->flags & NODE_WARN)
 	cpp_error (pfile, DL_WARNING, "undefining \"%s\"", NODE_NAME (node));
+
+      if (CPP_OPTION (pfile, warn_unused_macros))
+	_cpp_warn_if_unused_macro (pfile, node, NULL);
 
       _cpp_free_definition (node);
     }
@@ -701,7 +687,6 @@ do_include_common (pfile, type)
 	  if (pfile->cb.include)
 	    (*pfile->cb.include) (pfile, pfile->directive_line,
 				  pfile->directive->name, header);
-
 	  _cpp_execute_include (pfile, header, type);
 	}
     }
@@ -1292,6 +1277,9 @@ destringize_and_run (pfile, in)
 {
   const unsigned char *src, *limit;
   char *dest, *result;
+  cpp_context saved_context;
+  cpp_context *saved_cur_context;
+  unsigned int saved_line;
 
   dest = result = alloca (in->len + 1);
   for (src = in->text, limit = src + in->len; src < limit;)
@@ -1303,7 +1291,40 @@ destringize_and_run (pfile, in)
     }
   *dest = '\0';
 
+  /* FIXME.  All this saving is a horrible kludge to handle the case
+     when we're in a macro expansion.
+
+     A better strategy it to not convert _Pragma to #pragma if doing
+     preprocessed output, but to just pass it through as-is, unless it
+     is a CPP pragma in which case is should be processed normally.
+     When compiling the preprocessed output the _Pragma should be
+     handled.  This will be become necessary when we move to
+     line-at-a-time lexing since we will be macro-expanding the line
+     before outputting / compiling it.  */
+  saved_line = pfile->line;
+  saved_context = pfile->base_context;
+  saved_cur_context = pfile->context;
+  pfile->context = &pfile->base_context;
   run_directive (pfile, T_PRAGMA, result, dest - result);
+  pfile->context = saved_cur_context;
+  pfile->base_context = saved_context;
+  pfile->line = saved_line;
+
+  /* See above comment.  For the moment, we'd like
+
+     token1 _Pragma ("foo") token2
+
+     to be output as
+
+		token1
+		# 7 "file.c"
+		#pragma foo
+		# 7 "file.c"
+			       token2
+
+      Getting the line markers is a little tricky.  */
+  if (pfile->cb.line_change)
+    (*pfile->cb.line_change) (pfile, pfile->cur_token, false);
 }
 
 /* Handle the _Pragma operator.  */
@@ -1313,36 +1334,19 @@ _cpp_do__Pragma (pfile)
 {
   const cpp_token *string = get__Pragma_string (pfile);
 
-  if (!string)
+  if (string)
+    destringize_and_run (pfile, &string->val.str);
+  else
     cpp_error (pfile, DL_ERROR,
 	       "_Pragma takes a parenthesized string literal");
-  else
-    {
-      /* Ideally, we'd like
-			token1 _Pragma ("foo") token2
-	 to be output as
-			token1
-			# 7 "file.c"
-			#pragma foo
-			# 7 "file.c"
-					       token2
-	 Getting these correct line markers is a little tricky.  */
-
-      unsigned int orig_line = pfile->line;
-      destringize_and_run (pfile, &string->val.str);
-      pfile->line = orig_line;
-      pfile->buffer->saved_flags = BOL;
-    }
 }
 
-/* Just ignore #sccs, on systems where we define it at all.  */
-#ifdef SCCS_DIRECTIVE
+/* Just ignore #sccs on all systems.  */
 static void
 do_sccs (pfile)
      cpp_reader *pfile ATTRIBUTE_UNUSED;
 {
 }
-#endif
 
 /* Handle #ifdef.  */
 static void
@@ -1356,10 +1360,11 @@ do_ifdef (pfile)
       const cpp_hashnode *node = lex_macro_node (pfile);
 
       if (node)
-	skip = node->type != NT_MACRO;
-
-      if (node)
-	check_eol (pfile);
+	{
+	  skip = node->type != NT_MACRO;
+	  _cpp_mark_macro_used (node);
+	  check_eol (pfile);
+	}
     }
 
   push_conditional (pfile, skip, T_IFDEF, 0);
@@ -1376,11 +1381,13 @@ do_ifndef (pfile)
   if (! pfile->state.skipping)
     {
       node = lex_macro_node (pfile);
-      if (node)
-	skip = node->type == NT_MACRO;
 
       if (node)
-	check_eol (pfile);
+	{
+	  skip = node->type == NT_MACRO;
+	  _cpp_mark_macro_used (node);
+	  check_eol (pfile);
+	}
     }
 
   push_conditional (pfile, skip, T_IFNDEF, node);
@@ -1931,9 +1938,6 @@ cpp_push_buffer (pfile, buffer, len, from_stage3, return_at_eof)
 
   pfile->buffer = new;
 
-  if (CPP_OPTION (pfile, traditional))
-    _cpp_set_trad_context (pfile);
-
   return new;
 }
 
@@ -1978,12 +1982,9 @@ _cpp_pop_buffer (pfile)
 	    _cpp_maybe_push_include_file (pfile);
 	}
     }
-
-  if (pfile->buffer && CPP_OPTION (pfile, traditional))
-    _cpp_set_trad_context (pfile);
 }
 
-/* Enter all recognised directives in the hash table.  */
+/* Enter all recognized directives in the hash table.  */
 void
 _cpp_init_directives (pfile)
      cpp_reader *pfile;

@@ -1437,7 +1437,7 @@ mcore_output_movedouble (operands, mode)
 
 /* Predicates used by the templates.  */
 
-/* Non zero if OP can be source of a simple move operation.  */
+/* Nonzero if OP can be source of a simple move operation.  */
 
 int
 mcore_general_movsrc_operand (op, mode)
@@ -1451,7 +1451,7 @@ mcore_general_movsrc_operand (op, mode)
   return general_operand (op, mode);
 }
 
-/* Non zero if OP can be destination of a simple move operation. */
+/* Nonzero if OP can be destination of a simple move operation. */
 
 int
 mcore_general_movdst_operand (op, mode)
@@ -1483,7 +1483,7 @@ mcore_arith_reg_operand (op, mode)
   return 1;
 }
 
-/* Non zero if OP should be recognized during reload for an ixh/ixw
+/* Nonzero if OP should be recognized during reload for an ixh/ixw
    operand.  See the ixh/ixw patterns.  */
 
 int
@@ -2341,7 +2341,6 @@ mcore_expand_prolog ()
     {
       /* Emit a symbol for this routine's frame size.  */
       rtx x;
-      int len;
 
       x = DECL_RTL (current_function_decl);
       
@@ -2356,10 +2355,7 @@ mcore_expand_prolog ()
       if (mcore_current_function_name)
 	free (mcore_current_function_name);
       
-      len = strlen (XSTR (x, 0)) + 1;
-      mcore_current_function_name = (char *) xmalloc (len);
-      
-      memcpy (mcore_current_function_name, XSTR (x, 0), len);
+      mcore_current_function_name = xstrdup (XSTR (x, 0));
       
       ASM_OUTPUT_CG_NODE (asm_out_file, mcore_current_function_name, space_allocated);
 
@@ -2622,7 +2618,7 @@ mcore_output_jump_label_table ()
 	{
 	  pool_node * p = pool_vector + i;
 
-	  ASM_OUTPUT_INTERNAL_LABEL (asm_out_file, "L", CODE_LABEL_NUMBER (p->label));
+	  (*targetm.asm_out.internal_label) (asm_out_file, "L", CODE_LABEL_NUMBER (p->label));
 	  
 	  output_asm_insn (".long	%0", &p->value);
 	}
@@ -3544,7 +3540,7 @@ mcore_unique_section (decl, reloc)
     prefix = ".text$";
   /* For compatibility with EPOC, we ignore the fact that the
      section might have relocs against it.  */
-  else if (DECL_READONLY_SECTION (decl, 0))
+  else if (decl_readonly_section (decl, 0))
     prefix = ".rdata$";
   else
     prefix = ".data$";

@@ -111,10 +111,10 @@ Boston, MA 02111-1307, USA.  */
 #define TARGET_VERSION fprintf (stderr," (intel 80960)");
 
 /* Generate DBX debugging information.  */
-#define DBX_DEBUGGING_INFO
+#define DBX_DEBUGGING_INFO 1
 
 /* Generate SDB style debugging information.  */
-#define SDB_DEBUGGING_INFO
+#define SDB_DEBUGGING_INFO 1
 #define EXTENDED_SDB_BASIC_TYPES
 
 /* Generate DBX_DEBUGGING_INFO by default.  */
@@ -872,8 +872,8 @@ enum reg_class { NO_REGS, GLOBAL_REGS, LOCAL_REGS, LOCAL_OR_GLOBAL_REGS,
   (VALIST) = i960_build_va_list ()
 
 /* Implement `va_start' for varargs and stdarg.  */
-#define EXPAND_BUILTIN_VA_START(stdarg, valist, nextarg) \
-  i960_va_start (stdarg, valist, nextarg)
+#define EXPAND_BUILTIN_VA_START(valist, nextarg) \
+  i960_va_start (valist, nextarg)
 
 /* Implement `va_arg'.  */
 #define EXPAND_BUILTIN_VA_ARG(valist, type) \
@@ -1151,9 +1151,6 @@ struct cum_args { int ca_nregparms; int ca_nstackparms; };
 /* Define this as 1 if `char' should by default be signed; else as 0.  */
 #define DEFAULT_SIGNED_CHAR 0
 
-/* Allow and ignore #sccs directives.  */
-#define	SCCS_DIRECTIVE
-
 /* Max number of bytes we can move from memory to memory
    in one reasonably fast instruction.  */
 #define MOVE_MAX 16
@@ -1315,29 +1312,12 @@ extern struct rtx_def *i960_compare_op0, *i960_compare_op1;
 	fprintf((FILE),"\t.stabd	68,0,%d\n",(LINE));	\
   } }
 
-/* This is how to output the definition of a user-level label named NAME,
-   such as the label on a static function or variable NAME.  */
-
-#define ASM_OUTPUT_LABEL(FILE,NAME)	\
-  do { assemble_name (FILE, NAME); fputs (":\n", FILE); } while (0)
-
-/* This is how to output a command to make the user-level label named NAME
-   defined for reference from other files.  */
-
-#define ASM_GLOBALIZE_LABEL(FILE,NAME)		\
-{ fputs ("\t.globl ", FILE);			\
-  assemble_name (FILE, NAME);			\
-  fputs ("\n", FILE); }
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP "\t.globl "
 
 /* The prefix to add to user-visible assembler symbols.  */
 
 #define USER_LABEL_PREFIX "_"
-
-/* This is how to output an internal numbered label where
-   PREFIX is the class of label and NUM is the number within the class.  */
-
-#define ASM_OUTPUT_INTERNAL_LABEL(FILE,PREFIX,NUM)	\
-  fprintf (FILE, "%s%d:\n", PREFIX, NUM)
 
 /* This is how to store into the string LABEL
    the symbol_ref name of an internal numbered label where
@@ -1424,13 +1404,6 @@ extern struct rtx_def *i960_compare_op0, *i960_compare_op1;
 
 #define	LABEL_ALIGN_AFTER_BARRIER(LABEL) (TARGET_CODE_ALIGN ? 3 : 0)
 
-/* Store in OUTPUT a string (made with alloca) containing
-   an assembler-name for a local static variable named NAME.
-   LABELNO is an integer which is different for each call.  */
-
-#define ASM_FORMAT_PRIVATE_NAME(OUTPUT, NAME, LABELNO)	\
-	( (OUTPUT) = (char *) alloca (strlen ((NAME)) + 10),	\
-	  sprintf ((OUTPUT), "%s.%d", (NAME), (LABELNO)))
 
 /* Print operand X (an rtx) in assembler syntax to file FILE.
    CODE is a letter or dot (`z' in `%z0') or 0 if no letter was specified.

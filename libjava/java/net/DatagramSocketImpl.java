@@ -42,16 +42,18 @@ import java.io.IOException;
 import java.io.FileDescriptor;
 
 /**
- * Written using on-line Java Platform 1.2 API Specification, as well
- * as "The Java Class Libraries", 2nd edition (Addison-Wesley, 1998).
- * Status:  Believed complete and correct.
- *
- * <p>This abstract class models a datagram socket implementation.  An
+ * This abstract class models a datagram socket implementation.  An
  * actual implementation class would implement these methods, probably
  * via redirecting them to native code.
+ * <p>
+ * Written using on-line Java Platform 1.2 API Specification, as well
+ * as "The Java Class Libraries", 2nd edition (Addison-Wesley, 1998).
+ * <p>
+ * Status:  Believed complete and correct.
  *
  * @author Aaron M. Renn (arenn@urbanophile.com)
  * @author Warren Levy <warrenl@cygnus.com>
+ * @since 1.1
  */
 public abstract class DatagramSocketImpl implements SocketOptions
 {
@@ -108,6 +110,20 @@ public abstract class DatagramSocketImpl implements SocketOptions
    * @exception IOException If an error occurs
    */
   protected abstract int peek(InetAddress i) throws IOException;
+
+  /**
+   * Takes a peek at the next packet received.  This packet is not consumed.
+   * With the next peekData/receive operation this packet will be read again.
+   * 
+   * @param p The DatagramPacket to fill in with the data sent.
+   *
+   * @return The port number of the sender of the packet.
+   * 
+   * @exception IOException If an error occurs
+   * 
+   * @since 1.4
+   */
+  protected abstract int peekData (DatagramPacket p) throws IOException;
 
   /**
    * Transmits the specified packet of data to the network.  The destination
@@ -206,7 +222,7 @@ public abstract class DatagramSocketImpl implements SocketOptions
    * Sets the specified option on a socket to the passed in object.  For
    * options that take an integer argument, the passed in object is an
    * <code>Integer</code>.  For options that are set to on or off, the
-   * value passed will be a <code>Boolean</code>.   The <code>option_id</code> 
+   * value passed will be a <code>Boolean</code>.   The <code>option_id</code>
    * parameter is one of the defined constants in the superinterface.
    *
    * @param option_id The identifier of the option
@@ -219,9 +235,9 @@ public abstract class DatagramSocketImpl implements SocketOptions
     throws SocketException;
 
   /**
-   * Returns the current setting of the specified option.  The 
-   * <code>Object</code> returned will be an <code>Integer</code> for options 
-   * that have integer values.  For options that are set to on or off, a 
+   * Returns the current setting of the specified option.  The
+   * <code>Object</code> returned will be an <code>Integer</code> for options
+   * that have integer values.  For options that are set to on or off, a
    * <code>Boolean</code> will be returned.   The <code>option_id</code>
    * is one of the defined constants in the superinterface.
    *
