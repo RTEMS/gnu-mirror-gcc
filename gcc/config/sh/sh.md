@@ -117,6 +117,7 @@
   (UNSPECV_CONST2	2)
   (UNSPECV_CONST4	4)
   (UNSPECV_CONST8	6)
+  (UNSPECV_WINDOW_END	10)
   (UNSPECV_CONST_END	11)
 ])  
 
@@ -1160,7 +1161,7 @@
 		 (zero_extend:SI
 		  (match_operand:HI 1 "arith_reg_operand" "r"))))]
   ""
-  "mulu	%1,%0"
+  "mulu.w	%1,%0"
   [(set_attr "type" "smpy")])
 
 (define_insn "mulhisi3_i"
@@ -1170,7 +1171,7 @@
 		 (sign_extend:SI
 		  (match_operand:HI 1 "arith_reg_operand" "r"))))]
   ""
-  "muls	%1,%0"
+  "muls.w	%1,%0"
   [(set_attr "type" "smpy")])
 
 (define_expand "mulhisi3"
@@ -2438,8 +2439,8 @@
 ;; ??? This allows moves from macl to fpul to be recognized, but these moves
 ;; will require a reload.
 (define_insn "movsi_ie"
-  [(set (match_operand:SI 0 "general_movdst_operand" "=r,r,t,r,r,r,r,m,<,<,x,l,x,l,y,r,y,r,y")
-	(match_operand:SI 1 "general_movsrc_operand" "Q,rI,r,mr,x,l,t,r,x,l,r,r,>,>,>,i,r,y,y"))]
+  [(set (match_operand:SI 0 "general_movdst_operand" "=r,r,t,r,r,r,r,m,<,<,x,l,x,l,y,<,r,y,r,y")
+	(match_operand:SI 1 "general_movsrc_operand" "Q,rI,r,mr,x,l,t,r,x,l,r,r,>,>,>,y,i,r,y,y"))]
   "TARGET_SH3E
    && (register_operand (operands[0], SImode)
        || register_operand (operands[1], SImode))"
@@ -2459,12 +2460,13 @@
 	lds.l	%1,%0
 	lds.l	%1,%0
 	lds.l	%1,%0
+	sts.l	%1,%0
 	fake	%1,%0
 	lds	%1,%0
 	sts	%1,%0
 	! move optimized away"
-  [(set_attr "type" "pcload_si,move,*,load_si,move,prget,move,store,store,pstore,move,prset,load,pload,load,pcload_si,gp_fpul,gp_fpul,nil")
-   (set_attr "length" "*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,0")])
+  [(set_attr "type" "pcload_si,move,*,load_si,move,prget,move,store,store,pstore,move,prset,load,pload,load,store,pcload_si,gp_fpul,gp_fpul,nil")
+   (set_attr "length" "*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,*,0")])
 
 (define_insn "movsi_i_lowpart"
   [(set (strict_low_part (match_operand:SI 0 "general_movdst_operand" "+r,r,r,r,r,r,m,r"))
@@ -3084,11 +3086,11 @@
 ;; when the destination changes mode.
 (define_insn "movsf_ie"
   [(set (match_operand:SF 0 "general_movdst_operand"
-	 "=f,r,f,f,fy,f,m,r,r,m,f,y,y,rf,r<,y,y")
+	 "=f,r,f,f,fy,f,m,r,r,m,f,y,y,rf,r,y,<,y,y")
 	(match_operand:SF 1 "general_movsrc_operand"
-	  "f,r,G,H,FQ,mf,f,FQ,mr,r,y,f,>,fr,y,r>,y"))
-   (use (match_operand:PSI 2 "fpscr_operand" "c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c"))
-   (clobber (match_scratch:SI 3 "=X,X,X,X,&z,X,X,X,X,X,X,X,X,y,X,X,X"))]
+	  "f,r,G,H,FQ,mf,f,FQ,mr,r,y,f,>,fr,y,r,y,>,y"))
+   (use (match_operand:PSI 2 "fpscr_operand" "c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c"))
+   (clobber (match_scratch:SI 3 "=X,X,X,X,&z,X,X,X,X,X,X,X,X,y,X,X,X,X,X"))]
 
   "TARGET_SH3E
    && (arith_reg_operand (operands[0], SFmode)
@@ -3117,9 +3119,11 @@
 	#
 	sts	%1,%0
 	lds	%1,%0
+	sts.l	%1,%0
+	lds.l	%1,%0
 	! move optimized away"
-  [(set_attr "type" "fmove,move,fmove,fmove,pcload,load,store,pcload,load,store,fmove,fmove,load,*,gp_fpul,gp_fpul,nil")
-   (set_attr "length" "*,*,*,*,4,*,*,*,*,*,2,2,2,4,2,2,0")
+  [(set_attr "type" "fmove,move,fmove,fmove,pcload,load,store,pcload,load,store,fmove,fmove,load,*,gp_fpul,gp_fpul,store,load,nil")
+   (set_attr "length" "*,*,*,*,4,*,*,*,*,*,2,2,2,4,2,2,2,2,0")
    (set (attr "fp_mode") (if_then_else (eq_attr "fmovd" "yes")
 					   (const_string "single")
 					   (const_string "none")))])
@@ -3749,6 +3753,15 @@
 }
 ")
 
+(define_expand "builtin_setjmp_receiver"
+  [(match_operand 0 "" "")]
+  "flag_pic"
+  "
+{
+  emit_insn (gen_GOTaddr2picreg ());
+  DONE;
+}")
+
 (define_expand "call_site"
   [(unspec [(match_dup 0)] UNSPEC_CALLER)]
   ""
@@ -4107,12 +4120,14 @@
 ; 2 byte integer in line
 
 (define_insn "consttable_2"
- [(unspec_volatile [(match_operand:SI 0 "general_operand" "=g")]
+ [(unspec_volatile [(match_operand:SI 0 "general_operand" "=g")
+		    (match_operand 1 "" "")]
 		   UNSPECV_CONST2)]
  ""
  "*
 {
-  assemble_integer (operands[0], 2, 1);
+  if (operands[1] != const0_rtx)
+    assemble_integer (operands[0], 2, 1);
   return \"\";
 }"
  [(set_attr "length" "2")
@@ -4121,12 +4136,14 @@
 ; 4 byte integer in line
 
 (define_insn "consttable_4"
- [(unspec_volatile [(match_operand:SI 0 "general_operand" "=g")]
+ [(unspec_volatile [(match_operand:SI 0 "general_operand" "=g")
+		    (match_operand 1 "" "")]
 		   UNSPECV_CONST4)]
  ""
  "*
 {
-  assemble_integer (operands[0], 4, 1);
+  if (operands[1] != const0_rtx)
+    assemble_integer (operands[0], 4, 1);
   return \"\";
 }"
  [(set_attr "length" "4")
@@ -4135,12 +4152,14 @@
 ; 8 byte integer in line
 
 (define_insn "consttable_8"
- [(unspec_volatile [(match_operand:SI 0 "general_operand" "=g")]
+ [(unspec_volatile [(match_operand:SI 0 "general_operand" "=g")
+		    (match_operand 1 "" "")]
 		   UNSPECV_CONST8)]
  ""
  "*
 {
-  assemble_integer (operands[0], 8, 1);
+  if (operands[1] != const0_rtx)
+    assemble_integer (operands[0], 8, 1);
   return \"\";
 }"
  [(set_attr "length" "8")
@@ -4149,14 +4168,18 @@
 ; 4 byte floating point
 
 (define_insn "consttable_sf"
- [(unspec_volatile [(match_operand:SF 0 "general_operand" "=g")]
+ [(unspec_volatile [(match_operand:SF 0 "general_operand" "=g")
+		    (match_operand 1 "" "")]
 		   UNSPECV_CONST4)]
  ""
  "*
 {
-  union real_extract u;
-  memcpy (&u, &CONST_DOUBLE_LOW (operands[0]), sizeof u);
-  assemble_real (u.d, SFmode);
+  if (operands[1] != const0_rtx)
+    {
+      union real_extract u;
+      memcpy (&u, &CONST_DOUBLE_LOW (operands[0]), sizeof u);
+      assemble_real (u.d, SFmode);
+    }
   return \"\";
 }"
  [(set_attr "length" "4")
@@ -4165,14 +4188,18 @@
 ; 8 byte floating point
 
 (define_insn "consttable_df"
- [(unspec_volatile [(match_operand:DF 0 "general_operand" "=g")]
+ [(unspec_volatile [(match_operand:DF 0 "general_operand" "=g")
+		    (match_operand 1 "" "")]
 		   UNSPECV_CONST8)]
  ""
  "*
 {
-  union real_extract u;
-  memcpy (&u, &CONST_DOUBLE_LOW (operands[0]), sizeof u);
-  assemble_real (u.d, DFmode);
+  if (operands[1] != const0_rtx)
+    {
+      union real_extract u;
+      memcpy (&u, &CONST_DOUBLE_LOW (operands[0]), sizeof u);
+      assemble_real (u.d, DFmode);
+    }
   return \"\";
 }"
  [(set_attr "length" "8")
@@ -4217,6 +4244,15 @@
   ""
   "* return output_jump_label_table ();"
   [(set_attr "in_delay_slot" "no")])
+
+; emitted at the end of the window in the literal table.
+
+(define_insn "consttable_window_end"
+  [(unspec_volatile [(match_operand 0 "" "")] UNSPECV_WINDOW_END)]
+  ""
+  ""
+  [(set_attr "length" "0")
+   (set_attr "in_delay_slot" "no")])
 
 ;; -------------------------------------------------------------------------
 ;; Misc

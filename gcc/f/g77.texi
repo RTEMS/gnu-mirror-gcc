@@ -2,8 +2,8 @@
 @c %**start of header
 @setfilename g77.info
 
-@set last-update 2000-12-21
-@set copyrights-g77 1995,1996,1997,1998,1999,2000
+@set last-update 2001-06-03
+@set copyrights-g77 1995,1996,1997,1998,1999,2000,2001
 
 @include root.texi
 
@@ -97,32 +97,24 @@ Boston, MA 02111-1307 USA
 
 Copyright (C) @value{copyrights-g77} Free Software Foundation, Inc.
 
-Permission is granted to make and distribute verbatim copies of
-this manual provided the copyright notice and this permission notice
-are preserved on all copies.
 
-@ignore
-Permission is granted to process this file through Tex and print the
-results, provided the printed document carries copying permission
-notice identical to this one except for the removal of this paragraph
-(this paragraph not being relevant to the printed manual).
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.1 or
+any later version published by the Free Software Foundation; with the
+Invariant Sections being ``GNU General Public License'', the Front-Cover
+texts being (a) (see below), and with the Back-Cover Texts being (b)
+(see below).  A copy of the license is included in the section entitled
+``GNU Free Documentation License''.
 
-@end ignore
-Permission is granted to copy and distribute modified versions of this
-manual under the conditions for verbatim copying, provided also that the
-sections entitled ``GNU General Public License,'' ``Funding for Free
-Software,'' and ``Protect Your Freedom---Fight `Look And Feel'@w{}'' are
-included exactly as in the original, and provided that the entire
-resulting derived work is distributed under the terms of a permission
-notice identical to this one.
+(a) The FSF's Front-Cover Text is:
 
-Permission is granted to copy and distribute translations of this manual
-into another language, under the above conditions for modified versions,
-except that the sections entitled ``GNU General Public License,''
-``Funding for Free Software,'' and ``Protect Your Freedom---Fight `Look
-And Feel'@w{}'', and this permission notice, may be included in
-translations approved by the Free Software Foundation instead of in the
-original English.
+     A GNU Manual
+
+(b) The FSF's Back-Cover Text is:
+
+     You have freedom to copy and modify this GNU Manual, like GNU
+     software.  Copies published by the Free Software Foundation raise
+     funds for GNU development.
 @end ifinfo
 
 Contributed by James Craig Burley (@email{@value{email-burley}}).
@@ -163,26 +155,26 @@ Boston, MA 02111-1307, USA@*
 @c Printed copies are available for $? each.@*
 @c ISBN ???
 @sp 1
-Permission is granted to make and distribute verbatim copies of
-this manual provided the copyright notice and this permission notice
-are preserved on all copies.
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.1 or
+any later version published by the Free Software Foundation; with the
+Invariant Sections being ``GNU General Public License'', the Front-Cover
+texts being (a) (see below), and with the Back-Cover Texts being (b)
+(see below).  A copy of the license is included in the section entitled
+``GNU Free Documentation License''.
 
-Permission is granted to copy and distribute modified versions of this
-manual under the conditions for verbatim copying, provided also that the
-sections entitled ``GNU General Public License,'' ``Funding for Free
-Software,'' and ``Protect Your Freedom---Fight `Look And Feel'@w{}'' are
-included exactly as in the original, and provided that the entire
-resulting derived work is distributed under the terms of a permission
-notice identical to this one.
+(a) The FSF's Front-Cover Text is:
 
-Permission is granted to copy and distribute translations of this manual
-into another language, under the above conditions for modified versions,
-except that the sections entitled ``GNU General Public License,''
-``Funding for Free Software,'' and ``Protect Your Freedom---Fight `Look
-And Feel'@w{}'', and this permission notice, may be included in
-translations approved by the Free Software Foundation instead of in the
-original English.
+     A GNU Manual
+
+(b) The FSF's Back-Cover Text is:
+
+     You have freedom to copy and modify this GNU Manual, like GNU
+     software.  Copies published by the Free Software Foundation raise
+     funds for GNU development.
 @end titlepage
+@summarycontents
+@contents
 @page
 
 @ifinfo
@@ -234,6 +226,8 @@ most consistent with the @code{g77} product in that version.
 @menu
 * Copying::         GNU General Public License says
                     how you can copy and share GNU Fortran.
+* GNU Free Documentation License::
+		    How you can copy and share this manual.
 * Contributors::    People who have contributed to GNU Fortran.
 * Funding::         How to help assure continued work for free software.
 * Funding GNU Fortran::  How to help assure continued work on GNU Fortran.
@@ -622,7 +616,8 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+Foundation, Inc., 59 Temple Place - Suite 330,
+Boston, MA 02111-1307, USA.
 @end smallexample
 
 Also add information on how to contact you by electronic and paper mail.
@@ -661,6 +656,8 @@ proprietary programs.  If your program is a subroutine library, you may
 consider it more useful to permit linking proprietary applications with the
 library.  If this is what you want to do, use the GNU Library General
 Public License instead of this License.
+
+@include fdl.texi
 
 @node Contributors
 @unnumbered Contributors to GNU Fortran
@@ -826,10 +823,13 @@ without royalty; alteration is not permitted.
 @cindex funding improvements
 @cindex improvements, funding
 
-Work on GNU Fortran is still being done mostly by its author,
-James Craig Burley (@email{@value{email-burley}}), who is a volunteer
-for, not an employee of, the Free Software Foundation (FSF).
+James Craig Burley (@email{@value{email-burley}}), the original author
+of g77, stopped working on it in September 1999
 (He has a web page at @uref{@value{www-burley}}.)
+
+GNU Fortran is currently maintained by Toon Moene
+(@email{toon@@moene.indiv.nluug.nl}), with the help of countless other
+volunteers.
 
 As with other GNU software, funding is important because it can pay for
 needed equipment, personnel, and so on.
@@ -840,36 +840,6 @@ The FSF provides information on the best way to fund ongoing
 development of GNU software (such as GNU Fortran) in documents
 such as the ``GNUS Bulletin''.
 Email @email{gnu@@gnu.org} for information on funding the FSF.
-
-To fund specific GNU Fortran work in particular, the FSF might
-provide a means for that, but the FSF does not provide direct funding
-to the author of GNU Fortran to continue his work.  The FSF has
-employee salary restrictions that can be incompatible with the
-financial needs of some volunteers, who therefore choose to
-remain volunteers and thus be able to be free to do contract work
-and otherwise make their own schedules for doing GNU work.
-
-Still, funding the FSF at least indirectly benefits work
-on specific projects like GNU Fortran because it ensures the
-continuing operation of the FSF offices, their workstations, their
-network connections, and so on, which are invaluable to volunteers.
-(Similarly, hiring Cygnus Support can help a project like GNU
-Fortran---Cygnus has been a long-time donor of equipment usage to the author
-of GNU Fortran, and this too has been invaluable---see @ref{Contributors}.)
-
-Currently, the only way to directly fund the author of GNU Fortran
-in his work on that project is to hire him for the work you want
-him to do, or donate money to him.
-Several people have done this
-already, with the result that he has not needed to immediately find
-contract work on a few occasions.
-If more people did this, he
-would be able to plan on not doing contract work for many months and
-could thus devote that time to work on projects (such as the planned
-changes for 0.6) that require longer timeframes to complete.
-For the latest information on the status of the author, do
-@kbd{finger -l burley@@gnu.org} on a UNIX system
-(or any system with a command like UNIX @code{finger}).
 
 Another important way to support work on GNU Fortran is to volunteer
 to help out.
@@ -1403,7 +1373,8 @@ by type.  Explanations are in the following sections.
 -fintrin-case-lower  -fintrin-case-any
 -fmatch-case-initcap  -fmatch-case-upper
 -fmatch-case-lower  -fmatch-case-any
--fsource-case-upper -fsource-case-lower  -fsource-case-preserve
+-fsource-case-upper  -fsource-case-lower
+-fsource-case-preserve
 -fsymbol-case-initcap  -fsymbol-case-upper
 -fsymbol-case-lower  -fsymbol-case-any
 -fcase-strict-upper  -fcase-strict-lower
@@ -1429,7 +1400,7 @@ by type.  Explanations are in the following sections.
 @xref{Warning Options,,Options to Request or Suppress Warnings}.
 @smallexample
 -fsyntax-only  -pedantic  -pedantic-errors  -fpedantic
--w  -Wno-globals  -Wimplicit -Wunused  -Wuninitialized
+-w  -Wno-globals  -Wimplicit  -Wunused  -Wuninitialized
 -Wall  -Wsurprising
 -Werror  -W
 @end smallexample
@@ -13729,8 +13700,8 @@ we should be able to reproduce the crash ourselves.
 
 If you would like to write bug fixes or improvements for the GNU Fortran
 compiler, that is very helpful.
-Send suggested fixes to the bug report
-mailing list, @email{@value{email-bugs}}.
+Send suggested fixes to the mailing list for patches,
+@email{@value{email-patch}}.
 
 Please follow these guidelines so we can study your patches efficiently.
 If you don't follow these guidelines, your information might still be
@@ -13855,7 +13826,7 @@ The service directory is found in the file named @file{SERVICE} in the
 GNU CC distribution.
 
 @item
-Send a message to @email{@value{email-general}}.
+Send a message to @email{@value{email-help}}.
 @end itemize
 
 @end ifset
@@ -15102,6 +15073,4 @@ that is not Year-2000 (Y2K) compliant.
 @unnumbered Index
 
 @printindex cp
-@summarycontents
-@contents
 @bye

@@ -177,6 +177,7 @@ static void mark_sequence_stack         PARAMS ((struct sequence_stack *));
 static void unshare_all_rtl_1		PARAMS ((rtx));
 static void unshare_all_decls		PARAMS ((tree));
 static void reset_used_decls		PARAMS ((tree));
+static void mark_label_nuses		PARAMS ((rtx));
 static hashval_t const_int_htab_hash    PARAMS ((const void *));
 static int const_int_htab_eq            PARAMS ((const void *,
 						 const void *));
@@ -1741,7 +1742,7 @@ unshare_all_rtl (fndecl, insn)
 
   /* Make sure that virtual parameters are not shared.  */
   for (decl = DECL_ARGUMENTS (fndecl); decl; decl = TREE_CHAIN (decl))
-    DECL_RTL (decl) = copy_rtx_if_shared (DECL_RTL (decl));
+    SET_DECL_RTL (decl, copy_rtx_if_shared (DECL_RTL (decl)));
 
   /* Make sure that virtual stack slots are not shared.  */
   unshare_all_decls (DECL_INITIAL (fndecl));
@@ -1816,7 +1817,8 @@ unshare_all_decls (blk)
 
   /* Copy shared decls.  */
   for (t = BLOCK_VARS (blk); t; t = TREE_CHAIN (t))
-    DECL_RTL (t) = copy_rtx_if_shared (DECL_RTL (t));
+    if (DECL_RTL_SET_P (t))
+      SET_DECL_RTL (t, copy_rtx_if_shared (DECL_RTL (t)));
 
   /* Now process sub-blocks.  */
   for (t = BLOCK_SUBBLOCKS (blk); t; t = TREE_CHAIN (t))
@@ -1833,7 +1835,8 @@ reset_used_decls (blk)
 
   /* Mark decls.  */
   for (t = BLOCK_VARS (blk); t; t = TREE_CHAIN (t))
-    reset_used_flags (DECL_RTL (t));
+    if (DECL_RTL_SET_P (t))
+      reset_used_flags (DECL_RTL (t));
 
   /* Now process sub-blocks.  */
   for (t = BLOCK_SUBBLOCKS (blk); t; t = TREE_CHAIN (t))
@@ -2389,6 +2392,32 @@ prev_cc0_setter (insn)
   return insn;
 }
 #endif
+
+/* Increment the label uses for all labels present in rtx.  */
+
+static void
+mark_label_nuses (x)
+     rtx x;
+{
+  register enum rtx_code code;
+  register int i, j;
+  register const char *fmt;
+
+  code = GET_CODE (x);
+  if (code == LABEL_REF)
+    LABEL_NUSES (XEXP (x, 0))++;
+
+  fmt = GET_RTX_FORMAT (code);
+  for (i = GET_RTX_LENGTH (code) - 1; i >= 0; i--)
+    {
+      if (fmt[i] == 'e')
+        mark_label_nuses (XEXP (x, i));
+      else if (fmt[i] == 'E')
+        for (j = XVECLEN (x, i) - 1; j >= 0; j--)
+	  mark_label_nuses (XVECEXP (x, i, j));
+    }
+}
+
 
 /* Try splitting insns that can be split for better scheduling.
    PAT is the pattern which might split.
@@ -2426,6 +2455,7 @@ try_split (pat, trial, last)
       if (GET_CODE (seq) == SEQUENCE)
 	{
 	  int i;
+	  rtx eh_note;
 
 	  /* Avoid infinite loop if any insn of the result matches 
 	     the original pattern.  */
@@ -2447,6 +2477,26 @@ try_split (pat, trial, last)
 	      if (GET_CODE (XVECEXP (seq, 0, i)) == CALL_INSN)
 		CALL_INSN_FUNCTION_USAGE (XVECEXP (seq, 0, i))
 		  = CALL_INSN_FUNCTION_USAGE (trial);
+
+	  /* Copy EH notes.  */
+	  if ((eh_note = find_reg_note (trial, REG_EH_REGION, NULL_RTX)))
+	    for (i = 0; i < XVECLEN (seq, 0); i++)
+	      {
+		rtx insn = XVECEXP (seq, 0, i);
+		if (GET_CODE (insn) == CALL_INSN
+		    || (flag_non_call_exceptions 
+			&& may_trap_p (PATTERN (insn))))
+		  REG_NOTES (insn) 
+		    = gen_rtx_EXPR_LIST (REG_EH_REGION, XEXP (eh_note, 0),
+					 REG_NOTES (insn));
+	      }
+
+	  /* If there are LABELS inside the split insns increment the
+	     usage count so we don't delete the label.  */
+	  if (GET_CODE (trial) == INSN)
+	    for (i = XVECLEN (seq, 0) - 1; i >= 0; i--)
+	      if (GET_CODE (XVECEXP (seq, 0, i)) == INSN)
+	        mark_label_nuses (PATTERN (XVECEXP (seq, 0, i)));
 
 	  tem = emit_insn_after (seq, before);
 
@@ -4139,9 +4189,9 @@ init_emit_once (line_numbers)
 	const_tiny_rtx[i][(int) mode] = GEN_INT (i);
     }
 
-  for (mode = CCmode; mode < MAX_MACHINE_MODE; ++mode)
-    if (GET_MODE_CLASS (mode) == MODE_CC)
-      const_tiny_rtx[0][(int) mode] = const0_rtx;
+  for (i = (int) CCmode; i < (int) MAX_MACHINE_MODE; ++i)
+    if (GET_MODE_CLASS ((enum machine_mode) i) == MODE_CC)
+      const_tiny_rtx[0][i] = const0_rtx;
 
   const_tiny_rtx[0][(int) BImode] = const0_rtx;
   if (STORE_FLAG_VALUE == 1)

@@ -21,9 +21,6 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 
-#include "rs6000/rs6000.h"
-#include "rs6000/aix.h"
-
 /* AIX V5 and above support 64-bit executables.  */
 #undef  SUBSUBTARGET_SWITCHES
 #define SUBSUBTARGET_SWITCHES					\
@@ -204,6 +201,10 @@ do {									\
      %{!maix64:\
        %{pthread:%{pg:gcrt0_r%O%s}%{!pg:%{p:mcrt0_r%O%s}%{!p:crt0_r%O%s}}}\
        %{!pthread:%{pg:gcrt0%O%s}%{!pg:%{p:mcrt0%O%s}%{!p:crt0%O%s}}}}}}"
+
+/* Since there are separate multilibs for pthreads, determine the
+   thread model based on the command-line arguments.  */
+#define THREAD_MODEL_SPEC "%{pthread:posix}%{!pthread:single}"
 
 /* AIX V5 typedefs ptrdiff_t as "long" while earlier releases used "int".  */
 

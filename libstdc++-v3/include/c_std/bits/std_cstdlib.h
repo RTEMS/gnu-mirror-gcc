@@ -85,18 +85,6 @@ namespace std
   using ::div_t;
   using ::ldiv_t;
 
-#ifdef _GLIBCPP_USE_LONG_LONG
-# ifdef _GLIBCPP_HAVE_LLDIV_T
-  using ::lldiv_t;
-# else
-  struct lldiv_t
-  {
-    long long quot;
-    long long rem;
-  };
-# endif
-#endif 
-
   extern "C" double atof(const char*); 
   extern "C" int atoi(const char*); 
   extern "C" long int atol(const char*); 
@@ -130,7 +118,18 @@ namespace std
   extern "C" size_t mbstowcs(wchar_t*, const char*, size_t); 
   extern "C" size_t wcstombs(char*, const wchar_t*, size_t);
 
-#ifdef _GLIBCPP_USE_LONG_LONG
+  inline long 
+  abs(long __i) { return ::labs(__i); }
+
+  inline ldiv_t
+  div(long __i, long __j) { return ::ldiv(__i, __j); }
+} // namespace std
+
+#if _GLIBCPP_USE_C99
+namespace __gnu_cxx
+{
+  using ::lldiv_t;
+
   inline long long 
   abs(long long __x) { return __x >= 0 ? __x : -__x; }
 
@@ -148,18 +147,26 @@ namespace std
   extern "C" long long int atoll(const char*); 
   extern "C" long long int strtoll(const char*, char**, int); 
   extern "C" unsigned long long int strtoull(const char*, char**, int); 
-#endif
 
 #ifdef _GLIBCPP_HAVE_STRTOLD
   extern "C" long double strtold(const char*, char**); 
 #endif
+} // namespace __gnu_cxx
+
+namespace std
+{
+  using __gnu_cxx::lldiv_t;
+  using __gnu_cxx::abs;
+  //using __gnu_cxx::llabs; // XXX ???
+  using __gnu_cxx::div;
+  using __gnu_cxx::lldiv;
+  using __gnu_cxx::atoll;
+  using __gnu_cxx::strtoll;
+  using __gnu_cxx::strtoull;
+#ifdef _GLIBCPP_HAVE_STRTOLD
+  using __gnu_cxx::strtold;
+#endif
 }
+#endif
 
 #endif 
-
-
-
-
-
-
-

@@ -10,6 +10,10 @@
 @c When this manual is copyrighted.
 @set copyrights-gcj 2001
 
+@c Versions
+@set version-gcc 3.0
+@set which-gcj GCC-@value{version-gcc}
+
 @ifinfo
 @format
 @dircategory Programming
@@ -31,29 +35,23 @@
 
 Copyright (C) @value{copyrights-gcj} Free Software Foundation, Inc.
 
-Permission is granted to make and distribute verbatim copies of
-this manual provided the copyright notice and this permission notice
-are preserved on all copies.
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.1 or
+any later version published by the Free Software Foundation; with the
+Invariant Sections being ``GNU General Public License'', the Front-Cover
+texts being (a) (see below), and with the Back-Cover Texts being (b)
+(see below).  A copy of the license is included in the section entitled
+``GNU Free Documentation License''.
 
-@ignore
-Permission is granted to process this file through Tex and print the
-results, provided the printed document carries copying permission
-notice identical to this one except for the removal of this paragraph
-(this paragraph not being relevant to the printed manual).
+(a) The FSF's Front-Cover Text is:
 
-@end ignore
-Permission is granted to copy and distribute modified versions of this
-manual under the conditions for verbatim copying, provided also that the
-sections entitled ``GNU General Public License'' and ``Funding for Free
-Software'' are included exactly as in the original, and provided that 
-the entire resulting derived work is distributed under the terms of a 
-permission notice identical to this one.
+     A GNU Manual
 
-Permission is granted to copy and distribute translations of this manual
-into another language, under the above conditions for modified versions,
-except that the sections entitled ``GNU General Public License'', and
-this permission notice, may be included in translations approved by the
-Free Software Foundation instead of in the original English.
+(b) The FSF's Back-Cover Text is:
+
+     You have freedom to copy and modify this GNU Manual, like GNU
+     software.  Copies published by the Free Software Foundation raise
+     funds for GNU development.
 @end ifinfo
 
 @titlepage
@@ -64,30 +62,31 @@ Free Software Foundation instead of in the original English.
 @vskip 0pt plus 1filll
 Copyright @copyright{} @value{copyrights-gcj} Free Software Foundation, Inc.
 @sp 2
-For the @value{which-g77} Version*
+For the @value{which-gcj} Version*
 @sp 1
 Published by the Free Software Foundation @*
 59 Temple Place - Suite 330@*
 Boston, MA 02111-1307, USA@*
 @sp 1
-Permission is granted to make and distribute verbatim copies of
-this manual provided the copyright notice and this permission notice
-are preserved on all copies.
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.1 or
+any later version published by the Free Software Foundation; with the
+Invariant Sections being ``GNU General Public License'', the Front-Cover
+texts being (a) (see below), and with the Back-Cover Texts being (b)
+(see below).  A copy of the license is included in the section entitled
+``GNU Free Documentation License''.
 
-Permission is granted to copy and distribute modified versions of this
-manual under the conditions for verbatim copying, provided also that the
-sections entitled ``GNU General Public License,'' ``Funding for Free
-Software,'' and ``Protect Your Freedom---Fight `Look And Feel'@w{}'' are
-included exactly as in the original, and provided that the entire
-resulting derived work is distributed under the terms of a permission
-notice identical to this one.
+(a) The FSF's Front-Cover Text is:
 
-Permission is granted to copy and distribute translations of this manual
-into another language, under the above conditions for modified versions,
-except that the section entitled ``GNU General Public License,'' and
-this permission notice, may be included in translations approved by the
-Free Software Foundation instead of in the original English.
+     A GNU Manual
+
+(b) The FSF's Back-Cover Text is:
+
+     You have freedom to copy and modify this GNU Manual, like GNU
+     software.  Copies published by the Free Software Foundation raise
+     funds for GNU development.
 @end titlepage
+@contents
 @page
 
 
@@ -101,6 +100,8 @@ files and object files, and it can read both Java source code and
 
 @menu
 * Copying::		The GNU General Public License
+* GNU Free Documentation License::
+			How you can share and copy this manual
 * Invoking gcj::	Compiler options supported by @code{gcj}
 * Compatibility::	Compatibility between gcj and other tools for Java
 * Invoking gcjh::       Generate header files from class files
@@ -504,6 +505,9 @@ library.  If this is what you want to do, use the GNU Library General
 Public License instead of this License.
 
 
+@include fdl.texi
+
+
 @node Invoking gcj
 @chapter Invoking gcj
 
@@ -513,6 +517,7 @@ gcc, Using the GNU Compiler Collection}.  This manual only documents the
 options specific to @code{gcj}.
 
 @menu
+* Input and output files::
 * Input Options::		How gcj finds files
 * Encodings::                   Options controlling source file encoding
 * Warnings::			Options controlling warnings specific to gcj
@@ -520,6 +525,43 @@ options specific to @code{gcj}.
 * Configure-time Options::	Options you won't use
 @end menu
 
+@node Input and output files
+@section Input and output files
+
+A @code{gcj} command is like a @code{gcc} command, in that it
+consists of a number of options and file names.  The following kinds
+of input file names are supported:
+
+@table @code
+@item @var{file}.java
+Java source files.
+@item @var{file}.class
+Java bytecode files.
+@item @var{file}.zip
+@itemx @var{file}.jar
+An archive containing one or more @code{.class} files, all of
+which are compiled.  The archive may be compressed.
+@item @@@var{file}
+A file containing a whitespace-separated list of input file names.
+(Currently, these must all be @code{.java} source files, but that
+may change.)
+Each named file is compiled, just as if it had been on the command line.
+@item @var{library}.a
+@itemx @var{library}.so
+@itemx -l@var{libname}
+Libraries to use when linking.  See the @code{gcc} manual.
+@end table
+
+You can specify more than one input file on the @code{gcj} command line,
+in which case they will all be compiled.  If you specify a
+@code{-o @var{FILENAME}}
+option, all the input files will be compiled together, producing a
+single output file, named @var{FILENAME}.
+This is allowed even when using @code{-S} or @code{-c},
+but not when using @code{-C}.
+(This is an extension beyond the what plain @code{gcc} allows.)
+(If more than one input file is specified, all must currently
+be @code{.java} files, though we hope to fix this.)
 
 @node Input Options
 @section Input Options
@@ -586,6 +628,20 @@ suppressed by @code{--CLASSPATH}), then its value is appended.
 Finally, the built-in system directory, @file{libgcj.jar}, is appended.
 @end itemize
 
+The classfile built by @code{gcj} for the class @code{java.lang.Object}
+(and placed in @code{libgcj.jar}) contains a special zero length
+attribute @code{gnu.gcj.gcj-compiled}. The compiler looks for this
+attribute when loading @code{java.lang.Object} and will report an error
+if it isn't found, unless it compiles to bytecode (the option
+@code{-fforce-classes-archive-check} can be used to overide this
+behavior in this particular case.)
+
+@table @code
+@item -fforce-classes-archive-check
+This forces the compiler to always check for the special zero length
+attribute @code{gnu.gcj.gcj-compiled} in @code{java.lang.Object} and
+issue an error if it isn't found.
+@end table
 
 @node Encodings
 @section Encodings
@@ -936,5 +992,4 @@ a free software Java class library test suite which is being written
 because the JCK is not free.  See
 @uref{http://sources.redhat.com/mauve/} for more information.
 
-@contents
 @bye

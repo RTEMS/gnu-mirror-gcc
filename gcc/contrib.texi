@@ -91,7 +91,7 @@ Dario Dariol contributed the four varieties of sample programs
 that print a copy of their source.
 
 @item
-Ulrich Drepper for his work on the C++ runtime libraries, glibc, 
+Ulrich Drepper for his work on the C++ runtime libraries, glibc,
  testing of GCC using glibc, ISO C99 support, CFG dumping support, etc.
 
 @item
@@ -128,7 +128,7 @@ Peter Gerwinski for various bugfixes and the Pascal front end.
 @item
 Anthony Green for his -Os contributions and Java front end work.
 
-@item 
+@item
 Kaveh Ghazi for his direction via the steering committee and
 amazing work to make -W -Wall useful.
 
@@ -289,7 +289,7 @@ Martin von L&ouml;wis for internal consistency checking infrastructure,
 and various C++ improvements including namespace support.
 
 @item
-Dave Love for his ongoing work with the Fortran front end and 
+Dave Love for his ongoing work with the Fortran front end and
 runtime libraries.
 
 @item
@@ -344,9 +344,9 @@ developers.
 Gary Miller ported GCC to Charles River Data Systems machines.
 
 @item
-Mark Mitchell for his direction via the steering committee, mountains
-of C++ work, load/store hoisting out of loops and alias analysis
-improvements, ISO "restrict" support.
+Mark Mitchell for his direction via the steering committee, mountains of
+C++ work, load/store hoisting out of loops, alias analysis improvements,
+ISO "restrict" support, and serving as release manager for GCC 3.0.
 
 @item
 Alan Modra for various Linux bits and testing.
@@ -364,8 +364,8 @@ kernels.
 Philippe De Muyter for his work on the m68k port.
 
 @item
-Joseph Myers for his work on the PDP-11 port, format checking and ISO
-C99 support.
+Joseph S. Myers for his work on the PDP-11 port, format checking and ISO
+C99 support, and continous emphasis on (and contributions to) documentation.
 
 @item
 Nathan Myers for his work on libstdc++-v3.
@@ -402,8 +402,9 @@ Alexandre Petit-Bianco for his Java work.
 Matthias Pfaller for major improvements to the NS32k port.
 
 @item
-Gerald Pfeifer his direction via the steering committee, maintenance of
-the web pages and pointing out lots of problems we need to solve.
+Gerald Pfeifer for his direction via the steering committee, pointing
+out lots of problems we need to solve, maintenance of the web pages, and
+taking care of documentation maintainance in general.
 
 @item
 Ovidiu Predescu for his work on the ObjC front end and runtime libraries.
@@ -452,7 +453,8 @@ William Schelter did most of the work on the Intel 80386 support.
 
 @item
 Bernd Schmidt for various code generation improvements and major
-work in the reload pass.
+work in the reload pass as well a serving as release manager for
+GCC 2.95.3.
 
 @item
 Franz Sirl for his ongoing work with making the PPC port stable
@@ -510,8 +512,8 @@ fixincludes, etc.
 Holger Teutsch provided the support for the Clipper cpu.
 
 @item
-Michael Tiemann for random bugfixes the first instruction scheduler, 
-initial C++ support, function integration, NS32k, sparc and M88k 
+Michael Tiemann for random bugfixes the first instruction scheduler,
+initial C++ support, function integration, NS32k, sparc and M88k
 machine description work, delay slot scheduling.
 
 @item
@@ -540,6 +542,10 @@ types.
 
 @item
 Todd Vierling for contributions for NetBSD ports.
+
+@item
+Dean Wakerley for converting the install documentation from HTML to texinfo
+in time for GCC 3.0.
 
 @item
 Krister Walfridsson for random bugfixes.

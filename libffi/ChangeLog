@@ -1,3 +1,77 @@
+2001-06-03  Andrew Haley  <aph@redhat.com>
+
+	* src/alpha/osf.S: Add unwind info.
+	* src/powerpc/sysv.S: Add unwind info.
+	* src/powerpc/ppc_closure.S: Likewise.
+
+2001-05-06  Bryce McKinlay  <bryce@waitaki.otago.ac.nz>
+
+	* configure.in: Remove warning about beta code.
+	* configure: Rebuilt.
+
+2001-04-25 Hans Boehm <Hans_Boehm@hp.com>
+
+	* src/ia64/unix.S: Restore stack pointer when returning from
+	ffi_closure_UNIX.
+
+2001-04-18  Jim Wilson  <wilson@redhat.com>
+
+	* src/ia64/unix.S: Delete unnecessary increment and decrement of loc2
+	to eliminate RAW DV.
+
+2001-04-12  Bryce McKinlay  <bryce@albatross.co.nz>
+
+	* Makefile.am: Make a libtool convenience library.
+	* Makefile.in: Rebuilt.
+	
+2001-03-29  Bryce McKinlay  <bryce@albatross.co.nz>
+
+	* configure.in: Use different syntax for subdirectory creation.
+	* configure: Rebuilt.
+
+2001-03-27  Jon Beniston  <jon@beniston.com>
+
+	* configure.in: Added X86_WIN32 target (Win32, CygWin, MingW).
+	* configure: Rebuilt.
+	* Makefile.am: Added X86_WIN32 target support.
+	* Makefile.in: Rebuilt.
+
+	* include/ffi.h.in: Added X86_WIN32 target support.
+
+	* src/ffitest.c: Doesn't run structure tests for X86_WIN32 targets.
+	* src/types.c: Added X86_WIN32 target support.
+
+	* src/x86/win32.S: New file. Based on sysv.S, but with EH
+	stuff removed and made to work with CygWin's gas.
+
+2001-03-26  Bryce McKinlay  <bryce@albatross.co.nz>
+
+	* configure.in: Make target subdirectory in build dir.
+	* Makefile.am: Override suffix based rules to specify correct output
+	subdirectory.
+	* Makefile.in: Rebuilt.
+	* configure: Rebuilt.
+
+2001-03-23  Kevin B Hendricks  <khendricks@ivey.uwo.ca>
+
+	* src/powerpc/ppc_closure.S: New file.
+	* src/powerpc/ffi.c (ffi_prep_args): Fixed ABI compatibility bug
+	involving long long and register pairs.
+	(ffi_prep_closure): New function.
+	(flush_icache): Likewise.
+	(ffi_closure_helper_SYSV): Likewise.
+	* include/ffi.h.in (FFI_CLOSURES): Define on PPC.
+	(FFI_TRAMPOLINE_SIZE): Likewise.
+	(FFI_NATIVE_RAW_API): Likewise.
+	* Makefile.in: Rebuilt.
+	* Makefile.am (EXTRA_DIST): Added src/powerpc/ppc_closure.S.
+	(TARGET_SRC_POWERPC): Likewise.
+
+2001-03-19  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in: Rebuilt.
+	* Makefile.am (ffitest_LDFLAGS): New macro.
+
 2001-02-08  Joseph S. Myers  <jsm28@cam.ac.uk>
 
 	* include/ffi.h.in: Change sourceware.cygnus.com references to

@@ -1,4 +1,4 @@
-// Copyright (C) 1999 Free Software Foundation
+// Copyright (C) 1999, 2001 Free Software Foundation
 
 // by Alexandre Oliva <oliva@lsd.ic.unicamp.br>
 
@@ -29,8 +29,9 @@ struct Bar : virtual Foo {
 };
 
 int main() {
-  delete [] new Bar[2];
+  try {
+    delete [] new Bar[2];
+  } catch (...) {
+  }
   abort();
 }
-
-

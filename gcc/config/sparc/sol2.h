@@ -35,6 +35,14 @@ Boston, MA 02111-1307, USA.  */
 %{compat-bsd:-iwithprefixbefore ucbinclude -I/usr/ucbinclude} \
 "
 
+/* For C++ we need to add some additional macro definitions required
+   by the C++ standard library.  */
+#define CPLUSPLUS_CPP_SPEC "\
+-D_XOPEN_SOURCE=500 -D_LARGEFILE_SOURCE=1 -D_LARGEFILE64_SOURCE=1 \
+-D__EXTENSIONS__ \
+%(cpp) \
+"
+
 /* The sun bundled assembler doesn't accept -Yd, (and neither does gas).
    It's safe to pass -s always, even if -g is not used. */
 #undef ASM_SPEC

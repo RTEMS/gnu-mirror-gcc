@@ -248,6 +248,16 @@ the very end of the command given to the linker.
 
 Do not define this macro if it does not need to do anything.
 
+@findex THREAD_MODEL_SPEC
+@item THREAD_MODEL_SPEC
+GCC @code{-v} will print the thread model GCC was configured to use.
+However, this doesn't work on platforms that are multilibbed on thread
+models, such as AIX 4.3.  On such platforms, define
+@code{THREAD_MODEL_SPEC} such that it evaluates to a string without
+blanks that names one of the recognized thread models.  @code{%*}, the
+default value of this macro, will expand to the value of
+@code{thread_file} set in @file{config.gcc}.
+
 @findex EXTRA_SPECS
 @item EXTRA_SPECS
 Define this macro to provide additional specifications to put in the
@@ -324,6 +334,12 @@ change is made to the link command line within @file{gcc.c}.  Therefore,
 define this macro only if you need to completely redefine the command
 line for invoking the linker and there is no other way to accomplish
 the effect you need.
+
+@findex LINK_ELIMINATE_DUPLICATE_LDIRECTORIES
+@item LINK_ELIMINATE_DUPLICATE_LDIRECTORIES
+A nonzero value causes collect2 to remove duplicate -L<directory> search
+directories from linking commands.  Do not give it a nonzero value if
+removing duplicate search directories changes the linker's semantics.
 
 @findex MULTILIB_DEFAULTS
 @item MULTILIB_DEFAULTS
@@ -734,7 +750,7 @@ If a target needs per-function specific data it should define the type
 @code{INIT_EXPANDERS}.  This macro should be used to initialise some or
 all of the function pointers @code{init_machine_status},
 @code{free_machine_status} and @code{mark_machine_status}.  These
-pointers are explained below. 
+pointers are explained below.
 
 One typical use of per-function, target specific data is to create an
 RTX to hold the register containing the function's return address.  This
@@ -746,7 +762,7 @@ all of the per-function information.  Thus when processing of a nested
 function began the old per-function data had to be pushed onto a
 stack, and when the processing was finished, it had to be popped off the
 stack.  GCC used to provide function pointers called
-@code{save_machine_status} and @code{restore_machine_status} to handle 
+@code{save_machine_status} and @code{restore_machine_status} to handle
 the saving and restoring of the target specific information.  Since the
 single data area approach is no longer used, these pointers are no
 longer supported.
@@ -1244,7 +1260,7 @@ If @code{DEFAULT_VTABLE_THUNKS} is 0, GCC uses the traditional
 implementation by default.  The ``thunk'' implementation is more efficient
 (especially if you have provided an implementation of
 @code{ASM_OUTPUT_MI_THUNK}, see @ref{Function Entry}), but is not binary
-compatible with code compiled using the traditional implementation.  
+compatible with code compiled using the traditional implementation.
 If you are writing a new port, define @code{DEFAULT_VTABLE_THUNKS} to 1.
 
 If you do not define this macro, the default for @samp{-fvtable-thunk} is 0.
@@ -1453,6 +1469,45 @@ label.
 On certain machines, it is important to have a separate label for each
 selector because this enables the linker to eliminate duplicate selectors.
 
+@findex TARGET_PTRMEMFUNC_VBIT_LOCATION
+@item TARGET_PTRMEMFUNC_VBIT_LOCATION
+The C++ compiler represents a pointer-to-member-function with a struct
+that looks like:
+
+@example
+  struct @{
+    union @{
+      void (*fn)();
+      ptrdiff_t vtable_index;
+    @};
+    ptrdiff_t delta;
+  @};
+@end example
+
+@noindent
+The C++ compiler must use one bit to indicate whether the function that
+will be called through a pointer-to-member-function is virtual.
+Normally, we assume that the low-order bit of a function pointer must
+always be zero.  Then, by ensuring that the vtable_index is odd, we can
+distinguish which variant of the union is in use.  But, on some
+platforms function pointers can be odd, and so this doesn't work.  In
+that case, we use the low-order bit of the @code{delta} field, and shift
+the remainder of the @code{delta} field to the left.
+
+GCC will automatically make the right selection about where to store
+this bit using the @code{FUNCTION_BOUNDARY} setting for your platform.
+However, some platforms such as ARM/Thumb have @code{FUNCTION_BOUNDARY}
+set such that functions always start at even addresses, but the lowest
+bit of pointers to functions indicate whether the function at that
+address is in ARM or Thumb mode.  If this is the case of your
+architecture, you should define this macro to
+@code{ptrmemfunc_vbit_in_delta}.
+
+In general, you should not have to define this macro.  On architectures
+in which function addresses are always even, according to
+@code{FUNCTION_BOUNDARY}, GCC will automatically define this macro to
+@code{ptrmemfunc_vbit_in_pfn}.
+
 @findex TARGET_BELL
 @item TARGET_BELL
 A C constant expression for the integer value for escape sequence
@@ -1571,7 +1626,7 @@ Zero or more C statements that may conditionally modify five variables
 Before the macro is called @code{fixed_regs}, @code{call_used_regs}
 @code{reg_class_contents} and @code{reg_names} have been initialized
 from @code{FIXED_REGISTERS}, @code{CALL_USED_REGISTERS},
-@code{REG_CLASS_CONTENTS} and @code{REGISTER_NAMES}, respectively, 
+@code{REG_CLASS_CONTENTS} and @code{REGISTER_NAMES}, respectively,
 @code{global_regs} has been cleared, and any @samp{-ffixed-@var{reg}},
 @samp{-fcall-used-@var{reg}} and @samp{-fcall-saved-@var{reg}} command
 options have been applied.
@@ -1699,7 +1754,7 @@ definition of this macro is
 
 @findex ALTER_HARD_SUBREG
 @item ALTER_HARD_SUBREG (@var{tgt_mode}, @var{word}, @var{src_mode}, @var{regno})
-A C expression that returns an adjusted hard register number for 
+A C expression that returns an adjusted hard register number for
 
 @smallexample
 (subreg:@var{tgt_mode} (reg:@var{src_mode} @var{regno}) @var{word})
@@ -2491,7 +2546,7 @@ debugging information like that provided by DWARF 2.
 @item ARG_POINTER_CFA_OFFSET (@var{fundecl})
 A C expression whose value is an integer giving the offset, in bytes,
 from the argument pointer to the canonical frame address (cfa).  The
-final value should coincide with that calculated by 
+final value should coincide with that calculated by
 @code{INCOMING_FRAME_SP_OFFSET}.  Which is unfortunately not usable
 during virtual register instantiation.
 
@@ -2504,6 +2559,81 @@ and rs6000, and so such targets need to define this macro.
 You only need to define this macro if the default is incorrect, and you
 want to support call frame debugging information like that provided by
 DWARF 2.
+
+@findex EH_RETURN_DATA_REGNO
+@item EH_RETURN_DATA_REGNO (@var{N})
+A C expression whose value is the @var{N}th register number used for
+data by exception handlers, or @code{INVALID_REGNUM} if fewer than
+@var{N} registers are usable.
+
+The exception handling library routines communicate with the exception
+handlers via a set of agreed upon registers.  Ideally these registers
+should be call-clobbered; it is possible to use call-saved registers,
+but may negatively impact code size.  The target must support at least
+2 data registers, but should define 4 if there are enough free registers.
+
+You must define this macro if you want to support call frame exception
+handling like that provided by DWARF 2.
+
+@findex EH_RETURN_STACKADJ_RTX
+@item EH_RETURN_STACKADJ_RTX
+A C expression whose value is RTL representing a location in which
+to store a stack adjustment to be applied before function return.
+This is used to unwind the stack to an exception handler's call frame.
+It will be assigned zero on code paths that return normally.
+
+Typically this is a call-clobbered hard register that is otherwise
+untouched by the epilogue, but could also be a stack slot.
+
+You must define this macro if you want to support call frame exception
+handling like that provided by DWARF 2.
+
+@findex EH_RETURN_HANDLER_RTX
+@item EH_RETURN_HANDLER_RTX
+A C expression whose value is RTL representing a location in which
+to store the address of an exception handler to which we should
+return.  It will not be assigned on code paths that return normally.
+
+Typically this is the location in the call frame at which the normal
+return address is stored.  For targets that return by popping an
+address off the stack, this might be a memory address just below
+the @emph{target} call frame rather than inside the current call
+frame.  @code{EH_RETURN_STACKADJ_RTX} will have already been assigned,
+so it may be used to calculate the location of the target call frame.
+
+Some targets have more complex requirements than storing to an
+address calculable during initial code generation.  In that case
+the @code{eh_return} instruction pattern should be used instead.
+
+If you want to support call frame exception handling, you must
+define either this macro or the @code{eh_return} instruction pattern.
+
+@findex ASM_PREFERRED_EH_DATA_FORMAT
+@item ASM_PREFERRED_EH_DATA_FORMAT(@var{CODE}, @var{GLOBAL})
+This macro chooses the encoding of pointers embedded in the exception
+handling sections.  If at all possible, this should be defined such
+that the exception handling section will not require dynamic relocations,
+and so may be read-only.
+
+@var{CODE} is 0 for data, 1 for code labels, 2 for function pointers.
+@var{GLOBAL} is true if the symbol may be affected by dynamic relocations.
+The macro should return a combination of the @code{DW_EH_PE_*} defines
+as found in @file{dwarf2.h}.
+
+If this macro is not defined, pointers will not be encoded but
+represented directly.
+
+@findex ASM_MAYBE_OUTPUT_ENCODED_ADDR_RTX
+@item ASM_MAYBE_OUTPUT_ENCODED_ADDR_RTX(@var{FILE}, @var{ENCODING}, @var{SIZE}, @var{ADDR}, @var{DONE})
+This macro allows the target to emit whatever special magic is required
+to represent the encoding chosen by @code{ASM_PREFERRED_EH_DATA_FORMAT}.
+Generic code takes care of pc-relative and indirect encodings; this must
+be defined if the target uses text-relative or data-relative encodings.
+
+This is a C statement that branches to @var{DONE} if the format was
+handled.  @var{ENCODING} is the format chosen, @var{SIZE} is the number
+of bytes that the format occupies, @var{ADDR} is the @code{SYMBOL_REF}
+to be emitted.
 
 @findex SMALL_STACK
 @item SMALL_STACK
@@ -2544,8 +2674,8 @@ will use the third approach.
 @findex STACK_CHECK_BUILTIN
 @item STACK_CHECK_BUILTIN
 A nonzero value if stack checking is done by the configuration files in a
-machine-dependent manner.  You should define this macro if stack checking 
-is require by the ABI of your machine or if you would like to have to stack 
+machine-dependent manner.  You should define this macro if stack checking
+is require by the ABI of your machine or if you would like to have to stack
 checking in some more efficient way than GCC's portable approach.
 The default value of this macro is zero.
 
@@ -2558,7 +2688,7 @@ default value of 4096 is suitable for most systems.
 
 @findex STACK_CHECK_PROBE_LOAD
 @item STACK_CHECK_PROBE_LOAD
-A integer which is nonzero if GCC should perform the stack probe 
+A integer which is nonzero if GCC should perform the stack probe
 as a load instruction and zero if GCC should use a store instruction.
 The default is zero, which is the most efficient choice on most systems.
 
@@ -2999,7 +3129,7 @@ register in which to pass this part of the argument, and the mode of the
 register RTX indicates how large this part of the argument is.  The
 second operand of the @code{expr_list} is a @code{const_int} which gives
 the offset in bytes into the entire argument of where this part starts.
-As a special exception the first @code{expr_list} in the @code{parallel} 
+As a special exception the first @code{expr_list} in the @code{parallel}
 RTX may have a first operand of zero.  This indicates that the entire
 argument is also stored on the stack.
 
@@ -3174,8 +3304,8 @@ constant size shorter than an @code{int}, and upward otherwise.
 
 @findex PAD_VARARGS_DOWN
 @item PAD_VARARGS_DOWN
-If defined, a C expression which determines whether the default 
-implementation of va_arg will attempt to pad down before reading the 
+If defined, a C expression which determines whether the default
+implementation of va_arg will attempt to pad down before reading the
 next argument, if that argument is smaller than its aligned space as
 controlled by @code{PARM_BOUNDARY}.  If this macro is not defined, all such
 arguments are padded down if @code{BYTES_BIG_ENDIAN} is true.
@@ -3198,7 +3328,7 @@ stack.
 @findex LOAD_ARGS_REVERSED
 @item LOAD_ARGS_REVERSED
 If defined, the order in which arguments are loaded into their
-respective argument registers is reversed so that the last 
+respective argument registers is reversed so that the last
 argument is loaded first.  This macro only affects arguments
 passed in registers.
 
@@ -3411,7 +3541,7 @@ must live across calls.
 @item DEFAULT_CALLER_SAVES
 Define this macro if function calls on the target machine do not preserve
 any registers; in other words, if @code{CALL_USED_REGISTERS} has 1
-for all registers.  When defined, this macro enables @samp{-fcaller-saves} 
+for all registers.  When defined, this macro enables @samp{-fcaller-saves}
 by default for all optimization levels.  It has no effect for optimization
 levels 2 and higher, where @samp{-fcaller-saves} is the default.
 
@@ -3868,6 +3998,21 @@ Registers or condition codes clobbered by @code{FUNCTION_PROLOGUE} or
 @item BLOCK_PROFILER_CODE
 A C function or functions which are needed in the library to
 support block profiling.
+
+@findex TARGET_ALLOWS_PROFILING_WITHOUT_FRAME_POINTER
+@item TARGET_ALLOWS_PROFILING_WITHOUT_FRAME_POINTER
+On some targets, it is impossible to use profiling when the frame
+pointer has been omitted.  For example, on x86 GNU/Linux systems,
+the @code{mcount} routine provided by the GNU C Library finds the
+address of the routine that called the routine that called @code{mcount}
+by looking in the immediate caller's stack frame.  If the immediate
+caller has no frame pointer, this lookup will fail.
+
+By default, GCC assumes that the target does allow profiling when the
+frame pointer is omitted.  This macro should be defined to a C
+expression that evaluates to @code{false} if the target does not allow
+profiling when the frame pointer is omitted.
+
 @end table
 
 @node Inlining
@@ -3890,12 +4035,12 @@ return 0.
 @findex FUNCTION_OK_FOR_SIBCALL
 @item FUNCTION_OK_FOR_SIBCALL (@var{decl})
 A C expression that evaluates to true if it is ok to perform a sibling
-call to @var{decl}.  
+call to @var{decl}.
 
 It is not uncommon for limitations of calling conventions to prevent
 tail calls to functions outside the current unit of translation, or
 during PIC compilation.  Use this macro to enforce these restrictions,
-as the @code{sibcall} md pattern can not fail, or fall over to a 
+as the @code{sibcall} md pattern can not fail, or fall over to a
 ``normal'' call.
 @end table
 
@@ -4351,12 +4496,13 @@ macro, a reasonable default is used.
 @findex TARGET_MEM_FUNCTIONS
 @cindex @code{bcopy}, implicit usage
 @cindex @code{memcpy}, implicit usage
+@cindex @code{memmove}, implicit usage
 @cindex @code{bzero}, implicit usage
 @cindex @code{memset}, implicit usage
 @item TARGET_MEM_FUNCTIONS
 Define this macro if GCC should generate calls to the ISO C
-(and System V) library functions @code{memcpy} and @code{memset}
-rather than the BSD functions @code{bcopy} and @code{bzero}.
+(and System V) library functions @code{memcpy}, @code{memmove} and
+@code{memset} rather than the BSD functions @code{bcopy} and @code{bzero}.
 
 @findex LIBGCC_NEEDS_DOUBLE
 @item LIBGCC_NEEDS_DOUBLE
@@ -4651,7 +4797,7 @@ A C compound statement that attempts to replace @var{x}, which is an address
 that needs reloading, with a valid memory address for an operand of mode
 @var{mode}.  @var{win} will be a C statement label elsewhere in the code.
 It is not necessary to define this macro, but it might be useful for
-performance reasons. 
+performance reasons.
 
 For example, on the i386, it is sometimes possible to use a single
 reload register instead of two by reloading a sum of two pseudo
@@ -4792,7 +4938,7 @@ two places, the @file{md} file and in @code{NOTICE_UPDATE_CC}.
 
 @findex EXTRA_CC_MODES
 @item EXTRA_CC_MODES
-A list of additional modes for condition code values in registers 
+A list of additional modes for condition code values in registers
 (@pxref{Jump Patterns}).  This macro should expand to a sequence of
 calls of the macro @code{CC} separated by white space.  @code{CC} takes
 two arguments.  The first is the enumeration name of the mode, which
@@ -4933,7 +5079,7 @@ calculation is used for any RTL for which this macro does not return a
 value.
 
 This macro is optional; do not define it if the default cost assumptions
-are adequate for the target machine.  
+are adequate for the target machine.
 
 @findex ADDRESS_COST
 @item ADDRESS_COST (@var{address})
@@ -5318,7 +5464,7 @@ data section.
 
 @findex JUMP_TABLES_IN_TEXT_SECTION
 @item JUMP_TABLES_IN_TEXT_SECTION
-Define this macro to be an expression with a non-zero value if jump 
+Define this macro to be an expression with a non-zero value if jump
 tables (for @code{tablejump} insns) should be output in the text
 section, along with the assembler instructions.  Otherwise, the
 readonly data section is used.
@@ -5483,22 +5629,6 @@ definition.
 
 On systems that use SDB, it is necessary to output certain commands;
 see @file{attasm.h}.
-
-@findex ASM_IDENTIFY_GCC
-@item ASM_IDENTIFY_GCC (@var{file})
-A C statement to output assembler commands which will identify
-the object file as having been compiled with GCC (or another
-GNU compiler).
-
-If you don't define this macro, the string @samp{gcc_compiled.:}
-is output.  This string is calculated to define a symbol which,
-on BSD systems, will never be defined for any other reason.
-GDB checks for the presence of this symbol when reading the
-symbol table of an executable.
-
-On non-BSD systems, you must arrange communication with GDB in
-some other fashion.  If GDB is not used on your system, you can
-define this macro with an empty body.
 
 @findex ASM_COMMENT_START
 @item ASM_COMMENT_START
@@ -6762,7 +6892,7 @@ If this macro is not defined, nothing special is output at the end of
 the jump-table.
 @end table
 
-@node Exception Region Output 
+@node Exception Region Output
 @subsection Assembler Commands for Exception Regions
 
 @c prevent bad page break with this line
@@ -6879,7 +7009,7 @@ implementation.
 
 @findex LABEL_ALIGN_AFTER_BARRIER_MAX_SKIP
 @item LABEL_ALIGN_AFTER_BARRIER_MAX_SKIP
-The maximum number of bytes to skip when applying 
+The maximum number of bytes to skip when applying
 @code{LABEL_ALIGN_AFTER_BARRIER}.  This works only if
 @code{ASM_OUTPUT_MAX_SKIP_ALIGN} is defined.
 
@@ -7636,7 +7766,7 @@ return an integer value not larger than the corresponding element in
 NUM_MODES_FOR_MODE_SWITCHING, to denote the mode that @var{entity} must
 be switched into prior to the execution of INSN.
 
-@findex NORMAL_MODE 
+@findex NORMAL_MODE
 @item NORMAL_MODE (@var{entity})
 If this macro is defined, it is evaluated for every @var{entity} that needs
 mode switching.  It should evaluate to an integer, which is a mode that
@@ -7696,9 +7826,9 @@ declaration will be generated in @file{insn-codes.h}.
 @item SPECIAL_MODE_PREDICATES
 @findex SPECIAL_MODE_PREDICATES
 Define this if you have special predicates that know special things
-about modes.  Genrecog will warn about certain forms of 
+about modes.  Genrecog will warn about certain forms of
 @code{match_operand} without a mode; if the operand predicate is
-listed in @code{SPECIAL_MODE_PREDICATES}, the warning will be 
+listed in @code{SPECIAL_MODE_PREDICATES}, the warning will be
 suppressed.
 
 Here is an example from the IA-32 port (@code{ext_register_operand}
@@ -7720,7 +7850,7 @@ elements of a jump-table should have.
 Optional: return the preferred mode for an @code{addr_diff_vec}
 when the minimum and maximum offset are known.  If you define this,
 it enables extra code in branch shortening to deal with @code{addr_diff_vec}.
-To make this work, you also have to define INSN_ALIGN and 
+To make this work, you also have to define INSN_ALIGN and
 make the alignment for @code{addr_diff_vec} explicit.
 The @var{body} argument is provided so that the offset_unsigned and scale
 flags can be updated.
