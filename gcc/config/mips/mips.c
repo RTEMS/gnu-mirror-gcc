@@ -1,5 +1,5 @@
 /* Subroutines for insn-output.c for MIPS
-   Copyright (C) 1989, 90, 91, 93-95, 1996 Free Software Foundation, Inc.
+   Copyright (C) 1989, 90, 91, 93-97, 1998 Free Software Foundation, Inc.
    Contributed by A. Lichnewsky, lich@inria.inria.fr.
    Changes by Michael Meissner, meissner@osf.org.
    64 bit r4000 support by Ian Lance Taylor, ian@cygnus.com, and
@@ -27,6 +27,9 @@ Boston, MA 02111-1307, USA.  */
    be replaced with something better designed.  */
 
 #include "config.h"
+
+#include <stdio.h>
+
 #include "rtl.h"
 #include "regs.h"
 #include "hard-reg-set.h"
@@ -42,7 +45,6 @@ Boston, MA 02111-1307, USA.  */
 #undef MAX			/* sys/param.h may also define these */
 #undef MIN
 
-#include <stdio.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/file.h>
@@ -193,9 +195,9 @@ enum processor_type mips_cpu;
 int mips_isa;
 
 #ifdef MIPS_ABI_DEFAULT
-/* which ABI to use.  This is defined to a constant in mips.h if the target
+/* Which ABI to use.  This is defined to a constant in mips.h if the target
    doesn't support multiple ABIs.  */
-enum mips_abi_type mips_abi;
+int mips_abi;
 #endif
 
 /* Strings to hold which cpu and instruction set architecture to use.  */
@@ -437,13 +439,17 @@ large_int (op, mode)
     return FALSE;
 
   value = INTVAL (op);
-  if ((value & ~0x0000ffff) == 0)			/* ior reg,$r0,value */
+
+  /* ior reg,$r0,value */
+  if ((value & ~ ((HOST_WIDE_INT) 0x0000ffff)) == 0)
     return FALSE;
 
-  if (((unsigned long)(value + 32768)) <= 32767)	/* subu reg,$r0,value */
+  /* subu reg,$r0,value */
+  if (((unsigned HOST_WIDE_INT) (value + 32768)) <= 32767)
     return FALSE;
 
-  if ((value & 0x0000ffff) == 0)			/* lui reg,value>>16 */
+  /* lui reg,value>>16 */
+  if ((value & 0x0000ffff) == 0)
     return FALSE;
 
   return TRUE;
@@ -2077,7 +2083,7 @@ gen_int_relational (test_code, result, cmp0, cmp1, p_invert)
   if (test == ITEST_MAX)
     abort ();
 
-  p_info = &info[ (int)test ];
+  p_info = &info[(int) test];
   eqne_p = (p_info->test_code == XOR);
 
   mode = GET_MODE (cmp0);
@@ -2092,11 +2098,11 @@ gen_int_relational (test_code, result, cmp0, cmp1, p_invert)
 	{
 	  /* Comparisons against zero are simple branches */
 	  if (GET_CODE (cmp1) == CONST_INT && INTVAL (cmp1) == 0)
-	    return (rtx)0;
+	    return NULL_RTX;
 
 	  /* Test for beq/bne.  */
 	  if (eqne_p)
-	    return (rtx)0;
+	    return NULL_RTX;
 	}
 
       /* allocate a pseudo to calculate the value in.  */
@@ -2110,6 +2116,7 @@ gen_int_relational (test_code, result, cmp0, cmp1, p_invert)
   if (GET_CODE (cmp1) == CONST_INT)
     {
       HOST_WIDE_INT value = INTVAL (cmp1);
+
       if (value < p_info->const_low
 	  || value > p_info->const_high
 	  /* ??? Why?  And why wasn't the similar code below modified too?  */
@@ -2142,6 +2149,7 @@ gen_int_relational (test_code, result, cmp0, cmp1, p_invert)
       if (p_info->const_add != 0)
 	{
 	  HOST_WIDE_INT new = INTVAL (cmp1) + p_info->const_add;
+
 	  /* If modification of cmp1 caused overflow,
 	     we would get the wrong answer if we follow the usual path;
 	     thus, x > 0xffffffffU would turn into x > 0U.  */
@@ -2247,8 +2255,7 @@ gen_conditional_branch (operands, test_code)
          0 in the instruction built below.  The MIPS FPU handles
          inequality testing by testing for equality and looking for a
          false result.  */
-      emit_insn (gen_rtx (SET, VOIDmode,
-			  reg,
+      emit_insn (gen_rtx (SET, VOIDmode, reg,
 			  gen_rtx (test_code == NE ? EQ : test_code,
 				   CCmode, cmp0, cmp1)));
 
@@ -2271,8 +2278,7 @@ gen_conditional_branch (operands, test_code)
       label1 = pc_rtx;
     }
 
-  emit_jump_insn (gen_rtx (SET, VOIDmode,
-			   pc_rtx,
+  emit_jump_insn (gen_rtx (SET, VOIDmode, pc_rtx,
 			   gen_rtx (IF_THEN_ELSE, VOIDmode,
 				    gen_rtx (test_code, mode, cmp0, cmp1),
 				    label1,
@@ -3208,7 +3214,9 @@ function_arg (cum, mode, type, named)
 		    % BITS_PER_WORD == 0))
 	      break;
 
-	  if (! field)
+	  /* If the whole struct fits a DFmode register,
+	     we don't need the PARALLEL.  */
+	  if (! field || mode == DFmode)
 	    ret = gen_rtx (REG, mode, regbase + *arg_words + bias);
 	  else
 	    {
@@ -3221,11 +3229,6 @@ function_arg (cum, mode, type, named)
 
 	      /* ??? If this is a packed structure, then the last hunk won't
 		 be 64 bits.  */
-
-	      /* ??? If this is a structure with a single double field,
-		 it would be more convenient to return (REG:DI %fX) than
-		 a parallel.  However, we would have to modify the mips
-		 backend to allow DImode values in fp registers.  */
 
 	      chunks = TREE_INT_CST_LOW (TYPE_SIZE (type)) / BITS_PER_WORD;
 	      if (chunks + *arg_words + bias > MAX_ARGS_IN_REGISTERS)
@@ -3479,8 +3482,10 @@ override_options ()
   if (mips_abi == ABI_32)
     target_flags &= ~ (MASK_FLOAT64|MASK_64BIT);
 
-  /* In the EABI in 64 bit mode, longs and pointers are 64 bits.  */
-  if (mips_abi == ABI_EABI && TARGET_64BIT)
+  /* In the EABI in 64 bit mode, longs and pointers are 64 bits.  Likewise
+   for the SGI Irix6 N64 ABI.  */
+  if ((mips_abi == ABI_EABI && TARGET_64BIT)
+      || mips_abi == ABI_64)
     target_flags |= MASK_LONG64;
 
   /* ??? This doesn't work yet, so don't let people try to use it.  */
@@ -3555,6 +3560,8 @@ override_options ()
 	case '3':
 	  if (!strcmp (p, "3000") || !strcmp (p, "3k") || !strcmp (p, "3K"))
 	    mips_cpu = PROCESSOR_R3000;
+	  else if (!strcmp (p, "3900"))
+	    mips_cpu = PROCESSOR_R3900;
 	  break;
 
 	case '4':
@@ -3684,7 +3691,7 @@ override_options ()
     }
 
   /* This optimization requires a linker that can support a R_MIPS_LO16
-     relocation which is not immediately preceeded by a R_MIPS_HI16 relocation.
+     relocation which is not immediately preceded by a R_MIPS_HI16 relocation.
      GNU ld has this support, but not all other MIPS linkers do, so we enable
      this optimization only if the user requests it, or if GNU ld is the
      standard linker for this configuration.  */
@@ -4144,22 +4151,17 @@ print_operand (file, op, letter)
       fprintf (file, s);
     }
 
-  else if ((letter == 'x') && (GET_CODE(op) == CONST_INT))
+  else if (letter == 'x' && GET_CODE(op) == CONST_INT)
     fprintf (file, "0x%04x", 0xffff & (INTVAL(op)));
 
-  else if ((letter == 'X') && (GET_CODE(op) == CONST_INT)
-	   && HOST_BITS_PER_WIDE_INT == 32)
-    fprintf (file, "0x%08x", INTVAL(op));
+  else if (letter == 'X' && GET_CODE(op) == CONST_INT)
+    fprintf (file, HOST_WIDE_INT_PRINT_HEX, INTVAL (op));
 
-  else if ((letter == 'X') && (GET_CODE(op) == CONST_INT)
-	   && HOST_BITS_PER_WIDE_INT == 64)
-    fprintf (file, "0x%016lx", INTVAL(op));
-
-  else if ((letter == 'd') && (GET_CODE(op) == CONST_INT))
-    fprintf (file, "%d", (INTVAL(op)));
+  else if (letter == 'd' && GET_CODE(op) == CONST_INT)
+    fprintf (file, HOST_WIDE_INT_PRINT_DEC, (INTVAL(op)));
 
   else if (letter == 'z'
-	   && (GET_CODE (op) == CONST_INT)
+	   && GET_CODE (op) == CONST_INT
 	   && INTVAL (op) == 0)
     fputs (reg_names[GP_REG_FIRST], file);
 
@@ -4316,7 +4318,7 @@ mips_output_external (file, decl, name)
 #ifdef ASM_OUTPUT_UNDEF_FUNCTION
   if (TREE_CODE (decl) == FUNCTION_DECL
       /* ??? Don't include alloca, since gcc will always expand it
-	 inline.  If we don't do this, libg++ fails to build.  */
+	 inline.  If we don't do this, the C++ library fails to build.  */
       && strcmp (name, "alloca")
       /* ??? Don't include __builtin_next_arg, because then gcc will not
 	 bootstrap under Irix 5.1.  */
@@ -4855,8 +4857,10 @@ compute_frame_size (size)
   /* The gp reg is caller saved in the 32 bit ABI, so there is no need
      for leaf routines (total_size == extra_size) to save the gp reg.
      The gp reg is callee saved in the 64 bit ABI, so all routines must
-     save the gp reg.  */
-  if (total_size == extra_size && (mips_abi == ABI_32 || mips_abi == ABI_EABI))
+     save the gp reg.  This is not a leaf routine if -p, because of the
+     call to mcount.  */
+  if (total_size == extra_size && (mips_abi == ABI_32 || mips_abi == ABI_EABI)
+      && ! profile_flag)
     total_size = extra_size = 0;
   else if (TARGET_ABICALLS)
     {
@@ -4989,7 +4993,8 @@ save_restore_insns (store_p, large_reg, large_offset, file)
 		insn = emit_insn (gen_adddi3 (base_reg_rtx, large_reg, stack_pointer_rtx));
 	      else
 		insn = emit_insn (gen_addsi3 (base_reg_rtx, large_reg, stack_pointer_rtx));
-	      RTX_FRAME_RELATED_P (insn) = 1;
+	      if (store_p)
+		RTX_FRAME_RELATED_P (insn) = 1;
 	    }
 	  else
 	    fprintf (file, "\t%s\t%s,%s,%s\n",
@@ -5005,13 +5010,38 @@ save_restore_insns (store_p, large_reg, large_offset, file)
 	  base_offset  = gp_offset;
 	  if (file == (FILE *)0)
 	    {
-	      insn = emit_move_insn (base_reg_rtx, GEN_INT (gp_offset));
-	      RTX_FRAME_RELATED_P (insn) = 1;
+	      rtx gp_offset_rtx = GEN_INT (gp_offset);
+
+	      /* Instruction splitting doesn't preserve the RTX_FRAME_RELATED_P
+		 bit, so make sure that we don't emit anything that can be
+		 split.  */
+	      /* ??? There is no DImode ori immediate pattern, so we can only
+		 do this for 32 bit code.  */
+	      if (large_int (gp_offset_rtx)
+		  && GET_MODE (base_reg_rtx) == SImode)
+		{
+		  insn = emit_move_insn (base_reg_rtx,
+					 GEN_INT (gp_offset & 0xffff0000));
+		  if (store_p)
+		    RTX_FRAME_RELATED_P (insn) = 1;
+		  insn = emit_insn (gen_iorsi3 (base_reg_rtx, base_reg_rtx,
+						GEN_INT (gp_offset & 0x0000ffff)));
+		  if (store_p)
+		    RTX_FRAME_RELATED_P (insn) = 1;
+		}
+	      else
+		{
+		  insn = emit_move_insn (base_reg_rtx, gp_offset_rtx);
+		  if (store_p)
+		    RTX_FRAME_RELATED_P (insn) = 1;
+		}
+
 	      if (TARGET_LONG64)
 		insn = emit_insn (gen_adddi3 (base_reg_rtx, base_reg_rtx, stack_pointer_rtx));
 	      else
 		insn = emit_insn (gen_addsi3 (base_reg_rtx, base_reg_rtx, stack_pointer_rtx));
-	      RTX_FRAME_RELATED_P (insn) = 1;
+	      if (store_p)
+		RTX_FRAME_RELATED_P (insn) = 1;
 	    }
 	  else
 	    fprintf (file, "\tli\t%s,0x%.08lx\t# %ld\n\t%s\t%s,%s,%s\n",
@@ -5106,7 +5136,8 @@ save_restore_insns (store_p, large_reg, large_offset, file)
 		insn = emit_insn (gen_adddi3 (base_reg_rtx, large_reg, stack_pointer_rtx));
 	      else
 		insn = emit_insn (gen_addsi3 (base_reg_rtx, large_reg, stack_pointer_rtx));
-	      RTX_FRAME_RELATED_P (insn) = 1;
+	      if (store_p)
+		RTX_FRAME_RELATED_P (insn) = 1;
 	    }
 	  else
 	    fprintf (file, "\t%s\t%s,%s,%s\n",
@@ -5122,13 +5153,40 @@ save_restore_insns (store_p, large_reg, large_offset, file)
 	  base_offset  = fp_offset;
 	  if (file == (FILE *)0)
 	    {
-	      insn = emit_move_insn (base_reg_rtx, GEN_INT (fp_offset));
-	      RTX_FRAME_RELATED_P (insn) = 1;
+	      rtx fp_offset_rtx = GEN_INT (fp_offset);
+
+	      /* Instruction splitting doesn't preserve the RTX_FRAME_RELATED_P
+		 bit, so make sure that we don't emit anything that can be
+		 split.  */
+	      /* ??? There is no DImode ori immediate pattern, so we can only
+		 do this for 32 bit code.  */
+	      if (large_int (fp_offset_rtx)
+		  && GET_MODE (base_reg_rtx) == SImode)
+		{
+		  insn = emit_move_insn (base_reg_rtx,
+					 GEN_INT (fp_offset & 0xffff0000));
+		  if (store_p)
+		    RTX_FRAME_RELATED_P (insn) = 1;
+		  insn = emit_insn (gen_iorsi3 (base_reg_rtx, base_reg_rtx,
+						GEN_INT (fp_offset & 0x0000ffff)));
+		  if (store_p)
+		    RTX_FRAME_RELATED_P (insn) = 1;
+		}
+	      else
+		{
+		  insn = emit_move_insn (base_reg_rtx, fp_offset_rtx);
+		  if (store_p)
+		    RTX_FRAME_RELATED_P (insn) = 1;
+		}
+
+	      if (store_p)
+		RTX_FRAME_RELATED_P (insn) = 1;
 	      if (TARGET_LONG64)
 		insn = emit_insn (gen_adddi3 (base_reg_rtx, base_reg_rtx, stack_pointer_rtx));
 	      else
 		insn = emit_insn (gen_addsi3 (base_reg_rtx, base_reg_rtx, stack_pointer_rtx));
-	      RTX_FRAME_RELATED_P (insn) = 1;
+	      if (store_p)
+		RTX_FRAME_RELATED_P (insn) = 1;
 	    }
 	  else
 	    fprintf (file, "\tli\t%s,0x%.08lx\t# %ld\n\t%s\t%s,%s,%s\n",
@@ -5204,29 +5262,35 @@ function_prologue (file, size)
      exactly matches the name used in ASM_DECLARE_FUNCTION_NAME.  */
   fnname = XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0);
 
-  fputs ("\t.ent\t", file);
-  assemble_name (file, fnname);
-  fputs ("\n", file);
+  if (!flag_inhibit_size_directive)
+    {
+      fputs ("\t.ent\t", file);
+      assemble_name (file, fnname);
+      fputs ("\n", file);
+    }
 
   assemble_name (file, fnname);
   fputs (":\n", file);
 #endif
 
-  fprintf (file, "\t.frame\t%s,%d,%s\t\t# vars= %d, regs= %d/%d, args= %d, extra= %d\n",
-	   reg_names[ (frame_pointer_needed) ? FRAME_POINTER_REGNUM : STACK_POINTER_REGNUM ],
-	   tsize,
-	   reg_names[31 + GP_REG_FIRST],
-	   current_frame_info.var_size,
-	   current_frame_info.num_gp,
-	   current_frame_info.num_fp,
-	   current_function_outgoing_args_size,
-	   current_frame_info.extra_size);
+  if (!flag_inhibit_size_directive)
+    {
+      fprintf (file, "\t.frame\t%s,%d,%s\t\t# vars= %d, regs= %d/%d, args= %d, extra= %d\n",
+	      reg_names[ (frame_pointer_needed) ? FRAME_POINTER_REGNUM : STACK_POINTER_REGNUM ],
+	      tsize,
+	      reg_names[31 + GP_REG_FIRST],
+	      current_frame_info.var_size,
+	      current_frame_info.num_gp,
+	      current_frame_info.num_fp,
+	      current_function_outgoing_args_size,
+	      current_frame_info.extra_size);
 
-  fprintf (file, "\t.mask\t0x%08lx,%d\n\t.fmask\t0x%08lx,%d\n",
-	   current_frame_info.mask,
-	   current_frame_info.gp_save_offset,
-	   current_frame_info.fmask,
-	   current_frame_info.fp_save_offset);
+      fprintf (file, "\t.mask\t0x%08lx,%d\n\t.fmask\t0x%08lx,%d\n",
+	       current_frame_info.mask,
+	       current_frame_info.gp_save_offset,
+	       current_frame_info.fmask,
+	       current_frame_info.fp_save_offset);
+    }
 
   if (TARGET_ABICALLS && mips_abi == ABI_32)
     {
@@ -5241,6 +5305,9 @@ function_prologue (file, size)
 		   sp_str, sp_str, tsize);
 	  fprintf (file, "\t.cprestore %d\n", current_frame_info.args_size);
 	}
+
+      if (dwarf2out_do_frame ())
+	dwarf2out_def_cfa ("", STACK_POINTER_REGNUM, tsize);
     }
 }
 
@@ -5438,7 +5505,8 @@ mips_expand_prologue ()
 	}
 
       if (TARGET_ABICALLS && mips_abi != ABI_32)
-	emit_insn (gen_loadgp (XEXP (DECL_RTL (current_function_decl), 0)));
+	emit_insn (gen_loadgp (XEXP (DECL_RTL (current_function_decl), 0),
+			       gen_rtx (REG, DImode, 25)));
     }
 
   /* If we are profiling, make sure no instructions are scheduled before
@@ -5467,9 +5535,12 @@ function_epilogue (file, size)
      exactly matches the name used in ASM_DECLARE_FUNCTION_NAME.  */
   fnname = XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0);
 
-  fputs ("\t.end\t", file);
-  assemble_name (file, fnname);
-  fputs ("\n", file);
+  if (!flag_inhibit_size_directive)
+    {
+      fputs ("\t.end\t", file);
+      assemble_name (file, fnname);
+      fputs ("\n", file);
+    }
 #endif
 
   if (TARGET_STATS)
@@ -5568,6 +5639,13 @@ mips_expand_epilogue ()
 	  else
 	    emit_insn (gen_movsi (stack_pointer_rtx, frame_pointer_rtx));
 	}
+      /* The GP/PIC register is implicitly used by all SYMBOL_REFs, so if we
+	 are going to restore it, then we must emit a blockage insn to
+	 prevent the scheduler from moving the restore out of the epilogue.  */
+      else if (TARGET_ABICALLS && mips_abi != ABI_32
+	       && (current_frame_info.mask
+		   & (1L << (PIC_OFFSET_TABLE_REGNUM - GP_REG_FIRST))))
+	emit_insn (gen_blockage ());
 
       save_restore_insns (FALSE, tmp_rtx, tsize, (FILE *)0);
 

@@ -1,5 +1,5 @@
 /* Subroutines for manipulating rtx's in semantically interesting ways.
-   Copyright (C) 1987, 91, 94, 95, 96, 1997 Free Software Foundation, Inc.
+   Copyright (C) 1987, 91, 94-97, 1998 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -20,6 +20,7 @@ Boston, MA 02111-1307, USA.  */
 
 
 #include "config.h"
+#include <stdio.h>
 #include "rtl.h"
 #include "tree.h"
 #include "flags.h"
@@ -78,10 +79,15 @@ plus_constant_wide (x, c)
       if (GET_CODE (XEXP (x, 0)) == SYMBOL_REF
 	  && CONSTANT_POOL_ADDRESS_P (XEXP (x, 0)))
 	{
+	  /* Any rtl we create here must go in a saveable obstack, since
+	     we might have been called from within combine.  */
+	  push_obstacks_nochange ();
+	  rtl_in_saveable_obstack ();
 	  tem
 	    = force_const_mem (GET_MODE (x),
 			       plus_constant (get_pool_constant (XEXP (x, 0)),
 					      c));
+	  pop_obstacks ();
 	  if (memory_address_p (GET_MODE (tem), XEXP (tem, 0)))
 	    return tem;
 	}
@@ -119,6 +125,10 @@ plus_constant_wide (x, c)
 	return gen_rtx (PLUS, mode,
 			XEXP (x, 0),
 			plus_constant (XEXP (x, 1), c));
+      break;
+      
+    default:
+      break;
     }
 
   if (c != 0)
@@ -251,7 +261,8 @@ expr_size (exp)
       && contains_placeholder_p (size))
     size = build (WITH_RECORD_EXPR, sizetype, size, exp);
 
-  return expand_expr (size, NULL_RTX, TYPE_MODE (sizetype), 0);
+  return expand_expr (size, NULL_RTX, TYPE_MODE (sizetype),
+  		      EXPAND_MEMORY_USE_BAD);
 }
 
 /* Return a copy of X in which all memory references
@@ -316,7 +327,9 @@ convert_memory_address (to_mode, x)
       return x;
 
     case LABEL_REF:
-      return gen_rtx (LABEL_REF, to_mode, XEXP (x, 0));
+      temp = gen_rtx (LABEL_REF, to_mode, XEXP (x, 0));
+      LABEL_REF_NONLOCAL_P (temp) = LABEL_REF_NONLOCAL_P (x);
+      return temp;
 
     case SYMBOL_REF:
       temp = gen_rtx (SYMBOL_REF, to_mode, XSTR (x, 0));
@@ -331,7 +344,7 @@ convert_memory_address (to_mode, x)
     case PLUS:
     case MULT:
       /* For addition the second operand is a small constant, we can safely
-	 permute the converstion and addition operation.  We can always safely
+	 permute the conversion and addition operation.  We can always safely
 	 permute them if we are making the address narrower.  In addition,
 	 always permute the operations if this is a constant.  */
       if (GET_MODE_SIZE (to_mode) < GET_MODE_SIZE (from_mode)
@@ -341,6 +354,10 @@ convert_memory_address (to_mode, x)
 	return gen_rtx (GET_CODE (x), to_mode, 
 			convert_memory_address (to_mode, XEXP (x, 0)),
 			convert_memory_address (to_mode, XEXP (x, 1)));
+      break;
+      
+    default:
+      break;
     }
 
   return convert_modes (to_mode, from_mode,
@@ -397,6 +414,9 @@ memory_address (mode, x)
      register rtx x;
 {
   register rtx oldx = x;
+
+  if (GET_CODE (x) == ADDRESSOF)
+    return x;
 
 #ifdef POINTERS_EXTEND_UNSIGNED
   if (GET_MODE (x) == ptr_mode)
@@ -739,6 +759,9 @@ promote_mode (type, mode, punsignedp, for_call)
       unsignedp = POINTERS_EXTEND_UNSIGNED;
       break;
 #endif
+      
+    default:
+      break;
     }
 
   *punsignedp = unsignedp;
@@ -878,6 +901,8 @@ emit_stack_save (save_level, psave, after)
 	}
       break;
 #endif
+    default:
+      break;
     }
 
   /* If there is no save area and we have to allocate one, do so.  Otherwise
@@ -958,6 +983,8 @@ emit_stack_restore (save_level, sa, after)
 	fcn = gen_restore_stack_nonlocal;
       break;
 #endif
+    default:
+      break;
     }
 
   if (sa != 0)
@@ -1089,38 +1116,39 @@ allocate_dynamic_stack_space (size, target, known_align)
 
   mark_reg_pointer (target, known_align / BITS_PER_UNIT);
 
-#ifndef STACK_GROWS_DOWNWARD
-  emit_move_insn (target, virtual_stack_dynamic_rtx);
-#endif
-
   /* Perform the required allocation from the stack.  Some systems do
      this differently than simply incrementing/decrementing from the
-     stack pointer.  */
+     stack pointer, such as acquiring the space by calling malloc().  */
 #ifdef HAVE_allocate_stack
   if (HAVE_allocate_stack)
     {
-      enum machine_mode mode
-	= insn_operand_mode[(int) CODE_FOR_allocate_stack][0];
-
-      size = convert_modes (mode, ptr_mode, size, 1);
+      enum machine_mode mode;
 
       if (insn_operand_predicate[(int) CODE_FOR_allocate_stack][0]
 	  && ! ((*insn_operand_predicate[(int) CODE_FOR_allocate_stack][0])
+		(target, Pmode)))
+	target = copy_to_mode_reg (Pmode, target);
+      mode = insn_operand_mode[(int) CODE_FOR_allocate_stack][1];
+      size = convert_modes (mode, ptr_mode, size, 1);
+      if (insn_operand_predicate[(int) CODE_FOR_allocate_stack][1]
+	  && ! ((*insn_operand_predicate[(int) CODE_FOR_allocate_stack][1])
 		(size, mode)))
 	size = copy_to_mode_reg (mode, size);
 
-      emit_insn (gen_allocate_stack (size));
+      emit_insn (gen_allocate_stack (target, size));
     }
   else
 #endif
     {
+#ifndef STACK_GROWS_DOWNWARD
+      emit_move_insn (target, virtual_stack_dynamic_rtx);
+#endif
       size = convert_modes (Pmode, ptr_mode, size, 1);
       anti_adjust_stack (size);
-    }
-
 #ifdef STACK_GROWS_DOWNWARD
   emit_move_insn (target, virtual_stack_dynamic_rtx);
 #endif
+    }
 
   if (MUST_ALIGN)
     {
@@ -1206,7 +1234,8 @@ probe_stack_range (first, size)
 
   /* If we have to generate explicit probes, see if we have a constant
      small number of them to generate.  If so, that's the easy case.  */
-  if (GET_CODE (size) == CONST_INT && INTVAL (size) < 10)
+  if (GET_CODE (size) == CONST_INT
+      && INTVAL (size) < 10 * STACK_CHECK_PROBE_INTERVAL)
     {
       HOST_WIDE_INT offset;
 
@@ -1274,6 +1303,10 @@ probe_stack_range (first, size)
       emit_jump (end_lab);
       emit_note (NULL_PTR, NOTE_INSN_LOOP_END);
       emit_label (end_lab);
+
+      /* If will be doing stupid optimization, show test_addr is still live. */
+      if (obey_regdecls)
+	emit_insn (gen_rtx (USE, VOIDmode, test_addr));
 
       emit_stack_probe (last_addr);
     }
