@@ -31,7 +31,6 @@ Boston, MA 02111-1307, USA.  */
 #include "tree.h"
 #include "cp-tree.h"
 #include "cpplib.h"
-#include "lex.h"
 #include "flags.h"
 #include "c-pragma.h"
 #include "toplev.h"
@@ -82,62 +81,6 @@ struct impl_files
 
 static struct impl_files *impl_file_chain;
 
-
-/* Return something to represent absolute declarators containing a *.
-   TARGET is the absolute declarator that the * contains.
-   CV_QUALIFIERS is a list of modifiers such as const or volatile
-   to apply to the pointer type, represented as identifiers.
-
-   We return an INDIRECT_REF whose "contents" are TARGET
-   and whose type is the modifier list.  */
-
-tree
-make_pointer_declarator (tree cv_qualifiers, tree target)
-{
-  if (target && TREE_CODE (target) == IDENTIFIER_NODE
-      && ANON_AGGRNAME_P (target))
-    error ("type name expected before `*'");
-  target = build_nt (INDIRECT_REF, target);
-  TREE_TYPE (target) = cv_qualifiers;
-  return target;
-}
-
-/* Return something to represent absolute declarators containing a &.
-   TARGET is the absolute declarator that the & contains.
-   CV_QUALIFIERS is a list of modifiers such as const or volatile
-   to apply to the reference type, represented as identifiers.
-
-   We return an ADDR_EXPR whose "contents" are TARGET
-   and whose type is the modifier list.  */
-
-tree
-make_reference_declarator (tree cv_qualifiers, tree target)
-{
-  target = build_nt (ADDR_EXPR, target);
-  TREE_TYPE (target) = cv_qualifiers;
-  return target;
-}
-
-tree
-make_call_declarator (tree target, tree parms, tree cv_qualifiers, 
-                      tree exception_specification)
-{
-  target = build_nt (CALL_EXPR, target,
-		     tree_cons (parms, cv_qualifiers, NULL_TREE),
-		     /* The third operand is really RTL.  We
-			shouldn't put anything there.  */
-		     NULL_TREE);
-  CALL_DECLARATOR_EXCEPTION_SPEC (target) = exception_specification;
-  return target;
-}
-
-void
-set_quals_and_spec (tree call_declarator, tree cv_qualifiers, 
-                    tree exception_specification)
-{
-  CALL_DECLARATOR_QUALS (call_declarator) = cv_qualifiers;
-  CALL_DECLARATOR_EXCEPTION_SPEC (call_declarator) = exception_specification;
-}
 
 int interface_only;		/* whether or not current file is only for
 				   interface definitions.  */
@@ -207,7 +150,6 @@ init_operators (void)
   operator_name_info [(int) ABS_EXPR].name = "abs";
   operator_name_info [(int) TRUTH_AND_EXPR].name = "strict &&";
   operator_name_info [(int) TRUTH_OR_EXPR].name = "strict ||";
-  operator_name_info [(int) IN_EXPR].name = "in";
   operator_name_info [(int) RANGE_EXPR].name = "...";
   operator_name_info [(int) CONVERT_EXPR].name = "+";
 
@@ -239,6 +181,8 @@ struct resword
    _true_.  */
 #define D_EXT		0x01	/* GCC extension */
 #define D_ASM		0x02	/* in C99, but has a switch to turn it off */
+/* APPLE LOCAL Objective-C++ */
+#define D_OBJC		0x10	/* Objective C only */
 
 CONSTRAINT(ridbits_fit, RID_LAST_MODIFIER < sizeof(unsigned long) * CHAR_BIT);
 
@@ -253,6 +197,7 @@ static const struct resword reswords[] =
   { "__asm__",		RID_ASM,	0 },
   { "__attribute",	RID_ATTRIBUTE,	0 },
   { "__attribute__",	RID_ATTRIBUTE,	0 },
+  { "__builtin_offsetof", RID_OFFSETOF, 0 },
   { "__builtin_va_arg",	RID_VA_ARG,	0 },
   { "__complex",	RID_COMPLEX,	0 },
   { "__complex__",	RID_COMPLEX,	0 },
@@ -266,8 +211,8 @@ static const struct resword reswords[] =
   { "__inline__",	RID_INLINE,	0 },
   { "__label__",	RID_LABEL,	0 },
   { "__null",		RID_NULL,	0 },
-  { "__offsetof",       RID_OFFSETOF,   0 },
-  { "__offsetof__",     RID_OFFSETOF,   0 },
+   /* APPLE LOCAL private extern */
+  { "__private_extern__", RID_PRIVATE_EXTERN, 0 },
   { "__real",		RID_REALPART,	0 },
   { "__real__",		RID_REALPART,	0 },
   { "__restrict",	RID_RESTRICT,	0 },
@@ -343,7 +288,33 @@ static const struct resword reswords[] =
   { "volatile",		RID_VOLATILE,	0 },
   { "wchar_t",          RID_WCHAR,	0 },
   { "while",		RID_WHILE,	0 },
+  /* APPLE LOCAL begin Objective-C++ */
+  { "id",		RID_ID,			D_OBJC },
 
+  /* These objc keywords are recognized only immediately after
+     an '@'.  Note that some of these overlap with existing C++ keywords. */
+/*{ "class",		RID_AT_CLASS,		D_OBJC },  OVERLAP */
+  { "compatibility_alias", RID_AT_ALIAS,	D_OBJC },
+  { "defs",		RID_AT_DEFS,		D_OBJC },
+  { "encode",		RID_AT_ENCODE,		D_OBJC },
+  { "end",		RID_AT_END,		D_OBJC },
+  { "implementation",	RID_AT_IMPLEMENTATION,	D_OBJC },
+  { "interface",	RID_AT_INTERFACE,	D_OBJC },
+/*{ "private",		RID_AT_PRIVATE,		D_OBJC },  OVERLAP */
+/*{ "protected",	RID_AT_PROTECTED,	D_OBJC },  OVERLAP */
+  { "protocol",		RID_AT_PROTOCOL,	D_OBJC },
+/*{ "public",		RID_AT_PUBLIC,		D_OBJC },  OVERLAP */
+  { "selector",		RID_AT_SELECTOR,	D_OBJC },
+
+  /* These are recognized only in protocol-qualifier context
+     (see above) */
+  { "bycopy",		RID_BYCOPY,		D_OBJC },
+  { "byref",		RID_BYREF,		D_OBJC },
+  { "in",		RID_IN,			D_OBJC },
+  { "inout",		RID_INOUT,		D_OBJC },
+  { "oneway",		RID_ONEWAY,		D_OBJC },
+  { "out",		RID_OUT,		D_OBJC },
+  /* APPLE LOCAL end Objective-C++ */
 };
 
 void
@@ -354,6 +325,9 @@ init_reswords (void)
   int mask = ((flag_no_asm ? D_ASM : 0)
 	      | (flag_no_gnu_keywords ? D_EXT : 0));
 
+  /* APPLE LOCAL objc++ */
+  mask |= D_OBJC;
+
   ridpointers = ggc_calloc ((int) RID_MAX, sizeof (tree));
   for (i = 0; i < ARRAY_SIZE (reswords); i++)
     {
@@ -363,6 +337,25 @@ init_reswords (void)
       if (! (reswords[i].disable & mask))
 	C_IS_RESERVED_WORD (id) = 1;
     }
+    
+  /* APPLE LOCAL begin private extern  Radar 2872481 --ilr */
+  /* For C++ there is always a -D__private_extern__=extern on the
+     command line.  However, if -fpreprocessed was specified then
+     macros are not expanded so the -D is meaningless.  But this
+     replacement is required for C++.  There for we have to "pretend"
+     that '__private_extern__' is 'extern' and we can do this simply by
+     making the rid code for '__private_extern__' be the same as for
+     extern.  Note, we probably could always do this here since
+     '__private_extern__' is always to be treated like 'extern' for
+     c++.  But we'll be conservative and only do it when -fpreprocessed
+     is specified and depend on the macro substitution in all other
+     cases.  */
+  if (flag_preprocessed)
+    {
+      id = get_identifier ("__private_extern__");
+      C_RID_CODE (id) = RID_EXTERN;
+    }
+  /* APPLE LOCAL end private extern  Radar 2872481 --ilr */
 }
 
 static void
@@ -394,7 +387,11 @@ cxx_init (void)
   /* We cannot just assign to input_filename because it has already
      been initialized and will be used later as an N_BINCL for stabs+
      debugging.  */
-  push_srcloc ("<internal>", 0);
+#ifdef USE_MAPPED_LOCATION
+  push_srcloc (BUILTINS_LOCATION);
+#else
+  push_srcloc ("<built-in>", 0);
+#endif
 
   init_reswords ();
   init_tree ();
@@ -427,6 +424,7 @@ cxx_init (void)
   init_repo (main_input_filename);
 
   pop_srcloc();
+
   return true;
 }
 
@@ -627,26 +625,18 @@ unqualified_name_lookup_error (tree name)
       if (name != ansi_opname (ERROR_MARK))
 	error ("`%D' not defined", name);
     }
-  else if (current_function_decl == 0)
-    error ("`%D' was not declared in this scope", name);
   else
     {
-      if (IDENTIFIER_NAMESPACE_VALUE (name) != error_mark_node
-	  || IDENTIFIER_ERROR_LOCUS (name) != current_function_decl)
+      error ("`%D' was not declared in this scope", name);
+      /* Prevent repeated error messages by creating a VAR_DECL with
+	 this NAME in the innermost block scope.  */
+      if (current_function_decl)
 	{
-	  static int undeclared_variable_notice;
-
-	  error ("`%D' undeclared (first use this function)", name);
-
-	  if (! undeclared_variable_notice)
-	    {
-	      error ("(Each undeclared identifier is reported only once for each function it appears in.)");
-	      undeclared_variable_notice = 1;
-	    }
+	  tree decl;
+	  decl = build_decl (VAR_DECL, name, error_mark_node);
+	  DECL_CONTEXT (decl) = current_function_decl;
+	  push_local_binding (name, decl, 0);
 	}
-      /* Prevent repeated error messages.  */
-      SET_IDENTIFIER_NAMESPACE_VALUE (name, error_mark_node);
-      SET_IDENTIFIER_ERROR_LOCUS (name, current_function_decl);
     }
 
   return error_mark_node;
@@ -840,26 +830,12 @@ cxx_make_type (enum tree_code code)
     {
       SET_CLASSTYPE_INTERFACE_UNKNOWN_X (t, interface_unknown);
       CLASSTYPE_INTERFACE_ONLY (t) = interface_only;
-
-      /* Make sure this is laid out, for ease of use later.  In the
-	 presence of parse errors, the normal was of assuring this
-	 might not ever get executed, so we lay it out *immediately*.  */
-      build_pointer_type (t);
     }
   else
     /* We use TYPE_ALIAS_SET for the CLASSTYPE_MARKED bits.  But,
        TYPE_ALIAS_SET is initialized to -1 by default, so we must
        clear it here.  */
     TYPE_ALIAS_SET (t) = 0;
-
-  /* We need to allocate a TYPE_BINFO even for TEMPLATE_TYPE_PARMs
-     since they can be virtual base types, and we then need a
-     canonical binfo for them.  Ideally, this would be done lazily for
-     all types.  */
-  if (IS_AGGR_TYPE_CODE (code) || code == TEMPLATE_TYPE_PARM
-      || code == BOUND_TEMPLATE_TEMPLATE_PARM
-      || code == TYPENAME_TYPE)
-    TYPE_BINFO (t) = make_binfo (size_zero_node, t, NULL_TREE, NULL_TREE);
 
   return t;
 }

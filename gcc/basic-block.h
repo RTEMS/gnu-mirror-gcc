@@ -142,10 +142,15 @@ struct edge_def GTY((chain_next ("%h.pred_next")))
   /* Auxiliary info specific to a pass.  */
   PTR GTY ((skip (""))) aux;
 
+  /* Location of any goto implicit in the edge, during tree-ssa.  */
+  source_locus goto_locus;
+
   int flags;			/* see EDGE_* below  */
   int probability;		/* biased by REG_BR_PROB_BASE */
   gcov_type count;		/* Expected number of executions calculated
 				   in profile.c  */
+  bool crossing_edge;           /* Crosses between hot and cold sections, when
+				   we do partitioning.  */
 };
 
 typedef struct edge_def *edge;
@@ -268,6 +273,9 @@ struct basic_block_def GTY((chain_next ("%h.next_bb"), chain_prev ("%h.prev_bb")
   /* Various flags.  See BB_* below.  */
   int flags;
 
+  /* Which section block belongs in, when partitioning basic blocks.  */
+  int partition;
+
   /* The data used by basic block copying and reordering functions.  */
   struct reorder_block_def * GTY ((skip (""))) rbi;
 
@@ -289,6 +297,8 @@ typedef struct reorder_block_def
   /* Used by loop copying.  */
   basic_block copy;
   int duplicated;
+  /* APPLE LOCAL lno */
+  int copy_number;
 
   /* These fields are used by bb-reorder pass.  */
   int visited;
@@ -303,6 +313,12 @@ typedef struct reorder_block_def
 #define BB_VISITED		8
 #define BB_IRREDUCIBLE_LOOP	16
 #define BB_SUPERBLOCK		32
+
+/* Partitions, to be used when partitioning hot and cold basic blocks into
+   separate sections.  */
+#define UNPARTITIONED   0
+#define HOT_PARTITION   1
+#define COLD_PARTITION  2
 
 /* Number of basic blocks in the current function.  */
 
@@ -356,7 +372,6 @@ extern regset regs_live_at_setjmp;
 /* Special labels found during CFG build.  */
 
 extern GTY(()) rtx label_value_list;
-extern GTY(()) rtx tail_recursion_label_list;
 
 extern struct obstack flow_obstack;
 
@@ -395,7 +410,7 @@ extern void compute_bb_for_insn (void);
 extern void free_bb_for_insn (void);
 extern void update_bb_for_insn (basic_block);
 
-extern void free_basic_block_vars (int);
+extern void free_basic_block_vars (void);
 
 extern void insert_insn_on_edge (rtx, edge);
 bool safe_insert_insn_on_edge (rtx, edge);
@@ -404,6 +419,7 @@ extern void commit_edge_insertions (void);
 extern void commit_edge_insertions_watch_calls (void);
 
 extern void remove_fake_edges (void);
+extern void remove_fake_exit_edges (void);
 extern void add_noreturn_fake_exit_edges (void);
 extern void connect_infinite_loops_to_exit (void);
 extern edge unchecked_make_edge (basic_block, basic_block, int);
@@ -543,17 +559,16 @@ enum update_life_extent
 #define CLEANUP_CROSSJUMP	2	/* Do crossjumping.  */
 #define CLEANUP_POST_REGSTACK	4	/* We run after reg-stack and need
 					   to care REG_DEAD notes.  */
-#define CLEANUP_PRE_SIBCALL	8	/* Do not get confused by code hidden
-					   inside call_placeholders..  */
-#define CLEANUP_PRE_LOOP	16	/* Take care to preserve syntactic loop
+#define CLEANUP_PRE_LOOP	8	/* Take care to preserve syntactic loop
 					   notes.  */
-#define CLEANUP_UPDATE_LIFE	32	/* Keep life information up to date.  */
-#define CLEANUP_THREADING	64	/* Do jump threading.  */
-#define CLEANUP_NO_INSN_DEL	128	/* Do not try to delete trivially dead
+#define CLEANUP_UPDATE_LIFE	16	/* Keep life information up to date.  */
+#define CLEANUP_THREADING	32	/* Do jump threading.  */
+#define CLEANUP_NO_INSN_DEL	64	/* Do not try to delete trivially dead
 					   insns.  */
-#define CLEANUP_CFGLAYOUT	256	/* Do cleanup in cfglayout mode.  */
-#define CLEANUP_LOG_LINKS	512	/* Update log links.  */
-extern void life_analysis (rtx, FILE *, int);
+#define CLEANUP_CFGLAYOUT	128	/* Do cleanup in cfglayout mode.  */
+#define CLEANUP_LOG_LINKS	256	/* Update log links.  */
+
+extern void life_analysis (FILE *, int);
 extern int update_life_info (sbitmap, enum update_life_extent, int);
 extern int update_life_info_in_dirty_blocks (enum update_life_extent, int);
 extern int count_or_remove_death_notes (sbitmap, int);
@@ -607,7 +622,7 @@ extern void unlink_block (basic_block);
 extern void compact_blocks (void);
 extern basic_block alloc_block (void);
 extern void find_unreachable_blocks (void);
-extern int delete_noop_moves (rtx);
+extern int delete_noop_moves (void);
 extern basic_block force_nonfallthru (edge);
 extern rtx block_label (basic_block);
 extern bool forwarder_block_p (basic_block);
@@ -617,6 +632,7 @@ extern void find_sub_basic_blocks (basic_block);
 extern void find_many_sub_basic_blocks (sbitmap);
 extern void rtl_make_eh_edge (sbitmap *, basic_block, rtx);
 extern bool can_fallthru (basic_block, basic_block);
+extern bool could_fall_through (basic_block, basic_block);
 extern void flow_nodes_print (const char *, const sbitmap, FILE *);
 extern void flow_edge_list_print (const char *, const edge *, int, FILE *);
 extern void alloc_aux_for_block (basic_block, int);
@@ -664,6 +680,7 @@ extern bool control_flow_insn_p (rtx);
 
 /* In bb-reorder.c */
 extern void reorder_basic_blocks (void);
+extern void partition_hot_cold_basic_blocks (void);
 
 /* In cfg.c */
 extern void alloc_rbi_pool (void);

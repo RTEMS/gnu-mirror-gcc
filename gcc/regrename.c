@@ -101,7 +101,7 @@ note_sets (rtx x, rtx set ATTRIBUTE_UNUSED, void *data)
   HARD_REG_SET *pset = (HARD_REG_SET *) data;
   unsigned int regno;
   int nregs;
-  if (GET_CODE (x) != REG)
+  if (!REG_P (x))
     return;
   regno = REGNO (x);
   nregs = hard_regno_nregs[regno][GET_MODE (x)];
@@ -345,6 +345,7 @@ regrename_optimize (void)
 
 	  do_replace (this, best_new_reg);
 	  tick[best_new_reg] = ++this_tick;
+	  regs_ever_live[best_new_reg] = 1;
 
 	  if (dump_file)
 	    fprintf (dump_file, ", renamed as %s\n", reg_names[best_new_reg]);
@@ -823,7 +824,7 @@ build_def_use (basic_block bb)
 	    *recog_data.operand_loc[i] = old_operands[i];
 
 	  /* Step 2B: Can't rename function call argument registers.  */
-	  if (GET_CODE (insn) == CALL_INSN && CALL_INSN_FUNCTION_USAGE (insn))
+	  if (CALL_P (insn) && CALL_INSN_FUNCTION_USAGE (insn))
 	    scan_rtx (insn, &CALL_INSN_FUNCTION_USAGE (insn),
 		      NO_REGS, terminate_all_read, OP_IN, 0);
 
@@ -835,7 +836,7 @@ build_def_use (basic_block bb)
 		rtx *loc = recog_data.operand_loc[i];
 		rtx op = *loc;
 
-		if (GET_CODE (op) == REG
+		if (REG_P (op)
 		    && REGNO (op) == ORIGINAL_REGNO (op)
 		    && (recog_data.operand_type[i] == OP_IN
 			|| recog_data.operand_type[i] == OP_INOUT))
@@ -878,7 +879,7 @@ build_def_use (basic_block bb)
 
 	  /* Step 4B: If this is a call, any chain live at this point
 	     requires a caller-saved reg.  */
-	  if (GET_CODE (insn) == CALL_INSN)
+	  if (CALL_P (insn))
 	    {
 	      struct du_chain *p;
 	      for (p = open_chains; p; p = p->next_chain)
@@ -925,7 +926,7 @@ build_def_use (basic_block bb)
 		    rtx op = *loc;
 		    enum reg_class class = recog_op_alt[i][alt].class;
 
-		    if (GET_CODE (op) == REG
+		    if (REG_P (op)
 			&& REGNO (op) == ORIGINAL_REGNO (op))
 		      continue;
 
@@ -933,7 +934,7 @@ build_def_use (basic_block bb)
 			      recog_op_alt[i][alt].earlyclobber);
 		  }
 	    }
-	  else if (GET_CODE (insn) != CALL_INSN)
+	  else if (!CALL_P (insn))
 	    for (i = 0; i < n_ops + recog_data.n_dups; i++)
 	      {
 		int opn = i < n_ops ? i : recog_data.dup_num[i - n_ops];
@@ -1267,6 +1268,14 @@ static bool
 mode_change_ok (enum machine_mode orig_mode, enum machine_mode new_mode,
 		unsigned int regno ATTRIBUTE_UNUSED)
 {
+  /* APPLE LOCAL begin add mode change case */
+#ifdef TARGET_POWERPC
+  /* This arises from FLOAT_EXTEND which is really a NOP.  */
+  if (orig_mode == SFmode && new_mode == DFmode)
+    return true;
+#endif
+  /* APPLE LOCAL end add mode change case */
+
   if (GET_MODE_SIZE (orig_mode) < GET_MODE_SIZE (new_mode))
     return false;
 
@@ -1658,7 +1667,7 @@ copyprop_hardreg_forward_1 (basic_block bb, struct value_data *vd)
 	    continue;
 
 	  /* Don't replace in asms intentionally referencing hard regs.  */
-	  if (is_asm && GET_CODE (recog_data.operand[i]) == REG
+	  if (is_asm && REG_P (recog_data.operand[i])
 	      && (REGNO (recog_data.operand[i])
 		  == ORIGINAL_REGNO (recog_data.operand[i])))
 	    continue;
@@ -1675,11 +1684,11 @@ copyprop_hardreg_forward_1 (basic_block bb, struct value_data *vd)
 		  = replace_oldest_value_reg (recog_data.operand_loc[i],
 					      recog_op_alt[i][alt].class,
 					      insn, vd);
-	      else if (GET_CODE (recog_data.operand[i]) == MEM)
+	      else if (MEM_P (recog_data.operand[i]))
 		replaced = replace_oldest_value_mem (recog_data.operand[i],
 						     insn, vd);
 	    }
-	  else if (GET_CODE (recog_data.operand[i]) == MEM)
+	  else if (MEM_P (recog_data.operand[i]))
 	    replaced = replace_oldest_value_mem (recog_data.operand[i],
 						 insn, vd);
 
@@ -1701,7 +1710,7 @@ copyprop_hardreg_forward_1 (basic_block bb, struct value_data *vd)
 
     did_replacement:
       /* Clobber call-clobbered registers.  */
-      if (GET_CODE (insn) == CALL_INSN)
+      if (CALL_P (insn))
 	for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
 	  if (TEST_HARD_REG_BIT (regs_invalidated_by_call, i))
 	    kill_value_regno (i, vd);
@@ -1712,6 +1721,15 @@ copyprop_hardreg_forward_1 (basic_block bb, struct value_data *vd)
       /* Notice copies.  */
       if (set && REG_P (SET_DEST (set)) && REG_P (SET_SRC (set)))
 	copy_value (SET_DEST (set), SET_SRC (set), vd);
+      /* APPLE LOCAL begin record that float extend is a copy */
+#ifdef TARGET_POWERPC
+      /* FLOAT_EXTEND is actually a copy; record that too.  */
+      if (set && REG_P (SET_DEST (set)) 
+	  && GET_CODE (SET_SRC (set)) == FLOAT_EXTEND
+	  && REG_P (XEXP (SET_SRC (set), 0)))
+        copy_value (SET_DEST (set), XEXP (SET_SRC (set), 0), vd);
+#endif
+      /* APPLE LOCAL end record that float extend is a copy */
 
       if (insn == BB_END (bb))
 	break;
@@ -1762,7 +1780,7 @@ copyprop_hardreg_forward (void)
       /* ??? Irritatingly, delete_noop_moves does not take a set of blocks
 	 to scan, so we have to do a life update with no initial set of
 	 blocks Just In Case.  */
-      delete_noop_moves (get_insns ());
+      delete_noop_moves ();
       update_life_info (NULL, UPDATE_LIFE_GLOBAL_RM_NOTES,
 			PROP_DEATH_NOTES
 			| PROP_SCAN_DEAD_CODE

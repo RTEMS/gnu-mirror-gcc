@@ -195,7 +195,7 @@ find_btr_reference (rtx *px, void *preg)
   if (px == preg)
     return -1;
   x = *px;
-  if (GET_CODE (x) != REG)
+  if (!REG_P (x))
     return 0;
   regno = REGNO (x);
   for (i = hard_regno_nregs[regno][GET_MODE (x)] - 1; i >= 0; i--)
@@ -225,7 +225,7 @@ insn_sets_btr_p (rtx insn, int check_const, int *regno)
 {
   rtx set;
 
-  if (GET_CODE (insn) == INSN
+  if (NONJUMP_INSN_P (insn)
       && (set = single_set (insn)))
     {
       rtx dest = SET_DEST (set);
@@ -234,7 +234,7 @@ insn_sets_btr_p (rtx insn, int check_const, int *regno)
       if (GET_CODE (dest) == SUBREG)
 	dest = XEXP (dest, 0);
 
-      if (GET_CODE (dest) == REG
+      if (REG_P (dest)
 	  && TEST_HARD_REG_BIT (all_btrs, REGNO (dest)))
 	{
 	  if (btr_referenced_p (src, NULL))
@@ -427,7 +427,7 @@ note_btr_set (rtx dest, rtx set ATTRIBUTE_UNUSED, void *data)
   defs_uses_info *info = data;
   int regno, end_regno;
 
-  if (GET_CODE (dest) != REG)
+  if (!REG_P (dest))
     return;
   regno = REGNO (dest);
   end_regno = regno + hard_regno_nregs[regno][GET_MODE (dest)];
@@ -533,7 +533,7 @@ compute_defs_uses_and_gen (fibheap_t all_btr_defs, btr_def *def_array,
 		      user->next = info.users_this_bb;
 		      info.users_this_bb = user;
 		    }
-		  if (GET_CODE (insn) == CALL_INSN)
+		  if (CALL_P (insn))
 		    {
 		      HARD_REG_SET *clobbered = &call_used_reg_set;
 		      HARD_REG_SET call_saved;
@@ -580,7 +580,7 @@ compute_defs_uses_and_gen (fibheap_t all_btr_defs, btr_def *def_array,
 	  IOR_HARD_REG_SET (btrs_live_at_end[i], tmp);
 	  can_throw = 1;
 	}
-      if (can_throw || GET_CODE (insn) == JUMP_INSN)
+      if (can_throw || JUMP_P (insn))
 	{
 	  int regno;
 
@@ -740,7 +740,7 @@ link_btr_uses (btr_def *def_array, btr_user *use_array, sbitmap *bb_out,
 		  sbitmap_free (reaching_defs_of_reg);
 		}
 
-	      if (GET_CODE (insn) == CALL_INSN)
+	      if (CALL_P (insn))
 		{
 		  int regno;
 
@@ -1135,7 +1135,7 @@ move_btr_def (basic_block new_def_bb, int btr, btr_def def, bitmap live_range,
   combine_btr_defs (def, btrs_live_in_range);
   btr = def->btr;
   add_btr_to_live_range (def);
-  if (GET_CODE (insp) == CODE_LABEL)
+  if (LABEL_P (insp))
     insp = NEXT_INSN (insp);
   /* N.B.: insp is expected to be NOTE_INSN_BASIC_BLOCK now.  Some
      optimizations can result in insp being both first and last insn of
@@ -1148,7 +1148,7 @@ move_btr_def (basic_block new_def_bb, int btr, btr_def def, bitmap live_range,
       for (insp = BB_END (b); ! INSN_P (insp); insp = PREV_INSN (insp))
 	if (insp == BB_HEAD (b))
 	  abort ();
-      if (GET_CODE (insp) == JUMP_INSN || can_throw_internal (insp))
+      if (JUMP_P (insp) || can_throw_internal (insp))
 	insp = PREV_INSN (insp);
     }
 
@@ -1267,7 +1267,7 @@ migrate_btr_def (btr_def def, int min_cost)
   bitmap_copy (live_range, def->live_range);
 
 #ifdef INSN_SCHEDULING
-  if ((*targetm.sched.use_dfa_pipeline_interface) ())
+  if (targetm.sched.use_dfa_pipeline_interface ())
     def_latency = insn_default_latency (def->insn);
   else
     def_latency = result_ready_cost (def->insn);
@@ -1385,8 +1385,7 @@ migrate_btr_defs (enum reg_class btr_class, int allow_callee_save)
 
   while (!fibheap_empty (all_btr_defs))
     {
-      btr_def def =
-	(btr_def) fibheap_extract_min (all_btr_defs);
+      btr_def def = fibheap_extract_min (all_btr_defs);
       int min_cost = -fibheap_min_key (all_btr_defs);
       if (migrate_btr_def (def, min_cost))
 	{
@@ -1412,14 +1411,14 @@ migrate_btr_defs (enum reg_class btr_class, int allow_callee_save)
 }
 
 void
-branch_target_load_optimize (rtx insns, bool after_prologue_epilogue_gen)
+branch_target_load_optimize (bool after_prologue_epilogue_gen)
 {
-  enum reg_class class = (*targetm.branch_target_register_class) ();
+  enum reg_class class = targetm.branch_target_register_class ();
   if (class != NO_REGS)
     {
       /* Initialize issue_rate.  */
       if (targetm.sched.issue_rate)
-	issue_rate = (*targetm.sched.issue_rate) ();
+	issue_rate = targetm.sched.issue_rate ();
       else
 	issue_rate = 1;
 
@@ -1430,12 +1429,12 @@ branch_target_load_optimize (rtx insns, bool after_prologue_epilogue_gen)
       cleanup_cfg (optimize ? CLEANUP_EXPENSIVE : 0);
 #endif
 
-      life_analysis (insns, NULL, 0);
+      life_analysis (NULL, 0);
 
       /* Dominator info is also needed for migrate_btr_def.  */
       calculate_dominance_info (CDI_DOMINATORS);
       migrate_btr_defs (class,
-		       ((*targetm.branch_target_register_callee_saved)
+		       (targetm.branch_target_register_callee_saved
 			(after_prologue_epilogue_gen)));
 
       free_dominance_info (CDI_DOMINATORS);

@@ -662,9 +662,6 @@ extern const enum reg_class reg_class_from_letter[];
    On the MCore, only r4 can return results.  */
 #define FUNCTION_VALUE_REGNO_P(REGNO)  ((REGNO) == FIRST_RET_REG)
 
-#define	MUST_PASS_IN_STACK(MODE,TYPE)  \
-  mcore_must_pass_on_stack (MODE, TYPE)
-
 /* 1 if N is a possible register number for function argument passing.  */
 #define FUNCTION_ARG_REGNO_P(REGNO)  \
   ((REGNO) >= FIRST_PARM_REG && (REGNO) < (NPARM_REGS + FIRST_PARM_REG))
@@ -714,14 +711,6 @@ extern const enum reg_class reg_class_from_letter[];
 /* Define where to put the arguments to a function.  */
 #define FUNCTION_ARG(CUM, MODE, TYPE, NAMED) \
   mcore_function_arg (CUM, MODE, TYPE, NAMED)
-
-/* A C expression that indicates when an argument must be passed by
-   reference.  If nonzero for an argument, a copy of that argument is
-   made in memory and a pointer to the argument is passed instead of
-   the argument itself.  The pointer is passed in whatever way is
-   appropriate for passing a pointer to that type.  */
-#define FUNCTION_ARG_PASS_BY_REFERENCE(CUM, MODE, TYPE, NAMED) \
-  MUST_PASS_IN_STACK (MODE, TYPE)
 
 /* For an arg passed partly in registers and partly in memory,
    this is the number of registers used.
@@ -909,9 +898,6 @@ extern const enum reg_class reg_class_from_letter[];
 /* The type of size_t unsigned int.  */
 #define SIZE_TYPE "unsigned int"
 
-/* Don't cse the address of the function being compiled.  */
-#define NO_RECURSIVE_FUNCTION_CSE 1
-
 /* Max number of bytes we can move from memory to memory
    in one reasonably fast instruction.  */
 #define MOVE_MAX 4
@@ -955,9 +941,6 @@ extern const enum reg_class reg_class_from_letter[];
 #define REGISTER_MOVE_COST(MODE, SRCCLASS, DSTCLASS) 2
 
 #define WORD_REGISTER_OPERATIONS
-
-/* Implicit library calls should use memcpy, not bcopy, etc.  */
-#define TARGET_MEM_FUNCTIONS
 
 /* Assembler output control.  */
 #define ASM_COMMENT_START "\t//"

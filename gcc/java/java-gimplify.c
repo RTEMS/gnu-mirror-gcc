@@ -1,6 +1,5 @@
 /* Java(TM) language-specific gimplification routines.
-
-   Copyright (C) 2003 Free Software Foundation, Inc.
+   Copyright (C) 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -30,7 +29,7 @@ The Free Software Foundation is independent of Sun Microsystems, Inc.  */
 #include "tree.h"
 #include "java-tree.h"
 #include "tree-dump.h"
-#include "tree-simple.h"
+#include "tree-gimple.h"
 #include "toplev.h"
 
 static tree java_gimplify_case_expr (tree);
@@ -60,6 +59,27 @@ int
 java_gimplify_expr (tree *expr_p, tree *pre_p ATTRIBUTE_UNUSED,
 		    tree *post_p ATTRIBUTE_UNUSED)
 {
+  char code_class = TREE_CODE_CLASS(TREE_CODE (*expr_p));
+
+  /* Java insists on strict left-to-right evaluation of expressions.
+     A problem may arise if a variable used in the LHS of a binary
+     operation is altered by an assignment to that value in the RHS
+     before we've performed the operation.  So, we always copy every
+     LHS to a temporary variable.  
+
+     FIXME: Are there any other cases where we should do this?
+     Parameter lists, maybe?  Or perhaps that's unnecessary because
+     the front end already generates SAVE_EXPRs.  */
+  if (code_class == '2')
+    {
+      tree lhs = TREE_OPERAND (*expr_p, 0);
+      enum gimplify_status stat 
+	= gimplify_expr (&lhs, pre_p, post_p, is_gimple_tmp_var, fb_rvalue);
+      if (stat == GS_ERROR)
+	return stat;
+      TREE_OPERAND (*expr_p, 0) = lhs;
+    }
+
   switch (TREE_CODE (*expr_p))
     {
     case BLOCK:
@@ -156,6 +176,11 @@ java_gimplify_block (tree java_block)
      because they use BLOCK_SUBBLOCKS for another purpose.  */
   block = make_node (BLOCK);
   BLOCK_VARS (block) = decls;
+
+  /* The TREE_USED flag on a block determines whether the debug ouput
+     routines generate info for the variables in that block.  */
+  TREE_USED (block) = 1;
+
   if (outer != NULL_TREE)
     {
       outer = BIND_EXPR_BLOCK (outer);
@@ -187,6 +212,9 @@ java_gimplify_new_array_init (tree exp)
 
   int index = 0;
 
+  DECL_CONTEXT (array) = current_function_decl;
+  DECL_CONTEXT (tmp) = current_function_decl;
+
   /* FIXME: try to allocate array statically?  */
   while (values != NULL_TREE)
     {
@@ -194,10 +222,11 @@ java_gimplify_new_array_init (tree exp)
 	 bounds checking.  */
       tree lhs = build (COMPONENT_REF, TREE_TYPE (data_field),    
 			build_java_indirect_ref (array_type, tmp, 0),
-			data_field);
+			data_field, NULL_TREE);
       tree assignment = build (MODIFY_EXPR, element_type,
   			       build (ARRAY_REF, element_type, lhs,
-				      build_int_2 (index++, 0)),
+				      build_int_2 (index++, 0),
+				      NULL_TREE, NULL_TREE),
 			       TREE_VALUE (values));
       body = build (COMPOUND_EXPR, element_type, body, assignment);
       values = TREE_CHAIN (values);

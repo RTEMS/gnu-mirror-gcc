@@ -44,15 +44,9 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Stroke;
-import java.awt.Insets;
 import java.awt.Rectangle;
-import java.awt.event.FocusListener;
-import java.awt.event.FocusAdapter;
-import java.awt.event.FocusEvent;
-import java.awt.event.InputEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.Stroke;
+
 import javax.swing.AbstractButton;
 import javax.swing.ButtonModel;
 import javax.swing.Icon;
@@ -60,7 +54,6 @@ import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 import javax.swing.UIDefaults;
 import javax.swing.UIManager;
-import javax.swing.event.MouseInputListener;
 import javax.swing.plaf.ButtonUI;
 import javax.swing.plaf.ComponentUI;
 
@@ -99,6 +92,7 @@ public class BasicButtonUI extends ButtonUI
     b.setBackground(defaults.getColor("Button.background"));
     b.setMargin(defaults.getInsets("Button.margin"));
     b.setBorder(defaults.getBorder("Button.border"));
+    b.setOpaque(true);
   }
 
   protected void uninstallDefaults(AbstractButton b)
@@ -250,7 +244,8 @@ public class BasicButtonUI extends ButtonUI
       paintButtonNormal(g, br, c);
 	
     paintIcon(g, c, ir);
-    paintText(g, c, tr, b.getText());
+    if (text != null)
+      paintText(g, c, tr, b.getText());
     paintFocus(g, c, vr, tr, ir);
   }
 
@@ -309,11 +304,7 @@ public class BasicButtonUI extends ButtonUI
     Icon i = currentIcon(b);
 
     if (i != null)
-      {
-        int x = iconRect.x;
-        int y = iconRect.y;
-        i.paintIcon(c, g, x, y);
-      }
+      i.paintIcon(c, g, iconRect.x, iconRect.y);
   }
 
   /**
@@ -345,7 +336,7 @@ public class BasicButtonUI extends ButtonUI
    */
   protected void paintButtonNormal(Graphics g, Rectangle area, JComponent b)
   {
-    if (((AbstractButton)b).isContentAreaFilled())
+    if (((AbstractButton)b).isContentAreaFilled() && b.isOpaque())
       {
         g.setColor(b.getBackground());
         g.fillRect(area.x, area.y, area.width, area.height);
@@ -367,9 +358,18 @@ public class BasicButtonUI extends ButtonUI
     Font f = c.getFont();
     g.setFont(f);
     FontMetrics fm = g.getFontMetrics(f);
-    g.setColor(c.getForeground());
-    BasicGraphicsUtils.drawString(g, text, 0,
-                                  textRect.x, 
-                                  textRect.y + fm.getAscent());
+
+    if (c.isEnabled())
+      {
+	g.setColor(c.getForeground());
+	g.drawString(text, textRect.x, textRect.y + fm.getAscent());
+      }
+    else
+      {
+	g.setColor(c.getBackground().brighter());
+	g.drawString(text, textRect.x, textRect.y + fm.getAscent());
+	g.setColor(c.getBackground().darker());
+	g.drawString(text, textRect.x + 1, textRect.y + fm.getAscent() + 1);
+      }
   } 
 }

@@ -101,6 +101,23 @@ flow_loop_nested_p (const struct loop *outer, const struct loop *loop)
 	 && loop->pred[outer->depth] == outer;
 }
 
+/* APPLE LOCAL begin lno */
+/* Returns the loop such that LOOP is nested DEPTH (indexed from zero)
+   loops within LOOP.  */
+/* APPLE LOCAL end lno */
+
+struct loop *
+superloop_at_depth (struct loop *loop, unsigned depth)
+{
+  if (depth > (unsigned) loop->depth)
+    abort ();
+
+  if (depth == (unsigned) loop->depth)
+    return loop;
+
+  return loop->pred[depth];
+}
+
 /* Dump the loop information specified by LOOP to the stream FILE
    using auxiliary dump callback function LOOP_DUMP_AUX if non null.  */
 
@@ -300,7 +317,11 @@ flow_loop_exit_edges_find (struct loop *loop)
 	  basic_block dest = e->dest;
 
 	  if (!flow_bb_inside_loop_p (loop, dest))
-	    loop->exit_edges[num_exits++] = e;
+	    {
+	      /* APPLE LOCAL lno */
+	      e->flags |= EDGE_LOOP_EXIT;
+	      loop->exit_edges[num_exits++] = e;
+	    }
       }
     }
   free (bbs);
@@ -560,6 +581,8 @@ update_latch_info (basic_block jump)
   HEADER_BLOCK (jump) = 0;
   alloc_aux_for_edge (jump->pred, sizeof (int));
   LATCH_EDGE (jump->pred) = 0;
+  /* APPLE LOCAL lno */
+  set_immediate_dominator (CDI_DOMINATORS, jump, jump->pred->src);
 }
 
 /* A callback for make_forwarder block, to redirect all edges except for
@@ -591,8 +614,9 @@ canonicalize_loop_headers (void)
   basic_block header;
   edge e;
 
-  /* Compute the dominators.  */
-  calculate_dominance_info (CDI_DOMINATORS);
+  /* APPLE LOCAL lno */
+  /* Compute the dominators */
+  /* calculate_dominance_info (CDI_DOMINATORS); */
 
   alloc_aux_for_blocks (sizeof (int));
   alloc_aux_for_edges (sizeof (int));
@@ -623,7 +647,8 @@ canonicalize_loop_headers (void)
 	HEADER_BLOCK (header) = num_latches;
     }
 
-  free_dominance_info (CDI_DOMINATORS);
+  /* APPLE LOCAL lno */
+  /* free_dominance_info (CDI_DOMINATORS); */
 
   if (HEADER_BLOCK (ENTRY_BLOCK_PTR->succ->dest))
     {
@@ -696,6 +721,12 @@ canonicalize_loop_headers (void)
 
   free_aux_for_blocks ();
   free_aux_for_edges ();
+
+/* APPLE LOCAL begin lno */
+#ifdef ENABLE_CHECKING
+  verify_dominators (CDI_DOMINATORS);
+#endif
+/* APPLE LOCAL end lno */
 }
 
 /* Find all the natural loops in the function and save in LOOPS structure and
@@ -732,11 +763,16 @@ flow_loops_find (struct loops *loops, int flags)
   dfs_order = NULL;
   rc_order = NULL;
 
+  /* APPLE LOCAL begin lno */
+  /* Ensure that the dominators are computed.  */
+  calculate_dominance_info (CDI_DOMINATORS);
+
   /* Join loops with shared headers.  */
   canonicalize_loop_headers ();
 
   /* Compute the dominators.  */
-  calculate_dominance_info (CDI_DOMINATORS);
+  /* calculate_dominance_info (CDI_DOMINATORS); */
+  /* APPLE LOCAL end lno */
 
   /* Count the number of loop headers.  This should be the
      same as the number of natural loops.  */
@@ -864,11 +900,13 @@ flow_loops_find (struct loops *loops, int flags)
 	flow_loop_scan (loops->parray[i], flags);
 
       loops->num = num_loops;
+/* APPLE LOCAL begin lno */
     }
   else
     {
       free_dominance_info (CDI_DOMINATORS);
     }
+/* APPLE LOCAL end lno */
 
   sbitmap_free (headers);
 
@@ -928,6 +966,7 @@ glb_enum_p (basic_block bb, void *glb_header)
 /* Gets basic blocks of a LOOP.  Header is the 0-th block, rest is in dfs
    order against direction of edges from latch.  Specially, if
    header != latch, latch is the 1-st block.  */
+
 basic_block *
 get_loop_body (const struct loop *loop)
 {
@@ -992,7 +1031,7 @@ fill_sons_in_loop (const struct loop *loop, basic_block bb,
 
 /* Gets body of a LOOP (that must be different from the outermost loop)
    sorted by dominance relation.  Additionally, if a basic block s dominates
-   the latch, then only blocks dominated by s are be after it.  */
+   the latch, then only blocks dominated by s are after it.  */
 
 basic_block *
 get_loop_body_in_dom_order (const struct loop *loop)
@@ -1016,6 +1055,62 @@ get_loop_body_in_dom_order (const struct loop *loop)
 
   return tovisit;
 }
+
+/* APPLE LOCAL begin lno */
+/* Get body of a LOOP in breadth first sort order.  */
+
+basic_block *
+get_loop_body_in_bfs_order (const struct loop *loop)
+{
+  basic_block *blocks;
+  basic_block bb;
+  bitmap visited;
+  unsigned int i = 0;
+  unsigned int vc = 1;
+
+  if (!loop->num_nodes)
+    abort ();
+
+  if (loop->latch == EXIT_BLOCK_PTR)
+    abort ();
+
+  blocks = xcalloc (loop->num_nodes, sizeof (basic_block));
+  visited = BITMAP_XMALLOC ();
+
+  bb = loop->header;
+  while (i < loop->num_nodes)
+    {
+      edge e;
+
+      if (!bitmap_bit_p (visited, bb->index))
+	{
+	  /* This basic block is now visited */
+	  bitmap_set_bit (visited, bb->index);
+	  blocks[i++] = bb;
+	}
+
+      for (e = bb->succ; e; e = e->succ_next)
+	{
+	  if (flow_bb_inside_loop_p (loop, e->dest))
+	    {
+	      if (!bitmap_bit_p (visited, e->dest->index))
+		{
+		  bitmap_set_bit (visited, e->dest->index);
+		  blocks[i++] = e->dest;
+		}
+	    }
+	}
+
+      if (i < vc)
+	abort ();
+
+      bb = blocks[vc++];
+    }
+
+  BITMAP_XFREE (visited);
+  return blocks;
+}
+/* APPLE LOCAL end lno */
 
 /* Gets exit edges of a LOOP, returning their number in N_EDGES.  */
 edge *

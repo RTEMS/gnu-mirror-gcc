@@ -39,12 +39,13 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #ifndef TARGET_BELL
 #  define TARGET_BELL 007
 #  define TARGET_BS 010
-#  define TARGET_TAB 011
-#  define TARGET_NEWLINE 012
-#  define TARGET_VT 013
-#  define TARGET_FF 014
 #  define TARGET_CR 015
+#  define TARGET_DIGIT0 060
 #  define TARGET_ESC 033
+#  define TARGET_FF 014
+#  define TARGET_NEWLINE 012
+#  define TARGET_TAB 011
+#  define TARGET_VT 013
 #endif
 
 /* Store in OUTPUT a string (made with alloca) containing an
@@ -237,6 +238,20 @@ do { fputs (integer_asm_op (POINTER_SIZE / BITS_PER_UNIT, TRUE), FILE); \
 #endif
 #endif
 
+/* This determines whether weak symbols must be left out of a static
+   archive's table of contents.  Defining this macro to be nonzero has
+   the consequence that certain symbols will not be made weak that
+   otherwise would be.  The C++ ABI requires this macro to be zero;
+   see the documentation. */ 
+#ifndef TARGET_WEAK_NOT_IN_ARCHIVE_TOC
+#define TARGET_WEAK_NOT_IN_ARCHIVE_TOC 0
+#endif
+
+/* This determines whether or not we need linkonce unwind information */
+#ifndef TARGET_USES_WEAK_UNWIND_INFO
+#define TARGET_USES_WEAK_UNWIND_INFO 0
+#endif
+
 /* By default, there is no prefix on user-defined symbols.  */
 #ifndef USER_LABEL_PREFIX
 #define USER_LABEL_PREFIX ""
@@ -257,6 +272,24 @@ do { fputs (integer_asm_op (POINTER_SIZE / BITS_PER_UNIT, TRUE), FILE); \
 #  define TARGET_ATTRIBUTE_WEAK
 # endif
 #endif
+
+/* This determines whether this target supports hidden visibility.
+   This is a weaker condition than HAVE_GAS_HIDDEN, which probes for
+   specific assembler syntax.  */
+#ifndef TARGET_SUPPORTS_HIDDEN
+# ifdef HAVE_GAS_HIDDEN
+#  define TARGET_SUPPORTS_HIDDEN 1
+# else
+#  define TARGET_SUPPORTS_HIDDEN 0
+# endif
+#endif
+
+/* Determines whether we may use common symbols to represent one-only
+   semantics (a.k.a. "vague linkage").  */
+#ifndef USE_COMMON_FOR_ONE_ONLY
+# define USE_COMMON_FOR_ONE_ONLY 1
+#endif
+
 
 /* If the target supports init_priority C++ attribute, give
    SUPPORTS_INIT_PRIORITY a nonzero value.  */
@@ -454,6 +487,16 @@ do { fputs (integer_asm_op (POINTER_SIZE / BITS_PER_UNIT, TRUE), FILE); \
 #define TARGET_VTABLE_DATA_ENTRY_DISTANCE 1
 #endif
 
+/* Decide whether it is safe to use a local alias for a virtual function
+   when constructing thunks.  */
+#ifndef TARGET_USE_LOCAL_THUNK_ALIAS_P
+#ifdef ASM_OUTPUT_DEF
+#define TARGET_USE_LOCAL_THUNK_ALIAS_P(DECL) 1
+#else
+#define TARGET_USE_LOCAL_THUNK_ALIAS_P(DECL) 0
+#endif
+#endif
+
 /* Select a format to encode pointers in exception handling data.  We
    prefer those that result in fewer dynamic relocations.  Assume no
    special support here and encode direct references.  */
@@ -580,16 +623,32 @@ You Lose!  You must define PREFERRED_DEBUGGING_TYPE!
 #endif
 
 #ifndef HOT_TEXT_SECTION_NAME
-#define HOT_TEXT_SECTION_NAME "text.hot"
+#define HOT_TEXT_SECTION_NAME ".text.hot"
 #endif
 
+/* APPLE LOCAL NORMAL_TEXT_SECTION_NAME definition removed */
+
 #ifndef UNLIKELY_EXECUTED_TEXT_SECTION_NAME
-#define UNLIKELY_EXECUTED_TEXT_SECTION_NAME "text.unlikely"
+#define UNLIKELY_EXECUTED_TEXT_SECTION_NAME ".text.unlikely"
+#endif
+
+#ifndef HAS_LONG_COND_BRANCH
+#define HAS_LONG_COND_BRANCH 0
+#endif
+
+#ifndef HAS_LONG_UNCOND_BRANCH
+#define HAS_LONG_UNCOND_BRANCH 0
 #endif
 
 #ifndef VECTOR_MODE_SUPPORTED_P
 #define VECTOR_MODE_SUPPORTED_P(MODE) 0
 #endif
+
+/* APPLE LOCAL begin lno */
+#ifndef UNITS_PER_SIMD_WORD
+#define UNITS_PER_SIMD_WORD 0
+#endif
+/* APPLE LOCAL end lno */
 
 /* Determine whether __cxa_atexit, rather than atexit, is used to
    register C++ destructors for local statics and global objects.  */
@@ -710,6 +769,10 @@ You Lose!  You must define PREFERRED_DEBUGGING_TYPE!
 
 #ifndef LEGITIMIZE_ADDRESS
 #define LEGITIMIZE_ADDRESS(X, OLDX, MODE, WIN)
+#endif
+
+#ifndef REVERSIBLE_CC_MODE
+#define REVERSIBLE_CC_MODE(MODE) 0
 #endif
 
 #endif  /* ! GCC_DEFAULTS_H */

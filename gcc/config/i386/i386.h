@@ -34,6 +34,9 @@ Boston, MA 02111-1307, USA.  */
    ADDR_BEG, ADDR_END, PRINT_IREG, PRINT_SCALE, PRINT_B_I_S, and many
    that start with ASM_ or end in ASM_OP.  */
 
+/* APPLE LOCAL fat builds */
+#define DEFAULT_TARGET_ARCH "i386"
+
 /* Define the specific costs for a given cpu */
 
 struct processor_costs {
@@ -207,6 +210,9 @@ extern int target_flags;
 #endif
 #endif
 
+#define HAS_LONG_COND_BRANCH 1
+#define HAS_LONG_UNCOND_BRANCH 1
+
 /* Avoid adding %gs:0 in TLS references; use %gs:address directly.  */
 #define TARGET_TLS_DIRECT_SEG_REFS (target_flags & MASK_TLS_DIRECT_SEG_REFS)
 
@@ -219,6 +225,7 @@ extern int target_flags;
 #define TARGET_PENTIUM4 (ix86_tune == PROCESSOR_PENTIUM4)
 #define TARGET_K8 (ix86_tune == PROCESSOR_K8)
 #define TARGET_ATHLON_K8 (TARGET_K8 || TARGET_ATHLON)
+#define TARGET_NOCONA (ix86_tune == PROCESSOR_NOCONA)
 
 #define TUNEMASK (1 << ix86_tune)
 extern const int x86_use_leave, x86_push_memory, x86_zero_extend_with_and;
@@ -606,6 +613,8 @@ extern int x86_prefetch_sse;
 	builtin_define ("__tune_k8__");				\
       else if (TARGET_PENTIUM4)					\
 	builtin_define ("__tune_pentium4__");			\
+      else if (TARGET_NOCONA)					\
+	builtin_define ("__tune_nocona__");			\
 								\
       if (TARGET_MMX)						\
 	builtin_define ("__MMX__");				\
@@ -673,6 +682,11 @@ extern int x86_prefetch_sse;
 	{							\
 	  builtin_define ("__pentium4");			\
 	  builtin_define ("__pentium4__");			\
+	}							\
+      else if (ix86_arch == PROCESSOR_NOCONA)			\
+	{							\
+	  builtin_define ("__nocona");				\
+	  builtin_define ("__nocona__");			\
 	}							\
     }								\
   while (0)
@@ -774,7 +788,8 @@ extern int x86_prefetch_sse;
 #define PARM_BOUNDARY BITS_PER_WORD
 
 /* Boundary (in *bits*) on which stack pointer should be aligned.  */
-#define STACK_BOUNDARY BITS_PER_WORD
+/* APPLE LOCAL compiler should obey -mpreferred-stack-boundary (radar 3232990) */
+#define STACK_BOUNDARY ((ix86_preferred_stack_boundary > 128) ? 128 : ix86_preferred_stack_boundary)
 
 /* Boundary (in *bits*) on which the stack pointer prefers to be
    aligned; the compiler cannot rely on having this alignment.  */
@@ -825,7 +840,8 @@ extern int x86_prefetch_sse;
 #define BIGGEST_FIELD_ALIGNMENT 32
 #endif
 #else
-#define ADJUST_FIELD_ALIGN(FIELD, COMPUTED) \
+/* APPLE LOCAL Macintosh alignment */
+#define ADJUST_FIELD_ALIGN(FIELD, COMPUTED, FIRST_FIELD_P) \
    x86_field_alignment (FIELD, COMPUTED)
 #endif
 
@@ -1069,6 +1085,12 @@ do {									\
      : VALID_MMX_REG_MODE (MODE) && TARGET_MMX ? 1			\
      : VALID_MMX_REG_MODE_3DNOW (MODE) && TARGET_3DNOW ? 1 : 0)
 
+/* APPLE LOCAL begin lno */
+/* ??? Shouldn't be needed...  */
+#define UNITS_PER_SIMD_WORD \
+    (TARGET_SSE ? 16 : TARGET_MMX || TARGET_3DNOW ? 8 : 0)
+/* APPLE LOCAL end lno */
+
 #define VALID_FP_MODE_P(MODE)						\
     ((MODE) == SFmode || (MODE) == DFmode || (MODE) == XFmode		\
      || (MODE) == SCmode || (MODE) == DCmode || (MODE) == XCmode)	\
@@ -1151,10 +1173,6 @@ do {									\
 /* First & last stack-like regs */
 #define FIRST_STACK_REG FIRST_FLOAT_REG
 #define LAST_STACK_REG (FIRST_FLOAT_REG + 7)
-
-#define FLAGS_REG 17
-#define FPSR_REG 18
-#define DIRFLAG_REG 19
 
 #define FIRST_SSE_REG (FRAME_POINTER_REGNUM + 1)
 #define LAST_SSE_REG  (FIRST_SSE_REG + 7)
@@ -1655,13 +1673,6 @@ enum reg_class
    which.  */
 #define REG_PARM_STACK_SPACE(FNDECL) 0
 
-/* Define as a C expression that evaluates to nonzero if we do not know how
-   to pass TYPE solely in registers.  The file expr.h defines a
-   definition that is usually appropriate, refer to expr.h for additional
-   documentation. If `REG_PARM_STACK_SPACE' is defined, the argument will be
-   computed in the stack and then loaded into a register.  */
-#define MUST_PASS_IN_STACK(MODE, TYPE)  ix86_must_pass_in_stack ((MODE), (TYPE))
-
 /* Value is the number of bytes of arguments automatically
    popped when returning from a subroutine call.
    FUNDECL is the declaration node of the function (as a tree),
@@ -1765,22 +1776,9 @@ typedef struct ix86_args {
 
 #define FUNCTION_ARG_PARTIAL_NREGS(CUM, MODE, TYPE, NAMED) 0
 
-/* A C expression that indicates when an argument must be passed by
-   reference.  If nonzero for an argument, a copy of that argument is
-   made in memory and a pointer to the argument is passed instead of
-   the argument itself.  The pointer is passed in whatever way is
-   appropriate for passing a pointer to that type.  */
- 
-#define FUNCTION_ARG_PASS_BY_REFERENCE(CUM, MODE, TYPE, NAMED) \
-  function_arg_pass_by_reference(&CUM, MODE, TYPE, NAMED)
- 
 /* Implement `va_start' for varargs and stdarg.  */
 #define EXPAND_BUILTIN_VA_START(VALIST, NEXTARG) \
   ix86_va_start (VALIST, NEXTARG)
-
-/* Implement `va_arg'.  */
-#define EXPAND_BUILTIN_VA_ARG(VALIST, TYPE) \
-  ix86_va_arg ((VALIST), (TYPE))
 
 #define TARGET_ASM_FILE_END ix86_file_end
 #define NEED_INDICATE_EXEC_STACK 0
@@ -2485,7 +2483,10 @@ enum ix86_builtins
   IX86_BUILTIN_MONITOR,
   IX86_BUILTIN_MWAIT,
 
-  IX86_BUILTIN_MAX
+  /* APPLE LOCAL begin constant cfstrings */
+  IX86_BUILTIN_MAX,
+  TARGET_BUILTIN_MAX = IX86_BUILTIN_MAX
+  /* APPLE LOCAL end constant cfstrings */
 };
 
 /* Max number of args passed in registers.  If this is more than 3, we will
@@ -2523,7 +2524,7 @@ enum ix86_builtins
 #define MOVE_MAX_PIECES (TARGET_64BIT ? 8 : 4)
 
 /* If a memory-to-memory move would take MOVE_RATIO or more simple
-   move-instruction pairs, we will do a movstr or libcall instead.
+   move-instruction pairs, we will do a movmem or libcall instead.
    Increasing the value will always make code faster, but eventually
    incurs high cost in increased code size.
 
@@ -2635,12 +2636,6 @@ do {							\
    faster than one with a register address.  */
 
 #define NO_FUNCTION_CSE
-
-/* Define this macro if it is as good or better for a function to call
-   itself with an explicit address than to call an address kept in a
-   register.  */
-
-#define NO_RECURSIVE_FUNCTION_CSE
 
 /* Given a comparison code (EQ, NE, etc.) and the first operand of a COMPARE,
    return the mode to be used for the comparison.
@@ -2660,9 +2655,7 @@ do {							\
 
 /* A C expression whose value is reversed condition code of the CODE for
    comparison done in CC_MODE mode.  */
-#define REVERSE_CONDITION(CODE, MODE) \
-  ((MODE) != CCFPmode && (MODE) != CCFPUmode ? reverse_condition (CODE) \
-   : reverse_condition_maybe_unordered (CODE))
+#define REVERSE_CONDITION(CODE, MODE) ix86_reverse_condition ((CODE), (MODE))
 
 
 /* Control the assembler format that we output, to the extent
@@ -2946,6 +2939,7 @@ enum processor_type
   PROCESSOR_ATHLON,
   PROCESSOR_PENTIUM4,
   PROCESSOR_K8,
+  PROCESSOR_NOCONA,
   PROCESSOR_max
 };
 

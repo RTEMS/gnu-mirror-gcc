@@ -93,6 +93,8 @@ extern int mips_address_insns (rtx, enum machine_mode);
 extern int mips_const_insns (rtx);
 extern int mips_fetch_insns (rtx);
 extern int mips_idiv_insns (void);
+extern int fp_register_operand (rtx, enum machine_mode);
+extern int lo_operand (rtx, enum machine_mode);
 extern bool mips_legitimate_address_p (enum machine_mode, rtx, int);
 extern rtx mips_unspec_address (rtx, enum mips_symbol_type);
 extern bool mips_legitimize_address (rtx *, enum machine_mode);
@@ -114,18 +116,14 @@ extern int m16_uimm8_4 (rtx, enum machine_mode);
 extern int m16_nuimm8_4 (rtx, enum machine_mode);
 extern int m16_simm8_8 (rtx, enum machine_mode);
 extern int m16_nsimm8_8 (rtx, enum machine_mode);
-extern int m16_usym8_4 (rtx, enum machine_mode);
-extern int m16_usym5_4 (rtx, enum machine_mode);
 
-extern struct rtx_def *embedded_pic_fnaddr_reg (void);
-extern struct rtx_def *embedded_pic_offset (rtx);
 extern rtx mips_subword (rtx, int);
 extern bool mips_split_64bit_move_p (rtx, rtx);
 extern void mips_split_64bit_move (rtx, rtx);
 extern const char *mips_output_move (rtx, rtx);
 extern rtx mips_gp_save_slot (void);
 #ifdef RTX_CODE
-extern rtx gen_int_relational (enum rtx_code, rtx, rtx, rtx, int *);
+extern bool mips_emit_scc (enum rtx_code, rtx);
 extern void gen_conditional_branch (rtx *, enum rtx_code);
 #endif
 extern void gen_conditional_move (rtx *);
@@ -145,7 +143,6 @@ extern int function_arg_partial_nregs (const CUMULATIVE_ARGS *,
 extern bool mips_pad_arg_upward (enum machine_mode, tree);
 extern bool mips_pad_reg_upward (enum machine_mode, tree);
 extern void mips_va_start (tree, rtx);
-extern struct rtx_def *mips_va_arg (tree, tree);
 
 extern bool mips_expand_unaligned_load (rtx, rtx, unsigned int, int);
 extern bool mips_expand_unaligned_store (rtx, rtx, unsigned int, int);
@@ -168,6 +165,9 @@ extern void mips_output_aligned_bss (FILE *, tree, const char *,
 extern void mips_output_aligned_decl_common (FILE *, tree, const char *,
 					     unsigned HOST_WIDE_INT,
 					     unsigned int);
+extern void mips_declare_common_object (FILE *, const char *,
+					const char *, unsigned HOST_WIDE_INT,
+					unsigned int, bool);
 extern void mips_declare_object (FILE *, const char *, const char *,
 				 const char *, ...);
 extern void mips_declare_object_name (FILE *, const char *, tree);
@@ -181,8 +181,6 @@ extern void mips_expand_prologue (void);
 extern void mips_expand_epilogue (int);
 extern int mips_can_use_return_insn (void);
 extern struct rtx_def *mips_function_value (tree, tree, enum machine_mode);
-extern int function_arg_pass_by_reference (const CUMULATIVE_ARGS *,
-					   enum machine_mode, tree, int);
 
 extern bool mips_cannot_change_mode_class (enum machine_mode,
 					   enum machine_mode, enum reg_class);
@@ -203,6 +201,7 @@ extern const char *mips_output_conditional_branch (rtx, rtx *, int, int,
 						   int, int);
 extern const char *mips_output_division (const char *, rtx *);
 extern unsigned int mips_hard_regno_nregs (int, enum machine_mode);
+extern bool mips_linked_madd_p (rtx, rtx);
 extern const char *mips_emit_prefetch (rtx *);
 
 extern void irix_asm_output_align (FILE *, unsigned);

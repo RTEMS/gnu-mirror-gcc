@@ -23,6 +23,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "coretypes.h"
 #include "tm.h"
 #include "tree.h"
+#include "version.h"
 #include "flags.h"
 #include "real.h"
 #include "c-common.h"
@@ -31,6 +32,11 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "except.h"		/* For USING_SJLJ_EXCEPTIONS.  */
 #include "toplev.h"
 #include "tm_p.h"		/* Target prototypes.  */
+/* APPLE LOCAL begin pascal strings */
+#include "../libcpp/include/cpplib.h"
+#include "../libcpp/internal.h"
+/* APPLE LOCAL end pascal strings */
+#include "target.h"
 
 #ifndef TARGET_OS_CPP_BUILTINS
 # define TARGET_OS_CPP_BUILTINS()
@@ -289,6 +295,32 @@ define__GNUC__ (void)
 
   if (*v && *v != ' ' && *v != '-')
     abort ();
+
+  /* APPLE LOCAL begin Apple version */
+  {
+    /* This chunk of code defines __APPLE_CC__ from the version
+       string.  It expects to see a substring of the version string of
+       the form "build NNNN)", where each N is a digit, and the first
+       N is nonzero (there can be 4 or 5 digits).  It will abort() if
+       these conditions are not met, since that usually means that
+       someone's broken the version string.  */
+    const char *vt;
+    
+    vt = strstr (version_string, "build ");
+    if (vt == NULL)
+      abort ();
+    vt += strlen ("build ");
+    if (! ISDIGIT (*vt))
+      abort ();
+    for (q = vt; *q != 0 && ISDIGIT (*q); q++)
+      ;
+    if (q == vt || *q != ')')
+      abort ();
+    if ((q - vt != 4 && q - vt != 5) || *vt == '0')
+      abort ();
+    builtin_define_with_value_n ("__APPLE_CC__", vt, q - vt);
+  }
+  /* APPLE LOCAL end Apple version */
 }
 
 /* Hook that registers front end and target-specific built-ins.  */
@@ -401,12 +433,19 @@ c_cpp_builtins (cpp_reader *pfile)
   if (!flag_signed_char)
     cpp_define (pfile, "__CHAR_UNSIGNED__");
 
-  if (c_dialect_cxx () && TREE_UNSIGNED (wchar_type_node))
+  if (c_dialect_cxx () && TYPE_UNSIGNED (wchar_type_node))
     cpp_define (pfile, "__WCHAR_UNSIGNED__");
 
   /* Make the choice of ObjC runtime visible to source code.  */
   if (c_dialect_objc () && flag_next_runtime)
     cpp_define (pfile, "__NEXT_RUNTIME__");
+
+  /* Show the availability of some target pragmas.  */
+  if (flag_mudflap || targetm.handle_pragma_redefine_extname)
+    cpp_define (pfile, "__PRAGMA_REDEFINE_EXTNAME");
+
+  if (targetm.handle_pragma_extern_prefix)
+    cpp_define (pfile, "__PRAGMA_EXTERN_PREFIX");
 
   /* A straightforward target hook doesn't work, because of problems
      linking that hook's body when part of non-C front ends.  */
@@ -581,8 +620,8 @@ builtin_define_type_max (const char *macro, tree type, int is_long)
     default:    abort ();
     }
 
-  value = values[idx + TREE_UNSIGNED (type)];
-  suffix = suffixes[is_long * 2 + TREE_UNSIGNED (type)];
+  value = values[idx + TYPE_UNSIGNED (type)];
+  suffix = suffixes[is_long * 2 + TYPE_UNSIGNED (type)];
 
   buf = alloca (strlen (macro) + 1 + strlen (value) + strlen (suffix) + 1);
   sprintf (buf, "%s=%s%s", macro, value, suffix);

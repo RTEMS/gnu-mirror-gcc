@@ -145,7 +145,9 @@ bool
 probably_never_executed_bb_p (basic_block bb)
 {
   if (profile_info && flag_branch_probabilities)
-    return ((bb->count + profile_info->runs / 2) / profile_info->runs) == 0;
+    /* APPLE LOCAL begin hot/cold partitioning */
+    return (bb->count == 0);
+    /* APPLE LOCAL end hot/cold partitioning */
   return false;
 }
 
@@ -247,7 +249,7 @@ tree_predict_edge (edge e, enum br_predictor predictor, int probability)
 static bool
 can_predict_insn_p (rtx insn)
 {
-  return (GET_CODE (insn) == JUMP_INSN
+  return (JUMP_P (insn)
 	  && any_condjump_p (insn)
 	  && BLOCK_FOR_INSN (insn)->succ->succ_next);
 }
@@ -431,7 +433,7 @@ combine_predictions_for_bb (FILE *file, basic_block bb)
   edge e, first = NULL, second = NULL;
 
   for (e = bb->succ; e; e = e->succ_next)
-    if (!(bb->succ->flags & EDGE_EH))
+    if (!(e->flags & (EDGE_EH | EDGE_FAKE)))
       {
         nedges ++;
 	if (first && !second)
@@ -449,11 +451,14 @@ combine_predictions_for_bb (FILE *file, basic_block bb)
   if (nedges != 2)
     {
       for (e = bb->succ; e; e = e->succ_next)
-	if (!(bb->succ->flags & EDGE_EH))
+	if (!(e->flags & (EDGE_EH | EDGE_FAKE)))
 	  e->probability = (REG_BR_PROB_BASE + nedges / 2) / nedges;
 	else
 	  e->probability = 0;
       bb_ann (bb)->predictions = NULL;
+      if (file)
+	fprintf (file, "%i edges in bb %i predicted to even probabilities\n",
+		 nedges, bb->index);
       return;
     }
 
@@ -612,6 +617,11 @@ predict_loops (struct loops *loops_info, bool simpleloops)
       /* Free basic blocks from get_loop_body.  */
       free (bbs);
     }
+      
+  /* APPLE LOCAL begin lno */
+  if (simpleloops)
+    iv_analysis_done ();
+  /* APPLE LOCAL end lno */
 }
 
 /* Statically estimate the probability that a branch will be taken and produce
@@ -669,7 +679,7 @@ estimate_probability (struct loops *loops_info)
 		 messages.  */
 	      for (insn = BB_HEAD (e->dest); insn != NEXT_INSN (BB_END (e->dest));
 		   insn = NEXT_INSN (insn))
-		if (GET_CODE (insn) == CALL_INSN
+		if (CALL_P (insn)
 		    /* Constant and pure calls are hardly used to signalize
 		       something exceptional.  */
 		    && ! CONST_OR_PURE_CALL_P (insn))
@@ -771,12 +781,12 @@ estimate_probability (struct loops *loops_info)
 
   /* Attach the combined probability to each conditional jump.  */
   FOR_EACH_BB (bb)
-    if (GET_CODE (BB_END (bb)) == JUMP_INSN
+    if (JUMP_P (BB_END (bb))
 	&& any_condjump_p (BB_END (bb))
 	&& bb->succ->succ_next != NULL)
       combine_predictions_for_insn (BB_END (bb), bb);
 
-  remove_fake_edges ();
+  remove_fake_exit_edges ();
   /* Fill in the probability values in flowgraph based on the REG_BR_PROB
      notes.  */
   FOR_EACH_BB (bb)
@@ -862,6 +872,7 @@ tree_predict_by_opcode (basic_block bb)
 	break;
 
       case NE_EXPR:
+      case LTGT_EXPR:
 	/* Floating point comparisons appears to behave in a very
 	   unpredictable way because of special role of = tests in
 	   FP code.  */
@@ -982,7 +993,7 @@ tree_estimate_probability (void)
 
   estimate_bb_frequencies (&loops_info);
   free_dominance_info (CDI_POST_DOMINATORS);
-  remove_fake_edges ();
+  remove_fake_exit_edges ();
   flow_loops_free (&loops_info);
   if (dump_file && (dump_flags & TDF_DETAILS))
     dump_tree_cfg (dump_file, dump_flags);
@@ -1019,7 +1030,7 @@ expected_value_to_br_prob (void)
 	case JUMP_INSN:
 	  /* Look for simple conditional branches.  If we haven't got an
 	     expected value yet, no point going further.  */
-	  if (GET_CODE (insn) != JUMP_INSN || ev == NULL_RTX
+	  if (!JUMP_P (insn) || ev == NULL_RTX
 	      || ! any_condjump_p (insn))
 	    continue;
 	  break;
@@ -1151,7 +1162,7 @@ process_note_predictions (basic_block bb, int *heads)
   for (insn = BB_END (bb); insn;
        was_bb_head |= (insn == BB_HEAD (bb)), insn = PREV_INSN (insn))
     {
-      if (GET_CODE (insn) != NOTE)
+      if (!NOTE_P (insn))
 	{
 	  if (was_bb_head)
 	    break;
@@ -1159,7 +1170,7 @@ process_note_predictions (basic_block bb, int *heads)
 	    {
 	      /* Noreturn calls cause program to exit, therefore they are
 	         always predicted as not taken.  */
-	      if (GET_CODE (insn) == CALL_INSN
+	      if (CALL_P (insn)
 		  && find_reg_note (insn, REG_NORETURN, NULL))
 		contained_noreturn_call = 1;
 	      continue;
@@ -1216,7 +1227,7 @@ note_prediction_to_br_prob (void)
   free_dominance_info (CDI_DOMINATORS);
   free (heads);
 
-  remove_fake_edges ();
+  remove_fake_exit_edges ();
 }
 
 /* This is used to carry information about basic blocks.  It is
@@ -1265,7 +1276,7 @@ propagate_freq (struct loop *loop)
 
   /* For each basic block we need to visit count number of his predecessors
      we need to visit first.  */
-  FOR_EACH_BB (bb)
+  FOR_BB_BETWEEN (bb, ENTRY_BLOCK_PTR, NULL, next_bb)
     {
       if (BLOCK_INFO (bb)->tovisit)
 	{
@@ -1578,6 +1589,14 @@ choose_function_section (void)
 	 of all instances.  For now just never set frequency for these.  */
       || DECL_ONE_ONLY (current_function_decl))
     return;
+
+  /* APPLE LOCAL begin hot/cold partitioning  */
+  /* If we are doing the partitioning optimization, let the optimization
+     choose the correct section into which to put things.  */
+  if (flag_reorder_blocks_and_partition)
+    return;
+  /* APPLE LOCAL end hot/cold partitioning  */
+
   if (cfun->function_frequency == FUNCTION_FREQUENCY_HOT)
     DECL_SECTION_NAME (current_function_decl) =
       build_string (strlen (HOT_TEXT_SECTION_NAME), HOT_TEXT_SECTION_NAME);
