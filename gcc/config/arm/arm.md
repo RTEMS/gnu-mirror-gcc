@@ -1,6 +1,6 @@
 ;;- Machine description for ARM for GNU compiler
 ;;  Copyright 1991, 1993, 1994, 1995, 1996, 1996, 1997, 1998, 1999, 2000,
-;;  2001, 2002  Free Software Foundation, Inc.
+;;  2001, 2002, 2004  Free Software Foundation, Inc.
 ;;  Contributed by Pieter `Tiggr' Schoenmakers (rcpieter@win.tue.nl)
 ;;  and Martin Simmons (@harleqn.co.uk).
 ;;  More major hacks by Richard Earnshaw (rearnsha@arm.com).
@@ -59,7 +59,11 @@
    (UNSPEC_PIC_SYM   3) ; A symbol that has been treated properly for pic
 			;   usage, that is, we will add the pic_register
 			;   value to it before trying to dereference it.
-   (UNSPEC_PRLG_STK  4) ; A special barrier that prevents frame accesses 
+   (UNSPEC_PIC_BASE  4)	; Adding the PC value to the offset to the
+			;   GLOBAL_OFFSET_TABLE.  The operation is fully
+			;   described by the RTL but must be wrapped to
+			;   prevent combine from trying to rip it apart.
+   (UNSPEC_PRLG_STK  5) ; A special barrier that prevents frame accesses 
 			;   being scheduled before the stack adjustment insn.
    (UNSPEC_CLZ	     5) ; `clz' instruction, count leading zeros (SImode):
 			;   operand 0 is the result,
@@ -116,7 +120,7 @@
 
 ;; Operand number of an input operand that is shifted.  Zero if the
 ;; given instruction does not shift one of its input operands.
-(define_attr "is_xscale" "no,yes" (const (symbol_ref "arm_is_xscale")))
+(define_attr "is_xscale" "no,yes" (const (symbol_ref "arm_tune_xscale")))
 (define_attr "shift" "" (const_int 0))
 
 ; Floating Point Unit.  If we only have floating point emulation, then there
@@ -1181,7 +1185,7 @@
 			 (const_int 0)))
    (set (match_operand:SI 0 "s_register_operand" "=&r,&r")
 	(mult:SI (match_dup 2) (match_dup 1)))]
-  "TARGET_ARM && !arm_is_xscale"
+  "TARGET_ARM && !arm_arch_xscale"
   "mul%?s\\t%0, %2, %1"
   [(set_attr "conds" "set")
    (set_attr "type" "mult")]
@@ -1194,7 +1198,7 @@
 			  (match_operand:SI 1 "s_register_operand" "%?r,0"))
 			 (const_int 0)))
    (clobber (match_scratch:SI 0 "=&r,&r"))]
-  "TARGET_ARM && !arm_is_xscale"
+  "TARGET_ARM && !arm_arch_xscale"
   "mul%?s\\t%0, %2, %1"
   [(set_attr "conds" "set")
    (set_attr "type" "mult")]
@@ -1225,7 +1229,7 @@
    (set (match_operand:SI 0 "s_register_operand" "=&r,&r,&r,&r")
 	(plus:SI (mult:SI (match_dup 2) (match_dup 1))
 		 (match_dup 3)))]
-  "TARGET_ARM && !arm_is_xscale"
+  "TARGET_ARM && !arm_arch_xscale"
   "mla%?s\\t%0, %2, %1, %3"
   [(set_attr "conds" "set")
    (set_attr "type" "mult")]
@@ -1240,7 +1244,7 @@
 		  (match_operand:SI 3 "s_register_operand" "?r,r,0,0"))
 	 (const_int 0)))
    (clobber (match_scratch:SI 0 "=&r,&r,&r,&r"))]
-  "TARGET_ARM && !arm_is_xscale"
+  "TARGET_ARM && !arm_arch_xscale"
   "mla%?s\\t%0, %2, %1, %3"
   [(set_attr "conds" "set")
    (set_attr "type" "mult")]
@@ -1334,7 +1338,7 @@
 		  (match_operand:HI 1 "s_register_operand" "%r"))
 		 (sign_extend:SI
 		  (match_operand:HI 2 "s_register_operand" "r"))))]
-  "TARGET_ARM && arm_is_xscale"
+  "TARGET_ARM && arm_arch_xscale"
   "smulbb%?\\t%0, %1, %2"
   [(set_attr "type" "mult")]
 )
@@ -1346,7 +1350,7 @@
 			   (match_operand:HI 2 "s_register_operand" "%r"))
 			  (sign_extend:SI
 			   (match_operand:HI 3 "s_register_operand" "r")))))]
-  "TARGET_ARM && arm_is_xscale"
+  "TARGET_ARM && arm_arch_xscale"
   "smlabb%?\\t%0, %2, %3, %1"
   [(set_attr "type" "mult")]
 )
@@ -1359,7 +1363,7 @@
 	 	    (match_operand:HI 2 "s_register_operand" "%r"))
 		   (sign_extend:DI
 		    (match_operand:HI 3 "s_register_operand" "r")))))]
-  "TARGET_ARM && arm_is_xscale"
+  "TARGET_ARM && arm_arch_xscale"
   "smlalbb%?\\t%Q0, %R0, %2, %3"
 [(set_attr "type" "mult")])
 
@@ -4202,7 +4206,9 @@
 
 (define_insn "pic_add_dot_plus_four"
   [(set (match_operand:SI 0 "register_operand" "+r")
-	(plus:SI (match_dup 0) (const (plus:SI (pc) (const_int 4)))))
+	(unspec:SI [(plus:SI (match_dup 0)
+			     (const (plus:SI (pc) (const_int 4))))]
+		   UNSPEC_PIC_BASE))
    (use (label_ref (match_operand 1 "" "")))]
   "TARGET_THUMB && flag_pic"
   "*
@@ -4215,7 +4221,9 @@
 
 (define_insn "pic_add_dot_plus_eight"
   [(set (match_operand:SI 0 "register_operand" "+r")
-	(plus:SI (match_dup 0) (const (plus:SI (pc) (const_int 8)))))
+	(unspec:SI [(plus:SI (match_dup 0)
+			     (const (plus:SI (pc) (const_int 8))))]
+		   UNSPEC_PIC_BASE))
    (use (label_ref (match_operand 1 "" "")))]
   "TARGET_ARM && flag_pic"
   "*
@@ -4577,8 +4585,8 @@
 )
 
 (define_insn "*thumb_movhi_insn"
-  [(set (match_operand:HI 0 "nonimmediate_operand" "=l,l, m,*r,*h,l")
-	(match_operand:HI 1 "general_operand"       "l,mn,l,*h,*r,I"))]
+  [(set (match_operand:HI 0 "nonimmediate_operand" "=l,l,m,*r,*h,l")
+	(match_operand:HI 1 "general_operand"       "l,m,l,*h,*r,I"))]
   "TARGET_THUMB
    && (   register_operand (operands[0], HImode)
        || register_operand (operands[1], HImode))"
@@ -4610,8 +4618,7 @@
       return \"ldrh	%0, %1\";
     }"
   [(set_attr "length" "2,4,2,2,2,2")
-   (set_attr "type" "*,load,store1,*,*,*")
-   (set_attr "pool_range" "*,64,*,*,*,*")]
+   (set_attr "type" "*,load,store1,*,*,*")]
 )
 
 
@@ -8681,8 +8688,14 @@
   "
 )
 
+;; Note - although unspec_volatile's USE all hard registers,
+;; USEs are ignored after relaod has completed.  Thus we need
+;; to add an unspec of the link register to ensure that flow
+;; does not think that it is unused by the sibcall branch that
+;; will replace the standard function epilogue.
 (define_insn "sibcall_epilogue"
-  [(unspec_volatile [(const_int 0)] VUNSPEC_EPILOGUE)]
+  [(parallel [(unspec:SI [(reg:SI LR_REGNUM)] UNSPEC_PROLOGUE_USE)
+              (unspec_volatile [(return)] VUNSPEC_EPILOGUE)])]
   "TARGET_ARM"
   "*
   if (USE_RETURN_INSN (FALSE))
@@ -8691,7 +8704,11 @@
   "
 ;; Length is absolute worst case
   [(set_attr "length" "44")
-   (set_attr "type" "block")]
+   (set_attr "type" "block")
+   ;; We don't clobber the conditions, but the potential length of this
+   ;; operation is sufficient to make conditionalizing the sequence 
+   ;; unlikely to be profitable.
+   (set_attr "conds" "clob")]
 )
 
 (define_insn "*epilogue_insns"
@@ -8705,7 +8722,11 @@
   "
   ; Length is absolute worst case
   [(set_attr "length" "44")
-   (set_attr "type" "block")]
+   (set_attr "type" "block")
+   ;; We don't clobber the conditions, but the potential length of this
+   ;; operation is sufficient to make conditionalizing the sequence 
+   ;; unlikely to be profitable.
+   (set_attr "conds" "clob")]
 )
 
 (define_expand "eh_epilogue"
