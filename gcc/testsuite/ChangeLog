@@ -1,3 +1,252 @@
+2004-02-04  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
+
+	* objc.dg/encode-2.m, objc.dg/encode-3.m, objc.dg/encode-4.m: Fix
+	tests for systems where `char' is unsigned by default.
+
+2003-02-04  Giovanni Bajo  <giovannibajo@gcc.gnu.org>
+
+	PR c++/13997
+	* g++.dg/template/partial3.C: New test.
+
+2004-02-03  Mark Mitchell  <mark@codesourcery.com>
+
+	PR c++/13950
+	* g++.dg/template/lookup4.C: New test.
+
+	PR c++/13970
+	* g++.dg/parse/error14.C: New test.
+
+2004-02-03  Mark Mitchell  <mark@codesourcery.com>
+
+	PR c++/13925
+	* g++.dg/template/lookup5.C: New test.
+
+	PR c++/14002
+	* g++.dg/parse/template13.C: New test.
+
+	PR c++/13978
+	* g++.dg/template/koenig4.C: New test.
+
+	PR c++/13968
+	* g++.dg/template/crash17.C: New test.
+
+	PR c++/13975
+	* g++.dg/parse/error13.C: New test.
+	* g++.old-deja/g++.robertl/eb125.C: Tweak error messages.
+
+2004-02-02  Andrew Pinski  <pinskia@physics.uc.edu>
+
+	PR c++/10858
+	* g++.dg/template/sizeof7.C: New test.
+
+2004-02-02  Eric Christopher  <echristo@redhat.com>
+            Zack Weinberg  <zack@codesourcery.com>
+
+        * gcc.c-torture/execute/wchar_t-1.c: Add -finput-charset.
+
+2004-02-02  Zack Weinberg  <zack@codesourcery.com>
+
+	* g++.dg/eh/forced1.C, g++.dg/eh/forced2.C, g++.dg/eh/forced3.C
+	* g++.dg/eh/forced4.C: XFAIL ia64-hp-hpux11.*.
+	* g++.dg/eh/ia64-1.C: Test branch regs only #ifdef __LP64__.
+	* gcc.dg/cleanup-5.c: Run only on Linux targets.
+
+2004-02-02  Giovanni Bajo  <giovannibajo@gcc.gnu.org>
+
+	DR206
+	PR c++/13813
+	* g++.dg/template/member4.C: New test.
+
+2004-02-02  Mark Mitchell  <mark@codesourcery.com>
+
+	PR c++/13113
+	* g++.old-deja/g++.mike/net36.C: Adjust error messages.
+
+	PR c++/13854
+	* g++.dg/ext/attrib13.C: New test.
+
+	PR c++/13907
+	* g++.dg/conversion/op2.C: New test.
+
+2004-02-02  Eric Botcazou  <ebotcazou@libertysurf.fr>
+
+	* gcc.dg/titype-1.c: Fix pasto.
+
+2004-02-02  Giovanni Bajo  <giovannibajo@gcc.gnu.org>
+
+	PR c++/13957
+	* g++.dg/template/non-type-template-argument-1.C,
+	g++.dg/template/qualified-id1.C: Update dg-error marks.
+	* g++.dg/template/nontype6.C: New test.
+
+2004-02-02  Eric Botcazou  <ebotcazou@libertysurf.fr>
+
+	* gcc.dg/titype-1.c: New test.
+
+2004-01-30  Michael Matz  <matz@suse.de>
+
+	* g++.dg/ext/case-range1.C, g++.dg/ext/case-range2.C,
+	g++.dg/ext/case-range3.C: New tests.
+
+2004-01-31  Bud Davis  <bdavis9659@comcast.net>
+
+	PR fortran/12884
+	* g77.f-torture/execute/12884.f: New test
+
+2004-01-30  Giovanni Bajo  <giovannibajo@gcc.gnu.org>
+
+	PR c++/13683
+	* g++.dg/template/sizeof6.C: New test.
+
+2004-01-30  Eric Botcazou  <ebotcazou@libertysurf.fr>
+
+	* gcc.dg/fwritable-strings-1.c: New test.
+
+2004-01-30  Eric Botcazou  <ebotcazou@libertysurf.fr>
+
+	* gcc.c-torture/compile/20040130-1.c: New test.
+
+2004-01-29  Giovanni Bajo  <giovannibajo@gcc.gnu.org>
+
+	* g++.dg/parse/error11.C: New test.
+	* g++.dg/parse/error12.C: Likewise.
+
+2004-01-29  Mark Mitchell  <mark@codesourcery.com>
+
+	PR c++/13883
+	* g++.dg/template/ctor3.C: New test.
+
+2004-01-28  Ziemowit Laski  <zlaski@apple.com>
+
+	* objc.dg/proto-qual-1.m (ROUND, aligned_sizeof): New.
+	(scan_initial, main): Use aligned_sizeof instead of sizeof.
+
+2004-01-28  Mark Mitchell  <mark@codesourcery.com>
+
+	PR c++/13791
+	* g++.dg/ext/attrib12.C: New test.
+
+2004-01-28  Mark Mitchell  <mark@codesourcery.com>
+
+	PR c++/13736
+	* g++.dg/parse/cast2.C: New test.
+
+2004-01-27  James E Wilson  <wilson@specifixinc.com>
+
+	* objc.dg/encode-2.m (main): New local string.  Set depending on
+	sizeof long.  Use in sscanf call.
+	* objc.dg/encode-3.m (main): New local string.  Set depending on
+	sizeof long.  Use in scan_initial call.
+
+2004-01-27  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
+
+	* objc.dg/call-super-2.m: Make LP64-safe.
+	* objc.dg/desig-init-1.m: Likewise.
+
+2004-01-27  Ian Lance Taylor  <ian@wasabisystems.com>
+
+	* gcc.dg/arm-mmx-1.c: New test.
+
+2004-01-27  Eric Botcazou  <ebotcazou@libertysurf.fr>
+
+	* gcc.dg/20040127-1.c: New test.
+	* gcc.dg/20040127-2.c: New test.
+
+2004-01-26  Rainer Orth  <ro@TechFak.Uni-Bielefeld.DE>
+
+	* objc.dg/stret-1.m (glob): Renamed to globa.
+
+2004-01-26  Mark Mitchell  <mark@codesourcery.com>
+
+	PR c++/13363
+	* g++.dg/expr/for1.C: New test.
+
+2004-01-26  Eric Botcazou  <ebotcazou@libertysurf.fr>
+
+	* gcc.dg/sparc-ret.c: Run only in 32-bit mode.  Don't scan
+	the assembly output if -m64 is passed.
+
+2004-01-25  Mark Mitchell  <mark@codesourcery.com>
+
+	PR c++/13833
+	* g++.dg/template/cond3.C: New test.
+
+2004-01-25  Giovanni Bajo  <giovannibajo@gcc.gnu.org>
+
+	PR c++/13810
+	* g++.dg/template/ttp7.C: New test.
+
+2004-01-25  Kriang Lerdsuwanakij  <lerdsuwa@users.sourceforge.net>
+
+	PR c++/13797
+	* g++.dg/template/nontype4.C: New test.
+	* g++.dg/template/nontype5.C: Likewise.
+
+2004-01-25  Richard Sandiford  <rsandifo@redhat.com>
+
+	* gcc.dg/torture/mips-clobber-at.c: New test.
+
+2004-01-24  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/20040123-1.c: New test.
+
+2004-01-23  Zack Weinberg  <zack@codesourcery.com>
+
+	PR 18314
+	* gcc.dg/builtins-30.c: New testcase.
+
+2004-01-22  Hartmut Penner  <hpenner@de.ibm.com>
+
+	* gcc.dg/ppc64-abi-2.c: New test.
+
+2004-01-22  Eric Botcazou  <ebotcazou@libertysurf.fr>
+
+	* gcc.dg/struct-by-value-2.c: New test.
+
+2004-01-21  Andrew Pinski  <apinski@apple.com>
+
+	PR target/13785
+	* gcc.dg/20030121-1.c: New test.
+
+2004-01-22  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gcc.dg/20030123-1.c: Add -fno-omit-frame-pointer option.  Do not
+	clobber frame pointer register in asm statement.
+
+2004-01-21  Zack Weinberg  <zack@codesourcery.com>
+
+	* gcc.dg/noncompile/20020213-1.c: Add another dg-warning line.
+
+2004-01-19  Mark Mitchell  <mark@codesourcery.com>
+
+	PR c++/13592
+	* g++.dg/other/error1.C (class foo): Tweak error message.
+
+2004-01-19  Mark Mitchell  <mark@codesourcery.com>
+
+	PR c++/13592
+	* g++.dg/template/call2.C: New test.
+
+2004-01-19  Eric Botcazou  <ebotcazou@libertysurf.fr>
+
+	* gcc.dg/tls/alias-1.c: Add dg-warning for unsupported visibility
+	attribute on sparc*-sun-solaris2.*.
+
+2004-01-18  Mark Mitchell  <mark@codesourcery.com>
+
+	PR c++/13710
+	* g++.dg/ext/typeof7.C: New test.
+
+2004-01-17  Ziemowit Laski  <zlaski@apple.com>
+
+	* objc.dg/stret-1.m: New.
+	* objc.dg/stret-2.m: New.
+
+2004-01-17  Andrew Pinski  <pinskia@physics.uc.edu>
+
+	PR c++/11895
+	* g++.dg/ext/vector1.C: New test.
+
 2004-01-16  Mark Mitchell  <mark@codesourcery.com>
 
 	PR c++/13574
@@ -20230,4 +20479,3 @@ rlsruhe.de>
 	correspond to c-torture	1.11.
 
 	* New file.
-

@@ -1266,7 +1266,7 @@ duplicate_decls (tree newdecl, tree olddecl)
 	  tree attribs = (*targetm.merge_type_attributes)
 	    (TREE_TYPE (olddecl), type);
 
-	  type = build_type_attribute_variant (type, attribs);
+	  type = cp_build_type_attribute_variant (type, attribs);
 	  TREE_TYPE (newdecl) = TREE_TYPE (olddecl) = type;
 	}
 
@@ -4330,14 +4330,14 @@ reshape_init (tree type, tree *initp)
 		}
 	    }
 	}
-      else if (TREE_CODE (type) == ARRAY_TYPE)
+      else if ((TREE_CODE (type) == ARRAY_TYPE)|| (TREE_CODE (type) == VECTOR_TYPE))
 	{
 	  tree index;
 	  tree max_index;
 
 	  /* If the bound of the array is known, take no more initializers
 	     than are allowed.  */
-	  max_index = (TYPE_DOMAIN (type) 
+	  max_index = ((TYPE_DOMAIN (type) && (TREE_CODE (type) == ARRAY_TYPE))
 		       ? array_type_nelts (type) : NULL_TREE);
 	  /* Loop through the array elements, gathering initializers.  */
 	  for (index = size_zero_node;
@@ -8177,7 +8177,7 @@ grokdeclarator (tree declarator,
 	    if (decl == NULL_TREE)
 	      return NULL_TREE;
 	  }
-	else if (!staticp && ! processing_template_decl
+	else if (!staticp && !dependent_type_p (type)
 		 && !COMPLETE_TYPE_P (complete_type (type))
 		 && (TREE_CODE (type) != ARRAY_TYPE || initialized == 0))
 	  {
@@ -10272,8 +10272,9 @@ start_function (tree declspecs, tree declarator, tree attrs, int flags)
   if (!processing_template_decl && !(flags & SF_PRE_PARSED))
     {
       /* A specialization is not used to guide overload resolution.  */
-      if (!DECL_TEMPLATE_SPECIALIZATION (decl1)
-	  && ! DECL_FUNCTION_MEMBER_P (decl1))
+      if (!DECL_FUNCTION_MEMBER_P (decl1)
+	  && !(DECL_USE_TEMPLATE (decl1) && 
+	       PRIMARY_TEMPLATE_P (DECL_TI_TEMPLATE (decl1))))
 	{
 	  tree olddecl = pushdecl (decl1);
 
@@ -10736,8 +10737,6 @@ finish_function (int flags)
       which then got a warning when stored in a ptr-to-function variable.  */
 
   my_friendly_assert (building_stmt_tree (), 20000911);
-
-  finish_fname_decls ();
   
   /* For a cloned function, we've already got all the code we need;
      there's no need to add any extra bits.  */
@@ -10761,6 +10760,8 @@ finish_function (int flags)
 			      (TREE_TYPE (current_function_decl)),
 			      current_eh_spec_block);
     }
+
+  finish_fname_decls ();
 
   /* If we're saving up tree structure, tie off the function now.  */
   finish_stmt_tree (&DECL_SAVED_TREE (fndecl));

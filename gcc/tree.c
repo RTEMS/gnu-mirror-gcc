@@ -1656,6 +1656,13 @@ unsafe_for_reeval (tree expr)
       unsafeness = 1;
       break;
 
+    case EXIT_BLOCK_EXPR:
+      /* EXIT_BLOCK_LABELED_BLOCK, a.k.a. TREE_OPERAND (expr, 0), holds
+	 a reference to an ancestor LABELED_BLOCK, so we need to avoid
+	 unbounded recursion in the 'e' traversal code below.  */
+      exp = EXIT_BLOCK_RETURN (expr);
+      return exp ? unsafe_for_reeval (exp) : 0;
+
     default:
       tmp = (*lang_hooks.unsafe_for_reeval) (expr);
       if (tmp >= 0)
@@ -4863,6 +4870,10 @@ build_common_tree_nodes (int signed_char)
   unsigned_intSI_type_node = make_unsigned_type (GET_MODE_BITSIZE (SImode));
   unsigned_intDI_type_node = make_unsigned_type (GET_MODE_BITSIZE (DImode));
   unsigned_intTI_type_node = make_unsigned_type (GET_MODE_BITSIZE (TImode));
+  
+  access_public_node = get_identifier ("public");
+  access_protected_node = get_identifier ("protected");
+  access_private_node = get_identifier ("private");
 }
 
 /* Call this function after calling build_common_tree_nodes and set_sizetype.
