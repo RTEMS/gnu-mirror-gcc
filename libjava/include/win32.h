@@ -48,6 +48,21 @@ _Jv_platform_close_on_exec (jint)
   // Ignore.
 }
 
+#ifdef JV_HASH_SYNCHRONIZATION
+/* Suspends the execution of the current thread for the specified
+   number of microseconds.  Tries to emulate the behaviour of usleep()
+   on UNIX and provides a granularity of 1 millisecond.  */
+inline void
+_Jv_platform_usleep (unsigned long usecs)
+{
+  if (usecs > 0UL)
+    {
+      unsigned long millis = ((usecs + 999UL) / 1000UL);
+      Sleep (millis);
+    }
+}
+#endif /* JV_HASH_SYNCHRONIZATION */
+
 #ifndef DISABLE_JAVA_NET
 
 static inline int
@@ -99,8 +114,6 @@ _Jv_read(int s, void *buf, int len)
 }
 
 #endif /* DISABLE_JAVA_NET */
-
-#define HAVE_BACKTRACE
 
 /* Store up to SIZE return address of the current program state in
    ARRAY and return the exact number of values stored.  */
