@@ -71,6 +71,9 @@ do {									\
 #undef COMMON_ASM_OP
 #define COMMON_ASM_OP "\t.common\t"
 
+#undef  LOCAL_LABEL_PREFIX
+#define LOCAL_LABEL_PREFIX  "."
+
 /* This is how to output a definition of an internal numbered label where
    PREFIX is the class of label and NUM is the number within the class.  */
 
@@ -128,6 +131,6 @@ do {									\
 
 /* ??? This does not work in SunOS 4.x, so it is not enabled in sparc.h.
    Instead, it is enabled here, because it does work under Solaris.  */
-/* Define for support of TFmode long double and REAL_ARITHMETIC.
+/* Define for support of TFmode long double.
    Sparc ABI says that long double is 4 words.  */
 #define LONG_DOUBLE_TYPE_SIZE 64

@@ -1,6 +1,6 @@
-// natFileWin32.cc - Native part of File class for Win32.
+// natFileWin32.cc - Native part of File class.
 
-/* Copyright (C) 1998, 1999, 2001  Red Hat, Inc.
+/* Copyright (C) 1998, 1999, 2002  Red Hat, Inc.
 
    This file is part of libgcj.
 
@@ -14,6 +14,7 @@ details.  */
 #include <string.h>
 
 #include <windows.h>
+#undef STRICT
 
 #include <gcj/cni.h>
 #include <jvm.h>
@@ -22,14 +23,17 @@ details.  */
 #include <java/util/Vector.h>
 #include <java/lang/String.h>
 #include <java/io/FilenameFilter.h>
+#include <java/io/FileFilter.h>
 #include <java/lang/System.h>
 
 jboolean
 java::io::File::_access (jint query)
 {
-  char buf[MAX_PATH];
-  jsize total = JvGetStringUTFRegion (path, 0, path->length(), buf);
-  // FIXME?
+  jstring canon = getCanonicalPath();
+  if (! canon)
+    return false;
+  char *buf = (char *) __builtin_alloca (JvGetStringUTFLength (canon) + 1);
+  jsize total = JvGetStringUTFRegion (canon, 0, canon->length(), buf);
   buf[total] = '\0';
 
   JvAssert (query == READ || query == WRITE || query == EXISTS);
@@ -48,12 +52,12 @@ java::io::File::_access (jint query)
 jboolean
 java::io::File::_stat (jint query)
 {
-  char buf[MAX_PATH];
-  jsize total = JvGetStringUTFRegion (path, 0, path->length(), buf);
-  // FIXME?
+  jstring canon = getCanonicalPath();
+  if (! canon)
+    return false;
+  char *buf = (char *) __builtin_alloca (JvGetStringUTFLength (canon) + 1);
+  jsize total = JvGetStringUTFRegion (canon, 0, canon->length(), buf);
   buf[total] = '\0';
-
-  // FIXME: Need to handle ISHIDDEN query.
 
   JvAssert (query == DIRECTORY || query == ISFILE);
 
@@ -70,9 +74,11 @@ java::io::File::_stat (jint query)
 jlong
 java::io::File::attr (jint query)
 {
-  char buf[MAX_PATH];
-  jsize total = JvGetStringUTFRegion (path, 0, path->length(), buf);
-  // FIXME?
+  jstring canon = getCanonicalPath();
+  if (! canon)
+    return false;
+  char *buf = (char *) __builtin_alloca (JvGetStringUTFLength (canon) + 1);
+  jsize total = JvGetStringUTFRegion (canon, 0, canon->length(), buf);
   buf[total] = '\0';
 
   JvAssert (query == MODIFIED || query == LENGTH);
@@ -84,7 +90,7 @@ java::io::File::attr (jint query)
   if (query == LENGTH)
     return ((long long)info.nFileSizeHigh) << 32 | (unsigned long long)info.nFileSizeLow;
   else {
-    // FIXME? This is somewhat compiler dependent (the LL constant suffix)
+    // FIXME? This is somewhat compiler dependant (the LL constant suffix)
     // The file time as return by windows is the number of 100-nanosecond intervals since January 1, 1601
     return (((((long long)info.ftLastWriteTime.dwHighDateTime) << 32) | ((unsigned long long)info.ftLastWriteTime.dwLowDateTime)) - 116444736000000000LL) / 10000LL;
   }
@@ -93,12 +99,12 @@ java::io::File::attr (jint query)
 jstring
 java::io::File::getCanonicalPath (void)
 {
-  char buf[MAX_PATH], buf2[MAX_PATH];
+  char *buf = (char *) __builtin_alloca (JvGetStringUTFLength (path) + 1);
   jsize total = JvGetStringUTFRegion (path, 0, path->length(), buf);
-  // FIXME?
   buf[total] = '\0';
 
   LPTSTR unused;
+  char buf2[MAX_PATH];
   if(!GetFullPathName(buf, MAX_PATH, buf2, &unused))
     throw new IOException (JvNewStringLatin1 ("GetFullPathName failed"));
 
@@ -123,13 +129,19 @@ java::io::File::isAbsolute (void)
 	  && (path->charAt(2) == '/' || path->charAt(2) == '\\'));
 }
 
-jstringArray
+void java::io::File::init_native() { }
+
+
+jobjectArray
 java::io::File::performList (java::io::FilenameFilter *filter, 
 			     java::io::FileFilter *fileFilter, 
-			     java::lang::Class *result_type)
+			     java::lang::Class *clazz)
 {
-  char buf[MAX_PATH];
-  jsize total = JvGetStringUTFRegion (path, 0, path->length(), buf);
+  jstring canon = getCanonicalPath();
+  if (! canon)
+    return NULL;
+  char *buf = (char *) __builtin_alloca (JvGetStringUTFLength (canon) + 5);
+  jsize total = JvGetStringUTFRegion (canon, 0, canon->length(), buf);
   // FIXME?
   strcpy(&buf[total], "\\*.*");
 
@@ -138,7 +150,7 @@ java::io::File::performList (java::io::FilenameFilter *filter,
   if (handle == INVALID_HANDLE_VALUE)
     return NULL;
 
-  java::util::ArrayList *list = new java::util::ArrayList ();
+  java::util::Vector *vec = new java::util::Vector ();
 
   do
     {
@@ -146,20 +158,18 @@ java::io::File::performList (java::io::FilenameFilter *filter,
         {
           jstring name = JvNewStringUTF (data.cFileName);
 
-	  if (filter && ! filter->accept(this, name))
+          if (filter && !filter->accept(this, name))
 	    continue;
-
-	  if (result_type == &java::io::File::class$)
-            {
-	      java::io::File *file = new java::io::File (this, name);
-	      if (fileFilter && ! fileFilter->accept(file))
+          if (clazz == &java::io::File::class$)
+	    {
+              java::io::File *file = new java::io::File (this, name);
+              if (fileFilter && !fileFilter->accept(file))
 		continue;
-
-	      list->add(file);
+	      vec->addElement (file);
 	    }
 	  else
-	    list->add(name);
-	}
+	    vec->addElement (name);
+        }
     }
   while (FindNextFile (handle, &data));
 
@@ -168,71 +178,42 @@ java::io::File::performList (java::io::FilenameFilter *filter,
 
   FindClose (handle);
 
-  jobjectArray ret = JvNewObjectArray (vec->size(), path->getClass(), NULL);
+  jobjectArray ret = JvNewObjectArray (vec->size(), clazz, NULL);
   vec->copyInto (ret);
-  return reinterpret_cast<jstringArray> (ret);
+  return ret;
 }
+
 
 jboolean
 java::io::File::performMkdir (void)
 {
-  char buf[MAX_PATH];
+  char *buf = (char *) __builtin_alloca (JvGetStringUTFLength (path) + 1);
   jsize total = JvGetStringUTFRegion(path, 0, path->length(), buf);
-  // FIXME?
   buf[total] = '\0';
 
   return (CreateDirectory(buf, NULL)) ? true : false;
 }
 
 jboolean
-java::io::File::performSetReadOnly (void)
-{
-  // PLEASE IMPLEMENT ME
-  return false;
-}
-
-JArray< ::java::io::File *>*
-java::io::File::performListRoots ()
-{
-  // PLEASE IMPLEMENT ME
-  return NULL;
-}
-
-jboolean
 java::io::File::performRenameTo (File *dest)
 {
-  char buf[MAX_PATH];
+  char *buf = (char *) __builtin_alloca (JvGetStringUTFLength (path) + 1);
   jsize total = JvGetStringUTFRegion(path, 0, path->length(), buf);
-  // FIXME?
   buf[total] = '\0';
-  char buf2[MAX_PATH];
+  char *buf2 = (char *) __builtin_alloca (JvGetStringUTFLength (dest->path)
+					  + 1);
   total = JvGetStringUTFRegion(dest->path, 0, dest->path->length(), buf2);
-  // FIXME?
   buf2[total] = '\0';
 
   return (MoveFile(buf, buf2)) ? true : false;
 }
 
 jboolean
-java::io::File::performSetLastModified (jlong time)
-{
-  // PLEASE IMPLEMENT ME
-  return false;
-}
-
-jboolean
-java::io::File::performCreate (void)
-{
-  // PLEASE IMPLEMENT ME
-  return false;
-}
-
-jboolean
 java::io::File::performDelete ()
 {
-  char buf[MAX_PATH];
-  jsize total = JvGetStringUTFRegion(path, 0, path->length(), buf);
-  // FIXME?
+  jstring canon = getCanonicalPath();
+  char *buf = (char *) __builtin_alloca (JvGetStringUTFLength (canon) + 1);
+  jsize total = JvGetStringUTFRegion(canon, 0, canon->length(), buf);
   buf[total] = '\0';
 
   DWORD attributes = GetFileAttributes (buf);
@@ -245,9 +226,7 @@ java::io::File::performDelete ()
     return (DeleteFile (buf)) ? true : false;
 }
 
-void
-java::io::File::init_native ()
-{
-  maxPathLen = MAX_PATH;
-  caseSensitive = false;
-}
+jboolean java::io::File::performCreate (void) { JvFail("unimplemented\n"); }
+jboolean java::io::File::performSetReadOnly() { JvFail("unimplemented"); }
+jboolean java::io::File::performSetLastModified(jlong time) { JvFail("unimplemented"); }
+JArray<java::io::File*>* java::io::File::performListRoots() { JvFail("unimplemented"); }

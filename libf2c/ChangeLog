@@ -1,3 +1,75 @@
+2002-05-16  Rainer Orth  <ro@TechFak.Uni-Bielefeld.DE>
+
+	* Makefile.in: Allow for PWDCMD to override hardcoded pwd.
+	* aclocal.m4: Likewise.
+	* configure: Regenerate.
+
+2002-05-08  Alexandre Oliva  <aoliva@redhat.com>
+
+	* configure.in (ORIGINAL_LD_FOR_MULTILIBS): Preserve LD at
+	script entry, and set LD to it when configuring multilibs.
+	* configure: Rebuilt.
+
+2002-05-02  Alexandre Oliva  <aoliva@redhat.com>
+
+        * Makefile.in: Fix for multilibbed natives.
+
+2002-04-15  Loren J. Rittle  <ljrittle@acm.org>
+
+	* aclocal.m4 (gcc_version_trigger): Use robust path construction.
+	* configure: Rebuilt.
+
+2002-04-11  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* libI77/lio.h: Treat INTEGER*1 as signed char.
+
+2002-03-06  Phil Edwards  <pme@gcc.gnu.org>
+
+	* libF77/Version.c:  Fix misplaced leading blanks on first line.
+	* libI77/Version.c:  Likewise.
+	* libU77/Version.c:  Likewise.
+
+2002-01-28  Geoffrey Keating  <geoffk@redhat.com>
+
+	* aclocal.m4: Replace with version copied from libstdc++-v3.
+	* configure.in: Update for changes to aclocal and Makefile.
+	* configure: Regenerate.
+	* Makefile.in: Correct install and uninstall for cross targets.
+	* libU77/configure: Regenerate.
+
+2002-01-20  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* Makefile.in: $(MULTISUBDIR) has an implied leading `/';
+	remove duplicates.
+	Use libtool for removing libg2c{a|la|so} for the `uninstall' target.
+
+2002-01-18  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* Makefile.in: Add missing `/' separator in last change.
+
+2002-01-18  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* Makefile.in: Install libg2c.{a|la|so} in $(libdir)$(MULTISUBDIR)
+	instead of $(libsubdir)$(MULTISUBDIR).
+
+2002-01-15  Loren J. Rittle  <ljrittle@acm.org>
+
+	* libI77/configure.in: Remove fcntl.h check; never define
+	_POSIX_SOURCE, NO_FCNTL or OPEN_DECL.  Add check for tmpnam().
+	* libI77/configure: Rebuilt.
+	* libI77/config.h.in: Rebuilt.
+	* libI77/Makefile.in: Remove all traces of rawio.h from
+	dependencies lists.
+	* libI77/fio.h (FSEEK): Unroll -j1.7 -j1.6 made 2002-01-04.
+	* libI77/open.c (f_open): Use HAVE_TMPNAM.
+	* libI77/rawio.h: Remove file.
+
+2002-01-14  John David Anglin  <dave@hiauly1.hia.nrc.ca>
+
+	* libI77/configure.in (_LARGEFILE_SOURCE): AC_DEFINE.
+	* libI77/configure: Rebuilt.
+	* libI77/config.h.in: Rebuilt.
+
 2002-01-04  Loren J. Rittle  <ljrittle@acm.org>
 
 	* libI77/fio.h (FSEEK): Enforce type of second parameter to be

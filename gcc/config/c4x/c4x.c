@@ -148,8 +148,8 @@ enum machine_mode c4x_caller_save_map[FIRST_PSEUDO_REGISTER] =
 /* Test and compare insns in c4x.md store the information needed to
    generate branch and scc insns here.  */
 
-struct rtx_def *c4x_compare_op0 = NULL_RTX;
-struct rtx_def *c4x_compare_op1 = NULL_RTX;
+rtx c4x_compare_op0;
+rtx c4x_compare_op1;
 
 const char *c4x_rpts_cycles_string;
 int c4x_rpts_cycles = 0;	/* Max. cycles for RPTS.  */
@@ -165,7 +165,6 @@ tree noreturn_tree = NULL_TREE;
 tree interrupt_tree = NULL_TREE;
 
 /* Forward declarations */
-static void c4x_add_gc_roots PARAMS ((void));
 static int c4x_isr_reg_used_p PARAMS ((unsigned int));
 static int c4x_leaf_function_p PARAMS ((void));
 static int c4x_assembler_function_p PARAMS ((void));
@@ -219,32 +218,6 @@ static int c4x_adjust_cost PARAMS ((rtx, rtx, rtx, int));
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
-/* Called to register all of our global variables with the garbage
-   collector.  */
-
-static void
-c4x_add_gc_roots ()
-{
-  ggc_add_rtx_root (&c4x_compare_op0, 1);
-  ggc_add_rtx_root (&c4x_compare_op1, 1);
-  ggc_add_tree_root (&code_tree, 1);
-  ggc_add_tree_root (&data_tree, 1);
-  ggc_add_tree_root (&pure_tree, 1);
-  ggc_add_tree_root (&noreturn_tree, 1);
-  ggc_add_tree_root (&interrupt_tree, 1);
-  ggc_add_rtx_root (&smulhi3_libfunc, 1);
-  ggc_add_rtx_root (&umulhi3_libfunc, 1);
-  ggc_add_rtx_root (&fix_truncqfhi2_libfunc, 1);
-  ggc_add_rtx_root (&fixuns_truncqfhi2_libfunc, 1);
-  ggc_add_rtx_root (&fix_trunchfhi2_libfunc, 1);
-  ggc_add_rtx_root (&fixuns_trunchfhi2_libfunc, 1);
-  ggc_add_rtx_root (&floathiqf2_libfunc, 1);
-  ggc_add_rtx_root (&floatunshiqf2_libfunc, 1);
-  ggc_add_rtx_root (&floathihf2_libfunc, 1);
-  ggc_add_rtx_root (&floatunshihf2_libfunc, 1);
-}
-
-
 /* Override command line options.
    Called once after all options have been parsed.
    Mostly we process the processor
@@ -307,15 +280,12 @@ c4x_override_options ()
     target_flags &= ~C3X_FLAG;
 
   /* Convert foo / 8.0 into foo * 0.125, etc.  */
-  set_fast_math_flags();
+  set_fast_math_flags (1);
 
   /* We should phase out the following at some stage.
      This provides compatibility with the old -mno-aliases option.  */
   if (! TARGET_ALIASES && ! flag_argument_noalias)
     flag_argument_noalias = 1;
-
-  /* Register global variables with the garbage collector.  */
-  c4x_add_gc_roots ();
 }
 
 
@@ -514,7 +484,7 @@ static const int c4x_int_reglist[3][6] =
   {AR2_REGNO, RC_REGNO, RS_REGNO, RE_REGNO, 0, 0}
 };
 
-static int c4x_fp_reglist[2] = {R2_REGNO, R3_REGNO};
+static const int c4x_fp_reglist[2] = {R2_REGNO, R3_REGNO};
 
 
 /* Initialize a variable CUM of type CUMULATIVE_ARGS for a call to a
@@ -1479,16 +1449,12 @@ c4x_emit_libcall_mulhi (libcall, code, mode, operands)
 /* Set the SYMBOL_REF_FLAG for a function decl.  However, wo do not
    yet use this info.  */
 void
-c4x_encode_section_info (decl)
-  tree decl;
+c4x_encode_section_info (decl, first)
+     tree decl;
+     int first ATTRIBUTE_UNUSED;
 {
-#if 0
-  if (TREE_CODE (TREE_TYPE (decl)) == FUNCTION_TYPE)   
-    SYMBOL_REF_FLAG (XEXP (DECL_RTL (decl), 0)) = 1;
-#else
   if (TREE_CODE (decl) == FUNCTION_DECL)   
     SYMBOL_REF_FLAG (XEXP (DECL_RTL (decl), 0)) = 1;
-#endif
 }
 
 
@@ -3469,6 +3435,34 @@ tsrc_operand (op, mode)
 }
 
 
+/* Check src operand of two operand non immedidate instructions.  */
+
+int
+nonimmediate_src_operand (op, mode)
+     rtx op;
+     enum machine_mode mode;
+{
+  if (GET_CODE (op) == CONST_INT || GET_CODE (op) == CONST_DOUBLE)
+    return 0;
+
+  return src_operand (op, mode);
+}
+
+
+/* Check logical src operand of two operand non immedidate instructions.  */
+
+int
+nonimmediate_lsrc_operand (op, mode)
+     rtx op;
+     enum machine_mode mode;
+{
+  if (GET_CODE (op) == CONST_INT || GET_CODE (op) == CONST_DOUBLE)
+    return 0;
+
+  return lsrc_operand (op, mode);
+}
+
+
 int
 reg_or_const_operand (op, mode)
      rtx op;
@@ -5058,3 +5052,4 @@ c4x_asm_named_section (name, flags)
 {
   fprintf (asm_out_file, "\t.sect\t\"%s\"\n", name);
 }
+

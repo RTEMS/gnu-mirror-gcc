@@ -1,6 +1,6 @@
 /* Instruction scheduling pass.
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
    Contributed by Michael Tiemann (tiemann@cygnus.com) Enhanced by,
    and currently maintained by, Jim Wilson (wilson@cygnus.com)
 
@@ -62,6 +62,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "recog.h"
 #include "cfglayout.h"
 #include "sched-int.h"
+#include "target.h"
 
 /* Define when we want to do count REG_DEAD notes before and after scheduling
    for sanity checking.  We can't do that when conditional execution is used,
@@ -294,12 +295,16 @@ static int haifa_classify_insn PARAMS ((rtx));
 static int is_prisky PARAMS ((rtx, int, int));
 static int is_exception_free PARAMS ((rtx, int, int));
 
+static bool sets_likely_spilled PARAMS ((rtx));
+static void sets_likely_spilled_1 PARAMS ((rtx, rtx, void *));
 static void add_branch_dependences PARAMS ((rtx, rtx));
 static void compute_block_backward_dependences PARAMS ((int));
 void debug_dependencies PARAMS ((void));
 
 static void init_regions PARAMS ((void));
 static void schedule_region PARAMS ((int));
+static rtx concat_INSN_LIST PARAMS ((rtx, rtx));
+static void concat_insn_mem_list PARAMS ((rtx, rtx, rtx *, rtx *));
 static void propagate_deps PARAMS ((int, struct deps *));
 static void free_pending_lists PARAMS ((void));
 
@@ -335,7 +340,7 @@ is_cfg_nonregular ()
   /* If we have exception handlers, then we consider the cfg not well
      structured.  ?!?  We should be able to handle this now that flow.c
      computes an accurate cfg for EH.  */
-  if (exception_handler_labels)
+  if (current_function_has_exception_handlers ())
     return 1;
 
   /* If we have non-jumping insns which refer to labels, then we consider
@@ -572,17 +577,17 @@ too_large (block, num_bbs, num_insns)
 /* Update_loop_relations(blk, hdr): Check if the loop headed by max_hdr[blk]
    is still an inner loop.  Put in max_hdr[blk] the header of the most inner
    loop containing blk.  */
-#define UPDATE_LOOP_RELATIONS(blk, hdr)                              \
-{                                                                    \
-  if (max_hdr[blk] == -1)                                            \
-    max_hdr[blk] = hdr;                                              \
-  else if (dfs_nr[max_hdr[blk]] > dfs_nr[hdr])                       \
-         RESET_BIT (inner, hdr);                                     \
-  else if (dfs_nr[max_hdr[blk]] < dfs_nr[hdr])                       \
-         {                                                           \
-            RESET_BIT (inner,max_hdr[blk]);			     \
-            max_hdr[blk] = hdr;                                      \
-         }                                                           \
+#define UPDATE_LOOP_RELATIONS(blk, hdr)		\
+{						\
+  if (max_hdr[blk] == -1)			\
+    max_hdr[blk] = hdr;				\
+  else if (dfs_nr[max_hdr[blk]] > dfs_nr[hdr])	\
+    RESET_BIT (inner, hdr);			\
+  else if (dfs_nr[max_hdr[blk]] < dfs_nr[hdr])	\
+    {						\
+      RESET_BIT (inner,max_hdr[blk]);		\
+      max_hdr[blk] = hdr;			\
+    }						\
 }
 
 /* Find regions for interblock scheduling.
@@ -1028,11 +1033,11 @@ find_rgns (edge_list, dom)
   free (max_hdr);
   free (dfs_nr);
   free (stack);
-  free (passed);
-  free (header);
-  free (inner);
-  free (in_queue);
-  free (in_stack);
+  sbitmap_free (passed);
+  sbitmap_free (header);
+  sbitmap_free (inner);
+  sbitmap_free (in_queue);
+  sbitmap_free (in_stack);
 }
 
 /* Functions for regions scheduling information.  */
@@ -1089,7 +1094,7 @@ compute_dom_prob_ps (bb)
 	  if (CONTAINING_RGN (TO_BLOCK (nxt_out_edge)) !=
 	      CONTAINING_RGN (BB_TO_BLOCK (bb)))
 	    ++nr_rgn_out_edges;
-        SET_BIT (pot_split[bb], EDGE_TO_BIT (nxt_out_edge));
+	  SET_BIT (pot_split[bb], EDGE_TO_BIT (nxt_out_edge));
 	  nxt_out_edge = NEXT_OUT (nxt_out_edge);
 
 	}
@@ -1557,17 +1562,17 @@ enum INSN_TRAP_CLASS
 
 /* Non-zero if block bb_to is equal to, or reachable from block bb_from.  */
 #define IS_REACHABLE(bb_from, bb_to)					\
-(bb_from == bb_to                                                       \
+  (bb_from == bb_to							\
    || IS_RGN_ENTRY (bb_from)						\
-   || (TEST_BIT (ancestor_edges[bb_to],                               \
-                    EDGE_TO_BIT (IN_EDGES (BB_TO_BLOCK (bb_from))))))
+   || (TEST_BIT (ancestor_edges[bb_to],					\
+		 EDGE_TO_BIT (IN_EDGES (BB_TO_BLOCK (bb_from))))))
 
 /* Non-zero iff the address is comprised from at most 1 register.  */
 #define CONST_BASED_ADDRESS_P(x)			\
   (GET_CODE (x) == REG					\
-   || ((GET_CODE (x) == PLUS || GET_CODE (x) == MINUS   \
-	|| (GET_CODE (x) == LO_SUM))	                \
-       && (CONSTANT_P (XEXP (x, 0))		\
+   || ((GET_CODE (x) == PLUS || GET_CODE (x) == MINUS	\
+	|| (GET_CODE (x) == LO_SUM))			\
+       && (CONSTANT_P (XEXP (x, 0))			\
 	   || CONSTANT_P (XEXP (x, 1)))))
 
 /* Turns on the fed_by_spec_load flag for insns fed by load_insn.  */
@@ -2053,7 +2058,14 @@ init_ready_list (ready)
 
 	    if (!CANT_MOVE (insn)
 		&& (!IS_SPECULATIVE_INSN (insn)
-		    || (insn_issue_delay (insn) <= 3
+		    || ((((!targetm.sched.use_dfa_pipeline_interface
+			   || !(*targetm.sched.use_dfa_pipeline_interface) ())
+			  && insn_issue_delay (insn) <= 3)
+			 || (targetm.sched.use_dfa_pipeline_interface
+			     && (*targetm.sched.use_dfa_pipeline_interface) ()
+			     && (recog_memoized (insn) < 0
+			         || min_insn_conflict_delay (curr_state,
+							     insn, insn) <= 3)))
 			&& check_live (insn, bb_src)
 			&& is_exception_free (insn, bb_src, target_bb))))
 	      {
@@ -2161,7 +2173,15 @@ new_ready (next)
       && (!IS_VALID (INSN_BB (next))
 	  || CANT_MOVE (next)
 	  || (IS_SPECULATIVE_INSN (next)
-	      && (insn_issue_delay (next) > 3
+	      && (0
+		  || (targetm.sched.use_dfa_pipeline_interface
+		      && (*targetm.sched.use_dfa_pipeline_interface) ()
+		      && recog_memoized (next) >= 0
+		      && min_insn_conflict_delay (curr_state, next,
+						  next) > 3)
+		  || ((!targetm.sched.use_dfa_pipeline_interface
+		       || !(*targetm.sched.use_dfa_pipeline_interface) ())
+		      && insn_issue_delay (next) > 3)
 		  || !check_live (next, INSN_BB (next))
 		  || !is_exception_free (next, INSN_BB (next), target_bb)))))
     return 0;
@@ -2266,6 +2286,31 @@ static struct sched_info region_sched_info =
   0, 0
 };
 
+/* Determine if PAT sets a CLASS_LIKELY_SPILLED_P register.  */
+
+static bool
+sets_likely_spilled (pat)
+     rtx pat;
+{
+  bool ret = false;
+  note_stores (pat, sets_likely_spilled_1, &ret);
+  return ret;
+}
+
+static void
+sets_likely_spilled_1 (x, pat, data)
+     rtx x, pat;
+     void *data;
+{
+  bool *ret = (bool *) data;
+
+  if (GET_CODE (pat) == SET
+      && REG_P (x)
+      && REGNO (x) < FIRST_PSEUDO_REGISTER
+      && CLASS_LIKELY_SPILLED_P (REGNO_REG_CLASS (REGNO (x))))
+    *ret = true;
+}
+
 /* Add dependences so that branches are scheduled to run last in their
    block.  */
 
@@ -2275,15 +2320,22 @@ add_branch_dependences (head, tail)
 {
   rtx insn, last;
 
-  /* For all branches, calls, uses, clobbers, and cc0 setters, force them
-     to remain in order at the end of the block by adding dependencies and
-     giving the last a high priority.  There may be notes present, and
-     prev_head may also be a note.
+  /* For all branches, calls, uses, clobbers, cc0 setters, and instructions
+     that can throw exceptions, force them to remain in order at the end of
+     the block by adding dependencies and giving the last a high priority.
+     There may be notes present, and prev_head may also be a note.
 
      Branches must obviously remain at the end.  Calls should remain at the
      end since moving them results in worse register allocation.  Uses remain
-     at the end to ensure proper register allocation.  cc0 setters remaim
-     at the end because they can't be moved away from their cc0 user.  */
+     at the end to ensure proper register allocation.
+
+     cc0 setters remaim at the end because they can't be moved away from
+     their cc0 user.
+
+     Insns setting CLASS_LIKELY_SPILLED_P registers (usually return values)
+     are not moved before reload because we can wind up with register
+     allocation failures.  */
+
   insn = tail;
   last = 0;
   while (GET_CODE (insn) == CALL_INSN
@@ -2291,16 +2343,17 @@ add_branch_dependences (head, tail)
 	 || (GET_CODE (insn) == INSN
 	     && (GET_CODE (PATTERN (insn)) == USE
 		 || GET_CODE (PATTERN (insn)) == CLOBBER
+		 || can_throw_internal (insn)
 #ifdef HAVE_cc0
 		 || sets_cc0_p (PATTERN (insn))
 #endif
-	     ))
+		 || (!reload_completed
+		     && sets_likely_spilled (PATTERN (insn)))))
 	 || GET_CODE (insn) == NOTE)
     {
       if (GET_CODE (insn) != NOTE)
 	{
-	  if (last != 0
-	      && !find_insn_list (insn, LOG_LINKS (last)))
+	  if (last != 0 && !find_insn_list (insn, LOG_LINKS (last)))
 	    {
 	      add_dependence (last, insn, REG_DEP_ANTI);
 	      INSN_REF_COUNT (insn)++;
@@ -2356,125 +2409,124 @@ add_branch_dependences (head, tail)
 
 static struct deps *bb_deps;
 
+/* Duplicate the INSN_LIST elements of COPY and prepend them to OLD.  */
+
+static rtx
+concat_INSN_LIST (copy, old)
+     rtx copy, old;
+{
+  rtx new = old;
+  for (; copy ; copy = XEXP (copy, 1))
+    new = alloc_INSN_LIST (XEXP (copy, 0), new);
+  return new;
+}
+
+static void
+concat_insn_mem_list (copy_insns, copy_mems, old_insns_p, old_mems_p)
+     rtx copy_insns, copy_mems;
+     rtx *old_insns_p, *old_mems_p;
+{
+  rtx new_insns = *old_insns_p;
+  rtx new_mems = *old_mems_p;
+
+  while (copy_insns)
+    {
+      new_insns = alloc_INSN_LIST (XEXP (copy_insns, 0), new_insns);
+      new_mems = alloc_EXPR_LIST (VOIDmode, XEXP (copy_mems, 0), new_mems);
+      copy_insns = XEXP (copy_insns, 1);
+      copy_mems = XEXP (copy_mems, 1);
+    }
+
+  *old_insns_p = new_insns;
+  *old_mems_p = new_mems;
+}
+
 /* After computing the dependencies for block BB, propagate the dependencies
    found in TMP_DEPS to the successors of the block.  */
 static void
-propagate_deps (bb, tmp_deps)
+propagate_deps (bb, pred_deps)
      int bb;
-     struct deps *tmp_deps;
+     struct deps *pred_deps;
 {
   int b = BB_TO_BLOCK (bb);
   int e, first_edge;
-  int reg;
-  rtx link_insn, link_mem;
-  rtx u;
-
-  /* These lists should point to the right place, for correct
-     freeing later.  */
-  bb_deps[bb].pending_read_insns = tmp_deps->pending_read_insns;
-  bb_deps[bb].pending_read_mems = tmp_deps->pending_read_mems;
-  bb_deps[bb].pending_write_insns = tmp_deps->pending_write_insns;
-  bb_deps[bb].pending_write_mems = tmp_deps->pending_write_mems;
 
   /* bb's structures are inherited by its successors.  */
   first_edge = e = OUT_EDGES (b);
-  if (e <= 0)
-    return;
+  if (e > 0)
+    do
+      {
+	int b_succ = TO_BLOCK (e);
+	int bb_succ = BLOCK_TO_BB (b_succ);
+	struct deps *succ_deps = bb_deps + bb_succ;
+	int reg;
 
-  do
-    {
-      rtx x;
-      int b_succ = TO_BLOCK (e);
-      int bb_succ = BLOCK_TO_BB (b_succ);
-      struct deps *succ_deps = bb_deps + bb_succ;
+	/* Only bbs "below" bb, in the same region, are interesting.  */
+	if (CONTAINING_RGN (b) != CONTAINING_RGN (b_succ)
+	    || bb_succ <= bb)
+	  {
+	    e = NEXT_OUT (e);
+	    continue;
+	  }
 
-      /* Only bbs "below" bb, in the same region, are interesting.  */
-      if (CONTAINING_RGN (b) != CONTAINING_RGN (b_succ)
-	  || bb_succ <= bb)
-	{
-	  e = NEXT_OUT (e);
-	  continue;
-	}
+	/* The reg_last lists are inherited by bb_succ.  */
+	EXECUTE_IF_SET_IN_REG_SET (&pred_deps->reg_last_in_use, 0, reg,
+	  {
+	    struct deps_reg *pred_rl = &pred_deps->reg_last[reg];
+	    struct deps_reg *succ_rl = &succ_deps->reg_last[reg];
 
-      /* The reg_last lists are inherited by bb_succ.  */
-      EXECUTE_IF_SET_IN_REG_SET (&tmp_deps->reg_last_in_use, 0, reg,
-	{
-	  struct deps_reg *tmp_deps_reg = &tmp_deps->reg_last[reg];
-	  struct deps_reg *succ_deps_reg = &succ_deps->reg_last[reg];
+	    succ_rl->uses = concat_INSN_LIST (pred_rl->uses, succ_rl->uses);
+	    succ_rl->sets = concat_INSN_LIST (pred_rl->sets, succ_rl->sets);
+	    succ_rl->clobbers = concat_INSN_LIST (pred_rl->clobbers,
+						  succ_rl->clobbers);
+	    succ_rl->uses_length += pred_rl->uses_length;
+	    succ_rl->clobbers_length += pred_rl->clobbers_length;
+	  });
+	IOR_REG_SET (&succ_deps->reg_last_in_use, &pred_deps->reg_last_in_use);
 
-	  for (u = tmp_deps_reg->uses; u; u = XEXP (u, 1))
-	    if (! find_insn_list (XEXP (u, 0), succ_deps_reg->uses))
-	      succ_deps_reg->uses
-		= alloc_INSN_LIST (XEXP (u, 0), succ_deps_reg->uses);
+	/* Mem read/write lists are inherited by bb_succ.  */
+	concat_insn_mem_list (pred_deps->pending_read_insns,
+			      pred_deps->pending_read_mems,
+			      &succ_deps->pending_read_insns,
+			      &succ_deps->pending_read_mems);
+	concat_insn_mem_list (pred_deps->pending_write_insns,
+			      pred_deps->pending_write_mems,
+			      &succ_deps->pending_write_insns,
+			      &succ_deps->pending_write_mems);
 
-	  for (u = tmp_deps_reg->sets; u; u = XEXP (u, 1))
-	    if (! find_insn_list (XEXP (u, 0), succ_deps_reg->sets))
-	      succ_deps_reg->sets
-		= alloc_INSN_LIST (XEXP (u, 0), succ_deps_reg->sets);
+	succ_deps->last_pending_memory_flush
+	  = concat_INSN_LIST (pred_deps->last_pending_memory_flush,
+			      succ_deps->last_pending_memory_flush);
 
-	  for (u = tmp_deps_reg->clobbers; u; u = XEXP (u, 1))
-	    if (! find_insn_list (XEXP (u, 0), succ_deps_reg->clobbers))
-	      succ_deps_reg->clobbers
-		= alloc_INSN_LIST (XEXP (u, 0), succ_deps_reg->clobbers);
-	});
-      IOR_REG_SET (&succ_deps->reg_last_in_use, &tmp_deps->reg_last_in_use);
+	succ_deps->pending_lists_length += pred_deps->pending_lists_length;
+	succ_deps->pending_flush_length += pred_deps->pending_flush_length;
 
-      /* Mem read/write lists are inherited by bb_succ.  */
-      link_insn = tmp_deps->pending_read_insns;
-      link_mem = tmp_deps->pending_read_mems;
-      while (link_insn)
-	{
-	  if (!(find_insn_mem_list (XEXP (link_insn, 0),
-				    XEXP (link_mem, 0),
-				    succ_deps->pending_read_insns,
-				    succ_deps->pending_read_mems)))
-	    add_insn_mem_dependence (succ_deps, &succ_deps->pending_read_insns,
-				     &succ_deps->pending_read_mems,
-				     XEXP (link_insn, 0), XEXP (link_mem, 0));
-	  link_insn = XEXP (link_insn, 1);
-	  link_mem = XEXP (link_mem, 1);
-	}
+	/* last_function_call is inherited by bb_succ.  */
+	succ_deps->last_function_call
+	  = concat_INSN_LIST (pred_deps->last_function_call,
+			      succ_deps->last_function_call);
 
-      link_insn = tmp_deps->pending_write_insns;
-      link_mem = tmp_deps->pending_write_mems;
-      while (link_insn)
-	{
-	  if (!(find_insn_mem_list (XEXP (link_insn, 0),
-				    XEXP (link_mem, 0),
-				    succ_deps->pending_write_insns,
-				    succ_deps->pending_write_mems)))
-	    add_insn_mem_dependence (succ_deps,
-				     &succ_deps->pending_write_insns,
-				     &succ_deps->pending_write_mems,
-				     XEXP (link_insn, 0), XEXP (link_mem, 0));
+	/* sched_before_next_call is inherited by bb_succ.  */
+	succ_deps->sched_before_next_call
+	  = concat_INSN_LIST (pred_deps->sched_before_next_call,
+			      succ_deps->sched_before_next_call);
 
-	  link_insn = XEXP (link_insn, 1);
-	  link_mem = XEXP (link_mem, 1);
-	}
+	e = NEXT_OUT (e);
+      }
+    while (e != first_edge);
 
-      /* last_function_call is inherited by bb_succ.  */
-      for (u = tmp_deps->last_function_call; u; u = XEXP (u, 1))
-	if (! find_insn_list (XEXP (u, 0), succ_deps->last_function_call))
-	  succ_deps->last_function_call
-	    = alloc_INSN_LIST (XEXP (u, 0), succ_deps->last_function_call);
+  /* These lists should point to the right place, for correct
+     freeing later.  */
+  bb_deps[bb].pending_read_insns = pred_deps->pending_read_insns;
+  bb_deps[bb].pending_read_mems = pred_deps->pending_read_mems;
+  bb_deps[bb].pending_write_insns = pred_deps->pending_write_insns;
+  bb_deps[bb].pending_write_mems = pred_deps->pending_write_mems;
 
-      /* last_pending_memory_flush is inherited by bb_succ.  */
-      for (u = tmp_deps->last_pending_memory_flush; u; u = XEXP (u, 1))
-	if (! find_insn_list (XEXP (u, 0),
-			      succ_deps->last_pending_memory_flush))
-	  succ_deps->last_pending_memory_flush
-	    = alloc_INSN_LIST (XEXP (u, 0),
-			       succ_deps->last_pending_memory_flush);
-
-      /* sched_before_next_call is inherited by bb_succ.  */
-      x = LOG_LINKS (tmp_deps->sched_before_next_call);
-      for (; x; x = XEXP (x, 1))
-	add_dependence (succ_deps->sched_before_next_call,
-			XEXP (x, 0), REG_DEP_ANTI);
-
-      e = NEXT_OUT (e);
-    }
-  while (e != first_edge);
+  /* Can't allow these to be freed twice.  */
+  pred_deps->pending_read_insns = 0;
+  pred_deps->pending_read_mems = 0;
+  pred_deps->pending_write_insns = 0;
+  pred_deps->pending_write_mems = 0;
 }
 
 /* Compute backward dependences inside bb.  In a multiple blocks region:
@@ -2553,14 +2605,27 @@ debug_dependencies ()
 	  fprintf (sched_dump, "\n;;   --- Region Dependences --- b %d bb %d \n",
 		   BB_TO_BLOCK (bb), bb);
 
-	  fprintf (sched_dump, ";;   %7s%6s%6s%6s%6s%6s%11s%6s\n",
-	  "insn", "code", "bb", "dep", "prio", "cost", "blockage", "units");
-	  fprintf (sched_dump, ";;   %7s%6s%6s%6s%6s%6s%11s%6s\n",
-	  "----", "----", "--", "---", "----", "----", "--------", "-----");
+	  if (targetm.sched.use_dfa_pipeline_interface
+	      && (*targetm.sched.use_dfa_pipeline_interface) ())
+	    {
+	      fprintf (sched_dump, ";;   %7s%6s%6s%6s%6s%6s%14s\n",
+		       "insn", "code", "bb", "dep", "prio", "cost",
+		       "reservation");
+	      fprintf (sched_dump, ";;   %7s%6s%6s%6s%6s%6s%14s\n",
+		       "----", "----", "--", "---", "----", "----",
+		       "-----------");
+	    }
+	  else
+	    {
+	      fprintf (sched_dump, ";;   %7s%6s%6s%6s%6s%6s%11s%6s\n",
+	      "insn", "code", "bb", "dep", "prio", "cost", "blockage", "units");
+	      fprintf (sched_dump, ";;   %7s%6s%6s%6s%6s%6s%11s%6s\n",
+	      "----", "----", "--", "---", "----", "----", "--------", "-----");
+	    }
+
 	  for (insn = head; insn != next_tail; insn = NEXT_INSN (insn))
 	    {
 	      rtx link;
-	      int unit, range;
 
 	      if (! INSN_P (insn))
 		{
@@ -2580,22 +2645,46 @@ debug_dependencies ()
 		  continue;
 		}
 
-	      unit = insn_unit (insn);
-	      range = (unit < 0
-		 || function_units[unit].blockage_range_function == 0) ? 0 :
-		function_units[unit].blockage_range_function (insn);
-	      fprintf (sched_dump,
-		       ";;   %s%5d%6d%6d%6d%6d%6d  %3d -%3d   ",
-		       (SCHED_GROUP_P (insn) ? "+" : " "),
-		       INSN_UID (insn),
-		       INSN_CODE (insn),
-		       INSN_BB (insn),
-		       INSN_DEP_COUNT (insn),
-		       INSN_PRIORITY (insn),
-		       insn_cost (insn, 0, 0),
-		       (int) MIN_BLOCKAGE_COST (range),
-		       (int) MAX_BLOCKAGE_COST (range));
-	      insn_print_units (insn);
+	      if (targetm.sched.use_dfa_pipeline_interface
+		  && (*targetm.sched.use_dfa_pipeline_interface) ())
+		{
+		  fprintf (sched_dump,
+			   ";;   %s%5d%6d%6d%6d%6d%6d   ",
+			   (SCHED_GROUP_P (insn) ? "+" : " "),
+			   INSN_UID (insn),
+			   INSN_CODE (insn),
+			   INSN_BB (insn),
+			   INSN_DEP_COUNT (insn),
+			   INSN_PRIORITY (insn),
+			   insn_cost (insn, 0, 0));
+
+		  if (recog_memoized (insn) < 0)
+		    fprintf (sched_dump, "nothing");
+		  else
+		    print_reservation (sched_dump, insn);
+		}
+	      else
+		{
+		  int unit = insn_unit (insn);
+		  int range
+		    = (unit < 0
+		       || function_units[unit].blockage_range_function == 0
+		       ? 0
+		       : function_units[unit].blockage_range_function (insn));
+		  fprintf (sched_dump,
+			   ";;   %s%5d%6d%6d%6d%6d%6d  %3d -%3d   ",
+			   (SCHED_GROUP_P (insn) ? "+" : " "),
+			   INSN_UID (insn),
+			   INSN_CODE (insn),
+			   INSN_BB (insn),
+			   INSN_DEP_COUNT (insn),
+			   INSN_PRIORITY (insn),
+			   insn_cost (insn, 0, 0),
+			   (int) MIN_BLOCKAGE_COST (range),
+			   (int) MAX_BLOCKAGE_COST (range));
+		  insn_print_units (insn);
+		}
+
 	      fprintf (sched_dump, "\t: ");
 	      for (link = INSN_DEPEND (insn); link; link = XEXP (link, 1))
 		fprintf (sched_dump, "%d ", INSN_UID (XEXP (link, 0)));
@@ -2907,7 +2996,7 @@ schedule_insns (dump_file)
   init_regions ();
 
   current_sched_info = &region_sched_info;
-  
+
   /* Schedule every region in the subroutine.  */
   for (rgn = 0; rgn < nr_regions; rgn++)
     schedule_region (rgn);

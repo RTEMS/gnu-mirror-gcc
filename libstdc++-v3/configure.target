@@ -69,6 +69,7 @@ esac
 case "${target_os}" in
   aix4.[3456789]* | aix[56789]*)
     os_include_dir="config/os/aix"
+    OPT_LDFLAGS="-Wl,-G"
     ;;
   bsd* | freebsd* )
     os_include_dir="config/os/bsd/freebsd"
@@ -106,6 +107,9 @@ case "${target_os}" in
     ;;
   hpux*)
     os_include_dir="config/os/hpux"
+    ;;
+  windiss*)
+    os_include_dir="config/os/windiss"
     ;;
   *)
     os_include_dir="config/os/generic"
@@ -158,6 +162,9 @@ case "${target}" in
      ;;
    m68k-*-* | m680[246]0-*-*)
      CPULIMITSH=config/cpu/m68k
+     ;;
+   mmix-*-*)
+     CPULIMITSH=config/cpu/mmix
      ;;
    powerpc-*-*)
      CPULIMITSH=config/cpu/powerpc

@@ -54,8 +54,8 @@ static void java_init_options PARAMS ((void));
 static int java_decode_option PARAMS ((int, char **));
 static void put_decl_string PARAMS ((const char *, int));
 static void put_decl_node PARAMS ((tree));
-static void java_dummy_print PARAMS ((diagnostic_context *, const char *));
-static void lang_print_error PARAMS ((diagnostic_context *, const char *));
+static void java_print_error_function PARAMS ((diagnostic_context *,
+					       const char *));
 static int process_option_with_no PARAMS ((const char *,
 					   const struct string_option *,
 					   int));
@@ -70,7 +70,8 @@ static int process_option_with_no PARAMS ((const char *,
 
 #define DEFTREECODE(SYM, NAME, TYPE, LENGTH) TYPE,
 
-static const char java_tree_code_type[] = {
+const char tree_code_type[] = {
+#include "tree.def"
   'x',
 #include "java-tree.def"
 };
@@ -82,7 +83,8 @@ static const char java_tree_code_type[] = {
 
 #define DEFTREECODE(SYM, NAME, TYPE, LENGTH) LENGTH,
 
-static const int java_tree_code_length[] = {
+const unsigned char tree_code_length[] = {
+#include "tree.def"
   0,
 #include "java-tree.def"
 };
@@ -92,11 +94,16 @@ static const int java_tree_code_length[] = {
    Used for printing out the tree and error messages.  */
 #define DEFTREECODE(SYM, NAME, TYPE, LEN) NAME,
 
-static const char *const java_tree_code_name[] = {
+const char *const tree_code_name[] = {
+#include "tree.def"
   "@@dummy",
 #include "java-tree.def"
 };
 #undef DEFTREECODE
+
+/* Used to avoid printing error messages with bogus function
+   prototypes.  Starts out false.  */
+static bool inhibit_error_function_printing;
 
 int compiling_from_source;
 
@@ -157,6 +164,9 @@ int flag_optimize_sci = 1;
    in order to improve binary compatibility. */
 int flag_indirect_dispatch = 0;
 
+/* When zero, don't generate runtime array store checks. */
+int flag_store_check = 1;
+
 /* When non zero, print extra version information.  */
 static int version_flag = 0;
 
@@ -179,7 +189,8 @@ lang_f_options[] =
   {"check-references", &flag_check_references, 1},
   {"force-classes-archive-check", &flag_force_classes_archive_check, 1},
   {"optimize-static-class-initialization", &flag_optimize_sci, 1 },
-  {"indirect-dispatch", &flag_indirect_dispatch, 1}
+  {"indirect-dispatch", &flag_indirect_dispatch, 1},
+  {"store-check", &flag_store_check, 1}
 };
 
 static const struct string_option
@@ -202,6 +213,11 @@ static int dependency_tracking = 0;
 #define DEPEND_TARGET_SET 4
 #define DEPEND_FILE_ALREADY_SET 8
 
+struct language_function GTY(())
+{
+  int unused;
+};
+
 #undef LANG_HOOKS_NAME
 #define LANG_HOOKS_NAME "GNU Java"
 #undef LANG_HOOKS_INIT
@@ -212,8 +228,31 @@ static int dependency_tracking = 0;
 #define LANG_HOOKS_INIT_OPTIONS java_init_options
 #undef LANG_HOOKS_DECODE_OPTION
 #define LANG_HOOKS_DECODE_OPTION java_decode_option
-#undef LANG_HOOKS_SET_YYDEBUG
-#define LANG_HOOKS_SET_YYDEBUG java_set_yydebug
+#undef LANG_HOOKS_PARSE_FILE
+#define LANG_HOOKS_PARSE_FILE java_parse_file
+#undef LANG_HOOKS_MARK_ADDRESSABLE
+#define LANG_HOOKS_MARK_ADDRESSABLE java_mark_addressable
+#undef LANG_HOOKS_EXPAND_EXPR
+#define LANG_HOOKS_EXPAND_EXPR java_expand_expr
+#undef LANG_HOOKS_TRUTHVALUE_CONVERSION
+#define LANG_HOOKS_TRUTHVALUE_CONVERSION java_truthvalue_conversion
+#undef LANG_HOOKS_DUP_LANG_SPECIFIC_DECL
+#define LANG_HOOKS_DUP_LANG_SPECIFIC_DECL java_dup_lang_specific_decl
+#undef LANG_HOOKS_DECL_PRINTABLE_NAME
+#define LANG_HOOKS_DECL_PRINTABLE_NAME lang_printable_name
+#undef LANG_HOOKS_PRINT_ERROR_FUNCTION
+#define LANG_HOOKS_PRINT_ERROR_FUNCTION	java_print_error_function
+
+#undef LANG_HOOKS_TYPE_FOR_MODE
+#define LANG_HOOKS_TYPE_FOR_MODE java_type_for_mode
+#undef LANG_HOOKS_TYPE_FOR_SIZE
+#define LANG_HOOKS_TYPE_FOR_SIZE java_type_for_size
+#undef LANG_HOOKS_SIGNED_TYPE
+#define LANG_HOOKS_SIGNED_TYPE java_signed_type
+#undef LANG_HOOKS_UNSIGNED_TYPE
+#define LANG_HOOKS_UNSIGNED_TYPE java_unsigned_type
+#undef LANG_HOOKS_SIGNED_OR_UNSIGNED_TYPE
+#define LANG_HOOKS_SIGNED_OR_UNSIGNED_TYPE java_signed_or_unsigned_type
 
 /* Each front end provides its own.  */
 const struct lang_hooks lang_hooks = LANG_HOOKS_INITIALIZER;
@@ -257,6 +296,8 @@ java_decode_option (argc, argv)
 {
   char *p = argv[0];
 
+  jcf_path_init ();
+
   if (strcmp (p, "-version") == 0)
     {
       version_flag = 1;
@@ -299,6 +340,13 @@ java_decode_option (argc, argv)
       return 1;
     }
 #undef CLARG
+#define CLARG "-fCLASSPATH="
+  if (strncmp (p, CLARG, sizeof (CLARG) - 1) == 0)
+    {
+      jcf_path_classpath_arg (p + sizeof (CLARG) - 1);
+      return 1;
+    }
+#undef CLARG
 #define CLARG "-fclasspath="
   if (strncmp (p, CLARG, sizeof (CLARG) - 1) == 0)
     {
@@ -306,10 +354,17 @@ java_decode_option (argc, argv)
       return 1;
     }
 #undef CLARG
-#define CLARG "-fCLASSPATH="
+#define CLARG "-fbootclasspath="
   if (strncmp (p, CLARG, sizeof (CLARG) - 1) == 0)
     {
-      jcf_path_CLASSPATH_arg (p + sizeof (CLARG) - 1);
+      jcf_path_bootclasspath_arg (p + sizeof (CLARG) - 1);
+      return 1;
+    }
+#undef CLARG
+#define CLARG "-fextdirs="
+  if (strncmp (p, CLARG, sizeof (CLARG) - 1) == 0)
+    {
+      jcf_path_extdirs_arg (p + sizeof (CLARG) - 1);
       return 1;
     }
 #undef CLARG
@@ -486,23 +541,6 @@ java_init (filename)
   jcf_path_init ();
   jcf_path_seal (version_flag);
 
-  decl_printable_name = lang_printable_name;
-  print_error_function = lang_print_error;
-  lang_expand_expr = java_lang_expand_expr;
-
-  /* Append to Gcc tree node definition arrays */
-
-  memcpy (tree_code_type + (int) LAST_AND_UNUSED_TREE_CODE,
-	  java_tree_code_type,
-	  (int)LAST_JAVA_TREE_CODE - (int)LAST_AND_UNUSED_TREE_CODE);
-  memcpy (tree_code_length + (int) LAST_AND_UNUSED_TREE_CODE,
-	  java_tree_code_length,
-	  (LAST_JAVA_TREE_CODE - 
-	   (int)LAST_AND_UNUSED_TREE_CODE) * sizeof (int));
-  memcpy (tree_code_name + (int) LAST_AND_UNUSED_TREE_CODE,
-	  java_tree_code_name,
-	  (LAST_JAVA_TREE_CODE - 
-	   (int)LAST_AND_UNUSED_TREE_CODE) * sizeof (char *));
   java_init_decl_processing ();
 
   using_eh_for_cleanups ();
@@ -628,7 +666,7 @@ put_decl_node (node)
 /* Return a user-friendly name for DECL.
    The resulting string is only valid until the next call.
    The value of the hook decl_printable_name is this function,
-   which is also called directly by lang_print_error. */
+   which is also called directly by java_print_error_function. */
 
 const char *
 lang_printable_name (decl, v)
@@ -657,25 +695,18 @@ lang_printable_name_wls (decl, v)
 }
 
 /* Print on stderr the current class and method context.  This function
-   is the value of the hook print_error_function, called from toplev.c. */
+   is the value of the hook print_error_function. */
 
+static GTY(()) tree last_error_function_context;
+static GTY(()) tree last_error_function;
 static void
-lang_print_error (context, file)
+java_print_error_function (context, file)
      diagnostic_context *context __attribute__((__unused__));
      const char *file;
 {
-  static tree last_error_function_context = NULL_TREE;
-  static tree last_error_function = NULL;
-  static int initialized_p;
-
-  /* Register LAST_ERROR_FUNCTION_CONTEXT and LAST_ERROR_FUNCTION with
-     the garbage collector.  */
-  if (!initialized_p)
-    {
-      ggc_add_tree_root (&last_error_function_context, 1);
-      ggc_add_tree_root (&last_error_function, 1);
-      initialized_p = 1;
-    }
+  /* Don't print error messages with bogus function prototypes.  */
+  if (inhibit_error_function_printing)
+    return;
 
   if (current_function_decl != NULL
       && DECL_CONTEXT (current_function_decl) != last_error_function_context)
@@ -708,31 +739,17 @@ lang_print_error (context, file)
 
 }
 
-/* This doesn't do anything on purpose. It's used to satisfy the
-   print_error_function hook we don't print error messages with bogus
-   function prototypes.  */
-
-static void
-java_dummy_print (c, s)
-     diagnostic_context *c __attribute__ ((__unused__));
-     const char *s __attribute__ ((__unused__));
-{
-}
-
 /* Called to install the PRINT_ERROR_FUNCTION hook differently
    according to LEVEL. LEVEL is 1 during early parsing, when function
-   prototypes aren't fully resolved. print_error_function is set so it
-   doesn't print incomplete function prototypes. When LEVEL is 2,
-   function prototypes are fully resolved and can be printed when
+   prototypes aren't fully resolved. java_print_error_function is set
+   so it doesn't print incomplete function prototypes. When LEVEL is
+   2, function prototypes are fully resolved and can be printed when
    reporting errors.  */
 
 void lang_init_source (level)
      int level;
 {
-  if (level == 1)
-    print_error_function = java_dummy_print;
-  else 
-    print_error_function = lang_print_error;
+  inhibit_error_function_printing = (level == 1);
 }
 
 static void
@@ -741,4 +758,9 @@ java_init_options ()
   flag_bounds_check = 1;
   flag_exceptions = 1;
   flag_non_call_exceptions = 1;
+
+  /* In Java floating point operations never trap.  */
+  flag_trapping_math = 0;
 }
+
+#include "gt-java-lang.h"

@@ -1,6 +1,6 @@
 // 2001-11-21 Benjamin Kosnik  <bkoz@redhat.com>
 
-// Copyright (C) 2001-2002 Free Software Foundation
+// Copyright (C) 2001, 2002 Free Software Foundation
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -213,7 +213,7 @@ void test01()
   VERIFY( err == goodbit );
 
   // const void
-  iss.str("0xbffff74c.");
+  iss.str("0xbffff74c,");
   iss.clear();
   err = goodbit;
   ng.get(iss.rdbuf(), 0, iss, err, v);
@@ -242,33 +242,203 @@ void test02()
   using namespace std;
   bool test = true;
 
-  // Num_get works with other iterators besides streambuf output iterators
+  // Check num_get works with other iterators besides streambuf
+  // output iterators. (As long as output_iterator requirements are met.)
   typedef string::const_iterator iter_type;
   typedef num_get<char, iter_type> num_get_type;
   const ios_base::iostate goodbit = ios_base::goodbit;
   const ios_base::iostate eofbit = ios_base::eofbit;
   ios_base::iostate err = ios_base::goodbit;
   const locale loc_c = locale::classic();
+  const string str("20000106 Elizabeth Durack");
+  const string str2("0 true 0xbffff74c Durack");
 
-  long i = 0;
-  const string str = "20000106 Elizabeth Durack";
   istringstream iss; // need an ios, add my num_get facet
   iss.imbue(locale(loc_c, new num_get_type));
 
   // Iterator advanced, state, output.
   const num_get_type& ng = use_facet<num_get_type>(iss.getloc());
-  iter_type end = ng.get(str.begin(), str.end(), iss, err, i);
-  string rem(end, str.end());
 
+  // 01 get(long)
+  // 02 get(long double)
+  // 03 get(bool)
+  // 04 get(void*)
+
+  // 01 get(long)
+  long i = 0;
+  err = goodbit;
+  iter_type end1 = ng.get(str.begin(), str.end(), iss, err, i);
+  string rem1(end1, str.end());
   VERIFY( err == goodbit );
   VERIFY( i == 20000106);
-  VERIFY( rem == " Elizabeth Durack" );
+  VERIFY( rem1 == " Elizabeth Durack" );
+
+  // 02 get(long double)
+  long double ld = 0;
+  err = goodbit;
+  iter_type end2 = ng.get(str.begin(), str.end(), iss, err, ld);
+  string rem2(end2, str.end());
+  VERIFY( err == goodbit );
+  VERIFY( ld == 20000106);
+  VERIFY( rem2 == " Elizabeth Durack" );
+
+  // 03 get(bool)
+  bool b = 1;
+  iss.clear();
+  err = goodbit;
+  iter_type end3 = ng.get(str2.begin(), str2.end(), iss, err, b);
+  string rem3(end3, str2.end());
+  VERIFY( err == goodbit );
+  VERIFY( b == 0 );
+  VERIFY( rem3 == " true 0xbffff74c Durack" );
+
+  iss.clear();
+  err = goodbit;
+  iss.setf(ios_base::boolalpha);
+  iter_type end4 = ng.get(++end3, str2.end(), iss, err, b);
+  string rem4(end4, str2.end());
+  VERIFY( err == goodbit );
+  VERIFY( b == true );
+  VERIFY( rem4 == " 0xbffff74c Durack" );
+
+  // 04 get(void*)
+  void* v;
+  iss.clear();
+  err = goodbit;
+  iss.setf(ios_base::fixed, ios_base::floatfield);
+  iter_type end5 = ng.get(++end4, str2.end(), iss, err, v);
+  string rem5(end5, str2.end());
+  VERIFY( err == goodbit );
+  VERIFY( b == true );
+  VERIFY( rem5 == " Durack" );
+}
+
+// libstdc++/5280
+void test03()
+{
+#ifdef _GLIBCPP_HAVE_SETENV 
+  // Set the global locale to non-"C".
+  std::locale loc_de("de_DE");
+  std::locale::global(loc_de);
+
+  // Set LANG environment variable to de_DE.
+  const char* oldLANG = getenv("LANG");
+  if (!setenv("LANG", "de_DE", 1))
+    {
+      test01();
+      test02();
+      setenv("LANG", oldLANG ? oldLANG : "", 1);
+    }
+#endif
+}
+
+// Testing the correct parsing of grouped hexadecimals and octals.
+void test04()
+{
+  using namespace std;
+
+  bool test = true;
+ 
+  unsigned long ul;
+
+  istringstream iss;
+
+  // A locale that expects grouping  
+  locale loc_de("de_DE");
+  iss.imbue(loc_de);
+
+  const num_get<char>& ng = use_facet<num_get<char> >(iss.getloc()); 
+  const ios_base::iostate goodbit = ios_base::goodbit;
+  ios_base::iostate err = ios_base::goodbit;
+
+  iss.setf(ios::hex, ios::basefield);
+  iss.str("0xbf.fff.74c ");
+  err = goodbit;
+  ng.get(iss.rdbuf(), 0, iss, err, ul);
+  VERIFY( err == goodbit );
+  VERIFY( ul == 0xbffff74c );
+
+  iss.str("0Xf.fff ");
+  err = goodbit;
+  ng.get(iss.rdbuf(), 0, iss, err, ul);
+  VERIFY( err == goodbit );
+  VERIFY( ul == 0xffff );
+
+  iss.str("ffe ");
+  err = goodbit;
+  ng.get(iss.rdbuf(), 0, iss, err, ul);
+  VERIFY( err == goodbit );
+  VERIFY( ul == 0xffe );
+
+  iss.setf(ios::oct, ios::basefield);
+  iss.str("07.654.321 ");
+  err = goodbit;
+  ng.get(iss.rdbuf(), 0, iss, err, ul);
+  VERIFY( err == goodbit );
+  VERIFY( ul == 07654321 );
+
+  iss.str("07.777 ");
+  err = goodbit;
+  ng.get(iss.rdbuf(), 0, iss, err, ul);
+  VERIFY( err == goodbit );
+  VERIFY( ul == 07777 );
+
+  iss.str("776 ");
+  err = goodbit;
+  ng.get(iss.rdbuf(), 0, iss, err, ul);
+  VERIFY( err == goodbit );
+  VERIFY( ul == 0776 );
+}
+
+// libstdc++/5816
+void test05()
+{
+  using namespace std;
+  bool test = true;
+
+  double d = 0.0;
+
+  istringstream iss;
+  locale loc_de("de_DE");
+  iss.imbue(loc_de);
+
+  const num_get<char>& ng = use_facet<num_get<char> >(iss.getloc()); 
+  const ios_base::iostate goodbit = ios_base::goodbit;
+  ios_base::iostate err = ios_base::goodbit;
+
+  iss.str("1234,5 ");
+  err = goodbit;
+  ng.get(iss.rdbuf(), 0, iss, err, d);
+  VERIFY( err == goodbit );
+  VERIFY( d == 1234.5 );
+}
+
+// http://gcc.gnu.org/ml/libstdc++/2002-05/msg00038.html
+void test06()
+{
+  bool test = true;
+
+  const char* tentLANG = setlocale(LC_ALL, "ja_JP.eucjp");
+  if (tentLANG != NULL)
+    {
+      std::string preLANG = tentLANG;
+      test01();
+      test02();
+      test04();
+      test05();
+      std::string postLANG = setlocale(LC_ALL, NULL);
+      VERIFY( preLANG == postLANG );
+    }
 }
 
 int main()
 {
   test01();
   test02();
+  test03();
+  test04();
+  test05();
+  test06();
   return 0;
 }
 

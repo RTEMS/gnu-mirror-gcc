@@ -1,5 +1,5 @@
 /* Target definitions for Darwin (Mac OS X) systems.
-   Copyright (C) 1989, 1990, 1991, 1992, 1993, 2000, 2001
+   Copyright (C) 1989, 1990, 1991, 1992, 1993, 2000, 2001, 2002
    Free Software Foundation, Inc.
    Contributed by Apple Computer Inc.
 
@@ -150,12 +150,6 @@ do { text_section ();							\
 
 #define NO_PROFILE_COUNTERS
 
-/* Don't use .gcc_compiled symbols to communicate with GDB;
-   They interfere with numerically sorted symbol lists. */
-
-#undef	ASM_IDENTIFY_GCC
-#define ASM_IDENTIFY_GCC(asm_out_file)
-
 #undef	INIT_SECTION_ASM_OP
 #define INIT_SECTION_ASM_OP
 
@@ -214,7 +208,7 @@ do { text_section ();							\
     if ((TREE_STATIC (DECL)                                             \
 	 && (!DECL_COMMON (DECL) || !TREE_PUBLIC (DECL)))               \
         || DECL_INITIAL (DECL))                                         \
-      ENCODE_SECTION_INFO (DECL);  \
+      ENCODE_SECTION_INFO (DECL, false);				\
     ASM_OUTPUT_LABEL (FILE, xname);                                     \
   } while (0)
 
@@ -230,7 +224,7 @@ do { text_section ();							\
     if ((TREE_STATIC (DECL)                                             \
 	 && (!DECL_COMMON (DECL) || !TREE_PUBLIC (DECL)))               \
         || DECL_INITIAL (DECL))                                         \
-      ENCODE_SECTION_INFO (DECL);					\
+      ENCODE_SECTION_INFO (DECL, false);				\
     ASM_OUTPUT_LABEL (FILE, xname);                                     \
     /* Avoid generating stubs for functions we've just defined by	\
        outputting any required stub name label now.  */			\
@@ -276,19 +270,20 @@ do { text_section ();							\
 /* Ensure correct alignment of bss data.  */
 
 #undef	ASM_OUTPUT_ALIGNED_DECL_LOCAL
-#define ASM_OUTPUT_ALIGNED_DECL_LOCAL(FILE, DECL, NAME, SIZE, ALIGN) \
-  do {  \
-    fputs (".lcomm ", (FILE));				\
-    assemble_name ((FILE), (NAME));			\
-    fprintf ((FILE), ",%u,%u\n", (SIZE), floor_log2 ((ALIGN) / BITS_PER_UNIT)); \
-    if ((DECL) && ((TREE_STATIC (DECL)                                             \
-	 && (!DECL_COMMON (DECL) || !TREE_PUBLIC (DECL)))               \
-        || DECL_INITIAL (DECL)))                                         \
-      ENCODE_SECTION_INFO (DECL);  \
-    if ((DECL) && ((TREE_STATIC (DECL)                                             \
-	 && (!DECL_COMMON (DECL) || !TREE_PUBLIC (DECL)))               \
-        || DECL_INITIAL (DECL)))                                         \
-      machopic_define_name (NAME);                                     \
+#define ASM_OUTPUT_ALIGNED_DECL_LOCAL(FILE, DECL, NAME, SIZE, ALIGN)	\
+  do {									\
+    fputs (".lcomm ", (FILE));						\
+    assemble_name ((FILE), (NAME));					\
+    fprintf ((FILE), ",%u,%u\n", (SIZE),				\
+	     floor_log2 ((ALIGN) / BITS_PER_UNIT));			\
+    if ((DECL) && ((TREE_STATIC (DECL)					\
+	 && (!DECL_COMMON (DECL) || !TREE_PUBLIC (DECL)))		\
+        || DECL_INITIAL (DECL)))					\
+      ENCODE_SECTION_INFO (DECL, false);				\
+    if ((DECL) && ((TREE_STATIC (DECL)					\
+	 && (!DECL_COMMON (DECL) || !TREE_PUBLIC (DECL)))		\
+        || DECL_INITIAL (DECL)))					\
+      machopic_define_name (NAME);					\
   } while (0)
 
 /* Output nothing for #ident.  */
@@ -320,11 +315,6 @@ FUNCTION ()								\
       in_section = SECTION;						\
     }									\
 }									\
-
-#define ALIAS_SECTION(enum_value, alias_name) 				\
-do { if (!strcmp (alias_name, name))					\
-       section_alias[enum_value] = (alias ? get_identifier (alias) : 0);  \
-   } while (0)
 
 /* Darwin uses many types of special sections.  */
 
@@ -491,157 +481,13 @@ objc_section_init ()				\
       objc_module_info_section ();		\
       objc_symbols_section ();			\
     }						\
-} 						\
-static tree section_alias[(int) num_sections];	\
-static void try_section_alias PARAMS ((void));	\
-static void try_section_alias () 		\
-{						\
-    if (section_alias[in_section] && asm_out_file) \
-      fprintf (asm_out_file, "%s\n",		\
-	       IDENTIFIER_POINTER (section_alias[in_section]));	\
-}      						\
-
-#if 0
-static void alias_section PARAMS ((const char *, const char *)); \
-static void alias_section (name, alias)			\
-     const char *name, *alias;				\
-{							\
-    ALIAS_SECTION (in_data, "data");			\
-    ALIAS_SECTION (in_text, "text");			\
-    ALIAS_SECTION (in_const, "const");			\
-    ALIAS_SECTION (in_const_data, "const_data");	\
-    ALIAS_SECTION (in_cstring, "cstring");		\
-    ALIAS_SECTION (in_literal4, "literal4");		\
-    ALIAS_SECTION (in_literal8, "literal8");		\
 }
-#endif
 
 #undef	READONLY_DATA_SECTION
 #define READONLY_DATA_SECTION const_section
 
-#undef	SELECT_SECTION
-#define SELECT_SECTION(exp,reloc,align)				\
-  do								\
-    {								\
-      if (TREE_CODE (exp) == STRING_CST)			\
-	{							\
-	  if (flag_writable_strings)				\
-	    data_section ();					\
-	  else if (TREE_STRING_LENGTH (exp) !=			\
-		   strlen (TREE_STRING_POINTER (exp)) + 1)	\
-	    readonly_data_section ();				\
-	  else							\
-	    cstring_section ();					\
-	}							\
-      else if (TREE_CODE (exp) == INTEGER_CST			\
-	       || TREE_CODE (exp) == REAL_CST)			\
-        {							\
-	  tree size = TYPE_SIZE (TREE_TYPE (exp));		\
-	  							\
-	  if (TREE_CODE (size) == INTEGER_CST &&		\
-	      TREE_INT_CST_LOW (size) == 4 &&			\
-	      TREE_INT_CST_HIGH (size) == 0)			\
-	    literal4_section ();				\
-	  else if (TREE_CODE (size) == INTEGER_CST &&		\
-	      TREE_INT_CST_LOW (size) == 8 &&			\
-	      TREE_INT_CST_HIGH (size) == 0)			\
-	    literal8_section ();				\
-	  else							\
-	    readonly_data_section ();				\
-	}							\
-      else if (TREE_CODE (exp) == CONSTRUCTOR				\
-	       && TREE_TYPE (exp)					\
-	       && TREE_CODE (TREE_TYPE (exp)) == RECORD_TYPE		\
-	       && TYPE_NAME (TREE_TYPE (exp)))				\
-	{								\
-	  tree name = TYPE_NAME (TREE_TYPE (exp));			\
-	  if (TREE_CODE (name) == TYPE_DECL)				\
-	    name = DECL_NAME (name);					\
-	  if (!strcmp (IDENTIFIER_POINTER (name), "NSConstantString"))	\
-	    objc_constant_string_object_section ();			\
-	  else if (!strcmp (IDENTIFIER_POINTER (name), "NXConstantString")) \
-	    objc_string_object_section ();				\
-	  else if (TREE_READONLY (exp) || TREE_CONSTANT (exp))		\
-	    {								\
-	      if (TREE_SIDE_EFFECTS (exp) || flag_pic && reloc)		\
-		const_data_section ();					\
-	      else							\
-		readonly_data_section (); 				\
-            }								\
-	  else								\
-	    data_section ();						\
-      }									\
-      else if (TREE_CODE (exp) == VAR_DECL &&				\
-	       DECL_NAME (exp) &&					\
-	       TREE_CODE (DECL_NAME (exp)) == IDENTIFIER_NODE &&	\
-	       IDENTIFIER_POINTER (DECL_NAME (exp)) &&			\
-	       !strncmp (IDENTIFIER_POINTER (DECL_NAME (exp)), "_OBJC_", 6)) \
-	{								\
-	  const char *name = IDENTIFIER_POINTER (DECL_NAME (exp));	\
-	  								\
-	  if (!strncmp (name, "_OBJC_CLASS_METHODS_", 20))		\
-	    objc_cls_meth_section ();					\
-	  else if (!strncmp (name, "_OBJC_INSTANCE_METHODS_", 23))	\
-	    objc_inst_meth_section ();					\
-	  else if (!strncmp (name, "_OBJC_CATEGORY_CLASS_METHODS_", 20)) \
-	    objc_cat_cls_meth_section ();				\
-	  else if (!strncmp (name, "_OBJC_CATEGORY_INSTANCE_METHODS_", 23)) \
-	    objc_cat_inst_meth_section ();				\
-	  else if (!strncmp (name, "_OBJC_CLASS_VARIABLES_", 22))	\
-	    objc_class_vars_section ();					\
-	  else if (!strncmp (name, "_OBJC_INSTANCE_VARIABLES_", 25))	\
-	    objc_instance_vars_section ();				\
-	  else if (!strncmp (name, "_OBJC_CLASS_PROTOCOLS_", 22))	\
-	    objc_cat_cls_meth_section ();				\
-	  else if (!strncmp (name, "_OBJC_CLASS_NAME_", 17))		\
-	    objc_class_names_section ();				\
-	  else if (!strncmp (name, "_OBJC_METH_VAR_NAME_", 20))		\
-	    objc_meth_var_names_section ();				\
-	  else if (!strncmp (name, "_OBJC_METH_VAR_TYPE_", 20))		\
-	    objc_meth_var_types_section ();				\
-	  else if (!strncmp (name, "_OBJC_CLASS_REFERENCES", 22))	\
-	    objc_cls_refs_section ();					\
-	  else if (!strncmp (name, "_OBJC_CLASS_", 12))			\
-	    objc_class_section ();					\
-	  else if (!strncmp (name, "_OBJC_METACLASS_", 16))		\
-	    objc_meta_class_section ();					\
-	  else if (!strncmp (name, "_OBJC_CATEGORY_", 15))		\
-	    objc_category_section ();					\
-	  else if (!strncmp (name, "_OBJC_SELECTOR_REFERENCES", 25))	\
-	    objc_selector_refs_section ();				\
-	  else if (!strncmp (name, "_OBJC_SELECTOR_FIXUP", 20))		\
-	    objc_selector_fixup_section ();				\
-	  else if (!strncmp (name, "_OBJC_SYMBOLS", 13))		\
-	    objc_symbols_section ();					\
-	  else if (!strncmp (name, "_OBJC_MODULES", 13))		\
-	    objc_module_info_section ();				\
-	  else if (!strncmp (name, "_OBJC_PROTOCOL_INSTANCE_METHODS_", 32)) \
-	    objc_cat_inst_meth_section ();                              \
-	  else if (!strncmp (name, "_OBJC_PROTOCOL_CLASS_METHODS_", 29)) \
-	    objc_cat_cls_meth_section ();                               \
-	  else if (!strncmp (name, "_OBJC_PROTOCOL_REFS_", 20))         \
-	    objc_cat_cls_meth_section ();                               \
-	  else if (!strncmp (name, "_OBJC_PROTOCOL_", 15))              \
-	    objc_protocol_section ();                                   \
-	  else if ((TREE_READONLY (exp) || TREE_CONSTANT (exp))		\
-		&& !TREE_SIDE_EFFECTS (exp))     			\
-             { if (flag_pic && reloc ) const_data_section ();             \
-               else readonly_data_section (); }                       	\
-	  else								\
-	    data_section ();						\
-	}								\
-      else if (TREE_READONLY (exp) || TREE_CONSTANT (exp))		\
-	{								\
-	  if (TREE_SIDE_EFFECTS (exp) || flag_pic && reloc)		\
-	    const_data_section ();					\
-	  else								\
-	    readonly_data_section (); 					\
-        }								\
-      else								\
-        data_section ();						\
-      try_section_alias ();						\
-    }									\
-  while (0)
+#undef	TARGET_ASM_SELECT_SECTION
+#define TARGET_ASM_SELECT_SECTION machopic_select_section
 
 /* This can be called with address expressions as "rtx".
    They must go in "const". */
@@ -722,12 +568,8 @@ enum machopic_addr_class {
 #define MACHOPIC_JUST_INDIRECT (flag_pic == 1)
 #define MACHOPIC_PURE          (flag_pic == 2)
 
-#define ENCODE_SECTION_INFO(DECL)  \
-  darwin_encode_section_info (DECL)
-
-/* Be conservative and always redo the encoding.  */
-
-#define REDO_SECTION_INFO_P(DECL) (1)
+#define ENCODE_SECTION_INFO(DECL, FIRST) \
+  darwin_encode_section_info (DECL, FIRST)
 
 #define STRIP_NAME_ENCODING(VAR,SYMBOL_NAME)  \
   ((VAR) = ((SYMBOL_NAME[0] == '!') ? (SYMBOL_NAME) + 4 : (SYMBOL_NAME)))

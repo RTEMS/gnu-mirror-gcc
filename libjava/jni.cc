@@ -1,6 +1,6 @@
 // jni.cc - JNI implementation, including the jump table.
 
-/* Copyright (C) 1998, 1999, 2000, 2001  Free Software Foundation
+/* Copyright (C) 1998, 1999, 2000, 2001, 2002  Free Software Foundation
 
    This file is part of libgcj.
 
@@ -26,7 +26,7 @@ details.  */
 #include <java/lang/Throwable.h>
 #include <java/lang/ArrayIndexOutOfBoundsException.h>
 #include <java/lang/StringIndexOutOfBoundsException.h>
-#include <java/lang/AbstractMethodError.h>
+#include <java/lang/UnsatisfiedLinkError.h>
 #include <java/lang/InstantiationException.h>
 #include <java/lang/NoSuchFieldError.h>
 #include <java/lang/NoSuchMethodError.h>
@@ -325,7 +325,7 @@ _Jv_JNI_NewLocalRef (JNIEnv *env, jobject obj)
 
       // If we found a slot, or if the frame we just searched is the
       // mark frame, then we are done.
-      if (done || frame->marker != MARK_NONE)
+      if (done || frame == NULL || frame->marker != MARK_NONE)
 	break;
     }
 
@@ -424,7 +424,7 @@ wrap_value (JNIEnv *env, T *value)
 static jint
 _Jv_JNI_GetVersion (JNIEnv *)
 {
-  return JNI_VERSION_1_2;
+  return JNI_VERSION_1_4;
 }
 
 static jclass
@@ -1672,6 +1672,31 @@ _Jv_JNI_DeleteWeakGlobalRef (JNIEnv *, jweak obj)
 
 
 
+// Direct byte buffers.
+
+static jobject
+_Jv_JNI_NewDirectByteBuffer (JNIEnv *, void *, jlong)
+{
+  // For now we don't support this.
+  return NULL;
+}
+
+static void *
+_Jv_JNI_GetDirectBufferAddress (JNIEnv *, jobject)
+{
+  // For now we don't support this.
+  return NULL;
+}
+
+static jlong
+_Jv_JNI_GetDirectBufferCapacity (JNIEnv *, jobject)
+{
+  // For now we don't support this.
+  return -1;
+}
+
+
+
 // Hash table of native methods.
 static JNINativeMethod *nathash;
 // Number of slots used.
@@ -2014,7 +2039,7 @@ _Jv_LookupJNIMethod (jclass klass, _Jv_Utf8Const *name,
       if (function == NULL)
 	{
 	  jstring str = JvNewStringUTF (name->data);
-	  throw new java::lang::AbstractMethodError (str);
+	  throw new java::lang::UnsatisfiedLinkError (str);
 	}
     }
 
@@ -2096,7 +2121,8 @@ _Jv_JNIMethod::call (ffi_cif *, void *ret, ffi_raw *args, void *__this)
 
 // An internal helper function.
 static jint
-_Jv_JNI_AttachCurrentThread (JavaVM *, jstring name, void **penv, void *args)
+_Jv_JNI_AttachCurrentThread (JavaVM *, jstring name, void **penv,
+			     void *args, jboolean is_daemon)
 {
   JavaVMAttachArgs *attach = reinterpret_cast<JavaVMAttachArgs *> (args);
   java::lang::ThreadGroup *group = NULL;
@@ -2104,7 +2130,8 @@ _Jv_JNI_AttachCurrentThread (JavaVM *, jstring name, void **penv, void *args)
   if (attach)
     {
       // FIXME: do we really want to support 1.1?
-      if (attach->version != JNI_VERSION_1_2
+      if (attach->version != JNI_VERSION_1_4
+	  && attach->version != JNI_VERSION_1_2
 	  && attach->version != JNI_VERSION_1_1)
 	return JNI_EVERSION;
 
@@ -2131,6 +2158,14 @@ _Jv_JNI_AttachCurrentThread (JavaVM *, jstring name, void **penv, void *args)
       _Jv_Free (env);
       return JNI_ERR;
     }
+
+  env->locals->marker = MARK_SYSTEM;
+  env->locals->size = FRAME_SIZE;
+  env->locals->next = NULL;
+
+  for (int i = 0; i < env->locals->size; ++i)
+    env->locals->vec[i] = NULL;
+
   *penv = reinterpret_cast<void *> (env);
 
   // This thread might already be a Java thread -- this function might
@@ -2139,7 +2174,10 @@ _Jv_JNI_AttachCurrentThread (JavaVM *, jstring name, void **penv, void *args)
     {
       try
 	{
-	  _Jv_AttachCurrentThread (name, group);
+	  if (is_daemon)
+	    _Jv_AttachCurrentThreadAsDaemon (name, group);
+	  else
+	    _Jv_AttachCurrentThread (name, group);
 	}
       catch (jthrowable t)
 	{
@@ -2155,7 +2193,13 @@ _Jv_JNI_AttachCurrentThread (JavaVM *, jstring name, void **penv, void *args)
 static jint
 _Jv_JNI_AttachCurrentThread (JavaVM *vm, void **penv, void *args)
 {
-  return _Jv_JNI_AttachCurrentThread (vm, NULL, penv, args);
+  return _Jv_JNI_AttachCurrentThread (vm, NULL, penv, args, false);
+}
+
+static jint
+_Jv_JNI_AttachCurrentThreadAsDaemon (JavaVM *vm, void **penv, void *args)
+{
+  return _Jv_JNI_AttachCurrentThread (vm, NULL, penv, args, true);
 }
 
 static jint
@@ -2177,10 +2221,9 @@ _Jv_JNI_DestroyJavaVM (JavaVM *vm)
 	  return JNI_ERR;
 	}
 
-      jint r = _Jv_JNI_AttachCurrentThread (vm,
-					    main_name,
+      jint r = _Jv_JNI_AttachCurrentThread (vm, main_name,
 					    reinterpret_cast<void **> (&env),
-					    NULL);
+					    NULL, false);
       if (r < 0)
 	return r;
     }
@@ -2219,7 +2262,8 @@ _Jv_JNI_GetEnv (JavaVM *, void **penv, jint version)
 #endif
 
   // FIXME: do we really want to support 1.1?
-  if (version != JNI_VERSION_1_2 && version != JNI_VERSION_1_1)
+  if (version != JNI_VERSION_1_4 && version != JNI_VERSION_1_2
+      && version != JNI_VERSION_1_1)
     {
       *penv = NULL;
       return JNI_EVERSION;
@@ -2233,12 +2277,12 @@ jint
 JNI_GetDefaultJavaVMInitArgs (void *args)
 {
   jint version = * (jint *) args;
-  // Here we only support 1.2.
-  if (version != JNI_VERSION_1_2)
+  // Here we only support 1.2 and 1.4.
+  if (version != JNI_VERSION_1_2 && version != JNI_VERSION_1_4)
     return JNI_EVERSION;
 
   JavaVMInitArgs *ia = reinterpret_cast<JavaVMInitArgs *> (args);
-  ia->version = JNI_VERSION_1_2;
+  ia->version = JNI_VERSION_1_4;
   ia->nOptions = 0;
   ia->options = NULL;
   ia->ignoreUnrecognized = true;
@@ -2263,8 +2307,8 @@ JNI_CreateJavaVM (JavaVM **vm, void **penv, void *args)
   if (args != NULL)
     {
       jint version = * (jint *) args;
-      // We only support 1.2.
-      if (version != JNI_VERSION_1_2)
+      // We only support 1.2 and 1.4.
+      if (version != JNI_VERSION_1_2 && version != JNI_VERSION_1_4)
 	return JNI_EVERSION;
       JavaVMInitArgs *ia = reinterpret_cast<JavaVMInitArgs *> (args);
       for (int i = 0; i < ia->nOptions; ++i)
@@ -2543,7 +2587,7 @@ struct JNINativeInterface _Jv_JNIFunctions =
   _Jv_JNI_ReleaseStringChars,	       // ReleaseStringChars
   _Jv_JNI_NewStringUTF,		       // NewStringUTF
   _Jv_JNI_GetStringUTFLength,	       // GetStringUTFLength
-  _Jv_JNI_GetStringUTFChars,	       // GetStringUTFLength
+  _Jv_JNI_GetStringUTFChars,	       // GetStringUTFChars
   _Jv_JNI_ReleaseStringUTFChars,       // ReleaseStringUTFChars
   _Jv_JNI_GetArrayLength,	       // GetArrayLength
   _Jv_JNI_NewObjectArray,	       // NewObjectArray
@@ -2606,7 +2650,11 @@ struct JNINativeInterface _Jv_JNIFunctions =
   _Jv_JNI_NewWeakGlobalRef,		    // NewWeakGlobalRef
   _Jv_JNI_DeleteWeakGlobalRef,		    // DeleteWeakGlobalRef
 
-  _Jv_JNI_ExceptionCheck
+  _Jv_JNI_ExceptionCheck,		    // ExceptionCheck
+
+  _Jv_JNI_NewDirectByteBuffer,		    // NewDirectByteBuffer
+  _Jv_JNI_GetDirectBufferAddress,	    // GetDirectBufferAddress
+  _Jv_JNI_GetDirectBufferCapacity	    // GetDirectBufferCapacity
 };
 
 struct JNIInvokeInterface _Jv_JNI_InvokeFunctions =
@@ -2618,5 +2666,6 @@ struct JNIInvokeInterface _Jv_JNI_InvokeFunctions =
   _Jv_JNI_DestroyJavaVM,
   _Jv_JNI_AttachCurrentThread,
   _Jv_JNI_DetachCurrentThread,
-  _Jv_JNI_GetEnv
+  _Jv_JNI_GetEnv,
+  _Jv_JNI_AttachCurrentThreadAsDaemon
 };

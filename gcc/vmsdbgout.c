@@ -72,16 +72,13 @@ dst_file_info_entry;
 #define ASM_COMMENT_START ";#"
 #endif
 
-/* Maximum size (in bytes) of an artificially generated label.   */
+/* Maximum size (in bytes) of an artificially generated label.  */
 #define MAX_ARTIFICIAL_LABEL_BYTES	30
 
 /* Make sure we know the sizes of the various types debug can describe. These
    are only defaults.  If the sizes are different for your target, you should
    override these values by defining the appropriate symbols in your tm.h
    file.  */
-#ifndef CHAR_TYPE_SIZE
-#define CHAR_TYPE_SIZE BITS_PER_UNIT
-#endif
 #ifndef PTR_SIZE
 #define PTR_SIZE 4 /* Must be 32 bits for VMS debug info */
 #endif
@@ -173,7 +170,7 @@ static void vmsdbgout_abstract_function PARAMS ((tree));
 
 /* The debug hooks structure.  */
 
-struct gcc_debug_hooks vmsdbg_debug_hooks
+const struct gcc_debug_hooks vmsdbg_debug_hooks
 = {vmsdbgout_init,
    vmsdbgout_finish,
    vmsdbgout_define,
@@ -1331,7 +1328,7 @@ vmsdbgout_end_epilogue ()
   if (debug_info_level > DINFO_LEVEL_NONE)
     {
       /* Output a label to mark the endpoint of the code generated for this
-         function.        */
+         function.  */
       ASM_GENERATE_INTERNAL_LABEL (label, FUNC_END_LABEL,
 				   current_funcdef_number);
       ASM_OUTPUT_LABEL (asm_out_file, label);
@@ -1458,15 +1455,26 @@ lookup_filename (file_name)
 
   if (stat (file_name, &statbuf) == 0)
     {
-      cdt = 10000000 * (statbuf.st_ctime + vms_epoch_offset);
-      ebk = statbuf.st_size / 512 + 1;
-      ffb = statbuf.st_size - ((statbuf.st_size / 512) * 512);
+      long gmtoff;
 #ifdef VMS
+      struct tm *ts;
+
+      /* Adjust for GMT */
+      ts = (struct tm *) localtime (&statbuf.st_ctime);
+      gmtoff = ts->tm_gmtoff;
+
+      /* VMS has multiple file format types */
       rfo = statbuf.st_fab_rfm;
 #else
+      /* Is GMT adjustment an issue with a cross-compiler? */
+      gmtoff = 0;
+
       /* Assume stream LF type file */
       rfo = 2;
 #endif
+      cdt = 10000000 * (statbuf.st_ctime + gmtoff + vms_epoch_offset);
+      ebk = statbuf.st_size / 512 + 1;
+      ffb = statbuf.st_size - ((statbuf.st_size / 512) * 512);
       fnam = full_name (file_name);
       flen = strlen (fnam);
     }
@@ -1639,7 +1647,7 @@ vmsdbgout_init (main_input_filename)
 
   module_producer
     = (char *) xmalloc (strlen (language_string) + 1
-			+ strlen (version_string + 1));
+			+ strlen (version_string) + 1);
   sprintf (module_producer, "%s %s", language_string, version_string);
 
   ASM_GENERATE_INTERNAL_LABEL (text_end_label, TEXT_END_LABEL, 0);

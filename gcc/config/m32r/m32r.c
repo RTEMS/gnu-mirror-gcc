@@ -1,5 +1,5 @@
 /* Subroutines used for code generation on the Mitsubishi M32R cpu.
-   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001
+   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002
    Free Software Foundation, Inc.
 
 This file is part of GNU CC.
@@ -73,6 +73,8 @@ static void   m32r_sched_init	   PARAMS ((FILE *, int, int));
 static int    m32r_sched_reorder   PARAMS ((FILE *, int, rtx *, int *, int));
 static int    m32r_variable_issue  PARAMS ((FILE *, int, rtx, int));
 static int    m32r_issue_rate	   PARAMS ((void));
+
+static void m32r_select_section PARAMS ((tree, int, unsigned HOST_WIDE_INT));
 
 
 /* Initialize the GCC target structure.  */
@@ -172,7 +174,7 @@ enum m32r_mode_class
 
 /* Value is 1 if register/mode pair is acceptable on arc.  */
 
-unsigned int m32r_hard_regno_mode_ok[FIRST_PSEUDO_REGISTER] =
+const unsigned int m32r_hard_regno_mode_ok[FIRST_PSEUDO_REGISTER] =
 {
   T_MODES, T_MODES, T_MODES, T_MODES, T_MODES, T_MODES, T_MODES, T_MODES,
   T_MODES, T_MODES, T_MODES, T_MODES, T_MODES, S_MODES, S_MODES, S_MODES,
@@ -320,10 +322,11 @@ m32r_handle_model_attribute (node, name, args, flags, no_add_attrs)
    or a constant of some sort.  RELOC indicates whether forming
    the initial value of DECL requires link-time relocations.  */
 
-void
-m32r_select_section (decl, reloc)
+static void
+m32r_select_section (decl, reloc, align)
      tree decl;
      int reloc;
+     unsigned HOST_WIDE_INT align ATTRIBUTE_UNUSED;
 {
   if (TREE_CODE (decl) == STRING_CST)
     {
@@ -366,11 +369,15 @@ m32r_select_section (decl, reloc)
 */
 
 void
-m32r_encode_section_info (decl)
+m32r_encode_section_info (decl, first)
      tree decl;
+     int first;
 {
   char prefix = 0;
   tree model = 0;
+
+  if (!first)
+    return;
 
   switch (TREE_CODE (decl))
     {
@@ -1277,9 +1284,9 @@ gen_split_move_double (operands)
      subregs to make this code simpler.  It is safe to call
      alter_subreg any time after reload.  */
   if (GET_CODE (dest) == SUBREG)
-    dest = alter_subreg (dest);
+    alter_subreg (&dest);
   if (GET_CODE (src) == SUBREG)
-    src = alter_subreg (src);
+    alter_subreg (&src);
 
   start_sequence ();
   if (GET_CODE (dest) == REG)
@@ -2245,14 +2252,14 @@ m32r_print_operand (file, x, code)
       if (GET_CODE (x) == REG)
 	fprintf (file, "@+%s", reg_names [REGNO (x)]);
       else
-	output_operand_lossage ("invalid operand to %s code");
+	output_operand_lossage ("invalid operand to %%s code");
       return;
       
     case 'p':
       if (GET_CODE (x) == REG)
 	fprintf (file, "@%s+", reg_names [REGNO (x)]);
       else
-	output_operand_lossage ("invalid operand to %p code");
+	output_operand_lossage ("invalid operand to %%p code");
       return;
 
     case 'R' :
@@ -2275,7 +2282,7 @@ m32r_print_operand (file, x, code)
 	  fputc (')', file);
 	}
       else
-	output_operand_lossage ("invalid operand to %R code");
+	output_operand_lossage ("invalid operand to %%R code");
       return;
 
     case 'H' : /* High word */
@@ -2298,7 +2305,7 @@ m32r_print_operand (file, x, code)
 		   code == 'L' ? INTVAL (first) : INTVAL (second));
 	}
       else
-	output_operand_lossage ("invalid operand to %H/%L code");
+	output_operand_lossage ("invalid operand to %%H/%%L code");
       return;
 
     case 'A' :
@@ -2360,7 +2367,7 @@ m32r_print_operand (file, x, code)
 	  fputc (')', file);
 	  return;
 	default :
-	  output_operand_lossage ("invalid operand to %T/%B code");
+	  output_operand_lossage ("invalid operand to %%T/%%B code");
 	  return;
 	}
       break;
@@ -2375,7 +2382,7 @@ m32r_print_operand (file, x, code)
 	    fputs (".a", file);
 	}
       else
-	output_operand_lossage ("invalid operand to %U code");
+	output_operand_lossage ("invalid operand to %%U code");
       return;
 
     case 'N' :
@@ -2383,7 +2390,7 @@ m32r_print_operand (file, x, code)
       if (GET_CODE (x) == CONST_INT)
 	output_addr_const (file, GEN_INT (- INTVAL (x)));
       else
-	output_operand_lossage ("invalid operand to %N code");
+	output_operand_lossage ("invalid operand to %%N code");
       return;
 
     case 'X' :

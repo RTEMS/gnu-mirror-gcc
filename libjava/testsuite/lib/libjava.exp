@@ -1,4 +1,4 @@
-# Copyright (C) 1998, 1999, 2000, 2001 Free Software Foundation
+# Copyright (C) 1998, 1999, 2000, 2001, 2002 Free Software Foundation
 
 load_lib "libgloss.exp"
 
@@ -112,6 +112,9 @@ proc libjava_init { args } {
     global TOOL_EXECUTABLE
     global original_ld_library_path
     global env objdir
+    global env gcc_version
+    global tool_root_dir
+    global libjava_libgcc_s_path
 
     if { $libjava_initialized == 1 } { return; }
 
@@ -127,8 +130,18 @@ proc libjava_init { args } {
 	}
     }
 
+    # Determine the version so we can find the libgcj jar file.
+    set text [eval exec "$GCJ_UNDER_TEST --version 2>@ stdout"]
+    regexp -- "gcj \[^ \]+ (\[^ \]+) .*" $text ignore gcc_version
+    verbose "jar file is libgcj-$gcc_version.jar"
+
+    # FIXME: This finds libgcj.spec for the default multilib.
+    # If thread models differ between multilibs, this has to be moved
+    # to libjava_arguments
+    set specdir [libjava_find_spec]
+
     # The -B is so we find libgcj.spec.
-    set text [eval exec "$GCJ_UNDER_TEST -B$objdir/../ -v 2>@ stdout"]
+    set text [eval exec "$GCJ_UNDER_TEST -B$specdir -v 2>@ stdout"]
     regexp -- "Thread model: (\[^\n\]+)\n" $text ignore model
     set libjava_uses_threads [expr {! ($model == "no"
 				       || $model == "none"
@@ -159,6 +172,29 @@ proc libjava_init { args } {
 	}
     }
 
+    # Finally, add the gcc build directory so that we can find the
+    # shared libgcc.  This, like much of dejagnu, is hideous.
+    set libjava_libgcc_s_path {}
+    set gccdir [lookfor_file $tool_root_dir gcc/libgcc_s.so]
+    if {$gccdir != ""} {
+	set gccdir [file dirname $gccdir]
+	lappend libjava_libgcc_s_path $gccdir
+	set compiler ${gccdir}/xgcc
+	if { [is_remote host] == 0 && [which $compiler] != 0 } {
+	    foreach i "[exec $compiler --print-multi-lib]" {
+		set mldir ""
+		regexp -- "\[a-z0-9=/\.-\]*;" $i mldir
+		set mldir [string trimright $mldir "\;@"]
+		if { "$mldir" == "." } {
+		    continue
+		}
+		if { [llength [glob -nocomplain ${gccdir}/${mldir}/libgcc_s*.so.*]] == 1 } {
+		    lappend libjava_libgcc_s_path "${gccdir}/${mldir}"
+		}
+	    }
+	}
+    }
+
     set libjava_initialized 1
 }
 
@@ -169,23 +205,45 @@ proc libjava_init { args } {
 # find the appropriate libraries so we must add -L options for their
 # paths.  However we can't simply use those libraries; we still need
 # libtool for linking.
+# Don't return the the lib${name}.la files here, since this causes the
+# libraries to be linked twice: once as lib${name}.so and another time
+# via gcj's implicit -l${name}.  This is both unnecessary and causes the
+# Solaris ld to warn: attempted multiple inclusion of file.  This warning
+# is not ignored by the dejagnu framework and cannot be disabled.
 proc libjava_find_lib {dir name} {
     global base_dir
     set gp [get_multilibs]
     foreach sub {.libs _libs} {
 	if {$gp != ""} {
 	    if {[file exists $gp/$dir/$sub/lib${name}.a]} then {
-		return "$gp/$dir/lib${name}.la -L$gp/$dir/$sub"
+		# Just return the `-L' option.  The library itself
+		# will be picked up via the spec file.
+		return "-L$gp/$dir/$sub"
 	    }
 	}
+	# Just return the `-L' option.  The library itself will be
+	# picked up via the spec file.
 	set lib [findfile $base_dir/../../$dir/$sub/lib${name}.a \
-		   "$base_dir/../../$dir/lib${name}.la -L$base_dir/../../$dir/$sub" \
+		   "-L$base_dir/../../$dir/$sub" \
 		   ""]
 	if {$lib != ""} {
 	    return $lib
 	}
     }
     return ""
+}
+
+# Find libgcj.spec.  We need to use the file corresponding to the multilib
+# under test since they might differ.  Append a trailing slash since this
+# is used with -B.
+proc libjava_find_spec {} {
+    global objdir
+    set gp [get_multilibs]
+
+    if {[file exists $gp/libjava/libgcj.spec]} then {
+	return "$gp/libjava/"
+    }
+    return "$objdir/../"
 }
 
 # Remove a bunch of files.
@@ -218,6 +276,8 @@ proc libjava_arguments {{mode compile}} {
     global runtests
     global env
     global tool_root_dir
+    global gcc_version
+    global libjava_libgcc_s_path
 
     if [info exists LIBJAVA] {
 	set libjava $LIBJAVA;
@@ -267,13 +327,7 @@ proc libjava_arguments {{mode compile}} {
 	}
     }
 
-    # Finally, add the gcc build directory so that we can find the
-    # shared libgcc.  This, like much of dejagnu, is hideous.
-    set gccdir [lookfor_file $tool_root_dir gcc/libgcc_s.so]
-    if {$gccdir != ""} {
-	lappend lpath [file dirname $gccdir]
-    }
-
+    set lpath [concat $lpath $libjava_libgcc_s_path]
     set ld_library_path [join $lpath :]
 
     # That's enough to make things work for the normal case.
@@ -288,18 +342,20 @@ proc libjava_arguments {{mode compile}} {
     verbose "LD_LIBRARY_PATH = $env(LD_LIBRARY_PATH)"
 
     # Set the CLASSPATH environment variable
-    verbose "CLASSPATH is .:$srcdir/$subdir:$objdir:$objdir/../libgcj.jar"
+    verbose "CLASSPATH is .:$srcdir/$subdir:$objdir:$objdir/../libgcj-$gcc_version.jar"
     global env
-    set env(CLASSPATH) ".:$srcdir/$subdir:$objdir:$objdir/../libgcj.jar"
+    set env(CLASSPATH) ".:$srcdir/$subdir:$objdir:$objdir/../libgcj-$gcc_version.jar"
 
-    global wrapper_file wrap_compile_flags;
-    lappend args "additional_flags=$wrap_compile_flags";
-    lappend args "libs=$wrapper_file";
-    lappend args "libs=$libjava";
-    lappend args "libs=$libgc";
-    lappend args "libs=$libqthreads"
-    lappend args "libs=$libz"
-    lappend args debug
+    if {$mode == "link"} {
+	global wrapper_file wrap_compile_flags;
+	lappend args "additional_flags=$wrap_compile_flags";
+	lappend args "libs=$wrapper_file";
+	lappend args "libs=$libjava";
+	lappend args "libs=$libgc";
+	lappend args "libs=$libqthreads"
+	lappend args "libs=$libz"
+	lappend args debug
+    }
 
     if { [target_info needs_status_wrapper]!="" && [info exists gluefile] } {
 	lappend args "libs=${gluefile}"
@@ -310,6 +366,9 @@ proc libjava_arguments {{mode compile}} {
 	lappend args "additional_flags=$TOOL_OPTIONS"
     }
 
+    # Determine libgcj.spec corresponding to multilib under test.
+    set specdir [libjava_find_spec]
+
     # Search for libtool.  We need it to link.
     set found_compiler 0
     set d [absolute $objdir]
@@ -317,20 +376,23 @@ proc libjava_arguments {{mode compile}} {
 	if {[file exists $d/$x/libtool]} then {
 	    # We have to run silently to avoid DejaGNU lossage.
 	    lappend args \
-	      "compiler=$d/$x/libtool --silent --tag=GCJ --mode=$mode $GCJ_UNDER_TEST -B$objdir/../"
+	      "compiler=$d/$x/libtool --silent --tag=GCJ --mode=$mode $GCJ_UNDER_TEST -B$specdir"
 	    set found_compiler 1
 	    break
 	}
     }
     if {! $found_compiler} {
-	# Append -B$objdir/../ so that we find libgcj.spec before it
+	# Append -B$specdir so that we find libgcj.spec before it
 	# is installed.
-	lappend args "compiler=$GCJ_UNDER_TEST -B$objdir/../"
+	lappend args "compiler=$GCJ_UNDER_TEST -B$specdir"
     }
 
     # Avoid libtool wrapper scripts when possible.
+    # but not if libtool warnings results in FAILs
     if {$mode == "link"} {
-        lappend args "additional_flags=-no-install"
+        if {! [istarget "*-*-cygwin*"]} {
+            lappend args "additional_flags=-no-install"
+        }
     }
 
     return $args
@@ -413,6 +475,10 @@ proc test_libjava_from_source { options srcfile compile_args inpfile resultfile 
 	append executable ".o"
 	set target object
     } else {
+        # DOS/win32 targets default to .exe if no suffix is given
+        # We then try to delete a file that doesn't exist.  It is
+        # simpler to add the suffix everywhere.
+        append executable ".exe"
 	set target executable
     }
     if { $compile_args != "" } {
@@ -506,12 +572,13 @@ proc test_libjava_from_source { options srcfile compile_args inpfile resultfile 
     if {[info exists opts(xfail-output)]} {
 	setup_xfail *-*-*
     }
+    if {[info exists opts(xfail-source-output)]} {
+	setup_xfail *-*-*
+    }
     if { $passed == 1 } {
 	pass "$errname output from source compiled test"
 	eval gcj_cleanup $removeList
     } else {
-	clone_output "expected was $expected"
-	clone_output "output was $output"
 	fail "$errname output from source compiled test"
     }
     close $id;
@@ -636,7 +703,10 @@ proc test_libjava_from_javac { options srcfile compile_args inpfile resultfile e
     } else {
 	set type executable
 	lappend largs "additional_flags=--main=$main_name"
-	set executable "${objdir}/$main_name"
+	# DOS/win32 targets default to .exe if no suffix is given
+        # We then try to delete a file that doesn't exist.  It is
+	# simpler to add the suffix everywhere.
+	set executable "${objdir}/${main_name}.exe"
 	set mode link
     }
 
@@ -733,6 +803,9 @@ proc test_libjava_from_javac { options srcfile compile_args inpfile resultfile e
     if {[info exists opts(xfail-output)]} {
 	setup_xfail *-*-*
     }
+    if {[info exists opts(xfail-byte-output)]} {
+	setup_xfail *-*-*
+    }
     if {$options == "regexp_match"} {
 	if [regexp $expected $output] {
 	    set passed 1;
@@ -746,8 +819,6 @@ proc test_libjava_from_javac { options srcfile compile_args inpfile resultfile e
 	pass "$errname output from bytecode->native test"
 	eval gcj_cleanup $removeList
     } else {
-	clone_output "expected was $expected"
-	clone_output "output was $output"
 	fail "$errname output from bytecode->native test"
     }
     close $id;
@@ -770,6 +841,10 @@ proc test_libjava_from_javac { options srcfile compile_args inpfile resultfile e
 #   `xfail-exec'  exec will fail
 #   `xfail-output'
 #                 output will be wrong
+#   `xfail-byte-output'
+#                 output will be wrong when compiled from bytecode
+#   `xfail-source-output'
+#                 output will be wrong when compiled from source code
 #   `need-threads'
 #                 test relies on thread support
 #

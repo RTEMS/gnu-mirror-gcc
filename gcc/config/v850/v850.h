@@ -158,24 +158,6 @@ enum small_memory_type {
 
 extern struct small_memory_info small_memory[(int)SMALL_MEMORY_max];
 
-/* This macro is similar to `TARGET_SWITCHES' but defines names of
-   command options that have values.  Its definition is an
-   initializer with a subgrouping for each command option.
-
-   Each subgrouping contains a string constant, that defines the
-   fixed part of the option name, and the address of a variable.  The
-   variable, type `char *', is set to the variable part of the given
-   option if the fixed part matches.  The actual option name is made
-   by appending `-m' to the specified name.
-
-   Here is an example which defines `-mshort-data-NUMBER'.  If the
-   given option is `-mshort-data-512', the variable `m88k_short_data'
-   will be set to the string `"512"'.
-
-          extern char *m88k_short_data;
-          #define TARGET_OPTIONS \
-           { { "short-data-", &m88k_short_data } } */
-
 #define TARGET_OPTIONS							\
 {									\
   { "tda=",	&small_memory[ (int)SMALL_MEMORY_TDA ].value,		\
@@ -246,21 +228,8 @@ extern struct small_memory_info small_memory[(int)SMALL_MEMORY_max];
    This is not true on the NEC V850.  */
 #define WORDS_BIG_ENDIAN 0
 
-/* Number of bits in an addressable storage unit */
-#define BITS_PER_UNIT 8
-
-/* Width in bits of a "word", which is the contents of a machine register.
-   Note that this is not necessarily the width of data type `int';
-   if using 16-bit ints on a 68000, this would still be 32.
-   But on a machine with 16-bit registers, this would be 16.  */
-#define BITS_PER_WORD		32
-
 /* Width of a word, in units (bytes).  */
 #define UNITS_PER_WORD		4
-
-/* Width in bits of a pointer.
-   See also the macro `Pmode' defined below.  */
-#define POINTER_SIZE 		32
 
 /* Define this macro if it is advisable to hold scalars in registers
    in a wider mode than that declared by the program.  In such cases,
@@ -786,7 +755,7 @@ extern int current_function_anonymous_args;
 #define TRAMPOLINE_TEMPLATE(FILE)			\
   do {							\
     fprintf (FILE, "\tjarl .+4,r12\n");			\
-    fprintf (FILE, "\tld.w 12[r12],r5\n");		\
+    fprintf (FILE, "\tld.w 12[r12],r20\n");		\
     fprintf (FILE, "\tld.w 16[r12],r12\n");		\
     fprintf (FILE, "\tjmp [r12]\n");			\
     fprintf (FILE, "\tnop\n");				\
@@ -1031,9 +1000,6 @@ do {									\
    than accessing full words.  */
 #define SLOW_BYTE_ACCESS 1
 
-/* Define this if zero-extension is slow (more than one real instruction).  */
-#define SLOW_ZERO_EXTEND 
-
 /* According expr.c, a value of around 6 should minimize code size, and
    for the V850 series, that's our primary concern.  */
 #define MOVE_RATIO 6
@@ -1152,71 +1118,6 @@ zbss_section ()								\
 #define SCOMMON_ASM_OP 	       "\t.scomm\t"
 #define ZCOMMON_ASM_OP 	       "\t.zcomm\t"
 #define TCOMMON_ASM_OP 	       "\t.tcomm\t"
-
-/* A C statement or statements to switch to the appropriate section
-   for output of EXP.  You can assume that EXP is either a `VAR_DECL'
-   node or a constant of some sort.  RELOC indicates whether the
-   initial value of EXP requires link-time relocations.  Select the
-   section by calling `text_section' or one of the alternatives for
-   other sections.
-
-   Do not define this macro if you put all read-only variables and
-   constants in the read-only data section (usually the text section).  */
-#undef  SELECT_SECTION
-#define SELECT_SECTION(EXP, RELOC, ALIGN)				\
-do {									\
-  if (TREE_CODE (EXP) == VAR_DECL)					\
-    {									\
-      int is_const;							\
-      if (!TREE_READONLY (EXP)						\
-	  || TREE_SIDE_EFFECTS (EXP)					\
-	  || !DECL_INITIAL (EXP)					\
-	  || (DECL_INITIAL (EXP) != error_mark_node			\
-	      && !TREE_CONSTANT (DECL_INITIAL (EXP))))			\
-        is_const = FALSE;						\
-      else								\
-        is_const = TRUE;						\
-									\
-      switch (v850_get_data_area (EXP))					\
-        {								\
-        case DATA_AREA_ZDA:						\
-	  if (is_const)	        					\
-	    rozdata_section ();						\
-	  else								\
-	    zdata_section ();						\
-	  break;							\
-									\
-        case DATA_AREA_TDA:						\
-	  tdata_section ();						\
-	  break;							\
-									\
-        case DATA_AREA_SDA:						\
-	  if (is_const)		                        		\
-	    rosdata_section ();						\
-	  else								\
-	    sdata_section ();						\
-	  break;							\
-									\
-        default:							\
-          if (is_const)							\
-	    const_section ();						\
-	  else								\
-	    data_section ();						\
-	  break;							\
-        }								\
-    }									\
-  else if (TREE_CODE (EXP) == STRING_CST)				\
-    {									\
-      if (! flag_writable_strings)					\
-	const_section ();						\
-      else								\
-	data_section ();						\
-    }									\
-									\
-  else									\
-    const_section ();							\
-									\
-} while (0)
 
 /* A C statement or statements to switch to the appropriate section
    for output of RTX in mode MODE.  You can assume that RTX is some
@@ -1390,10 +1291,6 @@ do {									\
 #undef PREFERRED_DEBUGGING_TYPE
 #define PREFERRED_DEBUGGING_TYPE DBX_DEBUG
 
-/* Define to use software floating point emulator for REAL_ARITHMETIC and
-   decimal <-> binary conversion. */
-#define REAL_ARITHMETIC
-
 /* Specify the machine mode that this machine uses
    for the index in the tablejump instruction.  */
 #define CASE_VECTOR_MODE (TARGET_BIG_SWITCH ? SImode : HImode)
@@ -1529,10 +1426,10 @@ extern union tree_node * GHS_current_section_names [(int) COUNT_OF_GHS_SECTION_K
 
 #define EP_REGNUM 30	/* ep register number */
 
-#define ENCODE_SECTION_INFO(DECL)				\
+#define ENCODE_SECTION_INFO(DECL, FIRST)			\
   do								\
     {								\
-      if (TREE_CODE (DECL) == VAR_DECL				\
+      if ((FIRST) && TREE_CODE (DECL) == VAR_DECL		\
           && (TREE_STATIC (DECL) || DECL_EXTERNAL (DECL)))	\
 	v850_encode_data_area (DECL);				\
     }								\

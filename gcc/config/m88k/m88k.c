@@ -1,6 +1,6 @@
 /* Subroutines for insn-output.c for Motorola 88000.
    Copyright (C) 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
-   2001 Free Software Foundation, Inc. 
+   2001, 2002 Free Software Foundation, Inc. 
    Contributed by Michael Tiemann (tiemann@mcc.com)
    Currently maintained by (gcc@dg-rtp.dg.com)
 
@@ -43,7 +43,6 @@ Boston, MA 02111-1307, USA.  */
 #include "target.h"
 #include "target-def.h"
 
-extern int flag_traditional;
 extern FILE *asm_out_file;
 
 const char *m88k_pound_sign = ""; /* Either # for SVR4 or empty for SVR3 */
@@ -72,7 +71,7 @@ static void m88k_output_function_begin_epilogue PARAMS ((FILE *));
 static void m88k_svr3_asm_out_constructor PARAMS ((rtx, int));
 static void m88k_svr3_asm_out_destructor PARAMS ((rtx, int));
 #endif
-
+static void m88k_select_section PARAMS ((tree, int, unsigned HOST_WIDE_INT));
 static int m88k_adjust_cost PARAMS ((rtx, rtx, rtx, int));
 
 /* Initialize the GCC target structure.  */
@@ -1124,9 +1123,9 @@ real_power_of_2_operand (op, mode)
      rtx op;
      enum machine_mode mode ATTRIBUTE_UNUSED;
 {
+  REAL_VALUE_TYPE d;
   union {
-    REAL_VALUE_TYPE d;
-    int i[sizeof (REAL_VALUE_TYPE) / sizeof (int)];
+    long l[2];
     struct {				/* IEEE double precision format */
       unsigned sign	 :  1;
       unsigned exponent  : 11;
@@ -1148,8 +1147,8 @@ real_power_of_2_operand (op, mode)
   if (GET_CODE (op) != CONST_DOUBLE)
     return 0;
 
-  u.i[0] = CONST_DOUBLE_LOW  (op);
-  u.i[1] = CONST_DOUBLE_HIGH (op);
+  REAL_VALUE_FROM_CONST_DOUBLE (d, op);
+  REAL_VALUE_TO_TARGET_DOUBLE (d, u.l);
 
   if (u.s.mantissa1 != 0 || u.s.mantissa2 != 0	/* not a power of two */
       || u.s.exponent == 0			/* constant 0.0 */
@@ -1170,8 +1169,9 @@ legitimize_operand (op, mode)
      enum machine_mode mode;
 {
   rtx temp;
+  REAL_VALUE_TYPE r;
   union {
-    union real_extract r;
+    long l[2];
     struct {				/* IEEE double precision format */
       unsigned sign	 :  1;
       unsigned exponent  : 11;
@@ -1192,7 +1192,8 @@ legitimize_operand (op, mode)
 
   if (GET_CODE (op) == CONST_DOUBLE)
     {
-      memcpy (&u.r, &CONST_DOUBLE_LOW (op), sizeof u);
+      REAL_VALUE_FROM_CONST_DOUBLE (r, op);
+      REAL_VALUE_TO_TARGET_DOUBLE (r, u.l);
       if (u.d.exponent != 0x7ff /* NaN */
 	  && u.d.mantissa2 == 0 /* Mantissa fits */
 	  && (u.s.exponent1 == 0x8 || u.s.exponent1 == 0x7) /* Exponent fits */
@@ -1567,8 +1568,6 @@ output_options (file, f_options, f_len, W_options, W_len,
     pos = output_option (file, sep, "-O", "", indent, pos, max);
   if (write_symbols != NO_DEBUG)
     pos = output_option (file, sep, "-g", "", indent, pos, max);
-  if (flag_traditional)
-    pos = output_option (file, sep, "-traditional", "", indent, pos, max);
   if (profile_flag)
     pos = output_option (file, sep, "-p", "", indent, pos, max);
   for (j = 0; j < f_len; j++)
@@ -2879,7 +2878,7 @@ print_operand (file, x, code)
   if (sequencep)
     {
       if (code < 'B' || code > 'E')
-	output_operand_lossage ("%R not followed by %B/C/D/E");
+	output_operand_lossage ("%%R not followed by %%B/C/D/E");
       if (reversep)
 	xc = reverse_condition (xc);
       sequencep = 0;
@@ -2947,43 +2946,43 @@ print_operand (file, x, code)
       value >>= 16;
     case 'x': /* print the lower 16 bits of the integer constant in hex */
       if (xc != CONST_INT)
-	output_operand_lossage ("invalid %x/X value");
+	output_operand_lossage ("invalid %%x/X value");
       fprintf (file, "0x%x", value & 0xffff); return;
 
     case 'H': /* print the low 16 bits of the negated integer constant */
       if (xc != CONST_INT)
-	output_operand_lossage ("invalid %H value");
+	output_operand_lossage ("invalid %%H value");
       value = -value;
     case 'h': /* print the register or low 16 bits of the integer constant */
       if (xc == REG)
 	goto reg;
       if (xc != CONST_INT)
-	output_operand_lossage ("invalid %h value");
+	output_operand_lossage ("invalid %%h value");
       fprintf (file, "%d", value & 0xffff);
       return;
 
     case 'Q': /* print the low 8 bits of the negated integer constant */
       if (xc != CONST_INT)
-	output_operand_lossage ("invalid %Q value");
+	output_operand_lossage ("invalid %%Q value");
       value = -value;
     case 'q': /* print the register or low 8 bits of the integer constant */
       if (xc == REG)
 	goto reg;
       if (xc != CONST_INT)
-	output_operand_lossage ("invalid %q value");
+	output_operand_lossage ("invalid %%q value");
       fprintf (file, "%d", value & 0xff);
       return;
 
     case 'w': /* print the integer constant (X == 32 ? 0 : 32 - X) */
       if (xc != CONST_INT)
-	output_operand_lossage ("invalid %o value");
+	output_operand_lossage ("invalid %%o value");
       fprintf (file, "%d", value == 32 ? 0 : 32 - value);
       return;
 
     case 'p': /* print the logarithm of the integer constant */
       if (xc != CONST_INT
 	  || (value = exact_log2 (value)) < 0)
-	output_operand_lossage ("invalid %p value");
+	output_operand_lossage ("invalid %%p value");
       fprintf (file, "%d", value);
       return;
 
@@ -2996,12 +2995,12 @@ print_operand (file, x, code)
 	register int top, bottom;
 
 	if (xc != CONST_INT)
-	  output_operand_lossage ("invalid %s/S value");
+	  output_operand_lossage ("invalid %%s/S value");
 	/* All the "one" bits must be contiguous.  If so, MASK will be
 	   a power of two or zero.  */
 	mask = (uval | (uval - 1)) + 1;
 	if (!(uval && POWER_OF_2_or_0 (mask)))
-	  output_operand_lossage ("invalid %s/S value");
+	  output_operand_lossage ("invalid %%s/S value");
 	top = mask ? exact_log2 (mask) : 32;
 	bottom = exact_log2 (uval & ~(uval - 1));
 	fprintf (file,"%d<%d>", top - bottom, bottom);
@@ -3012,7 +3011,7 @@ print_operand (file, x, code)
       if (xc == LABEL_REF)
 	output_addr_const (file, x);
       else if (xc != PC)
-	output_operand_lossage ("invalid %P operand");
+	output_operand_lossage ("invalid %%P operand");
       return;
 
     case 'L': /* print 0 or 1 if operand is label_ref and then...  */
@@ -3043,7 +3042,7 @@ print_operand (file, x, code)
 	case LE: fputs ("le0", file); return;
 	case LT: fputs ("lt0", file); return;
 	case GE: fputs ("ge0", file); return;
-	default: output_operand_lossage ("invalid %B value");
+	default: output_operand_lossage ("invalid %%B value");
 	}
 
     case 'C': /* bb0/bb1 branch values for comparisons */
@@ -3060,7 +3059,7 @@ print_operand (file, x, code)
 	case LEU: fputs ("ls", file); return;
 	case LTU: fputs ("lo", file); return;
 	case GEU: fputs ("hs", file); return;
-	default:  output_operand_lossage ("invalid %C value");
+	default:  output_operand_lossage ("invalid %%C value");
 	}
 
     case 'D': /* bcnd branch values for float comparisons */
@@ -3073,7 +3072,7 @@ print_operand (file, x, code)
 	case LE: fputs ("0xe", file); return;
 	case LT: fputs ("0x4", file); return;
 	case GE: fputs ("0xb", file); return;
-	default: output_operand_lossage ("invalid %D value");
+	default: output_operand_lossage ("invalid %%D value");
 	}
 
     case 'E': /* bcnd branch values for special integers */
@@ -3081,12 +3080,12 @@ print_operand (file, x, code)
 	{
 	case EQ: fputs ("0x8", file); return;
 	case NE: fputs ("0x7", file); return;
-	default: output_operand_lossage ("invalid %E value");
+	default: output_operand_lossage ("invalid %%E value");
 	}
 
     case 'd': /* second register of a two register pair */
       if (xc != REG)
-	output_operand_lossage ("`%d' operand isn't a register");
+	output_operand_lossage ("`%%d' operand isn't a register");
       fputs (reg_names[REGNO (x) + 1], file);
       return;
 
@@ -3097,7 +3096,7 @@ print_operand (file, x, code)
 	  return;
 	}
       else if (xc != REG)
-	output_operand_lossage ("invalid %r value");
+	output_operand_lossage ("invalid %%r value");
     case 0:
     name:
       if (xc == REG)
@@ -3320,6 +3319,38 @@ m88k_svr3_asm_out_destructor (symbol, priority)
     assemble_integer (constm1_rtx, UNITS_PER_WORD, BITS_PER_WORD, 1);
 }
 #endif /* INIT_SECTION_ASM_OP && ! OBJECT_FORMAT_ELF */
+
+static void
+m88k_select_section (decl, reloc, align)
+     tree decl;
+     int reloc;
+     unsigned HOST_WIDE_INT align ATTRIBUTE_UNUSED;
+{
+  if (TREE_CODE (decl) == STRING_CST)
+    {
+      if (! flag_writable_strings)
+	const_section ();
+      else if (TREE_STRING_LENGTH (decl) <= m88k_gp_threshold)
+	sdata_section ();
+      else
+	data_section ();
+    }
+  else if (TREE_CODE (decl) == VAR_DECL)
+    {
+      if (SYMBOL_REF_FLAG (XEXP (DECL_RTL (decl), 0)))
+	sdata_section ();
+      else if ((flag_pic && reloc)
+	       || !TREE_READONLY (decl) || TREE_SIDE_EFFECTS (decl)
+	       || !DECL_INITIAL (decl)
+	       || (DECL_INITIAL (decl) != error_mark_node
+		   && !TREE_CONSTANT (DECL_INITIAL (decl))))
+	data_section ();
+      else
+	const_section ();
+    }
+  else
+    const_section ();
+}
 
 /* Adjust the cost of INSN based on the relationship between INSN that
    is dependent on DEP_INSN through the dependence LINK.  The default

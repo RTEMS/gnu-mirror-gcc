@@ -1,5 +1,5 @@
 /* Support routines for the various generation passes.
-   Copyright (C) 2000, 2001 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2002 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -76,10 +76,10 @@ struct file_name_list
     const char *fname;
   };
 
-struct file_name_list *include = 0;     /* First dir to search */
+struct file_name_list *first_dir_md_include = 0;  /* First dir to search */
         /* First dir to search for <file> */
 struct file_name_list *first_bracket_include = 0;
-struct file_name_list *last_include = 0;        /* Last in chain */
+struct file_name_list *last_dir_md_include = 0;        /* Last in chain */
 
 static void remove_constraints PARAMS ((rtx));
 static void process_rtx PARAMS ((rtx, int));
@@ -227,7 +227,7 @@ process_include (desc, lineno)
   struct file_name_list *stackp;
   int flen;
 
-  stackp = include;
+  stackp = first_dir_md_include;
 
   /* If specified file name is absolute, just open it.  */
   if (IS_ABSOLUTE_PATHNAME (filename) || !stackp)
@@ -981,11 +981,11 @@ init_md_reader_args (argc, argv)
 		dirtmp = (struct file_name_list *)
 		  xmalloc (sizeof (struct file_name_list));
 		dirtmp->next = 0;	/* New one goes on the end */
-		if (include == 0)
-		  include = dirtmp;
+		if (first_dir_md_include == 0)
+		  first_dir_md_include = dirtmp;
 		else
-		  last_include->next = dirtmp;
-		last_include = dirtmp;	/* Tail follows the last one */
+		  last_dir_md_include->next = dirtmp;
+		last_dir_md_include = dirtmp;	/* Tail follows the last one */
 		if (argv[i][1] == 'I' && argv[i][2] != 0)
 		  dirtmp->fname = argv[i] + 2;
 		else if (i + 1 == argc)
@@ -1015,12 +1015,9 @@ init_md_reader (filename)
   int c;
   char *lastsl;
 
-  if (!IS_ABSOLUTE_PATHNAME (filename))
-    {
-      lastsl = strrchr (filename, '/');
-      if (lastsl != NULL) 
-	base_dir = save_string (filename, lastsl - filename + 1 );
-    }
+  lastsl = strrchr (filename, '/');
+  if (lastsl != NULL) 
+    base_dir = save_string (filename, lastsl - filename + 1 );
 
   read_rtx_filename = filename;
   input_file = fopen (filename, "r");
@@ -1101,4 +1098,52 @@ read_md_rtx (lineno, seqnr)
     }
 
   return desc;
+}
+
+/* Given a string, return the number of comma-separated elements in it.
+   Return 0 for the null string.  */
+int
+n_comma_elts (s)
+     const char *s;
+{
+  int n;
+
+  if (*s == '\0')
+    return 0;
+
+  for (n = 1; *s; s++)
+    if (*s == ',')
+      n++;
+
+  return n;
+}
+
+/* Given a pointer to a (char *), return a pointer to the beginning of the
+   next comma-separated element in the string.  Advance the pointer given
+   to the end of that element.  Return NULL if at end of string.  Caller
+   is responsible for copying the string if necessary.  White space between
+   a comma and an element is ignored.  */
+
+const char *
+scan_comma_elt (pstr)
+     const char **pstr;
+{
+  const char *start;
+  const char *p = *pstr;
+
+  if (*p == ',')
+    p++;
+  while (ISSPACE(*p))
+    p++;
+
+  if (*p == '\0')
+    return NULL;
+
+  start = p;
+
+  while (*p != ',' && *p != '\0')
+    p++;
+
+  *pstr = p;
+  return start;
 }

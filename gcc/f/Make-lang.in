@@ -1,5 +1,5 @@
 # Top level makefile fragment for GNU Fortran.           -*-makefile-*-
-#   Copyright (C) 1995, 1996, 1997, 1998, 2000, 2001 Free Software Foundation, Inc.
+#   Copyright (C) 1995, 1996, 1997, 1998, 2000, 2001, 2002 Free Software Foundation, Inc.
 
 #This file is part of GNU Fortran.
 
@@ -137,6 +137,8 @@ f/fini.o:
 	$(HOST_CC) $(HOST_CFLAGS) $(HOST_CPPFLAGS) $(INCLUDES) \
 	      -c $(srcdir)/f/fini.c $(OUTPUT_OPTION)
 
+gt-f-com.h gt-f-ste.h gtype-f.h : s-gtype; @true
+
 #
 # Build hooks:
 
@@ -167,7 +169,7 @@ f/g77.dvi: $(srcdir)/f/g77.texi $(srcdir)/f/bugs.texi \
 		$(srcdir)/f/root.texi $(srcdir)/doc/include/fdl.texi \
 		$(srcdir)/doc/include/gpl.texi \
 		$(srcdir)/doc/include/funding.texi
-	s=`cd $(srcdir); pwd`; export s; \
+	s=`cd $(srcdir); ${PWD}`; export s; \
 	cd f && $(TEXI2DVI) -I $$s/doc/include $$s/f/g77.texi
 
 $(srcdir)/f/g77.1: $(srcdir)/f/invoke.texi
@@ -350,7 +352,7 @@ f/bad.o: f/bad.c f/proj.h $(CONFIG_H) $(SYSTEM_H) f/bad.h f/bad.def f/where.h \
  glimits.h f/top.h f/malloc.h flags.h f/com.h f/com-rt.def $(TREE_H) f/bld.h \
  f/bld-op.def f/bit.h f/info.h f/info-b.def f/info-k.def f/info-w.def \
  f/target.h f/lex.h f/type.h f/intrin.h f/intrin.def f/lab.h f/symbol.h \
- f/symbol.def f/equiv.h f/storag.h f/global.h f/name.h toplev.h
+ f/symbol.def f/equiv.h f/storag.h f/global.h f/name.h toplev.h intl.h
 f/bit.o: f/bit.c f/proj.h $(CONFIG_H) $(SYSTEM_H) glimits.h f/bit.h \
  f/malloc.h
 f/bld.o: f/bld.c f/proj.h $(CONFIG_H) $(SYSTEM_H) f/bld.h f/bld-op.def f/bit.h \
@@ -364,7 +366,7 @@ f/com.o: f/com.c f/proj.h $(CONFIG_H) $(SYSTEM_H) flags.h $(RTL_H) $(TREE_H) \
  f/bad.def f/where.h glimits.h f/top.h f/lex.h f/type.h f/intrin.h \
  f/intrin.def f/lab.h f/symbol.h f/symbol.def f/equiv.h f/storag.h f/global.h \
  f/name.h f/expr.h f/implic.h f/src.h f/st.h $(GGC_H) toplev.h diagnostic.h \
- langhooks.h langhooks-def.h
+ langhooks.h langhooks-def.h intl.h debug.h gt-f-com.h gtype-f.h
 f/data.o: f/data.c f/proj.h $(CONFIG_H) $(SYSTEM_H) f/data.h f/bld.h f/bld-op.def \
  f/bit.h f/malloc.h f/com.h f/com-rt.def $(TREE_H) f/info.h f/info-b.def \
  f/info-k.def f/info-w.def f/target.h f/bad.h f/bad.def f/where.h glimits.h \
@@ -460,7 +462,8 @@ f/ste.o: f/ste.c f/proj.h $(CONFIG_H) $(SYSTEM_H) $(RTL_H) toplev.h f/ste.h \
  f/info.h f/info-b.def f/info-k.def f/info-w.def f/target.h f/bad.h f/bad.def \
  f/where.h glimits.h f/top.h f/lex.h f/type.h f/lab.h f/storag.h f/symbol.h \
  f/symbol.def f/equiv.h f/global.h f/name.h f/intrin.h f/intrin.def f/stp.h \
- f/stt.h f/stamp-str f/sts.h f/stv.h f/stw.h f/expr.h f/sta.h $(GGC_H)
+ f/stt.h f/stamp-str f/sts.h f/stv.h f/stw.h f/expr.h f/sta.h $(GGC_H) \
+ gt-f-ste.h
 f/storag.o: f/storag.c f/proj.h $(CONFIG_H) $(SYSTEM_H) f/storag.h f/bld.h  \
  f/bld-op.def f/bit.h f/malloc.h f/com.h f/com-rt.def $(TREE_H) \
  f/info.h f/info-b.def f/info-k.def f/info-w.def f/target.h f/bad.h \
@@ -513,7 +516,7 @@ f/symbol.o: f/symbol.c f/proj.h $(CONFIG_H) $(SYSTEM_H) f/symbol.h \
  f/global.h f/name.h f/src.h f/st.h
 f/target.o: f/target.c f/proj.h $(CONFIG_H) $(SYSTEM_H) glimits.h f/target.h \
  $(TREE_H) f/bad.h f/bad.def f/where.h f/top.h f/malloc.h f/info.h \
- f/info-b.def f/info-k.def f/info-w.def f/type.h f/lex.h
+ f/info-b.def f/info-k.def f/info-w.def f/type.h f/lex.h diagnostic.h
 f/top.o: f/top.c f/proj.h $(CONFIG_H) $(SYSTEM_H) f/top.h f/malloc.h f/where.h \
  glimits.h f/bad.h f/bad.def f/bit.h f/bld.h f/bld-op.def f/com.h \
  f/com-rt.def $(TREE_H) f/info.h f/info-b.def f/info-k.def \

@@ -1,5 +1,5 @@
 /* Define control and data flow tables, and regsets.
-   Copyright (C) 1987, 1997, 1998, 1999, 2000, 2001
+   Copyright (C) 1987, 1997, 1998, 1999, 2000, 2001, 2002
    Free Software Foundation, Inc.
 
 This file is part of GCC.
@@ -33,7 +33,7 @@ typedef bitmap_head regset_head;
 typedef bitmap regset;
 
 /* Initialize a new regset.  */
-#define INIT_REG_SET(HEAD) bitmap_initialize (HEAD)
+#define INIT_REG_SET(HEAD) bitmap_initialize (HEAD, 1)
 
 /* Clear a register set by freeing up the linked list.  */
 #define CLEAR_REG_SET(HEAD) bitmap_clear (HEAD)
@@ -99,7 +99,7 @@ do {									\
 #define OBSTACK_ALLOC_REG_SET(OBSTACK) BITMAP_OBSTACK_ALLOC (OBSTACK)
 
 /* Initialize a register set.  Returns the new register set.  */
-#define INITIALIZE_REG_SET(HEAD) bitmap_initialize (&HEAD)
+#define INITIALIZE_REG_SET(HEAD) bitmap_initialize (&HEAD, 1)
 
 /* Do any cleanup needed on a regset when it is no longer used.  */
 #define FREE_REG_SET(REGSET) BITMAP_FREE(REGSET)
@@ -141,6 +141,7 @@ typedef struct edge_def {
 #define EDGE_EH			8
 #define EDGE_FAKE		16
 #define EDGE_DFS_BACK		32
+#define EDGE_CAN_FALLTHRU	64
 
 #define EDGE_COMPLEX	(EDGE_ABNORMAL | EDGE_ABNORMAL_CALL | EDGE_EH)
 
@@ -221,7 +222,9 @@ typedef struct basic_block_def {
 #define BB_FREQ_MAX 10000
 
 /* Masks for basic_block.flags.  */
-#define BB_REACHABLE		1
+#define BB_DIRTY		1
+#define BB_NEW			2
+#define BB_REACHABLE		4
 
 /* Number of basic blocks in the current function.  */
 
@@ -293,7 +296,10 @@ extern void free_basic_block_vars	PARAMS ((int));
 extern edge split_block			PARAMS ((basic_block, rtx));
 extern basic_block split_edge		PARAMS ((edge));
 extern void insert_insn_on_edge		PARAMS ((rtx, edge));
+
 extern void commit_edge_insertions	PARAMS ((void));
+extern void commit_edge_insertions_watch_calls	PARAMS ((void));
+
 extern void remove_fake_edges		PARAMS ((void));
 extern void add_noreturn_fake_exit_edges	PARAMS ((void));
 extern void connect_infinite_loops_to_exit	PARAMS ((void));
@@ -311,6 +317,8 @@ extern void redirect_edge_pred		PARAMS ((edge, basic_block));
 extern basic_block create_basic_block_structure PARAMS ((int, rtx, rtx, rtx));
 extern basic_block create_basic_block	PARAMS ((int, rtx, rtx));
 extern int flow_delete_block		PARAMS ((basic_block));
+extern int flow_delete_block_noexpunge	PARAMS ((basic_block));
+extern void clear_bb_flags		PARAMS ((void));
 extern void merge_blocks_nomove		PARAMS ((basic_block, basic_block));
 extern void tidy_fallthru_edge		PARAMS ((edge, basic_block,
 						 basic_block));
@@ -560,6 +568,7 @@ enum update_life_extent
 #define PROP_ALLOW_CFG_CHANGES	32	/* Allow the CFG to be changed
 					   by dead code removal.  */
 #define PROP_AUTOINC		64	/* Create autoinc mem references.  */
+#define PROP_EQUAL_NOTES	128	/* Take into account REG_EQUAL notes.  */
 #define PROP_FINAL		127	/* All of the above.  */
 
 #define CLEANUP_EXPENSIVE	1	/* Do relativly expensive optimizations
@@ -584,8 +593,10 @@ enum update_life_extent
 #define LOOP_ALL	       31	/* All of the above  */
 
 extern void life_analysis	PARAMS ((rtx, FILE *, int));
-extern void update_life_info	PARAMS ((sbitmap, enum update_life_extent,
+extern int update_life_info	PARAMS ((sbitmap, enum update_life_extent,
 					 int));
+extern int update_life_info_in_dirty_blocks PARAMS ((enum update_life_extent,
+						      int));
 extern int count_or_remove_death_notes	PARAMS ((sbitmap, int));
 extern int propagate_block	PARAMS ((basic_block, regset, regset, regset,
 					 int));
@@ -615,7 +626,12 @@ extern rtx emit_block_insn_before	PARAMS ((rtx, rtx, basic_block));
 
 /* In predict.c */
 extern void estimate_probability        PARAMS ((struct loops *));
+extern void note_prediction_to_br_prob	PARAMS ((void));
 extern void expected_value_to_br_prob	PARAMS ((void));
+extern void note_prediction_to_br_prob	PARAMS ((void));
+extern bool maybe_hot_bb_p		PARAMS ((basic_block));
+extern bool probably_cold_bb_p		PARAMS ((basic_block));
+extern bool probably_never_executed_bb_p PARAMS ((basic_block));
 
 /* In flow.c */
 extern void init_flow                   PARAMS ((void));
@@ -628,9 +644,10 @@ extern void debug_regset		PARAMS ((regset));
 extern void allocate_reg_life_data      PARAMS ((void));
 extern void allocate_bb_life_data	PARAMS ((void));
 extern void expunge_block		PARAMS ((basic_block));
+extern void expunge_block_nocompact	PARAMS ((basic_block));
 extern basic_block alloc_block		PARAMS ((void));
 extern void find_unreachable_blocks	PARAMS ((void));
-extern void delete_noop_moves		PARAMS ((rtx));
+extern int delete_noop_moves		PARAMS ((rtx));
 extern basic_block redirect_edge_and_branch_force PARAMS ((edge, basic_block));
 extern basic_block force_nonfallthru	PARAMS ((edge));
 extern bool redirect_edge_and_branch	PARAMS ((edge, basic_block));
@@ -687,7 +704,9 @@ extern conflict_graph conflict_graph_compute
                                         PARAMS ((regset,
 						 partition));
 extern bool mark_dfs_back_edges		PARAMS ((void));
+extern void set_edge_can_fallthru_flag	PARAMS ((void));
 extern void update_br_prob_note		PARAMS ((basic_block));
+extern void fixup_abnormal_edges	PARAMS ((void));
 
 /* In dominance.c */
 

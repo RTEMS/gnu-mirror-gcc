@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler, for DEC Alpha w/ELF.
-   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001
+   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002
    Free Software Foundation, Inc.
    Contributed by Richard Henderson (rth@tamu.edu).
 
@@ -24,6 +24,9 @@ Boston, MA 02111-1307, USA.    */
 #undef EXTENDED_COFF
 #define OBJECT_FORMAT_ELF
 
+/* ??? Move all SDB stuff from alpha.h to osf.h.  */
+#undef SDB_DEBUGGING_INFO
+
 #define DBX_DEBUGGING_INFO
 #define DWARF2_DEBUGGING_INFO
 
@@ -32,21 +35,14 @@ Boston, MA 02111-1307, USA.    */
 
 #undef ASM_FINAL_SPEC
 
+#undef  CPP_SUBTARGET_SPEC
+#define CPP_SUBTARGET_SPEC "-D__ELF__"
+
 #undef  CC1_SPEC
 #define CC1_SPEC  "%{G*}"
 
 #undef  ASM_SPEC
 #define ASM_SPEC  "%{G*} %{relax:-relax} %{!gstabs*:-no-mdebug}%{gstabs*:-mdebug}"
-
-#undef  LINK_SPEC
-#define LINK_SPEC "-m elf64alpha %{G*} %{relax:-relax}		\
-  %{O*:-O3} %{!O*:-O1}						\
-  %{shared:-shared}						\
-  %{!shared:							\
-    %{!static:							\
-      %{rdynamic:-export-dynamic}				\
-      %{!dynamic-linker:-dynamic-linker %(elf_dynamic_linker)}}	\
-    %{static:-static}}"
 
 /* Output at beginning of assembler file.  */
 #undef  ASM_FILE_START
@@ -165,6 +161,16 @@ do {									\
   ASM_OUTPUT_SKIP((FILE), (SIZE));					\
 } while (0)
 
+/* This says how to output assembler code to declare an
+   uninitialized external linkage data object.  */
+
+#undef  ASM_OUTPUT_ALIGNED_BSS
+#define ASM_OUTPUT_ALIGNED_BSS(FILE, DECL, NAME, SIZE, ALIGN)		\
+do {									\
+  ASM_GLOBALIZE_LABEL (FILE, NAME);					\
+  ASM_OUTPUT_ALIGNED_LOCAL (FILE, NAME, SIZE, ALIGN);			\
+} while (0)
+
 /* Biggest alignment supported by the object file format of this
    machine.  Use this macro to limit the alignment which can be
    specified using the `__attribute__ ((aligned (N)))' construct.  If
@@ -185,13 +191,7 @@ do {									\
 #undef  ASCII_DATA_ASM_OP
 #define ASCII_DATA_ASM_OP	"\t.ascii\t"
 
-/* Support const sections and the ctors and dtors sections for g++.
-   Note that there appears to be two different ways to support const
-   sections at the moment.  You can either #define the symbol
-   READONLY_DATA_SECTION (giving it some code which switches to the
-   readonly data section) or else you can #define the symbols
-   EXTRA_SECTIONS, EXTRA_SECTION_FUNCTIONS, SELECT_SECTION, and
-   SELECT_RTX_SECTION.  We do both here just to be on the safe side.  */
+/* Support const sections and the ctors and dtors sections for g++.  */
 
 #undef USE_CONST_SECTION
 #define USE_CONST_SECTION	1
@@ -278,160 +278,9 @@ void FN ()					\
 
 /* Switch into a generic section.  */
 #define TARGET_ASM_NAMED_SECTION  default_elf_asm_named_section
-
-/* A C statement or statements to switch to the appropriate
-   section for output of DECL.  DECL is either a `VAR_DECL' node
-   or a constant of some sort.  RELOC indicates whether forming
-   the initial value of DECL requires link-time relocations.
-
-   Set SECNUM to:
-	0	.text
-	1	.rodata
-	2	.data
-	3	.sdata
-	4	.bss
-	5	.sbss
-*/
-
-#define DO_SELECT_SECTION(SECNUM, DECL, RELOC)			\
-  do								\
-     {								\
-       HOST_WIDE_INT size;					\
-       SECNUM = 1;						\
-       if (TREE_CODE (DECL) == FUNCTION_DECL)			\
-	 {							\
-	   SECNUM = 0;						\
-	   break;						\
-	 }							\
-       else if (TREE_CODE (DECL) == STRING_CST)			\
-	 {							\
-	   if (flag_writable_strings)				\
-	     SECNUM = 2;					\
-	   else							\
-	     SECNUM = 0x101;					\
-	   break;						\
-	 }							\
-       else if (TREE_CODE (DECL) == VAR_DECL)			\
-	 {							\
-	   if (DECL_INITIAL (DECL) == NULL			\
-	       || DECL_INITIAL (DECL) == error_mark_node)	\
-	     SECNUM = 4;					\
-	   else if ((flag_pic && RELOC)				\
-		    || ! TREE_READONLY (DECL)			\
-		    || TREE_SIDE_EFFECTS (DECL)			\
-		    || ! TREE_CONSTANT (DECL_INITIAL (DECL)))	\
-	     SECNUM = 2;					\
-	  else if (flag_merge_constants >= 2)			\
-	    {							\
-	      /* C and C++ don't allow different variables to	\
-		 share the same location.  -fmerge-all-constants\
-		 allows even that (at the expense of not	\
-		 conforming).  */				\
-	      if (TREE_CODE (DECL_INITIAL (DECL)) == STRING_CST)\
-		SECNUM = 0x201;					\
-	      else						\
-		SECNUM = 0x301;					\
-	    }							\
-	 }							\
-       else if (TREE_CODE (DECL) == CONSTRUCTOR)		\
-	 {							\
-	   if ((flag_pic && RELOC)				\
-	       || TREE_SIDE_EFFECTS (DECL)			\
-	       || ! TREE_CONSTANT (DECL))			\
-	     SECNUM = 2;					\
-	 }							\
-								\
-       /* Select small data sections based on size.  */		\
-       size = int_size_in_bytes (TREE_TYPE (DECL));		\
-       if (size >= 0 && size <= g_switch_value)			\
-	 {							\
-	   if ((SECNUM & 0xff) >= 2)				\
-	     SECNUM += 1;					\
-	   /* Move readonly data to .sdata only if -msmall-data.  */ \
-	   /* ??? Consider .sdata.{lit4,lit8} as		\
-	      SHF_MERGE|SHF_ALPHA_GPREL.  */			\
-	   else if (TARGET_SMALL_DATA)				\
-	     SECNUM = 3;					\
-	 }							\
-     }								\
-   while (0)
-
-#undef  SELECT_SECTION
-#define SELECT_SECTION(DECL, RELOC, ALIGN)		\
-  do							\
-    {							\
-      typedef void (*sec_fn) PARAMS ((void));		\
-      static sec_fn const sec_functions[6] =		\
-      {							\
-	text_section,					\
-	const_section,					\
-	data_section,					\
-	sdata_section,					\
-	bss_section,					\
-	sbss_section					\
-      };						\
-							\
-      int sec;						\
-							\
-      DO_SELECT_SECTION (sec, DECL, RELOC);		\
-							\
-      switch (sec)					\
-	{						\
-	case 0x101:					\
-	  mergeable_string_section (DECL, ALIGN, 0);	\
-	  break;					\
-	case 0x201:					\
-	  mergeable_string_section (DECL_INITIAL (DECL),\
-				    ALIGN, 0);		\
-	  break;					\
-	case 0x301:					\
-	  mergeable_constant_section (DECL_MODE (DECL),	\
-				      ALIGN, 0);	\
-	  break;					\
-	default:					\
-	  (*sec_functions[sec]) ();			\
-	  break;					\
-	}						\
-    }							\
-  while (0)
+#define TARGET_ASM_SELECT_SECTION  default_elf_select_section
 
 #define MAKE_DECL_ONE_ONLY(DECL) (DECL_WEAK (DECL) = 1)
-
-#undef  UNIQUE_SECTION
-#define UNIQUE_SECTION(DECL, RELOC)					\
-  do									\
-    {									\
-      static const char * const prefixes[6][2] =			\
-      {									\
-	{ ".text.",   ".gnu.linkonce.t." },				\
-	{ ".rodata.", ".gnu.linkonce.r." },				\
-	{ ".data.",   ".gnu.linkonce.d." },				\
-	{ ".sdata.",  ".gnu.linkonce.s." },				\
-	{ ".bss.",    ".gnu.linkonce.b." },				\
-	{ ".sbss.",   ".gnu.linkonce.sb." }				\
-      };								\
-									\
-      int nlen, plen, sec;						\
-      const char *name, *prefix;					\
-      char *string;							\
-									\
-      DO_SELECT_SECTION (sec, DECL, RELOC);				\
-									\
-      name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (DECL));		\
-      STRIP_NAME_ENCODING (name, name);					\
-      nlen = strlen (name);						\
-									\
-      prefix = prefixes[sec & 0xff][DECL_ONE_ONLY(DECL)];		\
-      plen = strlen (prefix);						\
-									\
-      string = alloca (nlen + plen + 1);				\
-									\
-      memcpy (string, prefix, plen);					\
-      memcpy (string + plen, name, nlen + 1);				\
-									\
-      DECL_SECTION_NAME (DECL) = build_string (nlen + plen, string);	\
-    }									\
-  while (0)
 
 /* A C statement or statements to switch to the appropriate
    section for output of RTX in mode MODE.  RTX is some kind
@@ -470,11 +319,32 @@ do {									\
 /* This is how we tell the assembler that two symbols have the same value.  */
 
 #undef  ASM_OUTPUT_DEF
-#define ASM_OUTPUT_DEF(FILE, NAME1, NAME2) \
-  do { assemble_name(FILE, NAME1); 	 \
-       fputs(" = ", FILE);		 \
-       assemble_name(FILE, NAME2);	 \
-       fputc('\n', FILE); } while (0)
+#define ASM_OUTPUT_DEF(FILE, ALIAS, NAME)			\
+  do {								\
+    assemble_name(FILE, ALIAS);					\
+    fputs(" = ", FILE);						\
+    assemble_name(FILE, NAME);					\
+    fputc('\n', FILE);						\
+  } while (0)
+
+#undef  ASM_OUTPUT_DEF_FROM_DECLS
+#define ASM_OUTPUT_DEF_FROM_DECLS(FILE, DECL, TARGET)		\
+  do {								\
+    const char *alias = XSTR (XEXP (DECL_RTL (DECL), 0), 0);	\
+    const char *name = IDENTIFIER_POINTER (TARGET);		\
+    if (TREE_CODE (DECL) == FUNCTION_DECL)			\
+      {								\
+	fputc ('$', FILE);					\
+	assemble_name (FILE, alias);				\
+	fputs ("..ng = $", FILE);				\
+	assemble_name (FILE, name);				\
+	fputs ("..ng\n", FILE);					\
+      }								\
+    assemble_name(FILE, alias);					\
+    fputs(" = ", FILE);						\
+    assemble_name(FILE, name);					\
+    fputc('\n', FILE);						\
+  } while (0)
 
 /* The following macro defines the format used to output the second
    operand of the .type assembler directive.  Different svr4 assemblers
@@ -599,17 +469,14 @@ do {									\
 /* Provide a STARTFILE_SPEC appropriate for ELF.  Here we add the
    (even more) magical crtbegin.o file which provides part of the
    support for getting C++ file-scope static object constructed
-   before entering `main'. 
+   before entering `main'.   */
 
-   Don't bother seeing crtstuff.c -- there is absolutely no hope
-   of getting that file to understand multiple GPs.  We provide a
-   hand-coded assembly version.  */
-   
 #undef	STARTFILE_SPEC
 #define STARTFILE_SPEC \
   "%{!shared: \
      %{pg:gcrt1.o%s} %{!pg:%{p:gcrt1.o%s} %{!p:crt1.o%s}}}\
-   crti.o%s %{shared:crtbeginS.o%s}%{!shared:crtbegin.o%s}"
+   crti.o%s %{static:crtbeginT.o%s}\
+   %{!static:%{shared:crtbeginS.o%s}%{!shared:crtbegin.o%s}}"
 
 /* Provide a ENDFILE_SPEC appropriate for ELF.  Here we tack on the
    magical crtend.o file which provides part of the support for
@@ -642,3 +509,25 @@ do {									\
   alpha_this_gpdisp_sequence_number = 0)
 extern int alpha_this_literal_sequence_number;
 extern int alpha_this_gpdisp_sequence_number;
+
+/* Since the bits of the _init and _fini function is spread across
+   many object files, each potentially with its own GP, we must assume
+   we need to load our GP.  Further, the .init/.fini section can
+   easily be more than 4MB away from the function to call so we can't
+   use bsr.  */
+#define CRT_CALL_STATIC_FUNCTION(SECTION_OP, FUNC)	\
+   asm (SECTION_OP "\n"					\
+"	br $29,1f\n"					\
+"1:	ldgp $29,0($29)\n"				\
+"	unop\n"						\
+"	jsr $26," USER_LABEL_PREFIX #FUNC "\n"		\
+"	.align 3\n"					\
+"	.previous");
+
+/* If we have the capability create headers for efficient EH lookup.
+   As of Jan 2002, only glibc 2.2.4 can actually make use of this, but
+   I imagine that other systems will catch up.  In the meantime, it
+   doesn't harm to make sure that the data exists to be used later.  */
+#if defined(HAVE_LD_EH_FRAME_HDR)
+#define LINK_EH_SPEC "%{!static:--eh-frame-hdr} "
+#endif

@@ -1,6 +1,6 @@
 /* Control flow graph manipulation code for GNU compiler.
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -38,6 +38,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 	 dump_flow_info, debug_flow_info, dump_edge_info
      - Allocation of AUX fields for basic blocks
 	 alloc_aux_for_blocks, free_aux_for_blocks, alloc_aux_for_block
+     - clear_bb_flags
  */
 
 #include "config.h"
@@ -222,6 +223,17 @@ alloc_block ()
 /* Remove block B from the basic block array and compact behind it.  */
 
 void
+expunge_block_nocompact (b)
+     basic_block b;
+{
+  /* Invalidate data to make bughunting easier.  */
+  memset (b, 0, sizeof *b);
+  b->index = -3;
+  b->succ = (edge) first_deleted_block;
+  first_deleted_block = (basic_block) b;
+}
+
+void
 expunge_block (b)
      basic_block b;
 {
@@ -234,13 +246,10 @@ expunge_block (b)
       x->index = i;
     }
 
-  /* Invalidate data to make bughunting easier.  */
-  memset (b, 0, sizeof *b);
-  b->index = -3;
-  basic_block_info->num_elements--;
   n_basic_blocks--;
-  b->succ = (edge) first_deleted_block;
-  first_deleted_block = (basic_block) b;
+  basic_block_info->num_elements--;
+
+  expunge_block_nocompact (b);
 }
 
 /* Create an edge connecting SRC and DST with FLAGS optionally using
@@ -440,6 +449,16 @@ redirect_edge_pred (e, new_pred)
   new_pred->succ = e;
   e->src = new_pred;
 }
+
+void
+clear_bb_flags ()
+{
+  int i;
+  ENTRY_BLOCK_PTR->flags = 0;
+  EXIT_BLOCK_PTR->flags = 0;
+  for (i = 0; i < n_basic_blocks; i++)
+    BASIC_BLOCK (i)->flags = 0;
+}
 
 void
 dump_flow_info (file)
@@ -461,7 +480,7 @@ dump_flow_info (file)
 	if (REG_N_SETS (i))
 	  fprintf (file, "; set %d time%s", REG_N_SETS (i),
 		   (REG_N_SETS (i) == 1) ? "" : "s");
-	if (REG_USERVAR_P (regno_reg_rtx[i]))
+	if (regno_reg_rtx[i] != NULL && REG_USERVAR_P (regno_reg_rtx[i]))
 	  fprintf (file, "; user var");
 	if (REG_N_DEATHS (i) != 1)
 	  fprintf (file, "; dies in %d places", REG_N_DEATHS (i));
@@ -469,7 +488,8 @@ dump_flow_info (file)
 	  fprintf (file, "; crosses 1 call");
 	else if (REG_N_CALLS_CROSSED (i))
 	  fprintf (file, "; crosses %d calls", REG_N_CALLS_CROSSED (i));
-	if (PSEUDO_REGNO_BYTES (i) != UNITS_PER_WORD)
+	if (regno_reg_rtx[i] != NULL
+	    && PSEUDO_REGNO_BYTES (i) != UNITS_PER_WORD)
 	  fprintf (file, "; %d bytes", PSEUDO_REGNO_BYTES (i));
 
 	class = reg_preferred_class (i);
@@ -486,7 +506,7 @@ dump_flow_info (file)
 		       reg_class_names[(int) altclass]);
 	  }
 
-	if (REG_POINTER (regno_reg_rtx[i]))
+	if (regno_reg_rtx[i] != NULL && REG_POINTER (regno_reg_rtx[i]))
 	  fprintf (file, "; pointer");
 	fprintf (file, ".\n");
       }
@@ -496,6 +516,8 @@ dump_flow_info (file)
     {
       basic_block bb = BASIC_BLOCK (i);
       edge e;
+      int sum;
+      gcov_type lsum;
 
       fprintf (file, "\nBasic block %d: first insn %d, last %d, ",
 	       i, INSN_UID (bb->head), INSN_UID (bb->end));
@@ -518,6 +540,37 @@ dump_flow_info (file)
       dump_regset (bb->global_live_at_end, file);
 
       putc ('\n', file);
+
+      /* Check the consistency of profile information.  We can't do that
+	 in verify_flow_info, as the counts may get invalid for incompletely
+	 solved graphs, later elliminating of conditionals or roundoff errors.
+	 It is still practical to have them reported for debugging of simple
+	 testcases.  */
+      sum = 0;
+      for (e = bb->succ; e; e = e->succ_next)
+	sum += e->probability;
+      if (bb->succ && abs (sum - REG_BR_PROB_BASE) > 100)
+	fprintf (file, "Invalid sum of outgoing probabilities %.1f%%\n",
+		 sum * 100.0 / REG_BR_PROB_BASE);
+      sum = 0;
+      for (e = bb->pred; e; e = e->pred_next)
+	sum += EDGE_FREQUENCY (e);
+      if (abs (sum - bb->frequency) > 100)
+	fprintf (file,
+		 "Invalid sum of incomming frequencies %i, should be %i\n",
+		 sum, bb->frequency);
+      lsum = 0;
+      for (e = bb->pred; e; e = e->pred_next)
+	lsum += e->count;
+      if (lsum - bb->count > 100 || lsum - bb->count < -100)
+	fprintf (file, "Invalid sum of incomming counts %i, should be %i\n",
+		 (int)lsum, (int)bb->count);
+      lsum = 0;
+      for (e = bb->succ; e; e = e->succ_next)
+	lsum += e->count;
+      if (bb->succ && (lsum - bb->count > 100 || lsum - bb->count < -100))
+	fprintf (file, "Invalid sum of incomming counts %i, should be %i\n",
+		 (int)lsum, (int)bb->count);
     }
 
   putc ('\n', file);
@@ -556,7 +609,7 @@ dump_edge_info (file, e, do_succ)
   if (e->flags)
     {
       static const char * const bitnames[]
-	= {"fallthru", "ab", "abcall", "eh", "fake", "dfs_back"};
+	= {"fallthru", "ab", "abcall", "eh", "fake", "dfs_back", "can_fallthru"};
       int comma = 0;
       int i, flags = e->flags;
 

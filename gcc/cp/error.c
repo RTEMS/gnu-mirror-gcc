@@ -28,6 +28,7 @@ Boston, MA 02111-1307, USA.  */
 #include "toplev.h"
 #include "flags.h"
 #include "diagnostic.h"
+#include "langhooks-def.h"
 
 enum pad { none, before, after };
 
@@ -104,8 +105,6 @@ static void dump_scope PARAMS ((tree, int));
 static void dump_template_parms PARAMS ((tree, int, int));
 
 static const char *function_category PARAMS ((tree));
-static void lang_print_error_function PARAMS ((diagnostic_context *,
-                                               const char *));
 static void maybe_print_instantiation_context PARAMS ((output_buffer *));
 static void print_instantiation_full_context PARAMS ((output_buffer *));
 static void print_instantiation_partial_context PARAMS ((output_buffer *, tree,
@@ -125,7 +124,6 @@ static tree locate_error PARAMS ((const char *, va_list));
 void
 init_error ()
 {
-  print_error_function = lang_print_error_function;
   diagnostic_starter (global_dc) = cp_diagnostic_starter;
   diagnostic_finalizer (global_dc) = cp_diagnostic_finalizer;
   diagnostic_format_decoder (global_dc) = cp_printer;
@@ -140,8 +138,7 @@ dump_scope (scope, flags)
      tree scope;
      int flags;
 {
-  int f = ~TFF_RETURN_TYPE & (TFF_DECL_SPECIFIERS
-                              | (flags & (TFF_SCOPE | TFF_CHASE_TYPEDEF)));
+  int f = ~TFF_RETURN_TYPE & (flags & (TFF_SCOPE | TFF_CHASE_TYPEDEF));
 
   if (scope == NULL_TREE)
     return;
@@ -383,7 +380,14 @@ dump_type (t, flags)
 
     case VECTOR_TYPE:
       output_add_string (scratch_buffer, "vector ");
-      dump_type (TREE_TYPE (t), flags);
+      {
+	/* The subtype of a VECTOR_TYPE is something like intQI_type_node,
+	   which has no name and is not very useful for diagnostics.  So
+	   look up the equivalent C type and print its name.  */
+	tree elt = TREE_TYPE (t);
+	elt = c_common_type_for_mode (TYPE_MODE (elt), TREE_UNSIGNED (elt));
+	dump_type (elt, flags);
+      }
       break;
 
     case INTEGER_TYPE:
@@ -453,7 +457,8 @@ dump_type (t, flags)
       break;
     }
     case TYPENAME_TYPE:
-      output_add_string (scratch_buffer, "typename ");
+      if (!IMPLICIT_TYPENAME_P (t))
+        output_add_string (scratch_buffer, "typename ");
       dump_typename (t, flags);
       break;
 
@@ -737,8 +742,8 @@ dump_type_suffix (t, flags)
 	if (TREE_CODE (t) == METHOD_TYPE)
 	  dump_qualifiers
 	    (TREE_TYPE (TREE_VALUE (TYPE_ARG_TYPES (t))), before);
-	dump_type_suffix (TREE_TYPE (t), flags);
 	dump_exception_spec (TYPE_RAISES_EXCEPTIONS (t), flags);
+	dump_type_suffix (TREE_TYPE (t), flags);
 	break;
       }
 
@@ -803,7 +808,7 @@ dump_global_iord (t)
   else if (DECL_GLOBAL_DTOR_P (t))
     p = "destructors";
   else
-    my_friendly_abort (352);
+    abort ();
 
   output_printf (scratch_buffer, "(static %s for %s)", p, input_filename);
 }
@@ -910,7 +915,7 @@ dump_decl (t, flags)
       break;
 
     case TYPE_EXPR:
-      my_friendly_abort (69);
+      abort ();
       break;
 
       /* These special cases are duplicated here so that other functions
@@ -1050,7 +1055,7 @@ dump_template_decl (t, flags)
   else if (TREE_CODE (DECL_TEMPLATE_RESULT (t)) == VAR_DECL)
     dump_decl (DECL_TEMPLATE_RESULT (t), flags | TFF_TEMPLATE_NAME);
   else if (TREE_TYPE (t) == NULL_TREE)
-    my_friendly_abort (353);
+    abort ();
   else
     switch (NEXT_CODE (t))
     {
@@ -1137,12 +1142,9 @@ dump_function_decl (t, flags)
 
   dump_function_name (t, flags);
 
-  if (flags & TFF_DECL_SPECIFIERS) 
+  if (1)
     {
       dump_parameters (parmtypes, flags);
-
-      if (show_return)
-	dump_type_suffix (TREE_TYPE (fntype), flags);
 
       if (TREE_CODE (fntype) == METHOD_TYPE)
 	dump_qualifiers (TREE_TYPE (TREE_VALUE (TYPE_ARG_TYPES (fntype))),
@@ -1150,6 +1152,9 @@ dump_function_decl (t, flags)
 
       if (flags & TFF_EXCEPTION_SPECIFICATION)
 	dump_exception_spec (TYPE_RAISES_EXCEPTIONS (fntype), flags);
+
+      if (show_return)
+	dump_type_suffix (TREE_TYPE (fntype), flags);
     }
 
   /* If T is a template instantiation, dump the parameter binding.  */
@@ -1501,9 +1506,6 @@ dump_expr (t, flags)
       break;
 
     case REAL_CST:
-#ifndef REAL_IS_NOT_DOUBLE
-      sprintf (digit_buffer, "%g", TREE_REAL_CST (t));
-#else
       {
 	const unsigned char *p = (const unsigned char *) &TREE_REAL_CST (t);
 	size_t i;
@@ -1511,7 +1513,6 @@ dump_expr (t, flags)
 	for (i = 0; i < sizeof TREE_REAL_CST (t); i++)
 	  sprintf (digit_buffer + 2 + 2*i, "%02x", *p++);
       }
-#endif
       output_add_string (scratch_buffer, digit_buffer);
       break;
 
@@ -1728,7 +1729,7 @@ dump_expr (t, flags)
       break;
 
     case CONVERT_EXPR:
-      if (VOID_TYPE_P (TREE_TYPE (t)))
+      if (TREE_TYPE (t) && VOID_TYPE_P (TREE_TYPE (t)))
 	{
 	  print_left_paren (scratch_buffer);
 	  dump_type (TREE_TYPE (t), flags);
@@ -2126,7 +2127,7 @@ context_as_string (context, flags)
   return output_finalize_message (scratch_buffer);
 }
 
-/* Generate the three forms of printable names for lang_printable_name.  */
+/* Generate the three forms of printable names for cxx_printable_name.  */
 
 const char *
 lang_decl_name (decl, v)
@@ -2272,7 +2273,7 @@ language_to_string (c, v)
       return "Java";
 
     default:
-      my_friendly_abort (355);
+      abort ();
       return 0;
     }
 }
@@ -2372,18 +2373,19 @@ cv_to_string (p, v)
   return output_finalize_message (scratch_buffer);
 }
 
-static void
-lang_print_error_function (context, file)
+/* Langhook for print_error_function.  */
+void
+cxx_print_error_function (context, file)
      diagnostic_context *context;
      const char *file;
 {
   output_state os;
 
-  default_print_error_function (context, file);
-  os = output_buffer_state (context);
+  lhd_print_error_function (context, file);
+  os = diagnostic_state (context);
   output_set_prefix ((output_buffer *)context, file);
   maybe_print_instantiation_context ((output_buffer *)context);
-  output_buffer_state (context) = os;
+  diagnostic_state (context) = os;
 }
 
 static void
@@ -2430,7 +2432,7 @@ cp_print_error_function (buffer, dc)
       else
         output_printf
           (buffer, "In %s `%s':", function_category (current_function_decl),
-           (*decl_printable_name) (current_function_decl, 2));
+           cxx_printable_name (current_function_decl, 2));
       output_add_newline (buffer);
 
       record_last_error_function ();

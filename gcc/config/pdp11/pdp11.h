@@ -131,7 +131,6 @@ extern int target_flags;
 
 
 /* TYPE SIZES */
-#define CHAR_TYPE_SIZE		8
 #define SHORT_TYPE_SIZE		16
 #define INT_TYPE_SIZE		(TARGET_INT16 ? 16 : 32)
 #define LONG_TYPE_SIZE		32
@@ -165,16 +164,6 @@ extern int target_flags;
 /* Define this if most significant word of a multiword number is numbered.  */
 #define WORDS_BIG_ENDIAN 1
 
-/* number of bits in an addressable storage unit */
-#define BITS_PER_UNIT 8
-
-/* Width in bits of a "word", which is the contents of a machine register.
-   Note that this is not necessarily the width of data type `int';
-   if using 16-bit ints on a 68000, this would still be 32.
-   But on a machine with 16-bit registers, this would be 16.  */
-/*  This is a machine with 16-bit registers */
-#define BITS_PER_WORD 16
-
 /* Width of a word, in units (bytes). 
 
    UNITS OR BYTES - seems like units */
@@ -183,10 +172,6 @@ extern int target_flags;
 /* Maximum sized of reasonable data type 
    DImode or Dfmode ...*/
 #define MAX_FIXED_MODE_SIZE 64	
-
-/* Width in bits of a pointer.
-   See also the macro `Pmode' defined below.  */
-#define POINTER_SIZE 16
 
 /* Allocation boundary (in *bits*) for storing pointers in memory.  */
 #define POINTER_BOUNDARY 16
@@ -888,9 +873,6 @@ extern int may_call_alloca;
 
 #define MOVE_MAX 2
 
-/* Zero extension is faster if the target is known to be zero */
-/* #define SLOW_ZERO_EXTEND */
-
 /* Nonzero if access to memory by byte is slow and undesirable. -
 */
 #define SLOW_BYTE_ACCESS 0
@@ -1158,9 +1140,11 @@ fprintf (FILE, "$help$: . = .+8 ; space for tmp moves!\n")	\
   else if (GET_CODE (X) == MEM)						\
     output_address (XEXP (X, 0));					\
   else if (GET_CODE (X) == CONST_DOUBLE && GET_MODE (X) != SImode)	\
-    { union { double d; int i[2]; } u;					\
-      u.i[0] = CONST_DOUBLE_LOW (X); u.i[1] = CONST_DOUBLE_HIGH (X);	\
-      fprintf (FILE, "#%.20e", u.d); }					\
+    { REAL_VALUE_TYPE r;						\
+      char buf[30];							\
+      REAL_VALUE_FROM_CONST_DOUBLE (r, X);				\
+      REAL_VALUE_TO_DECIMAL (r, "%.20e", buf);				\
+      fprintf (FILE, "#%s", buf); }					\
   else { putc ('$', FILE); output_addr_const_pdp11 (FILE, X); }}
 
 /* Print a memory address as an operand to reference that memory location.  */
@@ -1200,7 +1184,7 @@ JMP	FUNCTION	0x0058  0x0000 <- FUNCTION
 }
 
 #define TRAMPOLINE_SIZE 8
-#define TRAMPOLINE_ALIGN 16
+#define TRAMPOLINE_ALIGNMENT 16
 
 /* Emit RTL insns to initialize the variable parts of a trampoline.
    FNADDR is an RTX for the address of the function's pure code.

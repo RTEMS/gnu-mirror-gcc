@@ -92,6 +92,10 @@
 /* Define to version of GCJ in use.  */
 #undef GCJVERSION
 
+/* Define if if the synchronization code should try to avoid pthread_self 
+   calls by caching thread IDs in a hashtable.  */
+#undef SLOW_PTHREAD_SELF
+
 /* Define if you have the appropriate function.  */
 #undef HAVE_ACCESS
 #undef HAVE_STAT
@@ -123,6 +127,9 @@
    getenv("GCJ_PROPERTIES").  */
 #undef DISABLE_GETENV_PROPERTIES
 
+/* Define if we should ignore arguments to main().  */
+#undef DISABLE_MAIN_ARGS
+
 /* Define if using setjmp/longjmp exceptions.  */
 #undef SJLJ_EXCEPTIONS
 
@@ -132,6 +139,9 @@
 /* Define if you have dladdr() */
 #undef HAVE_DLADDR
  
+/* Define if tzname is missing.  */
+#undef NO_TZNAME
+
 /* Define if getuid() and friends are missing.  */
 #undef NO_GETUID
 
@@ -146,3 +156,9 @@
 
 /* Define if you are using JVMPI.  */
 #undef ENABLE_JVMPI
+
+/* Define if your platform has a working backtrace() function.  */
+#undef HAVE_BACKTRACE
+
+/* Define if your platform has the global _timezone variable.  */
+#undef HAVE_UNDERSCORE_TIMEZONE

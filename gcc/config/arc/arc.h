@@ -43,13 +43,17 @@ Boston, MA 02111-1307, USA.  */
 #define TARGET_VERSION fprintf (stderr, " (arc)")
 
 /* Names to predefine in the preprocessor for this target machine.  */
-#define CPP_PREDEFINES "-Acpu=arc -Amachine=arc -D__arc__"
-
-/* Additional flags for the preprocessor.  */
-#define CPP_SPEC "\
-%{!mcpu=*:-D__base__} %{mcpu=base:-D__base__} \
-%{EB:-D__big_endian__} \
-"
+#define TARGET_CPU_CPP_BUILTINS()		\
+  do						\
+    {						\
+	builtin_define ("__arc__");		\
+	if (TARGET_BIG_ENDIAN)			\
+	  builtin_define ("__big_endian__");	\
+	if (arc_cpu_type == 0)			\
+	  builtin_define ("__base__");		\
+	builtin_assert ("cpu=arc");		\
+	builtin_assert ("machine=arc");		\
+    } while (0)
 
 /* Pass -mmangle-cpu if we get -mcpu=*.
    Doing it this way lets one have it on as default with -mcpu=*,
@@ -130,23 +134,6 @@ extern int target_flags;
 /* Non-zero means the cpu has a barrel shifter.  */
 #define TARGET_SHIFTER 0
 
-/* This macro is similar to `TARGET_SWITCHES' but defines names of
-   command options that have values.  Its definition is an
-   initializer with a subgrouping for each command option.
-
-   Each subgrouping contains a string constant, that defines the
-   fixed part of the option name, and the address of a variable. 
-   The variable, type `char *', is set to the variable part of the
-   given option if the fixed part matches.  The actual option name
-   is made by appending `-m' to the specified name.
-
-   Here is an example which defines `-mshort-data-NUMBER'.  If the
-   given option is `-mshort-data-512', the variable `m88k_short_data'
-   will be set to the string `"512"'.
-
-	extern char *m88k_short_data;
-	#define TARGET_OPTIONS { { "short-data-", &m88k_short_data } }  */
-
 extern const char *arc_cpu_string;
 extern const char *arc_text_string,*arc_data_string,*arc_rodata_string;
 
@@ -185,10 +172,6 @@ do {				\
 
 /* Target machine storage layout.  */
 
-/* Define to use software floating point emulator for REAL_ARITHMETIC and
-   decimal <-> binary conversion.  */
-#define REAL_ARITHMETIC
-
 /* Define this if most significant bit is lowest numbered
    in instructions that operate on numbered bit-fields.  */
 #define BITS_BIG_ENDIAN 1
@@ -207,15 +190,6 @@ do {				\
 #else
 #define LIBGCC2_WORDS_BIG_ENDIAN 0
 #endif
-
-/* Number of bits in an addressable storage unit.  */
-#define BITS_PER_UNIT 8
-
-/* Width in bits of a "word", which is the contents of a machine register.
-   Note that this is not necessarily the width of data type `int';
-   if using 16-bit ints on a 68000, this would still be 32.
-   But on a machine with 16-bit registers, this would be 16.  */
-#define BITS_PER_WORD 32
 
 /* Width of a word, in units (bytes).  */
 #define UNITS_PER_WORD 4
@@ -238,10 +212,6 @@ if (GET_MODE_CLASS (MODE) == MODE_INT		\
 
 /* Likewise, if the function return value is promoted.  */
 #define PROMOTE_FUNCTION_RETURN
-
-/* Width in bits of a pointer.
-   See also the macro `Pmode' defined below.  */
-#define POINTER_SIZE 32
 
 /* Allocation boundary (in *bits*) for storing arguments in argument list.  */
 #define PARM_BOUNDARY 32
@@ -388,6 +358,16 @@ if (GET_MODE_CLASS (MODE) == MODE_INT		\
   32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,	\
   48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61,		\
   27, 28, 29, 30 }
+
+/* Macro to conditionally modify fixed_regs/call_used_regs.  */
+#define CONDITIONAL_REGISTER_USAGE			\
+do {							\
+  if (PIC_OFFSET_TABLE_REGNUM != INVALID_REGNUM)	\
+    {							\
+      fixed_regs[PIC_OFFSET_TABLE_REGNUM] = 1;		\
+      call_used_regs[PIC_OFFSET_TABLE_REGNUM] = 1;	\
+    }							\
+} while (0)
 
 /* Return number of consecutive hard regs needed starting at reg REGNO
    to hold something of mode MODE.
@@ -1159,7 +1139,7 @@ extern const char *arc_text_section, *arc_data_section, *arc_rodata_section;
    Branch to absolute address insns take an address that is right-shifted
    by 2.  We encode the fact that we have a function here, and then emit a
    special assembler op when outputting the address.  */
-#define ENCODE_SECTION_INFO(DECL) \
+#define ENCODE_SECTION_INFO(DECL, FIRST)		\
 do {							\
   if (TREE_CODE (DECL) == FUNCTION_DECL)		\
     SYMBOL_REF_FLAG (XEXP (DECL_RTL (DECL), 0)) = 1;	\
@@ -1186,7 +1166,7 @@ do {							\
    pointer and frame pointer registers.  If this macro is not defined, it
    is up to the machine-dependent files to allocate such a register (if
    necessary).  */
-#define PIC_OFFSET_TABLE_REGNUM 26
+#define PIC_OFFSET_TABLE_REGNUM  (flag_pic ? 26 : INVALID_REGNUM)
 
 /* Define this macro if the register defined by PIC_OFFSET_TABLE_REGNUM is
    clobbered by calls.  Do not define this macro if PIC_OFFSET_TABLE_REGNUM

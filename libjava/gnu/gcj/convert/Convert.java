@@ -40,12 +40,12 @@ public class Convert
 
   static void version ()
   {
-    System.out.println("jv-convert (GNU "
+    System.out.println("jv-convert ("
 		       + System.getProperty("java.vm.name")
 		       + ") "
 		       + System.getProperty("java.vm.version"));
     System.out.println();
-    System.out.println("Copyright 1999, 2002 Free Software Foundation");
+    System.out.println("Copyright (C) 2002 Free Software Foundation, Inc.");
     System.out.println("This is free software; see the source for copying conditions.  There is NO");
     System.out.println("warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.");
     System.exit(0);

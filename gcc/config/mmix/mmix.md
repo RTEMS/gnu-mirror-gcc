@@ -34,11 +34,9 @@
 ;; The order of insns is as in Node: Standard Names, with smaller modes
 ;; before bigger modes.
 
-;; FIXME:s
-;; - Use new formats; e.g. '{' not '"*{'.
-
 (define_constants
-  [(MMIX_rJ_REGNUM 259)]
+  [(MMIX_rJ_REGNUM 259)
+   (MMIX_fp_rO_OFFSET -24)]
 )
 
 ;; FIXME: Can we remove the reg-to-reg for smaller modes?  Shouldn't they
@@ -88,8 +86,8 @@
 
 ;; We assume all "s" are addresses.  Does that hold?
 (define_insn "movdi"
-  [(set (match_operand:DI 0 "nonimmediate_operand" "=r,r ,r,x,r,m,r,m,r,??r")
-	(match_operand:DI 1 "general_operand"	    "r,LS,K,r,x,I,m,r,s,n"))]
+  [(set (match_operand:DI 0 "nonimmediate_operand" "=r,r ,r,x,r,m,r,m,r,r,??r")
+	(match_operand:DI 1 "general_operand"	    "r,LS,K,r,x,I,m,r,R,s,n"))]
   ""
   "@
    SET %0,%1
@@ -101,6 +99,7 @@
    LDO %0,%1
    STOU %1,%0
    GETA %0,%1
+   LDA %0,%1
    %r0%I1")
 
 ;; Note that we move around the float as a collection of bits; no
@@ -242,8 +241,10 @@
 ;; One day we might persuade GCC to expand divisions with constants the
 ;; way MMIX does; giving the remainder the sign of the divisor.  But even
 ;; then, it might be good to have an option to divide the way "everybody
-;; else" does.  Perhaps then, this option can be on by default.  Until
-;; then, we do division and modulus in a library function.
+;; else" does.  Perhaps then, this option can be on by default.  However,
+;; it's not likely to happen because major (C, C++, Fortran) language
+;; standards in effect at 2002-04-29 reportedly demand that the sign of
+;; the remainder must follow the sign of the dividend.
 
 (define_insn "divmoddi4"
   [(set (match_operand:DI 0 "register_operand" "=r")
@@ -568,7 +569,7 @@ DIVU %1,%1,%2\;GET %0,:rR\;NEGU %2,0,%0\;CSNN %0,$255,%2")
 (define_insn "fixuns_truncdfdi2"
   [(set (match_operand:DI 0 "register_operand" "=r")
 	(unsigned_fix:DI
-	 (fix:DF (match_operand:DF 1 "register_operand" "r"))))]
+	 (unsigned_fix:DF (match_operand:DF 1 "register_operand" "r"))))]
   ""
   ;; ROUND_OFF
   "FIXU %0,1,%1")
@@ -581,7 +582,7 @@ DIVU %1,%1,%2\;GET %0,:rR\;NEGU %2,0,%0\;CSNN %0,$255,%2")
 ;; FIXME: Perhaps with SECONDARY_MEMORY_NEEDED?
 (define_expand "truncdfsf2"
   [(set (match_operand:SF 0 "memory_operand" "")
-	(fix:SF (match_operand:DF 1 "register_operand" "")))]
+	(float_truncate:SF (match_operand:DF 1 "register_operand" "")))]
   ""
   "
 {
@@ -609,7 +610,7 @@ DIVU %1,%1,%2\;GET %0,:rR\;NEGU %2,0,%0\;CSNN %0,$255,%2")
 
 (define_insn "*truncdfsf2_real"
   [(set (match_operand:SF 0 "memory_operand" "=m")
-	(fix:SF (match_operand:DF 1 "register_operand" "r")))]
+	(float_truncate:SF (match_operand:DF 1 "register_operand" "r")))]
   ""
   "STSF %1,%0")
 
@@ -996,11 +997,6 @@ DIVU %1,%1,%2\;GET %0,:rR\;NEGU %2,0,%0\;CSNN %0,$255,%2")
   if (operands[2] == NULL_RTX)
     operands[2] = const0_rtx;
 
-  /* FIXME: Documentation bug: operands[3] (operands[2] for 'call') is the
-     *next* argument register, not the number of arguments in registers.  */
-  cfun->machine->has_call_without_parameters
-    |= REG_P (operands[2]) && REGNO (operands[2]) == MMIX_FIRST_ARG_REGNUM;
-
   operands[4] = gen_rtx_REG (DImode, MMIX_INCOMING_RETURN_ADDRESS_REGNUM);
 }")
 
@@ -1025,9 +1021,8 @@ DIVU %1,%1,%2\;GET %0,:rR\;NEGU %2,0,%0\;CSNN %0,$255,%2")
     operands[3] = const0_rtx;
 
   /* FIXME: Documentation bug: operands[3] (operands[2] for 'call') is the
-     *next* argument register, not the number of arguments in registers.  */
-  cfun->machine->has_call_without_parameters
-    |= REG_P (operands[3]) && REGNO (operands[3]) == MMIX_FIRST_ARG_REGNUM;
+     *next* argument register, not the number of arguments in registers.
+     (There used to be code here where that mattered.)  */
 
   operands[5] = gen_rtx_REG (DImode, MMIX_INCOMING_RETURN_ADDRESS_REGNUM);
 }")
@@ -1106,35 +1101,70 @@ DIVU %1,%1,%2\;GET %0,:rR\;NEGU %2,0,%0\;CSNN %0,$255,%2")
 ;; of "pop 0,0" until rO equals the saved value.  (If it goes lower, we
 ;; should call abort.)
 (define_expand "nonlocal_goto_receiver"
-  [(parallel [(unspec_volatile [(match_dup 0)] 1)
+  [(parallel [(unspec_volatile [(const_int 0)] 1)
 	      (clobber (scratch:DI))
 	      (clobber (reg:DI MMIX_rJ_REGNUM))])
-   (set (reg:DI MMIX_rJ_REGNUM) (match_dup 1))]
+   (set (reg:DI MMIX_rJ_REGNUM) (match_dup 0))]
   ""
   "
 {
-  rtx tem
-    = validize_mem (gen_rtx_MEM (Pmode,
-				 plus_constant (frame_pointer_rtx, -24)));
-  operands[0] = XEXP (tem, 0);
-  operands[1]
+  operands[0]
     = get_hard_reg_initial_val (Pmode, MMIX_INCOMING_RETURN_ADDRESS_REGNUM);
 
   /* Mark this function as containing a landing-pad.  */
   cfun->machine->has_landing_pad = 1;
 }")
 
-;; FIXME: Do we need to keep this in memory?  Can GCC counter our
-;; expectations and use saved registers to keep the slot address in,
-;; "across" the exception or goto?  Anyway, we need to make sure the value
-;; ends up in a non-local register, so best is to load it ourselves.
+;; GCC can insist on using saved registers to keep the slot address in
+;; "across" the exception, or (perhaps) to use saved registers in the
+;; address and re-use them after the register stack unwind, so it's best
+;; to form the address ourselves.
 (define_insn "*nonlocal_goto_receiver_expanded"
-  [(unspec_volatile [(match_operand:DI 0 "address_operand" "p")] 1)
-   (clobber (match_scratch:DI 1 "=&r"))
+  [(unspec_volatile [(const_int 0)] 1)
+   (clobber (match_scratch:DI 0 "=&r"))
    (clobber (reg:DI MMIX_rJ_REGNUM))]
   ""
-  "GETA $255,0f\;PUT rJ,$255\;LDOU $255,%a0\n\
-0: GET %1,rO\;CMPU %1,%1,$255\;BNP %1,1f\;POP 0,0\n1:")
+{
+  rtx temp_reg = operands[0];
+  rtx my_operands[2];
+  HOST_WIDEST_INT offs;
+  const char *my_template
+    = "GETA $255,0f\;PUT rJ,$255\;LDOU $255,%a0\n\
+0:\;GET %1,rO\;CMPU %1,%1,$255\;BNP %1,1f\;POP 0,0\n1:";
+
+  my_operands[1] = temp_reg;
+
+  /* If we have a frame-pointer (hence unknown stack-pointer offset),
+     just use the frame-pointer and the known offset.  */
+  if (frame_pointer_needed)
+    {
+      my_operands[0] = GEN_INT (-MMIX_fp_rO_OFFSET);
+
+      output_asm_insn ("NEGU %1,0,%0", my_operands);
+      my_operands[0] = gen_rtx_PLUS (Pmode, frame_pointer_rtx, temp_reg);
+    }
+  else
+    {
+      /* We know the fp-based offset, so "eliminate" it to be sp-based.  */
+      offs
+	= (mmix_initial_elimination_offset (MMIX_FRAME_POINTER_REGNUM,
+					    MMIX_STACK_POINTER_REGNUM)
+	   + MMIX_fp_rO_OFFSET);
+
+      if (offs >= 0 && offs <= 255)
+	my_operands[0]
+	  = gen_rtx_PLUS (Pmode, stack_pointer_rtx, GEN_INT (offs));
+      else
+	{
+	  mmix_output_register_setting (asm_out_file, REGNO (temp_reg),
+					offs, 1);
+	  my_operands[0] = gen_rtx_PLUS (Pmode, stack_pointer_rtx, temp_reg);
+	}
+    }
+
+  output_asm_insn (my_template, my_operands);
+  return "";
+})
 
 (define_insn "*Naddu"
   [(set (match_operand:DI 0 "register_operand" "=r")

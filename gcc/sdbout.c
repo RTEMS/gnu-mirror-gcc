@@ -1,6 +1,6 @@
 /* Output sdb-format symbol table information from GNU compiler.
    Copyright (C) 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001  Free Software Foundation, Inc.
+   2000, 2001, 2002 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -42,11 +42,15 @@ AT&T C compiler.  From the example below I would conclude the following:
 */
 
 #include "config.h"
+#include "system.h"
+#include "debug.h"
+#include "tree.h"
+#include "ggc.h"
+
+static GTY(()) tree anonymous_types;
 
 #ifdef SDB_DEBUGGING_INFO
 
-#include "system.h"
-#include "tree.h"
 #include "rtl.h"
 #include "regs.h"
 #include "flags.h"
@@ -54,10 +58,9 @@ AT&T C compiler.  From the example below I would conclude the following:
 #include "reload.h"
 #include "output.h"
 #include "toplev.h"
-#include "ggc.h"
 #include "tm_p.h"
 #include "gsyms.h"
-#include "debug.h"
+#include "langhooks.h"
 
 /* 1 if PARM is passed to this function in memory.  */
 
@@ -150,7 +153,7 @@ static void sdbout_global_decl		PARAMS ((tree));
 #define PUT_SDB_INT_VAL(a) \
  do {									\
    fputs ("\t.val\t", asm_out_file);		       			\
-   fprintf (asm_out_file, HOST_WIDE_INT_PRINT_DEC, (HOST_WIDE_INT)(a));	\
+   fprintf (asm_out_file, HOST_WIDE_INT_PRINT_DEC, (HOST_WIDE_INT) (a)); \
    fprintf (asm_out_file, "%s", SDB_DELIM);				\
  } while (0)
 
@@ -186,7 +189,7 @@ do { fprintf (asm_out_file, "\t.def\t");	\
 #define PUT_SDB_SIZE(a) \
  do {									\
    fputs ("\t.size\t", asm_out_file);					\
-   fprintf (asm_out_file, HOST_WIDE_INT_PRINT_DEC, (HOST_WIDE_INT)(a));	\
+   fprintf (asm_out_file, HOST_WIDE_INT_PRINT_DEC, (HOST_WIDE_INT) (a)); \
    fprintf (asm_out_file, "%s", SDB_DELIM);				\
  } while(0)
 #endif
@@ -299,7 +302,7 @@ static struct sdb_file *current_file;
 #endif /* MIPS_DEBUGGING_INFO */
 
 /* The debug hooks structure.  */
-struct gcc_debug_hooks sdb_debug_hooks =
+const struct gcc_debug_hooks sdb_debug_hooks =
 {
   sdbout_init,			/* init */
   sdbout_finish,		/* finish */
@@ -381,9 +384,9 @@ gen_fake_label ()
    PREV is the number describing the target, value or element type.
    DT_type describes how to transform that type.  */
 #define PUSH_DERIVED_LEVEL(DT_type,PREV)		\
-  ((((PREV) & ~(int)N_BTMASK) << (int)N_TSHIFT)		\
-   | ((int)DT_type << (int)N_BTSHFT)			\
-   | ((PREV) & (int)N_BTMASK))
+  ((((PREV) & ~(int) N_BTMASK) << (int) N_TSHIFT)		\
+   | ((int) DT_type << (int) N_BTSHFT)			\
+   | ((PREV) & (int) N_BTMASK))
 
 /* Number of elements used in sdb_dims.  */
 static int sdb_n_dims = 0;
@@ -781,7 +784,7 @@ sdbout_symbol (decl, local)
       if (!DECL_RTL_SET_P (decl))
 	return;
 
-      SET_DECL_RTL (decl, 
+      SET_DECL_RTL (decl,
 		    eliminate_regs (DECL_RTL (decl), 0, NULL_RTX));
 #ifdef LEAF_REG_REMAP
       if (current_function_uses_only_leaf_regs)
@@ -857,12 +860,12 @@ sdbout_symbol (decl, local)
 	  if (TREE_PUBLIC (decl))
 	    {
 	      PUT_SDB_VAL (XEXP (value, 0));
-              PUT_SDB_SCL (C_EXT);
+	      PUT_SDB_SCL (C_EXT);
 	    }
 	  else
 	    {
 	      PUT_SDB_VAL (XEXP (value, 0));
-              PUT_SDB_SCL (C_STAT);
+	      PUT_SDB_SCL (C_STAT);
 	    }
 	}
       else if (regno >= 0)
@@ -987,8 +990,6 @@ sdbout_toplevel_data (decl)
 #ifdef SDB_ALLOW_FORWARD_REFERENCES
 
 /* Machinery to record and output anonymous types.  */
-
-static tree anonymous_types;
 
 static void
 sdbout_queue_anonymous_type (type)
@@ -1516,7 +1517,7 @@ static void
 sdbout_finish (main_filename)
      const char *main_filename ATTRIBUTE_UNUSED;
 {
-  tree decl = getdecls ();
+  tree decl = (*lang_hooks.decls.getdecls) ();
   unsigned int len = list_length (decl);
   tree *vec = (tree *) xmalloc (sizeof (tree) * len);
   unsigned int i;
@@ -1754,15 +1755,18 @@ sdbout_init (input_file_name)
 
 #ifdef RMS_QUICK_HACK_1
   tree t;
-  for (t = getdecls (); t; t = TREE_CHAIN (t))
+  for (t = (*lang_hooks.decls.getdecls) (); t; t = TREE_CHAIN (t))
     if (DECL_NAME (t) && IDENTIFIER_POINTER (DECL_NAME (t)) != 0
 	&& !strcmp (IDENTIFIER_POINTER (DECL_NAME (t)), "__vtbl_ptr_type"))
       sdbout_symbol (t, 0);
 #endif  
-
-#ifdef SDB_ALLOW_FORWARD_REFERENCES
-  ggc_add_tree_root (&anonymous_types, 1);
-#endif
 }
 
+#else  /* SDB_DEBUGGING_INFO */
+
+/* This should never be used, but its address is needed for comparisons.  */
+const struct gcc_debug_hooks sdb_debug_hooks;
+
 #endif /* SDB_DEBUGGING_INFO */
+
+#include "gt-sdbout.h"

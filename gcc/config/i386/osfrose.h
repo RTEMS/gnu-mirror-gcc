@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler.
    Intel 386 (OSF/1 with OSF/rose) version.
-   Copyright (C) 1991, 1992, 1993, 1996, 1998, 1999, 2000
+   Copyright (C) 1991, 1992, 1993, 1996, 1998, 1999, 2000, 2002
    Free Software Foundation, Inc.
 
 This file is part of GNU CC.
@@ -19,9 +19,6 @@ You should have received a copy of the GNU General Public License
 along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
-
-#include "halfpic.h"
-#include "i386/gstabs.h"
 
 #define OSF_OS
 
@@ -101,7 +98,7 @@ Boston, MA 02111-1307, USA.  */
 %{melf: -D__ELF__ %{fpic: -D__SHARED__}} \
 %{mno-underscores: -D__NO_UNDERSCORES__} \
 %{melf: %{!munderscores: -D__NO_UNDERSCORES__}} \
-%{.S:	%{!ansi:%{!traditional:%{!traditional-cpp:%{!ftraditional: -traditional}}}}} \
+%{.S:	%{!ansi:%{!traditional-cpp: -traditional}}} \
 %{.S:	-D__LANGUAGE_ASSEMBLY %{!ansi:-DLANGUAGE_ASSEMBLY}} \
 %{.cc:	-D__LANGUAGE_C_PLUS_PLUS} \
 %{.cxx:	-D__LANGUAGE_C_PLUS_PLUS} \
@@ -149,7 +146,6 @@ Boston, MA 02111-1307, USA.  */
 #define STARTFILE_SPEC "%{pg:gcrt0.o%s}%{!pg:%{p:mcrt0.o%s}%{!p:crt0.o%s}}"
 
 #undef TARGET_VERSION_INTERNAL
-#undef TARGET_VERSION
 
 #define I386_VERSION " 80386, OSF/rose objects"
 
@@ -449,21 +445,23 @@ while (0)
    `PRINT_OPERAND_ADDRESS'.  */
 
 #undef	ENCODE_SECTION_INFO
-#define ENCODE_SECTION_INFO(DECL)					\
-do									\
-  {									\
-   if (HALF_PIC_P ())							\
-      HALF_PIC_ENCODE (DECL);						\
-									\
-   else if (flag_pic)							\
-     {									\
-       rtx rtl = (TREE_CODE_CLASS (TREE_CODE (DECL)) != 'd'		\
-		  ? TREE_CST_RTL (DECL) : DECL_RTL (DECL));		\
-       SYMBOL_REF_FLAG (XEXP (rtl, 0))					\
-	 = (TREE_CODE_CLASS (TREE_CODE (DECL)) != 'd'			\
-	    || ! TREE_PUBLIC (DECL));					\
-      }									\
-  }									\
+#define ENCODE_SECTION_INFO(DECL, FIRST)			\
+do								\
+  {								\
+    if (HALF_PIC_P ())						\
+      {								\
+	if (FIRST)						\
+	  HALF_PIC_ENCODE (DECL);				\
+      }								\
+    else if (flag_pic)						\
+      {								\
+	rtx rtl = (TREE_CODE_CLASS (TREE_CODE (DECL)) != 'd'	\
+		   ? TREE_CST_RTL (DECL) : DECL_RTL (DECL));	\
+	SYMBOL_REF_FLAG (XEXP (rtl, 0))				\
+	  = (TREE_CODE_CLASS (TREE_CODE (DECL)) != 'd'		\
+	     || ! TREE_PUBLIC (DECL));				\
+      }								\
+  }								\
 while (0)
 
 

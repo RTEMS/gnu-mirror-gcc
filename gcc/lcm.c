@@ -162,7 +162,8 @@ compute_antinout_edge (antloc, transp, antin, antout)
 	  sbitmap_intersection_of_succs (antout[bb], antin, bb);
 	}
 
-      if (sbitmap_a_or_b_and_c (antin[bb], antloc[bb], transp[bb], antout[bb]))
+      if (sbitmap_a_or_b_and_c_cg (antin[bb], antloc[bb],
+				   transp[bb], antout[bb]))
 	/* If the in state of this block changed, then we need
 	   to add the predecessors of this block to the worklist
 	   if they are not already on the worklist.  */
@@ -331,10 +332,10 @@ compute_laterin (edge_list, earliest, antloc, later, laterin)
 
       /* Calculate LATER for all outgoing edges.  */
       for (e = b->succ; e != NULL; e = e->succ_next)
-	if (sbitmap_union_of_diff (later[(size_t) e->aux],
-				   earliest[(size_t) e->aux],
-				   laterin[e->src->index],
-				   antloc[e->src->index])
+	if (sbitmap_union_of_diff_cg (later[(size_t) e->aux],
+				      earliest[(size_t) e->aux],
+				      laterin[e->src->index],
+				      antloc[e->src->index])
 	    /* If LATER for an outgoing edge was changed, then we need
 	       to add the target of the outgoing edge to the worklist.  */
 	    && e->dest != EXIT_BLOCK_PTR && e->dest->aux == 0)
@@ -552,7 +553,7 @@ compute_available (avloc, kill, avout, avin)
 	  sbitmap_intersection_of_preds (avin[bb], avout, bb);
 	}
 
-      if (sbitmap_union_of_diff (avout[bb], avloc[bb], avin[bb], kill[bb]))
+      if (sbitmap_union_of_diff_cg (avout[bb], avloc[bb], avin[bb], kill[bb]))
 	/* If the out state of this block changed, then we need
 	   to add the successors of this block to the worklist
 	   if they are not already on the worklist.  */
@@ -678,10 +679,10 @@ compute_nearerout (edge_list, farthest, st_avloc, nearer, nearerout)
 
       /* Calculate NEARER for all incoming edges.  */
       for (e = b->pred; e != NULL; e = e->pred_next)
-	if (sbitmap_union_of_diff (nearer[(size_t) e->aux],
-				   farthest[(size_t) e->aux],
-				   nearerout[e->dest->index],
-				   st_avloc[e->dest->index])
+	if (sbitmap_union_of_diff_cg (nearer[(size_t) e->aux],
+				      farthest[(size_t) e->aux],
+				      nearerout[e->dest->index],
+				      st_avloc[e->dest->index])
 	    /* If NEARER for an incoming edge was changed, then we need
 	       to add the source of the incoming edge to the worklist.  */
 	    && e->src != ENTRY_BLOCK_PTR && e->src->aux == 0)
@@ -1023,7 +1024,7 @@ optimize_mode_switching (file)
   sbitmap *kill;
   struct edge_list *edge_list;
   static const int num_modes[] = NUM_MODES_FOR_MODE_SWITCHING;
-#define N_ENTITIES (sizeof num_modes / sizeof (int))
+#define N_ENTITIES ARRAY_SIZE (num_modes)
   int entity_map[N_ENTITIES];
   struct bb_info *bb_info[N_ENTITIES];
   int i, j;
@@ -1031,6 +1032,7 @@ optimize_mode_switching (file)
   int max_num_modes = 0;
   bool emited = false;
 
+  clear_bb_flags ();
 #ifdef NORMAL_MODE
   /* Increment n_basic_blocks before allocating bb_info.  */
   n_basic_blocks++;
@@ -1398,16 +1400,11 @@ optimize_mode_switching (file)
   if (!need_commit && !emited)
     return 0;
 
-  /* Ideally we'd figure out what blocks were affected and start from
-     there, but this is enormously complicated by commit_edge_insertions,
-     which would screw up any indices we'd collected, and also need to
-     be involved in the update.  Bail and recompute global life info for
-     everything.  */
-
-  allocate_reg_life_data ();
-  update_life_info (NULL, UPDATE_LIFE_GLOBAL_RM_NOTES,
-		    (PROP_DEATH_NOTES | PROP_KILL_DEAD_CODE
-		     | PROP_SCAN_DEAD_CODE | PROP_REG_INFO));
+  max_regno = max_reg_num ();
+  allocate_reg_info (max_regno, FALSE, FALSE);
+  update_life_info_in_dirty_blocks (UPDATE_LIFE_GLOBAL_RM_NOTES,
+				    (PROP_DEATH_NOTES | PROP_KILL_DEAD_CODE
+				     | PROP_SCAN_DEAD_CODE));
 
   return 1;
 }

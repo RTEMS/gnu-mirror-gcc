@@ -93,18 +93,8 @@ extern const char *const sectname[4];
 /* number of bits in an addressable storage unit */
 #define BITS_PER_UNIT        16
 
-/* Width in bits of a "word", which is the contents of a machine register.
-   Note that this is not necessarily the width of data type `int';
-   if using 16-bit ints on a 68000, this would still be 32.
-   But on a machine with 16-bit registers, this would be 16.  */
-#define BITS_PER_WORD        16
-
 /* Width of a word, in units (bytes).  */
 #define UNITS_PER_WORD       1
-
-/* Width in bits of a pointer.
-   See also the macro `Pmode' defined below.  */
-#define POINTER_SIZE         16
 
 #define PTRDIFF_TYPE        "int"
 
@@ -154,10 +144,6 @@ extern const char *const sectname[4];
 /* 1750 PRELIMINARY : no processor support for `long long', therefore
         need to check out the long-long opencodings ! */
 #define LONG_LONG_TYPE_SIZE  64
-
-/* Define number of bits in char type.
-   (If undefined, default is one fourth of BITS_PER_WORD).  */
-#define CHAR_TYPE_SIZE  16
 
 /* Define number of bits in float type.
    (If undefined, default is BITS_PER_WORD).  */
@@ -769,9 +755,6 @@ enum reg_class { NO_REGS, R2, R0_1, INDEX_REGS, BASE_REGS, ALL_REGS, LIM_REG_CLA
 /* If a memory-to-memory move would take MOVE_RATIO or more simple
    move-instruction pairs, we will do a movstr or libcall instead.  */
 #define MOVE_RATIO 4
-
-/* Define this if zero-extension is slow (more than one real instruction).  */
-/* #define SLOW_ZERO_EXTEND */
 
 /* Nonzero if access to memory by bytes is slow and undesirable.  */
 #define SLOW_BYTE_ACCESS 0

@@ -62,21 +62,8 @@ extern int target_flags;
    since there are no machine instructions for them.  */
 #define WORDS_BIG_ENDIAN 1
 
-/* number of bits in an addressable storage unit */
-#define BITS_PER_UNIT 8
-
-/* Width in bits of a "word", which is the contents of a machine register.
-   Note that this is not necessarily the width of data type `int';
-   if using 16-bit ints on a we32000, this would still be 32.
-   But on a machine with 16-bit registers, this would be 16.  */
-#define BITS_PER_WORD 32
-
 /* Width of a word, in units (bytes).  */
 #define UNITS_PER_WORD 4
-
-/* Width in bits of a pointer.
-   See also the macro `Pmode' defined below.  */
-#define POINTER_SIZE 32
 
 /* Allocation boundary (in *bits*) for storing arguments in argument list.  */
 #define PARM_BOUNDARY 32
@@ -599,9 +586,6 @@ enum reg_class { NO_REGS, GENERAL_REGS,
    in one reasonably fast instruction.  */
 #define MOVE_MAX 4
 
-/* Define this if zero-extension is slow (more than one real instruction).  */
-/* #define SLOW_ZERO_EXTEND */
-
 /* Nonzero if access to memory by bytes is slow and undesirable.  */
 #define SLOW_BYTE_ACCESS 0
 
@@ -863,13 +847,12 @@ do {							\
     output_address (XEXP (X, 0));					\
   else if (GET_CODE (X) == CONST_DOUBLE && GET_MODE (X) == SFmode)	\
          {								\
-         union { double d; long l[2]; } dtem;				\
-         union { float f; long l; } ftem;				\
+	   REAL_VALUE_TYPE r;						\
+	   long l;							\
 									\
-         dtem.l[0] = CONST_DOUBLE_LOW (X);				\
-         dtem.l[1] = CONST_DOUBLE_HIGH (X);				\
-         ftem.f = dtem.d;						\
-         fprintf(FILE, "&0x%lx", ftem.l);				\
+	   REAL_VALUE_FROM_CONST_DOUBLE (r, X);				\
+	   REAL_VALUE_TO_TARGET_SINGLE (r, l);				\
+	   fprintf (FILE, "&0x%lx", l);					\
          }								\
   else { putc ('&', FILE); output_addr_const (FILE, X); }}
 

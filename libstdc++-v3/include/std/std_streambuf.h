@@ -1,6 +1,7 @@
 // Stream buffer classes -*- C++ -*-
 
-// Copyright (C) 1997, 1998, 1999, 2000, 2001 Free Software Foundation, Inc.
+// Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002
+// Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -31,9 +32,9 @@
 // ISO C++ 14882: 27.5  Stream buffers
 //
 
-/** @file std_streambuf.h
- *  This is an internal header file, included by other library headers.
- *  You should not attempt to use it directly.
+/** @file streambuf
+ *  This is a Standard C++ Library header.  You should @c #include this header
+ *  in your programs, rather than any of the "st[dl]_*.h" implementation files.
  */
 
 #ifndef _CPP_STREAMBUF
@@ -82,7 +83,6 @@ namespace std
 			  __streambuf_type* __sbin,__streambuf_type* __sbout);
       
     protected:
-
       // Pointer to the beginning of internally-allocated
       // space. Filebuf manually allocates/deallocates this, whereas
       // stringstreams attempt to use the built-in intelligence of the
@@ -126,8 +126,8 @@ namespace std
       // requirements. The only basic_streambuf member function that
       // needs access to these data members is in_avail...
       // NB: pbacks of over one character are not currently supported.
-      int_type    		_M_pback_size; 
-      char_type*		_M_pback; 
+      static const int_type    	_S_pback_size = 1; 
+      char_type			_M_pback[_S_pback_size]; 
       char_type*		_M_pback_cur_save;
       char_type*		_M_pback_end_save;
       bool			_M_pback_init; 
@@ -141,7 +141,7 @@ namespace std
 	if (!_M_pback_init)
 	  {
 	    int_type __dist = _M_in_end - _M_in_cur;
-	    int_type __len = min(_M_pback_size, __dist);
+	    int_type __len = min(_S_pback_size, __dist);
 	    traits_type::copy(_M_pback, _M_in_cur, __len);
 	    _M_pback_cur_save = _M_in_cur;
 	    _M_pback_end_save = _M_in_end;
@@ -227,48 +227,6 @@ namespace std
 	    // Using non-allocated buffer.
 	    else
 	      __ret = _M_out_end - _M_out_cur;
-	  }
-	return __ret;
-      }
-
-      // These three functions are used to clarify internal buffer
-      // maintenance. After an overflow, or after a seekoff call that
-      // started at beg or end, or possibly when the stream becomes
-      // unbuffered, and a myrid other obscure corner cases, the
-      // internal buffer does not truly reflect the contents of the
-      // external buffer. At this point, for whatever reason, it is in
-      // an indeterminate state.
-      void
-      _M_set_indeterminate(void)
-      {
-	if (_M_mode & ios_base::in)
-	  this->setg(_M_buf, _M_buf, _M_buf);
-	if (_M_mode & ios_base::out)
-	  this->setp(_M_buf, _M_buf);
-      }
-
-      void
-      _M_set_determinate(off_type __off)
-      {
-	bool __testin = _M_mode & ios_base::in;
-	bool __testout = _M_mode & ios_base::out;
-	if (__testin)
-	  this->setg(_M_buf, _M_buf, _M_buf + __off);
-	if (__testout)
-	  this->setp(_M_buf, _M_buf + __off);
-      }
-
-      bool
-      _M_is_indeterminate(void)
-      { 
-	bool __ret = false;
-	// Don't return true if unbuffered.
-	if (_M_buf)
-	  {
-	    if (_M_mode & ios_base::in)
-	      __ret = _M_in_beg == _M_in_cur && _M_in_cur == _M_in_end;
-	    if (_M_mode & ios_base::out)
-	      __ret = _M_out_beg == _M_out_cur && _M_out_cur == _M_out_end;
 	  }
 	return __ret;
       }
@@ -388,8 +346,8 @@ namespace std
       _M_buf_size_opt(static_cast<int_type>(BUFSIZ)), _M_buf_unified(false), 
       _M_in_beg(0), _M_in_cur(0), _M_in_end(0), _M_out_beg(0), _M_out_cur(0), 
       _M_out_end(0), _M_mode(ios_base::openmode(0)), _M_buf_locale(locale()), 
-      _M_buf_locale_init(false), _M_pback_size(1), _M_pback(NULL), 
-      _M_pback_cur_save(NULL), _M_pback_end_save(NULL), _M_pback_init(false)
+      _M_buf_locale_init(false), _M_pback_cur_save(0), _M_pback_end_save(0), 
+      _M_pback_init(false)
       { }
 
       // Get area:
@@ -518,23 +476,21 @@ namespace std
 #endif
 
 #ifdef _GLIBCPP_RESOLVE_LIB_DEFECTS
-    // Side effect of DR 50.
+    // Side effect of DR 50. 
     private:
-      basic_streambuf(const __streambuf_type&);
+      basic_streambuf(const __streambuf_type&) { }; 
 
       __streambuf_type& 
-      operator=(const __streambuf_type&);
+      operator=(const __streambuf_type&) { return *this; };
 #endif
     };
-
 } // namespace std
 
 #ifdef _GLIBCPP_NO_TEMPLATE_EXPORT
 # define export
+#endif
 #ifdef  _GLIBCPP_FULLY_COMPLIANT_HEADERS
 #include <bits/streambuf.tcc>
 #endif
-#endif
 
-#endif	/* _CPP_STREAMBUF */
-
+#endif	

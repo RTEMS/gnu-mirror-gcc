@@ -42,14 +42,12 @@
 #include "ggc.h"
 #include "target.h"
 #include "target-def.h"
+#include "langhooks.h"
 
 static void d30v_print_operand_memory_reference PARAMS ((FILE *, rtx));
 static void d30v_build_long_insn PARAMS ((HOST_WIDE_INT, HOST_WIDE_INT,
 					  rtx, rtx));
-static void d30v_add_gc_roots PARAMS ((void));
-static void d30v_init_machine_status PARAMS ((struct function *));
-static void d30v_mark_machine_status PARAMS ((struct function *));
-static void d30v_free_machine_status PARAMS ((struct function *));
+static struct machine_function * d30v_init_machine_status PARAMS ((void));
 static void d30v_output_function_prologue PARAMS ((FILE *, HOST_WIDE_INT));
 static void d30v_output_function_epilogue PARAMS ((FILE *, HOST_WIDE_INT));
 static int d30v_adjust_cost PARAMS ((rtx, rtx, rtx, int));
@@ -297,8 +295,6 @@ override_options ()
   reg_class_from_letter['x'] = F0_REGS;
   reg_class_from_letter['y'] = F1_REGS;
   reg_class_from_letter['z'] = OTHER_FLAG_REGS;
-
-  d30v_add_gc_roots ();
 }
 
 
@@ -2202,7 +2198,7 @@ d30v_build_va_list ()
   tree f_arg_ptr, f_arg_num, record, type_decl;
   tree int_type_node;
 
-  record = make_lang_type (RECORD_TYPE);
+  record = (*lang_hooks.types.make_type) (RECORD_TYPE);
   type_decl = build_decl (TYPE_DECL, get_identifier ("__va_list_tag"), record);
   int_type_node = make_signed_type (INT_TYPE_SIZE);
 
@@ -3543,35 +3539,10 @@ d30v_issue_rate ()
 /* Routine to allocate, mark and free a per-function,
    machine specific structure.  */
 
-static void
-d30v_init_machine_status (p)
-     struct function *p;
+static struct machine_function *
+d30v_init_machine_status ()
 {
-  p->machine =
-    (machine_function *) xcalloc (1, sizeof (machine_function));
-}
-
-static void
-d30v_mark_machine_status (p)
-     struct function * p;
-{
-  if (p->machine == NULL)
-    return;
-  
-  ggc_mark_rtx (p->machine->eh_epilogue_sp_ofs);
-}
-
-static void
-d30v_free_machine_status (p)
-     struct function *p;
-{
-  struct machine_function *machine = p->machine;
-
-  if (machine == NULL)
-    return;
-
-  free (machine);
-  p->machine = NULL;
+  return ggc_alloc_cleared (sizeof (machine_function));
 }
 
 /* Do anything needed before RTL is emitted for each function.  */
@@ -3581,8 +3552,6 @@ d30v_init_expanders ()
 {
   /* Arrange to save and restore machine status around nested functions.  */
   init_machine_status = d30v_init_machine_status;
-  mark_machine_status = d30v_mark_machine_status;
-  free_machine_status = d30v_free_machine_status;
 }
 
 /* Find the current function's return address.
@@ -3596,14 +3565,4 @@ rtx
 d30v_return_addr ()
 {
   return get_hard_reg_initial_val (Pmode, GPR_LINK);
-}
-
-/* Called to register all of our global variables with the garbage
-   collector.  */
-
-static void
-d30v_add_gc_roots ()
-{
-  ggc_add_rtx_root (&d30v_compare_op0, 1);
-  ggc_add_rtx_root (&d30v_compare_op1, 1);
 }

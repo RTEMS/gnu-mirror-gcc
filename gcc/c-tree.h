@@ -34,16 +34,31 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
    lang_identifier nodes, because some keywords are only special in a
    particular context.  */
 
-struct lang_identifier
+struct lang_identifier GTY(())
 {
-  struct c_common_identifier ignore;
-  tree global_value, local_value, label_value, implicit_decl;
-  tree error_locus, limbo_value;
+  struct c_common_identifier common_id;
+  tree global_value;
+  tree local_value;
+  tree label_value;
+  tree implicit_decl;
+  tree error_locus;
+  tree limbo_value;
+};
+
+/* The resulting tree type.  */
+
+union lang_tree_node 
+  GTY((desc ("TREE_CODE (&%h.generic) == IDENTIFIER_NODE")))
+{
+  union tree_node GTY ((tag ("0"), 
+			desc ("tree_node_structure (&%h)"))) 
+    generic;
+  struct lang_identifier GTY ((tag ("1"))) identifier;
 };
 
 /* Language-specific declaration information.  */
 
-struct lang_decl
+struct lang_decl GTY(())
 {
   struct c_lang_decl base;
   /* The return types and parameter types may have variable size.
@@ -107,10 +122,10 @@ struct lang_decl
   (DECL_LANG_SPECIFIC (NODE)->base.declared_inline)
 
 /* In a RECORD_TYPE, a sorted array of the fields of the type.  */
-struct lang_type
+struct lang_type GTY(())
 {
   int len;
-  tree elts[1];
+  tree GTY((length ("%h.len"))) elts[1];
 };
 
 /* Record whether a type or decl was written with nonconstant size.
@@ -131,6 +146,10 @@ struct lang_type
 
 /* Record whether a typedef for type `int' was actually `signed int'.  */
 #define C_TYPEDEF_EXPLICITLY_SIGNED(EXP) DECL_LANG_FLAG_1 (EXP)
+
+/* For a FUNCTION_DECL, nonzero if it was defined without an explicit
+   return type.  */
+#define C_FUNCTION_IMPLICIT_INT(EXP) DECL_LANG_FLAG_1 (EXP)
 
 /* Nonzero for a declaration of a built in function if there has been no
    occasion that would declare the function in ordinary C.
@@ -156,14 +175,23 @@ extern tree lookup_objc_ivar			PARAMS ((tree));
 
 /* in c-parse.in */
 extern void c_parse_init			PARAMS ((void));
-extern void c_set_yydebug			PARAMS ((int));
-extern int yyparse_1				PARAMS ((void));
 
 /* in c-aux-info.c */
 extern void gen_aux_info_record                 PARAMS ((tree, int, int, int));
 
 /* in c-decl.c */
+extern int global_bindings_p			PARAMS ((void));
+extern int kept_level_p				PARAMS ((void));
+extern tree getdecls				PARAMS ((void));
+extern void pushlevel				PARAMS ((int));
+extern tree poplevel				PARAMS ((int,int, int));
+extern void insert_block			PARAMS ((tree));
+extern void set_block				PARAMS ((tree));
+extern tree pushdecl				PARAMS ((tree));
+
+extern void c_insert_default_attributes		PARAMS ((tree));
 extern void c_init_decl_processing		PARAMS ((void));
+extern void c_dup_lang_specific_decl		PARAMS ((tree));
 extern void c_print_identifier			PARAMS ((FILE *, tree, int));
 extern tree build_array_declarator              PARAMS ((tree, tree, int, int));
 extern tree build_enumerator                    PARAMS ((tree, tree));
@@ -177,7 +205,7 @@ extern tree define_label                        PARAMS ((const char *, int,
 							 tree));
 extern void finish_decl                         PARAMS ((tree, tree, tree));
 extern tree finish_enum                         PARAMS ((tree, tree, tree));
-extern void finish_function                     PARAMS ((int));
+extern void finish_function                     PARAMS ((int, int));
 extern tree finish_struct                       PARAMS ((tree, tree, tree));
 extern tree get_parm_info                       PARAMS ((int));
 extern tree grokfield                           PARAMS ((const char *, int, tree, tree, tree));
@@ -187,14 +215,12 @@ extern tree implicitly_declare                  PARAMS ((tree));
 extern void implicit_decl_warning               PARAMS ((tree));
 extern int  in_parm_level_p                     PARAMS ((void));
 extern void keep_next_level                     PARAMS ((void));
-extern int  kept_level_p                        PARAMS ((void));
 extern tree lookup_name                         PARAMS ((tree));
 extern tree lookup_name_current_level		PARAMS ((tree));
 extern void parmlist_tags_warning               PARAMS ((void));
 extern void pending_xref_error                  PARAMS ((void));
-extern void mark_c_function_context             PARAMS ((struct function *));
-extern void push_c_function_context             PARAMS ((struct function *));
-extern void pop_c_function_context              PARAMS ((struct function *));
+extern void c_push_function_context             PARAMS ((struct function *));
+extern void c_pop_function_context              PARAMS ((struct function *));
 extern void pop_label_level                     PARAMS ((void));
 extern void push_label_level                    PARAMS ((void));
 extern void push_parm_decl                      PARAMS ((tree));
@@ -223,6 +249,7 @@ extern const char *c_objc_common_init		PARAMS ((const char *));
 extern int c_missing_noreturn_ok_p		PARAMS ((tree));
 extern void c_objc_common_finish_file		PARAMS ((void));
 extern int defer_fn				PARAMS ((tree));
+extern bool c_warn_unused_global_decl		PARAMS ((tree));
 
 #define c_build_type_variant(TYPE, CONST_P, VOLATILE_P)		  \
   c_build_qualified_type ((TYPE),				  \
@@ -234,6 +261,9 @@ extern tree require_complete_type		PARAMS ((tree));
 extern int comptypes				PARAMS ((tree, tree));
 extern tree c_sizeof_nowarn			PARAMS ((tree));
 extern tree c_size_in_bytes                     PARAMS ((tree));
+extern bool c_mark_addressable			PARAMS ((tree));
+extern void c_incomplete_type_error		PARAMS ((tree, tree));
+extern tree c_type_promotes_to			PARAMS ((tree));
 extern tree build_component_ref                 PARAMS ((tree, tree));
 extern tree build_indirect_ref                  PARAMS ((tree, const char *));
 extern tree build_array_ref                     PARAMS ((tree, tree));
@@ -266,6 +296,7 @@ extern void c_finish_case                       PARAMS ((void));
 extern tree simple_asm_stmt			PARAMS ((tree));
 extern tree build_asm_stmt			PARAMS ((tree, tree, tree,
 							 tree, tree));
+extern tree c_convert_parm_for_inlining		PARAMS ((tree, tree, tree));
 
 /* Set to 0 at beginning of a function definition, set to 1 if
    a return statement that specifies a return value is seen.  */
@@ -276,6 +307,11 @@ extern int current_function_returns_value;
    a return statement with no argument is seen.  */
 
 extern int current_function_returns_null;
+
+/* Set to 0 at beginning of a function definition, set to 1 if
+   a call to a noreturn function is seen.  */
+
+extern int current_function_returns_abnormally;
 
 /* Nonzero means the expression being parsed will never be evaluated.
    This is a count, since unevaluated expressions can nest.  */
@@ -339,10 +375,6 @@ extern int warn_char_subscripts;
 
 extern int warn_main;
 
-/* Nonzero means to allow single precision math even if we're generally
-   being traditional.  */
-extern int flag_allow_single_precision;
-
 /* Warn if initializer is not completely bracketed.  */
 
 extern int warn_missing_braces;
@@ -355,10 +387,6 @@ extern int warn_sign_compare;
 
 extern int warn_float_equal;
 
-/* Warn about multicharacter constants.  */
-
-extern int warn_multichar;
-
 /* Nonzero means we are reading code that came from a system header file.  */
 
 extern int system_header_p;
@@ -367,9 +395,9 @@ extern int system_header_p;
 extern int mesg_implicit_function_declaration;
 
 /* In c-decl.c */
-extern void finish_incomplete_decl PARAMS ((tree));
+extern void c_finish_incomplete_decl PARAMS ((tree));
 
-extern tree static_ctors;
-extern tree static_dtors;
+extern GTY(()) tree static_ctors;
+extern GTY(()) tree static_dtors;
 
 #endif /* ! GCC_C_TREE_H */

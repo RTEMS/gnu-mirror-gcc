@@ -1,6 +1,6 @@
 // 2000-02-16 bkoz
 
-// Copyright (C) 2000 Free Software Foundation, Inc.
+// Copyright (C) 2000, 2001, 2002 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -31,8 +31,6 @@
 
 #include <locale>
 #include <vector>
-//#include <iostream>
-//#include <iomanip>
 #include <testsuite_hooks.h>
 
 // XXX This test (test02) is not working for non-glibc locale models.
@@ -236,9 +234,75 @@ void test02()
   VERIFY( v_c != v_de );
 }
 
+// Dietmar Kühl via Peter Schmid 
+class comma_ctype: public std::ctype<char>
+{
+public:
+  comma_ctype(): std::ctype<char>() { }
+  static void get_table()
+  { classic_table(); }
+};
+
+// Per Liboriussen <liborius@stofanet.dk>
+void test03()
+{
+  bool test = true;
+  std::ctype_base::mask maskdata[256];
+  for (int i = 0; i < 256; ++i)
+    maskdata[i] = std::ctype_base::alpha;
+  std::ctype<char>* f = new std::ctype<char>(maskdata);
+  std::locale global;
+  std::locale loc(global, f);
+  for (int i = 0; i < 256; ++i) 
+    {
+      char ch = i;
+      VERIFY( std::isalpha(ch, loc) );
+    }
+}
+
+// libstdc++/5280
+void test04()
+{
+#ifdef _GLIBCPP_HAVE_SETENV 
+  // Set the global locale to non-"C".
+  std::locale loc_de("de_DE");
+  std::locale::global(loc_de);
+
+  // Set LANG environment variable to de_DE.
+  const char* oldLANG = getenv("LANG");
+  if (!setenv("LANG", "de_DE", 1))
+    {
+      test01();
+      test02();
+      test03();
+      setenv("LANG", oldLANG ? oldLANG : "", 1);
+    }
+#endif
+}
+
+// http://gcc.gnu.org/ml/libstdc++/2002-05/msg00038.html
+void test05()
+{
+  bool test = true;
+
+  const char* tentLANG = setlocale(LC_ALL, "ja_JP.eucjp");
+  if (tentLANG != NULL)
+    {
+      std::string preLANG = tentLANG;
+      test01();
+      test02();
+      test03();
+      std::string postLANG = setlocale(LC_ALL, NULL);
+      VERIFY( preLANG == postLANG );
+    }
+}
+
 int main() 
 {
   test01();
   test02();
+  test03();
+  test04();
+  test05();
   return 0;
 }

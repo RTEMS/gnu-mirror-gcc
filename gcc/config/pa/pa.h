@@ -41,6 +41,7 @@ enum processor_type
   PROCESSOR_7100,
   PROCESSOR_7100LC,
   PROCESSOR_7200,
+  PROCESSOR_7300,
   PROCESSOR_8000
 };
 
@@ -157,6 +158,11 @@ extern int target_flags;
 /* Generate code for ELF32 ABI.  */
 #ifndef TARGET_ELF32
 #define TARGET_ELF32 0
+#endif
+
+/* Generate code for SOM 32bit ABI.  */
+#ifndef TARGET_SOM
+#define TARGET_SOM 0
 #endif
 
 /* Macro to define tables used to set the flags.
@@ -362,10 +368,6 @@ extern int target_flags;
 
 /* target machine storage layout */
 
-/* Define for cross-compilation from a host with a different float format
-   or endianness (e.g. VAX, x86).  */
-#define REAL_ARITHMETIC
-
 /* Define this macro if it is advisable to hold scalars in registers
    in a wider mode than that declared by the program.  In such cases, 
    the value is constrained to be within the bounds of the declared
@@ -389,25 +391,12 @@ extern int target_flags;
    numbered.  */
 #define WORDS_BIG_ENDIAN 1
 
-/* number of bits in an addressable storage unit */
-#define BITS_PER_UNIT 8
-
-/* Width in bits of a "word", which is the contents of a machine register.
-   Note that this is not necessarily the width of data type `int';
-   if using 16-bit ints on a 68000, this would still be 32.
-   But on a machine with 16-bit registers, this would be 16.  */
-#define BITS_PER_WORD (TARGET_64BIT ? 64 : 32)
 #define MAX_BITS_PER_WORD 64
 #define MAX_LONG_TYPE_SIZE 32
-#define MAX_WCHAR_TYPE_SIZE 32
 
 /* Width of a word, in units (bytes).  */
 #define UNITS_PER_WORD (TARGET_64BIT ? 8 : 4)
 #define MIN_UNITS_PER_WORD 4
-
-/* Width in bits of a pointer.
-   See also the macro `Pmode' defined below.  */
-#define POINTER_SIZE BITS_PER_WORD
 
 /* Allocation boundary (in *bits*) for storing arguments in argument list.  */
 #define PARM_BOUNDARY BITS_PER_WORD
@@ -423,6 +412,8 @@ extern int target_flags;
    but that happens late in the compilation process.  */
 #define STACK_BOUNDARY (TARGET_64BIT ? 128 : 64)
 
+#define PREFERRED_STACK_BOUNDARY 512
+
 /* Allocation boundary (in *bits*) for the code of a function.  */
 #define FUNCTION_BOUNDARY (TARGET_64BIT ? 64 : 32)
 
@@ -435,8 +426,9 @@ extern int target_flags;
 /* A bitfield declared as `int' forces `int' alignment for the struct.  */
 #define PCC_BITFIELD_TYPE_MATTERS 1
 
-/* No data type wants to be aligned rounder than this.  */
-#define BIGGEST_ALIGNMENT 64
+/* No data type wants to be aligned rounder than this.  This is set
+   to 128 bits to allow for lock semaphores in the stack frame.*/
+#define BIGGEST_ALIGNMENT 128
 
 /* Get around hp-ux assembler bug, and make strcpy of constants fast.  */
 #define CONSTANT_ALIGNMENT(CODE, TYPEALIGN) \
@@ -519,10 +511,22 @@ extern struct rtx_def *hppa_pic_save_rtx PARAMS ((void));
 #define STRUCT_VALUE_REGNUM 28
 
 /* Describe how we implement __builtin_eh_return.  */
+/* FIXME: What's a good choice for the EH data registers on TARGET_64BIT?  */
 #define EH_RETURN_DATA_REGNO(N)	\
-  ((N) < 3 ? (N) + 20 : (N) == 4 ? 31 : INVALID_REGNUM)
+  (TARGET_64BIT								\
+   ? ((N) < 4 ? (N) + 4 : INVALID_REGNUM)				\
+   : ((N) < 3 ? (N) + 20 : (N) == 4 ? 31 : INVALID_REGNUM))
 #define EH_RETURN_STACKADJ_RTX	gen_rtx_REG (Pmode, 29)
-#define EH_RETURN_HANDLER_RTX	gen_rtx_REG (Pmode, 2)
+#define EH_RETURN_HANDLER_RTX \
+  gen_rtx_MEM (word_mode,						\
+	       gen_rtx_PLUS (word_mode, frame_pointer_rtx,		\
+			     TARGET_64BIT ? GEN_INT (-16) : GEN_INT (-20)))
+			  	
+
+/* Offset from the argument pointer register value to the top of
+   stack.  This is different from FIRST_PARM_OFFSET because of the
+   frame marker.  */
+#define ARG_POINTER_CFA_OFFSET(FNDECL) 0
 
 /* The letters I, J, K, L and M in a register constraint string
    can be used to stand for particular ranges of immediate operands.
@@ -857,34 +861,95 @@ struct hppa_args {int words, nargs_prototype, indirect; };
       || ((MODE) && GET_MODE_SIZE (MODE) > 8)))
 
 
-extern struct rtx_def *hppa_compare_op0, *hppa_compare_op1;
+extern GTY(()) rtx hppa_compare_op0;
+extern GTY(()) rtx hppa_compare_op1;
 extern enum cmp_type hppa_branch_type;
 
 #define ASM_OUTPUT_MI_THUNK(FILE, THUNK_FNDECL, DELTA, FUNCTION) \
 { const char *target_name = XSTR (XEXP (DECL_RTL (FUNCTION), 0), 0); \
+  static unsigned int current_thunk_number; \
+  char label[16]; \
+  char *lab; \
+  ASM_GENERATE_INTERNAL_LABEL (label, "LTHN", current_thunk_number); \
+  STRIP_NAME_ENCODING (lab, label); \
   STRIP_NAME_ENCODING (target_name, target_name); \
+  /* FIXME: total_code_bytes is not handled correctly in files with \
+     mi thunks.  */ \
   pa_output_function_prologue (FILE, 0); \
   if (VAL_14_BITS_P (DELTA)) \
     { \
-      fprintf (FILE, "\tb %s\n\tldo ", target_name); \
-      fprintf (FILE, HOST_WIDE_INT_PRINT_DEC, DELTA); \
-      fprintf (FILE, "(%%r26),%%r26\n"); \
+      if (! TARGET_64BIT && ! TARGET_PORTABLE_RUNTIME && flag_pic) \
+	{ \
+	  fprintf (FILE, "\taddil LT%%%s,%%r19\n", lab); \
+	  fprintf (FILE, "\tldw RT%%%s(%%r1),%%r22\n", lab); \
+	  fprintf (FILE, "\tldw 0(%%sr0,%%r22),%%r22\n"); \
+	  fprintf (FILE, "\tbb,>=,n %%r22,30,.+16\n"); \
+	  fprintf (FILE, "\tdepi 0,31,2,%%r22\n"); \
+	  fprintf (FILE, "\tldw 4(%%sr0,%%r22),%%r19\n"); \
+	  fprintf (FILE, "\tldw 0(%%sr0,%%r22),%%r22\n"); \
+	  fprintf (FILE, "\tldsid (%%sr0,%%r22),%%r1\n\tmtsp %%r1,%%sr0\n"); \
+	  fprintf (FILE, "\tbe 0(%%sr0,%%r22)\n\tldo "); \
+	  fprintf (FILE, HOST_WIDE_INT_PRINT_DEC, DELTA); \
+	  fprintf (FILE, "(%%r26),%%r26\n"); \
+	} \
+      else \
+	{ \
+	  fprintf (FILE, "\tb %s\n\tldo ", target_name); \
+	  fprintf (FILE, HOST_WIDE_INT_PRINT_DEC, DELTA); \
+	  fprintf (FILE, "(%%r26),%%r26\n"); \
+	} \
     } \
   else \
     { \
-      fprintf (FILE, "\taddil L%%"); \
-      fprintf (FILE, HOST_WIDE_INT_PRINT_DEC, DELTA); \
-      fprintf (FILE, ",%%r26\n\tb %s\n\tldo R%%", target_name); \
-      fprintf (FILE, HOST_WIDE_INT_PRINT_DEC, DELTA); \
-      fprintf (FILE, "(%%r1),%%r26\n"); \
+      if (! TARGET_64BIT && ! TARGET_PORTABLE_RUNTIME && flag_pic) \
+	{ \
+	  fprintf (FILE, "\taddil L%%"); \
+	  fprintf (FILE, HOST_WIDE_INT_PRINT_DEC, DELTA); \
+	  fprintf (FILE, ",%%r26\n\tldo R%%"); \
+	  fprintf (FILE, HOST_WIDE_INT_PRINT_DEC, DELTA); \
+	  fprintf (FILE, "(%%r1),%%r26\n"); \
+	  fprintf (FILE, "\taddil LT%%%s,%%r19\n", lab); \
+	  fprintf (FILE, "\tldw RT%%%s(%%r1),%%r22\n", lab); \
+	  fprintf (FILE, "\tldw 0(%%sr0,%%r22),%%r22\n"); \
+	  fprintf (FILE, "\tbb,>=,n %%r22,30,.+16\n"); \
+	  fprintf (FILE, "\tdepi 0,31,2,%%r22\n"); \
+	  fprintf (FILE, "\tldw 4(%%sr0,%%r22),%%r19\n"); \
+	  fprintf (FILE, "\tldw 0(%%sr0,%%r22),%%r22\n"); \
+	  fprintf (FILE, "\tldsid (%%sr0,%%r22),%%r1\n\tmtsp %%r1,%%sr0\n"); \
+	  fprintf (FILE, "\tbe,n 0(%%sr0,%%r22)\n"); \
+	} \
+      else \
+	{ \
+	  fprintf (FILE, "\taddil L%%"); \
+	  fprintf (FILE, HOST_WIDE_INT_PRINT_DEC, DELTA); \
+	  fprintf (FILE, ",%%r26\n\tb %s\n\tldo R%%", target_name); \
+	  fprintf (FILE, HOST_WIDE_INT_PRINT_DEC, DELTA); \
+	  fprintf (FILE, "(%%r1),%%r26\n"); \
+	} \
     } \
-  fprintf (FILE, "\n\t.EXIT\n\t.PROCEND\n"); \
+  fprintf (FILE, "\t.EXIT\n\t.PROCEND\n"); \
+  if (! TARGET_64BIT && ! TARGET_PORTABLE_RUNTIME && flag_pic) \
+    { \
+      data_section (); \
+      fprintf (FILE, "\t.align 4\n"); \
+      ASM_OUTPUT_INTERNAL_LABEL (FILE, "LTHN", current_thunk_number); \
+      fprintf (FILE, "\t.word P%%%s\n", target_name); \
+      function_section (THUNK_FNDECL); \
+    } \
+  current_thunk_number++; \
 }
 
 /* On HPPA, we emit profiling code as rtl via PROFILE_HOOK rather than
-   as assembly via FUNCTION_PROFILER.  */
+   as assembly via FUNCTION_PROFILER.  Just output a local label.
+   We can't use the function label because the GAS SOM target can't
+   handle the difference of a global symbol and a local symbol.  */
 
-#define FUNCTION_PROFILER(FILE, LABEL) /* nothing */
+#ifndef FUNC_BEGIN_PROLOG_LABEL
+#define FUNC_BEGIN_PROLOG_LABEL        "LFBP"
+#endif
+
+#define FUNCTION_PROFILER(FILE, LABEL) \
+  ASM_OUTPUT_INTERNAL_LABEL (FILE, FUNC_BEGIN_PROLOG_LABEL, LABEL)
 
 #define PROFILE_HOOK(label_no) hppa_profile_hook (label_no)
 void hppa_profile_hook PARAMS ((int label_no));
@@ -1175,6 +1240,7 @@ extern int may_call_alloca;
 			     ? GET_MODE (OP)		\
 			     : DFmode),			\
 			    XEXP (OP, 0))		\
+       && GET_CODE (XEXP (OP, 0)) != LO_SUM		\
        && !(GET_CODE (XEXP (OP, 0)) == PLUS		\
 	    && (GET_CODE (XEXP (XEXP (OP, 0), 0)) == MULT\
 		|| GET_CODE (XEXP (XEXP (OP, 0), 1)) == MULT)))\
@@ -1283,12 +1349,12 @@ extern int may_call_alloca;
       if (! TARGET_SOFT_FLOAT				\
 	  && ! TARGET_DISABLE_INDEXING			\
 	  && base					\
-	  && (mode == SFmode || mode == DFmode)		\
+	  && ((MODE) == SFmode || (MODE) == DFmode)	\
 	  && GET_CODE (index) == MULT			\
 	  && GET_CODE (XEXP (index, 0)) == REG		\
 	  && REG_OK_FOR_BASE_P (XEXP (index, 0))	\
 	  && GET_CODE (XEXP (index, 1)) == CONST_INT	\
-	  && INTVAL (XEXP (index, 1)) == (mode == SFmode ? 4 : 8))\
+	  && INTVAL (XEXP (index, 1)) == ((MODE) == SFmode ? 4 : 8))\
 	goto ADDR;					\
     }							\
   else if (GET_CODE (X) == LO_SUM			\
@@ -1438,25 +1504,7 @@ do { 									\
   else					\
     readonly_data_section ();
 
-/* On hpux10, the linker will give an error if we have a reference
-   in the read-only data section to a symbol defined in a shared
-   library.  Therefore, expressions that might require a reloc can
-   not be placed in the read-only data section.  */
-#define SELECT_SECTION(EXP,RELOC,ALIGN) \
-  if (TREE_CODE (EXP) == VAR_DECL \
-      && TREE_READONLY (EXP) \
-      && !TREE_THIS_VOLATILE (EXP) \
-      && DECL_INITIAL (EXP) \
-      && (DECL_INITIAL (EXP) == error_mark_node \
-          || TREE_CONSTANT (DECL_INITIAL (EXP))) \
-      && !RELOC) \
-    readonly_data_section (); \
-  else if (TREE_CODE_CLASS (TREE_CODE (EXP)) == 'c' \
-	   && !(TREE_CODE (EXP) == STRING_CST && flag_writable_strings) \
-	   && !RELOC) \
-    readonly_data_section (); \
-  else \
-    data_section ();
+#define TARGET_ASM_SELECT_SECTION  pa_select_section
    
 /* Define this macro if references to a symbol must be treated
    differently depending on something about the variable or
@@ -1486,9 +1534,9 @@ do { 									\
 
 #define FUNCTION_NAME_P(NAME)  (*(NAME) == '@')
 
-#define ENCODE_SECTION_INFO(DECL)\
+#define ENCODE_SECTION_INFO(DECL, FIRST)		\
 do							\
-  { if (TEXT_SPACE_P (DECL))				\
+  { if (FIRST && TEXT_SPACE_P (DECL))			\
       {	rtx _rtl;					\
 	if (TREE_CODE (DECL) == FUNCTION_DECL		\
 	    || TREE_CODE (DECL) == VAR_DECL)		\
@@ -1705,6 +1753,10 @@ while (0)
 
 #define ASM_APP_OFF ""
 
+/* Output deferred plabels at the end of the file.  */
+
+#define ASM_FILE_END(FILE) output_deferred_plabels (FILE)
+
 /* This is how to output the definition of a user-level label named NAME,
    such as the label on a static function or variable NAME.  */
 
@@ -1913,6 +1965,7 @@ while (0)
    will never return.  */
 #define FUNCTION_OK_FOR_SIBCALL(DECL) \
   (DECL \
+   && ! TARGET_PORTABLE_RUNTIME \
    && ! TARGET_64BIT \
    && ! TREE_PUBLIC (DECL))
 
@@ -1922,6 +1975,7 @@ while (0)
 			    CONST_DOUBLE, CONST, HIGH, CONSTANT_P_RTX}}, \
   {"symbolic_operand", {SYMBOL_REF, LABEL_REF, CONST}},			\
   {"symbolic_memory_operand", {SUBREG, MEM}},				\
+  {"reg_before_reload_operand", {REG, MEM}},				\
   {"reg_or_nonsymb_mem_operand", {SUBREG, REG, MEM}},			\
   {"reg_or_0_or_nonsymb_mem_operand", {SUBREG, REG, MEM, CONST_INT,	\
 				       CONST_DOUBLE}},			\

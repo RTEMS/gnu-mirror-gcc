@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler, for DEC Alpha on Cray
    T3E running Unicos/Mk.
-   Copyright (C) 2001
+   Copyright (C) 2001, 2002
    Free Software Foundation, Inc.
    Contributed by Roman Lechtchinsky (rl@cs.tu-berlin.de)
 
@@ -32,15 +32,20 @@ Boston, MA 02111-1307, USA.  */
 /* The following defines are necessary for the standard headers to work
    correctly.  */
 
-#undef CPP_PREDEFINES
-#define CPP_PREDEFINES "-D__unix=1 -D_UNICOS=205 -D_CRAY=1 -D_CRAYT3E=1 -D_CRAYMPP=1 -D_CRAYIEEE=1 -D_ADDR64=1 -D_LD64=1 -D__UNICOSMK__ -D__INT_MAX__=9223372036854775807 -D__SHRT_MAX__=2147483647"
-
-/* Disable software floating point emulation because it requires a 16-bit
-   type which we do not have.  */
-
-#ifndef __GNUC__
-#undef REAL_ARITHMETIC
-#endif
+#define TARGET_OS_CPP_BUILTINS()				\
+    do {							\
+	builtin_define ("__unix");				\
+	builtin_define ("_UNICOS=205");				\
+	builtin_define ("_CRAY");				\
+	builtin_define ("_CRAYT3E");				\
+	builtin_define ("_CRAYMPP");				\
+	builtin_define ("_CRAYIEEE");				\
+	builtin_define ("_ADDR64");				\
+	builtin_define ("_LD64");				\
+	builtin_define ("__UNICOSMK__");			\
+	builtin_define ("__INT_MAX__=9223372036854775807");	\
+	builtin_define ("__SHRT_MAX__=2147483647");		\
+    } while (0)
 
 #define SHORT_TYPE_SIZE 32
 
@@ -290,15 +295,15 @@ do {								\
 
 /* Machine-specific function data.  */
 
-struct machine_function
+struct machine_function GTY(())
 {
   /* List of call information words for calls from this function.  */
-  struct rtx_def *first_ciw;
-  struct rtx_def *last_ciw;
+  rtx first_ciw;
+  rtx last_ciw;
   int ciw_count;
 
   /* List of deferred case vectors.  */
-  struct rtx_def *addr_list;
+  rtx addr_list;
 };
 
 /* Would have worked, only the stack doesn't seem to be executable
@@ -374,16 +379,6 @@ ssib_section ()			\
 {				\
   in_section = in_ssib;		\
 }
-
-/* A C expression which evaluates to true if declshould be placed into a
-   unique section for some target-specific reason. On Unicos/Mk, functions
-   and public variables are always placed in unique sections.  */ 
-
-/*
-#define UNIQUE_SECTION_P(DECL) (TREE_PUBLIC (DECL)		\
-				|| TREE_CODE (DECL) == FUNCTION_DECL)
-*/
-#define UNIQUE_SECTION(DECL, RELOC) unicosmk_unique_section (DECL, RELOC)
 
 /* This outputs text to go at the start of an assembler file.  */
 
@@ -568,14 +563,6 @@ ssib_section ()			\
 #undef ASM_OUTPUT_MAX_SKIP_ALIGN
 #define ASM_OUTPUT_MAX_SKIP_ALIGN(STREAM,POWER,MAXSKIP)
 
-/* We have to define these because we do not use the floating-point
-   emulation. Unfortunately, atof does not accept hex literals.  */ 
-
-#ifndef REAL_ARITHMETIC
-#define REAL_VALUE_ATOF(x,s) atof(x)
-#define REAL_VALUE_HTOF(x,s) atof(x)
-#endif
-
 #undef NM_FLAGS
 
 #undef OBJECT_FORMAT_COFF

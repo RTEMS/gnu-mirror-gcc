@@ -1,5 +1,5 @@
 /* Dead-code elimination pass for the GNU compiler.
-   Copyright (C) 2000, 2001 Free Software Foundation, Inc.
+   Copyright (C) 2000, 2001, 2002 Free Software Foundation, Inc.
    Written by Jeffrey D. Oldham <oldham@codesourcery.com>.
 
 This file is part of GCC.
@@ -341,7 +341,7 @@ note_inherently_necessary_set (dest, set, data)
      rtx dest;
      void *data;
 {
-  int *inherently_necessary_set_p = (int *)data;
+  int *inherently_necessary_set_p = (int *) data;
 
   while (GET_CODE (dest) == SUBREG
 	 || GET_CODE (dest) == STRICT_LOW_PART
@@ -370,7 +370,7 @@ find_inherently_necessary (x)
     return !0;
   else
     switch (GET_CODE (x))
-      {  
+      {
       case CALL_INSN:
       case BARRIER:
       case PREFETCH:
@@ -396,7 +396,7 @@ find_inherently_necessary (x)
 	}
       default:
 	/* Found an impossible insn type.  */
-	abort();
+	abort ();
 	break;
       }
 }
@@ -521,7 +521,7 @@ ssa_eliminate_dead_code ()
   for (i = 0; i < n_basic_blocks; ++i)
     if (pdom[i] == INVALID_BLOCK)
       pdom[i] = EXIT_BLOCK;
-  el = create_edge_list();
+  el = create_edge_list ();
   find_all_control_dependences (el, pdom, cdbte);
 
   /* Find inherently necessary instructions.  */
@@ -691,7 +691,7 @@ ssa_eliminate_dead_code ()
 	    remove_edge (temp);
 	  }
 
-	/* Create an edge from this block to the post dominator.  
+	/* Create an edge from this block to the post dominator.
 	   What about the PHI nodes at the target?  */
 	make_edge (bb, pdom_bb, 0);
 
@@ -711,7 +711,7 @@ ssa_eliminate_dead_code ()
     else if (!JUMP_P (insn))
       delete_insn_bb (insn);
   });
-  
+
   /* Remove fake edges from the CFG.  */
   remove_fake_edges ();
 
@@ -735,7 +735,6 @@ ssa_eliminate_dead_code ()
     RESURRECT_INSN (insn);
   if (VARRAY_ACTIVE_SIZE (unprocessed_instructions) != 0)
     abort ();
-  VARRAY_FREE (unprocessed_instructions);
   control_dependent_block_to_edge_map_free (cdbte);
   free ((PTR) pdom);
   free_edge_list (el);

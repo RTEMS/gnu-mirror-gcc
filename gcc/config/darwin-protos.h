@@ -1,5 +1,5 @@
 /* Prototypes.
-   Copyright (C) 2001 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2002 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -25,8 +25,6 @@ extern void machopic_validate_stub_or_non_lazy_ptr PARAMS ((const char *, int));
 extern char *machopic_function_base_name PARAMS ((void));
 extern char *machopic_non_lazy_ptr_name PARAMS ((const char*));
 extern char *machopic_stub_name PARAMS ((const char*));
-
-extern void machopic_add_gc_roots PARAMS ((void));
 
 extern void machopic_picsymbol_stub_section PARAMS ((void));
 extern void machopic_symbol_stub_section PARAMS ((void));
@@ -58,7 +56,7 @@ extern void machopic_define_ident PARAMS ((tree));
 extern void machopic_define_name PARAMS ((const char*));
 extern int machopic_name_defined_p PARAMS ((const char*));
 extern int machopic_ident_defined_p PARAMS ((tree));
-extern void darwin_encode_section_info PARAMS ((tree));
+extern void darwin_encode_section_info PARAMS ((tree, int));
 
 #endif /* TREE_CODE */
 
@@ -68,6 +66,8 @@ extern void machopic_output_possible_stub_label PARAMS ((FILE *, const char*));
 
 extern void darwin_exception_section PARAMS ((void));
 extern void darwin_eh_frame_section PARAMS ((void));
+extern void machopic_select_section PARAMS ((tree, int,
+					     unsigned HOST_WIDE_INT));
 
 #ifdef GCC_C_PRAGMA_H
 extern void darwin_pragma_ignore PARAMS ((cpp_reader *));

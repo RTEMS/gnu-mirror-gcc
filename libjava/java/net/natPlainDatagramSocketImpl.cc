@@ -1,4 +1,4 @@
-/* Copyright (C) 1999, 2000  Free Software Foundation
+/* Copyright (C) 1999, 2000, 2002  Free Software Foundation
 
    This file is part of libgcj.
 
@@ -8,16 +8,22 @@ details.  */
 
 #include <config.h>
 
-#ifdef USE_WINSOCK
-#include <windows.h>
-#include <winsock.h>
+#include <platform.h>
+
+#ifdef WIN32
 #include <errno.h>
 #include <string.h>
 #ifndef ENOPROTOOPT
 #define ENOPROTOOPT 109
 #endif
-#else /* USE_WINSOCK */
-#include "posix.h"
+
+static inline int
+close(int s)
+{
+  return closesocket(s);
+}
+
+#else /* WIN32 */
 #ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
 #endif
@@ -29,13 +35,14 @@ details.  */
 #endif
 #include <errno.h>
 #include <string.h>
-#endif /* USE_WINSOCK */
+#endif /* WIN32 */
 
 #if HAVE_BSTRING_H
 // Needed for bzero, implicitly used by FD_ZERO on IRIX 5.2 
 #include <bstring.h>
 #endif
 
+#ifndef DISABLE_JAVA_NET
 // Avoid macro definitions of bind from system headers, e.g. on
 // Solaris 7 with _XOPEN_SOURCE.  FIXME
 static inline int
@@ -43,6 +50,7 @@ _Jv_bind (int fd, struct sockaddr *addr, int addrlen)
 {
   return ::bind (fd, addr, addrlen);
 }
+#endif /* DISABLE_JAVA_NET */
 
 #ifdef bind
 #undef bind
@@ -50,7 +58,6 @@ _Jv_bind (int fd, struct sockaddr *addr, int addrlen)
 
 #include <gcj/cni.h>
 #include <java/io/IOException.h>
-#include <java/io/FileDescriptor.h>
 #include <java/io/InterruptedIOException.h>
 #include <java/net/BindException.h>
 #include <java/net/SocketException.h>
@@ -87,6 +94,13 @@ java::net::PlainDatagramSocketImpl::peek (java::net::InetAddress *)
 {
   throw new java::io::IOException (
     JvNewStringLatin1 ("DatagramSocketImpl.peek: unimplemented"));
+}
+
+void
+java::net::PlainDatagramSocketImpl::close ()
+{
+  throw new java::io::IOException (
+    JvNewStringLatin1 ("DatagramSocketImpl.close: unimplemented"));
 }
 
 void
@@ -184,15 +198,18 @@ java::net::PlainDatagramSocketImpl::create ()
       char* strerr = strerror (errno);
       throw new java::net::SocketException (JvNewStringUTF (strerr));
     }
+
+  _Jv_platform_close_on_exec (sock);
+
+  // We use fnum in place of fd here.  From leaving fd null we avoid
+  // the double close problem in FileDescriptor.finalize.
   fnum = sock;
-  fd = new java::io::FileDescriptor (sock);
 }
 
 void
 java::net::PlainDatagramSocketImpl::bind (jint lport,
 					  java::net::InetAddress *host)
 {
-  // FIXME: prob. need to do a setsockopt with SO_BROADCAST to allow multicast.
   union SockAddr u;
   struct sockaddr *ptr = (struct sockaddr *) &u.address;
   // FIXME: Use getaddrinfo() to get actual protocol instead of assuming ipv4.
@@ -230,6 +247,11 @@ java::net::PlainDatagramSocketImpl::bind (jint lport,
       else if (::getsockname (fnum, (sockaddr*) &u, &addrlen) == 0)
         localPort = ntohs (u.address.sin_port);
       else
+        goto error;
+      /* Allow broadcast by default. */
+      int broadcast = 1;
+      if (::setsockopt (fnum, SOL_SOCKET, SO_BROADCAST, (char *) &broadcast, 
+                        sizeof (broadcast)) != 0)
         goto error;
       return;
     }
@@ -274,6 +296,20 @@ java::net::PlainDatagramSocketImpl::peek (java::net::InetAddress *i)
  error:
   char* strerr = strerror (errno);
   throw new java::io::IOException (JvNewStringUTF (strerr));
+}
+
+// Close(shutdown) the socket.
+void
+java::net::PlainDatagramSocketImpl::close ()
+{
+  // Avoid races from asynchronous finalization.
+  JvSynchronize sync (this);
+
+  // The method isn't declared to throw anything, so we disregard
+  // the return value.
+  ::close (fnum);
+  fnum = -1;
+  timeout = 0;
 }
 
 void
@@ -322,6 +358,8 @@ java::net::PlainDatagramSocketImpl::receive (java::net::DatagramPacket *p)
   jbyte *dbytes = elements (p->getData());
   ssize_t retlen = 0;
 
+// FIXME: implement timeout support for Win32
+#ifndef WIN32
   // Do timeouts via select since SO_RCVTIMEO is not always available.
   if (timeout > 0)
     {
@@ -337,6 +375,7 @@ java::net::PlainDatagramSocketImpl::receive (java::net::DatagramPacket *p)
       else if (retval == 0)
 	throw new java::io::InterruptedIOException ();
     }
+#endif /* WIN32 */
 
   retlen =
     ::recvfrom (fnum, (char *) dbytes, p->getLength(), 0, (sockaddr*) &u,

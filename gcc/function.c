@@ -55,10 +55,11 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "basic-block.h"
 #include "obstack.h"
 #include "toplev.h"
-#include "hash.h"
+#include "hashtab.h"
 #include "ggc.h"
 #include "tm_p.h"
 #include "integrate.h"
+#include "langhooks.h"
 
 #ifndef TRAMPOLINE_ALIGNMENT
 #define TRAMPOLINE_ALIGNMENT FUNCTION_BOUNDARY
@@ -123,21 +124,12 @@ int current_function_uses_only_leaf_regs;
    post-instantiation libcalls.  */
 int virtuals_instantiated;
 
+/* Assign unique numbers to labels generated for profiling.  */
+static int profile_label_no;
+
 /* These variables hold pointers to functions to create and destroy
    target specific, per-function data structures.  */
-void (*init_machine_status) PARAMS ((struct function *));
-void (*free_machine_status) PARAMS ((struct function *));
-/* This variable holds a pointer to a function to register any
-   data items in the target specific, per-function data structure
-   that will need garbage collection.  */
-void (*mark_machine_status) PARAMS ((struct function *));
-
-/* Likewise, but for language-specific data.  */
-void (*init_lang_status) PARAMS ((struct function *));
-void (*save_lang_status) PARAMS ((struct function *));
-void (*restore_lang_status) PARAMS ((struct function *));
-void (*mark_lang_status) PARAMS ((struct function *));
-void (*free_lang_status) PARAMS ((struct function *));
+struct machine_function * (*init_machine_status) PARAMS ((void));
 
 /* The FUNCTION_DECL for an inline function currently being expanded.  */
 tree inline_function_decl;
@@ -146,12 +138,12 @@ tree inline_function_decl;
 struct function *cfun = 0;
 
 /* These arrays record the INSN_UIDs of the prologue and epilogue insns.  */
-static varray_type prologue;
-static varray_type epilogue;
+static GTY(()) varray_type prologue;
+static GTY(()) varray_type epilogue;
 
 /* Array of INSN_UIDs to hold the INSN_UIDs for each sibcall epilogue
    in this function.  */
-static varray_type sibcall_epilogue;
+static GTY(()) varray_type sibcall_epilogue;
 
 /* In order to evaluate some expressions, such as function calls returning
    structures in memory, we need to temporarily allocate stack locations.
@@ -171,7 +163,7 @@ static varray_type sibcall_epilogue;
    level where they are defined.  They are marked a "kept" so that
    free_temp_slots will not free them.  */
 
-struct temp_slot
+struct temp_slot GTY(())
 {
   /* Points to next temporary slot.  */
   struct temp_slot *next;
@@ -212,7 +204,7 @@ struct temp_slot
    maintain this list in case two operands of an insn were required to match;
    in that case we must ensure we use the same replacement.  */
 
-struct fixup_replacement
+struct fixup_replacement GTY(())
 {
   rtx old;
   rtx new;
@@ -221,9 +213,9 @@ struct fixup_replacement
 
 struct insns_for_mem_entry
 {
-  /* The KEY in HE will be a MEM.  */
-  struct hash_entry he;
-  /* These are the INSNS which reference the MEM.  */
+  /* A MEM.  */
+  rtx key;
+  /* These are the INSNs which reference the MEM.  */
   rtx insns;
 };
 
@@ -235,25 +227,26 @@ static struct temp_slot *find_temp_slot_from_address  PARAMS ((rtx));
 static void put_reg_into_stack	PARAMS ((struct function *, rtx, tree,
 					 enum machine_mode, enum machine_mode,
 					 int, unsigned int, int,
-					 struct hash_table *));
+					 htab_t));
 static void schedule_fixup_var_refs PARAMS ((struct function *, rtx, tree,
 					     enum machine_mode,
-					     struct hash_table *));
-static void fixup_var_refs	PARAMS ((rtx, enum machine_mode, int,
-					 struct hash_table *));
+					     htab_t));
+static void fixup_var_refs	PARAMS ((rtx, enum machine_mode, int, rtx,
+					 htab_t));
 static struct fixup_replacement
   *find_fixup_replacement	PARAMS ((struct fixup_replacement **, rtx));
 static void fixup_var_refs_insns PARAMS ((rtx, rtx, enum machine_mode,
-					  int, int));
+					  int, int, rtx));
 static void fixup_var_refs_insns_with_hash
-				PARAMS ((struct hash_table *, rtx,
-					 enum machine_mode, int));
+				PARAMS ((htab_t, rtx,
+					 enum machine_mode, int, rtx));
 static void fixup_var_refs_insn PARAMS ((rtx, rtx, enum machine_mode,
-					 int, int));
+					 int, int, rtx));
 static void fixup_var_refs_1	PARAMS ((rtx, enum machine_mode, rtx *, rtx,
-					 struct fixup_replacement **));
-static rtx fixup_memory_subreg	PARAMS ((rtx, rtx, int));
-static rtx walk_fixup_memory_subreg  PARAMS ((rtx, rtx, int));
+					 struct fixup_replacement **, rtx));
+static rtx fixup_memory_subreg	PARAMS ((rtx, rtx, enum machine_mode, int));
+static rtx walk_fixup_memory_subreg  PARAMS ((rtx, rtx, enum machine_mode,
+					      int));
 static rtx fixup_stack_1	PARAMS ((rtx, rtx));
 static void optimize_bit_field	PARAMS ((rtx, rtx, rtx *));
 static void instantiate_decls	PARAMS ((tree, int));
@@ -285,29 +278,24 @@ static int contains		PARAMS ((rtx, varray_type));
 #ifdef HAVE_return
 static void emit_return_into_block PARAMS ((basic_block, rtx));
 #endif
-static void put_addressof_into_stack PARAMS ((rtx, struct hash_table *));
+static void put_addressof_into_stack PARAMS ((rtx, htab_t));
 static bool purge_addressof_1 PARAMS ((rtx *, rtx, int, int,
-					  struct hash_table *));
+					  htab_t));
 static void purge_single_hard_subreg_set PARAMS ((rtx));
 #if defined(HAVE_epilogue) && defined(INCOMING_RETURN_ADDR_RTX)
 static rtx keep_stack_depressed PARAMS ((rtx));
 #endif
 static int is_addressof		PARAMS ((rtx *, void *));
-static struct hash_entry *insns_for_mem_newfunc PARAMS ((struct hash_entry *,
-							 struct hash_table *,
-							 hash_table_key));
-static unsigned long insns_for_mem_hash PARAMS ((hash_table_key));
-static bool insns_for_mem_comp PARAMS ((hash_table_key, hash_table_key));
+static hashval_t insns_for_mem_hash PARAMS ((const void *));
+static int insns_for_mem_comp PARAMS ((const void *, const void *));
 static int insns_for_mem_walk   PARAMS ((rtx *, void *));
-static void compute_insns_for_mem PARAMS ((rtx, rtx, struct hash_table *));
-static void mark_function_status PARAMS ((struct function *));
-static void maybe_mark_struct_function PARAMS ((void *));
+static void compute_insns_for_mem PARAMS ((rtx, rtx, htab_t));
 static void prepare_function_start PARAMS ((void));
 static void do_clobber_return_reg PARAMS ((rtx, void *));
 static void do_use_return_reg PARAMS ((rtx, void *));
 
 /* Pointer to chain of `struct function' for containing functions.  */
-static struct function *outer_function_chain;
+static GTY(()) struct function *outer_function_chain;
 
 /* Given a function decl for a containing function,
    return the `struct function' for it.  */
@@ -327,7 +315,7 @@ find_function_data (decl)
 
 /* Save the current context for compilation of a nested function.
    This is called from language-specific code.  The caller should use
-   the save_lang_status callback to save any language-specific state,
+   the enter_nested langhook to save any language-specific state,
    since this function knows only about language-independent
    variables.  */
 
@@ -356,8 +344,7 @@ push_function_context_to (context)
   outer_function_chain = p;
   p->fixup_var_refs_queue = 0;
 
-  if (save_lang_status)
-    (*save_lang_status) (p);
+  (*lang_hooks.function.enter_nested) (p);
 
   cfun = 0;
 }
@@ -386,14 +373,31 @@ pop_function_context_from (context)
 
   restore_emit_status (p);
 
-  if (restore_lang_status)
-    (*restore_lang_status) (p);
+  (*lang_hooks.function.leave_nested) (p);
 
-  /* Finish doing put_var_into_stack for any of our variables
-     which became addressable during the nested function.  */
-  for (queue = p->fixup_var_refs_queue; queue; queue = queue->next)
-    fixup_var_refs (queue->modified, queue->promoted_mode,
-		    queue->unsignedp, 0);
+  /* Finish doing put_var_into_stack for any of our variables which became
+     addressable during the nested function.  If only one entry has to be
+     fixed up, just do that one.  Otherwise, first make a list of MEMs that
+     are not to be unshared.  */
+  if (p->fixup_var_refs_queue == 0)
+    ;
+  else if (p->fixup_var_refs_queue->next == 0)
+    fixup_var_refs (p->fixup_var_refs_queue->modified,
+		    p->fixup_var_refs_queue->promoted_mode,
+		    p->fixup_var_refs_queue->unsignedp,
+		    p->fixup_var_refs_queue->modified, 0);
+  else
+    {
+      rtx list = 0;
+
+      for (queue = p->fixup_var_refs_queue; queue; queue = queue->next)
+	list = gen_rtx_EXPR_LIST (VOIDmode, queue->modified, list);
+
+      for (queue = p->fixup_var_refs_queue; queue; queue = queue->next)
+	fixup_var_refs (queue->modified, queue->promoted_mode,
+			queue->unsignedp, list, 0);
+
+    }
 
   p->fixup_var_refs_queue = 0;
 
@@ -422,9 +426,8 @@ free_after_parsing (f)
   /* f->varasm is used by code generation.  */
   /* f->eh->eh_return_stub_label is used by code generation.  */
 
-  if (free_lang_status)
-    (*free_lang_status) (f);
-  free_stmt_status (f);
+  (*lang_hooks.function.final) (f);
+  f->stmt = NULL;
 }
 
 /* Clear out all parts of the state in F that can safely be discarded
@@ -435,16 +438,11 @@ void
 free_after_compilation (f)
      struct function *f;
 {
-  free_eh_status (f);
-  free_expr_status (f);
-  free_emit_status (f);
-  free_varasm_status (f);
-
-  if (free_machine_status)
-    (*free_machine_status) (f);
-
-  if (f->x_parm_reg_stack_loc)
-    free (f->x_parm_reg_stack_loc);
+  f->eh = NULL;
+  f->expr = NULL;
+  f->emit = NULL;
+  f->varasm = NULL;
+  f->machine = NULL;
 
   f->x_temp_slots = NULL;
   f->arg_offset_rtx = NULL;
@@ -524,6 +522,7 @@ assign_stack_local_1 (mode, size, align, function)
   rtx x, addr;
   int bigend_correction = 0;
   int alignment;
+  int frame_off, frame_alignment, frame_phase;
 
   if (align == 0)
     {
@@ -536,7 +535,7 @@ assign_stack_local_1 (mode, size, align, function)
 
       /* Allow the target to (possibly) increase the alignment of this
 	 stack slot.  */
-      type = type_for_mode (mode, 0);
+      type = (*lang_hooks.types.type_for_mode) (mode, 0);
       if (type)
 	alignment = LOCAL_ALIGNMENT (type, alignment);
 
@@ -561,15 +560,21 @@ assign_stack_local_1 (mode, size, align, function)
   if (function->stack_alignment_needed < alignment * BITS_PER_UNIT)
     function->stack_alignment_needed = alignment * BITS_PER_UNIT;
 
+  /* Calculate how many bytes the start of local variables is off from
+     stack alignment.  */
+  frame_alignment = PREFERRED_STACK_BOUNDARY / BITS_PER_UNIT;
+  frame_off = STARTING_FRAME_OFFSET % frame_alignment;
+  frame_phase = frame_off ? frame_alignment - frame_off : 0;
+
   /* Round frame offset to that alignment.
      We must be careful here, since FRAME_OFFSET might be negative and
      division with a negative dividend isn't as well defined as we might
      like.  So we instead assume that ALIGNMENT is a power of two and
      use logical operations which are unambiguous.  */
 #ifdef FRAME_GROWS_DOWNWARD
-  function->x_frame_offset = FLOOR_ROUND (function->x_frame_offset, alignment);
+  function->x_frame_offset = FLOOR_ROUND (function->x_frame_offset - frame_phase, alignment) + frame_phase;
 #else
-  function->x_frame_offset = CEIL_ROUND (function->x_frame_offset, alignment);
+  function->x_frame_offset = CEIL_ROUND (function->x_frame_offset - frame_phase, alignment) + frame_phase;
 #endif
 
   /* On a big-endian machine, if we are allocating more space than we will use,
@@ -649,7 +654,7 @@ assign_stack_temp_for_type (mode, size, keep, type)
     align = GET_MODE_ALIGNMENT (mode);
 
   if (! type)
-    type = type_for_mode (mode, 0);
+    type = (*lang_hooks.types.type_for_mode) (mode, 0);
 
   if (type)
     align = LOCAL_ALIGNMENT (type, align);
@@ -819,7 +824,10 @@ assign_stack_temp (mode, size, keep)
   return assign_stack_temp_for_type (mode, size, keep, NULL_TREE);
 }
 
-/* Assign a temporary of given TYPE.
+/* Assign a temporary.
+   If TYPE_OR_DECL is a decl, then we are doing it on behalf of the decl
+   and so that should be used in error messages.  In either case, we
+   allocate of the given type.
    KEEP is as for assign_stack_temp.
    MEMORY_REQUIRED is 1 if the result must be addressable stack memory;
    it is 0 if a register is OK.
@@ -827,15 +835,26 @@ assign_stack_temp (mode, size, keep)
    to wider modes.  */
 
 rtx
-assign_temp (type, keep, memory_required, dont_promote)
-     tree type;
+assign_temp (type_or_decl, keep, memory_required, dont_promote)
+     tree type_or_decl;
      int keep;
      int memory_required;
      int dont_promote ATTRIBUTE_UNUSED;
 {
-  enum machine_mode mode = TYPE_MODE (type);
+  tree type, decl;
+  enum machine_mode mode;
 #ifndef PROMOTE_FOR_CALL_ONLY
-  int unsignedp = TREE_UNSIGNED (type);
+  int unsignedp;
+#endif
+
+  if (DECL_P (type_or_decl))
+    decl = type_or_decl, type = TREE_TYPE (decl);
+  else
+    decl = NULL, type = type_or_decl;
+
+  mode = TYPE_MODE (type);
+#ifndef PROMOTE_FOR_CALL_ONLY
+  unsignedp = TREE_UNSIGNED (type);
 #endif
 
   if (mode == BLKmode || memory_required)
@@ -856,6 +875,17 @@ assign_temp (type, keep, memory_required, dont_promote)
 	  && TYPE_ARRAY_MAX_SIZE (type) != NULL_TREE
 	  && host_integerp (TYPE_ARRAY_MAX_SIZE (type), 1))
 	size = tree_low_cst (TYPE_ARRAY_MAX_SIZE (type), 1);
+
+      /* The size of the temporary may be too large to fit into an integer.  */
+      /* ??? Not sure this should happen except for user silliness, so limit
+	 this to things that aren't compiler-generated temporaries.  The
+	 rest of the time we'll abort in assign_stack_temp_for_type.  */
+      if (decl && size == -1
+	  && TREE_CODE (TYPE_SIZE_UNIT (type)) == INTEGER_CST)
+	{
+	  error_with_decl (decl, "size of variable `%s' is too large");
+	  size = 1;
+	}
 
       tmp = assign_stack_temp_for_type (mode, size, keep, type);
       return tmp;
@@ -1315,8 +1345,8 @@ put_var_into_stack (decl)
   context = decl_function_context (decl);
 
   /* Get the current rtl used for this object and its original mode.  */
-  reg = (TREE_CODE (decl) == SAVE_EXPR 
-	 ? SAVE_EXPR_RTL (decl) 
+  reg = (TREE_CODE (decl) == SAVE_EXPR
+	 ? SAVE_EXPR_RTL (decl)
 	 : DECL_RTL_IF_SET (decl));
 
   /* No need to do anything if decl has no rtx yet
@@ -1389,7 +1419,7 @@ put_var_into_stack (decl)
 	 to the whole CONCAT, lest we do double fixups for the latter
 	 references.  */
       enum machine_mode part_mode = GET_MODE (XEXP (reg, 0));
-      tree part_type = type_for_mode (part_mode, 0);
+      tree part_type = (*lang_hooks.types.type_for_mode) (part_mode, 0);
       rtx lopart = XEXP (reg, 0);
       rtx hipart = XEXP (reg, 1);
 #ifdef FRAME_GROWS_DOWNWARD
@@ -1452,7 +1482,7 @@ put_reg_into_stack (function, reg, type, promoted_mode, decl_mode, volatile_p,
      int volatile_p;
      unsigned int original_regno;
      int used_p;
-     struct hash_table *ht;
+     htab_t ht;
 {
   struct function *func = function ? function : cfun;
   rtx new = 0;
@@ -1500,7 +1530,7 @@ schedule_fixup_var_refs (function, reg, type, promoted_mode, ht)
      rtx reg;
      tree type;
      enum machine_mode promoted_mode;
-     struct hash_table *ht;
+     htab_t ht;
 {
   int unsigned_p = type ? TREE_UNSIGNED (type) : 0;
 
@@ -1518,15 +1548,16 @@ schedule_fixup_var_refs (function, reg, type, promoted_mode, ht)
     }
   else
     /* Variable is local; fix it up now.  */
-    fixup_var_refs (reg, promoted_mode, unsigned_p, ht);
+    fixup_var_refs (reg, promoted_mode, unsigned_p, reg, ht);
 }
 
 static void
-fixup_var_refs (var, promoted_mode, unsignedp, ht)
+fixup_var_refs (var, promoted_mode, unsignedp, may_share, ht)
      rtx var;
      enum machine_mode promoted_mode;
      int unsignedp;
-     struct hash_table *ht;
+     htab_t ht;
+     rtx may_share;
 {
   tree pending;
   rtx first_insn = get_insns ();
@@ -1538,19 +1569,20 @@ fixup_var_refs (var, promoted_mode, unsignedp, ht)
     {
       if (stack != 0)
 	abort ();
-      fixup_var_refs_insns_with_hash (ht, var, promoted_mode, unsignedp);
+      fixup_var_refs_insns_with_hash (ht, var, promoted_mode, unsignedp,
+				      may_share);
       return;
     }
 
   fixup_var_refs_insns (first_insn, var, promoted_mode, unsignedp,
-			stack == 0);
+			stack == 0, may_share);
 
   /* Scan all pending sequences too.  */
   for (; stack; stack = stack->next)
     {
       push_to_full_sequence (stack->first, stack->last);
       fixup_var_refs_insns (stack->first, var, promoted_mode, unsignedp,
-			    stack->next != 0);
+			    stack->next != 0, may_share);
       /* Update remembered end of sequence
 	 in case we added an insn at the end.  */
       stack->last = get_last_insn ();
@@ -1564,7 +1596,8 @@ fixup_var_refs (var, promoted_mode, unsignedp, ht)
       if (seq != const0_rtx && seq != 0)
 	{
 	  push_to_sequence (seq);
-	  fixup_var_refs_insns (seq, var, promoted_mode, unsignedp, 0);
+	  fixup_var_refs_insns (seq, var, promoted_mode, unsignedp, 0,
+				may_share);
 	  end_sequence ();
 	}
     }
@@ -1597,17 +1630,19 @@ find_fixup_replacement (replacements, x)
   return p;
 }
 
-/* Scan the insn-chain starting with INSN for refs to VAR
-   and fix them up.  TOPLEVEL is nonzero if this chain is the
-   main chain of insns for the current function.  */
+/* Scan the insn-chain starting with INSN for refs to VAR and fix them
+   up.  TOPLEVEL is nonzero if this chain is the main chain of insns
+   for the current function.  MAY_SHARE is either a MEM that is not
+   to be unshared or a list of them.  */
 
 static void
-fixup_var_refs_insns (insn, var, promoted_mode, unsignedp, toplevel)
+fixup_var_refs_insns (insn, var, promoted_mode, unsignedp, toplevel, may_share)
      rtx insn;
      rtx var;
      enum machine_mode promoted_mode;
      int unsignedp;
      int toplevel;
+     rtx may_share;
 {
   while (insn)
     {
@@ -1632,7 +1667,8 @@ fixup_var_refs_insns (insn, var, promoted_mode, unsignedp, toplevel)
 	      if (seq)
 		{
 		  push_to_sequence (seq);
-		  fixup_var_refs_insns (seq, var, promoted_mode, unsignedp, 0);
+		  fixup_var_refs_insns (seq, var, promoted_mode, unsignedp, 0,
+					may_share);
 		  XEXP (PATTERN (insn), i) = get_insns ();
 		  end_sequence ();
 		}
@@ -1640,7 +1676,8 @@ fixup_var_refs_insns (insn, var, promoted_mode, unsignedp, toplevel)
 	}
 
       else if (INSN_P (insn))
-	fixup_var_refs_insn (insn, var, promoted_mode, unsignedp, toplevel);
+	fixup_var_refs_insn (insn, var, promoted_mode, unsignedp, toplevel,
+			     may_share);
 
       insn = next;
     }
@@ -1654,25 +1691,23 @@ fixup_var_refs_insns (insn, var, promoted_mode, unsignedp, toplevel)
    (inside the CALL_PLACEHOLDER).  */
 
 static void
-fixup_var_refs_insns_with_hash (ht, var, promoted_mode, unsignedp)
-     struct hash_table *ht;
+fixup_var_refs_insns_with_hash (ht, var, promoted_mode, unsignedp, may_share)
+     htab_t ht;
      rtx var;
      enum machine_mode promoted_mode;
      int unsignedp;
+     rtx may_share;
 {
-  struct insns_for_mem_entry *ime = (struct insns_for_mem_entry *)
-    hash_lookup (ht, var, /*create=*/0, /*copy=*/0);
-  rtx insn_list = ime->insns;
+  struct insns_for_mem_entry tmp;
+  struct insns_for_mem_entry *ime;
+  rtx insn_list;
 
-  while (insn_list)
-    {
-      rtx insn = XEXP (insn_list, 0);
-	
-      if (INSN_P (insn))
-	fixup_var_refs_insn (insn, var, promoted_mode, unsignedp, 1);
-
-      insn_list = XEXP (insn_list, 1);
-    }
+  tmp.key = var;
+  ime = (struct insns_for_mem_entry *) htab_find (ht, &tmp);
+  for (insn_list = ime->insns; insn_list != 0; insn_list = XEXP (insn_list, 1))
+    if (INSN_P (XEXP (insn_list, 0)))
+      fixup_var_refs_insn (XEXP (insn_list, 0), var, promoted_mode,
+			   unsignedp, 1, may_share);
 }
 
 
@@ -1683,12 +1718,13 @@ fixup_var_refs_insns_with_hash (ht, var, promoted_mode, unsignedp)
    function.  */
 
 static void
-fixup_var_refs_insn (insn, var, promoted_mode, unsignedp, toplevel)
+fixup_var_refs_insn (insn, var, promoted_mode, unsignedp, toplevel, no_share)
      rtx insn;
      rtx var;
      enum machine_mode promoted_mode;
      int unsignedp;
      int toplevel;
+     rtx no_share;
 {
   rtx call_dest = 0;
   rtx set, prev, prev_set;
@@ -1793,7 +1829,7 @@ fixup_var_refs_insn (insn, var, promoted_mode, unsignedp, toplevel)
 	 it here.  */
 
       fixup_var_refs_1 (var, promoted_mode, &PATTERN (insn), insn,
-			&replacements);
+			&replacements, no_share);
 
       /* If this is last_parm_insn, and any instructions were output
 	 after it to fix it up, then we must set last_parm_insn to
@@ -1813,7 +1849,8 @@ fixup_var_refs_insn (insn, var, promoted_mode, unsignedp, toplevel)
 	      /* OLD might be a (subreg (mem)).  */
 	      if (GET_CODE (replacements->old) == SUBREG)
 		replacements->old
-		  = fixup_memory_subreg (replacements->old, insn, 0);
+		  = fixup_memory_subreg (replacements->old, insn,
+					 promoted_mode, 0);
 	      else
 		replacements->old
 		  = fixup_stack_1 (replacements->old, insn);
@@ -1853,7 +1890,8 @@ fixup_var_refs_insn (insn, var, promoted_mode, unsignedp, toplevel)
     {
       if (GET_CODE (note) != INSN_LIST)
 	XEXP (note, 0)
-	  = walk_fixup_memory_subreg (XEXP (note, 0), insn, 1);
+	  = walk_fixup_memory_subreg (XEXP (note, 0), insn,
+				      promoted_mode, 1);
       note = XEXP (note, 1);
     }
 }
@@ -1870,12 +1908,13 @@ fixup_var_refs_insn (insn, var, promoted_mode, unsignedp, toplevel)
    or the SUBREG, as appropriate, to the pseudo.  */
 
 static void
-fixup_var_refs_1 (var, promoted_mode, loc, insn, replacements)
+fixup_var_refs_1 (var, promoted_mode, loc, insn, replacements, no_share)
      rtx var;
      enum machine_mode promoted_mode;
      rtx *loc;
      rtx insn;
      struct fixup_replacement **replacements;
+     rtx no_share;
 {
   int i;
   rtx x = *loc;
@@ -1972,7 +2011,7 @@ fixup_var_refs_1 (var, promoted_mode, loc, insn, replacements)
 	{
 	  replacement = find_fixup_replacement (replacements, x);
 	  if (replacement->new == 0)
-	    replacement->new = copy_most_rtx (x, var);
+	    replacement->new = copy_most_rtx (x, no_share);
 
 	  *loc = x = replacement->new;
 	  code = GET_CODE (x);
@@ -1987,6 +2026,7 @@ fixup_var_refs_1 (var, promoted_mode, loc, insn, replacements)
     case SYMBOL_REF:
     case LABEL_REF:
     case CONST_DOUBLE:
+    case CONST_VECTOR:
       return;
 
     case SIGN_EXTRACT:
@@ -2022,7 +2062,7 @@ fixup_var_refs_1 (var, promoted_mode, loc, insn, replacements)
 		  return;
 		}
 	      else
-		tem = fixup_memory_subreg (tem, insn, 0);
+		tem = fixup_memory_subreg (tem, insn, promoted_mode, 0);
 	    }
 	  else
 	    tem = fixup_stack_1 (tem, insn);
@@ -2108,7 +2148,8 @@ fixup_var_refs_1 (var, promoted_mode, loc, insn, replacements)
 	  if (SUBREG_PROMOTED_VAR_P (x))
 	    {
 	      *loc = var;
-	      fixup_var_refs_1 (var, GET_MODE (var), loc, insn, replacements);
+	      fixup_var_refs_1 (var, GET_MODE (var), loc, insn, replacements,
+				no_share);
 	      return;
 	    }
 
@@ -2136,7 +2177,8 @@ fixup_var_refs_1 (var, promoted_mode, loc, insn, replacements)
 	      return;
 	    }
 
-	  replacement->new = *loc = fixup_memory_subreg (x, insn, 0);
+	  replacement->new = *loc = fixup_memory_subreg (x, insn,
+							 promoted_mode, 0);
 
 	  INSN_CODE (insn) = -1;
 	  if (! flag_force_mem && recog_memoized (insn) >= 0)
@@ -2214,11 +2256,11 @@ fixup_var_refs_1 (var, promoted_mode, loc, insn, replacements)
 	    /* Since this case will return, ensure we fixup all the
 	       operands here.  */
 	    fixup_var_refs_1 (var, promoted_mode, &XEXP (outerdest, 1),
-			      insn, replacements);
+			      insn, replacements, no_share);
 	    fixup_var_refs_1 (var, promoted_mode, &XEXP (outerdest, 2),
-			      insn, replacements);
+			      insn, replacements, no_share);
 	    fixup_var_refs_1 (var, promoted_mode, &SET_SRC (x),
-			      insn, replacements);
+			      insn, replacements, no_share);
 
 	    tem = XEXP (outerdest, 0);
 
@@ -2227,7 +2269,7 @@ fixup_var_refs_1 (var, promoted_mode, loc, insn, replacements)
 	       This was legitimate when the MEM was a REG.  */
 	    if (GET_CODE (tem) == SUBREG
 		&& SUBREG_REG (tem) == var)
-	      tem = fixup_memory_subreg (tem, insn, 0);
+	      tem = fixup_memory_subreg (tem, insn, promoted_mode, 0);
 	    else
 	      tem = fixup_stack_1 (tem, insn);
 
@@ -2311,15 +2353,30 @@ fixup_var_refs_1 (var, promoted_mode, loc, insn, replacements)
 	  {
 	    rtx pat, last;
 
-	    replacement = find_fixup_replacement (replacements, SET_SRC (x));
-	    if (replacement->new)
-	      SET_SRC (x) = replacement->new;
-	    else if (GET_CODE (SET_SRC (x)) == SUBREG)
-	      SET_SRC (x) = replacement->new
-		= fixup_memory_subreg (SET_SRC (x), insn, 0);
+	    if (GET_CODE (SET_SRC (x)) == SUBREG
+		&& (GET_MODE_SIZE (GET_MODE (SET_SRC (x)))
+		    > GET_MODE_SIZE (GET_MODE (var))))
+	      {
+		/* This (subreg VAR) is now a paradoxical subreg.  We need
+		   to replace VAR instead of the subreg.  */
+		replacement = find_fixup_replacement (replacements, var);
+		if (replacement->new == NULL_RTX)
+		  replacement->new = gen_reg_rtx (GET_MODE (var));
+		SUBREG_REG (SET_SRC (x)) = replacement->new;
+	      }
 	    else
-	      SET_SRC (x) = replacement->new
-		= fixup_stack_1 (SET_SRC (x), insn);
+	      {
+		replacement = find_fixup_replacement (replacements, SET_SRC (x));
+		if (replacement->new)
+		  SET_SRC (x) = replacement->new;
+		else if (GET_CODE (SET_SRC (x)) == SUBREG)
+		  SET_SRC (x) = replacement->new
+		    = fixup_memory_subreg (SET_SRC (x), insn, promoted_mode,
+					   0);
+		else
+		  SET_SRC (x) = replacement->new
+		    = fixup_stack_1 (SET_SRC (x), insn);
+	      }
 
 	    if (recog_memoized (insn) >= 0)
 	      return;
@@ -2368,7 +2425,8 @@ fixup_var_refs_1 (var, promoted_mode, loc, insn, replacements)
 	    rtx pat, last;
 
 	    if (GET_CODE (SET_DEST (x)) == SUBREG)
-	      SET_DEST (x) = fixup_memory_subreg (SET_DEST (x), insn, 0);
+	      SET_DEST (x) = fixup_memory_subreg (SET_DEST (x), insn,
+						  promoted_mode, 0);
 	    else
 	      SET_DEST (x) = fixup_stack_1 (SET_DEST (x), insn);
 
@@ -2413,6 +2471,7 @@ fixup_var_refs_1 (var, promoted_mode, loc, insn, replacements)
 	  {
 	    rtx temp;
 	    rtx fixeddest = SET_DEST (x);
+	    enum machine_mode temp_mode;
 
 	    /* STRICT_LOW_PART can be discarded, around a MEM.  */
 	    if (GET_CODE (fixeddest) == STRICT_LOW_PART)
@@ -2420,13 +2479,17 @@ fixup_var_refs_1 (var, promoted_mode, loc, insn, replacements)
 	    /* Convert (SUBREG (MEM)) to a MEM in a changed mode.  */
 	    if (GET_CODE (fixeddest) == SUBREG)
 	      {
-		fixeddest = fixup_memory_subreg (fixeddest, insn, 0);
-		promoted_mode = GET_MODE (fixeddest);
+		fixeddest = fixup_memory_subreg (fixeddest, insn,
+						 promoted_mode, 0);
+		temp_mode = GET_MODE (fixeddest);
 	      }
 	    else
-	      fixeddest = fixup_stack_1 (fixeddest, insn);
+	      {
+		fixeddest = fixup_stack_1 (fixeddest, insn);
+		temp_mode = promoted_mode;
+	      }
 
-	    temp = gen_reg_rtx (promoted_mode);
+	    temp = gen_reg_rtx (temp_mode);
 
 	    emit_insn_after (gen_move_insn (fixeddest,
 					    gen_lowpart (GET_MODE (fixeddest),
@@ -2447,47 +2510,59 @@ fixup_var_refs_1 (var, promoted_mode, loc, insn, replacements)
   for (i = GET_RTX_LENGTH (code) - 1; i >= 0; i--)
     {
       if (fmt[i] == 'e')
-	fixup_var_refs_1 (var, promoted_mode, &XEXP (x, i), insn, replacements);
+	fixup_var_refs_1 (var, promoted_mode, &XEXP (x, i), insn, replacements,
+			  no_share);
       else if (fmt[i] == 'E')
 	{
 	  int j;
 	  for (j = 0; j < XVECLEN (x, i); j++)
 	    fixup_var_refs_1 (var, promoted_mode, &XVECEXP (x, i, j),
-			      insn, replacements);
+			      insn, replacements, no_share);
 	}
     }
 }
 
-/* Given X, an rtx of the form (SUBREG:m1 (MEM:m2 addr)),
-   return an rtx (MEM:m1 newaddr) which is equivalent.
-   If any insns must be emitted to compute NEWADDR, put them before INSN.
+/* Previously, X had the form (SUBREG:m1 (REG:PROMOTED_MODE ...)).
+   The REG  was placed on the stack, so X now has the form (SUBREG:m1
+   (MEM:m2 ...)).
+
+   Return an rtx (MEM:m1 newaddr) which is equivalent.  If any insns
+   must be emitted to compute NEWADDR, put them before INSN.
 
    UNCRITICAL nonzero means accept paradoxical subregs.
    This is used for subregs found inside REG_NOTES.  */
 
 static rtx
-fixup_memory_subreg (x, insn, uncritical)
+fixup_memory_subreg (x, insn, promoted_mode, uncritical)
      rtx x;
      rtx insn;
+     enum machine_mode promoted_mode;
      int uncritical;
 {
-  int offset = SUBREG_BYTE (x);
-  rtx addr = XEXP (SUBREG_REG (x), 0);
+  int offset;
+  rtx mem = SUBREG_REG (x);
+  rtx addr = XEXP (mem, 0);
   enum machine_mode mode = GET_MODE (x);
   rtx result;
 
   /* Paradoxical SUBREGs are usually invalid during RTL generation.  */
-  if (GET_MODE_SIZE (mode) > GET_MODE_SIZE (GET_MODE (SUBREG_REG (x)))
-      && ! uncritical)
+  if (GET_MODE_SIZE (mode) > GET_MODE_SIZE (GET_MODE (mem)) && ! uncritical)
     abort ();
+
+  offset = SUBREG_BYTE (x);
+  if (BYTES_BIG_ENDIAN)
+    /* If the PROMOTED_MODE is wider than the mode of the MEM, adjust
+       the offset so that it points to the right location within the
+       MEM.  */
+    offset -= (GET_MODE_SIZE (promoted_mode) - GET_MODE_SIZE (GET_MODE (mem)));
 
   if (!flag_force_addr
       && memory_address_p (mode, plus_constant (addr, offset)))
     /* Shortcut if no insns need be emitted.  */
-    return adjust_address (SUBREG_REG (x), mode, offset);
+    return adjust_address (mem, mode, offset);
 
   start_sequence ();
-  result = adjust_address (SUBREG_REG (x), mode, offset);
+  result = adjust_address (mem, mode, offset);
   emit_insn_before (gen_sequence (), insn);
   end_sequence ();
   return result;
@@ -2498,14 +2573,14 @@ fixup_memory_subreg (x, insn, uncritical)
    If X itself is a (SUBREG (MEM ...) ...), return the replacement expression.
    Otherwise return X, with its contents possibly altered.
 
-   If any insns must be emitted to compute NEWADDR, put them before INSN.
-
-   UNCRITICAL is as in fixup_memory_subreg.  */
+   INSN, PROMOTED_MODE and UNCRITICAL are as for
+   fixup_memory_subreg.  */
 
 static rtx
-walk_fixup_memory_subreg (x, insn, uncritical)
+walk_fixup_memory_subreg (x, insn, promoted_mode, uncritical)
      rtx x;
      rtx insn;
+     enum machine_mode promoted_mode;
      int uncritical;
 {
   enum rtx_code code;
@@ -2518,7 +2593,7 @@ walk_fixup_memory_subreg (x, insn, uncritical)
   code = GET_CODE (x);
 
   if (code == SUBREG && GET_CODE (SUBREG_REG (x)) == MEM)
-    return fixup_memory_subreg (x, insn, uncritical);
+    return fixup_memory_subreg (x, insn, promoted_mode, uncritical);
 
   /* Nothing special about this RTX; fix its operands.  */
 
@@ -2526,13 +2601,15 @@ walk_fixup_memory_subreg (x, insn, uncritical)
   for (i = GET_RTX_LENGTH (code) - 1; i >= 0; i--)
     {
       if (fmt[i] == 'e')
-	XEXP (x, i) = walk_fixup_memory_subreg (XEXP (x, i), insn, uncritical);
+	XEXP (x, i) = walk_fixup_memory_subreg (XEXP (x, i), insn,
+						promoted_mode, uncritical);
       else if (fmt[i] == 'E')
 	{
 	  int j;
 	  for (j = 0; j < XVECLEN (x, i); j++)
 	    XVECEXP (x, i, j)
-	      = walk_fixup_memory_subreg (XVECEXP (x, i, j), insn, uncritical);
+	      = walk_fixup_memory_subreg (XVECEXP (x, i, j), insn,
+					  promoted_mode, uncritical);
 	}
     }
   return x;
@@ -2861,10 +2938,10 @@ gen_mem_addressof (reg, decl)
 	SET_DECL_RTL (decl, reg);
 
       if (TREE_USED (decl) || (DECL_P (decl) && DECL_INITIAL (decl) != 0))
-	fixup_var_refs (reg, GET_MODE (reg), TREE_UNSIGNED (type), 0);
+	fixup_var_refs (reg, GET_MODE (reg), TREE_UNSIGNED (type), reg, 0);
     }
   else
-    fixup_var_refs (reg, GET_MODE (reg), 0, 0);
+    fixup_var_refs (reg, GET_MODE (reg), 0, reg, 0);
 
   return reg;
 }
@@ -2888,7 +2965,7 @@ flush_addressof (decl)
 static void
 put_addressof_into_stack (r, ht)
      rtx r;
-     struct hash_table *ht;
+     htab_t ht;
 {
   tree decl, type;
   int volatile_p, used_p;
@@ -2940,7 +3017,7 @@ purge_addressof_1 (loc, insn, force, store, ht)
      rtx *loc;
      rtx insn;
      int force, store;
-     struct hash_table *ht;
+     htab_t ht;
 {
   rtx x;
   RTX_CODE code;
@@ -2975,7 +3052,7 @@ purge_addressof_1 (loc, insn, force, store, ht)
 	  put_addressof_into_stack (x, ht);
 	  return true;
 	}
-	  
+
       /* We must create a copy of the rtx because it was created by
 	 overwriting a REG rtx which is always shared.  */
       sub = copy_rtx (XEXP (XEXP (x, 0), 0));
@@ -3200,50 +3277,34 @@ purge_addressof_1 (loc, insn, force, store, ht)
   return result;
 }
 
-/* Return a new hash table entry in HT.  */
-
-static struct hash_entry *
-insns_for_mem_newfunc (he, ht, k)
-     struct hash_entry *he;
-     struct hash_table *ht;
-     hash_table_key k ATTRIBUTE_UNUSED;
-{
-  struct insns_for_mem_entry *ifmhe;
-  if (he)
-    return he;
-
-  ifmhe = ((struct insns_for_mem_entry *)
-	   hash_allocate (ht, sizeof (struct insns_for_mem_entry)));
-  ifmhe->insns = NULL_RTX;
-
-  return &ifmhe->he;
-}
-
 /* Return a hash value for K, a REG.  */
 
-static unsigned long
+static hashval_t
 insns_for_mem_hash (k)
-     hash_table_key k;
+     const void * k;
 {
-  /* K is really a RTX.  Just use the address as the hash value.  */
-  return (unsigned long) k;
+  /* Use the address of the key for the hash value.  */
+  struct insns_for_mem_entry *m = (struct insns_for_mem_entry *) k;
+  return (hashval_t) m->key;
 }
 
 /* Return non-zero if K1 and K2 (two REGs) are the same.  */
 
-static bool
+static int
 insns_for_mem_comp (k1, k2)
-     hash_table_key k1;
-     hash_table_key k2;
+     const void * k1;
+     const void * k2;
 {
-  return k1 == k2;
+  struct insns_for_mem_entry *m1 = (struct insns_for_mem_entry *) k1;
+  struct insns_for_mem_entry *m2 = (struct insns_for_mem_entry *) k2;
+  return m1->key == m2->key;
 }
 
 struct insns_for_mem_walk_info
 {
   /* The hash table that we are using to record which INSNs use which
      MEMs.  */
-  struct hash_table *ht;
+  htab_t ht;
 
   /* The INSN we are currently processing.  */
   rtx insn;
@@ -3265,18 +3326,26 @@ insns_for_mem_walk (r, data)
 {
   struct insns_for_mem_walk_info *ifmwi
     = (struct insns_for_mem_walk_info *) data;
+  struct insns_for_mem_entry tmp;
+  tmp.insns = NULL_RTX;
 
   if (ifmwi->pass == 0 && *r && GET_CODE (*r) == ADDRESSOF
       && GET_CODE (XEXP (*r, 0)) == REG)
-    hash_lookup (ifmwi->ht, XEXP (*r, 0), /*create=*/1, /*copy=*/0);
+    {
+      PTR *e;
+      tmp.key = XEXP (*r, 0);
+      e = htab_find_slot (ifmwi->ht, &tmp, INSERT);
+      if (*e == NULL)
+	{
+	  *e = ggc_alloc (sizeof (tmp));
+	  memcpy (*e, &tmp, sizeof (tmp));
+	}
+    }
   else if (ifmwi->pass == 1 && *r && GET_CODE (*r) == REG)
     {
-      /* Lookup this MEM in the hashtable, creating it if necessary.  */
-      struct insns_for_mem_entry *ifme
-	= (struct insns_for_mem_entry *) hash_lookup (ifmwi->ht,
-						      *r,
-						      /*create=*/0,
-						      /*copy=*/0);
+      struct insns_for_mem_entry *ifme;
+      tmp.key = *r;
+      ifme = (struct insns_for_mem_entry *) htab_find (ifmwi->ht, &tmp);
 
       /* If we have not already recorded this INSN, do so now.  Since
 	 we process the INSNs in order, we know that if we have
@@ -3296,7 +3365,7 @@ static void
 compute_insns_for_mem (insns, last_insn, ht)
      rtx insns;
      rtx last_insn;
-     struct hash_table *ht;
+     htab_t ht;
 {
   rtx insn;
   struct insns_for_mem_walk_info ifmwi;
@@ -3331,7 +3400,7 @@ purge_addressof (insns)
      rtx insns;
 {
   rtx insn;
-  struct hash_table ht;
+  htab_t ht;
 
   /* When we actually purge ADDRESSOFs, we turn REGs into MEMs.  That
      requires a fixup pass over the instruction stream to correct
@@ -3340,23 +3409,20 @@ purge_addressof (insns)
      mentioned in very many instructions.  So, we speed up the process
      by pre-calculating which REGs occur in which INSNs; that allows
      us to perform the fixup passes much more quickly.  */
-  hash_table_init (&ht,
-		   insns_for_mem_newfunc,
-		   insns_for_mem_hash,
-		   insns_for_mem_comp);
-  compute_insns_for_mem (insns, NULL_RTX, &ht);
+  ht = htab_create_ggc (1000, insns_for_mem_hash, insns_for_mem_comp, NULL);
+  compute_insns_for_mem (insns, NULL_RTX, ht);
 
   for (insn = insns; insn; insn = NEXT_INSN (insn))
     if (GET_CODE (insn) == INSN || GET_CODE (insn) == JUMP_INSN
 	|| GET_CODE (insn) == CALL_INSN)
       {
 	if (! purge_addressof_1 (&PATTERN (insn), insn,
-				 asm_noperands (PATTERN (insn)) > 0, 0, &ht))
+				 asm_noperands (PATTERN (insn)) > 0, 0, ht))
 	  /* If we could not replace the ADDRESSOFs in the insn,
 	     something is wrong.  */
 	  abort ();
 
-	if (! purge_addressof_1 (&REG_NOTES (insn), NULL_RTX, 0, 0, &ht))
+	if (! purge_addressof_1 (&REG_NOTES (insn), NULL_RTX, 0, 0, ht))
 	  {
 	    /* If we could not replace the ADDRESSOFs in the insn's notes,
 	       we can just remove the offending notes instead.  */
@@ -3377,7 +3443,6 @@ purge_addressof (insns)
       }
 
   /* Clean up.  */
-  hash_table_free (&ht);
   purge_bitfield_addressof_replacements = 0;
   purge_addressof_replacements = 0;
 
@@ -3417,7 +3482,7 @@ purge_single_hard_subreg_set (pattern)
       reg = SUBREG_REG (reg);
     }
 
-		  
+
   if (GET_CODE (reg) == REG && REGNO (reg) < FIRST_PSEUDO_REGISTER)
     {
       reg = gen_rtx_REG (mode, REGNO (reg) + offset);
@@ -3446,7 +3511,7 @@ purge_hard_subreg_sets (insn)
 	    case SET:
 	      if (GET_CODE (SET_DEST (pattern)) == SUBREG)
 		purge_single_hard_subreg_set (pattern);
-	      break;	      
+	      break;
 	    case PARALLEL:
 	      {
 		int j;
@@ -3567,7 +3632,7 @@ instantiate_decls_1 (let, valid_only)
 
   for (t = BLOCK_VARS (let); t; t = TREE_CHAIN (t))
     if (DECL_RTL_SET_P (t))
-      instantiate_decl (DECL_RTL (t), 
+      instantiate_decl (DECL_RTL (t),
 			int_size_in_bytes (TREE_TYPE (t)),
 			valid_only);
 
@@ -3715,6 +3780,7 @@ instantiate_virtual_regs_1 (loc, object, extra_insns)
     {
     case CONST_INT:
     case CONST_DOUBLE:
+    case CONST_VECTOR:
     case CONST:
     case SYMBOL_REF:
     case CODE_LABEL:
@@ -4278,7 +4344,7 @@ assign_parms (fndecl)
     }
 
   max_parm_reg = LAST_VIRTUAL_REGISTER + 1;
-  parm_reg_stack_loc = (rtx *) xcalloc (max_parm_reg, sizeof (rtx));
+  parm_reg_stack_loc = (rtx *) ggc_alloc_cleared (max_parm_reg * sizeof (rtx));
 
 #ifdef INIT_CUMULATIVE_INCOMING_ARGS
   INIT_CUMULATIVE_INCOMING_ARGS (args_so_far, fntype, NULL_RTX);
@@ -4517,8 +4583,8 @@ assign_parms (fndecl)
 	 to indicate there is no preallocated stack slot for the parm.  */
 
       if (entry_parm == stack_parm
-          || (GET_CODE (entry_parm) == PARALLEL
-              && XEXP (XVECEXP (entry_parm, 0, 0), 0) == NULL_RTX)
+	  || (GET_CODE (entry_parm) == PARALLEL
+	      && XEXP (XVECEXP (entry_parm, 0, 0), 0) == NULL_RTX)
 #if defined (REG_PARM_STACK_SPACE) && ! defined (MAYBE_REG_PARM_STACK_SPACE)
 	  /* On some machines, even if a parm value arrives in a register
 	     there is still an (uninitialized) stack slot allocated for it.
@@ -4643,8 +4709,7 @@ assign_parms (fndecl)
 	  SET_DECL_RTL (parm, stack_parm);
 	}
       else if (! ((! optimize
-		   && ! DECL_REGISTER (parm)
-		   && ! DECL_INLINE (fndecl))
+		   && ! DECL_REGISTER (parm))
 		  || TREE_SIDE_EFFECTS (parm)
 		  /* If -ffloat-store specified, don't put explicit
 		     float variables into registers.  */
@@ -4673,7 +4738,7 @@ assign_parms (fndecl)
 	  if (passed_pointer)
 	    {
 	      rtx x = gen_rtx_MEM (TYPE_MODE (TREE_TYPE (passed_type)),
-			     	   parmreg);
+				   parmreg);
 	      set_mem_attributes (x, parm, 1);
 	      SET_DECL_RTL (parm, x);
 	    }
@@ -4682,7 +4747,7 @@ assign_parms (fndecl)
 	      SET_DECL_RTL (parm, parmreg);
 	      maybe_set_unchanging (DECL_RTL (parm), parm);
 	    }
-	      
+
 	  /* Copy the value into the register.  */
 	  if (nominal_mode != passed_mode
 	      || promoted_nominal_mode != promoted_mode)
@@ -4725,7 +4790,7 @@ assign_parms (fndecl)
 		  /* The argument is already sign/zero extended, so note it
 		     into the subreg.  */
 		  SUBREG_PROMOTED_VAR_P (tempreg) = 1;
-		  SUBREG_PROMOTED_UNSIGNED_P (tempreg) = unsignedp;
+		  SUBREG_PROMOTED_UNSIGNED_SET (tempreg, unsignedp);
 		}
 
 	      /* TREE_USED gets set erroneously during expand_assignment.  */
@@ -4743,14 +4808,15 @@ assign_parms (fndecl)
 	  /* If we were passed a pointer but the actual value
 	     can safely live in a register, put it in one.  */
 	  if (passed_pointer && TYPE_MODE (TREE_TYPE (parm)) != BLKmode
-	      && ! ((! optimize
-		     && ! DECL_REGISTER (parm)
-		     && ! DECL_INLINE (fndecl))
-		    || TREE_SIDE_EFFECTS (parm)
-		    /* If -ffloat-store specified, don't put explicit
-		       float variables into registers.  */
-		    || (flag_float_store
-			&& TREE_CODE (TREE_TYPE (parm)) == REAL_TYPE)))
+	      /* If by-reference argument was promoted, demote it.  */
+	      && (TYPE_MODE (TREE_TYPE (parm)) != GET_MODE (DECL_RTL (parm))
+		  || ! ((! optimize
+			 && ! DECL_REGISTER (parm))
+			|| TREE_SIDE_EFFECTS (parm)
+			/* If -ffloat-store specified, don't put explicit
+			   float variables into registers.  */
+			|| (flag_float_store
+			    && TREE_CODE (TREE_TYPE (parm)) == REAL_TYPE))))
 	    {
 	      /* We can't use nominal_mode, because it will have been set to
 		 Pmode above.  We must use the actual mode of the parm.  */
@@ -4763,7 +4829,7 @@ assign_parms (fndecl)
 		  push_to_sequence (conversion_insns);
 		  emit_move_insn (tempreg, DECL_RTL (parm));
 		  SET_DECL_RTL (parm,
-				convert_to_mode (GET_MODE (parmreg), 
+				convert_to_mode (GET_MODE (parmreg),
 						 tempreg,
 						 unsigned_p));
 		  emit_move_insn (parmreg, DECL_RTL (parm));
@@ -4842,7 +4908,7 @@ assign_parms (fndecl)
 		 but it's also rare and we need max_parm_reg to be
 		 precisely correct.  */
 	      max_parm_reg = regno + 1;
-	      new = (rtx *) xrealloc (parm_reg_stack_loc,
+	      new = (rtx *) ggc_realloc (parm_reg_stack_loc,
 				      max_parm_reg * sizeof (rtx));
 	      memset ((char *) (new + old_max_parm_reg), 0,
 		     (max_parm_reg - old_max_parm_reg) * sizeof (rtx));
@@ -5070,6 +5136,35 @@ assign_parms (fndecl)
   current_function_return_rtx
     = (DECL_RTL_SET_P (DECL_RESULT (fndecl))
        ? DECL_RTL (DECL_RESULT (fndecl)) : NULL_RTX);
+
+  /* If scalar return value was computed in a pseudo-reg, or was a named
+     return value that got dumped to the stack, copy that to the hard
+     return register.  */
+  if (DECL_RTL_SET_P (DECL_RESULT (fndecl)))
+    {
+      tree decl_result = DECL_RESULT (fndecl);
+      rtx decl_rtl = DECL_RTL (decl_result);
+
+      if (REG_P (decl_rtl)
+	  ? REGNO (decl_rtl) >= FIRST_PSEUDO_REGISTER
+	  : DECL_REGISTER (decl_result))
+	{
+	  rtx real_decl_rtl;
+
+#ifdef FUNCTION_OUTGOING_VALUE
+	  real_decl_rtl = FUNCTION_OUTGOING_VALUE (TREE_TYPE (decl_result),
+						   fndecl);
+#else
+	  real_decl_rtl = FUNCTION_VALUE (TREE_TYPE (decl_result),
+					  fndecl);
+#endif
+	  REG_FUNCTION_VALUE_P (real_decl_rtl) = 1;
+	  /* The delay slot scheduler assumes that current_function_return_rtx
+	     holds the hard register containing the return value, not a
+	     temporary pseudo.  */
+	  current_function_return_rtx = real_decl_rtl;
+	}
+    }
 }
 
 /* Indicate whether REGNO is an incoming argument to the current function
@@ -5139,7 +5234,7 @@ promoted_input_arg (regno, pmode, punsignedp)
 /*  offset_ptr will be negative for ARGS_GROW_DOWNWARD case;
     initial_offset_ptr is positive because locate_and_pad_parm's
     callers pass in the total size of args so far as
-    initial_offset_ptr. arg_size_ptr is always positive.*/
+    initial_offset_ptr. arg_size_ptr is always positive.  */
 
 void
 locate_and_pad_parm (passed_mode, type, in_regs, fndecl,
@@ -5289,8 +5384,8 @@ pad_to_arg_alignment (offset_ptr, boundary, alignment_pad)
 	      (ARGS_SIZE_TREE (*offset_ptr),
 	       boundary / BITS_PER_UNIT);
 	  offset_ptr->constant = 0; /*?*/
-          if (boundary > PARM_BOUNDARY && boundary > STACK_BOUNDARY)
-            alignment_pad->var = size_binop (MINUS_EXPR, offset_ptr->var,
+	  if (boundary > PARM_BOUNDARY && boundary > STACK_BOUNDARY)
+	    alignment_pad->var = size_binop (MINUS_EXPR, offset_ptr->var,
 					     save_var);
 	}
       else
@@ -5350,7 +5445,7 @@ uninitialized_vars_warning (block)
   for (decl = BLOCK_VARS (block); decl; decl = TREE_CHAIN (decl))
     {
       if (warn_uninitialized
-          && TREE_CODE (decl) == VAR_DECL
+	  && TREE_CODE (decl) == VAR_DECL
 	  /* These warnings are unreliable for and aggregates
 	     because assigning the fields one by one can fail to convince
 	     flow.c that the entire aggregate was initialized.
@@ -5370,7 +5465,7 @@ uninitialized_vars_warning (block)
 	warning_with_decl (decl,
 			   "`%s' might be used uninitialized in this function");
       if (extra_warnings
-          && TREE_CODE (decl) == VAR_DECL
+	  && TREE_CODE (decl) == VAR_DECL
 	  && DECL_RTL (decl) != 0
 	  && GET_CODE (DECL_RTL (decl)) == REG
 	  && regno_clobbered_at_setjmp (REGNO (DECL_RTL (decl))))
@@ -5815,8 +5910,6 @@ reorder_blocks ()
 
   /* Remove deleted blocks from the block fragment chains.  */
   reorder_fix_fragments (block);
-
-  VARRAY_FREE (block_stack);
 }
 
 /* Helper function for reorder_blocks.  Reset TREE_ASM_WRITTEN.  */
@@ -5904,7 +5997,7 @@ reorder_blocks_1 (insns, current_block, p_block_stack)
 
 static void
 reorder_fix_fragments (block)
-    tree block;
+     tree block;
 {
   while (block)
     {
@@ -5916,7 +6009,7 @@ reorder_fix_fragments (block)
 	  if (! TREE_ASM_WRITTEN (dup_origin))
 	    {
 	      new_origin = BLOCK_FRAGMENT_CHAIN (dup_origin);
-	      
+
 	      /* Find the first of the remaining fragments.  There must
 		 be at least one -- the current block.  */
 	      while (! TREE_ASM_WRITTEN (new_origin))
@@ -6197,10 +6290,15 @@ prepare_function_start ()
 
   current_function_outgoing_args_size = 0;
 
-  if (init_lang_status)
-    (*init_lang_status) (cfun);
+  cfun->arc_profile = profile_arc_flag || flag_test_coverage;
+
+  cfun->arc_profile = profile_arc_flag || flag_test_coverage;
+
+  cfun->function_frequency = FUNCTION_FREQUENCY_NORMAL;
+
+  (*lang_hooks.function.init) (cfun);
   if (init_machine_status)
-    (*init_machine_status) (cfun);
+    cfun->machine = (*init_machine_status) ();
 }
 
 /* Initialize the rtl expansion mechanism so that we can do simple things
@@ -6224,7 +6322,7 @@ init_function_start (subr, filename, line)
 {
   prepare_function_start ();
 
-  current_function_name = (*decl_printable_name) (subr, 2);
+  current_function_name = (*lang_hooks.decl_printable_name) (subr, 2);
   cfun->decl = subr;
 
   /* Nonzero if this is a nested function that uses a static chain.  */
@@ -6317,7 +6415,7 @@ expand_main_function ()
 #endif
       if (tmp != stack_pointer_rtx)
 	emit_move_insn (stack_pointer_rtx, tmp);
-      
+
       /* Enlist allocate_dynamic_stack_space to pick up the pieces.  */
       tmp = force_reg (Pmode, const0_rtx);
       allocate_dynamic_stack_space (tmp, NULL_RTX, BIGGEST_ALIGNMENT);
@@ -6493,8 +6591,8 @@ expand_function_start (subr, parms_have_cleanups)
      avoid conflicts with the parameter passing registers.  */
 
   if (SMALL_REGISTER_CLASSES && current_function_needs_context)
-      if (GET_CODE (static_chain_incoming_rtx) != REG)
-        emit_move_insn (last_ptr, static_chain_incoming_rtx);
+    if (GET_CODE (static_chain_incoming_rtx) != REG)
+      emit_move_insn (last_ptr, static_chain_incoming_rtx);
 
   /* The following was moved from init_function_start.
      The move is supposed to make sdb output more accurate.  */
@@ -6567,10 +6665,13 @@ expand_function_start (subr, parms_have_cleanups)
 			 Pmode);
     }
 
-#ifdef PROFILE_HOOK
   if (current_function_profile)
-    PROFILE_HOOK (profile_label_no);
+    {
+      current_function_profile_label_no = profile_label_no++;
+#ifdef PROFILE_HOOK
+      PROFILE_HOOK (current_function_profile_label_no);
 #endif
+    }
 
   /* After the display initializations is where the tail-recursion label
      should go, if we end up needing one.   Ensure we have a NOTE here
@@ -6668,6 +6769,8 @@ use_return_register ()
   diddle_return_value (do_use_return_reg, NULL);
 }
 
+static GTY(()) rtx initial_trampoline;
+
 /* Generate RTL for the end of the current function.
    FILENAME and LINE are the current position in the source file.
 
@@ -6682,10 +6785,6 @@ expand_function_end (filename, line, end_bindings)
 {
   tree link;
   rtx clobber_after;
-
-#ifdef TRAMPOLINE_TEMPLATE
-  static rtx initial_trampoline;
-#endif
 
   finish_expr_for_function ();
 
@@ -6725,8 +6824,6 @@ expand_function_end (filename, line, end_bindings)
 	  initial_trampoline
 	    = gen_rtx_MEM (BLKmode, assemble_trampoline_template ());
 	  set_mem_align (initial_trampoline, TRAMPOLINE_ALIGNMENT);
-
-	  ggc_add_rtx_root (&initial_trampoline, 1);
 	}
 #endif
 
@@ -6883,26 +6980,21 @@ expand_function_end (filename, line, end_bindings)
 	  ? REGNO (decl_rtl) >= FIRST_PSEUDO_REGISTER
 	  : DECL_REGISTER (decl_result))
 	{
-	  rtx real_decl_rtl;
+	  rtx real_decl_rtl = current_function_return_rtx;
 
-#ifdef FUNCTION_OUTGOING_VALUE
-	  real_decl_rtl = FUNCTION_OUTGOING_VALUE (TREE_TYPE (decl_result),
-						   current_function_decl);
-#else
-	  real_decl_rtl = FUNCTION_VALUE (TREE_TYPE (decl_result),
-					  current_function_decl);
-#endif
-	  REG_FUNCTION_VALUE_P (real_decl_rtl) = 1;
+	  /* This should be set in assign_parms.  */
+	  if (! REG_FUNCTION_VALUE_P (real_decl_rtl))
+	    abort ();
 
 	  /* If this is a BLKmode structure being returned in registers,
 	     then use the mode computed in expand_return.  Note that if
-	     decl_rtl is memory, then its mode may have been changed, 
+	     decl_rtl is memory, then its mode may have been changed,
 	     but that current_function_return_rtx has not.  */
 	  if (GET_MODE (real_decl_rtl) == BLKmode)
-	    PUT_MODE (real_decl_rtl, GET_MODE (current_function_return_rtx));
+	    PUT_MODE (real_decl_rtl, GET_MODE (decl_rtl));
 
 	  /* If a named return value dumped decl_return to memory, then
-	     we may need to re-do the PROMOTE_MODE signed/unsigned 
+	     we may need to re-do the PROMOTE_MODE signed/unsigned
 	     extension.  */
 	  if (GET_MODE (real_decl_rtl) != GET_MODE (decl_rtl))
 	    {
@@ -6920,11 +7012,6 @@ expand_function_end (filename, line, end_bindings)
 			     int_size_in_bytes (TREE_TYPE (decl_result)));
 	  else
 	    emit_move_insn (real_decl_rtl, decl_rtl);
-
-	  /* The delay slot scheduler assumes that current_function_return_rtx
-	     holds the hard register containing the return value, not a
-	     temporary pseudo.  */
-	  current_function_return_rtx = real_decl_rtl;
 	}
     }
 
@@ -6974,14 +7061,14 @@ expand_function_end (filename, line, end_bindings)
   /* Emit the actual code to clobber return register.  */
   {
     rtx seq, after;
-    
+
     start_sequence ();
     clobber_return_register ();
     seq = gen_sequence ();
     end_sequence ();
 
     after = emit_insn_after (seq, clobber_after);
-    
+
     if (clobber_after != after)
       cfun->x_clobber_return_insn = after;
   }
@@ -7018,7 +7105,7 @@ get_arg_pointer_save_area (f)
     {
       rtx seq;
 
-      /* Save the arg pointer at the beginning of the function.  The 
+      /* Save the arg pointer at the beginning of the function.  The
 	 generated stack slot may not be a valid memory address, so we
 	 have to check it and fix it if necessary.  */
       start_sequence ();
@@ -7164,7 +7251,7 @@ struct epi_info
 {
   rtx sp_equiv_reg;		/* REG that SP is set from, perhaps SP.  */
   HOST_WIDE_INT sp_offset;	/* Offset from SP_EQUIV_REG of present SP.  */
-  rtx new_sp_equiv_reg;		/* REG to be used at end of insn.   */
+  rtx new_sp_equiv_reg;		/* REG to be used at end of insn.  */
   HOST_WIDE_INT new_sp_offset;	/* Offset to be used at end of insn.  */
   rtx equiv_reg_src;		/* If nonzero, the value that SP_EQUIV_REG
 				   should be set to once we no longer need
@@ -7184,7 +7271,7 @@ keep_stack_depressed (seq)
   int i, j;
   struct epi_info info;
 
-  /* If the epilogue is just a single instruction, it ust be OK as is.   */
+  /* If the epilogue is just a single instruction, it ust be OK as is.  */
 
   if (GET_CODE (seq) != SEQUENCE)
     return seq;
@@ -7348,7 +7435,7 @@ keep_stack_depressed (seq)
 
 /* SET is a SET from an insn in the epilogue.  P is a pointer to the epi_info
    structure that contains information about what we've seen so far.  We
-   process this SET by either updating that data or by emitting one or 
+   process this SET by either updating that data or by emitting one or
    more insns.  */
 
 static void
@@ -7747,195 +7834,93 @@ reposition_prologue_and_epilogue_notes (f)
      rtx f ATTRIBUTE_UNUSED;
 {
 #if defined (HAVE_prologue) || defined (HAVE_epilogue)
+  rtx insn, last, note;
   int len;
 
   if ((len = VARRAY_SIZE (prologue)) > 0)
     {
-      rtx insn, note = 0;
+      last = 0, note = 0;
 
       /* Scan from the beginning until we reach the last prologue insn.
 	 We apparently can't depend on basic_block_{head,end} after
 	 reorg has run.  */
-      for (insn = f; len && insn; insn = NEXT_INSN (insn))
+      for (insn = f; insn; insn = NEXT_INSN (insn))
 	{
 	  if (GET_CODE (insn) == NOTE)
 	    {
 	      if (NOTE_LINE_NUMBER (insn) == NOTE_INSN_PROLOGUE_END)
 		note = insn;
 	    }
-	  else if ((len -= contains (insn, prologue)) == 0)
+	  else if (contains (insn, prologue))
 	    {
-	      rtx next;
-	      /* Find the prologue-end note if we haven't already, and
-		 move it to just after the last prologue insn.  */
-	      if (note == 0)
-		{
-		  for (note = insn; (note = NEXT_INSN (note));)
-		    if (GET_CODE (note) == NOTE
-			&& NOTE_LINE_NUMBER (note) == NOTE_INSN_PROLOGUE_END)
-		      break;
-		}
-
-	      next = NEXT_INSN (note);
-
-	      /* Whether or not we can depend on BLOCK_HEAD,
-		 attempt to keep it up-to-date.  */
-	      if (BLOCK_HEAD (0) == note)
-		BLOCK_HEAD (0) = next;
-
-	      remove_insn (note);
-	      /* Avoid placing note between CODE_LABEL and BASIC_BLOCK note.  */
-	      if (GET_CODE (insn) == CODE_LABEL)
-		insn = NEXT_INSN (insn);
-	      add_insn_after (note, insn);
+	      last = insn;
+	      if (--len == 0)
+		break;
 	    }
+	}
+
+      if (last)
+	{
+	  rtx next;
+
+	  /* Find the prologue-end note if we haven't already, and
+	     move it to just after the last prologue insn.  */
+	  if (note == 0)
+	    {
+	      for (note = last; (note = NEXT_INSN (note));)
+		if (GET_CODE (note) == NOTE
+		    && NOTE_LINE_NUMBER (note) == NOTE_INSN_PROLOGUE_END)
+		  break;
+	    }
+
+	  next = NEXT_INSN (note);
+
+	  /* Avoid placing note between CODE_LABEL and BASIC_BLOCK note.  */
+	  if (GET_CODE (last) == CODE_LABEL)
+	    last = NEXT_INSN (last);
+	  reorder_insns (note, note, last);
 	}
     }
 
   if ((len = VARRAY_SIZE (epilogue)) > 0)
     {
-      rtx insn, note = 0;
+      last = 0, note = 0;
 
       /* Scan from the end until we reach the first epilogue insn.
 	 We apparently can't depend on basic_block_{head,end} after
 	 reorg has run.  */
-      for (insn = get_last_insn (); len && insn; insn = PREV_INSN (insn))
+      for (insn = get_last_insn (); insn; insn = PREV_INSN (insn))
 	{
 	  if (GET_CODE (insn) == NOTE)
 	    {
 	      if (NOTE_LINE_NUMBER (insn) == NOTE_INSN_EPILOGUE_BEG)
 		note = insn;
 	    }
-	  else if ((len -= contains (insn, epilogue)) == 0)
+	  else if (contains (insn, epilogue))
 	    {
-	      /* Find the epilogue-begin note if we haven't already, and
-		 move it to just before the first epilogue insn.  */
-	      if (note == 0)
-		{
-		  for (note = insn; (note = PREV_INSN (note));)
-		    if (GET_CODE (note) == NOTE
-			&& NOTE_LINE_NUMBER (note) == NOTE_INSN_EPILOGUE_BEG)
-		      break;
-		}
-
-	      /* Whether or not we can depend on BLOCK_HEAD,
-		 attempt to keep it up-to-date.  */
-	      if (n_basic_blocks
-		  && BLOCK_HEAD (n_basic_blocks-1) == insn)
-		BLOCK_HEAD (n_basic_blocks-1) = note;
-
-	      remove_insn (note);
-	      add_insn_before (note, insn);
+	      last = insn;
+	      if (--len == 0)
+		break;
 	    }
+	}
+
+      if (last)
+	{
+	  /* Find the epilogue-begin note if we haven't already, and
+	     move it to just before the first epilogue insn.  */
+	  if (note == 0)
+	    {
+	      for (note = insn; (note = PREV_INSN (note));)
+		if (GET_CODE (note) == NOTE
+		    && NOTE_LINE_NUMBER (note) == NOTE_INSN_EPILOGUE_BEG)
+		  break;
+	    }
+
+	  if (PREV_INSN (last) != note)
+	    reorder_insns (note, note, PREV_INSN (last));
 	}
     }
 #endif /* HAVE_prologue or HAVE_epilogue */
-}
-
-/* Mark P for GC.  */
-
-static void
-mark_function_status (p)
-     struct function *p;
-{
-  struct var_refs_queue *q;
-  struct temp_slot *t;
-  int i;
-  rtx *r;
-
-  if (p == 0)
-    return;
-
-  ggc_mark_rtx (p->arg_offset_rtx);
-
-  if (p->x_parm_reg_stack_loc)
-    for (i = p->x_max_parm_reg, r = p->x_parm_reg_stack_loc;
-	 i > 0; --i, ++r)
-      ggc_mark_rtx (*r);
-
-  ggc_mark_rtx (p->return_rtx);
-  ggc_mark_rtx (p->x_cleanup_label);
-  ggc_mark_rtx (p->x_return_label);
-  ggc_mark_rtx (p->x_save_expr_regs);
-  ggc_mark_rtx (p->x_stack_slot_list);
-  ggc_mark_rtx (p->x_parm_birth_insn);
-  ggc_mark_rtx (p->x_tail_recursion_label);
-  ggc_mark_rtx (p->x_tail_recursion_reentry);
-  ggc_mark_rtx (p->internal_arg_pointer);
-  ggc_mark_rtx (p->x_arg_pointer_save_area);
-  ggc_mark_tree (p->x_rtl_expr_chain);
-  ggc_mark_rtx (p->x_last_parm_insn);
-  ggc_mark_tree (p->x_context_display);
-  ggc_mark_tree (p->x_trampoline_list);
-  ggc_mark_rtx (p->epilogue_delay_list);
-  ggc_mark_rtx (p->x_clobber_return_insn);
-
-  for (t = p->x_temp_slots; t != 0; t = t->next)
-    {
-      ggc_mark (t);
-      ggc_mark_rtx (t->slot);
-      ggc_mark_rtx (t->address);
-      ggc_mark_tree (t->rtl_expr);
-      ggc_mark_tree (t->type);
-    }
-
-  for (q = p->fixup_var_refs_queue; q != 0; q = q->next)
-    {
-      ggc_mark (q);
-      ggc_mark_rtx (q->modified);
-      }
-
-  ggc_mark_rtx (p->x_nonlocal_goto_handler_slots);
-  ggc_mark_rtx (p->x_nonlocal_goto_handler_labels);
-  ggc_mark_rtx (p->x_nonlocal_goto_stack_level);
-  ggc_mark_tree (p->x_nonlocal_labels);
-
-  mark_hard_reg_initial_vals (p);
-}
-
-/* Mark the struct function pointed to by *ARG for GC, if it is not
-   NULL.  This is used to mark the current function and the outer
-   function chain.  */
-
-static void
-maybe_mark_struct_function (arg)
-     void *arg;
-{
-  struct function *f = *(struct function **) arg;
-
-  if (f == 0)
-    return;
-
-  ggc_mark_struct_function (f);
-}
-
-/* Mark a struct function * for GC.  This is called from ggc-common.c.  */
-
-void
-ggc_mark_struct_function (f)
-     struct function *f;
-{
-  ggc_mark (f);
-  ggc_mark_tree (f->decl);
-
-  mark_function_status (f);
-  mark_eh_status (f->eh);
-  mark_stmt_status (f->stmt);
-  mark_expr_status (f->expr);
-  mark_emit_status (f->emit);
-  mark_varasm_status (f->varasm);
-
-  if (mark_machine_status)
-    (*mark_machine_status) (f);
-  if (mark_lang_status)
-    (*mark_lang_status) (f);
-
-  if (f->original_arg_vector)
-    ggc_mark_rtvec ((rtvec) f->original_arg_vector);
-  if (f->original_decl_initial)
-    ggc_mark_tree (f->original_decl_initial);
-  if (f->outer)
-    ggc_mark_struct_function (f->outer);
 }
 
 /* Called once, at initialization, to initialize function.c.  */
@@ -7943,11 +7928,9 @@ ggc_mark_struct_function (f)
 void
 init_function_once ()
 {
-  ggc_add_root (&cfun, 1, sizeof cfun, maybe_mark_struct_function);
-  ggc_add_root (&outer_function_chain, 1, sizeof outer_function_chain,
-		maybe_mark_struct_function);
-
   VARRAY_INT_INIT (prologue, 0, "prologue");
   VARRAY_INT_INIT (epilogue, 0, "epilogue");
   VARRAY_INT_INIT (sibcall_epilogue, 0, "sibcall_epilogue");
 }
+
+#include "gt-function.h"

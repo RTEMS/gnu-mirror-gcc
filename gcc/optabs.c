@@ -186,12 +186,16 @@ widen_operand (op, mode, oldmode, unsignedp, no_extend)
 {
   rtx result;
 
-  /* If we must extend do so.  If OP is either a constant or a SUBREG
-     for a promoted object, also extend since it will be more efficient to
-     do so.  */
+  /* If we don't have to extend and this is a constant, return it.  */
+  if (no_extend && GET_MODE (op) == VOIDmode)
+    return op;
+
+  /* If we must extend do so.  If OP is a SUBREG for a promoted object, also
+     extend since it will be more efficient to do so unless the signedness of
+     a promoted object differs from our extension.  */
   if (! no_extend
-      || GET_MODE (op) == VOIDmode
-      || (GET_CODE (op) == SUBREG && SUBREG_PROMOTED_VAR_P (op)))
+      || (GET_CODE (op) == SUBREG && SUBREG_PROMOTED_VAR_P (op)
+	  && SUBREG_PROMOTED_UNSIGNED_P (op) == unsignedp))
     return convert_modes (mode, oldmode, op, unsignedp);
 
   /* If MODE is no wider than a single word, we return a paradoxical
@@ -1186,7 +1190,7 @@ expand_binop (mode, binoptab, op0, op1, target, unsignedp, methods)
       && GET_MODE_SIZE (mode) >= 2 * UNITS_PER_WORD
       && binoptab->handlers[(int) word_mode].insn_code != CODE_FOR_nothing)
     {
-      int i;
+      unsigned int i;
       optab otheroptab = binoptab == add_optab ? sub_optab : add_optab;
       unsigned int nwords = GET_MODE_BITSIZE (mode) / BITS_PER_WORD;
       rtx carry_in = NULL_RTX, carry_out = NULL_RTX;
@@ -1273,7 +1277,7 @@ expand_binop (mode, binoptab, op0, op1, target, unsignedp, methods)
 	  carry_in = carry_out;
 	}	
 
-      if (i == GET_MODE_BITSIZE (mode) / BITS_PER_WORD)
+      if (i == GET_MODE_BITSIZE (mode) / (unsigned) BITS_PER_WORD)
 	{
 	  if (mov_optab->handlers[(int) mode].insn_code != CODE_FOR_nothing)
 	    {
@@ -2735,10 +2739,17 @@ emit_no_conflict_block (insns, target, op0, op1, equiv)
      these from the list.  */
   for (insn = insns; insn; insn = next)
     {
-      rtx set = 0;
+      rtx set = 0, note;
       int i;
 
       next = NEXT_INSN (insn);
+
+      /* Some ports (cris) create an libcall regions at their own.  We must
+	 avoid any potential nesting of LIBCALLs.  */
+      if ((note = find_reg_note (insn, REG_LIBCALL, NULL)) != NULL)
+	remove_note (insn, note);
+      if ((note = find_reg_note (insn, REG_RETVAL, NULL)) != NULL)
+	remove_note (insn, note);
 
       if (GET_CODE (PATTERN (insn)) == SET || GET_CODE (PATTERN (insn)) == USE
 	  || GET_CODE (PATTERN (insn)) == CLOBBER)
@@ -2902,6 +2913,14 @@ emit_libcall_block (insns, target, result, equiv)
   for (insn = insns; insn; insn = next)
     {
       rtx set = single_set (insn);
+      rtx note;
+
+      /* Some ports (cris) create an libcall regions at their own.  We must
+	 avoid any potential nesting of LIBCALLs.  */
+      if ((note = find_reg_note (insn, REG_LIBCALL, NULL)) != NULL)
+	remove_note (insn, note);
+      if ((note = find_reg_note (insn, REG_RETVAL, NULL)) != NULL)
+	remove_note (insn, note);
 
       next = NEXT_INSN (insn);
 
@@ -3395,6 +3414,7 @@ prepare_float_lib_cmp (px, py, pcomparison, pmode, punsignedp)
      int *punsignedp;
 {
   enum rtx_code comparison = *pcomparison;
+  rtx tmp;
   rtx x = *px = protect_from_queue (*px, 0);
   rtx y = *py = protect_from_queue (*py, 0);
   enum machine_mode mode = GET_MODE (x);
@@ -3414,18 +3434,42 @@ prepare_float_lib_cmp (px, py, pcomparison, pmode, punsignedp)
 
       case GT:
 	libfunc = gthf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = LT;
+	    libfunc = lthf2_libfunc;
+	  }
 	break;
 
       case GE:
 	libfunc = gehf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = LE;
+	    libfunc = lehf2_libfunc;
+	  }
 	break;
 
       case LT:
 	libfunc = lthf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = GT;
+	    libfunc = gthf2_libfunc;
+	  }
 	break;
 
       case LE:
 	libfunc = lehf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = GE;
+	    libfunc = gehf2_libfunc;
+	  }
 	break;
 
       case UNORDERED:
@@ -3448,18 +3492,42 @@ prepare_float_lib_cmp (px, py, pcomparison, pmode, punsignedp)
 
       case GT:
 	libfunc = gtsf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = LT;
+	    libfunc = ltsf2_libfunc;
+	  }
 	break;
 
       case GE:
 	libfunc = gesf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = LE;
+	    libfunc = lesf2_libfunc;
+	  }
 	break;
 
       case LT:
 	libfunc = ltsf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = GT;
+	    libfunc = gtsf2_libfunc;
+	  }
 	break;
 
       case LE:
 	libfunc = lesf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = GE;
+	    libfunc = gesf2_libfunc;
+	  }
 	break;
 
       case UNORDERED:
@@ -3482,18 +3550,42 @@ prepare_float_lib_cmp (px, py, pcomparison, pmode, punsignedp)
 
       case GT:
 	libfunc = gtdf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = LT;
+	    libfunc = ltdf2_libfunc;
+	  }
 	break;
 
       case GE:
 	libfunc = gedf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = LE;
+	    libfunc = ledf2_libfunc;
+	  }
 	break;
 
       case LT:
 	libfunc = ltdf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = GT;
+	    libfunc = gtdf2_libfunc;
+	  }
 	break;
 
       case LE:
 	libfunc = ledf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = GE;
+	    libfunc = gedf2_libfunc;
+	  }
 	break;
 
       case UNORDERED:
@@ -3516,18 +3608,42 @@ prepare_float_lib_cmp (px, py, pcomparison, pmode, punsignedp)
 
       case GT:
 	libfunc = gtxf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = LT;
+	    libfunc = ltxf2_libfunc;
+	  }
 	break;
 
       case GE:
 	libfunc = gexf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = LE;
+	    libfunc = lexf2_libfunc;
+	  }
 	break;
 
       case LT:
 	libfunc = ltxf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = GT;
+	    libfunc = gtxf2_libfunc;
+	  }
 	break;
 
       case LE:
 	libfunc = lexf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = GE;
+	    libfunc = gexf2_libfunc;
+	  }
 	break;
 
       case UNORDERED:
@@ -3550,18 +3666,42 @@ prepare_float_lib_cmp (px, py, pcomparison, pmode, punsignedp)
 
       case GT:
 	libfunc = gttf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = LT;
+	    libfunc = lttf2_libfunc;
+	  }
 	break;
 
       case GE:
 	libfunc = getf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = LE;
+	    libfunc = letf2_libfunc;
+	  }
 	break;
 
       case LT:
 	libfunc = lttf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = GT;
+	    libfunc = gttf2_libfunc;
+	  }
 	break;
 
       case LE:
 	libfunc = letf2_libfunc;
+	if (libfunc == NULL_RTX)
+	  {
+	    tmp = x; x = y; y = tmp;
+	    *pcomparison = GE;
+	    libfunc = getf2_libfunc;
+	  }
 	break;
 
       case UNORDERED:
@@ -4116,8 +4256,6 @@ expand_float (to, from, unsignedp)
 	  }
     }
 
-#if !defined (REAL_IS_NOT_DOUBLE) || defined (REAL_ARITHMETIC)
-
   /* Unsigned integer, and no way to convert directly.
      Convert as signed, then conditionally adjust the result.  */
   if (unsignedp)
@@ -4232,7 +4370,6 @@ expand_float (to, from, unsignedp)
       emit_label (label);
       goto done;
     }
-#endif
 
   /* No hardware instruction available; call a library routine to convert from
      SImode, DImode, or TImode into SFmode, DFmode, XFmode, or TFmode.  */
@@ -4383,7 +4520,6 @@ expand_fix (to, from, unsignedp)
 	  }
       }
 
-#if !defined (REAL_IS_NOT_DOUBLE) || defined (REAL_ARITHMETIC)
   /* For an unsigned conversion, there is one more way to do it.
      If we have a signed conversion, we generate code that compares
      the real value to the largest representable positive number.  If if
@@ -4439,9 +4575,9 @@ expand_fix (to, from, unsignedp)
 				 NULL_RTX, 0, OPTAB_LIB_WIDEN);
 	  expand_fix (to, target, 0);
 	  target = expand_binop (GET_MODE (to), xor_optab, to,
-				 GEN_INT (trunc_int_for_mode
-					  ((HOST_WIDE_INT) 1 << (bitsize - 1),
-					   GET_MODE (to))),
+				 gen_int_mode
+				 ((HOST_WIDE_INT) 1 << (bitsize - 1),
+				  GET_MODE (to)),
 				 to, 1, OPTAB_LIB_WIDEN);
 
 	  if (target != to)
@@ -4463,7 +4599,6 @@ expand_fix (to, from, unsignedp)
 
 	  return;
 	}
-#endif
 
   /* We can't do it with an insn, so use a library call.  But first ensure
      that the mode of TO is at least as wide as SImode, since those are the
@@ -4572,7 +4707,7 @@ static optab
 new_optab ()
 {
   int i;
-  optab op = (optab) xmalloc (sizeof (struct optab));
+  optab op = (optab) ggc_alloc (sizeof (struct optab));
   for (i = 0; i < NUM_MACHINE_MODES; i++)
     {
       op->handlers[i].insn_code = CODE_FOR_nothing;
@@ -4701,19 +4836,6 @@ init_one_libfunc (name)
 
   /* Return the symbol_ref from the mem rtx.  */
   return XEXP (DECL_RTL (decl), 0);
-}
-
-/* Mark ARG (which is really an OPTAB *) for GC.  */
-
-void
-mark_optab (arg)
-     void *arg;
-{
-  optab o = *(optab *) arg;
-  int i;
-
-  for (i = 0; i < NUM_MACHINE_MODES; ++i)
-    ggc_mark_rtx (o->handlers[i].libfunc);
 }
 
 /* Call this once to initialize the contents of the optabs
@@ -4941,6 +5063,7 @@ init_optabs ()
   truncxfdf2_libfunc = init_one_libfunc ("__truncxfdf2");
   trunctfdf2_libfunc = init_one_libfunc ("__trunctfdf2");
 
+  abort_libfunc = init_one_libfunc ("abort");
   memcpy_libfunc = init_one_libfunc ("memcpy");
   memmove_libfunc = init_one_libfunc ("memmove");
   bcopy_libfunc = init_one_libfunc ("bcopy");
@@ -5065,18 +5188,15 @@ init_optabs ()
   /* Allow the target to add more libcalls or rename some, etc.  */
   INIT_TARGET_OPTABS;
 #endif
-
-  /* Add these GC roots.  */
-  ggc_add_root (optab_table, OTI_MAX, sizeof(optab), mark_optab);
-  ggc_add_rtx_root (libfunc_table, LTI_MAX);
 }
 
+static GTY(()) rtx trap_rtx;
+
 #ifdef HAVE_conditional_trap
 /* The insn generating function can not take an rtx_code argument.
    TRAP_RTX is used as an rtx argument.  Its code is replaced with
    the code to be used in the trap insn and all other fields are
    ignored.  */
-static rtx trap_rtx;
 
 static void
 init_traps ()
@@ -5084,7 +5204,6 @@ init_traps ()
   if (HAVE_conditional_trap)
     {
       trap_rtx = gen_rtx_fmt_ee (EQ, VOIDmode, NULL_RTX, NULL_RTX);
-      ggc_add_rtx_root (&trap_rtx, 1);
     }
 }
 #endif
@@ -5123,3 +5242,5 @@ gen_cond_trap (code, op1, op2, tcode)
 
   return 0;
 }
+
+#include "gt-optabs.h"

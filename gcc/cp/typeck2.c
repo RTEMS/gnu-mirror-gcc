@@ -1,7 +1,7 @@
 /* Report error messages, build initializers, and perform
    some front-end optimizations for C++ compiler.
    Copyright (C) 1987, 1988, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GNU CC.
@@ -185,7 +185,7 @@ abstract_virtuals_error (decl, type)
    and TYPE is the type that was invalid.  */
 
 void
-incomplete_type_error (value, type)
+cxx_incomplete_type_error (value, type)
      tree value;
      tree type;
 {
@@ -248,32 +248,8 @@ retry:
       break;
     
     default:
-      my_friendly_abort (108);
+      abort ();
     }
-}
-
-/* This is a wrapper around fancy_abort, as used in the back end and
-   other front ends.  It will also report the magic number assigned to
-   this particular abort.  That is for backward compatibility with the
-   old C++ abort handler, which would just report the magic number.  */
-void
-friendly_abort (where, file, line, func)
-     int where;
-     const char *file;
-     int line;
-     const char *func;
-{
-  if (errorcount > 0 || sorrycount > 0)
-    /* Say nothing.  */;
-  else if (where > 0)
-    {
-      error ("internal error #%d", where);
-
-      /* Uncount this error, so internal_error will do the right thing.  */
-      --errorcount;
-    }
-
-  fancy_abort (file, line, func);
 }
 
 
@@ -318,7 +294,7 @@ store_init_value (decl, init)
     {
       if (! TYPE_HAS_TRIVIAL_INIT_REF (type)
 	  && TREE_CODE (init) != CONSTRUCTOR)
-	my_friendly_abort (109);
+	abort ();
 
       if (TREE_CODE (init) == TREE_LIST)
 	{
@@ -444,6 +420,28 @@ store_init_value (decl, init)
   DECL_INITIAL (decl) = value;
   return NULL_TREE;
 }
+
+/* Same as store_init_value, but used for known-to-be-valid static
+   initializers.  Used to introduce a static initializer even in data
+   structures that may require dynamic initialization.  */
+
+tree
+force_store_init_value (decl, init)
+     tree decl, init;
+{
+  tree type = TREE_TYPE (decl);
+  int needs_constructing = TYPE_NEEDS_CONSTRUCTING (type);
+
+  TYPE_NEEDS_CONSTRUCTING (type) = 0;
+
+  init = store_init_value (decl, init);
+  if (init)
+    abort ();
+
+  TYPE_NEEDS_CONSTRUCTING (type) = needs_constructing;
+
+  return init;
+}  
 
 /* Digest the parser output INIT as an initializer for type TYPE.
    Return a C expression of type TYPE to represent the initial value.
@@ -482,6 +480,12 @@ digest_init (type, init, tail)
     /* __PRETTY_FUNCTION__'s initializer is a bogus expression inside
        a template function. This gets substituted during instantiation. */
     return init;
+
+  /* We must strip the outermost array type when completing the type,
+     because the its bounds might be incomplete at the moment.  */
+  if (!complete_type_or_else (TREE_CODE (type) == ARRAY_TYPE
+			      ? TREE_TYPE (type) : type, NULL_TREE))
+    return error_mark_node;
   
   /* Strip NON_LVALUE_EXPRs since we aren't using as an lvalue.  */
   if (TREE_CODE (init) == NON_LVALUE_EXPR)
@@ -562,7 +566,7 @@ digest_init (type, init, tail)
 
   if (code == INTEGER_TYPE || code == REAL_TYPE || code == POINTER_TYPE
       || code == ENUMERAL_TYPE || code == REFERENCE_TYPE
-      || code == BOOLEAN_TYPE || code == COMPLEX_TYPE || code == VECTOR_TYPE
+      || code == BOOLEAN_TYPE || code == COMPLEX_TYPE
       || TYPE_PTRMEMFUNC_P (type))
     {
       if (raw_constructor)
@@ -596,7 +600,7 @@ digest_init (type, init, tail)
       return error_mark_node;
     }
 
-  if (code == ARRAY_TYPE || IS_AGGR_TYPE_CODE (code))
+  if (code == ARRAY_TYPE || code == VECTOR_TYPE || IS_AGGR_TYPE_CODE (code))
     {
       if (raw_constructor && TYPE_NON_AGGREGATE_CLASS (type)
 	  && TREE_HAS_CONSTRUCTOR (init))
@@ -677,18 +681,26 @@ process_init_constructor (type, init, elts)
      for each element of this aggregate.  Chain them together in result.
      If there are too few, use 0 for each scalar ultimate component.  */
 
-  if (TREE_CODE (type) == ARRAY_TYPE)
+  if (TREE_CODE (type) == ARRAY_TYPE || TREE_CODE (type) == VECTOR_TYPE)
     {
-      tree domain = TYPE_DOMAIN (type);
       register long len;
       register int i;
 
-      if (domain)
-	len = (TREE_INT_CST_LOW (TYPE_MAX_VALUE (domain))
-	       - TREE_INT_CST_LOW (TYPE_MIN_VALUE (domain))
-	       + 1);
+      if (TREE_CODE (type) == ARRAY_TYPE)
+	{
+	  tree domain = TYPE_DOMAIN (type);
+	  if (domain)
+	    len = (TREE_INT_CST_LOW (TYPE_MAX_VALUE (domain))
+		   - TREE_INT_CST_LOW (TYPE_MIN_VALUE (domain))
+		   + 1);
+	  else
+	    len = -1;  /* Take as many as there are */
+	}
       else
-	len = -1;  /* Take as many as there are */
+	{
+	  /* Vectors are like simple fixed-size arrays.  */
+	  len = TYPE_VECTOR_SUBPARTS (type);
+	}
 
       for (i = 0; len < 0 || i < len; i++)
 	{
@@ -742,6 +754,8 @@ process_init_constructor (type, init, elts)
 		next1 = build (CONSTRUCTOR, NULL_TREE, NULL_TREE, NULL_TREE);
 	      next1 = digest_init (TREE_TYPE (type), next1, 0);
 	    }
+	  else if (! zero_init_p (TREE_TYPE (type)))
+	    next1 = build_forced_zero_init (TREE_TYPE (type));
 	  else
 	    /* The default zero-initialization is fine for us; don't
 	       add anything to the CONSTRUCTOR.  */
@@ -858,9 +872,12 @@ process_init_constructor (type, init, elts)
 	          && (!init || TREE_HAS_CONSTRUCTOR (init)))
 		warning ("missing initializer for member `%D'", field);
 
-	      /* The default zero-initialization is fine for us; don't
-		 add anything to the CONSTRUCTOR.  */
-	      continue;
+	      if (! zero_init_p (TREE_TYPE (field)))
+		next1 = build_forced_zero_init (TREE_TYPE (field));
+	      else
+		/* The default zero-initialization is fine for us; don't
+		   add anything to the CONSTRUCTOR.  */
+		continue;
 	    }
 
 	  if (next1 == error_mark_node)
@@ -925,7 +942,7 @@ process_init_constructor (type, init, elts)
 	  next1 = digest_init (TREE_TYPE (field),
 			       TREE_VALUE (tail), &tail1);
 	  if (tail1 != 0 && TREE_CODE (tail1) != TREE_LIST)
-	    my_friendly_abort (357);
+	    abort ();
 	  tail = tail1;
 	}
       else
@@ -964,7 +981,7 @@ process_init_constructor (type, init, elts)
 
 /* Given a structure or union value DATUM, construct and return
    the structure or union component which results from narrowing
-   that value by the type specified in BASETYPE.  For example, given the
+   that value to the base specified in BASETYPE.  For example, given the
    hierarchy
 
    class L { int ii; };
@@ -985,29 +1002,36 @@ process_init_constructor (type, init, elts)
    I used to think that this was nonconformant, that the standard specified
    that first we look up ii in A, then convert x to an L& and pull out the
    ii part.  But in fact, it does say that we convert x to an A&; A here
-   is known as the "naming class".  (jason 2000-12-19) */
+   is known as the "naming class".  (jason 2000-12-19)
+
+   BINFO_P points to a variable initialized either to NULL_TREE or to the
+   binfo for the specific base subobject we want to convert to.  */
 
 tree
-build_scoped_ref (datum, basetype)
+build_scoped_ref (datum, basetype, binfo_p)
      tree datum;
      tree basetype;
+     tree *binfo_p;
 {
-  tree ref;
   tree binfo;
 
   if (datum == error_mark_node)
     return error_mark_node;
-  binfo = lookup_base (TREE_TYPE (datum), basetype, ba_check, NULL);
+  if (*binfo_p)
+    binfo = *binfo_p;
+  else
+    binfo = lookup_base (TREE_TYPE (datum), basetype, ba_check, NULL);
 
-  if (binfo == error_mark_node)
-    return error_mark_node;
-  if (!binfo)
-    return error_not_base_type (TREE_TYPE (datum), basetype);
-  
-  ref = build_unary_op (ADDR_EXPR, datum, 0);
-  ref = build_base_path (PLUS_EXPR, ref, binfo, 1);
+  if (!binfo || binfo == error_mark_node)
+    {
+      *binfo_p = NULL_TREE;
+      if (!binfo)
+	error_not_base_type (basetype, TREE_TYPE (datum));
+      return error_mark_node;
+    }
 
-  return build_indirect_ref (ref, "(compiler error in build_scoped_ref)");
+  *binfo_p = binfo;
+  return build_base_path (PLUS_EXPR, datum, binfo, 1);
 }
 
 /* Build a reference to an object specified by the C++ `->' operator.
@@ -1329,7 +1353,7 @@ add_exception_specifier (list, spec, complain)
         }
     }
   else if (complain)
-    incomplete_type_error (NULL_TREE, core);
+    cxx_incomplete_type_error (NULL_TREE, core);
   return list;
 }
 

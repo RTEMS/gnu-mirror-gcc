@@ -29,6 +29,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "output.h"
 #include "c-lex.h"
 #include "c-tree.h"
+#include "c-common.h"
 #include "flags.h"
 #include "timevar.h"
 #include "cpplib.h"
@@ -38,13 +39,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "tm_p.h"
 #include "splay-tree.h"
 #include "debug.h"
-
-/* MULTIBYTE_CHARS support only works for native compilers.
-   ??? Ideally what we want is to model widechar support after
-   the current floating point support.  */
-#ifdef CROSS_COMPILE
-#undef MULTIBYTE_CHARS
-#endif
 
 #ifdef MULTIBYTE_CHARS
 #include "mbchar.h"
@@ -64,9 +58,6 @@ static unsigned int src_lineno;
 static int header_time, body_time;
 static splay_tree file_info_tree;
 
-/* Cause the `yydebug' variable to be defined.  */
-#define YYDEBUG 1
-
 /* File used for outputting assembler code.  */
 extern FILE *asm_out_file;
 
@@ -83,9 +74,9 @@ int c_header_level;	 /* depth in C headers - C++ only */
 /* Nonzero tells yylex to ignore \ in string constants.  */
 static int ignore_escape_flag;
 
-static void parse_float		PARAMS ((PTR));
 static tree lex_number		PARAMS ((const char *, unsigned int));
-static tree lex_string		PARAMS ((const char *, unsigned int, int));
+static tree lex_string		PARAMS ((const unsigned char *, unsigned int,
+					 int));
 static tree lex_charconst	PARAMS ((const cpp_token *));
 static void update_header_times	PARAMS ((const char *));
 static int dump_one_header	PARAMS ((splay_tree_node, void *));
@@ -150,14 +141,25 @@ init_c_lex (filename)
 }
 
 /* A thin wrapper around the real parser that initializes the 
-   integrated preprocessor after debug output has been initialized.  */
+   integrated preprocessor after debug output has been initialized.
+   Also, make sure the start_source_file debug hook gets called for
+   the primary source file.  */
 
-int
-yyparse()
+void
+c_common_parse_file (set_yydebug)
+     int set_yydebug ATTRIBUTE_UNUSED;
 {
+#if YYDEBUG != 0
+  yydebug = set_yydebug;
+#else
+  warning ("YYDEBUG not defined");
+#endif
+
+  (*debug_hooks->start_source_file) (lineno, input_filename);
   cpp_finish_options (parse_in);
 
-  return yyparse_1();
+  yyparse ();
+  free_parser_stacks ();
 }
 
 struct c_fileinfo *
@@ -223,9 +225,6 @@ dump_time_statistics ()
   splay_tree_foreach (file_info_tree, dump_one_header, 0);
 }
 
-/* Not yet handled: #pragma, #define, #undef.
-   No need to deal with linemarkers under normal conditions.  */
-
 static void
 cb_ident (pfile, line, str)
      cpp_reader *pfile ATTRIBUTE_UNUSED;
@@ -236,7 +235,7 @@ cb_ident (pfile, line, str)
   if (! flag_no_ident)
     {
       /* Convert escapes in the string.  */
-      tree value = lex_string ((const char *)str->text, str->len, 0);
+      tree value = lex_string (str->text, str->len, 0);
       ASM_OUTPUT_IDENT (asm_out_file, TREE_STRING_POINTER (value));
     }
 #endif
@@ -268,10 +267,12 @@ cb_file_change (pfile, new_map)
 	main_input_filename = new_map->to_file;
       else
 	{
-	  lineno = SOURCE_LINE (new_map - 1, new_map->from_line - 1);
+          int included_at = SOURCE_LINE (new_map - 1, new_map->from_line - 1);
+
+	  lineno = included_at;
 	  push_srcloc (new_map->to_file, 1);
 	  input_file_stack->indent_level = indent_level;
-	  (*debug_hooks->start_source_file) (lineno, new_map->to_file);
+	  (*debug_hooks->start_source_file) (included_at, new_map->to_file);
 #ifndef NO_IMPLICIT_EXTERN_C
 	  if (c_header_level)
 	    ++c_header_level;
@@ -696,67 +697,6 @@ struct try_type type_sequence[] =
 };
 #endif /* 0 */
 
-struct pf_args
-{
-  /* Input */
-  const char *str;
-  int fflag;
-  int lflag;
-  int base;
-  /* Output */
-  int conversion_errno;
-  REAL_VALUE_TYPE value;
-  tree type;
-};
- 
-static void
-parse_float (data)
-  PTR data;
-{
-  struct pf_args * args = (struct pf_args *) data;
-  const char *typename;
-
-  args->conversion_errno = 0;
-  args->type = double_type_node;
-  typename = "double";
-
-  /* The second argument, machine_mode, of REAL_VALUE_ATOF
-     tells the desired precision of the binary result
-     of decimal-to-binary conversion.  */
-
-  if (args->fflag)
-    {
-      if (args->lflag)
-	error ("both 'f' and 'l' suffixes on floating constant");
-
-      args->type = float_type_node;
-      typename = "float";
-    }
-  else if (args->lflag)
-    {
-      args->type = long_double_type_node;
-      typename = "long double";
-    }
-  else if (flag_single_precision_constant)
-    {
-      args->type = float_type_node;
-      typename = "float";
-    }
-
-  errno = 0;
-  if (args->base == 16)
-    args->value = REAL_VALUE_HTOF (args->str, TYPE_MODE (args->type));
-  else
-    args->value = REAL_VALUE_ATOF (args->str, TYPE_MODE (args->type));
-
-  args->conversion_errno = errno;
-  /* A diagnostic is required here by some ISO C testsuites.
-     This is not pedwarn, because some people don't want
-     an error for this.  */
-  if (REAL_VALUE_ISINF (args->value) && pedantic)
-    warning ("floating point number exceeds range of '%s'", typename);
-}
- 
 int
 c_lex (value)
      tree *value;
@@ -804,8 +744,8 @@ c_lex (value)
 
     case CPP_STRING:
     case CPP_WSTRING:
-      *value = lex_string ((const char *)tok->val.str.text,
-			   tok->val.str.len, tok->type == CPP_WSTRING);
+      *value = lex_string (tok->val.str.text, tok->val.str.len,
+			   tok->type == CPP_WSTRING);
       break;
 
       /* These tokens should not be visible outside cpplib.  */
@@ -967,13 +907,10 @@ lex_number (str, len)
   if (floatflag != NOT_FLOAT)
     {
       tree type;
-      int imag, fflag, lflag, conversion_errno;
+      const char *typename;
+      int imag, fflag, lflag;
       REAL_VALUE_TYPE real;
-      struct pf_args args;
       char *copy;
-
-      if (base == 16 && pedantic && !flag_isoc99)
-	pedwarn ("floating constant may not be in radix 16");
 
       if (base == 16 && floatflag != AFTER_EXPON)
 	ERROR ("hexadecimal floating constant has no exponent");
@@ -1039,34 +976,45 @@ lex_number (str, len)
 	    ERROR ("invalid suffix on floating constant");
 	  }
 
-      /* Setup input for parse_float() */
-      args.str = copy;
-      args.fflag = fflag;
-      args.lflag = lflag;
-      args.base = base;
-
-      /* Convert string to a double, checking for overflow.  */
-      if (do_float_handler (parse_float, (PTR) &args))
+      type = double_type_node;
+      typename = "double";
+	
+      if (fflag)
 	{
-	  /* Receive output from parse_float() */
-	  real = args.value;
-	}
-      else
-	  /* We got an exception from parse_float() */
-	  ERROR ("floating constant out of range");
+	  if (lflag)
+	    ERROR ("both 'f' and 'l' suffixes on floating constant");
 
-      /* Receive output from parse_float() */
-      conversion_errno = args.conversion_errno;
-      type = args.type;
-	    
-#ifdef ERANGE
-      /* ERANGE is also reported for underflow,
-	 so test the value to distinguish overflow from that.  */
-      if (conversion_errno == ERANGE && !flag_traditional && pedantic
-	  && (REAL_VALUES_LESS (dconst1, real)
-	      || REAL_VALUES_LESS (real, dconstm1)))
+	  type = float_type_node;
+	  typename = "float";
+	}
+      else if (lflag)
+	{
+	  type = long_double_type_node;
+	  typename = "long double";
+	}
+      else if (flag_single_precision_constant)
+	{
+	  type = float_type_node;
+	  typename = "float";
+	}
+
+      /* Warn about this only after we know we're not issuing an error.  */
+      if (base == 16 && pedantic && !flag_isoc99)
+	pedwarn ("hexadecimal floating constants are only valid in C99");
+
+      /* The second argument, machine_mode, of REAL_VALUE_ATOF
+	 tells the desired precision of the binary result
+	 of decimal-to-binary conversion.  */
+      if (base == 16)
+	real = REAL_VALUE_HTOF (copy, TYPE_MODE (type));
+      else
+	real = REAL_VALUE_ATOF (copy, TYPE_MODE (type));
+
+      /* A diagnostic is required here by some ISO C testsuites.
+	 This is not pedwarn, because some people don't want
+	 an error for this.  */
+      if (REAL_VALUE_ISINF (real) && pedantic)
 	warning ("floating point number exceeds range of 'double'");
-#endif
 
       /* Create a node with determined type and value.  */
       if (imag)
@@ -1077,7 +1025,7 @@ lex_number (str, len)
     }
   else
     {
-      tree trad_type, ansi_type, type;
+      tree trad_type, type;
       HOST_WIDE_INT high, low;
       int spec_unsigned = 0;
       int spec_long = 0;
@@ -1086,7 +1034,7 @@ lex_number (str, len)
       int suffix_lu = 0;
       int warn = 0, i;
 
-      trad_type = ansi_type = type = NULL_TREE;
+      trad_type = type = NULL_TREE;
       while (p < str + len)
 	{
 	  c = *p++;
@@ -1158,11 +1106,9 @@ lex_number (str, len)
       TREE_TYPE (value) = long_long_unsigned_type_node;
 
       /* If warn_traditional, calculate both the ISO type and the
-	 traditional type, then see if they disagree.
-	 Otherwise, calculate only the type for the dialect in use.  */
-      if (warn_traditional || flag_traditional)
+	 traditional type, then see if they disagree.  */
+      if (warn_traditional)
 	{
-	  /* Calculate the traditional type.  */
 	  /* Traditionally, any constant is signed; but if unsigned is
 	     specified explicitly, obey that.  Use the smallest size
 	     with the right number of bits, except for one special
@@ -1192,50 +1138,46 @@ lex_number (str, len)
 			 ? widest_unsigned_literal_type_node
 			 : widest_integer_literal_type_node);
 	}
-      if (warn_traditional || ! flag_traditional)
-	{
-	  /* Calculate the ISO type.  */
-	  if (! spec_long && ! spec_unsigned
-	      && int_fits_type_p (value, integer_type_node))
-	    ansi_type = integer_type_node;
-	  else if (! spec_long && (base != 10 || spec_unsigned)
-		   && int_fits_type_p (value, unsigned_type_node))
-	    ansi_type = unsigned_type_node;
-	  else if (! spec_unsigned && !spec_long_long
-		   && int_fits_type_p (value, long_integer_type_node))
-	    ansi_type = long_integer_type_node;
-	  else if (! spec_long_long
-		   && int_fits_type_p (value, long_unsigned_type_node))
-	    ansi_type = long_unsigned_type_node;
-	  else if (! spec_unsigned
-		   && int_fits_type_p (value, long_long_integer_type_node))
-	    ansi_type = long_long_integer_type_node;
-	  else if (int_fits_type_p (value, long_long_unsigned_type_node))
-	    ansi_type = long_long_unsigned_type_node;
-	  else if (! spec_unsigned
-		   && int_fits_type_p (value, widest_integer_literal_type_node))
-	    ansi_type = widest_integer_literal_type_node;
-	  else
-	    ansi_type = widest_unsigned_literal_type_node;
-	}
-
-      type = flag_traditional ? trad_type : ansi_type;
+	
+	/* Calculate the ISO type.  */
+	if (! spec_long && ! spec_unsigned
+	    && int_fits_type_p (value, integer_type_node))
+	  type = integer_type_node;
+	else if (! spec_long && (base != 10 || spec_unsigned)
+		 && int_fits_type_p (value, unsigned_type_node))
+	  type = unsigned_type_node;
+	else if (! spec_unsigned && !spec_long_long
+		 && int_fits_type_p (value, long_integer_type_node))
+	  type = long_integer_type_node;
+	else if (! spec_long_long
+		 && int_fits_type_p (value, long_unsigned_type_node))
+	  type = long_unsigned_type_node;
+	else if (! spec_unsigned
+		 && int_fits_type_p (value, long_long_integer_type_node))
+	  type = long_long_integer_type_node;
+	else if (int_fits_type_p (value, long_long_unsigned_type_node))
+	  type = long_long_unsigned_type_node;
+	else if (! spec_unsigned
+		 && int_fits_type_p (value, widest_integer_literal_type_node))
+	  type = widest_integer_literal_type_node;
+	else
+	  type = widest_unsigned_literal_type_node;
 
       /* We assume that constants specified in a non-decimal
 	 base are bit patterns, and that the programmer really
 	 meant what they wrote.  */
       if (warn_traditional && !in_system_header
-	  && base == 10 && trad_type != ansi_type)
+	  && base == 10 && trad_type != type)
 	{
-	  if (TYPE_PRECISION (trad_type) != TYPE_PRECISION (ansi_type))
-	    warning ("width of integer constant changes with -traditional");
-	  else if (TREE_UNSIGNED (trad_type) != TREE_UNSIGNED (ansi_type))
-	    warning ("integer constant is unsigned in ISO C, signed with -traditional");
+	  if (TYPE_PRECISION (trad_type) != TYPE_PRECISION (type))
+	    warning ("width of integer constant is different in traditional C");
+	  else if (TREE_UNSIGNED (trad_type) != TREE_UNSIGNED (type))
+	    warning ("integer constant is unsigned in ISO C, signed in traditional C");
 	  else
-	    warning ("width of integer constant may change on other systems with -traditional");
+	    warning ("width of integer constant may change on other systems in traditional C");
 	}
 
-      if (pedantic && !flag_traditional && (flag_isoc99 || !spec_long_long)
+      if (pedantic && (flag_isoc99 || !spec_long_long)
 	  && !warn
 	  && ((flag_isoc99
 	       ? TYPE_PRECISION (long_long_integer_type_node)
@@ -1262,15 +1204,6 @@ lex_number (str, len)
 	  else
 	    ERROR ("complex integer constant is too wide for 'complex int'");
 	}
-      else if (flag_traditional && !int_fits_type_p (value, type))
-	/* The traditional constant 0x80000000 is signed
-	   but doesn't fit in the range of int.
-	   This will change it to -0x80000000, which does fit.  */
-	{
-	  TREE_TYPE (value) = unsigned_type (type);
-	  value = convert (type, value);
-	  TREE_OVERFLOW (value) = TREE_CONSTANT_OVERFLOW (value) = 0;
-	}
       else
 	TREE_TYPE (value) = type;
 
@@ -1294,17 +1227,15 @@ lex_number (str, len)
 
 static tree
 lex_string (str, len, wide)
-     const char *str;
+     const unsigned char *str;
      unsigned int len;
      int wide;
 {
   tree value;
   char *buf = alloca ((len + 1) * (wide ? WCHAR_BYTES : 1));
   char *q = buf;
-  const char *p = str, *limit = str + len;
-  unsigned int c;
-  unsigned width = wide ? WCHAR_TYPE_SIZE
-			: TYPE_PRECISION (char_type_node);
+  const unsigned char *p = str, *limit = str + len;
+  cppchar_t c;
 
 #ifdef MULTIBYTE_CHARS
   /* Reset multibyte conversion state.  */
@@ -1317,7 +1248,7 @@ lex_string (str, len, wide)
       wchar_t wc;
       int char_len;
 
-      char_len = local_mbtowc (&wc, p, limit - p);
+      char_len = local_mbtowc (&wc, (const char *) p, limit - p);
       if (char_len == -1)
 	{
 	  warning ("ignoring invalid multibyte character");
@@ -1334,20 +1265,10 @@ lex_string (str, len, wide)
 #endif
 
       if (c == '\\' && !ignore_escape_flag)
-	{
-	  unsigned int mask;
-
-	  if (width < HOST_BITS_PER_INT)
-	    mask = ((unsigned int) 1 << width) - 1;
-	  else
-	    mask = ~0;
-	  c = cpp_parse_escape (parse_in, (const unsigned char **) &p,
-				(const unsigned char *) limit,
-				mask, flag_traditional);
-	}
+	c = cpp_parse_escape (parse_in, &p, limit, wide);
 	
-      /* Add this single character into the buffer either as a wchar_t
-	 or as a single byte.  */
+      /* Add this single character into the buffer either as a wchar_t,
+	 a multibyte sequence, or as a single byte.  */
       if (wide)
 	{
 	  unsigned charwidth = TYPE_PRECISION (char_type_node);
@@ -1368,6 +1289,16 @@ lex_string (str, len, wide)
 	    }
 	  q += WCHAR_BYTES;
 	}
+#ifdef MULTIBYTE_CHARS
+      else if (char_len > 1)
+	{
+	  /* We're dealing with a multibyte character. */
+	  for ( ; char_len >0; --char_len)
+	    {
+	      *q++ = *(p - char_len);
+	    }
+	}
+#endif
       else
 	{
 	  *q++ = c;
@@ -1401,31 +1332,31 @@ static tree
 lex_charconst (token)
      const cpp_token *token;
 {
-  HOST_WIDE_INT result;
-  tree value;
+  cppchar_t result;
+  tree type, value;
   unsigned int chars_seen;
+  int unsignedp;
  
-  result = cpp_interpret_charconst (parse_in, token, warn_multichar,
- 				    flag_traditional, &chars_seen);
-  if (token->type == CPP_WCHAR)
-    {
-      value = build_int_2 (result, 0);
-      TREE_TYPE (value) = wchar_type_node;
-    }
+  result = cpp_interpret_charconst (parse_in, token,
+ 				    &chars_seen, &unsignedp);
+
+  /* Cast to cppchar_signed_t to get correct sign-extension of RESULT
+     before possibly widening to HOST_WIDE_INT for build_int_2.  */
+  if (unsignedp || (cppchar_signed_t) result >= 0)
+    value = build_int_2 (result, 0);
   else
-    {
-      if (result < 0)
- 	value = build_int_2 (result, -1);
-      else
- 	value = build_int_2 (result, 0);
- 
-      /* In C, a character constant has type 'int'.
- 	 In C++ 'char', but multi-char charconsts have type 'int'.  */
-      if (c_language == clk_cplusplus && chars_seen <= 1)
- 	TREE_TYPE (value) = char_type_node;
-      else
- 	TREE_TYPE (value) = integer_type_node;
-    }
- 
+    value = build_int_2 ((cppchar_signed_t) result, -1);
+
+  if (token->type == CPP_WCHAR)
+    type = wchar_type_node;
+  /* In C, a character constant has type 'int'.
+     In C++ 'char', but multi-char charconsts have type 'int'.  */
+  else if ((c_language == clk_c || c_language == clk_objective_c)
+	   || chars_seen > 1)
+    type = integer_type_node;
+  else
+    type = char_type_node;
+
+  TREE_TYPE (value) = type;
   return value;
 }

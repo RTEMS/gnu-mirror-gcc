@@ -86,21 +86,9 @@ extern int mvs_function_name_length;
 
 #define WORDS_BIG_ENDIAN 1
 
-/* Number of bits in an addressable storage unit.  */
-
-#define BITS_PER_UNIT 8
-
-/* Width in bits of a "word", which is the contents of a machine register.  */
-
-#define BITS_PER_WORD 32
-
 /* Width of a word, in units (bytes).  */
 
 #define UNITS_PER_WORD 4
-
-/* Width in bits of a pointer.  See also the macro `Pmode' defined below.  */
-
-#define POINTER_SIZE 32
 
 /* Allocation boundary (in *bits*) for storing pointers in memory.  */
 
@@ -295,7 +283,7 @@ extern int mvs_function_name_length;
 
 /* Mark external references.  */
 
-#define ENCODE_SECTION_INFO(decl)  					\
+#define ENCODE_SECTION_INFO(decl, first)  				\
   if (DECL_EXTERNAL (decl) && TREE_PUBLIC (decl)) 			\
     SYMBOL_REF_FLAG (XEXP (DECL_RTL (decl), 0)) = 1;
 
@@ -874,10 +862,6 @@ enum reg_class
 
 #define MOVE_MAX 256
 
-/* Define this if zero-extension is slow (more than one real instruction).  */
-
-#define SLOW_ZERO_EXTEND 1
-
 /* Nonzero if access to memory by bytes is slow and undesirable.  */
 
 #define SLOW_BYTE_ACCESS 1
@@ -1001,7 +985,7 @@ enum reg_class
 	      case MULT:  /* case UMULT: */ case DIV:      case UDIV: 	\
               /* and, or and xor set the cc's the wrong way !! */	\
 	      case AND:   case IOR:    case XOR:  			\
-              /* some shifts set the CC some don't. */			\
+              /* some shifts set the CC some don't.  */			\
               case ASHIFT: 	 case ASHIFTRT:  			\
                  do {} while (0);					\
               default:							\
@@ -1132,7 +1116,7 @@ enum reg_class
 
 /* Generate case label.  For HLASM we can change to the data CSECT
    and put the vectors out of the code body. The assembler just
-   concatenates CSECTs with the same name. */
+   concatenates CSECTs with the same name.  */
 
 #define ASM_OUTPUT_CASE_LABEL(FILE, PREFIX, NUM, TABLE)			\
   fprintf (FILE, "\tDS\t0F\n");                                         \
@@ -1290,7 +1274,7 @@ enum reg_class
 
 /* Print operand XV (an rtx) in assembler syntax to file FILE.
    CODE is a letter or dot (`z' in `%z0') or 0 if no letter was specified.
-   For `%' followed by punctuation, CODE is the punctuation and XV is null. */
+   For `%' followed by punctuation, CODE is the punctuation and XV is null.  */
 
 #define PRINT_OPERAND(FILE, XV, CODE)					\
 {									\
@@ -1390,21 +1374,26 @@ enum reg_class
 	  }								\
 	else								\
 	  { 								\
-            /* hack alert -- this prints wildly incorrect values */	\
-            /* when run in cross-compiler mode. See ELF section  */	\
-            /* for suggested fix */					\
-	    union { double d; int i[2]; } u;				\
-	    u.i[0] = CONST_DOUBLE_LOW (XV);				\
-	    u.i[1] = CONST_DOUBLE_HIGH (XV);				\
+            char buf[50];						\
+            REAL_VALUE_TYPE rval;					\
+            REAL_VALUE_FROM_CONST_DOUBLE(rval, XV);			\
+            REAL_VALUE_TO_DECIMAL (rval, HOST_WIDE_INT_PRINT_DEC, buf);	\
 	    if (GET_MODE (XV) == SFmode)				\
 	      {								\
 		mvs_page_lit += 4;					\
-		fprintf (FILE, "=E'%.9G'", u.d);			\
+		fprintf (FILE, "=E'%s'", buf);				\
 	      }								\
 	    else							\
+	    if (GET_MODE (XV) == DFmode)				\
 	      {								\
 		mvs_page_lit += 8;					\
-		fprintf (FILE, "=D'%.18G'", u.d);			\
+		fprintf (FILE, "=D'%s'", buf);				\
+	      }								\
+	    else /* VOIDmode !?!? strange but true ...  */		\
+	      {								\
+		mvs_page_lit += 8;					\
+		fprintf (FILE, "=XL8'%08X%08X'", 			\
+			CONST_DOUBLE_HIGH (XV), CONST_DOUBLE_LOW (XV));	\
 	      }								\
 	  }								\
 	break;								\
@@ -1579,7 +1568,7 @@ enum reg_class
 
 /* Print operand XV (an rtx) in assembler syntax to file FILE.
    CODE is a letter or dot (`z' in `%z0') or 0 if no letter was specified.
-   For `%' followed by punctuation, CODE is the punctuation and XV is null. */
+   For `%' followed by punctuation, CODE is the punctuation and XV is null.  */
 
 #define PRINT_OPERAND(FILE, XV, CODE)					\
 {									\
@@ -1694,7 +1683,7 @@ enum reg_class
 		mvs_page_lit += 8;					\
 		fprintf (FILE, "=D'%s'", buf);				\
 	      }								\
-	    else /* VOIDmode !?!? strange but true ... */		\
+	    else /* VOIDmode !?!? strange but true ...  */		\
 	      {								\
 		mvs_page_lit += 8;					\
 		fprintf (FILE, "=XL8'%08X%08X'", 			\
@@ -1859,7 +1848,7 @@ abort(); \
 
 /* Generate internal label.  Since we can branch here from off page, we
    must reload the base register.  Note that internal labels are generated
-   for loops, goto's and case labels.   */
+   for loops, goto's and case labels.  */
 #undef ASM_OUTPUT_INTERNAL_LABEL
 #define ASM_OUTPUT_INTERNAL_LABEL(FILE, PREFIX, NUM) 			\
 {									\
@@ -1901,7 +1890,7 @@ abort(); \
    count is in %cl.  Some assemblers require %cl as an argument;
    some don't.
 
-   GAS requires the %cl argument, so override i386/unix.h. */
+   GAS requires the %cl argument, so override i386/unix.h.  */
 
 #undef SHIFT_DOUBLE_OMITS_COUNT
 #define SHIFT_DOUBLE_OMITS_COUNT 0

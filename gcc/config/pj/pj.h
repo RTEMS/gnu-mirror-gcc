@@ -95,11 +95,7 @@ extern int target_flags;
    We take this chance to register the global variables with the garbage
    collector. */
 
-#define OVERRIDE_OPTIONS                                                \
- do {                                                                   \
-   ggc_add_rtx_root (&pj_cmp_op0, 1);                                   \
-   ggc_add_rtx_root (&pj_cmp_op1, 1);                                   \
- } while (0)
+/* #define OVERRIDE_OPTIONS */
 
 /* Define this to change the optimizations performed by default.  */
 #define OPTIMIZATION_OPTIONS(LEVEL,SIZE)                                \
@@ -109,10 +105,6 @@ extern int target_flags;
  } while (0)
 
 /* Target machine storage layout.  */
-
-/* Define to use software floating point emulator for REAL_ARITHMETIC and
-   decimal <-> binary conversion.  */
-#define REAL_ARITHMETIC
 
 /* Define this if most significant bit is lowest numbered
    in instructions that operate on numbered bit-fields.  */
@@ -133,22 +125,10 @@ extern int target_flags;
 #define LIBGCC2_WORDS_BIG_ENDIAN 1
 #endif
 
-/* Number of bits in an addressable storage unit.  */
-#define BITS_PER_UNIT  8
-
-/* Width in bits of a "word", which is the contents of a machine register.
-   Note that this is not necessarily the width of data type `int';
-   if using 16-bit ints on a 68000, this would still be 32.
-   But on a machine with 16-bit registers, this would be 16.  */
-#define BITS_PER_WORD  32
 #define MAX_BITS_PER_WORD 32
 
 /* Width of a word, in units (bytes).  */
 #define UNITS_PER_WORD  4
-
-/* Width in bits of a pointer.
-   See also the macro `Pmode' defined below.  */
-#define POINTER_SIZE  32
 
 /* Allocation boundary (in *bits*) for storing arguments in argument list.  */
 #define PARM_BOUNDARY   32
@@ -746,7 +726,7 @@ struct pj_args
 
 #define INITIALIZE_TRAMPOLINE(TRAMP, FNADDR, CXT)                             \
 {                                                                             \
-  static int off[4] = { 1, 0, 4, 3 };                                         \
+  static const int off[4] = { 1, 0, 4, 3 };                                   \
   int i;                                                                      \
                                                                               \
   /* Move the FNADDR and CXT into the instruction stream. Do this byte        \
@@ -931,11 +911,6 @@ struct pj_args
 /* Define if loading short immediate values into registers sign extends.  */
 
 #define SHORT_IMMEDIATES_SIGN_EXTEND
-
-/* Define this if zero-extension is slow (more than one real
-   instruction).  */
-
-/* #define SLOW_ZERO_EXTEND  */
 
 /* Nonzero if access to memory by bytes is no faster than for words.  */
 #define SLOW_BYTE_ACCESS 1
@@ -1257,7 +1232,6 @@ extern short pj_debugreg_renumber_vec[FIRST_PSEUDO_REGISTER];
 #undef  PREFERRED_DEBUGGING_TYPE 
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
 #define DWARF2_UNWIND_INFO 1
-#define DWARF_LINE_MIN_INSTR_LENGTH 1
 
 
 /* varargs and stdarg builtins.  */

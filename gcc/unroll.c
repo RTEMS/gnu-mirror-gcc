@@ -147,6 +147,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "hard-reg-set.h"
 #include "basic-block.h"
 #include "predict.h"
+#include "params.h"
 
 /* The prime factors looked for when trying to unroll a loop by some
    number which is modulo the total number of iterations.  Just checking
@@ -168,13 +169,6 @@ enum unroll_types
   UNROLL_MODULO,
   UNROLL_NAIVE
 };
-
-/* This controls which loops are unrolled, and by how much we unroll
-   them.  */
-
-#ifndef MAX_UNROLLED_INSNS
-#define MAX_UNROLLED_INSNS 100
-#endif
 
 /* Indexed by register number, if non-zero, then it contains a pointer
    to a struct induction for a DEST_REG giv which has been combined with
@@ -727,8 +721,7 @@ unroll_loop (loop, insn_count, strength_reduce_p)
 
   if (max_labelno > 0)
     {
-      map->label_map = (rtx *) xmalloc (max_labelno * sizeof (rtx));
-
+      map->label_map = (rtx *) xcalloc (max_labelno, sizeof (rtx));
       local_label = (char *) xcalloc (max_labelno, sizeof (char));
     }
 
@@ -930,6 +923,19 @@ unroll_loop (loop, insn_count, strength_reduce_p)
 
 	  start_sequence ();
 
+	  /* Final value may have form of (PLUS val1 const1_rtx).  We need
+	     to convert it into general operand, so compute the real value.  */
+
+	  if (GET_CODE (final_value) == PLUS)
+	    {
+	      final_value = expand_simple_binop (mode, PLUS,
+						 copy_rtx (XEXP (final_value, 0)),
+						 copy_rtx (XEXP (final_value, 1)),
+						 NULL_RTX, 0, OPTAB_LIB_WIDEN);
+	    }
+	  if (!nonmemory_operand (final_value, VOIDmode))
+	    final_value = force_reg (mode, copy_rtx (final_value));
+
 	  /* Calculate the difference between the final and initial values.
 	     Final value may be a (plus (reg x) (const_int 1)) rtx.
 	     Let the following cse pass simplify this if initial value is
@@ -949,7 +955,7 @@ unroll_loop (loop, insn_count, strength_reduce_p)
 	     so we can pretend that the overflow value is 0/~0.  */
 
 	  if (cc == NE || less_p != neg_inc)
-	    diff = expand_simple_binop (mode, MINUS, copy_rtx (final_value),
+	    diff = expand_simple_binop (mode, MINUS, final_value,
 					copy_rtx (initial_value), NULL_RTX, 0,
 					OPTAB_LIB_WIDEN);
 	  else
@@ -987,7 +993,7 @@ unroll_loop (loop, insn_count, strength_reduce_p)
 				       less_p ? GE : LE, NULL_RTX,
 				       mode, unsigned_p, labels[1]);
 	      predict_insn_def (get_last_insn (), PRED_LOOP_CONDITION,
-				NOT_TAKEN);
+				TAKEN);
 	      JUMP_LABEL (get_last_insn ()) = labels[1];
 	      LABEL_NUSES (labels[1])++;
 	    }
@@ -2209,6 +2215,7 @@ copy_loop_body (loop, copy_start, copy_end, map, exit_label, last_iteration,
 	  pattern = copy_rtx_and_substitute (PATTERN (insn), map, 0);
 	  copy = emit_call_insn (pattern);
 	  REG_NOTES (copy) = initial_reg_note_copy (REG_NOTES (insn), map);
+	  SIBLING_CALL_P (copy) = SIBLING_CALL_P (insn);
 
 	  /* Because the USAGE information potentially contains objects other
 	     than hard registers, we need to copy it.  */
@@ -3731,7 +3738,18 @@ loop_iterations (loop)
 	  for (biv_inc = bl->biv; biv_inc; biv_inc = biv_inc->next_iv)
 	    {
 	      if (loop_insn_first_p (v->insn, biv_inc->insn))
-		offset -= INTVAL (biv_inc->add_val);
+		{
+		  if (REG_P (biv_inc->add_val))
+		    {
+		      if (loop_dump_stream)
+			fprintf (loop_dump_stream,
+				 "Loop iterations: Basic induction var add_val is REG %d.\n",
+				 REGNO (biv_inc->add_val));
+			return 0;
+		    }
+
+		  offset -= INTVAL (biv_inc->add_val);
+		}
 	    }
 	}
       if (loop_dump_stream)

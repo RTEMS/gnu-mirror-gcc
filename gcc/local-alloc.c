@@ -245,7 +245,7 @@ static rtx this_insn;
 struct equivalence
 {
   /* Set when an attempt should be made to replace a register
-     with the associated src entry.  */
+     with the associated src_p entry.  */
 
   char replace;
 
@@ -255,7 +255,7 @@ struct equivalence
 
   rtx replacement;
 
-  rtx src;
+  rtx *src_p;
 
   /* Loop depth is used to recognize equivalences which appear
      to be present within the same loop (or in an inner loop).  */
@@ -352,7 +352,8 @@ local_alloc ()
 
   /* Promote REG_EQUAL notes to REG_EQUIV notes and adjust status of affected
      registers.  */
-  update_equiv_regs ();
+  if (optimize)
+    update_equiv_regs ();
 
   /* This sets the maximum number of quantities we can have.  Quantity
      numbers start at zero and we can have one for each pseudo.  */
@@ -539,6 +540,7 @@ equiv_init_varies_p (x)
     case CONST:
     case CONST_INT:
     case CONST_DOUBLE:
+    case CONST_VECTOR:
     case SYMBOL_REF:
     case LABEL_REF:
       return 0;
@@ -658,10 +660,10 @@ contains_replace_regs (x)
     case LABEL_REF:
     case SYMBOL_REF:
     case CONST_DOUBLE:
+    case CONST_VECTOR:
     case PC:
     case CC0:
     case HIGH:
-    case LO_SUM:
       return 0;
 
     case REG:
@@ -708,6 +710,7 @@ memref_referenced_p (memref, x)
     case LABEL_REF:
     case SYMBOL_REF:
     case CONST_DOUBLE:
+    case CONST_VECTOR:
     case PC:
     case CC0:
     case HIGH:
@@ -1002,7 +1005,7 @@ update_equiv_regs ()
 		recorded_label_ref = 1;
 
 	      reg_equiv[regno].replacement = XEXP (note, 0);
-	      reg_equiv[regno].src = src;
+	      reg_equiv[regno].src_p = &SET_SRC (set);
 	      reg_equiv[regno].loop_depth = loop_depth;
 
 	      /* Don't mess with things live during setjmp.  */
@@ -1084,7 +1087,7 @@ update_equiv_regs ()
 
 		  if (asm_noperands (PATTERN (equiv_insn)) < 0
 		      && validate_replace_rtx (regno_reg_rtx[regno],
-					       reg_equiv[regno].src, insn))
+					       *(reg_equiv[regno].src_p), insn))
 		    {
 		      rtx equiv_link;
 		      rtx last_link;

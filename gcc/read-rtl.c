@@ -73,7 +73,7 @@ fatal_with_file_and_line VPARAMS ((FILE *infile, const char *msg, ...))
   putc ('\n', stderr);
 
   /* Gather some following context.  */
-  for (i = 0; i < sizeof(context)-1; ++i)
+  for (i = 0; i < sizeof (context)-1; ++i)
     {
       c = getc (infile);
       if (c == EOF)
@@ -265,7 +265,7 @@ read_escape (ob, infile)
 
   obstack_1grow (ob, c);
 }
-      
+
 
 /* Read a double-quoted string onto the obstack.  Caller has scanned
    the leading quote.  */
@@ -325,7 +325,7 @@ read_braced_string (ob, infile)
 
       obstack_1grow (ob, c);
     }
-      
+
   obstack_1grow (ob, 0);
   return obstack_finish (ob);
 }
@@ -361,7 +361,7 @@ read_string (ob, infile, star_if_braced)
     }
   else
     fatal_with_file_and_line (infile, "expected `\"' or `{', found `%c'", c);
-       
+
   if (saw_paren)
     {
       c = read_skip_spaces (infile);
@@ -376,13 +376,13 @@ read_string (ob, infile, star_if_braced)
    not provide one.  */
 #if HOST_BITS_PER_WIDE_INT > HOST_BITS_PER_LONG && !defined(HAVE_ATOLL) && !defined(HAVE_ATOQ)
 HOST_WIDE_INT
-atoll(p)
+atoll (p)
     const char *p;
 {
   int neg = 0;
   HOST_WIDE_INT tmp_wide;
 
-  while (ISSPACE(*p))
+  while (ISSPACE (*p))
     p++;
   if (*p == '-')
     neg = 1, p++;
@@ -390,7 +390,7 @@ atoll(p)
     p++;
 
   tmp_wide = 0;
-  while (ISDIGIT(*p))
+  while (ISDIGIT (*p))
     {
       HOST_WIDE_INT new_wide = tmp_wide*10 + (*p - '0');
       if (new_wide < tmp_wide)
@@ -415,7 +415,7 @@ def_hash (def)
      const void *def;
 {
   unsigned result, i;
-  const char *string = ((const struct md_constant *)def)->name;
+  const char *string = ((const struct md_constant *) def)->name;
 
   for (result = i = 0;*string++ != '\0'; i++)
     result += ((unsigned char) *string << (i % CHAR_BIT));
@@ -427,8 +427,8 @@ static int
 def_name_eq_p (def1, def2)
      const void *def1, *def2;
 {
-  return ! strcmp (((const struct md_constant *)def1)->name,
-		   ((const struct md_constant *)def2)->name);
+  return ! strcmp (((const struct md_constant *) def1)->name,
+		   ((const struct md_constant *) def2)->name);
 }
 
 /* INFILE is a FILE pointer to read text from.  TMP_CHAR is a buffer suitable
@@ -510,7 +510,7 @@ validate_const_int (infile, string)
   int valid = 1;
 
   cp = string;
-  while (*cp && ISSPACE(*cp))
+  while (*cp && ISSPACE (*cp))
     cp++;
   if (*cp == '-' || *cp == '+')
     cp++;
@@ -639,7 +639,7 @@ again:
 	  {
 	    XVEC (return_rtx, i) = 0;
 	    break;
- 	  }
+	  }
 	/* Now process the vector.  */
 
       case 'E':
@@ -694,7 +694,7 @@ again:
 	     gets a star inserted as its first character, if it is
 	     written with a brace block instead of a string constant.  */
 	  int star_if_braced = (format_ptr[-1] == 'T');
-	    
+
 	  stringbuf = read_string (&rtl_obstack, infile, star_if_braced);
 
 	  /* For insn patterns, we want to provide a default name
@@ -728,7 +728,7 @@ again:
 
       case 'w':
 	read_name (tmp_char, infile);
-	validate_const_int(infile, tmp_char);
+	validate_const_int (infile, tmp_char);
 #if HOST_BITS_PER_WIDE_INT == HOST_BITS_PER_INT
 	tmp_wide = atoi (tmp_char);
 #else
@@ -750,7 +750,7 @@ again:
       case 'i':
       case 'n':
 	read_name (tmp_char, infile);
-	validate_const_int(infile, tmp_char);
+	validate_const_int (infile, tmp_char);
 	tmp_int = atoi (tmp_char);
 	XINT (return_rtx, i) = tmp_int;
 	break;

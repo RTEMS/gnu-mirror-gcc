@@ -89,8 +89,6 @@ extern int target_flags;
 
 /* Target machine storage layout */
 
-#define REAL_ARITHMETIC
-
 /* Define this if most significant bit is lowest numbered
    in instructions that operate on numbered bit-fields.
    This is not true on the VAX.  */
@@ -105,21 +103,8 @@ extern int target_flags;
 /* This is not true on the VAX.  */
 #define WORDS_BIG_ENDIAN 0
 
-/* Number of bits in an addressable storage unit */
-#define BITS_PER_UNIT 8
-
-/* Width in bits of a "word", which is the contents of a machine register.
-   Note that this is not necessarily the width of data type `int';
-   if using 16-bit ints on a 68000, this would still be 32.
-   But on a machine with 16-bit registers, this would be 16.  */
-#define BITS_PER_WORD 32
-
 /* Width of a word, in units (bytes).  */
 #define UNITS_PER_WORD 4
-
-/* Width in bits of a pointer.
-   See also the macro `Pmode' defined below.  */
-#define POINTER_SIZE 32
 
 /* Allocation boundary (in *bits*) for storing arguments in argument list.  */
 #define PARM_BOUNDARY 32
@@ -689,14 +674,14 @@ enum reg_class { NO_REGS, ALL_REGS, LIM_REG_CLASSES };
       && GET_CODE (xfoob) == REG && REG_OK_FOR_BASE_P (xfoob))		\
     goto ADDR; }
 
-/* 1 if PROD is either a reg times size of mode MODE
-   or just a reg, if MODE is just one byte.
+/* 1 if PROD is either a reg times size of mode MODE and MODE is less
+   than or equal 8 bytes, or just a reg if MODE is one byte.
    This macro's expansion uses the temporary variables xfoo0 and xfoo1
    that must be declared in the surrounding context.  */
 #define INDEX_TERM_P(PROD, MODE)   \
 (GET_MODE_SIZE (MODE) == 1						\
  ? (GET_CODE (PROD) == REG && REG_OK_FOR_BASE_P (PROD))			\
- : (GET_CODE (PROD) == MULT						\
+ : (GET_CODE (PROD) == MULT && GET_MODE_SIZE (MODE) <= 8		\
     &&									\
     (xfoo0 = XEXP (PROD, 0), xfoo1 = XEXP (PROD, 1),			\
      ((((GET_CODE (xfoo0) == CONST_INT					\
@@ -806,9 +791,6 @@ enum reg_class { NO_REGS, ALL_REGS, LIM_REG_CLASSES };
 /* Max number of bytes we can move from memory to memory
    in one reasonably fast instruction.  */
 #define MOVE_MAX 8
-
-/* Define this if zero-extension is slow (more than one real instruction).  */
-/* #define SLOW_ZERO_EXTEND */
 
 /* Nonzero if access to memory by bytes is slow and undesirable.  */
 #define SLOW_BYTE_ACCESS 0

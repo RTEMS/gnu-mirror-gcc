@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler,
    for Alpha Linux-based GNU systems.
-   Copyright (C) 1996, 1997, 1998 Free Software Foundation, Inc.
+   Copyright (C) 1996, 1997, 1998, 2002 Free Software Foundation, Inc.
    Contributed by Richard Henderson.
 
 This file is part of GNU CC.
@@ -23,10 +23,14 @@ Boston, MA 02111-1307, USA.  */
 #undef TARGET_DEFAULT
 #define TARGET_DEFAULT (MASK_FP | MASK_FPREGS | MASK_GAS)
 
-#undef CPP_PREDEFINES
-#define CPP_PREDEFINES \
-"-Dlinux -Dunix -Asystem=linux -D_LONGLONG -D__alpha__ " \
-SUB_CPP_PREDEFINES
+#define TARGET_OS_CPP_BUILTINS()				\
+    do {							\
+	builtin_define ("__gnu_linux__");			\
+	builtin_define ("_LONGLONG");				\
+	builtin_define_std ("linux");				\
+	builtin_define_std ("unix");				\
+	builtin_assert ("system=linux");			\
+    } while (0)
 
 /* The GNU C++ standard library requires that these macros be defined.  */
 #undef CPLUSPLUS_CPP_SPEC

@@ -20,13 +20,59 @@ along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
+/* Target CPU builtins.  */
+#define TARGET_CPU_CPP_BUILTINS()			\
+  do							\
+    {							\
+	builtin_define ("__alpha");			\
+	builtin_define ("__alpha__");			\
+	builtin_assert ("cpu=alpha");			\
+	builtin_assert ("machine=alpha");		\
+	if (TARGET_CIX)					\
+	  {						\
+	    builtin_define ("__alpha_cix__");		\
+	    builtin_assert ("cpu=cix");			\
+	  }						\
+	if (TARGET_FIX)					\
+	  {						\
+	    builtin_define ("__alpha_fix__");		\
+	    builtin_assert ("cpu=fix");			\
+	  }						\
+	if (TARGET_BWX)					\
+	  {						\
+	    builtin_define ("__alpha_bwx__");		\
+	    builtin_assert ("cpu=bwx");			\
+	  }						\
+	if (TARGET_MAX)					\
+	  {						\
+	    builtin_define ("__alpha_max__");		\
+	    builtin_assert ("cpu=max");			\
+	  }						\
+	if (TARGET_CPU_EV6)				\
+	  {						\
+	    builtin_define ("__alpha_ev6__");		\
+	    builtin_assert ("cpu=ev6");			\
+	  }						\
+	else if (TARGET_CPU_EV5)			\
+	  {						\
+	    builtin_define ("__alpha_ev5__");		\
+	    builtin_assert ("cpu=ev5");			\
+	  }						\
+	else	/* Presumably ev4.  */			\
+	  {						\
+	    builtin_define ("__alpha_ev4__");		\
+	    builtin_assert ("cpu=ev4");			\
+	  }						\
+	if (TARGET_IEEE || TARGET_IEEE_WITH_INEXACT)	\
+	  builtin_define ("__IEEE_FP");			\
+	if (TARGET_IEEE_WITH_INEXACT)			\
+	  builtin_define ("__IEEE_FP_INEXACT");		\
+} while (0)
 
 /* For C++ we need to ensure that __LANGUAGE_C_PLUS_PLUS is defined independent
    of the source file extension.  */
-#define CPLUSPLUS_CPP_SPEC "\
--D__LANGUAGE_C_PLUS_PLUS__ -D__LANGUAGE_C_PLUS_PLUS -D__cplusplus \
-%(cpp) \
-"
+#define CPLUSPLUS_CPP_SPEC "-D__LANGUAGE_C_PLUS_PLUS__\
+ -D__LANGUAGE_C_PLUS_PLUS %(cpp)"
 
 /* Write out the correct language type definition for the header files.  
    Unless we have assembler language, write out the symbols for C.  */
@@ -34,20 +80,12 @@ Boston, MA 02111-1307, USA.  */
 %{!undef:\
 %{.S:-D__LANGUAGE_ASSEMBLY__ -D__LANGUAGE_ASSEMBLY %{!ansi:-DLANGUAGE_ASSEMBLY }}\
 %{.m:-D__LANGUAGE_OBJECTIVE_C__ -D__LANGUAGE_OBJECTIVE_C }\
-%{!.S:%{!.cc:%{!.cxx:%{!.cpp:%{!.cp:%{!.c++:%{!.C:%{!.m:-D__LANGUAGE_C__ -D__LANGUAGE_C %{!ansi:-DLANGUAGE_C }}}}}}}}}\
-%{mieee:-D_IEEE_FP }\
-%{mieee-with-inexact:-D_IEEE_FP -D_IEEE_FP_INEXACT }}\
-%(cpp_cpu) %(cpp_subtarget)"
+%{!.S:%{!.cc:%{!.cxx:%{!.cpp:%{!.cp:%{!.c++:%{!.C:%{!.m:-D__LANGUAGE_C__ -D__LANGUAGE_C %{!ansi:-DLANGUAGE_C }}}}}}}}}}\
+%(cpp_subtarget)"
 
 #ifndef CPP_SUBTARGET_SPEC
 #define CPP_SUBTARGET_SPEC ""
 #endif
-
-/* Set the spec to use for signed char.  The default tests the above macro
-   but DEC's compiler can't handle the conditional in a "constant"
-   operand.  */
-
-#define SIGNED_CHAR_SPEC "%{funsigned-char:-D__CHAR_UNSIGNED__}"
 
 #define WORD_SWITCH_TAKES_ARG(STR)		\
  (!strcmp (STR, "rpath") || DEFAULT_WORD_SWITCH_TAKES_ARG(STR))
@@ -268,23 +306,6 @@ extern enum alpha_fp_trap_mode alpha_fptm;
 #endif
 #endif
 
-/* This macro is similar to `TARGET_SWITCHES' but defines names of
-   command options that have values.  Its definition is an initializer
-   with a subgrouping for each command option.
-
-   Each subgrouping contains a string constant, that defines the fixed
-   part of the option name, and the address of a variable.  The
-   variable, type `char *', is set to the variable part of the given
-   option if the fixed part matches.  The actual option name is made
-   by appending `-m' to the specified name.
-
-   Here is an example which defines `-mshort-data-NUMBER'.  If the
-   given option is `-mshort-data-512', the variable `m88k_short_data'
-   will be set to the string `"512"'.
-
-	extern char *m88k_short_data;
-	#define TARGET_OPTIONS { { "short-data-", &m88k_short_data } }  */
-
 extern const char *alpha_cpu_string;	/* For -mcpu= */
 extern const char *alpha_tune_string;	/* For -mtune= */
 extern const char *alpha_fprm_string;	/* For -mfp-rounding-mode=[n|m|c|d] */
@@ -308,65 +329,6 @@ extern const char *alpha_mlat_string;	/* For -mmemory-latency= */
    N_("Tune expected memory latency")},			\
 }
 
-/* Attempt to describe CPU characteristics to the preprocessor.  */
-
-/* Corresponding to amask...  */
-#define CPP_AM_BWX_SPEC	"-D__alpha_bwx__ -Acpu=bwx"
-#define CPP_AM_MAX_SPEC	"-D__alpha_max__ -Acpu=max"
-#define CPP_AM_FIX_SPEC	"-D__alpha_fix__ -Acpu=fix"
-#define CPP_AM_CIX_SPEC	"-D__alpha_cix__ -Acpu=cix"
-
-/* Corresponding to implver...  */
-#define CPP_IM_EV4_SPEC	"-D__alpha_ev4__ -Acpu=ev4"
-#define CPP_IM_EV5_SPEC	"-D__alpha_ev5__ -Acpu=ev5"
-#define CPP_IM_EV6_SPEC	"-D__alpha_ev6__ -Acpu=ev6"
-
-/* Common combinations.  */
-#define CPP_CPU_EV4_SPEC	"%(cpp_im_ev4)"
-#define CPP_CPU_EV5_SPEC	"%(cpp_im_ev5)"
-#define CPP_CPU_EV56_SPEC	"%(cpp_im_ev5) %(cpp_am_bwx)"
-#define CPP_CPU_PCA56_SPEC	"%(cpp_im_ev5) %(cpp_am_bwx) %(cpp_am_max)"
-#define CPP_CPU_EV6_SPEC \
-  "%(cpp_im_ev6) %(cpp_am_bwx) %(cpp_am_max) %(cpp_am_fix)"
-#define CPP_CPU_EV67_SPEC \
-  "%(cpp_im_ev6) %(cpp_am_bwx) %(cpp_am_max) %(cpp_am_fix) %(cpp_am_cix)"
-
-#ifndef CPP_CPU_DEFAULT_SPEC
-# if TARGET_CPU_DEFAULT & MASK_CPU_EV6
-#  if TARGET_CPU_DEFAULT & MASK_CIX
-#    define CPP_CPU_DEFAULT_SPEC	CPP_CPU_EV67_SPEC
-#  else
-#    define CPP_CPU_DEFAULT_SPEC	CPP_CPU_EV6_SPEC
-#  endif
-# else
-#  if TARGET_CPU_DEFAULT & MASK_CPU_EV5
-#   if TARGET_CPU_DEFAULT & MASK_MAX
-#    define CPP_CPU_DEFAULT_SPEC	CPP_CPU_PCA56_SPEC
-#   else
-#    if TARGET_CPU_DEFAULT & MASK_BWX
-#     define CPP_CPU_DEFAULT_SPEC	CPP_CPU_EV56_SPEC
-#    else
-#     define CPP_CPU_DEFAULT_SPEC	CPP_CPU_EV5_SPEC
-#    endif
-#   endif
-#  else
-#   define CPP_CPU_DEFAULT_SPEC		CPP_CPU_EV4_SPEC
-#  endif
-# endif
-#endif /* CPP_CPU_DEFAULT_SPEC */
-
-#ifndef CPP_CPU_SPEC
-#define CPP_CPU_SPEC "\
-%{!undef:-Acpu=alpha -Amachine=alpha -D__alpha -D__alpha__ \
-%{mcpu=ev4|mcpu=21064:%(cpp_cpu_ev4) }\
-%{mcpu=ev5|mcpu=21164:%(cpp_cpu_ev5) }\
-%{mcpu=ev56|mcpu=21164a:%(cpp_cpu_ev56) }\
-%{mcpu=pca56|mcpu=21164pc|mcpu=21164PC:%(cpp_cpu_pca56) }\
-%{mcpu=ev6|mcpu=21264:%(cpp_cpu_ev6) }\
-%{mcpu=ev67|mcpu=21264a:%(cpp_cpu_ev67) }\
-%{!mcpu*:%(cpp_cpu_default) }}"
-#endif
-
 /* This macro defines names of additional specifications to put in the
    specs that can be used in various specifications like CC1_SPEC.  Its
    definition is an initializer with a subgrouping for each command option.
@@ -382,21 +344,6 @@ extern const char *alpha_mlat_string;	/* For -mmemory-latency= */
 #endif
 
 #define EXTRA_SPECS				\
-  { "cpp_am_bwx", CPP_AM_BWX_SPEC },		\
-  { "cpp_am_max", CPP_AM_MAX_SPEC },		\
-  { "cpp_am_fix", CPP_AM_FIX_SPEC },		\
-  { "cpp_am_cix", CPP_AM_CIX_SPEC },		\
-  { "cpp_im_ev4", CPP_IM_EV4_SPEC },		\
-  { "cpp_im_ev5", CPP_IM_EV5_SPEC },		\
-  { "cpp_im_ev6", CPP_IM_EV6_SPEC },		\
-  { "cpp_cpu_ev4", CPP_CPU_EV4_SPEC },		\
-  { "cpp_cpu_ev5", CPP_CPU_EV5_SPEC },		\
-  { "cpp_cpu_ev56", CPP_CPU_EV56_SPEC },	\
-  { "cpp_cpu_pca56", CPP_CPU_PCA56_SPEC },	\
-  { "cpp_cpu_ev6", CPP_CPU_EV6_SPEC },		\
-  { "cpp_cpu_ev67", CPP_CPU_EV67_SPEC },	\
-  { "cpp_cpu_default", CPP_CPU_DEFAULT_SPEC },	\
-  { "cpp_cpu", CPP_CPU_SPEC },			\
   { "cpp_subtarget", CPP_SUBTARGET_SPEC },	\
   SUBTARGET_EXTRA_SPECS
 
@@ -431,9 +378,6 @@ extern const char *alpha_mlat_string;	/* For -mmemory-latency= */
 #define CAN_DEBUG_WITHOUT_FP
 
 /* target machine storage layout */
-
-/* Define to enable software floating point emulation.  */
-#define REAL_ARITHMETIC
 
 /* Define the size of `int'.  The default is the same as the word size.  */
 #define INT_TYPE_SIZE 32
@@ -496,15 +440,6 @@ extern const char *alpha_mlat_string;	/* For -mmemory-latency= */
    For Alpha we can decide arbitrarily since there are no machine instructions
    for them.  Might as well be consistent with bytes.  */
 #define WORDS_BIG_ENDIAN 0
-
-/* number of bits in an addressable storage unit */
-#define BITS_PER_UNIT 8
-
-/* Width in bits of a "word", which is the contents of a machine register.
-   Note that this is not necessarily the width of data type `int';
-   if using 16-bit ints on a 68000, this would still be 32.
-   But on a machine with 16-bit registers, this would be 16.  */
-#define BITS_PER_WORD 64
 
 /* Width of a word, in units (bytes).  */
 #define UNITS_PER_WORD 8
@@ -1823,16 +1758,8 @@ literal_section ()						\
    depending on something about the variable or function named by the symbol
    (such as what section it is in).  */
 
-#define ENCODE_SECTION_INFO(DECL)  alpha_encode_section_info (DECL)
-
-/* If a variable is weakened, made one only or moved into a different
-   section, it may be necessary to redo the section info to move the
-   variable out of sdata.  */
-
-#define REDO_SECTION_INFO_P(DECL)                                       \
-   ((TREE_CODE (DECL) == VAR_DECL)                                      \
-    && (DECL_ONE_ONLY (DECL) || DECL_WEAK (DECL) || DECL_COMMON (DECL)  \
-        || DECL_SECTION_NAME (DECL) != 0))
+#define ENCODE_SECTION_INFO(DECL, FIRST)  \
+  alpha_encode_section_info (DECL, FIRST)
 
 #define STRIP_NAME_ENCODING(VAR,SYMBOL_NAME)	\
 do {						\
@@ -2096,8 +2023,8 @@ do {						\
   {"reg_no_subreg_operand", {REG}},					\
   {"addition_operation", {PLUS}},					\
   {"symbolic_operand", {SYMBOL_REF, LABEL_REF, CONST}},			\
-  {"some_small_symbolic_mem_operand", {MEM, SIGN_EXTEND, ZERO_EXTEND,	\
-				       FLOAT_EXTEND}},
+  {"some_small_symbolic_operand", {SET, PARALLEL, PREFETCH, UNSPEC,	\
+				   UNSPEC_VOLATILE}},
 
 /* Define the `__builtin_va_list' type for the ABI.  */
 #define BUILD_VA_LIST_TYPE(VALIST) \
@@ -2260,3 +2187,8 @@ do {							\
 
 /* Generate calls to memcpy, etc., not bcopy, etc.  */
 #define TARGET_MEM_FUNCTIONS 1
+
+/* Output code to add DELTA to the first argument, and then jump to FUNCTION.
+   Used for C++ multiple inheritance.  */
+#define ASM_OUTPUT_MI_THUNK(FILE, THUNK_FNDECL, DELTA, FUNCTION) \
+  alpha_output_mi_thunk_osf (FILE, THUNK_FNDECL, DELTA, FUNCTION)

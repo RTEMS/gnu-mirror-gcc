@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler, for ARM with PE obj format.
-   Copyright (C) 1995, 1996, 1999, 2000 Free Software Foundation, Inc.
+   Copyright (C) 1995, 1996, 1999, 2000, 2002 Free Software Foundation, Inc.
    Contributed by Doug Evans (dje@cygnus.com).
    
 This file is part of GNU CC.
@@ -102,14 +102,8 @@ Boston, MA 02111-1307, USA.  */
    section and we need to set DECL_SECTION_NAME so we do that here.
    Note that we can be called twice on the same decl.  */
 #undef  ENCODE_SECTION_INFO
-#define ENCODE_SECTION_INFO(DECL) \
-  arm_pe_encode_section_info (DECL)
-
-/* Used to implement dllexport overriding dllimport semantics.  It's also used
-   to handle vtables - the first pass won't do anything because
-   DECL_CONTEXT (DECL) will be 0 so arm_dll{ex,im}port_p will return 0.
-   It's also used to handle dllimport override semantics.  */
-#define REDO_SECTION_INFO_P(DECL) 1
+#define ENCODE_SECTION_INFO(DECL, FIRST) \
+  arm_pe_encode_section_info (DECL, FIRST)
 
 /* Define this macro if in some cases global symbols from one translation
    unit may not be bound to undefined symbols in another translation unit
@@ -117,7 +111,7 @@ Boston, MA 02111-1307, USA.  */
    symbols must be explicitly imported from shared libraries (DLLs).  */
 #define MULTIPLE_SYMBOL_SPACES
 
-#define UNIQUE_SECTION(DECL, RELOC) arm_pe_unique_section (DECL, RELOC)
+#define TARGET_ASM_UNIQUE_SECTION arm_pe_unique_section
 
 #define SUPPORTS_ONE_ONLY 1
 

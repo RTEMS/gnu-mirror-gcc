@@ -31,11 +31,18 @@ Boston, MA 02111-1307, USA.  */
 
 /* Run-time target specifications */
 
-#define CPP_CPU_SPEC "\
-  -Acpu=ia64 -Amachine=ia64 \
-  %{!ansi:%{!std=c*:%{!std=i*:-Dia64}}} -D__ia64 -D__ia64__"
+#define EXTRA_SPECS \
+  { "cpp_cpu", CPP_CPU_SPEC }, \
+  { "asm_extra", ASM_EXTRA_SPEC },
+
+#define CPP_CPU_SPEC " \
+  -Acpu=ia64 -Amachine=ia64 -D__ia64 -D__ia64__ %{!milp32:-D_LP64 -D__LP64__} \
+  -D__ELF__"
 
 #define CC1_SPEC "%(cc1_cpu) "
+
+#define ASM_EXTRA_SPEC ""
+
 
 /* This declaration should be present.  */
 extern int target_flags;
@@ -53,7 +60,7 @@ extern int target_flags;
 
 #define MASK_VOL_ASM_STOP 0x00000010	/* Emit stop bits for vol ext asm.  */
 
-#define MASK_ILP32      0x00000020      /* Generate ILP32 code. */
+#define MASK_ILP32      0x00000020      /* Generate ILP32 code.  */
 
 #define MASK_B_STEP	0x00000040	/* Emit code for Itanium B step.  */
 
@@ -203,27 +210,8 @@ extern const char *ia64_fixed_range_string;
    defines in other tm.h files.  */
 #define CPP_SPEC \
   "%{mcpu=itanium:-D__itanium__} %{mbig-endian:-D__BIG_ENDIAN__}	\
+   %(cpp_cpu)	\
    -D__LONG_MAX__=9223372036854775807L"
-
-/* If this macro is defined, the preprocessor will not define the builtin macro
-   `__SIZE_TYPE__'.  The macro `__SIZE_TYPE__' must then be defined by
-   `CPP_SPEC' instead.
-
-   This should be defined if `SIZE_TYPE' depends on target dependent flags
-   which are not accessible to the preprocessor.  Otherwise, it should not be
-   defined.  */
-/* This is always "long" so it doesn't "change" in ILP32 vs. LP64.  */
-/* #define NO_BUILTIN_SIZE_TYPE */
-
-/* If this macro is defined, the preprocessor will not define the builtin macro
-   `__PTRDIFF_TYPE__'.  The macro `__PTRDIFF_TYPE__' must then be defined by
-   `CPP_SPEC' instead.
-
-   This should be defined if `PTRDIFF_TYPE' depends on target dependent flags
-   which are not accessible to the preprocessor.  Otherwise, it should not be
-   defined.  */
-/* This is always "long" so it doesn't "change" in ILP32 vs. LP64.  */
-/* #define NO_BUILTIN_PTRDIFF_TYPE */
 
 /* A C string constant that tells the GNU CC driver program options to pass to
    `cc1'.  It can also specify how to translate options you give to GNU CC into
@@ -245,9 +233,6 @@ extern const char *ia64_fixed_range_string;
 
 #define BITS_BIG_ENDIAN 0
 
-/* Define this macro to have the value 1 if the most significant byte in a word
-   has the lowest number.  This macro need not be a constant.  */
-
 #define BYTES_BIG_ENDIAN (TARGET_BIG_ENDIAN != 0)
 
 /* Define this macro to have the value 1 if, in a multiword object, the most
@@ -255,29 +240,14 @@ extern const char *ia64_fixed_range_string;
 
 #define WORDS_BIG_ENDIAN (TARGET_BIG_ENDIAN != 0)
 
-/* Define this macro if WORDS_BIG_ENDIAN is not constant.  This must be a
-   constant value with the same meaning as WORDS_BIG_ENDIAN, which will be used
-   only when compiling libgcc2.c.  Typically the value will be set based on
-   preprocessor defines.  */
 #if defined(__BIG_ENDIAN__)
 #define LIBGCC2_WORDS_BIG_ENDIAN 1
 #else
 #define LIBGCC2_WORDS_BIG_ENDIAN 0
 #endif
 
-/* Define this macro to be the number of bits in an addressable storage unit
-   (byte); normally 8.  */
-#define BITS_PER_UNIT 8
-
-/* Number of bits in a word; normally 32.  */
-#define BITS_PER_WORD 64
-
-/* Number of storage units in a word; normally 4.  */
 #define UNITS_PER_WORD 8
 
-/* Width of a pointer, in bits.  You must specify a value no wider than the
-   width of `Pmode'.  If it is not equal to the width of `Pmode', you must
-   define `POINTERS_EXTEND_UNSIGNED'.  */
 #define POINTER_SIZE (TARGET_ILP32 ? 32 : 64)
 
 /* A C expression whose value is zero if pointers that need to be extended
@@ -301,22 +271,12 @@ do									\
   }									\
 while (0)
 
-/* Define this macro if the promotion described by `PROMOTE_MODE' should also
-   be done for outgoing function arguments.  */
 /* ??? ABI doesn't allow us to define this.  */
 /* #define PROMOTE_FUNCTION_ARGS */
 
-/* Define this macro if the promotion described by `PROMOTE_MODE' should also
-   be done for the return value of functions.
-
-   If this macro is defined, `FUNCTION_VALUE' must perform the same promotions
-   done by `PROMOTE_MODE'.  */
 /* ??? ABI doesn't allow us to define this.  */
 /* #define PROMOTE_FUNCTION_RETURN */
 
-/* Normal alignment required for function parameters on the stack, in bits.
-   All stack parameters receive at least this much alignment regardless of data
-   type.  On most machines, this is the same as the size of an integer.  */
 #define PARM_BOUNDARY 64
 
 /* Define this macro if you wish to preserve a certain alignment for the stack
@@ -330,11 +290,8 @@ while (0)
 #define IA64_STACK_ALIGN(LOC) (((LOC) + 15) & ~15)
 #endif
 
-/* Alignment required for a function entry point, in bits.  */
 #define FUNCTION_BOUNDARY 128
 
-/* Biggest alignment that any data type can require on this machine,
-   in bits.  */
 /* Optional x86 80-bit float, quad-precision 128-bit float, and quad-word
    128 bit integers all require 128 bit alignment.  */
 #define BIGGEST_ALIGNMENT 128
@@ -358,9 +315,6 @@ while (0)
   (TREE_CODE (EXP) == STRING_CST	\
    && (ALIGN) < BITS_PER_WORD ? BITS_PER_WORD : (ALIGN))
 
-/* Define this macro to be the value 1 if instructions will fail to work if
-   given data not on the nominal alignment.  If instructions will merely go
-   slower in that case, define this macro as 0.  */
 #define STRICT_ALIGNMENT 1
 
 /* Define this if you wish to imitate the way many other C compilers handle
@@ -384,52 +338,27 @@ while (0)
 /* By default, the C++ compiler will use function addresses in the
    vtable entries.  Setting this non-zero tells the compiler to use
    function descriptors instead.  The value of this macro says how
-   many words wide the descriptor is (normally 2).  It is assumed 
+   many words wide the descriptor is (normally 2).  It is assumed
    that the address of a function descriptor may be treated as a
    pointer to a function.  */
 #define TARGET_VTABLE_USES_DESCRIPTORS 2
 
 /* Layout of Source Language Data Types */
 
-/* A C expression for the size in bits of the type `int' on the target machine.
-   If you don't define this, the default is one word.  */
 #define INT_TYPE_SIZE 32
 
-/* A C expression for the size in bits of the type `short' on the target
-   machine.  If you don't define this, the default is half a word.  (If this
-   would be less than one storage unit, it is rounded up to one unit.)  */
 #define SHORT_TYPE_SIZE 16
 
-/* A C expression for the size in bits of the type `long' on the target
-   machine.  If you don't define this, the default is one word.  */
 #define LONG_TYPE_SIZE (TARGET_ILP32 ? 32 : 64)
 
-/* Maximum number for the size in bits of the type `long' on the target
-   machine.  If this is undefined, the default is `LONG_TYPE_SIZE'.  Otherwise,
-   it is the constant value that is the largest value that `LONG_TYPE_SIZE' can
-   have at run-time.  This is used in `cpp'.  */
 #define MAX_LONG_TYPE_SIZE 64
 
-/* A C expression for the size in bits of the type `long long' on the target
-   machine.  If you don't define this, the default is two words.  If you want
-   to support GNU Ada on your machine, the value of macro must be at least 64.  */
 #define LONG_LONG_TYPE_SIZE 64
 
-/* A C expression for the size in bits of the type `char' on the target
-   machine.  If you don't define this, the default is one quarter of a word.
-   (If this would be less than one storage unit, it is rounded up to one unit.)  */
-#define CHAR_TYPE_SIZE 8
-
-/* A C expression for the size in bits of the type `float' on the target
-   machine.  If you don't define this, the default is one word.  */
 #define FLOAT_TYPE_SIZE 32
 
-/* A C expression for the size in bits of the type `double' on the target
-   machine.  If you don't define this, the default is two words.  */
 #define DOUBLE_TYPE_SIZE 64
 
-/* A C expression for the size in bits of the type `long double' on the target
-   machine.  If you don't define this, the default is two words.  */
 #define LONG_DOUBLE_TYPE_SIZE 128
 
 /* Tell real.c that this is the 80-bit Intel extended float format
@@ -437,9 +366,6 @@ while (0)
 
 #define INTEL_EXTENDED_IEEE_FORMAT 1
 
-/* An expression whose value is 1 or 0, according to whether the type `char'
-   should be signed or unsigned by default.  The user can always override this
-   default with the options `-fsigned-char' and `-funsigned-char'.  */
 #define DEFAULT_SIGNED_CHAR 1
 
 /* A C expression for a string describing the name of the data type to use for
@@ -464,16 +390,10 @@ while (0)
    This is used in `cpp', which cannot make use of `WCHAR_TYPE'.  */
 /* #define WCHAR_TYPE_SIZE */
 
-/* Maximum number for the size in bits of the data type for wide characters.
-   If this is undefined, the default is `WCHAR_TYPE_SIZE'.  Otherwise, it is
-   the constant value that is the largest value that `WCHAR_TYPE_SIZE' can have
-   at run-time.  This is used in `cpp'.  */
-/* #define MAX_WCHAR_TYPE_SIZE */
-
 
 /* Register Basics */
 
-/* Number of hardware registers known to the compiler.  
+/* Number of hardware registers known to the compiler.
    We have 128 general registers, 128 floating point registers,
    64 predicate registers, 8 branch registers, one frame pointer,
    and several "application" registers.  */
@@ -535,7 +455,7 @@ while (0)
    f0: constant 0.0
    f1: constant 1.0
    p0: constant true
-   fp: eliminable frame pointer */   
+   fp: eliminable frame pointer */
 
 /* The last 16 stacked regs are reserved for the 8 input and 8 output
    registers.  */
@@ -605,12 +525,12 @@ while (0)
      1, 1,  1,   1,  1, 0, 1				\
 }
 
-/* Like `CALL_USED_REGISTERS' but used to overcome a historical 
+/* Like `CALL_USED_REGISTERS' but used to overcome a historical
    problem which makes CALL_USED_REGISTERS *always* include
-   all the FIXED_REGISTERS.  Until this problem has been 
+   all the FIXED_REGISTERS.  Until this problem has been
    resolved this macro can be used to overcome this situation.
-   In particular, block_propagate() requires this list 
-   be acurate, or we can remove registers which should be live.  
+   In particular, block_propagate() requires this list
+   be acurate, or we can remove registers which should be live.
    This macro is used in regs_invalidated_by_call.  */
 
 #define CALL_REALLY_USED_REGISTERS \
@@ -1227,6 +1147,14 @@ enum reg_class
    in it.  */
 #define ARG_POINTER_REGNUM R_GR(0)
 
+/* Due to the way varargs and argument spilling happens, the argument
+   pointer is not 16-byte aligned like the stack pointer.  */
+#define INIT_EXPANDERS					\
+  do {							\
+    if (cfun && cfun->emit->regno_pointer_align)	\
+      REGNO_POINTER_ALIGN (ARG_POINTER_REGNUM) = 64;	\
+  } while (0)
+
 /* The register number for the return address register.  For IA-64, this
    is not actually a pointer as the name suggests, but that's a name that
    gen_rtx_REG already takes care to keep unique.  We modify
@@ -1334,7 +1262,8 @@ enum reg_class
    pointer is passed in whatever way is appropriate for passing a pointer to
    that type.  */
 
-#define FUNCTION_ARG_PASS_BY_REFERENCE(CUM, MODE, TYPE, NAMED) 0
+#define FUNCTION_ARG_PASS_BY_REFERENCE(CUM, MODE, TYPE, NAMED) \
+  ia64_function_arg_pass_by_reference (&CUM, MODE, TYPE, NAMED)
 
 /* A C type for declaring a variable that is used as the first argument of
    `FUNCTION_ARG' and other related values.  For some target machines, the type
@@ -1343,6 +1272,7 @@ enum reg_class
 typedef struct ia64_args
 {
   int words;			/* # words of arguments so far  */
+  int int_regs;			/* # GR registers used so far  */
   int fp_regs;			/* # FR registers used so far  */
   int prototype;		/* whether function prototyped  */
 } CUMULATIVE_ARGS;
@@ -1353,6 +1283,7 @@ typedef struct ia64_args
 #define INIT_CUMULATIVE_ARGS(CUM, FNTYPE, LIBNAME, INDIRECT) \
 do {									\
   (CUM).words = 0;							\
+  (CUM).int_regs = 0;							\
   (CUM).fp_regs = 0;							\
   (CUM).prototype = ((FNTYPE) && TYPE_ARG_TYPES (FNTYPE)) || (LIBNAME);	\
 } while (0)
@@ -1366,6 +1297,7 @@ do {									\
 #define INIT_CUMULATIVE_INCOMING_ARGS(CUM, FNTYPE, LIBNAME) \
 do {									\
   (CUM).words = 0;							\
+  (CUM).int_regs = 0;							\
   (CUM).fp_regs = 0;							\
   (CUM).prototype = 1;							\
 } while (0)
@@ -1431,7 +1363,7 @@ do {									\
 
 #define FUNCTION_VALUE_REGNO_P(REGNO)				\
   (((REGNO) >= GR_RET_FIRST && (REGNO) <= GR_RET_LAST)		\
-   || ((REGNO) >= FR_RET_FIRST && (REGNO) <= FR_RET_LAST)) 
+   || ((REGNO) >= FR_RET_FIRST && (REGNO) <= FR_RET_LAST))
 
 
 /* How Large Values are Returned */
@@ -1479,6 +1411,10 @@ do {									\
    used by the epilogue or the `return' pattern.  */
 
 #define EPILOGUE_USES(REGNO) ia64_epilogue_uses (REGNO)
+
+/* Nonzero for registers used by the exception handling mechanism.  */
+
+#define EH_USES(REGNO) ia64_eh_uses (REGNO)
 
 /* Output at beginning of assembler file.  */
 
@@ -1798,7 +1734,7 @@ do {									\
    || (CLASS) == GR_AND_FR_REGS ? 4 : 10)
 
 /* A C expression for the cost of a branch instruction.  A value of 1 is the
-   default; other values are interpreted relative to that.  Used by the 
+   default; other values are interpreted relative to that.  Used by the
    if-conversion code as max instruction count.  */
 /* ??? This requires investigation.  The primary effect might be how
    many additional insn groups we run into, vs how good the dynamic
@@ -1842,16 +1778,7 @@ do {									\
    depending on something about the variable or function named by the symbol
    (such as what section it is in).  */
 
-#define ENCODE_SECTION_INFO(DECL) ia64_encode_section_info (DECL)
-
-/* If a variable is weakened, made one only or moved into a different
-   section, it may be necessary to redo the section info to move the
-   variable out of sdata. */
-
-#define REDO_SECTION_INFO_P(DECL)					\
-   ((TREE_CODE (DECL) == VAR_DECL)					\
-    && (DECL_ONE_ONLY (DECL) || DECL_WEAK (DECL) || DECL_COMMON (DECL)	\
-	|| DECL_SECTION_NAME (DECL) != 0))
+#define ENCODE_SECTION_INFO(DECL, FIRST) ia64_encode_section_info (DECL, FIRST)
 
 #define SDATA_NAME_FLAG_CHAR '@'
 
@@ -2349,7 +2276,7 @@ do {									\
   fprintf (FILE, "[.%s%d:]\n", PREFIX, NUM)
 
 /* Use section-relative relocations for debugging offsets.  Unlike other
-   targets that fake this by putting the section VMA at 0, IA-64 has 
+   targets that fake this by putting the section VMA at 0, IA-64 has
    proper relocations for them.  */
 #define ASM_OUTPUT_DWARF_OFFSET(FILE, SIZE, LABEL)	\
   do {							\
@@ -2367,12 +2294,6 @@ do {									\
     assemble_name (FILE, LABEL);			\
     fputc (')', FILE);					\
   } while (0)
-
-/* Cross Compilation and Floating Point.  */
-
-/* Define to enable software floating point emulation. */
-#define REAL_ARITHMETIC
-
 
 /* Register Renaming Parameters.  */
 
@@ -2433,7 +2354,8 @@ do {									\
 { "ar_pfs_reg_operand", {REG}},						\
 { "general_tfmode_operand", {SUBREG, REG, CONST_DOUBLE, MEM}},		\
 { "destination_tfmode_operand", {SUBREG, REG, MEM}},			\
-{ "tfreg_or_fp01_operand", {REG, CONST_DOUBLE}},
+{ "tfreg_or_fp01_operand", {REG, CONST_DOUBLE}},			\
+{ "basereg_operand", {SUBREG, REG}},
 
 /* An alias for a machine mode name.  This is the machine mode that elements of
    a jump-table should have.  */
@@ -2528,16 +2450,16 @@ extern int ia64_final_schedule;
 #define EH_RETURN_DATA_REGNO(N) ((N) < 4 ? (N) + 15 : INVALID_REGNUM)
 
 /* This function contains machine specific function data.  */
-struct machine_function
+struct machine_function GTY(())
 {
   /* The new stack pointer when unwinding from EH.  */
-  struct rtx_def* ia64_eh_epilogue_sp;
+  rtx ia64_eh_epilogue_sp;
 
-  /* The new bsp value when unwinding from EH. */
-  struct rtx_def* ia64_eh_epilogue_bsp;
+  /* The new bsp value when unwinding from EH.  */
+  rtx ia64_eh_epilogue_bsp;
 
   /* The GP value save register.  */
-  struct rtx_def* ia64_gp_save;
+  rtx ia64_gp_save;
 
   /* The number of varargs registers to save.  */
   int n_varargs;
@@ -2598,9 +2520,16 @@ enum ia64_builtins
   IA64_BUILTIN_FLUSHRS
 };
 
-/* Codes for expand_compare_and_swap and expand_swap_and_compare. */
+/* Codes for expand_compare_and_swap and expand_swap_and_compare.  */
 enum fetchop_code {
   IA64_ADD_OP, IA64_SUB_OP, IA64_OR_OP, IA64_AND_OP, IA64_XOR_OP, IA64_NAND_OP
 };
+
+#define DONT_USE_BUILTIN_SETJMP
+
+/* Output any profiling code before the prologue.  */
+
+#undef  PROFILE_BEFORE_PROLOGUE
+#define PROFILE_BEFORE_PROLOGUE 1
 
 /* End of ia64.h */

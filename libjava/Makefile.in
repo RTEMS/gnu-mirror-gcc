@@ -67,6 +67,7 @@ AM_RUNTESTFLAGS = @AM_RUNTESTFLAGS@
 AR = @AR@
 AS = @AS@
 CC = @CC@
+CHECKREFSPEC = @CHECKREFSPEC@
 COMPPATH = @COMPPATH@
 CXX = @CXX@
 CXXCPP = @CXXCPP@
@@ -103,24 +104,29 @@ OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
 PACKAGE = @PACKAGE@
 PERL = @PERL@
+PLATFORMOBJS = @PLATFORMOBJS@
 RANLIB = @RANLIB@
 STRIP = @STRIP@
 SYSDEP_SOURCES = @SYSDEP_SOURCES@
 SYSTEMSPEC = @SYSTEMSPEC@
+SYS_ZLIBS = @SYS_ZLIBS@
 THREADDEPS = @THREADDEPS@
 THREADINCS = @THREADINCS@
+THREADLDFLAGS = @THREADLDFLAGS@
 THREADLIBS = @THREADLIBS@
 THREADOBJS = @THREADOBJS@
 THREADSPEC = @THREADSPEC@
 VERSION = @VERSION@
-ZDEPS = @ZDEPS@
 ZINCS = @ZINCS@
 ZLIBS = @ZLIBS@
 ZLIBSPEC = @ZLIBSPEC@
 ZLIBTESTSPEC = @ZLIBTESTSPEC@
+gcc_version = @gcc_version@
+glibjava_CXX = @glibjava_CXX@
 here = @here@
 libgcj_basedir = @libgcj_basedir@
 mkinstalldirs = @mkinstalldirs@
+tool_include_dir = @tool_include_dir@
 
 AUTOMAKE_OPTIONS = foreign
 @TESTSUBDIR_TRUE@SUBDIRS = \
@@ -139,7 +145,9 @@ AUTOMAKE_OPTIONS = foreign
 
 toolexeclib_LTLIBRARIES = libgcj.la $(cond_x_ltlibrary)
 toolexeclib_DATA = libgcj.spec
-data_DATA = libgcj.jar
+
+jardir = $(datadir)/java
+jar_DATA = libgcj-@gcc_version@.jar
 
 secdir = $(libdir)/security
 
@@ -160,9 +168,9 @@ bin_SCRIPTS = addr2name.awk
 
 GCJ_WITH_FLAGS = $(GCJ) --encoding=UTF-8
 
-GCJCOMPILE = $(LIBTOOL) --tag=GCJ --mode=compile $(GCJ_WITH_FLAGS) -fassume-compiled -fclasspath=$(here) -L$(here) $(JC1FLAGS) -MD -MT $@ -MF $(@:.lo=.d) -c
+GCJCOMPILE = $(LIBTOOL) --tag=GCJ --mode=compile $(GCJ_WITH_FLAGS) -fclasspath= -fbootclasspath=$(here) $(JC1FLAGS) -MD -MT $@ -MF $(@:.lo=.d) -c
 GCJLINK = $(LIBTOOL) --tag=GCJ --mode=link $(GCJ) -L$(here) $(JC1FLAGS) $(LDFLAGS) -o $@
-LIBLINK = $(LIBTOOL) --tag=CC --mode=link $(CC) -L$(here) $(JC1FLAGS) $(LDFLAGS) -o $@
+LIBLINK = $(LIBTOOL) --tag=CXX --mode=link $(CXX) -L$(here) $(JC1FLAGS) $(LDFLAGS) -o $@
 
 LTCXXCOMPILE = $(LIBTOOL) --tag=CXX --mode=compile $(CXX) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
 
@@ -173,6 +181,7 @@ GCC_UNWIND_INCLUDE = @GCC_UNWIND_INCLUDE@
 WARNINGS = -W -Wall
 AM_CXXFLAGS = -fno-rtti -fnon-call-exceptions \
 	-fdollars-in-identifiers \
+	-Wswitch-enum \
 	@LIBGCJ_CXXFLAGS@ @X_CFLAGS@ $(WARNINGS) -D_GNU_SOURCE \
 	-DPREFIX="\"$(prefix)\""
 
@@ -199,31 +208,33 @@ javao_files = $(java_source_files:.java=.lo) \
 
 x_javao_files = $(x_java_source_files:.java=.lo)
 
-libgcj_la_SOURCES = prims.cc posix.cc jni.cc exception.cc \
+libgcj_la_SOURCES = prims.cc jni.cc exception.cc \
 	resolve.cc defineclass.cc interpret.cc name-finder.cc verify.cc \
 	$(nat_source_files)
 
 EXTRA_libgcj_la_SOURCES = boehm.cc nogc.cc posix-threads.cc no-threads.cc \
+	win32-threads.cc posix.cc win32.cc \
 	$(c_source_files) $(java_source_files) $(built_java_source_files)
 
-libgcj_la_DEPENDENCIES = libgcj.jar $(javao_files) \
-	$(c_files) $(GCOBJS) $(THREADOBJS) $(LIBLTDL)
+libgcj_la_DEPENDENCIES = libgcj-@gcc_version@.jar $(javao_files) \
+	$(c_files) $(GCOBJS) $(THREADOBJS) $(PLATFORMOBJS) $(LIBLTDL) \
+	$(LIBFFI) $(ZLIBS) $(GCLIBS)
 
 
 libgcj_la_LIBADD = $(javao_files) $(c_files) $(GCOBJS) \
-	$(THREADOBJS)
+	$(THREADOBJS) $(PLATFORMOBJS)
 
 # Include THREADLIBS here to ensure that the correct version of
 # certain linuxthread functions get linked:
-libgcj_la_LDFLAGS = -rpath $(toolexeclibdir) $(THREADLIBS) $(LIBLTDL) \
-	$(GCLIBS) $(ZLIBS) \
+libgcj_la_LDFLAGS = -rpath $(toolexeclibdir) $(THREADLDFLAGS) $(THREADLIBS) \
+	$(LIBLTDL) $(SYS_ZLIBS) \
 	-version-info `grep -v '^\#' $(srcdir)/libtool-version`
 
 libgcj_la_LINK = $(LIBLINK)
 
 libgcjx_la_SOURCES = $(x_nat_source_files)
 EXTRA_libgcjx_la_SOURCES = $(x_java_source_files)
-libgcjx_la_DEPENDENCIES = libgcj.jar $(x_javao_files)
+libgcjx_la_DEPENDENCIES = libgcj-@gcc_version@.jar $(x_javao_files)
 libgcjx_la_LIBADD = $(x_javao_files)
 libgcjx_la_LDFLAGS = @X_PRE_LIBS@ @X_LIBS@ -lX11 @X_EXTRA_LIBS@ \
         -rpath $(toolexeclibdir) \
@@ -231,8 +242,16 @@ libgcjx_la_LDFLAGS = @X_PRE_LIBS@ @X_LIBS@ -lX11 @X_EXTRA_LIBS@ \
 
 libgcjx_la_LINK = $(LIBLINK)
 
+all_java_source_files = \
+    $(java_source_files) \
+    $(built_java_source_files) \
+    $(x_java_source_files)
+
+
+all_java_class_files = $(all_java_source_files:.java=.class)
+
 MOSTLYCLEANFILES = $(javao_files) $(nat_files) $(nat_headers) $(c_files) $(x_javao_files) $(x_nat_files) $(x_nat_headers)
-CLEANFILES = tmp-list libgcj.jar
+CLEANFILES = libgcj-@gcc_version@.jar
 
 SUFFIXES = .class .java .h
 
@@ -260,37 +279,37 @@ CONVERT_DIR = gnu/gcj/convert
 jv_convert_SOURCES = 
 EXTRA_jv_convert_SOURCES = $(convert_source_files)
 jv_convert_LDFLAGS = --main=gnu.gcj.convert.Convert \
-	-rpath $(toolexeclibdir) -shared-libgcc
+	-rpath $(toolexeclibdir) -shared-libgcc $(THREADLDFLAGS)
 
 jv_convert_LINK = $(GCJLINK)
-jv_convert_LDADD = libgcj.la $(GCLIBS) $(THREADLIBS) $(ZLIBS) -L$(here)/.libs
+jv_convert_LDADD = -L$(here)/.libs libgcj.la
 jv_convert_DEPENDENCIES = $(convert_source_files:.java=.lo) \
-	$(GCDEPS) $(THREADDEPS) $(ZDEPS) libgcj.la libgcj.spec
+	libgcj.la libgcj.spec
 
 
 gij_SOURCES = gij.cc
-gij_LDFLAGS = -rpath $(toolexeclibdir) -shared-libgcc
+gij_LDFLAGS = -rpath $(toolexeclibdir) -shared-libgcc $(THREADLDFLAGS)
 gij_LINK = $(GCJLINK)
-gij_LDADD = libgcj.la $(GCLIBS) $(THREADLIBS) $(ZLIBS) -L$(here)/.libs
-gij_DEPENDENCIES = $(GCDEPS) $(THREADDEPS) $(ZDEPS) libgcj.la libgcj.spec
+gij_LDADD = -L$(here)/.libs libgcj.la
+gij_DEPENDENCIES = libgcj.la libgcj.spec
 
 rmic_SOURCES = 
 EXTRA_rmic_SOURCES = $(rmi_java_source_files)
 rmic_LDFLAGS = --main=gnu.java.rmi.rmic.RMIC \
-	-rpath $(toolexeclibdir) -shared-libgcc
+	-rpath $(toolexeclibdir) -shared-libgcc $(THREADLDFLAGS)
 
 rmic_LINK = $(GCJLINK)
-rmic_LDADD = libgcj.la $(GCLIBS) $(THREADLIBS) $(ZLIBS) -L$(here)/.libs
-rmic_DEPENDENCIES = $(GCDEPS) $(THREADDEPS) $(ZDEPS) libgcj.la libgcj.spec
+rmic_LDADD = -L$(here)/.libs libgcj.la
+rmic_DEPENDENCIES = libgcj.la libgcj.spec
 
 rmiregistry_SOURCES = 
 EXTRA_rmiregistry_SOURCES = $(rmi_java_source_files)
 rmiregistry_LDFLAGS = --main=gnu.java.rmi.registry.RegistryImpl \
-	-rpath $(toolexeclibdir) -shared-libgcc
+	-rpath $(toolexeclibdir) -shared-libgcc $(THREADLDFLAGS)
 
 rmiregistry_LINK = $(GCJLINK)
-rmiregistry_LDADD = libgcj.la $(GCLIBS) $(THREADLIBS) $(ZLIBS) -L$(here)/.libs
-rmiregistry_DEPENDENCIES = $(GCDEPS) $(THREADDEPS) $(ZDEPS) libgcj.la libgcj.spec
+rmiregistry_LDADD = -L$(here)/.libs libgcj.la
+rmiregistry_DEPENDENCIES = libgcj.la libgcj.spec
 
 gen_from_JIS_SOURCES = 
 EXTRA_gen_from_JIS_SOURCES = $(srcdir)/$(CONVERT_DIR)/gen-from-JIS.c \
@@ -334,10 +353,10 @@ gnu/awt/j2d/DirectRasterGraphics.java \
 gnu/awt/j2d/Graphics2DImpl.java \
 gnu/awt/j2d/IntegerGraphicsState.java \
 gnu/awt/j2d/MappedRaster.java \
-gnu/gcj/awt/BitMaskExtent.java \
-gnu/gcj/awt/Buffers.java \
-gnu/gcj/awt/ComponentDataBlitOp.java \
-gnu/gcj/awt/GLightweightPeer.java \
+gnu/java/awt/BitMaskExtent.java \
+gnu/java/awt/Buffers.java \
+gnu/java/awt/ComponentDataBlitOp.java \
+gnu/java/awt/GLightweightPeer.java \
 gnu/java/beans/editors/ColorEditor.java	\
 gnu/java/beans/editors/FontEditor.java \
 gnu/java/beans/editors/NativeBooleanEditor.java	\
@@ -400,6 +419,7 @@ java/awt/Label.java \
 java/awt/LayoutManager.java \
 java/awt/LayoutManager2.java \
 java/awt/List.java \
+java/awt/MediaTracker.java \
 java/awt/Menu.java \
 java/awt/MenuBar.java \
 java/awt/MenuComponent.java \
@@ -412,6 +432,8 @@ java/awt/Panel.java \
 java/awt/Point.java \
 java/awt/Polygon.java \
 java/awt/PopupMenu.java	\
+java/awt/PrintGraphics.java \
+java/awt/PrintJob.java \
 java/awt/Rectangle.java	\
 java/awt/RenderingHints.java \
 java/awt/ScrollPane.java \
@@ -428,6 +450,14 @@ java/awt/color/ColorSpace.java \
 java/awt/color/ICC_ColorSpace.java \
 java/awt/color/ICC_Profile.java	\
 java/awt/datatransfer/Clipboard.java \
+java/awt/datatransfer/ClipboardOwner.java \
+java/awt/datatransfer/DataFlavor.java \
+java/awt/datatransfer/FlavorMap.java \
+java/awt/datatransfer/MimeTypeParseException.java \
+java/awt/datatransfer/StringSelection.java \
+java/awt/datatransfer/SystemFlavorMap.java \
+java/awt/datatransfer/Transferable.java	\
+java/awt/datatransfer/UnsupportedFlavorException.java \
 java/awt/event/AWTEventListener.java \
 java/awt/event/ActionEvent.java	\
 java/awt/event/ActionListener.java \
@@ -477,22 +507,30 @@ java/awt/geom/Point2D.java \
 java/awt/geom/Rectangle2D.java \
 java/awt/geom/RectangularShape.java \
 java/awt/geom/RoundRectangle2D.java \
+java/awt/image/AreaAveragingScaleFilter.java \
 java/awt/image/BufferedImage.java \
 java/awt/image/ColorModel.java \
 java/awt/image/ComponentColorModel.java	\
 java/awt/image/ComponentSampleModel.java \
+java/awt/image/CropImageFilter.java \
 java/awt/image/DataBuffer.java \
 java/awt/image/DataBufferByte.java \
 java/awt/image/DataBufferInt.java \
 java/awt/image/DataBufferUShort.java \
 java/awt/image/DirectColorModel.java \
+java/awt/image/FilteredImageSource.java	\
 java/awt/image/ImageConsumer.java \
+java/awt/image/ImageFilter.java	\
 java/awt/image/ImageObserver.java \
 java/awt/image/ImageProducer.java \
 java/awt/image/IndexColorModel.java \
+java/awt/image/MemoryImageSource.java \
 java/awt/image/PackedColorModel.java \
+java/awt/image/PixelGrabber.java \
+java/awt/image/RGBImageFilter.java \
 java/awt/image/Raster.java \
 java/awt/image/RasterOp.java \
+java/awt/image/ReplicateScaleFilter.java \
 java/awt/image/SampleModel.java	\
 java/awt/image/SinglePixelPackedSampleModel.java \
 java/awt/image/WritableRaster.java \
@@ -828,6 +866,7 @@ java/lang/SecurityException.java \
 java/lang/SecurityManager.java \
 java/lang/Short.java \
 java/lang/StackOverflowError.java \
+java/lang/StrictMath.java \
 java/lang/String.java \
 java/lang/StringBuffer.java \
 java/lang/StringIndexOutOfBoundsException.java \
@@ -1007,6 +1046,7 @@ gnu/java/io/NullOutputStream.java \
 gnu/java/io/ObjectIdentityWrapper.java \
 gnu/java/lang/ArrayHelper.java \
 gnu/java/lang/ClassHelper.java \
+gnu/java/lang/CharData.java \
 gnu/java/lang/reflect/TypeSignature.java \
 gnu/java/locale/Calendar.java \
 gnu/java/locale/Calendar_de.java \
@@ -1519,6 +1559,7 @@ java/net/natInetAddress.cc \
 java/net/natPlainDatagramSocketImpl.cc \
 java/net/natPlainSocketImpl.cc \
 java/text/natCollator.cc \
+java/util/natTimeZone.cc \
 java/util/zip/natDeflater.cc \
 java/util/zip/natInflater.cc
 
@@ -1646,7 +1687,7 @@ X_CFLAGS = @X_CFLAGS@
 X_LIBS = @X_LIBS@
 X_EXTRA_LIBS = @X_EXTRA_LIBS@
 X_PRE_LIBS = @X_PRE_LIBS@
-libgcj_la_OBJECTS =  prims.lo posix.lo jni.lo exception.lo resolve.lo \
+libgcj_la_OBJECTS =  prims.lo jni.lo exception.lo resolve.lo \
 defineclass.lo interpret.lo name-finder.lo verify.lo gnu/gcj/natCore.lo \
 gnu/gcj/convert/JIS0208_to_Unicode.lo \
 gnu/gcj/convert/JIS0212_to_Unicode.lo gnu/gcj/convert/Unicode_to_JIS.lo \
@@ -1669,8 +1710,8 @@ java/lang/ref/natReference.lo java/lang/reflect/natArray.lo \
 java/lang/reflect/natConstructor.lo java/lang/reflect/natField.lo \
 java/lang/reflect/natMethod.lo java/net/natInetAddress.lo \
 java/net/natPlainDatagramSocketImpl.lo java/net/natPlainSocketImpl.lo \
-java/text/natCollator.lo java/util/zip/natDeflater.lo \
-java/util/zip/natInflater.lo
+java/text/natCollator.lo java/util/natTimeZone.lo \
+java/util/zip/natDeflater.lo java/util/zip/natInflater.lo
 libgcjx_la_OBJECTS =  gnu/gcj/xlib/natClip.lo \
 gnu/gcj/xlib/natColormap.lo gnu/gcj/xlib/natDisplay.lo \
 gnu/gcj/xlib/natDrawable.lo gnu/gcj/xlib/natFont.lo \
@@ -1705,7 +1746,7 @@ COMPILE = $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CF
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 CCLD = $(CC)
 LINK = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(LDFLAGS) -o $@
-DATA =  $(data_DATA) $(toolexeclib_DATA)
+DATA =  $(jar_DATA) $(toolexeclib_DATA)
 
 DIST_COMMON =  README COPYING ChangeLog Makefile.am Makefile.in NEWS \
 THANKS acinclude.m4 aclocal.m4 configure configure.in \
@@ -1732,11 +1773,8 @@ DEP_FILES =  .deps/$(srcdir)/$(CONVERT_DIR)/gen-from-JIS.P \
 .deps/gnu/awt/xlib/XGraphicsConfiguration.P \
 .deps/gnu/awt/xlib/XPanelPeer.P .deps/gnu/awt/xlib/XToolkit.P \
 .deps/gnu/classpath/Configuration.P .deps/gnu/gcj/Core.P \
-.deps/gnu/gcj/RawData.P .deps/gnu/gcj/awt/BitMaskExtent.P \
-.deps/gnu/gcj/awt/Buffers.P .deps/gnu/gcj/awt/ComponentDataBlitOp.P \
-.deps/gnu/gcj/awt/GLightweightPeer.P \
-.deps/gnu/gcj/convert/BytesToUnicode.P .deps/gnu/gcj/convert/Convert.P \
-.deps/gnu/gcj/convert/IOConverter.P \
+.deps/gnu/gcj/RawData.P .deps/gnu/gcj/convert/BytesToUnicode.P \
+.deps/gnu/gcj/convert/Convert.P .deps/gnu/gcj/convert/IOConverter.P \
 .deps/gnu/gcj/convert/Input_8859_1.P \
 .deps/gnu/gcj/convert/Input_ASCII.P \
 .deps/gnu/gcj/convert/Input_EUCJIS.P \
@@ -1802,6 +1840,9 @@ DEP_FILES =  .deps/$(srcdir)/$(CONVERT_DIR)/gen-from-JIS.P \
 .deps/gnu/gcj/xlib/natXColor.P .deps/gnu/gcj/xlib/natXConfigureEvent.P \
 .deps/gnu/gcj/xlib/natXException.P .deps/gnu/gcj/xlib/natXExposeEvent.P \
 .deps/gnu/gcj/xlib/natXImage.P .deps/gnu/gcj/xlib/natXUnmapEvent.P \
+.deps/gnu/java/awt/BitMaskExtent.P .deps/gnu/java/awt/Buffers.P \
+.deps/gnu/java/awt/ComponentDataBlitOp.P \
+.deps/gnu/java/awt/GLightweightPeer.P \
 .deps/gnu/java/beans/BeanInfoEmbryo.P \
 .deps/gnu/java/beans/EmptyBeanInfo.P \
 .deps/gnu/java/beans/ExplicitBeanInfo.P \
@@ -1820,7 +1861,8 @@ DEP_FILES =  .deps/$(srcdir)/$(CONVERT_DIR)/gen-from-JIS.P \
 .deps/gnu/java/io/ClassLoaderObjectInputStream.P \
 .deps/gnu/java/io/NullOutputStream.P \
 .deps/gnu/java/io/ObjectIdentityWrapper.P \
-.deps/gnu/java/lang/ArrayHelper.P .deps/gnu/java/lang/ClassHelper.P \
+.deps/gnu/java/lang/ArrayHelper.P .deps/gnu/java/lang/CharData.P \
+.deps/gnu/java/lang/ClassHelper.P \
 .deps/gnu/java/lang/reflect/TypeSignature.P \
 .deps/gnu/java/locale/Calendar.P .deps/gnu/java/locale/Calendar_de.P \
 .deps/gnu/java/locale/Calendar_en.P .deps/gnu/java/locale/Calendar_nl.P \
@@ -2015,12 +2057,14 @@ DEP_FILES =  .deps/$(srcdir)/$(CONVERT_DIR)/gen-from-JIS.P \
 .deps/java/awt/Insets.P .deps/java/awt/ItemSelectable.P \
 .deps/java/awt/Label.P .deps/java/awt/LayoutManager.P \
 .deps/java/awt/LayoutManager2.P .deps/java/awt/List.P \
-.deps/java/awt/Menu.P .deps/java/awt/MenuBar.P \
-.deps/java/awt/MenuComponent.P .deps/java/awt/MenuContainer.P \
-.deps/java/awt/MenuItem.P .deps/java/awt/MenuShortcut.P \
-.deps/java/awt/Paint.P .deps/java/awt/PaintContext.P \
-.deps/java/awt/Panel.P .deps/java/awt/Point.P .deps/java/awt/Polygon.P \
-.deps/java/awt/PopupMenu.P .deps/java/awt/Rectangle.P \
+.deps/java/awt/MediaTracker.P .deps/java/awt/Menu.P \
+.deps/java/awt/MenuBar.P .deps/java/awt/MenuComponent.P \
+.deps/java/awt/MenuContainer.P .deps/java/awt/MenuItem.P \
+.deps/java/awt/MenuShortcut.P .deps/java/awt/Paint.P \
+.deps/java/awt/PaintContext.P .deps/java/awt/Panel.P \
+.deps/java/awt/Point.P .deps/java/awt/Polygon.P \
+.deps/java/awt/PopupMenu.P .deps/java/awt/PrintGraphics.P \
+.deps/java/awt/PrintJob.P .deps/java/awt/Rectangle.P \
 .deps/java/awt/RenderingHints.P .deps/java/awt/ScrollPane.P \
 .deps/java/awt/Scrollbar.P .deps/java/awt/Shape.P \
 .deps/java/awt/SystemColor.P .deps/java/awt/TextArea.P \
@@ -2030,6 +2074,14 @@ DEP_FILES =  .deps/$(srcdir)/$(CONVERT_DIR)/gen-from-JIS.P \
 .deps/java/awt/color/ICC_ColorSpace.P \
 .deps/java/awt/color/ICC_Profile.P \
 .deps/java/awt/datatransfer/Clipboard.P \
+.deps/java/awt/datatransfer/ClipboardOwner.P \
+.deps/java/awt/datatransfer/DataFlavor.P \
+.deps/java/awt/datatransfer/FlavorMap.P \
+.deps/java/awt/datatransfer/MimeTypeParseException.P \
+.deps/java/awt/datatransfer/StringSelection.P \
+.deps/java/awt/datatransfer/SystemFlavorMap.P \
+.deps/java/awt/datatransfer/Transferable.P \
+.deps/java/awt/datatransfer/UnsupportedFlavorException.P \
 .deps/java/awt/event/AWTEventListener.P \
 .deps/java/awt/event/ActionEvent.P \
 .deps/java/awt/event/ActionListener.P \
@@ -2070,19 +2122,27 @@ DEP_FILES =  .deps/$(srcdir)/$(CONVERT_DIR)/gen-from-JIS.P \
 .deps/java/awt/geom/Rectangle2D.P \
 .deps/java/awt/geom/RectangularShape.P \
 .deps/java/awt/geom/RoundRectangle2D.P \
+.deps/java/awt/image/AreaAveragingScaleFilter.P \
 .deps/java/awt/image/BufferedImage.P .deps/java/awt/image/ColorModel.P \
 .deps/java/awt/image/ComponentColorModel.P \
 .deps/java/awt/image/ComponentSampleModel.P \
+.deps/java/awt/image/CropImageFilter.P \
 .deps/java/awt/image/DataBuffer.P .deps/java/awt/image/DataBufferByte.P \
 .deps/java/awt/image/DataBufferInt.P \
 .deps/java/awt/image/DataBufferUShort.P \
 .deps/java/awt/image/DirectColorModel.P \
-.deps/java/awt/image/ImageConsumer.P \
+.deps/java/awt/image/FilteredImageSource.P \
+.deps/java/awt/image/ImageConsumer.P .deps/java/awt/image/ImageFilter.P \
 .deps/java/awt/image/ImageObserver.P \
 .deps/java/awt/image/ImageProducer.P \
 .deps/java/awt/image/IndexColorModel.P \
-.deps/java/awt/image/PackedColorModel.P .deps/java/awt/image/Raster.P \
-.deps/java/awt/image/RasterOp.P .deps/java/awt/image/SampleModel.P \
+.deps/java/awt/image/MemoryImageSource.P \
+.deps/java/awt/image/PackedColorModel.P \
+.deps/java/awt/image/PixelGrabber.P \
+.deps/java/awt/image/RGBImageFilter.P .deps/java/awt/image/Raster.P \
+.deps/java/awt/image/RasterOp.P \
+.deps/java/awt/image/ReplicateScaleFilter.P \
+.deps/java/awt/image/SampleModel.P \
 .deps/java/awt/image/SinglePixelPackedSampleModel.P \
 .deps/java/awt/image/WritableRaster.P .deps/java/awt/peer/ButtonPeer.P \
 .deps/java/awt/peer/CanvasPeer.P \
@@ -2222,8 +2282,8 @@ DEP_FILES =  .deps/$(srcdir)/$(CONVERT_DIR)/gen-from-JIS.P \
 .deps/java/lang/Runtime.P .deps/java/lang/RuntimeException.P \
 .deps/java/lang/RuntimePermission.P .deps/java/lang/SecurityException.P \
 .deps/java/lang/SecurityManager.P .deps/java/lang/Short.P \
-.deps/java/lang/StackOverflowError.P .deps/java/lang/String.P \
-.deps/java/lang/StringBuffer.P \
+.deps/java/lang/StackOverflowError.P .deps/java/lang/StrictMath.P \
+.deps/java/lang/String.P .deps/java/lang/StringBuffer.P \
 .deps/java/lang/StringIndexOutOfBoundsException.P \
 .deps/java/lang/System.P .deps/java/lang/Thread.P \
 .deps/java/lang/ThreadDeath.P .deps/java/lang/ThreadGroup.P \
@@ -2504,8 +2564,8 @@ DEP_FILES =  .deps/$(srcdir)/$(CONVERT_DIR)/gen-from-JIS.P \
 .deps/java/util/jar/JarException.P .deps/java/util/jar/JarFile.P \
 .deps/java/util/jar/JarInputStream.P \
 .deps/java/util/jar/JarOutputStream.P .deps/java/util/jar/Manifest.P \
-.deps/java/util/zip/Adler32.P .deps/java/util/zip/CRC32.P \
-.deps/java/util/zip/CheckedInputStream.P \
+.deps/java/util/natTimeZone.P .deps/java/util/zip/Adler32.P \
+.deps/java/util/zip/CRC32.P .deps/java/util/zip/CheckedInputStream.P \
 .deps/java/util/zip/CheckedOutputStream.P \
 .deps/java/util/zip/Checksum.P \
 .deps/java/util/zip/DataFormatException.P \
@@ -2654,7 +2714,8 @@ DEP_FILES =  .deps/$(srcdir)/$(CONVERT_DIR)/gen-from-JIS.P \
 .deps/org/xml/sax/helpers/XMLFilterImpl.P \
 .deps/org/xml/sax/helpers/XMLReaderAdapter.P \
 .deps/org/xml/sax/helpers/XMLReaderFactory.P .deps/posix-threads.P \
-.deps/posix.P .deps/prims.P .deps/resolve.P .deps/verify.P
+.deps/posix.P .deps/prims.P .deps/resolve.P .deps/verify.P \
+.deps/win32-threads.P .deps/win32.P
 SOURCES = $(libgcj_la_SOURCES) $(EXTRA_libgcj_la_SOURCES) $(libgcjx_la_SOURCES) $(EXTRA_libgcjx_la_SOURCES) $(jv_convert_SOURCES) $(EXTRA_jv_convert_SOURCES) $(gij_SOURCES) $(rmic_SOURCES) $(EXTRA_rmic_SOURCES) $(rmiregistry_SOURCES) $(EXTRA_rmiregistry_SOURCES) $(gen_from_JIS_SOURCES) $(EXTRA_gen_from_JIS_SOURCES)
 OBJECTS = $(libgcj_la_OBJECTS) $(libgcjx_la_OBJECTS) $(jv_convert_OBJECTS) $(gij_OBJECTS) $(rmic_OBJECTS) $(rmiregistry_OBJECTS) $(gen_from_JIS_OBJECTS)
 
@@ -2822,23 +2883,23 @@ uninstall-binSCRIPTS:
 .cc.lo:
 	$(LTCXXCOMPILE) -c $<
 
-install-dataDATA: $(data_DATA)
+install-jarDATA: $(jar_DATA)
 	@$(NORMAL_INSTALL)
-	$(mkinstalldirs) $(DESTDIR)$(datadir)
-	@list='$(data_DATA)'; for p in $$list; do \
+	$(mkinstalldirs) $(DESTDIR)$(jardir)
+	@list='$(jar_DATA)'; for p in $$list; do \
 	  if test -f $(srcdir)/$$p; then \
-	    echo " $(INSTALL_DATA) $(srcdir)/$$p $(DESTDIR)$(datadir)/$$p"; \
-	    $(INSTALL_DATA) $(srcdir)/$$p $(DESTDIR)$(datadir)/$$p; \
+	    echo " $(INSTALL_DATA) $(srcdir)/$$p $(DESTDIR)$(jardir)/$$p"; \
+	    $(INSTALL_DATA) $(srcdir)/$$p $(DESTDIR)$(jardir)/$$p; \
 	  else if test -f $$p; then \
-	    echo " $(INSTALL_DATA) $$p $(DESTDIR)$(datadir)/$$p"; \
-	    $(INSTALL_DATA) $$p $(DESTDIR)$(datadir)/$$p; \
+	    echo " $(INSTALL_DATA) $$p $(DESTDIR)$(jardir)/$$p"; \
+	    $(INSTALL_DATA) $$p $(DESTDIR)$(jardir)/$$p; \
 	  fi; fi; \
 	done
 
-uninstall-dataDATA:
+uninstall-jarDATA:
 	@$(NORMAL_UNINSTALL)
-	list='$(data_DATA)'; for p in $$list; do \
-	  rm -f $(DESTDIR)$(datadir)/$$p; \
+	list='$(jar_DATA)'; for p in $$list; do \
+	  rm -f $(DESTDIR)$(jardir)/$$p; \
 	done
 
 install-toolexeclibDATA: $(toolexeclib_DATA)
@@ -3077,14 +3138,14 @@ install-exec-am: install-toolexeclibLTLIBRARIES install-binPROGRAMS \
 	$(MAKE) $(AM_MAKEFLAGS) install-exec-hook
 install-exec: install-exec-recursive
 
-install-data-am: install-dataDATA install-data-local
+install-data-am: install-jarDATA install-data-local
 install-data: install-data-recursive
 
 install-am: all-am
 	@$(MAKE) $(AM_MAKEFLAGS) install-exec-am install-data-am
 install: install-recursive
 uninstall-am: uninstall-toolexeclibLTLIBRARIES uninstall-binPROGRAMS \
-		uninstall-binSCRIPTS uninstall-dataDATA \
+		uninstall-binSCRIPTS uninstall-jarDATA \
 		uninstall-toolexeclibDATA
 uninstall: uninstall-recursive
 all-am: Makefile $(LTLIBRARIES) $(PROGRAMS) $(SCRIPTS) $(DATA)
@@ -3094,7 +3155,7 @@ install-strip:
 installdirs: installdirs-recursive
 installdirs-am:
 	$(mkinstalldirs)  $(DESTDIR)$(toolexeclibdir) $(DESTDIR)$(bindir) \
-		$(DESTDIR)$(bindir) $(DESTDIR)$(datadir) \
+		$(DESTDIR)$(bindir) $(DESTDIR)$(jardir) \
 		$(DESTDIR)$(toolexeclibdir)
 
 
@@ -3154,7 +3215,7 @@ distclean-binPROGRAMS clean-binPROGRAMS maintainer-clean-binPROGRAMS \
 uninstall-binPROGRAMS install-binPROGRAMS mostlyclean-noinstPROGRAMS \
 distclean-noinstPROGRAMS clean-noinstPROGRAMS \
 maintainer-clean-noinstPROGRAMS uninstall-binSCRIPTS install-binSCRIPTS \
-uninstall-dataDATA install-dataDATA uninstall-toolexeclibDATA \
+uninstall-jarDATA install-jarDATA uninstall-toolexeclibDATA \
 install-toolexeclibDATA install-data-recursive uninstall-data-recursive \
 install-exec-recursive uninstall-exec-recursive installdirs-recursive \
 uninstalldirs-recursive all-recursive check-recursive \
@@ -3178,28 +3239,22 @@ install-exec-hook:
 	  $(LN_S) libgcjx.la gnu-awt-xlib.la; \
 	fi
 
-$(built_java_source_files:.java=.class): libgcj.jar
-$(java_source_files:.java=.class): libgcj.jar
+.java.class:
+	$(JAVAC) $(JCFLAGS) -classpath '' -bootclasspath $(here):$(srcdir) \
+             -d $(here) $<
 
-$(x_java_source_files:.java=.class): libgcj.jar
-
-libgcj.jar: $(built_java_source_files) $(java_source_files) $(x_java_source_files)
-	@: $(shell echo Creating list of files to compile...) $(shell rm -f tmp-list || :) $(shell touch tmp-list) $(foreach source,$?,$(shell echo $(source) >> tmp-list))
-	@set fnord $(MAKEFLAGS); amf=$$2; fail=no; \
-	javac="$(JAVAC)"; \
-	cat tmp-list | (while read f; do \
-	  echo $$javac $(JCFLAGS) -classpath $(here):$(srcdir) -d $(here) $$f; \
-	  $$javac $(JCFLAGS) -classpath $(here):$(srcdir) -d $(here) $$f \
-	    || case "$$amf" in *=*) exit 1;; *k*) fail=yes ;; *) exit 1;; esac; \
-	done; \
-	test "$$fail" = no)
-	-@rm -f tmp-list libgcj.jar
+libgcj-@gcc_version@.jar: $(all_java_class_files)
+	-@rm -f libgcj-@gcc_version@.jar
 	find java gnu javax org -type d -o -type f -name '*.class' | \
 	  sed -e '/\/\./d' -e '/\/xlib/d' | \
 	  $(ZIP) cfM0E@ $@
 
 clean-local:
 	find . -name '*.class' -print | xargs rm -f
+
+# Just remove the objects from C++ sources, for testing the C++ compiler.
+clean-nat:
+	rm -f $(nat_files) $(x_nat_files)
 
 .class.lo:
 	$(GCJCOMPILE) -o $@ $<
@@ -3223,7 +3278,7 @@ $(javao_files) $(x_javao_files): %.lo: %.java
 libgcj.la: $(libgcj_la_OBJECTS) $(libgcj_la_DEPENDENCIES)
 	@: $(shell echo Creating list of files to link...) $(shell rm -f libgcj.objectlist || :) $(shell touch libgcj.objectlist) $(foreach object,$(libgcj_la_OBJECTS) $(libgcj_la_LIBADD),$(shell echo $(object) >> libgcj.objectlist))
 	$(libgcj_la_LINK) -objectlist libgcj.objectlist \
-	@LIBFFI@ \
+	@GCLIBS@ @LIBFFI@ @ZLIBS@ \
 	-rpath $(toolexeclibdir) $(libgcj_la_LDFLAGS) $(LIBS)
 
 libgcjx.la: $(libgcjx_la_OBJECTS) $(libgcjx_la_DEPENDENCIES)
@@ -3232,18 +3287,18 @@ libgcjx.la: $(libgcjx_la_OBJECTS) $(libgcjx_la_DEPENDENCIES)
 	-rpath $(toolexeclibdir) $(libgcjx_la_LDFLAGS) $(LIBS)
 
 .class.h:
-	$(GCJH) -classpath $(top_builddir) $(basename $<)
+	$(GCJH) -classpath '' -bootclasspath $(top_builddir) $(basename $<)
 
 $(ordinary_nat_headers) $(x_nat_headers): %.h: %.class
 
 java/lang/ClassLoader.h: java/lang/ClassLoader.class
-	$(GCJH) -classpath $(top_builddir) \
+	$(GCJH) -classpath '' -bootclasspath $(top_builddir) \
 		-friend 'jclass _Jv_FindClass (_Jv_Utf8Const *name, java::lang::ClassLoader *loader);' \
 		-friend 'void _Jv_RunMain (jclass klass, const char *name, int argc, const char **argv, bool is_jar);' \
 		$(basename $<)
 
 java/lang/Thread.h: java/lang/Thread.class
-	$(GCJH) -classpath $(top_builddir) \
+	$(GCJH) -classpath '' -bootclasspath $(top_builddir) \
 		-prepend 'class _Jv_JNIEnv;' \
 		-prepend '#define _JV_NOT_OWNER 1' \
 		-prepend '#define _JV_INTERRUPTED 2' \
@@ -3252,11 +3307,12 @@ java/lang/Thread.h: java/lang/Thread.class
 		-friend 'void _Jv_ThreadRun (java::lang::Thread* thread);' \
 		-friend 'jint _Jv_AttachCurrentThread(java::lang::Thread* thread);' \
 		-friend 'java::lang::Thread* _Jv_AttachCurrentThread(jstring name, java::lang::ThreadGroup* group);' \
+		-friend 'java::lang::Thread* _Jv_AttachCurrentThreadAsDaemon(jstring name, java::lang::ThreadGroup* group);' \
 		-friend 'jint _Jv_DetachCurrentThread ();' \
 		$(basename $<)
 
 java/lang/String.h: java/lang/String.class
-	$(GCJH) -classpath $(top_builddir) \
+	$(GCJH) -classpath '' -bootclasspath $(top_builddir) \
 	    -friend 'jchar* _Jv_GetStringChars (jstring str);' \
 	    -friend 'jstring* _Jv_StringFindSlot (jchar*, jint, jint);' \
 	    -friend 'jstring* _Jv_StringGetSlot (jstring);' \
@@ -3266,21 +3322,21 @@ java/lang/String.h: java/lang/String.class
 	    $(basename $<)
 
 java/lang/reflect/Constructor.h: java/lang/reflect/Constructor.class
-	$(GCJH) -classpath $(top_builddir) \
+	$(GCJH) -classpath '' -bootclasspath $(top_builddir) \
 	    -friend 'jmethodID _Jv_FromReflectedConstructor (java::lang::reflect::Constructor *);' \
 	    -friend 'class java::lang::Class;' \
 	    -friend 'jobject _Jv_JNI_ToReflectedMethod (_Jv_JNIEnv *, jclass, jmethodID, jboolean);' \
 	    $(basename $<)
 
 java/lang/reflect/Field.h: java/lang/reflect/Field.class
-	$(GCJH) -classpath $(top_builddir) \
+	$(GCJH) -classpath '' -bootclasspath $(top_builddir) \
 	    -friend 'jfieldID _Jv_FromReflectedField (java::lang::reflect::Field *);' \
 	    -friend 'jobject _Jv_JNI_ToReflectedField (_Jv_JNIEnv*, jclass, jfieldID, jboolean);' \
 	    -friend 'class java::lang::Class;' \
 	    $(basename $<)
 
 java/lang/reflect/Method.h: java/lang/reflect/Method.class
-	$(GCJH) -classpath $(top_builddir) \
+	$(GCJH) -classpath '' -bootclasspath $(top_builddir) \
 	    -friend 'jmethodID _Jv_FromReflectedMethod (java::lang::reflect::Method *);' \
 	    -friend 'class java::lang::Class;' \
 	    -friend 'class java::io::ObjectInputStream;' \
@@ -3288,16 +3344,16 @@ java/lang/reflect/Method.h: java/lang/reflect/Method.class
 	    $(basename $<)
 
 gnu/gcj/runtime/VMClassLoader.h: gnu/gcj/runtime/VMClassLoader.class
-	$(GCJH) -classpath $(top_builddir) \
+	$(GCJH) -classpath '' -bootclasspath $(top_builddir) \
 	    -friend 'class ::java::lang::ClassLoader;' \
 	    $(basename $<)
 
 java/io/ObjectInputStream$$GetField.h: java/io/ObjectInputStream.class
-	$(GCJH) -classpath $(top_builddir) \
+	$(GCJH) -classpath '' -bootclasspath $(top_builddir) \
 	'java/io/ObjectInputStream$$GetField'
 
 java/io/ObjectOutputStream$$PutField.h: java/io/ObjectOutputStream.class
-	$(GCJH) -classpath $(top_builddir) \
+	$(GCJH) -classpath '' -bootclasspath $(top_builddir) \
 	'java/io/ObjectOutputStream$$PutField'
 
 $(extra_headers):
@@ -3305,13 +3361,15 @@ $(extra_headers):
 
 install-data-local:
 	$(PRE_INSTALL)
-	@for f in $(nat_headers) $(extra_headers); do \
+	@: $(shell echo Creating list of headers to install...) $(shell rm -f tmp-ilist || :) $(shell touch tmp-ilist) $(foreach hdr,$(nat_headers) $(extra_headers),$(shell echo $(hdr) >> tmp-ilist))
+	@cat tmp-ilist | while read f; do \
 	  d="`echo $$f | sed -e 's,/[^/]*$$,,'`"; \
 	  $(mkinstalldirs) $(DESTDIR)$(includedir)/$$d; \
 	  if test -f $(srcdir)/$$f; then p=$(srcdir)/$$f; else p=$$f; fi; \
 	  echo " $(INSTALL_DATA) $$p $(DESTDIR)$(includedir)/$$f"; \
 	  $(INSTALL_DATA) $$p $(DESTDIR)$(includedir)/$$f; \
 	done
+	-@rm -f tmp-ilist
 	$(mkinstalldirs) $(DESTDIR)$(secdir)
 	@for f in classpath.security libgcj.security; do \
 	  echo " $(INSTALL_DATA) $(srcdir)/java/security/$$f $(DESTDIR)$(secdir)/$$f"; \
@@ -3324,14 +3382,14 @@ maintainer-check: libgcj.la
 	  | grep -v 'Jv' \
 	  | grep -v 'terminate__Fv' | grep -v 'unexpected__Fv'
 
-header-check: libgcj.jar $(nat_headers)
+header-check: libgcj-@gcc_version@.jar $(nat_headers)
 	rm -f htest.cc; \
 	for h in $(nat_headers); do \
 	  echo "#include \"$$h\"" >> htest.cc; \
 	done; \
 	$(CXXCOMPILE) -fsyntax-only htest.cc
 
-class-check: libgcj.jar
+class-check: libgcj-@gcc_version@.jar
 	@ok=0; find . -name '*.class' -print | fgrep -v testsuite | \
 	while read f; do \
 	  echo "$(GCJ_WITH_FLAGS) --syntax-only $$f"; \

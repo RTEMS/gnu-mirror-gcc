@@ -1,6 +1,6 @@
 // 2000-09-11 Benjamin Kosnik <bkoz@redhat.com>
 
-// Copyright (C) 2000, 2001 Free Software Foundation
+// Copyright (C) 2000, 2001, 2002 Free Software Foundation
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -47,14 +47,14 @@ void test01()
 }
 
 // bool operator()(const string_type&, const string_type&) const
-typedef std::collate<char> ccollate;
 long gnu_count;
-class gnu_collate: public ccollate 
+
+class gnu_collate: public std::collate<char>
 { 
 protected:
   virtual int
   do_compare(const char*, const char*, const char*, const char*) const
-  { ++gnu_count; }
+  { ++gnu_count; return 0; }
 }; 
 
 void test02()
@@ -79,7 +79,7 @@ void test02()
 int main ()
 {
   test01();
-
+  test02();
   return 0;
 }
 

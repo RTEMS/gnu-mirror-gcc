@@ -28,71 +28,6 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 
 #include "real.h"
 
-/* Calculate the format for CONST_DOUBLE.  This depends on the relative
-   widths of HOST_WIDE_INT and REAL_VALUE_TYPE.
-
-   We need to go out to e0wwwww, since REAL_ARITHMETIC assumes 16-bits
-   per element in REAL_VALUE_TYPE.
-
-   This is duplicated in rtl.c.
-
-   A number of places assume that there are always at least two 'w'
-   slots in a CONST_DOUBLE, so we provide them even if one would suffice.  */
-
-#ifdef REAL_ARITHMETIC
-# if MAX_LONG_DOUBLE_TYPE_SIZE == 96
-#  define REAL_WIDTH	\
-     (11*8 + HOST_BITS_PER_WIDE_INT)/HOST_BITS_PER_WIDE_INT
-# else
-#  if MAX_LONG_DOUBLE_TYPE_SIZE == 128
-#   define REAL_WIDTH	\
-      (19*8 + HOST_BITS_PER_WIDE_INT)/HOST_BITS_PER_WIDE_INT
-#  else
-#   if HOST_FLOAT_FORMAT != TARGET_FLOAT_FORMAT
-#    define REAL_WIDTH	\
-      (7*8 + HOST_BITS_PER_WIDE_INT)/HOST_BITS_PER_WIDE_INT
-#   endif
-#  endif
-# endif
-#endif /* REAL_ARITHMETIC */
-
-#ifndef REAL_WIDTH
-# if HOST_BITS_PER_WIDE_INT*2 >= MAX_LONG_DOUBLE_TYPE_SIZE
-#  define REAL_WIDTH	2
-# else
-#  if HOST_BITS_PER_WIDE_INT*3 >= MAX_LONG_DOUBLE_TYPE_SIZE
-#   define REAL_WIDTH	3
-#  else
-#   if HOST_BITS_PER_WIDE_INT*4 >= MAX_LONG_DOUBLE_TYPE_SIZE
-#    define REAL_WIDTH	4
-#   endif
-#  endif
-# endif
-#endif /* REAL_WIDTH */
-
-#if REAL_WIDTH == 1
-# define CONST_DOUBLE_FORMAT	"0ww"
-#else
-# if REAL_WIDTH == 2
-#  define CONST_DOUBLE_FORMAT	"0ww"
-# else
-#  if REAL_WIDTH == 3
-#   define CONST_DOUBLE_FORMAT	"0www"
-#  else
-#   if REAL_WIDTH == 4
-#    define CONST_DOUBLE_FORMAT	"0wwww"
-#   else
-#    if REAL_WIDTH == 5
-#     define CONST_DOUBLE_FORMAT	"0wwwww"
-#    else
-#     define CONST_DOUBLE_FORMAT /* nothing - will cause syntax error */
-#    endif
-#   endif
-#  endif
-# endif
-#endif
-
-
 struct rtx_definition 
 {
   const char *const enumname, *const name, *const format;
@@ -197,19 +132,29 @@ special_format (fmt)
 	  || strchr (fmt, 'n') != 0);
 }
 
-/* Return nonzero if the RTL code given by index IDX is one that we should not
-   generate a gen_RTX_FOO function foo (because that function is present
-   elsewhere in the compiler).  */
+/* Return nonzero if the RTL code given by index IDX is one that we should
+   generate a gen_rtx_raw_FOO macro for, not gen_rtx_FOO (because gen_rtx_FOO
+   is a wrapper in emit-rtl.c).  */
 
 static int
 special_rtx (idx)
      int idx;
 {
   return (strcmp (defs[idx].enumname, "CONST_INT") == 0
-	  || strcmp (defs[idx].enumname, "CONST_DOUBLE") == 0
 	  || strcmp (defs[idx].enumname, "REG") == 0
 	  || strcmp (defs[idx].enumname, "SUBREG") == 0
 	  || strcmp (defs[idx].enumname, "MEM") == 0);
+}
+
+/* Return nonzero if the RTL code given by index IDX is one that we should
+   generate no macro for at all (because gen_rtx_FOO is never used or
+   cannot have the obvious interface).  */
+
+static int
+excluded_rtx (idx)
+     int idx;
+{
+  return (strcmp (defs[idx].enumname, "CONST_DOUBLE") == 0);
 }
 
 /* Place a list of all format specifiers we use into the array FORMAT.  */
@@ -277,6 +222,10 @@ genmacro (idx)
 
   /* We write a macro that defines gen_rtx_RTLCODE to be an equivalent to
      gen_rtx_fmt_FORMAT where FORMAT is the RTX_FORMAT of RTLCODE.  */
+
+  if (excluded_rtx (idx))
+    /* Don't define a macro for this code.  */
+    return;
 
   printf ("#define gen_rtx_%s%s(MODE",
 	   special_rtx (idx) ? "raw_" : "", defs[idx].enumname);

@@ -1,5 +1,5 @@
 /* Subroutines for insn-output.c for VAX.
-   Copyright (C) 1987, 1994, 1995, 1997, 1998, 1999, 2000
+   Copyright (C) 1987, 1994, 1995, 1997, 1998, 1999, 2000, 2001, 2002
    Free Software Foundation, Inc.
 
 This file is part of GNU CC.
@@ -42,6 +42,7 @@ static void vax_output_function_prologue PARAMS ((FILE *, HOST_WIDE_INT));
 #if VMS_TARGET
 static void vms_asm_out_constructor PARAMS ((rtx, int));
 static void vms_asm_out_destructor PARAMS ((rtx, int));
+static void vms_select_section PARAMS ((tree, int, unsigned HOST_WIDE_INT));
 #endif
 
 /* Initialize the GCC target structure.  */
@@ -50,6 +51,11 @@ static void vms_asm_out_destructor PARAMS ((rtx, int));
 
 #undef TARGET_ASM_FUNCTION_PROLOGUE
 #define TARGET_ASM_FUNCTION_PROLOGUE vax_output_function_prologue
+
+#if VMS_TARGET
+#undef TARGET_ASM_SELECT_SECTION
+#define TARGET_ASM_SELECT_SECTION vms_select_section
+#endif
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -374,10 +380,8 @@ vax_float_literal(c)
     register rtx c;
 {
   register enum machine_mode mode;
-#if HOST_FLOAT_FORMAT == VAX_FLOAT_FORMAT
+  REAL_VALUE_TYPE r, s;
   int i;
-  union {double d; int i[2];} val;
-#endif
 
   if (GET_CODE (c) != CONST_DOUBLE)
     return 0;
@@ -389,15 +393,20 @@ vax_float_literal(c)
       || c == const_tiny_rtx[(int) mode][2])
     return 1;
 
-#if HOST_FLOAT_FORMAT == VAX_FLOAT_FORMAT
+  REAL_VALUE_FROM_CONST_DOUBLE (r, c);
 
-  val.i[0] = CONST_DOUBLE_LOW (c);
-  val.i[1] = CONST_DOUBLE_HIGH (c);
+  for (i = 0; i < 7; i++)
+    {
+      int x = 1 << i;
+      REAL_VALUE_FROM_INT (s, x, 0, mode);
 
-  for (i = 0; i < 7; i ++)
-    if (val.d == 1 << i || val.d == 1 / (1 << i))
-      return 1;
-#endif
+      if (REAL_VALUES_EQUAL (r, s))
+	return 1;
+      if (!exact_real_inverse (mode, &s))
+	abort ();
+      if (REAL_VALUES_EQUAL (r, s))
+	return 1;
+    }
   return 0;
 }
 
@@ -521,13 +530,12 @@ vax_rtx_cost (x)
 	  c = 10;		/* 3-4 on VAX 9000, 20-28 on VAX 2 */
 	  break;
 	default:
-	  /* Careful, init_expmed generates arbitrary rtx and
-	     computes costs, so we can't abort.  */
-	  c = 1000;
-	  break;
+	  return MAX_COST;	/* Mode is not supported.  */
 	}
       break;
     case UDIV:
+      if (mode != SImode)
+	return MAX_COST;	/* Mode is not supported.  */
       c = 17;
       break;
     case DIV:
@@ -543,6 +551,8 @@ vax_rtx_cost (x)
       c = 23;
       break;
     case UMOD:
+      if (mode != SImode)
+	return MAX_COST;	/* Mode is not supported.  */
       c = 29;
       break;
     case FLOAT:
@@ -866,6 +876,36 @@ vms_asm_out_destructor (symbol, priority)
   fprintf (asm_out_file,"$$PsectAttributes_NOOVR$$__gxx_clean_1:\n\t.long\t");
   assemble_name (asm_out_file, XSTR (symbol, 0));
   fputc ('\n', asm_out_file);
+}
+
+static void
+vax_select_section (exp, reloc, align)
+     tree exp;
+     int reloc ATTRIBUTE_UNUSED;
+     unsigned HOST_WIDE_INT align ATTRIBUTE_UNUSED;
+{
+  if (TREE_CODE (exp) == VAR_DECL)
+    {
+      if (TREE_READONLY (exp) && ! TREE_THIS_VOLATILE (exp)
+	  && DECL_INITIAL (exp)
+	  && (DECL_INITIAL (exp) == error_mark_node
+	      || TREE_CONSTANT (DECL_INITIAL (exp))))
+	{
+	  if (TREE_PUBLIC (exp))
+	    const_section ();
+	  else
+	    text_section ();
+	}
+      else
+	data_section ();
+    }
+  if (TREE_CODE_CLASS (TREE_CODE (exp)) == 'c')
+    {
+      if (TREE_CODE (exp) == STRING_CST && flag_writable_strings)
+	data_section ();
+      else
+	text_section ();
+    }
 }
 #endif /* VMS_TARGET */
 

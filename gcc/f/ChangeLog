@@ -1,3 +1,312 @@
+2002-05-08  Geoffrey Keating  <geoffk@redhat.com>
+
+	* Make-lang.in (f/com.o): Depend on debug.h.
+	* com.c: Include debug.h.
+	(LANG_HOOKS_MARK_TREE): Delete.
+	(struct lang_identifier): Use gengtype.
+	(union lang_tree_node): New.
+	(struct lang_decl): New dummy definition.
+	(struct lang_type): New dummy definition.
+	(ffe_mark_tree): Delete.
+
+2002-05-03  Geoffrey Keating  <geoffk@redhat.com>
+
+	* com.c (struct language_function): New dummy structure.
+
+2002-04-04  Geoffrey Keating  <geoffk@redhat.com>
+
+	* Make-lang.in: Add rules to generate gt-f-ste.h gtype-f.h; allow
+	for filename changes.
+	(com.o): Allow for filename changes; add gtype-f.h as dependency.
+	(ste.o): Add gt-f-ste.h as dependency.
+	* config-lang.in (gtfiles): Add com.h, ste.c.
+	* com.c: Replace uses of ggc_add_* with GTY markers.  Include
+	gtype-f.h.
+	(mark_binding_level): Delete.
+	* com.h: Replace uses of ggc_add_* with GTY markers.
+	* ste.c: Replace uses of ggc_add_* with GTY markers.  Include
+	gt-f-ste.h.
+
+2002-03-12  Geoffrey Keating  <geoffk@redhat.com>
+
+	* Make-lang.in (f/gt-com.h): Build using gengtype.
+	(com.o): Depend on f/gt-com.h.
+	* com.c: Rename struct binding_level to f_binding_level.
+	(struct f_binding_level): Use gengtype.
+	(struct tree_ggc_tracker): Use gengtype.
+	(mark_tracker_head): Use gt_ggc_m_tree_ggc_tracker.
+	(make_binding_level): Use GGC.
+	(mark_binding_level): Use gt_ggc_m_f_binding_level.
+	(ffecom_init_decl_processing): Change free_binding_level
+	to a deletable root.
+	* config-lang.in (gtfiles): Define.
+	* where.c: Strings need no longer be allocated in GCable memory;
+	remove my change of 30 Dec 1999.
+
+2002-05-16  Rainer Orth  <ro@TechFak.Uni-Bielefeld.DE>
+
+	* Make-lang.in: Allow for PWDCMD to override hardcoded pwd.
+
+2002-05-09  Hassan Aurag  <aurag@cae.com>
+
+	* expr.c (ffeexpr_reduced_ugly2log_): Allow logicals-as-integers
+	under -fugly-logint as arguments of .and., .or., .xor.
+
+2002-05-07  Jan Hubicka  <jh@suse.cz>
+
+	* target.h (FFETARGET_32bit_longs): Undefine for x86-64.
+
+2002-04-29  Joseph S. Myers  <jsm28@cam.ac.uk>
+
+	* invoke.texi: Use @gol at ends of lines inside @gccoptlist.
+	* g77.texi: Update last update date.
+
+Thu Apr 25 07:44:44 2002  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* com.h (ffe_parse_file): Update.
+	* lex.c (ffe_parse_file): Update.
+
+2002-04-20  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* root.texi: Remove variable version-g77.
+	* g77.texi: Remove the single use of that variable.
+
+Thu Apr 18 19:10:44 2002  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* com.c (incomplete_type_error): Remove.
+
+Tue Apr 16 14:55:47 2002  Mark Mitchell  <mark@codesourcery.com>
+
+	* com.c (ffecom_expr_power_integer): Add has_scope argument to
+	call to expand_start_stmt_expr.
+
+Mon Apr 15 10:59:14 2002  Mark Mitchell  <mark@codesourcery.com>
+
+	* g77.texi: Remove Chill reference.
+
+2002-04-13  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* news.texi: Deprecate frontend version number;
+	update list of fixed bugs.
+
+2002-04-08  Hans-Peter Nilsson  <hp@bitrange.com>
+
+	* Make-lang.in (f/target.o): Depend on diagnostic.h.
+	* target.c: Include diagnostic.h.
+	(ffetarget_memcpy_): Call sorry if host and target endians are
+	not matching.
+
+Thu Apr  4 23:29:48 2002  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* com.c (LANG_HOOKS_TRUTHVALUE_CONVERSION): Redefine.
+	(truthvalue_conversion): Rename.  Update.  Make static.
+	(ffecom_truth_value): Update.
+
+Mon Apr  1 21:39:36 2002  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* com.c (LANG_HOOKS_MARK_ADDRESSABLE): Redefine.
+	(mark_addressable): Rename.
+	(ffecom_arrayref_, ffecom_1): Update.
+
+Mon Apr  1 09:59:53 2002  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* com.c (LANG_HOOKS_SIGNED_TYPE, LANG_HOOKS_UNSIGNED_TYPE,
+	LANG_HOOKS_SIGNED_OR_UNSIGNED_TYPE): New.
+	(unsigned_type, signed_type, signed_or_unsigned_type): Rename.
+
+Sun Mar 31 23:50:22 2002  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* com.c (lang_print_error_function): Rename.
+	(LANG_HOOKS_PRINT_ERROR_FUNCTION): Redefine.
+	(ffe_init): Don't set hook.
+
+Fri Mar 29 21:59:15 2002  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* com.c (LANG_HOOKS_TYPE_FOR_MODE, LANG_HOOKS_TYPE_FOR_SIZE):
+	Redefine.
+	(type_for_mode, type_for_size): Rename.
+	(signed_or_unsigned_type, signed_type, truthvalue_conversion,
+	unsigned_type):	Use new hooks.
+
+Tue Mar 26 10:30:05 2002  Andrew Cagney  <ac131313@redhat.com>
+
+	* invoke.texi (Warning Options): Mention -Wswitch-enum.
+	Fix PR c/5044.
+
+Tue Mar 26 07:30:51 2002  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* com.c (LANG_HOOKS_MARK_TREE): Redefine.
+	(lang_mark_tree): Rename ffe_mark_tree, make static.
+
+Mon Mar 25 19:27:11 2002  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* com.c (maybe_build_cleanup): Remove.
+
+2002-03-23  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* com.c (ffecom_check_size_overflow_): Add a test
+	so that arrays too large for 32-bit byte-offset
+	addressing get caught.
+	* news.texi: Document the fixing of this problem.
+
+Sat Mar 23 11:18:17 2002  Andrew Cagney  <ac131313@redhat.com>
+
+	* invoke.texi (Warning Options): Mention -Wswitch-default.
+
+Thu Mar 21 18:55:41 2002  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* cp-tree.h (pushdecl, pushlevel, poplevel, set_block,
+	insert_block, getdecls, global_bindings_p): New.
+
+Wed Mar 20 08:03:42 2002  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* com.c (lang_printable_name): Rename.
+	(LANG_HOOKS_DECL_PRINTABLE_NAME): Redefine.
+	(ffe_init): Don't use old hook.
+
+Sun Mar 17 18:50:15 2002  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
+
+	* com.h (ffe_parse_file): Prototype.
+
+Sun Mar 17 20:57:30 2002  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* com.c (LANG_HOOKS_PARSE_FILE): Redefine.
+	* com.h (ffe_parse_file): New.
+	* parse.c (NAME_OF_STDIN): Remove.
+	(yyparse): Rename ffe_parse_file.
+
+Tue Mar 12 20:23:18 2002  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
+
+	* com.c (tree_code_type, tree_code_length, tree_code_name):
+	Define.
+
+Sun Mar 10 12:37:42 2002  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
+
+	* target.c (ffetarget_print_hex): Const-ify.
+
+2002-03-06  Phil Edwards  <pme@gcc.gnu.org>
+
+	* version.c:  Fix misplaced leading blanks on first line.
+
+2002-03-03  Zack Weinberg  <zack@codesourcery.com>
+
+	* com.c, target.h: Remove all #ifndef REAL_ARITHMETIC
+	blocks, make all #ifdef REAL_ARITHMETIC blocks unconditional.
+	Delete some further #ifdef blocks predicated on REAL_ARITHMETIC.
+
+Thu Feb 28 07:53:46 2002  Neil Booth  <neil@daikokuya.demon.co.uk>
+
+	* com.c (copy_lang_decl): Delete.
+
+2002-02-27  Zack Weinberg  <zack@codesourcery.com>
+
+	* com.c, lex.c, top.c: Delete traditional-mode-related code
+	copied from the C front end but not used, or used only to
+	permit the compiler to link.
+
+2002-02-13  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* news.texi: List Problem Reports fixed in 3.1.
+
+2002-02-13  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* data.c (ffedata_eval_offset_): Only convert index,
+	low and high bound in data statements to default integer
+	if they are constants.  Use a copy of the data structure.
+
+2002-02-09  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* data.c (ffedata_eval_offset_): Convert non-default integer
+	constants to default integer kind if necessary.
+
+2002-02-09  Toon Moene  <toon@moene.indiv.nlug.nl>
+
+	* invoke.texi: Add a short debugging session
+	as an example to the documentation of -g.
+
+2002-02-06  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	PR fortran/4730 fortran/5473
+	* com.c (ffecom_expr_): Deal with %VAL constructs.
+	* intrin.c (ffeintrin_check_): Handle 'N' constraints for intrinsics,
+	to indicate "no larger than default kind" integers and logicals.
+	* intrin.def: Use 'N' constraints in table of intrinsics.
+	* intdoc.c: Document this constraint.
+	* intdoc.texi: Regenerated.
+
+2002-02-04  Philipp Thomas  <pthomas@suse.de>
+
+	* implic.c lex.c stb.c ste.c stu.c: Update copyright dates.
+
+2002-02-04  Philipp Thomas  <pthomas@suse.de>
+
+	* bad.def com.c expr.c implic.c lex.c stb.c ste.c stu.c:
+	Insert comments to mark messages as not being printf style
+	where appropriate.
+
+2002-02-03  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* expr.c (ffeexpr_sym_impdoitem_): Allow other than
+	default INTEGER implied-do loop counts.
+
+2002-02-01  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* bad.def: Remove non-historical reference to version 0.6.
+	* bugs.texi: Ditto.
+	* com.c: Ditto.
+	* ffe.texi: Ditto.
+	* proj.h: Ditto.
+	* g77.texi: Ditto.
+
+2002-01-31  Joseph S. Myers  <jsm28@cam.ac.uk>
+
+	* g77spec.c (lang_specific_driver): Follow GNU Coding Standards
+	for --version.
+
+2002-01-30  Richard Henderson  <rth@redhat.com>
+
+	* ste.c (ffeste_begin_iterdo_): Use expand_exit_loop_top_cond.
+	(ffeste_R819B): Likewise.
+
+2002-01-30  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* intrin.c (upcasecmp_): New function.
+	(ffeintrin_cmp_name_): Use it to correctly compare name
+	and table entry for bsearch.
+
+2002-01-26  Toon Moene  <toon@moene.indiv.nluug.nl>
+
+	* intrin.c (ffeintrin_cmp_name_): Correct comparison
+	for intrinsics in intrinsic table (intrin.def).
+
+2002-01-22  Zack Weinberg  <zack@codesourcery.com>
+
+	* bad.c: Include intl.h.
+	(FFEBAD_MSGS1, FFEBAD_MSGS2): Replace by FFEBAD_MSG, SHORT,
+	LONG.  Adjust definitions to work with exgettext.
+	(ffebad_start_): Translate all error messages.
+	(ffebad_finish): Mark constant strings for translation.
+	* bad.h: Use FFEBAD_MSG.  Adjust prototype of ffebad_start_
+	and definitions of ffebad_start_msg, ffebad_start_msg_lex to
+	work with exgettext.
+	* bad.def: Use FFEBAD_MSG, SHORT, LONG throughout.
+
+	* com.c: Include intl.h.
+	(lang_print_error_function): Always use ffeinfo_kind_message
+	to get the kind label for a non-nested construct.  Translate
+	it.  Translate constant strings.
+	* info.c (FFEINFO_KIND): Adjust definition to work with exgettext.
+	* info-k.def: Block xgettext from slurping copyright notice
+	into gcc.pot.  Adjust strings for their sole use, in com.c.
+
+	* Make-lang.in (f/bad.o, f/com.o): Depend on intl.h.
+
+2002-01-14  David Billinghurst <David.Billinghurst@riotinto.com>
+
+	PR fortran/3807
+	* f/intrin.c (ffeintrin_check_):  Allow for case of intrinsic
+	control string have COL-spec an integer > 0.
+
 2002-01-08  Joseph S. Myers  <jsm28@cam.ac.uk>
 
 	* g77spec.c (lookup_option): Handle -fversion.
@@ -40,7 +349,7 @@ Sun Dec 16 16:08:57 2001  Joseph S. Myers  <jsm28@cam.ac.uk>
 Sun Dec 16 10:36:51 2001  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
 
 	* Make-lang.in (f/version.o): Depend on f/version.h.
-	* version.c: Include ansidecl.h and f/version.h.	
+	* version.c: Include ansidecl.h and f/version.h.
 
 Sun Dec 16 08:52:48 2001  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
 

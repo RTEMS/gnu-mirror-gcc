@@ -1,5 +1,5 @@
 /* Definitions for GCC.  Part of the machine description for CRIS.
-   Copyright (C) 1998, 1999, 2000, 2001 Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
    Contributed by Axis Communications.  Written by Hans-Peter Nilsson.
 
 This file is part of GCC.
@@ -55,15 +55,15 @@ Boston, MA 02111-1307, USA.  */
 	abort ();						\
     } while (0)
 
-#define LOSE_AND_RETURN(msg, x)			\
+#define LOSE_AND_RETURN(msgid, x)			\
   do						\
     {						\
-      cris_operand_lossage (msg, x);		\
+      cris_operand_lossage (msgid, x);		\
       return;					\
     } while (0)
 
 /* Per-function machine data.  */
-struct machine_function
+struct machine_function GTY(())
  {
    int needs_return_address_on_stack;
  };
@@ -85,7 +85,7 @@ static void cris_print_base PARAMS ((rtx, FILE *));
 
 static void cris_print_index PARAMS ((rtx, FILE *));
 
-static void cris_init_machine_status PARAMS ((struct function *));
+static struct machine_function * cris_init_machine_status PARAMS ((void));
 
 static int cris_initial_frame_pointer_offset PARAMS ((void));
 
@@ -507,12 +507,12 @@ cris_op_str (x)
    categorization of the error.  */
 
 static void
-cris_operand_lossage (msg, op)
-     const char *msg;
+cris_operand_lossage (msgid, op)
+     const char *msgid;
      rtx op;
 {
   debug_rtx (op);
-  output_operand_lossage (msg);
+  output_operand_lossage ("%s", msgid);
 }
 
 /* Print an index part of an address to file.  */
@@ -711,7 +711,7 @@ cris_target_asm_function_prologue (file, size)
     {
       if ((((regs_ever_live[regno]
 	     && !call_used_regs[regno])
-	    || (regno == PIC_OFFSET_TABLE_REGNUM
+	    || (regno == (int) PIC_OFFSET_TABLE_REGNUM
 		&& (current_function_uses_pic_offset_table
 		    /* It is saved anyway, if there would be a gap.  */
 		    || (flag_pic
@@ -1043,7 +1043,7 @@ cris_target_asm_function_epilogue (file, size)
        regno++)
     if ((((regs_ever_live[regno]
 	   && !call_used_regs[regno])
-	  || (regno == PIC_OFFSET_TABLE_REGNUM
+	  || (regno == (int) PIC_OFFSET_TABLE_REGNUM
 	      && (current_function_uses_pic_offset_table
 		  /* It is saved anyway, if there would be a gap.  */
 		  || (flag_pic
@@ -1069,7 +1069,7 @@ cris_target_asm_function_epilogue (file, size)
        regno--)
     if ((((regs_ever_live[regno]
 	   && !call_used_regs[regno])
-	  || (regno == PIC_OFFSET_TABLE_REGNUM
+	  || (regno == (int) PIC_OFFSET_TABLE_REGNUM
 	      && (current_function_uses_pic_offset_table
 		  /* It is saved anyway, if there would be a gap.  */
 		  || (flag_pic
@@ -1264,7 +1264,7 @@ cris_print_operand (file, x, code)
   rtx operand = x;
 
   /* Size-strings corresponding to MULT expressions.  */
-  static const char *mults[] = { "BAD:0", ".b", ".w", "BAD:3", ".d" };
+  static const char *const mults[] = { "BAD:0", ".b", ".w", "BAD:3", ".d" };
 
   /* New code entries should just be added to the switch below.  If
      handling is finished, just return.  If handling was just a
@@ -1363,8 +1363,11 @@ cris_print_operand (file, x, code)
       switch (GET_CODE (operand))
 	{
 	case CONST_INT:
-	  /* Sign-extension from a normal int to a long long.  */
-	  fprintf (file, INTVAL (operand) < 0 ? "-1" : "0");
+	  if (HOST_BITS_PER_WIDE_INT == 32)
+	    /* Sign-extension from a normal int to a long long.  */
+	    fprintf (file, INTVAL (operand) < 0 ? "-1" : "0");
+	  else
+	    fprintf (file, "0x%x", (unsigned int)(INTVAL (x) >> 31 >> 1));
 	  return;
 
 	case CONST_DOUBLE:
@@ -1447,8 +1450,14 @@ cris_print_operand (file, x, code)
 	  fprintf (file, "0x%x", CONST_DOUBLE_LOW (x));
 	  return;
 	}
-      /* If not a CONST_DOUBLE, the least significant part equals the
-	 normal part, so handle it normally.  */
+      else if (HOST_BITS_PER_WIDE_INT > 32 && GET_CODE (operand) == CONST_INT)
+	{
+	  fprintf (file, "0x%x",
+		   INTVAL (x) & ((unsigned int) 0x7fffffff * 2 + 1));
+	  return;
+	}
+      /* Otherwise the least significant part equals the normal part,
+	 so handle it normally.  */
       break;
 
     case 'A':
@@ -1650,7 +1659,7 @@ cris_initial_frame_pointer_offset ()
   for (regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
     if ((((regs_ever_live[regno]
 	   && !call_used_regs[regno])
-	  || (regno == PIC_OFFSET_TABLE_REGNUM
+	  || (regno == (int) PIC_OFFSET_TABLE_REGNUM
 	      && (current_function_uses_pic_offset_table
 		  /* It is saved anyway, if there would be a gap.  */
 		  || (flag_pic
@@ -2042,7 +2051,7 @@ cris_simple_epilogue ()
      in the delay-slot of the "ret".  */
   for (regno = 0; regno < reglimit; regno++)
     if ((regs_ever_live[regno] && ! call_used_regs[regno])
-	|| (regno == PIC_OFFSET_TABLE_REGNUM
+	|| (regno == (int) PIC_OFFSET_TABLE_REGNUM
 	    && (current_function_uses_pic_offset_table
 		/* It is saved anyway, if there would be a gap.  */
 		|| (flag_pic
@@ -2532,7 +2541,7 @@ cris_override_options ()
 	 further errors.  */
       if (! TARGET_LINUX)
 	{
-	  error ("-fPIC not supported in this configuration");
+	  error ("-fPIC and -fpic are not supported in this configuration");
 	  flag_pic = 0;
 	}
 
@@ -2604,32 +2613,71 @@ cris_expand_builtin_va_arg (valist, type)
 {
   tree addr_tree, t;
   rtx addr;
-  enum machine_mode mode = TYPE_MODE (type);
-  int passed_size;
+  tree passed_size = size_zero_node;
+  tree type_size = NULL;
+  tree size3 = size_int (3);
+  tree size4 = size_int (4);
+  tree size8 = size_int (8);
+  tree rounded_size;
 
   /* Get AP.  */
   addr_tree = valist;
 
-  /* Check if the type is passed by value or by reference.  */
-  if (MUST_PASS_IN_STACK (mode, type)
-      || CRIS_FUNCTION_ARG_SIZE (mode, type) > 8)
-    {
-      tree type_ptr = build_pointer_type (type);
-      addr_tree = build1 (INDIRECT_REF, type_ptr, addr_tree);
-      passed_size = 4;
-    }
+  if (type == error_mark_node
+      || (type_size = TYPE_SIZE_UNIT (TYPE_MAIN_VARIANT (type))) == NULL
+      || TREE_OVERFLOW (type_size))
+    /* Presumably an error; the size isn't computable.  A message has
+       supposedly been emitted elsewhere.  */
+    rounded_size = size_zero_node;
   else
-    passed_size = (CRIS_FUNCTION_ARG_SIZE (mode, type) > 4) ? 8 : 4;
+    rounded_size
+      = fold (build (MULT_EXPR, sizetype,
+		     fold (build (TRUNC_DIV_EXPR, sizetype,
+				  fold (build (PLUS_EXPR, sizetype,
+					       type_size, size3)),
+				  size4)),
+		     size4));
+
+  if (!integer_zerop (rounded_size))
+    {
+      /* Check if the type is passed by value or by reference.  Values up
+	 to 8 bytes are passed by-value, padded to register-size (4
+	 bytes).  Larger values and varying-size types are passed
+	 by reference.  */
+      passed_size
+	= (!really_constant_p (type_size)
+	   ? size4
+	   : fold (build (COND_EXPR, sizetype,
+			  fold (build (GT_EXPR, sizetype,
+				       rounded_size,
+				       size8)),
+			  size4,
+			  rounded_size)));
+
+      addr_tree
+	= (!really_constant_p (type_size)
+	   ? build1 (INDIRECT_REF, build_pointer_type (type), addr_tree)
+	   : fold (build (COND_EXPR, TREE_TYPE (addr_tree),
+			  fold (build (GT_EXPR, sizetype,
+				       rounded_size,
+				       size8)),
+			  build1 (INDIRECT_REF, build_pointer_type (type),
+				  addr_tree),
+			  addr_tree)));
+    }
 
   addr = expand_expr (addr_tree, NULL_RTX, Pmode, EXPAND_NORMAL);
   addr = copy_to_reg (addr);
 
-  /* Compute new value for AP.  */
-  t = build (MODIFY_EXPR, TREE_TYPE (valist), valist,
-	     build (PLUS_EXPR, TREE_TYPE (valist), valist,
-		    build_int_2 (passed_size, 0)));
-  TREE_SIDE_EFFECTS (t) = 1;
-  expand_expr (t, const0_rtx, VOIDmode, EXPAND_NORMAL);
+  if (!integer_zerop (rounded_size))
+    {
+      /* Compute new value for AP.  */
+      t = build (MODIFY_EXPR, TREE_TYPE (valist), valist,
+		 build (PLUS_EXPR, TREE_TYPE (valist), valist,
+			passed_size));
+      TREE_SIDE_EFFECTS (t) = 1;
+      expand_expr (t, const0_rtx, VOIDmode, EXPAND_NORMAL);
+    }
 
   return addr;
 }
@@ -2645,11 +2693,10 @@ cris_init_expanders ()
 
 /* Zero initialization is OK for all current fields.  */
 
-static void
-cris_init_machine_status (p)
-     struct function *p;
+static struct machine_function *
+cris_init_machine_status ()
 {
-  p->machine = xcalloc (1, sizeof (struct machine_function));
+  return ggc_alloc_cleared (sizeof (struct machine_function));
 }
 
 /* Split a 2 word move (DI or presumably DF) into component parts.
@@ -2991,19 +3038,22 @@ restart:
    functions.  */
 
 void
-cris_encode_section_info (exp)
+cris_encode_section_info (exp, first)
      tree exp;
+     int first ATTRIBUTE_UNUSED;
 {
   if (flag_pic)
     {
       if (DECL_P (exp))
 	{
 	  if (TREE_CODE (exp) == FUNCTION_DECL
-	      && (TREE_PUBLIC (exp) || DECL_WEAK (exp)))
+	      && (TREE_PUBLIC (exp) || DECL_WEAK (exp))
+	      && ! MODULE_LOCAL_P (exp))
 	    SYMBOL_REF_FLAG (XEXP (DECL_RTL (exp), 0)) = 0;
 	  else
 	    SYMBOL_REF_FLAG (XEXP (DECL_RTL (exp), 0))
-	      = ! TREE_PUBLIC (exp) && ! DECL_WEAK (exp);
+	      = ((! TREE_PUBLIC (exp) && ! DECL_WEAK (exp))
+		 || MODULE_LOCAL_P (exp));
 	}
       else
 	/* Others are local entities.  */
@@ -3084,6 +3134,8 @@ Prev_insn (insn)
   return PREV_INSN (insn);
 }
 #endif
+
+#include "gt-cris.h"
 
 /*
  * Local variables:

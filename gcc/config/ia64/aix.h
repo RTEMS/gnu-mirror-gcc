@@ -1,5 +1,5 @@
 /* Definitions of target machine GNU compiler.  IA-64/AIX version.
-   Copyright (C) 1999, 2000, 2001 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
    Contributed by Timothy Wall (twall@cygnus.com)
 
 This file is part of GNU CC.
@@ -20,7 +20,7 @@ the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
 /* AIX5 (aka Monterey): a mix of AIX and UnixWare.  
-   This file is loosely based on ia64/linux.h. */
+   This file is loosely based on ia64/linux.h.  */
 
 /* This macro is a C statement to print on `stderr' a string describing the
    particular machine description choice.  */
@@ -51,7 +51,7 @@ Boston, MA 02111-1307, USA.  */
 /* Provide a STARTFILE_SPEC appropriate for AIX.  Here we add
    the crti C++ startup files file which provide part of the support
    for getting C++ file-scope static object constructed before entering
-   `main'. */ 
+   `main'.  */ 
    
 #undef	STARTFILE_SPEC
 #define STARTFILE_SPEC \
@@ -63,7 +63,7 @@ Boston, MA 02111-1307, USA.  */
 
 /* Provide a ENDFILE_SPEC appropriate for AIX.  Here we tack on
    the crtn file which provides termination of the support for getting C++
-   file-scope static object constructed before entering `main'. */
+   file-scope static object constructed before entering `main'.  */
 
 #undef  ENDFILE_SPEC
 #define ENDFILE_SPEC "%{!shared:crtend.o%s} %{shared:crtendS.o%s} crtn.o%s"
@@ -75,7 +75,7 @@ Boston, MA 02111-1307, USA.  */
    CPP.  It can also specify how to translate options you give to GNU CC into
    options for GNU CC to pass to the CPP.  */
 
-/* If -ansi, we need to define _ANSI_C_SOURCE to get the right headers. */
+/* If -ansi, we need to define _ANSI_C_SOURCE to get the right headers.  */
 #undef CPP_SPEC
 #define CPP_SPEC "\
 %{mcpu=itanium:-D__itanium__} %{mbig-endian:-D__BIG_ENDIAN__} \
@@ -86,11 +86,11 @@ Boston, MA 02111-1307, USA.  */
 
 #undef CPP_PREDEFINES
 #define CPP_PREDEFINES "\
--D__ia64 -D__ia64__ -D_AIX -D_AIX64 -D_LONGLONG -Dunix \
--D__LP64__ -D__ELF__ -Asystem=unix -Asystem=aix -Acpu=ia64 -Amachine=ia64 \
--D__64BIT__ -D_LONG_LONG -D_IA64 -D__int128=__size128_t"
+  -D_AIX -D_AIX64 -D_LONGLONG -Dunix \
+  -Asystem=unix -Asystem=aix \
+  -D__64BIT__ -D_LONG_LONG -D_IA64 -D__int128=__size128_t"
 
-/* The GNU C++ standard library requires that these macros be defined. */
+/* The GNU C++ standard library requires that these macros be defined.  */
 #undef CPLUSPLUS_CPP_SPEC
 #define CPLUSPLUS_CPP_SPEC                      \
   "-D_XOPEN_SOURCE=500                          \
@@ -100,11 +100,7 @@ Boston, MA 02111-1307, USA.  */
    -D__LONG_MAX__=9223372036854775807L          \
    %{cpp_cpu}"
 
-/* ia64-specific options for gas */
-#undef ASM_SPEC
-#define ASM_SPEC "-x %{mconstant-gp} %{mauto-pic}"
-
-/* Define this for shared library support. */
+/* Define this for shared library support.  */
 
 #undef LINK_SPEC
 #define LINK_SPEC "\
@@ -115,13 +111,7 @@ Boston, MA 02111-1307, USA.  */
     %{!dynamic-linker:-dynamic-linker /usr/lib/ia64l64/libc.so.1}} \
     %{static:-static}}"
 
-#define DONT_USE_BUILTIN_SETJMP
 #define JMP_BUF_SIZE  85
-
-/* Output any profiling code before the prologue.  */
-
-#undef PROFILE_BEFORE_PROLOGUE
-#define PROFILE_BEFORE_PROLOGUE 1
 
 /* A C statement or compound statement to output to FILE some assembler code to
    call the profiling subroutine `mcount'.  
@@ -135,54 +125,17 @@ Boston, MA 02111-1307, USA.  */
 do {							\
 } while (0)
 
-/* Tell the linker where to find the crt*.o files. */
+/* Tell the linker where to find the crt*.o files.  */
 
 #ifndef CROSS_COMPILE
 #undef STANDARD_STARTFILE_PREFIX
 #define STANDARD_STARTFILE_PREFIX "/usr/lib/ia64l64/"
 #endif
 
-/* Override SELECT_SECTION and SELECT_RTX_SECTION from config/ia64/sysv4.h;  
-   these definitions ignore flag_pic as if it were always set; 
-   it is illegal to have relocations in shared segments on AIX.  */
-
-/* A C statement or statements to switch to the appropriate
-   section for output of DECL.  DECL is either a `VAR_DECL' node
-   or a constant of some sort.  RELOC indicates whether forming
-   the initial value of DECL requires link-time relocations.  */
-
-#undef SELECT_SECTION
-#define SELECT_SECTION(DECL,RELOC,ALIGN)				\
-{									\
-  if (TREE_CODE (DECL) == STRING_CST)					\
-    {									\
-      if (! flag_writable_strings)					\
-	const_section ();						\
-      else								\
-	data_section ();						\
-    }									\
-  else if (TREE_CODE (DECL) == VAR_DECL)				\
-    {									\
-      if (XSTR (XEXP (DECL_RTL (DECL), 0), 0)[0]			\
-	  == SDATA_NAME_FLAG_CHAR)					\
-        sdata_section ();						\
-      /* ??? We need the extra ! RELOC check, because the default is to \
-	 only check RELOC if flag_pic is set, and we don't set flag_pic \
-	 (yet?).  */							\
-      else if (DECL_READONLY_SECTION (DECL, RELOC) && ! (RELOC))	\
-	const_section ();						\
-      else								\
-	data_section ();						\
-    }									\
-  /* This could be a CONSTRUCTOR containing ADDR_EXPR of a VAR_DECL,	\
-     in which case we can't put it in a shared library rodata.  */	\
-  else if (RELOC)                                                       \
-    data_section ();							\
-  else									\
-    const_section ();							\
-}
-
-/* Similarly for constant pool data.  */
+#undef	TARGET_ASM_SELECT_SECTION
+#define TARGET_ASM_SELECT_SECTION  ia64_aix_select_section
+#undef	TARGET_ASM_UNIQUE_SECTION
+#define TARGET_ASM_UNIQUE_SECTION  ia64_aix_unique_section
 
 extern unsigned int ia64_section_threshold;
 #undef SELECT_RTX_SECTION
@@ -197,50 +150,7 @@ extern unsigned int ia64_section_threshold;
     const_section ();							\
 }
 
-#undef UNIQUE_SECTION
-#define UNIQUE_SECTION(DECL, RELOC)				\
-  do								\
-    {								\
-      int len;							\
-      int sec;							\
-      const char *name;						\
-      char *string;						\
-      const char *prefix;					\
-      static const char *const prefixes[/*4*/3][2] =		\
-      {								\
-	{ ".text.",   ".gnu.linkonce.t." },			\
-	{ ".rodata.", ".gnu.linkonce.r." },			\
-	{ ".data.",   ".gnu.linkonce.d." }			\
-	/* Do not generate unique sections for uninitialised 	\
-	   data since we do not have support for this in the    \
-	   linker scripts yet...				\
-        ,{ ".bss.",    ".gnu.linkonce.b." }  */			\
-      };							\
-      								\
-      if (TREE_CODE (DECL) == FUNCTION_DECL)			\
-	sec = 0;						\
-  /*  else if (DECL_INITIAL (DECL) == 0				\
-	       || DECL_INITIAL (DECL) == error_mark_node)	\
-        sec =  3; */						\
-      else if (DECL_READONLY_SECTION (DECL, RELOC) && ! (RELOC))\
-	sec = 1;						\
-      else							\
-	sec = 2;						\
-      								\
-      name   = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (DECL));	\
-      /* Strip off any encoding in name.  */			\
-      STRIP_NAME_ENCODING (name, name);				\
-      prefix = prefixes[sec][DECL_ONE_ONLY(DECL)];		\
-      len    = strlen (name) + strlen (prefix);			\
-      string = alloca (len + 1);				\
-      								\
-      sprintf (string, "%s%s", prefix, name);			\
-      								\
-      DECL_SECTION_NAME (DECL) = build_string (len, string);	\
-    }								\
-  while (0)
-
-/* Override ia64/sysv4.h setting with that used by AIX5. */
+/* Override ia64/sysv4.h setting with that used by AIX5.  */
 #undef WCHAR_TYPE
 #ifdef __64BIT__
 #define WCHAR_TYPE "unsigned int"

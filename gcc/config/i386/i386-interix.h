@@ -1,5 +1,5 @@
 /* Target definitions for GNU compiler for Intel 80386 running Interix
-   Parts Copyright (C) 1991, 1999, 2000 Free Software Foundation, Inc.
+   Parts Copyright (C) 1991, 1999, 2000, 2002 Free Software Foundation, Inc.
 
    Parts:
      by Douglas B. Rupp (drupp@cs.washington.edu).
@@ -24,10 +24,6 @@ along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
-#define YES_UNDERSCORES
-
-/* YES_UNDERSCORES must precede gas.h */
-#include <i386/gas.h>
 /* The rest must follow.  */
 
 #define DBX_DEBUGGING_INFO
@@ -48,7 +44,6 @@ Boston, MA 02111-1307, USA.  */
 #undef TARGET_CPU_DEFAULT
 #define TARGET_CPU_DEFAULT 2 /* 486 */
 
-#define WCHAR_UNSIGNED 1
 #define WCHAR_TYPE_SIZE 16
 #define WCHAR_TYPE "short unsigned int"
 
@@ -65,6 +60,7 @@ Boston, MA 02111-1307, USA.  */
   -D_M_IX86=300 -D_X86_=1 \
   -D__stdcall=__attribute__((__stdcall__)) \
   -D__cdecl=__attribute__((__cdecl__)) \
+  -D__declspec(x)=__attribute__((x)) \
   -Asystem=unix -Asystem=interix"
 
 #undef CPP_SPEC
@@ -85,7 +81,6 @@ Boston, MA 02111-1307, USA.  */
 %{posix:-D_POSIX_SOURCE} \
 -isystem %$INTERIX_ROOT/usr/include"
 
-#undef TARGET_VERSION
 #define TARGET_VERSION fprintf (stderr, " (i386 Interix)");
 
 /* The global __fltused is necessary to cause the printf/scanf routines
@@ -237,13 +232,7 @@ Boston, MA 02111-1307, USA.  */
 #undef LD_INIT_SWITCH
 #undef LD_FINI_SWITCH
 
-
-/* Note that there appears to be two different ways to support const
-   sections at the moment.  You can either #define the symbol
-   READONLY_DATA_SECTION (giving it some code which switches to the
-   readonly data section) or else you can #define the symbols
-   EXTRA_SECTIONS, EXTRA_SECTION_FUNCTIONS, SELECT_SECTION, and
-   SELECT_RTX_SECTION.  We do both here just to be on the safe side.  */
+#define EH_FRAME_IN_DATA_SECTION
 
 #define USE_CONST_SECTION	1
 
@@ -354,7 +343,7 @@ union tree_node;
 const char *gen_stdcall_suffix PARAMS ((union tree_node *));
 
 #undef ENCODE_SECTION_INFO
-#define ENCODE_SECTION_INFO(DECL) 					\
+#define ENCODE_SECTION_INFO(DECL, FIRST)				\
 do 									\
   {									\
     if (flag_pic)							\
@@ -365,7 +354,7 @@ do 									\
 	  = (TREE_CODE_CLASS (TREE_CODE (DECL)) != 'd'			\
 	     || ! TREE_PUBLIC (DECL));					\
       }									\
-    if (TREE_CODE (DECL) == FUNCTION_DECL) 				\
+    if ((FIRST) && TREE_CODE (DECL) == FUNCTION_DECL) 			\
       if (lookup_attribute ("stdcall",					\
 			    TYPE_ATTRIBUTES (TREE_TYPE (DECL))))	\
         XEXP (DECL_RTL (DECL), 0) = 					\
@@ -406,14 +395,14 @@ do {									\
    symbols must be explicitly imported from shared libraries (DLLs).  */
 #define MULTIPLE_SYMBOL_SPACES
 
-extern void i386_pe_unique_section ();
-#define UNIQUE_SECTION(DECL,RELOC) i386_pe_unique_section (DECL, RELOC)
+extern void i386_pe_unique_section PARAMS ((tree, int));
+#define TARGET_ASM_UNIQUE_SECTION i386_pe_unique_section
 
 #define SUPPORTS_ONE_ONLY 1
+#endif /* 0 */
 
 /* Switch into a generic section.  */
 #define TARGET_ASM_NAMED_SECTION  default_pe_asm_named_section
-#endif /* 0 */
 
 /* DWARF2 Unwinding doesn't work with exception handling yet.  */
 #define DWARF2_UNWIND_INFO 0
@@ -421,3 +410,11 @@ extern void i386_pe_unique_section ();
 /* Don't assume anything about the header files.  */
 #define NO_IMPLICIT_EXTERN_C
 
+/* MSVC returns structs of up to 8 bytes via registers. */
+
+#define DEFAULT_PCC_STRUCT_RETURN 0
+
+#undef RETURN_IN_MEMORY
+#define RETURN_IN_MEMORY(TYPE) \
+  (TYPE_MODE (TYPE) == BLKmode || \
+     (AGGREGATE_TYPE_P (TYPE) && int_size_in_bytes(TYPE) > 8 ))

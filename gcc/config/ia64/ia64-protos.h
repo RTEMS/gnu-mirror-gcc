@@ -16,12 +16,13 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
-Boston, MA 02111-1307, USA. */
+Boston, MA 02111-1307, USA.  */
 
 /* Variables defined in ia64.c.  */
 
 #ifdef RTX_CODE
-extern rtx ia64_compare_op0, ia64_compare_op1;
+extern GTY(()) rtx ia64_compare_op0;
+extern GTY(()) rtx ia64_compare_op1;
 #endif
 
 /* Functions defined in ia64.c */
@@ -66,6 +67,7 @@ extern int ar_pfs_reg_operand PARAMS((rtx, enum machine_mode));
 extern int general_tfmode_operand PARAMS((rtx, enum machine_mode));
 extern int destination_tfmode_operand PARAMS((rtx, enum machine_mode));
 extern int tfreg_or_fp01_operand PARAMS((rtx, enum machine_mode));
+extern int basereg_operand PARAMS((rtx, enum machine_mode));
 
 extern int ia64_move_ok PARAMS((rtx, rtx));
 extern int ia64_depz_field_mask PARAMS((rtx, rtx));
@@ -113,15 +115,19 @@ extern int ia64_function_arg_partial_nregs PARAMS((CUMULATIVE_ARGS *,
 extern void ia64_function_arg_advance PARAMS((CUMULATIVE_ARGS *,
 					      enum machine_mode,
 					      tree, int));
+extern int ia64_function_arg_pass_by_reference PARAMS((CUMULATIVE_ARGS *,
+						       enum machine_mode,
+						       tree, int));
 extern int ia64_return_in_memory PARAMS((tree));
 extern void ia64_asm_output_external PARAMS((FILE *, tree, const char *));
 
-extern void ia64_encode_section_info PARAMS((tree));
+extern void ia64_encode_section_info PARAMS((tree, int));
 #endif /* TREE_CODE */
 
 extern int ia64_register_move_cost PARAMS((enum machine_mode, enum reg_class,
 					   enum reg_class));
 extern int ia64_epilogue_uses PARAMS((int));
+extern int ia64_eh_uses PARAMS((int));
 extern void emit_safe_across_calls PARAMS((FILE *));
 extern void ia64_init_builtins PARAMS((void));
 extern void ia64_override_options PARAMS((void));

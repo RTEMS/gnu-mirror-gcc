@@ -1,4 +1,4 @@
-/* Copyright (C) 1998, 1999, 2000 , 2002 Free Software Foundation
+/* Copyright (C) 1998, 1999, 2000, 2002 Free Software Foundation
 
    This file is part of libgcj.
 
@@ -7,25 +7,63 @@ Libgcj License.  Please consult the file "LIBGCJ_LICENSE" for
 details.  */
 
 #include <config.h>
-
+#include <platform.h>
 
 #ifndef DISABLE_JAVA_NET
-#ifdef USE_WINSOCK
+#ifdef WIN32
 #include <windows.h>
 #include <winsock.h>
 #include <errno.h>
 #include <string.h>
+#undef STRICT
+#undef MAX_PRIORITY
+#undef MIN_PRIORITY
+#undef FIONREAD
+
+// These functions make the Win32 socket API look more POSIXy
+static inline int
+close(int s)
+{
+  return closesocket(s);
+}
+
+static inline int
+write(int s, void *buf, int len)
+{
+  return send(s, (char*)buf, len, 0);
+}
+
+static inline int
+read(int s, void *buf, int len)
+{
+  return recv(s, (char*)buf, len, 0);
+}
+
+// these errors cannot occur on Win32
+#define ENOTCONN 0
+#define ECONNRESET 0
 #ifndef ENOPROTOOPT
 #define ENOPROTOOPT 109
 #endif
-#else /* USE_WINSOCK */
-#include "posix.h"
+#else /* WIN32 */
+
+#ifdef HAVE_SYS_IOCTL_H
+#define BSD_COMP /* Get FIONREAD on Solaris2. */
+#include <sys/ioctl.h>
+#endif
+
+// Pick up FIONREAD on Solaris 2.5.
+#ifdef HAVE_SYS_FILIO_H
+#include <sys/filio.h>
+#endif
+
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <errno.h>
 #include <string.h>
-#endif /* USE_WINSOCK */
+
+#endif /* WIN32 */
 #endif /* DISABLE_JAVA_NET */
 
 #if HAVE_BSTRING_H
@@ -36,6 +74,8 @@ details.  */
 #ifndef HAVE_SOCKLEN_T
 typedef int socklen_t;
 #endif
+
+#ifndef DISABLE_JAVA_NET
 
 // Avoid macro definitions of bind, connect from system headers, e.g. on
 // Solaris 7 with _XOPEN_SOURCE.  FIXME
@@ -70,10 +110,11 @@ _Jv_accept (int fd, struct sockaddr *addr, socklen_t *addrlen)
 #undef accept
 #endif
 
+#endif /* DISABLE_JAVA_NET */
+
 #include <gcj/cni.h>
 #include <gcj/javaprims.h>
 #include <java/io/IOException.h>
-#include <java/io/FileDescriptor.h>
 #include <java/io/InterruptedIOException.h>
 #include <java/net/BindException.h>
 #include <java/net/ConnectException.h>
@@ -88,8 +129,7 @@ _Jv_accept (int fd, struct sockaddr *addr, socklen_t *addrlen)
 #include <java/lang/Thread.h>
 #include <java/lang/NullPointerException.h>
 #include <java/lang/ArrayIndexOutOfBoundsException.h>
-
-#define BooleanClass java::lang::Boolean::class$
+#include <java/lang/IllegalArgumentException.h>
 
 #ifdef DISABLE_JAVA_NET
 
@@ -142,6 +182,48 @@ java::net::PlainSocketImpl::getOption (jint)
     JvNewStringLatin1 ("SocketImpl.getOption: unimplemented"));
 }
 
+jint
+java::net::PlainSocketImpl::read(void)
+{
+  throw new SocketException (
+    JvNewStringLatin1 ("SocketImpl.read: unimplemented"));
+}
+
+jint
+java::net::PlainSocketImpl::read(jbyteArray buffer, jint offset, jint count)
+{
+  throw new SocketException (
+    JvNewStringLatin1 ("SocketImpl.read: unimplemented"));
+}
+
+void
+java::net::PlainSocketImpl::write(jint b)
+{
+  throw new SocketException (
+    JvNewStringLatin1 ("SocketImpl.write: unimplemented"));
+}
+
+void
+java::net::PlainSocketImpl::write(jbyteArray b, jint offset, jint len)
+{
+  throw new SocketException (
+    JvNewStringLatin1 ("SocketImpl.write: unimplemented"));
+}
+
+jint
+java::net::PlainSocketImpl::available(void)
+{
+  throw new SocketException (
+    JvNewStringLatin1 ("SocketImpl.available: unimplemented"));
+}
+
+void
+java::net::PlainSocketImpl::close(void)
+{
+  throw new SocketException (
+    JvNewStringLatin1 ("SocketImpl.close: unimplemented"));
+}
+
 #else /* DISABLE_JAVA_NET */
 
 union SockAddr
@@ -161,8 +243,12 @@ java::net::PlainSocketImpl::create (jboolean stream)
       char* strerr = strerror (errno);
       throw new java::io::IOException (JvNewStringUTF (strerr));
     }
+
+  _Jv_platform_close_on_exec (sock);
+
+  // We use fnum in place of fd here.  From leaving fd null we avoid
+  // the double close problem in FileDescriptor.finalize.
   fnum = sock;
-  fd = new java::io::FileDescriptor (sock);
 }
 
 void
@@ -280,6 +366,8 @@ java::net::PlainSocketImpl::accept (java::net::PlainSocketImpl *s)
   socklen_t addrlen = sizeof(u);
   int new_socket = 0; 
 
+// FIXME: implement timeout support for Win32
+#ifndef WIN32
   // Do timeouts via select since SO_RCVTIMEO is not always available.
   if (timeout > 0)
     {
@@ -296,10 +384,14 @@ java::net::PlainSocketImpl::accept (java::net::PlainSocketImpl *s)
 	throw new java::io::InterruptedIOException (
 	         JvNewStringUTF("Accept timed out"));
     }
+#endif /* WIN32 */
 
   new_socket = _Jv_accept (fnum, (sockaddr*) &u, &addrlen);
   if (new_socket < 0)
     goto error;
+
+  _Jv_platform_close_on_exec (new_socket);
+
   jbyteArray raddr;
   jint rport;
   if (u.address.sin_family == AF_INET)
@@ -323,7 +415,6 @@ java::net::PlainSocketImpl::accept (java::net::PlainSocketImpl *s)
   s->localport = localport;
   s->address = new InetAddress (raddr, NULL);
   s->port = rport;
-  s->fd = new java::io::FileDescriptor (new_socket);
   return;
  error:
   char* strerr = strerror (errno);
@@ -334,6 +425,9 @@ java::net::PlainSocketImpl::accept (java::net::PlainSocketImpl *s)
 void
 java::net::PlainSocketImpl::close()
 {
+  // Avoid races from asynchronous finalization.
+  JvSynchronize sync (this);
+
   // should we use shutdown here? how would that effect so_linger?
   int res = ::close (fnum);
 
@@ -346,6 +440,7 @@ java::net::PlainSocketImpl::close()
     }
   // Safe place to reset the file pointer.
   fnum = -1;
+  timeout = 0;
 }
 
 // Write a byte to the socket.
@@ -371,6 +466,7 @@ java::net::PlainSocketImpl::write(jint b)
 	  // Some errors should not cause exceptions.
 	  if (errno != ENOTCONN && errno != ECONNRESET && errno != EBADF)
 	    throw new java::io::IOException (JvNewStringUTF (strerror (errno)));
+	  break;
 	}
     }
 }
@@ -402,6 +498,7 @@ java::net::PlainSocketImpl::write(jbyteArray b, jint offset, jint len)
 	  // Some errors should not cause exceptions.
 	  if (errno != ENOTCONN && errno != ECONNRESET && errno != EBADF)
 	    throw new java::io::IOException (JvNewStringUTF (strerror (errno)));
+	  break;
 	}
       written += r;
       len -= r;
@@ -416,6 +513,8 @@ java::net::PlainSocketImpl::read(void)
 {
   jbyte b;
 
+// FIXME: implement timeout support for Win32
+#ifndef WIN32
   // Do timeouts via select.
   if (timeout > 0)
   {
@@ -437,6 +536,8 @@ java::net::PlainSocketImpl::read(void)
     // If select returns ok we know we either got signalled or read some data...
     // either way we need to try to read.
   }
+#endif /* WIN32 */
+
   int r = ::read (fnum, &b, 1);
 
   if (r == 0)
@@ -471,6 +572,8 @@ java::net::PlainSocketImpl::read(jbyteArray buffer, jint offset, jint count)
     throw new java::lang::ArrayIndexOutOfBoundsException;
   jbyte *bytes = elements (buffer) + offset;
 
+// FIXME: implement timeout support for Win32
+#ifndef WIN32
   // Do timeouts via select.
   if (timeout > 0)
   {
@@ -496,8 +599,10 @@ java::net::PlainSocketImpl::read(jbyteArray buffer, jint offset, jint count)
 	throw iioe;
       }
   }
+#endif
+
   // Read the socket.
-  int r = ::recv (fnum, bytes, count, 0);
+  int r = ::recv (fnum, (char *) bytes, count, 0);
   if (r == 0)
     return -1;
   if (java::lang::Thread::interrupted())
@@ -584,7 +689,7 @@ java::net::PlainSocketImpl::setOption (jint optID, java::lang::Object *value)
   int val;
   socklen_t val_len = sizeof (val);
 
-  if (_Jv_IsInstanceOf (value, &BooleanClass))
+  if (_Jv_IsInstanceOf (value, &java::lang::Boolean::class$))
     {
       java::lang::Boolean *boolobj = 
         static_cast<java::lang::Boolean *> (value);
@@ -598,11 +703,15 @@ java::net::PlainSocketImpl::setOption (jint optID, java::lang::Object *value)
 	    val = 0;
         }
     }
-  else  // assume value is an Integer
+  else if (_Jv_IsInstanceOf (value, &java::lang::Integer::class$))
     {
       java::lang::Integer *intobj = 
         static_cast<java::lang::Integer *> (value);          
       val = (int) intobj->intValue();
+    }
+  else
+    {
+      throw new java::lang::IllegalArgumentException (JvNewStringLatin1 ("`value' must be Boolean or Integer"));
     }
 
   switch (optID) 

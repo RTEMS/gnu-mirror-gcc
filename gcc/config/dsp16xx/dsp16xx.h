@@ -31,29 +31,30 @@ extern const char *const_seg_name;
 extern const char *rsect_const;
 extern const char *chip_name;
 extern const char *save_chip_name;
-extern struct rtx_def *dsp16xx_compare_op0, *dsp16xx_compare_op1;
-extern struct rtx_def *dsp16xx_addhf3_libcall;
-extern struct rtx_def *dsp16xx_subhf3_libcall;
-extern struct rtx_def *dsp16xx_mulhf3_libcall;
-extern struct rtx_def *dsp16xx_divhf3_libcall;
-extern struct rtx_def *dsp16xx_cmphf3_libcall;
-extern struct rtx_def *dsp16xx_fixhfhi2_libcall;
-extern struct rtx_def *dsp16xx_floathihf2_libcall;
-extern struct rtx_def *dsp16xx_neghf2_libcall;
-extern struct rtx_def *dsp16xx_umulhi3_libcall;
-extern struct rtx_def *dsp16xx_mulhi3_libcall;
-extern struct rtx_def *dsp16xx_udivqi3_libcall;
-extern struct rtx_def *dsp16xx_udivhi3_libcall;
-extern struct rtx_def *dsp16xx_divqi3_libcall;
-extern struct rtx_def *dsp16xx_divhi3_libcall;
-extern struct rtx_def *dsp16xx_modqi3_libcall;
-extern struct rtx_def *dsp16xx_modhi3_libcall;
-extern struct rtx_def *dsp16xx_umodqi3_libcall;
-extern struct rtx_def *dsp16xx_umodhi3_libcall;
+extern GTY(()) rtx dsp16xx_compare_op0;
+extern GTY(()) rtx dsp16xx_compare_op1;
+extern GTY(()) rtx dsp16xx_addhf3_libcall;
+extern GTY(()) rtx dsp16xx_subhf3_libcall;
+extern GTY(()) rtx dsp16xx_mulhf3_libcall;
+extern GTY(()) rtx dsp16xx_divhf3_libcall;
+extern GTY(()) rtx dsp16xx_cmphf3_libcall;
+extern GTY(()) rtx dsp16xx_fixhfhi2_libcall;
+extern GTY(()) rtx dsp16xx_floathihf2_libcall;
+extern GTY(()) rtx dsp16xx_neghf2_libcall;
+extern GTY(()) rtx dsp16xx_umulhi3_libcall;
+extern GTY(()) rtx dsp16xx_mulhi3_libcall;
+extern GTY(()) rtx dsp16xx_udivqi3_libcall;
+extern GTY(()) rtx dsp16xx_udivhi3_libcall;
+extern GTY(()) rtx dsp16xx_divqi3_libcall;
+extern GTY(()) rtx dsp16xx_divhi3_libcall;
+extern GTY(()) rtx dsp16xx_modqi3_libcall;
+extern GTY(()) rtx dsp16xx_modhi3_libcall;
+extern GTY(()) rtx dsp16xx_umodqi3_libcall;
+extern GTY(()) rtx dsp16xx_umodhi3_libcall;
 
-extern struct rtx_def *dsp16xx_ashrhi3_libcall;
-extern struct rtx_def *dsp16xx_ashlhi3_libcall;
-extern struct rtx_def *dsp16xx_lshrhi3_libcall;
+extern GTY(()) rtx dsp16xx_ashrhi3_libcall;
+extern GTY(()) rtx dsp16xx_ashlhi3_libcall;
+extern GTY(()) rtx dsp16xx_lshrhi3_libcall;
 
 /* RUN-TIME TARGET SPECIFICATION */
 #define DSP16XX   1
@@ -251,23 +252,6 @@ extern int target_flags;
 #define TARGET_DEFAULT  MASK_REGPARM|MASK_YBASE_HIGH
 #endif
 
-/* This macro is similar to `TARGET_SWITCHES' but defines names of
-   command options that have values.  Its definition is an
-   initializer with a subgrouping for each command option.
-
-   Each subgrouping contains a string constant, that defines the
-   fixed part of the option name, and the address of a variable. 
-   The variable, type `char *', is set to the variable part of the
-   given option if the fixed part matches.  The actual option name
-   is made by appending `-m' to the specified name.
-
-   Here is an example which defines `-mshort-data-NUMBER'.  If the
-   given option is `-mshort-data-512', the variable `m88k_short_data'
-   will be set to the string `"512"'.
-
-	extern char *m88k_short_data;
-	#define TARGET_OPTIONS { { "short-data-", &m88k_short_data } }  */
-
 #define TARGET_OPTIONS						\
 {								\
   { "text=",	&text_seg_name,				        \
@@ -311,11 +295,6 @@ extern int target_flags;
 
 /* STORAGE LAYOUT */
 
-/* Define if you don't want extended real, but do want to use the
-   software floating point emulator for REAL_ARITHMETIC and
-   decimal <-> binary conversion.  */
-#define REAL_ARITHMETIC
-
 /* Define this if most significant bit is lowest numbered
    in instructions that operate on numbered bit-fields.
  */
@@ -333,21 +312,11 @@ extern int target_flags;
 /* number of bits in an addressable storage unit */
 #define BITS_PER_UNIT 16
 
-/* Width in bits of a "word", which is the contents of a machine register.
-   Note that this is not necessarily the width of data type `int';
-   if using 16-bit ints on a 68000, this would still be 32.
-   But on a machine with 16-bit registers, this would be 16.  */
-#define BITS_PER_WORD 16
-
 /* Maximum number of bits in a word.  */
 #define MAX_BITS_PER_WORD 16
 
 /* Width of a word, in units (bytes).  */
 #define UNITS_PER_WORD 1
-
-/* Width in bits of a pointer.
-   See also the macro `Pmode' defined below.  */
-#define POINTER_SIZE 16
 
 /* Allocation boundary (in *bits*) for storing pointers in memory.  */
 #define POINTER_BOUNDARY 16
@@ -385,7 +354,6 @@ extern int target_flags;
 
 /* LAYOUT OF SOURCE LANGUAGE DATA TYPES */
 
-#define CHAR_TYPE_SIZE         16
 #define SHORT_TYPE_SIZE        16
 #define INT_TYPE_SIZE          16
 #define LONG_TYPE_SIZE         32
@@ -1565,10 +1533,6 @@ extern struct dsp16xx_frame_info current_frame_info;
    loads.  */
 #define SLOW_BYTE_ACCESS 1
 
-/* Define this macro if zero-extension (of a char or short to an int) can
-   be done faster if the destination is a register that is know to be zero.  */
-/* #define SLOW_ZERO_EXTEND */
-
 /* Define this macro if unaligned accesses have a cost many times greater than
    aligned accesses, for example if they are emulated in a trap handler */
 /* define SLOW_UNALIGNED_ACCESS(MODE, ALIGN) */
@@ -1619,9 +1583,6 @@ const_section ()                                                   \
 
 /* Output at beginning of assembler file.  */
 #define ASM_FILE_START(FILE) coff_dsp16xx_file_start (FILE) 
-
-/* Prevent output of .gcc_compiled */
-#define ASM_IDENTIFY_GCC(FILE)   
 
 /* A C string constant describing how to begin a comment in the target
    assembler language.  */

@@ -42,8 +42,8 @@ static void open_repo_file PARAMS ((const char *));
 static char *afgets PARAMS ((FILE *));
 static void reopen_repo_file_for_write PARAMS ((void));
 
-static tree pending_repo;
-static tree original_repo;
+static GTY(()) tree pending_repo;
+static GTY(()) tree original_repo;
 static char *repo_name;
 static FILE *repo_file;
 
@@ -103,7 +103,7 @@ repo_get_id (t)
 	 the vtable, so going ahead would give the wrong answer.
          See g++.pt/instantiate4.C.  */
       if (!COMPLETE_TYPE_P (t) || TYPE_BEING_DEFINED (t))
-	my_friendly_abort (981113);
+	abort ();
 
       vtable = get_vtbl_decl_for_binfo (TYPE_BINFO (t));
 
@@ -147,7 +147,7 @@ repo_template_used (t)
 				0);
     }
   else
-    my_friendly_abort (1);
+    abort ();
 
   if (! IDENTIFIER_REPO_USED (id))
     {
@@ -320,8 +320,6 @@ init_repo (filename)
   if (! flag_use_repository)
     return;
 
-  ggc_add_tree_root (&pending_repo, 1);
-  ggc_add_tree_root (&original_repo, 1);
   gcc_obstack_init (&temporary_obstack);
 
   open_repo_file (filename);
@@ -458,3 +456,5 @@ finish_repo ()
   if (repo_file)
     fclose (repo_file);
 }
+
+#include "gt-cp-repo.h"

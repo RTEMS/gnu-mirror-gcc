@@ -48,6 +48,7 @@ extern int s390_match_ccmode PARAMS ((rtx, enum machine_mode));
 extern enum machine_mode s390_select_ccmode PARAMS ((enum rtx_code, rtx, rtx));
 extern int symbolic_reference_mentioned_p PARAMS ((rtx));
 extern int legitimate_la_operand_p PARAMS ((rtx));
+extern rtx legitimize_la_operand PARAMS ((rtx));
 extern int legitimate_pic_operand_p PARAMS ((rtx));
 extern int legitimate_constant_p PARAMS ((rtx));
 extern int legitimate_reload_constant_p PARAMS ((rtx));
@@ -55,6 +56,9 @@ extern int legitimate_address_p PARAMS ((enum machine_mode, rtx, int));
 extern rtx legitimize_pic_address PARAMS ((rtx, rtx));
 extern rtx legitimize_address PARAMS ((rtx, rtx, enum machine_mode));
 extern enum reg_class s390_preferred_reload_class PARAMS ((rtx, enum reg_class));
+extern enum reg_class s390_secondary_input_reload_class PARAMS ((enum reg_class, enum machine_mode, rtx));
+extern int s390_plus_operand PARAMS ((rtx, enum machine_mode));
+extern void s390_expand_plus_operand PARAMS ((rtx, rtx, rtx));
 extern void emit_pic_move PARAMS ((rtx *, enum machine_mode));
 
 extern void s390_output_symbolic_const PARAMS ((FILE *, rtx));
@@ -66,6 +70,7 @@ extern void s390_dump_literal_pool PARAMS ((rtx, rtx));
 extern void s390_trampoline_template PARAMS ((FILE *));
 extern void s390_initialize_trampoline PARAMS ((rtx, rtx, rtx));
 extern rtx s390_gen_rtx_const_DI PARAMS ((int, int));
+extern rtx s390_simplify_dwarf_addr PARAMS ((rtx));
 #endif /* RTX_CODE */
 
 #ifdef TREE_CODE

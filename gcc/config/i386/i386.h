@@ -222,6 +222,7 @@ extern const int x86_add_esp_4, x86_add_esp_8, x86_sub_esp_4, x86_sub_esp_8;
 extern const int x86_partial_reg_dependency, x86_memory_mismatch_stall;
 extern const int x86_accumulate_outgoing_args, x86_prologue_using_move;
 extern const int x86_epilogue_using_move, x86_decompose_lea;
+extern const int x86_arch_always_fancy_math_387;
 extern int x86_prefetch_sse;
 
 #define TARGET_USE_LEAVE (x86_use_leave & CPUMASK)
@@ -281,18 +282,23 @@ extern int x86_prefetch_sse;
 
 #define TARGET_RED_ZONE (!(target_flags & MASK_NO_RED_ZONE))
 
+/* WARNING: Do not mark empty strings for translation, as calling
+            gettext on an empty string does NOT return an empty
+            string. */
+
+
 #define TARGET_SWITCHES							      \
 { { "80387",			 MASK_80387, N_("Use hardware fp") },	      \
   { "no-80387",			-MASK_80387, N_("Do not use hardware fp") },  \
   { "hard-float",		 MASK_80387, N_("Use hardware fp") },	      \
   { "soft-float",		-MASK_80387, N_("Do not use hardware fp") },  \
   { "no-soft-float",		 MASK_80387, N_("Use hardware fp") },	      \
-  { "386",			 0, N_("") /*Deprecated.*/},		      \
-  { "486",			 0, N_("") /*Deprecated.*/},		      \
-  { "pentium",			 0, N_("") /*Deprecated.*/},		      \
-  { "pentiumpro",		 0, N_("") /*Deprecated.*/},		      \
-  { "intel-syntax",		 0, N_("") /*Deprecated.*/},	 	      \
-  { "no-intel-syntax",		 0, N_("") /*Deprecated.*/},	 	      \
+  { "386",			 0, "" /*Deprecated.*/},		      \
+  { "486",			 0, "" /*Deprecated.*/},		      \
+  { "pentium",			 0, "" /*Deprecated.*/},		      \
+  { "pentiumpro",		 0, "" /*Deprecated.*/},		      \
+  { "intel-syntax",		 0, "" /*Deprecated.*/},	 	      \
+  { "no-intel-syntax",		 0, "" /*Deprecated.*/},	 	      \
   { "rtd",			 MASK_RTD,				      \
     N_("Alternate calling convention") },				      \
   { "no-rtd",			-MASK_RTD,				      \
@@ -346,20 +352,20 @@ extern int x86_prefetch_sse;
     N_("Support MMX built-in functions") },				      \
   { "no-mmx",			 -MASK_MMX,				      \
     N_("Do not support MMX built-in functions") },			      \
-  { "no-mmx",			 MASK_MMX_SET, N_("") },		      \
+  { "no-mmx",			 MASK_MMX_SET, "" },			      \
   { "3dnow",                     MASK_3DNOW | MASK_3DNOW_SET,		      \
     N_("Support 3DNow! built-in functions") },				      \
-  { "no-3dnow",                  -MASK_3DNOW, N_("") },			      \
+  { "no-3dnow",                  -MASK_3DNOW, "" },			      \
   { "no-3dnow",                  MASK_3DNOW_SET,			      \
     N_("Do not support 3DNow! built-in functions") },			      \
   { "sse",			 MASK_SSE | MASK_SSE_SET,		      \
     N_("Support MMX and SSE built-in functions and code generation") },	      \
-  { "no-sse",			 -MASK_SSE, N_("") },	 		      \
+  { "no-sse",			 -MASK_SSE, "" },	 		      \
   { "no-sse",			 MASK_SSE_SET,				      \
     N_("Do not support MMX and SSE built-in functions and code generation") },\
   { "sse2",			 MASK_SSE2 | MASK_SSE2_SET,		      \
     N_("Support MMX, SSE and SSE2 built-in functions and code generation") }, \
-  { "no-sse2",			 -MASK_SSE2, N_("") },			      \
+  { "no-sse2",			 -MASK_SSE2, "" },			      \
   { "no-sse2",			 MASK_SSE2_SET,				      \
     N_("Do not support MMX, SSE and SSE2 built-in functions and code generation") },    \
   { "128bit-long-double",	 MASK_128BIT_LONG_DOUBLE,		      \
@@ -440,9 +446,9 @@ extern int ix86_arch;
   { "cmodel=", &ix86_cmodel_string,				\
     N_("Use given x86-64 code model") },			\
   { "debug-arg", &ix86_debug_arg_string,			\
-    N_("" /* Undocumented. */) },				\
+    "" /* Undocumented. */ },					\
   { "debug-addr", &ix86_debug_addr_string,			\
-    N_("" /* Undocumented. */) },				\
+    "" /* Undocumented. */ },					\
   { "asm=", &ix86_asm_string,					\
     N_("Use given assembler dialect") },			\
   SUBTARGET_OPTIONS						\
@@ -548,27 +554,12 @@ extern int ix86_arch;
 #endif
 #endif /* CPP_CPU_DEFAULT_SPEC */
 
-#ifdef TARGET_BI_ARCH
-#define NO_BUILTIN_SIZE_TYPE
-#define NO_BUILTIN_PTRDIFF_TYPE
-#endif
-
-#ifdef NO_BUILTIN_SIZE_TYPE
-#define CPP_CPU32_SIZE_TYPE_SPEC \
-  " -D__SIZE_TYPE__=unsigned\\ int -D__PTRDIFF_TYPE__=int"
-#define CPP_CPU64_SIZE_TYPE_SPEC \
-  " -D__SIZE_TYPE__=unsigned\\ long\\ int -D__PTRDIFF_TYPE__=long\\ int"
-#else
-#define CPP_CPU32_SIZE_TYPE_SPEC ""
-#define CPP_CPU64_SIZE_TYPE_SPEC ""
-#endif
-
 #define CPP_CPU32_SPEC \
   "-Acpu=i386 -Amachine=i386 %{!ansi:%{!std=c*:%{!std=i*:-Di386}}} -D__i386 \
--D__i386__ %(cpp_cpu32sizet)"
+-D__i386__"
 
 #define CPP_CPU64_SPEC \
-  "-Acpu=x86_64 -Amachine=x86_64 -D__x86_64 -D__x86_64__ %(cpp_cpu64sizet)"
+  "-Acpu=x86_64 -Amachine=x86_64 -D__x86_64 -D__x86_64__"
 
 #define CPP_CPUCOMMON_SPEC "\
 %{march=i386:%{!mcpu*:-D__tune_i386__ }}\
@@ -606,13 +597,14 @@ extern int ix86_arch;
 %{march=athlon-tbird|march=athlon-xp|march=athlon-mp|march=pentium3|march=pentium4:\
 -D__SSE__ }\
 %{march=pentium-mmx|march=k6|march=k6-2|march=k6-3\
-march=athlon|march=athlon-tbird|march=athlon-4|march=athlon-xp\
+|march=athlon|march=athlon-tbird|march=athlon-4|march=athlon-xp\
 |march=athlon-mp|march=pentium2|march=pentium3|march=pentium4: -D__MMX__ }\
 %{march=k6-2|march=k6-3\
-march=athlon|march=athlon-tbird|march=athlon-4|march=athlon-xp\
+|march=athlon|march=athlon-tbird|march=athlon-4|march=athlon-xp\
 |march=athlon-mp: -D__3dNOW__ }\
 %{march=athlon|march=athlon-tbird|march=athlon-4|march=athlon-xp\
 |march=athlon-mp: -D__3dNOW_A__ }\
+%{msse2: -D__SSE2__ }\
 %{march=pentium4: -D__SSE2__ }\
 %{!march*:%{!mcpu*:%{!m386:%{!m486:%{!mpentium*:%(cpp_cpu_default)}}}}}"
 
@@ -655,8 +647,6 @@ march=athlon|march=athlon-tbird|march=athlon-4|march=athlon-xp\
   { "cpp_cpu",	CPP_CPU_SPEC },						\
   { "cpp_cpu32", CPP_CPU32_SPEC },					\
   { "cpp_cpu64", CPP_CPU64_SPEC },					\
-  { "cpp_cpu32sizet", CPP_CPU32_SIZE_TYPE_SPEC },			\
-  { "cpp_cpu64sizet", CPP_CPU64_SIZE_TYPE_SPEC },			\
   { "cpp_cpucommon", CPP_CPUCOMMON_SPEC },				\
   { "cc1_cpu",  CC1_CPU_SPEC },						\
   SUBTARGET_EXTRA_SPECS
@@ -664,8 +654,6 @@ march=athlon|march=athlon-tbird|march=athlon-4|march=athlon-xp\
 /* target machine storage layout */
 
 /* Define for XFmode or TFmode extended real floating point support.
-   This will automatically cause REAL_ARITHMETIC to be defined.
- 
    The XFmode is specified by i386 ABI, while TFmode may be faster
    due to alignment and simplifications in the address calculations.
  */
@@ -697,11 +685,6 @@ march=athlon|march=athlon-tbird|march=athlon-4|march=athlon-xp\
 #define MAX_LONG_TYPE_SIZE 32
 #endif
 
-/* Define if you don't want extended real, but do want to use the
-   software floating point emulator for REAL_ARITHMETIC and
-   decimal <-> binary conversion.  */
-/* #define REAL_ARITHMETIC */
-
 /* Define this if most significant byte of a word is the lowest numbered.  */
 /* That is true on the 80386.  */
 
@@ -716,22 +699,9 @@ march=athlon|march=athlon-tbird|march=athlon-4|march=athlon-xp\
 /* Not true for 80386 */
 #define WORDS_BIG_ENDIAN 0
 
-/* number of bits in an addressable storage unit */
-#define BITS_PER_UNIT 8
-
-/* Width in bits of a "word", which is the contents of a machine register.
-   Note that this is not necessarily the width of data type `int';
-   if using 16-bit ints on a 80386, this would still be 32.
-   But on a machine with 16-bit registers, this would be 16.  */
-#define BITS_PER_WORD (TARGET_64BIT ? 64 : 32)
-
 /* Width of a word, in units (bytes).  */
 #define UNITS_PER_WORD (TARGET_64BIT ? 8 : 4)
 #define MIN_UNITS_PER_WORD 4
-
-/* Width in bits of a pointer.
-   See also the macro `Pmode' defined below.  */
-#define POINTER_SIZE BITS_PER_WORD
 
 /* Allocation boundary (in *bits*) for storing arguments in argument list.  */
 #define PARM_BOUNDARY BITS_PER_WORD
@@ -926,38 +896,21 @@ march=athlon|march=athlon-tbird|march=athlon-4|march=athlon-xp\
    registers listed in CALL_USED_REGISTERS, keeping the others
    available for storage of persistent values.
 
-   Three different versions of REG_ALLOC_ORDER have been tried:
-
-   If the order is edx, ecx, eax, ... it produces a slightly faster compiler,
-   but slower code on simple functions returning values in eax.
-
-   If the order is eax, ecx, edx, ... it causes reload to abort when compiling
-   perl 4.036 due to not being able to create a DImode register (to hold a 2
-   word union).
-
-   If the order is eax, edx, ecx, ... it produces better code for simple
-   functions, and a slightly slower compiler.  Users complained about the code
-   generated by allocating edx first, so restore the 'natural' order of things.  */
+   The ORDER_REGS_FOR_LOCAL_ALLOC actually overwrite the order,
+   so this is just empty initializer for array.  */
 
 #define REG_ALLOC_ORDER 					\
-/*ax,dx,cx,*/							\
-{  0, 1, 2,							\
-/* bx,si,di,bp,sp,*/						\
-   3, 4, 5, 6, 7,						\
-/*r8,r9,r10,r11,*/						\
-  37,38, 39, 40,						\
-/*r12,r15,r14,r13*/						\
-  41, 44, 43, 42,						\
-/*xmm0,xmm1,xmm2,xmm3,xmm4,xmm5,xmm6,xmm7*/			\
-    21,  22,  23,  24,  25,  26,  27,  28,			\
-/*xmm8,xmm9,xmm10,xmm11,xmm12,xmm13,xmm14,xmm15*/		\
-    45,  46,   47,   48,   49,   50,   51,   52,		\
-/*st,st1,st2,st3,st4,st5,st6,st7*/				\
-   8,  9, 10, 11, 12, 13, 14, 15,				\
-/*,arg,cc,fpsr,dir,frame*/					\
-     16,17, 18, 19,   20,					\
-/*mmx0,mmx1,mmx2,mmx3,mmx4,mmx5,mmx6,mmx7*/			\
-    29,  30,  31,  32,  33,  34,  35,  36 }
+{  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,\
+   18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,	\
+   33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,  \
+   48, 49, 50, 51, 52 }
+
+/* ORDER_REGS_FOR_LOCAL_ALLOC is a macro which permits reg_alloc_order
+   to be rearranged based on a particular function.  When using sse math,
+   we want to allocase SSE before x87 registers and vice vera.  */
+
+#define ORDER_REGS_FOR_LOCAL_ALLOC x86_order_regs_for_local_alloc ()
+
 
 /* Macro to conditionally modify fixed_regs/call_used_regs.  */
 #define CONDITIONAL_REGISTER_USAGE					\
@@ -969,7 +922,7 @@ do {									\
         call_used_regs[i] = (call_used_regs[i]				\
 			     & (TARGET_64BIT ? 2 : 1)) != 0;		\
       }									\
-    if (flag_pic)							\
+    if (PIC_OFFSET_TABLE_REGNUM != INVALID_REGNUM)			\
       {									\
 	fixed_regs[PIC_OFFSET_TABLE_REGNUM] = 1;			\
 	call_used_regs[PIC_OFFSET_TABLE_REGNUM] = 1;			\
@@ -1018,9 +971,15 @@ do {									\
       ? (TARGET_64BIT ? 4 : 6)						\
       : ((GET_MODE_SIZE (MODE) + UNITS_PER_WORD - 1) / UNITS_PER_WORD)))
 
+#define VALID_SSE2_REG_MODE(MODE) \
+    ((MODE) == V16QImode || (MODE) == V8HImode || (MODE) == V2DFmode    \
+     || (MODE) == V2DImode)
+
 #define VALID_SSE_REG_MODE(MODE)					\
     ((MODE) == TImode || (MODE) == V4SFmode || (MODE) == V4SImode	\
      || (MODE) == SFmode						\
+     /* Always accept SSE2 modes so that xmmintrin.h compiles.  */	\
+     || VALID_SSE2_REG_MODE (MODE)					\
      || (TARGET_SSE2 && ((MODE) == DFmode || VALID_MMX_REG_MODE (MODE))))
 
 #define VALID_MMX_REG_MODE_3DNOW(MODE) \
@@ -1145,11 +1104,11 @@ do {									\
 #define STATIC_CHAIN_REGNUM (TARGET_64BIT ? FIRST_REX_INT_REG + 10 - 8 : 2)
 
 /* Register to hold the addressing base for position independent
-   code access to data items.
-   We don't use PIC pointer for 64bit mode.  Define the regnum to
-   dummy value to prevent gcc from pessimizing code dealing with EBX.
- */
-#define PIC_OFFSET_TABLE_REGNUM (TARGET_64BIT ? INVALID_REGNUM : 3)
+   code access to data items.  We don't use PIC pointer for 64bit
+   mode.  Define the regnum to dummy value to prevent gcc from
+   pessimizing code dealing with EBX.  */
+#define PIC_OFFSET_TABLE_REGNUM \
+  (TARGET_64BIT || !flag_pic ? INVALID_REGNUM : 3)
 
 /* Register in which address to store a structure value
    arrives in the function.  On the 386, the prologue
@@ -1347,7 +1306,7 @@ enum reg_class
 #define SSE_REG_P(N) (REG_P (N) && SSE_REGNO_P (REGNO (N)))
 
 #define SSE_FLOAT_MODE_P(MODE) \
-  ((TARGET_SSE_MATH && (MODE) == SFmode) || (TARGET_SSE2 && (MODE) == DFmode))
+  ((TARGET_SSE && (MODE) == SFmode) || (TARGET_SSE2 && (MODE) == DFmode))
 
 #define MMX_REGNO_P(N) ((N) >= FIRST_MMX_REG && (N) <= LAST_MMX_REG)
 #define MMX_REG_P(XOP) (REG_P (XOP) && MMX_REGNO_P (REGNO (XOP)))
@@ -1456,7 +1415,8 @@ enum reg_class
 
 #define LIMIT_RELOAD_CLASS(MODE, CLASS) 			\
   ((MODE) == QImode && !TARGET_64BIT				\
-   && ((CLASS) == ALL_REGS || (CLASS) == GENERAL_REGS) 		\
+   && ((CLASS) == ALL_REGS || (CLASS) == GENERAL_REGS		\
+       || (CLASS) == LEGACY_REGS || (CLASS) == INDEX_REGS)	\
    ? Q_REGS : (CLASS))
 
 /* Given an rtx X being reloaded into a reg required to be
@@ -1485,7 +1445,8 @@ enum reg_class
    pseudo.  */
 
 #define SECONDARY_OUTPUT_RELOAD_CLASS(CLASS, MODE, OUT)			\
-  ((CLASS) == GENERAL_REGS && !TARGET_64BIT && (MODE) == QImode		\
+  (((CLASS) == GENERAL_REGS || (CLASS) == LEGACY_REGS			\
+    || (CLASS) == INDEX_REGS) && !TARGET_64BIT && (MODE) == QImode	\
    ? Q_REGS : NO_REGS)
 
 /* Return the maximum number of consecutive registers
@@ -2247,6 +2208,212 @@ enum ix86_builtins
   IX86_BUILTIN_SSE_ZERO,
   IX86_BUILTIN_MMX_ZERO,
 
+  /* SSE2 */
+  IX86_BUILTIN_ADDPD,
+  IX86_BUILTIN_ADDSD,
+  IX86_BUILTIN_DIVPD,
+  IX86_BUILTIN_DIVSD,
+  IX86_BUILTIN_MULPD,
+  IX86_BUILTIN_MULSD,
+  IX86_BUILTIN_SUBPD,
+  IX86_BUILTIN_SUBSD,
+
+  IX86_BUILTIN_CMPEQPD,
+  IX86_BUILTIN_CMPLTPD,
+  IX86_BUILTIN_CMPLEPD,
+  IX86_BUILTIN_CMPGTPD,
+  IX86_BUILTIN_CMPGEPD,
+  IX86_BUILTIN_CMPNEQPD,
+  IX86_BUILTIN_CMPNLTPD,
+  IX86_BUILTIN_CMPNLEPD,
+  IX86_BUILTIN_CMPNGTPD,
+  IX86_BUILTIN_CMPNGEPD,
+  IX86_BUILTIN_CMPORDPD,
+  IX86_BUILTIN_CMPUNORDPD,
+  IX86_BUILTIN_CMPNEPD,
+  IX86_BUILTIN_CMPEQSD,
+  IX86_BUILTIN_CMPLTSD,
+  IX86_BUILTIN_CMPLESD,
+  IX86_BUILTIN_CMPGTSD,
+  IX86_BUILTIN_CMPGESD,
+  IX86_BUILTIN_CMPNEQSD,
+  IX86_BUILTIN_CMPNLTSD,
+  IX86_BUILTIN_CMPNLESD,
+  IX86_BUILTIN_CMPNGTSD,
+  IX86_BUILTIN_CMPNGESD,
+  IX86_BUILTIN_CMPORDSD,
+  IX86_BUILTIN_CMPUNORDSD,
+  IX86_BUILTIN_CMPNESD,
+
+  IX86_BUILTIN_COMIEQSD,
+  IX86_BUILTIN_COMILTSD,
+  IX86_BUILTIN_COMILESD,
+  IX86_BUILTIN_COMIGTSD,
+  IX86_BUILTIN_COMIGESD,
+  IX86_BUILTIN_COMINEQSD,
+  IX86_BUILTIN_UCOMIEQSD,
+  IX86_BUILTIN_UCOMILTSD,
+  IX86_BUILTIN_UCOMILESD,
+  IX86_BUILTIN_UCOMIGTSD,
+  IX86_BUILTIN_UCOMIGESD,
+  IX86_BUILTIN_UCOMINEQSD,
+
+  IX86_BUILTIN_MAXPD,
+  IX86_BUILTIN_MAXSD,
+  IX86_BUILTIN_MINPD,
+  IX86_BUILTIN_MINSD,
+
+  IX86_BUILTIN_ANDPD,
+  IX86_BUILTIN_ANDNPD,
+  IX86_BUILTIN_ORPD,
+  IX86_BUILTIN_XORPD,
+
+  IX86_BUILTIN_SQRTPD,
+  IX86_BUILTIN_SQRTSD,
+
+  IX86_BUILTIN_UNPCKHPD,
+  IX86_BUILTIN_UNPCKLPD,
+
+  IX86_BUILTIN_SHUFPD,
+
+  IX86_BUILTIN_LOADAPD,
+  IX86_BUILTIN_LOADUPD,
+  IX86_BUILTIN_STOREAPD,
+  IX86_BUILTIN_STOREUPD,
+  IX86_BUILTIN_LOADSD,
+  IX86_BUILTIN_STORESD,
+  IX86_BUILTIN_MOVSD,
+
+  IX86_BUILTIN_LOADHPD,
+  IX86_BUILTIN_LOADLPD,
+  IX86_BUILTIN_STOREHPD,
+  IX86_BUILTIN_STORELPD,
+
+  IX86_BUILTIN_CVTDQ2PD,
+  IX86_BUILTIN_CVTDQ2PS,
+
+  IX86_BUILTIN_CVTPD2DQ,
+  IX86_BUILTIN_CVTPD2PI,
+  IX86_BUILTIN_CVTPD2PS,
+  IX86_BUILTIN_CVTTPD2DQ,
+  IX86_BUILTIN_CVTTPD2PI,
+
+  IX86_BUILTIN_CVTPI2PD,
+  IX86_BUILTIN_CVTSI2SD,
+
+  IX86_BUILTIN_CVTSD2SI,
+  IX86_BUILTIN_CVTSD2SS,
+  IX86_BUILTIN_CVTSS2SD,
+  IX86_BUILTIN_CVTTSD2SI,
+
+  IX86_BUILTIN_CVTPS2DQ,
+  IX86_BUILTIN_CVTPS2PD,
+  IX86_BUILTIN_CVTTPS2DQ,
+
+  IX86_BUILTIN_MOVNTI,
+  IX86_BUILTIN_MOVNTPD,
+  IX86_BUILTIN_MOVNTDQ,
+
+  IX86_BUILTIN_SETPD1,
+  IX86_BUILTIN_SETPD,
+  IX86_BUILTIN_CLRPD,
+  IX86_BUILTIN_SETRPD,
+  IX86_BUILTIN_LOADPD1,
+  IX86_BUILTIN_LOADRPD,
+  IX86_BUILTIN_STOREPD1,
+  IX86_BUILTIN_STORERPD,
+
+  /* SSE2 MMX */
+  IX86_BUILTIN_MASKMOVDQU,
+  IX86_BUILTIN_MOVMSKPD,
+  IX86_BUILTIN_PMOVMSKB128,
+  IX86_BUILTIN_MOVQ2DQ,
+
+  IX86_BUILTIN_PACKSSWB128,
+  IX86_BUILTIN_PACKSSDW128,
+  IX86_BUILTIN_PACKUSWB128,
+
+  IX86_BUILTIN_PADDB128,
+  IX86_BUILTIN_PADDW128,
+  IX86_BUILTIN_PADDD128,
+  IX86_BUILTIN_PADDQ128,
+  IX86_BUILTIN_PADDSB128,
+  IX86_BUILTIN_PADDSW128,
+  IX86_BUILTIN_PADDUSB128,
+  IX86_BUILTIN_PADDUSW128,
+  IX86_BUILTIN_PSUBB128,
+  IX86_BUILTIN_PSUBW128,
+  IX86_BUILTIN_PSUBD128,
+  IX86_BUILTIN_PSUBQ128,
+  IX86_BUILTIN_PSUBSB128,
+  IX86_BUILTIN_PSUBSW128,
+  IX86_BUILTIN_PSUBUSB128,
+  IX86_BUILTIN_PSUBUSW128,
+
+  IX86_BUILTIN_PAND128,
+  IX86_BUILTIN_PANDN128,
+  IX86_BUILTIN_POR128,
+  IX86_BUILTIN_PXOR128,
+
+  IX86_BUILTIN_PAVGB128,
+  IX86_BUILTIN_PAVGW128,
+
+  IX86_BUILTIN_PCMPEQB128,
+  IX86_BUILTIN_PCMPEQW128,
+  IX86_BUILTIN_PCMPEQD128,
+  IX86_BUILTIN_PCMPGTB128,
+  IX86_BUILTIN_PCMPGTW128,
+  IX86_BUILTIN_PCMPGTD128,
+
+  IX86_BUILTIN_PEXTRW128,
+  IX86_BUILTIN_PINSRW128,
+
+  IX86_BUILTIN_PMADDWD128,
+
+  IX86_BUILTIN_PMAXSW128,
+  IX86_BUILTIN_PMAXUB128,
+  IX86_BUILTIN_PMINSW128,
+  IX86_BUILTIN_PMINUB128,
+
+  IX86_BUILTIN_PMULUDQ,
+  IX86_BUILTIN_PMULUDQ128,
+  IX86_BUILTIN_PMULHUW128,
+  IX86_BUILTIN_PMULHW128,
+  IX86_BUILTIN_PMULLW128,
+
+  IX86_BUILTIN_PSADBW128,
+  IX86_BUILTIN_PSHUFHW,
+  IX86_BUILTIN_PSHUFLW,
+  IX86_BUILTIN_PSHUFD,
+
+  IX86_BUILTIN_PSLLW128,
+  IX86_BUILTIN_PSLLD128,
+  IX86_BUILTIN_PSLLQ128,
+  IX86_BUILTIN_PSRAW128,
+  IX86_BUILTIN_PSRAD128,
+  IX86_BUILTIN_PSRLW128,
+  IX86_BUILTIN_PSRLD128,
+  IX86_BUILTIN_PSRLQ128,
+  IX86_BUILTIN_PSLLWI128,
+  IX86_BUILTIN_PSLLDI128,
+  IX86_BUILTIN_PSLLQI128,
+  IX86_BUILTIN_PSRAWI128,
+  IX86_BUILTIN_PSRADI128,
+  IX86_BUILTIN_PSRLWI128,
+  IX86_BUILTIN_PSRLDI128,
+  IX86_BUILTIN_PSRLQI128,
+
+  IX86_BUILTIN_PUNPCKHBW128,
+  IX86_BUILTIN_PUNPCKHWD128,
+  IX86_BUILTIN_PUNPCKHDQ128,
+  IX86_BUILTIN_PUNPCKLBW128,
+  IX86_BUILTIN_PUNPCKLWD128,
+  IX86_BUILTIN_PUNPCKLDQ128,
+
+  IX86_BUILTIN_CLFLUSH,
+  IX86_BUILTIN_MFENCE,
+  IX86_BUILTIN_LFENCE,
+
   IX86_BUILTIN_MAX
 };
 
@@ -2257,7 +2424,7 @@ enum ix86_builtins
    On i386, if using PIC, mark a SYMBOL_REF for a non-global symbol
    so that we may access it directly in the GOT.  */
 
-#define ENCODE_SECTION_INFO(DECL)				\
+#define ENCODE_SECTION_INFO(DECL, FIRST)			\
 do {								\
     if (flag_pic)						\
       {								\
@@ -2276,7 +2443,8 @@ do {								\
 	    							\
 	    SYMBOL_REF_FLAG (XEXP (rtl, 0))			\
 	      = (TREE_CODE_CLASS (TREE_CODE (DECL)) != 'd'	\
-		 || ! TREE_PUBLIC (DECL));			\
+		 || ! TREE_PUBLIC (DECL)			\
+		 || MODULE_LOCAL_P (DECL));			\
 	  }							\
       }								\
 } while (0)
@@ -2410,16 +2578,21 @@ do {							\
     return flag_pic && SYMBOLIC_CONST (RTX) ? 1 : 0;		\
 								\
   case CONST_DOUBLE:						\
-    {								\
-      int code;							\
-      if (GET_MODE (RTX) == VOIDmode)				\
-	return 0;						\
-								\
-      code = standard_80387_constant_p (RTX);			\
-      return code == 1 ? 1 :					\
-	     code == 2 ? 2 :					\
-			 3;					\
-    }
+    if (GET_MODE (RTX) == VOIDmode)				\
+      return 0;							\
+    switch (standard_80387_constant_p (RTX))			\
+      {								\
+      case 1: /* 0.0 */						\
+	return 1;						\
+      case 2: /* 1.0 */						\
+	return 2;						\
+      default:							\
+	/* Start with (MEM (SYMBOL_REF)), since that's where	\
+	   it'll probably end up.  Add a penalty for size.  */	\
+	return (COSTS_N_INSNS (1) + (flag_pic != 0)		\
+		+ (GET_MODE (RTX) == SFmode ? 0			\
+		   : GET_MODE (RTX) == DFmode ? 1 : 2));	\
+      }
 
 /* Delete the definition here when TOPLEVEL_COSTS_N_INSNS gets added to cse.c */
 #define TOPLEVEL_COSTS_N_INSNS(N) \
@@ -2581,6 +2754,9 @@ do {							\
       TOPLEVEL_COSTS_N_INSNS (ix86_cost->add * 2);			\
     TOPLEVEL_COSTS_N_INSNS (ix86_cost->add);				\
 									\
+  case FLOAT_EXTEND:							\
+    TOPLEVEL_COSTS_N_INSNS (0);						\
+									\
   egress_rtx_costs:							\
     break;
 
@@ -2680,19 +2856,6 @@ do {							\
 
 /* Nonzero if access to memory by shorts is slow and undesirable.  */
 #define SLOW_SHORT_ACCESS 0
-
-/* Define this macro if zero-extension (of a `char' or `short' to an
-   `int') can be done faster if the destination is a register that is
-   known to be zero.
-
-   If you define this macro, you must have instruction patterns that
-   recognize RTL structures like this:
-
-          (set (strict_low_part (subreg:QI (reg:SI ...) 0)) ...)
-
-   and likewise for `HImode'.  */
-
-/* #define SLOW_ZERO_EXTEND */
 
 /* Define this macro to be the value 1 if unaligned accesses have a
    cost many times greater than aligned accesses, for example if they
@@ -2924,6 +3087,14 @@ extern int const svr4_dbx_register_map[FIRST_PSEUDO_REGISTER];
 
 #define ASM_SIMPLIFY_DWARF_ADDR(X) \
   i386_simplify_dwarf_addr (X)
+
+/* Switch to init or fini section via SECTION_OP, emit a call to FUNC,
+   and switch back.  For x86 we do this only to save a few bytes that
+   would otherwise be unused in the text section.  */
+#define CRT_CALL_STATIC_FUNCTION(SECTION_OP, FUNC)	\
+   asm (SECTION_OP "\n\t"				\
+	"call " USER_LABEL_PREFIX #FUNC "\n"		\
+	TEXT_SECTION_ASM_OP);
 
 /* Print operand X (an rtx) in assembler syntax to file FILE.
    CODE is a letter or dot (`z' in `%z0') or 0 if no letter was specified.

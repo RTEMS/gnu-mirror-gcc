@@ -1,5 +1,5 @@
 /* Subroutines used for code generation on the Argonaut ARC cpu.
-   Copyright (C) 1994, 1995, 1997, 1998, 1999, 2000, 2001
+   Copyright (C) 1994, 1995, 1997, 1998, 1999, 2000, 2001, 2002
    Free Software Foundation, Inc.
 
 This file is part of GNU CC.
@@ -1706,7 +1706,7 @@ arc_print_operand (file, x, code)
 	  fputc (']', file);
 	}
       else
-	output_operand_lossage ("invalid operand to %R code");
+	output_operand_lossage ("invalid operand to %%R code");
       return;
     case 'S' :
       if ((GET_CODE (x) == SYMBOL_REF && SYMBOL_REF_FLAG (x))
@@ -1738,7 +1738,7 @@ arc_print_operand (file, x, code)
 		   (long)(code == 'L' ? INTVAL (first) : INTVAL (second)));
 	}
       else
-	output_operand_lossage ("invalid operand to %H/%L code");
+	output_operand_lossage ("invalid operand to %%H/%%L code");
       return;
     case 'A' :
       {
@@ -1762,7 +1762,7 @@ arc_print_operand (file, x, code)
 	    fputs (".a", file);
 	}
       else
-	output_operand_lossage ("invalid operand to %U code");
+	output_operand_lossage ("invalid operand to %%U code");
       return;
     case 'V' :
       /* Output cache bypass indicator for a load/store insn.  Volatile memory
@@ -1773,7 +1773,7 @@ arc_print_operand (file, x, code)
 	    fputs (".di", file);
 	}
       else
-	output_operand_lossage ("invalid operand to %V code");
+	output_operand_lossage ("invalid operand to %%V code");
       return;
     case 0 :
       /* Do nothing special.  */
@@ -2190,7 +2190,7 @@ arc_final_prescan_insn (insn, opvec, noperands)
 	      if (!this_insn)
 	        {
 		  /* Oh dear! we ran off the end, give up.  */
-		  insn_extract (insn);
+		  extract_insn_cached (insn);
 		  arc_ccfsm_state = 0;
 		  arc_ccfsm_target_insn = NULL;
 		  return;
@@ -2212,9 +2212,8 @@ arc_final_prescan_insn (insn, opvec, noperands)
 
       /* Restore recog_data.  Getting the attributes of other insns can
 	 destroy this array, but final.c assumes that it remains intact
-	 across this call; since the insn has been recognized already we
-	 call insn_extract direct.  */
-      insn_extract (insn);
+	 across this call.  */
+      extract_insn_cached (insn);
     }
 }
 

@@ -41,6 +41,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "predict.h"
 #include "tm_p.h"
 #include "target.h"
+#include "langhooks.h"
 
 #define CALLED_AS_BUILT_IN(NODE) \
    (!strncmp (IDENTIFIER_POINTER (DECL_NAME (NODE)), "__builtin_", 10))
@@ -71,8 +72,6 @@ const char *const built_in_names[(int) END_BUILTINS] =
 /* Setup an array of _DECL trees, make sure each element is
    initialized to NULL_TREE.  */
 tree built_in_decls[(int) END_BUILTINS];
-
-tree (*lang_type_promotes_to) PARAMS ((tree));
 
 static int get_pointer_alignment	PARAMS ((tree, unsigned int));
 static tree c_strlen			PARAMS ((tree));
@@ -126,6 +125,8 @@ static rtx builtin_strncpy_read_str	PARAMS ((PTR, HOST_WIDE_INT,
 static rtx expand_builtin_strncpy	PARAMS ((tree, rtx,
 						 enum machine_mode));
 static rtx builtin_memset_read_str	PARAMS ((PTR, HOST_WIDE_INT,
+						 enum machine_mode));
+static rtx builtin_memset_gen_str	PARAMS ((PTR, HOST_WIDE_INT,
 						 enum machine_mode));
 static rtx expand_builtin_memset	PARAMS ((tree, rtx,
                                                  enum machine_mode));
@@ -639,7 +640,7 @@ void
 expand_builtin_longjmp (buf_addr, value)
      rtx buf_addr, value;
 {
-  rtx fp, lab, stack, insn;
+  rtx fp, lab, stack, insn, last;
   enum machine_mode sa_mode = STACK_SAVEAREA_MODE (SAVE_NONLOCAL);
 
   if (setjmp_alias_set == -1)
@@ -662,6 +663,7 @@ expand_builtin_longjmp (buf_addr, value)
 
   current_function_calls_longjmp = 1;
 
+  last = get_last_insn ();
 #ifdef HAVE_builtin_longjmp
   if (HAVE_builtin_longjmp)
     emit_insn (gen_builtin_longjmp (buf_addr));
@@ -707,6 +709,8 @@ expand_builtin_longjmp (buf_addr, value)
      internal exception handling use only.  */
   for (insn = get_last_insn (); insn; insn = PREV_INSN (insn))
     {
+      if (insn == last)
+	abort ();
       if (GET_CODE (insn) == JUMP_INSN)
 	{
 	  REG_NOTES (insn) = alloc_EXPR_LIST (REG_NON_LOCAL_GOTO, const0_rtx,
@@ -784,9 +788,17 @@ expand_builtin_prefetch (arglist)
 #ifdef HAVE_prefetch
   if (HAVE_prefetch)
     {
-      if (! (*insn_data[(int)CODE_FOR_prefetch].operand[0].predicate)
-	    (op0, Pmode))
-        op0 = force_reg (Pmode, op0);
+      if ((! (*insn_data[(int)CODE_FOR_prefetch].operand[0].predicate)
+	     (op0,
+	      insn_data[(int)CODE_FOR_prefetch].operand[0].mode)) ||
+          (GET_MODE(op0) != Pmode))
+        {
+#ifdef POINTERS_EXTEND_UNSIGNED
+	  if (GET_MODE(op0) != Pmode)
+	    op0 = convert_memory_address (Pmode, op0);
+#endif
+          op0 = force_reg (Pmode, op0);
+        }
       emit_insn (gen_prefetch (op0, op1, op2));
     }
   else
@@ -1469,6 +1481,7 @@ expand_builtin_mathfn (exp, target, subtarget)
   rtx op0, insns;
   tree fndecl = TREE_OPERAND (TREE_OPERAND (exp, 0), 0);
   tree arglist = TREE_OPERAND (exp, 1);
+  enum machine_mode argmode;
 
   if (!validate_arglist (arglist, REAL_TYPE, VOID_TYPE))
     return 0;
@@ -1517,8 +1530,8 @@ expand_builtin_mathfn (exp, target, subtarget)
 
   /* Compute into TARGET.
      Set TARGET to wherever the result comes back.  */
-  target = expand_unop (TYPE_MODE (TREE_TYPE (TREE_VALUE (arglist))),
-			builtin_optab, op0, target, 0);
+  argmode = TYPE_MODE (TREE_TYPE (TREE_VALUE (arglist)));
+  target = expand_unop (argmode, builtin_optab, op0, target, 0);
 
   /* If we were unable to expand via the builtin, stop the
      sequence (without outputting the insns) and return 0, causing
@@ -1529,17 +1542,11 @@ expand_builtin_mathfn (exp, target, subtarget)
       return 0;
     }
 
-  /* If errno must be maintained and if we are not allowing unsafe
-     math optimizations, check the result.  */
+  /* If errno must be maintained, we must set it to EDOM for NaN results.  */
 
-  if (flag_errno_math && ! flag_unsafe_math_optimizations)
+  if (flag_errno_math && HONOR_NANS (argmode))
     {
       rtx lab1;
-
-      /* Don't define the builtin FP instructions
-	 if your machine is not IEEE.  */
-      if (TARGET_FLOAT_FORMAT != IEEE_FLOAT_FORMAT)
-	abort ();
 
       lab1 = gen_label_rtx ();
 
@@ -2061,7 +2068,7 @@ expand_builtin_strncpy (arglist, target, mode)
 	return 0;
 
       /* If the len parameter is zero, return the dst parameter.  */
-      if (compare_tree_int (len, 0) == 0)
+      if (integer_zerop (len))
         {
 	/* Evaluate and ignore the src argument in case it has
            side-effects.  */
@@ -2129,6 +2136,34 @@ builtin_memset_read_str (data, offset, mode)
   return c_readstr (p, mode);
 }
 
+/* Callback routine for store_by_pieces.  Return the RTL of a register
+   containing GET_MODE_SIZE (MODE) consecutive copies of the unsigned
+   char value given in the RTL register data.  For example, if mode is
+   4 bytes wide, return the RTL for 0x01010101*data.  */
+
+static rtx
+builtin_memset_gen_str (data, offset, mode)
+     PTR data;
+     HOST_WIDE_INT offset ATTRIBUTE_UNUSED;
+     enum machine_mode mode;
+{
+  rtx target, coeff;
+  size_t size;
+  char *p;
+
+  size = GET_MODE_SIZE (mode);
+  if (size==1)
+    return (rtx)data;
+
+  p = alloca (size);
+  memset (p, 1, size);
+  coeff = c_readstr (p, mode);
+
+  target = convert_to_mode (mode, (rtx)data, 1);
+  target = expand_mult (mode, target, coeff, NULL_RTX, 1);
+  return force_reg (mode, target);
+}
+
 /* Expand expression EXP, which is a call to the memset builtin.  Return 0
    if we failed the caller should emit a normal call, otherwise try to get
    the result in TARGET, if convenient (and in mode MODE if that's
@@ -2170,7 +2205,34 @@ expand_builtin_memset (exp, target, mode)
         }
 
       if (TREE_CODE (val) != INTEGER_CST)
-	return 0;
+        {
+          rtx val_rtx;
+
+          if (!host_integerp (len, 1))
+            return 0;
+
+          if (optimize_size && tree_low_cst (len, 1) > 1)
+            return 0;
+
+          /* Assume that we can memset by pieces if we can store the
+           * the coefficients by pieces (in the required modes).
+           * We can't pass builtin_memset_gen_str as that emits RTL.  */
+          c = 1;
+	  if (!can_store_by_pieces (tree_low_cst (len, 1),
+				    builtin_memset_read_str,
+                                    (PTR) &c, dest_align))
+	    return 0;
+
+          val = fold (build1 (CONVERT_EXPR, unsigned_char_type_node, val));
+          val_rtx = expand_expr (val, NULL_RTX, VOIDmode, 0);
+          val_rtx = force_reg (TYPE_MODE (unsigned_char_type_node),
+                               val_rtx);
+	  dest_mem = get_memory_rtx (dest);
+	  store_by_pieces (dest_mem, tree_low_cst (len, 1),
+			   builtin_memset_gen_str,
+			   (PTR)val_rtx, dest_align);
+	  return force_operand (XEXP (dest_mem, 0), NULL_RTX);
+        }
 
       if (target_char_cast (val, &c))
 	return 0;
@@ -2278,10 +2340,11 @@ expand_builtin_memcmp (exp, arglist, target, mode)
   /* If all arguments are constant, and the value of len is not greater
      than the lengths of arg1 and arg2, evaluate at compile-time.  */
   if (host_integerp (len, 1) && p1 && p2
-      && compare_tree_int (len, strlen (p1)+1) <= 0
-      && compare_tree_int (len, strlen (p2)+1) <= 0)
+      && compare_tree_int (len, strlen (p1) + 1) <= 0
+      && compare_tree_int (len, strlen (p2) + 1) <= 0)
     {
       const int r = memcmp (p1, p2, tree_low_cst (len, 1));
+
       return (r < 0 ? constm1_rtx : (r > 0 ? const1_rtx : const0_rtx));
     }
 
@@ -2606,8 +2669,7 @@ expand_builtin_strncat (arglist, target, mode)
 
       /* If the requested length is zero, or the src parameter string
           length is zero, return the dst parameter.  */
-      if ((TREE_CODE (len) == INTEGER_CST && compare_tree_int (len, 0) == 0)
-	  || (p && *p == '\0'))
+      if (integer_zerop (len) || (p && *p == '\0'))
         {
 	  /* Evaluate and ignore the src and len parameters in case
 	     they have side-effects.  */
@@ -2621,9 +2683,9 @@ expand_builtin_strncat (arglist, target, mode)
       if (TREE_CODE (len) == INTEGER_CST && p
 	  && compare_tree_int (len, strlen (p)) >= 0)
         {
-	  tree newarglist =
-	    tree_cons (NULL_TREE, dst, build_tree_list (NULL_TREE, src)),
-	    fn = built_in_decls[BUILT_IN_STRCAT];
+	  tree newarglist
+	    = tree_cons (NULL_TREE, dst, build_tree_list (NULL_TREE, src));
+	  tree fn = built_in_decls[BUILT_IN_STRCAT];
 
 	  /* If the replacement _DECL isn't initialized, don't do the
 	     transformation.  */
@@ -2990,37 +3052,54 @@ rtx
 std_expand_builtin_va_arg (valist, type)
      tree valist, type;
 {
-  tree addr_tree, t;
-  HOST_WIDE_INT align;
-  HOST_WIDE_INT rounded_size;
+  tree addr_tree, t, type_size = NULL;
+  tree align, alignm1;
+  tree rounded_size;
   rtx addr;
 
   /* Compute the rounded size of the type.  */
-  align = PARM_BOUNDARY / BITS_PER_UNIT;
-  rounded_size = (((int_size_in_bytes (type) + align - 1) / align) * align);
+  align = size_int (PARM_BOUNDARY / BITS_PER_UNIT);
+  alignm1 = size_int (PARM_BOUNDARY / BITS_PER_UNIT - 1);
+  if (type == error_mark_node
+      || (type_size = TYPE_SIZE_UNIT (TYPE_MAIN_VARIANT (type))) == NULL
+      || TREE_OVERFLOW (type_size))
+    rounded_size = size_zero_node;
+  else
+    rounded_size = fold (build (MULT_EXPR, sizetype,
+				fold (build (TRUNC_DIV_EXPR, sizetype,
+					     fold (build (PLUS_EXPR, sizetype,
+							  type_size, alignm1)),
+					     align)),
+				align));
 
   /* Get AP.  */
   addr_tree = valist;
-  if (PAD_VARARGS_DOWN)
+  if (PAD_VARARGS_DOWN && ! integer_zerop (rounded_size))
     {
       /* Small args are padded downward.  */
-
-      HOST_WIDE_INT adj
-	= rounded_size > align ? rounded_size : int_size_in_bytes (type);
-
-      addr_tree = build (PLUS_EXPR, TREE_TYPE (addr_tree), addr_tree,
-			 build_int_2 (rounded_size - adj, 0));
+      addr_tree = fold (build (PLUS_EXPR, TREE_TYPE (addr_tree), addr_tree,
+			       fold (build (COND_EXPR, sizetype,
+					    fold (build (GT_EXPR, sizetype,
+							 rounded_size,
+							 align)),
+					    size_zero_node,
+					    fold (build (MINUS_EXPR, sizetype,
+							 rounded_size,
+							 type_size))))));
     }
 
   addr = expand_expr (addr_tree, NULL_RTX, Pmode, EXPAND_NORMAL);
   addr = copy_to_reg (addr);
 
   /* Compute new value for AP.  */
-  t = build (MODIFY_EXPR, TREE_TYPE (valist), valist,
-	     build (PLUS_EXPR, TREE_TYPE (valist), valist,
-		    build_int_2 (rounded_size, 0)));
-  TREE_SIDE_EFFECTS (t) = 1;
-  expand_expr (t, const0_rtx, VOIDmode, EXPAND_NORMAL);
+  if (! integer_zerop (rounded_size))
+    {
+      t = build (MODIFY_EXPR, TREE_TYPE (valist), valist,
+		 build (PLUS_EXPR, TREE_TYPE (valist), valist,
+			rounded_size));
+      TREE_SIDE_EFFECTS (t) = 1;
+      expand_expr (t, const0_rtx, VOIDmode, EXPAND_NORMAL);
+    }
 
   return addr;
 }
@@ -3060,10 +3139,11 @@ expand_builtin_va_arg (valist, type)
 
   /* Generate a diagnostic for requesting data of a type that cannot
      be passed through `...' due to type promotion at the call site.  */
-  else if ((promoted_type = (*lang_type_promotes_to) (type)) != NULL_TREE)
+  else if ((promoted_type = (*lang_hooks.types.type_promotes_to) (type))
+	   != type)
     {
       const char *name = "<anonymous type>", *pname = 0;
-      static int gave_help;
+      static bool gave_help;
 
       if (TYPE_NAME (type))
 	{
@@ -3082,13 +3162,24 @@ expand_builtin_va_arg (valist, type)
 	    pname = IDENTIFIER_POINTER (DECL_NAME (TYPE_NAME (promoted_type)));
 	}
 
-      error ("`%s' is promoted to `%s' when passed through `...'", name, pname);
+      /* Unfortunately, this is merely undefined, rather than a constraint
+	 violation, so we cannot make this an error.  If this call is never
+	 executed, the program is still strictly conforming.  */
+      warning ("`%s' is promoted to `%s' when passed through `...'",
+	       name, pname);
       if (! gave_help)
 	{
-	  gave_help = 1;
-	  error ("(so you should pass `%s' not `%s' to `va_arg')", pname, name);
+	  gave_help = true;
+	  warning ("(so you should pass `%s' not `%s' to `va_arg')",
+		   pname, name);
 	}
 
+      /* We can, however, treat "undefined" any way we please.
+	 Call abort to encourage the user to fix the program.  */
+      expand_builtin_trap ();
+
+      /* This is dead code, but go ahead and finish so that the
+	 mode of the result comes out right.  */
       addr = const0_rtx;
     }
   else
@@ -3540,6 +3631,18 @@ expand_builtin_expect_jump (exp, if_false_label, if_true_label)
 
   return ret;
 }
+
+void
+expand_builtin_trap ()
+{
+#ifdef HAVE_trap
+  if (HAVE_trap)
+    emit_insn (gen_trap ());
+  else
+#endif
+    emit_library_call (abort_libfunc, LCT_NORETURN, VOIDmode, 0);
+  emit_barrier ();
+}
 
 /* Expand an expression EXP that calls a built-in function,
    with result going to TARGET if that's convenient
@@ -3874,13 +3977,7 @@ expand_builtin (exp, target, subtarget, mode, ignore)
 	}
 
     case BUILT_IN_TRAP:
-#ifdef HAVE_trap
-      if (HAVE_trap)
-	emit_insn (gen_trap ());
-      else
-#endif
-	error ("__builtin_trap not supported by this target");
-      emit_barrier ();
+      expand_builtin_trap ();
       return const0_rtx;
 
     case BUILT_IN_PUTCHAR:

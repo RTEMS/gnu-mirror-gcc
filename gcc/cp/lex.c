@@ -23,9 +23,6 @@ Boston, MA 02111-1307, USA.  */
 
 /* This file is the lexical analyzer for GNU C++.  */
 
-/* Cause the `yydebug' variable to be defined.  */
-#define YYDEBUG 1
-
 #include "config.h"
 #include "system.h"
 #include "input.h"
@@ -205,37 +202,6 @@ int interface_only;		/* whether or not current file is only for
 int interface_unknown;		/* whether or not we know this class
 				   to behave according to #pragma interface.  */
 
-/* Tree code classes. */
-
-#define DEFTREECODE(SYM, NAME, TYPE, LENGTH) TYPE,
-
-static const char cplus_tree_code_type[] = {
-  'x',
-#include "cp-tree.def"
-};
-#undef DEFTREECODE
-
-/* Table indexed by tree code giving number of expression
-   operands beyond the fixed part of the node structure.
-   Not used for types or decls.  */
-
-#define DEFTREECODE(SYM, NAME, TYPE, LENGTH) LENGTH,
-
-static const int cplus_tree_code_length[] = {
-  0,
-#include "cp-tree.def"
-};
-#undef DEFTREECODE
-
-/* Names of tree components.
-   Used for printing out the tree and error messages.  */
-#define DEFTREECODE(SYM, NAME, TYPE, LEN) NAME,
-
-static const char *const cplus_tree_code_name[] = {
-  "@@dummy",
-#include "cp-tree.def"
-};
-#undef DEFTREECODE
 
 /* Post-switch processing.  */
 void
@@ -263,8 +229,6 @@ cxx_init_options ()
 void
 cxx_finish ()
 {
-  if (flag_gnu_xref)
-    GNU_xref_end (errorcount + sorrycount);
   c_common_finish ();
 }
 
@@ -486,7 +450,6 @@ static const struct resword reswords[] =
   { "xor_eq",		RID_XOR_EQ,	D_OPNAME },
 
 };
-#define N_reswords (sizeof reswords / sizeof (struct resword))
 
 /* Table mapping from RID_* constants to yacc token numbers.
    Unfortunately we have to have entries for all the keywords in all
@@ -641,7 +604,7 @@ init_reswords ()
      all the trees it points to are permanently interned in the
      get_identifier hash anyway.  */
   ridpointers = (tree *) xcalloc ((int) RID_MAX, sizeof (tree));
-  for (i = 0; i < N_reswords; i++)
+  for (i = 0; i < ARRAY_SIZE (reswords); i++)
     {
       id = get_identifier (reswords[i].word);
       C_RID_CODE (id) = reswords[i].rid;
@@ -676,27 +639,12 @@ const char *
 cxx_init (filename)
      const char *filename;
 {
-  decl_printable_name = lang_printable_name;
   input_filename = "<internal>";
 
   init_reswords ();
   init_spew ();
   init_tree ();
-  init_cplus_expand ();
   init_cp_semantics ();
-
-  add_c_tree_codes ();
-
-  memcpy (tree_code_type + (int) LAST_C_TREE_CODE,
-	  cplus_tree_code_type,
-	  (int)LAST_CPLUS_TREE_CODE - (int)LAST_C_TREE_CODE);
-  memcpy (tree_code_length + (int) LAST_C_TREE_CODE,
-	  cplus_tree_code_length,
-	  (LAST_CPLUS_TREE_CODE - (int)LAST_C_TREE_CODE) * sizeof (int));
-  memcpy (tree_code_name + (int) LAST_C_TREE_CODE,
-	  cplus_tree_code_name,
-	  (LAST_CPLUS_TREE_CODE - (int)LAST_C_TREE_CODE) * sizeof (char *));
-
   init_operators ();
   init_method ();
   init_error ();
@@ -723,18 +671,18 @@ cxx_init (filename)
 
   /* Create the built-in __null node.  */
   null_node = build_int_2 (0, 0);
-  TREE_TYPE (null_node) = type_for_size (POINTER_SIZE, 0);
+  TREE_TYPE (null_node) = c_common_type_for_size (POINTER_SIZE, 0);
   ridpointers[RID_NULL] = null_node;
 
   token_count = init_cpp_parse ();
   interface_unknown = 1;
 
   filename = c_common_init (filename);
+  if (filename == NULL)
+    return NULL;
 
   init_cp_pragma ();
 
-  if (flag_gnu_xref)
-    GNU_xref_begin (filename);
   init_repo (filename);
 
   return filename;
@@ -780,7 +728,7 @@ yyprint (file, yychar, yylval)
       else if (yylval.ttype == enum_type_node)
 	fprintf (file, " `enum'");
       else
-	my_friendly_abort (80);
+	abort ();
       break;
 
     case CONSTANT:
@@ -816,8 +764,8 @@ static int *reduce_count;
 int *token_count;
 
 #if 0
-#define REDUCE_LENGTH (sizeof (yyr2) / sizeof (yyr2[0]))
-#define TOKEN_LENGTH (256 + sizeof (yytname) / sizeof (yytname[0]))
+#define REDUCE_LENGTH ARRAY_SIZE (yyr2)
+#define TOKEN_LENGTH (256 + ARRAY_SIZE (yytname))
 #endif
 
 #ifdef GATHER_STATISTICS
@@ -895,22 +843,6 @@ print_parse_statistics ()
 #endif
 }
 
-/* Sets the value of the 'yydebug' variable to VALUE.
-   This is a function so we don't have to have YYDEBUG defined
-   in order to build the compiler.  */
-
-void
-cxx_set_yydebug (value)
-     int value;
-{
-#if YYDEBUG != 0
-  extern int yydebug;
-  yydebug = value;
-#else
-  warning ("YYDEBUG not defined");
-#endif
-}
-
 /* Helper function to load global variables with interface
    information.  */
 
@@ -931,9 +863,6 @@ extract_interface_info ()
 
   interface_only = finfo->interface_only;
   interface_unknown = finfo->interface_unknown;
-
-  /* This happens to be a convenient place to put this.  */
-  if (flag_gnu_xref) GNU_xref_file (input_filename);
 }
 
 /* Return nonzero if S is not considered part of an
@@ -1012,7 +941,7 @@ note_got_semicolon (type)
      tree type;
 {
   if (!TYPE_P (type))
-    my_friendly_abort (60);
+    abort ();
   if (CLASS_TYPE_P (type))
     CLASSTYPE_GOT_SEMICOLON (type) = 1;
 }
@@ -1026,7 +955,7 @@ note_list_got_semicolon (declspecs)
   for (link = declspecs; link; link = TREE_CHAIN (link))
     {
       tree type = TREE_VALUE (link);
-      if (TYPE_P (type))
+      if (type && TYPE_P (type))
 	note_got_semicolon (type);
     }
   clear_anon_tags ();
@@ -1248,6 +1177,9 @@ do_identifier (token, parsing, args)
     {
       if (current_template_parms)
 	return build_min_nt (LOOKUP_EXPR, token);
+      else if (IDENTIFIER_TYPENAME_P (token))
+	/* A templated conversion operator might exist.  */
+	return token;
       else if (IDENTIFIER_OPNAME_P (token))
 	{
 	  if (token != ansi_opname (ERROR_MARK))
@@ -1372,7 +1304,8 @@ do_scoped_id (token, parsing)
     id = IDENTIFIER_GLOBAL_VALUE (token);
   if (parsing && yychar == YYEMPTY)
     yychar = yylex ();
-  if (! id)
+  if (!id || (TREE_CODE (id) == FUNCTION_DECL
+	      && DECL_ANTICIPATED (id)))
     {
       if (processing_template_decl)
 	{
@@ -1507,6 +1440,12 @@ retrofit_lang_decl (t)
 
   ld = (struct lang_decl *) ggc_alloc_cleared (size);
 
+  ld->decl_flags.can_be_full = CAN_HAVE_FULL_LANG_DECL_P (t) ? 1 : 0;
+  ld->decl_flags.u1sel = TREE_CODE (t) == NAMESPACE_DECL ? 1 : 0;
+  ld->decl_flags.u2sel = 0;
+  if (ld->decl_flags.can_be_full)
+    ld->u.f.u3sel = TREE_CODE (t) == FUNCTION_DECL ? 1 : 0;
+
   DECL_LANG_SPECIFIC (t) = ld;
   if (current_lang_name == lang_name_cplusplus)
     SET_DECL_LANGUAGE (t, lang_cplusplus);
@@ -1514,7 +1453,7 @@ retrofit_lang_decl (t)
     SET_DECL_LANGUAGE (t, lang_c);
   else if (current_lang_name == lang_name_java)
     SET_DECL_LANGUAGE (t, lang_java);
-  else my_friendly_abort (64);
+  else abort ();
 
 #ifdef GATHER_STATISTICS
   tree_node_counts[(int)lang_decl] += 1;
@@ -1523,7 +1462,7 @@ retrofit_lang_decl (t)
 }
 
 void
-copy_lang_decl (node)
+cxx_dup_lang_specific_decl (node)
      tree node;
 {
   int size;
@@ -1555,7 +1494,7 @@ copy_decl (decl)
   tree copy;
 
   copy = copy_node (decl);
-  copy_lang_decl (copy);
+  cxx_dup_lang_specific_decl (copy);
   return copy;
 }
 
@@ -1571,7 +1510,10 @@ copy_lang_type (node)
   if (! TYPE_LANG_SPECIFIC (node))
     return;
 
-  size = sizeof (struct lang_type);
+  if (TYPE_LANG_SPECIFIC (node)->u.h.is_lang_type_class)
+    size = sizeof (struct lang_type);
+  else
+    size = sizeof (struct lang_type_ptrmem);
   lt = (struct lang_type *) ggc_alloc (size);
   memcpy (lt, TYPE_LANG_SPECIFIC (node), size);
   TYPE_LANG_SPECIFIC (node) = lt;
@@ -1596,7 +1538,7 @@ copy_type (type)
 }
 
 tree
-cp_make_lang_type (code)
+cxx_make_type (code)
      enum tree_code code;
 {
   register tree t = make_node (code);
@@ -1611,6 +1553,7 @@ cp_make_lang_type (code)
 	    ggc_alloc_cleared (sizeof (struct lang_type)));
 
       TYPE_LANG_SPECIFIC (t) = pi;
+      pi->u.c.h.is_lang_type_class = 1;
 
 #ifdef GATHER_STATISTICS
       tree_node_counts[(int)lang_type] += 1;
@@ -1651,7 +1594,7 @@ tree
 make_aggr_type (code)
      enum tree_code code;
 {
-  tree t = cp_make_lang_type (code);
+  tree t = cxx_make_type (code);
 
   if (IS_AGGR_TYPE_CODE (code))
     SET_IS_AGGR_TYPE (t, 1);
@@ -1687,6 +1630,6 @@ cp_type_qual_from_rid (rid)
   else if (rid == ridpointers[(int) RID_RESTRICT])
     return TYPE_QUAL_RESTRICT;
 
-  my_friendly_abort (0);
+  abort ();
   return TYPE_UNQUALIFIED;
 }

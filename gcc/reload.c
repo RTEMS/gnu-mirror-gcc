@@ -266,8 +266,9 @@ static int find_reloads_address_1 PARAMS ((enum machine_mode, rtx, int, rtx *,
 static void find_reloads_address_part PARAMS ((rtx, rtx *, enum reg_class,
 					     enum machine_mode, int,
 					     enum reload_type, int));
-static rtx find_reloads_subreg_address PARAMS ((rtx, int, int, enum reload_type,
-					      int, rtx));
+static rtx find_reloads_subreg_address PARAMS ((rtx, int, int,
+						enum reload_type, int, rtx));
+static void copy_replacements_1 PARAMS ((rtx *, rtx *, int));
 static int find_inc_amount	PARAMS ((rtx, rtx));
 
 #ifdef HAVE_SECONDARY_RELOADS
@@ -1879,6 +1880,7 @@ find_dummy_reload (real_in, real_out, inloc, outloc,
       *inloc = const0_rtx;
 
       if (regno < FIRST_PSEUDO_REGISTER
+	  && HARD_REGNO_MODE_OK (regno, outmode)
 	  && ! refers_to_regno_for_reload_p (regno, regno + nwords,
 					     PATTERN (this_insn), outloc))
 	{
@@ -3031,6 +3033,7 @@ find_reloads (insn, replace, ind_levels, live_known, reload_reg_p)
 		   were handled in find_reloads_address.  */
 		this_alternative[i] = (int) MODE_BASE_REG_CLASS (VOIDmode);
 		win = 1;
+		badop = 0;
 		break;
 
 	      case 'm':
@@ -3120,18 +3123,6 @@ find_reloads (insn, replace, ind_levels, live_known, reload_reg_p)
 		break;
 
 	      case 'E':
-#ifndef REAL_ARITHMETIC
-		/* Match any floating double constant, but only if
-		   we can examine the bits of it reliably.  */
-		if ((HOST_FLOAT_FORMAT != TARGET_FLOAT_FORMAT
-		     || HOST_BITS_PER_WIDE_INT != BITS_PER_WORD)
-		    && GET_MODE (operand) != VOIDmode && ! flag_pretend_float)
-		  break;
-#endif
-		if (GET_CODE (operand) == CONST_DOUBLE)
-		  win = 1;
-		break;
-
 	      case 'F':
 		if (GET_CODE (operand) == CONST_DOUBLE)
 		  win = 1;
@@ -3572,7 +3563,7 @@ find_reloads (insn, replace, ind_levels, live_known, reload_reg_p)
 
   for (i = 0; i < noperands; i++)
     goal_alternative_matched[i] = -1;
- 
+
   for (i = 0; i < noperands; i++)
     if (! goal_alternative_win[i]
 	&& goal_alternative_matches[i] >= 0)
@@ -4240,6 +4231,23 @@ find_reloads (insn, replace, ind_levels, live_known, reload_reg_p)
 
       rld[i].nregs = CLASS_MAX_NREGS (rld[i].class, rld[i].mode);
     }
+
+  /* Special case a simple move with an input reload and a
+     destination of a hard reg, if the hard reg is ok, use it.  */
+  for (i = 0; i < n_reloads; i++)
+    if (rld[i].when_needed == RELOAD_FOR_INPUT
+	&& GET_CODE (PATTERN (insn)) == SET
+ 	&& GET_CODE (SET_DEST (PATTERN (insn))) == REG
+ 	&& SET_SRC (PATTERN (insn)) == rld[i].in)
+      {
+ 	rtx dest = SET_DEST (PATTERN (insn));
+	unsigned int regno = REGNO (dest);
+
+ 	if (regno < FIRST_PSEUDO_REGISTER
+ 	    && TEST_HARD_REG_BIT (reg_class_contents[rld[i].class], regno)
+ 	    && HARD_REGNO_MODE_OK (regno, rld[i].mode))
+ 	  rld[i].reg_rtx = dest;
+      }
 
   return retval;
 }
@@ -4909,6 +4917,7 @@ subst_reg_equivs (ad, insn)
     case CONST_INT:
     case CONST:
     case CONST_DOUBLE:
+    case CONST_VECTOR:
     case SYMBOL_REF:
     case LABEL_REF:
     case PC:
@@ -5881,46 +5890,67 @@ subst_reloads (insn)
     }
 }
 
-/* Make a copy of any replacements being done into X and move those copies
-   to locations in Y, a copy of X.  We only look at the highest level of
-   the RTL.  */
+/* Make a copy of any replacements being done into X and move those
+   copies to locations in Y, a copy of X.  */
 
 void
 copy_replacements (x, y)
-     rtx x;
-     rtx y;
+     rtx x, y;
 {
-  int i, j;
-  enum rtx_code code = GET_CODE (x);
-  const char *fmt = GET_RTX_FORMAT (code);
-  struct replacement *r;
-
   /* We can't support X being a SUBREG because we might then need to know its
      location if something inside it was replaced.  */
-  if (code == SUBREG)
+  if (GET_CODE (x) == SUBREG)
     abort ();
 
-  for (i = GET_RTX_LENGTH (code) - 1; i >= 0; i--)
-    if (fmt[i] == 'e')
-      for (j = 0; j < n_replacements; j++)
+  copy_replacements_1 (&x, &y, n_replacements);
+}
+
+static void
+copy_replacements_1 (px, py, orig_replacements)
+     rtx *px;
+     rtx *py;
+     int orig_replacements;
+{
+  int i, j;
+  rtx x, y;
+  struct replacement *r;
+  enum rtx_code code;
+  const char *fmt;
+
+  for (j = 0; j < orig_replacements; j++)
+    {
+      if (replacements[j].subreg_loc == px)
 	{
-	  if (replacements[j].subreg_loc == &XEXP (x, i))
-	    {
-	      r = &replacements[n_replacements++];
-	      r->where = replacements[j].where;
-	      r->subreg_loc = &XEXP (y, i);
-	      r->what = replacements[j].what;
-	      r->mode = replacements[j].mode;
-	    }
-	  else if (replacements[j].where == &XEXP (x, i))
-	    {
-	      r = &replacements[n_replacements++];
-	      r->where = &XEXP (y, i);
-	      r->subreg_loc = 0;
-	      r->what = replacements[j].what;
-	      r->mode = replacements[j].mode;
-	    }
+	  r = &replacements[n_replacements++];
+	  r->where = replacements[j].where;
+	  r->subreg_loc = py;
+	  r->what = replacements[j].what;
+	  r->mode = replacements[j].mode;
 	}
+      else if (replacements[j].where == px)
+	{
+	  r = &replacements[n_replacements++];
+	  r->where = py;
+	  r->subreg_loc = 0;
+	  r->what = replacements[j].what;
+	  r->mode = replacements[j].mode;
+	}
+    }
+
+  x = *px;
+  y = *py;
+  code = GET_CODE (x);
+  fmt = GET_RTX_FORMAT (code);
+
+  for (i = GET_RTX_LENGTH (code) - 1; i >= 0; i--)
+    {
+      if (fmt[i] == 'e')
+	copy_replacements_1 (&XEXP (x, i), &XEXP (y, i), orig_replacements);
+      else if (fmt[i] == 'E')
+	for (j = XVECLEN (x, i); --j >= 0; )
+	  copy_replacements_1 (&XVECEXP (x, i, j), &XVECEXP (y, i, j),
+			       orig_replacements);
+    }
 }
 
 /* Change any replacements being done to *X to be done to *Y */
@@ -6149,7 +6179,8 @@ reg_overlap_mentioned_for_reload_p (x, in)
   int regno, endregno;
 
   /* Overly conservative.  */
-  if (GET_CODE (x) == STRICT_LOW_PART)
+  if (GET_CODE (x) == STRICT_LOW_PART
+      || GET_RTX_CLASS (GET_CODE (x)) == 'a')
     x = XEXP (x, 0);
 
   /* If either argument is a constant, then modifying X can not affect IN.  */
@@ -6185,6 +6216,9 @@ reg_overlap_mentioned_for_reload_p (x, in)
   else if (GET_CODE (x) == SCRATCH || GET_CODE (x) == PC
 	   || GET_CODE (x) == CC0)
     return reg_mentioned_p (x, in);
+  else if (GET_CODE (x) == PLUS)
+    return (reg_overlap_mentioned_for_reload_p (XEXP (x, 0), in)
+	    || reg_overlap_mentioned_for_reload_p (XEXP (x, 1), in));
   else
     abort ();
 
@@ -6790,7 +6824,7 @@ regno_clobbered_p (regno, insn, mode, sets)
 	      && GET_CODE (XEXP (elt, 0)) == REG)
 	    {
 	      unsigned int test = REGNO (XEXP (elt, 0));
-	      
+
 	      if (test >= regno && test < endregno)
 		return 1;
 	    }

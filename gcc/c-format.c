@@ -1,6 +1,6 @@
 /* Check calls to formatted I/O functions (-Wformat).
-   Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001
-   Free Software Foundation, Inc.
+   Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
+   2001, 2002 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -27,7 +27,7 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "c-common.h"
 #include "intl.h"
 #include "diagnostic.h"
-
+#include "langhooks.h"
 
 /* Command line options and their associated flags.  */
 
@@ -1516,13 +1516,12 @@ check_format_info_recurse (status, res, info, format_tree, params, arg_num)
 	  res->number_non_literal++;
 	  return;
 	}
-      if (!host_integerp (arg1, 1))
+      if (!host_integerp (arg1, 0)
+	  || (offset = tree_low_cst (arg1, 0)) < 0)
 	{
 	  res->number_non_literal++;
 	  return;
 	}
-
-      offset = TREE_INT_CST_LOW (arg1);
     }
   if (TREE_CODE (format_tree) != ADDR_EXPR)
     {
@@ -1752,11 +1751,6 @@ check_format_info_main (status, res, info, format_chars, format_length,
 	      /* "...a field width...may be indicated by an asterisk.
 		 In this case, an int argument supplies the field width..."  */
 	      ++format_chars;
-	      if (params == 0)
-		{
-		  status_warning (status, "too few arguments for format");
-		  return;
-		}
 	      if (has_operand_number != 0)
 		{
 		  int opnum;
@@ -1776,6 +1770,11 @@ check_format_info_main (status, res, info, format_chars, format_length,
 		}
 	      if (info->first_arg_num != 0)
 		{
+		  if (params == 0)
+		    {
+		      status_warning (status, "too few arguments for format");
+		      return;
+		    }
 		  cur_param = TREE_VALUE (params);
 		  if (has_operand_number <= 0)
 		    {
@@ -2259,7 +2258,6 @@ check_format_types (status, types)
       tree cur_type;
       tree orig_cur_type;
       tree wanted_type;
-      tree promoted_type;
       int arg_num;
       int i;
       int char_type_flag;
@@ -2278,11 +2276,7 @@ check_format_types (status, types)
 	abort ();
 
       if (types->pointer_count == 0)
-	{
-	  promoted_type = simple_type_promotes_to (wanted_type);
-	  if (promoted_type != NULL_TREE)
-	    wanted_type = promoted_type;
-	}
+	wanted_type = (*lang_hooks.types.type_promotes_to) (wanted_type);
 
       STRIP_NOPS (cur_param);
 
@@ -2387,8 +2381,8 @@ check_format_types (status, types)
 	  && TREE_CODE (cur_type) == INTEGER_TYPE
 	  && (! pedantic || i == 0 || (i == 1 && char_type_flag))
 	  && (TREE_UNSIGNED (wanted_type)
-	      ? wanted_type == unsigned_type (cur_type)
-	      : wanted_type == signed_type (cur_type)))
+	      ? wanted_type == c_common_unsigned_type (cur_type)
+	      : wanted_type == c_common_signed_type (cur_type)))
 	continue;
       /* Likewise, "signed char", "unsigned char" and "char" are
 	 equivalent but the above test won't consider them equivalent.  */

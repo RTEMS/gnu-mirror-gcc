@@ -1,5 +1,5 @@
 /* Definitions for Intel 386 running SCO Unix System V 3.2 Version 5.
-   Copyright (C) 1992, 1995, 1996, 1997, 1998, 1999, 2000
+   Copyright (C) 1992, 1995, 1996, 1997, 1998, 1999, 2000, 2002
    Free Software Foundation, Inc.
    Contributed by Kean Johnston (hug@netcom.com)
 
@@ -20,10 +20,6 @@ along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
-#include "i386/i386.h"	/* Base i386 target definitions */
-#include "i386/att.h"	/* Use AT&T i386 assembler syntax */
-
-#undef TARGET_VERSION
 #define TARGET_VERSION fprintf (stderr, " (i386, SCO OpenServer 5 Syntax)");
 
 #undef LPREFIX
@@ -544,28 +540,9 @@ init_section ()								\
 	      == void_type_node))) ? (SIZE)				\
    : 0))
 
-#undef SELECT_SECTION
-#define SELECT_SECTION(DECL,RELOC,ALIGN)				\
-{									\
-  if (TARGET_ELF && flag_pic && RELOC)					\
-     data_section ();							\
-  else if (TREE_CODE (DECL) == STRING_CST)				\
-    {									\
-      if (! flag_writable_strings)					\
-	const_section ();						\
-      else								\
-	data_section ();						\
-    }									\
-  else if (TREE_CODE (DECL) == VAR_DECL)				\
-    {									\
-      if (! DECL_READONLY_SECTION (DECL, RELOC)) 			\
-	data_section ();						\
-      else								\
-	const_section ();						\
-    }									\
-  else									\
-    const_section ();							\
-}
+/* ??? Ignore coff.  */
+#undef	TARGET_ASM_SELECT_SECTION
+#define TARGET_ASM_SELECT_SECTION  default_elf_select_section
 
 #undef SWITCH_TAKES_ARG
 #define SWITCH_TAKES_ARG(CHAR) 						\
@@ -676,13 +653,11 @@ init_section ()								\
     %{pg:gcrt.o%s}%{!pg:%{p:mcrt1.o%s}%{!p:crt1.o%s}}}} \
   %{ansi:values-Xc.o%s} \
   %{!ansi: \
-   %{traditional:values-Xt.o%s} \
-    %{!traditional: \
-     %{Xa:values-Xa.o%s} \
-      %{!Xa:%{Xc:values-Xc.o%s} \
-       %{!Xc:%{Xk:values-Xk.o%s} \
-        %{!Xk:%{Xt:values-Xt.o%s} \
-         %{!Xt:values-Xa.o%s}}}}}} \
+   %{Xa:values-Xa.o%s} \
+    %{!Xa:%{Xc:values-Xc.o%s} \
+     %{!Xc:%{Xk:values-Xk.o%s} \
+      %{!Xk:%{Xt:values-Xt.o%s} \
+       %{!Xt:values-Xa.o%s}}}}} \
   %{mcoff:crtbeginS.o%s} %{!mcoff:crtbegin.o%s}"
 
 #undef ENDFILE_SPEC
@@ -719,7 +694,6 @@ init_section ()								\
                       -DM_BITFIELDS -DM_SYS5 -DM_SYSV -DM_INTERNAT -DM_SYSIII \
                       -DM_WORDSWAP}}}} \
   %{scointl:-DM_INTERNAT -D_M_INTERNAT} \
-  %{traditional:-D_KR -D_SVID -D_NO_PROTOTYPE} \
   %{!mcoff:-D_SCO_ELF} \
   %{mcoff:-D_M_COFF -D_SCO_COFF} \
   %{!mcoff:%{fpic:-D__PIC__ -D__pic__} \
@@ -728,8 +702,7 @@ init_section ()								\
   %{!Xa:%{Xc:-D_SCO_C_DIALECT=3} \
    %{!Xc:%{Xk:-D_SCO_C_DIALECT=4} \
     %{!Xk:%{Xt:-D_SCO_C_DIALECT=2} \
-     %{!Xt:-D_SCO_C_DIALECT=1}}}} \
-  %{traditional:-traditional -D_KR -D_NO_PROTOTYPE}"
+     %{!Xt:-D_SCO_C_DIALECT=1}}}}"
 
 #undef LINK_SPEC
 #define LINK_SPEC \

@@ -1,55 +1,40 @@
-2001-12-18
+2002-05-02
 
 Release Notes   
 -------------
-The Standard C++ Library v3, or libstdc++-2.9x, is an ongoing project
+The Standard C++ Library, or libstdc++-v3, is an ongoing project
 to fully implement the ISO 14882 Standard C++ library as described in
 chapters 17 through 27 and annex D.
 
-This is the twelfth snapshot of the libstdc++ rewrite.  It is still
+This is the fifteenth snapshot of the libstdc++ rewrite.  It still
 has some incomplet and incorrekt parts, but it's a lot less incomplete
 and incorrect than some of the earlier snapshots, and quite usable.
 
-The Standard C++ Library v3, or libstdc++-2.9x, follows an open
-development model, attempting to be fully buzzword, bazaar, and GNU
-compliant. Full details on participating, including contributor
-guidelines, mailing list subscription, mailing list archives,
-up-to-date documentation, and various and sundry other details can be
-found at the following URL:
+The Standard C++ Library, follows an open development model,
+attempting to be fully buzzword, bazaar, and GNU compliant. Full
+details on participating, including contributor guidelines, mailing
+list subscription, mailing list archives, up-to-date documentation,
+and various and sundry other details can be found at the following
+URL:
 
   http://gcc.gnu.org/libstdc++/
 
 
 New: 
 --- 
-- add S390, m68k, x86-64 support.
-- doxygen documentation has been extended, including man pages.
-- verbose terminate handling has been added.
-- some libsupc++ tweaks
-- warnings for deprecated headers now active.
-- dejagnu testsuite preliminary documentation.
-- dejagnu testsuite default.
-- dejagnu testsuite cross compiler, multilib safe.
-- long long iostreams on by default, rework of ISO C99 support.
-- iterator re-write and testsuites.
-- container testsuites.
-- allocator revamp and testsuites.
-- more concept-checking work.
-- basic_string optimization and MT fixes.
-- new limits implementation.
-- update -fno-exceptions code, verify it works.
-- full named locale support fpr all facets, choice of gnu,
-  ieee_1003.1-200x (POSIX 2), or generic models. Full support depends
-  on target OS and underlying "C" library support.
+- more doxygen documentation
+- more named locale fixups
+- stdio_filebuf that takes fd, FILE
+- io performance tuning
+- allocation tuning, valgrind fixups
+- __cxa_demangle now supported
+
 
 Bugs fixed:
 -----------
-2964, 2627, 2523, 2832, 2830, 2931, 2985, 2970, 2997, 2976, 3016,
-3018, 3034, 3035, 3036, 3017, 3045, 3082, 2767, 2989, 2992, 3113,
-3114, 2346, 3126, 3139, 3140, 3141, 3142, 2071, 3377, 3272, 2211,
-3284, 3599, 3988, 3349, 3740, 4143, 4536, 4545, 4542, 4503, 3647,
-4354, 4622, 4749, 3666, 4219, 4548, 3655, 3150, 4402, 282, 3720,
-5037, 5054, 3679, 5136, others.
+6533, 6513, 6501, 6511, 5820, 6414, 4150, 6360, 4164, 1072, 6124,
+5180, 3457, 3139, 5268, 3983, 5542, 3129, 5207, 3719, 5734
++ others.
 
 
 What doesn't:
@@ -85,9 +70,13 @@ Dos Reis, Phil Edwards, and Ulrich Drepper.
 Development tools:
 ------------------
 
-You will need a recent version of gcc to compile the snapshot of
-libstdc++. The use of CVS gcc, or gcc-3_0-branch is strongly
-recommended, which may introduce additional dependencies for
-up-to-date binutils. In addition, you may need up-to-date tools for
-modifying Makefiles and regenerating configure scripts: automake
-(version 1.4), autoconf (version 2.13 and higher), and libtool.
+You will need a current version of gcc to compile this snapshot of
+libstdc++. The use of the latest stable gcc-3.0.x release (3.0.4), CVS
+gcc, or gcc-3_1-branch is strongly recommended, which may also
+introduce additional dependencies for up-to-date binutils. In
+particular, current binutils (2.12) is recommended so that symbol
+versioning for the library is on by default. In addition, you may need
+up-to-date tools for modifying Makefiles and regenerating configure
+scripts: automake (version 1.4), autoconf (version 2.13 and higher),
+and libtool.
+

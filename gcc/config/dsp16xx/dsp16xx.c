@@ -1725,29 +1725,6 @@ override_options ()
   rsect_const = tmp = (char *) xmalloc (strlen(".rsect ") + 
 					strlen(const_seg_name) + 3);
   sprintf (tmp, ".rsect \"%s\"", const_seg_name);
-  
-  /* Mark our global variables for GC.  */
-  ggc_add_rtx_root (&dsp16xx_addhf3_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_subhf3_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_mulhf3_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_divhf3_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_cmphf3_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_fixhfhi2_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_floathihf2_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_neghf2_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_mulhi3_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_udivqi3_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_udivhi3_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_divqi3_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_divhi3_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_modqi3_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_modhi3_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_umodqi3_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_umodhi3_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_ashrhi3_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_ashlhi3_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_ucmphi2_libcall, 1);
-  ggc_add_rtx_root (&dsp16xx_lshrhi3_libcall, 1);
 }
 
 int
@@ -1870,16 +1847,15 @@ print_operand(file, op, letter)
 	  fprintf (file, HOST_WIDE_INT_PRINT_HEX, (val >> 16) & 0xffff);
         else
            output_addr_const(file, op);
-    }
+      }
     else if (code == CONST_DOUBLE && GET_MODE(op) != DImode)
-    {
-	  union { double d; int i[2]; } u;
-	  union { float f; int i; } u1;
-	  u.i[0] = CONST_DOUBLE_LOW (op);
-	  u.i[1] = CONST_DOUBLE_HIGH (op);
-	  u1.f = u.d;
-          fprintf (file, "0x%x", u1.i);
-    }
+      {
+	long l;
+	REAL_VALUE_TYPE r;
+	REAL_VALUE_FROM_CONST_DOUBLE (r, op);
+	REAL_VALUE_TO_TARGET_SINGLE (r, l);
+	fprintf (file, "0x%x", l);
+      }
     else if (code == CONST)
       {
 	rtx addr = XEXP (op, 0);
@@ -1977,7 +1953,6 @@ output_dsp16xx_float_const (operands)
 {
   rtx src = operands[1];
   
-#if HOST_FLOAT_FORMAT == TARGET_FLOAT_FORMAT
   REAL_VALUE_TYPE d;
   long value;
   
@@ -1986,9 +1961,6 @@ output_dsp16xx_float_const (operands)
   
   operands[1] = GEN_INT (value);
   output_asm_insn ("%u0=%U1\n\t%w0=%H1", operands);
-#else
-  fatal_error ("inline float constants not supported on this host");
-#endif
 }
 
 static int

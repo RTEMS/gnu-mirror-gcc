@@ -1,5 +1,5 @@
 /* Definitions of various defaults for tm.h macros.
-   Copyright (C) 1992, 1996, 1997, 1998, 1999, 2000, 2001
+   Copyright (C) 1992, 1996, 1997, 1998, 1999, 2000, 2001, 2002
    Free Software Foundation, Inc.
    Contributed by Ron Guilmette (rfg@monkeys.com)
 
@@ -33,6 +33,18 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #  define TARGET_FF 014
 #  define TARGET_CR 015
 #  define TARGET_ESC 033
+#endif
+
+/* When removal of CPP_PREDEFINES is complete, TARGET_CPU_CPP_BULITINS
+   can also be removed from here.  */
+#ifndef TARGET_OS_CPP_BUILTINS
+# define TARGET_OS_CPP_BUILTINS()
+#endif
+#ifndef TARGET_CPU_CPP_BUILTINS
+# define TARGET_CPU_CPP_BUILTINS()
+#endif
+#ifndef CPP_PREDEFINES
+# define CPP_PREDEFINES ""
 #endif
 
 /* Store in OUTPUT a string (made with alloca) containing
@@ -158,7 +170,7 @@ do { ASM_OUTPUT_LABEL(FILE,LABEL_ALTERNATE_NAME (INSN)); } while (0)
 
 /* This determines whether or not we support weak symbols.  */
 #ifndef SUPPORTS_WEAK
-#ifdef ASM_WEAKEN_LABEL
+#if defined (ASM_WEAKEN_LABEL) || defined (ASM_WEAKEN_DECL)
 #define SUPPORTS_WEAK 1
 #else
 #define SUPPORTS_WEAK 0
@@ -281,8 +293,21 @@ do {								\
    your target, you should override these values by defining the
    appropriate symbols in your tm.h file.  */
 
+#ifndef BITS_PER_UNIT
+#define BITS_PER_UNIT 8
+#endif
+
+#ifndef BITS_PER_WORD
+#define BITS_PER_WORD (BITS_PER_UNIT * UNITS_PER_WORD)
+#endif
+
 #ifndef CHAR_TYPE_SIZE
 #define CHAR_TYPE_SIZE BITS_PER_UNIT
+#endif
+
+#ifndef BOOL_TYPE_SIZE
+/* `bool' has size and alignment `1', on almost all platforms.  */
+#define BOOL_TYPE_SIZE CHAR_TYPE_SIZE
 #endif
 
 #ifndef SHORT_TYPE_SIZE
@@ -305,10 +330,6 @@ do {								\
 #define WCHAR_TYPE_SIZE INT_TYPE_SIZE
 #endif
 
-#ifndef WCHAR_UNSIGNED
-#define WCHAR_UNSIGNED 0
-#endif
-
 #ifndef FLOAT_TYPE_SIZE
 #define FLOAT_TYPE_SIZE BITS_PER_WORD
 #endif
@@ -319,6 +340,11 @@ do {								\
 
 #ifndef LONG_DOUBLE_TYPE_SIZE
 #define LONG_DOUBLE_TYPE_SIZE (BITS_PER_WORD * 2)
+#endif
+
+/* Width in bits of a pointer.  Mind the value of the macro `Pmode'.  */
+#ifndef POINTER_SIZE
+#define POINTER_SIZE BITS_PER_WORD
 #endif
 
 #ifndef BUILD_VA_LIST_TYPE
@@ -455,6 +481,48 @@ You Lose!  You must define PREFERRED_DEBUGGING_TYPE!
    the mode of the memory access.  */
 #ifndef MODE_BASE_REG_CLASS
 #define MODE_BASE_REG_CLASS(MODE) BASE_REG_CLASS
+#endif
+
+#ifndef LARGEST_EXPONENT_IS_NORMAL
+#define LARGEST_EXPONENT_IS_NORMAL(SIZE) 0
+#endif
+
+#ifndef ROUND_TOWARDS_ZERO
+#define ROUND_TOWARDS_ZERO 0
+#endif
+
+#ifndef MODE_HAS_NANS
+#define MODE_HAS_NANS(MODE)					\
+  (FLOAT_MODE_P (MODE)						\
+   && TARGET_FLOAT_FORMAT == IEEE_FLOAT_FORMAT			\
+   && !LARGEST_EXPONENT_IS_NORMAL (GET_MODE_BITSIZE (MODE)))
+#endif
+
+#ifndef MODE_HAS_INFINITIES
+#define MODE_HAS_INFINITIES(MODE)				\
+  (FLOAT_MODE_P (MODE)						\
+   && TARGET_FLOAT_FORMAT == IEEE_FLOAT_FORMAT			\
+   && !LARGEST_EXPONENT_IS_NORMAL (GET_MODE_BITSIZE (MODE)))
+#endif
+
+#ifndef MODE_HAS_SIGNED_ZEROS
+#define MODE_HAS_SIGNED_ZEROS(MODE) \
+  (FLOAT_MODE_P (MODE) && TARGET_FLOAT_FORMAT == IEEE_FLOAT_FORMAT)
+#endif
+
+#ifndef MODE_HAS_SIGN_DEPENDENT_ROUNDING
+#define MODE_HAS_SIGN_DEPENDENT_ROUNDING(MODE)			\
+  (FLOAT_MODE_P (MODE)						\
+   && TARGET_FLOAT_FORMAT == IEEE_FLOAT_FORMAT			\
+   && !ROUND_TOWARDS_ZERO)
+#endif
+
+#ifndef HOT_TEXT_SECTION_NAME
+#define HOT_TEXT_SECTION_NAME "text.hot"
+#endif
+
+#ifndef UNLIKELY_EXECUTED_TEXT_SECTION_NAME
+#define UNLIKELY_EXECUTED_TEXT_SECTION_NAME "text.unlikely"
 #endif
 
 #endif  /* ! GCC_DEFAULTS_H */

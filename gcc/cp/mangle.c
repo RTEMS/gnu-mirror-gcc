@@ -93,6 +93,11 @@ static struct globals
   /* An array of the current substitution candidates, in the order
      we've seen them.  */
   varray_type substitutions;
+
+  /* We are mangling an internal symbol. It is important to keep those
+     involving template parmeters distinct by distinguishing their level
+     and, for non-type parms, their type.  */
+  bool internal_mangling_p;
 } G;
 
 /* Indices into subst_identifiers.  These are identifiers used in
@@ -361,7 +366,7 @@ add_substitution (node)
 	    || (TYPE_P (node) 
 		&& TYPE_P (candidate) 
 		&& same_type_p (node, candidate)))
-	  my_friendly_abort (20000524);
+	  abort ();
       }
   }
 #endif /* ENABLE_CHECKING */
@@ -779,7 +784,7 @@ write_unscoped_name (decl)
 	   || TREE_CODE (context) == FUNCTION_DECL)
     write_unqualified_name (decl);
   else 
-    my_friendly_abort (20000521);
+    abort ();
 }
 
 /* <unscoped-template-name> ::= <unscoped-name>
@@ -923,7 +928,7 @@ write_template_prefix (node)
     template = CLASSTYPE_TI_TEMPLATE (type);
   else
     /* Oops, not a template.  */
-    my_friendly_abort (20000524);
+    abort ();
 
   /* For a member template, though, the template name for the
      innermost name must have all the outer template levels
@@ -1106,7 +1111,7 @@ write_integer_cst (cst)
 	  chunk *= chunk;
 	}
       
-      type = signed_or_unsigned_type (1, TREE_TYPE (cst));
+      type = c_common_signed_or_unsigned_type (1, TREE_TYPE (cst));
       base = build_int_2 (chunk, 0);
       n = build_int_2 (TREE_INT_CST_LOW (cst), TREE_INT_CST_HIGH (cst));
       TREE_TYPE (n) = TREE_TYPE (base) = type;
@@ -1185,7 +1190,7 @@ write_special_name_constructor (ctor)
   else if (DECL_BASE_CONSTRUCTOR_P (ctor))
     write_string ("C2");
   else
-    my_friendly_abort (20001115);
+    abort ();
 }
 
 /* Handle destructor productions of non-terminal <special-name>.
@@ -1214,7 +1219,7 @@ write_special_name_destructor (dtor)
   else if (DECL_BASE_DESTRUCTOR_P (dtor))
     write_string ("D2");
   else
-    my_friendly_abort (20001115);
+    abort ();
 }
 
 /* Return the discriminator for ENTITY appearing inside
@@ -1353,6 +1358,11 @@ write_type (type)
        since both the qualified and uqualified types are substitution
        candidates.  */
     write_type (TYPE_MAIN_VARIANT (type));
+  else if (TREE_CODE (type) == ARRAY_TYPE)
+    /* It is important not to use the TYPE_MAIN_VARIANT of TYPE here
+       so that the cv-qualification of the element type is available
+       in write_array_type.  */
+    write_array_type (type);
   else
     {
       /* See through any typedefs.  */
@@ -1399,10 +1409,6 @@ write_type (type)
 	  write_nested_name (TYPE_STUB_DECL (type));
 	  break;
 
-	case ARRAY_TYPE:
-	  write_array_type (type);
-	  break;
-
 	case POINTER_TYPE:
 	  /* A pointer-to-member variable is represented by a POINTER_TYPE
 	     to an OFFSET_TYPE, so check for this first.  */
@@ -1445,7 +1451,7 @@ write_type (type)
 	  break;
 
 	default:
-	  my_friendly_abort (20000409);
+	  abort ();
 	}
     }
 
@@ -1469,19 +1475,23 @@ write_CV_qualifiers_for_type (type)
 
        "In cases where multiple order-insensitive qualifiers are
        present, they should be ordered 'K' (closest to the base type),
-       'V', 'r', and 'U' (farthest from the base type) ..."  */
+       'V', 'r', and 'U' (farthest from the base type) ..."  
 
-  if (CP_TYPE_RESTRICT_P (type))
+     Note that we do not use cp_type_quals below; given "const
+     int[3]", the "const" is emitted with the "int", not with the
+     array.  */
+
+  if (TYPE_QUALS (type) & TYPE_QUAL_RESTRICT)
     {
       write_char ('r');
       ++num_qualifiers;
     }
-  if (CP_TYPE_VOLATILE_P (type))
+  if (TYPE_QUALS (type) & TYPE_QUAL_VOLATILE)
     {
       write_char ('V');
       ++num_qualifiers;
     }
-  if (CP_TYPE_CONST_P (type))
+  if (TYPE_QUALS (type) & TYPE_QUAL_CONST)
     {
       write_char ('K');
       ++num_qualifiers;
@@ -1506,8 +1516,8 @@ write_CV_qualifiers_for_type (type)
                     ::= m   # unsigned long
                     ::= x   # long long, __int64
                     ::= y   # unsigned long long, __int64  
-                    ::= n   # __int128            [not supported]
-                    ::= o   # unsigned __int128   [not supported] 
+                    ::= n   # __int128
+                    ::= o   # unsigned __int128
                     ::= f   # float
                     ::= d   # double
                     ::= e   # long double, __float80 
@@ -1552,15 +1562,24 @@ write_builtin_type (type)
 		write_char (integer_type_codes[itk]);
 		break;
 	      }
-	  
+
 	  if (itk == itk_none)
 	    {
-	      tree t = type_for_mode (TYPE_MODE (type), TREE_UNSIGNED (type));
+	      tree t = c_common_type_for_mode (TYPE_MODE (type),
+					       TREE_UNSIGNED (type));
 	      if (type == t)
-		/* Couldn't find this type.  */
-		my_friendly_abort (20000408);
-	      type = t;
-	      goto iagain;
+		{
+		  if (TYPE_PRECISION (type) == 128)
+		    write_char (TREE_UNSIGNED (type) ? 'o' : 'n');
+		  else
+		    /* Couldn't find this type.  */
+		    abort ();
+		}
+	      else
+		{
+		  type = t;
+		  goto iagain;
+		}
 	    }
 	}
       break;
@@ -1575,11 +1594,11 @@ write_builtin_type (type)
       else if (type == long_double_type_node)
 	write_char ('e');
       else
-	my_friendly_abort (20000409);
+	abort ();
       break;
 
     default:
-      my_friendly_abort (20000509);
+      abort ();
     }
 }
 
@@ -1594,6 +1613,17 @@ write_function_type (type)
      tree type;
 {
   MANGLE_TRACE_TREE ("function-type", type);
+
+  /* For a pointer to member function, the function type may have
+     cv-qualifiers, indicating the quals for the artificial 'this'
+     parameter.  */
+  if (TREE_CODE (type) == METHOD_TYPE)
+    {
+      /* The first parameter must be a POINTER_TYPE pointing to the
+	 `this' parameter.  */
+      tree this_type = TREE_TYPE (TREE_VALUE (TYPE_ARG_TYPES (type)));
+      write_CV_qualifiers_for_type (this_type);
+    }
 
   write_char ('F');
   /* We don't track whether or not a type is `extern "C"'.  Note that
@@ -1769,6 +1799,16 @@ write_expression (expr)
       code = TREE_CODE (expr);
     }
 
+  /* Skip NOP_EXPRs.  They can occur when (say) a pointer argument
+     is converted (via qualification conversions) to another
+     type.  */
+  while (TREE_CODE (expr) == NOP_EXPR
+	 || TREE_CODE (expr) == NON_LVALUE_EXPR)
+    {
+      expr = TREE_OPERAND (expr, 0);
+      code = TREE_CODE (expr);
+    }
+
   /* Handle template parameters. */
   if (code == TEMPLATE_TYPE_PARM 
       || code == TEMPLATE_TEMPLATE_PARM
@@ -1787,15 +1827,6 @@ write_expression (expr)
   else
     {
       int i;
-
-      /* Skip NOP_EXPRs.  They can occur when (say) a pointer argument
-	 is converted (via qualification conversions) to another
-	 type.  */
-      while (TREE_CODE (expr) == NOP_EXPR)
-	{
-	  expr = TREE_OPERAND (expr, 0);
-	  code = TREE_CODE (expr);
-	}
 
       /* When we bind a variable or function to a non-type template
 	 argument with reference type, we create an ADDR_EXPR to show
@@ -1877,7 +1908,7 @@ write_template_arg_literal (value)
 	  else if (value == boolean_true_node)
 	    write_unsigned_number (1);
 	  else 
-	    my_friendly_abort (20000412);
+	    abort ();
 	}
       else
 	write_integer_cst (value);
@@ -1902,7 +1933,7 @@ write_template_arg_literal (value)
 #endif
     }
   else
-    my_friendly_abort (20000412);
+    abort ();
 
   write_char ('E');
 }
@@ -2021,24 +2052,7 @@ write_pointer_to_member_type (type)
      tree type;
 {
   write_char ('M');
-  /* For a pointer-to-function member, the class type may be
-     cv-qualified, bug that won't be reflected in
-     TYPE_PTRMEM_CLASS_TYPE.  So, we go fishing around in
-     TYPE_PTRMEM_POINTED_TO_TYPE instead.  */
-  if (TYPE_PTRMEMFUNC_P (type))
-    {
-      tree fn_type;
-      tree this_type;
-
-      fn_type = TYPE_PTRMEM_POINTED_TO_TYPE (type);
-      /* The first parameter must be a POINTER_TYPE pointing to the
-	 `this' parameter.  */
-      this_type = TREE_TYPE (TREE_VALUE (TYPE_ARG_TYPES (fn_type)));
-      write_type (this_type);
-    }
-  /* For a pointer-to-data member, things are simpler.  */
-  else
-    write_type (TYPE_PTRMEM_CLASS_TYPE (type));
+  write_type (TYPE_PTRMEM_CLASS_TYPE (type));
   write_type (TYPE_PTRMEM_POINTED_TO_TYPE (type));
 }
 
@@ -2046,13 +2060,22 @@ write_pointer_to_member_type (type)
    TEMPLATE_TEMPLATE_PARM, BOUND_TEMPLATE_TEMPLATE_PARM or a
    TEMPLATE_PARM_INDEX.
 
-     <template-param> ::= T </parameter/ number> _  */
+     <template-param> ::= T </parameter/ number> _
+
+   If we are internally mangling then we distinguish level and, for
+   non-type parms, type too. The mangling appends
+   
+     </level/ number> _ </non-type type/ type> _
+
+   This is used by mangle_conv_op_name_for_type.  */
 
 static void
 write_template_param (parm)
      tree parm;
 {
   int parm_index;
+  int parm_level;
+  tree parm_type = NULL_TREE;
 
   MANGLE_TRACE_TREE ("template-parm", parm);
 
@@ -2062,14 +2085,17 @@ write_template_param (parm)
     case TEMPLATE_TEMPLATE_PARM:
     case BOUND_TEMPLATE_TEMPLATE_PARM:
       parm_index = TEMPLATE_TYPE_IDX (parm);
+      parm_level = TEMPLATE_TYPE_LEVEL (parm);
       break;
 
     case TEMPLATE_PARM_INDEX:
       parm_index = TEMPLATE_PARM_IDX (parm);
+      parm_level = TEMPLATE_PARM_LEVEL (parm);
+      parm_type = TREE_TYPE (TEMPLATE_PARM_DECL (parm));
       break;
 
     default:
-      my_friendly_abort (20000523);
+      abort ();
     }
 
   write_char ('T');
@@ -2078,6 +2104,15 @@ write_template_param (parm)
   if (parm_index > 0)
     write_unsigned_number (parm_index - 1);
   write_char ('_');
+  if (G.internal_mangling_p)
+    {
+      if (parm_level > 0)
+	write_unsigned_number (parm_level - 1);
+      write_char ('_');
+      if (parm_type)
+	write_type (parm_type);
+      write_char ('_');
+    }
 }
 
 /*  <template-template-param>
@@ -2130,6 +2165,7 @@ write_substitution (seq_id)
 static inline void
 start_mangling ()
 {
+  VARRAY_TREE_INIT (G.substitutions, 1, "mangling substitutions");
   obstack_free (&G.name_obstack, obstack_base (&G.name_obstack));
 }
 
@@ -2139,7 +2175,7 @@ static inline const char *
 finish_mangling ()
 {
   /* Clear all the substitutions.  */
-  VARRAY_POP_ALL (G.substitutions);
+  G.substitutions = 0;
 
   /* Null-terminate the string.  */
   write_char ('\0');
@@ -2153,7 +2189,6 @@ void
 init_mangle ()
 {
   gcc_obstack_init (&G.name_obstack);
-  VARRAY_TREE_INIT (G.substitutions, 1, "mangling substitutions");
 
   /* Cache these identifiers for quick comparison when checking for
      standard substitutions.  */
@@ -2404,15 +2439,26 @@ mangle_conv_op_name_for_type (type)
      tree type;
 {
   tree identifier;
+  const char *mangled_type;
+  char *op_name;
 
-  /* Build the mangling for TYPE.  */
-  const char *mangled_type = mangle_type_string (type);
+  /* Build the internal mangling for TYPE.  */
+  G.internal_mangling_p = true;
+  mangled_type = mangle_type_string (type);
+  G.internal_mangling_p = false;
+  
   /* Allocate a temporary buffer for the complete name.  */
-  char *op_name = concat ("operator ", mangled_type, NULL);
+  op_name = concat ("operator ", mangled_type, NULL);
   /* Find or create an identifier.  */
   identifier = get_identifier (op_name);
   /* Done with the temporary buffer.  */
   free (op_name);
+
+  /* It had better be a unique mangling for the type.  */
+  my_friendly_assert (!IDENTIFIER_TYPENAME_P (identifier)
+		      || same_type_p (type, TREE_TYPE (identifier)),
+		      20011230);
+  
   /* Set bits on the identifier so we know later it's a conversion.  */
   IDENTIFIER_OPNAME_P (identifier) = 1;
   IDENTIFIER_TYPENAME_P (identifier) = 1;
@@ -2477,6 +2523,6 @@ write_java_integer_type_codes (type)
   else if (type == java_boolean_type_node)
     write_char ('b');
   else
-    my_friendly_abort (20001207);
+    abort ();
 }
 

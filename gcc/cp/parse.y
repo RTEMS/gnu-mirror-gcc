@@ -28,9 +28,6 @@ Boston, MA 02111-1307, USA.  */
    is given.  Keep this in mind when reading the actions.  */
 
 %{
-/* Cause the `yydebug' variable to be defined.  */
-#define YYDEBUG 1
-
 #include "config.h"
 
 #include "system.h"
@@ -40,6 +37,7 @@ Boston, MA 02111-1307, USA.  */
 #include "flags.h"
 #include "cp-tree.h"
 #include "lex.h"
+#include "c-lex.h"		/* For YYDEBUG definition.  */
 #include "output.h"
 #include "except.h"
 #include "toplev.h"
@@ -49,6 +47,49 @@ extern struct obstack permanent_obstack;
 
 /* Like YYERROR but do call yyerror.  */
 #define YYERROR1 { yyerror ("syntax error"); YYERROR; }
+
+/* Like the default stack expander, except (1) use realloc when possible,
+   (2) impose no hard maxiumum on stack size, (3) REALLY do not use alloca.
+
+   Irritatingly, YYSTYPE is defined after this %{ %} block, so we cannot
+   give malloced_yyvs its proper type.  This is ok since all we need from
+   it is to be able to free it.  */
+
+static short *malloced_yyss;
+static void *malloced_yyvs;
+
+#define yyoverflow(MSG, SS, SSSIZE, VS, VSSIZE, YYSSZ)			\
+do {									\
+  size_t newsize;							\
+  short *newss;								\
+  YYSTYPE *newvs;							\
+  newsize = *(YYSSZ) *= 2;						\
+  if (malloced_yyss)							\
+    {									\
+      newss = (short *)							\
+	really_call_realloc (*(SS), newsize * sizeof (short));		\
+      newvs = (YYSTYPE *)						\
+	really_call_realloc (*(VS), newsize * sizeof (YYSTYPE));	\
+    }									\
+  else									\
+    {									\
+      newss = (short *) really_call_malloc (newsize * sizeof (short));	\
+      newvs = (YYSTYPE *) really_call_malloc (newsize * sizeof (YYSTYPE)); \
+      if (newss)							\
+        memcpy (newss, *(SS), (SSSIZE));				\
+      if (newvs)							\
+        memcpy (newvs, *(VS), (VSSIZE));				\
+    }									\
+  if (!newss || !newvs)							\
+    {									\
+      yyerror (MSG);							\
+      return 2;								\
+    }									\
+  *(SS) = newss;							\
+  *(VS) = newvs;							\
+  malloced_yyss = newss;						\
+  malloced_yyvs = (void *) newvs;					\
+} while (0)
 
 #define OP0(NODE) (TREE_OPERAND (NODE, 0))
 #define OP1(NODE) (TREE_OPERAND (NODE, 1))
@@ -62,21 +103,21 @@ int have_extern_spec;
 int used_extern_spec;
 
 /* List of types and structure classes of the current declaration.  */
-static tree current_declspecs;
+static GTY(()) tree current_declspecs;
 
 /* List of prefix attributes in effect.
    Prefix attributes are parsed by the reserved_declspecs and declmods
    rules.  They create a list that contains *both* declspecs and attrs.  */
 /* ??? It is not clear yet that all cases where an attribute can now appear in
    a declspec list have been updated.  */
-static tree prefix_attributes;
+static GTY(()) tree prefix_attributes;
 
 /* When defining an enumeration, this is the type of the enumeration.  */
-static tree current_enum_type;
+static GTY(()) tree current_enum_type;
 
 /* When parsing a conversion operator name, this is the scope of the
    operator itself.  */
-static tree saved_scopes;
+static GTY(()) tree saved_scopes;
 
 static tree empty_parms PARAMS ((void));
 static tree parse_decl0 PARAMS ((tree, tree, tree, tree, int));
@@ -87,7 +128,8 @@ static tree parse_field PARAMS ((tree, tree, tree, tree));
 static tree parse_bitfield0 PARAMS ((tree, tree, tree, tree, tree));
 static tree parse_bitfield PARAMS ((tree, tree, tree));
 static tree parse_method PARAMS ((tree, tree, tree));
-static void frob_specs PARAMS ((tree, tree)); 
+static void frob_specs PARAMS ((tree, tree));
+static void check_class_key PARAMS ((tree, tree));
 
 /* Cons up an empty parameter list.  */
 static inline tree
@@ -208,22 +250,24 @@ parse_method (declarator, specs_attrs, lookups)
   return d;
 }
 
-void
-cp_parse_init ()
+static void
+check_class_key (key, aggr)
+     tree key;
+     tree aggr;
 {
-  ggc_add_tree_root (&current_declspecs, 1);
-  ggc_add_tree_root (&prefix_attributes, 1);
-  ggc_add_tree_root (&current_enum_type, 1);
-  ggc_add_tree_root (&saved_scopes, 1);
+  if (TREE_CODE (key) == TREE_LIST)
+    key = TREE_VALUE (key);
+  if ((key == union_type_node) != (TREE_CODE (aggr) == UNION_TYPE))
+    pedwarn ("`%s' tag used in naming `%#T'",
+	     key == union_type_node ? "union"
+	     : key == record_type_node ? "struct" : "class", aggr);
 }
 
-/* Rename the "yyparse" function so that we can override it elsewhere.  */
-#define yyparse yyparse_1
 %}
 
 %start program
 
-%union {
+%union { GTY(())
   long itype; 
   tree ttype; 
   char *strtype; 
@@ -301,7 +345,7 @@ cp_parse_init ()
 %nonassoc IF
 %nonassoc ELSE
 
-%left IDENTIFIER PFUNCNAME TYPENAME SELFNAME PTYPENAME SCSPEC TYPESPEC CV_QUALIFIER ENUM AGGR ELLIPSIS TYPEOF SIGOF OPERATOR NSNAME TYPENAME_KEYWORD
+%left IDENTIFIER PFUNCNAME TYPENAME SELFNAME PTYPENAME SCSPEC TYPESPEC CV_QUALIFIER ENUM AGGR ELLIPSIS TYPEOF SIGOF OPERATOR NSNAME TYPENAME_KEYWORD ATTRIBUTE
 
 %left '{' ',' ';'
 
@@ -335,8 +379,8 @@ cp_parse_init ()
 %type <ttype> PFUNCNAME maybe_identifier
 %type <ttype> paren_expr_or_null nontrivial_exprlist SELFNAME
 %type <ttype> expr_no_commas expr_no_comma_rangle
-%type <ttype> cast_expr unary_expr primary string STRING
-%type <ttype> reserved_declspecs boolean.literal
+%type <ttype> cast_expr unary_expr primary STRING
+%type <ttype> reserved_declspecs boolean_literal
 %type <ttype> reserved_typespecquals
 %type <ttype> SCSPEC TYPESPEC CV_QUALIFIER maybe_cv_qualifier
 %type <ttype> init initlist maybeasm maybe_init defarg defarg1
@@ -384,13 +428,13 @@ cp_parse_init ()
 %token <ttype> PRE_PARSED_CLASS_DECL DEFARG DEFARG_MARKER
 %token <pi> PRE_PARSED_FUNCTION_DECL 
 %type <ttype> component_constructor_declarator
-%type <ttype> fn.def2 return_id constructor_declarator
-%type <ttype> .begin_function_body
+%type <ttype> fn_def2 return_id constructor_declarator
+%type <ttype> begin_function_body_
 %type <ttype> class_head class_head_apparent_template
 %type <ftype> class_head_decl class_head_defn
 %type <ttype> base_class_list
 %type <ttype> base_class_access_list
-%type <ttype> base_class maybe_base_class_list base_class.1
+%type <ttype> base_class maybe_base_class_list base_class_1
 %type <ttype> exception_specification_opt ansi_raise_identifier ansi_raise_identifiers
 %type <ttype> operator_name
 %type <ttype> object aggr
@@ -418,7 +462,7 @@ cp_parse_init ()
 %token TYPENAME_DEFN IDENTIFIER_DEFN PTYPENAME_DEFN
 %type <ttype> identifier_defn IDENTIFIER_DEFN TYPENAME_DEFN PTYPENAME_DEFN
 %type <ttype> handler_args
-%type <ttype> self_template_type .finish_template_type
+%type <ttype> self_template_type finish_template_type_
 
 %token NSNAME
 %type <ttype> NSNAME
@@ -500,9 +544,8 @@ extdef:
 		{ do_pending_inlines (); }
 	| template_def
 		{ do_pending_inlines (); }
-	| asm_keyword '(' string ')' ';'
-		{ if (TREE_CHAIN ($3)) $3 = combine_strings ($3);
-		  assemble_asm ($3); }
+	| asm_keyword '(' STRING ')' ';'
+		{ assemble_asm ($3); }
 	| extern_lang_string '{' extdefs_opt '}'
 		{ pop_lang_context (); }
 	| extern_lang_string .hush_warning fndef .warning_ok eat_saved_input
@@ -584,6 +627,7 @@ namespace_qualifier:
 		    $$ = lastiddecl;
 		  got_scope = $$;
 		}
+        ;
 
 any_id:
 	  unqualified_id
@@ -633,6 +677,7 @@ maybe_identifier:
 	  	{ $$ = $1; }
 	|	/* empty */
 		{ $$ = NULL_TREE; }
+        ;
 
 template_type_parm:
 	  aggr maybe_identifier
@@ -758,9 +803,16 @@ eat_saved_input:
 	| END_OF_SAVED_INPUT
 	;
 
+/* The outermost block of a function really begins before the
+   mem-initializer-list, so we open one there and suppress the one that
+   actually corresponds to the curly braces.  */
 function_body:
-	  .begin_function_body ctor_initializer_opt compstmt
-		{
+	  begin_function_body_ ctor_initializer_opt save_lineno '{'
+		{ $<ttype>$ = begin_compound_stmt (/*has_no_scope=*/1); }
+	  compstmtend 
+                {
+		  STMT_LINENO ($<ttype>5) = $3;
+		  finish_compound_stmt (/*has_no_scope=*/1, $<ttype>5);
 		  finish_function_body ($1);
 		}
 	;
@@ -849,7 +901,7 @@ component_constructor_declarator:
 
 /* more C++ complexity.  See component_decl for a comment on the
    reduce/reduce conflict introduced by these rules.  */
-fn.def2:
+fn_def2:
 	  declmods component_constructor_declarator
 		{ $$ = parse_method ($2, $1.t, $1.lookups);
 		 rest_of_mdef:
@@ -903,7 +955,7 @@ base_init:
 		}
 	;
 
-.begin_function_body:
+begin_function_body_:
 	  /* empty */
 		{
 		  $$ = begin_function_body ();
@@ -1023,9 +1075,11 @@ explicit_instantiation:
 
 begin_explicit_instantiation: 
       { begin_explicit_instantiation(); }
+        ;
 
 end_explicit_instantiation: 
       { end_explicit_instantiation(); }
+        ;
 
 /* The TYPENAME expansions are to deal with use of a template class name as
   a template within the class itself, where the template decl is hidden by
@@ -1033,10 +1087,10 @@ end_explicit_instantiation:
 
 template_type:
 	  PTYPENAME '<' template_arg_list_opt template_close_bracket
-	    .finish_template_type
+	    finish_template_type_
                 { $$ = $5; }
 	| TYPENAME  '<' template_arg_list_opt template_close_bracket
-	    .finish_template_type
+	    finish_template_type_
                 { $$ = $5; }
 	| self_template_type
 	;
@@ -1044,16 +1098,17 @@ template_type:
 apparent_template_type:
 	  template_type
 	| identifier '<' template_arg_list_opt '>'
-	    .finish_template_type
+	    finish_template_type_
 		{ $$ = $5; }
+        ;
 
 self_template_type:
 	  SELFNAME  '<' template_arg_list_opt template_close_bracket
-	    .finish_template_type
+	    finish_template_type_
                 { $$ = $5; }
 	;
 
-.finish_template_type:
+finish_template_type_:
                 { 
 		  if (yychar == YYEMPTY)
 		    yychar = YYLEX;
@@ -1061,6 +1116,7 @@ self_template_type:
 		  $$ = finish_template_type ($<ttype>-3, $<ttype>-1, 
 					     yychar == SCOPE);
 		}
+        ;
 
 template_close_bracket:
 	  '>'
@@ -1480,6 +1536,7 @@ do_id:
 		  else
 		    $$ = $<ttype>-1;
 		}
+        ;
 
 template_id:
           PFUNCNAME '<' do_id template_arg_list_opt template_close_bracket 
@@ -1550,11 +1607,11 @@ primary:
 		    $$ = finish_id_expr ($1);
 		}		
 	| CONSTANT
-	| boolean.literal
-	| string
+	| boolean_literal
+	| STRING
 		{
-		  $$ = combine_strings ($$);
-		  /* combine_strings doesn't set up TYPE_MAIN_VARIANT of
+		  $$ = fix_string_type ($$);
+		  /* fix_string_type doesn't set up TYPE_MAIN_VARIANT of
 		     a const array the way we want, so fix it.  */
 		  if (flag_const_strings)
 		    TREE_TYPE ($$) = build_cplus_array_type
@@ -1585,7 +1642,7 @@ primary:
 		    pedwarn ("ISO C++ forbids braced-groups within expressions");  
 		  $<ttype>$ = begin_stmt_expr (); 
 		}
-	  compstmt ')'
+	  compstmt_or_stmtexpr ')'
                { $$ = finish_stmt_expr ($<ttype>2); }
         /* Koenig lookup support
            We could store lastiddecl in $1 to avoid another lookup,
@@ -1643,7 +1700,7 @@ primary:
 	| TYPEID '(' type_id ')'
 		{ tree type = groktypename ($3.t);
 		  check_for_new_type ("typeid", $3);
-		  $$ = get_typeid (TYPE_MAIN_VARIANT (type)); }
+		  $$ = get_typeid (type); }
 	| global_scope IDENTIFIER
 		{ $$ = do_scoped_id ($2, 1); }
 	| global_scope template_id
@@ -1710,7 +1767,7 @@ primary_no_id:
 		      YYERROR;
 		    }
 		  $<ttype>$ = expand_start_stmt_expr (); }
-	  compstmt ')'
+	  compstmt_or_stmtexpr ')'
 		{ if (pedantic)
 		    pedwarn ("ISO C++ forbids braced-groups within expressions");
 		  $$ = expand_end_stmt_expr ($<ttype>2); }
@@ -1748,24 +1805,18 @@ delete:
 		{ got_scope = NULL_TREE; $$ = 1; }
 	;
 
-boolean.literal:
+boolean_literal:
 	  CXX_TRUE
 		{ $$ = boolean_true_node; }
 	| CXX_FALSE
 		{ $$ = boolean_false_node; }
 	;
 
-/* Produces a STRING_CST with perhaps more STRING_CSTs chained onto it.  */
-string:
-	  STRING
-	| string STRING
-		{ $$ = chainon ($$, $2); }
-	;
-
 nodecls:
 	  /* empty */
 		{
-		  setup_vtbl_ptr (NULL_TREE, NULL_TREE);
+		  if (DECL_CONSTRUCTOR_P (current_function_decl))
+		    finish_mem_initializers (NULL_TREE);
 		}
 	;
 
@@ -1887,10 +1938,6 @@ reserved_declspecs:
 		    warning ("`%s' is not at beginning of declaration",
 			     IDENTIFIER_POINTER ($2));
 		  $$ = tree_cons (NULL_TREE, $2, $$); }
-	| reserved_declspecs attributes
-		{ $$ = tree_cons ($2, NULL_TREE, $1); }
-	| attributes
-		{ $$ = tree_cons ($1, NULL_TREE, NULL_TREE); }
 	;
 
 /* List of just storage classes and type modifiers.
@@ -1930,11 +1977,6 @@ declmods:
 		}
 	| declmods attributes
 		{ $$.t = hash_tree_cons ($2, NULL_TREE, $1.t); }
-	| attributes  %prec EMPTY
-		{
-		  $$.t = hash_tree_cons ($1, NULL_TREE, NULL_TREE);
-		  $$.new_type_flag = 0; $$.lookups = NULL_TREE;
-		}
 	;
 
 /* Used instead of declspecs where storage classes are not allowed
@@ -1963,6 +2005,10 @@ reserved_typespecquals:
 		{ $$ = build_tree_list (NULL_TREE, $1.t); }
 	| reserved_typespecquals typespecqual_reserved
 		{ $$ = tree_cons (NULL_TREE, $2.t, $1); }
+	| reserved_typespecquals attributes
+		{ $$ = tree_cons ($2, NULL_TREE, $1); }
+	| attributes %prec EMPTY
+		{ $$ = tree_cons ($1, NULL_TREE, NULL_TREE); }
 	;
 
 /* A typespec (but not a type qualifier).
@@ -2045,8 +2091,8 @@ nomods_initdecls:
 maybeasm:
 	  /* empty */
 		{ $$ = NULL_TREE; }
-	| asm_keyword '(' string ')'
-		{ if (TREE_CHAIN ($3)) $3 = combine_strings ($3); $$ = $3; }
+	| asm_keyword '(' STRING ')'
+		{ $$ = $3; }
 	;
 
 initdcl:
@@ -2095,7 +2141,7 @@ notype_initdcl0:
 nomods_initdcl0:
           notype_declarator maybeasm
             { /* Set things up as initdcl0_innards expects.  */
-	      $<ttype>3 = $2;
+	      $<ttype>$ = $2;
 	      $2 = $1; 
               $<ftype>1.t = NULL_TREE;
 	      $<ftype>1.lookups = NULL_TREE; }
@@ -2170,6 +2216,7 @@ maybe_init:
 		{ $$ = NULL_TREE; }
 	| '=' init
 		{ $$ = $2; }
+        ;
 
 /* If we are processing a template, we don't want to expand this
    initializer yet.  */
@@ -2234,6 +2281,7 @@ defarg_again:
 		{ replace_defarg ($1, $2); }
 	| DEFARG_MARKER error END_OF_SAVED_INPUT
 		{ replace_defarg ($1, error_mark_node); }
+        ;
 
 pending_defargs:
 	  /* empty */ %prec EMPTY
@@ -2289,6 +2337,7 @@ structsp:
 		      xref_basetypes (current_aggr, $1.t, type, $2);
 		    }
 		  $1.t = begin_class_definition (TREE_TYPE ($1.t)); 
+		  check_class_key (current_aggr, $1.t);
                   current_aggr = NULL_TREE; }
           opt.component_decl_list '}' maybe_attribute
 		{ 
@@ -2315,7 +2364,6 @@ structsp:
 		}
 	  pending_inlines
                 {
-		  finish_inline_definitions ();
 		  $$.t = $<ttype>8;
 		  $$.new_type_flag = 1; 
 		}
@@ -2323,6 +2371,7 @@ structsp:
 		{
 		  $$.t = TREE_TYPE ($1.t);
 		  $$.new_type_flag = $1.new_type_flag;
+		  check_class_key (current_aggr, $$.t);
 		}
 	;
 
@@ -2433,12 +2482,22 @@ class_head_defn:
 		  yyungetc ('{', 1);
 		  $$.t = $1;
 		  $$.new_type_flag = 0;
+		  if (TREE_CODE (TREE_TYPE ($1)) == RECORD_TYPE)
+		    /* We might be specializing a template with a different
+		       class-key.  */
+		    CLASSTYPE_DECLARED_CLASS (TREE_TYPE ($1))
+		      = (current_aggr == class_type_node);
 		}
 	| class_head_apparent_template ':'
 		{
 		  yyungetc (':', 1);
 		  $$.t = $1;
 		  $$.new_type_flag = 0;
+		  if (TREE_CODE (TREE_TYPE ($1)) == RECORD_TYPE)
+		    /* We might be specializing a template with a different
+		       class-key.  */
+		    CLASSTYPE_DECLARED_CLASS (TREE_TYPE ($1))
+		      = (current_aggr == class_type_node);
 		}
 	| aggr identifier_defn '{'
 		{
@@ -2482,13 +2541,13 @@ base_class_list:
 	;
 
 base_class:
-	  base_class.1
+	  base_class_1
 		{ $$ = finish_base_specifier (access_default_node, $1); }
-	| base_class_access_list see_typename base_class.1
+	| base_class_access_list see_typename base_class_1
                 { $$ = finish_base_specifier ($1, $3); }
 	;
 
-base_class.1:
+base_class_1:
 	  typename_sub
 		{ if (!TYPE_P ($$))
 		    $$ = error_mark_node; }
@@ -2564,13 +2623,13 @@ component_decl:
 		  yyungetc ('}', 0); }
 	/* C++: handle constructors, destructors and inline functions */
 	/* note that INLINE is like a TYPESPEC */
-	| fn.def2 ':' /* base_init compstmt */
+	| fn_def2 ':' /* base_init compstmt */
 		{ $$ = finish_method ($$); }
-	| fn.def2 TRY /* base_init compstmt */
+	| fn_def2 TRY /* base_init compstmt */
 		{ $$ = finish_method ($$); }
-	| fn.def2 RETURN_KEYWORD /* base_init compstmt */
+	| fn_def2 RETURN_KEYWORD /* base_init compstmt */
 		{ $$ = finish_method ($$); }
-	| fn.def2 '{' /* nodecls compstmt */
+	| fn_def2 '{' /* nodecls compstmt */
 		{ $$ = finish_method ($$); }
 	| ';'
 		{ $$ = NULL_TREE; }
@@ -2653,6 +2712,7 @@ component_decl_1:
 		{ $$ = grokfield ($$, NULL_TREE, $4, $2, $3); }
 	| using_decl
 		{ $$ = do_class_using_decl ($1); }
+        ;
 
 /* The case of exactly one component is handled directly by component_decl.  */
 /* ??? Huh? ^^^ */
@@ -2800,6 +2860,12 @@ nonempty_cv_qualifiers:
 		  $$.new_type_flag = 0; }
 	| nonempty_cv_qualifiers CV_QUALIFIER
 		{ $$.t = hash_tree_cons (NULL_TREE, $2, $1.t); 
+		  $$.new_type_flag = $1.new_type_flag; }
+	| attributes %prec EMPTY
+		{ $$.t = hash_tree_cons ($1, NULL_TREE, NULL_TREE); 
+		  $$.new_type_flag = 0; }
+	| nonempty_cv_qualifiers attributes %prec EMPTY
+		{ $$.t = hash_tree_cons ($2, NULL_TREE, $1.t); 
 		  $$.new_type_flag = $1.new_type_flag; }
 	;
 
@@ -3010,14 +3076,14 @@ nested_name_specifier:
 		{ $$ = $2; }
 	| nested_name_specifier TEMPLATE explicit_template_type SCOPE
                 { got_scope = $$ 
-		    = make_typename_type ($1, $3, /*complain=*/1); }
+		    = make_typename_type ($1, $3, tf_error); }
 	/* Error handling per Core 125.  */
 	| nested_name_specifier IDENTIFIER SCOPE
                 { got_scope = $$ 
-		    = make_typename_type ($1, $2, /*complain=*/1); }
+		    = make_typename_type ($1, $2, tf_error); }
 	| nested_name_specifier PTYPENAME SCOPE
                 { got_scope = $$ 
-		    = make_typename_type ($1, $2, /*complain=*/1); }
+		    = make_typename_type ($1, $2, tf_error); }
 	;
 
 /* Why the @#$%^& do type_name and notype_identifier need to be expanded
@@ -3059,7 +3125,7 @@ typename_sub0:
 	  typename_sub1 identifier %prec EMPTY
 		{
 		  if (TYPE_P ($1))
-		    $$ = make_typename_type ($1, $2, /*complain=*/1);
+		    $$ = make_typename_type ($1, $2, tf_error);
 		  else if (TREE_CODE ($2) == IDENTIFIER_NODE)
 		    error ("`%T' is not a class or namespace", $2);
 		  else
@@ -3072,9 +3138,9 @@ typename_sub0:
 	| typename_sub1 template_type %prec EMPTY
 		{ $$ = TREE_TYPE ($2); }
 	| typename_sub1 explicit_template_type %prec EMPTY
-                { $$ = make_typename_type ($1, $2, /*complain=*/1); }
+                { $$ = make_typename_type ($1, $2, tf_error); }
 	| typename_sub1 TEMPLATE explicit_template_type %prec EMPTY
-                { $$ = make_typename_type ($1, $3, /*complain=*/1); }
+                { $$ = make_typename_type ($1, $3, tf_error); }
 	;
 
 typename_sub1:
@@ -3088,7 +3154,7 @@ typename_sub1:
 	| typename_sub1 typename_sub2
 		{
 		  if (TYPE_P ($1))
-		    $$ = make_typename_type ($1, $2, /*complain=*/1);
+		    $$ = make_typename_type ($1, $2, tf_error);
 		  else if (TREE_CODE ($2) == IDENTIFIER_NODE)
 		    error ("`%T' is not a class or namespace", $2);
 		  else
@@ -3100,10 +3166,10 @@ typename_sub1:
 		}
 	| typename_sub1 explicit_template_type SCOPE
                 { got_scope = $$ 
-		    = make_typename_type ($1, $2, /*complain=*/1); }
+		    = make_typename_type ($1, $2, tf_error); }
 	| typename_sub1 TEMPLATE explicit_template_type SCOPE
                 { got_scope = $$ 
-		    = make_typename_type ($1, $3, /*complain=*/1); }
+		    = make_typename_type ($1, $3, tf_error); }
 	;
 
 /* This needs to return a TYPE_DECL for simple names so that we don't
@@ -3305,12 +3371,17 @@ label_decl:
 		}
 	;
 
-compstmt:
+compstmt_or_stmtexpr:
 	  save_lineno '{'
                 { $<ttype>$ = begin_compound_stmt (0); }
 	  compstmtend 
                 { STMT_LINENO ($<ttype>3) = $1;
 		  finish_compound_stmt (0, $<ttype>3); }
+	;
+
+compstmt:
+	  compstmt_or_stmtexpr
+		{ last_expr_type = NULL_TREE; }
 	;
 
 simple_if:
@@ -3415,27 +3486,27 @@ simple_stmt:
                 { $$ = finish_return_stmt (NULL_TREE); }
 	| RETURN_KEYWORD expr ';'
                 { $$ = finish_return_stmt ($2); }
-	| asm_keyword maybe_cv_qualifier '(' string ')' ';'
+	| asm_keyword maybe_cv_qualifier '(' STRING ')' ';'
 		{ $$ = finish_asm_stmt ($2, $4, NULL_TREE, NULL_TREE,
 					NULL_TREE);
 		  ASM_INPUT_P ($$) = 1; }
 	/* This is the case with just output operands.  */
-	| asm_keyword maybe_cv_qualifier '(' string ':' asm_operands ')' ';'
+	| asm_keyword maybe_cv_qualifier '(' STRING ':' asm_operands ')' ';'
 		{ $$ = finish_asm_stmt ($2, $4, $6, NULL_TREE, NULL_TREE); }
 	/* This is the case with input operands as well.  */
-	| asm_keyword maybe_cv_qualifier '(' string ':' asm_operands ':'
+	| asm_keyword maybe_cv_qualifier '(' STRING ':' asm_operands ':'
 	  asm_operands ')' ';'
 		{ $$ = finish_asm_stmt ($2, $4, $6, $8, NULL_TREE); }
-	| asm_keyword maybe_cv_qualifier '(' string SCOPE asm_operands ')' ';'
+	| asm_keyword maybe_cv_qualifier '(' STRING SCOPE asm_operands ')' ';'
 		{ $$ = finish_asm_stmt ($2, $4, NULL_TREE, $6, NULL_TREE); }
 	/* This is the case with clobbered registers as well.  */
-	| asm_keyword maybe_cv_qualifier '(' string ':' asm_operands ':'
+	| asm_keyword maybe_cv_qualifier '(' STRING ':' asm_operands ':'
 	  asm_operands ':' asm_clobbers ')' ';'
 		{ $$ = finish_asm_stmt ($2, $4, $6, $8, $10); }
-	| asm_keyword maybe_cv_qualifier '(' string SCOPE asm_operands ':'
+	| asm_keyword maybe_cv_qualifier '(' STRING SCOPE asm_operands ':'
 	  asm_clobbers ')' ';'
 		{ $$ = finish_asm_stmt ($2, $4, NULL_TREE, $6, $8); }
-	| asm_keyword maybe_cv_qualifier '(' string ':' asm_operands SCOPE
+	| asm_keyword maybe_cv_qualifier '(' STRING ':' asm_operands SCOPE
 	  asm_clobbers ')' ';'
 		{ $$ = finish_asm_stmt ($2, $4, $6, NULL_TREE, $8); }
 	| GOTO '*' expr ';'
@@ -3487,6 +3558,15 @@ try_block:
 handler_seq:
 	  handler
 	| handler_seq handler
+	| /* empty */
+		{ /* Generate a fake handler block to avoid later aborts. */
+		  tree fake_handler = begin_handler ();
+		  finish_handler_parms (NULL_TREE, fake_handler);
+		  finish_handler (fake_handler);
+		  $<ttype>$ = fake_handler;
+
+		  error ("must have at least one catch per try block");
+		}
 	;
 
 handler:
@@ -3583,14 +3663,16 @@ asm_operand:
 	  STRING '(' expr ')'
 		{ $$ = build_tree_list (build_tree_list (NULL_TREE, $1), $3); }
 	| '[' identifier ']' STRING '(' expr ')'
-		{ $$ = build_tree_list (build_tree_list ($2, $4), $6); }
+		{ $2 = build_string (IDENTIFIER_LENGTH ($2),
+				     IDENTIFIER_POINTER ($2));
+		  $$ = build_tree_list (build_tree_list ($2, $4), $6); }
 	;
 
 asm_clobbers:
-	  string
-		{ $$ = tree_cons (NULL_TREE, combine_strings ($1), NULL_TREE);}
-	| asm_clobbers ',' string
-		{ $$ = tree_cons (NULL_TREE, combine_strings ($3), $1); }
+	  STRING
+		{ $$ = tree_cons (NULL_TREE, $1, NULL_TREE);}
+	| asm_clobbers ',' STRING
+		{ $$ = tree_cons (NULL_TREE, $3, $1); }
 	;
 
 /* This is what appears inside the parens in a function declarator.
@@ -3691,9 +3773,8 @@ named_parm:
 	/* Here we expand typed_declspecs inline to avoid mis-parsing of
 	   TYPESPEC IDENTIFIER.  */
 	  typed_declspecs1 declarator
-		{ tree specs = strip_attrs ($1.t);
-		  $$.new_type_flag = $1.new_type_flag;
-		  $$.t = build_tree_list (specs, $2); }
+		{ $$.new_type_flag = $1.new_type_flag;
+		  $$.t = build_tree_list ($1.t, $2); }
 	| typed_typespecs declarator
 		{ $$.t = build_tree_list ($1.t, $2); 
 		  $$.new_type_flag = $1.new_type_flag; }
@@ -3702,16 +3783,13 @@ named_parm:
 					  $2); 
 		  $$.new_type_flag = $1.new_type_flag; }
 	| typed_declspecs1 absdcl
-		{ tree specs = strip_attrs ($1.t);
-		  $$.t = build_tree_list (specs, $2);
+		{ $$.t = build_tree_list ($1.t, $2);
 		  $$.new_type_flag = $1.new_type_flag; }
 	| typed_declspecs1  %prec EMPTY
-		{ tree specs = strip_attrs ($1.t);
-		  $$.t = build_tree_list (specs, NULL_TREE); 
+		{ $$.t = build_tree_list ($1.t, NULL_TREE); 
 		  $$.new_type_flag = $1.new_type_flag; }
 	| declmods notype_declarator
-		{ tree specs = strip_attrs ($1.t);
-		  $$.t = build_tree_list (specs, $2); 
+		{ $$.t = build_tree_list ($1.t, $2); 
 		  $$.new_type_flag = 0; }
 	;
 
@@ -3791,6 +3869,8 @@ ansi_raise_identifier:
 		  check_for_new_type ("exception specifier", $1);
 		  $$ = groktypename ($1.t);
 		}
+	  | error
+		{ $$ = error_mark_node; }
 	;
 
 ansi_raise_identifiers:
@@ -3924,5 +4004,18 @@ debug_yytranslate (value)
 {
   return yytname[YYTRANSLATE (value)];
 }
-
 #endif
+
+/* Free malloced parser stacks if necessary.  */
+
+void
+free_parser_stacks ()
+{
+  if (malloced_yyss)
+    {
+      free (malloced_yyss);
+      free (malloced_yyvs);
+    }
+}
+
+#include "gt-cp-parse.h"

@@ -74,9 +74,7 @@ extern int mmix_constant_alignment PARAMS ((tree, int));
 extern int mmix_local_alignment PARAMS ((tree, int));
 extern void mmix_setup_incoming_varargs
   PARAMS ((CUMULATIVE_ARGS *, enum machine_mode, tree, int *, int));
-extern void mmix_select_section PARAMS ((tree, int, int));
-extern void mmix_encode_section_info PARAMS ((tree));
-extern void mmix_unique_section PARAMS ((tree, int));
+extern void mmix_encode_section_info PARAMS ((tree, int));
 extern void mmix_asm_output_pool_prologue
   PARAMS ((FILE *, const char *, tree, int));
 extern void mmix_asm_output_aligned_common
@@ -125,6 +123,7 @@ extern void mmix_print_operand PARAMS ((FILE *, rtx, int));
 extern void mmix_print_operand_address PARAMS ((FILE *, rtx));
 extern int mmix_valid_comparison PARAMS ((RTX_CODE, enum machine_mode, rtx));
 extern rtx mmix_gen_compare_reg PARAMS ((enum rtx_code, rtx, rtx));
+extern void mmix_machine_dependent_reorg PARAMS ((rtx));
 #endif /* RTX_CODE */
 
 extern int mmix_asm_preferred_eh_data_format PARAMS ((int, int));

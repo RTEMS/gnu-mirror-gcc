@@ -50,9 +50,6 @@ language front ends, and test suites.  @xref{gcc Directory, , The
 @item include
 Headers for the @code{libiberty} library.
 
-@item libchill
-The CHILL runtime library.
-
 @item libf2c
 The Fortran runtime library.
 
@@ -60,7 +57,7 @@ The Fortran runtime library.
 The @code{libffi} library, used as part of the Java runtime library.
 
 @item libiberty
-The @code{libibery} library, used for portability and for some
+The @code{libiberty} library, used for portability and for some
 generally useful data structures and algorithms.  @xref{Top, ,
 Introduction, libiberty, @sc{gnu} libiberty}, for more information
 about this library.
@@ -692,9 +689,8 @@ enumerated in the manual.
 Documentation in @file{gcc/doc/extend.texi} for any target-specific
 pragmas supported.
 @item
-Documentation of any target-specific built-in functions supported.
-FIXME: where should this documentation be?  For MMX built-in functions
-it is currently in @file{gcc/doc/invoke.texi}.
+Documentation in @file{gcc/doc/extend.texi} of any target-specific
+built-in functions supported.
 @item
 Documentation in @file{gcc/doc/md.texi} of any target-specific
 constraint letters (@pxref{Machine Constraints, , Constraints for
@@ -844,16 +840,18 @@ FIXME: describe this.
 
 This directory should probably not be used for new tests.
 @item gcc.dg
-This test suite contains tests using the more modern @samp{dg}
-harness.  Magic comments determine whether the file is preprocessed,
-compiled, linked or run.  In these tests, error and warning message
-texts are compared against expected texts or regular expressions given
-in comments.  These tests are run with the options @samp{-ansi
--pedantic} unless other options are given in the test.  Except for the
-@file{noncompile} subdirectory, they are not run with multiple
-optimization options.
+This test suite contains tests using the more modern @samp{dg} harness.
+Magic comments determine whether the file is preprocessed, compiled,
+linked or run.  In these tests, error and warning message texts are
+compared against expected texts or regular expressions given in
+comments.  These tests are run with the options @samp{-ansi -pedantic}
+unless other options are given in the test.  Except as noted below they
+are not run with multiple optimization options.
 @item gcc.dg/cpp
 This subdirectory contains tests of the preprocessor.
+@item gcc.dg/debug
+This subdirectory contains tests for debug formats.  Tests in this
+subdirectory are run for each debug format that the compiler supports.
 @item gcc.dg/format
 This subdirectory contains tests of the @option{-Wformat} format
 checking.  Tests in this directory are run with and without

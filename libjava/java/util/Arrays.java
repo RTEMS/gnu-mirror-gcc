@@ -1,5 +1,5 @@
 /* Arrays.java -- Utility class with methods to operate on arrays
-   Copyright (C) 1998, 1999, 2000, 2001 Free Software Foundation, Inc.
+   Copyright (C) 1998, 1999, 2000, 2001, 2002 Free Software Foundation, Inc.
 
 This file is part of GNU Classpath.
 
@@ -18,11 +18,22 @@ along with GNU Classpath; see the file COPYING.  If not, write to the
 Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 02111-1307 USA.
 
-As a special exception, if you link this library with other files to
-produce an executable, this library does not by itself cause the
-resulting executable to be covered by the GNU General Public License.
-This exception does not however invalidate any other reasons why the
-executable file might be covered by the GNU General Public License. */
+Linking this library statically or dynamically with other modules is
+making a combined work based on this library.  Thus, the terms and
+conditions of the GNU General Public License cover the whole
+combination.
+
+As a special exception, the copyright holders of this library give you
+permission to link this library with independent modules to produce an
+executable, regardless of the license terms of these independent
+modules, and to copy and distribute the resulting executable under
+terms of your choice, provided that you also meet, for each linked
+independent module, the terms and conditions of the license of that
+module.  An independent module is a module which is not derived from
+or based on this library.  If you modify this library, you may extend
+this exception to your version of the library, but you are not
+obligated to do so.  If you do not wish to do so, delete this
+exception statement from your version. */
 
 
 package java.util;
@@ -1067,9 +1078,9 @@ public class Arrays
     if (count > 40)
       { // big arrays, pseudomedian of 9
         int s = count / 8;
-        lo = med3(lo, lo + s, lo + s + s, array);
+        lo = med3(lo, lo + s, lo + 2 * s, array);
         mid = med3(mid - s, mid, mid + s, array);
-        hi = med3(hi - s - s, hi - s, hi, array);
+        hi = med3(hi - 2 * s, hi - s, hi, array);
       }
     mid = med3(lo, mid, hi, array);
 
@@ -1078,8 +1089,8 @@ public class Arrays
 
     // Pull the median element out of the fray, and use it as a pivot.
     swap(from, mid, array);
-    a = b = from + 1;
-    c = d = hi;
+    a = b = from;
+    c = d = from + count - 1;
 
     // Repeatedly move b and c to each other, swapping elements so
     // that all elements before index b are less than the pivot, and all
@@ -1113,12 +1124,13 @@ public class Arrays
       }
 
     // Swap pivot(s) back in place, the recurse on left and right sections.
+    hi = from + count;
     int span;
     span = Math.min(a - from, b - a);
     vecswap(from, b - span, span, array);
 
     span = Math.min(d - c, hi - d - 1);
-    vecswap(b, hi - span + 1, span, array);
+    vecswap(b, hi - span, span, array);
 
     span = b - a;
     if (span > 1)
@@ -1126,7 +1138,7 @@ public class Arrays
 
     span = d - c;
     if (span > 1)
-      qsort(array, hi - span + 1, span);
+      qsort(array, hi - span, span);
   }
 
   /**
@@ -1228,9 +1240,9 @@ public class Arrays
     if (count > 40)
       { // big arrays, pseudomedian of 9
         int s = count / 8;
-        lo = med3(lo, lo + s, lo + s + s, array);
+        lo = med3(lo, lo + s, lo + 2 * s, array);
         mid = med3(mid - s, mid, mid + s, array);
-        hi = med3(hi - s - s, hi - s, hi, array);
+        hi = med3(hi - 2 * s, hi - s, hi, array);
       }
     mid = med3(lo, mid, hi, array);
 
@@ -1239,8 +1251,8 @@ public class Arrays
 
     // Pull the median element out of the fray, and use it as a pivot.
     swap(from, mid, array);
-    a = b = from + 1;
-    c = d = hi;
+    a = b = from;
+    c = d = from + count - 1;
 
     // Repeatedly move b and c to each other, swapping elements so
     // that all elements before index b are less than the pivot, and all
@@ -1274,12 +1286,13 @@ public class Arrays
       }
 
     // Swap pivot(s) back in place, the recurse on left and right sections.
+    hi = from + count;
     int span;
     span = Math.min(a - from, b - a);
     vecswap(from, b - span, span, array);
 
     span = Math.min(d - c, hi - d - 1);
-    vecswap(b, hi - span + 1, span, array);
+    vecswap(b, hi - span, span, array);
 
     span = b - a;
     if (span > 1)
@@ -1287,7 +1300,7 @@ public class Arrays
 
     span = d - c;
     if (span > 1)
-      qsort(array, hi - span + 1, span);
+      qsort(array, hi - span, span);
   }
 
   /**
@@ -1389,9 +1402,9 @@ public class Arrays
     if (count > 40)
       { // big arrays, pseudomedian of 9
         int s = count / 8;
-        lo = med3(lo, lo + s, lo + s + s, array);
+        lo = med3(lo, lo + s, lo + 2 * s, array);
         mid = med3(mid - s, mid, mid + s, array);
-        hi = med3(hi - s - s, hi - s, hi, array);
+        hi = med3(hi - 2 * s, hi - s, hi, array);
       }
     mid = med3(lo, mid, hi, array);
 
@@ -1400,8 +1413,8 @@ public class Arrays
 
     // Pull the median element out of the fray, and use it as a pivot.
     swap(from, mid, array);
-    a = b = from + 1;
-    c = d = hi;
+    a = b = from;
+    c = d = from + count - 1;
 
     // Repeatedly move b and c to each other, swapping elements so
     // that all elements before index b are less than the pivot, and all
@@ -1435,12 +1448,13 @@ public class Arrays
       }
 
     // Swap pivot(s) back in place, the recurse on left and right sections.
+    hi = from + count;
     int span;
     span = Math.min(a - from, b - a);
     vecswap(from, b - span, span, array);
 
     span = Math.min(d - c, hi - d - 1);
-    vecswap(b, hi - span + 1, span, array);
+    vecswap(b, hi - span, span, array);
 
     span = b - a;
     if (span > 1)
@@ -1448,7 +1462,7 @@ public class Arrays
 
     span = d - c;
     if (span > 1)
-      qsort(array, hi - span + 1, span);
+      qsort(array, hi - span, span);
   }
 
   /**
@@ -1562,9 +1576,9 @@ public class Arrays
     if (count > 40)
       { // big arrays, pseudomedian of 9
         int s = count / 8;
-        lo = med3(lo, lo + s, lo + s + s, array);
+        lo = med3(lo, lo + s, lo + 2 * s, array);
         mid = med3(mid - s, mid, mid + s, array);
-        hi = med3(hi - s - s, hi - s, hi, array);
+        hi = med3(hi - 2 * s, hi - s, hi, array);
       }
     mid = med3(lo, mid, hi, array);
 
@@ -1573,8 +1587,8 @@ public class Arrays
 
     // Pull the median element out of the fray, and use it as a pivot.
     swap(from, mid, array);
-    a = b = from + 1;
-    c = d = hi;
+    a = b = from;
+    c = d = from + count - 1;
 
     // Repeatedly move b and c to each other, swapping elements so
     // that all elements before index b are less than the pivot, and all
@@ -1608,12 +1622,13 @@ public class Arrays
       }
 
     // Swap pivot(s) back in place, the recurse on left and right sections.
+    hi = from + count;
     int span;
     span = Math.min(a - from, b - a);
     vecswap(from, b - span, span, array);
 
     span = Math.min(d - c, hi - d - 1);
-    vecswap(b, hi - span + 1, span, array);
+    vecswap(b, hi - span, span, array);
 
     span = b - a;
     if (span > 1)
@@ -1621,7 +1636,7 @@ public class Arrays
 
     span = d - c;
     if (span > 1)
-      qsort(array, hi - span + 1, span);
+      qsort(array, hi - span, span);
   }
 
   /**
@@ -1735,9 +1750,9 @@ public class Arrays
     if (count > 40)
       { // big arrays, pseudomedian of 9
         int s = count / 8;
-        lo = med3(lo, lo + s, lo + s + s, array);
+        lo = med3(lo, lo + s, lo + 2 * s, array);
         mid = med3(mid - s, mid, mid + s, array);
-        hi = med3(hi - s - s, hi - s, hi, array);
+        hi = med3(hi - 2 * s, hi - s, hi, array);
       }
     mid = med3(lo, mid, hi, array);
 
@@ -1746,8 +1761,8 @@ public class Arrays
 
     // Pull the median element out of the fray, and use it as a pivot.
     swap(from, mid, array);
-    a = b = from + 1;
-    c = d = hi;
+    a = b = from;
+    c = d = from + count - 1;
 
     // Repeatedly move b and c to each other, swapping elements so
     // that all elements before index b are less than the pivot, and all
@@ -1781,12 +1796,13 @@ public class Arrays
       }
 
     // Swap pivot(s) back in place, the recurse on left and right sections.
+    hi = from + count;
     int span;
     span = Math.min(a - from, b - a);
     vecswap(from, b - span, span, array);
 
     span = Math.min(d - c, hi - d - 1);
-    vecswap(b, hi - span + 1, span, array);
+    vecswap(b, hi - span, span, array);
 
     span = b - a;
     if (span > 1)
@@ -1794,7 +1810,7 @@ public class Arrays
 
     span = d - c;
     if (span > 1)
-      qsort(array, hi - span + 1, span);
+      qsort(array, hi - span, span);
   }
 
   /**
@@ -1902,9 +1918,9 @@ public class Arrays
     if (count > 40)
       { // big arrays, pseudomedian of 9
         int s = count / 8;
-        lo = med3(lo, lo + s, lo + s + s, array);
+        lo = med3(lo, lo + s, lo + 2 * s, array);
         mid = med3(mid - s, mid, mid + s, array);
-        hi = med3(hi - s - s, hi - s, hi, array);
+        hi = med3(hi - 2 * s, hi - s, hi, array);
       }
     mid = med3(lo, mid, hi, array);
 
@@ -1913,8 +1929,8 @@ public class Arrays
 
     // Pull the median element out of the fray, and use it as a pivot.
     swap(from, mid, array);
-    a = b = from + 1;
-    c = d = hi;
+    a = b = from;
+    c = d = from + count - 1;
 
     // Repeatedly move b and c to each other, swapping elements so
     // that all elements before index b are less than the pivot, and all
@@ -1948,12 +1964,13 @@ public class Arrays
       }
 
     // Swap pivot(s) back in place, the recurse on left and right sections.
+    hi = from + count;
     int span;
     span = Math.min(a - from, b - a);
     vecswap(from, b - span, span, array);
 
     span = Math.min(d - c, hi - d - 1);
-    vecswap(b, hi - span + 1, span, array);
+    vecswap(b, hi - span, span, array);
 
     span = b - a;
     if (span > 1)
@@ -1961,7 +1978,7 @@ public class Arrays
 
     span = d - c;
     if (span > 1)
-      qsort(array, hi - span + 1, span);
+      qsort(array, hi - span, span);
   }
 
   /**
@@ -2069,9 +2086,9 @@ public class Arrays
     if (count > 40)
       { // big arrays, pseudomedian of 9
         int s = count / 8;
-        lo = med3(lo, lo + s, lo + s + s, array);
+        lo = med3(lo, lo + s, lo + 2 * s, array);
         mid = med3(mid - s, mid, mid + s, array);
-        hi = med3(hi - s - s, hi - s, hi, array);
+        hi = med3(hi - 2 * s, hi - s, hi, array);
       }
     mid = med3(lo, mid, hi, array);
 
@@ -2080,8 +2097,8 @@ public class Arrays
 
     // Pull the median element out of the fray, and use it as a pivot.
     swap(from, mid, array);
-    a = b = from + 1;
-    c = d = hi;
+    a = b = from;
+    c = d = from + count - 1;
 
     // Repeatedly move b and c to each other, swapping elements so
     // that all elements before index b are less than the pivot, and all
@@ -2115,12 +2132,13 @@ public class Arrays
       }
 
     // Swap pivot(s) back in place, the recurse on left and right sections.
+    hi = from + count;
     int span;
     span = Math.min(a - from, b - a);
     vecswap(from, b - span, span, array);
 
     span = Math.min(d - c, hi - d - 1);
-    vecswap(b, hi - span + 1, span, array);
+    vecswap(b, hi - span, span, array);
 
     span = b - a;
     if (span > 1)
@@ -2128,7 +2146,7 @@ public class Arrays
 
     span = d - c;
     if (span > 1)
-      qsort(array, hi - span + 1, span);
+      qsort(array, hi - span, span);
   }
 
   /**
@@ -2419,7 +2437,7 @@ public class Arrays
     {
       int size = a.length;
       for (int i = 0; i < size; i++)
-        if (equals(o, a[i]))
+        if (this.equals(o, a[i]))
           return i;
       return -1;
     }
@@ -2428,7 +2446,7 @@ public class Arrays
     {
       int i = a.length;
       while (--i >= 0)
-        if (equals(o, a[i]))
+        if (this.equals(o, a[i]))
           return i;
       return -1;
     }

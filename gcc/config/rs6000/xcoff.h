@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler,
    for some generic XCOFF file format
-   Copyright (C) 2001 Free Software Foundation, Inc.
+   Copyright (C) 2001, 2002 Free Software Foundation, Inc.
 
 This file is part of GNU CC.
 
@@ -21,10 +21,6 @@ Boston, MA 02111-1307, USA.  */
 
 
 #define TARGET_OBJECT_FORMAT OBJECT_XCOFF
-
-/* The AIX linker will discard static constructors in object files before
-   collect has a chance to see them, so scan the object files directly.  */
-#define COLLECT_EXPORT_LIST
 
 /* The RS/6000 uses the XCOFF format.  */
 #define XCOFF_DEBUGGING_INFO
@@ -144,30 +140,7 @@ toc_section ()						\
    On the RS/6000, we have a special section for all variables except those
    that are static.  */
 
-#define SELECT_SECTION(EXP,RELOC,ALIGN)			\
-{							\
-  if ((TREE_CODE (EXP) == STRING_CST			\
-       && ! flag_writable_strings)			\
-      || (TREE_CODE_CLASS (TREE_CODE (EXP)) == 'd'	\
-	  && TREE_READONLY (EXP) && ! TREE_THIS_VOLATILE (EXP) \
-	  && DECL_INITIAL (EXP)				\
-	  && (DECL_INITIAL (EXP) == error_mark_node	\
-	      || TREE_CONSTANT (DECL_INITIAL (EXP)))	\
-	  && ! (RELOC)))				\
-    {							\
-      if (TREE_PUBLIC (EXP))				\
-        read_only_data_section ();			\
-      else						\
-        read_only_private_data_section ();		\
-    }							\
-  else							\
-    {							\
-      if (TREE_PUBLIC (EXP))				\
-        data_section ();				\
-      else						\
-        private_data_section ();			\
-    }							\
-}
+#define TARGET_ASM_SELECT_SECTION  rs6000_xcoff_select_section
 
 /* Return non-zero if this entry is to be written into the constant
    pool in a special way.  We do so if this is a SYMBOL_REF, LABEL_REF
@@ -211,7 +184,7 @@ toc_section ()						\
    that we can branch to this function without emitting a no-op after the
    call.  Do not set this flag if the function is weakly defined.  */
 
-#define ENCODE_SECTION_INFO(DECL)			\
+#define ENCODE_SECTION_INFO(DECL, FIRST)		\
   if (TREE_CODE (DECL) == FUNCTION_DECL			\
       && !TREE_PUBLIC (DECL)				\
       && !DECL_WEAK (DECL))				\
@@ -345,13 +318,7 @@ toc_section ()						\
     SYMBOL_REF_FLAG (sym_ref) = 1;				\
   if (TREE_PUBLIC (DECL))					\
     {								\
-      if (RS6000_WEAK && DECL_WEAK (decl))			\
-	{							\
-	  fputs ("\t.weak .", FILE);				\
-	  RS6000_OUTPUT_BASENAME (FILE, NAME);			\
-	  putc ('\n', FILE);					\
-	}							\
-      else							\
+      if (!RS6000_WEAK || !DECL_WEAK (decl))			\
 	{							\
 	  fputs ("\t.globl .", FILE);				\
 	  RS6000_OUTPUT_BASENAME (FILE, NAME);			\
@@ -464,20 +431,6 @@ toc_section ()						\
 		xcoff_bss_section_name);		\
      } while (0)
 
-/* Output a weak symbol, if weak support present.  */
-#ifdef HAVE_GAS_WEAK
-#define HANDLE_PRAGMA_WEAK 1
-
-#define ASM_WEAKEN_LABEL(FILE, NAME)	\
-  do					\
-    {					\
-      fputs ("\t.weak ", (FILE));	\
-      assemble_name ((FILE), (NAME));	\
-      fputc ('\n', (FILE));		\
-    }					\
-  while (0)
-#endif /* HAVE_GAS_WEAK */
-
 /* This is how we tell the assembler that two symbols have the same value.  */
 #define SET_ASM_OP "\t.set "
 
@@ -492,20 +445,7 @@ toc_section ()						\
 #define DATA_SECTION_ASM_OP "\t.csect .data[RW],3"
 
 /* Define unique section name -- functions only.  */
-#define UNIQUE_SECTION(DECL,RELOC)			\
-  do {							\
-    int len;						\
-    const char *name;					\
-    char *string;					\
-							\
-    if (TREE_CODE (DECL) == FUNCTION_DECL) {		\
-      name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (DECL)); \
-      len = strlen (name) + 5;				\
-      string = alloca (len + 1);			\
-      sprintf (string, ".%s[PR]", name);		\
-      DECL_SECTION_NAME (DECL) = build_string (len, string); \
-    }							\
-  } while (0)
+#define TARGET_ASM_UNIQUE_SECTION  rs6000_xcoff_unique_section
 
 /* Switch into a generic section.  */
 #define TARGET_ASM_NAMED_SECTION  xcoff_asm_named_section

@@ -1,5 +1,5 @@
 /* Target definitions for GNU compiler for Intel 80386 running Solaris 2
-   Copyright (C) 1993, 1995, 1996, 1997, 1998, 1999, 2000, 2001
+   Copyright (C) 1993, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002
    Free Software Foundation, Inc.
    Contributed by Fred Fish (fnf@cygnus.com).
 
@@ -39,6 +39,8 @@ Boston, MA 02111-1307, USA.  */
 #define ASM_SPEC \
   "%{v:-V} %{Qy:} %{!Qn:-Qy} %{n} %{T} %{Ym,*} %{Wa,*:%*} -s"
 
+#define CMOV_SUN_AS_SYNTAX 1
+
 #else /* GAS_REJECTS_MINUS_S */
 
 /* Same as above, except for -s, unsupported by GNU as.  */
@@ -56,9 +58,7 @@ Boston, MA 02111-1307, USA.  */
    two 0x00000090 ints, which generates a segmentation violation when
    executed.  This macro forces the assembler to do the padding, since
    it knows what it is doing.  */
-
-#define FORCE_INIT_SECTION_ALIGN asm (ALIGN_ASM_OP ## "16")
-#define FORCE_FINI_SECTION_ALIGN FORCE_INIT_SECTION_ALIGN
+#define FORCE_CODE_SECTION_ALIGN  asm(ALIGN_ASM_OP "16");
 
 /* Select a format to encode pointers in exception handling data.  CODE
    is 0 for data, 1 for code labels, 2 for function pointers.  GLOBAL is
@@ -75,10 +75,11 @@ Boston, MA 02111-1307, USA.  */
 #undef	WINT_TYPE_SIZE
 #define	WINT_TYPE_SIZE BITS_PER_WORD
 
-/* Add "sun" to the list of symbols defined for SVR4.  */
+#define HANDLE_PRAGMA_REDEFINE_EXTNAME 1
+
 #undef CPP_PREDEFINES
 #define CPP_PREDEFINES \
-  "-Dunix -D__svr4__ -D__SVR4 -Dsun -Asystem=svr4"
+  "-Dunix -D__svr4__ -D__SVR4 -Dsun -D__PRAGMA_REDEFINE_EXTNAME -Asystem=svr4"
 
 /* Solaris 2/Intel as chokes on #line directives.  */
 #undef CPP_SPEC
@@ -115,9 +116,7 @@ Boston, MA 02111-1307, USA.  */
 			  %{pg:gcrt1.o%s}%{!pg:%{p:mcrt1.o%s}%{!p:crt1.o%s}}}}\
 			%{pg:gmon.o%s} crti.o%s \
 			%{ansi:values-Xc.o%s} \
-			%{!ansi: \
-			 %{traditional:values-Xt.o%s} \
-			 %{!traditional:values-Xa.o%s}} \
+			%{!ansi:values-Xa.o%s} \
  			crtbegin.o%s"
   
 /* This should be the same as in svr4.h, except with -R added.  */
@@ -156,3 +155,6 @@ Boston, MA 02111-1307, USA.  */
 
 #undef LOCAL_LABEL_PREFIX
 #define LOCAL_LABEL_PREFIX "."
+
+/* The Solaris assembler does not support .quad.  Do not use it.  */
+#undef ASM_QUAD

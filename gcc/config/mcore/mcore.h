@@ -178,9 +178,10 @@ extern const char * mcore_stack_increment_string;
      N_("Maximum amount for a single stack increment operation")}	\
 }
 
-/* The MCore ABI says that bitfields are unsigned by default. */
-/* The EPOC C++ environment does not support exceptions.  */
-#define CC1_SPEC "-funsigned-bitfields %{!DIN_GCC:-fno-rtti} %{!DIN_GCC:-fno-exceptions}"
+#ifndef CC1_SPEC
+/* The MCore ABI says that bitfields are unsigned by default.  */
+#define CC1_SPEC "-funsigned-bitfields"
+#endif
 
 /* What options are we going to default to specific settings when
    -O* happens; the user can subsequently override these settings.
@@ -214,10 +215,6 @@ extern const char * mcore_stack_increment_string;
 
 /* Target machine storage Layout.  */
 
-/* Define to use software floating point emulator for REAL_ARITHMETIC and
-   decimal <-> binary conversion.  */
-#define REAL_ARITHMETIC
-
 #define PROMOTE_MODE(MODE,UNSIGNEDP,TYPE)  	\
   if (GET_MODE_CLASS (MODE) == MODE_INT         \
       && GET_MODE_SIZE (MODE) < UNITS_PER_WORD) \
@@ -247,30 +244,15 @@ extern const char * mcore_stack_increment_string;
 #define LIBGCC2_WORDS_BIG_ENDIAN 0
 #endif
 
-/* Number of bits in an addressable storage unit.  */
-#define BITS_PER_UNIT  8
-
-/* Width in bits of a "word", which is the contents of a machine register.
-   Note that this is not necessarily the width of data type `int';
-   if using 16-bit ints on a 68000, this would still be 32.
-   But on a machine with 16-bit registers, this would be 16.  */
-#define BITS_PER_WORD  32
 #define MAX_BITS_PER_WORD 32
 
 /* Width of a word, in units (bytes).  */
 #define UNITS_PER_WORD	4
 
-/* Width in bits of a pointer.
-   See also the macro `Pmode' defined below.  */
-#define POINTER_SIZE  32
-
 /* A C expression for the size in bits of the type `long long' on the
    target machine.  If you don't define this, the default is two
    words.  */
 #define LONG_LONG_TYPE_SIZE 64
-
-/* the size of the boolean type -- in C++; */
-#define	BOOL_TYPE_SIZE	8
 
 /* Allocation boundary (in *bits*) for storing arguments in argument list.  */
 #define PARM_BOUNDARY  	32
@@ -530,7 +512,7 @@ enum reg_class
    reg number REGNO.  This could be a conditional expression
    or could index an array.  */
 
-extern int regno_reg_class[FIRST_PSEUDO_REGISTER];
+extern const int regno_reg_class[FIRST_PSEUDO_REGISTER];
 #define REGNO_REG_CLASS(REGNO) regno_reg_class[REGNO]
 
 /* When defined, the compiler allows registers explicitly used in the
@@ -826,8 +808,8 @@ extern const enum reg_class reg_class_from_letter[];
 /* Length in units of the trampoline for entering a nested function.  */
 #define TRAMPOLINE_SIZE  12
 
-/* Alignment required for a trampoline in units.  */
-#define TRAMPOLINE_ALIGN  4
+/* Alignment required for a trampoline in bits.  */
+#define TRAMPOLINE_ALIGNMENT  32
 
 /* Emit RTL insns to initialize the variable parts of a trampoline.
    FNADDR is an RTX for the address of the function's pure code.
@@ -1161,11 +1143,6 @@ switch_to_section (section, decl)				\
 #define STRIP_NAME_ENCODING(VAR, SYM_NAME) \
   (VAR) = MCORE_STRIP_NAME_ENCODING (SYM_NAME)
 
-#undef  UNIQUE_SECTION
-#define UNIQUE_SECTION(DECL, RELOC) mcore_unique_section (DECL, RELOC)
-
-#define REDO_SECTION_INFO_P(DECL) 1
-
 #define MULTIPLE_SYMBOL_SPACES 1
 
 #define SUPPORTS_ONE_ONLY 1
@@ -1318,7 +1295,8 @@ extern long mcore_current_compilation_timestamp;
 /* We must mark dll symbols specially.  Definitions of dllexport'd objects
    install some info in the .drective (PE) or .exports (ELF) sections.   */
 #undef  ENCODE_SECTION_INFO
-#define ENCODE_SECTION_INFO(DECL) mcore_encode_section_info (DECL)
+#define ENCODE_SECTION_INFO(DECL, FIRST) \
+  mcore_encode_section_info (DECL, FIRST)
 
 /* Print operand X (an rtx) in assembler syntax to file FILE.
    CODE is a letter or dot (`z' in `%z0') or 0 if no letter was specified.

@@ -67,6 +67,7 @@ Boston, MA 02111-1307, USA.  */
 #define CRIS_PLT_GOTOFFSET_SUFFIX ":PLTG"
 #define CRIS_PLT_PCOFFSET_SUFFIX ":PLT"
 
+/* If you tweak this, don't forget to check cris_expand_builtin_va_arg.  */
 #define CRIS_FUNCTION_ARG_SIZE(MODE, TYPE)	\
   ((MODE) != BLKmode ? GET_MODE_SIZE (MODE)	\
    : (unsigned) int_size_in_bytes (TYPE))
@@ -231,6 +232,7 @@ extern const char *cris_elinux_stacksize_str;
    link them to crt0.o to be prepared.  Use scrt0.c if running the
    simulator, linear style, or s2crt0.c if fixed style.  */
 /* We need to remove any previous definition (elfos.h).  */
+#undef STARTFILE_SPEC
 #define STARTFILE_SPEC \
  "%{sim2:s2crt0.o%s}\
   %{!sim2:%{sim:scrt0.o%s}\
@@ -238,6 +240,7 @@ extern const char *cris_elinux_stacksize_str;
     %{!pg:%{p:mcrt0.o%s}%{!p:crt0.o%s}}}}\
   crtbegin.o%s"
 
+#undef ENDFILE_SPEC
 #define ENDFILE_SPEC "crtend.o%s"
 
 #define EXTRA_SPECS				\
@@ -438,7 +441,7 @@ extern int target_flags;
    gcc-cris they are using.  Please use some flavor of "R<number>" for
    the version (no need for major.minor versions, I believe).  */
 #define TARGET_VERSION \
- fprintf (stderr, " [Axis CRIS release R36a%s]", CRIS_SUBTARGET_VERSION)
+ fprintf (stderr, " [Axis CRIS%s]", CRIS_SUBTARGET_VERSION)
 
 /* For the cris-*-elf subtarget.  */
 #define CRIS_SUBTARGET_VERSION " - generic ELF"
@@ -473,13 +476,7 @@ extern int target_flags;
    post-increment on DImode indirect.  */
 #define WORDS_BIG_ENDIAN 0
 
-#define BITS_PER_UNIT 8
-
-#define BITS_PER_WORD 32
-
 #define UNITS_PER_WORD 4
-
-#define POINTER_SIZE 32
 
 /* A combination of defining PROMOTE_MODE, PROMOTE_FUNCTION_ARGS,
    PROMOTE_FOR_CALL_ONLY and *not* defining PROMOTE_PROTOTYPES gives the
@@ -940,7 +937,8 @@ enum reg_class {NO_REGS, ALL_REGS, LIM_REG_CLASSES};
   ? 1 : 0)
 
 /* Structs may be passed by value, but they must not be more than 8
-   bytes long.  */
+   bytes long.  If you tweak this, don't forget to adjust
+   cris_expand_builtin_va_arg.  */
 #define FUNCTION_ARG_PASS_BY_REFERENCE(CUM, MODE, TYPE, NAMED)		\
  (MUST_PASS_IN_STACK (MODE, TYPE)					\
   || CRIS_FUNCTION_ARG_SIZE (MODE, TYPE) > 8)				\
@@ -1446,24 +1444,33 @@ struct cum_args {int regs;};
 
 /* We need to code in PIC-specific flags into SYMBOL_REF_FLAG.  */
 
-#define ENCODE_SECTION_INFO(EXP) cris_encode_section_info (EXP)
+#define ENCODE_SECTION_INFO(EXP, FIRST) cris_encode_section_info (EXP, FIRST)
 
 /* We pull a little trick to register the _fini function with atexit,
    after (presumably) registering the eh frame info, since we don't handle
-   _fini (a.k.a. ___fini_start) in crt0 or have a crti for "pure" ELF.  */
+   _fini (a.k.a. ___fini_start) in crt0 or have a crti for "pure" ELF.  If
+   you change this, don't forget that you can't have library function
+   references (e.g. to atexit) in crtend.o, since those won't be resolved
+   to libraries; those are linked in *before* crtend.o.  */
 #ifdef CRT_BEGIN
-#define FORCE_INIT_SECTION_ALIGN		\
- do						\
-   {						\
-     extern void __fini__start (void);		\
-     atexit (__fini__start);			\
-   }						\
- while (0)
+# define CRT_CALL_STATIC_FUNCTION(SECTION_OP, FUNC)		\
+static void __attribute__((__used__))				\
+call_ ## FUNC (void)						\
+{								\
+  asm (SECTION_OP);						\
+  FUNC ();							\
+  if (__builtin_strcmp (#FUNC, "frame_dummy") == 0)		\
+   {								\
+     extern void __fini__start (void);				\
+     atexit (__fini__start);					\
+   }								\
+  asm (TEXT_SECTION_ASM_OP);					\
+}
 #endif
 
 /* Node: PIC */
 
-#define PIC_OFFSET_TABLE_REGNUM 0
+#define PIC_OFFSET_TABLE_REGNUM (flag_pic ? 0 : INVALID_REGNUM)
 
 #define LEGITIMATE_PIC_OPERAND_P(X) cris_legitimate_pic_operand (X)
 
@@ -1737,13 +1744,7 @@ struct cum_args {int regs;};
 
 
 /* Node: SDB and DWARF */
-
-#define DWARF_LINE_MIN_INSTR_LENGTH 2
-
-
-/* Node: Cross-compilation */
-#define REAL_ARITHMETIC
-
+/* (no definitions) */
 
 /* Node: Misc */
 

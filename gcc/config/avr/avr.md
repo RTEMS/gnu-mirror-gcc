@@ -68,7 +68,7 @@
                                           (le (minus (pc) (match_dup 0))
                                               (const_int 2045)))
                                      (const_int 2)
-                                     (const_int 2)))
+                                     (const_int 3)))
          (eq_attr "type" "branch1")
          (if_then_else (and (ge (minus (pc) (match_dup 0))
                                 (const_int -62))
@@ -80,7 +80,7 @@
                                           (le (minus (pc) (match_dup 0))
                                               (const_int 2043)))
                                      (const_int 3)
-                                     (const_int 3)))]
+                                     (const_int 4)))]
         (const_int 2)))
 
 (define_insn "*pop1"
@@ -605,6 +605,19 @@
   [(set_attr "length" "4,3,3,4,5,5")
    (set_attr "cc" "set_n,set_n,set_czn,set_czn,set_n,set_n")])
 
+(define_insn "*addsi3_zero_extend"
+  [(set (match_operand:SI 0 "register_operand" "=r")
+	(plus:SI (zero_extend:SI
+		  (match_operand:QI 1 "register_operand" "r"))
+		 (match_operand:SI 2 "register_operand" "0")))]
+  ""
+  "add %A0,%1
+	adc %B0,__zero_reg__
+	adc %C0,__zero_reg__
+	adc %D0,__zero_reg__"
+  [(set_attr "length" "4")
+   (set_attr "cc" "set_n")])
+
 ;-----------------------------------------------------------------------------
 ; sub bytes
 (define_insn "subqi3"
@@ -629,6 +642,17 @@
   [(set_attr "length" "2,2")
    (set_attr "cc" "set_czn,set_czn")])
 
+(define_insn "*subhi3_zero_extend1"
+  [(set (match_operand:HI 0 "register_operand" "=r")
+	(minus:HI (match_operand:HI 1 "register_operand" "0")
+		  (zero_extend:HI
+		   (match_operand:QI 2 "register_operand" "r"))))]
+  ""
+  "sub %A0,%2
+	sbc %B0,__zero_reg__"
+  [(set_attr "length" "2")
+   (set_attr "cc" "set_n")])
+
 (define_insn "subsi3"
   [(set (match_operand:SI 0 "register_operand" "=r,d")
         (minus:SI (match_operand:SI 1 "register_operand" "0,0")
@@ -639,6 +663,19 @@
 	subi %A0,lo8(%2)\;sbci %B0,hi8(%2)\;sbci %C0,hlo8(%2)\;sbci %D0,hhi8(%2)"
   [(set_attr "length" "4,4")
    (set_attr "cc" "set_czn,set_czn")])
+
+(define_insn "*subsi3_zero_extend"
+  [(set (match_operand:SI 0 "register_operand" "=r")
+	(minus:SI (match_operand:SI 1 "register_operand" "0")
+		  (zero_extend:SI
+		   (match_operand:QI 2 "register_operand" "r"))))]
+  ""
+  "sub %A0,%2
+	sbc %B0,__zero_reg__
+	sbc %C0,__zero_reg__
+	sbc %D0,__zero_reg__"
+  [(set_attr "length" "4")
+   (set_attr "cc" "set_n")])
 
 ;******************************************************************************
 ; mul
@@ -2193,6 +2230,105 @@
   [(set_attr "length" "1")
    (set_attr "cc" "compare")])
 
+;; Clear/set/test a single bit in I/O address space.
+
+(define_insn "*cbi"
+  [(set (mem:QI (match_operand 0 "const_int_operand" "n"))
+	(and:QI (mem:QI (match_dup 0))
+		(match_operand 1 "const_int_operand" "n")))]
+  "avr_io_address_p (operands[0], 1 + 0x20)
+   && exact_log2 (~INTVAL (operands[1]) & 0xff) >= 0"
+{
+  operands[2] = GEN_INT (exact_log2 (~INTVAL (operands[1]) & 0xff));
+  return AS2 (cbi,%0-0x20,%2);
+}
+  [(set_attr "length" "1")
+   (set_attr "cc" "none")])
+
+(define_insn "*sbi"
+  [(set (mem:QI (match_operand 0 "const_int_operand" "n"))
+	(ior:QI (mem:QI (match_dup 0))
+		(match_operand 1 "const_int_operand" "n")))]
+  "avr_io_address_p (operands[0], 1 + 0x20)
+   && exact_log2 (INTVAL (operands[1]) & 0xff) >= 0"
+{
+  operands[2] = GEN_INT (exact_log2 (INTVAL (operands[1]) & 0xff));
+  return AS2 (sbi,%0-0x20,%2);
+}
+  [(set_attr "length" "1")
+   (set_attr "cc" "none")])
+
+(define_insn "*sbix_branch"
+  [(set (pc)
+	(if_then_else
+	 (match_operator 0 "comparison_operator"
+			 [(zero_extract
+			   (mem:QI (match_operand 1 "const_int_operand" "n"))
+			   (const_int 1)
+			   (match_operand 2 "const_int_operand" "n"))
+			  (const_int 0)])
+	 (label_ref (match_operand 3 "" ""))
+	 (pc)))]
+  "(GET_CODE (operands[0]) == EQ || GET_CODE (operands[0]) == NE)
+   && avr_io_address_p (operands[1], 1 + 0x20)"
+{
+  enum rtx_code comp = GET_CODE (operands[0]);
+  int reverse = (get_attr_length (insn) == 4);
+
+  if (reverse)
+    comp = reverse_condition (comp);
+  if (comp == EQ)
+    output_asm_insn (AS2 (sbis,%1-0x20,%2), operands);
+  else
+    output_asm_insn (AS2 (sbic,%1-0x20,%2), operands);
+  if (!reverse)
+    return AS1 (rjmp,%3);
+  return (AS1 (rjmp,_PC_+4) CR_TAB
+	  AS1 (jmp,%3));
+}
+  [(set (attr "length")
+	(if_then_else (and (ge (minus (pc) (match_dup 3)) (const_int -2046))
+			   (le (minus (pc) (match_dup 3)) (const_int 2046)))
+		      (const_int 2)
+		      (if_then_else (eq_attr "mcu_mega" "no")
+				    (const_int 2)
+				    (const_int 4))))
+   (set_attr "cc" "clobber")])
+
+;; Tests of bit 7 are pessimized to sign tests, so we need this too...
+(define_insn "*sbix_branch_bit7"
+  [(set (pc)
+	(if_then_else
+	 (match_operator 0 "comparison_operator"
+			 [(mem:QI (match_operand 1 "const_int_operand" "n"))
+			  (const_int 0)])
+	 (label_ref (match_operand 2 "" ""))
+	 (pc)))]
+  "(GET_CODE (operands[0]) == GE || GET_CODE (operands[0]) == LT)
+   && avr_io_address_p (operands[1], 1 + 0x20)"
+{
+  enum rtx_code comp = GET_CODE (operands[0]);
+  int reverse = (get_attr_length (insn) == 4);
+
+  if (reverse)
+    comp = reverse_condition (comp);
+  if (comp == GE)
+    output_asm_insn (AS2 (sbis,%1-0x20,7), operands);
+  else
+    output_asm_insn (AS2 (sbic,%1-0x20,7), operands);
+  if (!reverse)
+    return AS1 (rjmp,%2);
+  return (AS1 (rjmp,_PC_+4) CR_TAB
+	  AS1 (jmp,%2));
+}
+  [(set (attr "length")
+	(if_then_else (and (ge (minus (pc) (match_dup 2)) (const_int -2046))
+			   (le (minus (pc) (match_dup 2)) (const_int 2046)))
+		      (const_int 2)
+		      (if_then_else (eq_attr "mcu_mega" "no")
+				    (const_int 2)
+				    (const_int 4))))
+   (set_attr "cc" "clobber")])
 
 ;; ************************* Peepholes ********************************
 

@@ -2,7 +2,7 @@
    hosting on Windows NT 3.x, using a Unix style C library and tools,
    as distinct from winnt.h, which is used to build GCC for use with a
    windows style library and tool set and uses the Microsoft tools.
-   Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000
+   Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2002
    Free Software Foundation, Inc.
 
 This file is part of GNU CC.
@@ -22,8 +22,6 @@ along with GNU CC; see the file COPYING.  If not, write to
 the Free Software Foundation, 59 Temple Place - Suite 330,
 Boston, MA 02111-1307, USA.  */
 
-#define YES_UNDERSCORES
-
 /* Enable parsing of #pragma pack(push,<n>) and #pragma pack(pop).  */
 #define HANDLE_PRAGMA_PACK_PUSH_POP 1
 
@@ -31,6 +29,8 @@ Boston, MA 02111-1307, USA.  */
 #define SDB_DEBUGGING_INFO 
 #define PREFERRED_DEBUGGING_TYPE DBX_DEBUG
 
+#include "i386/unix.h"
+#include "i386/bsd.h"
 #include "i386/gas.h"
 #include "dbxcoff.h"
 
@@ -95,7 +95,6 @@ Boston, MA 02111-1307, USA.  */
 
 #define SIZE_TYPE "unsigned int"
 #define PTRDIFF_TYPE "int"
-#define WCHAR_UNSIGNED 1
 #define WCHAR_TYPE_SIZE 16
 #define WCHAR_TYPE "short unsigned int"
 /* Currently we do not have the atexit() function,
@@ -115,9 +114,8 @@ Boston, MA 02111-1307, USA.  */
    the number of bytes of arguments passed to the function, if it has the 
    attribute STDCALL.  */
 
-#ifdef ENCODE_SECTION_INFO
 #undef ENCODE_SECTION_INFO
-#define ENCODE_SECTION_INFO(DECL) 					\
+#define ENCODE_SECTION_INFO(DECL, FIRST)				\
 do									\
   {									\
     if (flag_pic)							\
@@ -128,14 +126,13 @@ do									\
 	  = (TREE_CODE_CLASS (TREE_CODE (DECL)) != 'd'			\
 	     || ! TREE_PUBLIC (DECL));					\
       }									\
-    if (TREE_CODE (DECL) == FUNCTION_DECL) 				\
+    if ((FIRST) && TREE_CODE (DECL) == FUNCTION_DECL) 			\
       if (lookup_attribute ("stdcall",					\
 			    TYPE_ATTRIBUTES (TREE_TYPE (DECL))))	\
         XEXP (DECL_RTL (DECL), 0) = 					\
           gen_rtx (SYMBOL_REF, Pmode, gen_stdcall_suffix (DECL)); 	\
   }									\
 while (0)
-#endif
 
 /* This macro gets just the user-specified name
    out of the string in a SYMBOL_REF.  Discard
@@ -187,8 +184,8 @@ do {									\
    symbols must be explicitly imported from shared libraries (DLLs).  */
 #define MULTIPLE_SYMBOL_SPACES
 
-extern void i386_pe_unique_section ();
-#define UNIQUE_SECTION(DECL,RELOC) i386_pe_unique_section (DECL, RELOC)
+extern void i386_pe_unique_section PARAMS ((tree, int));
+#define TARGET_ASM_UNIQUE_SECTION i386_pe_unique_section
 
 #define SUPPORTS_ONE_ONLY 1
 

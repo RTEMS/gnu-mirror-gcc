@@ -25,9 +25,11 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "rtl.h"
 #include "hard-reg-set.h"
 #include "basic-block.h"
+#include "insn-config.h"
+#include "recog.h"
 #include "toplev.h"
-
 #include "obstack.h"
+#include "tm_p.h"
 
 /* Store the data structures necessary for depth-first search.  */
 struct depth_first_search_dsS {
@@ -85,7 +87,10 @@ can_fallthru (src, target)
   rtx insn = src->end;
   rtx insn2 = target->head;
 
-  if (src->index + 1 == target->index && !active_insn_p (insn2))
+  if (src->index + 1 != target->index)
+    return 0;
+
+  if (!active_insn_p (insn2))
     insn2 = next_active_insn (insn2);
 
   /* ??? Later we may add code to move jump tables offline.  */
@@ -184,6 +189,36 @@ mark_dfs_back_edges ()
   return found;
 }
 
+/* Set the flag EDGE_CAN_FALLTHRU for edges that can be fallthru.  */
+
+void
+set_edge_can_fallthru_flag ()
+{
+  int i;
+  for (i = 0; i < n_basic_blocks; i++)
+    {
+      basic_block bb = BASIC_BLOCK (i);
+      edge e;
+
+      /* The FALLTHRU edge is also CAN_FALLTHRU edge.  */
+      for (e = bb->succ; e; e = e->succ_next)
+	if (e->flags & EDGE_FALLTHRU)
+	  e->flags |= EDGE_CAN_FALLTHRU;
+
+      /* If the BB ends with an invertable condjump all (2) edges are
+	 CAN_FALLTHRU edges.  */
+      if (!bb->succ || !bb->succ->succ_next || bb->succ->succ_next->succ_next)
+	continue;
+      if (!any_condjump_p (bb->end))
+	continue;
+      if (!invert_jump (bb->end, JUMP_LABEL (bb->end), 0))
+	continue;
+      invert_jump (bb->end, JUMP_LABEL (bb->end), 0);
+      bb->succ->flags |= EDGE_CAN_FALLTHRU;
+      bb->succ->succ_next->flags |= EDGE_CAN_FALLTHRU;
+    }
+}
+
 /* Return true if we need to add fake edge to exit.
    Helper function for the flow_call_edges_add.  */
 
@@ -259,17 +294,27 @@ flow_call_edges_add (blocks)
      spanning tree in the case that the call doesn't return.
 
      Handle this by adding a dummy instruction in a new last basic block.  */
-  if (check_last_block
-      && need_fake_edge_p (BASIC_BLOCK (n_basic_blocks - 1)->end))
+  if (check_last_block)
     {
-       edge e;
+      basic_block bb = BASIC_BLOCK (n_basic_blocks - 1);
+      rtx insn = bb->end;
 
-       for (e = BASIC_BLOCK (n_basic_blocks - 1)->succ; e; e = e->succ_next)
-	 if (e->dest == EXIT_BLOCK_PTR)
-	    break;
+      /* Back up past insns that must be kept in the same block as a call.  */
+      while (insn != bb->head
+	     && keep_with_call_p (insn))
+	insn = PREV_INSN (insn);
 
-       insert_insn_on_edge (gen_rtx_USE (VOIDmode, const0_rtx), e);
-       commit_edge_insertions ();
+      if (need_fake_edge_p (insn))
+	{
+	  edge e;
+
+	  for (e = bb->succ; e; e = e->succ_next)
+	    if (e->dest == EXIT_BLOCK_PTR)
+	      break;
+
+	  insert_insn_on_edge (gen_rtx_USE (VOIDmode, const0_rtx), e);
+	  commit_edge_insertions ();
+	}
     }
 
   /* Now add fake edges to the function exit for any non constant
@@ -288,14 +333,22 @@ flow_call_edges_add (blocks)
 	  if (need_fake_edge_p (insn))
 	    {
 	      edge e;
+	      rtx split_at_insn = insn;
 
-	      /* The above condition should be enough to verify that there is
-		 no edge to the exit block in CFG already.  Calling make_edge
-		 in such case would make us to mark that edge as fake and
-		 remove it later.  */
+	      /* Don't split the block between a call and an insn that should
+	         remain in the same block as the call.  */
+	      if (GET_CODE (insn) == CALL_INSN)
+		while (split_at_insn != bb->end
+		       && keep_with_call_p (NEXT_INSN (split_at_insn)))
+		  split_at_insn = NEXT_INSN (split_at_insn);
+
+	      /* The handling above of the final block before the epilogue
+	         should be enough to verify that there is no edge to the exit
+		 block in CFG already.  Calling make_edge in such case would
+		 cause us to mark that edge as fake and remove it later.  */
 
 #ifdef ENABLE_CHECKING
-	      if (insn == bb->end)
+	      if (split_at_insn == bb->end)
 		for (e = bb->succ; e; e = e->succ_next)
 		  if (e->dest == EXIT_BLOCK_PTR)
 		    abort ();
@@ -303,9 +356,12 @@ flow_call_edges_add (blocks)
 
 	      /* Note that the following may create a new basic block
 		 and renumber the existing basic blocks.  */
-	      e = split_block (bb, insn);
-	      if (e)
-		blocks_split++;
+	      if (split_at_insn != bb->end)
+		{
+		  e = split_block (bb, split_at_insn);
+		  if (e)
+		    blocks_split++;
+		}
 
 	      make_edge (bb, EXIT_BLOCK_PTR, EDGE_FAKE);
 	    }

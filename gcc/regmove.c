@@ -111,7 +111,7 @@ try_auto_increment (insn, inc_insn, inc_insn_set, reg, increment, pre)
       /* Can't use the size of SET_SRC, we might have something like
 	 (sign_extend:SI (mem:QI ...  */
       rtx use = find_use_as_address (pset, reg, 0);
-      if (use != 0 && use != (rtx) 1)
+      if (use != 0 && use != (rtx) (size_t) 1)
 	{
 	  int size = GET_MODE_SIZE (GET_MODE (use));
 	  if (0
@@ -239,7 +239,7 @@ mark_flags_life_zones (flags)
     {
       enum machine_mode mode = (flags ? HImode : VOIDmode);
       rtx insn;
-      for (insn = get_insns(); insn; insn = NEXT_INSN (insn))
+      for (insn = get_insns (); insn; insn = NEXT_INSN (insn))
 	PUT_MODE (insn, mode);
       return;
     }
@@ -269,7 +269,7 @@ mark_flags_life_zones (flags)
       {
 	int i;
 	for (i = 0; i < flags_nregs; ++i)
-          live |= REGNO_REG_SET_P (BASIC_BLOCK (block)->global_live_at_start,
+	  live |= REGNO_REG_SET_P (BASIC_BLOCK (block)->global_live_at_start,
 				   flags_regno + i);
       }
 #endif
@@ -334,7 +334,7 @@ static int *regno_src_regno;
    a candidate for tying to a hard register, since the output might in
    turn be a candidate to be tied to a different hard register.  */
 static int
-replacement_quality(reg)
+replacement_quality (reg)
      rtx reg;
 {
   int src_regno;
@@ -950,7 +950,7 @@ fixup_match_2 (insn, dst, src, offset, regmove_dump_file)
       if (perhaps_ends_bb_p (p))
 	break;
       else if (! INSN_P (p))
-        continue;
+	continue;
 
       if (find_regno_note (p, REG_DEAD, REGNO (dst)))
 	dst_death = p;
@@ -962,7 +962,7 @@ fixup_match_2 (insn, dst, src, offset, regmove_dump_file)
 	  && GET_CODE (SET_SRC (pset)) == PLUS
 	  && XEXP (SET_SRC (pset), 0) == src
 	  && GET_CODE (XEXP (SET_SRC (pset), 1)) == CONST_INT)
-        {
+	{
 	  HOST_WIDE_INT newconst
 	    = INTVAL (offset) - INTVAL (XEXP (SET_SRC (pset), 1));
 	  rtx add = gen_add3_insn (dst, dst, GEN_INT (newconst));
@@ -1013,10 +1013,10 @@ fixup_match_2 (insn, dst, src, offset, regmove_dump_file)
 #endif
 	      return 1;
 	    }
-        }
+	}
 
       if (reg_set_p (dst, PATTERN (p)))
-        break;
+	break;
 
       /* If we have passed a call instruction, and the
          pseudo-reg SRC is not already live across a call,
@@ -1025,19 +1025,19 @@ fixup_match_2 (insn, dst, src, offset, regmove_dump_file)
 	 hard regs are clobbered.  Thus, we only use it for src for
 	 non-call insns.  */
       if (GET_CODE (p) == CALL_INSN)
-        {
+	{
 	  if (! dst_death)
 	    num_calls++;
 
-          if (REG_N_CALLS_CROSSED (REGNO (src)) == 0)
-            break;
+	  if (REG_N_CALLS_CROSSED (REGNO (src)) == 0)
+	    break;
 
 	  if (call_used_regs [REGNO (dst)]
 	      || find_reg_fusage (p, CLOBBER, dst))
 	    break;
-        }
+	}
       else if (reg_set_p (src, PATTERN (p)))
-        break;
+	break;
     }
 
   return 0;
@@ -1104,12 +1104,12 @@ regmove_optimize (f, nregs, regmove_dump_file)
 	      && (GET_CODE (SET_SRC (set)) == SIGN_EXTEND
 		  || GET_CODE (SET_SRC (set)) == ZERO_EXTEND)
 	      && GET_CODE (XEXP (SET_SRC (set), 0)) == REG
-	      && GET_CODE (SET_DEST(set)) == REG)
+	      && GET_CODE (SET_DEST (set)) == REG)
 	    optimize_reg_copy_3 (insn, SET_DEST (set), SET_SRC (set));
 
 	  if (flag_expensive_optimizations && ! pass
 	      && GET_CODE (SET_SRC (set)) == REG
-	      && GET_CODE (SET_DEST(set)) == REG)
+	      && GET_CODE (SET_DEST (set)) == REG)
 	    {
 	      /* If this is a register-register copy where SRC is not dead,
 		 see if we can optimize it.  If this optimization succeeds,
@@ -1124,15 +1124,15 @@ regmove_optimize (f, nregs, regmove_dump_file)
 		  if (regno_src_regno[REGNO (SET_DEST (set))] < 0
 		      && SET_SRC (set) != SET_DEST (set))
 		    {
-		      int srcregno = REGNO (SET_SRC(set));
+		      int srcregno = REGNO (SET_SRC (set));
 		      if (regno_src_regno[srcregno] >= 0)
 			srcregno = regno_src_regno[srcregno];
 		      regno_src_regno[REGNO (SET_DEST (set))] = srcregno;
 		    }
 		}
 	    }
-          if (! flag_regmove)
-            continue;
+	  if (! flag_regmove)
+	    continue;
 
 	  if (! find_matches (insn, &match))
 	    continue;
@@ -1328,6 +1328,21 @@ regmove_optimize (f, nregs, regmove_dump_file)
 		}
 	      src_class = reg_preferred_class (REGNO (src));
 	      dst_class = reg_preferred_class (REGNO (dst));
+
+	      if (! (src_note = find_reg_note (insn, REG_DEAD, src)))
+		{
+		  /* We used to force the copy here like in other cases, but
+		     it produces worse code, as it eliminates no copy
+		     instructions and the copy emitted will be produced by
+		     reload anyway.  On patterns with multiple alternatives,
+		     there may be better sollution availble.
+
+		     In particular this change produced slower code for numeric
+		     i387 programs.  */
+
+		  continue;
+		}
+
 	      if (! regclass_compatible_p (src_class, dst_class))
 		{
 		  if (!copy_src)
@@ -1350,23 +1365,12 @@ regmove_optimize (f, nregs, regmove_dump_file)
 		  continue;
 		}
 
-	      if (! (src_note = find_reg_note (insn, REG_DEAD, src)))
-		{
-		  if (!copy_src)
-		    {
-		      copy_src = src;
-		      copy_dst = dst;
-		    }
-		  continue;
-		}
-
-
 	      /* If src is set once in a different basic block,
 		 and is set equal to a constant, then do not use
 		 it for this optimization, as this would make it
 		 no longer equivalent to a constant.  */
 
-              if (reg_is_remote_constant_p (src, insn, f))
+	      if (reg_is_remote_constant_p (src, insn, f))
 		{
 		  if (!copy_src)
 		    {
@@ -1599,7 +1603,7 @@ find_matches (insn, matchp)
 	  case 'j': case 'k': case 'l': case 'p': case 'q': case 't': case 'u':
 	  case 'v': case 'w': case 'x': case 'y': case 'z': case 'A': case 'B':
 	  case 'C': case 'D': case 'W': case 'Y': case 'Z':
-	    if (CLASS_LIKELY_SPILLED_P (REG_CLASS_FROM_LETTER ((unsigned char)c)))
+	    if (CLASS_LIKELY_SPILLED_P (REG_CLASS_FROM_LETTER ((unsigned char) c)))
 	      likely_spilled[op_no] = 1;
 	    break;
 	  }
@@ -1922,7 +1926,7 @@ fixup_match_1 (insn, set, src, src_subreg, dst, backward, operand_number,
 
       if (note && CONSTANT_P (XEXP (note, 0)))
 	{
-	  for (q = PREV_INSN (insn); q; q = PREV_INSN(q))
+	  for (q = PREV_INSN (insn); q; q = PREV_INSN (q))
 	    {
 	      /* ??? We can't scan past the end of a basic block without
 		 updating the register lifetime info
@@ -2327,19 +2331,17 @@ combine_stack_adjustments_for_block (bb)
   HOST_WIDE_INT last_sp_adjust = 0;
   rtx last_sp_set = NULL_RTX;
   struct csa_memlist *memlist = NULL;
-  rtx pending_delete;
-  rtx insn, next;
+  rtx insn, next, set;
   struct record_stack_memrefs_data data;
+  bool end_of_block = false;
 
-  for (insn = bb->head; ; insn = next)
+  for (insn = bb->head; !end_of_block ; insn = next)
     {
-      rtx set;
-
-      pending_delete = NULL_RTX;
+      end_of_block = insn == bb->end;
       next = NEXT_INSN (insn);
 
       if (! INSN_P (insn))
-	goto processed;
+	continue;
 
       set = single_set_for_csa (insn);
       if (set)
@@ -2361,7 +2363,7 @@ combine_stack_adjustments_for_block (bb)
 		{
 		  last_sp_set = insn;
 		  last_sp_adjust = this_adjust;
-		  goto processed;
+		  continue;
 		}
 
 	      /* If not all recorded memrefs can be adjusted, or the
@@ -2393,9 +2395,9 @@ combine_stack_adjustments_for_block (bb)
 						  this_adjust))
 		    {
 		      /* It worked!  */
-		      pending_delete = insn;
+		      delete_insn (insn);
 		      last_sp_adjust += this_adjust;
-		      goto processed;
+		      continue;
 		    }
 		}
 
@@ -2414,16 +2416,20 @@ combine_stack_adjustments_for_block (bb)
 		      last_sp_adjust += this_adjust;
 		      free_csa_memlist (memlist);
 		      memlist = NULL;
-		      goto processed;
+		      continue;
 		    }
 		}
 
-	      /* Combination failed.  Restart processing from here.  */
+	      /* Combination failed.  Restart processing from here.  If
+		 deallocation+allocation conspired to cancel, we can
+		 delete the old deallocation insn.  */
+	      if (last_sp_set && last_sp_adjust == 0)
+		delete_insn (insn);
 	      free_csa_memlist (memlist);
 	      memlist = NULL;
 	      last_sp_set = insn;
 	      last_sp_adjust = this_adjust;
-	      goto processed;
+	      continue;
 	    }
 
 	  /* Find a predecrement of exactly the previous adjustment and
@@ -2449,15 +2455,12 @@ combine_stack_adjustments_for_block (bb)
 							 stack_pointer_rtx),
 				  0))
 	    {
-	      if (last_sp_set == bb->head)
-		bb->head = NEXT_INSN (last_sp_set);
 	      delete_insn (last_sp_set);
-
 	      free_csa_memlist (memlist);
 	      memlist = NULL;
 	      last_sp_set = NULL_RTX;
 	      last_sp_adjust = 0;
-	      goto processed;
+	      continue;
 	    }
 	}
 
@@ -2467,7 +2470,7 @@ combine_stack_adjustments_for_block (bb)
 	  && !for_each_rtx (&PATTERN (insn), record_stack_memrefs, &data))
 	{
 	   memlist = data.memlist;
-	   goto processed;
+	   continue;
 	}
       memlist = data.memlist;
 
@@ -2477,20 +2480,15 @@ combine_stack_adjustments_for_block (bb)
 	  && (GET_CODE (insn) == CALL_INSN
 	      || reg_mentioned_p (stack_pointer_rtx, PATTERN (insn))))
 	{
+	  if (last_sp_set && last_sp_adjust == 0)
+	    delete_insn (last_sp_set);
 	  free_csa_memlist (memlist);
 	  memlist = NULL;
 	  last_sp_set = NULL_RTX;
 	  last_sp_adjust = 0;
 	}
-
-    processed:
-      if (insn == bb->end)
-	break;
-
-      if (pending_delete)
-	delete_insn (pending_delete);
     }
 
-  if (pending_delete)
-    delete_insn (pending_delete);
+  if (last_sp_set && last_sp_adjust == 0)
+    delete_insn (last_sp_set);
 }

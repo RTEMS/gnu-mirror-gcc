@@ -1,6 +1,6 @@
 /* Prints out tree in human readable form - GNU C-compiler
    Copyright (C) 1990, 1991, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
-   2001 Free Software Foundation, Inc.
+   2001, 2002 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -124,7 +124,6 @@ print_node_brief (file, prefix, node, indent)
       if (TREE_OVERFLOW (node))
 	fprintf (file, " overflow");
 
-#if !defined(REAL_IS_NOT_DOUBLE) || defined(REAL_ARITHMETIC)
       d = TREE_REAL_CST (node);
       if (REAL_VALUE_ISINF (d))
 	fprintf (file, " Inf");
@@ -137,16 +136,6 @@ print_node_brief (file, prefix, node, indent)
 	  REAL_VALUE_TO_DECIMAL (d, "%e", string);
 	  fprintf (file, " %s", string);
 	}
-#else
-      {
-	int i;
-	unsigned char *p = (unsigned char *) &TREE_REAL_CST (node);
-	fprintf (file, " 0x");
-	for (i = 0; i < sizeof TREE_REAL_CST (node); i++)
-	  fprintf (file, "%02x", *p++);
-	fprintf (file, "");
-      }
-#endif
     }
 
   fprintf (file, ">");
@@ -328,6 +317,8 @@ print_node (file, prefix, node, indent)
 	fputs (" common", file);
       if (DECL_EXTERNAL (node))
 	fputs (" external", file);
+      if (DECL_WEAK (node))
+	fputs (" weak", file);
       if (DECL_REGISTER (node) && TREE_CODE (node) != FIELD_DECL
 	  && TREE_CODE (node) != FUNCTION_DECL
 	  && TREE_CODE (node) != LABEL_DECL)
@@ -387,7 +378,7 @@ print_node (file, prefix, node, indent)
       if (DECL_LANG_FLAG_7 (node))
 	fputs (" decl_7", file);
 
-      fprintf (file, " %s", GET_MODE_NAME(mode));
+      fprintf (file, " %s", GET_MODE_NAME (mode));
       fprintf (file, " file %s line %d",
 	       DECL_SOURCE_FILE (node), DECL_SOURCE_LINE (node));
 
@@ -531,7 +522,7 @@ print_node (file, prefix, node, indent)
 	fputs (" type_6", file);
 
       mode = TYPE_MODE (node);
-      fprintf (file, " %s", GET_MODE_NAME(mode));
+      fprintf (file, " %s", GET_MODE_NAME (mode));
 
       print_node (file, "size", TYPE_SIZE (node), indent + 4);
       print_node (file, "unit size", TYPE_SIZE_UNIT (node), indent + 4);
@@ -681,7 +672,6 @@ print_node (file, prefix, node, indent)
 	    if (TREE_OVERFLOW (node))
 	      fprintf (file, " overflow");
 
-#if !defined(REAL_IS_NOT_DOUBLE) || defined(REAL_ARITHMETIC)
 	    d = TREE_REAL_CST (node);
 	    if (REAL_VALUE_ISINF (d))
 	      fprintf (file, " Inf");
@@ -694,16 +684,22 @@ print_node (file, prefix, node, indent)
 		REAL_VALUE_TO_DECIMAL (d, "%e", string);
 		fprintf (file, " %s", string);
 	      }
-#else
-	    {
-	      int i;
-	      unsigned char *p = (unsigned char *) &TREE_REAL_CST (node);
-	      fprintf (file, " 0x");
-	      for (i = 0; i < sizeof TREE_REAL_CST (node); i++)
-		fprintf (file, "%02x", *p++);
-	      fprintf (file, "");
-	    }
-#endif
+	  }
+	  break;
+
+	case VECTOR_CST:
+	  {
+	    tree vals = TREE_VECTOR_CST_ELTS (node);
+	    char buf[10];
+	    tree link;
+	    int i;
+
+	    i = 0;
+	    for (link = vals; link; link = TREE_CHAIN (link), ++i)
+	      {
+		sprintf (buf, "elt%d: ", i);
+		print_node (file, buf, TREE_VALUE (link), indent + 4);
+	      }
 	  }
 	  break;
 

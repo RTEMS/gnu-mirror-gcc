@@ -43,6 +43,7 @@ extern void   arm_encode_call_attribute	PARAMS ((tree, int));
 extern int    arm_function_ok_for_sibcall PARAMS ((tree));
 #endif
 #ifdef RTX_CODE
+extern int    arm_hard_regno_mode_ok	PARAMS ((unsigned int, enum machine_mode));
 extern int    const_ok_for_arm		PARAMS ((HOST_WIDE_INT));
 extern int    arm_split_constant	PARAMS ((RTX_CODE, enum machine_mode,
 						HOST_WIDE_INT, rtx, rtx, int));
@@ -184,7 +185,7 @@ extern int  arm_dllimport_name_p 	PARAMS ((const char *));
 
 #ifdef TREE_CODE
 extern void arm_pe_unique_section 	PARAMS ((tree, int));
-extern void arm_pe_encode_section_info 	PARAMS ((tree));
+extern void arm_pe_encode_section_info 	PARAMS ((tree, int));
 extern int  arm_dllexport_p 		PARAMS ((tree));
 extern int  arm_dllimport_p 		PARAMS ((tree));
 extern void arm_mark_dllexport 		PARAMS ((tree));

@@ -1,6 +1,6 @@
 // 2001-08-15 Benjamin Kosnik  <bkoz@redhat.com>
 
-// Copyright (C) 2001 Free Software Foundation
+// Copyright (C) 2001, 2002 Free Software Foundation
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -60,18 +60,18 @@ void test01()
   int i1;
   int size1 = strlen(strlit1) - 1;
   i1 = coll_c.compare(strlit1, strlit1 + size1, strlit1, strlit1 + 7);
-  VERIFY ( i1 > 0 );
+  VERIFY ( i1 == 1 );
   i1 = coll_c.compare(strlit1, strlit1 + 7, strlit1, strlit1 + size1);
-  VERIFY ( i1 < 0 );
+  VERIFY ( i1 == -1 );
   i1 = coll_c.compare(strlit1, strlit1 + 7, strlit1, strlit1 + 7);
   VERIFY ( i1 == 0 );
 
   int i2;
   int size2 = strlen(strlit2) - 1;
   i2 = coll_c.compare(strlit2, strlit2 + size2, strlit2, strlit2 + 13);
-  VERIFY ( i2 > 0 );
+  VERIFY ( i2 == 1 );
   i2 = coll_c.compare(strlit2, strlit2 + 13, strlit2, strlit2 + size2);
-  VERIFY ( i2 < 0 );
+  VERIFY ( i2 == -1 );
   i2 = coll_c.compare(strlit2, strlit2 + size2, strlit2, strlit2 + size2);
   VERIFY ( i2 == 0 );
 
@@ -86,10 +86,10 @@ void test01()
 
   string str1 = coll_c.transform(strlit1, strlit1 + size1);
   string str2 = coll_c.transform(strlit2, strlit2 + size2);
-  i1 = coll_c.compare(str1.c_str(), str1.c_str() + size1,
-		       str2.c_str(), str2.c_str() + size2);
+  i1 = str1.compare(str2);
   i2 = coll_c.compare(strlit1, strlit1 + size1, strlit2, strlit2 + size2);
-  VERIFY(i1 == i2);
+  VERIFY ( i2 == 1 );
+  VERIFY ( i1 * i2 > 0 );
 
   // Check German "de_DE" locale.
   const char* strlit3 = "Äuglein Augment"; // "C" == "Augment Äuglein"
@@ -97,20 +97,20 @@ void test01()
 
   int size3 = strlen(strlit3) - 1;
   i1 = coll_de.compare(strlit3, strlit3 + size3, strlit3, strlit3 + 7);
-  VERIFY ( i1 > 0 );
+  VERIFY ( i1 == 1 );
   i1 = coll_de.compare(strlit3, strlit3 + 7, strlit3, strlit3 + size1);
-  VERIFY ( i1 < 0 );
+  VERIFY ( i1 == -1 );
   i1 = coll_de.compare(strlit3, strlit3 + 7, strlit3, strlit3 + 7);
   VERIFY ( i1 == 0 );
 
   i1 = coll_de.compare(strlit3, strlit3 + 6, strlit3 + 8, strlit3 + 14);
-  VERIFY ( i1 < 0 );
+  VERIFY ( i1 == -1 );
 
   int size4 = strlen(strlit4) - 1;
   i2 = coll_de.compare(strlit4, strlit4 + size4, strlit4, strlit4 + 13);
-  VERIFY ( i2 > 0 );
+  VERIFY ( i2 == 1 );
   i2 = coll_de.compare(strlit4, strlit4 + 13, strlit4, strlit4 + size4);
-  VERIFY ( i2 < 0 );
+  VERIFY ( i2 == -1 );
   i2 = coll_de.compare(strlit4, strlit4 + size4, strlit4, strlit4 + size4);
   VERIFY ( i2 == 0 );
 
@@ -123,18 +123,65 @@ void test01()
 
   string str3 = coll_de.transform(strlit3, strlit3 + size3);
   string str4 = coll_de.transform(strlit4, strlit4 + size4);
-  i1 = coll_de.compare(str3.c_str(), str3.c_str() + size3,
-		       str4.c_str(), str4.c_str() + size4);
+  i1 = str3.compare(str4);
   i2 = coll_de.compare(strlit3, strlit3 + size3, strlit4, strlit4 + size4);
-  VERIFY(i1 == i2);
+  VERIFY ( i2 == -1 );
+  VERIFY ( i1 * i2 > 0 );
+}
+
+// libstdc++/5280
+void test02()
+{
+#ifdef _GLIBCPP_HAVE_SETENV 
+  // Set the global locale to non-"C".
+  std::locale loc_de("de_DE");
+  std::locale::global(loc_de);
+
+  // Set LANG environment variable to de_DE.
+  const char* oldLANG = getenv("LANG");
+  if (!setenv("LANG", "de_DE", 1))
+    {
+      test01();
+      setenv("LANG", oldLANG ? oldLANG : "", 1);
+    }
+#endif
+}
+
+void test03()
+{
+  bool test = true;
+  std::string str1("fffff");
+  std::string str2("ffffffffffff");
+
+  const std::locale cloc = std::locale::classic();
+  const std::collate<char> &col = std::use_facet<std::collate<char> >(cloc);
+
+  long l1 = col.hash(str1.c_str(), str1.c_str() + str1.size());
+  long l2 = col.hash(str2.c_str(), str2.c_str() + str2.size());
+  VERIFY( l1 != l2 );
+}
+
+// http://gcc.gnu.org/ml/libstdc++/2002-05/msg00038.html
+void test04()
+{
+  bool test = true;
+
+  const char* tentLANG = setlocale(LC_ALL, "ja_JP.eucjp");
+  if (tentLANG != NULL)
+    {
+      std::string preLANG = tentLANG;
+      test01();
+      test03();
+      std::string postLANG = setlocale(LC_ALL, NULL);
+      VERIFY( preLANG == postLANG );
+    }
 }
 
 int main()
 {
   test01();
-
+  test02();
+  test03();
+  test04();
   return 0;
 }
-
-
-

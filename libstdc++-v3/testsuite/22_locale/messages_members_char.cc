@@ -1,6 +1,6 @@
 // 2001-07-17 Benjamin Kosnik  <bkoz@redhat.com>
 
-// Copyright (C) 2001 Free Software Foundation
+// Copyright (C) 2001, 2002 Free Software Foundation
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -79,12 +79,45 @@ void test01()
   VERIFY ( s01 == "please" );
   VERIFY ( s02 == "thank you" );
   mssg_us.close(cat_us);
+}
 
- }
+// libstdc++/5280
+void test02()
+{
+#ifdef _GLIBCPP_HAVE_SETENV 
+  // Set the global locale to non-"C".
+  std::locale loc_de("de_DE");
+  std::locale::global(loc_de);
+
+  // Set LANG environment variable to de_DE.
+  const char* oldLANG = getenv("LANG");
+  if (!setenv("LANG", "de_DE", 1))
+    {
+      test01();
+      setenv("LANG", oldLANG ? oldLANG : "", 1);
+    }
+#endif
+}
+
+// http://gcc.gnu.org/ml/libstdc++/2002-05/msg00038.html
+void test03()
+{
+  bool test = true;
+
+  const char* tentLANG = setlocale(LC_ALL, "ja_JP.eucjp");
+  if (tentLANG != NULL)
+    {
+      std::string preLANG = tentLANG;
+      test01();
+      std::string postLANG = setlocale(LC_ALL, NULL);
+      VERIFY( preLANG == postLANG );
+    }
+}
 
 int main()
 {
   test01();
-
+  test02();
+  test03();
   return 0;
 }

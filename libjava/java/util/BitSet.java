@@ -18,11 +18,22 @@ along with GNU Classpath; see the file COPYING.  If not, write to the
 Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
 02111-1307 USA.
 
-As a special exception, if you link this library with other files to
-produce an executable, this library does not by itself cause the
-resulting executable to be covered by the GNU General Public License.
-This exception does not however invalidate any other reasons why the
-executable file might be covered by the GNU General Public License. */
+Linking this library statically or dynamically with other modules is
+making a combined work based on this library.  Thus, the terms and
+conditions of the GNU General Public License cover the whole
+combination.
+
+As a special exception, the copyright holders of this library give you
+permission to link this library with independent modules to produce an
+executable, regardless of the license terms of these independent
+modules, and to copy and distribute the resulting executable under
+terms of your choice, provided that you also meet, for each linked
+independent module, the terms and conditions of the license of that
+module.  An independent module is a module which is not derived from
+or based on this library.  If you modify this library, you may extend
+this exception to your version of the library, but you are not
+obligated to do so.  If you do not wish to do so, delete this
+exception statement from your version. */
 
 package java.util;
 import java.io.Serializable;
@@ -91,6 +102,9 @@ public class BitSet implements Cloneable, Serializable
    */
   public BitSet(int nbits)
   {
+    if (nbits < 0)
+      throw new NegativeArraySizeException();
+    
     int length = nbits >>> 6;
     if ((nbits & LONG_MASK) != 0)
       ++length;
@@ -184,7 +198,7 @@ public class BitSet implements Cloneable, Serializable
    */
   public void clear(int pos)
   {
-    int offset = pos >>> 6;
+    int offset = pos >> 6;
     ensure(offset);
     // ArrayIndexOutOfBoundsException subclasses IndexOutOfBoundsException,
     // so we'll just let that be our exception.
@@ -278,7 +292,7 @@ public class BitSet implements Cloneable, Serializable
    */
   public void flip(int index)
   {
-    int offset = index >>> 6;
+    int offset = index >> 6;
     ensure(offset);
     // ArrayIndexOutOfBoundsException subclasses IndexOutOfBoundsException,
     // so we'll just let that be our exception.
@@ -324,7 +338,7 @@ public class BitSet implements Cloneable, Serializable
    */
   public boolean get(int pos)
   {
-    int offset = pos >>> 6;
+    int offset = pos >> 6;
     if (offset >= bits.length)
       return false;
     // ArrayIndexOutOfBoundsException subclasses IndexOutOfBoundsException,
@@ -487,7 +501,7 @@ public class BitSet implements Cloneable, Serializable
    */
   public int nextClearBit(int from)
   {
-    int offset = from >>> 6;
+    int offset = from >> 6;
     long mask = 1L << from;
     while (offset < bits.length)
       {
@@ -524,7 +538,7 @@ public class BitSet implements Cloneable, Serializable
    */
   public int nextSetBit(int from)
   {
-    int offset = from >>> 6;
+    int offset = from >> 6;
     long mask = 1L << from;
     while (offset < bits.length)
       {
@@ -572,7 +586,7 @@ public class BitSet implements Cloneable, Serializable
    */
   public void set(int pos)
   {
-    int offset = pos >>> 6;
+    int offset = pos >> 6;
     ensure(offset);
     // ArrayIndexOutOfBoundsException subclasses IndexOutOfBoundsException,
     // so we'll just let that be our exception.

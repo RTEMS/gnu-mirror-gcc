@@ -1,6 +1,6 @@
 /* Language-dependent node constructors for parse phase of GNU compiler.
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GNU CC.
@@ -44,7 +44,6 @@ static tree no_linkage_helper PARAMS ((tree *, int *, void *));
 static tree build_srcloc PARAMS ((const char *, int));
 static tree mark_local_for_remap_r PARAMS ((tree *, int *, void *));
 static tree cp_unsave_r PARAMS ((tree *, int *, void *));
-static void cp_unsave PARAMS ((tree *));
 static tree build_target_expr PARAMS ((tree, tree));
 static tree count_trees_r PARAMS ((tree *, int *, void *));
 static tree verify_stmt_tree_r PARAMS ((tree *, int *, void *));
@@ -127,7 +126,7 @@ lvalue_p_1 (ref, treat_class_rvalues_as_lvalues)
 
       /* A currently unresolved scope ref.  */
     case SCOPE_REF:
-      my_friendly_abort (103);
+      abort ();
     case OFFSET_REF:
       if (TREE_CODE (TREE_OPERAND (ref, 1)) == FUNCTION_DECL)
 	return clk_ordinary;
@@ -235,7 +234,7 @@ build_target_expr (decl, value)
   tree t;
 
   t = build (TARGET_EXPR, TREE_TYPE (decl), decl, value, 
-	     maybe_build_cleanup (decl), NULL_TREE);
+	     cxx_maybe_build_cleanup (decl), NULL_TREE);
   /* We always set TREE_SIDE_EFFECTS so that expand_expr does not
      ignore the TARGET_EXPR.  If there really turn out to be no
      side-effects, then the optimizer should be able to get rid of
@@ -293,7 +292,7 @@ build_cplus_new (type, init)
   return rval;
 }
 
-/* Buidl a TARGET_EXPR using INIT to initialize a new temporary of the
+/* Build a TARGET_EXPR using INIT to initialize a new temporary of the
    indicated TYPE.  */
 
 tree
@@ -464,7 +463,12 @@ build_cplus_array_type_1 (elt_type, index_type)
   if (elt_type == error_mark_node || index_type == error_mark_node)
     return error_mark_node;
 
-  if (processing_template_decl 
+  /* Don't do the minimal thing just because processing_template_decl is
+     set; we want to give string constants the right type immediately, so
+     we don't have to fix them up at instantiation time.  */
+  if ((processing_template_decl
+       && index_type && TYPE_MAX_VALUE (index_type)
+       && TREE_CODE (TYPE_MAX_VALUE (index_type)) != INTEGER_CST)
       || uses_template_parms (elt_type) 
       || uses_template_parms (index_type))
     {
@@ -491,32 +495,48 @@ build_cplus_array_type (elt_type, index_type)
 {
   tree t;
   int type_quals = cp_type_quals (elt_type);
+  int cv_quals = type_quals & (TYPE_QUAL_CONST|TYPE_QUAL_VOLATILE);
+  int other_quals = type_quals & ~(TYPE_QUAL_CONST|TYPE_QUAL_VOLATILE);
 
-  if (type_quals != TYPE_UNQUALIFIED)
-    elt_type = cp_build_qualified_type (elt_type, TYPE_UNQUALIFIED);
+  if (cv_quals)
+    elt_type = cp_build_qualified_type (elt_type, other_quals);
 
   t = build_cplus_array_type_1 (elt_type, index_type);
 
-  if (type_quals != TYPE_UNQUALIFIED)
-    t = cp_build_qualified_type (t, type_quals);
+  if (cv_quals)
+    t = cp_build_qualified_type (t, cv_quals);
 
   return t;
 }
 
 /* Make a variant of TYPE, qualified with the TYPE_QUALS.  Handles
    arrays correctly.  In particular, if TYPE is an array of T's, and
-   TYPE_QUALS is non-empty, returns an array of qualified T's.  If
-   at attempt is made to qualify a type illegally, and COMPLAIN is
-   non-zero, an error is issued.  If COMPLAIN is zero, error_mark_node
-   is returned.  */
+   TYPE_QUALS is non-empty, returns an array of qualified T's.
+  
+   FLAGS determines how to deal with illformed qualifications. If
+   tf_ignore_bad_quals is set, then bad qualifications are dropped
+   (this is permitted if TYPE was introduced via a typedef or template
+   type parameter). If bad qualifications are dropped and tf_warning
+   is set, then a warning is issued for non-const qualifications.  If
+   tf_ignore_bad_quals is not set and tf_error is not set, we
+   return error_mark_node. Otherwise, we issue an error, and ignore
+   the qualifications.
 
+   Qualification of a reference type is valid when the reference came
+   via a typedef or template type argument. [dcl.ref] No such
+   dispensation is provided for qualifying a function type.  [dcl.fct]
+   DR 295 queries this and the proposed resolution brings it into line
+   with qualifiying a reference.  We implement the DR.  We also behave
+   in a similar manner for restricting non-pointer types.  */
+ 
 tree
 cp_build_qualified_type_real (type, type_quals, complain)
      tree type;
      int type_quals;
-     int complain;
+     tsubst_flags_t complain;
 {
   tree result;
+  int bad_quals = TYPE_UNQUALIFIED;
 
   if (type == error_mark_node)
     return type;
@@ -524,32 +544,51 @@ cp_build_qualified_type_real (type, type_quals, complain)
   if (type_quals == cp_type_quals (type))
     return type;
 
-  /* A restrict-qualified pointer type must be a pointer (or reference)
+  /* A reference, fucntion or method type shall not be cv qualified.
+     [dcl.ref], [dct.fct]  */
+  if (type_quals & (TYPE_QUAL_CONST | TYPE_QUAL_VOLATILE)
+      && (TREE_CODE (type) == REFERENCE_TYPE
+	  || TREE_CODE (type) == FUNCTION_TYPE
+	  || TREE_CODE (type) == METHOD_TYPE))
+    {
+      bad_quals |= type_quals & (TYPE_QUAL_CONST | TYPE_QUAL_VOLATILE);
+      type_quals &= ~(TYPE_QUAL_CONST | TYPE_QUAL_VOLATILE);
+    }
+  
+  /* A restrict-qualified type must be a pointer (or reference)
      to object or incomplete type.  */
   if ((type_quals & TYPE_QUAL_RESTRICT)
       && TREE_CODE (type) != TEMPLATE_TYPE_PARM
-      && (!POINTER_TYPE_P (type)
-	  || TYPE_PTRMEM_P (type)
-	  || TREE_CODE (TREE_TYPE (type)) == FUNCTION_TYPE))
+      && TREE_CODE (type) != TYPENAME_TYPE
+      && !POINTER_TYPE_P (type))
     {
-      if (complain)
-	error ("`%T' cannot be `restrict'-qualified", type);
-      else
-	return error_mark_node;
-
+      bad_quals |= TYPE_QUAL_RESTRICT;
       type_quals &= ~TYPE_QUAL_RESTRICT;
     }
 
-  if (type_quals != TYPE_UNQUALIFIED
-      && TREE_CODE (type) == FUNCTION_TYPE)
+  if (bad_quals == TYPE_UNQUALIFIED)
+    /*OK*/;
+  else if (!(complain & (tf_error | tf_ignore_bad_quals)))
+    return error_mark_node;
+  else
     {
-      if (complain)
-	error ("`%T' cannot be `const'-, `volatile'-, or `restrict'-qualified", type);
-      else
-	return error_mark_node;
-      type_quals = TYPE_UNQUALIFIED;
+      if (complain & tf_ignore_bad_quals)
+ 	/* We're not going to warn about constifying things that can't
+ 	   be constified.  */
+ 	bad_quals &= ~TYPE_QUAL_CONST;
+      if (bad_quals)
+ 	{
+ 	  tree bad_type = build_qualified_type (ptr_type_node, bad_quals);
+ 
+ 	  if (!(complain & tf_ignore_bad_quals))
+ 	    error ("`%V' qualifiers cannot be applied to `%T'",
+		   bad_type, type);
+ 	  else if (complain & tf_warning)
+ 	    warning ("ignoring `%V' qualifiers on `%T'", bad_type, type);
+ 	}
     }
-  else if (TREE_CODE (type) == ARRAY_TYPE)
+  
+  if (TREE_CODE (type) == ARRAY_TYPE)
     {
       /* In C++, the qualification really applies to the array element
 	 type.  Obtain the appropriately qualified element type.  */
@@ -591,7 +630,7 @@ cp_build_qualified_type_real (type, type_quals, complain)
     {
       /* For a pointer-to-member type, we can't just return a
 	 cv-qualified version of the RECORD_TYPE.  If we do, we
-	 haven't change the field that contains the actual pointer to
+	 haven't changed the field that contains the actual pointer to
 	 a method, and so TYPE_PTRMEMFUNC_FN_TYPE will be wrong.  */
       tree t;
 
@@ -599,7 +638,7 @@ cp_build_qualified_type_real (type, type_quals, complain)
       t = cp_build_qualified_type_real (t, type_quals, complain);
       return build_ptrmemfunc_type (t);
     }
-
+  
   /* Retrieve (or create) the appropriately qualified variant.  */
   result = build_qualified_type (type, type_quals);
 
@@ -670,7 +709,7 @@ unshare_base_binfos (binfo)
    While all these live in the same table, they are completely independent,
    and the hash code is computed differently for each of these.  */
 
-static htab_t list_hash_table;
+static GTY ((param_is (union tree_node))) htab_t list_hash_table;
 
 struct list_proxy 
 {
@@ -896,7 +935,7 @@ count_functions (t)
       return i;
     }
 
-  my_friendly_abort (359);
+  abort ();
   return 0;
 }
 
@@ -998,9 +1037,6 @@ cp_statement_code_p (code)
 {
   switch (code)
     {
-    case SUBOBJECT:
-    case CLEANUP_STMT:
-    case CTOR_STMT:
     case CTOR_INITIALIZER:
     case RETURN_INIT:
     case TRY_BLOCK:
@@ -1018,7 +1054,7 @@ cp_statement_code_p (code)
 #define PRINT_RING_SIZE 4
 
 const char *
-lang_printable_name (decl, v)
+cxx_printable_name (decl, v)
      tree decl;
      int v;
 {
@@ -1049,7 +1085,7 @@ lang_printable_name (decl, v)
       if (ring_counter == PRINT_RING_SIZE)
 	ring_counter = 0;
       if (decl_ring[ring_counter] == current_function_decl)
-	my_friendly_abort (106);
+	abort ();
     }
 
   if (print_ring[ring_counter])
@@ -1155,7 +1191,7 @@ verify_stmt_tree_r (tp, walk_subtrees, data)
   /* If this statement is already present in the hash table, then
      there is a circularity in the statement tree.  */
   if (htab_find (*statements, t))
-    my_friendly_abort (20000727);
+    abort ();
   
   slot = htab_find_slot (*statements, t, INSERT);
   *slot = t;
@@ -1480,7 +1516,7 @@ get_type_decl (t)
   if (t == error_mark_node)
     return t;
   
-  my_friendly_abort (42);
+  abort ();
 
   /* Stop compiler from complaining control reaches end of non-void function.  */
   return 0;
@@ -1683,25 +1719,15 @@ cp_tree_equal (t1, t2)
   return -1;
 }
 
-/* Build a wrapper around some pointer PTR so we can use it as a tree.  */
+/* Build a wrapper around a 'struct z_candidate' so we can use it as a
+   tree.  */
 
 tree
-build_ptr_wrapper (ptr)
-     void *ptr;
+build_zc_wrapper (ptr)
+     struct z_candidate *ptr;
 {
   tree t = make_node (WRAPPER);
-  WRAPPER_PTR (t) = ptr;
-  return t;
-}
-
-/* Build a wrapper around some integer I so we can use it as a tree.  */
-
-tree
-build_int_wrapper (i)
-     int i;
-{
-  tree t = make_node (WRAPPER);
-  WRAPPER_INT (t) = i;
+  WRAPPER_ZC (t) = ptr;
   return t;
 }
 
@@ -1815,7 +1841,11 @@ maybe_dummy_object (type, binfop)
   if (binfop)
     *binfop = binfo;
   
-  if (current_class_ref && context == current_class_type)
+  if (current_class_ref && context == current_class_type
+      // Kludge: Make sure that current_class_type is actually correct.
+      // It might not be if we're in the middle of tsubst_default_argument.
+      && same_type_p (TYPE_MAIN_VARIANT (TREE_TYPE (current_class_ref)),
+		      current_class_type))
     decl = current_class_ref;
   else
     decl = build_dummy_object (context);
@@ -1861,8 +1891,29 @@ pod_type_p (t)
   return 1;
 }
 
+/* Returns 1 iff zero initialization of type T means actually storing
+   zeros in it.  */
+
+int
+zero_init_p (t)
+     tree t;
+{
+  t = strip_array_types (t);
+
+  /* NULL pointers to data members are initialized with -1.  */
+  if (TYPE_PTRMEM_P (t))
+    return 0;
+
+  /* Classes that contain types that can't be zero-initialized, cannot
+     be zero-initialized themselves.  */
+  if (CLASS_TYPE_P (t) && CLASSTYPE_NON_ZERO_INIT_P (t))
+    return 0;
+
+  return 1;
+}
+
 /* Table of valid C++ attributes.  */
-const struct attribute_spec cp_attribute_table[] =
+const struct attribute_spec cxx_attribute_table[] =
 {
   /* { name, min_len, max_len, decl_req, type_req, fn_type_req, handler } */
   { "java_interface", 0, 0, false, false, false, handle_java_interface_attribute },
@@ -2100,6 +2151,10 @@ cp_cannot_inline_tree_fn (fnp)
 {
   tree fn = *fnp;
 
+  if (flag_really_no_inline
+      && lookup_attribute ("always_inline", DECL_ATTRIBUTES (fn)) == NULL)
+    return 1;
+
   /* We can inline a template instantiation only if it's fully
      instantiated.  */
   if (DECL_TEMPLATE_INFO (fn)
@@ -2259,14 +2314,8 @@ cp_end_inlining (fn)
 void
 init_tree ()
 {
-  make_lang_type_fn = cp_make_lang_type;
-  lang_unsave = cp_unsave;
   lang_statement_code_p = cp_statement_code_p;
-  lang_set_decl_assembler_name = mangle_decl;
-  list_hash_table = htab_create (31, list_hash, list_hash_eq, NULL);
-  ggc_add_root (&list_hash_table, 1, 
-		sizeof (list_hash_table),
-		mark_tree_hashtable);
+  list_hash_table = htab_create_ggc (31, list_hash, list_hash_eq, NULL);
 }
 
 /* Called via walk_tree.  If *TP points to a DECL_STMT for a local
@@ -2352,12 +2401,11 @@ cp_unsave_r (tp, walk_subtrees, data)
   return NULL_TREE;
 }
 
-/* Called by unsave_expr_now whenever an expression (*TP) needs to be
-   unsaved.  */
+/* Called whenever an expression needs to be unsaved.  */
 
-static void
-cp_unsave (tp)
-     tree *tp;
+tree
+cxx_unsave_expr_now (tp)
+     tree tp;
 {
   splay_tree st;
 
@@ -2366,13 +2414,15 @@ cp_unsave (tp)
   st = splay_tree_new (splay_tree_compare_pointers, NULL, NULL);
 
   /* Walk the tree once figuring out what needs to be remapped.  */
-  walk_tree (tp, mark_local_for_remap_r, st, NULL);
+  walk_tree (&tp, mark_local_for_remap_r, st, NULL);
 
   /* Walk the tree again, copying, remapping, and unsaving.  */
-  walk_tree (tp, cp_unsave_r, st, NULL);
+  walk_tree (&tp, cp_unsave_r, st, NULL);
 
   /* Clean up.  */
   splay_tree_delete (st);
+
+  return tp;
 }
 
 /* Returns the kind of special function that DECL (a FUNCTION_DECL)
@@ -2460,3 +2510,53 @@ decl_linkage (decl)
   /* Everything else has internal linkage.  */
   return lk_internal;
 }
+
+/* EXP is an expression that we want to pre-evaluate.  Returns via INITP an
+   expression to perform the pre-evaluation, and returns directly an
+   expression to use the precalculated result.  */
+
+tree
+stabilize_expr (exp, initp)
+     tree exp;
+     tree *initp;
+{
+  tree init_expr;
+
+  if (!TREE_SIDE_EFFECTS (exp))
+    {
+      init_expr = void_zero_node;
+    }
+  else if (!real_lvalue_p (exp)
+	   || !TYPE_NEEDS_CONSTRUCTING (TREE_TYPE (exp)))
+    {
+      init_expr = get_target_expr (exp);
+      exp = TARGET_EXPR_SLOT (init_expr);
+    }
+  else
+    {
+      exp = build_unary_op (ADDR_EXPR, exp, 1);
+      init_expr = get_target_expr (exp);
+      exp = TARGET_EXPR_SLOT (init_expr);
+      exp = build_indirect_ref (exp, 0);
+    }
+
+  *initp = init_expr;
+  return exp;
+}
+
+#if defined ENABLE_TREE_CHECKING && (GCC_VERSION >= 2007)
+/* Complain that some language-specific thing hanging off a tree
+   node has been accessed improperly.  */
+
+void
+lang_check_failed (file, line, function)
+     const char *file;
+     int line;
+     const char *function;
+{
+  internal_error ("lang_* check: failed in %s, at %s:%d",
+		  function, trim_filename (file), line);
+}
+#endif /* ENABLE_TREE_CHECKING */
+
+#include "gt-cp-tree.h"
