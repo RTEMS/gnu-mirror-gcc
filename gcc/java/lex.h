@@ -115,18 +115,21 @@ struct java_lexer
   unicode_t unget_value;
 
   /* If nonzero, we've hit EOF.  Used only by java_get_unicode().  */
-  int hit_eof : 1;
+  unsigned int hit_eof : 1;
+  
+  /* Name of the character encoding we're using.  */
+  const char *encoding;
 
 #ifdef HAVE_ICONV
   /* Nonzero if we've read any bytes.  We only recognize the
      byte-order-marker (BOM) as the first word.  */
-  int read_anything : 1;
+  unsigned int read_anything : 1;
 
   /* Nonzero if we have to byte swap.  */
-  int byte_swap : 1;
+  unsigned int byte_swap : 1;
 
   /* Nonzero if we're using the fallback decoder.  */
-  int use_fallback : 1;
+  unsigned int use_fallback : 1;
 
   /* The handle for the iconv converter we're using.  */
   iconv_t handle;
@@ -185,7 +188,6 @@ extern void java_destroy_lexer (java_lexer *);
 #define BUILD_OPERATOR(TOKEN)	return TOKEN
 #define BUILD_OPERATOR2(TOKEN)	return ASSIGN_ANY_TK
 #define SET_LVAL_NODE(NODE)
-#define SET_LVAL_NODE_TYPE(NODE, TYPE)
 #define BUILD_ID_WFL(EXP) (EXP)
 #define JAVA_FLOAT_RANGE_ERROR(S) {}
 #define JAVA_INTEGRAL_RANGE_ERROR(S) do { } while (0)
@@ -222,11 +224,6 @@ extern void java_destroy_lexer (java_lexer *);
   }
 /* Set java_lval->node and TREE_TYPE(java_lval->node) in macros */
 #define SET_LVAL_NODE(NODE) java_lval->node = (NODE)
-#define SET_LVAL_NODE_TYPE(NODE,TYPE)		\
-  {						\
-    java_lval->node = (NODE);			\
-    TREE_TYPE (java_lval->node) = (TYPE);	\
-  }
 /* Wrap identifier around a wfl */
 #define BUILD_ID_WFL(EXP) build_wfl_node ((EXP))
 /* Special ways to report error on numeric literals  */
