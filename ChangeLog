@@ -1,3 +1,36 @@
+2003-01-26  Christian Cornelssen  <ccorn@cs.tu-berlin.de>
+
+	* Makefile.tpl (BASE_FLAGS_TO_PASS): Also pass DESTDIR.
+	(install-info, dir.info): Prepend $(DESTDIR) to $(infodir).
+	* Makefile.in: Regenerate.
+
+2003-01-22  Volker Reichelt  <reichelt@igpm.rwth-aachen.de>
+
+	* MAINTAINERS: Move myself from GNATS-only-accounts to
+	write-after-approval.
+
+2002-12-31  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in: Rebuilt.
+	* Makefile.def (target_modules) [libffi]: Allow installation.
+
+2002-12-13  Jason Merrill  <jason@redhat.com>
+
+	* Makefile.tpl (check-gcc-c++): Renamed from check-c++.  Don't run
+	library tests.
+	(check-c++): Just depend on it and check-target-libstdc++-v3.
+	* Makefile.in: Regenerate.
+
+2002-12-12  Alexandre Oliva  <aoliva@redhat.com>
+
+	* Makefile.tpl (configure-target-rda): Depend on $(ALL_GCC_C).
+	* Makefile.in: Rebuilt.
+
+2002-12-25  Svein E. Seldal  <Svein.Seldal@solidas.com>
+
+	* config.sub: Import from master repository
+	* config.guess: Ditto
+
 2002-12-13  Jason Merrill  <jason@redhat.com>
 
 	* Makefile.in (check-gcc-c++): Renamed from check-c++.  Don't run

@@ -1,6 +1,6 @@
 // Iostreams base classes -*- C++ -*-
 
-// Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002
+// Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003
 // Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
@@ -43,6 +43,8 @@
 #pragma GCC system_header
 
 #include <bits/atomicity.h>
+#include <bits/localefwd.h>
+#include <bits/locale_classes.h>
 
 namespace std
 {
@@ -638,7 +640,7 @@ namespace std
      *  Destroys local storage and
      *  [XXX does something with callbacks].
     */
-    virtual ~ios_base();
+    ~ios_base();
 
   protected:
     ios_base();
