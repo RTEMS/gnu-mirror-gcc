@@ -1,3 +1,139 @@
+1999-06-21  Mark Mitchell  <mark@codesourcery.com>
+
+	* init.c (expand_aggr_vbase_init): Rename to
+	construct_virtual_bases.  Conditionalize construction here, 
+	rather than ...
+	(emit_base_init): Here.
+
+1999-06-19  Mark Mitchell  <mark@codesourcery.com>
+
+        * semantics.c (finish_asm_statement): Apply decay conversions to
+        input operands.
+
+	* decl.c (expand_static_init): When building an anonymous function
+	for use with atexit, compute its body before and after entering
+	the function.
+
+1999-06-18  Mark Mitchell  <mark@codesourcery.com>
+
+	* init.c (expand_aggr_vbase_init): Add flag parameter.
+	(build_partial_cleanup_for): Remove, inlining into ..
+	(expand_cleanup_for_base): ... here.  Take flag parameter.
+	(emit_base_init): Pass the in_chrg parameter to
+	emit_aggr_vbase_init. 
+	(emit_aggr_vbase_init): Pass it to expand_cleanup_for_base.
+	
+1999-06-16  Mark Mitchell  <mark@codesourcery.com>
+
+	* decl2.c (import_export_decl): Use same_type_p, rather than
+	relying on pointer-equality for types.
+
+	* method.c (do_build_copy_constructor): Simplify.
+
+	* call.c (build_method_call): Remove bogus code for two-argument
+	delete.
+	* init.c (build_new_1): Expand on comment, and remove dead code.
+
+	* init.c (expand_cleanup_for_base): New function, split out
+	from ...
+	(emit_base_init): Here.
+	(expand_aggr_vbase_init): Use it.
+
+1999-06-15  Mark Mitchell  <mark@codesourcery.com>
+
+	* cp-tree.h (class_cache_firstobj): Declare.
+	(maybe_push_cache_obstack): Rename to push_cache_obstack.
+	* class.c (permanent_obstack): Remove declaration.
+	(class_cache_firstobj): Make it global.
+	(add_method): Don't use permanent_obstack directly.
+	(pushclass): Only free the class_cache_obstack if we know how far
+	back to free it.
+	(maybe_push_cache_obstack): Rename to push_cache_obstack.
+	* decl.c: Remove dead comment.
+	(saved_scope): Add class_cache_firstobj.
+	(push_to_top_level): Save it.
+	(pop_from_top_level): Restore it.
+	(push_class_level_binding): Use push_cache_obstack, not
+	maybe_push_cache_obstack.
+	* search.c (push_class_decls): Likewise.
+
+1999-06-14  Nathan Sidwell  <nathan@acm.org>
+
+	* call.c (build_new_op): Remove REF_BIND from all operands.
+
+1999-06-07  Mark Mitchell  <mark@codesourcery.com>
+
+	* search.c (convert_pointer_to_single_level): Reimplement without
+	using get_binfo.
+
+1999-06-06  Mark Mitchell  <mark@codesourcery.com>
+
+	* method.c (is_back_referenceable_type): Back-reference bools when
+	not squangling.
+
+1999-06-04  Jason Merrill  <jason@yorick.cygnus.com>
+
+	* semantics.c (finish_if_stmt_cond): Copy cond to permanent_obstack.
+	(finish_while_stmt_cond, finish_do_stmt, finish_for_cond): Likewise.
+
+1999-05-30  Mark Mitchell  <mark@codesourcery.com>
+
+	* lex.c (make_lang_type): Create TYPE_BINFO for
+	TEMPLATE_TYPE_PARMs just like for non-template types.
+
+1999-05-28  Nathan Sidwell  <nathan@acm.org>
+
+	* decl.c (complete_array_type): Allocate off same obstack. Fix
+	DO_DEFAULT comment to match reality.
+
+1999-05-22  Mark Mitchell  <mark@codesourcery.com>
+
+	* tree.c (mapcar): Handle NON_LVALUE_EXPR.
+
+1999-05-21  Mark Mitchell  <mark@codesourcery.com>
+
+	* typeck.c (build_ptrmemfunc): Handle PTRMEM_CSTs carefully to
+	reveal optimization opportunities.
+
+1999-05-20  Mark Mitchell  <mark@codesourcery.com>
+
+	* decl.c (grokdeclarator): Don't treat [] as indicating a
+	zero-sized array in a typedef.
+
+	* call.c (build_object_call): Don't look at DECL_NAME for a type.
+	(pt.c): Or CP_TYPE_QUALS for an ERROR_MARK.
+	(typeck.c): Or TYPE_MAIN_VARIANT for a type.
+
+1999-05-20  Jason Merrill  <jason@yorick.cygnus.com>
+
+	* tree.c (lvalue_p_1): A NOP_EXPR can be an lvalue.
+	(build_cplus_new): Make sure that what we return is of the right type.
+
+1999-05-20  Mark Mitchell  <mark@codesourcery.com>
+
+	* cp-tree.h (make_ptrmem_cst): New function.
+	* expr.c (cplus_expand_constant): Split out from ...
+	(cplus_expand_expr): Here.  Use cplus_expand_constant.
+	(init_cplus_expand): Set lang_expand_constant.
+	* pt.c (convert_nontype_argument): Use make_ptrmem_cst.
+	* tree.c (make_ptrmem_cst): Define.
+	* typeck.c (unary_complex_lvalue): Use make_ptrmem_cst.
+	* typeck2.c (initializer_constant_valid_p): Use make_ptrmem_cst.
+
+1999-05-19  Mark Mitchell  <mark@codesourcery.com>
+
+	* decl2.c (start_static_storage_duration_function): Fix comment.
+	(finish_file): Create static storage duration functions lazily.
+
+Wed May 19 02:50:53 1999  Arvind Sankar <arvinds@mit.edu>
+
+	* gxxint.texi: Fix typo.
+
+1999-05-18  Jason Merrill  <jason@yorick.cygnus.com>
+
+	* call.c (joust): Compare the types of the conv ops, not the
+	target types of the conversions.
+
 Tue May 18 00:21:34 1999  Zack Weinberg  <zack@rabi.phys.columbia.edu>
 
 	* lang-specs.h: Define __GNUC__ and __GNUC_MINOR__ only if -no-gcc

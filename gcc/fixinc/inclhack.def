@@ -136,6 +136,18 @@ fix = {
 
     sed = "/^[ ]*typedef[ \t][ \t]*unsigned char[ \t][ \t]*bool[ \t]*;/a\\\n"
                 "#endif\n";
+
+    sed = "/^typedef[ \t][ \t]*int[ \t][ \t]*bool[ \t]*;/i\\\n"
+                "#ifndef __cplusplus\n";
+
+    sed = "/^typedef[ \t][ \t]*int[ \t][ \t]*bool[ \t]*;/a\\\n"
+                "#endif\n";
+
+    sed = "/^[ ]*typedef[ \t][ \t]*unsigned int[ \t][ \t]*bool[ \t]*;/i\\\n"
+                "#ifndef __cplusplus\n";
+
+    sed = "/^[ ]*typedef[ \t][ \t]*unsigned int[ \t][ \t]*bool[ \t]*;/a\\\n"
+                "#endif\n";
 };
 
 
@@ -173,7 +185,6 @@ fix = {
  */
 fix = {
     hackname = bad_lval;
-    select   = "^[ \t]*#[ \t]*pragma[ \t]extern_prefix";
     files    = libgen.h;
     files    = dirent.h;
     files    = ftw.h;
@@ -339,7 +350,7 @@ fix = {
      *  Also, only accept double slashes that are not part of URL's
      *  and are not the end of a quoted string.
      */
-    test   = '-z `echo ${file} | egrep \'(CC|cxx|\+\+)/\' `';
+    test   = ' -z "`echo ${file} | egrep \'(CC|cxx|\+\+)/\'`"';
     select = '(^|[^:])//[^"*]';
     sed    = 's,^//.*$,,';
     sed    = 's,[^:]//[^"].*$,,';
@@ -410,13 +421,19 @@ fix = {
      *  match '#endif / * foo * /', but it also wont match
      *  '#endif / done' either.
      *
+     *  We have a second regexp in the selector to detect
+     *  #endif followed by a / followed by anything other
+     *  than a *.  For example "#endif / * foo * /" or 
+     *  "#endif /% blah %/ which appear on OSF4.0A and AIX4.2
+     *  repsectively.
+     * 
      *  We use the pattern [!-.0-z{|}~] instead of [^/ \t] to match a noncomment
      *  following #else or #endif because some buggy egreps think [^/] matches
      *  newline, and they thus think `#else ' matches
      *  `#e[ndiflse]*[ \t]+[^/ \t]'.
      *  [!-.0-~] does not work properly on AIX 4.1.
      */
-    select   = "^[ \t]*#[ \t]*endif[ \t]+[!-.0-z\{\|\}\~]";
+    select   = "^[ \t]*#[ \t]*endif[ \t]+[!-.0-z\{\|\}\~]|^[ \t]*#[ \t]*endif[ \t]+/[^\*]";
 
     /*
      *  First, join the continued input lines.
@@ -567,7 +584,8 @@ fix = {
 fix = {
     hackname = io_def_quotes;
     select = "[ \t]*[ \t](_|DES)IO[A-Z]*[ \t]*\\( *[^,']";
-    sed = "s/\\([ \t]*[ \t](_|DES)IO[A-Z]*[ \t]*(\\)\\([^,']\\),/\\1'\\2',/";
+    sed = "s/\\([ \t]*[ \t]_IO[A-Z]*[ \t]*(\\)\\([^,']\\),/\\1'\\2',/";
+    sed = "s/\\([ \t]*[ \t]DESIO[A-Z]*[ \t]*(\\)\\([^,']\\),/\\1'\\2',/";
     sed = "/#[ \t]*define[ \t]*[ \t]_IO/"       "s/'\\([cgxtf]\\)'/\\1/g";
     sed = "/#[ \t]*define[ \t]*[ \t]DESIOC/"    's/\'\([cdgx]\)\'/\1/g';
 };
@@ -575,10 +593,20 @@ fix = {
 
 /*
  *  Fix CTRL macros
+ *
+ * Basically, what is supposed to be happening is that every
+ * _invocation_ of the "_CTRL()" or "CTRL()" macros is supposed to have
+ * its argument inserted into single quotes.  We _must_ do this because
+ * ANSI macro substitution rules prohibit looking inside quoted strings
+ * for the substitution names.  A side effect is that the quotes are
+ * inserted in the definitions of those macros as well.  So, the last
+ * three sed expressions are supposed to clean up the definitions, as
+ * long as those definitions are using "c", "g" or "x" as the macro
+ * argument :).  Yuck.
  */
 fix = {
     hackname = ioctl_fix_ctrl;
-    select = "CTRL[ \t]";
+    select = "CTRL[ \t]*\\(";
 
     sed = "/[^A-Z0-9_]CTRL[ \t]*(/"
               "s/\\([^']\\))/'\\1')/";
@@ -593,6 +621,9 @@ fix = {
               "s/'\\([cgx]\\)'/\\1/g";
 
     sed = "/#[ \t]*define[ \t]*[ \t]BSD43_CTRL/"
+              "s/'\\([cgx]\\)'/\\1/g";
+
+    sed = "/#[ \t]*define[ \t]*[ \t]_*ISCTRL/"
               "s/'\\([cgx]\\)'/\\1/g";
 };
 
@@ -724,6 +755,7 @@ fix = {
 fix = {
     hackname = limits_ifndefs;
     files  = "limits.h";
+    files  = "sys/limits.h";
     bypass = "ifndef[ \t]+FLT_MIN";
 
     sed  = "/[ \t]FLT_MIN[ \t]/i\\\n#ifndef FLT_MIN\n";
@@ -1040,8 +1072,8 @@ fix = {
     "\tthen sed -e '/define[ \t]HUGE_VAL[ \t]DBL_MAX/s/DBL_MAX/$dbl_max_def/'"
     "\n\telse cat ; fi |\n"
 
-    "\tsed -e'/define[ \t]HUGE_VAL[ \t]/i\\\n#ifndef HUGE_VAL\n' "
-          "-e'/define[ \t]HUGE_VAL[ \t]/a\\\n#endif\n'";
+    "\tsed -e '/define[ \t]HUGE_VAL[ \t]/i\\\n#ifndef HUGE_VAL\n' "
+          "-e '/define[ \t]HUGE_VAL[ \t]/a\\\n#endif\n'";
 };
 
 
@@ -1390,7 +1422,7 @@ fix = {
 fix = {
     hackname = sun_catmacro;
     files  = pixrect/memvar.h;
-    select = "^#define[ \t]+CAT(a,b)";
+    select = "^#define[ \t]+CAT\\(a,b\\)";
     sed    = "/^#define[ \t]CAT(a,b)/ i\\\n"
                  "#ifdef __STDC__ \\\n"
                  "#define CAT(a,b) a##b\\\n"
@@ -1494,12 +1526,9 @@ fix = {
     files    = rpc/svc.h;
     files    = rpc/xdr.h;
     /*
-     *  Select those files containing '(*name)()' but *not*
-     *  containing '(*name)(junk)'.  The change would be innocuous
-     *  but there is no point bothering if the fix is not needed.
+     *  Select those files containing '(*name)()'.
      */
     select   = '\(\*[a-z][a-z_]*\)\(\)';
-    bypass   = '\(\*[a-z][a-z_]*\)\(' "[ \t]*[a-zA-Z.].*" '\)';
     sed      = 's'
                 '/^\(.*(\*[a-z][a-z_]*)(\)'      '\();.*\)'
                 "/\\\n"
