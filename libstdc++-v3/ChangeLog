@@ -1,3 +1,57 @@
+2000-11-29  Loren J. Rittle  <ljrittle@acm.org>
+
+        * tests_flags.in: Correct typo.
+
+2000-11-29  Gabriel Dos Reis  <gdr@codesourcery.com>
+
+	* tests_flags (SH_FLAGS, ST_FLAGS): Move them back to ...
+	* mkcheck.in (SH_FLAGS, ST_FLAGS): ...here
+
+2000-11-29  Gabriel Dos Reis  <gdr@codesourcery.com>
+
+	* src/Makefile.am (sources): Add bitset.cc
+	* src/Makefile.in: Regenrate.
+
+	* include/bits/std_bitset.h (_GLIBCPP_BITSET_BITS_PER_WORD): New
+	macro. Replace __BITS_PER_WORDS throughout.
+	(__BITS_PER_WORDS): Remove.
+	(bitset<>::_M_do_find_first, bitset<>::_M_do_find_next): Move
+	definitions to src/bitset.cc.
+
+	* src/bitset.cc (bitset<>::_M_do_find_first,
+	bitset<>::_M_do_find_next):  Define here.
+	(_Bit_count<>::_S_bit_count, _Find_one<>::_S_first_one): Define
+	here. Explicitly instantiate definitions.
+
+2000-11-28  Franz Sirl  <Franz.Sirl-kernel@lauterbach.com>
+
+	* config/cpu/powerpc/bits/atomicity.h (__exchange_and_add): Silence
+	preprocessor multi-line string warnings.
+	(__atomic_add): Likewise.
+	(__compare_and_swap): Likewise.
+	(__always_swap): Likewise.
+	(__test_and_set): Likewise.
+	* config/cpu/arm/bits/atomicity.h (__exchange_and_add): Likewise.
+	(__atomic_add): Likewise.
+	(__compare_and_swap): Likewise.
+	(__always_swap): Likewise.
+	(__test_and_set): Likewise.
+
+2000-11-28  Benjamin Kosnik  <bkoz@purist.soma.redhat.com>
+
+	Update for 2.91 release.
+	* include/bits/c++config (__GLIBCPP__): Update.
+	* docs/17_intro/RELEASE-NOTES: Update.
+	* docs/status.html: Update, remove bogus autotools disinformation.
+	
+2000-11-27  Benjamin Kosnik  <bkoz@redhat.com>
+
+	* tests_flags.in (LTCXX): Change CXX_FLAG to CXXFLAGS.
+
+	* testsuite/22_locale/ctor_copy_dtor.cc: Adjust formatting.
+	* testsuite/27_io/istream_extractor_arith.cc (test11): New
+	testcase, based on libstdc++/90.
+	
 2000-11-27  Franz Sirl  <Franz.Sirl-kernel@lauterbach.com>
 
         * config/cpu/arm/bits/atomicity.h (__exchange_and_add): Add
