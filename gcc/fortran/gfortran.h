@@ -181,7 +181,7 @@ extern mstring intrinsic_operators[];
 /* Arithmetic results.  */
 typedef enum
 { ARITH_OK = 1, ARITH_OVERFLOW, ARITH_UNDERFLOW, ARITH_NAN,
-  ARITH_DIV0, ARITH_0TO0, ARITH_INCOMMENSURATE, ARITH_ASYMMETRIC
+  ARITH_DIV0, ARITH_INCOMMENSURATE, ARITH_ASYMMETRIC
 }
 arith;
 
@@ -1556,6 +1556,7 @@ void gfc_arith_done_1 (void);
 int gfc_validate_kind (bt, int, bool);
 extern int gfc_index_integer_kind;
 extern int gfc_default_integer_kind;
+extern int gfc_max_integer_kind;
 extern int gfc_default_real_kind;
 extern int gfc_default_double_kind;
 extern int gfc_default_character_kind;

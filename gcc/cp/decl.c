@@ -948,6 +948,12 @@ decls_match (tree newdecl, tree olddecl)
     }
   else
     {
+      /* Need to check scope for variable declaration (VAR_DECL).
+	 For typedef (TYPE_DECL), scope is ignored.  */
+      if (TREE_CODE (newdecl) == VAR_DECL
+	  && CP_DECL_CONTEXT (newdecl) != CP_DECL_CONTEXT (olddecl))
+	return 0;
+
       if (TREE_TYPE (newdecl) == error_mark_node)
 	types_match = TREE_TYPE (olddecl) == error_mark_node;
       else if (TREE_TYPE (olddecl) == NULL_TREE)
@@ -1920,7 +1926,8 @@ redeclaration_error_message (tree newdecl, tree olddecl)
       /* If both functions come from different namespaces, this is not
 	 a redeclaration - this is a conflict with a used function.  */
       if (DECL_NAMESPACE_SCOPE_P (olddecl)
-	  && DECL_CONTEXT (olddecl) != DECL_CONTEXT (newdecl))
+	  && DECL_CONTEXT (olddecl) != DECL_CONTEXT (newdecl)
+	  && ! decls_match (olddecl, newdecl))
 	return "%qD conflicts with used function";
 
       /* We'll complain about linkage mismatches in
@@ -4103,13 +4110,18 @@ reshape_init_array (tree elt_type, tree max_index,
 		    tree *initp, tree new_init)
 {
   bool sized_array_p = (max_index != NULL_TREE);
-  HOST_WIDE_INT max_index_cst = 0;
-  HOST_WIDE_INT index;
+  unsigned HOST_WIDE_INT max_index_cst = 0;
+  unsigned HOST_WIDE_INT index;
 
   if (sized_array_p)
-    /* HWI is either 32bit or 64bit, so it must be enough to represent the
-	array size.  */
-    max_index_cst = tree_low_cst (max_index, 1);
+    {
+      if (host_integerp (max_index, 1))
+	max_index_cst = tree_low_cst (max_index, 1);
+      /* sizetype is sign extended, not zero extended.  */
+      else
+	max_index_cst = tree_low_cst (fold_convert (size_type_node, max_index),
+				      1);
+    }
 
   /* Loop until there are no more initializers.  */
   for (index = 0;
@@ -4126,27 +4138,16 @@ reshape_init_array (tree elt_type, tree max_index,
       CONSTRUCTOR_ELTS (new_init) = element_init;
       designated_index = TREE_PURPOSE (element_init);
       if (designated_index)
-      {
+	{
 	  /* Handle array designated initializers (GNU extension).  */
 	  if (TREE_CODE (designated_index) == IDENTIFIER_NODE)
 	    {
 	      error ("name %qD used in a GNU-style designated "
-                     "initializer for an array", designated_index);
+		     "initializer for an array", designated_index);
 	      TREE_PURPOSE (element_init) = NULL_TREE;
 	    }
 	  else
-	    {
-	      gcc_assert (TREE_CODE (designated_index) == INTEGER_CST);
-	      if (sized_array_p
-		  && tree_int_cst_lt (max_index, designated_index))
-		{
-		  error ("Designated initializer %qE larger than array "
-			 "size", designated_index);
-		  TREE_PURPOSE (element_init) = NULL_TREE;
-		}
-	      else
-		index = tree_low_cst (designated_index, 1);
-	    }
+	    gcc_unreachable ();
 	}
     }
 
@@ -11115,7 +11116,22 @@ cxx_comdat_group (tree decl)
   /* For all other DECLs, the COMDAT group is the mangled name of the
      declaration itself.  */
   else
-    name = DECL_ASSEMBLER_NAME (decl);
+    {
+      while (DECL_THUNK_P (decl))
+	{
+	  /* If TARGET_USE_LOCAL_THUNK_ALIAS_P, use_thunk puts the thunk
+	     into the same section as the target function.  In that case
+	     we must return target's name.  */
+	  tree target = THUNK_TARGET (decl);
+	  if (TARGET_USE_LOCAL_THUNK_ALIAS_P (target)
+	      && DECL_SECTION_NAME (target) != NULL
+	      && DECL_ONE_ONLY (target))
+	    decl = target;
+	  else
+	    break;
+	}
+      name = DECL_ASSEMBLER_NAME (decl);
+    }
 
   return IDENTIFIER_POINTER (name);
 }

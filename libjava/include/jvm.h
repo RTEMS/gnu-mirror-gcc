@@ -250,7 +250,8 @@ namespace gcj
 class _Jv_Linker
 {
 private:
-  static _Jv_Field *find_field_helper(jclass, _Jv_Utf8Const *, jclass *);
+  static _Jv_Field *find_field_helper(jclass, _Jv_Utf8Const *, _Jv_Utf8Const *,
+				      jclass *);
   static _Jv_Field *find_field(jclass, jclass, _Jv_Utf8Const *,
 			       _Jv_Utf8Const *);
   static void prepare_constant_time_tables(jclass);
@@ -583,6 +584,15 @@ _Jv_CheckABIVersion (unsigned long value)
   // well.)
   return (value == GCJ_VERSION
 	  || value == (GCJ_VERSION + GCJ_BINARYCOMPAT_ADDITION));
+}
+
+// It makes the source cleaner if we simply always define this
+// function.  If the interpreter is not built, it will never return
+// 'true'.
+extern inline jboolean
+_Jv_IsInterpretedClass (jclass c)
+{
+  return (c->accflags & java::lang::reflect::Modifier::INTERPRETED) != 0;
 }
 
 #endif /* __JAVA_JVM_H__ */

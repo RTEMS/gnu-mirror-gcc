@@ -6070,6 +6070,15 @@ fold_widened_comparison (enum tree_code code, tree type, tree arg0, tree arg1)
     return NULL_TREE;
   shorter_type = TREE_TYPE (arg0_unw);
 
+#ifdef HAVE_canonicalize_funcptr_for_compare
+  /* Disable this optimization if we're casting a function pointer
+     type on targets that require function pointer canonicalization.  */
+  if (HAVE_canonicalize_funcptr_for_compare
+      && TREE_CODE (shorter_type) == POINTER_TYPE
+      && TREE_CODE (TREE_TYPE (shorter_type)) == FUNCTION_TYPE)
+    return NULL_TREE;
+#endif
+
   if (TYPE_PRECISION (TREE_TYPE (arg0)) <= TYPE_PRECISION (shorter_type))
     return NULL_TREE;
 
@@ -6144,18 +6153,29 @@ fold_sign_changed_comparison (enum tree_code code, tree type,
   tree arg0_inner, tmp;
   tree inner_type, outer_type;
 
-  if (TREE_CODE (arg0) != NOP_EXPR)
+  if (TREE_CODE (arg0) != NOP_EXPR
+      && TREE_CODE (arg0) != CONVERT_EXPR)
     return NULL_TREE;
 
   outer_type = TREE_TYPE (arg0);
   arg0_inner = TREE_OPERAND (arg0, 0);
   inner_type = TREE_TYPE (arg0_inner);
 
+#ifdef HAVE_canonicalize_funcptr_for_compare
+  /* Disable this optimization if we're casting a function pointer
+     type on targets that require function pointer canonicalization.  */
+  if (HAVE_canonicalize_funcptr_for_compare
+      && TREE_CODE (inner_type) == POINTER_TYPE
+      && TREE_CODE (TREE_TYPE (inner_type)) == FUNCTION_TYPE)
+    return NULL_TREE;
+#endif
+
   if (TYPE_PRECISION (inner_type) != TYPE_PRECISION (outer_type))
     return NULL_TREE;
 
   if (TREE_CODE (arg1) != INTEGER_CST
-      && !(TREE_CODE (arg1) == NOP_EXPR
+      && !((TREE_CODE (arg1) == NOP_EXPR
+	    || TREE_CODE (arg1) == CONVERT_EXPR)
 	   && TREE_TYPE (TREE_OPERAND (arg1, 0)) == inner_type))
     return NULL_TREE;
 
@@ -6176,7 +6196,7 @@ fold_sign_changed_comparison (enum tree_code code, tree type,
   else
     arg1 = fold_convert (inner_type, arg1);
 
-  return fold (build (code, type, arg0_inner, arg1));
+  return fold (build2 (code, type, arg0_inner, arg1));
 }
 
 /* Tries to replace &a[idx] CODE s * delta with &a[idx CODE delta], if s is
@@ -9094,7 +9114,8 @@ fold (tree expr)
 			     TREE_OPERAND (arg0, 0), TREE_OPERAND (arg0, 1)));
 
       else if (TREE_CODE (TREE_TYPE (arg0)) == INTEGER_TYPE
-	       && TREE_CODE (arg0) == NOP_EXPR)
+	       && (TREE_CODE (arg0) == NOP_EXPR
+		   || TREE_CODE (arg0) == CONVERT_EXPR))
 	{
 	  /* If we are widening one operand of an integer comparison,
 	     see if the other operand is similarly being widened.  Perhaps we
@@ -9905,8 +9926,11 @@ fold_checksum_tree (tree expr, struct md5_ctx *ctx, htab_t ht)
       expr = (tree) buf;
       TYPE_POINTER_TO (expr) = NULL;
       TYPE_REFERENCE_TO (expr) = NULL;
-      TYPE_CACHED_VALUES_P (expr) = 0;
-      TYPE_CACHED_VALUES (expr) = NULL;
+      if (TYPE_CACHED_VALUES_P (expr))
+	{
+	  TYPE_CACHED_VALUES_P (expr) = 0;
+	  TYPE_CACHED_VALUES (expr) = NULL;
+	}
     }
   md5_process_bytes (expr, tree_size (expr), ctx);
   fold_checksum_tree (TREE_TYPE (expr), ctx, ht);
