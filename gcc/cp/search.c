@@ -1,7 +1,7 @@
 /* Breadth-first and depth-first routines for
    searching multiple-inheritance lattice for GNU C++.
    Copyright (C) 1987, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2002 Free Software Foundation, Inc.
+   1999, 2000, 2002, 2003 Free Software Foundation, Inc.
    Contributed by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GNU CC.
@@ -80,7 +80,6 @@ struct vbase_info
   tree inits;
 };
 
-static tree lookup_field_1 PARAMS ((tree, tree));
 static int is_subobject_of_p PARAMS ((tree, tree, tree));
 static int is_subobject_of_p_1 PARAMS ((tree, tree, tree));
 static tree dfs_check_overlap PARAMS ((tree, void *));
@@ -453,9 +452,8 @@ get_dynamic_cast_base_type (subtype, target)
    figure out whether it can access this field.  (Since it is only one
    level, this is reasonable.)  */
 
-static tree
-lookup_field_1 (type, name)
-     tree type, name;
+tree
+lookup_field_1 (tree type, tree name, bool want_type)
 {
   register tree field;
 
@@ -492,14 +490,28 @@ lookup_field_1 (type, name)
 	    lo = i + 1;
 	  else
 	    {
+	      field = NULL_TREE;
+
 	      /* We might have a nested class and a field with the
 		 same name; we sorted them appropriately via
-		 field_decl_cmp, so just look for the last field with
-		 this name.  */
-	      while (i + 1 < hi
-		     && DECL_NAME (fields[i+1]) == name)
-		++i;
-	      return fields[i];
+		 field_decl_cmp, so just look for the first or last
+		 field with this name.  */
+	      if (want_type)
+		{
+		  do
+		    field = fields[i--];
+		  while (i >= lo && DECL_NAME (fields[i]) == name);
+		  if (TREE_CODE (field) != TYPE_DECL
+		      && !DECL_CLASS_TEMPLATE_P (field))
+		    field = NULL_TREE;
+		}
+	      else
+		{
+		  do
+		    field = fields[i++];
+		  while (i < hi && DECL_NAME (fields[i]) == name);
+		}
+	      return field;
 	    }
 	}
       return NULL_TREE;
@@ -510,7 +522,7 @@ lookup_field_1 (type, name)
 #ifdef GATHER_STATISTICS
   n_calls_lookup_field_1++;
 #endif /* GATHER_STATISTICS */
-  while (field)
+  for (field = TYPE_FIELDS (type); field; field = TREE_CHAIN (field))
     {
 #ifdef GATHER_STATISTICS
       n_fields_searched++;
@@ -519,7 +531,7 @@ lookup_field_1 (type, name)
       if (DECL_NAME (field) == NULL_TREE
 	  && ANON_AGGR_TYPE_P (TREE_TYPE (field)))
 	{
-	  tree temp = lookup_field_1 (TREE_TYPE (field), name);
+	  tree temp = lookup_field_1 (TREE_TYPE (field), name, want_type);
 	  if (temp)
 	    return temp;
 	}
@@ -529,10 +541,13 @@ lookup_field_1 (type, name)
 	   to return a USING_DECL, and the rest of the compiler can't
 	   handle it.  Once the class is defined, these are purged
 	   from TYPE_FIELDS anyhow; see handle_using_decl.  */
-	;
-      else if (DECL_NAME (field) == name)
+	continue;
+
+      if (DECL_NAME (field) == name
+	  && (!want_type 
+	      || TREE_CODE (field) == TYPE_DECL
+	      || DECL_CLASS_TEMPLATE_P (field)))
 	return field;
-      field = TREE_CHAIN (field);
     }
   /* Not found.  */
   if (name == vptr_identifier)
@@ -1003,9 +1018,15 @@ void
 type_access_control (type, val)
      tree type, val;
 {
+  /* The check processing_specialization is here because the parser in 3.3
+     does not set current_class_type while parsing class head of class
+     template specialization.  Access checking, if performed, will be
+     evaluated in the wrong context so we disable it here.  This doesn't
+     apply to the new parser in 3.4.  */
   if (val == NULL_TREE
       || (TREE_CODE (val) != TEMPLATE_DECL && TREE_CODE (val) != TYPE_DECL)
-      || ! DECL_CLASS_SCOPE_P (val))
+      || ! DECL_CLASS_SCOPE_P (val)
+      || processing_specialization)
     return;
 
   if (type_lookups == error_mark_node)
@@ -1288,7 +1309,7 @@ lookup_field_r (binfo, data)
 
   if (!nval)
     /* Look for a data member or type.  */
-    nval = lookup_field_1 (type, lfi->name);
+    nval = lookup_field_1 (type, lfi->name, lfi->want_type);
 
   /* If there is no declaration with the indicated name in this type,
      then there's nothing to do.  */
@@ -1313,11 +1334,12 @@ lookup_field_r (binfo, data)
 	}
       else
 	nval = NULL_TREE;
-      if (!nval)
+      if (!nval && CLASSTYPE_NESTED_UDTS (type) != NULL)
 	{
-	  nval = purpose_member (lfi->name, CLASSTYPE_TAGS (type));
-	  if (nval)
-	    nval = TYPE_MAIN_DECL (TREE_VALUE (nval));
+          binding_entry e = binding_table_find (CLASSTYPE_NESTED_UDTS (type),
+                                                lfi->name);
+	  if (e != NULL)
+	    nval = TYPE_MAIN_DECL (e->type);
 	  else 
 	    return NULL_TREE;
 	}
@@ -1464,7 +1486,7 @@ lookup_member (xbasetype, name, protect, want_type)
       && IDENTIFIER_CLASS_VALUE (name))
     {
       tree field = IDENTIFIER_CLASS_VALUE (name);
-      if (TREE_CODE (field) != FUNCTION_DECL
+      if (! is_overloaded_fn (field)
 	  && ! (want_type && TREE_CODE (field) != TYPE_DECL))
 	/* We're in the scope of this class, and the value has already
 	   been looked up.  Just return the cached value.  */
@@ -1580,95 +1602,208 @@ lookup_fnfields (xbasetype, name, protect)
   return rval;
 }
 
-/* TYPE is a class type. Return the index of the fields within
-   the method vector with name NAME, or -1 is no such field exists.  */
+/* Try to find NAME inside a nested class.  */
 
-int
-lookup_fnfields_1 (type, name)
-     tree type, name;
+tree
+lookup_nested_field (name, complain)
+     tree name;
+     int complain;
 {
-  tree method_vec = (CLASS_TYPE_P (type)
-		     ? CLASSTYPE_METHOD_VEC (type)
-		     : NULL_TREE);
+  register tree t;
 
-  if (method_vec != 0)
+  tree id = NULL_TREE;
+  if (TYPE_MAIN_DECL (current_class_type))
     {
-      register int i;
-      register tree *methods = &TREE_VEC_ELT (method_vec, 0);
-      int len = TREE_VEC_LENGTH (method_vec);
-      tree tmp;
-
-#ifdef GATHER_STATISTICS
-      n_calls_lookup_fnfields_1++;
-#endif /* GATHER_STATISTICS */
-
-      /* Constructors are first...  */
-      if (name == ctor_identifier)
-	return (methods[CLASSTYPE_CONSTRUCTOR_SLOT] 
-		? CLASSTYPE_CONSTRUCTOR_SLOT : -1);
-      /* and destructors are second.  */
-      if (name == dtor_identifier)
-	return (methods[CLASSTYPE_DESTRUCTOR_SLOT]
-		? CLASSTYPE_DESTRUCTOR_SLOT : -1);
-
-      for (i = CLASSTYPE_FIRST_CONVERSION_SLOT; 
-	   i < len && methods[i]; 
-	   ++i)
+      /* Climb our way up the nested ladder, seeing if we're trying to
+	 modify a field in an enclosing class.  If so, we should only
+	 be able to modify if it's static.  */
+      for (t = TYPE_MAIN_DECL (current_class_type);
+	   t && DECL_CONTEXT (t);
+	   t = TYPE_MAIN_DECL (DECL_CONTEXT (t)))
 	{
-#ifdef GATHER_STATISTICS
-	  n_outer_fields_searched++;
-#endif /* GATHER_STATISTICS */
+	  if (TREE_CODE (DECL_CONTEXT (t)) != RECORD_TYPE)
+	    break;
 
-	  tmp = OVL_CURRENT (methods[i]);
-	  if (DECL_NAME (tmp) == name)
-	    return i;
-
-	  /* If the type is complete and we're past the conversion ops,
-	     switch to binary search.  */
-	  if (! DECL_CONV_FN_P (tmp)
-	      && COMPLETE_TYPE_P (type))
+	  /* N.B.: lookup_field will do the access checking for us */
+	  id = lookup_field (DECL_CONTEXT (t), name, complain, 0);
+	  if (id == error_mark_node)
 	    {
-	      int lo = i + 1, hi = len;
+	      id = NULL_TREE;
+	      continue;
+	    }
 
-	      while (lo < hi)
+	  if (id != NULL_TREE)
+	    {
+	      if (TREE_CODE (id) == FIELD_DECL
+		  && ! TREE_STATIC (id)
+		  && TREE_TYPE (id) != error_mark_node)
 		{
-		  i = (lo + hi) / 2;
-
-#ifdef GATHER_STATISTICS
-		  n_outer_fields_searched++;
-#endif /* GATHER_STATISTICS */
-
-		  tmp = DECL_NAME (OVL_CURRENT (methods[i]));
-
-		  if (tmp > name)
-		    hi = i;
-		  else if (tmp < name)
-		    lo = i + 1;
+		  if (complain)
+		    {
+		      /* At parse time, we don't want to give this error, since
+			 we won't have enough state to make this kind of
+			 decision properly.  But there are times (e.g., with
+			 enums in nested classes) when we do need to call
+			 this fn at parse time.  So, in those cases, we pass
+			 complain as a 0 and just return a NULL_TREE.  */
+		      error ("assignment to non-static member `%D' of enclosing class `%T'",
+				id, DECL_CONTEXT (t));
+		      /* Mark this for do_identifier().  It would otherwise
+			 claim that the variable was undeclared.  */
+		      TREE_TYPE (id) = error_mark_node;
+		    }
 		  else
-		    return i;
+		    {
+		      id = NULL_TREE;
+		      continue;
+		    }
 		}
 	      break;
 	    }
 	}
+    }
 
-      /* If we didn't find it, it might have been a template
-	 conversion operator to a templated type.  If there are any,
-	 such template conversion operators will all be overloaded on
-	 the first conversion slot.  (Note that we don't look for this
-	 case above so that we will always find specializations
-	 first.)  */
-      if (IDENTIFIER_TYPENAME_P (name)) 
+  return id;
+}
+
+/* Return the index in the CLASSTYPE_METHOD_VEC for CLASS_TYPE
+   corresponding to "operator TYPE ()", or -1 if there is no such
+   operator.  Only CLASS_TYPE itself is searched; this routine does
+   not scan the base classes of CLASS_TYPE.  */
+
+static int
+lookup_conversion_operator (tree class_type, tree type)
+{
+  int pass;
+  int i;
+
+  tree methods = CLASSTYPE_METHOD_VEC (class_type);
+
+  for (pass = 0; pass < 2; ++pass)
+    for (i = CLASSTYPE_FIRST_CONVERSION_SLOT; 
+	 i < TREE_VEC_LENGTH (methods);
+	 ++i)
+      {
+	tree fn = TREE_VEC_ELT (methods, i);
+	/* The size of the vector may have some unused slots at the
+	   end.  */
+	if (!fn)
+	  break;
+
+	/* All the conversion operators come near the beginning of the
+	   class.  Therefore, if FN is not a conversion operator, there
+	   is no matching conversion operator in CLASS_TYPE.  */
+	fn = OVL_CURRENT (fn);
+	if (!DECL_CONV_FN_P (fn))
+	  break;
+
+	if (pass == 0)
+	  {
+	    /* On the first pass we only consider exact matches.  If
+	       the types match, this slot is the one where the right
+	       conversion operators can be found.  */
+	    if (TREE_CODE (fn) != TEMPLATE_DECL
+		&& same_type_p (DECL_CONV_FN_TYPE (fn), type))
+	      return i;
+	  }
+	else
+	  {
+	    /* On the second pass we look for template conversion
+	       operators.  It may be possible to instantiate the
+	       template to get the type desired.  All of the template
+	       conversion operators share a slot.  By looking for
+	       templates second we ensure that specializations are
+	       preferred over templates.  */
+	    if (TREE_CODE (fn) == TEMPLATE_DECL)
+	      return i;
+	  }
+      }
+
+  return -1;
+}
+
+/* TYPE is a class type. Return the index of the fields within
+   the method vector with name NAME, or -1 is no such field exists.  */
+
+int
+lookup_fnfields_1 (tree type, tree name)
+{
+  tree method_vec;
+  tree *methods;
+  tree tmp;
+  int i;
+  int len;
+
+  if (!CLASS_TYPE_P (type))
+    return -1;
+
+  method_vec = CLASSTYPE_METHOD_VEC (type);
+
+  if (!method_vec)
+    return -1;
+
+  methods = &TREE_VEC_ELT (method_vec, 0);
+  len = TREE_VEC_LENGTH (method_vec);
+
+#ifdef GATHER_STATISTICS
+  n_calls_lookup_fnfields_1++;
+#endif /* GATHER_STATISTICS */
+
+  /* Constructors are first...  */
+  if (name == ctor_identifier)
+    return (methods[CLASSTYPE_CONSTRUCTOR_SLOT] 
+	    ? CLASSTYPE_CONSTRUCTOR_SLOT : -1);
+  /* and destructors are second.  */
+  if (name == dtor_identifier)
+    return (methods[CLASSTYPE_DESTRUCTOR_SLOT]
+	    ? CLASSTYPE_DESTRUCTOR_SLOT : -1);
+  if (IDENTIFIER_TYPENAME_P (name))
+    return lookup_conversion_operator (type, TREE_TYPE (name));
+
+  /* Skip the conversion operators.  */
+  i = CLASSTYPE_FIRST_CONVERSION_SLOT;
+  while (i < len && methods[i] && DECL_CONV_FN_P (OVL_CURRENT (methods[i])))
+    i++;
+
+  /* If the type is complete, use binary search.  */
+  if (COMPLETE_TYPE_P (type))
+    {
+      int lo = i;
+      int hi = len;
+
+      while (lo < hi)
 	{
-	  i = CLASSTYPE_FIRST_CONVERSION_SLOT;
-	  if (i < len && methods[i])
-	    {
-	      tmp = OVL_CURRENT (methods[i]);
-	      if (TREE_CODE (tmp) == TEMPLATE_DECL
-		  && DECL_TEMPLATE_CONV_FN_P (tmp))
-		return i;
-	    }
+	  i = (lo + hi) / 2;
+
+#ifdef GATHER_STATISTICS
+	  n_outer_fields_searched++;
+#endif /* GATHER_STATISTICS */
+
+	  tmp = methods[i];
+	  /* This slot may be empty; we allocate more slots than we
+	     need.  In that case, the entry we're looking for is
+	     closer to the beginning of the list. */
+	  if (tmp)
+	    tmp = DECL_NAME (OVL_CURRENT (tmp));
+	  if (!tmp || tmp > name)
+	    hi = i;
+	  else if (tmp < name)
+	    lo = i + 1;
+	  else
+	    return i;
 	}
     }
+  else
+    for (; i < len && methods[i]; ++i)
+      {
+#ifdef GATHER_STATISTICS
+	n_outer_fields_searched++;
+#endif /* GATHER_STATISTICS */
+
+	tmp = OVL_CURRENT (methods[i]);
+	if (DECL_NAME (tmp) == name)
+	  return i;
+      }
 
   return -1;
 }
@@ -2736,8 +2871,8 @@ lookup_conversions (type)
   tree t;
   tree conversions = NULL_TREE;
 
-  if (COMPLETE_TYPE_P (type))
-    bfs_walk (TYPE_BINFO (type), add_conversions, 0, &conversions);
+  complete_type (type);
+  bfs_walk (TYPE_BINFO (type), add_conversions, 0, &conversions);
 
   for (t = conversions; t; t = TREE_CHAIN (t))
     IDENTIFIER_MARKED (DECL_NAME (OVL_CURRENT (TREE_VALUE (t)))) = 0;
