@@ -2085,26 +2085,16 @@
   DONE;
 }")
 
-;;; pic symbol references
-
-(define_insn ""
-  [(set (match_operand:SI 0 "register_operand" "=r")
-	(mem:SI (plus:SI (match_operand:SI 1 "register_operand" "r")
-			 (match_operand:SI 2 "symbolic_operand" ""))))]
-  "flag_pic && operands[1] == pic_offset_table_rtx"
-  "ldw T'%2(%1),%0"
-  [(set_attr "type" "load")
-   (set_attr "length" "4")])
-
 (define_insn ""
   [(set (match_operand:SI 0 "reg_or_nonsymb_mem_operand"
-				"=r,r,r,r,r,Q,*q,!f,f,*TR")
+				"=r,r,r,r,r,r,Q,*q,!f,f,*TR")
 	(match_operand:SI 1 "move_operand"
-				"r,J,N,K,RQ,rM,rM,!fM,*RT,f"))]
+				"A,r,J,N,K,RQ,rM,rM,!fM,*RT,f"))]
   "(register_operand (operands[0], SImode)
     || reg_or_0_operand (operands[1], SImode))
    && ! TARGET_SOFT_FLOAT"
   "@
+   ldw RT'%A1,%0
    copy %1,%0
    ldi %1,%0
    ldil L'%1,%0
@@ -2115,19 +2105,20 @@
    fcpy,sgl %f1,%0
    fldw%F1 %1,%0
    fstw%F0 %1,%0"
-  [(set_attr "type" "move,move,move,shift,load,store,move,fpalu,fpload,fpstore")
+  [(set_attr "type" "load,move,move,move,shift,load,store,move,fpalu,fpload,fpstore")
    (set_attr "pa_combine_type" "addmove")
-   (set_attr "length" "4,4,4,4,4,4,4,4,4,4")])
+   (set_attr "length" "4,4,4,4,4,4,4,4,4,4,4")])
 
 (define_insn ""
   [(set (match_operand:SI 0 "reg_or_nonsymb_mem_operand"
-				"=r,r,r,r,r,Q,*q")
+				"=r,r,r,r,r,r,Q,*q")
 	(match_operand:SI 1 "move_operand"
-				"r,J,N,K,RQ,rM,rM"))]
+				"A,r,J,N,K,RQ,rM,rM"))]
   "(register_operand (operands[0], SImode)
     || reg_or_0_operand (operands[1], SImode))
    && TARGET_SOFT_FLOAT"
   "@
+   ldw RT'%A1,%0
    copy %1,%0
    ldi %1,%0
    ldil L'%1,%0
@@ -2135,9 +2126,9 @@
    ldw%M1 %1,%0
    stw%M0 %r1,%0
    mtsar %r1"
-  [(set_attr "type" "move,move,move,move,load,store,move")
+  [(set_attr "type" "load,move,move,move,move,load,store,move")
    (set_attr "pa_combine_type" "addmove")
-   (set_attr "length" "4,4,4,4,4,4,4")])
+   (set_attr "length" "4,4,4,4,4,4,4,4")])
 
 (define_insn ""
   [(set (match_operand:SI 0 "register_operand" "=r")
@@ -2329,7 +2320,7 @@
 		 (high:SI (match_operand 2 "" ""))))]
   "symbolic_operand (operands[2], Pmode)
    && ! function_label_operand (operands[2], Pmode)
-   && flag_pic == 2"
+   && flag_pic"
   "addil LT'%G2,%1"
   [(set_attr "type" "binary")
    (set_attr "length" "4")])
@@ -2341,44 +2332,9 @@
   "symbolic_operand (operands[2], Pmode)
    && ! function_label_operand (operands[2], Pmode)
    && TARGET_64BIT
-   && flag_pic == 2"
+   && flag_pic"
   "addil LT'%G2,%1"
   [(set_attr "type" "binary")
-   (set_attr "length" "4")])
-
-; We need this to make sure CSE doesn't simplify a memory load with a
-; symbolic address, whose content it think it knows.  For PIC, what CSE
-; think is the real value will be the address of that value.
-(define_insn ""
-  [(set (match_operand:SI 0 "register_operand" "=r")
-	(mem:SI
-	  (lo_sum:SI (match_operand:SI 1 "register_operand" "r")
-		     (unspec:SI
-			[(match_operand:SI 2 "symbolic_operand" "")] 0))))]
-  ""
-  "*
-{
-  if (flag_pic != 2)
-    abort ();
-  return \"ldw RT'%G2(%1),%0\";
-}"
-  [(set_attr "type" "load")
-   (set_attr "length" "4")])
-
-(define_insn ""
-  [(set (match_operand:DI 0 "register_operand" "=r")
-	(mem:DI
-	  (lo_sum:DI (match_operand:DI 1 "register_operand" "r")
-		     (unspec:DI
-			[(match_operand:DI 2 "symbolic_operand" "")] 0))))]
-  "TARGET_64BIT"
-  "*
-{
-  if (flag_pic != 2)
-    abort ();
-  return \"ldd RT'%G2(%1),%0\";
-}"
-  [(set_attr "type" "load")
    (set_attr "length" "4")])
 
 ;; Always use addil rather than ldil;add sequences.  This allows the
@@ -3083,7 +3039,7 @@
 }")
 
 (define_expand "reload_outdi"
-  [(set (match_operand:DI 0 "general_operand" "")
+  [(set (match_operand:DI 0 "non_hard_reg_operand" "")
 	(match_operand:DI 1 "register_operand" "Z"))
    (clobber (match_operand:SI 2 "register_operand" "=&r"))]
   ""
@@ -3156,13 +3112,14 @@
 
 (define_insn ""
   [(set (match_operand:DI 0 "reg_or_nonsymb_mem_operand"
-				"=r,r,r,r,r,Q,*q,!f,f,*TR")
+				"=r,r,r,r,r,r,Q,*q,!f,f,*TR")
 	(match_operand:DI 1 "move_operand"
-				"r,J,N,K,RQ,rM,rM,!fM,*RT,f"))]
+				"A,r,J,N,K,RQ,rM,rM,!fM,*RT,f"))]
   "(register_operand (operands[0], DImode)
     || reg_or_0_operand (operands[1], DImode))
    && ! TARGET_SOFT_FLOAT && TARGET_64BIT"
   "@
+   ldd RT'%A1,%0
    copy %1,%0
    ldi %1,%0
    ldil L'%1,%0
@@ -3173,9 +3130,9 @@
    fcpy,dbl %f1,%0
    fldd%F1 %1,%0
    fstd%F0 %1,%0"
-  [(set_attr "type" "move,move,move,shift,load,store,move,fpalu,fpload,fpstore")
+  [(set_attr "type" "load,move,move,move,shift,load,store,move,fpalu,fpload,fpstore")
    (set_attr "pa_combine_type" "addmove")
-   (set_attr "length" "4,4,4,4,4,4,4,4,4,4")])
+   (set_attr "length" "4,4,4,4,4,4,4,4,4,4,4")])
 
 (define_insn ""
   [(set (match_operand:DI 0 "reg_or_nonsymb_mem_operand"
@@ -6289,8 +6246,10 @@
 {
   /* The elements of the buffer are, in order:  */
   rtx fp = gen_rtx_MEM (Pmode, operands[0]);
-  rtx lab = gen_rtx_MEM (Pmode, plus_constant (operands[0], 4));
-  rtx stack = gen_rtx_MEM (Pmode, plus_constant (operands[0], 8));
+  rtx lab = gen_rtx_MEM (Pmode, plus_constant (operands[0],
+			 POINTER_SIZE / BITS_PER_UNIT));
+  rtx stack = gen_rtx_MEM (Pmode, plus_constant (operands[0],
+			   (POINTER_SIZE * 2) / BITS_PER_UNIT));
   rtx pv = gen_rtx_REG (Pmode, 1);
 
   /* This bit is the same as expand_builtin_longjmp.  */

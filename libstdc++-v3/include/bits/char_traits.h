@@ -34,6 +34,8 @@
 #ifndef _CPP_BITS_CHAR_TRAITS_H
 #define _CPP_BITS_CHAR_TRAITS_H 1
 
+#pragma GCC system_header
+
 #include <bits/std_cwchar.h> 	// For mbstate_t.
 #include <bits/std_cstring.h> 	// For memmove, memset, memchr
 #include <bits/fpos.h> 		// For streamoff, streamsize
@@ -130,14 +132,8 @@ namespace std {
       eq_int_type(const int_type& __c1, const int_type& __c2)
       { return __c1 == __c2; }
 
-      static state_type 
-      _S_get_state(const pos_type& __pos) { return __pos.state(); }
-
       static int_type 
       eof() { return static_cast<int_type>(-1); }
-
-      static int_type 
-      _S_eos() { return char_type(); }
 
       static int_type 
       not_eof(const int_type& __c)
@@ -205,14 +201,8 @@ namespace std {
       eq_int_type(const int_type& __c1, const int_type& __c2)
       { return __c1 == __c2; }
 
-      static state_type 
-      _S_get_state(const pos_type& __pos) { return __pos.state(); }
-
       static int_type 
       eof() { return static_cast<int_type>(EOF); }
-
-      static int_type 
-      _S_eos() { return char_type(); }
 
       static int_type 
       not_eof(const int_type& __c)
@@ -276,14 +266,8 @@ namespace std {
       eq_int_type(const int_type& __c1, const int_type& __c2)
       { return __c1 == __c2; }
 
-      static state_type 
-      _S_get_state(const pos_type& __pos) { return __pos.state(); }
-
       static int_type 
       eof() { return static_cast<int_type>(WEOF); }
-
-      static int_type 
-      _S_eos() { return char_type(); }
 
       static int_type 
       not_eof(const int_type& __c)

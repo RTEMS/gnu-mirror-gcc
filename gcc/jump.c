@@ -420,6 +420,28 @@ jump_optimize_1 (f, cross_jump, noop_moves, after_regscan,
 
 	      if (temp2 == temp)
 		{
+		  /* Ensure that we jump to the later of the two labels.  
+		     Consider:
+
+			if (test) goto L2;
+			goto L1;
+			...
+		      L1:
+			(clobber return-reg)
+		      L2:
+			(use return-reg)
+
+		     If we leave the goto L1, we'll incorrectly leave
+		     return-reg dead for TEST true.  */
+
+		  temp2 = next_active_insn (JUMP_LABEL (insn));
+		  if (!temp2)
+		    temp2 = get_last_insn ();
+		  if (GET_CODE (temp2) != CODE_LABEL)
+		    temp2 = prev_label (temp2);
+		  if (temp2 != JUMP_LABEL (temp))
+		    redirect_jump (temp, temp2, 1);
+
 		  delete_jump (insn);
 		  changed = 1;
 		  continue;
@@ -859,6 +881,17 @@ mark_all_labels (f, cross_jump)
 	    mark_all_labels (XEXP (PATTERN (insn), 0), cross_jump);
 	    mark_all_labels (XEXP (PATTERN (insn), 1), cross_jump);
 	    mark_all_labels (XEXP (PATTERN (insn), 2), cross_jump);
+
+	    /* Canonicalize the tail recursion label attached to the
+	       CALL_PLACEHOLDER insn.  */
+	    if (XEXP (PATTERN (insn), 3))
+	      {
+		rtx label_ref = gen_rtx_LABEL_REF (VOIDmode,
+						   XEXP (PATTERN (insn), 3));
+		mark_jump_label (label_ref, insn, cross_jump, 0);
+		XEXP (PATTERN (insn), 3) = XEXP (label_ref, 0);
+	      }
+
 	    continue;
 	  }
 
@@ -2882,16 +2915,15 @@ delete_insn (insn)
      to special NOTEs instead.  When not optimizing, leave them alone.  */
   if (was_code_label && LABEL_NAME (insn) != 0)
     {
-      if (! optimize)
-	dont_really_delete = 1;
-      else if (! dont_really_delete)
+      if (optimize)
 	{
 	  const char *name = LABEL_NAME (insn);
 	  PUT_CODE (insn, NOTE);
 	  NOTE_LINE_NUMBER (insn) = NOTE_INSN_DELETED_LABEL;
 	  NOTE_SOURCE_FILE (insn) = name;
-	  dont_really_delete = 1;
 	}
+
+      dont_really_delete = 1;
     }
   else
     /* Mark this insn as deleted.  */

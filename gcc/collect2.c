@@ -29,6 +29,9 @@ Boston, MA 02111-1307, USA.  */
 #include "config.h"
 #include "system.h"
 #include <signal.h>
+#if ! defined( SIGCHLD ) && defined( SIGCLD )
+#  define SIGCHLD SIGCLD
+#endif
 
 #ifdef vfork /* Autoconf may define this to fork for us. */
 # define VFORK_STRING "fork"
@@ -586,21 +589,9 @@ is_ctor_dtor (s)
   register const char *orig_s = s;
 
   static struct names special[] = {
-#ifdef NO_DOLLAR_IN_LABEL
-#ifdef NO_DOT_IN_LABEL
     { "GLOBAL__I_", sizeof ("GLOBAL__I_")-1, 1, 0 },
     { "GLOBAL__D_", sizeof ("GLOBAL__D_")-1, 2, 0 },
     { "GLOBAL__F_", sizeof ("GLOBAL__F_")-1, 5, 0 },
-#else
-    { "GLOBAL_.I.", sizeof ("GLOBAL_.I.")-1, 1, 0 },
-    { "GLOBAL_.D.", sizeof ("GLOBAL_.D.")-1, 2, 0 },
-    { "GLOBAL_.F.", sizeof ("GLOBAL_.F.")-1, 5, 0 },
-#endif
-#else
-    { "GLOBAL_$I$", sizeof ("GLOBAL_$I$")-1, 1, 0 },
-    { "GLOBAL_$D$", sizeof ("GLOBAL_$D$")-1, 2, 0 },
-    { "GLOBAL_$F$", sizeof ("GLOBAL_$F$")-1, 5, 0 },
-#endif
     { "GLOBAL__FI_", sizeof ("GLOBAL__FI_")-1, 3, 0 },
     { "GLOBAL__FD_", sizeof ("GLOBAL__FD_")-1, 4, 0 },
 #ifdef CFRONT_LOSSAGE /* Do not collect cfront initialization functions.
@@ -867,6 +858,12 @@ main (argc, argv)
 #if defined (COLLECT2_HOST_INITIALIZATION)
   /* Perform system dependent initialization, if neccessary.  */
   COLLECT2_HOST_INITIALIZATION;
+#endif
+
+#ifdef SIGCHLD
+  /* We *MUST* set SIGCHLD to SIG_DFL so that the wait4() call will
+     receive the signal.  A different setting is inheritable */
+  signal (SIGCHLD, SIG_DFL);
 #endif
 
 /* LC_CTYPE determines the character set used by the terminal so it has be set

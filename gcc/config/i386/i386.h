@@ -381,10 +381,14 @@ extern int ix86_arch;
 #ifndef CC1_CPU_SPEC
 #define CC1_CPU_SPEC "\
 %{!mcpu*: \
-%{m386:-mcpu=i386} \
-%{m486:-mcpu=i486} \
-%{mpentium:-mcpu=pentium} \
-%{mpentiumpro:-mcpu=pentiumpro}}"
+%{m386:-mcpu=i386 \
+%n`-mpentium' is deprecated. Use `-march' or `-mcpu' instead.\n} \
+%{m486:-mcpu=i486 \
+%n`-mpentium' is deprecated. Use `-march' or `-mcpu' instead.\n} \
+%{mpentium:-mcpu=pentium \
+%n`-mpentium' is deprecated. Use `-march' or `-mcpu' instead.\n} \
+%{mpentiumpro:-mcpu=pentiumpro \
+%n`-mpentiumpro' is deprecated. Use `-march' or `-mcpu' instead.\n}}"
 #endif
 
 #ifndef CPP_CPU_DEFAULT_SPEC
@@ -899,11 +903,11 @@ extern int ix86_arch;
    should always be returned in memory.  You should instead use
    `DEFAULT_PCC_STRUCT_RETURN' to indicate this.  */
 
-#define RETURN_IN_MEMORY(TYPE)							\
-  ((TYPE_MODE (TYPE) == BLKmode)						\
-   || (VECTOR_MODE_P (TYPE_MODE (TYPE)) && int_size_in_bytes (TYPE) == 8)	\
-   || (int_size_in_bytes (TYPE) > 12 && TYPE_MODE (TYPE) != TImode		\
-       && ! VECTOR_MODE_P (TYPE_MODE (TYPE))))
+#define RETURN_IN_MEMORY(TYPE)						\
+  ((TYPE_MODE (TYPE) == BLKmode)					\
+   || (VECTOR_MODE_P (TYPE_MODE (TYPE)) && int_size_in_bytes (TYPE) == 8)\
+   || (int_size_in_bytes (TYPE) > 12 && TYPE_MODE (TYPE) != TImode	\
+       && TYPE_MODE (TYPE) != TFmode && ! VECTOR_MODE_P (TYPE_MODE (TYPE))))
 
 
 /* Define the classes of registers for register constraints in the
