@@ -1,7 +1,11 @@
+# APPLE LOCAL begin AltiVec
 # Add trampoline and long double support to libgcc.
 LIB2FUNCS_EXTRA = $(srcdir)/config/rs6000/darwin-tramp.asm \
-	$(srcdir)/config/rs6000/darwin-ldouble.c
+        $(srcdir)/config/rs6000/darwin-fpsave.asm \
+        $(srcdir)/config/rs6000/darwin-ldouble.c
 
+# Enable AltiVec instructions when assembling the aforementioned .asm files.
 # For libgcc, we always want 128-bit long double, since a libgcc built with
 # that will work without it.
-TARGET_LIBGCC2_CFLAGS = -mlong-double-128
+TARGET_LIBGCC2_CFLAGS = -mlong-double-128 -Wa,-force_cpusubtype_ALL
+# APPLE LOCAL end AltiVec
