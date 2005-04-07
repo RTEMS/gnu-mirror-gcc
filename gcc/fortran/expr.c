@@ -352,7 +352,7 @@ gfc_copy_shape_excluding (mpz_t * shape, int rank, gfc_expr * dim)
 
   n = mpz_get_si (dim->value.integer);
   n--; /* Convert to zero based index */
-  if (n < 0 && n >= rank)
+  if (n < 0 || n >= rank)
     return NULL;
 
   s = new_shape = gfc_get_shape (rank-1);
@@ -1789,11 +1789,12 @@ gfc_check_assign (gfc_expr * lvalue, gfc_expr * rvalue, int conform)
       return FAILURE;
     }
 
-  /* This is a guaranteed segfault and possibly a typo: p = NULL()
-     instead of p => NULL()  */
-  if (rvalue->expr_type == EXPR_NULL)
-    gfc_warning ("NULL appears on right-hand side in assignment at %L",
-		 &rvalue->where);
+   if (rvalue->expr_type == EXPR_NULL)
+     {
+       gfc_error ("NULL appears on right-hand side in assignment at %L",
+		  &rvalue->where);
+       return FAILURE;
+     }
 
   /* This is possibly a typo: x = f() instead of x => f()  */
   if (gfc_option.warn_surprising 
