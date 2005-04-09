@@ -2373,6 +2373,8 @@ expand_builtin_powi (tree exp, rtx target, rtx subtarget)
   tree arg0, arg1;
   rtx op0, op1;
   enum machine_mode mode;
+  /* APPLE LOCAL mainline 2005-03-30 */
+  enum machine_mode mode2;
 
   if (! validate_arglist (arglist, REAL_TYPE, INTEGER_TYPE, VOID_TYPE))
     return 0;
@@ -2404,19 +2406,24 @@ expand_builtin_powi (tree exp, rtx target, rtx subtarget)
 
   /* Emit a libcall to libgcc.  */
 
+  /* APPLE LOCAL begin mainline 2005-03-30 */
+  /* Mode of the 2nd argument must match that of an int. */
+  mode2 = mode_for_size (INT_TYPE_SIZE, MODE_INT, 0);
+
   if (target == NULL_RTX)
     target = gen_reg_rtx (mode);
 
   op0 = expand_expr (arg0, subtarget, mode, 0);
   if (GET_MODE (op0) != mode)
     op0 = convert_to_mode (mode, op0, 0);
-  op1 = expand_expr (arg1, 0, word_mode, 0);
-  if (GET_MODE (op1) != word_mode)
-    op1 = convert_to_mode (word_mode, op1, 0);
+  op1 = expand_expr (arg1, 0, mode2, 0);
+  if (GET_MODE (op1) != mode2)
+    op1 = convert_to_mode (mode2, op1, 0);
 
   target = emit_library_call_value (powi_optab->handlers[(int) mode].libfunc,
 				    target, LCT_CONST_MAKE_BLOCK, mode, 2,
-				    op0, mode, op1, word_mode);
+				    op0, mode, op1, mode2);
+  /* APPLE LOCAL end mainline 2005-03-30 */
 
   return target;
 }
@@ -5726,6 +5733,12 @@ expand_builtin (tree exp, rtx target, rtx subtarget, enum machine_mode mode,
 	return target;
       break;
 
+    /* APPLE LOCAL begin lno */
+    case BUILT_IN_MAYBE_INFINITE_LOOP:
+      /* This is just a fake statement that expands to nothing.  */
+      return const0_rtx;
+    /* APPLE LOCAL end lno */
+
     default:	/* just do library call, if unknown builtin */
       break;
     }
@@ -8177,6 +8190,11 @@ fold_builtin_1 (tree exp, bool ignore)
       break;
 
     default:
+      /* APPLE LOCAL begin constant cfstrings */
+      /* Don't just do the library call if it's unknown, try using
+	 our target version, then call the library call if that doesn't work. */
+      return (*targetm.expand_tree_builtin) (fndecl, arglist,NULL_TREE);
+      /* APPLE LOCAL end constant cfstrings */
       break;
     }
 

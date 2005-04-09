@@ -28,6 +28,8 @@ Software Foundation, 59 Temple Place - Suite 330, Boston, MA
 #include "real.h"
 #include "ggc.h"
 #include "langhooks.h"
+/* APPLE LOCAL mainline */
+#include "tree-iterator.h"
 
 /* Define the hash table of nodes already seen.
    Such nodes are not repeated; brief cross-references are used.  */
@@ -274,6 +276,10 @@ print_node (FILE *file, const char *prefix, tree node, int indent)
     fputs (" static", file);
   if (TREE_DEPRECATED (node))
     fputs (" deprecated", file);
+  /* APPLE LOCAL begin "unavailable" attribute (Radar 2809697) */
+  if (TREE_UNAVAILABLE (node))
+    fputs (" unavailable", file);
+  /* APPLE LOCAL end "unavailable" attribute (Radar 2809697) */
   if (TREE_VISITED (node))
     fputs (" visited", file);
   if (TREE_LANG_FLAG_0 (node))
@@ -707,6 +713,30 @@ print_node (FILE *file, const char *prefix, tree node, int indent)
 		print_node_brief (file, temp, TREE_VEC_ELT (node, i), 0);
 	      }
 	  break;
+
+	/* APPLE LOCAL begin mainline */
+    	case STATEMENT_LIST:
+	  fprintf (file, " head " HOST_PTR_PRINTF " tail " HOST_PTR_PRINTF " stmts",
+		   (void *) node->stmt_list.head, (void *) node->stmt_list.tail);
+	  {
+	    tree_stmt_iterator i;
+	    for (i = tsi_start (node); !tsi_end_p (i); tsi_next (&i))
+	      {
+		/* Not printing the addresses of the (not-a-tree)
+		   'struct tree_stmt_list_node's.  */
+		fprintf (file, " " HOST_PTR_PRINTF, (void *)tsi_stmt (i));
+	      }
+	    fprintf (file, "\n");
+	    for (i = tsi_start (node); !tsi_end_p (i); tsi_next (&i))
+	      {
+		/* Not printing the addresses of the (not-a-tree)
+		   'struct tree_stmt_list_node's.  */
+		print_node (file, "stmt", tsi_stmt (i), indent + 4);
+	      }
+	  }
+	  print_node (file, "chain", TREE_CHAIN (node), indent + 4);
+	  break;
+	/* APPLE LOCAL end mainline */
 
 	case BLOCK:
 	  print_node (file, "vars", BLOCK_VARS (node), indent + 4);
