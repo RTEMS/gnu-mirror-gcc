@@ -973,12 +973,6 @@ systems that support conditional traps).
 Division by zero checks use the break instruction.
 @end table
 
-@item --enable-altivec
-Specify that the target supports AltiVec vector enhancements.  This
-option will adjust the ABI for AltiVec enhancements, as well as generate
-AltiVec code when appropriate.  This option is only available for
-PowerPC systems.
-
 @item --enable-__cxa_atexit
 Define if you want to use __cxa_atexit, rather than atexit, to
 register C++ destructors for local statics and global objects.
@@ -1041,6 +1035,13 @@ particularly useful if you intend to use several versions of GCC in
 parallel.  This is currently supported by @samp{libgfortran},
 @samp{libjava}, @samp{libmudflap}, @samp{libstdc++}, and @samp{libobjc}.
 
+@item --with-java-home=@var{dirname}
+This @samp{libjava} option overrides the default value of the
+@samp{java.home} system property.  It is also used to set
+@samp{sun.boot.class.path} to @file{@var{dirname}/lib/rt.jar}.  By
+default @samp{java.home} is set to @file{@var{prefix}} and
+@samp{sun.boot.class.path} to
+@file{@var{datadir}/java/libgcj-@var{version}.jar}.
 
 @item --enable-languages=@var{lang1},@var{lang2},@dots{}
 Specify that only a particular subset of compilers and
@@ -1829,7 +1830,7 @@ testsuite at @file{libjava/testsuite/libjava.mauve/mauve}, or by
 specifying the location of that tree when invoking @samp{make}, as in
 @samp{make MAUVEDIR=~/mauve check}.
 
-@uref{http://www-124.ibm.com/developerworks/oss/cvs/jikes/~checkout~/jacks/jacks.html,,Jacks}
+@uref{http://sources.redhat.com/mauve/,,Jacks}
 is a free testsuite that tests Java compiler front ends.  This suite
 can be run as part of libgcj testing by placing the Jacks tree within
 the libjava testsuite at @file{libjava/testsuite/libjava.jacks/jacks}.
@@ -2238,7 +2239,7 @@ GNU Compiler Collection on your machine.
 @item
 @uref{#powerpc-*-elf,,powerpc-*-elf, powerpc-*-sysv4}
 @item
-@uref{#powerpc-*-linux-gnu*,,powerpc-*-linux-gnu*}
+@uref{#powerpc*-*-linux-gnu*,,powerpc*-*-linux-gnu*}
 @item
 @uref{#powerpc-*-netbsd*,,powerpc-*-netbsd*}
 @item
@@ -3386,10 +3387,10 @@ PowerPC system in big endian mode, running System V.4.
 @html
 <hr />
 @end html
-@heading @anchor{powerpc-*-linux-gnu*}powerpc-*-linux-gnu*
+@heading @anchor{powerpc*-*-linux-gnu*}powerpc*-*-linux-gnu*
 
 You will need
-@uref{ftp://ftp.kernel.org/pub/linux/devel/binutils,,binutils 2.13.90.0.10}
+@uref{ftp://ftp.kernel.org/pub/linux/devel/binutils,,binutils 2.15}
 or newer for a working GCC@.
 
 @html
