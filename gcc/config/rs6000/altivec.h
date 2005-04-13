@@ -1094,7 +1094,7 @@ vec_vcmpgtub (vector unsigned char a1, vector unsigned char a2)
 inline vector signed int
 vec_cmple (vector float a1, vector float a2)
 {
-  return (vector signed int) __builtin_altivec_vcmpgefp ((vector float) a1, (vector float) a2);
+  return (vector signed int) __builtin_altivec_vcmpgefp ((vector float) a2, (vector float) a1);
 }
 
 /* vec_cmplt */
@@ -1102,43 +1102,43 @@ vec_cmple (vector float a1, vector float a2)
 inline vector signed char
 vec_cmplt (vector unsigned char a1, vector unsigned char a2)
 {
-  return (vector signed char) __builtin_altivec_vcmpgtub ((vector signed char) a1, (vector signed char) a2);
+  return (vector signed char) __builtin_altivec_vcmpgtub ((vector signed char) a2, (vector signed char) a1);
 }
 
 inline vector signed char
 vec_cmplt (vector signed char a1, vector signed char a2)
 {
-  return (vector signed char) __builtin_altivec_vcmpgtsb ((vector signed char) a1, (vector signed char) a2);
+  return (vector signed char) __builtin_altivec_vcmpgtsb ((vector signed char) a2, (vector signed char) a1);
 }
 
 inline vector signed short
 vec_cmplt (vector unsigned short a1, vector unsigned short a2)
 {
-  return (vector signed short) __builtin_altivec_vcmpgtuh ((vector signed short) a1, (vector signed short) a2);
+  return (vector signed short) __builtin_altivec_vcmpgtuh ((vector signed short) a2, (vector signed short) a1);
 }
 
 inline vector signed short
 vec_cmplt (vector signed short a1, vector signed short a2)
 {
-  return (vector signed short) __builtin_altivec_vcmpgtsh ((vector signed short) a1, (vector signed short) a2);
+  return (vector signed short) __builtin_altivec_vcmpgtsh ((vector signed short) a2, (vector signed short) a1);
 }
 
 inline vector signed int
 vec_cmplt (vector unsigned int a1, vector unsigned int a2)
 {
-  return (vector signed int) __builtin_altivec_vcmpgtuw ((vector signed int) a1, (vector signed int) a2);
+  return (vector signed int) __builtin_altivec_vcmpgtuw ((vector signed int) a2, (vector signed int) a1);
 }
 
 inline vector signed int
 vec_cmplt (vector signed int a1, vector signed int a2)
 {
-  return (vector signed int) __builtin_altivec_vcmpgtsw ((vector signed int) a1, (vector signed int) a2);
+  return (vector signed int) __builtin_altivec_vcmpgtsw ((vector signed int) a2, (vector signed int) a1);
 }
 
 inline vector signed int
 vec_cmplt (vector float a1, vector float a2)
 {
-  return (vector signed int) __builtin_altivec_vcmpgtfp ((vector float) a1, (vector float) a2);
+  return (vector signed int) __builtin_altivec_vcmpgtfp ((vector float) a2, (vector float) a1);
 }
 
 /* vec_ctf */
@@ -1198,7 +1198,7 @@ vec_dss (const char a1)
 /* vec_dssall */
 
 inline void
-vec_dssall ()
+vec_dssall (void)
 {
   __builtin_altivec_dssall ();
 }
@@ -2419,7 +2419,7 @@ vec_vmrglb (vector unsigned char a1, vector unsigned char a2)
 /* vec_mfvscr */
 
 inline vector unsigned short
-vec_mfvscr ()
+vec_mfvscr (void)
 {
   return (vector unsigned short) __builtin_altivec_mfvscr ();
 }
@@ -5526,7 +5526,7 @@ vec_all_nlt (vector float a1, vector float a2)
 inline int
 vec_all_numeric (vector float a1)
 {
-  return __builtin_altivec_vcmpeqfp_p (__CR6_EQ, a1, a1);
+  return __builtin_altivec_vcmpeqfp_p (__CR6_LT, a1, a1);
 }
 
 /* vec_any_eq */
@@ -6521,9 +6521,9 @@ __ch (__bin_args_eq (vector unsigned char, (a1), vector unsigned char, (a2)), \
       ((vector signed char) __builtin_altivec_vcmpgtub ((vector signed char) (a1), (vector signed char) (a2))), \
   __altivec_link_error_invalid_argument ())
 
-#define vec_cmple(a1, a2) __builtin_altivec_vcmpgefp ((a1), (a2))
+#define vec_cmple(a1, a2) __builtin_altivec_vcmpgefp ((a2), (a1))
 
-#define vec_cmplt(a1, a2) \
+#define vec_cmplt(a2, a1) \
 __ch (__bin_args_eq (vector unsigned char, (a1), vector unsigned char, (a2)), \
       ((vector signed char) __builtin_altivec_vcmpgtub ((vector signed char) (a1), (vector signed char) (a2))), \
 __ch (__bin_args_eq (vector signed char, (a1), vector signed char, (a2)), \
@@ -8343,7 +8343,7 @@ __ch (__bin_args_eq (vector float, (a1), vector float, (a2)), \
 
 #define vec_all_nlt(a1, a2) __builtin_altivec_vcmpgtfp_p (__CR6_EQ, (a2), (a1))
 
-#define vec_all_numeric(a1) __builtin_altivec_vcmpeqfp_p (__CR6_EQ, (a1), (a1))
+#define vec_all_numeric(a1) __builtin_altivec_vcmpeqfp_p (__CR6_LT, (a1), (a1))
 
 #define vec_any_eq(a1, a2) \
 __ch (__bin_args_eq (vector signed char, (a1), vector unsigned char, (a2)), \
