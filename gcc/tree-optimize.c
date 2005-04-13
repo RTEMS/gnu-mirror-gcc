@@ -347,7 +347,6 @@ init_tree_optimization_passes (void)
 
   p = &pass_all_optimizations.sub;
   NEXT_PASS (pass_referenced_vars);
-  NEXT_PASS (pass_maybe_create_global_var);
   NEXT_PASS (pass_build_ssa);
   NEXT_PASS (pass_may_alias);
   NEXT_PASS (pass_rename_ssa_copies);
@@ -364,6 +363,10 @@ init_tree_optimization_passes (void)
   NEXT_PASS (pass_ch);
   NEXT_PASS (pass_profile);
   NEXT_PASS (pass_sra);
+  /* FIXME: SRA may generate arbitrary gimple code, exposing new
+     aliased and call-clobbered variables.  As mentioned below,
+     pass_may_alias should be a TODO item.  */
+  NEXT_PASS (pass_may_alias);
   NEXT_PASS (pass_rename_ssa_copies);
   NEXT_PASS (pass_dominator);
   NEXT_PASS (pass_redundant_phi);
@@ -414,9 +417,18 @@ init_tree_optimization_passes (void)
   NEXT_PASS (pass_record_bounds);
   NEXT_PASS (pass_linear_transform);
   NEXT_PASS (pass_iv_canon);
+  /* APPLE LOCAL begin loops-to-memset */
+  NEXT_PASS (pass_memset);
+  /* APPLE LOCAL end loops-to-memset */
+  /* APPLE LOCAL begin lno */
+  NEXT_PASS (pass_loop_test);
+  NEXT_PASS (pass_mark_maybe_inf_loops);
+  /* APPLE LOCAL end lno */
   NEXT_PASS (pass_if_conversion);
   NEXT_PASS (pass_vectorize);
   NEXT_PASS (pass_complete_unroll);
+  /* APPLE LOCAL lno */
+  NEXT_PASS (pass_loop_prefetch);
   NEXT_PASS (pass_iv_optimize);
   NEXT_PASS (pass_loop_done);
   *p = NULL;
@@ -439,6 +451,14 @@ execute_todo (int properties, unsigned int flags)
       rewrite_into_ssa (false);
       bitmap_clear (vars_to_rename);
     }
+  /* APPLE LOCAL begin lno */
+  if (flags & TODO_write_loop_closed)
+    {
+      rewrite_into_ssa (false);
+      rewrite_into_loop_closed_ssa ();
+      bitmap_clear (vars_to_rename);
+    }
+  /* APPLE LOCAL end lno */
   if (flags & TODO_fix_def_def_chains)
     {
       rewrite_def_def_chains ();
@@ -652,15 +672,14 @@ tree_rest_of_compilation (tree fndecl)
 
   /* We are not going to maintain the cgraph edges up to date.
      Kill it so it won't confuse us.  */
-  while (node->callees)
-    cgraph_remove_edge (node->callees);
+  cgraph_node_remove_callees (node);
 
 
   /* Initialize the default bitmap obstack.  */
   bitmap_obstack_initialize (NULL);
   bitmap_obstack_initialize (&reg_obstack); /* FIXME, only at RTL generation*/
   
-  vars_to_rename = BITMAP_XMALLOC ();
+  vars_to_rename = BITMAP_ALLOC (NULL);
   
   /* Perform all tree transforms and optimizations.  */
   execute_pass_list (all_passes);
@@ -684,8 +703,7 @@ tree_rest_of_compilation (tree fndecl)
 	{
 	  struct cgraph_edge *e;
 
-	  while (node->callees)
-	    cgraph_remove_edge (node->callees);
+	  cgraph_node_remove_callees (node);
 	  node->callees = saved_node->callees;
 	  saved_node->callees = NULL;
 	  update_inlined_to_pointers (node, node);
