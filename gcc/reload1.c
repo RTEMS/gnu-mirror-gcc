@@ -5411,19 +5411,18 @@ choose_reload_regs (struct insn_chain *chain)
 		    need_mode = mode;
 		  else
 		    need_mode
-		      = smallest_mode_for_size (GET_MODE_SIZE (mode) + byte,
+		      = smallest_mode_for_size (GET_MODE_BITSIZE (mode)
+						+ byte * BITS_PER_UNIT,
 						GET_MODE_CLASS (mode));
 
-		  if (
-#ifdef CANNOT_CHANGE_MODE_CLASS
-		      (!REG_CANNOT_CHANGE_MODE_P (i, GET_MODE (last_reg),
-						  need_mode)
-		       &&
-#endif
-		      (GET_MODE_SIZE (GET_MODE (last_reg))
+		  if ((GET_MODE_SIZE (GET_MODE (last_reg))
 		       >= GET_MODE_SIZE (need_mode))
 #ifdef CANNOT_CHANGE_MODE_CLASS
-		      )
+		      /* Verify that the register in "i" can be obtained
+			 from LAST_REG.  */
+		      && !REG_CANNOT_CHANGE_MODE_P (REGNO (last_reg),
+						    GET_MODE (last_reg),
+						    mode)
 #endif
 		      && reg_reloaded_contents[i] == regno
 		      && TEST_HARD_REG_BIT (reg_reloaded_valid, i)
@@ -5605,23 +5604,18 @@ choose_reload_regs (struct insn_chain *chain)
 		 and of the desired class.  */
 	      if (equiv != 0)
 		{
-		  int regs_used = 0;
+		  /* APPLE LOCAL begin don't reload unavailable hard regs. PR/16028 */
 		  int bad_for_class = 0;
 		  int max_regno = regno + rld[r].nregs;
 
 		  for (i = regno; i < max_regno; i++)
-		    {
-		      regs_used |= TEST_HARD_REG_BIT (reload_reg_used_at_all,
-						      i);
 		      bad_for_class |= ! TEST_HARD_REG_BIT (reg_class_contents[(int) rld[r].class],
 							   i);
-		    }
-
-		  if ((regs_used
-		       && ! free_for_value_p (regno, rld[r].mode,
-					      rld[r].opnum, rld[r].when_needed,
-					      rld[r].in, rld[r].out, r, 1))
-		      || bad_for_class)
+                  if (bad_for_class
+                      || ! free_for_value_p (regno, rld[r].mode,
+                                             rld[r].opnum, rld[r].when_needed,
+                                             rld[r].in, rld[r].out, r, 1))
+		  /* APPLE LOCAL end don't reload unavailable hard regs. PR/16028 */
 		    equiv = 0;
 		}
 
