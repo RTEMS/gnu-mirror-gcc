@@ -161,6 +161,11 @@ Wunused-variable
 Common Var(warn_unused_variable)
 Warn when a variable is unused
 
+; APPLE LOCAL begin fat builds
+arch
+Common Separate
+; APPLE LOCAL end fat builds
+
 aux-info
 Common Separate
 -aux-info <file>	Emit declaration information into <file>
@@ -210,6 +215,16 @@ Align labels which are only reached by jumping
 falign-jumps=
 Common RejectNegative Joined UInteger
 
+; APPLE LOCAL begin falign-jumps-max-skip
+
+falign-jumps-max-skip
+Common Report Var(align_jumps_max_skip,0)
+
+falign-jumps-max-skip=
+Common RejectNegative Joined UInteger
+
+; APPLE LOCAL end falign-jumps-max-skip
+
 falign-labels
 Common Report Var(align_labels,0)
 Align all labels
@@ -223,6 +238,25 @@ Align the start of loops
 
 falign-loops=
 Common RejectNegative Joined UInteger
+
+; APPLE LOCAL begin falign-loops-max-skip
+
+falign-loops-max-skip
+Common Report Var(align_loops_max_skip,0)
+
+falign-loops-max-skip=
+Common RejectNegative Joined UInteger
+
+; APPLE LOCAL end falign-loops-max-skip
+
+; APPLE LOCAL begin predictive compilation
+fpredictive-compilation
+Common
+Predictive Compilation
+
+fpredictive-compilation=
+Common RejectNegative Joined UInteger
+; APPLE LOCAL end predictive compilation
 
 ; This flag is only tested if alias checking is enabled.
 ; 0 if pointer arguments may alias each other.  True in C.
@@ -298,6 +332,12 @@ fcprop-registers
 Common Report Var(flag_cprop_registers)
 Perform a register copy-propagation optimization pass
 
+; APPLE LOCAL begin new profiling flag
+fcreate-profile
+Common
+Enable common options for generating profile info for profile feedback directed optimizations
+; APPLE LOCAL end new profiling flag
+
 fcrossjumping
 Common Report Var(flag_crossjumping)
 Perform cross-jumping optimization
@@ -309,6 +349,10 @@ When running CSE, follow jumps to their targets
 fcse-skip-blocks
 Common Report Var(flag_cse_skip_blocks)
 When running CSE, follow conditional jumps
+
+fcx-limited-range
+Common Report Var(flag_cx_limited_range)
+Omit range reduction step when performing complex division
 
 fdata-sections
 Common Report Var(flag_data_sections)
@@ -496,6 +540,12 @@ floop-optimize2
 Common Report Var(flag_loop_optimize2)
 Perform loop optimizations using the new loop optimizer
 
+; APPLE LOCAL begin lno
+floop-test
+Common Report Var(flag_tree_ssa_loop_test)
+Run loop optimizer tests
+; APPLE LOCAL end lno
+
 fmath-errno
 Common Report Var(flag_errno_math) Init(1)
 Set errno after built-in math functions
@@ -547,6 +597,12 @@ fnon-call-exceptions
 Common Report Var(flag_non_call_exceptions)
 Support synchronous non-call exceptions
 
+; APPLE LOCAL begin -fobey-inline
+fobey-inline
+Common Report Var(flag_obey_inline) VarExists
+Obey 'inline' keyword and always inline, regardless of size
+; APPLE LOCAL end -fobey-inline
+
 fomit-frame-pointer
 Common Report Var(flag_omit_frame_pointer)
 When possible do not generate stack frames
@@ -562,6 +618,12 @@ Optimize sibling and tail recursive calls
 fpack-struct
 Common Report Var(flag_pack_struct)
 Pack structure members together without holes
+
+; APPLE LOCAL begin pascal strings
+fpascal-strings
+Common
+Allow Pascal-style string literals
+; APPLE LOCAL end pascal strings
 
 fpack-struct=
 Common RejectNegative Joined UInteger
@@ -598,6 +660,12 @@ Generate position-independent code if possible (small mode)
 fpie
 Common Report Var(flag_pie,1) VarExists
 Generate position-independent code for executables if possible (small mode)
+
+; APPLE LOCAL begin -ffppc 2001-08-01 --sts
+fppc
+Common Var(flag_fppc) VarExists
+Perform floating-point precision-control pass
+; APPLE LOCAL end -ffppc 2001-08-01 --sts
 
 fprefetch-loop-arrays
 Common Report Var(flag_prefetch_loop_arrays)
@@ -710,7 +778,7 @@ Allow premature scheduling of queued insns
 
 fsched-stalled-insns=
 Common RejectNegative Joined UInteger 
--fsched-stalled-insns=<number>       Set number of queued insns that can be prematurely scheduled
+-fsched-stalled-insns=<number>	Set number of queued insns that can be prematurely scheduled
 
 ; sched_stalled_insns_dep controls how many recently scheduled cycles will
 ; be examined for a dependency on a stalled insn that is candidate for
@@ -722,7 +790,7 @@ Set dependence distance checking in premature scheduling of queued insns
 
 fsched-stalled-insns-dep=
 Common RejectNegative Joined UInteger
--fsched-stalled-insns-dep=<number>   Set dependence distance checking in premature scheduling of queued insns
+-fsched-stalled-insns-dep=<number>	Set dependence distance checking in premature scheduling of queued insns
 
 fshared-data
 Common Report Var(flag_shared_data)
@@ -860,6 +928,12 @@ ftree-loop-ivcanon
 Common Report Var(flag_tree_loop_ivcanon) Init(1)
 Create canonical induction variables in loops
 
+; APPLE LOCAL begin loops-to-memset
+ftree-loop-memset
+Common Report Var(flag_tree_loop_memset) Init(0)
+Transform appropriate loops to memset calls
+; APPLE LOCAL end loops-to-memset
+
 ftree-loop-optimize
 Common Report Var(flag_tree_loop_optimize) Init(1)
 Enable loop optimizations on tree level
@@ -908,6 +982,12 @@ funwind-tables
 Common Report Var(flag_unwind_tables)
 Just generate unwind tables for exception handling
 
+; APPLE LOCAL begin new profiling flag
+fuse-profile
+Common
+Enable common options for performing profile feedback directed optimizations
+; APPLE LOCAL end new profiling flag
+
 fvar-tracking
 Common Report Var(flag_var_tracking) VarExists
 Perform variable tracking
@@ -918,7 +998,7 @@ Enable loop vectorization on trees
 
 ftree-vectorizer-verbose=
 Common RejectNegative Joined
--ftree-vectorizer-verbose=<number>   Set the verbosity level of the vectorizer
+-ftree-vectorizer-verbose=<number>	Set the verbosity level of the vectorizer
 
 ; -fverbose-asm causes extra commentary information to be produced in
 ; the generated assembly code (to make it more readable).  This option
@@ -946,6 +1026,18 @@ Construct webs and split unrelated uses of single variable
 fwrapv
 Common Report Var(flag_wrapv)
 Assume signed arithmetic overflow wraps around
+
+; APPLE LOCAL begin fwritable strings
+fwritable-strings
+Common Report Var(flag_writable_strings) VarExists
+Store strings in writable data section
+; APPLE LOCAL end fwritable strings
+
+; APPLE LOCAL begin KEXT
+fapple-kext
+C++ Report Var(flag_apple_kext)
+Generate code for darwin loadable kernel extentions
+; APPLE LOCAL end KEXT
 
 fzero-initialized-in-bss
 Common Report Var(flag_zero_initialized_in_bss) Init(1)

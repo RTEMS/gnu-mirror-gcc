@@ -31,7 +31,7 @@ AC_CONFIG_SRCDIR(tree.c)
 AC_CONFIG_HEADER(auto-host.h:config.in)
 
 #Set to 1 on a release branch
-is_release=
+is_release=1
 
 # Determine the host, build, and target systems
 AC_CANONICAL_BUILD
@@ -775,6 +775,10 @@ esac
 AC_SUBST(ranlib_flags)
      
 gcc_AC_PROG_INSTALL
+
+# APPLE LOCAL begin Mach time
+AC_CHECK_HEADERS(mach/mach_time.h)
+# APPLE LOCAL end Mach time
 
 # See if cmp has --ignore-initial.
 gcc_AC_PROG_CMP_IGNORE_INITIAL

@@ -471,7 +471,29 @@ decode_options (unsigned int argc, const char **argv)
 		}
 	    }
 	}
+        /* APPLE LOCAL begin -fast or -fastf or -fastcp */
+      else if (argv[i][0] == '-' && argv[i][1] == 'f')
+        {
+          const char *p = &argv[i][2];
+          if (!strcmp(p, "ast"))
+            flag_fast = 1;
+          else if (!strcmp(p, "astf"))
+            flag_fastf = 1;
+          else if (!strcmp(p, "astcp"))
+            flag_fastcp = 1;
+        }
     }
+
+    if (flag_fast || flag_fastf || flag_fastcp )
+    {
+      optimize = 3;
+      optimize_size = 0;
+      /* This goes here, rather than in rs6000.c, so that
+	 later -fcommon can override it.  */
+      if (flag_fast || flag_fastcp)
+        flag_no_common = 1;
+    }
+    /* APPLE LOCAL end -fast or -fastf or -fastcp */
 
   if (!optimize)
     {
@@ -496,6 +518,13 @@ decode_options (unsigned int argc, const char **argv)
       flag_tree_dce = 1;
       flag_tree_dom = 1;
       flag_tree_dse = 1;
+      /* APPLE LOCAL begin lno */
+      flag_tree_loop_im = 1;
+      flag_ivopts = 1;
+      flag_tree_vectorize = 0;
+      flag_tree_loop_linear = 0;
+      flag_tree_pre = 1;
+      /* APPLE LOCAL end lno */
       flag_tree_ter = 1;
       flag_tree_live_range_split = 1;
       flag_tree_sra = 1;
@@ -662,6 +691,13 @@ decode_options (unsigned int argc, const char **argv)
       flag_reorder_blocks_and_partition = 0;
       flag_reorder_blocks = 1;
     }
+
+  /* APPLE LOCAL begin AV 3846092 */
+  /* We have apple local patch to disable -fstrict-aliasing when -O2 is used.
+     Do not disable it when -ftree-vectorize is used.  */
+  if (optimize >= 2 && flag_tree_vectorize)
+    flag_strict_aliasing = 1;
+  /* APPLE LOCAL end AV 3846092 */
 }
 
 /* Handle target- and language-independent options.  Return zero to
@@ -676,6 +712,12 @@ common_handle_option (size_t scode, const char *arg, int value)
 
   switch (code)
     {
+    /* APPLE LOCAL begin fat builds */
+    case OPT_arch:
+      /* Ignore for now. */
+      break;
+    /* APPLE LOCAL end fat builds */
+
     case OPT__help:
       print_help ();
       exit_after_options = true;
@@ -763,6 +805,16 @@ common_handle_option (size_t scode, const char *arg, int value)
       align_jumps = value;
       break;
 
+    /* APPLE LOCAL begin falign-jumps-max-skip */
+    case OPT_falign_jumps_max_skip_:
+      align_jumps_max_skip = value;
+      break;
+
+    case OPT_falign_loops_max_skip_:
+      align_loops_max_skip = value;
+      break;
+    /* APPLE LOCAL end falign-jumps-max-skip */
+
     case OPT_falign_labels_:
       align_labels = value;
       break;
@@ -770,6 +822,26 @@ common_handle_option (size_t scode, const char *arg, int value)
     case OPT_falign_loops_:
       align_loops = value;
       break;
+
+    /* APPLE LOCAL begin predictive compilation */
+    case OPT_fpredictive_compilation:
+      predictive_compilation = 0;
+      break;
+
+    case OPT_fpredictive_compilation_:
+      {
+	char* buf = xmalloc (strlen(arg) + 1);
+	sprintf (buf, "%d", value);
+	if (strcmp(buf, arg))
+	  {
+	    error ("argument to \"-fpredictive-compilation=\" should be a valid non-negative integer instead of \"%s\"", arg);
+	    value = 0;
+	  }
+	free(buf);
+        predictive_compilation = value;
+        break;
+      }
+    /* APPLE LOCAL end predictive compilation */
 
     case OPT_fbranch_probabilities:
       flag_branch_probabilities_set = true;
@@ -834,6 +906,9 @@ common_handle_option (size_t scode, const char *arg, int value)
       profile_arc_flag_set = true;
       break;
 
+    /* APPLE LOCAL begin add fuse-profile */
+    case OPT_fuse_profile:
+    /* APPLE LOCAL end add fuse-profile */
     case OPT_fprofile_use:
       if (!flag_branch_probabilities_set)
         flag_branch_probabilities = value;
@@ -853,6 +928,9 @@ common_handle_option (size_t scode, const char *arg, int value)
 #endif
       break;
 
+    /* APPLE LOCAL begin add fcreate-profile */
+    case OPT_fcreate_profile:
+    /* APPLE LOCAL end add fcreate-profile */
     case OPT_fprofile_generate:
       if (!profile_arc_flag_set)
         profile_arc_flag = value;
@@ -969,6 +1047,12 @@ common_handle_option (size_t scode, const char *arg, int value)
     case OPT_funroll_loops:
       flag_unroll_loops_set = true;
       break;
+
+      /* APPLE LOCAL begin fwritable strings  */
+    case OPT_fwritable_strings:
+      flag_writable_strings = value;
+      break;
+      /* APPLE LOCAL end fwritable strings  */
 
     case OPT_g:
       set_debug_level (NO_DEBUG, DEFAULT_GDB_EXTENSIONS, arg);
@@ -1097,6 +1181,7 @@ set_fast_math_flags (int set)
     {
       flag_signaling_nans = 0;
       flag_rounding_math = 0;
+      flag_cx_limited_range = 1;
     }
 }
 
@@ -1132,6 +1217,12 @@ set_debug_level (enum debug_info_type type, int extended, const char *arg)
 #elif defined DBX_DEBUGGING_INFO
 	      write_symbols = DBX_DEBUG;
 #endif
+/* APPLE LOCAL begin dwarf */
+/* Even though DWARF2_DEBUGGING_INFO is defined, use stabs for
+   debugging symbols with -ggdb.  Remove this local patch when we
+   switch to dwarf.  */
+	      write_symbols = DBX_DEBUG;
+/* APPLE LOCAL end dwarf */
 	    }
 
 	  if (write_symbols == NO_DEBUG)
