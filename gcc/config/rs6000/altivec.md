@@ -474,6 +474,66 @@
   DONE;
 }")
 
+;; APPLE LOCAL begin 3972875 mainline 2005-04-18 
+;; 32 bit integer multiplication
+;; A_high = Operand_0 & 0xFFFF0000 >> 16
+;; A_low = Operand_0 & 0xFFFF
+;; B_high = Operand_1 & 0xFFFF0000 >> 16
+;; B_low = Operand_1 & 0xFFFF
+;; result = A_low * B_low + (A_high * B_low + B_high * A_low) << 16
+
+;; (define_insn "mulv4si3"
+;;   [(set (match_operand:V4SI 0 "register_operand" "=v")
+;;         (mult:V4SI (match_operand:V4SI 1 "register_operand" "v")
+;;                    (match_operand:V4SI 2 "register_operand" "v")))]
+(define_expand "mulv4si3"
+  [(use (match_operand:V4SI 0 "register_operand" ""))
+   (use (match_operand:V4SI 1 "register_operand" ""))
+   (use (match_operand:V4SI 2 "register_operand" ""))]
+   "TARGET_ALTIVEC"
+   "
+ {
+   rtx zero;
+   rtx swap;
+   rtx small_swap;
+   rtx sixteen;
+   rtx one;
+   rtx two;
+   rtx low_product;
+   rtx high_product;
+       
+   zero = gen_reg_rtx (V4SImode);
+   emit_insn (gen_altivec_vspltisw (zero, const0_rtx));
+ 
+   sixteen = gen_reg_rtx (V4SImode);   
+   emit_insn (gen_altivec_vspltisw (sixteen,  gen_rtx_CONST_INT (V4SImode, -16)));
+ 
+   swap = gen_reg_rtx (V4SImode);
+   emit_insn (gen_altivec_vrlw (swap, operands[2], sixteen));
+ 
+   one = gen_reg_rtx (V8HImode);
+   convert_move (one, operands[1], 0);
+ 
+   two = gen_reg_rtx (V8HImode);
+   convert_move (two, operands[2], 0);
+ 
+   small_swap = gen_reg_rtx (V8HImode);
+   convert_move (small_swap, swap, 0);
+ 
+   low_product = gen_reg_rtx (V4SImode);
+   emit_insn (gen_altivec_vmulouh (low_product, one, two));
+ 
+   high_product = gen_reg_rtx (V4SImode);
+   emit_insn (gen_altivec_vmsumuhm (high_product, one, small_swap, zero));
+ 
+   emit_insn (gen_altivec_vslw (high_product, high_product, sixteen));
+ 
+   emit_insn (gen_addv4si3 (operands[0], high_product, low_product));
+   
+   DONE;
+ }")
+;; APPLE LOCAL end 3972875 mainline 2005-04-18
+
 ;; Fused multiply subtract 
 (define_insn "altivec_vnmsubfp"
   [(set (match_operand:V4SF 0 "register_operand" "=v")
@@ -968,21 +1028,23 @@
   "vslo %0,%1,%2"
   [(set_attr "type" "vecperm")])
 
-(define_insn "altivec_vsr<VI_char>"
+; APPLE LOCAL begin mainline 2005-04-05 3972515 
+(define_insn "lshr<mode>3"
   [(set (match_operand:VI 0 "register_operand" "=v")
-        (unspec:VI [(match_operand:VI 1 "register_operand" "v")
-                    (match_operand:VI 2 "register_operand" "v")] 112))]
+        (lshiftrt:VI (match_operand:VI 1 "register_operand" "v")
+                    (match_operand:VI 2 "register_operand" "v") ))]
   "TARGET_ALTIVEC"
   "vsr<VI_char> %0,%1,%2"
   [(set_attr "type" "vecsimple")])
 
-(define_insn "altivec_vsra<VI_char>"
+(define_insn "ashr<mode>3"
   [(set (match_operand:VI 0 "register_operand" "=v")
-        (unspec:VI [(match_operand:VI 1 "register_operand" "v")
-                    (match_operand:VI 2 "register_operand" "v")] 115))]
+        (ashiftrt:VI (match_operand:VI 1 "register_operand" "v")
+                    (match_operand:VI 2 "register_operand" "v") ))]
   "TARGET_ALTIVEC"
   "vsra<VI_char> %0,%1,%2"
   [(set_attr "type" "vecsimple")])
+; APPLE LOCAL end mainline 2005-04-05 3972515 
 
 (define_insn "altivec_vsr"
   [(set (match_operand:V4SI 0 "register_operand" "=v")
