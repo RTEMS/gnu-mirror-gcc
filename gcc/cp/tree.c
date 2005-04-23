@@ -1459,6 +1459,7 @@ cp_tree_equal (tree t1, tree t2)
     case FUNCTION_DECL:
     case TEMPLATE_DECL:
     case IDENTIFIER_NODE:
+    case SSA_NAME:
       return false;
 
     case BASELINK:
@@ -1848,17 +1849,6 @@ handle_init_priority_attribute (tree* node,
       *no_add_attrs = true;
       return NULL_TREE;
     }
-}
-
-/* Return a new TINST_LEVEL for DECL at location locus.  */
-tree
-make_tinst_level (tree decl, location_t locus)
-{
-  tree tinst_level = make_node (TINST_LEVEL);
-  TREE_CHAIN (tinst_level) = NULL_TREE;
-  TINST_DECL (tinst_level) = decl;
-  TINST_LOCATION (tinst_level) = locus;
-  return tinst_level;
 }
 
 /* Return a new PTRMEM_CST of the indicated TYPE.  The MEMBER is the
@@ -2256,7 +2246,10 @@ stabilize_init (tree init, tree *initp)
       if (TREE_CODE (t) == COND_EXPR)
 	return false;
 
-      stabilize_call (t, initp);
+      /* The TARGET_EXPR might be initializing via bitwise copy from
+	 another variable; leave that alone.  */
+      if (TREE_SIDE_EFFECTS (t))
+	stabilize_call (t, initp);
     }
 
   return true;
