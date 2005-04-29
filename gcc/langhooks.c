@@ -1,5 +1,5 @@
 /* Default language-specific hooks.
-   Copyright 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
+   Copyright 2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
    Contributed by Alexandre Oliva  <aoliva@redhat.com>
 
 This file is part of GCC.
@@ -366,6 +366,14 @@ lhd_tree_inlining_anon_aggr_type_p (tree t ATTRIBUTE_UNUSED)
   return 0;
 }
 
+/* APPLE LOCAL begin kext identify vtables */
+int
+lhd_vtable_p (tree t ATTRIBUTE_UNUSED)
+{
+  return 0;
+}
+/* APPLE LOCAL end kext identify vtables */
+
 /* lang_hooks.tree_inlining.start_inlining and end_inlining perform any
    language-specific bookkeeping necessary for processing
    FN. start_inlining returns nonzero if inlining should proceed, zero if
@@ -545,4 +553,10 @@ tree
 lhd_make_node (enum tree_code code)
 {
   return make_node (code);
+}
+
+HOST_WIDE_INT
+lhd_to_target_charset (HOST_WIDE_INT c)
+{
+  return c;
 }
