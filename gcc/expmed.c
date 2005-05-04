@@ -299,6 +299,7 @@ store_bit_field (str_rtx, bitsize, bitnum, fieldmode, value, total_size)
   unsigned HOST_WIDE_INT bitpos = bitnum % unit;
   rtx op0 = str_rtx;
   int byte_offset;
+  rtx orig_value;
 
   enum machine_mode op_mode = mode_for_extraction (EP_insv, 3);
 
@@ -532,6 +533,7 @@ store_bit_field (str_rtx, bitsize, bitnum, fieldmode, value, total_size)
      corresponding size.  This can occur on a machine with 64 bit registers
      that uses SFmode for float.  This can also occur for unaligned float
      structure fields.  */
+  orig_value = value;
   if (GET_MODE_CLASS (GET_MODE (value)) != MODE_INT
       && GET_MODE_CLASS (GET_MODE (value)) != MODE_PARTIAL_INT)
     value = gen_lowpart ((GET_MODE (value) == VOIDmode
@@ -598,7 +600,7 @@ store_bit_field (str_rtx, bitsize, bitnum, fieldmode, value, total_size)
 	  /* Fetch that unit, store the bitfield in it, then store
 	     the unit.  */
 	  tempreg = copy_to_reg (op0);
-	  store_bit_field (tempreg, bitsize, bitpos, fieldmode, value,
+	  store_bit_field (tempreg, bitsize, bitpos, fieldmode, orig_value,
 			   total_size);
 	  emit_move_insn (op0, tempreg);
 	  return value;
@@ -4341,19 +4343,27 @@ emit_store_flag (target, code, op0, op1, mode, unsignedp, normalizep)
     {
       if (code == EQ || code == NE)
 	{
+	  rtx op00, op01, op0both;
+
 	  /* Do a logical OR of the two words and compare the result.  */
-	  rtx op0h = gen_highpart (word_mode, op0);
-	  rtx op0l = gen_lowpart (word_mode, op0);
-	  rtx op0both = expand_binop (word_mode, ior_optab, op0h, op0l,
-				      NULL_RTX, unsignedp, OPTAB_DIRECT);
+	  op00 = simplify_gen_subreg (word_mode, op0, mode, 0);
+	  op01 = simplify_gen_subreg (word_mode, op0, mode, UNITS_PER_WORD);
+	  op0both = expand_binop (word_mode, ior_optab, op00, op01,
+				  NULL_RTX, unsignedp, OPTAB_DIRECT);
 	  if (op0both != 0)
 	    return emit_store_flag (target, code, op0both, op1, word_mode,
 				    unsignedp, normalizep);
 	}
       else if (code == LT || code == GE)
-	/* If testing the sign bit, can just test on high word.  */
-	return emit_store_flag (target, code, gen_highpart (word_mode, op0),
-				op1, word_mode, unsignedp, normalizep);
+	{
+	  rtx op0h;
+
+	  /* If testing the sign bit, can just test on high word.  */
+	  op0h = simplify_gen_subreg (word_mode, op0, mode,
+				      subreg_highpart_offset (word_mode, mode));
+	  return emit_store_flag (target, code, op0h, op1, word_mode,
+				  unsignedp, normalizep);
+	}
     }
 
   /* From now on, we won't change CODE, so set ICODE now.  */
