@@ -983,7 +983,7 @@ AC_DEFUN([GLIBCXX_ENABLE_C99], [
   AC_MSG_RESULT($ac_c99_complex)
 
   if test x"$ac_c99_complex" = x"yes"; then
-    AC_DEFINE(_GLIBCXX_USE_C99_COMPLEX_MATH)
+    AC_DEFINE(_GLIBCXX_USE_C99_COMPLEX)
   fi
 
   # Check for the existence in <stdio.h> of vscanf, et. al.
@@ -1325,7 +1325,7 @@ AC_DEFUN([GLIBCXX_ENABLE_ALLOCATOR], [
   if test $enable_libstdcxx_allocator_flag = auto; then
     case ${target_os} in
       linux* | gnu* | kfreebsd*-gnu | knetbsd*-gnu)
-        enable_libstdcxx_allocator_flag=mt
+        enable_libstdcxx_allocator_flag=new
         ;;
       *)
         enable_libstdcxx_allocator_flag=new
