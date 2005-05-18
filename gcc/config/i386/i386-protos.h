@@ -88,6 +88,8 @@ extern int memory_displacement_operand PARAMS ((rtx, enum machine_mode));
 extern int cmpsi_operand PARAMS ((rtx, enum machine_mode));
 extern int long_memory_operand PARAMS ((rtx, enum machine_mode));
 extern int aligned_operand PARAMS ((rtx, enum machine_mode));
+extern int compare_operator PARAMS ((rtx, enum machine_mode));
+extern int flags_reg_operand PARAMS ((rtx, enum machine_mode));
 extern enum machine_mode ix86_cc_mode PARAMS ((enum rtx_code, rtx, rtx));
 
 extern int ix86_expand_movstr PARAMS ((rtx, rtx, rtx, rtx));
@@ -146,6 +148,7 @@ extern void ix86_split_ashrdi PARAMS ((rtx *, rtx));
 extern void ix86_split_lshrdi PARAMS ((rtx *, rtx));
 extern int ix86_address_cost PARAMS ((rtx));
 extern rtx ix86_find_base_term PARAMS ((rtx));
+extern int ix86_check_movabs PARAMS ((rtx, int));
 
 extern rtx assign_386_stack_local PARAMS ((enum machine_mode, int));
 extern int ix86_attr_length_immediate_default PARAMS ((rtx, int));
@@ -190,6 +193,9 @@ extern void x86_function_profiler PARAMS ((FILE *, int));
 #ifdef TREE_CODE
 extern void init_cumulative_args PARAMS ((CUMULATIVE_ARGS *, tree, rtx));
 extern rtx function_arg PARAMS ((CUMULATIVE_ARGS *, enum machine_mode, tree, int));
+extern int function_arg_pass_by_reference PARAMS ((CUMULATIVE_ARGS *,
+						   enum machine_mode,
+						   tree, int));
 extern void function_arg_advance PARAMS ((CUMULATIVE_ARGS *, enum machine_mode,
 					tree, int));
 extern rtx ix86_function_value PARAMS ((tree));
