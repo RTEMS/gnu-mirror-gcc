@@ -35,6 +35,7 @@ Boston, MA 02111-1307, USA.  */
 #include "toplev.h"
 #include "target.h"
 #include "convert.h"
+#include "cgraph.h"
 
 /* The number of nested classes being processed.  If we are not in the
    scope of any class, this is zero.  */
@@ -2048,14 +2049,17 @@ update_vtable_entry_for_fn (tree t, tree binfo, tree fn, tree* virtuals,
 	  tree thunk_binfo, base_binfo;
 
 	  /* Find the base binfo within the overriding function's
-	     return type.  */
+	     return type.  We will always find a thunk_binfo, except
+	     when the covariancy is invalid (which we will have
+	     already diagnosed).  */
 	  for (base_binfo = TYPE_BINFO (base_return),
 	       thunk_binfo = TYPE_BINFO (over_return);
-	       !SAME_BINFO_TYPE_P (BINFO_TYPE (thunk_binfo),
-				   BINFO_TYPE (base_binfo));
+	       thunk_binfo;
 	       thunk_binfo = TREE_CHAIN (thunk_binfo))
-	    continue;
-
+	    if (SAME_BINFO_TYPE_P (BINFO_TYPE (thunk_binfo),
+				   BINFO_TYPE (base_binfo)))
+	      break;
+	  
 	  /* See if virtual inheritance is involved.  */
 	  for (virtual_offset = thunk_binfo;
 	       virtual_offset;
@@ -2063,7 +2067,8 @@ update_vtable_entry_for_fn (tree t, tree binfo, tree fn, tree* virtuals,
 	    if (BINFO_VIRTUAL_P (virtual_offset))
 	      break;
 	  
-	  if (virtual_offset || !BINFO_OFFSET_ZEROP (thunk_binfo))
+	  if (virtual_offset
+	      || (thunk_binfo && !BINFO_OFFSET_ZEROP (thunk_binfo)))
 	    {
 	      tree offset = convert (ssizetype, BINFO_OFFSET (thunk_binfo));
 
@@ -5025,7 +5030,9 @@ finish_struct_1 (tree t)
   /* Build the VTT for T.  */
   build_vtt (t);
 
-  if (warn_nonvdtor && TYPE_POLYMORPHIC_P (t))
+  /* This warning does not make sense for Java classes, since they
+     cannot have destructors.  */
+  if (!TYPE_FOR_JAVA (t) && warn_nonvdtor && TYPE_POLYMORPHIC_P (t))
     {
       tree dtor;
 
@@ -7712,6 +7719,8 @@ cp_fold_obj_type_ref (tree ref, tree known_type)
   gcc_assert (tree_int_cst_equal (OBJ_TYPE_REF_TOKEN (ref),
 				  DECL_VINDEX (fndecl)));
 #endif
+
+  cgraph_node (fndecl)->local.vtable_method = true;
 
   return build_address (fndecl);
 }

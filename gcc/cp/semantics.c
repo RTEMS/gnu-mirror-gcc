@@ -1523,6 +1523,9 @@ finish_stmt_expr_expr (tree expr, tree stmt_expr)
 {
   tree result = NULL_TREE;
 
+  if (error_operand_p (expr))
+    return error_mark_node;
+  
   if (expr)
     {
       if (!processing_template_decl && !VOID_TYPE_P (TREE_TYPE (expr)))
@@ -1993,7 +1996,8 @@ finish_compound_literal (tree type, tree initializer_list)
 
 	 implies that the array has two elements.  */
       if (TREE_CODE (type) == ARRAY_TYPE && !COMPLETE_TYPE_P (type))
-	complete_array_type (type, compound_literal, 1);
+	cp_complete_array_type (&TREE_TYPE (compound_literal),
+				compound_literal, 1);
     }
 
   return compound_literal;
@@ -2122,7 +2126,7 @@ begin_class_definition (tree t)
   if (t == error_mark_node || ! IS_AGGR_TYPE (t))
     {
       t = make_aggr_type (RECORD_TYPE);
-      pushtag (make_anon_name (), t, 0);
+      pushtag (make_anon_name (), t, /*tag_scope=*/ts_current);
     }
 
   /* Update the location of the decl.  */
@@ -2131,7 +2135,7 @@ begin_class_definition (tree t)
   if (TYPE_BEING_DEFINED (t))
     {
       t = make_aggr_type (TREE_CODE (t));
-      pushtag (TYPE_IDENTIFIER (t), t, 0);
+      pushtag (TYPE_IDENTIFIER (t), t, /*tag_scope=*/ts_current);
     }
   maybe_process_partial_specialization (t);
   pushclass (t);

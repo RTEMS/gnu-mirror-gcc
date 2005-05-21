@@ -244,14 +244,18 @@ namespace gcj
 
   /* Print out class names as they are initialized. */
   extern bool verbose_class_flag;
+  
+  /* When true, enable the bytecode verifier and BC-ABI verification. */
+  extern bool verifyClasses;
 }
 
 // This class handles all aspects of class preparation and linking.
 class _Jv_Linker
 {
 private:
-  static _Jv_Field *find_field_helper(jclass, _Jv_Utf8Const *, jclass *);
-  static _Jv_Field *find_field(jclass, jclass, _Jv_Utf8Const *,
+  static _Jv_Field *find_field_helper(jclass, _Jv_Utf8Const *, _Jv_Utf8Const *,
+				      jclass *);
+  static _Jv_Field *find_field(jclass, jclass, jclass *, _Jv_Utf8Const *,
 			       _Jv_Utf8Const *);
   static void prepare_constant_time_tables(jclass);
   static jshort get_interfaces(jclass, _Jv_ifaces *);
@@ -372,6 +376,9 @@ void _Jv_SetMaximumHeapSize (const char *arg);
 extern "C" void JvRunMain (jclass klass, int argc, const char **argv);
 void _Jv_RunMain (jclass klass, const char *name, int argc, const char **argv, 
 		  bool is_jar);
+
+void _Jv_RunMain (struct _Jv_VMInitArgs *vm_args, jclass klass,
+                  const char *name, int argc, const char **argv, bool is_jar);
 
 // Delayed until after _Jv_AllocBytes is declared.
 //
@@ -583,6 +590,15 @@ _Jv_CheckABIVersion (unsigned long value)
   // well.)
   return (value == GCJ_VERSION
 	  || value == (GCJ_VERSION + GCJ_BINARYCOMPAT_ADDITION));
+}
+
+// It makes the source cleaner if we simply always define this
+// function.  If the interpreter is not built, it will never return
+// 'true'.
+extern inline jboolean
+_Jv_IsInterpretedClass (jclass c)
+{
+  return (c->accflags & java::lang::reflect::Modifier::INTERPRETED) != 0;
 }
 
 #endif /* __JAVA_JVM_H__ */
