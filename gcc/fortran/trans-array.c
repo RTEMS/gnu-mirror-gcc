@@ -99,43 +99,6 @@ static gfc_ss *gfc_walk_subexpr (gfc_ss *, gfc_expr *);
 static gfc_ss gfc_ss_terminator_var;
 gfc_ss * const gfc_ss_terminator = &gfc_ss_terminator_var;
 
-unsigned HOST_WIDE_INT gfc_stack_space_left;
-
-
-/* Returns true if a variable of specified size should go on the stack.  */
-
-int
-gfc_can_put_var_on_stack (tree size)
-{
-  unsigned HOST_WIDE_INT low;
-
-  if (!INTEGER_CST_P (size))
-    return 0;
-
-  if (gfc_option.flag_max_stack_var_size < 0)
-    return 1;
-
-  if (TREE_INT_CST_HIGH (size) != 0)
-    return 0;
-
-  low = TREE_INT_CST_LOW (size);
-  if (low > (unsigned HOST_WIDE_INT) gfc_option.flag_max_stack_var_size)
-    return 0;
-
-/* TODO: Set a per-function stack size limit.  */
-#if 0
-  /* We should be a bit more clever with array temps.  */
-  if (gfc_option.flag_max_function_vars_size >= 0)
-    {
-      if (low > gfc_stack_space_left)
-	return 0;
-
-      gfc_stack_space_left -= low;
-    }
-#endif
-
-  return 1;
-}
 
 static tree
 gfc_array_dataptr_type (tree desc)
@@ -3410,7 +3373,9 @@ gfc_trans_dummy_array_bias (gfc_symbol * sym, tree tmpdesc, tree body)
 
   /* Only do the entry/initialization code if the arg is present.  */
   dumdesc = GFC_DECL_SAVED_DESCRIPTOR (tmpdesc);
-  optional_arg = sym->attr.optional || sym->ns->proc_name->attr.entry_master;
+  optional_arg = (sym->attr.optional
+		  || (sym->ns->proc_name->attr.entry_master
+		      && sym->attr.dummy));
   if (optional_arg)
     {
       tmp = gfc_conv_expr_present (sym);
@@ -4035,7 +4000,8 @@ gfc_trans_deferred_array (gfc_symbol * sym, tree body)
       deallocate = gfc_array_deallocate (descriptor);
 
       tmp = gfc_conv_descriptor_data (descriptor);
-      tmp = build2 (NE_EXPR, boolean_type_node, tmp, integer_zero_node);
+      tmp = build2 (NE_EXPR, boolean_type_node, tmp, 
+		    build_int_cst (TREE_TYPE (tmp), 0));
       tmp = build3_v (COND_EXPR, tmp, deallocate, build_empty_stmt ());
       gfc_add_expr_to_block (&block, tmp);
 

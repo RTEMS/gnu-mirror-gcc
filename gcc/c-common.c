@@ -284,6 +284,12 @@ int warn_unknown_pragmas; /* Tri state variable.  */
 
 int warn_format;
 
+/* Warn about using __null (as NULL in C++) as sentinel.  For code compiled
+   with GCC this doesn't matter as __null is guaranteed to have the right
+   size.  */
+
+int warn_strict_null_sentinel;
+
 /* Zero means that faster, ...NonNil variants of objc_msgSend...
    calls will be used in ObjC; passing nil receivers to such calls
    will most likely result in crashes.  */
@@ -2319,33 +2325,33 @@ pointer_int_sum (enum tree_code resultcode, tree ptrop, tree intop)
 tree
 c_common_truthvalue_conversion (tree expr)
 {
-  if (TREE_CODE (expr) == ERROR_MARK)
-    return expr;
-
-  if (TREE_CODE (expr) == FUNCTION_DECL)
-    expr = build_unary_op (ADDR_EXPR, expr, 0);
-
   switch (TREE_CODE (expr))
     {
     case EQ_EXPR:   case NE_EXPR:   case UNEQ_EXPR: case LTGT_EXPR:
     case LE_EXPR:   case GE_EXPR:   case LT_EXPR:   case GT_EXPR:
     case UNLE_EXPR: case UNGE_EXPR: case UNLT_EXPR: case UNGT_EXPR:
     case ORDERED_EXPR: case UNORDERED_EXPR:
+      if (TREE_TYPE (expr) == truthvalue_type_node)
+	return expr;
+      return build2 (TREE_CODE (expr), truthvalue_type_node,
+		     TREE_OPERAND (expr, 0), TREE_OPERAND (expr, 1));
+
     case TRUTH_ANDIF_EXPR:
     case TRUTH_ORIF_EXPR:
     case TRUTH_AND_EXPR:
     case TRUTH_OR_EXPR:
     case TRUTH_XOR_EXPR:
-      if (TREE_TYPE (expr) != truthvalue_type_node)
-	return build2 (TREE_CODE (expr), truthvalue_type_node,
-		       TREE_OPERAND (expr, 0), TREE_OPERAND (expr, 1));
-      return expr;
+      if (TREE_TYPE (expr) == truthvalue_type_node)
+	return expr;
+      return build2 (TREE_CODE (expr), truthvalue_type_node,
+		 lang_hooks.truthvalue_conversion (TREE_OPERAND (expr, 0)),
+		 lang_hooks.truthvalue_conversion (TREE_OPERAND (expr, 1)));
 
     case TRUTH_NOT_EXPR:
-      if (TREE_TYPE (expr) != truthvalue_type_node)
-	return build1 (TREE_CODE (expr), truthvalue_type_node,
-		       TREE_OPERAND (expr, 0));
-      return expr;
+      if (TREE_TYPE (expr) == truthvalue_type_node)
+	return expr;
+      return build1 (TREE_CODE (expr), truthvalue_type_node,
+		 lang_hooks.truthvalue_conversion (TREE_OPERAND (expr, 0)));
 
     case ERROR_MARK:
       return expr;
@@ -2360,6 +2366,10 @@ c_common_truthvalue_conversion (tree expr)
       return real_compare (NE_EXPR, &TREE_REAL_CST (expr), &dconst0)
 	     ? truthvalue_true_node
 	     : truthvalue_false_node;
+
+    case FUNCTION_DECL:
+      expr = build_unary_op (ADDR_EXPR, expr, 0);
+      /* Fall through.  */
 
     case ADDR_EXPR:
       {
@@ -3265,6 +3275,11 @@ c_common_nodes_and_builtins (void)
     mudflap_init ();
 
   main_identifier_node = get_identifier ("main");
+
+  /* Create the built-in __null node.  It is important that this is
+     not shared.  */
+  null_node = make_node (INTEGER_CST);
+  TREE_TYPE (null_node) = c_common_type_for_size (POINTER_SIZE, 0);
 }
 
 /* Look up the function in built_in_decls that corresponds to DECL
@@ -5111,8 +5126,15 @@ check_function_sentinel (tree attrs, tree params)
 	    }
 
 	  /* Validate the sentinel.  */
-	  if (!POINTER_TYPE_P (TREE_TYPE (TREE_VALUE (sentinel)))
-	      || !integer_zerop (TREE_VALUE (sentinel)))
+	  if ((!POINTER_TYPE_P (TREE_TYPE (TREE_VALUE (sentinel)))
+	       || !integer_zerop (TREE_VALUE (sentinel)))
+	      /* Although __null (in C++) is only an integer we allow it
+		 nevertheless, as we are guaranteed that it's exactly
+		 as wide as a pointer, and we don't want to force
+		 users to cast the NULL they have written there.
+		 We warn with -Wstrict-null-sentinel, though.  */
+              && (warn_strict_null_sentinel
+		  || null_node != TREE_VALUE (sentinel)))
 	    warning ("missing sentinel in function call");
 	}
     }
@@ -5744,6 +5766,95 @@ lvalue_or_else (tree ref, enum lvalue_use use)
     }
 
   return win;
+}
+
+/* *PTYPE is an incomplete array.  Complete it with a domain based on
+   INITIAL_VALUE.  If INITIAL_VALUE is not present, use 1 if DO_DEFAULT
+   is true.  Return 0 if successful, 1 if INITIAL_VALUE can't be deciphered,
+   2 if INITIAL_VALUE was NULL, and 3 if INITIAL_VALUE was empty.  */
+
+int
+complete_array_type (tree *ptype, tree initial_value, bool do_default)
+{
+  tree maxindex, type, main_type, elt, unqual_elt;
+  int failure = 0, quals;
+
+  maxindex = size_zero_node;
+  if (initial_value)
+    {
+      if (TREE_CODE (initial_value) == STRING_CST)
+	{
+	  int eltsize
+	    = int_size_in_bytes (TREE_TYPE (TREE_TYPE (initial_value)));
+	  maxindex = size_int (TREE_STRING_LENGTH (initial_value)/eltsize - 1);
+	}
+      else if (TREE_CODE (initial_value) == CONSTRUCTOR)
+	{
+	  tree elts = CONSTRUCTOR_ELTS (initial_value);
+
+	  if (elts == NULL)
+	    {
+	      if (pedantic)
+		failure = 3;
+	      maxindex = integer_minus_one_node;
+	    }
+	  else
+	    {
+	      tree curindex;
+
+	      if (TREE_PURPOSE (elts))
+		maxindex = fold_convert (sizetype, TREE_PURPOSE (elts));
+	      curindex = maxindex;
+
+	      for (elts = TREE_CHAIN (elts); elts; elts = TREE_CHAIN (elts))
+		{
+		  if (TREE_PURPOSE (elts))
+		    curindex = fold_convert (sizetype, TREE_PURPOSE (elts));
+		  else
+		    curindex = size_binop (PLUS_EXPR, curindex, size_one_node);
+
+		  if (tree_int_cst_lt (maxindex, curindex))
+		    maxindex = curindex;
+		}
+	    }
+	}
+      else
+	{
+	  /* Make an error message unless that happened already.  */
+	  if (initial_value != error_mark_node)
+	    failure = 1;
+	}
+    }
+  else
+    {
+      failure = 2;
+      if (!do_default)
+	return failure;
+    }
+
+  type = *ptype;
+  elt = TREE_TYPE (type);
+  quals = TYPE_QUALS (strip_array_types (elt));
+  if (quals == 0)
+    unqual_elt = elt;
+  else
+    unqual_elt = c_build_qualified_type (elt, TYPE_UNQUALIFIED);
+
+  /* Using build_distinct_type_copy and modifying things afterward instead
+     of using build_array_type to create a new type preserves all of the
+     TYPE_LANG_FLAG_? bits that the front end may have set.  */
+  main_type = build_distinct_type_copy (TYPE_MAIN_VARIANT (type));
+  TREE_TYPE (main_type) = unqual_elt;
+  TYPE_DOMAIN (main_type) = build_index_type (maxindex);
+  layout_type (main_type);
+
+  if (quals == 0)
+    type = main_type;
+  else
+    type = c_build_qualified_type (main_type, quals);
+
+  *ptype = type;
+  return failure;
 }
 
 #include "gt-c-common.h"
