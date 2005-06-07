@@ -1,7 +1,7 @@
 /* Collect static initialization info into data structures that can be
    traversed by C++ initialization and finalization routines.
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
    Contributed by Chris Smith (csmith@convex.com).
    Heavily modified by Michael Meissner (meissner@cygnus.com),
    Per Bothner (bothner@cygnus.com), and John Gilmore (gnu@cygnus.com).
@@ -189,6 +189,7 @@ static int strip_flag;			/* true if -s */
 #ifdef COLLECT_EXPORT_LIST
 static int export_flag;                 /* true if -bE */
 static int aix64_flag;			/* true if -b64 */
+static int aixrtl_flag;			/* true if -brtl */
 #endif
 
 int debug;				/* true if -debug */
@@ -246,7 +247,6 @@ static struct path_prefix cmdline_lib_dirs; /* directories specified with -L */
 static struct path_prefix libpath_lib_dirs; /* directories in LIBPATH */
 static struct path_prefix *libpaths[3] = {&cmdline_lib_dirs,
 					  &libpath_lib_dirs, NULL};
-static const char *const libexts[3] = {"a", "so", NULL};  /* possible library extensions */
 #endif
 
 static void handler (int);
@@ -1080,6 +1080,8 @@ main (int argc, char **argv)
                 export_flag = 1;
 	      else if (arg[2] == '6' && arg[3] == '4')
 		aix64_flag = 1;
+	      else if (arg[2] == 'r' && arg[3] == 't' && arg[4] == 'l')
+		aixrtl_flag = 1;
 	      break;
 #endif
 
@@ -1398,10 +1400,12 @@ main (int argc, char **argv)
       if (! exports.first)
 	*ld2++ = concat ("-bE:", export_file, NULL);
 
+#ifndef LD_INIT_SWITCH
       add_to_list (&exports, initname);
       add_to_list (&exports, fininame);
       add_to_list (&exports, "_GLOBAL__DI");
       add_to_list (&exports, "_GLOBAL__DD");
+#endif
       exportf = fopen (export_file, "w");
       if (exportf == (FILE *) 0)
 	fatal_perror ("fopen %s", export_file);
@@ -2719,7 +2723,7 @@ scan_prog_file (const char *prog_name, enum pass which_pass)
 			case 1:
 			  if (! is_shared)
 			    add_to_list (&constructors, name);
-#ifdef COLLECT_EXPORT_LIST
+#if defined (COLLECT_EXPORT_LIST) && !defined (LD_INIT_SWITCH)
 			  if (which_pass == PASS_OBJ)
 			    add_to_list (&exports, name);
 #endif
@@ -2728,7 +2732,7 @@ scan_prog_file (const char *prog_name, enum pass which_pass)
 			case 2:
 			  if (! is_shared)
 			    add_to_list (&destructors, name);
-#ifdef COLLECT_EXPORT_LIST
+#if defined (COLLECT_EXPORT_LIST) && !defined (LD_INIT_SWITCH)
 			  if (which_pass == PASS_OBJ)
 			    add_to_list (&exports, name);
 #endif
@@ -2753,7 +2757,7 @@ scan_prog_file (const char *prog_name, enum pass which_pass)
 			case 5:
 			  if (! is_shared)
 			    add_to_list (&frame_tables, name);
-#ifdef COLLECT_EXPORT_LIST
+#if defined (COLLECT_EXPORT_LIST) && !defined (LD_INIT_SWITCH)
 			  if (which_pass == PASS_OBJ)
 			    add_to_list (&exports, name);
 #endif
@@ -2761,13 +2765,14 @@ scan_prog_file (const char *prog_name, enum pass which_pass)
 
 			default:	/* not a constructor or destructor */
 #ifdef COLLECT_EXPORT_LIST
-			  /* If we are building a shared object on AIX we need
-			     to explicitly export all global symbols.  */
-			  if (shared_obj)
-			    {
-			      if (which_pass == PASS_OBJ && (! export_flag))
-				add_to_list (&exports, name);
-			    }
+			  /* Explicitly export all global symbols when
+			     building a shared object on AIX, but do not
+			     re-export symbols from another shared object
+			     and do not export symbols if the user
+			     provides an explicit export list.  */
+			  if (shared_obj && !is_shared
+			      && which_pass == PASS_OBJ && !export_flag)
+			    add_to_list (&exports, name);
 #endif
 			  continue;
 			}
@@ -2820,6 +2825,8 @@ resolve_lib_name (const char *name)
 {
   char *lib_buf;
   int i, j, l = 0;
+  /* Library extensions for AIX dynamic linking.  */
+  const char * const libexts[2] = {"a", "so"};
 
   for (i = 0; libpaths[i]; i++)
     if (libpaths[i]->max_len > l)
@@ -2838,14 +2845,15 @@ resolve_lib_name (const char *name)
 	  const char *p = "";
 	  if (list->prefix[strlen(list->prefix)-1] != '/')
 	    p = "/";
-	  for (j = 0; libexts[j]; j++)
+	  for (j = 0; j < 2; j++)
 	    {
 	      sprintf (lib_buf, "%s%slib%s.%s",
-		       list->prefix, p, name, libexts[j]);
-if (debug) fprintf (stderr, "searching for: %s\n", lib_buf);
+		       list->prefix, p, name,
+		       libexts[(j + aixrtl_flag) % 2]);
+	      if (debug) fprintf (stderr, "searching for: %s\n", lib_buf);
 	      if (file_exists (lib_buf))
 		{
-if (debug) fprintf (stderr, "found: %s\n", lib_buf);
+		  if (debug) fprintf (stderr, "found: %s\n", lib_buf);
 		  return (lib_buf);
 		}
 	    }
