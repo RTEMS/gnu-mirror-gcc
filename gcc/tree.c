@@ -243,6 +243,10 @@ tree_size (tree node)
       return (sizeof (struct tree_phi_node)
 	      + (PHI_ARG_CAPACITY (node) - 1) * sizeof (struct phi_arg_d));
 
+    case TREE_BINFO:
+      return (offsetof (struct tree_binfo, base_binfos)
+	      + VEC_embedded_size (tree, BINFO_N_BASE_BINFOS (node)));
+
     case TREE_VEC:
       return (sizeof (struct tree_vec)
 	      + (TREE_VEC_LENGTH (node) - 1) * sizeof(char *));
@@ -4726,7 +4730,8 @@ get_unwidened (tree op, tree for_type)
        && TYPE_UNSIGNED (type));
   tree win = op;
 
-  while (TREE_CODE (op) == NOP_EXPR)
+  while (TREE_CODE (op) == NOP_EXPR
+	 || TREE_CODE (op) == CONVERT_EXPR)
     {
       int bitschange
 	= TYPE_PRECISION (TREE_TYPE (op))
@@ -4756,7 +4761,9 @@ get_unwidened (tree op, tree for_type)
 	  /* TYPE_UNSIGNED says whether this is a zero-extension.
 	     Let's avoid computing it if it does not affect WIN
 	     and if UNS will not be needed again.  */
-	  if ((uns || TREE_CODE (op) == NOP_EXPR)
+	  if ((uns
+	       || TREE_CODE (op) == NOP_EXPR
+	       || TREE_CODE (op) == CONVERT_EXPR)
 	      && TYPE_UNSIGNED (TREE_TYPE (op)))
 	    {
 	      uns = 1;
@@ -5842,7 +5849,7 @@ build_common_builtin_nodes (void)
       tmp = tree_cons (NULL_TREE, size_type_node, void_list_node);
       tmp = tree_cons (NULL_TREE, const_ptr_type_node, tmp);
       tmp = tree_cons (NULL_TREE, const_ptr_type_node, tmp);
-      ftype = build_function_type (ptr_type_node, tmp);
+      ftype = build_function_type (integer_type_node, tmp);
       local_define_builtin ("__builtin_memcmp", ftype, BUILT_IN_MEMCMP,
 			    "memcmp", ECF_PURE | ECF_NOTHROW);
     }
