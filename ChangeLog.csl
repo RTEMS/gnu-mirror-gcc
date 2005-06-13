@@ -1,0 +1,36 @@
+2005-06-13  Mark Mitchell  <mark@codesourcery.com>
+
+	* gcc/config.gcc (i[34567]86-wrs-linux*): Build a bi-arch
+	compiler.
+	* gcc/config/i386/x86-64.h (ASM_SPEC): Explicitly pass --64 to the
+	assembler in 64-bit mode.
+
+2005-05-09  Mark Mitchell  <mark@codesourcery.com>
+
+	PR 18655
+	* dwarf2out.c (output_call_frame_info): Use DWARF2_FRAME_REG_OUT
+	before outputting DWARF_FRAME_RETURN_COLUMN.
+
+2005-03-30  Mark Mitchell <mark@codesourcery.com>
+
+	Merge to merge-csl-arm-csl_3_4_3-linux-1.
+	
+2005-03-23  Mark Mitchell <mark@codesourcery.com>
+
+	Backport from mainline:
+	2005-03-23  Mark Mitchell  <mark@codesourcery.com>
+	* testsuite/lib/libstdc++.exp (libstdc++_init): Improve handling
+	of compilers not in the build directory.
+	(libstdc++_wchar_t): New variable.
+	(libstdc++_threads): Likewise.
+	(libstdc++_test_objs): Likewise.
+	(v3_target_compile): Use libstdc++_test_objs.
+	(v3-list-tests): Remove.
+	(listdc++_build_support): New function.
+	* testsuite/libstdc++-dg/normal.exp: Rework to dynamically
+	generate list of tests.
+
+2005-01-31  Mark Mitchell <mark@codesourcery.com>
+
+	* libiberty/pex-unix.c (pexecute): Set last_pipe_input to -1 at
+	the end of the pipeline.

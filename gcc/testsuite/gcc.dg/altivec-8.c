@@ -1,8 +1,9 @@
 /* Origin: Aldy Hernandez  <aldyh@redhat.com>  */
 /* Test rs6000_legitimate_address.  PRE_INC should be invalid.  */
 
-/* { dg-do compile { target powerpc-*-* } } */
-/* { dg-options "-maltivec" } */
+/* { dg-do compile { target powerpc*-*-* } } */
+/* { dg-xfail-if "" { "powerpc-ibm-aix*" } { "-maltivec" } { "" } } */
+/* { dg-options "-mcpu=7400 -maltivec" } */
 
 #include <altivec.h>
 

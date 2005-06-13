@@ -73,10 +73,7 @@ Boston, MA 02111-1307, USA.  */
 #define TARGET_OS_CPP_BUILTINS()		\
   do						\
     {						\
-	builtin_define_std ("linux");		\
-	builtin_define_std ("unix");		\
-	builtin_define ("__gnu_linux__");	\
-	builtin_assert ("system=posix");	\
+	LINUX_TARGET_OS_CPP_BUILTINS();		\
 	if (flag_pic)				\
 	  {					\
 	    builtin_define ("__PIC__");		\
@@ -216,7 +213,9 @@ Boston, MA 02111-1307, USA.  */
    signal-turned-exceptions for them.  There's also no configure-run for
    the target, so we can't check on (e.g.) HAVE_SYS_UCONTEXT_H.  Using the
    target libc1 macro should be enough.  */
-#if !(defined (USE_GNULIBC_1) || (__GLIBC__ == 2 && __GLIBC_MINOR__ == 0))
+#if !(defined (USE_GNULIBC_1) 				\
+      || (__GLIBC__ == 2 && __GLIBC_MINOR__ == 0)	\
+      || defined(inhibit_libc))
 #include <signal.h>
 #include <sys/ucontext.h>
 
