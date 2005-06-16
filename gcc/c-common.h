@@ -160,6 +160,8 @@ enum c_tree_index
     
     CTI_VOID_ZERO,
 
+    CTI_NULL,
+
     CTI_MAX
 };
 
@@ -203,6 +205,9 @@ struct c_common_identifier GTY(())
 
 /* A node for `((void) 0)'.  */
 #define void_zero_node                  c_global_trees[CTI_VOID_ZERO]
+
+/* The node for C++ `__null'.  */
+#define null_node                       c_global_trees[CTI_NULL]
 
 extern GTY(()) tree c_global_trees[CTI_MAX];
 
@@ -575,6 +580,12 @@ extern int flag_threadsafe_statics;
 
 extern int warn_implicit;
 
+/* Warn about using __null (as NULL in C++) as sentinel.  For code compiled
+   with GCC this doesn't matter as __null is guaranteed to have the right
+   size.  */
+
+extern int warn_strict_null_sentinel;
+
 /* Maximum template instantiation depth.  This limit is rather
    arbitrary, but it exists to limit the time it takes to notice
    infinite template instantiations.  */
@@ -888,6 +899,8 @@ enum lvalue_use {
 };
 
 extern int lvalue_or_else (tree, enum lvalue_use);
+
+extern int complete_array_type (tree *, tree, bool);
 
 /* In c-gimplify.c  */
 extern void c_genericize (tree);

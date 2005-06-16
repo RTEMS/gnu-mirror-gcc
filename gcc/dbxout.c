@@ -378,7 +378,8 @@ const struct gcc_debug_hooks dbx_debug_hooks =
   debug_nothing_tree,		         /* outlining_inline_function */
   debug_nothing_rtx,		         /* label */
   dbxout_handle_pch,		         /* handle_pch */
-  debug_nothing_rtx		         /* var_location */
+  debug_nothing_rtx,		         /* var_location */
+  0                                      /* start_end_main_source_file */
 };
 #endif /* DBX_DEBUGGING_INFO  */
 
@@ -408,7 +409,8 @@ const struct gcc_debug_hooks xcoff_debug_hooks =
   debug_nothing_tree,		         /* outlining_inline_function */
   debug_nothing_rtx,		         /* label */
   dbxout_handle_pch,		         /* handle_pch */
-  debug_nothing_rtx		         /* var_location */
+  debug_nothing_rtx,		         /* var_location */
+  0                                      /* start_end_main_source_file */
 };
 #endif /* XCOFF_DEBUGGING_INFO  */
 
@@ -1388,14 +1390,14 @@ dbxout_type_fields (tree type)
 
       /* Omit here local type decls until we know how to support them.  */
       if (TREE_CODE (tem) == TYPE_DECL
+	  /* Omit here the nameless fields that are used to skip bits.  */
+	  || DECL_IGNORED_P (tem)
 	  /* Omit fields whose position or size are variable or too large to
 	     represent.  */
 	  || (TREE_CODE (tem) == FIELD_DECL
 	      && (! host_integerp (bit_position (tem), 0)
 		  || ! DECL_SIZE (tem)
-		  || ! host_integerp (DECL_SIZE (tem), 1)))
-	  /* Omit here the nameless fields that are used to skip bits.  */
-	   || DECL_IGNORED_P (tem))
+		  || ! host_integerp (DECL_SIZE (tem), 1))))
 	continue;
 
       else if (TREE_CODE (tem) != CONST_DECL)
