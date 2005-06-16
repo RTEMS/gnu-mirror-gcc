@@ -495,11 +495,34 @@ if test -z "$show_help"; then
     # Only attempt this if the compiler in the base compile
     # command doesn't match the default compiler.
     if test -n "$available_tags" && test -z "$tagname"; then
+      # APPLE LOCAL begin handle ~ in pathnames 2002-01-14 --sts
+      # Since CC may have args with shell metachars in them, add
+      # doublequotes to args so it looks the same as $base_compile.
+      qCC=
+      for argu in $CC; do
+	case $argu in
+	# Double-quote args containing other shell metacharacters.
+	# Many Bourne shells cannot handle close brackets correctly
+	# in scan sets, so we specify it separately.
+	*[\[\~\#\^\&\*\(\)\{\}\|\;\<\>\?\'\ \	]*|*]*|"")
+	  argu="\"$argu\""
+	  ;;
+	esac
+        # Add the previous argument to qCC.
+        if test -z "$qCC"; then
+	  qCC="$argu"
+        else
+	  qCC="$qCC $argu"
+        fi
+      done
+      # APPLE LOCAL end handle ~ in pathnames 2002-01-14 --sts 
       case $base_compile in
-      "$CC "*) ;;
+      # APPLE LOCAL handle ~ in pathnames 2002-01-14 --sts 
+      "$qCC "*) ;;
       # Blanks in the command may have been stripped by the calling shell,
       # but not from the CC environment variable when ltconfig was run.
-      "`$echo $CC` "*) ;;
+      # APPLE LOCAL handle ~ in pathnames 2002-01-14 --sts 
+      "`$echo $qCC` "*) ;;
       *)
         for z in $available_tags; do
           if grep "^### BEGIN LIBTOOL TAG CONFIG: $z$" < "$0" > /dev/null; then
@@ -4307,6 +4330,63 @@ fi\
 #	  fi
 #	done
 
+	# POSIX demands no paths to be encoded in archives.  We have
+	# to avoid creating archives with duplicate basenames if we
+	# might have to extract them afterwards, e.g., when creating a
+	# static archive out of a convenience library, or when linking
+	# the entirety of a libtool archive into another (currently
+	# not supported by libtool).
+        if (for obj in $oldobjs
+	    do
+	      $echo "X$obj" | $Xsed -e 's%^.*/%%'
+	    done | sort | sort -uc >/dev/null 2>&1); then
+	  :
+	else
+	  $echo "copying selected object files to avoid basename conflicts..."
+
+	  if test -z "$gentop"; then
+	    gentop="$output_objdir/${outputname}x"
+
+	    $show "${rm}r $gentop"
+	    $run ${rm}r "$gentop"
+	    $show "$mkdir $gentop"
+	    $run $mkdir "$gentop"
+	    status=$?
+	    if test $status -ne 0 && test ! -d "$gentop"; then
+	      exit $status
+	    fi
+	    generated="$generated $gentop"
+	  fi
+
+	  save_oldobjs=$oldobjs
+	  oldobjs=
+	  counter=1
+	  for obj in $save_oldobjs
+	  do
+	    objbase=`$echo "X$obj" | $Xsed -e 's%^.*/%%'`
+	    case " $oldobjs " in
+	    " ") oldobjs=$obj ;;
+	    *[\ /]"$objbase "*)
+	      while :; do
+		# Make sure we don't pick an alternate name that also
+		# overlaps.
+	        newobj=lt$counter-$objbase
+	        counter=`expr $counter + 1`
+		case " $oldobjs " in
+		*[\ /]"$newobj "*) ;;
+		*) if test ! -f "$gentop/$newobj"; then break; fi ;;
+		esac
+	      done
+	      $show "ln $obj $gentop/$newobj || cp $obj $gentop/$newobj"
+	      $run ln "$obj" "$gentop/$newobj" ||
+	      $run cp "$obj" "$gentop/$newobj"
+	      oldobjs="$oldobjs $gentop/$newobj"
+	      ;;
+	    *) oldobjs="$oldobjs $obj" ;;
+	    esac
+	  done
+	fi
+
         eval cmds=\"$old_archive_cmds\"
 
         if len=`expr "X$cmds" : ".*"` &&
@@ -4320,20 +4400,7 @@ fi\
           objlist=
           concat_cmds=
           save_oldobjs=$oldobjs
-	  # GNU ar 2.10+ was changed to match POSIX; thus no paths are
-	  # encoded into archives.  This makes 'ar r' malfunction in
-	  # this piecewise linking case whenever conflicting object
-	  # names appear in distinct ar calls; check, warn and compensate.
-          if (for obj in $save_oldobjs
-	    do
-	      $echo "X$obj" | $Xsed -e 's%^.*/%%'
-	    done | sort | sort -uc >/dev/null 2>&1); then
-	    :
-	  else
-	    $echo "$modename: warning: object name conflicts; overriding AR_FLAGS to 'cq'" 1>&2
-	    $echo "$modename: warning: to ensure that POSIX-compatible ar will work" 1>&2
-	    AR_FLAGS=cq
-	  fi
+
           for obj in $save_oldobjs
           do
             oldobjs="$objlist $obj"
@@ -4923,7 +4990,8 @@ relink_command=\"$relink_command\""
 
       # Do each command in the postinstall commands.
       eval cmds=\"$old_postinstall_cmds\"
-      IFS="${IFS= 	}"; save_ifs="$IFS"; IFS='~'
+      # APPLE LOCAL handle ~ in pathnames 2002-01-14 --sts
+      IFS="${IFS= 	}"; save_ifs="$IFS"; IFS='@'
       for cmd in $cmds; do
 	IFS="$save_ifs"
 	$show "$cmd"

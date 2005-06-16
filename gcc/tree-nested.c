@@ -411,7 +411,8 @@ get_trampoline_type (void)
 
   /* If we won't be able to guarantee alignment simply via TYPE_ALIGN,
      then allocate extra space so that we can do dynamic alignment.  */
-  if (align > STACK_BOUNDARY)
+  /* APPLE LOCAL STACK_BOUNDARY must be a signed expression on Darwin/x86 */
+  if (align > (unsigned int) STACK_BOUNDARY)
     {
       size += ((align/BITS_PER_UNIT) - 1) & -(STACK_BOUNDARY/BITS_PER_UNIT);
       align = STACK_BOUNDARY;
@@ -1303,8 +1304,15 @@ finalize_nesting_tree_1 (struct nesting_info *root)
      out at this time.  */
   if (root->frame_type)
     {
+      /* APPLE LOCAL begin mainline 4137012 */
+      /* In some cases the frame type will trigger the -Wpadded warning.
+	 This is not helpful; suppress it. */
+      int save_warn_padded = warn_padded;
+      warn_padded = 0;
       layout_type (root->frame_type);
+      warn_padded = save_warn_padded;
       layout_decl (root->frame_decl, 0);
+      /* APPLE LOCAL end mainline 4137012 */
     }
 
   /* If any parameters were referenced non-locally, then we need to 
