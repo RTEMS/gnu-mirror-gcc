@@ -1708,6 +1708,7 @@ expand_builtin_mathfn (tree exp, rtx target, rtx subtarget)
       narg = save_expr (arg);
       if (narg != arg)
 	{
+	  arg = narg;
 	  arglist = build_tree_list (NULL_TREE, arg);
 	  exp = build_function_call_expr (fndecl, arglist);
 	}
@@ -1840,6 +1841,7 @@ expand_builtin_mathfn_2 (tree exp, rtx target, rtx subtarget)
   narg = save_expr (arg1);
   if (narg != arg1)
     {
+      arg1 = narg;
       temp = build_tree_list (NULL_TREE, narg);
       stable = false;
     }
@@ -1849,6 +1851,7 @@ expand_builtin_mathfn_2 (tree exp, rtx target, rtx subtarget)
   narg = save_expr (arg0);
   if (narg != arg0)
     {
+      arg0 = narg;
       arglist = tree_cons (NULL_TREE, narg, temp);
       stable = false;
     }
@@ -4131,6 +4134,7 @@ expand_builtin_va_arg (tree valist, tree type)
 
       /* We can, however, treat "undefined" any way we please.
 	 Call abort to encourage the user to fix the program.  */
+      inform ("if this code is reached, the program will abort");
       expand_builtin_trap ();
 
       /* This is dead code, but go ahead and finish so that the
@@ -4458,7 +4462,7 @@ expand_builtin_expect_jump (tree exp, rtx if_false_label, rtx if_true_label)
   if (TREE_CODE (TREE_TYPE (arg1)) == INTEGER_TYPE
       && (integer_zerop (arg1) || integer_onep (arg1)))
     {
-      rtx insn, drop_through_label;
+      rtx insn, drop_through_label, temp;
 
       /* Expand the jump insns.  */
       start_sequence ();
@@ -4492,16 +4496,16 @@ expand_builtin_expect_jump (tree exp, rtx if_false_label, rtx if_true_label)
 
 	      /* First check if we recognize any of the labels.  */
 	      if (GET_CODE (then_dest) == LABEL_REF
-		  && XEXP (then_dest, 1) == if_true_label)
+		  && XEXP (then_dest, 0) == if_true_label)
 		taken = 1;
 	      else if (GET_CODE (then_dest) == LABEL_REF
-		       && XEXP (then_dest, 1) == if_false_label)
+		       && XEXP (then_dest, 0) == if_false_label)
 		taken = 0;
 	      else if (GET_CODE (else_dest) == LABEL_REF
-		       && XEXP (else_dest, 1) == if_false_label)
+		       && XEXP (else_dest, 0) == if_false_label)
 		taken = 1;
 	      else if (GET_CODE (else_dest) == LABEL_REF
-		       && XEXP (else_dest, 1) == if_true_label)
+		       && XEXP (else_dest, 0) == if_true_label)
 		taken = 0;
 	      /* Otherwise check where we drop through.  */
 	      else if (else_dest == pc_rtx)
@@ -4511,13 +4515,15 @@ expand_builtin_expect_jump (tree exp, rtx if_false_label, rtx if_true_label)
 
 		  if (next && GET_CODE (next) == JUMP_INSN
 		      && any_uncondjump_p (next))
-		    next = XEXP (SET_SRC (pc_set (next)), 1);
+		    temp = XEXP (SET_SRC (pc_set (next)), 0);
+		  else
+		    temp = next;
 
-		  /* NEXT is either a CODE_LABEL, NULL_RTX or something
+		  /* TEMP is either a CODE_LABEL, NULL_RTX or something
 		     else that can't possibly match either target label.  */
-		  if (next == if_false_label)
+		  if (temp == if_false_label)
 		    taken = 1;
-		  else if (next == if_true_label)
+		  else if (temp == if_true_label)
 		    taken = 0;
 		}
 	      else if (then_dest == pc_rtx)
@@ -4527,11 +4533,13 @@ expand_builtin_expect_jump (tree exp, rtx if_false_label, rtx if_true_label)
 
 		  if (next && GET_CODE (next) == JUMP_INSN
 		      && any_uncondjump_p (next))
-		    next = XEXP (SET_SRC (pc_set (next)), 1);
+		    temp = XEXP (SET_SRC (pc_set (next)), 0);
+		  else
+		    temp = next;
 
-		  if (next == if_false_label)
+		  if (temp == if_false_label)
 		    taken = 0;
-		  else if (next == if_true_label)
+		  else if (temp == if_true_label)
 		    taken = 1;
 		}
 
@@ -5431,6 +5439,9 @@ expand_builtin (tree exp, rtx target, rtx subtarget, enum machine_mode mode,
     case BUILT_IN_EH_RETURN_DATA_REGNO:
       return expand_builtin_eh_return_data_regno (arglist);
 #endif
+    case BUILT_IN_EXTEND_POINTER:
+      return expand_builtin_extend_pointer (TREE_VALUE (arglist));
+
     case BUILT_IN_VA_START:
     case BUILT_IN_STDARG_START:
       return expand_builtin_va_start (arglist);
@@ -6573,7 +6584,7 @@ fold_builtin (tree exp)
 	      return build_function_call_expr (expfn, arglist);
 	    }
 
-	  /* Optimize sqrt(pow(x,y)) = pow(x,y*0.5).  */
+	  /* Optimize sqrt(pow(x,y)) = pow(|x|,y*0.5).  */
 	  if (flag_unsafe_math_optimizations
 	      && (fcode == BUILT_IN_POW
 		  || fcode == BUILT_IN_POWF
@@ -6582,8 +6593,11 @@ fold_builtin (tree exp)
 	      tree powfn = TREE_OPERAND (TREE_OPERAND (arg, 0), 0);
 	      tree arg0 = TREE_VALUE (TREE_OPERAND (arg, 1));
 	      tree arg1 = TREE_VALUE (TREE_CHAIN (TREE_OPERAND (arg, 1)));
-	      tree narg1 = fold (build (MULT_EXPR, type, arg1,
-					build_real (type, dconsthalf)));
+	      tree narg1;
+	      if (!tree_expr_nonnegative_p (arg0))
+		arg0 = build1 (ABS_EXPR, type, arg0);
+	      narg1 = fold (build (MULT_EXPR, type, arg1,
+				   build_real (type, dconsthalf)));
 	      arglist = tree_cons (NULL_TREE, arg0,
 				   build_tree_list (NULL_TREE, narg1));
 	      return build_function_call_expr (powfn, arglist);
