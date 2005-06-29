@@ -492,6 +492,14 @@ extern int flag_pie;
 
 extern int flag_shlib;
 
+/* Nonzero if we may use jump tables for switch statements.  */
+
+extern int flag_jump_tables;
+
+/* Nonzero if we may use constant pools.  */
+
+extern int flag_constant_pools;
+
 /* Nonzero means generate extra code for exception handling and enable
    exception handling.  */
 
@@ -698,6 +706,10 @@ extern int flag_eliminate_dwarf2_dups;
 
 extern int flag_eliminate_unused_debug_types;
 
+/* Nonzero means we should use DWARF2 indirect strings when appropriate. */
+
+extern int flag_dwarf2_indirect_strings;
+
 /* Nonzero means to collect statistics which might be expensive
    and to print them when we are done.  */
 extern int flag_detailed_statistics;
@@ -723,6 +735,27 @@ extern int flag_remove_unreachable_functions;
    to make it really random.  */
 
 extern const char *flag_random_seed;
+
+/*  The version of the C++ ABI in use.  The following values are
+    allowed:
+
+    0: The version of the ABI believed most conformant with the 
+       C++ ABI specification.  This ABI may change as bugs are
+       discovered and fixed.  Therefore, 0 will not necessarily
+       indicate the same ABI in different versions of G++.
+
+    1: The version of the ABI first used in G++ 3.2.
+
+    Additional positive integers will be assigned as new versions of
+    the ABI become the default version of the ABI.  */
+
+extern int flag_abi_version;
+
+/* Returns TRUE if generated code should match ABI version N or
+   greater is in use.  */
+
+#define abi_version_at_least(N) \
+  (flag_abi_version == 0 || flag_abi_version >= (N))
 
 /* True if the given mode has a NaN representation and the treatment of
    NaN operands is important.  Certain optimizations, such as folding

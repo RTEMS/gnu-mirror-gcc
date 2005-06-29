@@ -1,5 +1,5 @@
 /* Pragma related interfaces.
-   Copyright (C) 1995, 1998, 1999, 2000, 2001, 2002, 2003
+   Copyright (C) 1995, 1998, 1999, 2000, 2001, 2002, 2003, 2004
    Free Software Foundation, Inc.
 
 This file is part of GCC.
@@ -46,14 +46,18 @@ extern struct cpp_reader* parse_in;
 
 extern void init_pragma (void);
 
-/* Front-end wrapper for pragma registration to avoid dragging
+/* Front-end wrappers for pragma registration to avoid dragging
    cpplib.h in almost everywhere.  */
 extern void c_register_pragma (const char *, const char *,
 			       void (*) (struct cpp_reader *));
+extern void c_register_pragma_with_expansion (const char *, const char *,
+					      void (*) (struct cpp_reader *));
 extern void maybe_apply_pragma_weak (tree);
+extern void maybe_apply_pending_pragma_weaks (void);
 extern tree maybe_apply_renaming_pragma (tree, tree);
 extern void add_to_renaming_pragma_list (tree, tree);
 
 extern int c_lex (tree *);
+extern int c_lex_with_flags (tree *, unsigned char *);
 
 #endif /* GCC_C_PRAGMA_H */

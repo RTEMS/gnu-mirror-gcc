@@ -448,7 +448,8 @@ handle_options (unsigned int argc, const char **argv, unsigned int lang_mask)
       /* Interpret "-" or a non-switch as a file name.  */
       if (opt[0] != '-' || opt[1] == '\0')
 	{
-	  main_input_filename = opt;
+	  if (main_input_filename == NULL)
+	    main_input_filename = opt;
 	  add_input_filename (opt);
 	  n = 1;
 	  continue;
@@ -832,6 +833,10 @@ common_handle_option (size_t scode, const char *arg,
       flag_pie = value + value;
       break;
 
+    case OPT_fabi_version_:
+      flag_abi_version = value;
+      break;
+
     case OPT_falign_functions:
       align_functions = !value;
       break;
@@ -933,6 +938,10 @@ common_handle_option (size_t scode, const char *arg,
       flag_cse_skip_blocks = value;
       break;
 
+    case OPT_fconstant_pools:
+      flag_constant_pools = value;
+      break;
+
     case OPT_fdata_sections:
       flag_data_sections = value;
       break;
@@ -961,6 +970,10 @@ common_handle_option (size_t scode, const char *arg,
 
     case OPT_fdump_unnumbered:
       flag_dump_unnumbered = value;
+      break;
+
+    case OPT_fdwarf2_indirect_strings:
+      flag_dwarf2_indirect_strings = value;
       break;
 
     case OPT_feliminate_dwarf2_dups:
@@ -1068,6 +1081,10 @@ common_handle_option (size_t scode, const char *arg,
 
     case OPT_finstrument_functions:
       flag_instrument_function_entry_exit = value;
+      break;
+
+    case OPT_fjump_tables:
+      flag_jump_tables = value;
       break;
 
     case OPT_fkeep_inline_functions:
@@ -1445,6 +1462,9 @@ common_handle_option (size_t scode, const char *arg,
 
     case OPT_fwritable_strings:
       flag_writable_strings = value;
+      if (flag_writable_strings)
+        inform ("-fwritable-strings is deprecated; "
+                "see documentation for details");
       break;
 
     case OPT_fzero_initialized_in_bss:
