@@ -155,7 +155,8 @@ static void expand_operands (tree, tree, rtx, rtx*, rtx*,
 static rtx reduce_to_bit_field_precision (rtx, rtx, tree);
 static rtx do_store_flag (tree, rtx, enum machine_mode, int);
 #ifdef PUSH_ROUNDING
-static void emit_single_push_insn (enum machine_mode, rtx, tree);
+/* APPLE LOCAL radar 4087332 */
+static void emit_single_push_insn (enum machine_mode, rtx, tree, rtx);
 #endif
 static void do_tablejump (rtx, enum machine_mode, rtx, rtx, rtx);
 static rtx const_vector_from_tree (tree);
@@ -1084,7 +1085,8 @@ move_by_pieces_1 (rtx (*genfun) (rtx, ...), enum machine_mode mode,
       else
 	{
 #ifdef PUSH_ROUNDING
-	  emit_single_push_insn (mode, from1, NULL);
+	  /* APPLE LOCAL radar 4087332 */
+	  emit_single_push_insn (mode, from1, NULL, NULL_RTX);
 #else
 	  gcc_unreachable ();
 #endif
@@ -2877,19 +2879,14 @@ emit_move_complex (enum machine_mode mode, rtx x, rtx y)
   if (push_operand (x, mode))
     return emit_move_complex_push (mode, x, y);
 
-  /* For memory to memory moves, optimal behavior can be had with the
-     existing block move logic.  */
-  if (MEM_P (x) && MEM_P (y))
-    {
-      emit_block_move (x, y, GEN_INT (GET_MODE_SIZE (mode)),
-		       BLOCK_OP_NO_LIBCALL);
-      return get_last_insn ();
-    }
-
   /* See if we can coerce the target into moving both values at once.  */
 
+  /* Move floating point as parts.  */
+  if (GET_MODE_CLASS (mode) == MODE_COMPLEX_FLOAT
+      && mov_optab->handlers[GET_MODE_INNER (mode)].insn_code != CODE_FOR_nothing)
+    try_int = false;
   /* Not possible if the values are inherently not adjacent.  */
-  if (GET_CODE (x) == CONCAT || GET_CODE (y) == CONCAT)
+  else if (GET_CODE (x) == CONCAT || GET_CODE (y) == CONCAT)
     try_int = false;
   /* Is possible if both are registers (or subregs of registers).  */
   else if (register_operand (x, mode) && register_operand (y, mode))
@@ -2907,7 +2904,18 @@ emit_move_complex (enum machine_mode mode, rtx x, rtx y)
 
   if (try_int)
     {
-      rtx ret = emit_move_via_integer (mode, x, y);
+      rtx ret;
+
+      /* For memory to memory moves, optimal behavior can be had with the
+	 existing block move logic.  */
+      if (MEM_P (x) && MEM_P (y))
+	{
+	  emit_block_move (x, y, GEN_INT (GET_MODE_SIZE (mode)),
+			   BLOCK_OP_NO_LIBCALL);
+	  return get_last_insn ();
+	}
+
+      ret = emit_move_via_integer (mode, x, y);
       if (ret)
 	return ret;
     }
@@ -3243,7 +3251,8 @@ push_block (rtx size, int extra, int below)
 /* Emit single push insn.  */
 
 static void
-emit_single_push_insn (enum machine_mode mode, rtx x, tree type)
+/* APPLE LOCAL radar 4087332 */
+emit_single_push_insn (enum machine_mode mode, rtx x, tree type, rtx args_so_far)
 {
   rtx dest_addr;
   unsigned rounded_size = PUSH_ROUNDING (GET_MODE_SIZE (mode));
@@ -3252,6 +3261,22 @@ emit_single_push_insn (enum machine_mode mode, rtx x, tree type)
   insn_operand_predicate_fn pred;
 
   stack_pointer_delta += PUSH_ROUNDING (GET_MODE_SIZE (mode));
+  /* APPLE LOCAL begin radar 4087332 */
+  if (args_so_far != NULL_RTX && GET_CODE (args_so_far) == CONST_INT)
+    {
+      int offset = INTVAL (args_so_far);
+      unsigned int unit_stack_boundary = cfun->preferred_stack_boundary / BITS_PER_UNIT;
+      if (!(offset % unit_stack_boundary) && (stack_pointer_delta % unit_stack_boundary))
+	{
+	  /* argument must be aligned on stack boundary, but it is not.
+	     align 'sp' before the push. */
+	  int delta = unit_stack_boundary - (stack_pointer_delta % unit_stack_boundary);	
+	  expand_simple_binop (Pmode, PLUS, stack_pointer_rtx,
+			       GEN_INT (-delta), stack_pointer_rtx, 1, OPTAB_DIRECT);
+	  stack_pointer_delta += delta;
+	}
+    }
+  /* APPLE LOCAL end radar 4087332 */
   /* If there is push pattern, use it.  Otherwise try old way of throwing
      MEM representing push operation to move expander.  */
   icode = push_optab->handlers[(int) mode].insn_code;
@@ -3514,7 +3539,8 @@ emit_push_insn (rtx x, enum machine_mode mode, tree type, rtx size,
       int not_stack;
       /* # bytes of start of argument
 	 that we must make space for but need not store.  */
-      int offset = partial % (PARM_BOUNDARY / BITS_PER_WORD);
+      /* APPLE LOCAL mainline 2005-04-21 */
+      int offset = partial % (PARM_BOUNDARY / BITS_PER_UNIT);
       int args_offset = INTVAL (args_so_far);
       int skip;
 
@@ -3531,9 +3557,12 @@ emit_push_insn (rtx x, enum machine_mode mode, tree type, rtx size,
       if (args_addr == 0)
 	offset = 0;
 
+      /* APPLE LOCAL begin mainline 2005-04-21 */
       /* Now NOT_STACK gets the number of words that we don't need to
-	 allocate on the stack.  */
+	 allocate on the stack. Convert OFFSET to words too. */
       not_stack = (partial - offset) / UNITS_PER_WORD;
+      offset /= UNITS_PER_WORD;
+      /* APPLE LOCAL end mainline 2005-04-21 */
 
       /* If the partial register-part of the arg counts in its stack size,
 	 skip the part of stack space corresponding to the registers.
@@ -3580,7 +3609,8 @@ emit_push_insn (rtx x, enum machine_mode mode, tree type, rtx size,
 
 #ifdef PUSH_ROUNDING
       if (args_addr == 0 && PUSH_ARGS)
-	emit_single_push_insn (mode, x, type);
+	/* APPLE LOCAL radar 4087332 */
+	emit_single_push_insn (mode, x, type, args_so_far);
       else
 #endif
 	{
