@@ -7,7 +7,7 @@ ACLOCAL_AMFLAGS = -I ../config
 
 toolexeclib_LTLIBRARIES = libgfortran.la libgfortranbegin.la
 
-libgfortran_la_LDFLAGS = -version-info `grep -v '^\#' $(srcdir)/libtool-version` -lm
+libgfortran_la_LDFLAGS = -version-info `grep -v '^\#' $(srcdir)/libtool-version` -lm $(extra_ldflags_libgfortran)
 
 ## This should really go in the compiler lib dir, not the system lib dir.
 libgfortranbegin_la_SOURCES = fmain.c
@@ -44,6 +44,7 @@ intrinsics/abort.c \
 intrinsics/args.c \
 intrinsics/bessel.c \
 intrinsics/c99_functions.c \
+intrinsics/chdir.c \
 intrinsics/cpu_time.c \
 intrinsics/cshift0.c \
 intrinsics/date_and_time.c \
@@ -55,23 +56,34 @@ intrinsics/etime.c \
 intrinsics/exit.c \
 intrinsics/flush.c \
 intrinsics/fnum.c \
+intrinsics/gerror.c \
 intrinsics/getcwd.c \
+intrinsics/getlog.c \
 intrinsics/getXid.c \
+intrinsics/hostnm.c \
+intrinsics/kill.c \
+intrinsics/ierrno.c \
 intrinsics/ishftc.c \
+intrinsics/link.c \
 intrinsics/mvbits.c \
 intrinsics/pack_generic.c \
+intrinsics/perror.c \
 intrinsics/size.c \
+intrinsics/sleep.c \
 intrinsics/spread_generic.c \
 intrinsics/string_intrinsics.c \
 intrinsics/system.c \
 intrinsics/rand.c \
 intrinsics/random.c \
+intrinsics/rename.c \
 intrinsics/reshape_generic.c \
 intrinsics/reshape_packed.c \
 intrinsics/selected_int_kind.f90 \
 intrinsics/selected_real_kind.f90 \
 intrinsics/stat.c \
+intrinsics/symlnk.c \
 intrinsics/system_clock.c \
+intrinsics/time.c \
 intrinsics/transpose_generic.c \
 intrinsics/umask.c \
 intrinsics/unlink.c \
