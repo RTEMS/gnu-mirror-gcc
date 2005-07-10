@@ -1310,18 +1310,34 @@ push_reload (rtx in, rtx out, rtx *inloc, rtx *outloc,
 	 and IN or CLASS and OUT.  Get the icode and push any required reloads
 	 needed for each of them if so.  */
 
+      /* APPLE LOCAL begin restoration of inmode/outmode */
 #ifdef SECONDARY_INPUT_RELOAD_CLASS
       if (in != 0)
-	secondary_in_reload
-	  = push_secondary_reload (1, in, opnum, optional, class, inmode, type,
-				   &secondary_in_icode);
+	{
+	  secondary_in_reload
+	    = push_secondary_reload (1, in, opnum, optional, class, inmode, type,
+				     &secondary_in_icode);
+#ifdef TARGET_POWERPC
+	  if ( secondary_in_reload != -1 && in_subreg_loc )
+	    inmode = GET_MODE (*in_subreg_loc);
+#endif
+	}
+      /* APPLE LOCAL end restoration of inmode/outmode */
 #endif
 
 #ifdef SECONDARY_OUTPUT_RELOAD_CLASS
+	  /* APPLE LOCAL begin restoration of inmode/outmode */
       if (out != 0 && GET_CODE (out) != SCRATCH)
-	secondary_out_reload
-	  = push_secondary_reload (0, out, opnum, optional, class, outmode,
-				   type, &secondary_out_icode);
+	{
+	  secondary_out_reload
+	    = push_secondary_reload (0, out, opnum, optional, class, outmode,
+				     type, &secondary_out_icode);
+#ifdef TARGET_POWERPC
+	  if ( secondary_out_reload != -1 && out_subreg_loc )
+	    outmode = GET_MODE (*out_subreg_loc);
+#endif
+	}
+      /* APPLE LOCAL end restoration of inmode/outmode */
 #endif
 
       /* We found no existing reload suitable for re-use.
@@ -1520,7 +1536,7 @@ push_reload (rtx in, rtx out, rtx *inloc, rtx *outloc,
      But if there is no spilling in this block, that is OK.
      An explicitly used hard reg cannot be a spill reg.  */
 
-  if (rld[i].reg_rtx == 0 && in != 0)
+  if (rld[i].reg_rtx == 0 && in != 0 && hard_regs_live_known)
     {
       rtx note;
       int regno;
@@ -1534,6 +1550,11 @@ push_reload (rtx in, rtx out, rtx *inloc, rtx *outloc,
 	    && REG_P (XEXP (note, 0))
 	    && (regno = REGNO (XEXP (note, 0))) < FIRST_PSEUDO_REGISTER
 	    && reg_mentioned_p (XEXP (note, 0), in)
+	    /* Check that we don't use a hardreg for an uninitialized
+	       pseudo.  See also find_dummy_reload().  */
+	    && (ORIGINAL_REGNO (XEXP (note, 0)) < FIRST_PSEUDO_REGISTER
+		|| ! bitmap_bit_p (ENTRY_BLOCK_PTR->global_live_at_end,
+				   ORIGINAL_REGNO (XEXP (note, 0))))
 	    && ! refers_to_regno_for_reload_p (regno,
 					       (regno
 						+ hard_regno_nregs[regno]
@@ -1729,7 +1750,13 @@ combine_reloads (void)
     if ((rld[i].when_needed == RELOAD_FOR_OUTPUT_ADDRESS
 	 || rld[i].when_needed == RELOAD_FOR_OUTADDR_ADDRESS)
 	&& rld[i].opnum == rld[output_reload].opnum)
+      /* APPLE LOCAL begin try destroyed input */
+#ifdef TARGET_POWERPC
+      goto try_destroyed_input;
+#else
       return;
+#endif
+      /* APPLE LOCAL end try destroyed input */
 
   /* Check each input reload; can we combine it?  */
 
@@ -1826,6 +1853,11 @@ combine_reloads (void)
      that it does not occur in the output (we already know it isn't an
      earlyclobber.  If this is an asm insn, give up.  */
 
+  /* APPLE LOCAL begin try destroyed input */
+#ifdef TARGET_POWERPC
+ try_destroyed_input:
+#endif
+  /* APPLE LOCAL end try destroyed input */
   if (INSN_CODE (this_insn) == -1)
     return;
 
@@ -1997,7 +2029,17 @@ find_dummy_reload (rtx real_in, rtx real_out, rtx *inloc, rtx *outloc,
 				is a subreg, and in that case, out
 				has a real mode.  */
 			     (GET_MODE (out) != VOIDmode
-			      ? GET_MODE (out) : outmode)))
+			      ? GET_MODE (out) : outmode))
+        /* But only do all this if we can be sure, that this input
+           operand doesn't correspond with an uninitialized pseudoreg.
+           global can assign some hardreg to it, which is the same as
+	   a different pseudo also currently live (as it can ignore the
+	   conflict).  So we never must introduce writes to such hardregs,
+	   as they would clobber the other live pseudo using the same.
+	   See also PR20973.  */
+      && (ORIGINAL_REGNO (in) < FIRST_PSEUDO_REGISTER
+          || ! bitmap_bit_p (ENTRY_BLOCK_PTR->global_live_at_end,
+			     ORIGINAL_REGNO (in))))
     {
       unsigned int regno = REGNO (in) + in_offset;
       unsigned int nwords = hard_regno_nregs[regno][inmode];
@@ -2159,15 +2201,20 @@ operands_match_p (rtx x, rtx y)
       else
 	j = REGNO (y);
 
+      /* APPLE LOCAL begin mainline 2005-03-04 */
       /* On a WORDS_BIG_ENDIAN machine, point to the last register of a
-	 multiple hard register group, so that for example (reg:DI 0) and
-	 (reg:SI 1) will be considered the same register.  */
+	 multiple hard register group of scalar integer registers, so that
+	 for example (reg:DI 0) and (reg:SI 1) will be considered the same
+	 register.  */
       if (WORDS_BIG_ENDIAN && GET_MODE_SIZE (GET_MODE (x)) > UNITS_PER_WORD
+	  && SCALAR_INT_MODE_P (GET_MODE (x))
 	  && i < FIRST_PSEUDO_REGISTER)
 	i += hard_regno_nregs[i][GET_MODE (x)] - 1;
       if (WORDS_BIG_ENDIAN && GET_MODE_SIZE (GET_MODE (y)) > UNITS_PER_WORD
+	  && SCALAR_INT_MODE_P (GET_MODE (y))
 	  && j < FIRST_PSEUDO_REGISTER)
 	j += hard_regno_nregs[j][GET_MODE (y)] - 1;
+      /* APPLE LOCAL end mainline 2005-03-04 */
 
       return i == j;
     }
