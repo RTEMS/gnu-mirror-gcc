@@ -1,5 +1,5 @@
 /* Prototypes for m32r.c functions used in the md file & elsewhere.
-   Copyright (C) 1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -51,13 +51,15 @@ extern void   m32r_initialize_trampoline (rtx, rtx, rtx);
 extern int    zero_and_one (rtx, rtx);
 extern char * emit_cond_move (rtx *, rtx);
 extern void   m32r_output_block_move (rtx, rtx *);
-extern void   m32r_expand_block_move (rtx *);
+extern int   m32r_expand_block_move (rtx *);
 extern void   m32r_print_operand (FILE *, rtx, int);
 extern void   m32r_print_operand_address (FILE *, rtx);
 extern int    m32r_not_same_reg (rtx, rtx);
 extern int    m32r_hard_regno_rename_ok (unsigned int, unsigned int);
 extern int    m32r_legitimate_pic_operand_p (rtx);
 extern rtx    m32r_legitimize_pic_address (rtx, rtx);
+extern rtx    m32r_return_addr (int);
+extern rtx    m32r_function_symbol (const char *);
 
 #ifdef HAVE_MACHINE_MODES
 extern int    call_address_operand (rtx, Mmode);
