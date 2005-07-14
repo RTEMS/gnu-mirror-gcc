@@ -3750,20 +3750,6 @@ build_new_op (enum tree_code code, int flags, tree arg1, tree arg2, tree arg3,
 	  if (overloaded_p)
 	    *overloaded_p = true;
 
-	  if (warn_synth
-	      && fnname == ansi_assopname (NOP_EXPR)
-	      && DECL_ARTIFICIAL (cand->fn)
-	      && candidates->next
-	      && ! candidates->next->next)
-	    {
-	      warning ("using synthesized %q#D for copy assignment",
-			  cand->fn);
-	      cp_warning_at ("  where cfront would use %q#D",
-			     cand == candidates
-			     ? candidates->next->fn
-			     : candidates->fn);
-	    }
-
 	  result = build_over_call (cand, LOOKUP_NORMAL);
 	}
       else
@@ -4049,7 +4035,7 @@ build_op_delete_call (enum tree_code code, tree addr, tree size,
   if (placement)
     return NULL_TREE;
 
-  error ("no suitable %<operator %s> for %qT",
+  error ("no suitable %<operator %s%> for %qT",
 	 operator_name_info[(int)code].name, type);
   return error_mark_node;
 }
@@ -4804,7 +4790,7 @@ build_over_call (struct z_candidate *cand, int flags)
   converted_args = nreverse (converted_args);
 
   check_function_arguments (TYPE_ATTRIBUTES (TREE_TYPE (fn)),
-			    converted_args);
+			    converted_args, TYPE_ARG_TYPES (TREE_TYPE (fn)));
 
   /* Avoid actually calling copy constructors and copy assignment operators,
      if possible.  */
@@ -6098,10 +6084,9 @@ joust (struct z_candidate *cand1, struct z_candidate *cand2, bool warn)
   
   if (cand1->template_decl && cand2->template_decl)
     {
-      winner = more_specialized
+      winner = more_specialized_fn
         (TI_TEMPLATE (cand1->template_decl),
          TI_TEMPLATE (cand2->template_decl),
-         DEDUCE_ORDER,
          /* Tell the deduction code how many real function arguments
 	    we saw, not counting the implicit 'this' argument.  But,
 	    add_function_candidate() suppresses the "this" argument

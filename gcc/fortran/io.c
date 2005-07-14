@@ -490,6 +490,10 @@ format_item:
 
     case FMT_DOLLAR:
       t = format_lex ();
+
+      if (gfc_notify_std (GFC_STD_GNU, "Extension: $ descriptor at %C")
+          == FAILURE)
+        return FAILURE;
       if (t != FMT_RPAREN || level > 0)
 	{
 	  error = "$ must the last specifier";
@@ -641,7 +645,7 @@ data_desc:
       {
         while(repeat >0)
          {
-          next_char(0);
+          next_char(1);
           repeat -- ;
          }
       }
@@ -962,24 +966,63 @@ resolve_tag (const io_tag * tag, gfc_expr * e)
   if (gfc_resolve_expr (e) == FAILURE)
     return FAILURE;
 
-  if (e->ts.type != tag->type)
+  if (e->ts.type != tag->type && tag != &tag_format)
     {
-      /* Format label can be integer varibale.  */
-      if (tag != &tag_format || e->ts.type != BT_INTEGER)
-        {
-          gfc_error ("%s tag at %L must be of type %s", tag->name, &e->where,
-		     gfc_basic_typename (tag->type));
-          return FAILURE;
-        }
+      gfc_error ("%s tag at %L must be of type %s", tag->name,
+		&e->where, gfc_basic_typename (tag->type));
+      return FAILURE;
     }
 
   if (tag == &tag_format)
     {
-      if (e->rank != 1 && e->rank != 0)
+      /* If e's rank is zero and e is not an element of an array, it should be
+	 of integer or character type.  The integer variable should be
+	 ASSIGNED.  */
+      if (e->symtree == NULL || e->symtree->n.sym->as == NULL
+		|| e->symtree->n.sym->as->rank == 0)
 	{
-	  gfc_error ("FORMAT tag at %L cannot be array of strings",
-		     &e->where);
-	  return FAILURE;
+	  if (e->ts.type != BT_CHARACTER && e->ts.type != BT_INTEGER)
+	    {
+	      gfc_error ("%s tag at %L must be of type %s or %s", tag->name,
+			&e->where, gfc_basic_typename (BT_CHARACTER),
+			gfc_basic_typename (BT_INTEGER));
+	      return FAILURE;
+	    }
+	  else if (e->ts.type == BT_INTEGER && e->expr_type == EXPR_VARIABLE)
+	    {
+	      if (gfc_notify_std (GFC_STD_F95_DEL,
+			"Obsolete: ASSIGNED variable in FORMAT tag at %L",
+			&e->where) == FAILURE)
+		return FAILURE;
+	      if (e->symtree->n.sym->attr.assign != 1)
+		{
+		  gfc_error ("Variable '%s' at %L has not been assigned a "
+			"format label", e->symtree->n.sym->name, &e->where);
+		  return FAILURE;
+		}
+	    }
+	  return SUCCESS;
+	}
+      else
+	{
+	  /* if rank is nonzero, we allow the type to be character under
+	     GFC_STD_GNU and other type under GFC_STD_LEGACY. It may be
+	     assigned an Hollerith constant.  */
+	  if (e->ts.type == BT_CHARACTER)
+	    {
+	      if (gfc_notify_std (GFC_STD_GNU,
+			"Extension: Character array in FORMAT tag at %L",
+			&e->where) == FAILURE)
+		return FAILURE;
+	    }
+	  else
+	    {
+	      if (gfc_notify_std (GFC_STD_LEGACY,
+			"Extension: Non-character in FORMAT tag at %L",
+			&e->where) == FAILURE)
+		return FAILURE;
+	    }
+	  return SUCCESS;
 	}
     }
   else
@@ -1526,9 +1569,6 @@ match_dt_format (gfc_dt * dt)
 	  gfc_free_expr (e);
 	  goto conflict;
 	}
-      if (e->ts.type == BT_INTEGER && e->rank == 0)
-        e->symtree->n.sym->attr.assign = 1;
-
       dt->format_expr = e;
       return MATCH_YES;
     }
@@ -2351,12 +2391,15 @@ gfc_match_inquire (void)
   gfc_inquire *inquire;
   gfc_code *code;
   match m;
+  locus loc;
 
   m = gfc_match_char ('(');
   if (m == MATCH_NO)
     return m;
 
   inquire = gfc_getmem (sizeof (gfc_inquire));
+
+  loc = gfc_current_locus;
 
   m = match_inquire_element (inquire);
   if (m == MATCH_ERROR)
@@ -2422,6 +2465,20 @@ gfc_match_inquire (void)
 
   if (gfc_match_eos () != MATCH_YES)
     goto syntax;
+
+  if (inquire->unit != NULL && inquire->file != NULL)
+    {
+      gfc_error ("INQUIRE statement at %L cannot contain both FILE and"
+		 " UNIT specifiers", &loc);
+      goto cleanup;
+    }
+
+  if (inquire->unit == NULL && inquire->file == NULL)
+    {
+      gfc_error ("INQUIRE statement at %L requires either FILE or"
+		     " UNIT specifier", &loc);
+      goto cleanup;
+    }
 
   if (gfc_pure (NULL))
     {

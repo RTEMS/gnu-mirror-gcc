@@ -48,28 +48,28 @@ eoshift3_8 (gfc_array_char *ret, gfc_array_char *array,
 		       GFC_INTEGER_8 *pwhich)
 {
   /* r.* indicates the return array.  */
-  index_type rstride[GFC_MAX_DIMENSIONS - 1];
+  index_type rstride[GFC_MAX_DIMENSIONS];
   index_type rstride0;
   index_type roffset;
   char *rptr;
   char *dest;
   /* s.* indicates the source array.  */
-  index_type sstride[GFC_MAX_DIMENSIONS - 1];
+  index_type sstride[GFC_MAX_DIMENSIONS];
   index_type sstride0;
   index_type soffset;
   const char *sptr;
   const char *src;
   /* h.* indicates the shift array.  */
-  index_type hstride[GFC_MAX_DIMENSIONS - 1];
+  index_type hstride[GFC_MAX_DIMENSIONS];
   index_type hstride0;
   const GFC_INTEGER_8 *hptr;
   /* b.* indicates the bound array.  */
-  index_type bstride[GFC_MAX_DIMENSIONS - 1];
+  index_type bstride[GFC_MAX_DIMENSIONS];
   index_type bstride0;
   const char *bptr;
 
-  index_type count[GFC_MAX_DIMENSIONS - 1];
-  index_type extent[GFC_MAX_DIMENSIONS - 1];
+  index_type count[GFC_MAX_DIMENSIONS];
+  index_type extent[GFC_MAX_DIMENSIONS];
   index_type dim;
   index_type size;
   index_type len;
@@ -84,6 +84,25 @@ eoshift3_8 (gfc_array_char *ret, gfc_array_char *array,
     which = 0;
 
   size = GFC_DESCRIPTOR_SIZE (ret);
+  if (ret->data == NULL)
+    {
+      int i;
+
+      ret->data = internal_malloc_size (size * size0 ((array_t *)array));
+      ret->base = 0;
+      ret->dtype = array->dtype;
+      for (i = 0; i < GFC_DESCRIPTOR_RANK (array); i++)
+        {
+          ret->dim[i].lbound = 0;
+          ret->dim[i].ubound = array->dim[i].ubound - array->dim[i].lbound;
+
+          if (i == 0)
+            ret->dim[i].stride = 1;
+          else
+            ret->dim[i].stride = (ret->dim[i-1].ubound + 1) * ret->dim[i-1].stride;
+        }
+    }
+
 
   extent[0] = 1;
   count[0] = 0;
@@ -110,7 +129,7 @@ eoshift3_8 (gfc_array_char *ret, gfc_array_char *array,
 
           hstride[n] = h->dim[n].stride;
           if (bound)
-            bstride[n] = bound->dim[n].stride;
+            bstride[n] = bound->dim[n].stride * size;
           else
             bstride[n] = 0;
           n++;
@@ -142,7 +161,14 @@ eoshift3_8 (gfc_array_char *ret, gfc_array_char *array,
     {
       /* Do the shift for this dimension.  */
       sh = *hptr;
-      delta = (sh >= 0) ? sh: -sh;
+      if (( sh >= 0 ? sh : -sh ) > len)
+	{
+	  delta = len;
+	  sh = len;
+	}
+      else
+	delta = (sh >= 0) ? sh: -sh;
+
       if (sh > 0)
         {
           src = &sptr[delta * soffset];

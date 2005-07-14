@@ -177,7 +177,7 @@
 
 (define_expand "push<mode>1"
   [(match_operand:MMXMODE 0 "register_operand" "")]
-  "TARGET_SSE"
+  "TARGET_MMX"
 {
   ix86_expand_push (<MODE>mode, operands[0]);
   DONE;
@@ -1111,7 +1111,7 @@
 	(vec_duplicate:V4HI
 	  (truncate:HI
 	    (match_operand:SI 1 "register_operand" "0"))))]
-  "TARGET_MMX"
+  "TARGET_SSE || TARGET_3DNOW_A"
   "pshufw\t{$0, %0, %0|%0, %0, 0}"
   [(set_attr "type" "mmxcvt")
    (set_attr "mode" "DI")])
