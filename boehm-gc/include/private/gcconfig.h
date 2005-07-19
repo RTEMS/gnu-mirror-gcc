@@ -616,6 +616,7 @@
 #   ifdef LINUX
 #       define OS_TYPE "LINUX"
 #       define STACKBOTTOM ((ptr_t)0xf0000000)
+#	define USE_MMAP
 #       define USE_GENERIC_PUSH_REGS
 		/* We never got around to the assembly version. */
 /* #       define MPROTECT_VDB - Reported to not work  9/17/01 */
@@ -721,6 +722,7 @@
 #     if (defined (powerpc64) || defined(__powerpc64__))
 #       define ALIGNMENT 8
 #       define CPP_WORDSZ 64
+#       define HBLKSIZE 4096
 #     else
 #       define ALIGNMENT 4
 #     endif
@@ -896,12 +898,10 @@
       extern ptr_t GC_SysVGetDataStart();
 #     ifdef __arch64__
 #	define DATASTART GC_SysVGetDataStart(0x100000, _etext)
-	/* libc_stack_end is not set reliably for sparc64 */
-#       define STACKBOTTOM ((ptr_t) 0x80000000000ULL)
 #     else
 #       define DATASTART GC_SysVGetDataStart(0x10000, _etext)
-#	define LINUX_STACKBOTTOM
 #     endif
+#     define LINUX_STACKBOTTOM
 #   endif
 #   ifdef OPENBSD
 #     define OS_TYPE "OPENBSD"
@@ -1513,7 +1513,7 @@
 #   endif
 #   ifdef LINUX
 #       define OS_TYPE "LINUX"
-#       define STACKBOTTOM ((ptr_t) 0x120000000)
+#       define LINUX_STACKBOTTOM
 #       ifdef __ELF__
 #	  define SEARCH_FOR_DATA_START
 #         define DYNAMIC_LOADING
@@ -1751,7 +1751,7 @@
 #   endif
 #   ifdef LINUX
 #     define OS_TYPE "LINUX"
-#     define STACKBOTTOM ((ptr_t) 0x7c000000)
+#     define LINUX_STACKBOTTOM
 #     define USE_GENERIC_PUSH_REGS
 #     define DYNAMIC_LOADING
 #     define SEARCH_FOR_DATA_START
@@ -1800,10 +1800,10 @@
 	     extern int etext[];
 #            define DATASTART ((ptr_t)((((word) (etext)) + 0xfff) & ~0xfff))
 #       endif
-#	define PREFETCH(x) \
-	  __asm__ __volatile__ ("	prefetch	%0": : "m"(*(char *)(x)))
-#	define PREFETCH_FOR_WRITE(x) \
-	  __asm__ __volatile__ ("	prefetchw	%0": : "m"(*(char *)(x)))
+#	if defined(__GNUC__) && __GNUC__ >= 3
+#	    define PREFETCH(x) __builtin_prefetch ((x), 0, 0)
+#	    define PREFETCH_FOR_WRITE(x) __builtin_prefetch ((x), 1)
+#	endif
 #   endif
 # endif
 
