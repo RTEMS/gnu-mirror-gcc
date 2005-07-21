@@ -41,6 +41,7 @@ package gnu.java.net.protocol.jar;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.IOException;
@@ -151,12 +152,11 @@ public final class Connection extends JarURLConnection
     if (jarfile != null)
       {
 	// this is the easy way...
-	ZipEntry entry = jarfile.getEntry(getEntryName());
+	ZipEntry entry = jarfile.getEntry
+	  (gnu.java.net.protocol.file.Connection.unquote(getEntryName()));
         
 	if (entry != null)
 	  return jarfile.getInputStream (entry);
-	else
-	  return null;
       }
     else
       {
@@ -164,12 +164,14 @@ public final class Connection extends JarURLConnection
 	JarInputStream zis = new JarInputStream(
 			jarFileURLConnection.getInputStream ());
 
+	String entryName = gnu.java.net.protocol.file.Connection.unquote(getEntryName());
+
 	// This is hideous, we're doing a linear search...
 	for (ZipEntry entry = zis.getNextEntry(); 
 	     entry != null; 
 	     entry = zis.getNextEntry())
 	  {
-	    if (getEntryName().equals(entry.getName()))
+	    if (entryName.equals(entry.getName()))
 	      {
 		int size = (int) entry.getSize();
 		byte[] data = new byte[size];
@@ -179,7 +181,10 @@ public final class Connection extends JarURLConnection
 	  }
       }
 
-    return null;
+    throw new FileNotFoundException("No entry for \"" + getEntryName()
+				    + "\" in \""
+				    + getJarFileURL()
+				    + "\"");
   }
 
   public synchronized JarFile getJarFile() throws IOException
@@ -203,12 +208,14 @@ public final class Connection extends JarURLConnection
 	    jar_file = (JarFile) file_cache.get (jarFileURL);
 	    if (jar_file == null)
 	      {
-		jar_file = new JarFile (jarFileURL.getFile());
+		jar_file = new JarFile 
+		  (gnu.java.net.protocol.file.Connection.unquote(jarFileURL.getFile()));
 		file_cache.put (jarFileURL, jar_file);
 	      }
 	  }
 	else
-	  jar_file = new JarFile (jarFileURL.getFile());
+	  jar_file = new JarFile 
+	    (gnu.java.net.protocol.file.Connection.unquote(jarFileURL.getFile()));
       }
     else
       {

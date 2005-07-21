@@ -967,6 +967,7 @@ gfc_simplify_exp (gfc_expr * x)
 gfc_expr *
 gfc_simplify_exponent (gfc_expr * x)
 {
+  int i;
   mpfr_t tmp;
   gfc_expr *result;
 
@@ -990,6 +991,12 @@ gfc_simplify_exponent (gfc_expr * x)
   mpfr_log2 (tmp, tmp, GFC_RND_MODE);
 
   gfc_mpfr_to_mpz (result->value.integer, tmp);
+
+  /* The model number for tiny(x) is b**(emin - 1) where b is the base and emin
+     is the smallest exponent value.  So, we need to add 1 if x is tiny(x).  */
+  i = gfc_validate_kind (x->ts.type, x->ts.kind, false);
+  if (mpfr_cmp (x->value.real, gfc_real_kinds[i].tiny) == 0)
+    mpz_add_ui (result->value.integer,result->value.integer, 1);
 
   mpfr_clear (tmp);
 
@@ -1766,16 +1773,18 @@ gfc_simplify_kind (gfc_expr * e)
 
 
 static gfc_expr *
-gfc_simplify_bound (gfc_expr * array, gfc_expr * dim, int upper)
+simplify_bound (gfc_expr * array, gfc_expr * dim, int upper)
 {
   gfc_ref *ref;
   gfc_array_spec *as;
-  int i;
+  gfc_expr *e;
+  int d;
 
   if (array->expr_type != EXPR_VARIABLE)
     return NULL;
 
   if (dim == NULL)
+    /* TODO: Simplify constant multi-dimensional bounds.  */
     return NULL;
 
   if (dim->expr_type != EXPR_CONSTANT)
@@ -1783,29 +1792,66 @@ gfc_simplify_bound (gfc_expr * array, gfc_expr * dim, int upper)
 
   /* Follow any component references.  */
   as = array->symtree->n.sym->as;
-  ref = array->ref;
-  while (ref->next != NULL)
+  for (ref = array->ref; ref; ref = ref->next)
     {
-      if (ref->type == REF_COMPONENT)
-	as = ref->u.c.sym->as;
-      ref = ref->next;
+      switch (ref->type)
+	{
+	case REF_ARRAY:
+	  switch (ref->u.ar.type)
+	    {
+	    case AR_ELEMENT:
+	      as = NULL;
+	      continue;
+
+	    case AR_FULL:
+	      /* We're done because 'as' has already been set in the
+		 previous iteration.  */
+	      goto done;
+
+	    case AR_SECTION:
+	    case AR_UNKNOWN:
+	      return NULL;
+	    }
+
+	  gcc_unreachable ();
+
+	case REF_COMPONENT:
+	  as = ref->u.c.component->as;
+	  continue;
+
+	case REF_SUBSTRING:
+	  continue;
+	}
+    }
+ 
+  gcc_unreachable ();
+
+ done:
+  if (as->type == AS_DEFERRED || as->type == AS_ASSUMED_SHAPE)
+    return NULL;
+
+  d = mpz_get_si (dim->value.integer);
+
+  if (d < 1 || d > as->rank
+      || (d == as->rank && as->type == AS_ASSUMED_SIZE && upper))
+    {
+      gfc_error ("DIM argument at %L is out of bounds", &dim->where);
+      return &gfc_bad_expr;
     }
 
-  if (ref->type != REF_ARRAY || ref->u.ar.type != AR_FULL)
+  e = upper ? as->upper[d-1] : as->lower[d-1];
+
+  if (e->expr_type != EXPR_CONSTANT)
     return NULL;
-  
-  i = mpz_get_si (dim->value.integer);
-  if (upper) 
-    return gfc_copy_expr (as->upper[i-1]);
-  else
-    return gfc_copy_expr (as->lower[i-1]);
+
+  return gfc_copy_expr (e);
 }
 
 
 gfc_expr *
 gfc_simplify_lbound (gfc_expr * array, gfc_expr * dim)
 {
-  return gfc_simplify_bound (array, dim, 0);
+  return simplify_bound (array, dim, 0);
 }
 
 
@@ -2233,12 +2279,11 @@ gfc_simplify_modulo (gfc_expr * a, gfc_expr * p)
       mpfr_div (quot, a->value.real, p->value.real, GFC_RND_MODE);
       mpfr_floor (iquot, quot);
       mpfr_mul (term, iquot, p->value.real, GFC_RND_MODE);
+      mpfr_sub (result->value.real, a->value.real, term, GFC_RND_MODE);
 
       mpfr_clear (quot);
       mpfr_clear (iquot);
       mpfr_clear (term);
-
-      mpfr_sub (result->value.real, a->value.real, term, GFC_RND_MODE);
       break;
 
     default:
@@ -3578,7 +3623,7 @@ gfc_simplify_trim (gfc_expr * e)
 gfc_expr *
 gfc_simplify_ubound (gfc_expr * array, gfc_expr * dim)
 {
-  return gfc_simplify_bound (array, dim, 1);
+  return simplify_bound (array, dim, 1);
 }
 
 
@@ -3675,6 +3720,9 @@ gfc_convert_constant (gfc_expr * e, bt type, int kind)
 	case BT_COMPLEX:
 	  f = gfc_int2complex;
 	  break;
+	case BT_LOGICAL:
+	  f = gfc_int2log;
+	  break;
 	default:
 	  goto oops;
 	}
@@ -3716,9 +3764,45 @@ gfc_convert_constant (gfc_expr * e, bt type, int kind)
       break;
 
     case BT_LOGICAL:
-      if (type != BT_LOGICAL)
-	goto oops;
-      f = gfc_log2log;
+      switch (type)
+	{
+	case BT_INTEGER:
+	  f = gfc_log2int;
+	  break;
+	case BT_LOGICAL:
+	  f = gfc_log2log;
+	  break;
+	default:
+	  goto oops;
+	}
+      break;
+
+    case BT_HOLLERITH:
+      switch (type)
+	{
+	case BT_INTEGER:
+	  f = gfc_hollerith2int;
+	  break;
+
+	case BT_REAL:
+	  f = gfc_hollerith2real;
+	  break;
+
+	case BT_COMPLEX:
+	  f = gfc_hollerith2complex;
+	  break;
+
+	case BT_CHARACTER:
+	  f = gfc_hollerith2character;
+	  break;
+
+	case BT_LOGICAL:
+	  f = gfc_hollerith2logical;
+	  break;
+
+	default:
+	  goto oops;
+	}
       break;
 
     default:
