@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler,
    for 64 bit PowerPC linux.
-   Copyright (C) 2000, 2001, 2002, 2003, 2004
+   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005
    Free Software Foundation, Inc.
 
    This file is part of GCC.
@@ -244,13 +244,11 @@ extern int dot_symbols;
    the first field is an FP double, only if in power alignment mode.  */
 #undef  ROUND_TYPE_ALIGN
 #define ROUND_TYPE_ALIGN(STRUCT, COMPUTED, SPECIFIED)			\
-  ((TARGET_ALTIVEC && TREE_CODE (STRUCT) == VECTOR_TYPE)		\
-   ? MAX (MAX ((COMPUTED), (SPECIFIED)), 128)				\
-   : (TARGET_64BIT							\
-      && (TREE_CODE (STRUCT) == RECORD_TYPE				\
-	  || TREE_CODE (STRUCT) == UNION_TYPE				\
-	  || TREE_CODE (STRUCT) == QUAL_UNION_TYPE)			\
-      && TARGET_ALIGN_NATURAL == 0)					\
+  ((TARGET_64BIT							\
+    && (TREE_CODE (STRUCT) == RECORD_TYPE				\
+	|| TREE_CODE (STRUCT) == UNION_TYPE				\
+	|| TREE_CODE (STRUCT) == QUAL_UNION_TYPE)			\
+    && TARGET_ALIGN_NATURAL == 0)					\
    ? rs6000_special_round_type_align (STRUCT, COMPUTED, SPECIFIED)	\
    : MAX ((COMPUTED), (SPECIFIED)))
 
@@ -552,7 +550,7 @@ while (0)
 #undef DRAFT_V4_STRUCT_RET
 #define DRAFT_V4_STRUCT_RET (!TARGET_64BIT)
 
-#define TARGET_ASM_FILE_END file_end_indicate_exec_stack
+#define TARGET_ASM_FILE_END rs6000_elf_end_indicate_exec_stack
 
 #define TARGET_HAS_F_SETLKW
 
