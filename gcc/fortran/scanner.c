@@ -458,6 +458,9 @@ restart:
 	    }
 	  while (c != '\n');
 
+	  /* Avoid truncation warnings for comment ending lines.  */
+	  gfc_current_locus.lb->truncated = 0;
+
 	  goto done;
 	}
 
@@ -525,6 +528,9 @@ restart:
 	      c = next_char ();
 	    }
 	  while (c != '\n');
+
+	  /* Avoid truncation warnings for comment ending lines.  */
+	  gfc_current_locus.lb->truncated = 0;
 	}
 
       if (c != '\n')
@@ -631,21 +637,17 @@ gfc_error_recovery (void)
 	  if (c == delim)
 	    break;
 	  if (c == '\n')
-	    goto done;
+	    return;
 	  if (c == '\\')
 	    {
 	      c = next_char ();
 	      if (c == '\n')
-		goto done;
+		return;
 	    }
 	}
       if (gfc_at_eof ())
 	break;
     }
-
-done:
-  if (c == '\n')
-    gfc_advance_line ();
 }
 
 
@@ -677,13 +679,14 @@ gfc_gobble_whitespace (void)
    need be.
    In fixed mode, we expand a tab that occurs within the statement
    label region to expand to spaces that leave the next character in
-   the source region.  */
+   the source region.
+   load_line returns wether the line was truncated.  */
 
-static void
-load_line (FILE * input, char **pbuf, char *filename, int linenum)
+static int
+load_line (FILE * input, char **pbuf, int *pbuflen)
 {
-  int c, maxlen, i, trunc_flag, preprocessor_flag;
-  static int buflen = 0;
+  int c, maxlen, i, preprocessor_flag, buflen = *pbuflen;
+  int trunc_flag = 0;
   char *buffer;
 
   /* Determine the maximum allowed line length.  */
@@ -749,33 +752,27 @@ load_line (FILE * input, char **pbuf, char *filename, int linenum)
       *buffer++ = c;
       i++;
 
-      if (i >= buflen && (maxlen == 0 || preprocessor_flag))
+      if (maxlen == 0 || preprocessor_flag)
 	{
-	  /* Reallocate line buffer to double size to hold the
-	     overlong line.  */
-	  buflen = buflen * 2;
-	  *pbuf = xrealloc (*pbuf, buflen);
-	  buffer = (*pbuf)+i;
+	  if (i >= buflen)
+	    {
+	      /* Reallocate line buffer to double size to hold the
+	         overlong line.  */
+	      buflen = buflen * 2;
+	      *pbuf = xrealloc (*pbuf, buflen + 1);
+	      buffer = (*pbuf)+i;
+	    }
 	}
-      else if (i >= buflen)
+      else if (i >= maxlen)
 	{			
 	  /* Truncate the rest of the line.  */
-	  trunc_flag = 1;
-
 	  for (;;)
 	    {
 	      c = fgetc (input);
 	      if (c == '\n' || c == EOF)
 		break;
 
-	      if (gfc_option.warn_line_truncation
-		  && trunc_flag
-		  && !gfc_is_whitespace (c))
-		{
-		  gfc_warning_now ("%s:%d: Line is being truncated",
-				   filename, linenum);
-		  trunc_flag = 0;
-		}
+	      trunc_flag = 1;
 	    }
 
 	  ungetc ('\n', input);
@@ -787,10 +784,13 @@ load_line (FILE * input, char **pbuf, char *filename, int linenum)
       && gfc_option.fixed_line_length > 0
       && !preprocessor_flag
       && c != EOF)
-    while (i++ < buflen)
+    while (i++ < gfc_option.fixed_line_length)
       *buffer++ = ' ';
 
   *buffer = '\0';
+  *pbuflen = buflen;
+
+  return trunc_flag;
 }
 
 
@@ -842,15 +842,13 @@ preprocessor_line (char *c)
 
   line = atoi (c);
 
-  /* Set new line number.  */
-  current_file->line = line;
-
-  c = strchr (c, ' '); 
+  c = strchr (c, ' ');
   if (c == NULL)
-    /* No file name given.  */
-    return;
-
-
+    {
+      /* No file name given.  Set new line number.  */
+      current_file->line = line;
+      return;
+    }
 
   /* Skip spaces.  */
   while (*c == ' ' || *c == '\t')
@@ -883,8 +881,8 @@ preprocessor_line (char *c)
 
 
   /* Get flags.  */
-  
-  flag[1] = flag[2] = flag[3] = flag[4] = flag[5] = false;
+
+  flag[1] = flag[2] = flag[3] = flag[4] = false;
 
   for (;;)
     {
@@ -898,24 +896,32 @@ preprocessor_line (char *c)
       if (1 <= i && i <= 4)
 	flag[i] = true;
     }
-     
+
   /* Interpret flags.  */
-  
-  if (flag[1] || flag[3]) /* Starting new file.  */
+
+  if (flag[1]) /* Starting new file.  */
     {
       f = get_file (filename, LC_RENAME);
       f->up = current_file;
       current_file = f;
     }
-  
+
   if (flag[2]) /* Ending current file.  */
     {
+      if (!current_file->up
+	  || strcmp (current_file->up->filename, filename) != 0)
+	{
+	  gfc_warning_now ("%s:%d: file %s left but not entered",
+			   current_file->filename, current_file->line,
+			   filename);
+	  return;
+	}
       current_file = current_file->up;
     }
-  
+
   /* The name of the file can be a temporary file produced by
      cpp. Replace the name if it is different.  */
-  
+
   if (strcmp (current_file->filename, filename) != 0)
     {
       gfc_free (current_file->filename);
@@ -923,10 +929,12 @@ preprocessor_line (char *c)
       strcpy (current_file->filename, filename);
     }
 
+  /* Set new line number.  */
+  current_file->line = line;
   return;
 
  bad_cpp_line:
-  gfc_warning_now ("%s:%d: Illegal preprocessor directive", 
+  gfc_warning_now ("%s:%d: Illegal preprocessor directive",
 		   current_file->filename, current_file->line);
   current_file->line++;
 }
@@ -996,7 +1004,7 @@ load_file (char *filename, bool initial)
   gfc_linebuf *b;
   gfc_file *f;
   FILE *input;
-  int len;
+  int len, line_len;
 
   for (f = current_file; f; f = f->up)
     if (strcmp (filename, f->filename) == 0)
@@ -1031,10 +1039,11 @@ load_file (char *filename, bool initial)
   current_file = f;
   current_file->line = 1;
   line = NULL;
+  line_len = 0;
 
   for (;;) 
     {
-      load_line (input, &line, filename, current_file->line);
+      int trunc = load_line (input, &line, &line_len);
 
       len = strlen (line);
       if (feof (input) && len == 0)
@@ -1066,6 +1075,7 @@ load_file (char *filename, bool initial)
       b->linenum = current_file->line++;
 #endif
       b->file = current_file;
+      b->truncated = trunc;
       strcpy (b->line, line);
 
       if (line_head == NULL)

@@ -419,15 +419,6 @@ do {									\
 	((TARGET_ALTIVEC && TREE_CODE (TREE_TYPE (FIELD)) == VECTOR_TYPE)     \
 	 ? 128 : COMPUTED)
 
-/* Define this macro as an expression for the alignment of a type
-   (given by TYPE as a tree node) if the alignment computed in the
-   usual way is COMPUTED and the alignment explicitly specified was
-   SPECIFIED.  */
-#define ROUND_TYPE_ALIGN(TYPE, COMPUTED, SPECIFIED)			\
-	((TARGET_ALTIVEC  && TREE_CODE (TYPE) == VECTOR_TYPE)		\
-	 ? MAX (MAX ((COMPUTED), (SPECIFIED)), 128)			\
-	 : MAX (COMPUTED, SPECIFIED))
-
 #undef  BIGGEST_FIELD_ALIGNMENT
 
 /* Use ELF style section commands.  */
@@ -1362,8 +1353,6 @@ ncrtn.o%s"
   ((flag_pic || TARGET_RELOCATABLE)					     \
    ? (((GLOBAL) ? DW_EH_PE_indirect : 0) | DW_EH_PE_pcrel | DW_EH_PE_sdata4) \
    : DW_EH_PE_absptr)
-
-#define TARGET_ASM_EXCEPTION_SECTION readonly_data_section
 
 #define DOUBLE_INT_ASM_OP "\t.quad\t"
 

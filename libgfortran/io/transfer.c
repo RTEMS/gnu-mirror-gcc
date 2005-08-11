@@ -1,5 +1,6 @@
 /* Copyright (C) 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
    Contributed by Andy Vaught
+   Namelist transfer functions contributed by Paul Thomas
 
 This file is part of the GNU Fortran 95 runtime library (libgfortran).
 
@@ -79,6 +80,14 @@ export_proto(transfer_complex);
 
 gfc_unit *current_unit = NULL;
 static int sf_seen_eor = 0;
+static int eor_condition = 0;
+
+/* Maximum righthand column written to.  */
+static int max_pos;
+/* Number of skips + spaces to be done for T and X-editing.  */
+static int skips;
+/* Number of spaces to be done for T and X-editing.  */
+static int pending_spaces;
 
 char scratch[SCRATCH_SIZE] = { };
 static char *line_buffer = NULL;
@@ -150,20 +159,25 @@ read_sf (int *length)
   else
     p = base = data;
 
-  memset(base,'\0',*length);
+  /* If we have seen an eor previously, return a length of 0.  The
+     caller is responsible for correctly padding the input field.  */
+  if (sf_seen_eor)
+    {
+      *length = 0;
+      return base;
+    }
 
-  current_unit->bytes_left = options.default_recl;
   readlen = 1;
   n = 0;
 
   do
     {
       if (is_internal_unit())
-        {
+	{
 	  /* readlen may be modified inside salloc_r if 
 	     is_internal_unit() is true.  */
-          readlen = 1;
-        }
+	  readlen = 1;
+	}
 
       q = salloc_r (current_unit->s, &readlen);
       if (q == NULL)
@@ -177,15 +191,18 @@ read_sf (int *length)
 	  return NULL;
 	}
 
-      if (readlen < 1 || *q == '\n')
+      if (readlen < 1 || *q == '\n' || *q == '\r')
 	{
-	  /* ??? What is this for?  */
-          if (current_unit->unit_number == options.stdin_unit)
-            {
-              if (n <= 0)
-                continue;
-            }
 	  /* Unexpected end of line.  */
+
+	  /* If we see an EOR during non-advancing I/O, we need to skip
+	     the rest of the I/O statement.  Set the corresponding flag.  */
+	  if (advance_status == ADVANCE_NO || g.seen_dollar)
+	    eor_condition = 1;
+
+	  /* Without padding, terminate the I/O statement without assigning
+	     the value.  With padding, the value still needs to be assigned,
+	     so we can just continue with a short read.  */
 	  if (current_unit->flags.pad == PAD_NO)
 	    {
 	      generate_error (ERROR_EOR, NULL);
@@ -194,7 +211,7 @@ read_sf (int *length)
 
 	  current_unit->bytes_left = 0;
 	  *length = n;
-          sf_seen_eor = 1;
+	  sf_seen_eor = 1;
 	  break;
 	}
 
@@ -203,6 +220,10 @@ read_sf (int *length)
       sf_seen_eor = 0;
     }
   while (n < *length);
+  current_unit->bytes_left -= *length;
+
+  if (ioparm.size != NULL)
+    *ioparm.size += *length;
 
   return base;
 }
@@ -423,9 +444,10 @@ require_type (bt expected, bt actual, fnode * f)
 static void
 formatted_transfer (bt type, void *p, int len)
 {
-  int pos ,m ;
+  int pos, bytes_used;
   fnode *f;
-  int i, n;
+  format_token t;
+  int n;
   int consume_data_flag;
 
   /* Change a complex data item into a pair of reals.  */
@@ -434,15 +456,20 @@ formatted_transfer (bt type, void *p, int len)
   if (type == BT_COMPLEX)
     type = BT_REAL;
 
+  /* If there's an EOR condition, we simulate finalizing the transfer
+     by doing nothing.  */
+  if (eor_condition)
+    return;
+
   for (;;)
     {
       /* If reversion has occurred and there is another real data item,
-         then we have to move to the next record.  */
+	 then we have to move to the next record.  */
       if (g.reversion_flag && n > 0)
-        {
-          g.reversion_flag = 0;
-          next_record (0);
-        }
+	{
+	  g.reversion_flag = 0;
+	  next_record (0);
+	}
 
       consume_data_flag = 1 ;
       if (ioparm.library_return != LIBRARY_OK)
@@ -450,9 +477,34 @@ formatted_transfer (bt type, void *p, int len)
 
       f = next_format ();
       if (f == NULL)
-	return;		/* No data descriptors left (already raised).  */
+	return;	      /* No data descriptors left (already raised).  */
 
-      switch (f->format)
+      /* Now discharge T, TR and X movements to the right.  This is delayed
+	 until a data producing format to supress trailing spaces.  */
+      t = f->format;
+      if (g.mode == WRITING && skips != 0
+	&& ((n>0 && (  t == FMT_I  || t == FMT_B  || t == FMT_O
+		    || t == FMT_Z  || t == FMT_F  || t == FMT_E
+		    || t == FMT_EN || t == FMT_ES || t == FMT_G
+		    || t == FMT_L  || t == FMT_A  || t == FMT_D))
+	    || t == FMT_STRING))
+	{
+	  if (skips > 0)
+	    {
+	      write_x (skips, pending_spaces);
+	      max_pos = (int)(current_unit->recl - current_unit->bytes_left);
+	    }
+	  if (skips < 0)
+	    {
+	      move_pos_offset (current_unit->s, skips);
+	      current_unit->bytes_left -= (gfc_offset)skips;
+	    }
+	skips = pending_spaces = 0;
+	}
+
+      bytes_used = (int)(current_unit->recl - current_unit->bytes_left);
+
+      switch (t)
 	{
 	case FMT_I:
 	  if (n == 0)
@@ -505,8 +557,6 @@ formatted_transfer (bt type, void *p, int len)
 	case FMT_A:
 	  if (n == 0)
 	    goto need_data;
-	  if (require_type (BT_CHARACTER, type, f))
-	    return;
 
 	  if (g.mode == READING)
 	    read_a (f, p, len);
@@ -634,7 +684,7 @@ formatted_transfer (bt type, void *p, int len)
 	  break;
 
 	case FMT_STRING:
-          consume_data_flag = 0 ;
+	  consume_data_flag = 0 ;
 	  if (g.mode == READING)
 	    {
 	      format_error (f, "Constant string in input format");
@@ -643,95 +693,102 @@ formatted_transfer (bt type, void *p, int len)
 	  write_constant_string (f);
 	  break;
 
-	  /* Format codes that don't transfer data.  */
+	/* Format codes that don't transfer data.  */
 	case FMT_X:
 	case FMT_TR:
-          consume_data_flag = 0 ;
+	  consume_data_flag = 0 ;
+
+	  pos = bytes_used + f->u.n + skips;
+	  skips = f->u.n + skips;
+	  pending_spaces = pos - max_pos;
+
+	  /* Writes occur just before the switch on f->format, above, so that
+	     trailing blanks are suppressed.  */
 	  if (g.mode == READING)
 	    read_x (f);
-	  else
-	    write_x (f);
 
 	  break;
 
-        case FMT_TL:
-        case FMT_T:
-           if (f->format==FMT_TL)
-             {
-                pos = f->u.n ;
-                pos= current_unit->recl - current_unit->bytes_left - pos;
-             }
-           else // FMT==T
-             {
-                consume_data_flag = 0 ;
-                pos = f->u.n - 1; 
-             }
+	case FMT_TL:
+	case FMT_T:
+	  if (f->format == FMT_TL)
+	    pos = bytes_used - f->u.n;
+	  else /* FMT_T */
+	    {
+	      consume_data_flag = 0;
+	      pos = f->u.n - 1;
+	    }
 
-           if (pos < 0 || pos >= current_unit->recl )
-           {
-             generate_error (ERROR_EOR, "T Or TL edit position error");
-             break ;
-            }
-            m = pos - (current_unit->recl - current_unit->bytes_left);
+	  /* Standard 10.6.1.1: excessive left tabbing is reset to the
+	     left tab limit.  We do not check if the position has gone
+	     beyond the end of record because a subsequent tab could
+	     bring us back again.  */
+	  pos = pos < 0 ? 0 : pos;
 
-            if (m == 0)
-               break;
+	  skips = skips + pos - bytes_used;
+	  pending_spaces =  pending_spaces + pos - max_pos;
 
-            if (m > 0)
-             {
-               f->u.n = m;
-               if (g.mode == READING)
-                 read_x (f);
-               else
-                 write_x (f);
-             }
-            if (m < 0)
-             {
-               move_pos_offset (current_unit->s,m);
-             }
+	  if (skips == 0)
+	    break;
 
-	  break;
+	  /* Writes occur just before the switch on f->format, above, so that
+	     trailing blanks are suppressed.  */
+	  if (g.mode == READING)
+	    {
+	      if (skips > 0)
+		{
+		  f->u.n = skips;
+		  read_x (f);
+		}
+	      if (skips < 0)
+		{
+		  move_pos_offset (current_unit->s, skips);
+		  current_unit->bytes_left -= skips;
+		  skips = pending_spaces = 0;
+		}
+	    }
+
+	break;
 
 	case FMT_S:
-          consume_data_flag = 0 ;
+	  consume_data_flag = 0 ;
 	  g.sign_status = SIGN_S;
-	  break;
+	break;
 
 	case FMT_SS:
-          consume_data_flag = 0 ;
+	  consume_data_flag = 0 ;
 	  g.sign_status = SIGN_SS;
-	  break;
+	break;
 
 	case FMT_SP:
-          consume_data_flag = 0 ;
+	  consume_data_flag = 0 ;
 	  g.sign_status = SIGN_SP;
-	  break;
+	break;
 
 	case FMT_BN:
-          consume_data_flag = 0 ;
+	  consume_data_flag = 0 ;
 	  g.blank_status = BLANK_NULL;
-	  break;
+	break;
 
 	case FMT_BZ:
-          consume_data_flag = 0 ;
+	  consume_data_flag = 0 ;
 	  g.blank_status = BLANK_ZERO;
-	  break;
+	break;
 
 	case FMT_P:
-          consume_data_flag = 0 ;
+	  consume_data_flag = 0 ;
 	  g.scale_factor = f->u.k;
 	  break;
 
 	case FMT_DOLLAR:
-          consume_data_flag = 0 ;
+	  consume_data_flag = 0 ;
 	  g.seen_dollar = 1;
 	  break;
 
 	case FMT_SLASH:
-          consume_data_flag = 0 ;
-	  for (i = 0; i < f->repeat; i++)
-	    next_record (0);
-
+	  consume_data_flag = 0 ;
+	  skips = pending_spaces = 0;
+	  next_record (0);
 	  break;
 
 	case FMT_COLON:
@@ -739,7 +796,7 @@ formatted_transfer (bt type, void *p, int len)
 	     particular preventing another / descriptor from being
 	     processed) unless there is another data item to be
 	     transferred.  */
-          consume_data_flag = 0 ;
+	  consume_data_flag = 0 ;
 	  if (n == 0)
 	    return;
 	  break;
@@ -763,8 +820,15 @@ formatted_transfer (bt type, void *p, int len)
       if ((consume_data_flag > 0) && (n > 0))
       {
 	n--;
-        p = ((char *) p) + len;
+	p = ((char *) p) + len;
       }
+
+      if (g.mode == READING)
+	skips = 0;
+
+      pos = (int)(current_unit->recl - current_unit->bytes_left);
+      max_pos = (max_pos > pos) ? max_pos : pos;
+
     }
 
   return;
@@ -935,6 +999,12 @@ data_transfer_init (int read_flag)
   current_unit = get_unit (read_flag);
   if (current_unit == NULL)
   {  /* Open the unit with some default flags.  */
+     if (ioparm.unit < 0)
+     {
+       generate_error (ERROR_BAD_OPTION, "Bad unit number in OPEN statement");
+       library_end ();
+       return;
+     }
      memset (&u_flags, '\0', sizeof (u_flags));
      u_flags.access = ACCESS_SEQUENTIAL;
      u_flags.action = ACTION_READWRITE;
@@ -958,7 +1028,9 @@ data_transfer_init (int read_flag)
     {
       current_unit->recl = file_length(current_unit->s);
       if (g.mode==WRITING)
-        empty_internal_buffer (current_unit->s);
+	empty_internal_buffer (current_unit->s);
+      else
+        current_unit->bytes_left = current_unit->recl;	
     }
 
   /* Check the action.  */
@@ -988,14 +1060,14 @@ data_transfer_init (int read_flag)
 
   if (ioparm.namelist_name != NULL && ionml != NULL)
      {
-        if(ioparm.format != NULL)
-           generate_error (ERROR_OPTION_CONFLICT,
-                    "A format cannot be specified with a namelist");
+	if(ioparm.format != NULL)
+	   generate_error (ERROR_OPTION_CONFLICT,
+		    "A format cannot be specified with a namelist");
      }
   else if (current_unit->flags.form == FORM_FORMATTED &&
-           ioparm.format == NULL && !ioparm.list_format)
+	   ioparm.format == NULL && !ioparm.list_format)
     generate_error (ERROR_OPTION_CONFLICT,
-                    "Missing format for FORMATTED data transfer");
+		    "Missing format for FORMATTED data transfer");
 
 
   if (is_internal_unit () && current_unit->flags.form == FORM_UNFORMATTED)
@@ -1089,11 +1161,11 @@ data_transfer_init (int read_flag)
       /* Check to see if we might be reading what we wrote before  */
 
       if (g.mode == READING && current_unit->mode  == WRITING)
-         flush(current_unit->s);
+	 flush(current_unit->s);
 
       /* Position the file.  */
       if (sseek (current_unit->s,
-               (ioparm.rec - 1) * current_unit->recl) == FAILURE)
+	       (ioparm.rec - 1) * current_unit->recl) == FAILURE)
 	generate_error (ERROR_OS, NULL);
     }
 
@@ -1108,6 +1180,7 @@ data_transfer_init (int read_flag)
   g.first_item = 1;
   g.item_count = 0;
   sf_seen_eor = 0;
+  eor_condition = 0;
 
   pre_position ();
 
@@ -1120,10 +1193,10 @@ data_transfer_init (int read_flag)
       else
 	{
 	  if (ioparm.list_format)
-            {
-               transfer = list_formatted_read;
-               init_at_eol();
-            }
+	    {
+	       transfer = list_formatted_read;
+	       init_at_eol();
+	    }
 	  else
 	    transfer = formatted_transfer;
 	}
@@ -1154,9 +1227,12 @@ data_transfer_init (int read_flag)
     }
   else
     {
-      if (advance_status == ADVANCE_YES)
+      if (advance_status == ADVANCE_YES && !g.seen_dollar)
 	current_unit->read_bad = 1;
     }
+
+  /* Reset counters for T and X-editing.  */
+  max_pos = skips = pending_spaces = 0;
 
   /* Start the data transfer if we are doing a formatted transfer.  */
   if (current_unit->flags.form == FORM_FORMATTED && !ioparm.list_format
@@ -1223,30 +1299,33 @@ next_record_r (int done)
       length = 1;
       /* sf_read has already terminated input because of an '\n'  */
       if (sf_seen_eor) 
-         break;
+	{
+	  sf_seen_eor=0;
+	  break;
+	}
 
       do
-        {
-          p = salloc_r (current_unit->s, &length);
+	{
+	  p = salloc_r (current_unit->s, &length);
 
-          /* In case of internal file, there may not be any '\n'.  */
-          if (is_internal_unit() && p == NULL)
-            {
-               break;
-            }
+	  /* In case of internal file, there may not be any '\n'.  */
+	  if (is_internal_unit() && p == NULL)
+	    {
+	       break;
+	    }
 
-          if (p == NULL)
-            {
-              generate_error (ERROR_OS, NULL);
-              break;
-            }
+	  if (p == NULL)
+	    {
+	      generate_error (ERROR_OS, NULL);
+	      break;
+	    }
 
-          if (length == 0)
-            {
-              current_unit->endfile = AT_ENDFILE;
-              break;
-            }
-        }
+	  if (length == 0)
+	    {
+	      current_unit->endfile = AT_ENDFILE;
+	      break;
+	    }
+	}
       while (*p != '\n');
 
       break;
@@ -1265,6 +1344,9 @@ next_record_w (int done)
   gfc_offset c, m;
   int length;
   char *p;
+
+  /* Zero counters for X- and T-editing.  */
+  max_pos = skips = pending_spaces = 0;
 
   switch (current_mode ())
     {
@@ -1285,7 +1367,7 @@ next_record_w (int done)
 
     case UNFORMATTED_DIRECT:
       if (sfree (current_unit->s) == FAILURE)
-        goto io_error;
+	goto io_error;
       break;
 
     case UNFORMATTED_SEQUENTIAL:
@@ -1327,12 +1409,12 @@ next_record_w (int done)
       p = salloc_w (current_unit->s, &length);
 
       if (!is_internal_unit())
-        {
-          if (p)
-            *p = '\n'; /* No CR for internal writes.  */
-          else
-            goto io_error;
-        }
+	{
+	  if (p)
+	    *p = '\n'; /* No CR for internal writes.  */
+	  else
+	    goto io_error;
+	}
 
       if (sfree (current_unit->s) == FAILURE)
  	goto io_error;
@@ -1389,15 +1471,22 @@ next_record (int done)
 static void
 finalize_transfer (void)
 {
+
+  if (eor_condition)
+    {
+      generate_error (ERROR_EOR, NULL);
+      return;
+    }
+
   if (ioparm.library_return != LIBRARY_OK)
     return;
 
   if ((ionml != NULL) && (ioparm.namelist_name != NULL))
     {
        if (ioparm.namelist_read_mode)
-         namelist_read();
+	 namelist_read();
        else
-         namelist_write();
+	 namelist_write();
     }
 
   transfer = NULL;
@@ -1416,11 +1505,12 @@ finalize_transfer (void)
     {
       free_fnodes ();
 
-      if (advance_status == ADVANCE_NO)
+      if (advance_status == ADVANCE_NO || g.seen_dollar)
 	{
 	  /* Most systems buffer lines, so force the partial record
 	     to be written out.  */
 	  flush (current_unit->s);
+	  g.seen_dollar = 0;
 	  return;
 	}
 
@@ -1497,6 +1587,7 @@ export_proto(st_read);
 void
 st_read (void)
 {
+
   library_start ();
 
   data_transfer_init (1);
@@ -1513,11 +1604,11 @@ st_read (void)
 	break;
 
       case AT_ENDFILE:
-        if (!is_internal_unit())
-          {
-            generate_error (ERROR_END, NULL);
-            current_unit->endfile = AFTER_ENDFILE;
-          }
+	if (!is_internal_unit())
+	  {
+	    generate_error (ERROR_END, NULL);
+	    current_unit->endfile = AFTER_ENDFILE;
+	  }
 	break;
 
       case AFTER_ENDFILE:
@@ -1542,6 +1633,7 @@ export_proto(st_write);
 void
 st_write (void)
 {
+
   library_start ();
   data_transfer_init (0);
 }
@@ -1568,11 +1660,11 @@ st_write_done (void)
 
       case NO_ENDFILE:
 	if (current_unit->current_record > current_unit->last_record)
-          {
-            /* Get rid of whatever is after this record.  */
-            if (struncate (current_unit->s) == FAILURE)
-              generate_error (ERROR_OS, NULL);
-          }
+	  {
+	    /* Get rid of whatever is after this record.  */
+	    if (struncate (current_unit->s) == FAILURE)
+	      generate_error (ERROR_OS, NULL);
+	  }
 
 	current_unit->endfile = AT_ENDFILE;
 	break;
@@ -1581,94 +1673,78 @@ st_write_done (void)
   library_end ();
 }
 
+/* Receives the scalar information for namelist objects and stores it
+   in a linked list of namelist_info types.  */
 
-static void
-st_set_nml_var (void * var_addr, char * var_name, int var_name_len,
-                int kind, bt type, int string_length)
+void
+st_set_nml_var (void * var_addr, char * var_name, GFC_INTEGER_4 len,
+		gfc_charlen_type string_length, GFC_INTEGER_4 dtype)
 {
-  namelist_info *t1 = NULL, *t2 = NULL;
-  namelist_info *nml = (namelist_info *) get_mem (sizeof (namelist_info));
+  namelist_info *t1 = NULL;
+  namelist_info *nml;
+
+  nml = (namelist_info*) get_mem (sizeof (namelist_info));
+
   nml->mem_pos = var_addr;
-  if (var_name)
+
+  nml->var_name = (char*) get_mem (strlen (var_name) + 1);
+  strcpy (nml->var_name, var_name);
+
+  nml->len = (int) len;
+  nml->string_length = (index_type) string_length;
+
+  nml->var_rank = (int) (dtype & GFC_DTYPE_RANK_MASK);
+  nml->size = (index_type) (dtype >> GFC_DTYPE_SIZE_SHIFT);
+  nml->type = (bt) ((dtype & GFC_DTYPE_TYPE_MASK) >> GFC_DTYPE_TYPE_SHIFT);
+
+  if (nml->var_rank > 0)
     {
-      assert (var_name_len > 0);
-      nml->var_name = (char*) get_mem (var_name_len+1);
-      strncpy (nml->var_name, var_name, var_name_len);
-      nml->var_name[var_name_len] = 0;
+      nml->dim = (descriptor_dimension*)
+		   get_mem (nml->var_rank * sizeof (descriptor_dimension));
+      nml->ls = (nml_loop_spec*)
+		  get_mem (nml->var_rank * sizeof (nml_loop_spec));
     }
   else
     {
-      assert (var_name_len == 0);
-      nml->var_name = NULL;
+      nml->dim = NULL;
+      nml->ls = NULL;
     }
-
-  nml->len = kind;
-  nml->type = type;
-  nml->string_length = string_length;
 
   nml->next = NULL;
 
   if (ionml == NULL)
-     ionml = nml;
+    ionml = nml;
   else
     {
-      t1 = ionml;
-      while (t1 != NULL)
-       {
-         t2 = t1;
-         t1 = t1->next;
-       }
-       t2->next = nml;
+      for (t1 = ionml; t1->next; t1 = t1->next);
+      t1->next = nml;
     }
+  return;
 }
 
-extern void st_set_nml_var_int (void *, char *, int, int);
-export_proto(st_set_nml_var_int);
-
-extern void st_set_nml_var_float (void *, char *, int, int);
-export_proto(st_set_nml_var_float);
-
-extern void st_set_nml_var_char (void *, char *, int, int, gfc_charlen_type);
-export_proto(st_set_nml_var_char);
-
-extern void st_set_nml_var_complex (void *, char *, int, int);
-export_proto(st_set_nml_var_complex);
-
-extern void st_set_nml_var_log (void *, char *, int, int);
-export_proto(st_set_nml_var_log);
+/* Store the dimensional information for the namelist object.  */
 
 void
-st_set_nml_var_int (void * var_addr, char * var_name, int var_name_len,
-		    int kind)
+st_set_nml_var_dim (GFC_INTEGER_4 n_dim, GFC_INTEGER_4 stride,
+		    GFC_INTEGER_4 lbound, GFC_INTEGER_4 ubound)
 {
-  st_set_nml_var (var_addr, var_name, var_name_len, kind, BT_INTEGER, 0);
+  namelist_info * nml;
+  int n;
+
+  n = (int)n_dim;
+
+  for (nml = ionml; nml->next; nml = nml->next);
+
+  nml->dim[n].stride = (ssize_t)stride;
+  nml->dim[n].lbound = (ssize_t)lbound;
+  nml->dim[n].ubound = (ssize_t)ubound;
 }
 
-void
-st_set_nml_var_float (void * var_addr, char * var_name, int var_name_len,
-		      int kind)
-{
-  st_set_nml_var (var_addr, var_name, var_name_len, kind, BT_REAL, 0);
-}
+extern void st_set_nml_var (void * ,char * ,
+			    GFC_INTEGER_4 ,gfc_charlen_type ,GFC_INTEGER_4);
+export_proto(st_set_nml_var);
 
-void
-st_set_nml_var_char (void * var_addr, char * var_name, int var_name_len,
-		     int kind, gfc_charlen_type string_length)
-{
-  st_set_nml_var (var_addr, var_name, var_name_len, kind, BT_CHARACTER,
-		  string_length);
-}
+extern void st_set_nml_var_dim (GFC_INTEGER_4, GFC_INTEGER_4,
+				GFC_INTEGER_4 ,GFC_INTEGER_4);
+export_proto(st_set_nml_var_dim);
 
-void
-st_set_nml_var_complex (void * var_addr, char * var_name, int var_name_len,
-			int kind)
-{
-  st_set_nml_var (var_addr, var_name, var_name_len, kind, BT_COMPLEX, 0);
-}
-
-void
-st_set_nml_var_log (void * var_addr, char * var_name, int var_name_len,
-		    int kind)
-{
-   st_set_nml_var (var_addr, var_name, var_name_len, kind, BT_LOGICAL, 0);
-}
