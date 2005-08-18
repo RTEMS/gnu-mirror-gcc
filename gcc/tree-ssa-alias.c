@@ -446,7 +446,7 @@ count_uses_and_derefs (tree ptr, tree stmt, unsigned *num_uses_p,
 	  rhs = stmt;
 	}
 
-      if (lhs && EXPR_P (lhs))
+      if (lhs && (TREE_CODE (lhs) == TREE_LIST || EXPR_P (lhs)))
 	{
 	  struct count_ptr_d count;
 	  count.ptr = ptr;
@@ -456,7 +456,7 @@ count_uses_and_derefs (tree ptr, tree stmt, unsigned *num_uses_p,
 	  *num_derefs_p = count.count;
 	}
 
-      if (rhs && EXPR_P (rhs))
+      if (rhs && (TREE_CODE (rhs) == TREE_LIST || EXPR_P (rhs)))
 	{
 	  struct count_ptr_d count;
 	  count.ptr = ptr;
@@ -1621,23 +1621,6 @@ may_alias_p (tree ptr, HOST_WIDE_INT mem_alias_set,
 
   alias_stats.tbaa_queries++;
 
-  /* If VAR is a pointer with the same alias set as PTR, then dereferencing
-     PTR can't possibly affect VAR.  Note, that we are specifically testing
-     for PTR's alias set here, not its pointed-to type.  We also can't
-     do this check with relaxed aliasing enabled.  */
-  if (POINTER_TYPE_P (TREE_TYPE (var))
-      && var_alias_set != 0
-      && mem_alias_set != 0)
-    {
-      HOST_WIDE_INT ptr_alias_set = get_alias_set (ptr);
-      if (ptr_alias_set == var_alias_set)
-	{
-	  alias_stats.alias_noalias++;
-	  alias_stats.tbaa_resolved++;
-	  return false;
-	}
-    }
-
   /* If the alias sets don't conflict then MEM cannot alias VAR.  */
   if (!alias_sets_conflict_p (mem_alias_set, var_alias_set))
     {
@@ -1904,7 +1887,11 @@ add_pointed_to_var (struct alias_info *ai, tree ptr, tree value)
   if (REFERENCE_CLASS_P (pt_var))
     pt_var = get_base_address (pt_var);
 
-  if (pt_var && SSA_VAR_P (pt_var))
+  if (pt_var == NULL)
+    {
+      pi->pt_anything = 1;
+    }
+  else if (SSA_VAR_P (pt_var))
     {
       uid = var_ann (pt_var)->uid;
       bitmap_set_bit (ai->addresses_needed, uid);
@@ -1917,6 +1904,18 @@ add_pointed_to_var (struct alias_info *ai, tree ptr, tree value)
 	 global memory (which will make its tag a global variable).  */
       if (is_global_var (pt_var))
 	pi->pt_global_mem = 1;
+    }
+  else if (TREE_CODE (pt_var) == INDIRECT_REF
+           && TREE_CODE (TREE_OPERAND (pt_var, 0)) == SSA_NAME)
+    {
+      /* If VALUE is of the form &(*P_j), then PTR will have the same
+	 points-to information as P_j.  */
+      add_pointed_to_expr (ai, ptr, TREE_OPERAND (pt_var, 0));
+    }
+  else
+    {
+      /* Give up.  PTR points anywhere.  */
+      set_pt_anything (ptr);
     }
 }
 

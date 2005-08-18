@@ -1,3 +1,882 @@
+2005-08-17  Tom Tromey  <tromey@redhat.com>
+
+	* java/lang/Class.h (_Jv_IsBinaryCompatibilityABI): Declare as
+	friend.
+	* include/jvm.h (_Jv_IsBinaryCompatibilityABI): New function.
+	* testsuite/libjava.lang/bclink.java: New file.
+	* testsuite/libjava.lang/bclink.out: New file.
+	* link.cc (print_class_loaded): Changed ABI test to look at
+	various _syms fields.
+
+2005-08-17  Paolo Bonzini  <bonzini@gnu.org>
+
+	Backport from mainline:
+
+	2005-05-18  Paolo Bonzini  <bonzini@gnu.org>
+
+	* Makefile.am (Makefile.deps): Do not use \0, it is unportable.
+	* Makefile.in: Regenerate.
+
+	2005-05-17  Paolo Bonzini  <bonzini@gnu.org>
+
+	* configure.ac (--enable-libgcj-multifile): Remove.
+
+	* Makefile.am (all_native_compiled_source_files,
+	(all_native_compiled_dirs, all_java_dirs, all_java_lo_files,
+	all_libgcj_lo_files, all_xlib_lo_files,
+	all_java_deps_files, all_java_stamp_files,
+	all_java_filelist_files): New variables.
+	(EXTRA_DIST): New Automake variable.
+	(CLEANFILES): Add .stamp, .list and .lo files.
+	(%.list, %.lo, %.stamp, Makefile.deps): New rules.
+	(classes.stamp): Depend on $(all_java_stamp_files).
+	(libgcj.la): Pass $(libgcj_la_LIBADD) to the linker without
+	going through write_entries_to_file.
+
+	(all_java_source_files, all_property_files): Move earlier.
+	(libgcj_la_OBJECTS, javao_files, xlib_javao_files,
+	all_java_class_files): Remove.
+	(gtk_awt_peer_sources): Rename to...
+	(gtk_awt_peer_source_files): ... this.  Adjust throughout.
+
+	(ONESTEP): Remove.
+	(libgcj0_convenience_la_SOURCES): Remove Java source files.
+	(libgcj0_convenience_la_LIBADD): Add $(all_libgcj_lo_files).
+	(libgcj0_convenience_la_DEPENDENCIES): Likewise.
+	(libgcj_la_SOURCES): Remove.
+	(lib_gnu_awt_xlib_la_SOURCES): Remove Java source files.
+	(lib_gnu_awt_xlib_la_LIBADD): Add $(all_xlib_lo_files).
+	(lib_gnu_awt_xlib_la_DEPENDENCIES): Likewise.
+
+	* configure: Regenerate.
+	* Makefile.in: Regenerate.
+	* external/Makefile.in: Regenerate.
+	* external/sax/Makefile.in: Regenerate.
+	* external/w3c_dom/Makefile.in: Regenerate.
+	* gcj/Makefile.in: Regenerate.
+	* include/Makefile.in: Regenerate.
+	* libltdl/Makefile.in: Regenerate.
+	* testsuite/Makefile.in: Regenerate.
+
+	2005-05-10  Paolo Bonzini  <bonzini@gnu.org>
+
+	PR java/21436
+	* testsuite/libjava.jacks/jacks.xfail: Adjust.
+
+2005-08-12  Morgan Deters  <mdeters@morgandeters.com>
+
+	PR libgcj/23353:
+	* java/lang/natObject.cc (clone): Clear sync_info.
+
+2005-07-13  Andrew Haley  <aph@redhat.com>
+
+	* gnu/java/net/protocol/file/Connection.java (unquote): New
+	method.
+	(connect): Unquote filename.
+	gnu/java/net/protocol/jar/Connection.java (getInputStream):
+	Likewise.  
+	(getJarFile): Likewise.
+
+	* java/net/URLConnection.java (getContentHandler): Guard cast with
+	instaceof.
+
+	* java/net/URL.java (URL): If the file part of a spec is absolute,
+	ignore the file part of its context.
+
+2005-07-08  Colin Walters  <walters@verbum.org>
+
+	* verify.cc (class _Jv_BytecodeVerifier) <op_new>: Don't
+	check for abstract classes or interfaces here; JVM spec
+	says it should throw an exception, so we'll do so later.
+	* interpret.cc (run): Throw an InstantiationException for
+	abstract classes and interfaces.
+
+2005-07-08  Andrew Haley  <aph@redhat.com>
+
+	* posix-threads.cc (_Jv_ThreadSetPriority): Use SCHED_OTHER
+	(regular, non-realtime scheduling), not SCHED_RR (realtime,
+	round-robin).
+
+2005-07-07  Release Manager
+
+	* GCC 4.0.1 released.
+
+2005-06-05  Anthony Green  <green@redhat.com>
+
+	* gnu/java/net/natPlainSocketImplPosix.cc (setOption): Fix case
+	fall-through bug.
+
+2005-06-04  Anthony Green  <green@redhat.com>
+
+	* java/net/URLClassLoader.java: import gnu.gcj.Core,
+	and gnu.java.net.protocol.core.CoreInputStream.
+	(CureURLLoader): New class.
+	(CoreResource): New class.
+	(addURLImpl): Add special treatment for the "core" protocol.
+	* gnu/gcj/natCore.cc (find): New method.
+	* gnu/gcj/Core.java (find): New method.
+	
+2005-06-04  Andreas Tobler  <a.tobler@schweiz.ch>
+
+	* jawt.c: Remove malloc.h include and use stdlib.h instead.
+
+2005-06-01  Tom Tromey  <tromey@redhat.com>
+
+	PR libgcj/21753:
+	* java/lang/natString.cc (substring): Changed sharing heuristic.
+
+2005-05-29  Michael Koch  <konqueror@gmx.de>
+
+	PR libgcj/20273:
+	* java/util/LinkedHashMap.java (access): Set 'root.pred'.
+
+2005-05-27  Robin Green  <greenrd@greenrd.org>
+
+	PR libgcj/21775:
+	* java/util/logging/natLogger.cc (getCallerStackFrame): Start
+	with i=1.
+
+2005-05-26  Bryce McKinlay  <mckinlay@redhat.com>
+
+	* include/jvm.h (FLAG_BINARYCOMPAT_ABI): New.
+	(GCJ_BINARYCOMPAT_ADDITION): Removed.
+	(OLD_GCJ_40_BC_ABI_VERSION): Renamed. Old-style version ID for BC-ABI
+	classes.
+	(GCJ_40_BC_ABI_VERSION): New. Calculate version	ID using new method.
+	(_Jv_CheckABIVersion): Check for both old and new style version IDs.
+
+2005-05-14  Chris Burdess  <dog@gnu.org>
+
+	* gnu/xml/dom/ls/SAXEventSink.java: Ignore XML entities in start/
+	end entity callbacks.
+
+2005-05-24  Gary Benson  <gbenson@redhat.com>
+
+	PR libgcj/21736:
+	* java/text/MessageFormat.java (MessageFormatElement.setLocale):
+	Handle DateFormat.DEFAULT case correctly.
+
+2005-05-21  Tom Tromey  <tromey@redhat.com>
+
+	PR libgcj/21703:
+	* java/lang/ref/natReference.cc (find_slot): Handle case where
+	table has no NULL entries.
+	* java/lang/natString.cc (_Jv_StringFindSlot): Handle case where
+	table has no NULL entries.
+
+2005-05-20  Tom Tromey  <tromey@redhat.com>
+
+	PR libgcj/21637:
+	* gnu/java/net/protocol/jar/Connection.java (getInputStream):
+	Throw FileNotFoundException if jar entry not found.
+
+2005-05-18  Thomas Fitzsimmons  <fitzsim@redhat.com>
+
+	PR libgcj/19729
+	* gnu/java/security/provider/DSASignature.java: Import updates
+	from GNU Crypto.
+
+2005-05-18  Anthony Green  <green@redhat.com>
+
+	* jni/gtk-peer/gtk_jawt.c (classpath_jawt_object_lock,
+	classpath_jawt_object_unlock, classpath_jawt_create_lock,
+	classpath_jawt_destroy_lock): New functions.
+	* jni/classpath/classpath_jawt.h (classpath_jawt_object_lock,
+	classpath_jawt_object_unlock, classpath_jawt_create_lock,
+	classpath_jawt_destroy_lock): New functions.
+	* include/jawt.h (struct _JAWT_DrawingSurface): Add lock
+	field.
+	* jawt.c: #include malloc.h.
+	(_Jv_Lock): Use lock.
+	(_Jv_Unlock): Ditto.
+	(_Jv_GetDrawingSurface): Initialize lock.
+	(_Jv_FreeDrawingSurface): Destroy lock.
+	(_Jv_FreeDrawingSurfaceInfo): Free platformInfo.
+
+2005-05-17  David Daney  <ddaney@avtrex.com>
+
+	PR libgcj/18220
+	* testsuite/libjava.lang/Process_3.java (run):  Exit on error.
+
+2005-05-16  Tom Tromey  <tromey@redhat.com>
+
+	PR libgcj/21140:
+	* java/nio/charset/Charset.java (encode, decode): Don't cache.
+
+2005-05-16  Tom Tromey  <tromey@redhat.com>
+
+	* gnu/java/net/protocol/http/Headers.java (parse): Include final
+	character of line.
+
+2005-05-16  Tom Tromey  <tromey@redhat.com>
+
+	PR libgcj/21606:
+	* java/net/URI.java (unquote): Handle lower-case letters as well.
+
+2005-05-16  Ziga Mahkovec  <ziga.mahkovec@klika.si>
+
+	PR libgcj/20504
+	gnu/regexp/RE.java: Add support for quoting constructs.
+
+2005-05-15  Tom Tromey  <tromey@redhat.com>
+
+	PR java/21519:
+	* testsuite/libjava.compile/pr21519.java: New file.
+	* testsuite/libjava.compile/pr21519.no-link: New file.
+
+2005-05-13  Bryce McKinlay  <mckinlay@redhat.com>
+
+	PR libgcj/21557
+	* java/lang/natObject.cc (_Jv_MonitorEnter): Save and clear thread
+	interrupt status flag if _Jv_CondWait is interrupted.
+
+2005-05-13  Bryce McKinlay  <mckinlay@redhat.com>
+
+	* include/jvm.h (gcj::verifyClasses): Declare.
+	* link.cc (gcj::verbose_class_flag): Moved.
+	* prims.cc (gcj::verifyClasses): Define here.
+	(gcj::verbose_class_flag): Move definition here.
+	(_Jv_Linker::wait_for_state): Don't call verify_class
+	if gcj::verifyClasses is not set.
+	* gij.cc (main): Set gcj::verifyClasses when '-noverify' is given.
+
+2005-05-13  Aaron Luchko  <aluchko@redhat.com>
+
+	* gij.cc (main): Recognize '-verify', '-noverify', and
+	'-verifyremote'
+
+2005-05-13  Tom Tromey  <tromey@redhat.com>
+
+	* gnu/gcj/runtime/SystemClassLoader.java (init): Handle empty
+	element in path.
+
+2005-05-09  David Daney  <ddaney@avtrex.com>
+
+	* java/util/BitSet.java (get(int, int)): Fix breakage when
+	requested set doesn't start on a multiple of 64.
+
+2005-04-27  Andrew Haley  <aph@redhat.com>
+
+	PR java/19285
+	* prims.cc (_Jv_ResolvePoolEntry): New function.
+	* include/jvm.h (_Jv_Linker::find_field): New arg: found_class.
+	* link.cc (_Jv_Linker::find_field): New arg: found_class.
+	(resolve_pool_entry): Initialize the class in which a field is
+	found.
+	(link_symbol_table): Pass new arg to found_class.
+
+2005-05-05  Thomas Fitzsimmons  <fitzsim@redhat.com>
+
+	* jni/gtk-peer/gnu_java_awt_peer_gtk_GtkToolkit.c
+	(init_glib_threads): Check if threading system is already
+	initialized.
+
+2005-05-04  Tom Tromey  <tromey@redhat.com>
+
+	* java/nio/channels/FileLock.java (toString): Entirely avoid
+	String "+".
+
+2005-05-04  Andrew Overholt  <overholt@redhat.com>
+
+	* java/nio/channels/FileLock.java (toString): Re-implement using
+	StringBuffer.
+
+2005-05-03  Andrew Overholt  <overholt@redhat.com>
+
+	PR libgcj/21372:
+	* gnu/java/nio/channels/FileChannelImpl.java: Return null if lock
+	could not be acquired.
+	* java/nio/channels/FileLock.java (toString): Re-implement to be
+	in line with other implementations.
+
+2005-04-26  Luca Barbieri  <luca.barbieri@gmail.com>
+
+	PR libgcj/21136:
+	* gnu/java/nio/channels/FileChannelImpl.java (tryLock): Pass
+	'false' to native lock().
+	(lock): Pass 'true' to native lock().
+
+2005-04-27  Thomas Fitzsimmons  <fitzsim@redhat.com>
+
+	* Makefile.am (ordinary_java_source_files): Add
+	gnu/java/net/protocol/https/Handler.java.
+	* Makefile.in: Regenerate.
+	* java/net/URL.java: Remove org.metastatic.jessie from default
+	protocol search path.
+
+2005-04-27  Chris Burdess  <dog@gnu.org>
+
+	* gnu/java/net/protocol/https/Handler.java: New file.
+
+2005-04-26  Thomas Fitzsimmons  <fitzsim@redhat.com>
+
+	PR libgcj/21233:
+	* gij.cc (version): Properly quote java version.
+	(main): Fix typo in comment.
+
+2005-04-20  Release Manager
+
+	* GCC 4.0.0 released.
+
+2005-04-17  Mark Wielaard  <mark@klomp.org>
+
+	* java/lang/natRuntime.cc (insertSystemProperties): Set
+	java.class.path to CLASSPATH only when not empty. Fall back to
+	default path "." when java.class.path is empty.
+
+2005-04-16  Anthony Green  <green@redhat.com>
+
+	* Makefile.am (gnu-xml.lo, javax-imageio.lo, javax-xml.lo,
+	gnu-java-beans.lo, gtk-awt-peer.lo) : Sort the output of all
+	"find" output in order to work around the libtool bug described in
+	PR libgcj/20693.
+	* Makefile.in: Rebuilt.
+
+2005-04-16  Tom Tromey  <tromey@redhat.com>
+
+	* gnu/xml/pipeline/ValidationConsumer.java (Recognizer): Make
+	'ANY' package-private.
+
+2005-04-15  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in: Rebuilt.
+	* Makefile.am (libgij_la_LIBADD): Moved SAX and DOM...
+	(libgcj0_convenience_la_LIBADD): ... here.
+
+2005-04-14  Tom Tromey  <tromey@redhat.com>
+
+	* java/lang/natClassLoader.cc (_Jv_FindClass): Use system loader,
+	not boot loader.
+	(_Jv_RegisterInitiatingLoader): Likewise.
+	(_Jv_UnregisterInitiatingLoader): Likewise.
+
+2005-04-13  Mark Wielaard  <mark@klomp.org>
+
+	* java/lang/natRuntime.cc (insertSystemProperties): Set
+	java.class.path to CLASSPATH if not already set.
+
+2005-04-13  Thomas Fitzsimmons  <fitzsim@redhat.com>
+
+	* prims.cc (parse_verbose_args): Fix verbose argument parsing.
+
+2005-04-11  Michael Koch  <konqueror@gmx.de>
+
+	* javax/imageio/ImageIO.java (ReaderFormatFilter.filter):
+	Fixed wrong casting.
+
+2005-04-06  Andrew Haley  <aph@redhat.com>
+
+	* testsuite/libjava.lang/bytearray.java: New file.
+	* testsuite/libjava.lang/bytearray.out: New file.
+	* java/lang/ClassLoader.java (loadClassFromSig): Declare
+	(loadClass): Use it.
+	* java/lang/natClassLoader.cc (loadClassFromSig): New method.
+
+2005-04-06  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in: Rebuilt.
+	* Makefile.am (lib_gnu_java_awt_peer_gtk_la_SOURCES): Removed
+	gtk_awt_peer_sources.
+	(lib_gnu_java_awt_peer_gtk_la_LIBADD): Added gtk-awt-peer.lo.
+	(lib_gnu_java_awt_peer_gtk_la_DEPENDENCIES): Likewise.
+	($(gtk_awt_peer_sources:.java=.lo)): Removed.
+	(gtk-awt-peer.lo): New target.
+
+	* java/lang/natVMClassLoader.cc (getSystemClassLoaderInternal):
+	Updated for name change.
+	(nativeFindClass): New method.
+	(loadClass): Use nativeFindClass.
+	* java/lang/natClassLoader.cc (_Jv_FindClass): Use single-argument
+	form of loadClass.
+	* java/lang/VMClassLoader.java (tried_libraries, lib_control,
+	LIB_FULL, LIB_CACHE, LIB_NEVER): New fields from old
+	VMClassLoader.
+	(initialize): New method.
+	(nativeFindClass): Declare.
+	* gnu/gcj/runtime/natVMClassLoader.cc: Removed.
+	* gnu/gcj/runtime/VMClassLoader.java: Removed.
+	* gnu/gcj/runtime/ExtensionClassLoader.java: Renamed from
+	VMClassLoader.java.
+	(definePackageForNative): Removed.
+	(tried_libraries, LIB_CACHE, LIB_FULL, LIB_NEVER, lib_control):
+	Moved to VMClassLoader.java.
+	* prims.cc (_Jv_CreateJavaVM): Updated for renaming.
+	* Makefile.am (gnu/gcj/runtime/ExtensionClassLoader.h): Renamed.
+	(ordinary_java_source_files): Added ExtensionClassLoader.java,
+	removed VMClassLoader.java.
+	(nat_source_files): Removed natVMClassLoader.cc.
+
+	* java/lang/natRuntime.cc (insertSystemProperties): Set
+	gnu.gcj.runtime.endorsed.dirs.
+	* Makefile.in: Rebuilt.
+	* Makefile.am (ordinary_java_source_files): Added
+	HelperClassLoader.java.
+	(AM_CXXFLAGS): Define GCJ_ENDORSED_DIRS.
+	* gnu/gcj/runtime/VMClassLoader.java (VMClassLoader): Extends
+	HelperClassLoader.
+	(init): Use addDirectoriesFromProperty.
+	* gnu/gcj/runtime/BootClassLoader.java (BootClassLoader): Extends
+	HelperClassLoader.  Use addDirectoriesFromProperty.  Handle
+	gnu.gcj.runtime.endorsed.dirs.
+	* gnu/gcj/runtime/HelperClassLoader.java: New file.
+
+	* gnu/gcj/runtime/BootClassLoader.java (BootClassLoader): Don't
+	add sax and w3c libraries.
+	* Makefile.am (libgij_la_LIBADD): Added libsax-gcj.la and
+	libw3c-gcj.la.
+	* external/w3c_dom/Makefile.in: Rebuilt.
+	* external/w3c_dom/Makefile.am (libw3c_gcj_la_GCJFLAGS): Include
+	AM_GCJFLAGS.
+	(libw3c_gcj_la_LDFLAGS): New variable.
+	(noinst_LTLIBRARIES): Renamed.
+	* external/sax/Makefile.in: Rebuilt.
+	* external/sax/Makefile.am (libsax_gcj_la_GCJFLAGS): Include
+	AM_GCJFLAGS.
+	(libsax_gcj_la_LDFLAGS): New variable.
+	(noinst_LTLIBRARIES): Renamed.
+
+	* Makefile.in: Rebuilt.
+	* Makefile.am (AM_CXXFLAGS): Define TOOLEXECLIBDIR.
+	(libgcj0_convenience_la_SOURCES): Don't include
+	gnu_xml_source_files.
+	(libgcj0_convenience_la_LIBADD): New variable.
+	(libgcj_la_LIBADD): Don't include sax or w3c_dom.
+	(all_java_source_files): javax_imageio_source_files,
+	javax_xml_source_files, and gnu_java_beans_source_files.
+	($(gnu_xml_source_files:.java=.lo)): Removed target.
+	(gnu-xml.lo): New target.
+	(javax-imageio.lo): Likewise.
+	(javax-xml.lo): Likewise.
+	(gnu-java-beans.lo): Likewise.
+	(gnu_java_beans_source_files): New variable.
+	(javax_imageio_source_files): Likewise.
+	(javax_xml_source_files): Likewise.
+	(javax_source_files): Moved files to other variable.
+	(awt_java_source_files): Likewise.
+	(ordinary_java_source_files): Added BootClassLoader.java.
+	* java/lang/natVMClassLoader.cc (defineClass): Use boot loader,
+	not system class loader.
+	(initBootLoader): New method.
+	(loadClass): Search bootLoader.
+	* java/lang/natClassLoader.cc (_Jv_RegisterInitiatingLoader): Use
+	boot loader, not system class loader.
+	(_Jv_UnregisterInitiatingLoader): Likewise.
+	(_Jv_FindClass): Likewise.  Ensure entries in
+	bootstrap_class_list are unique.
+	* java/lang/natClass.cc (getClassLoader): Don't special case
+	system class loader.
+	* java/lang/VMClassLoader.java (bootLoader): New field.
+	(getResource): Use bootLoader.
+	(getResources): Likewise.
+	(initBootLoader): Declare.
+	* gnu/gcj/runtime/BootClassLoader.java: New file.
+	* external/sax/org/xml/sax/helpers/NamespaceSupport.java
+	(EMPTY_ENUMERATION): Now package-private.
+	* external/w3c_com/Makefile.in: Rebuilt.
+	* external/w3c_com/Makefile.am (MULTIBUILDTOP): New variable.
+	(w3c.jar): New target.
+	(classes.stamp): Updated.
+	(toolexeclib_LTLIBRARIES): Renamed from noinst_LTLIBRARIES.
+	Changed name of library.
+	(libw3c_gcj_la_SOURCES): New variable.
+	(libw3c_gcj_la_GCJFLAGS): Likewise.
+	(source_files): Renamed from lib3c_convenience_la_SOURCES.
+	* external/sax/Makefile.in: Rebuilt.
+	* external/sax/Makefile.am (MULTIBUILDTOP): New variable.
+	(sax.jar): New target.
+	(classes.stamp): Updated.
+	(toolexeclib_LTLIBRARIES): Renamed from noinst_LTLIBRARIES.
+	Changed name of library.
+	(libsax_gcj_la_SOURCES): New variable.
+	(libsax_gcj_la_GCJFLAGS): Likewise.
+	(source_files): Renamed from libsax_convenience_la_SOURCES.
+	* prims.cc (_Jv_CreateJavaVM): Initialize the bootstrap class
+	loader.
+	(_Jv_RunMain): Handle case where 'runtime' is NULL at exit.
+
+2005-03-28  Alexandre Oliva  <aoliva@redhat.com>
+
+	* configure.ac: Revert 2005-03-25's patch.  Propagate MULTIlib
+	settings to sub Makefiles.
+	(GCJH, ZIP): Prefix with top_builddir.
+	* configure: Rebuild.
+	* external/w3c_dom/Makefile.am (MULTIBUILDTOP): Don't override.
+	* external/w3c_dom/Makefile.in: Rebuild.
+	* external/sax/Makefile.am (MULTIBUILDTOP): Don't override.
+	* external/sax/Makefile.in: Rebuild.
+
+2005-04-05  Andrew Haley  <aph@redhat.com>
+
+	* gnu/gcj/tools/gcj_dbtool/Main.java (Fileset): New class.
+	(Tokenizer): New class.
+	(getFiles): New method.
+	(main): Add "-" argument.
+	Add "-0" argument.
+	Read list of files from stdin when merging map databases.
+	(usage):  Add "-" argument.
+	Add "-0" argument.
+	Minor corrections.
+
+2005-04-05  Thomas Fitzsimmons  <fitzsim@redhat.com>
+
+	PR libgcj/20750
+	* Makefile.am (AM_CXXFLAGS): Define JAVA_HOME.
+	* Makefile.in: Regenerate.
+	* configure.ac: Add --with-java-home option.
+	* configure: Regenerate.
+	* external/Makefile.in: Regenerate.
+	* external/sax/Makefile.in: Regenerate.
+	* external/w3c_dom/Makefile.in: Regenerate.
+	* gcj/Makefile.in: Regenerate.
+	* include/Makefile.in: Regenerate.
+	* testsuite/Makefile.in: Regenerate.
+	* java/lang/natRuntime.cc (insertSystemProperties): Set java.home
+	to JAVA_HOME macro.
+
+2005-04-04  Steve Pribyl <steve@netfuel.com>
+
+	PR libgcj/20761
+	* configure.ac: Fix fastjar definition for cross builds.
+	* configure: Rebuilt.
+
+2005-04-04  Tom Tromey  <tromey@redhat.com>
+
+	* java/lang/ClassLoader.java (loadClass): Resolve class even if
+	it was already found.
+
+2005-04-04  Tom Tromey  <tromey@redhat.com>
+
+	* java/net/URL.java (DEFAULT_SEARCH_PATH): Added
+	org.metastatic.jessie.
+
+2005-04-02  Anthony Green  <green@redhat.com>
+
+	PR libgcj/20727
+	* java/nio/DirectByteBufferImpl.java: Fix buffer ownership bug.
+
+2005-04-02  Mark Wielaard  <mark@klomp.org>
+
+	* javax/naming/directory/BasicAttributes.java (equals): Compare to any
+	Attributes and attribute order doesn't matter.
+	(BasicAttributesEnumeration.where): Initialize to zero.
+	(BasicAttributesEnumeration.nextElement): Update and compare where
+	appropriately (zero based).
+
+2005-04-01  Thomas Fitzsimmons  <fitzsim@redhat.com>
+
+	PR libgcj/20090, PR libgcj/20526
+	* gij.cc (nonstandard_opts_help): New function.
+	(add_option): New function.
+	(main): Support java options.  Set java.class.path.  Don't set
+	_Jv_Jar_Class_Path.
+	* prims.cc (parse_x_arg): New function.
+	(parse_init_args): Call parse_x_arg for -X and _ options, when
+	ignoreUnrecognized is true.
+	(new _Jv_RunMain): New vm_args variant.
+	(old _Jv_RunMain): Call new vm_args _Jv_RunMain.
+	(_Jv_Jar_Class_Path): Remove variable.
+	* include/java-props.h: Likewise.
+	* include/cni.h (JvRealloc): New function.
+	* include/jvm.h (_Jv_RunMain): Declare vm_args variant.
+	* java/lang/natRuntime.cc (insertSystemProperties): Remove
+	_Jv_Jar_Class_Path logic.  Use JV_VERSION and JV_API_VERSION
+	macros.
+	* configure.ac (JV_VERSION): Define.
+	(JV_API_VERSION): Likewise.
+	* configure: Regenerate.
+	* include/config.h.in: Regenerate.
+
+2005-04-01  Mark Anderson <mark@panonet.net>
+
+	* java/lang/natDouble.cc (parseDouble): Handle NaN, Infinity and
+	-Infinity as parameters.
+
+2005-04-01  Michael Koch  <konqueror@gmx.de>
+
+	* java/io/PipedInputStream.java
+	(read): Make sure a positive byte value is returned. Revised javadoc.
+	Thanks to Olafur Bragason for reporting these bugs.
+
+2005-04-01  Jeroen Frijters  <jeroen@frijters.net>
+
+	* java/util/Timer.java
+	(run): Stop the queue if a task throws an exception.
+
+2005-03-31  Thomas Fitzsimmons  <fitzsim@redhat.com>
+
+	* javax/swing/text/JTextComponent.java (viewToModel): New method.
+
+2005-03-30  Thomas Fitzsimmons  <fitzsim@redhat.com>
+
+	* Makefile.am (gtk_c_source_files): Remove jni/classpath/jcl.c,
+	jni/classpath/jnilink.c, jni/classpath/primlib.c.
+	(lib_gnu_java_awt_peer_gtk_la_SOURCES): jni/classpath/jcl.h,
+	jni/classpath/jnilink.h, jni/classpath/primlib.h.
+	* Makefile.in: Regenerate.
+	* jni/classpath/jcl.h: Remove.
+	* jni/classpath/jcl.c: Likewise.
+	* jni/classpath/jnilink.h: Likewise.
+	* jni/classpath/jnilink.c: Likewise.
+	* jni/classpath/primlib.h: Likewise.
+	* jni/classpath/primlib.c: Likewise.
+
+2005-03-30  Andreas Tobler  <a.tobler@schweiz.ch>
+
+	* Makefile.am (classes.stamp): Add gnu/gcj/tools/gcj_dbtool/Main.java
+	to fix a ONESTEP fallout.
+	* Makefile.in: Regenerate.
+
+2005-03-30  Andreas Tobler  <a.tobler@schweiz.ch>
+
+	* testsuite/lib/libjava.exp (libjava_init): Use the same target
+	check for Darwin.
+	(libjava_arguments): Likewise.
+
+	* testsuite/libjava.jni/jni.exp (gcj_jni_compile_c_to_so): Likewise.
+	(gcj_jni_test_one): Likewise.
+	(gcj_jni_invocation_compile_c_to_binary): Likewise.
+	Add flags to keep the Darwin linker quiet.
+	(gcj_jni_invocation_test_one): Use the same target check for Darwin.
+	Add -liconv and lgcc_s for Darwin.
+
+2005-03-26  Chris Burdess  <dog@gnu.org>
+
+	* gnu/xml/dom/DomNode.java (notifyNode): grow listener array as
+	required.
+
+2005-03-13  Michael Koch  <konqueror@gmx.de>
+
+	* gnu/xml/aelfred2/XmlParser.java: Fixed typo.
+
+2005-03-11  Chris Burdess  <dog@gnu.org>
+
+	* gnu/xml/aelfred2/SAXDriver.java: Corrected bug handling URI
+	warnings.
+
+2005-02-27  Chris Burdess  <dog@gnu.org>
+
+	* gnu/xml/aelfred2/JAXPFactory.java,
+	  gnu/xml/aelfred2/SAXDriver.java,
+	  gnu/xml/aelfred2/XmlParser.java,
+	  gnu/xml/aelfred2/XmlReader.java: Applied GNU Classpath source code
+	formatting conventions. Replaced arrays of Object with struct-like
+	classes for easier maintainability. Made SAXDriver.stringInterning
+	package private to allow access from XmlParser inside the loop without
+	a method call overhead.
+
+2005-03-11  Chris Burdess  <dog@gnu.org>
+
+	* gnu/xml/aelfred2/SAXDriver.java: Corrected bug handling URI
+	warnings.
+
+2005-03-28  Per Bothner  <per@bothner.com>
+
+	* boehm.cc (_Jv_MarkObj): Don't follow null pointer to static field,
+	which can happen if class is JV_STATE_LOADED but not JV_STATE_PREPARED.
+
+2005-03-28  Eric Botcazou  <ebotcazou@libertysurf.fr>
+
+	* testsuite/libjava.jni/jni.exp (gcj_jni_invocation_test_one): Add
+	libsocket to the libraries to link for Solaris.
+
+2005-03-24  Anthony Green  <green@redhat.com>
+
+	* gnu/gcj/tools/gcj_dbtool/Main.java: Accept libdir argument with
+	-p option.
+	(usage): Add [LIBDIR] to help output.
+	* gnu/gcj/tools/gcj_dbtool/natMain.cc: New file.
+	* Makefile.am (AM_CXXFLAGS): Define
+	LIBGCJ_DEFAULT_DATABASE_PATH_TAIL.
+	(db_pathtail): New macro.
+
+2005-03-23  Sven de Marothy  <sven@physto.se>
+
+	PR libgcj/2641, PR libgcj/9854, PR libgcj/14892, PR libgcj/18083,
+	PR libgcj/11085:
+	* java/util/Calendar.java
+	(set): Use starting day of week when one is needed if none is given.
+	* java/text/SimpleDateFormat.java
+	(parse): Handle 1-12 and 1-24 timestamps correctly.
+	* java/util/GregorianCalendar.java
+	(computeTime, computeFields): HOUR should be in 0-11 format.
+	(nonLeniencyCheck): Adjust leniency checking to that fact.
+	(getLinearDay): Should be private.
+
+2005-03-22  Mohan Embar  <gnustuff@thisiscool.com>
+	    David Daney  <ddaney@avtrex.com>
+
+	* gnu/java/net/natPlainSocketImplWin32.cc (read): Handle
+	count == 0 case.
+
+2005-03-22  Mohan Embar  <gnustuff@thisiscool.com>
+
+	* Makefile.am ($(db_name)): Add $(EXEEXT) suffix to
+	gcj-dbtool dependency
+	* Makefile.in: Regenerated
+
+2005-03-22  Tom Tromey  <tromey@redhat.com>
+
+	* gnu/gcj/tools/gcj_dbtool/Main.java (usage): Fixed output.
+
+2005-03-21  Tom Tromey  <tromey@redhat.com>
+
+	* java/lang/VMCompiler.java (static block): Also catch
+	BufferUnderflowException.
+
+2005-03-16  Tom Tromey  <tromey@redhat.com>
+
+	* link.cc (ensure_class_linked): Removed #ifdef.
+	(print_class_loaded): Likewise.
+	(wait_for_state): Likewise.
+	* java/lang/Class.h (_Jv_IsInterpretedClass): Always declare.
+	* include/jvm.h (_Jv_IsInterpretedClass): Moved from...
+	* include/java-interp.h: ... here.
+
+2005-03-16  Tom Tromey  <tromey@redhat.com>
+
+	* gnu/java/lang/MainThread.java (run): Load main class using
+	system class loader.
+
+2005-03-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libgcj/20251
+	* Makefile.am (libjawt_la_LIBADD): Add -L$(here)/.libs.
+	* Makefile.in: Rebuilt.
+
+2005-03-15  David Daney  <ddaney@avtrex.com>
+
+	* gnu/java/net/natPlainSocketImplPosix.cc (read_helper): Handle
+	count == 0 case.
+
+2005-03-15  David Daney  <ddaney@avtrex.com>
+
+	* java/io/BufferedInputStream.java (available): Use 'in' instead
+	of 'super' for underlying stream access.
+	(close): Ditto.
+	(read(byte[], int, int)): Ditto.
+	(refill): Ditto.
+	(skip): Call skip on underlying stream when possible. 
+
+2005-03-14  David Daney  <ddaney@avtrex.com>
+
+	* configure.host: Don't use -mxgot for MIPS builds.
+	
+2005-03-10  Tom Tromey  <tromey@redhat.com>
+
+	* gnu/gcj/tools/gcj_dbtool/Main.java (main): Handle '-p'.
+	(usage): Document '-p'.
+	* Makefile.in: Rebuilt.
+	* Makefile.am (dbexecdir): New variable.
+	(db_name): Likewise.
+	(dbexec_DATA): Likewise.
+	($(db_name)): New target.
+	(AM_CXXFLAGS): Define LIBGCJ_DEFAULT_DATABASE.
+	* java/lang/natRuntime.cc (insertSystemProperties): Set default
+	system database.
+
+2005-03-10  Chris Burdess  <dog@bluezoo.org>
+
+	* gnu/xml/dom/ls/SAXEventSink.java: Ignore element declarations if
+	not currently parsing the DTD.
+
+2005-03-10  Andrew Haley  <aph@redhat.com>
+
+	* gnu/java/nio/channels/FileChannelImpl.java (smallTransferFrom):
+	New.
+	(smallTransferTo): New.
+	(transferFrom): Loop around smallTransferFrom, copying pageSize
+	bytes each time.
+	(transferTo): Likewise.
+
+2005-03-09  David Daney  <ddaney@avtrex.com>
+
+	PR libgcj/20389
+	Merge BufferedInputStream from GNU Classpath.
+	* java/io/BufferedInputStream.java (marktarget): Field removed.
+	(CHUNKSIZE): Field removed.
+	(bufferSize): New field.
+	(BufferedInputStream): Initialize fields.
+	(close): Invalidate mark and buffer indexes.
+	(mark):  Rewritten.
+	(read()): Move mark handling code to refill.
+	(read(byte[], int, int)): Ditto.
+	(skip): Ditto and simplify EOF testing.
+	(refill): Rewritten.
+	* java/io/InputStreamReader.java (refill): Removed mark and reset
+	of internal BufferedInputStream.
+
+2005-03-09  Tom Tromey  <tromey@redhat.com>
+
+	* java/lang/natVMClassLoader.cc (defineClass): Reference
+	'systemClassLoader' field directly.
+	* java/lang/natRuntime.cc (_load): Reference 'systemClassLoader'
+	field directly.
+	* java/lang/natClassLoader.cc (_Jv_RegisterInitiatingLoader):
+	Reference 'systemClassLoader' field directly.
+	(_Jv_UnregisterInitiatingLoader): Likewise.
+	(_Jv_FindClass): Likewise.
+
+2005-03-09  Tom Tromey  <tromey@redhat.com>
+
+	* java/net/URLClassLoader.java (addURLImpl): Reset 'thisString'.
+	(toString): Synchronize.
+
+2005-03-07  Tom Tromey  <tromey@redhat.com>
+
+	* gnu/gcj/tools/gcj_dbtool/Main.java (main): Recognize '-f'.
+	(usage): Document '-f'.
+
+2005-02-13  Anthony Green  <green@redhat.com>
+
+	* jni/gtk-peer/gtk_jawt.c (classpath_jawt_get_drawable,
+	classpath_jawt_lock, classpath_jawt_unlock): New functions.
+	* jawt.c (_Jv_AWTLock, _Jv_AWTUnlock): New functions.
+	(_Jv_GetDrawingSurface): Set visualID.
+	(_Jv_FreeDrawingSurfaceInfo): Clear visualID.
+	(JAWT_GetAWT): Set Lock and Unlock.
+	* include/jawt_md.h (struct _JAWT_X11DrawingSurfaceInfo): Add visualID.
+	* include/jawt.h (JAWT_VERSION_1_4, JAWT_LOCK_ERROR,
+	JAWT_LOCK_CLIP_CHANGED, JAWT_LOCK_BOUNDS_CHANGED,
+	JAWT_LOCK_SURFACE_CHANGED): New macros.
+	(struct _JAWT): Add Lock and Unlock.
+
+2005-03-07  Tom Tromey  <tromey@redhat.com>
+
+	* java/lang/VMCompiler.java (md5Digest): New field.
+	(compileClass): Clone md5Digest instead of looking up a new one.
+
+2005-03-06  Tom Tromey  <tromey@redhat.com>
+
+	PR java/20215:
+	* include/jvm.h (_Jv_Linker::find_field_helper): Updated.
+	* link.cc (find_field_helper): Added 'type' argument.
+	(find_field): Updated.
+
+2005-03-06  Roger Sayle  <roger@eyesopen.com>
+
+	PR libgcj/20155
+	* Makefile.am (libgcj0_convenience.la): Revert last change.
+	* Makefile.in: Regenerate.
+
+2005-03-05  Roger Sayle  <roger@eyesopen.com>
+	    Alexandre Oliva  <aoliva@redhat.com>
+	    Kelley Cook  <kcook@gcc.gnu.org>
+
+	PR libgcj/20155
+	* Makefile.am (libgcj0_convenience.la): New rule to create a file
+	of the object files to link to avoid exceeding the command line
+	length limits on some platforms.
+	(clean-local): Clean up objectlist files.
+	* Makefile.in: Regenerate.
+
+2005-03-02  Thomas Fitzsimmons  <fitzsim@redhat.com>
+
+	PR libgcj/20292
+	* testsuite/libjava.jni/jni.exp
+	(gcj_jni_invocation_compile_c_to_binary): Add -I. -I.. to compile
+	flags.
+	(gcj_jni_invocation_test_one): Add -L../.libs to cxx flags.
+
 2005-02-24  David Gilbert  <david.gilbert@object-refinery.com>
 
 	* java/awt/font/TextAttribute.java: changed names to lower case;
