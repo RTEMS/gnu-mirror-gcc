@@ -5,12 +5,12 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
@@ -115,21 +115,7 @@ proc objc_init { args } {
 
     objc_maybe_build_wrapper "${tmpdir}/objc-testglue.o"
 
-    set objc_libgcc_s_path "${rootme}"
-    set compiler [lindex $OBJC_UNDER_TEST 0]
-    if { [is_remote host] == 0 && [which $compiler] != 0 } {
-	foreach i "[exec $compiler --print-multi-lib]" {
-	    set mldir ""
-	    regexp -- "\[a-z0-9=/\.-\]*;" $i mldir
-	    set mldir [string trimright $mldir "\;@"]
-	    if { "$mldir" == "." } {
-		continue
-	    }
-	    if { [llength [glob -nocomplain ${rootme}/${mldir}/libgcc_s*.so.*]] >= 1 } {
-		append objc_libgcc_s_path ":${rootme}/${mldir}"
-	    }
-	}
-    }
+    append objc_libgcc_s_path [gcc-set-multilib-library-path $OBJC_UNDER_TEST]
 }
 
 proc objc_target_compile { source dest type options } {
@@ -248,7 +234,7 @@ proc objc_exit { } {
 	unset gluefile;
     }
 }
-    
+
 # If this is an older version of dejagnu (without runtest_file_p),
 # provide one and assume the old syntax: foo1.exp bar1.c foo2.exp bar2.c.
 # This can be deleted after next dejagnu release.
@@ -310,4 +296,3 @@ proc prune_objc_output { text } {
 
     return $text
 }
-

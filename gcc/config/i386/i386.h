@@ -104,6 +104,13 @@ extern int target_flags;
 #endif
 #endif
 
+/* APPLE LOCAL begin mainline 2005-04-11 4010614 */
+#ifndef TARGET_FPMATH_DEFAULT
+#define TARGET_FPMATH_DEFAULT \
+  (TARGET_64BIT && TARGET_SSE ? FPMATH_SSE : FPMATH_387)
+#endif
+/* APPLE LOCAL end mainline 2005-04-11 4010614 */
+
 /* Masks for the -m switches */
 #define MASK_80387		0x00000001	/* Hardware floating point */
 #define MASK_RTD		0x00000002	/* Use ret that pops args */
@@ -129,7 +136,8 @@ extern int target_flags;
 #define MASK_MS_BITFIELD_LAYOUT 0x00200000	/* Use native (MS) bitfield layout */
 #define MASK_TLS_DIRECT_SEG_REFS 0x00400000	/* Avoid adding %gs:0  */
 
-/* Unused:			0x03e0000	*/
+/* APPLE LOCAL dynamic-no-pic */
+/* Unused:			0x03000000	*/
 
 /* ... overlap with subtarget options starts by 0x04000000.  */
 #define MASK_NO_RED_ZONE	0x04000000	/* Do not use red zone */
@@ -229,7 +237,8 @@ extern int target_flags;
 
 #define TUNEMASK (1 << ix86_tune)
 extern const int x86_use_leave, x86_push_memory, x86_zero_extend_with_and;
-extern const int x86_use_bit_test, x86_cmove, x86_deep_branch;
+/* APPLE LOCAL mainline 2005-03-16 4054919 */
+extern const int x86_use_bit_test, x86_cmove, x86_fisttp, x86_deep_branch;
 extern const int x86_branch_hints, x86_unroll_strlen;
 extern const int x86_double_with_add, x86_partial_reg_stall, x86_movx;
 extern const int x86_use_loop, x86_use_fiop, x86_use_mov0;
@@ -258,6 +267,8 @@ extern int x86_prefetch_sse;
 /* For sane SSE instruction set generation we need fcomi instruction.  It is
    safe to enable all CMOVE instructions.  */
 #define TARGET_CMOVE ((x86_cmove & (1 << ix86_arch)) || TARGET_SSE)
+/* APPLE LOCAL mainline 2005-03-16 4054919 */
+#define TARGET_FISTTP (x86_fisttp & (1 << ix86_arch))
 #define TARGET_DEEP_BRANCH_PREDICTION (x86_deep_branch & TUNEMASK)
 #define TARGET_BRANCH_PREDICTION_HINTS (x86_branch_hints & TUNEMASK)
 #define TARGET_DOUBLE_WITH_ADD (x86_double_with_add & TUNEMASK)
@@ -792,7 +803,15 @@ extern int x86_prefetch_sse;
 #define PARM_BOUNDARY BITS_PER_WORD
 
 /* Boundary (in *bits*) on which stack pointer should be aligned.  */
-#define STACK_BOUNDARY BITS_PER_WORD
+/* APPLE LOCAL begin compiler should obey -mpreferred-stack-boundary (radar 3232990) */
+/* prefer * #define STACK_BOUNDARY ((ix86_preferred_stack_boundary > 128) ? 128 : ix86_preferred_stack_boundary) */
+/*  We're going to extremes to yield a result of indeterminite
+    signedness here; this macro will be expanded in signed and
+    unsigned contexts, and mixed signedness induces fatal
+    warnings.  Radar 3941684.  */
+#define STACK_BOUNDARY ((ix86_preferred_stack_boundary >=  128) ? 128 : \
+			(ix86_preferred_stack_boundary == 64) ? 64 : 32)
+/* APPLE LOCAL end compiler should obey -mpreferred-stack-boundary (radar 3232990) */
 
 /* Boundary (in *bits*) on which the stack pointer prefers to be
    aligned; the compiler cannot rely on having this alignment.  */
@@ -843,7 +862,8 @@ extern int x86_prefetch_sse;
 #define BIGGEST_FIELD_ALIGNMENT 32
 #endif
 #else
-#define ADJUST_FIELD_ALIGN(FIELD, COMPUTED) \
+/* APPLE LOCAL Macintosh alignment */
+#define ADJUST_FIELD_ALIGN(FIELD, COMPUTED, FIRST_FIELD_P) \
    x86_field_alignment (FIELD, COMPUTED)
 #endif
 
@@ -1031,14 +1051,14 @@ do {									\
 	int i;								\
         for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)			\
           if (TEST_HARD_REG_BIT (reg_class_contents[(int)MMX_REGS], i))	\
-	    fixed_regs[i] = call_used_regs[i] = 1;		 	\
+	    fixed_regs[i] = call_used_regs[i] = 1, reg_names[i] = "";	\
       }									\
     if (! TARGET_SSE)							\
       {									\
 	int i;								\
         for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)			\
           if (TEST_HARD_REG_BIT (reg_class_contents[(int)SSE_REGS], i))	\
-	    fixed_regs[i] = call_used_regs[i] = 1;		 	\
+	    fixed_regs[i] = call_used_regs[i] = 1, reg_names[i] = "";	\
       }									\
     if (! TARGET_80387 && ! TARGET_FLOAT_RETURNS_IN_80387)		\
       {									\
@@ -1047,7 +1067,15 @@ do {									\
         COPY_HARD_REG_SET (x, reg_class_contents[(int)FLOAT_REGS]);	\
         for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)			\
           if (TEST_HARD_REG_BIT (x, i)) 				\
-	    fixed_regs[i] = call_used_regs[i] = 1;			\
+	    fixed_regs[i] = call_used_regs[i] = 1, reg_names[i] = "";	\
+      }									\
+    if (! TARGET_64BIT)							\
+      {									\
+	int i;								\
+	for (i = FIRST_REX_INT_REG; i <= LAST_REX_INT_REG; i++)		\
+	  reg_names[i] = "";						\
+	for (i = FIRST_REX_SSE_REG; i <= LAST_REX_SSE_REG; i++)		\
+	  reg_names[i] = "";						\
       }									\
   } while (0)
 
@@ -1106,11 +1134,6 @@ do {									\
  ((MODE) == TImode || (MODE) == V16QImode || (MODE) == TFmode		\
    || (MODE) == V8HImode || (MODE) == V2DFmode || (MODE) == V2DImode	\
    || (MODE) == V4SFmode || (MODE) == V4SImode)
-
-/* Return true for modes passed in MMX registers.  */
-#define MMX_REG_MODE_P(MODE) \
- ((MODE) == V8QImode || (MODE) == V4HImode || (MODE) == V2SImode	\
-   || (MODE) == V2SFmode)
 
 /* Value is 1 if hard register REGNO can hold a value of machine-mode MODE.  */
 
@@ -1434,7 +1457,7 @@ enum reg_class
 #define BASE_REG_CLASS GENERAL_REGS
 
 /* Unused letters:
-    B                 TU W   
+    B                 TU W
           h jk          vw  z
 */
 
@@ -1543,6 +1566,14 @@ enum reg_class
 #define PREFERRED_RELOAD_CLASS(X, CLASS) \
    ix86_preferred_reload_class ((X), (CLASS))
 
+/* APPLE LOCAL begin 3501055 mainline candidate */
+/* Discourage putting floating-point values in SSE registers unless
+   SSE math is being used, and likewise for the 387 registers.  */
+
+#define PREFERRED_OUTPUT_RELOAD_CLASS(X, CLASS) \
+   ix86_preferred_output_reload_class ((X), (CLASS))
+/* APPLE LOCAL end 3501055 mainline candidate */
+
 /* If we are copying between general and FP registers, we need a memory
    location. The same is true for SSE and MMX registers.  */
 #define SECONDARY_MEMORY_NEEDED(CLASS1, CLASS2, MODE) \
@@ -1594,19 +1625,10 @@ enum reg_class
    || ((CLASS) == FP_TOP_REG)						\
    || ((CLASS) == FP_SECOND_REG))
 
-/* Return a class of registers that cannot change FROM mode to TO mode.
+/* Return a class of registers that cannot change FROM mode to TO mode.  */
 
-   x87 registers can't do subreg as all values are reformated to extended
-   precision.  XMM registers does not support with nonzero offsets equal
-   to 4, 8 and 12 otherwise valid for integer registers. Since we can't
-   determine these, prohibit all nonparadoxical subregs changing size.  */
-
-#define CANNOT_CHANGE_MODE_CLASS(FROM, TO, CLASS)	\
-  (GET_MODE_SIZE (TO) < GET_MODE_SIZE (FROM)		\
-   ? reg_classes_intersect_p (FLOAT_SSE_REGS, (CLASS))	\
-     || MAYBE_MMX_CLASS_P (CLASS) 			\
-   : GET_MODE_SIZE (FROM) != GET_MODE_SIZE (TO)		\
-   ? reg_classes_intersect_p (FLOAT_REGS, (CLASS)) : 0)
+#define CANNOT_CHANGE_MODE_CLASS(FROM, TO, CLASS) \
+  ix86_cannot_change_mode_class (FROM, TO, CLASS)
 
 /* Stack layout; function entry, exit and calling.  */
 
@@ -2203,7 +2225,7 @@ do {							\
 /* How to refer to registers in assembler output.
    This sequence is indexed by compiler's hard-register-number (see above).  */
 
-/* In order to refer to the first 8 regs as 32 bit regs prefix an "e"
+/* In order to refer to the first 8 regs as 32 bit regs, prefix an "e".
    For non floating point regs, the following are the HImode names.
 
    For float regs, the stack top is sometimes referred to as "%st(0)"
@@ -2228,9 +2250,7 @@ do {							\
   { "rax", 0 }, { "rdx", 1 }, { "rcx", 2 }, { "rbx", 3 },	\
   { "rsi", 4 }, { "rdi", 5 }, { "rbp", 6 }, { "rsp", 7 },	\
   { "al", 0 }, { "dl", 1 }, { "cl", 2 }, { "bl", 3 },		\
-  { "ah", 0 }, { "dh", 1 }, { "ch", 2 }, { "bh", 3 },		\
-  { "mm0", 8},  { "mm1", 9},  { "mm2", 10}, { "mm3", 11},	\
-  { "mm4", 12}, { "mm5", 13}, { "mm6", 14}, { "mm7", 15} }
+  { "ah", 0 }, { "dh", 1 }, { "ch", 2 }, { "bh", 3 } }
 
 /* Note we are omitting these since currently I don't know how
 to get gcc to use these, since they want the same but different
@@ -2495,8 +2515,8 @@ extern rtx ix86_compare_op1;	/* operand 1 for comparisons */
    `OPTIMIZE_MODE_SWITCHING' is defined, you must define this macro to
    return an integer value not larger than the corresponding element
    in `NUM_MODES_FOR_MODE_SWITCHING', to denote the mode that ENTITY
-   must be switched into prior to the execution of INSN. 
-   
+   must be switched into prior to the execution of INSN.
+
    The mode UNINITIALIZED is used to force re-load of possibly previously
    stored control word after function call.  The mode ANY specify that
    function has no requirements on the control word and make no changes
@@ -2563,6 +2583,294 @@ struct machine_function GTY(())
 /* Control behavior of x86_file_start.  */
 #define X86_FILE_START_VERSION_DIRECTIVE false
 #define X86_FILE_START_FLTUSED false
+
+/* APPLE LOCAL begin CW asm blocks */
+/* Table of instructions that need extra constraints.  Keep this table sorted.  */
+#undef TARGET_CW_OP_CONSTRAINT
+#define TARGET_CW_OP_CONSTRAINT \
+  { "adc", 1, "i,i,i,r,m" },	\
+  { "adc", 2, "r,m,m,m,r" },	\
+  { "add", 1, "i,i,i,r,m" },	\
+  { "add", 2, "r,m,m,m,r" },	\
+  { "addsd", 1, "m"},		\
+  { "addsd", 2, "x"},		\
+  { "addss", 1, "m"},		\
+  { "addss", 2, "x"},		\
+  { "addsubpd", 1, "m"},	\
+  { "addsubpd", 2, "x"},       	\
+  { "addsubps", 1, "m"},      	\
+  { "addsubps", 2, "x"},	\
+  { "and", 1, "i,i,i,r,m"},	\
+  { "and", 2, "r,m,m,m,r"},	\
+  { "andpd", 1, "m"},		\
+  { "andpd", 2, "x"},		\
+  { "andps", 1, "m"},		\
+  { "andps", 2, "x"},		\
+  { "andnpd", 1, "m"},		\
+  { "andnpd", 2, "x"},		\
+  { "andnps", 1, "m"},		\
+  { "andnps", 2, "x"},		\
+  { "arpl", 2, "m"},		\
+  { "bound", 2, "m"},		\
+  { "bsf", 1, "m"},		\
+  { "bsr", 1, "m"},		\
+  { "bt", 1, "r,i"},		\
+  { "bt", 2, "m,m"},		\
+  { "btc", 1, "r,i"},		\
+  { "btc", 2, "m,m"},		\
+  { "btr", 1, "r,i"},		\
+  { "btr", 2, "m,m"},		\
+  { "bts", 1, "r,i"},		\
+  { "bts", 2, "m,m"},		\
+  { "call", 1, "rsm"},		\
+  { "clflush", 1, "m"},		\
+  { "cmova", 1, "m"},		\
+  { "cmovae", 1, "m"},		\
+  { "cmovb", 1, "m"},		\
+  { "cmovbe", 1, "m"},		\
+  { "cmovc", 1, "m"},		\
+  { "cmove", 1, "m"},		\
+  { "cmovg", 1, "m"},		\
+  { "cmovge", 1, "m"},		\
+  { "cmovl", 1, "m"},		\
+  { "cmovle", 1, "m"},		\
+  { "cmovna", 1, "m"},		\
+  { "cmovnae", 1, "m"},		\
+  { "cmovnb", 1, "m"},		\
+  { "cmovnbe", 1, "m"},		\
+  { "cmovnc", 1, "m"},		\
+  { "cmovne", 1, "m"},		\
+  { "cmovng", 1, "m"},		\
+  { "cmovnge", 1, "m"},		\
+  { "cmovnl", 1, "m"},		\
+  { "cmovnle", 1, "m"},		\
+  { "cmovno", 1, "m"},		\
+  { "cmovnp", 1, "m"},		\
+  { "cmovns", 1, "m"},		\
+  { "cmovnz", 1, "m"},		\
+  { "cmovo", 1, "m"},		\
+  { "cmovp", 1, "m"},		\
+  { "cmovpe", 1, "m"},		\
+  { "cmovpo", 1, "m"},		\
+  { "cmovs", 1, "m"},		\
+  { "cmovz", 1, "m"},		\
+  { "cmp", 1, "i,i,i,r,m"},    	\
+  { "cmp", 2, "r,m,m,m,r"},    	\
+  { "cmppd", 1, "i"},		\
+  { "cmppd", 2, "m"},		\
+  { "cmppd", 3, "x"},		\
+  { "cmpps", 1, "i"},		\
+  { "cmpps", 2, "m"},		\
+  { "cmpps", 3, "x"},		\
+  { "cmpsd", 1, "i"},		\
+  { "cmpsd", 2, "m"},		\
+  { "cmpsd", 3, "x"},		\
+  { "cmpss", 1, "i"},		\
+  { "cmpss", 2, "m"},		\
+  { "cmpss", 3, "x"},		\
+  { "cmpxchg", 2, "m"},		\
+  { "comisd", 1, "m"},		\
+  { "comisd", 2, "x"},		\
+  { "comiss", 1, "m"},		\
+  { "comiss", 2, "x"},		\
+  { "cvtdq2pd", 1, "m"},	\
+  { "cvtdq2pd", 2, "x"},	\
+  { "cvtdq2ps", 1, "m"},	\
+  { "cvtdq2ps", 2, "x"},	\
+  { "cvtpd2pi", 1, "m"},	\
+  { "cvtpd2pi", 2, "y"},	\
+  { "cvtpd2ps", 1, "m"},	\
+  { "cvtpd2ps", 2, "x"},	\
+  { "cvtpi2pd", 1, "m"},	\
+  { "cvtpi2pd", 2, "x"},	\
+  { "cvtpi2ps", 1, "m"},	\
+  { "cvtpi2ps", 2, "x"},	\
+  { "cvtps2dq", 1, "m"},	\
+  { "cvtps2dq", 2, "x"},	\
+  { "cvtps2pd", 1, "m"},	\
+  { "cvtps2pd", 2, "x"},	\
+  { "cvtps2pi", 1, "m"},	\
+  { "cvtps2pi", 2, "y"},	\
+  { "cvtsd2si", 1, "m"},	\
+  { "cvtsd2ss", 1, "m"},	\
+  { "cvtsd2ss", 2, "x"},	\
+  { "cvtsi2sd", 1, "m"},	\
+  { "cvtsi2sd", 2, "x"},	\
+  { "cvtsi2ss", 1, "m"},	\
+  { "cvtsi2ss", 2, "x"},	\
+  { "cvtss2sd", 1, "m"},	\
+  { "cvtss2sd", 2, "x"},	\
+  { "cvtss2si", 1, "m"},	\
+  { "cvtss2si", 2, "x"},	\
+  { "cvttpd2pi", 1, "m"},	\
+  { "cvttpd2pi", 2, "y"},	\
+  { "cvttpd2dq", 1, "m"},	\
+  { "cvttpd2dq", 2, "x"},	\
+  { "cvttps2dq", 1, "m"},	\
+  { "cvttps2dq", 2, "x"},	\
+  { "cvttps2pi", 1, "m"},	\
+  { "cvttps2pi", 2, "y"},	\
+  { "cvttsd2si", 1, "m"},	\
+  { "cvttss2si", 1, "m"},	\
+  { "dec", 1, "m"},		\
+  { "div", 1, "m"},		\
+  { "divpd", 1, "m"},		\
+  { "divpd", 2, "y"},		\
+  { "divps", 1, "m"},		\
+  { "divps", 2, "y"},		\
+  { "divsd", 1, "m"},		\
+  { "divsd", 2, "y"},		\
+  { "divss", 1, "m"},		\
+  { "divss", 2, "y"},		\
+  { "enter", 1, "i"},		\
+  { "enter", 2, "i"},		\
+  { "fadd", 1, "G,f,t"},       	\
+  { "fadd", 2, "t,f"},		\
+  { "faddp", 1, "t"},		\
+  { "faddp", 2, "f"},		\
+  { "fbld", 1, "m"},		\
+  { "fbstp", 1, "m"},		\
+  { "fcmovb", 1, "f"},		\
+  { "fcmovb", 2, "t"},		\
+  { "fcmove", 1, "f"},		\
+  { "fcmove", 2, "t"},		\
+  { "fcmovbe", 1, "f"},		\
+  { "fcmovbe", 2, "t"},		\
+  { "fcmovu", 1, "f"},		\
+  { "fcmovu", 2, "t"},		\
+  { "fcmovnb", 1, "f"},		\
+  { "fcmovnb", 2, "t"},		\
+  { "fcmovne", 1, "f"},		\
+  { "fcmovne", 2, "t"},		\
+  { "fcmovnbe", 1, "f"},	\
+  { "fcmovnbe", 2, "t"},	\
+  { "fcmovnu", 1, "f"},		\
+  { "fcmovnu", 2, "t"},		\
+  { "fcom", 1, "f,m"},		\
+  { "fcomp", 1, "f,m"},		\
+  { "fcomi", 1, "f"},		\
+  { "fcomi", 2, "t"},		\
+  { "fcomip", 1, "f"},		\
+  { "fcomip", 2, "t"},		\
+  { "fucomi", 1, "f"},		\
+  { "fucomi", 2, "t"},		\
+  { "fucomip", 1, "f"},		\
+  { "fucomip", 2, "t"},		\
+  { "fdiv", 1, "f,t,m"},       	\
+  { "fdiv", 2, "t,f"},		\
+  { "fidivl", 1, "m"},		\
+  { "fidiv", 1, "m"},		\
+  { "fdivp", 1, "t"},		\
+  { "fdivp", 2, "f"},		\
+  { "fdivr", 1, "f,m"},		\
+  { "fdivr", 2, "t"},		\
+  { "fidivrl", 1, "m"},		\
+  { "fidivr", 1, "m"},		\
+  { "fdivrp", 1, "t"},		\
+  { "fdivrp", 2, "f"},		\
+  { "ffree", 1, "f"},		\
+  { "fiadd", 1, "m"},		\
+  { "ficom", 1, "m"},		\
+  { "ficomp", 1, "m"},		\
+  { "fidiv", 1, "m"},		\
+  { "fidivl", 1, "m"},		\
+  { "fild", 1, "m"},		\
+  { "fildl", 1, "m"},		\
+  { "fildll", 1, "m"},		\
+  { "fimul", 1, "G"},		\
+  { "fisub", 1, "m"},		\
+  { "fisubr", 1, "m"},		\
+  { "fist", 1, "m"},		\
+  { "fistp", 1, "m"},		\
+  { "fistpll", 1, "m"},		\
+  { "fisttp", 1, "m"},		\
+  { "fisttpll", 1, "m"},	\
+  { "fld", 1, "m"},		\
+  { "fldt", 1, "m"},		\
+  { "fld", 1, "f"},		\
+  { "fldcw", 1, "L"},		\
+  { "fldenv", 1, "i"},		\
+  { "fmul", 1, "G,t,f"},       	\
+  { "fmul", 2, "f,t"},		\
+  { "fmulp", 1, "t"},		\
+  { "fmulp", 2, "f"},		\
+  { "fnsave", 1, "m"},		\
+  { "fnstcw", 1, "m"},		\
+  { "fnstenv", 1, "m"},		\
+  { "fnstsw", 1, "m,a"},	\
+  { "frstor", 1, "m"},		\
+  { "fsave", 1, "m"},		\
+  { "fst", 1, "m,f"},		\
+  { "fstcw", 1, "m"},		\
+  { "fstenv", 1, "m"},		\
+  { "fstsw", 1, "m,a"},		\
+  { "fsub", 1, "m,t,f"},	\
+  { "fsub", 2, "f,t"},		\
+  { "fsubr", 1, "m,t,f"},	\
+  { "fsubr", 2, "f,t"},		\
+  { "fucom", 1, "f"},		\
+  { "fucomp", 1, "f"},		\
+  { "fxch", 1, "+f" },		\
+  { "fxrstor", 1, "m"},		\
+  { "fxsave", 1, "m"},		\
+  { "haddpd", 1, "x,m"},	\
+  { "haddpd", 2, "x"},		\
+  { "haddps", 1, "x,m"},	\
+  { "haddps", 2, "x"},		\
+  { "hsubpd", 1, "x,m"},	\
+  { "hsubpd", 2, "x"},		\
+  { "hsubps", 1, "x,m"},	\
+  { "hsubps", 2, "x"},		\
+  { "idiv", 1, "m"},		\
+  { "imul", 1, "m,r,i"},	\
+  { "imul", 2, "m,m"},		\
+  { "imul", 3, "r"},		\
+  { "in", 1, "i"},		\
+  { "in", 2, "a"},		\
+  { "inc", 1, "m,r"},		\
+  { "ins", 1, "d"},		\
+  { "ins", 2, "m"},		\
+  { "int", 1, "i"},		\
+  { "invlpg", 1, "m"},		\
+  { "ja", 1, "i"},		\
+  { "jae", 1, "i"},		\
+  { "jb", 1, "i"},		\
+  { "jbe", 1, "i"},		\
+  { "jc", 1, "i"},		\
+  { "jcxz", 1, "i"},		\
+  { "jecxz", 1, "i"},		\
+  { "je", 1, "i"},		\
+  { "jg", 1, "i"},		\
+  { "jge", 1, "i"},		\
+  { "jl", 1, "i"},		\
+  { "jle", 1, "i"},		\
+  { "jmp", 1, "i,m"},		\
+  { "jna", 1, "i"},		\
+  { "jnae", 1, "i"},		\
+  { "jnb", 1, "i"},		\
+  { "jnc", 1, "i"},		\
+  { "jne", 1, "i"},		\
+  { "jng", 1, "i"},		\
+  { "jnge", 1, "i"},		\
+  { "jnl", 1, "i"},		\
+  { "jnle", 1, "i"},		\
+  { "jno", 1, "i"},		\
+  { "jnp", 1, "i"},		\
+  { "jns", 1, "i"},		\
+  { "jnz", 1, "i"},		\
+  { "jo", 1, "i"},		\
+  { "jp", 1, "i"},		\
+  { "jpe", 1, "i"},		\
+  { "jpo", 1, "i"},		\
+  { "js", 1, "i"},		\
+  { "jz", 1, "i"},		\
+  { "movaps", 1, "=xm" },	\
+  { "movaps", 2, "x" },		\
+  { "movd", 1, "=x,=mx" },	\
+  { "movd", 2, "xm,x" },	\
+  { "movzx", 1, "=r" },		\
+  { "movzx", 2, "qm" },
+/* APPLE LOCAL end CW asm blocks */
 
 /*
 Local variables:
