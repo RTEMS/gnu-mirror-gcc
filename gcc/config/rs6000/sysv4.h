@@ -123,8 +123,10 @@ extern const char *rs6000_tls_size_string; /* For -mtls-size= */
   { "no-toc",		 0, N_("no description yet") },			\
   { "toc",		 MASK_MINIMAL_TOC, N_("no description yet") },	\
   { "full-toc",		 MASK_MINIMAL_TOC, N_("no description yet") },	\
-  { "prototype",	 MASK_PROTOTYPE, N_("no description yet") },	\
-  { "no-prototype",	-MASK_PROTOTYPE, N_("no description yet") },	\
+  { "prototype",	 MASK_PROTOTYPE,				\
+    N_("Assume all variable arg functions are prototyped") },		\
+  { "no-prototype",	-MASK_PROTOTYPE,				\
+    N_("Non-prototyped functions might take a variable number of args") }, \
   { "no-traceback",	 0, N_("no description yet") },			\
   { "eabi",		 MASK_EABI, N_("Use EABI") },			\
   { "no-eabi",		-MASK_EABI, N_("Don't use EABI") },		\
@@ -418,15 +420,6 @@ do {									\
 #define ADJUST_FIELD_ALIGN(FIELD, COMPUTED)				      \
 	((TARGET_ALTIVEC && TREE_CODE (TREE_TYPE (FIELD)) == VECTOR_TYPE)     \
 	 ? 128 : COMPUTED)
-
-/* Define this macro as an expression for the alignment of a type
-   (given by TYPE as a tree node) if the alignment computed in the
-   usual way is COMPUTED and the alignment explicitly specified was
-   SPECIFIED.  */
-#define ROUND_TYPE_ALIGN(TYPE, COMPUTED, SPECIFIED)			\
-	((TARGET_ALTIVEC  && TREE_CODE (TYPE) == VECTOR_TYPE)		\
-	 ? MAX (MAX ((COMPUTED), (SPECIFIED)), 128)			\
-	 : MAX (COMPUTED, SPECIFIED))
 
 #undef  BIGGEST_FIELD_ALIGNMENT
 
@@ -1362,8 +1355,6 @@ ncrtn.o%s"
   ((flag_pic || TARGET_RELOCATABLE)					     \
    ? (((GLOBAL) ? DW_EH_PE_indirect : 0) | DW_EH_PE_pcrel | DW_EH_PE_sdata4) \
    : DW_EH_PE_absptr)
-
-#define TARGET_ASM_EXCEPTION_SECTION readonly_data_section
 
 #define DOUBLE_INT_ASM_OP "\t.quad\t"
 
