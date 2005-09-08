@@ -925,8 +925,8 @@
 	  (vec_concat:V8SF
 	    (match_operand:V4SF 1 "nonimmediate_operand" " 0,o,x")
 	    (match_operand:V4SF 2 "nonimmediate_operand" " x,0,0"))
-	  (parallel [(const_int 4)
-		     (const_int 5)
+	  (parallel [(const_int 6)
+		     (const_int 7)
 		     (const_int 2)
 		     (const_int 3)])))]
   "TARGET_SSE && !(MEM_P (operands[1]) && MEM_P (operands[2]))"
@@ -2111,8 +2111,8 @@
    movlpd\t{%2, %0|%0, %2}
    movlpd\t{%2, %0|%0, %2}
    shufpd\t{$2, %2, %0|%0, %2, 2}
-   movhps\t{%H1, %0|%0, %H1
-   movhps\t{%1, %H0|%H0, %1"
+   movhps\t{%H1, %0|%0, %H1}
+   movhps\t{%1, %H0|%H0, %1}"
   [(set_attr "type" "ssemov,ssemov,ssemov,sselog,ssemov,ssemov")
    (set_attr "mode" "DF,V1DF,V1DF,V2DF,V1DF,V1DF")])
 

@@ -93,7 +93,13 @@ struct lang_type GTY(())
 
 /* For FUNCTION_DECLs, evaluates true if the decl is built-in but has
    been declared.  */
-#define C_DECL_DECLARED_BUILTIN(EXP) DECL_LANG_FLAG_3 (EXP)
+#define C_DECL_DECLARED_BUILTIN(EXP)		\
+  DECL_LANG_FLAG_3 (FUNCTION_DECL_CHECK (EXP))
+
+/* For FUNCTION_DECLs, evaluates true if the decl is built-in, has a
+   built-in prototype and does not have a non-built-in prototype.  */
+#define C_DECL_BUILTIN_PROTOTYPE(EXP)		\
+  DECL_LANG_FLAG_6 (FUNCTION_DECL_CHECK (EXP))
 
 /* Record whether a decl was declared register.  This is strictly a
    front-end flag, whereas DECL_REGISTER is used for code generation;
@@ -104,7 +110,30 @@ struct lang_type GTY(())
    unevaluated operand of sizeof / typeof / alignof.  This is only
    used for functions declared static but not defined, though outside
    sizeof and typeof it is set for other function decls as well.  */
-#define C_DECL_USED(EXP) DECL_LANG_FLAG_5 (EXP)
+#define C_DECL_USED(EXP) DECL_LANG_FLAG_5 (FUNCTION_DECL_CHECK (EXP))
+
+/* Record whether a label was defined in a statement expression which
+   has finished and so can no longer be jumped to.  */
+#define C_DECL_UNJUMPABLE_STMT_EXPR(EXP)	\
+  DECL_LANG_FLAG_6 (LABEL_DECL_CHECK (EXP))
+
+/* Record whether a label was the subject of a goto from outside the
+   current level of statement expression nesting and so cannot be
+   defined right now.  */
+#define C_DECL_UNDEFINABLE_STMT_EXPR(EXP)	\
+  DECL_LANG_FLAG_7 (LABEL_DECL_CHECK (EXP))
+
+/* Record whether a label was defined in the scope of an identifier
+   with variably modified type which has finished and so can no longer
+   be jumped to.  */
+#define C_DECL_UNJUMPABLE_VM(EXP)	\
+  DECL_LANG_FLAG_3 (LABEL_DECL_CHECK (EXP))
+
+/* Record whether a label was the subject of a goto from outside the
+   current level of scopes of identifiers with variably modified type
+   and so cannot be defined right now.  */
+#define C_DECL_UNDEFINABLE_VM(EXP)	\
+  DECL_LANG_FLAG_5 (LABEL_DECL_CHECK (EXP))
 
 /* Nonzero for a decl which either doesn't exist or isn't a prototype.
    N.B. Could be simplified if all built-in decls had complete prototypes
@@ -345,6 +374,45 @@ struct language_function GTY(())
   int extern_inline;
 };
 
+/* Save lists of labels used or defined in particular contexts.
+   Allocated on the parser obstack.  */
+
+struct c_label_list
+{
+  /* The label at the head of the list.  */
+  tree label;
+  /* The rest of the list.  */
+  struct c_label_list *next;
+};
+
+/* Statement expression context.  */
+
+struct c_label_context_se
+{
+  /* The labels defined at this level of nesting.  */
+  struct c_label_list *labels_def;
+  /* The labels used at this level of nesting.  */
+  struct c_label_list *labels_used;
+  /* The next outermost context.  */
+  struct c_label_context_se *next;
+};
+
+/* Context of variably modified declarations.  */
+
+struct c_label_context_vm
+{
+  /* The labels defined at this level of nesting.  */
+  struct c_label_list *labels_def;
+  /* The labels used at this level of nesting.  */
+  struct c_label_list *labels_used;
+  /* The scope of this context.  Multiple contexts may be at the same
+     numbered scope, since each variably modified declaration starts a
+     new context.  */
+  unsigned scope;
+  /* The next outermost context.  */
+  struct c_label_context_vm *next;
+};
+
 
 /* in c-parse.in */
 extern void c_parse_init (void);
@@ -373,7 +441,6 @@ extern struct c_declarator *build_array_declarator (tree, struct c_declspecs *,
 extern tree build_enumerator (tree, tree);
 extern void check_for_loop_decls (void);
 extern void mark_forward_parm_decls (void);
-extern int  complete_array_type (tree, tree, int);
 extern void declare_parm_level (void);
 extern void undeclared_variable (tree);
 extern tree declare_label (tree);
@@ -448,6 +515,8 @@ extern int in_sizeof;
 extern int in_typeof;
 
 extern struct c_switch *c_switch_stack;
+extern struct c_label_context_se *label_context_stack_se;
+extern struct c_label_context_vm *label_context_stack_vm;
 
 extern tree require_complete_type (tree);
 extern int same_translation_unit_p (tree, tree);
@@ -501,6 +570,9 @@ extern tree c_finish_return (tree);
 extern tree c_finish_bc_stmt (tree *, bool);
 extern tree c_finish_goto_label (tree);
 extern tree c_finish_goto_ptr (tree);
+extern void c_begin_vm_scope (unsigned int);
+extern void c_end_vm_scope (unsigned int);
+extern tree c_expr_to_decl (tree, bool *, bool *, bool *);
 
 /* Set to 0 at beginning of a function definition, set to 1 if
    a return statement that specifies a return value is seen.  */

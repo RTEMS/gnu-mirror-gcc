@@ -3734,7 +3734,8 @@ extern void mark_decl_referenced (tree);
 extern void notice_global_symbol (tree);
 extern void set_user_assembler_name (tree, const char *);
 extern void process_pending_assemble_externals (void);
-extern void process_pending_assemble_output_defs (void);
+extern void finish_aliases_1 (void);
+extern void finish_aliases_2 (void);
 
 /* In stmt.c */
 extern void expand_computed_goto (tree);
@@ -3883,6 +3884,8 @@ enum tree_dump_index
 #define TDF_TREE	(1 << 9)	/* is a tree dump */
 #define TDF_RTL		(1 << 10)	/* is a RTL dump */
 #define TDF_IPA		(1 << 11)	/* is an IPA dump */
+
+#define TDF_GRAPH	(1 << 12)	/* a graph dump is being emitted */
 
 typedef struct dump_info *dump_info_p;
 

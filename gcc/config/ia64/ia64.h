@@ -620,7 +620,7 @@ while (0)
 
 #define CALL_REALLY_USED_REGISTERS \
 { /* General registers.  */				\
-  1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1,	\
+  0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1,	\
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,	\
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	\
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	\
@@ -629,7 +629,7 @@ while (0)
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	\
   0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1,	\
   /* Floating-point registers.  */			\
-  1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,	\
+  0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,	\
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	\
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,	\
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,	\
@@ -638,7 +638,7 @@ while (0)
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,	\
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,	\
   /* Predicate registers.  */				\
-  1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,	\
+  0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,	\
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	\
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	\
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	\
@@ -1434,24 +1434,11 @@ do {									\
    call the profiling subroutine `mcount'.  */
 
 #undef FUNCTION_PROFILER
-#define FUNCTION_PROFILER(FILE, LABELNO)				\
-do {									\
-  char buf[20];								\
-  ASM_GENERATE_INTERNAL_LABEL (buf, "LP", LABELNO);			\
-  fputs ("\talloc out0 = ar.pfs, 8, 0, 4, 0\n", FILE);			\
-  if (TARGET_AUTO_PIC)							\
-    fputs ("\tmovl out3 = @gprel(", FILE);				\
-  else									\
-    fputs ("\taddl out3 = @ltoff(", FILE);				\
-  assemble_name (FILE, buf);						\
-  if (TARGET_AUTO_PIC)							\
-    fputs (");;\n", FILE);						\
-  else									\
-    fputs ("), r1;;\n", FILE);						\
-  fputs ("\tmov out1 = r1\n", FILE);					\
-  fputs ("\tmov out2 = b0\n", FILE);					\
-  fputs ("\tbr.call.sptk.many b0 = _mcount;;\n", FILE);			\
-} while (0)
+#define FUNCTION_PROFILER(FILE, LABELNO) \
+  ia64_output_function_profiler(FILE, LABELNO)
+
+/* Neither hpux nor linux use profile counters.  */
+#define NO_PROFILE_COUNTERS 1
 
 /* Trampolines for Nested Functions.  */
 
@@ -1576,10 +1563,7 @@ do {									\
 /* A C expression that is nonzero if X is a legitimate constant for an
    immediate operand on the target machine.  */
 
-#define LEGITIMATE_CONSTANT_P(X) \
-  (GET_CODE (X) != CONST_DOUBLE || GET_MODE (X) == VOIDmode	\
-   || GET_MODE (X) == DImode || CONST_DOUBLE_OK_FOR_G (X))	\
-
+#define LEGITIMATE_CONSTANT_P(X) ia64_legitimate_constant_p (X)
 
 /* Condition Code Status */
 

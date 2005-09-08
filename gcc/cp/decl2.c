@@ -717,7 +717,7 @@ check_classfn (tree ctype, tree function, tree template_parms)
      case we'll only confuse ourselves when the function is declared
      properly within the class.  */
   if (COMPLETE_TYPE_P (ctype))
-    add_method (ctype, function);
+    add_method (ctype, function, NULL_TREE);
   return NULL_TREE;
 }
 
@@ -906,9 +906,17 @@ grokfield (const cp_declarator *declarator,
 	{
 	  /* Initializers for functions are rejected early in the parser.
 	     If we get here, it must be a pure specifier for a method.  */
-	  gcc_assert (TREE_CODE (TREE_TYPE (value)) == METHOD_TYPE);
-	  gcc_assert (error_operand_p (init) || integer_zerop (init));
-	  DECL_PURE_VIRTUAL_P (value) = 1;
+	  if (TREE_CODE (TREE_TYPE (value)) == METHOD_TYPE)
+	    {
+	      gcc_assert (error_operand_p (init) || integer_zerop (init));
+	      DECL_PURE_VIRTUAL_P (value) = 1;
+	    }
+	  else
+	    {
+	      gcc_assert (TREE_CODE (TREE_TYPE (value)) == FUNCTION_TYPE);
+	      error ("initializer specified for static member function %qD",
+		     value);
+	    }
 	}
       else if (pedantic && TREE_CODE (value) != VAR_DECL)
 	/* Already complained in grokdeclarator.  */
@@ -1780,29 +1788,43 @@ import_export_decl (tree decl)
       else if (CLASSTYPE_INTERFACE_KNOWN (type)
 	       && CLASSTYPE_INTERFACE_ONLY (type))
 	import_p = true;
-      else if (TARGET_WEAK_NOT_IN_ARCHIVE_TOC
+      else if ((!flag_weak || TARGET_WEAK_NOT_IN_ARCHIVE_TOC)
 	       && !CLASSTYPE_USE_TEMPLATE (type)
 	       && CLASSTYPE_KEY_METHOD (type)
 	       && !DECL_DECLARED_INLINE_P (CLASSTYPE_KEY_METHOD (type)))
 	/* The ABI requires that all virtual tables be emitted with
 	   COMDAT linkage.  However, on systems where COMDAT symbols
 	   don't show up in the table of contents for a static
-	   archive, the linker will report errors about undefined
-	   symbols because it will not see the virtual table
-	   definition.  Therefore, in the case that we know that the
-	   virtual table will be emitted in only one translation
-	   unit, we make the virtual table an ordinary definition
-	   with external linkage.  */
+	   archive, or on systems without weak symbols (where we
+	   approximate COMDAT linkage by using internal linkage), the
+	   linker will report errors about undefined symbols because
+	   it will not see the virtual table definition.  Therefore,
+	   in the case that we know that the virtual table will be
+	   emitted in only one translation unit, we make the virtual
+	   table an ordinary definition with external linkage.  */
 	DECL_EXTERNAL (decl) = 0;
       else if (CLASSTYPE_INTERFACE_KNOWN (type))
 	{
 	  /* TYPE is being exported from this translation unit, so DECL
-	     should be defined here.  The ABI requires COMDAT
-	     linkage.  Normally, we only emit COMDAT things when they
-	     are needed; make sure that we realize that this entity is
-	     indeed needed.  */
-	  comdat_p = true;
-	  mark_needed (decl);
+	     should be defined here.  */ 
+	  if (!flag_weak && CLASSTYPE_EXPLICIT_INSTANTIATION (type))
+	    /* If a class is declared in a header with the "extern
+	       template" extension, then it will not be instantiated,
+	       even in translation units that would normally require
+	       it.  Often such classes are explicitly instantiated in
+	       one translation unit.  Therefore, the explicit
+	       instantiation must be made visible to other translation
+	       units.  */
+	    DECL_EXTERNAL (decl) = 0;
+	  else
+	    {
+	      /* The ABI requires COMDAT linkage.  Normally, we only
+		 emit COMDAT things when they are needed; make sure
+		 that we realize that this entity is indeed
+		 needed.  */
+	      comdat_p = true;
+	      mark_needed (decl);
+	    }
 	}
       else if (!flag_implicit_templates
 	       && CLASSTYPE_IMPLICIT_INSTANTIATION (type))
@@ -1830,7 +1852,14 @@ import_export_decl (tree decl)
 	      comdat_p = true;
 	      if (CLASSTYPE_INTERFACE_KNOWN (type)
 		  && !CLASSTYPE_INTERFACE_ONLY (type))
-		mark_needed (decl);
+		{
+		  mark_needed (decl);
+		  if (!flag_weak)
+		    {
+		      comdat_p = false;
+		      DECL_EXTERNAL (decl) = 0;
+		    }
+		}
 	    }
 	}
       else
@@ -2887,6 +2916,10 @@ cp_finish_file (void)
 		 finish_function doesn't clean things up, and we end
 		 up with CURRENT_FUNCTION_DECL set.  */
 	      push_to_top_level ();
+	      /* The decl's location will mark where it was first
+	         needed.  Save that so synthesize method can indicate
+	         where it was needed from, in case of error  */
+	      input_location = DECL_SOURCE_LOCATION (decl);
 	      synthesize_method (decl);
 	      pop_from_top_level ();
 	      reconsider = true;
@@ -3144,12 +3177,38 @@ check_default_args (tree x)
     }
 }
 
+/* Mark DECL as "used" in the program.  If DECL is a specialization or
+   implicitly declared class member, generate the actual definition.  */
+
 void
 mark_used (tree decl)
 {
+  HOST_WIDE_INT saved_processing_template_decl = 0;
+
   TREE_USED (decl) = 1;
-  if (processing_template_decl || skip_evaluation)
+  /* If we don't need a value, then we don't need to synthesize DECL.  */ 
+  if (skip_evaluation)
     return;
+  /* Normally, we can wait until instantiation-time to synthesize
+     DECL.  However, if DECL is a static data member initialized with
+     a constant, we need the value right now because a reference to
+     such a data member is not value-dependent.  */
+  if (processing_template_decl)
+    {
+      if (TREE_CODE (decl) == VAR_DECL
+	  && DECL_INITIALIZED_BY_CONSTANT_EXPRESSION_P (decl)
+	  && DECL_CLASS_SCOPE_P (decl)
+	  && !dependent_type_p (DECL_CONTEXT (decl)))
+	{
+	  /* Pretend that we are not in a template so that the
+	     initializer for the static data member will be full
+	     simplified.  */
+	  saved_processing_template_decl = processing_template_decl;
+	  processing_template_decl = 0;
+	}
+      else
+	return;  
+    }
 
   if (TREE_CODE (decl) == FUNCTION_DECL && DECL_DECLARED_INLINE_P (decl)
       && !TREE_ASM_WRITTEN (decl))
@@ -3157,6 +3216,14 @@ mark_used (tree decl)
     {
       if (DECL_DEFERRED_FN (decl))
 	return;
+      
+      /* Remember the current location for a function we will end up
+         synthesizing.  Then we can inform the user where it was
+         required in the case of error.  */
+      if (DECL_ARTIFICIAL (decl) && DECL_NONSTATIC_MEMBER_FUNCTION_P (decl)
+	  && !DECL_THUNK_P (decl))
+	DECL_SOURCE_LOCATION (decl) = input_location;
+      
       note_vague_linkage_fn (decl);
     }
   
@@ -3174,14 +3241,6 @@ mark_used (tree decl)
 	 pointing to the class location.  */
       && current_function_decl)
     {
-      /* Put the function definition at the position where it is needed,
-	 rather than within the body of the class.  That way, an error
-	 during the generation of the implicit body points at the place
-	 where the attempt to generate the function occurs, giving the
-	 user a hint as to why we are attempting to generate the
-	 function.  */
-      DECL_SOURCE_LOCATION (decl) = input_location;
-
       synthesize_method (decl);
       /* If we've already synthesized the method we don't need to
 	 instantiate it, so we can return right away.  */
@@ -3197,12 +3256,19 @@ mark_used (tree decl)
       && (!DECL_EXPLICIT_INSTANTIATION (decl)
 	  || (TREE_CODE (decl) == FUNCTION_DECL 
 	      && DECL_INLINE (DECL_TEMPLATE_RESULT 
-			      (template_for_substitution (decl))))))
+			      (template_for_substitution (decl))))
+	  /* We need to instantiate static data members so that there
+	     initializers are available in integral constant
+	     expressions.  */
+	  || (TREE_CODE (decl) == VAR_DECL
+	      && DECL_INITIALIZED_BY_CONSTANT_EXPRESSION_P (decl))))
     /* We put off instantiating functions in order to improve compile
        times.  Maintaining a stack of active functions is expensive,
        and the inliner knows to instantiate any functions it might
        need.  */
     instantiate_decl (decl, /*defer_ok=*/true, /*undefined_ok=*/0);
+
+  processing_template_decl = saved_processing_template_decl;
 }
 
 #include "gt-cp-decl2.h"
