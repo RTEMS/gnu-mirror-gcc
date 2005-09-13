@@ -441,7 +441,7 @@ enum reg_class { NO_REGS, ALL_REGS, LIM_REG_CLASSES };
 
    On the VAX, the offset starts at 0.  */
 
-#define INIT_CUMULATIVE_ARGS(CUM,FNTYPE,LIBNAME,INDIRECT)	\
+#define INIT_CUMULATIVE_ARGS(CUM, FNTYPE, LIBNAME, INDIRECT, N_NAMED_ARGS) \
  ((CUM) = 0)
 
 /* Update the data in CUM to advance over an argument
@@ -800,11 +800,6 @@ enum reg_class { NO_REGS, ALL_REGS, LIM_REG_CLASSES };
    table.
    Do not define this if the table should contain absolute addresses.  */
 #define CASE_VECTOR_PC_RELATIVE 1
-
-/* Define this if the case instruction drops through after the table
-   when the index is out of range.  Don't define it if the case insn
-   jumps to the default label instead.  */
-#define CASE_DROPS_THROUGH
 
 /* Indicate that jump tables go in the text section.  This is
    necessary when compiling PIC code.  */
