@@ -32,6 +32,7 @@ extern "C" void _Jv_RegisterClasses_Counted (const jclass *classes,
 // This must be predefined with "C" linkage.
 extern "C" void *_Jv_LookupInterfaceMethodIdx (jclass klass, jclass iface, 
                                                int meth_idx);
+extern "C" void *_Jv_ResolvePoolEntry (jclass this_class, jint index);
 
 // These are the possible values for the `state' field of the class
 // structure.  Note that ordering is important here.  Whenever the
@@ -234,8 +235,10 @@ jboolean _Jv_CheckAccess (jclass self_klass, jclass other_klass,
 			  jint flags);
 jclass _Jv_GetArrayClass (jclass klass, java::lang::ClassLoader *loader);
 
-#ifdef INTERPRETER
 jboolean _Jv_IsInterpretedClass (jclass);
+jboolean _Jv_IsBinaryCompatibilityABI (jclass);
+
+#ifdef INTERPRETER
 void _Jv_InitField (jobject, jclass, int);
 
 class _Jv_ClassReader;	
@@ -466,8 +469,10 @@ private:
   friend jclass (::_Jv_GetArrayClass) (jclass klass,
 				       java::lang::ClassLoader *loader);
 
-#ifdef INTERPRETER
   friend jboolean (::_Jv_IsInterpretedClass) (jclass);
+  friend jboolean (::_Jv_IsBinaryCompatibilityABI) (jclass);
+
+#ifdef INTERPRETER
   friend void ::_Jv_InitField (jobject, jclass, int);
 
   friend class ::_Jv_ClassReader;	
@@ -489,6 +494,8 @@ private:
   friend class ::_Jv_InterpreterEngine;
 
   friend void ::_Jv_sharedlib_register_hook (jclass klass);
+
+  friend void *::_Jv_ResolvePoolEntry (jclass this_class, jint index);
 
   // Chain for class pool.  This also doubles as the ABI version
   // number.  It is only used for this purpose at class registration

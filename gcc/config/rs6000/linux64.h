@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler,
    for 64 bit PowerPC linux.
-   Copyright (C) 2000, 2001, 2002, 2003, 2004
+   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005
    Free Software Foundation, Inc.
 
    This file is part of GCC.
@@ -244,13 +244,11 @@ extern int dot_symbols;
    the first field is an FP double, only if in power alignment mode.  */
 #undef  ROUND_TYPE_ALIGN
 #define ROUND_TYPE_ALIGN(STRUCT, COMPUTED, SPECIFIED)			\
-  ((TARGET_ALTIVEC && TREE_CODE (STRUCT) == VECTOR_TYPE)		\
-   ? MAX (MAX ((COMPUTED), (SPECIFIED)), 128)				\
-   : (TARGET_64BIT							\
-      && (TREE_CODE (STRUCT) == RECORD_TYPE				\
-	  || TREE_CODE (STRUCT) == UNION_TYPE				\
-	  || TREE_CODE (STRUCT) == QUAL_UNION_TYPE)			\
-      && TARGET_ALIGN_NATURAL == 0)					\
+  ((TARGET_64BIT							\
+    && (TREE_CODE (STRUCT) == RECORD_TYPE				\
+	|| TREE_CODE (STRUCT) == UNION_TYPE				\
+	|| TREE_CODE (STRUCT) == QUAL_UNION_TYPE)			\
+    && TARGET_ALIGN_NATURAL == 0)					\
    ? rs6000_special_round_type_align (STRUCT, COMPUTED, SPECIFIED)	\
    : MAX ((COMPUTED), (SPECIFIED)))
 
@@ -512,10 +510,19 @@ while (0)
     {									\
       const char *s;							\
       dbxout_begin_stabn (BRAC);					\
-      assemble_name (FILE, NAME);					\
-      putc ('-', FILE);							\
       s = XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0);		\
-      rs6000_output_function_entry (FILE, s);				\
+      /* dbxout_block passes this macro the function name as NAME,	\
+	 assuming that it is the function code start label.  In our	\
+	 case, the function name is the OPD entry.  dbxout_block is	\
+	 broken, hack around it here.  */				\
+      if (NAME == s)							\
+	putc ('0', FILE);						\
+      else								\
+	{								\
+	  assemble_name (FILE, NAME);					\
+	  putc ('-', FILE);						\
+	  rs6000_output_function_entry (FILE, s);			\
+	}								\
       putc ('\n', FILE);						\
     }									\
   while (0)
@@ -552,7 +559,7 @@ while (0)
 #undef DRAFT_V4_STRUCT_RET
 #define DRAFT_V4_STRUCT_RET (!TARGET_64BIT)
 
-#define TARGET_ASM_FILE_END file_end_indicate_exec_stack
+#define TARGET_ASM_FILE_END rs6000_elf_end_indicate_exec_stack
 
 #define TARGET_HAS_F_SETLKW
 

@@ -108,6 +108,8 @@ match gfc_match_derived_decl (void);
 match gfc_match_implicit_none (void);
 match gfc_match_implicit (void);
 
+void gfc_set_constant_character_len (int, gfc_expr *);
+
 /* Matchers for attribute declarations */
 match gfc_match_allocatable (void);
 match gfc_match_dimension (void);
@@ -127,6 +129,7 @@ match gfc_match_target (void);
 match gfc_match_structure_constructor (gfc_symbol *, gfc_expr **);
 match gfc_match_rvalue (gfc_expr **);
 match gfc_match_variable (gfc_expr **, int);
+match gfc_match_equiv_variable (gfc_expr **);
 match gfc_match_actual_arglist (int, gfc_actual_arglist **);
 match gfc_match_literal_constant (gfc_expr **, int);
 

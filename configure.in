@@ -70,6 +70,11 @@ progname=$0
 # if PWD already has a value, it is probably wrong.
 if test -n "$PWD" ; then PWD=`${PWDCMD-pwd}`; fi
 
+# If we're building in the source directory, error.
+if test "${srcdir}" = "." ; then
+  AC_MSG_ERROR([Building in the source directory is not supported in this release. See http://gcc.gnu.org/install/configure.html for more details.])
+fi
+
 # Export original configure arguments for use by sub-configures.  These
 # will be expanded by make, so quote '$'.
 tmp="$progname $@"
@@ -1043,7 +1048,7 @@ have_gmp=yes
 AC_ARG_WITH(mpfr-dir, [  --with-mpfr-dir=PATH    Specify source directory for MPFR library])
 
 if test "x$with_mpfr_dir" != x; then
-  gmpinc="-I$with_mpfr_dir/mpfr"
+  gmpinc="-I$with_mpfr_dir"
   gmplibs="$with_mpfr_dir/libmpfr.a"
 else
   gmplibs="-lmpfr"
@@ -1131,6 +1136,15 @@ if test -d ${srcdir}/gcc; then
     fi
   fi
   enable_languages=`echo "${enable_languages}" | sed -e 's/[[ 	,]][[ 	,]]*/,/g' -e 's/,$//'`
+
+  # 'fortran' is a compatibility name for 'f95'. We issue a warning and
+  # make the substitution.
+  case ,${enable_languages}, in
+    *,fortran,*)
+      echo configure.in: warning: the official name for 'fortran' on this branch is 'f95' 1>&2
+      enable_languages=`echo "${enable_languages}" | sed -e 's/fortran/f95/g'`
+      ;;
+  esac
 
   # First scan to see if an enabled language requires some other language.
   # We assume that a given config-lang.in will list all the language
@@ -1666,6 +1680,7 @@ esac
 
 case "${host}" in
   *-*-hpux*) RPATH_ENVVAR=SHLIB_PATH ;;
+  *-*-darwin* | *-*-rhapsody* ) RPATH_ENVVAR=DYLD_LIBRARY_PATH ;;
   *) RPATH_ENVVAR=LD_LIBRARY_PATH ;;
 esac
 

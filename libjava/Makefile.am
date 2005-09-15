@@ -118,14 +118,33 @@ pkgconfig_DATA = libgcj.pc
 jardir = $(datadir)/java
 jar_DATA = libgcj-@gcc_version@.jar
 
+if JAVA_HOME_SET
+JAVA_HOME_DIR = $(JAVA_HOME)
+BOOT_CLASS_PATH_DIR = $(JAVA_HOME)/lib/rt.jar
+else
+JAVA_HOME_DIR = $(prefix)
+BOOT_CLASS_PATH_DIR = $(jardir)/$(jar_DATA)
+endif
+
 ## FIXME: Using libdir violates GNU coding standards.
 secdir = $(libdir)/security
 ## Where to install default logging property file.
 propdir = $(libdir)
 
+## Where the standard .db file is found.
+dbexecdir = $(libdir)/gcj-@gcc_version@
+## Name of the default .db.
+db_name = classmap.db
+## Compiler specific component of the .db file
+db_pathtail = gcj-@gcc_version@/$(db_name)
+
 ## For now, only on native systems.  FIXME.
 if NATIVE
 bin_PROGRAMS = jv-convert gij grmic grmiregistry gcj-dbtool
+
+## It is convenient to actually build and install the default database
+## when gcj-dbtool is available.
+dbexec_DATA = $(db_name)
 endif
 
 bin_SCRIPTS = addr2name.awk
@@ -170,8 +189,13 @@ AM_CXXFLAGS = \
 	-D_GNU_SOURCE \
 	-DPREFIX="\"$(prefix)\"" \
 	-DLIBDIR="\"$(libdir)\"" \
-	-DBOOT_CLASS_PATH="\"$(jardir)/$(jar_DATA)\"" \
-	-DJAVA_EXT_DIRS="\"$(jardir)/ext\""
+        -DJAVA_HOME="\"$(JAVA_HOME_DIR)\"" \
+        -DBOOT_CLASS_PATH="\"$(BOOT_CLASS_PATH_DIR)\"" \
+	-DJAVA_EXT_DIRS="\"$(jardir)/ext\"" \
+	-DGCJ_ENDORSED_DIRS="\"$(jardir)/gcj-endorsed\"" \
+	-DLIBGCJ_DEFAULT_DATABASE="\"$(dbexecdir)/$(db_name)\"" \
+	-DLIBGCJ_DEFAULT_DATABASE_PATH_TAIL="\"$(db_pathtail)\"" \
+	-DTOOLEXECLIBDIR="\"$(toolexeclibdir)\""
 
 AM_GCJFLAGS = \
 	@LIBGCJ_JAVAFLAGS@ \
@@ -201,6 +225,72 @@ BOOTCLASSPATH = $(here)'$(CLASSPATH_SEPARATOR)'$(srcdir)'$(CLASSPATH_SEPARATOR)'
 
 ## ################################################################
 
+# Files for which we build .lo files
+all_native_compiled_source_files = \
+    $(java_source_files) \
+    $(built_java_source_files) \
+    $(xlib_java_source_files)
+
+# Files for which we build .class files
+# It *must* begin with $(all_native_compiled_source_files)
+all_java_source_files = \
+    $(all_native_compiled_source_files) \
+    $(gtk_awt_peer_source_files) \
+    $(gnu_xml_source_files) \
+    $(javax_imageio_source_files) \
+    $(javax_xml_source_files) \
+    $(gnu_java_beans_source_files) \
+    gnu/gcj/tools/gcj_dbtool/Main.java
+
+EXTRA_DIST = $(all_java_source_files)
+
+# Build dependencies between java, class and lo files.  They are included
+# below, together with automatically-generated dependencies between Java
+# files.
+#
+# Dependencies from Java to .class files
+# --------------------------------------
+# Each directory's filelist file depends on the corresponding Java source files.
+# The stamp file depends on the filelist (using a `Static Pattern Rule').
+# Each class file depends on the its directory's .stamp file.  This reflects
+# the fact that 1) all classfiles are compiled in one go when the .stamp file
+# is built and 2) anything which depends on a particular .class file must wait
+# until its directory is processed and the .stamp file is created.
+#
+# Dependencies from Java to .lo files
+# -----------------------------------
+# As above, each directory's filelist file depends on the corresponding Java
+# source files, and the stamp file depends on the filelist.  For native
+# compilation, the lo file depends on the stamp file (also using a `Static
+# Pattern Rule').  So, when one Java file changes, the filelist file is
+# updated, the stamp file rule builds the .class files, and the .lo file rule
+# recompiles to native code.
+Makefile.deps: $(srcdir)/Makefile.in
+	@: $(call write_entries_to_file,$(all_java_source_files),files.tmplist)
+	echo 's,^\(.*\)/\([^/]*\)\.java$$,\1.list: &\' > tmpsed
+	echo '\1/\2.class: \1.stamp,' >> tmpsed
+	sed -ftmpsed files.tmplist > Makefile.deps
+	rm files.tmplist tmpsed
+
+all_native_compiled_dirs = $(sort $(patsubst %/, %, $(dir $(all_native_compiled_source_files))))
+all_java_dirs = $(sort $(patsubst %/, %, $(dir $(all_java_source_files))))
+all_java_lo_files = $(all_native_compiled_dirs:=.lo)
+all_java_deps_files = $(all_java_dirs:=.deps)
+all_java_stamp_files = $(all_java_dirs:=.stamp)
+all_java_filelist_files = $(all_java_dirs:=.list)
+
+# In the future these may be defined manually, if we decide to split libgcj.so
+# into multiple shared libraries.  For now, everything but xlib goes into
+# all_libgcj_lo_files
+all_xlib_lo_files = gnu/gcj/xlib.lo gnu/awt/xlib.lo
+all_libgcj_lo_files = $(filter-out $(all_xlib_lo_files), $(all_java_lo_files))
+
+# Include automatically generated dependencies between Java source files.
+-include Makefile.deps $(all_java_deps_files)
+
+all_property_files = $(property_files) \
+    java/util/logging/logging.properties
+
 ##
 ## How to build libgcj.a and libgcj.jar
 ##
@@ -219,16 +309,22 @@ libgij_la_LDFLAGS = -rpath $(toolexeclibdir) \
 # subsections in the linker, such as Alpha and MIPS.
 libgcj0_convenience_la_SOURCES = prims.cc jni.cc exception.cc \
 	link.cc defineclass.cc interpret.cc verify.cc \
-	$(nat_source_files) $(math_c_source_files) $(java_source_files) \
-	$(gnu_xml_source_files) $(built_java_source_files) \
+	$(nat_source_files) $(math_c_source_files) \
 	$(BOEHMGC_SRC) $(NOGC_SRC) \
 	$(BACKTRACE_SRC) \
 	$(POSIX_PLATFORM_SRC) $(WIN32_PLATFORM_SRC) $(ECOS_PLATFORM_SRC) \
 	$(DARWIN_CRT_SRC) \
 	$(POSIX_THREAD_SRC) $(WIN32_THREAD_SRC) $(NO_THREAD_SRC)
-noinst_LTLIBRARIES = libgcj0_convenience.la
+libgcj0_convenience_la_LIBADD = \
+	$(all_libgcj_lo_files) \
+	gnu/gcj/runtime/StackTrace.lo \
+	gnu-xml.lo javax-imageio.lo \
+	javax-xml.lo gnu-java-beans.lo \
+	external/sax/libsax-gcj.la \
+	external/w3c_dom/libw3c-gcj.la
+libgcj0_convenience_la_DEPENDENCIES = $(libgcj0_convenience_la_LIBADD)
 
-libgcj_la_SOURCES =
+noinst_LTLIBRARIES = libgcj0_convenience.la
 
 ## Objects from C++ sources in subdirs.
 nat_files = $(nat_source_files:.cc=.lo)
@@ -241,14 +337,24 @@ libgcj_la_LDFLAGS = -rpath $(toolexeclibdir) $(THREADLDFLAGS) $(THREADLIBS) \
 	$(LIBLTDL) $(SYS_ZLIBS) \
 	-version-info `grep -v '^\#' $(srcdir)/libtool-version`
 libgcj_la_LIBADD = \
-	external/sax/libsax_convenience.la \
-	external/w3c_dom/libw3c_convenience.la \
 	libgcj0_convenience.la \
 	$(LIBFFI) $(ZLIBS) $(GCLIBS) $(propertyo_files)
+libgcj_la_SOURCES = 
 libgcj_la_DEPENDENCIES = libgcj-@gcc_version@.jar \
 	java/lang/fdlibm.h java/lang/ieeefp.h java/lang/mprec.h \
-	$(libgcj_la_LIBADD)
+	$(LIBLTDL) $(libgcj_la_LIBADD)
 libgcj_la_LINK = $(LIBLINK)
+
+
+## The .db file.  This rule is only used for native builds, so it is
+## safe to invoke gcj-dbtool.
+$(db_name): gcj-dbtool$(EXEEXT)
+## In case it exists already.
+	@rm -f $(db_name)
+## We don't actually care if it fails -- if it does, just make an
+## empty file.  This is simpler than trying to discover when mmap is
+## not available.
+	./gcj-dbtool -n $(db_name) || touch $(db_name)
 
 # Gtk/Cairo JNI sources.
 if GTK_CAIRO
@@ -299,13 +405,10 @@ jni/gtk-peer/gnu_java_awt_peer_gtk_GtkWindowPeer.c \
 jni/gtk-peer/gnu_java_awt_peer_gtk_GThreadNativeMethodRunner.c \
 jni/gtk-peer/gthread-jni.c \
 jni/gtk-peer/gtk_jawt.c \
-jni/classpath/jcl.c \
-jni/classpath/jnilink.c	\
-jni/classpath/native_state.c \
-jni/classpath/primlib.c
+jni/classpath/native_state.c
 
 ## Java sources for Gtk peers.
-gtk_awt_peer_sources = \
+gtk_awt_peer_source_files = \
 gnu/java/awt/peer/gtk/GdkTextLayout.java \
 gnu/java/awt/peer/gtk/GdkFontMetrics.java \
 gnu/java/awt/peer/gtk/GdkFontPeer.java \
@@ -353,7 +456,7 @@ gnu/java/awt/peer/gtk/GThreadMutex.java \
 gnu/java/awt/peer/gtk/GThreadNativeMethodRunner.java
 
 
-gtk_jni_headers = $(patsubst %.java,jniinclude/%.h,$(subst /,_,$(gtk_awt_peer_sources)))
+gtk_jni_headers = $(patsubst %.java,jniinclude/%.h,$(subst /,_,$(gtk_awt_peer_source_files)))
 
 jniinclude/gnu_java_awt_peer_gtk_GdkGraphics.h: gnu/java/awt/peer/gtk/GdkGraphics.java
 jniinclude/gnu_java_awt_peer_gtk_GdkGraphics2D.h: gnu/java/awt/peer/gtk/GdkGraphics2D.java
@@ -444,22 +547,18 @@ jni/gtk-peer/gnu_java_awt_peer_gtk_GtkWindowPeer.lo: $(top_builddir)/jniinclude/
 $(lib_gnu_java_awt_peer_gtk_la_OBJECTS): $(lib_gnu_java_awt_peer_gtk_la_DEPENDENCIES)
 
 lib_gnu_java_awt_peer_gtk_la_SOURCES = \
-$(gtk_awt_peer_sources) \
 $(gtk_c_source_files) \
 jni/gtk-peer/gthread-jni.h \
 jni/gtk-peer/gtkpeer.h \
-jni/classpath/jcl.h \
-jni/classpath/jnilink.h	\
-jni/classpath/native_state.h \
-jni/classpath/primlib.h
+jni/classpath/native_state.h
 
 lib_gnu_java_awt_peer_gtk_la_CFLAGS = \
 	-Ijniinclude -I$(srcdir)/jni/classpath \
 	-I$(srcdir)/jni/gtk-peer $(PEDANTIC_CFLAGS) $(GTK_CFLAGS) $(LIBART_CFLAGS) \
 	$(X_CFLAGS) $(CAIRO_CFLAGS) $(PANGOFT2_CFLAGS)
 lib_gnu_java_awt_peer_gtk_la_GCJFLAGS = $(AM_GCJFLAGS) -fjni
-lib_gnu_java_awt_peer_gtk_la_LIBADD = $(GTK_LIBS) $(GLIB_LIBS) $(LIBART_LIBS) $(CAIRO_LIBS) $(PANGOFT2_LIBS)
-lib_gnu_java_awt_peer_gtk_la_DEPENDENCIES = $(gtk_jni_headers) libgcj-@gcc_version@.jar libgcj.la libgcj.spec
+lib_gnu_java_awt_peer_gtk_la_LIBADD = gtk-awt-peer.lo $(GTK_LIBS) $(GLIB_LIBS) $(LIBART_LIBS) $(CAIRO_LIBS) $(PANGOFT2_LIBS)
+lib_gnu_java_awt_peer_gtk_la_DEPENDENCIES = gtk-awt-peer.lo $(gtk_jni_headers) libgcj-@gcc_version@.jar libgcj.la libgcj.spec
 ## The mysterious backslash in the grep pattern is consumed by make.
 lib_gnu_java_awt_peer_gtk_la_LDFLAGS = \
         -version-info `grep -v '^\#' $(srcdir)/libtool-version` $(LIBGCJ_LD_SYMBOLIC) $(X_LIBS) -lXtst
@@ -467,17 +566,17 @@ lib_gnu_java_awt_peer_gtk_la_LINK = $(LIBLINK)
 
 libjawt_la_SOURCES = jawt.c
 libjawt_la_CFLAGS = -I$(srcdir)/jni/classpath $(PEDANTIC_CFLAGS) $(X_CFLAGS)
-libjawt_la_LIBADD = lib-gnu-java-awt-peer-gtk.la
+## See jv_convert_LDADD.
+libjawt_la_LIBADD = -L$(here)/.libs lib-gnu-java-awt-peer-gtk.la
 libjawt_la_LDFLAGS = \
 	-version-info `grep -v '^\#' $(srcdir)/libtool-version` \
 	$(LIBGCJ_LD_SYMBOLIC)
 libjawt_la_LINK = $(LIBLINK)
 
-lib_gnu_awt_xlib_la_SOURCES = \
-	$(xlib_java_source_files) \
-	$(xlib_nat_source_files)
-lib_gnu_awt_xlib_la_DEPENDENCIES = libgcj-@gcc_version@.jar libgcj.la libgcj.spec
-lib_gnu_awt_xlib_la_LIBADD = $(xlib_javao_files)
+lib_gnu_awt_xlib_la_SOURCES = $(xlib_nat_source_files)
+lib_gnu_awt_xlib_la_LIBADD = $(all_xlib_lo_files)
+lib_gnu_awt_xlib_la_DEPENDENCIES = libgcj-@gcc_version@.jar libgcj.la libgcj.spec \
+	$(lib_gnu_awt_xlib_la_LIBADD)
 ## We require libstdc++-v3 to be in the same build tree.
 lib_gnu_awt_xlib_la_CPPFLAGS = \
 	$(AM_CPPFLAGS) \
@@ -491,55 +590,40 @@ lib_gnu_awt_xlib_la_LDFLAGS = ../libstdc++-v3/src/libstdc++.la \
         -version-info `grep -v '^\#' $(srcdir)/libtool-version` $(LIBGCJ_LD_SYMBOLIC)
 lib_gnu_awt_xlib_la_LINK = $(LIBLINK)
 
-all_java_source_files = \
-    $(java_source_files) \
-    $(built_java_source_files) \
-    $(gtk_awt_peer_sources) \
-    $(xlib_java_source_files) \
-    $(gnu_xml_source_files)
-
-all_java_class_files = $(all_java_source_files:.java=.class)
-
-all_property_files = $(property_files) \
-    java/util/logging/logging.properties
-
 ## Build property files into the library.
 property_files = \
 gnu/regexp/MessagesBundle.properties \
 gnu/regexp/MessagesBundle_fr.properties \
 org/ietf/jgss/MessagesBundle.properties
 
-propertyo_files = $(property_files:.properties=.properties.lo) 
+propertyo_files = $(property_files:.properties=.properties.lo)
 
 %.properties.lo: %.properties
 	$(LTGCJCOMPILE) -o $@ -c $< -Wc,--resource,`echo $@ | sed "s/\.lo$$//"`
 
-if ONESTEP
+# Compile one directory in one go.  If the files have to be compiled with the
+# binary compatibility ABI, only make the .class here -- the .lo is made
+# elsewhere in this Makefile.
 
-# Compile all classfiles in one go.
+# For 4.0, we have an exception: gnu/gcj/runtime/StackTrace.java is compiled
+# without optimizing sibcalls, so it is compiled separately from its directory;
+# thus for each dir we build a .lolist file, equal to the .list file except in
+# the gnu.gcj.runtime package.  We have a separate rule below for StackTrace.lo.
+%.list:
+	@: $(shell $(mkinstalldirs) $(basename $@))
+	@: $(call write_entries_to_file,$^,$@)
+	@: $(call write_entries_to_file,$(filter-out $(srcdir)/gnu/gcj/runtime/StackTrace.java, $^),${@:.list=.lolist})
 
-classes.stamp: $(all_java_source_files)
-	@echo Compiling Java sourcefiles...
-	@: $(call write_entries_to_file,$?,libgcj.sourcelist)
-	$(JAVAC) $(JCFLAGS) -classpath '' -bootclasspath $(BOOTCLASSPATH) -d $(here) @libgcj.sourcelist
-	echo > classes.stamp
-# This next rule seems backward, but reflects the fact that 1) all
-# classfiles are compiled in one go when classes.stamp is built and 2)
-# anything which depends on a particular .class file must wait until
-# this file is built.
-$(all_java_class_files): classes.stamp
+$(all_java_lo_files): %.lo: %.stamp
+	$(LTGCJCOMPILE) -o $@ -c @${<:.stamp=.lolist}
 
-else # !ONESTEP
+$(all_java_stamp_files): %.stamp: %.list
+	$(JAVAC) $(JCFLAGS) -classpath '' -bootclasspath $(BOOTCLASSPATH) -d $(here) \
+		-MD -MF ${@:.stamp=.deps} @$<
+	echo timestamp > $@
 
-# Compile each classfile individually.
-
-.java.class:
-	$(JAVAC) $(JCFLAGS) -classpath '' -bootclasspath $(BOOTCLASSPATH) -d $(here) $<
-
-classes.stamp: $(all_java_class_files) $(all_property_files)
-	echo > classes.stamp
-
-endif
+classes.stamp: $(all_property_files) $(all_java_stamp_files)
+	echo timestamp > classes.stamp
 
 libgcj-@gcc_version@.jar: classes.stamp
 	-@rm -f libgcj-@gcc_version@.jar
@@ -565,7 +649,9 @@ libgcj-@gcc_version@.jar: classes.stamp
 	  $(ZIP) -ufM0E@ $@; \
 	done
 
-CLEANFILES = libgcj-@gcc_version@.jar classes.stamp
+CLEANFILES = libgcj-@gcc_version@.jar classes.stamp $(all_java_stamp_files) \
+	$(all_java_deps_files) $(all_java_filelist_files)
+DISTCLEANFILES = Makefile.deps native.dirs bytecompile.dirs
 
 mostlyclean-local:
 ## Use libtool rm to remove each libtool object
@@ -588,14 +674,6 @@ clean-nat:
 
 SUFFIXES = .class .java .h .properties
 
-## Note: we omit StackTrace here, since it has an explicit rule a bit
-## later, and GNU make will warn in this case.
-$(filter-out gnu/gcj/runtime/StackTrace.lo, $(javao_files)) $(xlib_javao_files): %.lo: %.java
-	$(LTGCJCOMPILE) -o $@ -c $<
-
-$(gtk_awt_peer_sources:.java=.lo) $(gnu_xml_source_files:.java=.lo): %.lo: %.java
-	$(LTGCJCOMPILE) -fjni -o $@ -c $<
-
 ## A special case.  The sibcall optimization can change the number of
 ## frames on the stack, and StackTrace makes assumptions about this
 ## number.
@@ -616,6 +694,69 @@ lib-gnu-awt-xlib.la: $(lib_gnu_awt_xlib_la_OBJECTS) $(lib_gnu_awt_xlib_la_DEPEND
 	@: $(call write_entries_to_file,$(lib_gnu_awt_xlib_la_OBJECTS) $(lib_gnu_awt_xlib_la_LIBADD),lib_gnu_awt_xlib.objectlist)
 	$(lib_gnu_awt_xlib_la_LINK) -objectlist lib_gnu_awt_xlib.objectlist \
 	-rpath $(toolexeclibdir) $(lib_gnu_awt_xlib_la_LDFLAGS) $(LIBS)
+
+## ################################################################
+
+##
+## Some packages must be built with the binary compatibility ABI.  We
+## compile each such package into a .so, broken down more or less by
+## conceptual unit.
+##
+
+## Depend on the sources, even though we are going to compile the
+## classes.
+gnu-xml.lo: $(gnu_xml_source_files)
+## FIXME: this is ugly.  We want to make sure the .class files have
+## been built, but we don't want a real dependency on them as this
+## would cause our target to be rebuilt whenever any .java file is
+## touched.
+	$(MAKE) classes.stamp
+	$(LTGCJCOMPILE) -fjni -findirect-dispatch -c -o gnu-xml.lo \
+		`find gnu/xml -name '*.class' -print | sort -r`
+
+## Depend on the sources, even though we are going to compile the
+## classes.
+javax-imageio.lo: $(javax_imageio_source_files)
+## FIXME: this is ugly.  We want to make sure the .class files have
+## been built, but we don't want a real dependency on them as this
+## would cause our target to be rebuilt whenever any .java file is
+## touched.
+	$(MAKE) classes.stamp
+	$(LTGCJCOMPILE) -findirect-dispatch -c -o javax-imageio.lo \
+		`find javax/imageio -name '*.class' -print | sort -r`
+
+## Depend on the sources, even though we are going to compile the
+## classes.
+javax-xml.lo: $(javax_xml_source_files)
+## FIXME: this is ugly.  We want to make sure the .class files have
+## been built, but we don't want a real dependency on them as this
+## would cause our target to be rebuilt whenever any .java file is
+## touched.
+	$(MAKE) classes.stamp
+	$(LTGCJCOMPILE) -findirect-dispatch -c -o javax-xml.lo \
+		`find javax/xml -name '*.class' -print | sort -r`
+
+## Depend on the sources, even though we are going to compile the
+## classes.
+gnu-java-beans.lo: $(gnu_java_beans_source_files)
+## FIXME: this is ugly.  We want to make sure the .class files have
+## been built, but we don't want a real dependency on them as this
+## would cause our target to be rebuilt whenever any .java file is
+## touched.
+	$(MAKE) classes.stamp
+	$(LTGCJCOMPILE) -findirect-dispatch -c -o gnu-java-beans.lo \
+		`find gnu/java/beans -name '*.class' -print | sort -r`
+
+## Depend on the sources, even though we are going to compile the
+## classes.
+gtk-awt-peer.lo: $(gtk_awt_peer_source_files)
+## FIXME: this is ugly.  We want to make sure the .class files have
+## been built, but we don't want a real dependency on them as this
+## would cause our target to be rebuilt whenever any .java file is
+## touched.
+	$(MAKE) classes.stamp
+	$(LTGCJCOMPILE) -findirect-dispatch -fjni -c -o gtk-awt-peer.lo \
+		`find gnu/java/awt/peer/gtk -name '*.class' -print | sort -r`
 
 ## ################################################################
 
@@ -644,7 +785,7 @@ inner_nat_headers = java/io/ObjectOutputStream$$PutField.h \
 	gnu/java/nio/PipeImpl$$SourceChannelImpl.h \
 	$(PLATFORM_INNER_NAT_HDRS)
 
-nat_headers = $(ordinary_nat_headers) $(inner_nat_headers)
+nat_headers = $(ordinary_nat_headers) $(inner_nat_headers) gnu/gcj/tools/gcj_dbtool/Main.h
 nat_headers_install = $(ordinary_nat_headers)
 
 xlib_nat_headers = $(xlib_java_source_files:.java=.h)
@@ -736,7 +877,7 @@ java/lang/reflect/Proxy$$ProxyType.h: java/lang/reflect/Proxy.class
 	$(GCJH) -classpath '' -bootclasspath $(top_builddir) \
 	'java/lang/reflect/Proxy$$ProxyType'
 
-gnu/gcj/runtime/VMClassLoader.h: gnu/gcj/runtime/VMClassLoader.class
+gnu/gcj/runtime/ExtensionClassLoader.h: gnu/gcj/runtime/ExtensionClassLoader.class
 	$(GCJH) -classpath '' -bootclasspath $(top_builddir) \
 	    -friend 'class ::java::lang::ClassLoader;' \
 	    $(basename $<)
@@ -957,7 +1098,8 @@ jv_convert_LDADD = -L$(here)/.libs libgcj.la
 ## linking this program.
 jv_convert_DEPENDENCIES = libgcj.la libgcj.spec
 
-gcj_dbtool_SOURCES = gnu/gcj/tools/gcj_dbtool/Main.java
+gcj_dbtool_SOURCES = gnu/gcj/tools/gcj_dbtool/Main.java \
+	gnu/gcj/tools/gcj_dbtool/natMain.cc
 ## We need -nodefaultlibs because we want to avoid gcj's `-lgcj'.  We
 ## need this because we are explicitly using libtool to link using the
 ## `.la' file.
@@ -1043,40 +1185,7 @@ gnu/gcj/convert/UnicodeToBytes.java
 ## hand.
 special_java_source_files = java/lang/Class.java java/lang/Object.java
 
-awt_java_source_files =	\
-gnu/awt/LightweightRedirector.java \
-gnu/awt/j2d/AbstractGraphicsState.java \
-gnu/awt/j2d/DirectRasterGraphics.java \
-gnu/awt/j2d/Graphics2DImpl.java \
-gnu/awt/j2d/IntegerGraphicsState.java \
-gnu/awt/j2d/MappedRaster.java \
-gnu/java/awt/BitMaskExtent.java \
-gnu/java/awt/Buffers.java \
-gnu/java/awt/BitwiseXORComposite.java \
-gnu/java/awt/ComponentDataBlitOp.java \
-gnu/java/awt/ClasspathToolkit.java \
-gnu/java/awt/EmbeddedWindow.java \
-gnu/java/awt/EmbeddedWindowSupport.java \
-gnu/java/awt/EventModifier.java \
-gnu/java/awt/color/CieXyzConverter.java \
-gnu/java/awt/color/ClutProfileConverter.java \
-gnu/java/awt/color/ColorLookUpTable.java \
-gnu/java/awt/color/ColorSpaceConverter.java \
-gnu/java/awt/color/GrayProfileConverter.java \
-gnu/java/awt/color/GrayScaleConverter.java \
-gnu/java/awt/color/LinearRGBConverter.java \
-gnu/java/awt/color/ProfileHeader.java \
-gnu/java/awt/color/PyccConverter.java \
-gnu/java/awt/color/RgbProfileConverter.java \
-gnu/java/awt/color/SrgbConverter.java \
-gnu/java/awt/color/TagEntry.java \
-gnu/java/awt/color/ToneReproductionCurve.java \
-gnu/java/awt/image/ImageDecoder.java \
-gnu/java/awt/image/XBMDecoder.java \
-gnu/java/awt/peer/EmbeddedWindowPeer.java \
-gnu/java/awt/peer/GLightweightPeer.java \
-gnu/java/awt/peer/ClasspathFontPeer.java \
-gnu/java/awt/peer/ClasspathTextLayoutPeer.java \
+gnu_java_beans_source_files = \
 gnu/java/beans/decoder/AbstractContext.java \
 gnu/java/beans/decoder/AbstractCreatableObjectContext.java \
 gnu/java/beans/decoder/AbstractElementHandler.java \
@@ -1128,7 +1237,42 @@ gnu/java/beans/BeanInfoEmbryo.java \
 gnu/java/beans/DummyAppletContext.java \
 gnu/java/beans/DummyAppletStub.java \
 gnu/java/beans/ExplicitBeanInfo.java \
-gnu/java/beans/IntrospectionIncubator.java \
+gnu/java/beans/IntrospectionIncubator.java
+
+awt_java_source_files =	\
+gnu/awt/LightweightRedirector.java \
+gnu/awt/j2d/AbstractGraphicsState.java \
+gnu/awt/j2d/DirectRasterGraphics.java \
+gnu/awt/j2d/Graphics2DImpl.java \
+gnu/awt/j2d/IntegerGraphicsState.java \
+gnu/awt/j2d/MappedRaster.java \
+gnu/java/awt/BitMaskExtent.java \
+gnu/java/awt/Buffers.java \
+gnu/java/awt/BitwiseXORComposite.java \
+gnu/java/awt/ComponentDataBlitOp.java \
+gnu/java/awt/ClasspathToolkit.java \
+gnu/java/awt/EmbeddedWindow.java \
+gnu/java/awt/EmbeddedWindowSupport.java \
+gnu/java/awt/EventModifier.java \
+gnu/java/awt/color/CieXyzConverter.java \
+gnu/java/awt/color/ClutProfileConverter.java \
+gnu/java/awt/color/ColorLookUpTable.java \
+gnu/java/awt/color/ColorSpaceConverter.java \
+gnu/java/awt/color/GrayProfileConverter.java \
+gnu/java/awt/color/GrayScaleConverter.java \
+gnu/java/awt/color/LinearRGBConverter.java \
+gnu/java/awt/color/ProfileHeader.java \
+gnu/java/awt/color/PyccConverter.java \
+gnu/java/awt/color/RgbProfileConverter.java \
+gnu/java/awt/color/SrgbConverter.java \
+gnu/java/awt/color/TagEntry.java \
+gnu/java/awt/color/ToneReproductionCurve.java \
+gnu/java/awt/image/ImageDecoder.java \
+gnu/java/awt/image/XBMDecoder.java \
+gnu/java/awt/peer/EmbeddedWindowPeer.java \
+gnu/java/awt/peer/GLightweightPeer.java \
+gnu/java/awt/peer/ClasspathFontPeer.java \
+gnu/java/awt/peer/ClasspathTextLayoutPeer.java \
 java/applet/Applet.java \
 java/applet/AppletStub.java \
 java/applet/AppletContext.java \
@@ -1971,7 +2115,7 @@ gnu/java/rmi/server/UnicastRemoteStub.java \
 gnu/java/rmi/server/UnicastServer.java \
 gnu/java/rmi/server/UnicastServerRef.java
 
-javax_source_files = \
+javax_imageio_source_files = \
 javax/imageio/ImageWriteParam.java \
 javax/imageio/ImageReader.java \
 javax/imageio/ImageWriter.java \
@@ -2017,7 +2161,63 @@ javax/imageio/event/IIOWriteProgressListener.java \
 javax/imageio/ImageTranscoder.java \
 javax/imageio/ImageTypeSpecifier.java \
 javax/imageio/ImageIO.java \
-javax/imageio/IIOImage.java \
+javax/imageio/IIOImage.java
+
+javax_xml_source_files = \
+javax/xml/xpath/XPathConstants.java \
+javax/xml/xpath/XPathFunction.java \
+javax/xml/xpath/XPathVariableResolver.java \
+javax/xml/xpath/XPathExpressionException.java \
+javax/xml/xpath/XPathFunctionResolver.java \
+javax/xml/xpath/XPath.java \
+javax/xml/xpath/XPathFactoryConfigurationException.java	\
+javax/xml/xpath/XPathFactory.java \
+javax/xml/xpath/XPathException.java \
+javax/xml/xpath/XPathExpression.java \
+javax/xml/xpath/XPathFunctionException.java \
+javax/xml/validation/ValidatorHandler.java \
+javax/xml/validation/Validator.java \
+javax/xml/validation/TypeInfoProvider.java \
+javax/xml/validation/SchemaFactory.java	\
+javax/xml/validation/Schema.java \
+javax/xml/parsers/SAXParserFactory.java	\
+javax/xml/parsers/FactoryConfigurationError.java \
+javax/xml/parsers/SAXParser.java \
+javax/xml/parsers/DocumentBuilderFactory.java \
+javax/xml/parsers/ParserConfigurationException.java \
+javax/xml/parsers/DocumentBuilder.java \
+javax/xml/datatype/DatatypeFactory.java	\
+javax/xml/datatype/XMLGregorianCalendar.java \
+javax/xml/datatype/Duration.java \
+javax/xml/datatype/DatatypeConfigurationException.java \
+javax/xml/datatype/DatatypeConstants.java \
+javax/xml/XMLConstants.java \
+javax/xml/namespace/NamespaceContext.java \
+javax/xml/namespace/QName.java \
+javax/xml/transform/TransformerException.java \
+javax/xml/transform/TransformerFactoryConfigurationError.java \
+javax/xml/transform/sax/SAXResult.java \
+javax/xml/transform/sax/TransformerHandler.java	\
+javax/xml/transform/sax/SAXTransformerFactory.java \
+javax/xml/transform/sax/SAXSource.java \
+javax/xml/transform/sax/TemplatesHandler.java \
+javax/xml/transform/OutputKeys.java \
+javax/xml/transform/stream/StreamResult.java \
+javax/xml/transform/stream/StreamSource.java \
+javax/xml/transform/Source.java	\
+javax/xml/transform/SourceLocator.java \
+javax/xml/transform/ErrorListener.java \
+javax/xml/transform/TransformerConfigurationException.java \
+javax/xml/transform/Templates.java \
+javax/xml/transform/Result.java	\
+javax/xml/transform/URIResolver.java \
+javax/xml/transform/dom/DOMSource.java \
+javax/xml/transform/dom/DOMLocator.java	\
+javax/xml/transform/dom/DOMResult.java \
+javax/xml/transform/Transformer.java \
+javax/xml/transform/TransformerFactory.java
+
+javax_source_files = \
 javax/net/VanillaSocketFactory.java \
 javax/net/ssl/TrustManagerFactorySpi.java \
 javax/net/ssl/SSLKeyException.java \
@@ -2256,58 +2456,6 @@ javax/naming/NameClassPair.java	\
 javax/naming/RefAddr.java \
 javax/naming/CompositeName.java	\
 javax/naming/Name.java \
-javax/xml/xpath/XPathConstants.java \
-javax/xml/xpath/XPathFunction.java \
-javax/xml/xpath/XPathVariableResolver.java \
-javax/xml/xpath/XPathExpressionException.java \
-javax/xml/xpath/XPathFunctionResolver.java \
-javax/xml/xpath/XPath.java \
-javax/xml/xpath/XPathFactoryConfigurationException.java	\
-javax/xml/xpath/XPathFactory.java \
-javax/xml/xpath/XPathException.java \
-javax/xml/xpath/XPathExpression.java \
-javax/xml/xpath/XPathFunctionException.java \
-javax/xml/validation/ValidatorHandler.java \
-javax/xml/validation/Validator.java \
-javax/xml/validation/TypeInfoProvider.java \
-javax/xml/validation/SchemaFactory.java	\
-javax/xml/validation/Schema.java \
-javax/xml/parsers/SAXParserFactory.java	\
-javax/xml/parsers/FactoryConfigurationError.java \
-javax/xml/parsers/SAXParser.java \
-javax/xml/parsers/DocumentBuilderFactory.java \
-javax/xml/parsers/ParserConfigurationException.java \
-javax/xml/parsers/DocumentBuilder.java \
-javax/xml/datatype/DatatypeFactory.java	\
-javax/xml/datatype/XMLGregorianCalendar.java \
-javax/xml/datatype/Duration.java \
-javax/xml/datatype/DatatypeConfigurationException.java \
-javax/xml/datatype/DatatypeConstants.java \
-javax/xml/XMLConstants.java \
-javax/xml/namespace/NamespaceContext.java \
-javax/xml/namespace/QName.java \
-javax/xml/transform/TransformerException.java \
-javax/xml/transform/TransformerFactoryConfigurationError.java \
-javax/xml/transform/sax/SAXResult.java \
-javax/xml/transform/sax/TransformerHandler.java	\
-javax/xml/transform/sax/SAXTransformerFactory.java \
-javax/xml/transform/sax/SAXSource.java \
-javax/xml/transform/sax/TemplatesHandler.java \
-javax/xml/transform/OutputKeys.java \
-javax/xml/transform/stream/StreamResult.java \
-javax/xml/transform/stream/StreamSource.java \
-javax/xml/transform/Source.java	\
-javax/xml/transform/SourceLocator.java \
-javax/xml/transform/ErrorListener.java \
-javax/xml/transform/TransformerConfigurationException.java \
-javax/xml/transform/Templates.java \
-javax/xml/transform/Result.java	\
-javax/xml/transform/URIResolver.java \
-javax/xml/transform/dom/DOMSource.java \
-javax/xml/transform/dom/DOMLocator.java	\
-javax/xml/transform/dom/DOMResult.java \
-javax/xml/transform/Transformer.java \
-javax/xml/transform/TransformerFactory.java \
 javax/security/cert/CertificateNotYetValidException.java \
 javax/security/cert/Certificate.java \
 javax/security/cert/X509Certificate.java \
@@ -2908,18 +3056,20 @@ gnu/gcj/RawDataManaged.java \
 gnu/gcj/io/DefaultMimeTypes.java \
 gnu/gcj/io/MimeTypes.java \
 gnu/gcj/io/SimpleSHSStream.java	\
+gnu/gcj/runtime/BootClassLoader.java \
+gnu/gcj/runtime/ExtensionClassLoader.java \
 gnu/gcj/runtime/FileDeleter.java \
 gnu/gcj/runtime/FinalizerThread.java \
+gnu/gcj/runtime/HelperClassLoader.java \
 gnu/gcj/runtime/JNIWeakRef.java \
 gnu/gcj/runtime/MethodRef.java \
 gnu/gcj/runtime/NameFinder.java \
 gnu/gcj/runtime/PersistentByteMap.java \
 gnu/gcj/runtime/SharedLibHelper.java \
 gnu/gcj/runtime/SharedLibLoader.java \
-gnu/gcj/runtime/StackTrace.java \
 gnu/gcj/runtime/StringBuffer.java \
+gnu/gcj/runtime/StackTrace.java \
 gnu/gcj/runtime/SystemClassLoader.java \
-gnu/gcj/runtime/VMClassLoader.java \
 gnu/gcj/util/Debug.java \
 gnu/java/io/ASN1ParsingException.java \
 gnu/java/io/Base64InputStream.java \
@@ -3126,6 +3276,7 @@ gnu/java/net/protocol/http/event/ConnectionEvent.java \
 gnu/java/net/protocol/http/event/ConnectionListener.java \
 gnu/java/net/protocol/http/event/RequestEvent.java \
 gnu/java/net/protocol/http/event/RequestListener.java \
+gnu/java/net/protocol/https/Handler.java \
 gnu/java/net/protocol/jar/Connection.java \
 gnu/java/net/protocol/jar/Handler.java \
 gnu/java/nio/ChannelInputStream.java \
@@ -3680,7 +3831,6 @@ gnu/gcj/runtime/natNameFinder.cc \
 gnu/gcj/runtime/natSharedLibLoader.cc \
 gnu/gcj/runtime/natStackTrace.cc \
 gnu/gcj/runtime/natStringBuffer.cc \
-gnu/gcj/runtime/natVMClassLoader.cc \
 gnu/gcj/util/natDebug.cc \
 gnu/java/lang/natMainThread.cc \
 gnu/java/net/natPlainDatagramSocketImpl.cc \

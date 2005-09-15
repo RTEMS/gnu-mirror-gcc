@@ -31,10 +31,8 @@ Boston, MA 02111-1307, USA.  */
       BASELINK, or TEMPLATE_ID_EXPR (corresponding to `m').
 
       The expression is a pointer-to-member if its address is taken,
-      but simply denotes a member of the object if its address isnot
-      taken.  In the latter case, resolve_offset_ref is used to
-      convert it to a representation of the member referred to by the
-      OFFSET_REF.
+      but simply denotes a member of the object if its address is not
+      taken.
       
       This form is only used during the parsing phase; once semantic
       analysis has taken place they are eliminated.
@@ -88,10 +86,6 @@ DEFTREECODE (THROW_EXPR, "throw_expr", tcc_expression, 1)
 /* An empty class object.  The TREE_TYPE gives the class type.  We use
    these to avoid actually creating instances of the empty classes.  */
 DEFTREECODE (EMPTY_CLASS_EXPR, "empty_class_expr", tcc_expression, 0)
-
-/* A DECL which is really just a placeholder for an expression.  Used to
-   implement non-class scope anonymous unions.  */
-DEFTREECODE (ALIAS_DECL, "alias_decl", tcc_declaration, 0)
 
 /* A reference to a member function or member functions from a base
    class.  BASELINK_FUNCTIONS gives the FUNCTION_DECL,
@@ -208,7 +202,9 @@ DEFTREECODE (USING_DECL, "using_decl", tcc_declaration, 0)
 /* A using directive. The operand is USING_STMT_NAMESPACE.  */     
 DEFTREECODE (USING_STMT, "using_directive", tcc_expression, 1)
 
-/* An un-parsed default argument.  Looks like an IDENTIFIER_NODE.  */
+/* An un-parsed default argument.  Looks like an IDENTIFIER_NODE.
+   TREE_CHAIN is used to hold instantiations of functions that had to
+   be instantiated before the argument was parsed.  */
 DEFTREECODE (DEFAULT_ARG, "default_arg", tcc_exceptional, 0)
 
 /* A template-id, like foo<int>.  The first operand is the template.
@@ -291,6 +287,7 @@ DEFTREECODE (TAG_DEFN, "tag_defn", tcc_expression, 0)
 
    TINST_DECL contains the original DECL node.
    TINST_LOCATION contains the location where the template is instantiated.
+   TINST_IN_SYSTEM_HEADER_P is true if the location is in a system header.
 
    A stack of template instantiation nodes is kept through the TREE_CHAIN
    fields of these nodes.  */

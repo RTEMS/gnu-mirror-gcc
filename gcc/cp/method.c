@@ -36,6 +36,7 @@ Boston, MA 02111-1307, USA.  */
 #include "toplev.h"
 #include "tm_p.h"
 #include "target.h"
+#include "diagnostic.h"
 
 /* Various flags to control the mangling process.  */
 
@@ -328,6 +329,10 @@ use_thunk (tree thunk_fndecl, bool emit_p)
        There's no need to process this thunk again.  */
     return;
 
+  if (DECL_THUNK_P (function))
+    /* The target is itself a thunk, process it now.  */
+    use_thunk (function, emit_p);
+  
   /* Thunks are always addressable; they only appear in vtables.  */
   TREE_ADDRESSABLE (thunk_fndecl) = 1;
 
@@ -466,10 +471,27 @@ use_thunk (tree thunk_fndecl, bool emit_p)
 	finish_expr_stmt (t);
       else
 	{
-	  t = force_target_expr (TREE_TYPE (t), t);
 	  if (!this_adjusting)
-	    t = thunk_adjust (t, /*this_adjusting=*/0,
-			      fixed_offset, virtual_offset);
+	    {
+	      tree cond = NULL_TREE;
+
+	      if (TREE_CODE (TREE_TYPE (t)) == POINTER_TYPE)
+		{
+		  /* If the return type is a pointer, we need to
+		     protect against NULL.  We know there will be an
+		     adjustment, because that's why we're emitting a
+		     thunk.  */
+		  t = save_expr (t);
+		  cond = cp_convert (boolean_type_node, t);
+		}
+	      
+	      t = thunk_adjust (t, /*this_adjusting=*/0,
+				fixed_offset, virtual_offset);
+	      if (cond)
+		t = build3 (COND_EXPR, TREE_TYPE (t), cond, t,
+			    cp_convert (TREE_TYPE (t), integer_zero_node));
+	    }
+	  t = force_target_expr (TREE_TYPE (t), t);
 	  finish_return_stmt (t);
 	}
 
@@ -698,6 +720,8 @@ do_build_assign_ref (tree fndecl)
   finish_compound_stmt (compound_stmt);
 }
 
+/* Synthesize FNDECL, a non-static member function.   */
+
 void
 synthesize_method (tree fndecl)
 {
@@ -706,17 +730,19 @@ synthesize_method (tree fndecl)
   bool need_body = true;
   tree stmt;
   location_t save_input_location = input_location;
+  int error_count = errorcount;
+  int warning_count = warningcount;
 
+  /* Reset the source location, we might have been previously
+     deferred, and thus have saved where we were first needed.  */
+  DECL_SOURCE_LOCATION (fndecl)
+    = DECL_SOURCE_LOCATION (TYPE_NAME (DECL_CONTEXT (fndecl)));
+  
   /* If we've been asked to synthesize a clone, just synthesize the
      cloned function instead.  Doing so will automatically fill in the
      body for the clone.  */
   if (DECL_CLONED_FUNCTION_P (fndecl))
-    {
-      DECL_SOURCE_LOCATION (DECL_CLONED_FUNCTION (fndecl)) =
-	DECL_SOURCE_LOCATION (fndecl);
-      synthesize_method (DECL_CLONED_FUNCTION (fndecl));
-      return;
-    }
+    fndecl = DECL_CLONED_FUNCTION (fndecl);
 
   /* We may be in the middle of deferred access check.  Disable
      it now.  */
@@ -766,6 +792,10 @@ synthesize_method (tree fndecl)
     pop_function_context_from (context);
 
   pop_deferring_access_checks ();
+
+  if (error_count != errorcount || warning_count != warningcount)
+    warning ("%Hsynthesized method %qD first required here ",
+	     &input_location, fndecl);
 }
 
 /* Use EXTRACTOR to locate the relevant function called for each base &
@@ -935,6 +965,19 @@ implicitly_declare_fn (special_function_kind kind, tree type, bool const_p)
   tree raises = empty_except_spec;
   tree rhs_parm_type = NULL_TREE;
   tree name;
+  HOST_WIDE_INT saved_processing_template_decl;
+
+  /* Because we create declarations for implictly declared functions
+     lazily, we may be creating the declaration for a member of TYPE
+     while in some completely different context.  However, TYPE will
+     never be a dependent class (because we never want to do lookups
+     for implicitly defined functions in a dependent class).
+     Furthermore, we must set PROCESSING_TEMPLATE_DECL to zero here
+     because we only create clones for constructors and destructors
+     when not in a template.  */
+  gcc_assert (!dependent_type_p (type));
+  saved_processing_template_decl = processing_template_decl;
+  processing_template_decl = 0;
 
   type = TYPE_MAIN_VARIANT (type);
 
@@ -1033,6 +1076,9 @@ implicitly_declare_fn (special_function_kind kind, tree type, bool const_p)
   DECL_INLINE (fn) = 1;
   gcc_assert (!TREE_USED (fn));
 
+  /* Restore PROCESSING_TEMPLATE_DECL.  */
+  processing_template_decl = saved_processing_template_decl;
+
   return fn;
 }
 
@@ -1061,7 +1107,7 @@ lazily_declare_fn (special_function_kind sfk, tree type)
   if (sfk == sfk_destructor)
     check_for_override (fn, type);
   /* Add it to CLASSTYPE_METHOD_VEC.  */
-  add_method (type, fn);
+  add_method (type, fn, NULL_TREE);
   /* Add it to TYPE_METHODS.  */
   if (sfk == sfk_destructor 
       && DECL_VIRTUAL_P (fn)
