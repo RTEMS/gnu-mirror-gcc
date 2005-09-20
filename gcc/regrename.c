@@ -101,8 +101,12 @@ note_sets (rtx x, rtx set ATTRIBUTE_UNUSED, void *data)
   HARD_REG_SET *pset = (HARD_REG_SET *) data;
   unsigned int regno;
   int nregs;
+
+  if (GET_CODE (x) == SUBREG)
+    x = SUBREG_REG (x);
   if (GET_CODE (x) != REG)
     return;
+
   regno = REGNO (x);
   nregs = HARD_REGNO_NREGS (regno, GET_MODE (x));
 
@@ -671,7 +675,8 @@ scan_rtx (rtx insn, rtx *loc, enum reg_class class,
 
     case SET:
       scan_rtx (insn, &SET_SRC (x), class, action, OP_IN, 0);
-      scan_rtx (insn, &SET_DEST (x), class, action, OP_OUT, 0);
+      scan_rtx (insn, &SET_DEST (x), class, action, 
+		GET_CODE (PATTERN (insn)) == COND_EXEC ? OP_INOUT : OP_OUT, 0);
       return;
 
     case STRICT_LOW_PART:
@@ -696,7 +701,8 @@ scan_rtx (rtx insn, rtx *loc, enum reg_class class,
       abort ();
 
     case CLOBBER:
-      scan_rtx (insn, &SET_DEST (x), class, action, OP_OUT, 1);
+      scan_rtx (insn, &SET_DEST (x), class, action,
+		GET_CODE (PATTERN (insn)) == COND_EXEC ? OP_INOUT : OP_OUT, 1);
       return;
 
     case EXPR_LIST:

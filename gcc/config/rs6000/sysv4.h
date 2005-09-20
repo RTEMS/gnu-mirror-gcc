@@ -1,6 +1,6 @@
 /* Target definitions for GNU compiler for PowerPC running System V.4
    Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-   2004 Free Software Foundation, Inc.
+   2004, 2005 Free Software Foundation, Inc.
    Contributed by Cygnus Support.
 
    This file is part of GCC.
@@ -385,12 +385,6 @@ do {									\
 #undef	STRICT_ALIGNMENT
 #define	STRICT_ALIGNMENT (TARGET_STRICT_ALIGN)
 
-/* Alignment in bits of the stack boundary.  Note, in order to allow building
-   one set of libraries with -mno-eabi instead of eabi libraries and non-eabi
-   versions, just use 64 as the stack boundary.  */
-#undef	STACK_BOUNDARY
-#define	STACK_BOUNDARY	(TARGET_ALTIVEC_ABI ? 128 : 64)
-
 /* Define this macro if you wish to preserve a certain alignment for
    the stack pointer, greater than what the hardware enforces.  The
    definition is a C expression for the desired alignment (measured
@@ -407,7 +401,8 @@ do {									\
 #define PREFERRED_STACK_BOUNDARY 128
 
 /* Real stack boundary as mandated by the appropriate ABI.  */
-#define ABI_STACK_BOUNDARY ((TARGET_EABI && !TARGET_ALTIVEC_ABI) ? 64 : 128)
+#define ABI_STACK_BOUNDARY \
+  ((TARGET_EABI && !TARGET_ALTIVEC && !TARGET_ALTIVEC_ABI) ? 64 : 128)
 
 /* An expression for the alignment of a structure field FIELD if the
    alignment computed in the usual way is COMPUTED.  */
@@ -744,6 +739,18 @@ extern int fixuplabelno;
 
 #define DBX_REGISTER_NUMBER(REGNO) rs6000_dbx_register_number (REGNO)
 
+/* Map register numbers held in the call frame info that gcc has
+   collected using DWARF_FRAME_REGNUM to those that should be output in
+   .debug_frame and .eh_frame.  We continue to use gcc hard reg numbers
+   for .eh_frame, but use the numbers mandated by the various ABIs for
+   .debug_frame.  rs6000_emit_prologue has translated any combination of
+   CR2, CR3, CR4 saves to a save of CR2.  The actual code emitted saves
+   the whole of CR, so we map CR2_REGNO to the DWARF reg for CR.  */
+#define DWARF2_FRAME_REG_OUT(REGNO, FOR_EH)	\
+  ((FOR_EH) ? (REGNO)				\
+   : (REGNO) == CR2_REGNO ? 64			\
+   : DBX_REGISTER_NUMBER (REGNO))
+
 #define TARGET_ENCODE_SECTION_INFO  rs6000_elf_encode_section_info
 #define TARGET_IN_SMALL_DATA_P  rs6000_elf_in_small_data_p
 #define TARGET_SECTION_TYPE_FLAGS  rs6000_elf_section_type_flags
@@ -1079,17 +1086,17 @@ extern int fixuplabelno;
 #define LINK_START_FREEBSD_SPEC	""
 
 #define LINK_OS_FREEBSD_SPEC "\
-  %{p:%e`-p' not supported; use `-pg' and gprof(1)} \
-    %{Wl,*:%*} \
-    %{v:-V} \
-    %{assert*} %{R*} %{rpath*} %{defsym*} \
-    %{shared:-Bshareable %{h*} %{soname*}} \
-    %{!shared: \
-      %{!static: \
-	%{rdynamic: -export-dynamic} \
-	%{!dynamic-linker: -dynamic-linker /usr/libexec/ld-elf.so.1}} \
-      %{static:-Bstatic}} \
-    %{symbolic:-Bsymbolic}"
+  %{p:%nconsider using `-pg' instead of `-p' with gprof(1)} \
+  %{Wl,*:%*} \
+  %{v:-V} \
+  %{assert*} %{R*} %{rpath*} %{defsym*} \
+  %{shared:-Bshareable %{h*} %{soname*}} \
+  %{!shared: \
+    %{!static: \
+      %{rdynamic: -export-dynamic} \
+      %{!dynamic-linker:-dynamic-linker %(fbsd_dynamic_linker) }} \
+    %{static:-Bstatic}} \
+  %{symbolic:-Bsymbolic}"
 
 /* GNU/Linux support.  */
 #define LIB_LINUX_SPEC "%{mnewlib: --start-group -llinux -lc --end-group } \
@@ -1108,8 +1115,9 @@ extern int fixuplabelno;
 %{static:crtbeginT.o%s;shared|pie:crtbeginS.o%s;:crtbegin.o%s}"
 #endif
 
-#define	ENDFILE_LINUX_SPEC "%{!shared:crtend.o%s} %{shared:crtendS.o%s} \
-%{mnewlib: ecrtn.o%s} %{!mnewlib: crtn.o%s}"
+#define	ENDFILE_LINUX_SPEC "\
+%{shared|pie:crtendS.o%s;:crtend.o%s} \
+%{mnewlib:ecrtn.o%s;:crtn.o%s}"
 
 #define LINK_START_LINUX_SPEC ""
 
@@ -1302,6 +1310,7 @@ ncrtn.o%s"
   { "cpp_os_openbsd",		CPP_OS_OPENBSD_SPEC },			\
   { "cpp_os_windiss",           CPP_OS_WINDISS_SPEC },                  \
   { "cpp_os_default",		CPP_OS_DEFAULT_SPEC },			\
+  { "fbsd_dynamic_linker",	FBSD_DYNAMIC_LINKER },			\
   SUBSUBTARGET_EXTRA_SPECS
 
 #define	SUBSUBTARGET_EXTRA_SPECS
@@ -1345,9 +1354,7 @@ ncrtn.o%s"
    ? (((GLOBAL) ? DW_EH_PE_indirect : 0) | DW_EH_PE_pcrel | DW_EH_PE_sdata4) \
    : DW_EH_PE_absptr)
 
-#define TARGET_ASM_EXCEPTION_SECTION readonly_data_section
-
 #define DOUBLE_INT_ASM_OP "\t.quad\t"
 
 /* Generate entries in .fixup for relocatable addresses.  */
-#define RELOCATABLE_NEEDS_FIXUP
+#define RELOCATABLE_NEEDS_FIXUP 1
