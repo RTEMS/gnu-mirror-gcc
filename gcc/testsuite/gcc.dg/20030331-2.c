@@ -1,4 +1,5 @@
-// { dg-options "" }
+// APPLE LOCAL testsuite nested functions
+// { dg-options "-Wno-nested-funcs" }
 
 extern int printf (const char *, ...);
 
