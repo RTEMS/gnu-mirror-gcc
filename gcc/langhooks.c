@@ -487,10 +487,10 @@ write_global_declarations (void)
     vec[len - i - 1] = decl;
 
   wrapup_global_declarations (vec, len);
-
   check_global_declarations (vec, len);
+  emit_debug_global_declarations (vec, len);
 
-    /* Clean up.  */
+  /* Clean up.  */
   free (vec);
 }
 
@@ -551,4 +551,11 @@ HOST_WIDE_INT
 lhd_to_target_charset (HOST_WIDE_INT c)
 {
   return c;
+}
+
+tree
+lhd_expr_to_decl (tree expr, bool *tc ATTRIBUTE_UNUSED,
+		  bool *ti ATTRIBUTE_UNUSED, bool *se ATTRIBUTE_UNUSED)
+{
+  return expr;
 }
