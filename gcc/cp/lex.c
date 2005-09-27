@@ -535,7 +535,7 @@ handle_pragma_interface (cpp_reader* dfile ATTRIBUTE_UNUSED )
   else if (fname == 0)
     main_filename = lbasename (input_filename);
   else
-    main_filename = ggc_strdup (TREE_STRING_POINTER (fname));
+    main_filename = TREE_STRING_POINTER (fname);
 
   finfo = get_fileinfo (input_filename);
 
@@ -585,7 +585,7 @@ handle_pragma_implementation (cpp_reader* dfile ATTRIBUTE_UNUSED )
     }
   else
     {
-      main_filename = ggc_strdup (TREE_STRING_POINTER (fname));
+      main_filename = TREE_STRING_POINTER (fname);
       if (cpp_included (parse_in, main_filename))
 	warning ("#pragma implementation for %s appears after file is included",
 		 main_filename);
@@ -627,26 +627,18 @@ unqualified_name_lookup_error (tree name)
       if (name != ansi_opname (ERROR_MARK))
 	error ("`%D' not defined", name);
     }
-  else if (current_function_decl == 0)
-    error ("`%D' was not declared in this scope", name);
   else
     {
-      if (IDENTIFIER_NAMESPACE_VALUE (name) != error_mark_node
-	  || IDENTIFIER_ERROR_LOCUS (name) != current_function_decl)
+      error ("`%D' was not declared in this scope", name);
+      /* Prevent repeated error messages by creating a VAR_DECL with
+	 this NAME in the innermost block scope.  */
+      if (current_function_decl)
 	{
-	  static int undeclared_variable_notice;
-
-	  error ("`%D' undeclared (first use this function)", name);
-
-	  if (! undeclared_variable_notice)
-	    {
-	      error ("(Each undeclared identifier is reported only once for each function it appears in.)");
-	      undeclared_variable_notice = 1;
-	    }
+	  tree decl;
+	  decl = build_decl (VAR_DECL, name, error_mark_node);
+	  DECL_CONTEXT (decl) = current_function_decl;
+	  push_local_binding (name, decl, 0);
 	}
-      /* Prevent repeated error messages.  */
-      SET_IDENTIFIER_NAMESPACE_VALUE (name, error_mark_node);
-      SET_IDENTIFIER_ERROR_LOCUS (name, current_function_decl);
     }
 
   return error_mark_node;
@@ -726,7 +718,8 @@ retrofit_lang_decl (tree t)
     ld->u.f.u3sel = TREE_CODE (t) == FUNCTION_DECL ? 1 : 0;
 
   DECL_LANG_SPECIFIC (t) = ld;
-  if (current_lang_name == lang_name_cplusplus)
+  if (current_lang_name == lang_name_cplusplus
+      || decl_linkage (t) == lk_none)
     SET_DECL_LANGUAGE (t, lang_cplusplus);
   else if (current_lang_name == lang_name_c)
     SET_DECL_LANGUAGE (t, lang_c);

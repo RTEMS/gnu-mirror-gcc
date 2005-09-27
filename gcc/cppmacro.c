@@ -1136,6 +1136,10 @@ cpp_sys_macro_p (cpp_reader *pfile)
 void
 cpp_scan_nooutput (cpp_reader *pfile)
 {
+  /* Request a CPP_EOF token at the end of this file, rather than
+     transparently continuing with the including file.  */
+  pfile->buffer->return_at_eof = true;
+
   if (CPP_OPTION (pfile, traditional))
     while (_cpp_read_logical_line_trad (pfile))
       ;
@@ -1622,6 +1626,7 @@ cpp_macro_definition (cpp_reader *pfile, const cpp_hashnode *node)
 	len += NODE_LEN (macro->params[i]) + 1; /* "," */
     }
 
+  /* This should match below where we fill in the buffer.  */
   if (CPP_OPTION (pfile, traditional))
     len += _cpp_replacement_text_len (macro);
   else
@@ -1633,11 +1638,14 @@ cpp_macro_definition (cpp_reader *pfile, const cpp_hashnode *node)
 	  if (token->type == CPP_MACRO_ARG)
 	    len += NODE_LEN (macro->params[token->val.arg_no - 1]);
 	  else
-	    len += cpp_token_len (token) + 1; /* Includes room for ' '.  */
+	    len += cpp_token_len (token);
+
 	  if (token->flags & STRINGIFY_ARG)
 	    len++;			/* "#" */
 	  if (token->flags & PASTE_LEFT)
 	    len += 3;		/* " ##" */
+	  if (token->flags & PREV_WHITE)
+	    len++;              /* " " */
 	}
     }
 
@@ -1697,10 +1705,10 @@ cpp_macro_definition (cpp_reader *pfile, const cpp_hashnode *node)
 
 	  if (token->type == CPP_MACRO_ARG)
 	    {
-	      len = NODE_LEN (macro->params[token->val.arg_no - 1]);
 	      memcpy (buffer,
-		      NODE_NAME (macro->params[token->val.arg_no - 1]), len);
-	      buffer += len;
+		      NODE_NAME (macro->params[token->val.arg_no - 1]),
+		      NODE_LEN (macro->params[token->val.arg_no - 1]));
+	      buffer += NODE_LEN (macro->params[token->val.arg_no - 1]);
 	    }
 	  else
 	    buffer = cpp_spell_token (pfile, token, buffer);

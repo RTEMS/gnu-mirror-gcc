@@ -215,7 +215,7 @@ struct cp_binding_level GTY(())
 
     /* True if this scope is an SK_TEMPLATE_SPEC scope.  This field is
        only valid if KIND == SK_TEMPLATE_PARMS.  */
-    bool explicit_spec_p : 1;
+    BOOL_BITFIELD explicit_spec_p : 1;
 
     /* true means make a BLOCK for this level regardless of all else.  */
     unsigned keep : 1;
@@ -264,11 +264,10 @@ extern void print_binding_stack	(void);
 extern void print_binding_level	(cxx_scope *);
 extern void push_to_top_level (void);
 extern void pop_from_top_level (void);
-extern void maybe_push_to_top_level (int);
 extern void pop_everything (void);
 extern void keep_next_level (bool);
 extern bool is_ancestor (tree, tree);
-extern void push_scope (tree);
+extern bool push_scope (tree);
 extern void pop_scope (tree);
 
 extern void push_namespace (tree);
@@ -288,6 +287,7 @@ extern tree lookup_namespace_name (tree, tree);
 extern tree lookup_qualified_name (tree, tree, bool, bool);
 extern tree lookup_name_nonclass (tree);
 extern tree lookup_function_nonclass (tree, tree);
+extern void push_local_binding (tree, tree, int);
 extern int push_class_binding (tree, tree);
 extern bool pushdecl_class_level (tree);
 extern tree pushdecl_namespace_level (tree);
