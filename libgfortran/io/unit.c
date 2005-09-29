@@ -288,13 +288,13 @@ is_internal_unit ()
 void
 init_units (void)
 {
-  gfc_offset m, n;
   gfc_unit *u;
   int i;
 
   if (options.stdin_unit >= 0)
     {				/* STDIN */
       u = get_mem (sizeof (gfc_unit));
+      memset (u, '\0', sizeof (gfc_unit));
 
       u->unit_number = options.stdin_unit;
       u->s = input_stream ();
@@ -304,7 +304,7 @@ init_units (void)
       u->flags.access = ACCESS_SEQUENTIAL;
       u->flags.form = FORM_FORMATTED;
       u->flags.status = STATUS_OLD;
-      u->flags.blank = BLANK_ZERO;
+      u->flags.blank = BLANK_UNSPECIFIED;
       u->flags.position = POSITION_ASIS;
 
       u->recl = options.default_recl;
@@ -316,6 +316,7 @@ init_units (void)
   if (options.stdout_unit >= 0)
     {				/* STDOUT */
       u = get_mem (sizeof (gfc_unit));
+      memset (u, '\0', sizeof (gfc_unit));
 
       u->unit_number = options.stdout_unit;
       u->s = output_stream ();
@@ -325,7 +326,7 @@ init_units (void)
       u->flags.access = ACCESS_SEQUENTIAL;
       u->flags.form = FORM_FORMATTED;
       u->flags.status = STATUS_OLD;
-      u->flags.blank = BLANK_ZERO;
+      u->flags.blank = BLANK_UNSPECIFIED;
       u->flags.position = POSITION_ASIS;
 
       u->recl = options.default_recl;
@@ -337,6 +338,7 @@ init_units (void)
   if (options.stderr_unit >= 0)
     {				/* STDERR */
       u = get_mem (sizeof (gfc_unit));
+      memset (u, '\0', sizeof (gfc_unit));
 
       u->unit_number = options.stderr_unit;
       u->s = error_stream ();
@@ -346,7 +348,7 @@ init_units (void)
       u->flags.access = ACCESS_SEQUENTIAL;
       u->flags.form = FORM_FORMATTED;
       u->flags.status = STATUS_OLD;
-      u->flags.blank = BLANK_ZERO;
+      u->flags.blank = BLANK_UNSPECIFIED;
       u->flags.position = POSITION_ASIS;
 
       u->recl = options.default_recl;

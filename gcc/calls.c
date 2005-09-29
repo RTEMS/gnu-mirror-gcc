@@ -1994,8 +1994,10 @@ expand_call (tree exp, rtx target, int ignore)
 	    structure_value_addr = expand_expr (return_arg, NULL_RTX,
 						VOIDmode, EXPAND_NORMAL);
 	  }
+#if 0
 	else if (target && MEM_P (target))
 	  structure_value_addr = XEXP (target, 0);
+#endif
 	else
 	  {
 	    /* For variable-sized objects, we must be called with a target
@@ -2257,10 +2259,14 @@ expand_call (tree exp, rtx target, int ignore)
 	 Also, do all pending adjustments now if there is any chance
 	 this might be a call to alloca or if we are expanding a sibling
 	 call sequence or if we are calling a function that is to return
-	 with stack pointer depressed.  */
+	 with stack pointer depressed.
+	 Also do the adjustments before a throwing call, otherwise
+	 exception handling can fail; PR 19225. */
       if (pending_stack_adjust >= 32
 	  || (pending_stack_adjust > 0
 	      && (flags & (ECF_MAY_BE_ALLOCA | ECF_SP_DEPRESSED)))
+	  || (pending_stack_adjust > 0
+	      && flag_exceptions && !(flags & ECF_NOTHROW))
 	  || pass == 0)
 	do_pending_stack_adjust ();
 
@@ -4047,6 +4053,43 @@ store_one_arg (struct arg_data *arg, rtx argblock, int flags,
 
       if (arg->pass_on_stack)
 	stack_arg_under_construction--;
+    }
+
+  /* Check for overlap with already clobbered argument area.  */
+  if ((flags & ECF_SIBCALL) && MEM_P (arg->value))
+    {
+      int i = -1;
+      unsigned HOST_WIDE_INT k;
+      rtx x = arg->value;
+
+      if (XEXP (x, 0) == current_function_internal_arg_pointer)
+	i = 0;
+      else if (GET_CODE (XEXP (x, 0)) == PLUS
+	       && XEXP (XEXP (x, 0), 0) ==
+		  current_function_internal_arg_pointer
+	       && GET_CODE (XEXP (XEXP (x, 0), 1)) == CONST_INT)
+	i = INTVAL (XEXP (XEXP (x, 0), 1));
+      else
+	i = -1;
+
+      if (i >= 0)
+	{
+#ifdef ARGS_GROW_DOWNWARD
+	  i = -i - arg->locate.size.constant;
+#endif
+	  if (arg->locate.size.constant > 0)
+	    {
+	      unsigned HOST_WIDE_INT sc = arg->locate.size.constant;
+
+	      for (k = 0; k < sc; k++)
+		if (i + k < stored_args_map->n_bits
+		    && TEST_BIT (stored_args_map, i + k))
+		  {
+		    sibcall_failure = 1;
+		    break;
+		  }
+	    }
+	}
     }
 
   /* Don't allow anything left on stack from computation

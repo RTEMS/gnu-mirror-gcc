@@ -250,7 +250,6 @@ match
 gfc_match_label (void)
 {
   char name[GFC_MAX_SYMBOL_LEN + 1];
-  gfc_state_data *p;
   match m;
 
   gfc_new_block = NULL;
@@ -265,18 +264,15 @@ gfc_match_label (void)
       return MATCH_ERROR;
     }
 
-  if (gfc_new_block->attr.flavor != FL_LABEL
-      && gfc_add_flavor (&gfc_new_block->attr, FL_LABEL,
-			 gfc_new_block->name, NULL) == FAILURE)
-    return MATCH_ERROR;
+  if (gfc_new_block->attr.flavor == FL_LABEL)
+    {
+      gfc_error ("Duplicate construct label '%s' at %C", name);
+      return MATCH_ERROR;
+    }
 
-  for (p = gfc_state_stack; p; p = p->previous)
-    if (p->sym == gfc_new_block)
-      {
-	gfc_error ("Label %s at %C already in use by a parent block",
-		   gfc_new_block->name);
-	return MATCH_ERROR;
-      }
+  if (gfc_add_flavor (&gfc_new_block->attr, FL_LABEL,
+		      gfc_new_block->name, NULL) == FAILURE)
+    return MATCH_ERROR;
 
   return MATCH_YES;
 }
@@ -899,6 +895,43 @@ cleanup:
 }
 
 
+/* We try to match an easy arithmetic IF statement. This only happens
+   when just after having encountered a simple IF statement. This code
+   is really duplicate with parts of the gfc_match_if code, but this is
+   *much* easier.  */
+static match
+match_arithmetic_if (void)
+{
+  gfc_st_label *l1, *l2, *l3;
+  gfc_expr *expr;
+  match m;
+
+  m = gfc_match (" ( %e ) %l , %l , %l%t", &expr, &l1, &l2, &l3);
+  if (m != MATCH_YES)
+    return m;
+
+  if (gfc_reference_st_label (l1, ST_LABEL_TARGET) == FAILURE
+      || gfc_reference_st_label (l2, ST_LABEL_TARGET) == FAILURE
+      || gfc_reference_st_label (l3, ST_LABEL_TARGET) == FAILURE)
+    {
+      gfc_free_expr (expr);
+      return MATCH_ERROR;
+    }
+
+  if (gfc_notify_std (GFC_STD_F95_DEL,
+		      "Obsolete: arithmetic IF statement at %C") == FAILURE)
+    return MATCH_ERROR;
+
+  new_st.op = EXEC_ARITHMETIC_IF;
+  new_st.expr = expr;
+  new_st.label = l1;
+  new_st.label2 = l2;
+  new_st.label3 = l3;
+
+  return MATCH_YES;
+}
+
+
 /* The IF statement is a bit of a pain.  First of all, there are three
    forms of it, the simple IF, the IF that starts a block and the
    arithmetic IF.
@@ -960,6 +993,11 @@ gfc_match_if (gfc_statement * if_type)
 	  gfc_free_expr (expr);
 	  return MATCH_ERROR;
 	}
+      
+      if (gfc_notify_std (GFC_STD_F95_DEL,
+  		          "Obsolete: arithmetic IF statement at %C")
+	  == FAILURE)
+        return MATCH_ERROR;
 
       new_st.op = EXEC_ARITHMETIC_IF;
       new_st.expr = expr;
@@ -1036,6 +1074,7 @@ gfc_match_if (gfc_statement * if_type)
     match ("exit", gfc_match_exit, ST_EXIT)
     match ("forall", match_simple_forall, ST_FORALL)
     match ("go to", gfc_match_goto, ST_GOTO)
+    match ("if", match_arithmetic_if, ST_ARITHMETIC_IF)
     match ("inquire", gfc_match_inquire, ST_INQUIRE)
     match ("nullify", gfc_match_nullify, ST_NULLIFY)
     match ("open", gfc_match_open, ST_OPEN)
@@ -1526,7 +1565,6 @@ gfc_match_goto (void)
 	  == FAILURE)
 	return MATCH_ERROR;
 
-      expr->symtree->n.sym->attr.assign = 1;
       new_st.op = EXEC_GOTO;
       new_st.expr = expr;
 
@@ -1941,12 +1979,7 @@ gfc_match_return (void)
   gfc_expr *e;
   match m;
   gfc_compile_state s;
-
-  gfc_enclosing_unit (&s);
-  if (s == COMP_PROGRAM
-      && gfc_notify_std (GFC_STD_GNU, "Extension: RETURN statement in "
-			 "main program at %C") == FAILURE)
-      return MATCH_ERROR;
+  int c;
 
   e = NULL;
   if (gfc_match_eos () == MATCH_YES)
@@ -1959,7 +1992,18 @@ gfc_match_return (void)
       goto cleanup;
     }
 
-  m = gfc_match ("% %e%t", &e);
+  if (gfc_current_form == FORM_FREE)
+    {
+      /* The following are valid, so we can't require a blank after the
+        RETURN keyword:
+          return+1
+          return(1)  */
+      c = gfc_peek_char ();
+      if (ISALPHA (c) || ISDIGIT (c))
+       return MATCH_NO;
+    }
+
+  m = gfc_match (" %e%t", &e);
   if (m == MATCH_YES)
     goto done;
   if (m == MATCH_ERROR)
@@ -1972,6 +2016,12 @@ cleanup:
   return MATCH_ERROR;
 
 done:
+  gfc_enclosing_unit (&s);
+  if (s == COMP_PROGRAM
+      && gfc_notify_std (GFC_STD_GNU, "Extension: RETURN statement in "
+                        "main program at %C") == FAILURE)
+      return MATCH_ERROR;
+
   new_st.op = EXEC_RETURN;
   new_st.expr = e;
 
@@ -1981,6 +2031,12 @@ done:
 
 /* Match a CALL statement.  The tricky part here are possible
    alternate return specifiers.  We handle these by having all
+  gfc_enclosing_unit (&s);
+  if (s == COMP_PROGRAM
+      && gfc_notify_std (GFC_STD_GNU, "Extension: RETURN statement in "
+                        "main program at %C") == FAILURE)
+      return MATCH_ERROR;
+
    "subroutines" actually return an integer via a register that gives
    the return number.  If the call specifies alternate returns, we
    generate code for a SELECT statement whose case clauses contain
@@ -2173,10 +2229,11 @@ match_common_name (char *name)
 match
 gfc_match_common (void)
 {
-  gfc_symbol *sym, **head, *tail, *old_blank_common;
+  gfc_symbol *sym, **head, *tail, *other, *old_blank_common;
   char name[GFC_MAX_SYMBOL_LEN+1];
   gfc_common_head *t;
   gfc_array_spec *as;
+  gfc_equiv * e1, * e2;
   match m;
 
   old_blank_common = gfc_current_ns->blank_common.head;
@@ -2187,9 +2244,6 @@ gfc_match_common (void)
     }
 
   as = NULL;
-
-  if (gfc_match_eos () == MATCH_YES)
-    goto syntax;
 
   for (;;)
     {
@@ -2220,9 +2274,6 @@ gfc_match_common (void)
 	}
 
       /* Grab the list of symbols.  */
-      if (gfc_match_eos () == MATCH_YES)
-	goto done;
-  
       for (;;)
 	{
 	  m = gfc_match_symbol (&sym, 0);
@@ -2301,7 +2352,45 @@ gfc_match_common (void)
 
 	      sym->as = as;
 	      as = NULL;
+
 	    }
+
+	  sym->common_head = t;
+
+	  /* Check to see if the symbol is already in an equivalence group.
+	     If it is, set the other members as being in common.  */
+	  if (sym->attr.in_equivalence)
+	    {
+	      for (e1 = gfc_current_ns->equiv; e1; e1 = e1->next)
+	        {
+	          for (e2 = e1; e2; e2 = e2->eq)
+	            if (e2->expr->symtree->n.sym == sym)
+		      goto equiv_found;
+
+		  continue;
+
+	  equiv_found:
+
+		  for (e2 = e1; e2; e2 = e2->eq)
+		    {
+		      other = e2->expr->symtree->n.sym;
+		      if (other->common_head
+		            && other->common_head != sym->common_head)
+			{
+			  gfc_error ("Symbol '%s', in COMMON block '%s' at "
+				     "%C is being indirectly equivalenced to "
+				     "another COMMON block '%s'",
+				     sym->name,
+				     sym->common_head->name,
+				     other->common_head->name);
+			    goto cleanup;
+			}
+		      other->attr.in_common = 1;
+		      other->common_head = t;
+		    }
+		}
+	    }
+
 
 	  gfc_gobble_whitespace ();
 	  if (gfc_match_eos () == MATCH_YES)
@@ -2506,7 +2595,10 @@ gfc_match_equivalence (void)
 {
   gfc_equiv *eq, *set, *tail;
   gfc_ref *ref;
+  gfc_symbol *sym;
   match m;
+  gfc_common_head *common_head = NULL;
+  bool common_flag;
 
   tail = NULL;
 
@@ -2523,10 +2615,11 @@ gfc_match_equivalence (void)
 	goto syntax;
 
       set = eq;
+      common_flag = FALSE;
 
       for (;;)
 	{
-	  m = gfc_match_variable (&set->expr, 1);
+	  m = gfc_match_equiv_variable (&set->expr);
 	  if (m == MATCH_ERROR)
 	    goto cleanup;
 	  if (m == MATCH_NO)
@@ -2541,6 +2634,14 @@ gfc_match_equivalence (void)
 		goto cleanup;
 	      }
 
+	  if (set->expr->symtree->n.sym->attr.in_common)
+	    {
+	      common_flag = TRUE;
+	      common_head = set->expr->symtree->n.sym->common_head;
+	    }
+
+	  set->expr->symtree->n.sym->attr.in_equivalence = 1;
+
 	  if (gfc_match_char (')') == MATCH_YES)
 	    break;
 	  if (gfc_match_char (',') != MATCH_YES)
@@ -2549,6 +2650,26 @@ gfc_match_equivalence (void)
 	  set->eq = gfc_get_equiv ();
 	  set = set->eq;
 	}
+
+      /* If one of the members of an equivalence is in common, then
+	 mark them all as being in common.  Before doing this, check
+	 that members of the equivalence group are not in different
+	 common blocks. */
+      if (common_flag)
+	for (set = eq; set; set = set->eq)
+	  {
+	    sym = set->expr->symtree->n.sym;
+	    if (sym->common_head && sym->common_head != common_head)
+	      {
+		gfc_error ("Attempt to indirectly overlap COMMON "
+			   "blocks %s and %s by EQUIVALENCE at %C",
+			   sym->common_head->name,
+			   common_head->name);
+		goto cleanup;
+	      }
+	    sym->attr.in_common = 1;
+	    sym->common_head = common_head;
+	  }
 
       if (gfc_match_eos () == MATCH_YES)
 	break;
@@ -2600,6 +2721,8 @@ gfc_match_st_function (void)
   m = gfc_match (" = %e%t", &expr);
   if (m == MATCH_NO)
     goto undo_error;
+
+  gfc_free_error (&old_error);
   if (m == MATCH_ERROR)
     return m;
 
@@ -3030,9 +3153,7 @@ match_forall_iterator (gfc_forall_iterator ** result)
     }
 
   m = gfc_match_expr (&iter->start);
-  if (m == MATCH_NO)
-    goto syntax;
-  if (m == MATCH_ERROR)
+  if (m != MATCH_YES)
     goto cleanup;
 
   if (gfc_match_char (':') != MATCH_YES)

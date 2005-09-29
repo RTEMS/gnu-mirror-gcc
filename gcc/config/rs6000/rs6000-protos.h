@@ -121,7 +121,7 @@ extern enum rtx_code rs6000_reverse_condition (enum machine_mode,
 extern void rs6000_emit_sCOND (enum rtx_code, rtx);
 extern void rs6000_emit_cbranch (enum rtx_code, rtx);
 extern char * output_cbranch (rtx, const char *, int, rtx);
-extern char * output_e500_flip_eq_bit (rtx, rtx);
+extern char * output_e500_flip_gt_bit (rtx, rtx);
 extern rtx rs6000_emit_set_const (rtx, enum machine_mode, rtx, int);
 extern int rs6000_emit_cmove (rtx, rtx, rtx, rtx);
 extern int rs6000_emit_vector_cond_expr (rtx, rtx, rtx, rtx, rtx, rtx);
@@ -146,6 +146,7 @@ extern rtx rs6000_return_addr (int, rtx);
 extern void rs6000_output_symbol_ref (FILE*, rtx);
 extern HOST_WIDE_INT rs6000_initial_elimination_offset (int, int);
 extern bool rs6000_legitimate_offset_address_p (enum machine_mode, rtx, int);
+extern bool rs6000_legitimate_small_data_p (enum machine_mode, rtx);
 
 extern rtx rs6000_machopic_legitimize_pic_address (rtx orig,
 						   enum machine_mode mode,

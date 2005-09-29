@@ -927,20 +927,28 @@ cleanup_tree_cfg (void)
   retval = cleanup_control_flow ();
   retval |= delete_unreachable_blocks ();
 
-  /* cleanup_forwarder_blocks can redirect edges out of SWITCH_EXPRs,
-     which can get expensive.  So we want to enable recording of edge
-     to CASE_LABEL_EXPR mappings around the call to
-     cleanup_forwarder_blocks.  */
-  start_recording_case_labels ();
-  retval |= cleanup_forwarder_blocks ();
-  end_recording_case_labels ();
+  /* Forwarder blocks can carry line number information which is
+     useful when debugging, so we only clean them up when
+     optimizing.  */
+
+  if (optimize > 0)
+    {
+      /* cleanup_forwarder_blocks can redirect edges out of
+	 SWITCH_EXPRs, which can get expensive.  So we want to enable
+	 recording of edge to CASE_LABEL_EXPR mappings around the call
+	 to cleanup_forwarder_blocks.  */
+      start_recording_case_labels ();
+      retval |= cleanup_forwarder_blocks ();
+      end_recording_case_labels ();
+    }
 
 #ifdef ENABLE_CHECKING
   if (retval)
     {
       gcc_assert (!cleanup_control_flow ());
       gcc_assert (!delete_unreachable_blocks ());
-      gcc_assert (!cleanup_forwarder_blocks ());
+      if (optimize > 0)
+	gcc_assert (!cleanup_forwarder_blocks ());
     }
 #endif
 
@@ -2030,11 +2038,23 @@ remove_bb (basic_block bb)
     {
       tree stmt = bsi_stmt (i);
       if (TREE_CODE (stmt) == LABEL_EXPR
-          && FORCED_LABEL (LABEL_EXPR_LABEL (stmt)))
+          && (FORCED_LABEL (LABEL_EXPR_LABEL (stmt))
+	      || DECL_NONLOCAL (LABEL_EXPR_LABEL (stmt))))
 	{
-	  basic_block new_bb = bb->prev_bb;
-	  block_stmt_iterator new_bsi = bsi_start (new_bb);
+	  basic_block new_bb;
+	  block_stmt_iterator new_bsi;
+
+	  /* A non-reachable non-local label may still be referenced.
+	     But it no longer needs to carry the extra semantics of
+	     non-locality.  */
+	  if (DECL_NONLOCAL (LABEL_EXPR_LABEL (stmt)))
+	    {
+	      DECL_NONLOCAL (LABEL_EXPR_LABEL (stmt)) = 0;
+	      FORCED_LABEL (LABEL_EXPR_LABEL (stmt)) = 1;
+	    }
 	  	  
+	  new_bb = bb->prev_bb;
+	  new_bsi = bsi_start (new_bb);
 	  bsi_remove (&i);
 	  bsi_insert_before (&new_bsi, stmt, BSI_NEW_STMT);
 	}
@@ -2247,19 +2267,10 @@ find_taken_edge_cond_expr (basic_block bb, tree val)
   edge true_edge, false_edge;
 
   extract_true_false_edges_from_block (bb, &true_edge, &false_edge);
-
-  /* Otherwise, try to determine which branch of the if() will be taken.
-     If VAL is a constant but it can't be reduced to a 0 or a 1, then
-     we don't really know which edge will be taken at runtime.  This
-     may happen when comparing addresses (e.g., if (&var1 == 4)).  */
-  if (integer_nonzerop (val))
-    return true_edge;
-  else if (integer_zerop (val))
-    return false_edge;
-
-  gcc_unreachable ();
+  
+  gcc_assert (TREE_CODE (val) == INTEGER_CST);
+  return (zero_p (val) ? false_edge : true_edge);
 }
-
 
 /* Given an INTEGER_CST VAL and the entry block BB to a SWITCH_EXPR
    statement, determine which edge will be taken out of the block.  Return
@@ -5750,7 +5761,8 @@ execute_warn_function_return (void)
 	{
 	  tree last = last_stmt (e->src);
 	  if (TREE_CODE (last) == RETURN_EXPR
-	      && TREE_OPERAND (last, 0) == NULL)
+	      && TREE_OPERAND (last, 0) == NULL
+	      && !TREE_NO_WARNING (last))
 	    {
 #ifdef USE_MAPPED_LOCATION
 	      location = EXPR_LOCATION (last);

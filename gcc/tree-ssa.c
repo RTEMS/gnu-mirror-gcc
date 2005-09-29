@@ -778,11 +778,17 @@ delete_tree_ssa (void)
 bool
 tree_ssa_useless_type_conversion_1 (tree outer_type, tree inner_type)
 {
+  if (inner_type == outer_type)
+    return true;
+
+  /* Changes in machine mode are never useless conversions.  */
+  if (TYPE_MODE (inner_type) != TYPE_MODE (outer_type))
+    return false;
+
   /* If the inner and outer types are effectively the same, then
      strip the type conversion and enter the equivalence into
      the table.  */
-  if (inner_type == outer_type
-     || (lang_hooks.types_compatible_p (inner_type, outer_type)))
+  if (lang_hooks.types_compatible_p (inner_type, outer_type))
     return true;
 
   /* If both types are pointers and the outer type is a (void *), then
@@ -793,17 +799,24 @@ tree_ssa_useless_type_conversion_1 (tree outer_type, tree inner_type)
      implement the ABI.  */
   else if (POINTER_TYPE_P (inner_type)
            && POINTER_TYPE_P (outer_type)
-	   && TYPE_MODE (inner_type) == TYPE_MODE (outer_type)
 	   && TYPE_REF_CAN_ALIAS_ALL (inner_type)
 	      == TYPE_REF_CAN_ALIAS_ALL (outer_type)
 	   && TREE_CODE (TREE_TYPE (outer_type)) == VOID_TYPE)
     return true;
 
+  /* Don't lose casts between pointers to volatile and non-volatile
+     qualified types.  Doing so would result in changing the semantics
+     of later accesses.  */
+  else if (POINTER_TYPE_P (inner_type)
+           && POINTER_TYPE_P (outer_type)
+	   && TYPE_VOLATILE (TREE_TYPE (outer_type))
+	      != TYPE_VOLATILE (TREE_TYPE (inner_type)))
+    return false;
+
   /* Pointers and references are equivalent once we get to GENERIC,
      so strip conversions that just switch between them.  */
   else if (POINTER_TYPE_P (inner_type)
            && POINTER_TYPE_P (outer_type)
-	   && TYPE_MODE (inner_type) == TYPE_MODE (outer_type)
 	   && TYPE_REF_CAN_ALIAS_ALL (inner_type)
 	      == TYPE_REF_CAN_ALIAS_ALL (outer_type)
            && lang_hooks.types_compatible_p (TREE_TYPE (inner_type),
@@ -819,7 +832,6 @@ tree_ssa_useless_type_conversion_1 (tree outer_type, tree inner_type)
      mean that testing of precision is necessary.  */
   else if (INTEGRAL_TYPE_P (inner_type)
            && INTEGRAL_TYPE_P (outer_type)
-	   && TYPE_MODE (inner_type) == TYPE_MODE (outer_type)
 	   && TYPE_UNSIGNED (inner_type) == TYPE_UNSIGNED (outer_type)
 	   && TYPE_PRECISION (inner_type) == TYPE_PRECISION (outer_type))
     {
@@ -1332,7 +1344,7 @@ struct tree_opt_pass pass_redundant_phi =
    warning text is in MSGID and LOCUS may contain a location or be null.  */
 
 static void
-warn_uninit (tree t, const char *msgid, location_t *locus)
+warn_uninit (tree t, const char *gmsgid, location_t *locus)
 {
   tree var = SSA_NAME_VAR (t);
   tree def = SSA_NAME_DEF_STMT (t);
@@ -1357,7 +1369,7 @@ warn_uninit (tree t, const char *msgid, location_t *locus)
 
   if (!locus)
     locus = &DECL_SOURCE_LOCATION (var);
-  warning (msgid, locus, var);
+  warning (gmsgid, locus, var);
   TREE_NO_WARNING (var) = 1;
 }
    
