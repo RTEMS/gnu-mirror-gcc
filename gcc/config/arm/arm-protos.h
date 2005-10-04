@@ -1,5 +1,6 @@
 /* Prototypes for exported functions defined in arm.c and pe.c
-   Copyright (C) 1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2005
+   Free Software Foundation, Inc.
    Contributed by Richard Earnshaw (rearnsha@arm.com)
    Minor hacks by Nick Clifton (nickc@cygnus.com)
 
@@ -104,8 +105,10 @@ extern int load_multiple_sequence (rtx *, int, int *, int *, HOST_WIDE_INT *);
 extern const char *emit_ldm_seq (rtx *, int);
 extern int store_multiple_sequence (rtx *, int, int *, int *, HOST_WIDE_INT *);
 extern const char * emit_stm_seq (rtx *, int);
-extern rtx arm_gen_load_multiple (int, int, rtx, int, int, int, int, int);
-extern rtx arm_gen_store_multiple (int, int, rtx, int, int, int, int, int);
+extern rtx arm_gen_load_multiple (int, int, rtx, int, int,
+				  rtx, HOST_WIDE_INT *);
+extern rtx arm_gen_store_multiple (int, int, rtx, int, int,
+				   rtx, HOST_WIDE_INT *);
 extern int arm_gen_movstrqi (rtx *);
 extern rtx arm_gen_rotated_half_load (rtx);
 extern enum machine_mode arm_select_cc_mode (RTX_CODE, rtx, rtx);
@@ -138,6 +141,7 @@ extern int arm_debugger_arg_offset (int, rtx);
 extern int arm_is_longcall_p (rtx, int, int);
 extern int    arm_emit_vector_const (FILE *, rtx);
 extern const char * arm_output_load_gr (rtx *);
+extern int arm_eliminable_register (rtx);
 
 #if defined TREE_CODE
 extern rtx arm_function_arg (CUMULATIVE_ARGS *, enum machine_mode, tree, int);

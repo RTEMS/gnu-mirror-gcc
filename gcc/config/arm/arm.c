@@ -1,6 +1,6 @@
 /* Output routines for GCC for ARM.
    Copyright (C) 1991, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
-   2002, 2003, 2004  Free Software Foundation, Inc.
+   2002, 2003, 2004, 2005  Free Software Foundation, Inc.
    Contributed by Pieter `Tiggr' Schoenmakers (rcpieter@win.tue.nl)
    and Martin Simmons (@harleqn.co.uk).
    More major hacks by Richard Earnshaw (rearnsha@arm.com).
@@ -50,6 +50,7 @@
 #include "tm_p.h"
 #include "target.h"
 #include "target-def.h"
+#include "debug.h"
 
 /* Forward definitions of types.  */
 typedef struct minipool_node    Mnode;
@@ -85,7 +86,7 @@ static struct machine_function *arm_init_machine_status (void);
 static int number_of_first_bit_set (int);
 static void replace_symbols_in_block (tree, rtx, rtx);
 static void thumb_exit (FILE *, int, rtx);
-static void thumb_pushpop (FILE *, int, int);
+static void thumb_pushpop (FILE *, int, int, int *, int);
 static rtx is_jump_table (rtx);
 static HOST_WIDE_INT get_jump_table_size (rtx);
 static Mnode *move_minipool_fix_forward_ref (Mnode *, Mnode *, HOST_WIDE_INT);
@@ -688,6 +689,9 @@ arm_override_options (void)
       warning ("target CPU does not support THUMB instructions");
       target_flags &= ~ARM_FLAG_THUMB;
     }
+
+  if (!TARGET_APCS_32)
+    inform ("future releases of GCC will not support -mapcs-26");
 
   if (TARGET_APCS_FRAME && TARGET_THUMB)
     {
@@ -2735,12 +2739,12 @@ arm_legitimate_address_p (enum machine_mode mode, rtx x, int strict_p)
 	   && GET_MODE_SIZE (mode) <= 4
 	   && arm_address_register_rtx_p (XEXP (x, 0), strict_p)
 	   && GET_CODE (XEXP (x, 1)) == PLUS
-	   && XEXP (XEXP (x, 1), 0) == XEXP (x, 0))
+	   && rtx_equal_p (XEXP (XEXP (x, 1), 0), XEXP (x, 0)))
     return arm_legitimate_index_p (mode, XEXP (XEXP (x, 1), 1), strict_p);
 
   /* After reload constants split into minipools will have addresses
      from a LABEL_REF.  */
-  else if (GET_MODE_SIZE (mode) >= 4 && reload_completed
+  else if (reload_completed
 	   && (GET_CODE (x) == LABEL_REF
 	       || (GET_CODE (x) == CONST
 		   && GET_CODE (XEXP (x, 0)) == PLUS
@@ -2860,8 +2864,10 @@ arm_legitimate_index_p (enum machine_mode mode, rtx index, int strict_p)
      load, but that has a restricted addressing range and we are unable
      to tell here whether that is the case.  To be safe we restrict all
      loads to that range.  */
-  range = ((mode) == HImode || (mode) == QImode)
-    ? (arm_arch4 ? 256 : 4095) : 4096;
+  if (arm_arch4)
+    range = (mode == HImode || mode == QImode) ? 256 : 4096;
+  else
+    range = (mode == HImode) ? 4095 : 4096;
 
   return (code == CONST_INT
 	  && INTVAL (index) < range
@@ -4050,6 +4056,16 @@ cirrus_shift_const (rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
 	  && INTVAL (op) < 64);
 }
 
+/* Return true if X is a register that will be eliminated later on.  */
+int
+arm_eliminable_register (rtx x)
+{
+  return REG_P (x) && (REGNO (x) == FRAME_POINTER_REGNUM
+		       || REGNO (x) == ARG_POINTER_REGNUM
+		       || (REGNO (x) >= FIRST_VIRTUAL_REGISTER
+			   && REGNO (x) <= LAST_VIRTUAL_REGISTER));
+}
+
 /* Returns TRUE if INSN is an "LDR REG, ADDR" instruction.
    Use by the Cirrus Maverick code which has to workaround
    a hardware bug triggered by such instructions.  */
@@ -4563,33 +4579,42 @@ adjacent_mem_locations (rtx a, rtx b)
 	  || (GET_CODE (XEXP (b, 0)) == PLUS
 	      && GET_CODE (XEXP (XEXP (b, 0), 1)) == CONST_INT)))
     {
-      int val0 = 0, val1 = 0;
-      int reg0, reg1;
-  
+      HOST_WIDE_INT val0 = 0, val1 = 0;
+      rtx reg0, reg1;
+      int val_diff;
+
       if (GET_CODE (XEXP (a, 0)) == PLUS)
         {
-	  reg0 = REGNO  (XEXP (XEXP (a, 0), 0));
+	  reg0 = XEXP (XEXP (a, 0), 0);
 	  val0 = INTVAL (XEXP (XEXP (a, 0), 1));
         }
       else
-	reg0 = REGNO (XEXP (a, 0));
+	reg0 = XEXP (a, 0);
 
       if (GET_CODE (XEXP (b, 0)) == PLUS)
         {
-	  reg1 = REGNO  (XEXP (XEXP (b, 0), 0));
+	  reg1 = XEXP (XEXP (b, 0), 0);
 	  val1 = INTVAL (XEXP (XEXP (b, 0), 1));
         }
       else
-	reg1 = REGNO (XEXP (b, 0));
+	reg1 = XEXP (b, 0);
 
       /* Don't accept any offset that will require multiple
 	 instructions to handle, since this would cause the
 	 arith_adjacentmem pattern to output an overlong sequence.  */
       if (!const_ok_for_op (PLUS, val0) || !const_ok_for_op (PLUS, val1))
 	return 0;
-      
-      return (reg0 == reg1) && ((val1 - val0) == 4 || (val0 - val1) == 4);
+
+      /* Don't allow an eliminable register: register elimination can make
+	 the offset too large.  */
+      if (arm_eliminable_register (reg0))
+	return 0;
+
+      val_diff = val1 - val0;
+      return ((REGNO (reg0) == REGNO (reg1))
+	      && (val_diff == 4 || val_diff == -4));
     }
+
   return 0;
 }
 
@@ -4617,7 +4642,6 @@ load_multiple_operation (rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
       /* Now check it more carefully.  */
       if (GET_CODE (SET_DEST (elt)) != REG
           || GET_CODE (XEXP (SET_SRC (elt), 0)) != REG
-          || REGNO (XEXP (SET_SRC (elt), 0)) != REGNO (SET_DEST (elt))
           || GET_CODE (XEXP (SET_SRC (elt), 1)) != CONST_INT
           || INTVAL (XEXP (SET_SRC (elt), 1)) != (count - 1) * 4)
         return 0;
@@ -4677,7 +4701,6 @@ store_multiple_operation (rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
       /* Now check it more carefully.  */
       if (GET_CODE (SET_DEST (elt)) != REG
           || GET_CODE (XEXP (SET_SRC (elt), 0)) != REG
-          || REGNO (XEXP (SET_SRC (elt), 0)) != REGNO (SET_DEST (elt))
           || GET_CODE (XEXP (SET_SRC (elt), 1)) != CONST_INT
           || INTVAL (XEXP (SET_SRC (elt), 1)) != (count - 1) * 4)
         return 0;
@@ -5135,13 +5158,13 @@ multi_register_push (rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
 
 rtx
 arm_gen_load_multiple (int base_regno, int count, rtx from, int up,
-		       int write_back, int unchanging_p, int in_struct_p,
-		       int scalar_p)
+		       int write_back, rtx basemem, HOST_WIDE_INT *offsetp)
 {
+  HOST_WIDE_INT offset = *offsetp;
   int i = 0, j;
   rtx result;
   int sign = up ? 1 : -1;
-  rtx mem;
+  rtx mem, addr;
 
   /* XScale has load-store double instructions, but they have stricter
      alignment requirements than load-store multiple, so we can not
@@ -5179,15 +5202,17 @@ arm_gen_load_multiple (int base_regno, int count, rtx from, int up,
       
       for (i = 0; i < count; i++)
 	{
-	  mem = gen_rtx_MEM (SImode, plus_constant (from, i * 4 * sign));
-	  RTX_UNCHANGING_P (mem) = unchanging_p;
-	  MEM_IN_STRUCT_P (mem) = in_struct_p;
-	  MEM_SCALAR_P (mem) = scalar_p;
+	  addr = plus_constant (from, i * 4 * sign);
+	  mem = adjust_automodify_address (basemem, SImode, addr, offset);
 	  emit_move_insn (gen_rtx_REG (SImode, base_regno + i), mem);
+	  offset += 4 * sign;
 	}
 
       if (write_back)
-	emit_move_insn (from, plus_constant (from, count * 4 * sign));
+	{
+	  emit_move_insn (from, plus_constant (from, count * 4 * sign));
+	  *offsetp = offset;
+	}
 
       seq = get_insns ();
       end_sequence ();
@@ -5208,26 +5233,28 @@ arm_gen_load_multiple (int base_regno, int count, rtx from, int up,
 
   for (j = 0; i < count; i++, j++)
     {
-      mem = gen_rtx_MEM (SImode, plus_constant (from, j * 4 * sign));
-      RTX_UNCHANGING_P (mem) = unchanging_p;
-      MEM_IN_STRUCT_P (mem) = in_struct_p;
-      MEM_SCALAR_P (mem) = scalar_p;
+      addr = plus_constant (from, j * 4 * sign);
+      mem = adjust_automodify_address_nv (basemem, SImode, addr, offset);
       XVECEXP (result, 0, i)
 	= gen_rtx_SET (VOIDmode, gen_rtx_REG (SImode, base_regno + j), mem);
+      offset += 4 * sign;
     }
+
+  if (write_back)
+    *offsetp = offset;
 
   return result;
 }
 
 rtx
 arm_gen_store_multiple (int base_regno, int count, rtx to, int up,
-			int write_back, int unchanging_p, int in_struct_p,
-			int scalar_p)
+			int write_back, rtx basemem, HOST_WIDE_INT *offsetp)
 {
+  HOST_WIDE_INT offset = *offsetp;
   int i = 0, j;
   rtx result;
   int sign = up ? 1 : -1;
-  rtx mem;
+  rtx mem, addr;
 
   /* See arm_gen_load_multiple for discussion of
      the pros/cons of ldm/stm usage for XScale.  */
@@ -5239,15 +5266,17 @@ arm_gen_store_multiple (int base_regno, int count, rtx to, int up,
       
       for (i = 0; i < count; i++)
 	{
-	  mem = gen_rtx_MEM (SImode, plus_constant (to, i * 4 * sign));
-	  RTX_UNCHANGING_P (mem) = unchanging_p;
-	  MEM_IN_STRUCT_P (mem) = in_struct_p;
-	  MEM_SCALAR_P (mem) = scalar_p;
+	  addr = plus_constant (to, i * 4 * sign);
+	  mem = adjust_automodify_address (basemem, SImode, addr, offset);
 	  emit_move_insn (mem, gen_rtx_REG (SImode, base_regno + i));
+	  offset += 4 * sign;
 	}
 
       if (write_back)
-	emit_move_insn (to, plus_constant (to, count * 4 * sign));
+	{
+	  emit_move_insn (to, plus_constant (to, count * 4 * sign));
+	  *offsetp = offset;
+	}
 
       seq = get_insns ();
       end_sequence ();
@@ -5268,14 +5297,15 @@ arm_gen_store_multiple (int base_regno, int count, rtx to, int up,
 
   for (j = 0; i < count; i++, j++)
     {
-      mem = gen_rtx_MEM (SImode, plus_constant (to, j * 4 * sign));
-      RTX_UNCHANGING_P (mem) = unchanging_p;
-      MEM_IN_STRUCT_P (mem) = in_struct_p;
-      MEM_SCALAR_P (mem) = scalar_p;
-
+      addr = plus_constant (to, j * 4 * sign);
+      mem = adjust_automodify_address_nv (basemem, SImode, addr, offset);
       XVECEXP (result, 0, i)
 	= gen_rtx_SET (VOIDmode, mem, gen_rtx_REG (SImode, base_regno + j));
+      offset += 4 * sign;
     }
+
+  if (write_back)
+    *offsetp = offset;
 
   return result;
 }
@@ -5284,13 +5314,11 @@ int
 arm_gen_movstrqi (rtx *operands)
 {
   HOST_WIDE_INT in_words_to_go, out_words_to_go, last_bytes;
+  HOST_WIDE_INT srcoffset, dstoffset;
   int i;
-  rtx src, dst;
-  rtx st_src, st_dst, fin_src, fin_dst;
+  rtx src, dst, srcbase, dstbase;
   rtx part_bytes_reg = NULL;
   rtx mem;
-  int dst_unchanging_p, dst_in_struct_p, src_unchanging_p, src_in_struct_p;
-  int dst_scalar_p, src_scalar_p;
 
   if (GET_CODE (operands[2]) != CONST_INT
       || GET_CODE (operands[3]) != CONST_INT
@@ -5298,23 +5326,17 @@ arm_gen_movstrqi (rtx *operands)
       || INTVAL (operands[3]) & 3)
     return 0;
 
-  st_dst = XEXP (operands[0], 0);
-  st_src = XEXP (operands[1], 0);
-
-  dst_unchanging_p = RTX_UNCHANGING_P (operands[0]);
-  dst_in_struct_p = MEM_IN_STRUCT_P (operands[0]);
-  dst_scalar_p = MEM_SCALAR_P (operands[0]);
-  src_unchanging_p = RTX_UNCHANGING_P (operands[1]);
-  src_in_struct_p = MEM_IN_STRUCT_P (operands[1]);
-  src_scalar_p = MEM_SCALAR_P (operands[1]);
-
-  fin_dst = dst = copy_to_mode_reg (SImode, st_dst);
-  fin_src = src = copy_to_mode_reg (SImode, st_src);
+  dstbase = operands[0];
+  srcbase = operands[1];
+  
+  dst = copy_to_mode_reg (SImode, XEXP (dstbase, 0));
+  src = copy_to_mode_reg (SImode, XEXP (srcbase, 0));
 
   in_words_to_go = ARM_NUM_INTS (INTVAL (operands[2]));
   out_words_to_go = INTVAL (operands[2]) / 4;
   last_bytes = INTVAL (operands[2]) & 3;
-
+  dstoffset = srcoffset = 0;
+  
   if (out_words_to_go != in_words_to_go && ((in_words_to_go - 1) & 3) != 0)
     part_bytes_reg = gen_rtx_REG (SImode, (in_words_to_go - 1) & 3);
 
@@ -5322,38 +5344,32 @@ arm_gen_movstrqi (rtx *operands)
     {
       if (in_words_to_go > 4)
 	emit_insn (arm_gen_load_multiple (0, 4, src, TRUE, TRUE,
-					  src_unchanging_p,
-					  src_in_struct_p,
-					  src_scalar_p));
+					  srcbase, &srcoffset));
       else
 	emit_insn (arm_gen_load_multiple (0, in_words_to_go, src, TRUE, 
-					  FALSE, src_unchanging_p,
-					  src_in_struct_p, src_scalar_p));
+					  FALSE, srcbase, &srcoffset));
 
       if (out_words_to_go)
 	{
 	  if (out_words_to_go > 4)
 	    emit_insn (arm_gen_store_multiple (0, 4, dst, TRUE, TRUE,
-					       dst_unchanging_p,
-					       dst_in_struct_p,
-					       dst_scalar_p));
+					       dstbase, &dstoffset));
+	  
 	  else if (out_words_to_go != 1)
 	    emit_insn (arm_gen_store_multiple (0, out_words_to_go,
 					       dst, TRUE, 
 					       (last_bytes == 0
 						? FALSE : TRUE),
-					       dst_unchanging_p,
-					       dst_in_struct_p,
-					       dst_scalar_p));
+					       dstbase, &dstoffset));
 	  else
 	    {
-	      mem = gen_rtx_MEM (SImode, dst);
-	      RTX_UNCHANGING_P (mem) = dst_unchanging_p;
-	      MEM_IN_STRUCT_P (mem) = dst_in_struct_p;
-	      MEM_SCALAR_P (mem) = dst_scalar_p;
+	      mem = adjust_automodify_address (dstbase, SImode, dst, dstoffset);
 	      emit_move_insn (mem, gen_rtx_REG (SImode, 0));
 	      if (last_bytes != 0)
-		emit_insn (gen_addsi3 (dst, dst, GEN_INT (4)));
+		{
+		  emit_insn (gen_addsi3 (dst, dst, GEN_INT (4)));
+		  dstoffset += 4;
+		}
 	    }
 	}
 
@@ -5365,20 +5381,12 @@ arm_gen_movstrqi (rtx *operands)
   if (out_words_to_go)
     {
       rtx sreg;
-      
-      mem = gen_rtx_MEM (SImode, src);
-      RTX_UNCHANGING_P (mem) = src_unchanging_p;
-      MEM_IN_STRUCT_P (mem) = src_in_struct_p;
-      MEM_SCALAR_P (mem) = src_scalar_p;
-      emit_move_insn (sreg = gen_reg_rtx (SImode), mem);
-      emit_move_insn (fin_src = gen_reg_rtx (SImode), plus_constant (src, 4));
-      
-      mem = gen_rtx_MEM (SImode, dst);
-      RTX_UNCHANGING_P (mem) = dst_unchanging_p;
-      MEM_IN_STRUCT_P (mem) = dst_in_struct_p;
-      MEM_SCALAR_P (mem) = dst_scalar_p;
+
+      mem = adjust_automodify_address (srcbase, SImode, src, srcoffset);
+      sreg = copy_to_reg (mem);
+
+      mem = adjust_automodify_address (dstbase, SImode, dst, dstoffset);
       emit_move_insn (mem, sreg);
-      emit_move_insn (fin_dst = gen_reg_rtx (SImode), plus_constant (dst, 4));
       in_words_to_go--;
       
       if (in_words_to_go)	/* Sanity check */
@@ -5390,10 +5398,7 @@ arm_gen_movstrqi (rtx *operands)
       if (in_words_to_go < 0)
 	abort ();
 
-      mem = gen_rtx_MEM (SImode, src);
-      RTX_UNCHANGING_P (mem) = src_unchanging_p;
-      MEM_IN_STRUCT_P (mem) = src_in_struct_p;
-      MEM_SCALAR_P (mem) = src_scalar_p;
+      mem = adjust_automodify_address (srcbase, SImode, src, srcoffset);
       part_bytes_reg = copy_to_mode_reg (SImode, mem);
     }
 
@@ -5411,10 +5416,9 @@ arm_gen_movstrqi (rtx *operands)
       
       while (last_bytes)
 	{
-	  mem = gen_rtx_MEM (QImode, plus_constant (dst, last_bytes - 1));
-	  RTX_UNCHANGING_P (mem) = dst_unchanging_p;
-	  MEM_IN_STRUCT_P (mem) = dst_in_struct_p;
-	  MEM_SCALAR_P (mem) = dst_scalar_p;
+	  mem = adjust_automodify_address (dstbase, QImode,
+					   plus_constant (dst, last_bytes - 1),
+					   dstoffset + last_bytes - 1);
 	  emit_move_insn (mem, gen_lowpart (QImode, part_bytes_reg));
 
 	  if (--last_bytes)
@@ -5430,10 +5434,7 @@ arm_gen_movstrqi (rtx *operands)
     {
       if (last_bytes > 1)
 	{
-	  mem = gen_rtx_MEM (HImode, dst);
-	  RTX_UNCHANGING_P (mem) = dst_unchanging_p;
-	  MEM_IN_STRUCT_P (mem) = dst_in_struct_p;
-	  MEM_SCALAR_P (mem) = dst_scalar_p;
+	  mem = adjust_automodify_address (dstbase, HImode, dst, dstoffset);
 	  emit_move_insn (mem, gen_lowpart (HImode, part_bytes_reg));
 	  last_bytes -= 2;
 	  if (last_bytes)
@@ -5443,15 +5444,13 @@ arm_gen_movstrqi (rtx *operands)
 	      emit_insn (gen_addsi3 (dst, dst, GEN_INT (2)));
 	      emit_insn (gen_lshrsi3 (tmp, part_bytes_reg, GEN_INT (16)));
 	      part_bytes_reg = tmp;
+	      dstoffset += 2;
 	    }
 	}
       
       if (last_bytes)
 	{
-	  mem = gen_rtx_MEM (QImode, dst);
-	  RTX_UNCHANGING_P (mem) = dst_unchanging_p;
-	  MEM_IN_STRUCT_P (mem) = dst_in_struct_p;
-	  MEM_SCALAR_P (mem) = dst_scalar_p;
+	  mem = adjust_automodify_address (dstbase, QImode, dst, dstoffset);
 	  emit_move_insn (mem, gen_lowpart (QImode, part_bytes_reg));
 	}
     }
@@ -7297,7 +7296,6 @@ output_call_mem (rtx *operands)
   return "";
 }
 
-
 /* Output a move from arm registers to an fpa registers.
    OPERANDS[0] is an fpa register.
    OPERANDS[1] is the first registers of an arm register pair.  */
@@ -8245,15 +8243,25 @@ output_return_instruction (rtx operand, int really_return, int reverse)
 	return_reg = reg_names[LR_REGNUM];
 
       if ((live_regs_mask & (1 << IP_REGNUM)) == (1 << IP_REGNUM))
-	/* There are two possible reasons for the IP register being saved.
-	   Either a stack frame was created, in which case IP contains the
-	   old stack pointer, or an ISR routine corrupted it.  If this in an
-	   ISR routine then just restore IP, otherwise restore IP into SP.  */
-	if (! IS_INTERRUPT (func_type))
-	  {
-	    live_regs_mask &= ~ (1 << IP_REGNUM);
-	    live_regs_mask |=   (1 << SP_REGNUM);
-	  }
+	{
+	  /* There are three possible reasons for the IP register
+	     being saved.  1) a stack frame was created, in which case
+	     IP contains the old stack pointer, or 2) an ISR routine
+	     corrupted it, or 3) it was saved to align the stack on
+	     iWMMXt.  In case 1, restore IP into SP, otherwise just
+	     restore IP.  */
+	  if (frame_pointer_needed)
+	    {
+	      live_regs_mask &= ~ (1 << IP_REGNUM);
+	      live_regs_mask |=   (1 << SP_REGNUM);
+	    }
+	  else
+	    {
+	      if (! IS_INTERRUPT (func_type)
+		  && ! TARGET_REALLY_IWMMXT)
+		abort ();
+	    }
+	}
 
       /* On some ARM architectures it is faster to use LDR rather than
 	 LDM to load a single register.  On other architectures, the
@@ -11562,7 +11570,8 @@ thumb_exit (FILE *f, int reg_containing_return_addr, rtx eh_ofs)
     }
 
   /* Pop as many registers as we can.  */
-  thumb_pushpop (f, regs_available_for_popping, FALSE);
+  thumb_pushpop (f, regs_available_for_popping, FALSE, NULL,
+		 regs_available_for_popping);
 
   /* Process the registers we popped.  */
   if (reg_containing_return_addr == -1)
@@ -11643,7 +11652,8 @@ thumb_exit (FILE *f, int reg_containing_return_addr, rtx eh_ofs)
       int  popped_into;
       int  move_to;
       
-      thumb_pushpop (f, regs_available_for_popping, FALSE);
+      thumb_pushpop (f, regs_available_for_popping, FALSE, NULL,
+		     regs_available_for_popping);
 
       /* We have popped either FP or SP.
 	 Move whichever one it is into the correct register.  */
@@ -11663,7 +11673,8 @@ thumb_exit (FILE *f, int reg_containing_return_addr, rtx eh_ofs)
     {
       int  popped_into;
       
-      thumb_pushpop (f, regs_available_for_popping, FALSE);
+      thumb_pushpop (f, regs_available_for_popping, FALSE, NULL,
+		     regs_available_for_popping);
 
       popped_into = number_of_first_bit_set (regs_available_for_popping);
 
@@ -11693,12 +11704,20 @@ thumb_exit (FILE *f, int reg_containing_return_addr, rtx eh_ofs)
   asm_fprintf (f, "\tbx\t%r\n", reg_containing_return_addr);
 }
 
-/* Emit code to push or pop registers to or from the stack.  */
+/* Emit code to push or pop registers to or from the stack.  F is the
+   assembly file.  MASK is the registers to push or pop.  PUSH is
+   non-zero if we should push, and zero if we should pop.  For debugging
+   output, if pushing, adjust CFA_OFFSET by the amount of space added
+   to the stack.  REAL_REGS should have the same number of bits set as
+   MASK, and will be used instead (in the same order) to describe which
+   registers were saved - this is used to mark the save slots when we
+   push high registers after moving them to low registers.  */
 static void
-thumb_pushpop (FILE *f, int mask, int push)
+thumb_pushpop (FILE *f, int mask, int push, int *cfa_offset, int real_regs)
 {
   int regno;
   int lo_mask = mask & 0xFF;
+  int pushed_words = 0;
 
   if (lo_mask == 0 && !push && (mask & (1 << 15)))
     {
@@ -11719,6 +11738,8 @@ thumb_pushpop (FILE *f, int mask, int push)
 	  
 	  if ((lo_mask & ~1) != 0)
 	    fprintf (f, ", ");
+
+	  pushed_words++;
 	}
     }
   
@@ -11729,6 +11750,8 @@ thumb_pushpop (FILE *f, int mask, int push)
 	fprintf (f, ", ");
       
       asm_fprintf (f, "%r", LR_REGNUM);
+
+      pushed_words++;
     }
   else if (!push && (mask & (1 << PC_REGNUM)))
     {
@@ -11753,6 +11776,23 @@ thumb_pushpop (FILE *f, int mask, int push)
     }
        
   fprintf (f, "}\n");
+
+  if (push && pushed_words && dwarf2out_do_frame ())
+    {
+      char *l = dwarf2out_cfi_label ();
+      int pushed_mask = real_regs;
+
+      *cfa_offset += pushed_words * 4;
+      dwarf2out_def_cfa (l, SP_REGNUM, *cfa_offset);
+
+      pushed_words = 0;
+      pushed_mask = real_regs;
+      for (regno = 0; regno <= 14; regno++, pushed_mask >>= 1)
+	{
+	  if (pushed_mask & 1)
+	    dwarf2out_reg_save (l, regno, 4 * pushed_words++ - *cfa_offset);
+	}
+    }
 }
 
 void
@@ -11951,7 +11991,7 @@ thumb_unexpanded_epilogue (void)
 	  mask &= (2 << regno) - 1;	/* A noop if regno == 8 */
 
 	  /* Pop the values into the low register(s).  */
-	  thumb_pushpop (asm_out_file, mask, 0);
+	  thumb_pushpop (asm_out_file, mask, 0, NULL, mask);
 
 	  /* Move the value(s) into the high registers.  */
 	  for (regno = 0; regno <= LAST_LO_REGNUM; regno++)
@@ -11993,7 +12033,8 @@ thumb_unexpanded_epilogue (void)
 	 structure was created which includes an adjusted stack
 	 pointer, so just pop everything.  */
       if (live_regs_mask)
-	thumb_pushpop (asm_out_file, live_regs_mask, FALSE);
+	thumb_pushpop (asm_out_file, live_regs_mask, FALSE, NULL,
+		       live_regs_mask);
       
       if (eh_ofs)
 	thumb_exit (asm_out_file, 2, eh_ofs);
@@ -12013,11 +12054,13 @@ thumb_unexpanded_epilogue (void)
       live_regs_mask &= ~(1 << PC_REGNUM);
       
       if (live_regs_mask)
-	thumb_pushpop (asm_out_file, live_regs_mask, FALSE);
+	thumb_pushpop (asm_out_file, live_regs_mask, FALSE, NULL,
+		       live_regs_mask);
 
       if (had_to_push_lr)
 	/* Get the return address into a temporary register.  */
-	thumb_pushpop (asm_out_file, 1 << LAST_ARG_REGNUM, 0);
+	thumb_pushpop (asm_out_file, 1 << LAST_ARG_REGNUM, 0, NULL,
+		       1 << LAST_ARG_REGNUM);
       
       /* Remove the argument registers that were pushed onto the stack.  */
       asm_fprintf (asm_out_file, "\tadd\t%r, %r, #%d\n",
@@ -12163,6 +12206,8 @@ thumb_get_frame_size (void)
 void
 thumb_expand_prologue (void)
 {
+  rtx insn, dwarf;
+
   HOST_WIDE_INT amount = (thumb_get_frame_size ()
 			  + current_function_outgoing_args_size);
   unsigned long func_type;
@@ -12180,15 +12225,21 @@ thumb_expand_prologue (void)
     }
 
   if (frame_pointer_needed)
-    emit_insn (gen_movsi (hard_frame_pointer_rtx, stack_pointer_rtx));
+    {
+      insn = emit_insn (gen_movsi (hard_frame_pointer_rtx, stack_pointer_rtx));
+      RTX_FRAME_RELATED_P (insn) = 1;
+    }
 
   if (amount)
     {
       amount = ROUND_UP_WORD (amount);
       
       if (amount < 512)
-	emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
-			       GEN_INT (- amount)));
+	{
+	  insn = emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
+					GEN_INT (- amount)));
+	  RTX_FRAME_RELATED_P (insn) = 1;
+	}
       else
 	{
 	  int regno;
@@ -12228,8 +12279,16 @@ thumb_expand_prologue (void)
 
 	      /* Decrement the stack.  */
 	      emit_insn (gen_movsi (reg, GEN_INT (- amount)));
-	      emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
-				     reg));
+	      insn = emit_insn (gen_addsi3 (stack_pointer_rtx,
+					    stack_pointer_rtx, reg));
+	      RTX_FRAME_RELATED_P (insn) = 1;
+	      dwarf = gen_rtx_SET (SImode, stack_pointer_rtx,
+				   plus_constant (stack_pointer_rtx,
+						  GEN_INT (- amount)));
+	      RTX_FRAME_RELATED_P (dwarf) = 1;
+	      REG_NOTES (insn)
+		= gen_rtx_EXPR_LIST (REG_FRAME_RELATED_EXPR, dwarf,
+				     REG_NOTES (insn));
 
 	      /* Restore the low register's original value.  */
 	      emit_insn (gen_movsi (reg, spare));
@@ -12245,8 +12304,17 @@ thumb_expand_prologue (void)
 	      reg = gen_rtx (REG, SImode, regno);
 
 	      emit_insn (gen_movsi (reg, GEN_INT (- amount)));
-	      emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
-				     reg));
+
+	      insn = emit_insn (gen_addsi3 (stack_pointer_rtx,
+					    stack_pointer_rtx, reg));
+	      RTX_FRAME_RELATED_P (insn) = 1;
+	      dwarf = gen_rtx_SET (SImode, stack_pointer_rtx,
+				   plus_constant (stack_pointer_rtx,
+						  GEN_INT (- amount)));
+	      RTX_FRAME_RELATED_P (dwarf) = 1;
+	      REG_NOTES (insn)
+		= gen_rtx_EXPR_LIST (REG_FRAME_RELATED_EXPR, dwarf,
+				     REG_NOTES (insn));
 	    }
 	}
     }
@@ -12307,6 +12375,7 @@ thumb_output_function_prologue (FILE *f, HOST_WIDE_INT size ATTRIBUTE_UNUSED)
 {
   int live_regs_mask = 0;
   int high_regs_pushed = 0;
+  int cfa_offset = 0;
   int regno;
 
   if (IS_NAKED (arm_current_func_type ()))
@@ -12369,6 +12438,16 @@ thumb_output_function_prologue (FILE *f, HOST_WIDE_INT size ATTRIBUTE_UNUSED)
 	asm_fprintf (f, "\tsub\t%r, %r, #%d\n", 
 		     SP_REGNUM, SP_REGNUM,
 		     current_function_pretend_args_size);
+
+      /* We don't need to record the stores for unwinding (would it
+	 help the debugger any if we did?), but record the change in
+	 the stack pointer.  */
+      if (dwarf2out_do_frame ())
+	{
+	  char *l = dwarf2out_cfi_label ();
+	  cfa_offset = cfa_offset + current_function_pretend_args_size;
+	  dwarf2out_def_cfa (l, SP_REGNUM, cfa_offset);
+	}
     }
 
   for (regno = 0; regno <= LAST_LO_REGNUM; regno++)
@@ -12424,9 +12503,16 @@ thumb_output_function_prologue (FILE *f, HOST_WIDE_INT size ATTRIBUTE_UNUSED)
       asm_fprintf
 	(f, "\tsub\t%r, %r, #16\t%@ Create stack backtrace structure\n",
 	 SP_REGNUM, SP_REGNUM);
-      
+
+      if (dwarf2out_do_frame ())
+	{
+	  char *l = dwarf2out_cfi_label ();
+	  cfa_offset = cfa_offset + 16;
+	  dwarf2out_def_cfa (l, SP_REGNUM, cfa_offset);
+	}
+
       if (live_regs_mask)
-	thumb_pushpop (f, live_regs_mask, 1);
+	thumb_pushpop (f, live_regs_mask, 1, &cfa_offset, live_regs_mask);
       
       for (offset = 0, wr = 1 << 15; wr != 0; wr >>= 1)
 	if (wr & live_regs_mask)
@@ -12470,7 +12556,7 @@ thumb_output_function_prologue (FILE *f, HOST_WIDE_INT size ATTRIBUTE_UNUSED)
 		   ARM_HARD_FRAME_POINTER_REGNUM, work_register);
     }
   else if (live_regs_mask)
-    thumb_pushpop (f, live_regs_mask, 1);
+    thumb_pushpop (f, live_regs_mask, 1, &cfa_offset, live_regs_mask);
 
   for (regno = 8; regno < 13; regno++)
     if (THUMB_REG_PUSHED_P (regno))
@@ -12498,6 +12584,8 @@ thumb_output_function_prologue (FILE *f, HOST_WIDE_INT size ATTRIBUTE_UNUSED)
 
       while (high_regs_pushed > 0)
 	{
+	  int real_regs_mask = 0;
+
 	  for (regno = LAST_LO_REGNUM; regno >= 0; regno--)
 	    {
 	      if (mask & (1 << regno))
@@ -12505,6 +12593,7 @@ thumb_output_function_prologue (FILE *f, HOST_WIDE_INT size ATTRIBUTE_UNUSED)
 		  asm_fprintf (f, "\tmov\t%r, %r\n", regno, next_hi_reg);
 		  
 		  high_regs_pushed--;
+		  real_regs_mask |= (1 << next_hi_reg);
 		  
 		  if (high_regs_pushed)
 		    {
@@ -12520,8 +12609,8 @@ thumb_output_function_prologue (FILE *f, HOST_WIDE_INT size ATTRIBUTE_UNUSED)
 		    }
 		}
 	    }
-	  
-	  thumb_pushpop (f, mask, 1);
+
+	  thumb_pushpop (f, mask, 1, &cfa_offset, real_regs_mask);
 	}
 
       if (pushable_regs == 0
@@ -13156,6 +13245,8 @@ arm_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
 		     HOST_WIDE_INT vcall_offset ATTRIBUTE_UNUSED,
 		     tree function)
 {
+  static int thunk_label = 0;
+  char label[256];
   int mi_delta = delta;
   const char *const mi_op = mi_delta < 0 ? "sub" : "add";
   int shift = 0;
@@ -13163,6 +13254,14 @@ arm_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
                     ? 1 : 0);
   if (mi_delta < 0)
     mi_delta = - mi_delta;
+  if (TARGET_THUMB)
+    {
+      int labelno = thunk_label++;
+      ASM_GENERATE_INTERNAL_LABEL (label, "LTHUMBFUNC", labelno);
+      fputs ("\tldr\tr12, ", file);
+      assemble_name (file, label);
+      fputc ('\n', file);
+    }
   while (mi_delta != 0)
     {
       if ((mi_delta & (3 << shift)) == 0)
@@ -13176,11 +13275,22 @@ arm_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
           shift += 8;
         }
     }
-  fputs ("\tb\t", file);
-  assemble_name (file, XSTR (XEXP (DECL_RTL (function), 0), 0));
-  if (NEED_PLT_RELOC)
-    fputs ("(PLT)", file);
-  fputc ('\n', file);
+  if (TARGET_THUMB)
+    {
+      fprintf (file, "\tbx\tr12\n");
+      ASM_OUTPUT_ALIGN (file, 2);
+      assemble_name (file, label);
+      fputs (":\n", file);
+      assemble_integer (XEXP (DECL_RTL (function), 0), 4, BITS_PER_WORD, 1);
+    }
+  else
+    {
+      fputs ("\tb\t", file);
+      assemble_name (file, XSTR (XEXP (DECL_RTL (function), 0), 0));
+      if (NEED_PLT_RELOC)
+        fputs ("(PLT)", file);
+      fputc ('\n', file);
+    }
 }
 
 int
