@@ -373,7 +373,7 @@ const char * structure_size_string = NULL;
 int    arm_structure_size_boundary = DEFAULT_STRUCTURE_SIZE_BOUNDARY;
 
 /* Used for Thumb call_via trampolines.  */
-rtx thumb_call_via_label[13];
+rtx thumb_call_via_label[14];
 static int thumb_call_reg_needed;
 
 /* Bit values used to identify processor capabilities.  */
@@ -569,6 +569,10 @@ struct arm_cpu_select arm_select[] =
   { NULL,	"-mtune=",	all_cores }
 };
 
+/* Defines representing the indexes into the above table.  */
+#define ARM_OPT_SET_CPU 0
+#define ARM_OPT_SET_ARCH 1
+#define ARM_OPT_SET_TUNE 2
 
 /* The name of the proprocessor macro to define for this architecture.  */
 
@@ -761,6 +765,7 @@ void
 arm_override_options (void)
 {
   unsigned i;
+  enum processor_type target_arch_cpu = arm_none;
 
   /* Set up the flags based on the cpu/architecture selected by the user.  */
   for (i = ARRAY_SIZE (arm_select); i--;)
@@ -775,22 +780,25 @@ arm_override_options (void)
             if (streq (ptr->string, sel->name))
               {
 		/* Set the architecture define.  */
-		if (i != 2)
+		if (i != ARM_OPT_SET_TUNE)
 		  sprintf (arm_arch_name, "__ARM_ARCH_%s__", sel->arch);
 
 		/* Determine the processor core for which we should
 		   tune code-generation.  */
 		if (/* -mcpu= is a sensible default.  */
-		    i == 0
-		    /* If -march= is used, and -mcpu= has not been used,
-		       assume that we should tune for a representative
-		       CPU from that architecture.  */
-		    || i == 1
+		    i == ARM_OPT_SET_CPU
 		    /* -mtune= overrides -mcpu= and -march=.  */
-		    || i == 2)
+		    || i == ARM_OPT_SET_TUNE)
 		  arm_tune = (enum processor_type) (sel - ptr->processors);
 
-		if (i != 2)
+		/* Remember the CPU associated with this architecture.
+		   If no other option is used to set the CPU type,
+		   we'll use this to guess the most suitable tuning
+		   options.  */
+		if (i == ARM_OPT_SET_ARCH)
+		  target_arch_cpu = sel->core;
+		
+		if (i != ARM_OPT_SET_TUNE)
 		  {
 		    /* If we have been given an architecture and a processor
 		       make sure that they are compatible.  We only generate
@@ -810,6 +818,10 @@ arm_override_options (void)
             error ("bad value (%s) for %s switch", ptr->string, ptr->name);
         }
     }
+
+  /* Guess the tuning options from the architecture if necessary.  */
+  if (arm_tune == arm_none)
+    arm_tune = target_arch_cpu;
 
   /* If the user did not specify a processor, choose one for them.  */
   if (insn_flags == 0)
@@ -931,6 +943,11 @@ arm_override_options (void)
       /* warning ("ignoring -mapcs-frame because -mthumb was used"); */
       target_flags &= ~ARM_FLAG_APCS_FRAME;
     }
+
+  /* Callee super interworking implies thumb interworking.  Adding
+     this to the flags here simplifies the logic elsewhere.  */
+  if (TARGET_THUMB && TARGET_CALLEE_INTERWORKING)
+      target_flags |= ARM_FLAG_INTERWORK;
 
   /* TARGET_BACKTRACE calls leaf_function_p, which causes a crash if done
      from here where no function is being compiled currently.  */
@@ -7341,57 +7358,37 @@ push_minipool_fix (rtx insn, HOST_WIDE_INT address, rtx *loc,
   minipool_fix_tail = fix;
 }
 
-/* Return the cost of synthesizing the const_double VAL inline.
+/* Return the cost of synthesizing a 64-bit constant VAL inline.
    Returns the number of insns needed, or 99 if we don't know how to
    do it.  */
 int
 arm_const_double_inline_cost (rtx val)
 {
-  long parts[2];
+  rtx lowpart, highpart;
+  enum machine_mode mode;
   
-  if (GET_MODE (val) == DFmode)
-    {
-      REAL_VALUE_TYPE r;
-      if (!TARGET_SOFT_FLOAT)
-	return 99;
-      REAL_VALUE_FROM_CONST_DOUBLE (r, val);
-      REAL_VALUE_TO_TARGET_DOUBLE (r, parts);
-    }
-  else if (GET_MODE (val) != VOIDmode)
-    return 99;
-  else
-    {
-      parts[0] = CONST_DOUBLE_LOW (val);
-      parts[1] = CONST_DOUBLE_HIGH (val);
-    }
+  mode = GET_MODE (val);
 
-  return (arm_gen_constant (SET, SImode, NULL_RTX, parts[0],
+  if (mode == VOIDmode)
+    mode = DImode;
+
+  gcc_assert (GET_MODE_SIZE (mode) == 8);
+  
+  lowpart = gen_lowpart (SImode, val);
+  highpart = gen_highpart_mode (SImode, mode, val);
+  
+  gcc_assert (GET_CODE (lowpart) == CONST_INT);
+  gcc_assert (GET_CODE (highpart) == CONST_INT);
+
+  return (arm_gen_constant (SET, SImode, NULL_RTX, INTVAL (lowpart),
 			    NULL_RTX, NULL_RTX, 0, 0)
-	  + arm_gen_constant (SET, SImode, NULL_RTX, parts[1],
+	  + arm_gen_constant (SET, SImode, NULL_RTX, INTVAL (highpart),
 			      NULL_RTX, NULL_RTX, 0, 0));
-}
-
-/* Determine if a CONST_DOUBLE should be pushed to the minipool */
-static bool
-const_double_needs_minipool (rtx val)
-{
-  /* thumb only knows to load a CONST_DOUBLE from memory at the moment */
-  if (TARGET_THUMB)
-    return true;
-
-  /* Don't push anything to the minipool if a CONST_DOUBLE can be built with
-     a few ALU insns directly. On balance, the optimum is likely to be around
-     3 insns, except when there are no load delay slots where it should be 4.
-     When optimizing for size, a limit of 3 allows saving at least one word
-     except for cases where a single minipool entry could be shared more than
-     2 times which is rather unlikely to outweight the overall savings. */
-  return (arm_const_double_inline_cost (val)
-	  > ((optimize_size || arm_ld_sched) ? 3 : 4));
 }
 
 /* Scan INSN and note any of its operands that need fixing.
    If DO_PUSHES is false we do not actually push any of the fixups
-   needed.  The function returns TRUE is any fixups were needed/pushed.
+   needed.  The function returns TRUE if any fixups were needed/pushed.
    This is used by arm_memory_load_p() which needs to know about loads
    of constants that will be converted into minipool loads.  */
 static bool
@@ -7408,7 +7405,8 @@ note_invalid_constants (rtx insn, HOST_WIDE_INT address, int do_pushes)
   if (recog_data.n_alternatives == 0)
     return false;
 
-  /* Fill in recog_op_alt with information about the constraints of this insn.  */
+  /* Fill in recog_op_alt with information about the constraints of
+     this insn.  */
   preprocess_constraints ();
 
   for (opno = 0; opno < recog_data.n_operands; opno++)
@@ -7425,9 +7423,7 @@ note_invalid_constants (rtx insn, HOST_WIDE_INT address, int do_pushes)
 	{
 	  rtx op = recog_data.operand[opno];
 
-	  if (CONSTANT_P (op)
-	      && (GET_CODE (op) != CONST_DOUBLE
-		  || const_double_needs_minipool (op)))
+	  if (CONSTANT_P (op))
 	    {
 	      if (do_pushes)
 		push_minipool_fix (insn, address, recog_data.operand_loc[opno],
@@ -8021,175 +8017,7 @@ output_move_double (rtx *operands)
 
       otherops[0] = gen_rtx_REG (SImode, 1 + reg0);
 
-      if (code1 == REG)
-	{
-	  int reg1 = REGNO (operands[1]);
-	  if (reg1 == IP_REGNUM)
-	    abort ();
-
-	  /* Ensure the second source is not overwritten.  */
-	  if (reg1 == reg0 + (WORDS_BIG_ENDIAN ? -1 : 1))
-	    output_asm_insn ("mov%?\t%Q0, %Q1\n\tmov%?\t%R0, %R1", operands);
-	  else
-	    output_asm_insn ("mov%?\t%R0, %R1\n\tmov%?\t%Q0, %Q1", operands);
-	}
-      else if (code1 == CONST_VECTOR)
-	{
-	  HOST_WIDE_INT hint = 0;
-
-	  switch (GET_MODE (operands[1]))
-	    {
-	    case V2SImode:
-	      otherops[1] = GEN_INT (INTVAL (CONST_VECTOR_ELT (operands[1], 1)));
-	      operands[1] = GEN_INT (INTVAL (CONST_VECTOR_ELT (operands[1], 0)));
-	      break;
-
-	    case V4HImode:
-	      if (BYTES_BIG_ENDIAN)
-		{
-		  hint = INTVAL (CONST_VECTOR_ELT (operands[1], 2));
-		  hint <<= 16;
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 3));
-		}
-	      else
-		{
-		  hint = INTVAL (CONST_VECTOR_ELT (operands[1], 3));
-		  hint <<= 16;
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 2));
-		}
-
-	      otherops[1] = GEN_INT (hint);
-	      hint = 0;
-
-	      if (BYTES_BIG_ENDIAN)
-		{
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 0));
-		  hint <<= 16;
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 1));
-		}
-	      else
-		{
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 1));
-		  hint <<= 16;
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 0));
-		}
-
-	      operands[1] = GEN_INT (hint);
-	      break;
-
-	    case V8QImode:
-	      if (BYTES_BIG_ENDIAN)
-		{
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 4));
-		  hint <<= 8;
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 5));
-		  hint <<= 8;
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 6));
-		  hint <<= 8;
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 7));
-		}
-	      else
-		{
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 7));
-		  hint <<= 8;
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 6));
-		  hint <<= 8;
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 5));
-		  hint <<= 8;
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 4));
-		}
-
-	      otherops[1] = GEN_INT (hint);
-	      hint = 0;
-
-	      if (BYTES_BIG_ENDIAN)
-		{
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 0));
-		  hint <<= 8;
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 1));
-		  hint <<= 8;
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 2));
-		  hint <<= 8;
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 3));
-		}
-	      else
-		{
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 3));
-		  hint <<= 8;
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 2));
-		  hint <<= 8;
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 1));
-		  hint <<= 8;
-		  hint |= INTVAL (CONST_VECTOR_ELT (operands[1], 0));
-		}
-
-	      operands[1] = GEN_INT (hint);
-	      break;
-
-	    default:
-	      abort ();
-	    }
-	  output_mov_immediate (operands);
-	  output_mov_immediate (otherops);
-	}
-      else if (code1 == CONST_DOUBLE)
-	{
-	  if (GET_MODE (operands[1]) == DFmode)
-	    {
-	      REAL_VALUE_TYPE r;
-	      long l[2];
-
-	      REAL_VALUE_FROM_CONST_DOUBLE (r, operands[1]);
-	      REAL_VALUE_TO_TARGET_DOUBLE (r, l);
-	      otherops[1] = GEN_INT (l[1]);
-	      operands[1] = GEN_INT (l[0]);
-	    }
-	  else if (GET_MODE (operands[1]) != VOIDmode)
-	    abort ();
-	  else if (WORDS_BIG_ENDIAN)
-	    {
-	      otherops[1] = GEN_INT (CONST_DOUBLE_LOW (operands[1]));
-	      operands[1] = GEN_INT (CONST_DOUBLE_HIGH (operands[1]));
-	    }
-	  else
-	    {
-	      otherops[1] = GEN_INT (CONST_DOUBLE_HIGH (operands[1]));
-	      operands[1] = GEN_INT (CONST_DOUBLE_LOW (operands[1]));
-	    }
-
-	  output_mov_immediate (operands);
-	  output_mov_immediate (otherops);
-	}
-      else if (code1 == CONST_INT)
-	{
-#if HOST_BITS_PER_WIDE_INT > 32
-	  /* If HOST_WIDE_INT is more than 32 bits, the intval tells us
-	     what the upper word is.  */
-	  if (WORDS_BIG_ENDIAN)
-	    {
-	      otherops[1] = GEN_INT (ARM_SIGN_EXTEND (INTVAL (operands[1])));
-	      operands[1] = GEN_INT (INTVAL (operands[1]) >> 32);
-	    }
-	  else
-	    {
-	      otherops[1] = GEN_INT (INTVAL (operands[1]) >> 32);
-	      operands[1] = GEN_INT (ARM_SIGN_EXTEND (INTVAL (operands[1])));
-	    }
-#else
-	  /* Sign extend the intval into the high-order word.  */
-	  if (WORDS_BIG_ENDIAN)
-	    {
-	      otherops[1] = operands[1];
-	      operands[1] = (INTVAL (operands[1]) < 0
-			     ? constm1_rtx : const0_rtx);
-	    }
-	  else
-	    otherops[1] = INTVAL (operands[1]) < 0 ? constm1_rtx : const0_rtx;
-#endif
-	  output_mov_immediate (otherops);
-	  output_mov_immediate (operands);
-	}
-      else if (code1 == MEM)
+      if (code1 == MEM)
 	{
 	  switch (GET_CODE (XEXP (operands[1], 0)))
 	    {
@@ -8424,43 +8252,6 @@ output_move_double (rtx *operands)
   else
     /* Constraints should prevent this.  */
     abort ();
-
-  return "";
-}
-
-
-/* Output an arbitrary MOV reg, #n.
-   OPERANDS[0] is a register.  OPERANDS[1] is a const_int.  */
-const char *
-output_mov_immediate (rtx *operands)
-{
-  HOST_WIDE_INT n = INTVAL (operands[1]);
-
-  /* Try to use one MOV.  */
-  if (const_ok_for_arm (n))
-    output_asm_insn ("mov%?\t%0, %1", operands);
-
-  /* Try to use one MVN.  */
-  else if (const_ok_for_arm (~n))
-    {
-      operands[1] = GEN_INT (~n);
-      output_asm_insn ("mvn%?\t%0, %1", operands);
-    }
-  else
-    {
-      int n_ones = 0;
-      int i;
-
-      /* If all else fails, make it out of ORRs or BICs as appropriate.  */
-      for (i = 0; i < 32; i++)
-	if (n & 1 << i)
-	  n_ones++;
-
-      if (n_ones > 16)  /* Shorter to use MVN with BIC in this case.  */
-	output_multi_immediate (operands, "mvn%?\t%0, %1", "bic%?\t%0, %0, %1", 1, ~ n);
-      else
-	output_multi_immediate (operands, "mov%?\t%0, %1", "orr%?\t%0, %0, %1", 1, n);
-    }
 
   return "";
 }
@@ -9624,7 +9415,7 @@ arm_output_function_epilogue (FILE *file ATTRIBUTE_UNUSED,
 
       /* Emit any call-via-reg trampolines that are needed for v4t support
 	 of call_reg and call_value_reg type insns.  */
-      for (regno = 0; regno < SP_REGNUM; regno++)
+      for (regno = 0; regno < LR_REGNUM; regno++)
 	{
 	  rtx label = cfun->machine->call_via[regno];
 
@@ -13696,7 +13487,7 @@ thumb_call_via_reg (rtx reg)
   int regno = REGNO (reg);
   rtx *labelp;
 
-  gcc_assert (regno < SP_REGNUM);
+  gcc_assert (regno < LR_REGNUM);
 
   /* If we are in the normal text section we can use a single instance
      per compilation unit.  If we are doing function sections, then we need
@@ -13842,7 +13633,7 @@ arm_file_end (void)
   asm_fprintf (asm_out_file, "\t.code 16\n");
   ASM_OUTPUT_ALIGN (asm_out_file, 1);
 
-  for (regno = 0; regno < SP_REGNUM; regno++)
+  for (regno = 0; regno < LR_REGNUM; regno++)
     {
       rtx label = thumb_call_via_label[regno];
 

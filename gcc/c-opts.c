@@ -464,6 +464,10 @@ c_common_handle_option (size_t scode, const char *arg, int value)
       warn_return_type = value;
       break;
 
+    case OPT_Wstrict_null_sentinel:
+      warn_strict_null_sentinel = value;
+      break;
+
     case OPT_Wsystem_headers:
       cpp_opts->warn_system_headers = value;
       break;
@@ -1089,13 +1093,18 @@ c_common_parse_file (int set_yydebug)
   i = 0;
   for (;;)
     {
+      /* Start the main input file, if the debug writer wants it.  */
+      if (debug_hooks->start_end_main_source_file)
+        (*debug_hooks->start_source_file) (0, this_input_filename);
       finish_options ();
       pch_init ();
       push_file_scope ();
       c_parse_file ();
       finish_file ();
       pop_file_scope ();
-
+      /* And end the main input file, if the debug writer wants it */
+      if (debug_hooks->start_end_main_source_file)
+        (*debug_hooks->end_source_file) (0);
       if (++i >= num_in_fnames)
 	break;
       cpp_undef_all (parse_in);
