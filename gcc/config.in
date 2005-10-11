@@ -97,6 +97,9 @@
 /* Define if your assembler supports the Sun syntax for cmov. */
 #undef HAVE_AS_IX86_CMOV_SUN_SYNTAX
 
+/* Define if your assembler supports the lituse_jsrdirect relocation. */
+#undef HAVE_AS_JSRDIRECT_RELOCS
+
 /* Define if your assembler supports .sleb128 and .uleb128. */
 #undef HAVE_AS_LEB128
 
@@ -105,6 +108,9 @@
 
 /* Define if your assembler supports mfcr field. */
 #undef HAVE_AS_MFCRF
+
+/* Define if your assembler supports the -no-mul-bug-abort option. */
+#undef HAVE_AS_NO_MUL_BUG_ABORT_OPTION
 
 /* Define if your assembler supports offsetable %lo(). */
 #undef HAVE_AS_OFFSETABLE_LO10
@@ -259,6 +265,9 @@
    skip when using the GAS .p2align command. */
 #undef HAVE_GAS_MAX_SKIP_P2ALIGN
 
+/* Define if your assembler supports .nsubspa comdat option. */
+#undef HAVE_GAS_NSUBSPA_COMDAT
+
 /* Define 0/1 if your assembler supports marking sections with SHF_MERGE flag.
    */
 #undef HAVE_GAS_SHF_MERGE
@@ -303,6 +312,9 @@
 /* Define to 1 if you have the <ldfcn.h> header file. */
 #undef HAVE_LDFCN_H
 
+/* Define if your linker supports --as-needed and --no-as-needed options. */
+#undef HAVE_LD_AS_NEEDED
+
 /* Define if your linker supports --eh-frame-hdr option. */
 #undef HAVE_LD_EH_FRAME_HDR
 
@@ -312,6 +324,9 @@
 /* Define if your linker links a mix of read-only and read-write sections into
    a read-write section. */
 #undef HAVE_LD_RO_RW_SECTION_MIXING
+
+/* Define if your linker supports -Bstatic/-Bdynamic option. */
+#undef HAVE_LD_STATIC_DYNAMIC
 
 /* Define to 1 if you have the <limits.h> header file. */
 #undef HAVE_LIMITS_H
@@ -528,9 +543,6 @@
 /* Define if your assembler mis-optimizes .eh_frame data. */
 #undef USE_AS_TRADITIONAL_FORMAT
 
-/* Define if gcc should use -lunwind. */
-#undef USE_LIBUNWIND_EXCEPTIONS
-
 /* Define to be the last portion of registry key on windows hosts. */
 #undef WIN32_REGISTRY_KEY
 
@@ -543,9 +555,11 @@
 /* Define to `int' if <sys/types.h> doesn't define. */
 #undef gid_t
 
-/* Define as `__inline' if that's what the C compiler calls it, or to nothing
-   if it is not supported. */
+/* Define to `__inline__' or `__inline' if that's what the C compiler
+   calls it, or to nothing if 'inline' is not supported under any name.  */
+#ifndef __cplusplus
 #undef inline
+#endif
 
 /* Define to `int' if <sys/types.h> does not define. */
 #undef pid_t
