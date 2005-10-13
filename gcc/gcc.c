@@ -392,7 +392,7 @@ or with constant text in a single argument.
 	chosen in a way that is hard to predict even when previously
 	chosen file names are known.  For example, `%g.s ... %g.o ... %g.s'
 	might turn into `ccUVUUAU.s ccXYAXZ12.o ccUVUUAU.s'.  SUFFIX matches
-	the regexp "[.A-Za-z]*%O"; "%O" is treated exactly as if it
+	the regexp "[.0-9A-Za-z]*%O"; "%O" is treated exactly as if it
 	had been pre-processed.  Previously, %g was simply substituted
 	with a file name chosen once per compilation, without regard
 	to any appended suffix (which was therefore treated just like
@@ -954,7 +954,7 @@ static const struct compiler default_compilers[] =
 		cc1 %(cpp_unique_options) %(cc1_options)}}\
                 %{!fsyntax-only:%(invoke_as)}}}}}}", 0, 1, 1},
   {"-",
-   "%{!E:%e-E required when input is from standard input}\
+   "%{!E:%e-E or -x required when input is from standard input}\
     %(trad_capable_cpp) %(cpp_options) %(cpp_debug_options)", 0, 0, 0},
   {".h", "@c-header", 0, 0, 0},
   {"@c-header",
@@ -4685,7 +4685,7 @@ do_spec_1 (const char *spec, int inswitch, const char *soft_matched_part)
 		arg_going = 1;
 
 		/* consume suffix */
-		while (*p == '.' || ISALPHA ((unsigned char) *p))
+		while (*p == '.' || ISALNUM ((unsigned char) *p))
 		  p++;
 		if (p[0] == '%' && p[1] == 'O')
 		  p += 2;
@@ -4697,7 +4697,7 @@ do_spec_1 (const char *spec, int inswitch, const char *soft_matched_part)
 	    if (use_pipes)
 	      {
 		/* consume suffix */
-		while (*p == '.' || ISALPHA ((unsigned char) *p))
+		while (*p == '.' || ISALNUM ((unsigned char) *p))
 		  p++;
 		if (p[0] == '%' && p[1] == 'O')
 		  p += 2;
@@ -4715,14 +4715,14 @@ do_spec_1 (const char *spec, int inswitch, const char *soft_matched_part)
 		const char *suffix = p;
 		char *saved_suffix = NULL;
 
-		while (*p == '.' || ISALPHA ((unsigned char) *p))
+		while (*p == '.' || ISALNUM ((unsigned char) *p))
 		  p++;
 		suffix_length = p - suffix;
 		if (p[0] == '%' && p[1] == 'O')
 		  {
 		    p += 2;
 		    /* We don't support extra suffix characters after %O.  */
-		    if (*p == '.' || ISALPHA ((unsigned char) *p))
+		    if (*p == '.' || ISALNUM ((unsigned char) *p))
 		      fatal ("spec '%s' has invalid '%%0%c'", spec, *p);
 		    if (suffix_length == 0)
 		      suffix = TARGET_OBJECT_SUFFIX;
@@ -6012,6 +6012,9 @@ main (int argc, const char **argv)
   GCC_DRIVER_HOST_INITIALIZATION;
 #endif
 
+  /* Unlock the stdio streams.  */
+  unlock_std_streams ();
+
   gcc_init_libintl ();
 
   if (signal (SIGINT, SIG_IGN) != SIG_IGN)
@@ -6736,40 +6739,46 @@ fancy_abort (const char *file, int line, const char *func)
 /* Output an error message and exit.  */
 
 void
-fatal (const char *msgid, ...)
+fatal (const char *cmsgid, ...)
 {
   va_list ap;
 
-  va_start (ap, msgid);
+  va_start (ap, cmsgid);
 
   fprintf (stderr, "%s: ", programname);
-  vfprintf (stderr, _(msgid), ap);
+  vfprintf (stderr, _(cmsgid), ap);
   va_end (ap);
   fprintf (stderr, "\n");
   delete_temp_files ();
   exit (1);
 }
 
+/* The argument is actually c-format, not gcc-internal-format,
+   but because functions with identical names are used through
+   the rest of the compiler with gcc-internal-format, we just
+   need to hope all users of these functions use the common
+   subset between c-format and gcc-internal-format.  */
+
 void
-error (const char *msgid, ...)
+error (const char *gmsgid, ...)
 {
   va_list ap;
 
-  va_start (ap, msgid);
+  va_start (ap, gmsgid);
   fprintf (stderr, "%s: ", programname);
-  vfprintf (stderr, _(msgid), ap);
+  vfprintf (stderr, _(gmsgid), ap);
   va_end (ap);
 
   fprintf (stderr, "\n");
 }
 
 static void
-notice (const char *msgid, ...)
+notice (const char *cmsgid, ...)
 {
   va_list ap;
 
-  va_start (ap, msgid);
-  vfprintf (stderr, _(msgid), ap);
+  va_start (ap, cmsgid);
+  vfprintf (stderr, _(cmsgid), ap);
   va_end (ap);
 }
 

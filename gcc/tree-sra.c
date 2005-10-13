@@ -1116,6 +1116,12 @@ instantiate_element (struct sra_elt *elt)
   DECL_SOURCE_LOCATION (var) = DECL_SOURCE_LOCATION (base);
   DECL_ARTIFICIAL (var) = 1;
 
+  if (TREE_THIS_VOLATILE (elt->type))
+    {
+      TREE_THIS_VOLATILE (var) = 1;
+      TREE_SIDE_EFFECTS (var) = 1;
+    }
+
   if (DECL_NAME (base) && !DECL_IGNORED_P (base))
     {
       char *pretty_name = build_element_name (elt);
@@ -1293,6 +1299,12 @@ decide_block_copy (struct sra_elt *elt)
 	  fputc ('\n', dump_file);
 	}
 
+      /* Disable scalarization of sub-elements */
+      for (c = elt->children; c; c = c->sibling)
+	{
+	  c->cannot_scalarize = 1;
+	  decide_block_copy (c);
+	}
       return false;
     }
 
@@ -1316,8 +1328,7 @@ decide_block_copy (struct sra_elt *elt)
       else if (host_integerp (size_tree, 1))
 	{
 	  unsigned HOST_WIDE_INT full_size, inst_size = 0;
-	  unsigned int inst_count;
-	  unsigned int max_size;
+ 	  unsigned int max_size, max_count, inst_count, full_count;
 
 	  /* If the sra-max-structure-size parameter is 0, then the
 	     user has not overridden the parameter and we can choose a
@@ -1325,8 +1336,13 @@ decide_block_copy (struct sra_elt *elt)
 	  max_size = SRA_MAX_STRUCTURE_SIZE
 	    ? SRA_MAX_STRUCTURE_SIZE
 	    : MOVE_RATIO * UNITS_PER_WORD;
+	  max_count = SRA_MAX_STRUCTURE_COUNT
+	    ? SRA_MAX_STRUCTURE_COUNT
+	    : MOVE_RATIO;
 
 	  full_size = tree_low_cst (size_tree, 1);
+	  full_count = count_type_elements (elt->type);
+	  inst_count = sum_instantiated_sizes (elt, &inst_size);
 
 	  /* ??? What to do here.  If there are two fields, and we've only
 	     instantiated one, then instantiating the other is clearly a win.
@@ -1336,15 +1352,12 @@ decide_block_copy (struct sra_elt *elt)
 	  /* If the structure is small, and we've made copies, go ahead
 	     and instantiate, hoping that the copies will go away.  */
 	  if (full_size <= max_size
+	      && (full_count - inst_count) <= max_count
 	      && elt->n_copies > elt->n_uses)
 	    use_block_copy = false;
-	  else
-	    {
-	      inst_count = sum_instantiated_sizes (elt, &inst_size);
-
-	      if (inst_size * 100 >= full_size * SRA_FIELD_STRUCTURE_RATIO)
-		use_block_copy = false;
-	    }
+	  else if (inst_count * 100 >= full_count * SRA_FIELD_STRUCTURE_RATIO
+		   && inst_size * 100 >= full_size * SRA_FIELD_STRUCTURE_RATIO)
+	    use_block_copy = false;
 
 	  /* In order to avoid block copy, we have to be able to instantiate
 	     all elements of the type.  See if this is possible.  */
@@ -1634,10 +1647,31 @@ generate_element_init_1 (struct sra_elt *elt, tree init, tree *list_p)
     case CONSTRUCTOR:
       for (t = CONSTRUCTOR_ELTS (init); t ; t = TREE_CHAIN (t))
 	{
-	  sub = lookup_element (elt, TREE_PURPOSE (t), NULL, NO_INSERT);
-	  if (sub == NULL)
-	    continue;
-	  result &= generate_element_init_1 (sub, TREE_VALUE (t), list_p);
+	  tree purpose = TREE_PURPOSE (t);
+	  tree value = TREE_VALUE (t);
+
+	  if (TREE_CODE (purpose) == RANGE_EXPR)
+	    {
+	      tree lower = TREE_OPERAND (purpose, 0);
+	      tree upper = TREE_OPERAND (purpose, 1);
+
+	      while (1)
+		{
+	  	  sub = lookup_element (elt, lower, NULL, NO_INSERT);
+		  if (sub != NULL)
+		    result &= generate_element_init_1 (sub, value, list_p);
+		  if (tree_int_cst_equal (lower, upper))
+		    break;
+		  lower = int_const_binop (PLUS_EXPR, lower,
+					   integer_one_node, true);
+		}
+	    }
+	  else
+	    {
+	      sub = lookup_element (elt, purpose, NULL, NO_INSERT);
+	      if (sub != NULL)
+		result &= generate_element_init_1 (sub, value, list_p);
+	    }
 	}
       break;
 

@@ -1137,7 +1137,8 @@ s390_extract_part (rtx op, enum machine_mode mode, int def)
   unsigned HOST_WIDE_INT value = 0;
   int max_parts = HOST_BITS_PER_WIDE_INT / GET_MODE_BITSIZE (mode);
   int part_bits = GET_MODE_BITSIZE (mode);
-  unsigned HOST_WIDE_INT part_mask = (1 << part_bits) - 1;
+  unsigned HOST_WIDE_INT part_mask
+    = ((unsigned HOST_WIDE_INT)1 << part_bits) - 1;
   int i;
 
   for (i = 0; i < max_parts; i++)
@@ -1166,7 +1167,8 @@ s390_single_part (rtx op,
 {
   unsigned HOST_WIDE_INT value = 0;
   int n_parts = GET_MODE_SIZE (mode) / GET_MODE_SIZE (part_mode);
-  unsigned HOST_WIDE_INT part_mask = (1 << GET_MODE_BITSIZE (part_mode)) - 1;
+  unsigned HOST_WIDE_INT part_mask
+    = ((unsigned HOST_WIDE_INT)1 << GET_MODE_BITSIZE (part_mode)) - 1;
   int i, part = -1;
 
   if (GET_CODE (op) != CONST_INT)
@@ -1867,8 +1869,9 @@ s390_const_ok_for_constraint_p (HOST_WIDE_INT value,
 
       switch (str[2])
 	{
-	case 'H': part_mode = HImode; break;
-	case 'Q': part_mode = QImode; break;
+  	case 'Q': part_mode = QImode; break;
+ 	case 'H': part_mode = HImode; break;
+ 	case 'S': part_mode = SImode; break;
 	default:  return 0;
 	}
 
@@ -2557,8 +2560,11 @@ s390_secondary_output_reload_class (enum reg_class class,
                     : (mode == DImode || mode == DFmode))
       && reg_classes_intersect_p (GENERAL_REGS, class)
       && GET_CODE (out) == MEM
-      && !offsettable_memref_p (out)
-      && !s_operand (out, VOIDmode))
+      && GET_CODE (XEXP (out, 0)) == PLUS
+      && GET_CODE (XEXP (XEXP (out, 0), 0)) == PLUS
+      && GET_CODE (XEXP (XEXP (out, 0), 1)) == CONST_INT
+      && !DISP_IN_RANGE (INTVAL (XEXP (XEXP (out, 0), 1))
+			 + GET_MODE_SIZE (mode) - 1))
     return ADDR_REGS;
 
   if (reg_classes_intersect_p (CC_REGS, class))
@@ -6119,6 +6125,10 @@ s390_optimize_prologue (void)
 
 	  if (GET_CODE (base) != REG || off < 0)
 	    continue;
+	  if (cfun_frame_layout.first_save_gpr != -1
+	      && (cfun_frame_layout.first_save_gpr < first
+		  || cfun_frame_layout.last_save_gpr > last))
+	    continue;
 	  if (REGNO (base) != STACK_POINTER_REGNUM
 	      && REGNO (base) != HARD_FRAME_POINTER_REGNUM)
 	    continue;
@@ -6140,7 +6150,8 @@ s390_optimize_prologue (void)
 	  continue;
 	}
 
-      if (GET_CODE (PATTERN (insn)) == SET
+      if (cfun_frame_layout.first_save_gpr == -1
+	  && GET_CODE (PATTERN (insn)) == SET
 	  && GET_CODE (SET_SRC (PATTERN (insn))) == REG
 	  && (REGNO (SET_SRC (PATTERN (insn))) == BASE_REGNUM
 	      || (!TARGET_CPU_ZARCH
@@ -6158,16 +6169,6 @@ s390_optimize_prologue (void)
 	  if (REGNO (base) != STACK_POINTER_REGNUM
 	      && REGNO (base) != HARD_FRAME_POINTER_REGNUM)
 	    continue;
-	  if (cfun_frame_layout.first_save_gpr != -1)
-	    {
-	      new_insn = save_gprs (base, 
-				    off + (cfun_frame_layout.first_save_gpr 
-					   - first) * UNITS_PER_WORD, 
-				    cfun_frame_layout.first_save_gpr,
-				    cfun_frame_layout.last_save_gpr);
-	      new_insn = emit_insn_before (new_insn, insn);
-	      INSN_ADDRESSES_NEW (new_insn, -1);
-	    }
 
 	  remove_insn (insn);
 	  continue;
@@ -6184,6 +6185,10 @@ s390_optimize_prologue (void)
 	  off = INTVAL (offset);
 
 	  if (GET_CODE (base) != REG || off < 0)
+	    continue;
+	  if (cfun_frame_layout.first_restore_gpr != -1
+	      && (cfun_frame_layout.first_restore_gpr < first
+		  || cfun_frame_layout.last_restore_gpr > last))
 	    continue;
 	  if (REGNO (base) != STACK_POINTER_REGNUM
 	      && REGNO (base) != HARD_FRAME_POINTER_REGNUM)
@@ -6206,7 +6211,8 @@ s390_optimize_prologue (void)
 	  continue;
 	}
 
-      if (GET_CODE (PATTERN (insn)) == SET
+      if (cfun_frame_layout.first_restore_gpr == -1
+	  && GET_CODE (PATTERN (insn)) == SET
 	  && GET_CODE (SET_DEST (PATTERN (insn))) == REG
 	  && (REGNO (SET_DEST (PATTERN (insn))) == BASE_REGNUM
 	      || (!TARGET_CPU_ZARCH
@@ -6224,16 +6230,6 @@ s390_optimize_prologue (void)
 	  if (REGNO (base) != STACK_POINTER_REGNUM
 	      && REGNO (base) != HARD_FRAME_POINTER_REGNUM)
 	    continue;
-	  if (cfun_frame_layout.first_restore_gpr != -1)
-	    {
-	      new_insn = restore_gprs (base, 
-				       off + (cfun_frame_layout.first_restore_gpr 
-					      - first) * UNITS_PER_WORD,
-				       cfun_frame_layout.first_restore_gpr,
-				       cfun_frame_layout.last_restore_gpr);
-	      new_insn = emit_insn_before (new_insn, insn);
-	      INSN_ADDRESSES_NEW (new_insn, -1);
-	    }
 
 	  remove_insn (insn);
 	  continue;
@@ -8399,12 +8395,12 @@ s390_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
         {
 	  if (CONST_OK_FOR_CONSTRAINT_P (vcall_offset, 'J', "J"))
 	    {
-	      output_asm_insn ("lg\t%4,0(%1)", op);
+	      output_asm_insn ("l\t%4,0(%1)", op);
 	      output_asm_insn ("a\t%1,%3(%4)", op);
 	    }
 	  else if (DISP_IN_RANGE (vcall_offset))
 	    {
-	      output_asm_insn ("lg\t%4,0(%1)", op);
+	      output_asm_insn ("l\t%4,0(%1)", op);
 	      output_asm_insn ("ay\t%1,%3(%4)", op);
 	    }
 	  else if (CONST_OK_FOR_CONSTRAINT_P (vcall_offset, 'K', "K"))

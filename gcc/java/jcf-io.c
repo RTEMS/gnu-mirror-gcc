@@ -311,6 +311,14 @@ typedef struct memoized_dirlist_entry
   struct dirent **files;
 } memoized_dirlist_entry;
 
+/* A hash function for a memoized_dirlist_entry.  */
+static hashval_t
+memoized_dirlist_hash (const void *entry)
+{
+  const memoized_dirlist_entry *mde = (const memoized_dirlist_entry *) entry;
+  return htab_hash_string (mde->dir);
+}
+
 /* Returns true if ENTRY (a memoized_dirlist_entry *) corresponds to
    the directory given by KEY (a char *) giving the directory 
    name.  */
@@ -341,11 +349,12 @@ caching_stat (char *filename, struct stat *buf)
   char *base;
   memoized_dirlist_entry *dent;
   void **slot;
+  struct memoized_dirlist_entry temp;
   
   /* If the hashtable has not already been created, create it now.  */
   if (!memoized_dirlists)
     memoized_dirlists = htab_create (37,
-				     htab_hash_string,
+				     memoized_dirlist_hash,
 				     memoized_dirlist_lookup_eq,
 				     NULL);
 
@@ -364,8 +373,13 @@ caching_stat (char *filename, struct stat *buf)
   else
     base = filename;
 
-  /* Obtain the entry for this directory from the hash table.  */
-  slot = htab_find_slot (memoized_dirlists, filename, INSERT);
+  /* Obtain the entry for this directory from the hash table.  This
+     approach is ok since we know that the hash function only looks at
+     the directory name.  */
+  temp.dir = filename;
+  temp.num_files = 0;
+  temp.files = NULL;
+  slot = htab_find_slot (memoized_dirlists, &temp, INSERT);
   if (!*slot)
     {
       /* We have not already scanned this directory; scan it now.  */
@@ -376,11 +390,11 @@ caching_stat (char *filename, struct stat *buf)
 	 particular, the type of the function pointer passed as the
 	 third argument sometimes takes a "const struct dirent *"
 	 parameter, and sometimes just a "struct dirent *".  We cast
-	 to (void *) so that either way it is quietly accepted.
-	 FIXME: scandir is not in POSIX.  */
-      dent->num_files = scandir (filename, &dent->files, 
-				 (void *) java_or_class_file, 
-				 alphasort);
+	 to (void *) and use __extension__ so that either way it is
+	 quietly accepted.  FIXME: scandir is not in POSIX.  */
+      dent->num_files = __extension__ scandir (filename, &dent->files, 
+					       (void *) java_or_class_file, 
+					       alphasort);
       *slot = dent;
     }
   else

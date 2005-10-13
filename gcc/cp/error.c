@@ -437,9 +437,7 @@ dump_aggr_type (tree t, int flags)
       typdef = !DECL_ARTIFICIAL (name);
       tmplate = !typdef && TREE_CODE (t) != ENUMERAL_TYPE
                 && TYPE_LANG_SPECIFIC (t) && CLASSTYPE_TEMPLATE_INFO (t)
-                && (CLASSTYPE_TEMPLATE_SPECIALIZATION (t)
-                    || TREE_CODE (CLASSTYPE_TI_TEMPLATE (t)) != TEMPLATE_DECL
-                    || DECL_TEMPLATE_SPECIALIZATION (CLASSTYPE_TI_TEMPLATE (t))
+                && (TREE_CODE (CLASSTYPE_TI_TEMPLATE (t)) != TEMPLATE_DECL
                     || PRIMARY_TEMPLATE_P (CLASSTYPE_TI_TEMPLATE (t)));
       dump_scope (CP_DECL_CONTEXT (name), flags | TFF_SCOPE);
       if (tmplate)
@@ -744,7 +742,6 @@ dump_decl (tree t, int flags)
       /* Else fall through.  */
     case FIELD_DECL:
     case PARM_DECL:
-    case ALIAS_DECL:
       dump_simple_decl (t, TREE_TYPE (t), flags);
       break;
 
@@ -1183,9 +1180,7 @@ dump_function_name (tree t, int flags)
 
   if (DECL_TEMPLATE_INFO (t)
       && !DECL_FRIEND_PSEUDO_TEMPLATE_INSTANTIATION (t)
-      && (DECL_TEMPLATE_SPECIALIZATION (t)
-	  || TREE_CODE (DECL_TI_TEMPLATE (t)) != TEMPLATE_DECL
-	  || DECL_TEMPLATE_SPECIALIZATION (DECL_TI_TEMPLATE (t))
+      && (TREE_CODE (DECL_TI_TEMPLATE (t)) != TEMPLATE_DECL
 	  || PRIMARY_TEMPLATE_P (DECL_TI_TEMPLATE (t))))
     dump_template_parms (DECL_TEMPLATE_INFO (t), !DECL_USE_TEMPLATE (t), flags);
 }
@@ -1283,6 +1278,7 @@ dump_expr (tree t, int flags)
     case FUNCTION_DECL:
     case TEMPLATE_DECL:
     case NAMESPACE_DECL:
+    case LABEL_DECL:
     case OVERLOAD:
     case IDENTIFIER_NODE:
       dump_decl (t, (flags & ~TFF_DECL_SPECIFIERS) | TFF_NO_FUNCTION_ARGUMENTS);
@@ -1489,7 +1485,8 @@ dump_expr (tree t, int flags)
 	  {
 	    ob = TREE_OPERAND (ob, 0);
 	    if (TREE_CODE (ob) != PARM_DECL
-		|| strcmp (IDENTIFIER_POINTER (DECL_NAME (ob)), "this"))
+		|| (DECL_NAME (ob)
+		    && strcmp (IDENTIFIER_POINTER (DECL_NAME (ob)), "this")))
 	      {
 		dump_expr (ob, flags | TFF_EXPR_IN_PARENS);
 		pp_cxx_arrow (cxx_pp);
@@ -1532,6 +1529,8 @@ dump_expr (tree t, int flags)
 	  || (TREE_TYPE (t)
 	      && TREE_CODE (TREE_TYPE (t)) == REFERENCE_TYPE))
 	dump_expr (TREE_OPERAND (t, 0), flags | TFF_EXPR_IN_PARENS);
+      else if (TREE_CODE (TREE_OPERAND (t, 0)) == LABEL_DECL)
+	dump_unary_op ("&&", t, flags);
       else
 	dump_unary_op ("&", t, flags);
       break;
@@ -2319,13 +2318,13 @@ cp_printer (pretty_printer *pp, text_info *text)
    behavior of cp_*_at.  */
 
 static tree
-locate_error (const char *msgid, va_list ap)
+locate_error (const char *gmsgid, va_list ap)
 {
   tree here = 0, t;
   int plus = 0;
   const char *f;
 
-  for (f = msgid; *f; f++)
+  for (f = gmsgid; *f; f++)
     {
       plus = 0;
       if (*f == '%')
@@ -2381,57 +2380,57 @@ locate_error (const char *msgid, va_list ap)
 
 
 void
-cp_error_at (const char *msgid, ...)
+cp_error_at (const char *gmsgid, ...)
 {
   tree here;
   diagnostic_info diagnostic;
   va_list ap;
 
-  va_start (ap, msgid);
-  here = locate_error (msgid, ap);
+  va_start (ap, gmsgid);
+  here = locate_error (gmsgid, ap);
   va_end (ap);
 
-  va_start (ap, msgid);
-  diagnostic_set_info (&diagnostic, msgid, &ap,
+  va_start (ap, gmsgid);
+  diagnostic_set_info (&diagnostic, gmsgid, &ap,
                        input_location, DK_ERROR);
   cp_diagnostic_starter (global_dc, &diagnostic);
-  diagnostic_set_info (&diagnostic, msgid, &ap,
+  diagnostic_set_info (&diagnostic, gmsgid, &ap,
                        location_of (here), DK_ERROR);
   report_diagnostic (&diagnostic);
   va_end (ap);
 }
 
 void
-cp_warning_at (const char *msgid, ...)
+cp_warning_at (const char *gmsgid, ...)
 {
   tree here;
   diagnostic_info diagnostic;
   va_list ap;
 
-  va_start (ap, msgid);
-  here = locate_error (msgid, ap);
+  va_start (ap, gmsgid);
+  here = locate_error (gmsgid, ap);
   va_end (ap);
 
-  va_start (ap, msgid);
-  diagnostic_set_info (&diagnostic, msgid, &ap,
+  va_start (ap, gmsgid);
+  diagnostic_set_info (&diagnostic, gmsgid, &ap,
                        location_of (here), DK_WARNING);
   report_diagnostic (&diagnostic);
   va_end (ap);
 }
 
 void
-cp_pedwarn_at (const char *msgid, ...)
+cp_pedwarn_at (const char *gmsgid, ...)
 {
   tree here;
   diagnostic_info diagnostic;
   va_list ap;
 
-  va_start (ap, msgid);
-  here = locate_error (msgid, ap);
+  va_start (ap, gmsgid);
+  here = locate_error (gmsgid, ap);
   va_end (ap);
 
-  va_start (ap, msgid);
-  diagnostic_set_info (&diagnostic, msgid, &ap,
+  va_start (ap, gmsgid);
+  diagnostic_set_info (&diagnostic, gmsgid, &ap,
                        location_of (here), pedantic_error_kind());
   report_diagnostic (&diagnostic);
   va_end (ap);

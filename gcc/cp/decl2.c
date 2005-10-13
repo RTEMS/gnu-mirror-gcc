@@ -71,10 +71,8 @@ static void finish_objects (int, int, tree);
 static tree start_static_storage_duration_function (unsigned);
 static void finish_static_storage_duration_function (tree);
 static priority_info get_priority_info (int);
-static void do_static_initialization (tree, tree);
-static void do_static_destruction (tree);
-static tree start_static_initialization_or_destruction (tree, int);
-static void finish_static_initialization_or_destruction (tree);
+static void do_static_initialization_or_destruction (tree, bool);
+static void one_static_initialization_or_destruction (tree, tree, bool);
 static void generate_ctor_or_dtor_function (bool, int, location_t *);
 static int generate_ctor_and_dtor_functions_for_priority (splay_tree_node,
                                                           void *);
@@ -717,7 +715,7 @@ check_classfn (tree ctype, tree function, tree template_parms)
      case we'll only confuse ourselves when the function is declared
      properly within the class.  */
   if (COMPLETE_TYPE_P (ctype))
-    add_method (ctype, function);
+    add_method (ctype, function, NULL_TREE);
   return NULL_TREE;
 }
 
@@ -906,9 +904,17 @@ grokfield (const cp_declarator *declarator,
 	{
 	  /* Initializers for functions are rejected early in the parser.
 	     If we get here, it must be a pure specifier for a method.  */
-	  gcc_assert (TREE_CODE (TREE_TYPE (value)) == METHOD_TYPE);
-	  gcc_assert (error_operand_p (init) || integer_zerop (init));
-	  DECL_PURE_VIRTUAL_P (value) = 1;
+	  if (TREE_CODE (TREE_TYPE (value)) == METHOD_TYPE)
+	    {
+	      gcc_assert (error_operand_p (init) || integer_zerop (init));
+	      DECL_PURE_VIRTUAL_P (value) = 1;
+	    }
+	  else
+	    {
+	      gcc_assert (TREE_CODE (TREE_TYPE (value)) == FUNCTION_TYPE);
+	      error ("initializer specified for static member function %qD",
+		     value);
+	    }
 	}
       else if (pedantic && TREE_CODE (value) != VAR_DECL)
 	/* Already complained in grokdeclarator.  */
@@ -1072,7 +1078,7 @@ cplus_decl_attributes (tree *decl, tree attributes, int flags)
 }
 
 /* Walks through the namespace- or function-scope anonymous union
-   OBJECT, with the indicated TYPE, building appropriate ALIAS_DECLs.
+   OBJECT, with the indicated TYPE, building appropriate VAR_DECLs.
    Returns one of the fields for use in the mangled name.  */
 
 static tree
@@ -1117,11 +1123,17 @@ build_anon_union_vars (tree type, tree object)
 
       if (DECL_NAME (field))
 	{
-	  decl = build_decl (ALIAS_DECL, DECL_NAME (field), TREE_TYPE (field));
-	  DECL_INITIAL (decl) = ref;	    
-	  TREE_PUBLIC (decl) = 0;
-	  TREE_STATIC (decl) = 0;
-	  DECL_EXTERNAL (decl) = 1;
+	  tree base;
+
+	  decl = build_decl (VAR_DECL, DECL_NAME (field), TREE_TYPE (field));
+
+	  base = get_base_address (object);
+	  TREE_PUBLIC (decl) = TREE_PUBLIC (base);
+	  TREE_STATIC (decl) = TREE_STATIC (base);
+	  DECL_EXTERNAL (decl) = DECL_EXTERNAL (base);
+
+	  DECL_VALUE_EXPR (decl) = ref;
+
 	  decl = pushdecl (decl);
 	}
       else if (ANON_AGGR_TYPE_P (TREE_TYPE (field)))
@@ -1780,29 +1792,43 @@ import_export_decl (tree decl)
       else if (CLASSTYPE_INTERFACE_KNOWN (type)
 	       && CLASSTYPE_INTERFACE_ONLY (type))
 	import_p = true;
-      else if (TARGET_WEAK_NOT_IN_ARCHIVE_TOC
+      else if ((!flag_weak || TARGET_WEAK_NOT_IN_ARCHIVE_TOC)
 	       && !CLASSTYPE_USE_TEMPLATE (type)
 	       && CLASSTYPE_KEY_METHOD (type)
 	       && !DECL_DECLARED_INLINE_P (CLASSTYPE_KEY_METHOD (type)))
 	/* The ABI requires that all virtual tables be emitted with
 	   COMDAT linkage.  However, on systems where COMDAT symbols
 	   don't show up in the table of contents for a static
-	   archive, the linker will report errors about undefined
-	   symbols because it will not see the virtual table
-	   definition.  Therefore, in the case that we know that the
-	   virtual table will be emitted in only one translation
-	   unit, we make the virtual table an ordinary definition
-	   with external linkage.  */
+	   archive, or on systems without weak symbols (where we
+	   approximate COMDAT linkage by using internal linkage), the
+	   linker will report errors about undefined symbols because
+	   it will not see the virtual table definition.  Therefore,
+	   in the case that we know that the virtual table will be
+	   emitted in only one translation unit, we make the virtual
+	   table an ordinary definition with external linkage.  */
 	DECL_EXTERNAL (decl) = 0;
       else if (CLASSTYPE_INTERFACE_KNOWN (type))
 	{
 	  /* TYPE is being exported from this translation unit, so DECL
-	     should be defined here.  The ABI requires COMDAT
-	     linkage.  Normally, we only emit COMDAT things when they
-	     are needed; make sure that we realize that this entity is
-	     indeed needed.  */
-	  comdat_p = true;
-	  mark_needed (decl);
+	     should be defined here.  */ 
+	  if (!flag_weak && CLASSTYPE_EXPLICIT_INSTANTIATION (type))
+	    /* If a class is declared in a header with the "extern
+	       template" extension, then it will not be instantiated,
+	       even in translation units that would normally require
+	       it.  Often such classes are explicitly instantiated in
+	       one translation unit.  Therefore, the explicit
+	       instantiation must be made visible to other translation
+	       units.  */
+	    DECL_EXTERNAL (decl) = 0;
+	  else
+	    {
+	      /* The ABI requires COMDAT linkage.  Normally, we only
+		 emit COMDAT things when they are needed; make sure
+		 that we realize that this entity is indeed
+		 needed.  */
+	      comdat_p = true;
+	      mark_needed (decl);
+	    }
 	}
       else if (!flag_implicit_templates
 	       && CLASSTYPE_IMPLICIT_INSTANTIATION (type))
@@ -1830,7 +1856,14 @@ import_export_decl (tree decl)
 	      comdat_p = true;
 	      if (CLASSTYPE_INTERFACE_KNOWN (type)
 		  && !CLASSTYPE_INTERFACE_ONLY (type))
-		mark_needed (decl);
+		{
+		  mark_needed (decl);
+		  if (!flag_weak)
+		    {
+		      comdat_p = false;
+		      DECL_EXTERNAL (decl) = 0;
+		    }
+		}
 	    }
 	}
       else
@@ -2283,32 +2316,34 @@ get_priority_info (int priority)
   return pi;
 }
 
+/* The effective initialization priority of a DECL.  */
+
+#define DECL_EFFECTIVE_INIT_PRIORITY(decl)                      \
+      (DECL_INIT_PRIORITY (decl) == 0 				\
+       ? DEFAULT_INIT_PRIORITY : DECL_INIT_PRIORITY (decl))
+
+/* Wether a DECL needs a guard to protect it against multiple
+   initialization.  */
+
+#define NEEDS_GUARD_P(decl) (TREE_PUBLIC (decl) && (DECL_COMMON (decl)      \
+                                                    || DECL_ONE_ONLY (decl) \
+                                                    || DECL_WEAK (decl)))
+
 /* Set up to handle the initialization or destruction of DECL.  If
    INITP is nonzero, we are initializing the variable.  Otherwise, we
    are destroying it.  */
 
-static tree
-start_static_initialization_or_destruction (tree decl, int initp)
+static void
+one_static_initialization_or_destruction (tree decl, tree init, bool initp)
 {
   tree guard_if_stmt = NULL_TREE;
-  int priority;
-  tree cond;
   tree guard;
-  tree init_cond;
-  priority_info pi;
 
-  /* Figure out the priority for this declaration.  */
-  priority = DECL_INIT_PRIORITY (decl);
-  if (!priority)
-    priority = DEFAULT_INIT_PRIORITY;
-
-  /* Remember that we had an initialization or finalization at this
-     priority.  */
-  pi = get_priority_info (priority);
-  if (initp)
-    pi->initializations_p = 1;
-  else
-    pi->destructions_p = 1;
+  /* If we are supposed to destruct and there's a trivial destructor,
+     nothing has to be done.  */
+  if (!initp
+      && TYPE_HAS_TRIVIAL_DESTRUCTOR (TREE_TYPE (decl)))
+    return;
 
   /* Trick the compiler into thinking we are at the file and line
      where DECL was declared so that error-messages make sense, and so
@@ -2334,27 +2369,13 @@ start_static_initialization_or_destruction (tree decl, int initp)
       DECL_STATIC_FUNCTION_P (current_function_decl) = 1;
     }
   
-  /* Conditionalize this initialization on being in the right priority
-     and being initializing/finalizing appropriately.  */
-  guard_if_stmt = begin_if_stmt ();
-  cond = cp_build_binary_op (EQ_EXPR,
-			     priority_decl,
-			     build_int_cst (NULL_TREE, priority));
-  init_cond = initp ? integer_one_node : integer_zero_node;
-  init_cond = cp_build_binary_op (EQ_EXPR,
-				  initialize_p_decl,
-				  init_cond);
-  cond = cp_build_binary_op (TRUTH_ANDIF_EXPR, cond, init_cond);
-
   /* Assume we don't need a guard.  */
   guard = NULL_TREE;
   /* We need a guard if this is an object with external linkage that
      might be initialized in more than one place.  (For example, a
      static data member of a template, when the data member requires
      construction.)  */
-  if (TREE_PUBLIC (decl) && (DECL_COMMON (decl) 
-			     || DECL_ONE_ONLY (decl)
-			     || DECL_WEAK (decl)))
+  if (NEEDS_GUARD_P (decl))
     {
       tree guard_cond;
 
@@ -2391,28 +2412,36 @@ start_static_initialization_or_destruction (tree decl, int initp)
 						/*noconvert=*/1),
 				integer_zero_node);
 
-      cond = cp_build_binary_op (TRUTH_ANDIF_EXPR, cond, guard_cond);
+      guard_if_stmt = begin_if_stmt ();
+      finish_if_stmt_cond (guard_cond, guard_if_stmt);
     }
 
-  finish_if_stmt_cond (cond, guard_if_stmt);
 
   /* If we're using __cxa_atexit, we have not already set the GUARD,
      so we must do so now.  */
   if (guard && initp && flag_use_cxa_atexit)
     finish_expr_stmt (set_guard (guard));
 
-  return guard_if_stmt;
-}
+  /* Perform the initialization or destruction.  */
+  if (initp)
+    {
+      if (init)
+        finish_expr_stmt (init);
 
-/* We've just finished generating code to do an initialization or
-   finalization.  GUARD_IF_STMT is the if-statement we used to guard
-   the initialization.  */
+      /* If we're using __cxa_atexit, register a function that calls the
+         destructor for the object.  */
+      if (flag_use_cxa_atexit)
+        finish_expr_stmt (register_dtor_fn (decl));
+    }
+  else
+    finish_expr_stmt (build_cleanup (decl));
 
-static void
-finish_static_initialization_or_destruction (tree guard_if_stmt)
-{
-  finish_then_clause (guard_if_stmt);
-  finish_if_stmt (guard_if_stmt);
+  /* Finish the guard if-stmt, if necessary.  */
+  if (guard)
+    {
+      finish_then_clause (guard_if_stmt);
+      finish_if_stmt (guard_if_stmt);
+    }
 
   /* Now that we're done with DECL we don't need to pretend to be a
      member of its class any longer.  */
@@ -2420,55 +2449,72 @@ finish_static_initialization_or_destruction (tree guard_if_stmt)
   DECL_STATIC_FUNCTION_P (current_function_decl) = 0;
 }
 
-/* Generate code to do the initialization of DECL, a VAR_DECL with
-   static storage duration.  The initialization is INIT.  */
+/* Generate code to do the initialization or destruction of the decls in VARS,
+   a TREE_LIST of VAR_DECL with static storage duration.
+   Whether initialization or destruction is performed is specified by INITP.  */
 
 static void
-do_static_initialization (tree decl, tree init)
+do_static_initialization_or_destruction (tree vars, bool initp)
 {
-  tree guard_if_stmt;
+  tree node, init_if_stmt, cond;
 
-  /* Set up for the initialization.  */
-  guard_if_stmt
-    = start_static_initialization_or_destruction (decl,
-						  /*initp=*/1);
+  /* Build the outer if-stmt to check for initialization or destruction.  */
+  init_if_stmt = begin_if_stmt ();
+  cond = initp ? integer_one_node : integer_zero_node;
+  cond = cp_build_binary_op (EQ_EXPR,
+				  initialize_p_decl,
+				  cond);
+  finish_if_stmt_cond (cond, init_if_stmt);
 
-  /* Perform the initialization.  */
-  if (init)
-    finish_expr_stmt (init);
+  node = vars;
+  do {
+    tree decl = TREE_VALUE (node);
+    tree priority_if_stmt;
+    int priority;
+    priority_info pi;
 
-  /* If we're using __cxa_atexit, register a function that calls the
-     destructor for the object.  */
-  if (flag_use_cxa_atexit)
-    finish_expr_stmt (register_dtor_fn (decl));
+    /* If we don't need a destructor, there's nothing to do.  Avoid
+       creating a possibly empty if-stmt.  */
+    if (!initp && TYPE_HAS_TRIVIAL_DESTRUCTOR (TREE_TYPE (decl)))
+      {
+	node = TREE_CHAIN (node);
+	continue;
+      }
 
-  /* Finish up.  */
-  finish_static_initialization_or_destruction (guard_if_stmt);
-}
+    /* Remember that we had an initialization or finalization at this
+       priority.  */
+    priority = DECL_EFFECTIVE_INIT_PRIORITY (decl);
+    pi = get_priority_info (priority);
+    if (initp)
+      pi->initializations_p = 1;
+    else
+      pi->destructions_p = 1;
 
-/* Generate code to do the static destruction of DECL.  If DECL may be
-   initialized more than once in different object files, GUARD is the
-   guard variable to check.  PRIORITY is the priority for the
-   destruction.  */
+    /* Conditionalize this initialization on being in the right priority
+       and being initializing/finalizing appropriately.  */
+    priority_if_stmt = begin_if_stmt ();
+    cond = cp_build_binary_op (EQ_EXPR,
+			       priority_decl,
+			       build_int_cst (NULL_TREE, priority));
+    finish_if_stmt_cond (cond, priority_if_stmt);
 
-static void
-do_static_destruction (tree decl)
-{
-  tree guard_if_stmt;
+    /* Process initializers with same priority.  */
+    for (; node
+	   && DECL_EFFECTIVE_INIT_PRIORITY (TREE_VALUE (node)) == priority;
+	 node = TREE_CHAIN (node))
+      /* Do one initialization or destruction.  */
+      one_static_initialization_or_destruction (TREE_VALUE (node),
+				 		TREE_PURPOSE (node), initp);
 
-  /* If we're using __cxa_atexit, then destructors are registered
-     immediately after objects are initialized.  */
-  gcc_assert (!flag_use_cxa_atexit);
+    /* Finish up the priority if-stmt body.  */
+    finish_then_clause (priority_if_stmt);
+    finish_if_stmt (priority_if_stmt);
 
-  /* If we don't need a destructor, there's nothing to do.  */
-  if (TYPE_HAS_TRIVIAL_DESTRUCTOR (TREE_TYPE (decl)))
-    return;
+  } while (node);
 
-  /* Actually do the destruction.  */
-  guard_if_stmt = start_static_initialization_or_destruction (decl,
-							      /*initp=*/0);
-  finish_expr_stmt (build_cleanup (decl));
-  finish_static_initialization_or_destruction (guard_if_stmt);
+  /* Finish up the init/destruct if-stmt body.  */
+  finish_then_clause (init_if_stmt);
+  finish_if_stmt (init_if_stmt);
 }
 
 /* VARS is a list of variables with static storage duration which may
@@ -2814,8 +2860,6 @@ cp_finish_file (void)
 
       if (vars)
 	{
-	  tree v;
-
 	  /* We need to start a new initialization function each time
 	     through the loop.  That's because we need to know which
 	     vtables have been referenced, and TREE_SYMBOL_REFERENCED
@@ -2834,9 +2878,8 @@ cp_finish_file (void)
 	  write_out_vars (vars);
 
 	  /* First generate code to do all the initializations.  */
-	  for (v = vars; v; v = TREE_CHAIN (v))
-	    do_static_initialization (TREE_VALUE (v),
-				      TREE_PURPOSE (v));
+	  if (vars)
+	    do_static_initialization_or_destruction (vars, /*initp=*/true);
 
 	  /* Then, generate code to do all the destructions.  Do these
 	     in reverse order so that the most recently constructed
@@ -2844,11 +2887,10 @@ cp_finish_file (void)
 	     __cxa_atexit, then we don't need to do this; functions
 	     were registered at initialization time to destroy the
 	     local statics.  */
-	  if (!flag_use_cxa_atexit)
+	  if (!flag_use_cxa_atexit && vars)
 	    {
 	      vars = nreverse (vars);
-	      for (v = vars; v; v = TREE_CHAIN (v))
-		do_static_destruction (TREE_VALUE (v));
+	      do_static_initialization_or_destruction (vars, /*initp=*/false);
 	    }
 	  else
 	    vars = NULL_TREE;
@@ -2887,6 +2929,10 @@ cp_finish_file (void)
 		 finish_function doesn't clean things up, and we end
 		 up with CURRENT_FUNCTION_DECL set.  */
 	      push_to_top_level ();
+	      /* The decl's location will mark where it was first
+	         needed.  Save that so synthesize method can indicate
+	         where it was needed from, in case of error  */
+	      input_location = DECL_SOURCE_LOCATION (decl);
 	      synthesize_method (decl);
 	      pop_from_top_level ();
 	      reconsider = true;
@@ -3035,8 +3081,12 @@ cp_finish_file (void)
      etc., and emit debugging information.  */
   walk_namespaces (wrapup_globals_for_namespace, /*data=*/&reconsider);
   if (pending_statics)
-    check_global_declarations (&VARRAY_TREE (pending_statics, 0),
-			       pending_statics_used);
+    {
+      check_global_declarations (&VARRAY_TREE (pending_statics, 0),
+			         pending_statics_used);
+      emit_debug_global_declarations (&VARRAY_TREE (pending_statics, 0),
+				      pending_statics_used);
+    }
 
   finish_repo ();
 
@@ -3144,12 +3194,38 @@ check_default_args (tree x)
     }
 }
 
+/* Mark DECL as "used" in the program.  If DECL is a specialization or
+   implicitly declared class member, generate the actual definition.  */
+
 void
 mark_used (tree decl)
 {
+  HOST_WIDE_INT saved_processing_template_decl = 0;
+
   TREE_USED (decl) = 1;
-  if (processing_template_decl || skip_evaluation)
+  /* If we don't need a value, then we don't need to synthesize DECL.  */ 
+  if (skip_evaluation)
     return;
+  /* Normally, we can wait until instantiation-time to synthesize
+     DECL.  However, if DECL is a static data member initialized with
+     a constant, we need the value right now because a reference to
+     such a data member is not value-dependent.  */
+  if (processing_template_decl)
+    {
+      if (TREE_CODE (decl) == VAR_DECL
+	  && DECL_INITIALIZED_BY_CONSTANT_EXPRESSION_P (decl)
+	  && DECL_CLASS_SCOPE_P (decl)
+	  && !dependent_type_p (DECL_CONTEXT (decl)))
+	{
+	  /* Pretend that we are not in a template so that the
+	     initializer for the static data member will be full
+	     simplified.  */
+	  saved_processing_template_decl = processing_template_decl;
+	  processing_template_decl = 0;
+	}
+      else
+	return;  
+    }
 
   if (TREE_CODE (decl) == FUNCTION_DECL && DECL_DECLARED_INLINE_P (decl)
       && !TREE_ASM_WRITTEN (decl))
@@ -3157,6 +3233,14 @@ mark_used (tree decl)
     {
       if (DECL_DEFERRED_FN (decl))
 	return;
+      
+      /* Remember the current location for a function we will end up
+         synthesizing.  Then we can inform the user where it was
+         required in the case of error.  */
+      if (DECL_ARTIFICIAL (decl) && DECL_NONSTATIC_MEMBER_FUNCTION_P (decl)
+	  && !DECL_THUNK_P (decl))
+	DECL_SOURCE_LOCATION (decl) = input_location;
+      
       note_vague_linkage_fn (decl);
     }
   
@@ -3174,14 +3258,6 @@ mark_used (tree decl)
 	 pointing to the class location.  */
       && current_function_decl)
     {
-      /* Put the function definition at the position where it is needed,
-	 rather than within the body of the class.  That way, an error
-	 during the generation of the implicit body points at the place
-	 where the attempt to generate the function occurs, giving the
-	 user a hint as to why we are attempting to generate the
-	 function.  */
-      DECL_SOURCE_LOCATION (decl) = input_location;
-
       synthesize_method (decl);
       /* If we've already synthesized the method we don't need to
 	 instantiate it, so we can return right away.  */
@@ -3197,12 +3273,19 @@ mark_used (tree decl)
       && (!DECL_EXPLICIT_INSTANTIATION (decl)
 	  || (TREE_CODE (decl) == FUNCTION_DECL 
 	      && DECL_INLINE (DECL_TEMPLATE_RESULT 
-			      (template_for_substitution (decl))))))
+			      (template_for_substitution (decl))))
+	  /* We need to instantiate static data members so that there
+	     initializers are available in integral constant
+	     expressions.  */
+	  || (TREE_CODE (decl) == VAR_DECL
+	      && DECL_INITIALIZED_BY_CONSTANT_EXPRESSION_P (decl))))
     /* We put off instantiating functions in order to improve compile
        times.  Maintaining a stack of active functions is expensive,
        and the inliner knows to instantiate any functions it might
        need.  */
     instantiate_decl (decl, /*defer_ok=*/true, /*undefined_ok=*/0);
+
+  processing_template_decl = saved_processing_template_decl;
 }
 
 #include "gt-cp-decl2.h"

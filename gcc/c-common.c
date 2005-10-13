@@ -284,6 +284,12 @@ int warn_unknown_pragmas; /* Tri state variable.  */
 
 int warn_format;
 
+/* Warn about using __null (as NULL in C++) as sentinel.  For code compiled
+   with GCC this doesn't matter as __null is guaranteed to have the right
+   size.  */
+
+int warn_strict_null_sentinel;
+
 /* Zero means that faster, ...NonNil variants of objc_msgSend...
    calls will be used in ObjC; passing nil receivers to such calls
    will most likely result in crashes.  */
@@ -2319,33 +2325,33 @@ pointer_int_sum (enum tree_code resultcode, tree ptrop, tree intop)
 tree
 c_common_truthvalue_conversion (tree expr)
 {
-  if (TREE_CODE (expr) == ERROR_MARK)
-    return expr;
-
-  if (TREE_CODE (expr) == FUNCTION_DECL)
-    expr = build_unary_op (ADDR_EXPR, expr, 0);
-
   switch (TREE_CODE (expr))
     {
     case EQ_EXPR:   case NE_EXPR:   case UNEQ_EXPR: case LTGT_EXPR:
     case LE_EXPR:   case GE_EXPR:   case LT_EXPR:   case GT_EXPR:
     case UNLE_EXPR: case UNGE_EXPR: case UNLT_EXPR: case UNGT_EXPR:
     case ORDERED_EXPR: case UNORDERED_EXPR:
+      if (TREE_TYPE (expr) == truthvalue_type_node)
+	return expr;
+      return build2 (TREE_CODE (expr), truthvalue_type_node,
+		     TREE_OPERAND (expr, 0), TREE_OPERAND (expr, 1));
+
     case TRUTH_ANDIF_EXPR:
     case TRUTH_ORIF_EXPR:
     case TRUTH_AND_EXPR:
     case TRUTH_OR_EXPR:
     case TRUTH_XOR_EXPR:
-      if (TREE_TYPE (expr) != truthvalue_type_node)
-	return build2 (TREE_CODE (expr), truthvalue_type_node,
-		       TREE_OPERAND (expr, 0), TREE_OPERAND (expr, 1));
-      return expr;
+      if (TREE_TYPE (expr) == truthvalue_type_node)
+	return expr;
+      return build2 (TREE_CODE (expr), truthvalue_type_node,
+		 lang_hooks.truthvalue_conversion (TREE_OPERAND (expr, 0)),
+		 lang_hooks.truthvalue_conversion (TREE_OPERAND (expr, 1)));
 
     case TRUTH_NOT_EXPR:
-      if (TREE_TYPE (expr) != truthvalue_type_node)
-	return build1 (TREE_CODE (expr), truthvalue_type_node,
-		       TREE_OPERAND (expr, 0));
-      return expr;
+      if (TREE_TYPE (expr) == truthvalue_type_node)
+	return expr;
+      return build1 (TREE_CODE (expr), truthvalue_type_node,
+		 lang_hooks.truthvalue_conversion (TREE_OPERAND (expr, 0)));
 
     case ERROR_MARK:
       return expr;
@@ -2360,6 +2366,10 @@ c_common_truthvalue_conversion (tree expr)
       return real_compare (NE_EXPR, &TREE_REAL_CST (expr), &dconst0)
 	     ? truthvalue_true_node
 	     : truthvalue_false_node;
+
+    case FUNCTION_DECL:
+      expr = build_unary_op (ADDR_EXPR, expr, 0);
+      /* Fall through.  */
 
     case ADDR_EXPR:
       {
@@ -2932,7 +2942,7 @@ c_common_nodes_and_builtins (void)
 
   typedef enum builtin_type builtin_type;
 
-  tree builtin_types[(int) BT_LAST];
+  tree builtin_types[(int) BT_LAST + 1];
   int wchar_type_size;
   tree array_domain_type;
   tree va_list_ref_type_node;
@@ -3220,6 +3230,7 @@ c_common_nodes_and_builtins (void)
 #undef DEF_FUNCTION_TYPE_VAR_2
 #undef DEF_FUNCTION_TYPE_VAR_3
 #undef DEF_POINTER_TYPE
+  builtin_types[(int) BT_LAST] = NULL_TREE;
 
   c_init_attributes ();
 
@@ -3265,6 +3276,11 @@ c_common_nodes_and_builtins (void)
     mudflap_init ();
 
   main_identifier_node = get_identifier ("main");
+
+  /* Create the built-in __null node.  It is important that this is
+     not shared.  */
+  null_node = make_node (INTEGER_CST);
+  TREE_TYPE (null_node) = c_common_type_for_size (POINTER_SIZE, 0);
 }
 
 /* Look up the function in built_in_decls that corresponds to DECL
@@ -3741,7 +3757,32 @@ c_do_switch_warnings (splay_tree cases, tree switch_stmt)
 	{
 	  splay_tree_node node
 	    = splay_tree_lookup (cases, (splay_tree_key) TREE_VALUE (chain));
-
+	  if (!node)
+	    {
+	      tree low_value = TREE_VALUE (chain);
+	      splay_tree_node low_bound;
+	      splay_tree_node high_bound;
+	      /* Even though there wasn't an exact match, there might be a
+		 case range which includes the enumator's value.  */
+	      low_bound = splay_tree_predecessor (cases,
+						  (splay_tree_key) low_value);
+	      high_bound = splay_tree_successor (cases,
+						 (splay_tree_key) low_value);
+	      
+	      /* It is smaller than the LOW_VALUE, so there is no need to check
+	         unless the LOW_BOUND is in fact itself a case range.  */
+	      if (low_bound
+		  && CASE_HIGH ((tree) low_bound->value)
+		  && tree_int_cst_compare (CASE_HIGH ((tree) low_bound->value),
+					    low_value) >= 0)
+		node = low_bound;
+	      /* The low end of that range is bigger than the current value. */
+	      else if (high_bound
+		       && (tree_int_cst_compare ((tree) high_bound->key,
+						 low_value)
+			   <= 0))
+		node = high_bound;
+	    }
 	  if (node)
 	    {
 	      /* Mark the CASE_LOW part of the case entry as seen, so
@@ -5069,14 +5110,21 @@ check_function_nonnull (tree attrs, tree params)
    from the end) is a (pointer)0.  */
 
 static void
-check_function_sentinel (tree attrs, tree params)
+check_function_sentinel (tree attrs, tree params, tree typelist)
 {
   tree attr = lookup_attribute ("sentinel", attrs);
 
   if (attr)
     {
-      if (!params)
-	warning ("missing sentinel in function call");
+      /* Skip over the named arguments.  */
+      while (typelist && params)
+      {
+	typelist = TREE_CHAIN (typelist);
+	params = TREE_CHAIN (params);
+      }
+      
+      if (typelist || !params)
+	warning ("not enough variable arguments to fit a sentinel");
       else
         {
 	  tree sentinel, end;
@@ -5099,7 +5147,7 @@ check_function_sentinel (tree attrs, tree params)
 	    }
 	  if (pos > 0)
 	    {
-	      warning ("not enough arguments to fit a sentinel");
+	      warning ("not enough variable arguments to fit a sentinel");
 	      return;
 	    }
 
@@ -5111,8 +5159,15 @@ check_function_sentinel (tree attrs, tree params)
 	    }
 
 	  /* Validate the sentinel.  */
-	  if (!POINTER_TYPE_P (TREE_TYPE (TREE_VALUE (sentinel)))
-	      || !integer_zerop (TREE_VALUE (sentinel)))
+	  if ((!POINTER_TYPE_P (TREE_TYPE (TREE_VALUE (sentinel)))
+	       || !integer_zerop (TREE_VALUE (sentinel)))
+	      /* Although __null (in C++) is only an integer we allow it
+		 nevertheless, as we are guaranteed that it's exactly
+		 as wide as a pointer, and we don't want to force
+		 users to cast the NULL they have written there.
+		 We warn with -Wstrict-null-sentinel, though.  */
+              && (warn_strict_null_sentinel
+		  || null_node != TREE_VALUE (sentinel)))
 	    warning ("missing sentinel in function call");
 	}
     }
@@ -5313,7 +5368,7 @@ handle_sentinel_attribute (tree *node, tree name, tree args,
 
 /* Check for valid arguments being passed to a function.  */
 void
-check_function_arguments (tree attrs, tree params)
+check_function_arguments (tree attrs, tree params, tree typelist)
 {
   /* Check for null being passed in a pointer argument that must be
      non-null.  We also need to do this if format checking is enabled.  */
@@ -5326,7 +5381,7 @@ check_function_arguments (tree attrs, tree params)
   if (warn_format)
     {
       check_function_format (attrs, params);
-      check_function_sentinel (attrs, params);
+      check_function_sentinel (attrs, params, typelist);
     }
 }
 
@@ -5497,51 +5552,51 @@ catenate_strings (const char *lhs, const char *rhs_start, int rhs_size)
   return result;
 }
 
-/* Issue the error given by MSGID, indicating that it occurred before
+/* Issue the error given by GMSGID, indicating that it occurred before
    TOKEN, which had the associated VALUE.  */
 
 void
-c_parse_error (const char *msgid, enum cpp_ttype token, tree value)
+c_parse_error (const char *gmsgid, enum cpp_ttype token, tree value)
 {
 #define catenate_messages(M1, M2) catenate_strings ((M1), (M2), sizeof (M2))
 
   char *message = NULL;
 
   if (token == CPP_EOF)
-    message = catenate_messages (msgid, " at end of input");
+    message = catenate_messages (gmsgid, " at end of input");
   else if (token == CPP_CHAR || token == CPP_WCHAR)
     {
       unsigned int val = TREE_INT_CST_LOW (value);
       const char *const ell = (token == CPP_CHAR) ? "" : "L";
       if (val <= UCHAR_MAX && ISGRAPH (val))
-        message = catenate_messages (msgid, " before %s'%c'");
+        message = catenate_messages (gmsgid, " before %s'%c'");
       else
-        message = catenate_messages (msgid, " before %s'\\x%x'");
+        message = catenate_messages (gmsgid, " before %s'\\x%x'");
 
       error (message, ell, val);
       free (message);
       message = NULL;
     }
   else if (token == CPP_STRING || token == CPP_WSTRING)
-    message = catenate_messages (msgid, " before string constant");
+    message = catenate_messages (gmsgid, " before string constant");
   else if (token == CPP_NUMBER)
-    message = catenate_messages (msgid, " before numeric constant");
+    message = catenate_messages (gmsgid, " before numeric constant");
   else if (token == CPP_NAME)
     {
-      message = catenate_messages (msgid, " before %qs");
+      message = catenate_messages (gmsgid, " before %qs");
       error (message, IDENTIFIER_POINTER (value));
       free (message);
       message = NULL;
     }
   else if (token < N_TTYPES)
     {
-      message = catenate_messages (msgid, " before %qs token");
+      message = catenate_messages (gmsgid, " before %qs token");
       error (message, cpp_type2name (token));
       free (message);
       message = NULL;
     }
   else
-    error (msgid);
+    error (gmsgid);
 
   if (message)
     {
@@ -5744,6 +5799,110 @@ lvalue_or_else (tree ref, enum lvalue_use use)
     }
 
   return win;
+}
+
+/* *PTYPE is an incomplete array.  Complete it with a domain based on
+   INITIAL_VALUE.  If INITIAL_VALUE is not present, use 1 if DO_DEFAULT
+   is true.  Return 0 if successful, 1 if INITIAL_VALUE can't be deciphered,
+   2 if INITIAL_VALUE was NULL, and 3 if INITIAL_VALUE was empty.  */
+
+int
+complete_array_type (tree *ptype, tree initial_value, bool do_default)
+{
+  tree maxindex, type, main_type, elt, unqual_elt;
+  int failure = 0, quals;
+
+  maxindex = size_zero_node;
+  if (initial_value)
+    {
+      if (TREE_CODE (initial_value) == STRING_CST)
+	{
+	  int eltsize
+	    = int_size_in_bytes (TREE_TYPE (TREE_TYPE (initial_value)));
+	  maxindex = size_int (TREE_STRING_LENGTH (initial_value)/eltsize - 1);
+	}
+      else if (TREE_CODE (initial_value) == CONSTRUCTOR)
+	{
+	  tree elts = CONSTRUCTOR_ELTS (initial_value);
+
+	  if (elts == NULL)
+	    {
+	      if (pedantic)
+		failure = 3;
+	      maxindex = integer_minus_one_node;
+	    }
+	  else
+	    {
+	      tree curindex;
+
+	      if (TREE_PURPOSE (elts))
+		maxindex = fold_convert (sizetype, TREE_PURPOSE (elts));
+	      curindex = maxindex;
+
+	      for (elts = TREE_CHAIN (elts); elts; elts = TREE_CHAIN (elts))
+		{
+		  if (TREE_PURPOSE (elts))
+		    curindex = fold_convert (sizetype, TREE_PURPOSE (elts));
+		  else
+		    curindex = size_binop (PLUS_EXPR, curindex, size_one_node);
+
+		  if (tree_int_cst_lt (maxindex, curindex))
+		    maxindex = curindex;
+		}
+	    }
+	}
+      else
+	{
+	  /* Make an error message unless that happened already.  */
+	  if (initial_value != error_mark_node)
+	    failure = 1;
+	}
+    }
+  else
+    {
+      failure = 2;
+      if (!do_default)
+	return failure;
+    }
+
+  type = *ptype;
+  elt = TREE_TYPE (type);
+  quals = TYPE_QUALS (strip_array_types (elt));
+  if (quals == 0)
+    unqual_elt = elt;
+  else
+    unqual_elt = c_build_qualified_type (elt, TYPE_UNQUALIFIED);
+
+  /* Using build_distinct_type_copy and modifying things afterward instead
+     of using build_array_type to create a new type preserves all of the
+     TYPE_LANG_FLAG_? bits that the front end may have set.  */
+  main_type = build_distinct_type_copy (TYPE_MAIN_VARIANT (type));
+  TREE_TYPE (main_type) = unqual_elt;
+  TYPE_DOMAIN (main_type) = build_index_type (maxindex);
+  layout_type (main_type);
+
+  if (quals == 0)
+    type = main_type;
+  else
+    type = c_build_qualified_type (main_type, quals);
+
+  *ptype = type;
+  return failure;
+}
+
+/* Ignoring their sign, return true if two scalar types are the same.  */
+bool
+same_scalar_type_ignoring_signedness (tree t1, tree t2)
+{
+  enum tree_code c1 = TREE_CODE (t1), c2 = TREE_CODE (t2);
+
+  gcc_assert ((c1 == INTEGER_TYPE || c1 == REAL_TYPE)
+	      && (c2 == INTEGER_TYPE || c2 == REAL_TYPE));
+
+  /* Equality works here because c_common_signed_type uses
+     TYPE_MAIN_VARIANT.  */
+  return lang_hooks.types.signed_type (t1)
+    == lang_hooks.types.signed_type (t2);
 }
 
 #include "gt-c-common.h"

@@ -383,7 +383,7 @@ static int eliminate_regs_in_insn (rtx, int);
 static void update_eliminable_offsets (void);
 static void mark_not_eliminable (rtx, rtx, void *);
 static void set_initial_elim_offsets (void);
-static void verify_initial_elim_offsets (void);
+static bool verify_initial_elim_offsets (void);
 static void set_initial_label_offsets (void);
 static void set_offsets_for_label (rtx);
 static void init_elim_table (void);
@@ -740,8 +740,20 @@ reload (rtx first, int global)
 		     that is not a legitimate memory operand.  As later
 		     stages of reload assume that all addresses found
 		     in the reg_equiv_* arrays were originally legitimate,
-		     we ignore such REG_EQUIV notes.  */
-		  if (memory_operand (x, VOIDmode))
+
+		     It can also happen that a REG_EQUIV note contains a
+		     readonly memory location.  If the destination pseudo
+		     is set from some other value (typically a different
+		     pseudo), and the destination pseudo does not get a
+		     hard reg, then reload will replace the destination
+		     pseudo with its equivalent memory location.  This
+		     is horribly bad as it creates a store to a readonly
+		     memory location and a runtime segfault.  To avoid
+		     this problem we reject readonly memory locations
+		     for equivalences.  This is overly conservative as
+		     we could find all sets of the destination pseudo
+		     and remove them as they should be redundant.  */
+		  if (memory_operand (x, VOIDmode) && ! MEM_READONLY_P (x))
 		    {
 		      /* Always unshare the equivalence, so we can
 			 substitute into this insn without touching the
@@ -972,6 +984,13 @@ reload (rtx first, int global)
       if (starting_frame_size != get_frame_size ())
 	something_changed = 1;
 
+      /* Even if the frame size remained the same, we might still have
+	 changed elimination offsets, e.g. if find_reloads called 
+	 force_const_mem requiring the back end to allocate a constant
+	 pool base register that needs to be saved on the stack.  */
+      else if (!verify_initial_elim_offsets ())
+	something_changed = 1;
+
       {
 	HARD_REG_SET to_spill;
 	CLEAR_HARD_REG_SET (to_spill);
@@ -1063,8 +1082,7 @@ reload (rtx first, int global)
 
       gcc_assert (old_frame_size == get_frame_size ());
 
-      if (num_eliminable)
-	verify_initial_elim_offsets ();
+      gcc_assert (verify_initial_elim_offsets ());
     }
 
   /* If we were able to eliminate the frame pointer, show that it is no
@@ -3275,23 +3293,32 @@ mark_not_eliminable (rtx dest, rtx x, void *data ATTRIBUTE_UNUSED)
    where something illegal happened during reload_as_needed that could
    cause incorrect code to be generated if we did not check for it.  */
 
-static void
+static bool
 verify_initial_elim_offsets (void)
 {
   HOST_WIDE_INT t;
 
-#ifdef ELIMINABLE_REGS
-  struct elim_table *ep;
+  if (!num_eliminable)
+    return true;
 
-  for (ep = reg_eliminate; ep < &reg_eliminate[NUM_ELIMINABLE_REGS]; ep++)
-    {
-      INITIAL_ELIMINATION_OFFSET (ep->from, ep->to, t);
-      gcc_assert (t == ep->initial_offset);
-    }
+#ifdef ELIMINABLE_REGS
+  {
+   struct elim_table *ep;
+
+   for (ep = reg_eliminate; ep < &reg_eliminate[NUM_ELIMINABLE_REGS]; ep++)
+     {
+       INITIAL_ELIMINATION_OFFSET (ep->from, ep->to, t);
+       if (t != ep->initial_offset)
+	 return false;
+     }
+  }
 #else
   INITIAL_FRAME_POINTER_OFFSET (t);
-  gcc_assert (t == reg_eliminate[0].initial_offset);
+  if (t != reg_eliminate[0].initial_offset)
+    return false;
 #endif
+
+  return true;
 }
 
 /* Reset all offsets on eliminable registers to their initial values.  */
@@ -5411,19 +5438,18 @@ choose_reload_regs (struct insn_chain *chain)
 		    need_mode = mode;
 		  else
 		    need_mode
-		      = smallest_mode_for_size (GET_MODE_SIZE (mode) + byte,
+		      = smallest_mode_for_size (GET_MODE_BITSIZE (mode)
+						+ byte * BITS_PER_UNIT,
 						GET_MODE_CLASS (mode));
 
-		  if (
-#ifdef CANNOT_CHANGE_MODE_CLASS
-		      (!REG_CANNOT_CHANGE_MODE_P (i, GET_MODE (last_reg),
-						  need_mode)
-		       &&
-#endif
-		      (GET_MODE_SIZE (GET_MODE (last_reg))
+		  if ((GET_MODE_SIZE (GET_MODE (last_reg))
 		       >= GET_MODE_SIZE (need_mode))
 #ifdef CANNOT_CHANGE_MODE_CLASS
-		      )
+		      /* Verify that the register in "i" can be obtained
+			 from LAST_REG.  */
+		      && !REG_CANNOT_CHANGE_MODE_P (REGNO (last_reg),
+						    GET_MODE (last_reg),
+						    mode)
 #endif
 		      && reg_reloaded_contents[i] == regno
 		      && TEST_HARD_REG_BIT (reg_reloaded_valid, i)

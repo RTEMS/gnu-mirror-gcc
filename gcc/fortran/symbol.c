@@ -248,7 +248,8 @@ check_conflict (symbol_attribute * attr, const char * name, locus * where)
     *in_common = "COMMON", *result = "RESULT", *in_namelist = "NAMELIST",
     *public = "PUBLIC", *optional = "OPTIONAL", *entry = "ENTRY",
     *function = "FUNCTION", *subroutine = "SUBROUTINE",
-    *dimension = "DIMENSION";
+    *dimension = "DIMENSION", *in_equivalence = "EQUIVALENCE",
+    *use_assoc = "USE ASSOCIATED";
 
   const char *a1, *a2;
 
@@ -308,6 +309,15 @@ check_conflict (symbol_attribute * attr, const char * name, locus * where)
   conf (in_common, allocatable);
   conf (in_common, result);
   conf (dummy, result);
+
+  conf (in_equivalence, use_assoc);
+  conf (in_equivalence, dummy);
+  conf (in_equivalence, target);
+  conf (in_equivalence, pointer);
+  conf (in_equivalence, function);
+  conf (in_equivalence, result);
+  conf (in_equivalence, entry);
+  conf (in_equivalence, allocatable);
 
   conf (in_namelist, pointer);
   conf (in_namelist, allocatable);
@@ -369,6 +379,7 @@ check_conflict (symbol_attribute * attr, const char * name, locus * where)
 	{
 	case PROC_ST_FUNCTION:
 	  conf2 (in_common);
+	  conf2 (dummy);
 	  break;
 
 	case PROC_MODULE:
@@ -419,6 +430,7 @@ check_conflict (symbol_attribute * attr, const char * name, locus * where)
       conf2 (target);
       conf2 (dummy);
       conf2 (in_common);
+      conf2 (save);
       break;
 
     default:
@@ -701,6 +713,21 @@ gfc_add_in_common (symbol_attribute * attr, const char *name, locus * where)
 
   /* Duplicate attribute already checked for.  */
   attr->in_common = 1;
+  if (check_conflict (attr, name, where) == FAILURE)
+    return FAILURE;
+
+  if (attr->flavor == FL_VARIABLE)
+    return SUCCESS;
+
+  return gfc_add_flavor (attr, FL_VARIABLE, name, where);
+}
+
+try
+gfc_add_in_equivalence (symbol_attribute * attr, const char *name, locus * where)
+{
+
+  /* Duplicate attribute already checked for.  */
+  attr->in_equivalence = 1;
   if (check_conflict (attr, name, where) == FAILURE)
     return FAILURE;
 
@@ -2316,6 +2343,25 @@ gfc_traverse_ns (gfc_namespace * ns, void (*func) (gfc_symbol *))
 }
 
 
+/* Return TRUE if the symbol is an automatic variable.  */
+static bool
+gfc_is_var_automatic (gfc_symbol * sym)
+{
+  /* Pointer and allocatable variables are never automatic.  */
+  if (sym->attr.pointer || sym->attr.allocatable)
+    return false;
+  /* Check for arrays with non-constant size.  */
+  if (sym->attr.dimension && sym->as
+      && !gfc_is_compile_time_shape (sym->as))
+    return true;
+  /* Check for non-constant length character vairables.  */
+  if (sym->ts.type == BT_CHARACTER
+      && sym->ts.cl
+      && !gfc_is_constant_expr (sym->ts.cl->length))
+    return true;
+  return false;
+}
+
 /* Given a symbol, mark it as SAVEd if it is allowed.  */
 
 static void
@@ -2329,7 +2375,9 @@ save_symbol (gfc_symbol * sym)
       || sym->attr.dummy
       || sym->attr.flavor != FL_VARIABLE)
     return;
-
+  /* Automatic objects are not saved.  */
+  if (gfc_is_var_automatic (sym))
+    return;
   gfc_add_save (&sym->attr, sym->name, &sym->declared_at);
 }
 

@@ -40,18 +40,11 @@ Boston, MA 02111-1307, USA.  */
 static int
 compare0 (const char *s1, int s1_len, const char *s2)
 {
-  int i;
+  int len;
 
-  if (strncasecmp (s1, s2, s1_len) != 0)
-    return 0;
-
-  /* The rest of s1 needs to be blanks for equality.  */
-
-  for (i = strlen (s2); i < s1_len; i++)
-    if (s1[i] != ' ')
-      return 0;
-
-  return 1;
+  /* Strip trailing blanks from the Fortran string.  */
+  len = fstrlen(s1, s1_len);
+  return strncasecmp(s1,s2,len) == 0;
 }
 
 
@@ -111,7 +104,7 @@ cf_strcpy (char *dest, int dest_len, const char *src)
    if no default is provided.  */
 
 int
-find_option (const char *s1, int s1_len, st_option * opts,
+find_option (const char *s1, int s1_len, const st_option * opts,
 	     const char *error_message)
 {
   for (; opts->name; opts++)
