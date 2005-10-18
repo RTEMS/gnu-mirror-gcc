@@ -79,6 +79,8 @@ cp_convert_to_pointer (tree type, tree expr, bool force)
   tree intype = TREE_TYPE (expr);
   enum tree_code form;
   tree rval;
+  if (intype == error_mark_node)
+    return error_mark_node;
 
   if (IS_AGGR_TYPE (intype))
     {
@@ -791,6 +793,13 @@ convert_to_void (tree expr, const char *implicit)
     return error_mark_node;
   if (!TREE_TYPE (expr))
     return expr;
+  if (invalid_nonstatic_memfn_p (expr))
+    return error_mark_node;
+  if (TREE_CODE (expr) == PSEUDO_DTOR_EXPR)
+    {
+      error ("pseudo-destructor is not called");
+      return error_mark_node;
+    }
   if (VOID_TYPE_P (TREE_TYPE (expr)))
     return expr;
   switch (TREE_CODE (expr))
@@ -1022,6 +1031,7 @@ build_expr_type_conversion (int desires, tree expr, bool complain)
 	  return expr;
 	/* else fall through...  */
 
+      case VECTOR_TYPE:
       case BOOLEAN_TYPE:
 	return (desires & WANT_INT) ? expr : NULL_TREE;
       case ENUMERAL_TYPE:
@@ -1041,8 +1051,9 @@ build_expr_type_conversion (int desires, tree expr, bool complain)
 
   /* The code for conversions from class type is currently only used for
      delete expressions.  Other expressions are handled by build_new_op.  */
-
-  if (! TYPE_HAS_CONVERSION (basetype))
+  if (!complete_type_or_else (basetype, expr))
+    return error_mark_node;
+  if (!TYPE_HAS_CONVERSION (basetype))
     return NULL_TREE;
 
   for (conv = lookup_conversions (basetype); conv; conv = TREE_CHAIN (conv))
