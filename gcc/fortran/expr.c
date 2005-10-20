@@ -141,6 +141,12 @@ free_expr0 (gfc_expr * e)
   switch (e->expr_type)
     {
     case EXPR_CONSTANT:
+      if (e->from_H)
+	{
+	  gfc_free (e->value.character.string);
+	  break;
+	}
+
       switch (e->ts.type)
 	{
 	case BT_INTEGER:
@@ -152,6 +158,7 @@ free_expr0 (gfc_expr * e)
 	  break;
 
 	case BT_CHARACTER:
+	case BT_HOLLERITH:
 	  gfc_free (e->value.character.string);
 	  break;
 
@@ -352,7 +359,7 @@ gfc_copy_shape_excluding (mpz_t * shape, int rank, gfc_expr * dim)
 
   n = mpz_get_si (dim->value.integer);
   n--; /* Convert to zero based index */
-  if (n < 0 && n >= rank)
+  if (n < 0 || n >= rank)
     return NULL;
 
   s = new_shape = gfc_get_shape (rank-1);
@@ -393,6 +400,15 @@ gfc_copy_expr (gfc_expr * p)
       break;
 
     case EXPR_CONSTANT:
+      if (p->from_H)
+	{
+	  s = gfc_getmem (p->value.character.length + 1);
+	  q->value.character.string = s;
+
+	  memcpy (s, p->value.character.string,
+		  p->value.character.length + 1);
+	  break;
+	}
       switch (q->ts.type)
 	{
 	case BT_INTEGER:
@@ -414,6 +430,7 @@ gfc_copy_expr (gfc_expr * p)
 	  break;
 
 	case BT_CHARACTER:
+	case BT_HOLLERITH:
 	  s = gfc_getmem (p->value.character.length + 1);
 	  q->value.character.string = s;
 
@@ -1316,7 +1333,7 @@ check_inquiry (gfc_expr * e)
   /* FIXME: This should be moved into the intrinsic definitions,
      to eliminate this ugly hack.  */
   static const char * const inquiry_function[] = {
-    "digits", "epsilon", "huge", "kind", "maxexponent", "minexponent",
+    "digits", "epsilon", "huge", "kind", "len", "maxexponent", "minexponent",
     "precision", "radix", "range", "tiny", "bit_size", "size", "shape",
     "lbound", "ubound", NULL
   };
@@ -1337,10 +1354,9 @@ check_inquiry (gfc_expr * e)
   if (e == NULL || e->expr_type != EXPR_VARIABLE)
     return FAILURE;
 
-  /* At this point we have a numeric inquiry function with a variable
-     argument.  The type of the variable might be undefined, but we
-     need it now, because the arguments of these functions are allowed
-     to be undefined.  */
+  /* At this point we have an inquiry function with a variable argument.  The
+     type of the variable might be undefined, but we need it now, because the
+     arguments of these functions are allowed to be undefined.  */
 
   if (e->ts.type == BT_UNKNOWN)
     {
@@ -1635,12 +1651,16 @@ check_restricted (gfc_expr * e)
 	  break;
 	}
 
+      /* gfc_is_formal_arg broadcasts that a formal argument list is being processed
+	 in resolve.c(resolve_formal_arglist).  This is done so that host associated
+	 dummy array indices are accepted (PR23446).  */
       if (sym->attr.in_common
 	  || sym->attr.use_assoc
 	  || sym->attr.dummy
 	  || sym->ns != gfc_current_ns
 	  || (sym->ns->proc_name != NULL
-	      && sym->ns->proc_name->attr.flavor == FL_MODULE))
+	      && sym->ns->proc_name->attr.flavor == FL_MODULE)
+	  || gfc_is_formal_arg ())
 	{
 	  t = SUCCESS;
 	  break;
@@ -1789,11 +1809,12 @@ gfc_check_assign (gfc_expr * lvalue, gfc_expr * rvalue, int conform)
       return FAILURE;
     }
 
-  /* This is a guaranteed segfault and possibly a typo: p = NULL()
-     instead of p => NULL()  */
-  if (rvalue->expr_type == EXPR_NULL)
-    gfc_warning ("NULL appears on right-hand side in assignment at %L",
-		 &rvalue->where);
+   if (rvalue->expr_type == EXPR_NULL)
+     {
+       gfc_error ("NULL appears on right-hand side in assignment at %L",
+		  &rvalue->where);
+       return FAILURE;
+     }
 
   /* This is possibly a typo: x = f() instead of x => f()  */
   if (gfc_option.warn_surprising 
@@ -1812,7 +1833,10 @@ gfc_check_assign (gfc_expr * lvalue, gfc_expr * rvalue, int conform)
 
   if (!conform)
     {
-      if (gfc_numeric_ts (&lvalue->ts) && gfc_numeric_ts (&rvalue->ts))
+      /* Numeric can be converted to any other numeric. And Hollerith can be
+	 converted to any other type.  */
+      if ((gfc_numeric_ts (&lvalue->ts) && gfc_numeric_ts (&rvalue->ts))
+	  || rvalue->ts.type == BT_HOLLERITH)
 	return SUCCESS;
 
       if (lvalue->ts.type == BT_LOGICAL && rvalue->ts.type == BT_LOGICAL)

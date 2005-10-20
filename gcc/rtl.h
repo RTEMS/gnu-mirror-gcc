@@ -1540,6 +1540,7 @@ extern rtx simplify_gen_subreg (enum machine_mode, rtx, enum machine_mode,
 extern rtx simplify_replace_rtx (rtx, rtx, rtx);
 extern rtx simplify_rtx (rtx);
 extern rtx avoid_constant_pool_reference (rtx);
+extern bool constant_pool_reference_p (rtx x);
 extern bool mode_signbit_p (enum machine_mode, rtx);
 
 /* In regclass.c  */
@@ -1608,6 +1609,7 @@ extern int side_effects_p (rtx);
 extern int volatile_refs_p (rtx);
 extern int volatile_insn_p (rtx);
 extern int may_trap_p (rtx);
+extern int may_trap_or_fault_p (rtx);
 extern int inequality_comparisons_p (rtx);
 extern rtx replace_rtx (rtx, rtx, rtx);
 extern rtx replace_regs (rtx, rtx *, unsigned int, int);

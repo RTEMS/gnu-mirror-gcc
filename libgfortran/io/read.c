@@ -48,16 +48,28 @@ set_integer (void *dest, int64_t value, int length)
   switch (length)
     {
     case 8:
-      *((int64_t *) dest) = value;
+      {
+	int64_t tmp = value;
+	memcpy (dest, (void *) &tmp, length);
+      }
       break;
     case 4:
-      *((int32_t *) dest) = value;
+      {
+	int32_t tmp = value;
+	memcpy (dest, (void *) &tmp, length);
+      }
       break;
     case 2:
-      *((int16_t *) dest) = value;
+      {
+	int16_t tmp = value;
+	memcpy (dest, (void *) &tmp, length);
+      }
       break;
     case 1:
-      *((int8_t *) dest) = value;
+      {
+	int8_t tmp = value;
+	memcpy (dest, (void *) &tmp, length);
+      }
       break;
     default:
       internal_error ("Bad integer kind");
@@ -108,21 +120,27 @@ convert_real (void *dest, const char *buffer, int length)
   switch (length)
     {
     case 4:
-      *((float *) dest) =
+      {
+	float tmp = 
 #if defined(HAVE_STRTOF)
-	strtof (buffer, NULL);
+	  strtof (buffer, NULL);
 #else
-	(float) strtod (buffer, NULL);
+	  (float) strtod (buffer, NULL);
 #endif
+	memcpy (dest, (void *) &tmp, length);
+      }
       break;
     case 8:
-      *((double *) dest) = strtod (buffer, NULL);
+      {
+	double tmp = strtod (buffer, NULL);
+	memcpy (dest, (void *) &tmp, length);
+      }
       break;
     default:
       internal_error ("Unsupported real kind during IO");
     }
 
-  if (errno != 0)
+  if (errno != 0 && errno != EINVAL)
     {
       generate_error (ERROR_READ_VALUE,
 		      "Range error during floating point read");
@@ -240,8 +258,8 @@ next_char (char **p, int *w)
 
   if (c != ' ')
     return c;
-  if (g.blank_status == BLANK_ZERO)
-    return '0';
+  if (g.blank_status != BLANK_UNSPECIFIED)
+    return ' ';  /* return a blank to signal a null */ 
 
   /* At this point, the rest of the field has to be trailing blanks */
 
@@ -309,7 +327,13 @@ read_decimal (fnode * f, char *dest, int length)
       c = next_char (&p, &w);
       if (c == '\0')
 	break;
-
+	
+      if (c == ' ')
+        {
+          if (g.blank_status == BLANK_NULL) continue;
+          if (g.blank_status == BLANK_ZERO) c = '0';
+        }
+        
       if (c < '0' || c > '9')
 	goto bad;
 
@@ -396,6 +420,11 @@ read_radix (fnode * f, char *dest, int length, int radix)
       c = next_char (&p, &w);
       if (c == '\0')
 	break;
+      if (c == ' ')
+        {
+          if (g.blank_status == BLANK_NULL) continue;
+          if (g.blank_status == BLANK_ZERO) c = '0';
+        }
 
       switch (radix)
 	{
@@ -504,23 +533,7 @@ read_f (fnode * f, char *dest, int length)
 
   p = eat_leading_spaces (&w, p);
   if (w == 0)
-    {
-      switch (length)
-	{
-	case 4:
-	  *((float *) dest) = 0.0f;
-	  break;
-
-	case 8:
-	  *((double *) dest) = 0.0;
-	  break;
-
-	default:
-	  internal_error ("Unsupported real kind during IO");
-	}
-
-      return;
-    }
+    goto zero;
 
   /* Optional sign */
 
@@ -529,16 +542,19 @@ read_f (fnode * f, char *dest, int length)
       if (*p == '-')
         val_sign = -1;
       p++;
-
-      if (--w == 0)
-	goto bad_float;
+      w--;
     }
 
   exponent_sign = 1;
+  p = eat_leading_spaces (&w, p);
+  if (w == 0)
+    goto zero;
 
-  /* A digit (or a '.') is required at this point */
+  /* A digit, a '.' or a exponent character ('e', 'E', 'd' or 'D')
+     is required at this point */
 
-  if (!isdigit (*p) && *p != '.')
+  if (!isdigit (*p) && *p != '.' && *p != 'd' && *p != 'D'
+      && *p != 'e' && *p != 'E')
     goto bad_float;
 
   /* Remember the position of the first digit.  */
@@ -602,6 +618,23 @@ read_f (fnode * f, char *dest, int length)
   generate_error (ERROR_READ_VALUE, "Bad value during floating point read");
   return;
 
+  /* The value read is zero */
+ zero:
+  switch (length)
+    {
+      case 4:
+	*((float *) dest) = 0.0f;
+	break;
+
+      case 8:
+	*((double *) dest) = 0.0;
+	break;
+
+      default:
+	internal_error ("Unsupported real kind during IO");
+    }
+  return;
+
   /* At this point the start of an exponent has been found */
  exp1:
   while (w > 0 && *p == ' ')
@@ -636,21 +669,46 @@ read_f (fnode * f, char *dest, int length)
   p++;
   w--;
 
-  while (w > 0 && isdigit (*p))
-    {
-      exponent = 10 * exponent + *p - '0';
-      p++;
-      w--;
-    }
+  if (g.blank_status == BLANK_UNSPECIFIED) /* Normal processing of exponent */
+     {
+      while (w > 0 && isdigit (*p))
+        {
+          exponent = 10 * exponent + *p - '0';
+          p++;
+          w--;
+        }
 
-  /* Only allow trailing blanks */
+      /* Only allow trailing blanks */
 
-  while (w > 0)
+      while (w > 0)
+        {
+          if (*p != ' ')
+	  goto bad_float;
+          p++;
+          w--;
+        }
+    }    
+  else  /* BZ or BN status is enabled */
     {
-      if (*p != ' ')
-	goto bad_float;
-      p++;
-      w--;
+      while (w > 0)
+        {
+          if (*p == ' ')
+            {
+              if (g.blank_status == BLANK_ZERO) *p = '0';
+              if (g.blank_status == BLANK_NULL)
+                {
+                  p++;
+                  w--;
+                  continue;
+                }
+            }
+          else if (!isdigit (*p))
+            goto bad_float;
+
+          exponent = 10 * exponent + *p - '0';
+          p++;
+          w--;
+        }
     }
 
   exponent = exponent * exponent_sign;
@@ -688,16 +746,22 @@ read_f (fnode * f, char *dest, int length)
     buffer = get_mem (i);
 
   /* Reformat the string into a temporary buffer.  As we're using atof it's
-     easiest to just leave the dcimal point in place.  */
+     easiest to just leave the decimal point in place.  */
   p = buffer;
   if (val_sign < 0)
     *(p++) = '-';
   for (; ndigits > 0; ndigits--)
     {
-      if (*digits == ' ' && g.blank_status == BLANK_ZERO)
-	*p = '0';
-      else
-	*p = *digits;
+      if (*digits == ' ')
+        {
+          if (g.blank_status == BLANK_ZERO) *digits = '0';
+          if (g.blank_status == BLANK_NULL)
+            {
+              digits++;
+              continue;
+            } 
+        }
+      *p = *digits;
       p++;
       digits++;
     }
@@ -718,10 +782,12 @@ read_f (fnode * f, char *dest, int length)
  * and never look at it. */
 
 void
-read_x (fnode * f)
+read_x (int n)
 {
-  int n;
+  if ((current_unit->flags.pad == PAD_NO || is_internal_unit ())
+      && current_unit->bytes_left < n)
+    n = current_unit->bytes_left;
 
-  n = f->u.n;
-  read_block (&n);
+  if (n > 0)
+    read_block (&n);
 }

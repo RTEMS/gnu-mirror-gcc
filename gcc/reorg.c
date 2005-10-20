@@ -1334,7 +1334,7 @@ steal_delay_list_from_target (rtx insn, rtx condition, rtx seq,
       if (! must_annul
 	  && ((condition == const_true_rtx
 	       || (! insn_sets_resource_p (trial, other_needed, 0)
-		   && ! may_trap_p (PATTERN (trial)))))
+		   && ! may_trap_or_fault_p (PATTERN (trial)))))
 	  ? eligible_for_delay (insn, total_slots_filled, trial, flags)
 	  : (must_annul || (delay_list == NULL && new_delay_list == NULL))
 	     && (must_annul = 1,
@@ -1428,7 +1428,7 @@ steal_delay_list_from_fallthrough (rtx insn, rtx condition, rtx seq,
       if (! must_annul
 	  && ((condition == const_true_rtx
 	       || (! insn_sets_resource_p (trial, other_needed, 0)
-		   && ! may_trap_p (PATTERN (trial)))))
+		   && ! may_trap_or_fault_p (PATTERN (trial)))))
 	  ? eligible_for_delay (insn, *pslots_filled, trial, flags)
 	  : (must_annul || delay_list == NULL) && (must_annul = 1,
 	     check_annul_list_true_false (1, delay_list)
@@ -2320,7 +2320,7 @@ fill_simple_delay_slots (int non_jumps_p)
 #ifdef HAVE_cc0
 		    && ! (reg_mentioned_p (cc0_rtx, pat) && ! sets_cc0_p (pat))
 #endif
-		    && ! (maybe_never && may_trap_p (pat))
+		    && ! (maybe_never && may_trap_or_fault_p (pat))
 		    && (trial = try_split (pat, trial, 0))
 		    && eligible_for_delay (insn, slots_filled, trial, flags)
 		    && ! can_throw_internal(trial))
@@ -2373,7 +2373,7 @@ fill_simple_delay_slots (int non_jumps_p)
 #ifdef HAVE_cc0
 	      && ! reg_mentioned_p (cc0_rtx, PATTERN (next_trial))
 #endif
-	      && ! (maybe_never && may_trap_p (PATTERN (next_trial)))
+	      && ! (maybe_never && may_trap_or_fault_p (PATTERN (next_trial)))
 	      && (next_trial = try_split (PATTERN (next_trial), next_trial, 0))
 	      && eligible_for_delay (insn, slots_filled, next_trial, flags)
 	      && ! can_throw_internal (trial))
@@ -2653,7 +2653,7 @@ fill_slots_from_thread (rtx insn, rtx condition, rtx thread,
 	  if (!must_annul
 	      && (condition == const_true_rtx
 	          || (! insn_sets_resource_p (trial, &opposite_needed, 1)
-		      && ! may_trap_p (pat))))
+		      && ! may_trap_or_fault_p (pat))))
 	    {
 	      old_trial = trial;
 	      trial = try_split (pat, trial, 0);
@@ -3120,10 +3120,11 @@ relax_delay_slots (rtx first)
 	  if (target_label && target_label != JUMP_LABEL (insn))
 	    reorg_redirect_jump (insn, target_label);
 
-	  /* See if this jump branches around an unconditional jump.
-	     If so, invert this jump and point it to the target of the
+	  /* See if this jump conditionally branches around an unconditional
+	     jump.  If so, invert this jump and point it to the target of the
 	     second jump.  */
 	  if (next && JUMP_P (next)
+	      && any_condjump_p (insn)
 	      && (simplejump_p (next) || GET_CODE (PATTERN (next)) == RETURN)
 	      && target_label
 	      && next_active_insn (target_label) == next_active_insn (next)
@@ -3169,7 +3170,7 @@ relax_delay_slots (rtx first)
       if (JUMP_P (insn)
 	  && (simplejump_p (insn) || GET_CODE (PATTERN (insn)) == RETURN)
 	  && (other = prev_active_insn (insn)) != 0
-	  && (condjump_p (other) || condjump_in_parallel_p (other))
+	  && any_condjump_p (other)
 	  && no_labels_between_p (other, insn)
 	  && 0 > mostly_true_jump (other,
 				   get_branch_condition (other,

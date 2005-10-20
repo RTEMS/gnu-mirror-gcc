@@ -479,7 +479,13 @@ next_statement (void)
       gfc_buffer_error (1);
 
       if (gfc_at_eol ())
-	gfc_advance_line ();
+	{
+	  if (gfc_option.warn_line_truncation
+	      && gfc_current_locus.lb->truncated)
+	    gfc_warning_now ("Line truncated at %C");
+
+	  gfc_advance_line ();
+	}
 
       gfc_skip_comments ();
 
@@ -2545,6 +2551,10 @@ gfc_parse_file (void)
     return FAILURE;	/* Come here on unexpected EOF */
 
   seen_program = 0;
+
+  /* Exit early for empty files.  */
+  if (gfc_at_eof ())
+    goto done;
 
 loop:
   gfc_init_2 ();

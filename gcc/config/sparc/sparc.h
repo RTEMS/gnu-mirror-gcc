@@ -214,6 +214,9 @@ extern enum cmodel sparc_cmodel;
    total memory ordering (TMO).  */
 #define SPARC_RELAXED_ORDERING false
 
+/* Do not use the .note.GNU-stack convention by default.  */
+#define NEED_INDICATE_EXEC_STACK 0
+
 /* This is call-clobbered in the normal ABI, but is reserved in the
    home grown (aka upward compatible) embedded ABI.  */
 #define EMBMEDANY_BASE_REG "%g4"
@@ -813,11 +816,9 @@ if (TARGET_ARCH64				\
 
 /* Boundary (in *bits*) on which stack pointer should be aligned.  */
 /* FIXME, this is wrong when TARGET_ARCH64 and TARGET_STACK_BIAS, because
-   then sp+2047 is 128-bit aligned so sp is really only byte-aligned.  */
+   then %sp+2047 is 128-bit aligned so %sp is really only byte-aligned.  */
 #define STACK_BOUNDARY (TARGET_ARCH64 ? 128 : 64)
-/* Temporary hack until the FIXME above is fixed.  This macro is used
-   only in pad_to_arg_alignment in function.c; see the comment there
-   for details about what it does.  */
+/* Temporary hack until the FIXME above is fixed.  */
 #define SPARC_STACK_BOUNDARY_HACK (TARGET_ARCH64 && TARGET_STACK_BIAS)
 
 /* ALIGN FRAMES on double word boundaries */
@@ -1677,7 +1678,7 @@ extern char leaf_reg_remap[];
 /* Define the size of space to allocate for the return value of an
    untyped_call.  */
 
-#define APPLY_RESULT_SIZE 16
+#define APPLY_RESULT_SIZE (TARGET_ARCH64 ? 24 : 16)
 
 /* 1 if N is a possible register number for function argument passing.
    On SPARC, these are the "output" registers.  v9 also uses %f0-%f31.  */
@@ -1795,7 +1796,7 @@ extern GTY(()) rtx sparc_compare_op1;
    case of a global register variable occupying more than one register
    we prefix the second and following registers with .gnu.part1. etc.  */
 
-extern char sparc_hard_reg_printed[8];
+extern GTY(()) char sparc_hard_reg_printed[8];
 
 #ifdef HAVE_AS_REGISTER_PSEUDO_OP
 #define ASM_DECLARE_REGISTER_GLOBAL(FILE, DECL, REGNO, NAME)		\

@@ -1,3 +1,73 @@
+2005-09-20  Release Manager
+
+	* GCC 4.0.2 released.
+
+2005-08-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR preprocessor/20348
+	PR preprocessor/20356
+	* files.c (_cpp_find_file, search_cache): Revert 2004-06-26 and
+	2004-06-05 changes.
+
+2005-07-07  Release Manager
+
+	* GCC 4.0.1 released.
+
+2005-05-12  Ryota Kunisawa  <kunisawa@access.co.jp>
+
+	PR bootstrap/21230
+	* configure: Regenerate.
+
+2005-04-24  Kaveh R. Ghazi  <ghazi@caip.rutgers.edu>
+
+	* configure.ac (libcpp_UNLOCKED_FUNCS): New.
+	(AC_CHECK_FUNCS, AC_CHECK_DECLS): Check for libcpp_UNLOCKED_FUNCS.
+	* system.h (putchar, getc, getchar, clearerr, feof, fileno,
+	fflush, fgetc, fgets, ferror, fread): Redefine to the associated
+	_unlocked function.
+	(fwrite_unlocked): Fix prototype.
+	
+	* configure, config.in: Regenerate.
+
+	* system.h (fopen, fdopen, freopen): Define these to the unlocked
+	libiberty functions.
+
+2005-04-19  Per Bothner  <per@bothner.com>
+
+	PR preprocessor/20907
+	* line-map.c (linemap_line_start): Fix bug when we need to increse
+	column_bits but can re-use the current line_map.
+
+2005-04-20  Release Manager
+
+	* GCC 4.0.0 released.
+
+2005-04-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR preprocessor/19475
+	* macro.c (create_iso_definition): For < ISO C99, don't
+	pedwarn if there is no whitespace between macro name and its
+	replacement, but the replacement starts with a basic character
+	set character.
+
+2005-03-19  Joseph S. Myers  <joseph@codesourcery.com>
+
+	* configure.ac: Consistently use solaris2.1[0-9]* instead of
+	solaris2.1[0-9].
+	* configure: Regenerate.
+
+2005-03-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR bootstrap/20282
+	PR bootstrap/20305
+	* macro.c (replace_args, cpp_get_token): Copy whole
+	cpp_token_u instead of just cpp_string field from it.
+
+2005-02-28  Devang Patel  <dpatel@apple.com>
+
+	* directives.c (do_line): Save sysp early before line table is
+	realloc'ed.
+	
 2005-02-20  Zack Weinberg  <zack@codesourcery.com>
 
 	PR 18785

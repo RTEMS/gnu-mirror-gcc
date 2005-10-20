@@ -207,14 +207,6 @@ do_jump (tree exp, rtx if_false_label, rtx if_true_label)
       do_jump (TREE_OPERAND (exp, 0), if_false_label, if_true_label);
       break;
 
-    case MINUS_EXPR:
-      /* Nonzero iff operands of minus differ.  */
-      do_compare_and_jump (build2 (NE_EXPR, TREE_TYPE (exp),
-				   TREE_OPERAND (exp, 0),
-				   TREE_OPERAND (exp, 1)),
-                           NE, NE, if_false_label, if_true_label);
-      break;
-
     case BIT_AND_EXPR:
       /* fold_single_bit_test() converts (X & (1 << C)) into (X >> C) & 1.
 	 See if the former is preferred for jump tests and restore it
@@ -369,6 +361,12 @@ do_jump (tree exp, rtx if_false_label, rtx if_true_label)
         break;
       }
 
+    case MINUS_EXPR:
+      /* Nonzero iff operands of minus differ.  */
+      exp = build2 (NE_EXPR, TREE_TYPE (exp),
+		    TREE_OPERAND (exp, 0),
+		    TREE_OPERAND (exp, 1));
+      /* FALLTHRU */
     case NE_EXPR:
       {
         tree inner_type = TREE_TYPE (TREE_OPERAND (exp, 0));
@@ -512,6 +510,42 @@ do_jump (tree exp, rtx if_false_label, rtx if_true_label)
       }
       break;
 
+    case TRUTH_AND_EXPR:
+      /* High branch cost, expand as the bitwise AND of the conditions.  */
+      if (BRANCH_COST >= 4)
+	goto normal;
+
+      if (if_false_label == NULL_RTX)
+        {
+	  drop_through_label = gen_label_rtx ();
+          do_jump (TREE_OPERAND (exp, 0), drop_through_label, NULL_RTX);
+          do_jump (TREE_OPERAND (exp, 1), NULL_RTX, if_true_label);
+	}
+      else
+	{
+	  do_jump (TREE_OPERAND (exp, 0), if_false_label, NULL_RTX);
+          do_jump (TREE_OPERAND (exp, 1), if_false_label, if_true_label);
+	}
+      break;
+
+    case TRUTH_OR_EXPR:
+      /* High branch cost, expand as the bitwise OR of the conditions.  */
+      if (BRANCH_COST >= 4)
+	goto normal;
+
+      if (if_true_label == NULL_RTX)
+	{
+          drop_through_label = gen_label_rtx ();
+          do_jump (TREE_OPERAND (exp, 0), NULL_RTX, drop_through_label);
+          do_jump (TREE_OPERAND (exp, 1), if_false_label, NULL_RTX);
+	}
+      else
+	{
+          do_jump (TREE_OPERAND (exp, 0), NULL_RTX, if_true_label);
+          do_jump (TREE_OPERAND (exp, 1), if_false_label, if_true_label);
+	}
+      break;
+
       /* Special case:
           __builtin_expect (<test>, 0)	and
           __builtin_expect (<test>, 1)
@@ -542,8 +576,8 @@ do_jump (tree exp, rtx if_false_label, rtx if_true_label)
 	      }
 	  }
       }
+ 
       /* Fall through and generate the normal code.  */
-
     default:
     normal:
       temp = expand_expr (exp, NULL_RTX, VOIDmode, 0);

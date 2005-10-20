@@ -530,29 +530,34 @@ syntax:
 }
 
 
-/* Special subroutine for finding a symbol.  If we're compiling a
-   function or subroutine and the parent compilation unit is an
-   interface, then check to see if the name we've been given is the
-   name of the interface (located in another namespace).  If so,
-   return that symbol.  If not, use gfc_get_symbol().  */
+/* Special subroutine for finding a symbol.  Check if the name is found
+   in the current name space.  If not, and we're compiling a function or
+   subroutine and the parent compilation unit is an interface, then check
+   to see if the name we've been given is the name of the interface
+   (located in another namespace).  */
 
 static int
 find_special (const char *name, gfc_symbol ** result)
 {
   gfc_state_data *s;
+  int i;
 
+  i = gfc_get_symbol (name, NULL, result);
+  if (i==0) 
+    goto end;
+  
   if (gfc_current_state () != COMP_SUBROUTINE
       && gfc_current_state () != COMP_FUNCTION)
-    goto normal;
+    goto end;
 
   s = gfc_state_stack->previous;
   if (s == NULL)
-    goto normal;
+    goto end;
 
   if (s->state != COMP_INTERFACE)
-    goto normal;
+    goto end;
   if (s->sym == NULL)
-    goto normal;		/* Nameless interface */
+    goto end;                  /* Nameless interface */
 
   if (strcmp (name, s->sym->name) == 0)
     {
@@ -560,8 +565,8 @@ find_special (const char *name, gfc_symbol ** result)
       return 0;
     }
 
-normal:
-  return gfc_get_symbol (name, NULL, result);
+end:
+  return i;
 }
 
 
@@ -616,7 +621,8 @@ build_sym (const char *name, gfc_charlen * cl,
   symbol_attribute attr;
   gfc_symbol *sym;
 
-  if (find_special (name, &sym))
+  /* if (find_special (name, &sym)) */
+  if (gfc_get_symbol (name, NULL, &sym))
     return FAILURE;
 
   /* Start updating the symbol table.  Add basic type attribute
@@ -646,6 +652,30 @@ build_sym (const char *name, gfc_charlen * cl,
   return SUCCESS;
 }
 
+/* Set character constant to the given length. The constant will be padded or
+   truncated.  */
+
+void
+gfc_set_constant_character_len (int len, gfc_expr * expr)
+{
+  char * s;
+  int slen;
+
+  gcc_assert (expr->expr_type == EXPR_CONSTANT);
+  gcc_assert (expr->ts.type == BT_CHARACTER && expr->ts.kind == 1);
+
+  slen = expr->value.character.length;
+  if (len != slen)
+    {
+      s = gfc_getmem (len);
+      memcpy (s, expr->value.character.string, MIN (len, slen));
+      if (len > slen)
+	memset (&s[slen], ' ', len - slen);
+      gfc_free (expr->value.character.string);
+      expr->value.character.string = s;
+      expr->value.character.length = len;
+    }
+}
 
 /* Function called by variable_decl() that adds an initialization
    expression to a symbol.  */
@@ -710,6 +740,42 @@ add_init_expr_to_sym (const char *name, gfc_expr ** initp,
       if (sym->ts.type != BT_DERIVED && init->ts.type != BT_DERIVED
 	  && gfc_check_assign_symbol (sym, init) == FAILURE)
 	return FAILURE;
+
+      if (sym->ts.type == BT_CHARACTER && sym->ts.cl)
+	{
+	  /* Update symbol character length according initializer.  */
+	  if (sym->ts.cl->length == NULL)
+	    {
+	      /* If there are multiple CHARACTER variables declared on
+		 the same line, we don't want them to share the same
+	        length.  */
+	      sym->ts.cl = gfc_get_charlen ();
+	      sym->ts.cl->next = gfc_current_ns->cl_list;
+	      gfc_current_ns->cl_list = sym->ts.cl;
+
+	      if (init->expr_type == EXPR_CONSTANT)
+		sym->ts.cl->length =
+			gfc_int_expr (init->value.character.length);
+	      else if (init->expr_type == EXPR_ARRAY)
+		sym->ts.cl->length = gfc_copy_expr (init->ts.cl->length);
+	    }
+	  /* Update initializer character length according symbol.  */
+	  else if (sym->ts.cl->length->expr_type == EXPR_CONSTANT)
+	    {
+	      int len = mpz_get_si (sym->ts.cl->length->value.integer);
+	      gfc_constructor * p;
+
+	      if (init->expr_type == EXPR_CONSTANT)
+		gfc_set_constant_character_len (len, init);
+	      else if (init->expr_type == EXPR_ARRAY)
+		{
+		  gfc_free_expr (init->ts.cl->length);
+		  init->ts.cl->length = gfc_copy_expr (sym->ts.cl->length);
+		  for (p = init->value.constructor; p; p = p->next)
+		    gfc_set_constant_character_len (len, p->expr);
+		}
+	    }
+	}
 
       /* Add initializer.  Make sure we keep the ranks sane.  */
       if (sym->attr.dimension && init->rank == 0)
@@ -841,7 +907,7 @@ gfc_match_null (gfc_expr ** result)
    symbol table or the current interface.  */
 
 static match
-variable_decl (void)
+variable_decl (int elem)
 {
   char name[GFC_MAX_SYMBOL_LEN + 1];
   gfc_expr *initializer, *char_len;
@@ -885,8 +951,20 @@ variable_decl (void)
 	  cl->length = char_len;
 	  break;
 
+	/* Non-constant lengths need to be copied after the first
+	   element.  */
 	case MATCH_NO:
-	  cl = current_ts.cl;
+	  if (elem > 1 && current_ts.cl->length
+		&& current_ts.cl->length->expr_type != EXPR_CONSTANT)
+	    {
+	      cl = gfc_get_charlen ();
+	      cl->next = gfc_current_ns->cl_list;
+	      gfc_current_ns->cl_list = cl;
+	      cl->length = gfc_copy_expr (current_ts.cl->length);
+	    }
+	  else
+	    cl = current_ts.cl;
+
 	  break;
 
 	case MATCH_ERROR:
@@ -1796,6 +1874,20 @@ match_attr_spec (void)
 	  goto cleanup;
 	}
 
+      if ((d == DECL_PRIVATE || d == DECL_PUBLIC)
+	     && gfc_current_state () != COMP_MODULE)
+	{
+	  if (d == DECL_PRIVATE)
+	    attr = "PRIVATE";
+	  else
+	    attr = "PUBLIC";
+
+	  gfc_error ("%s attribute at %L is not allowed outside of a MODULE",
+		     attr, &seen_at[d]);
+	  m = MATCH_ERROR;
+	  goto cleanup;
+	}
+
       switch (d)
 	{
 	case DECL_ALLOCATABLE:
@@ -1885,6 +1977,7 @@ gfc_match_data_decl (void)
 {
   gfc_symbol *sym;
   match m;
+  int elem;
 
   m = match_type_spec (&current_ts, 0);
   if (m != MATCH_YES)
@@ -1936,10 +2029,12 @@ ok:
   if (m == MATCH_NO && current_ts.type == BT_CHARACTER && old_char_selector)
     gfc_match_char (',');
 
-  /* Give the types/attributes to symbols that follow.  */
+  /* Give the types/attributes to symbols that follow. Give the element
+     a number so that repeat character length expressions can be copied.  */
+  elem = 1;
   for (;;)
     {
-      m = variable_decl ();
+      m = variable_decl (elem++);
       if (m == MATCH_ERROR)
 	goto cleanup;
       if (m == MATCH_NO)
@@ -2342,7 +2437,7 @@ gfc_match_entry (void)
   else
     {
       /* An entry in a function.  */
-      m = gfc_match_formal_arglist (entry, 0, 0);
+      m = gfc_match_formal_arglist (entry, 0, 1);
       if (m != MATCH_YES)
 	return MATCH_ERROR;
 
@@ -2354,8 +2449,7 @@ gfc_match_entry (void)
 	      || gfc_add_function (&entry->attr, entry->name, NULL) == FAILURE)
 	    return MATCH_ERROR;
 
-	  entry->result = proc->result;
-
+	  entry->result = entry;
 	}
       else
 	{
@@ -2370,6 +2464,8 @@ gfc_match_entry (void)
 	      || gfc_add_function (&entry->attr, result->name,
 				   NULL) == FAILURE)
 	    return MATCH_ERROR;
+
+	  entry->result = result;
 	}
 
       if (proc->attr.recursive && result == NULL)
