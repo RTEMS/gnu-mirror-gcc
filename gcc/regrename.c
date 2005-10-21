@@ -234,7 +234,13 @@ regrename_optimize (void)
 
 	  all_chains = this->next_chain;
 
+	  /* APPLE LOCAL begin 4203984 */
+#ifdef TARGET_POWERPC
+	  best_new_reg = -1;
+#else
 	  best_new_reg = reg;
+#endif
+	  /* APPLE LOCAL end 4203984 */
 
 #if 0 /* This just disables optimization opportunities.  */
 	  /* Only rename once we've seen the reg more than once.  */
@@ -316,8 +322,11 @@ regrename_optimize (void)
 		  break;
 	      if (! tmp)
 		{
-		  if (tick[best_new_reg] > tick[new_reg])
+		  /* APPLE LOCAL begin 4203984 */
+		  if (best_new_reg == -1
+		      || tick[best_new_reg] > tick[new_reg])
 		    best_new_reg = new_reg;
+		  /* APPLE LOCAL end 4203984 */
 		}
 	    }
 
@@ -329,9 +338,12 @@ regrename_optimize (void)
 		fprintf (dump_file, " crosses a call");
 	    }
 
-	  if (best_new_reg == reg)
+	  /* APPLE LOCAL begin 4203984 */
+	  if (best_new_reg == -1 || best_new_reg == reg)
 	    {
-	      tick[reg] = ++this_tick;
+	      if (best_new_reg == reg)
+		tick[reg] = ++this_tick;
+	  /* APPLE LOCAL end 4203984 */
 	      if (dump_file)
 		fprintf (dump_file, "; no available better choice\n");
 	      continue;
@@ -1283,6 +1295,14 @@ static bool
 mode_change_ok (enum machine_mode orig_mode, enum machine_mode new_mode,
 		unsigned int regno ATTRIBUTE_UNUSED)
 {
+  /* APPLE LOCAL begin add mode change case */
+#ifdef TARGET_POWERPC
+  /* This arises from FLOAT_EXTEND which is really a NOP.  */
+  if (orig_mode == SFmode && new_mode == DFmode)
+    return true;
+#endif
+  /* APPLE LOCAL end add mode change case */
+
   if (GET_MODE_SIZE (orig_mode) < GET_MODE_SIZE (new_mode))
     return false;
 
@@ -1733,6 +1753,15 @@ copyprop_hardreg_forward_1 (basic_block bb, struct value_data *vd)
       /* Notice copies.  */
       if (set && REG_P (SET_DEST (set)) && REG_P (SET_SRC (set)))
 	copy_value (SET_DEST (set), SET_SRC (set), vd);
+      /* APPLE LOCAL begin record that float extend is a copy */
+#ifdef TARGET_POWERPC
+      /* FLOAT_EXTEND is actually a copy; record that too.  */
+      if (set && REG_P (SET_DEST (set)) 
+	  && GET_CODE (SET_SRC (set)) == FLOAT_EXTEND
+	  && REG_P (XEXP (SET_SRC (set), 0)))
+        copy_value (SET_DEST (set), XEXP (SET_SRC (set), 0), vd);
+#endif
+      /* APPLE LOCAL end record that float extend is a copy */
 
       if (insn == BB_END (bb))
 	break;
