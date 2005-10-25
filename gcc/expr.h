@@ -1,6 +1,6 @@
 /* Definitions for code generation pass of GNU compiler.
    Copyright (C) 1987, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -188,11 +188,6 @@ do {							\
 #define FUNCTION_ARG_BOUNDARY(MODE, TYPE)	PARM_BOUNDARY
 #endif
 
-/* Define to nonzero if complex arguments should be split into their
-   corresponding components.  */
-#ifndef SPLIT_COMPLEX_ARGS
-#define SPLIT_COMPLEX_ARGS 0
-#endif
 tree split_complex_types (tree);
 tree split_complex_values (tree);
 
@@ -530,6 +525,9 @@ extern rtx expand_expr_real (tree, rtx, enum machine_mode,
 /* At the start of a function, record that we have no previously-pushed
    arguments waiting to be popped.  */
 extern void init_pending_stack_adjust (void);
+
+/* Discard any pending stack adjustment.  */
+extern void discard_pending_stack_adjust (void);
 
 /* When exiting from function, if safe, clear out any pending stack adjust
    so the adjustment won't get done.  */
