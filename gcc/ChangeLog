@@ -1,3 +1,87 @@
+2008-06-25  Olivier Hainque  <hainque@adacore.com>
+
+	* Makefile.in (GTFILES_H): Use | instead of ; as separator in
+	sed substitutions.
+
+2008-06-25  Richard Guenther  <rguenther@suse.de>
+
+	* tree-ssa-structalias.c (fieldoff_compare): Make sure to
+	not overflow the result type.
+
+2008-06-25  Richard Guenther  <rguenther@suse.de>
+
+	* tree-vn.c (vn_add): Handle TRUTH_*_EXPR.
+	(vn_lookup): Likewise.
+
+2008-06-25  Richard Guenther  <rguenther@suse.de>
+
+	PR tree-optimization/35518
+	* fold-const.c (fold_ternary): Strip trivial BIT_FIELD_REFs.
+	* tree-sra.c (instantiate_element): Use fold_build3 to build
+	BIT_FIELD_REFs.
+	(try_instantiate_multiple_fields): Likewise.
+
+2008-06-24  Andrew Pinski  <andrew_pinski@playstation.sony.com>
+
+	* config/rs6000/rs6000.md: Change all string instruction's clobber to
+	be early clobbers.
+
+2008-06-24  Andrew Pinski  <andrew_pinski@playstation.sony.com>
+
+	* config/rs6000/rs6000.c (rs6000_emit_epilogue): Set
+	use_backchain_to_restore_sp to true
+	if the offset of the link register save area would go over the 32k - 1
+	offset limit of the load
+	instructions.
+
+2008-06-25  Hans-Peter Nilsson  <hp@axis.com>
+
+	* doc/invoke.texi (Optimize Options) <fstrict-aliasing>: Add
+	anchor for the type-punning blurb.  Cross-reference "Structures
+	unions enumerations and bit-fields implementation".  Provide a
+	cast-through-pointer example.  Make final sentence self-contained.
+	* doc/implement-c.texi (Structures unions enumerations and
+	bit-fields implementation): Cross-reference the type-punning blurb
+	in the -fstrict-aliasing documentation.
+
+2008-06-24  Andrew Pinski  <andrew_pinski@playstation.sony.com>
+
+	PR middle-end/36594
+	* builtins.c (expand_builtin_nonlocal_goto): Stabilize the address of
+	the memory instead of the memory itself for the save area.
+
+2008-06-24  Olivier Hainque  <hainque@adacore.com>
+            Nicolas Roche  <roche@adacore.com>
+
+	* gengtype.c (srcdir_len): size_t instead of int.
+	(get_file_realbasename): New function.  For F a filename, the real
+	basename of F, with all the path components stripped.
+	(get_file_srcdir_relative_path): New function.  For F a filename, the
+	relative path to F from $(srcdir).
+	(get_file_basename): Rewrite using get_file_srcdir_relative_path and
+	get_file_realbasename.  Adjust the head comment.
+	(get_prefix_langdir_index): New function. For F a filename, return the
+	lang_dir_names[] relative index of the language directory that is
+	a prefix in F.
+	(get_file_langdir): For F a filename, return the name of the language
+	directory where F is located.
+	(get_file_gtfilename): New function. The gt- output file name for an
+	input filename F.
+	(get_output_file_with_visibility): Replace in-line computations with
+	uses of get_file_gtfilename and get_prefix_langdir_index.
+	* Makefile.in (GTFILES_H): Adjust to match what gengtype generates.
+
+2008-06-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/36504
+	* tree-ssa-loop-prefetch.c (gather_memory_references_ref): Skip
+	references without base address.
+
+2008-06-23  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR middle-end/PR36584
+	* calls.c (expand_call): Increase alignment for recursive functions.
+
 2008-06-23  Anatoly Sokolov  <aesok@post.ru>
 
 	* config/avr/avr.c (avr_function_value): Add new 'outgoing' argument.
@@ -147,8 +231,7 @@
 
 	* ggc.h (GGC_RESIZEVAR): New, reorder macros.
 	* tracer.c (tail_duplicate): Fix for -Wc++-compat.
-	* tree-affine.c (aff_combination_expand, free_name_expansion):
-	Likewise.
+	* tree-affine.c (aff_combination_expand, free_name_expansion): Likewise.
 	* tree-cfg.c (replace_by_duplicate_decl, replace_ssa_name,
 	move_stmt_r, new_label_mapper): Likewise.
 	* tree-complex.c (cvc_lookup): Likewise.
