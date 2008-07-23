@@ -1095,6 +1095,11 @@ bits.  Note that this is not the biggest alignment that is supported,
 just the biggest alignment that, when violated, may cause a fault.
 @end defmac
 
+@defmac MALLOC_ABI_ALIGNMENT
+Alignment, in bits, a C conformant malloc implementation has to
+provide.  If not defined, the default value is @code{BITS_PER_WORD}.
+@end defmac
+
 @defmac MINIMUM_ATOMIC_ALIGNMENT
 If defined, the smallest alignment, in bits, that can be given to an
 object that can be referenced in one operation, without disturbing any
@@ -9264,6 +9269,51 @@ This target hook returns @code{true} if it is ok to inline @var{fndecl}
 into the current function, despite its having target-specific
 attributes, @code{false} otherwise.  By default, if a function has a
 target specific attribute attached to it, it will not be inlined.
+@end deftypefn
+
+@deftypefn {Target Hook} bool TARGET_VALID_OPTION_ATTRIBUTE_P (tree @var{fndecl}, tree @var{name}, tree @var{args}, int @var{flags})
+This hook is called to parse the @code{attribute(option("..."))}, and
+it allows the function to set different target machine compile time
+options for the current function that might be different than the
+options specified on the command line.  The hook should return
+@code{true} if the options are valid.
+
+The hook should set the @var{DECL_FUNCTION_SPECIFIC_TARGET} field in
+the function declaration to hold a pointer to a target specific
+@var{struct cl_target_option} structure.
+@end deftypefn
+
+@deftypefn {Target Hook} void TARGET_OPTION_SAVE (struct cl_target_option *@var{ptr})
+This hook is called to save any additional target specific information
+in the @var{struct cl_target_option} structure for function specific
+options.
+@xref{Option file format}.
+@end deftypefn
+
+@deftypefn {Target Hook} void TARGET_OPTION_RESTORE (struct cl_target_option *@var{ptr})
+This hook is called to restore any additional target specific
+information in the @var{struct cl_target_option} structure for
+function specific options.
+@end deftypefn
+
+@deftypefn {Target Hook} void TARGET_OPTION_PRINT (struct cl_target_option *@var{ptr})
+This hook is called to print any additional target specific
+information in the @var{struct cl_target_option} structure for
+function specific options.
+@end deftypefn
+
+@deftypefn {Target Hook} bool TARGET_OPTION_PRAGMA_PARSE (target @var{args})
+This target hook parses the options for @code{#pragma GCC option} to
+set the machine specific options for functions that occur later in the
+input stream.  The options should be the same as handled by the
+@code{TARGET_VALID_OPTION_ATTRIBUTE_P} hook.
+@end deftypefn
+
+@deftypefn {Target Hook} bool TARGET_CAN_INLINE_P (tree @var{caller}, tree @var{callee})
+This target hook returns @code{false} if the @var{caller} function
+cannot inline @var{callee}, based on target specific information.  By
+default, inlining is not allowed if the callee function has function
+specific target options and the caller does not use the same options.
 @end deftypefn
 
 @node Emulated TLS
