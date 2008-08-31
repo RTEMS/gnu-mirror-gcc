@@ -364,6 +364,7 @@
 #define TARGET_VECTORIZE_BUILTIN_VECTORIZATION_COST 0
 #define TARGET_VECTOR_ALIGNMENT_REACHABLE \
   default_builtin_vector_alignment_reachable
+#define TARGET_VECTORIZE_BUILTIN_VEC_PERM 0
 
 #define TARGET_VECTORIZE                                                \
   {									\
@@ -373,7 +374,8 @@
     TARGET_VECTORIZE_BUILTIN_MUL_WIDEN_EVEN,                            \
     TARGET_VECTORIZE_BUILTIN_MUL_WIDEN_ODD,				\
     TARGET_VECTORIZE_BUILTIN_VECTORIZATION_COST,			\
-    TARGET_VECTOR_ALIGNMENT_REACHABLE					\
+    TARGET_VECTOR_ALIGNMENT_REACHABLE,                                  \
+    TARGET_VECTORIZE_BUILTIN_VEC_PERM                                   \
   }
 
 #define TARGET_DEFAULT_TARGET_FLAGS 0
@@ -571,6 +573,8 @@
 
 #define TARGET_FUNCTION_VALUE default_function_value
 #define TARGET_INTERNAL_ARG_POINTER default_internal_arg_pointer
+#define TARGET_UPDATE_STACK_BOUNDARY NULL
+#define TARGET_GET_DRAP_RTX NULL
 #define TARGET_ALLOCATE_STACK_SLOTS_FOR_ARGS hook_bool_void_true
 
 #define TARGET_CALLS {						\
@@ -592,6 +596,8 @@
    TARGET_INVALID_ARG_FOR_UNPROTOTYPED_FN,			\
    TARGET_FUNCTION_VALUE,					\
    TARGET_INTERNAL_ARG_POINTER,					\
+   TARGET_UPDATE_STACK_BOUNDARY,				\
+   TARGET_GET_DRAP_RTX,						\
    TARGET_ALLOCATE_STACK_SLOTS_FOR_ARGS				\
    }
 
@@ -760,7 +766,8 @@
 
 /* Function specific option attribute support.  */
 #ifndef TARGET_OPTION_VALID_ATTRIBUTE_P
-#define TARGET_OPTION_VALID_ATTRIBUTE_P NULL
+#define TARGET_OPTION_VALID_ATTRIBUTE_P \
+  default_target_option_valid_attribute_p
 #endif
 
 #ifndef TARGET_OPTION_SAVE
@@ -776,7 +783,7 @@
 #endif
 
 #ifndef TARGET_OPTION_PRAGMA_PARSE
-#define TARGET_OPTION_PRAGMA_PARSE NULL
+#define TARGET_OPTION_PRAGMA_PARSE default_target_option_pragma_parse
 #endif
 
 #ifndef TARGET_OPTION_CAN_INLINE_P

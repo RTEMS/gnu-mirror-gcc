@@ -34,6 +34,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "insn-attr.h"
 #include "flags.h"
 #include "recog.h"
+#include "reload.h"
 #include "expr.h"
 #include "optabs.h"
 #include "function.h"
@@ -1319,25 +1320,30 @@ store_multiple_operation (rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
 }
 
 /* What (if any) secondary registers are needed to move IN with mode
-   MODE into a register in register class CLASS.
+   MODE into a register in register class RCLASS.
 
    We might be able to simplify this.  */
 enum reg_class
-mn10300_secondary_reload_class (enum reg_class class, enum machine_mode mode,
+mn10300_secondary_reload_class (enum reg_class rclass, enum machine_mode mode,
 				rtx in)
 {
+  rtx inner = in;
+
+  /* Strip off any SUBREG expressions from IN.  Basically we want
+     to know if IN is a pseudo or (subreg (pseudo)) as those can
+     turn into MEMs during reload.  */
+  while (GET_CODE (inner) == SUBREG)
+    inner = SUBREG_REG (inner);
+
   /* Memory loads less than a full word wide can't have an
      address or stack pointer destination.  They must use
      a data register as an intermediate register.  */
   if ((GET_CODE (in) == MEM
-       || (GET_CODE (in) == REG
-	   && REGNO (in) >= FIRST_PSEUDO_REGISTER)
-       || (GET_CODE (in) == SUBREG
-	   && GET_CODE (SUBREG_REG (in)) == REG
-	   && REGNO (SUBREG_REG (in)) >= FIRST_PSEUDO_REGISTER))
+       || (GET_CODE (inner) == REG
+	   && REGNO (inner) >= FIRST_PSEUDO_REGISTER))
       && (mode == QImode || mode == HImode)
-      && (class == ADDRESS_REGS || class == SP_REGS
-	  || class == SP_OR_ADDRESS_REGS))
+      && (rclass == ADDRESS_REGS || rclass == SP_REGS
+	  || rclass == SP_OR_ADDRESS_REGS))
     {
       if (TARGET_AM33)
 	return DATA_OR_EXTENDED_REGS;
@@ -1346,12 +1352,12 @@ mn10300_secondary_reload_class (enum reg_class class, enum machine_mode mode,
 
   /* We can't directly load sp + const_int into a data register;
      we must use an address register as an intermediate.  */
-  if (class != SP_REGS
-      && class != ADDRESS_REGS
-      && class != SP_OR_ADDRESS_REGS
-      && class != SP_OR_EXTENDED_REGS
-      && class != ADDRESS_OR_EXTENDED_REGS
-      && class != SP_OR_ADDRESS_OR_EXTENDED_REGS
+  if (rclass != SP_REGS
+      && rclass != ADDRESS_REGS
+      && rclass != SP_OR_ADDRESS_REGS
+      && rclass != SP_OR_EXTENDED_REGS
+      && rclass != ADDRESS_OR_EXTENDED_REGS
+      && rclass != SP_OR_ADDRESS_OR_EXTENDED_REGS
       && (in == stack_pointer_rtx
 	  || (GET_CODE (in) == PLUS
 	      && (XEXP (in, 0) == stack_pointer_rtx
@@ -1363,13 +1369,22 @@ mn10300_secondary_reload_class (enum reg_class class, enum machine_mode mode,
 	  || XEXP (in, 1) == stack_pointer_rtx))
     return GENERAL_REGS;
 
-  if (TARGET_AM33_2 && class == FP_REGS
-      && GET_CODE (in) == MEM
-      && ! (GET_CODE (in) == MEM && !CONSTANT_ADDRESS_P (XEXP (in, 0))))
+  if (TARGET_AM33_2
+      && rclass == FP_REGS)
     {
-      if (TARGET_AM33)
-	return DATA_OR_EXTENDED_REGS;
-      return DATA_REGS;
+      /* We can't load directly into an FP register from a	
+	 constant address.  */
+      if (GET_CODE (in) == MEM
+	  && CONSTANT_ADDRESS_P (XEXP (in, 0)))
+	return (TARGET_AM33 ? DATA_OR_EXTENDED_REGS : DATA_REGS);
+
+      /* Handle case were a pseudo may not get a hard register
+	 but has an equivalent memory location defined.  */
+      if (GET_CODE (inner) == REG
+	  && REGNO (inner) >= FIRST_PSEUDO_REGISTER
+	  && reg_equiv_mem [REGNO (inner)]
+	  && CONSTANT_ADDRESS_P (XEXP (reg_equiv_mem [REGNO (inner)], 0)))
+	return (TARGET_AM33 ? DATA_OR_EXTENDED_REGS : DATA_REGS);
     }
 
   /* Otherwise assume no secondary reloads are needed.  */

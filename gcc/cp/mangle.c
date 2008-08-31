@@ -1056,7 +1056,10 @@ write_unqualified_name (const tree decl)
   else if (DECL_LANG_SPECIFIC (decl) != NULL && DECL_DESTRUCTOR_P (decl))
     write_special_name_destructor (decl);
   else if (DECL_NAME (decl) == NULL_TREE)
-    write_source_name (DECL_ASSEMBLER_NAME (decl));
+    {
+      gcc_assert (DECL_ASSEMBLER_NAME_SET_P (decl));
+      write_source_name (DECL_ASSEMBLER_NAME (decl));
+    }
   else if (DECL_CONV_FN_P (decl))
     {
       /* Conversion operator. Handle it right here.
@@ -1546,6 +1549,13 @@ write_type (tree type)
 	  if (target_mangling)
 	    {
 	      write_string (target_mangling);
+	      /* Add substitutions for types other than fundamental
+		 types.  */
+	      if (TREE_CODE (type) != VOID_TYPE
+		  && TREE_CODE (type) != INTEGER_TYPE
+		  && TREE_CODE (type) != REAL_TYPE
+		  && TREE_CODE (type) != BOOLEAN_TYPE)
+		add_substitution (type);
 	      return;
 	    }
 

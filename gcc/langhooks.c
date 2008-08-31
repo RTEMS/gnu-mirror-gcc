@@ -27,7 +27,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "toplev.h"
 #include "tree.h"
 #include "tree-inline.h"
-#include "tree-gimple.h"
+#include "gimple.h"
 #include "rtl.h"
 #include "insn-config.h"
 #include "integrate.h"
@@ -133,7 +133,7 @@ lhd_warn_unused_global_decl (const_tree decl)
   /* This is what used to exist in check_global_declarations.  Probably
      not many of these actually apply to non-C languages.  */
 
-  if (TREE_CODE (decl) == FUNCTION_DECL && DECL_INLINE (decl))
+  if (TREE_CODE (decl) == FUNCTION_DECL && DECL_DECLARED_INLINE_P (decl))
     return false;
   if (TREE_CODE (decl) == VAR_DECL && TREE_READONLY (decl))
     return false;
@@ -303,8 +303,9 @@ lhd_expr_size (const_tree exp)
 /* lang_hooks.gimplify_expr re-writes *EXPR_P into GIMPLE form.  */
 
 int
-lhd_gimplify_expr (tree *expr_p ATTRIBUTE_UNUSED, tree *pre_p ATTRIBUTE_UNUSED,
-		   tree *post_p ATTRIBUTE_UNUSED)
+lhd_gimplify_expr (tree *expr_p ATTRIBUTE_UNUSED,
+		   gimple_seq *pre_p ATTRIBUTE_UNUSED,
+		   gimple_seq *post_p ATTRIBUTE_UNUSED)
 {
   return GS_UNHANDLED;
 }
@@ -527,7 +528,7 @@ lhd_omp_predetermined_sharing (tree decl ATTRIBUTE_UNUSED)
 tree
 lhd_omp_assignment (tree clause ATTRIBUTE_UNUSED, tree dst, tree src)
 {
-  return build_gimple_modify_stmt (dst, src);
+  return build2 (MODIFY_EXPR, TREE_TYPE (dst), dst, src);
 }
 
 /* Register language specific type size variables as potentially OpenMP
@@ -539,13 +540,16 @@ lhd_omp_firstprivatize_type_sizes (struct gimplify_omp_ctx *c ATTRIBUTE_UNUSED,
 {
 }
 
-tree
-add_builtin_function (const char *name,
-		      tree type,
-		      int function_code,
-		      enum built_in_class cl,
-		      const char *library_name,
-		      tree attrs)
+/* Common function for add_builtin_function and
+   add_builtin_function_ext_scope.  */
+static tree
+add_builtin_function_common (const char *name,
+			     tree type,
+			     int function_code,
+			     enum built_in_class cl,
+			     const char *library_name,
+			     tree attrs,
+			     tree (*hook) (tree))
 {
   tree   id = get_identifier (name);
   tree decl = build_decl (FUNCTION_DECL, id, type);
@@ -570,8 +574,43 @@ add_builtin_function (const char *name,
   else
     decl_attributes (&decl, NULL_TREE, 0);
 
-  return lang_hooks.builtin_function (decl);
+  return hook (decl);
 
+}
+
+/* Create a builtin function.  */
+
+tree
+add_builtin_function (const char *name,
+		      tree type,
+		      int function_code,
+		      enum built_in_class cl,
+		      const char *library_name,
+		      tree attrs)
+{
+  return add_builtin_function_common (name, type, function_code, cl,
+				      library_name, attrs,
+				      lang_hooks.builtin_function);
+}
+
+/* Like add_builtin_function, but make sure the scope is the external scope.
+   This is used to delay putting in back end builtin functions until the ISA
+   that defines the builtin is declared via function specific target options,
+   which can save memory for machines like the x86_64 that have multiple ISAs.
+   If this points to the same function as builtin_function, the backend must
+   add all of the builtins at program initialization time.  */
+
+tree
+add_builtin_function_ext_scope (const char *name,
+				tree type,
+				int function_code,
+				enum built_in_class cl,
+				const char *library_name,
+				tree attrs)
+{
+  return add_builtin_function_common (name, type, function_code, cl,
+				      library_name, attrs,
+				      lang_hooks.builtin_function_ext_scope);
 }
 
 tree

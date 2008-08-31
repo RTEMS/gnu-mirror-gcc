@@ -2630,9 +2630,28 @@ split_insn (rtx insn)
   /* Split insns here to get max fine-grain parallelism.  */
   rtx first = PREV_INSN (insn);
   rtx last = try_split (PATTERN (insn), insn, 1);
+  rtx insn_set, last_set, note;
 
   if (last == insn)
     return NULL_RTX;
+
+  /* If the original instruction was a single set that was known to be
+     equivalent to a constant, see if we can say the same about the last
+     instruction in the split sequence.  The two instructions must set
+     the same destination.  */
+  insn_set = single_set (insn);
+  if (insn_set)
+    {
+      last_set = single_set (last);
+      if (last_set && rtx_equal_p (SET_DEST (last_set), SET_DEST (insn_set)))
+	{
+	  note = find_reg_equal_equiv_note (insn);
+	  if (note && CONSTANT_P (XEXP (note, 0)))
+	    set_unique_reg_note (last, REG_EQUAL, XEXP (note, 0));
+	  else if (CONSTANT_P (SET_SRC (insn_set)))
+	    set_unique_reg_note (last, REG_EQUAL, SET_SRC (insn_set));
+	}
+    }
 
   /* try_split returns the NOTE that INSN became.  */
   SET_INSN_DELETED (insn);
@@ -2651,6 +2670,7 @@ split_insn (rtx insn)
 	  first = NEXT_INSN (first);
 	}
     }
+
   return last;
 }
 
@@ -2672,6 +2692,7 @@ split_all_insns (void)
       rtx insn, next;
       bool finish = false;
 
+      rtl_profile_for_bb (bb);
       for (insn = BB_HEAD (bb); !finish ; insn = next)
 	{
 	  /* Can't use `next_real_insn' because that might go across
@@ -2714,6 +2735,7 @@ split_all_insns (void)
 	}
     }
 
+  default_rtl_profile ();
   if (changed)
     find_many_sub_basic_blocks (blocks);
 
@@ -2966,6 +2988,7 @@ peephole2_optimize (void)
 
   FOR_EACH_BB_REVERSE (bb)
     {
+      rtl_profile_for_bb (bb);
       /* Indicate that all slots except the last holds invalid data.  */
       for (i = 0; i < MAX_INSNS_PER_PEEP2; ++i)
 	peep2_insn_data[i].insn = NULL_RTX;
@@ -3182,6 +3205,7 @@ peephole2_optimize (void)
 	}
     }
 
+  default_rtl_profile ();
   for (i = 0; i < MAX_INSNS_PER_PEEP2 + 1; ++i)
     BITMAP_FREE (peep2_insn_data[i].live_before);
   BITMAP_FREE (live);

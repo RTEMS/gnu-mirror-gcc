@@ -1723,7 +1723,7 @@ assemble_start_function (tree decl, const char *fnname)
      because ASM_OUTPUT_MAX_SKIP_ALIGN might not do any alignment at all.  */
   if (! DECL_USER_ALIGN (decl)
       && align_functions_log > align
-      && cfun->function_frequency != FUNCTION_FREQUENCY_UNLIKELY_EXECUTED)
+      && optimize_function_for_speed_p (cfun))
     {
 #ifdef ASM_OUTPUT_MAX_SKIP_ALIGN
       ASM_OUTPUT_MAX_SKIP_ALIGN (asm_out_file,
@@ -2228,7 +2228,7 @@ contains_pointers_p (tree type)
     }
 }
 
-/* In unit-at-a-time mode, we delay assemble_external processing until
+/* We delay assemble_external processing until
    the compilation unit is finalized.  This is the best we can do for
    right now (i.e. stage 3 of GCC 4.0) - the right thing is to delay
    it all the way to final.  See PR 17982 for further discussion.  */
@@ -2286,6 +2286,10 @@ process_pending_assemble_externals (void)
 #endif
 }
 
+/* This TREE_LIST contains any weak symbol declarations waiting
+   to be emitted.  */
+static GTY(()) tree weak_decls;
+
 /* Output something to declare an external symbol to the assembler.
    (Most assemblers don't need this, so we normally output nothing.)
    Do nothing if DECL is not external.  */
@@ -2302,6 +2306,9 @@ assemble_external (tree decl ATTRIBUTE_UNUSED)
 #ifdef ASM_OUTPUT_EXTERNAL
   if (!DECL_P (decl) || !DECL_EXTERNAL (decl) || !TREE_PUBLIC (decl))
     return;
+
+  if (SUPPORTS_WEAK && DECL_WEAK (decl))
+    weak_decls = tree_cons (NULL, decl, weak_decls);
 
   /* We want to output external symbols at very last to check if they
      are references or not.  */
@@ -4846,10 +4853,6 @@ output_constructor (tree exp, unsigned HOST_WIDE_INT size,
     assemble_zeros (size - total_bytes);
 }
 
-/* This TREE_LIST contains any weak symbol declarations waiting
-   to be emitted.  */
-static GTY(()) tree weak_decls;
-
 /* Mark DECL as weak.  */
 
 static void
@@ -4942,12 +4945,7 @@ declare_weak (tree decl)
     error ("weak declaration of %q+D must be public", decl);
   else if (TREE_CODE (decl) == FUNCTION_DECL && TREE_ASM_WRITTEN (decl))
     error ("weak declaration of %q+D must precede definition", decl);
-  else if (SUPPORTS_WEAK)
-    {
-      if (! DECL_WEAK (decl))
-	weak_decls = tree_cons (NULL, decl, weak_decls);
-    }
-  else
+  else if (!SUPPORTS_WEAK)
     warning (0, "weak declaration of %q+D not supported", decl);
 
   mark_weak (decl);
@@ -5380,7 +5378,7 @@ assemble_alias (tree decl, tree target)
 
   /* If the target has already been emitted, we don't have to queue the
      alias.  This saves a tad of memory.  */
-  if (!flag_unit_at_a_time || cgraph_global_info_ready)
+  if (cgraph_global_info_ready)
     target_decl = find_decl_and_mark_needed (decl, target);
   else
     target_decl= NULL;
