@@ -118,7 +118,7 @@ static int microblaze_address_cost              (rtx);
 static int microblaze_address_insns             (rtx, enum machine_mode);
 static void microblaze_asm_constructor          (rtx, int);
 static void microblaze_asm_destructor           (rtx, int);
-static void microblaze_select_section           (tree, int, 
+static section* microblaze_select_section       (tree, int, 
 						 unsigned HOST_WIDE_INT);
 static bool microblaze_valid_base_register_p    (rtx, enum machine_mode, int);
 static bool microblaze_valid_index_register_p   (rtx, enum machine_mode, int);
@@ -3293,7 +3293,7 @@ microblaze_elf_in_small_data_p (tree decl)
 }
 
 
-static void
+static section*
 microblaze_select_section (tree decl, int reloc, unsigned HOST_WIDE_INT align)
 {
   switch (categorize_decl_for_section (decl, reloc))
@@ -3304,12 +3304,9 @@ microblaze_select_section (tree decl, int reloc, unsigned HOST_WIDE_INT align)
          relaxation/relocation. Currently, turning mergeable sections 
          into regular readonly sections. */
 
-      switch_to_section (readonly_data_section);
-      return;
-
+      return readonly_data_section;
     default:
-      default_elf_select_section (decl, reloc, align);
-      return;
+      return default_elf_select_section (decl, reloc, align);
     }
 }
 
