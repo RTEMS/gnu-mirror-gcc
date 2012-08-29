@@ -71,8 +71,6 @@ typedef struct priority_info_s {
 static void mark_vtable_entries (tree);
 static bool maybe_emit_vtables (tree);
 static bool acceptable_java_type (tree);
-static tree start_objects (int, int);
-static void finish_objects (int, int, tree);
 static tree start_static_storage_duration_function (unsigned);
 static void finish_static_storage_duration_function (tree);
 static priority_info get_priority_info (int);
@@ -2729,12 +2727,12 @@ set_guard (tree guard)
 /* Start the process of running a particular set of global constructors
    or destructors.  Subroutine of do_[cd]tors.  */
 
-static tree
-start_objects (int method_type, int initp)
+tree
+start_objects (int method_type, int initp, const char *extra_name)
 {
   tree body;
   tree fndecl;
-  char type[14];
+  char *type = NULL;
 
   /* Make ctor or dtor function.  METHOD_TYPE may be 'I' or 'D'.  */
 
@@ -2748,15 +2746,23 @@ start_objects (int method_type, int initp)
       joiner = '_';
 #endif
 
-      sprintf (type, "sub_%c%c%.5u", method_type, joiner, initp);
+      type = (char *) xmalloc ((4 + 1 + 1 + 10 + 1 + strlen (extra_name)) 
+		       * sizeof (char));
+      sprintf (type, "sub_%c%c%.5u%s", method_type, joiner, initp,
+               extra_name);
     }
   else
-    sprintf (type, "sub_%c", method_type);
+    {
+      type = (char *) xmalloc ((4 + 1) * sizeof (char));
+      sprintf (type, "sub_%c", method_type);
+    }
 
   fndecl = build_lang_decl (FUNCTION_DECL,
 			    get_file_function_name (type),
 			    build_function_type_list (void_type_node,
 						      NULL_TREE));
+  free (type);
+
   start_preparsed_function (fndecl, /*attrs=*/NULL_TREE, SF_PRE_PARSED);
 
   TREE_PUBLIC (current_function_decl) = 0;
@@ -2782,7 +2788,7 @@ start_objects (int method_type, int initp)
 /* Finish the process of running a particular set of global constructors
    or destructors.  Subroutine of do_[cd]tors.  */
 
-static void
+tree
 finish_objects (int method_type, int initp, tree body)
 {
   tree fn;
@@ -2795,6 +2801,14 @@ finish_objects (int method_type, int initp, tree body)
     {
       DECL_STATIC_CONSTRUCTOR (fn) = 1;
       decl_init_priority_insert (fn, initp);
+
+      /* TODO: try not to match based on name */
+      if (flag_vtable_verify
+	  && strstr (IDENTIFIER_POINTER (DECL_NAME (fn)), ".vtable"))
+	{
+	  /* TODO: Is it ok to leave this function without calling expand_or_defer_fn()? */
+	  return fn;
+	}
     }
   else
     {
@@ -2803,6 +2817,7 @@ finish_objects (int method_type, int initp, tree body)
     }
 
   expand_or_defer_fn (fn);
+  return fn;
 }
 
 /* The names of the parameters to the function created to handle
@@ -3330,7 +3345,7 @@ generate_ctor_or_dtor_function (bool constructor_p, int priority,
   if (c_dialect_objc () && (priority == DEFAULT_INIT_PRIORITY)
       && constructor_p && objc_static_init_needed_p ())
     {
-      body = start_objects (function_key, priority);
+      body = start_objects (function_key, priority, "");
       objc_generate_static_init_call (NULL_TREE);
     }
 
@@ -3344,7 +3359,7 @@ generate_ctor_or_dtor_function (bool constructor_p, int priority,
 	  tree call;
 
 	  if (! body)
-	    body = start_objects (function_key, priority);
+	    body = start_objects (function_key, priority, "");
 
 	  call = cp_build_function_call_nary (fndecl, tf_warning_or_error,
 					      build_int_cst (NULL_TREE,
@@ -4071,7 +4086,20 @@ cp_write_global_declarations (void)
   timevar_stop (TV_PHASE_DEFERRED);
   timevar_start (TV_PHASE_CGRAPH);
 
+  if (flag_vtable_verify)
+    vtv_compute_class_hierarchy_transitive_closure ();
+
   cgraph_finalize_compilation_unit ();
+
+  /* Generate the special constructor function that calls
+     __VLTChangePermission and __VLTRegisterPairs, and give it
+     a very high initialization priority.  */
+
+  /* TODO: Can we put the body of this "if" into a routine in vtable-class-hierarchy.c ? */
+  if (flag_vtable_verify)
+    {
+      vtv_generate_init_routine(main_input_filename);
+    }
 
   timevar_stop (TV_PHASE_CGRAPH);
   timevar_start (TV_PHASE_CHECK_DBGINFO);

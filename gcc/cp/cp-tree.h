@@ -4902,6 +4902,8 @@ extern void note_vague_linkage_fn		(tree);
 extern tree build_artificial_parm		(tree, tree);
 extern bool possibly_inlined_p			(tree);
 extern int parm_index                           (tree);
+extern tree start_objects                       (int, int, const char *);
+extern tree finish_objects                      (int, int, tree);
 
 /* in error.c */
 extern void init_error				(void);
@@ -5621,6 +5623,7 @@ extern tree merge_exception_specifiers		(tree, tree);
 
 /* in mangle.c */
 extern void init_mangle				(void);
+extern tree get_mangled_id			(tree);
 extern void mangle_decl				(tree);
 extern const char *mangle_type_string		(tree);
 extern tree mangle_typeinfo_for_type		(tree);
@@ -5676,6 +5679,15 @@ extern bool cxx_omp_privatize_by_reference	(const_tree);
 
 /* in name-lookup.c */
 extern void suggest_alternatives_for (location_t, tree);
+
+/* in init.c */
+extern tree build_vtbl_address                   (tree);
+
+/* in vtable-class-hierarchy.c */
+
+extern void vtv_compute_class_hierarchy_transitive_closure (void);
+extern void vtv_generate_init_routine                (const char *);
+extern void vtv_save_base_class_info                 (tree);
 
 /* -- end of C++ */
 
