@@ -1,0 +1,545 @@
+2014-05-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000-modes.def (KFmode): Change XFmode to
+	KFmode, so there is no confusion with x86's XFmode.
+	* config/rs6000/vector.md (VEC_L): Likewise.
+	(VEC_R): Likewise.
+	* config/rs6000/predicates.md (easy_fp_constant): Likewise.
+	* config/rs6000/rs6000.c (rs6000_debug_reg_global): Likewise.
+	(rs6000_init_hard_regno_mode_ok): Likewise.
+	(invalid_e500_subreg): Likewise.
+	(reg_offset_addressing_ok_p): Likewise.
+	(rs6000_legitimate_offset_address_p): Likewise.
+	(rs6000_legitimize_address): Likewise.
+	(rs6000_legitimize_reload_address): Likewise.
+	(rs6000_emit_move): Likewise.
+	(rs6000_gimplify_va_arg): Likewise.
+	(rs6000_init_builtins): Likewise.
+	(init_float128_ieee): Likewise.
+	(rs6000_init_libfuncs): Likewise.
+	(rs6000_cannot_change_mode_class): Likewise.
+	(rs6000_generate_compare): Likewise.
+	(output_toc): Likewise.
+	* config/rs6000/vsx.md (VSX_L): Likewise.
+	(VSX_M): Likewise.
+	(VSX_M2): Likewise.
+	* config/rs6000/rs6000.h (FLOAT128_IEEE_P): Likewise.
+	* config/rs6000/altivec.md (VM): Likewise.
+	(VM2): Likewise.
+	* config/rs6000/rs6000.md (FMOVE128): Likewise.
+	(FMOVE128_GPR): Likewise.
+	(FP128_64): Likewise.
+
+2014-05-20  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_option_override_internal):
+	-mfloat128 now requires -mvsx.
+	(rs6000_init_builtins): Initialize __float128 type if -mfloat128,
+	initialize __ibm128 type if long double size is 128.
+	(init_float128_ieee): Change the naming of the IEEE 128-bit
+	functions to be *xf* instead *tf*_{vector,fpr}.  Drop the support
+	for __float128 on non VSX systems.
+	(rs6000_opt_masks): Allow -mfloat128 to be set via #pragma target.
+
+2014-05-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_option_override_internal):
+	Silently turn off -mfloat128 if -mlong-double-64 was used and
+	-mfloat128 was not.
+
+2014-05-15  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 210478.
+	* REVISION: Update subversion id.
+
+2014-05-02  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_cannot_change_mode_class): Undo
+	change that broke TFmode loading up constants on little endian.
+
+2014-05-01  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 209991.
+	* REVISION: Update subversion id.
+
+	* config/rs6000/rs6000-c.c (rs6000_target_modify_macros): Move
+	__FLOAT128__ to rs6000_cpu_cpp_builtins.
+	(rs6000_cpu_cpp_builtins): Define __FLOAT128__ if __float128
+	available.  Define __LONG_DOUBLE_IEEE128__ if long double is IEEE
+	128-bit floating point.  Define __LONG_DOUBLE_64__ if long double
+	is the same as double.  Define __SIZEOF_FLOAT128__ to be 16 for
+	x86 compatibility.
+
+2014-04-29  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/aix53.h: Undo long double size changes.
+	* config/rs6000/aix43.h: Likewise.
+	* config/rs6000/aix52.h: Likewise.
+	* config/rs6000/aix61.h: Likewise.
+	* doc/invoke.texi: Likewise.
+
+	* config/rs6000/rs6000.h (OPTION_MASK_FP128_OPTIONS): Delete, no
+	longer used.
+
+	* config/rs6000/rs6000-cpus.def (ISA_2_7_MASKS_SERVER): Add
+	OPTION_MASK_FLOAT128.  Delete IEEEQUAD, long double 128-bit
+	masks.
+	(POWERPC_MASKS): Likewise.
+
+	* config/rs6000/rs6000-c.c (rs6000_target_modify_macros): Delete
+	code to print what long double becomes.
+
+	* config/rs6000/rs6000.opt (-mabi=ieeelongdouble): Go back to
+	trunk method of changing long double size and whether long double
+	is IEEE 128-bit or IBM double double.
+	(-mabi=ibmlongdouble): Likewise.
+	(-mlong-double-128): Likewise.
+	(-mlong-double-64): Likewise.
+	(-mlong-double-ieee128): Likewise.
+	(-mlong-double-ibm128): Likewise.
+
+	* config/rs6000/rs6000.c (rs6000_debug_reg_global): Go back to
+	trunk method of changing long double size and whether long double
+	is IEEE 128-bit or IBM double double.  Disallow -mfloat128 if
+	-mlong-double-64.
+	(rs6000_option_override_internal): Likewise.
+	(rs6000_init_builtins): Likewise.
+	(rs6000_opt_masks): Likewise.
+	(init_float128_ieee): Use <op>_vector for -mfloat128 support
+	functions on VSX systems, use <op>_fpr for -mfloat128 support
+	functions without VSX support, and use the historical names
+	without -mfloat128.
+
+	* config/rs6000/rs6000.h (TARGET_LONG_DOUBLE_128): Go back to
+	trunk method of changing long double size and whether long double
+	is IEEE 128-bit or IBM double double.
+	(TARGET_IEEEQUAD): Likewise.
+	(LONG_DOUBLE_TYPE_SIZE): Likewise.
+	(MASK_FLOAT128): Define shortcut as OPTION_MASK_FLOAT128.
+
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Remove
+	changes complaining about long double size changes in target
+	attribute, since it is buggy.
+
+	* config/rs6000/rs6000-builtin.def (PACK_JF): Add pack, unpack
+	builtins for __ibm128.
+	(UNPACK_JF): Likewise.
+
+	* config/rs6000/rs6000.c (rs6000_hard_regno_nregs_internal):
+	Change all uses of FLOAT128_PAIRED_P to FLOAT128_2REG_P.
+	(rs6000_legitimate_address_p): Likewise.
+	(rs6000_emit_move): Likewise.
+	(rs6000_function_arg_boundary): Likewise.
+	(rs6000_function_arg_advance_1): Likewise.
+	(rs6000_function_arg): Likewise.
+	(rs6000_cannot_change_mode_class): Likewise.
+	(print_operand): Likewise.
+	(rs6000_split_multireg_move): Likewise.
+	(spe_func_has_64bit_regs_p): Likewise.
+	(rs6000_register_move_cost): Likewise.
+	* config/rs6000/rs6000.h (FLOAT128_2REG_P): Likewise.
+	* config/rs6000/rs6000.md (mov<mode>_64bit, FMOVE128): Likewise.
+	(mov<mode>_32bit, FMOVE128): Likewise.
+
+	* config/rs6000/rs6000.md (FP128_64): Add support for XFmode,
+	JFmode for 128-bit pack/unpack builtin support.  Limit TFmode
+	unpack/pack to just when TFmode is the ibm double-double format.
+	(unpack<mode>, FMOVE128): Likewise.
+	(TF_JF): Likewise.
+	(unpack<mode>_0): Likewise.
+	(unpack<mode>_1): Likewise.
+	(unpack<mode>_dm): Likewise.
+	(unpack<mode>_nodm): Likewise.
+	(pack<mode>): Likewise.
+
+	* doc/extend.texi (PowerPC Built-in Functions): Document pack,
+	unpack builtins for __ibm128.
+
+	Merge up to 209899.
+	* REVISION: Update subversion id.
+
+2014-04-28  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.h (HARD_REGNO_CALLER_SAVE_MODE): Fix typo.
+	Use FLOAT128_PAIRED_P instead of FLOAT128_IBM_P.
+	(MODES_TIEABLE_P): Make XFmode pairable with vectors, not with
+	scalar floating point.
+
+	* config/rs6000/rs6000-c.c (rs6000_target_modify_macros): If
+	-mfloat128, define __FLOAT128__.
+
+	* config/rs6000/rs6000.opt (-mfloat128): Add option to explicitly
+	enable/disable IEEE 128-bit floating point.
+
+	* config/rs6000/rs6000.c (rs6000_debug_reg_global): If
+	-mdebug=reg, print status of IEEE 128-bit support.
+	(rs6000_option_override_internal): Add support for -mfloat128 to
+	enable/disable IEEE 128-bit support.
+	(rs6000_init_builtins): Likewise.
+	(init_float128_ieee): Change names for now to be _<opt>xf<n>,
+	instead of _<opt>tf<n>.
+	(rs6000_opt_masks): Add -mfloat128.
+
+	* config/rs6000/rs6000.h (OPTION_MASK_FP128_OPTIONS): New mask
+	that is a combination of options for 128-bit floating point.
+
+	* doc/invoke.texi (RS/6000 and PowerPC Options): Add -mfloat128.
+
+2014-04-24  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_mangle_type): Add support for
+	manging __float128 and __ibm128 types.
+
+	* config/rs6000/rs6000.md (FMOVE128): Merge in recent trunk
+	changes.
+	(mov<mode>_64bit): Add test for the type being paired.
+
+2014-04-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 209717.
+	* REVISION: Update subversion id.
+
+2014-04-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 209662 (after gcc 4.9 release).
+	* REVISION: Update subversion id.
+
+2014-02-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 207860.
+	* REVISION: Update subversion id.
+
+2014-02-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 207735.
+	* REVISION: Update subversion id.
+
+2014-02-04  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 207480.
+	* REVISION: Update subversion id.
+
+2014-01-31  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* doc/extend.texi (Floating Types): Add documentation for
+	__float128 and __ibm128 on PowerPC systems.
+
+	* doc/invoke.texi (-mlong-double-64): Document the long double
+	size switches.
+	(-mlong-double-128): Likewise.
+	(-mlong-double-ieee128): Document the new switches to control
+	whether long double is IEEE 128-bit or IBM double double.
+
+	* config/rs6000/rs6000-common.c (rs6000_handle_option): Drop
+	-mlong-double-<size> support.
+
+	* config/rs6000/aix53.h (SUBTARGET_OVERRIDE_OPTIONS): Move
+	-mlong-double-<size> to target option bits.
+	* config/rs6000/aix43.h (SUBTARGET_OVERRIDE_OPTIONS): Likewise.
+	* config/rs6000/aix52.h (SUBTARGET_OVERRIDE_OPTIONS): Likewise.
+	* config/rs6000/aix61.h (SUBTARGET_OVERRIDE_OPTIONS): Likewise.
+
+	* config/rs6000/predicates.md (easy_fp_constant): Handle IEEE
+	128-bit constants.
+
+	* config/rs6000/rs6000-cpus.def (ISA_2_6_MASKS_SERVER): Delete the
+	-mieee128-vector option.  Change -mlong-double-<size> and
+	-mabi=ieeelongdouble/-mabi=ibmlongdouble options to be target
+	option bits.
+	(POWERPC_MASKS): Likewise.
+	(power7 cpu): Likewise.
+
+	* config/rs6000/rs6000.opt (-mabi=ieeelongdouble): Change option
+	to -mlong-double-ieee128.  Delete warning on its use.
+	(-mabi=ibmlongdouble): Change option to -mlong-double-ibm128.
+	(-mlong-double-): Delete -mlong-double-<size>, and replace it with
+	-mlong-double-64, -mlong-double-128, -mlong-double-ieee128,
+	-mlong-double-ibm128 options to control the size and format of the
+	long double type.
+	(-mlong-double-64): Likewise.
+	(-mlong-double-128): Likewise.
+	(-mlong-double-ieee128): Likewise.
+	(-mlong-double-ibm128): Likewise.
+
+	* config/rs6000/rs6000-c.c (rs6000_target_modify_macros): Define
+	__LONG_DOUBLE_IEEE128__ and __LONG_DOUBLE_IBM128__ depending on
+	the long double format.  Delete support for the temporary
+	-mieee128-vector switch.
+
+	* config/rs6000/rs6000.c (rs6000_debug_reg_global): Change how
+	long double size is printed.
+	(rs6000_init_hard_regno_mode_ok): Delete temporary
+	-mieee128-vector switch.  Replace -mlong-double-<size> and
+	-mabi=<fmt>longdouble with -mlong-double-64, -mlong-double-128,
+	-mlong-double-ieee128, and -mlong-double-ibm128.  Only allow
+	selecting IEEE 128 support if VSX is avaiable.
+	(rs6000_option_override_internal): Likewise.
+	(rs6000_return_in_memory): Drop temporary -mieee128-vector, use
+	-mvsx instead.
+	(rs6000_function_arg_boundary): Rework IEEE 128-bit support.
+	(rs6000_init_builtins): Only enable __float128 and __ibm128 if VSX
+	is available.
+	(init_float128_ibm): Update comment.
+	(init_float128_ieee): If VSX, use the normal __<op>tf<n> names
+	instead of __ieee128....  If not VSX, retain the existing
+	convention of using names of the form _q_<op>.
+	(rs6000_opt_masks): Update the long double options.
+
+	* config/rs6000/rs6000.h (FLOAT128_VECTOR_P): Drop support for the
+	temporary -mieee128-vector switch, just test -mvsx.
+	(FLOAT128_PAIRED_P): Likewise.
+	(TARGET_LONG_DOUBLE_128): Delete, target macro is now defined in
+	rs6000.opt.
+	(TARGET_IEEEQUAD): Likewise.
+
+2014-01-29  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/predicates.md (int_reg_operand_not_pseudo): New
+	predicate to return true if op is a hard GPR register.
+
+	* config/rs6000/rs6000.opt (-mabi=ieeelongdouble): Remove warning
+	if the option was used.
+	(-mabi=ibmlongdouble): Likewise.
+
+	* config/rs6000/rs6000.c (scalar_float_not_vector_p): New helper
+	function to differentiate scalar floating point that is passed in
+	the traditional floating point registers from IEEE 128-bit
+	floating point passed in vector registers.
+	(rs6000_hard_regno_mode_ok): Make sure TF/XFmode uses the correct
+	number of registers.
+	(USE_FP_FOR_ARG_P): Do not use scalar float registers for IEEE
+	128-bit floating point passed in vector registers.
+	(rs6000_aggregate_candidate): Do not count IEEE 128-bit that is
+	passed as a vector as a special aggregate.
+	(rs6000_discover_homogeneous_aggregate): Likewise.
+	(init_cumulative_args): Record whether this call is a library
+	call.  Distinguish between scalar floating point values passed in
+	traditional FP registers from those passed in vector registers.
+	(rs6000_function_arg_advance_1): Likewise.
+	(rs6000_function_arg): Likewise.
+	(rs6000_arg_partial_bytes): Likewise.
+	(rs6000_function_value): Likewise.
+	(rs6000_libcall_value): Likewise.
+
+	* config/rs6000/rs6000.h (CUMULATIVE_ARGS): Add field to denote if
+	this is a library function.
+
+	* config/rs6000/vsx.md (VSX_L): Add XFmode, TFmode if those types
+	are passed in vector registers.
+	(VSX_M): Likewise.
+	(VSX_M2): Likewise.
+
+	* config/rs6000/altivec.md (VM): Add XFmode, TFmode if those types
+	are passed in vector registers.
+	(VM2): Likewise.
+
+	* config/rs6000/rs6000.md (mov<mode>_internal, 128-bit FP): Handle
+	spliting IEEE 128-bit floating point if it is in GPRs.
+
+2014-01-28  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 207203.
+	* REVISION: Update subversion id.
+
+2014-01-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 206895.
+	* REVISION: Update subversion id.
+
+2014-01-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 206671.
+	* REVISION: Update subversion id.
+
+2014-01-15  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/vector.md (VEC_M): Do not include XFmode.
+
+	* config/rs6000/rs6000.c (rs6000_hard_regno_nregs_internal): Use
+	FLOAT128_PAIRED_P, FLOAT128_IBM_P, FLOAT128_IEEE_P,
+	FLOAT128_VECTOR_P to classify 128-bit floating point.
+	(rs6000_init_hard_regno_mode_ok): Likewise.
+	(rs6000_legitimate_address_p): Likewise.
+	(rs6000_return_in_memory): Likewise.
+	(rs6000_function_arg_boundary): Likewise.
+	(rs6000_function_arg_advance_1): Likewise.
+	(rs6000_function_arg): Likewise.
+	(rs6000_pass_by_reference): Likewise.
+	(rs6000_init_builtins): Always add support __float128 and
+	__ibm128, even if not -mvsx.
+	(init_float128_ibm): New functions to set up all of the optab
+	libfunc interfaces for IBM 128-bit and IEEE 128-bit floating
+	point.
+	(init_float128_ieee): Likewise.
+	(rs6000_init_libfuncs): Call init_float128_ibm, init_float128_ieee
+	to properly setup XFmode, TFmode, and JFmode.
+	(rs6000_cannot_change_mode_class): Use FLOAT128_PAIRED_P,
+	FLOAT128_IBM_P, FLOAT128_IEEE_P, FLOAT128_VECTOR_P to classify
+	128-bit floating point.
+	(print_operand): Likewise.
+	(rs6000_generate_compare): Likewise.
+	(rs6000_split_multireg_move): Likewise.
+	(spe_func_has_64bit_regs_p): Likewise.
+	(rs6000_register_move_cost): Likewise.
+	(rs6000_function_value): Likewise.
+	(rs6000_libcall_value): Likewise.
+
+	* config/rs6000/vsx.md (VSX_L): Add XFmode and TFmode if those
+	types occupy a single VSX register.
+
+	* config/rs6000/rs6000.h (IEEE128_MODE_P): Delete, rename macros
+	to be more consistent.
+	(IBM128_MODE_P): Likewise.
+	(FLOAT128_IEEE_P): New macros to classify 128-bit floating point.
+	(FLOAT128_IBM_P): Likewise.
+	(FLOAT128_VECTOR_P): Likewise.
+	(FLOAT128_PAIRED_P): Likewise.
+	(SLOW_UNALIGNED_ACCESS): Use new FLOAT128 macros for 128-bit
+	floating point.
+	(HARD_REGNO_CALLER_SAVE_MODE): Likewise.
+	(HARD_REGNO_CALL_PART_CLOBBERED): Likewise.
+	(ALTIVEC_VECTOR_MODE): Likewise.
+
+	* config/rs6000/rs6000.md (FMOVE128): Remove conditions from the
+	macro attribute, and add XFmode, JFmode.
+	(FMOVE128_GPR): Add XFmode, TFmode.
+	(mov<mode>, 128-bit floating point): Add test for whether this is
+	a paired floating point move.
+
+2014-01-10  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000-modes.def (JFmode): Add mode to represent
+	IBM 128-bit floating point.
+
+	* config/rs6000/rs6000-cpus.def (ISA_2_6_MASKS_SERVER): Set
+	-mieee128-vector.
+	(ISA_2_7_MASKS_SERVER): Likewise.
+	(power7 cpu): Likewise.
+
+	* config/rs6000/rs6000-c.c (rs6000_target_modify_macros): If
+	-mieee128-vector, define ___IEEE128_VECTOR__.
+
+	* config/rs6000/rs6000.opt (-mieee128-vector): New debug switch to
+	control whether IEEE 128-bit floating point type can go in a
+	single vector register.
+
+	* config/rs6000/rs6000.c (rs6000_hard_regno_nregs_internal): IBM
+	128-bit floating point only uses 64-bit registers.
+	(rs6000_debug_reg_global): Debug JFmode.
+	(rs6000_init_hard_regno_mode_ok): Add explicit support for both
+	IEEE 128-bit floating point and IBM 128-bit floating point.  Add
+	support for -mieee128-vector to pass/return IEEE 128-bit floating
+	point as a vector.
+	(invalid_e500_subreg): Likewise.
+	(rs6000_legitimate_offset_address_p): Likewise.
+	(rs6000_legitimize_address): Likewise.
+	(rs6000_legitimize_reload_address): Likewise.
+	(rs6000_legitimate_address_p): Likewise.
+	(rs6000_legitimate_offset_address_p): Likewise.
+	(rs6000_emit_move): Likewise.
+	(rs6000_return_in_memory): Likewise.
+	(rs6000_function_arg_boundary): Likewise.
+	(rs6000_function_arg_advance_1): Likewise.
+	(rs6000_function_arg): Likewise.
+	(rs6000_pass_by_reference): Likewise.
+	(rs6000_init_builtins): Likewise.
+	(rs6000_cannot_change_mode_class): Likewise.
+	(print_operand): Likewise.
+	(rs6000_generate_compare): Likewise.
+	(rs6000_split_multireg_move): Likewise.
+	(spe_func_has_64bit_regs_p): Likewise.
+	(rs6000_output_function_epilogue): Likewise.
+	(output_toc): Likewise.
+	(rs6000_register_move_cost): Likewise.
+	(rs6000_function_value): Likewise.
+	(rs6000_libcall_value): Likewise.
+	(rs6000_opt_masks): Add debugging for -mieee128-vector.
+
+	* config/rs6000/rs6000.h (IEEE128_MODE_P): New macros to determine
+	if a mode is an IEEE 128-bit floating point or IBM 128-bit
+	floating point mode.
+	(IBM128_MODE_P): Likewise.
+	(SLOW_UNALIGNED_ACCESS): Use IEEE128_MODE_P and IBM128_MODE_P as
+	appropriate instead of testing against TFmode.
+	(HARD_REGNO_CALLER_SAVE_MODE): Likewise.
+	(HARD_REGNO_CALL_PART_CLOBBERED): Likewise.
+	(ALTIVEC_VECTOR_MODE): Treat IEEE 128-bit floating point as a
+	vector mode if -mieee128-vector.
+	(enum rs6000_builtin_type_index): Add IBM 128-bit floating point
+	type.
+	(ibm128_float_type_node): Likewise.
+
+2014-01-09  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 206496.
+	* REVISION: Update subversion id.
+
+2014-01-06  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 206375.
+	* REVISION: Update subversin id.
+
+2014-01-03  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/vector.md (VEC_L): Add XFmode (ieee 128-bit
+	floating point).
+	(VEC_M): Likewise.
+	(VEC_R): Likewise.
+
+	* config/rs6000/predicates.md (easy_fp_support): Add support for
+	XFmode.
+
+	* config/rs6000/rs6000-modes.def (XFmode): Add new floating point
+	type that is IEEE 128-bit floating point.  Make this mode a
+	fractional mode so it is not selected by normal mode lookup
+	rules.
+
+	* config/rs6000/rs6000.c (rs6000_debug_reg_global): Add XFmode to
+	modes to print out with debugging.
+	(rs6000_init_hard_regno_mode_ok): Setup XFmode if VSX is
+	available.
+	(reg_offset_addressing_ok_p): Treat XFmode as a vector type that
+	only uses reg+reg addressing, and is passed/returned like a vector
+	type.
+	(rs6000_legitimate_offset_address_p): Likewise.
+	(rs6000_legitimize_address): Likewise.
+	(rs6000_emit_move): Likewise.
+	(rs6000_function_arg_boundary): Likewise.
+	(rs6000_init_builtins): Add support for new __float128 keyword.
+	Setup XFmode.
+	(rs6000_output_function_epilogue): Add XFmode support.
+
+	* config/rs6000/vsx.md (VSX_L): Add XFmode to VSX mode iterators.
+	(VSX_M): Likewise.
+	(VSX_M2): Likewise.
+
+	* config/rs6000/rs6000.h (VSX_VECTOR_MODE): Treat XFmode (ieee
+	128-bit floating point) as a VSX mode.
+	(enum rs6000_builtin_type_index): Add type for IEEE 128-bit
+	floating point.
+	(ieee128_float_type_node): Likewise.
+
+	* config/rs6000/altivec.md (VM): Add XFmode to VMX mode
+	iterators.
+	(VM2): Likewise.
+
+2014-01-02  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 206281.
+	* REVISION: Update subversion id.
+
+2013-12-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 206028.
+	* REVISION: Update subversion id.
+
+2013-12-09  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 205830.
+	* REVISION: Update subversion id.
+
+2013-11-26  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Clone branch from subversion id 205398.
+	* REVISION: New file to track subversion id.
+
