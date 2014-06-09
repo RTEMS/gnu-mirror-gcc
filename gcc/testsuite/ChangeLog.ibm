@@ -1,0 +1,282 @@
+2011-10-11  Peter Bergner  <bergner@vnet.ibm.com>
+
+	Backport from mainline
+	2011-10-11  Janis Johnson  <janisjo@codesourcery.com>
+
+	PR c++/44473
+	* g++.dg/dfp/44473-1.C: New test.
+	* g++.dg/dfp/44473-2.C: New test.
+	* g++.dg/dfp/mangle-1.C: New test.
+	* g++.dg/dfp/mangle-2.C: New test.
+	* g++.dg/dfp/mangle-3.C: New test.
+	* g++.dg/dfp/mangle-4.C: New test.
+	* g++.dg/dfp/mangle-5.C: New test.
+
+2011-09-08  Peter Bergner  <bergner@vnet.ibm.com>
+
+	Backport from mainline
+	2011-08-23  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/46862
+	* g++.dg/dfp/nofields.C: New test.
+
+	2011-08-29  Jakub Jelinek  <jakub@redhat.com>
+		    Jason Merrill  <jason@redhat.com>
+
+	PR c++/50207
+	* g++.dg/dfp/base.C: New test.
+
+2011-05-11  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Backport from mainline
+	2011-05-10  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/48857
+	* gcc.target/powerpc/pr48857.c: New file, make sure V2DI arguments
+	are passed and returned in vector registers.
+
+2011-03-16  Bill Schmidt  <wschmidt@vnet.ibm.com>
+
+	Backport from mainline:
+	2010-09-19  Ira Rosen  <irar@il.ibm.com>
+
+	PR tree-optimization/45714
+	* gfortran.dg/vect/pr45714-a.f: New test.
+	* gfortran.dg/vect/pr45714-b.f: New test.
+
+2011-03-11  Peter Bergner  <bergner@vnet.ibm.com>
+
+	Backport proposed mainline patch.
+
+	PR target/48053
+	* gcc/testsuite/gcc.target/powerpc/pr48053-1.c: New test.
+	* gcc/testsuite/gcc.target/powerpc/pr48053-2.c: Likewise.
+
+2011-03-11  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to gcc-4_5-branch, subversion id 170880.
+
+2011-03-09  Peter Bergner  <bergner@vnet.ibm.com>
+
+	Backport from mainline
+	2010-07-02  Ulrich Weigand  <Ulrich.Weigand@de.ibm.com>
+
+	PR target/44707
+	* gcc.c-torture/compile/pr44707.c: New test.
+
+2011-03-09  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to gcc-4_5-branch, subversion id 170820.
+
+2011-03-08  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Backport from mainline
+	2011-03-08  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/47755
+	* gcc.target/powerpc/pr47755-2.c: New file.
+
+2011-03-07  Pat Haugen <pthaugen@us.ibm.com>
+
+	Backport from mainline
+	2011-03-07  Pat Haugen <pthaugen@us.ibm.com>
+
+	PR target/47862
+	* gcc.target/powerpc/pr47862.c: New.
+
+2011-02-15  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Backport from mainline
+	2011-02-15  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/47755
+	* gcc.target/powerpc/pr47755.c: New file, test all 0 vector
+	constant does not generate a load from memory.
+
+2011-02-03  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Backport from the GCC 4.6 mainline:
+	2011-02-02  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/47272
+	* gcc.target/powerpc/vsx-builtin-8.c: New file, test vec_vsx_ld
+	and vec_vsx_st.
+
+	* gcc.target/powerpc/avoid-indexed-addresses.c: Disable altivec
+	and vsx so a default --with-cpu=power7 doesn't give an error
+	when -mavoid-indexed-addresses is used.
+
+	* gcc.target/powerpc/ppc32-abi-dfp-1.c: Rewrite to use an asm
+	wrapper function to save the arguments and then jump to the real
+	function, rather than depending on the compiler not to move stuff
+	before an asm.
+	* gcc.target/powerpc/ppc64-abi-dfp-2.c: Ditto.
+
+2011-01-24  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Backport from the GCC 4.6 mainline:
+	2011-01-24  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/47408
+	* gcc.target/powerpc/altivec-11.c: Add explicit -mno-vsx.
+	* gcc.target/powerpc/altivec-14.c: Ditto.
+	* gcc.target/powerpc/altivec-33.c: Ditto.
+	* gcc.target/powerpc/altivec-types-1.c: Ditto.
+	* gcc.target/powerpc/altivec-types-2.c: Ditto.
+	* gcc.target/powerpc/altivec-types-3.c: Ditto.
+	* gcc.target/powerpc/altivec-types-4.c: Ditto.
+	* gcc.target/powerpc/ppc-vector-memcpy.c: Ditto.
+	* gcc.target/powerpc/ppc-vector-memset.c: Ditto.
+	* g++.dg/ext/altivec-15.C: Ditto.
+	* g++.dg/ext/altivec-types-1.C: Ditto.
+	* g++.dg/ext/altivec-types-2.C: Ditto.
+	* g++.dg/ext/altivec-types-3.C: Ditto.
+	* g++.dg/ext/altivec-types-4.C: Ditto.
+
+2010-11-30  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Backport from the GCC 4.6 mainline:
+	2010-11-30  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/ppc-fma-7.c: New file, test that (a*b)+c and
+	(a*b)-c generates two fma instructions, instead of separate
+	multiply, add, and subtract.
+
+	Backport from the GCC 4.6 mainline:
+	2010-10-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/ppc-fma-6.c: Ditto.
+
+	Backport from the GCC 4.6 mainline:
+	2010-11-30  Richard Guenther  <rguenther@suse.de>
+
+	PR tree-optimization/46722
+	* gcc.target/i386/fma4-fma-2.c: New testcase.
+
+2010-11-24  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Backport from the GCC 4.6 mainline
+	2010-11-09  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/ppc-round.c: New file, test (double)(int)
+	optimization.
+
+	* gcc.target/powerpc/ppc-fpconv-2.c: Update # times lfiwax is
+	expected.
+
+	Backport from the GCC 4.6 mainline
+	2010-11-15  Richard Henderson  <rth@redhat.com>
+
+	* gcc.dg/torture/builtin-math-2.c: Split out fma tests...
+	* gcc.dg/torture/builtin-math-8.c: ... here.  New file.
+	Use builtin_constant_p rather than scanning for builtin name.
+
+	Backport from the GCC 4.6 mainline
+	2010-11-16  Richard Henderson  <rth@redhat.com>
+
+	* gcc.target/powerpc/ppc-fma-2.c: Use -ffp-contract=off.
+	* gcc.target/powerpc/ppc-fma-4.c: Likewise.
+
+2010-11-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to gcc-4_5-branch revision 167090.
+
+2010-11-15  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Backport from mainline
+	2010-11-09  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/ppc-fpconv-11.c: Use -mcpu=power5+, not
+	power5 to enable generation of FRIZ.
+
+	Backport from mainline
+	2010-06-02  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* lib/target-supports.exp (is-effective-target): Add vsx_hw,
+	ppc_recip_hw.
+	(is-effective-target-keyword): Ditto.
+
+2010-11-08  Pat Haugen  <pthaugen@us.ibm.com>
+	Backport from mainline
+	2010-11-04  Pat Haugen  <pthaugen@us.ibm.com>
+
+	* gcc.target/powerpc/loop_align.c: New.
+
+2010-11-03  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Backport from mainline
+	2010-11-03  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/vsx-sfminmax.c: New test for using double
+	precision min/max for single precision on VSX.
+
+2010-10-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/ppc-fma-6.c: Delete, we aren't supportting
+	-msoft-float in AT 4.0, at least at present.
+
+2010-10-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Backport from mainline
+	2010-10-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/ppc-fma-1.c: New tests for powerpc FMA
+	builtin combiner patterns.
+	* gcc.target/powerpc/ppc-fma-2.c: Ditto.
+	* gcc.target/powerpc/ppc-fma-3.c: Ditto.
+	* gcc.target/powerpc/ppc-fma-4.c: Ditto.
+	* gcc.target/powerpc/ppc-fma-5.c: Ditto.
+	* gcc.target/powerpc/ppc-fma-6.c: Ditto.
+
+2010-09-02  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Backport from mainline
+	2010-09-02  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/ppc-fpconv-10.c: New file to test generating
+	FRIZ/XSRIZ instruciton for (double)(long long)x.
+	* gcc.target/powerpc/ppc-fpconv-11.c: Ditto.
+
+2010-08-31  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Backport from mainline:
+	2010-08-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/ppc-fpconv-1.c: New test for integer to
+	floating point conversion code generation.
+	* gcc.target/powerpc/ppc-fpconv-2.c: Ditto.
+	* gcc.target/powerpc/ppc-fpconv-3.c: Ditto.
+	* gcc.target/powerpc/ppc-fpconv-4.c: Ditto.
+	* gcc.target/powerpc/ppc-fpconv-5.c: New test for floating point
+	to integer conversion code generation.
+	* gcc.target/powerpc/ppc-fpconv-6.c: Ditto.
+	* gcc.target/powerpc/ppc-fpconv-7.c: Ditto.
+	* gcc.target/powerpc/ppc-fpconv-8.c: Ditto.
+	* gcc.target/powerpc/ppc-fpconv-9.c: Ditto.
+
+	Backport from mainline:
+	2010-08-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/vsx-mass-1.c: New file, test
+	-mveclibabi=mass.
+
+2010-08-26  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Backport from the mainline:
+	2010-06-02  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/44218
+	* gcc.target/powerpc/recip-1.c: New test for -mrecip support.
+	* gcc.target/powerpc/recip-2.c: Ditto.
+	* gcc.target/powerpc/recip-3.c: Ditto.
+	* gcc.target/powerpc/recip-4.c: Ditto.
+	* gcc.target/powerpc/recip-5.c: Ditto.
+	* gcc.target/powerpc/recip-6.c: Ditto.
+	* gcc.target/powerpc/recip-7.c: Ditto.
+	* gcc.target/powerpc/recip-test.h: Ditto.
+	* gcc.target/powerpc/recip-test2.h: Ditto.
+
+2010-08-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Clone from gcc-4_5-branch, subversion id 163203.
+
