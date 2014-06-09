@@ -1,0 +1,100 @@
+2009-11-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/41787
+	* gcc/testsuite/gcc.target/powerpc/vsx-vrsave.c: Delete,
+	2009-10-23 change to set VRSAVE if VSX has been reverted.
+
+2009-10-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/41787
+	* gcc.target/powerpc/vsx-vrsave.c: New file.
+
+2009-10-22  Janis Johnson  <janis187@us.ibm.com>
+
+	Backport from 4.3 branch:
+	2009-09-21  Janis Johnson  <janis187@us.ibm.com>
+
+	PR c/41049
+	* gcc.dg/dfp/pr41049.c: New test.
+
+2009-10-15  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/altivec-4.c (b): Make sure altivec builtin
+	result used.
+	* g++.dg/ext/altivec-2.C (main): Ditto.
+
+2009-09-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/41331 (backported from mainline)
+	* gcc.target/powerpc/bswap64-4.c: New file to test bswap64 on a
+	-m32 -mpowerpc64 system.
+
+2009-07-24  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/vsx-builtin-5.c: Include altivec.h, since GCC
+	4.3 doesn't have the automatic vector -> __vector like GCC 4.5
+	does.
+
+	Merge up to power7-meissner branch, id 15066.  See
+	ChangeLog.power7 for more details.
+
+2009-05-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/altivec-6.c: Make sure the result of vec_add
+	is used to eliminate spurious warnings.
+
+2009-04-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/vsx-builtin-4.c: New VSX test.
+	* gcc.target/powerpc/vsx-builtin-5.c: Ditto.
+
+2009-04-26  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/vsx-builtin-3.c: New test for VSX builtins.
+
+2009-04-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR testsuite/39769
+	* gcc.dg/vmx/3a-04.c (test): Don't rely on floating point equality
+	for testing the results of estimate instructions.
+	* gcc.dg/vmx/3a-04m.c (test): Ditto.
+	* gcc.dg/vmx/3a-05.c (test): Ditto.
+
+2009-04-13  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/vsx-builtin-1.c: New file, backported from
+	4.5 development branch for VSX tests.
+	* gcc.target/powerpc/vsx-builtin-2.c: Ditto.
+	* gcc.target/powerpc/vsx-vector-1.c: Ditto.
+	* gcc.target/powerpc/vsx-vector-2.c: Ditto.
+	* gcc.target/powerpc/vsx-vector-3.c: Ditto.
+	* gcc.target/powerpc/vsx-vector-4.c: Ditto.
+	* gcc.target/powerpc/pr39457.c: Ditto.
+
+	* gcc.dg/vmx/vmx.exp (DEFAULT_VMXCFLAGS): Backport from 4.5
+	development branch, turn off -mvsx for VMX tests.
+
+	* lib/target-supports.exp (check_vsx_hw_available): Backport from
+	4.5 development branch, enable testing VSX/cell on appropriate
+	machines.
+	(check_effective_target_cell_hw): Ditto.
+	(check_effective_target_powerpc64): Ditto.
+	(check_effective_target_llp64): Ditto.
+	(check_effective_target_powerpc_vsx_ok): Ditto.
+	(check_effective_target_powerpc_ppu_ok): Ditto.
+	(check_effective_target_powerpc_spe_nocache): Ditto.
+	(check_effective_target_powerpc_405_nocache): Ditto.
+	(check_effective_target_vect_pack_trunc): Ditto.
+	(check_effective_target_vect_unpack): Ditto.
+	(check_effective_target_vect_short_mult): Ditto.
+	(check_effective_target_vect_extract): Ditto.
+	(check_effective_target_vect_interleave): Ditto.
+
+2009-2-23  Pat Haugen  <pthaugen@us.ibm.com>
+
+	Backport:
+	2009-02-11 Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	 * gcc.target/powerpc/popcount-2.c: New file for power7 support.
+	 * gcc.target/powerpc/popcount-3.c: Ditto.
+
