@@ -1,0 +1,112 @@
+2011-11-08  Michael Meissner  <meissner@the-meissners.org>
+
+	Merge up to 181175.
+
+2011-10-31  Michael Meissner  <meissner@the-meissners.org>
+
+	Merge up to 180705.
+
+2011-10-28  Michael Meissner  <meissner@the-meissners.org>
+
+	Merge up to 180628.
+
+2011-10-28  Michael Meissner  <meissner@the-meissners.org>
+
+	* c-lex.c (c_lex_with_flags): Add #if 0 code to create builtin
+	function as soon as the lazy builtin function is parsed.
+
+	* c-common.c (c_common_builtin_lazy_create): Trace type and
+	attrbute addresses.
+
+2011-10-26  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 180534.
+
+2011-10-25  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 180445.
+
+2011-10-24  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 180408.
+
+2011-10-24  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* c-common.c (lazy_builtin_fncode): Rewrite and move to tree.h.
+	(set_lazy_builtin_fncode): Ditto.
+	(c_common_add_builtin_function_lazy): Use new functions in tree.h
+	to encode function code and class.  Improve debugging.
+	(c_common_builtin_lazy_create): New signature.  Don't handle MD
+	builtins here.  Add gcc_unreachable for default case.
+	(c_common_add_builtin_function_lazy): Make static, and move
+	creation of the lazy id to c_common_builtin_lazy_register.
+	(c_common_builtin_lazy_register): New hook to register lazy
+	builtin functions.
+
+	* c-common.h (c_common_builtin_lazy_create): Update signature.
+	(c_common_add_builtin_function_lazy): Delete.
+	(c_common_builtin_lazy_register): Add declaration.
+
+2011-10-20  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* c-common.c (c_common_add_builtin_function_lazy): Add more
+	builtins to the list that cannot be lazy.
+
+	* c-lex.c (c_lex_with_flags): Undo lazy builtin support here.
+
+2011-10-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 180202.
+
+2011-10-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* c-lex.c (c_lex_with_flags): Add support for lazy builtin
+	functions that delay creating the FUNCTION_DECL node for most
+	builtin functions until the name is actually used.  Builtin
+	functions used by the optimization passes are created all of the
+	time.  Enable lazy builtins by default for C but not for C++.
+	Delete nobind hooks.
+	* c-common.c (c_common_add_builtin_function_lazy): Ditto.
+	(c_common_builtin_lazy_create): Ditto.
+	* c-common.h (c_common_add_builtin_function_lazy): Ditto.
+
+2011-10-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to subversion id 180165.
+
+2011-10-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* c-opts.c (c_common_post_options): Default -flazy-builtin to true
+	for C and false for C++ until issues with the C++ scoping rules
+	are ironed out.
+	* c-common.c (c_common_add_builtin_function_lazy): Ditto.
+
+2011-10-13  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 179931.
+
+2011-10-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* c-common.c (builtin_types): Add support for lazy builtin
+	functions that are created when the identifier is first used in
+	the program, rather than being created at compiler startup time.
+	Mark builtin type and attribute arrays as needing garbage
+	collection.  Use address_space and rid_code to encode the builtin
+	lazy builtin function index.
+	(built_in_attributes): Ditto.
+	(LAZY_BUILTIN_MD): Ditto.
+	(lazy_builtin_fncode): Ditto.
+	(set_lazy_builtin_fncode): Ditto.
+	(c_common_add_builtin_function_lazy): Ditto.
+	(c_common_builtin_lazy_create): Ditto.
+	(c_common_nodes_and_builtins): Ditto.
+	(def_builtin_1): Ditto.
+	* c-lex.c (c_lex_with_flags): Ditto.
+	* c-common.h (c_common_add_builtin_function_lazy): Ditto.
+	(c_common_builtin_lazy_create): Ditto.
+
+2011-10-11  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Clone branch, subversion id 179820.
+
+
