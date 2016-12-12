@@ -1,3 +1,14 @@
+2016-12-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_split_vec_extract_var): Rework
+	code somewhat.  Add support for an explicit GPR temporary.
+
+	* config/rs6000/vsx.md (vsx_extract_<mode>_p9): Add clobber of GPR
+	temporary if we are going to use VEXTU{B,H,W}{R,L}X.
+	(vsx_extract_<mode>_p9 splitter): Likewise.
+	(vsx_extract_<mode>_di_p9): Likewise.
+	(vsx_extract_<mode>_store_p9): Likewise.
+
 2016-12-09  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.md (mov<mode>_internal): Undo changes

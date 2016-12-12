@@ -2550,7 +2550,8 @@
   [(set (match_operand:<VS_scalar> 0 "gpc_reg_operand" "=r,<VSX_EX>")
 	(vec_select:<VS_scalar>
 	 (match_operand:VSX_EXTRACT_I 1 "gpc_reg_operand" "wK,<VSX_EX>")
-	 (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>" "n,n")])))]
+	 (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>" "n,n")])))
+   (clobber (match_scratch:SI 3 "=r,X"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_VEXTRACTUB
    && TARGET_VSX_SMALL_INTEGER"
 {
@@ -2577,23 +2578,26 @@
   [(set_attr "type" "vecsimple")])
 
 (define_split
-  [(set (match_operand:<VS_scalar> 0 "int_reg_operand" "")
+  [(set (match_operand:<VS_scalar> 0 "int_reg_operand")
 	(vec_select:<VS_scalar>
-	 (match_operand:VSX_EXTRACT_I 1 "altivec_register_operand" "")
-	 (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>" "")])))]
+	 (match_operand:VSX_EXTRACT_I 1 "altivec_register_operand")
+	 (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>")])))
+   (clobber (match_operand:SI 3 "int_reg_operand"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_VEXTRACTUB
    && TARGET_VSX_SMALL_INTEGER && reload_completed"
   [(const_int 0)]
 {
   rtx op0_si = gen_rtx_REG (SImode, REGNO (operands[0]));
   rtx op1 = operands[1];
-  HOST_WIDE_INT offset = INTVAL (operands[2]) * GET_MODE_UNIT_SIZE (<MODE>mode);
+  rtx op2 = operands[2];
+  rtx op3 = operands[3];
+  HOST_WIDE_INT offset = INTVAL (op2) * GET_MODE_UNIT_SIZE (<MODE>mode);
 
-  emit_move_insn (op0_si, GEN_INT (offset));
+  emit_move_insn (op3, GEN_INT (offset));
   if (VECTOR_ELT_ORDER_BIG)
-    emit_insn (gen_vextu<wd>lx (op0_si, op0_si, op1));
+    emit_insn (gen_vextu<wd>lx (op0_si, op3, op1));
   else
-    emit_insn (gen_vextu<wd>rx (op0_si, op0_si, op1));
+    emit_insn (gen_vextu<wd>rx (op0_si, op3, op1));
   DONE;
 })
 
@@ -2603,17 +2607,19 @@
 	(zero_extend:DI
 	 (vec_select:<VS_scalar>
 	  (match_operand:VSX_EXTRACT_I 1 "gpc_reg_operand" "wK,<VSX_EX>")
-	  (parallel [(match_operand:QI 2 "const_int_operand" "n,n")]))))]
+	  (parallel [(match_operand:QI 2 "const_int_operand" "n,n")]))))
+   (clobber (match_scratch:SI 3 "=r,X"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_VEXTRACTUB
    && TARGET_VSX_SMALL_INTEGER"
   "#"
   "&& reload_completed"
-  [(set (match_dup 3)
-	(vec_select:<VS_scalar>
-	 (match_dup 1)
-	 (parallel [(match_dup 2)])))]
+  [(parallel [(set (match_dup 4)
+		   (vec_select:<VS_scalar>
+		    (match_dup 1)
+		    (parallel [(match_dup 2)])))
+	      (clobber (match_dup 3))])]
 {
-  operands[3] = gen_rtx_REG (<VS_scalar>mode, REGNO (operands[0]));
+  operands[4] = gen_rtx_REG (<VS_scalar>mode, REGNO (operands[0]));
 })
 
 ;; Optimize stores to use the ISA 3.0 scalar store instructions
@@ -2765,7 +2771,7 @@
 	 [(match_operand:VSX_EXTRACT_I 1 "input_operand" "wK,v,m")
 	  (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
 	 UNSPEC_VSX_EXTRACT))
-   (clobber (match_scratch:DI 3 "=X,r,&b"))
+   (clobber (match_scratch:DI 3 "=r,r,&b"))
    (clobber (match_scratch:V2DI 4 "=X,&v,X"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
@@ -2784,7 +2790,7 @@
 	  [(match_operand:VSX_EXTRACT_I 1 "input_operand" "wK,v,m")
 	   (match_operand:DI 2 "gpc_reg_operand" "r,r,r")]
 	  UNSPEC_VSX_EXTRACT)))
-   (clobber (match_scratch:DI 3 "=X,r,&b"))
+   (clobber (match_scratch:DI 3 "=r,r,&b"))
    (clobber (match_scratch:V2DI 4 "=X,&v,X"))]
   "VECTOR_MEM_VSX_P (<VSX_EXTRACT_I:MODE>mode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
