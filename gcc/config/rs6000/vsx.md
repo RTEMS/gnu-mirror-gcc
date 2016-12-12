@@ -2922,10 +2922,11 @@
    && TARGET_P9_VECTOR && TARGET_VSX_SMALL_INTEGER"
   "#"
   "&& reload_completed"
-  [(set (match_dup 3)
-	(vec_select:<VSX_EXTRACT_I:VS_scalar>
-	 (match_dup 1)
-	 (parallel [(match_dup 2)])))
+  [(parallel [(set (match_dup 3)
+		   (vec_select:<VSX_EXTRACT_I:VS_scalar>
+		    (match_dup 1)
+		    (parallel [(match_dup 2)])))
+	      (clobber (scratch:SI))])
    (set (match_dup 4)
 	(sign_extend:DI (match_dup 3)))
    (set (match_dup 0)
@@ -2945,10 +2946,11 @@
    && TARGET_P9_VECTOR && TARGET_VSX_SMALL_INTEGER"
   "#"
   "&& reload_completed"
-  [(set (match_dup 3)
-	(vec_select:<VSX_EXTRACT_I:VS_scalar>
-	 (match_dup 1)
-	 (parallel [(match_dup 2)])))
+  [(parallel [(set (match_dup 3)
+		   (vec_select:<VSX_EXTRACT_I:VS_scalar>
+		    (match_dup 1)
+		    (parallel [(match_dup 2)])))
+	      (clobber (scratch:SI))])
    (set (match_dup 0)
 	(float:<FL_CONV:MODE> (match_dup 4)))]
 {
