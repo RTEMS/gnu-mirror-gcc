@@ -2581,7 +2581,7 @@
   [(set (match_operand:<VS_scalar> 0 "int_reg_operand")
 	(vec_select:<VS_scalar>
 	 (match_operand:VSX_EXTRACT_I 1 "altivec_register_operand")
-	 (parallel [(match_operand:QI 2 "<VSX_EXTRACT_PREDICATE>")])))
+	 (parallel [(match_operand:QI 2 "const_int_operand")])))
    (clobber (match_operand:SI 3 "int_reg_operand"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_VEXTRACTUB
    && TARGET_VSX_SMALL_INTEGER && reload_completed"
@@ -2624,19 +2624,21 @@
 
 ;; Optimize stores to use the ISA 3.0 scalar store instructions
 (define_insn_and_split "*vsx_extract_<mode>_store_p9"
-  [(set (match_operand:<VS_scalar> 0 "memory_operand" "=Z")
+  [(set (match_operand:<VS_scalar> 0 "memory_operand" "=Z,m")
 	(vec_select:<VS_scalar>
-	 (match_operand:VSX_EXTRACT_I 1 "gpc_reg_operand" "<VSX_EX>")
-	 (parallel [(match_operand:QI 2 "const_int_operand" "n")])))
-   (clobber (match_scratch:<VS_scalar> 3 "=<VSX_EX>"))]
+	 (match_operand:VSX_EXTRACT_I 1 "gpc_reg_operand" "<VSX_EX>,<VSX_EX>")
+	 (parallel [(match_operand:QI 2 "const_int_operand" "n,n")])))
+   (clobber (match_scratch:<VS_scalar> 3 "=<VSX_EX>,&r"))
+   (clobber (match_scratch:SI 4 "=X,&r"))]
   "VECTOR_MEM_VSX_P (<MODE>mode) && TARGET_VEXTRACTUB
    && TARGET_VSX_SMALL_INTEGER"
   "#"
   "&& reload_completed"
-  [(set (match_dup 3)
-	(vec_select:<VS_scalar>
-	 (match_dup 1)
-	 (parallel [(match_dup 2)])))
+  [(parallel [(set (match_dup 3)
+		   (vec_select:<VS_scalar>
+		    (match_dup 1)
+		    (parallel [(match_dup 2)])))
+	      (clobber (match_dup 4))])
    (set (match_dup 0)
 	(match_dup 3))])
 
