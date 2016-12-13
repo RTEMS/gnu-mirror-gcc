@@ -15546,7 +15546,7 @@ altivec_expand_builtin (tree exp, rtx target, bool *expandedp)
   size_t i;
   enum insn_code icode;
   tree fndecl = TREE_OPERAND (CALL_EXPR_FN (exp), 0);
-  tree arg0;
+  tree arg0, arg1, arg2;
   rtx op0, pat;
   machine_mode tmode, mode0;
   enum rs6000_builtins fcode
@@ -15765,6 +15765,40 @@ altivec_expand_builtin (tree exp, rtx target, bool *expandedp)
     case VSX_BUILTIN_VEC_EXT_V2DI:
     case VSX_BUILTIN_VEC_EXT_V1TI:
       return altivec_expand_vec_ext_builtin (exp, target);
+
+    case P9V_BUILTIN_VEXTRACT4B:
+    case P9V_BUILTIN_VEC_VEXTRACT4B:
+      arg1 = CALL_EXPR_ARG (exp, 1);
+      STRIP_NOPS (arg1);
+
+      /* Generate a normal call if it is invalid.  */
+      /* If we got invalid arguments bail out before generating bad rtl.  */
+      if (arg1 == error_mark_node)
+	return expand_call (exp, target, false);
+
+      if (TREE_CODE (arg1) != INTEGER_CST || TREE_INT_CST_LOW (arg1) > 11)
+	{
+	  error ("second argument to vec_vextract4b must 0..11");
+	  return expand_call (exp, target, false);
+	}
+      break;
+
+    case P9V_BUILTIN_VINSERT4B:
+    case P9V_BUILTIN_VINSERT4B_DI:
+    case P9V_BUILTIN_VEC_VINSERT4B:
+      arg2 = CALL_EXPR_ARG (exp, 2);
+      STRIP_NOPS (arg2);
+
+      /* If we got invalid arguments bail out before generating bad rtl.  */
+      if (arg2 == error_mark_node)
+	return expand_call (exp, target, false);
+
+      if (TREE_CODE (arg2) != INTEGER_CST || TREE_INT_CST_LOW (arg2) > 11)
+	{
+	  error ("third argument to vec_vinsert4b must 0..11");
+	  return expand_call (exp, target, false);
+	}
+      break;
 
     default:
       break;

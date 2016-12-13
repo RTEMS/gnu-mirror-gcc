@@ -366,6 +366,8 @@
    UNSPEC_VCMPNEZH
    UNSPEC_VCMPNEW
    UNSPEC_VCMPNEZW
+   UNSPEC_XXEXTRACTUW
+   UNSPEC_XXINSERTW
   ])
 
 ;; VSX moves
@@ -3686,3 +3688,94 @@
   "TARGET_P9_VECTOR"
   "vextuwrx %0,%1,%2"
   [(set_attr "type" "vecsimple")])
+
+;; Vector insert/extract word at arbitrary byte values.  Note, the little
+;; endian version needs to adjust the byte number, and the V4SI element in
+;; vinsert4b.
+(define_expand "vextract4b"
+  [(set (match_operand:DI 0 "gpc_reg_operand")
+	(unspec:DI [(match_operand:V16QI 1 "vsx_register_operand")
+		    (match_operand:QI 2 "const_0_to_11_operand")]
+		   UNSPEC_XXEXTRACTUW))]
+  "TARGET_P9_VECTOR"
+{
+  if (!VECTOR_ELT_ORDER_BIG)
+    operands[2] = GEN_INT (12 - INTVAL (operands[2]));
+})
+
+(define_insn_and_split "*vextract4b_internal"
+  [(set (match_operand:DI 0 "gpc_reg_operand" "=wj,r")
+	(unspec:DI [(match_operand:V16QI 1 "vsx_register_operand" "wa,v")
+		    (match_operand:QI 2 "const_0_to_11_operand" "n,n")]
+		   UNSPEC_XXEXTRACTUW))]
+  "TARGET_P9_VECTOR"
+  "@
+   xxextractuw %x0,%x1,%2
+   #"
+  "&& reload_completed && int_reg_operand (operands[0], DImode)"
+  [(const_int 0)]
+{
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  rtx op2 = operands[2];
+  rtx op0_si = gen_rtx_REG (SImode, REGNO (op0));
+  rtx op1_v4si = gen_rtx_REG (V4SImode, REGNO (op1));
+
+  emit_move_insn (op0, op2);
+  if (VECTOR_ELT_ORDER_BIG)
+    emit_insn (gen_vextuwlx (op0_si, op0_si, op1_v4si));
+  else
+    emit_insn (gen_vextuwrx (op0_si, op0_si, op1_v4si));
+  DONE;
+}
+  [(set_attr "type" "vecperm")])
+
+(define_expand "vinsert4b"
+  [(set (match_operand:V16QI 0 "vsx_register_operand")
+	(unspec:V16QI [(match_operand:V4SI 1 "vsx_register_operand")
+		       (match_operand:V16QI 2 "vsx_register_operand")
+		       (match_operand:QI 3 "const_0_to_11_operand")]
+		   UNSPEC_XXINSERTW))]
+  "TARGET_P9_VECTOR"
+{
+  if (!VECTOR_ELT_ORDER_BIG)
+    {
+      rtx op1 = operands[1];
+      rtx v4si_tmp = gen_reg_rtx (V4SImode);
+      emit_insn (gen_vsx_xxpermdi_v4si (v4si_tmp, op1, op1, const1_rtx));
+      operands[1] = v4si_tmp;
+      operands[3] = GEN_INT (12 - INTVAL (operands[3]));
+    }
+})
+
+(define_insn "*vinsert4b_internal"
+  [(set (match_operand:V16QI 0 "vsx_register_operand" "=wa")
+	(unspec:V16QI [(match_operand:V4SI 1 "vsx_register_operand" "wa")
+		       (match_operand:V16QI 2 "vsx_register_operand" "0")
+		       (match_operand:QI 3 "const_0_to_11_operand" "n")]
+		   UNSPEC_XXINSERTW))]
+  "TARGET_P9_VECTOR"
+  "xxinsertw %x0,%x1,%3"
+  [(set_attr "type" "vecperm")])
+
+(define_expand "vinsert4b_di"
+  [(set (match_operand:V16QI 0 "vsx_register_operand")
+	(unspec:V16QI [(match_operand:DI 1 "vsx_register_operand")
+		       (match_operand:V16QI 2 "vsx_register_operand")
+		       (match_operand:QI 3 "const_0_to_11_operand")]
+		   UNSPEC_XXINSERTW))]
+  "TARGET_P9_VECTOR"
+{
+  if (!VECTOR_ELT_ORDER_BIG)
+    operands[3] = GEN_INT (12 - INTVAL (operands[3]));
+})
+
+(define_insn "*vinsert4b_di_internal"
+  [(set (match_operand:V16QI 0 "vsx_register_operand" "=wa")
+	(unspec:V16QI [(match_operand:DI 1 "vsx_register_operand" "wj")
+		       (match_operand:V16QI 2 "vsx_register_operand" "0")
+		       (match_operand:QI 3 "const_0_to_11_operand" "n")]
+		   UNSPEC_XXINSERTW))]
+  "TARGET_P9_VECTOR"
+  "xxinsertw %x0,%x1,%3"
+  [(set_attr "type" "vecperm")])
