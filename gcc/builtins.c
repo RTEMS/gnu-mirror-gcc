@@ -3091,7 +3091,7 @@ check_sizes (int opt, tree exp, tree size, tree maxlen, tree str, tree objsize)
     {
       /* STR is normally a pointer to string but as a special case
 	 it can be an integer denoting the length of a string.  */
-      if (TREE_CODE (TREE_TYPE (str)) == POINTER_TYPE)
+      if (POINTER_TYPE_P (TREE_TYPE (str)))
 	{
 	  /* Try to determine the range of lengths the source string
 	     refers to.  If it can be determined add one to it for
@@ -4797,18 +4797,30 @@ expand_builtin_alloca (tree exp, bool cannot_accumulate)
 {
   rtx op0;
   rtx result;
-  bool valid_arglist;
   unsigned int align;
-  bool alloca_with_align = (DECL_FUNCTION_CODE (get_callee_fndecl (exp))
+  tree fndecl = get_callee_fndecl (exp);
+  bool alloca_with_align = (DECL_FUNCTION_CODE (fndecl)
 			    == BUILT_IN_ALLOCA_WITH_ALIGN);
 
-  valid_arglist
+  bool valid_arglist
     = (alloca_with_align
        ? validate_arglist (exp, INTEGER_TYPE, INTEGER_TYPE, VOID_TYPE)
        : validate_arglist (exp, INTEGER_TYPE, VOID_TYPE));
 
   if (!valid_arglist)
     return NULL_RTX;
+
+  if ((alloca_with_align && !warn_vla_limit)
+      || (!alloca_with_align && !warn_alloca_limit))
+    {
+      /* -Walloca-larger-than and -Wvla-larger-than settings override
+	 the more general -Walloc-size-larger-than so unless either of
+	 the former options is specified check the alloca arguments for
+	 overflow.  */
+      tree args[] = { CALL_EXPR_ARG (exp, 0), NULL_TREE };
+      int idx[] = { 0, -1 };
+      maybe_warn_alloc_args_overflow (fndecl, exp, args, idx);
+    }
 
   /* Compute the argument.  */
   op0 = expand_normal (CALL_EXPR_ARG (exp, 0));

@@ -1,3 +1,21 @@
+2016-12-12  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/78647
+	* c-common.c (attribute_fallthrough_p): Return false for
+	error_mark_node.
+
+2016-12-08  Martin Sebor  <msebor@redhat.com>
+
+	PR c/78284
+	* c.opt (-Walloc-zero, -Walloc-size-larger-than): New options.
+
+2016-12-08  Martin Sebor  <msebor@redhat.com>
+
+	PR c/78165
+           * c-pretty-print (pp_c_integer_constant): Avoid formatting type
+             suffix.
+gcc/testsuite/ChangeLog:
+
 2016-12-07  Martin Sebor  <msebor@redhat.com>
 
 	PR c/53562

@@ -1532,19 +1532,27 @@ typedef struct gfc_symbol
   gfc_namelist *namelist, *namelist_tail;
 
   /* Change management fields.  Symbols that might be modified by the
-     current statement have the mark member nonzero and are kept in a
-     singly linked list through the tlink field.  Of these symbols,
+     current statement have the mark member nonzero.  Of these symbols,
      symbols with old_symbol equal to NULL are symbols created within
      the current statement.  Otherwise, old_symbol points to a copy of
-     the old symbol.  */
-
-  struct gfc_symbol *old_symbol, *tlink;
+     the old symbol. gfc_new is used in symbol.c to flag new symbols.  */
+  struct gfc_symbol *old_symbol;
   unsigned mark:1, gfc_new:1;
+
+  /* The tlink field is used in the front end to carry the module
+     declaration of separate module procedures so that the characteristics
+     can be compared with the corresponding declaration in a submodule. In
+     translation this field carries a linked list of symbols that require
+     deferred initialization.  */
+  struct gfc_symbol *tlink;
+
   /* Nonzero if all equivalences associated with this symbol have been
      processed.  */
   unsigned equiv_built:1;
   /* Set if this variable is used as an index name in a FORALL.  */
   unsigned forall_index:1;
+  /* Set if the symbol is used in a function result specification .  */
+  unsigned fn_result_spec:1;
   /* Used to avoid multiple resolutions of a single symbol.  */
   unsigned resolved:1;
   /* Set if this is a module function or subroutine with the
@@ -1768,7 +1776,7 @@ typedef struct gfc_namespace
   /* !$ACC ROUTINE names.  */
   gfc_oacc_routine_name *oacc_routine_names;
 
-  gfc_charlen *cl_list, *old_cl_list;
+  gfc_charlen *cl_list;
 
   gfc_dt_list *derived_types;
 
@@ -2778,6 +2786,7 @@ const char *gfc_print_wide_char (gfc_char_t);
 
 bool gfc_warning (int opt, const char *, ...) ATTRIBUTE_GCC_GFC(2,3);
 bool gfc_warning_now (int opt, const char *, ...) ATTRIBUTE_GCC_GFC(2,3);
+bool gfc_warning_internal (int opt, const char *, ...) ATTRIBUTE_GCC_GFC(2,3);
 bool gfc_warning_now_at (location_t loc, int opt, const char *gmsgid, ...)
   ATTRIBUTE_GCC_GFC(3,4);
 

@@ -1,3 +1,32 @@
+2016-12-12  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* testsuite/21_strings/basic_string/numeric_conversions/char/stod.cc:
+	XFAIL run if newlib_broken_long_double_io.
+	* testsuite/21_strings/basic_string/numeric_conversions/wchar_t/stod.cc:
+	Likewise.
+	* testsuite/21_strings/basic_string/numeric_conversions/wchar_t/stold.cc:
+	Likewise.
+	* testsuite/27_io/basic_ostream/inserters_arithmetic/char/hexfloat.cc:
+	Likewise.
+
+2016-12-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/experimental/filesystem/operations/is_empty.cc:
+	Remove stray character at end of dg-do directive.
+
+	* testsuite/experimental/filesystem/operations/temp_directory_path.cc:
+	Remove stray character at end of dg-do directive.
+
+2016-12-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/variant: Remove misplaced
+	_GLIBCXX_BEGIN_NAMESPACE_VERSION macro.
+
+2016-12-08  David Edelsohn  <dje.gcc@gmail.com>
+
+	* testsuite/25_algorithms/headers/algorithm/
+	parallel_algorithm_assert2.cc: Move dg-do run first.
+
 2016-12-08  Eric Botcazou  <ebotcazou@adacore.com>
 
 	PR libstdc++/78264
