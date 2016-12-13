@@ -1,6 +1,9 @@
 2016-12-13  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
-	* gcc.target/powerpc/p9-vinsert4b.c: New test.
+	* gcc.target/powerpc/p9-vinsert4b-1.c: New test.
+	* gcc.target/powerpc/p9-vinsert4b-2.c: Likewise.
+
+	* gcc.target/powerpc/p9-vinsert4b.c: Delete.
 
 2016-12-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
