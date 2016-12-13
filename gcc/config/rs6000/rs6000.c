@@ -15772,7 +15772,6 @@ altivec_expand_builtin (tree exp, rtx target, bool *expandedp)
       STRIP_NOPS (arg1);
 
       /* Generate a normal call if it is invalid.  */
-      /* If we got invalid arguments bail out before generating bad rtl.  */
       if (arg1 == error_mark_node)
 	return expand_call (exp, target, false);
 
@@ -15789,7 +15788,7 @@ altivec_expand_builtin (tree exp, rtx target, bool *expandedp)
       arg2 = CALL_EXPR_ARG (exp, 2);
       STRIP_NOPS (arg2);
 
-      /* If we got invalid arguments bail out before generating bad rtl.  */
+      /* Generate a normal call if it is invalid.  */
       if (arg2 == error_mark_node)
 	return expand_call (exp, target, false);
 
