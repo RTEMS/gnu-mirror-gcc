@@ -16,7 +16,3 @@ char_fetch_add_relaxed (char *ptr, int value)
 }
 
 /* { dg-final { scan-assembler-times "lbarx" 1 } } */
-
-
-
-

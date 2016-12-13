@@ -15,6 +15,3 @@ div_we (int a, int b)
 }
 
 /* { dg-final { scan-assembler-times "divwe "   1 } } */
-
-
-

@@ -1,13 +1,20 @@
 /* { dg-do compile { target { powerpc*-*-* } } } */
 /* { dg-skip-if "do not override -mcpu" { powerpc*-*-* } { "-mcpu=*" } { "-mcpu=power5" } } */
 
-/* It is desirable to require-effective-target to be p5_ok, but there's
-   no such effective target, so we're just assuming that the effective
-   target is at minimum power5 ok.  This test will fail if the
-   effective target is not power 5 ok, but there is no dg directive to
-   "unsupport" this test on such a platform.  */
-/* dfp_hw represents support for power 6 */
+/* powerpc_popcntb_ok represents support for power 5.  */
+/* { dg-require-effective-target powerpc_popcntb_ok } */
+/* dfp_hw represents support for power 6.  */
+#ifdef KELVIN_TESTING
+deliberate syntax error tells me that the processor is not filtering this
+source file before dg starts looking for its directives.
+
+The purpose of KELVIN_TESTING is to assure that dg is considering this
+target configuration as powerpc_popcntb_ok to be valid.
+
+Note that the test itself will FAIL because we will not issue the expected
+warning or error messages.
 /* { dg-skip-if "" { dfp_hw } } */
+#endif
 /* { dg-skip-if "" { powerpc*-*-aix* } } */
 /* { dg-options "-mcpu=power5" } */
 
@@ -15,8 +22,7 @@
  * exercised with binutils 2.25.  This test, however, has not
  * been exercised because the author of the test does not have access
  * to a development environment that succesfully bootstraps gcc
- * while at the same lacking assembler support for power 6.
- */
+ * while at the same lacking assembler support for power 6.  */
 
 /* This test should succeed on both 32- and 64-bit configurations.  */
 /* Though the command line specifies power5 target, this function is
@@ -28,4 +34,3 @@ double normal1 (double a, double b)
 { /* { dg-warning "lacks power6 support" } */
   return __builtin_copysign (a, b); /* { dg-warning "implicit declaration" } */
 }
-

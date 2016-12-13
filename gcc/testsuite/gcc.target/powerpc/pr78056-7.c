@@ -13,4 +13,3 @@ double power6 (double a, double b)
   return __builtin_copysign (a, b);
 }
 /* { dg-final { scan-assembler-times "fcpsgn" 1 } } */
-

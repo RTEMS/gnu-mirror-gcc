@@ -14,8 +14,7 @@
  * exercised with binutils 2.25.  This test, however, has not
  * been exercised because the author of the test does not have access
  * to a development environment that succesfully bootstraps gcc
- * while at the same lacking assembler support for power 7.
- */
+ * while at the same lacking assembler support for power 7.  */
 
 /* Though the command line specifies power6 target, this function is
    to support power7.  */
@@ -25,7 +24,3 @@ div_we (int a, int b)
 { /* { dg-warning "lacks power7 support" } */
   return __builtin_divwe (a, b); /* { dg-warning "implicit declaration" } */
 }
-
-
-
-
