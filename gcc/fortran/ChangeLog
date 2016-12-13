@@ -1,3 +1,29 @@
+2016-12-12  Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/78392
+	* expr.c (gfc_is_constant_expr): Specification functions are not
+	compile-time constants. Update documentation (add reference to F08
+	standard), add a FIXME.
+	(external_spec_function): Add reference to F08 standard.
+	* resolve.c (resolve_fl_variable): Ditto.
+
+2016-12-10  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/78226
+	* error.c (gfc_warning_internal):  New function.
+	* frontend-passes.c (gfc_run_passes):  Call check_locus if
+	CHECKING_P is defined.
+	(check_locus_code):  New function.
+	(check_locus_expr):  New function.
+	(check_locus):  New function.
+	* gfortran.h:  Add prototype for gfc_warning_internal.
+
+2016-12-10 Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/78350
+	* resolve.c (resolve_structure_cons): Remove the block that
+	tried to remove a charlen and rely on namespace cleanup.
+
 2016-12-09  Paul Thomas  <pault@gcc.gnu.org>
 
 	PR fortran/77903

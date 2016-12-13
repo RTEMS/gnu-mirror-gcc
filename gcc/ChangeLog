@@ -1,3 +1,146 @@
+2016-12-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/78777
+	* gimple-ssa-strength-reduction.c (create_add_on_incoming_edge,
+	insert_initializers): Use stmt_ends_bb_p instead of is_ctrl_stmt.
+
+	PR other/78766
+	* opt-functions.awk (opt_args): Use [{] instead of { in regexps.
+	Formatting fix.
+
+2016-12-12  Martin Sebor  <msebor@redhat.com>
+
+	PR middle-end/78622
+	PR middle-end78606
+	* gimple-ssa-sprintf.c (min_bytes_remaining): Use res.knownrange
+	rather than res.bounded.
+	(get_width_and_precision): Set precision to -1 when negative.
+	(adjust_range_for_overflow): New function.
+	(format_integer): Correct the handling of the space, plus, and pound
+	flags, and the special case of zero precision.
+	Always set res.bounded to true unless either precision or width
+	is specified and unknown.
+	Call adjust_range_for_overflow.
+	Avoid use zero as the shortest value when precision is specified
+	but unknown.
+	(format_directive): Remove vestigial quoting.  Always inform of
+	argument value or range when it's available.
+	(add_bytes): Correct the computation of boundrange used to
+	decide whether a warning is of a "maybe" or "defnitely" kind.
+
+2016-12-12  Dominik Vogt  <vogt@linux.vnet.ibm.com>
+
+	* combine.c (change_zero_ext): Handle mode expanding zero_extracts.
+
+2016-12-12  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/78738
+	* config/i386/i386.h (X87_ENABLE_ARITH): Also enable for
+	flag_unsafe_math_optimizations.
+	(X87_ENABLE_FLOAT): Ditto.
+
+2016-12-12  Marek Polacek  <polacek@redhat.com>
+
+	PR middle-end/78716
+	* gimplify.c (gimplify_va_arg_expr): Don't require ADDR_EXPR for
+	Case 1; check POINTER_TYPE_P instead.
+
+2016-12-12  Bernd Schmidt  <bschmidt@redhat.com>
+
+	PR rtl-optimization/78669
+	* ira.c (combine_and_move_insns): When deleting an insn, clear the
+	replace flag for all used regs in that insn.
+
+2016-12-12  Thomas Preud'homme  <thomas.preudhomme@arm.com>
+
+	* config/arm/arm-opts.h: Move struct arm_arch_core_flag and
+	arm_arch_core_flags to ...
+	* common/config/arm/arm-common.c: There.
+
+2016-12-12  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* config/sparc/constraints.md (T): Use special memory constraint.
+	(U): Minor tweak.
+	(W): Add TARGET_ARCH64 test.
+	* config/sparc/sparc.md (*movdi_insn_sp32): Replace 'W' with 'T'.
+	(*movdf_insn_sp32): Likewise.
+	(*mov<VM64:mode>_insn_sp32): Likewise.  Replace 'e' with 'f' in
+	conjunction with offsettable memory references.
+
+2016-12-11  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* config/nios2/nios2.c (nios2_emit_move_sequence): Call copy_rtx
+	to avoid shared structure error.
+
+2016-12-11  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+
+	PR target/78695
+	* config/rs6000/rs6000.c (find_alignment_op): Discard from
+	consideration any artificial definition.
+
+2016-12-11  Iain Sandoe  <iain@codesourcery.com>
+
+	* configure.ac (CROSS directory tests): Remove the assumption that
+	Darwin hosts contain suitable target sysroots in "/".
+	* configure: Regenerate.
+
+2016-12-11  Iain Sandoe  <iain@codesourcery.com>
+
+	PR rtl-optimization/71496
+	* config/rs6000/darwin.md (load_macho_picbase_si): Mark as non-
+	copyable.  (load_macho_picbase_di, reload_macho_picbase_si,
+	reload_macho_picbase_di): Likewise.
+
+2012-12-11  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/pa/pa.c (pa_callee_copies): New function.
+	* config/pa/pa.opt (mcaller-copies): New option.
+	* doc/invoke.texi (mcaller-copies): Document option.
+
+2016-12-11  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/70799
+	* config/i386/i386.c (dimode_scalar_to_vector_candidate_p)
+	<case ASHIFT, case LSHIFTRT>: Consider all constant shifts.
+	Add FIXME comment.
+	(dimode_scalar_chain::compute_convert_gain): Reduce gain for
+	constant shifts larger or equal than 32.
+
+2016-12-11  Roger Pau Monné  <roger.pau@citrix.com>
+
+	* config/i386/x86-64.h: Append --32 to the assembler options when
+	-m16 is used on non-glibc systems as well.
+
+2016-12-10  Allan Sandfeld Jensen  <allan.jensen@qt.io>
+
+	PR target/70118
+	* config/i386/mmintrin.h (__m64_u): New type
+	* config/i386/emmintrin.h (_mm_loadl_epi64, _mm_storel_epi64):
+	Make the allowed unaligned memory access explicit.
+
+2016-12-10  Krister Walfridsson  <krister.walfridsson@gmail.com>
+
+	* config.gcc (i386-*-netbsd*): Make i486 the default arch on NetBSD.
+	Generally use cpu generic.
+
+2016-12-10  Jakub Jelinek  <jakub@redhat.com>
+	    Marc Glisse  <marc.glisse@inria.fr>
+
+	PR tree-optimization/78720
+	* match.pd (A < 0 ? C : 0): Only optimize for signed A.  If shift
+	is negative, sign extend to @1's type and than AND with C.
+
+2016-12-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/78758
+	* tree-object-size.c (compute_object_offset) <case ARRAY_REF>: Handle
+	non-zero low bound or non-standard element sizes.
+
+	PR sanitizer/78708
+	* lto-streamer-in.c (input_function): In addition to debug stmts
+	without -g, remove IFN_*SAN_* calls if corresponding flag_sanitize
+	bit is not enabled.
+
 2016-12-09  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000-passes.def: New file.
@@ -10,8 +153,8 @@
 2016-12-09  Kugan Vivekanandarajah  <kuganv@linaro.org>
 
 	PR ipa/78721
-	* ipa-cp.c (propagate_vr_accross_jump_function): drop_tree_overflow
-	after fold_convert.
+	* ipa-cp.c (propagate_vr_accross_jump_function): Call
+	drop_tree_overflow after fold_convert.
 
 2016-12-09  Jakub Jelinek  <jakub@redhat.com>
 
