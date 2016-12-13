@@ -1,3 +1,15 @@
+2016-12-13  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/p9-extract-1.c: Update per comments from
+	Segher.
+	* gcc.target/powerpc/p9-extract-3.c: Likewise.
+	* gcc.target/powerpc/vec-extract-v16qi-df.c: Likewise.
+	* gcc.target/powerpc/vec-extract-v16qiu-df.c: Likewise.
+	* gcc.target/powerpc/vec-extract-v8hi-df.c: Likewise.
+	* gcc.target/powerpc/vec-extract-v8hiu-df.c: Likewise.
+	* gcc.target/powerpc/vec-extract-v4si-df.c: Likewise.
+	* gcc.target/powerpc/vec-extract-v4siu-df.c: Likewise.
+
 2016-12-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Merge up to 243590.

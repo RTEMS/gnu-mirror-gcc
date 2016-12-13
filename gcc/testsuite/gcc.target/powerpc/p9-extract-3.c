@@ -3,6 +3,12 @@
 /* { dg-require-effective-target powerpc_p9vector_ok } */
 /* { dg-options "-mcpu=power9 -O2" } */
 
+/* Test that under ISA 3.0 (-mcpu=power9), the compiler optimizes conversion to
+   double after a vec_extract to use the VEXTRACTU{B,H} or XXEXTRACTUW
+   instructions (which leaves the result in a vector register), and not the
+   VEXTU{B,H,W}{L,R}X instructions (which needs a direct move to do the floating
+   point conversion).  */
+
 #include <altivec.h>
 
 double
@@ -89,23 +95,14 @@ fpcvt_uchar_15 (vector unsigned char a)
   return (double)b;
 }
 
-/* { dg-final { scan-assembler     "vextractub"    } } */
-/* { dg-final { scan-assembler     "vextractuh"    } } */
-/* { dg-final { scan-assembler     "vextsb2d"      } } */
-/* { dg-final { scan-assembler     "vextsh2d"      } } */
-/* { dg-final { scan-assembler     "vspltw"        } } */
-/* { dg-final { scan-assembler     "xscvsxddp"     } } */
-/* { dg-final { scan-assembler     "xvcvsxwdp"     } } */
-/* { dg-final { scan-assembler     "xvcvuxwdp"     } } */
-/* { dg-final { scan-assembler-not "exts\[bhw\] "  } } */
-/* { dg-final { scan-assembler-not "stxvd2x"       } } */
-/* { dg-final { scan-assembler-not "stxv"          } } */
-/* { dg-final { scan-assembler-not "mfvsrd"        } } */
-/* { dg-final { scan-assembler-not "mfvsrwz"       } } */
-/* { dg-final { scan-assembler-not "mtvsrd"        } } */
-/* { dg-final { scan-assembler-not "mtvsrwa"       } } */
-/* { dg-final { scan-assembler-not "mtvsrwz"       } } */
-/* { dg-final { scan-assembler-not "lwa"           } } */
-/* { dg-final { scan-assembler-not "lwz"           } } */
-/* { dg-final { scan-assembler-not "lha"           } } */
-/* { dg-final { scan-assembler-not "lhz"           } } */
+/* { dg-final { scan-assembler     "vextractu\[bh\] "    } } */
+/* { dg-final { scan-assembler     "vexts\[bh\]2d "      } } */
+/* { dg-final { scan-assembler     "vspltw "             } } */
+/* { dg-final { scan-assembler     "xscvsxddp "          } } */
+/* { dg-final { scan-assembler     "xvcvsxwdp "          } } */
+/* { dg-final { scan-assembler     "xvcvuxwdp "          } } */
+/* { dg-final { scan-assembler-not "exts\[bhw\] "        } } */
+/* { dg-final { scan-assembler-not "stxv"                } } */
+/* { dg-final { scan-assembler-not "m\[ft\]vsrd "        } } */
+/* { dg-final { scan-assembler-not "m\[ft\]vsrw\[az\] "  } } */
+/* { dg-final { scan-assembler-not "l\[hw\]\[az\] "      } } */
