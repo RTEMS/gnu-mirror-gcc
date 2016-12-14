@@ -1,3 +1,8 @@
+2016-12-13  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_split_vec_extract_var): Rework
+	code.
+
 2016-12-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Merge up to 243590.

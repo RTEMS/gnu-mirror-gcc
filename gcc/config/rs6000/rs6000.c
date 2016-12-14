@@ -7523,6 +7523,8 @@ rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
       int src_regno = regno_or_subregno (src);
       int element_regno = regno_or_subregno (element);
 
+      gcc_assert (REG_P (tmp_gpr));
+
       /* See if we want to generate VEXTU{B,H,W}{L,R}X if the destination is in
 	 a general purpose register.  */
       if (TARGET_P9_VECTOR
@@ -7541,9 +7543,7 @@ rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
 
 	  else if (mode == V8HImode)
 	    {
-	      rtx tmp_gpr_si = (GET_CODE (tmp_gpr) == SCRATCH
-				? dest_si
-				: gen_rtx_REG (SImode, REGNO (tmp_gpr)));
+	      rtx tmp_gpr_si = gen_rtx_REG (SImode, REGNO (tmp_gpr));
 	      emit_insn (gen_ashlsi3 (tmp_gpr_si, element_si, const1_rtx));
 	      emit_insn (VECTOR_ELT_ORDER_BIG
 			 ? gen_vextuhlx (dest_si, tmp_gpr_si, src)
@@ -7553,10 +7553,8 @@ rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
 
 	  else
 	    {
-	      rtx tmp_gpr_si = (GET_CODE (tmp_gpr) == SCRATCH
-				? dest_si
-				: gen_rtx_REG (SImode, REGNO (tmp_gpr)));
-	      emit_insn (gen_ashlsi3 (tmp_gpr_si, element_si, const1_rtx));
+	      rtx tmp_gpr_si = gen_rtx_REG (SImode, REGNO (tmp_gpr));
+	      emit_insn (gen_ashlsi3 (tmp_gpr_si, element_si, const2_rtx));
 	      emit_insn (VECTOR_ELT_ORDER_BIG
 			 ? gen_vextuwlx (dest_si, tmp_gpr_si, src)
 			 : gen_vextuwrx (dest_si, tmp_gpr_si, src));
@@ -7566,7 +7564,7 @@ rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
 	}
 
 
-      gcc_assert (REG_P (tmp_gpr) && REG_P (tmp_altivec));
+      gcc_assert (REG_P (tmp_altivec));
 
       /* For little endian, adjust element ordering.  For V2DI/V2DF, we can use
 	 an XOR, otherwise we need to subtract.  The shift amount is so VSLO
