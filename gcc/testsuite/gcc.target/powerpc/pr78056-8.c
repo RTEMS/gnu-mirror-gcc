@@ -4,17 +4,7 @@
 /* powerpc_popcntb_ok represents support for power 5.  */
 /* { dg-require-effective-target powerpc_popcntb_ok } */
 /* dfp_hw represents support for power 6.  */
-#ifdef KELVIN_TESTING
-deliberate syntax error tells me that the processor is not filtering this
-source file before dg starts looking for its directives.
-
-The purpose of KELVIN_TESTING is to assure that dg is considering this
-target configuration as powerpc_popcntb_ok to be valid.
-
-Note that the test itself will FAIL because we will not issue the expected
-warning or error messages.
 /* { dg-skip-if "" { dfp_hw } } */
-#endif
 /* { dg-skip-if "" { powerpc*-*-aix* } } */
 /* { dg-options "-mcpu=power5" } */
 
