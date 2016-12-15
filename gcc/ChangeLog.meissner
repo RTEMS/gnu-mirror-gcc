@@ -1,3 +1,15 @@
+2016-12-15  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/71977
+	* config/rs6000/vsx.md (sf_logical): New code iterator and
+	constants for optimizing logical operations on SFmode.
+	(SFBOOL_*): Likewise.
+	(SFmode define_peephole2): Recognize when we are moving a SFmode
+	value from a vector register to a GPR, doing a simple logical
+	operation on the result, and moving it back to a vector register
+	and moving the logical operand to the vector registsrs, and do the
+	boolean operation there.
+
 2016-12-14   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 243664
