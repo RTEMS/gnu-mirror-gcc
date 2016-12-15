@@ -3920,8 +3920,6 @@
 ;;
 ;; (set (reg:SF reg7) (unspec:SF [(reg:SF reg7)] UNSPEC_VSX_CVSPDPN))
 
-(define_code_iterator sf_logical [and ior xor])
-
 (define_constants
   [(SFBOOL_TMP_GPR		 0)		;; GPR temporary
    (SFBOOL_TMP_VSX		 1)		;; vector temporary
@@ -3933,12 +3931,12 @@
    (SFBOOL_SHL_D		 7)		;; shift left dest
    (SFBOOL_SHL_A		 8)		;; shift left arg
    (SFBOOL_MTVSR_D		 9)		;; move to vecter dest
-   (SFBOOL_BOOL_A_DI		10)		;; SFBOOL_BOOL_A1/A2 as DImode
-   (SFBOOL_TMP_VSX_DI		11)		;; SFBOOL_TMP_VSX as DImode
-   (SFBOOL_MTVSR_D_V4SF		12)])		;; SFBOOL_MTVSRD_D as V4SFmode
+   (SFBOOL_SET1			10)		;; first insn set
+   (SFBOOL_SET2			11)		;; second insn set
+   (SFBOOL_MTVSR_D_V4SF		12)])		;; output reg as V4SF
 
 (define_peephole2
-  [(match_scratch:DI SFBOOL_TMP_GPR "r")
+  [(match_scratch:DI SFBOOL_TMP_GPR "b")
    (match_scratch:V4SF SFBOOL_TMP_VSX "wa")
 
    ;; MFVSRD
@@ -3953,8 +3951,9 @@
 
    ;; AND/IOR/XOR operation on int
    (set (match_operand:SI SFBOOL_BOOL_D "int_reg_operand")
-	(sf_logical:SI (match_operand:SI SFBOOL_BOOL_A1 "int_reg_operand")
-		       (match_operand:SI SFBOOL_BOOL_A2 "int_reg_operand")))
+	(and_ior_xor:SI
+	 (match_operand:SI SFBOOL_BOOL_A1 "int_reg_operand")
+	 (match_operand:SI SFBOOL_BOOL_A2 "reg_or_cint_operand")))
 
    ;; SLDI
    (set (match_operand:DI SFBOOL_SHL_D "int_reg_operand")
@@ -3969,37 +3968,57 @@
    /* The REG_P (xxx) tests prevents SUBREG's, which allows us to use REGNO
       to compare registers, when the mode is different.  */
    && REG_P (operands[SFBOOL_MFVSR_D]) && REG_P (operands[SFBOOL_BOOL_D])
-   && REG_P (operands[SFBOOL_BOOL_A1]) && REG_P (operands[SFBOOL_BOOL_A2])
    && REG_P (operands[SFBOOL_SHL_D])   && REG_P (operands[SFBOOL_SHL_A])
    && REG_P (operands[SFBOOL_MTVSR_D])
    && (REGNO (operands[SFBOOL_BOOL_D]) == REGNO (operands[SFBOOL_MFVSR_D])
        || peep2_reg_dead_p (3, operands[SFBOOL_MFVSR_D]))
-   && (REGNO (operands[SFBOOL_MFVSR_D]) == REGNO (operands[SFBOOL_BOOL_A1])
-       || REGNO (operands[SFBOOL_MFVSR_D]) == REGNO (operands[SFBOOL_BOOL_A2]))
+   && ((REG_P (operands[SFBOOL_BOOL_A1])
+	&&  REGNO (operands[SFBOOL_MFVSR_D]) == REGNO (operands[SFBOOL_BOOL_A1]))
+       || (REG_P (operands[SFBOOL_BOOL_A2])
+           && REGNO (operands[SFBOOL_MFVSR_D])
+	      == REGNO (operands[SFBOOL_BOOL_A2])))
    && REGNO (operands[SFBOOL_BOOL_D]) == REGNO (operands[SFBOOL_SHL_A])
    && (REGNO (operands[SFBOOL_SHL_D]) == REGNO (operands[SFBOOL_BOOL_D])
        || peep2_reg_dead_p (4, operands[SFBOOL_BOOL_D]))
    && peep2_reg_dead_p (5, operands[SFBOOL_SHL_D])"
-  [(set (match_dup SFBOOL_TMP_GPR)
-	(ashift:DI (match_dup SFBOOL_BOOL_A_DI)
-		   (const_int 32)))
-
-   (set (match_dup SFBOOL_TMP_VSX_DI)
-	(match_dup SFBOOL_TMP_GPR))
-
+  [(match_dup SFBOOL_SET1)
+   (match_dup SFBOOL_SET2)
    (set (match_dup SFBOOL_MTVSR_D_V4SF)
-	(sf_logical:V4SF (match_dup SFBOOL_MFVSR_A)
-			 (match_dup SFBOOL_TMP_VSX)))]
+	(and_ior_xor:V4SF (match_dup SFBOOL_MFVSR_A)
+			  (match_dup SFBOOL_TMP_VSX)))]
 {
-  int regno_mfvsr_d = REGNO (operands[SFBOOL_MFVSR_D]);
-  int regno_bool_a1 = REGNO (operands[SFBOOL_BOOL_A1]);
-  int regno_bool_a2 = REGNO (operands[SFBOOL_BOOL_A2]);
-  int regno_bool_a = (regno_mfvsr_d == regno_bool_a1
-		      ? regno_bool_a2 : regno_bool_a1);
-  int regno_tmp_vsx = REGNO (operands[SFBOOL_TMP_VSX]);
-  int regno_mtvsr_d = REGNO (operands[SFBOOL_MTVSR_D]);
+  rtx tmp_gpr = operands[SFBOOL_TMP_GPR];
+  rtx tmp_vsx = operands[SFBOOL_TMP_VSX];
+  rtx mfvsr_d = operands[SFBOOL_MFVSR_D];
+  rtx bool_a1 = operands[SFBOOL_BOOL_A1];
+  rtx bool_a2 = operands[SFBOOL_BOOL_A2];
+  rtx mtvsr_d = operands[SFBOOL_MTVSR_D];
+  unsigned int regno_mfvsr_d = REGNO (mfvsr_d);
+  unsigned int regno_tmp_vsx = REGNO (tmp_vsx);
+  unsigned int regno_mtvsr_d = REGNO (mtvsr_d);
+  rtx tmp_vsx_di = gen_rtx_REG (DImode, regno_tmp_vsx);
+  rtx reg;
 
-  operands[SFBOOL_BOOL_A_DI] = gen_rtx_REG (DImode, regno_bool_a);
-  operands[SFBOOL_TMP_VSX_DI] = gen_rtx_REG (DImode, regno_tmp_vsx);
+  if (CONST_INT_P (bool_a2))
+    {
+      emit_move_insn (tmp_gpr, bool_a2);
+      reg = tmp_gpr;
+    }
+  else
+    reg = REGNO (bool_a1) == regno_mfvsr_d ? bool_a2 : bool_a1;
+
+  if (TARGET_P9_VECTOR)
+    {
+      rtx tmp_vsx_v4si = gen_rtx_REG (V4SImode, regno_tmp_vsx);
+      operands[SFBOOL_SET1] = gen_vsx_splat_v4si (tmp_vsx_v4si, reg);
+      operands[SFBOOL_SET2] = gen_rtx_CLOBBER (VOIDmode, tmp_gpr);
+    }
+  else
+    {
+      rtx reg_di = gen_rtx_REG (DImode, REGNO (reg));
+      operands[SFBOOL_SET1] = gen_ashldi3 (tmp_gpr, reg_di, GEN_INT (32));
+      operands[SFBOOL_SET2] = gen_rtx_SET (tmp_vsx_di, tmp_gpr);
+    }
+
   operands[SFBOOL_MTVSR_D_V4SF] = gen_rtx_REG (V4SFmode, regno_mtvsr_d);
 })
