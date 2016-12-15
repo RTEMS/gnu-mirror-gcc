@@ -3560,7 +3560,7 @@ dimode_scalar_chain::make_vector_copies (unsigned regno)
 	  }
 	else
 	  {
-	    rtx tmp = assign_386_stack_local (DImode, SLOT_TEMP);
+	    rtx tmp = assign_386_stack_local (DImode, SLOT_STV_TEMP);
 	    emit_move_insn (adjust_address (tmp, SImode, 0),
 			    gen_rtx_SUBREG (SImode, reg, 0));
 	    emit_move_insn (adjust_address (tmp, SImode, 4),
@@ -3637,7 +3637,7 @@ dimode_scalar_chain::convert_reg (unsigned regno)
 	    }
 	  else
 	    {
-	      rtx tmp = assign_386_stack_local (DImode, SLOT_TEMP);
+	      rtx tmp = assign_386_stack_local (DImode, SLOT_STV_TEMP);
 	      emit_move_insn (tmp, reg);
 	      emit_move_insn (gen_rtx_SUBREG (SImode, scopy, 0),
 			      adjust_address (tmp, SImode, 0));
@@ -33573,6 +33573,7 @@ ix86_fold_builtin (tree fndecl, int n_args,
 	  }
 
 	case IX86_BUILTIN_TZCNT16:
+	case IX86_BUILTIN_CTZS:
 	case IX86_BUILTIN_TZCNT32:
 	case IX86_BUILTIN_TZCNT64:
 	  gcc_assert (n_args == 1);
@@ -33580,7 +33581,8 @@ ix86_fold_builtin (tree fndecl, int n_args,
 	    {
 	      tree type = TREE_TYPE (TREE_TYPE (fndecl));
 	      tree arg = args[0];
-	      if (fn_code == IX86_BUILTIN_TZCNT16)
+	      if (fn_code == IX86_BUILTIN_TZCNT16
+		  || fn_code == IX86_BUILTIN_CTZS)
 		arg = fold_convert (short_unsigned_type_node, arg);
 	      if (integer_zerop (arg))
 		return build_int_cst (type, TYPE_PRECISION (TREE_TYPE (arg)));
@@ -33590,6 +33592,7 @@ ix86_fold_builtin (tree fndecl, int n_args,
 	  break;
 
 	case IX86_BUILTIN_LZCNT16:
+	case IX86_BUILTIN_CLZS:
 	case IX86_BUILTIN_LZCNT32:
 	case IX86_BUILTIN_LZCNT64:
 	  gcc_assert (n_args == 1);
@@ -33597,7 +33600,8 @@ ix86_fold_builtin (tree fndecl, int n_args,
 	    {
 	      tree type = TREE_TYPE (TREE_TYPE (fndecl));
 	      tree arg = args[0];
-	      if (fn_code == IX86_BUILTIN_LZCNT16)
+	      if (fn_code == IX86_BUILTIN_LZCNT16
+		  || fn_code == IX86_BUILTIN_CLZS)
 		arg = fold_convert (short_unsigned_type_node, arg);
 	      if (integer_zerop (arg))
 		return build_int_cst (type, TYPE_PRECISION (TREE_TYPE (arg)));
