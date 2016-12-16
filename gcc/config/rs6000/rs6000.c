@@ -21095,6 +21095,7 @@ rs6000_secondary_reload (bool in_p,
 
   if (TARGET_DEBUG_ADDR)
     {
+      rtx x2 = x;
       fprintf (stderr,
 	       "\nrs6000_secondary_reload, return %s, in_p = %s, rclass = %s, "
 	       "mode = %s",
@@ -21103,7 +21104,15 @@ rs6000_secondary_reload (bool in_p,
 	       reg_class_names[rclass],
 	       GET_MODE_NAME (mode));
 
-      if (REG_P (x) || (SUBREG_P (x) && REG_P (SUBREG_REG (x))))
+      if (SUBREG_P (x))
+	{
+	  int offset = SUBREG_BYTE (x2);
+	  x2 = SUBREG_REG (x2);
+	  fprintf (stderr, ", subreg (%s, %d)", 
+		   GET_MODE_NAME (GET_MODE (x2)), offset);
+	}
+
+      if (REG_P (x))
 	{
 	  unsigned int r = reg_or_subregno (x);
 
@@ -21117,14 +21126,7 @@ rs6000_secondary_reload (bool in_p,
 	      fprintf (stderr, ", reg %d", r);
 #endif
 	    }
-
-	  if (SUBREG_P (x))
-	    fprintf (stderr, ", subreg (%s, %d)",
-		     GET_MODE_NAME (GET_MODE (SUBREG_REG (x))),
-		     (int) SUBREG_BYTE (x));
 	}
-      else if (SUBREG_P (x))
-	fprintf (stderr, ", subreg not reg");
       else if (MEM_P (x))
 	{
 	  rtx addr = XEXP (x, 0);
