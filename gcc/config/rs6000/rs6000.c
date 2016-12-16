@@ -21103,6 +21103,47 @@ rs6000_secondary_reload (bool in_p,
 	       reg_class_names[rclass],
 	       GET_MODE_NAME (mode));
 
+      if (REG_P (x) || (SUBREG_P (x) && REG_P (SUBREG_REG (x))))
+	{
+	  unsigned int r = reg_or_subregno (x);
+
+	  if (r >= FIRST_PSEUDO_REGISTER)
+	    fprintf (stderr, ", pseudo %d", r);
+	  else
+	    {
+#ifdef TARGET_REGNAMES
+	      fprintf (stderr, ", reg %s", alt_reg_names[r]);
+#else
+	      fprintf (stderr, ", reg %d", r);
+#endif
+	    }
+
+	  if (SUBREG_P (x))
+	    fprintf (stderr, ", subreg (%s, %d)",
+		     GET_MODE_NAME (GET_MODE (SUBREG_REG (x))),
+		     (int) SUBREG_BYTE (x));
+	}
+      else if (SUBREG_P (x))
+	fprintf (stderr, ", subreg not reg");
+      else if (MEM_P (x))
+	{
+	  rtx addr = XEXP (x, 0);
+	  if (GET_CODE (x) == LO_SUM)
+	    fputs (", mem offset", stderr);
+	  else if (GET_CODE (x) == PLUS)
+	    {
+	      rtx op2 = XEXP (addr, 1);
+	      if (!REG_P (op2) && !SUBREG_P (op2))
+		fputs (", mem offset", stderr);
+	      else
+		fputs (", mem indexed", stderr);
+	    }
+	  else if (REG_P (addr) || SUBREG_P (addr))
+	    fputs (", mem indirect", stderr);
+	  else
+	    fputs (", mem unknown", stderr);
+	}
+
       if (reload_completed)
 	fputs (", after reload", stderr);
 
@@ -21110,7 +21151,7 @@ rs6000_secondary_reload (bool in_p,
 	fputs (", done_p not set", stderr);
 
       if (default_p)
-	fputs (", default secondary reload", stderr);
+	fputs (", default reload", stderr);
 
       if (sri->icode != CODE_FOR_nothing)
 	fprintf (stderr, ", reload func = %s, extra cost = %d",

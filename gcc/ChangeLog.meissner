@@ -1,3 +1,9 @@
+2016-12-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_secondary_reload): Print reg or
+	mem basic information in first line if -mdebug=addr.  Shorten
+	default secondary reload output.
+
 2016-12-15  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Merge up to 243729.
