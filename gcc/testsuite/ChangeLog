@@ -1,3 +1,37 @@
+2016-12-16  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* gcc.target/aarch64/ubfiz_lsl_1.c: New test.
+
+2016-12-16  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* gcc.target/aarch64/ubfx_lsr_1.c: New test.
+
+2016-12-16  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/78408
+	* gcc.dg/pr78408-1.c: New test.
+	* gcc.dg/pr78408-2.c: New test.
+
+2016-12-16  Marek Polacek  <polacek@redhat.com>
+
+	PR tree-optimization/78819
+	* gcc.dg/tree-ssa/vrp112.c: New test.
+
+2016-12-16  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/opt61.adb: New test.
+	* gnat.dg/opt61_pkg.ad[sb]: New helper.
+
+2016-12-16  Richard Biener  <rguenther@suse.de>
+
+	PR c++/71694
+	* g++.dg/pr71694.C: New testcase.
+
+2016-12-16  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/71632
+	* gcc.dg/pr71632.c: New testcase.
+
 2016-12-15  Andrew Senkevich  <andrew.senkevich@intel.com>
 
 	* gcc.target/i386/avx512bw-kmovd-1.c: New test.

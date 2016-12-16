@@ -1,3 +1,102 @@
+2016-12-16  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64.md: New define_split above bswap<mode>2.
+
+2016-12-16  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64.md: New define_split above insv<mode>.
+
+2016-12-16  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/78408
+	* tree-ssa-ccp.c: Include tree-dfa.h.
+	(optimize_memcpy): New function.
+	(pass_fold_builtins::execute): Use it.  Remove useless conditional
+	break after BUILT_IN_VA_*.
+
+2016-12-16  Marek Polacek  <polacek@redhat.com>
+
+	PR tree-optimization/78819
+	* tree-vrp.c (find_switch_asserts): Return if the insertion limit is 0.
+	Don't register an assertion if the default case shares a label with
+	another case.
+
+2016-12-16  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	* config/arm/arm.md (subsi3_carryin): Add Thumb-2 RSC #0.
+	(arm_negdi2) Rename to negdi2_insn, allow on Thumb-2.
+	* config/arm/thumb2.md (thumb2_negdi2): Remove pattern.
+
+2016-12-16  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	* config/arm/arm.c (thumb_core_reg_alloc_order): Swap R12 and R14.
+
+2016-12-16  Claudiu Zissulescu  <claziss@synopsys.com>
+
+	* config/arc/arc.md (call_prof): Remove.
+	(call_value_prof): Likewise.
+	(sibcall_prof): Likewise.
+	(sibcall_value_prof): Likewise.
+
+2016-12-16  Claudiu Zissulescu  <claziss@synopsys.com>
+
+	* config/arc/arc.h (LINK_SPEC): Tidy up.
+	(ENDFILE_SPEC): Likewise.
+	(LIB_SPEC): Likewise.
+	(STARTFILE_SPEC): Include gcrt0 when profiling.
+	(FUNCTION_PROFILER): Use __mcount.
+	* config/arc/arc.opt (mucb-mcount): Remove.
+	* doc/invoke.texi (ARC): Remove mucb-mcount doc.
+	* arc/arc-protos.h (arc_profile_call): Remove.
+	* config/arc/arc.c (write_profile_sections): Likewise.
+	(arc_profile_call): Likewise.
+	(unspec_prof_hash): Likewise.
+	(unspec_prof_htab_eq): Likewise.
+	(arc_legitimate_constant_p): Remove UNSPEC_PROF.
+	(arc_reorg): Remove call to write_profile_sections.
+	* config/arc/arc.md (call): Remove call to arc_profile_call.
+	(call_value): Likewise.
+	(sibcall): Likewise.
+	(sibcall_value): Likewise.
+	(define_constants): Remove UNSPEC_PROF.
+
+2016-12-16  Claudiu Zissulescu  <claziss@synopsys.com>
+
+	* config/arc/arc.md (mulsidi_600): Change to insn_and_split,
+	generate new mul64 insn for core multiplication work.
+	(umulsidi_600): Likewise, but use mulu64 insn.
+	(mul64): New pattern, content taken from old mulsidi_600 insn
+	pattern.
+	(mulu64): Likewise, but using umulsidi_600.
+	(mulsidi3): Remove move to destination, this is now handled by
+	mulsidi_600 insn_and_split.
+	(umulsidi3): Likewise, but using umulsidi_600.
+
+2016-12-16  Richard Biener  <rguenther@suse.de>
+
+	PR c++/71694
+	* langhooks-def.h (lhd_unit_size_without_reusable_padding): Declare.
+	(LANG_HOOKS_UNIT_SIZE_WITHOUT_REUSABLE_PADDING): Define.
+	(LANG_HOOKS_FOR_TYPES_INITIALIZER): Adjust.
+	* langhooks.h (struct lang_hooks_for_types): Add
+	unit_size_without_reusable_padding.
+	* langhooks.c (lhd_unit_size_without_reusable_padding): New.
+	* stor-layout.c (finish_bitfield_representative): Use
+	unit_size_without_reusable_padding langhook to decide on the
+	last representatives size.
+
+2016-12-16  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/71632
+	* expr.c (expand_cond_expr_using_cmove): Bail out early if
+	we end up recursing via TER.
+
+2016-12-15  Martin Sebor  <msebor@redhat.com>
+
+	PR bootstrap/78817
+	* vec.h (vec<T, va_heap, vl_ptr>::safe_grow_cleared): Assert
+	a pointer is non-null.
+
 2016-12-15  Andrew Senkevich  <andrew.senkevich@intel.com>
 
 	* config/i386/avx512bwintrin.h: Add new k-mask intrinsics.

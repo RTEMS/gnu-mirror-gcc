@@ -1,7 +1,4 @@
-// { dg-options "-std=gnu++17" }
-// { dg-do compile }
-
-// Copyright (C) 2014-2016 Free Software Foundation, Inc.
+// Copyright (C) 2016 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -18,13 +15,21 @@
 // with this library; see the file COPYING3.  If not see
 // <http://www.gnu.org/licenses/>.
 
-#include <any>
+// { dg-options "-D_GLIBCXX_ASSERTIONS" }
+// { dg-do run { xfail *-*-* } }
 
-void test01()
+#include <map>
+
+void
+test01()
 {
-  using std::any;
-  using std::any_cast;
+  std::map<int, int> m;
+  m[0];
+  m.erase(m.end());
+}
 
-  const any y(1);
-  any_cast<int&>(y); // { dg-error "invalid static_cast" "" { target { *-*-* } } 455 }
+int
+main()
+{
+  test01();
 }
