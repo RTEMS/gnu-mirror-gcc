@@ -1,5 +1,38 @@
 2016-12-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/predicates.md (const_0_to_12_operand): Fix thinko,
+	range should be 0..12.
+
+	* config/rs6000/rs6000.c (rs6000_emit_move): If we are moving a
+	SFmode to a SImode via a subreg, catch it, and do the conversion.
+	Similarly, do the conversion if we are moving SImode ot SFmode.
+
+	* config/rs6000/vsx.md (vextract4b): Fix thinko, range should be
+	0..12.
+	(vextract4b_internal): Likewise.
+	(vinsert4b): Likewise.
+	(vinsert4b_internal): Likewise.
+	(vinsert4b_di): Likewise.
+	(vinsert4b_di_internal): Likewise.
+
+	* config/rs6000/rs6000.md (UNSPEC_SF_FROM_SI): New unspecs.
+	(UNSPEC_SI_FROM_SF): Likewise.
+	(zero_extendsi<mode>2): Split into an expander and insn.
+	Recognize the special case of doing a zero/sign extend of a value
+	that is a SUBREG of the SFmode value.  If it is, make sure the
+	SFmode is converted from the internal format in the vector
+	registers to the standard storage format.  Fix a thinko where
+	zero_extend on vector registers accessed the wrong 4 bytes.
+	(zero_extendsi<mode>2_internal): Likewise.
+	(extendsi<mode>2): Likewise.
+	(extendsi<mode>2_internal): Likewise.
+	(movsi_from_sf): New insn to generate better code when a SFmode is
+	put into a union, and a SImode is extracted.  Do not depend on the
+	register allocator do the right thing with secondary reload.
+	(movdi_from_sf_zero_ext): Optimize zero_extend of movsi_from_sf.
+	(movsf_from_si): New insn to generate better code when putting a
+	SFmode value into a union and SFmode is extracted.
+
 	Merge up to 243758.
 	* REVISION: Update subversion id.
 
