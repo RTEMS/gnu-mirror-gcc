@@ -1,3 +1,27 @@
+2016-12-20  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/predicates.md (reg_or_mem_no_sfmode): New
+	predicate that is like reg_or_mem_operand, except it does not
+	allow mixing SUBREGs of SImode/SFmode on machines that can allow
+	SImode in the vector registers.
+	(lwa_operand_no_sfmode): (reg_or_mem_no_sfmode): New predicate
+	that is like lwa_operand, except it does not allow mixing SUBREGs
+	of SImode/SFmode on machines that can allow SImode in the vector
+	registers.
+
+	* config/rs6000/rs6000.c (rs6000_emit_move): Add support for
+	destination being a MEM in handling mixing SUBREGs of SImode and
+	SFmode.
+
+	* config/rs6000/rs6000.md (zero_extendsi<mode>2): Rework zero and
+	sign extend of SImode to use new predicates.
+	(extendsi<mode>2): Likewise.
+	(movsi_from_sf): Redo spacing of multiple alternatives.
+	(movdi_from_sf_zero_ext): Likewise.
+	(movdi_from_sf_sign_ext): New insn that handles sign extension
+	combined with movsi_from_sf.
+	(movsf_from_si): Fix warning that prevented bootsrapping.
+
 2016-12-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/predicates.md (const_0_to_12_operand): Fix thinko,

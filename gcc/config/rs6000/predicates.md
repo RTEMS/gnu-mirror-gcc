@@ -911,6 +911,26 @@
 	       (ior (match_operand 0 "volatile_mem_operand")
 		    (match_operand 0 "gpc_reg_operand")))))
 
+;; Return 1 if the matches reg_or_mem_operand and it does not contain:
+;; (SUBREG:SI (REG:SF)) or (SUBREG:SF (REG:SI))
+;;
+;; on systems that support SImode in vector registers (i.e. 64-bit systems with
+;; direct move).  These subreg's need to be handled specially in the function
+;; rs6000_emit_move to make sure the value is in the right context.
+(define_predicate "reg_or_mem_no_sfmode"
+  (match_operand 0 "reg_or_mem_operand")
+{
+  if (TARGET_VSX_SMALL_INTEGER && SUBREG_P (op))
+    {
+      rtx inner = SUBREG_REG (op);
+      if (mode == SFmode && GET_MODE (inner) == SImode)
+	return 0;
+      if (mode == SImode && GET_MODE (inner) == SFmode)
+	return 0;
+    }
+  return 1;
+})
+
 ;; Return 1 if the operand is either an easy FP constant or memory or reg.
 (define_predicate "reg_or_none500mem_operand"
   (if_then_else (match_code "mem")
@@ -969,6 +989,26 @@
   if (GET_CODE (offset) != CONST_INT)
     return true;
   return INTVAL (offset) % 4 == 0;
+})
+
+;; Return 1 if the matches lwa_operand and it does not contain:
+;; (SUBREG:SI (REG:SF)) or (SUBREG:SF (REG:SI))
+;;
+;; on systems that support SImode in vector registers (i.e. 64-bit systems with
+;; direct move).  These subreg's need to be handled specially in the function
+;; rs6000_emit_move to make sure the value is in the right context.
+(define_predicate "lwa_operand_no_sfmode"
+  (match_operand 0 "lwa_operand")
+{
+  if (TARGET_VSX_SMALL_INTEGER && SUBREG_P (op))
+    {
+      rtx inner = SUBREG_REG (op);
+      if (mode == SFmode && GET_MODE (inner) == SImode)
+	return 0;
+      if (mode == SImode && GET_MODE (inner) == SFmode)
+	return 0;
+    }
+  return 1;
 })
 
 ;; Return 1 if the operand, used inside a MEM, is a SYMBOL_REF.

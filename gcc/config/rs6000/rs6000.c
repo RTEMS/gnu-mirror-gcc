@@ -10399,13 +10399,27 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 
       if (mode == SImode && inner_mode == SFmode)
 	{
-	  emit_insn (gen_movsi_from_sf (dest, inner_source));
+	  if (MEM_P (dest))
+	    {
+	      rtx dest2 = gen_reg_rtx (SImode);
+	      emit_insn (gen_movsi_from_sf (dest2, inner_source));
+	      emit_insn (gen_rtx_SET (dest, dest2));
+	    }
+	  else
+	    emit_insn (gen_movsi_from_sf (dest, inner_source));
 	  return;
 	}
 
       if (mode == SFmode && inner_mode == SImode)
 	{
-	  emit_insn (gen_movsf_from_si (dest, inner_source));
+	  if (MEM_P (dest))
+	    {
+	      rtx dest2 = gen_reg_rtx (SFmode);
+	      emit_insn (gen_movsf_from_si (dest2, inner_source));
+	      emit_insn (gen_rtx_SET (dest, dest2));
+	    }
+	  else
+	    emit_insn (gen_movsf_from_si (dest, inner_source));
 	  return;
 	}
     }
