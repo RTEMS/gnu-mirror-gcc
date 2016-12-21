@@ -941,8 +941,8 @@
                 ?jwM,      jwM,       W,         W,         v,         wZ"))]
 
   "TARGET_POWERPC64 && VECTOR_MEM_VSX_P (<MODE>mode)
-   && (register_operand (operands[0], <MODE>mode) 
-       || register_operand (operands[1], <MODE>mode))"
+   && (gpc_reg_operand (operands[0], <MODE>mode) 
+       || gpc_reg_operand (operands[1], <MODE>mode))"
 {
   return rs6000_output_move_128bit (operands);
 }
@@ -971,8 +971,8 @@
                 v,         wZ"))]
 
   "!TARGET_POWERPC64 && VECTOR_MEM_VSX_P (<MODE>mode)
-   && (register_operand (operands[0], <MODE>mode) 
-       || register_operand (operands[1], <MODE>mode))"
+   && (gpc_reg_operand (operands[0], <MODE>mode) 
+       || gpc_reg_operand (operands[1], <MODE>mode))"
 {
   return rs6000_output_move_128bit (operands);
 }
@@ -4010,7 +4010,8 @@
   if (TARGET_P9_VECTOR)
     {
       rtx tmp_vsx_v4si = gen_rtx_REG (V4SImode, regno_tmp_vsx);
-      operands[SFBOOL_SET1] = gen_vsx_splat_v4si (tmp_vsx_v4si, reg);
+      rtx reg_si = gen_rtx_REG (SImode, REGNO (reg));
+      operands[SFBOOL_SET1] = gen_vsx_splat_v4si (tmp_vsx_v4si, reg_si);
       operands[SFBOOL_SET2] = gen_rtx_CLOBBER (VOIDmode, tmp_gpr);
     }
   else

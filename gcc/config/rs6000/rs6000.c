@@ -7801,6 +7801,32 @@ invalid_e500_subreg (rtx op, machine_mode mode)
   return false;
 }
 
+/* Return TRUE if OP is an invalid SUBREG operation on systems that allow small
+   integers in the vector/floating point registers.  The problem is that SFmode
+   is internally stored as DFmode in the vector/floating point registers, so we
+   can't allow SUBREG's that involve SFmode, except for the special case of
+   hard GPR registers (after/during register allocation).  */
+
+bool
+invalid_vsx_subreg (rtx op, machine_mode mode)
+{
+  if (TARGET_VSX && SUBREG_P (op)
+      && (mode == SFmode || GET_MODE (SUBREG_REG (op)) == SFmode))
+    {
+      rtx inner = SUBREG_REG (op);
+
+      if (!REG_P (inner))
+	return true;
+
+      if (REGNO (inner) >= FIRST_PSEUDO_REGISTER)
+	return true;
+
+      return !INT_REGNO_P (REGNO (inner));
+    }
+
+  return false;
+}
+
 /* Return alignment of TYPE.  Existing alignment is ALIGN.  HOW
    selects whether the alignment is abi mandated, optional, or
    both abi and optional alignment.  */
@@ -10381,47 +10407,43 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       && !gpc_reg_operand (operands[1], mode))
     operands[1] = force_reg (mode, operands[1]);
 
-  /* If we are running before register allocation on a 64-bit machine with
-     direct move, and we see either:
+  /* If we are running before register allocation on a VSX machine, and we see
+     either:
 
 	(set (reg:SF xxx) (subreg:SF (reg:SI yyy) zzz))		(or)
 	(set (reg:SI xxx) (subreg:SI (reg:SF yyy) zzz))
 
-     convert these into a form using UNSPEC.  This is due to SFmode being
-     stored within a vector register in the same format as DFmode.  We need to
-     convert the bits before we can use a direct move or operate on the bits in
-     the vector register as an integer type.  */
-  if (TARGET_DIRECT_MOVE_64BIT && !reload_in_progress && !reload_completed
-      && !lra_in_progress && SUBREG_P (source))
+     convert these into a form using UNSPEC.  SFmode is stored within a vector
+     register in the same format as DFmode.  We need to convert the bits before
+     we can use a direct move or operate on the bits in the vector register as
+     an integer type.  */
+  if (TARGET_VSX && !reload_in_progress && !reload_completed && !lra_in_progress
+      && SUBREG_P (source) && invalid_vsx_subreg (source, mode))
     {
       rtx inner_source = SUBREG_REG (source);
       machine_mode inner_mode = GET_MODE (inner_source);
 
-      if (mode == SImode && inner_mode == SFmode)
+      if (MEM_P (dest))
 	{
-	  if (MEM_P (dest))
-	    {
-	      rtx dest2 = gen_reg_rtx (SImode);
-	      emit_insn (gen_movsi_from_sf (dest2, inner_source));
-	      emit_insn (gen_rtx_SET (dest, dest2));
-	    }
-	  else
-	    emit_insn (gen_movsi_from_sf (dest, inner_source));
+	  rtx dest2 = change_address (dest, inner_mode, XEXP (dest, 0));
+	  emit_insn (gen_rtx_SET (dest2, inner_source));
 	  return;
 	}
 
-      if (mode == SFmode && inner_mode == SImode)
+      else if (mode == SImode && inner_mode == SFmode)
 	{
-	  if (MEM_P (dest))
-	    {
-	      rtx dest2 = gen_reg_rtx (SFmode);
-	      emit_insn (gen_movsf_from_si (dest2, inner_source));
-	      emit_insn (gen_rtx_SET (dest, dest2));
-	    }
-	  else
-	    emit_insn (gen_movsf_from_si (dest, inner_source));
+	  emit_insn (gen_movsi_from_sf (dest, inner_source));
 	  return;
 	}
+
+      else if (mode == SFmode && inner_mode == SImode)
+	{
+	  emit_insn (gen_movsf_from_si (dest, inner_source));
+	  return;
+	}
+
+      else
+	gcc_unreachable ();
     }
 
   /* Recognize the case where operand[1] is a reference to thread-local

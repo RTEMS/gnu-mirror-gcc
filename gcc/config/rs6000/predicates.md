@@ -36,7 +36,12 @@
   (match_operand 0 "register_operand")
 {
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      if (TARGET_VSX && invalid_vsx_subreg (op, mode))
+	return 0;
+
+      op = SUBREG_REG (op);
+    }
 
   if (!REG_P (op))
     return 0;
@@ -52,7 +57,12 @@
   (match_operand 0 "register_operand")
 {
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      if (TARGET_VSX && invalid_vsx_subreg (op, mode))
+	return 0;
+
+      op = SUBREG_REG (op);
+    }
 
   if (!REG_P (op))
     return 0;
@@ -69,7 +79,12 @@
   (match_operand 0 "register_operand")
 {
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      if (TARGET_VSX && invalid_vsx_subreg (op, mode))
+	return 0;
+
+      op = SUBREG_REG (op);
+    }
 
   if (!REG_P (op))
     return 0;
@@ -86,7 +101,12 @@
   (match_operand 0 "register_operand")
 {
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      if (TARGET_VSX && invalid_vsx_subreg (op, mode))
+	return 0;
+
+      op = SUBREG_REG (op);
+    }
 
   if (!REG_P (op))
     return 0;
@@ -103,7 +123,12 @@
   (match_operand 0 "register_operand")
 {
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      if (TARGET_VSX && invalid_vsx_subreg (op, mode))
+	return 0;
+
+      op = SUBREG_REG (op);
+    }
 
   if (!REG_P (op))
     return 0;
@@ -224,11 +249,19 @@
 (define_predicate "gpc_reg_operand"
   (match_operand 0 "register_operand")
 {
-  if ((TARGET_E500_DOUBLE || TARGET_SPE) && invalid_e500_subreg (op, mode))
-    return 0;
-
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      /* Do not allow invalid E500 subregs.  */
+      if ((TARGET_E500_DOUBLE || TARGET_SPE)
+	  && invalid_e500_subreg (op, mode))
+	return 0;
+
+      /* Do not allow invalid SFmode SUBREGS in VSX registers.  */
+      if (TARGET_VSX && invalid_vsx_subreg (op, mode))
+	return 0;
+
+      op = SUBREG_REG (op);
+    }
 
   if (!REG_P (op))
     return 0;
@@ -250,11 +283,19 @@
 (define_predicate "int_reg_operand"
   (match_operand 0 "register_operand")
 {
-  if ((TARGET_E500_DOUBLE || TARGET_SPE) && invalid_e500_subreg (op, mode))
-    return 0;
-
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      /* Do not allow invalid E500 subregs.  */
+      if ((TARGET_E500_DOUBLE || TARGET_SPE)
+	  && invalid_e500_subreg (op, mode))
+	return 0;
+
+      /* Do not allow invalid SFmode SUBREGS in VSX registers.  */
+      if (TARGET_VSX && invalid_vsx_subreg (op, mode))
+	return 0;
+
+      op = SUBREG_REG (op);
+    }
 
   if (!REG_P (op))
     return 0;
@@ -269,11 +310,19 @@
 (define_predicate "int_reg_operand_not_pseudo"
   (match_operand 0 "register_operand")
 {
-  if ((TARGET_E500_DOUBLE || TARGET_SPE) && invalid_e500_subreg (op, mode))
-    return 0;
-
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      /* Do not allow invalid E500 subregs.  */
+      if ((TARGET_E500_DOUBLE || TARGET_SPE)
+	  && invalid_e500_subreg (op, mode))
+	return 0;
+
+      /* Do not allow invalid SFmode SUBREGS in VSX registers.  */
+      if (TARGET_VSX && invalid_vsx_subreg (op, mode))
+	return 0;
+
+      op = SUBREG_REG (op);
+    }
 
   if (!REG_P (op))
     return 0;
@@ -289,7 +338,18 @@
   (match_operand 0 "int_reg_operand")
 {
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      /* Do not allow invalid E500 subregs.  */
+      if ((TARGET_E500_DOUBLE || TARGET_SPE)
+	  && invalid_e500_subreg (op, mode))
+	return 0;
+
+      /* Do not allow invalid SFmode SUBREGS in VSX registers.  */
+      if (TARGET_VSX && invalid_vsx_subreg (op, mode))
+	return 0;
+
+      op = SUBREG_REG (op);
+    }
 
   if (!REG_P (op))
     return 0;
@@ -305,7 +365,12 @@
   HOST_WIDE_INT r;
 
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      if (TARGET_VSX && invalid_vsx_subreg (op, mode))
+	return 0;
+
+      op = SUBREG_REG (op);
+    }
 
   if (!REG_P (op))
     return 0;
@@ -340,8 +405,12 @@
     return 0;
 
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      if (TARGET_VSX && invalid_vsx_subreg (op, mode))
+	return 0;
 
+      op = SUBREG_REG (op);
+    }
   if (!REG_P (op))
     return 0;
 
@@ -369,7 +438,12 @@
     return 0;
 
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      if (TARGET_VSX && invalid_vsx_subreg (op, mode))
+	return 0;
+
+      op = SUBREG_REG (op);
+    }
 
   if (!REG_P (op))
     return 0;
@@ -792,9 +866,8 @@
   if (MEM_P (op))
     return indexed_or_indirect_operand (op, mode);
   else if (TARGET_DIRECT_MOVE)
-    return register_operand (op, mode);
-  return
-    0;
+    return gpc_reg_operand (op, mode);
+  return 0;
 })
 
 ;; Return 1 if the operand is an indexed or indirect memory operand with an
@@ -911,26 +984,6 @@
 	       (ior (match_operand 0 "volatile_mem_operand")
 		    (match_operand 0 "gpc_reg_operand")))))
 
-;; Return 1 if the matches reg_or_mem_operand and it does not contain:
-;; (SUBREG:SI (REG:SF)) or (SUBREG:SF (REG:SI))
-;;
-;; on systems that support SImode in vector registers (i.e. 64-bit systems with
-;; direct move).  These subreg's need to be handled specially in the function
-;; rs6000_emit_move to make sure the value is in the right context.
-(define_predicate "reg_or_mem_no_sfmode"
-  (match_operand 0 "reg_or_mem_operand")
-{
-  if (TARGET_VSX_SMALL_INTEGER && SUBREG_P (op))
-    {
-      rtx inner = SUBREG_REG (op);
-      if (mode == SFmode && GET_MODE (inner) == SImode)
-	return 0;
-      if (mode == SImode && GET_MODE (inner) == SFmode)
-	return 0;
-    }
-  return 1;
-})
-
 ;; Return 1 if the operand is either an easy FP constant or memory or reg.
 (define_predicate "reg_or_none500mem_operand"
   (if_then_else (match_code "mem")
@@ -962,6 +1015,9 @@
 {
   rtx inner, addr, offset;
 
+  if (GET_CODE (op) == SUBREG && TARGET_VSX && invalid_vsx_subreg (op, mode))
+    return 0;
+
   inner = op;
   if (reload_completed && GET_CODE (inner) == SUBREG)
     inner = SUBREG_REG (inner);
@@ -989,26 +1045,6 @@
   if (GET_CODE (offset) != CONST_INT)
     return true;
   return INTVAL (offset) % 4 == 0;
-})
-
-;; Return 1 if the matches lwa_operand and it does not contain:
-;; (SUBREG:SI (REG:SF)) or (SUBREG:SF (REG:SI))
-;;
-;; on systems that support SImode in vector registers (i.e. 64-bit systems with
-;; direct move).  These subreg's need to be handled specially in the function
-;; rs6000_emit_move to make sure the value is in the right context.
-(define_predicate "lwa_operand_no_sfmode"
-  (match_operand 0 "lwa_operand")
-{
-  if (TARGET_VSX_SMALL_INTEGER && SUBREG_P (op))
-    {
-      rtx inner = SUBREG_REG (op);
-      if (mode == SFmode && GET_MODE (inner) == SImode)
-	return 0;
-      if (mode == SImode && GET_MODE (inner) == SFmode)
-	return 0;
-    }
-  return 1;
 })
 
 ;; Return 1 if the operand, used inside a MEM, is a SYMBOL_REF.
@@ -1077,11 +1113,17 @@
       && easy_vector_constant (op, mode))
     return 1;
 
-  /* Do not allow invalid E500 subregs.  */
-  if ((TARGET_E500_DOUBLE || TARGET_SPE)
-      && GET_CODE (op) == SUBREG
-      && invalid_e500_subreg (op, mode))
-    return 0;
+  if (GET_CODE (op) == SUBREG)
+    {
+      /* Do not allow invalid E500 subregs.  */
+      if ((TARGET_E500_DOUBLE || TARGET_SPE)
+	  && invalid_e500_subreg (op, mode))
+	return 0;
+
+      /* Do not allow invalid SFmode SUBREGS in VSX registers.  */
+      if (TARGET_VSX && invalid_vsx_subreg (op, mode))
+	return 0;
+    }
 
   /* For floating-point or multi-word mode, the only remaining valid type
      is a register.  */
@@ -1146,10 +1188,17 @@
 (define_predicate "rs6000_nonimmediate_operand"
   (match_code "reg,subreg,mem")
 {
-  if ((TARGET_E500_DOUBLE || TARGET_SPE)
-      && GET_CODE (op) == SUBREG
-      && invalid_e500_subreg (op, mode))
-    return 0;
+  if (GET_CODE (op) == SUBREG)
+    {
+      /* Do not allow invalid E500 subregs.  */
+      if ((TARGET_E500_DOUBLE || TARGET_SPE)
+	  && invalid_e500_subreg (op, mode))
+	return 0;
+
+      /* Do not allow invalid SFmode SUBREGS in VSX registers.  */
+      if (TARGET_VSX && invalid_vsx_subreg (op, mode))
+	return 0;
+    }
 
   return nonimmediate_operand (op, mode);
 })

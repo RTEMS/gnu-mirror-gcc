@@ -1,3 +1,52 @@
+2016-12-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/predicates.md (altivec_register_operand): Disallow
+	SUBREG mixing SFmode and other types, except when a hard GPR
+	reister is used, since SFmode is stored like DFmode within the
+	floating point and vector registers.  In the cases where SPE is
+	possible, rewrite the code to check for SUBREG only one.
+	(vsx_register_operand): Likewise.
+	(vfloat_operand): Likewise.
+	(vint_operand): Likewise.
+	(vlogical_operand): Likewise.
+	(gpc_reg_operand): Likewise.
+	(int_reg_operand): Likewise.
+	(int_reg_operand_not_pseudo): Likewise.
+	(base_reg_operand): Likewise.
+	(fpr_reg_operand): Likewise.
+	(toc_fusion_or_p9_reg_operand): Likewise.
+	(htm_spr_reg_operand): Likewise.
+	(reg_or_indexed_operand): Likewise.
+	(lwa_operand): Likewise.
+	(symbol_ref_operand): Likewise.
+	(splat_input_operand): Likewise.
+	(reg_or_mem_no_sfmode): Delete, no longer used.
+	(lwa_operand_no_sfmode): Likewise.
+
+	* config/rs6000/rs6000-protos.h (invalid_vsx_subreg): Add
+	declaration.
+
+	* config/rs6000/rs6000.c (invalid_vsx_subreg): New function, don't
+	allow SUBREG mixing of SFmode and other types.
+	(rs6000_emit_move): Rework invalid SFmode subreg support.
+
+	* config/rs6000/vsx.md (vsx_mov<mode>_64bit): Change
+	register_operand to gpc_reg_operand.
+	(vsx_mov<mode>_32bit): Likewise.
+	(peephole to optimize logical operations on SFmode): Use correct
+	mode for power9 splat operation.
+
+	* config/rs6000/rs6000.md (zero_extendsi<mode>2): Undo last
+	change.
+	(extendsi<mode>2): Likewise.
+	(fixuns_trunc<mode>di2): Use gpc_reg_operand instead of
+	register_operand.
+	(movsi_from_sf): Rework to allow use on power7 and/or 32-bit
+	systems.
+	(movsi_from_sf): Likewise.
+	(movdi_from_sf_zero_ext): Likewise.
+	(movdi_from_sf_sign_ext): Likewise.
+
 2016-12-20  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/predicates.md (reg_or_mem_no_sfmode): New
