@@ -1,3 +1,8 @@
+2016-12-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/71977
+	* gcc.target/powerpc/pr71977-1.c: New test.
+
 2016-12-22   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 243891
