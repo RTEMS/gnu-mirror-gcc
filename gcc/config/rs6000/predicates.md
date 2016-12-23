@@ -31,6 +31,36 @@
        (match_test "REGNO (op) == CTR_REGNO
 		    || REGNO (op) > LAST_VIRTUAL_REGISTER")))
 
+;; Return 1 if op is a SUBREG that is used to look at a SFmode value as
+;; and integer or vice versa.
+;;
+;; In the normal case where SFmode is in a floating point/vector register, it
+;; is stored as a DFmode and has a different format.  If we don't transform the
+;; value, things that use logical operations on the values will get the wrong
+;; value.
+;;
+;; If we don't have 64-bit and direct move, this conversion will be done by
+;; store and load, instead of by fiddling with the bits within the register.
+(define_predicate "sf_subreg_operand"
+  (match_code "subreg")
+{
+  rtx inner_reg = SUBREG_REG (op);
+  machine_mode inner_mode = GET_MODE (inner_reg);
+
+  if (!TARGET_DIRECT_MOVE_64BIT || !REG_P (inner_reg))
+    return 0;
+
+  if ((mode == SFmode && GET_MODE_CLASS (inner_mode) == MODE_INT)
+       || (GET_MODE_CLASS (mode) == MODE_INT && inner_mode == SFmode))
+    {
+      if (INT_REGNO_P (REGNO (inner_reg)))
+	return 0;
+
+      return 1;
+    }
+  return 0;
+})
+
 ;; Return 1 if op is an Altivec register.
 (define_predicate "altivec_register_operand"
   (match_operand 0 "register_operand")
@@ -103,7 +133,13 @@
   (match_operand 0 "register_operand")
 {
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      if (TARGET_DIRECT_MOVE_64BIT && sf_subreg_operand (op, mode))
+	return 0;
+
+      op = SUBREG_REG (op);
+    }
+
 
   if (!REG_P (op))
     return 0;
@@ -243,6 +279,18 @@
     return 1;
 
   return INT_REGNO_P (REGNO (op)) || FP_REGNO_P (REGNO (op));
+})
+
+;; Return 1 like gpc_reg_operand, unless the argument is a SUBREG involving
+;; SFmode, which is problematical on VSX where SFmode is stored with the vector
+;; registers as DFmode.
+(define_predicate "gpc_nosf_reg_operand"
+  (match_operand 0 "gpc_reg_operand")
+{
+  if (SUBREG_P (op) && TARGET_DIRECT_MOVE_64BIT)
+    return !sf_subreg_operand (op, mode);
+
+  return 1;
 })
 
 ;; Return 1 if op is a general purpose register.  Unlike gpc_reg_operand, don't
@@ -488,6 +536,11 @@
 (define_predicate "reg_or_cint_operand"
   (ior (match_code "const_int")
        (match_operand 0 "gpc_reg_operand")))
+
+;; Like reg_or_cint_operand, but do not allow SFmode in SUBREG's
+(define_predicate "reg_nosf_or_cint_operand"
+  (ior (match_code "const_int")
+       (match_operand 0 "gpc_nosf_reg_operand")))
 
 ;; Return 1 if op is a constant integer valid for addition with addis, addi.
 (define_predicate "add_cint_operand"

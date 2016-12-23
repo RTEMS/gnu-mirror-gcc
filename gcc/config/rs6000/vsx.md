@@ -3954,7 +3954,7 @@
    ;; AND/IOR/XOR operation on int
    (set (match_operand:SI SFBOOL_BOOL_D "int_reg_operand")
 	(sf_logical:SI (match_operand:SI SFBOOL_BOOL_A1 "int_reg_operand")
-		       (match_operand:SI SFBOOL_BOOL_A2 "int_reg_operand")))
+		       (match_operand:SI SFBOOL_BOOL_A2 "reg_or_cint_operand")))
 
    ;; SLDI
    (set (match_operand:DI SFBOOL_SHL_D "int_reg_operand")
@@ -3969,13 +3969,16 @@
    /* The REG_P (xxx) tests prevents SUBREG's, which allows us to use REGNO
       to compare registers, when the mode is different.  */
    && REG_P (operands[SFBOOL_MFVSR_D]) && REG_P (operands[SFBOOL_BOOL_D])
-   && REG_P (operands[SFBOOL_BOOL_A1]) && REG_P (operands[SFBOOL_BOOL_A2])
-   && REG_P (operands[SFBOOL_SHL_D])   && REG_P (operands[SFBOOL_SHL_A])
-   && REG_P (operands[SFBOOL_MTVSR_D])
+   && REG_P (operands[SFBOOL_BOOL_A1]) && REG_P (operands[SFBOOL_SHL_D])
+   && REG_P (operands[SFBOOL_SHL_A])   && REG_P (operands[SFBOOL_MTVSR_D])
+   && (REG_P (operands[SFBOOL_BOOL_A2])
+       || CONST_INT_P (operands[SFBOOL_BOOL_A2]))
    && (REGNO (operands[SFBOOL_BOOL_D]) == REGNO (operands[SFBOOL_MFVSR_D])
        || peep2_reg_dead_p (3, operands[SFBOOL_MFVSR_D]))
    && (REGNO (operands[SFBOOL_MFVSR_D]) == REGNO (operands[SFBOOL_BOOL_A1])
-       || REGNO (operands[SFBOOL_MFVSR_D]) == REGNO (operands[SFBOOL_BOOL_A2]))
+       || (REG_P (operands[SFBOOL_BOOL_A2])
+	   && REGNO (operands[SFBOOL_MFVSR_D])
+		== REGNO (operands[SFBOOL_BOOL_A2])))
    && REGNO (operands[SFBOOL_BOOL_D]) == REGNO (operands[SFBOOL_SHL_A])
    && (REGNO (operands[SFBOOL_SHL_D]) == REGNO (operands[SFBOOL_BOOL_D])
        || peep2_reg_dead_p (4, operands[SFBOOL_BOOL_D]))
@@ -3991,15 +3994,27 @@
 	(sf_logical:V4SF (match_dup SFBOOL_MFVSR_A)
 			 (match_dup SFBOOL_TMP_VSX)))]
 {
+  rtx bool_a1 = operands[SFBOOL_BOOL_A1];
+  rtx bool_a2 = operands[SFBOOL_BOOL_A2];
   int regno_mfvsr_d = REGNO (operands[SFBOOL_MFVSR_D]);
-  int regno_bool_a1 = REGNO (operands[SFBOOL_BOOL_A1]);
-  int regno_bool_a2 = REGNO (operands[SFBOOL_BOOL_A2]);
-  int regno_bool_a = (regno_mfvsr_d == regno_bool_a1
-		      ? regno_bool_a2 : regno_bool_a1);
   int regno_tmp_vsx = REGNO (operands[SFBOOL_TMP_VSX]);
   int regno_mtvsr_d = REGNO (operands[SFBOOL_MTVSR_D]);
 
-  operands[SFBOOL_BOOL_A_DI] = gen_rtx_REG (DImode, regno_bool_a);
+  if (CONST_INT_P (bool_a2))
+    {
+      rtx tmp_gpr = operands[SFBOOL_TMP_GPR];
+      emit_move_insn (tmp_gpr, bool_a2);
+      operands[SFBOOL_BOOL_A_DI] = tmp_gpr;
+    }
+  else
+    {
+      int regno_bool_a1 = REGNO (bool_a1);
+      int regno_bool_a2 = REGNO (bool_a2);
+      int regno_bool_a = (regno_mfvsr_d == regno_bool_a1
+			  ? regno_bool_a2 : regno_bool_a1);
+      operands[SFBOOL_BOOL_A_DI] = gen_rtx_REG (DImode, regno_bool_a);
+    }
+
   operands[SFBOOL_TMP_VSX_DI] = gen_rtx_REG (DImode, regno_tmp_vsx);
   operands[SFBOOL_MTVSR_D_V4SF] = gen_rtx_REG (V4SFmode, regno_mtvsr_d);
 })

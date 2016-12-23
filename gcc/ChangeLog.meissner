@@ -1,6 +1,63 @@
 2016-12-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	PR target/71977
+	PR target/70568
+	* config/rs6000/predicates.md (sf_subreg_operand): New predicate
+	that recognizes (SUBREG:SI (REG:SF)) and (SUBREG:SF (REG:SI)), so
+	that these can be handled specially.
+	(vlogical_operand): Reject sf_subreg_operand arguments.
+	(gpc_nosf_reg_operand): New predicates that are like
+	gpc_reg_operand and reg_or_cint_operand, but they do not allow the
+	operand to match sf_subreg_operand.
+	(reg_nosf_or_cint_operand): Likewise.
+
+	* config/rs6000/rs6000.c (rs6000_emit_move): If we are moving a
+	SFmode or SImode via a SUBREG, call special insns to do these
+	moves using an explicit temporary.
+
+	* config/rs6000/rs6000.md (UNSPEC_SF_FROM_SI): New unspec.
+	(UNSPEC_SI_FROM_SF): Likewise.
+	(zero_extendsi<mode>2): Fix typo in xxextractuw where we extracted
+	the word from byte 1 instead of byte 4.
+	(and<mode>3): Change all logical operations to reject SF subregs,
+	and require an explicit copy of the subreg to a temporary.
+	(and<mode>3_imm): Likewise.
+	(and<mode>3_imm_dot): Likewise.
+	(and<mode>3_imm_dot2): Likewise.
+	(and<mode>3_imm_mask_dot): Likewise.
+	(and<mode>3_imm_mask_dot2): Likewise.
+	(and<mode>3_imm_dot_shifted): Likewise.
+	(and<mode>3_mask): Likewise.
+	(and<mode>3_mask_dot2): Likewise.
+	(and<mode>3_2insn): Likewise.
+	(and<mode>3_2insn_dot): Likewise.
+	(and<mode>3_2insn_dot2): Likewise.
+	(<code><mode>3): Likewise.
+	(iorxor splitter): Likewise.
+	(bool<mode>3_imm): Likewise.
+	(bool<mode>3): Likewise.
+	(bool<mode>3_dot): Likewise.
+	(boolc<mode>3): Likewise.
+	(boolc<mode>3_dot): Likewise.
+	(boolcc<mode>3): Likewise.
+	(boolcc<mode>3_dot): Likewise.
+	(boolcc<mode>3_dot2): Likewise.
+	(eqv<mode>3): Likewise.
+	(lfiwzx): Fix typo in xxextractuw where we extracted the word from
+	byte 1 instead of byte 4.
+	(movsi_from_sf): New insnss to be explicit when we are using
+	SFmode in subregs, where the value might need to be converted from
+	the format used in the floatint point and vector registers to the
+	format used in GPRs and in memory.
+	(movdi_from_sf_zero_ext): Likewise.
+	(movsf_from_si): Likewise.
+
+	* config/rs6000/vsx.md (SFmode define_peephole2):  Allow the
+	logical operation to be an integer constant as well as a register.
+
+2016-12-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/71977
 	* config/rs6000/rs6000.md (sf_logical): New code iterator for
 	optimizing logical operations on SFmode.
 	* config/rs6000/vsx.md (SFBOOL_*): New constants for optimizing
