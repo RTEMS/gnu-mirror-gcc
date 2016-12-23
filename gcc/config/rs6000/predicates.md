@@ -47,7 +47,7 @@
   rtx inner_reg = SUBREG_REG (op);
   machine_mode inner_mode = GET_MODE (inner_reg);
 
-  if (!TARGET_DIRECT_MOVE_64BIT || !REG_P (inner_reg))
+  if (!TARGET_NO_SF_SUBREG || !REG_P (inner_reg))
     return 0;
 
   if ((mode == SFmode && GET_MODE_CLASS (inner_mode) == MODE_INT)
@@ -66,7 +66,12 @@
   (match_operand 0 "register_operand")
 {
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      if (TARGET_NO_SF_SUBREG && sf_subreg_operand (op, mode))
+	return 0;
+
+      op = SUBREG_REG (op);
+    }
 
   if (!REG_P (op))
     return 0;
@@ -82,7 +87,12 @@
   (match_operand 0 "register_operand")
 {
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      if (TARGET_NO_SF_SUBREG && sf_subreg_operand (op, mode))
+	return 0;
+
+      op = SUBREG_REG (op);
+    }
 
   if (!REG_P (op))
     return 0;
@@ -99,7 +109,12 @@
   (match_operand 0 "register_operand")
 {
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      if (TARGET_NO_SF_SUBREG && sf_subreg_operand (op, mode))
+	return 0;
+
+      op = SUBREG_REG (op);
+    }
 
   if (!REG_P (op))
     return 0;
@@ -116,7 +131,12 @@
   (match_operand 0 "register_operand")
 {
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      if (TARGET_NO_SF_SUBREG && sf_subreg_operand (op, mode))
+	return 0;
+
+      op = SUBREG_REG (op);
+    }
 
   if (!REG_P (op))
     return 0;
@@ -134,7 +154,7 @@
 {
   if (GET_CODE (op) == SUBREG)
     {
-      if (TARGET_DIRECT_MOVE_64BIT && sf_subreg_operand (op, mode))
+      if (TARGET_NO_SF_SUBREG && sf_subreg_operand (op, mode))
 	return 0;
 
       op = SUBREG_REG (op);
@@ -287,7 +307,7 @@
 (define_predicate "gpc_nosf_reg_operand"
   (match_operand 0 "gpc_reg_operand")
 {
-  if (SUBREG_P (op) && TARGET_DIRECT_MOVE_64BIT)
+  if (SUBREG_P (op) && TARGET_NO_SF_SUBREG)
     return !sf_subreg_operand (op, mode);
 
   return 1;
@@ -514,7 +534,7 @@
 (define_predicate "reg_or_short_operand"
   (if_then_else (match_code "const_int")
     (match_operand 0 "short_cint_operand")
-    (match_operand 0 "gpc_reg_operand")))
+    (match_operand 0 "gpc_nosf_reg_operand")))
 
 ;; Return 1 if op is a constant integer valid for DS field
 ;; or non-special register.
@@ -522,23 +542,18 @@
   (if_then_else (match_code "const_int")
     (and (match_operand 0 "short_cint_operand")
 	 (match_test "!(INTVAL (op) & 3)"))
-    (match_operand 0 "gpc_reg_operand")))
+    (match_operand 0 "gpc_nosf_reg_operand")))
 
 ;; Return 1 if op is a constant integer whose high-order 16 bits are zero
 ;; or non-special register.
 (define_predicate "reg_or_u_short_operand"
   (if_then_else (match_code "const_int")
     (match_operand 0 "u_short_cint_operand")
-    (match_operand 0 "gpc_reg_operand")))
+    (match_operand 0 "gpc_nosf_reg_operand")))
 
 ;; Return 1 if op is any constant integer 
 ;; or non-special register.
 (define_predicate "reg_or_cint_operand"
-  (ior (match_code "const_int")
-       (match_operand 0 "gpc_reg_operand")))
-
-;; Like reg_or_cint_operand, but do not allow SFmode in SUBREG's
-(define_predicate "reg_nosf_or_cint_operand"
   (ior (match_code "const_int")
        (match_operand 0 "gpc_nosf_reg_operand")))
 
@@ -554,7 +569,7 @@
 (define_predicate "reg_or_add_cint_operand"
   (if_then_else (match_code "const_int")
     (match_operand 0 "add_cint_operand")
-    (match_operand 0 "gpc_reg_operand")))
+    (match_operand 0 "gpc_nosf_reg_operand")))
 
 ;; Return 1 if op is a constant integer valid for subtraction
 ;; or non-special register.
@@ -563,7 +578,7 @@
     (match_test "(unsigned HOST_WIDE_INT)
 		   (- UINTVAL (op) + (mode == SImode ? 0x80000000 : 0x80008000))
 		 < (unsigned HOST_WIDE_INT) 0x100000000ll")
-    (match_operand 0 "gpc_reg_operand")))
+    (match_operand 0 "gpc_nosf_reg_operand")))
 
 ;; Return 1 if op is any 32-bit unsigned constant integer
 ;; or non-special register.
@@ -573,7 +588,7 @@
 		  && INTVAL (op) >= 0)
 		 || ((INTVAL (op) & GET_MODE_MASK (mode)
 		      & (~ (unsigned HOST_WIDE_INT) 0xffffffff)) == 0)")
-    (match_operand 0 "gpc_reg_operand")))
+    (match_operand 0 "gpc_nosf_reg_operand")))
 
 ;; Like reg_or_logical_cint_operand, but allow vsx registers
 (define_predicate "vsx_reg_or_cint_operand"
@@ -948,7 +963,7 @@
   (ior (and (match_code "const_int")
 	    (match_test "rs6000_is_valid_and_mask (op, mode)"))
        (if_then_else (match_test "fixed_regs[CR0_REGNO]")
-	 (match_operand 0 "gpc_reg_operand")
+	 (match_operand 0 "gpc_nosf_reg_operand")
 	 (match_operand 0 "logical_operand"))))
 
 ;; Return 1 if the operand is either a logical operand or a short cint operand.
@@ -962,7 +977,7 @@
 	  (ior (and (match_code "mem")
 		    (match_test "macho_lo_sum_memory_operand (op, mode)"))
 	       (ior (match_operand 0 "volatile_mem_operand")
-		    (match_operand 0 "gpc_reg_operand")))))
+		    (match_operand 0 "gpc_nosf_reg_operand")))))
 
 ;; Return 1 if the operand is either an easy FP constant or memory or reg.
 (define_predicate "reg_or_none500mem_operand"
@@ -971,7 +986,7 @@
 	  (ior (match_operand 0 "memory_operand")
 	       (ior (match_test "macho_lo_sum_memory_operand (op, mode)")
 		    (match_operand 0 "volatile_mem_operand"))))
-     (match_operand 0 "gpc_reg_operand")))
+     (match_operand 0 "gpc_nosf_reg_operand")))
 
 ;; Return 1 if the operand is CONST_DOUBLE 0, register or memory operand.
 (define_predicate "zero_reg_mem_operand"

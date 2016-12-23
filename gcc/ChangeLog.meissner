@@ -1,3 +1,44 @@
+2016-12-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/71977
+	PR target/70568
+	* config/rs6000/predicates.md (sf_subreg_operand): Change test to
+	TARGET_NO_SF_SUBREG instead of TARGET_DIRECT_MOVE_64BIT.
+	(altivec_register_operand): If TARGET_NO_SF_SUBREG, don't allow
+	SFmode subregs.
+	(vsx_register_operand): Likewise.
+	(vfloat_operand): Likewise.
+	(vint_operand): Likewise.
+	(vlogical_operand): Likewise.
+	(gpc_nosf_reg_operand): Change test to TARGET_NO_SF_SUBREG instead
+	of TARGET_DIRECT_MOVE_64BIT.
+	(reg_or_short_operand): Call gpc_nosf_reg_operand instead of
+	gpc_reg_operand.
+	(reg_or_aligned_short_operand): Likewise.
+	(reg_or_u_short_operand): Likewise.
+	(reg_or_cint_operand): Likewise.
+	(reg_or_add_cint_operand"): Likewise.
+	(reg_or_sub_cint_operand): Likewise.
+	(reg_or_logical_cint_operand): Likewise.
+	(and_operand): Likewise.
+	(reg_or_mem_operand): Likewise.reg_or_none500mem_operand"): Likewise.
+	(reg_nosf_or_cint_operand): Delete.
+
+	* config/rs6000/rs6000.h (TARGET_NO_SF_SUBREG): Define to be true
+	if we have to worry about SFmode and integers intermixing in
+	vector registers or via direct move.
+
+	* config/rs6000/rs6000.md (zero_extendqi<mode>2): Use
+	gpc_nosf_reg_operand instead of gpc_reg_operand.
+	(zero_extendhi<mode>2): Likewise.
+	(zero_extendsi<mode>2): Likewise.
+	(extendqi<mode>2): Likewise.
+	(extendhi<mode>2): Likewise.
+	(extendsi<mode>2): Likewise.
+	(and<mode>3): Go back to reg_or_cint_operand instead of
+	reg_nosf_or_cint_operand.
+	(<code><mode>3): Likewise.
+
 2016-12-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	PR target/71977
