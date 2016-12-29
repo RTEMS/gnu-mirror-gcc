@@ -1,3 +1,169 @@
+2016-12-29  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/predicates.md (sf_subreg_operand): Use
+	TARGET_ALLOW_SF_SUBREG.
+	(vsx_reg_sfsubreg_ok): New predicate to allow VSX registers, but
+	don't check for SFmode SUBREGS.
+	(gpc_nosf_reg_operand): Delete, not used.
+	(gpc_reg_operand): Don't match if we have a SFmode SUBREG that
+	might be problematical on a VSX system.
+	(int_reg_operand): Likewise.
+	(reg_or_short_operand): Undo previous changes that used
+	gpc_nosf_reg_operand instead of gpc_reg_operand.
+	(reg_or_aligned_short_operand): Likewise.
+	(reg_or_u_short_operand): Likewise.
+	(reg_or_cint_operand): Likewise.
+	(add_cint_operand): Likewise.
+	(reg_or_sub_cint_operand): Likewise.
+	(reg_or_logical_cint_operand): Likewise.
+	(vsx_reg_or_cint_operand): Likewise.
+	(reg_or_mem_operand): Likewise.
+	(reg_or_none500mem_operand): Likewise.
+
+	* config/rs6000/rs600-protos.h (valid_sf_si_move): New
+	declaration.
+
+	* config/rs6000/rs6000.c (valid_sf_si_move): New function to
+	validate a move to make sure it does not include a SFmode SUBREG
+	which can be problematical on VSX systems.
+
+	* config/rs6000/rs6000.h (TARGET_ALLOW_SF_SUBREG): New macro that
+	is the inverse of TARGET_NO_SF_SUBREG.
+
+	* config/rs6000/rs6000.md (zero_extendqi<mode>2): Undo previous
+	changes that used gpc_nosf_reg_operand instead of
+	gpc_reg_operand.
+	(zero_extendhi<mode>2): Likewise.
+	(zero_extendsi<mode>2): Likewise.
+	(zero_extendsi<mode>2): Likewise.
+	(extendqi<mode>2): Likewise.
+	(extendhi<mode>2): Likewise.
+	(extendsi<mode>2): Likewise.
+	(and<mode>3): Likewise.
+	(and<mode>3_imm): Likewise.
+	(and<mode>3_imm_dot): Likewise.
+	(and<mode>3_imm_dot2): Likewise.
+	(and<mode>3_imm_mask_dot): Likewise.
+	(and<mode>3_imm_mask_dot2): Likewise.
+	(and<mode>3_imm_dot_shifted): Likewise.
+	(and<mode>3_mask): Likewise.
+	(and<mode>3_mask_dot): Likewise.
+	(and<mode>3_mask_dot2): Likewise.
+	(and<mode>3_2insn): Likewise.
+	(and<mode>3_2insn_dot): Likewise.
+	(and<mode>3_2insn_dot2): Likewise.
+	(<code><mode>3, iorxor iterator): Likewise.
+	(bool<mode>3_imm): Likewise.
+	(bool<mode>3): Likewise.
+	(bool<mode>3_dot): Likewise.
+	(bool<mode>3_dot2): Likewise.
+	(boolc<mode>3): Likewise.
+	(boolc<mode>3_dot): Likewise.
+	(boolc<mode>3_dot2): Likewise.
+	(boolcc<mode>3): Likewise.
+	(boolcc<mode>3): Likewise.
+	(boolcc<mode>3_dot): Likewise.
+	(boolcc<mode>3_dot2): Likewise.
+	(eqv<mode>3): Likewise.
+	(bpermd_<mode>): Likewise.
+	(movsi_from_sf): Rework previous changes.
+	(movdi_from_sf_zero_ext): Likewise.
+	(mov<mode>_hardfloat): Don't call gpc_reg_operand, call
+	register_operand.  Validate move with valid_sf_si_move.
+	(movsf_from-si): Rework previous changes.
+	(fma<mode>4): Use gpc_reg_operand instead of register_operand to
+	prevent problems with SFmode SUBREGs.
+	(fms<mode>4): Likewise.
+	(fnma<mode>4): Likewise.
+	(fnms<mode>4): Likewise.
+	(nfma<mode>4): Likewise.
+	(nfms<mode>4): Likewise.
+
+2016-12-28  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/predicates.md (sf_subreg_operand): Use
+	TARGET_ALLOW_SF_SUBREG.
+	(vsx_reg_sfsubreg_ok): New predicate to allow VSX registers, but
+	don't check for SFmode SUBREGS.
+	(gpc_nosf_reg_operand): Delete, not used.
+	(gpc_reg_operand): Don't match if we have a SFmode SUBREG that
+	might be problematical on a VSX system.
+	(int_reg_operand): Likewise.
+	(reg_or_short_operand): Undo previous changes that used
+	gpc_nosf_reg_operand instead of gpc_reg_operand.
+	(reg_or_aligned_short_operand): Likewise.
+	(reg_or_u_short_operand): Likewise.
+	(reg_or_cint_operand): Likewise.
+	(add_cint_operand): Likewise.
+	(reg_or_sub_cint_operand): Likewise.
+	(reg_or_logical_cint_operand): Likewise.
+	(vsx_reg_or_cint_operand): Likewise.
+	(reg_or_mem_operand): Likewise.
+	(reg_or_none500mem_operand): Likewise.
+
+	* config/rs6000/rs600-protos.h (valid_sf_si_move): New
+	declaration.
+
+	* config/rs6000/rs6000.c (valid_sf_si_move): New function to valid
+	a move to make sure it does not include a SFmode SUBREG which can
+	be problematical on VSX systems.
+	(rs6000_emit_move): Rework previous changes.
+
+	* config/rs6000/rs6000.h (TARGET_ALLOW_SF_SUBREG): New macro that
+	is the inverse of TARGET_NO_SF_SUBREG.
+
+	* config/rs6000/rs6000.md (UNSPEC_SF_FROM_SI): Delete.
+	(UNSPEC_SI_FROM_SF): Likewise.
+	(UNSPEC_SF_SUBREG): New unspec.
+	(zero_extendqi<mode>2): Undo previous changes that used
+	gpc_nosf_reg_operand instead of gpc_reg_operand.
+	(zero_extendhi<mode>2): Likewise.
+	(zero_extendsi<mode>2): Likewise.
+	(zero_extendsi<mode>2): Likewise.
+	(extendqi<mode>2): Likewise.
+	(extendhi<mode>2): Likewise.
+	(extendsi<mode>2): Likewise.
+	(and<mode>3): Likewise.
+	(and<mode>3_imm): Likewise.
+	(and<mode>3_imm_dot): Likewise.
+	(and<mode>3_imm_dot2): Likewise.
+	(and<mode>3_imm_mask_dot): Likewise.
+	(and<mode>3_imm_mask_dot2): Likewise.
+	(and<mode>3_imm_dot_shifted): Likewise.
+	(and<mode>3_mask): Likewise.
+	(and<mode>3_mask_dot): Likewise.
+	(and<mode>3_mask_dot2): Likewise.
+	(and<mode>3_2insn): Likewise.
+	(and<mode>3_2insn_dot): Likewise.
+	(and<mode>3_2insn_dot2): Likewise.
+	(<code><mode>3, iorxor iterator): Likewise.
+	(bool<mode>3_imm): Likewise.
+	(bool<mode>3): Likewise.
+	(bool<mode>3_dot): Likewise.
+	(bool<mode>3_dot2): Likewise.
+	(boolc<mode>3): Likewise.
+	(boolc<mode>3_dot): Likewise.
+	(boolc<mode>3_dot2): Likewise.
+	(boolcc<mode>3): Likewise.
+	(boolcc<mode>3): Likewise.
+	(boolcc<mode>3_dot): Likewise.
+	(boolcc<mode>3_dot2): Likewise.
+	(eqv<mode>3): Likewise.
+	(bpermd_<mode>): Likewise.
+	(mov<mode>_from_sf): Rework previous changes.
+	(movsi_from_sf): Delete.
+	(movdi_from_sf_zero_ext): Rework previous changes.
+	(mov<mode>_hardfloat): Don't call gpc_reg_operand, call
+	register_operand.  Validate move with valid_sf_si_move.
+	(movsf_from-si): Rework previous changes.
+	(fma<mode>4): Use gpc_reg_operand instead of register_operand to
+	prevent problems with SFmode SUBREGs.
+	(fms<mode>4): Likewise.
+	(fnma<mode>4): Likewise.
+	(fnms<mode>4): Likewise.
+	(nfma<mode>4): Likewise.
+	(nfms<mode>4): Likewise.
+
 2016-12-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	PR target/71977

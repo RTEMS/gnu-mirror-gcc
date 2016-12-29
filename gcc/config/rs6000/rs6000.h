@@ -612,6 +612,7 @@ extern int rs6000_vector_align[];
 
 /* Whether we should avoid (SUBREG:SI (REG:SF) and (SUBREG:SF (REG:SI).  */
 #define TARGET_NO_SF_SUBREG	TARGET_DIRECT_MOVE_64BIT
+#define TARGET_ALLOW_SF_SUBREG	(!TARGET_DIRECT_MOVE_64BIT)
 
 /* This wants to be set for p8 and newer.  On p7, overlapping unaligned
    loads are slow. */
