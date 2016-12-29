@@ -1,3 +1,185 @@
+2016-12-29  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (altivec_expand_builtin): Fix typos in
+	error messages.
+
+2016-12-29  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/extend.texi (Cilk Plus Builtins): cilkplus.org now uses
+	https by default.
+	* doc/passes.texi (Cilk Plus Transformation): Ditto.
+	* doc/generic.texi (Statements for C++): Ditto, and use @uref.
+
+2016-12-28  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/78904
+	* config/i386/constraints.md (Bn): New special memory constraint.
+	* config/i386/predicates.md (norex_memory_operand): New predicate.
+	* config/i386/i386.md (*extzvqi_mem_rex64): New insn pattern and
+	corresponding peephole2 pattern.
+
+2016-12-27  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* doc/cppdiropts.texi, doc/cppwarnopts.texi:  New files, split from...
+	* doc/cppopts.texi: .... here.
+	* doc/cpp.texi (Invocation): Adjust includes.
+	* doc/invoke.texi (Option Summary): Add missing preprocesor-related
+	options.  Adjust sorting and formatting.
+	(Warning Options): Include cppwarnopts.texi.
+	(Preprocessor Options): Add pointers and list the specific
+	preprocessor options from cppopts.texi first instead of last.
+	(Directory Options): Move/merge documentation of -I, -iquote, and
+	-I- to cppdiropts.texi.  Include that file here.
+
+2016-12-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/predicates.md (const_0_to_12_operand): Rename
+	predicate and change test from 0..11 to 0..12 to match the
+	semantics of the word extract/insert instructions.  Change all
+	callers.
+	(const_0_to_11_operand): Likewise.
+	* config/rs6000/rs6000.c (altivec_expand_builtin): Likewise.
+	* config/rs6000/vsx.md (vextract4b): Likewise.
+	(vextract4b_internal): Likewise.
+	(vinsert4b): Likewise.
+	(vinsert4b_internal): Likewise.
+	(vinsert4b_di): Likewise.
+	(vinsert4b_di_internal): Likewise.
+	* config/rs6000/rs6000.md (zero_extendsi<mode>2): Fix offset used
+	in xxextractuw to zero extend the word in the vector registers.
+	(lfiwzx): Likewise.
+
+2016-12-27  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.c (ix86_secondary_reload): Require QImode
+	intermediate for QImode mask register spill only for !TARGET_AVX512DQ.
+	Always use true_regnum to determine operand regno.
+
+2016-12-27  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* doc/cppopts.texi: Delete redundant documentation for -x.  Move
+	-fno-show-column documentation to...
+	* doc/invoke.texi (Diagnostic Message Formatting Options):  ...here.
+	Update the option summary.
+
+2016-12-27  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.md (VI_512): Remove.
+	(vcond<V_512:mode><VI_AVX512BW:mode>): Use VI_AVX512BW
+	mode iterator instead of VI_512.
+	(vcondu<V_512:mode><VI_AVX512BW:mode>): Ditto.
+
+2016-12-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR translation/78922
+	* config/i386/stringop.opt: Remove.
+
+2016-12-27  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/78904
+	* config/i386/constraints.md (Bc): New special memory constraint.
+	* config/i386/i386.md (*cmpqi_ext_1, *extvqi, *extzvqi): Use Bc
+	constraint with nonimmediate_operand to allow constant memory operands.
+	(*cmpqi_ext_3, insv<mode>_1, addqi_ext_1, *testqi_ext_1, andqi_ext_1)
+	(*<any_or:code>qi_ext_1, *xorqi_ext_1_cc): Use Bc constraint
+	with general_operand to allow constant memory operands.
+
+2016-12-27  Alexander Ivchenko  <alexander.ivchenko@intel.com>
+
+	* c-family/c.opt (flag_chkp_flexible_struct_trailing_arrays):
+	Add new option.
+	(fchkp-narrow-to-innermost-array): Fix typo.
+	* doc/cpp.texi (flag_chkp_flexible_struct_trailing_arrays): Ditto.
+	* tree-chkp.c (chkp_may_narrow_to_field ): Forbid
+	narrowing when flag_chkp_flexible_struct_trailing_arrays is used
+	and the field is the last array field in the structure.
+
+2016-12-27  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.md (andqi_ext_1): Use general_operand
+	predicate for operand 2.
+
+2016-12-27  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/78904
+	* config/i386/i386.md (*cmpqi_ext_1, *extvqi, *extzvqi): Use
+	nonimmediate_operand instead of nonimmediate_x64nomem_operand.
+	(*cmpqi_ext_3, insv<mode>_1, addqi_ext_1, *testqi_ext_1, andqi_ext_1)
+	(*<any_or:code>qi_ext_1, *xorqi_ext_1_cc): Use general_operand
+	instead of general_x64nomem_operand.
+	* config/i386/predicates.md (nonimmediate_x64nomem_operand): Remove.
+	(general_x64nomem_operand): Ditto.
+
+2016-12-26  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/78904
+	* config/i386/i386.md (addqi_ext_1): Canonicalize insn pattern w.r.t.
+	zero_extract RTXes.
+	(*addqi_ext_2): Ditto.
+	(testqi_ext_ccno_0): Canonicalize expander w.r.t. zero_extract RTXes.
+	(testqi_ext_1_ccno): Rename from testqi_ext_ccno_0.
+	(*testqi_ext_0): Merge with *testqi_ext_1.
+	(*testqi_ext_1): Canonicalize insn pattern w.r.t. zero_extract RTXes.
+	Update corresponding splitter.
+	(*testqi_ext_2): Canonicalize insn pattern w.r.t. zero_extract RTXes.
+	(*andqi_ext_0): Merge with *andqi_ext_1.
+	(andqi_ext_1): Canonicalize insn pattern w.r.t. zero_extract RTXes.
+	Rename from *andqi_ext_1.  Update corresponding splitter and
+	peephole2 patterns.
+	(*andqi_ext_1_cc): Rename from *andqi_ext_0_cc.
+	(*andqi_ext_2): Canonicalize insn pattern w.r.t. zero_extract RTXes.
+	(*<any_or:code>qi_ext_0): Merge with *andqi_ext_1.
+	(*<any_or:code>qi_ext_1): Canonicalize insn pattern w.r.t.
+	zero_extract RTXes.  Update corresponding splitter.
+	(*<any_or:code>qi_ext_2): Canonicalize insn pattern w.r.t.
+	zero_extract RTXes.
+	(xorqi_cc_ext_1): Canonicalize expander w.r.t. zero_extract RTXes.
+	(xorqi_ext_1_cc): Rename from xorqi_cc_ext_1.
+	(*xorqi_cc_ext_1): Canonicalize insn pattern w.r.t. zero_extract RTXes.
+	Update corresponding splitter.
+	(*xorqi_ext_1_cc): Rename from *xorqi_cc_ext_1.
+	(isinfxf2): Update calls to renamed expanders.
+	(isinf<mode>2): Ditto.
+	* config/i386/i386.c (ix86_expand_fp_compare): Ditto.
+	(ix86_emit_fp_unordered_jump): Ditto.
+	(ix86_emit_i387_round): Ditto.
+
+2016-12-26  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* doc/invoke.texi (SPARC options): Add missing documentation for -mlra.
+
+	* doc/cpp.texi (Invocation): Remove space in command.
+
+2016-12-25  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* doc/cpp.texi (Invocation): Revise to indicate that GCC driver
+	options are only documented in the GCC manual.
+	* doc/cppopts.texi: Delete documentation of GCC driver options
+	-o, -Wall, -Wtraditional, -Werror, -Wsystem-headers, -w,
+	-pedantic, -pedantic-errors, -std=, -ansi, --help, --target-help,
+	-v, -version.  Update -Wcomment, -Wtrigraphs, -Wundef,
+	-Wexpansion-to-defined, -Wno-endif-labels, -traditional,
+	-traditional-cpp, -trigraphs to merge text previously in GCC manual.
+	* doc/invoke.texi (Option Summary): Move -trigraphs, -traditional,
+	and -traditional-cpp from C dialect options to preprocessor options.
+	(C Dialect Options): Likewise.
+	(Warning Options): Delete documentation of -Wcomment, -Wtrigraphs,
+	-Wexpansion-to-defined, -Wundef, and -Wno-endif-labels.
+
+2016-12-24  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* tree-core.h (tree_base): Document the meaning of public_flag
+	for SSA names.
+	* tree.h (SSA_NAME_IS_VIRTUAL_OPERAND): New macro.
+	(SET_SSA_NAME_VAR_OR_IDENTIFIER): Record whether the variable
+	is a virtual operand.
+	* gimple-expr.h (virtual_operand_p): Use SSA_NAME_IS_VIRTUAL_OPERAND.
+
+2016-12-22  Prathamesh Kulkarni  <prathamesh.kulkarni@linaro.org>
+
+	* tree-pretty-print.c (dump_generic_node): Change dump format for
+	REALPART_EXPR and IMAGPART_EXPR with TDF_GIMPLE.
+
 2016-12-22  Andreas Krebbel  <krebbel@linux.vnet.ibm.com>
 
 	* varasm.c (build_constant_desc): Use the alignment of the var
@@ -53,7 +235,8 @@
 	(rs6000_option_optimization_table): Enable -fsched-pressure.
 	* config/rs6000/rs6000.c (TARGET_COMPUTE_PRESSURE_CLASSES): Define
 	target hook.
-	(rs6000_option_override_internal): Set default -fsched-pressure algorithm.
+	(rs6000_option_override_internal): Set default -fsched-pressure
+	algorithm.
 	(rs6000_compute_pressure_classes): Implement target hook.
 
 2016-12-21  Bill Seurer  <seurer@linux.vnet.ibm.com>
