@@ -10341,6 +10341,39 @@ rs6000_emit_le_vsx_move (rtx dest, rtx source, machine_mode mode)
     }
 }
 
+/* Return whether a SFmode or SImode move can be done without converting one
+   mode to another.  This arrises when we have:
+
+	(SUBREG:SF (REG:SI ...))
+	(SUBREG:SI (REG:SF ...))
+
+   and one of the values is in a floating point/vector register, where SFmode
+   scalars are stored in DFmode format.  */
+
+bool
+valid_sf_si_move (rtx dest, rtx src, machine_mode mode)
+{
+  if (TARGET_ALLOW_SF_SUBREG)
+    return true;
+
+  if (mode != SFmode && GET_MODE_CLASS (mode) != MODE_INT)
+    return true;
+
+  if (!SUBREG_P (src) || !sf_subreg_operand (src, mode))
+    return true;
+
+  /*.  Allow (set (SUBREG:SI (REG:SF)) (SUBREG:SI (REG:SF))).  */
+  if (SUBREG_P (dest))
+    {
+      rtx dest_subreg = SUBREG_REG (dest);
+      rtx src_subreg = SUBREG_REG (src);
+      return GET_MODE (dest_subreg) == GET_MODE (src_subreg);
+    }
+
+  return false;
+}
+
+
 /* Emit a move from SOURCE to DEST in mode MODE.  */
 void
 rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
@@ -10369,6 +10402,39 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
     {
       /* This should be fixed with the introduction of CONST_WIDE_INT.  */
       gcc_unreachable ();
+    }
+
+  /* If we are running before register allocation on a 64-bit machine with
+     direct move, and we see either:
+
+	(set (reg:SF xxx) (subreg:SF (reg:SI yyy) zzz))		(or)
+	(set (reg:SI xxx) (subreg:SI (reg:SF yyy) zzz))
+
+     convert these into a form using UNSPEC.  This is due to SFmode being
+     stored within a vector register in the same format as DFmode.  We need to
+     convert the bits before we can use a direct move or operate on the bits in
+     the vector register as an integer type.
+
+     Skip things like (set (SUBREG:SI (...) (SUBREG:SI (...)).  */
+  if (TARGET_DIRECT_MOVE_64BIT && !reload_in_progress && !reload_completed
+      && !lra_in_progress
+      && (!SUBREG_P (dest) || !sf_subreg_operand (dest, mode))
+      && SUBREG_P (source) && sf_subreg_operand (source, mode))
+    {
+      rtx inner_source = SUBREG_REG (source);
+      machine_mode inner_mode = GET_MODE (inner_source);
+
+      if (mode == SImode && inner_mode == SFmode)
+	{
+	  emit_insn (gen_movsi_from_sf (dest, inner_source));
+	  return;
+	}
+
+      if (mode == SFmode && inner_mode == SImode)
+	{
+	  emit_insn (gen_movsf_from_si (dest, inner_source));
+	  return;
+	}
     }
 
   /* Check if GCC is setting up a block move that will end up using FP
