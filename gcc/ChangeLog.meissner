@@ -1,5 +1,15 @@
 2017-01-04  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_emit_move_si_sf_subreg): Move
+	SI/SFmode SUBREG code to helper function.
+	(rs6000_emit_move): Likewise.
+
+	* config/rs6000/vsx.md (peephole2 for GLIBC optimization): Rework
+	comments.  Use and_ior_xor instead of sf_logical.
+	(sf_logical): Delete.
+
+2017-01-04  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	PR target/71977
 	PR target/70568
 	PR target/78823
@@ -28,6 +38,7 @@
 	contains SUBREGs that mix SImode and SFmode, call special insns,
 	that can allocate the necessary temporary registers to convert
 	between SFmode and SImode within the registers.
+
 	* config/rs6000/vsx.md (SFBOOL_*): Add peephole2 to recognize when
 	we are converting a SFmode to a SImode, moving the result to a GPR
 	register, doing a single AND/IOR/XOR operation, and then moving it

@@ -3900,10 +3900,52 @@
 
 
 
-;; Attempt to optimize some common operations using logical operations to pick
-;; apart SFmode operations.  This is tricky, because we can't just do the
-;; operation using VSX logical operations directly, because in the PowerPC,
-;; SFmode is represented internally as DFmode in the vector registers.
+;; Operand numbers for the following peephole2
+(define_constants
+  [(SFBOOL_TMP_GPR		 0)		;; GPR temporary
+   (SFBOOL_TMP_VSX		 1)		;; vector temporary
+   (SFBOOL_MFVSR_D		 2)		;; move to gpr dest
+   (SFBOOL_MFVSR_A		 3)		;; move to gpr src
+   (SFBOOL_BOOL_D		 4)		;; and/ior/xor dest
+   (SFBOOL_BOOL_A1		 5)		;; and/ior/xor arg1
+   (SFBOOL_BOOL_A2		 6)		;; and/ior/xor arg1
+   (SFBOOL_SHL_D		 7)		;; shift left dest
+   (SFBOOL_SHL_A		 8)		;; shift left arg
+   (SFBOOL_MTVSR_D		 9)		;; move to vecter dest
+   (SFBOOL_BOOL_A_DI		10)		;; SFBOOL_BOOL_A1/A2 as DImode
+   (SFBOOL_TMP_VSX_DI		11)		;; SFBOOL_TMP_VSX as DImode
+   (SFBOOL_MTVSR_D_V4SF		12)])		;; SFBOOL_MTVSRD_D as V4SFmode
+
+;; Attempt to optimize some common GLIBC operations using logical operations to
+;; pick apart SFmode operations.  For example, there is code from e_powf.c
+;; after macro expansion that looks like:
+;;
+;;	typedef union {
+;;	  float value;
+;;	  uint32_t word;
+;;	} ieee_float_shape_type;
+;;
+;;	float t1;
+;;	int32_t is;
+;;
+;;	do {
+;;	  ieee_float_shape_type gf_u;
+;;	  gf_u.value = (t1);
+;;	  (is) = gf_u.word;
+;;	} while (0);
+;;
+;;	do {
+;;	  ieee_float_shape_type sf_u;
+;;	  sf_u.word = (is & 0xfffff000);
+;;	  (t1) = sf_u.value;
+;;	} while (0);
+;;
+;;
+;; This would result in two direct move operations (convert to memory format,
+;; direct move to GPR, do the AND operation, direct move to VSX, convert to
+;; scalar format).  With this peephole, we eliminate the direct move to the
+;; GPR, and instead move the integer mask value to the vector register after a
+;; shift and do the VSX logical operation.
 
 ;; The insns for dealing with SFmode in GPR registers looks like:
 ;; (set (reg:V4SF reg2) (unspec:V4SF [(reg:SF reg1)] UNSPEC_VSX_CVDPSPN))
@@ -3919,23 +3961,6 @@
 ;; (set (reg:SF reg7) (unspec:SF [(reg:DI reg6)] UNSPEC_P8V_MTVSRD))
 ;;
 ;; (set (reg:SF reg7) (unspec:SF [(reg:SF reg7)] UNSPEC_VSX_CVSPDPN))
-
-(define_code_iterator sf_logical [and ior xor])
-
-(define_constants
-  [(SFBOOL_TMP_GPR		 0)		;; GPR temporary
-   (SFBOOL_TMP_VSX		 1)		;; vector temporary
-   (SFBOOL_MFVSR_D		 2)		;; move to gpr dest
-   (SFBOOL_MFVSR_A		 3)		;; move to gpr src
-   (SFBOOL_BOOL_D		 4)		;; and/ior/xor dest
-   (SFBOOL_BOOL_A1		 5)		;; and/ior/xor arg1
-   (SFBOOL_BOOL_A2		 6)		;; and/ior/xor arg1
-   (SFBOOL_SHL_D		 7)		;; shift left dest
-   (SFBOOL_SHL_A		 8)		;; shift left arg
-   (SFBOOL_MTVSR_D		 9)		;; move to vecter dest
-   (SFBOOL_BOOL_A_DI		10)		;; SFBOOL_BOOL_A1/A2 as DImode
-   (SFBOOL_TMP_VSX_DI		11)		;; SFBOOL_TMP_VSX as DImode
-   (SFBOOL_MTVSR_D_V4SF		12)])		;; SFBOOL_MTVSRD_D as V4SFmode
 
 (define_peephole2
   [(match_scratch:DI SFBOOL_TMP_GPR "r")
@@ -3953,8 +3978,8 @@
 
    ;; AND/IOR/XOR operation on int
    (set (match_operand:SI SFBOOL_BOOL_D "int_reg_operand")
-	(sf_logical:SI (match_operand:SI SFBOOL_BOOL_A1 "int_reg_operand")
-		       (match_operand:SI SFBOOL_BOOL_A2 "reg_or_cint_operand")))
+	(and_ior_xor:SI (match_operand:SI SFBOOL_BOOL_A1 "int_reg_operand")
+			(match_operand:SI SFBOOL_BOOL_A2 "reg_or_cint_operand")))
 
    ;; SLDI
    (set (match_operand:DI SFBOOL_SHL_D "int_reg_operand")
@@ -3991,8 +4016,8 @@
 	(match_dup SFBOOL_TMP_GPR))
 
    (set (match_dup SFBOOL_MTVSR_D_V4SF)
-	(sf_logical:V4SF (match_dup SFBOOL_MFVSR_A)
-			 (match_dup SFBOOL_TMP_VSX)))]
+	(and_ior_xor:V4SF (match_dup SFBOOL_MFVSR_A)
+			  (match_dup SFBOOL_TMP_VSX)))]
 {
   rtx bool_a1 = operands[SFBOOL_BOOL_A1];
   rtx bool_a2 = operands[SFBOOL_BOOL_A2];

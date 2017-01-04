@@ -10374,6 +10374,45 @@ valid_sf_si_move (rtx dest, rtx src, machine_mode mode)
 }
 
 
+/* Helper function to change moves with:
+
+	(SUBREG:SF (REG:SI)) and
+	(SUBREG:SI (REG:SF))
+
+   into separate UNSPEC insns.  In the PowerPC architecture, scalar SFmode
+   values are stored as DFmode values in the VSX registers.  We need to convert
+   the bits before we can use a direct move or operate on the bits in the
+   vector register as an integer type.
+
+   Skip things like (set (SUBREG:SI (...) (SUBREG:SI (...)).  */
+
+static bool
+rs6000_emit_move_si_sf_subreg (rtx dest, rtx source, machine_mode mode)
+{
+  if (TARGET_DIRECT_MOVE_64BIT && !reload_in_progress && !reload_completed
+      && !lra_in_progress
+      && (!SUBREG_P (dest) || !sf_subreg_operand (dest, mode))
+      && SUBREG_P (source) && sf_subreg_operand (source, mode))
+    {
+      rtx inner_source = SUBREG_REG (source);
+      machine_mode inner_mode = GET_MODE (inner_source);
+
+      if (mode == SImode && inner_mode == SFmode)
+	{
+	  emit_insn (gen_movsi_from_sf (dest, inner_source));
+	  return true;
+	}
+
+      if (mode == SFmode && inner_mode == SImode)
+	{
+	  emit_insn (gen_movsf_from_si (dest, inner_source));
+	  return true;
+	}
+    }
+
+  return false;
+}
+
 /* Emit a move from SOURCE to DEST in mode MODE.  */
 void
 rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
@@ -10404,38 +10443,10 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       gcc_unreachable ();
     }
 
-  /* If we are running before register allocation on a 64-bit machine with
-     direct move, and we see either:
-
-	(set (reg:SF xxx) (subreg:SF (reg:SI yyy) zzz))		(or)
-	(set (reg:SI xxx) (subreg:SI (reg:SF yyy) zzz))
-
-     convert these into a form using UNSPEC.  This is due to SFmode being
-     stored within a vector register in the same format as DFmode.  We need to
-     convert the bits before we can use a direct move or operate on the bits in
-     the vector register as an integer type.
-
-     Skip things like (set (SUBREG:SI (...) (SUBREG:SI (...)).  */
-  if (TARGET_DIRECT_MOVE_64BIT && !reload_in_progress && !reload_completed
-      && !lra_in_progress
-      && (!SUBREG_P (dest) || !sf_subreg_operand (dest, mode))
-      && SUBREG_P (source) && sf_subreg_operand (source, mode))
-    {
-      rtx inner_source = SUBREG_REG (source);
-      machine_mode inner_mode = GET_MODE (inner_source);
-
-      if (mode == SImode && inner_mode == SFmode)
-	{
-	  emit_insn (gen_movsi_from_sf (dest, inner_source));
-	  return;
-	}
-
-      if (mode == SFmode && inner_mode == SImode)
-	{
-	  emit_insn (gen_movsf_from_si (dest, inner_source));
-	  return;
-	}
-    }
+  /* See if we need to special case SImode/SFmode SUBREG moves.  */
+  if ((mode == SImode || mode == SFmode) && SUBREG_P (source)
+      && rs6000_emit_move_si_sf_subreg (dest, source, mode))
+    return;
 
   /* Check if GCC is setting up a block move that will end up using FP
      registers as temporaries.  We must make sure this is acceptable.  */
