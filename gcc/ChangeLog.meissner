@@ -1,3 +1,46 @@
+2017-01-06  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/79004
+	* config/rs6000/rs6000-cpus.def (ISA_3_0_MASKS_IEEE): Add
+	OPTION_MASK_VSX_SMALL_INTEGER.
+
+	* config/rs6000/rs6000-protos.h (convert_float128_to_int):
+	Delete.
+	(convert_int_to_float128): Likewise.
+
+	* config/rs6000/rs6000.c (convert_float128_to_int): Delete.
+	(convert_int_to_float128): Likewise.
+
+	* config/rs6000/rs6000.md (UNSPEC_IEEE128_MOVE): Delete.
+	(UNSPEC_IEEE128_CONVERT): Likewise.
+	(uns_tf): New code attribute.
+	(floatsi<mode>2, FLOAT128 iterator): Rework IEEE 128-bit floating
+	point conversions to know about VSX small integer support, and
+	eliminate the old methods using V2SImode to get stuff into/out of
+	altivec registers.
+	(fix_trunc<mode>si2): Likewise.
+	(fix_trunc<mode>di2): Likewise.
+	(fixuns_trunc<IEEE128:mode><SDI:mode>2): Likewise.
+	(floatdi<mode>2): Likewise.
+	(floatuns<SDI:mode><IEEE128:mode>2): Likewise.
+	(fix<uns>_<mode>si2_hw): Likewise.
+	(fix<uns>_<mode>di2_hw): Likewise.
+	(float<uns>_<mode>si2_hw): Likewise.
+	(float<uns>_<mode>di2_hw): Likewise.
+	(xscvqp<su>wz_<mode>): Likewise.
+	(xscvqp<su>dz_<mode>): Likewise.
+	(fix<uns>_<mode>di2_hw): Likewise.
+	(xscv<su>dqp_<mode>): Likewise.
+	(float<uns>_<mode>di2_hw): Likewise.
+	(ieee128_mfvsrd_64bit): Likewise.
+	(ieee128_mfvsrd_32bit): Likewise.
+	(ieee128_mfvsrwz): Likewise.
+	(ieee128_mtvsrw): Likewise.
+	(ieee128_mtvsrd_64bit): Likewise.
+	(float_<mode>si2_hw"): Likewise.
+	(ieee128_mtvsrd_32bit): Likewise.
+	(floatuns_<mode>si2_hw): Likewise.
+
 2017-01-06   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 244180
