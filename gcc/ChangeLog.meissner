@@ -21,6 +21,10 @@
 	as the destination if the target is in a VSX register.
 	(fix_trunc<mode>di2, IEEE128 iterator): Add expander.
 
+	* doc/md.texi (RS/6000 constraints): Update wp/wq documentation.
+	* config/rs6000/constraints.md (wp constraint): Likewise.
+	(wq constraint): Likewise.
+
 	PR target/79004
 	* config/rs6000/rs6000-cpus.def (ISA_3_0_MASKS_IEEE): Add
 	OPTION_MASK_VSX_SMALL_INTEGER.
