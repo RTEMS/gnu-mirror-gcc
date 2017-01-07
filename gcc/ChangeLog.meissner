@@ -1,5 +1,26 @@
 2017-01-06  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_init_hard_regno_mode_ok): If
+	hardware IEEE 128-bit, restrict wp/wq attributes to Altivec
+	registers.
+
+	* config/rs6000/rs6000.md (FP_ISA3): Restrict KF/TFmode to only if
+	hardware IEEE 128-bit.
+	(Fv): Add KFmode/TFmode.
+	(float<QHI:mode><FP_ISA3:mode>2): Switch the char/short support to
+	FP_ISA3 to allow for IEEE 128-bit floating point.  Rework
+	constraints so that IEEE 128-bit only uses Altivec registers.
+	(float<QHI:mode><SFDF:mode>2): Likewise.
+	(float<QHI:mode><FP_ISA3:mode>2_internal): Likewise.
+	(float<QHI:mode><SFDF:mode>2_internal): Likewise.
+	(floatuns<QHI:mode><FP_ISA3:mode>2): Likewise.
+	(floatuns<QHI:mode><SFDF:mode>2): Likewise.
+	(floatuns<QHI:mode><FP_ISA3:mode>2_internal): Likewise.
+	(floatuns<QHI:mode><SFDF:mode>2_internal): Likewise.
+	(fix_trunc<SFDF:mode><QHI:mode>2_internal): Switch to use SImode
+	as the destination if the target is in a VSX register.
+	(fix_trunc<mode>di2, IEEE128 iterator): Add expander.
+
 	PR target/79004
 	* config/rs6000/rs6000-cpus.def (ISA_3_0_MASKS_IEEE): Add
 	OPTION_MASK_VSX_SMALL_INTEGER.

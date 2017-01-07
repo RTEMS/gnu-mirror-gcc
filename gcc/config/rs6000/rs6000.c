@@ -3229,9 +3229,13 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 
   if (TARGET_FLOAT128_TYPE)
     {
-      rs6000_constraints[RS6000_CONSTRAINT_wq] = VSX_REGS;	/* KFmode  */
+      /* The hardware support for IEEE 128-bit only supports Altivec registers,
+	 but for software IEEE 128-bit floating point allow any VSX
+	 register.  */
+      enum reg_class rclass = TARGET_FLOAT128_HW ? ALTIVEC_REGS : VSX_REGS;
+      rs6000_constraints[RS6000_CONSTRAINT_wq] = rclass;	/* KFmode  */
       if (FLOAT128_IEEE_P (TFmode))
-	rs6000_constraints[RS6000_CONSTRAINT_wp] = VSX_REGS;	/* TFmode  */
+	rs6000_constraints[RS6000_CONSTRAINT_wp] = rclass;	/* TFmode  */
     }
 
   /* Support for new D-form instructions.  */
