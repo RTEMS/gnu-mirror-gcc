@@ -1,3 +1,149 @@
+2017-01-09  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/78365
+	PR ipa/78599
+	* ipa-prop.h (ipa_jump_func): Swap positions of vr_known and m_vr.
+	* ipa-cp.c (ipa_vr_operation_and_type_effects): New function.
+	(propagate_vr_accross_jump_function): Use the above function for all
+	value range computations for pass-through jump functions and type
+	converasion from explicit value range values.
+        (ipcp_propagate_stage): Do not attempt to deduce types of formal
+        parameters from TYPE_ARG_TYPES.
+	* ipa-prop.c (ipa_write_jump_function): Remove trailing whitespace.
+	(ipa_write_node_info): Stream type of the actual argument.
+	(ipa_read_node_info): Likewise. Also remove trailing whitespace.
+
+2017-01-09  Martin Liska  <mliska@suse.cz>
+
+	PR pch/78970
+	* gcc.c (driver_handle_option): Handle OPT_E and set
+	have_E.
+	(lookup_compiler): Do not show error message with have_E.
+
+2017-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/78938
+	* tree-vect-stmts.c (vectorizable_condition): For non-masked COND_EXPR
+	where comp_vectype is VECTOR_BOOLEAN_TYPE_P, use
+	BIT_{NOT,XOR,AND,IOR}_EXPR on the comparison operands instead of
+	{EQ,NE,GE,GT,LE,LT}_EXPR directly inside of VEC_COND_EXPR.  Formatting
+	fixes.
+
+2017-01-09  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* tree-ssa-address.c (gen_addr_rtx): Don't handle index if it
+	is const0_rtx.
+
+2017-01-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/78997
+	* tree-vect-slp.c (vect_mask_constant_operand_p): Handle SSA
+	name condition properly.
+
+2017-01-09  Richard Biener  <rguenther@suse.de>
+
+	PR debug/79000
+	* dwarf2out.c (is_cxx): New overload with context.
+	(is_naming_typedef_decl): Use it.
+
+2017-01-08  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* invoke.texi (Option Summary): Correct spacing in option lists
+	and add line breaks to fix over-long lines.
+
+2017-01-08  Sandra Loosemore  <sandra@codesourcery.com>
+
+	PR middle-end/17660
+
+	* extend.texi (Common Variable Attributes): Add xref to GCC
+	Internals manual to explain mode attribute keywords.
+
+2017-01-08  Sandra Loosemore  <sandra@codesourcery.com>
+
+	PR other/16519
+
+	* doc/invoke.texi (Option Summary): Move -pthread to Linker Options
+	and Preprocessor Options.
+	(Options for Linking): Document -pthread here....
+	(RS/6000 and PowerPC Options): ...not here.
+	(Solaris 2 Options): ...or here.
+	* doc/cppopts.texi: Document -pthread.
+
+2017-01-08  Martin Sebor  <msebor@redhat.com>
+
+	PR middle-end/77708
+	* doc/invoke.texi (Warning Options): Document -Wformat-truncation.
+	* gimple-ssa-sprintf.c (call_info::reval_used, call_info::warnopt):
+	New member functions.
+	(format_directive): Used them.
+	(add_bytes): Same.
+	(pass_sprintf_length::handle_gimple_call): Same.
+	* graphite-sese-to-poly.c (tree_int_to_gmp): Increase buffer size
+	to avoid truncation for any argument.
+	(extract_affine_mul): Same.
+	* tree.c (get_file_function_name): Same.
+
+2017-01-01  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR middle-end/77484
+	* predict.def (PRED_INDIR_CALL): Set to 86.
+
+2017-01-07  Sandra Loosemore  <sandra@codesourcery.com>
+
+	PR preprocessor/54124
+
+	* doc/cppopts.texi: Reformat -d subtable to list the full name
+	of the options.  Add cross-reference to the docs for the general
+	compiler -d options.
+	* doc/invoke.texi (Developer Options): Add cross-reference to the
+	preprocessor-specific -d option documentation.
+
+2017-01-07  Sandra Loosemore  <sandra@codesourcery.com>
+
+	PR preprocessor/13498
+
+	* doc/cpp.texi (Search Path): Rewrite to remove obsolete and
+	redudant material, and reflect new command-line options.
+	(System Headers): Likewise.
+
+2017-01-07  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* doc/cppdiropts.texi: Merge documentation of -I, -iquote,
+	-isystem, and -idirafter.  Copy-edit.
+	* doc/cppopts.texi: Copy-edit.  Remove contradiction about 
+	default for -ftrack-macro-expansion.  Delete obsolete and 
+	badly-formatted implementation details about -fdebug-cpp output.
+	* doc/cppwarnopts.texi: Copy-edit.
+
+2017-01-07  David Malcolm  <dmalcolm@redhat.com>
+
+	PR c++/72803
+	* input.c (selftest::test_accessing_ordinary_linemaps): Verify
+	that the transition from a max line width >= 1<<10 to narrower
+	lines works correctly.
+
+2017-01-07  Alexandre Oliva <aoliva@redhat.com>
+
+	* doc/options.texi (PerFunction): New.
+	* opt-functions.awk (switch_flags): Map both Optimization and
+	PerFunction to CL_OPTIMIZATION.
+	* opth-gen.awk: Test for PerFunction flag along with
+	Optimization.
+	* optc-save-gen.awk: Likewise.  Introduce var_opt_hash and set
+	it only when the latter is present.  Skip those that don't in
+	the hash function generator.
+	* common.opt (fvar-tracking): Mark as PerFunction instead of
+	Optimization.
+	(fvar-tracking-assignments): Likewise.
+	(fvar-tracking-assignments-toggle): Likewise.
+	(fvar-tracking-uninit): Likewise.
+
+2017-01-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR translation/79018
+	* params.def (PARAM_MAX_STORES_TO_MERGE): Add missing space between
+	the and store.
+
 2017-01-06  Mikael Pettersson  <mikpelinux@gmail.com>
 
 	PR target/57583

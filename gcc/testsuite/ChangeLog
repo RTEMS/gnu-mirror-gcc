@@ -1,3 +1,62 @@
+2017-01-09  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/78365
+	PR ipa/78599
+	* gcc.dg/torture/pr78365.c: New test.
+
+2017-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/78948
+	* g++.dg/cpp1z/constexpr-if10.C: Fix PR number in comment.
+	(main): Use int* instead of long long.
+
+	PR tree-optimization/78938
+	* gcc.dg/vect/pr78938.c: New test.
+
+2017-01-09  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* gcc.dg/20161219.c: New test.
+
+2017-01-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/78997
+	* gcc.dg/torture/pr78997.c: New testcase.
+
+2017-01-09  Richard Biener  <rguenther@suse.de>
+
+	PR debug/79000
+	* g++.dg/lto/pr79000_0.C: New testcase.
+	* g++.dg/lto/pr79000_1.c: Likewise.
+
+2017-01-08  Martin Sebor  <msebor@redhat.com>
+
+	PR middle-end/77708
+	* gcc.dg/tree-ssa/builtin-snprintf-warn-1.c: New test.
+	* gcc.dg/tree-ssa/builtin-snprintf-warn-2.c: New test.
+	* gcc.dg/tree-ssa/builtin-sprintf-warn-6.c: XFAIL test cases failing
+	due to bug 78969.
+	* gcc.dg/format/pr78569.c: Adjust.
+
+2017-01-07  David Malcolm  <dmalcolm@redhat.com>
+
+	PR c++/72803
+	* g++.dg/diagnostic/pr72803.C: New test case.
+
+2017-01-07  Martin Sebor  <msebor@redhat.com>
+
+	* gcc.dg/attr-alloc_size-3.c: Remove regex made redundant by r243461.
+	* gcc.dg/attr-alloc_size-4.c: Same.
+
+2017-01-07  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	* gfortran.dg/coarray/ptr_comp_1.f08: New test.
+	* gfortran.dg/coarray/ptr_comp_2.f08: New test.
+	* gfortran.dg/coarray/ptr_comp_3.f08: New test.
+	* gfortran.dg/coarray/ptr_comp_4.f08: New test.
+	* gfortran.dg/coarray_ptr_comp_1.f08: New test.
+	* gfortran.dg/coarray_ptr_comp_2.f08: New test.
+	* gfortran.dg/coarray_ptr_comp_3.f08: New test.
+
 2017-01-06  Aaron Sawdey  <acsawdey@linux.vnet.ibm.com>
 	* gcc.dg/memcmp-1.c: New.
 	* gcc.dg/strncmp-1.c: New.
