@@ -3750,6 +3750,13 @@ rs6000_option_override_internal (bool global_init_p)
       && !global_options_set.x_flag_ira_loop_pressure)
     flag_ira_loop_pressure = 1;
 
+  /* -fsanitize=address needs to turn on -fasynchronous-unwind-tables in order
+     for tracebacks to be complete but not if any -fasynchronous-unwind-tables
+     options were already specified.  */
+  if (flag_sanitize & SANITIZE_USER_ADDRESS
+      && !global_options_set.x_flag_asynchronous_unwind_tables)
+    flag_asynchronous_unwind_tables = 1;
+
   /* Set the pointer size.  */
   if (TARGET_64BIT)
     {
@@ -4190,6 +4197,10 @@ rs6000_option_override_internal (bool global_init_p)
     {
       if (rs6000_isa_flags_explicit & OPTION_MASK_P8_FUSION)
 	{
+	  /* We prefer to not mention undocumented options in
+	     error messages.  However, if users have managed to select
+	     power9-fusion without selecting power8-fusion, they
+	     already know about undocumented flags.  */
 	  error ("-mpower9-fusion requires -mpower8-fusion");
 	  rs6000_isa_flags &= ~OPTION_MASK_P9_FUSION;
 	}
@@ -4237,6 +4248,10 @@ rs6000_option_override_internal (bool global_init_p)
   /* ISA 3.0 vector instructions include ISA 2.07.  */
   if (TARGET_P9_VECTOR && !TARGET_P8_VECTOR)
     {
+      /* We prefer to not mention undocumented options in
+	 error messages.  However, if users have managed to select
+	 power9-vector without selecting power8-vector, they
+	 already know about undocumented flags.  */
       if (rs6000_isa_flags_explicit & OPTION_MASK_P8_VECTOR)
 	error ("-mpower9-vector requires -mpower8-vector");
       rs6000_isa_flags &= ~OPTION_MASK_P9_VECTOR;
@@ -4264,6 +4279,10 @@ rs6000_option_override_internal (bool global_init_p)
   /* ISA 3.0 D-form instructions require p9-vector and upper-regs.  */
   if ((TARGET_P9_DFORM_SCALAR || TARGET_P9_DFORM_VECTOR) && !TARGET_P9_VECTOR)
     {
+      /* We prefer to not mention undocumented options in
+	 error messages.  However, if users have managed to select
+	 power9-dform without selecting power9-vector, they
+	 already know about undocumented flags.  */
       if (rs6000_isa_flags_explicit & OPTION_MASK_P9_VECTOR)
 	error ("-mpower9-dform requires -mpower9-vector");
       rs6000_isa_flags &= ~(OPTION_MASK_P9_DFORM_SCALAR
@@ -4272,6 +4291,10 @@ rs6000_option_override_internal (bool global_init_p)
 
   if (TARGET_P9_DFORM_SCALAR && !TARGET_UPPER_REGS_DF)
     {
+      /* We prefer to not mention undocumented options in
+	 error messages.  However, if users have managed to select
+	 power9-dform without selecting upper-regs-df, they
+	 already know about undocumented flags.  */
       if (rs6000_isa_flags_explicit & OPTION_MASK_UPPER_REGS_DF)
 	error ("-mpower9-dform requires -mupper-regs-df");
       rs6000_isa_flags &= ~OPTION_MASK_P9_DFORM_SCALAR;
@@ -15489,13 +15512,13 @@ rs6000_invalid_builtin (enum rs6000_builtins fncode)
   else if ((fnmask & RS6000_BTM_P8_VECTOR) != 0)
     error ("Builtin function %s requires the -mpower8-vector option", name);
   else if ((fnmask & RS6000_BTM_P9_VECTOR) != 0)
-    error ("Builtin function %s requires the -mpower9-vector option", name);
+    error ("Builtin function %s requires the -mcpu=power9 option", name);
   else if ((fnmask & (RS6000_BTM_P9_MISC | RS6000_BTM_64BIT))
 	   == (RS6000_BTM_P9_MISC | RS6000_BTM_64BIT))
-    error ("Builtin function %s requires the -mpower9-misc and"
+    error ("Builtin function %s requires the -mcpu=power9 and"
 	   " -m64 options", name);
   else if ((fnmask & RS6000_BTM_P9_MISC) == RS6000_BTM_P9_MISC)
-    error ("Builtin function %s requires the -mpower9-misc option", name);
+    error ("Builtin function %s requires the -mcpu=power9 option", name);
   else if ((fnmask & (RS6000_BTM_HARD_FLOAT | RS6000_BTM_LDBL128))
 	   == (RS6000_BTM_HARD_FLOAT | RS6000_BTM_LDBL128))
     error ("Builtin function %s requires the -mhard-float and"
