@@ -606,6 +606,19 @@ extern int rs6000_vector_align[];
    loads are slow. */
 #define TARGET_EFFICIENT_OVERLAPPING_UNALIGNED TARGET_EFFICIENT_UNALIGNED_VSX
 
+/* Macro to say whether we can do optimizations where we need to do parts of
+   the calculation in 64-bit GPRs and then is transfered to the vector
+   registers.  Do not allow -maltivec=be for these optimizations, because it
+   adds to the complexity of the code.  */
+#define TARGET_DIRECT_MOVE_64BIT	(TARGET_DIRECT_MOVE		\
+					 && TARGET_P8_VECTOR		\
+					 && TARGET_POWERPC64		\
+					 && (rs6000_altivec_element_order != 2))
+
+/* Whether we should avoid (SUBREG:SI (REG:SF) and (SUBREG:SF (REG:SI).  */
+#define TARGET_NO_SF_SUBREG	TARGET_DIRECT_MOVE_64BIT
+#define TARGET_ALLOW_SF_SUBREG	(!TARGET_DIRECT_MOVE_64BIT)
+
 /* Byte/char syncs were added as phased in for ISA 2.06B, but are not present
    in power7, so conditionalize them on p8 features.  TImode syncs need quad
    memory support.  */
