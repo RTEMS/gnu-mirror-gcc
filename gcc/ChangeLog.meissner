@@ -1,5 +1,34 @@
 2017-01-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/rs6000.md (fix_trunc<mode>si2): If we have VSX
+	small integer support, we don't need to generate special UNSPECs
+	because SImode is now allowed in vector registers.  Disallow the
+	UNSPECs if we have small integers in vector registers.
+	(fix_trunc<mode>si2_internal): Likewise.
+	(fix<uns>_trunc<SFDF:mode>si2_smallint): Likewise.
+	(fix<uns>_trunc<SFDF:mode><QHI:mode>2): Rewrite conversion to
+	QImode/HImode, so that it does not use special UNSPECs.
+	(fix_trunc<IEEE128:mode><QHI:mode>2): Add support to optimize
+	converting IEEE 128-bit floating point to QImode/HImode.
+	(fix_trunc<SFDF:mode><QHSI:mode>2_mem): Use combiners to build
+	conversion to QImode/HImode/SImode and do a store, forcing the
+	register allocator not to do a direct move.
+	(fix_trunc<IEEE128:mode><QHSI:mode>2_mem): Likewise.
+	(fixuns_trunc<mode>si2): If we have VSX small integer support, we
+	don't need to generate special UNSPECs because SImode is now
+	allowed in vector registers.  Disallow the UNSPECs if we have
+	small integers in vector registers.
+	(fixuns_trunc<mode>si2_internal): Likewise.
+	(fixuns_trunc<SFDF:mode><QHI:mode>2): Likewise.
+	(fixuns_trunc<IEEE128:mode><QHI:mode>2): Likewise.
+	(fixuns_trunc<SFDF:mode><QHSI:mode>2_mem): Use combiners to build
+	conversion to QImode/HImode/SImode and do a store, forcing the
+	register allocator not to do a direct move.
+	(fixuns_trunc<IEEE128:mode><QHSI:mode>2_mem): Likewise.
+	(round32<mode>2_fprs): Disable if we have VSX small integers.
+
+2017-01-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/rs6000.md
 	(float<QHI:mode><FP_ISA3:mode>2_internal): Use "v" constraints for
 	temporaries that need to be Altivec registers.
