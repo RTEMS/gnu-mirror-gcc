@@ -1,3 +1,64 @@
+2017-01-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/79038
+	* config/rs6000/constraints.md (wp constraint): If IEEE 128-bit
+	floating point hardware is supported, restrict constraint to
+	Altivec registers.
+	(wq constraint): Likewise.
+	* config/rs6000/rs6000-cpus.def (ISA_3_0_MASKS_IEEE): Require VSX
+	small integer support.
+	* config/rs6000/rs6000-protos.h (convert_float128_to_int): Delete,
+	no longer used.
+	(convert_int_to_float128): Likewise.
+	* config/rs6000/rs6000.c (rs6000_init_hard_regno_mode_ok): If we
+	have IEEE 128-bit floating point hardware, limit wp/wq constraints
+	to Altivec registers.
+	(convert_float128_to_int): Delete, no longer used.
+	(convert_int_to_float128): Likewise.
+	* config/rs6000/vsx.md (VSr3 mode attribute): Set KF/TF modes to
+	wa instead of wp/wq.
+	(VSa mode attribute): Likewise.
+	* config/rs6000/rs6000.md (UNSPEC_IEEE128_MOVE): Delete, no longer
+	used.
+	(UNSPEC_IEEE128_CONVERT): Likewise.
+	(FP_ISA3): Add support for converting char/short values from
+	memory to IEEE 128-bit floating point without using the GPRs.
+	(Fv mode attribute): Add appropriate support for KFmode/TFmode.
+	(uns_tf code attribute): Return true/false, depending on whether
+	the conversion is signed or unsigned.
+	(float<QHI:mode><FP_ISA3:mode>2): Optimize char/short conversions
+	to IEEE 128-bit floating point.
+	(float<QHI:mode><FP_ISA3:mode>2_internal): Likewise.
+	(floatuns<QHI:mode><FP_ISA3:mode>2): Likewise.
+	(floatuns<QHI:mode><FP_ISA3:mode>2_internal): Likewise.
+	(fix_trunc<SFDF:mode><QHI:mode>2_internal): Likewise.
+	(floatsi<mode>2): Update conversion between SImode and IEEE
+	128-bit floating point to know about SImode in VSX registers.
+	(fix_trunc<mode>si2): Likewise.
+	(floatdi<mode>2): Combine IEEE 128-bit conversions floatdi<mode>2
+	and floatunsdi<mode>2 into one combined insn.
+	(float<uns>di<mode>2): Likewise.
+	(floatunssi<mode>2): Likewise.
+	(fix<uns>_<mode>si2_hw): Delete, no longer used.
+	(fix<uns>_<mode>di2_hw): Likewise.
+	(float<uns>_<mode>si2_hw): Likewise.
+	(float<uns>_<mode>di2_hw): Likewise.
+	(xscvqp<su>wz_<mode>): Likewise.
+	(xscv<su>dqp_<mode>): Likewise.
+	(fix<uns>_<mode>si2_hw): Add direct support for conversion to
+	32/64-bit integer directly in Altivec registers.
+	(fix<uns>_<mode>di2_hw): Likewise.
+	(float_<mode>si2_hw): Likewise.
+	(floatuns_<mode>si2_hw): Likewise.
+	(ieee128_mfvsrd_64bit): Delete, no longer used.
+	(ieee128_mfvsrd_32bit): Likewise.
+	(ieee128_mfvsrwz): Likewise.
+	(ieee128_mtvsrw): Likewise.
+	(ieee128_mtvsrd_64bit): Likewise.
+	(ieee128_mtvsrd_32bit): Likewise.
+	* doc/md.texi (RS/6000 constraints): Update wp and wq
+	documentation.
+
 2017-01-18   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 244594

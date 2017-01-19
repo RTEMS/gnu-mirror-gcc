@@ -101,10 +101,10 @@
   "VSX register if the -mpower9-vector option was used or NO_REGS.")
 
 (define_register_constraint "wp" "rs6000_constraints[RS6000_CONSTRAINT_wp]"
-  "VSX register to use for IEEE 128-bit fp TFmode, or NO_REGS.")
+  "Altivec or VSX register to use for TFmode IEEE 128-bit float, or NO_REGS.")
 
 (define_register_constraint "wq" "rs6000_constraints[RS6000_CONSTRAINT_wq]"
-  "VSX register to use for IEEE 128-bit fp KFmode, or NO_REGS.")
+  "Altivec or VSX register to use for KFmode IEEE 128-bit float, or NO_REGS.")
 
 (define_register_constraint "wr" "rs6000_constraints[RS6000_CONSTRAINT_wr]"
   "General purpose register if 64-bit instructions are enabled or NO_REGS.")

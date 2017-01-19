@@ -128,8 +128,8 @@
 			 (DF    "ws")
 			 (SF	"ww")
 			 (DI	"wi")
-			 (KF	"wq")
-			 (TF	"wp")])
+			 (KF	"wa")
+			 (TF	"wa")])
 
 ;; Map the register class for sp<->dp float conversions, destination
 (define_mode_attr VSr4	[(SF	"ws")
@@ -157,8 +157,8 @@
 			 (SF	"ww")
 			 (V1TI	"wa")
 			 (TI    "wt")
-			 (TF	"wp")
-			 (KF	"wq")])
+			 (TF	"wa")
+			 (KF	"wa")])
 
 ;; Same size integer type for floating point data
 (define_mode_attr VSi [(V4SF  "v4si")
