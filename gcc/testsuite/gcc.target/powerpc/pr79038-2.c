@@ -117,8 +117,7 @@ ulong_indexed (unsigned long *a, long unsigned n)
 /* { dg-final { scan-assembler-times {\mlxsd\M}      2 } } */
 /* { dg-final { scan-assembler-times {\mlxsdx\M}     2 } } */
 /* { dg-final { scan-assembler-times {\mlxsibzx\M}   6 } } */
-/* { dg-final { scan-assembler-times {\mlxsibzx\M}   4 } } */
-/* { dg-final { scan-assembler-times {\mlxsihzx\M}   2 } } */
+/* { dg-final { scan-assembler-times {\mlxsihzx\M}   4 } } */
 /* { dg-final { scan-assembler-times {\mlxsiwax\M}   2 } } */
 /* { dg-final { scan-assembler-times {\mlxsiwzx\M}   2 } } */
 /* { dg-final { scan-assembler-times {\mvextsb2d\M}  2 } } */
