@@ -32,5 +32,5 @@ rev_uint128 (vector __uint128_t a)
   return vec_revb (a);		/* XXBRQ.  */
 }
 
-/* { dg-final { scan-assembler-count "xxbrd" 2 } } */
-/* { dg-final { scan-assembler-count "xxbrq" 2 } } */
+/* { dg-final { scan-assembler-times "xxbrd" 2 } } */
+/* { dg-final { scan-assembler-times "xxbrq" 2 } } */
