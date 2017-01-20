@@ -369,31 +369,29 @@ package body Sem_Ch6 is
          Set_Is_Inlined (Prev);
          Ret_Type := Etype (Prev);
 
-         --  An expression function that is a completion freezes the
-         --  expression. This means freezing the return type, and if it is an
-         --  access type, freezing its designated type as well.
+         --  An expression function which acts as a completion freezes the
+         --  expression. This means freezing the return type, and if it is
+         --  an access type, freezing its designated type as well.
 
          --  Note that we cannot defer this freezing to the analysis of the
          --  expression itself, because a freeze node might appear in a nested
          --  scope, leading to an elaboration order issue in gigi.
 
-         --  An entity can only be frozen if it has a completion, so we must
-         --  check this explicitly. If it is declared elsewhere it will have
-         --  been frozen already, so only types declared in currently opened
-         --  scopes need to be tested.
+         Freeze_Before (N, Ret_Type);
 
-         if Ekind (Ret_Type) = E_Private_Type
-           and then In_Open_Scopes (Scope (Ret_Type))
+         --  An entity can only be frozen if it is complete, so if the type
+         --  is still unfrozen it must still be incomplete in some way, e.g.
+         --  a privte type without a full view, or a type derived from such
+         --  in an enclosing scope. Except in a generic context, such an
+         --  incomplete type is an error.
+
+         if not Is_Frozen (Ret_Type)
            and then not Is_Generic_Type (Ret_Type)
-           and then not Is_Frozen (Ret_Type)
-           and then No (Full_View (Ret_Type))
+           and then not Inside_A_Generic
          then
             Error_Msg_NE
               ("premature use of private type&",
                Result_Definition (Specification (N)), Ret_Type);
-
-         else
-            Freeze_Before (N, Ret_Type);
          end if;
 
          if Is_Access_Type (Etype (Prev)) then
@@ -1711,7 +1709,31 @@ package body Sem_Ch6 is
                                                        E_Function,
                                                        E_Procedure)
       then
-         Analyze_Call_And_Resolve;
+         --  When front-end inlining is enabled, as with SPARK_Mode, a call
+         --  in prefix notation may still be missing its controlling argument,
+         --  so perform the transformation now.
+
+         if SPARK_Mode = On and then In_Inlined_Body then
+            declare
+               Subp : constant Entity_Id := Entity (Selector_Name (P));
+               Typ  : constant Entity_Id := Etype (Prefix (P));
+
+            begin
+               if Is_Tagged_Type (Typ)
+                 and then Present (First_Formal (Subp))
+                 and then Etype (First_Formal (Subp)) = Typ
+                 and then Try_Object_Operation (P)
+               then
+                  return;
+
+               else
+                  Analyze_Call_And_Resolve;
+               end if;
+            end;
+
+         else
+            Analyze_Call_And_Resolve;
+         end if;
 
       elsif Nkind (P) = N_Selected_Component
         and then Ekind (Entity (Selector_Name (P))) = E_Entry_Family
@@ -2377,8 +2399,10 @@ package body Sem_Ch6 is
          --  of subprogram body From and insert them after node To. The pragmas
          --  in question are:
          --    Ghost
-         --    SPARK_Mode
          --    Volatile_Function
+         --  Also copy pragma SPARK_Mode if present in the declarative list
+         --  of subprogram body From and insert it after node To. This pragma
+         --  should not be moved, as it applies to the body too.
 
          ------------------
          -- Move_Pragmas --
@@ -2403,14 +2427,17 @@ package body Sem_Ch6 is
             while Present (Decl) loop
                Next_Decl := Next (Decl);
 
-               if Nkind (Decl) = N_Pragma
-                 and then Nam_In (Pragma_Name_Unmapped (Decl),
-                                  Name_Ghost,
-                                  Name_SPARK_Mode,
-                                  Name_Volatile_Function)
-               then
-                  Remove (Decl);
-                  Insert_After (To, Decl);
+               if Nkind (Decl) = N_Pragma then
+                  if Pragma_Name_Unmapped (Decl) = Name_SPARK_Mode then
+                     Insert_After (To, New_Copy_Tree (Decl));
+
+                  elsif Nam_In (Pragma_Name_Unmapped (Decl),
+                                Name_Ghost,
+                                Name_Volatile_Function)
+                  then
+                     Remove (Decl);
+                     Insert_After (To, Decl);
+                  end if;
                end if;
 
                Decl := Next_Decl;
@@ -2440,6 +2467,13 @@ package body Sem_Ch6 is
          Insert_Before (N, Subp_Decl);
          Move_Aspects (N, To => Subp_Decl);
          Move_Pragmas (N, To => Subp_Decl);
+
+         --  Ensure that the generated corresponding spec and original body
+         --  share the same SPARK_Mode pragma or aspect. As a result, both have
+         --  the same SPARK_Mode attributes, and the global SPARK_Mode value is
+         --  correctly set for local subprograms.
+
+         Copy_SPARK_Mode_Aspect (Subp_Decl, To => N);
 
          Analyze (Subp_Decl);
 
@@ -2493,13 +2527,6 @@ package body Sem_Ch6 is
          Body_Spec := Copy_Subprogram_Spec (Body_Spec);
          Set_Specification (N, Body_Spec);
          Body_Id := Analyze_Subprogram_Specification (Body_Spec);
-
-         --  Ensure that the generated corresponding spec and original body
-         --  share the same SPARK_Mode attributes.
-
-         Set_SPARK_Pragma (Body_Id, SPARK_Pragma (Spec_Id));
-         Set_SPARK_Pragma_Inherited
-           (Body_Id, SPARK_Pragma_Inherited (Spec_Id));
       end Build_Subprogram_Declaration;
 
       ----------------------------
@@ -3821,12 +3848,12 @@ package body Sem_Ch6 is
       --    end P;                                      --    mode is ON
 
       elsif not Comes_From_Source (N)
-        and then Present (Prev_Id)
-        and then Is_Expression_Function (Prev_Id)
+        and then Present (Spec_Id)
+        and then Is_Expression_Function (Spec_Id)
       then
-         Set_SPARK_Pragma (Body_Id, SPARK_Pragma (Prev_Id));
+         Set_SPARK_Pragma (Body_Id, SPARK_Pragma (Spec_Id));
          Set_SPARK_Pragma_Inherited
-           (Body_Id, SPARK_Pragma_Inherited (Prev_Id));
+           (Body_Id, SPARK_Pragma_Inherited (Spec_Id));
 
       --  Set the SPARK_Mode from the current context (may be overwritten later
       --  with explicit pragma). Exclude the case where the SPARK_Mode appears

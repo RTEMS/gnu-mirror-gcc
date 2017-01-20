@@ -4524,7 +4524,7 @@ package body Exp_Ch9 is
                      --  If actual is an out parameter of a null-excluding
                      --  access type, there is access check on entry, so set
                      --  Suppress_Assignment_Checks on the generated statement
-                     --  that assigns the actual to the parameter block
+                     --  that assigns the actual to the parameter block.
 
                      Set_Suppress_Assignment_Checks (Last (Stats));
                   end if;
@@ -6025,6 +6025,25 @@ package body Exp_Ch9 is
       ---------------------
 
       function Is_Pure_Barrier (N : Node_Id) return Traverse_Result is
+         function Is_Count_Attribute (N : Node_Id) return Boolean;
+         --  Check whether N is part of an expansion of the Count attribute.
+         --  Return True if N represents the expanded function call.
+
+         ------------------------
+         -- Is_Count_Attribute --
+         ------------------------
+
+         function Is_Count_Attribute (N : Node_Id) return Boolean is
+         begin
+            return
+              Nkind (N) = N_Function_Call
+                and then Present (Original_Node (N))
+                and then Nkind (Original_Node (N)) = N_Attribute_Reference
+                and then Attribute_Name (Original_Node (N)) = Name_Count;
+         end Is_Count_Attribute;
+
+      --  Start of processing for Is_Pure_Barrier
+
       begin
          case Nkind (N) is
             when N_Expanded_Name
@@ -6032,6 +6051,12 @@ package body Exp_Ch9 is
             =>
                if No (Entity (N)) then
                   return Abandon;
+               end if;
+
+               if Present (Parent (N))
+                 and then Is_Count_Attribute (Parent (N))
+               then
+                  return OK;
                end if;
 
                case Ekind (Entity (N)) is
@@ -6056,6 +6081,11 @@ package body Exp_Ch9 is
                   when others =>
                      null;
                end case;
+
+            when N_Function_Call =>
+               if Is_Count_Attribute (N) then
+                  return OK;
+               end if;
 
             when N_Character_Literal
                | N_Integer_Literal
@@ -6787,7 +6817,7 @@ package body Exp_Ch9 is
          Insert_Before (N, Decl);
          Analyze (Decl);
 
-         --  Rewrite abortable part into a call to this procedure.
+         --  Rewrite abortable part into a call to this procedure
 
          Astats :=
            New_List (
@@ -9000,7 +9030,7 @@ package body Exp_Ch9 is
                   elsif Restriction_Active (No_Implicit_Heap_Allocations) then
                      if not Discriminated_Size (Defining_Identifier (Priv))
                      then
-                        --  Any object of the type will be  non-static.
+                        --  Any object of the type will be non-static
 
                         Error_Msg_N ("component has non-static size??", Priv);
                         Error_Msg_NE
@@ -9009,7 +9039,7 @@ package body Exp_Ch9 is
                            & "No_Implicit_Heap_Allocations??", Priv, Prot_Typ);
                      else
 
-                        --  Object will be non-static if discriminants are.
+                        --  Object will be non-static if discriminants are
 
                         Error_Msg_NE
                           ("creation of protected object of type& with "
@@ -9025,7 +9055,7 @@ package body Exp_Ch9 is
                   then
                      if not Discriminated_Size (Defining_Identifier (Priv))
                      then
-                        --  Any object of the type will be  non-static.
+                        --  Any object of the type will be non-static
 
                         Error_Msg_N ("component has non-static size??", Priv);
                         Error_Msg_NE
@@ -9034,7 +9064,7 @@ package body Exp_Ch9 is
                            & "No_Implicit_Protected_Object_Allocations??",
                            Priv, Prot_Typ);
                      else
-                        --  Object will be non-static if discriminants are.
+                        --  Object will be non-static if discriminants are
 
                         Error_Msg_NE
                           ("creation of protected object of type& with "
@@ -13739,7 +13769,7 @@ package body Exp_Ch9 is
                     Expression
                      (First (Pragma_Argument_Associations (Prio_Clause)));
 
-                  --  Get_Rep_Item returns either priority pragma.
+                  --  Get_Rep_Item returns either priority pragma
 
                   if Pragma_Name (Prio_Clause) = Name_Priority then
                      Prio_Type := RTE (RE_Any_Priority);
