@@ -1,5 +1,15 @@
 2017-01-20  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/constraints.md: Undo changes, start over.
+	* config/rs6000/rs6000-cpus.def: Likewise.
+	* config/rs6000/rs6000-protos.h: Likewise.
+	* config/rs6000/rs6000.c: Likewise.
+	* config/rs6000/vsx.md: Likewise.
+	* config/rs6000/rs6000.md: Likewise.
+	* doc/md.texi: Likewise.
+
+2017-01-20  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/rs6000.md (fix<uns>_trunc<SFDF:mode>si2_smallint):
 	Don't use code iterator, since it doesn't seem to work, instead
 	use separate insns.
