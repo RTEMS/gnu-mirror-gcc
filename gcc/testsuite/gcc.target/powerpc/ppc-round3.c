@@ -5,8 +5,8 @@
 /* { dg-options "-O2 -mcpu=power9" } */
 /* { dg-final { scan-assembler-times {\mfcfid|xscvsxddp\M}     2 } } */
 /* { dg-final { scan-assembler-times {\mfcfids|xscvsxdsp\M}    2 } } */
-/* { dg-final { scan-assembler-times {\mfctiwz|xscvdpsxws\M}"  2 } } */
-/* { dg-final { scan-assembler-times {\mfctiwuz|xscvdpuxws\M}" 2 } } */
+/* { dg-final { scan-assembler-times {\mfctiwz|xscvdpsxws\M}   2 } } */
+/* { dg-final { scan-assembler-times {\mfctiwuz|xscvdpuxws\M}  2 } } */
 /* { dg-final { scan-assembler-times {\mvextsw2d\M}            2 } } */
 /* { dg-final { scan-assembler-times {\mxxextractuw\M}         2 } } */
 /* { dg-final { scan-assembler-not   {\mmfvsrwz\M}               } } */
