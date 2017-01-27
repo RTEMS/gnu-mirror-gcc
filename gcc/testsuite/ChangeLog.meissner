@@ -1,3 +1,7 @@
+2017-01-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 244996.
+
 2017-01-24  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* gcc.target/powerpc/ppc-round2.c: Adjust for code generation

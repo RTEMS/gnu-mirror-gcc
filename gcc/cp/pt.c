@@ -12358,8 +12358,6 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain)
 	    maybe_retrofit_in_chrg (r);
 	    if (DECL_CONSTRUCTOR_P (r))
 	      grok_ctor_properties (ctx, r);
-	    if (DECL_INHERITED_CTOR (r))
-	      deduce_inheriting_ctor (r);
 	    /* If this is an instantiation of a member template, clone it.
 	       If it isn't, that'll be handled by
 	       clone_constructors_and_destructors.  */
@@ -17470,7 +17468,14 @@ tsubst_copy_and_build (tree t,
 	if (member == error_mark_node)
 	  RETURN (error_mark_node);
 
-	if (type_dependent_expression_p (object))
+	if (TREE_CODE (member) == FIELD_DECL)
+	  {
+	    r = finish_non_static_data_member (member, object, NULL_TREE);
+	    if (TREE_CODE (r) == COMPONENT_REF)
+	      REF_PARENTHESIZED_P (r) = REF_PARENTHESIZED_P (t);
+	    RETURN (r);
+	  }
+	else if (type_dependent_expression_p (object))
 	  /* We can't do much here.  */;
 	else if (!CLASS_TYPE_P (object_type))
 	  {
@@ -17534,13 +17539,6 @@ tsubst_copy_and_build (tree t,
 			 TREE_OPERAND (member, 0));
 	      }
 	    RETURN (error_mark_node);
-	  }
-	else if (TREE_CODE (member) == FIELD_DECL)
-	  {
-	    r = finish_non_static_data_member (member, object, NULL_TREE);
-	    if (TREE_CODE (r) == COMPONENT_REF)
-	      REF_PARENTHESIZED_P (r) = REF_PARENTHESIZED_P (t);
-	    RETURN (r);
 	  }
 
 	r = finish_class_member_access_expr (object, member,
@@ -17707,8 +17705,15 @@ tsubst_copy_and_build (tree t,
       }
 
     case OFFSETOF_EXPR:
-      RETURN (finish_offsetof (RECUR (TREE_OPERAND (t, 0)),
-			       EXPR_LOCATION (t)));
+      {
+	tree object_ptr
+	  = tsubst_copy_and_build (TREE_OPERAND (t, 1), args, complain,
+				   in_decl, /*function_p=*/false,
+				   /*integral_constant_expression_p=*/false);
+	RETURN (finish_offsetof (object_ptr,
+				 RECUR (TREE_OPERAND (t, 0)),
+				 EXPR_LOCATION (t)));
+      }
 
     case ADDRESSOF_EXPR:
       RETURN (cp_build_addressof (EXPR_LOCATION (t),
