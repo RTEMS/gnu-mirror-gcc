@@ -33,7 +33,8 @@
 	conversions.
 	(float_<mode>si2_hw): Likewise.
 	(float<uns>_<mode>di2_hw): Likewise.
-	(float<QHI:mode><IEEE128:mode>2): Likewise.
+	(float<QHI:mode><IEEE128:mode>2): Define insns to convert from
+	char/short to IEEE 128-bit floating point.
 	(xscvqp<su>wz_<mode>): Delete, no longer used.
 	(xscvqp<su>dz_<mode>): Likewise.
 	(xscv<su>dqp_<mode>): Likewise.
@@ -41,8 +42,8 @@
 	(ieee128_mfvsrd_32bit): Likewise.
 	(ieee128_mfvsrwz): Likewise.
 	(ieee128_mtvsrw): Likewise.
-	(floatuns<QHI:mode><IEEE128:mode>2): Rework IEEE 128-bit <->
-	integer conversions.
+	(floatuns<QHI:mode><IEEE128:mode>2): Define insns to convert from
+	IEEE 128-bit floating point to char/short.
 	(ieee128_mtvsrd_64bit): Delete, no longer used.
 	(ieee128_mtvsrd_32bit): Likewise.
 
