@@ -1,3 +1,39 @@
+2017-02-01  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/79038
+	PR target/79202
+	PR target/79203
+	* config/rs6000/rs6000.md (u code attribute): Add FIX and
+	UNSIGNED_FIX.
+	(extendsi<mode>2): Add support for doing sign extension via
+	VUPKHSW and XXPERMDI if the value is in Altivec registers and we
+	don't have ISA 3.0 instructions.
+	(extendsi<mode>2 splitter): Likewise.
+	(fix_trunc<mode>si2): If we are at ISA 2.07 (VSX small integer),
+	generate the normal insns since SImode can now go in vector
+	registers.  Disallow the special UNSPECs needed for previous
+	machines to hide SImode being used.  Rename the fctiw{,u}z_<mode>
+	insns to highlight they are for older hardware.  Add new insns
+	fctiw{,w}_<mode>_smallint if we have small integers.
+	(fix_trunc<mode>si2_stfiwx): Likewise.
+	(fix_trunc<mode>si2_internal): Likewise.
+	(fixuns_trunc<mode>si2): Likewise.
+	(fixuns_trunc<mode>si2_stfiwx): Likewise.
+	(fctiw<u>z_<mode>_smallint): Likewise.
+	(fctiw<u>z_<mode>_mem): New combiner pattern to prevent conversion
+	of floating point to 32-bit integer from doing a direct move to
+	the GPR registers to do a store.
+	(fctiwz_<mode>): Rename from fctiwz_<mode>.
+	(fctiwz_<mode>_no_smallint): Likewise.
+	(fctiwuz_<mode>): Likewise.
+	(fctiwuz_<mode>_no_smallint): Likewise.
+	(fix<uns>_<mode>_mem): Combiner pattern to prevent excess direct
+	moves to store IEEE 128-bit values converted to small integers.
+	(float<QHI:mode><IEEE128:mode>2): Define insns to convert from
+	char/short to IEEE 128-bit floating point.
+	(floatuns<QHI:mode><IEEE128:mode>2): Define insns to convert from
+	IEEE 128-bit floating point to char/short.
+
 2017-02-01   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 245101
