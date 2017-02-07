@@ -1,3 +1,10 @@
+2017-02-07  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/68163
+	* config/rs6000/rs6000.md (mov<mode>_hardfloat): Reorder SF/SD
+	stores, so that all of the vector/fp registers come first, and
+	disparage slightly GPR stores.
+
 2017-02-06   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 245231
