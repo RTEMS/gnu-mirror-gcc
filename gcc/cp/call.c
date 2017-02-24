@@ -2005,7 +2005,11 @@ add_function_candidate (struct z_candidate **candidates,
      considered in overload resolution.  */
   if (DECL_CONSTRUCTOR_P (fn))
     {
-      parmlist = skip_artificial_parms_for (fn, parmlist);
+      if (ctor_omit_inherited_parms (fn))
+	/* Bring back parameters omitted from an inherited ctor.  */
+	parmlist = FUNCTION_FIRST_USER_PARMTYPE (DECL_ORIGIN (fn));
+      else
+	parmlist = skip_artificial_parms_for (fn, parmlist);
       skip = num_artificial_parms_for (fn);
       if (skip > 0 && first_arg != NULL_TREE)
 	{
@@ -2053,7 +2057,9 @@ add_function_candidate (struct z_candidate **candidates,
     {
       tree ptype = non_reference (TREE_VALUE (parmlist));
       tree dtype = DECL_CONTEXT (fn);
-      if (reference_related_p (ptype, dtype))
+      tree btype = DECL_INHERITED_CTOR_BASE (fn);
+      if (reference_related_p (ptype, dtype)
+	  && reference_related_p (btype, ptype))
 	{
 	  viable = false;
 	  reason = inherited_ctor_rejection ();
@@ -6420,7 +6426,8 @@ enforce_access (tree basetype_path, tree decl, tree diag_decl,
 	 accessible when used to construct an object of the corresponding base
 	 class.  */
       decl = strip_inheriting_ctors (decl);
-      basetype_path = TYPE_BINFO (DECL_CONTEXT (decl));
+      basetype_path = lookup_base (basetype_path, DECL_CONTEXT (decl),
+				   ba_any, NULL, complain);
     }
 
   if (!accessible_p (basetype_path, decl, true))
@@ -7831,12 +7838,13 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
       if (flags & LOOKUP_NO_CONVERSION)
 	conv->user_conv_p = true;
 
-      val = convert_like_with_context (conv, arg, fn, i - is_method,
-				       conversion_warning
-				       ? complain
-				       : complain & (~tf_warning));
+      tsubst_flags_t arg_complain = complain & (~tf_no_cleanup);
+      if (!conversion_warning)
+	arg_complain &= ~tf_warning;
 
-      val = convert_for_arg_passing (type, val, complain);
+      val = convert_like_with_context (conv, arg, fn, i - is_method,
+				       arg_complain);
+      val = convert_for_arg_passing (type, val, arg_complain);
 	
       if (val == error_mark_node)
         return error_mark_node;
@@ -7950,7 +7958,14 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 
       /* Pull out the real argument, disregarding const-correctness.  */
       targ = arg;
-      while (CONVERT_EXPR_P (targ)
+      /* Strip the reference binding for the constructor parameter.  */
+      if (CONVERT_EXPR_P (targ)
+	  && TREE_CODE (TREE_TYPE (targ)) == REFERENCE_TYPE)
+	targ = TREE_OPERAND (targ, 0);
+      /* But don't strip any other reference bindings; binding a temporary to a
+	 reference prevents copy elision.  */
+      while ((CONVERT_EXPR_P (targ)
+	      && TREE_CODE (TREE_TYPE (targ)) != REFERENCE_TYPE)
 	     || TREE_CODE (targ) == NON_LVALUE_EXPR)
 	targ = TREE_OPERAND (targ, 0);
       if (TREE_CODE (targ) == ADDR_EXPR)
@@ -8342,9 +8357,15 @@ build_special_member_call (tree instance, tree name, vec<tree, va_gc> **args,
       /* FIXME P0135 doesn't say how to handle direct initialization from a
 	 type with a suitable conversion operator.  Let's handle it like
 	 copy-initialization, but allowing explict conversions.  */
+      tsubst_flags_t sub_complain = tf_warning;
+      if (!is_dummy_object (instance))
+	/* If we're using this to initialize a non-temporary object, don't
+	   require the destructor to be accessible.  */
+	sub_complain |= tf_no_cleanup;
       if (!reference_related_p (class_type, TREE_TYPE (arg)))
 	arg = perform_implicit_conversion_flags (class_type, arg,
-						 tf_warning, flags);
+						 sub_complain,
+						 flags);
       if ((TREE_CODE (arg) == TARGET_EXPR
 	   || TREE_CODE (arg) == CONSTRUCTOR)
 	  && (same_type_ignoring_top_level_qualifiers_p
