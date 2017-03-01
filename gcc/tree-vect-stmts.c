@@ -6324,7 +6324,7 @@ vectorizable_store (gimple *stmt, gimple_stmt_iterator *gsi, gimple **vec_stmt,
 		   vect_permute_store_chain().  */
 		vec_oprnd = result_chain[i];
 
-	      data_ref = fold_build2 (MEM_REF, TREE_TYPE (vec_oprnd),
+	      data_ref = fold_build2 (MEM_REF, vectype,
 				      dataref_ptr,
 				      dataref_offset
 				      ? dataref_offset
@@ -8957,6 +8957,7 @@ free_stmt_vec_info (gimple *stmt)
 static tree
 get_vectype_for_scalar_type_and_size (tree scalar_type, unsigned size)
 {
+  tree orig_scalar_type = scalar_type;
   machine_mode inner_mode = TYPE_MODE (scalar_type);
   machine_mode simd_mode;
   unsigned int nbytes = GET_MODE_SIZE (inner_mode);
@@ -9016,6 +9017,12 @@ get_vectype_for_scalar_type_and_size (tree scalar_type, unsigned size)
   if (!VECTOR_MODE_P (TYPE_MODE (vectype))
       && !INTEGRAL_MODE_P (TYPE_MODE (vectype)))
     return NULL_TREE;
+
+  /* Re-attach the address-space qualifier if we canonicalized the scalar
+     type.  */
+  if (TYPE_ADDR_SPACE (orig_scalar_type) != TYPE_ADDR_SPACE (vectype))
+    return build_qualified_type
+	     (vectype, KEEP_QUAL_ADDR_SPACE (TYPE_QUALS (orig_scalar_type)));
 
   return vectype;
 }

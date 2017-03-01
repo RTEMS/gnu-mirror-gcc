@@ -1,3 +1,178 @@
+2017-03-01  Uros Bizjak  <ubizjak@gmail.com>
+
+	* gcc.target/i386/invsize-2.c: New test.
+	* gcc.target/i386/invsize-3.c: Ditto.
+	* gcc.target/i386/invsize-4.c: Ditto.
+	* gcc.target/i386/pr66274.c: Expect "unsuported size" warning.
+	* gcc.target/i386/stackalign/asm-1.c: Ditto.
+
+2017-03-01  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/79439
+	* gcc.target/powerpc/pr79439.c: New test.
+
+2017-03-01  Pat Haugen  <pthaugen@us.ibm.com>
+
+	* gcc.target/powerpc/pr79544.c: Add test for vec_vsrad and fix up
+	scan string.
+
+
+2017-03-01  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	PR target/79395
+	* gcc.target/powerpc/vsu/vec-all-ne-10.c: Change scan-assembler
+	pattern to look for vcmpequd. instead of vcmpnew.
+	* gcc.target/powerpc/vsu/vec-all-ne-14.c: Likewise.
+	* gcc.target/powerpc/vsu/vec-all-ne-7.c: Change scan-assembler
+	pattern to look for xvcmpeqsp. instead of xvcmpnesp.
+	* gcc.target/powerpc/vsu/vec-all-ne-8.c: Change scan-assembler to
+	look for xvcmpeqdp. instead of xvcmpnedp.
+	* gcc.target/powerpc/vsu/vec-all-ne-9.c: Change scan-assembler to
+	look for vcmpequd. instead of vcmpnew.
+	* gcc.target/powerpc/vsu/vec-any-eq-10.c: Likewise.
+	* gcc.target/powerpc/vsu/vec-any-eq-14.c: Likewise.
+	* gcc.target/powerpc/vsu/vec-any-eq-7.c: Change scan-assembler to
+	look for xvcmpeqsp. instead of xvcmpnesp.
+	* gcc.target/powerpc/vsu/vec-any-eq-8.c: Change scan-assembler to
+	look for xvcmpeqdp. instead of xvcmpnedp.
+	* gcc.target/powerpc/vsu/vec-any-eq-9.c: Change scan-assembler to
+	look for vcmpequd. instead of vcmpnew.
+	* gcc.target/powerpc/vsu/vec-cmpne-8.c: Change scan-assembler to
+	look for vcmpeqsp instead of xvcmpnesp.
+	* gcc.target/powerpc/vsu/vec-cmpne-9.c: Change scan-assembler to
+	look for xvcmpeqdp instead of xvcmpnedp.
+
+2017-03-01  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/79721
+	* gcc.dg/torture/pr79721.c: New testcase.
+
+2017-03-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/79681
+	* g++.dg/cpp1y/constexpr-79681-1.C: New test.
+	* g++.dg/cpp1y/constexpr-79681-2.C: New test.
+
+	PR c++/79746
+	* g++.dg/warn/Wunused-parm-9.C: New test.
+
+	PR tree-optimization/79734
+	* g++.dg/opt/pr79734.C: New test.
+
+2017-02-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/79737
+	* gcc.c-torture/execute/pr79737-1.c: New test.
+	* gcc.c-torture/execute/pr79737-2.c: New test.
+
+2017-02-28  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc.target/sparc/20170228-1.c: New test.
+
+2017-02-28  Uros Bizjak  <ubizjak@gmail.com>
+
+	* gcc.target/i386/invsize-1.c: New test.
+
+2017-02-28  Martin Sebor  <msebor@redhat.com>
+
+	PR tree-optimization/79691
+	* gcc.dg/tree-ssa/pr79691.c: New test.
+
+2017-02-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/79729
+	* gcc.target/i386/pr79729.c: New test.
+
+2017-02-28  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/79740
+	* gcc.dg/torture/pr79740.c: New testcase.
+
+2017-02-28  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/79731
+	* c-c++-common/torture/pr79731.c: New testcase.
+
+2017-02-28  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/79732
+	* gcc.dg/torture/pr79732.c: New testcase.
+
+2017-02-28  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/79723
+	* gcc.target/i386/pr79723.c: New testcase.
+
+2017-02-27  Pat Haugen  <pthaugen@us.ibm.com>
+
+	PR target/79544
+	* gcc.target/powerpc/pr79544.c: New.
+
+2017-02-27  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/79414
+	* g++.dg/parse/crash67.C: New.
+
+2017-02-27  Bin Cheng  <bin.cheng@arm.com>
+
+	PR tree-optimization/77536
+	* gcc.dg/vect/pr79347.c: Revise testing string.
+
+2017-02-27  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/45397
+	* gcc.dg/tree-ssa/pr45397.c: New testcase.
+
+2017-02-27  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/79690
+	* gcc.target/i386/pr79690.c: New testcase.
+
+2017-02-26  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/51119
+	* gfortran.dg/inline_matmul_1.f90: Scan optimized dump instead
+	of original.
+	* gfortran.dg/inline_matmul_11.f90: Likewise.
+	* gfortran.dg/inline_matmul_9.f90: Likewise.
+	* gfortran.dg/matmul_13.f90: New test.
+	* gfortran.dg/matmul_14.f90: New test.
+
+2017-02-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/79396
+	* g++.dg/opt/pr79396.C: New test.
+
+2017-02-25  Dominique d'Humieres  <dominiq@lps.ens.fr>
+
+	PR fortran/79597
+	* gfortran.dg/dtio_6.f90: Update test.
+
+2017-02-25  Dominique d'Humieres  <dominiq@lps.ens.fr>
+
+	PR fortran/79601
+	* gfortran.dg/interface_operator_2.f90: New test.
+
+2017-02-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/79677
+	* gcc.dg/pr79677.c: New test.
+
+2017-02-24  Matthew Fortune  <matthew.fortune@imgtec.com>
+
+	* gcc.target/mips/mips-ps-type-2.c (move): Force generation
+	of mov.ps.
+	* gcc.target/mips/mips-ps-type.c (move): Likewise.
+	(cond_move1): Simplify condition to force generation of
+	mov[nz].ps.
+	(cond_move2): Likewise.
+
+2017-02-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/79588
+	* g++.dg/warn/Wrestrict-1.C: New test.
+	* g++.dg/warn/Wrestrict-2.C: New test.
+
 2017-02-24  David Edelsohn  <dje.gcc@gmail.com>
 
 	* g++.dg/ext/complit15.C: Require LTO.
