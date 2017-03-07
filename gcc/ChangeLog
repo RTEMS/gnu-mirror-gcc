@@ -1,3 +1,354 @@
+2017-03-07  Marek Polacek  <polacek@redhat.com>
+
+	PR middle-end/79809
+	* gimple-ssa-warn-alloca.c (pass_walloca::gate): Use HOST_WIDE_INT.
+	(alloca_call_type): Likewise.
+
+2017-03-07  Martin Liska  <mliska@suse.cz>
+
+	* gcov.c (process_args): Put comment to correct location.
+
+2017-03-07  Martin Liska  <mliska@suse.cz>
+
+	PR middle-end/68270
+	* tree-chkp.c (chkp_may_narrow_to_field): Add new argument ref.
+	Use array_at_struct_end_p instead of DECL_CHAIN (field).
+	(chkp_narrow_bounds_for_field): Likewise.
+	(chkp_parse_array_and_component_ref): Pass one more argument to
+	call.
+
+2017-03-07  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-loop-manip.c (slpeel_add_loop_guard): Preserve
+	preheaders.
+
+2017-03-07  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* config/i386/i386.c (ix86_local_alignment): Align most aggregates
+	of 16 bytes and more to 16 bytes, not those of 16 bits and more.
+
+2017-03-07  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR c/79855
+	* params.def (PARAM_STORE_MERGING_ALLOW_UNALIGNED): Add full stop
+	to end of description.
+	(PARAM_MAX_STORES_TO_MERGE): Likewise.
+
+2017-03-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/79901
+	* config/i386/sse.md (*avx512bw_<code><mode>3<mask_name>): Renamed to
+	...
+	(*avx512f_<code><mode>3<mask_name>): ... this.
+	(<code><mode>3 with maxmin code iterator): Use VI8_AVX2_AVX512F
+	iterator instead of VI8_AVX2_AVX512BW.
+
+	PR rtl-optimization/79901
+	* expr.c (expand_expr_real_2): For vector MIN/MAX, if there is no
+	min/max expander, expand it using expand_vec_cond_expr.
+
+	PR sanitizer/79897
+	* ubsan.c (ubsan_encode_value): Call mark_addressable on the
+	temporary.
+
+2017-03-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/79821
+	* dwarf2out.h (dw_vec_const): Change array type from unsigned char *
+	to void * for PCH reasons.
+	* dwarf2out.c (output_loc_operands, output_die): Cast
+	v.val_vec.array to unsigned char *.
+
+2017-03-06  John David Anglin  <danglin@gcc.gnu.org>
+
+	PR target/77850
+	* config/pa/pa-64.h (PAD_VARARGS_DOWN): Don't pad down complex and
+	vector types.
+
+2017-03-06  Vladimir Makarov  <vmakarov@redhat.com>
+
+	PR rtl-optimization/79571
+	* lra-constraints.c (process_alt_operands): Calculate static
+	reject and subtract it from overall when only addresses will be
+	reloaded.
+
+2017-03-06  Julia Koval  <julia.koval@intel.com>
+
+	PR target/79793
+	* config/i386/i386.c (ix86_minimum_incoming_stack_boundary): Set
+	incoming stack boundary to 128 for 64-bit targets.
+
+2017-03-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/79894
+	* tree-vectorizer.c (vectorize_loops): Set loop_vectorized_call
+	to NULL after folding it.
+
+2017-03-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/79824
+	* tree-vect-stmts.c (get_group_load_store_type): Fix alignment
+	check disabling peeling for gaps.
+
+2017-03-06  Toma Tabacu  <toma.tabacu@imgtec.com>
+
+	* doc/sourcebuild.texi (Effective-Target Keywords, Environment
+	attributes): Document gettimeofday.
+
+2017-03-06  Robin Dapp  <rdapp@linux.vnet.ibm.com>
+
+	* config/s390/s390.c (s390_option_override_internal): Set
+	PARAM_MIN_VECT_LOOP_BOUND
+
+2017-03-06  Robin Dapp  <rdapp@linux.vnet.ibm.com>
+
+	* config/s390/s390.c (s390_asm_output_function_label): Use nopr %r0.
+	* config/s390/s390.md: Likewise.
+
+2017-03-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/79812
+	* config/i386/sse.md (VI8F_256_512): Remove mode iterator.
+	(<avx2_avx512>_perm<mode>): Rename to ...
+	(avx2_perm<mode>): ... this.  Use VI8F_256 iterator instead
+	of VI8F_256_512.
+	(<avx512>_perm<mode>_mask): Rename to ...
+	(avx512vl_perm<mode>_mask): ... this.  Use VI8F_256 iterator instead
+	of VI8F_256_512.
+	(<avx2_avx512>_perm<mode>_1<mask_name>): Rename to ...
+	(avx2_perm<mode>_1<mask_name): ... this.  Use VI8F_256 iterator
+	instead of VI8F_256_512.
+	(avx512f_perm<mode>): New define_expand.
+	(avx512f_perm<mode>_mask): Likewise.
+	(avx512f_perm<mode>_1<mask_name>): New define_insn.
+	(<avx512>_vec_dup<mode>_1): Fix up vec_select mode.
+
+2017-03-06  Prachi Godbole  <prachi.godbole@imgtec.com>
+
+	* config/mips/mips-msa.md (msa_fmax_a_<msafmt>, msa_fmin_a_<msafmt>,
+	msa_max_a_<msafmt>, msa_min_a_<msafmt>): Introduce mode interator for
+	if_then_else.
+	(smin<mode>3, smax<mode>3): Change operand print code from 'B' to 'E'.
+
+2017-03-06  Martin Liska  <mliska@suse.cz>
+
+	PR sanitize/79783
+	* asan.c (asan_expand_poison_ifn): Do not expand ASAN_POISON
+	when having a SSA NAME w/o VAR_DECL assigned to it.
+
+2017-03-06  Prachi Godbole  <prachi.godbole@imgtec.com>
+
+	* config/mips/mips-msa.md (msa_dotp_<su>_d, msa_dpadd_<su>_d,
+	msa_dpsub_<su>_d): Fix MODE for vec_select.
+
+2017-03-06  Prachi Godbole  <prachi.godbole@imgtec.com>
+
+	* config/mips/mips.c (mips_gen_const_int_vector): Change type of last
+	argument.
+	* config/mips/mips-protos.h (mips_gen_const_int_vector): Likewise.
+
+2017-03-06  Richard Biener  <rguenther@suse.de>
+
+	* lto-streamer.c (lto_check_version): Use %qs in diagnostics.
+	* plugin.c (register_plugin_info): Likewise.
+	* tree-chkp.c (chkp_make_static_const_bounds): Likewise.
+
+2017-03-05  Jakub Jelinek  <jakub@redhat.com>
+
+	* config/i386/sse.md (sse_storehps, sse_storelps,
+	avx_<castmode><avxsizesuffix>_<castmode>,
+	avx512f_<castmode><avxsizesuffix>_<castmode>,
+	avx512f_<castmode><avxsizesuffix>_256<castmode>): Require
+	in condition that at least one operand is not a MEM.
+
+2017-03-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/79805
+	* internal-fn.def (ATOMIC_BIT_TEST_AND_SET, ATOMIC_BIT_TEST_AND_RESET,
+	ATOMIC_BIT_TEST_AND_COMPLEMENT, ATOMIC_COMPARE_EXCHANGE): Remove
+	ECF_NOTHROW.
+	* gimple-fold.c (fold_builtin_atomic_compare_exchange): Set
+	gimple_call_nothrow_p flag based on whether original builtin can throw.
+	If it can, emit following stmts on the fallthrough edge.
+	* tree-ssa-ccp.c (optimize_atomic_bit_test_and): Similarly, except
+	don't create new bb if inserting just debug stmts on the edge, try to
+	insert them on the fallthru bb or just reset debug stmts.
+
+2017-03-03  Segher Boesssenkool  <segher@kernel.crashing.org>
+
+	PR target/43763
+	* config/rs6000/rs6000.c (rs6000_final_prescan_insn): Save and
+	restore recog_data (including the operand rtxes inside it) around
+	the call to get_insn_template.
+
+2017-03-03  Martin Sebor  <msebor@redhat.com>
+
+	PR tree-optimization/79699
+	* context.c (context::~context): Free MPFR caches to avoid
+	a memory leak on program exit.
+
+2017-03-03  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64.c (aarch64_float_const_representable_p):
+	Use wide_int::ulow () instead of .elt (0).
+
+2017-03-03  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.md (*pushtf): Change *roF constraint to *roC.
+	(*pushxf): Limit oF constraint to 32bit targets and add oC
+	constraint for 64bit targets.
+	(pushxf splitter): Use PUSH_ROUNDING to calculate stack adjustment.
+	(*pushdf): Change rmF constraint to rmC.
+
+2017-03-03  Martin Liska  <mliska@suse.cz>
+
+	* tree-ssa-loop-prefetch.c (pass_loop_prefetch::execute):
+	Remove unused variable.
+
+2017-03-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/79807
+	* config/i386/i386.c (ix86_expand_multi_arg_builtin): If target
+	is a memory operand, increase num_memory.
+	(ix86_expand_args_builtin): Likewise.
+
+2017-03-03  Jan Hubicka  <jh@suse.cz>
+
+	PR lto/79760
+	* ipa-devirt.c (maybe_record_node): Properly handle
+	__cxa_pure_virtual visibility.
+
+2017-03-03  Martin Liska  <mliska@suse.cz>
+
+	PR tree-optimization/79803
+	* tree-ssa-loop-prefetch.c (tree_ssa_prefetch_arrays): Remove
+	assert.
+	(pass_loop_prefetch::execute): Disabled optimization if an
+	assumption about L1 cache size is not met.
+
+2017-03-03  Martin Liska  <mliska@suse.cz>
+
+	PR rtl-optimization/79574
+	* gcse.c (struct gcse_expr): Use HOST_WIDE_INT instead of int.
+	(hash_scan_set): Likewise.
+	(dump_hash_table): Likewise.
+	(hoist_code): Likewise.
+
+2017-03-03  Richard Biener  <rguenther@suse.de>
+
+	* fixed-value.c (fixed_from_string): Restore use of elt (1)
+	in place of uhigh ().
+	(fixed_convert_from_real): Likewise.
+
+2017-03-03  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/79514
+	* config/i386/i386.md (*pushxf_rounded): Use Pmode instead of DImode.
+
+2017-03-03  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/79818
+	* match.pd ( X +- C1 CMP C2 -> X CMP C2 -+ C1): Add missing
+	TYPE_OVERFLOW_UNDEFINED check.
+
+2017-03-02  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+
+	* config/rs6000/vector.md (vector_ne_<mode>_p): Correct operand
+	numbers.
+	(vector_ae_<mode>_p): Likewise.
+	(vector_nez_<mode>_p): Likewise.
+	(vector_ne_v2di_p): Likewise.
+	(vector_ae_v2di_p): Likewise.
+	(vector_ne_<mode>_p): Likewise.
+	* config/rs6000/vsx.md (vsx_tsqrt<mode>2_fg): Correct operand
+	numbers.
+	(vsx_tsqrt<mode>2_fe): Likewise.
+
+2017-03-02  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/79514
+	* config/i386/i386.md (*pushxf_rounded): New insn_and_split pattern.
+
+2017-03-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/79780
+	* cprop.c (one_cprop_pass): When second and further conditional trap
+	in a single basic block is turned into an unconditional trap, turn it
+	into a deleted note to avoid RTL verification failures.
+
+2017-03-02  Richard Biener  <rguenther@suse.de>
+
+	* fold-const.c (const_binop): Use ulow () instead of elt (0).
+
+2017-03-02  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/79345
+	PR c++/42000
+	* tree-ssa-alias.c (walk_aliased_vdefs_1): Take a limit
+	param and abort the walk, returning -1 if it is hit.
+	(walk_aliased_vdefs): Take a limit param and pass it on.
+	* tree-ssa-alias.h (walk_aliased_vdefs): Add a limit param,
+	defaulting to 0 and return a signed int.
+	* tree-ssa-uninit.c (struct check_defs_data): New struct.
+	(check_defs): New helper.
+	(warn_uninitialized_vars): Use walk_aliased_vdefs to warn
+	about uninitialized memory.
+	* fixed-value.c (fixed_from_string): Use ulow/uhigh to avoid
+	bogus uninitialized warning.
+	(fixed_convert_from_real): Likewise.
+
+2017-03-02  Bin Cheng  <bin.cheng@arm.com>
+
+	PR tree-optimization/66768
+	* tree-ssa-loop-ivopts.c (find_interesting_uses_address): Skip addr
+	iv_use if base object can't be determined.
+
+2017-03-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/79345
+	* gensupport.h (struct pattern_stats): Add min_scratch_opno field.
+	* gensupport.c (get_pattern_stats_1) <case MATCH_SCRATCH>: Update it.
+	(get_pattern_stats): Initialize it.
+	* genemit.c (gen_expand): Verify match_scratch numbers come after
+	match_operand/match_dup numbers.
+	* config/i386/i386.md (<s>mul<mode>3_highpart): Swap match_dup and
+	match_scratch numbers.
+	* config/i386/sse.md (avx2_gathersi<mode>, avx2_gatherdi<mode>):
+	Likewise.
+	* config/s390/s390.md (trunctdsd2): Likewise.
+
+2017-03-02  Richard Biener  <rguenther@suse.de>
+
+	* wide-int.h (wide_int_storage::operator=): Implement in terms
+	of wi::copy.
+
+2017-03-02  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/79777
+	* tree-ssa-pre.c (eliminate_insert): Give up if we simplify
+	the to insert expression to sth existing.
+
+2017-03-01  Martin Sebor  <msebor@redhat.com>
+
+	PR middle-end/79692
+	* gimple-ssa-sprintf.c
+	(directive::known_width_and_precision): New function.
+	(format_integer): Use it.
+	(get_mpfr_format_length): Consider the full range of precision
+	when computing %g output with the # flag.  Set the likely byte
+	count to 3 rather than 1 when precision is indeterminate.
+	(format_floating): Correct the lower bound of precision.
+
+2017-03-01  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+
+	* doc/invoke.texi: Document default code model for 64-bit Linux.
+
+2017-03-01  Aaron Sawdey  <acsawdey@linux.vnet.ibm.com>
+
+	PR target/79752
+	* config/rs6000/rs6000.md (peephole2 for udiv/umod): Should emit
+	udiv rather than div since input pattern is unsigned.
+
 2017-03-01  Uros Bizjak  <ubizjak@gmail.com>
 
 	* config/i386/i386.c (print_reg): Warn for values of
@@ -1956,7 +2307,7 @@
 	scalar_stmt_cost and vec_stmt_cost.
 
 2017-02-01  Torvald Riegel  <triegel@redhat.com>
-            Richard Henderson  <rth@redhat.com>
+	    Richard Henderson  <rth@redhat.com>
 
 	* builtins.c (fold_builtin_atomic_always_lock_free): Make "lock-free"
 	conditional on existance of a fast atomic load.
@@ -2257,9 +2608,9 @@
 2017-01-27  Richard Earnshaw  <rearnsha@arm.com>
 
 	PR target/79239
-        * arm.c (arm_option_override): Don't call build_target_option_node
-        until after doing all option overrides.
-        (arm_valid_target_attribute_tree): Likewise.
+	* arm.c (arm_option_override): Don't call build_target_option_node
+	until after doing all option overrides.
+	(arm_valid_target_attribute_tree): Likewise.
 
 2017-01-27  Martin Liska  <mliska@suse.cz>
 

@@ -5732,6 +5732,9 @@ redeclare_class_template (tree type, tree parms, tree cons)
 	  gcc_assert (DECL_CONTEXT (parm) == NULL_TREE);
 	  DECL_CONTEXT (parm) = tmpl;
 	}
+
+      if (TREE_CODE (parm) == TYPE_DECL)
+	TEMPLATE_TYPE_PARM_FOR_CLASS (TREE_TYPE (parm)) = true;
     }
 
   // Cannot redeclare a class template with a different set of constraints.
@@ -14638,6 +14641,15 @@ tsubst_copy (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	     have to substitute this with one having context `D<int>'.  */
 
 	  tree context = tsubst (DECL_CONTEXT (t), args, complain, in_decl);
+	  if (dependent_scope_p (context))
+	    {
+	      /* When rewriting a constructor into a deduction guide, a
+		 non-dependent name can become dependent, so memtmpl<args>
+		 becomes context::template memtmpl<args>.  */
+	      tree type = tsubst (TREE_TYPE (t), args, complain, in_decl);
+	      return build_qualified_name (type, context, DECL_NAME (t),
+					   /*template*/true);
+	    }
 	  return lookup_field (context, DECL_NAME(t), 0, false);
 	}
       else
@@ -16620,6 +16632,14 @@ tsubst_copy_and_build (tree t,
 	  targs = tsubst_template_args (targs, args, complain, in_decl);
 	if (targs == error_mark_node)
 	  return error_mark_node;
+
+	if (TREE_CODE (templ) == SCOPE_REF)
+	  {
+	    tree name = TREE_OPERAND (templ, 1);
+	    tree tid = lookup_template_function (name, targs);
+	    TREE_OPERAND (templ, 1) = tid;
+	    return templ;
+	  }
 
 	if (variable_template_p (templ))
 	  RETURN (lookup_and_finish_template_variable (templ, targs, complain));
@@ -24846,6 +24866,35 @@ deduction_guide_p (const_tree fn)
   return false;
 }
 
+/* True if FN is the copy deduction guide, i.e. A(A)->A.  */
+
+bool
+copy_guide_p (const_tree fn)
+{
+  gcc_assert (deduction_guide_p (fn));
+  if (!DECL_ARTIFICIAL (fn))
+    return false;
+  tree parms = FUNCTION_FIRST_USER_PARMTYPE (DECL_TI_TEMPLATE (fn));
+  return (TREE_CHAIN (parms) == void_list_node
+	  && same_type_p (TREE_VALUE (parms), TREE_TYPE (DECL_NAME (fn))));
+}
+
+/* True if FN is a guide generated from a constructor template.  */
+
+bool
+template_guide_p (const_tree fn)
+{
+  gcc_assert (deduction_guide_p (fn));
+  if (!DECL_ARTIFICIAL (fn))
+    return false;
+  if (tree ctor = DECL_ABSTRACT_ORIGIN (fn))
+    {
+      tree tmpl = DECL_TI_TEMPLATE (ctor);
+      return PRIMARY_TEMPLATE_P (tmpl);
+    }
+  return false;
+}
+
 /* OLDDECL is a _DECL for a template parameter.  Return a similar parameter at
    LEVEL:INDEX, using tsubst_args and complain for substitution into non-type
    template parameter types.  Note that the handling of template template
@@ -25092,6 +25141,8 @@ build_deduction_guide (tree ctor, tree outer_args, tsubst_flags_t complain)
   TREE_TYPE (ded_tmpl) = TREE_TYPE (ded_fn);
   DECL_TEMPLATE_INFO (ded_fn) = build_template_info (ded_tmpl, targs);
   DECL_PRIMARY_TEMPLATE (ded_tmpl) = ded_tmpl;
+  if (DECL_P (ctor))
+    DECL_ABSTRACT_ORIGIN (ded_fn) = ctor;
   if (ci)
     set_constraints (ded_tmpl, ci);
 
@@ -25144,8 +25195,7 @@ do_class_deduction (tree ptype, tree tmpl, tree init, int flags,
       type = TREE_TYPE (most_general_template (tmpl));
     }
 
-  bool saw_default = false;
-  bool saw_copy = false;
+  bool saw_ctor = false;
   if (CLASSTYPE_METHOD_VEC (type))
     // FIXME cache artificial deduction guides
     for (tree fns = CLASSTYPE_CONSTRUCTORS (type); fns; fns = OVL_NEXT (fns))
@@ -25154,25 +25204,15 @@ do_class_deduction (tree ptype, tree tmpl, tree init, int flags,
 	tree guide = build_deduction_guide (fn, outer_args, complain);
 	cands = ovl_cons (guide, cands);
 
-	tree parms = FUNCTION_FIRST_USER_PARMTYPE (fn);
-	if (sufficient_parms_p (parms))
-	  saw_default = true;
-	if (parms && sufficient_parms_p (TREE_CHAIN (parms)))
-	  {
-	    tree pt = TREE_VALUE (parms);
-	    if (TREE_CODE (pt) == REFERENCE_TYPE
-		&& (same_type_ignoring_top_level_qualifiers_p
-		    (TREE_TYPE (pt), type)))
-	      saw_copy = true;
-	  }
+	saw_ctor = true;
       }
 
-  if (!saw_default && args->length() == 0)
+  if (!saw_ctor && args->length() == 0)
     {
       tree guide = build_deduction_guide (type, outer_args, complain);
       cands = ovl_cons (guide, cands);
     }
-  if (!saw_copy && args->length() == 1)
+  if (args->length() == 1)
     {
       tree guide = build_deduction_guide (build_reference_type (type),
 					  outer_args, complain);
