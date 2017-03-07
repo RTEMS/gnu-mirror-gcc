@@ -88,6 +88,8 @@ extern TFtype __floatunsikf_sw (USItype_ppc);
 extern TFtype __floatundikf_sw (UDItype_ppc);
 extern IBM128_TYPE __extendkftf2_sw (TFtype);
 extern TFtype __trunctfkf2_sw (IBM128_TYPE);
+extern TCtype __mulkc3_sw (TFtype, TFtype, TFtype, TFtype);
+extern TCtype __divkc3_sw (TFtype, TFtype, TFtype, TFtype);
 
 #ifdef _ARCH_PPC64
 /* We do not provide ifunc resolvers for __fixkfti, __fixunskfti, __floattikf,
@@ -128,6 +130,8 @@ extern TFtype __floatunsikf_hw (USItype_ppc);
 extern TFtype __floatundikf_hw (UDItype_ppc);
 extern IBM128_TYPE __extendkftf2_hw (TFtype);
 extern TFtype __trunctfkf2_hw (IBM128_TYPE);
+extern TCtype __mulkc3_hw (TFtype, TFtype, TFtype, TFtype);
+extern TCtype __divkc3_hw (TFtype, TFtype, TFtype, TFtype);
 
 /* Ifunc function declarations, to automatically switch between software
    emulation and hardware support.  */

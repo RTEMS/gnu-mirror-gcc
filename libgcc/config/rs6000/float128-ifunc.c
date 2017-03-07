@@ -120,6 +120,8 @@ static void *__floatunsikf_resolve (void);
 static void *__floatundikf_resolve (void);
 static void *__extendkftf2_resolve (void);
 static void *__trunctfkf2_resolve (void);
+static void *__mulkc3_resolve (void);
+static void *__divkc3_resolve (void);
 
 static void *
 __addkf3_resolve (void)
@@ -280,6 +282,17 @@ __ltkf2_resolve (void)
   return (void *) SW_OR_HW (__lekf2_sw, __lekf2_hw);
 }
 
+static void *
+__mulkc3_resolve (void)
+{
+  return (void *) SW_OR_HW (__mulkc3_sw, __mulkc3_hw);
+}
+
+static void *
+__divkc3_resolve (void)
+{
+  return (void *) SW_OR_HW (__divkc3_sw, __divkc3_hw);
+}
 
 
 /* Ifunc definitions.  */
@@ -360,3 +373,9 @@ IBM128_TYPE __extendkftf2 (TFtype)
 
 TFtype __trunctfkf2 (IBM128_TYPE)
   __attribute__ ((__ifunc__ ("__trunctfkf2_resolve")));
+
+TCtype __mulkc3 (TFtype, TFtype, TFtype, TFtype)
+  __attribute__ ((__ifunc__ ("__mulkc3_resolve")));
+
+TCtype __divkc3 (TFtype, TFtype, TFtype, TFtype)
+  __attribute__ ((__ifunc__ ("__divkc3_resolve")));

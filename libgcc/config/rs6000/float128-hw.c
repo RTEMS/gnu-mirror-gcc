@@ -205,3 +205,11 @@ __trunctfkf2_hw (IBM128_TYPE value)
   CVT_IBM128_TO_FLOAT128 (ret, value);
   return ret;
 }
+
+/* __mulkc3 does complex multiplication.  */
+#define __mulkc3 __mulkc3_hw
+#include <_mulkc3.h>
+
+/* __divkc3 does complex division.  */
+#define __divkc3 __divkc3_hw
+#include <_divkc3.h>

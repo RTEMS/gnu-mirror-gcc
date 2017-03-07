@@ -23,21 +23,20 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 /* This is a temporary specialization of code from libgcc/libgcc2.c.  */
 
-typedef float KFtype __attribute__ ((mode (KF)));
-typedef __complex float KCtype __attribute__ ((mode (KC)));
-
 #define COPYSIGN(x,y) __builtin_copysignq (x, y)
-#define INFINITY __builtin_infq ()
 #define FABS __builtin_fabsq
 #define isnan __builtin_isnan
 #define isinf __builtin_isinf
 #define isfinite __builtin_isfinite
 
-KCtype
-__divkc3 (KFtype a, KFtype b, KFtype c, KFtype d)
+TCtype
+__divkc3 (TFtype a, TFtype b, TFtype c, TFtype d)
 {
-  KFtype denom, ratio, x, y;
-  KCtype res;
+  TFtype denom, ratio, x, y;
+  TCtype res;
+  TFtype one = 1.0;
+  TFtype zero = 0.0;
+  TFtype infinity = __builtin_infq ();
 
   /* ??? We can get better behavior from logarithmic scaling instead of
      the division.  But that would mean starting to link libgcc against
@@ -62,24 +61,24 @@ __divkc3 (KFtype a, KFtype b, KFtype c, KFtype d)
      are nonzero/zero, infinite/finite, and finite/infinite.  */
   if (isnan (x) && isnan (y))
     {
-      if (c == 0.0 && d == 0.0 && (!isnan (a) || !isnan (b)))
+      if (c == zero && d == zero && (!isnan (a) || !isnan (b)))
 	{
-	  x = COPYSIGN (INFINITY, c) * a;
-	  y = COPYSIGN (INFINITY, c) * b;
+	  x = COPYSIGN (infinity, c) * a;
+	  y = COPYSIGN (infinity, c) * b;
 	}
       else if ((isinf (a) || isinf (b)) && isfinite (c) && isfinite (d))
 	{
-	  a = COPYSIGN (isinf (a) ? 1 : 0, a);
-	  b = COPYSIGN (isinf (b) ? 1 : 0, b);
-	  x = INFINITY * (a * c + b * d);
-	  y = INFINITY * (b * c - a * d);
+	  a = COPYSIGN (isinf (a) ? one : zero, a);
+	  b = COPYSIGN (isinf (b) ? one : zero, b);
+	  x = infinity * (a * c + b * d);
+	  y = infinity * (b * c - a * d);
 	}
       else if ((isinf (c) || isinf (d)) && isfinite (a) && isfinite (b))
 	{
-	  c = COPYSIGN (isinf (c) ? 1 : 0, c);
-	  d = COPYSIGN (isinf (d) ? 1 : 0, d);
-	  x = 0.0 * (a * c + b * d);
-	  y = 0.0 * (b * c - a * d);
+	  c = COPYSIGN (isinf (c) ? one : zero, c);
+	  d = COPYSIGN (isinf (d) ? one : zero, d);
+	  x = zero * (a * c + b * d);
+	  y = zero * (b * c - a * d);
 	}
     }
 

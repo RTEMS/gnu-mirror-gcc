@@ -1,3 +1,32 @@
+2017-03-07  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/_mulkc3.c: Rename _mulkc3.c to _mulkc3.h in order
+	to compile it for both float128 software and hardware support.
+	* config/rs6000/_mulkc3.h: Likewise.
+	* config/rs6000/_divkc3.c: Rename _divkc3.c to _divkc3.h in order
+	to compile it for both float128 software and hardware support.
+	* config/rs6000/_divkc3.h: Likewise.
+	* config/rs6000/float128-hw.c (__mulkc3_hw): Build hardware
+	versions of IEEE 128-bit floating point complex multiply and
+	divide.
+	(__divkc3_hw): Likewise.
+	* config/rs6000/float128-ifunc.c (__mulkc3_resolve): Likewise.
+	(__divkc3_resolve): Likewise.
+	(__mulkc3): Likewise.
+	(__divkc3): Likewise.
+	* config/rs6000/quad-float128.h (__mulkc3_sw): Likewise.
+	(__divkc3_sw): Likewise.
+	(__mulkc3_hw): Likewise.
+	(__divkc3_hw): Likewise.
+	* config/rs6000/t-float128 (fp128_ppc_funcs): Move _mulkc3 to
+	_mulkc3_sw and _divkc3 to _divkc3_sw.
+	(_mulkc3-sw_s$(objext)): Add dependency on _mulkc3.h and
+	_divkc3.h.
+	(_mulkc3-sw(objext)): Likewise.
+	(_divkc3-sw_s$(objext)): Likewise.
+	(_divkc3-sw(objext)): Likewise.
+	* config/rs6000/t-float128-hw (fp128_hw_obj): Likewise.
+
 2017-02-13  Segher Boessenkool  <segher@kernel.crashing.org>
 
         * configure.ac (test for libgcc_cv_powerpc_float128): Temporarily

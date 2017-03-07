@@ -23,19 +23,18 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 /* This is a temporary specialization of code from libgcc/libgcc2.c.  */
 
-typedef float KFtype __attribute__ ((mode (KF)));
-typedef __complex float KCtype __attribute__ ((mode (KC)));
-
 #define COPYSIGN(x,y) __builtin_copysignq (x, y)
-#define INFINITY __builtin_infq ()
 #define isnan __builtin_isnan
 #define isinf __builtin_isinf
 
-KCtype
-__mulkc3 (KFtype a, KFtype b, KFtype c, KFtype d)
+TCtype
+__mulkc3 (TFtype a, TFtype b, TFtype c, TFtype d)
 {
-  KFtype ac, bd, ad, bc, x, y;
-  KCtype res;
+  TFtype ac, bd, ad, bc, x, y;
+  TCtype res;
+  TFtype one = 1.0;
+  TFtype zero = 0.0;
+  TFtype infinity = __builtin_infq ();
 
   ac = a * c;
   bd = b * d;
@@ -53,37 +52,56 @@ __mulkc3 (KFtype a, KFtype b, KFtype c, KFtype d)
 	{
 	  /* z is infinite.  "Box" the infinity and change NaNs in
 	     the other factor to 0.  */
-	  a = COPYSIGN (isinf (a) ? 1 : 0, a);
-	  b = COPYSIGN (isinf (b) ? 1 : 0, b);
-	  if (isnan (c)) c = COPYSIGN (0, c);
-	  if (isnan (d)) d = COPYSIGN (0, d);
+	  a = COPYSIGN (isinf (a) ? one : zero, a);
+	  b = COPYSIGN (isinf (b) ? one : zero, b);
+	  if (isnan (c))
+	    c = COPYSIGN (zero, c);
+
+	  if (isnan (d))
+	    d = COPYSIGN (zero, d);
+
           recalc = 1;
 	}
+
      if (isinf (c) || isinf (d))
 	{
 	  /* w is infinite.  "Box" the infinity and change NaNs in
 	     the other factor to 0.  */
-	  c = COPYSIGN (isinf (c) ? 1 : 0, c);
-	  d = COPYSIGN (isinf (d) ? 1 : 0, d);
-	  if (isnan (a)) a = COPYSIGN (0, a);
-	  if (isnan (b)) b = COPYSIGN (0, b);
+	  c = COPYSIGN (isinf (c) ? one : zero, c);
+	  d = COPYSIGN (isinf (d) ? one : zero, d);
+	  if (isnan (a))
+	    a = COPYSIGN (zero, a);
+
+	  if (isnan (b))
+	    b = COPYSIGN (zero, b);
+
 	  recalc = 1;
 	}
+
      if (!recalc
 	  && (isinf (ac) || isinf (bd)
 	      || isinf (ad) || isinf (bc)))
 	{
 	  /* Recover infinities from overflow by changing NaNs to 0.  */
-	  if (isnan (a)) a = COPYSIGN (0, a);
-	  if (isnan (b)) b = COPYSIGN (0, b);
-	  if (isnan (c)) c = COPYSIGN (0, c);
-	  if (isnan (d)) d = COPYSIGN (0, d);
+	  if (isnan (a))
+	    a = COPYSIGN (zero, a);
+
+	  if (isnan (b))
+	    b = COPYSIGN (zero, b);
+
+	  if (isnan (c))
+	    c = COPYSIGN (zero, c);
+
+	  if (isnan (d))
+	    d = COPYSIGN (zero, d);
+
 	  recalc = 1;
 	}
+
       if (recalc)
 	{
-	  x = INFINITY * (a * c - b * d);
-	  y = INFINITY * (a * d + b * c);
+	  x = infinity * (a * c - b * d);
+	  y = infinity * (a * d + b * c);
 	}
     }
 

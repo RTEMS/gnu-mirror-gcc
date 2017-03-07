@@ -30,6 +30,8 @@ FP128_CFLAGS_HW		 = -Wno-type-limits -mvsx -mfloat128 \
 
 $(fp128_hw_obj)		 : INTERNAL_CFLAGS += $(FP128_CFLAGS_HW)
 $(fp128_hw_obj)		 : $(srcdir)/config/rs6000/t-float128-hw
+$(fp128_hw_obj)		 : $(srcdir)/config/rs6000/_mulkc3.h
+$(fp128_hw_obj)		 : $(srcdir)/config/rs6000/_divkc3.h
 
 $(fp128_ifunc_obj)	 : INTERNAL_CFLAGS += $(FP128_CFLAGS_SW)
 $(fp128_ifunc_obj)	 : $(srcdir)/config/rs6000/t-float128-hw
