@@ -1,3 +1,8 @@
+2017-02-13  Segher Boessenkool  <segher@kernel.crashing.org>
+
+        * config/rs6000/rs6000.c (rs6000_option_override_internal): Disallow
+        -mfloat128-hardware without -m64.
+
 2017-03-06   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 245938

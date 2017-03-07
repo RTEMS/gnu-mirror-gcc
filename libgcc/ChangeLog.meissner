@@ -1,3 +1,12 @@
+2017-02-13  Segher Boessenkool  <segher@kernel.crashing.org>
+
+        * configure.ac (test for libgcc_cv_powerpc_float128): Temporarily
+        modify CFLAGS.  Add -mabi=altivec.
+        (test for libgcc_cv_powerpc_float128_hw): Add -mpower9-vector and
+        -mfloat128-hardware to the CFLAGS.  Fix syntax error in the C snippet.
+        * configure: Regenerate.
+        * config.in: Regenerate.
+
 2017-03-06   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 245938
