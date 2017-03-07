@@ -1,5 +1,9 @@
 2017-03-07  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	Merge up to 245960.
+
+2017-03-07  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/_mulkc3.c: Rename _mulkc3.c to _mulkc3.h in order
 	to compile it for both float128 software and hardware support.
 	* config/rs6000/_mulkc3.h: Likewise.

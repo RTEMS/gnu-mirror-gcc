@@ -1,3 +1,56 @@
+2017-03-07  Marek Polacek  <polacek@redhat.com>
+
+	PR middle-end/79809
+	* gimple-ssa-warn-alloca.c (pass_walloca::gate): Use HOST_WIDE_INT.
+	(alloca_call_type): Likewise.
+
+2017-03-07  Martin Liska  <mliska@suse.cz>
+
+	* gcov.c (process_args): Put comment to correct location.
+
+2017-03-07  Martin Liska  <mliska@suse.cz>
+
+	PR middle-end/68270
+	* tree-chkp.c (chkp_may_narrow_to_field): Add new argument ref.
+	Use array_at_struct_end_p instead of DECL_CHAIN (field).
+	(chkp_narrow_bounds_for_field): Likewise.
+	(chkp_parse_array_and_component_ref): Pass one more argument to
+	call.
+
+2017-03-07  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-loop-manip.c (slpeel_add_loop_guard): Preserve
+	preheaders.
+
+2017-03-07  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* config/i386/i386.c (ix86_local_alignment): Align most aggregates
+	of 16 bytes and more to 16 bytes, not those of 16 bits and more.
+
+2017-03-07  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR c/79855
+	* params.def (PARAM_STORE_MERGING_ALLOW_UNALIGNED): Add full stop
+	to end of description.
+	(PARAM_MAX_STORES_TO_MERGE): Likewise.
+
+2017-03-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/79901
+	* config/i386/sse.md (*avx512bw_<code><mode>3<mask_name>): Renamed to
+	...
+	(*avx512f_<code><mode>3<mask_name>): ... this.
+	(<code><mode>3 with maxmin code iterator): Use VI8_AVX2_AVX512F
+	iterator instead of VI8_AVX2_AVX512BW.
+
+	PR rtl-optimization/79901
+	* expr.c (expand_expr_real_2): For vector MIN/MAX, if there is no
+	min/max expander, expand it using expand_vec_cond_expr.
+
+	PR sanitizer/79897
+	* ubsan.c (ubsan_encode_value): Call mark_addressable on the
+	temporary.
+
 2017-03-06  Jakub Jelinek  <jakub@redhat.com>
 
 	PR c++/79821

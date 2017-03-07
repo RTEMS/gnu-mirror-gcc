@@ -1,3 +1,27 @@
+2017-03-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/79834
+	* c-c++-common/goacc/pragma_context.c (f2): Adjust expected
+	diagnostics.
+
+2017-03-07  Marek Polacek  <polacek@redhat.com>
+
+	PR middle-end/79809
+	* g++.dg/Walloca1.C: New test.
+
+2017-03-07  Martin Liska  <mliska@suse.cz>
+
+	PR middle-end/68270
+	* g++.dg/pr68270.C: New test.
+
+2017-03-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/79901
+	* gcc.target/i386/pr79901.c: New test.
+
+	PR sanitizer/79897
+	* c-c++-common/ubsan/pr79897.c: New test.
+
 2017-03-06  Vladimir Makarov  <vmakarov@redhat.com>
 
 	PR rtl-optimization/79571
