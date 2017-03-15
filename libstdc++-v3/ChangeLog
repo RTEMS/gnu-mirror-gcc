@@ -1,3 +1,160 @@
+2017-03-15  Xi Ruoyao  <ryxi@stu.xidian.edu.cn>
+
+	PR libstdc++/62045
+	* include/ext/pb_ds/qdetail/binary_heap_/binary_heap_.hpp
+	(is_heap): Remove.
+	(push_heap): Remove the wrong checking using is_heap.
+	(make_heap): Remove the assertion using is_heap.
+	* include/ext/pb_ds/detail/binary_heap_/insert_fn_imps.hpp
+	(modify): Ditto.
+	(resize_for_insert_if_needed): Add PB_DS_ASSERT_VALID after
+	calling make_heap.
+
+2017-03-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/62045
+	* testsuite/ext/pb_ds/regression/priority_queue_binary_heap-62045.cc:
+	New test.
+	* testsuite/ext/pb_ds/regression/priority_queues.cc: Fix copy&paste
+	error in comment.
+
+2017-03-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* acinclude.m4 (GLIBCXX_CHECK_S_ISREG_OR_S_IFREG): Fix typo in
+	comment.
+	* config.h.in: Regenerate.
+	* configure: Regenerate.
+	* doc/Makefile.in: Regenerate.
+
+2017-03-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/79162
+	* include/bits/basic_string.h [_GLIBCXX_USE_CXX11_ABI]
+	(basic_string<C,T,A>::operator=(basic_string_view<C,T>)): Replace
+	with a constrained template.
+	[!_GLIBCXX_USE_CXX11_ABI]
+	(basic_string<C,T,A>::operator=(basic_string_view<C,T>)): Likewise.
+	* testsuite/21_strings/basic_string/cons/char/79162.cc: New test.
+	* testsuite/21_strings/basic_string/cons/wchar_t/79162.cc: New test.
+
+2017-03-13  Ville Voutilainen  <ville.voutilainen@gmail.com>
+
+	PR libstdc++/80034
+	* include/bits/list.tcc (merge(list&&)): Use const for the size_t
+	in the catch-block.
+	(merge(list&&, _StrictWeakOrdering)): Likewise.
+	* testsuite/23_containers/list/operations/80034.cc: New.
+
+2017-03-13  Ville Voutilainen  <ville.voutilainen@gmail.com>
+
+	Implement LWG 2806, Base class of bad_optional_access.
+	* include/std/optional (bad_optional_access):
+	Derive from std::exception.
+	(bad_optional_access::bad_optional_access): Adjust.
+	(bad_optional_access::what): New.
+	(__throw_bad_optional_access(const char*)):
+	Remove the parameter and adjust calls.
+	* testsuite/20_util/optional/cons/value_neg.cc: Adjust.
+	* testsuite/20_util/optional/typedefs.cc: Likewise.
+
+2017-03-12  Ville Voutilainen  <ville.voutilainen@gmail.com>
+
+	Implement LWG 2934, optional<const T> doesn't compare with T.
+	* include/std/optional
+	(operator==(const optional<_Tp>&, const optional<_Tp>&)):
+	Turn into operator==(const optional<_Tp>&, const optional<_Up>&).
+	(operator!=(const optional<_Tp>&, const optional<_Tp>&)):
+	Turn into operator!=(const optional<_Tp>&, const optional<_Up>&).
+	(operator<(const optional<_Tp>&, const optional<_Tp>&)):
+	Turn into operator<(const optional<_Tp>&, const optional<_Up>&.
+	(operator>(const optional<_Tp>&, const optional<_Tp>&)):
+	Turn into operator>(const optional<_Tp>&, const optional<_Up>&.
+	(operator<=(const optional<_Tp>&, const optional<_Tp>&)):
+	Turn into operator<=(const optional<_Tp>&, const optional<_Up>&).
+	(operator>=(const optional<_Tp>&, const optional<_Tp>&)):
+	Turn into operator>=(const optional<_Tp>&, const optional<_Up>&).
+	(operator==(const optional<_Tp>&, const _Tp&)):
+	Turn into operator==(const optional<_Tp>&, const _Up&).
+	(operator==(const _Tp&, const optional<_Tp>&)):
+	Turn into operator==(const _Up&, const optional<_Tp>&).
+	(operator!=(const optional<_Tp>&, const _Tp&)):
+	Turn into operator!=(const optional<_Tp>&, const _Up&).
+	(operator!=(const _Tp&, const optional<_Tp>&)):
+	Turn into operator!=(const _Up&, const optional<_Tp>&).
+	(operator<(const optional<_Tp>&, const _Tp&)):
+	Turn into operator<(const optional<_Tp>&, const _Up&).
+	(operator<(const _Tp&, const optional<_Tp>&)):
+	Turn into operator<(const _Up&, const optional<_Tp>&).
+	(operator>(const optional<_Tp>&, const _Tp&)):
+	Turn into operator>(const optional<_Tp>&, const _Up&).
+	(operator>(const _Tp&, const optional<_Tp>&)):
+	Turn into operator>(const _Up&, const optional<_Tp>&).
+	(operator<=(const optional<_Tp>&, const _Tp&)):
+	Turn into operator<=(const optional<_Tp>&, const _Up&).
+	(operator<=(const _Tp&, const optional<_Tp>&)):
+	Turn into operator<=(const _Up&, const optional<_Tp>&).
+	(operator>=(const optional<_Tp>&, const _Tp&)):
+	Turn into operator>=(const optional<_Tp>&, const _Up&).
+	(operator>=(const _Tp&, const optional<_Tp>&)):
+	Turn into operator>=(const _Up&, const optional<_Tp>&).
+	* testsuite/20_util/optional/relops/7.cc: New.
+
+2017-03-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/17_intro/names.cc: Undefine macros that clash with
+	identifiers in AIX system headers.
+
+	* include/bits/invoke.h (__invoke): Use __invoke_result instead of
+	result_of, and __is_nothrow_invocable instead of
+	__is_nothrow_callable.
+	* include/bits/shared_ptr_base.h (__shared_ptr): Use __is_invocable
+	instead of __is_callable.
+	* include/std/functional (invoke): use invoke_result_t instead of
+	result_of_t and is_nothrow_invocable instead of is_nothrow_callable.
+	(_Not_fn): Use __invoke_result instead of result_of.
+	* include/std/type_traits (__result_of_memobj, __result_of_memfun):
+	Remove partial specializations for reference_wrapper types.
+	(__result_of_impl): Use __inv_unwrap to strip reference_wrapper.
+	(__invoke_result): Define replacement for result_of and then use it to
+	define result_of.
+	(__is_callable_impl, __is_callable, __is_nothrow_callable): Replace
+	with __is_invocable_impl, __is_invocable, and __is_nothrow_invocable
+	respectively.
+	(invoke_result, invoke_result_t): Define for C++17.
+	(is_callable, is_nothrow_callable): Replace with is_invocable,
+	is_invocable_r, is_nothrow_invocable, and is_nothrow_invocable_r.
+	(is_callable_v, is_nothrow_callable_v): Replace with is_invocable_v,
+	is_invocable_r_v, is_nothrow_invocable_v, and is_nothrow_invocable_r_v.
+	* include/std/variant (hash<variant<T...>>): Use is_nothrow_invocable_v
+	instead of is_nothrow_callable_v.
+	* testsuite/20_util/function_objects/invoke/59768.cc: Remove unused
+	main function.
+	* testsuite/20_util/function_objects/not_fn/1.cc: Use is_invocable
+	instead of is_callable.
+	* testsuite/20_util/is_callable/*: Rename directory and adjust tests
+	to use new traits.
+	* testsuite/20_util/is_notjrow_callable/*: Likewise.
+	* testsuite/20_util/optional/hash.cc: Use is_invocable_v instead of
+	is_callable.
+	* testsuite/20_util/variant/hash.cc: Likewise.
+
+2017-03-10  George Lander  <george.lander@arm.com>
+
+	* acinclude.m4 (glibcxx_cv_obsolete_isnan): Define
+	_GLIBCXX_INCLUDE_NEXT_C_HEADERS before including math.h.
+	* configure: Regenerate.
+
+2017-03-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/functional (_Not_fn): Define macro to simplify
+	repetitive function definitions.
+
+	* doc/xml/manual/status_cxx2017.xml: Document std::byte support.
+	* include/c_global/cstddef (std::byte): Define for C++17.
+	* testsuite/18_support/byte/global_neg.cc: New test.
+	* testsuite/18_support/byte/ops.cc: New test.
+	* testsuite/18_support/byte/requirements.cc: New test.
+
 2017-03-05  Jonathan Wakely  <jwakely@redhat.com>
 
 	* doc/xml/manual/status_cxx2017.xml: Document P0156R2 status.
