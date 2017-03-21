@@ -1,3 +1,437 @@
+2017-03-21  Alexandre Oliva <aoliva@redhat.com>
+
+	PR debug/63238
+	* dwarf2out.c (struct checksum_attributes): Add at_alignment.
+	(collect_checksum_attributes): Set it.
+	(die_checksum_ordered): Use it.
+
+2017-03-21  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+
+	PR tree-optimization/79908
+	* tree-stdarg.c (expand_ifn_va_arg_1): Revert the following
+	change: For a VA_ARG whose LHS has been cast away, use
+	force_gimple_operand to construct the side effects.
+
+2017-03-21  David Malcolm  <dmalcolm@redhat.com>
+
+	PR translation/80001
+	* omp-offload.c (oacc_loop_fixed_partitions): Make diagnostics
+	more amenable to translation.
+	(oacc_loop_auto_partitions): Likewise.
+
+2017-03-21  Marek Polacek  <polacek@redhat.com>
+	    Martin Sebor  <msebor@redhat.com>
+
+	PR tree-optimization/80109
+	* gimple-ssa-warn-alloca.c (alloca_call_type): Only call get_range_info
+	on INTEGRAL_TYPE_P.
+
+2017-03-21  Jakub Jelinek  <jakub@redhat.com>
+	    Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR target/80125
+	* combine.c (can_combine_p): Revert the 2017-03-20 change, only
+	check reg_used_between_p between insn and one of succ or succ2
+	depending on if succ is artificial insn not inserted into insn
+	stream.
+
+2017-03-21  Martin Liska  <mliska@suse.cz>
+
+	PR gcov-profile/80081
+	* Makefile.in: Add gcov-dump and fix installation of gcov-tool.
+	* doc/gcc.texi: Include gcov-dump stuff.
+	* doc/gcov-dump.texi: New file.
+
+2017-03-21  Toma Tabacu  <toma.tabacu@imgtec.com>
+
+	PR rtl-optimization/79150
+	* config/mips/mips.c (mips_block_move_loop): Emit a NOP after the
+	conditional jump, if the jump is the last insn of the loop.
+
+2017-03-21  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+            Richard Biener  <rguenth@suse.com>
+
+	PR tree-optimization/79908
+	* tree-stdarg.c (expand_ifn_va_arg_1): For a VA_ARG whose LHS has
+	been cast away, use force_gimple_operand to construct the side
+	effects.
+
+2017-03-21  Martin Liska  <mliska@suse.cz>
+
+	PR libfortran/79956
+	* simplify-rtx.c (simplify_immed_subreg): Initialize a variable
+	to NULL.
+
+2017-03-21  Brad Spengler <spender@grsecurity.net>
+
+	PR plugins/80094
+	* plugin.c (htab_hash_plugin): New function.
+	(add_new_plugin): Use it and adjust.
+	(parse_plugin_arg_opt): Adjust.
+	(init_one_plugin): Likewise.
+
+2017-03-21  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/80032
+	* gimplify.c (gimple_push_cleanup): Add force_uncond parameter,
+	if set force the cleanup to happen unconditionally.
+	(gimplify_target_expr): Push inserted clobbers with force_uncond
+	to avoid them being removed by control-dependent DCE.
+
+2017-03-21  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/80122
+	* tree-inline.c (copy_bb): Do not expans va-arg packs or
+	va_arg_pack_len when the inlined call stmt requires pack
+	expansion itself.
+	* tree-inline.h (struct copy_body_data): Make call_stmt a gcall *.
+
+2017-03-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/78158
+	* tsan.c (instrument_builtin_call): If the memory model argument
+	is not a constant, assume it is valid.
+
+	PR c/67338
+	* fold-const.c (round_up_loc): Negate divisor in unsigned type to
+	avoid UB.
+
+2017-03-20  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR rtl-optimization/79910
+	* combine.c (can_combine_p): Do not allow combining an I0 or I1
+	if its dest is used by an insn before I2 (other than the combined
+	insns themselves, which are properly handled already).
+
+2017-03-20  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	Revert:
+	2017-03-17  Bernd Schmidt  <bschmidt@redhat.com>
+
+	* combine.c (record_used_regs): New static function.
+	(try_combine): Handle situations where there is an additional
+	instruction between I2 and I3 which needs to have a LOG_LINK
+	updated.
+
+	Revert:
+	2017-03-17  Jim Wilson  <jim.wilson@linaro.org>
+
+	* combine.c (try_combine): Delete redundant i1 test.  Call
+	prev_nonnote_nondebug_insn instead of prev_nonnote_insn.
+
+2017-03-20  Aaron Sawdey  <acsawdey@linux.vnet.ibm.com>
+
+	PR target/80083
+	* config/rs6000/rs6000.md (*movsi_internal1): Fix constraints for
+	alternatives 13/14.
+
+2017-03-20  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+
+	PR tree-optimization/80054
+	* gimple-ssa-strength-reduction.c (all_phi_incrs_profitable): Fail
+	the optimization if a PHI or any of its arguments is not dominated
+	by the candidate's basis.  Use gphi* rather than gimple* as
+	appropriate.
+	(replace_profitable_candidates): Clean up a gimple* variable that
+	should be a gphi* variable.
+
+2017-03-20  Martin Sebor  <msebor@redhat.com>
+
+	PR c++/52477
+	* doc/extend.texi (attribute constructor): Document present limitation.
+
+2017-03-20  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	PR target/79963
+	* config/rs6000/altivec.h (vec_all_ne): Under __cplusplus__ and
+	__POWER9_VECTOR__ #ifdef control, change template definition to
+	use Power9-specific built-in function.
+	(vec_any_eq): Likewise.
+	* config/rs6000/vector.md (vector_ae_v2di_p): Change the flag used
+	to control outcomes from this test.
+	(vector_ae_<mode>p): For VEC_F modes, likewise.
+
+2017-03-20  Ian Lance Taylor  <iant@google.com>
+
+	* config/i386/i386.c (ix86_function_regparm): Save an extra
+	register for -fsplit-stack with DECL_STATIC_CHAIN.
+
+2017-03-17  Palmer Dabbelt  <palmer@dabbelt.com>
+
+	PR target/79912
+	* config/riscv/riscv.c (riscv_preferred_reload_class): Remove.
+	(TARGET_PREFERRED_RELOAD_CLASS): Likewise.
+
+2017-03-17  Palmer Dabbelt  <palmer@dabbelt.com>
+
+	* config/riscv/riscv.c (riscv_print_operand): Use "fence
+	iorw,ow".
+	* config/riscv/sync.mc (mem_thread_fence_1): Use "fence
+	iorw,iorw".
+
+2017-03-20  Marek Polacek  <polacek@redhat.com>
+
+	PR sanitizer/80063
+	* asan.c (DEF_SANITIZER_BUILTIN): Use do { } while (0).
+
+2017-03-20  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/80113
+	* graphite-isl-ast-to-gimple.c (copy_loop_phi_nodes): Do not
+	allocate extra SSA name for PHI def.
+	(add_close_phis_to_outer_loops): Likewise.
+	(add_close_phis_to_merge_points): Likewise.
+	(copy_loop_close_phi_args): Likewise.
+	(copy_cond_phi_nodes): Likewise.
+
+2017-03-20  Martin Liska  <mliska@suse.cz>
+
+	PR middle-end/79753
+	* tree-chkp.c (chkp_build_returned_bound): Do not build
+	returned bounds for a LHS that's not a BOUNDED_P type.
+
+2017-03-20  Martin Liska  <mliska@suse.cz>
+
+	PR target/79769
+	PR target/79770
+	* tree-chkp.c (chkp_find_bounds_1): Handle REAL_CST,
+	COMPLEX_CST and VECTOR_CST.
+
+2017-03-20  Andreas Krebbel  <krebbel@linux.vnet.ibm.com>
+
+	PR target/78857
+	* config/s390/s390.md ("cmp<mode>_ccs_0"): Add a clobber of the
+	target operand.  A new splitter adds the clobber statement in case
+	the target operand is dead anyway.
+
+2017-03-19  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/install.texi (Specific) <sparc-*-linux*>: No longer refer 
+	to age-old versions of binutils and glibc.
+
+2017-03-18  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* doc/contrib.texi (Contributors): Remove duplicate entry for myself.
+
+2017-03-18  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/contrib.texi (Contributors): Add Segher Boessenkool.
+
+2017-03-18  Gerald Pfeifer  <gerald@pfeifer.com>
+	
+	* doc/install.texi (Specific) <arm-*-eabi>: Remove old
+	requirement for binutils 2.13.
+
+2017-03-17  Jim Wilson  <jim.wilson@linaro.org>
+
+	* combine.c (try_combine): Delete redundant i1 test.  Call
+	prev_nonnote_nondebug_insn instead of prev_nonnote_insn.
+
+2017-03-17  Palmer Dabbelt  <palmer@dabbelt.com
+
+	* doc/install.texi (Specific) <riscv32-*-elf>: Add riscv32-*-elf,
+	riscv32-*-linux, riscv64-*-elf, riscv64-*-linux to the table of
+	contents.
+	<riscv64-*-elf>: Re-arrange section
+	<riscv32-*-elf>: Add a note about requiring binutils 2.28.
+	<riscv32-*-linux>: Likewise.
+	<riscv64-*-elf>: Likewise
+	<riscv64-*-linux>: Likewise.
+
+2017-03-17  Richard Earnshaw  <rearnsha@arm.com>
+
+	PR target/80052
+	* aarch64.opt(verbose-cost-dump): Fix typo.
+
+2017-03-17  Pat Haugen  <pthaugen@us.ibm.com>
+
+	PR target/79951
+	* config/rs6000/rs6000.md (copysign<mode>3_fcpsgn): Test
+	for VECTOR_UNIT_VSX_P (<MODE>mode) too.
+
+2017-03-17  Bernd Schmidt  <bschmidt@redhat.com>
+
+	* reload.c (find_reloads): When reloading a nonoffsettable address,
+	use RELOAD_OTHER for it and its address reloads.
+
+	PR rtl-optimization/79910
+	* combine.c (record_used_regs): New static function.
+	(try_combine): Handle situations where there is an additional
+	instruction between I2 and I3 which needs to have a LOG_LINK
+	updated.
+
+2017-03-17  Jeff Law  <law@redhat.com>
+
+	PR tree-optimization/71437
+	* tree-vrp.c (simplify_stmt_for_jump_threading): Lookup the
+	conditional in the hash table first.
+	(vrp_dom_walker::before_dom_children): Extract condition from
+	ASSERT_EXPR.  Record condition, its inverion and any implied
+	conditions as well.
+
+2017-03-17  Marek Polacek  <polacek@redhat.com>
+	    Markus Trippelsdorf  <markus@trippelsdorf.de>
+
+	PR tree-optimization/80079
+	* gimple-ssa-store-merging.c (class pass_store_merging): Initialize
+	m_stores_head.
+
+2017-03-17  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/80075
+	* tree-eh.c (stmt_could_throw_1_p): Only handle gimple assigns.
+	Properly verify the LHS before the RHS possibly claims to be
+	handled.
+	(stmt_could_throw_p): Hande gimple conds fully here.  Clobbers
+	do not throw.
+
+2017-03-17  Martin Jambor  <mjambor@suse.cz>
+
+	* doc/invoke.texi (Option Options): Include -fipa-vrp in the list.
+	(List of -O2 options): Likewise.
+	(-fipa-bit-cp): Replace "ipa" with "interprocedural."
+	(-fipa-vrp) New.
+
+2017-03-17  Tom de Vries  <tom@codesourcery.com>
+
+	* gcov-dump.c (print_usage): Print bug_report_url.
+
+2017-03-17  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/80050
+	* genmatch.c (parser::next): Remove pointless check for CPP_EOF.
+	(parser::peek): Likewise.
+
+2017-03-17  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/80048
+	* sese.c (free_sese_info): Properly release rename_map and
+	copied_bb_map elements.
+
+2017-03-16  Alexandre Oliva <aoliva@redhat.com>
+
+	* gimple-ssa-store-merging.c (struct imm_store_chain_info):
+	Add linked-list forward and backlinks.  Insert on
+	construction, remove on destruction.
+	(class pass_store_merging): Add m_stores_head field.
+	(pass_store_merging::terminate_and_process_all_chains):
+	Iterate over m_stores_head list.
+	(pass_store_merging::terminate_all_aliasing_chains):
+	Likewise.
+	(pass_store_merging::execute): Check for debug stmts first.
+	Push new chains onto the m_stores_head stack.
+
+2017-03-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/71294
+	* config/rs6000/vsx.md (vsx_splat_<mode>, VSX_D iterator): Allow a
+	SPLAT operation on ISA 2.07 64-bit systems that have direct move,
+	but no MTVSRDD support, by doing MTVSRD and XXPERMDI.
+
+2017-03-16  Jeff Law  <law@redhat.com>
+
+	PR tree-optimization/71437
+	* tree-ssa-dom.c (dom_opt_dom_walker): Remove thread_across_edge
+	member function.  Implementation moved into after_dom_children
+	member function and into the threader's thread_outgoing_edges
+	function.
+	(dom_opt_dom_walker::after_dom_children): Simplify by moving
+	some code into new thread_outgoing_edges.
+	* tree-ssa-threadedge.c (thread_across_edge): Make static and simplify
+	definition.  Simplify marker handling (do it here).   Assume we always
+	have the available expression and the const/copies tables.
+	(thread_outgoing_edges): New function extracted from tree-ssa-dom.c
+	and tree-vrp.c
+	* tree-ssa-threadedge.h (thread_outgoing_edges): Declare.
+	* tree-vrp.c (equiv_stack): No longer file scoped.
+	(vrp_dom_walker): New class.
+	(vrp_dom_walker::before_dom_children): New member function.
+	(vrp_dom_walker::after_dom_children): Likewise.
+	(identify_jump_threads):  Setup domwalker.  Use it rather than
+	walking edges in a random order by hand.  Simplify setup/finalization.
+	(finalize_jump_threads): Remove.
+	(vrp_finalize): Do not call identify_jump_threads here.
+	(execute_vrp): Do it here instead and call thread_through_all_blocks
+	here too.
+
+	PR tree-optimization/71437
+	* tree-ssa-dom.c (pfn_simplify): Add basic_block argument.  All
+	callers changed.
+	(simplify_stmt_for_jump_threading): Add basic_block argument.  All
+	callers changed.
+	(lhs_of_dominating_assert): Moved from here into tree-vrp.c.
+	(dom_opt_dom_walker::thread_across_edge): Remove
+	handle_dominating_asserts argument.  All callers changed.
+	(record_temporary_equivalences_from_stmts_at_dest): Corresponding
+	changes.  Remove calls to lhs_of_dominating_assert.  Other
+	uses of handle_dominating_asserts turn into unconditional code
+	(simplify_control_stmt_condition_1): Likewise.
+	(simplify_control_stmt_condition): Likewise.
+	(thread_through_normal_block, thread_across_edge): Likewise.
+	* tree-ssa-threadedge.h (thread_across_edge): Corresponding changes.
+	* tree-vrp.c (lhs_of_dominating_assert): Move here.  Return original
+	object if it is not an SSA_NAME.
+	(simplify_stmt_for_jump_threading): Call lhs_of_dominating_assert
+	before calling into the VRP specific simplifiers.
+	(identify_jump_threads): Remove handle_dominating_asserts
+	argument.
+
+2017-03-16  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/79886
+	* tree-diagnostic.c (default_tree_printer): No longer static.
+	* tree-diagnostic.h (default_tree_printer): New prototype.
+
+2017-03-16  Tamar Christina  <tamar.christina@arm.com>
+
+	* config/aarch64/aarch64-simd.md (*aarch64_simd_mov<mode>)
+	Change ins into fmov.
+
+2017-03-16  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/iterators.md (h_con): Return "x" for V4HF and V8HF.
+	* config/aarch64/aarch64-simd.md (*aarch64_fma4_elt_from_dup<mode>):
+	Use h_con constraint for operand 1.
+	(*aarch64_fnma4_elt_from_dup<mode>): Likewise.
+	(*aarch64_mulx_elt_from_dup<mode>): Likewise for operand 2.
+
+2017-03-15  Jeff Law  <law@redhat.com>
+
+	PR tree-optimization/71437
+	* tree-ssa-dom.c (derive_equivalences_from_bit_ior): New function.
+	(record_temporary_equivalences): Use it.
+
+	PR tree-optimization/71437
+	* tree-ssa-dom.c (struct cond_equivalence): Moved from here into
+	tree-ssa-scopedtables.
+	(lookup_avail_expr, build_and_record_new_cond): Likewise.
+	(record_conditions, record_cond, vuse_eq): Likewise.
+	(record_edge_info): Adjust to API tweak of record_conditions.
+	(simplify_stmt_for_jump_threading): Similarly for lookup_avail_expr.
+	(record_temporary_equivalences, optimize_stmt): Likewise.
+	(eliminate_redundant_computations): Likewise.
+	(record_equivalences_from_stmt): Likewise.
+	* tree-ssa-scopedtables.c: Include options.h and params.h.
+	(vuse_eq): New function, moved from tree-ssa-dom.c
+	(build_and_record_new_cond): Likewise.
+	(record_conditions): Likewise.  Accept vector of conditions rather
+	than edge_equivalence structure for first argument.
+	for the first argument.
+	(avail_exprs_stack::lookup_avail_expr): New member function, moved
+	from tree-ssa-dom.c.
+	(avail_exprs_stack::record_cond): Likewise.
+	* tree-ssa-scopedtables.h (struct cond_equivalence): Moved here
+	from tree-ssa-dom.c.
+	(avail_exprs_stack): Add new member functions lookup_avail_expr
+	and record_cond.
+	(record_conditions): Declare.
+
+2017-03-15  Vladimir Makarov  <vmakarov@redhat.com>
+
+	PR target/80017
+	* lra-constraints.c (process_alt_operands): Increase reject for
+	reloading an input/output operand.
+
 2017-03-15  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	PR target/79038
