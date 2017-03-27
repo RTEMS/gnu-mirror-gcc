@@ -1,3 +1,46 @@
+2017-03-27  Aaron Sawdey  <acsawdey@linux.vnet.ibm.com>
+
+	Backport from trunk
+	PR target/79449
+	PR target/79170
+
+	* gcc.dg/strncmp-2.c: New.  Test strncmp and memcmp builtin expansion
+	for reading beyond a 4k boundary.
+	* config/rs6000/rs6000.c (expand_block_compare): Make sure runtime
+	boundary crossing check and subsequent code generation agree.
+	* gcc.dg/memcmp-1.c: Improved to catch failures seen in PR 79170.
+	* config/rs6000/altivec.md (*setb_internal): Rename to setb_signed.
+	(setb_unsigned) New pattern for setb with CCUNS.
+	* config/rs6000/rs6000.c (expand_block_compare): Use a different
+	subfc./subfe sequence to avoid overflow problems.  Generate a
+	shorter sequence with cmpld/setb for power9.
+	* config/rs6000/rs6000.md (subf<mode>3_carry_dot2): Add a new pattern
+	for generating subfc. instruction.
+	(cmpstrsi): Add TARGET_POPCNTD predicate as the generate sequence
+	now uses this instruction.
+	* config/rs6000/rs6000-protos.h (expand_strn_compare): Add arg.
+	* config/rs6000/rs6000.c (expand_strn_compare): Add ability to expand
+	strcmp. Fix bug where comparison didn't stop with zero byte. Fix
+	case where N arg is SIZE_MAX.
+	* config/rs6000/rs6000.md (cmpstrnsi): Args to expand_strn_compare.
+	(cmpstrsi): Add pattern.
+	* gcc.dg/memcmp-1.c: New.
+	* gcc.dg/strncmp-1.c: New.
+	* config/rs6000/rs6000-protos.h (expand_strn_compare): Declare.
+	* config/rs6000/rs6000.md (UNSPEC_CMPB): New unspec.
+	(cmpb<mode>3): pattern for generating cmpb.
+	(cmpstrnsi): pattern to expand strncmp ().
+	* config/rs6000/rs6000.opt (mstring-compare-inline-limit): Add a new
+	target option for controlling how much code inline expansion of
+	strncmp() will be allowed to generate.
+	* config/rs6000/rs6000.c (expand_strncmp_align_check): generate code
+	for runtime page crossing check of strncmp () args.
+	(expand_strn_compare): Function to do builtin expansion of strncmp ().
+	* config/i386/i386.md (cmpstrnsi): New test to bail out if neither
+	string input is a string constant.
+	* builtins.c (expand_builtin_strncmp): Attempt expansion of strncmp
+	via cmpstrnsi even if neither string is constant.
+
 2017-03-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Merge up to 246128.
