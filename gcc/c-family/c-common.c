@@ -9061,7 +9061,7 @@ handle_nonnull_attribute (tree *node, tree ARG_UNUSED (name),
       tree arg = TREE_VALUE (args);
       if (arg && TREE_CODE (arg) != IDENTIFIER_NODE
 	  && TREE_CODE (arg) != FUNCTION_DECL)
-	arg = default_conversion (arg);
+	TREE_VALUE (args) = arg = default_conversion (arg);
 
       if (!get_nonnull_operand (arg, &arg_num))
 	{
@@ -12028,7 +12028,12 @@ set_underlying_type (tree x)
       tt = build_variant_type_copy (tt);
       TYPE_STUB_DECL (tt) = TYPE_STUB_DECL (DECL_ORIGINAL_TYPE (x));
       TYPE_NAME (tt) = x;
-      TREE_USED (tt) = TREE_USED (x);
+
+      /* Mark the type as used only when its type decl is decorated
+	 with attribute unused.  */
+      if (lookup_attribute ("unused", DECL_ATTRIBUTES (x)))
+	TREE_USED (tt) = 1;
+
       TREE_TYPE (x) = tt;
     }
 }

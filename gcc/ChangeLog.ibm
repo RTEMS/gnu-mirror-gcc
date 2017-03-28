@@ -1,3 +1,8 @@
+2017-03-27  Peter Bergner  <bergner@vnet.ibm.com>
+
+	Merge up to 246509.
+	* REVISION: Update subversion id.
+
 2017-03-27  Aaron Sawdey  <acsawdey@linux.vnet.ibm.com>
 
 	Backport from trunk
