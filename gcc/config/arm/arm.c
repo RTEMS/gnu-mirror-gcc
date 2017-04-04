@@ -841,8 +841,8 @@ int arm_arch6m = 0;
 /* Nonzero if this chip supports the ARM 7 extensions.  */
 int arm_arch7 = 0;
 
-/* Nonzero if this chip supports the ARM 7ve extensions.  */
-int arm_arch7ve = 0;
+/* Nonzero if this chip supports the Large Physical Address Extension.  */
+int arm_arch_lpae = 0;
 
 /* Nonzero if instructions not present in the 'M' profile can be used.  */
 int arm_arch_notm = 0;
@@ -3365,8 +3365,7 @@ arm_option_override (void)
   arm_arch_crc = bitmap_bit_p (arm_active_target.isa, isa_bit_crc32);
   arm_arch_cmse = bitmap_bit_p (arm_active_target.isa, isa_bit_cmse);
   arm_fp16_inst = bitmap_bit_p (arm_active_target.isa, isa_bit_fp16);
-  arm_arch7ve
-    = (arm_arch6k && arm_arch7 && arm_arch_thumb_hwdiv && arm_arch_arm_hwdiv);
+  arm_arch_lpae = bitmap_bit_p (arm_active_target.isa, isa_bit_lpae);
   if (arm_fp16_inst)
     {
       if (arm_fp16_format == ARM_FP16_FORMAT_ALTERNATIVE)
@@ -26229,7 +26228,7 @@ arm_thumb1_mi_thunk (FILE *file, tree, HOST_WIDE_INT delta,
     {
       int labelno = thunk_label++;
       ASM_GENERATE_INTERNAL_LABEL (label, "LTHUMBFUNC", labelno);
-      /* Thunks are entered in arm mode when avaiable.  */
+      /* Thunks are entered in arm mode when available.  */
       if (TARGET_THUMB1_ONLY)
 	{
 	  /* push r3 so we can use it as a temporary.  */

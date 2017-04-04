@@ -11414,7 +11414,7 @@ mips_save_restore_reg (machine_mode mode, int regno,
   fn (gen_rtx_REG (mode, regno), mem);
 }
 
-/* Call FN for each accumlator that is saved by the current function.
+/* Call FN for each accumulator that is saved by the current function.
    SP_OFFSET is the offset of the current stack pointer from the start
    of the frame.  */
 
@@ -21757,11 +21757,12 @@ mips_expand_vector_init (rtx target, rtx vals)
 		case V8HImode:
 		case V4SImode:
 		case V2DImode:
-		  emit_move_insn (target, same);
+		  temp = gen_rtx_CONST_VECTOR (vmode, XVEC (vals, 0));
+		  emit_move_insn (target, temp);
 		  return;
 
 		default:
-		  break;
+		  gcc_unreachable ();
 		}
 	    }
 	  temp = gen_reg_rtx (imode);
