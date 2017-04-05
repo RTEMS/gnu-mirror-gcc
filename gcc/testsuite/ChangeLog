@@ -1,3 +1,45 @@
+2017-04-03  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Back port from the trunk
+	2017-03-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/79947
+	* gcc.target/powerpc/pr79947.c: New test.
+
+2017-04-03  Peter Bergner  <bergner@vnet.ibm.com>
+
+	Backport from mainline
+	2017-04-03  Peter Bergner  <bergner@vnet.ibm.com>
+
+	PR target/80246
+	* gcc.target/powerpc/dfp-builtin-1.c: Require hard_dfp, not
+	powerpc_vsx_ok.
+	(std, ld): Limit scan-assembler-times check to lp64.
+	(stwu, stw, lwz): Add scan-assembler-times check for ilp32.
+	* gcc.target/powerpc/dfp-builtin-2.c: Require hard_dfp, not
+	powerpc_vsx_ok.
+
+	PR target/80246
+	* gcc.target/powerpc/pr80246.c: Require hard_dfp.
+
+2017-04-01  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backport from trunk
+	PR fortran/71838
+	* gfortran.dg/submodule_26.f08 : New test.
+	* gfortran.dg/submodule_27.f08 : New test.
+
+2017-04-01  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backport from trunk
+	PR fortran/79676
+	* gfortran.dg/submodule_28.f08 : New test.
+
+2017-03-31  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/80218
+	* gcc.dg/pr80218.c: New test.
+
 2017-03-30  Peter Bergner  <bergner@vnet.ibm.com>
 
 	Backport from mainline
