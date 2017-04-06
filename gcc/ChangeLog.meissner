@@ -1,3 +1,14 @@
+2017-04-06  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.md (movsi_from_sf): Rework to know that
+	XSCVDPSPN puts the 32-bit SFmode vector value into both first and
+	second words and we can eliminate the shift.
+	(movdi_from_sf_zero_ext): Likewise.
+	(reload_gpr_from_vsxsf): Likewise.
+	(p8_mfvsrd_4_disf): Delete, no longer used.
+	(p8_mfvsrwz_sf): New unspec to do a MFVSRWZ to move a SFmode from
+	a vector register to a GPR register.
+
 2017-04-05  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	PR target/79038
