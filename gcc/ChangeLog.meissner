@@ -1,5 +1,17 @@
 2017-04-06  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/vsx.md (peephole2 for SFmode/SImode unions):
+	Rework peephole to match code being generated.
+
+	* config/rs6000/rs6000.md (movsi_from_sf): Do not use zero extend
+	to do direct move, call p8_mfvsrwz_disf.
+	(movdi_from_sf_zero_ext): Likewise.
+	(reload_gpr_from_vsxsf): Call p8_mfvsrwz_disf instead of
+	p8_mfvsrwz_sf.
+	(p8_mfvsrwz_sf): Rename to p8_mfvsrwz_disf and take DImode as the
+	first argument.
+	(p8_mfvsrwz_disf): Likewise.
+
 	* config/rs6000/rs6000.md (movsi_from_sf): Rework to know that
 	XSCVDPSPN puts the 32-bit SFmode vector value into both first and
 	second words and we can eliminate the shift.

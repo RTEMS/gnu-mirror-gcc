@@ -1,3 +1,8 @@
+2017-04-06  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/direct-move-float1.c: Update expected code.
+	* gcc.target/powerpc/pr71977-1.c: Likewise.
+
 2017-04-05  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	PR target/79038
