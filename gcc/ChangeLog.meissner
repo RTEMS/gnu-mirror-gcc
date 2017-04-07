@@ -1,3 +1,4 @@
+<patch gcc8.patch02b>
 2017-04-07  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/vsx.md (peephole2 for SFmode/SImode unions):
@@ -14,6 +15,7 @@
 	value to the GPR instead of MFVSRD.
 	(p8_mfvsrwz_disf): Likewise.
 
+<patch gcc8.patch01b>
 2017-04-05  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	PR target/79038
