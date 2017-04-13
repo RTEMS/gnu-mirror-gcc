@@ -1,3 +1,8 @@
+2017-04-13  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 246904.
+	* REVISION: Update subversion id.
+
 2017-04-06  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/vsx.md (peephole2 for SFmode/SImode unions):
