@@ -1,3 +1,80 @@
+2017-04-12  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	PR target/80315
+	* gcc.target/powerpc/pr80315-1.c: New test.
+	* gcc.target/powerpc/pr80315-2.c: New test.
+	* gcc.target/powerpc/pr80315-3.c: New test.
+	* gcc.target/powerpc/pr80315-4.c: New test.
+
+2017-04-16  Tom de Vries  <tom@codesourcery.com>
+
+	* g++.dg/parse/error11.C: Remove braces around line number in dejagnu
+	  directive.
+	* g++.dg/parse/error3.C: Same.
+	* g++.old-deja/g++.pt/niklas01a.C: Same.
+	* gcc.dg/990506-0.c: Same.
+	* gcc.dg/cpp/19990413-1.c: Same.
+	* gcc.dg/cpp/pragma-1.c: Same.
+	* gcc.dg/cpp/pragma-2.c: Same.
+	* gcc.dg/m-un-2.c: Same.
+	* objc.dg/private-1.m: Same.
+
+2017-04-15  Uros Bizjak  <ubizjak@gmail.com>
+
+	* gcc.dg/pr54669.c: Fix dg-do directive.
+	* gcc.dg/pr78582.c: Ditto.
+	* gcc.dg/pr80020.c: Ditto.
+	* gcc.dg/torture/pr57993-2.cpp: Ditto.
+	* gcc.dg/tree-ssa/builtin-sprintf-3.c: Ditto.
+	* gcc.dg/tree-ssa/builtin-sprintf-4.c: Ditto.
+	* gcc.dg/tree-ssa/builtin-sprintf-5.c: Ditto.
+	* gcc.dg/tree-ssa/builtin-sprintf-6.c: Ditto.
+	* gcc.dg/tree-ssa/builtin-sprintf-warn-5.c: Ditto.
+	* gcc.dg/tree-ssa/pr79327-2.c: Ditto.
+	* gcc.dg/tree-ssa/pr79352.c: Ditto.
+	* gcc.dg/tree-ssa/pr79376.c: Ditto.
+	* gcc.dg/tree-ssa/pr79691.c: Ditto.
+
+2017-04-15  Dominique d'Humieres  <dominiq@lps.ens.fr>
+
+	* gfortran.dg/deferred_character_3.f90: Fix dg-do directive.
+	* gfortran.dg/generic_29.f90: Likewise.
+	* gfortran.dg/goacc/multi-clause.f90: Likewise.
+	* gfortran.dg/pr41922.f90: Likewise.
+	* gfortran.dg/pr70006.f90: Likewise.
+
+2017-04-15  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR tree-optimization/66612
+	* gcc.target/powerpc/20050830-1.c: Remove xfail.
+
+2017-04-14  Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/80361
+	* gfortran.dg/class_62.f90: New test case.
+
+2017-04-14  Andrew Burgess  <andrew.burgess@embecosm.com>
+
+	* gcc.target/arc/loop-1.c: New file.
+
+2017-04-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/80098
+	* gcc.target/powerpc/pr80098-1.c: New test.
+	* gcc.target/powerpc/pr80098-2.c: Likewise.
+	* gcc.target/powerpc/pr80098-3.c: Likewise.
+	* gcc.target/powerpc/pr80098-4.c: Likewise.
+
+2017-04-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/80403
+	* g++.dg/ubsan/pr80403-2.C: New test.
+
+2017-04-13  Vladimir Makarov  <vmakarov@redhat.com>
+
+	PR rtl-optimization/80343
+	* gcc.target/powerpc/pr80343.c: New.
+
 2017-04-13  Denis Khalikov  <d.khalikov@partner.samsung.com>
 
 	PR sanitizer/80414
