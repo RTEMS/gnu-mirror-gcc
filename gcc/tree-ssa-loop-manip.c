@@ -1233,6 +1233,7 @@ tree_transform_and_unroll_loop (struct loop *loop, unsigned factor,
 			   scale_unrolled, scale_rest, true);
   gcc_assert (new_loop != NULL);
   update_ssa (TODO_update_ssa);
+  loop_constraint_set (new_loop, LOOP_C_EPILOG);
 
   /* Prepare the cfg and update the phi nodes.  Move the loop exit to the
      loop latch (and make its condition dummy, for the moment).  */

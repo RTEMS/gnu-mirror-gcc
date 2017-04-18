@@ -9922,6 +9922,10 @@ If the number of candidates in the set is smaller than this value,
 always try to remove unnecessary ivs from the set
 when adding a new one.
 
+@item iv-max-selected-candidates
+The induction variable optimizations give up on loops that more induction
+variable candidates are selected.
+
 @item avg-loop-niter
 Average number of iterations of a loop.
 

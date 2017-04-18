@@ -1,3 +1,221 @@
+2017-04-11  Bin Cheng  <bin.cheng@arm.com>
+
+	* rtlanal.c (rtx_cost): Handle TRUNCATE between tieable modes.
+
+	* tree-ssa-loop-ivopts.c (get_computation_cost_at): Remove pseudo
+	iv_cand code.
+	(determine_group_iv_cost_cond, determine_iv_cost): Ditto.
+	(iv_ca_set_no_cp, create_new_iv): Ditto.
+
+	* tree-ssa-loop-ivopts.c (struct cost_pair): Rename depends_on to
+	inv_vars.  Add inv_exprs.
+	(struct iv_cand): Rename depends_on to inv_vars.
+	(struct ivopts_data): Rename max_inv_id/n_invariant_uses to
+	max_inv_var_id/n_inv_var_uses.  Move max_inv_expr_id around.
+	Refactor field used_inv_exprs from has_map to array
+	n_inv_expr_uses.
+	(dump_cand): Dump inv_vars.
+	(tree_ssa_iv_optimize_init): Support inv_vars and inv_exprs.
+	(record_invariant, find_depends, add_candidate_1): Ditto.
+	(set_group_iv_cost, force_var_cost): Ditto.
+	(split_address_cost, ptr_difference_cost, difference_cost): Ditto.
+	(get_computation_cost_at, get_computation_cost): Ditto.
+	(determine_group_iv_cost_generic): Ditto.
+	(determine_group_iv_cost_address): Ditto.
+	(determine_group_iv_cost_cond, autoinc_possible_for_pair): Ditto.
+	(determine_group_iv_costs): Ditto.
+	(iv_ca_recount_cost): Update call to ivopts_global_cost_for_size.
+	(iv_ca_set_remove_invariants): Renamed to ...
+	(iv_ca_set_remove_invs): ... this.  Support inv_vars and
+	inv_exprs.
+	(iv_ca_set_no_cp): Use iv_ca_set_remove_invs.
+	(iv_ca_set_add_invariants):  Renamed to ...
+	(iv_ca_set_add_invs): ... this.  Support inv_vars and inv_exprs.
+	(iv_ca_set_cp): Use iv_ca_set_add_invs.
+	(iv_ca_has_deps): Support inv_vars and inv_exprs.
+	(iv_ca_new, iv_ca_free, iv_ca_dump, free_loop_data): Ditto.
+	(create_new_ivs): Remove useless dump.
+
+	* tree-ssa-loop-ivopts.c (struct walk_tree_data): New.
+	(find_inv_vars_cb): New.
+	(find_depends): Renamed to ...
+	(find_inv_vars): ... this.
+	(add_candidate_1, force_var_cost): Call find_inv_vars.
+	(split_address_cost, determine_group_iv_cost_cond): Ditto.
+
+	* tree-ssa-loop-ivopts.c (struct iv_ca): Rename n_regs to n_invs.
+	(ivopts_global_cost_for_size): Rename parameter and update uses.
+	(iv_ca_recount_cost): Update uses.
+	(iv_ca_set_remove_invs, iv_ca_set_no_cp): Record invariants and
+	candidates seperately in n_invs and n_cands.
+	(iv_ca_set_add_invs, iv_ca_set_cp, iv_ca_new): Ditto.
+
+	* tree-ssa-loop-ivopts.c (rewrite_use_address): Simple refactor.
+
+	* tree-ssa-loop-ivopts.c (compute_max_addr_offset): Delete.
+	(addr_offset_valid_p): New function.
+	(split_address_groups): Check offset validity with above function.
+
+	* tree-ssa-loop-ivopts.c (get_computation_at): Reorder parameters.
+	(get_computation): Delete.
+	(get_computation_cost): Implement like get_computation_cost_at.
+	Use get_computation_at.
+	(get_computation_cost_at): Delete.
+	(rewrite_use_nonlinear_expr): Use get_computation_at.
+	(rewrite_use_compare, remove_unused_ivs): Ditto.
+
+	* tree-ssa-loop-ivopts.c (get_computation_aff_1): New.
+	(get_computation_aff): Reorder parameters.  Use
+	get_computation_aff_1.
+	(get_computation_at, rewrite_use_address): Update use of
+	get_computation_aff.
+
+	* tree-ssa-loop-ivopts.c (get_scaled_computation_cost_at): Delete
+	parameter cand.  Update dump information.
+	(get_computation_cost): Update uses.
+
+	* tree-affine.h (aff_combination_type): New interface.
+	(aff_combination_const_p, aff_combination_simple_p): New
+	interfaces.
+
+	* tree-ssa-address.c (struct mem_address): Move to header file.
+	(valid_mem_ref_p, move_fixed_address_to_symbol): Make it global.
+	* tree-ssa-address.h (struct mem_address): Move from C file.
+	(valid_mem_ref_p, move_fixed_address_to_symbol): Declare.
+
+	* tree-ssa-loop-ivopts.c (get_loop_invariant_expr): Simplify.
+	(adjust_setup_cost): New parameter supporting round up adjustment.
+	(struct address_cost_data): Delete.
+	(force_expr_to_var_cost): Don't bound cost with spill_cost.
+	(split_address_cost, ptr_difference_cost): Delete.
+	(difference_cost, compare_aff_trees, record_inv_expr): Delete.
+	(struct ainc_cost_data): New struct.
+	(get_address_cost_ainc): New function.
+	(get_address_cost, get_computation_cost): Reimplement.
+	(determine_group_iv_cost_address): Record inv_expr for all uses of
+	a group.
+	(determine_group_iv_cost_cond): Call get_loop_invariant_expr.
+	(iv_ca_has_deps): Reimplemented to ...
+	(iv_ca_more_deps): ... this.  Check if NEW_CP introduces more deps
+	than OLD_CP.
+	(iv_ca_extend): Call iv_ca_more_deps.
+
+	* tree-ssa-loop-ivopts.c (force_expr_to_var_cost): Handle more
+	operators: TRUNC_DIV_EXPR, BIT_AND_EXPR, BIT_IOR_EXPR, RSHIFT_EXPR
+	and BIT_NOT_EXPR.
+
+	* tree-ssa-loop-ivopts.c (autoinc_possible_for_pair): Simplify.
+
+	* tree-ssa-loop-ivopts.c (multiplier_allowed_in_address_p): Move
+	from ...
+	* tree-ssa-address.c (multiplier_allowed_in_address_p): ... to
+	here as local function.  Include necessary header files.
+	* tree-ssa-loop-ivopts.h (multiplier_allowed_in_address_p):
+	Delete.
+
+	* tree-ssa-loop-ivopts.c (struct iv_cand): New field inv_exprs.
+	(dump_cand): Support iv_cand.inv_exprs.
+	(add_candidate_1): Record invariant exprs in iv_cand.inv_exprs
+	for candidates.
+	(iv_ca_set_no_cp, iv_ca_set_cp, free_loop_data): Support
+	iv_cand.inv_exprs.
+
+	* tree-ssa-loop-ivopts.c (relate_compare_use_with_all_cands): New.
+	(find_iv_candidates): Call relate_compare_use_with_all_cands.
+
+	* tree-ssa-loop-ivopts.c (rewrite_use_nonlinear_expr):
+	Re-associate
+	nonlinear iv_use computation in loop invariant sensitive way.
+
+	* tree-ssa-loop-ivopts.c (enum comp_iv_rewrite): New.
+	(extract_cond_operands): Detect condition comparing against non-
+	invariant bound and return appropriate enum value.
+	(find_interesting_uses_cond): Update use of extract_cond_operands.
+	Handle its return value accordingly.
+	(determine_group_iv_cost_cond, rewrite_use_compare): Ditto.
+
+        PR tree-optimization/53090
+	* tree-ssa-loop-ivopts.c (enum comp_iv_rewrite): New enum value
+	COMP_IV_EXPR_2.
+	(extract_cond_operands): Detect condition with IV on both sides
+	and return COMP_IV_EXPR_2.
+	(find_interesting_uses_cond): Add iv_use for both IVs in condition.
+	(rewrite_use_compare): Simplify by removing call to function
+	extract_cond_operands.
+
+	* tree-ssa-address.c: Include header file.
+	(move_hint_to_base): Return TRUE if BASE_HINT is moved to memory
+	address.
+	(add_to_parts): Refactor.
+	(addr_to_parts): New parameter.  Update use of move_hint_to_base.
+	(create_mem_ref): Update use of addr_to_parts.  Re-associate addr
+	in new order.
+
+	* tree-ssa-loop-ivopts.c (allow_ip_end_pos_p): Refine comments.
+	(get_shiftadd_cost): Ditto.
+
+	* doc/invoke.texi (iv-max-selected-candidates): New.
+	* params.def (PARAM_IV_MAX_SELECTED_CANDIDATES): New.
+	* tree-ssa-loop-ivopts.c (MAX_SELECTED_CANDIDATES): New.
+	(tree_ssa_iv_optimize_loop): Skip if too many cands are selected.
+
+	* cfgloop.h (LOOP_C_PROLOG, LOOP_C_EPILOG, LOOP_C_VERSION): New.
+	* tree-ssa-loop-manip.c (tree_transform_and_unroll_loop): Set
+	LOOP_C_EPILOG for unrolled epilogue loop.
+	(vect_do_peeling): Set LOOP_C_PROLOG and LOOP_C_EPILOG for peeled
+	loops.
+	(vect_loop_versioning): Set LOOP_C_VERSION for versioned loop.
+
+	* tree-ssa-loop-ivopts.c (find_interesting_uses): Move inv vars	dump
+	to ...
+	(determine_group_iv_costs): ... here.
+	(find_inv_vars_cb): Record inv var if it's not recorded before.
+
+	* tree-ssa-loop-ivopts.c (compare_cost_pair): New.
+	(iv_ca_more_deps): Renamed to ...
+	(iv_ca_compare_deps): ... this.
+	(iv_ca_extend): Extend iv_ca if NEW_CP is cheaper than OLD_CP.
+
+	* tree-ssa-loop-ivopts.c (determine_set_costs): Skip non-interger
+	when counting register pressure.
+
+	* tree-ssa-loop-ivopts.c (struct ivopts_data): New field.
+	(ivopts_estimate_reg_pressure): New reg_pressure model function.
+	(ivopts_global_cost_for_size): Delete.
+	(determine_set_costs, iv_ca_recount_cost): Call new model function
+	ivopts_estimate_reg_pressure.
+	(determine_hot_innermost_loop): New.
+	(tree_ssa_iv_optimize_loop): Call above function.
+
+	* tree-affine.c: Include header file.
+	(aff_combination_expand): Move (T1)(X *+- CST) simplification to ...
+	(tree_to_aff_combination): ... here.  Support (T1)(X + X) case,	and
+	unsigned type case if range information allows.
+
+	* tree-vect-loop-manip.c (vect_gen_vector_loop_niters): Refactor.
+	Set range information for vector loop bound variable.
+	(vect_do_peeling): Ditto.
+
+	* tree-vect-loop-manip.c (vect_do_peeling): Don't skip vector loop
+	if versioning is required.
+	* tree-vect-loop.c (vect_analyze_loop_2): Merge niter check for loop
+	peeling with the check for versioning.
+
+	PR tree-optimization/68030
+	PR tree-optimization/69710
+	* tree-ssa-dom.c (cse_bbs): New function.
+	* tree-ssa-dom.h (cse_bbs): New declaration.
+	* tree-vect-data-refs.c (vect_create_addr_base_for_vector_ref):
+	Re-associate address by splitting constant offset.
+	(vect_create_data_ref_ptr, vect_setup_realignment): Record changed
+	basic block.
+	* tree-vect-loop-manip.c (vect_gen_prolog_loop_niters): Record
+	changed basic block.
+	* tree-vectorizer.c (tree-ssa-dom.h): Include header file.
+	(changed_bbs): New variable.
+	(vectorize_loops): Allocate and free CHANGED_BBS.  Call cse_bbs.
+	* tree-vectorizer.h (changed_bbs): New declaration.
+
 2017-04-18   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 246975

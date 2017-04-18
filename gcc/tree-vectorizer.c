@@ -74,6 +74,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgloop.h"
 #include "tree-vectorizer.h"
 #include "tree-ssa-propagate.h"
+#include "tree-ssa-dom.h"
 #include "dbgcnt.h"
 #include "tree-scalar-evolution.h"
 
@@ -83,6 +84,9 @@ source_location vect_location;
 
 /* Vector mapping GIMPLE stmt to stmt_vec_info. */
 vec<stmt_vec_info> stmt_vec_info_vec;
+
+/* Basic blocks should be cleaned up by CSE after vectorization.  */
+bitmap changed_bbs;
 
 /* For mapping simduid to vectorization factor.  */
 
@@ -540,6 +544,7 @@ vectorize_loops (void)
     note_simd_array_uses (&simd_array_to_simduid_htab);
 
   init_stmt_vec_info_vec ();
+  changed_bbs = BITMAP_ALLOC (NULL);
 
   /*  ----------- Analyze loops. -----------  */
 
@@ -762,6 +767,9 @@ vectorize_loops (void)
       loop->aux = NULL;
     }
 
+  if (!bitmap_empty_p (changed_bbs))
+    cse_bbs (changed_bbs);
+  BITMAP_FREE (changed_bbs);
   free_stmt_vec_info_vec ();
 
   /* Fold IFN_GOMP_SIMD_{VF,LANE,LAST_LANE,ORDERED_{START,END}} builtins.  */

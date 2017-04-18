@@ -248,6 +248,12 @@ struct GTY ((chain_next ("%h.next"))) loop {
 #define LOOP_C_INFINITE		(1 << 0)
 /* Set if the loop is known to be finite without any assumptions.  */
 #define LOOP_C_FINITE		(1 << 1)
+/* Set if the loop is peeled prologue loop.  */
+#define LOOP_C_PROLOG		(1 << 2)
+/* Set if the loop is peeled epilogue loop.  */
+#define LOOP_C_EPILOG		(1 << 3)
+/* Set if the loop is versioned loop.  */
+#define LOOP_C_VERSION		(1 << 4)
 
 /* Set C to the LOOP constraint.  */
 static inline void

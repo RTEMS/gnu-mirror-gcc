@@ -24,5 +24,6 @@ extern bool simple_iv_increment_p (gimple *);
 extern void record_temporary_equivalences (edge,
 					   class const_and_copies *,
 					   class avail_exprs_stack *);
+extern void cse_bbs (bitmap);
 
 #endif /* GCC_TREE_SSA_DOM_H */

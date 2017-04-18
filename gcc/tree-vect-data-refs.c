@@ -4247,23 +4247,27 @@ vect_create_addr_base_for_vector_ref (gimple *stmt,
       base_name = get_name (DR_REF (dr));
     }
 
-  /* Create base_offset */
-  base_offset = size_binop (PLUS_EXPR,
-			    fold_convert (sizetype, base_offset),
-			    fold_convert (sizetype, init));
+  base_offset = fold_convert (sizetype, base_offset);
+  init = fold_convert (sizetype, init);
 
   if (offset)
     {
       offset = fold_build2 (MULT_EXPR, sizetype,
 			    fold_convert (sizetype, offset), step);
-      base_offset = fold_build2 (PLUS_EXPR, sizetype,
-				 base_offset, offset);
+      if (TREE_CODE (offset) == INTEGER_CST)
+	init = fold_build2 (PLUS_EXPR, sizetype, init, offset);
+      else
+	base_offset = fold_build2 (PLUS_EXPR, sizetype,
+				   base_offset, offset);
     }
   if (byte_offset)
     {
       byte_offset = fold_convert (sizetype, byte_offset);
-      base_offset = fold_build2 (PLUS_EXPR, sizetype,
-				 base_offset, byte_offset);
+      if (TREE_CODE (byte_offset) == INTEGER_CST)
+	init = fold_build2 (PLUS_EXPR, sizetype, init, byte_offset);
+      else
+	base_offset = fold_build2 (PLUS_EXPR, sizetype,
+				   base_offset, byte_offset);
     }
 
   /* base + base_offset */
@@ -4277,6 +4281,10 @@ vect_create_addr_base_for_vector_ref (gimple *stmt,
     }
 
   vect_ptr_type = build_pointer_type (STMT_VINFO_VECTYPE (stmt_info));
+  addr_base = force_gimple_operand (addr_base, &seq, true, NULL);
+  gimple_seq_add_seq (new_stmt_list, seq);
+  /* Add constant offset at last.  */
+  addr_base = fold_build_pointer_plus (addr_base, init);
   dest = vect_get_new_vect_var (vect_ptr_type, vect_pointer_var, base_name);
   addr_base = force_gimple_operand (addr_base, &seq, true, dest);
   gimple_seq_add_seq (new_stmt_list, seq);
@@ -4507,12 +4515,13 @@ vect_create_data_ref_ptr (gimple *stmt, tree aggr_type, struct loop *at_loop,
   if (new_stmt_list)
     {
       if (pe)
-        {
-          new_bb = gsi_insert_seq_on_edge_immediate (pe, new_stmt_list);
-          gcc_assert (!new_bb);
-        }
+	{
+	  new_bb = gsi_insert_seq_on_edge_immediate (pe, new_stmt_list);
+	  gcc_assert (!new_bb);
+	  bitmap_set_bit (changed_bbs, pe->src->index);
+	}
       else
-        gsi_insert_seq_before (gsi, new_stmt_list, GSI_SAME_STMT);
+	gsi_insert_seq_before (gsi, new_stmt_list, GSI_SAME_STMT);
     }
 
   *initial_address = new_temp;
@@ -5220,9 +5229,10 @@ vect_setup_realignment (gimple *stmt, gimple_stmt_iterator *gsi,
 							NULL_TREE, loop);
           if (loop)
             {
-   	      pe = loop_preheader_edge (loop);
+	      pe = loop_preheader_edge (loop);
 	      new_bb = gsi_insert_seq_on_edge_immediate (pe, stmts);
 	      gcc_assert (!new_bb);
+	      bitmap_set_bit (changed_bbs, pe->src->index);
             }
           else
              gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);

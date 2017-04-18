@@ -1023,6 +1023,7 @@ vect_gen_prolog_loop_niters (loop_vec_info loop_vinfo,
   if (stmts)
     {
       gcc_assert (single_succ_p (bb));
+      bitmap_set_bit (changed_bbs, bb->index);
       gimple_stmt_iterator gsi = gsi_last_bb (bb);
       if (gsi_end_p (gsi))
 	gsi_insert_seq_before (&gsi, stmts, GSI_SAME_STMT);
@@ -1177,22 +1178,21 @@ vect_gen_vector_loop_niters (loop_vec_info loop_vinfo, tree niters,
 			     tree *niters_vector_ptr, bool niters_no_overflow)
 {
   tree ni_minus_gap, var;
-  tree niters_vector;
+  tree niters_vector, type = TREE_TYPE (niters);
   int vf = LOOP_VINFO_VECT_FACTOR (loop_vinfo);
   edge pe = loop_preheader_edge (LOOP_VINFO_LOOP (loop_vinfo));
-  tree log_vf = build_int_cst (TREE_TYPE (niters), exact_log2 (vf));
+  tree log_vf = build_int_cst (type, exact_log2 (vf));
 
   /* If epilogue loop is required because of data accesses with gaps, we
      subtract one iteration from the total number of iterations here for
      correct calculation of RATIO.  */
   if (LOOP_VINFO_PEELING_FOR_GAPS (loop_vinfo))
     {
-      ni_minus_gap = fold_build2 (MINUS_EXPR, TREE_TYPE (niters),
-				  niters,
-				  build_one_cst (TREE_TYPE (niters)));
+      ni_minus_gap = fold_build2 (MINUS_EXPR, type, niters,
+				  build_one_cst (type));
       if (!is_gimple_val (ni_minus_gap))
 	{
-	  var = create_tmp_var (TREE_TYPE (niters), "ni_gap");
+	  var = create_tmp_var (type, "ni_gap");
 	  gimple *stmts = NULL;
 	  ni_minus_gap = force_gimple_operand (ni_minus_gap, &stmts,
 					       true, var);
@@ -1208,25 +1208,28 @@ vect_gen_vector_loop_niters (loop_vec_info loop_vinfo, tree niters,
      (niters - vf) >> log2(vf) + 1 by using the fact that we know ratio
      will be at least one.  */
   if (niters_no_overflow)
-    niters_vector = fold_build2 (RSHIFT_EXPR, TREE_TYPE (niters),
-				 ni_minus_gap, log_vf);
+    niters_vector = fold_build2 (RSHIFT_EXPR, type, ni_minus_gap, log_vf);
   else
     niters_vector
-      = fold_build2 (PLUS_EXPR, TREE_TYPE (niters),
-		     fold_build2 (RSHIFT_EXPR, TREE_TYPE (niters),
-				  fold_build2 (MINUS_EXPR, TREE_TYPE (niters),
-					       ni_minus_gap,
-					       build_int_cst
-						 (TREE_TYPE (niters), vf)),
+      = fold_build2 (PLUS_EXPR, type,
+		     fold_build2 (RSHIFT_EXPR, type,
+				  fold_build2 (MINUS_EXPR, type, ni_minus_gap,
+					       build_int_cst (type, vf)),
 				  log_vf),
-		     build_int_cst (TREE_TYPE (niters), 1));
+		     build_int_cst (type, 1));
 
   if (!is_gimple_val (niters_vector))
     {
-      var = create_tmp_var (TREE_TYPE (niters), "bnd");
+      var = create_tmp_var (type, "bnd");
       gimple *stmts = NULL;
       niters_vector = force_gimple_operand (niters_vector, &stmts, true, var);
       gsi_insert_seq_on_edge_immediate (pe, stmts);
+      /* Peeling algorithm guarantees that vector loop bound is at least ONE,
+	 we set range information to make niters analyzer's life easier.  */
+      if (TREE_CODE (niters_vector) == SSA_NAME)
+	set_range_info (niters_vector, VR_RANGE, build_int_cst (type, 1),
+			fold_build2 (RSHIFT_EXPR, type,
+				     TYPE_MAX_VALUE (type), log_vf));
     }
   *niters_vector_ptr = niters_vector;
 
@@ -1684,9 +1687,11 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
 
   /* Prolog loop may be skipped.  */
   bool skip_prolog = (prolog_peeling != 0);
-  /* Skip to epilog if scalar loop may be preferred.  It's only used when
-     we peel for epilog loop.  */
-  bool skip_vector = (!LOOP_VINFO_NITERS_KNOWN_P (loop_vinfo));
+  /* Skip to epilog if scalar loop may be preferred.  It's only needed
+     when we peel for epilog loop and when it hasn't been checked with
+     loop versioning.  */
+  bool skip_vector = (!LOOP_VINFO_NITERS_KNOWN_P (loop_vinfo)
+		      && !LOOP_REQUIRES_VERSIONING (loop_vinfo));
   /* Epilog loop must be executed if the number of iterations for epilog
      loop is known at compile time, otherwise we need to add a check at
      the end of vector loop and skip to the end of epilog loop.  */
@@ -1735,6 +1740,7 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
 	  gcc_unreachable ();
 	}
       slpeel_update_phi_nodes_for_loops (loop_vinfo, prolog, loop, true);
+      loop_constraint_set (prolog, LOOP_C_PROLOG);
       first_loop = prolog;
       reset_original_copy_tables ();
 
@@ -1772,6 +1778,11 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
 	= fold_build2 (MINUS_EXPR, type,
 		       LOOP_VINFO_NITERSM1 (loop_vinfo), niters_prolog);
       niters = vect_build_loop_niters (loop_vinfo);
+      /* It's guaranteed that vector loop bound before vectorization is at
+	 least VF, so set range information.  */
+      if (TREE_CODE (niters) == SSA_NAME)
+	set_range_info (niters, VR_RANGE,
+			build_int_cst (type, vf), TYPE_MAX_VALUE (type));
 
       /* Prolog iterates at most bound_prolog times, latch iterates at
 	 most bound_prolog - 1 times.  */
@@ -1799,6 +1810,7 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
 	  gcc_unreachable ();
 	}
       slpeel_update_phi_nodes_for_loops (loop_vinfo, loop, epilog, false);
+      loop_constraint_set (epilog, LOOP_C_EPILOG);
 
       /* Scalar version loop may be preferred.  In this case, add guard
 	 and skip to epilog.  Note this only happens when the number of
@@ -2400,6 +2412,7 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
 			  prob, REG_BR_PROB_BASE - prob,
 			  prob, REG_BR_PROB_BASE - prob, true);
 
+  loop_constraint_set (nloop, LOOP_C_VERSION);
   if (version_niter)
     {
       /* The versioned loop could be infinite, we need to clear existing

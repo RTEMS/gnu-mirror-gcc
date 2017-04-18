@@ -88,6 +88,12 @@ bool aff_comb_cannot_overlap_p (aff_tree *, const widest_int &,
 /* Debugging functions.  */
 void debug_aff (aff_tree *);
 
+static inline tree
+aff_combination_type (aff_tree *aff)
+{
+  return aff->type;
+}
+
 /* Return true if AFF is actually ZERO.  */
 static inline bool
 aff_combination_zero_p (aff_tree *aff)
@@ -101,4 +107,35 @@ aff_combination_zero_p (aff_tree *aff)
   return false;
 }
 
+/* Return true if AFF is actually const.  */
+static inline bool
+aff_combination_const_p (aff_tree *aff)
+{
+  if (!aff)
+    return true;
+
+  if (aff->n == 0)
+    return true;
+
+  return false;
+}
+
+/* Return true if AFF is simple enough.  */
+static inline bool
+aff_combination_simple_p (aff_tree *aff)
+{
+  if (!aff || aff->n == 0)
+    return true;
+
+  if (aff->n > 1)
+    return false;
+
+  if (aff->offset != 0)
+    return false;
+
+  if (aff->elts[0].coef != 1 && aff->elts[0].coef != -1)
+    return false;
+
+  return true;
+}
 #endif /* GCC_TREE_AFFINE_H */

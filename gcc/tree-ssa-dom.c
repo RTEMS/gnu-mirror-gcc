@@ -1764,3 +1764,50 @@ optimize_stmt (basic_block bb, gimple_stmt_iterator si,
     }
   return retval;
 }
+
+/* A local CSE interface which runs CSE for basic blocks recorded in
+   CHANGED_BBS.  */
+
+void
+cse_bbs (bitmap changed_bbs)
+{
+  unsigned index;
+  bitmap_iterator bi;
+  gimple_stmt_iterator gsi;
+
+  hash_table<expr_elt_hasher> *avail_exprs;
+  class avail_exprs_stack *avail_exprs_stack;
+  class const_and_copies *const_and_copies;
+
+  avail_exprs = new hash_table<expr_elt_hasher> (1024);
+  avail_exprs_stack = new class avail_exprs_stack (avail_exprs);
+  const_and_copies = new class const_and_copies ();
+
+  threadedge_initialize_values ();
+  /* Push a marker on the stacks of local information so that we know how
+     far to unwind when we finalize this block.  */
+  avail_exprs_stack->push_marker ();
+  const_and_copies->push_marker ();
+
+  EXECUTE_IF_SET_IN_BITMAP (changed_bbs, 0, index, bi)
+    {
+      basic_block bb = BASIC_BLOCK_FOR_FN (cfun, index);
+
+      if (dump_file && (dump_flags & TDF_DETAILS))
+	fprintf (dump_file, "\n\nRun local cse on block #%d\n\n", bb->index);
+
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+	optimize_stmt (bb, gsi, const_and_copies, avail_exprs_stack);
+
+      /* Pop stacks to keep it small.  */
+      avail_exprs_stack->pop_to_marker ();
+      const_and_copies->pop_to_marker ();
+    }
+
+  delete avail_exprs;
+  avail_exprs = NULL;
+
+  delete avail_exprs_stack;
+  delete const_and_copies;
+  threadedge_finalize_values ();
+}

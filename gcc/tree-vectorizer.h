@@ -797,6 +797,7 @@ struct dataref_aux {
        && TYPE_UNSIGNED (TYPE)))
 
 extern vec<stmt_vec_info> stmt_vec_info_vec;
+extern bitmap changed_bbs;
 
 void init_stmt_vec_info_vec (void);
 void free_stmt_vec_info_vec (void);
