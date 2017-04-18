@@ -1,3 +1,73 @@
+2017-04-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/80443
+	* tree-vrp.c (intersect_ranges): For signed 1-bit precision type,
+	instead of adding 1, subtract -1 and similarly instead of subtracting
+	1 add -1.
+
+2017-04-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR rtl-optimization/80357
+	* haifa-sched.c (tmp_bitmap): New variable.
+	(model_recompute): Handle duplicate use records.
+	(alloc_global_sched_pressure_data): Initialize tmp_bitmap.
+	(free_global_sched_pressure_data): Free it.
+
+2017-04-18  Bernd Edlinger  <bernd.edlinger@hotmail.de>
+
+	Revert:
+	2017-02-20  Bernd Edlinger  <bernd.edlinger@hotmail.de>
+	* Makefile.in (BUILD_SYSTEM_HEADER_DIR): New make variabe.
+	(LIMITS_H_TEST, if_multiarch, stmp-fixinc): Use BUILD_SYSTEM_HEADER_DIR
+	instead of SYSTEM_HEADER_DIR.
+
+2017-04-18  Jeff Law  <law@redhat.com>
+
+	PR middle-end/80422
+	* cfgcleanup.c (try_crossjump_to_edge): Verify SRC1 and SRC2 have
+	predecessors after walking up the insn chain.
+
+2017-04-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/80263
+	* dwarf2out.c (modified_type_die): Try harder not to emit internal
+	sizetype type into debug info.
+
+2017-04-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/80099
+	* config/rs6000/rs6000.c (rs6000_expand_vector_extract): Eliminate
+	unneeded test for TARGET_UPPER_REGS_SF.
+	* config/rs6000/vsx.md (vsx_extract_v4sf_var): Likewise.
+
+2017-04-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/80444
+	* sancov.c (sancov_pass): Use gsi_start_nondebug_after_labels_bb
+	instead of gsi_after_labels.
+
+2017-04-18  Jeff Law  <law@redhat.com>
+
+	* regcprop.c (maybe_mode_change): Avoid creating copies of the
+	stack pointer.
+
+	Revert:
+	2017-04-13  Jeff Law  <law@redhat.com>
+	* config/mips.mips.md (zero_extendsidi2): Do not allow SP to appear
+	in operands[1] if it is a MEM and TARGET_MIPS16 is active.
+
+2017-04-18  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/79453
+	* config/avr/avr.c (intl.h): Include it.
+	(avr_pgm_check_var_decl) [reason]: Wrap	diagnostic snippets into _().
+
+2017-04-18  Martin Liska  <mliska@suse.cz>
+
+	PR gcov-profile/78783
+	* gcov-tool.c (gcov_output_files): Validate that destination
+	file is either removed by the tool or by a user.
+
 2017-04-14  Andrew Burgess  <andrew.burgess@embecosm.com>
 	    Guy Benyei  <guybe@mellanox.com>
 

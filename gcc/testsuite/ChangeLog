@@ -1,3 +1,55 @@
+2017-04-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/80443
+	* gcc.c-torture/compile/pr80443.c: New test.
+
+2017-04-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR rtl-optimization/80357
+	* gcc.c-torture/compile/pr80357.c: New test.
+
+2017-04-18  Jeff Law  <law@redhat.com>
+
+	PR middle-end/80422
+	* gcc.c-torture/compile/pr80422.c: New test.
+
+2017-04-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/80263
+	* gcc.dg/debug/dwarf2/pr80263.c: New test.
+
+2017-04-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/80099
+	* gcc.target/powerpc/pr80099-1.c: New test.
+	* gcc.target/powerpc/pr80099-2.c: Likewise.
+	* gcc.target/powerpc/pr80099-3.c: Likewise.
+	* gcc.target/powerpc/pr80099-4.c: Likewise.
+	* gcc.target/powerpc/pr80099-5.c: Likewise.
+
+2017-04-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/80444
+	* gcc.dg/sancov/pr80444.c: New test.
+
+	PR middle-end/79788
+	PR middle-end/80375
+	* gcc.dg/pr79788-1.c: New test.
+	* gcc.dg/pr79788-2.c: New test.
+
+2017-04-18  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/80244 - ICE with attribute in template alias.
+	* g++.dg/cpp0x/alias-decl-59.C: New test.
+
+	PR c++/80241 - ICE with alignas pack expansion.
+	* g++.dg/cpp0x/alignas11.C: New test.
+
+2017-04-17  Bernd Edlinger  <bernd.edlinger@hotmail.de>
+
+	PR c++/80287
+	* g++.dg/lto/pr80287_0.C: New test.
+
 2017-04-12  Kelvin Nilsen  <kelvin@gcc.gnu.org>
 
 	PR target/80315

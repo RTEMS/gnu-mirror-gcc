@@ -1,5 +1,10 @@
 2017-04-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	Merge up to 246981.
+	* REVISION: Update subversion id.
+
+2017-04-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	PR target/68163
 	* config/rs6000/rs6000.md (mov<mode>_hardfloat): Reorder SF/SD
 	stores, so that all of the vector/fp registers come first, and
