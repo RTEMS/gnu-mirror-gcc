@@ -4281,11 +4281,11 @@ vect_create_addr_base_for_vector_ref (gimple *stmt,
     }
 
   vect_ptr_type = build_pointer_type (STMT_VINFO_VECTYPE (stmt_info));
-  addr_base = force_gimple_operand (addr_base, &seq, true, NULL);
+  dest = vect_get_new_vect_var (vect_ptr_type, vect_pointer_var, base_name);
+  addr_base = force_gimple_operand (addr_base, &seq, true, dest);
   gimple_seq_add_seq (new_stmt_list, seq);
   /* Add constant offset at last.  */
   addr_base = fold_build_pointer_plus (addr_base, init);
-  dest = vect_get_new_vect_var (vect_ptr_type, vect_pointer_var, base_name);
   addr_base = force_gimple_operand (addr_base, &seq, true, dest);
   gimple_seq_add_seq (new_stmt_list, seq);
 
