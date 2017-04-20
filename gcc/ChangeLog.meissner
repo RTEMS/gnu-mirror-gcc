@@ -1,5 +1,11 @@
 2017-04-20  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	PR target/68163
+	* config/rs6000/rs6000.md (mov<mode>_hardfloat): Undo 4/18
+	changes.
+
+2017-04-20  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	Merge up to 247037.
 	* REVISION: Update subversion id.
 
