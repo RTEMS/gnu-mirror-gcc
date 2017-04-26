@@ -847,6 +847,12 @@
   (and (match_operand 0 "memory_operand")
        (match_test "offsettable_nonstrict_memref_p (op)")))
 
+;; Return 1 if the operand is a simple offsettable memory operand
+;; that does not include pre-increment, post-increment, etc.
+(define_predicate "simple_offsettable_mem_operand"
+  (and (match_operand 0 "offsettable_mem_operand")
+       (match_test "GET_RTX_CLASS (GET_CODE (op)) != RTX_AUTOINC")))
+
 ;; Return 1 if the operand is suitable for load/store quad memory.
 ;; This predicate only checks for non-atomic loads/stores (not lqarx/stqcx).
 (define_predicate "quad_memory_operand"
