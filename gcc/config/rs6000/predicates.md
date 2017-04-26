@@ -850,8 +850,18 @@
 ;; Return 1 if the operand is a simple offsettable memory operand
 ;; that does not include pre-increment, post-increment, etc.
 (define_predicate "simple_offsettable_mem_operand"
-  (and (match_operand 0 "offsettable_mem_operand")
-       (match_test "GET_RTX_CLASS (GET_CODE (op)) != RTX_AUTOINC")))
+  (match_operand 0 "offsettable_mem_operand")
+{
+  rtx addr = XEXP (op, 0);
+  rtx add_op0, add_op1;
+
+  if (GET_CODE (addr) != PLUS && GET_CODE (addr) != LO_SUM)
+    return 0;
+
+  add_op0 = XEXP (addr, 0);
+  add_op1 = XEXP (addr, 1);
+  return (REG_P (add_op0) && CONSTANT_P (add_op1));
+})
 
 ;; Return 1 if the operand is suitable for load/store quad memory.
 ;; This predicate only checks for non-atomic loads/stores (not lqarx/stqcx).
