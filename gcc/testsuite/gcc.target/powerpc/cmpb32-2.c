@@ -2,18 +2,13 @@
 /* { dg-skip-if "do not override -mcpu" { powerpc*-*-* } { "-mcpu=*" } { "-mcpu=power5" } } */
 /* { dg-require-effective-target powerpc_popcntb_ok } */
 /* { dg-options "-mcpu=power5" } */
-/* { dg-excess-errors "expect error due to unresolved reference" } */
-/* Since the error message is not associated with a particular line
-   number, we cannot use the dg-error directive and cannot specify a
-   regexp to describe the expected error message.  The expected error
-   message is: "undefined reference to `__builtin_cmpb_32'"  */
 
 void abort ();
 
 int
 do_compare (int a, int b)
 {
-  return __builtin_cmpb_32 (a, b);
+  return __builtin_cmpb_32 (a, b);  /* { dg-warning "implicit declaration of function '__builtin_cmpb_32'" } */
 }
 
 void

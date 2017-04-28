@@ -3,11 +3,6 @@
 /* { dg-require-effective-target lp64 } */
 /* { dg-require-effective-target powerpc_popcntb_ok } */
 /* { dg-options "-mcpu=power5" } */
-/* { dg-excess-errors "expect error due to unresolved reference" } */
-/* Since the error message is not associated with a particular line
-   number, we cannot use the dg-error directive and cannot specify a
-   regexp to describe the expected error message.  The expected error
-   message is: "undefined reference to `__builtin_cmpb'"  */
 
 void abort ();
 
