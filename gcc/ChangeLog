@@ -1,3 +1,38 @@
+2017-05-02  Uros Bizjak  <ubizjak@gmail.com>
+
+	Backport from mainline
+	2017-05-01  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/68491
+	* config/i386/cpuid.h (__get_cpuid): Always return 0 when
+	__get_cpuid_max returns 0.
+	(__get_cpuid_count): Ditto.
+
+2017-05-02  Jakub Jelinek <jakub@redhat.com>
+
+	Backported from mainline
+	2017-04-25 Jakub Jelinek <jakub@redhat.com>
+
+	* Makefile.in (s-options): Invoke opt-gather.awk with LC_ALL=C in the
+	environment.
+
+2017-05-02  Jakub Jelinek  <jakub@redhat.com>
+
+	* BASE-VER: Set to 7.1.1.
+
+2017-05-02  Release Manager
+
+	* GCC 7.1.0 released.
+
+2017-05-02  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/80591
+	Revert
+	2017-04-10  Richard Biener  <rguenther@suse.de>
+
+	* tree-ssa-structalias.c (find_func_aliases): Properly handle
+	asm inputs.
+
 2017-04-28  Jakub Jelinek  <jakub@redhat.com>
 
 	PR bootstrap/80531
