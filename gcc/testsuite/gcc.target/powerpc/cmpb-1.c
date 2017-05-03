@@ -6,14 +6,14 @@
 
 void abort ();
 
-long long int
-do_compare (long long int a, long long int b)
+unsigned long long int
+do_compare (unsigned long long int a, unsigned long long int b)
 {
   return __builtin_cmpb (a, b);
 }
 
 void
-expect (long long int pattern, long long int value)
+expect (unsigned long long int pattern, unsigned long long int value)
 {
   if (pattern != value)
     abort ();
@@ -22,10 +22,10 @@ expect (long long int pattern, long long int value)
 int
 main (int argc, char *argv[])
 {
-  expect (0xff00000000000000,
-	  do_compare (0x0123456789abcdef, 0x0100000000000000));
+  expect (0xff00000000000000LL,
+	  do_compare (0x0123456789abcdefLL, 0x0100000000000000LL));
   expect (0x00ffffffffffffff,
-	  do_compare (0x0123456789abcdef, 0x0023456789abcdef));
+	  do_compare (0x0123456789abcdefLL, 0x0023456789abcdefLL));
   expect (0x00000000000000ff,
-	  do_compare (0x00000000000000ef, 0x0123456789abcdef));
+	  do_compare (0x00000000000000efLL, 0x0123456789abcdefLL));
 }

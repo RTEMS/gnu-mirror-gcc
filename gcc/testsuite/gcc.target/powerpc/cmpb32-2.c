@@ -5,14 +5,14 @@
 
 void abort ();
 
-int
-do_compare (int a, int b)
+unsigned int
+do_compare (unsigned int a, unsigned int b)
 {
-  return __builtin_cmpb_32 (a, b);  /* { dg-warning "implicit declaration of function '__builtin_cmpb_32'" } */
+  return __builtin_cmpb (a, b);  /* { dg-warning "implicit declaration of function '__builtin_cmpb'" } */
 }
 
 void
-expect (int pattern, int value)
+expect (unsigned int pattern, unsigned int value)
 {
   if (pattern != value)
     abort ();

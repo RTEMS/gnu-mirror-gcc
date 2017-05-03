@@ -32,7 +32,10 @@
 #include "c-family/c-pragma.h"
 #include "langhooks.h"
 #include "c/c-tree.h"
-
+#define KELVIN_DEBUG
+#ifdef KELVIN_DEBUG
+#include "print-tree.h"
+#endif
 
 
 /* Handle the machine specific pragma longcall.  Its syntax is
@@ -5348,6 +5351,11 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_unsigned_V1TI, RS6000_BTI_unsigned_V1TI,
     RS6000_BTI_unsigned_V1TI, 0 },
 
+  { P6_OV_BUILTIN_CMPB, P6_BUILTIN_CMPB_32,
+    RS6000_BTI_UINTSI, RS6000_BTI_UINTSI, RS6000_BTI_UINTSI, 0 },
+  { P6_OV_BUILTIN_CMPB, P6_BUILTIN_CMPB,
+    RS6000_BTI_UINTDI, RS6000_BTI_UINTDI, RS6000_BTI_UINTDI, 0 },
+
   { P8V_BUILTIN_VEC_VUPKHSW, P8V_BUILTIN_VUPKHSW,
     RS6000_BTI_V2DI, RS6000_BTI_V4SI, 0, 0 },
   { P8V_BUILTIN_VEC_VUPKHSW, P8V_BUILTIN_VUPKHSW,
@@ -5565,6 +5573,10 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
   if (!rs6000_overloaded_builtin_p (fcode))
     return NULL_TREE;
 
+#ifdef KELVIN_DEBUG
+    fprintf (stderr, "altivec_resolve_overloaded_builtin, code = %4d, %s\n",
+	     (int)fcode, IDENTIFIER_POINTER (DECL_NAME (fndecl)));
+#endif
   if (TARGET_DEBUG_BUILTIN)
     fprintf (stderr, "altivec_resolve_overloaded_builtin, code = %4d, %s\n",
 	     (int)fcode, IDENTIFIER_POINTER (DECL_NAME (fndecl)));
@@ -6252,12 +6264,23 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	       desc->code && desc->code != fcode; desc++)
 	    continue;
 
+#ifdef KELVIN_DEBUG
+	  fprintf (stderr, "A: desc->code == fcode: %d\n", fcode);
+	  fprintf (stderr, "arg0: "); debug_tree (arg0);
+	  fprintf (stderr, "arg1: "); debug_tree (arg1);
+#endif
 	  for (; desc->code == fcode; desc++)
 	    if (rs6000_builtin_type_compatible (TREE_TYPE (arg0), desc->op1)
 		&& (rs6000_builtin_type_compatible (TREE_TYPE (arg1),
 						    desc->op2)))
 	      {
 		tree ret_type = rs6000_builtin_type (desc->ret_type);
+#ifdef KELVIN_DEBUG
+		fprintf (stderr, "arg0 is type_compatible with: %d\n",
+			 desc->op1);
+		fprintf (stderr, "and arg1 is type_compatible with: %d\n",
+			 desc->op2);
+#endif
 		if (TYPE_MODE (ret_type) == V2DImode)
 		  /* Type-based aliasing analysis thinks vector long
 		     and vector long long are different and will put them
@@ -6313,6 +6336,11 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	       desc->code && desc->code != fcode; desc++)
 	    continue;
 
+#ifdef KELVIN_DEBUG
+	  fprintf (stderr, "B: desc->code == fcode: %d\n", fcode);
+	  fprintf (stderr, "arg0: "); debug_tree (arg0);
+	  fprintf (stderr, "arg1: "); debug_tree (arg1);
+#endif
 	  for (; desc->code == fcode; desc++)
 	    if (rs6000_builtin_type_compatible (TREE_TYPE (arg0), desc->op1)
 		&& rs6000_builtin_type_compatible (TREE_TYPE (arg1), desc->op2)
@@ -6320,6 +6348,12 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 						   desc->op3))
 	      {
 		tree arg0_type = TREE_TYPE (arg0);
+#ifdef KELVIN_DEBUG
+		fprintf (stderr, "arg0 is type_compatible with: %d\n",
+			 desc->op1);
+		fprintf (stderr, "and arg1 is type_compatible with: %d\n",
+			 desc->op2);
+#endif
 		if (TYPE_MODE (arg0_type) == V2DImode)
 		  /* Type-based aliasing analysis thinks vector long
 		     and vector long long are different and will put them
@@ -6409,11 +6443,23 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
     for (desc = altivec_overloaded_builtins;
 	 desc->code && desc->code != fcode; desc++)
       continue;
-    
+
+#ifdef KELVIN_DEBUG
+    fprintf (stderr, "C: desc->code == fcode: %d\n", fcode);
+    fprintf (stderr, " types[0]: "); debug_tree (types[0]);
+    fprintf (stderr, " types[1]: "); debug_tree (types[1]);
+    fprintf (stderr, " types[2]: "); debug_tree (types[2]);
+#endif
     /* For arguments after the last, we have RS6000_BTI_NOT_OPAQUE in
        the opX fields.  */
     for (; desc->code == fcode; desc++)
       {
+#ifdef KELVIN_DEBUG
+	fprintf (stderr, "considering overloaded code: %d\n",
+		 desc->overloaded_code);
+	fprintf (stderr, " desc->op1: %d, op2: %d, op3: %d\n",
+		 desc->op1, desc->op2, desc->op3);
+#endif
 	if ((desc->op1 == RS6000_BTI_NOT_OPAQUE
 	     || rs6000_builtin_type_compatible (types[0], desc->op1))
 	    && (desc->op2 == RS6000_BTI_NOT_OPAQUE
@@ -6421,6 +6467,13 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	    && (desc->op3 == RS6000_BTI_NOT_OPAQUE
 		|| rs6000_builtin_type_compatible (types[2], desc->op3)))
 	  {
+#ifdef KELVIN_DEBUG
+	    fprintf (stderr, "Satisfied conditions, overloaded_code: %d\n",
+		     desc->overloaded_code);
+	    fprintf (stderr, " rs6000_builtin_decls[overloaded_code] is %s\n",
+		     (rs6000_builtin_decls[desc->overloaded_code] != NULL_TREE)?
+		     "not NULL": "NULL");
+#endif
 	    if (rs6000_builtin_decls[desc->overloaded_code] != NULL_TREE)
 	      return altivec_build_resolved_builtin (args, n, desc);
 	    else
