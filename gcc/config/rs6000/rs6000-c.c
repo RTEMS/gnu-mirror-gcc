@@ -6450,37 +6450,76 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
     fprintf (stderr, " types[1]: "); debug_tree (types[1]);
     fprintf (stderr, " types[2]: "); debug_tree (types[2]);
 #endif
-    /* For arguments after the last, we have RS6000_BTI_NOT_OPAQUE in
-       the opX fields.  */
-    for (; desc->code == fcode; desc++)
+
+    /* Need to special case __builtin_cmp because the overloaded forms
+       of this function take (unsigned int, unsigned int) or (unsigned
+       long long int, unsigned long long int), and since C conventions
+       allow the respective argument types to be implicitly coerced into
+       each other, the default handling does not provide adequate
+       discrimination between the desired forms of the function.  */
+    if (fcode == P6_OV_BUILTIN_CMPB)
       {
-#ifdef KELVIN_DEBUG
-	fprintf (stderr, "considering overloaded code: %d\n",
-		 desc->overloaded_code);
-	fprintf (stderr, " desc->op1: %d, op2: %d, op3: %d\n",
-		 desc->op1, desc->op2, desc->op3);
-#endif
-	if ((desc->op1 == RS6000_BTI_NOT_OPAQUE
-	     || rs6000_builtin_type_compatible (types[0], desc->op1))
-	    && (desc->op2 == RS6000_BTI_NOT_OPAQUE
-		|| rs6000_builtin_type_compatible (types[1], desc->op2))
-	    && (desc->op3 == RS6000_BTI_NOT_OPAQUE
-		|| rs6000_builtin_type_compatible (types[2], desc->op3)))
+	int overloaded_code;
+	int arg1_mode = TYPE_MODE (types[0]);
+	int arg2_mode = TYPE_MODE (types[1]);
+
+	if (nargs != 2)
 	  {
-#ifdef KELVIN_DEBUG
-	    fprintf (stderr, "Satisfied conditions, overloaded_code: %d\n",
-		     desc->overloaded_code);
-	    fprintf (stderr, " rs6000_builtin_decls[overloaded_code] is %s\n",
-		     (rs6000_builtin_decls[desc->overloaded_code] != NULL_TREE)?
-		     "not NULL": "NULL");
-#endif
-	    if (rs6000_builtin_decls[desc->overloaded_code] != NULL_TREE)
-	      return altivec_build_resolved_builtin (args, n, desc);
-	    else
-	      unsupported_builtin = true;
+	    error ("__builtin_cmpb only accepts 2 arguments");
+	    return error_mark_node;
+	  }
+
+      /* If any supplied arguments are wider than 32 bits, resolve to
+	 64-bit variant of built-in function.  */
+      if ((arg1_mode == TImode) || (arg1_mode == DImode) ||
+	  (arg2_mode == TImode) || (arg2_mode == DImode))
+	{
+	  /* Assure all argument and result types are compatible with
+	     the built-in function represented by P6_BUILTIN_CMPB.  */
+	  overloaded_code = P6_BUILTIN_CMPB;
+	}
+      else
+	{
+	  /* Assure all argument and result types are compatible with
+	     the built-in function represented by P6_BUILTIN_CMPB_32.  */
+	  overloaded_code = P6_BUILTIN_CMPB_32;
+	}
+
+      while (desc->code && desc->code == fcode &&
+	     desc->overloaded_code != overloaded_code)
+	desc++;
+
+      if (desc->code && (desc->code == fcode)
+	  && rs6000_builtin_type_compatible (types[0], desc->op1)
+	  && rs6000_builtin_type_compatible (types[1], desc->op2))
+	{
+	  if (rs6000_builtin_decls[desc->overloaded_code] != NULL_TREE)
+	    return altivec_build_resolved_builtin (args, n, desc);
+	  else
+	    unsupported_builtin = true;
+	}
+      }
+    else
+      {
+	/* For arguments after the last, we have RS6000_BTI_NOT_OPAQUE in
+	   the opX fields.  */
+	for (; desc->code == fcode; desc++)
+	  {
+	    if ((desc->op1 == RS6000_BTI_NOT_OPAQUE
+		 || rs6000_builtin_type_compatible (types[0], desc->op1))
+		&& (desc->op2 == RS6000_BTI_NOT_OPAQUE
+		    || rs6000_builtin_type_compatible (types[1], desc->op2))
+		&& (desc->op3 == RS6000_BTI_NOT_OPAQUE
+		    || rs6000_builtin_type_compatible (types[2], desc->op3)))
+	      {
+		if (rs6000_builtin_decls[desc->overloaded_code] != NULL_TREE)
+		  return altivec_build_resolved_builtin (args, n, desc);
+		else
+		  unsupported_builtin = true;
+	      }
 	  }
       }
-    
+
     if (unsupported_builtin)
       {
 	const char *name = rs6000_overloaded_builtin_name (fcode);
