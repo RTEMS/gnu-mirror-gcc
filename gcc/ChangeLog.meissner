@@ -1,3 +1,35 @@
+2017-05-05  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (toplevel): Include attribs.h.
+	(enum clone_list): New enumeration of the various PowerPC target
+	clones that are supported.
+	(rs6000_clone_map): New mapping between compiler ISA flag and
+	HWCAP/HWCAP2 name.
+	(TARGET_COMPARE_VERSION_PRIORITY): New defines to enable
+	target_clone attribute.
+	(TARGET_GENERATE_VERSION_DISPATCHER_BODY): Likewise.
+	(TARGET_GET_FUNCTION_VERSIONS_DISPATCHER): Likewise.
+	(TARGET_OPTION_FUNCTION_VERSIONS): Likewise.
+	(cpu_expand_builtin): Add support for target clone attribute.
+	(rs6000_valid_attribute_p): Likewise.
+	(get_decl_name): New helper function for debug functions.
+	(rs6000_clone_priority): New functions to support the target clone
+	attribute that allows a user to compile functions that have
+	automatic versioning between ISA 2.05/2.06/2.07/3.0.
+	(rs6000_compare_version_priority): Likewise.
+	(make_name): Likewise.
+	(make_dispatcher_decl): Likewise.
+	(is_function_default_version): Likewise.
+	(rs6000_get_function_versions_dispatcher): Likewise.
+	(make_resolver_func): Likewise.
+	(add_condition_to_bb): Likewise.
+	(dispatch_function_versions): Likewise.
+	(rs6000_generate_version_dispatcher_body): Likewise.
+	(attr_strcmp): Likewise.
+	(sorted_attr_string): Likewise.
+	(rs6000_function_verisons): Likewise.
+	(rs6000_can_inline_p): Use get_decl_name.
+
 2017-04-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	PR target/80510
