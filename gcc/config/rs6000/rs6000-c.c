@@ -32,10 +32,7 @@
 #include "c-family/c-pragma.h"
 #include "langhooks.h"
 #include "c/c-tree.h"
-#undef KELVIN_DEBUG
-#ifdef KELVIN_DEBUG
-#include "print-tree.h"
-#endif
+
 
 
 /* Handle the machine specific pragma longcall.  Its syntax is
@@ -5573,10 +5570,6 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
   if (!rs6000_overloaded_builtin_p (fcode))
     return NULL_TREE;
 
-#ifdef KELVIN_DEBUG
-    fprintf (stderr, "altivec_resolve_overloaded_builtin, code = %4d, %s\n",
-	     (int)fcode, IDENTIFIER_POINTER (DECL_NAME (fndecl)));
-#endif
   if (TARGET_DEBUG_BUILTIN)
     fprintf (stderr, "altivec_resolve_overloaded_builtin, code = %4d, %s\n",
 	     (int)fcode, IDENTIFIER_POINTER (DECL_NAME (fndecl)));
@@ -6264,23 +6257,12 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	       desc->code && desc->code != fcode; desc++)
 	    continue;
 
-#ifdef KELVIN_DEBUG
-	  fprintf (stderr, "A: desc->code == fcode: %d\n", fcode);
-	  fprintf (stderr, "arg0: "); debug_tree (arg0);
-	  fprintf (stderr, "arg1: "); debug_tree (arg1);
-#endif
 	  for (; desc->code == fcode; desc++)
 	    if (rs6000_builtin_type_compatible (TREE_TYPE (arg0), desc->op1)
 		&& (rs6000_builtin_type_compatible (TREE_TYPE (arg1),
 						    desc->op2)))
 	      {
 		tree ret_type = rs6000_builtin_type (desc->ret_type);
-#ifdef KELVIN_DEBUG
-		fprintf (stderr, "arg0 is type_compatible with: %d\n",
-			 desc->op1);
-		fprintf (stderr, "and arg1 is type_compatible with: %d\n",
-			 desc->op2);
-#endif
 		if (TYPE_MODE (ret_type) == V2DImode)
 		  /* Type-based aliasing analysis thinks vector long
 		     and vector long long are different and will put them
@@ -6336,11 +6318,6 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	       desc->code && desc->code != fcode; desc++)
 	    continue;
 
-#ifdef KELVIN_DEBUG
-	  fprintf (stderr, "B: desc->code == fcode: %d\n", fcode);
-	  fprintf (stderr, "arg0: "); debug_tree (arg0);
-	  fprintf (stderr, "arg1: "); debug_tree (arg1);
-#endif
 	  for (; desc->code == fcode; desc++)
 	    if (rs6000_builtin_type_compatible (TREE_TYPE (arg0), desc->op1)
 		&& rs6000_builtin_type_compatible (TREE_TYPE (arg1), desc->op2)
@@ -6348,12 +6325,6 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 						   desc->op3))
 	      {
 		tree arg0_type = TREE_TYPE (arg0);
-#ifdef KELVIN_DEBUG
-		fprintf (stderr, "arg0 is type_compatible with: %d\n",
-			 desc->op1);
-		fprintf (stderr, "and arg1 is type_compatible with: %d\n",
-			 desc->op2);
-#endif
 		if (TYPE_MODE (arg0_type) == V2DImode)
 		  /* Type-based aliasing analysis thinks vector long
 		     and vector long long are different and will put them
@@ -6444,16 +6415,9 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	 desc->code && desc->code != fcode; desc++)
       continue;
 
-#ifdef KELVIN_DEBUG
-    fprintf (stderr, "C: desc->code == fcode: %d\n", fcode);
-    fprintf (stderr, " types[0]: "); debug_tree (types[0]);
-    fprintf (stderr, " types[1]: "); debug_tree (types[1]);
-    fprintf (stderr, " types[2]: "); debug_tree (types[2]);
-#endif
-
     /* Need to special case __builtin_cmp because the overloaded forms
        of this function take (unsigned int, unsigned int) or (unsigned
-       long long int, unsigned long long int), and since C conventions
+       long long int, unsigned long long int).  Since C conventions
        allow the respective argument types to be implicitly coerced into
        each other, the default handling does not provide adequate
        discrimination between the desired forms of the function.  */
