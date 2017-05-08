@@ -1,3 +1,49 @@
+2017-05-08  Jason Merrill  <jason@redhat.com>
+
+	* c-opts.c (c_common_post_options): Update defaults for
+	flag_abi_version and flag_abi_compat_version.
+
+2017-05-05  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-common.c (c_cpp_error): Replace report_diagnostic
+	with diagnostic_report_diagnostic.
+
+2017-05-04  Martin Sebor  <msebor@redhat.com>
+
+	PR translation/80280
+	* c-attribs.c (handle_alias_ifunc_attribute): Quote a %D directive.
+	(handle_weakref_attribute): Same.
+
+2017-05-03  Nathan Sidwell  <nathan@acm.org>
+
+	Canonicalize canonical type hashing
+	* c-common.c (complete_array_type): Use type_hash_canon.
+
+2017-05-01  Xi Ruoyao  <ryxi@stu.xidian.edu.cn>
+
+        PR c++/80038
+	* c-common.h (cilk_gimplify_call_params_in_spawned_fn): Remove
+	prototype.
+	(cilk_install_body_pedigree_operations): Likewise.
+	* cilk.c (cilk_set_spawn_marker): Mark functions that should be
+	detatched.
+	(cilk_gimplify_call_params_in_spawned_fn): Remove.
+	(cilk_install_body_pedigree_operations): Likewise.
+	(gimplify_cilk_spawn): Add EXPR_STMT and CLEANUP_POINT_EXPR
+	unwrapping.
+
+2017-04-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/80534
+	* c-common.c (complete_array_type): Only hash TYPE_TYPELESS_STORAGE
+	flag on non-aggregate element types.
+
+2017-04-25  Bernd Edlinger  <bernd.edlinger@hotmail.de>
+
+	* c-common.c (c_type_hasher, type_hash_table): Remove.
+	(c_common_get_alias_set): Remove unreachable code.
+	* c-opts.c (c_common_post_options): Make sure cc1 takes only one file.
+
 2017-04-20  Volker Reichelt  <v.reichelt@netcologne.de>
 
 	* c.opt (Wextra-semi): New C++ warning flag.

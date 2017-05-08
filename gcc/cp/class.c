@@ -1305,8 +1305,7 @@ alter_access (tree t, tree fdecl, tree access)
 {
   tree elem;
 
-  if (!DECL_LANG_SPECIFIC (fdecl))
-    retrofit_lang_decl (fdecl);
+  retrofit_lang_decl (fdecl);
 
   gcc_assert (!DECL_DISCRIMINATOR_P (fdecl));
 
@@ -9770,11 +9769,19 @@ build_vtbl_initializer (tree binfo,
 	  /* Likewise for deleted virtuals.  */
 	  else if (DECL_DELETED_FN (fn_original))
 	    {
-	      fn = get_identifier ("__cxa_deleted_virtual");
-	      if (!get_global_value_if_present (fn, &fn))
-		fn = push_library_fn (fn, (build_function_type_list
-					   (void_type_node, NULL_TREE)),
-				      NULL_TREE, ECF_NORETURN);
+	      static tree dvirt_fn;
+
+	      if (!dvirt_fn)
+		{
+		  tree name = get_identifier ("__cxa_deleted_virtual");
+		  dvirt_fn = IDENTIFIER_GLOBAL_VALUE (name);
+		  if (!dvirt_fn)
+		    dvirt_fn = push_library_fn
+		      (name,
+		       build_function_type_list (void_type_node, NULL_TREE),
+		       NULL_TREE, ECF_NORETURN);
+		}
+	      fn = dvirt_fn;
 	      if (!TARGET_VTABLE_USES_DESCRIPTORS)
 		init = fold_convert (vfunc_ptr_type_node,
 				     build_fold_addr_expr (fn));
@@ -9783,7 +9790,8 @@ build_vtbl_initializer (tree binfo,
 	    {
 	      if (!integer_zerop (delta) || vcall_index)
 		{
-		  fn = make_thunk (fn, /*this_adjusting=*/1, delta, vcall_index);
+		  fn = make_thunk (fn, /*this_adjusting=*/1,
+				   delta, vcall_index);
 		  if (!DECL_NAME (fn))
 		    finish_thunk (fn);
 		}

@@ -817,19 +817,23 @@ bitmap_set_and (bitmap_set_t dest, bitmap_set_t orig)
 
   if (dest != orig)
     {
-      bitmap_head temp;
-      bitmap_initialize (&temp, &grand_bitmap_obstack);
-
       bitmap_and_into (&dest->values, &orig->values);
-      bitmap_copy (&temp, &dest->expressions);
-      EXECUTE_IF_SET_IN_BITMAP (&temp, 0, i, bi)
+
+      unsigned int to_clear = -1U;
+      FOR_EACH_EXPR_ID_IN_SET (dest, i, bi)
 	{
+	  if (to_clear != -1U)
+	    {
+	      bitmap_clear_bit (&dest->expressions, to_clear);
+	      to_clear = -1U;
+	    }
 	  pre_expr expr = expression_for_id (i);
 	  unsigned int value_id = get_expr_value_id (expr);
 	  if (!bitmap_bit_p (&dest->values, value_id))
-	    bitmap_clear_bit (&dest->expressions, i);
+	    to_clear = i;
 	}
-      bitmap_clear (&temp);
+      if (to_clear != -1U)
+	bitmap_clear_bit (&dest->expressions, to_clear);
     }
 }
 
@@ -862,18 +866,20 @@ bitmap_set_subtract_values (bitmap_set_t a, bitmap_set_t b)
 {
   unsigned int i;
   bitmap_iterator bi;
-  bitmap_head temp;
-
-  bitmap_initialize (&temp, &grand_bitmap_obstack);
-
-  bitmap_copy (&temp, &a->expressions);
-  EXECUTE_IF_SET_IN_BITMAP (&temp, 0, i, bi)
+  pre_expr to_remove = NULL;
+  FOR_EACH_EXPR_ID_IN_SET (a, i, bi)
     {
+      if (to_remove)
+	{
+	  bitmap_remove_from_set (a, to_remove);
+	  to_remove = NULL;
+	}
       pre_expr expr = expression_for_id (i);
       if (bitmap_set_contains_value (b, get_expr_value_id (expr)))
-	bitmap_remove_from_set (a, expr);
+	to_remove = expr;
     }
-  bitmap_clear (&temp);
+  if (to_remove)
+    bitmap_remove_from_set (a, to_remove);
 }
 
 
@@ -1173,31 +1179,7 @@ get_or_alloc_expr_for (tree t)
     return get_or_alloc_expr_for_name (t);
   else if (is_gimple_min_invariant (t))
     return get_or_alloc_expr_for_constant (t);
-  else
-    {
-      /* More complex expressions can result from SCCVN expression
-	 simplification that inserts values for them.  As they all
-	 do not have VOPs the get handled by the nary ops struct.  */
-      vn_nary_op_t result;
-      unsigned int result_id;
-      vn_nary_op_lookup (t, &result);
-      if (result != NULL)
-	{
-	  pre_expr e = pre_expr_pool.allocate ();
-	  e->kind = NARY;
-	  PRE_EXPR_NARY (e) = result;
-	  result_id = lookup_expression_id (e);
-	  if (result_id != 0)
-	    {
-	      pre_expr_pool.remove (e);
-	      e = expression_for_id (result_id);
-	      return e;
-	    }
-	  alloc_expression_id (e);
-	  return e;
-	}
-    }
-  return NULL;
+  gcc_unreachable ();
 }
 
 /* Return the folded version of T if T, when folded, is a gimple
@@ -1313,17 +1295,20 @@ translate_vuse_through_block (vec<vn_reference_op_s> operands,
 }
 
 /* Like bitmap_find_leader, but checks for the value existing in SET1 *or*
-   SET2.  This is used to avoid making a set consisting of the union
-   of PA_IN and ANTIC_IN during insert.  */
+   SET2 *or* SET3.  This is used to avoid making a set consisting of the union
+   of PA_IN and ANTIC_IN during insert and phi-translation.  */
 
 static inline pre_expr
-find_leader_in_sets (unsigned int val, bitmap_set_t set1, bitmap_set_t set2)
+find_leader_in_sets (unsigned int val, bitmap_set_t set1, bitmap_set_t set2,
+		     bitmap_set_t set3 = NULL)
 {
   pre_expr result;
 
   result = bitmap_find_leader (set1, val);
   if (!result && set2)
     result = bitmap_find_leader (set2, val);
+  if (!result && set3)
+    result = bitmap_find_leader (set3, val);
   return result;
 }
 
@@ -1478,7 +1463,8 @@ phi_translate_1 (pre_expr expr, bitmap_set_t set1, bitmap_set_t set2,
 		    else
 		      {
 			unsigned value_id = get_expr_value_id (constant);
-			constant = find_leader_in_sets (value_id, set1, set2);
+			constant = find_leader_in_sets (value_id, set1, set2,
+							AVAIL_OUT (pred));
 			if (constant)
 			  return constant;
 		      }
@@ -5082,11 +5068,7 @@ pass_pre::execute (function *fun)
      loop_optimizer_init may create new phis, etc.  */
   loop_optimizer_init (LOOPS_NORMAL);
 
-  if (!run_scc_vn (VN_WALK))
-    {
-      loop_optimizer_finalize ();
-      return 0;
-    }
+  run_scc_vn (VN_WALK);
 
   init_pre ();
   scev_initialize ();
@@ -5198,8 +5180,7 @@ pass_fre::execute (function *fun)
 {
   unsigned int todo = 0;
 
-  if (!run_scc_vn (VN_WALKREWRITE))
-    return 0;
+  run_scc_vn (VN_WALKREWRITE);
 
   memset (&pre_stats, 0, sizeof (pre_stats));
 

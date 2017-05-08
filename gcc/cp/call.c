@@ -3457,26 +3457,26 @@ print_z_candidate (location_t loc, const char *msgstr,
     {
       cloc = loc;
       if (candidate->num_convs == 3)
-	inform (cloc, "%s%D(%T, %T, %T) <built-in>", msg, fn,
+	inform (cloc, "%s%<%D(%T, %T, %T)%> <built-in>", msg, fn,
 		candidate->convs[0]->type,
 		candidate->convs[1]->type,
 		candidate->convs[2]->type);
       else if (candidate->num_convs == 2)
-	inform (cloc, "%s%D(%T, %T) <built-in>", msg, fn,
+	inform (cloc, "%s%<%D(%T, %T)%> <built-in>", msg, fn,
 		candidate->convs[0]->type,
 		candidate->convs[1]->type);
       else
-	inform (cloc, "%s%D(%T) <built-in>", msg, fn,
+	inform (cloc, "%s%<%D(%T)%> <built-in>", msg, fn,
 		candidate->convs[0]->type);
     }
   else if (TYPE_P (fn))
-    inform (cloc, "%s%T <conversion>", msg, fn);
+    inform (cloc, "%s%qT <conversion>", msg, fn);
   else if (candidate->viable == -1)
-    inform (cloc, "%s%#D <near match>", msg, fn);
+    inform (cloc, "%s%#qD <near match>", msg, fn);
   else if (DECL_DELETED_FN (fn))
-    inform (cloc, "%s%#D <deleted>", msg, fn);
+    inform (cloc, "%s%#qD <deleted>", msg, fn);
   else
-    inform (cloc, "%s%#D", msg, fn);
+    inform (cloc, "%s%#qD", msg, fn);
   if (fn != candidate->fn)
     {
       cloc = location_of (candidate->fn);
@@ -4426,7 +4426,8 @@ build_op_call_1 (tree obj, vec<tree, va_gc> **args, tsubst_flags_t complain)
       if (complain & tf_error)
         /* It's no good looking for an overloaded operator() on a
            pointer-to-member-function.  */
-        error ("pointer-to-member function %E cannot be called without an object; consider using .* or ->*", obj);
+	error ("pointer-to-member function %qE cannot be called without "
+	       "an object; consider using %<.*%> or %<->*%>", obj);
       return error_mark_node;
     }
 
@@ -7351,17 +7352,21 @@ convert_for_arg_passing (tree type, tree val, tsubst_flags_t complain)
 	   && COMPLETE_TYPE_P (type)
 	   && tree_int_cst_lt (TYPE_SIZE (type), TYPE_SIZE (integer_type_node)))
     val = cp_perform_integral_promotions (val, complain);
-  if ((complain & tf_warning)
-      && warn_suggest_attribute_format)
+  if (complain & tf_warning)
     {
-      tree rhstype = TREE_TYPE (val);
-      const enum tree_code coder = TREE_CODE (rhstype);
-      const enum tree_code codel = TREE_CODE (type);
-      if ((codel == POINTER_TYPE || codel == REFERENCE_TYPE)
-	  && coder == codel
-	  && check_missing_format_attribute (type, rhstype))
-	warning (OPT_Wsuggest_attribute_format,
-		 "argument of function call might be a candidate for a format attribute");
+      if (warn_suggest_attribute_format)
+	{
+	  tree rhstype = TREE_TYPE (val);
+	  const enum tree_code coder = TREE_CODE (rhstype);
+	  const enum tree_code codel = TREE_CODE (type);
+	  if ((codel == POINTER_TYPE || codel == REFERENCE_TYPE)
+	      && coder == codel
+	      && check_missing_format_attribute (type, rhstype))
+	    warning (OPT_Wsuggest_attribute_format,
+		     "argument of function call might be a candidate "
+		     "for a format attribute");
+	}
+      maybe_warn_parm_abi (type, EXPR_LOC_OR_LOC (val, input_location));
     }
   return val;
 }
@@ -8233,7 +8238,10 @@ build_cxx_call (tree fn, int nargs, tree *argarray,
 	return error_mark_node;
 
       if (MAYBE_CLASS_TYPE_P (TREE_TYPE (fn)))
-	fn = build_cplus_new (TREE_TYPE (fn), fn, complain);
+	{
+	  fn = build_cplus_new (TREE_TYPE (fn), fn, complain);
+	  maybe_warn_parm_abi (TREE_TYPE (fn), loc);
+	}
     }
   return convert_from_reference (fn);
 }
@@ -10233,10 +10241,7 @@ perform_direct_initialization_if_possible (tree type,
 tree
 make_temporary_var_for_ref_to_temp (tree decl, tree type)
 {
-  tree var;
-
-  /* Create the variable.  */
-  var = create_temporary_var (type);
+  tree var = create_temporary_var (type);
 
   /* Register the variable.  */
   if (VAR_P (decl)
@@ -10244,15 +10249,16 @@ make_temporary_var_for_ref_to_temp (tree decl, tree type)
     {
       /* Namespace-scope or local static; give it a mangled name.  */
       /* FIXME share comdat with decl?  */
-      tree name;
 
       TREE_STATIC (var) = TREE_STATIC (decl);
       CP_DECL_THREAD_LOCAL_P (var) = CP_DECL_THREAD_LOCAL_P (decl);
       set_decl_tls_model (var, DECL_TLS_MODEL (decl));
-      name = mangle_ref_init_variable (decl);
+
+      tree name = mangle_ref_init_variable (decl);
       DECL_NAME (var) = name;
       SET_DECL_ASSEMBLER_NAME (var, name);
-      var = pushdecl_top_level (var);
+
+      var = pushdecl (var);
     }
   else
     /* Create a new cleanup level if necessary.  */
@@ -10543,15 +10549,15 @@ type_has_extended_temps (tree type)
 bool
 is_std_init_list (tree type)
 {
-  /* Look through typedefs.  */
   if (!TYPE_P (type))
     return false;
   if (cxx_dialect == cxx98)
     return false;
+  /* Look through typedefs.  */
   type = TYPE_MAIN_VARIANT (type);
   return (CLASS_TYPE_P (type)
 	  && CP_TYPE_CONTEXT (type) == std_node
-	  && strcmp (TYPE_NAME_STRING (type), "initializer_list") == 0);
+	  && init_list_identifier == DECL_NAME (TYPE_NAME (type)));
 }
 
 /* Returns true iff DECL is a list constructor: i.e. a constructor which

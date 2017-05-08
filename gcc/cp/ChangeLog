@@ -1,3 +1,274 @@
+2017-05-08  Jason Merrill  <jason@redhat.com>
+
+	PR c++/80178 - parameter passing for uncopyable classes
+	* tree.c (type_has_nontrivial_copy_init): True for classes with only
+	deleted copy/move ctors.
+	(remember_deleted_copy, maybe_warn_parm_abi): New.
+	* decl.c (require_complete_types_for_parms, check_function_type):
+	Call maybe_warn_parm_abi.
+	* call.c (convert_for_arg_passing, build_cxx_call): Likewise.
+
+2017-05-08  Nathan Sidwell  <nathan@acm.org>
+
+	* decl.c (builtin_function_1): Set DCL_ANTICIPATED before pushing.
+	(start_preparsed_function): Do decl pushing before setting
+	current_funciton_decl and announcing it.
+
+	* name-lookup.h (pushdecl_with_scope): Replace with ...
+	(pushdecl_outermost_localscope): ... this.
+	* name-lookup.c (pushdecl_with_scope): Replace with ...
+	(pushdecl_outermost_localscope): ... this.
+	(pushdecl_namespace_level): Adjust.
+	* decl.c (cp_make_fname_decl): Use pushdecl_outermost_localscope.
+	* lambda.c (insert_capture_proxy): Likewise.
+
+	* class.c (build_vtbl_initializer): Don't shadow outer variable
+	with static var.
+
+	Revert _binding -> _value change.
+	* name-lookup.h (get_namespace_value, set_global_value): Rename to ...
+	(get_namespace_binding, set_global_binding): ... these.
+	* name-lookup.c (get_namespace_value, set_global_value): Rename to ...
+	(get_namespace_binding, set_global_binding): ... these.
+	(arg_assoc_namespace, pushdecl_maybe_friend_1,
+	check_for_out_of_scope_variable, push_overloaded_decl_1,
+	lookup_name_innermost_nonclass_level, push_namespace): Adjust.
+	* cp-tree.h (IDENTIFIER_GLOBAL_VALUE,
+	SET_IDENTIFIER_GLOBAL_VALUE): Adjust.
+	* decl.c (poplevel): Adjust.
+	* pt.c (make_constrained_auto): Likewise.
+
+2017-05-07  Volker Reichelt  <v.reichelt@netcologne.de>
+
+	PR translation/80280
+	* call.c (print_z_candidate): Fix quoting.
+
+2017-05-05  David Malcolm  <dmalcolm@redhat.com>
+
+	* error.c (pedwarn_cxx98): Replace report_diagnostic
+	with diagnostic_report_diagnostic.
+
+2017-05-05  Nathan Sidwell  <nathan@acm.org>
+
+	* cp-tree.h (IDENTIFIER_GLOBAL_VALUE): Use get_namespace_value.
+	(SET_IDENTIFIER_GLOBAL_VALUE): Use set_global_value.
+	(IDENTIFIER_NAMESPACE_VALUE): Delete.
+	* name-lookup.h (namespace_binding, set_namespace_binding): Replace
+	with ...
+	(get_namespace_value, set_global_value): ... these.
+	(get_global_value_if_present, is_typename_at_global_scope): Delete.
+	* decl.c (poplevel): Use get_namespace_value.
+	(grokdeclarator): Use IDENTIFIER_GLOBAL_VALUE.
+	* class.c (build_vtbl_initializer): Stash library decl in
+	static var. Use IDENTIFIER_GLOBAL_VALUE.
+	* except.c (do_get_exception_ptr, do_begin_catch, do_end_catch,
+	do_allocate_exception, do_free_exception, build_throw): Likewise.
+	* init.c (throw_bad_array_new_length): Likewise.
+	* rtti.c (throw_bad_cast, throw_bad_typeid): Likewise.
+	* name-lookup.c (arg_assoc_namespace, pushdecl_maybe_friend_1,
+	check_for_our_of_scope_variable, push_overloaded_decl_1): Use
+	get_namespace_value.
+	(set_namespace_binding_1): Rename to
+	(set_namespace_binding): ... here.
+	(set_global_value): New.
+	(lookup_name_innermost_nonclass_level_1, push_namespace): Use
+	get_namespace_value.
+	* pt.c (listify): Use get_namespace_value.
+
+	* call.c (make_temporary_var_for_ref_to_temp): Push decl into
+	current scope.
+	* lex.c (unqualified_name_lookup_error): Likewise.
+
+	* class.c (alter_class): Use retrofit_lang_decl directly.
+	* decl.c (push_local_name, dupliate_decls): Likewise.
+	* semantics.c (omp_privatize_field): Likewise.
+
+	Kill walk_namespaces.
+	* cp-tree.h (walk_namespaces_fn, walk_namespaces): Delete.
+	* decl.c (walk_namespaces_r, walk_namespaces): Delete.
+
+	Kill per-namespace static_decls.
+	* cp-tree.h (static_decls): Declare.
+	(wrapup_globals_for_namespace,
+	diagnose_inline_vars_for_namespace): Replace with ...
+	(wrapup_namespace_globals): ... this.
+	* decl.c (static_decls): Define.
+	(wrapup_globals_for_namespace,
+	diagnose_inline_vars_for_namespace): Replace with ...
+	(wrapup_namespace_globals): ... this.
+	(cxx_init_decl_processing): Initialize static_decls.
+	* decl2.c (c_parse_final_cleanups): Adjust.
+	* name-lookup.h (cp_binding_level): Remove static_decls member.
+	* name-lookup.c (add_decl_to_level): Adjust.
+	(begin_scope): Adjust.
+
+2017-05-05  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/71577
+	* decl.c (reshape_init): Unconditionally return error_mark_node
+	upon error about too many initializers.
+
+2017-05-04  Nathan Sidwell  <nathan@acm.org>
+
+	* constraint.cc (diagnose_check_constraint): Fix %E thinko.
+
+2017-05-04  Martin Sebor  <msebor@redhat.com>
+
+	PR translation/80280
+	* call.c (print_z_candidate): Add missing quoting to %D and other
+	like directives.
+	(build_op_call_1): Same.
+	* constraint.cc (diagnose_check_constraint): Same.
+	* mangle.c (mangle_decl): Same.
+	* name-lookup.c (cp_binding_level_debug): Same.
+	(set_decl_namespace): Same.
+	* parser.c (cp_parser_tx_qualifier_opt): Same.
+	* pt.c (print_candidates_1): Same.
+	(check_template_variable): Same.
+	(tsubst_default_argument): Same.
+	(most_specialized_partial_spec): Same.
+	* semantics.c (omp_reduction_lookup): Same.
+	* tree.c (check_abi_tag_redeclaration): Same.
+	* typeck.c (comptypes): Same.
+	* typeck2.c (abstract_virtuals_error_sfinae): Same.
+
+2017-05-04  Nathan Sidwell  <nathan@acm.org>
+
+	More global trees.
+	* cp-tree.h (enum cp_tree_index): Add CPTI_GLOBAL,
+	CPTI_GLOBAL_TYPE, CPTI_GLOBAL_IDENTIFIER, CPTI_ANON_IDENTIFIER,
+	CPTI_INIT_LIST_IDENTIFIER.
+	(global_namespace, global_type_node, global_identifier,
+	anon_identifier, init_list_identifier): New.
+	* decl.c (global_type_node, global_scope_name): Delete.
+	(initialize_predefined_identifiers): Add new identifiers.
+	(cxx_init_decl_processing): Adjust.
+	* name-lookup.h (global_namespace, global_type_node): Delete.
+	* name-lookup.c (global_namespace, anonymous_namespace_name,
+	get_anonymous_namespace_name): Delete.
+	(namespace_scope_ht_size, begin_scope, pushtag_1,
+	push_namespace): Adjust,
+	* call.c (type_has_extended_temps): Use init_list_identifier.
+	* pt.c (listify): Likewise.
+
+	* name-lookup.c: Reorder functions to make merging from modules
+	branch simpler.
+
+2017-05-03  Jason Merrill  <jason@redhat.com>
+
+	* constexpr.c (cxx_eval_outermost_constant_expr): Use TV_CONSTEXPR.
+
+2017-05-03  Nathan Sidwell  <nathan@acm.org>
+
+	* cp-tree.h (enum cp_tree_index, cp_global_trees): Move earlier,
+	along with #defines, to before name-lookup include.
+
+2017-05-02  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	* pt.c (is_auto_or_concept): Remove.
+	(type_uses_auto_or_concept): Remove, unused.
+	(find_parameter_packs_r, extract_autos_r, is_auto_r): Adjust.
+	* parser.c (tree_type_is_auto_or_concept): Remove, unused.
+	* cp-tree.h (is_auto_or_concept): Remove.
+
+2017-05-01  Xi Ruoyao  <ryxi@stu.xidian.edu.cn>
+
+        PR c++/80038
+	* cp-cilkplus.c (cilk_install_body_with_frame_cleanup): Don't
+	add pedigree operation and detach call here.
+	* cp-gimplify.c (cp_gimplify_expr): Remove the calls to
+	cilk_cp_gimplify_call_params_in_spawned_fn.
+	(cilk_cp_gimplify_call_params_in_spawned_fn): Remove function.
+	* semantics.c (simplify_aggr_init_expr): Copy EXPR_CILK_SPAWN.
+
+2017-04-29  Volker Reichelt  <v.reichelt@netcologne.de>
+
+	* parser.c (cp_parser_member_declaration): Add fix-it hints for
+	stray comma and missing semicolon at end of member declaration.
+
+2017-04-27  Volker Reichelt  <v.reichelt@netcologne.de>
+
+	* parser.c (cp_parser_cast_expression): Add target type of cast to
+	diagnostic.
+	* error.c (type_to_string): Add '{enum}' suffix to enumeration types.
+
+2017-04-26  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	* decl.c (grok_ctor_properties, ambi_op_p, unary_op_p): Change
+	return type to bool.
+	* cp-tree.h (grok_ctor_properties): Update.
+
+2017-04-26  Volker Reichelt  <v.reichelt@netcologne.de>
+
+	* parser.c (cp_parser_nested_name_specifier_opt): Add fix-it
+	information to diagnostic of invalid colon in nested-name-specifier.
+
+2017-04-25  Volker Reichelt  <v.reichelt@netcologne.de>
+
+	* parser.c (cp_parser_elaborated_type_specifier): Add fix-it to
+	diagnostic of invalid class/struct keyword after enum.
+
+2017-04-25  David Malcolm  <dmalcolm@redhat.com>
+
+	* parser.c (cp_parser_member_declaration): Add fix-it hint
+	for removing stray semicolons.
+
+2017-04-25  David Malcolm  <dmalcolm@redhat.com>
+
+	* name-lookup.c (get_std_name_hint): New function.
+	(maybe_suggest_missing_header): New function.
+	(suggest_alternative_in_explicit_scope): Call
+	maybe_suggest_missing_header.
+
+2017-04-25  David Malcolm  <dmalcolm@redhat.com>
+
+	PR c++/80177
+	* name-lookup.c (suggest_alternative_in_explicit_scope): Convert
+	candidate type of bm from tree to const char *.
+	(consider_binding_level): Likewise.
+	(lookup_name_fuzzy): Likewise, using this to merge the best
+	result from the preprocessor into bm, rather than immediately
+	returning, so that better matches from reserved words can "win".
+	Guard the rejection of keywords that don't start decl-specifiers
+	so it only happens for FUZZY_LOOKUP_TYPENAME.
+
+2017-04-24  Volker Reichelt  <v.reichelt@netcologne.de>
+
+	* decl.c (grokdeclarator): Use %qT instead of %<%T%> in diagnostics.
+	(start_enum): Likewise.
+	(build_enumerator): Likewise. Use %qE instead of plain %E.
+	* parser.c (cp_parser_mem_initializer_list): Use %qD instead of
+	%<%D%> in diagnostics.
+	(cp_parser_elaborated_type_specifier): Likewise.
+	* pt.c (make_pack_expansion): Use %qT and %qE instead of
+	%<%T%> and %<%E%> in diagnostics.
+	(tsubst_pack_expansion): Likewise.
+
+2017-04-24  David Malcolm  <dmalcolm@redhat.com>
+
+	PR c++/80016
+	* parser.c (cp_parser_unary_expression):  Generate a location
+	range for alignof and sizeof expressions.
+
+2017-04-24  Volker Reichelt  <v.reichelt@netcologne.de>
+
+	* parser.c (cp_parser_cv_qualifier_seq_opt): Add fix-it info to
+	error message.
+	(cp_parser_virt_specifier_seq_opt): Likewise.
+	(set_and_check_decl_spec_loc): Likewise twice.
+
+2017-04-21  Jason Merrill  <jason@redhat.com>
+
+	PR c++/80179 - ICE with initialized flexible array member.
+	* constexpr.c (verify_ctor_sanity): Handle flexible array members.
+
+2017-04-21  Richard Biener  <rguenther@suse.de>
+
+	* cp-tree.h (copy_decl): Annotate with CXX_MEM_STAT_INFO.
+	(copy_type): Likewise.
+	* lex.c (copy_decl): Pass down mem-stat info.
+	(copy_type): Likewise.
+
 2017-04-20  Jonathan Wakely  <jwakely@redhat.com>
 
 	PR c++/80473

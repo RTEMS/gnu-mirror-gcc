@@ -4103,6 +4103,8 @@ simplify_aggr_init_expr (tree *tp)
     = CALL_EXPR_OPERATOR_SYNTAX (aggr_init_expr);
   CALL_EXPR_ORDERED_ARGS (call_expr) = CALL_EXPR_ORDERED_ARGS (aggr_init_expr);
   CALL_EXPR_REVERSE_ARGS (call_expr) = CALL_EXPR_REVERSE_ARGS (aggr_init_expr);
+  /* Preserve CILK_SPAWN flag.  */
+  EXPR_CILK_SPAWN (call_expr) = EXPR_CILK_SPAWN (aggr_init_expr);
 
   if (style == ctor)
     {
@@ -4476,8 +4478,7 @@ omp_privatize_field (tree t, bool shared)
   if (v == NULL_TREE)
     {
       v = create_temporary_var (TREE_TYPE (m));
-      if (!DECL_LANG_SPECIFIC (v))
-	retrofit_lang_decl (v);
+      retrofit_lang_decl (v);
       DECL_OMP_PRIVATIZED_MEMBER (v) = 1;
       SET_DECL_VALUE_EXPR (v, m);
       DECL_HAS_VALUE_EXPR_P (v) = 1;
@@ -5253,7 +5254,7 @@ omp_reduction_lookup (location_t loc, tree id, tree type, tree *baselinkp,
 	  error_at (loc, "user defined reduction lookup is ambiguous");
 	  FOR_EACH_VEC_ELT (ambiguous, idx, udr)
 	    {
-	      inform (DECL_SOURCE_LOCATION (udr), "%s %#D", str, udr);
+	      inform (DECL_SOURCE_LOCATION (udr), "%s %#qD", str, udr);
 	      if (idx == 0)
 		str = get_spaces (str);
 	    }

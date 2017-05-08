@@ -420,7 +420,7 @@ Objective-C and Objective-C++ Dialects}.
 -fsplit-paths @gol
 -fsplit-wide-types  -fssa-backprop  -fssa-phiopt @gol
 -fstdarg-opt  -fstore-merging  -fstrict-aliasing @gol
--fstrict-overflow  -fthread-jumps  -ftracer  -ftree-bit-ccp @gol
+-fthread-jumps  -ftracer  -ftree-bit-ccp @gol
 -ftree-builtin-call-dce  -ftree-ccp  -ftree-ch @gol
 -ftree-coalesce-vars  -ftree-copy-prop  -ftree-dce  -ftree-dominator-opts @gol
 -ftree-dse  -ftree-forwprop  -ftree-fre  -fcode-hoisting @gol
@@ -540,13 +540,13 @@ Objective-C and Objective-C++ Dialects}.
 -fdisable-tree-@var{pass_name} @gol
 -fdisable-tree-@var{pass-name}=@var{range-list} @gol
 -fdump-noaddr  -fdump-unnumbered  -fdump-unnumbered-links @gol
--fdump-translation-unit@r{[}-@var{n}@r{]} @gol
 -fdump-class-hierarchy@r{[}-@var{n}@r{]} @gol
+-fdump-final-insns@r{[}=@var{file}@r{]}
 -fdump-ipa-all  -fdump-ipa-cgraph  -fdump-ipa-inline @gol
 -fdump-passes @gol
 -fdump-rtl-@var{pass}  -fdump-rtl-@var{pass}=@var{filename} @gol
 -fdump-statistics @gol
--fdump-final-insns@r{[}=@var{file}@r{]}
+-fdump-translation-unit@r{[}-@var{n}@r{]} @gol
 -fdump-tree-all @gol
 -fdump-tree-@var{switch} @gol
 -fdump-tree-@var{switch}-@var{options} @gol
@@ -975,6 +975,7 @@ See RS/6000 and PowerPC Options.
 -mtune=@var{processor-string} @gol
 -msmall-data-limit=@var{N-bytes} @gol
 -msave-restore  -mno-save-restore @gol
+-mstrict-align -mno-strict-align @gol
 -mcmodel=@var{code-model} @gol
 -mexplicit-relocs  -mno-explicit-relocs @gol}
 
@@ -2293,6 +2294,8 @@ numeric argument such as @code{-faligned-new=32} can be used to
 specify how much alignment (in bytes) is provided by that function,
 but few users will need to override the default of
 @code{alignof(std::max_align_t)}.
+
+This flag is enabled by default for @option{-std=c++1z}.
 
 @item -fcheck-new
 @opindex fcheck-new
@@ -4937,7 +4940,7 @@ Does not warn about incomplete types.
 @itemx -Wstrict-overflow=@var{n}
 @opindex Wstrict-overflow
 @opindex Wno-strict-overflow
-This option is only active when @option{-fstrict-overflow} is active.
+This option is only active when signed overflow is undefined.
 It warns about cases where the compiler optimizes based on the
 assumption that signed overflow does not occur.  Note that it does not
 warn about all cases where the code might overflow: it only warns
@@ -4957,7 +4960,7 @@ executed at all.
 @table @gcctabopt
 @item -Wstrict-overflow=1
 Warn about cases that are both questionable and easy to avoid.  For
-example,  with @option{-fstrict-overflow}, the compiler simplifies
+example the compiler simplifies
 @code{x + 1 > x} to @code{1}.  This level of
 @option{-Wstrict-overflow} is enabled by @option{-Wall}; higher levels
 are not, and must be explicitly requested.
@@ -4965,7 +4968,7 @@ are not, and must be explicitly requested.
 @item -Wstrict-overflow=2
 Also warn about other cases where a comparison is simplified to a
 constant.  For example: @code{abs (x) >= 0}.  This can only be
-simplified when @option{-fstrict-overflow} is in effect, because
+simplified when signed integer overflow is undefined, because
 @code{abs (INT_MIN)} overflows to @code{INT_MIN}, which is less than
 zero.  @option{-Wstrict-overflow} (with no level) is the same as
 @option{-Wstrict-overflow=2}.
@@ -7113,7 +7116,7 @@ also turns on the following optimization flags:
 -fsched-interblock  -fsched-spec @gol
 -fschedule-insns  -fschedule-insns2 @gol
 -fstore-merging @gol
--fstrict-aliasing -fstrict-overflow @gol
+-fstrict-aliasing @gol
 -ftree-builtin-call-dce @gol
 -ftree-switch-conversion -ftree-tail-merge @gol
 -fcode-hoisting @gol
@@ -8649,41 +8652,6 @@ int f() @{
 The @option{-fstrict-aliasing} option is enabled at levels
 @option{-O2}, @option{-O3}, @option{-Os}.
 
-@item -fstrict-overflow
-@opindex fstrict-overflow
-Allow the compiler to assume strict signed overflow rules, depending
-on the language being compiled.  For C (and C++) this means that
-overflow when doing arithmetic with signed numbers is undefined, which
-means that the compiler may assume that it does not happen.  This
-permits various optimizations.  For example, the compiler assumes
-that an expression like @code{i + 10 > i} is always true for
-signed @code{i}.  This assumption is only valid if signed overflow is
-undefined, as the expression is false if @code{i + 10} overflows when
-using twos complement arithmetic.  When this option is in effect any
-attempt to determine whether an operation on signed numbers 
-overflows must be written carefully to not actually involve overflow.
-
-This option also allows the compiler to assume strict pointer
-semantics: given a pointer to an object, if adding an offset to that
-pointer does not produce a pointer to the same object, the addition is
-undefined.  This permits the compiler to conclude that @code{p + u >
-p} is always true for a pointer @code{p} and unsigned integer
-@code{u}.  This assumption is only valid because pointer wraparound is
-undefined, as the expression is false if @code{p + u} overflows using
-twos complement arithmetic.
-
-See also the @option{-fwrapv} option.  Using @option{-fwrapv} means
-that integer signed overflow is fully defined: it wraps.  When
-@option{-fwrapv} is used, there is no difference between
-@option{-fstrict-overflow} and @option{-fno-strict-overflow} for
-integers.  With @option{-fwrapv} certain types of overflow are
-permitted.  For example, if the compiler gets an overflow when doing
-arithmetic on constants, the overflowed value can still be used with
-@option{-fwrapv}, but not otherwise.
-
-The @option{-fstrict-overflow} option is enabled at levels
-@option{-O2}, @option{-O3}, @option{-Os}.
-
 @item -falign-functions
 @itemx -falign-functions=@var{n}
 @opindex falign-functions
@@ -9915,7 +9883,7 @@ The maximum number of insns of an unswitched loop.
 The maximum number of branches unswitched in a single loop.
 
 @item max-loop-headers-insns
-The maximum number of insns in loop header duplicated by he copy loop headers
+The maximum number of insns in loop header duplicated by the copy loop headers
 pass.
 
 @item lim-expensive
@@ -12970,16 +12938,6 @@ When doing debugging dumps (see @option{-d} option above), suppress
 instruction numbers for the links to the previous and next instructions
 in a sequence.
 
-@item -fdump-translation-unit @r{(C++ only)}
-@itemx -fdump-translation-unit-@var{options} @r{(C++ only)}
-@opindex fdump-translation-unit
-Dump a representation of the tree structure for the entire translation
-unit to a file.  The file name is made by appending @file{.tu} to the
-source file name, and the file is created in the same directory as the
-output file.  If the @samp{-@var{options}} form is used, @var{options}
-controls the details of the dump as described for the
-@option{-fdump-tree} options.
-
 @item -fdump-class-hierarchy @r{(C++ only)}
 @itemx -fdump-class-hierarchy-@var{options} @r{(C++ only)}
 @opindex fdump-class-hierarchy
@@ -13026,6 +12984,16 @@ form is used, @samp{-stats} causes counters to be summed over the
 whole compilation unit while @samp{-details} dumps every event as
 the passes generate them.  The default with no option is to sum
 counters for each function compiled.
+
+@item -fdump-translation-unit @r{(C++ only)}
+@itemx -fdump-translation-unit-@var{options} @r{(C++ only)}
+@opindex fdump-translation-unit
+Dump a representation of the tree structure for the entire translation
+unit to a file.  The file name is made by appending @file{.tu} to the
+source file name, and the file is created in the same directory as the
+output file.  If the @samp{-@var{options}} form is used, @var{options}
+controls the details of the dump as described for the
+@option{-fdump-tree} options.
 
 @item -fdump-tree-all
 @itemx -fdump-tree-@var{switch}
@@ -13252,7 +13220,8 @@ gcc -O2 -ftree-vectorize -fopt-info-vec-missed
 prints information about missed optimization opportunities from
 vectorization passes on @file{stderr}.  
 Note that @option{-fopt-info-vec-missed} is equivalent to 
-@option{-fopt-info-missed-vec}.
+@option{-fopt-info-missed-vec}.  The order of the optimization group
+names and message types listed after @option{-fopt-info} does not matter.
 
 As another example,
 @smallexample
@@ -15454,7 +15423,8 @@ by default.
 Do not allow constant data to be placed in code sections.
 Additionally, when compiling for ELF object format give all text sections the
 ELF processor-specific section attribute @code{SHF_ARM_PURECODE}.  This option
-is only available when generating non-pic code for ARMv7-M targets.
+is only available when generating non-pic code for M-profile targets with the
+MOVT instruction.
 
 @item -mcmse
 @opindex mcmse
@@ -20945,6 +20915,11 @@ Put global and static data smaller than @var{n} bytes into a special section
 @opindex msave-restore
 Use smaller but slower prologue and epilogue code.
 
+@item -mstrict-align
+@itemx -mno-strict-align
+@opindex mstrict-align
+Do not generate unaligned memory accesses.
+
 @item -mcmodel=@var{code-model}
 @opindex mcmodel
 Specify the code model.
@@ -26274,7 +26249,7 @@ Substitute the variable part of a matched option.  See below.
 Note that each comma in the substituted string is replaced by
 a single space.
 
-@item %<@code{S}
+@item %<S
 Remove all occurrences of @code{-S} from the command line.  Note---this
 command is position dependent.  @samp{%} commands in the spec string
 before this one see @code{-S}, @samp{%} commands in the spec string
@@ -26372,7 +26347,7 @@ It is used to separate compiler options from assembler options
 in the @option{--target-help} output.
 @end table
 
-@item %@{@code{S}@}
+@item %@{S@}
 Substitutes the @code{-S} switch, if that switch is given to GCC@.
 If that switch is not specified, this substitutes nothing.  Note that
 the leading dash is omitted when specifying this option, and it is
@@ -26380,11 +26355,11 @@ automatically inserted if the substitution is performed.  Thus the spec
 string @samp{%@{foo@}} matches the command-line option @option{-foo}
 and outputs the command-line option @option{-foo}.
 
-@item %W@{@code{S}@}
+@item %W@{S@}
 Like %@{@code{S}@} but mark last argument supplied within as a file to be
 deleted on failure.
 
-@item %@{@code{S}*@}
+@item %@{S*@}
 Substitutes all the switches specified to GCC whose names start
 with @code{-S}, but which also take an argument.  This is used for
 switches like @option{-o}, @option{-D}, @option{-I}, etc.
@@ -26392,19 +26367,19 @@ GCC considers @option{-o foo} as being
 one switch whose name starts with @samp{o}.  %@{o*@} substitutes this
 text, including the space.  Thus two arguments are generated.
 
-@item %@{@code{S}*&@code{T}*@}
+@item %@{S*&T*@}
 Like %@{@code{S}*@}, but preserve order of @code{S} and @code{T} options
 (the order of @code{S} and @code{T} in the spec is not significant).
 There can be any number of ampersand-separated variables; for each the
 wild card is optional.  Useful for CPP as @samp{%@{D*&U*&A*@}}.
 
-@item %@{@code{S}:@code{X}@}
+@item %@{S:X@}
 Substitutes @code{X}, if the @option{-S} switch is given to GCC@.
 
-@item %@{!@code{S}:@code{X}@}
+@item %@{!S:X@}
 Substitutes @code{X}, if the @option{-S} switch is @emph{not} given to GCC@.
 
-@item %@{@code{S}*:@code{X}@}
+@item %@{S*:X@}
 Substitutes @code{X} if one or more switches whose names start with
 @code{-S} are specified to GCC@.  Normally @code{X} is substituted only
 once, no matter how many such switches appeared.  However, if @code{%*}
@@ -26429,19 +26404,19 @@ when matching an option like @option{-mcu=newchip} produces:
 --script=newchip/memory.ld
 @end smallexample
 
-@item %@{.@code{S}:@code{X}@}
+@item %@{.S:X@}
 Substitutes @code{X}, if processing a file with suffix @code{S}.
 
-@item %@{!.@code{S}:@code{X}@}
+@item %@{!.S:X@}
 Substitutes @code{X}, if @emph{not} processing a file with suffix @code{S}.
 
-@item %@{,@code{S}:@code{X}@}
+@item %@{,S:X@}
 Substitutes @code{X}, if processing a file for language @code{S}.
 
-@item %@{!,@code{S}:@code{X}@}
+@item %@{!,S:X@}
 Substitutes @code{X}, if not processing a file for language @code{S}.
 
-@item %@{@code{S}|@code{P}:@code{X}@}
+@item %@{S|P:X@}
 Substitutes @code{X} if either @code{-S} or @code{-P} is given to
 GCC@.  This may be combined with @samp{!}, @samp{.}, @samp{,}, and
 @code{*} sequences as well, although they have a stronger binding than
@@ -26476,7 +26451,14 @@ be as many clauses as you need.  This may be combined with @code{.},
 
 @end table
 
-The conditional text @code{X} in a %@{@code{S}:@code{X}@} or similar
+The switch matching text @code{S} in a @samp{%@{S@}}, @samp{%@{S:X@}}
+or similar construct can use a backslash to ignore the special meaning
+of the character following it, thus allowing literal matching of a
+character that is otherwise specially treated.  For example,
+@samp{%@{std=iso9899\:1999:X@}} substitutes @code{X} if the
+@option{-std=iso9899:1999} option is given.
+
+The conditional text @code{X} in a @samp{%@{S:X@}} or similar
 construct may contain other nested @samp{%} constructs or spaces, or
 even newlines.  They are processed as usual, as described above.
 Trailing white space in @code{X} is ignored.  White space may also
