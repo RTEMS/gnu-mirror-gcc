@@ -1270,7 +1270,7 @@ get_size_range (tree exp, tree range[2])
 
   wide_int min, max;
   enum value_range_type range_type
-    = (TREE_CODE (exp) == SSA_NAME
+    = ((TREE_CODE (exp) == SSA_NAME && INTEGRAL_TYPE_P (TREE_TYPE (exp)))
        ? get_range_info (exp, &min, &max) : VR_VARYING);
 
   if (range_type == VR_VARYING)
@@ -2644,13 +2644,8 @@ combine_pending_stack_adjustment_and_call (int unadjusted_args_size,
   adjustment = pending_stack_adjust;
   /* Push enough additional bytes that the stack will be aligned
      after the arguments are pushed.  */
-  if (preferred_unit_stack_boundary > 1)
-    {
-      if (unadjusted_alignment > 0)
-	adjustment -= preferred_unit_stack_boundary - unadjusted_alignment;
-      else
-	adjustment += unadjusted_alignment;
-    }
+  if (preferred_unit_stack_boundary > 1 && unadjusted_alignment)
+    adjustment -= preferred_unit_stack_boundary - unadjusted_alignment;
 
   /* Now, sets ARGS_SIZE->CONSTANT so that we pop the right number of
      bytes after the call.  The right number is the entire
