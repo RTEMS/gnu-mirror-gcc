@@ -6433,35 +6433,35 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	    return error_mark_node;
 	  }
 
-      /* If any supplied arguments are wider than 32 bits, resolve to
-	 64-bit variant of built-in function.  */
-      if ((arg1_mode == TImode) || (arg1_mode == DImode) ||
-	  (arg2_mode == TImode) || (arg2_mode == DImode))
-	{
-	  /* Assure all argument and result types are compatible with
-	     the built-in function represented by P6_BUILTIN_CMPB.  */
-	  overloaded_code = P6_BUILTIN_CMPB;
-	}
-      else
-	{
-	  /* Assure all argument and result types are compatible with
-	     the built-in function represented by P6_BUILTIN_CMPB_32.  */
-	  overloaded_code = P6_BUILTIN_CMPB_32;
-	}
+	/* If any supplied arguments are wider than 32 bits, resolve to
+	   64-bit variant of built-in function.  */
+	if ((GET_MODE_PRECISION (arg1_mode) > 32)
+	    || (GET_MODE_PRECISION (arg2_mode) > 32))
+	  {
+	    /* Assure all argument and result types are compatible with
+	       the built-in function represented by P6_BUILTIN_CMPB.  */
+	    overloaded_code = P6_BUILTIN_CMPB;
+	  }
+	else
+	  {
+	    /* Assure all argument and result types are compatible with
+	       the built-in function represented by P6_BUILTIN_CMPB_32.  */
+	    overloaded_code = P6_BUILTIN_CMPB_32;
+	  }
 
-      while (desc->code && desc->code == fcode &&
-	     desc->overloaded_code != overloaded_code)
-	desc++;
+	while (desc->code && desc->code == fcode &&
+	       desc->overloaded_code != overloaded_code)
+	  desc++;
 
-      if (desc->code && (desc->code == fcode)
-	  && rs6000_builtin_type_compatible (types[0], desc->op1)
-	  && rs6000_builtin_type_compatible (types[1], desc->op2))
-	{
-	  if (rs6000_builtin_decls[desc->overloaded_code] != NULL_TREE)
-	    return altivec_build_resolved_builtin (args, n, desc);
-	  else
-	    unsupported_builtin = true;
-	}
+	if (desc->code && (desc->code == fcode)
+	    && rs6000_builtin_type_compatible (types[0], desc->op1)
+	    && rs6000_builtin_type_compatible (types[1], desc->op2))
+	  {
+	    if (rs6000_builtin_decls[desc->overloaded_code] != NULL_TREE)
+	      return altivec_build_resolved_builtin (args, n, desc);
+	    else
+	      unsupported_builtin = true;
+	  }
       }
     else
       {
