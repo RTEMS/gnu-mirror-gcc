@@ -1,4 +1,4 @@
-/* { dg-do compile { target { powerpc64-*-* && lp64 } } } */
+/* { dg-do compile { target { powerpc64*-*-* && lp64 } } } */
 /* { dg-skip-if "do not override -mcpu" { powerpc*-*-* } { "-mcpu=*" } { "-mcpu=power8" } } */
 /* { dg-options "-mcpu=power8 -O2" } */
 /* { dg-require-effective-target powerpc_p9vector_ok } */
