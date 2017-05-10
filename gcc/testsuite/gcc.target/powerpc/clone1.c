@@ -14,6 +14,6 @@ long mod_func_or (long a, long b, long c)
   return mod_func (a, b) | c;
 }
 
-/* { dg-final { scan-assembler-times {\mdivd\M}  1 } } */
-/* { dg-final { scan-assembler-times {\mmulld\M} 1 } } */
+/* { dg-final { scan-assembler-times {\mdivd\M}  3 } } */
+/* { dg-final { scan-assembler-times {\mmulld\M} 3 } } */
 /* { dg-final { scan-assembler-times {\mmodsd\M} 1 } } */
