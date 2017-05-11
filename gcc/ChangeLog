@@ -1,3 +1,529 @@
+2017-05-11  Carl Love  <cel@us.ibm.com>
+
+	* config/rs6000/rs6000-c: Add support for built-in functions
+	vector unsigned char vec_popcnt (vector signed char)
+	vector unsigned char vec_popcnt (vector unsigned char)
+	vector unsigned short vec_popcnt (vector signed short)
+	vector unsigned short vec_popcnt (vector unsigned short)
+	vector unsigned int vec_popcnt (vector signed int)
+	vector unsigned int vec_popcnt (vector unsigned int)
+	vector unsigned long long vec_popcnt (vector signed long long)
+	vector unsigned long long vec_popcnt (vector unsigned long long)
+	vector signed long long vec_slo (vector signed long long,
+                                         vector signed char)
+	vector signed long long vec_slo (vector signed long long,
+                                         vector unsigned char)
+	vector unsigned long long vec_slo (vector unsigned long long,
+                                           vector signed char)
+	vector unsigned long long vec_slo (vector unsigned long long,
+                                           vector unsigned char)
+	* config/rs6000/rs6000-builtin.def: Add definitions for VPOPCNTUB,
+	VPOPCNTUH, VPOPCNTUW, and VPOPCNTUD overloads.
+	* config/rs6000/altivec.h: Add define for vec_popcnt, vec_popcntb,
+	vec_popcnth, vec_popcntw and vec_popcntd built-in functions.
+	* doc/extend.texi: Update the built-in documentation file for the
+	new built-in functions.
+
+2017-05-11  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* attribs.h (sorted_attr_string): Move machine independent
+	functions for target clone support from the i386 port to common
+	code.  Rename ix86_function_versions to common_function_versions.
+	Rename make_name to make_unique_name.
+	(common_function_versions): Likewise.
+	(make_unique_name): Likewise.
+	(make_dispatcher_decl): Likewise.
+	(is_function_default_version): Likewise.
+	* attribs.c (attr_strcmp): Likewise.
+	(sorted_attr_string): Likewise.
+	(common_function_versions): Likewise.
+	(make_unique_name): Likewise.
+	(make_dispatcher_decl): Likewise.
+	(is_function_default_version): Likewise.
+	* config/i386/i386.c (attr_strcmp): Likewise.
+	(sorted_attr_string): Likewise.
+	(ix86_function_versions): Likewise.
+	(make_name): Likewise.
+	(make_dispatcher_decl): Likewise.
+	(is_function_default_version): Likewise.
+	(TARGET_OPTION_FUNCTION_VERSIONS): Update target function hook.
+
+2017-05-11  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+
+	PR target/80695
+	* config/rs6000/rs6000.c (rs6000_builtin_vectorization_cost):
+	Account for direct move costs for vec_construct of integer
+	vectors.
+
+2017-05-11  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/80706
+	* config/i386/sync.md (UNSPEC_LDX_ATOMIC): New unspec.
+	(UNSPEC_STX_ATOMIC): Ditto.
+	(loaddi_via_sse): New insn.
+	(storedi_via_sse): Ditto.
+	(atomic_loaddi_fpu): Emit loaddi_via_sse and storedi_via_sse.
+	Update corresponding peephole2 patterns.
+	(atomic_storedi_fpu): Ditto.
+
+2017-05-11  Julia Koval  <julia.koval@intel.com>
+
+	* config/i386/avx512fintrin.h (_mm_mask_rsqrt14_sd)
+	(_mm_maskz_rsqrt14_sd, _mm_mask_rsqrt14_ss, _mm_maskz_rsqrt14_ss):
+	New intrinsics.
+	* config/i386/i386-builtin.def (__builtin_ia32_rsqrt14sd_mask)
+	(__builtin_ia32_rsqrt14ss_mask): New builtins.
+	* config/i386/sse.md (rsqrt14_<mode>_mask): New pattern.
+
+2017-05-11  Nathan Sidwell  <nathan@acm.org>
+
+	* graphite-poly.c: Include dumpfile.h.
+
+	* dumpfle.h (dump_function): Declare here ...
+	* tree-dump.h (dump_function): ... not here.
+	* dumpfile.c: #include tree-cfg.h.
+	(dump_function): Move here from ...
+	* tree-dump.c (dump_function): ... here.
+	* gimplify.c: #include splay-tree.h, not tree-dump.h.
+	* graphite-poly.c: Don't include tree-dump.h.
+	* cgraphclones.c: Include dumpfile.h not tree-dump.h.
+	* print-tree.c: Likewise.
+	* stor-layout.c: Likewise.
+	* tree-nested.c: Likewise.
+
+	* dumpfile.c (dump_start): Use TDF_FLAGS.
+	(dump_enable_all): Fix TDF_KIND check thinko.
+
+2017-05-11  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	* config/rs6000/rs6000-c.c (altivec_overloaded_builtins): Add
+	array entries to represent two legal parameterizations of the
+	overloaded __builtin_cmpb function, as represented by the
+	P6_OV_BUILTIN_CMPB constant.
+	(altivec_resolve_overloaded_builtin): Add special case handling
+	for the __builtin_cmpb function, as represented by the
+	P6_OV_BUILTIN_CMPB constant.
+	* config/rs6000/rs6000-builtin.def (BU_P6_2): New macro.
+	(BU_P6_64BIT_2): New macro.
+	(BU_P6_OVERLOAD_2): New macro
+	(CMPB_32): Add 32-bit compare-bytes support for 32-bit only targets.
+	(CMPB): Add 64-bit compare-bytes support for 32-bit and 64-bit targets.
+	(CMPB): Add overload support to represent both 32-bit and 64-bit
+	compare-bytes function.
+	* config/rs6000/rs6000.c (rs6000_builtin_mask_calculate): Add
+	support for TARGET_CMPB.
+	* config/rs6000/rs6000.h: Add support for RS6000_BTM_CMPB.
+	* doc/extend.texi (PowerPC AltiVec Built-in Functions): Add
+	documentation of the __builtin_cmpb overloaded built-in function.
+
+2017-05-11  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/80705
+	* tree-vect-data-refs.c (vect_analyze_data_refs): DECL_NONALIASED
+	bases are not vectorizable.
+
+2017-05-11  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-ssa-loop-ivopts.c (determine_set_costs): Skip non-interger
+	when counting register pressure.
+
+2017-05-11  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-ssa-loop-ivopts.c (compare_cost_pair): New.
+	(iv_ca_more_deps): Renamed to ...
+	(iv_ca_compare_deps): ... this.
+	(iv_ca_extend): Extend iv_ca if NEW_CP is cheaper than OLD_CP.
+
+2017-05-11  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-ssa-loop-ivopts.c (find_interesting_uses): Move inv vars dump
+	to ...
+	(determine_group_iv_costs): ... here.
+	(find_inv_vars_cb): Record inv var if it's not recorded before.
+
+2017-05-11  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-ssa-loop-ivopts.c (allow_ip_end_pos_p): Refine comments.
+	(get_shiftadd_cost): Ditto.
+
+2017-05-11  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-ssa-address.c: Include header file.
+	(move_hint_to_base): Return TRUE if BASE_HINT is moved to memory
+	address.
+	(add_to_parts): Refactor.
+	(addr_to_parts): New parameter.  Update use of move_hint_to_base.
+	(create_mem_ref): Update use of addr_to_parts.  Re-associate addr
+	in new order.
+
+2017-05-11  Bin Cheng  <bin.cheng@arm.com>
+
+	PR tree-optimization/53090
+	* tree-ssa-loop-ivopts.c (enum comp_iv_rewrite): New enum value
+	COMP_IV_EXPR_2.
+	(extract_cond_operands): Detect condition with IV on both sides
+	and return COMP_IV_EXPR_2.
+	(find_interesting_uses_cond): Add iv_use for both IVs in condition.
+	(rewrite_use_compare): Simplify by removing call to function
+	extract_cond_operands.
+
+2017-05-11  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-ssa-loop-ivopts.c (enum comp_iv_rewrite): New.
+	(extract_cond_operands): Detect condition comparing against non-
+	invariant bound and return appropriate enum value.
+	(find_interesting_uses_cond): Update use of extract_cond_operands.
+	Handle its return value accordingly.
+	(determine_group_iv_cost_cond, rewrite_use_compare): Ditto.
+
+2017-05-11  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-ssa-loop-ivopts.c (rewrite_use_nonlinear_expr): Re-associate
+	nonlinear iv_use computation in loop invariant sensitive way.
+
+2017-05-11  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-ssa-loop-ivopts.c (relate_compare_use_with_all_cands): New.
+	(find_iv_candidates): Call relate_compare_use_with_all_cands.
+
+2017-05-11  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-ssa-loop-ivopts.c (struct iv_cand): New field inv_exprs.
+	(dump_cand): Support iv_cand.inv_exprs.
+	(add_candidate_1): Record invariant exprs in iv_cand.inv_exprs
+	for candidates.
+	(iv_ca_set_no_cp, iv_ca_set_cp, free_loop_data): Support
+	iv_cand.inv_exprs.
+
+2017-05-11  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-ssa-loop-ivopts.c (multiplier_allowed_in_address_p): Move
+	from ...
+	* tree-ssa-address.c (multiplier_allowed_in_address_p): ... to here
+	as local function.  Include necessary header files.
+	* tree-ssa-loop-ivopts.h (multiplier_allowed_in_address_p): Delete.
+
+2017-05-11  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-ssa-loop-ivopts.c (autoinc_possible_for_pair): Simplify.
+
+2017-05-11  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-ssa-loop-ivopts.c (force_expr_to_var_cost): Handle more
+	operators: TRUNC_DIV_EXPR, BIT_AND_EXPR, BIT_IOR_EXPR, LSHIFT_EXPR,
+	RSHIFT_EXPR and BIT_NOT_EXPR.
+
+2017-05-11  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-ssa-loop-ivopts.c (get_loop_invariant_expr): Simplify.
+	(adjust_setup_cost): New parameter supporting round up adjustment.
+	(struct address_cost_data): Delete.
+	(force_expr_to_var_cost): Don't bound cost with spill_cost.
+	(split_address_cost, ptr_difference_cost): Delete.
+	(difference_cost, compare_aff_trees, record_inv_expr): Delete.
+	(struct ainc_cost_data): New struct.
+	(get_address_cost_ainc): New function.
+	(get_address_cost, get_computation_cost): Reimplement.
+	(determine_group_iv_cost_address): Record inv_expr for all uses of
+	a group.
+	(determine_group_iv_cost_cond): Call get_loop_invariant_expr.
+	(iv_ca_has_deps): Reimplemented to ...
+	(iv_ca_more_deps): ... this.  Check if NEW_CP introduces more deps
+	than OLD_CP.
+	(iv_ca_extend): Call iv_ca_more_deps.
+
+2017-05-11  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-ssa-address.c (struct mem_address): Move to header file.
+	(valid_mem_ref_p, move_fixed_address_to_symbol): Make it global.
+	* tree-ssa-address.h (struct mem_address): Move from C file.
+	(valid_mem_ref_p, move_fixed_address_to_symbol): Declare.
+
+2017-05-11  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-affine.h (aff_combination_type): New interface.
+	(aff_combination_zero_p): Remove static.
+	(aff_combination_const_p): New interface.
+	(aff_combination_singleton_var_p): New interfaces.
+
+2017-05-11  Richard Biener  <rguenther@suse.de>
+
+	* tree-ssa-pre.c (eliminate_dom_walker::before_dom_children):
+	Skip unreachable blocks and destinations.
+	(eliminate): Move stmt removal and fixup ...
+	(fini_eliminate): ... here.  Skip inserted exprs.
+	(pass_pre::execute): Move fini_pre after fini_eliminate.
+	* tree-ssa-tailmerge.c: Include tree-cfgcleanup.h.
+	(tail_merge_optimize): Run cleanup_tree_cfg if requested by
+	PRE to get rid of dead code that has invalid SSA form and
+	split critical edges again.
+
+2017-05-11  Bin Cheng  <bin.cheng@arm.com>
+
+	* rtlanal.c (rtx_cost): Handle TRUNCATE between tieable modes.
+
+2017-05-11  Richard Biener  <rguenther@suse.de>
+
+	* passes.c (execute_function_todo): Verify loops if they are
+	said to be up-to-date.
+	* cfgexpand.c (pass_expand::execute): Discard loops for -dx.
+	* trans-mem.c (pass_tm_edges::execute): Mark loops for fixup.
+
+2017-05-10  John David Anglin  <danglin@gcc.gnu.org>
+
+	PR target/80090
+	* config/pa/pa.c (pa_assemble_integer): When outputting a SYMBOL_REF,
+	handle calling assemble_external ourself.
+
+	PR target/79027
+	* config/pa/pa.c (pa_cannot_change_mode_class): Reject changes to/from
+	modes with zero size.  Enhance comment.
+
+2017-05-10  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (altivec_init_builtins): Define POWER8
+	built-ins for vec_xl and vec_xst with short and char pointer
+	arguments.
+
+2017-05-10  Sebastian Peryt  <sebastian.peryt@intel.com>
+
+	* config/i386/avx512fintrin.h (_mm_mask_max_round_sd)
+	(_mm_maskz_max_round_sd, _mm_mask_max_round_ss)
+	(_mm_maskz_max_round_ss, _mm_mask_min_round_sd)
+	(_mm_maskz_min_round_sd, _mm_mask_min_round_ss)
+	(_mm_maskz_min_round_ss): New intrinsics.
+	* config/i386/i386-builtin-types.def (V2DF, V2DF, V2DF, V2DF, UQI, INT)
+	(V4SF, V4SF, V4SF, V4SF, UQI, INT): New function type aliases.
+	* config/i386/i386-builtin.def (__builtin_ia32_maxsd_mask_round)
+	(__builtin_ia32_maxss_mask_round, __builtin_ia32_minsd_mask_round)
+	(__builtin_ia32_minss_mask_round): New builtins.
+	* config/i386/i386.c (V2DF_FTYPE_V2DF_V2DF_V2DF_UQI_INT)
+	(V4SF_FTYPE_V4SF_V4SF_V4SF_UQI_INT): Handle new types.
+	* config/i386/sse.md (<sse>_vm<code><mode>3<round_saeonly_name>):
+	Rename to ...
+	(<sse>_vm<code><mode>3<mask_name><round_saeonly_name>): ... this.
+	(v<maxmin_float><ssescalarmodesuffix>\t{<round_saeonly_op3>%2, %1, %0|%0, %1, %<iptr>2<round_saeonly_op3>}):
+	Change to ...
+	(v<maxmin_float><ssescalarmodesuffix>\t{<round_saeonly_mask_op3>%2, %1, %0<mask_operand3>|%0<mask_operand3>, %1, %<iptr>2<round_saeonly_mask_op3>}):
+	... this.
+
+2017-05-10  Sebastian Peryt  <sebastian.peryt@intel.com>
+
+	* config/i386/avx512fintrin.h (_mm_mask_mul_round_sd)
+	(_mm_maskz_mul_round_sd, _mm_mask_mul_round_ss)
+	(_mm_maskz_mul_round_ss, _mm_mask_div_round_sd)
+	(_mm_maskz_div_round_sd, _mm_mask_div_round_ss)
+	(_mm_maskz_div_round_ss, _mm_mask_mul_sd, _mm_maskz_mul_sd)
+	(_mm_mask_mul_ss, _mm_maskz_mul_ss, _mm_mask_div_sd)
+	(_mm_maskz_div_sd, _mm_mask_div_ss, _mm_maskz_div_ss): New intrinsics.
+	* config/i386/i386-builtin-types.def (V2DF_FTYPE_V2DF_V2DF_V2DF_UQI_INT)
+	(V4SF_FTYPE_V4SF_V4SF_V4SF_UQI_INT): New function type aliases.
+	* config/i386/i386-builtin.def (__builtin_ia32_divsd_mask_round)
+	(__builtin_ia32_divss_mask_round, __builtin_ia32_mulsd_mask_round)
+	(__builtin_ia32_mulss_mask_round): New builtins.
+	* config/i386/i386.c (V2DF_FTYPE_V2DF_V2DF_V2DF_UQI_INT)
+	(V4SF_FTYPE_V4SF_V4SF_V4SF_UQI_INT): Handle new types.
+	* config/i386/sse.md (<sse>_vm<multdiv_mnemonic><mode>3<round_name>):
+	Rename to ...
+	(<sse>_vm<multdiv_mnemonic><mode>3<mask_name><round_name>): ... this.
+	(v<multdiv_mnemonic><ssescalarmodesuffix>\t{<round_op3>%2, %1, %0|%0, %1, %<iptr>2<round_op3>}):
+	Change to ...
+	(v<multdiv_mnemonic><ssescalarmodesuffix>\t{<round_mask_op3>%2, %1, %0<mask_operand3>|%0<mask_operand3>, %1, %<iptr>2<round_mask_op3>}):
+	... this.
+
+2017-05-10  Julia Koval  <julia.koval@intel.com>
+
+	* config/i386/avxintrin.h (_mm256_set_m128, _mm256_set_m128d)
+	(_mm256_set_m128i, _mm256_setr_m128, _mm256_setr_m128d)
+	(_mm256_setr_m128i): New intrinsics.
+
+2017-05-10  Julia Koval  <julia.koval@intel.com>
+
+	* config/i386/avx512fintrin.h (_mm_mask_rcp14_sd)
+	(_mm_maskz_rcp14_sd, _mm_mask_rcp14_ss)
+	(_mm_maskz_rcp14_ss): New intrinsics.
+	* config/i386/i386-builtin.def (__builtin_ia32_rcp14sd_mask)
+	(__builtin_ia32_rcp14ss_mask): New builtins.
+	* config/i386/sse.md (srcp14<mode>_mask): New pattern.
+
+2017-05-10  Peter Bergner  <bergner@vnet.ibm.com>
+
+	PR tree-optimization/51513
+	* tree-cfg.c (gimple_seq_unreachable_p): New function.
+	(assert_unreachable_fallthru_edge_p): Use it.
+	(group_case_labels_stmt): Likewise.
+	* tree-cfg.h: Prototype it.
+	* stmt.c: Include cfghooks.h and tree-cfg.h.
+	(emit_case_dispatch_table) <gap_label>: New local variable.
+	Use it to fill dispatch table gaps.
+	Test for default_label before updating probabilities.
+	(expand_case) <default_label>: Remove unneeded initialization.
+	Test for unreachable default case statement and remove its edge.
+	Set default_label accordingly.
+	* tree-ssa-ccp.c (optimize_unreachable): Update comment.
+
+2017-05-10  Carl Love  <cel@us.ibm.com>
+
+	* config/rs6000/rs6000-c: Add support for built-in functions
+	vector signed char        vec_neg (vector signed char)
+	vector signed short int   vec_neg (vector short int)
+	vector signed int         vec_neg (vector signed int)
+	vector signed long long   vec_neg (vector signed long long)
+	vector float              vec_neg (vector float)
+	vector double             vec_neg (vector double)
+	* config/rs6000/rs6000-builtin.def: Add definitions for NEG function
+	overload.
+	* config/rs6000/altivec.h: Add define for vec_neg
+	* doc/extend.texi: Update the built-in documentation for the
+	new built-in functions.
+
+2017-05-10  Prathamesh Kulkarni  <prathamesh.kulkarni@linaro.org>
+
+	PR tree-optimization/77644
+	* match.pd (sqrt(x) cmp sqrt(y) -> x cmp y): New pattern.
+
+2017-05-10  Nathan Sidwell  <nathan@acm.org>
+
+	* dumpfile.h (TDI_lang_all): New.
+	(TDF_KIND): New. Renumber others
+	(TDF_LANG, TDF_TREE, TDF_RTL, TDF_IPA): Enumerate value, rather
+	than bits.
+	* dumpfile.c (dump_files): Mark language dumps as TDF_LANG.  add
+	lang-all.
+	(get_dump_file_name): Adjust suffix generation.
+	(dump_enable_all): Use TDF_KIND.
+	* doc/invoke.texi (-fdump-lang-all): Document.
+
+	* dumpfile.h: Tabify.
+
+2017-05-10  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	PR target/80671
+	* config/aarch64/cortex-a57-fma-steering.c (merge_forest):
+	Move member access before delete.
+
+2017-05-10  Alexandre Oliva <aoliva@redhat.com>
+
+	* tree-inline.c (expand_call_inline): Split block at stmt
+	before the call.
+
+2017-05-09  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/68163
+	* config/rs6000/rs6000.md (f32_lr): Delete mode attributes that
+	are now unused after splitting mov{sf,sd}_hardfloat.
+	(f32_lr2): Likewise.
+	(f32_lm): Likewise.
+	(f32_lm2): Likewise.
+	(f32_li): Likewise.
+	(f32_li2): Likewise.
+	(f32_lv): Likewise.
+	(f32_sr): Likewise.
+	(f32_sr2): Likewise.
+	(f32_sm): Likewise.
+	(f32_sm2): Likewise.
+	(f32_si): Likewise.
+	(f32_si2): Likewise.
+	(f32_sv): Likewise.
+	(f32_dm): Likewise.
+	(f32_vsx): Likewise.
+	(f32_av): Likewise.
+	(mov<mode>_hardfloat): Split into separate movsf and movsd pieces.
+	For movsf, order stores so the VSX stores occur before the GPR
+	store which encourages the register allocator to use a traditional
+	FPR instead of a GPR.  For movsd, order the stores so that the GPR
+	store comes before the VSX stores to allow the power6 to work.
+	This is due to the power6 not having a 32-bit integer store
+	instruction from a FPR.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+
+2017-05-09  Martin Sebor  <msebor@redhat.com>
+
+	PR translation/80280
+	* config/sol2-c.c (cmn_err_flag_specs): Initialize new data member
+	added in r247778.
+
+	PR translation/80280
+	* config/i386/msformat-c.c (ms_printf_flag_specs): Initialize new
+	data member added in r247778.
+	(ms_scanf_flag_specs, ms_strftime_flag_specs): Same.
+
+2017-05-09  Nathan Sidwell  <nathan@acm.org>
+
+	* tree.h (tree_fits_shwi_p, tree_fits_uhwi_p): Unconditionally pure.
+
+	* ipa-devirt.c (default_hash_traits<type_pair>): Skip struct-scope
+	typedefs.
+
+2017-05-09  Marek Polacek  <polacek@redhat.com>
+
+	* doc/invoke.texi: Fix typo.
+
+2017-05-09  Richard Biener  <rguenther@suse.de>
+
+	* tree-vrp.c (vrp_val_is_max): Adjust comment.
+	(vrp_val_is_min): Likewise.
+	(set_value_range_to_value): Likewise.
+	(set_value_range_to_nonnegative): Likewise.
+	(gimple_assign_nonzero_p): Likewise.
+	(gimple_stmt_nonzero_p): Likewise.
+	(vrp_int_const_binop): Likewise.  Remove unreachable case.
+	(adjust_range_with_scev): Adjust comments.
+	(compare_range_with_value): Likewise.
+	(extract_range_from_phi_node): Likewise.
+	(test_for_singularity): Likewise.
+
+2017-05-09  Richard Biener  <rguenther@suse.de>
+
+	* tree-vrp.c (get_single_symbol): Add assert that we don't
+	get overflowed constants as invariant part.
+	(compare_values_warnv): Add comment before the TREE_NO_WARNING
+	checks.  Use wi::cmp instead of recursing for integer constants.
+	(compare_values): Just ignore whether we assumed undefined
+	overflow instead of failing the compare.
+	(extract_range_for_var_from_comparison_expr): Add comment before the
+	TREE_NO_WARNING sets.
+	(test_for_singularity): Likewise.
+	(extract_range_from_comparison): Do not disable optimization
+	when we assumed undefined overflow.
+	(extract_range_basic): Remove init of unused var.
+
+2017-05-09  Richard Biener  <rguenther@suse.de>
+
+	* tree-vrp.c (vrp_int_const_binop): Use wide-ints and simplify.
+	(extract_range_from_multiplicative_op_1): Adjust.
+	(extract_range_from_binary_expr_1): Use int_const_binop.
+
+2017-05-08  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	PR target/80101
+	* config/rs6000/power6.md: Replace store_data_bypass_p calls with
+	rs6000_store_data_bypass_p in seven define_bypass directives and
+	in several comments.
+	* config/rs6000/rs6000-protos.h: Add prototype for
+	rs6000_store_data_bypass_p function.
+	* config/rs6000/rs6000.c (rs6000_store_data_bypass_p): New
+	function implements slightly different (rs6000-specific) semantics
+	than store_data_bypass_p, returning false rather than aborting
+	with assertion error when arguments do not satisfy the
+	requirements of store data bypass.
+	(rs6000_adjust_cost): Replace six calls of store_data_bypass_p with
+	rs6000_store_data_bypass_p.
+
+2017-05-08  Max Filippov  <jcmvbkbc@gmail.com>
+
+	* config/xtensa/xtensa-protos.h
+       	(xtensa_initial_elimination_offset): New declaration.
+	* config/xtensa/xtensa.c (xtensa_initial_elimination_offset):
+	New function. Move its body from the INITIAL_ELIMINATION_OFFSET
+	macro definition, add case for FRAME_POINTER_REGNUM when
+	FRAME_GROWS_DOWNWARD.
+	* config/xtensa/xtensa.h (FRAME_GROWS_DOWNWARD): New macro
+	definition.
+	(INITIAL_ELIMINATION_OFFSET): Replace body with call to
+	xtensa_initial_elimination_offset.
+
 2017-05-08  Nathan Sidwell  <nathan@acm.org>
 
 	* doc/invoke.texi: Alphabetize -fdump options.

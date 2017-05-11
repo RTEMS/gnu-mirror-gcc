@@ -369,6 +369,7 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
       DECL_NON_TRIVIALLY_INITIALIZED_P (in VAR_DECL)
       CALL_EXPR_ORDERED_ARGS (in CALL_EXPR, AGGR_INIT_EXPR)
       DECLTYPE_FOR_REF_CAPTURE (in DECLTYPE_TYPE)
+      CONSTUCTOR_C99_COMPOUND_LITERAL (in CONSTRUCTOR)
    4: TREE_HAS_CONSTRUCTOR (in INDIRECT_REF, SAVE_EXPR, CONSTRUCTOR,
 	  CALL_EXPR, or FIELD_DECL).
       IDENTIFIER_TYPENAME_P (in IDENTIFIER_NODE)
@@ -3898,6 +3899,11 @@ more_aggr_init_expr_args_p (const aggr_init_expr_arg_iterator *iter)
 #define CONSTRUCTOR_MUTABLE_POISON(NODE) \
   (TREE_LANG_FLAG_2 (CONSTRUCTOR_CHECK (NODE)))
 
+/* True if this typed CONSTRUCTOR represents C99 compound-literal syntax rather
+   than C++11 functional cast syntax.  */
+#define CONSTRUCTOR_C99_COMPOUND_LITERAL(NODE) \
+  (TREE_LANG_FLAG_3 (CONSTRUCTOR_CHECK (NODE)))
+
 #define DIRECT_LIST_INIT_P(NODE) \
    (BRACE_ENCLOSED_INITIALIZER_P (NODE) && CONSTRUCTOR_IS_DIRECT_INIT (NODE))
 
@@ -5643,15 +5649,16 @@ extern tree type_decays_to			(tree);
 extern tree extract_call_expr			(tree);
 extern tree build_user_type_conversion		(tree, tree, int,
 						 tsubst_flags_t);
-extern tree build_new_function_call		(tree, vec<tree, va_gc> **, bool, 
+extern tree build_new_function_call		(tree, vec<tree, va_gc> **,
 						 tsubst_flags_t);
-extern tree build_operator_new_call		(tree, vec<tree, va_gc> **, tree *,
-						 tree *, tree, tree, tree *,
-						 tsubst_flags_t);
-extern tree build_new_method_call		(tree, tree, vec<tree, va_gc> **,
-						 tree, int, tree *,
-						 tsubst_flags_t);
-extern tree build_special_member_call		(tree, tree, vec<tree, va_gc> **,
+extern tree build_operator_new_call		(tree, vec<tree, va_gc> **,
+						 tree *, tree *, tree, tree,
+						 tree *, tsubst_flags_t);
+extern tree build_new_method_call		(tree, tree,
+						 vec<tree, va_gc> **, tree,
+						 int, tree *, tsubst_flags_t);
+extern tree build_special_member_call		(tree, tree,
+						 vec<tree, va_gc> **,
 						 tree, int, tsubst_flags_t);
 extern tree build_new_op			(location_t, enum tree_code,
 						 int, tree, tree, tree, tree *,
@@ -5659,7 +5666,7 @@ extern tree build_new_op			(location_t, enum tree_code,
 extern tree build_op_call			(tree, vec<tree, va_gc> **,
 						 tsubst_flags_t);
 extern bool aligned_allocation_fn_p		(tree);
-extern bool usual_deallocation_fn_p	(tree);
+extern bool usual_deallocation_fn_p		(tree);
 extern tree build_op_delete_call		(enum tree_code, tree, tree,
 						 bool, tree, tree,
 						 tsubst_flags_t);
@@ -5716,7 +5723,7 @@ extern tree build_vfn_ref			(tree, tree);
 extern tree get_vtable_decl			(tree, int);
 extern void resort_type_method_vec		(void *, void *,
 						 gt_pointer_operator, void *);
-extern bool add_method				(tree, tree, tree);
+extern bool add_method				(tree, tree, bool);
 extern tree declared_access			(tree);
 extern tree currently_open_class		(tree);
 extern tree currently_open_derived_class	(tree);
@@ -5779,7 +5786,7 @@ extern tree missing_abi_tags			(tree);
 extern void fixup_type_variants			(tree);
 extern void fixup_attribute_variants		(tree);
 extern tree* decl_cloned_function_p		(const_tree, bool);
-extern void clone_function_decl			(tree, int);
+extern void clone_function_decl			(tree, bool);
 extern void adjust_clone_args			(tree);
 extern void deduce_noexcept_on_destructor       (tree);
 extern void insert_late_enum_def_into_classtype_sorted_fields (tree, tree);
@@ -5813,13 +5820,8 @@ extern bool fnptr_conv_p			(tree, tree);
 extern tree strip_fnptr_conv			(tree);
 
 /* in name-lookup.c */
-extern tree pushdecl				(tree);
-extern tree pushdecl_maybe_friend		(tree, bool);
 extern void maybe_push_cleanup_level		(tree);
-extern tree pushtag				(tree, tree, tag_scope);
 extern tree make_anon_name			(void);
-extern tree pushdecl_top_level_maybe_friend	(tree, bool);
-extern tree pushdecl_top_level_and_finish	(tree, tree);
 extern tree check_for_out_of_scope_variable	(tree);
 extern void dump				(cp_binding_level &ref);
 extern void dump				(cp_binding_level *ptr);
@@ -6483,7 +6485,10 @@ extern tree finish_this_expr			(void);
 extern tree finish_pseudo_destructor_expr       (tree, tree, tree, location_t);
 extern cp_expr finish_unary_op_expr		(location_t, enum tree_code, cp_expr,
 						 tsubst_flags_t);
-extern tree finish_compound_literal		(tree, tree, tsubst_flags_t);
+/* Whether this call to finish_compound_literal represents a C++11 functional
+   cast or a C99 compound literal.  */
+enum fcl_t { fcl_functional, fcl_c99 };
+extern tree finish_compound_literal		(tree, tree, tsubst_flags_t, fcl_t = fcl_functional);
 extern tree finish_fname			(tree);
 extern void finish_translation_unit		(void);
 extern tree finish_template_type_parm		(tree, tree);

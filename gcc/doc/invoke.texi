@@ -543,6 +543,7 @@ Objective-C and Objective-C++ Dialects}.
 -fdump-class-hierarchy@r{[}-@var{n}@r{]} @gol
 -fdump-final-insns@r{[}=@var{file}@r{]}
 -fdump-ipa-all  -fdump-ipa-cgraph  -fdump-ipa-inline @gol
+-fdump-lang-all @gol
 -fdump-passes @gol
 -fdump-rtl-@var{pass}  -fdump-rtl-@var{pass}=@var{filename} @gol
 -fdump-statistics @gol
@@ -606,7 +607,8 @@ Objective-C and Objective-C++ Dialects}.
 -mnorm  -mspfp  -mspfp-compact  -mspfp-fast  -msimd  -msoft-float  -mswap @gol
 -mcrc  -mdsp-packa  -mdvbf  -mlock  -mmac-d16  -mmac-24  -mrtsc  -mswape @gol
 -mtelephony  -mxy  -misize  -mannotate-align  -marclinux  -marclinux_prof @gol
--mlong-calls  -mmedium-calls  -msdata @gol
+-mlong-calls  -mmedium-calls  -msdata -mirq-ctrl-saved @gol
+-mrgf-banked-regs @gol
 -mvolatile-cache  -mtp-regno=@var{regno} @gol
 -malign-call  -mauto-modify-reg  -mbbit-peephole  -mno-brcc @gol
 -mcase-vector-pcrel  -mcompact-casesi  -mno-cond-exec  -mearly-cbranchsi @gol
@@ -4279,10 +4281,10 @@ switch (cond)
 C++17 provides a standard way to suppress the @option{-Wimplicit-fallthrough}
 warning using @code{[[fallthrough]];} instead of the GNU attribute.  In C++11
 or C++14 users can use @code{[[gnu::fallthrough]];}, which is a GNU extension.
-Instead of the these attributes, it is also possible to add a fallthrough
-comment to silence the warning.  The whole body of the C or C++ style comment
-should match the given regular expressions listed below.  The option argument
-@var{n} specifies what kind of comments are accepted:
+Instead of these attributes, it is also possible to add a fallthrough comment
+to silence the warning.  The whole body of the C or C++ style comment should
+match the given regular expressions listed below.  The option argument @var{n}
+specifies what kind of comments are accepted:
 
 @itemize @bullet
 
@@ -12969,6 +12971,10 @@ Dump after function inlining.
 
 @end table
 
+@item -fdump-lang-all
+@opindex fdump-lang-all
+Control the dumping of language-specific information.
+
 @item -fdump-passes
 @opindex fdump-passes
 Print on @file{stderr} the list of optimization passes that are turned
@@ -14546,6 +14552,24 @@ Enables support for all single- and double-precision floating-point
 hardware extensions.  Not available for ARC EM@.
 
 @end table
+
+@item -mirq-ctrl-saved=@var{register-range}, @var{blink}, @var{lp_count}
+@opindex mirq-ctrl-saved
+Specifies general-purposes registers that the processor automatically
+saves/restores on interrupt entry and exit.  @var{register-range} is
+specified as two registers separated by a dash.  The register range
+always starts with @code{r0}, the upper limit is @code{fp} register.
+@var{blink} and @var{lp_count} are optional.  This option is only
+valid for ARC EM and ARC HS cores.
+
+@item -mrgf-banked-regs=@var{number}
+@opindex mrgf-banked-regs
+Specifies the number of registers replicated in second register bank
+on entry to fast interrupt.  Fast interrupts are interrupts with the
+highest priority level P0.  These interrupts save only PC and STATUS32
+registers to avoid memory transactions during interrupt entry and exit
+sequences.  Use this option when you are using fast interrupts in an
+ARC V2 family processor.  Permitted values are 4, 8, 16, and 32.
 
 @end table
 

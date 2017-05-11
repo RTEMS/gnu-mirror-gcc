@@ -582,7 +582,8 @@ poplevel (int keep, int reverse, int functionbody)
 
   block = NULL_TREE;
 
-  gcc_assert (current_binding_level->kind != sk_class);
+  gcc_assert (current_binding_level->kind != sk_class
+	      && current_binding_level->kind != sk_namespace);
 
   if (current_binding_level->kind == sk_cleanup)
     functionbody = 0;
@@ -644,12 +645,13 @@ poplevel (int keep, int reverse, int functionbody)
   if ((warn_unused_variable || warn_unused_but_set_variable)
       && current_binding_level->kind != sk_template_parms
       && !processing_template_decl)
-    for (tree d = getdecls (); d; d = TREE_CHAIN (d))
+    for (tree d = get_local_decls (); d; d = TREE_CHAIN (d))
       {
 	/* There are cases where D itself is a TREE_LIST.  See in
 	   push_local_binding where the list of decls returned by
 	   getdecls is built.  */
 	decl = TREE_CODE (d) == TREE_LIST ? TREE_VALUE (d) : d;
+
 	tree type = TREE_TYPE (decl);
 	if (VAR_P (decl)
 	    && (! TREE_USED (decl) || !DECL_READ_P (decl))
@@ -680,14 +682,15 @@ poplevel (int keep, int reverse, int functionbody)
   /* Remove declarations for all the DECLs in this level.  */
   for (link = decls; link; link = TREE_CHAIN (link))
     {
-      if (leaving_for_scope && VAR_P (link)
+      decl = TREE_CODE (link) == TREE_LIST ? TREE_VALUE (link) : link;
+      tree name = DECL_NAME (OVL_CURRENT (decl));
+
+      if (leaving_for_scope && VAR_P (decl)
 	  /* It's hard to make this ARM compatibility hack play nicely with
 	     lambdas, and it really isn't necessary in C++11 mode.  */
 	  && cxx_dialect < cxx11
-	  && DECL_NAME (link))
+	  && name)
 	{
-	  tree name = DECL_NAME (link);
-
 	  cxx_binding *ob = outer_binding (name,
 					   IDENTIFIER_BINDING (name),
 					   /*class_p=*/true);
@@ -703,7 +706,7 @@ poplevel (int keep, int reverse, int functionbody)
 
 	       and we are leaving the `for' scope.  There's no reason to
 	       keep the binding of the inner `i' in this case.  */
-	    pop_binding (name, link);
+	    ;
 	  else if ((ob && (TREE_CODE (ob->value) == TYPE_DECL))
 		   || (ns_binding && TREE_CODE (ns_binding) == TYPE_DECL))
 	    /* Here, we have something like:
@@ -716,7 +719,7 @@ poplevel (int keep, int reverse, int functionbody)
 
 	       We must pop the for-scope binding so we know what's a
 	       type and what isn't.  */
-	    pop_binding (name, link);
+	    ;
 	  else
 	    {
 	      /* Mark this VAR_DECL as dead so that we can tell we left it
@@ -742,32 +745,20 @@ poplevel (int keep, int reverse, int functionbody)
 		 its SCOPE since the scope is going away now.  */
 	      IDENTIFIER_BINDING (name)->scope
 		= current_binding_level->level_chain;
+
+	      /* Don't remove the binding. */
+	      name = NULL_TREE;
 	    }
 	}
-      else
-	{
-	  tree name;
-
-	  /* Remove the binding.  */
-	  decl = link;
-
-	  if (TREE_CODE (decl) == TREE_LIST)
-	    decl = TREE_VALUE (decl);
-	  name = decl;
-
-	  if (TREE_CODE (name) == OVERLOAD)
-	    name = OVL_FUNCTION (name);
-
-	  gcc_assert (DECL_P (name));
-	  pop_binding (DECL_NAME (name), decl);
-	}
+      /* Remove the binding.  */
+      pop_local_binding (name, decl);
     }
 
   /* Remove declarations for any `for' variables from inner scopes
      that we kept around.  */
   FOR_EACH_VEC_SAFE_ELT_REVERSE (current_binding_level->dead_vars_from_for,
 			         ix, decl)
-    pop_binding (DECL_NAME (decl), decl);
+    pop_local_binding (DECL_NAME (decl), decl);
 
   /* Restore the IDENTIFIER_TYPE_VALUEs.  */
   for (link = current_binding_level->type_shadowed;
@@ -13523,12 +13514,10 @@ lookup_and_check_tag (enum tag_types tag_code, tree name,
 
 static tree
 xref_tag_1 (enum tag_types tag_code, tree name,
-            tag_scope orig_scope, bool template_header_p)
+            tag_scope scope, bool template_header_p)
 {
   enum tree_code code;
-  tree t;
   tree context = NULL_TREE;
-  tag_scope scope;
 
   gcc_assert (identifier_p (name));
 
@@ -13548,19 +13537,12 @@ xref_tag_1 (enum tag_types tag_code, tree name,
       gcc_unreachable ();
     }
 
-  if (orig_scope == ts_lambda)
-    scope = ts_current;
-  else
-    scope = orig_scope;
-
   /* In case of anonymous name, xref_tag is only called to
      make type node and push name.  Name lookup is not required.  */
-  if (anon_aggrname_p (name))
-    t = NULL_TREE;
-  else
-    t = lookup_and_check_tag  (tag_code, name,
-			       scope, template_header_p);
-
+  tree t = NULL_TREE;
+  if (scope != ts_lambda && !anon_aggrname_p (name))
+    t = lookup_and_check_tag  (tag_code, name, scope, template_header_p);
+  
   if (t == error_mark_node)
     return error_mark_node;
 
@@ -13626,9 +13608,8 @@ xref_tag_1 (enum tag_types tag_code, tree name,
 	{
 	  t = make_class_type (code);
 	  TYPE_CONTEXT (t) = context;
-	  if (orig_scope == ts_lambda)
-	    /* Remember that we're declaring a lambda to avoid bogus errors
-	       in push_template_decl.  */
+	  if (scope == ts_lambda)
+	    /* Mark it as a lambda type.  */
 	    CLASSTYPE_LAMBDA_EXPR (t) = error_mark_node;
 	  t = pushtag (name, t, scope);
 	}
@@ -15231,7 +15212,7 @@ store_parm_decls (tree current_function_parms)
       /* Get the decls in their original chain order and record in the
 	 function.  This is all and only the PARM_DECLs that were
 	 pushed into scope by the loop above.  */
-      DECL_ARGUMENTS (fndecl) = getdecls ();
+      DECL_ARGUMENTS (fndecl) = get_local_decls ();
     }
   else
     DECL_ARGUMENTS (fndecl) = NULL_TREE;
@@ -15562,16 +15543,19 @@ finish_function (int flags)
   if (!processing_template_decl && FNDECL_USED_AUTO (fndecl)
       && TREE_TYPE (fntype) == current_function_auto_return_pattern)
     {
-      if (!is_auto (current_function_auto_return_pattern)
-	  && !current_function_returns_value && !current_function_returns_null)
+      if (is_auto (current_function_auto_return_pattern))
+	{
+	  apply_deduced_return_type (fndecl, void_type_node);
+	  fntype = TREE_TYPE (fndecl);
+	}
+      else if (!current_function_returns_value
+	       && !current_function_returns_null)
 	{
 	  error ("no return statements in function returning %qT",
 		 current_function_auto_return_pattern);
 	  inform (input_location, "only plain %<auto%> return type can be "
 		  "deduced to %<void%>");
 	}
-      apply_deduced_return_type (fndecl, void_type_node);
-      fntype = TREE_TYPE (fndecl);
     }
 
   // If this is a concept, check that the definition is reasonable.

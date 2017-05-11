@@ -936,7 +936,7 @@ push_binding (tree id, tree decl, cp_binding_level* level)
    for ID.  */
 
 void
-pop_binding (tree id, tree decl)
+pop_local_binding (tree id, tree decl)
 {
   cxx_binding *binding;
 
@@ -979,8 +979,8 @@ pop_binding (tree id, tree decl)
 void
 pop_bindings_and_leave_scope (void)
 {
-  for (tree t = getdecls (); t; t = DECL_CHAIN (t))
-    pop_binding (DECL_NAME (t), t);
+  for (tree t = get_local_decls (); t; t = DECL_CHAIN (t))
+    pop_local_binding (DECL_NAME (t), t);
   leave_scope ();
 }
 
@@ -1862,24 +1862,17 @@ pushdecl_maybe_friend_1 (tree x, bool is_friend)
   return x;
 }
 
-/* Wrapper for pushdecl_maybe_friend_1.  */
+/* Record a decl-node X as belonging to the current lexical scope.
+   It's a friend if IS_FRIEND is true.  */
 
 tree
-pushdecl_maybe_friend (tree x, bool is_friend)
+pushdecl (tree x, bool is_friend)
 {
   tree ret;
   bool subtime = timevar_cond_start (TV_NAME_LOOKUP);
   ret = pushdecl_maybe_friend_1 (x, is_friend);
   timevar_cond_stop (TV_NAME_LOOKUP, subtime);
   return ret;
-}
-
-/* Record a decl-node X as belonging to the current lexical scope.  */
-
-tree
-pushdecl (tree x)
-{
-  return pushdecl_maybe_friend (x, false);
 }
 
 /* Enter DECL into the symbol table, if that's appropriate.  Returns
@@ -2367,14 +2360,13 @@ keep_next_level (bool keep)
   keep_next_level_flag = keep;
 }
 
-/* Return the list of declarations of the current level.
-   Note that this list is in reverse order unless/until
-   you nreverse it; and when you do nreverse it, you must
-   store the result back using `storedecls' or you will lose.  */
+/* Return the list of declarations of the current local scope.  */
 
 tree
-getdecls (void)
+get_local_decls (void)
 {
+  gcc_assert (current_binding_level->kind != sk_namespace
+	      && current_binding_level->kind != sk_class);
   return current_binding_level->names;
 }
 
@@ -2863,7 +2855,7 @@ pushdecl_with_scope_1 (tree x, cp_binding_level *level, bool is_friend)
     {
       b = current_binding_level;
       current_binding_level = level;
-      x = pushdecl_maybe_friend (x, is_friend);
+      x = pushdecl (x, is_friend);
       current_binding_level = b;
     }
   current_function_decl = function_decl;
@@ -2875,19 +2867,17 @@ pushdecl_with_scope_1 (tree x, cp_binding_level *level, bool is_friend)
 tree
 pushdecl_outermost_localscope (tree x)
 {
+  cp_binding_level *b = NULL;
   bool subtime = timevar_cond_start (TV_NAME_LOOKUP);
-  cp_binding_level *b  = NULL, *n = current_binding_level;
 
-  if (n->kind == sk_function_parms)
-    return error_mark_node;
-  do
-    {
-      b = n;
-      n = b->level_chain;
-    }
-  while (n->kind != sk_function_parms);
-  tree ret = pushdecl_with_scope_1 (x, b, false);
+  /* Find the scope just inside the function parms.  */
+  for (cp_binding_level *n = current_binding_level;
+       n->kind != sk_function_parms; n = b->level_chain)
+    b = n;
+
+  tree ret = b ? pushdecl_with_scope_1 (x, b, false) : error_mark_node;
   timevar_cond_stop (TV_NAME_LOOKUP, subtime);
+
   return ret;
 }
 
@@ -4551,47 +4541,30 @@ parse_using_directive (tree name_space, tree attribs)
     }
 }
 
-/* Like pushdecl, only it places X in the global scope if appropriate.
-   Calls cp_finish_decl to register the variable, initializing it with
-   *INIT, if INIT is non-NULL.  */
+/* Pushes X into the global namespace.  */
 
-static tree
-pushdecl_top_level_1 (tree x, tree *init, bool is_friend)
+tree
+pushdecl_top_level (tree x, bool is_friend)
 {
   bool subtime = timevar_cond_start (TV_NAME_LOOKUP);
   push_to_top_level ();
   x = pushdecl_namespace_level (x, is_friend);
-  if (init)
-    cp_finish_decl (x, *init, false, NULL_TREE, 0);
   pop_from_top_level ();
   timevar_cond_stop (TV_NAME_LOOKUP, subtime);
   return x;
 }
 
-/* Like pushdecl, only it places X in the global scope if appropriate.  */
-
-tree
-pushdecl_top_level (tree x)
-{
-  return pushdecl_top_level_1 (x, NULL, false);
-}
-
-/* Like pushdecl_top_level, but adding the IS_FRIEND parameter.  */
-
-tree
-pushdecl_top_level_maybe_friend (tree x, bool is_friend)
-{
-  return pushdecl_top_level_1 (x, NULL, is_friend);
-}
-
-/* Like pushdecl, only it places X in the global scope if
-   appropriate.  Calls cp_finish_decl to register the variable,
-   initializing it with INIT.  */
+/* Pushes X into the global namespace and Calls cp_finish_decl to
+   register the variable, initializing it with INIT.  */
 
 tree
 pushdecl_top_level_and_finish (tree x, tree init)
 {
-  return pushdecl_top_level_1 (x, &init, false);
+  push_to_top_level ();
+  x = pushdecl_namespace_level (x, false);
+  cp_finish_decl (x, init, false, NULL_TREE, 0);
+  pop_from_top_level ();
+  return x;
 }
 
 /* Combines two sets of overloaded functions into an OVERLOAD chain, removing
@@ -6080,7 +6053,9 @@ pushtag_1 (tree name, tree type, tag_scope scope)
 	    view of the language.  */
 	 || (b->kind == sk_template_parms
 	     && (b->explicit_spec_p || scope == ts_global))
+	 /* Pushing into a class is ok for lambdas or when we want current  */
 	 || (b->kind == sk_class
+	     && scope != ts_lambda
 	     && (scope != ts_current
 		 /* We may be defining a new type in the initializer
 		    of a static member variable. We allow this when
@@ -6103,9 +6078,10 @@ pushtag_1 (tree name, tree type, tag_scope scope)
 	  tree cs = current_scope ();
 
 	  if (scope == ts_current
+	      || scope == ts_lambda
 	      || (cs && TREE_CODE (cs) == FUNCTION_DECL))
 	    context = cs;
-	  else if (cs != NULL_TREE && TYPE_P (cs))
+	  else if (cs && TYPE_P (cs))
 	    /* When declaring a friend class of a local class, we want
 	       to inject the newly named class into the scope
 	       containing the local class, not the namespace
@@ -6139,7 +6115,8 @@ pushtag_1 (tree name, tree type, tag_scope scope)
 
       if (b->kind == sk_class)
 	{
-	  if (!TYPE_BEING_DEFINED (current_class_type))
+	  if (!TYPE_BEING_DEFINED (current_class_type)
+	      && scope != ts_lambda)
 	    return error_mark_node;
 
 	  if (!PROCESSING_REAL_TEMPLATE_DECL_P ())
@@ -6190,6 +6167,7 @@ pushtag_1 (tree name, tree type, tag_scope scope)
 	    vec_safe_push (local_classes, type);
 	}
     }
+
   if (b->kind == sk_class
       && !COMPLETE_TYPE_P (current_class_type))
     {
@@ -6619,7 +6597,7 @@ pop_everything (void)
 {
   if (ENABLE_SCOPE_CHECKING)
     verbatim ("XXX entering pop_everything ()\n");
-  while (!toplevel_bindings_p ())
+  while (!namespace_bindings_p ())
     {
       if (current_binding_level->kind == sk_class)
 	pop_nested_class ();
