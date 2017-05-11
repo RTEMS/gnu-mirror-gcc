@@ -206,7 +206,7 @@ void test (ITYPE *bits, ITYPE n, TYPE one, TYPE_IN *p, TYPE_OUT *q)
   q[49] = x_49;
 }
 
-/* { dg-final { scan-assembler     {\xsaddsp\M}  } } */
-/* { dg-final { scan-assembler     {\stxsspx\M}  } } */
+/* { dg-final { scan-assembler     {\mxsaddsp\M} } } */
+/* { dg-final { scan-assembler     {\mstxsspx\M} } } */
 /* { dg-final { scan-assembler-not {\mmfvsrd\M}  } } */
 /* { dg-final { scan-assembler-not {\mmfvsrwz\M} } } */
