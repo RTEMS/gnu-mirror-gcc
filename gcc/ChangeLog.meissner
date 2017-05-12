@@ -8,7 +8,7 @@
 	(peephole2's for d-form load/store to Altivec registers): Use
 	gpc_reg_operand instead of fpr_reg_operand to allow removal of
 	direct moves to/from GPRs.  Don't allow raw moves of SFmode to
-	vector registers.
+	vector registers from a GPR.
 
 	* config/rs6000/rs6000.c: Undo the target_clone changes in this
 	sandbox.
