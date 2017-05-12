@@ -317,12 +317,6 @@
 ;; Mode attribute to give the suffix for the splat instruction
 (define_mode_attr VSX_SPLAT_SUFFIX [(V16QI "b") (V8HI "h")])
 
-;; Iterator for the splat types that we can do a splt from memory.
-(define_mode_iterator VSX_SPLAT_MEM [V2DF
-				     V2DI
-				     (V4SF "TARGET_P9_VECTOR")
-				     (V4SI "TARGET_P9_VECTOR")])
-
 ;; Constants for creating unspecs
 (define_c_enum "unspec"
   [UNSPEC_VSX_CONCAT
@@ -3071,21 +3065,26 @@
   DONE;
 })
 
-;; V2DF/V2DI splat
+;; V2DF/V2DI splat.
 (define_insn_and_split "vsx_splat_<mode>"
   [(set (match_operand:VSX_D 0 "vsx_register_operand"
-					"=<VSa>,    <VSa>,we,<VS_64dm>")
+			"=<VSa>,    <VSa>,?we,??<VS_64dm>")
+
 	(vec_duplicate:VSX_D
 	 (match_operand:<VS_scalar> 1 "splat_input_operand"
-					"<VS_64reg>,Z,    b, wA")))]
+			"<VS_64reg>,Z,    b,  wA")))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
   "@
    xxpermdi %x0,%x1,%x1,0
    lxvdsx %x0,%y1
    mtvsrdd %x0,%1,%1
    #"
-  "&& reload_completed && TARGET_POWERPC64 && !TARGET_P9_VECTOR
-   && int_reg_operand (operands[1], <VS_scalar>mode)"
+  "&& reload_completed
+   && !vsx_register_operand (operands[1], <VS_scalar>mode)
+   && !(MEM_P (operands[1])
+        && indexed_or_indirect_address (XEXP (operands[1], 0), Pmode))
+   && !(TARGET_POWERPC64 && TARGET_P9_VECTOR
+	&& base_reg_operand (operands[1], <VS_scalar>mode))"
   [(set (match_dup 2)
 	(match_dup 1))
    (set (match_dup 0)
@@ -3095,38 +3094,6 @@
 }
   [(set_attr "type" "vecperm,vecload,vecperm,vecperm")
    (set_attr "length" "4,4,4,8")])
-
-(define_insn_and_split "*vsx_splat_<mode>_offsettable"
-  [(set (match_operand:VSX_SPLAT_MEM 0 "vsx_register_operand" "=<VSa>")
-	(vec_duplicate:VSX_SPLAT_MEM
-	 (match_operand:<VS_scalar> 1 "simple_offsettable_mem_operand" "o")))
-   (clobber (match_scratch:DI 2 "=b"))]
-  "TARGET_POWERPC64 && VECTOR_MEM_VSX_P (<MODE>mode)"
-  "#"
-  "&& 1"
-  [(set (match_dup 2)
-	(match_dup 3))
-   (set (match_dup 0)
-	(vec_duplicate:<MODE> (match_dup 4)))]
-{
-  rtx mem = operands[1];
-  rtx tmp_reg = operands[2];
-  rtx addr = XEXP (mem, 0);
-  rtx add_op0, add_op1, new_addr;
-
-  gcc_assert (GET_CODE (addr) == PLUS || GET_CODE (addr) == LO_SUM);
-
-  if (GET_CODE (tmp_reg) == SCRATCH)
-    operands[2] = tmp_reg = gen_reg_rtx (DImode);
-
-  add_op0 = XEXP (addr, 0);
-  add_op1 = XEXP (addr, 1);
-  gcc_assert (REG_P (add_op0));
-  new_addr = gen_rtx_PLUS (DImode, add_op0, tmp_reg);
-
-  operands[3] = add_op1;
-  operands[4] = change_address (mem, <VS_scalar>mode, new_addr);
-})
 
 ;; V4SI splat support
 (define_insn "vsx_splat_v4si"
