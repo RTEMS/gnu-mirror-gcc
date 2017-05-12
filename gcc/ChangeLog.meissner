@@ -1,14 +1,11 @@
 2017-05-11  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
-	PR target/80697
-	* config/rs6000/rs6000.md (mov<mode>_hardfloat64): Reformat
-	constraints so they are easier to read.  Change all GPR moves to
-	use the '*' constraint, to prevent doing loads to a GPR and then
-	using direct move over to the vector registers.
-	(peephole2's for d-form load/store to Altivec registers): Use
-	gpc_reg_operand instead of fpr_reg_operand to allow removal of
-	direct moves to/from GPRs.  Don't allow raw moves of SFmode to
-	vector registers from a GPR.
+	PR target/80718
+	* config/rs6000/vsx.md (VSX_SPLAT_MEM): New mode iterator.
+	(vsx_splat_<mode>_offsettable): New combiner to allow offsettable
+	memory for vec_duplicate operations.
+
+	* config/rs6000/rs6000.md: Undo earlier changes for PR 80697.
 
 	* config/rs6000/rs6000.c: Undo the target_clone changes in this
 	sandbox.
