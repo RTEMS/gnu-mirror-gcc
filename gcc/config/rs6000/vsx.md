@@ -3071,7 +3071,7 @@
 			"=<VSa>,    <VSa>,?we,??<VS_64dm>")
 
 	(vec_duplicate:VSX_D
-	 (match_operand:<VS_scalar> 1 "splat_input_operand"
+	 (match_operand:<VS_scalar> 1 "input_operand"
 			"<VS_64reg>,Z,    b,  wA")))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
   "@
