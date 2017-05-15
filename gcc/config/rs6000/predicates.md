@@ -1193,18 +1193,30 @@
 (define_predicate "splat_input_operand"
   (match_code "reg,subreg,mem")
 {
-  machine_mode vmode;
-
-  if (mode == DFmode)
-    vmode = V2DFmode;
-  else if (mode == DImode)
-    vmode = V2DImode;
-  else if (mode == SImode && TARGET_P9_VECTOR)
-    vmode = V4SImode;
-  else if (mode == SFmode && TARGET_P9_VECTOR)
-    vmode = V4SFmode;
-  else
+  if (!TARGET_VSX)
     return false;
+
+  switch (mode)
+    {
+    case DImode:
+    case DFmode:
+      break;
+
+    case SImode:
+      if (!TARGET_P9_VECTOR && !TARGET_VSX_SMALL_INTEGER)
+	return false;
+      break;
+
+    /* VSX small integers is needed for SFmode, to allow use to do a load
+       without conversion from memory format to internal double format.  */
+    case SFmode:
+      if (!TARGET_P9_VECTOR && !TARGET_VSX_SMALL_INTEGER)
+	return gpc_reg_operand (op, mode);
+      break;
+
+    default:
+      return false;
+    }
 
   if (MEM_P (op))
     {
@@ -1213,11 +1225,9 @@
       if (! volatile_ok && MEM_VOLATILE_P (op))
 	return 0;
 
-      if (reload_in_progress || lra_in_progress || reload_completed)
-	return indexed_or_indirect_address (addr, vmode);
-      else
-	return memory_address_addr_space_p (vmode, addr, MEM_ADDR_SPACE (op));
+      return indexed_or_indirect_address (addr, mode);
     }
+
   return gpc_reg_operand (op, mode);
 })
 

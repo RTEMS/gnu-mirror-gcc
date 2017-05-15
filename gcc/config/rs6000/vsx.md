@@ -261,7 +261,9 @@
 ;; Map register class for 64-bit element in 128-bit vector for normal register
 ;; to register moves
 (define_mode_attr VS_64reg [(V2DF	"ws")
-			    (V2DI	"wi")])
+			    (V2DI	"wi")
+			    (V4SF	"ww")
+			    (V4SI	"wHwI")])
 
 ;; Iterators for loading constants with xxspltib
 (define_mode_iterator VSINT_84  [V4SI V2DI DI SI])
@@ -316,6 +318,12 @@
 
 ;; Mode attribute to give the suffix for the splat instruction
 (define_mode_attr VSX_SPLAT_SUFFIX [(V16QI "b") (V8HI "h")])
+
+;; Iterator for the splat types that we can do a splat from memory.
+(define_mode_iterator VSX_SPLAT_MEM [V2DF
+				     V2DI
+				     (V4SF "TARGET_P9_VECTOR")
+				     (V4SI "TARGET_P9_VECTOR")])
 
 ;; Constants for creating unspecs
 (define_c_enum "unspec"
@@ -3066,12 +3074,25 @@
 })
 
 ;; V2DF/V2DI splat.
-(define_insn_and_split "vsx_splat_<mode>"
+(define_expand "vsx_splat_<mode>"
+  [(set (match_operand:VSX_D 0 "vsx_register_operand")
+	(vec_duplicate:VSX_D
+	 (match_operand:<VS_scalar> 1 "input_operand")))]
+  "VECTOR_MEM_VSX_P (<MODE>mode)"
+{
+  if (MEM_P (operands[0]))
+    operands[1] = rs6000_address_for_fpconvert (operands[1]);
+
+  else if (!REG_P (operands[0]))
+    operands[1] = force_reg (<VS_scalar>mode, operands[1]);
+})
+
+(define_insn_and_split "*vsx_splat_<mode>"
   [(set (match_operand:VSX_D 0 "vsx_register_operand"
 			"=<VSa>,    <VSa>,?we,??<VS_64dm>")
 
 	(vec_duplicate:VSX_D
-	 (match_operand:<VS_scalar> 1 "input_operand"
+	 (match_operand:<VS_scalar> 1 "splat_input_operand"
 			"<VS_64reg>,Z,    b,  wA")))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
   "@
@@ -3095,50 +3116,115 @@
   [(set_attr "type" "vecperm,vecload,vecperm,vecperm")
    (set_attr "length" "4,4,4,8")])
 
-;; V4SI splat support
-(define_insn "vsx_splat_v4si"
-  [(set (match_operand:V4SI 0 "vsx_register_operand" "=we,we")
-	(vec_duplicate:V4SI
-	 (match_operand:SI 1 "splat_input_operand" "r,Z")))]
-  "TARGET_P9_VECTOR"
-  "@
-   mtvsrws %x0,%1
-   lxvwsx %x0,%y1"
-  [(set_attr "type" "vecperm,vecload")])
+;; V4SI/V4SF splat support
+(define_expand "vsx_splat_<mode>"
+  [(set (match_operand:VSX_W 0 "vsx_register_operand")
+	(vec_duplicate:VSX_W
+	 (match_operand:<VS_scalar> 1 "input_operand")))]
+  "VECTOR_MEM_VSX_P (V4SImode)"
+{
+  if (!TARGET_P9_VECTOR)
+    operands[1] = force_reg (<VS_scalar>mode, operands[1]);
 
-;; SImode is not currently allowed in vector registers.  This pattern
-;; allows us to use direct move to get the value in a vector register
-;; so that we can use XXSPLTW
-(define_insn "vsx_splat_v4si_di"
-  [(set (match_operand:V4SI 0 "vsx_register_operand" "=wa,we")
-	(vec_duplicate:V4SI
-	 (truncate:SI
-	  (match_operand:DI 1 "gpc_reg_operand" "wj,r"))))]
-  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
-  "@
-   xxspltw %x0,%x1,1
-   mtvsrws %x0,%1"
-  [(set_attr "type" "vecperm")])
+  else if (MEM_P (operands[0]))
+    operands[1] = rs6000_address_for_fpconvert (operands[1]);
 
-;; V4SF splat (ISA 3.0)
-(define_insn_and_split "vsx_splat_v4sf"
-  [(set (match_operand:V4SF 0 "vsx_register_operand" "=wa,wa,wa")
-	(vec_duplicate:V4SF
-	 (match_operand:SF 1 "splat_input_operand" "Z,wy,r")))]
-  "TARGET_P9_VECTOR"
+  else if (!REG_P (operands[0]))
+    operands[1] = force_reg (<VS_scalar>mode, operands[1]);
+})
+
+(define_insn "*vsx_splat_v4si"
+  [(set (match_operand:V4SI 0 "vsx_register_operand" "=we,wHwI,wa,we")
+	(vec_duplicate:V4SI
+	 (match_operand:SI 1 "splat_input_operand" "Z,Z,wHwI,?r")))]
+  "TARGET_P9_VECTOR || TARGET_VSX_SMALL_INTEGER"
   "@
    lxvwsx %x0,%y1
    #
+   xxspltw %x0,%x1,1
    mtvsrws %x0,%1"
-  "&& reload_completed && vsx_register_operand (operands[1], SFmode)"
+  [(set_attr "type" "vecload,vecperm,vecperm,vecperm")])
+
+(define_insn "*vsx_splat_v4sf"
+  [(set (match_operand:V4SF 0 "vsx_register_operand" "=we,wHwI,wa,we")
+	(vec_duplicate:V4SF
+	 (match_operand:SF 1 "input_operand" "Z,Z,?wy,?r")))]
+  "VECTOR_MEM_VSX_P (V4SFmode)"
+  "@
+   lxvwsx %x0,%y1
+   #
+   #
+   mtvsrws %x0,%1"
+  [(set_attr "type" "vecload,fpload,vecperm,mftgpr")
+   (set_attr "length" "4,8,8,4")])
+
+(define_split
+  [(set (match_operand:V4SF 0 "vsx_register_operand")
+	(vec_duplicate:V4SF
+	 (match_operand:SF 1 "vsx_register_operand")))]
+  "reload_completed && VECTOR_MEM_VSX_P (V4SFmode)"
   [(set (match_dup 0)
 	(unspec:V4SF [(match_dup 1)] UNSPEC_VSX_CVDPSPN))
    (set (match_dup 0)
 	(unspec:V4SF [(match_dup 0)
-		      (const_int 0)] UNSPEC_VSX_XXSPLTW))]
-  ""
-  [(set_attr "type" "vecload,vecperm,mftgpr")
-   (set_attr "length" "4,8,4")])
+		      (const_int 0)] UNSPEC_VSX_XXSPLTW))])
+
+(define_split
+  [(set (match_operand:VSX_W 0 "vsx_register_operand")
+	(vec_duplicate:VSX_W
+	 (match_operand:<VS_scalar> 1 "indexed_or_indirect_operand")))]
+  "reload_completed && !TARGET_P9_VECTOR && TARGET_VSX_SMALL_INTEGER
+   && VECTOR_MEM_VSX_P (<MODE>mode)"
+  [(set (match_dup 2)
+	(match_dup 3))
+   (set (match_dup 4)
+	(vec_duplicate:V4SI (match_dup 2)))]
+{
+  rtx dest = operands[0];
+  unsigned int dregno = reg_or_subregno (dest);
+  rtx mem = operands[1];
+  rtx addr = XEXP (mem, 0);
+
+  operands[2] = gen_rtx_REG (SImode, dregno);
+  if (<MODE>mode == V4SImode)
+    {
+      operands[3] = mem;
+      operands[4] = dest;
+    }
+  else
+    {
+      operands[3] = change_address (mem, SImode, addr);
+      operands[4] = gen_rtx_REG (V4SImode, dregno);
+    }
+})
+
+;; Combiner pattern to get splats from offsettable memory before register
+;; allocation
+(define_insn_and_split "*vsx_splat_<VSX_SPLAT_MEM:mode>_<P:mode>_offsettable"
+  [(set (match_operand:VSX_SPLAT_MEM 0 "vsx_register_operand" "=<VS_64reg>")
+	(vec_duplicate:VSX_SPLAT_MEM
+	 (match_operand:<VS_scalar> 1 "simple_offsettable_mem_operand" "o")))
+   (clobber (match_scratch:P 2 "=b"))]
+  "VECTOR_MEM_VSX_P (<MODE>mode)"
+  "#"
+  "&& 1"
+  [(set (match_dup 2)
+	(plus:P (match_dup 3)
+		(match_dup 4)))
+   (set (match_dup 0)
+	(vec_duplicate:<VSX_SPLAT_MEM:MODE> (match_dup 5)))]
+{
+  rtx mem = operands[1];
+  rtx addr = XEXP (mem, 0);
+  rtx base_reg = operands[2];
+
+  if (GET_CODE (base_reg) == SCRATCH)
+    operands[2] = base_reg = gen_reg_rtx (Pmode);
+
+  operands[3] = XEXP (addr, 0);
+  operands[4] = XEXP (addr, 1);
+  operands[5] = change_address (mem, <VS_scalar>mode, base_reg);
+})
 
 ;; V4SF/V4SI splat from a vector element
 (define_insn "vsx_xxspltw_<mode>"
