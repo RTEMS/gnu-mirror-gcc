@@ -8,10 +8,10 @@
 #include <altivec.h>
 
 double
-insert_exponent (unsigned long long int *significand_p,
+insert_exponent (long long int *significand_p,
 		 unsigned long long int *exponent_p)
 {
-  unsigned long long int significand = *significand_p;
+  long long int significand = *significand_p;
   unsigned long long int exponent = *exponent_p;
 
   return scalar_insert_exp (significand, exponent);

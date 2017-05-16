@@ -1971,6 +1971,10 @@ BU_P9V_VSX_1 (XXBRH_V8HI,	"xxbrh_v8hi",	CONST,	p9_xxbrh_v8hi)
 BU_P9V_64BIT_VSX_2 (VSIEDP,	"scalar_insert_exp",	CONST,	xsiexpdp)
 BU_P9V_64BIT_VSX_2 (VSIEDPF,	"scalar_insert_exp_dp",	CONST,	xsiexpdpf)
 
+BU_P9V_64BIT_VSX_2 (VSIEQP,	"scalar_insert_exp_q",	CONST,	xsiexpqp)
+BU_P9V_64BIT_VSX_2 (VSIEQPF,	"scalar_insert_exp_qp",	CONST,	xsiexpqpf)
+
+
 BU_P9V_VSX_2 (VSCEDPGT,	"scalar_cmp_exp_dp_gt",	CONST,	xscmpexpdp_gt)
 BU_P9V_VSX_2 (VSCEDPLT,	"scalar_cmp_exp_dp_lt",	CONST,	xscmpexpdp_lt)
 BU_P9V_VSX_2 (VSCEDPEQ,	"scalar_cmp_exp_dp_eq",	CONST,	xscmpexpdp_eq)

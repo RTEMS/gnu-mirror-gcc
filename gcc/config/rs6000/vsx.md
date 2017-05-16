@@ -352,6 +352,7 @@
    UNSPEC_VSX_SXEXPDP
    UNSPEC_VSX_SXSIGDP
    UNSPEC_VSX_SIEXPDP
+   UNSPEC_VSX_SIEXPQP
    UNSPEC_VSX_SCMPEXPDP
    UNSPEC_VSX_STSTDC
    UNSPEC_VSX_VXEXP
@@ -3456,6 +3457,32 @@
   "TARGET_P9_VECTOR && TARGET_64BIT"
   "xsxsigdp %0,%x1"
   [(set_attr "type" "integer")])
+
+;; VSX Scalar Insert Exponent Quad-Precision Floating Point Argument
+(define_insn "xsiexpqpf"
+  [(set (match_operand:TF 0 "altivec_register_operand" "=wa")
+	(unspec:TF [(match_operand:TF 1 "altivec_register_operand" "r")
+		    (match_operand:DI 2 "register_operand" "r")]
+	 UNSPEC_VSX_SIEXPQP))]
+  "TARGET_P9_VECTOR && TARGET_64BIT"
+  "mtvsrd %0, %2\; xsiexpqp %x0,%x1,%x0"
+  [(set_attr "type" "fpsimple")])
+;; above: kelvin not sure how operands of xsiexpqp are encoded.  the
+;; instruction is part of the VSR chapter, but the encoding uses only
+;; 5 bits to specify a VR offset.
+
+;; VSX Scalar Insert Exponent Quad-Precision
+(define_insn "xsiexpqp"
+  [(set (match_operand:TF 0 "altivec_register_operand" "=wa")
+	(unspec:TF [(match_operand:TI 1 "altivec_register_operand" "r")
+		    (match_operand:DI 2 "register_operand" "r")]
+	 UNSPEC_VSX_SIEXPQP))]
+  "TARGET_P9_VECTOR && TARGET_64BIT"
+  "mtvsrd %0, %2\; xsiexpqp %x0,%x1,%x0"
+  [(set_attr "type" "fpsimple")])
+;; above: kelvin not sure how operands of xsiexpqp are encoded.  the
+;; instruction is part of the VSR chapter, but the encoding uses only
+;; 5 bits to specify a VR offset.
 
 ;; VSX Scalar Insert Exponent Double-Precision
 (define_insn "xsiexpdp"
