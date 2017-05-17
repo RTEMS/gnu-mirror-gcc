@@ -320,10 +320,7 @@
 (define_mode_attr VSX_SPLAT_SUFFIX [(V16QI "b") (V8HI "h")])
 
 ;; Iterator for the splat types that we can do a splat from memory.
-(define_mode_iterator VSX_SPLAT_MEM [V2DF
-				     V2DI
-				     (V4SF "TARGET_P9_VECTOR")
-				     (V4SI "TARGET_P9_VECTOR")])
+(define_mode_iterator VSX_SPLAT_MEM [V2DF V2DI V4SF V4SI])
 
 ;; Constants for creating unspecs
 (define_c_enum "unspec"
@@ -3121,41 +3118,40 @@
   [(set (match_operand:VSX_W 0 "vsx_register_operand")
 	(vec_duplicate:VSX_W
 	 (match_operand:<VS_scalar> 1 "input_operand")))]
-  "VECTOR_MEM_VSX_P (V4SImode)"
+  "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT
+   && TARGET_VSX_SMALL_INTEGER"
 {
-  if (!TARGET_P9_VECTOR)
-    operands[1] = force_reg (<VS_scalar>mode, operands[1]);
-
-  else if (MEM_P (operands[0]))
+  if (MEM_P (operands[0]))
     operands[1] = rs6000_address_for_fpconvert (operands[1]);
 
   else if (!REG_P (operands[0]))
     operands[1] = force_reg (<VS_scalar>mode, operands[1]);
 })
 
-(define_insn "*vsx_splat_v4si"
-  [(set (match_operand:V4SI 0 "vsx_register_operand" "=we,wHwI,wa,we")
+(define_insn "*vsx_splat_v4si_internal"
+  [(set (match_operand:V4SI 0 "vsx_register_operand" "=wo,wHwI,wa,wo")
 	(vec_duplicate:V4SI
-	 (match_operand:SI 1 "splat_input_operand" "Z,Z,wHwI,?r")))]
-  "TARGET_P9_VECTOR || TARGET_VSX_SMALL_INTEGER"
+	 (match_operand:SI 1 "splat_input_operand" "Z,Z,wHwI,r")))]
+  "TARGET_DIRECT_MOVE_64BIT && TARGET_VSX_SMALL_INTEGER"
   "@
    lxvwsx %x0,%y1
    #
    xxspltw %x0,%x1,1
    mtvsrws %x0,%1"
-  [(set_attr "type" "vecload,vecperm,vecperm,vecperm")])
+  [(set_attr "type" "vecload,vecload,vecperm,vecperm")
+   (set_attr "length" "4,8,4,4")])
 
-(define_insn "*vsx_splat_v4sf"
-  [(set (match_operand:V4SF 0 "vsx_register_operand" "=we,wHwI,wa,we")
+(define_insn "vsx_splat_v4sf_internal"
+  [(set (match_operand:V4SF 0 "vsx_register_operand" "=wo,wHwI,wa,wo")
 	(vec_duplicate:V4SF
-	 (match_operand:SF 1 "input_operand" "Z,Z,?wy,?r")))]
+	 (match_operand:SF 1 "input_operand" "Z,Z,?ww,?r")))]
   "VECTOR_MEM_VSX_P (V4SFmode)"
   "@
    lxvwsx %x0,%y1
    #
    #
    mtvsrws %x0,%1"
-  [(set_attr "type" "vecload,fpload,vecperm,mftgpr")
+  [(set_attr "type" "vecload,vecload,vecperm,mftgpr")
    (set_attr "length" "4,8,8,4")])
 
 (define_split
@@ -3163,18 +3159,22 @@
 	(vec_duplicate:V4SF
 	 (match_operand:SF 1 "vsx_register_operand")))]
   "reload_completed && VECTOR_MEM_VSX_P (V4SFmode)"
-  [(set (match_dup 0)
-	(unspec:V4SF [(match_dup 1)] UNSPEC_VSX_CVDPSPN))
-   (set (match_dup 0)
-	(unspec:V4SF [(match_dup 0)
-		      (const_int 0)] UNSPEC_VSX_XXSPLTW))])
+  [(match_dup 2)
+   (match_dup 3)]
+{
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  operands[2] = (TARGET_XSCVDPSPN
+		 ? gen_vsx_xscvdpspn_scalar (op0, op1)
+		 : gen_vsx_xscvdpsp_scalar (op0, op1));
+  operands[3] = gen_vsx_xxspltw_v4sf_direct (op0, op0, const0_rtx);
+})
 
 (define_split
   [(set (match_operand:VSX_W 0 "vsx_register_operand")
 	(vec_duplicate:VSX_W
 	 (match_operand:<VS_scalar> 1 "indexed_or_indirect_operand")))]
-  "reload_completed && !TARGET_P9_VECTOR && TARGET_VSX_SMALL_INTEGER
-   && VECTOR_MEM_VSX_P (<MODE>mode)"
+  "reload_completed && !TARGET_P9_VECTOR && VECTOR_MEM_VSX_P (<MODE>mode)"
   [(set (match_dup 2)
 	(match_dup 3))
    (set (match_dup 4)
@@ -3184,6 +3184,17 @@
   unsigned int dregno = reg_or_subregno (dest);
   rtx mem = operands[1];
   rtx addr = XEXP (mem, 0);
+
+  /* For V4SF, fall back to load register, and splat word if we don't
+     allow small integers in vector registers.  */
+  if (<MODE>mode == V4SFmode &&
+      (!TARGET_VSX_SMALL_INTEGER || !TARGET_DIRECT_MOVE_64BIT))
+    {
+      rtx dregno_sf = gen_rtx_REG (SFmode, dregno);
+      emit_move_insn (dregno_sf, mem);
+      emit_insn (gen_vsx_splat_v4sf_internal (dest, dregno_sf));
+      DONE;
+    }
 
   operands[2] = gen_rtx_REG (SImode, dregno);
   if (<MODE>mode == V4SImode)

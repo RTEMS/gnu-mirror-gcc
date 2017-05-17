@@ -7269,19 +7269,13 @@ rs6000_expand_vector_init (rtx target, rtx vals)
     }
 
   /* Special case initializing vector int if we are on 64-bit systems with
-     direct move or we have the ISA 3.0 instructions.  */
+     direct move & 32-bit integer support in vector registers.  */
   if (mode == V4SImode  && VECTOR_MEM_VSX_P (V4SImode)
-      && TARGET_DIRECT_MOVE_64BIT
-      && (TARGET_VSX_SMALL_INTEGER || TARGET_P9_VECTOR))
+      && TARGET_DIRECT_MOVE_64BIT && TARGET_VSX_SMALL_INTEGER)
     {
       if (all_same)
 	{
 	  rtx element0 = XVECEXP (vals, 0, 0);
-	  if (MEM_P (element0))
-	    element0 = rs6000_address_for_fpconvert (element0);
-	  else
-	    element0 = force_reg (SImode, element0);
-
 	  emit_insn (gen_vsx_splat_v4si (target, element0));
 	  return;
 	}
@@ -7312,27 +7306,7 @@ rs6000_expand_vector_init (rtx target, rtx vals)
       if (all_same)
 	{
 	  rtx element0 = XVECEXP (vals, 0, 0);
-
-	  if (TARGET_P9_VECTOR || TARGET_VSX_SMALL_INTEGER)
-	    {
-	      if (MEM_P (element0))
-		element0 = rs6000_address_for_fpconvert (element0);
-
-	      emit_insn (gen_vsx_splat_v4sf (target, element0));
-	    }
-
-	  else
-	    {
-	      rtx freg = gen_reg_rtx (V4SFmode);
-	      rtx sreg = force_reg (SFmode, element0);
-	      rtx cvt  = (TARGET_XSCVDPSPN
-			  ? gen_vsx_xscvdpspn_scalar (freg, sreg)
-			  : gen_vsx_xscvdpsp_scalar (freg, sreg));
-
-	      emit_insn (cvt);
-	      emit_insn (gen_vsx_xxspltw_v4sf_direct (target, freg,
-						      const0_rtx));
-	    }
+	  emit_insn (gen_vsx_splat_v4sf (target, element0));
 	}
       else
 	{
