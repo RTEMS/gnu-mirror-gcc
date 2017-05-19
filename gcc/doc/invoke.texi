@@ -245,7 +245,7 @@ Objective-C and Objective-C++ Dialects}.
 -Wno-attributes -Wno-builtin-macro-redefined @gol
 -Wc90-c99-compat -Wc99-c11-compat @gol
 -Wc++-compat -Wc++11-compat -Wc++14-compat -Wcast-align  -Wcast-qual  @gol
--Wchar-subscripts -Wclobbered  -Wcomment -Wconditionally-supported  @gol
+-Wchar-subscripts -Wchkp -Wclobbered  -Wcomment -Wconditionally-supported  @gol
 -Wconversion -Wcoverage-mismatch -Wdate-time -Wdelete-incomplete -Wno-cpp  @gol
 -Wno-deprecated -Wno-deprecated-declarations -Wno-designated-init @gol
 -Wdisabled-optimization @gol
@@ -923,7 +923,7 @@ See RS/6000 and PowerPC Options.
 -mpointers-to-nested-functions -mno-pointers-to-nested-functions @gol
 -msave-toc-indirect -mno-save-toc-indirect @gol
 -mpower8-fusion -mno-mpower8-fusion -mpower8-vector -mno-power8-vector @gol
--mcrypto -mno-crypto -mdirect-move -mno-direct-move @gol
+-mcrypto -mno-crypto -mhtm -mno-htm -mdirect-move -mno-direct-move @gol
 -mquad-memory -mno-quad-memory @gol
 -mquad-memory-atomic -mno-quad-memory-atomic @gol
 -mcompat-align-parm -mno-compat-align-parm @gol
@@ -3538,6 +3538,11 @@ This warning is enabled by @option{-Wall}.
 Warn whenever a comment-start sequence @samp{/*} appears in a @samp{/*}
 comment, or whenever a Backslash-Newline appears in a @samp{//} comment.
 This warning is enabled by @option{-Wall}.
+
+@item -Wchkp
+@opindex Wchkp
+Warn about an invalid memory access that is found by Pointer Bounds Checker
+(@option{-fcheck-pointer-bounds}).
 
 @item -Wno-coverage-mismatch
 @opindex Wno-coverage-mismatch
@@ -18900,7 +18905,7 @@ following options:
 -mpopcntb -mpopcntd  -mpowerpc64 @gol
 -mpowerpc-gpopt  -mpowerpc-gfxopt  -msingle-float -mdouble-float @gol
 -msimple-fpu -mstring  -mmulhw  -mdlmzb  -mmfpgpr -mvsx @gol
--mcrypto -mdirect-move -mpower8-fusion -mpower8-vector @gol
+-mcrypto -mdirect-move -mhtm -mpower8-fusion -mpower8-vector @gol
 -mquad-memory -mquad-memory-atomic -mmodulo -mfloat128 -mfloat128-hardware @gol
 -mpower9-fusion -mpower9-vector}
 
@@ -19067,6 +19072,14 @@ access to the cryptographic instructions that were added in version
 Generate code that uses (does not use) the instructions to move data
 between the general purpose registers and the vector/scalar (VSX)
 registers that were added in version 2.07 of the PowerPC ISA.
+
+@item -mhtm
+@itemx -mno-htm
+@opindex mhtm
+@opindex mno-htm
+Enable (disable) the use of the built-in functions that allow direct
+access to the Hardware Transactional Memory (HTM) instructions that
+were added in version 2.07 of the PowerPC ISA.
 
 @item -mpower8-fusion
 @itemx -mno-power8-fusion

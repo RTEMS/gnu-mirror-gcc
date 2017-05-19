@@ -1,3 +1,52 @@
+2017-05-15  Adhemerval Zanella  <adhemerval.zanella@linaro.org>
+
+	* config/sparc/lb1spc.S [__ELF__ && __linux__]: Emit .note.GNU-stack
+	section for a non-executable stack.
+
+2017-05-09  Andreas Tobler  <andreast@gcc.gnu.org>
+
+	Backport from mainline
+        2017-05-09  Andreas Tobler  <andreast@gcc.gnu.org>
+
+	* config.host: Use the generic FreeBSD t-slibgcc-elf-ver for
+	arm*-*-freebsd* instead of the t-slibgcc-libgcc.
+
+2017-04-07  Alan Modra  <amodra@gmail.com>
+
+	PR target/45053
+	* config/rs6000/t-crtstuff (CRTSTUFF_T_CFLAGS): Add -O2.
+
+2017-01-09  Andreas Tobler  <andreast@gcc.gnu.org>
+
+	Backport from mainline
+	2016-10-10  Andreas Tobler  <andreast@gcc.gnu.org>
+
+	* config.host: Add support for aarch64-*-freebsd*.
+
+2016-11-07  Florian Weimer  <fweimer@redhat.com>
+
+	Backport from mainline
+	2016-10-24  Florian Weimer  <fweimer@redhat.com>
+
+	PR libgcc/78064
+	* unwind-c.c: Include auto-target.h.
+
+2016-09-28  Joseph Myers  <joseph@codesourcery.com>
+
+	Backport from mainline
+	2016-09-07  Joseph Myers  <joseph@codesourcery.com>
+
+	PR libgcc/77519
+	* libgcc2.c (NOTRUNC): Invert settings.
+
+2016-08-31  Jakub Sejdak  <jakub.sejdak@phoesys.com>
+
+	* config.host: Add support for arm*-*-phoenix* targets.
+
+2016-06-03  Release Manager
+
+	* GCC 5.4.0 released.
+
 2016-05-17  Sebastian Huber  <sebastian.huber@embedded-brains.de>
 
 	Backport from mainline

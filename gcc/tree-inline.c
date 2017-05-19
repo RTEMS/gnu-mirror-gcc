@@ -1852,7 +1852,8 @@ copy_bb (copy_body_data *id, basic_block bb, int frequency_scale,
 	  call_stmt = dyn_cast <gcall *> (stmt);
 	  if (call_stmt
 	      && gimple_call_va_arg_pack_p (call_stmt)
-	      && id->call_stmt)
+	      && id->call_stmt
+	      && ! gimple_call_va_arg_pack_p (id->call_stmt))
 	    {
 	      /* __builtin_va_arg_pack () should be replaced by
 		 all arguments corresponding to ... in the caller.  */
@@ -1932,7 +1933,8 @@ copy_bb (copy_body_data *id, basic_block bb, int frequency_scale,
 		   && id->call_stmt
 		   && (decl = gimple_call_fndecl (stmt))
 		   && DECL_BUILT_IN_CLASS (decl) == BUILT_IN_NORMAL
-		   && DECL_FUNCTION_CODE (decl) == BUILT_IN_VA_ARG_PACK_LEN)
+		   && DECL_FUNCTION_CODE (decl) == BUILT_IN_VA_ARG_PACK_LEN
+		   && ! gimple_call_va_arg_pack_p (id->call_stmt))
 	    {
 	      /* __builtin_va_arg_pack_len () should be replaced by
 		 the number of anonymous arguments.  */
@@ -4580,7 +4582,7 @@ expand_call_inline (basic_block bb, gimple stmt, copy_body_data *id)
   id->src_fn = fn;
   id->src_node = cg_edge->callee;
   id->src_cfun = DECL_STRUCT_FUNCTION (fn);
-  id->call_stmt = stmt;
+  id->call_stmt = call_stmt;
 
   gcc_assert (!id->src_cfun->after_inlining);
 
@@ -4755,7 +4757,7 @@ expand_call_inline (basic_block bb, gimple stmt, copy_body_data *id)
 	{
 	  tree name = gimple_call_lhs (stmt);
 	  tree var = SSA_NAME_VAR (name);
-	  tree def = ssa_default_def (cfun, var);
+	  tree def = var ? ssa_default_def (cfun, var) : NULL;
 
 	  if (def)
 	    {
@@ -4766,6 +4768,11 @@ expand_call_inline (basic_block bb, gimple stmt, copy_body_data *id)
 	    }
 	  else
 	    {
+	      if (!var)
+		{
+		  var = create_tmp_reg_fn (cfun, TREE_TYPE (name), NULL);
+		  SET_SSA_NAME_VAR_OR_IDENTIFIER (name, var);
+		}
 	      /* Otherwise make this variable undefined.  */
 	      gsi_remove (&stmt_gsi, true);
 	      set_ssa_default_def (cfun, var, name);

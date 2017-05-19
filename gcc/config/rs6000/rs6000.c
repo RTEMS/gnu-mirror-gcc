@@ -3707,6 +3707,13 @@ rs6000_option_override_internal (bool global_init_p)
       && !global_options_set.x_flag_ira_loop_pressure)
     flag_ira_loop_pressure = 1;
 
+  /* -fsanitize=address needs to turn on -fasynchronous-unwind-tables in order
+     for tracebacks to be complete but not if any -fasynchronous-unwind-tables
+     options were already specified.  */
+  if (flag_sanitize & SANITIZE_USER_ADDRESS
+      && !global_options_set.x_flag_asynchronous_unwind_tables)
+    flag_asynchronous_unwind_tables = 1;
+
   /* Set the pointer size.  */
   if (TARGET_64BIT)
     {
@@ -5764,8 +5771,8 @@ rs6000_file_start (void)
     }
 
 #ifdef USING_ELFOS_H
-  if (rs6000_default_cpu == 0 || rs6000_default_cpu[0] == '\0'
-      || !global_options_set.x_rs6000_cpu_index)
+  if (!(rs6000_default_cpu && rs6000_default_cpu[0])
+      && !global_options_set.x_rs6000_cpu_index)
     {
       fputs ("\t.machine ", asm_out_file);
       if ((rs6000_isa_flags & OPTION_MASK_MODULO) != 0)
@@ -12876,7 +12883,7 @@ rs6000_expand_unop_builtin (enum insn_code icode, tree exp, rtx target)
 	  || INTVAL (op0) < -16)
 	{
 	  error ("argument 1 must be a 5-bit signed literal");
-	  return const0_rtx;
+	  return CONST0_RTX (tmode);
 	}
     }
 
@@ -12979,7 +12986,7 @@ rs6000_expand_binop_builtin (enum insn_code icode, tree exp, rtx target)
 	  || TREE_INT_CST_LOW (arg1) & ~0x1f)
 	{
 	  error ("argument 2 must be a 5-bit unsigned literal");
-	  return const0_rtx;
+	  return CONST0_RTX (tmode);
 	}
     }
 
@@ -13755,11 +13762,18 @@ rs6000_expand_ternop_builtin (enum insn_code icode, tree exp, rtx target)
 	  || TREE_INT_CST_LOW (arg2) & ~0xf)
 	{
 	  error ("argument 3 must be a 4-bit unsigned literal");
-	  return const0_rtx;
+	  return CONST0_RTX (tmode);
 	}
     }
   else if (icode == CODE_FOR_vsx_xxpermdi_v2df
            || icode == CODE_FOR_vsx_xxpermdi_v2di
+           || icode == CODE_FOR_vsx_xxpermdi_v2df_be
+           || icode == CODE_FOR_vsx_xxpermdi_v2di_be
+           || icode == CODE_FOR_vsx_xxpermdi_v1ti
+           || icode == CODE_FOR_vsx_xxpermdi_v4sf
+           || icode == CODE_FOR_vsx_xxpermdi_v4si
+           || icode == CODE_FOR_vsx_xxpermdi_v8hi
+           || icode == CODE_FOR_vsx_xxpermdi_v16qi
            || icode == CODE_FOR_vsx_xxsldwi_v16qi
            || icode == CODE_FOR_vsx_xxsldwi_v8hi
            || icode == CODE_FOR_vsx_xxsldwi_v4si
@@ -13773,7 +13787,7 @@ rs6000_expand_ternop_builtin (enum insn_code icode, tree exp, rtx target)
 	  || TREE_INT_CST_LOW (arg2) & ~0x3)
 	{
 	  error ("argument 3 must be a 2-bit unsigned literal");
-	  return const0_rtx;
+	  return CONST0_RTX (tmode);
 	}
     }
   else if (icode == CODE_FOR_vsx_set_v2df
@@ -13793,7 +13807,7 @@ rs6000_expand_ternop_builtin (enum insn_code icode, tree exp, rtx target)
 	  || TREE_INT_CST_LOW (arg2) & ~0x1)
 	{
 	  error ("argument 3 must be a 1-bit unsigned literal");
-	  return const0_rtx;
+	  return CONST0_RTX (tmode);
 	}
     }
   else if (icode == CODE_FOR_dfp_ddedpd_dd
@@ -13805,7 +13819,7 @@ rs6000_expand_ternop_builtin (enum insn_code icode, tree exp, rtx target)
 	  || TREE_INT_CST_LOW (arg2) & ~0x3)
 	{
 	  error ("argument 1 must be 0 or 2");
-	  return const0_rtx;
+	  return CONST0_RTX (tmode);
 	}
     }
   else if (icode == CODE_FOR_dfp_denbcd_dd
@@ -13817,7 +13831,7 @@ rs6000_expand_ternop_builtin (enum insn_code icode, tree exp, rtx target)
 	  || TREE_INT_CST_LOW (arg0) & ~0x1)
 	{
 	  error ("argument 1 must be a 1-bit unsigned literal");
-	  return const0_rtx;
+	  return CONST0_RTX (tmode);
 	}
     }
   else if (icode == CODE_FOR_dfp_dscli_dd
@@ -13831,7 +13845,7 @@ rs6000_expand_ternop_builtin (enum insn_code icode, tree exp, rtx target)
 	  || TREE_INT_CST_LOW (arg1) & ~0x3f)
 	{
 	  error ("argument 2 must be a 6-bit unsigned literal");
-	  return const0_rtx;
+	  return CONST0_RTX (tmode);
 	}
     }
   else if (icode == CODE_FOR_crypto_vshasigmaw
@@ -13843,14 +13857,14 @@ rs6000_expand_ternop_builtin (enum insn_code icode, tree exp, rtx target)
       if (TREE_CODE (arg1) != INTEGER_CST || wi::geu_p (arg1, 2))
 	{
 	  error ("argument 2 must be 0 or 1");
-	  return const0_rtx;
+	  return CONST0_RTX (tmode);
 	}
 
       STRIP_NOPS (arg2);
-      if (TREE_CODE (arg2) != INTEGER_CST || wi::geu_p (arg1, 16))
+      if (TREE_CODE (arg2) != INTEGER_CST || wi::geu_p (arg2, 16))
 	{
 	  error ("argument 3 must be in the range 0..15");
-	  return const0_rtx;
+	  return CONST0_RTX (tmode);
 	}
     }
 
@@ -13907,6 +13921,7 @@ altivec_expand_ld_builtin (tree exp, rtx target, bool *expandedp)
       break;
     case ALTIVEC_BUILTIN_LD_INTERNAL_2di:
       icode = CODE_FOR_vector_altivec_load_v2di;
+      break;
     case ALTIVEC_BUILTIN_LD_INTERNAL_1ti:
       icode = CODE_FOR_vector_altivec_load_v1ti;
       break;
@@ -13968,6 +13983,7 @@ altivec_expand_st_builtin (tree exp, rtx target ATTRIBUTE_UNUSED,
       break;
     case ALTIVEC_BUILTIN_ST_INTERNAL_2di:
       icode = CODE_FOR_vector_altivec_store_v2di;
+      break;
     case ALTIVEC_BUILTIN_ST_INTERNAL_1ti:
       icode = CODE_FOR_vector_altivec_store_v1ti;
       break;
@@ -16463,6 +16479,7 @@ builtin_function_type (machine_mode mode_ret, machine_mode mode_arg0,
       break;
 
       /* unsigned args, signed return.  */
+    case VSX_BUILTIN_XVCVUXDSP:
     case VSX_BUILTIN_XVCVUXDDP_UNS:
     case ALTIVEC_BUILTIN_UNSFLOAT_V4SI_V4SF:
       h.uns_p[1] = 1;
@@ -18188,6 +18205,7 @@ rs6000_secondary_reload (bool in_p,
 		       && MEM_P (SUBREG_REG (x))));
 
   sri->icode = CODE_FOR_nothing;
+  sri->t_icode = CODE_FOR_nothing;
   sri->extra_cost = 0;
   icode = ((in_p)
 	   ? reg_addr[mode].reload_load
@@ -27363,53 +27381,54 @@ rs6000_output_function_epilogue (FILE *file,
 	 seems to set the bit when not optimizing.  */
       fprintf (file, "%d\n", ((float_parms << 1) | (! optimize)));
 
-      if (! optional_tbtab)
-	return;
+      if (optional_tbtab)
+	{
+	  /* Optional fields follow.  Some are variable length.  */
 
-      /* Optional fields follow.  Some are variable length.  */
+	  /* Parameter types, left adjusted bit fields: 0 fixed, 10 single
+	     float, 11 double float.  */
+	  /* There is an entry for each parameter in a register, in the order
+	     that they occur in the parameter list.  Any intervening arguments
+	     on the stack are ignored.  If the list overflows a long (max
+	     possible length 34 bits) then completely leave off all elements
+	     that don't fit.  */
+	  /* Only emit this long if there was at least one parameter.  */
+	  if (fixed_parms || float_parms)
+	    fprintf (file, "\t.long %d\n", parm_info);
 
-      /* Parameter types, left adjusted bit fields: 0 fixed, 10 single float,
-	 11 double float.  */
-      /* There is an entry for each parameter in a register, in the order that
-	 they occur in the parameter list.  Any intervening arguments on the
-	 stack are ignored.  If the list overflows a long (max possible length
-	 34 bits) then completely leave off all elements that don't fit.  */
-      /* Only emit this long if there was at least one parameter.  */
-      if (fixed_parms || float_parms)
-	fprintf (file, "\t.long %d\n", parm_info);
+	  /* Offset from start of code to tb table.  */
+	  fputs ("\t.long ", file);
+	  ASM_OUTPUT_INTERNAL_LABEL_PREFIX (file, "LT");
+	  RS6000_OUTPUT_BASENAME (file, fname);
+	  putc ('-', file);
+	  rs6000_output_function_entry (file, fname);
+	  putc ('\n', file);
 
-      /* Offset from start of code to tb table.  */
-      fputs ("\t.long ", file);
-      ASM_OUTPUT_INTERNAL_LABEL_PREFIX (file, "LT");
-      RS6000_OUTPUT_BASENAME (file, fname);
-      putc ('-', file);
-      rs6000_output_function_entry (file, fname);
-      putc ('\n', file);
+	  /* Interrupt handler mask.  */
+	  /* Omit this long, since we never set the interrupt handler bit
+	     above.  */
 
-      /* Interrupt handler mask.  */
-      /* Omit this long, since we never set the interrupt handler bit
-	 above.  */
+	  /* Number of CTL (controlled storage) anchors.  */
+	  /* Omit this long, since the has_ctl bit is never set above.  */
 
-      /* Number of CTL (controlled storage) anchors.  */
-      /* Omit this long, since the has_ctl bit is never set above.  */
+	  /* Displacement into stack of each CTL anchor.  */
+	  /* Omit this list of longs, because there are no CTL anchors.  */
 
-      /* Displacement into stack of each CTL anchor.  */
-      /* Omit this list of longs, because there are no CTL anchors.  */
+	  /* Length of function name.  */
+	  if (*fname == '*')
+	    ++fname;
+	  fprintf (file, "\t.short %d\n", (int) strlen (fname));
 
-      /* Length of function name.  */
-      if (*fname == '*')
-	++fname;
-      fprintf (file, "\t.short %d\n", (int) strlen (fname));
+	  /* Function name.  */
+	  assemble_string (fname, strlen (fname));
 
-      /* Function name.  */
-      assemble_string (fname, strlen (fname));
+	  /* Register for alloca automatic storage; this is always reg 31.
+	     Only emit this if the alloca bit was set above.  */
+	  if (frame_pointer_needed)
+	    fputs ("\t.byte 31\n", file);
 
-      /* Register for alloca automatic storage; this is always reg 31.
-	 Only emit this if the alloca bit was set above.  */
-      if (frame_pointer_needed)
-	fputs ("\t.byte 31\n", file);
-
-      fputs ("\t.align 2\n", file);
+	  fputs ("\t.align 2\n", file);
+	}
     }
 }
 
@@ -27919,7 +27938,10 @@ rs6000_output_symbol_ref (FILE *file, rtx x)
 		     (TREE_CODE (decl) == FUNCTION_DECL
 		      ? "[DS]" : "[UA]"),
 		     NULL);
-      XSTR (x, 0) = name;
+
+      /* Don't modify name in extern VAR_DECL to include mapping class.  */
+      if (TREE_CODE (decl) == FUNCTION_DECL)
+	XSTR (x, 0) = name;
     }
 
   if (VTABLE_NAME_P (name))
@@ -34384,7 +34406,10 @@ rs6000_inner_target_options (tree args, bool attr_p)
     }
 
   else
-    gcc_unreachable ();
+    {
+      error ("attribute %<target%> argument not a string");
+      return false;
+    }
 
   return ret;
 }
@@ -36937,7 +36962,7 @@ insn_is_swappable_p (swap_web_entry *insn_entry, rtx insn,
 	    if (GET_CODE (use_body) != SET
 		|| GET_CODE (SET_SRC (use_body)) != UNSPEC
 		|| XINT (SET_SRC (use_body), 1) != UNSPEC_VSX_XXSPLTW
-		|| XEXP (XEXP (SET_SRC (use_body), 0), 1) != const0_rtx)
+		|| XVECEXP (SET_SRC (use_body), 0, 1) != const0_rtx)
 	      return 0;
 	  }
 	}
