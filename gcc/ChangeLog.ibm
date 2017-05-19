@@ -1,3 +1,12 @@
+2017-05-19  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+
+	Backport from mainline
+	2016-08-11  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+
+	PR target/72863
+	* vsx.md (vsx_load_<mode>): For P8LE, emit swaps at expand time.
+	(vsx_store_<mode>): Likewise.
+
 2017-01-20  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
 
 	Backport from mainline
