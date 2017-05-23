@@ -10290,13 +10290,16 @@ Call_expression::do_get_backend(Translate_context* context)
       bfn = gogo->backend()->convert_expression(bft, bfn, location);
     }
 
-  Bexpression* call = gogo->backend()->call_expression(bfn, fn_args,
-						       bclosure, location);
+  Bfunction* bfunction = NULL;
+  if (context->function())
+    bfunction = context->function()->func_value()->get_decl();
+  Bexpression* call = gogo->backend()->call_expression(bfunction, bfn,
+                                                       fn_args, bclosure,
+                                                       location);
 
   if (this->results_ != NULL)
     {
       Bexpression* bcall_ref = this->call_result_ref(context);
-      Bfunction* bfunction = context->function()->func_value()->get_decl();
       Bstatement* assn_stmt =
           gogo->backend()->assignment_statement(bfunction,
                                                 bcall_ref, call, location);
@@ -10607,10 +10610,24 @@ Index_expression::do_lower(Gogo*, Named_object*, Statement_inserter*, int)
 	}
       return Expression::make_map_index(left, start, location);
     }
+  else if (cap != NULL)
+    {
+      go_error_at(location,
+		  "invalid 3-index slice of object that is not a slice");
+      return Expression::make_error(location);
+    }
+  else if (end != NULL)
+    {
+      go_error_at(location,
+		  ("attempt to slice object that is not "
+		   "array, slice, or string"));
+      return Expression::make_error(location);
+    }
   else
     {
       go_error_at(location,
-                  "attempt to index object which is not array, string, or map");
+                  ("attempt to index object that is not "
+		   "array, slice, string, or map"));
       return Expression::make_error(location);
     }
 }

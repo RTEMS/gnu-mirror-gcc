@@ -648,8 +648,8 @@ begin_template_parm_list (void)
 	 template <class T> struct S2 {};
        };
 
-     pushtag contains special code to call pushdecl_with_scope on the
-     TEMPLATE_DECL for S2.  */
+     pushtag contains special code to insert the TEMPLATE_DECL for S2
+     at the right scope.  */
   begin_scope (sk_template_parms, NULL);
   ++processing_template_decl;
   ++processing_template_parmlist;
@@ -784,9 +784,7 @@ check_specialization_namespace (tree tmpl)
       return false;
     }
 
-  if (cxx_dialect < cxx11
-      ? is_associated_namespace (current_namespace, tpl_ns)
-      : is_ancestor (current_namespace, tpl_ns))
+  if (is_nested_namespace (current_namespace, tpl_ns, cxx_dialect < cxx11))
     /* Same or enclosing namespace.  */
     return true;
   else
@@ -810,7 +808,7 @@ check_explicit_instantiation_namespace (tree spec)
   /* DR 275: An explicit instantiation shall appear in an enclosing
      namespace of its template.  */
   ns = decl_namespace_context (spec);
-  if (!is_ancestor (current_namespace, ns))
+  if (!is_nested_namespace (current_namespace, ns))
     permerror (input_location, "explicit instantiation of %qD in namespace %qD "
 	       "(which does not enclose namespace %qD)",
 	       spec, current_namespace, ns);
@@ -1189,31 +1187,25 @@ retrieve_specialization (tree tmpl, tree args, hashval_t hash)
 
   if (optimize_specialization_lookup_p (tmpl))
     {
-      tree class_template;
-      tree class_specialization;
-      vec<tree, va_gc> *methods;
-      tree fns;
-      int idx;
-
       /* The template arguments actually apply to the containing
 	 class.  Find the class specialization with those
 	 arguments.  */
-      class_template = CLASSTYPE_TI_TEMPLATE (DECL_CONTEXT (tmpl));
-      class_specialization
+      tree class_template = CLASSTYPE_TI_TEMPLATE (DECL_CONTEXT (tmpl));
+      tree class_specialization
 	= retrieve_specialization (class_template, args, 0);
       if (!class_specialization)
 	return NULL_TREE;
       /* Now, find the appropriate entry in the CLASSTYPE_METHOD_VEC
 	 for the specialization.  */
-      idx = class_method_index_for_fn (class_specialization, tmpl);
+      int idx = class_method_index_for_fn (class_specialization, tmpl);
       if (idx == -1)
 	return NULL_TREE;
       /* Iterate through the methods with the indicated name, looking
 	 for the one that has an instance of TMPL.  */
-      methods = CLASSTYPE_METHOD_VEC (class_specialization);
-      for (fns = (*methods)[idx]; fns; fns = OVL_NEXT (fns))
+      vec<tree, va_gc> *methods = CLASSTYPE_METHOD_VEC (class_specialization);
+      for (ovl_iterator iter ((*methods)[idx]); iter; ++iter)
 	{
-	  tree fn = OVL_CURRENT (fns);
+	  tree fn = *iter;
 	  if (DECL_TEMPLATE_INFO (fn) && DECL_TI_TEMPLATE (fn) == tmpl
 	      /* using-declarations can add base methods to the method vec,
 		 and we don't want those here.  */
@@ -1748,8 +1740,8 @@ iterative_hash_template_arg (tree arg, hashval_t val)
       return val;
 
     case OVERLOAD:
-      for (; arg; arg = OVL_NEXT (arg))
-	val = iterative_hash_template_arg (OVL_CURRENT (arg), val);
+      for (lkp_iterator iter (arg); iter; ++iter)
+	val = iterative_hash_template_arg (*iter, val);
       return val;
 
     case CONSTRUCTOR:
@@ -1928,15 +1920,15 @@ print_candidates_1 (tree fns, char **str, bool more = false)
     for (; fns; fns = TREE_CHAIN (fns))
       print_candidates_1 (TREE_VALUE (fns), str, more || TREE_CHAIN (fns));
   else
-    while (fns)
+    for (lkp_iterator iter (fns); iter;)
       {
-	tree cand = OVL_CURRENT (fns);
+	tree cand = *iter;
+	++iter;
 
-	fns = OVL_NEXT (fns);
 	const char *pfx = *str;
 	if (!pfx)
 	  {
-	    if (more || fns)
+	    if (more || iter)
 	      pfx = _("candidates are:");
 	    else
 	      pfx = _("candidate is:");
@@ -2104,9 +2096,9 @@ determine_specialization (tree template_id,
       if (targs != error_mark_node)
         templates = tree_cons (targs, fns, templates);
     }
-  else for (; fns; fns = OVL_NEXT (fns))
+  else for (lkp_iterator iter (fns); iter; ++iter)
     {
-      tree fn = OVL_CURRENT (fns);
+      tree fn = *iter;
 
       if (TREE_CODE (fn) == TEMPLATE_DECL)
 	{
@@ -2594,8 +2586,8 @@ check_unqualified_spec_or_inst (tree t, location_t loc)
 {
   tree tmpl = most_general_template (t);
   if (DECL_NAMESPACE_SCOPE_P (tmpl)
-      && !is_associated_namespace (current_namespace,
-				   CP_DECL_CONTEXT (tmpl)))
+      && !is_nested_namespace (current_namespace,
+			       CP_DECL_CONTEXT (tmpl), true))
     {
       if (processing_specialization)
 	permerror (loc, "explicit specialization of %qD outside its "
@@ -2932,14 +2924,14 @@ check_explicit_specialization (tree declarator,
 		     methods->iterate (idx, &ovl);
 		     ++idx)
 		  {
-		    if (!DECL_CONV_FN_P (OVL_CURRENT (ovl)))
+		    if (!DECL_CONV_FN_P (OVL_FIRST (ovl)))
 		      /* There are no more conversion functions.  */
 		      break;
 
 		    /* Glue all these conversion functions together
 		       with those we already have.  */
 		    for (; ovl; ovl = OVL_NEXT (ovl))
-		      fns = ovl_cons (OVL_CURRENT (ovl), fns);
+		      fns = lookup_add (OVL_CURRENT (ovl), fns);
 		  }
 	    }
 
@@ -3912,8 +3904,7 @@ check_template_shadow (tree decl)
     return true;
 
   /* Figure out what we're shadowing.  */
-  if (TREE_CODE (decl) == OVERLOAD)
-    decl = OVL_CURRENT (decl);
+  decl = OVL_FIRST (decl);
   olddecl = innermost_non_namespace_value (DECL_NAME (decl));
 
   /* If there's no previous binding for this name, we're not shadowing
@@ -10601,7 +10592,7 @@ instantiate_class_template_1 (tree type)
 		  --processing_template_decl;
 		}
 	      else if (!CLASSTYPE_USE_TEMPLATE (friend_type)
-		       && hidden_name_p (TYPE_NAME (friend_type)))
+		       && TYPE_HIDDEN_P (friend_type))
 		{
 		  /* friend class C;
 
@@ -14130,7 +14121,7 @@ tsubst_baselink (tree baselink, tree object_type,
 	  template_args = tsubst_template_args (template_args, args,
 						complain, in_decl);
       }
-    name = DECL_NAME (get_first_fn (fns));
+    name = OVL_NAME (fns);
     if (IDENTIFIER_TYPENAME_P (name))
       name = mangle_conv_op_name_for_type (optype);
     baselink = lookup_fnfields (qualifying_scope, name, /*protect=*/1);
@@ -14152,7 +14143,7 @@ tsubst_baselink (tree baselink, tree object_type,
     if (BASELINK_P (baselink))
       fns = BASELINK_FUNCTIONS (baselink);
     if (!template_id_p && !really_overloaded_fn (fns)
-	&& !mark_used (OVL_CURRENT (fns), complain) && !(complain & tf_error))
+	&& !mark_used (OVL_FIRST (fns), complain) && !(complain & tf_error))
       return error_mark_node;
 
     /* Add back the template arguments, if present.  */
@@ -14574,6 +14565,8 @@ tsubst_copy (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	 overload set from function scope will just be represented with an
 	 IDENTIFIER_NODE, and from class scope with a BASELINK.  */
       gcc_assert (!uses_template_parms (t));
+      /* We must have marked any lookups as persistent.  */
+      gcc_assert (!OVL_LOOKUP_P (t) || OVL_USED_P (t));
       return t;
 
     case BASELINK:
@@ -15679,7 +15672,8 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl,
       break;
 
     case USING_STMT:
-      do_using_directive (USING_STMT_NAMESPACE (t));
+      finish_local_using_directive (USING_STMT_NAMESPACE (t),
+				    /*attribs=*/NULL_TREE);
       break;
 
     case DECL_EXPR:
@@ -15702,7 +15696,7 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl,
 	    if (decl == error_mark_node || TREE_CODE (decl) == TREE_LIST)
 	      qualified_name_lookup_error (scope, name, decl, input_location);
 	    else
-	      do_local_using_decl (decl, scope, name);
+	      finish_local_using_decl (decl, scope, name);
 	  }
 	else if (DECL_PACK_P (decl))
 	  {
@@ -17189,10 +17183,9 @@ tsubst_copy_and_build (tree t,
 		    if (diag)
 		      {
 			tree fn = unq;
+
 			if (INDIRECT_REF_P (fn))
 			  fn = TREE_OPERAND (fn, 0);
-			if (TREE_CODE (fn) == COMPONENT_REF)
-			  fn = TREE_OPERAND (fn, 1);
 			if (is_overloaded_fn (fn))
 			  fn = get_first_fn (fn);
 
@@ -19383,9 +19376,9 @@ resolve_overloaded_unification (tree tparms,
       tree expl_subargs = TREE_OPERAND (arg, 1);
       arg = TREE_OPERAND (arg, 0);
 
-      for (; arg; arg = OVL_NEXT (arg))
+      for (lkp_iterator iter (arg); iter; ++iter)
 	{
-	  tree fn = OVL_CURRENT (arg);
+	  tree fn = *iter;
 	  tree subargs, elem;
 
 	  if (TREE_CODE (fn) != TEMPLATE_DECL)
@@ -19424,15 +19417,17 @@ resolve_overloaded_unification (tree tparms,
        not just the function on its own.  */
     return false;
   else
-    for (; arg; arg = OVL_NEXT (arg))
-      if (try_one_overload (tparms, targs, tempargs, parm,
-			    TREE_TYPE (OVL_CURRENT (arg)),
-			    strict, sub_strict, addr_p, explain_p)
-	  && (!goodfn || !decls_match (goodfn, OVL_CURRENT (arg))))
-	{
-	  goodfn = OVL_CURRENT (arg);
-	  ++good;
-	}
+    for (lkp_iterator iter (arg); iter; ++iter)
+      {
+	tree fn = *iter;
+	if (try_one_overload (tparms, targs, tempargs, parm, TREE_TYPE (fn),
+			      strict, sub_strict, addr_p, explain_p)
+	    && (!goodfn || !decls_match (goodfn, fn)))
+	  {
+	    goodfn = fn;
+	    ++good;
+	  }
+      }
 
   /* [temp.deduct.type] A template-argument can be deduced from a pointer
      to function or pointer to member function argument if the set of
@@ -19514,9 +19509,9 @@ resolve_nondeduced_context (tree orig_expr, tsubst_flags_t complain)
       tree badfn = NULL_TREE;
       tree badargs = NULL_TREE;
 
-      for (; arg; arg = OVL_NEXT (arg))
+      for (lkp_iterator iter (arg); iter; ++iter)
 	{
-	  tree fn = OVL_CURRENT (arg);
+	  tree fn = *iter;
 	  tree subargs, elem;
 
 	  if (TREE_CODE (fn) != TEMPLATE_DECL)
@@ -23930,12 +23925,10 @@ type_dependent_expression_p (tree expression)
       gcc_assert (TREE_CODE (expression) == OVERLOAD
 		  || TREE_CODE (expression) == FUNCTION_DECL);
 
-      while (expression)
-	{
-	  if (type_dependent_expression_p (OVL_CURRENT (expression)))
-	    return true;
-	  expression = OVL_NEXT (expression);
-	}
+      for (lkp_iterator iter (expression); iter; ++iter)
+	if (type_dependent_expression_p (*iter))
+	  return true;
+
       return false;
     }
 
@@ -24288,12 +24281,9 @@ dependent_template_p (tree tmpl)
 {
   if (TREE_CODE (tmpl) == OVERLOAD)
     {
-      while (tmpl)
-	{
-	  if (dependent_template_p (OVL_CURRENT (tmpl)))
-	    return true;
-	  tmpl = OVL_NEXT (tmpl);
-	}
+      for (lkp_iterator iter (tmpl); iter; ++iter)
+	if (dependent_template_p (*iter))
+	  return true;
       return false;
     }
 
@@ -24666,11 +24656,8 @@ make_constrained_auto (tree con, tree args)
 
   /* Build the constraint. */
   tree tmpl = DECL_TI_TEMPLATE (con);
-  tree expr;
-  if (VAR_P (con))
-    expr = build_concept_check (tmpl, type, args);
-  else
-    expr = build_concept_check (build_overload (tmpl, NULL_TREE), type, args);
+  tree expr = VAR_P (con) ? tmpl : ovl_make (tmpl);
+  expr = build_concept_check (expr, type, args);
 
   tree constr = normalize_expression (expr);
   PLACEHOLDER_TYPE_CONSTRAINTS (type) = constr;
@@ -25170,8 +25157,28 @@ do_class_deduction (tree ptype, tree tmpl, tree init, int flags,
   tree cands = lookup_qualified_name (CP_DECL_CONTEXT (tmpl), dname,
 				      /*type*/false, /*complain*/false,
 				      /*hidden*/false);
+  bool elided = false;
   if (cands == error_mark_node)
     cands = NULL_TREE;
+
+  /* Prune explicit deduction guides in copy-initialization context.  */
+  if (flags & LOOKUP_ONLYCONVERTING)
+    {
+      for (lkp_iterator iter (cands); !elided && iter; ++iter)
+	if (DECL_NONCONVERTING_P (STRIP_TEMPLATE (*iter)))
+	  elided = true;
+
+      if (elided)
+	{
+	  /* Found a nonconverting guide, prune the candidates.  */
+	  tree pruned = NULL_TREE;
+	  for (lkp_iterator iter (cands); iter; ++iter)
+	    if (!DECL_NONCONVERTING_P (STRIP_TEMPLATE (*iter)))
+	      pruned = lookup_add (*iter, pruned);
+
+	  cands = pruned;
+	}
+    }
 
   tree outer_args = NULL_TREE;
   if (DECL_CLASS_SCOPE_P (tmpl)
@@ -25184,53 +25191,45 @@ do_class_deduction (tree ptype, tree tmpl, tree init, int flags,
   bool saw_ctor = false;
   if (CLASSTYPE_METHOD_VEC (type))
     // FIXME cache artificial deduction guides
-    for (tree fns = CLASSTYPE_CONSTRUCTORS (type); fns; fns = OVL_NEXT (fns))
+    for (ovl_iterator iter (CLASSTYPE_CONSTRUCTORS (type));
+	 iter; ++iter)
       {
-	tree fn = OVL_CURRENT (fns);
-	tree guide = build_deduction_guide (fn, outer_args, complain);
-	cands = ovl_cons (guide, cands);
+	tree guide = build_deduction_guide (*iter, outer_args, complain);
+	if ((flags & LOOKUP_ONLYCONVERTING)
+	    && DECL_NONCONVERTING_P (STRIP_TEMPLATE (guide)))
+	  elided = true;
+	else
+	  cands = lookup_add (guide, cands);
 
 	saw_ctor = true;
       }
 
-  if (!saw_ctor && args->length() == 0)
+  if (args->length () < 2)
     {
-      tree guide = build_deduction_guide (type, outer_args, complain);
-      cands = ovl_cons (guide, cands);
-    }
-  if (args->length() == 1)
-    {
-      tree guide = build_deduction_guide (build_reference_type (type),
-					  outer_args, complain);
-      cands = ovl_cons (guide, cands);
+      tree gtype = NULL_TREE;
+
+      if (args->length () == 1)
+	gtype = build_reference_type (type);
+      else if (!saw_ctor)
+	gtype = type;
+
+      if (gtype)
+	{
+	  tree guide = build_deduction_guide (gtype, outer_args, complain);
+	  if ((flags & LOOKUP_ONLYCONVERTING)
+	      && DECL_NONCONVERTING_P (STRIP_TEMPLATE (guide)))
+	    elided = true;
+	  else
+	    cands = lookup_add (guide, cands);
+	}
     }
 
-  /* Prune explicit deduction guides in copy-initialization context.  */
-  tree old_cands = cands;
-  if (flags & LOOKUP_ONLYCONVERTING)
+  if (elided && !cands)
     {
-      tree t = cands;
-      for (; t; t = OVL_NEXT (t))
-	if (DECL_NONCONVERTING_P (STRIP_TEMPLATE (OVL_CURRENT (t))))
-	  break;
-      if (t)
-	{
-	  tree pruned = NULL_TREE;
-	  for (t = cands; t; t = OVL_NEXT (t))
-	    {
-	      tree f = OVL_CURRENT (t);
-	      if (!DECL_NONCONVERTING_P (STRIP_TEMPLATE (f)))
-		pruned = build_overload (f, pruned);
-	    }
-	  cands = pruned;
-	  if (cands == NULL_TREE)
-	    {
-	      error ("cannot deduce template arguments for copy-initialization"
-		     " of %qT, as it has no non-explicit deduction guides or "
-		     "user-declared constructors", type);
-	      return error_mark_node;
-	    }
-	}
+      error ("cannot deduce template arguments for copy-initialization"
+	     " of %qT, as it has no non-explicit deduction guides or "
+	     "user-declared constructors", type);
+      return error_mark_node;
     }
 
   ++cp_unevaluated_operand;
@@ -25240,7 +25239,7 @@ do_class_deduction (tree ptype, tree tmpl, tree init, int flags,
     {
       error ("class template argument deduction failed:");
       t = build_new_function_call (cands, &args, complain | tf_decltype);
-      if (old_cands != cands)
+      if (elided)
 	inform (input_location, "explicit deduction guides not considered "
 		"for copy-initialization");
     }

@@ -509,6 +509,7 @@ cxx_incomplete_type_diagnostic (location_t loc, const_tree value,
 	tree member = TREE_OPERAND (value, 1);
 	if (is_overloaded_fn (member))
 	  member = get_first_fn (member);
+
 	if (DECL_FUNCTION_MEMBER_P (member)
 	    && ! flag_ms_extensions)
 	  emit_diagnostic (diag_kind, loc, 0,

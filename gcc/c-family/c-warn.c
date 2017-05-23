@@ -537,10 +537,10 @@ strict_aliasing_warning (tree otype, tree type, tree expr)
 	    = get_alias_set (TREE_TYPE (TREE_OPERAND (expr, 0)));
 	  alias_set_type set2 = get_alias_set (TREE_TYPE (type));
 
-	  if (set1 != set2 && set2 != 0
-	      && (set1 == 0
-		  || (!alias_set_subset_of (set2, set1)
-		      && !alias_sets_conflict_p (set1, set2))))
+	  if (set2 != 0
+	      && set1 != set2
+	      && !alias_set_subset_of (set2, set1)
+	      && !alias_sets_conflict_p (set1, set2))
 	    {
 	      warning (OPT_Wstrict_aliasing, "dereferencing type-punned "
 		       "pointer will break strict-aliasing rules");
@@ -1069,6 +1069,10 @@ warnings_for_convert_and_check (location_t loc, tree type, tree expr,
 static void
 match_case_to_enum_1 (tree key, tree type, tree label)
 {
+  /* Avoid warning about enums that have no enumerators.  */
+  if (TYPE_VALUES (type) == NULL_TREE)
+    return;
+
   char buf[WIDE_INT_PRINT_BUFFER_SIZE];
 
   if (tree_fits_uhwi_p (key))
@@ -1078,7 +1082,7 @@ match_case_to_enum_1 (tree key, tree type, tree label)
   else
     print_hex (key, buf);
 
-  if (TYPE_NAME (type) == 0)
+  if (TYPE_NAME (type) == NULL_TREE)
     warning_at (DECL_SOURCE_LOCATION (CASE_LABEL (label)),
 		warn_switch ? OPT_Wswitch : OPT_Wswitch_enum,
 		"case value %qs not in enumerated type",

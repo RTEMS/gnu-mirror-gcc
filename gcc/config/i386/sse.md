@@ -13863,10 +13863,10 @@
 ;; movd instead of movq is required to handle broken assemblers.
 (define_insn "vec_concatv2di"
   [(set (match_operand:V2DI 0 "register_operand"
-	  "=Yr,*x,x ,v ,Yi,v ,!x,x,v ,x,x,v")
+	  "=Yr,*x,x ,v ,Yi,v ,x    ,x,v ,x,x,v")
 	(vec_concat:V2DI
 	  (match_operand:DI 1 "nonimmediate_operand"
-	  "  0, 0,x ,Yv,r ,vm,*y,0,Yv,0,0,v")
+	  "  0, 0,x ,Yv,r ,vm,?!*Yn,0,Yv,0,0,v")
 	  (match_operand:DI 2 "vector_move_operand"
 	  "*rm,rm,rm,rm,C ,C ,C ,x,Yv,x,m,m")))]
   "TARGET_SSE"
@@ -20031,3 +20031,40 @@
           (match_operand:VI48_512 1 "nonimmediate_operand" "vm")))]
   "TARGET_AVX512VPOPCNTDQ"
   "vpopcnt<ssemodesuffix>\t{%1, %0<mask_operand2>|%0<mask_operand2>, %1}")
+
+;; Save multiple registers out-of-line.
+(define_insn "save_multiple<mode>"
+  [(match_parallel 0 "save_multiple"
+    [(use (match_operand:P 1 "symbol_operand"))])]
+  "TARGET_SSE && TARGET_64BIT"
+  "call\t%P1")
+
+;; Restore multiple registers out-of-line.
+(define_insn "restore_multiple<mode>"
+  [(match_parallel 0 "restore_multiple"
+    [(use (match_operand:P 1 "symbol_operand"))])]
+  "TARGET_SSE && TARGET_64BIT"
+  "call\t%P1")
+
+;; Restore multiple registers out-of-line and return.
+(define_insn "restore_multiple_and_return<mode>"
+  [(match_parallel 0 "restore_multiple"
+    [(return)
+     (use (match_operand:P 1 "symbol_operand"))
+     (set (reg:DI SP_REG) (reg:DI R10_REG))
+    ])]
+  "TARGET_SSE && TARGET_64BIT"
+  "jmp\t%P1")
+
+;; Restore multiple registers out-of-line when hard frame pointer is used,
+;; perform the leave operation prior to returning (from the function).
+(define_insn "restore_multiple_leave_return<mode>"
+  [(match_parallel 0 "restore_multiple"
+    [(return)
+     (use (match_operand:P 1 "symbol_operand"))
+     (set (reg:DI SP_REG) (plus:DI (reg:DI BP_REG) (const_int 8)))
+     (set (reg:DI BP_REG) (mem:DI (reg:DI BP_REG)))
+     (clobber (mem:BLK (scratch)))
+    ])]
+  "TARGET_SSE && TARGET_64BIT"
+  "jmp\t%P1")

@@ -3666,7 +3666,7 @@ add_list_candidates (tree fns, tree first_arg,
      avoid the copy constructor call for copy-list-initialization.  */
   flags |= LOOKUP_NO_NARROWING;
 
-  unsigned nart = num_artificial_parms_for (get_first_fn (fns)) - 1;
+  unsigned nart = num_artificial_parms_for (OVL_FIRST (fns)) - 1;
   tree init_list = (*args)[nart];
 
   /* Always use the default constructor if the list is empty (DR 990).  */
@@ -3783,8 +3783,8 @@ build_user_type_conversion_1 (tree totype, tree expr, int flags,
 
       /* We should never try to call the abstract or base constructor
 	 from here.  */
-      gcc_assert (!DECL_HAS_IN_CHARGE_PARM_P (OVL_CURRENT (ctors))
-		  && !DECL_HAS_VTT_PARM_P (OVL_CURRENT (ctors)));
+      gcc_assert (!DECL_HAS_IN_CHARGE_PARM_P (OVL_FIRST (ctors))
+		  && !DECL_HAS_VTT_PARM_P (OVL_FIRST (ctors)));
 
       args = make_tree_vector_single (expr);
       if (BRACE_ENCLOSED_INITIALIZER_P (expr))
@@ -4172,7 +4172,7 @@ print_error_for_call_failure (tree fn, vec<tree, va_gc> *args,
       targs = TREE_OPERAND (fn, 1);
       fn = TREE_OPERAND (fn, 0);
     }
-  tree name = DECL_NAME (OVL_CURRENT (fn));
+  tree name = OVL_NAME (fn);
   location_t loc = location_of (name);
   if (targs)
     name = lookup_template_function (name, targs);
@@ -4449,16 +4449,15 @@ build_op_call_1 (tree obj, vec<tree, va_gc> **args, tsubst_flags_t complain)
 
   for (; convs; convs = TREE_CHAIN (convs))
     {
-      tree fns = TREE_VALUE (convs);
       tree totype = TREE_TYPE (convs);
 
       if (TYPE_PTRFN_P (totype)
 	  || TYPE_REFFN_P (totype)
 	  || (TREE_CODE (totype) == REFERENCE_TYPE
 	      && TYPE_PTRFN_P (TREE_TYPE (totype))))
-	for (; fns; fns = OVL_NEXT (fns))
+	for (ovl_iterator iter (TREE_VALUE (convs)); iter; ++iter)
 	  {
-	    tree fn = OVL_CURRENT (fns);
+	    tree fn = *iter;
 
 	    if (DECL_NONCONVERTING_P (fn))
 	      continue;
@@ -5376,13 +5375,12 @@ add_candidates (tree fns, tree first_arg, const vec<tree, va_gc> *args,
   bool check_list_ctor;
   bool check_converting;
   unification_kind_t strict;
-  tree fn;
 
   if (!fns)
     return;
 
   /* Precalculate special handling of constructors and conversion ops.  */
-  fn = OVL_CURRENT (fns);
+  tree fn = OVL_FIRST (fns);
   if (DECL_CONV_FN_P (fn))
     {
       check_list_ctor = false;
@@ -5425,12 +5423,12 @@ add_candidates (tree fns, tree first_arg, const vec<tree, va_gc> *args,
     /* Delay creating the implicit this parameter until it is needed.  */
     non_static_args = NULL;
 
-  for (; fns; fns = OVL_NEXT (fns))
+  for (lkp_iterator iter (fns); iter; ++iter)
     {
       tree fn_first_arg;
       const vec<tree, va_gc> *fn_args;
 
-      fn = OVL_CURRENT (fns);
+      fn = *iter;
 
       if (check_converting && DECL_NONCONVERTING_P (fn))
 	continue;
@@ -6201,8 +6199,7 @@ build_op_delete_call (enum tree_code code, tree addr, tree size,
       if (fn == error_mark_node)
 	return NULL_TREE;
 
-      if (BASELINK_P (fn))
-	fn = BASELINK_FUNCTIONS (fn);
+      fn = MAYBE_BASELINK_FUNCTIONS (fn);
 
       /* "If the lookup finds the two-parameter form of a usual deallocation
 	 function (3.7.4.2) and that function, considered as a placement
@@ -6221,10 +6218,10 @@ build_op_delete_call (enum tree_code code, tree addr, tree size,
 	     the usual deallocation function, so we shouldn't complain
 	     about using the operator delete (void *, size_t).  */
 	  if (DECL_CLASS_SCOPE_P (fn))
-	    for (t = BASELINK_P (fns) ? BASELINK_FUNCTIONS (fns) : fns;
-		 t; t = OVL_NEXT (t))
+	    for (lkp_iterator iter (MAYBE_BASELINK_FUNCTIONS (fns));
+		 iter; ++iter)
 	      {
-		tree elt = OVL_CURRENT (t);
+		tree elt = *iter;
 		if (usual_deallocation_fn_p (elt)
 		    && FUNCTION_ARG_CHAIN (elt) == void_list_node)
 		  goto ok;
@@ -6263,10 +6260,9 @@ build_op_delete_call (enum tree_code code, tree addr, tree size,
        allocation function. If the lookup finds a single matching
        deallocation function, that function will be called; otherwise, no
        deallocation function will be called."  */
-    for (t = BASELINK_P (fns) ? BASELINK_FUNCTIONS (fns) : fns;
-	 t; t = OVL_NEXT (t))
+    for (lkp_iterator iter (MAYBE_BASELINK_FUNCTIONS (fns)); iter; ++iter)
       {
-	tree elt = OVL_CURRENT (t);
+	tree elt = *iter;
 	if (usual_deallocation_fn_p (elt))
 	  {
 	    if (!fn)
@@ -6400,7 +6396,7 @@ build_op_delete_call (enum tree_code code, tree addr, tree size,
 
 bool
 enforce_access (tree basetype_path, tree decl, tree diag_decl,
-		tsubst_flags_t complain)
+		tsubst_flags_t complain, access_failure_info *afi)
 {
   gcc_assert (TREE_CODE (basetype_path) == TREE_BINFO);
 
@@ -6426,17 +6422,23 @@ enforce_access (tree basetype_path, tree decl, tree diag_decl,
 	      error ("%q#D is private within this context", diag_decl);
 	      inform (DECL_SOURCE_LOCATION (diag_decl),
 		      "declared private here");
+	      if (afi)
+		afi->record_access_failure (basetype_path, diag_decl);
 	    }
 	  else if (TREE_PROTECTED (decl))
 	    {
 	      error ("%q#D is protected within this context", diag_decl);
 	      inform (DECL_SOURCE_LOCATION (diag_decl),
 		      "declared protected here");
+	      if (afi)
+		afi->record_access_failure (basetype_path, diag_decl);
 	    }
 	  else
 	    {
 	      error ("%q#D is inaccessible within this context", diag_decl);
 	      inform (DECL_SOURCE_LOCATION (diag_decl), "declared here");
+	      if (afi)
+		afi->record_access_failure (basetype_path, diag_decl);
 	    }
 	}
       return false;
@@ -8537,7 +8539,7 @@ build_new_method_call_1 (tree instance, tree fns, vec<tree, va_gc> **args,
   gcc_assert (TREE_CODE (fns) == FUNCTION_DECL
 	      || TREE_CODE (fns) == TEMPLATE_DECL
 	      || TREE_CODE (fns) == OVERLOAD);
-  fn = get_first_fn (fns);
+  fn = OVL_FIRST (fns);
   name = DECL_NAME (fn);
 
   basetype = TYPE_MAIN_VARIANT (TREE_TYPE (instance));
@@ -8706,7 +8708,7 @@ build_new_method_call_1 (tree instance, tree fns, vec<tree, va_gc> **args,
 	      tree errname = name;
 	      if (IDENTIFIER_CTOR_OR_DTOR_P (errname))
 		{
-		  tree fn = DECL_ORIGIN (get_first_fn (fns));
+		  tree fn = DECL_ORIGIN (OVL_FIRST (fns));
 		  errname = DECL_NAME (fn);
 		}
 	      if (explicit_targs)

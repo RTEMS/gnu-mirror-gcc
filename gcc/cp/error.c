@@ -1189,17 +1189,16 @@ dump_decl (cxx_pretty_printer *pp, tree t, int flags)
       break;
 
     case OVERLOAD:
-      if (OVL_CHAIN (t))
+      if (!OVL_SINGLE_P (t))
 	{
-	  t = OVL_CURRENT (t);
-	  if (DECL_CLASS_SCOPE_P (t))
+	  t = OVL_FIRST (t);
+	  tree ctx = CP_DECL_CONTEXT (t);
+	  if (ctx != global_namespace)
 	    {
-	      dump_type (pp, DECL_CONTEXT (t), flags);
-	      pp_cxx_colon_colon (pp);
-	    }
-	  else if (!DECL_FILE_SCOPE_P (t))
-	    {
-	      dump_decl (pp, DECL_CONTEXT (t), flags);
+	      if (TYPE_P (ctx))
+		dump_type (pp, ctx, flags);
+	      else
+		dump_decl (pp, ctx, flags);
 	      pp_cxx_colon_colon (pp);
 	    }
 	  dump_decl (pp, DECL_NAME (t), flags);
@@ -1208,7 +1207,7 @@ dump_decl (cxx_pretty_printer *pp, tree t, int flags)
 
       /* If there's only one function, just treat it like an ordinary
 	 FUNCTION_DECL.  */
-      t = OVL_CURRENT (t);
+      t = OVL_FIRST (t);
       /* Fall through.  */
 
     case FUNCTION_DECL:
@@ -1235,10 +1234,8 @@ dump_decl (cxx_pretty_printer *pp, tree t, int flags)
 	tree name = TREE_OPERAND (t, 0);
 	tree args = TREE_OPERAND (t, 1);
 
-	if (is_overloaded_fn (name))
-	  name = get_first_fn (name);
-	if (DECL_P (name))
-	  name = DECL_NAME (name);
+	if (!identifier_p (name))
+	  name = OVL_NAME (name);
 	dump_decl (pp, name, flags);
 	pp_cxx_begin_template_argument_list (pp);
 	if (args == error_mark_node)
@@ -2498,7 +2495,7 @@ dump_expr (cxx_pretty_printer *pp, tree t, int flags)
 	      /* A::f */
 	      dump_expr (pp, t, flags | TFF_EXPR_IN_PARENS);
 	    else if (BASELINK_P (t))
-	      dump_expr (pp, OVL_CURRENT (BASELINK_FUNCTIONS (t)),
+	      dump_expr (pp, OVL_FIRST (BASELINK_FUNCTIONS (t)),
 			 flags | TFF_EXPR_IN_PARENS);
 	    else
 	      dump_decl (pp, t, flags);
@@ -3004,7 +3001,7 @@ location_of (tree t)
 	return input_location;
     }
   else if (TREE_CODE (t) == OVERLOAD)
-    t = OVL_FUNCTION (t);
+    t = OVL_FIRST (t);
 
   if (DECL_P (t))
     return DECL_SOURCE_LOCATION (t);

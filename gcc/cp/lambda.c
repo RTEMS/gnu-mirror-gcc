@@ -427,13 +427,15 @@ build_capture_proxy (tree member)
   return var;
 }
 
+static GTY(()) tree ptr_id;
+static GTY(()) tree max_id;
+
 /* Return a struct containing a pointer and a length for lambda capture of
    an array of runtime length.  */
 
 static tree
 vla_capture_type (tree array_type)
 {
-  static tree ptr_id, max_id;
   tree type = xref_tag (record_type, make_anon_name (), ts_current, false);
   xref_basetypes (type, NULL_TREE);
   type = begin_class_definition (type);
@@ -841,18 +843,15 @@ maybe_generic_this_capture (tree object, tree fns)
 	bool id_expr = TREE_CODE (fns) == TEMPLATE_ID_EXPR;
 	if (id_expr)
 	  fns = TREE_OPERAND (fns, 0);
-	for (; fns; fns = OVL_NEXT (fns))
-	  {
-	    tree fn = OVL_CURRENT (fns);
 
-	    if ((!id_expr || TREE_CODE (fn) == TEMPLATE_DECL)
-		&& DECL_NONSTATIC_MEMBER_FUNCTION_P (fn))
-	      {
-		/* Found a non-static member.  Capture this.  */
-		lambda_expr_this_capture (lam, true);
-		break;
-	      }
-	  }
+	for (lkp_iterator iter (fns); iter; ++iter)
+	  if ((!id_expr || TREE_CODE (*iter) == TEMPLATE_DECL)
+	      && DECL_NONSTATIC_MEMBER_FUNCTION_P (*iter))
+	    {
+	      /* Found a non-static member.  Capture this.  */
+	      lambda_expr_this_capture (lam, true);
+	      break;
+	    }
       }
 }
 
@@ -1251,3 +1250,5 @@ is_lambda_ignored_entity (tree val)
 
   return false;
 }
+
+#include "gt-cp-lambda.h"
