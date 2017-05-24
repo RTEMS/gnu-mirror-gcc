@@ -394,7 +394,7 @@ enum clone_list {
   CLONE_ISA_2_07,		/* ISA 2.07 (power8).  */
   CLONE_ISA_2_06,		/* ISA 2.06 (power7).  */
   CLONE_ISA_2_05,		/* ISA 2.05 (power6).  */
-  CLONE_DEFAULT,
+  CLONE_DEFAULT,		/* default clone.  */
   CLONE_MAX
 };
 
@@ -40261,7 +40261,7 @@ rs6000_clone_priority (tree fndecl)
 {
   tree fn_opts = DECL_FUNCTION_SPECIFIC_TARGET (fndecl);
   HOST_WIDE_INT isa_masks;
-  int ret = 0;
+  int ret = (int) CLONE_DEFAULT;
   tree attrs = lookup_attribute ("target", DECL_ATTRIBUTES (fndecl));
   const char *attrs_str = NULL;
 
@@ -40295,10 +40295,10 @@ rs6000_clone_priority (tree fndecl)
   return ret;
 }
 
-/* This compares the priority of target features in function DECL1
-   and DECL2.  It returns positive value if DECL1 is higher priority,
-   negative value if DECL2 is higher priority and 0 if they are the
-   same.  Note, priorities are ordered from highest to lowest.  */
+/* This compares the priority of target features in function DECL1 and DECL2.
+   It returns positive value if DECL1 is higher priority, negative value if
+   DECL2 is higher priority and 0 if they are the same.  Note, priorities are
+   ordered from highest (0, CLONE_ISA_3_0) to lowest (CLONE_DEFAULT).  */
 
 static int
 rs6000_compare_version_priority (tree decl1, tree decl2)
@@ -40590,11 +40590,11 @@ add_condition_to_bb (tree function_decl, tree version_decl,
   return bb3;
 }
 
-/* This function generates the dispatch function for
-   multi-versioned functions.  DISPATCH_DECL is the function which will
-   contain the dispatch logic.  FNDECLS are the function choices for
-   dispatch, and is a tree chain.  EMPTY_BB is the basic block pointer
-   in DISPATCH_DECL in which the dispatch code is generated.  */
+/* This function generates the dispatch function for multi-versioned functions.
+   DISPATCH_DECL is the function which will contain the dispatch logic.
+   FNDECLS are the function choices for dispatch, and is a tree chain.
+   EMPTY_BB is the basic block pointer in DISPATCH_DECL in which the dispatch
+   code is generated.  */
 
 static int
 dispatch_function_versions (tree dispatch_decl,
@@ -40603,11 +40603,8 @@ dispatch_function_versions (tree dispatch_decl,
 {
   int ix;
   tree ele;
-  gimple *ifunc_cpu_init_stmt;
-  gimple_seq gseq;
   vec<tree> *fndecls;
   tree clones[ (int)CLONE_MAX ];
-  tree init_decl;
 
   if (TARGET_DEBUG_TARGET)
     fputs ("dispatch_function_versions, top\n", stderr);
@@ -40626,18 +40623,9 @@ dispatch_function_versions (tree dispatch_decl,
   memset ((void *) clones, '\0', sizeof (clones));
   clones[ (int)CLONE_DEFAULT ] = (*fndecls)[0];
 
-  push_cfun (DECL_STRUCT_FUNCTION (dispatch_decl));
-
-  gseq = bb_seq (*empty_bb);
-  /* Function version dispatch is via IFUNC.  IFUNC resolvers fire before
-     constructors, so explicity call __builtin_cpu_init here.  */
-  init_decl = rs6000_builtin_decls [(int) RS6000_BUILTIN_CPU_INIT];
-  ifunc_cpu_init_stmt = gimple_build_call_vec (init_decl, vNULL);
-  gimple_seq_add_stmt (&gseq, ifunc_cpu_init_stmt);
-  gimple_set_bb (ifunc_cpu_init_stmt, *empty_bb);
-  set_bb_seq (*empty_bb, gseq);
-
-  pop_cfun ();
+  /* On the PowerPC, we do not need to call __builtin_cpu_init, if we are using
+     a new enough glibc.  If we ever need to call it, we would need to insert
+     the code here to do the call.  */
 
   for (ix = 1; fndecls->iterate (ix, &ele); ++ix)
     {
