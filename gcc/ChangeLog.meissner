@@ -24,6 +24,8 @@
 	(dispatch_function_versions): Likewise.
 	(rs6000_generate_version_dispatcher_body): Likewise.
 	(rs6000_can_inline_p): Call get_decl_name for debugging usage.
+	* doc/extend.texi (Common Function Attributes): Document that the
+	PowerPC supports the target_clone attribute.
 
 2017-05-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
