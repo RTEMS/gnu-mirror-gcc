@@ -3260,11 +3260,11 @@ It also creates a resolver function (see the @code{ifunc} attribute
 above) that dynamically selects a clone suitable for current
 architecture.
 
-On a PowerPC, you could compile a function with
-@code{target_clones("cpu=power9,default")}.  GCC creates two function
-clones, one compiled with @option{-mcpu=power9} and another with the
-default options.  It also creates a resolver function (see the
-@code{ifunc} attribute above) that dynamically selects a clone
+On a PowerPC, you can compile a function with
+@code{target_clones("cpu=power9,default")}.  GCC will create two
+function clones, one compiled with @option{-mcpu=power9} and another
+with the default options.  It also creates a resolver function (see
+the @code{ifunc} attribute above) that dynamically selects a clone
 suitable for current architecture.
 
 @item unused

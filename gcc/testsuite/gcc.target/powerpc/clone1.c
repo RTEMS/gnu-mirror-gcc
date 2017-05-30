@@ -1,7 +1,11 @@
-/* { dg-do compile { target { powerpc64*-*-* && lp64 } } } */
+/* { dg-do compile { target { powerpc*-*-* && lp64 } } } */
 /* { dg-skip-if "do not override -mcpu" { powerpc*-*-* } { "-mcpu=*" } { "-mcpu=power8" } } */
 /* { dg-options "-mcpu=power8 -O2" } */
 /* { dg-require-effective-target powerpc_p9vector_ok } */
+
+/* Power9 (aka, ISA 3.0) has a MODSD instruction to do modulus, while Power8
+   (aka, ISA 2.07) has to do modulus with divide and multiply.  Make sure
+   both clone functions are generated.  */
 
 __attribute__((target_clones("cpu=power9,default")))
 long mod_func (long a, long b)

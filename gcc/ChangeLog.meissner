@@ -1,3 +1,21 @@
+2017-05-30  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (CLONE_*): Reorder the clone priority so
+	it goes from lowest (default) to highest (currently ISA 3.0).  Use
+	const int instead of an enum.  Change users to reverse the
+	priority.
+	(rs6000_clone_map): Likewise.
+	(rs6000_clone_priority): Likewise.
+	(rs6000_compare_version_priority): Likewise.
+	(get_decl_name): Remove inline.
+	(rs6000_get_function_versions_dispatcher): General cleanup.
+	(make_resolver_func): Likewise.
+	(add_condition_to_bb): Likewise.
+	(dispatch_function_versions): Likewise.
+	(fusion_gpr_load_p): Fix spacing.
+	* doc/extend.texi (Common Function Attributes): Update
+	documentation.
+
 2017-05-24  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.c (toplevel): Include attribs.h.

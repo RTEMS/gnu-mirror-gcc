@@ -388,15 +388,13 @@ static const struct
 /* On PowerPC, we have a limited number of target clones that we care about
    which means we can use an array to hold the options, rather than having more
    elaborate data structures to identify each possible variation.  Order the
-   clones from the highest ISA to the least.  */
-enum clone_list {
-  CLONE_ISA_3_00,		/* ISA 3.00 (power9).  */
-  CLONE_ISA_2_07,		/* ISA 2.07 (power8).  */
-  CLONE_ISA_2_06,		/* ISA 2.06 (power7).  */
-  CLONE_ISA_2_05,		/* ISA 2.05 (power6).  */
-  CLONE_DEFAULT,		/* default clone.  */
-  CLONE_MAX
-};
+   clones from the default to the highest ISA.  */
+const int CLONE_DEFAULT		= 0;	/* default clone.  */
+const int CLONE_ISA_2_05	= 1;	/* ISA 2.05 (power6).  */
+const int CLONE_ISA_2_06	= 2;	/* ISA 2.06 (power7).  */
+const int CLONE_ISA_2_07	= 3;	/* ISA 2.07 (power8).  */
+const int CLONE_ISA_3_00	= 4;	/* ISA 3.00 (power9).  */
+const int CLONE_MAX		= 5;
 
 /* Map compiler ISA bits into HWCAP names.  */
 struct clone_map {
@@ -404,12 +402,12 @@ struct clone_map {
   const char *name;		/* name to use in __builtin_cpu_supports.  */
 };
 
-static const struct clone_map rs6000_clone_map[ (int)CLONE_MAX ] = {
-  { OPTION_MASK_P9_VECTOR,	"arch_3_00" },	/* ISA 3.00 (power9).  */
-  { OPTION_MASK_P8_VECTOR,	"arch_2_07" },	/* ISA 2.07 (power8).  */
-  { OPTION_MASK_POPCNTD,	"arch_2_06" },	/* ISA 2.06 (power7).  */
-  { OPTION_MASK_CMPB,		"arch_2_05" },	/* ISA 2.05 (power6).  */
+static const struct clone_map rs6000_clone_map[CLONE_MAX] = {
   { 0,				"" },		/* Default options.  */
+  { OPTION_MASK_CMPB,		"arch_2_05" },	/* ISA 2.05 (power6).  */
+  { OPTION_MASK_POPCNTD,	"arch_2_06" },	/* ISA 2.06 (power7).  */
+  { OPTION_MASK_P8_VECTOR,	"arch_2_07" },	/* ISA 2.07 (power8).  */
+  { OPTION_MASK_P9_VECTOR,	"arch_3_00" },	/* ISA 3.00 (power9).  */
 };
 
 
@@ -40237,7 +40235,7 @@ rs6000_disable_incompatible_switches (void)
 
 /* Helper function for printing the function name when debugging.  */
 
-static inline const char *
+static const char *
 get_decl_name (tree fn)
 {
   tree name;
@@ -40253,8 +40251,9 @@ get_decl_name (tree fn)
 }
 
 /* Return the clone id of the target we are compiling code for in a target
-   clone.  The clone id is ordered from 0 to CLONE_MAX-1 and gives the priority
-   list for the target clones (ordered from highest to lowest).  */
+   clone.  The clone id is ordered from 0 (default) to CLONE_MAX-1 and gives
+   the priority list for the target clones (ordered from lowest to
+   highest).  */
 
 static int
 rs6000_clone_priority (tree fndecl)
@@ -40283,14 +40282,14 @@ rs6000_clone_priority (tree fndecl)
       else
 	isa_masks = TREE_TARGET_OPTION (fn_opts)->x_rs6000_isa_flags;
 
-      for (ret = 0; ret < (int) CLONE_DEFAULT; ret++)
+      for (ret = CLONE_MAX - 1; ret != 0; ret--)
 	if ((rs6000_clone_map[ret].isa_mask & isa_masks) != 0)
 	  break;
     }
 
   if (TARGET_DEBUG_TARGET)
     fprintf (stderr, "rs6000_get_function_version_priority (%s) => %d\n",
-	     get_decl_name (fndecl), (int) ret);
+	     get_decl_name (fndecl), ret);
 
   return ret;
 }
@@ -40298,14 +40297,15 @@ rs6000_clone_priority (tree fndecl)
 /* This compares the priority of target features in function DECL1 and DECL2.
    It returns positive value if DECL1 is higher priority, negative value if
    DECL2 is higher priority and 0 if they are the same.  Note, priorities are
-   ordered from highest (0, CLONE_ISA_3_0) to lowest (CLONE_DEFAULT).  */
+   ordered from lowest (currently CLONE_ISA_3_0) to highest
+   (CLONE_DEFAULT).  */
 
 static int
 rs6000_compare_version_priority (tree decl1, tree decl2)
 {
   int priority1 = rs6000_clone_priority (decl1);
   int priority2 = rs6000_clone_priority (decl2);
-  int ret = priority2 - priority1;
+  int ret = priority1 - priority2;
 
   if (TARGET_DEBUG_TARGET)
     fprintf (stderr, "rs6000_compare_version_priority (%s, %s) => %d\n",
@@ -40330,7 +40330,6 @@ rs6000_get_function_versions_dispatcher (void *decl)
   tree dispatch_decl = NULL;
 
   struct cgraph_function_version_info *default_version_info = NULL;
- 
   gcc_assert (fn != NULL && DECL_FUNCTION_VERSIONED (fn));
 
   if (TARGET_DEBUG_TARGET)
@@ -40342,7 +40341,7 @@ rs6000_get_function_versions_dispatcher (void *decl)
 
   node_v = node->function_version ();
   gcc_assert (node_v != NULL);
- 
+
   if (node_v->dispatcher_resolver != NULL)
     return node_v->dispatcher_resolver;
 
@@ -40415,37 +40414,31 @@ rs6000_get_function_versions_dispatcher (void *decl)
   return dispatch_decl;
 }
 
-/* Make the resolver function decl to dispatch the versions of
-   a multi-versioned function,  DEFAULT_DECL.  Create an
-   empty basic block in the resolver and store the pointer in
-   EMPTY_BB.  Return the decl of the resolver function.  */
+/* Make the resolver function decl to dispatch the versions of a multi-
+   versioned function, DEFAULT_DECL.  Create an empty basic block in the
+   resolver and store the pointer in EMPTY_BB.  Return the decl of the resolver
+   function.  */
 
 static tree
 make_resolver_func (const tree default_decl,
 		    const tree dispatch_decl,
 		    basic_block *empty_bb)
 {
-  char *resolver_name;
-  tree decl, type, decl_name, t;
-  bool is_uniq = false;
-
   /* IFUNC's have to be globally visible.  So, if the default_decl is
      not, then the name of the IFUNC should be made unique.  */
-  if (TREE_PUBLIC (default_decl) == 0)
-    is_uniq = true;
+  bool is_uniq = (TREE_PUBLIC (default_decl) == 0);
 
   /* Append the filename to the resolver function if the versions are
      not externally visible.  This is because the resolver function has
      to be externally visible for the loader to find it.  So, appending
      the filename will prevent conflicts with a resolver function from
      another module which is based on the same version name.  */
-  resolver_name = make_unique_name (default_decl, "resolver", is_uniq);
+  char *resolver_name = make_unique_name (default_decl, "resolver", is_uniq);
 
-  /* The resolver function should return a (void *). */
-  type = build_function_type_list (ptr_type_node, NULL_TREE);
-
-  decl = build_fn_decl (resolver_name, type);
-  decl_name = get_identifier (resolver_name);
+  /* The resolver function should return a (void *).  */
+  tree type = build_function_type_list (ptr_type_node, NULL_TREE);
+  tree decl = build_fn_decl (resolver_name, type);
+  tree decl_name = get_identifier (resolver_name);
   SET_DECL_ASSEMBLER_NAME (decl, decl_name);
 
   DECL_NAME (decl) = decl_name;
@@ -40464,8 +40457,7 @@ make_resolver_func (const tree default_decl,
   DECL_INITIAL (decl) = make_node (BLOCK);
   DECL_STATIC_CONSTRUCTOR (decl) = 0;
 
-  if (DECL_COMDAT_GROUP (default_decl)
-      || TREE_PUBLIC (default_decl))
+  if (DECL_COMDAT_GROUP (default_decl) || TREE_PUBLIC (default_decl))
     {
       /* In this case, each translation unit with a call to this
 	 versioned function will put out a resolver.  Ensure it
@@ -40473,8 +40465,8 @@ make_resolver_func (const tree default_decl,
       DECL_COMDAT (decl) = 1;
       make_decl_one_only (decl, DECL_ASSEMBLER_NAME (decl));
     }
-  /* Build result decl and add to function_decl. */
-  t = build_decl (UNKNOWN_LOCATION, RESULT_DECL, NULL_TREE, ptr_type_node);
+  /* Build result decl and add to function_decl.  */
+  tree t = build_decl (UNKNOWN_LOCATION, RESULT_DECL, NULL_TREE, ptr_type_node);
   DECL_ARTIFICIAL (t) = 1;
   DECL_IGNORED_P (t) = 1;
   DECL_RESULT (decl) = t;
@@ -40493,8 +40485,9 @@ make_resolver_func (const tree default_decl,
   DECL_ATTRIBUTES (dispatch_decl)
     = make_attribute ("ifunc", resolver_name, DECL_ATTRIBUTES (dispatch_decl));
 
-  /* Create the alias for dispatch to resolver here.  */
-  /*cgraph_create_function_alias (dispatch_decl, decl);*/
+  /* In the future we probably want to create the alias for dispatch to
+     resolver here, instead of using the main function as the default.  */
+  /* cgraph_create_function_alias (dispatch_decl, decl);  */
   cgraph_node::create_same_body_alias (dispatch_decl, decl);
   XDELETEVEC (resolver_name);
   return decl;
@@ -40511,31 +40504,19 @@ static basic_block
 add_condition_to_bb (tree function_decl, tree version_decl,
 		     int clone_isa, basic_block new_bb)
 {
-  gimple *return_stmt;
-  tree convert_expr, result_var;
-  gimple *convert_stmt;
-  gimple_seq gseq;
-  gimple *call_cond_stmt;
-  gimple *if_else_stmt;
-
-  basic_block bb1, bb2, bb3;
-  edge e12, e23;
-  tree cond_var,  predicate_decl, predicate_arg, bool_zero;
-  const char *arg_str;
-
   push_cfun (DECL_STRUCT_FUNCTION (function_decl));
 
   gcc_assert (new_bb != NULL);
-  gseq = bb_seq (new_bb);
+  gimple_seq gseq = bb_seq (new_bb);
 
 
-  convert_expr = build1 (CONVERT_EXPR, ptr_type_node,
-	     		 build_fold_addr_expr (version_decl));
-  result_var = create_tmp_var (ptr_type_node);
-  convert_stmt = gimple_build_assign (result_var, convert_expr); 
-  return_stmt = gimple_build_return (result_var);
+  tree convert_expr = build1 (CONVERT_EXPR, ptr_type_node,
+			      build_fold_addr_expr (version_decl));
+  tree result_var = create_tmp_var (ptr_type_node);
+  gimple *convert_stmt = gimple_build_assign (result_var, convert_expr);
+  gimple *return_stmt = gimple_build_return (result_var);
 
-  if (clone_isa == (int)CLONE_DEFAULT)
+  if (clone_isa == CLONE_DEFAULT)
     {
       gimple_seq_add_stmt (&gseq, convert_stmt);
       gimple_seq_add_stmt (&gseq, return_stmt);
@@ -40546,20 +40527,20 @@ add_condition_to_bb (tree function_decl, tree version_decl,
       return new_bb;
     }
 
-  bool_zero = build_int_cst (bool_int_type_node, 0);
-  cond_var = create_tmp_var (bool_int_type_node);
-  predicate_decl = rs6000_builtin_decls [(int) RS6000_BUILTIN_CPU_SUPPORTS];
-  arg_str = rs6000_clone_map[clone_isa].name;
-  predicate_arg = build_string_literal (strlen (arg_str) + 1, arg_str);
-  call_cond_stmt = gimple_build_call (predicate_decl, 1, predicate_arg);
+  tree bool_zero = build_int_cst (bool_int_type_node, 0);
+  tree cond_var = create_tmp_var (bool_int_type_node);
+  tree predicate_decl = rs6000_builtin_decls [(int) RS6000_BUILTIN_CPU_SUPPORTS];
+  const char *arg_str = rs6000_clone_map[clone_isa].name;
+  tree predicate_arg = build_string_literal (strlen (arg_str) + 1, arg_str);
+  gimple *call_cond_stmt = gimple_build_call (predicate_decl, 1, predicate_arg);
   gimple_call_set_lhs (call_cond_stmt, cond_var);
 
   gimple_set_block (call_cond_stmt, DECL_INITIAL (function_decl));
   gimple_set_bb (call_cond_stmt, new_bb);
   gimple_seq_add_stmt (&gseq, call_cond_stmt);
 
-  if_else_stmt = gimple_build_cond (NE_EXPR, cond_var, bool_zero, NULL_TREE,
-				    NULL_TREE);
+  gimple *if_else_stmt = gimple_build_cond (NE_EXPR, cond_var, bool_zero,
+					    NULL_TREE, NULL_TREE);
   gimple_set_block (if_else_stmt, DECL_INITIAL (function_decl));
   gimple_set_bb (if_else_stmt, new_bb);
   gimple_seq_add_stmt (&gseq, if_else_stmt);
@@ -40568,25 +40549,23 @@ add_condition_to_bb (tree function_decl, tree version_decl,
   gimple_seq_add_stmt (&gseq, return_stmt);
   set_bb_seq (new_bb, gseq);
 
-  bb1 = new_bb;
-  e12 = split_block (bb1, if_else_stmt);
-  bb2 = e12->dest;
+  basic_block bb1 = new_bb;
+  edge e12 = split_block (bb1, if_else_stmt);
+  basic_block bb2 = e12->dest;
   e12->flags &= ~EDGE_FALLTHRU;
   e12->flags |= EDGE_TRUE_VALUE;
 
-  e23 = split_block (bb2, return_stmt);
-
+  edge e23 = split_block (bb2, return_stmt);
   gimple_set_bb (convert_stmt, bb2);
   gimple_set_bb (return_stmt, bb2);
 
-  bb3 = e23->dest;
-  make_edge (bb1, bb3, EDGE_FALSE_VALUE); 
+  basic_block bb3 = e23->dest;
+  make_edge (bb1, bb3, EDGE_FALSE_VALUE);
 
   remove_edge (e23);
   make_edge (bb2, EXIT_BLOCK_PTR_FOR_FN (cfun), 0);
 
   pop_cfun ();
-
   return bb3;
 }
 
@@ -40604,7 +40583,7 @@ dispatch_function_versions (tree dispatch_decl,
   int ix;
   tree ele;
   vec<tree> *fndecls;
-  tree clones[ (int)CLONE_MAX ];
+  tree clones[CLONE_MAX];
 
   if (TARGET_DEBUG_TARGET)
     fputs ("dispatch_function_versions, top\n", stderr);
@@ -40621,7 +40600,7 @@ dispatch_function_versions (tree dispatch_decl,
 
   /* The first version in the vector is the default decl.  */
   memset ((void *) clones, '\0', sizeof (clones));
-  clones[ (int)CLONE_DEFAULT ] = (*fndecls)[0];
+  clones[CLONE_DEFAULT] = (*fndecls)[0];
 
   /* On the PowerPC, we do not need to call __builtin_cpu_init, if we are using
      a new enough glibc.  If we ever need to call it, we would need to insert
@@ -40634,7 +40613,7 @@ dispatch_function_versions (tree dispatch_decl,
 	clones[priority] = ele;
     }
 
-  for (ix = 0; ix < (int)CLONE_MAX; ix++)
+  for (ix = CLONE_MAX - 1; ix >= 0; ix--)
     if (clones[ix])
       {
 	if (TARGET_DEBUG_TARGET)
@@ -40653,65 +40632,51 @@ dispatch_function_versions (tree dispatch_decl,
    provide the code to dispatch the right function at run-time.  NODE points
    to the dispatcher decl whose body will be created.  */
 
-static tree 
+static tree
 rs6000_generate_version_dispatcher_body (void *node_p)
 {
-  tree resolver_decl;
+  tree resolver;
   basic_block empty_bb;
-  tree default_ver_decl;
-  struct cgraph_node *versn;
-  struct cgraph_node *node;
+  struct cgraph_node *node = (cgraph_node *) node_p;
+  struct cgraph_function_version_info *ninfo = node->function_version ();
 
-  struct cgraph_function_version_info *node_version_info = NULL;
-  struct cgraph_function_version_info *versn_info = NULL;
-
-  node = (cgraph_node *)node_p;
-
-  node_version_info = node->function_version ();
-  gcc_assert (node->dispatcher_function
-	      && node_version_info != NULL);
-
-  if (node_version_info->dispatcher_resolver)
-    return node_version_info->dispatcher_resolver;
-
-  /* The first version in the chain corresponds to the default version.  */
-  default_ver_decl = node_version_info->next->this_node->decl;
+  if (ninfo->dispatcher_resolver)
+    return ninfo->dispatcher_resolver;
 
   /* node is going to be an alias, so remove the finalized bit.  */
   node->definition = false;
 
-  resolver_decl = make_resolver_func (default_ver_decl,
-				      node->decl, &empty_bb);
-
-  node_version_info->dispatcher_resolver = resolver_decl;
+  /* The first version in the chain corresponds to the default version.  */
+  ninfo->dispatcher_resolver = resolver
+    = make_resolver_func (ninfo->next->this_node->decl, node->decl, &empty_bb);
 
   if (TARGET_DEBUG_TARGET)
     fprintf (stderr, "rs6000_get_function_versions_dispatcher, %s\n",
-	     get_decl_name (resolver_decl));
+	     get_decl_name (resolver));
 
-  push_cfun (DECL_STRUCT_FUNCTION (resolver_decl));
-
+  push_cfun (DECL_STRUCT_FUNCTION (resolver));
   auto_vec<tree, 2> fn_ver_vec;
 
-  for (versn_info = node_version_info->next; versn_info;
-       versn_info = versn_info->next)
+  for (struct cgraph_function_version_info *vinfo = ninfo->next;
+       vinfo;
+       vinfo = vinfo->next)
     {
-      versn = versn_info->this_node;
+      struct cgraph_node *version = vinfo->this_node;
       /* Check for virtual functions here again, as by this time it should
 	 have been determined if this function needs a vtable index or
 	 not.  This happens for methods in derived classes that override
 	 virtual methods in base classes but are not explicitly marked as
 	 virtual.  */
-      if (DECL_VINDEX (versn->decl))
+      if (DECL_VINDEX (version->decl))
 	sorry ("Virtual function multiversioning not supported");
 
-      fn_ver_vec.safe_push (versn->decl);
+      fn_ver_vec.safe_push (version->decl);
     }
 
-  dispatch_function_versions (resolver_decl, &fn_ver_vec, &empty_bb);
+  dispatch_function_versions (resolver, &fn_ver_vec, &empty_bb);
   cgraph_edge::rebuild_edges ();
   pop_cfun ();
-  return resolver_decl;
+  return resolver;
 }
 
 
@@ -41406,7 +41371,7 @@ bool
 fusion_gpr_load_p (rtx addis_reg,	/* register set via addis.  */
 		   rtx addis_value,	/* addis value.  */
 		   rtx target,		/* target register that is loaded.  */
-		   rtx mem)		/* bottom part of the memory addr. */
+		   rtx mem)		/* bottom part of the memory addr.  */
 {
   rtx addr;
   rtx base_reg;
