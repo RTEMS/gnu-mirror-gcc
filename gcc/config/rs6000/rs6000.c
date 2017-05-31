@@ -40465,6 +40465,7 @@ make_resolver_func (const tree default_decl,
       DECL_COMDAT (decl) = 1;
       make_decl_one_only (decl, DECL_ASSEMBLER_NAME (decl));
     }
+
   /* Build result decl and add to function_decl.  */
   tree t = build_decl (UNKNOWN_LOCATION, RESULT_DECL, NULL_TREE, ptr_type_node);
   DECL_ARTIFICIAL (t) = 1;
@@ -40480,14 +40481,10 @@ make_resolver_func (const tree default_decl,
 
   pop_cfun ();
 
-  gcc_assert (dispatch_decl != NULL);
   /* Mark dispatch_decl as "ifunc" with resolver as resolver_name.  */
   DECL_ATTRIBUTES (dispatch_decl)
     = make_attribute ("ifunc", resolver_name, DECL_ATTRIBUTES (dispatch_decl));
 
-  /* In the future we probably want to create the alias for dispatch to
-     resolver here, instead of using the main function as the default.  */
-  /* cgraph_create_function_alias (dispatch_decl, decl);  */
   cgraph_node::create_same_body_alias (dispatch_decl, decl);
   XDELETEVEC (resolver_name);
   return decl;

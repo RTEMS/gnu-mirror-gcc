@@ -1,3 +1,7 @@
+2017-05-31  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (make_resolver_func): Minor tweaks.
+
 2017-05-30  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.c (CLONE_*): Reorder the clone priority so
