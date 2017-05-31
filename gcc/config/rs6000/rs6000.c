@@ -157,6 +157,8 @@ typedef struct GTY(()) machine_function
   bool split_stack_argp_used;
   /* Flag if r2 setup is needed with ELFv2 ABI.  */
   bool r2_setup_needed;
+  /* The number of components we use for separate shrink-wrapping.  */
+  int n_components;
   /* The components already handled by separate shrink-wrapping, which should
      not be considered by the prologue and epilogue.  */
   bool gpr_is_wrapped_separately[32];
@@ -4300,16 +4302,9 @@ rs6000_option_override_internal (bool global_init_p)
 	error ("SPE not supported in this target");
     }
 
-  /* Disable Cell microcode if we are optimizing for the Cell
-     and not optimizing for size.  */
-  if (rs6000_gen_cell_microcode == -1)
-    rs6000_gen_cell_microcode = !(rs6000_cpu == PROCESSOR_CELL
-                                  && !optimize_size);
-
-  /* If we are optimizing big endian systems for space and it's OK to
-     use instructions that would be microcoded on the Cell, use the
-     load/store multiple and string instructions.  */
-  if (BYTES_BIG_ENDIAN && optimize_size && rs6000_gen_cell_microcode)
+  /* If we are optimizing big endian systems for space, use the load/store
+     multiple and string instructions.  */
+  if (BYTES_BIG_ENDIAN && optimize_size)
     rs6000_isa_flags |= ~rs6000_isa_flags_explicit & (OPTION_MASK_MULTIPLE
 						      | OPTION_MASK_STRING);
 
@@ -29279,9 +29274,9 @@ rs6000_get_separate_components (void)
      Components 13..31 are the save/restore of GPR13..GPR31.
      Components 46..63 are the save/restore of FPR14..FPR31.  */
 
-  int n_components = 64;
+  cfun->machine->n_components = 64;
 
-  sbitmap components = sbitmap_alloc (n_components);
+  sbitmap components = sbitmap_alloc (cfun->machine->n_components);
   bitmap_clear (components);
 
   int reg_size = TARGET_32BIT ? 4 : 8;
@@ -29363,7 +29358,7 @@ rs6000_components_for_bb (basic_block bb)
   bitmap gen = &DF_LIVE_BB_INFO (bb)->gen;
   bitmap kill = &DF_LIVE_BB_INFO (bb)->kill;
 
-  sbitmap components = sbitmap_alloc (32);
+  sbitmap components = sbitmap_alloc (cfun->machine->n_components);
   bitmap_clear (components);
 
   /* A register is used in a bb if it is in the IN, GEN, or KILL sets.  */
@@ -39343,38 +39338,6 @@ rs6000_stack_protect_fail (void)
 	 : default_external_stack_protect_fail ();
 }
 
-void
-rs6000_final_prescan_insn (rtx_insn *insn, rtx *operand ATTRIBUTE_UNUSED,
-			   int num_operands ATTRIBUTE_UNUSED)
-{
-  if (rs6000_warn_cell_microcode)
-    {
-      const char *temp;
-      int insn_code_number = recog_memoized (insn);
-      location_t location = INSN_LOCATION (insn);
-
-      /* Punt on insns we cannot recognize.  */
-      if (insn_code_number < 0)
-	return;
-
-      /* get_insn_template can modify recog_data, so save and restore it.  */
-      struct recog_data_d recog_data_save = recog_data;
-      for (int i = 0; i < recog_data.n_operands; i++)
-	recog_data.operand[i] = copy_rtx (recog_data.operand[i]);
-      temp = get_insn_template (insn_code_number, insn);
-      recog_data = recog_data_save;
-
-      if (get_attr_cell_micro (insn) == CELL_MICRO_ALWAYS)
-	warning_at (location, OPT_mwarn_cell_microcode,
-		    "emitting microcode insn %s\t[%s] #%d",
-		    temp, insn_data[INSN_CODE (insn)].name, INSN_UID (insn)); 
-      else if (get_attr_cell_micro (insn) == CELL_MICRO_CONDITIONAL)
-	warning_at (location, OPT_mwarn_cell_microcode,
-		    "emitting conditional microcode insn %s\t[%s] #%d",
-		    temp, insn_data[INSN_CODE (insn)].name, INSN_UID (insn));
-    }
-}
-
 /* Implement the TARGET_ASAN_SHADOW_OFFSET hook.  */
 
 #if TARGET_ELF
@@ -39547,12 +39510,6 @@ static struct rs6000_opt_var const rs6000_opt_vars[] =
   { "sched-epilog",
     offsetof (struct gcc_options, x_TARGET_SCHED_PROLOG),
     offsetof (struct cl_target_option, x_TARGET_SCHED_PROLOG), },
-  { "gen-cell-microcode",
-    offsetof (struct gcc_options, x_rs6000_gen_cell_microcode),
-    offsetof (struct cl_target_option, x_rs6000_gen_cell_microcode), },
-  { "warn-cell-microcode",
-    offsetof (struct gcc_options, x_rs6000_warn_cell_microcode),
-    offsetof (struct cl_target_option, x_rs6000_warn_cell_microcode), },
 };
 
 /* Inner function to handle attribute((target("..."))) and #pragma GCC target

@@ -1,4 +1,448 @@
+2017-05-31  Jason Merrill  <jason@redhat.com>
+
+	PR c++/80840 - ICE with constexpr and reference
+	* pt.c (convert_nontype_argument): Don't test whether a decl is
+	value-dependent when binding to a reference.
+
+2017-05-31  Nathan Sidwell  <nathan@acm.org>
+
+	* cp-tree.h (lang_decl_slector): New enum.
+	(lang_decl_base): Make selector an enum.  Drop decomposition_p
+	field.
+	(lang_decl): Use enum for discrimination.
+	(LANG_DECL_FN_CHECK, LANG_DECL_NS_CHECK, LANG_DECL_PARM_CHECK,
+	LANG_DECL_DEOMP_CHECK): Use enum.
+	(DECL_DECOMPOSITION_P): Use selector value.
+	(SET_DECL_DECOMPOSITION_P): Delete.
+	(retrofit_lang_decl): Lose SEL parm.
+	(fit_decomposition_lang_decl): Declare.
+	* decl.c (cp_finish_decomp, grokdeclarator): Use
+	fit_decomposition_lang_decl.
+	* lex.c (maybe_add_lang_decl_raw): New. Broken out of
+	retrofit_lang_decl.
+	(set_decl_linkage): New.  Broken out of retrofit_lang_decl.  Use enum.
+	(fit_decomposition_lang_decl): Likewise.
+	(retrofit_lang_decl): Use worker functions.
+	(cxx_dup_lang_specific_decl): Use selector enum.
+	(maybe_add_lang_type_raw): New.  Broken out of ...
+	(cxx_make_type_name): ... here.  Call it.
+
+2017-05-30  Jason Merrill  <jason@redhat.com>
+
+	PR c++/80856 - ICE with local extern in template
+	* semantics.c (finish_call_expr): Replace a local extern overload
+	set in a template with the IDENTIFIER_NODE.
+
+2017-05-30  David Malcolm  <dmalcolm@redhat.com>
+
+	* call.c (perform_implicit_conversion_flags): Convert
+	"from %qT to %qT" to "from %qH to %qI" in diagnostic.
+	(print_conversion_rejection): Replace pairs of %qT with
+	%qH and %qI in various places.
+	(build_user_type_conversion_1): Likewise.
+	(build_integral_nontype_arg_conv): Likewise.
+	(build_conditional_expr_1): Likewise.
+	(convert_like_real): Likewise.
+	(convert_arg_to_ellipsis): Likewise.
+	(joust): Likewise.
+	(initialize_reference): Likewise.
+	* cvt.c (cp_convert_to_pointer): Likewise.
+	(cp_convert_to_pointer): Likewise.
+	(convert_to_reference): Likewise.
+	(ocp_convert): Likewise.
+	* error.c (cp_printer): Gain bool and const char ** parameters.
+	(struct deferred_printed_type): New struct.
+	(class cxx_format_postprocessor): New class.
+	(cxx_initialize_diagnostics): Wire up a cxx_format_postprocessor
+	to pp->m_format_postprocessor.
+	(comparable_template_types_p): New function.
+	(newline_and_indent): New function.
+	(arg_to_string): New function.
+	(print_nonequal_arg): New function.
+	(print_template_differences): New function.
+	(type_to_string_with_compare): New function.
+	(print_template_tree_comparison): New function.
+	(append_formatted_chunk): New function.
+	(add_quotes): New function.
+	(cxx_format_postprocessor::handle): New function.
+	(defer_phase_2_of_type_diff): New function.
+	(cp_printer): Add "quoted" and "buffer_ptr" params.  Implement
+	%H and %I.
+	* typeck.c (cp_build_binary_op): Replace pairs of %qT with
+	%qH and %qI in various places.
+	(convert_member_func_to_ptr): Likewise.
+	(build_reinterpret_cast_1): Likewise.
+	(convert_for_assignment): Likewise.
+	* typeck2.c (check_narrowing): Likewise.
+
+2017-05-30  Nathan Sidwell  <nathan@acm.org>
+
+	Kill IDENTIFIER_NAMESPACE_BINDINGS
+	* cp-tree.h (lang_identifier): Delete namespace_bindings.
+	(IDENTIFIER_NAMESPACE_BINDINGS): Delete.
+	(lang_decl_ns): Add bindings.
+	(DECL_NAMESPACE_BINDINGS): New.
+	* lex.c (retrofit_lang_decl): Create namespace hash table.
+	* name-lookup.c (find_namespace_slot): Change to use hash-map.
+	* ptree.c (cxx_print_binding): Delete.
+	(cxx_print_identifier): Remove NAMESPACE_BINDING printing.
+
+	* cp-tree.def (OVERLOAD): Fix comment.
+	* cp-tree.h: Fix comments and whitespace.
+	* error.c (dump_decl): Use pp_cxx_colon_colon, ovl_scope.
+	* name-lookup.c (add_decl_to_level): Assert not class.
+	(check_local_shadow): Use OVL_P.
+	(pushdecl_with_scope_1): Rename to ...
+	(do_pushdecl_with_Scope): ... here.
+	(do_nonmember_using_decl): Use qualified_namespace_lookup return
+	value.
+	(push_class_level_binding_1): Use OVL_P.
+	(pushdecl_namespace_level): Use do_pushdecl_with_scope.
+	(pushtag_1): Rename to ...
+	(do_pushtag): ... here.  Adjust do_pushdecl_with_scope call.
+	(pushtag): Adjust.
+	(store_class_bindings): Do not time here.
+	* name-lookup.h (pushdecl_outermost_localscope): Reorder.
+	* pt.c (listify): Declare argvec at point of initialization.
+
+	PR c++/80913
+	* name-lookup.c (add_decl_to_level): Assert not making a circular
+	chain.
+	(update_binding): Don't prematurely slide artificial decl.
+
+2017-05-29  Alexandre Oliva <aoliva@redhat.com>
+
+	* cp-tree.h (lang_identifier): Drop oracle_looked_up, unused.
+
+2017-05-29  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/80891 (#1,#5)
+	* cp-tree.h (lookup_maybe_add): Add DEDUPING argument.
+	* name-lookup.c (name_lookup): Add deduping field.
+	(name_lookup::preserve_state, name_lookup::restore_state): Deal
+	with deduping.
+	(name_lookup::add_overload): New.
+	(name_lookup::add_value, name_lookup::add_fns): Call add_overload.
+	(name_lookup::search_adl): Set deduping.  Don't unmark here.
+	* pt.c (most_specialized_instantiation): Revert previous change,
+	Assert not given duplicates.
+	* tree.c (lookup_mark): Just mark the underlying decls.
+	(lookup_maybe_add): Dedup using marked decls.
+
+	PR c++/80891 (#4)
+	* ptree.c (cxx_print_xnode): Show internal OVERLOAD structure.
+	* tree.c (ovl_insert, ovl_iterator_remove_node): Fix copying assert.
+
+	Stat hack representation
+	* name-lookup.c (STAT_HACK_P, STAT_TYPE, STAT_DECL,
+	MAYBE_STAT_DECL, MAYBE_STAT_TYPE): New.
+	(stat_hack): New.
+	(find_namespace_binding): Replace with ...
+	(find_namespace_slot): ... this.
+	(find_namespace_value): New.
+	(name_lookup::search_namespace_only,
+	name_lookup::adl_namespace_only): Adjust.
+	(update_binding): Add SLOT parameter, adjust.
+	(check_local_shadow): Use find_namespace_value.
+	(set_local_extern_decl_linkage): Likewise.
+	(do_pushdecl): Adjust for namespace slot.
+	(push_local_binding): Assert not a namespace binding.
+	(check_for_out_of_scope_variable): Use find_namespace_value.
+	(set_identifier_type_value_with_scope): Likewise.
+	(get_namespace_binding): Likewise.
+	(set_namespace_binding): Delete.
+	(set_global_binding): Directly update the binding.
+	(finish_namespace_using_decl): Likewise.
+	(lookup_type_scope_1): Use find_namespace_slot and update.
+	(do_push_nested_namespace): Use find_namespace_value.
+
+	PR c++/80891 (#1)
+	* pt.c (most_specialized_instantiation): Cope with duplicate
+	instantiations.
+
+	PR c++/80891 (#3)
+	* cp-tree.h (build_min_nt_call_vec): Declare.
+	* decl.c (build_offset_ref_call_from_tree): Call it.
+	* parser.c (cp_parser_postfix_expression): Likewise.
+	* pt.c (tsubst_copy_and_build): Likewise.
+	* semantics.c (finish_call_expr): Likewise.
+	* tree.c (build_min_nt_loc): Keep unresolved lookups.
+	(build_min): Likewise.
+	(build_min_non_dep): Likewise.
+	(build_min_non_dep_call_vec): Likewise.
+	(build_min_nt_call_vec): New.
+
+	PR c++/80891 (#2)
+	* tree.c (ovl_copy): Adjust assert, copy OVL_LOOKUP.
+	(ovl_used): New.
+	(lookup_keep): Call it.
+
+2017-05-26  Nathan Sidwell  <nathan@acm.org>
+
+	Implement DR2061
+	* name-lookup.c (push_inline_namespaces): New.
+	(push_namespace): Look inside inline namespaces.
+
+	Inline and using namespace representation change.
+	* cp-tree.h (struct lang_decl_ns): Delete ns_using.  Add usings,
+	inlinees as vector.
+	(DECL_NAMESPACE_USING): Adjust.
+	(DECL_NAMESPACE_INLINEES): New.
+	* name-lookup.h (struct cp_binding_level): Change usings
+	representation.
+	* name-lookup.c (name_lookup::do_queue_usings,
+	name_lookup::queue_usings): Adjust.
+	(name_lookup::search_namespace, name_lookup::search_usings,
+	name_lookup::queue_namespace): Adjust.
+	(name_lookup::adl_namespace_only): Adjust.
+	(add_using_namespace, push_namespace): Push onto vector.
+	(pop_namespace): Add timing logic.
+
+	* call.c (build_operator_new_call): Do namelookup and ADL here.
+	(build_new_op_1): Likewise.
+	* name-lookup.h (lookup_function_nonclass): Delete declaration.
+	(do_using_directive): Likewise.
+	* name-lookup.c (set_namespace_binding, push_local_binding): Don't
+	declare early.
+	(struct scope_binding): Delete.
+	(EMPTY_SCOPE_BINDING): Delete.
+	(set_decl_namespace): Use OVL_P.
+	(finish_local_using_decl): Lose unnecesary checks.
+	(lookup_function_nonclass): Delete.
+	(cp_emit_debug_info_for_using): Use MAYBE_BASELINK_P.
+
+	* cp-tree.h (OVL_CHAIN): Check looking at OVERLOAD.
+	(ovl_iterator): Add allow_inner field.  Adjust ctor.  Make
+	unduplicatable.
+	(ovl_iterator::maybe_push, ovl_iterator::pop): New.
+	(lkp_iterator): Add outer field.  Adjust ctor.
+	(lkp_iterator::operator++): New.
+	(lookup_mark, lookup_maybe_add): Declare.
+	* name-lookup.c (name_lookup): Delete fn_set member.
+	(name_lookup::preserve_state, name_lookup::restore_state): Unmark
+	and mark lookup.
+	(name_lookup::add_value): Use lookup_add directly.
+	(name_lookup::add_fns: Use lookup_maybe_add.
+	(name_lookup::search_adl): Mark and unmark fns.
+	(pushdecl): Adjust.
+	* pt.c (check_explicit_specialization): Use lookup_add directly.
+	* ptree.c (cxx_print_xnode): Show complete overload structure.
+	* tree.c (lookup_mark, lookup_maybe_add): New.
+
+	* name-lookup.c (name_lookup::search_adl): ADL OMP UDR type args.
+
+2017-05-26  Jakub Jelinek  <jakub@redhat.com>
+
+	* cp-tree.h (struct lang_decl_decomp): New type.
+	(struct lang_decl): Add u.decomp.
+	(LANG_DECL_DECOMP_CHECK): Define.
+	(DECL_DECOMPOSITION_P): Note it is set also on the vars
+	for user identifiers.
+	(DECL_DECOMP_BASE): Define.
+	(retrofit_lang_decl): Add extra int = 0 argument.
+	* lex.c (retrofit_lang_decl): Add SEL argument, if non-zero
+	use it to influence the selector choices and for selector
+	0 to non-zero transition copy old content.
+	(cxx_dup_lang_specific_decl): Handle DECL_DECOMPOSITION_P.
+	* decl.c (poplevel): For DECL_DECOMPOSITION_P, check
+	!DECL_DECOMP_BASE instead of !DECL_VALUE_EXPR.  Adjust warning
+	wording if decl is a structured binding.
+	(cp_finish_decomp): Pass 4 as the new argument to retrofit_lang_decl.
+	Set DECL_DECOMP_BASE.  Ignore DECL_READ_P sets from initialization
+	of individual variables for tuple structured bindings.
+	(grokdeclarator): Pass 4 as the new argument to retrofit_lang_decl.
+	Clear DECL_DECOMP_BASE.
+	* decl2.c (mark_used): Mark DECL_DECOMP_BASE TREE_USED as well.
+	* pt.c (tsubst_decomp_names): Assert DECL_DECOMP_BASE matches what
+	is expected.
+	* expr.c (mark_exp_read): Recurse on DECL_DECOMP_BASE instead of
+	DECL_VALUE_EXPR.
+
+2017-05-25  Jason Merrill  <jason@redhat.com>
+
+	PR c++/80605 - __is_standard_layout and zero-length array
+	* class.c (check_bases): Use DECL_FIELD_IS_BASE.
+
+2017-05-25  Nathan Sidwell  <nathan@acm.org>
+
+	Kill OVL_CURRENT, OVL_NEXT.
+	* cp-tree.h (OVL_CURRENT, OVL_NEXT): Delete.
+	* name-lookup.c (set_decl_namespace): Use ovl_iterator.
+	(consider_binding_level): Use OVL_FIRST.
+	(cp_emit_debug_info_for_using): Use lkp_iterator.
+	* pt.c (check_explicit_specialization): Use ovl_iterator.	
+
+	Kill DECL_NAMESPACE_USERS, DECL_NAMESPACE_ASSOCIATIONS.
+	* cp-tree.h (lang_decl_ns): Remove ns_users field.
+	(DECL_NAMESPACE_USERS, DECL_NAMESPACE_ASSOCIATIONS): Delete.
+	(TREE_INDIRECT_USING): Delete.
+	* name-lookup.h (is_associated_namespace): Delete.
+	* name-lookup.c (name_lookup::search_usings,
+	name_lookup::do_queue_usings): Usings are always direct.
+	(is_associated_namespace): Delete.
+	(handle_namespace_attrs): Use DECL_NAMESPACE_INLINE_P.
+	(namespace_ancestor_1, namespace_ancestor): Delete.
+	(push_using_directive_1, push_using_directive): Delete.
+	(add_using_namespace_1): Delete.
+	(add_using_namespace): Reimplement.
+	(emit_debug_info_using_namespace): New.
+	(finish_namespace_using_directive, finish_local_using_directive,
+	push_namespace): Adjust.
+	* tree.c (cp_free_lang_data): Remove DECL_NAMESPACE_USERS handling.
+
+2017-05-25  Volker Reichelt  <v.reichelt@netcologne.de>
+
+	* semantics.c (finish_handler_parms): Warn about non-reference type
+	catch handlers.
+
+2017-05-25  Nathan Sidwell  <nathan@acm.org>
+
+	Reimplement unqualified namespace lookup.
+	* name-lookup.c (name_lookup::using_pair,
+	name_lookup::using_queue): New typedefs.
+	(name_lookup::queue_namespace, name_lookup::do_queue_usings,
+	name_lookup::queue_usings): New.
+	(name_lookup::search_unqualified): New.
+	(merge_functions, same_entity_p, ambiguous_decl,
+	unqualified_namespace_lookup_1, unqualified_namespace_lookup,
+	lookup_using_namespace): Delete.
+	(lookup_name_real_1): Adjust.
+
+	Reimplement qualified namespace lookup.
+	* name-lookup.c (name_lookup::flags): New member.  Adjust ctor.
+	(name_lookup::ambiguous, name_lookup::add_value,
+	name_lookup::add_type, name_lookup::process_binding): New.
+	(name_lookup::search_namespace_only,
+	name_lookup::search_namespace, name_lookup::search_usings): New.
+	(name_lookup::search_qualified): New.
+	(do_nonmember_using_decl, suggest_alternatives_for,
+	lookup_qualified_name): Adjust.
+	(tree_vec_contains): Delete.
+	(qualified_lookup_using_namespace): Rename to ...
+	(qualified_namespace_lookup): ... here.  Reimplement.
+
+	Reimplement ADL.
+	* cp-tree.h (LOOKUP_SEEN_P, LOOKUP_FOUND_P): New.
+	* name-lookup.h (lookup_arg_dependent): Return plain tree.
+	* name-lookup.c (arg_lookup, arg_assoc, arg_assoc_args,
+	arg_assoc_args_vec, arg_assoc_type, add_function,
+	arg_assoc_namespace, arg_assoc_class_only, arg_assoc_bases,
+	arg_assoc_class, arg_assoc_template_arg, arg_assoc,
+	lookup_arg_dependent_1): Delete.
+	(name_lookup): New lookup object.
+	(name_lookup::preserve_state, name_lookup::restore_state,
+	name_lookup::mark_seen, name_lookup::find_and_mark,
+	name_lookup::add_fns, name_lookup::adl_namespace_only,
+	name_lookup::adl_namespace, name_lookup::adl_class_only,
+	name_lookup::adl_bases, name_lookup::adl_class,
+	name_lookup::adl_expr, name_lookup::adl_type,
+	name_lookup::adl_template_arg, name_lookup::search_adl): New.
+	(lookup_arg_dependent): Return a plain tree.  Adjust.
+	(is_associated_namespace): Move later.
+	
+2017-05-24  Nathan Sidwell  <nathan@acm.org>
+
+	* friend.c (do_friend): Remove check for existing decl.
+	* name-lookup.h (lookup_name_innermost_nonclass_level): Delete.
+	* name-lookup.c (push_local_binding): Directly look for binding.
+	(lookup_name_innermost_nonclass_level_1): Delete.
+	(lookup_name_innermost_nonclass_level): Delete.
+
+	* Make-lang.in (CXX_AND_OBJCXX_OBJS): Alphabetize.
+
+	* cp-tree.h (cp_free_lang_data): Add extern.
+	(ovl_skip_hidden, is_overloaded_fn, really_overloaded_fn): Add
+	ATTRIBUTE_PURE.
+	(type_unknown_p): Return bool, make inline, lose TREE_LIST check.
+	* typeck.c (type_unknown_p): Delete.
+	* tree.c (is_overloaded_fn): Use MAYBE_BASELINE_FUNCTIONS, adjust
+	overload management.
+	(dependent_name): Likewise.
+	(decl_anon_ns_mem_p): Simplify.
+
+2017-05-24  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR c++/80544
+	* tree.c (reshape_init): Use unqualified type for direct enum init.
+	* typeck.c (maybe_warn_about_cast_ignoring_quals): New.
+	(build_static_cast_1, build_reinterpret_cast_1): Strip cv-quals from
+	non-class destination types.
+	(build_const_cast_1): Strip cv-quals from destination types.
+	(build_static_cast, build_reinterpret_cast, build_const_cast)
+	(cp_build_c_cast): Add calls to maybe_warn_about_cast_ignoring_quals.
+
+2017-05-24  Martin Sebor  <msebor@redhat.com>
+
+	PR c/80731
+	* call.c (fully_fold_internal): Adjust.
+
+2017-05-24  Nathan Sidwell  <nathan@acm.org>
+
+	* cp-tree.h (ovl_skip_hidden): Declare.
+	* tree.c (ovl_skip_hidden): New.
+	* name-lookup.c (arg_assoc_namespace): Call ovl_skip_hidden.
+	(lookup_arg_dependent_1): Likewise.
+	(ambiguous_decl): Use DECL_HIDDEN_P, ovl_skip_hidden.
+	(hidden_name_p, remove_hidden_names): Delete.
+	(lookup_name_real_1): Do not strip hidden names.
+	* name-lookup.h (hidden_name_p, remove_hidden_names): Delete.
+
+	* cp-tree.h (OVL_HIDDEN_P): New.
+	(ovl_iterator::hidden_p, ovl_iterator::reveal_node): New.
+	(ovl_iterator::reveal_node): Declare.
+	* tree.c (ovl_copy): Copy OVL_HIDDEN_P.
+	(ovl_insert): Order on hiddenness.
+	(ovl_iterator::reveal_node): New.
+	* name-lookup.c (anticipated_builtin_p): New.
+	(supplement_binding_1): Use it.
+	(set_local_extern_decl_linkage): Use hidden_p.
+	(do_pushdecl): Deal with unhiding a hidden decl, use
+	anticipated_builtin_p.
+	(do_nonmember_using_decl): Use anticipated_decl_p.
+	(lookup_name_real_1): Use DECL_HIDDEN_P.
+
+2017-05-23  Jason Merrill  <jason@redhat.com>
+
+	-Wunused and C++17 structured bindings
+	* decl.c (poplevel): Don't warn about unused structured bindings,
+	only real variables.
+	* error.c (dump_simple_decl): Handle structured bindings.
+	* expr.c (mark_exp_read): Look through DECL_VALUE_EXPR.
+
 2017-05-23  Nathan Sidwell  <nathan@acm.org>
+
+	* cp-tree.h (PUSH_GLOBAL, PUSH_LOCAL, PUSH_USING): Delete.
+	* name-lookup.c (create_local_binding): New.
+	(update_binding): New.
+	(pushdecl_maybe_friend_1): Rename to ...
+	(do_pushdecl): ... this.  Reimplement.
+	(pushdecl): Adjust.
+	(push_overloaded_decl_1, push_overloaded_decl): Delete.
+
+2017-05-23  Jason Merrill  <jason@redhat.com>
+
+	PR c++/80396 - built-in for make_integer_sequence.
+	* pt.c (builtin_pack_fn_p, builtin_pack_call_p)
+	(expand_integer_pack, expand_builtin_pack_call): New.
+	(find_parameter_packs_r): Check builtin_pack_call_p.
+	(check_for_bare_parameter_packs): Handle it.
+	(tsubst_pack_expansion): Call expand_builtin_pack_call.
+	(declare_integer_pack): New.
+	(init_template_processing): Call it.
+	* decl2.c (mark_used): Check builtin_pack_fn_p.
+
+2017-05-23  Nathan Sidwell  <nathan@acm.org>
+
+	* name-lookup.c (find_namespace_binding): New.
+	(pushdecl_maybe_friend_1): Use CP_DECL_CONTEXT.
+	(set_identifier_type_value_with_scope): Use find_namespace_binding.
+	(find_binding, cp_binding_level_find_binding_for_name,
+	binding_for_name, namespace_binding_1): Delete.
+	(push_overloaded_decl_1): Use CP_DECL_CONTEXT.
+	(get_namespace_binding, set_namespace_binding,
+	finish_namespace_using_decl, unqualified_namespace_lookup_1,
+	qualified_lookup_using_namespace, lookup_type_scope_1,
+	lookup_name_innermost_nonclass_level_1): Use find_namespace_binding.
 
 	PR c++/80866
 	* parser.c (cp_parser_template_id): Keep the lookup when stashing
@@ -548,6 +992,7 @@
 
 2017-05-09  Jason Merrill  <jason@redhat.com>
 
+	PR c++/80605 - __is_standard_layout and empty base
 	* class.c (check_bases): Ignore empty bases.
 
 	PR c++/70979 - literal class and closure types

@@ -356,7 +356,7 @@ get_function_decl_from_block (tree block)
 {
   tree decl;
 
-  if (LOCATION_LOCUS (BLOCK_SOURCE_LOCATION (block) == UNKNOWN_LOCATION))
+  if (LOCATION_LOCUS (BLOCK_SOURCE_LOCATION (block)) == UNKNOWN_LOCATION)
     return NULL_TREE;
 
   for (decl = BLOCK_ABSTRACT_ORIGIN (block);
@@ -1377,7 +1377,7 @@ afdo_propagate (bb_set *annotated_bb, edge_set *annotated_edge)
   FOR_ALL_BB_FN (bb, cfun)
   {
     bb->count = ((basic_block)bb->aux)->count;
-    if (is_bb_annotated ((const basic_block)bb->aux, *annotated_bb))
+    if (is_bb_annotated ((basic_block)bb->aux, *annotated_bb))
       set_bb_annotated (bb, annotated_bb);
   }
 

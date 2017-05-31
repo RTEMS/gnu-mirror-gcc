@@ -1323,7 +1323,28 @@ finish_handler_parms (tree decl, tree handler)
 	}
     }
   else
-    type = expand_start_catch_block (decl);
+    {
+      type = expand_start_catch_block (decl);
+      if (warn_catch_value
+	  && type != NULL_TREE
+	  && type != error_mark_node
+	  && TREE_CODE (TREE_TYPE (decl)) != REFERENCE_TYPE)
+	{
+	  tree orig_type = TREE_TYPE (decl);
+	  if (CLASS_TYPE_P (orig_type))
+	    {
+	      if (TYPE_POLYMORPHIC_P (orig_type))
+		warning (OPT_Wcatch_value_,
+			 "catching polymorphic type %q#T by value", orig_type);
+	      else if (warn_catch_value > 1)
+		warning (OPT_Wcatch_value_,
+			 "catching type %q#T by value", orig_type);
+	    }
+	  else if (warn_catch_value > 2)
+	    warning (OPT_Wcatch_value_,
+		     "catching non-reference type %q#T", orig_type);
+	}
+    }
   HANDLER_TYPE (handler) = type;
 }
 
@@ -2295,13 +2316,23 @@ finish_call_expr (tree fn, vec<tree, va_gc> **args, bool disallow_virtual,
 
   if (processing_template_decl)
     {
+      /* If FN is a local extern declaration or set thereof, look them up
+	 again at instantiation time.  */
+      if (is_overloaded_fn (fn))
+	{
+	  tree ifn = get_first_fn (fn);
+	  if (TREE_CODE (ifn) == FUNCTION_DECL
+	      && DECL_LOCAL_FUNCTION_P (ifn))
+	    orig_fn = DECL_NAME (ifn);
+	}
+
       /* If the call expression is dependent, build a CALL_EXPR node
 	 with no type; type_dependent_expression_p recognizes
 	 expressions with no type as being dependent.  */
       if (type_dependent_expression_p (fn)
 	  || any_type_dependent_arguments_p (*args))
 	{
-	  result = build_nt_call_vec (fn, *args);
+	  result = build_min_nt_call_vec (orig_fn, *args);
 	  SET_EXPR_LOCATION (result, EXPR_LOC_OR_LOC (fn, input_location));
 	  KOENIG_LOOKUP_P (result) = koenig_p;
 	  if (is_overloaded_fn (fn))

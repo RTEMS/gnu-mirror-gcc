@@ -47,41 +47,27 @@ FILE *alt_dump_file = NULL;
 const char *dump_file_name;
 dump_flags_t dump_flags;
 
-CONSTEXPR dump_file_info::dump_file_info (): suffix (NULL), swtch (NULL),
-  glob (NULL), pfilename (NULL), alt_filename (NULL), pstream (NULL),
-  alt_stream (NULL), dkind (DK_none), pflags (), alt_flags (0),
-  optgroup_flags (0), pstate (0), alt_state (0), num (0), owns_strings (false),
-  graph_dump_initialized (false)
-{
-}
-
-dump_file_info::dump_file_info (const char *_suffix, const char *_swtch,
-				dump_kind _dkind, int _num):
-  suffix (_suffix), swtch (_swtch), glob (NULL),
-  pfilename (NULL), alt_filename (NULL), pstream (NULL), alt_stream (NULL),
-  dkind (_dkind), pflags (), alt_flags (0), optgroup_flags (0),
-  pstate (0), alt_state (0), num (_num), owns_strings (false),
-  graph_dump_initialized (false)
-{
-}
+#define DUMP_FILE_INFO(suffix, swtch, dkind, num) \
+  {suffix, swtch, NULL, NULL, NULL, NULL, NULL, dkind, 0, 0, 0, 0, 0, num, \
+   false, false}
 
 /* Table of tree dump switches. This must be consistent with the
    TREE_DUMP_INDEX enumeration in dumpfile.h.  */
 static struct dump_file_info dump_files[TDI_end] =
 {
-  dump_file_info (),
-  dump_file_info (".cgraph", "ipa-cgraph", DK_ipa, 0),
-  dump_file_info (".type-inheritance", "ipa-type-inheritance", DK_ipa, 0),
-  dump_file_info (".ipa-clones", "ipa-clones", DK_ipa, 0),
-  dump_file_info (".original", "tree-original", DK_tree, 3),
-  dump_file_info (".gimple", "tree-gimple", DK_tree, 4),
-  dump_file_info (".nested", "tree-nested", DK_tree, 5),
+  DUMP_FILE_INFO (NULL, NULL, DK_none, 0),
+  DUMP_FILE_INFO (".cgraph", "ipa-cgraph", DK_ipa, 0),
+  DUMP_FILE_INFO (".type-inheritance", "ipa-type-inheritance", DK_ipa, 0),
+  DUMP_FILE_INFO (".ipa-clones", "ipa-clones", DK_ipa, 0),
+  DUMP_FILE_INFO (".original", "tree-original", DK_tree, 3),
+  DUMP_FILE_INFO (".gimple", "tree-gimple", DK_tree, 4),
+  DUMP_FILE_INFO (".nested", "tree-nested", DK_tree, 5),
 #define FIRST_AUTO_NUMBERED_DUMP 3
 
-  dump_file_info (NULL, "lang-all", DK_lang, 0),
-  dump_file_info (NULL, "tree-all", DK_tree, 0),
-  dump_file_info (NULL, "rtl-all", DK_rtl, 0),
-  dump_file_info (NULL, "ipa-all", DK_ipa, 0),
+  DUMP_FILE_INFO (NULL, "lang-all", DK_lang, 0),
+  DUMP_FILE_INFO (NULL, "tree-all", DK_tree, 0),
+  DUMP_FILE_INFO (NULL, "rtl-all", DK_rtl, 0),
+  DUMP_FILE_INFO (NULL, "ipa-all", DK_ipa, 0),
 };
 
 /* Define a name->number mapping for a dump flag value.  */
@@ -111,19 +97,18 @@ static const struct dump_option_value_info dump_options[] =
   {"uid", TDF_UID},
   {"stmtaddr", TDF_STMTADDR},
   {"memsyms", TDF_MEMSYMS},
-  {"verbose", TDF_VERBOSE},
   {"eh", TDF_EH},
   {"alias", TDF_ALIAS},
   {"nouid", TDF_NOUID},
   {"enumerate_locals", TDF_ENUMERATE_LOCALS},
   {"scev", TDF_SCEV},
   {"gimple", TDF_GIMPLE},
+  {"folding", TDF_FOLDING},
   {"optimized", MSG_OPTIMIZED_LOCATIONS},
   {"missed", MSG_MISSED_OPTIMIZATION},
   {"note", MSG_NOTE},
   {"optall", MSG_ALL},
-  {"all", ~(TDF_RAW | TDF_SLIM | TDF_LINENO
-	    | TDF_STMTADDR | TDF_GRAPH | TDF_DIAGNOSTIC | TDF_VERBOSE
+  {"all", ~(TDF_RAW | TDF_SLIM | TDF_LINENO | TDF_GRAPH | TDF_STMTADDR
 	    | TDF_RHS_ONLY | TDF_NOUID | TDF_ENUMERATE_LOCALS | TDF_SCEV
 	    | TDF_GIMPLE)},
   {NULL, 0}

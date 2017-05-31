@@ -162,15 +162,6 @@ complete_type_or_else (tree type, tree value)
   return complete_type_or_maybe_complain (type, value, tf_warning_or_error);
 }
 
-/* Return truthvalue of whether type of EXP is instantiated.  */
-
-int
-type_unknown_p (const_tree exp)
-{
-  return (TREE_CODE (exp) == TREE_LIST
-	  || TREE_TYPE (exp) == unknown_type_node);
-}
-
 
 /* Return the common type of two parameter lists.
    We assume that comptypes has already been done and returned 1;
@@ -5049,7 +5040,7 @@ cp_build_binary_op (location_t location,
       result_type = cp_common_type (type0, type1);
       if (complain & tf_warning)
 	do_warn_double_promotion (result_type, type0, type1,
-				  "implicit conversion from %qT to %qT "
+				  "implicit conversion from %qH to %qI "
 				  "to match other operand of binary "
 				  "expression",
 				  location);
@@ -6655,9 +6646,7 @@ check_for_casting_away_constness (tree src_type, tree dest_type,
     }
 }
 
-/*
-  Warns if the cast from expression EXPR to type TYPE is useless.
- */
+/* Warns if the cast from expression EXPR to type TYPE is useless.  */
 void
 maybe_warn_about_useless_cast (tree type, tree expr, tsubst_flags_t complain)
 {
@@ -6670,6 +6659,20 @@ maybe_warn_about_useless_cast (tree type, tree expr, tsubst_flags_t complain)
 	   && same_type_p (TREE_TYPE (expr), TREE_TYPE (type)))
 	  || same_type_p (TREE_TYPE (expr), type))
 	warning (OPT_Wuseless_cast, "useless cast to type %qT", type);
+    }
+}
+
+/* Warns if the cast ignores cv-qualifiers on TYPE.  */
+void
+maybe_warn_about_cast_ignoring_quals (tree type, tsubst_flags_t complain)
+{
+  if (warn_ignored_qualifiers
+      && complain & tf_warning
+      && !CLASS_TYPE_P (type)
+      && (cp_type_quals (type) & (TYPE_QUAL_CONST|TYPE_QUAL_VOLATILE)))
+    {
+      warning (OPT_Wignored_qualifiers, "type qualifiers ignored on cast "
+	       "result type");
     }
 }
 
@@ -6745,6 +6748,10 @@ build_static_cast_1 (tree type, tree expr, bool c_cast_p,
 
   /* Save casted types in the function's used types hash table.  */
   used_types_insert (type);
+
+  /* A prvalue of non-class type is cv-unqualified.  */
+  if (!CLASS_TYPE_P (type))
+    type = cv_unqualified (type);
 
   /* [expr.static.cast]
 
@@ -7035,7 +7042,10 @@ build_static_cast (tree type, tree expr, tsubst_flags_t complain)
   if (valid_p)
     {
       if (result != error_mark_node)
-	maybe_warn_about_useless_cast (type, expr, complain);
+	{
+	  maybe_warn_about_useless_cast (type, expr, complain);
+	  maybe_warn_about_cast_ignoring_quals (type, complain);
+	}
       return result;
     }
 
@@ -7066,7 +7076,7 @@ convert_member_func_to_ptr (tree type, tree expr, tsubst_flags_t complain)
 
   if (pedantic || warn_pmf2ptr)
     pedwarn (input_location, pedantic ? OPT_Wpedantic : OPT_Wpmf_conversions,
-	     "converting from %qT to %qT", intype, type);
+	     "converting from %qH to %qI", intype, type);
 
   if (TREE_CODE (intype) == METHOD_TYPE)
     expr = build_addr_func (expr, complain);
@@ -7107,6 +7117,10 @@ build_reinterpret_cast_1 (tree type, tree expr, bool c_cast_p,
 
   /* Save casted types in the function's used types hash table.  */
   used_types_insert (type);
+
+  /* A prvalue of non-class type is cv-unqualified.  */
+  if (!CLASS_TYPE_P (type))
+    type = cv_unqualified (type);
 
   /* [expr.reinterpret.cast]
      An lvalue expression of type T1 can be cast to the type
@@ -7188,7 +7202,7 @@ build_reinterpret_cast_1 (tree type, tree expr, bool c_cast_p,
       if (TYPE_PRECISION (type) < TYPE_PRECISION (intype))
         {
           if (complain & tf_error)
-            permerror (input_location, "cast from %qT to %qT loses precision",
+            permerror (input_location, "cast from %qH to %qI loses precision",
                        intype, type);
           else
             return error_mark_node;
@@ -7228,7 +7242,7 @@ build_reinterpret_cast_1 (tree type, tree expr, bool c_cast_p,
 	  && COMPLETE_TYPE_P (TREE_TYPE (type))
 	  && COMPLETE_TYPE_P (TREE_TYPE (intype))
 	  && TYPE_ALIGN (TREE_TYPE (type)) > TYPE_ALIGN (TREE_TYPE (intype)))
-	warning (OPT_Wcast_align, "cast from %qT to %qT "
+	warning (OPT_Wcast_align, "cast from %qH to %qI "
                  "increases required alignment of target type", intype, type);
 
       /* We need to strip nops here, because the front end likes to
@@ -7289,7 +7303,10 @@ build_reinterpret_cast (tree type, tree expr, tsubst_flags_t complain)
   r = build_reinterpret_cast_1 (type, expr, /*c_cast_p=*/false,
 				/*valid_p=*/NULL, complain);
   if (r != error_mark_node)
-    maybe_warn_about_useless_cast (type, expr, complain);
+    {
+      maybe_warn_about_useless_cast (type, expr, complain);
+      maybe_warn_about_cast_ignoring_quals (type, complain);
+    }
   return r;
 }
 
@@ -7334,6 +7351,9 @@ build_const_cast_1 (tree dst_type, tree expr, tsubst_flags_t complain,
 	       "or reference to a function type", dst_type);
       return error_mark_node;
     }
+
+  /* A prvalue of non-class type is cv-unqualified.  */
+  dst_type = cv_unqualified (dst_type);
 
   /* Save casted types in the function's used types hash table.  */
   used_types_insert (dst_type);
@@ -7455,7 +7475,10 @@ build_const_cast (tree type, tree expr, tsubst_flags_t complain)
 
   r = build_const_cast_1 (type, expr, complain, /*valid_p=*/NULL);
   if (r != error_mark_node)
-    maybe_warn_about_useless_cast (type, expr, complain);
+    {
+      maybe_warn_about_useless_cast (type, expr, complain);
+      maybe_warn_about_cast_ignoring_quals (type, complain);
+    }
   return r;
 }
 
@@ -7558,7 +7581,10 @@ cp_build_c_cast (tree type, tree expr, tsubst_flags_t complain)
   if (valid_p)
     {
       if (result != error_mark_node)
-	maybe_warn_about_useless_cast (type, value, complain);
+	{
+	  maybe_warn_about_useless_cast (type, value, complain);
+	  maybe_warn_about_cast_ignoring_quals (type, complain);
+	}
       return result;
     }
 
@@ -7579,6 +7605,7 @@ cp_build_c_cast (tree type, tree expr, tsubst_flags_t complain)
       tree result_type;
 
       maybe_warn_about_useless_cast (type, value, complain);
+      maybe_warn_about_cast_ignoring_quals (type, complain);
 
       /* Non-class rvalues always have cv-unqualified type.  */
       if (!CLASS_TYPE_P (type))
@@ -8542,33 +8569,33 @@ convert_for_assignment (tree type, tree rhs,
 		    return r;
 		}
 	      else if (fndecl)
-		error ("cannot convert %qT to %qT for argument %qP to %qD",
+		error ("cannot convert %qH to %qI for argument %qP to %qD",
 		       rhstype, type, parmnum, fndecl);
 	      else
 		switch (errtype)
 		  {
 		    case ICR_DEFAULT_ARGUMENT:
-		      error ("cannot convert %qT to %qT in default argument",
+		      error ("cannot convert %qH to %qI in default argument",
 			     rhstype, type);
 		      break;
 		    case ICR_ARGPASS:
-		      error ("cannot convert %qT to %qT in argument passing",
+		      error ("cannot convert %qH to %qI in argument passing",
 			     rhstype, type);
 		      break;
 		    case ICR_CONVERTING:
-		      error ("cannot convert %qT to %qT",
+		      error ("cannot convert %qH to %qI",
 			     rhstype, type);
 		      break;
 		    case ICR_INIT:
-		      error ("cannot convert %qT to %qT in initialization",
+		      error ("cannot convert %qH to %qI in initialization",
 			     rhstype, type);
 		      break;
 		    case ICR_RETURN:
-		      error ("cannot convert %qT to %qT in return",
+		      error ("cannot convert %qH to %qI in return",
 			     rhstype, type);
 		      break;
 		    case ICR_ASSIGN:
-		      error ("cannot convert %qT to %qT in assignment",
+		      error ("cannot convert %qH to %qI in assignment",
 			     rhstype, type);
 		      break;
 		    default:

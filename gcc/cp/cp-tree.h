@@ -328,7 +328,6 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
       BASELINK_QUALIFIED_P (in BASELINK)
       TARGET_EXPR_IMPLICIT_P (in TARGET_EXPR)
       TEMPLATE_PARM_PARAMETER_PACK (in TEMPLATE_PARM_INDEX)
-      TREE_INDIRECT_USING (in a TREE_LIST of using-directives)
       ATTR_IS_DEPENDENT (in the TREE_LIST for an attribute)
       ABI_TAG_IMPLICIT (in the TREE_LIST for the argument of abi_tag)
       CONSTRUCTOR_IS_DIRECT_INIT (in CONSTRUCTOR)
@@ -378,6 +377,7 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
       REF_PARENTHESIZED_P (in COMPONENT_REF, INDIRECT_REF, SCOPE_REF)
       AGGR_INIT_ZERO_FIRST (in AGGR_INIT_EXPR)
       CONSTRUCTOR_MUTABLE_POISON (in CONSTRUCTOR)
+      OVL_HIDDEN_P (in OVERLOAD)
    3: (TREE_REFERENCE_EXPR) (in NON_LVALUE_EXPR) (commented-out).
       ICS_BAD_FLAG (in _CONV)
       FN_TRY_BLOCK_P (in TRY_BLOCK)
@@ -394,6 +394,7 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
       DECL_TINFO_P (in VAR_DECL)
       FUNCTION_REF_QUALIFIED (in FUNCTION_TYPE, METHOD_TYPE)
       OVL_LOOKUP_P (in OVERLOAD)
+      LOOKUP_FOUND_P (in RECORD_TYPE, UNION_TYPE, NAMESPACE_DECL)
    5: C_IS_RESERVED_WORD (in IDENTIFIER_NODE)
       DECL_VTABLE_OR_VTT_P (in VAR_DECL)
       FUNCTION_RVALUE_QUALIFIED (in FUNCTION_TYPE, METHOD_TYPE)
@@ -534,11 +535,9 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
 
 struct GTY(()) lang_identifier {
   struct c_common_identifier c_common;
-  cxx_binding *namespace_bindings;
   cxx_binding *bindings;
   tree class_template_info;
   tree label_value;
-  bool oracle_looked_up;
 };
 
 /* Return a typed pointer version of T if it designates a
@@ -647,18 +646,22 @@ typedef struct ptrmem_cst * ptrmem_cst_t;
     && MAIN_NAME_P (DECL_NAME (NODE))			\
     && flag_hosted)
 
-/* The overloaded FUNCTION_DECL.  */
+/* Lookup walker marking.  */
+#define LOOKUP_SEEN_P(NODE) TREE_VISITED(NODE)
+#define LOOKUP_FOUND_P(NODE) \
+  TREE_LANG_FLAG_4 (TREE_CHECK3(NODE,RECORD_TYPE,UNION_TYPE,NAMESPACE_DECL))
+
+/* These two accessors should only be used by OVL manipulators.
+   Other users should use iterators and convenience functions.  */
 #define OVL_FUNCTION(NODE) \
   (((struct tree_overload*)OVERLOAD_CHECK (NODE))->function)
-#define OVL_CHAIN(NODE)      TREE_CHAIN (NODE)
-/* Polymorphic access to FUNCTION and CHAIN.  */
-#define OVL_CURRENT(NODE)	\
-  ((TREE_CODE (NODE) == OVERLOAD) ? OVL_FUNCTION (NODE) : (NODE))
-#define OVL_NEXT(NODE)		\
-  ((TREE_CODE (NODE) == OVERLOAD) ? TREE_CHAIN (NODE) : NULL_TREE)
+#define OVL_CHAIN(NODE) \
+  (((struct tree_overload*)OVERLOAD_CHECK (NODE))->common.chain)
 
 /* If set, this was imported in a using declaration.   */
 #define OVL_USING_P(NODE)	TREE_LANG_FLAG_1 (OVERLOAD_CHECK (NODE))
+/* If set, this overload is a hidden decl.  */
+#define OVL_HIDDEN_P(NODE)	TREE_LANG_FLAG_2 (OVERLOAD_CHECK (NODE))
 /* If set, this overload contains a nested overload.  */
 #define OVL_NESTED_P(NODE)	TREE_LANG_FLAG_3 (OVERLOAD_CHECK (NODE))
 /* If set, this overload was constructed during lookup.  */
@@ -680,28 +683,32 @@ typedef struct ptrmem_cst * ptrmem_cst_t;
 #define OVL_SINGLE_P(NODE) \
   (TREE_CODE (NODE) != OVERLOAD || !OVL_CHAIN (NODE))
 
+/* OVL_HIDDEN_P nodes come first, then OVL_USING_P nodes, then regular
+   fns.  */
+
 struct GTY(()) tree_overload {
   struct tree_common common;
   tree function;
 };
 
-/* Iterator for a 1 dimensional overload. */
+/* Iterator for a 1 dimensional overload.  Permits iterating over the
+   outer level of a 2-d overload when explicitly enabled.  */
 
 class ovl_iterator 
 {
   tree ovl;
+  const bool allow_inner; /* Only used when checking.  */
 
  public:
-  ovl_iterator (tree o)
-  :ovl (o)
-    {}
-
-  ovl_iterator &operator= (const ovl_iterator &from)
+  explicit ovl_iterator (tree o, bool allow = false)
+    : ovl (o), allow_inner (allow)
   {
-    ovl = from.ovl;
-
-    return *this;
   }
+
+ private:
+  /* Do not duplicate.  */
+  ovl_iterator &operator= (const ovl_iterator &);
+  ovl_iterator (const ovl_iterator &);
 
  public:
   operator bool () const
@@ -718,7 +725,7 @@ class ovl_iterator
     tree fn = TREE_CODE (ovl) != OVERLOAD ? ovl : OVL_FUNCTION (ovl);
 
     /* Check this is not an unexpected 2-dimensional overload.  */
-    gcc_checking_assert (TREE_CODE (fn) != OVERLOAD);
+    gcc_checking_assert (allow_inner || TREE_CODE (fn) != OVERLOAD);
 
     return fn;
   }
@@ -729,31 +736,79 @@ class ovl_iterator
   {
     return TREE_CODE (ovl) == OVERLOAD && OVL_USING_P (ovl);
   }
+  bool hidden_p () const
+  {
+    return TREE_CODE (ovl) == OVERLOAD && OVL_HIDDEN_P (ovl);
+  }
+
+ public:
   tree remove_node (tree head)
   {
     return remove_node (head, ovl);
   }
+  tree reveal_node (tree head)
+  {
+    return reveal_node (head, ovl);
+  }
+
+ protected:
+  /* If we have a nested overload, point at the inner overload and
+     return the next link on the outer one.  */
+  tree maybe_push ()
+  {
+    tree r = NULL_TREE;
+
+    if (ovl && TREE_CODE (ovl) == OVERLOAD && OVL_NESTED_P (ovl))
+      {
+	r = OVL_CHAIN (ovl);
+	ovl = OVL_FUNCTION (ovl);
+      }
+    return r;
+  }
+  /* Restore an outer nested overload.  */
+  void pop (tree outer)
+  {
+    gcc_checking_assert (!ovl);
+    ovl = outer;
+  }
 
  private:
-  /* We make this a static function to avoid the address of the
+  /* We make these static functions to avoid the address of the
      iterator escaping the local context.  */
   static tree remove_node (tree head, tree node);
+  static tree reveal_node (tree ovl, tree node);
 };
 
 /* Iterator over a (potentially) 2 dimensional overload, which is
    produced by name lookup.  */
 
-/* Note this is currently a placeholder, as the name-lookup changes
-   are not yet committed.  */
-
 class lkp_iterator : public ovl_iterator
 {
   typedef ovl_iterator parent;
 
+  tree outer;
+
  public:
-  lkp_iterator (tree o)
-    : parent (o)
+  explicit lkp_iterator (tree o)
+    : parent (o, true), outer (maybe_push ())
   {
+  }
+
+ public:
+  lkp_iterator &operator++ ()
+  {
+    bool repush = !outer;
+
+    if (!parent::operator++ () && !repush)
+      {
+	pop (outer);
+	repush = true;
+      }
+
+    if (repush)
+      outer = maybe_push ();
+
+    return *this;
   }
 };
 
@@ -909,13 +964,11 @@ enum GTY(()) abstract_class_use {
 
 /* Macros for access to language-specific slots in an identifier.  */
 
-#define IDENTIFIER_NAMESPACE_BINDINGS(NODE)	\
-  (LANG_IDENTIFIER_CAST (NODE)->namespace_bindings)
 #define IDENTIFIER_TEMPLATE(NODE)	\
   (LANG_IDENTIFIER_CAST (NODE)->class_template_info)
 
 /* The IDENTIFIER_BINDING is the innermost cxx_binding for the
-    identifier.  It's PREVIOUS is the next outermost binding.  Each
+    identifier.  Its PREVIOUS is the next outermost binding.  Each
     VALUE field is a DECL for the associated declaration.  Thus,
     name lookup consists simply of pulling off the node at the front
     of the list (modulo oddities for looking up the names of types,
@@ -1399,6 +1452,7 @@ union GTY((desc ("cp_tree_node_structure (&%h)"),
     userdef_literal;
 };
 
+
 /* Global state.  */
 
 struct GTY(()) saved_scope {
@@ -2369,13 +2423,25 @@ struct GTY(()) lang_type {
 #define NAMESPACE_LEVEL(NODE) \
   (LANG_DECL_NS_CHECK (NODE)->level)
 
+/* Discriminator values for lang_decl.  */
+
+enum lang_decl_selector
+{
+  lds_min,
+  lds_fn,
+  lds_ns,
+  lds_parm,
+  lds_decomp
+};
+
 /* Flags shared by all forms of DECL_LANG_SPECIFIC.
 
    Some of the flags live here only to make lang_decl_min/fn smaller.  Do
    not make this struct larger than 32 bits; instead, make sel smaller.  */
 
 struct GTY(()) lang_decl_base {
-  unsigned selector : 16;   /* Larger than necessary for faster access.  */
+  /* Larger than necessary for faster access.  */
+  ENUM_BITFIELD(lang_decl_selector) selector : 16;
   ENUM_BITFIELD(languages) language : 1;
   unsigned use_template : 2;
   unsigned not_really_extern : 1;	   /* var or fn */
@@ -2390,8 +2456,7 @@ struct GTY(()) lang_decl_base {
   unsigned u2sel : 1;
   unsigned concept_p : 1;                  /* applies to vars and functions */
   unsigned var_declared_inline_p : 1;	   /* var */
-  unsigned decomposition_p : 1;		   /* var */
-  /* 1 spare bit */
+  /* 2 spare bits */
 };
 
 /* True for DECL codes which have template info and access.  */
@@ -2441,9 +2506,9 @@ struct GTY(()) lang_decl_fn {
   unsigned static_function : 1;
   unsigned pure_virtual : 1;
   unsigned defaulted_p : 1;
-
   unsigned has_in_charge_parm_p : 1;
   unsigned has_vtt_parm_p : 1;
+  
   unsigned pending_inline_p : 1;
   unsigned nonconverting : 1;
   unsigned thunk_p : 1;
@@ -2490,8 +2555,14 @@ struct GTY(()) lang_decl_fn {
 struct GTY(()) lang_decl_ns {
   struct lang_decl_base base;
   cp_binding_level *level;
-  tree ns_using;
-  tree ns_users;
+
+  /* using directives and inline children.  These need to be va_gc,
+     because of PCH.  */
+  vec<tree, va_gc> *usings;
+  vec<tree, va_gc> *inlinees;
+
+  /* Map from IDENTIFIER nodes to DECLS.  */
+  hash_map<lang_identifier *, tree> *bindings;
 };
 
 /* DECL_LANG_SPECIFIC for parameters.  */
@@ -2502,17 +2573,28 @@ struct GTY(()) lang_decl_parm {
   int index;
 };
 
+/* Additional DECL_LANG_SPECIFIC information for structured bindings.  */
+
+struct GTY(()) lang_decl_decomp {
+  struct lang_decl_min min;
+  /* The artificial underlying "e" variable of the structured binding
+     variable.  */
+  tree base;
+};
+
 /* DECL_LANG_SPECIFIC for all types.  It would be nice to just make this a
    union rather than a struct containing a union as its only field, but
    tree.h declares it as a struct.  */
 
 struct GTY(()) lang_decl {
   union GTY((desc ("%h.base.selector"))) lang_decl_u {
+     /* Nothing of only the base type exists.  */
     struct lang_decl_base GTY ((default)) base;
-    struct lang_decl_min GTY((tag ("0"))) min;
-    struct lang_decl_fn GTY ((tag ("1"))) fn;
-    struct lang_decl_ns GTY((tag ("2"))) ns;
-    struct lang_decl_parm GTY((tag ("3"))) parm;
+    struct lang_decl_min GTY((tag ("lds_min"))) min;
+    struct lang_decl_fn GTY ((tag ("lds_fn"))) fn;
+    struct lang_decl_ns GTY((tag ("lds_ns"))) ns;
+    struct lang_decl_parm GTY((tag ("lds_parm"))) parm;
+    struct lang_decl_decomp GTY((tag ("lds_decomp"))) decomp;
   } u;
 };
 
@@ -2533,21 +2615,31 @@ struct GTY(()) lang_decl {
    lang_decl_fn, look down through a TEMPLATE_DECL into its result.  */
 #define LANG_DECL_FN_CHECK(NODE) __extension__				\
 ({ struct lang_decl *lt = DECL_LANG_SPECIFIC (STRIP_TEMPLATE (NODE));	\
-   if (!DECL_DECLARES_FUNCTION_P (NODE) || lt->u.base.selector != 1)	\
+   if (!DECL_DECLARES_FUNCTION_P (NODE)					\
+       || lt->u.base.selector != lds_fn)				\
      lang_check_failed (__FILE__, __LINE__, __FUNCTION__);		\
    &lt->u.fn; })
 
 #define LANG_DECL_NS_CHECK(NODE) __extension__				\
 ({ struct lang_decl *lt = DECL_LANG_SPECIFIC (NODE);			\
-   if (TREE_CODE (NODE) != NAMESPACE_DECL || lt->u.base.selector != 2)	\
+   if (TREE_CODE (NODE) != NAMESPACE_DECL				\
+       || lt->u.base.selector != lds_ns)				\
      lang_check_failed (__FILE__, __LINE__, __FUNCTION__);		\
    &lt->u.ns; })
 
 #define LANG_DECL_PARM_CHECK(NODE) __extension__		\
 ({ struct lang_decl *lt = DECL_LANG_SPECIFIC (NODE);		\
-  if (TREE_CODE (NODE) != PARM_DECL)				\
+  if (TREE_CODE (NODE) != PARM_DECL				\
+      || lt->u.base.selector != lds_parm)			\
     lang_check_failed (__FILE__, __LINE__, __FUNCTION__);	\
   &lt->u.parm; })
+
+#define LANG_DECL_DECOMP_CHECK(NODE) __extension__		\
+({ struct lang_decl *lt = DECL_LANG_SPECIFIC (NODE);		\
+  if (!VAR_P (NODE)						\
+      || lt->u.base.selector != lds_decomp)			\
+    lang_check_failed (__FILE__, __LINE__, __FUNCTION__);	\
+  &lt->u.decomp; })
 
 #define LANG_DECL_U2_CHECK(NODE, TF) __extension__		\
 ({  struct lang_decl *lt = DECL_LANG_SPECIFIC (NODE);		\
@@ -2568,6 +2660,9 @@ struct GTY(()) lang_decl {
 
 #define LANG_DECL_PARM_CHECK(NODE) \
   (&DECL_LANG_SPECIFIC (NODE)->u.parm)
+
+#define LANG_DECL_DECOMP_CHECK(NODE) \
+  (&DECL_LANG_SPECIFIC (NODE)->u.decomp)
 
 #define LANG_DECL_U2_CHECK(NODE, TF) \
   (&DECL_LANG_SPECIFIC (NODE)->u.min.u2)
@@ -3058,19 +3153,17 @@ struct GTY(()) lang_decl {
 #define DECL_NAMESPACE_INLINE_P(NODE) \
   TREE_LANG_FLAG_0 (NAMESPACE_DECL_CHECK (NODE))
 
-/* For a NAMESPACE_DECL: the list of using namespace directives
-   The PURPOSE is the used namespace, the value is the namespace
-   that is the common ancestor.  */
-#define DECL_NAMESPACE_USING(NODE) (LANG_DECL_NS_CHECK (NODE)->ns_using)
+/* In a NAMESPACE_DECL, a vector of using directives.  */
+#define DECL_NAMESPACE_USING(NODE) \
+   (LANG_DECL_NS_CHECK (NODE)->usings)
 
-/* In a NAMESPACE_DECL, the DECL_INITIAL is used to record all users
-   of a namespace, to record the transitive closure of using namespace.  */
-#define DECL_NAMESPACE_USERS(NODE) (LANG_DECL_NS_CHECK (NODE)->ns_users)
+/* In a NAMESPACE_DECL, a vector of inline namespaces.  */
+#define DECL_NAMESPACE_INLINEES(NODE) \
+   (LANG_DECL_NS_CHECK (NODE)->inlinees)
 
-/* In a NAMESPACE_DECL, the list of namespaces which have associated
-   themselves with this one.  */
-#define DECL_NAMESPACE_ASSOCIATIONS(NODE) \
-  DECL_INITIAL (NAMESPACE_DECL_CHECK (NODE))
+/* Pointer to hash_map from IDENTIFIERS to DECLS  */
+#define DECL_NAMESPACE_BINDINGS(NODE) \
+   (LANG_DECL_NS_CHECK (NODE)->bindings)
 
 /* In a NAMESPACE_DECL, points to the original namespace if this is
    a namespace alias.  */
@@ -3084,10 +3177,6 @@ struct GTY(()) lang_decl {
   (TREE_CODE (NODE) == NAMESPACE_DECL			\
    && CP_DECL_CONTEXT (NODE) == global_namespace	\
    && DECL_NAME (NODE) == std_identifier)
-
-/* In a TREE_LIST concatenating using directives, indicate indirect
-   directives  */
-#define TREE_INDIRECT_USING(NODE) TREE_LANG_FLAG_0 (TREE_LIST_CHECK (NODE))
 
 /* In a TREE_LIST in an attribute list, indicates that the attribute
    must be applied at instantiation time.  */
@@ -3815,15 +3904,16 @@ more_aggr_init_expr_args_p (const aggr_init_expr_arg_iterator *iter)
   (DECL_LANG_SPECIFIC (VAR_DECL_CHECK (NODE))->u.base.var_declared_inline_p \
    = true)
 
-/* Nonzero if NODE is an artificial VAR_DECL for a C++17 decomposition
-   declaration.  */
+/* Nonzero if NODE is an artificial VAR_DECL for a C++17 structured binding
+   declaration or one of VAR_DECLs for the user identifiers in it.  */
 #define DECL_DECOMPOSITION_P(NODE) \
   (VAR_P (NODE) && DECL_LANG_SPECIFIC (NODE)			\
-   ? DECL_LANG_SPECIFIC (NODE)->u.base.decomposition_p		\
+   ? DECL_LANG_SPECIFIC (NODE)->u.base.selector == lds_decomp		\
    : false)
-#define SET_DECL_DECOMPOSITION_P(NODE) \
-  (DECL_LANG_SPECIFIC (VAR_DECL_CHECK (NODE))->u.base.decomposition_p \
-   = true)
+
+/* The underlying artificial VAR_DECL for structured binding.  */
+#define DECL_DECOMP_BASE(NODE) \
+  (LANG_DECL_DECOMP_CHECK (NODE)->base)
 
 /* Nonzero if NODE is an inline VAR_DECL.  In C++17, static data members
    declared with constexpr specifier are implicitly inline variables.  */
@@ -5312,14 +5402,6 @@ enum overload_flags { NO_SPECIAL = 0, DTOR_FLAG, TYPENAME_FLAG };
 				   will be identical to
 				   COMPARE_STRICT.  */
 
-/* Used with push_overloaded_decl.  */
-#define PUSH_GLOBAL	     0  /* Push the DECL into namespace scope,
-				   regardless of the current scope.  */
-#define PUSH_LOCAL	     1  /* Push the DECL into the current
-				   scope.  */
-#define PUSH_USING	     2  /* We are pushing this DECL as the
-				   result of a using declaration.  */
-
 /* Used with start function.  */
 #define SF_DEFAULT	     0  /* No flags.  */
 #define SF_PRE_PARSED	     1  /* The function declaration has
@@ -6269,6 +6351,7 @@ extern tree unqualified_fn_lookup_error		(cp_expr);
 extern tree build_lang_decl			(enum tree_code, tree, tree);
 extern tree build_lang_decl_loc			(location_t, enum tree_code, tree, tree);
 extern void retrofit_lang_decl			(tree);
+extern void fit_decomposition_lang_decl		(tree, tree);
 extern tree copy_decl				(tree CXX_MEM_STAT_INFO);
 extern tree copy_type				(tree CXX_MEM_STAT_INFO);
 extern tree cxx_make_type			(enum tree_code);
@@ -6382,6 +6465,7 @@ extern bool always_instantiate_p		(tree);
 extern void maybe_instantiate_noexcept		(tree);
 extern tree instantiate_decl			(tree, bool, bool);
 extern int comp_template_parms			(const_tree, const_tree);
+extern bool builtin_pack_fn_p			(tree);
 extern bool uses_parameter_packs                (tree);
 extern bool template_parameter_pack_p           (const_tree);
 extern bool function_parameter_pack_p		(const_tree);
@@ -6782,7 +6866,7 @@ extern tree finish_builtin_launder		(location_t, tree,
 /* in tree.c */
 extern int cp_tree_operand_length		(const_tree);
 extern int cp_tree_code_length			(enum tree_code);
-void cp_free_lang_data 				(tree t);
+extern void cp_free_lang_data 			(tree t);
 extern tree force_target_expr			(tree, tree, tsubst_flags_t);
 extern tree build_target_expr_with_type		(tree, tree, tsubst_flags_t);
 extern void lang_check_failed			(const char *, int,
@@ -6804,7 +6888,8 @@ extern bool type_has_nontrivial_copy_init	(const_tree);
 extern void maybe_warn_parm_abi			(tree, location_t);
 extern bool class_tmpl_impl_spec_p		(const_tree);
 extern int zero_init_p				(const_tree);
-extern bool check_abi_tag_redeclaration		(const_tree, const_tree, const_tree);
+extern bool check_abi_tag_redeclaration		(const_tree, const_tree,
+						 const_tree);
 extern bool check_abi_tag_args			(tree, tree);
 extern tree strip_typedefs			(tree, bool * = NULL);
 extern tree strip_typedefs_expr			(tree, bool * = NULL);
@@ -6824,6 +6909,7 @@ extern tree build_min_nt_loc			(location_t, enum tree_code,
 						 ...);
 extern tree build_min_non_dep			(enum tree_code, tree, ...);
 extern tree build_min_non_dep_op_overload	(enum tree_code, tree, tree, ...);
+extern tree build_min_nt_call_vec (tree, vec<tree, va_gc> *);
 extern tree build_min_non_dep_call_vec		(tree, tree, vec<tree, va_gc> *);
 extern vec<tree, va_gc>* vec_copy_and_insert    (vec<tree, va_gc>*, tree, unsigned);
 extern tree build_cplus_new			(tree, tree, tsubst_flags_t);
@@ -6845,9 +6931,14 @@ extern tree ovl_make				(tree fn,
 						 tree next = NULL_TREE);
 extern tree ovl_insert				(tree fn, tree maybe_ovl,
 						 bool using_p = false);
+extern tree ovl_skip_hidden			(tree) ATTRIBUTE_PURE;
+extern void lookup_mark				(tree lookup, bool val);
 extern tree lookup_add				(tree fns, tree lookup);
+extern tree lookup_maybe_add			(tree fns, tree lookup,
+						 bool deduping);
 extern void lookup_keep				(tree lookup, bool keep);
-extern int is_overloaded_fn			(tree);
+extern int is_overloaded_fn			(tree) ATTRIBUTE_PURE;
+extern bool really_overloaded_fn		(tree) ATTRIBUTE_PURE;
 extern tree dependent_name			(tree);
 extern tree get_fns				(tree) ATTRIBUTE_PURE;
 extern tree get_first_fn			(tree) ATTRIBUTE_PURE;
@@ -6868,7 +6959,6 @@ extern bool decl_anon_ns_mem_p			(const_tree);
 extern tree lvalue_type				(tree);
 extern tree error_type				(tree);
 extern int varargs_function_p			(const_tree);
-extern bool really_overloaded_fn		(tree);
 extern bool cp_tree_equal			(tree, tree);
 extern tree no_linkage_check			(tree, bool);
 extern void debug_binfo				(tree);
@@ -6925,7 +7015,7 @@ extern tree require_complete_type_sfinae	(tree, tsubst_flags_t);
 extern tree complete_type			(tree);
 extern tree complete_type_or_else		(tree, tree);
 extern tree complete_type_or_maybe_complain	(tree, tree, tsubst_flags_t);
-extern int type_unknown_p			(const_tree);
+inline bool type_unknown_p			(const_tree);
 enum { ce_derived, ce_type, ce_normal, ce_exact };
 extern bool comp_except_specs			(const_tree, const_tree, int);
 extern bool comptypes				(tree, tree, int);
@@ -7301,6 +7391,12 @@ ovl_first (tree node)
   while (TREE_CODE (node) == OVERLOAD)
     node = OVL_FUNCTION (node);
   return node;
+}
+
+inline bool
+type_unknown_p (const_tree expr)
+{
+  return TREE_TYPE (expr) == unknown_type_node;
 }
 
 /* -- end of C++ */

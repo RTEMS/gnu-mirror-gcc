@@ -1,3 +1,484 @@
+2017-05-31  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.md (*zero_extendsidi2): Enable alternative (?r, *Yj)
+	also for 32bit target.  Update insn attributes.
+	(zero-extendsidi2 splitter): Allow all registers for operand 1.
+
+2017-05-31  Sebastian Peryt  <sebastian.peryt@intel.com>
+
+	* config/i386/avx512fintrin.h (_mm_mask_max_sd)
+        (_mm_maskz_max_sd, _mm_mask_max_ss, _mm_maskz_max_ss)
+        (_mm_mask_min_sd, _mm_maskz_min_sd, _mm_mask_min_ss)
+        (_mm_maskz_min_ss): New intrinsics.
+
+2017-05-31  Martin Liska  <mliska@suse.cz>
+
+	* tree-vect-loop.c (vect_create_epilog_for_reduction):
+	Change comment style to one we normally use.
+	(vectorizable_reduction): Likewise.
+	(vectorizable_induction): Likewise.
+	* tree-vect-stmts.c (vectorizable_mask_load_store): Likewise.
+	(vectorizable_call): Likewise.
+	(vectorizable_simd_clone_call): Likewise.
+	(vectorizable_conversion): Likewise.
+	(vectorizable_assignment): Likewise.
+	(vectorizable_shift): Likewise.
+	(vectorizable_operation): Likewise.
+	(vectorizable_store): Likewise.
+	(vectorizable_load): Likewise.
+	* tree-vectorizer.h: Likewise.
+
+2017-05-31  Alexander Monakov  <amonakov@ispras.ru>
+
+	* passes.c (emergency_dump_function): New.
+	* tree-pass.h (emergency_dump_function): Declare.
+	* plugin.c (plugins_internal_error_function): Remove.
+	* plugin.h (plugins_internal_error_function): Remove declaration.
+	* toplev.c (internal_error_function): New static function.  Use it...
+	(general_init): ...here.
+
+2017-05-31  Graham Markall  <graham.markall@embecosm.com>
+
+	* config/arc/arc.c (arc_print_operand): Handle constant operands.
+	(arc_rtx_costs): Add costs for new patterns.
+	* config/arc/arc.md: Additional *add_n and *sub_n patterns.
+	* config/arc/predicates.md: Add _1_2_3_operand predicate.
+
+2017-05-31  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* tree-ssa-strlen.c (get_next_strinfo): New function.
+	(get_stridx_plus_constant): Use it.
+	(zero_length_string): Likewise.
+	(adjust_related_strinfos): Likewise.
+	(adjust_last_stmt): Likewise.
+
+2017-05-31  Richard Biener  <rguenther@suse.de>
+
+	PR target/80880
+	* config/i386/i386.c (ix86_expand_builtin): Remove assert
+	for arg being an SSA name when expanding IX86_BUILTIN_BNDRET.
+
+2017-05-31  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* tree-vect-data-refs.c (vect_find_same_alignment_drs): Remove
+	loop_vinfo argument and use of dependence distance vectors.
+	Check instead whether the two references differ only in their
+	initial value and assume that they have the same alignment if the
+	difference is a multiple of the vector alignment.
+	(vect_analyze_data_refs_alignment): Update call accordingly.
+
+2017-05-31  Martin Liska  <mliska@suse.cz>
+
+	PR target/79155
+	* config/i386/cpuid.h: Fix typo in a comment in cpuid.h.
+
+2017-05-31  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-vect-loop-manip.c (create_intersect_range_checks_index)
+	(create_intersect_range_checks): Move from ...
+	* tree-data-ref.c (create_intersect_range_checks_index)
+	(create_intersect_range_checks): ... to here.
+	(create_runtime_alias_checks): New function factored from ...
+	* tree-vect-loop-manip.c (vect_create_cond_for_alias_checks): ...
+	here.  Call above function.
+	* tree-data-ref.h (create_runtime_alias_checks): New function.
+
+2017-05-31  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-data-ref.c (prune_runtime_alias_test_list): Relax minimal
+	segment length for dr_b and compute it in wide_int.
+
+2017-05-31  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/80906
+	* graphite-isl-ast-to-gimple.c (copy_loop_close_phi_nodes): Get
+	and pass through iv_map.
+	(copy_bb_and_scalar_dependences): Adjust.
+	(translate_pending_phi_nodes): Likewise.
+	(copy_loop_close_phi_args): Handle code-generating IVs instead
+	of ICEing.
+
+2017-05-30  David Malcolm  <dmalcolm@redhat.com>
+
+	* diagnostic-color.c (color_dict): Add "type-diff".
+	(parse_gcc_colors): Update comment.
+	* doc/invoke.texi (Diagnostic Message Formatting Options): Add
+	-fdiagnostics-show-template-tree and -fno-elide-type.
+	(GCC_COLORS): Add type-diff to example.
+	(type-diff=): New.
+	(-fdiagnostics-show-template-tree): New.
+	(-fno-elide-type): New.
+	* pretty-print.c (pp_format): Pass quote and formatters[argno] to
+	the pp_format_decoder callback.  Call any m_format_postprocessor's
+	"handle" method.
+	(pretty_printer::pretty_printer): Initialize
+	m_format_postprocessor.
+	(pretty_printer::~pretty_printer): Delete any
+	m_format_postprocessor.
+	* pretty-print.h (printer_fn): Add bool and const char ** parameters.
+	(class format_postprocessor): New class.
+	(struct pretty_printer::format_decoder): Document the new parameters.
+	(struct pretty_printer::m_format_postprocessor): New field.
+	* tree-diagnostic.c (default_tree_printer): Update for new
+	bool and const char ** params.
+	* tree-diagnostic.h (default_tree_printer): Likewise.
+
+2017-05-30  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* config/rs6000/predicates.md (cc_reg_not_micro_cr0_operand): Delete.
+	(lwa_operand): Delete rs6000_gen_cell_microcode test.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Delete
+	rs6000_gen_cell_microcode code.
+	(rs6000_final_prescan_insn): Delete.
+	(rs6000_opt_vars): Delete the "gen-cell-microcode" and
+	"warn-cell-microcode" entries.
+	* config/rs6000/rs6000.h (FINAL_PRESCAN_INSN): Delete.
+	* config/rs6000/rs6000.md: Delete rs6000_gen_cell_microcode tests
+	throughout.  Change cc_reg_not_micro_cr0_operand to
+	cc_reg_not_cr0_operand throughout.
+	(*extendhi<mode>2_noload): Delete.
+	* config/rs6000/rs6000.opt (mgen-cell-microcode): Replace by stub.
+	(mwarn-cell-microcode): Delete.
+	* doc/invoke.texi (RS/6000 and PowerPC Options): Delete
+	-mgen-cell-microcode and -mwarn-cell-microcode.
+
+2017-05-30  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/80833
+	* config/i386/constraints.md (Yd): New constraint.
+	(Ye): Ditto.
+	* config/i386/i386.md (*movti_internal): Add (?r, Ye)
+	and (?Yd, r) alternatives.  Update insn attributes.
+	* config/i386/i386.md (*movti_internal): Add (?r, *Ye)
+	and (?*Yd, r) alternatives.  Update insn attributes.
+	(double-mode inter-unit splitters): Add new GR<->XMM splitters.
+
+2017-05-30  Pierre-Marie de Rodat  <derodat@adacore.com>
+
+	* gimplify.c (gimplify_modify_expr): Don't create a
+	DECL_DEBUG_EXPR link if *FROM_P does not belong to the current
+	function.
+
+2017-05-30  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	* config/arm/arm-builtins.c (arm_expand_builtin): Remove const.
+
+2017-05-30  Richard Biener  <rguenther@suse.de>
+
+	* tree-vectorizer.h (struct _stmt_vec_info): Add reduc_type
+	and reduc_def fields.
+	(STMT_VINFO_REDUC_TYPE): New define.
+	(STMT_VINFO_REDUC_DEF): Likewise.
+	(vect_force_simple_reduction): Adjust prototype.
+	* tree-vect-loop.c (vect_analyze_scalar_cycles_1): Adjust.
+	(vect_is_simple_reduction): Remove check_reduction argument.
+	(vect_force_simple_reduction): Adjust and set
+	STMT_VINFO_REDUC_TYPE and STMT_VINFO_REDUC_DEF.
+	(vectorizable_reduction): Do not re-do reduction analysis
+	but use STMT_VINFO_REDUC_TYPE and STMT_VINFO_REDUC_DEF.
+	* tree-parloops.c (gather_scalar_reductions): Adjust.
+
+2017-05-30  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/80901
+	* cfgexpand.c (expand_gimple_cond): Match up loop fixup with
+	split_edge code.
+
+2017-05-24  Robin Dapp  <rdapp@linux.vnet.ibm.com>
+
+	* tree-vect-data-refs.c (vect_get_peeling_costs_all_drs):
+	Introduce unknown_misalignment parameter and remove vf.
+	(vect_peeling_hash_get_lowest_cost):
+	Pass unknown_misalignment parameter.
+	(vect_enhance_data_refs_alignment):
+	Fix unsupportable data ref treatment.
+
+2017-05-30  Robin Dapp  <rdapp@linux.vnet.ibm.com>
+
+	* tree-vect-data-refs.c (vect_get_data_access_cost):
+	Workaround for SLP handling.
+	(vect_enhance_data_refs_alignment):
+	Compute costs for doing no peeling at all, compare to the best
+	peeling costs so far and avoid peeling if cheaper.
+
+2017-05-30  Robin Dapp  <rdapp@linux.vnet.ibm.com>
+
+	* tree-vect-data-refs.c (vect_peeling_hash_choose_best_peeling):
+	Return peeling info and set costs to zero for unlimited cost
+	model.
+	(vect_enhance_data_refs_alignment): Also inspect all datarefs
+	with unknown misalignment. Compute and costs for unknown
+	misalignment, compare them to the costs for known misalignment
+	and choose the cheapest for peeling.
+
+2017-05-30  Robin Dapp  <rdapp@linux.vnet.ibm.com>
+
+	* tree-vect-data-refs.c (vect_update_misalignment_for_peel): Rename.
+	(vect_get_peeling_costs_all_drs): Create function.
+	(vect_peeling_hash_get_lowest_cost):
+	Use vect_get_peeling_costs_all_drs.
+	(vect_peeling_supportable): Create function.
+	(vect_enhance_data_refs_alignment): Use vect_peeling_supportable.
+
+2017-05-30  Robin Dapp  <rdapp@linux.vnet.ibm.com>
+
+	* tree-vect-data-refs.c (vect_compute_data_ref_alignment): Create
+	DR_HAS_NEGATIVE_STEP.
+	(vect_update_misalignment_for_peel): Define DR_MISALIGNMENT.
+	(vect_enhance_data_refs_alignment): Use.
+	(vect_duplicate_ssa_name_ptr_info): Use.
+	* tree-vectorizer.h (dr_misalignment): Use.
+	(known_alignment_for_access_p): Use.
+
+2017-05-30  Jozef Lawrynowicz  <jozef.l@somniumtech.com>
+
+	PR target/78838
+	* config/msp430/msp430.c (gen_prefix): Return NULL when section name is
+	.lowtext.
+	(has_section_name): New function.
+
+2017-05-30  Martin Liska  <mliska@suse.cz>
+
+	PR other/80909
+	* auto-profile.c (get_function_decl_from_block): Fix
+	parenthesis.
+
+2017-05-30  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/80876
+	* cfgexpand.c (expand_gimple_cond): Fixup preserving loops again.
+
+2017-05-30  Martin Liska  <mliska@suse.cz>
+
+	* dumpfile.c: Use newly added macro DUMP_FILE_INFO.
+	* dumpfile.h (struct dump_file_info): Remove ctors.
+
+2017-05-30  Martin Liska  <mliska@suse.cz>
+
+	* predict.def: Fix GNU coding style.
+
+2017-05-29  Max Filippov  <jcmvbkbc@gmail.com>
+
+	* config/xtensa/xtensa.c (xtensa_initial_elimination_offset):
+	Mark 'to' argument with ATTRIBUTE_UNUSED.
+
+2017-05-29  Max Filippov  <jcmvbkbc@gmail.com>
+
+	* config/xtensa/xtensa.c (xtensa_emit_call): Use
+	HOST_WIDE_INT_PRINT_HEX instead of 0x%lx format string.
+	(print_operand): Use HOST_WIDE_INT_PRINT_DEC instead of %ld
+	format string.
+
+2017-05-29  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* doc/install.texi (Options specification): Restore entry of
+	--enable-sjlj-exceptions.
+
+2017-05-27  Michael Eager  <eager@eagercon.com>
+
+	Revert:
+	2016-01-21  Ajit Agarwal  <ajitkum@xilinx.com>
+
+	See https://gcc.gnu.org/ml/gcc/2017-05/msg00221.html.
+
+	* config/microblaze/microblaze.h
+	(FIXED_REGISTERS): Update in macro.
+	(CALL_USED_REGISTERS): Update in macro.
+
+2017-05-27  François-Xavier Coudett  <fxcoudert@gcc.gnu.org>
+
+	* doc/install.texi: Add links to macOS binary distributions.
+
+2017-05-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR bootstrap/80887
+	Revert:
+	2017-05-25  Marc Glisse  <marc.glisse@inria.fr>
+
+	* match.pd ((A +- CST1) +- CST2): Allow some conversions.
+
+2017-05-26  Martin Liska  <mliska@suse.cz>
+
+	* dumpfile.h (enum dump_kind): Renumber TDF_* flags to be contiguous.
+
+2017-05-26  Martin Liska  <mliska@suse.cz>
+
+	* cfg.c (check_bb_profile): Do not use TDF_COMMENT and print
+	always leading ';; '.
+	(dump_bb_info): Likewise.
+	(brief_dump_cfg): Likewise.
+	* cfgrtl.c (print_rtl_with_bb): Do not use TDF_COMMENT.
+	* dumpfile.c: Remove usage of TDF_VERBOSE.
+	* dumpfile.h (enum dump_kind): Likewise.
+	(dump_gimple_bb_header): Do not use TDF_COMMENT.
+	* print-tree.c (debug_verbose): Remove.
+	* tree-cfg.c (gimple_dump_cfg): Do not use TDF_COMMENT.
+	(dump_function_to_file): Remove dumps guarded with TDF_VERBOSE.
+	* tree-diagnostic.c (default_tree_printer): Replace
+	TDF_DIAGNOSTIC with TDF_SLIM.
+
+2017-05-26  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-vect-loop-manip.c (create_intersect_range_checks_index): Pass
+	in parameter loop, rather than loop_vinfo.
+	(create_intersect_range_checks): Ditto.
+	(vect_create_cond_for_alias_checks): Update call to above functions.
+
+2017-05-26  Bin Cheng  <bin.cheng@arm.com>
+
+	PR tree-optimization/80815
+	* tree-data-ref.c (prune_runtime_alias_test_list): Simplify condition
+	for merging runtime alias checks.  Handle negative DR_STEPs.
+
+2017-05-26  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-vect-data-refs.c (Operator==, comp_dr_with_seg_len_pair):
+	Move from ...
+	* tree-data-ref.c (Operator==, comp_dr_with_seg_len_pair): To here.
+	* tree-vect-data-refs.c (vect_prune_runtime_alias_test_list): Factor
+	out code pruning runtime alias checks.
+	* tree-data-ref.c (prune_runtime_alias_test_list): New function
+	factored out from above.
+	* tree-vectorizer.h (struct dr_with_seg_len, dr_with_seg_len_pair_t):
+	Move from ...
+	* tree-data-ref.h (struct dr_with_seg_len, dr_with_seg_len_pair_t):
+	... to here.
+	(prune_runtime_alias_test_list): New decalaration.
+
+2017-05-26  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-vect-data-refs.c (compare_tree): Rename and move ...
+	* tree-data-ref.c (data_ref_compare_tree): ... to here.
+	* tree-data-ref.h (data_ref_compare_tree): New decalaration.
+	* tree-vect-data-refs.c (dr_group_sort_cmp): Update uses.
+	(operator==, comp_dr_with_seg_len_pair): Ditto.
+	(vect_prune_runtime_alias_test_list): Ditto.
+
+2017-05-26  Martin Liska  <mliska@suse.cz>
+
+	PR ipa/80663
+	* params.def: Bound partial-inlining-entry-probability param.
+
+2017-05-26  Marek Polacek  <polacek@redhat.com>
+
+	PR sanitizer/80875
+	* fold-const.c (fold_binary_loc) <case MULT_EXPR>: Check if OP1
+	can be negated.
+
+2017-05-26  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/80842
+	* tree-ssa-ccp.c (set_lattice_value): Always meet with the old
+	value.
+
+2017-05-26  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/80844
+	* tree-vectorizer.c (adjust_simduid_builtins): Propagate results.
+
+2017-05-25  Sebastian Peryt  <sebastian.peryt@intel.com>
+
+	* doc/md.texi (Machine Constraints): Update x86 family
+	machine constraints section to match 'config/i386/constraints.md'.
+
+2017-05-25  Volker Reichelt  <v.reichelt@netcologne.de>
+
+	* doc/invoke.texi (-Wcatch-value=): Document new warning option.
+
+2017-05-25  Nathan Sidwell  <nathan@acm.org>
+
+	* doc/invoke.texi (--enable-languages): Update documentation.
+
+2017-05-25  Martin Liska  <mliska@suse.cz>
+
+	* dumpfile.c: Add TDF_FOLDING.
+	* dumpfile.h (enum dump_kind): Likewise.
+	* genmatch.c (dt_simplify::gen_1): Use it.
+
+2017-05-25  Marc Glisse  <marc.glisse@inria.fr>
+
+	* match.pd (view_convert (convert@0 @1)): Handle zero-extension.
+
+2017-05-25  Marc Glisse  <marc.glisse@inria.fr>
+
+	* match.pd ((A +- CST1) +- CST2): Allow some conversions.
+	* tree.c (drop_tree_overflow): Handle COMPLEX_CST and VECTOR_CST.
+
+2017-05-25  Marc Glisse  <marc.glisse@inria.fr>
+
+	* fold-const.c (fold_binary_loc) [(A & C) == D]: Remove transformation.
+	* match.pd (X == C): Rewrite it here.
+	(with_possible_nonzero_bits, with_possible_nonzero_bits2,
+	with_certain_nonzero_bits2): New predicates.
+	* tree-ssanames.c (get_nonzero_bits): Handle INTEGER_CST.
+
+2017-05-24  Nathan Sidwell  <nathan@acm.org>
+
+	* lto-streamer-in.c (lto_input_data_block): Adjust T const cast to
+	avoid warning.
+
+	* auto-profile.c (afdo_propagate): Adjust T const cast to avoid
+	warning.
+
+2017-05-24  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* config/powerpcspe: New port.  Files are copied from the rs6000
+	port, with "rs6000" in filenames replaced by "powerpcspe".
+
+2017-05-24  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	PR rtl-optimization/80754
+	* lra-remat.c (do_remat): Add overlap checks for dst_regno.
+
+2017-05-24  Sheldon Lobo  <smlobo@sheldon.us.oracle.com>
+
+	* config/sparc/sparc.md (length): Return the correct value for -mflat
+	sibcalls to match output_sibcall.
+
+2017-05-24  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR bootstrap/80860
+	PR bootstrap/80843
+	* config/rs6000/rs6000.c (struct machine_function): Add new field
+	n_components.
+	(rs6000_get_separate_components): Init that field, use it.
+	(rs6000_components_for_bb): Use the field.
+
+2017-05-24  Thomas Preud'homme  <thomas.preudhomme@arm.com>
+
+	* config/arm/arm.c (arm_expand_prologue): Fix typo in comment.
+
+2017-05-24  Peter Bergner  <bergner@vnet.ibm.com>
+
+	PR middle-end/80823
+	* tree-cfg.c (group_case_labels_stmt): Delete increment of "i";
+
+2017-05-24  Andreas Krebbel  <krebbel@linux.vnet.ibm.com>
+
+	PR target/80725
+	* config/s390/s390.c (s390_check_qrst_address): Check incoming
+	address against address_operand predicate.
+	* config/s390/s390.md ("*indirect_jump"): Swap alternatives.
+
+2017-05-24  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* var-tracking.c (track_expr_p): Do not return 0 for tracked record
+	parameters passed indirectly.
+
+2017-05-23  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.md (*movdi_internal): Remove SSE4
+	alternative 18 (?r, *v).  Update insn attributes.
+	(*movsi_internal): Remove SSE4 alternative 13 (?r, *v).
+	Update insn attributes.
+	(*zero_extendsidi2): Remove SSE4 alternative (?r, *x).
+	Update insn attributes.
+	* config/i386/sse.md (vec_extract<ssevecmodelower>_0): Remove SSE4
+	alternative 1 (r, v). Remove isa attribute.
+	* config/i386/i386.c (dimode_scalar_chain::make_vector_copies):
+	Always move value through stack for !TARGET_INTER_UNIT_MOVES_TO_VEC
+	and !TARGET_INTER_UNIT_MOVES_TO_VEC targets.
+
 2017-05-23  Tom de Vries  <tom@codesourcery.com>
 
 	* doc/sourcebuild.texi (Directives, Verify compiler message): Document

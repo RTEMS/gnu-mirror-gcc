@@ -1,3 +1,40 @@
+2017-05-30  David Malcolm  <dmalcolm@redhat.com>
+
+	* error.c (gfc_format_decoder): Update for new bool and
+	const char ** params.
+
+2017-05-29  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/37131
+	* frontend-passes.c (check_conjg_transpose_variable):
+	Add prototype.
+	(has_dimen_vector_ref):  Likewise
+	(matmul_temp_args):  New function. Add prototype.
+	(optimize_namespace):  Call matmul_temp_args.
+
+2017-05-28  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	* frontend-passes.c (matmul_lhs_realloc):  Correct
+	allocation size for case A1B2.
+
+2017-05-25  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	* dump-parse-tree.c (show_expr):  Also replace
+	with dumpfile for showing values for forgotten
+	case.
+
+2017-05-24  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	* dump-parse-tree.c (show_expr):  Replace stdout
+	with dumpfile for showing values.
+
+2017-05-24  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/66094
+	* frontend-passes.c (matrix_case):  Add A2TB2.
+	(inline_limit_check):  Handle MATMUL(TRANSPOSE(A),B)
+	(inline_matmul_assign):  Likewise.
+
 2017-05-23  Thomas Schwinge  <thomas@codesourcery.com>
 
 	* openmp.c (OACC_KERNELS_CLAUSES): Add "OMP_CLAUSE_NUM_GANGS",

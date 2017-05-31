@@ -6952,7 +6952,7 @@ cp_parser_postfix_expression (cp_parser *parser, bool address_p, bool cast_p,
 		  {
 		    maybe_generic_this_capture (instance, fn);
 		    postfix_expression
-		      = build_nt_call_vec (postfix_expression, args);
+		      = build_min_nt_call_vec (postfix_expression, args);
 		    release_tree_vector (args);
 		    break;
 		  }
@@ -15096,7 +15096,7 @@ cp_parser_template_parameter (cp_parser* parser, bool *is_non_type,
   *is_parameter_pack = false;
   /* Peek at the next token.  */
   token = cp_lexer_peek_token (parser->lexer);
-  /* If it is `class' or `template', we have a type-parameter.  */
+  /* If it is `template', we have a type-parameter.  */
   if (token->keyword == RID_TEMPLATE)
     return cp_parser_type_parameter (parser, is_parameter_pack);
   /* If it is `class' or `typename' we do not know yet whether it is a
