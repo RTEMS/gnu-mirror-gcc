@@ -40602,9 +40602,11 @@ dispatch_function_versions (tree dispatch_decl,
   memset ((void *) clones, '\0', sizeof (clones));
   clones[CLONE_DEFAULT] = (*fndecls)[0];
 
-  /* On the PowerPC, we do not need to call __builtin_cpu_init, if we are using
-     a new enough glibc.  If we ever need to call it, we would need to insert
-     the code here to do the call.  */
+  /* On the PowerPC, we do not need to call __builtin_cpu_init, which is a NOP
+     on the PowerPC (on the x86_64, it is not a NOP).  The builtin function
+     __builtin_cpu_support ensures that the TOC fields are setup by requiring a
+     recent glibc.  If we ever need to call __builtin_cpu_init, we would need
+     to insert the code here to do the call.  */
 
   for (ix = 1; fndecls->iterate (ix, &ele); ++ix)
     {
