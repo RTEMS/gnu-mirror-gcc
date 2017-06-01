@@ -391,12 +391,14 @@ static const struct
    which means we can use an array to hold the options, rather than having more
    elaborate data structures to identify each possible variation.  Order the
    clones from the default to the highest ISA.  */
-const int CLONE_DEFAULT		= 0;	/* default clone.  */
-const int CLONE_ISA_2_05	= 1;	/* ISA 2.05 (power6).  */
-const int CLONE_ISA_2_06	= 2;	/* ISA 2.06 (power7).  */
-const int CLONE_ISA_2_07	= 3;	/* ISA 2.07 (power8).  */
-const int CLONE_ISA_3_00	= 4;	/* ISA 3.00 (power9).  */
-const int CLONE_MAX		= 5;
+enum {
+  CLONE_DEFAULT		= 0,		/* default clone.  */
+  CLONE_ISA_2_05,			/* ISA 2.05 (power6).  */
+  CLONE_ISA_2_06,			/* ISA 2.06 (power7).  */
+  CLONE_ISA_2_07,			/* ISA 2.07 (power8).  */
+  CLONE_ISA_3_00,			/* ISA 3.00 (power9).  */
+  CLONE_MAX
+};
 
 /* Map compiler ISA bits into HWCAP names.  */
 struct clone_map {
@@ -40217,14 +40219,11 @@ rs6000_clone_priority (tree fndecl)
 {
   tree fn_opts = DECL_FUNCTION_SPECIFIC_TARGET (fndecl);
   HOST_WIDE_INT isa_masks;
-  int ret = (int) CLONE_DEFAULT;
+  int ret = CLONE_DEFAULT;
   tree attrs = lookup_attribute ("target", DECL_ATTRIBUTES (fndecl));
   const char *attrs_str = NULL;
 
-  gcc_assert (attrs != NULL);
   attrs = TREE_VALUE (TREE_VALUE (attrs));
-
-  gcc_assert (TREE_CODE (attrs) == STRING_CST);
   attrs_str = TREE_STRING_POINTER (attrs);
 
   /* Return priority zero for default function.  Return the ISA needed for the
@@ -40254,8 +40253,7 @@ rs6000_clone_priority (tree fndecl)
 /* This compares the priority of target features in function DECL1 and DECL2.
    It returns positive value if DECL1 is higher priority, negative value if
    DECL2 is higher priority and 0 if they are the same.  Note, priorities are
-   ordered from lowest (currently CLONE_ISA_3_0) to highest
-   (CLONE_DEFAULT).  */
+   ordered from lowest (CLONE_DEFAULT) to highest (currently CLONE_ISA_3_0).  */
 
 static int
 rs6000_compare_version_priority (tree decl1, tree decl2)
