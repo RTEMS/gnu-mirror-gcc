@@ -4655,26 +4655,52 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
   { P9V_BUILTIN_VEC_VSTDCDP, P9V_BUILTIN_VSTDCDP,
     RS6000_BTI_bool_int, RS6000_BTI_double, RS6000_BTI_INTSI, 0 },
 
-  { P9V_BUILTIN_VEC_VSTDCN, P9V_BUILTIN_VSTDCNSP,
-    RS6000_BTI_bool_int, RS6000_BTI_float, 0, 0 },
-  { P9V_BUILTIN_VEC_VSTDCN, P9V_BUILTIN_VSTDCNDP,
-    RS6000_BTI_bool_int, RS6000_BTI_double, 0, 0 },
+  /* kelvin thinks this old code was wrong.  This is apparently
+   * the representation of scalar_test_data_class overloading.
+   * we expect to args and a result.  this only has one arg.  Also,
+   * as originally implemented this was expanding into the same
+   * constant that were being used for scalar_test_neg.  The reason
+   * this problem was not detected previously may have been that
+   * existing dejagnu tests only look for presence of assembly
+   * instruction, which would be the same for either.  but shouldn't
+   * we see errors because of the extraneous second argument?
+   * probably not, due to only checking the arguments that are
+   * explicitly mentioned here, and also because I think this code is
+   * special cased.
+   */
+  { P9V_BUILTIN_VEC_VSTDCN, P9V_BUILTIN_VSTDCSP,
+    RS6000_BTI_bool_int, RS6000_BTI_float, RS6000_BTI_UINTSI, 0 },
+  { P9V_BUILTIN_VEC_VSTDCN, P9V_BUILTIN_VSTDCDP,
+    RS6000_BTI_bool_int, RS6000_BTI_double, RS6000_BTI_UINTSI, 0 },
+  { P9V_BUILTIN_VEC_VSTDCN, P9V_BUILTIN_VSTDCQP,
+    RS6000_BTI_bool_int, RS6000_BTI_ieee128_float, RS6000_BTI_UINTSI, 0 },
 
   { P9V_BUILTIN_VEC_VSTDCNSP, P9V_BUILTIN_VSTDCNSP,
     RS6000_BTI_bool_int, RS6000_BTI_float, 0, 0 },
   { P9V_BUILTIN_VEC_VSTDCNDP, P9V_BUILTIN_VSTDCNDP,
     RS6000_BTI_bool_int, RS6000_BTI_double, 0, 0 },
+  { P9V_BUILTIN_VEC_VSTDCNDP, P9V_BUILTIN_VSTDCNQP,
+    RS6000_BTI_bool_int, RS6000_BTI_ieee128_float, 0, 0 },
 
   { P9V_BUILTIN_VEC_VSEEDP, P9V_BUILTIN_VSEEDP,
     RS6000_BTI_UINTSI, RS6000_BTI_double, 0, 0 },
+  { P9V_BUILTIN_VEC_VSEEDP, P9V_BUILTIN_VSEEQP,
+    RS6000_BTI_UINTDI, RS6000_BTI_ieee128_float, 0, 0 },
 
   { P9V_BUILTIN_VEC_VSESDP, P9V_BUILTIN_VSESDP,
     RS6000_BTI_UINTDI, RS6000_BTI_double, 0, 0 },
+  { P9V_BUILTIN_VEC_VSESDP, P9V_BUILTIN_VSESQP,
+    RS6000_BTI_UINTTI, RS6000_BTI_ieee128_float, 0, 0 },
 
   { P9V_BUILTIN_VEC_VSIEDP, P9V_BUILTIN_VSIEDP,
     RS6000_BTI_double, RS6000_BTI_UINTDI, RS6000_BTI_UINTDI, 0 },
   { P9V_BUILTIN_VEC_VSIEDP, P9V_BUILTIN_VSIEDPF,
     RS6000_BTI_double, RS6000_BTI_double, RS6000_BTI_UINTDI, 0 },
+
+  { P9V_BUILTIN_VEC_VSIEDP, P9V_BUILTIN_VSIEQP,
+    RS6000_BTI_ieee128_float, RS6000_BTI_UINTTI, RS6000_BTI_UINTDI, 0 },
+  { P9V_BUILTIN_VEC_VSIEDP, P9V_BUILTIN_VSIEQPF,
+    RS6000_BTI_ieee128_float, RS6000_BTI_ieee128_float, RS6000_BTI_UINTDI, 0 },
 
   { P9V_BUILTIN_VEC_VSCEDPGT, P9V_BUILTIN_VSCEDPGT,
     RS6000_BTI_INTSI, RS6000_BTI_double, RS6000_BTI_double, 0 },
@@ -6505,6 +6531,100 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	    else
 	      unsupported_builtin = true;
 	  }
+      }
+    else if (fcode == P9V_BUILTIN_VEC_VSIEDP)
+      {
+	int overloaded_code;
+	int arg1_mode = TYPE_MODE (types[0]);
+
+#undef KELVIN_DEBUG
+#ifdef KELVIN_DEBUG
+	fprintf (stderr, "Looking at overloaded P9V_BUILTIN_VEC_VSIEDP\n");
+#endif
+	if (nargs != 2)
+	  {
+	    error ("scalar_insert_exp only accepts 2 arguments");
+	    return error_mark_node;
+	  }
+
+	/* If supplied first argument is wider than 64 bits, resolve to
+	   128-bit variant of built-in function.  */
+	if (GET_MODE_PRECISION (arg1_mode) > 64)
+	  {
+#ifdef KELVIN_DEBUG
+	    fprintf (stderr, " dealing with 128 bits\n");
+#endif
+	    /* if first argument is of float variety, choose variant
+	       that expects __ieee128 argument.  Otherwise, expect
+	       __int128 argument.
+	    */
+	    if (GET_MODE_CLASS (arg1_mode) == MODE_FLOAT) {
+#ifdef KELVIN_DEBUG
+	      fprintf (stderr, "  looking for quad_float\n");
+#endif
+	      overloaded_code = P9V_BUILTIN_VSIEQPF;
+	    } else {
+#ifdef KELVIN_DEBUG
+	      fprintf (stderr, "  looking for quad int\n");
+#endif
+	      overloaded_code = P9V_BUILTIN_VSIEQP;
+	    }
+	  }
+	else
+	  {
+#ifdef KELVIN_DEBUG
+	    fprintf (stderr, " dealing with 64 bits\n");
+#endif
+	    /* if first argument is of float variety, choose variant
+	       that expects double argument.  Otherwise, expect
+	       long long int argument.
+	    */
+	    if (GET_MODE_CLASS (arg1_mode) == MODE_FLOAT) {
+#ifdef KELVIN_DEBUG
+	      fprintf (stderr, " looking for double\n");
+#endif
+	      overloaded_code = P9V_BUILTIN_VSIEDPF;
+	    } else {
+#ifdef KELVIN_DEBUG
+	      fprintf (stderr, " looking for long long\n");
+#endif
+	      overloaded_code = P9V_BUILTIN_VSIEDP;
+	    }
+	  }
+	while (desc->code && desc->code == fcode &&
+	       desc->overloaded_code != overloaded_code)
+	  desc++;
+#ifdef KELVIN_DEBUG
+	fprintf (stderr,
+		 "looking for fcode: %d, overloaded_code: %d\n",
+		 fcode, overloaded_code);
+	fprintf (stderr,
+		 " out of loop, desc->code: %d, desc->overloaded_code: %d\n",
+		 desc->code, desc->overloaded_code);
+
+	fprintf (stderr, "desc->op1: %d, desc->op2: %d\n",
+		 desc->op1, desc->op2);
+	fprintf (stderr, "types[0] is%s integral\n",
+		 INTEGRAL_TYPE_P (types[0])? "": " not");
+	fprintf (stderr, "types[1] is%s integral\n",
+		 INTEGRAL_TYPE_P (types[1])? "": " not");
+#endif
+	if (desc->code && (desc->code == fcode)
+	    && rs6000_builtin_type_compatible (types[0], desc->op1)
+	    && rs6000_builtin_type_compatible (types[1], desc->op2))
+	  {
+#ifdef KELVIN_DEBUG
+	    fprintf (stderr, "builtin_type_compatible tests are happy\n");
+#endif
+	    if (rs6000_builtin_decls[desc->overloaded_code] != NULL_TREE)
+	      return altivec_build_resolved_builtin (args, n, desc);
+	    else
+	      unsupported_builtin = true;
+	  }
+#ifdef KELVIN_DEBUG
+	fprintf (stderr, "falling through, unsupported_builtin is %s\n",
+		 unsupported_builtin? "true": "false");
+#endif
       }
     else
       {
