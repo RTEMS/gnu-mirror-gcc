@@ -40332,7 +40332,6 @@ rs6000_get_function_versions_dispatcher (void *decl)
 
   default_node = default_version_info->this_node;
 
-#if defined (ASM_OUTPUT_TYPE_DIRECTIVE)
   if (targetm.has_ifunc_p ())
     {
       struct cgraph_function_version_info *it_v = NULL;
@@ -40359,7 +40358,6 @@ rs6000_get_function_versions_dispatcher (void *decl)
 	}
     }
   else
-#endif
     {
       error_at (DECL_SOURCE_LOCATION (default_node->decl),
 		"multiversioning needs ifunc which is not supported "
