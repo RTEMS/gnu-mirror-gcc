@@ -5,7 +5,7 @@
 /* { dg-skip-if "do not override -mcpu" { powerpc*-*-* } { "-mcpu=*" } { "-mcpu=power8" } } */
 /* { dg-options "-mcpu=power8 -O2" } */
 /* { dg-final { scan-assembler "mtvsrd" } } */
-/* { dg-final { scan-assembler "mfvsrd" } } */
+/* { dg-final { scan-assembler "mfvsrwz" } } */
 /* { dg-final { scan-assembler "xscvdpspn" } } */
 /* { dg-final { scan-assembler "xscvspdpn" } } */
 

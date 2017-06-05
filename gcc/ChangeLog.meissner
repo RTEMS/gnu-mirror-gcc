@@ -1,3 +1,19 @@
+2017-06-05  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/vsx.md (peephole2 for SFmode/SImode unions):
+	Rework peephole to match code after shift is removed from
+	XSCVDPSPN sequence.
+
+	* config/rs6000/rs6000.md (movsi_from_sf): Rework code to know
+	that XSCVDPSPN leaves the 32-bit value in both the first and
+	second words, and that we don't need to issue a shift to get the
+	32-bit value into the correct location.
+	(movdi_from_sf_zero_ext): Likewise.
+	(reload_gpr_from_vsxsf): Likewise.
+	(p8_mfvsrd_4_disf): Rename insn, and use a MFVSRWZ to move the
+	value to the GPR instead of MFVSRD.
+	(p8_mfvsrwz_disf): Likewise.
+
 2017-06-05   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 248891

@@ -4035,15 +4035,13 @@
 ;;
 ;; (set (reg:DI reg3) (unspec:DI [(reg:V4SF reg2)] UNSPEC_P8V_RELOAD_FROM_VSX))
 ;;
-;; (set (reg:DI reg3) (lshiftrt:DI (reg:DI reg3) (const_int 32)))
+;; (set (reg:DI reg4) (and:DI (reg:DI reg3) (reg:DI reg3)))
 ;;
-;; (set (reg:DI reg5) (and:DI (reg:DI reg3) (reg:DI reg4)))
+;; (set (reg:DI reg5) (ashift:DI (reg:DI reg4) (const_int 32)))
 ;;
-;; (set (reg:DI reg6) (ashift:DI (reg:DI reg5) (const_int 32)))
+;; (set (reg:SF reg6) (unspec:SF [(reg:DI reg5)] UNSPEC_P8V_MTVSRD))
 ;;
-;; (set (reg:SF reg7) (unspec:SF [(reg:DI reg6)] UNSPEC_P8V_MTVSRD))
-;;
-;; (set (reg:SF reg7) (unspec:SF [(reg:SF reg7)] UNSPEC_VSX_CVSPDPN))
+;; (set (reg:SF reg6) (unspec:SF [(reg:SF reg6)] UNSPEC_VSX_CVSPDPN))
 
 (define_peephole2
   [(match_scratch:DI SFBOOL_TMP_GPR "r")
@@ -4053,11 +4051,6 @@
    (set (match_operand:DI SFBOOL_MFVSR_D "int_reg_operand")
 	(unspec:DI [(match_operand:V4SF SFBOOL_MFVSR_A "vsx_register_operand")]
 		   UNSPEC_P8V_RELOAD_FROM_VSX))
-
-   ;; SRDI
-   (set (match_dup SFBOOL_MFVSR_D)
-	(lshiftrt:DI (match_dup SFBOOL_MFVSR_D)
-		     (const_int 32)))
 
    ;; AND/IOR/XOR operation on int
    (set (match_operand:SI SFBOOL_BOOL_D "int_reg_operand")
@@ -4082,15 +4075,15 @@
    && (REG_P (operands[SFBOOL_BOOL_A2])
        || CONST_INT_P (operands[SFBOOL_BOOL_A2]))
    && (REGNO (operands[SFBOOL_BOOL_D]) == REGNO (operands[SFBOOL_MFVSR_D])
-       || peep2_reg_dead_p (3, operands[SFBOOL_MFVSR_D]))
+       || peep2_reg_dead_p (2, operands[SFBOOL_MFVSR_D]))
    && (REGNO (operands[SFBOOL_MFVSR_D]) == REGNO (operands[SFBOOL_BOOL_A1])
        || (REG_P (operands[SFBOOL_BOOL_A2])
 	   && REGNO (operands[SFBOOL_MFVSR_D])
 		== REGNO (operands[SFBOOL_BOOL_A2])))
    && REGNO (operands[SFBOOL_BOOL_D]) == REGNO (operands[SFBOOL_SHL_A])
    && (REGNO (operands[SFBOOL_SHL_D]) == REGNO (operands[SFBOOL_BOOL_D])
-       || peep2_reg_dead_p (4, operands[SFBOOL_BOOL_D]))
-   && peep2_reg_dead_p (5, operands[SFBOOL_SHL_D])"
+       || peep2_reg_dead_p (3, operands[SFBOOL_BOOL_D]))
+   && peep2_reg_dead_p (4, operands[SFBOOL_SHL_D])"
   [(set (match_dup SFBOOL_TMP_GPR)
 	(ashift:DI (match_dup SFBOOL_BOOL_A_DI)
 		   (const_int 32)))
