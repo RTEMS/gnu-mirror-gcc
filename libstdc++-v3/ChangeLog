@@ -1,3 +1,27 @@
+2017-05-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/80796
+	* include/bits/stl_algo.h (search): Add new overload for C++17.
+	* testsuite/25_algorithms/search/searcher.cc: New.
+
+2017-05-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/80478
+	* include/std/functional (_Mem_fn_traits_base): Add specializations
+	for noexcept member function types.
+	* testsuite/20_util/function_objects/mem_fn/80478.cc: New test.
+
+2017-05-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/policy_data_structures.xml: Fix typo.
+	* doc/xml/manual/test_policy_data_structures.xml: Likewise.
+	* doc/html/*: Regenerate.
+
+	* doc/xml/manual/abi.xml: Document latest library versions.
+	* doc/xml/manual/build_hacking.xml: Document requirement to update
+	abi.xml when bumping library versions.
+	* doc/html/*: Regenerate.
+
 2017-05-15  Jonathan Wakely  <jwakely@redhat.com>
 
 	PR libstdc++/80761
