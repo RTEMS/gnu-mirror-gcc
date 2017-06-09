@@ -19,12 +19,12 @@ get_exponent (__ieee128 *p)
 int
 main ()
 {
-  __ieee128 x = (__ieee128) (((__int128) 0x1100LL) << 120);
-  __ieee128 z = (__ieee128) (((__int128) 0x1101LL) << 117);
+  __ieee128 x = (__ieee128) (((__int128) 0x1100LL) << 115);
+  __ieee128 z = (__ieee128) (((__int128) 0x1101LL) << 112);
 
-  if (get_exponent (&x) != 123)
+  if (get_exponent (&x) != 127)
     abort ();
-  if (get_exponent (&z) != 120)
+  if (get_exponent (&z) != 124)
     abort ();
   return 0;
 }

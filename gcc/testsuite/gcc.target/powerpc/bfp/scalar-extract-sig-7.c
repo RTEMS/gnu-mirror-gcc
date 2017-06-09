@@ -1,7 +1,7 @@
 /* { dg-do run { target { powerpc*-*-* } } } */
 /* { dg-skip-if "do not override -mcpu" { powerpc*-*-* } { "-mcpu=*" } { "-mcpu=power9" } } */
 /* { dg-require-effective-target lp64 } */
-/* { dg-require-effective-target powerpc_p9vector_ok } */
+/* { dg-require-effective-target p9vector_hw } */
 /* { dg-options "-mcpu=power9" } */
 
 /* This test should succeed only on 64-bit configurations.  */
@@ -19,11 +19,14 @@ get_significand (__ieee128 *p)
 int
 main ()
 {
-  __ieee128 x = (__ieee128) (((__int128) 0x1100LL) << 120);
-  __ieee128 z = (__ieee128) (((__int128) 0x1101LL) << 117);
+  __ieee128 x = (__ieee128) (((__int128) 0x1100LL) << 115);
+  __ieee128 z = (__ieee128) (((__int128) 0x1101LL) << 112);
 
-  unsigned __int128 first_anticipated_result = ((__int128) 0x1100LL) << 120;
-  unsigned __int128 second_anticipated_result = ((__int128) 0x1101LL) << 117;
+  /* 113 bits in the significand */
+  /* our constant mantissas have 13 bits */
+
+  unsigned __int128 first_anticipated_result = ((__int128) 0x1100LL) << 100;
+  unsigned __int128 second_anticipated_result = ((__int128) 0x1101LL) << 100;
 
   if (get_significand (&x) != first_anticipated_result)
     abort ();

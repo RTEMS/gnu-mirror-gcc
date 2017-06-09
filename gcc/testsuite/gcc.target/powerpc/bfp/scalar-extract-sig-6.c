@@ -22,9 +22,12 @@ main ()
   double x = (double) (0x1100LL << 50);
   double z = (double) (0x1101LL << 37);
 
-  if (get_significand (&x) != 0x18000000000000LL)
+  unsigned long long int first_anticipated = 0x1100LL << 40;
+  unsigned long long int second_anticipated = 0x1101LL << 40;
+
+  if (get_significand (&x) != first_anticipated)
     abort ();
-  if (get_significand (&z) != 0x1a000000000000LL)
+  if (get_significand (&z) != second_anticipated)
     abort ();
   return 0;
 }

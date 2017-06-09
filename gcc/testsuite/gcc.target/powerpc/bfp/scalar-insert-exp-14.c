@@ -24,11 +24,11 @@ main ()
   /* most-significant bit @13, shift it to position 113 */
   unsigned __int128 significand_1 = ((__int 128) 0x1100) << 100;
   unsigned __int128 significand_2 = ((__int 128) 0x1101) << 100;
-  unsigned long long int exponent_1 = 123;
-  unsigned long long int exponent_2 = 120;
+  unsigned long long int exponent_1 = 127;
+  unsigned long long int exponent_2 = 124;
 
-  __ieee128 x = (__ieee128) (((__int128) 0x1100LL) << 120);
-  __ieee128 z = (__ieee128) (((__int128) 0x1101LL) << 117);
+  __ieee128 x = (__ieee128) (((__int128) 0x1100LL) << 115);
+  __ieee128 z = (__ieee128) (((__int128) 0x1101LL) << 112);
 
   if (insert_exponent (&significand_1, &exponent_1) != x)
     abort ();
