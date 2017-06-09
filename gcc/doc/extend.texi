@@ -1,4 +1,4 @@
-@c Copyright (C) 1988-2017 Free Software Foundation, Inc.
+c Copyright (C) 1988-2017 Free Software Foundation, Inc.
 
 @c This is part of the GCC manual.
 @c For copying conditions, see the file gcc.texi.
@@ -15220,10 +15220,14 @@ functions require a 64-bit environment supporting ISA 3.0 or later.
 The @code{scalar_extract_exp} and @code{scalar_extract_sig} built-in
 functions return the significand and the biased exponent value
 respectively of their @code{source} arguments.
-Within the result returned by @code{scalar_extract_sig},
-the @code{0x10000000000000} bit is set if the
+When supplied with a 64-bit @code{source} argument, the
+result returned by @code{scalar_extract_sig} has
+the @code{0x10000000000000} bit set if the
 function's @code{source} argument is in normalized form.
 Otherwise, this bit is set to 0.
+When supplied with a 128-bit @code{source} argument, the
+@code{0x10000000000000000000000000000} bit of the result is
+treated similarly.
 Note that the sign of the significand is not represented in the result
 returned from the @code{scalar_extract_sig} function.  Use the
 @code{scalar_test_neg} function to test the sign of its @code{double}
