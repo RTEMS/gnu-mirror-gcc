@@ -19,7 +19,7 @@ get_significand (__ieee128 *p)
 int
 main ()
 {
-  __ieee128 x = (__ieee128) (((__int128) 0x1100LL) << 115);
+  __ieee128 x = (__ieee128) (((__int128) 0x1100LL) << 114);
   __ieee128 z = (__ieee128) (((__int128) 0x1101LL) << 112);
 
   /* 113 bits in the significand */

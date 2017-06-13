@@ -21,7 +21,7 @@ int
 main ()
 {
   /* NaN is denoted by exponent = 2047 and fraction != 0 */
-  unsigned long long int nan_image = 0x7ff0_0000_0000_0003LL;
+  unsigned long long int nan_image = 0x7ff0000000000003LL;
   double *nan_ptr = (double *) &nan_image;
 
   double x = (double) (0x1100LL << 50);

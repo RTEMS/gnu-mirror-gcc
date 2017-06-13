@@ -9,11 +9,11 @@
 #include <stdlib.h>
 
 unsigned int
-get_exponent (double *p)
+get_unbiased_exponent (double *p)
 {
   double source = *p;
 
-  return scalar_extract_exp (source);
+  return scalar_extract_exp (source) - 1023;
 }
 
 int
@@ -22,9 +22,9 @@ main ()
   double x = (double) (0x1100LL << 50);
   double z = (double) (0x1101LL << 37);
 
-  if (get_exponent (&x) != 53)
+  if (get_exponent (&x) != 62)
     abort ();
-  if (get_exponent (&z) != 40)
+  if (get_exponent (&z) != 49)
     abort ();
   return 0;
 }

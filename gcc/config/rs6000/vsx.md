@@ -3625,12 +3625,12 @@
 (define_insn "*xststdcqp"
   [(set (match_operand:CCFP 0 "" "=y")
 	(compare:CCFP
-	 (unspec:KF [(match_operand:KF 1 "vsx_register_operand" "wa")
+	 (unspec:KF [(match_operand:KF 1 "altivec_register_operand" "v")
 		     (match_operand:SI 2 "u7bit_cint_operand" "n")]
 	  UNSPEC_VSX_STSTDC)
 	 (match_operand:SI 3 "zero_constant" "j")))]
   "TARGET_P9_VECTOR"
-  "xststdcqp %0,%x1,%2"
+  "xststdcqp %0,%1,%2"
   [(set_attr "type" "fpcompare")])
 
 (define_insn "*xststdc<Fvsx>"

@@ -31,8 +31,8 @@ main ()
   exponents[0] = 1023;		/* 1.0 */
   exponents[1] = 1021;		/* -0.07 */
 
-  result = make_floats (significands_p, &exponents);
-  if ((result[0] != 1.0) || (result[1] != -0.07)
+  result = make_doubles (significands_p, &exponents);
+  if ((result[0] != 1.0) || (result[1] != -0.07))
     abort();
   return 0;
 }

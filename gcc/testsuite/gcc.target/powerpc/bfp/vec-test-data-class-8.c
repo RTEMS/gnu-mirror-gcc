@@ -47,6 +47,16 @@ test_denormal (__vector float *p)
   return vec_test_data_class (source, 0x03);
 }
 
+float 
+float_scalar_insert_exp (unsigned int significand, unsigned int exponent)
+{
+  float result;
+  unsigned int *result_as_uip = (unsigned int *) &result;
+
+  *result_as_uip = (significand & ~0x800000) | ((exponent & 0xff) << 23);
+  return result;
+}
+
 int
 main ()
 {
@@ -56,7 +66,8 @@ main ()
   unsigned int signaling_significand = 0x00a00000;
   unsigned int quiet_significand = 0x00c00000;
   unsigned int one_significand = 0x00800000;
-  unsigned int three_significand = 0x00800000;
+  unsigned int three_significand = 0x00c00000;
+  unsigned int five_significand = 0x00a00000;
   unsigned int zero_significand = 0x00000000;
   unsigned int minus_zero_significand = 0x80000000;
 
@@ -64,8 +75,8 @@ main ()
    *  non-zero fraction value. The sign bit ignored.  If the
    *  high-order bit of the fraction field is 0, then the NaN
    *  is a Signaling NaN.  Otherwise, it is a Quiet NaN.  */
-  argument[0] = scalar_insert_exp (signaling_significand, 255);
-  argument[1] = scalar_insert_exp (quiet_significand, 255);
+  argument[0] = float_scalar_insert_exp (signaling_significand, 255);
+  argument[1] = float_scalar_insert_exp (quiet_significand, 255);
   argument[2] = 1.0f;
   argument[3] = -0.07f;
   result = test_nan (&argument);
@@ -77,24 +88,24 @@ main ()
    *   2047 in double format
    * and a zero fraction value.  The difference between +infinity and
    * -infinity is the value of the sign bit.  */
-  argument[2] = scalar_insert_exp (zero_significand, 255);
-  argument[3] = scalar_insert_exp (minus_zero_significand, 255);
+  argument[2] = float_scalar_insert_exp (zero_significand, 255);
+  argument[3] = float_scalar_insert_exp (minus_zero_significand, 255);
   result = test_infinity (&argument);
   if (result[0] || result[1] || !result[2] || !result[3])
     abort ();
 
   /* A Zero value has a biased exponent value of zero and a zero
    *   fraction value.  The sign may be either positive or negative.  */
-  argument[1] = scalar_insert_exp (minus_zero_significand, 0);
-  argument[2] = scalar_insert_exp (zero_significand, 0);
+  argument[1] = float_scalar_insert_exp (minus_zero_significand, 0);
+  argument[2] = float_scalar_insert_exp (zero_significand, 0);
   result = test_zero (&argument);
   if (result[0] || !result[1] || !result[2] || result[3])
     abort ();
 
   /* A Denormal number has a biased exponent value of zero and a
    *   non-zero fraction value.  */
-  argument[0] = scalar_insert_exp (one_significand, 0);
-  argument[4] = scalar_insert_exp (three_significand, 0);
+  argument[0] = float_scalar_insert_exp (five_significand, 0);
+  argument[4] = float_scalar_insert_exp (three_significand, 0);
   result = test_denormal (&argument);
   if (!result[0] || result[1] || result[2] || !result[3])
     abort ();

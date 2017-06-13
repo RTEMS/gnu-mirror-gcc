@@ -20,11 +20,11 @@ main ()
   __vector double argument;
   __vector unsigned long long int result;
 
-  argument[0] = (double) (0xbabe << 22);
-  argument[1] = (double) (0xcafe << 23);
+  argument[0] = (double) (0xbabeLL << 22);
+  argument[1] = (double) (0xcafeLL << 23);
 
   result = get_significands (&argument);
-  if ((result[0] != 0xbabe) || (result[1] != 0xcafe))
+  if ((result[0] != (0xbabeULL << 37)) || (result[1] != (0xcafeULL << 37)))
     abort();
   return 0;
 }

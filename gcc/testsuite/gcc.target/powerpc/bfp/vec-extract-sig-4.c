@@ -26,8 +26,8 @@ main ()
   argument[3] = (float) (0xcafe << 7);
 
   result = get_significands (&argument);
-  if ((result[0] != 0x1234) ||
-      (result[1] != 0x4321) || (result[2] != 0xbabe) || (result[3] != 0xcafe))
+  if ((result[0] != 0x91a000) || (result[1] != 0x864200) ||
+      (result[2] != 0xbabe00) || (result[3] != 0xcafe00))
     abort();
   return 0;
 }

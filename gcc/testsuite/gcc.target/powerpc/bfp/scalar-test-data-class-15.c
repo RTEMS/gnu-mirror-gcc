@@ -64,7 +64,7 @@ main ()
    */
   __int128 plus_significand = (__int128) 0;
   __int128 minus_significand = ((__int128) 0x1) << 127;
-  __int128 a_number_signficand = (((__int128) 0x1) << 112);
+  __int128 a_number_significand = (((__int128) 0x1) << 112);
 
   unsigned long long int infinite_exponent = 0x7fff;
   unsigned long long int a_number_exponent = 16383;

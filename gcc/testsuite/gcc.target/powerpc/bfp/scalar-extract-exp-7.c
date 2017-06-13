@@ -9,22 +9,22 @@
 #include <stdlib.h>
 
 unsigned long long int
-get_exponent (__ieee128 *p)
+get_unbiased_exponent (__ieee128 *p)
 {
   __ieee128 source = *p;
 
-  return scalar_extract_exp (source);
+  return scalar_extract_exp (source) - 16383;
 }
 
 int
 main ()
 {
-  __ieee128 x = (__ieee128) (((__int128) 0x1100LL) << 115);
+  __ieee128 x = (__ieee128) (((__int128) 0x1100LL) << 114);
   __ieee128 z = (__ieee128) (((__int128) 0x1101LL) << 112);
 
-  if (get_exponent (&x) != 127)
+  if (get_unbiased_exponent (&x) != 126)
     abort ();
-  if (get_exponent (&z) != 124)
+  if (get_unbiased_exponent (&z) != 124)
     abort ();
   return 0;
 }

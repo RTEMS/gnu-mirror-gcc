@@ -52,9 +52,9 @@ main ()
   unsigned int zero_minus_image = 0x80000000;
   unsigned int non_zero_image = 0x60000000;
 
-  float zero_plus_p = (float *) &zero_plus_image;
-  float zero_minus_p = (float *) &zero_minus_image;
-  float not_zero_p = (float *) &non_zero_image;
+  float *zero_plus_p = (float *) &zero_plus_image;
+  float *zero_minus_p = (float *) &zero_minus_image;
+  float *not_zero_p = (float *) &non_zero_image;
 
   if (!test_zero (zero_plus_p))
     abort ();

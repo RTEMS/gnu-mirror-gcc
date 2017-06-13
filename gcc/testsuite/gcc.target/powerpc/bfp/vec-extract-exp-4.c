@@ -14,6 +14,11 @@ get_exponents (__vector float *p)
   return vec_extract_exp (source);
 }
 
+unsigned int bias_float_exp (int unbiased_exp)
+{
+  return (unsigned int) (unbiased_exp + 127);
+}
+
 int
 main ()
 {
@@ -26,8 +31,9 @@ main ()
   argument[3] = (float) (0x1 << 7);
 
   result = get_exponents (&argument);
-  if ((result[0] != 10) ||
-      (result[1] != 9) || (result[2] != 8) || (result[3] != 7))
+  if ((result[0] != bias_float_exp (10)) ||
+      (result[1] != bias_float_exp (9)) ||
+      (result[2] != bias_float_exp (8)) || (result[3] != bias_float_exp (7)))
     abort();
   return 0;
 }

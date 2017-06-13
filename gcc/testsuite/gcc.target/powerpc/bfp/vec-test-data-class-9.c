@@ -52,20 +52,22 @@ main ()
 {
   __vector double special_argument;
   __vector double nonspecial_argument;
-  __vector double result;
+  __vector bool long long int result;
 
   unsigned long long int signaling_significand =
-    0x0001_7000_0000_0000_0000_0000_0000_0000;
+    0x00017000000000000000000000000000;
   unsigned long long int quiet_significand =
-    0x0001_f000_0000_0000_0000_0000_0000_0000;
+    0x0001f000000000000000000000000000;
   unsigned long long int one_significand =
-    0x0001_0000_0000_0000_0000_0000_0000_0000;
+    0x00010000000000000000000000000000;
   unsigned long long int three_significand =
-    0x0001_8000_0000_0000_0000_0000_0000_0000;
+    0x00018000000000000000000000000000;
+  unsigned long long int five_significand =
+    0x00014000000000000000000000000000;
   unsigned long long int zero_significand =
-    0x0000_0000_0000_0000_0000_0000_0000_0000;
+    0x00000000000000000000000000000000;
   unsigned long long int minus_zero_significand =
-    0x8000_0000_0000_0000_0000_0000_0000_0000;
+    0x80000000000000000000000000000000;
 
   nonspecial_argument[0] = -3.825;
   nonspecial_argument[1] = 3.14159;
@@ -110,7 +112,7 @@ main ()
 
   /* A Denormal number has a biased exponent value of zero and a
    *   non-zero fraction value.  */
-  special_argument[0] = scalar_insert_exp (one_significand, 0);
+  special_argument[0] = scalar_insert_exp (five_significand, 0);
   special_argument[1] = scalar_insert_exp (three_significand, 0);
   result = test_denormal (&special_argument);
   if (!result[0] || !result[1])

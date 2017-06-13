@@ -48,9 +48,9 @@ main ()
    * A Denormal number has a biased exponent value of zero and a
    *   non-zero fraction value
    */
-  double denormal_plus = scalar_insert_exp (0x8000000000000ULL, 0x0ULL);
+  double denormal_plus = scalar_insert_exp (0x0008000000000000ULL, 0x0ULL);
   double denormal_minus = scalar_insert_exp (0x8008000000000000ULL, 0x0ULL);
-  double not_denormal = scalar_insert_exp (0x80000000000000000ULL, 1023ULL);
+  double not_denormal = scalar_insert_exp (0x8000000000000000ULL, 1023ULL);
 
   if (!test_denormal (&denormal_plus))
     abort ();

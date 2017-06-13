@@ -24,8 +24,8 @@ main ()
   unsigned long long int significand_1 = 0x18000000000000LL;
   unsigned long long int significand_2 = 0x1a000000000000LL;
 
-  double *significand_1_ptr = (double *) &signficand_1;
-  double *significand_2_ptr = (double *) &signficand_2;
+  double *significand_1_ptr = (double *) &significand_1;
+  double *significand_2_ptr = (double *) &significand_2;
 
   unsigned long long int exponent_1 = 53;
   unsigned long long int exponent_2 = 40;

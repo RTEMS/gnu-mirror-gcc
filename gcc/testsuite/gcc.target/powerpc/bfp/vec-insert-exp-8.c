@@ -35,7 +35,7 @@ main ()
   exponents[3] = 125;		/* -0.03 */
 
   result = make_floats (&significands, &exponents);
-  if ((result[0] != 1.0f)
+  if ((result[0] != 1.0f) ||
       (result[1] != 30.0f) || (result[2] != 700.0f) || (result[3] != -0.03f))
     abort();
   return 0;

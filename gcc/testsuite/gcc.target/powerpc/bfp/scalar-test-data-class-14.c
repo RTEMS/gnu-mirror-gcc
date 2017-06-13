@@ -64,7 +64,7 @@ main ()
    */
   __int128 signal_significand = (__int128) 0xffffffff;
   __int128 quiet_significand = (((__int128) 0x1) << 111) | 0xffffffff;
-  __int128 a_number_signficand = (((__int128) 0x1) << 111);
+  __int128 a_number_significand = (((__int128) 0x1) << 111);
   unsigned long long int nan_exponent = 0x7fff;
   unsigned long long int a_number_exponent = 16383;
 

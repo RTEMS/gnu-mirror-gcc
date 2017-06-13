@@ -14,6 +14,12 @@ get_exponents (__vector double *p)
   return vec_extract_exp (source);
 }
 
+unsigned long long int
+bias_double_exp (long long int unbiased_exp)
+{
+  return (unsigned long long int) (unbiased_exp + 1023);
+}
+
 int
 main ()
 {
@@ -24,7 +30,8 @@ main ()
   argument[1] = (double) (0x1 << 23);
 
   result = get_exponents (&argument);
-  if ((result[0] != 22) || (result[1] != 23))
+  if ((result[0] != bias_double_exp (22)) ||
+      (result[1] != bias_double_exp (23)))
     abort();
   return 0;
 }
