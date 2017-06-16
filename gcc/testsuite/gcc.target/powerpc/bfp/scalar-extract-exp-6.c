@@ -22,9 +22,9 @@ main ()
   double x = (double) (0x1100LL << 50);
   double z = (double) (0x1101LL << 37);
 
-  if (get_exponent (&x) != 62)
+  if (get_unbiased_exponent (&x) != 62)
     abort ();
-  if (get_exponent (&z) != 49)
+  if (get_unbiased_exponent (&z) != 49)
     abort ();
   return 0;
 }

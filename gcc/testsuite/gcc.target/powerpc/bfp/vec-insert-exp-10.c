@@ -25,19 +25,19 @@ main ()
   __vector float result;
 
   /* 24 bits in significand, plus the sign bit: 0x80ffffff */
-  significands[0] = 0x00800000;	/* 1 */
-  significands[1] = 0x00c00000;	/* 3 */
-  significands[2] = 0x80e00000;	/* 7 */
-  significands[3] = 0x80c00000;	/* -3 */
+  significands[0] = 0x00800000;	/*  1.0 */
+  significands[1] = 0x00c00000;	/*  1.5 */
+  significands[2] = 0x80e00000;	/* -1.75 */
+  significands[3] = 0x80c00000;	/* -1.5 */
 
-  exponents[0] = 127;		/* 1.0 */
-  exponents[1] = 128;		/* 30.0 */
-  exponents[2] = 129;		/* 700.0 */
-  exponents[3] = 125;		/* -0.03 */
+  exponents[0] = 127;		/*  exp = 0: 1.0 */
+  exponents[1] = 128;		/*  exp = 1: 3.0 */
+  exponents[2] = 129;		/*  exp = 2: -7.0 */
+  exponents[3] = 125;		/* exp = -2: -0.375 */
 
   result = make_floats (significands_p, &exponents);
   if ((result[0] != 1.0f) ||
-      (result[1] != 30.0f) || (result[2] != 700.0f) || (result[3] != -0.03f))
+      (result[1] != 3.0f) || (result[2] != -7.0f) || (result[3] != -0.375f))
     abort();
   return 0;
 }

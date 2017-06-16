@@ -3446,7 +3446,7 @@
 	(unspec:DI [(match_operand:KF 1 "altivec_register_operand" "v")]
 	 UNSPEC_VSX_SXEXPDP))]
   "TARGET_P9_VECTOR && TARGET_64BIT"
-  "xsxexpqp %0,%x1"
+  "xsxexpqp %0,%1"
   [(set_attr "type" "vecmove")])
 
 ;; VSX Scalar Extract Exponent Double-Precision
@@ -3464,7 +3464,7 @@
 	(unspec:TI [(match_operand:KF 1 "altivec_register_operand" "v")]
 	 UNSPEC_VSX_SXSIGDP))]
   "TARGET_P9_VECTOR && TARGET_64BIT"
-  "xsxsigqp %0,%x1"
+  "xsxsigqp %0,%1"
   [(set_attr "type" "vecmove")])
 
 ;; VSX Scalar Extract Significand Double-Precision
@@ -3493,7 +3493,7 @@
 		    (match_operand:DI 2 "altivec_register_operand" "v")]
 	 UNSPEC_VSX_SIEXPQP))]
   "TARGET_P9_VECTOR && TARGET_64BIT"
-  "xsiexpqp %0,%1,%0"
+  "xsiexpqp %0,%1,%2"
   [(set_attr "type" "vecmove")])
 
 ;; VSX Scalar Insert Exponent Double-Precision

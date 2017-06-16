@@ -24,14 +24,14 @@ main ()
   __vector double result;
 
   /* 53 bits in significand, plus the sign bit: 0x8000_0000_0000_0000 */
-  significands[0] = 0x0010000000000000;	/* 1 */
-  significands[1] = 0x801c000000000000;	/* -7 */
+  significands[0] = 0x0010000000000000;	/*  1.0 */
+  significands[1] = 0x801c000000000000;	/* -1.75 */
 
-  exponents[0] = 1023;		/* 1.0 */
-  exponents[1] = 1021;		/* -0.07 */
+  exponents[0] = 1023;		/*  exp = 0: 1.0 */
+  exponents[1] = 1021;		/* exp = -2: -0.4375 (7/16) */
 
   result = make_doubles (&significands, &exponents);
-  if ((result[0] != 1.0) || (result[1] != -0.07))
+  if ((result[0] != 1.0) || (result[1] != -0.4375))
     abort();
   return 0;
 }

@@ -55,19 +55,19 @@ main ()
   __vector bool long long int result;
 
   unsigned long long int signaling_significand =
-    0x00017000000000000000000000000000;
+    0x0017000000000000ULL;
   unsigned long long int quiet_significand =
-    0x0001f000000000000000000000000000;
+    0x001f000000000000ULL;
   unsigned long long int one_significand =
-    0x00010000000000000000000000000000;
+    0x0010000000000000ULL;
   unsigned long long int three_significand =
-    0x00018000000000000000000000000000;
+    0x0018000000000000ULL;
   unsigned long long int five_significand =
-    0x00014000000000000000000000000000;
+    0x0014000000000000ULL;
   unsigned long long int zero_significand =
-    0x00000000000000000000000000000000;
+    0x0000000000000000ULL;
   unsigned long long int minus_zero_significand =
-    0x80000000000000000000000000000000;
+    0x8000000000000000ULL;
 
   nonspecial_argument[0] = -3.825;
   nonspecial_argument[1] = 3.14159;
@@ -120,5 +120,6 @@ main ()
   result = test_denormal (&nonspecial_argument);
   if (result[0] || result[1])
     abort ();
+  return 0;
 }
 

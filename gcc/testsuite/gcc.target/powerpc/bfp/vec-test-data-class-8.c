@@ -105,7 +105,7 @@ main ()
   /* A Denormal number has a biased exponent value of zero and a
    *   non-zero fraction value.  */
   argument[0] = float_scalar_insert_exp (five_significand, 0);
-  argument[4] = float_scalar_insert_exp (three_significand, 0);
+  argument[3] = float_scalar_insert_exp (three_significand, 0);
   result = test_denormal (&argument);
   if (!result[0] || result[1] || result[2] || !result[3])
     abort ();

@@ -27,27 +27,8 @@ test_zero (float *p)
 int
 main ()
 {
-  /* A normalized number has a biased exponent value:
-   *    (my extrapolations for ieee128)
-   *   1 to 254 in single format
-   *   1 to 2046 in double format
-   *   1 to 32766 in ieee128 format
-   * Note that unbiased exponent value is:
-   *   biased_value - 127: single format (range: -126 to 127)
-   *   biased_value - 1023: double format (range: -1022 to 1023)
-   *   biased_value - 16,383: ieee128 format (range: -16382 to 16,383)
-   *
-   * For normalized numbers, the implied unit bit is 1.  Normalized
-   *   numbers are interpreted as follows:
-   *  normalized_number = (-1)^S * s^E * (1.<fraction>)
-   *   (note that the significand is 1 plus the <fraction>)
-   *
-   * A Zero value has a biased exponent value of zero and a zero
-   *   fraction value.  The sign may be either positive or negative.
-   *
-   * A Denormal number has a biased exponent value of zero and a
-   *   non-zero fraction value
-   */
+  /* A Zero value has a biased exponent value of zero and a zero
+   * fraction value.  The sign may be either positive or negative.  */
   unsigned int zero_plus_image = 0x0;
   unsigned int zero_minus_image = 0x80000000;
   unsigned int non_zero_image = 0x60000000;
