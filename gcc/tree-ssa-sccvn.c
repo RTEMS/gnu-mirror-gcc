@@ -1639,6 +1639,7 @@ vn_reference_lookup_or_insert_for_pieces (tree vuse,
 }
 
 static vn_nary_op_t vn_nary_op_insert_stmt (gimple *stmt, tree result);
+static unsigned mprts_hook_cnt;
 
 /* Hook for maybe_push_res_to_seq, lookup the expression in the VN tables.  */
 
@@ -1648,8 +1649,22 @@ vn_lookup_simplify_result (code_helper rcode, tree type, tree *ops)
   if (!rcode.is_tree_code ())
     return NULL_TREE;
   vn_nary_op_t vnresult = NULL;
-  return vn_nary_op_lookup_pieces (TREE_CODE_LENGTH ((tree_code) rcode),
-				   (tree_code) rcode, type, ops, &vnresult);
+  tree res = vn_nary_op_lookup_pieces (TREE_CODE_LENGTH ((tree_code) rcode),
+				       (tree_code) rcode, type, ops, &vnresult);
+  /* We can end up endlessly recursing simplifications if the lookup above
+     presents us with a def-use chain that mirrors the original simplification.
+     See PR80887 for an example.  Limit successful lookup artificially
+     to 10 times if we are called as mprts_hook.  */
+  if (res
+      && mprts_hook
+      && --mprts_hook_cnt == 0)
+    {
+      if (dump_file && (dump_flags & TDF_DETAILS))
+	fprintf (dump_file, "Resetting mprts_hook after too many "
+		 "invocations.\n");
+      mprts_hook = NULL;
+    }
+  return res;
 }
 
 /* Return a value-number for RCODE OPS... either by looking up an existing
@@ -1666,6 +1681,7 @@ vn_nary_build_or_lookup_1 (code_helper rcode, tree type, tree *ops,
      So first simplify and lookup this expression to see if it
      is already available.  */
   mprts_hook = vn_lookup_simplify_result;
+  mprts_hook_cnt = 9;
   bool res = false;
   switch (TREE_CODE_LENGTH ((tree_code) rcode))
     {
@@ -2035,7 +2051,9 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *vr_,
 	  ops[1] = bitsize_int (ref->size);
 	  ops[2] = bitsize_int (offset - offset2);
 	  tree val = vn_nary_build_or_lookup (rcode, vr->type, ops);
-	  if (val)
+	  if (val
+	      && (TREE_CODE (val) != SSA_NAME
+		  || ! SSA_NAME_OCCURS_IN_ABNORMAL_PHI (val)))
 	    {
 	      vn_reference_t res = vn_reference_lookup_or_insert_for_pieces
 		  (vuse, vr->set, vr->type, vr->operands, val);
@@ -3328,6 +3346,9 @@ set_ssa_val_to (tree from, tree to)
 	       == get_addr_base_and_unit_offset (TREE_OPERAND (to, 0), &toff))
 	   && coff == toff))
     {
+      if (dump_file && (dump_flags & TDF_DETAILS))
+	fprintf (dump_file, " (changed)\n");
+
       /* If we equate two SSA names we have to make the side-band info
          of the leader conservative (and remember whatever original value
 	 was present).  */
@@ -3342,22 +3363,6 @@ set_ssa_val_to (tree from, tree to)
 			 gimple_bb (SSA_NAME_DEF_STMT (to))))
 		/* Keep the info from the dominator.  */
 		;
-	      else if (SSA_NAME_IS_DEFAULT_DEF (from)
-		       || dominated_by_p_w_unex
-			    (gimple_bb (SSA_NAME_DEF_STMT (to)),
-			     gimple_bb (SSA_NAME_DEF_STMT (from))))
-		{
-		  /* Save old info.  */
-		  if (! VN_INFO (to)->info.range_info)
-		    {
-		      VN_INFO (to)->info.range_info = SSA_NAME_RANGE_INFO (to);
-		      VN_INFO (to)->range_info_anti_range_p
-			= SSA_NAME_ANTI_RANGE_P (to);
-		    }
-		  /* Use that from the dominator.  */
-		  SSA_NAME_RANGE_INFO (to) = SSA_NAME_RANGE_INFO (from);
-		  SSA_NAME_ANTI_RANGE_P (to) = SSA_NAME_ANTI_RANGE_P (from);
-		}
 	      else
 		{
 		  /* Save old info.  */
@@ -3369,6 +3374,12 @@ set_ssa_val_to (tree from, tree to)
 		    }
 		  /* Rather than allocating memory and unioning the info
 		     just clear it.  */
+		  if (dump_file && (dump_flags & TDF_DETAILS))
+		    {
+		      fprintf (dump_file, "clearing range info of ");
+		      print_generic_expr (dump_file, to);
+		      fprintf (dump_file, "\n");
+		    }
 		  SSA_NAME_RANGE_INFO (to) = NULL;
 		}
 	    }
@@ -3381,17 +3392,6 @@ set_ssa_val_to (tree from, tree to)
 			 gimple_bb (SSA_NAME_DEF_STMT (to))))
 		/* Keep the info from the dominator.  */
 		;
-	      else if (SSA_NAME_IS_DEFAULT_DEF (from)
-		       || dominated_by_p_w_unex
-			    (gimple_bb (SSA_NAME_DEF_STMT (to)),
-			     gimple_bb (SSA_NAME_DEF_STMT (from))))
-		{
-		  /* Save old info.  */
-		  if (! VN_INFO (to)->info.ptr_info)
-		    VN_INFO (to)->info.ptr_info = SSA_NAME_PTR_INFO (to);
-		  /* Use that from the dominator.  */
-		  SSA_NAME_PTR_INFO (to) = SSA_NAME_PTR_INFO (from);
-		}
 	      else if (! SSA_NAME_PTR_INFO (from)
 		       /* Handle the case of trivially equivalent info.  */
 		       || memcmp (SSA_NAME_PTR_INFO (to),
@@ -3403,14 +3403,18 @@ set_ssa_val_to (tree from, tree to)
 		    VN_INFO (to)->info.ptr_info = SSA_NAME_PTR_INFO (to);
 		  /* Rather than allocating memory and unioning the info
 		     just clear it.  */
+		  if (dump_file && (dump_flags & TDF_DETAILS))
+		    {
+		      fprintf (dump_file, "clearing points-to info of ");
+		      print_generic_expr (dump_file, to);
+		      fprintf (dump_file, "\n");
+		    }
 		  SSA_NAME_PTR_INFO (to) = NULL;
 		}
 	    }
 	}
 
       VN_INFO (from)->valnum = to;
-      if (dump_file && (dump_flags & TDF_DETAILS))
-	fprintf (dump_file, " (changed)\n");
       return true;
     }
   if (dump_file && (dump_flags & TDF_DETAILS))
@@ -3908,6 +3912,7 @@ try_to_simplify (gassign *stmt)
 
   /* First try constant folding based on our current lattice.  */
   mprts_hook = vn_lookup_simplify_result;
+  mprts_hook_cnt = 9;
   tem = gimple_fold_stmt_to_constant_1 (stmt, vn_valueize, vn_valueize);
   mprts_hook = NULL;
   if (tem

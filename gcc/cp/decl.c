@@ -51,6 +51,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cilk.h"
 #include "builtins.h"
 #include "gimplify.h"
+#include "asan.h"
 
 /* Possible cases of bad specifiers type used by bad_specifiers. */
 enum bad_spec_place {
@@ -158,6 +159,9 @@ tree integer_two_node;
 
 /* vector of static decls.  */
 vec<tree, va_gc> *static_decls;
+
+/* vector of keyed classes.  */
+vec<tree, va_gc> *keyed_classes;
 
 /* Used only for jumps to as-yet undefined labels, since jumps to
    defined labels can have their validity checked immediately.  */
@@ -1747,17 +1751,9 @@ duplicate_decls (tree newdecl, tree olddecl, bool newdecl_is_friend)
 	  && (DECL_NAMESPACE_ALIAS (newdecl)
 	      == DECL_NAMESPACE_ALIAS (olddecl)))
 	return olddecl;
-      /* [namespace.alias]
 
-	 A namespace-name or namespace-alias shall not be declared as
-	 the name of any other entity in the same declarative region.
-	 A namespace-name defined at global scope shall not be
-	 declared as the name of any other entity in any global scope
-	 of the program.  */
-      error ("conflicting declaration of namespace %q+D", newdecl);
-      inform (DECL_SOURCE_LOCATION (olddecl),
-	      "previous declaration of namespace %qD here", olddecl);
-      return error_mark_node;
+      /* Leave it to update_binding to merge or report error.  */
+      return NULL_TREE;
     }
   else
     {
@@ -4063,6 +4059,9 @@ cxx_init_decl_processing (void)
   /* Guess at the initial static decls size.  */
   vec_alloc (static_decls, 500);
 
+  /* ... and keyed classes.  */
+  vec_alloc (keyed_classes, 100);
+
   record_builtin_type (RID_BOOL, "bool", boolean_type_node);
   truthvalue_type_node = boolean_type_node;
   truthvalue_false_node = boolean_false_node;
@@ -4071,6 +4070,8 @@ cxx_init_decl_processing (void)
   empty_except_spec = build_tree_list (NULL_TREE, NULL_TREE);
   noexcept_true_spec = build_tree_list (boolean_true_node, NULL_TREE);
   noexcept_false_spec = build_tree_list (boolean_false_node, NULL_TREE);
+  noexcept_deferred_spec = build_tree_list (make_node (DEFERRED_NOEXCEPT),
+					    NULL_TREE);
 
 #if 0
   record_builtin_type (RID_MAX, NULL, string_type_node);
@@ -4269,7 +4270,7 @@ cxx_init_decl_processing (void)
 
   abort_fndecl
     = build_library_fn_ptr ("__cxa_pure_virtual", void_ftype,
-			    ECF_NORETURN | ECF_NOTHROW);
+			    ECF_NORETURN | ECF_NOTHROW | ECF_COLD);
 
   /* Perform other language dependent initializations.  */
   init_class_processing ();
@@ -4550,7 +4551,7 @@ push_void_library_fn (tree name, tree parmtypes, int ecf_flags)
 tree
 push_throw_library_fn (tree name, tree type)
 {
-  tree fn = push_library_fn (name, type, NULL_TREE, ECF_NORETURN);
+  tree fn = push_library_fn (name, type, NULL_TREE, ECF_NORETURN | ECF_COLD);
   return fn;
 }
 
@@ -7814,10 +7815,7 @@ start_cleanup_fn (void)
   /* Build the parameter.  */
   if (use_cxa_atexit)
     {
-      tree parmdecl;
-
-      parmdecl = cp_build_parm_decl (NULL_TREE, ptr_type_node);
-      DECL_CONTEXT (parmdecl) = fndecl;
+      tree parmdecl = cp_build_parm_decl (fndecl, NULL_TREE, ptr_type_node);
       TREE_USED (parmdecl) = 1;
       DECL_READ_P (parmdecl) = 1;
       DECL_ARGUMENTS (fndecl) = parmdecl;
@@ -8358,12 +8356,12 @@ check_class_member_definition_namespace (tree decl)
 	       decl, DECL_CONTEXT (decl));
 }
 
-/* Build a PARM_DECL for the "this" parameter.  TYPE is the
+/* Build a PARM_DECL for the "this" parameter of FN.  TYPE is the
    METHOD_TYPE for a non-static member function; QUALS are the
    cv-qualifiers that apply to the function.  */
 
 tree
-build_this_parm (tree type, cp_cv_quals quals)
+build_this_parm (tree fn, tree type, cp_cv_quals quals)
 {
   tree this_type;
   tree qual_type;
@@ -8382,7 +8380,7 @@ build_this_parm (tree type, cp_cv_quals quals)
      assigned to.  */
   this_quals = (quals & TYPE_QUAL_RESTRICT) | TYPE_QUAL_CONST;
   qual_type = cp_build_qualified_type (this_type, this_quals);
-  parm = build_artificial_parm (this_identifier, qual_type);
+  parm = build_artificial_parm (fn, this_identifier, qual_type);
   cp_apply_type_quals_to_decl (this_quals, parm);
   return parm;
 }
@@ -8516,8 +8514,7 @@ grokfndecl (tree ctype,
 
   if (TREE_CODE (type) == METHOD_TYPE)
     {
-      tree parm;
-      parm = build_this_parm (type, quals);
+      tree parm = build_this_parm (decl, type, quals);
       DECL_CHAIN (parm) = parms;
       parms = parm;
 
@@ -9524,8 +9521,7 @@ compute_array_index_type (tree name, tree size, tsubst_flags_t complain)
 
 	  stabilize_vla_size (itype);
 
-	  if (flag_sanitize & SANITIZE_VLA
-	      && do_ubsan_in_current_function ())
+	  if (sanitize_flags_p (SANITIZE_VLA))
 	    {
 	      /* We have to add 1 -- in the ubsan routine we generate
 		 LE_EXPR rather than LT_EXPR.  */
@@ -11617,7 +11613,8 @@ grokdeclarator (const cp_declarator *declarator,
 	   args && args != void_list_node;
 	   args = TREE_CHAIN (args))
 	{
-	  tree decl = cp_build_parm_decl (NULL_TREE, TREE_VALUE (args));
+	  tree decl = cp_build_parm_decl (NULL_TREE, NULL_TREE,
+					  TREE_VALUE (args));
 
 	  DECL_CHAIN (decl) = decls;
 	  decls = decl;
@@ -11786,7 +11783,7 @@ grokdeclarator (const cp_declarator *declarator,
 
     if (decl_context == PARM)
       {
-	decl = cp_build_parm_decl (unqualified_id, type);
+	decl = cp_build_parm_decl (NULL_TREE, unqualified_id, type);
 	DECL_ARRAY_PARAMETER_P (decl) = array_parameter_p;
 
 	bad_specifiers (decl, BSP_PARM, virtualp,
@@ -15108,7 +15105,7 @@ start_preparsed_function (tree decl1, tree attrs, int flags)
 
   if (!processing_template_decl
       && DECL_CONSTRUCTOR_P (decl1)
-      && (flag_sanitize & SANITIZE_VPTR)
+      && sanitize_flags_p (SANITIZE_VPTR)
       && !DECL_CLONED_FUNCTION_P (decl1)
       && !implicit_default_ctor_p (decl1))
     cp_ubsan_maybe_initialize_vtbl_ptrs (current_class_ptr);
@@ -15438,7 +15435,7 @@ record_key_method_defined (tree fndecl)
     {
       tree fnclass = DECL_CONTEXT (fndecl);
       if (fndecl == CLASSTYPE_KEY_METHOD (fnclass))
-	keyed_classes = tree_cons (NULL_TREE, fnclass, keyed_classes);
+	vec_safe_push (keyed_classes, fnclass);
     }
 }
 

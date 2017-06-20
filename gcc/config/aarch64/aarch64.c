@@ -526,6 +526,43 @@ static const cpu_approx_modes xgene1_approx_modes =
   AARCH64_APPROX_ALL	/* recip_sqrt  */
 };
 
+/* Generic prefetch settings (which disable prefetch).  */
+static const cpu_prefetch_tune generic_prefetch_tune =
+{
+  0,			/* num_slots  */
+  -1,			/* l1_cache_size  */
+  -1,			/* l1_cache_line_size  */
+  -1,			/* l2_cache_size  */
+  -1			/* default_opt_level  */
+};
+
+static const cpu_prefetch_tune exynosm1_prefetch_tune =
+{
+  0,			/* num_slots  */
+  -1,			/* l1_cache_size  */
+  64,			/* l1_cache_line_size  */
+  -1,			/* l2_cache_size  */
+  -1			/* default_opt_level  */
+};
+
+static const cpu_prefetch_tune qdf24xx_prefetch_tune =
+{
+  4,			/* num_slots  */
+  32,			/* l1_cache_size  */
+  64,			/* l1_cache_line_size  */
+  1024,			/* l2_cache_size  */
+  3			/* default_opt_level  */
+};
+
+static const cpu_prefetch_tune thunderx2t99_prefetch_tune =
+{
+  0,			/* num_slots  */
+  -1,			/* l1_cache_size  */
+  64,			/* l1_cache_line_size  */
+  -1,			/* l2_cache_size  */
+  -1			/* default_opt_level  */
+};
+
 static const struct tune_params generic_tunings =
 {
   &cortexa57_extra_costs,
@@ -546,9 +583,9 @@ static const struct tune_params generic_tunings =
   2,	/* min_div_recip_mul_sf.  */
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
-  0,	/* cache_line_size.  */
   tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_NONE)	/* tune_flags.  */
+  (AARCH64_EXTRA_TUNE_NONE),	/* tune_flags.  */
+  &generic_prefetch_tune
 };
 
 static const struct tune_params cortexa35_tunings =
@@ -572,9 +609,9 @@ static const struct tune_params cortexa35_tunings =
   2,	/* min_div_recip_mul_sf.  */
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
-  0,	/* cache_line_size.  */
   tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_NONE)	/* tune_flags.  */
+  (AARCH64_EXTRA_TUNE_NONE),	/* tune_flags.  */
+  &generic_prefetch_tune
 };
 
 static const struct tune_params cortexa53_tunings =
@@ -598,9 +635,9 @@ static const struct tune_params cortexa53_tunings =
   2,	/* min_div_recip_mul_sf.  */
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
-  0,	/* cache_line_size.  */
   tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_NONE)	/* tune_flags.  */
+  (AARCH64_EXTRA_TUNE_NONE),	/* tune_flags.  */
+  &generic_prefetch_tune
 };
 
 static const struct tune_params cortexa57_tunings =
@@ -624,9 +661,9 @@ static const struct tune_params cortexa57_tunings =
   2,	/* min_div_recip_mul_sf.  */
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
-  0,	/* cache_line_size.  */
   tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_RENAME_FMA_REGS)	/* tune_flags.  */
+  (AARCH64_EXTRA_TUNE_RENAME_FMA_REGS),	/* tune_flags.  */
+  &generic_prefetch_tune
 };
 
 static const struct tune_params cortexa72_tunings =
@@ -650,9 +687,9 @@ static const struct tune_params cortexa72_tunings =
   2,	/* min_div_recip_mul_sf.  */
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
-  0,	/* cache_line_size.  */
   tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_NONE)	/* tune_flags.  */
+  (AARCH64_EXTRA_TUNE_NONE),	/* tune_flags.  */
+  &generic_prefetch_tune
 };
 
 static const struct tune_params cortexa73_tunings =
@@ -676,10 +713,12 @@ static const struct tune_params cortexa73_tunings =
   2,	/* min_div_recip_mul_sf.  */
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
-  0,	/* cache_line_size.  */
   tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_NONE)	/* tune_flags.  */
+  (AARCH64_EXTRA_TUNE_NONE),	/* tune_flags.  */
+  &generic_prefetch_tune
 };
+
+
 
 static const struct tune_params exynosm1_tunings =
 {
@@ -701,9 +740,9 @@ static const struct tune_params exynosm1_tunings =
   2,	/* min_div_recip_mul_sf.  */
   2,	/* min_div_recip_mul_df.  */
   48,	/* max_case_values.  */
-  64,	/* cache_line_size.  */
   tune_params::AUTOPREFETCHER_WEAK, /* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_NONE) /* tune_flags.  */
+  (AARCH64_EXTRA_TUNE_NONE), /* tune_flags.  */
+  &exynosm1_prefetch_tune
 };
 
 static const struct tune_params thunderx_tunings =
@@ -726,9 +765,9 @@ static const struct tune_params thunderx_tunings =
   2,	/* min_div_recip_mul_sf.  */
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
-  0,	/* cache_line_size.  */
   tune_params::AUTOPREFETCHER_OFF,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_SLOW_UNALIGNED_LDPW)	/* tune_flags.  */
+  (AARCH64_EXTRA_TUNE_SLOW_UNALIGNED_LDPW),	/* tune_flags.  */
+  &generic_prefetch_tune
 };
 
 static const struct tune_params xgene1_tunings =
@@ -751,9 +790,9 @@ static const struct tune_params xgene1_tunings =
   2,	/* min_div_recip_mul_sf.  */
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
-  0,	/* cache_line_size.  */
   tune_params::AUTOPREFETCHER_OFF,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_NONE)	/* tune_flags.  */
+  (AARCH64_EXTRA_TUNE_NONE),	/* tune_flags.  */
+  &generic_prefetch_tune
 };
 
 static const struct tune_params qdf24xx_tunings =
@@ -777,9 +816,9 @@ static const struct tune_params qdf24xx_tunings =
   2,	/* min_div_recip_mul_sf.  */
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
-  64,	/* cache_line_size.  */
   tune_params::AUTOPREFETCHER_STRONG,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_NONE)		/* tune_flags.  */
+  (AARCH64_EXTRA_TUNE_NONE),		/* tune_flags.  */
+  &qdf24xx_prefetch_tune
 };
 
 static const struct tune_params thunderx2t99_tunings =
@@ -802,9 +841,9 @@ static const struct tune_params thunderx2t99_tunings =
   2,	/* min_div_recip_mul_sf.  */
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
-  64,	/* cache_line_size.  */
   tune_params::AUTOPREFETCHER_OFF,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_NONE)	/* tune_flags.  */
+  (AARCH64_EXTRA_TUNE_NONE),	/* tune_flags.  */
+  &thunderx2t99_prefetch_tune
 };
 
 /* Support for fine-grained override of the tuning structures.  */
@@ -7544,17 +7583,13 @@ cost_plus:
     case UMOD:
       if (speed)
 	{
+	  /* Slighly prefer UMOD over SMOD.  */
 	  if (VECTOR_MODE_P (mode))
 	    *cost += extra_cost->vect.alu;
 	  else if (GET_MODE_CLASS (mode) == MODE_INT)
 	    *cost += (extra_cost->mult[mode == DImode].add
-		      + extra_cost->mult[mode == DImode].idiv);
-	  else if (mode == DFmode)
-	    *cost += (extra_cost->fp[1].mult
-		      + extra_cost->fp[1].div);
-	  else if (mode == SFmode)
-	    *cost += (extra_cost->fp[0].mult
-		      + extra_cost->fp[0].div);
+		      + extra_cost->mult[mode == DImode].idiv
+		      + (code == MOD ? 1 : 0));
 	}
       return false;  /* All arguments need to be in registers.  */
 
@@ -7568,7 +7603,9 @@ cost_plus:
 	  else if (GET_MODE_CLASS (mode) == MODE_INT)
 	    /* There is no integer SQRT, so only DIV and UDIV can get
 	       here.  */
-	    *cost += extra_cost->mult[mode == DImode].idiv;
+	    *cost += (extra_cost->mult[mode == DImode].idiv
+		     /* Slighly prefer UDIV over SDIV.  */
+		     + (code == DIV ? 1 : 0));
 	  else
 	    *cost += extra_cost->fp[mode == DFmode].div;
 	}
@@ -8749,12 +8786,38 @@ aarch64_override_options_internal (struct gcc_options *opts)
 			 opts->x_param_values,
 			 global_options_set.x_param_values);
 
-  /* Set the L1 cache line size.  */
-  if (selected_cpu->tune->cache_line_size != 0)
-    maybe_set_param_value (PARAM_L1_CACHE_LINE_SIZE,
-			   selected_cpu->tune->cache_line_size,
+  /* Set up parameters to be used in prefetching algorithm.  Do not
+     override the defaults unless we are tuning for a core we have
+     researched values for.  */
+  if (aarch64_tune_params.prefetch->num_slots > 0)
+    maybe_set_param_value (PARAM_SIMULTANEOUS_PREFETCHES,
+			   aarch64_tune_params.prefetch->num_slots,
 			   opts->x_param_values,
 			   global_options_set.x_param_values);
+  if (aarch64_tune_params.prefetch->l1_cache_size >= 0)
+    maybe_set_param_value (PARAM_L1_CACHE_SIZE,
+			   aarch64_tune_params.prefetch->l1_cache_size,
+			   opts->x_param_values,
+			   global_options_set.x_param_values);
+  if (aarch64_tune_params.prefetch->l1_cache_line_size >= 0)
+    maybe_set_param_value (PARAM_L1_CACHE_LINE_SIZE,
+			   aarch64_tune_params.prefetch->l1_cache_line_size,
+			   opts->x_param_values,
+			   global_options_set.x_param_values);
+  if (aarch64_tune_params.prefetch->l2_cache_size >= 0)
+    maybe_set_param_value (PARAM_L2_CACHE_SIZE,
+			   aarch64_tune_params.prefetch->l2_cache_size,
+			   opts->x_param_values,
+			   global_options_set.x_param_values);
+
+  /* Enable sw prefetching at specified optimization level for
+     CPUS that have prefetch.  Lower optimization level threshold by 1
+     when profiling is enabled.  */
+  if (opts->x_flag_prefetch_loop_arrays < 0
+      && !opts->x_optimize_size
+      && aarch64_tune_params.prefetch->default_opt_level >= 0
+      && opts->x_optimize >= aarch64_tune_params.prefetch->default_opt_level)
+    opts->x_flag_prefetch_loop_arrays = 1;
 
   aarch64_override_options_after_change_1 (opts);
 }
@@ -11709,6 +11772,57 @@ aarch64_expand_vector_init (rtx target, rtx vals)
       return;
     }
 
+  enum insn_code icode = optab_handler (vec_set_optab, mode);
+  gcc_assert (icode != CODE_FOR_nothing);
+
+  /* If there are only variable elements, try to optimize
+     the insertion using dup for the most common element
+     followed by insertions.  */
+
+  /* The algorithm will fill matches[*][0] with the earliest matching element,
+     and matches[X][1] with the count of duplicate elements (if X is the
+     earliest element which has duplicates).  */
+
+  if (n_var == n_elts && n_elts <= 16)
+    {
+      int matches[16][2] = {0};
+      for (int i = 0; i < n_elts; i++)
+	{
+	  for (int j = 0; j <= i; j++)
+	    {
+	      if (rtx_equal_p (XVECEXP (vals, 0, i), XVECEXP (vals, 0, j)))
+		{
+		  matches[i][0] = j;
+		  matches[j][1]++;
+		  break;
+		}
+	    }
+	}
+      int maxelement = 0;
+      int maxv = 0;
+      for (int i = 0; i < n_elts; i++)
+	if (matches[i][1] > maxv)
+	  {
+	    maxelement = i;
+	    maxv = matches[i][1];
+	  }
+
+      /* Create a duplicate of the most common element.  */
+      rtx x = copy_to_mode_reg (inner_mode, XVECEXP (vals, 0, maxelement));
+      aarch64_emit_move (target, gen_rtx_VEC_DUPLICATE (mode, x));
+
+      /* Insert the rest.  */
+      for (int i = 0; i < n_elts; i++)
+	{
+	  rtx x = XVECEXP (vals, 0, i);
+	  if (matches[i][0] == maxelement)
+	    continue;
+	  x = copy_to_mode_reg (inner_mode, x);
+	  emit_insn (GEN_FCN (icode) (target, x, GEN_INT (i)));
+	}
+      return;
+    }
+
   /* Initialise a vector which is part-variable.  We want to first try
      to build those lanes which are constant in the most efficient way we
      can.  */
@@ -11742,10 +11856,6 @@ aarch64_expand_vector_init (rtx target, rtx vals)
     }
 
   /* Insert the variable lanes directly.  */
-
-  enum insn_code icode = optab_handler (vec_set_optab, mode);
-  gcc_assert (icode != CODE_FOR_nothing);
-
   for (int i = 0; i < n_elts; i++)
     {
       rtx x = XVECEXP (vals, 0, i);

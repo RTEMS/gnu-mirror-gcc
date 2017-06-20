@@ -2100,6 +2100,11 @@ write_type (tree type)
 	  || TREE_CODE (t) == METHOD_TYPE)
 	{
 	  t = build_ref_qualified_type (t, type_memfn_rqual (type));
+	  if (flag_noexcept_type)
+	    {
+	      tree r = TYPE_RAISES_EXCEPTIONS (type);
+	      t = build_exception_variant (t, r);
+	    }
 	  if (abi_version_at_least (8)
 	      || type == TYPE_MAIN_VARIANT (type))
 	    /* Avoid adding the unqualified function type as a substitution.  */
@@ -2900,7 +2905,7 @@ write_expression (tree expr)
     write_template_arg_literal (expr);
   else if (code == PARM_DECL && DECL_ARTIFICIAL (expr))
     {
-      gcc_assert (!strcmp ("this", IDENTIFIER_POINTER (DECL_NAME (expr))));
+      gcc_assert (id_equal (DECL_NAME (expr), "this"));
       write_string ("fpT");
     }
   else if (code == PARM_DECL)

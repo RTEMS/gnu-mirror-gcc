@@ -53,6 +53,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "builtins.h"
 #include "spellcheck-tree.h"
 #include "gcc-rich-location.h"
+#include "asan.h"
 
 /* In grokdeclarator, distinguish syntactic contexts of declarators.  */
 enum decl_context
@@ -6044,9 +6045,8 @@ grokdeclarator (const struct c_declarator *declarator,
 		       with known value.  */
 		    this_size_varies = size_varies = true;
 		    warn_variable_length_array (name, size);
-		    if (flag_sanitize & SANITIZE_VLA
-		        && decl_context == NORMAL
-			&& do_ubsan_in_current_function ())
+		    if (sanitize_flags_p (SANITIZE_VLA)
+			&& decl_context == NORMAL)
 		      {
 			/* Evaluate the array size only once.  */
 			size = save_expr (size);
@@ -7453,6 +7453,9 @@ start_struct (location_t loc, enum tree_code code, tree name,
     ref = lookup_tag (code, name, true, &refloc);
   if (ref && TREE_CODE (ref) == code)
     {
+      if (TYPE_STUB_DECL (ref))
+	refloc = DECL_SOURCE_LOCATION (TYPE_STUB_DECL (ref));
+
       if (TYPE_SIZE (ref))
 	{
 	  if (code == UNION_TYPE)
@@ -8185,7 +8188,10 @@ start_enum (location_t loc, struct c_enum_contents *the_enum, tree name)
   /* Update type location to the one of the definition, instead of e.g.
      a forward declaration.  */
   else if (TYPE_STUB_DECL (enumtype))
-    DECL_SOURCE_LOCATION (TYPE_STUB_DECL (enumtype)) = loc;
+    {
+      enumloc = DECL_SOURCE_LOCATION (TYPE_STUB_DECL (enumtype));
+      DECL_SOURCE_LOCATION (TYPE_STUB_DECL (enumtype)) = loc;
+    }
 
   if (C_TYPE_BEING_DEFINED (enumtype))
     error_at (loc, "nested redefinition of %<enum %E%>", name);

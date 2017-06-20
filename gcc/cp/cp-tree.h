@@ -169,8 +169,6 @@ enum cp_tree_index
     CPTI_DSO_HANDLE,
     CPTI_DCAST,
 
-    CPTI_KEYED_CLASSES,
-
     CPTI_NULLPTR,
     CPTI_NULLPTR_TYPE,
 
@@ -289,11 +287,6 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
 /* The type of the vtt parameter passed to subobject constructors and
    destructors.  */
 #define vtt_parm_type			cp_global_trees[CPTI_VTT_PARM_TYPE]
-
-/* A TREE_LIST of the dynamic classes whose vtables may have to be
-   emitted in this translation unit.  */
-
-#define keyed_classes			cp_global_trees[CPTI_KEYED_CLASSES]
 
 /* A node which matches any template argument.  */
 #define any_targ_node			cp_global_trees[CPTI_ANY_TARG]
@@ -557,7 +550,7 @@ identifier_p (tree t)
 
 template <>
 struct default_hash_traits <lang_identifier *>
-  : pointer_hash <tree_node>, ggc_remove <tree>
+  : pointer_hash <tree_node>
 {
   /* Use a regular tree as the type, to make using the hash table
      simpler.  We'll get dynamic type checking with the hash function
@@ -565,10 +558,14 @@ struct default_hash_traits <lang_identifier *>
   GTY((skip)) typedef tree value_type;
   GTY((skip)) typedef tree compare_type;
 
-  static hashval_t hash (const value_type &id)
+  static hashval_t hash (const value_type id)
   {
     return IDENTIFIER_HASH_VALUE (id);
   }
+
+  /* Nothing is deletable.  Everything is insertable.  */
+  static bool is_deleted (value_type) { return false; }
+  static void remove (value_type) { gcc_unreachable (); }
 };
 
 /* In an IDENTIFIER_NODE, nonzero if this identifier is actually a
@@ -3015,7 +3012,7 @@ struct GTY(()) lang_decl {
    template function.  */
 #define DECL_PRETTY_FUNCTION_P(NODE) \
   (DECL_NAME (NODE) \
-   && !strcmp (IDENTIFIER_POINTER (DECL_NAME (NODE)), "__PRETTY_FUNCTION__"))
+   && id_equal (DECL_NAME (NODE), "__PRETTY_FUNCTION__"))
 
 /* Nonzero if the variable was declared to be thread-local.
    We need a special C++ version of this test because the middle-end
@@ -5107,6 +5104,10 @@ extern GTY(()) vec<tree, va_gc> *local_classes;
 /* An array of static vars & fns.  */
 extern GTY(()) vec<tree, va_gc> *static_decls;
 
+/* An array of vtable-needing types that have no key function, or have
+   an emitted key function.  */
+extern GTY(()) vec<tree, va_gc> *keyed_classes;
+
 
 /* Here's where we control how name mangling takes place.  */
 
@@ -5907,7 +5908,7 @@ extern bool reference_related_p			(tree, tree);
 extern int remaining_arguments			(tree);
 extern tree perform_implicit_conversion		(tree, tree, tsubst_flags_t);
 extern tree perform_implicit_conversion_flags	(tree, tree, tsubst_flags_t, int);
-extern tree build_integral_nontype_arg_conv	(tree, tree, tsubst_flags_t);
+extern tree build_converted_constant_expr	(tree, tree, tsubst_flags_t);
 extern tree perform_direct_initialization_if_possible (tree, tree, bool,
                                                        tsubst_flags_t);
 extern tree in_charge_arg_for_name		(tree);
@@ -6022,6 +6023,7 @@ extern tree convert_force			(tree, tree, int,
 						 tsubst_flags_t);
 extern tree build_expr_type_conversion		(int, tree, bool);
 extern tree type_promotes_to			(tree);
+extern bool can_convert_qual			(tree, tree);
 extern tree perform_qualification_conversions	(tree, tree);
 extern bool tx_safe_fn_type_p			(tree);
 extern tree tx_unsafe_fn_variant		(tree);
@@ -6076,7 +6078,7 @@ extern int cp_complete_array_type_or_error	(tree *, tree, bool, tsubst_flags_t);
 extern tree build_ptrmemfunc_type		(tree);
 extern tree build_ptrmem_type			(tree, tree);
 /* the grokdeclarator prototype is in decl.h */
-extern tree build_this_parm			(tree, cp_cv_quals);
+extern tree build_this_parm			(tree, tree, cp_cv_quals);
 extern tree grokparms				(tree, tree *);
 extern int copy_fn_p				(const_tree);
 extern bool move_fn_p                           (const_tree);
@@ -6177,7 +6179,7 @@ extern void check_default_args			(tree);
 extern bool mark_used				(tree);
 extern bool mark_used			        (tree, tsubst_flags_t);
 extern void finish_static_data_member_decl	(tree, tree, bool, tree, int);
-extern tree cp_build_parm_decl			(tree, tree);
+extern tree cp_build_parm_decl			(tree, tree, tree);
 extern tree get_guard				(tree);
 extern tree get_guard_cond			(tree, bool);
 extern tree set_guard				(tree);
@@ -6186,7 +6188,7 @@ extern void mark_needed				(tree);
 extern bool decl_needed_p			(tree);
 extern void note_vague_linkage_fn		(tree);
 extern void note_variable_template_instantiation (tree);
-extern tree build_artificial_parm		(tree, tree);
+extern tree build_artificial_parm		(tree, tree, tree);
 extern bool possibly_inlined_p			(tree);
 extern int parm_index                           (tree);
 extern tree vtv_start_verification_constructor_init_function (void);
@@ -6319,7 +6321,6 @@ extern tree forward_parm			(tree);
 extern bool is_trivially_xible			(enum tree_code, tree, tree);
 extern bool is_xible				(enum tree_code, tree, tree);
 extern tree get_defaulted_eh_spec		(tree);
-extern tree unevaluated_noexcept_spec		(void);
 extern void after_nsdmi_defaulted_late_checks   (tree);
 extern bool maybe_explain_implicit_delete	(tree);
 extern void explain_implicit_non_constexpr	(tree);
@@ -6819,7 +6820,8 @@ extern void cp_free_lang_data 			(tree t);
 extern tree force_target_expr			(tree, tree, tsubst_flags_t);
 extern tree build_target_expr_with_type		(tree, tree, tsubst_flags_t);
 extern void lang_check_failed			(const char *, int,
-						 const char *) ATTRIBUTE_NORETURN;
+						 const char *) ATTRIBUTE_NORETURN
+						 ATTRIBUTE_COLD;
 extern tree stabilize_expr			(tree, tree *);
 extern void stabilize_call			(tree, tree *);
 extern bool stabilize_init			(tree, tree *);

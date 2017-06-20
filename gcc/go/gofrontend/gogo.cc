@@ -1504,10 +1504,10 @@ Gogo::write_globals()
       Bfunction* initfn = func->get_or_make_decl(this, *p);
       Bexpression* func_code =
           this->backend()->function_code_expression(initfn, func_loc);
-      Bexpression* call = this->backend()->call_expression(initfn, func_code,
+      Bexpression* call = this->backend()->call_expression(init_bfn, func_code,
                                                            empty_args,
 							   NULL, func_loc);
-      Bstatement* ist = this->backend()->expression_statement(initfn, call);
+      Bstatement* ist = this->backend()->expression_statement(init_bfn, call);
       init_stmts.push_back(ist);
     }
 
@@ -1686,6 +1686,16 @@ Gogo::register_package(const std::string& pkgpath,
     }
 
   return package;
+}
+
+// Return the pkgpath symbol for a package, given the pkgpath.
+
+std::string
+Gogo::pkgpath_symbol_for_package(const std::string& pkgpath)
+{
+  Packages::iterator p = this->packages_.find(pkgpath);
+  go_assert(p != this->packages_.end());
+  return p->second->pkgpath_symbol();
 }
 
 // Start compiling a function.
@@ -5418,8 +5428,8 @@ Function::get_or_make_decl(Gogo* gogo, Named_object* no)
               // use the pkgpath of the imported package to avoid
               // a possible name collision.  See bug478 for a test
               // case.
-              pkgpath = Gogo::hidden_name_pkgpath(no->name());
-              pkgpath = Gogo::pkgpath_for_symbol(pkgpath);
+	      std::string p = Gogo::hidden_name_pkgpath(no->name());
+	      pkgpath = gogo->pkgpath_symbol_for_package(p);
             }
 
           asm_name = pkgpath;
@@ -5514,8 +5524,19 @@ Function_declaration::get_or_make_decl(Gogo* gogo, Named_object* no)
       if (this->asm_name_.empty())
         {
           asm_name = (no->package() == NULL
-                                  ? gogo->pkgpath_symbol()
-                                  : no->package()->pkgpath_symbol());
+		      ? gogo->pkgpath_symbol()
+		      : no->package()->pkgpath_symbol());
+	  if (this->fntype_->is_method()
+	      && Gogo::is_hidden_name(no->name())
+	      && Gogo::hidden_name_pkgpath(no->name()) != gogo->pkgpath())
+	    {
+	      // This is a method created for an unexported method of
+	      // an imported embedded type.  Use the pkgpath of the
+	      // imported package.  This matches code in
+	      // Function::get_or_make_decl, above.
+	      std::string p = Gogo::hidden_name_pkgpath(no->name());
+	      asm_name = gogo->pkgpath_symbol_for_package(p);
+	    }
           asm_name.append(1, '.');
           asm_name.append(Gogo::unpack_hidden_name(no->name()));
           if (this->fntype_->is_method())

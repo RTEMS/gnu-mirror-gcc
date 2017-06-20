@@ -1316,13 +1316,13 @@
 }
   [(set_attr "type" "vecperm")])
 
-;; Power8 vector merge even/odd
-(define_insn "p8_vmrgew"
-  [(set (match_operand:V4SI 0 "register_operand" "=v")
-	(vec_select:V4SI
-	  (vec_concat:V8SI
-	    (match_operand:V4SI 1 "register_operand" "v")
-	    (match_operand:V4SI 2 "register_operand" "v"))
+;; Power8 vector merge two V4SF/V4SI even words to V4SF
+(define_insn "p8_vmrgew_<mode>"
+  [(set (match_operand:VSX_W 0 "register_operand" "=v")
+	(vec_select:VSX_W
+	  (vec_concat:<VS_double>
+	    (match_operand:VSX_W 1 "register_operand" "v")
+	    (match_operand:VSX_W 2 "register_operand" "v"))
 	  (parallel [(const_int 0) (const_int 4)
 		     (const_int 2) (const_int 6)])))]
   "TARGET_P8_VECTOR"
@@ -3002,7 +3002,7 @@
       emit_insn (gen_vsx_xxsldwi_<mode> (rtx_tmp, operands[1],
 					 operands[1], rtx_val));
 
-      rtx_val = GEN_INT (8);
+      rtx_val = GEN_INT (2);
       emit_insn (gen_vsx_xxsldwi_<mode> (rtx_tmp, operands[1],
 					 rtx_tmp, rtx_val));
       emit_insn (gen_vsx_xvcv<VS_sxwsp>dp (operands[0], rtx_tmp));

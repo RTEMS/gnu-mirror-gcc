@@ -1,5 +1,10 @@
 2017-06-20  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	Merge up to 249415.
+	* REVISION: Update subversion id.
+
+2017-06-20  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* target.def (create_default_clone): Add new hook to say whether
 	we need to create a separate default clone.
 	* targhooks.h (default_create_default_clone): Likewise.

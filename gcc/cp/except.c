@@ -54,9 +54,10 @@ init_exception_processing (void)
   push_namespace (std_identifier);
   tmp = build_function_type_list (void_type_node, NULL_TREE);
   terminate_fn = build_cp_library_fn_ptr ("terminate", tmp,
-					   ECF_NOTHROW | ECF_NORETURN);
-  TREE_THIS_VOLATILE (terminate_fn) = 1;
-  TREE_NOTHROW (terminate_fn) = 1;
+					   ECF_NOTHROW | ECF_NORETURN
+					   | ECF_COLD);
+  gcc_checking_assert (TREE_THIS_VOLATILE (terminate_fn)
+		       && TREE_NOTHROW (terminate_fn));
   pop_namespace ();
 
   /* void __cxa_call_unexpected(void *); */
@@ -1194,18 +1195,6 @@ build_noexcept_spec (tree expr, int complain)
 		  || TREE_CODE (expr) == DEFERRED_NOEXCEPT);
       return build_tree_list (expr, NULL_TREE);
     }
-}
-
-/* Returns a noexcept-specifier to be evaluated later, for an
-   implicitly-declared or explicitly defaulted special member function.  */
-
-tree
-unevaluated_noexcept_spec (void)
-{
-  if (!noexcept_deferred_spec)
-    noexcept_deferred_spec
-      = build_noexcept_spec (make_node (DEFERRED_NOEXCEPT), tf_none);
-  return noexcept_deferred_spec;
 }
 
 /* Returns a TRY_CATCH_EXPR that will put TRY_LIST and CATCH_LIST in the

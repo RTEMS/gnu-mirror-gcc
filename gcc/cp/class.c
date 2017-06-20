@@ -36,6 +36,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dumpfile.h"
 #include "gimplify.h"
 #include "intl.h"
+#include "asan.h"
 
 /* Id for dumping the class hierarchy.  */
 int class_dump_id;
@@ -462,7 +463,8 @@ build_base_path (enum tree_code code,
       else
 	{
 	  tree t = expr;
-	  if ((flag_sanitize & SANITIZE_VPTR) && fixed_type_p == 0)
+	  if (sanitize_flags_p (SANITIZE_VPTR)
+	      && fixed_type_p == 0)
 	    {
 	      t = cp_ubsan_maybe_instrument_cast_to_vbase (input_location,
 							   probe, expr);
@@ -2326,25 +2328,25 @@ resort_type_method_vec (void* obj,
 			gt_pointer_operator new_value,
 			void* cookie)
 {
-  vec<tree, va_gc> *method_vec = (vec<tree, va_gc> *) obj;
-  int len = vec_safe_length (method_vec);
-  size_t slot;
-  tree fn;
-
-  /* The type conversion ops have to live at the front of the vec, so we
-     can't sort them.  */
-  for (slot = CLASSTYPE_FIRST_CONVERSION_SLOT;
-       vec_safe_iterate (method_vec, slot, &fn);
-       ++slot)
-    if (!DECL_CONV_FN_P (OVL_FIRST (fn)))
-      break;
-
-  if (len - slot > 1)
+  if (vec<tree, va_gc> *method_vec = (vec<tree, va_gc> *) obj)
     {
-      resort_data.new_value = new_value;
-      resort_data.cookie = cookie;
-      qsort (method_vec->address () + slot, len - slot, sizeof (tree),
-	     resort_method_name_cmp);
+      int len = method_vec->length ();
+      int slot;
+
+      /* The type conversion ops have to live at the front of the vec, so we
+	 can't sort them.  */
+      for (slot = CLASSTYPE_FIRST_CONVERSION_SLOT;
+	   slot < len; slot++)
+	if (!DECL_CONV_FN_P (OVL_FIRST ((*method_vec)[slot])))
+	  break;
+
+      if (len > slot + 1)
+	{
+	  resort_data.new_value = new_value;
+	  resort_data.cookie = cookie;
+	  qsort (method_vec->address () + slot, len - slot, sizeof (tree),
+		 resort_method_name_cmp);
+	}
     }
 }
 
@@ -5023,10 +5025,8 @@ void
 deduce_noexcept_on_destructor (tree dtor)
 {
   if (!TYPE_RAISES_EXCEPTIONS (TREE_TYPE (dtor)))
-    {
-      tree eh_spec = unevaluated_noexcept_spec ();
-      TREE_TYPE (dtor) = build_exception_variant (TREE_TYPE (dtor), eh_spec);
-    }
+    TREE_TYPE (dtor) = build_exception_variant (TREE_TYPE (dtor),
+						noexcept_deferred_spec);
 }
 
 /* For each destructor in T, deduce noexcept:
@@ -6426,41 +6426,39 @@ layout_class_type (tree t, tree *virtuals_p)
       if (DECL_C_BIT_FIELD (field)
 	  && tree_int_cst_lt (TYPE_SIZE (type), DECL_SIZE (field)))
 	{
-	  unsigned int itk;
-	  tree integer_type;
 	  bool was_unnamed_p = false;
 	  /* We must allocate the bits as if suitably aligned for the
-	     longest integer type that fits in this many bits.  type
-	     of the field.  Then, we are supposed to use the left over
-	     bits as additional padding.  */
-	  for (itk = itk_char; itk != itk_none; ++itk)
-	    if (integer_types[itk] != NULL_TREE
-		&& (tree_int_cst_lt (size_int (MAX_FIXED_MODE_SIZE),
-				     TYPE_SIZE (integer_types[itk]))
-		    || tree_int_cst_lt (DECL_SIZE (field),
-					TYPE_SIZE (integer_types[itk]))))
-	      break;
+	     longest integer type that fits in this many bits.  Then,
+	     we are supposed to use the left over bits as additional
+	     padding.  */
 
-	  /* ITK now indicates a type that is too large for the
-	     field.  We have to back up by one to find the largest
-	     type that fits.  */
-	  do
-	  {
-            --itk;
-	    integer_type = integer_types[itk];
-	  } while (itk > 0 && integer_type == NULL_TREE);
+	  /* Do not pick a type bigger than MAX_FIXED_MODE_SIZE.  */
+	  tree limit = size_int (MAX_FIXED_MODE_SIZE);
+	  if (tree_int_cst_lt (DECL_SIZE (field), limit))
+	    limit = DECL_SIZE (field);
+
+	  tree integer_type = integer_types[itk_char];
+	  for (unsigned itk = itk_char; itk != itk_none; itk++)
+	    if (tree next = integer_types[itk])
+	      {
+		if (tree_int_cst_lt (limit, TYPE_SIZE (next)))
+		  /* Too big, so our current guess is what we want.  */
+		  break;
+		/* Not bigger than limit, ok  */
+		integer_type = next;
+	      }
 
 	  /* Figure out how much additional padding is required.  */
-	  if (tree_int_cst_lt (TYPE_SIZE (integer_type), DECL_SIZE (field)))
-	    {
-	      if (TREE_CODE (t) == UNION_TYPE)
-		/* In a union, the padding field must have the full width
-		   of the bit-field; all fields start at offset zero.  */
-		padding = DECL_SIZE (field);
-	      else
-		padding = size_binop (MINUS_EXPR, DECL_SIZE (field),
-				      TYPE_SIZE (integer_type));
-	    }
+	  if (TREE_CODE (t) == UNION_TYPE)
+	    /* In a union, the padding field must have the full width
+	       of the bit-field; all fields start at offset zero.  */
+	    padding = DECL_SIZE (field);
+	  else
+	    padding = size_binop (MINUS_EXPR, DECL_SIZE (field),
+				  TYPE_SIZE (integer_type));
+
+ 	  if (integer_zerop (padding))
+	    padding = NULL_TREE;
 
 	  /* An unnamed bitfield does not normally affect the
 	     alignment of the containing class on a target where
@@ -7189,8 +7187,8 @@ finish_struct_1 (tree t)
 	 in every translation unit where the class definition appears.  If
 	 we're devirtualizing, we can look into the vtable even if we
 	 aren't emitting it.  */
-      if (CLASSTYPE_KEY_METHOD (t) == NULL_TREE)
-	keyed_classes = tree_cons (NULL_TREE, t, keyed_classes);
+      if (!CLASSTYPE_KEY_METHOD (t))
+	vec_safe_push (keyed_classes, t);
     }
 
   /* Layout the class itself.  */
@@ -9729,7 +9727,7 @@ build_vtbl_initializer (tree binfo,
 		    dvirt_fn = push_library_fn
 		      (name,
 		       build_function_type_list (void_type_node, NULL_TREE),
-		       NULL_TREE, ECF_NORETURN);
+		       NULL_TREE, ECF_NORETURN | ECF_COLD);
 		}
 	      fn = dvirt_fn;
 	      if (!TARGET_VTABLE_USES_DESCRIPTORS)

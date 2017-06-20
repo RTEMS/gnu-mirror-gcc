@@ -60,6 +60,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimplify.h"
 #include "attribs.h"
 #include "selftest.h"
+#include "opts.h"
 
 /* This file contains functions for building the Control Flow Graph (CFG)
    for a function tree.  */
@@ -1048,10 +1049,27 @@ gimple_find_sub_bbs (gimple_seq seq, gimple_stmt_iterator *gsi)
   while (bb != afterbb)
     {
       struct omp_region *cur_region = NULL;
+      profile_count cnt = profile_count::zero ();
+      int freq = 0;
+
       int cur_omp_region_idx = 0;
       int mer = make_edges_bb (bb, &cur_region, &cur_omp_region_idx);
       gcc_assert (!mer && !cur_region);
       add_bb_to_loop (bb, afterbb->loop_father);
+
+      edge e;
+      edge_iterator ei;
+      FOR_EACH_EDGE (e, ei, bb->preds)
+	{
+	  cnt += e->count;
+	  freq += EDGE_FREQUENCY (e);
+	}
+      bb->count = cnt;
+      bb->frequency = freq;
+      tree_guess_outgoing_edge_probabilities (bb);
+      FOR_EACH_EDGE (e, ei, bb->succs)
+	e->count = bb->count.apply_probability (e->probability);
+
       bb = bb->next_bb;
     }
   return true;
@@ -2159,7 +2177,7 @@ remove_bb (basic_block bb)
 	 with it.  */
       if (loop->latch == bb
 	  || loop->header == bb)
-	free_numbers_of_iterations_estimates_loop (loop);
+	free_numbers_of_iterations_estimates (loop);
     }
 
   /* Remove all the instructions in the block.  */
@@ -7538,6 +7556,25 @@ dump_default_def (FILE *file, tree def, int spc, dump_flags_t flags)
   fprintf (file, ";\n");
 }
 
+/* Print no_sanitize attribute to FILE for a given attribute VALUE.  */
+
+static void
+print_no_sanitize_attr_value (FILE *file, tree value)
+{
+  unsigned int flags = tree_to_uhwi (value);
+  bool first = true;
+  for (int i = 0; sanitizer_opts[i].name != NULL; ++i)
+    {
+      if ((sanitizer_opts[i].flag & flags) == sanitizer_opts[i].flag)
+	{
+	  if (!first)
+	    fprintf (file, " | ");
+	  fprintf (file, "%s", sanitizer_opts[i].name);
+	  first = false;
+	}
+    }
+}
+
 /* Dump FUNCTION_DECL FN to file FILE using FLAGS (see TDF_* in dumpfile.h)
    */
 
@@ -7565,11 +7602,16 @@ dump_function_to_file (tree fndecl, FILE *file, dump_flags_t flags)
 	  if (!first)
 	    fprintf (file, ", ");
 
-	  print_generic_expr (file, get_attribute_name (chain), dump_flags);
+	  tree name = get_attribute_name (chain);
+	  print_generic_expr (file, name, dump_flags);
 	  if (TREE_VALUE (chain) != NULL_TREE)
 	    {
 	      fprintf (file, " (");
-	      print_generic_expr (file, TREE_VALUE (chain), dump_flags);
+
+	      if (strstr (IDENTIFIER_POINTER (name), "no_sanitize"))
+		print_no_sanitize_attr_value (file, TREE_VALUE (chain));
+	      else
+		print_generic_expr (file, TREE_VALUE (chain), dump_flags);
 	      fprintf (file, ")");
 	    }
 	}
@@ -9060,7 +9102,9 @@ execute_fixup_cfg (void)
   cgraph_node *node = cgraph_node::get (current_function_decl);
   profile_count num = node->count;
   profile_count den = ENTRY_BLOCK_PTR_FOR_FN (cfun)->count;
-  bool scale = num.initialized_p () && den.initialized_p () && !(num == den);
+  bool scale = num.initialized_p ()
+	       && (den > 0 || num == profile_count::zero ())
+	       && !(num == den);
 
   if (scale)
     {

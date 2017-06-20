@@ -2279,7 +2279,8 @@ gimplify_switch_expr (tree *expr_p, gimple_seq *pre_p)
 
       /* Do not create live_switch_vars if SWITCH_BODY is not a BIND_EXPR.  */
       saved_live_switch_vars = gimplify_ctxp->live_switch_vars;
-      if (TREE_CODE (SWITCH_BODY (switch_expr)) == BIND_EXPR)
+      tree_code body_type = TREE_CODE (SWITCH_BODY (switch_expr));
+      if (body_type == BIND_EXPR || body_type == STATEMENT_LIST)
 	gimplify_ctxp->live_switch_vars = new hash_set<tree> (4);
       else
 	gimplify_ctxp->live_switch_vars = NULL;
@@ -12647,7 +12648,7 @@ gimplify_function_tree (tree fndecl)
       && !needs_to_live_in_memory (ret))
     DECL_GIMPLE_REG_P (ret) = 1;
 
-  if (asan_sanitize_use_after_scope () && !asan_no_sanitize_address_p ())
+  if (asan_sanitize_use_after_scope () && sanitize_flags_p (SANITIZE_ADDRESS))
     asan_poisoned_variables = new hash_set<tree> ();
   bind = gimplify_body (fndecl, true);
   if (asan_poisoned_variables)
@@ -12714,8 +12715,7 @@ gimplify_function_tree (tree fndecl)
       bind = new_bind;
     }
 
-  if ((flag_sanitize & SANITIZE_THREAD) != 0
-      && !lookup_attribute ("no_sanitize_thread", DECL_ATTRIBUTES (fndecl)))
+  if (sanitize_flags_p (SANITIZE_THREAD))
     {
       gcall *call = gimple_build_call_internal (IFN_TSAN_FUNC_EXIT, 0);
       gimple *tf = gimple_build_try (seq, call, GIMPLE_TRY_FINALLY);
@@ -12732,7 +12732,7 @@ gimplify_function_tree (tree fndecl)
 
   pop_cfun ();
 
-  dump_function (TDI_generic, fndecl);
+  dump_function (TDI_gimple, fndecl);
 }
 
 /* Return a dummy expression of type TYPE in order to keep going after an
