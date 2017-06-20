@@ -1,3 +1,20 @@
+2017-06-20  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* target.def (create_default_clone): Add new hook to say whether
+	we need to create a separate default clone.
+	* targhooks.h (default_create_default_clone): Likewise.
+	* targhooks.c (default_create_default_clone): Likewise.
+	* doc/tm.texi (TARGET_CREATE_DEFAULT_CLINE): Likewise.
+	* doc/tm.texi.in (TARGET_CREATE_DEFAULT_CLINE): Likewise.
+
+	* multiple_target.c (separate_attrs): Check if we need to create a
+	separate default clone.
+
+	* config/rs6000/rs6000.c (TARGET_CREATE_DEFAULT_CLONE): Define.
+	(make_resolver_func): Add support for creating a separate default
+	clone.
+	(rs6000_create_default_clone): Likewise.
+
 2017-06-05  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Merge up to 248902.

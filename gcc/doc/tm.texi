@@ -10231,6 +10231,12 @@ different target specific attributes, that is, they are compiled for
 different target machines.
 @end deftypefn
 
+@deftypefn {Target Hook} bool TARGET_CREATE_DEFAULT_CLONE (void)
+This hook returns true if we should create a separate clone entry for
+the default entry when generating target_clones instead of using the main
+entry for the default.
+@end deftypefn
+
 @deftypefn {Target Hook} bool TARGET_CAN_INLINE_P (tree @var{caller}, tree @var{callee})
 This target hook returns @code{false} if the @var{caller} function
 cannot inline @var{callee}, based on target specific information.  By

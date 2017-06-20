@@ -2015,6 +2015,9 @@ static const struct attribute_spec rs6000_attribute_table[] =
 #undef TARGET_OPTION_FUNCTION_VERSIONS
 #define TARGET_OPTION_FUNCTION_VERSIONS common_function_versions
 
+#undef TARGET_CREATE_DEFAULT_CLONE
+#define TARGET_CREATE_DEFAULT_CLONE rs6000_create_default_clone
+
 
 
 /* Processor table.  */
@@ -40506,7 +40509,6 @@ make_resolver_func (const tree default_decl,
     = make_attribute ("ifunc", resolver_name, DECL_ATTRIBUTES (dispatch_decl));
 
   cgraph_node::create_same_body_alias (dispatch_decl, decl);
-  XDELETEVEC (resolver_name);
   return decl;
 }
 
@@ -40615,9 +40617,9 @@ dispatch_function_versions (tree dispatch_decl,
   /* At least one more version other than the default.  */
   gcc_assert (fndecls->length () >= 2);
 
-  /* The first version in the vector is the default decl.  */
   memset ((void *) clones, '\0', sizeof (clones));
-  clones[CLONE_DEFAULT] = (*fndecls)[0];
+  if (!targetm.create_default_clone ())
+    clones[CLONE_DEFAULT] = (*fndecls)[0];
 
   /* On the PowerPC, we do not need to call __builtin_cpu_init, which is a NOP
      on the PowerPC (on the x86_64, it is not a NOP).  The builtin function
@@ -40696,6 +40698,14 @@ rs6000_generate_version_dispatcher_body (void *node_p)
   cgraph_edge::rebuild_edges ();
   pop_cfun ();
   return resolver;
+}
+
+/* Target hook that returns if we should create a separate clone for the
+   default entry for target clones.  */
+static bool
+rs6000_create_default_clone (void)
+{
+  return true;
 }
 
 

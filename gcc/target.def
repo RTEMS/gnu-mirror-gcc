@@ -2471,6 +2471,15 @@ version at run-time. @var{decl} is one version from a set of semantically\n\
 identical versions.",
  tree, (void *decl), NULL)
 
+/* Target hook that returns if we should create a separate clone for the
+   default entry for target clones.  */
+DEFHOOK
+(create_default_clone,
+ "This hook returns true if we should create a separate clone entry for\n\
+the default entry when generating target_clones instead of using the main\n\
+entry for the default.",
+ bool, (void), default_create_default_clone)
+
 /* Returns a code for a target-specific builtin that implements
    reciprocal of a target-specific function, or NULL_TREE if not available.  */
 DEFHOOK

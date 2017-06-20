@@ -164,7 +164,8 @@ separate_attrs (char *attr_str, char **attrs)
       if (strcmp (attr, "default") == 0)
 	{
 	  has_default = true;
-	  continue;
+	  if (!targetm.create_default_clone ())
+	    continue;
 	}
       attrs[i++] = attr;
     }

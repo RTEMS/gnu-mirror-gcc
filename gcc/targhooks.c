@@ -2107,4 +2107,11 @@ default_excess_precision (enum excess_precision_type ATTRIBUTE_UNUSED)
   return FLT_EVAL_METHOD_PROMOTE_TO_FLOAT;
 }
 
+/* Default implementation of TARGET_CREATE_DEFAULT_CLONE.  */
+bool
+default_create_default_clone (void)
+{
+  return false;
+}
+
 #include "gt-targhooks.h"
