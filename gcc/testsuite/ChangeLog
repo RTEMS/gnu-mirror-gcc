@@ -1,5 +1,36 @@
 2017-06-22  Jeff Law  <law@redhat.com>
 
+	* gcc.c-torture/compile/stack-check-1.c: Require "untyped_assembly".
+
+2017-06-23  Will Schmidt  <will_schmidt@vnet.ibm.com>
+
+	* gcc.target/powerpc/fold-vec-shift-char.c: New.
+	* gcc.target/powerpc/fold-vec-shift-int.c: New.
+	* gcc.target/powerpc/fold-vec-shift-longlong.c: New.
+	* gcc.target/powerpc/fold-vec-shift-short.c: New.
+	* gcc.target/powerpc/fold-vec-shift-left.c: New.
+	* gcc.target/powerpc/fold-vec-shift-left-fwrapv.c: New.
+	* gcc.target/powerpc/fold-vec-shift-left-longlong-fwrapv.c: New.
+	* gcc.target/powerpc/fold-vec-shift-left-longlong.c: New.
+
+2017-06-23  James Cowgill  <James.Cowgill@imgtec.com>
+
+	* go.test/go-test.exp (go-set-goarch): Update MIPS architecture
+        names.
+
+2017-06-22  Matt Turner  <mattst88@gmail.com>
+
+	* gcc.target/i386/builtin_target.c: Add Kaby Lake models to
+	skylake check.
+
+2017-06-22 Carl Love  <cel@us.ibm.com>
+
+	* gcc.target/powerpc/builtins-3.c (vmulosh, vmulouh, vmulesh,
+	vmuleuh): Fix scan-assembler-times should check for word not half word
+	instructions.
+
+2017-06-22  Jeff Law  <law@redhat.com>
+
 	* gcc.c-torture/compile/stack-check-1.c: New test.
 
 2016-06-22  Richard Biener  <rguenther@suse.de>

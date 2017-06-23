@@ -1,3 +1,55 @@
+2017-06-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR ipa/81185
+	* multiple_target.c (create_dispatcher_calls): Only create the
+	dispatcher call if the function is the default clone of a
+	versioned function.
+
+2017-06-23  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR middle-end/80902
+	* builtins.c (expand_builtin_atomic_fetch_op): If emitting code after
+	a call, force the call to not be a tail call.
+
+2017-06-23  Jeff Law  <law@redhat.com>
+
+	* doc/contrib.texi: Add entry for Steven Pemberton's work on
+	enquire.
+
+2017-06-23  Will Schmidt  <will_schmidt@vnet.ibm.com>
+
+	* config/rs6000/rs6000.c: Add include of ssa-propagate.h for
+	update_call_from_tree().  (rs6000_gimple_fold_builtin): Add
+	handling for early expansion of vector shifts (sl,sr,sra,rl).
+	(builtin_function_type): Add vector shift right instructions
+	to the unsigned argument list.
+
+2017-06-23  Bernd Edlinger  <bernd.edlinger@hotmail.de>
+
+	rtl-optimizatoin/79286
+	* ira.c (update_equiv_regs): Revert to using may_trap_or_fault_p again.
+	* rtlanal.c (rtx_addr_can_trap_p_1): SYMBOL_REF_FUNCTION_P can never
+	trap.  PIC register plus a const unspec without offset can never trap.
+
+2017-06-23  Marc Glisse  <marc.glisse@inria.fr>
+
+	* tree.h (builtin_structptr_type): New type.
+	(builtin_structptr_types): Declare new array.
+	* tree.c (builtin_structptr_types): New array.
+	(free_lang_data, build_common_tree_nodes): Use it.
+
+2017-06-23  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR c++/81187
+	* doc/invoke.texi (-Wnoexcept-type): Fix name of option, from
+	-Wnoexcept.
+
+2017-06-22  Matt Turner  <mattst88@gmail.com>
+
+	* config/i386/driver-i386.c (host_detect_local_cpu): Add Kaby
+	Lake models to skylake case.  Assume skylake for unknown
+	models with clflushopt.
+
 2017-06-22  Jeff Law  <law@redhat.com>
 
 	* config/aarch64/aarch64.c (aarch64_emit_probe_stack_range): Handle
