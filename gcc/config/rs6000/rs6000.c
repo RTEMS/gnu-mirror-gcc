@@ -38697,6 +38697,11 @@ rs6000_get_function_versions_dispatcher (void *decl)
 
   default_node = default_version_info->this_node;
 
+#ifndef TARGET_LIBC_PROVIDES_HWCAP_IN_TCB
+  warning_at (DECL_SOURCE_LOCATION (default_node->decl), 0,
+	      "target_clone needs at least glibc 2.23");
+#endif
+
   if (targetm.has_ifunc_p ())
     {
       struct cgraph_function_version_info *it_v = NULL;
