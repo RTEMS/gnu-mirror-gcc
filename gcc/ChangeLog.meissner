@@ -1,3 +1,12 @@
+2017-06-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* multiple_target.c (create_dispatcher_calls): Make the default
+	clone private.
+
+	* config/rs6000/rs6000.c (make_resolver_func): Make resolver
+	function private and not a COMDAT function.  Create the name with
+	clone_function_name instead of make_unique_name.
+
 2017-06-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_get_function_versions_dispatcher): Add
