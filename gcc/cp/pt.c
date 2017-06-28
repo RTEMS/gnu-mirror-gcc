@@ -2884,7 +2884,7 @@ check_explicit_specialization (tree declarator,
 	      int is_constructor = DECL_CONSTRUCTOR_P (decl);
 
 	      if (is_constructor ? !TYPE_HAS_USER_CONSTRUCTOR (ctype)
-		  : !CLASSTYPE_DESTRUCTORS (ctype))
+		  : !CLASSTYPE_DESTRUCTOR (ctype))
 		{
 		  /* From [temp.expl.spec]:
 
@@ -7170,26 +7170,68 @@ unify_bound_ttp_args (tree tparms, tree targs, tree parm, tree& arg,
   parmvec = expand_template_argument_pack (parmvec);
   argvec = expand_template_argument_pack (argvec);
 
-  tree nparmvec = parmvec;
   if (flag_new_ttp)
     {
       /* In keeping with P0522R0, adjust P's template arguments
 	 to apply to A's template; then flatten it again.  */
+      tree nparmvec = parmvec;
       nparmvec = coerce_ttp_args_for_tta (arg, parmvec, tf_none);
       nparmvec = expand_template_argument_pack (nparmvec);
+
+      if (unify (tparms, targs, nparmvec, argvec,
+		 UNIFY_ALLOW_NONE, explain_p))
+	return 1;
+
+      /* If the P0522 adjustment eliminated a pack expansion, deduce
+	 empty packs.  */
+      if (flag_new_ttp
+	  && TREE_VEC_LENGTH (nparmvec) < TREE_VEC_LENGTH (parmvec)
+	  && unify_pack_expansion (tparms, targs, parmvec, argvec,
+				   DEDUCE_EXACT, /*sub*/true, explain_p))
+	return 1;
     }
+  else
+    {
+      /* Deduce arguments T, i from TT<T> or TT<i>.
+	 We check each element of PARMVEC and ARGVEC individually
+	 rather than the whole TREE_VEC since they can have
+	 different number of elements, which is allowed under N2555.  */
 
-  if (unify (tparms, targs, nparmvec, argvec,
-	     UNIFY_ALLOW_NONE, explain_p))
-    return 1;
+      int len = TREE_VEC_LENGTH (parmvec);
 
-  /* If the P0522 adjustment eliminated a pack expansion, deduce
-     empty packs.  */
-  if (flag_new_ttp
-      && TREE_VEC_LENGTH (nparmvec) < TREE_VEC_LENGTH (parmvec)
-      && unify_pack_expansion (tparms, targs, parmvec, argvec,
-			       DEDUCE_EXACT, /*sub*/true, explain_p))
-    return 1;
+      /* Check if the parameters end in a pack, making them
+	 variadic.  */
+      int parm_variadic_p = 0;
+      if (len > 0
+	  && PACK_EXPANSION_P (TREE_VEC_ELT (parmvec, len - 1)))
+	parm_variadic_p = 1;
+
+      for (int i = 0; i < len - parm_variadic_p; ++i)
+	/* If the template argument list of P contains a pack
+	   expansion that is not the last template argument, the
+	   entire template argument list is a non-deduced
+	   context.  */
+	if (PACK_EXPANSION_P (TREE_VEC_ELT (parmvec, i)))
+	  return unify_success (explain_p);
+
+      if (TREE_VEC_LENGTH (argvec) < len - parm_variadic_p)
+	return unify_too_few_arguments (explain_p,
+					TREE_VEC_LENGTH (argvec), len);
+
+      for (int i = 0; i < len - parm_variadic_p; ++i)
+	if (unify (tparms, targs,
+		   TREE_VEC_ELT (parmvec, i),
+		   TREE_VEC_ELT (argvec, i),
+		   UNIFY_ALLOW_NONE, explain_p))
+	  return 1;
+
+      if (parm_variadic_p
+	  && unify_pack_expansion (tparms, targs,
+				   parmvec, argvec,
+				   DEDUCE_EXACT,
+				   /*subr=*/true, explain_p))
+	return 1;
+    }
 
   return 0;
 }
@@ -12235,22 +12277,13 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain)
 
     case FUNCTION_DECL:
       {
-	tree ctx;
-	tree argvec = NULL_TREE;
-	tree *friends;
-	tree gen_tmpl;
-	tree type;
-	int member;
-	int args_depth;
-	int parms_depth;
+	tree gen_tmpl, argvec;
 
 	/* Nobody should be tsubst'ing into non-template functions.  */
 	gcc_assert (DECL_TEMPLATE_INFO (t) != NULL_TREE);
 
 	if (TREE_CODE (DECL_TI_TEMPLATE (t)) == TEMPLATE_DECL)
 	  {
-	    tree spec;
-
 	    /* If T is not dependent, just return it.  */
 	    if (!uses_template_parms (DECL_TI_ARGS (t)))
 	      RETURN (t);
@@ -12268,9 +12301,7 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain)
 
 	    /* Check to see if we already have this specialization.  */
 	    hash = hash_tmpl_and_args (gen_tmpl, argvec);
-	    spec = retrieve_specialization (gen_tmpl, argvec, hash);
-
-	    if (spec)
+	    if (tree spec = retrieve_specialization (gen_tmpl, argvec, hash))
 	      {
 		r = spec;
 		break;
@@ -12308,11 +12339,11 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain)
 
 	       which we can spot because the pattern will be a
 	       specialization in this case.  */
-	    args_depth = TMPL_ARGS_DEPTH (args);
-	    parms_depth =
+	    int args_depth = TMPL_ARGS_DEPTH (args);
+	    int parms_depth =
 	      TMPL_PARMS_DEPTH (DECL_TEMPLATE_PARMS (DECL_TI_TEMPLATE (t)));
-	    if (args_depth > parms_depth
-		&& !DECL_TEMPLATE_SPECIALIZATION (t))
+
+	    if (args_depth > parms_depth && !DECL_TEMPLATE_SPECIALIZATION (t))
 	      args = get_innermost_template_args (args, parms_depth);
 	  }
 	else
@@ -12329,23 +12360,18 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain)
 	       new decl (R) with appropriate types so that we can call
 	       determine_specialization.  */
 	    gen_tmpl = NULL_TREE;
+	    argvec = NULL_TREE;
 	  }
 
-	if (DECL_CLASS_SCOPE_P (t))
-	  {
-	    if (DECL_NAME (t) == constructor_name (DECL_CONTEXT (t)))
-	      member = 2;
-	    else
-	      member = 1;
-	    ctx = tsubst_aggr_type (DECL_CONTEXT (t), args,
-				    complain, t, /*entering_scope=*/1);
-	  }
-	else
-	  {
-	    member = 0;
-	    ctx = DECL_CONTEXT (t);
-	  }
-	type = tsubst (TREE_TYPE (t), args, complain|tf_fndecl_type, in_decl);
+	tree ctx = DECL_CONTEXT (t);
+	bool member = ctx && TYPE_P (ctx);
+
+	if (member)
+	  ctx = tsubst_aggr_type (ctx, args,
+				  complain, t, /*entering_scope=*/1);
+
+	tree type = tsubst (TREE_TYPE (t), args,
+			    complain | tf_fndecl_type, in_decl);
 	if (type == error_mark_node)
 	  RETURN (error_mark_node);
 
@@ -12465,14 +12491,13 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain)
 	  DECL_TEMPLATE_INFO (r) = NULL_TREE;
 
 	/* Copy the list of befriending classes.  */
-	for (friends = &DECL_BEFRIENDING_CLASSES (r);
+	for (tree *friends = &DECL_BEFRIENDING_CLASSES (r);
 	     *friends;
 	     friends = &TREE_CHAIN (*friends))
 	  {
 	    *friends = copy_node (*friends);
-	    TREE_VALUE (*friends) = tsubst (TREE_VALUE (*friends),
-					    args, complain,
-					    in_decl);
+	    TREE_VALUE (*friends)
+	      = tsubst (TREE_VALUE (*friends), args, complain, in_decl);
 	  }
 
 	if (DECL_CONSTRUCTOR_P (r) || DECL_DESTRUCTOR_P (r))
@@ -24797,6 +24822,14 @@ make_template_placeholder (tree tmpl)
   tree t = make_auto_1 (DECL_NAME (tmpl), true);
   CLASS_PLACEHOLDER_TEMPLATE (t) = tmpl;
   return t;
+}
+
+/* True iff T is a C++17 class template deduction placeholder.  */
+
+bool
+template_placeholder_p (tree t)
+{
+  return is_auto (t) && CLASS_PLACEHOLDER_TEMPLATE (t);
 }
 
 /* Make a "constrained auto" type-specifier. This is an

@@ -454,6 +454,7 @@ powerpc*-*-*spe*)
 	;;
 powerpc*-*-*)
 	cpu_type=rs6000
+	extra_objs="rs6000-string.o"
 	extra_headers="ppc-asm.h altivec.h htmintrin.h htmxlintrin.h"
 	extra_headers="${extra_headers} bmi2intrin.h bmiintrin.h x86intrin.h"
 	extra_headers="${extra_headers} ppu_intrinsics.h spu2vmx.h vec_types.h si2vmx.h"
@@ -471,6 +472,7 @@ riscv*)
 	;;
 rs6000*-*-*)
 	extra_options="${extra_options} g.opt fused-madd.opt rs6000/rs6000-tables.opt"
+	extra_objs="rs6000-string.o"
 	;;
 sparc*-*-*)
 	cpu_type=sparc
@@ -923,6 +925,11 @@ case ${target} in
     no) ;;
     "" | yes | vxworks) thread_file='vxworks' ;;
     *) echo 'Unknown thread configuration for VxWorks'; exit 1 ;;
+  esac
+  case $target in
+    *-*-vxworks7*)
+      tm_defines="$tm_defines TARGET_VXWORKS7=1"
+      ;;
   esac
   ;;
 *-*-elf|arc*-*-elf*)
@@ -1673,8 +1680,15 @@ i[34567]86-*-solaris2* | x86_64-*-solaris2.1[0-9]*)
 		esac
 	fi
 	;;
-i[4567]86-wrs-vxworks|i[4567]86-wrs-vxworksae)
-	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h vx-common.h"
+i[4567]86-wrs-vxworks|i[4567]86-wrs-vxworksae|i[4567]86-wrs-vxworks7|x86_64-wrs-vxworks7)
+	tm_file="${tm_file} i386/unix.h i386/att.h elfos.h"
+	case ${target} in
+	  x86_64-*)
+	    need_64bit_isa=yes
+	    tm_file="${tm_file} i386/x86-64.h"
+	    ;;
+	esac
+	tm_file="${tm_file} vx-common.h"
 	case ${target} in
 	  *-vxworksae*)
 	    tm_file="${tm_file} vxworksae.h i386/vxworks.h i386/vxworksae.h"

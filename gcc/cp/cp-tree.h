@@ -527,7 +527,6 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
 struct GTY(()) lang_identifier {
   struct c_common_identifier c_common;
   cxx_binding *bindings;
-  tree class_template_info;
   tree label_value;
 };
 
@@ -953,9 +952,6 @@ enum GTY(()) abstract_class_use {
 };
 
 /* Macros for access to language-specific slots in an identifier.  */
-
-#define IDENTIFIER_TEMPLATE(NODE)	\
-  (LANG_IDENTIFIER_CAST (NODE)->class_template_info)
 
 /* The IDENTIFIER_BINDING is the innermost cxx_binding for the
     identifier.  Its PREVIOUS is the next outermost binding.  Each
@@ -1776,6 +1772,7 @@ struct GTY(()) language_function {
   (operator_name_info[(int) (CODE)].identifier)
 #define cp_assignment_operator_id(CODE) \
   (assignment_operator_name_info[(int) (CODE)].identifier)
+
 /* In parser.c.  */
 extern tree cp_literal_operator_id (const char *);
 
@@ -2148,11 +2145,11 @@ struct GTY(()) lang_type {
 #define CLASSTYPE_CONSTRUCTORS(NODE) \
   ((*CLASSTYPE_METHOD_VEC (NODE))[CLASSTYPE_CONSTRUCTOR_SLOT])
 
-/* A FUNCTION_DECL for the destructor for NODE.  These are the
+/* A FUNCTION_DECL for the destructor for NODE.  This is the
    destructors that take an in-charge parameter.  If
    CLASSTYPE_LAZY_DESTRUCTOR is true, then this entry will be NULL
    until the destructor is created with lazily_declare_fn.  */
-#define CLASSTYPE_DESTRUCTORS(NODE) \
+#define CLASSTYPE_DESTRUCTOR(NODE) \
   (CLASSTYPE_METHOD_VEC (NODE)						      \
    ? (*CLASSTYPE_METHOD_VEC (NODE))[CLASSTYPE_DESTRUCTOR_SLOT]		      \
    : NULL_TREE)
@@ -2182,11 +2179,9 @@ struct GTY(()) lang_type {
 
 /* The type corresponding to NODE when NODE is used as a base class,
    i.e., NODE without virtual base classes or tail padding.  */
-
 #define CLASSTYPE_AS_BASE(NODE) (LANG_TYPE_CLASS_CHECK (NODE)->as_base)
 
 /* True iff NODE is the CLASSTYPE_AS_BASE version of some type.  */
-
 #define IS_FAKE_BASE_TYPE(NODE)					\
   (TREE_CODE (NODE) == RECORD_TYPE				\
    && TYPE_CONTEXT (NODE) && CLASS_TYPE_P (TYPE_CONTEXT (NODE))	\
@@ -2495,25 +2490,27 @@ struct GTY(()) lang_decl_fn {
   struct lang_decl_min min;
 
   /* In an overloaded operator, this is the value of
-     DECL_OVERLOADED_OPERATOR_P.  */
+     DECL_OVERLOADED_OPERATOR_P.
+     FIXME: We should really do better in compressing this.  */
   ENUM_BITFIELD (tree_code) operator_code : 16;
 
   unsigned global_ctor_p : 1;
   unsigned global_dtor_p : 1;
-  unsigned assignment_operator_p : 1;
   unsigned static_function : 1;
   unsigned pure_virtual : 1;
   unsigned defaulted_p : 1;
   unsigned has_in_charge_parm_p : 1;
   unsigned has_vtt_parm_p : 1;
-  
   unsigned pending_inline_p : 1;
+
   unsigned nonconverting : 1;
   unsigned thunk_p : 1;
   unsigned this_thunk_p : 1;
   unsigned hidden_friend_p : 1;
   unsigned omp_declare_reduction_p : 1;
-  /* 2 spare bits on 32-bit hosts, 34 on 64-bit hosts.  */
+  /* 3 spare bits.  */
+
+  /* 32-bits padding on 64-bit host.  */
 
   /* For a non-thunk function decl, this is a tree list of
      friendly classes. For a thunk function decl, it is the
@@ -2694,14 +2691,12 @@ struct GTY(()) lang_decl {
 /* Nonzero if NODE (a FUNCTION_DECL) is a constructor for a complete
    object.  */
 #define DECL_COMPLETE_CONSTRUCTOR_P(NODE)		\
-  (DECL_CONSTRUCTOR_P (NODE)				\
-   && DECL_NAME (NODE) == complete_ctor_identifier)
+  (DECL_NAME (NODE) == complete_ctor_identifier)
 
 /* Nonzero if NODE (a FUNCTION_DECL) is a constructor for a base
    object.  */
 #define DECL_BASE_CONSTRUCTOR_P(NODE)		\
-  (DECL_CONSTRUCTOR_P (NODE)			\
-   && DECL_NAME (NODE) == base_ctor_identifier)
+  (DECL_NAME (NODE) == base_ctor_identifier)
 
 /* Nonzero if NODE (a FUNCTION_DECL) is a constructor, but not either the
    specialized in-charge constructor or the specialized not-in-charge
@@ -2733,20 +2728,17 @@ struct GTY(()) lang_decl {
 /* Nonzero if NODE (a FUNCTION_DECL) is a destructor for a complete
    object.  */
 #define DECL_COMPLETE_DESTRUCTOR_P(NODE)		\
-  (DECL_DESTRUCTOR_P (NODE)				\
-   && DECL_NAME (NODE) == complete_dtor_identifier)
+  (DECL_NAME (NODE) == complete_dtor_identifier)
 
 /* Nonzero if NODE (a FUNCTION_DECL) is a destructor for a base
    object.  */
 #define DECL_BASE_DESTRUCTOR_P(NODE)		\
-  (DECL_DESTRUCTOR_P (NODE)			\
-   && DECL_NAME (NODE) == base_dtor_identifier)
+  (DECL_NAME (NODE) == base_dtor_identifier)
 
 /* Nonzero if NODE (a FUNCTION_DECL) is a destructor for a complete
    object that deletes the object after it has been destroyed.  */
 #define DECL_DELETING_DESTRUCTOR_P(NODE)		\
-  (DECL_DESTRUCTOR_P (NODE)				\
-   && DECL_NAME (NODE) == deleting_dtor_identifier)
+  (DECL_NAME (NODE) == deleting_dtor_identifier)
 
 /* Nonzero if NODE (a FUNCTION_DECL) is a cloned constructor or
    destructor.  */
@@ -2836,9 +2828,7 @@ struct GTY(()) lang_decl {
   (LANG_DECL_FN_CHECK (NODE)->operator_code = (CODE))
 
 /* If NODE is an overloaded operator, then this returns the TREE_CODE
-   associated with the overloaded operator.
-   DECL_ASSIGNMENT_OPERATOR_P must also be checked to determine
-   whether or not NODE is an assignment operator.  If NODE is not an
+   associated with the overloaded operator.  If NODE is not an
    overloaded operator, ERROR_MARK is returned.  Since the numerical
    value of ERROR_MARK is zero, this macro can be used as a predicate
    to test whether or not NODE is an overloaded operator.  */
@@ -2848,7 +2838,7 @@ struct GTY(()) lang_decl {
 
 /* Nonzero if NODE is an assignment operator (including += and such).  */
 #define DECL_ASSIGNMENT_OPERATOR_P(NODE) \
-  (LANG_DECL_FN_CHECK (NODE)->assignment_operator_p)
+  IDENTIFIER_ASSIGN_OP_P (DECL_NAME (NODE))
 
 /* For FUNCTION_DECLs: nonzero means that this function is a
    constructor or a destructor with an extra in-charge parameter to
@@ -6413,6 +6403,7 @@ extern void check_template_variable		(tree);
 extern tree make_auto				(void);
 extern tree make_decltype_auto			(void);
 extern tree make_template_placeholder		(tree);
+extern bool template_placeholder_p		(tree);
 extern tree do_auto_deduction                   (tree, tree, tree);
 extern tree do_auto_deduction                   (tree, tree, tree,
                                                  tsubst_flags_t,

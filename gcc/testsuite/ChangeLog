@@ -1,3 +1,174 @@
+2017-06-28  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/81193
+	* lib/target-supports.exp
+	(check_ppc_cpu_supports_hw_available): New test to make sure
+	__builtin_cpu_supports works on power7 and newer.
+
+2017-06-28  Martin Liska  <mliska@suse.cz>
+
+	PR ipa/81128
+	* gcc.target/i386/pr81128.c: New test.
+
+2017-06-28  Martin Liska  <mliska@suse.cz>
+
+	PR driver/79659
+	* g++.dg/opt/pr79659.C: New test.
+
+2017-06-28  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	* gcc.dg/tree-ssa/copy-sign-1.c: Add c99_runtime effective target
+	and options.
+	* gcc.dg/tree-ssa/mult-abs-2.c: Likewise.
+
+2017-06-28  Marc Glisse  <marc.glisse@inria.fr>
+
+	* gcc.dg/tree-ssa/addadd.c: Remove test duplicated in addadd-2.c.
+	* gcc.dg/tree-ssa/mulcmp-1.c: New file.
+
+2017-06-28  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.target/i386/cmov7.c (sgn): Renamed to ...
+	(foo): ... this.  Change constants such that it isn't matched
+	as __builtin_copysign, yet tests the combiner the same.
+
+2017-06-28  Martin Liska  <mliska@suse.cz>
+
+	PR sanitizer/81224
+	* gcc.dg/asan/pr81224.c: New test.
+
+2017-06-28  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc.dg/tree-prof/val-profiler-threads-1.c (main): Fix 2nd argument
+	passed to pthread_join.
+
+2017-06-28  Andreas Krebbel  <krebbel@linux.vnet.ibm.com>
+
+	* gcc.target/s390/nodatarel-1.c: New test.
+
+2017-06-27  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR fortran/80164
+	* gfortran.dg/array_temporaries_4.f90: New test.
+
+2017-06-27  Andrew Pinski  <apinski@cavium.com>
+
+	* gcc.dg/tree-ssa/copy-sign-1.c: New testcase.
+	* gcc.dg/tree-ssa/copy-sign-2.c: New testcase.
+	* gcc.dg/tree-ssa/mult-abs-2.c: New testcase.
+
+2017-06-27  Marek Polacek  <polacek@redhat.com>
+
+	PR sanitizer/81223
+	* gcc.dg/ubsan/pr81223.c: New test.
+
+2017-06-27  Marc Glisse  <marc.glisse@inria.fr>
+
+	* gcc.dg/tree-ssa/assoc-1.c: New file.
+
+2017-06-27  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/62046
+	* g++.dg/parse/catch2.C: New.
+
+2017-06-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/81209
+	* g++.dg/ubsan/pr81209.C: New test.
+
+	PR middle-end/81207
+	* gcc.c-torture/compile/pr81207.c: New test.
+
+2017-06-27  Marek Polacek  <polacek@redhat.com>
+
+	PR bootstrap/81216
+	* g++.dg/warn/Wmultistatement-macros-1.C: New test.
+
+2017-06-26  Martin Sebor  <msebor@redhat.com>
+
+	PR c++/81169
+	* g++.dg/Wclass-memaccess-2.C: New test.
+
+2017-06-26  Carl Love  <cel@us.ibm.com>
+
+	* gcc.target/powerpc/builtins-3-vec_reve-runnable.c:
+	Add new runnable test file for the vec_rev built-ins.
+
+2016-06-26  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+
+	PR/tree-optimization 71815
+	* gcc.dg/tree-ssa/slsr-35.c: Remove -fno-code-hoisting workaround.
+	* gcc.dg/tree-ssa/slsr-36.c: Likewise.
+
+2017-06-26  Renlin Li  <renlin.li@arm.com>
+	    Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	* gcc.c-torture/execute/builtins/memops-asm-lib.c (my_memmove): New.
+	* gcc.c-torture/execute/builtins/memops-asm.c (memmove): Declare
+	memmove.
+
+2017-06-26  Richard Biener  <rguenther@suse.de>
+
+	PR target/81175
+	* gfortran.dg/pr81175.f: New testcase.
+
+2017-06-26  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/81203
+	* gcc.dg/torture/pr81203.c: New testcase.
+
+2017-06-26  Marek Polacek  <polacek@redhat.com>
+
+	PR c/80116
+	* c-c++-common/Wmultistatement-macros-1.c: New test.
+	* c-c++-common/Wmultistatement-macros-2.c: New test.
+	* c-c++-common/Wmultistatement-macros-3.c: New test.
+	* c-c++-common/Wmultistatement-macros-4.c: New test.
+	* c-c++-common/Wmultistatement-macros-5.c: New test.
+	* c-c++-common/Wmultistatement-macros-6.c: New test.
+	* c-c++-common/Wmultistatement-macros-7.c: New test.
+	* c-c++-common/Wmultistatement-macros-8.c: New test.
+	* c-c++-common/Wmultistatement-macros-9.c: New test.
+	* c-c++-common/Wmultistatement-macros-10.c: New test.
+	* c-c++-common/Wmultistatement-macros-11.c: New test.
+
+2017-06-26  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* c-c++-common/ubsan/sanitize-recover-7.c (dg-options): Add -w.
+
+2017-06-26  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	* lib/target-supports.exp
+	(check_effective_target_arm_neon_ok_nocache): Add flags with
+	-mfloat-abi=hard. Include arm_neon.h.
+	(check_effective_target_arm_neon_ok_no_float_abi_nocache): New.
+	(check_effective_target_arm_neon_ok_no_float_abi): New.
+	* gcc.target/arm/lto/pr65837_0.c: Require
+	arm_neon_ok_no_float_abi. Add -mfpu=neon to dg-lto-options.
+	* gcc.target/arm/lto/pr65837-attr_0.c: Require
+	arm_neon_ok_no_float_abi. Remove dg-suppress-ld-options.
+
+2017-06-24  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/62315
+	* g++.dg/parse/typedef2.C: Specify a dg-error string.
+
+2017-06-24  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+        PR fortran/52473
+	* gfortran.dg/cshift_2.f90:  New test.
+
+2017-06-23  Jim Wilson  <jim.wilson@linaro.org>
+
+	PR middle-end/79794
+	* gcc.target/aarch64/pr79794.c: New.
+
+2017-06-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/80510
+	* gcc.target/powerpc/pr80510-1.c: Allow test to run on 32-bit.
+	* gcc.target/powerpc/pr80510-2.c: Likewise.
+
 2017-06-22  Jeff Law  <law@redhat.com>
 
 	* gcc.c-torture/compile/stack-check-1.c: Require "untyped_assembly".

@@ -1,4 +1,349 @@
+2017-06-28  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR ipa/81238
+	* multiple_target.c (create_dispatcher_calls): Set the default
+	clone to be static, not public.
+
+2017-06-28  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-loop.c (vectorizable_reduction): Move special
+	cond reduction IV var creation ...
+	(vect_create_epilog_for_reduction): ... here.  Remove induction_index
+	parameter.  Use STMT_VINFO_VECTYPE.
+	* tree-vect-slp.c (vect_get_constant_vectors): Properly reset
+	constant_p.
+
+2017-06-28  Martin Liska  <mliska@suse.cz>
+
+	PR ipa/81128
+	* ipa-visibility.c (non_local_p): Handle visibility.
+
+2017-06-28  Martin Liska  <mliska@suse.cz>
+
+	PR driver/79659
+	* common.opt: Add IntegerRange to various options.
+	* opt-functions.awk (integer_range_info): New function.
+	* optc-gen.awk: Add integer_range_info to cl_options struct.
+	* opts-common.c (decode_cmdline_option): Handle
+	CL_ERR_INT_RANGE_ARG.
+	(cmdline_handle_error): Likewise.
+	* opts.c (print_filtered_help): Show valid interval in
+	when --help is provided.
+	* opts.h (struct cl_option): Add range_min and range_max fields.
+	* config/i386/i386.opt: Add IntegerRange for -mbranch-cost.
+
+2017-06-28  Marc Glisse  <marc.glisse@inria.fr>
+
+	* match.pd ((X & ~Y) | (~X & Y)): Generalize to + and ^.
+	(x * C EQ/NE y * C): New transformation.
+
+2017-06-28  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	* genmultilib (combination_space): Accept '+' in option names.
+
+2017-06-28  Martin Liska  <mliska@suse.cz>
+
+	PR sanitizer/81224
+	* asan.c (instrument_derefs): Bail out inner references
+	that are hard register variables.
+
+2017-06-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/81175
+	* config/i386/i386.c (ix86_init_mmx_sse_builtins): Use def_builtin
+	rather than def_builtin_pure for __builtin_ia32_gatherpf*.
+
+2017-06-28  Richard Biener  <rguenther@suse.de>
+
+	* tree-vectorizer.h (vect_get_vec_defs): Remove.
+	(vect_get_slp_defs): Adjust.
+	* tree-vect-loop.c (get_initial_defs_for_reduction): Split
+	out from ...
+	* tree-vect-slp.c (vect_get_constant_vectors): ... here and
+	simplify.
+	* tree-vect-loop.c (vect_create_epilog_for_reduction): Use
+	get_initial_defs_for_reduction instead of vect_get_vec_defs.
+	(vectorizable_reduction): Adjust.
+	* tree-vect-slp.c (vect_get_constant_vectors): Remove reduction
+	handling.
+	(vect_get_slp_defs): Likewise.
+	* tree-vect-stmts.c (vect_get_vec_defs): Make static and adjust.
+	(vectorizable_bswap): Adjust.
+	(vectorizable_call): Likewise.
+	(vectorizable_conversion): Likewise.
+	(vectorizable_assignment): Likewise.
+	(vectorizable_shift): Likewise.
+	(vectorizable_operation): Likewise.
+	(vectorizable_store): Likewise.
+	(vectorizable_condition): Likewise.
+	(vectorizable_comparison): Likewise.
+
+2017-06-28  Michael Collison  <michael.collison@arm.com>
+
+	PR target/68535
+	* config/arm/arm.c (gen_ldm_seq): Remove last unnecessary
+	set of base_reg
+	(arm_gen_movmemqi): Removed unused variable 'i'.
+	Convert 'for' loop into 'while' loop.
+	(arm_expand_prologue): Remove last unnecessary set of insn.
+	(thumb_pop): Remove unused variable 'pushed_words'.
+	(thumb_exit): Remove last unnecessary set of regs_to_pop.
+
+2017-06-28  Andreas Krebbel  <krebbel@linux.vnet.ibm.com>
+
+	* config/s390/predicates.md: Use s390_rel_address_ok_p.
+	* config/s390/s390-protos.h: Add prototype of
+	s390_rel_address_ok_p.
+	* config/s390/s390.c (s390_got_symbol): New function.
+	(s390_rel_address_ok_p): New function.
+	(legitimize_pic_address): Use s390_rel_address_ok_p.
+	(s390_load_got): Use s390_got_symbol.
+	(s390_option_override): Issue error if
+	-mno-pic-data-is-text-relative is used without -fpic/-fPIC.
+	* config/s390/s390.h (TARGET_DEFAULT_PIC_DATA_IS_TEXT_RELATIVE):
+	New macro.
+	* config/s390/s390.opt: New option mpic-data-is-text-relative.
+
+2017-06-27  Andrew Pinski  <apinski@cavium.com>
+
+	* match.pd (X >/>=/</<= 0 ? 1.0 : -1.0): New patterns.
+	(X * copysign (1.0, X)): New pattern.
+	(X * copysign (1.0, -X)): New pattern.
+	(copysign (-1.0, CST)): New pattern.
+
+2017-06-27  Joseph Myers  <joseph@codesourcery.com>
+
+	* genmultilib (combination_space): Remove variable.
+	Validate reuse rules against regular expression for any sequence
+	of multilib options in any order.
+
+2017-06-27  Michael Collison  <michael.collison@arm.com>
+
+	* config/aarch64/aarch64-simd.md (aarch64_combine<mode>): Directly
+	call aarch64_split_simd_combine.
+	* (aarch64_combine_internal<mode>): Delete pattern.
+	* config/aarch64/aarch64.c (aarch64_split_simd_combine):
+	Allow register and subreg operands.
+
+2017-06-27  Jerome Lambourg  <lambourg@adacore.com>
+
+	* config/i386/vxworks.h (ASM_SPEC): Remove definition. No target
+	specific need, just fallback on defaults.
+	(ASM_OUTPUT_ALIGNED_BSS): Add #undef before #define.
+
+2017-06-27  Jerome Lambourg  <lambourg@adacore.com>
+            Olivier Hainque  <hainque@adacore.com>
+
+	* config/i386/vxworks.h (DBX_REGISTER_NUMBER): Pick distinct
+	map for 64bits.
+	(TARGET_OS_CPP_BUILTINS): builtin_define CPU to X86_64 for 64bit
+	targets. Pick a default if no particular attempt applied.
+	(STACK_CHECK_PROTECT): Double for 64bit targets, which have
+	larger contexts.
+
+2017-06-27  Jerome Lambourg  <lambourg@adacore.com>
+
+	* config.gcc (i*86-wrs-vxworks7): Handle new acceptable triplet.
+	(x86_64-wrs-vxworks7): Likewise.
+
+2017-06-27  Marek Polacek  <polacek@redhat.com>
+
+	PR sanitizer/81223
+	* ubsan.c (instrument_null): Check get_base_address's result for null.
+
+2017-06-27  Marc Glisse  <marc.glisse@inria.fr>
+
+	* match.pd ((A+-B)+(C-A), (A+B)-(A-C)): New transformations.
+
+2017-06-27  Marc Glisse  <marc.glisse@inria.fr>
+
+	* builtin-types.def (BT_FENV_T_PTR, BT_CONST_FENV_T_PTR,
+	BT_FEXCEPT_T_PTR, BT_CONST_FEXCEPT_T_PTR): New primitive types.
+	(BT_FN_INT_FENV_T_PTR, BT_FN_INT_CONST_FENV_T_PTR,
+	BT_FN_INT_FEXCEPT_T_PTR_INT, BT_FN_INT_CONST_FEXCEPT_T_PTR_INT):
+	New function types.
+	* builtins.def (BUILT_IN_FECLEAREXCEPT, BUILT_IN_FEGETENV,
+	BUILT_IN_FEGETEXCEPTFLAG, BUILT_IN_FEGETROUND,
+	BUILT_IN_FEHOLDEXCEPT, BUILT_IN_FERAISEEXCEPT,
+	BUILT_IN_FESETENV, BUILT_IN_FESETEXCEPTFLAG,
+	BUILT_IN_FESETROUND, BUILT_IN_FETESTEXCEPT,
+	BUILT_IN_FEUPDATEENV): New builtins.
+	* tree-core.h (TI_FENV_T_PTR_TYPE, TI_CONST_FENV_T_PTR_TYPE,
+	TI_FEXCEPT_T_PTR_TYPE, TI_CONST_FEXCEPT_T_PTR_TYPE): New entries.
+	* tree.h (fenv_t_ptr_type_node, const_fenv_t_ptr_type_node,
+	fexcept_t_ptr_type_node, const_fexcept_t_ptr_type_node): New
+	macros.
+	(builtin_structptr_types): Adjust size.
+	* tree.c (builtin_structptr_types): Add four entries.
+
+2017-06-27  Jerome Lambourg  <lambourg@adacore.com>
+            Olivier Hainque  <hainque@adacore.com>
+
+	* config/vxworks.h (VXWORKS_LIB_SPEC): Incorporate ...
+	(TLS_SYM): New local macro, forcing reference to __tls__ on
+	link command lines for VxWorks 7 RTPs, triggering initialization
+	of tlsLib.
+	(VXWORKS_HAVE_TLS): New macro. State whether the target VxWorks
+	OS features TLS support, true for RTPs on VxWorks 7.
+	* config/vxworks.c (vxworks_override_options): Setup emutls
+	accordingly.
+
+2017-06-27  Jakub Jelinek  <jakub@redhat.com>
+
+	* predict.c (test_prediction_value_range): Use -1U instead of -1
+	to avoid narrowing conversion warning.
+	* dumpfile.c (dump_options): Wrap all value into dump_flags_t cast
+	to avoid narrowing conversion warning.
+	* opt-functions.awk (var_ref): Return (unsigned short) -1 instead of
+	-1.
+	* optc-gen.awk (END): Expect (unsigned short) -1 instead of -1.
+
+2017-06-27  Jerome Lambourg  <lambourg@adacore.com>
+
+	* config/vxworks.h (VXWORKS_LIBS_RTP): Alternative definition for
+  	64bit configurations.
+  	(PTR_DIFF_TYPE): Alternative definition for TARGET_LP64.
+  	(SIZE_TYPE): Likewise.
+  	* config/vxworks.c (vxworks_emutls_var_fields): Use
+  	long_unsigned_type_node instead of unsigned_type_node as the offset
+	field type, which is "pointer" mode in emutls.c.
+
+2017-06-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/81209
+	* ubsan.c (ubsan_encode_value): Initialize DECL_CONTEXT on var.
+
+	PR middle-end/81207
+	* gimple-fold.c (replace_call_with_call_and_fold): Handle
+	gimple_vuse copying separately from gimple_vdef copying.
+
+2017-06-27  Prathamesh Kulkarni  <prathamesh.kulkarni@linaro.org>
+
+	* value-prof.c (free_hist): Remove call to memset and the enclosing if
+	condition.
+
+2017-06-26  Jerome Lambourg  <lambourg@adacore.com>
+            Olivier Hainque  <hainque@adacore.com>
+
+	* config.gcc (*-*-vxworks*): Add TARGET_VXWORKS7=1 to tm_defines
+	for all vxworks7 targets.
+	* config/vxworks.h (TARGET_VXWORKS7): If not defined, define to 0.
+	(VXWORKS_ADDITIONAL_CPP_SPEC): Alternative definition for VXWORKS7.
+	(VXWORKS_LIBS_RTP, VXWORKS_LIBS_RTP_DIR): New macros, allowing
+	variations for VX6/VX7 and 32/64bits later on in ...
+	(VXWORKS_LIB_SPEC): Leverage new macros.
+	(VXWORKS_OS_CPP_BUILTINS): Define _VSB_CONFIG_FILE for VXWORKS7,
+	as well as _ALLOW_KEYWORD_MACROS when "inline" is not a keyword.
+
+2017-06-26  Jerome Lambourg  <lambourg@adacore.com>
+
+	* config/vxworks.h (VXWORKS_OS_CPP_BUILTINS): builtin_define
+	_VX_TOOL_FAMILY and _VX_TOOL to gnu.
+
+2017-06-26  Carl Love  <cel@us.ibm.com>
+
+	* config/rs6000/rs6000-c.c: Add support for built-in functions
+	vector bool char vec_reve (vector bool char);
+	vector signed char vec_reve (vector signed char);
+	vector unsigned char vec_reve (vector unsigned char);
+	vector bool int vec_reve (vector bool int);
+	vector signed int vec_reve (vector signed int);
+	vector unsigned int vec_reve (vector unsigned int);
+	vector bool long long vec_reve (vector bool long long);
+	vector signed long long vec_reve (vector signed long long);
+	vector unsigned long long vec_reve (vector unsigned long long);
+	vector bool short vec_reve (vector bool short);
+	vector signed short vec_reve (vector signed short);
+	vector double vec_reve (vector double);
+	vector float vec_reve (vector float);
+	* config/rs6000/rs6000-builtin.def (VREVE_V2DI, VREVE_V4SI,
+	VREVE_V8HI, VREVE_V16QI, VREVE_V2DF, VREVE_V4SF, VREVE): New builtin.
+	* config/rs6000/altivec.md (UNSPEC_VREVEV): New UNSPEC.
+	(altivec_vreve): New pattern.
+	* config/rs6000/altivec.h (vec_reve): New define.
+	* doc/extend.texi (vec_rev): Update the built-in documentation file
+	for the new built-in functions.
+
+2016-06-26  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+
+	PR tree-optimization/71815
+	* gimple-ssa-strength-reduction.c (uses_consumed_by_stmt): New
+	function.
+	(find_basis_for_candidate): Call uses_consumed_by_stmt rather than
+	has_single_use.
+	(slsr_process_phi): Likewise.
+	(replace_uncond_cands_and_profitable_phis): Don't replace a
+	multiply candidate with a stride of 1 (copy or cast).
+	(phi_incr_cost): Call uses_consumed_by_stmt rather than
+	has_single_use.
+	(lowest_cost_path): Likewise.
+	(total_savings): Likewise.
+
+2017-06-26  Richard Biener  <rguenther@suse.de>
+
+	PR target/81175
+	* config/i386/i386.c (ix86_init_mmx_sse_builtins):
+	Use def_builtin_pure for all gather builtins.
+
+2017-06-26  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/81203
+	* tree-tailcall.c (find_tail_calls): Do not move stmts into
+	non-dominating BBs.
+
+2017-06-26  Marek Polacek  <polacek@redhat.com>
+
+	PR c/80116
+	* doc/invoke.texi: Document -Wmultistatement-macros.
+
+2017-06-26  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	* doc/sourcebuild.texi (ARM-specific attributes): Document new
+	arm_neon_ok_no_float_abi effective target.
+
+2017-06-26  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/80928
+	* cfghooks.c (duplicate_block): Do not copy BB_DUPLICATED flag.
+	(copy_bbs): Set BB_DUPLICATED flag early.
+	(execute_on_growing_pred): Do not execute for BB_DUPLICATED
+	marked blocks.
+	(execute_on_shrinking_pred): Likewise.
+	* tree-ssa.c (ssa_redirect_edge): Do not look for PHI args in
+	BB_DUPLICATED blocks.
+	* tree-ssa-phionlycoprop.c (eliminate_degenerate_phis_1): Properly
+	iterate over all PHIs considering removal of *gsi.
+
+2017-06-23  Jim Wilson  <jim.wilson@linaro.org>
+
+	* doc/invoke.texi (AArch64 Options, -mtune): Re-add falkor and
+	qdf24xx.
+
+2017-06-23  Aaron Sawdey  <acsawdey@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000-string.c: (expand_block_clear,
+	do_load_for_compare, select_block_compare_mode,
+	compute_current_alignment, expand_block_compare,
+	expand_strncmp_align_check, expand_strn_compare,
+	expand_block_move, rs6000_output_load_multiple)
+	Move functions related to string/block move/compare
+	to a separate file.
+	* config/rs6000/rs6000.c: Move above functions to rs6000-string.c.
+	* config/rs6000/rs6000-protos.h (rs6000_emit_dot_insn): Add prototype
+	for this function which is now used in two files.
+	* config/rs6000/t-rs6000: Add rule to compile rs6000-string.o.
+	* config.gcc: Add rs6000-string.o to extra_objs for
+	targets powerpc*-*-* and rs6000*-*-*.
+
 2017-06-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/80510
+	* config/rs6000/rs6000.md (ALTIVEC_DFORM): Do not allow DImode in
+	32-bit, since indexed is not valid for DImode.
+	(mov<mode>_hardfloat32): Reorder ISA 2.07 load/stores before ISA
+	3.0 d-form load/stores to be the same as mov<mode>_hardfloat64.
+	(define_peephole2 for Altivec d-form load): Add 32-bit support.
+	(define_peephole2 for Altivec d-form store): Likewise.
 
 	PR ipa/81185
 	* multiple_target.c (create_dispatcher_calls): Only create the

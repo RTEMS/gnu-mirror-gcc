@@ -8340,7 +8340,10 @@ maybe_warn_class_memaccess (location_t loc, tree fndecl, tree *args)
   if (!dest || !TREE_TYPE (dest) || !POINTER_TYPE_P (TREE_TYPE (dest)))
     return;
 
-  STRIP_NOPS (dest);
+  /* Remove the outermost (usually implicit) conversion to the void*
+     argument type.  */
+  if (TREE_CODE (dest) == NOP_EXPR)
+    dest = TREE_OPERAND (dest, 0);
 
   tree srctype = NULL_TREE;
 
@@ -8357,7 +8360,7 @@ maybe_warn_class_memaccess (location_t loc, tree fndecl, tree *args)
   if (current_function_decl
       && (DECL_CONSTRUCTOR_P (current_function_decl)
 	  || DECL_DESTRUCTOR_P (current_function_decl))
-      && is_this_parameter (dest))
+      && is_this_parameter (tree_strip_nop_conversions (dest)))
     {
       tree ctx = DECL_CONTEXT (current_function_decl);
       bool special = same_type_ignoring_top_level_qualifiers_p (ctx, desttype);
@@ -8677,20 +8680,22 @@ build_cxx_call (tree fn, int nargs, tree *argarray,
 tree
 in_charge_arg_for_name (tree name)
 {
- if (name == base_ctor_identifier
-      || name == base_dtor_identifier)
-    return integer_zero_node;
-  else if (name == complete_ctor_identifier)
-    return integer_one_node;
-  else if (name == complete_dtor_identifier)
-    return integer_two_node;
-  else if (name == deleting_dtor_identifier)
-    return integer_three_node;
+  if (IDENTIFIER_CTOR_P (name))
+    {
+      if (name == complete_ctor_identifier)
+	return integer_one_node;
+      gcc_checking_assert (name == base_ctor_identifier);
+    }
+  else
+    {
+      if (name == complete_dtor_identifier)
+	return integer_two_node;
+      else if (name == deleting_dtor_identifier)
+	return integer_three_node;
+      gcc_checking_assert (name == base_dtor_identifier);
+    }
 
-  /* This function should only be called with one of the names listed
-     above.  */
-  gcc_unreachable ();
-  return NULL_TREE;
+  return integer_zero_node;
 }
 
 /* We've built up a constructor call RET.  Complain if it delegates to the
@@ -8729,11 +8734,7 @@ build_special_member_call (tree instance, tree name, vec<tree, va_gc> **args,
   vec<tree, va_gc> *allocated = NULL;
   tree ret;
 
-  gcc_assert (name == complete_ctor_identifier
-	      || name == base_ctor_identifier
-	      || name == complete_dtor_identifier
-	      || name == base_dtor_identifier
-	      || name == deleting_dtor_identifier
+  gcc_assert (IDENTIFIER_CDTOR_P (name)
 	      || name == cp_assignment_operator_id (NOP_EXPR));
   if (TYPE_P (binfo))
     {
@@ -8753,9 +8754,7 @@ build_special_member_call (tree instance, tree name, vec<tree, va_gc> **args,
     instance = build_dummy_object (class_type);
   else
     {
-      if (name == complete_dtor_identifier
-	  || name == base_dtor_identifier
-	  || name == deleting_dtor_identifier)
+      if (IDENTIFIER_DTOR_P (name))
 	gcc_assert (args == NULL || vec_safe_is_empty (*args));
 
       /* Convert to the base class, if necessary.  */
