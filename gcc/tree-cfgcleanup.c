@@ -155,8 +155,6 @@ cleanup_control_expr_graph (basic_block bb, gimple_stmt_iterator gsi,
 	}
       if (!warned)
 	fold_undefer_and_ignore_overflow_warnings ();
-      if (taken_edge->probability > REG_BR_PROB_BASE)
-	taken_edge->probability = REG_BR_PROB_BASE;
     }
   else
     taken_edge = single_succ_edge (bb);
@@ -1205,7 +1203,8 @@ execute_cleanup_cfg_post_optimizing (void)
     }
   maybe_remove_unreachable_handlers ();
   cleanup_dead_labels ();
-  group_case_labels ();
+  if (group_case_labels ())
+    todo |= TODO_cleanup_cfg;
   if ((flag_compare_debug_opt || flag_compare_debug)
       && flag_dump_final_insns)
     {

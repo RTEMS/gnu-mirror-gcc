@@ -1,3 +1,165 @@
+2017-06-30  Nathan Sidwell  <nathan@acm.org>
+
+	* config-lang.in (gtfiles): Add cp/lex.c.
+	* cp-tree.h (mangle_convop_name_for_type): Rename ...
+	(make_conv_op_name): ... here.  Move to lex.
+	* lambda.c (maybe_add_lambda_conv_op): Update.
+	* parser.c (cp_parser_conversion_function_id): Update.
+	* pt.c (tsubst_decl, tsubst_baselink, tsubst_copy,
+	tsubst_copy_and_build): Update.
+	* semantics.c (apply_deduced_return_type): Update.
+	* mangle.c (conv_type_hasher, conv_type_names,
+	mangle_conv_op_name_for_type): Move to ...
+	* lex.c (conv_type_hasher, conv_type_names, make_convop_name):
+	... here.  Rename.
+
+2017-06-30  David Malcolm  <dmalcolm@redhat.com>
+
+	PR c++/80014
+	* parser.c (cp_parser_postfix_expression): Construct a location
+	for typeid expressions.
+
+2017-06-30  Nathan Sidwell  <nathan@acm.org>
+
+	* cp-tree.h (lookup_fnfields_1, class_method_index_for_fn): Don't
+	declare.
+	(lookup_all_conversions): Declare.
+	* class.c (get_basefndecls): Use lookup_fnfields_slot.
+	* decl.c (register_dtor_fn): Use lookup_fnfields_slot.
+	* decl2.c (check_class_fn): Use lookup_fnfields_slot.  Rework
+	diagnostics.
+	* pt.c (retrieve_specialization): Use lookup_fnfields_slot.
+	(check_explicit_specialization): Use lookup_fnfields_slot_nolazy,
+	lookup_all_conversions.
+	* search.c (lookup_fnfields_1): Make static.
+	(lookup_all_conversions): New.
+	(class_method_index_for_fn): Delete.
+	* semantics.c (classtype_has_nothrow_assign_or_copy_p): Use
+	lookup_fnfields_slot.
+
+	* call.c (build_new_method_call_1): Use constructo_name to get
+	ctor name.  Move argument processing earlier to merge cdtor
+	handling blocks.
+	* decl.c (grokfndecl): Cdtors have special names.
+	* method.c (implicitly_declare_fn): Likewise. Simplify flag setting.
+	* pt.c (check_explicit_specialization): Cdtor name is already
+	special.
+	* search.c (class_method_index_for_fn): Likewise.
+
+	PR c++/81229
+	* name-lookup.c (do_pushdecl): Reset IDENTIFIER_TYPE when finding
+	a matching TYPE_DECL.
+
+2017-06-29  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	* class.c (add_method): Change pair of errors to error + inform.
+	(handle_using_decl): Likewise.
+
+2017-06-29  Jason Merrill  <jason@redhat.com>
+
+	* constexpr.c, error.c, tree.c: Remove WITH_CLEANUP_EXPR handling.
+
+	PR c++/81180 - ICE with C++17 deduction of member class template.
+	* pt.c (build_deduction_guide): Correct member template handling.
+
+	PR c++/81188 - matching decltype of member function call.
+	* tree.c (cp_tree_equal): Remove COMPONENT_REF special case.
+
+2017-06-29  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/81247
+	* parser.c (cp_parser_namespace_definition): Immediately close the
+	namespace if there's no open-brace.
+	* name-lookup.c (do_pushdecl): Reset OLD when pushing into new
+	namespace.
+
+2017-06-29  Jason Merrill  <jason@redhat.com>
+
+	PR c++/81164 - ICE with invalid inherited constructor.
+	* search.c (binfo_direct_p): New.
+	* name-lookup.c (do_class_using_decl): Use it.
+
+2017-06-29  Nathan Sidwell  <nathan@acm.org>
+
+	* cp-tree.h (THIS_NAME, IN_CHARGE_NAME, VTBL_PTR_TYPE,
+	VTABLE_DELTA_NAME, VTABLE_PFN_NAME): Delete.
+	* decl.c (initialize_predefined_identifiers): Name cdtor special
+	names consistently.  Use literals for above deleted defines.
+	(cxx_init_decl_processing): Use literal for vtbl_ptr_type name,
+
+	* lex.c (maybe_add_lang_type_raw): Exit early, rather than use a
+	flag.
+
+	* call.c (check_dtor_name): Use constructor_name for enums too.
+	(build_new_method_call_1): Use constructor_name for cdtors and
+	show ~ for dtor.
+	* class.c (build_self_reference): Use TYPE_NAME to get name of
+	self reference.
+	* name-lookup (constructor_name): Use DECL_NAME directly.
+	(constructor_name_p): Reimplement.
+	(push_class_level_binding_1): Use TYPE_NAME directly.
+
+	* class.c (finish_struct): Use OVL_P.
+	(get_vfield_name): Measure constructor_name length.
+	* cp-tree.h (SET_CLASS_TYPE_P): Add RECORD_OR_UNION_CHECK.
+	(NON_UNION_CLASS_TYPE_P): Check RECORD_TYPE up front.
+	* cxx-pretty-print.c (is_destructor_name): Delete.
+	(pp_cxx_unqualified_id): Remove bogus destructor name checking.
+	* decl.c (grokfndecl): Move cheap checks first when looking for
+	implicit extern cness.
+
+	* parser.c (cp_parser_direct_declarator): Reorder if to avoid
+	indentation. Remove unnecessary assignment of constructor name.
+
+	Whitespace cleanups.
+	* call.c (name_as_c_string): Move CONST_CAST to return.
+	(build_new_method_call_1): Remove unneeded bracing.
+	* class.c (include_empty_classes): Unbreak line.
+	* constraint.cc (tsubst_check_constraint): Add space.
+	* cp-tree.h (lang_decl_ns): Add comment.
+	(PTRMEM_CST_MEMBER): Break line.
+	* decl.c (grokfndecl): Add blank lines. Unbreak some others.
+	(grokdeclarator): Remove lines, move declaration to first use.
+	* decl2.c (decl_needed_p): Fix indentation.
+	(c_parse_final_cleanups): Remove blank line.
+	* method.c (implicitly_declare_fn): Move declaration to first use.
+	* search.c (current_scope): Add blank lines.
+
+2017-06-28  Jason Merrill  <jason@redhat.com>
+
+	PR c++/72764 - ICE with invalid template typename.
+	* decl.c (build_typename_type): No longer static.
+	* tree.c (strip_typedefs): Use it instead of make_typename_type.
+
+	PR c++/69300 - ICE with self-referential noexcept
+	* pt.c (maybe_instantiate_noexcept): Check for recursion.
+
+	PR c++/61022 - error with variadic template template parm
+	* pt.c (convert_template_argument): Keep the TYPE_PACK_EXPANSION.
+
+	PR c++/72801 - ICE with variadic partial specialization
+	* pt.c (unify_pack_expansion): Use PACK_EXPANSION_EXTRA_ARGS.
+
+	PR c++/55639 - partial specialization with ::template
+	* parser.c (cp_parser_class_head): Handle ::template.
+
+	PR c++/45976 - error with ::template in declarator.
+	* pt.c (resolve_typename_type): Fix TEMPLATE_ID_EXPR handling.
+
+	PR c++/54769 - wrong lookup of dependent template-name.
+	* parser.c (cp_parser_template_name): Handle dependent object type.
+	(cp_parser_nested_name_specifier_opt): Make template_keyword_p a
+	parameter.
+	(cp_parser_id_expression): Pass it.
+	(cp_parser_diagnose_invalid_type_name): Handle TEMPLATE_ID_EXPR.
+
+	* parser.c (cp_parser_template_id): Use the range location on the
+	TEMPLATE_ID_EXPR.
+
+	PR c++/81204 - parse error with dependent template-name
+	* parser.c (cp_parser_lookup_name): Disqualify function templates
+	after lookup.
+
 2017-06-27  Nathan Sidwell  <nathan@acm.org>
 
 	* pt.c (tsubst_decl <FUNCTION_DECL>): Move var decls to

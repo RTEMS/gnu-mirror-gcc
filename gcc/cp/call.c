@@ -231,9 +231,8 @@ check_dtor_name (tree basetype, tree name)
   else if (identifier_p (name))
     {
       if ((MAYBE_CLASS_TYPE_P (basetype)
-	   && name == constructor_name (basetype))
-	  || (TREE_CODE (basetype) == ENUMERAL_TYPE
-	      && name == TYPE_IDENTIFIER (basetype)))
+	   || TREE_CODE (basetype) == ENUMERAL_TYPE)
+	  && name == constructor_name (basetype))
 	return true;
       else
 	name = get_type_value (name);
@@ -8878,7 +8877,7 @@ build_special_member_call (tree instance, tree name, vec<tree, va_gc> **args,
 static char *
 name_as_c_string (tree name, tree type, bool *free_p)
 {
-  char *pretty_name;
+  const char *pretty_name;
 
   /* Assume that we will not allocate memory.  */
   *free_p = false;
@@ -8886,7 +8885,7 @@ name_as_c_string (tree name, tree type, bool *free_p)
   if (IDENTIFIER_CDTOR_P (name))
     {
       pretty_name
-	= CONST_CAST (char *, identifier_to_locale (IDENTIFIER_POINTER (constructor_name (type))));
+	= identifier_to_locale (IDENTIFIER_POINTER (constructor_name (type)));
       /* For a destructor, add the '~'.  */
       if (IDENTIFIER_DTOR_P (name))
 	{
@@ -8905,9 +8904,9 @@ name_as_c_string (tree name, tree type, bool *free_p)
       *free_p = true;
     }
   else
-    pretty_name = CONST_CAST (char *, identifier_to_locale (IDENTIFIER_POINTER (name)));
+    pretty_name = identifier_to_locale (IDENTIFIER_POINTER (name));
 
-  return pretty_name;
+  return CONST_CAST (char *, pretty_name);
 }
 
 /* Build a call to "INSTANCE.FN (ARGS)".  If FN_P is non-NULL, it will
@@ -8995,6 +8994,7 @@ build_new_method_call_1 (tree instance, tree fns, vec<tree, va_gc> **args,
       if (! (complain & tf_error))
 	return error_mark_node;
 
+      name = constructor_name (basetype);
       if (permerror (input_location,
 		     "cannot call constructor %<%T::%D%> directly",
 		     basetype, name))
@@ -9003,26 +9003,6 @@ build_new_method_call_1 (tree instance, tree fns, vec<tree, va_gc> **args,
       call = build_functional_cast (basetype, build_tree_list_vec (user_args),
 				    complain);
       return call;
-    }
-
-  /* Figure out whether to skip the first argument for the error
-     message we will display to users if an error occurs.  We don't
-     want to display any compiler-generated arguments.  The "this"
-     pointer hasn't been added yet.  However, we must remove the VTT
-     pointer if this is a call to a base-class constructor or
-     destructor.  */
-  skip_first_for_error = false;
-  if (IDENTIFIER_CDTOR_P (name))
-    {
-      /* Callers should explicitly indicate whether they want to construct
-	 the complete object or just the part without virtual bases.  */
-      gcc_assert (name != ctor_identifier);
-      /* Similarly for destructors.  */
-      gcc_assert (name != dtor_identifier);
-      /* Remove the VTT pointer, if present.  */
-      if ((name == base_ctor_identifier || name == base_dtor_identifier)
-	  && CLASSTYPE_VBASECLASSES (basetype))
-	skip_first_for_error = true;
     }
 
   /* Process the argument list.  */
@@ -9037,12 +9017,28 @@ build_new_method_call_1 (tree instance, tree fns, vec<tree, va_gc> **args,
      static member function.  */
   instance = mark_type_use (instance);
 
-  /* It's OK to call destructors and constructors on cv-qualified objects.
-     Therefore, convert the INSTANCE to the unqualified type, if
-     necessary.  */
-  if (DECL_DESTRUCTOR_P (fn)
-      || DECL_CONSTRUCTOR_P (fn))
+
+  /* Figure out whether to skip the first argument for the error
+     message we will display to users if an error occurs.  We don't
+     want to display any compiler-generated arguments.  The "this"
+     pointer hasn't been added yet.  However, we must remove the VTT
+     pointer if this is a call to a base-class constructor or
+     destructor.  */
+  skip_first_for_error = false;
+  if (IDENTIFIER_CDTOR_P (name))
     {
+      /* Callers should explicitly indicate whether they want to ctor
+	 the complete object or just the part without virtual bases.  */
+      gcc_assert (name != ctor_identifier);
+
+      /* Remove the VTT pointer, if present.  */
+      if ((name == base_ctor_identifier || name == base_dtor_identifier)
+	  && CLASSTYPE_VBASECLASSES (basetype))
+	skip_first_for_error = true;
+
+      /* It's OK to call destructors and constructors on cv-qualified
+	 objects.  Therefore, convert the INSTANCE to the unqualified
+	 type, if necessary.  */
       if (!same_type_p (basetype, TREE_TYPE (instance)))
 	{
 	  instance = build_this (instance);
@@ -9050,8 +9046,8 @@ build_new_method_call_1 (tree instance, tree fns, vec<tree, va_gc> **args,
 	  instance = build_fold_indirect_ref (instance);
 	}
     }
-  if (DECL_DESTRUCTOR_P (fn))
-    name = complete_dtor_identifier;
+  else
+    gcc_assert (!DECL_DESTRUCTOR_P (fn) && !DECL_CONSTRUCTOR_P (fn));
 
   /* For the overload resolution we need to find the actual `this`
      that would be captured if the call turns out to be to a
@@ -9118,11 +9114,10 @@ build_new_method_call_1 (tree instance, tree fns, vec<tree, va_gc> **args,
 			   &candidates, complain);
     }
   else
-    {
-      add_candidates (fns, first_mem_arg, user_args, optype,
-		      explicit_targs, template_only, conversion_path,
-		      access_binfo, flags, &candidates, complain);
-    }
+    add_candidates (fns, first_mem_arg, user_args, optype,
+		    explicit_targs, template_only, conversion_path,
+		    access_binfo, flags, &candidates, complain);
+
   any_viable_p = false;
   candidates = splice_viable (candidates, false, &any_viable_p);
 
@@ -9140,17 +9135,18 @@ build_new_method_call_1 (tree instance, tree fns, vec<tree, va_gc> **args,
 	    {
 	      tree arglist = build_tree_list_vec (user_args);
 	      tree errname = name;
+	      bool twiddle = false;
 	      if (IDENTIFIER_CDTOR_P (errname))
 		{
-		  tree fn = DECL_ORIGIN (OVL_FIRST (fns));
-		  errname = DECL_NAME (fn);
+		  twiddle = IDENTIFIER_DTOR_P (errname);
+		  errname = constructor_name (basetype);
 		}
 	      if (explicit_targs)
 		errname = lookup_template_function (errname, explicit_targs);
 	      if (skip_first_for_error)
 		arglist = TREE_CHAIN (arglist);
-	      error ("no matching function for call to %<%T::%E(%A)%#V%>",
-		     basetype, errname, arglist,
+	      error ("no matching function for call to %<%T::%s%E(%A)%#V%>",
+		     basetype, &"~"[!twiddle], errname, arglist,
 		     TREE_TYPE (instance));
 	    }
 	  print_z_candidates (location_of (name), candidates);

@@ -507,10 +507,13 @@ current_scope (void)
 	      && same_type_p (DECL_FRIEND_CONTEXT (current_function_decl),
 			      current_class_type))))
     return current_function_decl;
+
   if (current_class_type)
     return current_class_type;
+
   if (current_function_decl)
     return current_function_decl;
+
   return current_namespace;
 }
 
@@ -1645,7 +1648,7 @@ lookup_fnfields_idx_nolazy (tree type, tree name)
 /* TYPE is a class type. Return the index of the fields within
    the method vector with name NAME, or -1 if no such field exists.  */
 
-int
+static int
 lookup_fnfields_1 (tree type, tree name)
 {
   if (!CLASS_TYPE_P (type))
@@ -1702,20 +1705,29 @@ lookup_fnfields_slot_nolazy (tree type, tree name)
   return (*CLASSTYPE_METHOD_VEC (type))[ix];
 }
 
-/* Like lookup_fnfields_1, except that the name is extracted from
-   FUNCTION, which is a FUNCTION_DECL or a TEMPLATE_DECL.  */
+/* Collect all the conversion operators of KLASS.  */
 
-int
-class_method_index_for_fn (tree class_type, tree function)
+tree
+lookup_all_conversions (tree klass)
 {
-  gcc_assert (DECL_DECLARES_FUNCTION_P (function));
+  tree lkp = NULL_TREE;
 
-  return lookup_fnfields_1 (class_type,
-			    DECL_CONSTRUCTOR_P (function) ? ctor_identifier :
-			    DECL_DESTRUCTOR_P (function) ? dtor_identifier :
-			    DECL_NAME (function));
+  if (vec<tree, va_gc> *methods = CLASSTYPE_METHOD_VEC (klass))
+    {
+      tree ovl;
+      for (int idx = CLASSTYPE_FIRST_CONVERSION_SLOT;
+	   methods->iterate (idx, &ovl); ++idx)
+	{
+	  if (!DECL_CONV_FN_P (OVL_FIRST (ovl)))
+	    /* There are no more conversion functions.  */
+	    break;
+
+	  lkp = lookup_add (ovl, lkp);
+	}
+    }
+
+  return lkp;
 }
-
 
 /* DECL is the result of a qualified name lookup.  QUALIFYING_SCOPE is
    the class or namespace used to qualify the name.  CONTEXT_CLASS is
@@ -2971,6 +2983,28 @@ binfo_via_virtual (tree binfo, tree limit)
 	return binfo;
     }
   return NULL_TREE;
+}
+
+/* BINFO is for a base class in some hierarchy.  Return true iff it is a
+   direct base.  */
+
+bool
+binfo_direct_p (tree binfo)
+{
+  tree d_binfo = BINFO_INHERITANCE_CHAIN (binfo);
+  if (BINFO_INHERITANCE_CHAIN (d_binfo))
+    /* A second inheritance chain means indirect.  */
+    return false;
+  if (!BINFO_VIRTUAL_P (binfo))
+    /* Non-virtual, so only one inheritance chain means direct.  */
+    return true;
+  /* A virtual base looks like a direct base, so we need to look through the
+     direct bases to see if it's there.  */
+  tree b_binfo;
+  for (int i = 0; BINFO_BASE_ITERATE (d_binfo, i, b_binfo); ++i)
+    if (b_binfo == binfo)
+      return true;
+  return false;
 }
 
 /* BINFO is a base binfo in the complete type BINFO_TYPE (HERE).

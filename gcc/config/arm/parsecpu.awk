@@ -299,13 +299,19 @@ function gen_comm_data () {
 	# arch, base_arch
 	print "    \"" arch_base[archs[n]] "\", BASE_ARCH_" \
 	    arch_base[archs[n]] ","
+	# profile letter code, or zero if none.
+	if (archs[n] in arch_prof) {
+	    print "    \'" arch_prof[archs[n]] "\',"
+	} else {
+	    print "    0,"
+	}
 	# tune_id
 	print "    TARGET_CPU_" cpu_cnames[arch_tune_for[archs[n]]] ","
 	print "  },"
     }
 
     print "  {{NULL, NULL, {isa_nobit}},"
-    print "   NULL, BASE_ARCH_0, TARGET_CPU_arm_none}"
+    print "   NULL, BASE_ARCH_0, 0, TARGET_CPU_arm_none}"
     print "};\n"
 
     print "const arm_fpu_desc all_fpus[] ="
@@ -474,6 +480,12 @@ BEGIN {
 /^[ 	]*base / {
     if (arch_name == "") fatal("\"base\" statement outside of arch block")
     arch_base[arch_name] = $2
+    parse_ok = 1
+}
+
+/^[ 	]*profile / {
+    if (arch_name == "") fatal("\"profile\" statement outside of arch block")
+    arch_prof[arch_name] = $2
     parse_ok = 1
 }
 

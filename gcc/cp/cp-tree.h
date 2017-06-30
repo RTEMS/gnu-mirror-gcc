@@ -1814,7 +1814,7 @@ enum languages { lang_c, lang_cplusplus };
 /* Set CLASS_TYPE_P for T to VAL.  T must be a class, struct, or
    union type.  */
 #define SET_CLASS_TYPE_P(T, VAL) \
-  (TYPE_LANG_FLAG_5 (T) = (VAL))
+  (TYPE_LANG_FLAG_5 (RECORD_OR_UNION_CHECK (T)) = (VAL))
 
 /* Nonzero if T is a class type.  Zero for template type parameters,
    typename types, and so forth.  */
@@ -1823,7 +1823,7 @@ enum languages { lang_c, lang_cplusplus };
 
 /* Nonzero if T is a class type but not an union.  */
 #define NON_UNION_CLASS_TYPE_P(T) \
-  (CLASS_TYPE_P (T) && TREE_CODE (T) != UNION_TYPE)
+  (TREE_CODE (T) == RECORD_TYPE && TYPE_LANG_FLAG_5 (T))
 
 /* Keep these checks in ascending code order.  */
 #define RECORD_OR_UNION_CODE_P(T)	\
@@ -2556,7 +2556,9 @@ struct GTY(()) lang_decl_ns {
   vec<tree, va_gc> *usings;
   vec<tree, va_gc> *inlinees;
 
-  /* Map from IDENTIFIER nodes to DECLS.  */
+  /* Map from IDENTIFIER nodes to DECLS.  It'd be nice to have this
+     inline, but as the hash_map has a dtor, we can't then put this
+     struct into a union (until moving to c++11).  */
   hash_map<lang_identifier *, tree> *bindings;
 };
 
@@ -4312,7 +4314,8 @@ more_aggr_init_expr_args_p (const aggr_init_expr_arg_iterator *iter)
 
 /* For a pointer-to-member constant `X::Y' this is the _DECL for
    `Y'.  */
-#define PTRMEM_CST_MEMBER(NODE) (((ptrmem_cst_t)PTRMEM_CST_CHECK (NODE))->member)
+#define PTRMEM_CST_MEMBER(NODE) \
+  (((ptrmem_cst_t)PTRMEM_CST_CHECK (NODE))->member)
 
 /* The expression in question for a TYPEOF_TYPE.  */
 #define TYPEOF_TYPE_EXPR(NODE) (TYPE_VALUES_RAW (TYPEOF_TYPE_CHECK (NODE)))
@@ -5191,14 +5194,6 @@ extern GTY(()) vec<tree, va_gc> *keyed_classes;
 
 #endif	/* NO_DOLLAR_IN_LABEL */
 #endif	/* NO_DOT_IN_LABEL */
-
-#define THIS_NAME "this"
-
-#define IN_CHARGE_NAME "__in_chrg"
-
-#define VTBL_PTR_TYPE		"__vtbl_ptr_type"
-#define VTABLE_DELTA_NAME	"__delta"
-#define VTABLE_PFN_NAME		"__pfn"
 
 #define LAMBDANAME_PREFIX "__lambda"
 #define LAMBDANAME_FORMAT LAMBDANAME_PREFIX "%d"
@@ -6087,6 +6082,7 @@ extern tree define_label			(location_t, tree);
 extern void check_goto				(tree);
 extern bool check_omp_return			(void);
 extern tree make_typename_type			(tree, tree, enum tag_types, tsubst_flags_t);
+extern tree build_typename_type			(tree, tree, tree, tag_types);
 extern tree make_unbound_class_template		(tree, tree, tree, tsubst_flags_t);
 extern tree build_library_fn_ptr		(const char *, tree, int);
 extern tree build_cp_library_fn_ptr		(const char *, tree, int);
@@ -6330,6 +6326,7 @@ extern void yyungetc				(int, int);
 extern tree unqualified_name_lookup_error	(tree,
 						 location_t = UNKNOWN_LOCATION);
 extern tree unqualified_fn_lookup_error		(cp_expr);
+extern tree make_conv_op_name			(tree);
 extern tree build_lang_decl			(enum tree_code, tree, tree);
 extern tree build_lang_decl_loc			(location_t, enum tree_code, tree, tree);
 extern void retrofit_lang_decl			(tree);
@@ -6571,10 +6568,9 @@ extern int accessible_p				(tree, tree, bool);
 extern int accessible_in_template_p		(tree, tree);
 extern tree lookup_field_1			(tree, tree, bool);
 extern tree lookup_field			(tree, tree, int, bool);
-extern int lookup_fnfields_1			(tree, tree);
 extern tree lookup_fnfields_slot		(tree, tree);
 extern tree lookup_fnfields_slot_nolazy		(tree, tree);
-extern int class_method_index_for_fn		(tree, tree);
+extern tree lookup_all_conversions		(tree);
 extern tree lookup_fnfields			(tree, tree, int);
 extern tree lookup_member			(tree, tree, int, bool,
 						 tsubst_flags_t,
@@ -6602,6 +6598,7 @@ extern tree dfs_walk_all (tree, tree (*) (tree, void *),
 extern tree dfs_walk_once (tree, tree (*) (tree, void *),
 			   tree (*) (tree, void *), void *);
 extern tree binfo_via_virtual			(tree, tree);
+extern bool binfo_direct_p			(tree);
 extern tree build_baselink			(tree, tree, tree, tree);
 extern tree adjust_result_of_qualified_name_lookup
 						(tree, tree, tree);
@@ -7184,7 +7181,6 @@ extern tree mangle_vtbl_for_type		(tree);
 extern tree mangle_vtt_for_type			(tree);
 extern tree mangle_ctor_vtbl_for_type		(tree, tree);
 extern tree mangle_thunk			(tree, int, tree, tree, tree);
-extern tree mangle_conv_op_name_for_type	(tree);
 extern tree mangle_guard_variable		(tree);
 extern tree mangle_tls_init_fn			(tree);
 extern tree mangle_tls_wrapper_fn		(tree);

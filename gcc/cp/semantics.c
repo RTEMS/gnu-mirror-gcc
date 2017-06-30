@@ -9081,11 +9081,9 @@ classtype_has_nothrow_assign_or_copy_p (tree type, bool assign_p)
 
   if (assign_p)
     {
-      int ix;
-      ix = lookup_fnfields_1 (type, cp_assignment_operator_id (NOP_EXPR));
-      if (ix < 0)
+      fns = lookup_fnfields_slot (type, cp_assignment_operator_id (NOP_EXPR));
+      if (!fns)
 	return false;
-      fns = (*CLASSTYPE_METHOD_VEC (type))[ix];
     } 
   else if (TYPE_HAS_COPY_CTOR (type))
     {
@@ -9401,7 +9399,7 @@ apply_deduced_return_type (tree fco, tree return_type)
     }
 
   if (DECL_CONV_FN_P (fco))
-    DECL_NAME (fco) = mangle_conv_op_name_for_type (return_type);
+    DECL_NAME (fco) = make_conv_op_name (return_type);
 
   TREE_TYPE (fco) = change_return_type (return_type, TREE_TYPE (fco));
 

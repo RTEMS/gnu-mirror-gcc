@@ -1196,15 +1196,10 @@ retrieve_specialization (tree tmpl, tree args, hashval_t hash)
 	= retrieve_specialization (class_template, args, 0);
       if (!class_specialization)
 	return NULL_TREE;
-      /* Now, find the appropriate entry in the CLASSTYPE_METHOD_VEC
-	 for the specialization.  */
-      int idx = class_method_index_for_fn (class_specialization, tmpl);
-      if (idx == -1)
-	return NULL_TREE;
-      /* Iterate through the methods with the indicated name, looking
-	 for the one that has an instance of TMPL.  */
-      vec<tree, va_gc> *methods = CLASSTYPE_METHOD_VEC (class_specialization);
-      for (ovl_iterator iter ((*methods)[idx]); iter; ++iter)
+
+      /* Find the instance of TMPL.  */
+      tree fns = lookup_fnfields_slot (class_specialization, DECL_NAME (tmpl));
+      for (ovl_iterator iter (fns); iter; ++iter)
 	{
 	  tree fn = *iter;
 	  if (DECL_TEMPLATE_INFO (fn) && DECL_TI_TEMPLATE (fn) == tmpl
@@ -2876,14 +2871,11 @@ check_explicit_specialization (tree declarator,
 	  /* Find the list of functions in ctype that have the same
 	     name as the declared function.  */
 	  tree name = TREE_OPERAND (declarator, 0);
-	  tree fns = NULL_TREE;
-	  int idx;
 
 	  if (constructor_name_p (name, ctype))
 	    {
-	      int is_constructor = DECL_CONSTRUCTOR_P (decl);
-
-	      if (is_constructor ? !TYPE_HAS_USER_CONSTRUCTOR (ctype)
+	      if (DECL_CONSTRUCTOR_P (decl)
+		  ? !TYPE_HAS_USER_CONSTRUCTOR (ctype)
 		  : !CLASSTYPE_DESTRUCTOR (ctype))
 		{
 		  /* From [temp.expl.spec]:
@@ -2898,42 +2890,19 @@ check_explicit_specialization (tree declarator,
 		  return error_mark_node;
 		}
 
-	      name = is_constructor ? ctor_identifier : dtor_identifier;
+	      name = DECL_NAME (decl);
 	    }
 
-	  if (!DECL_CONV_FN_P (decl))
-	    {
-	      idx = lookup_fnfields_1 (ctype, name);
-	      if (idx >= 0)
-		fns = (*CLASSTYPE_METHOD_VEC (ctype))[idx];
-	    }
+	  tree fns = NULL_TREE;
+	  if (DECL_CONV_FN_P (decl))
+	    /* For a type-conversion operator, we cannot do a
+	       name-based lookup.  We might be looking for `operator
+	       int' which will be a specialization of `operator T'.
+	       Grab all the conversion operators, and then select from
+	       them.  */
+	    fns = lookup_all_conversions (ctype);
 	  else
-	    {
-	      vec<tree, va_gc> *methods;
-	      tree ovl;
-
-	      /* For a type-conversion operator, we cannot do a
-		 name-based lookup.  We might be looking for `operator
-		 int' which will be a specialization of `operator T'.
-		 So, we find *all* the conversion operators, and then
-		 select from them.  */
-	      fns = NULL_TREE;
-
-	      methods = CLASSTYPE_METHOD_VEC (ctype);
-	      if (methods)
-		for (idx = CLASSTYPE_FIRST_CONVERSION_SLOT;
-		     methods->iterate (idx, &ovl);
-		     ++idx)
-		  {
-		    if (!DECL_CONV_FN_P (OVL_FIRST (ovl)))
-		      /* There are no more conversion functions.  */
-		      break;
-
-		    /* Glue all these conversion functions together
-		       with those we already have.  */
-		    fns = lookup_add (ovl, fns);
-		  }
-	    }
+	    fns = lookup_fnfields_slot_nolazy (ctype, name);
 
 	  if (fns == NULL_TREE)
 	    {
@@ -7695,7 +7664,7 @@ convert_template_argument (tree parm,
 	  if (TREE_CODE (TREE_TYPE (arg)) == UNBOUND_CLASS_TEMPLATE)
 	    /* The number of argument required is not known yet.
 	       Just accept it for now.  */
-	    val = TREE_TYPE (arg);
+	    val = orig_arg;
 	  else
 	    {
 	      tree parmparm = DECL_INNERMOST_TEMPLATE_PARMS (parm);
@@ -12416,7 +12385,7 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain)
 	if (member && DECL_CONV_FN_P (r))
 	  /* Type-conversion operator.  Reconstruct the name, in
 	     case it's the name of one of the template's parameters.  */
-	  DECL_NAME (r) = mangle_conv_op_name_for_type (TREE_TYPE (type));
+	  DECL_NAME (r) = make_conv_op_name (TREE_TYPE (type));
 
 	DECL_ARGUMENTS (r) = tsubst (DECL_ARGUMENTS (t), args,
 				     complain, t);
@@ -14273,7 +14242,7 @@ tsubst_baselink (tree baselink, tree object_type,
 
   tree name = OVL_NAME (fns);
   if (IDENTIFIER_CONV_OP_P (name))
-    name = mangle_conv_op_name_for_type (optype);
+    name = make_conv_op_name (optype);
 
   baselink = lookup_fnfields (qualifying_scope, name, /*protect=*/1);
   if (!baselink)
@@ -15063,7 +15032,7 @@ tsubst_copy (tree t, tree args, tsubst_flags_t complain, tree in_decl)
       if (IDENTIFIER_CONV_OP_P (t))
 	{
 	  tree new_type = tsubst (TREE_TYPE (t), args, complain, in_decl);
-	  return mangle_conv_op_name_for_type (new_type);
+	  return make_conv_op_name (new_type);
 	}
       else
 	return t;
@@ -16696,7 +16665,7 @@ tsubst_copy_and_build (tree t,
 	if (IDENTIFIER_CONV_OP_P (t))
 	  {
 	    tree new_type = tsubst (TREE_TYPE (t), args, complain, in_decl);
-	    t = mangle_conv_op_name_for_type (new_type);
+	    t = make_conv_op_name (new_type);
 	  }
 
 	/* Look up the name.  */
@@ -20044,6 +20013,9 @@ unify_pack_expansion (tree tparms, tree targs, tree packed_parms,
   tree pack, packs = NULL_TREE;
   int i, start = TREE_VEC_LENGTH (packed_parms) - 1;
 
+  /* Add in any args remembered from an earlier partial instantiation.  */
+  targs = add_to_template_args (PACK_EXPANSION_EXTRA_ARGS (parm), targs);
+
   packed_args = expand_template_argument_pack (packed_args);
 
   int len = TREE_VEC_LENGTH (packed_args);
@@ -22554,8 +22526,20 @@ maybe_instantiate_noexcept (tree fn)
 
   if (TREE_CODE (noex) == DEFERRED_NOEXCEPT)
     {
+      static hash_set<tree>* fns = new hash_set<tree>;
+      bool added = false;
       if (DEFERRED_NOEXCEPT_PATTERN (noex) == NULL_TREE)
 	spec = get_defaulted_eh_spec (fn);
+      else if (!(added = !fns->add (fn)))
+	{
+	  /* If hash_set::add returns true, the element was already there.  */
+	  location_t loc = EXPR_LOC_OR_LOC (DEFERRED_NOEXCEPT_PATTERN (noex),
+					    DECL_SOURCE_LOCATION (fn));
+	  error_at (loc,
+		    "exception specification of %qD depends on itself",
+		    fn);
+	  spec = noexcept_false_spec;
+	}
       else if (push_tinst_level (fn))
 	{
 	  push_access_scope (fn);
@@ -22575,6 +22559,9 @@ maybe_instantiate_noexcept (tree fn)
 	}
       else
 	spec = noexcept_false_spec;
+
+      if (added)
+	fns->remove (fn);
 
       TREE_TYPE (fn) = build_exception_variant (fntype, spec);
     }
@@ -24624,26 +24611,38 @@ resolve_typename_type (tree type, bool only_current_p)
   
   /* For a TYPENAME_TYPE like "typename X::template Y<T>", we want to
      find a TEMPLATE_DECL.  Otherwise, we want to find a TYPE_DECL.  */
+  tree fullname = TYPENAME_TYPE_FULLNAME (type);
   if (!decl)
     /*nop*/;
-  else if (identifier_p (TYPENAME_TYPE_FULLNAME (type))
+  else if (identifier_p (fullname)
 	   && TREE_CODE (decl) == TYPE_DECL)
     {
       result = TREE_TYPE (decl);
       if (result == error_mark_node)
 	result = NULL_TREE;
     }
-  else if (TREE_CODE (TYPENAME_TYPE_FULLNAME (type)) == TEMPLATE_ID_EXPR
+  else if (TREE_CODE (fullname) == TEMPLATE_ID_EXPR
 	   && DECL_CLASS_TEMPLATE_P (decl))
     {
-      tree tmpl;
-      tree args;
       /* Obtain the template and the arguments.  */
-      tmpl = TREE_OPERAND (TYPENAME_TYPE_FULLNAME (type), 0);
-      args = TREE_OPERAND (TYPENAME_TYPE_FULLNAME (type), 1);
+      tree tmpl = TREE_OPERAND (fullname, 0);
+      if (TREE_CODE (tmpl) == IDENTIFIER_NODE)
+	{
+	  /* We get here with a plain identifier because a previous tentative
+	     parse of the nested-name-specifier as part of a ptr-operator saw
+	     ::template X<A>.  The use of ::template is necessary in a
+	     ptr-operator, but wrong in a declarator-id.
+
+	     [temp.names]: In a qualified-id of a declarator-id, the keyword
+	     template shall not appear at the top level.  */
+	  pedwarn (EXPR_LOC_OR_LOC (fullname, input_location), OPT_Wpedantic,
+		   "keyword %<template%> not allowed in declarator-id");
+	  tmpl = decl;
+	}
+      tree args = TREE_OPERAND (fullname, 1);
       /* Instantiate the template.  */
       result = lookup_template_class (tmpl, args, NULL_TREE, NULL_TREE,
-				      /*entering_scope=*/0,
+				      /*entering_scope=*/true,
 				      tf_error | tf_user);
       if (result == error_mark_node)
 	result = NULL_TREE;
@@ -25186,17 +25185,16 @@ build_deduction_guide (tree ctor, tree outer_args, tsubst_flags_t complain)
     }
   else
     {
+      ++processing_template_decl;
+
+      tree fn_tmpl
+	= (TREE_CODE (ctor) == TEMPLATE_DECL ? ctor
+	   : DECL_TI_TEMPLATE (ctor));
       if (outer_args)
-	ctor = tsubst (ctor, outer_args, complain, ctor);
+	fn_tmpl = tsubst (fn_tmpl, outer_args, complain, ctor);
+      ctor = DECL_TEMPLATE_RESULT (fn_tmpl);
+
       type = DECL_CONTEXT (ctor);
-      tree fn_tmpl;
-      if (TREE_CODE (ctor) == TEMPLATE_DECL)
-	{
-	  fn_tmpl = ctor;
-	  ctor = DECL_TEMPLATE_RESULT (fn_tmpl);
-	}
-      else
-	fn_tmpl = DECL_TI_TEMPLATE (ctor);
 
       tparms = DECL_TEMPLATE_PARMS (fn_tmpl);
       /* If type is a member class template, DECL_TI_ARGS (ctor) will have
@@ -25218,7 +25216,6 @@ build_deduction_guide (tree ctor, tree outer_args, tsubst_flags_t complain)
 	  /* For a member template constructor, we need to flatten the two
 	     template parameter lists into one, and then adjust the function
 	     signature accordingly.  This gets...complicated.  */
-	  ++processing_template_decl;
 	  tree save_parms = current_template_parms;
 
 	  /* For a member template we should have two levels of parms/args, one
@@ -25279,8 +25276,8 @@ build_deduction_guide (tree ctor, tree outer_args, tsubst_flags_t complain)
 	    ci = tsubst_constraint_info (ci, tsubst_args, complain, ctor);
 
 	  current_template_parms = save_parms;
-	  --processing_template_decl;
 	}
+      --processing_template_decl;
     }
 
   if (!memtmpl)

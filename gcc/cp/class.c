@@ -1217,10 +1217,11 @@ add_method (tree type, tree method, bool via_using)
 			continue;
 		    }
 		  error_at (DECL_SOURCE_LOCATION (method),
-			    "%q#D", method);
-		  error_at (DECL_SOURCE_LOCATION (fn),
-			    "conflicts with version inherited from %qT",
-			    basef);
+			    "%q#D conflicts with version inherited from %qT",
+			    method, basef);
+		  inform (DECL_SOURCE_LOCATION (fn),
+			  "version inherited from %qT declared here",
+			  basef);
 		}
 	      /* Otherwise defer to the other function.  */
 	      return false;
@@ -1238,8 +1239,10 @@ add_method (tree type, tree method, bool via_using)
 	    }
 	  else
 	    {
-	      error ("%q+#D cannot be overloaded", method);
-	      error ("with %q+#D", fn);
+	      error_at (DECL_SOURCE_LOCATION (method),
+			"%q#D cannot be overloaded with %q#D", method, fn);
+	      inform (DECL_SOURCE_LOCATION (fn),
+		      "previous declaration %q#D", fn);
 	      return false;
 	    }
 	}
@@ -1371,16 +1374,21 @@ handle_using_decl (tree using_decl, tree t)
 	   the same name already present in the current class.  */;
       else
 	{
-	  error ("%q+D invalid in %q#T", using_decl, t);
-	  error ("  because of local method %q+#D with same name",
-		 old_value);
+	  error_at (DECL_SOURCE_LOCATION (using_decl), "%qD invalid in %q#T "
+		    "because of local method %q#D with same name",
+		    using_decl, t, old_value);
+	  inform (DECL_SOURCE_LOCATION (old_value),
+		  "local method %q#D declared here", old_value);
 	  return;
 	}
     }
   else if (!DECL_ARTIFICIAL (old_value))
     {
-      error ("%q+D invalid in %q#T", using_decl, t);
-      error ("  because of local member %q+#D with same name", old_value);
+      error_at (DECL_SOURCE_LOCATION (using_decl), "%qD invalid in %q#T "
+		"because of local member %q#D with same name",
+		using_decl, t, old_value);
+      inform (DECL_SOURCE_LOCATION (old_value),
+	      "local member %q#D declared here", old_value);
       return;
     }
 
@@ -2958,29 +2966,25 @@ modify_all_vtables (tree t, tree virtuals)
 static void
 get_basefndecls (tree name, tree t, vec<tree> *base_fndecls)
 {
-  int n_baseclasses = BINFO_N_BASE_BINFOS (TYPE_BINFO (t));
-  int i;
+  bool found_decls = false;
 
   /* Find virtual functions in T with the indicated NAME.  */
-  i = lookup_fnfields_1 (t, name);
-  bool found_decls = false;
-  if (i != -1)
-    for (ovl_iterator iter ((*CLASSTYPE_METHOD_VEC (t))[i]); iter; ++iter)
-      {
-	tree method = *iter;
+  for (ovl_iterator iter (lookup_fnfields_slot (t, name)); iter; ++iter)
+    {
+      tree method = *iter;
 
-	if (TREE_CODE (method) == FUNCTION_DECL
-	    && DECL_VINDEX (method))
-	  {
-	    base_fndecls->safe_push (method);
-	    found_decls = true;
-	  }
-      }
+      if (TREE_CODE (method) == FUNCTION_DECL && DECL_VINDEX (method))
+	{
+	  base_fndecls->safe_push (method);
+	  found_decls = true;
+	}
+    }
 
   if (found_decls)
     return;
 
-  for (i = 0; i < n_baseclasses; i++)
+  int n_baseclasses = BINFO_N_BASE_BINFOS (TYPE_BINFO (t));
+  for (int i = 0; i < n_baseclasses; i++)
     {
       tree basetype = BINFO_TYPE (BINFO_BASE_BINFO (TYPE_BINFO (t), i));
       get_basefndecls (name, basetype, base_fndecls);
@@ -6295,8 +6299,7 @@ include_empty_classes (record_layout_info rli)
      because we are willing to overlay multiple bases at the same
      offset.  However, now we need to make sure that RLI is big enough
      to reflect the entire class.  */
-  eoc = end_of_class (rli->t,
-		      CLASSTYPE_AS_BASE (rli->t) != NULL_TREE);
+  eoc = end_of_class (rli->t, CLASSTYPE_AS_BASE (rli->t) != NULL_TREE);
   rli_size = rli_size_unit_so_far (rli);
   if (TREE_CODE (rli_size) == INTEGER_CST
       && tree_int_cst_lt (rli_size, eoc))
@@ -7444,7 +7447,7 @@ finish_struct (tree t, tree attributes)
 	if (TREE_CODE (x) == USING_DECL)
 	  {
 	    tree fn = strip_using_decl (x);
-	    if (is_overloaded_fn (fn))
+  	    if (OVL_P (fn))
 	      for (lkp_iterator iter (fn); iter; ++iter)
 		add_method (t, *iter, true);
 	  }
@@ -8505,7 +8508,6 @@ static tree
 get_vfield_name (tree type)
 {
   tree binfo, base_binfo;
-  char *buf;
 
   for (binfo = TYPE_BINFO (type);
        BINFO_N_BASE_BINFOS (binfo);
@@ -8519,10 +8521,10 @@ get_vfield_name (tree type)
     }
 
   type = BINFO_TYPE (binfo);
-  buf = (char *) alloca (sizeof (VFIELD_NAME_FORMAT)
-			 + TYPE_NAME_LENGTH (type) + 2);
-  sprintf (buf, VFIELD_NAME_FORMAT,
-	   IDENTIFIER_POINTER (constructor_name (type)));
+  tree ctor_name = constructor_name (type);
+  char *buf = (char *) alloca (sizeof (VFIELD_NAME_FORMAT)
+			       + IDENTIFIER_LENGTH (ctor_name) + 2);
+  sprintf (buf, VFIELD_NAME_FORMAT, IDENTIFIER_POINTER (ctor_name));
   return get_identifier (buf);
 }
 
@@ -8552,9 +8554,8 @@ print_class_statistics (void)
 void
 build_self_reference (void)
 {
-  tree name = constructor_name (current_class_type);
+  tree name = DECL_NAME (TYPE_NAME (current_class_type));
   tree value = build_lang_decl (TYPE_DECL, name, current_class_type);
-  tree saved_cas;
 
   DECL_NONLOCAL (value) = 1;
   DECL_CONTEXT (value) = current_class_type;
@@ -8565,7 +8566,7 @@ build_self_reference (void)
   if (processing_template_decl)
     value = push_template_decl (value);
 
-  saved_cas = current_access_specifier;
+  tree saved_cas = current_access_specifier;
   current_access_specifier = access_public_node;
   finish_member_declaration (value);
   current_access_specifier = saved_cas;
