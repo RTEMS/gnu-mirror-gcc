@@ -173,7 +173,7 @@ enum required_token {
   RT_AT_THROW, /* @throw */
 
   RT_SELECT,  /* selection-statement */
-  RT_INTERATION, /* iteration-statement */
+  RT_ITERATION, /* iteration-statement */
   RT_JUMP, /* jump-statement */
   RT_CLASS_KEY, /* class-key */
   RT_CLASS_TYPENAME_TEMPLATE, /* class, typename, or template */
@@ -12061,7 +12061,7 @@ cp_parser_iteration_statement (cp_parser* parser, bool *if_p, bool ivdep)
   token_indent_info guard_tinfo;
 
   /* Peek at the next token.  */
-  token = cp_parser_require (parser, CPP_KEYWORD, RT_INTERATION);
+  token = cp_parser_require (parser, CPP_KEYWORD, RT_ITERATION);
   if (!token)
     return error_mark_node;
 
@@ -13150,7 +13150,7 @@ cp_parser_decomposition_declaration (cp_parser *parser,
     }
 
   if (cxx_dialect < cxx1z)
-    pedwarn (loc, 0, "decomposition declaration only available with "
+    pedwarn (loc, 0, "structured bindings only available with "
 		     "-std=c++1z or -std=gnu++1z");
 
   tree pushed_scope;
@@ -13199,7 +13199,7 @@ cp_parser_decomposition_declaration (cp_parser *parser,
 
   if (v.is_empty ())
     {
-      error_at (loc, "empty decomposition declaration");
+      error_at (loc, "empty structured binding declaration");
       decl = error_mark_node;
     }
 
@@ -13210,6 +13210,16 @@ cp_parser_decomposition_declaration (cp_parser *parser,
       *init_loc = cp_lexer_peek_token (parser->lexer)->location;
       tree initializer = cp_parser_initializer (parser, &is_direct_init,
 						&non_constant_p);
+      if (initializer == NULL_TREE
+	  || (TREE_CODE (initializer) == TREE_LIST
+	      && TREE_CHAIN (initializer))
+	  || (TREE_CODE (initializer) == CONSTRUCTOR
+	      && CONSTRUCTOR_NELTS (initializer) != 1))
+	{
+	  error_at (loc, "invalid initializer for structured binding "
+		    "declaration");
+	  initializer = error_mark_node;
+	}
 
       if (decl != error_mark_node)
 	{
@@ -15910,11 +15920,6 @@ cp_parser_template_name (cp_parser* parser,
 				check_dependency_p,
 				/*ambiguous_decls=*/NULL,
 				token->location);
-
-  /* If the lookup failed and we got the 'template' keyword, believe it.  */
-  if (decl == error_mark_node && template_keyword_p
-      && processing_template_decl)
-    return identifier;
 
   decl = strip_using_decl (decl);
 
@@ -28079,7 +28084,7 @@ cp_parser_required_error (cp_parser *parser,
 	  case RT_SELECT:
 	    cp_parser_error (parser, "expected selection-statement");
 	    return;
-	  case RT_INTERATION:
+	  case RT_ITERATION:
 	    cp_parser_error (parser, "expected iteration-statement");
 	    return;
 	  case RT_JUMP:

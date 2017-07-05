@@ -3820,7 +3820,7 @@ out_movqi_r_mr (rtx_insn *insn, rtx op[], int *plen)
   if (CONSTANT_ADDRESS_P (x))
     {
       int n_words = AVR_TINY ? 1 : 2;
-      return optimize > 0 && io_address_operand (x, QImode)
+      return io_address_operand (x, QImode)
         ? avr_asm_len ("in %0,%i1", op, plen, -1)
         : avr_asm_len ("lds %0,%m1", op, plen, -n_words);
     }
@@ -4088,7 +4088,7 @@ out_movhi_r_mr (rtx_insn *insn, rtx op[], int *plen)
   else if (CONSTANT_ADDRESS_P (base))
     {
       int n_words = AVR_TINY ? 2 : 4;
-      return optimize > 0 && io_address_operand (base, HImode)
+      return io_address_operand (base, HImode)
         ? avr_asm_len ("in %A0,%i1" CR_TAB
                        "in %B0,%i1+1", op, plen, -2)
 
@@ -5215,7 +5215,7 @@ out_movqi_mr_r (rtx_insn *insn, rtx op[], int *plen)
   if (CONSTANT_ADDRESS_P (x))
     {
       int n_words = AVR_TINY ? 1 : 2;
-      return optimize > 0 && io_address_operand (x, QImode)
+      return io_address_operand (x, QImode)
         ? avr_asm_len ("out %i0,%1", op, plen, -1)
         : avr_asm_len ("sts %m0,%1", op, plen, -n_words);
     }
@@ -5291,13 +5291,12 @@ avr_out_movhi_mr_r_xmega (rtx_insn *insn, rtx op[], int *plen)
 
   if (CONSTANT_ADDRESS_P (base))
     {
-      int n_words = AVR_TINY ? 2 : 4;
-      return optimize > 0 && io_address_operand (base, HImode)
+      return io_address_operand (base, HImode)
         ? avr_asm_len ("out %i0,%A1" CR_TAB
                        "out %i0+1,%B1", op, plen, -2)
 
         : avr_asm_len ("sts %m0,%A1" CR_TAB
-                       "sts %m0+1,%B1", op, plen, -n_words);
+                       "sts %m0+1,%B1", op, plen, -4);
     }
 
   if (reg_base > 0)
@@ -5477,7 +5476,7 @@ out_movhi_mr_r (rtx_insn *insn, rtx op[], int *plen)
   if (CONSTANT_ADDRESS_P (base))
     {
       int n_words = AVR_TINY ? 2 : 4;
-      return optimize > 0 && io_address_operand (base, HImode)
+      return io_address_operand (base, HImode)
         ? avr_asm_len ("out %i0+1,%B1" CR_TAB
                        "out %i0,%A1", op, plen, -2)
 
@@ -10001,7 +10000,9 @@ avr_asm_init_sections (void)
      resp. `avr_need_copy_data_p'.  If flash is not mapped to RAM then
      we have also to track .rodata because it is located in RAM then.  */
 
+#if defined HAVE_LD_AVR_AVRXMEGA3_RODATA_IN_FLASH
   if (0 == avr_arch->flash_pm_offset)
+#endif
     readonly_data_section->unnamed.callback = avr_output_data_section_asm_op;
   data_section->unnamed.callback = avr_output_data_section_asm_op;
   bss_section->unnamed.callback = avr_output_bss_section_asm_op;
@@ -10037,7 +10038,10 @@ avr_asm_named_section (const char *name, unsigned int flags, tree decl)
                             || STR_PREFIX_P (name, ".gnu.linkonce.d"));
 
   if (!avr_need_copy_data_p
-      && 0 == avr_arch->flash_pm_offset)
+#if defined HAVE_LD_AVR_AVRXMEGA3_RODATA_IN_FLASH
+      && 0 == avr_arch->flash_pm_offset
+#endif
+      )
     avr_need_copy_data_p = (STR_PREFIX_P (name, ".rodata")
                             || STR_PREFIX_P (name, ".gnu.linkonce.r"));
 
@@ -11367,8 +11371,7 @@ avr_address_cost (rtx x, machine_mode mode ATTRIBUTE_UNUSED,
     }
   else if (CONSTANT_ADDRESS_P (x))
     {
-      if (optimize > 0
-          && io_address_operand (x, QImode))
+      if (io_address_operand (x, QImode))
         cost = 2;
 
       if (AVR_TINY

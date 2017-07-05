@@ -1,3 +1,34 @@
+2017-07-04  Jakub Jelinek  <jakub@redhat.com>
+
+	* parser.c (cp_parser_decomposition_declaration): Replace
+	decomposition declaration with structured binding in diagnostics.
+	* decl.c (cp_finish_decomp): Likewise.
+	(grokdeclarator): Likewise.
+
+	PR c++/81258
+	* parser.c (cp_parser_decomposition_declaration): Diagnose invalid
+	forms of structured binding initializers.
+
+2017-07-03  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/65775
+	* decl.c (grokdeclarator): Move checks on function return type after
+	the splice_late_return_type call; if declspecs->locations[ds_type_spec]
+	is UNKNOWN_LOCATION fall back to input_location.
+
+2017-07-03  David Malcolm  <dmalcolm@redhat.com>
+
+	* parser.c (enum required_token): Fix spelling of
+	RT_INTERATION to RT_ITERATION.
+	(cp_parser_iteration_statement): Likewise.
+	(cp_parser_required_error): Likewise.
+
+2017-06-30  Jason Merrill  <jason@redhat.com>
+
+	PR c++/81257 - ICE with invalid ::template.
+	PR c++/54769 - wrong lookup of dependent template-name.
+	* parser.c (cp_parser_template_name): Revert part of last change.
+
 2017-06-30  Nathan Sidwell  <nathan@acm.org>
 
 	* config-lang.in (gtfiles): Add cp/lex.c.
