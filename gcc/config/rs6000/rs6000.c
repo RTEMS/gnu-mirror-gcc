@@ -37289,7 +37289,7 @@ rs6000_get_function_versions_dispatcher (void *decl)
   default_node = default_version_info->this_node;
 
 #ifndef TARGET_LIBC_PROVIDES_HWCAP_IN_TCB
-  error_at (DECL_SOURCE_LOCATION (default_node->decl), 0,
+  error_at (DECL_SOURCE_LOCATION (default_node->decl),
 	    "target_clones attribute needs GLIBC (2.23 and newer) that "
 	    "exports hardware capability bits");
 #else
