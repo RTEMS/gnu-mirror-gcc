@@ -15185,8 +15185,8 @@ cpu_expand_builtin (enum rs6000_builtins fcode, tree exp ATTRIBUTE_UNUSED,
   cpu_builtin_p = true;
 
 #else
-  warning ("%s needs GLIBC (2.23 and newer) to export hardware capability bits",
-	   rs6000_builtin_info[(size_t) fcode].name);
+  warning (0, "%s needs GLIBC (2.23 and newer) that exports hardware "
+	   "capability bits", rs6000_builtin_info[(size_t) fcode].name);
   
   /* For old LIBCs, always return FALSE.  */
   emit_move_insn (target, GEN_INT (0));
@@ -37290,8 +37290,8 @@ rs6000_get_function_versions_dispatcher (void *decl)
 
 #ifndef TARGET_LIBC_PROVIDES_HWCAP_IN_TCB
   error_at (DECL_SOURCE_LOCATION (default_node->decl), 0,
-	    "target_clones attribute needs GLIBC (2.23 and newer) to export "
-	    "hardware capability bits");
+	    "target_clones attribute needs GLIBC (2.23 and newer) that "
+	    "exports hardware capability bits");
 #else
 
   if (targetm.has_ifunc_p ())
