@@ -3282,7 +3282,9 @@ one compiled with @option{-msse4.1} and another with @option{-mavx}.
 On a PowerPC, you can compile a function with
 @code{target_clones("cpu=power9,default")}.  GCC will create two
 function clones, one compiled with @option{-mcpu=power9} and another
-with the default options.
+with the default options.  On the PowerPC, the compiler must be
+configured to use GLIBC 2.23 or newer in order to use the
+@code{target_clones} attribute.
 
 It also creates a resolver function (see
 the @code{ifunc} attribute above) that dynamically selects a clone
@@ -14918,8 +14920,16 @@ to maintain API compatibility with the x86 builtins.
 
 @deftypefn {Built-in Function} int __builtin_cpu_is (const char *@var{cpuname})
 This function returns a value of @code{1} if the run-time CPU is of type
-@var{cpuname} and returns @code{0} otherwise. The following CPU names can be
-detected:
+@var{cpuname} and returns @code{0} otherwise
+
+The @code{__builtin_cpu_is} function requires GLIBC 2.23 or newer in
+order to export the hardware capability bits.  The
+@code{__builtin_cpu_is} function will return 0 if the compiler was
+configured for an earlier GCC.  GCC defines the macro
+@code{__BUILTIN_CPU_IS__} if you can use the @code{__builtin_cpu_is}
+built-in function.
+
+The following CPU names can be detected:
 
 @table @samp
 @item power9
@@ -14969,7 +14979,16 @@ else
 
 @deftypefn {Built-in Function} int __builtin_cpu_supports (const char *@var{feature})
 This function returns a value of @code{1} if the run-time CPU supports the HWCAP
-feature @var{feature} and returns @code{0} otherwise. The following features can be
+feature @var{feature} and returns @code{0} otherwise.
+
+The @code{__builtin_cpu_supports} function requires GLIBC 2.23 or newer in
+order to export the hardware capability bits.  The
+@code{__builtin_cpu_supports} function will return 0 if the compiler was
+configured for an earlier GCC.  GCC defines the macro
+@code{__BUILTIN_CPU_SUPPORTS__} if you can use the @code{__builtin_cpu_supports}
+built-in function.
+
+The following features can be
 detected:
 
 @table @samp
