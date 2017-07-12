@@ -646,7 +646,6 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
     builtin_define ("__ibm128=long double");
 #ifdef TARGET_LIBC_PROVIDES_HWCAP_IN_TCB
   builtin_define ("__BUILTIN_CPU_SUPPORTS__");
-  builtin_define ("__BUILTIN_CPU_IS__");
 #endif
 
   /* We needed to create a keyword if -mfloat128-type was used but not -mfloat,
