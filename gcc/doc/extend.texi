@@ -3283,7 +3283,9 @@ On a PowerPC, you can compile a function with
 @code{target_clones("cpu=power9,default")}.  GCC will create two
 function clones, one compiled with @option{-mcpu=power9} and another
 with the default options.  GCC must be configured to use GLIBC 2.23 or
-newer in order to use the @code{target_clones} attribute.
+newer in order to use the @code{target_clones} attribute.  The macro
+@code{__BUILTIN_CPU_SUPPORTS__} is defined if you can use the
+@code{target_clones} attribute.
 
 It also creates a resolver function (see
 the @code{ifunc} attribute above) that dynamically selects a clone
