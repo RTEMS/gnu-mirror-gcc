@@ -1,3 +1,9 @@
+2017-07-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_get_function_versions_dispatcher):
+	Back port change from mainline to make target_clones without a new
+	glibc an error, not a warning.
+
 2017-07-07  Peter Bergner  <bergner@vnet.ibm.com>
 
 	Merge up to 250060.
