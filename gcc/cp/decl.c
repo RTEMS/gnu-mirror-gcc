@@ -8513,11 +8513,11 @@ grokfndecl (tree ctype,
     case sfk_constructor:
     case sfk_copy_constructor:
     case sfk_move_constructor:
-      DECL_CONSTRUCTOR_P (decl) = 1;
+      DECL_CXX_CONSTRUCTOR_P (decl) = 1;
       DECL_NAME (decl) = ctor_identifier;
       break;
     case sfk_destructor:
-      DECL_DESTRUCTOR_P (decl) = 1;
+      DECL_CXX_DESTRUCTOR_P (decl) = 1;
       DECL_NAME (decl) = dtor_identifier;
       break;
     default:
@@ -12591,9 +12591,11 @@ grokparms (tree parmlist, tree *parms)
 	    }
 	  else if (abstract_virtuals_error (decl, type))
 	    any_error = 1;  /* Seems like a good idea.  */
-	  else if (POINTER_TYPE_P (type))
+	  else if (cxx_dialect < cxx1z
+		   && POINTER_TYPE_P (type))
 	    {
-	      /* [dcl.fct]/6, parameter types cannot contain pointers
+	      /* Before C++17 DR 393:
+		 [dcl.fct]/6, parameter types cannot contain pointers
 		 (references) to arrays of unknown bound.  */
 	      tree t = TREE_TYPE (type);
 	      int ptr = TYPE_PTR_P (type);
@@ -12609,12 +12611,13 @@ grokparms (tree parmlist, tree *parms)
 		  t = TREE_TYPE (t);
 		}
 	      if (TREE_CODE (t) == ARRAY_TYPE)
-		error (ptr
-                       ? G_("parameter %qD includes pointer to array of "
-                            "unknown bound %qT")
-                       : G_("parameter %qD includes reference to array of "
-                            "unknown bound %qT"),
-                       decl, t);
+		pedwarn (DECL_SOURCE_LOCATION (decl), OPT_Wpedantic,
+			 ptr
+			 ? G_("parameter %qD includes pointer to array of "
+			      "unknown bound %qT")
+			 : G_("parameter %qD includes reference to array of "
+			      "unknown bound %qT"),
+			 decl, t);
 	    }
 
 	  if (any_error)

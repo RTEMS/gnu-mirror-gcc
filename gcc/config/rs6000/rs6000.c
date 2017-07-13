@@ -15176,6 +15176,8 @@ cpu_expand_builtin (enum rs6000_builtins fcode, tree exp ATTRIBUTE_UNUSED,
       emit_insn (gen_eqsi3 (scratch2, scratch1, const0_rtx));
       emit_insn (gen_rtx_SET (target, gen_rtx_XOR (SImode, scratch2, const1_rtx)));
     }
+  else
+    gcc_unreachable ();
 
   /* Record that we have expanded a CPU builtin, so that we can later
      emit a reference to the special symbol exported by LIBC to ensure we
@@ -15183,6 +15185,9 @@ cpu_expand_builtin (enum rs6000_builtins fcode, tree exp ATTRIBUTE_UNUSED,
   cpu_builtin_p = true;
 
 #else
+  warning (0, "%s needs GLIBC (2.23 and newer) that exports hardware "
+	   "capability bits", rs6000_builtin_info[(size_t) fcode].name);
+  
   /* For old LIBCs, always return FALSE.  */
   emit_move_insn (target, GEN_INT (0));
 #endif /* TARGET_LIBC_PROVIDES_HWCAP_IN_TCB */
@@ -16296,6 +16301,10 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
   enum rs6000_builtins fn_code
     = (enum rs6000_builtins) DECL_FUNCTION_CODE (fndecl);
   tree arg0, arg1, lhs;
+
+  /* Generic solution to prevent gimple folding of code without a LHS.  */
+  if (!gimple_call_lhs (stmt))
+    return false;
 
   switch (fn_code)
     {
@@ -37283,6 +37292,12 @@ rs6000_get_function_versions_dispatcher (void *decl)
 
   default_node = default_version_info->this_node;
 
+#ifndef TARGET_LIBC_PROVIDES_HWCAP_IN_TCB
+  error_at (DECL_SOURCE_LOCATION (default_node->decl),
+	    "target_clones attribute needs GLIBC (2.23 and newer) that "
+	    "exports hardware capability bits");
+#else
+
   if (targetm.has_ifunc_p ())
     {
       struct cgraph_function_version_info *it_v = NULL;
@@ -37314,6 +37329,7 @@ rs6000_get_function_versions_dispatcher (void *decl)
 		"multiversioning needs ifunc which is not supported "
 		"on this target");
     }
+#endif
 
   return dispatch_decl;
 }
@@ -37328,29 +37344,19 @@ make_resolver_func (const tree default_decl,
 		    const tree dispatch_decl,
 		    basic_block *empty_bb)
 {
-  /* IFUNC's have to be globally visible.  So, if the default_decl is
-     not, then the name of the IFUNC should be made unique.  */
-  bool is_uniq = (TREE_PUBLIC (default_decl) == 0);
-
-  /* Append the filename to the resolver function if the versions are
-     not externally visible.  This is because the resolver function has
-     to be externally visible for the loader to find it.  So, appending
-     the filename will prevent conflicts with a resolver function from
-     another module which is based on the same version name.  */
-  char *resolver_name = make_unique_name (default_decl, "resolver", is_uniq);
-
-  /* The resolver function should return a (void *).  */
+  /* Make the resolver function static.  The resolver function returns
+     void *.  */
+  tree decl_name = clone_function_name (default_decl, "resolver");
+  const char *resolver_name = IDENTIFIER_POINTER (decl_name);
   tree type = build_function_type_list (ptr_type_node, NULL_TREE);
   tree decl = build_fn_decl (resolver_name, type);
-  tree decl_name = get_identifier (resolver_name);
   SET_DECL_ASSEMBLER_NAME (decl, decl_name);
 
   DECL_NAME (decl) = decl_name;
   TREE_USED (decl) = 1;
   DECL_ARTIFICIAL (decl) = 1;
   DECL_IGNORED_P (decl) = 0;
-  /* IFUNC resolvers have to be externally visible.  */
-  TREE_PUBLIC (decl) = 1;
+  TREE_PUBLIC (decl) = 0;
   DECL_UNINLINABLE (decl) = 1;
 
   /* Resolver is not external, body is generated.  */
@@ -37360,15 +37366,6 @@ make_resolver_func (const tree default_decl,
   DECL_CONTEXT (decl) = NULL_TREE;
   DECL_INITIAL (decl) = make_node (BLOCK);
   DECL_STATIC_CONSTRUCTOR (decl) = 0;
-
-  if (DECL_COMDAT_GROUP (default_decl) || TREE_PUBLIC (default_decl))
-    {
-      /* In this case, each translation unit with a call to this
-	 versioned function will put out a resolver.  Ensure it
-	 is comdat to keep just one copy.  */
-      DECL_COMDAT (decl) = 1;
-      make_decl_one_only (decl, DECL_ASSEMBLER_NAME (decl));
-    }
 
   /* Build result decl and add to function_decl.  */
   tree t = build_decl (UNKNOWN_LOCATION, RESULT_DECL, NULL_TREE, ptr_type_node);
@@ -37391,7 +37388,7 @@ make_resolver_func (const tree default_decl,
     = make_attribute ("ifunc", resolver_name, DECL_ATTRIBUTES (dispatch_decl));
 
   cgraph_node::create_same_body_alias (dispatch_decl, decl);
-  XDELETEVEC (resolver_name);
+
   return decl;
 }
 

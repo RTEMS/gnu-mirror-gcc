@@ -1,3 +1,174 @@
+2017-07-13  David Malcolm  <dmalcolm@redhat.com>
+
+	PR c/81405
+	* gcc.dg/Wmissing-braces-fixits.c: Add coverage for PR c/81405.  */
+
+2017-07-13  Will Schmidt  <will_schmidt@vnet.ibm.com>
+
+	* gcc.target/powerpc/fold-vec-missing-lhs.c: New.
+
+2017-07-13  Martin Liska  <mliska@suse.cz>
+
+	* c-c++-common/ubsan/sanitize-all-1.c: Update scanned pattern.
+	* c-c++-common/ubsan/sanitize-recover-1.c:Likewise.
+	* c-c++-common/ubsan/sanitize-recover-2.c:Likewise.
+	* c-c++-common/ubsan/sanitize-recover-5.c:Likewise.
+	* c-c++-common/ubsan/sanitize-recover-7.c:Likewise.
+	* c-c++-common/ubsan/sanitize-recover-8.c:Likewise.
+	* c-c++-common/ubsan/sanitize-recover-9.c:Likewise.
+
+2017-07-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/81193
+	* gcc.target/powerpc/bmi-andn-1.c: Add guard against using
+	__builtin_cpu_supports with old GLIBC's.
+	* gcc.target/powerpc/bmi-andn-2.c: Likewise.
+	* gcc.target/powerpc/bmi-bextr-1.c: Likewise.
+	* gcc.target/powerpc/bmi-bextr-2.c: Likewise.
+	* gcc.target/powerpc/bmi-bextr-4.c: Likewise.
+	* gcc.target/powerpc/bmi-bextr-5.c: Likewise.
+	* gcc.target/powerpc/bmi-blsi-1.c: Likewise.
+	* gcc.target/powerpc/bmi-blsi-2.c: Likewise.
+	* gcc.target/powerpc/bmi-blsmsk-1.c: Likewise.
+	* gcc.target/powerpc/bmi-blsmsk-2.c: Likewise.
+	* gcc.target/powerpc/bmi-blsr-1.c: Likewise.
+	* gcc.target/powerpc/bmi-blsr-2.c: Likewise.
+	* gcc.target/powerpc/bmi-tzcnt-1.c: Likewise.
+	* gcc.target/powerpc/bmi-tzcnt-2.c: Likewise.
+	* gcc.target/powerpc/bmi2-bzhi32-1.c: Likewise.
+	* gcc.target/powerpc/bmi2-bzhi64-1.c: Likewise.
+	* gcc.target/powerpc/bmi2-mulx32-1.c: Likewise.
+	* gcc.target/powerpc/bmi2-mulx32-2.c: Likewise.
+	* gcc.target/powerpc/bmi2-mulx64-1.c: Likewise.
+	* gcc.target/powerpc/bmi2-mulx64-2.c: Likewise.
+	* gcc.target/powerpc/bmi2-pdep32-1.c: Likewise.
+	* gcc.target/powerpc/bmi2-pdep64-1.c: Likewise.
+	* gcc.target/powerpc/bmi2-pext32-1.c: Likewise.
+	* gcc.target/powerpc/bmi2-pext64-1.c: Likewise.
+	* gcc.target/powerpc/cpu-builtin-1.c: Likewise.
+
+2017-07-12  Carl Love  <cel@us.ibm.com>
+
+	* gcc.target/powerpc/p9-xxbr-1.c (rev_bool_char, rev_bool_short,
+	rev_bool_int): Add test cases for builtins.
+	* gcc.target/powerpc/p9-xxbr-2.c (rev_long_long, rev_ulong_ulong): Add
+	test cases for builtins.
+
+2017-07-12  Carl Love  <cel@us.ibm.com>
+
+	* gcc.target/powerpc/builtins-1-p9-runnable.c (dg-ddo run): Add
+	lp64 && p9vector_hw.
+
+2017-07-12  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	* lib/target-supports.exp (check_stack_check_available): Make
+	testcase name depend on stack_kind.
+
+2017-07-11  Michael Collison  <michael.collison@arm.com>
+
+	* testsuite/gcc.target/aarch64/cmp-2.c: New testcase.
+
+2017-07-11  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/51270
+	* g++.dg/warn/Wreturn-local-addr-3.C: New.
+
+2017-07-11  Carl Love  <cel@us.ibm.com>
+
+	* gcc.target/powerpc/builtins-2-p9-runnable.c: Add new file with
+	test cases for the builtins.
+
+2017-07-11  Yury Gribov  <tetra2005@gmail.com>
+
+	* lib/profopt.exp: Print relative names in UNSUPPORTED
+	AutoFDO tests.
+
+2017-07-10  Michael Collison <michael.collison@arm.com>
+
+	* gcc.target/aarch64/var_shift_mask_1.c: Fix for ILP32
+
+2017-07-10  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/81375
+	* gcc.target/i386/pr81375.c: New test.
+
+2017-07-10  Martin Sebor  <msebor@redhat.com>
+
+	PR tree-optimization/80397
+	* gcc.dg/tree-ssa/builtin-sprintf-warn-17.c: New test.
+
+2017-07-10  Martin Sebor  <msebor@redhat.com>
+
+	PR other/81345
+	* gcc.dg/pr81345.c: New test.
+
+2017-07-10  Claudiu Zissulescu  <claziss@synopsys.com>
+
+	* gcc.target/arc/mulsi3_highpart-1.c: Remove 'X' constraint.
+	* gcc.target/arc/mulsi3_highpart-2.c: Likewise.
+
+2017-07-09  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/81313
+	* gcc.dg/stack-layout-dynamic-1.c (bar): Add 4 additional
+	integer argumets to bypass x86_64 outgoing args optimization.
+
+2017-07-09  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	* gfortran.dg/eoshift_4.f90:  New test.
+	* gfortran.dg/eoshift_5.f90:  New test.
+	* gfortran.dg/eoshift_6.f90:  New test.
+
+2017-07-09  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/81313
+	* gcc.target/i386/pr81313-1.c: New test.
+	* gcc.target/i386/pr81313-2.c: Likewise.
+	* gcc.target/i386/pr81313-3.c: Likewise.
+	* gcc.target/i386/pr81313-4.c: Likewise.
+	* gcc.target/i386/pr81313-5.c: Likewise.
+
+2017-07-08  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* gnat.dg/vect15.ads (Sarray): Increase range to 1 .. 5.
+	* gnat.dg/vect16.ads (Sarray): Likewise.
+	* gnat.dg/vect17.ads (Sarray): Likewise.
+	* gnat.dg/vect15.adb (Add): Create a dependence distance of 1.
+	* gnat.dg/vect16.adb (Add): Likewise.
+	* gnat.dg/vect17.adb (Add): Likewise.
+
+2017-07-07  David Malcolm  <dmalcolm@redhat.com>
+
+	PR c++/79300
+	* g++.dg/diagnostic/pr79300.C: New test case.
+
+2017-07-07  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/clone1.c: Add check to make sure the
+	__builtin_cpu_supports function is fully supported.
+	* gcc.target/powerpc/clone2.c: New runtime test for
+	target_clones.
+
+	PR target/81348
+	* gcc.target/powerpc/pr81348.c: New test.
+
+2017-07-07  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	* gfortran.dg/vect/pr60510.f: Require vect_double support.
+
+2017-07-07  Carl Love  <cel@us.ibm.com>
+
+	* gcc.target/powerpc/builtins-1-p9-runnable.c: Add new test
+	file for built-ins.
+
+2017-07-07  Jose E. Marchesi  <jose.marchesi@oracle.com>
+
+	* gcc.target/sparc/dictunpack.c: New file.
+	* gcc.target/sparc/fpcmpdeshl.c: Likewise.
+	* gcc.target/sparc/fpcmpshl.c: Likewise.
+	* gcc.target/sparc/fpcmpurshl.c: Likewise.
+	* gcc.target/sparc/fpcmpushl.c: Likewise.
+
 2017-07-06  Harald Anlauf  <anlauf@gmx.de>
 
 	PR fortran/70071
