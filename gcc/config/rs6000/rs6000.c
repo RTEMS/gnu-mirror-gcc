@@ -36323,7 +36323,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "dlmzb",			OPTION_MASK_DLMZB,		false, true  },
   { "efficient-unaligned-vsx",	OPTION_MASK_EFFICIENT_UNALIGNED_VSX,
 								false, true  },
-  { "float128",			OPTION_MASK_FLOAT128_KEYWORD,	false, false },
+  { "float128",			OPTION_MASK_FLOAT128_KEYWORD,	false, true  },
   { "float128-type",		OPTION_MASK_FLOAT128_TYPE,	false, false },
   { "float128-hardware",	OPTION_MASK_FLOAT128_HW,	false, false },
   { "fprnd",			OPTION_MASK_FPRND,		false, true  },
