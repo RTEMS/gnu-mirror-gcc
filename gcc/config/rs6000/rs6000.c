@@ -16994,16 +16994,17 @@ rs6000_init_builtins (void)
      format that uses a pair of doubles, depending on the switches and
      defaults.
 
-     We do not enable the actual __float128 keyword unless the user explicitly
-     asks for it, because the library support is not yet complete.
-
      If we don't support for either 128-bit IBM double double or IEEE 128-bit
      floating point, we need make sure the type is non-zero or else self-test
      fails during bootstrap.
 
      We don't register a built-in type for __ibm128 if the type is the same as
      long double.  Instead we add a #define for __ibm128 in
-     rs6000_cpu_cpp_builtins to long double.  */
+     rs6000_cpu_cpp_builtins to long double.
+
+     For IEEE 128-bit floating point, always create the type __ieee128.  If the
+     user used -mfloat128, rs6000-c.c will create a define from __float128 to
+     __ieee128.  */
   if (TARGET_LONG_DOUBLE_128 && FLOAT128_IEEE_P (TFmode))
     {
       ibm128_float_type_node = make_node (REAL_TYPE);
@@ -17017,27 +17018,9 @@ rs6000_init_builtins (void)
   else
     ibm128_float_type_node = long_double_type_node;
 
-  if (TARGET_FLOAT128_KEYWORD)
+  if (TARGET_FLOAT128_TYPE)
     {
       ieee128_float_type_node = float128_type_node;
-      lang_hooks.types.register_builtin_type (ieee128_float_type_node,
-					      "__float128");
-    }
-
-  else if (TARGET_FLOAT128_TYPE)
-    {
-#if 1
-      ieee128_float_type_node = float128_type_node;
-#else
-      ieee128_float_type_node = make_node (REAL_TYPE);
-      TYPE_PRECISION (ibm128_float_type_node) = 128;
-      SET_TYPE_MODE (ieee128_float_type_node, KFmode);
-      layout_type (ieee128_float_type_node);
-#endif
-
-      /* If we are not exporting the __float128/_Float128 keywords, we need a
-	 keyword to get the types created.  Use __ieee128 as the dummy
-	 keyword.  */
       lang_hooks.types.register_builtin_type (ieee128_float_type_node,
 					      "__ieee128");
     }
@@ -36338,7 +36321,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
 								false, true  },
   { "float128",			OPTION_MASK_FLOAT128_KEYWORD,	false, true  },
   { "float128-type",		OPTION_MASK_FLOAT128_TYPE,	false, false },
-  { "float128-hardware",	OPTION_MASK_FLOAT128_HW,	false, false },
+  { "float128-hardware",	OPTION_MASK_FLOAT128_HW,	false, true  },
   { "fprnd",			OPTION_MASK_FPRND,		false, true  },
   { "hard-dfp",			OPTION_MASK_DFP,		false, true  },
   { "htm",			OPTION_MASK_HTM,		false, true  },

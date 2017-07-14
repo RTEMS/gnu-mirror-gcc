@@ -609,8 +609,6 @@ rs6000_target_modify_macros (bool define_p, HOST_WIDE_INT flags,
      2. If TARGET_P8_VECTOR is off.  */
   if ((flags & OPTION_MASK_UPPER_REGS_SF) != 0)
     rs6000_define_or_undefine_macro (define_p, "__UPPER_REGS_SF__");
-
-
   /* OPTION_MASK_FLOAT128 can be turned on via the -mfloat128 option or via the
      target attribute/pragma.  The -mfloat128-keyword option must be in
      effect.  */
@@ -622,7 +620,6 @@ rs6000_target_modify_macros (bool define_p, HOST_WIDE_INT flags,
       else
 	rs6000_define_or_undefine_macro (false, "__float128");
     }
-
   /* OPTION_MASK_FLOAT128_HARDWARE can be turned on if -mcpu=power9 is used or
      via the target attribute/pragma.  */
   if ((flags & OPTION_MASK_FLOAT128_HW) != 0)
