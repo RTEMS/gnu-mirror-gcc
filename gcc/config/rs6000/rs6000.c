@@ -17026,10 +17026,14 @@ rs6000_init_builtins (void)
 
   else if (TARGET_FLOAT128_TYPE)
     {
+#if 1
+      ieee128_float_type_node = float128_type_node;
+#else
       ieee128_float_type_node = make_node (REAL_TYPE);
       TYPE_PRECISION (ibm128_float_type_node) = 128;
       SET_TYPE_MODE (ieee128_float_type_node, KFmode);
       layout_type (ieee128_float_type_node);
+#endif
 
       /* If we are not exporting the __float128/_Float128 keywords, we need a
 	 keyword to get the types created.  Use __ieee128 as the dummy
@@ -36218,7 +36222,7 @@ rs6000_floatn_mode (int n, bool extended)
 	  return DFmode;
 
 	case 64:
-	  if (TARGET_FLOAT128_KEYWORD)
+	  if (TARGET_FLOAT128_TYPE)
 	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 	  else
 	    return VOIDmode;
@@ -36242,7 +36246,7 @@ rs6000_floatn_mode (int n, bool extended)
 	  return DFmode;
 
 	case 128:
-	  if (TARGET_FLOAT128_KEYWORD)
+	  if (TARGET_FLOAT128_TYPE)
 	    return (FLOAT128_IEEE_P (TFmode)) ? TFmode : KFmode;
 	  else
 	    return VOIDmode;
