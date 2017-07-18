@@ -150,6 +150,7 @@ static void build_base_fields (record_layout_info, splay_tree, tree *);
 static void check_methods (tree);
 static void remove_zero_width_bit_fields (tree);
 static bool accessible_nvdtor_p (tree);
+static bool classtype_has_move_assign_or_move_ctor (tree);
 
 /* Used by find_flexarrays and related functions.  */
 struct flexmems_t;
@@ -2240,10 +2241,10 @@ maybe_warn_about_overly_private_class (tree t)
   /* Warn about classes that have private constructors and no friends.  */
   if (TYPE_HAS_USER_CONSTRUCTOR (t)
       /* Implicitly generated constructors are always public.  */
-      && (!CLASSTYPE_LAZY_DEFAULT_CTOR (t)
-	  || !CLASSTYPE_LAZY_COPY_CTOR (t)))
+      && !CLASSTYPE_LAZY_DEFAULT_CTOR (t))
     {
       bool nonprivate_ctor = false;
+      tree copy_or_move = NULL_TREE;
 
       /* If a non-template class does not define a copy
 	 constructor, one is defined for it, enabling it to avoid
@@ -2260,13 +2261,15 @@ maybe_warn_about_overly_private_class (tree t)
       else
 	for (ovl_iterator iter (CLASSTYPE_CONSTRUCTORS (t));
 	     !nonprivate_ctor && iter; ++iter)
-	  /* Ideally, we wouldn't count copy constructors (or, in
-	     fact, any constructor that takes an argument of the class
-	     type as a parameter) because such things cannot be used
-	     to construct an instance of the class unless you already
-	     have one.  But, for now at least, we're more
-	     generous.  */
-	  if (! TREE_PRIVATE (*iter))
+	  if (TREE_PRIVATE (*iter))
+	    continue;
+	  else if (copy_fn_p (*iter) || move_fn_p (*iter))
+	    /* Ideally, we wouldn't count any constructor that takes
+	       an argument of the class type as a parameter, because
+	       such things cannot be used to construct an instance of
+	       the class unless you already have one.  */
+	    copy_or_move = *iter;
+	  else
 	    nonprivate_ctor = true;
 
       if (!nonprivate_ctor)
@@ -2274,6 +2277,10 @@ maybe_warn_about_overly_private_class (tree t)
 	  warning (OPT_Wctor_dtor_privacy,
 		   "%q#T only defines private constructors and has no friends",
 		   t);
+	  if (copy_or_move)
+	    inform (DECL_SOURCE_LOCATION (copy_or_move),
+		    "%q#D is public, but requires an existing %q#T object",
+		    copy_or_move, t);
 	  return;
 	}
     }
@@ -3378,7 +3385,7 @@ add_implicitly_declared_members (tree t, tree* access_decls,
   bool move_ok = false;
   if (cxx_dialect >= cxx11 && CLASSTYPE_LAZY_DESTRUCTOR (t)
       && !TYPE_HAS_COPY_CTOR (t) && !TYPE_HAS_COPY_ASSIGN (t)
-      && !type_has_move_constructor (t) && !type_has_move_assign (t))
+      && !classtype_has_move_assign_or_move_ctor (t))
     move_ok = true;
 
   /* [class.ctor]
@@ -5450,37 +5457,18 @@ type_has_virtual_destructor (tree type)
   return (dtor && DECL_VIRTUAL_P (dtor));
 }
 
-/* Returns true iff class T has a move constructor.  */
+/* Returns true iff class T has move assignment or move constructor.  */
 
-bool
-type_has_move_constructor (tree t)
+static bool
+classtype_has_move_assign_or_move_ctor (tree t)
 {
-  if (CLASSTYPE_LAZY_MOVE_CTOR (t))
-    {
-      gcc_assert (COMPLETE_TYPE_P (t));
-      lazily_declare_fn (sfk_move_constructor, t);
-    }
+  gcc_assert (!CLASSTYPE_LAZY_MOVE_CTOR (t)
+	      && !CLASSTYPE_LAZY_MOVE_ASSIGN (t));
 
-  if (!CLASSTYPE_METHOD_VEC (t))
-    return false;
-
-  for (ovl_iterator iter (CLASSTYPE_CONSTRUCTORS (t)); iter; ++iter)
+  for (ovl_iterator iter (lookup_fnfields_slot_nolazy
+			  (t, ctor_identifier)); iter; ++iter)
     if (move_fn_p (*iter))
       return true;
-
-  return false;
-}
-
-/* Returns true iff class T has a move assignment operator.  */
-
-bool
-type_has_move_assign (tree t)
-{
-  if (CLASSTYPE_LAZY_MOVE_ASSIGN (t))
-    {
-      gcc_assert (COMPLETE_TYPE_P (t));
-      lazily_declare_fn (sfk_move_assignment, t);
-    }
 
   for (ovl_iterator iter (lookup_fnfields_slot_nolazy
 			  (t, cp_assignment_operator_id (NOP_EXPR)));
@@ -5491,48 +5479,30 @@ type_has_move_assign (tree t)
   return false;
 }
 
-/* Returns true iff class T has a move constructor that was explicitly
-   declared in the class body.  Note that this is different from
-   "user-provided", which doesn't include functions that are defaulted in
-   the class.  */
+/* Returns true iff T, a class, has a user-declared move-assignment or
+   move-constructor.  Note that this is different from
+   "user-provided", which doesn't include functions that are defaulted
+   in the class.  */
 
 bool
-type_has_user_declared_move_constructor (tree t)
+classtype_has_user_move_assign_or_move_ctor_p (tree t)
 {
-  if (CLASSTYPE_LAZY_MOVE_CTOR (t))
-    return false;
-
   if (!CLASSTYPE_METHOD_VEC (t))
     return false;
 
-  for (ovl_iterator iter (CLASSTYPE_CONSTRUCTORS (t)); iter; ++iter)
-    {
-      tree fn = *iter;
-      if (move_fn_p (fn) && !DECL_ARTIFICIAL (fn))
+  if (!CLASSTYPE_LAZY_MOVE_CTOR (t))
+    for (ovl_iterator iter (lookup_fnfields_slot_nolazy (t, ctor_identifier));
+	 iter; ++iter)
+      if (!DECL_ARTIFICIAL (*iter) && move_fn_p (*iter))
 	return true;
-    }
 
-  return false;
-}
-
-/* Returns true iff class T has a move assignment operator that was
-   explicitly declared in the class body.  */
-
-bool
-type_has_user_declared_move_assign (tree t)
-{
-  if (CLASSTYPE_LAZY_MOVE_ASSIGN (t))
-    return false;
-
-  for (ovl_iterator iter (lookup_fnfields_slot_nolazy
-			  (t, cp_assignment_operator_id (NOP_EXPR)));
-       iter; ++iter)
-    {
-      tree fn = *iter;
-      if (move_fn_p (fn) && !DECL_ARTIFICIAL (fn))
+  if (!CLASSTYPE_LAZY_MOVE_ASSIGN (t))
+    for (ovl_iterator iter (lookup_fnfields_slot_nolazy
+			    (t, cp_assignment_operator_id (NOP_EXPR)));
+	 iter; ++iter)
+      if (!DECL_ARTIFICIAL (*iter) && move_fn_p (*iter))
 	return true;
-    }
-
+  
   return false;
 }
 

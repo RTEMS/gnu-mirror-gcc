@@ -2237,9 +2237,9 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_unsigned_V4SI, RS6000_BTI_unsigned_V8HI, RS6000_BTI_unsigned_V8HI, 0 },
   { ALTIVEC_BUILTIN_VEC_MULE, ALTIVEC_BUILTIN_VMULESH,
     RS6000_BTI_V4SI, RS6000_BTI_V8HI, RS6000_BTI_V8HI, 0 },
-  { ALTIVEC_BUILTIN_VEC_MULE, ALTIVEC_BUILTIN_VMULESW,
+  { ALTIVEC_BUILTIN_VEC_MULE, ALTIVEC_BUILTIN_VMULESH,
     RS6000_BTI_V2DI, RS6000_BTI_V4SI, RS6000_BTI_V4SI, 0 },
-  { ALTIVEC_BUILTIN_VEC_MULE, ALTIVEC_BUILTIN_VMULEUW,
+  { ALTIVEC_BUILTIN_VEC_MULE, ALTIVEC_BUILTIN_VMULEUH,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_unsigned_V4SI,
     RS6000_BTI_unsigned_V4SI, 0 },
   { ALTIVEC_BUILTIN_VEC_VMULEUB, ALTIVEC_BUILTIN_VMULEUB,
@@ -2256,9 +2256,9 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_V8HI, RS6000_BTI_V16QI, RS6000_BTI_V16QI, 0 },
   { ALTIVEC_BUILTIN_VEC_MULO, ALTIVEC_BUILTIN_VMULOUH,
     RS6000_BTI_unsigned_V4SI, RS6000_BTI_unsigned_V8HI, RS6000_BTI_unsigned_V8HI, 0 },
-  { ALTIVEC_BUILTIN_VEC_MULO, ALTIVEC_BUILTIN_VMULOSW,
+  { ALTIVEC_BUILTIN_VEC_MULO, ALTIVEC_BUILTIN_VMULOSH,
     RS6000_BTI_V2DI, RS6000_BTI_V4SI, RS6000_BTI_V4SI, 0 },
-  { ALTIVEC_BUILTIN_VEC_MULO, ALTIVEC_BUILTIN_VMULOUW,
+  { ALTIVEC_BUILTIN_VEC_MULO, ALTIVEC_BUILTIN_VMULOUH,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_unsigned_V4SI,
     RS6000_BTI_unsigned_V4SI, 0 },
   { ALTIVEC_BUILTIN_VEC_MULO, ALTIVEC_BUILTIN_VMULOSH,
@@ -4754,32 +4754,49 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_bool_int, RS6000_BTI_float, RS6000_BTI_INTSI, 0 },
   { P9V_BUILTIN_VEC_VSTDC, P9V_BUILTIN_VSTDCDP,
     RS6000_BTI_bool_int, RS6000_BTI_double, RS6000_BTI_INTSI, 0 },
+  { P9V_BUILTIN_VEC_VSTDC, P9V_BUILTIN_VSTDCQP,
+    RS6000_BTI_bool_int, RS6000_BTI_ieee128_float, RS6000_BTI_INTSI, 0 },
 
   { P9V_BUILTIN_VEC_VSTDCSP, P9V_BUILTIN_VSTDCSP,
     RS6000_BTI_bool_int, RS6000_BTI_float, RS6000_BTI_INTSI, 0 },
   { P9V_BUILTIN_VEC_VSTDCDP, P9V_BUILTIN_VSTDCDP,
     RS6000_BTI_bool_int, RS6000_BTI_double, RS6000_BTI_INTSI, 0 },
+  { P9V_BUILTIN_VEC_VSTDCQP, P9V_BUILTIN_VSTDCQP,
+    RS6000_BTI_bool_int, RS6000_BTI_ieee128_float, RS6000_BTI_INTSI, 0 },
 
   { P9V_BUILTIN_VEC_VSTDCN, P9V_BUILTIN_VSTDCNSP,
     RS6000_BTI_bool_int, RS6000_BTI_float, 0, 0 },
   { P9V_BUILTIN_VEC_VSTDCN, P9V_BUILTIN_VSTDCNDP,
     RS6000_BTI_bool_int, RS6000_BTI_double, 0, 0 },
+  { P9V_BUILTIN_VEC_VSTDCN, P9V_BUILTIN_VSTDCNQP,
+    RS6000_BTI_bool_int, RS6000_BTI_ieee128_float, 0, 0 },
 
   { P9V_BUILTIN_VEC_VSTDCNSP, P9V_BUILTIN_VSTDCNSP,
     RS6000_BTI_bool_int, RS6000_BTI_float, 0, 0 },
   { P9V_BUILTIN_VEC_VSTDCNDP, P9V_BUILTIN_VSTDCNDP,
     RS6000_BTI_bool_int, RS6000_BTI_double, 0, 0 },
+  { P9V_BUILTIN_VEC_VSTDCNQP, P9V_BUILTIN_VSTDCNQP,
+    RS6000_BTI_bool_int, RS6000_BTI_ieee128_float, 0, 0 },
 
   { P9V_BUILTIN_VEC_VSEEDP, P9V_BUILTIN_VSEEDP,
     RS6000_BTI_UINTSI, RS6000_BTI_double, 0, 0 },
+  { P9V_BUILTIN_VEC_VSEEDP, P9V_BUILTIN_VSEEQP,
+    RS6000_BTI_UINTDI, RS6000_BTI_ieee128_float, 0, 0 },
 
   { P9V_BUILTIN_VEC_VSESDP, P9V_BUILTIN_VSESDP,
     RS6000_BTI_UINTDI, RS6000_BTI_double, 0, 0 },
+  { P9V_BUILTIN_VEC_VSESDP, P9V_BUILTIN_VSESQP,
+    RS6000_BTI_UINTTI, RS6000_BTI_ieee128_float, 0, 0 },
 
   { P9V_BUILTIN_VEC_VSIEDP, P9V_BUILTIN_VSIEDP,
     RS6000_BTI_double, RS6000_BTI_UINTDI, RS6000_BTI_UINTDI, 0 },
   { P9V_BUILTIN_VEC_VSIEDP, P9V_BUILTIN_VSIEDPF,
     RS6000_BTI_double, RS6000_BTI_double, RS6000_BTI_UINTDI, 0 },
+
+  { P9V_BUILTIN_VEC_VSIEDP, P9V_BUILTIN_VSIEQP,
+    RS6000_BTI_ieee128_float, RS6000_BTI_UINTTI, RS6000_BTI_UINTDI, 0 },
+  { P9V_BUILTIN_VEC_VSIEDP, P9V_BUILTIN_VSIEQPF,
+    RS6000_BTI_ieee128_float, RS6000_BTI_ieee128_float, RS6000_BTI_UINTDI, 0 },
 
   { P9V_BUILTIN_VEC_VSCEDPGT, P9V_BUILTIN_VSCEDPGT,
     RS6000_BTI_INTSI, RS6000_BTI_double, RS6000_BTI_double, 0 },
@@ -6715,6 +6732,52 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	       desc->overloaded_code != overloaded_code)
 	  desc++;
 
+	if (desc->code && (desc->code == fcode)
+	    && rs6000_builtin_type_compatible (types[0], desc->op1)
+	    && rs6000_builtin_type_compatible (types[1], desc->op2))
+	  {
+	    if (rs6000_builtin_decls[desc->overloaded_code] != NULL_TREE)
+	      return altivec_build_resolved_builtin (args, n, desc);
+	    else
+	      unsupported_builtin = true;
+	  }
+      }
+    else if (fcode == P9V_BUILTIN_VEC_VSIEDP)
+      {
+	int overloaded_code;
+	int arg1_mode = TYPE_MODE (types[0]);
+
+	if (nargs != 2)
+	  {
+	    error ("scalar_insert_exp only accepts 2 arguments");
+	    return error_mark_node;
+	  }
+
+	/* If supplied first argument is wider than 64 bits, resolve to
+	   128-bit variant of built-in function.  */
+	if (GET_MODE_PRECISION (arg1_mode) > 64)
+	  {
+	    /* If first argument is of float variety, choose variant
+	       that expects __ieee128 argument.  Otherwise, expect
+	       __int128 argument.  */
+	    if (GET_MODE_CLASS (arg1_mode) == MODE_FLOAT)
+	      overloaded_code = P9V_BUILTIN_VSIEQPF;
+	    else
+	      overloaded_code = P9V_BUILTIN_VSIEQP;
+	  }
+	else
+	  {
+	    /* If first argument is of float variety, choose variant
+	       that expects double argument.  Otherwise, expect
+	       long long int argument.  */
+	    if (GET_MODE_CLASS (arg1_mode) == MODE_FLOAT)
+	      overloaded_code = P9V_BUILTIN_VSIEDPF;
+	    else
+	      overloaded_code = P9V_BUILTIN_VSIEDP;
+	  }
+	while (desc->code && desc->code == fcode &&
+	       desc->overloaded_code != overloaded_code)
+	  desc++;
 	if (desc->code && (desc->code == fcode)
 	    && rs6000_builtin_type_compatible (types[0], desc->op1)
 	    && rs6000_builtin_type_compatible (types[1], desc->op2))
