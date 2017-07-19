@@ -1,3 +1,15 @@
+2017-07-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000-cpus.def (OTHER_IEEE_SW_MASKS): New mask of
+	the float128 software/hardware options.
+	(OTHER_IEEE_HW_MASKS): Likewise.
+	(power7 cpu): Replace masks with ISA_2_6_MASKS_SERVER.
+	(power7-float128): New cpu target that combines a particular
+	machine with -mfloat128.
+	(power8-float128): Likewise.
+	(power9-float128): Likewise.
+	* config/rs6000/rs6000-tables.opt: Regenerate.
+
 2017-07-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Merge up to 250321.
