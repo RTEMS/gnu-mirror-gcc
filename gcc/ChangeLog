@@ -1,3 +1,148 @@
+2017-07-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Back port from trunk
+	2017-07-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/81193
+	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): If GLIBC
+	provides the hardware capability bits, define the macro
+	__BUILTIN_CPU_SUPPORTS__.
+	* config/rs6000/rs6000.c (cpu_expand_builtin): Generate a warning
+	if GLIBC does not provide the hardware capability bits.  Add a
+	gcc_unreachable call if the built-in cpu function is neither
+	__builtin_cpu_is nor __builtin_cpu_supports.
+	* doc/extend.texi (PowerPC built-in functions): Document that
+	GLIBC 2.23 or newer is needed by __builtin_cpu_is and
+	__builtin_cpu_supports.  Document the macros defined by GCC if the
+	newer GLIBC is available.
+
+2017-07-18  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/81471
+	* config/i386/i386.md (rorx_immediate_operand): New mode attribute.
+	(*bmi2_rorx<mode>3_1): Use rorx_immediate_operand as
+	operand 2 predicate.
+	(*bmi2_rorxsi3_1_zext): Use const_0_to_31_operand as
+	operand 2 predicate.
+	(ror,rol -> rorx splitters): Use const_int_operand as
+	operand 2 predicate.
+
+2017-07-18  Tom de Vries  <tom@codesourcery.com>
+
+	backport from mainline:
+	PR target/81069
+	2017-07-17  Tom de Vries  <tom@codesourcery.com>
+
+	* config/nvptx/nvptx.c (nvptx_single): Insert diverging branch as late
+	as possible.
+
+2017-07-18  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backport from 2017-07-18 trunk r250301.
+
+	PR target/81473
+	* config/avr/avr.c (avr_optimize_casesi): Don't use
+	INT8_MIN, INT8_MAX, UINT8_MAX, INT16_MIN, INT16_MAX, UINT16_MAX.
+
+2017-07-17  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/81428
+	* match.pd (X / X -> one): Don't optimize _Fract divisions, as 1
+	can't be built for those types.
+
+	PR tree-optimization/81365
+	* tree-ssa-phiprop.c (propagate_with_phi): When considering hoisting
+	aggregate moves onto bb predecessor edges, make sure there are no
+	loads that could alias the lhs in between the start of bb and the
+	loads from *phi.
+
+	Backported from mainline
+	2017-06-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/81225
+	* config/i386/sse.md (vec_extract_lo_<mode><mask_name>): For
+	V8FI, V16FI and VI8F_256 iterators, use <store_mask_predicate> instead
+	of nonimmediate_operand and <store_mask_constraint> instead of m for
+	the input operand.  For V8FI iterator, always split if input is a MEM.
+	For V16FI and V8SF_256 iterators, don't test if both operands are MEM
+	if <mask_applied>.  For VI4F_256 iterator, use <store_mask_predicate>
+	instead of register_operand and <store_mask_constraint> instead of v for
+	the input operand.  Make sure both operands aren't MEMs for if not
+	<mask_applied>.
+
+2017-07-17  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backport from 2017-07-17 trunk r250258.
+
+	PR 80929
+	* config/avr/avr.c (avr_mul_highpart_cost): New static function.
+	(avr_rtx_costs_1) [TRUNCATE]: Use it to compute mul_highpart cost.
+	[LSHIFTRT, outer_code = TRUNCATE]: Same.
+
+2017-07-17  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	Backport from mainline
+	2017-07-17  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	*  gcc/config/sparc/rtemself.h (TARGET_OS_CPP_BUILTINS): Add
+	conditional builtin define __FIX_LEON3FT_B2BST.
+
+2017-07-17  Daniel Cederman  <cederman@gaisler.com>
+
+	Backport from mainline
+	2017-07-17  Daniel Cederman  <cederman@gaisler.com>
+
+	* config/sparc/t-rtems: Add mfix-gr712rc multilibs. Replace
+	MULTILIB_EXCEPTIONS with MULTILIB_REQUIRED. Match -mfix-gr712rc
+	with -mfix-ut700.
+
+2017-07-16  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR rtl-optimization/81424
+	* optabs.c (prepare_cmp_insn): Use copy_to_reg instead of force_reg
+	to remove potential trapping from operands if -fnon-call-exceptions.
+
+2017-07-16  Daniel Cederman  <cederman@gaisler.com>
+
+	* config/sparc/sparc.md (divdf3_fix): Add NOP to prevent back
+	to back store errata sensitive sequence from being generated.
+	(sqrtdf2_fix): Likewise.
+
+2017-07-12  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backport from 2017-07-12 trunk r250156.
+
+	PR target/79883
+	* config/avr/avr.c (avr_set_current_function): In diagnostic
+	messages: Quote keywords and (parts of) identifiers.
+	[WITH_AVRLIBC]: Warn for functions named "ISR", "SIGNAL" or
+	"INTERRUPT".
+
+2017-07-11  Daniel Cederman  <cederman@gaisler.com>
+
+	* config/sparc/sparc.opt (mfix-ut700): New option.
+	(mfix-gr712rc): Likewise.
+	(sparc_fix_b2bst): New variable.
+	* doc/invoke.texi (SPARC options): Document them.
+	(ARM options): Fix warnings.
+	* config/sparc/sparc.c (sparc_do_work_around_errata): Insert NOP
+	instructions to prevent sequences that can trigger the store-store
+	errata for certain LEON3FT processors.
+	(pass_work_around_errata::gate): Also test sparc_fix_b2bst.
+	(sparc_option_override): Set sparc_fix_b2bst appropriately.
+	* config/sparc/sparc.md (fix_b2bst): New attribute.
+	(in_branch_delay): Prevent stores in delay slot if fix_b2bst.
+
+2017-07-10  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/81375
+	* config/i386/i386.md (divsf3): Add TARGET_SSE to TARGET_SSE_MATH.
+	(rcpps): Ditto.
+	(*rsqrtsf2_sse): Ditto.
+	(rsqrtsf2): Ditto.
+	(div<mode>3): Macroize insn from divdf3 and divsf3
+	using MODEF mode iterator.
+
 2017-07-07  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Backport from mainline
