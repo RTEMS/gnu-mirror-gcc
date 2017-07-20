@@ -1,3 +1,218 @@
+2017-07-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/80846
+	* config/i386/i386.c (ix86_expand_vector_init_general): Handle
+	V2TImode and V4TImode.
+	(ix86_expand_vector_extract): Likewise.
+	* config/i386/sse.md (VMOVE): Enable V4TImode even for just
+	TARGET_AVX512F, instead of only for TARGET_AVX512BW.
+	(ssescalarmode): Handle V4TImode and V2TImode.
+	(VEC_EXTRACT_MODE): Add V4TImode and V2TImode.
+	(*vec_extractv2ti, *vec_extractv4ti): New insns.
+	(VEXTRACTI128_MODE): New mode iterator.
+	(splitter for *vec_extractv?ti first element): New.
+	(VEC_INIT_MODE): New mode iterator.
+	(vec_init<mode>): Consolidate 3 expanders into one using
+	VEC_INIT_MODE mode iterator.
+
+2017-07-20  Alexander Monakov  <amonakov@ispras.ru>
+
+	* lra-assigns.c (pseudo_compare_func): Fix comparison step based on
+	non_spilled_static_chain_regno_p.
+
+2017-07-20  Alexander Monakov  <amonakov@ispras.ru>
+
+	* gimple-ssa-store-merging.c (sort_by_bitpos): Return 0 on equal bitpos.
+
+2017-07-20  Jan Hubicka  <hubicka@ucw.cz>
+
+	* bb-reorder.c (connect_traces): Allow copying of blocks within
+	single partition.
+
+2017-07-20  Richard Biener  <rguenther@suse.de>
+
+	* gimple.h (gimple_phi_result): Add gphi * overload.
+	(gimple_phi_result_ptr): Likewise.
+	(gimple_phi_arg): Likewise.  Adjust index assert to only
+	allow actual argument accesses rather than all slots available
+	by capacity.
+	(gimple_phi_arg_def): Add gphi * overload.
+	* tree-phinodes.c (make_phi_node): Initialize only actual
+	arguments.
+	(resize_phi_node): Clear memory not covered by old node,
+	do not initialize excess argument slots.
+	(reserve_phi_args_for_new_edge): Initialize new argument slot
+	completely.
+
+2017-07-20  Bin Cheng  <bin.cheng@arm.com>
+
+	PR tree-optimization/81388
+	Revert r238585:
+	2016-07-21  Bin Cheng  <bin.cheng@arm.com>
+
+	* tree-ssa-loop-niter.c (number_of_iterations_lt_to_ne): Clean up
+	by removing computation of may_be_zero.
+
+2017-07-18  Jan Hubicka  <hubicka@ucw.cz>
+	    Tom de Vries  <tom@codesourcery.com>
+
+	PR middle-end/81030
+	* cfgbuild.c (find_many_sub_basic_blocks): Update REG_BR_PROB note
+	when gimple level profile disagrees with what RTL expander did.
+
+2017-07-20  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/61171
+	* tree-vectorizer.h (slp_instance): Add reduc_phis member.
+	(vect_analyze_stmt): Add slp instance parameter.
+	(vectorizable_reduction): Likewise.
+	* tree-vect-loop.c (vect_analyze_loop_operations): Adjust.
+	(vect_is_simple_reduction): Deal with chains not detected
+	as SLP reduction chain, specifically not properly associated
+	chains containing a mix of plus/minus.
+	(get_reduction_op): Remove.
+	(get_initial_defs_for_reduction): Simplify, pass in whether
+	this is a reduction chain, pass in the SLP node for the PHIs.
+	(vect_create_epilog_for_reduction): Get the SLP instance as
+	arg and adjust.
+	(vectorizable_reduction): Get the SLP instance as arg.
+	During analysis remember the SLP node with the PHIs in the
+	instance.  Simplify getting at the vectorized reduction PHIs.
+	* tree-vect-slp.c (vect_slp_analyze_node_operations): Pass
+	through SLP instance.
+	(vect_slp_analyze_operations): Likewise.
+	* tree-vect-stms.c (vect_analyze_stmt): Likewise.
+	(vect_transform_stmt): Likewise.
+
+2017-07-20  Tom de Vries  <tom@codesourcery.com>
+
+	PR tree-optimization/81489
+	* gimple-ssa-isolate-paths.c (find_implicit_erroneous_behavior): Move
+	read of phi arg location to before loop that modifies phi.
+
+2017-07-20  Naveen H.S  <Naveen.Hurugalawadi@cavium.com>
+
+	* match.pd (((m1 >/</>=/<= m2) * d -> (m1 >/</>=/<= m2) ? d : 0):
+	New pattern.
+
+2017-07-19  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR middle-end/81331
+	* except.c (execute): Fix ordering issue.
+
+2018-07-19  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR rtl-optimization/81423
+	* combine.c (make_compound_operation_int): Don't try to optimize
+	the AND of a SUBREG of an LSHIFTRT if that SUBREG is paradoxical.
+
+2017-07-19  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR rtl-optimization/81423
+	* simplify-rtx.c (simplify_truncation): Handle truncating an IOR
+	with a constant that is -1 in the truncated to mode.
+
+2017-07-19  Jan Hubicka  <hubicka@ucw.cz>
+
+	* predict.c (propagate_unlikely_bbs_forward): Break out from ...
+	(determine_unlikely_bbs): ... here.
+	* predict.h (propagate_unlikely_bbs_forward): Declare.
+	* cfgexpand.c (pass_expand::execute): Use it.
+	* bb-reorder.c (sanitize_hot_paths): Do not consider known to be
+	unlikely edges.
+	(find_rarely_executed_basic_blocks_and_crossing_edges): Use
+	propagate_unlikely_bbs_forward.
+
+2017-07-19  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR middle-end/81331
+	* except.c (maybe_add_nop_after_section_switch): New function.
+	(execute): Use it.
+
+2017-07-19  Tom de Vries  <tom@codesourcery.com>
+
+	* gimple.h (gimple_phi_set_arg): Make assert more strict.
+
+2017-07-19  Tom de Vries  <tom@codesourcery.com>
+
+	* gimple.h (gimple_phi_arg): Make assert more strict.
+
+2017-07-19  Steven Munroe  <munroesj@gcc.gnu.org>
+
+	* config.gcc (powerpc*-*-*): Add mmintrin.h.
+	* config/rs6000/mmintrin.h: New file.
+	* config/rs6000/x86intrin.h [__ALTIVEC__]: Include mmintrin.h.
+
+2017-07-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/81346
+	* match.pd: Optimize (X - 1U) <= INT_MAX-1U into (int) X > 0.
+
+2017-07-19  Tom de Vries  <tom@codesourcery.com>
+
+	* config/nvptx/nvptx.md (VECIM): Add V2DI.
+
+2017-07-19  Tom de Vries  <tom@codesourcery.com>
+
+	* config/nvptx/nvptx-modes.def: Add V2DImode.
+	* config/nvptx/nvptx-protos.h (nvptx_data_alignment): Declare.
+	* config/nvptx/nvptx.c (nvptx_ptx_type_from_mode): Handle V2DImode.
+	(nvptx_output_mov_insn): Handle lack of mov.b128.
+	(nvptx_print_operand): Handle 'H' and 'L' codes.
+	(nvptx_vector_mode_supported): Allow V2DImode.
+	(nvptx_preferred_simd_mode): New function.
+	(nvptx_data_alignment): New function.
+	(TARGET_VECTORIZE_PREFERRED_SIMD_MODE): Redefine to
+	nvptx_preferred_simd_mode.
+	* config/nvptx/nvptx.h (STACK_BOUNDARY, BIGGEST_ALIGNMENT): Change from
+	64 to 128 bits.
+	(DATA_ALIGNMENT): Define.  Set to nvptx_data_alignment.
+
+2017-07-19  Tom de Vries  <tom@codesourcery.com>
+
+	* config/nvptx/nvptx-modes.def: New file.  Add V2SImode.
+	* config/nvptx/nvptx.c (nvptx_ptx_type_from_mode): Handle V2SImode.
+	(nvptx_vector_mode_supported): New function.  Allow V2SImode.
+	(TARGET_VECTOR_MODE_SUPPORTED_P): Redefine to nvptx_vector_mode_supported.
+	* config/nvptx/nvptx.md (VECIM): New mode iterator. Add V2SI.
+	(mov<VECIM>_insn): New define_insn.
+	(define_expand "mov<VECIM>): New define_expand.
+
+2017-07-19  Tom de Vries  <tom@codesourcery.com>
+
+	* config/nvptx/nvptx.c (nvptx_print_operand): Handle v2 vector mode.
+
+2017-07-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/81346
+	* fold-const.h (fold_div_compare, range_check_type): Declare.
+	* fold-const.c (range_check_type): New function.
+	(build_range_check): Use range_check_type.
+	(fold_div_compare): No longer static, rewritten into
+	a match.pd helper function.
+	(fold_comparison): Don't call fold_div_compare here.
+	* match.pd (X / C1 op C2): New optimization using fold_div_compare
+	as helper function.
+
+2017-07-19  Nathan Sidwell  <nathan@acm.org>
+
+	* tree.h (TYPE_MINVAL, TYPE_MAXVAL): Rename to ...
+	(TYPE_MIN_VALUE_RAW, TYPE_MAX_VALUE_RAW): ... these.
+	* tree.c (find_decls_types_r, verify_type): Use
+	TYPE_{MIN,MAX}_VALUE_RAW.
+	* lto-streamer-out.c (DFS::DFS_write_tree_body): Likewise.
+	(hash_tree): Likewise.
+	* tree-streamer-in.c (lto_input_ts_type_non_common_tree_pointers):
+	Likewise.
+	* tree-streamer-out.c (write_ts_type_non_common_tree_pointers):
+	Likewise.
+
+2017-07-18  Tom de Vries  <tom@codesourcery.com>
+
+	PR middle-end/81464
+	* omp-expand.c (expand_omp_for_static_chunk): Handle
+	equal-argument loop exit phi.
+
 2017-07-18  Uros Bizjak  <ubizjak@gmail.com>
 
 	PR target/81471

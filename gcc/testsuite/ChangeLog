@@ -1,3 +1,93 @@
+2017-07-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/80846
+	* gcc.target/i386/avx-pr80846.c: New test.
+	* gcc.target/i386/avx2-pr80846.c: New test.
+	* gcc.target/i386/avx512f-pr80846.c: New test.
+
+2017-07-20  Bin Cheng  <bin.cheng@arm.com>
+
+	PR tree-optimization/81388
+	* gcc.dg/tree-ssa/pr81388-1.c: New test.
+	* gcc.dg/tree-ssa/pr81388-2.c: New test.
+
+2017-07-17  Tom de Vries  <tom@codesourcery.com>
+
+	PR middle-end/81030
+	* gcc.dg/pr81030.c: New test.
+
+2017-07-20  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/61171
+	* g++.dg/vect/pr61171.cc: New testcase.
+	* gfortran.dg/vect/pr61171.f: Likewise.
+	* gcc.dg/vect/vect-reduc-11.c: Likewise.
+
+2017-07-20  Richard Biener  <rguenther@suse.de>
+
+	* gcc.dg/vect/slp-43.c: Increase loop count to enable vectorization
+	with V64QImode.
+	* gcc.dg/vect/slp-45.c: Likewise.
+
+2017-07-20  Naveen H.S  <Naveen.Hurugalawadi@cavium.com>
+
+	* gcc.dg/tree-ssa/vrp116.c: New Test.
+
+2017-07-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/cpu-builtin-1.c: Change test to use #ifdef
+	__BUILTIN_CPU_SUPPORTS to see if the GLIBC is new enough that
+	__builtin_cpu_is and __builtin_cpu_supports are supported.
+
+2017-07-19  Steven Munroe  <munroesj@gcc.gnu.org>
+
+	* gcc.target/powerpc/bmi-check.h (main): Skip unless
+	__BUILTIN_CPU_SUPPORTS__ defined.
+	* gcc.target/powerpc/bmi2-check.h (main): Skip unless
+	__BUILTIN_CPU_SUPPORTS__ defined.
+
+2017-07-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/81346
+	* gcc.dg/tree-ssa/pr81346-5.c: New test.
+
+2017-07-19  Tom de Vries  <tom@codesourcery.com>
+
+	* gcc.target/nvptx/decl-init.c: Update alignment.
+	* gcc.target/nvptx/slp-2-run.c: New test.
+	* gcc.target/nvptx/slp-2.c: New test.
+	* gcc.target/nvptx/v2di.c: New test.
+
+2017-07-19  Tom de Vries  <tom@codesourcery.com>
+
+	* gcc.target/nvptx/slp-run.c: New test.
+	* gcc.target/nvptx/slp.c: New test.
+	* gcc.target/nvptx/v2si-cvt.c: New test.
+	* gcc.target/nvptx/v2si-run.c: New test.
+	* gcc.target/nvptx/v2si.c: New test.
+	* gcc.target/nvptx/vec.inc: New test.
+
+2017-07-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/81346
+	* gcc.dg/tree-ssa/pr81346-1.c: New test.
+	* gcc.dg/tree-ssa/pr81346-2.c: New test.
+	* gcc.dg/tree-ssa/pr81346-3.c: New test.
+	* gcc.dg/tree-ssa/pr81346-4.c: New test.
+	* gcc.target/i386/umod-3.c: Hide comparison against 1 from the
+	compiler to avoid X / C1 op C2 optimization to trigger.
+
+2017-07-19  Martin Liska  <mliska@suse.cz>
+
+	PR sanitizer/63361
+	* c-c++-common/ubsan/float-cast-overflow-1.c: Add either
+	-ffloat-store or -mieee for targets that need it.
+
+2017-07-18  Tom de Vries  <tom@codesourcery.com>
+
+	PR middle-end/81464
+	* gfortran.dg/pr81464.f90: New test.
+
 2017-07-18  Uros Bizjak  <ubizjak@gmail.com>
 
 	PR target/81471

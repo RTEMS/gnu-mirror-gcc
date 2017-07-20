@@ -1,5 +1,10 @@
 2017-07-20  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	Merge up to 250405.
+	* REVISION: Update subversion id.
+
+2017-07-20  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config.gcc (powerpc*-*-*): Add support for -mcpu=power{7,8,9}f
 	that combines -mcpu=power{7,8,9} with -mfloat128.
 	* config/rs6000/rs6000-cpus.def (power7f): Rename
