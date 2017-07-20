@@ -1,3 +1,84 @@
+2017-07-18  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/81471
+	* config/i386/i386.md (rorx_immediate_operand): New mode attribute.
+	(*bmi2_rorx<mode>3_1): Use rorx_immediate_operand as
+	operand 2 predicate.
+	(*bmi2_rorxsi3_1_zext): Use const_0_to_31_operand as
+	operand 2 predicate.
+	(ror,rol -> rorx splitters): Use const_int_operand as
+	operand 2 predicate.
+
+2017-07-17  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backport from 2017-07-17 trunk r250258.
+
+	PR 80929
+	* config/avr/avr.c (avr_mul_highpart_cost): New static function.
+	(avr_rtx_costs_1) [TRUNCATE]: Use it to compute mul_highpart cost.
+	[LSHIFTRT, outer_code = TRUNCATE]: Same.
+
+2017-07-14  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	Backports from trunk
+
+	2017-03-23  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Change
+	handling of certain combinations of target options, including the
+	combinations -mpower8-vector vs. -mno-vsx, -mpower8-vector vs.
+	-mno-power8-vector, and -mpower9_dform vs. -mno-power9-vector.
+
+	2017-03-27  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+	PR target/80103
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Add
+	special handling for target option conflicts between dform options
+	(-mpower9-dform, -mpower9-dform-vector, -mpower9-dform-scalar) and
+	-mno-direct-move.
+
+	2017-05-08  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+	PR target/80101
+	* config/rs6000/power6.md: Replace store_data_bypass_p calls with
+	rs6000_store_data_bypass_p in seven define_bypass directives and
+	in several comments.
+	* config/rs6000/rs6000-protos.h: Add prototype for
+	rs6000_store_data_bypass_p function.
+	* config/rs6000/rs6000.c (rs6000_store_data_bypass_p): New
+	function implements slightly different (rs6000-specific) semantics
+	than store_data_bypass_p, returning false rather than aborting
+	with assertion error when arguments do not satisfy the
+	requirements of store data bypass.
+	(rs6000_adjust_cost): Replace six calls of store_data_bypass_p with
+	rs6000_store_data_bypass_p.
+
+2017-07-14  Uros Bizjak  <ubizjak@gmail.com>
+
+	Backport from mainline
+	2017-07-10  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/81375
+	* config/i386/i386.md (divsf3): Add TARGET_SSE to TARGET_SSE_MATH.
+	(rcpps): Ditto.
+	(*rsqrtsf2_sse): Ditto.
+	(rsqrtsf2): Ditto.
+	(div<mode>3): Macroize insn from divdf3 and divsf3
+	using MODEF mode iterator.
+
+	Backport from mainline
+	2017-07-04  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/81300
+	* config/i386/i386.md (setcc + movzbl/and to xor + setcc peepholes):
+	Require dead FLAGS_REG at the beginning of a peephole.
+
+2017-07-13  Tom de Vries  <tom@codesourcery.com>
+
+	backport from mainline:
+	PR tree-optimization/81192
+	2017-07-03  Tom de Vries  <tom@codesourcery.com>
+
+	* tree-ssa-tail-merge.c (same_succ_flush_bb): Handle
+	BB_SAME_SUCC (bb) == NULL.
+
 2017-07-06  Andrew Pinski  <apinski@cavium.com>
 
 	* config/aarch64/aarch64.c (aarch64_load_symref_appropriately):
@@ -426,7 +507,7 @@
 
 	PR target/80968
 	* config/sparc/sparc.c (sparc_flat_expand_epilogue): Don't
-        emit frame blockage here.
+	emit frame blockage here.
 	(sparc_expand_epilogue): Do it here.
 	* config/sparc/sparc.md (return expander): Emit frame blockage
 	for alloca here too.
