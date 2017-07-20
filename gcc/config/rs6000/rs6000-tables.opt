@@ -183,13 +183,13 @@ EnumValue
 Enum(rs6000_cpu_opt_value) String(power9) Value(51)
 
 EnumValue
-Enum(rs6000_cpu_opt_value) String(power7-float128) Value(52)
+Enum(rs6000_cpu_opt_value) String(power7f) Value(52)
 
 EnumValue
-Enum(rs6000_cpu_opt_value) String(power8-float128) Value(53)
+Enum(rs6000_cpu_opt_value) String(power8f) Value(53)
 
 EnumValue
-Enum(rs6000_cpu_opt_value) String(power9-float128) Value(54)
+Enum(rs6000_cpu_opt_value) String(power9f) Value(54)
 
 EnumValue
 Enum(rs6000_cpu_opt_value) String(powerpc) Value(55)

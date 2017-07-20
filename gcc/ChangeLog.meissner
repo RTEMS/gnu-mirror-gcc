@@ -1,3 +1,14 @@
+2017-07-20  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config.gcc (powerpc*-*-*): Add support for -mcpu=power{7,8,9}f
+	that combines -mcpu=power{7,8,9} with -mfloat128.
+	* config/rs6000/rs6000-cpus.def (power7f): Rename
+	-mcpu=power<x>-float128 to be -mcpu=power<x>f.
+	(power8f): Likewise.
+	(power9f): Likewise.
+	* config/rs6000/rs6000-tables.opt: Regenerate.
+	* doc/invoke.texi (PowerPC options): Document -mcpu=power{7,8,9}f.
+
 2017-07-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000-cpus.def (OTHER_IEEE_SW_MASKS): New mask of

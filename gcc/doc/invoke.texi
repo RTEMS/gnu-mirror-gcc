@@ -21675,6 +21675,7 @@ Supported values for @var{cpu_type} are @samp{401}, @samp{403},
 @samp{titan}, @samp{power3}, @samp{power4}, @samp{power5}, @samp{power5+},
 @samp{power6}, @samp{power6x}, @samp{power7}, @samp{power8},
 @samp{power9}, @samp{powerpc}, @samp{powerpc64}, @samp{powerpc64le},
+@samp{power7f}, @samp{power8f}, @samp{power9f}
 and @samp{rs64}.
 
 @option{-mcpu=powerpc}, @option{-mcpu=powerpc64}, and
@@ -21686,6 +21687,10 @@ model assumed for scheduling purposes.
 The other options specify a specific processor.  Code generated under
 those options runs best on that processor, and may not run at all on
 others.
+
+The options @samp{power7f}, @samp{power8f}, and @samp{power9f} set the
+processor to power7, power8, or power9, and also enable the
+@option{-mfloat128} option.
 
 The @option{-mcpu} options automatically enable or disable the
 following options:
@@ -21961,6 +21966,10 @@ If you use the ISA 3.0 instruction set (@option{-mcpu=power9}), the
 IEEE 128-bit floating point instructions.  Otherwise, IEEE 128-bit
 floating point will be done with software emulation.
 
+If you use @option{-mcpu=power7f} or @option{-mcpu=power8f}, it sets
+the @option{-mfloat128} option as well as setting the processor type
+to @var{power7} (ISA 2.05) or @var{power8} (ISA 2.06).
+
 @item -mfloat128-hardware
 @itemx -mno-float128-hardware
 @opindex mfloat128-hardware
@@ -21974,6 +21983,10 @@ If you use @option{-mfloat128-hardware}, it will enable the option
 If you select ISA 3.0 instructions with @option{-mcpu=power9}, but do
 not use either @option{-mfloat128} or @option{-mfloat128-hardware},
 the IEEE 128-bit floating point support will not be enabled.
+
+If you use @option{-mcpu=power9f}, it sets the @option{-mfloat128}
+option as well as setting the processor to @var{power9} (i.e. ISA
+3.0).
 
 @item -mfloat-gprs=@var{yes/single/double/no}
 @itemx -mfloat-gprs

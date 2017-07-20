@@ -1,7 +1,9 @@
 /* { dg-do run { target { powerpc*-*-linux* } } } */
 /* { dg-require-effective-target ppc_float128_sw } */
-/* { dg-require-effective-target vsx_hw } */
-/* { dg-options "-mvsx -O2 -mfloat128" } */
+/* { dg-skip-if "do not override -mcpu" { powerpc*-*-* } { "-mcpu=*" } { "-mcpu=power7f" } } */
+/* { dg-options "-mcpu=power7f -O2" } */
+
+/* This test is a clone of float128-1.c, using -mcpu=power7f.  */
 
 #ifdef DEBUG
 #include <stdio.h>
