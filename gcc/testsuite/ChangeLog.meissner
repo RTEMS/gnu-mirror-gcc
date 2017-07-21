@@ -1,5 +1,15 @@
 2017-07-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* gcc.target/powerpc/pr65849-1.c: Delete, test no longer valid
+	since the upper-regs options have been deleted.
+	* gcc.target/powerpc/pr65849-2.c: Likewise.
+	* gcc.target/powerpc/pr80099-1.c: Likewise.
+	* gcc.target/powerpc/pr80099-2.c: Likewise.
+	* gcc.target/powerpc/pr80099-3.c: Likewise.
+	* gcc.target/powerpc/pr80099-4.c: Likewise.
+	* gcc.target/powerpc/pr80099-5.c: Likewise.
+	* gcc.target/powerpc/pr79907.c: Delete -mno-upper-regs-df option.
+
 	* gcc.target/powerpc/builtins-2-p9-runnable.c: Update test to
 	support removal of the upper-regs options.
 	* gcc.target/powerpc/p8vector-fp.c: Likewise.
