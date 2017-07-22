@@ -16,4 +16,4 @@ foo (vector int *vp, int *ip)
   ip[4] = vec_extract (v, 0);
 }
 
-/* { dg-final { scan-assembler "xxextractuw\|vextuw\[lr\]x" } } */
+/* { dg-final { scan-assembler {\mxxextractuw\M|\mvextuw[lr]x\M} } } */

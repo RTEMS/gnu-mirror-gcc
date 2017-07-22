@@ -3,10 +3,10 @@
 /* { dg-require-effective-target powerpc_vsx_ok } */
 /* { dg-skip-if "do not override -mcpu" { powerpc*-*-* } { "-mcpu=*" } { "-mcpu=power7" } } */
 /* { dg-options "-O3 -mcpu=power7 -ffast-math" } */
-/* { dg-final { scan-assembler-times {\mfctiwz|xscvdpsxws\M}  2 } } */
-/* { dg-final { scan-assembler-times {\mfctiwuz|xscvdpuxws\M} 2 } } */
-/* { dg-final { scan-assembler-times {\mfctidz|xscvdpsxds\M}  2 } } */
-/* { dg-final { scan-assembler-times {\mfctiduz|xscvdpuxds\M} 2 } } */
+/* { dg-final { scan-assembler-times {\mfctiwz\M|\mxscvdpsxws\M}  2 } } */
+/* { dg-final { scan-assembler-times {\mfctiwuz\M|\mxscvdpuxws\M} 2 } } */
+/* { dg-final { scan-assembler-times {\mfctidz\M|\mxscvdpsxds\M}  2 } } */
+/* { dg-final { scan-assembler-times {\mfctiduz\M|\mxscvdpuxds\M} 2 } } */
 
 void float_to_int  (int *dest, float  src) { *dest = (int) src; }
 void double_to_int (int *dest, double src) { *dest = (int) src; }

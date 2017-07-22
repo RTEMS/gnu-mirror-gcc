@@ -21,7 +21,7 @@ p9_large (void)
   return ret;
 }
 
-/* { dg-final { scan-assembler     "\[ \t\]mtvsrd" } } */
-/* { dg-final { scan-assembler-not "\[ \t\]ld"     } } */
-/* { dg-final { scan-assembler-not "\[ \t\]lfd"    } } */
-/* { dg-final { scan-assembler-not "\[ \t\]lxsd"   } } */
+/* { dg-final { scan-assembler     {\mmtvsrd\M} } } */
+/* { dg-final { scan-assembler-not {\mld\M}     } } */
+/* { dg-final { scan-assembler-not {\mlfd\M}    } } */
+/* { dg-final { scan-assembler-not {\mlxsd\M}   } } */

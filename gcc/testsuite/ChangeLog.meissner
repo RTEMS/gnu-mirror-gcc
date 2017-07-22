@@ -25,6 +25,7 @@
 	* gcc.target/powerpc/pr72853.c: Likewise.
 	* gcc.target/powerpc/pr78953.c: Likewise.
 	* gcc.target/powerpc/upper-regs-df.c: Likewise.
+	* gcc.target/powerpc/upper-regs-sf.c: Likewise.
 	* gcc.target/powerpc/vec-extract-1.c: Likewise.
 	* gcc.target/powerpc/vec-init-3.c: Likewise.
 	* gcc.target/powerpc/vec-init-6.c: Likewise.
