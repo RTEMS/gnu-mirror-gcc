@@ -575,9 +575,11 @@ extern int rs6000_vector_align[];
    and/or SFmode could go in the traditional Altivec registers.  GCC 8.x deleted
    these options.  In order to simplify the code, define the options in terms
    of the base option (vsx, power8-vector).  */
-#define TARGET_UPPER_REGS_DF	TARGET_VSX
+#if (GCC_VERSION >= 3000)
+#pragma GCC poison TARGET_UPPER_REGS_DF TARGET_UPPER_REGS_SF
+#endif
+
 #define TARGET_UPPER_REGS_DI	TARGET_VSX
-#define TARGET_UPPER_REGS_SF	TARGET_P8_VECTOR
 
 /* ISA 2.01 allowed FCFID to be done in 32-bit, previously it was 64-bit only.
    Enable 32-bit fcfid's on any of the switches for newer ISA machines or

@@ -1,3 +1,13 @@
+2017-07-24  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_init_hard_regno_mode_ok):
+	Eliminate TARGET_UPPER_REGS_{DF,DI} usage.
+	* config/rs6000/rs6000.h (TARGET_UPPER_REGS_DF): Poison macro.
+	(TARGET_UPPER_REGS_SF): Likewise.
+	* config/rs6000/rs6000.md (ALTIVEC_DFORM): Eliminate
+	TARGET_UPPER_REGS_{DF,SF,DI} usage in optimizing DF/SF/DI memory
+	references involving Altivec registers.
+
 2017-07-24   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 250483

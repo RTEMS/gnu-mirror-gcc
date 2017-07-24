@@ -3216,22 +3216,12 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
       rs6000_constraints[RS6000_CONSTRAINT_wa] = VSX_REGS;
       rs6000_constraints[RS6000_CONSTRAINT_wd] = VSX_REGS;	/* V2DFmode  */
       rs6000_constraints[RS6000_CONSTRAINT_wf] = VSX_REGS;	/* V4SFmode  */
+      rs6000_constraints[RS6000_CONSTRAINT_ws] = VSX_REGS;	/* DFmode  */
+      rs6000_constraints[RS6000_CONSTRAINT_wv] = ALTIVEC_REGS;	/* DFmode  */
+      rs6000_constraints[RS6000_CONSTRAINT_wi] = VSX_REGS;	/* DImode  */
 
       if (TARGET_VSX_TIMODE)
 	rs6000_constraints[RS6000_CONSTRAINT_wt] = VSX_REGS;	/* TImode  */
-
-      if (TARGET_UPPER_REGS_DF)					/* DFmode  */
-	{
-	  rs6000_constraints[RS6000_CONSTRAINT_ws] = VSX_REGS;
-	  rs6000_constraints[RS6000_CONSTRAINT_wv] = ALTIVEC_REGS;
-	}
-      else
-	rs6000_constraints[RS6000_CONSTRAINT_ws] = FLOAT_REGS;
-
-      if (TARGET_UPPER_REGS_DI)					/* DImode  */
-	rs6000_constraints[RS6000_CONSTRAINT_wi] = VSX_REGS;
-      else
-	rs6000_constraints[RS6000_CONSTRAINT_wi] = FLOAT_REGS;
     }
 
   /* Add conditional constraints based on various options, to allow us to
