@@ -6284,6 +6284,12 @@ ix86_option_override_internal (bool main_args_p,
     opts->x_ix86_isa_flags
       |= OPTION_MASK_ISA_LZCNT & ~opts->x_ix86_isa_flags_explicit;
 
+  /* Disable BMI, BMI2 and TBM instructions for -m16.  */
+  if (TARGET_16BIT_P(opts->x_ix86_isa_flags))
+    opts->x_ix86_isa_flags
+      &= ~((OPTION_MASK_ISA_BMI | OPTION_MASK_ISA_BMI2 | OPTION_MASK_ISA_TBM)
+	   & ~opts->x_ix86_isa_flags_explicit);
+
   /* Validate -mpreferred-stack-boundary= value or default it to
      PREFERRED_STACK_BOUNDARY_DEFAULT.  */
   ix86_preferred_stack_boundary = PREFERRED_STACK_BOUNDARY_DEFAULT;
@@ -13588,8 +13594,7 @@ ix86_minimum_incoming_stack_boundary (bool sibcall)
 {
   unsigned int incoming_stack_boundary;
 
-  /* Stack of interrupt handler is aligned to 128 bits in 64bit
-     mode.  */
+  /* Stack of interrupt handler is aligned to 128 bits in 64bit mode.  */
   if (cfun->machine->func_type != TYPE_NORMAL)
     incoming_stack_boundary = TARGET_64BIT ? 128 : MIN_STACK_BOUNDARY;
   /* Prefer the one specified at command line. */
@@ -15783,8 +15788,7 @@ ix86_expand_split_stack_prologue (void)
   JUMP_LABEL (jump_insn) = label;
 
   /* Mark the jump as very likely to be taken.  */
-  add_int_reg_note (jump_insn, REG_BR_PROB,
-		    REG_BR_PROB_BASE - REG_BR_PROB_BASE / 100);
+  add_reg_br_prob_note (jump_insn, profile_probability::very_likely ());
 
   if (split_stack_fn == NULL_RTX)
     {
@@ -16182,9 +16186,9 @@ ix86_decompose_address (rtx addr, struct ix86_address *out)
 
   /* Allow arg pointer and stack pointer as index if there is not scaling.  */
   if (base_reg && index_reg && scale == 1
-      && (index_reg == arg_pointer_rtx
-	  || index_reg == frame_pointer_rtx
-	  || (REG_P (index_reg) && REGNO (index_reg) == STACK_POINTER_REGNUM)))
+      && (REGNO (index_reg) == ARG_POINTER_REGNUM
+	  || REGNO (index_reg) == FRAME_POINTER_REGNUM
+	  || REGNO (index_reg) == SP_REG))
     {
       std::swap (base, index);
       std::swap (base_reg, index_reg);
@@ -16192,14 +16196,11 @@ ix86_decompose_address (rtx addr, struct ix86_address *out)
 
   /* Special case: %ebp cannot be encoded as a base without a displacement.
      Similarly %r13.  */
-  if (!disp
-      && base_reg
-      && (base_reg == hard_frame_pointer_rtx
-	  || base_reg == frame_pointer_rtx
-	  || base_reg == arg_pointer_rtx
-	  || (REG_P (base_reg)
-	      && (REGNO (base_reg) == HARD_FRAME_POINTER_REGNUM
-		  || REGNO (base_reg) == R13_REG))))
+  if (!disp && base_reg
+      && (REGNO (base_reg) == ARG_POINTER_REGNUM
+	  || REGNO (base_reg) == FRAME_POINTER_REGNUM
+	  || REGNO (base_reg) == BP_REG
+	  || REGNO (base_reg) == R13_REG))
     disp = const0_rtx;
 
   /* Special case: on K6, [%esi] makes the instruction vector decoded.
@@ -16208,7 +16209,7 @@ ix86_decompose_address (rtx addr, struct ix86_address *out)
      to test cfun for being non-NULL. */
   if (TARGET_K6 && cfun && optimize_function_for_speed_p (cfun)
       && base_reg && !index_reg && !disp
-      && REG_P (base_reg) && REGNO (base_reg) == SI_REG)
+      && REGNO (base_reg) == SI_REG)
     disp = const0_rtx;
 
   /* Special case: encode reg+reg instead of reg*2.  */
@@ -19128,7 +19129,8 @@ ix86_print_operand (FILE *file, rtx x, int code)
 	    x = find_reg_note (current_output_insn, REG_BR_PROB, 0);
 	    if (x)
 	      {
-		int pred_val = XINT (x, 0);
+		int pred_val = profile_probability::from_reg_br_prob_note
+				 (XINT (x, 0)).to_reg_br_prob_base ();
 
 		if (pred_val < REG_BR_PROB_BASE * 45 / 100
 		    || pred_val > REG_BR_PROB_BASE * 55 / 100)
@@ -23865,8 +23867,8 @@ ix86_split_fp_branch (enum rtx_code code, rtx op1, rtx op2,
 		      (pc_rtx,
 		       gen_rtx_IF_THEN_ELSE (VOIDmode,
 					     condition, target1, target2)));
-  if (split_branch_probability >= 0)
-    add_int_reg_note (i, REG_BR_PROB, split_branch_probability);
+  if (split_branch_probability.initialized_p ())
+    add_reg_br_prob_note (i, split_branch_probability);
 }
 
 void
@@ -26911,7 +26913,7 @@ predict_jump (int prob)
 {
   rtx_insn *insn = get_last_insn ();
   gcc_assert (JUMP_P (insn));
-  add_int_reg_note (insn, REG_BR_PROB, prob);
+  add_reg_br_prob_note (insn, profile_probability::from_reg_br_prob_base (prob));
 }
 
 /* Helper function for the string operations below.  Dest VARIABLE whether
@@ -44118,6 +44120,26 @@ ix86_expand_vector_init_general (bool mmx_ok, machine_mode mode,
       ix86_expand_vector_init_concat (mode, target, ops, n);
       return;
 
+    case V2TImode:
+      for (i = 0; i < 2; i++)
+	ops[i] = gen_lowpart (V2DImode, XVECEXP (vals, 0, i));
+      op0 = gen_reg_rtx (V4DImode);
+      ix86_expand_vector_init_concat (V4DImode, op0, ops, 2);
+      emit_move_insn (target, gen_lowpart (GET_MODE (target), op0));
+      return;
+
+    case V4TImode:
+      for (i = 0; i < 4; i++)
+	ops[i] = gen_lowpart (V2DImode, XVECEXP (vals, 0, i));
+      ops[4] = gen_reg_rtx (V4DImode);
+      ix86_expand_vector_init_concat (V4DImode, ops[4], ops, 2);
+      ops[5] = gen_reg_rtx (V4DImode);
+      ix86_expand_vector_init_concat (V4DImode, ops[5], ops + 2, 2);
+      op0 = gen_reg_rtx (V8DImode);
+      ix86_expand_vector_init_concat (V8DImode, op0, ops + 4, 2);
+      emit_move_insn (target, gen_lowpart (GET_MODE (target), op0));
+      return;
+
     case V32QImode:
       half_mode = V16QImode;
       goto half;
@@ -44659,6 +44681,8 @@ ix86_expand_vector_extract (bool mmx_ok, rtx target, rtx vec, int elt)
 
     case V2DFmode:
     case V2DImode:
+    case V2TImode:
+    case V4TImode:
       use_vec_extr = true;
       break;
 

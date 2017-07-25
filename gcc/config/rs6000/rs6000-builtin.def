@@ -1031,14 +1031,14 @@ BU_ALTIVEC_2 (VMULEUB,	      "vmuleub",	CONST,	vec_widen_umult_even_v16qi)
 BU_ALTIVEC_2 (VMULESB,	      "vmulesb",	CONST,	vec_widen_smult_even_v16qi)
 BU_ALTIVEC_2 (VMULEUH,	      "vmuleuh",	CONST,	vec_widen_umult_even_v8hi)
 BU_ALTIVEC_2 (VMULESH,	      "vmulesh",	CONST,	vec_widen_smult_even_v8hi)
-BU_ALTIVEC_2 (VMULEUW,	      "vmuleuw",	CONST,	vec_widen_umult_even_v4si)
-BU_ALTIVEC_2 (VMULESW,	      "vmulesw",	CONST,	vec_widen_smult_even_v4si)
+BU_ALTIVEC_2 (VMULEUW,	      "vmuleuw",	CONST,  altivec_vmuleuw)
+BU_ALTIVEC_2 (VMULESW,	      "vmulesw",	CONST,  altivec_vmulesw)
 BU_ALTIVEC_2 (VMULOUB,	      "vmuloub",	CONST,	vec_widen_umult_odd_v16qi)
 BU_ALTIVEC_2 (VMULOSB,	      "vmulosb",	CONST,	vec_widen_smult_odd_v16qi)
 BU_ALTIVEC_2 (VMULOUH,	      "vmulouh",	CONST,	vec_widen_umult_odd_v8hi)
 BU_ALTIVEC_2 (VMULOSH,	      "vmulosh",	CONST,	vec_widen_smult_odd_v8hi)
-BU_ALTIVEC_2 (VMULOUW,	      "vmulouw",	CONST,	vec_widen_umult_odd_v4si)
-BU_ALTIVEC_2 (VMULOSW,	      "vmulosw",	CONST,	vec_widen_smult_odd_v4si)
+BU_ALTIVEC_2 (VMULOUW,	      "vmulouw",	CONST,  altivec_vmulouw)
+BU_ALTIVEC_2 (VMULOSW,	      "vmulosw",	CONST,  altivec_vmulosw)
 BU_ALTIVEC_2 (VNOR,	      "vnor",		CONST,	norv4si3)
 BU_ALTIVEC_2 (VOR,	      "vor",		CONST,	iorv4si3)
 BU_ALTIVEC_2 (VPKUHUM,	      "vpkuhum",	CONST,	altivec_vpkuhum)
@@ -2024,6 +2024,10 @@ BU_P9V_OVERLOAD_3 (RLMI,	"rlmi")
 BU_P9V_64BIT_VSX_1 (VSEEDP,	"scalar_extract_exp",	CONST,	xsxexpdp)
 BU_P9V_64BIT_VSX_1 (VSESDP,	"scalar_extract_sig",	CONST,	xsxsigdp)
 
+BU_P9V_64BIT_VSX_1 (VSEEQP,	"scalar_extract_expq",	CONST,	xsxexpqp)
+BU_P9V_64BIT_VSX_1 (VSESQP,	"scalar_extract_sigq",	CONST,	xsxsigqp)
+
+BU_P9V_VSX_1 (VSTDCNQP,	"scalar_test_neg_qp",	CONST,	xststdcnegqp)
 BU_P9V_VSX_1 (VSTDCNDP,	"scalar_test_neg_dp",	CONST,	xststdcnegdp)
 BU_P9V_VSX_1 (VSTDCNSP,	"scalar_test_neg_sp",	CONST,	xststdcnegsp)
 
@@ -2039,11 +2043,15 @@ BU_P9V_VSX_1 (XXBRH_V8HI,	"xxbrh_v8hi",	CONST,	p9_xxbrh_v8hi)
 BU_P9V_64BIT_VSX_2 (VSIEDP,	"scalar_insert_exp",	CONST,	xsiexpdp)
 BU_P9V_64BIT_VSX_2 (VSIEDPF,	"scalar_insert_exp_dp",	CONST,	xsiexpdpf)
 
+BU_P9V_64BIT_VSX_2 (VSIEQP,	"scalar_insert_exp_q",	CONST,	xsiexpqp)
+BU_P9V_64BIT_VSX_2 (VSIEQPF,	"scalar_insert_exp_qp",	CONST,	xsiexpqpf)
+
 BU_P9V_VSX_2 (VSCEDPGT,	"scalar_cmp_exp_dp_gt",	CONST,	xscmpexpdp_gt)
 BU_P9V_VSX_2 (VSCEDPLT,	"scalar_cmp_exp_dp_lt",	CONST,	xscmpexpdp_lt)
 BU_P9V_VSX_2 (VSCEDPEQ,	"scalar_cmp_exp_dp_eq",	CONST,	xscmpexpdp_eq)
 BU_P9V_VSX_2 (VSCEDPUO,	"scalar_cmp_exp_dp_unordered",	CONST,	xscmpexpdp_unordered)
 
+BU_P9V_VSX_2 (VSTDCQP,	"scalar_test_data_class_qp",	CONST,	xststdcqp)
 BU_P9V_VSX_2 (VSTDCDP,	"scalar_test_data_class_dp",	CONST,	xststdcdp)
 BU_P9V_VSX_2 (VSTDCSP,	"scalar_test_data_class_sp",	CONST,	xststdcsp)
 
@@ -2052,15 +2060,20 @@ BU_P9V_OVERLOAD_1 (VSEEDP,	"scalar_extract_exp")
 BU_P9V_OVERLOAD_1 (VSESDP,	"scalar_extract_sig")
 
 BU_P9V_OVERLOAD_1 (VSTDCN,	"scalar_test_neg")
+BU_P9V_OVERLOAD_1 (VSTDCNQP,	"scalar_test_neg_qp")
 BU_P9V_OVERLOAD_1 (VSTDCNDP,	"scalar_test_neg_dp")
 BU_P9V_OVERLOAD_1 (VSTDCNSP,	"scalar_test_neg_sp")
 
 BU_P9V_OVERLOAD_1 (REVB,	"revb")
 
+BU_P9V_OVERLOAD_1 (VEXTRACT_FP_FROM_SHORTH, "vextract_fp_from_shorth")
+BU_P9V_OVERLOAD_1 (VEXTRACT_FP_FROM_SHORTL, "vextract_fp_from_shortl")
+
 /* ISA 3.0 vector scalar overloaded 2 argument functions.  */
 BU_P9V_OVERLOAD_2 (VSIEDP,	"scalar_insert_exp")
 
 BU_P9V_OVERLOAD_2 (VSTDC,	"scalar_test_data_class")
+BU_P9V_OVERLOAD_2 (VSTDCQP,	"scalar_test_data_class_qp")
 BU_P9V_OVERLOAD_2 (VSTDCDP,	"scalar_test_data_class_dp")
 BU_P9V_OVERLOAD_2 (VSTDCSP,	"scalar_test_data_class_sp")
 
@@ -2074,6 +2087,8 @@ BU_P9V_VSX_1 (VEEDP, "extract_exp_dp", CONST, xvxexpdp)
 BU_P9V_VSX_1 (VEESP, "extract_exp_sp", CONST, xvxexpsp)
 BU_P9V_VSX_1 (VESDP, "extract_sig_dp", CONST, xvxsigdp)
 BU_P9V_VSX_1 (VESSP, "extract_sig_sp", CONST, xvxsigsp)
+BU_P9V_VSX_1 (VEXTRACT_FP_FROM_SHORTH, "vextract_fp_from_shorth", CONST, vextract_fp_from_shorth)
+BU_P9V_VSX_1 (VEXTRACT_FP_FROM_SHORTL, "vextract_fp_from_shortl", CONST, vextract_fp_from_shortl)
 
 /* 2 argument vsx vector functions added in ISA 3.0 (power9).  */
 BU_P9V_VSX_2 (VIEDP, "insert_exp_dp", CONST, xviexpdp)

@@ -1808,10 +1808,8 @@ maybe_explain_implicit_delete (tree decl)
 	    informed = false;
 	}
       else if (DECL_ARTIFICIAL (decl)
-	       && (sfk == sfk_copy_assignment
-		   || sfk == sfk_copy_constructor)
-	       && (type_has_user_declared_move_constructor (ctype)
-		   || type_has_user_declared_move_assign (ctype)))
+	       && (sfk == sfk_copy_assignment || sfk == sfk_copy_constructor)
+	       && classtype_has_move_assign_or_move_ctor_p (ctype, true))
 	{
 	  inform (DECL_SOURCE_LOCATION (decl),
 		  "%q#D is implicitly declared as deleted because %qT "
@@ -2248,8 +2246,10 @@ after_nsdmi_defaulted_late_checks (tree t)
     return;
   if (t == error_mark_node)
     return;
-  for (tree fn = TYPE_METHODS (t); fn; fn = DECL_CHAIN (fn))
-    if (!DECL_ARTIFICIAL (fn) && DECL_DEFAULTED_IN_CLASS_P (fn))
+  for (tree fn = TYPE_FIELDS (t); fn; fn = DECL_CHAIN (fn))
+    if (!DECL_ARTIFICIAL (fn)
+	&& DECL_DECLARES_FUNCTION_P (fn)
+	&& DECL_DEFAULTED_IN_CLASS_P (fn))
       {
 	tree fn_spec = TYPE_RAISES_EXCEPTIONS (TREE_TYPE (fn));
 	if (UNEVALUATED_NOEXCEPT_SPEC_P (fn_spec))
@@ -2372,31 +2372,34 @@ lazily_declare_fn (special_function_kind sfk, tree type)
   /* [class.copy]/8 If the class definition declares a move constructor or
      move assignment operator, the implicitly declared copy constructor is
      defined as deleted.... */
-  if ((sfk == sfk_copy_assignment
-       || sfk == sfk_copy_constructor)
-      && (type_has_user_declared_move_constructor (type)
-	  || type_has_user_declared_move_assign (type)))
+  if ((sfk == sfk_copy_assignment || sfk == sfk_copy_constructor)
+      && classtype_has_move_assign_or_move_ctor_p (type, true))
     DECL_DELETED_FN (fn) = true;
 
-  /* A destructor may be virtual.  */
+  /* Destructors and assignment operators may be virtual.  */
   if (sfk == sfk_destructor
       || sfk == sfk_move_assignment
       || sfk == sfk_copy_assignment)
     check_for_override (fn, type);
+
   /* Add it to CLASSTYPE_METHOD_VEC.  */
   bool added = add_method (type, fn, false);
   gcc_assert (added);
-  /* Add it to TYPE_METHODS.  */
+
+  /* Add it to TYPE_FIELDS.  */
   if (sfk == sfk_destructor
       && DECL_VIRTUAL_P (fn))
     /* The ABI requires that a virtual destructor go at the end of the
        vtable.  */
-    TYPE_METHODS (type) = chainon (TYPE_METHODS (type), fn);
+    TYPE_FIELDS (type) = chainon (TYPE_FIELDS (type), fn);
   else
     {
-      DECL_CHAIN (fn) = TYPE_METHODS (type);
-      TYPE_METHODS (type) = fn;
+      DECL_CHAIN (fn) = TYPE_FIELDS (type);
+      TYPE_FIELDS (type) = fn;
     }
+  /* Propagate TYPE_FIELDS.  */
+  fixup_type_variants (type);
+
   maybe_add_class_template_decl_list (type, fn, /*friend_p=*/0);
   if (DECL_MAYBE_IN_CHARGE_CONSTRUCTOR_P (fn)
       || DECL_MAYBE_IN_CHARGE_DESTRUCTOR_P (fn))

@@ -1,3 +1,26 @@
+2017-07-25  Jakub Jelinek  <jakub@redhat.com>
+
+	* ioparm.def: Use 1U << 31 instead of 1 << 31 as flags2 mask.
+
+2017-07-24  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	* dump-parse-tree.c (show_symbol):  Show binding label if present.
+
+2017-07-24  Thomas Koenig  <tkoenig@gcc.gnu.org>
+	    Mikael Morin  <mikael@gcc.gnu.org>
+
+	PR fortran/66102
+	* fortran/trans-array.c (gfc_conv_resolve_dependencies):
+	Break if dependency has been found.
+
+2017-07-23  Alexander Monakov  <amonakov@ispras.ru>
+
+	* interface.c (pair_cmp): Fix gfc_symbol comparison.  Adjust comment.
+
+2017-07-18  Nathan Sidwell  <nathan@acm.org>
+
+	* trans.c (gfc_build_array_ref): Use TYPE_MAX_VALUE.
+
 2017-07-09  Dominique d'Humieres  <dominiq@lps.ens.fr>
 
 	PR fortran/81341

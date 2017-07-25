@@ -1,3 +1,29 @@
+2017-07-07  Torsten Duwe  <duwe@suse.de>
+
+	* c-attribs.c (c_common_attribute_table): Add entry for
+	"patchable_function_entry".
+
+2017-07-20  Nathan Sidwell  <nathan@acm.org>
+
+	Remove TYPE_METHODS.
+	* c-ada-spec.c (is_tagged_type, has_nontrivial_methods,
+	dump_ada_template, print_ada_methods,
+	print_ada_declaration): Member fns are on TYPE_FIELDS.
+
+2017-07-18  Nathan Sidwell  <nathan@acm.org>
+
+	* c-warn.c (warn_for_memset): Use TYPE_{MIN,MAX}_VALUE.
+
+2017-07-14  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-common.c (try_to_locate_new_include_insertion_point): New
+	function.
+	(per_file_includes_t): New typedef.
+	(added_includes_t): New typedef.
+	(added_includes): New variable.
+	(maybe_add_include_fixit): New function.
+	* c-common.h (maybe_add_include_fixit): New decl.
+
 2017-07-10  Martin Sebor  <msebor@redhat.com>
 
 	PR other/81345

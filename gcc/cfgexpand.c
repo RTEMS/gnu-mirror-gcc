@@ -5497,8 +5497,6 @@ expand_gimple_basic_block (basic_block bb, bool disable_tail_calls)
       if (elt)
 	emit_label (*elt);
 
-      /* Java emits line number notes in the top of labels.
-	 ??? Make this go away once line number notes are obsoleted.  */
       BB_HEAD (bb) = NEXT_INSN (last);
       if (NOTE_P (BB_HEAD (bb)))
 	BB_HEAD (bb) = NEXT_INSN (BB_HEAD (bb));
@@ -6481,6 +6479,11 @@ pass_expand::execute (function *fun)
      the CFG as the code does not expect dead landing pads.  */
   if (fun->eh->region_tree != NULL)
     finish_eh_generation ();
+
+  /* BB subdivision may have created basic blocks that are are only reachable
+     from unlikely bbs but not marked as such in the profile.  */
+  if (optimize)
+    propagate_unlikely_bbs_forward ();
 
   /* Remove unreachable blocks, otherwise we cannot compute dominators
      which are needed for loop state verification.  As a side-effect

@@ -575,40 +575,6 @@ rs6000_target_modify_macros (bool define_p, HOST_WIDE_INT flags,
      2. If TARGET_ALTIVEC is turned off.  */
   if ((flags & OPTION_MASK_CRYPTO) != 0)
     rs6000_define_or_undefine_macro (define_p, "__CRYPTO__");
-  /* Note that the OPTION_MASK_UPPER_REGS_DF flag is automatically
-     turned on in the following conditions:
-     1. If TARGET_UPPER_REGS is explicitly turned on and
-	TARGET_VSX is turned on and OPTION_MASK_UPPER_REGS_DF is not
-	explicitly turned off.  Hereafter, the
-	OPTION_MASK_UPPER_REGS_DF flag is considered to have been
-	explicitly set.
-     Note that the OPTION_MASK_UPPER_REGS_DF flag is automatically
-     turned off in the following conditions:
-     1. If TARGET_UPPER_REGS is explicitly turned off and TARGET_VSX
-	is turned on and OPTION_MASK_UPPER_REGS_DF is not explicitly
-	turned on.  Hereafter, the OPTION_MASK_UPPER_REGS_DF flag is
-	considered to have been explicitly cleared.
-     2. If TARGET_UPPER_REGS_DF is turned on but TARGET_VSX is turned
-	off.  */
-  if ((flags & OPTION_MASK_UPPER_REGS_DF) != 0)
-    rs6000_define_or_undefine_macro (define_p, "__UPPER_REGS_DF__");
-  /* Note that the OPTION_MASK_UPPER_REGS_SF flag is automatically
-     turned on in the following conditions:
-     1. If TARGET_UPPER_REGS is explicitly turned on and
-	TARGET_P8_VECTOR is on and OPTION_MASK_UPPER_REGS_SF is not
-	turned off explicitly.  Hereafter, the
-	OPTION_MASK_UPPER_REGS_SF flag is considered to have been
-	explicitly set.
-     Note that the OPTION_MASK_UPPER_REGS_SF flag is automatically
-     turned off in the following conditions:
-     1. If TARGET_UPPER_REGS is explicitly turned off and
-	TARGET_P8_VECTOR is on and OPTION_MASK_UPPER_REGS_SF is not
-	turned off explicitly.  Hereafter, the
-	OPTION_MASK_UPPER_REGS_SF flag is considered to have been
-	explicitly cleared.
-     2. If TARGET_P8_VECTOR is off.  */
-  if ((flags & OPTION_MASK_UPPER_REGS_SF) != 0)
-    rs6000_define_or_undefine_macro (define_p, "__UPPER_REGS_SF__");
 
   /* options from the builtin masks.  */
   /* Note that RS6000_BTM_PAIRED is enabled only if
@@ -4749,32 +4715,49 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_bool_int, RS6000_BTI_float, RS6000_BTI_INTSI, 0 },
   { P9V_BUILTIN_VEC_VSTDC, P9V_BUILTIN_VSTDCDP,
     RS6000_BTI_bool_int, RS6000_BTI_double, RS6000_BTI_INTSI, 0 },
+  { P9V_BUILTIN_VEC_VSTDC, P9V_BUILTIN_VSTDCQP,
+    RS6000_BTI_bool_int, RS6000_BTI_ieee128_float, RS6000_BTI_INTSI, 0 },
 
   { P9V_BUILTIN_VEC_VSTDCSP, P9V_BUILTIN_VSTDCSP,
     RS6000_BTI_bool_int, RS6000_BTI_float, RS6000_BTI_INTSI, 0 },
   { P9V_BUILTIN_VEC_VSTDCDP, P9V_BUILTIN_VSTDCDP,
     RS6000_BTI_bool_int, RS6000_BTI_double, RS6000_BTI_INTSI, 0 },
+  { P9V_BUILTIN_VEC_VSTDCQP, P9V_BUILTIN_VSTDCQP,
+    RS6000_BTI_bool_int, RS6000_BTI_ieee128_float, RS6000_BTI_INTSI, 0 },
 
   { P9V_BUILTIN_VEC_VSTDCN, P9V_BUILTIN_VSTDCNSP,
     RS6000_BTI_bool_int, RS6000_BTI_float, 0, 0 },
   { P9V_BUILTIN_VEC_VSTDCN, P9V_BUILTIN_VSTDCNDP,
     RS6000_BTI_bool_int, RS6000_BTI_double, 0, 0 },
+  { P9V_BUILTIN_VEC_VSTDCN, P9V_BUILTIN_VSTDCNQP,
+    RS6000_BTI_bool_int, RS6000_BTI_ieee128_float, 0, 0 },
 
   { P9V_BUILTIN_VEC_VSTDCNSP, P9V_BUILTIN_VSTDCNSP,
     RS6000_BTI_bool_int, RS6000_BTI_float, 0, 0 },
   { P9V_BUILTIN_VEC_VSTDCNDP, P9V_BUILTIN_VSTDCNDP,
     RS6000_BTI_bool_int, RS6000_BTI_double, 0, 0 },
+  { P9V_BUILTIN_VEC_VSTDCNQP, P9V_BUILTIN_VSTDCNQP,
+    RS6000_BTI_bool_int, RS6000_BTI_ieee128_float, 0, 0 },
 
   { P9V_BUILTIN_VEC_VSEEDP, P9V_BUILTIN_VSEEDP,
     RS6000_BTI_UINTSI, RS6000_BTI_double, 0, 0 },
+  { P9V_BUILTIN_VEC_VSEEDP, P9V_BUILTIN_VSEEQP,
+    RS6000_BTI_UINTDI, RS6000_BTI_ieee128_float, 0, 0 },
 
   { P9V_BUILTIN_VEC_VSESDP, P9V_BUILTIN_VSESDP,
     RS6000_BTI_UINTDI, RS6000_BTI_double, 0, 0 },
+  { P9V_BUILTIN_VEC_VSESDP, P9V_BUILTIN_VSESQP,
+    RS6000_BTI_UINTTI, RS6000_BTI_ieee128_float, 0, 0 },
 
   { P9V_BUILTIN_VEC_VSIEDP, P9V_BUILTIN_VSIEDP,
     RS6000_BTI_double, RS6000_BTI_UINTDI, RS6000_BTI_UINTDI, 0 },
   { P9V_BUILTIN_VEC_VSIEDP, P9V_BUILTIN_VSIEDPF,
     RS6000_BTI_double, RS6000_BTI_double, RS6000_BTI_UINTDI, 0 },
+
+  { P9V_BUILTIN_VEC_VSIEDP, P9V_BUILTIN_VSIEQP,
+    RS6000_BTI_ieee128_float, RS6000_BTI_UINTTI, RS6000_BTI_UINTDI, 0 },
+  { P9V_BUILTIN_VEC_VSIEDP, P9V_BUILTIN_VSIEQPF,
+    RS6000_BTI_ieee128_float, RS6000_BTI_ieee128_float, RS6000_BTI_UINTDI, 0 },
 
   { P9V_BUILTIN_VEC_VSCEDPGT, P9V_BUILTIN_VSCEDPGT,
     RS6000_BTI_INTSI, RS6000_BTI_double, RS6000_BTI_double, 0 },
@@ -5166,6 +5149,11 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_INTDI, RS6000_BTI_V16QI, RS6000_BTI_UINTSI, 0 },
   { P9V_BUILTIN_VEC_VEXTRACT4B, P9V_BUILTIN_VEXTRACT4B,
     RS6000_BTI_INTDI, RS6000_BTI_unsigned_V16QI, RS6000_BTI_UINTSI, 0 },
+
+  { P9V_BUILTIN_VEC_VEXTRACT_FP_FROM_SHORTH, P9V_BUILTIN_VEXTRACT_FP_FROM_SHORTH,
+    RS6000_BTI_V4SF, RS6000_BTI_unsigned_V8HI, 0, 0 },
+  { P9V_BUILTIN_VEC_VEXTRACT_FP_FROM_SHORTL, P9V_BUILTIN_VEXTRACT_FP_FROM_SHORTL,
+    RS6000_BTI_V4SF, RS6000_BTI_unsigned_V8HI, 0, 0 },
 
   { P9V_BUILTIN_VEC_VEXTULX, P9V_BUILTIN_VEXTUBLX,
     RS6000_BTI_INTQI, RS6000_BTI_UINTSI,
@@ -6710,6 +6698,52 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	       desc->overloaded_code != overloaded_code)
 	  desc++;
 
+	if (desc->code && (desc->code == fcode)
+	    && rs6000_builtin_type_compatible (types[0], desc->op1)
+	    && rs6000_builtin_type_compatible (types[1], desc->op2))
+	  {
+	    if (rs6000_builtin_decls[desc->overloaded_code] != NULL_TREE)
+	      return altivec_build_resolved_builtin (args, n, desc);
+	    else
+	      unsupported_builtin = true;
+	  }
+      }
+    else if (fcode == P9V_BUILTIN_VEC_VSIEDP)
+      {
+	int overloaded_code;
+	int arg1_mode = TYPE_MODE (types[0]);
+
+	if (nargs != 2)
+	  {
+	    error ("scalar_insert_exp only accepts 2 arguments");
+	    return error_mark_node;
+	  }
+
+	/* If supplied first argument is wider than 64 bits, resolve to
+	   128-bit variant of built-in function.  */
+	if (GET_MODE_PRECISION (arg1_mode) > 64)
+	  {
+	    /* If first argument is of float variety, choose variant
+	       that expects __ieee128 argument.  Otherwise, expect
+	       __int128 argument.  */
+	    if (GET_MODE_CLASS (arg1_mode) == MODE_FLOAT)
+	      overloaded_code = P9V_BUILTIN_VSIEQPF;
+	    else
+	      overloaded_code = P9V_BUILTIN_VSIEQP;
+	  }
+	else
+	  {
+	    /* If first argument is of float variety, choose variant
+	       that expects double argument.  Otherwise, expect
+	       long long int argument.  */
+	    if (GET_MODE_CLASS (arg1_mode) == MODE_FLOAT)
+	      overloaded_code = P9V_BUILTIN_VSIEDPF;
+	    else
+	      overloaded_code = P9V_BUILTIN_VSIEDP;
+	  }
+	while (desc->code && desc->code == fcode &&
+	       desc->overloaded_code != overloaded_code)
+	  desc++;
 	if (desc->code && (desc->code == fcode)
 	    && rs6000_builtin_type_compatible (types[0], desc->op1)
 	    && rs6000_builtin_type_compatible (types[1], desc->op2))

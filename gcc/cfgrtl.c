@@ -1504,8 +1504,8 @@ force_nonfallthru_and_redirect (edge e, basic_block target, rtx jump_label)
 	{
 	  int prob = XINT (note, 0);
 
-	  b->probability = profile_probability::from_reg_br_prob_base (prob);
-	  b->count = e->count.apply_probability (prob);
+	  b->probability = profile_probability::from_reg_br_prob_note (prob);
+	  b->count = e->count.apply_probability (b->probability);
 	  e->probability -= e->probability;
 	  e->count -= b->count;
 	}
@@ -2109,8 +2109,6 @@ commit_edge_insertions (void)
 static void
 rtl_dump_bb (FILE *outf, basic_block bb, int indent, dump_flags_t flags)
 {
-  rtx_insn *insn;
-  rtx_insn *last;
   char *s_indent;
 
   s_indent = (char *) alloca ((size_t) indent + 1);
@@ -2124,18 +2122,22 @@ rtl_dump_bb (FILE *outf, basic_block bb, int indent, dump_flags_t flags)
     }
 
   if (bb->index != ENTRY_BLOCK && bb->index != EXIT_BLOCK)
-    for (insn = BB_HEAD (bb), last = NEXT_INSN (BB_END (bb)); insn != last;
-	 insn = NEXT_INSN (insn))
-      {
-	if (flags & TDF_DETAILS)
-	  df_dump_insn_top (insn, outf);
-	if (! (flags & TDF_SLIM))
-	  print_rtl_single (outf, insn);
-	else
-	  dump_insn_slim (outf, insn);
-	if (flags & TDF_DETAILS)
-	  df_dump_insn_bottom (insn, outf);
-      }
+    {
+      rtx_insn *last = BB_END (bb);
+      if (last)
+	last = NEXT_INSN (last);
+      for (rtx_insn *insn = BB_HEAD (bb); insn != last; insn = NEXT_INSN (insn))
+	{
+	  if (flags & TDF_DETAILS)
+	    df_dump_insn_top (insn, outf);
+	  if (! (flags & TDF_SLIM))
+	    print_rtl_single (outf, insn);
+	  else
+	    dump_insn_slim (outf, insn);
+	  if (flags & TDF_DETAILS)
+	    df_dump_insn_bottom (insn, outf);
+	}
+    }
 
   if (df && (flags & TDF_DETAILS))
     {
@@ -2253,9 +2255,9 @@ update_br_prob_note (basic_block bb)
     return;
   note = find_reg_note (BB_END (bb), REG_BR_PROB, NULL_RTX);
   if (!note
-      || XINT (note, 0) == BRANCH_EDGE (bb)->probability.to_reg_br_prob_base ())
+      || XINT (note, 0) == BRANCH_EDGE (bb)->probability.to_reg_br_prob_note ())
     return;
-  XINT (note, 0) = BRANCH_EDGE (bb)->probability.to_reg_br_prob_base ();
+  XINT (note, 0) = BRANCH_EDGE (bb)->probability.to_reg_br_prob_note ();
 }
 
 /* Get the last insn associated with block BB (that includes barriers and
@@ -2282,6 +2284,29 @@ get_last_bb_insn (basic_block bb)
   return end;
 }
 
+/* Add all BBs reachable from entry via hot paths into the SET.  */
+
+void
+find_bbs_reachable_by_hot_paths (hash_set<basic_block> *set)
+{
+  auto_vec<basic_block, 64> worklist;
+
+  set->add (ENTRY_BLOCK_PTR_FOR_FN (cfun));
+  worklist.safe_push (ENTRY_BLOCK_PTR_FOR_FN (cfun));
+
+  while (worklist.length () > 0)
+    {
+      basic_block bb = worklist.pop ();
+      edge_iterator ei;
+      edge e;
+
+      FOR_EACH_EDGE (e, ei, bb->succs)
+	if (BB_PARTITION (e->dest) != BB_COLD_PARTITION
+	    && !set->add (e->dest))
+	  worklist.safe_push (e->dest);
+    }
+}
+
 /* Sanity check partition hotness to ensure that basic blocks in
    the cold partition don't dominate basic blocks in the hot partition.
    If FLAG_ONLY is true, report violations as errors. Otherwise
@@ -2295,49 +2320,25 @@ find_partition_fixes (bool flag_only)
   basic_block bb;
   vec<basic_block> bbs_in_cold_partition = vNULL;
   vec<basic_block> bbs_to_fix = vNULL;
+  hash_set<basic_block> set;
 
   /* Callers check this.  */
   gcc_checking_assert (crtl->has_bb_partition);
 
+  find_bbs_reachable_by_hot_paths (&set);
+
   FOR_EACH_BB_FN (bb, cfun)
-    if ((BB_PARTITION (bb) == BB_COLD_PARTITION))
-      bbs_in_cold_partition.safe_push (bb);
-
-  if (bbs_in_cold_partition.is_empty ())
-    return vNULL;
-
-  bool dom_calculated_here = !dom_info_available_p (CDI_DOMINATORS);
-
-  if (dom_calculated_here)
-    calculate_dominance_info (CDI_DOMINATORS);
-
-  while (! bbs_in_cold_partition.is_empty  ())
-    {
-      bb = bbs_in_cold_partition.pop ();
-      /* Any blocks dominated by a block in the cold section
-         must also be cold.  */
-      basic_block son;
-      for (son = first_dom_son (CDI_DOMINATORS, bb);
-           son;
-           son = next_dom_son (CDI_DOMINATORS, son))
-        {
-          /* If son is not yet cold, then mark it cold here and
-             enqueue it for further processing.  */
-          if ((BB_PARTITION (son) != BB_COLD_PARTITION))
-            {
-              if (flag_only)
-                error ("non-cold basic block %d dominated "
-                       "by a block in the cold partition (%d)", son->index, bb->index);
-              else
-                BB_SET_PARTITION (son, BB_COLD_PARTITION);
-              bbs_to_fix.safe_push (son);
-              bbs_in_cold_partition.safe_push (son);
-            }
-        }
-    }
-
-  if (dom_calculated_here)
-    free_dominance_info (CDI_DOMINATORS);
+    if (!set.contains (bb)
+	&& BB_PARTITION (bb) != BB_COLD_PARTITION)
+      {
+	if (flag_only)
+	  error ("non-cold basic block %d reachable only "
+		 "by paths crossing the cold partition", bb->index);
+	else
+	  BB_SET_PARTITION (bb, BB_COLD_PARTITION);
+	bbs_to_fix.safe_push (bb);
+	bbs_in_cold_partition.safe_push (bb);
+      }
 
   return bbs_to_fix;
 }
@@ -2456,12 +2457,12 @@ rtl_verify_edges (void)
 		}
 	    }
 	  else if (XINT (note, 0)
-	           != BRANCH_EDGE (bb)->probability.to_reg_br_prob_base ()
+	           != BRANCH_EDGE (bb)->probability.to_reg_br_prob_note ()
 	           && profile_status_for_fn (cfun) != PROFILE_ABSENT)
 	    {
 	      error ("verify_flow_info: REG_BR_PROB does not match cfg %i %i",
 		     XINT (note, 0),
-		     BRANCH_EDGE (bb)->probability.to_reg_br_prob_base ());
+		     BRANCH_EDGE (bb)->probability.to_reg_br_prob_note ());
 	      err = 1;
 	    }
 	}
@@ -3164,9 +3165,9 @@ purge_dead_edges (basic_block bb)
 
 	  b = BRANCH_EDGE (bb);
 	  f = FALLTHRU_EDGE (bb);
-	  b->probability = profile_probability::from_reg_br_prob_base
+	  b->probability = profile_probability::from_reg_br_prob_note
 					 (XINT (note, 0));
-	  f->probability = profile_probability::always () - b->probability;
+	  f->probability = b->probability.invert ();
 	  b->count = bb->count.apply_probability (b->probability);
 	  f->count = bb->count.apply_probability (f->probability);
 	}
@@ -3792,7 +3793,8 @@ fixup_reorder_chain (void)
 		  rtx note = find_reg_note (bb_end_jump, REG_BR_PROB, 0);
 
 		  if (note
-		      && XINT (note, 0) < REG_BR_PROB_BASE / 2
+		      && profile_probability::from_reg_br_prob_note
+				 (XINT (note, 0)) < profile_probability::even ()
 		      && invert_jump (bb_end_jump,
 				      (e_fall->dest
 				       == EXIT_BLOCK_PTR_FOR_FN (cfun)

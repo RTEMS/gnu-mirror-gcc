@@ -5049,16 +5049,6 @@ is_cxx (const_tree decl)
   return is_cxx ();
 }
 
-/* Return TRUE if the language is Java.  */
-
-static inline bool
-is_java (void)
-{
-  unsigned int lang = get_AT_unsigned (comp_unit_die (), DW_AT_language);
-
-  return lang == DW_LANG_Java;
-}
-
 /* Return TRUE if the language is Fortran.  */
 
 static inline bool
@@ -10756,8 +10746,8 @@ output_pubname (dw_offset die_offset, pubname_entry *entry)
         case DW_TAG_enumerator:
           GDB_INDEX_SYMBOL_KIND_SET_VALUE(flags,
                                           GDB_INDEX_SYMBOL_KIND_VARIABLE);
-          if (!is_cxx () && !is_java ())
-            GDB_INDEX_SYMBOL_STATIC_SET_VALUE(flags, 1);
+	  if (!is_cxx ())
+	    GDB_INDEX_SYMBOL_STATIC_SET_VALUE(flags, 1);
           break;
         case DW_TAG_subprogram:
           GDB_INDEX_SYMBOL_KIND_SET_VALUE(flags,
@@ -10785,7 +10775,7 @@ output_pubname (dw_offset die_offset, pubname_entry *entry)
         case DW_TAG_union_type:
         case DW_TAG_enumeration_type:
           GDB_INDEX_SYMBOL_KIND_SET_VALUE(flags, GDB_INDEX_SYMBOL_KIND_TYPE);
-          if (!is_cxx () && !is_java ())
+	  if (!is_cxx ())
 	    GDB_INDEX_SYMBOL_STATIC_SET_VALUE(flags, 1);
           break;
         default:
@@ -11707,7 +11697,7 @@ output_file_names (void)
       output_line_string (str_form, filename0, "File Entry", 0);
 
       /* Include directory index.  */
-      if (dwarf_version >= 5 && idx_form != DW_FORM_udata)
+      if (idx_form != DW_FORM_udata)
 	dw2_asm_output_data (idx_form == DW_FORM_data1 ? 1 : 2,
 			     0, NULL);
       else
@@ -19830,7 +19820,6 @@ lower_bound_default (void)
     case DW_LANG_C_plus_plus_14:
     case DW_LANG_ObjC:
     case DW_LANG_ObjC_plus_plus:
-    case DW_LANG_Java:
       return 0;
     case DW_LANG_Fortran77:
     case DW_LANG_Fortran90:
@@ -19846,7 +19835,6 @@ lower_bound_default (void)
     case DW_LANG_Ada83:
     case DW_LANG_Cobol74:
     case DW_LANG_Cobol85:
-    case DW_LANG_Pascal83:
     case DW_LANG_Modula2:
     case DW_LANG_PLI:
       return dwarf_version >= 4 ? 1 : -1;
@@ -23305,46 +23293,6 @@ gen_field_die (tree decl, struct vlr_context *ctx, dw_die_ref context_die)
   equate_decl_number_to_die (decl, decl_die);
 }
 
-#if 0
-/* Don't generate either pointer_type DIEs or reference_type DIEs here.
-   Use modified_type_die instead.
-   We keep this code here just in case these types of DIEs may be needed to
-   represent certain things in other languages (e.g. Pascal) someday.  */
-
-static void
-gen_pointer_type_die (tree type, dw_die_ref context_die)
-{
-  dw_die_ref ptr_die
-    = new_die (DW_TAG_pointer_type, scope_die_for (type, context_die), type);
-
-  equate_type_number_to_die (type, ptr_die);
-  add_type_attribute (ptr_die, TREE_TYPE (type), TYPE_UNQUALIFIED, false,
-		      context_die);
-  add_AT_unsigned (mod_type_die, DW_AT_byte_size, PTR_SIZE);
-}
-
-/* Don't generate either pointer_type DIEs or reference_type DIEs here.
-   Use modified_type_die instead.
-   We keep this code here just in case these types of DIEs may be needed to
-   represent certain things in other languages (e.g. Pascal) someday.  */
-
-static void
-gen_reference_type_die (tree type, dw_die_ref context_die)
-{
-  dw_die_ref ref_die, scope_die = scope_die_for (type, context_die);
-
-  if (TYPE_REF_IS_RVALUE (type) && dwarf_version >= 4)
-    ref_die = new_die (DW_TAG_rvalue_reference_type, scope_die, type);
-  else
-    ref_die = new_die (DW_TAG_reference_type, scope_die, type);
-
-  equate_type_number_to_die (type, ref_die);
-  add_type_attribute (ref_die, TREE_TYPE (type), TYPE_UNQUALIFIED, false,
-		      context_die);
-  add_AT_unsigned (mod_type_die, DW_AT_byte_size, PTR_SIZE);
-}
-#endif
-
 /* Generate a DIE for a pointer to a member type.  TYPE can be an
    OFFSET_TYPE, for a pointer to data member, or a RECORD_TYPE, for a
    pointer to member function.  */
@@ -23576,8 +23524,6 @@ gen_compile_unit_die (const char *filename)
     }
   else if (strcmp (language_string, "GNU F77") == 0)
     language = DW_LANG_Fortran77;
-  else if (strcmp (language_string, "GNU Pascal") == 0)
-    language = DW_LANG_Pascal83;
   else if (dwarf_version >= 3 || !dwarf_strict)
     {
       if (strcmp (language_string, "GNU Ada") == 0)
@@ -23593,8 +23539,6 @@ gen_compile_unit_die (const char *filename)
 		language = DW_LANG_Fortran08;
 	    }
 	}
-      else if (strcmp (language_string, "GNU Java") == 0)
-	language = DW_LANG_Java;
       else if (strcmp (language_string, "GNU Objective-C") == 0)
 	language = DW_LANG_ObjC;
       else if (strcmp (language_string, "GNU Objective-C++") == 0)
@@ -24088,7 +24032,8 @@ gen_member_die (tree type, dw_die_ref context_die)
 {
   tree member;
   tree binfo = TYPE_BINFO (type);
-  dw_die_ref child;
+
+  gcc_assert (TYPE_MAIN_VARIANT (type) == type);
 
   /* If this is not an incomplete type, output descriptions of each of its
      members. Note that as we output the DIEs necessary to represent the
@@ -24125,13 +24070,16 @@ gen_member_die (tree type, dw_die_ref context_die)
 	   && (lang_hooks.decls.decl_dwarf_attribute (member, DW_AT_inline)
 	       != -1));
 
+      /* Ignore clones.  */
+      if (DECL_ABSTRACT_ORIGIN (member))
+	continue;
+
       /* If we thought we were generating minimal debug info for TYPE
 	 and then changed our minds, some of the member declarations
 	 may have already been defined.  Don't define them again, but
 	 do put them in the right order.  */
 
-      child = lookup_decl_die (member);
-      if (child)
+      if (dw_die_ref child = lookup_decl_die (member))
 	{
 	  /* Handle inline static data members, which only have in-class
 	     declarations.  */
@@ -24159,6 +24107,7 @@ gen_member_die (tree type, dw_die_ref context_die)
 		  static_inline_p = false;
 		}
 	    }
+
 	  if (child->die_tag == DW_TAG_variable
 	      && child->die_parent == comp_unit_die ()
 	      && ref == NULL)
@@ -24197,23 +24146,6 @@ gen_member_die (tree type, dw_die_ref context_die)
 	  DECL_EXTERNAL (member) = old_extern;
 	}
     }
-
-  /* We do not keep type methods in type variants.  */
-  gcc_assert (TYPE_MAIN_VARIANT (type) == type);
-  /* Now output info about the function members (if any).  */
-  if (TYPE_METHODS (type) != error_mark_node)
-    for (member = TYPE_METHODS (type); member; member = DECL_CHAIN (member))
-      {
-	/* Don't include clones in the member list.  */
-	if (DECL_ABSTRACT_ORIGIN (member))
-	  continue;
-
-	child = lookup_decl_die (member);
-	if (child)
-	  splice_child_die (context_die, child);
-	else
-	  gen_decl_die (member, NULL, NULL, context_die);
-      }
 }
 
 /* Generate a DIE for a structure or union type.  If TYPE_DECL_SUPPRESS_DEBUG
@@ -27043,6 +26975,7 @@ output_macinfo (void)
   macinfo_entry *ref;
   vec<macinfo_entry, va_gc> *files = NULL;
   macinfo_hash_type *macinfo_htab = NULL;
+  char dl_section_ref[MAX_ARTIFICIAL_LABEL_BYTES];
 
   if (! length)
     return;
@@ -27052,6 +26985,12 @@ output_macinfo (void)
 	      && (int) DW_MACINFO_undef == (int) DW_MACRO_undef
 	      && (int) DW_MACINFO_start_file == (int) DW_MACRO_start_file
 	      && (int) DW_MACINFO_end_file == (int) DW_MACRO_end_file);
+
+  /* AIX Assembler inserts the length, so adjust the reference to match the
+     offset expected by debuggers.  */
+  strcpy (dl_section_ref, debug_line_section_label);
+  if (XCOFF_DEBUGGING_INFO)
+    strcat (dl_section_ref, DWARF_INITIAL_LENGTH_SIZE_STR);
 
   /* For .debug_macro emit the section header.  */
   if (!dwarf_strict || dwarf_version >= 5)
@@ -27063,7 +27002,7 @@ output_macinfo (void)
       else
 	dw2_asm_output_data (1, 2, "Flags: 32-bit, lineptr present");
       dw2_asm_output_offset (DWARF_OFFSET_SIZE,
-                             (!dwarf_split_debug_info ? debug_line_section_label
+                             (!dwarf_split_debug_info ? dl_section_ref
                               : debug_skeleton_line_section_label),
                              debug_line_section, NULL);
     }

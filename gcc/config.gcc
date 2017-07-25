@@ -456,7 +456,8 @@ powerpc*-*-*)
 	cpu_type=rs6000
 	extra_objs="rs6000-string.o rs6000-p8swap.o"
 	extra_headers="ppc-asm.h altivec.h htmintrin.h htmxlintrin.h"
-	extra_headers="${extra_headers} bmi2intrin.h bmiintrin.h x86intrin.h"
+	extra_headers="${extra_headers} bmi2intrin.h bmiintrin.h"
+	extra_headers="${extra_headers} mmintrin.h x86intrin.h"
 	extra_headers="${extra_headers} ppu_intrinsics.h spu2vmx.h vec_types.h si2vmx.h"
 	extra_headers="${extra_headers} paired.h"
 	case x$with_cpu in
@@ -797,14 +798,7 @@ case ${target} in
   case ${enable_threads} in
     "" | yes | posix) thread_file='posix' ;;
   esac
-
-  # NetBSD 2.0 and later provide __cxa_atexit(), which we use by
-  # default (unless overridden by --disable-__cxa_atexit).
-  case ${target} in
-    *-*-netbsd[2-9]* | *-*-netbsdelf[2-9]*)
-      default_use_cxa_atexit=yes
-      ;;
-  esac
+  default_use_cxa_atexit=yes
   ;;
 *-*-openbsd*)
   tmake_file="t-openbsd"

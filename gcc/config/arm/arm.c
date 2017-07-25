@@ -3489,6 +3489,8 @@ arm_option_override (void)
     }
   else
     {
+      warning (0, "option %<-mstructure-size-boundary%> is deprecated");
+
       if (arm_structure_size_boundary != 8
 	  && arm_structure_size_boundary != 32
 	  && !(ARM_DOUBLEWORD_ALIGN && arm_structure_size_boundary == 64))
@@ -10755,7 +10757,7 @@ arm_rtx_costs_internal (rtx x, enum rtx_code code, enum rtx_code outer_code,
 	{
 	  if (speed_p)
 	    *cost += extra_cost->fp[mode == DFmode].widen;
-	  if (!TARGET_FPU_ARMV8
+	  if (!TARGET_VFP5
 	      && GET_MODE (XEXP (x, 0)) == HFmode)
 	    {
 	      /* Pre v8, widening HF->DF is a two-step process, first
@@ -10849,7 +10851,7 @@ arm_rtx_costs_internal (rtx x, enum rtx_code code, enum rtx_code outer_code,
 	      return true;
 	    }
 	  else if (GET_MODE_CLASS (mode) == MODE_FLOAT
-		   && TARGET_FPU_ARMV8)
+		   && TARGET_VFP5)
 	    {
 	      if (speed_p)
 		*cost += extra_cost->fp[mode == DFmode].roundint;
@@ -28268,10 +28270,8 @@ arm_emit_store_exclusive (machine_mode mode, rtx bval, rtx rval,
 static void
 emit_unlikely_jump (rtx insn)
 {
-  int very_unlikely = REG_BR_PROB_BASE / 100 - 1;
-
   rtx_insn *jump = emit_jump_insn (insn);
-  add_int_reg_note (jump, REG_BR_PROB, very_unlikely);
+  add_reg_br_prob_note (jump, profile_probability::very_unlikely ());
 }
 
 /* Expand a compare and swap pattern.  */
@@ -31224,12 +31224,15 @@ namespace selftest {
    inconsistencies in the option extensions at present (extensions
    that duplicate others but aren't marked as aliases).  Furthermore,
    for correct canonicalization later options must never be a subset
-   of an earlier option.  */
+   of an earlier option.  Any extension should also only specify other
+   feature bits and never an architecture bit.  The architecture is inferred
+   from the declaration of the extension.  */
 static void
 arm_test_cpu_arch_data (void)
 {
   const arch_option *arch;
   const cpu_option *cpu;
+  auto_sbitmap target_isa (isa_num_bits);
   auto_sbitmap isa1 (isa_num_bits);
   auto_sbitmap isa2 (isa_num_bits);
 
@@ -31239,6 +31242,8 @@ arm_test_cpu_arch_data (void)
 
       if (arch->common.extensions == NULL)
 	continue;
+
+      arm_initialize_isa (target_isa, arch->common.isa_bits);
 
       for (ext1 = arch->common.extensions; ext1->name != NULL; ++ext1)
 	{
@@ -31252,7 +31257,13 @@ arm_test_cpu_arch_data (void)
 		continue;
 
 	      arm_initialize_isa (isa2, ext2->isa_bits);
+	      /* If the option is a subset of the parent option, it doesn't
+		 add anything and so isn't useful.  */
 	      ASSERT_TRUE (!bitmap_subset_p (isa2, isa1));
+
+	      /* If the extension specifies any architectural bits then
+		 disallow it.  Extensions should only specify feature bits.  */
+	      ASSERT_TRUE (!bitmap_intersect_p (isa2, target_isa));
 	    }
 	}
     }
@@ -31263,6 +31274,8 @@ arm_test_cpu_arch_data (void)
 
       if (cpu->common.extensions == NULL)
 	continue;
+
+      arm_initialize_isa (target_isa, arch->common.isa_bits);
 
       for (ext1 = cpu->common.extensions; ext1->name != NULL; ++ext1)
 	{
@@ -31276,7 +31289,13 @@ arm_test_cpu_arch_data (void)
 		continue;
 
 	      arm_initialize_isa (isa2, ext2->isa_bits);
+	      /* If the option is a subset of the parent option, it doesn't
+		 add anything and so isn't useful.  */
 	      ASSERT_TRUE (!bitmap_subset_p (isa2, isa1));
+
+	      /* If the extension specifies any architectural bits then
+		 disallow it.  Extensions should only specify feature bits.  */
+	      ASSERT_TRUE (!bitmap_intersect_p (isa2, target_isa));
 	    }
 	}
     }

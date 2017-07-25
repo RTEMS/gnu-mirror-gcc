@@ -5557,7 +5557,8 @@ c_parser_else_body (c_parser *parser, const token_indent_info &else_tinfo,
     }
   else
     {
-      body_loc_after_labels = c_parser_peek_token (parser)->location;
+      if (!c_parser_next_token_is (parser, CPP_OPEN_BRACE))
+	body_loc_after_labels = c_parser_peek_token (parser)->location;
       c_parser_statement_after_labels (parser, NULL, chain);
     }
 
@@ -5811,6 +5812,7 @@ c_parser_while_statement (c_parser *parser, bool ivdep, bool *if_p)
     = get_token_indent_info (c_parser_peek_token (parser));
 
   location_t loc_after_labels;
+  bool open_brace = c_parser_next_token_is (parser, CPP_OPEN_BRACE);
   body = c_parser_c99_block_statement (parser, if_p, &loc_after_labels);
   c_finish_loop (loc, cond, NULL, body, c_break_label, c_cont_label, true);
   add_stmt (c_end_compound_stmt (loc, block, flag_isoc99));
@@ -5820,7 +5822,7 @@ c_parser_while_statement (c_parser *parser, bool ivdep, bool *if_p)
     = get_token_indent_info (c_parser_peek_token (parser));
   warn_for_misleading_indentation (while_tinfo, body_tinfo, next_tinfo);
 
-  if (next_tinfo.type != CPP_SEMICOLON)
+  if (next_tinfo.type != CPP_SEMICOLON && !open_brace)
     warn_for_multistatement_macros (loc_after_labels, next_tinfo.location,
 				    while_tinfo.location, RID_WHILE);
 
@@ -6109,6 +6111,7 @@ c_parser_for_statement (c_parser *parser, bool ivdep, bool *if_p)
     = get_token_indent_info (c_parser_peek_token (parser));
 
   location_t loc_after_labels;
+  bool open_brace = c_parser_next_token_is (parser, CPP_OPEN_BRACE);
   body = c_parser_c99_block_statement (parser, if_p, &loc_after_labels);
 
   if (is_foreach_statement)
@@ -6122,7 +6125,7 @@ c_parser_for_statement (c_parser *parser, bool ivdep, bool *if_p)
     = get_token_indent_info (c_parser_peek_token (parser));
   warn_for_misleading_indentation (for_tinfo, body_tinfo, next_tinfo);
 
-  if (next_tinfo.type != CPP_SEMICOLON)
+  if (next_tinfo.type != CPP_SEMICOLON && !open_brace)
     warn_for_multistatement_macros (loc_after_labels, next_tinfo.location,
 				    for_tinfo.location, RID_FOR);
 
@@ -18238,18 +18241,18 @@ c_parser_array_notation (location_t loc, c_parser *parser, tree initial_index,
 	      return error_mark_node;
 	    }
 
-	  start_index = TYPE_MINVAL (array_type_domain);
+	  start_index = TYPE_MIN_VALUE (array_type_domain);
 	  start_index = fold_build1 (CONVERT_EXPR, ptrdiff_type_node,
 				     start_index);
-	  if (!TYPE_MAXVAL (array_type_domain)
-	      || !TREE_CONSTANT (TYPE_MAXVAL (array_type_domain)))
+	  if (!TYPE_MAX_VALUE (array_type_domain)
+	      || !TREE_CONSTANT (TYPE_MAX_VALUE (array_type_domain)))
 	    {
 	      error_at (loc, "start-index and length fields necessary for "
 			"using array notations in variable-length arrays");
 	      c_parser_skip_until_found (parser, CPP_CLOSE_SQUARE, NULL);
 	      return error_mark_node;
 	    }
-	  end_index = TYPE_MAXVAL (array_type_domain);
+	  end_index = TYPE_MAX_VALUE (array_type_domain);
 	  end_index = fold_build2 (PLUS_EXPR, TREE_TYPE (end_index),
 				   end_index, integer_one_node);
 	  end_index = fold_build1 (CONVERT_EXPR, ptrdiff_type_node, end_index);

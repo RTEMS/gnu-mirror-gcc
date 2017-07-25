@@ -5162,8 +5162,6 @@ free_lang_data_in_type (tree type)
 	  /* C++ FE uses TREE_PURPOSE to store initial values.  */
 	  TREE_PURPOSE (p) = NULL;
 	}
-      /* Java uses TYPE_MINVAL for TYPE_ARGUMENT_SIGNATURE.  */
-      TYPE_MINVAL (type) = NULL;
     }
   if (TREE_CODE (type) == METHOD_TYPE)
     {
@@ -5174,8 +5172,6 @@ free_lang_data_in_type (tree type)
 	  /* C++ FE uses TREE_PURPOSE to store initial values.  */
 	  TREE_PURPOSE (p) = NULL;
 	}
-      /* Java uses TYPE_MINVAL for TYPE_ARGUMENT_SIGNATURE.  */
-      TYPE_MINVAL (type) = NULL;
     }
 
   /* Remove members that are not actually FIELD_DECLs from the field
@@ -5221,13 +5217,15 @@ free_lang_data_in_type (tree type)
       if (TYPE_VFIELD (type) && TREE_CODE (TYPE_VFIELD (type)) != FIELD_DECL)
         TYPE_VFIELD (type) = NULL_TREE;
 
-      /* Remove TYPE_METHODS list.  While it would be nice to keep it
- 	 to enable ODR warnings about different method lists, doing so
-	 seems to impractically increase size of LTO data streamed.
-	 Keep the information if TYPE_METHODS was non-NULL. This is used
-	 by function.c and pretty printers.  */
-      if (TYPE_METHODS (type))
-        TYPE_METHODS (type) = error_mark_node;
+      /* Splice out FUNCTION_DECLS and TEMPLATE_DECLS from
+	 TYPE_FIELDS.  So LTO doesn't grow.  */
+      for (tree probe, *prev= &TYPE_FIELDS (type); (probe = *prev); )
+	if (TREE_CODE (probe) == FUNCTION_DECL
+	    || TREE_CODE (probe) == TEMPLATE_DECL)
+	  *prev = probe;
+	else
+	  prev = &DECL_CHAIN (probe);
+
       if (TYPE_BINFO (type))
 	{
 	  free_lang_data_in_binfo (TYPE_BINFO (type));
@@ -5422,9 +5420,10 @@ free_lang_data_in_decl (tree decl)
 	 At this point, it is not needed anymore.  */
       DECL_SAVED_TREE (decl) = NULL_TREE;
 
-      /* Clear the abstract origin if it refers to a method.  Otherwise
-         dwarf2out.c will ICE as we clear TYPE_METHODS and thus the
-	 origin will not be output correctly.  */
+      /* Clear the abstract origin if it refers to a method.
+         Otherwise dwarf2out.c will ICE as we splice functions out of
+         TYPE_FIELDS and thus the origin will not be output
+         correctly.  */
       if (DECL_ABSTRACT_ORIGIN (decl)
 	  && DECL_CONTEXT (DECL_ABSTRACT_ORIGIN (decl))
 	  && RECORD_OR_UNION_TYPE_P
@@ -5637,9 +5636,9 @@ find_decls_types_r (tree *tp, int *ws, void *data)
 	 them and thus do not and want not to reach unused pointer types
 	 this way.  */
       if (!POINTER_TYPE_P (t))
-	fld_worklist_push (TYPE_MINVAL (t), fld);
+	fld_worklist_push (TYPE_MIN_VALUE_RAW (t), fld);
       if (!RECORD_OR_UNION_TYPE_P (t))
-	fld_worklist_push (TYPE_MAXVAL (t), fld);
+	fld_worklist_push (TYPE_MAX_VALUE_RAW (t), fld);
       fld_worklist_push (TYPE_MAIN_VARIANT (t), fld);
       /* Do not walk TYPE_NEXT_VARIANT.  We do not stream it and thus
          do not and want not to reach unused variants this way.  */
@@ -5661,16 +5660,7 @@ find_decls_types_r (tree *tp, int *ws, void *data)
 	  tree tem;
 	  FOR_EACH_VEC_ELT (*BINFO_BASE_BINFOS (TYPE_BINFO (t)), i, tem)
 	    fld_worklist_push (TREE_TYPE (tem), fld);
-	  tem = BINFO_VIRTUALS (TYPE_BINFO (t));
-	  if (tem
-	      /* The Java FE overloads BINFO_VIRTUALS for its own purpose.  */
-	      && TREE_CODE (tem) == TREE_LIST)
-	    do
-	      {
-		fld_worklist_push (TREE_VALUE (tem), fld);
-		tem = TREE_CHAIN (tem);
-	      }
-	    while (tem);
+	  fld_worklist_push (BINFO_VIRTUALS (TYPE_BINFO (t)), fld);
 	}
       if (RECORD_OR_UNION_TYPE_P (t))
 	{
@@ -6691,12 +6681,6 @@ build_distinct_type_copy (tree type MEM_STAT_DECL)
   /* Make it its own variant.  */
   TYPE_MAIN_VARIANT (t) = t;
   TYPE_NEXT_VARIANT (t) = 0;
-
-  /* We do not record methods in type copies nor variants
-     so we do not need to keep them up to date when new method
-     is inserted.  */
-  if (RECORD_OR_UNION_TYPE_P (t))
-    TYPE_METHODS (t) = NULL_TREE;
 
   /* Note that it is now possible for TYPE_MIN_VALUE to be a value
      whose TREE_TYPE is not t.  This can also happen in the Ada
@@ -10799,7 +10783,7 @@ build_common_builtin_nodes (void)
 			ECF_PURE | ECF_NOTHROW | ECF_LEAF);
 
   /* If there's a possibility that we might use the ARM EABI, build the
-    alternate __cxa_end_cleanup node used to resume from C++ and Java.  */
+    alternate __cxa_end_cleanup node used to resume from C++.  */
   if (targetm.arm_eabi_unwinder)
     {
       ftype = build_function_type_list (void_type_node, NULL_TREE);
@@ -13423,8 +13407,6 @@ verify_type_variant (const_tree t, tree tv)
      - aggregates may have new TYPE_FIELDS list that list variants of
        the main variant TYPE_FIELDS.
      - vector types may differ by TYPE_VECTOR_OPAQUE
-     - TYPE_METHODS is always NULL for variant types and maintained for
-       main variant only.
    */
 
   /* Convenience macro for matching individual fields.  */
@@ -13525,12 +13507,6 @@ verify_type_variant (const_tree t, tree tv)
     }
   if (TREE_CODE (t) == METHOD_TYPE)
     verify_variant_match (TYPE_METHOD_BASETYPE);
-  if (RECORD_OR_UNION_TYPE_P (t) && TYPE_METHODS (t))
-    {
-      error ("type variant has TYPE_METHODS");
-      debug_tree (tv);
-      return false;
-    }
   if (TREE_CODE (t) == OFFSET_TYPE)
     verify_variant_match (TYPE_OFFSET_BASETYPE);
   if (TREE_CODE (t) == ARRAY_TYPE)
@@ -13987,7 +13963,7 @@ verify_type (const_tree t)
    }
 
 
-  /* Check various uses of TYPE_MINVAL.  */
+  /* Check various uses of TYPE_MIN_VALUE_RAW.  */
   if (RECORD_OR_UNION_TYPE_P (t))
     {
       /* FIXME: C FE uses TYPE_VFIELD to record C_TYPE_INCOMPLETE_VARS
@@ -14029,27 +14005,10 @@ verify_type (const_tree t)
 				     TREE_TYPE (TYPE_MIN_VALUE (t))
 	 but does not for C sizetypes in LTO.  */
     }
-  /* Java uses TYPE_MINVAL for TYPE_ARGUMENT_SIGNATURE.  */
-  else if (TYPE_MINVAL (t)
-	   && ((TREE_CODE (t) != METHOD_TYPE && TREE_CODE (t) != FUNCTION_TYPE)
-	       || in_lto_p))
-    {
-      error ("TYPE_MINVAL non-NULL");
-      debug_tree (TYPE_MINVAL (t));
-      error_found = true;
-    }
 
   /* Check various uses of TYPE_MAXVAL.  */
   if (RECORD_OR_UNION_TYPE_P (t))
     {
-      if (TYPE_METHODS (t) && TREE_CODE (TYPE_METHODS (t)) != FUNCTION_DECL
-	  && TREE_CODE (TYPE_METHODS (t)) != TEMPLATE_DECL
-	  && TYPE_METHODS (t) != error_mark_node)
-	{
-	  error ("TYPE_METHODS is not FUNCTION_DECL, TEMPLATE_DECL nor error_mark_node");
-	  debug_tree (TYPE_METHODS (t));
-	  error_found = true;
-	}
     }
   else if (TREE_CODE (t) == FUNCTION_TYPE || TREE_CODE (t) == METHOD_TYPE)
     {
@@ -14091,10 +14050,10 @@ verify_type (const_tree t)
 	  error_found = true;
         } 
     }
-  else if (TYPE_MAXVAL (t))
+  else if (TYPE_MAX_VALUE_RAW (t))
     {
-      error ("TYPE_MAXVAL non-NULL");
-      debug_tree (TYPE_MAXVAL (t));
+      error ("TYPE_MAX_VALUE_RAW non-NULL");
+      debug_tree (TYPE_MAX_VALUE_RAW (t));
       error_found = true;
     }
 
@@ -14107,14 +14066,6 @@ verify_type (const_tree t)
 	{
 	  error ("TYPE_BINFO is not TREE_BINFO");
 	  debug_tree (TYPE_BINFO (t));
-	  error_found = true;
-	}
-      /* FIXME: Java builds invalid empty binfos that do not have
-         TREE_TYPE set.  */
-      else if (TREE_TYPE (TYPE_BINFO (t)) != TYPE_MAIN_VARIANT (t) && 0)
-	{
-	  error ("TYPE_BINFO type is not TYPE_MAIN_VARIANT");
-	  debug_tree (TREE_TYPE (TYPE_BINFO (t)));
 	  error_found = true;
 	}
     }
@@ -14187,6 +14138,8 @@ verify_type (const_tree t)
 	  else if (TREE_CODE (fld) == TEMPLATE_DECL)
 	    ;
 	  else if (TREE_CODE (fld) == USING_DECL)
+	    ;
+	  else if (TREE_CODE (fld) == FUNCTION_DECL)
 	    ;
 	  else
 	    {
@@ -14270,20 +14223,6 @@ verify_type (const_tree t)
     {
       error ("TYPE_STRING_FLAG is set on wrong type code");
       error_found = true;
-    }
-  else if (TYPE_STRING_FLAG (t))
-    {
-      const_tree b = t;
-      if (TREE_CODE (b) == ARRAY_TYPE)
-	b = TREE_TYPE (t);
-      /* Java builds arrays with TYPE_STRING_FLAG of promoted_char_type
-	 that is 32bits.  */
-      if (TREE_CODE (b) != INTEGER_TYPE)
-	{
-	  error ("TYPE_STRING_FLAG is set on type that does not look like "
-		 "char nor array of chars");
-	  error_found = true;
-	}
     }
   
   /* ipa-devirt makes an assumption that TYPE_METHOD_BASETYPE is always

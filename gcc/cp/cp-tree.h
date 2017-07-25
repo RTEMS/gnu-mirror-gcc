@@ -2148,29 +2148,21 @@ struct GTY(()) lang_type {
    and the RECORD_TYPE for the class template otherwise.  */
 #define CLASSTYPE_DECL_LIST(NODE) (LANG_TYPE_CLASS_CHECK (NODE)->decl_list)
 
-/* The slot in the CLASSTYPE_METHOD_VEC where constructors go.  */
-#define CLASSTYPE_CONSTRUCTOR_SLOT 0
-
-/* The slot in the CLASSTYPE_METHOD_VEC where destructors go.  */
-#define CLASSTYPE_DESTRUCTOR_SLOT 1
-
 /* The first slot in the CLASSTYPE_METHOD_VEC where conversion
    operators can appear.  */
-#define CLASSTYPE_FIRST_CONVERSION_SLOT 2
+#define CLASSTYPE_FIRST_CONVERSION_SLOT 0
 
 /* A FUNCTION_DECL or OVERLOAD for the constructors for NODE.  These
    are the constructors that take an in-charge parameter.  */
 #define CLASSTYPE_CONSTRUCTORS(NODE) \
-  ((*CLASSTYPE_METHOD_VEC (NODE))[CLASSTYPE_CONSTRUCTOR_SLOT])
+  (lookup_fnfields_slot_nolazy (NODE, ctor_identifier))
 
 /* A FUNCTION_DECL for the destructor for NODE.  This is the
    destructors that take an in-charge parameter.  If
    CLASSTYPE_LAZY_DESTRUCTOR is true, then this entry will be NULL
    until the destructor is created with lazily_declare_fn.  */
 #define CLASSTYPE_DESTRUCTOR(NODE) \
-  (CLASSTYPE_METHOD_VEC (NODE)						      \
-   ? (*CLASSTYPE_METHOD_VEC (NODE))[CLASSTYPE_DESTRUCTOR_SLOT]		      \
-   : NULL_TREE)
+  (lookup_fnfields_slot_nolazy (NODE, dtor_identifier))
 
 /* A dictionary of the nested user-defined-types (class-types, or enums)
    found within this class.  This table includes nested member class
@@ -3522,13 +3514,13 @@ extern void decl_shadowed_for_var_insert (tree, tree);
 #define PACK_EXPANSION_PARAMETER_PACKS(NODE)		\
   *(TREE_CODE (NODE) == EXPR_PACK_EXPANSION		\
     ? &TREE_OPERAND (NODE, 1)				\
-    : &TYPE_MINVAL (TYPE_PACK_EXPANSION_CHECK (NODE)))
+    : &TYPE_MIN_VALUE_RAW (TYPE_PACK_EXPANSION_CHECK (NODE)))
 
 /* Any additional template args to be applied when substituting into
    the pattern, set by tsubst_pack_expansion for partial instantiations.  */
 #define PACK_EXPANSION_EXTRA_ARGS(NODE)		\
   *(TREE_CODE (NODE) == TYPE_PACK_EXPANSION	\
-    ? &TYPE_MAXVAL (NODE)			\
+    ? &TYPE_MAX_VALUE_RAW (NODE)			\
     : &TREE_OPERAND ((NODE), 2))
 
 /* True iff this pack expansion is within a function context.  */
@@ -6023,10 +6015,7 @@ extern tree default_init_uninitialized_part (tree);
 extern bool trivial_default_constructor_is_constexpr (tree);
 extern bool type_has_constexpr_default_constructor (tree);
 extern bool type_has_virtual_destructor		(tree);
-extern bool type_has_move_constructor		(tree);
-extern bool type_has_move_assign		(tree);
-extern bool type_has_user_declared_move_constructor (tree);
-extern bool type_has_user_declared_move_assign(tree);
+extern bool classtype_has_move_assign_or_move_ctor_p (tree, bool user_declared);
 extern bool type_build_ctor_call		(tree);
 extern bool type_build_dtor_call		(tree);
 extern void explain_non_literal_class		(tree);

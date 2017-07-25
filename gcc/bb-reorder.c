@@ -1302,16 +1302,15 @@ connect_traces (int n_traces, struct trace *traces)
 		      }
 		  }
 
-	      if (crtl->has_bb_partition)
-		try_copy = false;
-
 	      /* Copy tiny blocks always; copy larger blocks only when the
 		 edge is traversed frequently enough.  */
 	      if (try_copy
+		  && BB_PARTITION (best->src) == BB_PARTITION (best->dest)
 		  && copy_bb_p (best->dest,
 				optimize_edge_for_speed_p (best)
 				&& EDGE_FREQUENCY (best) >= freq_threshold
-				&& best->count >= count_threshold))
+				&& (!best->count.initialized_p ()
+				    || best->count >= count_threshold)))
 		{
 		  basic_block new_bb;
 
@@ -1525,6 +1524,11 @@ sanitize_hot_paths (bool walk_up, unsigned int cold_bb_count,
           if (e->flags & EDGE_DFS_BACK)
             continue;
 
+	  /* Do not expect profile insanities when profile was not adjusted.  */
+	  if (e->probability == profile_probability::never ()
+	      || e->count == profile_count::zero ())
+	    continue;
+
           if (BB_PARTITION (reach_bb) != BB_COLD_PARTITION)
           {
             found = true;
@@ -1555,6 +1559,10 @@ sanitize_hot_paths (bool walk_up, unsigned int cold_bb_count,
         {
           if (e->flags & EDGE_DFS_BACK)
             continue;
+	  /* Do not expect profile insanities when profile was not adjusted.  */
+	  if (e->probability == profile_probability::never ()
+	      || e->count == profile_count::zero ())
+	    continue;
           /* Select the hottest edge using the edge count, if it is non-zero,
              then fallback to the edge frequency and finally the edge
              probability.  */
@@ -1576,6 +1584,10 @@ sanitize_hot_paths (bool walk_up, unsigned int cold_bb_count,
           /* We have a hot bb with an immediate dominator that is cold.
              The dominator needs to be re-marked hot.  */
           BB_SET_PARTITION (reach_bb, BB_HOT_PARTITION);
+	  if (dump_file)
+	    fprintf (dump_file, "Promoting bb %i to hot partition to sanitize "
+		     "profile of bb %i in %s walk\n", reach_bb->index,
+		     bb->index, walk_up ? "backward" : "forward");
           cold_bb_count--;
 
           /* Now we need to examine newly-hot reach_bb to see if it is also
@@ -1602,6 +1614,8 @@ find_rarely_executed_basic_blocks_and_crossing_edges (void)
   edge_iterator ei;
   unsigned int cold_bb_count = 0;
   auto_vec<basic_block> bbs_in_hot_partition;
+
+  propagate_unlikely_bbs_forward ();
 
   /* Mark which partition (hot/cold) each basic block belongs in.  */
   FOR_EACH_BB_FN (bb, cfun)
@@ -1651,6 +1665,12 @@ find_rarely_executed_basic_blocks_and_crossing_edges (void)
                                           &bbs_in_hot_partition);
       if (cold_bb_count)
         sanitize_hot_paths (false, cold_bb_count, &bbs_in_hot_partition);
+
+      hash_set <basic_block> set;
+      find_bbs_reachable_by_hot_paths (&set);
+      FOR_EACH_BB_FN (bb, cfun)
+	if (!set.contains (bb))
+	  BB_SET_PARTITION (bb, BB_COLD_PARTITION);
     }
 
   /* The format of .gcc_except_table does not allow landing pads to

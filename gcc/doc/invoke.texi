@@ -1045,9 +1045,6 @@ See RS/6000 and PowerPC Options.
 -mquad-memory  -mno-quad-memory @gol
 -mquad-memory-atomic  -mno-quad-memory-atomic @gol
 -mcompat-align-parm  -mno-compat-align-parm @gol
--mupper-regs-df  -mno-upper-regs-df  -mupper-regs-sf  -mno-upper-regs-sf @gol
--mupper-regs-di  -mno-upper-regs-di @gol
--mupper-regs  -mno-upper-regs @gol
 -mfloat128  -mno-float128  -mfloat128-hardware  -mno-float128-hardware @gol
 -mgnu-attribute  -mno-gnu-attribute @gol
 -mstack-protector-guard=@var{guard} -mstack-protector-guard-reg=@var{reg} @gol
@@ -11522,6 +11519,34 @@ of the function name, it is considered to be a match.  For C99 and C++
 extended identifiers, the function name must be given in UTF-8, not
 using universal character names.
 
+@item -fpatchable-function-entry=@var{N}[,@var{M}]
+@opindex fpatchable-function-entry
+Generate @var{N} NOPs right at the beginning
+of each function, with the function entry point before the @var{M}th NOP.
+If @var{M} is omitted, it defaults to @code{0} so the
+function entry points to the address just at the first NOP.
+The NOP instructions reserve extra space which can be used to patch in
+any desired instrumentation at run time, provided that the code segment
+is writable.  The amount of space is controllable indirectly via
+the number of NOPs; the NOP instruction used corresponds to the instruction
+emitted by the internal GCC back-end interface @code{gen_nop}.  This behavior
+is target-specific and may also depend on the architecture variant and/or
+other compilation options.
+
+For run-time identification, the starting addresses of these areas,
+which correspond to their respective function entries minus @var{M},
+are additionally collected in the @code{__patchable_function_entries}
+section of the resulting binary.
+
+Note that the value of @code{__attribute__ ((patchable_function_entry
+(N,M)))} takes precedence over command-line option
+@option{-fpatchable-function-entry=N,M}.  This can be used to increase
+the area size or to remove it completely on a single function.
+If @code{N=0}, no pad location is recorded.
+
+The NOP instructions are inserted at---and maybe before, depending on
+@var{M}---the function entry address, even before the prologue.
+
 @end table
 
 
@@ -14084,7 +14109,7 @@ support for the ARMv8.2-A architecture extensions.
 
 The value @samp{armv8.1-a} implies @samp{armv8-a} and enables compiler
 support for the ARMv8.1-A architecture extension.  In particular, it
-enables the @samp{+crc} and @samp{+lse} features.
+enables the @samp{+crc}, @samp{+lse}, and @samp{+rdma} features.
 
 The value @samp{native} is available on native AArch64 GNU/Linux and
 causes the compiler to pick the architecture of the host system.  This
@@ -14202,6 +14227,9 @@ instructions.  This is on by default for all possible values for options
 @item lse
 Enable Large System Extension instructions.  This is on by default for
 @option{-march=armv8.1-a}.
+@item rdma
+Enable Round Double Multiply Accumulate instructions.  This is on by default
+for @option{-march=armv8.1-a}.
 @item fp16
 Enable FP16 extension.  This also enables floating-point instructions.
 @item rcpc
@@ -14906,7 +14934,7 @@ Enable pre-reload use of the @code{cbranchsi} pattern.
 @item -mexpand-adddi
 @opindex mexpand-adddi
 Expand @code{adddi3} and @code{subdi3} at RTL generation time into
-@code{add.f}, @code{adc} etc.
+@code{add.f}, @code{adc} etc.  This option is deprecated.
 
 @item -mindexed-loads
 @opindex mindexed-loads
@@ -15493,6 +15521,8 @@ Disable the floating-point extension.
 @table @samp
 @item +crc
 The Cyclic Redundancy Check (CRC) instructions.
+@item +fp.sp
+The single-precision FPv5 floating-point instructions.
 @item +simd
 The ARMv8 Advanced SIMD and floating-point instructions.
 @item +crypto
@@ -15538,7 +15568,7 @@ Permissible names are: @samp{arm2}, @samp{arm250},
 @samp{cortex-a32}, @samp{cortex-a35}, @samp{cortex-a53}, @samp{cortex-a55},
 @samp{cortex-a57}, @samp{cortex-a72}, @samp{cortex-a73}, @samp{cortex-a75},
 @samp{cortex-r4}, @samp{cortex-r4f}, @samp{cortex-r5}, @samp{cortex-r7},
-@samp{cortex-r8},
+@samp{cortex-r8}, @samp{cortex-r52},
 @samp{cortex-m33},
 @samp{cortex-m23},
 @samp{cortex-m7},
@@ -15628,12 +15658,20 @@ Disables the floating-point and SIMD instructions on
 
 @item +nofp.dp
 Disables the double-precision component of the floating-point instructions
-on @samp{cortex-r5} and @samp{cortex-m7}.
+on @samp{cortex-r5}, @samp{cortex-r52} and @samp{cortex-m7}.
 
 @item +nosimd
 Disables the SIMD (but not floating-point) instructions on
 @samp{generic-armv7-a}, @samp{cortex-a5}, @samp{cortex-a7}
 and @samp{cortex-a9}.
+
+@item +crypto
+Enables the cryptographic instructions on @samp{cortex-a32},
+@samp{cortex-a35}, @samp{cortex-a53}, @samp{cortex-a55}, @samp{cortex-a57},
+@samp{cortex-a72}, @samp{cortex-a73}, @samp{cortex-a75}, @samp{exynos-m1},
+@samp{xgene1}, @samp{cortex-a57.cortex-a53}, @samp{cortex-a72.cortex-a53},
+@samp{cortex-a73.cortex-a35}, @samp{cortex-a73.cortex-a53} and
+@samp{cortex-a75.cortex-a55}.
 @end table
 
 Additionally the @samp{generic-armv7-a} pseudo target defaults to
@@ -15700,6 +15738,8 @@ can also increase the size of the program.  Different values are potentially
 incompatible.  Code compiled with one value cannot necessarily expect to
 work with code or libraries compiled with another value, if they exchange
 information using structures or unions.
+
+This option is deprecated.
 
 @item -mabort-on-noreturn
 @opindex mabort-on-noreturn
@@ -21888,50 +21928,6 @@ instructions.  The @option{-mquad-memory} option requires use of
 Generate code that uses (does not use) the atomic quad word memory
 instructions.  The @option{-mquad-memory-atomic} option requires use of
 64-bit mode.
-
-@item -mupper-regs-di
-@itemx -mno-upper-regs-di
-@opindex mupper-regs-di
-@opindex mno-upper-regs-di
-Generate code that uses (does not use) the scalar instructions that
-target all 64 registers in the vector/scalar floating point register
-set that were added in version 2.06 of the PowerPC ISA when processing
-integers.  @option{-mupper-regs-di} is turned on by default if you use
-any of the @option{-mcpu=power7}, @option{-mcpu=power8},
-@option{-mcpu=power9}, or @option{-mvsx} options.
-
-@item -mupper-regs-df
-@itemx -mno-upper-regs-df
-@opindex mupper-regs-df
-@opindex mno-upper-regs-df
-Generate code that uses (does not use) the scalar double precision
-instructions that target all 64 registers in the vector/scalar
-floating point register set that were added in version 2.06 of the
-PowerPC ISA.  @option{-mupper-regs-df} is turned on by default if you
-use any of the @option{-mcpu=power7}, @option{-mcpu=power8},
-@option{-mcpu=power9}, or @option{-mvsx} options.
-
-@item -mupper-regs-sf
-@itemx -mno-upper-regs-sf
-@opindex mupper-regs-sf
-@opindex mno-upper-regs-sf
-Generate code that uses (does not use) the scalar single precision
-instructions that target all 64 registers in the vector/scalar
-floating point register set that were added in version 2.07 of the
-PowerPC ISA.  @option{-mupper-regs-sf} is turned on by default if you
-use either of the @option{-mcpu=power8}, @option{-mpower8-vector}, or
-@option{-mcpu=power9} options.
-
-@item -mupper-regs
-@itemx -mno-upper-regs
-@opindex mupper-regs
-@opindex mno-upper-regs
-Generate code that uses (does not use) the scalar
-instructions that target all 64 registers in the vector/scalar
-floating point register set, depending on the model of the machine.
-
-If the @option{-mno-upper-regs} option is used, it turns off both
-@option{-mupper-regs-sf} and @option{-mupper-regs-df} options.
 
 @item -mfloat128
 @itemx -mno-float128
