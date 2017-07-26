@@ -1,5 +1,20 @@
 2017-07-26  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/constraints.md (wV constraint): New constraint
+	that matches a VSX register or VEC_SELECT.
+	* config/rs6000/predicates.md (reg_or_vec_select_operand): New
+	predicates to match register or VEC_SELECT operations to optimize
+	XXPERMDI sequences.
+	(vsxreg_or_vec_select_operand): Likewise.
+	* config/rs6000/rs6000-protos.h (rs6000_which_dword): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_which_dword): New function that
+	returns which double word within a vector register a RTX item is
+	located in.
+	* config/rs6000/vsx.md (vsx_concat_<mode>, VSX_D iterator):
+	Rewrite to allow concating VEC_SELECTs as well as registers.
+	(vsx_set_<mode>, VSX_D iterator): Likewise.
+
 	Merge up to 250577.
 	* REVISION: Update subversion id.
 

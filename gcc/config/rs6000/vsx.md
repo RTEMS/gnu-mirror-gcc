@@ -2366,19 +2366,37 @@
 
 ;; Build a V2DF/V2DI vector from two scalars
 (define_insn "vsx_concat_<mode>"
-  [(set (match_operand:VSX_D 0 "gpc_reg_operand" "=<VSa>,we")
+  [(set (match_operand:VSX_D 0 "gpc_reg_operand" "=wa,we")
 	(vec_concat:VSX_D
-	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "<VS_64reg>,b")
-	 (match_operand:<VS_scalar> 2 "gpc_reg_operand" "<VS_64reg>,b")))]
+	 (match_operand:<VS_scalar> 1 "reg_or_vec_select_operand" "wV,b")
+	 (match_operand:<VS_scalar> 2 "reg_or_vec_select_operand" "wV,b")))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
   if (which_alternative == 0)
-    return (BYTES_BIG_ENDIAN
-	    ? "xxpermdi %x0,%x1,%x2,0"
-	    : "xxpermdi %x0,%x2,%x1,0");
+    {
+      int op1_dword = rs6000_which_dword (operands[1], false);
+      int op2_dword = rs6000_which_dword (operands[2], false);
+      gcc_assert (IN_RANGE (op1_dword | op2_dword, 0, 1));
 
+      if (GET_CODE (operands[1]) == VEC_SELECT)
+	operands[1] = XEXP (operands[1], 0);
+
+      if (GET_CODE (operands[2]) == VEC_SELECT)
+	operands[2] = XEXP (operands[2], 0);
+
+      if (VECTOR_ELT_ORDER_BIG)
+	{
+	  operands[3] = GEN_INT (op1_dword + 2*op2_dword);
+	  return "xxpermdi %x0,%x1,%x2,%3";
+	}
+      else
+	{
+	  operands[3] = GEN_INT (2*op1_dword + op2_dword);
+	  return "xxpermdi %x0,%x2,%x1,%3";
+	}
+    }
   else if (which_alternative == 1)
-    return (BYTES_BIG_ENDIAN
+    return (VECTOR_ELT_ORDER_BIG
 	    ? "mtvsrdd %x0,%1,%2"
 	    : "mtvsrdd %x0,%2,%1");
 
@@ -2588,24 +2606,34 @@
 })
 
 ;; Set the element of a V2DI/VD2F mode
-(define_insn "vsx_set_<mode>"
-  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wd,?<VSa>")
-	(unspec:VSX_D
-	 [(match_operand:VSX_D 1 "vsx_register_operand" "wd,<VSa>")
-	  (match_operand:<VS_scalar> 2 "vsx_register_operand" "<VS_64reg>,<VSa>")
-	  (match_operand:QI 3 "u5bit_cint_operand" "i,i")]
-	 UNSPEC_VSX_SET))]
+(define_expand "vsx_set_<mode>"
+  [(use (match_operand:VSX_D 0 "vsx_register_operand"))
+   (use (match_operand:VSX_D 1 "vsx_register_operand"))
+   (use (match_operand:<VS_scalar> 2 "gpc_reg_operand"))
+   (use (match_operand:QI 3 "const_0_to_1_operand"))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
-  int idx_first = BYTES_BIG_ENDIAN ? 0 : 1;
-  if (INTVAL (operands[3]) == idx_first)
-    return \"xxpermdi %x0,%x2,%x1,1\";
-  else if (INTVAL (operands[3]) == 1 - idx_first)
-    return \"xxpermdi %x0,%x1,%x2,0\";
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  rtx op2 = operands[2];
+  int ele = INTVAL (operands[3]);
+  rtvec v = gen_rtvec (1, GEN_INT (!ele));
+  rtx p = gen_rtx_PARALLEL (VOIDmode, v);
+  rtx other = gen_rtx_VEC_SELECT (<VS_scalar>mode, op1, p);
+
+  if (ele == 0)
+    {
+      emit_insn (gen_vsx_concat_<mode> (op0, op2, other));
+      DONE;
+    }
+  else if (ele == 1)
+    {
+      emit_insn (gen_vsx_concat_<mode> (op0, other, op2));
+      DONE;
+    }
   else
     gcc_unreachable ();
-}
-  [(set_attr "type" "vecperm")])
+})
 
 ;; Extract a DF/DI element from V2DF/V2DI
 ;; Optimize cases were we can do a simple or direct move.

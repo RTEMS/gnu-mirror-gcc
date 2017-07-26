@@ -234,6 +234,8 @@ extern void rs6000_asm_output_dwarf_pcrel (FILE *file, int size,
 extern void rs6000_asm_output_dwarf_datarel (FILE *file, int size,
 					     const char *label);
 
+extern int rs6000_which_dword (rtx, bool);
+
 /* Declare functions in rs6000-c.c */
 
 extern void rs6000_pragma_longcall (struct cpp_reader *);

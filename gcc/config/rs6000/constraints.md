@@ -200,6 +200,10 @@
   "Vector constant that can be loaded with XXSPLTIB & sign extension."
   (match_test "xxspltib_constant_split (op, mode)"))
 
+(define_constraint "wV"
+  "Match VSX register or vector_select"
+  (match_operand 0 "vsxreg_or_vec_select_operand"))
+
 ;; ISA 3.0 DS-form instruction that has the bottom 2 bits 0 and no update form.
 ;; Used by LXSD/STXSD/LXSSP/STXSSP.  In contrast to "Y", the multiple-of-four
 ;; offset is enforced for 32-bit too.

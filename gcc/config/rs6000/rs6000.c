@@ -39167,6 +39167,71 @@ rs6000_optab_supported_p (int op, machine_mode mode1, machine_mode,
       return true;
     }
 }
+
+/* Given a register or vec_select (OP), return which double word the value is
+   in for creating the mask for the xxpermdi instruction.  If GPR_P is true,
+   allow GPR registers as well as VSX registers for normal registers.  If the
+   argument is not valid for the xxpermdi instruction, return -1.  */
+
+int
+rs6000_which_dword (rtx op, bool gpr_p)
+{
+  if (!TARGET_VSX)
+    return -1;
+
+  machine_mode mode = GET_MODE (op);
+  if (mode != DFmode && mode != DImode)
+    return -1;
+
+  /* At the moment, only allow SUBREG to change type.  */
+  if (SUBREG_P (op))
+    {
+      if (SUBREG_BYTE (op) != 0)
+	return -1;
+
+      op = SUBREG_REG (op);
+      machine_mode inner_mode = GET_MODE (op);
+      if (inner_mode != DFmode && inner_mode != DImode)
+	return -1;
+    }
+
+  if (REG_P (op))
+    {
+      if (vsx_register_operand (op, mode))
+	return 0;
+
+      if (gpr_p && TARGET_POWERPC64 && TARGET_P9_VECTOR
+	  && int_reg_operand (op, mode))
+	return 0;
+
+      return -1;
+    }
+
+  if (GET_CODE (op) != VEC_SELECT)
+    return -1;
+
+  rtx vec_reg = XEXP (op, 0);
+  machine_mode vec_mode = GET_MODE (vec_reg);
+  if (!vsx_register_operand (vec_reg, vec_mode))
+    return -1;
+
+  if (vec_mode != V2DFmode && vec_mode != V2DImode)
+    return -1;
+
+  rtx selected = XEXP (op, 1);
+  if (XVECLEN (selected, 0) != 1)
+    return -1;
+
+  rtx element = XVECEXP (selected, 0, 0);
+  if (element == const0_rtx)
+    return VECTOR_ELT_ORDER_BIG ? 0 : 1;
+
+  if (element == const1_rtx)
+    return VECTOR_ELT_ORDER_BIG ? 1 : 0;
+
+  return -1;
+}
+
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

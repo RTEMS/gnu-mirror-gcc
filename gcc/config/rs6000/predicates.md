@@ -2026,3 +2026,19 @@
 
   return offsettable_nonstrict_memref_p (op);
 })
+
+;; Return true if the operand is either a REG, SUBREG or a VEC_SELECT that can
+;; feed into an XXPERMDI instruction.  If we can do MTVSRDD, allow GPRs
+;; as well as VSX registers.
+(define_predicate "reg_or_vec_select_operand"
+  (match_code "reg,subreg,vec_select")
+{
+  return IN_RANGE (rs6000_which_dword (op, true), 0, 1);
+})
+
+;; Like reg_or_vec_select_operand, but do not allow non-VSX registers
+(define_predicate "vsxreg_or_vec_select_operand"
+  (match_code "reg,subreg,vec_select")
+{
+  return IN_RANGE (rs6000_which_dword (op, false), 0, 1);
+})
