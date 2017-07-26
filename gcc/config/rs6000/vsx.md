@@ -2366,35 +2366,15 @@
 
 ;; Build a V2DF/V2DI vector from two scalars
 (define_insn "vsx_concat_<mode>"
-  [(set (match_operand:VSX_D 0 "gpc_reg_operand" "=wa,we")
+  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa,we")
 	(vec_concat:VSX_D
-	 (match_operand:<VS_scalar> 1 "reg_or_vec_select_operand" "wV,b")
-	 (match_operand:<VS_scalar> 2 "reg_or_vec_select_operand" "wV,b")))]
+	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "wa,b")
+	 (match_operand:<VS_scalar> 2 "gpc_reg_operand" "wa,b")))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
   if (which_alternative == 0)
-    {
-      int op1_dword = rs6000_which_dword (operands[1], false);
-      int op2_dword = rs6000_which_dword (operands[2], false);
-      gcc_assert (IN_RANGE (op1_dword | op2_dword, 0, 1));
+    return rs6000_emit_xxpermdi (operands, NULL_RTX, NULL_RTX);
 
-      if (GET_CODE (operands[1]) == VEC_SELECT)
-	operands[1] = XEXP (operands[1], 0);
-
-      if (GET_CODE (operands[2]) == VEC_SELECT)
-	operands[2] = XEXP (operands[2], 0);
-
-      if (VECTOR_ELT_ORDER_BIG)
-	{
-	  operands[3] = GEN_INT (op1_dword + 2*op2_dword);
-	  return "xxpermdi %x0,%x1,%x2,%3";
-	}
-      else
-	{
-	  operands[3] = GEN_INT (2*op1_dword + op2_dword);
-	  return "xxpermdi %x0,%x2,%x1,%3";
-	}
-    }
   else if (which_alternative == 1)
     return (VECTOR_ELT_ORDER_BIG
 	    ? "mtvsrdd %x0,%1,%2"
@@ -2404,6 +2384,48 @@
     gcc_unreachable ();
 }
   [(set_attr "type" "vecperm")])
+
+;; Combiner patterns to allow creating XXPERMDI's to access either double
+;; register in a vector register.  Note, rs6000_emit_xxpermdi expects
+;; operands[0..2] to be the vector registers.
+
+(define_insn "vsx_concat_<mode>_1"
+  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
+	(vec_concat:VSX_D
+	 (vec_select:<VS_scalar>
+	  (match_operand:VSX_D 1 "gpc_reg_operand" "wa")
+	  (parallel [(match_operand:QI 3 "const_0_to_1_operand" "n")]))
+	 (match_operand:<VS_scalar> 2 "gpc_reg_operand" "wa")))]
+  "VECTOR_MEM_VSX_P (<MODE>mode)"
+{
+  return rs6000_emit_xxpermdi (operands, operands[3], NULL_RTX);
+})
+
+(define_insn "vsx_concat_<mode>_2"
+  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
+	(vec_concat:VSX_D
+	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "wa")
+	 (vec_select:<VS_scalar>
+	  (match_operand:VSX_D 2 "gpc_reg_operand" "wa")
+	  (parallel [(match_operand:QI 3 "const_0_to_1_operand" "n")]))))]
+  "VECTOR_MEM_VSX_P (<MODE>mode)"
+{
+  return rs6000_emit_xxpermdi (operands, NULL_RTX, operands[3]);
+})
+
+(define_insn "*vsx_concat_<mode>_3"
+  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
+	(vec_concat:VSX_D
+	 (vec_select:<VS_scalar>
+	  (match_operand:VSX_D 1 "gpc_reg_operand" "wa")
+	  (parallel [(match_operand:QI 3 "const_0_to_1_operand" "n")]))
+	 (vec_select:<VS_scalar>
+	  (match_operand:VSX_D 2 "gpc_reg_operand" "wa")
+	  (parallel [(match_operand:QI 4 "const_0_to_1_operand" "n")]))))]
+  "VECTOR_MEM_VSX_P (<MODE>mode)"
+{
+  return rs6000_emit_xxpermdi (operands, operands[3], operands[4]);
+})
 
 ;; Special purpose concat using xxpermdi to glue two single precision values
 ;; together, relying on the fact that internally scalar floats are represented
@@ -2613,22 +2635,19 @@
    (use (match_operand:QI 3 "const_0_to_1_operand"))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
-  rtx op0 = operands[0];
-  rtx op1 = operands[1];
-  rtx op2 = operands[2];
-  int ele = INTVAL (operands[3]);
-  rtvec v = gen_rtvec (1, GEN_INT (!ele));
-  rtx p = gen_rtx_PARALLEL (VOIDmode, v);
-  rtx other = gen_rtx_VEC_SELECT (<VS_scalar>mode, op1, p);
+  rtx dest = operands[0];
+  rtx vec_reg = operands[1];
+  rtx value = operands[2];
+  rtx ele = operands[3];
 
-  if (ele == 0)
+  if (ele == const0_rtx)
     {
-      emit_insn (gen_vsx_concat_<mode> (op0, op2, other));
+      emit_insn (gen_vsx_concat_<mode>_2 (dest, value, vec_reg, const1_rtx));
       DONE;
     }
-  else if (ele == 1)
+  else if (ele == const1_rtx)
     {
-      emit_insn (gen_vsx_concat_<mode> (op0, other, op2));
+      emit_insn (gen_vsx_concat_<mode>_1 (dest, vec_reg, value, const0_rtx));
       DONE;
     }
   else

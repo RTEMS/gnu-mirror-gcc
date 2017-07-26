@@ -39168,68 +39168,35 @@ rs6000_optab_supported_p (int op, machine_mode mode1, machine_mode,
     }
 }
 
-/* Given a register or vec_select (OP), return which double word the value is
-   in for creating the mask for the xxpermdi instruction.  If GPR_P is true,
-   allow GPR registers as well as VSX registers for normal registers.  If the
-   argument is not valid for the xxpermdi instruction, return -1.  */
+
+/* Emit a XXPERMDI instruction that can extract from either double word of the
+   two arguments.  ELEMENT1 and ELEMENT2 are either NULL or they are 0/1 giving
+   which double word to be used for the operand.  */
 
-int
-rs6000_which_dword (rtx op, bool gpr_p)
+char *
+rs6000_emit_xxpermdi (rtx operands[], rtx element1, rtx element2)
 {
-  if (!TARGET_VSX)
-    return -1;
+  int op1_dword = (!element1) ? 0 : INTVAL (element1);
+  int op2_dword = (!element2) ? 0 : INTVAL (element2);
 
-  machine_mode mode = GET_MODE (op);
-  if (mode != DFmode && mode != DImode)
-    return -1;
+  gcc_assert (IN_RANGE (op1_dword | op2_dword, 0, 1));
 
-  /* At the moment, only allow SUBREG to change type.  */
-  if (SUBREG_P (op))
+  if (VECTOR_ELT_ORDER_BIG)
     {
-      if (SUBREG_BYTE (op) != 0)
-	return -1;
-
-      op = SUBREG_REG (op);
-      machine_mode inner_mode = GET_MODE (op);
-      if (inner_mode != DFmode && inner_mode != DImode)
-	return -1;
+      operands[3] = GEN_INT (op1_dword + 2*op2_dword);
+      return "xxpermdi %x0,%x1,%x2,%3";
     }
-
-  if (REG_P (op))
+  else
     {
-      if (vsx_register_operand (op, mode))
-	return 0;
+      if (element1)
+	op1_dword = 1 - op1_dword;
 
-      if (gpr_p && TARGET_POWERPC64 && TARGET_P9_VECTOR
-	  && int_reg_operand (op, mode))
-	return 0;
+      if (element2)
+	op2_dword = 1 - op2_dword;
 
-      return -1;
+      operands[3] = GEN_INT (2*op1_dword + op2_dword);
+      return "xxpermdi %x0,%x2,%x1,%3";
     }
-
-  if (GET_CODE (op) != VEC_SELECT)
-    return -1;
-
-  rtx vec_reg = XEXP (op, 0);
-  machine_mode vec_mode = GET_MODE (vec_reg);
-  if (!vsx_register_operand (vec_reg, vec_mode))
-    return -1;
-
-  if (vec_mode != V2DFmode && vec_mode != V2DImode)
-    return -1;
-
-  rtx selected = XEXP (op, 1);
-  if (XVECLEN (selected, 0) != 1)
-    return -1;
-
-  rtx element = XVECEXP (selected, 0, 0);
-  if (element == const0_rtx)
-    return VECTOR_ELT_ORDER_BIG ? 0 : 1;
-
-  if (element == const1_rtx)
-    return VECTOR_ELT_ORDER_BIG ? 1 : 0;
-
-  return -1;
 }
 
 

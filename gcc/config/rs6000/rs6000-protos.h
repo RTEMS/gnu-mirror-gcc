@@ -233,8 +233,7 @@ extern void rs6000_asm_output_dwarf_pcrel (FILE *file, int size,
 					   const char *label);
 extern void rs6000_asm_output_dwarf_datarel (FILE *file, int size,
 					     const char *label);
-
-extern int rs6000_which_dword (rtx, bool);
+extern char *rs6000_emit_xxpermdi (rtx[], rtx, rtx);
 
 /* Declare functions in rs6000-c.c */
 
