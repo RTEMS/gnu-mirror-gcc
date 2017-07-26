@@ -1,3 +1,82 @@
+2017-07-26  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	* config/sparc/sparc.c (dump_target_flag_bits): Dump MASK_FSMULD.
+	(sparc_option_override): Honour MASK_FSMULD.
+	* config/sparc/sparc.h (MASK_FEATURES): Add MASK_FSMULD.
+	* config/sparc/sparc.md (muldf3_extend): Use TARGET_FSMULD.
+	* config/sparc/sparc.opt (mfsmuld): New option.
+	* doc/invoke.texi (mfsmuld): Document option.
+
+2017-07-26  Marek Polacek  <polacek@redhat.com>
+
+	PR middle-end/70992
+	* tree.c (build2_stat): Don't set TREE_CONSTANT on divisions by zero.
+
+2017-07-26  Richard Biener  <rguenther@suse.de>
+
+	* gimple-match-head.c (do_valueize): Return OP if valueize
+	returns NULL_TREE.
+	(get_def): New helper to get at the def stmt of a SSA name
+	if valueize allows.
+	* genmatch.c (dt_node::gen_kids_1): Use get_def instead of
+	do_valueize to get at the def stmt.
+	(dt_operand::gen_gimple_expr): Simplify do_valueize calls.
+
+2017-07-26  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	PR middle-end/46932
+	* auto-inc-dec.c (parse_add_or_inc): Block autoinc on sfp.
+
+2017-07-26  Martin Liska  <mliska@suse.cz>
+
+	PR sanitize/81186
+	* function.c (expand_function_start): Make expansion of
+	nonlocal_goto_save_area after parm_birth_insn.
+
+2017-07-26  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	* config/sparc/sparc.c (sparc_option_override): Remove MASK_FPU
+	from all CPU target flags enable members.
+
+2017-07-26  Richard Biener  <rguenther@suse.de>
+
+	* genmatch.c (dt_simplify::gen): Make iterator vars const.
+	(decision_tree::gen): Make 'type' const.
+	(write_predicate): Likewise.
+
+2017-07-24  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_init_hard_regno_mode_ok):
+	Eliminate TARGET_UPPER_REGS_{DF,DI,SF} usage.
+	(rs6000_option_override_internal): Likewise.
+	(rs6000_expand_vector_set): Likewise.
+	* config/rs6000/rs6000.h (TARGET_UPPER_REGS_DF): Delete.
+	(TARGET_UPPER_REGS_SF): Likewise.
+	(TARGET_UPPER_REGS_DI): Likewise.
+	(TARGET_VEXTRACTUB): Eliminate TARGET_UPPER_REGS_{DF,DI,SF}.
+	(TARGET_DIRECT_MOVE_64BIT): Likewise.
+	* config/rs6000/rs6000.md (ALTIVEC_DFORM): Likewise.
+	(float<QHI:mode><FP_ISA3:mode>2_internal): Likewise.
+	(Splitters for DI constants in Altivec registers): Likewise.
+	* config/rs6000/vsx.md (vsx_set_<mode>_p9): Likewise.
+	(vsx_set_v4sf_p9): Likewise.
+	(vsx_set_v4sf_p9_zero): Likewise.
+	(vsx_insert_extract_v4sf_p9): Likewise.
+	(vsx_insert_extract_v4sf_p9_2): Likewise.
+
+2017-07-25  Carl Love  <cel@us.ibm.com>
+
+	* doc/extend.texi: Update the built-in documentation file for the
+	existing built-in functions
+	vector signed char vec_cnttz (vector signed char);
+	vector unsigned char vec_cnttz (vector unsigned char);
+	vector signed short vec_cnttz (vector signed short);
+	vector unsigned short vec_cnttz (vector unsigned short);
+	vector signed int vec_cnttz (vector signed int);
+	vector unsigned int vec_cnttz (vector unsigned int);
+	vector signed long long vec_cnttz (vector signed long long);
+	vector unsigned long long vec_cnttz (vector unsigned long long);
+
 2017-07-25  Andrew Pinski  <apinski@cavium.com>
 
 	* tree-ssa-uninit.c (warn_uninitialized_vars): Don't warn about memory

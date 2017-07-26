@@ -1,3 +1,39 @@
+2017-07-26  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	PR target/79041
+	* gcc.target/aarch64/pr79041-2.c: Don't run in ILP32.
+
+2017-07-26  Marek Polacek  <polacek@redhat.com>
+
+	PR middle-end/70992
+	* gcc.dg/overflow-warn-1.c: Adjust dg-error.
+	* gcc.dg/overflow-warn-2.c: Likewise.
+	* gcc.dg/overflow-warn-3.c: Likewise.
+	* gcc.dg/overflow-warn-4.c: Likewise.
+	* gcc.dg/torture/pr70992-2.c: New test.
+	* gcc.dg/torture/pr70992.c: New test.
+
+2017-07-26  Richard Biener  <rguenther@suse.de>
+
+	* gcc/testsuite/gcc.dg/pr70920-2.c: Adjust for transform already
+	happening in ccp1.
+	* gcc/testsuite/gcc.dg/pr70920-4.c: Likewise.
+
+2017-07-26  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	PR middle-end/46932
+	* gcc.dg/pr46932.c: New testcase.
+
+2017-07-26  Martin Liska  <mliska@suse.cz>
+
+	PR sanitize/81186
+	* gcc.dg/asan/pr81186.c: New test.
+
+2017-07-25  Carl Love  <cel@us.ibm.com>
+
+	* gcc.target/powerpc/builtins-4-p9-runnable.c:  Add test file for
+	vec_cnttz builtins.
+
 2017-07-25 Eric Botcazou  <ebotcazou@adacore.com>
 
 	* gnat.dg/opt66.adb: New test.
