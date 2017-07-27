@@ -2389,7 +2389,7 @@
 ;; register in a vector register.  Note, rs6000_emit_xxpermdi expects
 ;; operands[0..2] to be the vector registers.
 
-(define_insn "vsx_concat_<mode>_1"
+(define_insn "*vsx_concat_<mode>_1"
   [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
 	(vec_concat:VSX_D
 	 (vec_select:<VS_scalar>
@@ -2401,7 +2401,7 @@
   return rs6000_emit_xxpermdi (operands, operands[3], NULL_RTX);
 })
 
-(define_insn "vsx_concat_<mode>_2"
+(define_insn "*vsx_concat_<mode>_2"
   [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
 	(vec_concat:VSX_D
 	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "wa")
@@ -2627,7 +2627,7 @@
   DONE;
 })
 
-;; Set the element of a V2DI/VD2F mode
+;; Rewrite V2DF/V2DI set in terms of VEC_CONCAT
 (define_expand "vsx_set_<mode>"
   [(use (match_operand:VSX_D 0 "vsx_register_operand"))
    (use (match_operand:VSX_D 1 "vsx_register_operand"))
@@ -2639,15 +2639,18 @@
   rtx vec_reg = operands[1];
   rtx value = operands[2];
   rtx ele = operands[3];
+  rtx tmp = gen_reg_rtx (<VS_scalar>mode);
 
   if (ele == const0_rtx)
     {
-      emit_insn (gen_vsx_concat_<mode>_2 (dest, value, vec_reg, const1_rtx));
+      emit_insn (gen_vsx_extract_<mode> (tmp, vec_reg, const1_rtx));
+      emit_insn (gen_vsx_concat_<mode> (dest, value, tmp));
       DONE;
     }
   else if (ele == const1_rtx)
     {
-      emit_insn (gen_vsx_concat_<mode>_1 (dest, vec_reg, value, const0_rtx));
+      emit_insn (gen_vsx_extract_<mode> (tmp, vec_reg, const0_rtx));
+      emit_insn (gen_vsx_concat_<mode> (dest, tmp, value));
       DONE;
     }
   else
