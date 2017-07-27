@@ -39181,9 +39181,9 @@ rs6000_emit_xxpermdi (rtx operands[], rtx element1, rtx element2)
 
   gcc_assert (IN_RANGE (op1_dword | op2_dword, 0, 1));
 
-  if (VECTOR_ELT_ORDER_BIG)
+  if (BYTES_BIG_ENDIAN)
     {
-      operands[3] = GEN_INT (op1_dword + 2*op2_dword);
+      operands[3] = GEN_INT (2*op1_dword + op2_dword);
       return "xxpermdi %x0,%x1,%x2,%3";
     }
   else
@@ -39194,7 +39194,7 @@ rs6000_emit_xxpermdi (rtx operands[], rtx element1, rtx element2)
       if (element2)
 	op2_dword = 1 - op2_dword;
 
-      operands[3] = GEN_INT (2*op1_dword + op2_dword);
+      operands[3] = GEN_INT (op1_dword + 2*op2_dword);
       return "xxpermdi %x0,%x2,%x1,%3";
     }
 }

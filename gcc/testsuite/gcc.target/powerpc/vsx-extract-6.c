@@ -9,7 +9,7 @@ test_vpasted (vector unsigned long high, vector unsigned long low)
   vector unsigned long res;
   res[1] = high[1];
   res[0] = low[0];
-  return (res);
+  return res;
 }
 
 /* { dg-final { scan-assembler-times {\mxxpermdi\M} 1 } } */
