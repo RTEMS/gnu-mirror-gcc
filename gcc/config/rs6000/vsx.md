@@ -2426,6 +2426,77 @@
   return rs6000_emit_xxpermdi (operands, operands[3], operands[4]);
 })
 
+;; Combiner pattern for storing CONCAT to memory
+(define_insn_and_split "*vsx_concat_<VSX_D:mode>_store_<P:mode>"
+  [(set (match_operand:VSX_D 0 "memory_operand" "=m,m,m,m")
+	(vec_concat:VSX_D
+	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "wa,wa, r,r")
+	 (match_operand:<VS_scalar> 2 "gpc_reg_operand" "wa, r,wa,r")))
+   (clobber (match_scratch:P 3 "=b,&b,&b,&b"))]
+  "VECTOR_MEM_VSX_P (<MODE>mode)"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  rtx mem = operands[0];
+  rtx addr = XEXP (mem, 0);
+  rtx hi = operands[1];
+  rtx lo = operands[2];
+  rtx tmp = operands[3];
+  machine_mode smode = <VS_scalar>mode;
+  rtx mem_hi, mem_lo;
+
+  if (!BYTES_BIG_ENDIAN)
+    std::swap (hi, lo);
+
+  /* See if we can use simple d-form addressing on ISA 2.06 (power7) and
+     ISA 2.07 (power8).  With ISA 3.0, we have d-form vector addresses
+     and d-form altivec register saves, so rs6000_adjust_vec_address
+     will fold this into the addressing.  If we can't use simple addressing,
+     fall back, and create two separate addresses with our base register.  */
+  if (!TARGET_P9_VECTOR
+      && (fpr_reg_operand (hi, smode)
+	  || (TARGET_POWERPC64 && int_reg_operand (hi, smode)))
+      && (fpr_reg_operand (lo, smode)
+	  || (TARGET_POWERPC64 && int_reg_operand (lo, smode))))
+    {
+      mem_hi = mem_lo = NULL_RTX;
+      if (REG_P (addr))
+	{
+	  mem_hi = adjust_address (mem, smode, 0);
+	  mem_lo = adjust_address (mem, smode, 8);
+	}
+      else if (GET_CODE (addr) == PLUS)
+	{
+	  rtx addr0 = XEXP (addr, 0);
+	  rtx addr1 = XEXP (addr, 1);
+	  if (REG_P (addr0) && REG_P (addr1))
+	    {
+	      rtx plus8 = gen_rtx_PLUS (Pmode, tmp, GEN_INT (8));
+	      emit_insn (gen_add3_insn (tmp, addr0, addr1));
+	      mem_hi = change_address (mem, smode, tmp);
+	      mem_lo = change_address (mem, smode, plus8);
+	    }
+	}
+
+      if (mem_hi && mem_lo)
+	{
+	  emit_move_insn (mem_hi, hi);
+	  emit_move_insn (mem_lo, lo);
+	  DONE;
+	}
+    }
+
+  mem_hi = rs6000_adjust_vec_address (hi, mem, const0_rtx, tmp, smode);
+  emit_move_insn (mem_hi, hi);
+
+  mem_lo = rs6000_adjust_vec_address (lo, mem, const1_rtx, tmp, smode);
+  emit_move_insn (mem_lo, lo);
+  DONE;
+}
+  [(set_attr "type" "fpstore,store,fpstore,store")
+   (set_attr "length" "16")])
+
 ;; Special purpose concat using xxpermdi to glue two single precision values
 ;; together, relying on the fact that internally scalar floats are represented
 ;; as doubles.  This is used to initialize a V4SF vector with 4 floats
