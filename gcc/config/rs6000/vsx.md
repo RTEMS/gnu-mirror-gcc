@@ -2443,10 +2443,11 @@
   rtx hi = operands[1];
   rtx lo = operands[2];
   rtx tmp = operands[3];
-  machine_mode smode = <VS_scalar>mode;
+  machine_mode smode = <VSX_D:VS_scalar>mode;
   rtx mem_hi, mem_lo;
 
-  if (!BYTES_BIG_ENDIAN)
+  /* We need to swap words for -maltivec=be.  */
+  if (!BYTES_BIG_ENDIAN && VECTOR_ELT_ORDER_BIG)
     std::swap (hi, lo);
 
   /* See if we can use simple d-form addressing on ISA 2.06 (power7) and
