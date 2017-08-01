@@ -39009,22 +39009,41 @@ rs6000_optab_supported_p (int op, machine_mode mode1, machine_mode,
 }
 
 
-/* Emit a XXPERMDI instruction that can extract from either double word of the
-   two arguments.  ELEMENT1 and ELEMENT2 are either NULL or they are 0/1 giving
-   which double word to be used for the operand.  */
+/* Output a xxpermdi instruction that sets a 128-bit vector DEST combining two
+   inputs SRC1 and SRC2.
+
+   If ELEMENT1 is null, use the top 64-bit double word of ARG1.  If it is
+   non-NULL, it is a 0 or 1 constant that gives the vector element number to
+   use for extracting the 64-bit double word from ARG1.
+
+   If ELEMENT2 is null, use the top 64-bit double word of ARG2.  If it is
+   non-NULL, it is a 0 or 1 constant that gives the vector element number to
+   use for extracting the 64-bit double word from ARG2.
+
+   The element number is based on the user element ordering, set by the
+   endianess and by the -maltivec={le,be} options.  */
 
 const char *
-rs6000_output_xxpermdi (rtx operands[], rtx element1, rtx element2)
+rs6000_output_xxpermdi (rtx dest,
+			rtx src1,
+			rtx src2,
+			rtx element1,
+			rtx element2)
 {
   int op1_dword = (!element1) ? 0 : INTVAL (element1);
   int op2_dword = (!element2) ? 0 : INTVAL (element2);
+  rtx xops[10];
+  const char *insn_string;
 
   gcc_assert (IN_RANGE (op1_dword | op2_dword, 0, 1));
+  xops[0] = dest;
+  xops[1] = src1;
+  xops[2] = src2;
 
   if (BYTES_BIG_ENDIAN)
     {
-      operands[3] = GEN_INT (2*op1_dword + op2_dword);
-      return "xxpermdi %x0,%x1,%x2,%3";
+      xops[3] = GEN_INT (2*op1_dword + op2_dword);
+      insn_string = "xxpermdi %x0,%x1,%x2,%3";
     }
   else
     {
@@ -39034,9 +39053,12 @@ rs6000_output_xxpermdi (rtx operands[], rtx element1, rtx element2)
       if (element2)
 	op2_dword = 1 - op2_dword;
 
-      operands[3] = GEN_INT (op1_dword + 2*op2_dword);
-      return "xxpermdi %x0,%x2,%x1,%3";
+      xops[3] = GEN_INT (op1_dword + 2*op2_dword);
+      insn_string = "xxpermdi %x0,%x2,%x1,%3";
     }
+
+  output_asm_insn (insn_string, xops);
+  return "";
 }
 
 
