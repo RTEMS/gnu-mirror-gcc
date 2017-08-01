@@ -39014,7 +39014,7 @@ rs6000_optab_supported_p (int op, machine_mode mode1, machine_mode,
    which double word to be used for the operand.  */
 
 const char *
-rs6000_emit_xxpermdi (rtx operands[], rtx element1, rtx element2)
+rs6000_output_xxpermdi (rtx operands[], rtx element1, rtx element2)
 {
   int op1_dword = (!element1) ? 0 : INTVAL (element1);
   int op2_dword = (!element2) ? 0 : INTVAL (element2);

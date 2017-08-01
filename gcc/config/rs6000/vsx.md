@@ -2371,7 +2371,7 @@
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
   if (which_alternative == 0)
-    return rs6000_emit_xxpermdi (operands, NULL_RTX, NULL_RTX);
+    return rs6000_output_xxpermdi (operands, NULL_RTX, NULL_RTX);
 
   else if (which_alternative == 1)
     return (VECTOR_ELT_ORDER_BIG
@@ -2384,7 +2384,7 @@
   [(set_attr "type" "vecperm")])
 
 ;; Combiner patterns to allow creating XXPERMDI's to access either double
-;; register in a vector register.  Note, rs6000_emit_xxpermdi expects
+;; register in a vector register.  Note, rs6000_output_xxpermdi expects
 ;; operands[0..2] to be the vector registers.
 (define_insn "*vsx_concat_<mode>_1"
   [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
@@ -2395,7 +2395,7 @@
 	 (match_operand:<VS_scalar> 2 "gpc_reg_operand" "wa")))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
-  return rs6000_emit_xxpermdi (operands, operands[3], NULL_RTX);
+  return rs6000_output_xxpermdi (operands, operands[3], NULL_RTX);
 })
 
 (define_insn "*vsx_concat_<mode>_2"
@@ -2407,7 +2407,7 @@
 	  (parallel [(match_operand:QI 3 "const_0_to_1_operand" "n")]))))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
-  return rs6000_emit_xxpermdi (operands, NULL_RTX, operands[3]);
+  return rs6000_output_xxpermdi (operands, NULL_RTX, operands[3]);
 })
 
 (define_insn "*vsx_concat_<mode>_3"
@@ -2421,7 +2421,7 @@
 	  (parallel [(match_operand:QI 4 "const_0_to_1_operand" "n")]))))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
-  return rs6000_emit_xxpermdi (operands, operands[3], operands[4]);
+  return rs6000_output_xxpermdi (operands, operands[3], operands[4]);
 })
 
 ;; Special purpose concat using xxpermdi to glue two single precision values
