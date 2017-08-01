@@ -1,3 +1,9 @@
+2017-07-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/81593
+	* gcc.target/powerpc/vsx-extract-6.c: New test.
+	* gcc.target/powerpc/vsx-extract-7.c: Likewise.
+
 2017-08-01   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 250793

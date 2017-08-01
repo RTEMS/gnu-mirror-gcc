@@ -2364,19 +2364,17 @@
 
 ;; Build a V2DF/V2DI vector from two scalars
 (define_insn "vsx_concat_<mode>"
-  [(set (match_operand:VSX_D 0 "gpc_reg_operand" "=<VSa>,we")
+  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa,we")
 	(vec_concat:VSX_D
-	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "<VS_64reg>,b")
-	 (match_operand:<VS_scalar> 2 "gpc_reg_operand" "<VS_64reg>,b")))]
+	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "wa,b")
+	 (match_operand:<VS_scalar> 2 "gpc_reg_operand" "wa,b")))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
   if (which_alternative == 0)
-    return (BYTES_BIG_ENDIAN
-	    ? "xxpermdi %x0,%x1,%x2,0"
-	    : "xxpermdi %x0,%x2,%x1,0");
+    return rs6000_emit_xxpermdi (operands, NULL_RTX, NULL_RTX);
 
   else if (which_alternative == 1)
-    return (BYTES_BIG_ENDIAN
+    return (VECTOR_ELT_ORDER_BIG
 	    ? "mtvsrdd %x0,%1,%2"
 	    : "mtvsrdd %x0,%2,%1");
 
@@ -2384,6 +2382,47 @@
     gcc_unreachable ();
 }
   [(set_attr "type" "vecperm")])
+
+;; Combiner patterns to allow creating XXPERMDI's to access either double
+;; register in a vector register.  Note, rs6000_emit_xxpermdi expects
+;; operands[0..2] to be the vector registers.
+(define_insn "*vsx_concat_<mode>_1"
+  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
+	(vec_concat:VSX_D
+	 (vec_select:<VS_scalar>
+	  (match_operand:VSX_D 1 "gpc_reg_operand" "wa")
+	  (parallel [(match_operand:QI 3 "const_0_to_1_operand" "n")]))
+	 (match_operand:<VS_scalar> 2 "gpc_reg_operand" "wa")))]
+  "VECTOR_MEM_VSX_P (<MODE>mode)"
+{
+  return rs6000_emit_xxpermdi (operands, operands[3], NULL_RTX);
+})
+
+(define_insn "*vsx_concat_<mode>_2"
+  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
+	(vec_concat:VSX_D
+	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "wa")
+	 (vec_select:<VS_scalar>
+	  (match_operand:VSX_D 2 "gpc_reg_operand" "wa")
+	  (parallel [(match_operand:QI 3 "const_0_to_1_operand" "n")]))))]
+  "VECTOR_MEM_VSX_P (<MODE>mode)"
+{
+  return rs6000_emit_xxpermdi (operands, NULL_RTX, operands[3]);
+})
+
+(define_insn "*vsx_concat_<mode>_3"
+  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
+	(vec_concat:VSX_D
+	 (vec_select:<VS_scalar>
+	  (match_operand:VSX_D 1 "gpc_reg_operand" "wa")
+	  (parallel [(match_operand:QI 3 "const_0_to_1_operand" "n")]))
+	 (vec_select:<VS_scalar>
+	  (match_operand:VSX_D 2 "gpc_reg_operand" "wa")
+	  (parallel [(match_operand:QI 4 "const_0_to_1_operand" "n")]))))]
+  "VECTOR_MEM_VSX_P (<MODE>mode)"
+{
+  return rs6000_emit_xxpermdi (operands, operands[3], operands[4]);
+})
 
 ;; Special purpose concat using xxpermdi to glue two single precision values
 ;; together, relying on the fact that internally scalar floats are represented
@@ -2585,25 +2624,35 @@
   DONE;
 })
 
-;; Set the element of a V2DI/VD2F mode
-(define_insn "vsx_set_<mode>"
-  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wd,?<VSa>")
-	(unspec:VSX_D
-	 [(match_operand:VSX_D 1 "vsx_register_operand" "wd,<VSa>")
-	  (match_operand:<VS_scalar> 2 "vsx_register_operand" "<VS_64reg>,<VSa>")
-	  (match_operand:QI 3 "u5bit_cint_operand" "i,i")]
-	 UNSPEC_VSX_SET))]
+;; Rewrite V2DF/V2DI set in terms of VEC_CONCAT
+(define_expand "vsx_set_<mode>"
+  [(use (match_operand:VSX_D 0 "vsx_register_operand"))
+   (use (match_operand:VSX_D 1 "vsx_register_operand"))
+   (use (match_operand:<VS_scalar> 2 "gpc_reg_operand"))
+   (use (match_operand:QI 3 "const_0_to_1_operand"))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
-  int idx_first = BYTES_BIG_ENDIAN ? 0 : 1;
-  if (INTVAL (operands[3]) == idx_first)
-    return \"xxpermdi %x0,%x2,%x1,1\";
-  else if (INTVAL (operands[3]) == 1 - idx_first)
-    return \"xxpermdi %x0,%x1,%x2,0\";
+  rtx dest = operands[0];
+  rtx vec_reg = operands[1];
+  rtx value = operands[2];
+  rtx ele = operands[3];
+  rtx tmp = gen_reg_rtx (<VS_scalar>mode);
+
+  if (ele == const0_rtx)
+    {
+      emit_insn (gen_vsx_extract_<mode> (tmp, vec_reg, const1_rtx));
+      emit_insn (gen_vsx_concat_<mode> (dest, value, tmp));
+      DONE;
+    }
+  else if (ele == const1_rtx)
+    {
+      emit_insn (gen_vsx_extract_<mode> (tmp, vec_reg, const0_rtx));
+      emit_insn (gen_vsx_concat_<mode> (dest, tmp, value));
+      DONE;
+    }
   else
     gcc_unreachable ();
-}
-  [(set_attr "type" "vecperm")])
+})
 
 ;; Extract a DF/DI element from V2DF/V2DI
 ;; Optimize cases were we can do a simple or direct move.

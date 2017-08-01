@@ -1,3 +1,21 @@
+2017-07-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/81593
+	* config/rs6000/rs6000-protos.h (rs6000_emit_xxpermdi): New
+	declaration.
+	* config/rs6000/rs6000.c (rs6000_emit_xxpermdi): New function to
+	emit XXPERMDI accessing either double word in either vector
+	register inputs.
+	* config/rs6000/vsx.md (vsx_concat_<mode>, VSX_D iterator):
+	Rewrite VEC_CONCAT insn to call rs6000_emit_xxpermdi.  Simplify
+	the constraints with the removal of the -mupper-regs-* switches.
+	(vsx_concat_<mode>_1): New combiner insns to optimize CONCATs
+	where either register might have come from VEC_SELECT.
+	(vsx_concat_<mode>_2): Likewise.
+	(vsx_concat_<mode>_3): Likewise.
+	(vsx_set_<mode>, VSX_D iterator): Rewrite insn to generate a
+	VEC_CONCAT rather than use an UNSPEC to specify the option.
+
 2017-08-01   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 250793
