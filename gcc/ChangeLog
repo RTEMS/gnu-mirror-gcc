@@ -1,3 +1,126 @@
+2017-08-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/81621
+	* bb-reorder.c (pass_partition_blocks::execute): Return TODO_df_finish
+	after setting changeable df flags.
+
+2017-08-03  Richard Biener  <rguenther@suse.de>
+
+	* tree-ssa-reassoc.c (should_break_up_subtract): Also break
+	up if the use is in USE - X.
+
+2017-08-03  Alexander Monakov  <amonakov@ispras.ru>
+
+	* toplev.c (dumpfile.h): New include.
+	(internal_error_reentered): New static function.  Use it...
+	(internal_error_function): ...here to handle reentered internal_error.
+
+2017-08-03  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/81148
+	* fold-const.c (split_tree): Add minus_var and minus_con
+	arguments, remove unused loc arg.  Never generate NEGATE_EXPRs
+	here but always use minus_*.
+	(associate_trees): Assert we never associate with MINUS_EXPR
+	and NULL first operand.  Do not recurse for PLUS_EXPR operands
+	when associating as MINUS_EXPR either.
+	(fold_binary_loc): Track minus_var and minus_con.
+
+2017-08-03  Tom de Vries  <tom@codesourcery.com>
+
+	PR lto/81430
+	* tree-streamer-in.c (lto_input_ts_function_decl_tree_pointers): If
+	ACCEL_COMPILER, apply finish_options on
+	DECL_FUNCTION_SPECIFIC_OPTIMIZATION.
+
+2017-08-03  Tom de Vries  <tom@codesourcery.com>
+
+	PR target/81662
+	* config/nvptx/nvptx.c (nvptx_option_override): Emit sorry if
+	function_entry_patch_area_size > 0.
+
+2017-08-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR driver/81650
+	* calls.c (alloc_max_size): Use HOST_WIDE_INT_UC (10??)
+	instead of 10??LU, perform unit multiplication in wide_int,
+	don't change alloc_object_size_limit if the limit is larger
+	than SSIZE_MAX.
+
+	PR tree-optimization/81655
+	PR tree-optimization/81588
+	* tree-ssa-reassoc.c (optimize_range_tests_var_bound): Handle also
+	the case when ranges[i].low and high are 1 for unsigned type with
+	precision 1.
+
+	PR middle-end/81052
+	* omp-low.c (diagnose_sb_0): Handle flag_openmp_simd like flag_openmp.
+	(pass_diagnose_omp_blocks::gate): Enable also for flag_openmp_simd.
+
+2017-08-03  Prathamesh Kulkarni  <prathamesh.kulkarni@linaro.org>
+
+	* tree-vrp.h: Add include guard.
+
+2017-08-02  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/81644
+	* config/i386/i386.md (unspecv): Add UNSPECV_UD2.
+	(ud2): New insn pattern.
+	* config/i386/i386.c (ix86_expand_epilogue):
+	For naked functions, generate ud2 instead of trap insn.
+
+2017-08-02  Marek Polacek  <polacek@redhat.com>
+
+	PR other/81667
+	* alloc-pool.h (base_pool_allocator): Initialize m_elt_size.
+
+2017-08-02  Tom de Vries  <tom@codesourcery.com>
+	    Cesar Philippidis  <cesar@codesourcery.com>
+
+	* config/nvptx/nvptx.c (nvptx_lockless_update, nvptx_lockfull_update):
+	Add missing edge probabilities.
+
+2017-08-02  Tamar Christina  <tamar.christina@arm.com>
+
+	* config/aarch64/aarch64.c (aarch64_reinterpret_float_as_int):
+	Correct endianness.
+
+2017-08-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/79499
+	* function.c (thread_prologue_and_epilogue_insns): Determine blocks
+	for find_many_sub_basic_blocks bitmap by looking up BLOCK_FOR_INSN
+	of first NONDEBUG_INSN_P in each of the split_prologue_seq and
+	prologue_seq sequences - if any.
+
+2017-08-02  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-stmts.c (vectorizable_store): Perform vector extracts
+	via vectors if supported, integer extracts via punning if supported
+	or otherwise vector extracts.
+
+2017-08-02  Richard Biener  <rguenther@suse.de>
+
+	* tree-ssa-pre.c (bitmap_insert_into_set_1): Remove and inline
+	into ...
+	(bitmap_insert_into_set): ... this.
+
+2017-08-02  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/81633
+	Revert
+	2015-08-17  Alan Hayward  <alan.hayward@arm.com>
+
+	PR tree-optimization/71752
+	* tree-vect-slp.c (vect_get_slp_defs): Handle null operands.
+
+2017-08-01  Daniel Santos  <daniel.santos@pobox.com>
+
+	* config/i386/i386.h (ix86_frame::outlined_save_offset): Remove field.
+	(machine_function::call_ms2sysv_pad_out): Remove field.
+	* config/i386/i386.c (xlogue_layout::get_stack_space_used): Modify.
+	(ix86_compute_frame_layout): Likewise.
+
 2017-08-01  H.J. Lu  <hongjiu.lu@intel.com>
 
 	PR target/81654
@@ -47,8 +170,8 @@
 	calls.
 
 2017-08-01  Jerome Lambourg  <lambourg@adacore.com>
-            Doug Rupp  <rupp@adacore.com>
-            Olivier Hainque  <hainque@adacore.com>
+	    Doug Rupp  <rupp@adacore.com>
+	    Olivier Hainque  <hainque@adacore.com>
 
 	* config.gcc (arm-wrs-vxworks*): Rework to handle arm-wrs-vxworks7 as
 	well as arm-wrs-vxworks. Update target_cpu_name from arm6 (arch v3) to

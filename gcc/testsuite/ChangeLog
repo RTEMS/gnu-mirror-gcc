@@ -1,3 +1,100 @@
+2017-08-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/81621
+	* gcc.dg/pr81621.c: New test.
+
+2017-08-03  Richard Biener  <rguenther@suse.de>
+
+	* gcc.dg/tree-ssa/reassoc-23.c: Adjust to fool early folding
+	and CSE.
+
+2017-08-03  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/81148
+	* c-c++-common/ubsan/pr81148.c: New testcase.
+
+2017-08-03  Tom de Vries  <tom@codesourcery.com>
+
+	PR target/81662
+	* gcc.target/nvptx/patchable_function_entry-default.c: New test.
+
+2017-08-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR driver/81650
+	* gcc.dg/pr81650.c: New test.
+
+2017-08-03  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/71440
+	* g++.dg/template/crash127.C: New.
+
+2017-08-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/81052
+	* c-c++-common/pr81052.c: New test.
+
+2017-08-03  Tom de Vries  <tom@codesourcery.com>
+
+	* gcc.dg/pr56727-2.c: Require alias.
+
+2017-08-03  Tom de Vries  <tom@codesourcery.com>
+
+	* gcc.dg/attr-noipa.c: Require alloca.
+
+2017-08-03  Tom de Vries  <tom@codesourcery.com>
+
+	* gcc.dg/torture/pr80163.c: Require label_values.
+
+2017-08-03  Tom de Vries  <tom@codesourcery.com>
+
+	PR target/81662
+	* c-c++-common/patchable_function_entry-decl.c: Skip for nvptx.
+	* c-c++-common/patchable_function_entry-default.c: Same.
+	* c-c++-common/patchable_function_entry-definition.c: Same.
+
+2017-08-02  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/81644
+	* gcc.target/i386/pr81644.c: New test.
+
+2017-08-02  Tom de Vries  <tom@codesourcery.com>
+
+	* gcc.dg/Walloca-14.c: Use relative line number.
+
+2017-08-02  Uros Bizjak  <ubizjak@gmail.com>
+
+	* gcc.target/i386/funcspec-56.inc (no_3dnowa): Properly
+	test "no-3dnowa" target attribute.
+
+2017-08-02  Marek Polacek  <polacek@redhat.com>
+
+	PR c/81289
+	* gcc.dg/noncompile/pr81289.c: New test.
+
+	PR c/81448
+	PR c/81306
+	* c-c++-common/Wmultistatement-macros-13.c: New test.
+
+2017-08-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/81640
+	* g++.dg/warn/Wshadow-compatible-local-2.C: New test.
+
+	PR middle-end/79499
+	* gcc.dg/pr79499.c: New test.
+
+2017-08-02  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/81633
+	* gcc.dg/vect/pr81633.c: New testcase.
+
+2017-08-01  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* gcc.dg/guality/pr25967-1.c: New test.
+	* gcc.dg/guality/pr25967-2.c: Likewise.
+	* gcc.dg/torture/pr25967-1.c: Likewise.
+	* gcc.dg/torture/pr25967-2.c: Likewise.
+
 2017-08-01  H.J. Lu  <hongjiu.lu@intel.com>
 
 	PR target/81654

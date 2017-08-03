@@ -1,3 +1,15 @@
+2017-08-03  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/71440
+	* typeck.c (build_x_unary_op): Avoid pretty-printing constructor /
+	destructor as expressions.
+
+2017-08-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/81640
+	* call.c (build_user_type_conversion_1): Only call
+	lookup_fnfields_slot if totype is CLASS_TYPE_P.
+
 2017-07-31  Jason Merrill  <jason@redhat.com>
 
 	* decl.c (declare_global_var): Set DECL_CONTEXT.

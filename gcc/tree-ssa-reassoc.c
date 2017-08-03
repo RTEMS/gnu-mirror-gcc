@@ -2918,11 +2918,22 @@ optimize_range_tests_var_bound (enum tree_code opcode, int first, int length,
 
   for (i = 0; i < length; i++)
     {
+      bool in_p = ranges[i].in_p;
       if (ranges[i].low == NULL_TREE
-	  || ranges[i].high == NULL_TREE
-	  || !integer_zerop (ranges[i].low)
-	  || !integer_zerop (ranges[i].high))
+	  || ranges[i].high == NULL_TREE)
 	continue;
+      if (!integer_zerop (ranges[i].low)
+	  || !integer_zerop (ranges[i].high))
+	{
+	  if (ranges[i].exp
+	      && TYPE_PRECISION (TREE_TYPE (ranges[i].exp)) == 1
+	      && TYPE_UNSIGNED (TREE_TYPE (ranges[i].exp))
+	      && integer_onep (ranges[i].low)
+	      && integer_onep (ranges[i].high))
+	    in_p = !in_p;
+	  else
+	    continue;
+	}
 
       gimple *stmt;
       tree_code ccode;
@@ -2964,7 +2975,7 @@ optimize_range_tests_var_bound (enum tree_code opcode, int first, int length,
 	default:
 	  continue;
 	}
-      if (ranges[i].in_p)
+      if (in_p)
 	ccode = invert_tree_comparison (ccode, false);
       switch (ccode)
 	{
@@ -4718,7 +4729,9 @@ should_break_up_subtract (gimple *stmt)
       && (immusestmt = get_single_immediate_use (lhs))
       && is_gimple_assign (immusestmt)
       && (gimple_assign_rhs_code (immusestmt) == PLUS_EXPR
-	  ||  gimple_assign_rhs_code (immusestmt) == MULT_EXPR))
+	  || (gimple_assign_rhs_code (immusestmt) == MINUS_EXPR
+	      && gimple_assign_rhs1 (immusestmt) == lhs)
+	  || gimple_assign_rhs_code (immusestmt) == MULT_EXPR))
     return true;
   return false;
 }
