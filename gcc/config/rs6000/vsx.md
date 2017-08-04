@@ -2376,7 +2376,7 @@
 	    : "xxpermdi %x0,%x2,%x1,0");
 
   else if (which_alternative == 1)
-    return (VECTOR_ELT_ORDER_BIG
+    return (BYTES_BIG_ENDIAN
 	    ? "mtvsrdd %x0,%1,%2"
 	    : "mtvsrdd %x0,%2,%1");
 
