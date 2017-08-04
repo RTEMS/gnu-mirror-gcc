@@ -2371,8 +2371,9 @@
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
   if (which_alternative == 0)
-    return rs6000_output_xxpermdi (operands[0], operands[1], operands[2],
-				   NULL_RTX, NULL_RTX);
+    return (BYTES_BIG_ENDIAN
+	    ? "xxpermdi %x0,%x1,%x2,0"
+	    : "xxpermdi %x0,%x2,%x1,0");
 
   else if (which_alternative == 1)
     return (VECTOR_ELT_ORDER_BIG
@@ -2392,13 +2393,23 @@
 	(vec_concat:VSX_D
 	 (vec_select:<VS_scalar>
 	  (match_operand:VSX_D 1 "gpc_reg_operand" "wa")
-	  (parallel [(match_operand:QI 3 "const_0_to_1_operand" "n")]))
-	 (match_operand:<VS_scalar> 2 "gpc_reg_operand" "wa")))]
+	  (parallel [(match_operand:QI 2 "const_0_to_1_operand" "n")]))
+	 (match_operand:<VS_scalar> 3 "gpc_reg_operand" "wa")))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
-  return rs6000_output_xxpermdi (operands[0], operands[1], operands[2],
-				 operands[3], NULL_RTX);
-})
+  HOST_WIDE_INT dword = INTVAL (operands[2]);
+  if (BYTES_BIG_ENDIAN)
+    {
+      operands[4] = GEN_INT (2*dword);
+      return "xxpermdi %x0,%x1,%x3,%4";
+    }
+  else
+    {
+      operands[4] = GEN_INT (!dword);
+      return "xxpermdi %x0,%x3,%x1,%4";
+    }
+}
+  [(set_attr "type" "vecperm")])
 
 (define_insn "*vsx_concat_<mode>_2"
   [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
@@ -2409,24 +2420,45 @@
 	  (parallel [(match_operand:QI 3 "const_0_to_1_operand" "n")]))))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
-  return rs6000_output_xxpermdi (operands[0], operands[1], operands[2],
-				 NULL_RTX, operands[3]);
-})
+  HOST_WIDE_INT dword = INTVAL (operands[3]);
+  if (BYTES_BIG_ENDIAN)
+    {
+      operands[4] = GEN_INT (dword);
+      return "xxpermdi %x0,%x1,%x2,%4";
+    }
+  else
+    {
+      operands[4] = GEN_INT (2 * !dword);
+      return "xxpermdi %x0,%x2,%x1,%4";
+    }
+}
+  [(set_attr "type" "vecperm")])
 
 (define_insn "*vsx_concat_<mode>_3"
   [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
 	(vec_concat:VSX_D
 	 (vec_select:<VS_scalar>
 	  (match_operand:VSX_D 1 "gpc_reg_operand" "wa")
-	  (parallel [(match_operand:QI 3 "const_0_to_1_operand" "n")]))
+	  (parallel [(match_operand:QI 2 "const_0_to_1_operand" "n")]))
 	 (vec_select:<VS_scalar>
-	  (match_operand:VSX_D 2 "gpc_reg_operand" "wa")
+	  (match_operand:VSX_D 3 "gpc_reg_operand" "wa")
 	  (parallel [(match_operand:QI 4 "const_0_to_1_operand" "n")]))))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
-  return rs6000_output_xxpermdi (operands[0], operands[1], operands[2],
-				 operands[3], operands[4]);
-})
+  HOST_WIDE_INT dword1 = INTVAL (operands[2]);
+  HOST_WIDE_INT dword2 = INTVAL (operands[4]);
+  if (BYTES_BIG_ENDIAN)
+    {
+      operands[5] = GEN_INT ((2 * dword1) + dword2);
+      return "xxpermdi %x0,%x1,%x3,%5";
+    }
+  else
+    {
+      operands[5] = GEN_INT ((2 * !dword2) + !dword1);
+      return "xxpermdi %x0,%x3,%x1,%5";
+    }
+}
+  [(set_attr "type" "vecperm")])
 
 ;; Special purpose concat using xxpermdi to glue two single precision values
 ;; together, relying on the fact that internally scalar floats are represented

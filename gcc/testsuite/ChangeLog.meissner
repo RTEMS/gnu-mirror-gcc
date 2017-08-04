@@ -1,3 +1,11 @@
+2017-08-04  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/vec-setup.h: New tests.
+	* gcc.target/powerpc/vec-setup-long.c: Likewise.
+	* gcc.target/powerpc/vec-setup-double.c: Likewise.
+	* gcc.target/powerpc/vec-setup-be-long.c: Likewise.
+	* gcc.target/powerpc/vec-setup-be-double.c: Likewise.
+
 2017-08-03  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Merge up to 250858.
