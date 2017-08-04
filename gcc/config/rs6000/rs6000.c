@@ -39007,7 +39007,6 @@ rs6000_optab_supported_p (int op, machine_mode mode1, machine_mode,
       return true;
     }
 }
-
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
