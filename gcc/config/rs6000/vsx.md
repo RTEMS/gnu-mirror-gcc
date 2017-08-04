@@ -2386,8 +2386,7 @@
   [(set_attr "type" "vecperm")])
 
 ;; Combiner patterns to allow creating XXPERMDI's to access either double
-;; register in a vector register.  Note, rs6000_output_xxpermdi expects
-;; operands[0..2] to be the vector registers.
+;; word element in a vector register.
 (define_insn "*vsx_concat_<mode>_1"
   [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
 	(vec_concat:VSX_D
