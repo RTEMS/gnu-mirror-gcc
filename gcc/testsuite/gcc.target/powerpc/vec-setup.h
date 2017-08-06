@@ -41,13 +41,13 @@ static int errors = 0;
 #elif defined(_ARCH_PPC64)
 #define TYPE	long
 #define STYPE	"long"
-#define ZERO	0
-#define ONE	1
-#define TWO	2
-#define THREE	3
-#define FOUR	4
-#define FIVE	5
-#define SIX	6
+#define ZERO	0L
+#define ONE	1L
+#define TWO	2L
+#define THREE	3L
+#define FOUR	4L
+#define FIVE	5L
+#define SIX	6L
 #define FMT	"ld"
 
 #else
