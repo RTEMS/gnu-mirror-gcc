@@ -1,3 +1,28 @@
+2017-08-07  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* c-ada-spec.c (has_nontrivial_methods): Test for FUNCTION_DECL.
+	(print_ada_methods): Likewise.
+	(print_ada_declaration): Likewise.
+
+2017-08-07  Martin Liska  <mliska@suse.cz>
+
+	* array-notation-common.c: Add new includes.
+	* c-format.c( handle_format_attribute): Canonicalize a format
+	function name.
+	* c-lex.c (c_common_has_attribute): Canonicalize name of an
+	attribute.
+	* c-pretty-print.c: Add new include.
+
+2017-08-05  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* c-ada-spec.c (has_static_fields): Look only into variables.
+	(print_constructor): Add TYPE parameter and use it for the name.
+	(print_destructor): Likewise.
+	(print_ada_declaration): Adjust to new constructor/destructor names.
+	Adjust calls to print_constructor and print_destructor.
+	(print_ada_struct_decl): Do not test TREE_STATIC on FIELD_DECL.
+	Look only into variables in the final loop.
+
 2017-08-01  Eric Botcazou  <ebotcazou@adacore.com>
 
 	* c-ada-spec.c (has_static_fields): Look only into fields.
