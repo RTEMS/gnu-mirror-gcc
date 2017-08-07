@@ -2472,7 +2472,8 @@
 ;; of the two values is in an Altivec register, we load up 8 into a GPR
 ;; and do a store from the Altivec register.
 ;;
-;; Simplify things by not optimizing -maltivec=be.
+;; Simplify things by not optimizing -maltivec=be.  Long longs on 32-bit
+;; cause problems because they don't support reg+reg addressing.
 
 (define_insn_and_split "*vsx_concat_<VSX_D:mode>_store_<P:mode>"
   [(set (match_operand:VSX_D 0 "quad_offsettable_memory_operand" "=wR,wR,?wR")
@@ -2481,6 +2482,7 @@
 	 (match_operand:<VSX_D:VS_scalar> 2 "gpc_reg_operand" "dwb,r,wa")))
    (clobber (match_scratch:P 3 "=X,X,&b"))]
   "VECTOR_MEM_VSX_P (<VSX_D:MODE>mode)
+   && (<VSX_D:MODE>mode == V2DFmode || TARGET_POWERPC64)
    && (BYTES_BIG_ENDIAN || !VECTOR_ELT_ORDER_BIG)"
   "#"
   "&& reload_completed"
@@ -2518,6 +2520,7 @@
 	 (match_operand:<VSX_D:VS_scalar> 1 "gpc_reg_operand" "dwb,r,v")))
    (clobber (match_scratch:P 2 "=X,X,&b"))]
   "VECTOR_MEM_VSX_P (<VSX_D:MODE>mode)
+   && (<VSX_D:MODE>mode == V2DFmode || TARGET_POWERPC64)
    && (BYTES_BIG_ENDIAN || !VECTOR_ELT_ORDER_BIG)"
   "#"
   "&& reload_completed"
