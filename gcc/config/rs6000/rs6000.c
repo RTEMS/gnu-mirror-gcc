@@ -8121,9 +8121,8 @@ quad_address_offset_p (HOST_WIDE_INT offset)
 
 /* Return true if the ADDR is an acceptable address for a quad memory
    operation of mode MODE (either LQ/STQ for general purpose registers, or
-   LXV/STXV for vector registers under ISA 3.0.  GPR_P is true if this address
-   is intended for LQ/STQ.  If it is false, the address is intended for the ISA
-   3.0 LXV/STXV instruction.  */
+   LXV/STXV for vector registers under ISA 3.0.  STRICT is true if pseudos
+   are not allowed.  */
 
 bool
 quad_address_p (rtx addr, machine_mode mode, bool strict)
