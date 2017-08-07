@@ -1,5 +1,11 @@
 2017-08-07  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	PR target/81594
+	* gcc.target/powerpc/vec-store-1.c: New test.
+	* gcc.target/powerpc/vec-store-2.c: Likewise.
+	* gcc.target/powerpc/vec-store-3.c: Likewise.
+	* gcc.target/powerpc/vec-store-4.c: Likewise.
+
 	Merge up to 250926.
 
 2017-08-06  Michael Meissner  <meissner@linux.vnet.ibm.com>
