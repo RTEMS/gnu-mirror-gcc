@@ -39061,7 +39061,7 @@ rs6000_output_fmr (machine_mode mode)
 const char *
 rs6000_output_xscpsgndp (void)
 {
-  return TARGET_FLOAT_MOVE ? "xxlor %x0,%x1,%x1" : "xscpsgn %x0,%x1,%x1";
+  return TARGET_FLOAT_MOVE ? "xxlor %x0,%x1,%x1" : "xscpsgndp %x0,%x1,%x1";
 }
 
 
