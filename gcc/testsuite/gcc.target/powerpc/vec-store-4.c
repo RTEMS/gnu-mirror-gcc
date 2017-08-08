@@ -1,6 +1,6 @@
 /* { dg-do compile { target { powerpc*-*-* } } } */
-/* { dg-require-effective-target powerpc_vsx_ok } */
-/* { dg-options "-O2 -mvsx" } */
+/* { dg-require-effective-target powerpc_power9_ok } */
+/* { dg-options "-O2 -mpower9-vector" } */
 
 /* Test that the compiler can optimize creating a vector and immediately
    storing it into doing 2 separate scalar stores.  */
