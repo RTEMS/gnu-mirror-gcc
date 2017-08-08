@@ -39037,9 +39037,7 @@ rs6000_output_fmr (machine_mode mode)
       return TARGET_XXLOR_FP ? "xxlor %x0,%x1,%x1" : "fmr %0,%1";
 
     case SFmode:
-      if (!TARGET_FLOAT_MOVE)
-	return "fcpsgn %0,%1,%1";
-      else if (TARGET_XXLOR_FP)
+      if (TARGET_XXLOR_FP || TARGET_FLOAT_MOVE)
 	return "xxlor %x0,%x1,%x1";
       else
 	return "fmr %0,%1";
@@ -39057,7 +39055,7 @@ rs6000_output_fmr (machine_mode mode)
 
 /* Return the appropriate insn output string to copy a 32-bit floating point
    value where one of the registers is an Altivec register.  On some machines,
-   copy sign is needed to handle Not a Number.  */
+   copy sign or fmr is needed to handle Not a Number.  */
 
 const char *
 rs6000_output_xscpsgndp (void)
