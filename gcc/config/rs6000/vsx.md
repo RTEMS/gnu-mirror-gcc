@@ -2724,7 +2724,7 @@
 	return "mfvsrd %0,%x1";
 
       else if (FP_REGNO_P (op0_regno) && FP_REGNO_P (op1_regno))
-	return "fmr %0,%1";
+	return rs6000_output_fmr (<VS_scalar>mode);
 
       else if (VSX_REGNO_P (op0_regno))
 	return "xxlor %x0,%x1,%x1";

@@ -633,3 +633,15 @@ Use the given offset for addressing the stack-protector guard.
 
 TargetVariable
 long rs6000_stack_protector_guard_offset = 0
+
+mfmr-int
+Target Undocumented Var(TARGET_FMR_INT) Save
+Use FMR instead of XXLOR to move integer types in the FPRs.
+
+mxxlor-fp
+Target Undocumented Var(TARGET_XXLOR_FP) Save
+Use XXLOR instead of FMR to move fp types in the FPRs.
+
+mfloat-move
+Target Undocumented Var(TARGET_FLOAT_MOVE) Save
+Do not use FCPSGN/XSCPSGNDP to copy 32-bit floating point types.

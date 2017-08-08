@@ -1,3 +1,32 @@
+2017-08-08  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (rs6000_output_fmr): Add
+	declaration.
+	(rs6000_output_xscpsgndp): Likewise.
+	* config/rs6000/rs6000.opt (-mfmr-int): Add options to control
+	whether FMR or XXLOR is used to move values in float registers.
+	Add option to control whether a copysign operation is used to move
+	32-bit floating point.
+	(-mxxlor-fp): Likewise.
+	(-mfloat-move): Likewise.
+	* config/rs6000/rs6000.c (rs6000_debug_reg_global): Print whether
+	the new options are enabled.
+	(rs6000_output_fmr): New function to return FMR/XXLOR/FCPSGN to
+	move values in floating point registers.
+	(rs6000_output_xscpsgndp): New function to return XSCPSGNDP or
+	XXLOR to move 32-bit floating point.
+	* config/rs6000/vsx.md (vsx_extract_<mode>): Add support for using
+	new options to control whether FMR/XXLOR/FCPSGN are generated for
+	floating point moves.
+	* config/rs6000/rs6000.md (extendsfdf2_fpr): Likewise.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_hardfloat32): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(trunc<mode>df2_internal1): Likewise.
+	(movdi_internal32): Likewise.
+	(movdi_internal64): Likewise.
+
 2017-08-08   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 250942
