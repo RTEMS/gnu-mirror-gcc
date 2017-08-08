@@ -39038,7 +39038,7 @@ rs6000_output_fmr (machine_mode mode)
 
     case SFmode:
       if (!TARGET_FLOAT_MOVE)
-	return "fcpsgn %0,%1";
+	return "fcpsgn %0,%1,%1";
       else if (TARGET_XXLOR_FP)
 	return "xxlor %x0,%x1,%x1";
       else
