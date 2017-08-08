@@ -2821,6 +2821,13 @@ rs6000_debug_reg_global (void)
   if (TARGET_DIRECT_MOVE_128)
     fprintf (stderr, DEBUG_FMT_D, "VSX easy 64-bit mfvsrld element",
 	     (int)VECTOR_ELEMENT_MFVSRLD_64BIT);
+
+  fprintf (stderr, DEBUG_FMT_S, "Use FMR not XXLOR for ints",
+	   TARGET_FMR_INT ? "yes" : "no");
+  fprintf (stderr, DEBUG_FMT_S, "Use XXLOR not FMR for fp",
+	   TARGET_XXLOR_FP ? "yes" : "no");
+  fprintf (stderr, DEBUG_FMT_S, "Don't use cpsign to move float",
+	   TARGET_FLOAT_MOVE ? "yes" : "no");
 }
 
 
@@ -8121,9 +8128,8 @@ quad_address_offset_p (HOST_WIDE_INT offset)
 
 /* Return true if the ADDR is an acceptable address for a quad memory
    operation of mode MODE (either LQ/STQ for general purpose registers, or
-   LXV/STXV for vector registers under ISA 3.0.  GPR_P is true if this address
-   is intended for LQ/STQ.  If it is false, the address is intended for the ISA
-   3.0 LXV/STXV instruction.  */
+   LXV/STXV for vector registers under ISA 3.0.  STRICT is true if pseudos
+   are not allowed.  */
 
 bool
 quad_address_p (rtx addr, machine_mode mode, bool strict)
@@ -39007,6 +39013,57 @@ rs6000_optab_supported_p (int op, machine_mode mode1, machine_mode,
       return true;
     }
 }
+
+/* Return the appropriate insn output string to do a move between two floating
+   point registers, based on the options and the mode of the type being
+   moved.  */
+
+const char *
+rs6000_output_fmr (machine_mode mode)
+{
+  if (!TARGET_VSX)
+    return "fmr %0,%1";
+
+  switch (mode)
+    {
+    case QImode:
+    case HImode:
+    case SImode:
+    case DImode:
+      return TARGET_FMR_INT ? "fmr %0,%1" : "xxlor %x0,%x1,%x1";
+
+    case DFmode:
+      return TARGET_XXLOR_FP ? "xxlor %x0,%x1,%x1" : "fmr %0,%1";
+
+    case SFmode:
+      if (!TARGET_FLOAT_MOVE)
+	return "fcpsgn %0,%1";
+      else if (TARGET_XXLOR_FP)
+	return "xxlor %x0,%x1,%x1";
+      else
+	return "fmr %0,%1";
+
+    case SDmode:
+    case DDmode:
+      return "fmr %0,%1";
+
+    default:
+      break;
+    }
+
+  return "xxlor %x0,%x1,%x1";
+}
+
+/* Return the appropriate insn output string to copy a 32-bit floating point
+   value where one of the registers is an Altivec register.  On some machines,
+   copy sign is needed to handle Not a Number.  */
+
+const char *
+rs6000_output_xscpsgndp (void)
+{
+  return TARGET_FLOAT_MOVE ? "xxlor %x0,%x1,%x1" : "xscpsgn %x0,%x1,%x1";
+}
+
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
