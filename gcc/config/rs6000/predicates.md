@@ -833,6 +833,15 @@
   return quad_address_p (XEXP (op, 0), mode, false);
 })
 
+;; Return 1 if the operand is an offsettable vector memory operand.  Unlike
+;; vsx_quad_dform_memory_operand, this predicate allows ISA 2.06/2.07 if the
+;; memory operand is just an indirect register.
+(define_predicate "quad_offsettable_memory_operand"
+  (match_code "mem")
+{
+  return quad_address_p (XEXP (op, 0), mode, false);
+})
+
 ;; Return 1 if the operand is an indexed or indirect memory operand.
 (define_predicate "indexed_or_indirect_operand"
   (match_code "mem")
