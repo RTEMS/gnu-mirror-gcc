@@ -39037,10 +39037,9 @@ rs6000_output_fmr (machine_mode mode)
       return TARGET_XXLOR_FP ? "xxlor %x0,%x1,%x1" : "fmr %0,%1";
 
     case SFmode:
-      if (TARGET_XXLOR_FP || TARGET_FLOAT_MOVE)
-	return "xxlor %x0,%x1,%x1";
-      else
-	return "fmr %0,%1";
+      return ((TARGET_XXLOR_FP || TARGET_FLOAT_MOVE)
+	      ? "xxlor %x0,%x1,%x1"
+	      : "fmr %0,%1");
 
     case SDmode:
     case DDmode:
