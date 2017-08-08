@@ -39053,7 +39053,7 @@ rs6000_output_fmr (machine_mode mode)
 
 /* Return the appropriate insn output string to copy a 32-bit floating point
    value where one of the registers is an Altivec register.  On some machines,
-   copy sign is needed to handle Not a Number.  */
+   copy sign or fmr is needed to handle Not a Number.  */
 
 const char *
 rs6000_output_xscpsgndp (void)
