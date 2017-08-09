@@ -323,6 +323,14 @@
 ;; Mode attribute to give the suffix for the splat instruction
 (define_mode_attr VSX_SPLAT_SUFFIX [(V16QI "b") (V8HI "h")])
 
+;; Mode attribute to say whether to use GPRs or not for V2DI/V2DF vectors when
+;; accessing the DI/DF component parts.  DImode is likely to be in GPR
+;; registers, while DFmode is likely to be in vector registers.  If we allow
+;; DFmode in GPRs without using telling the register allocator not to prefer
+;; that, it gets 'creative', and tends to generate MTVSRDD to form vectors
+;; instead of XXPERMDI
+(define_mode_attr VSX_gpr [(V2DF "!b") (DF "!b") (V2DI "b") (DI "b")])
+
 ;; Constants for creating unspecs
 (define_c_enum "unspec"
   [UNSPEC_VSX_CONCAT
@@ -2366,8 +2374,8 @@
 (define_insn "vsx_concat_<mode>"
   [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa,we")
 	(vec_concat:VSX_D
-	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "wa,b")
-	 (match_operand:<VS_scalar> 2 "gpc_reg_operand" "wa,b")))]
+	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "wa,<VSX_gpr>")
+	 (match_operand:<VS_scalar> 2 "gpc_reg_operand" "wa,<VSX_gpr>")))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
   if (which_alternative == 0)
@@ -2478,8 +2486,8 @@
 (define_insn_and_split "*vsx_concat_<VSX_D:mode>_store_<P:mode>"
   [(set (match_operand:VSX_D 0 "quad_offsettable_memory_operand" "=wR,wR,?wR")
 	(vec_concat:VSX_D
-	 (match_operand:<VSX_D:VS_scalar> 1 "gpc_reg_operand" "dwb,rdwb,wa")
-	 (match_operand:<VSX_D:VS_scalar> 2 "gpc_reg_operand" "dwb,r,wa")))
+	 (match_operand:<VSX_D:VS_scalar> 1 "gpc_reg_operand" "dwb,<VSX_gpr>,wa")
+	 (match_operand:<VSX_D:VS_scalar> 2 "gpc_reg_operand" "dwb,<VSX_gpr>,wa")))
    (clobber (match_scratch:P 3 "=X,X,&b"))]
   "VECTOR_MEM_VSX_P (<VSX_D:MODE>mode)
    && (<VSX_D:MODE>mode == V2DFmode || TARGET_POWERPC64)
@@ -3736,19 +3744,19 @@
 })
 
 (define_insn "vsx_splat_<mode>_reg"
-  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=<VSX_D:VSa>,?we")
+  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa,we")
 	(vec_duplicate:VSX_D
-	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "<VSX_D:VS_64reg>,b")))]
+	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "wa,<VSX_gpr>")))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
   "@
    xxpermdi %x0,%x1,%x1,0
    mtvsrdd %x0,%1,%1"
   [(set_attr "type" "vecperm")])
 
-(define_insn "vsx_splat_<VSX_D:mode>_mem"
-  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=<VSX_D:VSa>")
+(define_insn "vsx_splat_<mode>_mem"
+  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
 	(vec_duplicate:VSX_D
-	 (match_operand:<VSX_D:VS_scalar> 1 "memory_operand" "Z")))]
+	 (match_operand:<VS_scalar> 1 "memory_operand" "Z")))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
   "lxvdsx %x0,%y1"
   [(set_attr "type" "vecload")])
