@@ -2724,10 +2724,10 @@
 	return "mfvsrd %0,%x1";
 
       else if (FP_REGNO_P (op0_regno) && FP_REGNO_P (op1_regno))
-	return rs6000_output_fmr (<VS_scalar>mode);
+	return rs6000_output_move_scalar_fpr (<VS_scalar>mode);
 
       else if (VSX_REGNO_P (op0_regno))
-	return "xxlor %x0,%x1,%x1";
+	return rs6000_output_move_scalar_vsx (<VS_scalar>mode);
 
       else
 	gcc_unreachable ();
