@@ -1,3 +1,30 @@
+2017-08-09  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (rs6000_output_move_scalar_fpr):
+	Rewrite move functions.
+	(rs6000_output_move_scalar_vsx): Likewise.
+	(rs6000_output_fmr): Likewise.
+	(rs6000_output_xscpsgndp): Likewise.
+	* config/rs6000/rs6000. (rs6000_output_move_scalar_fpr):
+	Likewise.
+	(rs6000_output_move_scalar_vsx): Likewise.
+	(rs6000_output_fmr): Likewise.
+	(rs6000_output_xscpsgndp): Likewise.
+	* config/rs6000/rs6000.opt (-mxxlor): Replace -mfmr-int,
+	-mxxlor-fp, and -mfloat-move with -mxxlor.
+	(-mfmr-int): Likewise.
+	(-mxxlor-fp): Likewise.
+	(-mfloat-move): Likewise.
+	* config/rs6000/vsx.md (vsx_extract_<mode>): Likewise.
+	* config/rs6000/rs6000.md (extendsfdf2_fpr): Likewise.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_hardfloat32): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(trunc<mode>df2_internal1): Likewise.
+	(movdi_internal32): Likewise.
+	(movdi_internal64): Likewise.
+
 2017-08-08  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.md (movdi_internal32): Change type
