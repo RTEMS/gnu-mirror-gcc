@@ -39014,7 +39014,9 @@ rs6000_optab_supported_p (int op, machine_mode mode1, machine_mode,
 /* Return the appropriate insn output string to do a move between two floating
    point registers, based on the options and the mode of the type being moved.
    On some machines, the FMR instruction is treated as a floating point
-   instruction, and it can better fit in the floating point pipeline.  */
+   instruction, and it can better fit in the floating point pipeline.  In
+   addtion, it can be desirable to use a FMR for SFmode to better handle
+   denormal results.  */
 
 const char *
 rs6000_output_move_scalar_fpr (machine_mode mode)
