@@ -2459,7 +2459,7 @@
 }
   [(set_attr "type" "vecperm")])
 
-;; Peephole2 pattern of a concat followed by a store.  Eliminate the concat
+;; Peephole2 pattern of a splat followed by a store.  Eliminate the concat
 ;; if we can convert it to two separate stores.
 (define_peephole2
   [(set (match_operand:VSX_D 0 "vsx_register_operand")
@@ -2487,6 +2487,21 @@
 
   operands[4] = adjust_address (mem, <VS_scalar>mode, 0);
   operands[6] = adjust_address (mem, <VS_scalar>mode, 8);
+})
+
+(define_peephole2
+  [(set (match_operand:VSX_D 0 "vsx_register_operand")
+	(vec_duplicate:VSX_D
+	 (match_operand:<VS_scalar> 1 "dform_reg_operand")))
+   (set (match_operand:VSX_D 2 "quad_offsettable_memory_operand")
+	(match_dup 0))]
+  "VECTOR_MEM_VSX_P (<MODE>mode) && peep2_reg_dead_p (2, operands[0])"
+  [(set (match_dup 3) (match_dup 1))
+   (set (match_dup 4) (match_dup 1))]
+{
+  rtx mem = operands[2];
+  operands[3] = adjust_address (mem, <VS_scalar>mode, 0);
+  operands[4] = adjust_address (mem, <VS_scalar>mode, 8);
 })
 
 ;; Special purpose concat using xxpermdi to glue two single precision values
