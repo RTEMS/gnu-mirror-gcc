@@ -2459,8 +2459,11 @@
 }
   [(set_attr "type" "vecperm")])
 
-;; Peephole2 pattern of a splat followed by a store.  Eliminate the concat
-;; if we can convert it to two separate stores.
+;; Peephole2 pattern of a concat/splat followed by a store.  Eliminate the
+;; concat/splat if we can convert it to two separate stores.  Little endian ISA
+;; 2.07 (power8) has to recognize the swap optimization patterns, while big
+;; endian and ISA 3.0 (power9) don't have them.  To simplify the code, don't
+;; handle -maltivec=be.
 (define_peephole2
   [(set (match_operand:VSX_D 0 "vsx_register_operand")
 	(vec_concat:VSX_D
@@ -2468,13 +2471,15 @@
 	 (match_operand:<VS_scalar> 2 "dform_reg_operand")))
    (set (match_operand:VSX_D 3 "quad_offsettable_memory_operand")
 	(match_dup 0))]
-  "VECTOR_MEM_VSX_P (<MODE>mode) && peep2_reg_dead_p (2, operands[0])"
+  "VECTOR_MEM_VSX_P (<MODE>mode)
+   && (BYTES_BIG_ENDIAN || (!VECTOR_ELT_ORDER_BIG && TARGET_P9_VECTOR))
+   && peep2_reg_dead_p (2, operands[0])"
   [(set (match_dup 4) (match_dup 5))
    (set (match_dup 6) (match_dup 7))]
 {
   rtx mem = operands[3];
 
-  if (BYTES_BIG_ENDIAN || !VECTOR_ELT_ORDER_BIG)
+  if (BYTES_BIG_ENDIAN)
     {
       operands[5] = operands[1];
       operands[7] = operands[2];
@@ -2491,11 +2496,59 @@
 
 (define_peephole2
   [(set (match_operand:VSX_D 0 "vsx_register_operand")
+	(vec_concat:VSX_D
+	 (match_operand:<VS_scalar> 1 "dform_reg_operand")
+	 (match_operand:<VS_scalar> 2 "dform_reg_operand")))
+   (set (match_operand:VSX_D 3 "quad_offsettable_memory_operand")
+	(vec_select:VSX_D
+	 (match_dup 0)
+	 (parallel [(const_int 1)
+		    (const_int 0)])))]
+  "VECTOR_MEM_VSX_P (<MODE>mode)
+   && !BYTES_BIG_ENDIAN
+   && !VECTOR_ELT_ORDER_BIG
+   && !TARGET_P9_VECTOR
+   && peep2_reg_dead_p (2, operands[0])"
+  [(set (match_dup 4) (match_dup 2))
+   (set (match_dup 5) (match_dup 1))]
+{
+  rtx mem = operands[3];
+
+  operands[4] = adjust_address (mem, <VS_scalar>mode, 0);
+  operands[5] = adjust_address (mem, <VS_scalar>mode, 8);
+})
+
+(define_peephole2
+  [(set (match_operand:VSX_D 0 "vsx_register_operand")
 	(vec_duplicate:VSX_D
 	 (match_operand:<VS_scalar> 1 "dform_reg_operand")))
    (set (match_operand:VSX_D 2 "quad_offsettable_memory_operand")
 	(match_dup 0))]
-  "VECTOR_MEM_VSX_P (<MODE>mode) && peep2_reg_dead_p (2, operands[0])"
+  "VECTOR_MEM_VSX_P (<MODE>mode)
+   && (BYTES_BIG_ENDIAN || (!VECTOR_ELT_ORDER_BIG && TARGET_P9_VECTOR))
+   && peep2_reg_dead_p (2, operands[0])"
+  [(set (match_dup 3) (match_dup 1))
+   (set (match_dup 4) (match_dup 1))]
+{
+  rtx mem = operands[2];
+  operands[3] = adjust_address (mem, <VS_scalar>mode, 0);
+  operands[4] = adjust_address (mem, <VS_scalar>mode, 8);
+})
+
+(define_peephole2
+  [(set (match_operand:VSX_D 0 "vsx_register_operand")
+	(vec_duplicate:VSX_D
+	 (match_operand:<VS_scalar> 1 "dform_reg_operand")))
+   (set (match_operand:VSX_D 2 "quad_offsettable_memory_operand")
+	(vec_select:VSX_D
+	 (match_dup 0)
+	 (parallel [(const_int 1)
+		    (const_int 0)])))]
+  "VECTOR_MEM_VSX_P (<MODE>mode)
+   && !BYTES_BIG_ENDIAN
+   && !VECTOR_ELT_ORDER_BIG
+   && !TARGET_P9_VECTOR
+   && peep2_reg_dead_p (2, operands[0])"
   [(set (match_dup 3) (match_dup 1))
    (set (match_dup 4) (match_dup 1))]
 {
