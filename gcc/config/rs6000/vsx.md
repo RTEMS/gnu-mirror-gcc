@@ -323,14 +323,6 @@
 ;; Mode attribute to give the suffix for the splat instruction
 (define_mode_attr VSX_SPLAT_SUFFIX [(V16QI "b") (V8HI "h")])
 
-;; Mode attribute to say whether to use GPRs or not for V2DI/V2DF vectors when
-;; accessing the DI/DF component parts.  DImode is likely to be in GPR
-;; registers, while DFmode is likely to be in vector registers.  If we allow
-;; DFmode in GPRs without using telling the register allocator not to prefer
-;; that, it gets 'creative', and tends to generate MTVSRDD to form vectors
-;; instead of XXPERMDI
-(define_mode_attr VSX_gpr [(V2DF "!b") (DF "!b") (V2DI "b") (DI "b")])
-
 ;; Constants for creating unspecs
 (define_c_enum "unspec"
   [UNSPEC_VSX_CONCAT
@@ -2374,8 +2366,8 @@
 (define_insn "vsx_concat_<mode>"
   [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa,we")
 	(vec_concat:VSX_D
-	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "wa,<VSX_gpr>")
-	 (match_operand:<VS_scalar> 2 "gpc_reg_operand" "wa,<VSX_gpr>")))]
+	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "wa,b")
+	 (match_operand:<VS_scalar> 2 "gpc_reg_operand" "wa,b")))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
 {
   if (which_alternative == 0)
@@ -2467,94 +2459,35 @@
 }
   [(set_attr "type" "vecperm")])
 
-;; Optimize:
-;;	memory = (vector double) { a, b };		and
-;;	memory = (vector double) { a, a };
-;;
-;; to not create a vector and instead do two stores.  Only do this if we can
-;; create two separate stores without needing to use a temporary base register
-;; to hold the second address.
-;;
-;; On ISA 2.06/2.07 systems, this optimization is only done for indirect
-;; addresses.  We prefer to have the values in GPRs or FPRs, but if one
-;; of the two values is in an Altivec register, we load up 8 into a GPR
-;; and do a store from the Altivec register.
-;;
-;; Simplify things by not optimizing -maltivec=be.  Long longs on 32-bit
-;; cause problems because they don't support reg+reg addressing.
-
-(define_insn_and_split "*vsx_concat_<VSX_D:mode>_store_<P:mode>"
-  [(set (match_operand:VSX_D 0 "quad_offsettable_memory_operand" "=wR,wR,?wR")
+;; Peephole2 pattern of a concat followed by a store.  Eliminate the concat
+;; if we can convert it to two separate stores.
+(define_peephole2
+  [(set (match_operand:VSX_D 0 "vsx_register_operand")
 	(vec_concat:VSX_D
-	 (match_operand:<VSX_D:VS_scalar> 1 "gpc_reg_operand" "dwb,<VSX_gpr>,wa")
-	 (match_operand:<VSX_D:VS_scalar> 2 "gpc_reg_operand" "dwb,<VSX_gpr>,wa")))
-   (clobber (match_scratch:P 3 "=X,X,&b"))]
-  "VECTOR_MEM_VSX_P (<VSX_D:MODE>mode)
-   && (<VSX_D:MODE>mode == V2DFmode || TARGET_POWERPC64)
-   && (BYTES_BIG_ENDIAN || !VECTOR_ELT_ORDER_BIG)"
-  "#"
-  "&& reload_completed"
-  [(set (match_dup 4) (match_dup 1))
-   (set (match_dup 5) (match_dup 2))]
+	 (match_operand:<VS_scalar> 1 "dform_reg_operand")
+	 (match_operand:<VS_scalar> 2 "dform_reg_operand")))
+   (set (match_operand:VSX_D 3 "quad_offsettable_memory_operand")
+	(match_dup 0))]
+  "VECTOR_MEM_VSX_P (<MODE>mode) && peep2_reg_dead_p (2, operands[0])"
+  [(set (match_dup 4) (match_dup 5))
+   (set (match_dup 6) (match_dup 7))]
 {
-  rtx mem = operands[0];
-  rtx tmp = operands[3];
+  rtx mem = operands[3];
 
-  /* For big endian systems, the elements are in the natural order.  For little
-     endian systems with -maltivec=le, the elements are swapped, but they are
-     swapped in memory as well.  */
-  operands[4] = adjust_address (mem, <VSX_D:VS_scalar>mode, 0);
-
-  if (GET_CODE (tmp) == SCRATCH)
-    operands[5] = adjust_address (mem, <VSX_D:VS_scalar>mode, 8);
+  if (BYTES_BIG_ENDIAN || !VECTOR_ELT_ORDER_BIG)
+    {
+      operands[5] = operands[1];
+      operands[7] = operands[2];
+    }
   else
     {
-      rtx addr = XEXP (mem, 0);
-      gcc_assert (REG_P (addr));
-
-      /* If we have something in an Altivec register on a pre ISA 3.0 system,
-	 create the address for the second store.  */
-      emit_move_insn (tmp, GEN_INT (8));
-      operands[5] = change_address (mem, <VSX_D:VS_scalar>mode,
-				    gen_rtx_PLUS (<P:MODE>mode, tmp, addr));
+      operands[5] = operands[2];
+      operands[7] = operands[1];
     }
-}
-  [(set_attr "type" "fpstore,store,fpstore")
-   (set_attr "length" "8,8,12")])
 
-(define_insn_and_split "*vsx_splat_<VSX_D:mode>_store_<P:mode>"
-  [(set (match_operand:VSX_D 0 "quad_offsettable_memory_operand" "=wR,wR,?wR")
-	(vec_duplicate:VSX_D
-	 (match_operand:<VSX_D:VS_scalar> 1 "gpc_reg_operand" "dwb,r,v")))
-   (clobber (match_scratch:P 2 "=X,X,&b"))]
-  "VECTOR_MEM_VSX_P (<VSX_D:MODE>mode)
-   && (<VSX_D:MODE>mode == V2DFmode || TARGET_POWERPC64)
-   && (BYTES_BIG_ENDIAN || !VECTOR_ELT_ORDER_BIG)"
-  "#"
-  "&& reload_completed"
-  [(set (match_dup 3) (match_dup 1))
-   (set (match_dup 4) (match_dup 1))]
-{
-  rtx mem = operands[0];
-  rtx tmp = operands[2];
-
-  operands[3] = adjust_address (mem, <VSX_D:VS_scalar>mode, 0);
-  if (GET_CODE (tmp) == SCRATCH)
-    operands[4] = adjust_address (mem, <VSX_D:VS_scalar>mode, 8);
-  else
-    {
-      rtx addr = XEXP (mem, 0);
-      gcc_assert (REG_P (addr));
-
-      /* If we have something in an Altivec register on a pre ISA 3.0 system,
-	 create the address for the second store.  */
-      emit_move_insn (tmp, GEN_INT (8));
-      operands[4] = change_address (mem, <VSX_D:VS_scalar>mode,
-				    gen_rtx_PLUS (<P:MODE>mode, tmp, addr));
-    }
-}
-  [(set_attr "type" "fpstore,store,fpstore")
-   (set_attr "length" "8,8,12")])
+  operands[4] = adjust_address (mem, <VS_scalar>mode, 0);
+  operands[6] = adjust_address (mem, <VS_scalar>mode, 8);
+})
 
 ;; Special purpose concat using xxpermdi to glue two single precision values
 ;; together, relying on the fact that internally scalar floats are represented
@@ -3744,19 +3677,19 @@
 })
 
 (define_insn "vsx_splat_<mode>_reg"
-  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa,we")
+  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=<VSX_D:VSa>,?we")
 	(vec_duplicate:VSX_D
-	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "wa,<VSX_gpr>")))]
+	 (match_operand:<VS_scalar> 1 "gpc_reg_operand" "<VSX_D:VS_64reg>,b")))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
   "@
    xxpermdi %x0,%x1,%x1,0
    mtvsrdd %x0,%1,%1"
   [(set_attr "type" "vecperm")])
 
-(define_insn "vsx_splat_<mode>_mem"
-  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
+(define_insn "vsx_splat_<VSX_D:mode>_mem"
+  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=<VSX_D:VSa>")
 	(vec_duplicate:VSX_D
-	 (match_operand:<VS_scalar> 1 "memory_operand" "Z")))]
+	 (match_operand:<VSX_D:VS_scalar> 1 "memory_operand" "Z")))]
   "VECTOR_MEM_VSX_P (<MODE>mode)"
   "lxvdsx %x0,%y1"
   [(set_attr "type" "vecload")])

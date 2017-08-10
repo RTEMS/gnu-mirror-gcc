@@ -196,10 +196,6 @@
   "Memory operand suitable for the load/store quad instructions"
   (match_operand 0 "quad_memory_operand"))
 
-(define_memory_constraint "wR"
-  "Offsettable memory operand for vectors."
-  (match_operand 0 "quad_offsettable_memory_operand"))
-
 (define_constraint "wS"
   "Vector constant that can be loaded with XXSPLTIB & sign extension."
   (match_test "xxspltib_constant_split (op, mode)"))

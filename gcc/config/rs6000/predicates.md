@@ -399,27 +399,25 @@
 ;; Return true if this is a register that can has D-form addressing (GPR and
 ;; traditional FPR registers for scalars).  ISA 3.0 (power9) adds D-form
 ;; addressing for scalars in Altivec registers.
-;;
-;; If this is a pseudo only allow for GPR fusion in power8.  If we have the
-;; power9 fusion allow the floating point types.
-(define_predicate "toc_fusion_or_p9_reg_operand"
+(define_predicate "dform_reg_operand"
   (match_code "reg,subreg")
 {
   HOST_WIDE_INT r;
+  bool di_p = (TARGET_POWERPC64 && mode == DImode);
   bool gpr_p = (mode == QImode || mode == HImode || mode == SImode
 		|| mode == SFmode
 		|| (TARGET_POWERPC64 && (mode == DImode || mode == DFmode)));
-  bool fpr_p = (TARGET_P9_FUSION
-		&& (mode == DFmode || mode == SFmode
-		    || (TARGET_POWERPC64 && mode == DImode)));
-  bool vmx_p = (TARGET_P9_FUSION && TARGET_P9_VECTOR
-		&& (mode == DFmode || mode == SFmode));
-
-  if (!TARGET_P8_FUSION)
-    return 0;
+  bool fpr_p = (mode == DFmode || mode == SFmode || di_p);
+  bool vmx_p = (TARGET_P9_VECTOR && TARGET_P9_DFORM_SCALAR
+		&& (mode == DFmode || mode == SFmode || di_p));
 
   if (GET_CODE (op) == SUBREG)
-    op = SUBREG_REG (op);
+    {
+      if (TARGET_NO_SF_SUBREG && sf_subreg_operand (op, mode))
+	return 0;
+
+      op = SUBREG_REG (op);
+    }
 
   if (!REG_P (op))
     return 0;
