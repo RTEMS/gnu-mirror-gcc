@@ -1,3 +1,14 @@
+2017-08-11  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/float128-1.c: Eliminate using the
+	-static-libgcc option.  Use -mvsx instead of -mcpu=power7 to run
+	the tests.
+	* gcc.target/powerpc/float128-2.c: Likewise.
+	* gcc.target/powerpc/float128-3.c: Test enabling -mfloat128 via
+	#pragma target.
+	* gcc.target/powerpc/float128-4.c: New test, clone float128-1.c,
+	using the _Float128 keyword, and not using the -mfloat128 option.
+
 2017-08-11   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 251056
