@@ -4611,8 +4611,11 @@ rs6000_option_override_internal (bool global_init_p)
 #endif
 
   /* Enable the default support for IEEE 128-bit floating point on Linux VSX
-     sytems, but don't enable the __float128 keyword.  */
-  if (TARGET_VSX && TARGET_LONG_DOUBLE_128
+     sytems.  In GCC 7, we would enable the the IEEE 128-bit floating point
+     infrastructure (-mfloat128-type) but not enable the actual __float128 type
+     unless the user used the explicit -mfloat128.  In GCC 8, now enable the
+     keyword as well as the type.  */
+  if (TARGET_VSX
       && (TARGET_FLOAT128_ENABLE_TYPE || TARGET_IEEEQUAD)
       && ((rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_TYPE) == 0))
     rs6000_isa_flags |= OPTION_MASK_FLOAT128_TYPE;
@@ -4700,6 +4703,11 @@ rs6000_option_override_internal (bool global_init_p)
 
   if (TARGET_FLOAT128_HW && !TARGET_FLOAT128_KEYWORD
       && (rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_HW) != 0
+      && (rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_KEYWORD) == 0)
+    rs6000_isa_flags |= OPTION_MASK_FLOAT128_KEYWORD;
+
+  /* Enable __float128 by default.  */
+  if (TARGET_FLOAT128_TYPE
       && (rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_KEYWORD) == 0)
     rs6000_isa_flags |= OPTION_MASK_FLOAT128_KEYWORD;
 
@@ -32493,11 +32501,14 @@ rs6000_mangle_type (const_tree type)
       if (type == ieee128_float_type_node)
 	return "U10__float128";
 
-      if (type == ibm128_float_type_node)
-	return "g";
+      if (TARGET_LONG_DOUBLE_128)
+	{
+	  if (type == long_double_type_node)
+	    return (TARGET_IEEEQUAD) ? "U10__float128" : "g";
 
-      if (type == long_double_type_node && TARGET_LONG_DOUBLE_128)
-	return (TARGET_IEEEQUAD) ? "U10__float128" : "g";
+	  if (type == ibm128_float_type_node)
+	    return "g";
+	}
     }
 
   /* Mangle IBM extended float long double as `g' (__float128) on

@@ -1,0 +1,9 @@
+2017-08-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config.h.in (_GLIBCXX_USE_FLOAT128): Don't define if
+	-mlong-double-64.
+
+2017-08-11   Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Clone branch subversion id 251056
+
