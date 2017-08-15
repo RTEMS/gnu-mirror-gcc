@@ -915,11 +915,8 @@
 /* Define if fchmodat is available in <sys/stat.h>. */
 #undef _GLIBCXX_USE_FCHMODAT
 
-/* Define if __float128 is supported on this host.  PowerPC does not support
-   -mlong-double-64 and __float128 at the same time.  */
-#if (!defined(__ARCH_PPC)) || defined(__LONG_DOUBLE_128__)
+/* Define if __float128 is supported on this host. */
 #undef _GLIBCXX_USE_FLOAT128
-#endif
 
 /* Defined if gettimeofday is available. */
 #undef _GLIBCXX_USE_GETTIMEOFDAY
