@@ -1,5 +1,5 @@
 /* { dg-do compile { target { powerpc*-*-linux* } } } */
-/* { dg-require-effective-target powerpc_powerpc_p9vector_ok } */
+/* { dg-require-effective-target powerpc_p9vector_ok } */
 /* { dg-options "-O2 -mpower9-vector -mno-float128" } */
 
 /* Test that we can use #pragma GCC target to enable -mfloat128 and generate
