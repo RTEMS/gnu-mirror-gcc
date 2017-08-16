@@ -4613,73 +4613,40 @@ rs6000_option_override_internal (bool global_init_p)
   /* Enable the default support for IEEE 128-bit floating point on Linux VSX
      sytems.  In GCC 7, we would enable the the IEEE 128-bit floating point
      infrastructure (-mfloat128-type) but not enable the actual __float128 type
-     unless the user used the explicit -mfloat128.  In GCC 8, now enable the
-     keyword as well as the type.  */
-  if (TARGET_VSX
-      && (TARGET_FLOAT128_ENABLE_TYPE || TARGET_IEEEQUAD)
-      && ((rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_TYPE) == 0))
-    rs6000_isa_flags |= OPTION_MASK_FLOAT128_TYPE;
+     unless the user used the explicit -mfloat128.  In GCC 8, we enable both
+     the keyword as well as the type.  */
+  TARGET_FLOAT128_TYPE = TARGET_FLOAT128_ENABLE_TYPE && TARGET_VSX;
 
   /* IEEE 128-bit floating point requires VSX support.  */
-  if (!TARGET_VSX)
+  if (TARGET_FLOAT128_KEYWORD)
     {
-      if (TARGET_FLOAT128_KEYWORD)
+      if (!TARGET_VSX)
 	{
 	  if ((rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_KEYWORD) != 0)
 	    error ("-mfloat128 requires VSX support");
 
-	  rs6000_isa_flags &= ~(OPTION_MASK_FLOAT128_TYPE
-				| OPTION_MASK_FLOAT128_KEYWORD
+	  TARGET_FLOAT128_TYPE = 0;
+	  rs6000_isa_flags &= ~(OPTION_MASK_FLOAT128_KEYWORD
 				| OPTION_MASK_FLOAT128_HW);
 	}
-
-      else if (TARGET_FLOAT128_TYPE)
+      else if (!TARGET_FLOAT128_TYPE)
 	{
-	  if ((rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_TYPE) != 0)
-	    error ("-mfloat128-type requires VSX support");
-
-	  rs6000_isa_flags &= ~(OPTION_MASK_FLOAT128_TYPE
-				| OPTION_MASK_FLOAT128_KEYWORD
-				| OPTION_MASK_FLOAT128_HW);
+	  TARGET_FLOAT128_TYPE = 1;
+	  warning (0, "The -mfloat128 option may not be fully supported");
 	}
     }
 
-  /* -mfloat128 and -mfloat128-hardware internally require the underlying IEEE
-      128-bit floating point support to be enabled.  */
-  if (!TARGET_FLOAT128_TYPE)
-    {
-      if (TARGET_FLOAT128_KEYWORD)
-	{
-	  if ((rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_KEYWORD) != 0)
-	    {
-	      error ("-mfloat128 requires -mfloat128-type");
-	      rs6000_isa_flags &= ~(OPTION_MASK_FLOAT128_TYPE
-				    | OPTION_MASK_FLOAT128_KEYWORD
-				    | OPTION_MASK_FLOAT128_HW);
-	    }
-	  else
-	    rs6000_isa_flags |= OPTION_MASK_FLOAT128_TYPE;
-	}
+  /* Enable the __float128 keyword under Linux by default.  */
+  if (TARGET_FLOAT128_TYPE && !TARGET_FLOAT128_KEYWORD
+      && (rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_KEYWORD) == 0)
+    rs6000_isa_flags |= OPTION_MASK_FLOAT128_KEYWORD;
 
-      if (TARGET_FLOAT128_HW)
-	{
-	  if ((rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_HW) != 0)
-	    {
-	      error ("-mfloat128-hardware requires -mfloat128-type");
-	      rs6000_isa_flags &= ~OPTION_MASK_FLOAT128_HW;
-	    }
-	  else
-	    rs6000_isa_flags &= ~(OPTION_MASK_FLOAT128_TYPE
-				  | OPTION_MASK_FLOAT128_KEYWORD
-				  | OPTION_MASK_FLOAT128_HW);
-	}
-    }
-
-  /* If we have -mfloat128-type and full ISA 3.0 support, enable
-     -mfloat128-hardware by default.  However, don't enable the __float128
-     keyword.  If the user explicitly turned on -mfloat128-hardware, enable the
-     -mfloat128 option as well if it was not already set.  */
-  if (TARGET_FLOAT128_TYPE && !TARGET_FLOAT128_HW
+  /* If we have are supporting the float128 type and full ISA 3.0 support,
+     enable -mfloat128-hardware by default.  However, don't enable the
+     __float128 keyword if it was explicitly turned off.  64-bit mode is needed
+     because sometimes the compiler wants to put things in an integer
+     container, and if we don't have __int128 support, it is impossible.  */
+  if (TARGET_FLOAT128_TYPE && !TARGET_FLOAT128_HW && TARGET_64BIT
       && (rs6000_isa_flags & ISA_3_0_MASKS_IEEE) == ISA_3_0_MASKS_IEEE
       && !(rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_HW))
     rs6000_isa_flags |= OPTION_MASK_FLOAT128_HW;
@@ -4700,16 +4667,6 @@ rs6000_option_override_internal (bool global_init_p)
 
       rs6000_isa_flags &= ~OPTION_MASK_FLOAT128_HW;
     }
-
-  if (TARGET_FLOAT128_HW && !TARGET_FLOAT128_KEYWORD
-      && (rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_HW) != 0
-      && (rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_KEYWORD) == 0)
-    rs6000_isa_flags |= OPTION_MASK_FLOAT128_KEYWORD;
-
-  /* Enable __float128 by default.  */
-  if (TARGET_FLOAT128_TYPE
-      && (rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_KEYWORD) == 0)
-    rs6000_isa_flags |= OPTION_MASK_FLOAT128_KEYWORD;
 
   /* Print the options after updating the defaults.  */
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
@@ -4777,10 +4734,12 @@ rs6000_option_override_internal (bool global_init_p)
      unless the altivec ABI was set.  This is set by default for 64-bit, but
      not for 32-bit.  */
   if (main_target_opt != NULL && !main_target_opt->x_rs6000_altivec_abi)
-    rs6000_isa_flags &= ~((OPTION_MASK_VSX | OPTION_MASK_ALTIVEC
-			   | OPTION_MASK_FLOAT128_TYPE
-			   | OPTION_MASK_FLOAT128_KEYWORD)
-			  & ~rs6000_isa_flags_explicit);
+    {
+      TARGET_FLOAT128_TYPE = 0;
+      rs6000_isa_flags &= ~((OPTION_MASK_VSX | OPTION_MASK_ALTIVEC
+			     | OPTION_MASK_FLOAT128_KEYWORD)
+			    & ~rs6000_isa_flags_explicit);
+    }
 
   /* Enable Altivec ABI for AIX -maltivec.  */
   if (TARGET_XCOFF && (TARGET_ALTIVEC || TARGET_VSX))
@@ -36100,7 +36059,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "efficient-unaligned-vsx",	OPTION_MASK_EFFICIENT_UNALIGNED_VSX,
 								false, true  },
   { "float128",			OPTION_MASK_FLOAT128_KEYWORD,	false, true  },
-  { "float128-type",		OPTION_MASK_FLOAT128_TYPE,	false, false },
   { "float128-hardware",	OPTION_MASK_FLOAT128_HW,	false, true  },
   { "fprnd",			OPTION_MASK_FPRND,		false, true  },
   { "hard-dfp",			OPTION_MASK_DFP,		false, true  },

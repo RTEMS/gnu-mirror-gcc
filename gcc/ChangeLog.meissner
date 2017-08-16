@@ -1,3 +1,21 @@
+2017-08-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000-cpus.def (OTHER_VSX_VECTOR_MASKS): Delete
+	OPTION_MASK_FLOAT128_TYPE.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.opt (TARGET_FLOAT128_ENABLE_TYPE): Make
+	this a variable set to 1 on Linux 64-bit systems, and 0 elsewhere
+	to say whether to enable -mfloat128 by default.
+	(-mfloat128-type): Delete switch.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Set
+	-mfloat128 by default on Linux 64-bit VSX systems.  Remove support
+	for -mfloat128-type.
+	(rs6000_opt_masks): Delete -mfloat128-type.
+	* config/rs6000/rs6000.h (MASK_FLOAT128_TYPE): Delete.
+	(MASK_FLOAT128_KEYWORD): Define.
+	(RS6000_BTM_FLOAT128): Switch to use -mfloat128, not
+	-mfloat128-type for the float128 built-in functions.
+
 2017-08-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_option_override_internal): Enable
