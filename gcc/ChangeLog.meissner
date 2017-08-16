@@ -1,5 +1,6 @@
 2017-08-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	PR target/81872
 	* config/rs6000/rs6000-cpus.def (OTHER_VSX_VECTOR_MASKS): Delete
 	OPTION_MASK_FLOAT128_TYPE.
 	(POWERPC_MASKS): Likewise.
@@ -15,6 +16,8 @@
 	(MASK_FLOAT128_KEYWORD): Define.
 	(RS6000_BTM_FLOAT128): Switch to use -mfloat128, not
 	-mfloat128-type for the float128 built-in functions.
+	* doc/invoke.texi (RS/6000 and PowerPC Options): Update -mfloat128
+	and -mfloat128-hardware documentation.
 
 2017-08-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
