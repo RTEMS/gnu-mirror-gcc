@@ -1,5 +1,34 @@
 2017-08-17  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/predicates.md (vsx_quad_dform_memory_operand):
+	Delete debug switches -mpower9-dform{,-scalar,-vector}.  Just use
+	-mpower9-vector.
+	* config/rs6000/rs6000-cpus.def (ISA_3_0_MASKS_SERVER): Likewise.
+	(OTHER_P9_VECTOR_MASKS): Likewise.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000-c.c (rs6000_target_modify_macros): Delete
+	comments referring to -mpower9-dform{,-scalar,-vector}.
+	* config/rs6000/rs6000.opt (-mpower9-dform-scalar): Delete debug
+	switches -mpower9-dform{,-scalar,-vector}.
+	(-mpower9-dform-vector): Likewise.
+	(-mpower9-dform): Likewise.
+	* config/rs6000/rs6000.c (rs6000_setup_reg_addr_masks): Delete
+	-mpower9-dform{,-scalar,-vector}.  Insted, just use
+	-mpower9-vector.
+	(rs6000_init_hard_regno_mode_ok): Likewise.
+	(rs6000_option_override_internal): Likewise.
+	(rs6000_emit_prologue): Likewise.
+	(rs6000_emit_epilogue): Likewise.
+	(rs6000_opt_masks): Likewise.
+	(rs6000_disable_incompatible_switches): Likewise.
+	(emit_fusion_p9_load): Likewise.
+	(emit_fusion_p9_store): Likewise.
+	* config/rs6000/rs6000.h (TARGET_P9_DFORM_SCALAR): Likewise.
+	(TARGET_P9_DFORM_VECTOR): Likewise.
+	* config/rs6000/rs6000.md (load/store peephole2s): Likewise.
+
+2017-08-17  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/rs6000-cpus.def (-mvsx-scalar-float): Delete
 	undocumented debugging options.
 	(-mvsx-scalar-double): Likewise.
