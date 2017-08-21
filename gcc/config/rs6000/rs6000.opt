@@ -196,14 +196,6 @@ mvsx
 Target Report Mask(VSX) Var(rs6000_isa_flags)
 Use vector/scalar (VSX) instructions.
 
-; This option existed in the past, but now is always on.
-mvsx-scalar-float
-Target RejectNegative Undocumented Ignore
-
-; This option existed in the past, but now is always on.
-mvsx-scalar-double
-Target RejectNegative Undocumented Ignore
-
 mvsx-align-128
 Target Undocumented Report Var(TARGET_VSX_ALIGN_128) Save
 ; If -mvsx, set alignment to 128 bits instead of 32/64
@@ -216,10 +208,6 @@ mefficient-unaligned-vsx
 Target Undocumented Report Mask(EFFICIENT_UNALIGNED_VSX) Var(rs6000_isa_flags)
 ; Consider unaligned VSX vector and fp accesses to be efficient
 
-; This option existed in the past, but it hadn't been used in awhile
-mallow-df-permute
-Target RejectNegative Undocumented Ignore
-
 msched-groups
 Target Undocumented Report Var(TARGET_SCHED_GROUPS) Init(-1) Save
 ; Explicitly set rs6000_sched_groups
@@ -231,10 +219,6 @@ Target Undocumented Report Var(TARGET_ALWAYS_HINT) Init(-1) Save
 malign-branch-targets
 Target Undocumented Report Var(TARGET_ALIGN_BRANCH_TARGETS) Init(-1) Save
 ; Explicitly set rs6000_align_branch_targets
-
-; This option existed in the past, but now is always on.
-mvectorize-builtins
-Target RejectNegative Undocumented Ignore
 
 mno-update
 Target Report RejectNegative Mask(NO_UPDATE) Var(rs6000_isa_flags)
