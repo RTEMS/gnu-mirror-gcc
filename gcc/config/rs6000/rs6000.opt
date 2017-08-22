@@ -550,18 +550,6 @@ mpower9-vector
 Target Undocumented Report Mask(P9_VECTOR) Var(rs6000_isa_flags)
 Use vector instructions added in ISA 3.0.
 
-; This option existed in the past, but now is always on.
-mpower9-dform-scalar
-Target RejectNegative Undocumented Ignore
-
-; This option existed in the past, but now is always on.
-mpower9-dform-vector
-Target RejectNegative Undocumented Ignore
-
-; This option existed in the past, but now is always on.
-mpower9-dform
-Target RejectNegative Undocumented Ignore
-
 mpower9-minmax
 Target Undocumented Mask(P9_MINMAX) Var(rs6000_isa_flags)
 Use the new min/max instructions defined in ISA 3.0.

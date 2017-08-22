@@ -1,3 +1,9 @@
+2017-08-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.opt (-mpower9-dform-scalar): Delete.
+	(-mpower9-dform-vector): Likewise.
+	(-mpower9-dform): Likewise.
+
 2017-08-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Merge up to 251248.
@@ -31,19 +37,6 @@
 	* config/rs6000/rs6000.h (TARGET_P9_DFORM_SCALAR): Likewise.
 	(TARGET_P9_DFORM_VECTOR): Likewise.
 	* config/rs6000/rs6000.md (load/store peephole2s): Likewise.
-
-2017-08-17  Michael Meissner  <meissner@linux.vnet.ibm.com>
-
-	* config/rs6000/rs6000-cpus.def (-mvsx-scalar-float): Delete
-	undocumented debugging options.
-	(-mvsx-scalar-double): Likewise.
-	(-mallow-df-permute): Likewise.
-	(-mvectorize-builtins): Likewise.
-	* config/rs6000/rs6000.c (rs6000_init_hard_regno_mode_ok):
-	Likewise.
-	(rs6000_builtin_vectorized_function): Likewise.
-	(rs6000_builtin_md_vectorized_function): Likewise.
-	(rs6000_opt_vars): Likewise.
 
 2017-08-17   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
