@@ -113,7 +113,6 @@ static tree negate_expr (tree);
 static tree associate_trees (location_t, tree, tree, enum tree_code, tree);
 static enum comparison_code comparison_to_compcode (enum tree_code);
 static enum tree_code compcode_to_comparison (enum comparison_code);
-static int operand_equal_for_comparison_p (tree, tree, tree);
 static int twoval_comparison_p (tree, tree *, tree *, int *);
 static tree eval_subst (location_t, tree, tree, tree, tree, tree);
 static tree optimize_bit_field_compare (location_t, enum tree_code,
@@ -1945,7 +1944,7 @@ fold_convert_const_int_from_fixed (tree type, const_tree arg1)
 {
   tree t;
   double_int temp, temp_trunc;
-  unsigned int mode;
+  scalar_mode mode;
 
   /* Right shift FIXED_CST to temp by fbit.  */
   temp = TREE_FIXED_CST (arg1).data;
@@ -2033,7 +2032,8 @@ fold_convert_const_real_from_fixed (tree type, const_tree arg1)
   REAL_VALUE_TYPE value;
   tree t;
 
-  real_convert_from_fixed (&value, TYPE_MODE (type), &TREE_FIXED_CST (arg1));
+  real_convert_from_fixed (&value, SCALAR_FLOAT_TYPE_MODE (type),
+			   &TREE_FIXED_CST (arg1));
   t = build_real (type, value);
 
   TREE_OVERFLOW (t) = TREE_OVERFLOW (arg1);
@@ -2050,8 +2050,8 @@ fold_convert_const_fixed_from_fixed (tree type, const_tree arg1)
   tree t;
   bool overflow_p;
 
-  overflow_p = fixed_convert (&value, TYPE_MODE (type), &TREE_FIXED_CST (arg1),
-			      TYPE_SATURATING (type));
+  overflow_p = fixed_convert (&value, SCALAR_TYPE_MODE (type),
+			      &TREE_FIXED_CST (arg1), TYPE_SATURATING (type));
   t = build_fixed (type, value);
 
   /* Propagate overflow flags.  */
@@ -2079,7 +2079,7 @@ fold_convert_const_fixed_from_int (tree type, const_tree arg1)
   else
     di.high = TREE_INT_CST_ELT (arg1, 1);
 
-  overflow_p = fixed_convert_from_int (&value, TYPE_MODE (type), di,
+  overflow_p = fixed_convert_from_int (&value, SCALAR_TYPE_MODE (type), di,
 				       TYPE_UNSIGNED (TREE_TYPE (arg1)),
 				       TYPE_SATURATING (type));
   t = build_fixed (type, value);
@@ -2100,7 +2100,7 @@ fold_convert_const_fixed_from_real (tree type, const_tree arg1)
   tree t;
   bool overflow_p;
 
-  overflow_p = fixed_convert_from_real (&value, TYPE_MODE (type),
+  overflow_p = fixed_convert_from_real (&value, SCALAR_TYPE_MODE (type),
 					&TREE_REAL_CST (arg1),
 					TYPE_SATURATING (type));
   t = build_fixed (type, value);
@@ -3365,60 +3365,27 @@ operand_equal_p (const_tree arg0, const_tree arg1, unsigned int flags)
 #undef OP_SAME_WITH_NULL
 }
 
-/* Similar to operand_equal_p, but see if ARG0 might have been made by
-   shorten_compare from ARG1 when ARG1 was being compared with OTHER.
+/* Similar to operand_equal_p, but strip nops first.  */
 
-   When in doubt, return 0.  */
-
-static int
-operand_equal_for_comparison_p (tree arg0, tree arg1, tree other)
+static bool
+operand_equal_for_comparison_p (tree arg0, tree arg1)
 {
-  int unsignedp1, unsignedpo;
-  tree primarg0, primarg1, primother;
-  unsigned int correct_width;
-
   if (operand_equal_p (arg0, arg1, 0))
-    return 1;
+    return true;
 
   if (! INTEGRAL_TYPE_P (TREE_TYPE (arg0))
       || ! INTEGRAL_TYPE_P (TREE_TYPE (arg1)))
-    return 0;
+    return false;
 
   /* Discard any conversions that don't change the modes of ARG0 and ARG1
      and see if the inner values are the same.  This removes any
      signedness comparison, which doesn't matter here.  */
-  primarg0 = arg0, primarg1 = arg1;
-  STRIP_NOPS (primarg0);
-  STRIP_NOPS (primarg1);
-  if (operand_equal_p (primarg0, primarg1, 0))
-    return 1;
+  STRIP_NOPS (arg0);
+  STRIP_NOPS (arg1);
+  if (operand_equal_p (arg0, arg1, 0))
+    return true;
 
-  /* Duplicate what shorten_compare does to ARG1 and see if that gives the
-     actual comparison operand, ARG0.
-
-     First throw away any conversions to wider types
-     already present in the operands.  */
-
-  primarg1 = get_narrower (arg1, &unsignedp1);
-  primother = get_narrower (other, &unsignedpo);
-
-  correct_width = TYPE_PRECISION (TREE_TYPE (arg1));
-  if (unsignedp1 == unsignedpo
-      && TYPE_PRECISION (TREE_TYPE (primarg1)) < correct_width
-      && TYPE_PRECISION (TREE_TYPE (primother)) < correct_width)
-    {
-      tree type = TREE_TYPE (arg0);
-
-      /* Make sure shorter operand is extended the right way
-	 to match the longer operand.  */
-      primarg1 = fold_convert (signed_or_unsigned_type_for
-			       (unsignedp1, TREE_TYPE (primarg1)), primarg1);
-
-      if (operand_equal_p (arg0, fold_convert (type, primarg1), 0))
-	return 1;
-    }
-
-  return 0;
+  return false;
 }
 
 /* See if ARG is an expression that is either a comparison or is performing
@@ -3967,7 +3934,8 @@ optimize_bit_field_compare (location_t loc, enum tree_code code,
   tree type = TREE_TYPE (lhs);
   tree unsigned_type;
   int const_p = TREE_CODE (rhs) == INTEGER_CST;
-  machine_mode lmode, rmode, nmode;
+  machine_mode lmode, rmode;
+  scalar_int_mode nmode;
   int lunsignedp, runsignedp;
   int lreversep, rreversep;
   int lvolatilep = 0, rvolatilep = 0;
@@ -4014,12 +3982,11 @@ optimize_bit_field_compare (location_t loc, enum tree_code code,
 
   /* See if we can find a mode to refer to this field.  We should be able to,
      but fail if we can't.  */
-  nmode = get_best_mode (lbitsize, lbitpos, bitstart, bitend,
-			 const_p ? TYPE_ALIGN (TREE_TYPE (linner))
-			 : MIN (TYPE_ALIGN (TREE_TYPE (linner)),
-				TYPE_ALIGN (TREE_TYPE (rinner))),
-			 word_mode, false);
-  if (nmode == VOIDmode)
+  if (!get_best_mode (lbitsize, lbitpos, bitstart, bitend,
+		      const_p ? TYPE_ALIGN (TREE_TYPE (linner))
+		      : MIN (TYPE_ALIGN (TREE_TYPE (linner)),
+			     TYPE_ALIGN (TREE_TYPE (rinner))),
+		      BITS_PER_WORD, false, &nmode))
     return 0;
 
   /* Set signed and unsigned types of the precision of this mode for the
@@ -5300,7 +5267,7 @@ fold_cond_expr_with_comparison (location_t loc, tree type,
      expressions will be false, so all four give B.  The min()
      and max() versions would give a NaN instead.  */
   if (!HONOR_SIGNED_ZEROS (element_mode (type))
-      && operand_equal_for_comparison_p (arg01, arg2, arg00)
+      && operand_equal_for_comparison_p (arg01, arg2)
       /* Avoid these transformations if the COND_EXPR may be used
 	 as an lvalue in the C++ front-end.  PR c++/19199.  */
       && (in_gimple_form
@@ -5474,7 +5441,7 @@ static tree
 unextend (tree c, int p, int unsignedp, tree mask)
 {
   tree type = TREE_TYPE (c);
-  int modesize = GET_MODE_BITSIZE (TYPE_MODE (type));
+  int modesize = GET_MODE_BITSIZE (SCALAR_INT_TYPE_MODE (type));
   tree temp;
 
   if (p == modesize || unsignedp)
@@ -5624,7 +5591,7 @@ fold_truth_andor_1 (location_t loc, enum tree_code code, tree truth_type,
   int ll_unsignedp, lr_unsignedp, rl_unsignedp, rr_unsignedp;
   int ll_reversep, lr_reversep, rl_reversep, rr_reversep;
   machine_mode ll_mode, lr_mode, rl_mode, rr_mode;
-  machine_mode lnmode, rnmode;
+  scalar_int_mode lnmode, rnmode;
   tree ll_mask, lr_mask, rl_mask, rr_mask;
   tree ll_and_mask, lr_and_mask, rl_and_mask, rr_and_mask;
   tree l_const, r_const;
@@ -5810,10 +5777,9 @@ fold_truth_andor_1 (location_t loc, enum tree_code code, tree truth_type,
      to be relative to a field of that size.  */
   first_bit = MIN (ll_bitpos, rl_bitpos);
   end_bit = MAX (ll_bitpos + ll_bitsize, rl_bitpos + rl_bitsize);
-  lnmode = get_best_mode (end_bit - first_bit, first_bit, 0, 0,
-			  TYPE_ALIGN (TREE_TYPE (ll_inner)), word_mode,
-			  volatilep);
-  if (lnmode == VOIDmode)
+  if (!get_best_mode (end_bit - first_bit, first_bit, 0, 0,
+		      TYPE_ALIGN (TREE_TYPE (ll_inner)), BITS_PER_WORD,
+		      volatilep, &lnmode))
     return 0;
 
   lnbitsize = GET_MODE_BITSIZE (lnmode);
@@ -5875,10 +5841,9 @@ fold_truth_andor_1 (location_t loc, enum tree_code code, tree truth_type,
 
       first_bit = MIN (lr_bitpos, rr_bitpos);
       end_bit = MAX (lr_bitpos + lr_bitsize, rr_bitpos + rr_bitsize);
-      rnmode = get_best_mode (end_bit - first_bit, first_bit, 0, 0,
-			      TYPE_ALIGN (TREE_TYPE (lr_inner)), word_mode,
-			      volatilep);
-      if (rnmode == VOIDmode)
+      if (!get_best_mode (end_bit - first_bit, first_bit, 0, 0,
+			  TYPE_ALIGN (TREE_TYPE (lr_inner)), BITS_PER_WORD,
+			  volatilep, &rnmode))
 	return 0;
 
       rnbitsize = GET_MODE_BITSIZE (rnmode);
@@ -6064,8 +6029,9 @@ extract_muldiv_1 (tree t, tree c, enum tree_code code, tree wide_type,
 {
   tree type = TREE_TYPE (t);
   enum tree_code tcode = TREE_CODE (t);
-  tree ctype = (wide_type != 0 && (GET_MODE_SIZE (TYPE_MODE (wide_type))
-				   > GET_MODE_SIZE (TYPE_MODE (type)))
+  tree ctype = (wide_type != 0
+		&& (GET_MODE_SIZE (SCALAR_INT_TYPE_MODE (wide_type))
+		    > GET_MODE_SIZE (SCALAR_INT_TYPE_MODE (type)))
 		? wide_type : type);
   tree t1, t2;
   int same_p = tcode == code;
@@ -6672,8 +6638,7 @@ fold_single_bit_test_into_sign_test (location_t loc,
       if (arg00 != NULL_TREE
 	  /* This is only a win if casting to a signed type is cheap,
 	     i.e. when arg00's type is not a partial mode.  */
-	  && TYPE_PRECISION (TREE_TYPE (arg00))
-	     == GET_MODE_PRECISION (TYPE_MODE (TREE_TYPE (arg00))))
+	  && type_has_mode_precision_p (TREE_TYPE (arg00)))
 	{
 	  tree stype = signed_type_for (TREE_TYPE (arg00));
 	  return fold_build2_loc (loc, code == EQ_EXPR ? GE_EXPR : LT_EXPR,
@@ -6703,7 +6668,7 @@ fold_single_bit_test (location_t loc, enum tree_code code,
       tree inner = TREE_OPERAND (arg0, 0);
       tree type = TREE_TYPE (arg0);
       int bitnum = tree_log2 (TREE_OPERAND (arg0, 1));
-      machine_mode operand_mode = TYPE_MODE (type);
+      scalar_int_mode operand_mode = SCALAR_INT_TYPE_MODE (type);
       int ops_unsigned;
       tree signed_type, unsigned_type, intermediate_type;
       tree tem, one;
@@ -7014,7 +6979,7 @@ static int
 native_encode_int (const_tree expr, unsigned char *ptr, int len, int off)
 {
   tree type = TREE_TYPE (expr);
-  int total_bytes = GET_MODE_SIZE (TYPE_MODE (type));
+  int total_bytes = GET_MODE_SIZE (SCALAR_INT_TYPE_MODE (type));
   int byte, offset, word, words;
   unsigned char value;
 
@@ -7062,7 +7027,7 @@ static int
 native_encode_fixed (const_tree expr, unsigned char *ptr, int len, int off)
 {
   tree type = TREE_TYPE (expr);
-  machine_mode mode = TYPE_MODE (type);
+  scalar_mode mode = SCALAR_TYPE_MODE (type);
   int total_bytes = GET_MODE_SIZE (mode);
   FIXED_VALUE_TYPE value;
   tree i_value, i_type;
@@ -7092,7 +7057,7 @@ static int
 native_encode_real (const_tree expr, unsigned char *ptr, int len, int off)
 {
   tree type = TREE_TYPE (expr);
-  int total_bytes = GET_MODE_SIZE (TYPE_MODE (type));
+  int total_bytes = GET_MODE_SIZE (SCALAR_FLOAT_TYPE_MODE (type));
   int byte, offset, word, words, bitpos;
   unsigned char value;
 
@@ -7164,7 +7129,7 @@ native_encode_complex (const_tree expr, unsigned char *ptr, int len, int off)
     return 0;
   part = TREE_IMAGPART (expr);
   if (off != -1)
-    off = MAX (0, off - GET_MODE_SIZE (TYPE_MODE (TREE_TYPE (part))));
+    off = MAX (0, off - GET_MODE_SIZE (SCALAR_TYPE_MODE (TREE_TYPE (part))));
   isize = native_encode_expr (part, ptr+rsize, len-rsize, off);
   if (off == -1
       && isize != rsize)
@@ -7188,7 +7153,7 @@ native_encode_vector (const_tree expr, unsigned char *ptr, int len, int off)
   offset = 0;
   count = VECTOR_CST_NELTS (expr);
   itype = TREE_TYPE (TREE_TYPE (expr));
-  size = GET_MODE_SIZE (TYPE_MODE (itype));
+  size = GET_MODE_SIZE (SCALAR_TYPE_MODE (itype));
   for (i = 0; i < count; i++)
     {
       if (off >= size)
@@ -7224,7 +7189,8 @@ native_encode_string (const_tree expr, unsigned char *ptr, int len, int off)
 
   if (TREE_CODE (type) != ARRAY_TYPE
       || TREE_CODE (TREE_TYPE (type)) != INTEGER_TYPE
-      || GET_MODE_BITSIZE (TYPE_MODE (TREE_TYPE (type))) != BITS_PER_UNIT
+      || (GET_MODE_BITSIZE (SCALAR_INT_TYPE_MODE (TREE_TYPE (type)))
+	  != BITS_PER_UNIT)
       || !tree_fits_shwi_p (TYPE_SIZE_UNIT (type)))
     return 0;
   total_bytes = tree_to_shwi (TYPE_SIZE_UNIT (type));
@@ -7296,7 +7262,7 @@ native_encode_expr (const_tree expr, unsigned char *ptr, int len, int off)
 static tree
 native_interpret_int (tree type, const unsigned char *ptr, int len)
 {
-  int total_bytes = GET_MODE_SIZE (TYPE_MODE (type));
+  int total_bytes = GET_MODE_SIZE (SCALAR_INT_TYPE_MODE (type));
 
   if (total_bytes > len
       || total_bytes * BITS_PER_UNIT > HOST_BITS_PER_DOUBLE_INT)
@@ -7315,7 +7281,8 @@ native_interpret_int (tree type, const unsigned char *ptr, int len)
 static tree
 native_interpret_fixed (tree type, const unsigned char *ptr, int len)
 {
-  int total_bytes = GET_MODE_SIZE (TYPE_MODE (type));
+  scalar_mode mode = SCALAR_TYPE_MODE (type);
+  int total_bytes = GET_MODE_SIZE (mode);
   double_int result;
   FIXED_VALUE_TYPE fixed_value;
 
@@ -7324,7 +7291,7 @@ native_interpret_fixed (tree type, const unsigned char *ptr, int len)
     return NULL_TREE;
 
   result = double_int::from_buffer (ptr, total_bytes);
-  fixed_value = fixed_from_double_int (result, TYPE_MODE (type));
+  fixed_value = fixed_from_double_int (result, mode);
 
   return build_fixed (type, fixed_value);
 }
@@ -7337,7 +7304,7 @@ native_interpret_fixed (tree type, const unsigned char *ptr, int len)
 static tree
 native_interpret_real (tree type, const unsigned char *ptr, int len)
 {
-  machine_mode mode = TYPE_MODE (type);
+  scalar_float_mode mode = SCALAR_FLOAT_TYPE_MODE (type);
   int total_bytes = GET_MODE_SIZE (mode);
   unsigned char value;
   /* There are always 32 bits in each long, no matter the size of
@@ -7346,7 +7313,6 @@ native_interpret_real (tree type, const unsigned char *ptr, int len)
   REAL_VALUE_TYPE r;
   long tmp[6];
 
-  total_bytes = GET_MODE_SIZE (TYPE_MODE (type));
   if (total_bytes > len || total_bytes > 24)
     return NULL_TREE;
   int words = (32 / BITS_PER_UNIT) / UNITS_PER_WORD;
@@ -7401,7 +7367,7 @@ native_interpret_complex (tree type, const unsigned char *ptr, int len)
   int size;
 
   etype = TREE_TYPE (type);
-  size = GET_MODE_SIZE (TYPE_MODE (etype));
+  size = GET_MODE_SIZE (SCALAR_TYPE_MODE (etype));
   if (size * 2 > len)
     return NULL_TREE;
   rpart = native_interpret_expr (etype, ptr, size);
@@ -7426,7 +7392,7 @@ native_interpret_vector (tree type, const unsigned char *ptr, int len)
   tree *elements;
 
   etype = TREE_TYPE (type);
-  size = GET_MODE_SIZE (TYPE_MODE (etype));
+  size = GET_MODE_SIZE (SCALAR_TYPE_MODE (etype));
   count = TYPE_VECTOR_SUBPARTS (type);
   if (size * count > len)
     return NULL_TREE;
@@ -11357,8 +11323,7 @@ fold_ternary_loc (location_t loc, enum tree_code code, tree type,
 
          Also try swapping the arguments and inverting the conditional.  */
       if (COMPARISON_CLASS_P (arg0)
-	  && operand_equal_for_comparison_p (TREE_OPERAND (arg0, 0),
-					     arg1, TREE_OPERAND (arg0, 1))
+	  && operand_equal_for_comparison_p (TREE_OPERAND (arg0, 0), arg1)
 	  && !HONOR_SIGNED_ZEROS (element_mode (arg1)))
 	{
 	  tem = fold_cond_expr_with_comparison (loc, type, arg0, op1, op2);
@@ -11367,9 +11332,7 @@ fold_ternary_loc (location_t loc, enum tree_code code, tree type,
 	}
 
       if (COMPARISON_CLASS_P (arg0)
-	  && operand_equal_for_comparison_p (TREE_OPERAND (arg0, 0),
-					     op2,
-					     TREE_OPERAND (arg0, 1))
+	  && operand_equal_for_comparison_p (TREE_OPERAND (arg0, 0), op2)
 	  && !HONOR_SIGNED_ZEROS (element_mode (op2)))
 	{
 	  location_t loc0 = expr_location_or (arg0, loc);
@@ -13689,14 +13652,15 @@ fold_read_from_constant_string (tree exp)
 	  string = exp1;
 	}
 
+      scalar_int_mode char_mode;
       if (string
 	  && TYPE_MODE (TREE_TYPE (exp)) == TYPE_MODE (TREE_TYPE (TREE_TYPE (string)))
 	  && TREE_CODE (string) == STRING_CST
 	  && TREE_CODE (index) == INTEGER_CST
 	  && compare_tree_int (index, TREE_STRING_LENGTH (string)) < 0
-	  && (GET_MODE_CLASS (TYPE_MODE (TREE_TYPE (TREE_TYPE (string))))
-	      == MODE_INT)
-	  && (GET_MODE_SIZE (TYPE_MODE (TREE_TYPE (TREE_TYPE (string)))) == 1))
+	  && is_int_mode (TYPE_MODE (TREE_TYPE (TREE_TYPE (string))),
+			  &char_mode)
+	  && GET_MODE_SIZE (char_mode) == 1)
 	return build_int_cst_type (TREE_TYPE (exp),
 				   (TREE_STRING_POINTER (string)
 				    [TREE_INT_CST_LOW (index)]));
@@ -14109,22 +14073,19 @@ fold_indirect_ref_1 (location_t loc, tree type, tree op0)
 		   && type == TREE_TYPE (op00type))
 	    {
 	      tree type_domain = TYPE_DOMAIN (op00type);
-	      tree min;
-	      if (type_domain != NULL_TREE
-		  && (min = TYPE_MIN_VALUE (type_domain))
-		  && TREE_CODE (min) == INTEGER_CST)
+	      tree min = size_zero_node;
+	      if (type_domain && TYPE_MIN_VALUE (type_domain))
+		min = TYPE_MIN_VALUE (type_domain);
+	      offset_int off = wi::to_offset (op01);
+	      offset_int el_sz = wi::to_offset (TYPE_SIZE_UNIT (type));
+	      offset_int remainder;
+	      off = wi::divmod_trunc (off, el_sz, SIGNED, &remainder);
+	      if (remainder == 0 && TREE_CODE (min) == INTEGER_CST)
 		{
-		  offset_int off = wi::to_offset (op01);
-		  offset_int el_sz = wi::to_offset (TYPE_SIZE_UNIT (type));
-		  offset_int remainder;
-		  off = wi::divmod_trunc (off, el_sz, SIGNED, &remainder);
-		  if (remainder == 0)
-		    {
-		      off = off + wi::to_offset (min);
-		      op01 = wide_int_to_tree (sizetype, off);
-		      return build4_loc (loc, ARRAY_REF, type, op00, op01,
-					 NULL_TREE, NULL_TREE);
-		    }
+		  off = off + wi::to_offset (min);
+		  op01 = wide_int_to_tree (sizetype, off);
+		  return build4_loc (loc, ARRAY_REF, type, op00, op01,
+				     NULL_TREE, NULL_TREE);
 		}
 	    }
 	}

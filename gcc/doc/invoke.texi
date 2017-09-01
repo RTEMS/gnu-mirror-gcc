@@ -284,6 +284,7 @@ Objective-C and Objective-C++ Dialects}.
 -Wformat-security  -Wformat-signedness  -Wformat-truncation=@var{n} @gol
 -Wformat-y2k  -Wframe-address @gol
 -Wframe-larger-than=@var{len}  -Wno-free-nonheap-object  -Wjump-misses-init @gol
+-Wif-not-aligned @gol
 -Wignored-qualifiers  -Wignored-attributes  -Wincompatible-pointer-types @gol
 -Wimplicit  -Wimplicit-fallthrough  -Wimplicit-fallthrough=@var{n} @gol
 -Wimplicit-function-declaration  -Wimplicit-int @gol
@@ -298,7 +299,7 @@ Objective-C and Objective-C++ Dialects}.
 -Wnormalized=@r{[}none@r{|}id@r{|}nfc@r{|}nfkc@r{]} @gol
 -Wnull-dereference  -Wodr  -Wno-overflow  -Wopenmp-simd  @gol
 -Woverride-init-side-effects  -Woverlength-strings @gol
--Wpacked  -Wpacked-bitfield-compat  -Wpadded @gol
+-Wpacked  -Wpacked-bitfield-compat -Wpacked-not-aligned -Wpadded @gol
 -Wparentheses  -Wno-pedantic-ms-format @gol
 -Wplacement-new  -Wplacement-new=@var{n} @gol
 -Wpointer-arith  -Wpointer-compare  -Wno-pointer-to-int-cast @gol
@@ -346,7 +347,7 @@ Objective-C and Objective-C++ Dialects}.
 -gcolumn-info  -gno-column-info @gol
 -gvms  -gxcoff  -gxcoff+  -gz@r{[}=@var{type}@r{]} @gol
 -fdebug-prefix-map=@var{old}=@var{new}  -fdebug-types-section @gol
--feliminate-dwarf2-dups  -fno-eliminate-unused-debug-types @gol
+-fno-eliminate-unused-debug-types @gol
 -femit-struct-debug-baseonly  -femit-struct-debug-reduced @gol
 -femit-struct-debug-detailed@r{[}=@var{spec-list}@r{]} @gol
 -feliminate-unused-debug-symbols  -femit-class-debug-always @gol
@@ -613,7 +614,7 @@ Objective-C and Objective-C++ Dialects}.
 -mcrc  -mdsp-packa  -mdvbf  -mlock  -mmac-d16  -mmac-24  -mrtsc  -mswape @gol
 -mtelephony  -mxy  -misize  -mannotate-align  -marclinux  -marclinux_prof @gol
 -mlong-calls  -mmedium-calls  -msdata -mirq-ctrl-saved @gol
--mrgf-banked-regs @gol
+-mrgf-banked-regs -mlpc-width=@var{width} -G @var{num} @gol
 -mvolatile-cache  -mtp-regno=@var{regno} @gol
 -malign-call  -mauto-modify-reg  -mbbit-peephole  -mno-brcc @gol
 -mcase-vector-pcrel  -mcompact-casesi  -mno-cond-exec  -mearly-cbranchsi @gol
@@ -4427,6 +4428,13 @@ switch (cond)
 
 The @option{-Wimplicit-fallthrough=3} warning is enabled by @option{-Wextra}.
 
+@item -Wif-not-aligned @r{(C, C++, Objective-C and Objective-C++ only)}
+@opindex Wif-not-aligned
+@opindex Wno-if-not-aligned
+Control if warning triggered by the @code{warn_if_not_aligned} attribute
+should be issued.  This is is enabled by default.
+Use @option{-Wno-if-not-aligned} to disable it.
+
 @item -Wignored-qualifiers @r{(C and C++ only)}
 @opindex Wignored-qualifiers
 @opindex Wno-ignored-qualifiers
@@ -6520,6 +6528,25 @@ struct foo
 This warning is enabled by default.  Use
 @option{-Wno-packed-bitfield-compat} to disable this warning.
 
+@item -Wpacked-not-aligned @r{(C, C++, Objective-C and Objective-C++ only)}
+@opindex Wpacked-not-aligned
+@opindex Wno-packed-not-aligned
+Warn if a structure field with explicitly specified alignment in a
+packed struct or union is misaligned.  For example, a warning will
+be issued on @code{struct S}, like, @code{warning: alignment 1 of
+'struct S' is less than 8}, in this code:
+
+@smallexample
+@group
+struct __attribute__ ((aligned (8))) S8 @{ char a[8]; @};
+struct __attribute__ ((packed)) S @{
+  struct S8 s8;
+@};
+@end group
+@end smallexample
+
+This warning is enabled by @option{-Wall}.
+
 @item -Wpadded
 @opindex Wpadded
 @opindex Wno-padded
@@ -6807,8 +6834,8 @@ for maximum benefit.
 
 GCC no longer supports DWARF Version 1, which is substantially
 different than Version 2 and later.  For historical reasons, some
-other DWARF-related options (including @option{-feliminate-dwarf2-dups} 
-and @option{-fno-dwarf2-cfi-asm}) retain a reference to DWARF Version 2
+other DWARF-related options such as
+@option{-fno-dwarf2-cfi-asm}) retain a reference to DWARF Version 2
 in their names, but apply to all currently-supported versions of DWARF.
 
 @item -gstabs
@@ -6999,12 +7026,6 @@ compression in traditional GNU format).  If the linker doesn't support
 writing compressed debug sections, the option is rejected.  Otherwise,
 if the assembler does not support them, @option{-gz} is silently ignored
 when producing object files.
-
-@item -feliminate-dwarf2-dups
-@opindex feliminate-dwarf2-dups
-Compress DWARF debugging information by eliminating duplicated
-information about each symbol.  This option only makes sense when
-generating DWARF debugging information.
 
 @item -femit-struct-debug-baseonly
 @opindex femit-struct-debug-baseonly
@@ -11053,6 +11074,12 @@ This option enables instrumentation of C++ member function calls, member
 accesses and some conversions between pointers to base and derived classes,
 to verify the referenced object has the correct dynamic type.
 
+@item -fsanitize=pointer-overflow
+@opindex fsanitize=pointer-overflow
+
+This option enables instrumentation of pointer arithmetics.  If the pointer
+arithmetics overflows, a run-time error is issued.
+
 @end table
 
 While @option{-ftrapv} causes traps for signed overflows to be emitted,
@@ -14758,6 +14785,18 @@ registers to avoid memory transactions during interrupt entry and exit
 sequences.  Use this option when you are using fast interrupts in an
 ARC V2 family processor.  Permitted values are 4, 8, 16, and 32.
 
+@item -mlpc-width=@var{width}
+@opindex mlpc-width
+Specify the width of the @code{lp_count} register.  Valid values for
+@var{width} are 8, 16, 20, 24, 28 and 32 bits.  The default width is
+fixed to 32 bits.  If the width is less than 32, the compiler does not
+attempt to transform loops in your program to use the zero-delay loop
+mechanism unless it is known that the @code{lp_count} register can
+hold the required loop-counter value.  Depending on the width
+specified, the compiler and run-time library might continue to use the
+loop mechanism for various needs.  This option defines macro
+@code{__ARC_LPC_WIDTH__} with the value of @var{width}.
+
 @end table
 
 The following options are passed through to the assembler, and also
@@ -14874,6 +14913,13 @@ instruction.  Conditional execution of function calls is suppressed, to
 allow use of the 25-bit range, rather than the 21-bit range with
 conditional branch-and-link.  This is the default for tool chains built
 for @w{@code{arc-linux-uclibc}} and @w{@code{arceb-linux-uclibc}} targets.
+
+@item -G @var{num}
+@opindex G
+Put definitions of externally-visible data in a small data section if
+that data is no bigger than @var{num} bytes.  The default value of
+@var{num} is 4 for any ARC configuration, or 8 when we have double
+load/store operations.
 
 @item -mno-sdata
 @opindex mno-sdata

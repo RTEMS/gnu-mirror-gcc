@@ -266,7 +266,7 @@ init_lower_subreg (void)
 
   memset (this_target_lower_subreg, 0, sizeof (*this_target_lower_subreg));
 
-  twice_word_mode = GET_MODE_2XWIDER_MODE (word_mode);
+  twice_word_mode = GET_MODE_2XWIDER_MODE (word_mode).require ();
 
   rtxes.target = gen_rtx_REG (word_mode, LAST_VIRTUAL_REGISTER + 1);
   rtxes.source = gen_rtx_REG (word_mode, LAST_VIRTUAL_REGISTER + 2);
@@ -349,8 +349,7 @@ simple_move (rtx_insn *insn, bool speed_p)
      size.  */
   mode = GET_MODE (SET_DEST (set));
   if (!SCALAR_INT_MODE_P (mode)
-      && (mode_for_size (GET_MODE_SIZE (mode) * BITS_PER_UNIT, MODE_INT, 0)
-	  == BLKmode))
+      && !int_mode_for_size (GET_MODE_BITSIZE (mode), 0).exists ())
     return NULL_RTX;
 
   /* Reject PARTIAL_INT modes.  They are used for processor specific
@@ -661,10 +660,8 @@ simplify_gen_subreg_concatn (machine_mode outermode, rtx op,
       if (op2 == NULL_RTX)
 	{
 	  /* We don't handle paradoxical subregs here.  */
-	  gcc_assert (GET_MODE_SIZE (outermode)
-		      <= GET_MODE_SIZE (GET_MODE (op)));
-	  gcc_assert (GET_MODE_SIZE (GET_MODE (op))
-		      <= GET_MODE_SIZE (GET_MODE (SUBREG_REG (op))));
+	  gcc_assert (!paradoxical_subreg_p (outermode, GET_MODE (op)));
+	  gcc_assert (!paradoxical_subreg_p (op));
 	  op2 = simplify_subreg_concatn (outermode, SUBREG_REG (op),
 					 byte + SUBREG_BYTE (op));
 	  gcc_assert (op2 != NULL_RTX);
@@ -685,10 +682,7 @@ simplify_gen_subreg_concatn (machine_mode outermode, rtx op,
      resolve_simple_move will ask for the high part of the paradoxical
      subreg, which does not have a value.  Just return a zero.  */
   if (ret == NULL_RTX
-      && GET_CODE (op) == SUBREG
-      && SUBREG_BYTE (op) == 0
-      && (GET_MODE_SIZE (innermode)
-	  > GET_MODE_SIZE (GET_MODE (SUBREG_REG (op)))))
+      && paradoxical_subreg_p (op))
     return CONST0_RTX (outermode);
 
   gcc_assert (ret != NULL_RTX);
@@ -1220,6 +1214,7 @@ resolve_shift_zext (rtx_insn *insn)
   rtx_insn *insns;
   rtx src_reg, dest_reg, dest_upper, upper_src = NULL_RTX;
   int src_reg_num, dest_reg_num, offset1, offset2, src_offset;
+  scalar_int_mode inner_mode;
 
   set = single_set (insn);
   if (!set)
@@ -1233,6 +1228,8 @@ resolve_shift_zext (rtx_insn *insn)
     return NULL;
 
   op_operand = XEXP (op, 0);
+  if (!is_a <scalar_int_mode> (GET_MODE (op_operand), &inner_mode))
+    return NULL;
 
   /* We can tear this operation apart only if the regs were already
      torn apart.  */
@@ -1245,8 +1242,7 @@ resolve_shift_zext (rtx_insn *insn)
   src_reg_num = (GET_CODE (op) == LSHIFTRT || GET_CODE (op) == ASHIFTRT)
 		? 1 : 0;
 
-  if (WORDS_BIG_ENDIAN
-      && GET_MODE_SIZE (GET_MODE (op_operand)) > UNITS_PER_WORD)
+  if (WORDS_BIG_ENDIAN && GET_MODE_SIZE (inner_mode) > UNITS_PER_WORD)
     src_reg_num = 1 - src_reg_num;
 
   if (GET_CODE (op) == ZERO_EXTEND)

@@ -664,7 +664,7 @@ check_classfn (tree ctype, tree function, tree template_parms)
       else
 	{
 	  if (DECL_CONV_FN_P (function))
-	    fns = lookup_all_conversions (ctype);
+	    fns = lookup_fnfields_slot (ctype, conv_op_identifier);
 
 	  error_at (DECL_SOURCE_LOCATION (function),
 		    "no declaration matches %q#D", function);
@@ -1004,6 +1004,13 @@ grokbitfield (const cp_declarator *declarator,
   if (TREE_CODE (value) == FUNCTION_DECL)
     {
       error ("cannot declare bit-field %qD with function type",
+	     DECL_NAME (value));
+      return NULL_TREE;
+    }
+
+  if (width && TYPE_WARN_IF_NOT_ALIGN (TREE_TYPE (value)))
+    {
+      error ("cannot declare bit-field %qD with %<warn_if_not_aligned%> type",
 	     DECL_NAME (value));
       return NULL_TREE;
     }

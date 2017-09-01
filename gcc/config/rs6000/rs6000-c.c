@@ -430,8 +430,8 @@ rs6000_target_modify_macros (bool define_p, HOST_WIDE_INT flags,
     rs6000_define_or_undefine_macro (define_p, "_ARCH_PWR7");
   /* Note that the OPTION_MASK_DIRECT_MOVE flag is automatically
      turned on in the following condition:
-     1. TARGET_P9_DFORM_SCALAR or TARGET_P9_DFORM_VECTOR are enabled
-        and OPTION_MASK_DIRECT_MOVE is not explicitly disabled.
+     1. TARGET_P8_VECTOR is enabled and OPTION_MASK_DIRECT_MOVE is not
+        explicitly disabled.
         Hereafter, the OPTION_MASK_DIRECT_MOVE flag is considered to
         have been turned on explicitly.
      Note that the OPTION_MASK_DIRECT_MOVE flag is automatically
@@ -545,8 +545,7 @@ rs6000_target_modify_macros (bool define_p, HOST_WIDE_INT flags,
         also considered to have been turned off explicitly.
      Note that the OPTION_MASK_P9_VECTOR is automatically turned on
      in the following conditions:
-     1. If TARGET_P9_DFORM_SCALAR or TARGET_P9_DFORM_VECTOR and
-        OPTION_MASK_P9_VECTOR was not turned off explicitly.
+     1. If TARGET_P9_MINMAX was turned on explicitly.
         Hereafter, THE OPTION_MASK_P9_VECTOR flag is considered to
         have been turned on explicitly.  */
   if ((flags & OPTION_MASK_P9_VECTOR) != 0)
@@ -5814,7 +5813,7 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	 types.  */
       if (nargs != 2)
 	{
-	  error ("vec_mul only accepts 2 arguments");
+	  error ("builtin %qs only accepts 2 arguments", "vec_mul");
 	  return error_mark_node;
 	}
 
@@ -5831,23 +5830,23 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 
       switch (TYPE_MODE (TREE_TYPE (arg0_type)))
 	{
-	  case QImode:
-	  case HImode:
-	  case SImode:
-	  case DImode:
-	  case TImode:
+	  case E_QImode:
+	  case E_HImode:
+	  case E_SImode:
+	  case E_DImode:
+	  case E_TImode:
 	    {
 	      /* For scalar types just use a multiply expression.  */
 	      return fold_build2_loc (loc, MULT_EXPR, TREE_TYPE (arg0), arg0,
 				      fold_convert (TREE_TYPE (arg0), arg1));
 	    }
-	  case SFmode:
+	  case E_SFmode:
 	    {
 	      /* For floats use the xvmulsp instruction directly.  */
 	      tree call = rs6000_builtin_decls[VSX_BUILTIN_XVMULSP];
 	      return build_call_expr (call, 2, arg0, arg1);
 	    }
-	  case DFmode:
+	  case E_DFmode:
 	    {
 	      /* For doubles use the xvmuldp instruction directly.  */
 	      tree call = rs6000_builtin_decls[VSX_BUILTIN_XVMULDP];
@@ -5865,7 +5864,7 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	 for it (prior to power 9).  */
       if (nargs != 2)
 	{
-	  error ("vec_cmpne only accepts 2 arguments");
+	  error ("builtin %qs only accepts 2 arguments", "vec_cmpne");
 	  return error_mark_node;
 	}
 
@@ -5895,13 +5894,13 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 		 vec_cmpeq (va, vb)).  */
 	      /* Note:  vec_nand also works but opt changes vec_nand's
 		 to vec_nor's anyway.  */
-	    case QImode:
-	    case HImode:
-	    case SImode:
-	    case DImode:
-	    case TImode:
-	    case SFmode:
-	    case DFmode:
+	    case E_QImode:
+	    case E_HImode:
+	    case E_SImode:
+	    case E_DImode:
+	    case E_TImode:
+	    case E_SFmode:
+	    case E_DFmode:
 	      {
 		/* call = vec_cmpeq (va, vb)
 		   result = vec_nor (call, call).  */
@@ -5938,7 +5937,7 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	{
 	  const char *name = fcode == ALTIVEC_BUILTIN_VEC_ADDE ?
 	    "vec_adde": "vec_sube";
-	  error ("%s only accepts 3 arguments", name);
+	  error ("builtin %qs only accepts 3 arguments", name);
 	  return error_mark_node;
 	}
 
@@ -5964,7 +5963,7 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 						   vec_and (carryv, 1)).
 	     vec_sube (va, vb, carryv) == vec_sub (vec_sub (va, vb),
 						   vec_and (carryv, 1)).  */
-	  case SImode:
+	  case E_SImode:
 	    {
 	      tree add_sub_builtin;
 
@@ -5992,7 +5991,7 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	    }
 	  /* For {un}signed __int128s use the vaddeuqm instruction
 		directly.  */
-	  case TImode:
+	  case E_TImode:
 	    {
 	       tree bii;
 
@@ -6021,7 +6020,7 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	{
 	  const char *name = fcode == ALTIVEC_BUILTIN_VEC_ADDEC ?
 	    "vec_addec": "vec_subec";
-	  error ("%s only accepts 3 arguments", name);
+	  error ("builtin %qs only accepts 3 arguments", name);
 	  return error_mark_node;
 	}
 
@@ -6047,7 +6046,7 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 				vec_or (vec_addc (va, vb),
 					vec_addc (vec_add (va, vb),
 						  vec_and (carryv, 0x1))).  */
-	  case SImode:
+	  case E_SImode:
 	    {
 	    /* Use save_expr to ensure that operands used more than once
 		that may have side effects (like calls) are only evaluated
@@ -6098,7 +6097,7 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	    }
 	  /* For {un}signed __int128s use the vaddecuq/vsubbecuq
 	     instructions.  */
-	  case TImode:
+	  case E_TImode:
 	    {
 	       tree bii;
 
@@ -6128,19 +6127,14 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
       vec<constructor_elt, va_gc> *vec;
       const char *name = fcode == ALTIVEC_BUILTIN_VEC_SPLATS ? "vec_splats": "vec_promote";
 
-      if (nargs == 0)
-	{
-	  error ("%s only accepts %d arguments", name, (fcode == ALTIVEC_BUILTIN_VEC_PROMOTE)+1 );
-	  return error_mark_node;
-	}
       if (fcode == ALTIVEC_BUILTIN_VEC_SPLATS && nargs != 1)
 	{
-	  error ("%s only accepts 1 argument", name);
+	  error ("builtin %qs only accepts 1 argument", name);
 	  return error_mark_node;
 	}
       if (fcode == ALTIVEC_BUILTIN_VEC_PROMOTE && nargs != 2)
 	{
-	  error ("%s only accepts 2 arguments", name);
+	  error ("builtin %qs only accepts 2 arguments", name);
 	  return error_mark_node;
 	}
       /* Ignore promote's element argument.  */
@@ -6156,28 +6150,28 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
       unsigned_p = TYPE_UNSIGNED (type);
       switch (TYPE_MODE (type))
 	{
-	  case TImode:
+	  case E_TImode:
 	    type = (unsigned_p ? unsigned_V1TI_type_node : V1TI_type_node);
 	    size = 1;
 	    break;
-	  case DImode:
+	  case E_DImode:
 	    type = (unsigned_p ? unsigned_V2DI_type_node : V2DI_type_node);
 	    size = 2;
 	    break;
-	  case SImode:
+	  case E_SImode:
 	    type = (unsigned_p ? unsigned_V4SI_type_node : V4SI_type_node);
 	    size = 4;
 	    break;
-	  case HImode:
+	  case E_HImode:
 	    type = (unsigned_p ? unsigned_V8HI_type_node : V8HI_type_node);
 	    size = 8;
 	    break;
-	  case QImode:
+	  case E_QImode:
 	    type = (unsigned_p ? unsigned_V16QI_type_node : V16QI_type_node);
 	    size = 16;
 	    break;
-	  case SFmode: type = V4SF_type_node; size = 4; break;
-	  case DFmode: type = V2DF_type_node; size = 2; break;
+	  case E_SFmode: type = V4SF_type_node; size = 4; break;
+	  case E_DFmode: type = V2DF_type_node; size = 2; break;
 	  default:
 	    goto bad;
 	}
@@ -6206,7 +6200,7 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
       /* No second argument. */
       if (nargs != 2)
 	{
-	  error ("vec_extract only accepts 2 arguments");
+	  error ("builtin %qs only accepts 2 arguments", "vec_extract");
 	  return error_mark_node;
 	}
 
@@ -6249,33 +6243,33 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 		default:
 		  break;
 
-		case V1TImode:
+		case E_V1TImode:
 		  call = rs6000_builtin_decls[VSX_BUILTIN_VEC_EXT_V1TI];
 		  break;
 
-		case V2DFmode:
+		case E_V2DFmode:
 		  call = rs6000_builtin_decls[VSX_BUILTIN_VEC_EXT_V2DF];
 		  break;
 
-		case V2DImode:
+		case E_V2DImode:
 		  call = rs6000_builtin_decls[VSX_BUILTIN_VEC_EXT_V2DI];
 		  break;
 
-		case V4SFmode:
+		case E_V4SFmode:
 		  call = rs6000_builtin_decls[ALTIVEC_BUILTIN_VEC_EXT_V4SF];
 		  break;
 
-		case V4SImode:
+		case E_V4SImode:
 		  if (TARGET_DIRECT_MOVE_64BIT)
 		    call = rs6000_builtin_decls[ALTIVEC_BUILTIN_VEC_EXT_V4SI];
 		  break;
 
-		case V8HImode:
+		case E_V8HImode:
 		  if (TARGET_DIRECT_MOVE_64BIT)
 		    call = rs6000_builtin_decls[ALTIVEC_BUILTIN_VEC_EXT_V8HI];
 		  break;
 
-		case V16QImode:
+		case E_V16QImode:
 		  if (TARGET_DIRECT_MOVE_64BIT)
 		    call = rs6000_builtin_decls[ALTIVEC_BUILTIN_VEC_EXT_V16QI];
 		  break;
@@ -6291,27 +6285,27 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 		default:
 		  break;
 
-		case V2DFmode:
+		case E_V2DFmode:
 		  call = rs6000_builtin_decls[VSX_BUILTIN_VEC_EXT_V2DF];
 		  break;
 
-		case V2DImode:
+		case E_V2DImode:
 		  call = rs6000_builtin_decls[VSX_BUILTIN_VEC_EXT_V2DI];
 		  break;
 
-		case V4SFmode:
+		case E_V4SFmode:
 		  call = rs6000_builtin_decls[ALTIVEC_BUILTIN_VEC_EXT_V4SF];
 		  break;
 
-		case V4SImode:
+		case E_V4SImode:
 		  call = rs6000_builtin_decls[ALTIVEC_BUILTIN_VEC_EXT_V4SI];
 		  break;
 
-		case V8HImode:
+		case E_V8HImode:
 		  call = rs6000_builtin_decls[ALTIVEC_BUILTIN_VEC_EXT_V8HI];
 		  break;
 
-		case V16QImode:
+		case E_V16QImode:
 		  call = rs6000_builtin_decls[ALTIVEC_BUILTIN_VEC_EXT_V16QI];
 		  break;
 		}
@@ -6375,7 +6369,7 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
       /* No second or third arguments. */
       if (nargs != 3)
 	{
-	  error ("vec_insert only accepts 3 arguments");
+	  error ("builtin %qs only accepts 3 arguments", "vec_insert");
 	  return error_mark_node;
 	}
 
@@ -6700,7 +6694,7 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 
 	if (nargs != 2)
 	  {
-	    error ("__builtin_cmpb only accepts 2 arguments");
+	    error ("builtin %qs only accepts 2 arguments", "__builtin_cmpb");
 	    return error_mark_node;
 	  }
 
@@ -6737,11 +6731,12 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
     else if (fcode == P9V_BUILTIN_VEC_VSIEDP)
       {
 	int overloaded_code;
-	int arg1_mode = TYPE_MODE (types[0]);
+	machine_mode arg1_mode = TYPE_MODE (types[0]);
 
 	if (nargs != 2)
 	  {
-	    error ("scalar_insert_exp only accepts 2 arguments");
+	    error ("builtin %qs only accepts 2 arguments",
+		   "scalar_insert_exp");
 	    return error_mark_node;
 	  }
 
@@ -6804,15 +6799,15 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
     if (unsupported_builtin)
       {
 	const char *name = rs6000_overloaded_builtin_name (fcode);
-	error ("builtin function %s not supported in this compiler configuration",
-	       name);
+	error ("builtin function %qs not supported in this compiler "
+	       "configuration", name);
 	return error_mark_node;
       }
   }
  bad:
   {
     const char *name = rs6000_overloaded_builtin_name (fcode);
-    error ("invalid parameter combination for AltiVec intrinsic %s", name);
+    error ("invalid parameter combination for AltiVec intrinsic %qs", name);
     return error_mark_node;
   }
 }

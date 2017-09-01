@@ -1,3 +1,83 @@
+2017-09-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/81887
+	* parse.c (decode_omp_directive): Use matchs instead of matcho for
+	end ordered and ordered directives, except for ordered depend.  For
+	-fopenmp-simd and ordered depend, reject the stmt.
+	* trans-openmp.c (gfc_trans_omp_ordered): For -fopenmp-simd ignore
+	threads clause and if simd clause isn't present, just translate the
+	body.
+
+2017-08-30  Richard Sandiford  <richard.sandiford@linaro.org>
+	    Alan Hayward  <alan.hayward@arm.com>
+	    David Sherwood  <david.sherwood@arm.com>
+
+	* trans-types.c (gfc_init_kinds): Use opt_scalar_int_mode for
+	the mode iterator.
+
+2017-08-30  Richard Sandiford  <richard.sandiford@linaro.org>
+	    Alan Hayward  <alan.hayward@arm.com>
+	    David Sherwood  <david.sherwood@arm.com>
+
+	* target-memory.c (size_integer): Use SCALAR_INT_TYPE_MODE.
+	(size_logical): Likewise.
+
+2017-08-30  Richard Sandiford  <richard.sandiford@linaro.org>
+	    Alan Hayward  <alan.hayward@arm.com>
+	    David Sherwood  <david.sherwood@arm.com>
+
+	* trans-types.c (gfc_type_for_mode): Use is_a <scalar_int_mode>.
+
+2017-08-30  Richard Sandiford  <richard.sandiford@linaro.org>
+	    Alan Hayward  <alan.hayward@arm.com>
+	    David Sherwood  <david.sherwood@arm.com>
+
+	* trans-types.c (gfc_init_kinds): Use opt_scalar_float_mode
+	and FOR_EACH_MODE_IN_CLASS.
+
+2017-08-30  Richard Sandiford  <richard.sandiford@linaro.org>
+	    Alan Hayward  <alan.hayward@arm.com>
+	    David Sherwood  <david.sherwood@arm.com>
+
+	* target-memory.c (size_float): Use SCALAR_FLOAT_TYPE_MODE
+	instead of TYPE_MODE.
+
+2017-08-30  Richard Sandiford  <richard.sandiford@linaro.org>
+	    Alan Hayward  <alan.hayward@arm.com>
+	    David Sherwood  <david.sherwood@arm.com>
+
+	* trans-types.c (gfc_init_kinds): Use machine_mode instead of int
+	for "mode".
+
+2017-08-28  Janus Weil  <janus@gcc.gnu.org>
+
+	PR fortran/81770
+	* expr.c (gfc_check_pointer_assign): Improve the check whether pointer
+	may outlive pointer target.
+
+2017-08-27  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/81974
+	* frontend-passes (inline_matumul_assign):  Explicity
+	set typespec for call to CONJG.
+
+2017-08-21  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR fortran/81296
+	* trans-io.c (get_dtio_proc): Add check for format label and set
+	formatted flag accordingly. Reorganize the code a little.
+
+2017-08-16  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/81116
+	* frontend-passes.c (realloc_string_callback): If expression is a
+	concatenation, also check for dependency.
+	(constant_string_length): Check for presence of symtree.
+
+2017-08-13  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	* gfortran.texi: Document format of unformatted sequential files.
+
 2017-08-11  Thomas Koenig  <tkoenig@gcc.gnu.org>
 
 	* invoke.texi:  Actually commit change about -Ofast.

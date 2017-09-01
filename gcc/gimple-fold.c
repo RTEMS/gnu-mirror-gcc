@@ -628,6 +628,36 @@ var_decl_component_p (tree var)
   return SSA_VAR_P (inner);
 }
 
+/* If the SIZE argument representing the size of an object is in a range
+   of values of which exactly one is valid (and that is zero), return
+   true, otherwise false.  */
+
+static bool
+size_must_be_zero_p (tree size)
+{
+  if (integer_zerop (size))
+    return true;
+
+  if (TREE_CODE (size) != SSA_NAME)
+    return false;
+
+  wide_int min, max;
+  enum value_range_type rtype = get_range_info (size, &min, &max);
+  if (rtype != VR_ANTI_RANGE)
+    return false;
+
+  tree type = TREE_TYPE (size);
+  int prec = TYPE_PRECISION (type);
+
+  wide_int wone = wi::one (prec);
+
+  /* Compute the value of SSIZE_MAX, the largest positive value that
+     can be stored in ssize_t, the signed counterpart of size_t.  */
+  wide_int ssize_max = wi::lshift (wi::one (prec), prec - 1) - 1;
+
+  return wi::eq_p (min, wone) && wi::geu_p (max, ssize_max);
+}
+
 /* Fold function call to builtin mem{{,p}cpy,move}.  Return
    false if no simplification can be made.
    If ENDP is 0, return DEST (like memcpy).
@@ -646,8 +676,9 @@ gimple_fold_builtin_memory_op (gimple_stmt_iterator *gsi,
   tree destvar, srcvar;
   location_t loc = gimple_location (stmt);
 
-  /* If the LEN parameter is zero, return DEST.  */
-  if (integer_zerop (len))
+  /* If the LEN parameter is a constant zero or in range where
+     the only valid value is zero, return DEST.  */
+  if (size_must_be_zero_p (len))
     {
       gimple *repl;
       if (gimple_call_lhs (stmt))
@@ -717,31 +748,29 @@ gimple_fold_builtin_memory_op (gimple_stmt_iterator *gsi,
 	  unsigned ilen = tree_to_uhwi (len);
 	  if (pow2p_hwi (ilen))
 	    {
+	      scalar_int_mode mode;
 	      tree type = lang_hooks.types.type_for_size (ilen * 8, 1);
 	      if (type
-		  && TYPE_MODE (type) != BLKmode
-		  && (GET_MODE_SIZE (TYPE_MODE (type)) * BITS_PER_UNIT
-		      == ilen * 8)
+		  && is_a <scalar_int_mode> (TYPE_MODE (type), &mode)
+		  && GET_MODE_SIZE (mode) * BITS_PER_UNIT == ilen * 8
 		  /* If the destination pointer is not aligned we must be able
 		     to emit an unaligned store.  */
-		  && (dest_align >= GET_MODE_ALIGNMENT (TYPE_MODE (type))
-		      || !SLOW_UNALIGNED_ACCESS (TYPE_MODE (type), dest_align)
-		      || (optab_handler (movmisalign_optab, TYPE_MODE (type))
+		  && (dest_align >= GET_MODE_ALIGNMENT (mode)
+		      || !SLOW_UNALIGNED_ACCESS (mode, dest_align)
+		      || (optab_handler (movmisalign_optab, mode)
 			  != CODE_FOR_nothing)))
 		{
 		  tree srctype = type;
 		  tree desttype = type;
-		  if (src_align < GET_MODE_ALIGNMENT (TYPE_MODE (type)))
+		  if (src_align < GET_MODE_ALIGNMENT (mode))
 		    srctype = build_aligned_type (type, src_align);
 		  tree srcmem = fold_build2 (MEM_REF, srctype, src, off0);
 		  tree tem = fold_const_aggregate_ref (srcmem);
 		  if (tem)
 		    srcmem = tem;
-		  else if (src_align < GET_MODE_ALIGNMENT (TYPE_MODE (type))
-			   && SLOW_UNALIGNED_ACCESS (TYPE_MODE (type),
-						     src_align)
-			   && (optab_handler (movmisalign_optab,
-					      TYPE_MODE (type))
+		  else if (src_align < GET_MODE_ALIGNMENT (mode)
+			   && SLOW_UNALIGNED_ACCESS (mode, src_align)
+			   && (optab_handler (movmisalign_optab, mode)
 			       == CODE_FOR_nothing))
 		    srcmem = NULL_TREE;
 		  if (srcmem)
@@ -757,7 +786,7 @@ gimple_fold_builtin_memory_op (gimple_stmt_iterator *gsi,
 			  gimple_set_vuse (new_stmt, gimple_vuse (stmt));
 			  gsi_insert_before (gsi, new_stmt, GSI_SAME_STMT);
 			}
-		      if (dest_align < GET_MODE_ALIGNMENT (TYPE_MODE (type)))
+		      if (dest_align < GET_MODE_ALIGNMENT (mode))
 			desttype = build_aligned_type (type, dest_align);
 		      new_stmt
 			= gimple_build_assign (fold_build2 (MEM_REF, desttype,
@@ -1201,7 +1230,7 @@ gimple_fold_builtin_memset (gimple_stmt_iterator *gsi, tree c, tree len)
     return NULL_TREE;
 
   length = tree_to_uhwi (len);
-  if (GET_MODE_SIZE (TYPE_MODE (etype)) != length
+  if (GET_MODE_SIZE (SCALAR_INT_TYPE_MODE (etype)) != length
       || get_pointer_alignment (dest) / BITS_PER_UNIT < length)
     return NULL_TREE;
 
