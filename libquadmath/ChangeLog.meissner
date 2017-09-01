@@ -1,12 +1,14 @@
 2017-09-01  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* math/sqrtq.c (sqrtq): Changes from review.
+
 	Merge up to 251609.
 
 2017-08-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* configure.ac (powerpc*-linux*): Use attribute mode KC to create
 	complex __float128 on PowerPC instead of attribute mode TC.
-	* quadmth.h (__complex128): Likewise.
+	* quadmath.h (__complex128): Likewise.
 	* configure: Regenerate.
 	* math/cbrtq.c (CBRT2): Use __float128 not long double.
 	(CBRT4): Likewise.

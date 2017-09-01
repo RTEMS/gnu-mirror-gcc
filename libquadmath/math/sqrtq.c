@@ -31,13 +31,13 @@ sqrtq (const __float128 x)
     return y;
   }
 
-#if defined(HAVE_SQRTL)
+#ifdef HAVE_SQRTL
   {
-    long double xl = (long double)x;
+    long double xl = (long double) x;
     if (xl <= LDBL_MAX && xl >= LDBL_MIN)
       {
 	/* Use long double result as starting point.  */
-	y = sqrtl (xl);
+	y = (__float128) sqrtl (xl);
 
 	/* One Newton iteration.  */
 	y -= 0.5q * (y - x / y);
