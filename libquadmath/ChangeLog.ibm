@@ -1,5 +1,9 @@
 2017-09-06  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* math/atanq.c (huge): Use __float128 not long double.
+
+2017-09-06  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	Back port from trunk
 	2017-09-01  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
