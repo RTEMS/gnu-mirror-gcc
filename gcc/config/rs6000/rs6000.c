@@ -41922,6 +41922,77 @@ insn_is_swap_p (rtx insn)
   return 1;
 }
 
+void
+kelvin_breakpoint_b4 (const_rtx tocrel_expr)
+{
+  if (dump_file) {
+    fprintf (dump_file, "made it to kelvin_breakpoint_b4\n");
+    fprintf (dump_file, "  tocrel_expr: ");
+    print_rtl_single (dump_file, tocrel_expr);
+  }
+}
+
+  void
+kelvin_breakpoint_after (const_rtx tocrel_expr)
+{
+  if (dump_file) {
+    fprintf (dump_file, "made it to kelvin_breakpoint_after\n");
+    fprintf (dump_file, "  tocrel_expr: ");
+    print_rtl_single (dump_file, tocrel_expr);
+  }
+}
+
+void
+kelvin_breakpoint_4 (const_rtx const_vector)
+{
+  if (dump_file) {
+    fprintf (dump_file, "make it to kelvin_brekapoint_4\n");
+    fprintf (dump_file, "const_vector: ");
+    print_rtl_single (dump_file, const_vector);
+  }
+}
+
+void
+kelvin_breakpoint_5 (const_rtx my_tocrel_expr, const_rtx my_tocrel_base,
+		     const_rtx my_tocrel_offset)
+{
+  if (dump_file) {
+    fprintf (dump_file, "make it to kelvin_breakpoint_5\n");
+    fprintf (dump_file, "tocrel_expr: ");
+    print_rtl_single (dump_file, my_tocrel_expr);
+    fprintf (dump_file, "tocrel_base: ");
+    print_rtl_single (dump_file, my_tocrel_base);
+    fprintf (dump_file, "tocrel_offset: ");
+    print_rtl_single (dump_file, my_tocrel_offset);
+  }
+}
+
+void
+kelvin_breakpoint_6 (const_rtx my_base, const_rtx my_offset)
+{
+  if (dump_file) {
+    fprintf (dump_file, "made it to kelvin_breakpoint_6\n");
+    fprintf (dump_file, "  base: ");
+    print_rtl_single (dump_file, my_base);
+    fprintf (dump_file, "  offset: ");
+    print_rtl_single (dump_file, my_offset);
+  }
+}
+
+void
+kelvin_breakpoint (const_rtx toc_base, const_rtx my_base, const_rtx my_offset)
+{
+  if (dump_file) {
+    fprintf (dump_file, "made it to kelvin_breakpoint\n");
+    fprintf (dump_file, "  toc_base: ");
+    print_rtl_single (dump_file, toc_base);
+    fprintf (dump_file, "  my_base: ");
+    print_rtl_single (dump_file, my_base);
+    fprintf (dump_file, "  my_offset: ");
+    print_rtl_single (dump_file, my_offset);
+  }
+}
+
 /* Return TRUE if insn is a swap fed by a load from the constant pool.  */
 static bool
 const_load_sequence_p (swap_web_entry *insn_entry, rtx insn)
@@ -42027,13 +42098,36 @@ const_load_sequence_p (swap_web_entry *insn_entry, rtx insn)
 	  /* There is an extra level of indirection for small/large
 	     code models.  */
 	  rtx tocrel_expr = SET_SRC (tocrel_body);
+	  /* kelvin: G */
 	  if (GET_CODE (tocrel_expr) == MEM)
 	    tocrel_expr = XEXP (tocrel_expr, 0);
 	  if (!toc_relative_expr_p (tocrel_expr, false))
 	    return false;
 	  split_const (XVECEXP (tocrel_base, 0, 0), &base, &offset);
+	  /* kelvin: H */
+	  kelvin_breakpoint(tocrel_base, base, offset);
+	  /* bill says this should return false on test 20 */
 	  if (GET_CODE (base) != SYMBOL_REF || !CONSTANT_POOL_ADDRESS_P (base))
 	    return false;
+	  else
+	    {
+	      /* FIXME: The conditions under which
+	       *  ((GET_CODE (const_vector) == SYMBOL_REF) &&
+	       *   !CONSTANT_POOL_ADDRESS_P (const_vector))
+	       * are not well understood.  This code prevents
+	       * an internal compiler error which will occur in
+	       * replace_swapped_load_constant () if we were to return
+	       * true.  Some day, we should figure out how to properly
+	       * handle this condition in
+	       * replace_swapped_load_constant () and then we can
+	       * remove this special test.  */
+	      rtx const_vector = get_pool_constant (base);
+	      if (GET_CODE (const_vector) == SYMBOL_REF)
+		{
+		  if (!CONSTANT_POOL_ADDRESS_P (const_vector))
+		    return false;
+		}
+	    }
 	}
     }
 #ifdef KELVIN_DEBUG
@@ -43051,20 +43145,32 @@ replace_swapped_load_constant (swap_web_entry *insn_entry, rtx swap_insn)
   rtx base, offset;
   rtx tocrel_expr = SET_SRC (PATTERN (tocrel_insn));
   /* There is an extra level of indirection for small/large code models.  */
+  kelvin_breakpoint_b4 (tocrel_expr);
+  /* kelvin: G */
   if (GET_CODE (tocrel_expr) == MEM)
     tocrel_expr = XEXP (tocrel_expr, 0);
+  kelvin_breakpoint_after (tocrel_expr);
+  
   if (!toc_relative_expr_p (tocrel_expr, false))
     gcc_unreachable ();
+  kelvin_breakpoint_5 (tocrel_expr, tocrel_base, tocrel_offset);
   split_const (XVECEXP (tocrel_base, 0, 0), &base, &offset);
+  /* kelvin: H */
+  kelvin_breakpoint_6 (base, offset);
   rtx const_vector = get_pool_constant (base);
   /* With the extra indirection, get_pool_constant will produce the
      real constant from the reg_equal expression, so get the real
      constant.  */
   if (GET_CODE (const_vector) == SYMBOL_REF)
 #ifdef KELVIN_DEBUG
+    /* kelvin needs to:
+     *   find the equivalent code in load_const_p and return false so i
+     *   don't even try to apply this optimization.
+     */
     {				/* crash occurring here is difficult
 				   to debug because of all the macro
 				   expansions. */
+      kelvin_breakpoint_4 (const_vector);
       if (dump_file) {
 	fprintf (dump_file, "RTL_FLAG_CHECK1 returns %llx\n",
 		 (unsigned long long int)
@@ -43217,11 +43323,6 @@ replace_swapped_load_constant (swap_web_entry *insn_entry, rtx swap_insn)
   INSN_CODE (load_insn) = -1; /* Force re-recognition.  */
   df_insn_rescan (load_insn);
 
-  /* kelvin believes what's missing here is removal of the swaps, so
-     I'm adding it.  There's some code around line 43810 that
-     mark_swaps_for_removal (insn_entry, i), and then
-     replace_swap_with_copy (insn_entry, i).  What is i for the
-     original swap_insn?  */
   unsigned int uid = INSN_UID (swap_insn);
   mark_swaps_for_removal (insn_entry, uid);
   replace_swap_with_copy (insn_entry, uid);

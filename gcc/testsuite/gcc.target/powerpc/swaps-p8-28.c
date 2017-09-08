@@ -18,7 +18,7 @@ foo (void)
   return y;
 }
 
-void
+int
 main (int argc, char *argv[])
 {
   vector char fetched_value = foo ();
