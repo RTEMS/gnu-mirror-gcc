@@ -1,6 +1,8 @@
-/* { dg-do run { target { powerpc64le-*-* } } } */
+/* { dg-do compile { target { powerpc64le-*-* } } } */
 /* { dg-skip-if "do not override -mcpu" { powerpc*-*-* } { "-mcpu=*" } { "-mcpu=power8" } } */
 /* { dg-options "-mcpu=power8 -O3 " } */
+/* { dg-final { scan-assembler-not "swap" } } */
+/* { dg-final { scan-assembler-not "xxpermdi" } } */
 
 #include <altivec.h>
 

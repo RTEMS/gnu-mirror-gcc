@@ -42020,8 +42020,13 @@ const_load_sequence_p (swap_web_entry *insn_entry, rtx insn)
 	 this is an artificial definition, or if there are multiple
 	 definitions associated with this use, return false without
 	 further analysis.  */
+      /* kelvin inserted the kluge at the end of this test because
+       * he has observed def_link->next == def_link and this is a
+       * single definition even if def_link->next != NULL */
       if (!def_link || !def_link->ref || DF_REF_IS_ARTIFICIAL (def_link->ref)
 	  || def_link->next)
+	/* kelvin wants this but it causes an infinite loop somewhere:
+	   (def_link->next && (def_link->next != def_link))) */
 	return false;
 
       /* kelvin: B (def_link && !def_link->next) */
@@ -43121,8 +43126,6 @@ replace_swapped_load_constant (swap_web_entry *insn_entry, rtx swap_insn)
       struct df_link *def_link = DF_REF_CHAIN (use);
       /* kelvin: E (my def_link is other's base_def_link) */
       gcc_assert (def_link && !def_link->next);
-      /* kelvin getting a crash here.  maybe this is same problem i
-	 fixed somewhere else - ned to find that.  */
       if (dump_file) {
 	fprintf (dump_file, "About to lookup DF_REF_INSN (def_link->ref)\n");
 	fprintf (dump_file, "  is%s artificial\n",
