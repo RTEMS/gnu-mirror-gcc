@@ -1,8 +1,12 @@
+/* This file's name was changed from swaps-p8-30.c so that I could
+   search the assembler for "not swap", since swap is an alias for
+   xxpermdi.  With the original file name, the assembler search would
+   get a false positive on the name of the file.  */
 /* { dg-do compile { target { powerpc64le-*-* } } } */
 /* { dg-skip-if "do not override -mcpu" { powerpc*-*-* } { "-mcpu=*" } { "-mcpu=power8" } } */
 /* { dg-options "-mcpu=power8 -O3 " } */
-/* { dg-final { scan-assembler-not "swap" } } */
 /* { dg-final { scan-assembler-not "xxpermdi" } } */
+/* { dg-final { scan-assembler-not "swap" } } */
 
 #include <altivec.h>
 

@@ -43165,7 +43165,6 @@ replace_swapped_load_constant (swap_web_entry *insn_entry, rtx swap_insn)
      real constant from the reg_equal expression, so get the real
      constant.  */
   if (GET_CODE (const_vector) == SYMBOL_REF)
-#ifdef KELVIN_DEBUG
     /* kelvin needs to:
      *   find the equivalent code in load_const_p and return false so i
      *   don't even try to apply this optimization.
@@ -43188,15 +43187,11 @@ replace_swapped_load_constant (swap_web_entry *insn_entry, rtx swap_insn)
 	fprintf (dump_file, "SYMBOL_REF_CONSTANT returns %llx\n",
 		 (unsigned long long int)
 		 SYMBOL_REF_CONSTANT (const_vector));
-
-	const_vector = get_pool_constant (const_vector);
       }
+      const_vector = get_pool_constant (const_vector);
     }
-#else
-    const_vector = get_pool_constant (const_vector);
-#endif
-  /* test case vshuf-v16qi.c is crashing on the line immediately
-     above, at line 11, line 28 of vshuf-main.inc... */
+    /* the following assert is causing ICE in g++.dg/pr65240-1.C.  Is
+     * this part of the code I borrowed from Bill?  */
   gcc_assert (GET_CODE (const_vector) == CONST_VECTOR);
   if (dump_file) {
     fprintf (dump_file, "const_vector @ %llx is found to be ",
@@ -43925,6 +43920,10 @@ rs6000_analyze_swaps (function *fun)
      to try to remedy the problematic situation.  */
 
   /* Dataflow analysis for use-def chains.  */
+#ifdef KELVIN_COMMENT_OUT
+  kelvin believes this code may be responsible for causing def_link->next
+  to equal def_link in one of the def-use chains
+							     
   df_set_flags (DF_RD_PRUNE_DEAD_DEFS);
   df_chain_add_problem (DF_DU_CHAIN | DF_UD_CHAIN);
   df_analyze ();
@@ -43932,7 +43931,8 @@ rs6000_analyze_swaps (function *fun)
 
   /* Pre-pass to recombine lvx and stvx patterns so we don't lose info.  */
   recombine_lvx_stvx_patterns (fun);
-
+#endif
+  
   /* Allocate structure to represent webs of insns.  */
   swap_web_entry *pass2_insn_entry;
   pass2_insn_entry = XCNEWVEC (swap_web_entry, get_max_uid ());
