@@ -5,5 +5,5 @@
 __float128
 xsqrt (__float128 a)
 {
-  return __builtin_sqrtf128 (a); /* { dg-error "requires the ‘-mfloat128-hardware’ option" } */
+  return __builtin_sqrtf128 (a); /* { dg-error "ISA 3.0 IEEE 128-bit" } */
 }

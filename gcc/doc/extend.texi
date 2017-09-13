@@ -15310,42 +15310,30 @@ The following built-in functions are available on Linux 64-bit systems
 with @code{-mfloat128} and Altivec support.
 
 @table @code
-@item __float128 __builtin_fabsq (__float128)
-@itemx __float128 __builtin_fabsf128 (__float128)
+@item __float128 __builtin_fabsf128 (__float128)
 Similar to @code{__builtin_fabs}, except the return and input types
 are @code{__float128}.
-@findex __builtin_fabsq
 @findex __builtin_fabsf128
 
-@item __float128 __builtin_copysignq (__float128, __float128)
-@itemx __float128 __builtin_copysignf128 (__float128, __float128)
+@item __float128 __builtin_copysignf128 (__float128, __float128)
 Similar to @code{__builtin_copysign}, except the return and input
 types are @code{__float128}.
-@findex __builtin_copysignq
 @findex __builtin_copysignf128
 
-@item __float128 __builtin_infq (void)
-@itemx __float128 __builtin_inff128 (void)
+@item __float128 __builtin_inff128 (void)
 Similar to @code{__builtin_inf}, except the return type is @code{__float128}.
-@findex __builtin_infq
 @findex __builtin_inff128
 
-@item __float128 __builtin_huge_valq (void)
-@itemx __float128 __builtin_huge_valf128 (void)
+@item __float128 __builtin_huge_valf128 (void)
 Similar to @code{__builtin_huge_val}, except the return type is @code{__float128}.
-@findex __builtin_huge_valq
 @findex __builtin_huge_valf128
 
-@item __float128 __builtin_nanq (const char *)
-@itemx __float128 __builtin_nanf128 (const char *)
+@item __float128 __builtin_nanf128 (const char *)
 Similar to @code{__builtin_nan}, except the return type is @code{__float128}.
-@findex __builtin_nanq
 @findex __builtin_nanf128
 
-@item __float128 __builtin_nansq (const char *)
-@itemx __float128 __builtin_nansf128 (const char *)
+@item __float128 __builtin_nansf128 (const char *)
 Similar to @code{__builtin_nans}, except the return type is @code{__float128}.
-@findex __builtin_nansq
 @findex __builtin_nansf128
 @end table
 
@@ -15353,18 +15341,14 @@ The following built-in functions are available on Linux 64-bit systems
 that use the ISA 3.0 instruction set.
 
 @table @code
-@item __float128 __builtin_sqrtq (__float128)
-@itemx __float128 __builtin_sqrtf128 (__float128)
+@item __float128 __builtin_sqrtf128 (__float128)
 Similar to @code{__builtin_sqrtf}, except the return and input types
 are @code{__float128}.
-@findex __builtin_sqrtq
 @findex __builtin_sqrtf128
 
-@item __float128 __builtin_fmaq (__float128, __float128, __float128)
-@itemx __float128 __builtin_fmaf128 (__float128, __float128, __float128)
+@item __float128 __builtin_fmaf128 (__float128, __float128, __float128)
 Similar to @code{__builtin_fma}, except the return and input types are
 @code{__float128}.
-@findex __builtin_fmaq
 @findex __builtin_fmaf128
 @end table
 

@@ -16083,8 +16083,8 @@ rs6000_invalid_builtin (enum rs6000_builtins fncode)
     error ("builtin function %qs requires the %qs option", name,
 	   "-mhard-float");
   else if ((fnmask & RS6000_BTM_FLOAT128_HW) != 0)
-    error ("builtin function %qs requires the %qs option", name,
-	   "-mfloat128-hardware");
+    error ("builtin function %qs requires ISA 3.0 IEEE 128-bit floating point",
+	   name);
   else if ((fnmask & RS6000_BTM_FLOAT128) != 0)
     error ("builtin function %qs requires the %qs option", name, "-mfloat128");
   else

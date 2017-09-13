@@ -1,3 +1,19 @@
+2017-09-13  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/float128-fma2.c: Reword error message.
+	* gcc.target/powerpc/float128-sqrt2.c: Likewise.
+	* gcc.target/powerpc/abs128-1.c: Use __builtin_fabsf128 instead of
+	__builtin_fabsq.
+	* gcc.target/powerpc/float128-5.c: Use __builtin_fabsf128 instead
+	of __builtin_fabsq.  Do not allow on 32-bit.
+
+2017-09-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/float128-sqrt1.c: New test.
+	* gcc.target/powerpc/float128-sqrt2.c: Likewise.
+	* gcc.target/powerpc/float128-fma1.c: Likewise.
+	* gcc.target/powerpc/float128-fma2.c: Likewise.
+
 2017-09-11   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 251983

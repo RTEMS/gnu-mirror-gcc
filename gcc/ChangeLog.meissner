@@ -1,3 +1,14 @@
+2017-09-13  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_invalid_builtin): Reword error
+	message.
+	* config/rs6000/rs6000-builtin.def (SQRTQ): Drop 'q' versions of
+	sqrt and fma.
+	(FMAQ): Likewise.
+	* config/rs6000/rs6000.md (sqrt<mode>2_quadmath): Likewise.
+	(fma<mode>2_quadmath): Likewise.
+	* doc/extend.texi (RS/6000 built-in functions): Likewise.
+
 2017-09-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000-builtin.def (BU_FLOAT128_1_HW): New macros
