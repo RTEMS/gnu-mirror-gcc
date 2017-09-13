@@ -87,11 +87,6 @@
 #define min(A,B)	((A) < (B) ? (A) : (B))
 #define max(A,B)	((A) > (B) ? (A) : (B))
 
-#define KELVIN_DEBUG 1
-#ifdef KELVIN_DEBUG
-#include "cfgrtl.h"
-#endif
-
 /* Structure used to define the rs6000 stack */
 typedef struct rs6000_stack {
   int reload_completed;		/* stack info won't change from here on */
@@ -41922,77 +41917,6 @@ insn_is_swap_p (rtx insn)
   return 1;
 }
 
-void
-kelvin_breakpoint_b4 (const_rtx tocrel_expr)
-{
-  if (dump_file) {
-    fprintf (dump_file, "made it to kelvin_breakpoint_b4\n");
-    fprintf (dump_file, "  tocrel_expr: ");
-    print_rtl_single (dump_file, tocrel_expr);
-  }
-}
-
-  void
-kelvin_breakpoint_after (const_rtx tocrel_expr)
-{
-  if (dump_file) {
-    fprintf (dump_file, "made it to kelvin_breakpoint_after\n");
-    fprintf (dump_file, "  tocrel_expr: ");
-    print_rtl_single (dump_file, tocrel_expr);
-  }
-}
-
-void
-kelvin_breakpoint_4 (const_rtx const_vector)
-{
-  if (dump_file) {
-    fprintf (dump_file, "make it to kelvin_brekapoint_4\n");
-    fprintf (dump_file, "const_vector: ");
-    print_rtl_single (dump_file, const_vector);
-  }
-}
-
-void
-kelvin_breakpoint_5 (const_rtx my_tocrel_expr, const_rtx my_tocrel_base,
-		     const_rtx my_tocrel_offset)
-{
-  if (dump_file) {
-    fprintf (dump_file, "make it to kelvin_breakpoint_5\n");
-    fprintf (dump_file, "tocrel_expr: ");
-    print_rtl_single (dump_file, my_tocrel_expr);
-    fprintf (dump_file, "tocrel_base: ");
-    print_rtl_single (dump_file, my_tocrel_base);
-    fprintf (dump_file, "tocrel_offset: ");
-    print_rtl_single (dump_file, my_tocrel_offset);
-  }
-}
-
-void
-kelvin_breakpoint_6 (const_rtx my_base, const_rtx my_offset)
-{
-  if (dump_file) {
-    fprintf (dump_file, "made it to kelvin_breakpoint_6\n");
-    fprintf (dump_file, "  base: ");
-    print_rtl_single (dump_file, my_base);
-    fprintf (dump_file, "  offset: ");
-    print_rtl_single (dump_file, my_offset);
-  }
-}
-
-void
-kelvin_breakpoint (const_rtx toc_base, const_rtx my_base, const_rtx my_offset)
-{
-  if (dump_file) {
-    fprintf (dump_file, "made it to kelvin_breakpoint\n");
-    fprintf (dump_file, "  toc_base: ");
-    print_rtl_single (dump_file, toc_base);
-    fprintf (dump_file, "  my_base: ");
-    print_rtl_single (dump_file, my_base);
-    fprintf (dump_file, "  my_offset: ");
-    print_rtl_single (dump_file, my_offset);
-  }
-}
-
 /* Return TRUE if insn is a swap fed by a load from the constant pool.  */
 static bool
 const_load_sequence_p (swap_web_entry *insn_entry, rtx insn)
@@ -42005,37 +41929,18 @@ const_load_sequence_p (swap_web_entry *insn_entry, rtx insn)
      isn't unique, punt.  */
   struct df_insn_info *insn_info = DF_INSN_INFO_GET (insn);
   df_ref use;
-  /* kelvin: A */
-  if (dump_file) {
-    fprintf (dump_file, "const_load_sequence_p is looking at each info use\n");
-  }
   FOR_EACH_INSN_INFO_USE (use, insn_info)
     {
       struct df_link *def_link = DF_REF_CHAIN (use);
-      if (dump_file) {
-	fprintf (dump_file, " found a use, but won't examine it\n");
-      }
 
-      /* If this definition corresponds to an incoming argument, or if
-	 this is an artificial definition, or if there are multiple
-	 definitions associated with this use, return false without
-	 further analysis.  */
-      /* kelvin inserted the kluge at the end of this test because
-       * he has observed def_link->next == def_link and this is a
-       * single definition even if def_link->next != NULL */
       if (!def_link || !def_link->ref || DF_REF_IS_ARTIFICIAL (def_link->ref)
 	  || def_link->next)
-	/* kelvin wants this but it causes an infinite loop somewhere:
-	   (def_link->next && (def_link->next != def_link))) */
 	return false;
 
-      /* kelvin: B (def_link && !def_link->next) */
       rtx def_insn = DF_REF_INSN (def_link->ref);
-      /* kelvin: C (my def_insn is other's load_insn */
       unsigned uid2 = INSN_UID (def_insn);
       if (!insn_entry[uid2].is_load || !insn_entry[uid2].is_swap)
 	return false;
-      /* kelvin: and now we know that the def_insn is a load_insn */
 
       rtx body = PATTERN (def_insn);
       if (GET_CODE (body) != SET
@@ -42050,51 +41955,23 @@ const_load_sequence_p (swap_web_entry *insn_entry, rtx insn)
 
       df_ref base_use;
       insn_info = DF_INSN_INFO_GET (def_insn);
-      /* kelvin: D */
-      if (dump_file) {
-	fprintf (dump_file, "in const_load_sequence_p, look for tocrel_insn\n");
-      }
-
-      /* kelvin says we're looking at each insn that provides
-	 information used by the insn_info insn.  We're trying to find
-	 the insn that supplies the raw information that feeds into the
-	 calculations of the insn_info */
       FOR_EACH_INSN_INFO_USE (base_use, insn_info)
 	{
-	  if (dump_file) {
-	    fprintf (dump_file, "examining base_use:");
-	    df_ref_debug (base_use, dump_file);
-	    fprintf (dump_file, "and base_reg: ");
-	    print_rtl_single (dump_file, base_reg);
-	  }
-
-	  /* kelvin says we're looking for the definition of the
-	     base_reg.  Note that there is no "definition" of the stack
-	     pointer register because this is initialized by prologue
-	     code and has no rtl representation.  */
 	  if (!rtx_equal_p (DF_REF_REG (base_use), base_reg))
 	    continue;
 
 	  struct df_link *base_def_link = DF_REF_CHAIN (base_use);
-	  /* kelvin: E */
-
 	  if (!base_def_link || base_def_link->next)
 	    return false;
+
 	  /* Constants held on the stack are not "true" constants
 	   * because their values are not part of the static load
 	   * image.  If this constant's base reference is a stack
 	   * or frame pointer, it is seen as an artificial
 	   * reference. */
-	  if (dump_file) {
-	    fprintf (dump_file, "In const_load_sequence_p\n");
-	    fprintf (dump_file, "About to lookup DF_REF_INSN (base_def_link->ref)\n");
-	    fprintf (dump_file, "  is%s artificial\n",
-		     DF_REF_IS_ARTIFICIAL (base_def_link->ref)? "": " not");
-	  }
 	  if (DF_REF_IS_ARTIFICIAL (base_def_link->ref))
 	    return false;
 
-	  /* kelvin: F */
 	  rtx tocrel_insn = DF_REF_INSN (base_def_link->ref);
 	  rtx tocrel_body = PATTERN (tocrel_insn);
 	  rtx base, offset;
@@ -42103,15 +41980,11 @@ const_load_sequence_p (swap_web_entry *insn_entry, rtx insn)
 	  /* There is an extra level of indirection for small/large
 	     code models.  */
 	  rtx tocrel_expr = SET_SRC (tocrel_body);
-	  /* kelvin: G */
 	  if (GET_CODE (tocrel_expr) == MEM)
 	    tocrel_expr = XEXP (tocrel_expr, 0);
 	  if (!toc_relative_expr_p (tocrel_expr, false))
 	    return false;
 	  split_const (XVECEXP (tocrel_base, 0, 0), &base, &offset);
-	  /* kelvin: H */
-	  kelvin_breakpoint(tocrel_base, base, offset);
-	  /* bill says this should return false on test 20 */
 	  if (GET_CODE (base) != SYMBOL_REF || !CONSTANT_POOL_ADDRESS_P (base))
 	    return false;
 	  else
@@ -42135,13 +42008,6 @@ const_load_sequence_p (swap_web_entry *insn_entry, rtx insn)
 	    }
 	}
     }
-#ifdef KELVIN_DEBUG
-  if (dump_file) {
-    fprintf (dump_file, "Returning true from const_load_sequence_p\n");
-    fprintf (dump_file, "  the insn is: ");
-    print_rtl_single (dump_file, insn);
-  }
-#endif
   return true;
 }
 
@@ -42178,7 +42044,7 @@ v2df_reduction_p (rtx op)
 
   if (!rtx_equal_p (XVECEXP (parallel0, 0, 0), const1_rtx)
       || !rtx_equal_p (XVECEXP (parallel1, 0, 0), const0_rtx))
-   return false;
+    return false;
 
   return true;
 }
@@ -43035,16 +42901,12 @@ replace_swap_with_copy (swap_web_entry *insn_entry, unsigned i)
   insn->set_deleted ();
 }
 
-/* kelvin to remove/rewrite some of this comment.  it was moved from a
-   different context just to preserve some of the thinking represented
-   in the notes.
+/* Given that swap_insn represents a swap of a load of a constant
+   vector value, replace with a single instruction that loads a
+   swapped variant of the original constant. 
 
-   Given that constant_expr represents a vector constant, return
-   a new rtx that represents the constant result of performing
-   a swap on the original constant_expr.  Note that the effect of swap
-   depends on the size of the vector element.
-
-   The "natural" representation of a byte array in memory is the same:
+   The "natural" representation of a byte array in memory is the same
+   for big endian and little endian.
 
    unsigned char byte_array[] =
      { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, a, b, c, d, e, f };
@@ -43063,7 +42925,7 @@ replace_swap_with_copy (swap_web_entry *insn_entry, unsigned i)
      [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, a, b, c, d, e, f ]
 
 
-   Word arrays are more confusing.  Consider the word array:
+   Word arrays require different handling.  Consider the word array:
 
    unsigned int word_array[] =
      { 0x00010203, 0x04050607, 0x08090a0b, 0x0c0d0e0f };
@@ -43089,58 +42951,35 @@ replace_swap_with_copy (swap_web_entry *insn_entry, unsigned i)
 
 
   Similar transformations apply to the vector of half-word and vector
-  of double-word representations.
-*/
-/* kelvin wants this to be static, but not declared as such at the
-   moment so that I can debug more easily.  */
-void
+  of double-word representations.  */
+static void
 replace_swapped_load_constant (swap_web_entry *insn_entry, rtx swap_insn)
 {
   /* Find the load.  */
   struct df_insn_info *insn_info = DF_INSN_INFO_GET (swap_insn);
   rtx_insn *load_insn = 0;
   df_ref use;
-  /* kelvin: A */
+
   FOR_EACH_INSN_INFO_USE (use, insn_info)
     {
       struct df_link *def_link = DF_REF_CHAIN (use);
       gcc_assert (def_link && !def_link->next);
-      /* kelvin: B */
       load_insn = DF_REF_INSN (def_link->ref);
-      /* kelvin: C */
       break;
     }
   gcc_assert (load_insn);
-  if (dump_file) {
-    fprintf (dump_file, "The load_insn is found to be ");
-    print_inline_rtx (dump_file, load_insn, 2);
-    fprintf (dump_file, "\n");
-  }
 
   /* Find the TOC-relative symbol access.  */
   insn_info = DF_INSN_INFO_GET (load_insn);
   rtx_insn *tocrel_insn = 0;
-  /* kelvin: D (my use is other's base_use) */
   FOR_EACH_INSN_INFO_USE (use, insn_info)
     {
       struct df_link *def_link = DF_REF_CHAIN (use);
-      /* kelvin: E (my def_link is other's base_def_link) */
       gcc_assert (def_link && !def_link->next);
-      if (dump_file) {
-	fprintf (dump_file, "About to lookup DF_REF_INSN (def_link->ref)\n");
-	fprintf (dump_file, "  is%s artificial\n",
-		 DF_REF_IS_ARTIFICIAL (def_link->ref)? "": " not");
-      }
-      /* kelvin: F */
       tocrel_insn = DF_REF_INSN (def_link->ref);
       break;
     }
   gcc_assert (tocrel_insn);
-  if (dump_file) {
-    fprintf (dump_file, "The tocrel_insn is found to be ");
-    print_inline_rtx (dump_file, tocrel_insn, 2);
-    fprintf (dump_file, "\n");
-  }
 
   /* Find the embedded CONST_VECTOR.  We have to call toc_relative_expr_p
      to set tocrel_base; otherwise it would be unnecessary as we've
@@ -43148,75 +42987,18 @@ replace_swapped_load_constant (swap_web_entry *insn_entry, rtx swap_insn)
   rtx base, offset;
   rtx tocrel_expr = SET_SRC (PATTERN (tocrel_insn));
   /* There is an extra level of indirection for small/large code models.  */
-  kelvin_breakpoint_b4 (tocrel_expr);
-  /* kelvin: G */
   if (GET_CODE (tocrel_expr) == MEM)
     tocrel_expr = XEXP (tocrel_expr, 0);
-  kelvin_breakpoint_after (tocrel_expr);
-  
   if (!toc_relative_expr_p (tocrel_expr, false))
     gcc_unreachable ();
-  kelvin_breakpoint_5 (tocrel_expr, tocrel_base, tocrel_offset);
   split_const (XVECEXP (tocrel_base, 0, 0), &base, &offset);
-  /* kelvin: H */
-  kelvin_breakpoint_6 (base, offset);
   rtx const_vector = get_pool_constant (base);
   /* With the extra indirection, get_pool_constant will produce the
      real constant from the reg_equal expression, so get the real
      constant.  */
   if (GET_CODE (const_vector) == SYMBOL_REF)
-    /* kelvin needs to:
-     *   find the equivalent code in load_const_p and return false so i
-     *   don't even try to apply this optimization.
-     */
-    {				/* crash occurring here is difficult
-				   to debug because of all the macro
-				   expansions. */
-      kelvin_breakpoint_4 (const_vector);
-      if (dump_file) {
-	fprintf (dump_file, "RTL_FLAG_CHECK1 returns %llx\n",
-		 (unsigned long long int)
-		 RTL_FLAG_CHECK1 ("CONSTANT_POOL_ADDRESS_P",
-				  const_vector, SYMBOL_REF));
-	fprintf (dump_file, "CONSTANT_POOL_ADDRESS_P: %d",
-		 CONSTANT_POOL_ADDRESS_P (const_vector));
-	/* i'm expecting that the above returns false, so
-	   SYMBOL_REF_CONSTANT returns NULL, which causes
-	   get_pool_constant to ICE when it takes the result
-	   from SYMBOL_REF_CONSTANT and indirects via ->constant. */
-	fprintf (dump_file, "SYMBOL_REF_CONSTANT returns %llx\n",
-		 (unsigned long long int)
-		 SYMBOL_REF_CONSTANT (const_vector));
-      }
-      const_vector = get_pool_constant (const_vector);
-    }
-    /* the following assert is causing ICE in g++.dg/pr65240-1.C.  Is
-     * this part of the code I borrowed from Bill?  */
+    const_vector = get_pool_constant (const_vector);
   gcc_assert (GET_CODE (const_vector) == CONST_VECTOR);
-  if (dump_file) {
-    fprintf (dump_file, "const_vector @ %llx is found to be ",
-	     (unsigned long long) const_vector);
-    print_inline_rtx (dump_file, const_vector, 2);
-    fprintf (dump_file, "\n");
-  }
-
-#ifdef KELVIN_DEBUG
-  if (dump_file)
-    {
-      fprintf (dump_file, "About to examine elements of expression: ");
-      print_inline_rtx (dump_file, const_vector, 2);
-      fprintf (dump_file, "\n");
-
-      fprintf (dump_file, "The condition we need to test is %s\n",
-	       GET_MODE_NAME (GET_MODE (const_vector)));
-
-      if (GET_MODE (const_vector) != V16QImode) {
-	fprintf (dump_file, "The swap insn is\n");
-	print_inline_rtx (dump_file, swap_insn, 2);
-	fprintf (dump_file, "\n");
-      }
-    }
-#endif
 
   rtx new_mem;
   enum machine_mode mode = GET_MODE (const_vector);
@@ -43228,12 +43010,6 @@ replace_swapped_load_constant (swap_web_entry *insn_entry, rtx swap_insn)
       for (i = 0; i < 16; i++)
 	XVECEXP (vals, 0, ((i+8) % 16)) = XVECEXP (const_vector, 0, i);
       rtx new_const_vector = gen_rtx_CONST_VECTOR (mode, XVEC (vals, 0));
-
-      if (dump_file) {
-	fprintf (dump_file, " new_const_vector is: ");
-	print_inline_rtx (dump_file, new_const_vector, 2);
-	fprintf (dump_file, "\n");
-      }
       new_mem = force_const_mem (mode, new_const_vector);
     }
   else if ((mode == V4SImode) || (mode == V4SFmode))
@@ -43243,12 +43019,6 @@ replace_swapped_load_constant (swap_web_entry *insn_entry, rtx swap_insn)
       for (i = 0; i < 4; i++)
 	XVECEXP (vals, 0, ((i+2) % 4)) = XVECEXP (const_vector, 0, i);
       rtx new_const_vector = gen_rtx_CONST_VECTOR (mode, XVEC (vals, 0));
-
-      if (dump_file) {
-	fprintf (dump_file, " new_const_vector is: ");
-	print_inline_rtx (dump_file, new_const_vector, 2);
-	fprintf (dump_file, "\n");
-      }
       new_mem = force_const_mem (mode, new_const_vector);
     }
   else if ((mode == V8HImode)
@@ -43262,12 +43032,6 @@ replace_swapped_load_constant (swap_web_entry *insn_entry, rtx swap_insn)
       for (i = 0; i < 8; i++)
 	XVECEXP (vals, 0, ((i+4) % 8)) = XVECEXP (const_vector, 0, i);
       rtx new_const_vector = gen_rtx_CONST_VECTOR (mode, XVEC (vals, 0));
-
-      if (dump_file) {
-	fprintf (dump_file, " new_const_vector is: ");
-	print_inline_rtx (dump_file, new_const_vector, 2);
-	fprintf (dump_file, "\n");
-      }
       new_mem = force_const_mem (mode, new_const_vector);
     }
   else if ((mode == V2DImode) || (mode == V2DFmode))
@@ -43277,12 +43041,6 @@ replace_swapped_load_constant (swap_web_entry *insn_entry, rtx swap_insn)
       for (i = 0; i < 2; i++)
 	XVECEXP (vals, 0, ((i+1) % 2)) = XVECEXP (const_vector, 0, i);
       rtx new_const_vector = gen_rtx_CONST_VECTOR (mode, XVEC (vals, 0));
-
-      if (dump_file) {
-	fprintf (dump_file, " new_const_vector is: ");
-	print_inline_rtx (dump_file, new_const_vector, 2);
-	fprintf (dump_file, "\n");
-      }
       new_mem = force_const_mem (mode, new_const_vector);
     }
   else
@@ -43301,22 +43059,12 @@ replace_swapped_load_constant (swap_web_entry *insn_entry, rtx swap_insn)
     rtx_insn *force_insn = get_last_insn ();
     remove_insn (force_insn);
     rtx_insn *before_load_insn = PREV_INSN (load_insn);
-    /* kelvin says we're inserting the force_insn, which we just
-       removed, before the load_insn */
     add_insn_after (force_insn, before_load_insn, BLOCK_FOR_INSN (load_insn));
     df_insn_rescan (before_load_insn);
     df_insn_rescan (force_insn);
   }
-  if (dump_file) {
-    fprintf (dump_file, "The new_mem representing new constant is ");
-    print_inline_rtx (dump_file, new_mem, 2);
-    fprintf (dump_file, "\n");
-  }
 
   /* Replace the MEM in the load instruction and rescan it.  */
-  /* kelvin says this is supposed to replace the original load_insn
-     with my new_mem code, which it seems to do.  but the load_insn
-     still has a vec_select on top of it.  where do i fix that?  */
   XEXP (SET_SRC (PATTERN (load_insn)), 0) = new_mem;
   INSN_CODE (load_insn) = -1; /* Force re-recognition.  */
   df_insn_rescan (load_insn);
@@ -43324,10 +43072,6 @@ replace_swapped_load_constant (swap_web_entry *insn_entry, rtx swap_insn)
   unsigned int uid = INSN_UID (swap_insn);
   mark_swaps_for_removal (insn_entry, uid);
   replace_swap_with_copy (insn_entry, uid);
-
-  if (dump_file)
-    fprintf (dump_file, "Adjusting swap of constant for insn %d\n",
-	     INSN_UID (swap_insn));
 }
 
 
@@ -43667,15 +43411,6 @@ rs6000_analyze_swaps (function *fun)
   basic_block bb;
   rtx_insn *insn, *curr_insn = 0;
 
-#ifdef KELVIN_DEBUG
-  if (dump_file) {
-    fprintf (dump_file, "made it to rs6000_analyze_swaps\n");
-    fprintf (dump_file, "before we do our stuff:\n");
-    FOR_ALL_BB_FN (bb, fun)
-      dump_bb (dump_file, bb, 2, TDF_BLOCKS | TDF_DETAILS);
-  }
-#endif
-
   /* Dataflow analysis for use-def chains.  */
   df_set_flags (DF_RD_PRUNE_DEAD_DEFS);
   df_chain_add_problem (DF_DU_CHAIN | DF_UD_CHAIN);
@@ -43901,38 +43636,9 @@ rs6000_analyze_swaps (function *fun)
 
   /* Clean up.  */
   free (insn_entry);
-#ifdef KELVIN_DEBUG
-  if (dump_file) {
-    fprintf (dump_file, "This is where wschmidt says I need to do my fixup\n");
-    fprintf (dump_file, "After Bill's transformations but before mine:\n");
-    FOR_ALL_BB_FN (bb, fun)
-      dump_bb (dump_file, bb, 2, TDF_BLOCKS | TDF_DETAILS);
-  }
-
-  /* so Bill says i've got to rebuild the data structures before I can
-     use the services in the existing libraries.  */
-
-  /* Bill's original suggestion was that I need not rebuild "all" data
-     structures because I don't need them all for the simple analysis
-     that I am doing.  However, I found that during bootstrap build,
-     the system would crash because certrain insn data structures have
-     null-pointers.  So i'm inserting the following 5 function calls
-     to try to remedy the problematic situation.  */
 
   /* Dataflow analysis for use-def chains.  */
-#ifdef KELVIN_COMMENT_OUT
-  kelvin believes this code may be responsible for causing def_link->next
-  to equal def_link in one of the def-use chains
-							     
-  df_set_flags (DF_RD_PRUNE_DEAD_DEFS);
-  df_chain_add_problem (DF_DU_CHAIN | DF_UD_CHAIN);
-  df_analyze ();
-  df_set_flags (DF_DEFER_INSN_RESCAN);
 
-  /* Pre-pass to recombine lvx and stvx patterns so we don't lose info.  */
-  recombine_lvx_stvx_patterns (fun);
-#endif
-  
   /* Allocate structure to represent webs of insns.  */
   swap_web_entry *pass2_insn_entry;
   pass2_insn_entry = XCNEWVEC (swap_web_entry, get_max_uid ());
@@ -43946,18 +43652,10 @@ rs6000_analyze_swaps (function *fun)
 	{
 	  pass2_insn_entry[uid].insn = insn;
 
-	  /* Bill's code sets is_call */
-	  /* Bill's code only sets the du and ud information and
-	     is_load and is_store and is_swap info only if is_relevant. */
-	  /* Bill's code sets is_relevant, and is_128_int and
-	     contains_subreg.  It also unions together the definitions
-	     that are used by this instruction.  */
-	  /* For all uses of this insn's result, we set is_relevant,
-	     is_128_int, contains_subreg, is_live_out.  */
-
 	  pass2_insn_entry[uid].is_relevant = 1;
 	  pass2_insn_entry[uid].is_load = insn_is_load_p (insn);
 	  pass2_insn_entry[uid].is_store = insn_is_store_p (insn);
+
 	  /* Determine if this is a doubleword swap.  If not,
 	     determine whether it can legally be swapped.  */
 	  if (insn_is_swap_p (insn))
@@ -43965,66 +43663,21 @@ rs6000_analyze_swaps (function *fun)
 	}
     }
 
-  if (dump_file)
-    {
-      fprintf (dump_file, "\nSwap insn entry table when first built\n");
-      dump_swap_insn_table (pass2_insn_entry);
-    }
-
-  /* In Bill's code, there are various conditions that cause us to set
-     root->web_not_optimizable to 1.  As far as I can tell, this code
-     makes no changes to the "web".  */
-
-  if (dump_file)
-    {
-      fprintf (dump_file, "\nSwap insn entry table after NO web analysis\n");
-      dump_swap_insn_table (pass2_insn_entry);
-    }
-
   {
     unsigned e = get_max_uid (), i;
     for (i = 0; i < e; ++i)
       {
-	/* Bill's pass tests for is_load or is_store.  my relevance
-	   target is more restrictive.  I'm only loooking for is_load. */
-
-	/* Now Bill tells me that I should only try my transformation
-	   if is_swap but not is_load */
-
 	if (pass2_insn_entry[i].is_swap && !pass2_insn_entry[i].is_load)
 	  {
-	    /* apparently, i cannot fetch insn unless this entry in
-	       the pass2_insn_entry array is valid. I know this value
-	       is valid because is_swap. */
 	    insn = pass2_insn_entry[i].insn;
-
-	    if (dump_file) {
-	      fprintf (dump_file, "Looking at swap insn: ");
-	      print_inline_rtx (dump_file, insn, 2);
-	      fprintf (dump_file, "\n");
-	    }
-
 	    if (const_load_sequence_p (pass2_insn_entry, insn))
-	      {
-		/* kelvin to remove this */
-		if (dump_file)
-		  fprintf (dump_file,
-			   "insn is a swap fed by a const_load_sequence_p load from constant\n");
-		replace_swapped_load_constant (pass2_insn_entry, insn);
-	      }
-	    else if (dump_file)
-	      fprintf (dump_file,
-		       "insn is not a swap fed by a load from constant\n");
+	      replace_swapped_load_constant (pass2_insn_entry, insn);
 	  }
       }
   }
 
-  if (dump_file)
-    fprintf (dump_file, "done with kelvin's special code\n");
-
   /* Clean up.  */
   free (pass2_insn_entry);
-#endif
   return 0;
 }
 
@@ -44051,30 +43704,12 @@ public:
   /* opt_pass methods: */
   virtual bool gate (function *)
     {
-#ifdef KELVIN_DEBUG
-      if (dump_file) {
-	fprintf (dump_file, "gate function for pass_analyze_swaps\n");
-	fprintf (dump_file, "optimize %d\n", optimize);
-	fprintf (dump_file, "BYTES_BIG_ENDIAN: %d\n", BYTES_BIG_ENDIAN);
-	fprintf (dump_file, "TARGET_VSX: %d\n", TARGET_VSX);
-	fprintf (dump_file, "TARGET_P9_VECTOR: %d\n", TARGET_P9_VECTOR);
-	fprintf (dump_file,
-		 "rs6000_optimize_swaps: %d\n", rs6000_optimize_swaps);
-      }
-#endif
       return (optimize > 0 && !BYTES_BIG_ENDIAN && TARGET_VSX
 	      && !TARGET_P9_VECTOR && rs6000_optimize_swaps);
     }
 
   virtual unsigned int execute (function *fun)
     {
-#ifdef KELVIN_DEBUG
-      if (dump_file)
-	fprintf (dump_file,
-		 "rs6000_analyze_swaps to be called from execute\n");
-#endif
-      /* kelvin says this invocation results in a crash because the
-	 info-use information is not valid.  */
       return rs6000_analyze_swaps (fun);
     }
 
