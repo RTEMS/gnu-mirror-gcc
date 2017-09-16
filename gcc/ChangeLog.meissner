@@ -1,3 +1,10 @@
+2017-09-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.md (vsx_xscvdpsp_scalar): Fix constraint.
+	(vsx_sxcvdpspn): Eliminate useless alternative constraint.
+	(vsx_xscvspdpn): Likewise.
+	(vsx_xscvspdpn_scalar): Likewise.
+
 2017-09-15  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/vsx.md (vsx_xscvspdp_scalar2): Move insn higher in
