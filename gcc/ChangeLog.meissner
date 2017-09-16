@@ -1,3 +1,29 @@
+2017-09-15  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/vsx.md (vsx_xscvspdp_scalar2): Move insn higher in
+	the source so it is adjacent to vsx_xscvspdp_scalar.
+	(vsx_xscvdpsp_scalar): Use wy constraint instead of f for SFmode
+	to allow the use of Altivec registers.
+	(peephole for optimizing move SF to GPR): Adjust code to eliminate
+	needing to do the shift right 32-bits operation after XSCVDPSPN.
+	* config/rs6000/rs6000.md (extendsi<mode>2): Add a splitter to do
+	sign extension from a vector register to a GPR by doing a 32-bit
+	direct move and then an EXTSW.
+	(extendsi<mode>2 splitter): Likewise.
+	(movsi_from_sf): Rework code to know that the XSCVDPSPN
+	instruction actually lives the 32-bit value in both the first and
+	second words and we don't need to do a shift.  Remove the code to
+	handle moving the value to a GPR since SImode can now go in vector
+	registers and the register allocator will do the move.
+	(movdi_from_sf_zero_ext): Delete, this is not needed now that
+	movsi_from_sf can leave the result in a vector register.
+	(movsi_from_df): Add an optimization for converting a DFmod to a
+	SFmode, and then needing to move the SFmode to a GPR.
+	(reload_gpr_from_vsxsf): Replace p8_mfvsrd_4_disf with
+	p8_mfvsrwz_4_disf.  Eliminate shift after XSCVDPSPN.
+	(p8_mfvsrd_4_disf): Likewise.
+	(p8_mfvsrwz_4_disf): Likewise.
+
 2017-09-15   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 252844
