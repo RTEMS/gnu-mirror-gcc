@@ -21,7 +21,7 @@ ui_d (double d)
   return x.ui;
 }
 
-/* { dg-final { scan-assembler     {\mmtvsrwz\M}   } } */
+/* { dg-final { scan-assembler     {\mmfvsrwz\M}   } } */
 /* { dg-final { scan-assembler     {\mxscvdpsp\M}  } } */
 /* { dg-final { scan-assembler-not {\mmtvsrd\M}    } } */
 /* { dg-final { scan-assembler-not {\mxscvdpspn\M} } } */
