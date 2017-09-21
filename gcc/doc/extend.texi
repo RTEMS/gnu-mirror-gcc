@@ -15461,6 +15461,21 @@ element size.  However, if the size of the vector element added to
 @code{index} is greater than 15, the content of the returned value is
 undefined.
 
+The following built-in functions are available on Linux 64-bit systems
+that use the ISA 3.0 instruction set.
+
+@table @code
+@item __float128 __builtin_sqrtf128 (__float128)
+Similar to @code{__builtin_sqrtf}, except the return and input types
+are @code{__float128}.
+@findex __builtin_sqrtf128
+
+@item __float128 __builtin_fmaf128 (__float128, __float128, __float128)
+Similar to @code{__builtin_fma}, except the return and input types are
+@code{__float128}.
+@findex __builtin_fmaf128
+@end table
+
 The following built-in functions are available for the PowerPC family
 of processors when hardware decimal floating point
 (@option{-mhard-dfp}) is available:
