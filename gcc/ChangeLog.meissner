@@ -1,3 +1,35 @@
+2017-09-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000-builtin.def (BU_FLOAT128_2_HW): Define
+	helper macro.
+	(SQRTF128): Add float128 round to odd built-in functions.  Line up
+	columns of other float128 built-in functions.
+	(SQRT_ODDF128): Likewise.
+	(TRUNC_ODDF128): Likewise.
+	(TRUNC_ODDF128): Likewise.
+	(ADD_ODDF128): Likewise.
+	(SUB_ODDF128): Likewise.
+	(MUL_ODDF128): Likewise.
+	(DIV_ODDF128): Likewise.
+	(FMAF128): Likewise.
+	(FMA_ODDF128): Likewise.
+	* config/rs6000/rs6000.md (trunc<mode>sf2_hw): Rework convert to
+	double and round to odd insn generated.
+	(add<mode>3_odd): Add support for the float128 round to odd
+	built-in functions.
+	(sub<mode>3_odd): Likewise.
+	(mul<mode>3_odd): Likewise.
+	(div<mode>3_odd): Likewise.
+	(sqrt<mode>2_odd): Likewise.
+	(fma<mode>4_odd): Likewise.
+	(fms<mode>4_odd): Likewise.
+	(nfma<mode>4_odd): Likewise.
+	(nfms<mode>4_odd): Likewise.
+	(trunc<mode>df2_odd): Likewise.
+	* doc/extend.texi (PowerPC built-in functions): Document the round
+	to odd float128 built-in functions.  Improve the wording for the
+	__builtin_sqrtf128 and __builtin_fmaf128 built-in functions.
+
 2017-09-20   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 253026

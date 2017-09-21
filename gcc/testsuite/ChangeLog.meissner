@@ -1,3 +1,10 @@
+2017-09-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/float128-hw.c: Add fused multiply-subtract,
+	and negate fused multiply-add/subtract examples.  Use \m and \M in
+	the scan-assembler regexs.
+	* gcc.target/powerpc/float128-odd.c: New test.
+
 2017-09-20   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 253026

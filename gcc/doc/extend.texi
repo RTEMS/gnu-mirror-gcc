@@ -15346,14 +15346,47 @@ that use the ISA 3.0 instruction set.
 
 @table @code
 @item __float128 __builtin_sqrtf128 (__float128)
-Similar to @code{__builtin_sqrtf}, except the return and input types
-are @code{__float128}.
+Perform a 128-bit IEEE floating point square root operation.
 @findex __builtin_sqrtf128
 
 @item __float128 __builtin_fmaf128 (__float128, __float128, __float128)
-Similar to @code{__builtin_fma}, except the return and input types are
-@code{__float128}.
+Perform a 128-bit IEEE floating point fused multiply and add operation.
 @findex __builtin_fmaf128
+
+@item __float128 __builtin_add_round_to_oddf128 (__float128, __float128)
+Perform a 128-bit IEEE floating point add using round to odd as the
+rounding mode.
+@findex __builtin_add_round_to_oddf128
+
+@item __float128 __builtin_sub_round_to_oddf128 (__float128, __float128)
+Perform a 128-bit IEEE floating point subtract using round to odd as
+the rounding mode.
+@findex __builtin_sub_round_to_oddf128
+
+@item __float128 __builtin_mul_round_to_oddf128 (__float128, __float128)
+Perform a 128-bit IEEE floating point multiply using round to odd as
+the rounding mode.
+@findex __builtin_mul_round_to_oddf128
+
+@item __float128 __builtin_div_round_to_oddf128 (__float128, __float128)
+Perform a 128-bit IEEE floating point divide using round to odd as
+the rounding mode.
+@findex __builtin_div_round_to_oddf128
+
+@item __float128 __builtin_sqrt_round_to_oddf128 (__float128)
+Perform a 128-bit IEEE floating point square root using round to odd
+as the rounding mode.
+@findex __builtin_sqrt_round_to_oddf128
+
+@item __float128 __builtin_fmaf128 (__float128, __float128, __float128)
+Perform a 128-bit IEEE floating point fused multiply and add operation
+using round to odd as the rounding mode.
+@findex __builtin_fma_round_to_oddf128
+
+@item double __builtin_trunc_round_to_oddf128 (__float128)
+Convert a 128-bit IEEE floating point value to @code{double} using
+round to odd as the rounding mode.
+@findex __builtin_trunc_round_to_oddf128
 @end table
 
 The following built-in functions are available for the PowerPC family
