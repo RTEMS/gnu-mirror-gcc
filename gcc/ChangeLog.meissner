@@ -1,5 +1,11 @@
 2017-09-25  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/rs6000.md (movsi_from_df): Optimize converting a
+	DFmode to a SFmode, and then needing to move the SFmode to a GPR
+	to use the XSCVDPSP instruction instead of FRSP and XSCVDPSPN.
+
+2017-09-25  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/rs6000.md (movsi_from_sf): Adjust code to
 	eliminate doing a 32-bit shift right or vector extract after doing
 	XSCVDPSPN.
