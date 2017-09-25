@@ -1974,6 +1974,9 @@ static const struct attribute_spec rs6000_attribute_table[] =
 
 #undef TARGET_CAN_CHANGE_MODE_CLASS
 #define TARGET_CAN_CHANGE_MODE_CLASS rs6000_can_change_mode_class
+
+#undef TARGET_CONSTANT_ALIGNMENT
+#define TARGET_CONSTANT_ALIGNMENT rs6000_constant_alignment
 
 
 /* Processor table.  */
@@ -16157,6 +16160,25 @@ rs6000_fold_builtin (tree fndecl, int n_args ATTRIBUTE_UNUSED,
 #endif
 }
 
+/*  Helper function to sort out which built-ins may be valid without having
+    a LHS.  */
+static bool
+rs6000_builtin_valid_without_lhs (enum rs6000_builtins fn_code)
+{
+  switch (fn_code)
+    {
+    case ALTIVEC_BUILTIN_STVX_V16QI:
+    case ALTIVEC_BUILTIN_STVX_V8HI:
+    case ALTIVEC_BUILTIN_STVX_V4SI:
+    case ALTIVEC_BUILTIN_STVX_V4SF:
+    case ALTIVEC_BUILTIN_STVX_V2DI:
+    case ALTIVEC_BUILTIN_STVX_V2DF:
+      return true;
+    default:
+      return false;
+    }
+}
+
 /* Fold a machine-dependent built-in in GIMPLE.  (For folding into
    a constant, use rs6000_fold_builtin.)  */
 
@@ -16184,8 +16206,9 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
   if (!rs6000_fold_gimple)
     return false;
 
-  /* Generic solution to prevent gimple folding of code without a LHS.  */
-  if (!gimple_call_lhs (stmt))
+  /* Prevent gimple folding for code that does not have a LHS, unless it is
+   allowed per the rs6000_builtin_valid_without_lhs helper function.  */
+  if (!gimple_call_lhs (stmt) && !rs6000_builtin_valid_without_lhs (fn_code))
     return false;
 
   switch (fn_code)
@@ -16545,6 +16568,95 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);
 	update_call_from_tree (gsi, res);
 	return true;
+      }
+    /* Vector loads.  */
+    case ALTIVEC_BUILTIN_LVX_V16QI:
+    case ALTIVEC_BUILTIN_LVX_V8HI:
+    case ALTIVEC_BUILTIN_LVX_V4SI:
+    case ALTIVEC_BUILTIN_LVX_V4SF:
+    case ALTIVEC_BUILTIN_LVX_V2DI:
+    case ALTIVEC_BUILTIN_LVX_V2DF:
+      {
+	 arg0 = gimple_call_arg (stmt, 0);  // offset
+	 arg1 = gimple_call_arg (stmt, 1);  // address
+	 /* Do not fold for -maltivec=be on LE targets.  */
+	 if (VECTOR_ELT_ORDER_BIG && !BYTES_BIG_ENDIAN)
+	    return false;
+	 lhs = gimple_call_lhs (stmt);
+	 location_t loc = gimple_location (stmt);
+	 /* Since arg1 may be cast to a different type, just use ptr_type_node
+	    here instead of trying to enforce TBAA on pointer types.  */
+	 tree arg1_type = ptr_type_node;
+	 tree lhs_type = TREE_TYPE (lhs);
+	 /* POINTER_PLUS_EXPR wants the offset to be of type 'sizetype'.  Create
+	    the tree using the value from arg0.  The resulting type will match
+	    the type of arg1.  */
+	 gimple_seq stmts = NULL;
+	 tree temp_offset = gimple_convert (&stmts, loc, sizetype, arg0);
+	 tree temp_addr = gimple_build (&stmts, loc, POINTER_PLUS_EXPR,
+				       arg1_type, arg1, temp_offset);
+	 /* Mask off any lower bits from the address.  */
+	 tree aligned_addr = gimple_build (&stmts, loc, BIT_AND_EXPR,
+					  arg1_type, temp_addr,
+					  build_int_cst (arg1_type, -16));
+	 gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);
+	 /* Use the build2 helper to set up the mem_ref.  The MEM_REF could also
+	    take an offset, but since we've already incorporated the offset
+	    above, here we just pass in a zero.  */
+	 gimple *g;
+	 g = gimple_build_assign (lhs, build2 (MEM_REF, lhs_type, aligned_addr,
+						build_int_cst (arg1_type, 0)));
+	 gimple_set_location (g, loc);
+	 gsi_replace (gsi, g, true);
+	 return true;
+      }
+    /* Vector stores.  */
+    case ALTIVEC_BUILTIN_STVX_V16QI:
+    case ALTIVEC_BUILTIN_STVX_V8HI:
+    case ALTIVEC_BUILTIN_STVX_V4SI:
+    case ALTIVEC_BUILTIN_STVX_V4SF:
+    case ALTIVEC_BUILTIN_STVX_V2DI:
+    case ALTIVEC_BUILTIN_STVX_V2DF:
+      {
+	 /* Do not fold for -maltivec=be on LE targets.  */
+	 if (VECTOR_ELT_ORDER_BIG && !BYTES_BIG_ENDIAN)
+	    return false;
+	 arg0 = gimple_call_arg (stmt, 0); /* Value to be stored.  */
+	 arg1 = gimple_call_arg (stmt, 1); /* Offset.  */
+	 tree arg2 = gimple_call_arg (stmt, 2); /* Store-to address.  */
+	 location_t loc = gimple_location (stmt);
+	 tree arg0_type = TREE_TYPE (arg0);
+	 /* Use ptr_type_node (no TBAA) for the arg2_type.
+	  FIXME: (Richard)  "A proper fix would be to transition this type as
+	  seen from the frontend to GIMPLE, for example in a similar way we
+	  do for MEM_REFs by piggy-backing that on an extra argument, a
+	  constant zero pointer of the alias pointer type to use (which would
+	  also serve as a type indicator of the store itself).  I'd use a
+	  target specific internal function for this (not sure if we can have
+	  those target specific, but I guess if it's folded away then that's
+	  fine) and get away with the overload set."
+	  */
+	 tree arg2_type = ptr_type_node;
+	 /* POINTER_PLUS_EXPR wants the offset to be of type 'sizetype'.  Create
+	    the tree using the value from arg0.  The resulting type will match
+	    the type of arg2.  */
+	 gimple_seq stmts = NULL;
+	 tree temp_offset = gimple_convert (&stmts, loc, sizetype, arg1);
+	 tree temp_addr = gimple_build (&stmts, loc, POINTER_PLUS_EXPR,
+				       arg2_type, arg2, temp_offset);
+	 /* Mask off any lower bits from the address.  */
+	 tree aligned_addr = gimple_build (&stmts, loc, BIT_AND_EXPR,
+					  arg2_type, temp_addr,
+					  build_int_cst (arg2_type, -16));
+	 gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);
+	/* The desired gimple result should be similar to:
+	 MEM[(__vector floatD.1407 *)_1] = vf1D.2697;  */
+	 gimple *g;
+	 g = gimple_build_assign (build2 (MEM_REF, arg0_type, aligned_addr,
+					   build_int_cst (arg2_type, 0)), arg0);
+	 gimple_set_location (g, loc);
+	 gsi_replace (gsi, g, true);
+	 return true;
       }
     default:
 	if (TARGET_DEBUG_BUILTIN)
@@ -25009,24 +25121,23 @@ debug_stack_info (rs6000_stack_t *info)
 rtx
 rs6000_return_addr (int count, rtx frame)
 {
-  /* Currently we don't optimize very well between prolog and body
-     code and for PIC code the code can be actually quite bad, so
-     don't try to be too clever here.  */
+  /* We can't use get_hard_reg_initial_val for LR when count == 0 if LR
+     is trashed by the prologue, as it is for PIC on ABI_V4 and Darwin.  */
   if (count != 0
       || ((DEFAULT_ABI == ABI_V4 || DEFAULT_ABI == ABI_DARWIN) && flag_pic))
     {
       cfun->machine->ra_needs_full_frame = 1;
 
-      return
-	gen_rtx_MEM
-	  (Pmode,
-	   memory_address
-	   (Pmode,
-	    plus_constant (Pmode,
-			   copy_to_reg
-			   (gen_rtx_MEM (Pmode,
-					 memory_address (Pmode, frame))),
-			   RETURN_ADDRESS_OFFSET)));
+      if (count == 0)
+	/* FRAME is set to frame_pointer_rtx by the generic code, but that
+	   is good for loading 0(r1) only when !FRAME_GROWS_DOWNWARD.  */
+	frame = stack_pointer_rtx;
+      rtx prev_frame_addr = memory_address (Pmode, frame);
+      rtx prev_frame = copy_to_reg (gen_rtx_MEM (Pmode, prev_frame_addr));
+      rtx lr_save_off = plus_constant (Pmode,
+				       prev_frame, RETURN_ADDRESS_OFFSET);
+      rtx lr_save_addr = memory_address (Pmode, lr_save_off);
+      return gen_rtx_MEM (Pmode, lr_save_addr);
     }
 
   cfun->machine->ra_need_lr = 1;
@@ -26724,12 +26835,12 @@ rs6000_emit_prologue (void)
 
       if (crtl->is_leaf && !cfun->calls_alloca)
 	{
-	  if (size > PROBE_INTERVAL && size > STACK_CHECK_PROTECT)
-	    rs6000_emit_probe_stack_range (STACK_CHECK_PROTECT,
-					   size - STACK_CHECK_PROTECT);
+	  if (size > PROBE_INTERVAL && size > get_stack_check_protect ())
+	    rs6000_emit_probe_stack_range (get_stack_check_protect (),
+					   size - get_stack_check_protect ());
 	}
       else if (size > 0)
-	rs6000_emit_probe_stack_range (STACK_CHECK_PROTECT, size);
+	rs6000_emit_probe_stack_range (get_stack_check_protect (), size);
     }
 
   if (TARGET_FIX_AND_CONTINUE)
@@ -35553,8 +35664,7 @@ rs6000_expand_vec_perm_const (rtx operands[4])
 /* Test whether a constant permutation is supported.  */
 
 static bool
-rs6000_vectorize_vec_perm_const_ok (machine_mode vmode,
-				    const unsigned char *sel)
+rs6000_vectorize_vec_perm_const_ok (machine_mode vmode, vec_perm_indices sel)
 {
   /* AltiVec (and thus VSX) can handle arbitrary permutations.  */
   if (TARGET_ALTIVEC)
@@ -39087,6 +39197,17 @@ rs6000_optab_supported_p (int op, machine_mode mode1, machine_mode,
     default:
       return true;
     }
+}
+
+/* Implement TARGET_CONSTANT_ALIGNMENT.  */
+
+static HOST_WIDE_INT
+rs6000_constant_alignment (const_tree exp, HOST_WIDE_INT align)
+{
+  if (TREE_CODE (exp) == STRING_CST
+      && (STRICT_ALIGNMENT || !optimize_size))
+    return MAX (align, BITS_PER_WORD);
+  return align;
 }
 
 struct gcc_target targetm = TARGET_INITIALIZER;
