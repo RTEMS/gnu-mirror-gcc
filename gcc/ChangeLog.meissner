@@ -35,6 +35,7 @@
 	XSCVDPSPN.  Use zero_extendsidi2 instead of p8_mfvsrd_4_disf to
 	move the value to the GPRs.
 	(movdi_from_sf_zero_ext): Likewise.
+	(reload_gpr_from_vsxsf): Likewise.
 	(p8_mfvsrd_4_disf): Delete, no longer used.
 
 2017-09-25  Michael Meissner  <meissner@linux.vnet.ibm.com>
