@@ -32,9 +32,10 @@
 
 	* config/rs6000/rs6000.md (movsi_from_sf): Adjust code to
 	eliminate doing a 32-bit shift right or vector extract after doing
-	XSCVDPSPN.
+	XSCVDPSPN.  Use zero_extendsidi2 instead of p8_mfvsrd_4_disf to
+	move the value to the GPRs.
 	(movdi_from_sf_zero_ext): Likewise.
-
+	(p8_mfvsrd_4_disf): Delete, no longer used.
 
 2017-09-25  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
