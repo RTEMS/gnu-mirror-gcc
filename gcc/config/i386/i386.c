@@ -4758,6 +4758,7 @@ ix86_target_string (HOST_WIDE_INT isa, HOST_WIDE_INT isa2,
   static struct ix86_target_opts flag2_opts[] =
   {
     { "-mgeneral-regs-only",		OPTION_MASK_GENERAL_REGS_ONLY },
+    { "-mprefer-avx256",		OPTION_MASK_PREFER_AVX256 },
   };
 
   const char *opts[ARRAY_SIZE (isa_opts) + ARRAY_SIZE (isa2_opts)
@@ -13946,7 +13947,13 @@ ix86_adjust_stack_and_probe_stack_clash (const HOST_WIDE_INT size)
      no probes are needed.  */
   if (!size)
     {
-      dump_stack_clash_frame_info (NO_PROBE_NO_FRAME, false);
+      /* However, the allocation of space via pushes for register
+	 saves could be viewed as allocating space, but without the
+	 need to probe.  */
+      if (m->frame.nregs || m->frame.nsseregs || frame_pointer_needed)
+        dump_stack_clash_frame_info (NO_PROBE_SMALL_FRAME, true);
+      else
+	dump_stack_clash_frame_info (NO_PROBE_NO_FRAME, false);
       return;
     }
 
@@ -19945,6 +19952,14 @@ ix86_print_operand_address_as (FILE *file, rtx addr,
 	     to check legitimate address displacements for PIC.  */
 	  code = 'k';
 	}
+
+      /* Since the upper 32 bits of RSP are always zero for x32, we can
+	 encode %esp as %rsp to avoid 0x67 prefix if there is no index or
+	 base register.  */
+      if (TARGET_X32 && Pmode == SImode
+	  && ((!index && base && REG_P (base) && REGNO (base) == SP_REG)
+	      || (!base && index && REGNO (index) == SP_REG)))
+	code = 'q';
 
       if (ASSEMBLER_DIALECT == ASM_ATT)
 	{
@@ -31548,14 +31563,10 @@ ix86_sched_init_global (FILE *, int, int)
 }
 
 
-/* Compute the alignment given to a constant that is being placed in memory.
-   EXP is the constant and ALIGN is the alignment that the object would
-   ordinarily have.
-   The value of this function is used instead of that alignment to align
-   the object.  */
+/* Implement TARGET_CONSTANT_ALIGNMENT.  */
 
-int
-ix86_constant_alignment (tree exp, int align)
+static HOST_WIDE_INT
+ix86_constant_alignment (const_tree exp, HOST_WIDE_INT align)
 {
   if (TREE_CODE (exp) == REAL_CST || TREE_CODE (exp) == VECTOR_CST
       || TREE_CODE (exp) == INTEGER_CST)
@@ -50017,8 +50028,7 @@ ix86_expand_vec_perm_const (rtx operands[4])
 /* Implement targetm.vectorize.vec_perm_const_ok.  */
 
 static bool
-ix86_vectorize_vec_perm_const_ok (machine_mode vmode,
-				  const unsigned char *sel)
+ix86_vectorize_vec_perm_const_ok (machine_mode vmode, vec_perm_indices sel)
 {
   struct expand_vec_perm_d d;
   unsigned int i, nelt, which;
@@ -50089,11 +50099,11 @@ ix86_vectorize_vec_perm_const_ok (machine_mode vmode,
 
   /* Extract the values from the vector CST into the permutation
      array in D.  */
-  memcpy (d.perm, sel, nelt);
   for (i = which = 0; i < nelt; ++i)
     {
-      unsigned char e = d.perm[i];
+      unsigned char e = sel[i];
       gcc_assert (e < 2 * nelt);
+      d.perm[i] = e;
       which |= (e < nelt ? 1 : 2);
     }
 
@@ -51842,20 +51852,39 @@ ix86_preferred_simd_mode (scalar_mode mode)
   switch (mode)
     {
     case E_QImode:
-      return TARGET_AVX512BW ? V64QImode :
-       (TARGET_AVX && !TARGET_PREFER_AVX128) ? V32QImode : V16QImode;
+      if (TARGET_AVX512BW && !TARGET_PREFER_AVX256)
+	return V64QImode;
+      else if (TARGET_AVX && !TARGET_PREFER_AVX128)
+	return V32QImode;
+      else
+	return V16QImode;
+
     case E_HImode:
-      return TARGET_AVX512BW ? V32HImode :
-       (TARGET_AVX && !TARGET_PREFER_AVX128) ? V16HImode : V8HImode;
+      if (TARGET_AVX512BW && !TARGET_PREFER_AVX256)
+	return V32HImode;
+      else if (TARGET_AVX && !TARGET_PREFER_AVX128)
+	return V16HImode;
+      else
+	return V8HImode;
+
     case E_SImode:
-      return TARGET_AVX512F ? V16SImode :
-	(TARGET_AVX && !TARGET_PREFER_AVX128) ? V8SImode : V4SImode;
+      if (TARGET_AVX512F && !TARGET_PREFER_AVX256)
+	return V16SImode;
+      else if (TARGET_AVX && !TARGET_PREFER_AVX128)
+	return V8SImode;
+      else
+	return V4SImode;
+
     case E_DImode:
-      return TARGET_AVX512F ? V8DImode :
-	(TARGET_AVX && !TARGET_PREFER_AVX128) ? V4DImode : V2DImode;
+      if (TARGET_AVX512F && !TARGET_PREFER_AVX256)
+	return V8DImode;
+      else if (TARGET_AVX && !TARGET_PREFER_AVX128)
+	return V4DImode;
+      else
+	return V2DImode;
 
     case E_SFmode:
-      if (TARGET_AVX512F)
+      if (TARGET_AVX512F && !TARGET_PREFER_AVX256)
 	return V16SFmode;
       else if (TARGET_AVX && !TARGET_PREFER_AVX128)
 	return V8SFmode;
@@ -51863,7 +51892,7 @@ ix86_preferred_simd_mode (scalar_mode mode)
 	return V4SFmode;
 
     case E_DFmode:
-      if (TARGET_AVX512F)
+      if (TARGET_AVX512F && !TARGET_PREFER_AVX256)
 	return V8DFmode;
       else if (TARGET_AVX && !TARGET_PREFER_AVX128)
 	return V4DFmode;
@@ -51883,8 +51912,14 @@ ix86_preferred_simd_mode (scalar_mode mode)
 static unsigned int
 ix86_autovectorize_vector_sizes (void)
 {
-  return TARGET_AVX512F ? 64 | 32 | 16 :
-    (TARGET_AVX && !TARGET_PREFER_AVX128) ? 32 | 16 : 0;
+  unsigned int bytesizes = 0;
+
+  if (TARGET_AVX512F && !TARGET_PREFER_AVX256)
+    bytesizes |= (64 | 32 | 16);
+  else if (TARGET_AVX && !TARGET_PREFER_AVX128)
+    bytesizes |= (32 | 16);
+
+  return bytesizes;
 }
 
 /* Implemenation of targetm.vectorize.get_mask_mode.  */
@@ -53569,6 +53604,9 @@ ix86_run_selftests (void)
 
 #undef TARGET_CAN_CHANGE_MODE_CLASS
 #define TARGET_CAN_CHANGE_MODE_CLASS ix86_can_change_mode_class
+
+#undef TARGET_CONSTANT_ALIGNMENT
+#define TARGET_CONSTANT_ALIGNMENT ix86_constant_alignment
 
 #if CHECKING_P
 #undef TARGET_RUN_TARGET_SELFTESTS

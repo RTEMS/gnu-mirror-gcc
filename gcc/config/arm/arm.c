@@ -287,8 +287,7 @@ static int arm_cortex_a5_branch_cost (bool, bool);
 static int arm_cortex_m_branch_cost (bool, bool);
 static int arm_cortex_m7_branch_cost (bool, bool);
 
-static bool arm_vectorize_vec_perm_const_ok (machine_mode vmode,
-					     const unsigned char *sel);
+static bool arm_vectorize_vec_perm_const_ok (machine_mode, vec_perm_indices);
 
 static bool aarch_macro_fusion_pair_p (rtx_insn*, rtx_insn*);
 
@@ -317,6 +316,7 @@ static opt_scalar_float_mode arm_floatn_mode (int, bool);
 static unsigned int arm_hard_regno_nregs (unsigned int, machine_mode);
 static bool arm_hard_regno_mode_ok (unsigned int, machine_mode);
 static bool arm_modes_tieable_p (machine_mode, machine_mode);
+static HOST_WIDE_INT arm_constant_alignment (const_tree, HOST_WIDE_INT);
 
 /* Table of machine attributes.  */
 static const struct attribute_spec arm_attribute_table[] =
@@ -796,6 +796,9 @@ static const struct attribute_spec arm_attribute_table[] =
 
 #undef TARGET_CAN_CHANGE_MODE_CLASS
 #define TARGET_CAN_CHANGE_MODE_CLASS arm_can_change_mode_class
+
+#undef TARGET_CONSTANT_ALIGNMENT
+#define TARGET_CONSTANT_ALIGNMENT arm_constant_alignment
 
 /* Obstack for minipool constant handling.  */
 static struct obstack minipool_obstack;
@@ -3367,22 +3370,22 @@ arm_option_override (void)
 
   /* Initialize boolean versions of the architectural flags, for use
      in the arm.md file.  */
-  arm_arch3m = bitmap_bit_p (arm_active_target.isa, isa_bit_ARMv3m);
-  arm_arch4 = bitmap_bit_p (arm_active_target.isa, isa_bit_ARMv4);
+  arm_arch3m = bitmap_bit_p (arm_active_target.isa, isa_bit_armv3m);
+  arm_arch4 = bitmap_bit_p (arm_active_target.isa, isa_bit_armv4);
   arm_arch4t = arm_arch4 && bitmap_bit_p (arm_active_target.isa, isa_bit_thumb);
-  arm_arch5 = bitmap_bit_p (arm_active_target.isa, isa_bit_ARMv5);
-  arm_arch5e = bitmap_bit_p (arm_active_target.isa, isa_bit_ARMv5e);
+  arm_arch5 = bitmap_bit_p (arm_active_target.isa, isa_bit_armv5);
+  arm_arch5e = bitmap_bit_p (arm_active_target.isa, isa_bit_armv5e);
   arm_arch5te = arm_arch5e
     && bitmap_bit_p (arm_active_target.isa, isa_bit_thumb);
-  arm_arch6 = bitmap_bit_p (arm_active_target.isa, isa_bit_ARMv6);
-  arm_arch6k = bitmap_bit_p (arm_active_target.isa, isa_bit_ARMv6k);
+  arm_arch6 = bitmap_bit_p (arm_active_target.isa, isa_bit_armv6);
+  arm_arch6k = bitmap_bit_p (arm_active_target.isa, isa_bit_armv6k);
   arm_arch_notm = bitmap_bit_p (arm_active_target.isa, isa_bit_notm);
   arm_arch6m = arm_arch6 && !arm_arch_notm;
-  arm_arch7 = bitmap_bit_p (arm_active_target.isa, isa_bit_ARMv7);
-  arm_arch7em = bitmap_bit_p (arm_active_target.isa, isa_bit_ARMv7em);
-  arm_arch8 = bitmap_bit_p (arm_active_target.isa, isa_bit_ARMv8);
-  arm_arch8_1 = bitmap_bit_p (arm_active_target.isa, isa_bit_ARMv8_1);
-  arm_arch8_2 = bitmap_bit_p (arm_active_target.isa, isa_bit_ARMv8_2);
+  arm_arch7 = bitmap_bit_p (arm_active_target.isa, isa_bit_armv7);
+  arm_arch7em = bitmap_bit_p (arm_active_target.isa, isa_bit_armv7em);
+  arm_arch8 = bitmap_bit_p (arm_active_target.isa, isa_bit_armv8);
+  arm_arch8_1 = bitmap_bit_p (arm_active_target.isa, isa_bit_armv8_1);
+  arm_arch8_2 = bitmap_bit_p (arm_active_target.isa, isa_bit_armv8_2);
   arm_arch_thumb1 = bitmap_bit_p (arm_active_target.isa, isa_bit_thumb);
   arm_arch_thumb2 = bitmap_bit_p (arm_active_target.isa, isa_bit_thumb2);
   arm_arch_xscale = bitmap_bit_p (arm_active_target.isa, isa_bit_xscale);
@@ -3412,9 +3415,9 @@ arm_option_override (void)
 
   /* And finally, set up some quirks.  */
   arm_arch_no_volatile_ce
-    = bitmap_bit_p (arm_active_target.isa, isa_quirk_no_volatile_ce);
-  arm_arch6kz
-    = arm_arch6k && bitmap_bit_p (arm_active_target.isa, isa_quirk_ARMv6kz);
+    = bitmap_bit_p (arm_active_target.isa, isa_bit_quirk_no_volatile_ce);
+  arm_arch6kz = arm_arch6k && bitmap_bit_p (arm_active_target.isa,
+					    isa_bit_quirk_armv6kz);
 
   /* V5 code we generate is completely interworking capable, so we turn off
      TARGET_INTERWORK here to avoid many tests later on.  */
@@ -3459,7 +3462,7 @@ arm_option_override (void)
       else if (TARGET_HARD_FLOAT_ABI)
 	{
 	  arm_pcs_default = ARM_PCS_AAPCS_VFP;
-	  if (!bitmap_bit_p (arm_active_target.isa, isa_bit_VFPv2))
+	  if (!bitmap_bit_p (arm_active_target.isa, isa_bit_vfpv2))
 	    error ("-mfloat-abi=hard: selected processor lacks an FPU");
 	}
       else
@@ -3562,7 +3565,7 @@ arm_option_override (void)
   /* Enable -mfix-cortex-m3-ldrd by default for Cortex-M3 cores.  */
   if (fix_cm3_ldrd == 2)
     {
-      if (bitmap_bit_p (arm_active_target.isa, isa_quirk_cm3_ldrd))
+      if (bitmap_bit_p (arm_active_target.isa, isa_bit_quirk_cm3_ldrd))
 	fix_cm3_ldrd = 1;
       else
 	fix_cm3_ldrd = 0;
@@ -28657,9 +28660,8 @@ arm_split_atomic_op (enum rtx_code code, rtx old_out, rtx new_out, rtx mem,
 struct expand_vec_perm_d
 {
   rtx target, op0, op1;
-  unsigned char perm[MAX_VECT_LEN];
+  auto_vec_perm_indices perm;
   machine_mode vmode;
-  unsigned char nelt;
   bool one_vector_p;
   bool testing_p;
 };
@@ -28766,7 +28768,7 @@ neon_pair_endian_lane_map (machine_mode mode, int lane)
 static bool
 arm_evpc_neon_vuzp (struct expand_vec_perm_d *d)
 {
-  unsigned int i, odd, mask, nelt = d->nelt;
+  unsigned int i, odd, mask, nelt = d->perm.length ();
   rtx out0, out1, in0, in1;
   rtx (*gen)(rtx, rtx, rtx, rtx);
   int first_elem;
@@ -28778,7 +28780,7 @@ arm_evpc_neon_vuzp (struct expand_vec_perm_d *d)
   /* arm_expand_vec_perm_const_1 () helpfully swaps the operands for the
      big endian pattern on 64 bit vectors, so we correct for that.  */
   swap_nelt = BYTES_BIG_ENDIAN && !d->one_vector_p
-    && GET_MODE_SIZE (d->vmode) == 8 ? d->nelt : 0;
+    && GET_MODE_SIZE (d->vmode) == 8 ? nelt : 0;
 
   first_elem = d->perm[neon_endian_lane_map (d->vmode, 0)] ^ swap_nelt;
 
@@ -28837,7 +28839,7 @@ arm_evpc_neon_vuzp (struct expand_vec_perm_d *d)
 static bool
 arm_evpc_neon_vzip (struct expand_vec_perm_d *d)
 {
-  unsigned int i, high, mask, nelt = d->nelt;
+  unsigned int i, high, mask, nelt = d->perm.length ();
   rtx out0, out1, in0, in1;
   rtx (*gen)(rtx, rtx, rtx, rtx);
   int first_elem;
@@ -28912,7 +28914,7 @@ arm_evpc_neon_vzip (struct expand_vec_perm_d *d)
 static bool
 arm_evpc_neon_vrev (struct expand_vec_perm_d *d)
 {
-  unsigned int i, j, diff, nelt = d->nelt;
+  unsigned int i, j, diff, nelt = d->perm.length ();
   rtx (*gen)(rtx, rtx);
 
   if (!d->one_vector_p)
@@ -28988,7 +28990,7 @@ arm_evpc_neon_vrev (struct expand_vec_perm_d *d)
 static bool
 arm_evpc_neon_vtrn (struct expand_vec_perm_d *d)
 {
-  unsigned int i, odd, mask, nelt = d->nelt;
+  unsigned int i, odd, mask, nelt = d->perm.length ();
   rtx out0, out1, in0, in1;
   rtx (*gen)(rtx, rtx, rtx, rtx);
 
@@ -29054,7 +29056,7 @@ arm_evpc_neon_vtrn (struct expand_vec_perm_d *d)
 static bool
 arm_evpc_neon_vext (struct expand_vec_perm_d *d)
 {
-  unsigned int i, nelt = d->nelt;
+  unsigned int i, nelt = d->perm.length ();
   rtx (*gen) (rtx, rtx, rtx, rtx);
   rtx offset;
 
@@ -29128,7 +29130,7 @@ arm_evpc_neon_vtbl (struct expand_vec_perm_d *d)
 {
   rtx rperm[MAX_VECT_LEN], sel;
   machine_mode vmode = d->vmode;
-  unsigned int i, nelt = d->nelt;
+  unsigned int i, nelt = d->perm.length ();
 
   /* TODO: ARM's VTBL indexing is little-endian.  In order to handle GCC's
      numbering of elements for big-endian, we must reverse the order.  */
@@ -29165,11 +29167,10 @@ arm_expand_vec_perm_const_1 (struct expand_vec_perm_d *d)
   /* The pattern matching functions above are written to look for a small
      number to begin the sequence (0, 1, N/2).  If we begin with an index
      from the second operand, we can swap the operands.  */
-  if (d->perm[0] >= d->nelt)
+  unsigned int nelt = d->perm.length ();
+  if (d->perm[0] >= nelt)
     {
-      unsigned i, nelt = d->nelt;
-
-      for (i = 0; i < nelt; ++i)
+      for (unsigned int i = 0; i < nelt; ++i)
 	d->perm[i] = (d->perm[i] + nelt) & (2 * nelt - 1);
 
       std::swap (d->op0, d->op1);
@@ -29204,15 +29205,16 @@ arm_expand_vec_perm_const (rtx target, rtx op0, rtx op1, rtx sel)
 
   d.vmode = GET_MODE (target);
   gcc_assert (VECTOR_MODE_P (d.vmode));
-  d.nelt = nelt = GET_MODE_NUNITS (d.vmode);
   d.testing_p = false;
 
+  nelt = GET_MODE_NUNITS (d.vmode);
+  d.perm.reserve (nelt);
   for (i = which = 0; i < nelt; ++i)
     {
       rtx e = XVECEXP (sel, 0, i);
       int ei = INTVAL (e) & (2 * nelt - 1);
       which |= (ei < nelt ? 1 : 2);
-      d.perm[i] = ei;
+      d.perm.quick_push (ei);
     }
 
   switch (which)
@@ -29249,22 +29251,21 @@ arm_expand_vec_perm_const (rtx target, rtx op0, rtx op1, rtx sel)
 /* Implement TARGET_VECTORIZE_VEC_PERM_CONST_OK.  */
 
 static bool
-arm_vectorize_vec_perm_const_ok (machine_mode vmode,
-				 const unsigned char *sel)
+arm_vectorize_vec_perm_const_ok (machine_mode vmode, vec_perm_indices sel)
 {
   struct expand_vec_perm_d d;
   unsigned int i, nelt, which;
   bool ret;
 
   d.vmode = vmode;
-  d.nelt = nelt = GET_MODE_NUNITS (d.vmode);
   d.testing_p = true;
-  memcpy (d.perm, sel, nelt);
+  d.perm.safe_splice (sel);
 
   /* Categorize the set of elements in the selector.  */
+  nelt = GET_MODE_NUNITS (d.vmode);
   for (i = which = 0; i < nelt; ++i)
     {
-      unsigned char e = d.perm[i];
+      unsigned int e = d.perm[i];
       gcc_assert (e < 2 * nelt);
       which |= (e < nelt ? 1 : 2);
     }
@@ -31277,6 +31278,18 @@ arm_can_change_mode_class (machine_mode from, machine_mode to,
       && reg_classes_intersect_p (VFP_REGS, rclass))
     return false;
   return true;
+}
+
+/* Implement TARGET_CONSTANT_ALIGNMENT.  Make strings word-aligned so
+   strcpy from constants will be faster.  */
+
+static HOST_WIDE_INT
+arm_constant_alignment (const_tree exp, HOST_WIDE_INT align)
+{
+  unsigned int factor = (TARGET_THUMB || ! arm_tune_xscale ? 1 : 2);
+  if (TREE_CODE (exp) == STRING_CST && !optimize_size)
+    return MAX (align, BITS_PER_WORD * factor);
+  return align;
 }
 
 #if CHECKING_P
