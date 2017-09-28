@@ -2378,14 +2378,14 @@ BU_FLOAT128_2 (COPYSIGNQ,	"copysignq",   CONST, copysignkf3)
    standard functions should be folded into the common built-in function
    handling. */
 BU_FLOAT128_1_HW (SQRTF128,	 "sqrtf128",		   CONST, sqrtkf2)
-BU_FLOAT128_1_HW (SQRT_ODDF128,	 "sqrt_round_to_oddf128",  CONST, sqrtkf2_odd)
-BU_FLOAT128_1_HW (TRUNC_ODDF128, "trunc_round_to_oddf128", CONST, trunckfdf2_odd)
-BU_FLOAT128_2_HW (ADD_ODDF128,	 "add_round_to_oddf128",   CONST, addkf3_odd)
-BU_FLOAT128_2_HW (SUB_ODDF128,	 "sub_round_to_oddf128",   CONST, subkf3_odd)
-BU_FLOAT128_2_HW (MUL_ODDF128,	 "mul_round_to_oddf128",   CONST, mulkf3_odd)
-BU_FLOAT128_2_HW (DIV_ODDF128,	 "div_round_to_oddf128",   CONST, divkf3_odd)
+BU_FLOAT128_1_HW (SQRT_ODDF128,	 "sqrtf128_round_to_odd",  CONST, sqrtkf2_odd)
+BU_FLOAT128_1_HW (TRUNC_ODDF128, "truncf128_round_to_odd", CONST, trunckfdf2_odd)
+BU_FLOAT128_2_HW (ADD_ODDF128,	 "addf128_round_to_odd",   CONST, addkf3_odd)
+BU_FLOAT128_2_HW (SUB_ODDF128,	 "subf128_round_to_odd",   CONST, subkf3_odd)
+BU_FLOAT128_2_HW (MUL_ODDF128,	 "mulf128_round_to_odd",   CONST, mulkf3_odd)
+BU_FLOAT128_2_HW (DIV_ODDF128,	 "divf128_round_to_odd",   CONST, divkf3_odd)
 BU_FLOAT128_3_HW (FMAF128,	 "fmaf128",		   CONST, fmakf4_hw)
-BU_FLOAT128_3_HW (FMA_ODDF128,	 "fma_round_to_oddf128",   CONST, fmakf4_odd)
+BU_FLOAT128_3_HW (FMA_ODDF128,	 "fmaf128_round_to_odd",   CONST, fmakf4_odd)
 
 /* 1 argument crypto functions.  */
 BU_CRYPTO_1 (VSBOX,		"vsbox",	  CONST, crypto_vsbox)
