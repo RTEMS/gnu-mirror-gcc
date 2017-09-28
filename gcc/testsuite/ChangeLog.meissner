@@ -1,5 +1,9 @@
 2017-09-28  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	Merge up to 253267.
+
+2017-09-28  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* gcc.target/powerpc/float128-odd.c: Change built-in names to
 	__builtin_<func>f128_round_to_odd.
 

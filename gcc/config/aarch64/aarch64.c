@@ -6095,7 +6095,7 @@ aarch64_elf_asm_constructor (rtx symbol, int priority)
          -Wformat-truncation false positive, use a larger size.  */
       char buf[23];
       snprintf (buf, sizeof (buf), ".init_array.%.5u", priority);
-      s = get_section (buf, SECTION_WRITE, NULL);
+      s = get_section (buf, SECTION_WRITE | SECTION_NOTYPE, NULL);
       switch_to_section (s);
       assemble_align (POINTER_SIZE);
       assemble_aligned_integer (POINTER_BYTES, symbol);
@@ -6115,7 +6115,7 @@ aarch64_elf_asm_destructor (rtx symbol, int priority)
          -Wformat-truncation false positive, use a larger size.  */
       char buf[23];
       snprintf (buf, sizeof (buf), ".fini_array.%.5u", priority);
-      s = get_section (buf, SECTION_WRITE, NULL);
+      s = get_section (buf, SECTION_WRITE | SECTION_NOTYPE, NULL);
       switch_to_section (s);
       assemble_align (POINTER_SIZE);
       assemble_aligned_integer (POINTER_BYTES, symbol);
@@ -11902,19 +11902,9 @@ aarch64_builtin_support_vector_misalignment (machine_mode mode,
       if (optab_handler (movmisalign_optab, mode) == CODE_FOR_nothing)
         return false;
 
+      /* Misalignment factor is unknown at compile time.  */
       if (misalignment == -1)
-	{
-	  /* Misalignment factor is unknown at compile time but we know
-	     it's word aligned.  */
-	  if (aarch64_simd_vector_alignment_reachable (type, is_packed))
-            {
-              int element_size = TREE_INT_CST_LOW (TYPE_SIZE (type));
-
-              if (element_size != 64)
-                return true;
-            }
-	  return false;
-	}
+	return false;
     }
   return default_builtin_support_vector_misalignment (mode, type, misalignment,
 						      is_packed);

@@ -10560,6 +10560,8 @@ cp_parser_lambda_body (cp_parser* parser, tree lambda_expr)
      + function_definition_after_declarator
      + ctor_initializer_opt_and_function_body  */
   {
+    local_specialization_stack s (lss_copy);
+
     tree fco = lambda_function (lambda_expr);
     tree body = start_lambda_function (fco, lambda_expr);
     bool done = false;
@@ -31712,7 +31714,7 @@ cp_parser_oacc_wait_list (cp_parser *parser, location_t clause_loc, tree list)
 	    {
 	      tree c = build_omp_clause (clause_loc, OMP_CLAUSE_WAIT);
 
-	      mark_rvalue_use (targ);
+	      targ = mark_rvalue_use (targ);
 	      OMP_CLAUSE_DECL (c) = targ;
 	      OMP_CLAUSE_CHAIN (c) = list;
 	      list = c;

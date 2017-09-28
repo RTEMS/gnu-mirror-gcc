@@ -1,3 +1,58 @@
+2017-09-28  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.c (ix86_print_operand_address_as): Do not check
+	index when encoding %esp as %rsp to avoid 0x67 prefix.
+
+2017-09-28  Sergey Shalnov  <Sergey.Shalnov@intel.com>
+
+	* config/i386/i386.md (*movsf_internal, *movdf_internal):
+	Return 256-bit AVX modes for TARGET_PREFER_AVX256.
+
+2017-09-28  Thomas Preud'homme  <thomas.preudhomme@arm.com>
+
+	* config/arm/arm.c (arm_option_override): Forbid ARMv8-M Security
+	Extensions with more than 16 double VFP registers.
+	(cmse_nonsecure_entry_clear_before_return): Remove second entry of
+	to_clear_mask and all code related to it.  Replace the remaining
+	entry by a sbitmap and adapt code accordingly.
+
+2017-09-28  Henry Linjamäki  <henry.linjamaki@parmance.com>
+
+	* brig-builtins.def: Change pure attributes to const.
+
+2017-09-28  Joseph Myers  <joseph@codesourcery.com>
+
+	* config.gcc (default_gnu_indirect_function): Default to yes for
+	sparc*-*-linux* with glibc.
+
+2017-09-28  Joseph Myers  <joseph@codesourcery.com>
+
+	* config/aarch64/aarch64.c (aarch64_elf_asm_constructor)
+	(aarch64_elf_asm_destructor): Pass SECTION_NOTYPE to get_section
+	when creating .init_array and .fini_array sections with priority
+	specified.
+
+2017-09-27  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	PR target/71727
+	* config/aarch64/aarch64.c
+	(aarch64_builtin_support_vector_misalignment): Always return false
+	when misalignment is unknown.
+
+2017-09-27  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	* config/rs6000/rs6000-p8swap.c (const_load_sequence_p): Revise
+	this function to return false if the definition used by the swap
+	instruction is artificial, or if the memory address from which the
+	constant value is loaded is not represented by a base address held
+	in a register or if the base address register is a frame or stack
+	pointer.  Additionally, return false if the base address of the
+	loaded constant is a SYMBOL_REF but is not considered to be a
+	constant.
+	(replace_swapped_load_constant): New function.
+	(rs6000_analyze_swaps): Add a new pass to replace a swap of a
+	loaded constant vector with a load of a swapped constant vector.
+
 2017-09-27  Carl Love  <cel@us.ibm.com>
 
 	* config/rs6000/rs6000-builtin.def (BU_FP_1MISC_1): Add define macro.
@@ -740,7 +795,7 @@
 
 2017-09-21  Martin Sebor  <msebor@redhat.com>
 
-	* PR c/81882
+	PR c/81882
 	* doc/extend.texi (attribute ifunc): Avoid relying on ill-formed
 	code (in C++) or code that triggers warnings.
 
