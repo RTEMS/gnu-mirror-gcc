@@ -1,3 +1,32 @@
+2017-09-29  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* builtins.c (CASE_MATHFN_FLOATN): New helper macro for adding
+	_Float<N> and _Float<N>X support to the math functions.
+	(expand_builtin_classify_type): Add support for _Float<N> and
+	_Float<N>X math functions.
+	(mathfn_built_in_2): Add commented out code for SQRT supporting
+	_Float<N> and _Float<N>X.
+	(expand_builtin_mathfn_ternary): Add support for _Float<N> and
+	_Float<N>X FMA support.
+	(expand_builtin): Likewise.
+	(fold_builtin_3): Likewise.
+	* builtin-types.def (BT_FN_FLOAT16_FLOAT16_FLOAT16_FLOAT16): Add
+	types for FMA for _Float<N> and _Float<N>X.
+	((BT_FN_FLOAT32_FLOAT32_FLOAT16_FLOAT32): Likewise.
+	((BT_FN_FLOAT64_FLOAT64_FLOAT64_FLOAT64): Likewise.
+	((BT_FN_FLOAT128_FLOAT128_FLOAT128_FLOAT128): Likewise.
+	((BT_FN_FLOAT32X_FLOAT32X_FLOAT32X_FLOAT32X): Likewise.
+	((BT_FN_FLOAT64X_FLOAT64X_FLOAT64X_FLOAT64X): Likewise.
+	((BT_FN_FLOAT128X_FLOAT16128X_FLOAT128X_FLOAT128X): Likewise.
+	* builtins.def (BUILT_IN_FMA): Likewise.
+	(BUILT_IN_SQRT): Add #if 0 code to eventually enable SQRT for
+	_Float<N> and _Float<N>X.
+	* tree-call-cdce.c (can_test_argument_range): Likewise.
+	(edom_only_function): Likewise.
+	(get_no_error_domain): Likewise.
+	* config/rs6000/rs6000-builtins.def (FMAF128): Delete FMAF128)
+	since this is now handled in machine independent code.
+
 2017-09-28  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000-builtin.def: Rename built-in macro name to
