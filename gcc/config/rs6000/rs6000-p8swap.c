@@ -325,6 +325,137 @@ insn_is_swap_p (rtx insn)
   return 1;
 }
 
+/* Return TRUE if insn represents a swapped load from memory and the
+   memory address is quad-word aligned.  */
+static bool
+quad_aligned_load_p (swap_web_entry *insn_entry, rtx insn)
+{
+  /* kelvin notes that this code is adopted from const_load_sequence_p */
+
+  if (dump_file)
+    {
+      fprintf (dump_file, "made it to quad_aligned_load_p with insn:\n");
+      print_inline_rtx (dump_file, insn, 2);
+      fprintf (dump_file, "\n");
+      fprintf (dump_file, " insn_entry is %lx\n", (long long) insn_entry);
+    }
+
+  unsigned uid = INSN_UID (insn);
+  if (!insn_entry[uid].is_swap || insn_entry[uid].is_load)
+    {
+      if (dump_file)
+	fprintf (dump_file, " quad_aligned_load_p returning false (A)\n\n");
+      return false;
+    }
+
+  const_rtx tocrel_base;
+
+  struct df_insn_info *insn_info = DF_INSN_INFO_GET (insn);
+
+  /* Since insn is known to represent a swap instruction, we know it
+     "uses" only one input variable.  */
+  df_ref use = DF_INSN_INFO_USES (insn_info);
+
+  /* Figure out where this input variable is defined.  */
+  struct df_link *def_link = DF_REF_CHAIN (use);
+
+  /* If there is no definition or the definition is artificial or there are
+     multiple definitions, punt.  */
+  if (!def_link || !def_link->ref || DF_REF_IS_ARTIFICIAL (def_link->ref)
+      || def_link->next)
+    return false;
+
+  rtx def_insn = DF_REF_INSN (def_link->ref);
+  unsigned uid2 = INSN_UID (def_insn);
+  /* If this is not a load or is not a swap, return false.  */
+  if (!insn_entry[uid2].is_load || !insn_entry[uid2].is_swap)
+    {
+      if (dump_file)
+	fprintf (dump_file, " quad_aligned_load_p returning false (B)\n\n");
+      return false;
+    }
+
+  /* If the source of the rtl def is not a set from memory, return
+     false.  */
+  rtx body = PATTERN (def_insn);
+  if (GET_CODE (body) != SET
+      || GET_CODE (SET_SRC (body)) != VEC_SELECT
+      || GET_CODE (XEXP (SET_SRC (body), 0)) != MEM)
+    {
+      if (dump_file)
+	fprintf (dump_file, " quad_aligned_load_p returning false (C)\n\n");
+      return false;
+    }
+
+  rtx mem = XEXP (SET_SRC (body), 0);
+
+  if (dump_file)
+    {
+      fprintf (dump_file, " MEM_ALIGN (mem) is %d\n", MEM_ALIGN (mem));
+      fprintf (dump_file, " quad_aligned_load_p returning %s\n\n",
+	       (MEM_ALIGN (mem) >= 128)? "true": "false");
+    }
+
+  return (MEM_ALIGN (mem) >= 128)? true: false;
+}
+
+/* Return TRUE if insn represents a swapped followed by a store to
+ * memory and the memory address is quad-word aligned.  */
+static bool
+quad_aligned_store_p (swap_web_entry *insn_entry, rtx insn)
+{
+  if (dump_file)
+    {
+      fprintf (dump_file, "made it to quad_aligned_store_p with insn:\n");
+      print_inline_rtx (dump_file, insn, 2);
+      fprintf (dump_file, "\n");
+      fprintf (dump_file, " insn_entry is %lx\n", (long long) insn_entry);
+    }
+
+  /* the following code is borrowed from insn_is_store_p ().  */
+  rtx body = PATTERN (insn);
+  if (GET_CODE (body) == SET && GET_CODE (SET_DEST (body)) == MEM)
+    {
+      rtx mem = XEXP (SET_DEST (body), 0);
+
+      if (dump_file)
+	{
+	  fprintf (dump_file, "MEM_ALIGN (mem) is %d\n", MEM_ALIGN (mem));
+	  fprintf (dump_file, " quad_aligned_store_p returning %s\n\n",
+		   (MEM_ALIGN (mem) >= 128)? "true": "false");
+	}
+      return (MEM_ALIGN (mem) >= 128)? true: false;
+    }
+  else if (GET_CODE (body) != PARALLEL)
+    {
+      if (dump_file)
+	{
+	  fprintf (dump_file,
+		   " quad_aligned_store_p returning false, !PARALLEL\n\n");
+	}
+      return false;
+    }
+  else
+    {
+      rtx set = XVECEXP (body, 0, 0);
+      if (GET_CODE (set) == SET && GET_CODE (SET_DEST (set)) == MEM)
+	{
+	  rtx mem = XEXP (SET_DEST (set), 0);
+
+	  if (dump_file)
+	    {
+	      fprintf (dump_file, " MEM_ALIGN (mem) is %d\n", MEM_ALIGN (mem));
+	      fprintf (dump_file, " quad_aligned_store_p returning %s\n\n",
+		       (MEM_ALIGN (mem) >= 128)? "true": "false");
+	    }
+	  return (MEM_ALIGN (mem) >= 128)? true: false;
+	}
+    }
+  return false;
+
+}
+
+
 /* Return TRUE if insn is a swap fed by a load from the constant pool.  */
 static bool
 const_load_sequence_p (swap_web_entry *insn_entry, rtx insn)
@@ -337,9 +468,19 @@ const_load_sequence_p (swap_web_entry *insn_entry, rtx insn)
 
   struct df_insn_info *insn_info = DF_INSN_INFO_GET (insn);
   df_ref use;
+  /* kelvin says we're iterating over the definitions that are used by
+     this insn.  Since this is a swap insn, I really expect only one
+     used definition.  kelvin confirmed this by examining
+     replace_swapped_load_constant and observing that it treats
+     the same insn argument as having only one used definition. */
   FOR_EACH_INSN_INFO_USE (use, insn_info)
     {
+      /* kelvin says use is one of the variables that this insn makes
+	 use of.  def_link tells me where this variable is defined.  */
       struct df_link *def_link = DF_REF_CHAIN (use);
+
+      /* for kelvin's purposes, let's still enforce that there's only
+	 one def and it's not artificial.  */
 
       /* If there is no def or the def is artificial or there are
 	 multiple defs, punt.  */
@@ -362,6 +503,9 @@ const_load_sequence_p (swap_web_entry *insn_entry, rtx insn)
 	return false;
 
       rtx mem = XEXP (SET_SRC (body), 0);
+      /*  kelvin wants to test right here that mem is properly
+	  aligned.  if so, he wants to return true.  is there any
+	  reason to do the additional analysis that follows?  */
       rtx base_reg = XEXP (mem, 0);
       /* If the base address for the memory expression is not
 	 represented by a register, punt.  */
@@ -370,6 +514,11 @@ const_load_sequence_p (swap_web_entry *insn_entry, rtx insn)
 
       df_ref base_use;
       insn_info = DF_INSN_INFO_GET (def_insn);
+      /* kelvin thinks we're now iterating through all the uses that feed
+	 into the load subexpression in search of the rtl that
+	 represents the base_reg.  We're going to enforce some
+	 constraints on this expression.  kelvin believes he doesn't
+	 care about this in his aligned_store predicate test.  */
       FOR_EACH_INSN_INFO_USE (base_use, insn_info)
 	{
 	  /* If base_use does not represent base_reg, look for another
@@ -1318,6 +1467,34 @@ replace_swap_with_copy (swap_web_entry *insn_entry, unsigned i)
   insn->set_deleted ();
 }
 
+static void
+replace_swapped_aligned_store (swap_web_entry *insn_entry, rtx swap_insn)
+{
+  if (dump_file)
+    {
+      fprintf (dump_file,
+	       "made it to replace_swapped_aligned_store, insn is:\n");
+      print_inline_rtx (dump_file, swap_insn, 2);
+      fprintf (dump_file, "\n");
+      fprintf (dump_file, " insn_entry is $lx\n\n", (long long) insn_entry);
+    }
+  /* FIXME: not yet implemented */
+}
+
+static void
+replace_swapped_aligned_load (swap_web_entry *insn_entry, rtx swap_insn)
+{
+  if (dump_file)
+    {
+      fprintf (dump_file,
+	       "made it to replace_swapped_aligned_load, insn is:\n");
+      print_inline_rtx (dump_file, swap_insn, 2);
+      fprintf (dump_file, "\n");
+      fprintf (dump_file, " insn_entry is $lx\n\n", (long long) insn_entry);
+    }
+  /* FIXME: not yet implemented */
+}
+
 /* Given that swap_insn represents a swap of a load of a constant
    vector value, replace with a single instruction that loads a
    swapped variant of the original constant.
@@ -2100,8 +2277,9 @@ rs6000_analyze_swaps (function *fun)
   /* Clean up.  */
   free (insn_entry);
 
-  /* Use additional pass over rtl to replace swap(load(vector constant))
-     with load(swapped vector constant). */
+  /* Use a second pass over rtl to detect that certain vector values
+     fetched from or stored to memory on quad-word aligned addresses
+     can use lvx/stvx without swaps.  */
   swap_web_entry *pass2_insn_entry;
   pass2_insn_entry = XCNEWVEC (swap_web_entry, get_max_uid ());
 
@@ -2127,16 +2305,63 @@ rs6000_analyze_swaps (function *fun)
 
   e = get_max_uid ();
   for (unsigned i = 0; i < e; ++i)
-    if (pass2_insn_entry[i].is_swap && !pass2_insn_entry[i].is_load
-	&& !pass2_insn_entry[i].is_store)
+    if (pass2_insn_entry[i].is_swap)
       {
 	insn = pass2_insn_entry[i].insn;
-	if (const_load_sequence_p (pass2_insn_entry, insn))
-	  replace_swapped_load_constant (pass2_insn_entry, insn);
+	if (quad_aligned_store_p (pass2_insn_entry, insn))
+	  replace_swapped_aligned_store (pass2_insn_entry, insn);
+	else if (quad_aligned_load_p (pass2_insn_entry, insn))
+	  replace_swapped_aligned_load (pass2_insn_entry, insn);
+      }
+  /* notes to self:
+   *   quad_aligned_store_p and quad_aligned_load_p need to borrow
+   *    from const_load_sequence_p implementation, using
+   *    MEM_ALIGN (rtx) where rtx should be a MEM.
+   *   replace_swapped_aligned_laod and replace_swapped_aligned_store
+   *    need to borrow from replace_swapped_load_constant ();
+   */
+  /* Clean up.  */
+  free (pass2_insn_entry);
+
+  /* Use a third pass over rtl to replace swap(load(vector constant))
+     with load(swapped vector constant). Kelvin now wonders if a
+     constant value in memory will ever not be properly aligned in
+     memory.  */
+  swap_web_entry *pass3_insn_entry;
+  pass3_insn_entry = XCNEWVEC (swap_web_entry, get_max_uid ());
+
+  /* Walk the insns to gather basic data.  */
+  FOR_ALL_BB_FN (bb, fun)
+    FOR_BB_INSNS_SAFE (bb, insn, curr_insn)
+    {
+      unsigned int uid = INSN_UID (insn);
+      if (NONDEBUG_INSN_P (insn))
+	{
+	  pass3_insn_entry[uid].insn = insn;
+
+	  pass3_insn_entry[uid].is_relevant = 1;
+	  pass3_insn_entry[uid].is_load = insn_is_load_p (insn);
+	  pass3_insn_entry[uid].is_store = insn_is_store_p (insn);
+
+	  /* Determine if this is a doubleword swap.  If not,
+	     determine whether it can legally be swapped.  */
+	  if (insn_is_swap_p (insn))
+	    pass3_insn_entry[uid].is_swap = 1;
+	}
+    }
+
+  e = get_max_uid ();
+  for (unsigned i = 0; i < e; ++i)
+    if (pass3_insn_entry[i].is_swap && !pass3_insn_entry[i].is_load
+	&& !pass3_insn_entry[i].is_store)
+      {
+	insn = pass3_insn_entry[i].insn;
+	if (const_load_sequence_p (pass3_insn_entry, insn))
+	  replace_swapped_load_constant (pass3_insn_entry, insn);
       }
 
   /* Clean up.  */
-  free (pass2_insn_entry);
+  free (pass3_insn_entry);
   return 0;
 }
 
