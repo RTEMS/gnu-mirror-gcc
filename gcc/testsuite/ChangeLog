@@ -1,3 +1,53 @@
+2017-10-05  Bernd Edlinger  <bernd.edlinger@hotmail.de>
+
+	* gcc.dg/Wincompatible-pointer-types-1.c: New test.
+
+2017-10-05  Tamar Christina  <tamar.christina@arm.com>
+
+	* gcc.dg/vect/slp-perm-9.c: Use vect_sizes_16B_8B.
+	* lib/target-supports.exp (vect_sizes_16B_8B): New.
+
+2017-10-05  Tamar Christina  <tamar.christina@arm.com>
+
+	* gcc.dg/vect/vect-align-1.c: Fix vect_hw_misalign condition.
+	* gcc.dg/vect/vect-align-2.c: Likewise.
+	* gcc.dg/vect/vect-multitypes-1.c: Likewise
+
+2017-10-05  Nathan Sidwell  <nathan@acm.org>
+
+	* g++.dg/warn/mvp.C: New.
+
+2017-10-05  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/gomp/pr82374.c (SIZE): Change from 1G to 1M to make it ilp32
+	friendly.
+
+2017-10-05  Richard Biener  <rguenther@suse.de>
+
+	* gfortran.dg/graphite/id-17.f: Fix typo.
+	* gfortran.dg/graphite/id-19.f: Likewise.
+	* gfortran.dg/graphite/pr29832.f90: Likewise.
+	* gfortran.dg/graphite/pr42326-1.f90: Likewise.
+	* gfortran.dg/graphite/pr42326.f90: Likewise.
+	* gfortran.dg/graphite/pr68550-2.f90: Likewise.
+	* gfortran.dg/graphite/run-id-2.f90: Likewise.
+	* gfortran.dg/graphite/run-id-3.f90: Likewise.
+
+2017-10-04  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/80471
+	* g++.dg/cpp1y/pr80471.C: New.
+
+2017-10-04  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/78131
+	* g++.dg/cpp1z/constexpr-lambda17.C: New.
+
+2017-10-04  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/78018
+	* g++.dg/cpp1y/lambda-generic-78018.C: New.
+
 2017-10-04  Paolo Carlini  <paolo.carlini@oracle.com>
 	    Andrew Pinski  <apinski@cavium.com>
 

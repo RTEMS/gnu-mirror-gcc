@@ -613,11 +613,6 @@ struct GTY(()) ptrmem_cst {
 };
 typedef struct ptrmem_cst * ptrmem_cst_t;
 
-#define IDENTIFIER_GLOBAL_VALUE(NODE) \
-  get_namespace_binding (NULL_TREE, (NODE))
-#define SET_IDENTIFIER_GLOBAL_VALUE(NODE, VAL) \
-  set_global_binding ((NODE), (VAL))
-
 #define CLEANUP_P(NODE)		TREE_LANG_FLAG_0 (TRY_BLOCK_CHECK (NODE))
 
 #define BIND_EXPR_TRY_BLOCK(NODE) \
@@ -5676,6 +5671,10 @@ struct cp_declarator {
   /* Whether we parsed an ellipsis (`...') just before the declarator,
      to indicate this is a parameter pack.  */
   BOOL_BITFIELD parameter_pack_p : 1;
+  /* If this declarator is parenthesized, this the open-paren.  It is
+     UNKNOWN_LOCATION when not parenthesized.  */
+  location_t parenthesized;
+
   location_t id_loc; /* Currently only set for cdk_id, cdk_decomp and
 			cdk_function. */
   /* GNU Attributes that apply to this declarator.  If the declarator

@@ -1,5 +1,9 @@
 2017-10-05  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	Merge up to 253461.
+
+2017-10-05  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* gcc.target/powerpc/amo1.c: New test.
 	* gcc.target/powerpc/amo2.c: Likewise.
 
