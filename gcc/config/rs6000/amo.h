@@ -54,11 +54,8 @@ enum _AMO_LD {
    previously in the memory location.
 
    The LWAT/LDAT opcode requires the address to be a single register, and that
-   points to a suitably aligned memory location.
-
-   In order to indicate to the compiler that the memory location may be
-   modified, the memory location is passed both as a memory reference and the
-   address to put in a register.  */
+   points to a suitably aligned memory location.  Asm volatile is used to
+   prevent the optimizer from moving the operation.  */
 
 #define _AMO_LD_SIMPLE(NAME, TYPE, OPCODE, FC)				\
 static __inline__ TYPE							\
@@ -67,10 +64,10 @@ NAME (TYPE *_PTR, TYPE _VALUE)						\
   unsigned __int128 _TMP;						\
   TYPE _RET;								\
   __asm__ volatile ("mr %L1,%3\n"					\
-		    "\t" OPCODE " %1,%4,%5\t\t# %0\n"			\
+		    "\t" OPCODE " %1,%P0,%4\n"				\
 		    "\tmr %2,%1\n"					\
 		    : "+Q" (_PTR[0]), "=&r" (_TMP), "=r" (_RET)		\
-		    : "r" (_VALUE), "b" (&_PTR[0]), "n" (FC));		\
+		    : "r" (_VALUE), "n" (FC));				\
   return _RET;								\
 }
 
@@ -117,19 +114,16 @@ enum _AMO_ST {
    and modify one word or double-word of memory.  No value is returned.
 
    The STWAT/STDAT opcode requires the address to be a single register, and
-   that points to a suitably aligned memory location.
-
-   In order to indicate to the compiler that the memory location may be
-   modified, the memory location is passed both as a memory reference and the
-   address to put in a register.  */
+   that points to a suitably aligned memory location.  Asm volatile is used to
+   prevent the optimizer from moving the operation.  */
 
 #define _AMO_ST_SIMPLE(NAME, TYPE, OPCODE, FC)				\
 static __inline__ void							\
 NAME (TYPE *_PTR, TYPE _VALUE)						\
 {									\
-  __asm__ volatile (OPCODE " %1,%2,%3\t\t# %0"				\
+  __asm__ volatile (OPCODE " %1,%P0,%2"					\
 		    : "+Q" (_PTR[0])					\
-		    : "r" (_VALUE), "b" (&_PTR[0]), "n" (FC));		\
+		    : "r" (_VALUE), "n" (FC));				\
   return;								\
 }
 
