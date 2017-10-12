@@ -1,3 +1,9 @@
+2017-10-12  Peter Bergner  <bergner@vnet.ibm.com>
+
+	Merge up to 253676.
+	* REVISION: Update subversion id.
+	* Upstream FSF GCC 5 is now closed.
+
 2017-05-19  Peter Bergner  <bergner@vnet.ibm.com>
 
 	Merge up to 248295.
