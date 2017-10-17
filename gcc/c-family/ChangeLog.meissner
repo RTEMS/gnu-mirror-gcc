@@ -1,0 +1,4 @@
+2017-10-17  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* c-cppbuiltin.c (mode_has_fma): Add support for E_KFmode.
+
