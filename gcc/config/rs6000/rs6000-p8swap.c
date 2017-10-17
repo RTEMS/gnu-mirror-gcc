@@ -325,19 +325,44 @@ insn_is_swap_p (rtx insn)
   return 1;
 }
 
-/* Return TRUE if insn represents a swapped load from memory and the
-   memory address is quad-word aligned.  */
+/* Return true iff expr represents the sum of two registers.  */
 static bool
-quad_aligned_load_p (swap_web_entry *insn_entry, rtx insn)
+sum_of_two_registers_p (const_rtx expr)
 {
-  /* kelvin notes that this code is adopted from const_load_sequence_p */
+  if (GET_CODE (expr) == PLUS)
+    {
+      const_rtx operand1 = XEXP (expr, 0);
+      const_rtx operand2 = XEXP (expr, 1);
+      if (dump_file) {
+	fprintf (dump_file,
+		 "sum_of_two_registers_p looking at operand 1 (%s):\n",
+		 REG_P (operand1)? "REG_P": "!REG_P");
+	print_inline_rtx (dump_file, operand1, 2);
+	fprintf (dump_file, "\nand operand2 (%s):\n",
+		 REG_P (operand2)? "REG_P": "!REG_P");
+	print_inline_rtx (dump_file, operand2, 2);
+	fprintf (dump_file, "\n");
+      }
+      return (REG_P (operand1) && REG_P (operand2));
+    }
+  if (dump_file) {
+    fprintf (dump_file,
+	     "!PLUS: returning false from sum_of_two_registers_p\n");
+  }
+  return false;
+}
 
+/* Return TRUE if insn represents a swap of a swapped load from memory
+   and the memory address is quad-word aligned.  */
+static bool
+quad_aligned_load_p (swap_web_entry *insn_entry, rtx_insn *insn)
+{
   if (dump_file)
     {
       fprintf (dump_file, "made it to quad_aligned_load_p with insn:\n");
       print_inline_rtx (dump_file, insn, 2);
       fprintf (dump_file, "\n");
-      fprintf (dump_file, " insn_entry is %lx\n", (long long) insn_entry);
+      fprintf (dump_file, " insn_entry is %llx\n", (long long) insn_entry);
     }
 
   unsigned uid = INSN_UID (insn);
@@ -347,8 +372,6 @@ quad_aligned_load_p (swap_web_entry *insn_entry, rtx insn)
 	fprintf (dump_file, " quad_aligned_load_p returning false (A)\n\n");
       return false;
     }
-
-  const_rtx tocrel_base;
 
   struct df_insn_info *insn_info = DF_INSN_INFO_GET (insn);
 
@@ -367,12 +390,20 @@ quad_aligned_load_p (swap_web_entry *insn_entry, rtx insn)
 
   rtx def_insn = DF_REF_INSN (def_link->ref);
   unsigned uid2 = INSN_UID (def_insn);
-  /* If this is not a load or is not a swap, return false.  */
+  /* We're looking for a load-with-swap insn.  If this is not that,
+     return false.  */
   if (!insn_entry[uid2].is_load || !insn_entry[uid2].is_swap)
     {
       if (dump_file)
 	fprintf (dump_file, " quad_aligned_load_p returning false (B)\n\n");
       return false;
+    }
+
+  if (dump_file)
+    {
+      fprintf (dump_file, "Input to swap is load-with-swap\n");
+      print_inline_rtx (dump_file, def_insn, 2);
+      fprintf (dump_file, "\n");
     }
 
   /* If the source of the rtl def is not a set from memory, return
@@ -389,70 +420,232 @@ quad_aligned_load_p (swap_web_entry *insn_entry, rtx insn)
 
   rtx mem = XEXP (SET_SRC (body), 0);
 
+  /* note: i was previously not confirming that mem is regp */
+  rtx base_reg = XEXP (mem, 0);
+
+  /* kelvin is still working here.  he intends to enforce that
+   *     (REG_P (base_reg) || sum_of_two_registers_p (base_reg))
+   * then, over in replace_swapped_aligned_load, he intends to
+   * invoke the 2op version of the expansion if
+   * sum_of_two_registers_p (base_reg).  */
+
   if (dump_file)
     {
-      fprintf (dump_file, " MEM_ALIGN (mem) is %d\n", MEM_ALIGN (mem));
+      fprintf (dump_file, "mem is ");
+      print_inline_rtx (dump_file, mem, 2);
+      fprintf (dump_file, "\n MEM_ALIGN (mem) is %d\n", MEM_ALIGN (mem));
+      fprintf (dump_file, "base_reg is ");
+      print_inline_rtx (dump_file, base_reg, 2);
+      fprintf (dump_file, "\n");
       fprintf (dump_file, " quad_aligned_load_p returning %s\n\n",
-	       (MEM_ALIGN (mem) >= 128)? "true": "false");
+	       ((REG_P (base_reg) || sum_of_two_registers_p (base_reg))
+		&& MEM_ALIGN (mem) >= 128)? "true": "false");
     }
 
-  return (MEM_ALIGN (mem) >= 128)? true: false;
+  return ((REG_P (base_reg) || sum_of_two_registers_p (base_reg))
+	  && MEM_ALIGN (mem) >= 128)? true: false;
 }
 
-/* Return TRUE if insn represents a swapped followed by a store to
- * memory and the memory address is quad-word aligned.  */
+/* Return TRUE if insn represents a store-with-swap of a swapped value
+   and the memory address is quad-word aligned.  */
 static bool
-quad_aligned_store_p (swap_web_entry *insn_entry, rtx insn)
+quad_aligned_store_p (swap_web_entry *insn_entry, rtx_insn *insn)
 {
   if (dump_file)
     {
       fprintf (dump_file, "made it to quad_aligned_store_p with insn:\n");
       print_inline_rtx (dump_file, insn, 2);
       fprintf (dump_file, "\n");
-      fprintf (dump_file, " insn_entry is %lx\n", (long long) insn_entry);
+      fprintf (dump_file, " insn_entry is %llx\n",
+	       (long long unsigned) insn_entry);
+    }
+  
+  unsigned uid = INSN_UID (insn);
+  if (!insn_entry[uid].is_swap || !insn_entry[uid].is_store)
+    {
+      if (dump_file)
+	fprintf (dump_file, " quad_aligned_store_p returning false (A)\n\n");
+      return false;
     }
 
-  /* the following code is borrowed from insn_is_store_p ().  */
+  /* Confirm that the value to be stored is produced by a swap
+     instruction.  */
+
+  /* FIXME */
+  /* kelvin needs to detect the uses of this insn and needs to prove
+     that the value used here is the result of a swap insn.  */
+  struct df_insn_info *insn_info = DF_INSN_INFO_GET (insn);
+  df_ref use;
+  /* kelvin is expecting two uses here, because this is a swapped
+     store insn.  One of the uses is the address to which we are
+     storing.  The other is the value that we are storing.  I am
+     interested in both.  I want to confirm that the address is aligned
+     in memory.  I want to confirm that the value stored is computed
+     by performing a swap.  */
+  /* by the way, the "use" that represents the address may actually be
+     multiple uses, because this insn may add multiple registers
+     together to obtain the effective address of the store.  */
+  /* i want to borrow some code from const_load_sequence_p .. */
+
   rtx body = PATTERN (insn);
-  if (GET_CODE (body) == SET && GET_CODE (SET_DEST (body)) == MEM)
+  if (dump_file) {
+    fprintf (dump_file, "body is: ");
+    print_inline_rtx (dump_file, body, 2);
+    fprintf (dump_file, "\n");
+  }
+  rtx base_reg = XEXP (SET_DEST (body), 0);
+  if (dump_file) {
+    fprintf (dump_file, "base_reg is: ");
+    print_inline_rtx (dump_file, base_reg, 2);
+    fprintf (dump_file, "\n");
+  }
+  rtx swap_reg = XEXP (SET_SRC (body), 0);
+  if (dump_file) {
+    fprintf (dump_file, "swap_reg is: ");
+    print_inline_rtx (dump_file, swap_reg, 2);
+    fprintf (dump_file, "\n");
+  }
+
+  /* Unlike the patterns seen in quad_aligned_load_p, we expect
+     base_reg to be either a single register or the sum of two
+     registers.  */
+
+  /* If the base address for the memory expression is not represented
+     by a single register and is not the sum of two registers, punt.  */
+  if (!REG_P (base_reg) && !sum_of_two_registers_p (base_reg))
+    return false;
+
+  /* kelvin thinks maybe he should punt if !REG_P (swap_reg) */
+  if (dump_file) {
+    fprintf (dump_file, "swap_reg is %sREG_P ()\n", REG_P (swap_reg)? "": "!");
+  }
+
+  /* We know this is a set to memory.  The use that we are interested
+     in represents the source value to be stored to memory.  In the
+     case that the effective memory address is represented by a sum of
+     registers, there will be a use for each of the registers.  */
+  FOR_EACH_INSN_INFO_USE (use, insn_info)
     {
-      rtx mem = XEXP (SET_DEST (body), 0);
+      struct df_link *def_link = DF_REF_CHAIN (use);
 
       if (dump_file)
 	{
-	  fprintf (dump_file, "MEM_ALIGN (mem) is %d\n", MEM_ALIGN (mem));
-	  fprintf (dump_file, " quad_aligned_store_p returning %s\n\n",
-		   (MEM_ALIGN (mem) >= 128)? "true": "false");
+	  fprintf (dump_file, "looking at a use:\n");
+	  df_ref_debug (use, dump_file);
 	}
-      return (MEM_ALIGN (mem) >= 128)? true: false;
-    }
-  else if (GET_CODE (body) != PARALLEL)
-    {
+
+      /* if this is not the definition of the candidate swap register,
+	 then skip it.  I am interested in a different definition.  */
+      if (!rtx_equal_p (DF_REF_REG (use), swap_reg))
+	{
+	  if (dump_file)
+	      fprintf (dump_file,
+		       " ... continue loop because use is uninteresting\n");
+	  continue;
+	}
+      
       if (dump_file)
 	{
 	  fprintf (dump_file,
-		   " quad_aligned_store_p returning false, !PARALLEL\n\n");
+		   " ... so I think I found the def i'm interested in\n");
 	}
-      return false;
-    }
-  else
-    {
-      rtx set = XVECEXP (body, 0, 0);
-      if (GET_CODE (set) == SET && GET_CODE (SET_DEST (set)) == MEM)
-	{
-	  rtx mem = XEXP (SET_DEST (set), 0);
 
+      /* If there is no def or the def is artifical or there are
+	 multiple defs, punt.  */ 
+      if (!def_link || !def_link->ref || DF_REF_IS_ARTIFICIAL (def_link->ref)
+	  || def_link->next)
+	{
 	  if (dump_file)
 	    {
-	      fprintf (dump_file, " MEM_ALIGN (mem) is %d\n", MEM_ALIGN (mem));
-	      fprintf (dump_file, " quad_aligned_store_p returning %s\n\n",
-		       (MEM_ALIGN (mem) >= 128)? "true": "false");
+	      fprintf (dump_file, "premature departure\n");
+	      fprintf (dump_file, "def_link: %llx\n",
+		       (unsigned long long) def_link);
+	      if (def_link) {
+		fprintf (dump_file, "def_link->ref: %llx\n",
+			 (unsigned long long) def_link->ref);
+		if (def_link->ref) {
+		  fprintf (dump_file, " (which is%s artificial)\n",
+			   DF_REF_IS_ARTIFICIAL (def_link->ref)? "": " not");
+
+		  rtx def_insn = DF_REF_INSN (def_link->ref);
+		  unsigned uid2 = INSN_UID (def_insn);
+		  fprintf (dump_file, "looking at def_insn (%s, %s, %s)\n",
+			   insn_entry[uid2].is_load? "is_load": "!is_load",
+			   insn_entry[uid2].is_store? "is_store": "!is_store",
+			   insn_entry[uid2].is_swap? "is_swap": "!is_swap");
+		  print_inline_rtx (dump_file, def_insn, 2);
+		  fprintf (dump_file, "\n");
+		}
+		if (def_link->next)
+		  fprintf (dump_file, "def_link->next: %llx\n",
+			   (unsigned long long) def_link->next);
+	      }
 	    }
-	  return (MEM_ALIGN (mem) >= 128)? true: false;
+	  return false;
+	}
+
+      rtx def_insn = DF_REF_INSN (def_link->ref);
+      unsigned uid2 = INSN_UID (def_insn);
+      
+      if (dump_file)
+	{
+	  fprintf (dump_file, "looking at def_insn (%s, %s, %s)\n",
+		   insn_entry[uid2].is_load? "is_load": "!is_load",
+		   insn_entry[uid2].is_store? "is_store": "!is_store",
+		   insn_entry[uid2].is_swap? "is_swap": "!is_swap");
+	  print_inline_rtx (dump_file, def_insn, 2);
+	  fprintf (dump_file, "\n");	  
+	}
+
+      /* If this source value is not a simple swap, return false */
+      if (!insn_entry[uid2].is_swap || insn_entry[uid2].is_load
+	  || insn_entry[uid2].is_store)
+	{
+	  if (dump_file)
+	    fprintf (dump_file,
+		     " returning false because not a simple swap\n");
+	  return false;
+	}
+      /* I've processed the use that I care about, so break out of
+	 this loop.  */
+      break;
+    }
+
+  if (dump_file)
+    {
+      fprintf (dump_file, "outside loop, about to try single_set\n");
+    }
+
+  /* At this point, we know the source data comes from a swap.  The
+     remaining question is whether the memory address is aligned.  */
+
+  /* rtx body = PATTERN (insn);
+     single_set (body); didn't work
+  */
+  rtx set = single_set (insn);
+  if (set)
+    {
+      rtx dest = SET_DEST (set);
+      if (MEM_P(dest))
+	{
+	  if (dump_file)
+	    {
+	      fprintf (dump_file, "dest: ");
+	      print_inline_rtx (dump_file, dest, 2);
+	      fprintf (dump_file, "\n MEM_ALIGN (SET_DEST (body)) is %d\n",
+		       MEM_ALIGN (dest));
+	      fprintf (dump_file, " quad_aligned_store_p returning %s\n\n",
+		       (MEM_ALIGN (dest) >= 128)? "true": "false");
+	    }
+	  return (MEM_ALIGN (dest) >= 128)? true: false;
 	}
     }
+  if (dump_file)
+    {
+      fprintf (dump_file, " quad_aligned_store_p returning false\n");
+      fprintf (dump_file, "  (not single set or not mem_p)\n");
+    }
   return false;
-
 }
 
 
@@ -1468,19 +1661,73 @@ replace_swap_with_copy (swap_web_entry *insn_entry, unsigned i)
 }
 
 static void
-replace_swapped_aligned_store (swap_web_entry *insn_entry, rtx swap_insn)
+mimic_memory_attributes_and_flags (rtx new_mem_exp, rtx original_mem_exp)
+{
+  RTX_FLAG (new_mem_exp, jump) = RTX_FLAG (original_mem_exp, jump);
+  RTX_FLAG (new_mem_exp, call) = RTX_FLAG (original_mem_exp, call);
+  RTX_FLAG (new_mem_exp, unchanging) = RTX_FLAG (original_mem_exp, unchanging);
+  RTX_FLAG (new_mem_exp, volatil) = RTX_FLAG (original_mem_exp, volatil);
+  RTX_FLAG (new_mem_exp, frame_related) =
+    RTX_FLAG (original_mem_exp, frame_related);
+
+  /* The following fields may not be used with MEM subexpressions */
+  RTX_FLAG (new_mem_exp, in_struct) = RTX_FLAG (original_mem_exp, in_struct);
+  RTX_FLAG (new_mem_exp, return_val) = RTX_FLAG (original_mem_exp, return_val);
+
+  struct mem_attrs original_attrs = *get_mem_attrs(original_mem_exp);
+
+  alias_set_type set = original_attrs.alias;
+  set_mem_alias_set (new_mem_exp, set);
+
+  addr_space_t addrspace = original_attrs.addrspace;
+  set_mem_addr_space (new_mem_exp, addrspace);
+
+  unsigned int align = original_attrs.align;
+  set_mem_align (new_mem_exp, align);
+
+  tree expr = original_attrs.expr;
+  set_mem_expr (new_mem_exp, expr);
+
+  if (original_attrs.offset_known_p)
+    {
+      HOST_WIDE_INT offset = original_attrs.offset;
+      set_mem_offset (new_mem_exp, offset);
+    }
+  else
+    clear_mem_offset (new_mem_exp);
+
+  if (original_attrs.size_known_p)
+    {
+      HOST_WIDE_INT size = original_attrs.size;
+      set_mem_size (new_mem_exp, size);
+    }
+  else
+    clear_mem_size (new_mem_exp);
+
+}
+
+
+/* Given that store_insn represents an aligned store-with-swap of a
+   swapped value, replace the store with an aligned store (without
+   swap) and replace the swap with a copy insn.  */
+static void
+replace_swapped_aligned_store (swap_web_entry *insn_entry, rtx store_insn)
 {
   if (dump_file)
     {
       fprintf (dump_file,
 	       "made it to replace_swapped_aligned_store, insn is:\n");
-      print_inline_rtx (dump_file, swap_insn, 2);
+      print_inline_rtx (dump_file, store_insn, 2);
       fprintf (dump_file, "\n");
-      fprintf (dump_file, " insn_entry is $lx\n\n", (long long) insn_entry);
+      fprintf (dump_file, " insn_entry is %llx\n\n",
+	       (long long unsigned) insn_entry);
     }
   /* FIXME: not yet implemented */
 }
 
+/* Given that swap_insn represents a swap of an aligned
+   load-with-swap, replace the load with an aligned load (without
+   swap) and replace the swap with a copy insn.  */
 static void
 replace_swapped_aligned_load (swap_web_entry *insn_entry, rtx swap_insn)
 {
@@ -1490,9 +1737,150 @@ replace_swapped_aligned_load (swap_web_entry *insn_entry, rtx swap_insn)
 	       "made it to replace_swapped_aligned_load, insn is:\n");
       print_inline_rtx (dump_file, swap_insn, 2);
       fprintf (dump_file, "\n");
-      fprintf (dump_file, " insn_entry is $lx\n\n", (long long) insn_entry);
+      fprintf (dump_file, " insn_entry is %llx\n\n",
+	       (long long unsigned) insn_entry);
     }
-  /* FIXME: not yet implemented */
+
+  /* Find the load.  */
+  unsigned uid = INSN_UID (swap_insn);
+  /* Only call this if quad_aligned_load_p (swap_insn).  */
+  gcc_assert (insn_entry[uid].is_swap && !insn_entry[uid].is_load);
+  struct df_insn_info *insn_info = DF_INSN_INFO_GET (swap_insn);
+
+  /* Since insn is known to represent a swap instruction, we know it
+     "uses" only one input variable.  */
+  df_ref use = DF_INSN_INFO_USES (insn_info);
+
+  /* Figure out where this input variable is defined.  */
+  struct df_link *def_link = DF_REF_CHAIN (use);
+  gcc_assert (def_link && !def_link->next);
+  gcc_assert (def_link && def_link->ref &&
+	      !DF_REF_IS_ARTIFICIAL (def_link->ref) && !def_link->next);
+  
+  rtx_insn *def_insn = DF_REF_INSN (def_link->ref);
+  unsigned uid2 = INSN_UID (def_insn);
+
+  if (dump_file)
+    {
+      fprintf (dump_file, "in replace_swapped_aligned_load, load insn is\n");
+      print_inline_rtx (dump_file, def_insn, 2);
+      fprintf (dump_file, "\n");
+    }
+
+  /* We're expecting a load-with-swap insn.  */
+  gcc_assert (insn_entry[uid2].is_load && insn_entry[uid2].is_swap);
+
+  /* We expect this to be a set to memory, with source representing a
+     swap (indicated by code VEC_SELECT).  */
+  rtx body = PATTERN (def_insn);
+  gcc_assert ((GET_CODE (body) == SET)
+	      && (GET_CODE (SET_SRC (body)) == VEC_SELECT)
+	      && (GET_CODE (XEXP (SET_SRC (body), 0)) == MEM));
+
+  rtx src_exp = XEXP (SET_SRC (body), 0);
+  rtx ea_reg = XEXP (src_exp, 0);
+  enum machine_mode mode = GET_MODE (src_exp);
+  rtx lvx;
+
+  if (dump_file)
+    {
+      fprintf (dump_file, "The original src_exp before lvx replace is:\n");
+      print_inline_rtx (dump_file, src_exp, 2);
+      fprintf (dump_file, "\n");
+      fprintf (dump_file, "The register holding the effective address is\n");
+      print_inline_rtx (dump_file, ea_reg, 2);
+      fprintf (dump_file, "\n");
+      fprintf (dump_file, "mode is %d\n", mode);
+    }
+
+  if (sum_of_two_registers_p (ea_reg))
+    {
+      rtx op1, op2;
+      op1 = XEXP (ea_reg, 0);
+      op2 = XEXP (ea_reg, 1);
+
+      if (dump_file)
+	fprintf (dump_file, "Using the 2op form of lvx\n");
+
+      if (mode == V16QImode)
+	lvx = gen_altivec_lvx_v16qi_2op (SET_DEST (body), op1, op2);
+      else if (mode == V8HImode)
+	lvx = gen_altivec_lvx_v8hi_2op (SET_DEST (body), op1, op2);
+#ifdef HAVE_V8HFmode
+      else if (mode == V8HFmode)
+	lvx = gen_altivec_lvx_v8hf_2op (SET_DEST (body), op1, op2);
+#endif
+      else if (mode == V4SImode)
+	lvx = gen_altivec_lvx_v4si_2op (SET_DEST (body), op1, op2);
+      else if (mode == V4SFmode)
+	lvx = gen_altivec_lvx_v4sf_2op (SET_DEST (body), op1, op2);
+      else if (mode == V2DImode)
+	lvx = gen_altivec_lvx_v2di_2op (SET_DEST (body), op1, op2);
+      else if (mode == V2DFmode)
+	lvx = gen_altivec_lvx_v2df_2op (SET_DEST (body), op1, op2);
+      else if (mode == V1TImode)
+	lvx = gen_altivec_lvx_v1ti_2op (SET_DEST (body), op1, op2);
+      else
+	/* KFmode, TFmode, other modes not expected in this context.  */
+	gcc_unreachable ();    
+    }
+  else				/* REG_P (ea_reg) */
+    {
+      if (mode == V16QImode)
+	lvx = gen_altivec_lvx_v16qi_1op (SET_DEST (body), ea_reg);
+      else if (mode == V8HImode)
+	lvx = gen_altivec_lvx_v8hi_1op (SET_DEST (body), ea_reg);
+#ifdef HAVE_V8HFmode
+      else if (mode == V8HFmode)
+	lvx = gen_altivec_lvx_v8hf_1op (SET_DEST (body), ea_reg);
+#endif
+      else if (mode == V4SImode)
+	lvx = gen_altivec_lvx_v4si_1op (SET_DEST (body), ea_reg);
+      else if (mode == V4SFmode)
+	lvx = gen_altivec_lvx_v4sf_1op (SET_DEST (body), ea_reg);
+      else if (mode == V2DImode)
+	lvx = gen_altivec_lvx_v2di_1op (SET_DEST (body), ea_reg);
+      else if (mode == V2DFmode)
+	lvx = gen_altivec_lvx_v2df_1op (SET_DEST (body), ea_reg);
+      else if (mode == V1TImode)
+	lvx = gen_altivec_lvx_v1ti_1op (SET_DEST (body), ea_reg);
+      else
+	/* KFmode, TFmode, other modes not expected in this context.  */
+	gcc_unreachable ();    
+    }
+    
+  rtx_insn *new_insn = emit_insn_before (lvx, def_insn);
+  rtx new_body = PATTERN (new_insn);
+  gcc_assert ((GET_CODE (new_body) == SET)
+	      && (GET_CODE (SET_SRC (new_body)) == MEM));
+  rtx new_mem_exp = SET_SRC (new_body);
+
+  mimic_memory_attributes_and_flags (new_mem_exp, src_exp);
+
+  set_block_for_insn (new_insn, BLOCK_FOR_INSN (def_insn));
+  df_insn_rescan (new_insn);
+
+  if (dump_file)
+    {
+      unsigned int new_uid = INSN_UID (new_insn);
+      fprintf (dump_file,
+	       "Replacing swapped_load %d with load %d\n", uid2, new_uid);
+    }
+
+  df_insn_delete (def_insn);
+  remove_insn (def_insn);
+  def_insn->set_deleted ();
+
+  if (dump_file)
+    {
+      fprintf (dump_file, "The replacement lvx insn is\n");
+      print_inline_rtx (dump_file, new_insn, 2);
+      fprintf (dump_file, "\n");
+    }
+
+  /* Replace the swap with a copy.  */
+  mark_swaps_for_removal (insn_entry, uid);
+  replace_swap_with_copy (insn_entry, uid);
 }
 
 /* Given that swap_insn represents a swap of a load of a constant
@@ -2055,10 +2443,38 @@ rs6000_analyze_swaps (function *fun)
   df_set_flags (DF_RD_PRUNE_DEAD_DEFS);
   df_chain_add_problem (DF_DU_CHAIN | DF_UD_CHAIN);
   df_analyze ();
+  /* kelvin is experimenting with the following flag */
   df_set_flags (DF_DEFER_INSN_RESCAN);
+
+  if (dump_file)
+    {
+      fprintf (dump_file, "Before rs6000_analyze_swaps prepass\n");
+      df_dump (dump_file);
+    }
 
   /* Pre-pass to recombine lvx and stvx patterns so we don't lose info.  */
   recombine_lvx_stvx_patterns (fun);
+
+  if (dump_file)
+    {
+      fprintf (dump_file, "After rs6000_analyze_swaps prepass\n");
+      df_dump (dump_file);
+    }
+
+
+  /* We're thinking that we need to do some analysis to improve integrity of
+     data-flow information, but we're not sure which calls we need to make.
+     
+  df_remove_problem (df_chain);
+  df_process_deferred_rescans ();
+  df_set_flags (DF_RD_PRUNE_DEAD_DEFS);
+  df_chain_add_problem (DF_UD_CHAIN);
+  df_analyze ();
+  */
+  /* kelvin can't decide whether to keep or not.  am experimenting.
+     did the call to df_analyze cause us not to remove insns 8 and 9?
+     No. problem still exists even without df_analyze ().
+  */
 
   /* Allocate structure to represent webs of insns.  */
   insn_entry = XCNEWVEC (swap_web_entry, get_max_uid ());
@@ -2280,6 +2696,19 @@ rs6000_analyze_swaps (function *fun)
   /* Use a second pass over rtl to detect that certain vector values
      fetched from or stored to memory on quad-word aligned addresses
      can use lvx/stvx without swaps.  */
+
+  /* First, rebuild ud chains.  */
+  df_remove_problem (df_chain);
+  df_process_deferred_rescans ();
+  df_set_flags (DF_RD_PRUNE_DEAD_DEFS);
+  df_chain_add_problem (DF_UD_CHAIN);
+  df_analyze ();
+  if (dump_file)
+    {
+      fprintf (dump_file, "after df_analyze for pass 2\n");
+      df_dump (dump_file);
+    }
+
   swap_web_entry *pass2_insn_entry;
   pass2_insn_entry = XCNEWVEC (swap_web_entry, get_max_uid ());
 
@@ -2301,25 +2730,45 @@ rs6000_analyze_swaps (function *fun)
 	  if (insn_is_swap_p (insn))
 	    pass2_insn_entry[uid].is_swap = 1;
 	}
+      if (dump_file)
+	{
+	  fprintf (dump_file,
+		   "pass 2 web analysis of insn %d: (%s, %s, %s)\n", uid,
+		   (pass2_insn_entry[uid].is_load)? "is_load": "!is_load",
+		   (pass2_insn_entry[uid].is_store)? "is_store": "!is_store",
+		   (pass2_insn_entry[uid].is_swap)? "is_swap": "!is_swap");
+	  print_inline_rtx (dump_file, insn, 2);
+	  fprintf (dump_file, "\n\n");
+	}
+    }
+
+  if (dump_file)
+    {
+      fprintf (dump_file,
+	       "\nSwap insn entry table after web analysis for pass 2\n");
+      dump_swap_insn_table (pass2_insn_entry);
     }
 
   e = get_max_uid ();
   for (unsigned i = 0; i < e; ++i)
-    if (pass2_insn_entry[i].is_swap)
+    if (pass2_insn_entry[i].is_swap && !pass2_insn_entry[i].is_load
+	&& !pass2_insn_entry[i].is_store)
       {
-	insn = pass2_insn_entry[i].insn;
-	if (quad_aligned_store_p (pass2_insn_entry, insn))
-	  replace_swapped_aligned_store (pass2_insn_entry, insn);
-	else if (quad_aligned_load_p (pass2_insn_entry, insn))
-	  replace_swapped_aligned_load (pass2_insn_entry, insn);
+	/* Replace swap of aligned load-swap with aligned unswapped
+	   load.  */
+	rtx_insn *rtx_insn = pass2_insn_entry[i].insn;
+	if (quad_aligned_load_p (pass2_insn_entry, rtx_insn))
+	  replace_swapped_aligned_load (pass2_insn_entry, rtx_insn);
       }
-  /* notes to self:
-   *   quad_aligned_store_p and quad_aligned_load_p need to borrow
-   *    from const_load_sequence_p implementation, using
-   *    MEM_ALIGN (rtx) where rtx should be a MEM.
-   *   replace_swapped_aligned_laod and replace_swapped_aligned_store
-   *    need to borrow from replace_swapped_load_constant ();
-   */
+    else if (pass2_insn_entry[i].is_swap && pass2_insn_entry[i].is_store)
+      {
+	/* Replace aligned store-swap of swapped value with aligned
+	   unswapped store.  */
+	rtx_insn *rtx_insn = pass2_insn_entry[i].insn;
+	if (quad_aligned_store_p (pass2_insn_entry, rtx_insn))
+	  replace_swapped_aligned_store (pass2_insn_entry, rtx_insn);
+      }
+
   /* Clean up.  */
   free (pass2_insn_entry);
 
@@ -2327,6 +2776,19 @@ rs6000_analyze_swaps (function *fun)
      with load(swapped vector constant). Kelvin now wonders if a
      constant value in memory will ever not be properly aligned in
      memory.  */
+
+  /* First, rebuild ud chains.  */
+  df_remove_problem (df_chain);
+  df_process_deferred_rescans ();
+  df_set_flags (DF_RD_PRUNE_DEAD_DEFS);
+  df_chain_add_problem (DF_UD_CHAIN);
+  df_analyze ();
+  if (dump_file)
+    {
+      fprintf (dump_file, "after df_analyze for pass 3\n");
+      df_dump (dump_file);
+    }
+
   swap_web_entry *pass3_insn_entry;
   pass3_insn_entry = XCNEWVEC (swap_web_entry, get_max_uid ());
 

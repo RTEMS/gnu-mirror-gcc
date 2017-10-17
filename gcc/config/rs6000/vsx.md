@@ -494,9 +494,9 @@
 (define_insn_and_split "*vsx_le_perm_load_v16qi"
   [(set (match_operand:V16QI 0 "vsx_register_operand" "=wa")
         (match_operand:V16QI 1 "memory_operand" "Z"))]
-  "!BYTES_BIG_ENDIAN && TARGET_VSX && !TARGET_P9_VECTOR"
+  "0 && !BYTES_BIG_ENDIAN && TARGET_VSX && !TARGET_P9_VECTOR"
   "#"
-  "!BYTES_BIG_ENDIAN && TARGET_VSX && !TARGET_P9_VECTOR"
+  "&& 1"
   [(set (match_dup 2)
         (vec_select:V16QI
           (match_dup 1)
