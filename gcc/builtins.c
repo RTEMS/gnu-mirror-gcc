@@ -6595,10 +6595,21 @@ expand_builtin (tree exp, rtx target, rtx subtarget, machine_mode mode,
       break;
 
     CASE_FLT_FN (BUILT_IN_FMA):
+      target = expand_builtin_mathfn_ternary (exp, target, subtarget);
+      if (target)
+	return target;
+      break;
+
+      /* Warn if the user called __builtin_fmaf{32,64,128} and there is no fast
+	 insn to support it.  */
     CASE_FLT_FN_FLOATN_NX (BUILT_IN_FMA):
       target = expand_builtin_mathfn_ternary (exp, target, subtarget);
       if (target)
 	return target;
+
+      warning_at (tree_nonartificial_location (exp), 0,
+		  "%KThe built-in function %<__builtin_fmafN ()%> may not be "
+		  "supported", exp);
       break;
 
     CASE_FLT_FN (BUILT_IN_ILOGB):
