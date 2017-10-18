@@ -386,6 +386,14 @@ Target RejectNegative Undocumented Warn(using IEEE extended precision long doubl
 mabi=ibmlongdouble
 Target RejectNegative Undocumented Warn(using IBM extended precision long double) Var(rs6000_ieeequad, 0)
 
+; Switches that change long double type, but do not issue a warning.
+; These will be used in adding the appropriate library support.
+mabi=ieeelongdouble-library
+Target RejectNegative Undocumented Var(rs6000_ieeequad, 1)
+
+mabi=ibmlongdouble-library
+Target RejectNegative Undocumented Var(rs6000_ieeequad, 0)
+
 mcpu=
 Target RejectNegative Joined Var(rs6000_cpu_index) Init(-1) Enum(rs6000_cpu_opt_value) Save
 -mcpu=	Use features of and schedule code for given CPU.

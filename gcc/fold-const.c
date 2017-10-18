@@ -12747,6 +12747,7 @@ tree_call_nonnegative_warnv_p (tree type, combined_fn fn, tree arg0, tree arg1,
     CASE_CFN_EXP10:
     CASE_CFN_EXP2:
     CASE_CFN_FABS:
+    CASE_CFN_FABS_FN:
     CASE_CFN_FDIM:
     CASE_CFN_HYPOT:
     CASE_CFN_POW10:
@@ -12761,6 +12762,7 @@ tree_call_nonnegative_warnv_p (tree type, combined_fn fn, tree arg0, tree arg1,
       return true;
 
     CASE_CFN_SQRT:
+    CASE_CFN_SQRT_FN:
       /* sqrt(-0.0) is -0.0.  */
       if (!HONOR_SIGNED_ZEROS (element_mode (type)))
 	return true;
@@ -12805,14 +12807,17 @@ tree_call_nonnegative_warnv_p (tree type, combined_fn fn, tree arg0, tree arg1,
       return RECURSE (arg0);
 
     CASE_CFN_FMAX:
+    CASE_CFN_FMAX_FN:
       /* True if the 1st OR 2nd arguments are nonnegative.  */
       return RECURSE (arg0) || RECURSE (arg1);
 
     CASE_CFN_FMIN:
+    CASE_CFN_FMIN_FN:
       /* True if the 1st AND 2nd arguments are nonnegative.  */
       return RECURSE (arg0) && RECURSE (arg1);
 
     CASE_CFN_COPYSIGN:
+    CASE_CFN_COPYSIGN_FN:
       /* True if the 2nd argument is nonnegative.  */
       return RECURSE (arg1);
 
@@ -13311,7 +13316,9 @@ integer_valued_real_call_p (combined_fn fn, tree arg0, tree arg1, int depth)
       return true;
 
     CASE_CFN_FMIN:
+    CASE_CFN_FMIN_FN:
     CASE_CFN_FMAX:
+    CASE_CFN_FMAX_FN:
       return RECURSE (arg0) && RECURSE (arg1);
 
     default:
