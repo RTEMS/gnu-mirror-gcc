@@ -1,3 +1,27 @@
+2017-10-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* builtins.c (CASE_MATHFN_FLOATN): Add support for _Float<N> and
+	_Float<N>X math functions in addition to double, float, and long
+	double variants.  Initially, only FMA is supported.
+	(mathfn_built_in_2): Likewise.
+	(expand_builtin_mathfn_ternary): Add support for _Float<N> and
+	_Float<N>X fma.
+	* builtin-types.def (BT_FN_FLOAT16_FLOAT16_FLOAT16_FLOAT16):
+	Likewise.
+	(BT_FN_FLOAT32_FLOAT32_FLOAT16_FLOAT32): Likewise.
+	(BT_FN_FLOAT64_FLOAT64_FLOAT64_FLOAT64): Likewise.
+	(BT_FN_FLOAT128_FLOAT128_FLOAT128_FLOAT128): Likewise.
+	(BT_FN_FLOAT32X_FLOAT32X_FLOAT32X_FLOAT32X): Likewise.
+	(BT_FN_FLOAT64X_FLOAT64X_FLOAT64X_FLOAT64X): Likewise.
+	* builtins.def (BUILT_IN_FMA): Likewise.
+	(BUILT_IN_SQRT): Comment out future code to support _Float<N> and
+	_Float<N>X sqrt.
+	* tree-call-cdce.c (can_test_argument_range): Likewise.
+	(edom_only_function): Likewise.
+	(get_no_error_domain): Likewise.
+	* config/rs6000/rs6000-builtins.def (FMAF128): Delete, this is
+	handled by machine independent code now.
+
 2017-10-18   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 253857

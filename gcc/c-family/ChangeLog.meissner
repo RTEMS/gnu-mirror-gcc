@@ -1,3 +1,9 @@
+2017-10-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* c-cppbuiltin.c (mode_has_fma): Add PowerPC KFmode fma.
+	(c_cpp_builtins): Define __FP_FAST_FMA<x> for _Float<N> and
+	_Float<X>X.
+
 2017-10-18   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 253857

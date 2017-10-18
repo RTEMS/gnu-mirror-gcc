@@ -2384,7 +2384,6 @@ BU_FLOAT128_2_HW (ADDF128_ODD,	 "addf128_round_to_odd",   CONST, addkf3_odd)
 BU_FLOAT128_2_HW (SUBF128_ODD,	 "subf128_round_to_odd",   CONST, subkf3_odd)
 BU_FLOAT128_2_HW (MULF128_ODD,	 "mulf128_round_to_odd",   CONST, mulkf3_odd)
 BU_FLOAT128_2_HW (DIVF128_ODD,	 "divf128_round_to_odd",   CONST, divkf3_odd)
-BU_FLOAT128_3_HW (FMAF128,	 "fmaf128",		   CONST, fmakf4_hw)
 BU_FLOAT128_3_HW (FMAF128_ODD,	 "fmaf128_round_to_odd",   CONST, fmakf4_odd)
 
 /* 1 argument crypto functions.  */
