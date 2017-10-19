@@ -1,5 +1,9 @@
 2017-10-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* gcc.target/powerpc/float128-hw.c: Add more FMA tests.  Add test
+	for converting float128 to float.
+	* gcc.target/powerpc/float128-hw2.c: New test.
+
 	* gcc.target/powerpc/float128-sqrt2.c: Delete test, sqrtf128 is now
 	handled by machine independent code.
 
