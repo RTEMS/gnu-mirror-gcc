@@ -12747,7 +12747,6 @@ tree_call_nonnegative_warnv_p (tree type, combined_fn fn, tree arg0, tree arg1,
     CASE_CFN_EXP10:
     CASE_CFN_EXP2:
     CASE_CFN_FABS:
-    CASE_CFN_FABS_FN:
     CASE_CFN_FDIM:
     CASE_CFN_HYPOT:
     CASE_CFN_POW10:
