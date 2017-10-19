@@ -47,10 +47,10 @@ do_nfms (_Float128 a, _Float128 b, _Float128 c)
   return -fmaf128 (a, b, -c);
 }
 
-/* { dg-final { scan-assembler    {\mxscpsgnqp\M} } } */
-/* { dg-final { scan-assembler    {\mxssqrtqp\M}  } } */
-/* { dg-final { scan-assembler    {\mxsmaddqp\M}  } } */
-/* { dg-final { scan-assembler    {\mxsmsubqp\M}  } } */
-/* { dg-final { scan-assembler    {\mxsnmaddqp\M} } } */
-/* { dg-final { scan-assembler    {\mxsnmsubqp\M} } } */
-/* { dg-final { scan-assembler-no {\mbl\M}        } } */
+/* { dg-final { scan-assembler     {\mxscpsgnqp\M} } } */
+/* { dg-final { scan-assembler     {\mxssqrtqp\M}  } } */
+/* { dg-final { scan-assembler     {\mxsmaddqp\M}  } } */
+/* { dg-final { scan-assembler     {\mxsmsubqp\M}  } } */
+/* { dg-final { scan-assembler     {\mxsnmaddqp\M} } } */
+/* { dg-final { scan-assembler     {\mxsnmsubqp\M} } } */
+/* { dg-final { scan-assembler-not {\mbl\M}        } } */
