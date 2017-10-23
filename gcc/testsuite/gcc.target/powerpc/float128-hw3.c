@@ -1,11 +1,10 @@
 /* { dg-do compile { target { powerpc*-*-* && lp64 } } } */
 /* { dg-require-effective-target powerpc_p9vector_ok } */
-/* { dg-options "-mpower9-vector -O2 -ffast-math -fimplicit-math-floatn" } */
+/* { dg-options "-mpower9-vector -O2 -ffast-math -fno-implicit-math-floatn" } */
 
-/* Test to make sure the compiler handles the standard _Float128 functions that
-   have hardware support in ISA 3.0/power9.  */
-
-#define __STDC_WANT_IEC_60559_TYPES_EXT__ 1
+/* Test to make sure the compiler calls the external function instead of doing
+   the built-in processing for _Float128 functions that have hardware support
+   in ISA 3.0/power9 if the option -fimplicit-math-floatn is not used.  */
 
 extern _Float128 copysignf128 (_Float128, _Float128);
 extern _Float128 sqrtf128 (_Float128);
@@ -47,10 +46,10 @@ do_nfms (_Float128 a, _Float128 b, _Float128 c)
   return -fmaf128 (a, b, -c);
 }
 
-/* { dg-final { scan-assembler     {\mxscpsgnqp\M} } } */
-/* { dg-final { scan-assembler     {\mxssqrtqp\M}  } } */
-/* { dg-final { scan-assembler     {\mxsmaddqp\M}  } } */
-/* { dg-final { scan-assembler     {\mxsmsubqp\M}  } } */
-/* { dg-final { scan-assembler     {\mxsnmaddqp\M} } } */
-/* { dg-final { scan-assembler     {\mxsnmsubqp\M} } } */
-/* { dg-final { scan-assembler-not {\mbl\M}        } } */
+/* { dg-final { scan-assembler-not   {\mxscpsgnqp\M} } } */
+/* { dg-final { scan-assembler-not   {\mxssqrtqp\M}  } } */
+/* { dg-final { scan-assembler-not   {\mxsmaddqp\M}  } } */
+/* { dg-final { scan-assembler-not   {\mxsmsubqp\M}  } } */
+/* { dg-final { scan-assembler-not   {\mxsnmaddqp\M} } } */
+/* { dg-final { scan-assembler-not   {\mxsnmsubqp\M} } } */
+/* { dg-final { scan-assembler-times {\mbl\M} 6      } } */

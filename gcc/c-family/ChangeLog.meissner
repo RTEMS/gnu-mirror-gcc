@@ -1,3 +1,8 @@
+2017-10-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* c-cppbuiltin.c (c_cpp_builtins): Only declare __FP_FAST_FMA<x>
+	if -fimplicit-math-floatn.
+
 2017-10-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* c-cppbuiltin.c (mode_has_fma): Add PowerPC KFmode fma.

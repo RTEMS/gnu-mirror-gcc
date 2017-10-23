@@ -1,3 +1,11 @@
+2017-10-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/float128-hw2.c: Update test to use
+	-fimplicit-math-floatn.
+	* gcc.target/powerpc/float128-hw3.c: Test that
+	-fno-implicit-math-floatn does not export the name without the
+	__builtin_ prefix.
+
 2017-10-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* gcc.target/powerpc/float128-hw.c: Add more FMA tests.  Add test

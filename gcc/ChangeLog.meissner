@@ -1,3 +1,21 @@
+2017-10-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* builtins.def (DEF_FLOATN_BUILTIN_2): If -fimplicit-math-floatn,
+	declare the _Float<N> and _Float<N>X math functions both
+	implicitly without the __builtin_ prefix, and with it.  Otherwise,
+	just declare the __builtin_ version.  Use DEF_FLOATN_BUILTINS
+	instead of DEF_GCC_FLOATN_NX_BUILTINS.
+	(DEF_GCC_FLOATN_NX_BUILTINS): Likewise.
+	(DEF_FLOATN_BUILTINS): Likewise.
+	(_Float<N> and _Float<N>X BUILT_IN_COPYSIGN): Likewise.
+	(_Float<N> and _Float<N>X BUILT_IN_FABS): Likewise.
+	(_Float<N> and _Float<N>X BUILT_IN_FMA): Likewise.
+	(_Float<N> and _Float<N>X BUILT_IN_FMAX): Likewise.
+	(_Float<N> and _Float<N>X BUILT_IN_FMIN): Likewise.
+	(_Float<N> and _Float<N>X BUILT_IN_SQRT): Likewise.
+	* doc/invoke.texi (C Dialect Options): Document
+	-fimplicit-math-floatn.
+
 2017-10-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* fold-const-call.c (fold_const_call): Undo changes for NaN

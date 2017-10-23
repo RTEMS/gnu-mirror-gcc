@@ -1472,6 +1472,10 @@ fimplicit-templates
 C++ ObjC++ Var(flag_implicit_templates) Init(1)
 Emit implicit instantiations of templates.
 
+fimplicit-math-floatn
+C Var(flag_implicit_math_floatn) Init(0)
+Emit implicit _Float<N> and _Float<N>X math built-in functions.
+
 fnew-inheriting-ctors
 C++ ObjC++ Var(flag_new_inheriting_ctors) Init(1)
 Implement C++17 inheriting constructor semantics.
