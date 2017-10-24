@@ -87,14 +87,10 @@ along with GCC; see the file COPYING3.  If not see
   DEF_BUILTIN (ENUM, NAME, BUILT_IN_NORMAL, TYPE, BT_LAST,	\
 	       false, false, false, ATTRS, true, true)
 
-/* A set of GCC builtins for _FloatN and _FloatNx types.  TYPE_MACRO
-   is called with an argument such as FLOAT32 to produce the enum
-   value for the type.
-
-   ISO/IEC TS 18661 says that the user is expected to define the macro
-   __STDC_WANT_IEC_60559_TYPES_EXT__ before including math.h, the _Float<N> and
-   _Float<N>X math functions should be defined.  We use the
-   -fimplicit-math-floatn switch to enable these functions.  */
+/* A set of GCC builtins for _FloatN and _FloatNx types.  TYPE_MACRO is called
+   with an argument such as FLOAT32 to produce the enum value for the type.  If
+   -fimplicit-math-floatn is used, these functions will also be declared
+   implicitly without the __builtin_ prefix.  */
 #undef DEF_FLOATN_BUILTIN_2
 #define DEF_FLOATN_BUILTIN_2(ENUM, NAME, TYPE, ATTRS)			\
   DEF_BUILTIN (ENUM, "__builtin_" NAME, BUILT_IN_NORMAL, TYPE,		\

@@ -1,5 +1,9 @@
 2017-10-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* builtins.def (DEF_FLOATN_BUILTIN_2): Update comment.
+
+2017-10-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* builtins.def (DEF_FLOATN_BUILTIN_2): If -fimplicit-math-floatn,
 	declare the _Float<N> and _Float<N>X math functions both
 	implicitly without the __builtin_ prefix, and with it.  Otherwise,

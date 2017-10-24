@@ -1,7 +1,13 @@
 2017-10-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* c.opt (-fimplicit-math-floatn): Allow C++, Objective C, and
+	Objective C++.
+
+2017-10-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* c-cppbuiltin.c (c_cpp_builtins): Only declare __FP_FAST_FMA<x>
 	if -fimplicit-math-floatn.
+	* c.opt (-fimplicit-math-floatn): New switch.
 
 2017-10-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
