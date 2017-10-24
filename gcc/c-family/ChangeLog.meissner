@@ -1,5 +1,9 @@
 2017-10-24  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	Merge up to 254054.
+
+2017-10-24  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* c.opt (-fimplicit-math-floatn): Allow C++, Objective C, and
 	Objective C++.
 
