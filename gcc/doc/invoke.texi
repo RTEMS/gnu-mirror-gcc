@@ -181,8 +181,7 @@ in the following sections.
 -fpermitted-flt-eval-methods=@var{standard} @gol
 -aux-info @var{filename}  -fallow-parameterless-variadic-functions @gol
 -fno-asm  -fno-builtin  -fno-builtin-@var{function}  -fgimple@gol
--fhosted  -ffreestanding  -fimplicit-math-floatn -fopenacc  @gol
--fopenmp  -fopenmp-simd @gol
+-fhosted  -ffreestanding  -fopenacc  -fopenmp  -fopenmp-simd @gol
 -fms-extensions  -fplan9-extensions  -fsso-struct=@var{endianness} @gol
 -fallow-single-precision  -fcond-mismatch  -flax-vector-conversions @gol
 -fsigned-bitfields  -fsigned-char @gol
@@ -2046,17 +2045,6 @@ This is equivalent to @option{-fno-hosted}.
 
 @xref{Standards,,Language Standards Supported by GCC}, for details of
 freestanding and hosted environments.
-
-@item -fimplicit-math-floatn
-@opindex fimplicit-math-floatn
-@cindex Implicit _Float<N> and _Float<N>X math functions
-Declare some of the built-in math functions that use the _Float<N> and
-_Float<N>X types that are from the ISO/IEC TS 18661-3:2015 technical
-note implicitly.  The default for @option{-fimplicit-math-floatn} is
-off.
-
-@xref{Floating Types}, for details of the ISO/IEC TS
-18661-3:2015 _Float<N> and _Float<N>X types.
 
 @item -fopenacc
 @opindex fopenacc

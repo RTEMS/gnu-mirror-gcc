@@ -1,14 +1,19 @@
 /* { dg-do compile { target { powerpc*-*-* && lp64 } } } */
 /* { dg-require-effective-target powerpc_p9vector_ok } */
-/* { dg-options "-mpower9-vector -O2 -ffast-math -fno-implicit-math-floatn" } */
+/* { dg-options "-mpower9-vector -O2 -ffast-math -std=c11" } */
 
 /* Test to make sure the compiler calls the external function instead of doing
    the built-in processing for _Float128 functions that have hardware support
-   in ISA 3.0/power9 if the option -fimplicit-math-floatn is not used.  */
+   in ISA 3.0/power9 if are in strict standards mode, where the <func>f128 name
+   is not a synonym for __builtin_<func>f128.  */
 
 extern _Float128 copysignf128 (_Float128, _Float128);
 extern _Float128 sqrtf128 (_Float128);
 extern _Float128 fmaf128 (_Float128, _Float128, _Float128);
+
+#ifdef __FP_FAST_FMAF128
+#error "__FP_FAST_FMAF128 should not be defined."
+#endif
 
 _Float128
 do_copysign (_Float128 a, _Float128 b)

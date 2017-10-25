@@ -1468,14 +1468,6 @@ fimplicit-inline-templates
 C++ ObjC++ Var(flag_implicit_inline_templates) Init(1)
 Emit implicit instantiations of inline templates.
 
-; Even though the _Float<N> and _Float<N>X are C only, allow
-; -fimplicit-math-floatn for C++ since the two targets (X86-64 and PowerPC)
-; that support IEEE 128-bit floating point also support a __float128 keyword
-; that can be used in C++.
-fimplicit-math-floatn
-C ObjC C++ ObjC++ Var(flag_implicit_math_floatn) Init(0)
-Emit implicit _Float<N> and _Float<N>X math built-in functions.
-
 fimplicit-templates
 C++ ObjC++ Var(flag_implicit_templates) Init(1)
 Emit implicit instantiations of templates.

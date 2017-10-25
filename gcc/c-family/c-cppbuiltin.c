@@ -1124,7 +1124,8 @@ c_cpp_builtins (cpp_reader *pfile)
 	       floatn_nx_types[i].extended ? "X" : "");
       sprintf (csuffix, "F%d%s", floatn_nx_types[i].n,
 	       floatn_nx_types[i].extended ? "x" : "");
-      const char *csuffix2 = flag_implicit_math_floatn ? csuffix : NULL;
+      const char *csuffix2 = ((flag_no_builtin || flag_no_nonansi_builtin)
+			      ? NULL : csuffix);
       builtin_define_float_constants (prefix, csuffix, "%s", csuffix2,
 				      FLOATN_NX_TYPE_NODE (i));
     }

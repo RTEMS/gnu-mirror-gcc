@@ -1,11 +1,15 @@
 /* { dg-do compile { target { powerpc*-*-* && lp64 } } } */
 /* { dg-require-effective-target powerpc_p9vector_ok } */
-/* { dg-options "-mpower9-vector -O2 -ffast-math -fimplicit-math-floatn" } */
+/* { dg-options "-mpower9-vector -O2 -ffast-math -std=gnu11" } */
 
 /* Test to make sure the compiler handles the standard _Float128 functions that
    have hardware support in ISA 3.0/power9.  */
 
 #define __STDC_WANT_IEC_60559_TYPES_EXT__ 1
+
+#ifndef __FP_FAST_FMAF128
+#error "__FP_FAST_FMAF128 should be defined."
+#endif
 
 extern _Float128 copysignf128 (_Float128, _Float128);
 extern _Float128 sqrtf128 (_Float128);
