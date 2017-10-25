@@ -11,10 +11,6 @@ extern _Float128 copysignf128 (_Float128, _Float128);
 extern _Float128 sqrtf128 (_Float128);
 extern _Float128 fmaf128 (_Float128, _Float128, _Float128);
 
-#ifdef __FP_FAST_FMAF128
-#error "__FP_FAST_FMAF128 should not be defined."
-#endif
-
 _Float128
 do_copysign (_Float128 a, _Float128 b)
 {

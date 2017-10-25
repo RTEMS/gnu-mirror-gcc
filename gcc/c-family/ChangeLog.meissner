@@ -1,5 +1,10 @@
 2017-10-25  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	(c_cpp_builtins): Declare __FP_FAST_FMA<x> all of the time if the
+	machine supports it.
+
+2017-10-25  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* c.opt: Undo previous changes.
 	* c-cppbuiltin.c (c_cpp_builtins): Only declare __FP_FAST_FMA<x>
 	if not in strict ANSI mode.

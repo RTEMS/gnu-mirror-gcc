@@ -1,5 +1,10 @@
 2017-10-25  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* gcc.target/powerpc/float128-hw3.c: Remove test for
+	__FP_FAST_FMAF128 not being defined.
+
+2017-10-25  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* gcc.target/powerpc/float128-hw.c: Add more float128 tests.
 	* gcc.target/powerpc/float128-hw2.c: Use -std=<xxx> to control
 	visibility of float128 functions without __builtin_.

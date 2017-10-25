@@ -150,8 +150,8 @@ const char *const internal_fn_int_names[] = {
 };
 
 static const char *const flt_suffixes[] = { "F", "", "L", NULL };
-static const char *const fltfn_suffixes[] = { "F16", "F32", "F128", "F32X",
-					      "F64X", "F128X", NULL };
+static const char *const fltfn_suffixes[] = { "F16", "F32", "F64", "F128",
+					      "F32X", "F64X", "F128X", NULL };
 static const char *const int_suffixes[] = { "", "L", "LL", "IMAX", NULL };
 
 static const char *const *const suffix_lists[] = {

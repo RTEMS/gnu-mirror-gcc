@@ -1,5 +1,9 @@
 2017-10-25  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* gencfn-macros.c (fltfn_suffixes): Add missing "F64".
+
+2017-10-25  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* builtins.def (DEF_EXT_LIB_FLOATN_NX_BUILTINS): Rework _Float<N>
 	and _Float<N>X variant builtin support.
 	(_Float<N> and _Float<N>X BUILT_IN_COPYSIGN): Likewise.
