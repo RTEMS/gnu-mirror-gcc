@@ -1,4 +1,34 @@
+2017-10-26  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* builtins.def: (_Float<N> and _Float<N>X BUILT_IN_CEIL): Add
+	_Float<N> and _Float<N>X variants for rounding built-in
+	functions.
+	(_Float<N> and _Float<N>X BUILT_IN_FLOOR): Likewise.
+	(_Float<N> and _Float<N>X BUILT_IN_NEARBYINT): Likewise.
+	(_Float<N> and _Float<N>X BUILT_IN_RINT): Likewise.
+	(_Float<N> and _Float<N>X BUILT_IN_ROUND): Likewise.
+	(_Float<N> and _Float<N>X BUILT_IN_TRUNC): Likewise.
+	* builtins.c (mathfn_built_in_2): Likewise.
+	* internal-fn.def (CEIL): Likewise.
+	(FLOOR): Likewise.
+	(NEARBYINT): Likewise.
+	(RINT): Likewise.
+	(ROUND): Likewise.
+	(TRUNC): Likewise.
+	* fold-const.c (tree_call_nonnegative_warnv_p): Likewise.
+	(integer_valued_real_call_p): Likewise.
+	* fold-const-call.c (fold_const_call_ss): Likewise.
+	* config/rs6000/rs6000.md (floor<mode>2): Add support for IEEE
+	128-bit round to integer instructions.
+	(ceil<mode>2): Likewise.
+	(btrunc<mode>2): Likewise.
+	(round<mode>2): Likewise.
+
 2017-10-25  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* doc/cpp.texi (Common Predefined Macros): Document defining
+	__FP_FAST_FMAF<N> and __FP_FAST_FMAF<N>X if the back supports fma
+	_Float<N> and _Float<N>X variants.
 
 	* gencfn-macros.c (fltfn_suffixes): Add missing "F64".
 
