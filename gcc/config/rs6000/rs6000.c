@@ -20958,8 +20958,9 @@ rs6000_output_move_128bit (rtx operands[])
 	    return "lxvx %x0,%y1";
 
 	  else if (mode == V16QImode || mode == V8HImode || mode == V4SImode)
-	    return "lxvw4x %x0,%y1";
-
+	    {
+	      return "lxvw4x %x0,%y1";
+	    }
 	  else
 	    return "lxvd2x %x0,%y1";
 	}

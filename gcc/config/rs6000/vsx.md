@@ -419,7 +419,7 @@
         (match_operand:VSX_D 1 "memory_operand" "Z"))]
   "!BYTES_BIG_ENDIAN && TARGET_VSX && !TARGET_P9_VECTOR"
   "#"
-  "!BYTES_BIG_ENDIAN && TARGET_VSX && !TARGET_P9_VECTOR"
+  "&& 1"
   [(set (match_dup 2)
         (vec_select:<MODE>
           (match_dup 1)
@@ -430,6 +430,45 @@
           (parallel [(const_int 1) (const_int 0)])))]
   "
 {
+  extern bool rs6000_sum_of_two_registers_p (const_rtx);
+  const_rtx mem = operands[1];
+
+  /* Note: This pattern works with VSX_D addresses, apparently for V2DI
+     vectors.  The next pattern works with VSX_W patterns, apparently
+     for V4SI vectors.  And below, I've got patterns for V8HI vectors
+     and V16QI vectors.  */
+  if (dump_file)
+    fprintf (dump_file, \"*vsx_le_perm_load_<mode>, alignment %d\n\",
+    	     MEM_ALIGN (mem));
+
+  if (MEM_ALIGN (mem) >= 128)
+    {
+      const_rtx base_reg = XEXP (mem, 0);
+
+      fprintf (dump_file, \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
+      print_inline_rtx (dump_file, mem, 2);
+      fprintf (dump_file, \"\n\");
+
+      fprintf (dump_file, \"base address reg:\n\");
+      print_inline_rtx (dump_file, base_reg, 2);
+      fprintf (dump_file, \"\n\");
+
+      if (REG_P (base_reg) || rs6000_sum_of_two_registers_p (base_reg))
+        {
+          fprintf (dump_file, \"base_reg is REG_P or sum of two registers\n\");
+	  /* If this is already in the form that can be translated to lvx,
+	     transform it by masking off least significant 4 bits.  */
+
+	     /*
+	  rtx masked_address = AND (mem
+	  change_address
+	     */
+
+
+	  DONE;
+        }
+     /* Otherwise, transform into a swapping instruction.  */
+    }
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[0])
                                        : operands[0];
 }
@@ -442,7 +481,7 @@
         (match_operand:VSX_W 1 "memory_operand" "Z"))]
   "!BYTES_BIG_ENDIAN && TARGET_VSX && !TARGET_P9_VECTOR"
   "#"
-  "!BYTES_BIG_ENDIAN && TARGET_VSX && !TARGET_P9_VECTOR"
+  "&& 1"
   [(set (match_dup 2)
         (vec_select:<MODE>
           (match_dup 1)
@@ -455,6 +494,80 @@
                      (const_int 0) (const_int 1)])))]
   "
 {
+  extern bool rs6000_sum_of_two_registers_p (const_rtx);
+  const_rtx mem = operands[1];
+
+  /* Note: This pattern works with VSX_D addresses, apparently for V2DI
+     vectors.  The next pattern works with VSX_W patterns, apparently
+     for V4SI vectors.  And below, I've got patterns for V8HI vectors
+     and V16QI vectors.  */
+
+  if (dump_file)
+    fprintf (dump_file, \"*vsx_le_perm_load_<mode>, alignment %d\n\",
+    	     MEM_ALIGN (mem));
+
+  if (MEM_ALIGN (mem) >= 128)
+    {
+      const_rtx mem_address = XEXP (mem, 0);
+
+      if (dump_file) {
+        fprintf (dump_file,
+	         \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
+        print_inline_rtx (dump_file, mem, 2);
+        fprintf (dump_file, \"\n\");
+
+        fprintf (dump_file, \"base address reg:\n\");
+        print_inline_rtx (dump_file, mem_address, 2);
+        fprintf (dump_file, \"\n\");
+      }
+
+      enum machine_mode mode = GET_MODE (mem);
+
+      if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
+        {
+          fprintf (dump_file,
+	           \"mem_address is REG_P or sum of two registers\n\");
+
+          rtx lvx = rs6000_gen_lvx (mode, mem_address);
+
+          if (rs6000_sum_of_two_registers_p (mem_address))
+            {
+
+	    }
+
+we've got something like this in "mem".  Note that the address subexpression
+might even have the and:DI masking already in it, in which case we can leave
+it as is:
+
+(mem/c:V16QI (plus:DI (reg/f:DI 111 sfp)
+            (reg:DI 125)) [0 v+0 S16 A128])
+
+and i want to replace the memory subexpression with:
+
+(insn 22 11 13 2 (set (reg:V16QI 129 [ <retval> ])
+            (mem/u/c:V16QI (and:DI (reg/f:DI 128)
+                    (const_int -16 [0xfffffffffffffff0])) [0  S16 A128])) "swaps
+
+borrow from the code that I have over in rs6000-p8swap.c,
+  replace_swapped_aligned_load ()
+
+  operands[1] is the (mem expression)
+  so i think if i just replace operand[1] with my new expression, i'm good.
+  
+
+
+	  /* If this is already in the form that translates to lvx, leave
+	     it alone.  */
+	  DONE;
+        }
+      else if (rs6000_quadword_masked_address_p (base_reg)) 
+        {
+          fprintf (dump_file, \"base_reg is quad-word-masked address\n\");
+	  /* This rtl is already in the form that matches lvx instruction.  */
+	  DONE;
+        }
+      /* Otherwise, transform into a swapping instruction.  */
+    }
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[0])
                                        : operands[0];
 }
@@ -467,7 +580,7 @@
         (match_operand:V8HI 1 "memory_operand" "Z"))]
   "!BYTES_BIG_ENDIAN && TARGET_VSX && !TARGET_P9_VECTOR"
   "#"
-  "!BYTES_BIG_ENDIAN && TARGET_VSX && !TARGET_P9_VECTOR"
+  "&& 1"
   [(set (match_dup 2)
         (vec_select:V8HI
           (match_dup 1)
@@ -484,6 +597,39 @@
                      (const_int 2) (const_int 3)])))]
   "
 {
+  extern bool rs6000_sum_of_two_registers_p (const_rtx);
+  const_rtx mem = operands[1];
+
+  /* Note: This pattern works with VSX_D addresses, apparently for V2DI
+     vectors.  The next pattern works with VSX_W patterns, apparently
+     for V4SI vectors.  And below, I've got patterns for V8HI vectors
+     and V16QI vectors.  */
+
+  if (dump_file)
+    fprintf (dump_file, \"*vsx_le_perm_load_<mode>, alignment %d\n\",
+    	     MEM_ALIGN (mem));
+
+  if (MEM_ALIGN (mem) >= 128)
+    {
+      const_rtx base_reg = XEXP (mem, 0);
+
+      fprintf (dump_file, \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
+      print_inline_rtx (dump_file, mem, 2);
+      fprintf (dump_file, \"\n\");
+
+      fprintf (dump_file, \"base address reg:\n\");
+      print_inline_rtx (dump_file, base_reg, 2);
+      fprintf (dump_file, \"\n\");
+
+      if (REG_P (base_reg) || rs6000_sum_of_two_registers_p (base_reg))
+        {
+          fprintf (dump_file, \"base_reg is REG_P or sum of two registers\n\");
+	  /* If this is already in the form that translates to lvx, leave
+	     it alone.  */
+	  DONE;
+        }
+     /* Otherwise, transform into a swapping instruction.  */
+    }
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[0])
                                        : operands[0];
 }
@@ -494,7 +640,7 @@
 (define_insn_and_split "*vsx_le_perm_load_v16qi"
   [(set (match_operand:V16QI 0 "vsx_register_operand" "=wa")
         (match_operand:V16QI 1 "memory_operand" "Z"))]
-  "0 && !BYTES_BIG_ENDIAN && TARGET_VSX && !TARGET_P9_VECTOR"
+  "!BYTES_BIG_ENDIAN && TARGET_VSX && !TARGET_P9_VECTOR"
   "#"
   "&& 1"
   [(set (match_dup 2)
@@ -521,6 +667,39 @@
                      (const_int 6) (const_int 7)])))]
   "
 {
+  extern bool rs6000_sum_of_two_registers_p (const_rtx);
+  const_rtx mem = operands[1];
+
+  /* Note: This pattern works with VSX_D addresses, apparently for V2DI
+     vectors.  The next pattern works with VSX_W patterns, apparently
+     for V4SI vectors.  And below, I've got patterns for V8HI vectors
+     and V16QI vectors.  */
+
+  if (dump_file)
+    fprintf (dump_file, \"*vsx_le_perm_load_<mode>, alignment %d\n\",
+    	     MEM_ALIGN (mem));
+
+  if (MEM_ALIGN (operands[1]) >= 128)
+    {
+      const_rtx base_reg = XEXP (mem, 0);
+
+      fprintf (dump_file, \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
+      print_inline_rtx (dump_file, mem, 2);
+      fprintf (dump_file, \"\n\");
+
+      fprintf (dump_file, \"base address reg:\n\");
+      print_inline_rtx (dump_file, base_reg, 2);
+      fprintf (dump_file, \"\n\");
+
+      if (REG_P (base_reg) || rs6000_sum_of_two_registers_p (base_reg))
+        {
+          fprintf (dump_file, \"base_reg is REG_P or sum of two registers\n\");
+	  /* If this is already in the form that translates to lvx, leave
+	     it alone.  */
+	  DONE;
+        }
+     /* Otherwise, transform into a swapping instruction.  */
+    }
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[0])
                                        : operands[0];
 }
@@ -3998,6 +4177,63 @@
    (set_attr "type" "veccomplex")])
 
 
+;; kelvin reenabled to get original behavior.  will do some more testing
+;; of unadulterated compiler.
+;;
+;; kelvin disabled the following two optimizations because they are not
+;; working for V16QI on little endian.  Maybe these work on big endian.
+;; not sure...  These two peepholes differ only in the order of the
+;; two operands passed to the load operation.
+;;  Based on expansions of VSX_M and VSm, the instruction selected
+;;  for each vector type is as follows:
+;;
+;; V16QI: "lxvw4x"
+;;  BE memory bytes:    00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
+;;  BE loaded register: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
+;;  (good)
+;;
+;;  LE memory bytes:    00 01 02 03 | 04 05 06 07 | 08 09 0a 0b | 0c 0d 0e 0f
+;;  LE loaded register: 03 02 01 00 | 07 06 05 04 | 0b 0a 09 08 | 0f 0e 0d 0c
+;;  (bad)
+;;
+;;  big endian-load:
+;;  little endian-load:
+;;  
+;; V8HI: "lxvw4x"
+;;  short int array[] =
+;;  { 0x0001, 0x0203, 0x0405, 0x0607, 0x0809, 0x0a0b, 0x0c0d, 0x0e0f };
+;;
+;;  BE memory bytes: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
+;;  big-endian load: 0x0001 0x0203 0x0405 0x0607 0x0809 0x0a0b 0x0c0d 0x0e0f
+;;
+;;  LE memory bytes: 01 00 03 02 05 04 07 06 09 08 0b 0a 0d 0c 0f 0e
+;;  little-endian load: 0x0203 0x0001 0x06070405 0x0a0b0809
+;;  (bad)
+;;
+;; V4SI: "lxvw4x"
+;; int array[] =
+;; { 0x00010203, 0x04050607, 0x08090a0b, 0x0c0d0e0f }
+;;
+;; BE memory bytes: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
+;; BE loaded register: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
+;; 
+;; LE memory bytes: 03 02 01 00 07 06 05 04 0b 0a 09 08 0f 0e 0d 0c
+;; LE loaded register: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
+;;
+;; V4SF: "lxvw4x"
+;; V2DF: "lxvd2x"
+;; V2DI: "lxvd2x"
+;;   DF: "lxdx"
+;;   TF: "lxvd2x"
+;;   KF: "lxvd2x"
+;; V1TI: "lxvd2x"
+;;   TI: "lxvd2x"
+;;
+;; BE memory bytes: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
+;;
+;; LE memory bytes: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
+;;
+ 
 ;; Power8 Vector fusion.  The fused ops must be physically adjacent.
 (define_peephole
   [(set (match_operand:P 0 "base_reg_operand" "")
@@ -4006,7 +4242,7 @@
 	(mem:VSX_M (plus:P (match_dup 0)
 			   (match_operand:P 3 "int_reg_operand" ""))))]
   "TARGET_VSX && TARGET_P8_FUSION && !TARGET_P9_VECTOR"
-  "li %0,%1\t\t\t# vector load fusion\;lx<VSX_M:VSm>x %x2,%0,%3"  
+  "li %0,%1\t\t\t# vector load fusion\;lx<VSX_M:VSm>x %x2,%0,%3";
   [(set_attr "length" "8")
    (set_attr "type" "vecload")])
 
