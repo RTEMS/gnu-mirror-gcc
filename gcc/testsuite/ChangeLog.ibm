@@ -1,3 +1,10 @@
+2017-10-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Back port from trunk
+	2017-10-03  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/float128-odd.c: New test.
+
 2017-10-09  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Back port from trunk
