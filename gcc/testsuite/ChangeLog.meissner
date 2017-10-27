@@ -1,3 +1,8 @@
+2017-10-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/float128-hw2.c: Add tests for ceilf128,
+	floorf128, truncf128, and roundf128.
+
 2017-10-27   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 254171
