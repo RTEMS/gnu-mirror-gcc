@@ -430,44 +430,50 @@
           (parallel [(const_int 1) (const_int 0)])))]
   "
 {
-  extern bool rs6000_sum_of_two_registers_p (const_rtx);
-  const_rtx mem = operands[1];
+  rtx mem = operands[1];
 
-  /* Note: This pattern works with VSX_D addresses, apparently for V2DI
-     vectors.  The next pattern works with VSX_W patterns, apparently
-     for V4SI vectors.  And below, I've got patterns for V8HI vectors
-     and V16QI vectors.  */
   if (dump_file)
-    fprintf (dump_file, \"*vsx_le_perm_load_<mode>, alignment %d\n\",
-    	     MEM_ALIGN (mem));
+    fprintf (dump_file,
+	     \"*vsx_le_perm_load_<mode> for doubles, alignment %d\n\",
+	     MEM_ALIGN (mem));
 
   if (MEM_ALIGN (mem) >= 128)
     {
-      const_rtx base_reg = XEXP (mem, 0);
+      rtx mem_address = XEXP (mem, 0);
 
-      fprintf (dump_file, \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
-      print_inline_rtx (dump_file, mem, 2);
-      fprintf (dump_file, \"\n\");
-
-      fprintf (dump_file, \"base address reg:\n\");
-      print_inline_rtx (dump_file, base_reg, 2);
-      fprintf (dump_file, \"\n\");
-
-      if (REG_P (base_reg) || rs6000_sum_of_two_registers_p (base_reg))
+      if (dump_file)
         {
-          fprintf (dump_file, \"base_reg is REG_P or sum of two registers\n\");
-	  /* If this is already in the form that can be translated to lvx,
-	     transform it by masking off least significant 4 bits.  */
+          fprintf (dump_file,
+		   \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
+	  print_inline_rtx (dump_file, mem, 2);
+	  fprintf (dump_file, \"\n\");
 
-	     /*
-	  rtx masked_address = AND (mem
-	  change_address
-	     */
+	  fprintf (dump_file, \"memory address:\n\");
+	  print_inline_rtx (dump_file, mem_address, 2);
+	  fprintf (dump_file, \"\n\");
+	}
 
+      enum machine_mode mode = GET_MODE (mem);
 
+      if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
+        {
+	  if (dump_file)
+            fprintf (dump_file,
+	             \"mem_address is REG_P or sum of two registers\n\");
+	  /* Replace the source memory address with masked address.  */
+          rtx lvx_set_expr = rs6000_gen_lvx (mode, operands[0], mem);
+	  emit_insn (lvx_set_expr);
 	  DONE;
         }
-     /* Otherwise, transform into a swapping instruction.  */
+      else if (rs6000_quadword_masked_address_p (mem_address)) 
+        {
+	  if (dump_file)
+            fprintf (dump_file, \"base_reg is quad-word-masked address\n\");
+	  /* This rtl is already in the form that matches lvx
+	     instruction, so leave it alone.  */
+	  DONE;
+        }
+      /* Otherwise, fall through to transform into a swapping load.  */
     }
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[0])
                                        : operands[0];
@@ -494,79 +500,49 @@
                      (const_int 0) (const_int 1)])))]
   "
 {
-  extern bool rs6000_sum_of_two_registers_p (const_rtx);
-  const_rtx mem = operands[1];
-
-  /* Note: This pattern works with VSX_D addresses, apparently for V2DI
-     vectors.  The next pattern works with VSX_W patterns, apparently
-     for V4SI vectors.  And below, I've got patterns for V8HI vectors
-     and V16QI vectors.  */
+  rtx mem = operands[1];
 
   if (dump_file)
-    fprintf (dump_file, \"*vsx_le_perm_load_<mode>, alignment %d\n\",
+    fprintf (dump_file, \"*vsx_le_perm_load_<mode> for words, alignment %d\n\",
     	     MEM_ALIGN (mem));
 
   if (MEM_ALIGN (mem) >= 128)
     {
-      const_rtx mem_address = XEXP (mem, 0);
+      rtx mem_address = XEXP (mem, 0);
 
-      if (dump_file) {
-        fprintf (dump_file,
-	         \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
-        print_inline_rtx (dump_file, mem, 2);
-        fprintf (dump_file, \"\n\");
+      if (dump_file)
+        {
+	  fprintf (dump_file,
+		   \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
+	  print_inline_rtx (dump_file, mem, 2);
+	  fprintf (dump_file, \"\n\");
 
-        fprintf (dump_file, \"base address reg:\n\");
-        print_inline_rtx (dump_file, mem_address, 2);
-        fprintf (dump_file, \"\n\");
-      }
+	  fprintf (dump_file, \"memory address:\n\");
+	  print_inline_rtx (dump_file, mem_address, 2);
+	  fprintf (dump_file, \"\n\");
+	}
 
       enum machine_mode mode = GET_MODE (mem);
 
       if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
         {
-          fprintf (dump_file,
-	           \"mem_address is REG_P or sum of two registers\n\");
-
-          rtx lvx = rs6000_gen_lvx (mode, mem_address);
-
-          if (rs6000_sum_of_two_registers_p (mem_address))
-            {
-
-	    }
-
-we've got something like this in "mem".  Note that the address subexpression
-might even have the and:DI masking already in it, in which case we can leave
-it as is:
-
-(mem/c:V16QI (plus:DI (reg/f:DI 111 sfp)
-            (reg:DI 125)) [0 v+0 S16 A128])
-
-and i want to replace the memory subexpression with:
-
-(insn 22 11 13 2 (set (reg:V16QI 129 [ <retval> ])
-            (mem/u/c:V16QI (and:DI (reg/f:DI 128)
-                    (const_int -16 [0xfffffffffffffff0])) [0  S16 A128])) "swaps
-
-borrow from the code that I have over in rs6000-p8swap.c,
-  replace_swapped_aligned_load ()
-
-  operands[1] is the (mem expression)
-  so i think if i just replace operand[1] with my new expression, i'm good.
-  
-
-
-	  /* If this is already in the form that translates to lvx, leave
-	     it alone.  */
+	  if (dump_file)
+            fprintf (dump_file,
+	             \"mem_address is REG_P or sum of two registers\n\");
+	  /* Replace the source memory address with masked address.  */
+          rtx lvx_set_expr = rs6000_gen_lvx (mode, operands[0], mem);
+	  emit_insn (lvx_set_expr);
 	  DONE;
         }
-      else if (rs6000_quadword_masked_address_p (base_reg)) 
+      else if (rs6000_quadword_masked_address_p (mem_address)) 
         {
-          fprintf (dump_file, \"base_reg is quad-word-masked address\n\");
-	  /* This rtl is already in the form that matches lvx instruction.  */
+	  if (dump_file)
+            fprintf (dump_file, \"base_reg is quad-word-masked address\n\");
+	  /* This rtl is already in the form that matches lvx
+	     instruction, so leave it alone.  */
 	  DONE;
         }
-      /* Otherwise, transform into a swapping instruction.  */
+      /* Otherwise, fall through to transform into a swapping load.  */
     }
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[0])
                                        : operands[0];
@@ -597,38 +573,49 @@ borrow from the code that I have over in rs6000-p8swap.c,
                      (const_int 2) (const_int 3)])))]
   "
 {
-  extern bool rs6000_sum_of_two_registers_p (const_rtx);
-  const_rtx mem = operands[1];
-
-  /* Note: This pattern works with VSX_D addresses, apparently for V2DI
-     vectors.  The next pattern works with VSX_W patterns, apparently
-     for V4SI vectors.  And below, I've got patterns for V8HI vectors
-     and V16QI vectors.  */
+  rtx mem = operands[1];
 
   if (dump_file)
-    fprintf (dump_file, \"*vsx_le_perm_load_<mode>, alignment %d\n\",
+    fprintf (dump_file, \"*vsx_le_perm_load_<mode> for halfs, alignment %d\n\",
     	     MEM_ALIGN (mem));
 
   if (MEM_ALIGN (mem) >= 128)
     {
-      const_rtx base_reg = XEXP (mem, 0);
+      rtx mem_address = XEXP (mem, 0);
 
-      fprintf (dump_file, \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
-      print_inline_rtx (dump_file, mem, 2);
-      fprintf (dump_file, \"\n\");
-
-      fprintf (dump_file, \"base address reg:\n\");
-      print_inline_rtx (dump_file, base_reg, 2);
-      fprintf (dump_file, \"\n\");
-
-      if (REG_P (base_reg) || rs6000_sum_of_two_registers_p (base_reg))
+      if (dump_file)
         {
-          fprintf (dump_file, \"base_reg is REG_P or sum of two registers\n\");
-	  /* If this is already in the form that translates to lvx, leave
-	     it alone.  */
+	  fprintf (dump_file,
+		   \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
+	  print_inline_rtx (dump_file, mem, 2);
+	  fprintf (dump_file, \"\n\");
+
+	  fprintf (dump_file, \"memory address:\n\");
+	  print_inline_rtx (dump_file, mem_address, 2);
+	  fprintf (dump_file, \"\n\");
+	}
+
+      enum machine_mode mode = GET_MODE (mem);
+
+      if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
+        {
+	  if (dump_file)
+            fprintf (dump_file,
+	             \"mem_address is REG_P or sum of two registers\n\");
+	  /* Replace the source memory address with masked address.  */
+          rtx lvx_set_expr = rs6000_gen_lvx (mode, operands[0], mem);
+	  emit_insn (lvx_set_expr);
 	  DONE;
         }
-     /* Otherwise, transform into a swapping instruction.  */
+      else if (rs6000_quadword_masked_address_p (mem_address)) 
+        {
+	  if (dump_file)
+            fprintf (dump_file, \"base_reg is quad-word-masked address\n\");
+	  /* This rtl is already in the form that matches lvx
+	     instruction, so leave it alone.  */
+	  DONE;
+        }
+      /* Otherwise, fall through to transform into a swapping load.  */
     }
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[0])
                                        : operands[0];
@@ -667,38 +654,58 @@ borrow from the code that I have over in rs6000-p8swap.c,
                      (const_int 6) (const_int 7)])))]
   "
 {
-  extern bool rs6000_sum_of_two_registers_p (const_rtx);
-  const_rtx mem = operands[1];
-
-  /* Note: This pattern works with VSX_D addresses, apparently for V2DI
-     vectors.  The next pattern works with VSX_W patterns, apparently
-     for V4SI vectors.  And below, I've got patterns for V8HI vectors
-     and V16QI vectors.  */
+  rtx mem = operands[1];
 
   if (dump_file)
-    fprintf (dump_file, \"*vsx_le_perm_load_<mode>, alignment %d\n\",
+    fprintf (dump_file, \"*vsx_le_perm_load_<mode> for bytes, alignment %d\n\",
     	     MEM_ALIGN (mem));
 
-  if (MEM_ALIGN (operands[1]) >= 128)
+  if (MEM_ALIGN (mem) >= 128)
     {
-      const_rtx base_reg = XEXP (mem, 0);
+      rtx mem_address = XEXP (mem, 0);
 
-      fprintf (dump_file, \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
-      print_inline_rtx (dump_file, mem, 2);
-      fprintf (dump_file, \"\n\");
-
-      fprintf (dump_file, \"base address reg:\n\");
-      print_inline_rtx (dump_file, base_reg, 2);
-      fprintf (dump_file, \"\n\");
-
-      if (REG_P (base_reg) || rs6000_sum_of_two_registers_p (base_reg))
+      if (dump_file)
         {
-          fprintf (dump_file, \"base_reg is REG_P or sum of two registers\n\");
-	  /* If this is already in the form that translates to lvx, leave
-	     it alone.  */
+	  fprintf (dump_file,
+		   \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
+	  print_inline_rtx (dump_file, mem, 2);
+	  fprintf (dump_file, \"\n\");
+
+	  fprintf (dump_file, \"memory address:\n\");
+	  print_inline_rtx (dump_file, mem_address, 2);
+	  fprintf (dump_file, \"\n\");
+	}
+
+      enum machine_mode mode = GET_MODE (mem);
+
+      if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
+        {
+	  if (dump_file)
+            fprintf (dump_file,
+	             \"mem_address is REG_P or sum of two registers\n\");
+	  /* Replace the source memory address with masked address.  */
+          rtx lvx_set_expr = rs6000_gen_lvx (mode, operands[0], mem);
+
+	  if (dump_file) {
+	    fprintf (dump_file, \"lvx_set_expr is\n\");
+	    print_inline_rtx (dump_file, lvx_set_expr, 2);
+	    fprintf (dump_file, \"\nthe source of set is:\n\");
+	    print_inline_rtx (dump_file, SET_SRC (lvx_set_expr), 2);
+	    fprintf (dump_file, \"\n\");
+	  }
+
+	  emit_insn (lvx_set_expr);
 	  DONE;
         }
-     /* Otherwise, transform into a swapping instruction.  */
+      else if (rs6000_quadword_masked_address_p (mem_address)) 
+        {
+	  if (dump_file)
+            fprintf (dump_file, \"base_reg is quad-word-masked address\n\");
+	  /* This rtl is already in the form that matches lvx
+	     instruction, so leave it alone.  */
+	  DONE;
+        }
+      /* Otherwise, fall through to transform into a swapping load.  */
     }
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[0])
                                        : operands[0];

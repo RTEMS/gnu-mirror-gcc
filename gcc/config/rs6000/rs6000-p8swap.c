@@ -352,6 +352,39 @@ rs6000_sum_of_two_registers_p (const_rtx expr)
   return false;
 }
 
+/* Return true iff expr represents an address expression that masks off
+ * the low-order 4 bits in the style of an lvx or stvx rtl pattern.  */
+bool
+rs6000_quadword_masked_address_p (const_rtx expr)
+{
+  if (GET_CODE (expr) == AND)
+    {
+      const_rtx operand1 = XEXP (expr, 0);
+      const_rtx operand2 = XEXP (expr, 1);
+      if (dump_file)
+	{
+	  fprintf (dump_file, "rs6000_quadword_masked_address_p operand 1:\n");
+	  print_inline_rtx (dump_file, operand1, 2);
+	  fprintf (dump_file, "\nand operand2:\n");
+	  print_inline_rtx (dump_file, operand2, 2);
+	  fprintf (dump_file, "\n");
+	}
+      if (REG_P (operand2) || rs6000_sum_of_two_registers_p (operand2))
+	{
+	  if (CONST_SCALAR_INT_P (operand1) && INTVAL (operand1) == -16)
+	    {
+	      if (dump_file)
+		fprintf (dump_file, "returning true\n");
+	      return true;
+	    }
+	}
+    }
+  if (dump_file)
+    fprintf (dump_file,
+	     "returning false from rs6000_quadword_masked_address_p\n");
+  return false;
+}
+
 /* Return TRUE if insn represents a swap of a swapped load from memory
    and the memory address is quad-word aligned.  */
 static bool
@@ -1661,7 +1694,7 @@ replace_swap_with_copy (swap_web_entry *insn_entry, unsigned i)
 }
 
 static void
-mimic_memory_attributes_and_flags (rtx new_mem_exp, rtx original_mem_exp)
+mimic_memory_attributes_and_flags (rtx new_mem_exp, const_rtx original_mem_exp)
 {
   RTX_FLAG (new_mem_exp, jump) = RTX_FLAG (original_mem_exp, jump);
   RTX_FLAG (new_mem_exp, call) = RTX_FLAG (original_mem_exp, call);
@@ -1704,6 +1737,15 @@ mimic_memory_attributes_and_flags (rtx new_mem_exp, rtx original_mem_exp)
   else
     clear_mem_size (new_mem_exp);
 
+  if (dump_file) {
+    fprintf (dump_file,
+	     "in mimic_memory_attributes_and_flags, original memory exp\n");
+    print_inline_rtx (dump_file, original_mem_exp, 2);
+    fprintf (dump_file, "\n");
+    fprintf (dump_file, " new memory exp (may crash during output)\n");
+    print_inline_rtx (dump_file, new_mem_exp, 2);
+    fprintf (dump_file, "\n");
+  }
 }
 
 
@@ -1727,11 +1769,12 @@ replace_swapped_aligned_store (swap_web_entry *insn_entry, rtx store_insn)
 
 
 /* Generate an rtx expression that corresponds */
+/* arguments should be mode, dest, src_exp */
+/* dest_exp is SET_DEST (body); */
 rtx
-rs6000_gen_lvx (enum machine_mode mode, const_rtx body)
+rs6000_gen_lvx (enum machine_mode mode, rtx dest_exp, rtx src_exp)
 {
-  const_rtx src_exp = XEXP (SET_SRC (body), 0);
-  const_rtx memory_address = XEXP (src_exp, 0);
+  rtx memory_address = XEXP (src_exp, 0);
   rtx lvx;
   
   if (rs6000_sum_of_two_registers_p (memory_address))
@@ -1744,23 +1787,23 @@ rs6000_gen_lvx (enum machine_mode mode, const_rtx body)
 	fprintf (dump_file, "Using the 2op form of lvx\n");
       
       if (mode == V16QImode)
-	lvx = gen_altivec_lvx_v16qi_2op (SET_DEST (body), op1, op2);
+	lvx = gen_altivec_lvx_v16qi_2op (dest_exp, op1, op2);
       else if (mode == V8HImode)
-	lvx = gen_altivec_lvx_v8hi_2op (SET_DEST (body), op1, op2);
+	lvx = gen_altivec_lvx_v8hi_2op (dest_exp, op1, op2);
 #ifdef HAVE_V8HFmode
       else if (mode == V8HFmode)
-	lvx = gen_altivec_lvx_v8hf_2op (SET_DEST (body), op1, op2);
+	lvx = gen_altivec_lvx_v8hf_2op (dest_exp, op1, op2);
 #endif
       else if (mode == V4SImode)
-	lvx = gen_altivec_lvx_v4si_2op (SET_DEST (body), op1, op2);
+	lvx = gen_altivec_lvx_v4si_2op (dest_exp, op1, op2);
       else if (mode == V4SFmode)
-	lvx = gen_altivec_lvx_v4sf_2op (SET_DEST (body), op1, op2);
+	lvx = gen_altivec_lvx_v4sf_2op (dest_exp, op1, op2);
       else if (mode == V2DImode)
-	lvx = gen_altivec_lvx_v2di_2op (SET_DEST (body), op1, op2);
+	lvx = gen_altivec_lvx_v2di_2op (dest_exp, op1, op2);
       else if (mode == V2DFmode)
-	lvx = gen_altivec_lvx_v2df_2op (SET_DEST (body), op1, op2);
+	lvx = gen_altivec_lvx_v2df_2op (dest_exp, op1, op2);
       else if (mode == V1TImode)
-	lvx = gen_altivec_lvx_v1ti_2op (SET_DEST (body), op1, op2);
+	lvx = gen_altivec_lvx_v1ti_2op (dest_exp, op1, op2);
       else
 	/* KFmode, TFmode, other modes not expected in this context.  */
 	gcc_unreachable ();    
@@ -1768,32 +1811,35 @@ rs6000_gen_lvx (enum machine_mode mode, const_rtx body)
   else				/* REG_P (memory_address) */
     {
       if (mode == V16QImode)
-	lvx = gen_altivec_lvx_v16qi_1op (SET_DEST (body), memory_address);
+	lvx = gen_altivec_lvx_v16qi_1op (dest_exp, memory_address);
       else if (mode == V8HImode)
-	lvx = gen_altivec_lvx_v8hi_1op (SET_DEST (body), memory_address);
+	lvx = gen_altivec_lvx_v8hi_1op (dest_exp, memory_address);
 #ifdef HAVE_V8HFmode
       else if (mode == V8HFmode)
-	lvx = gen_altivec_lvx_v8hf_1op (SET_DEST (body), memory_address);
+	lvx = gen_altivec_lvx_v8hf_1op (dest_exp, memory_address);
 #endif
       else if (mode == V4SImode)
-	lvx = gen_altivec_lvx_v4si_1op (SET_DEST (body), memory_address);
+	lvx = gen_altivec_lvx_v4si_1op (dest_exp, memory_address);
       else if (mode == V4SFmode)
-	lvx = gen_altivec_lvx_v4sf_1op (SET_DEST (body), memory_address);
+	lvx = gen_altivec_lvx_v4sf_1op (dest_exp, memory_address);
       else if (mode == V2DImode)
-	lvx = gen_altivec_lvx_v2di_1op (SET_DEST (body), memory_address);
+	lvx = gen_altivec_lvx_v2di_1op (dest_exp, memory_address);
       else if (mode == V2DFmode)
-	lvx = gen_altivec_lvx_v2df_1op (SET_DEST (body), memory_address);
+	lvx = gen_altivec_lvx_v2df_1op (dest_exp, memory_address);
       else if (mode == V1TImode)
-	lvx = gen_altivec_lvx_v1ti_1op (SET_DEST (body), memory_address);
+	lvx = gen_altivec_lvx_v1ti_1op (dest_exp, memory_address);
       else
 	/* KFmode, TFmode, other modes not expected in this context.  */
 	gcc_unreachable ();    
     }
 
+  /* kelvin may rewrite the following code to use change_address.  As
+     such, we can eliminate the mimic_memory_attributes_and_flags
+     function.  */
   rtx new_mem_exp = SET_SRC (lvx);
   mimic_memory_attributes_and_flags (new_mem_exp, src_exp);
 
-  return rtx;
+  return lvx;
 }
 
 /* Given that swap_insn represents a swap of an aligned
@@ -1848,17 +1894,19 @@ replace_swapped_aligned_load (swap_web_entry *insn_entry, rtx swap_insn)
 	      && (GET_CODE (SET_SRC (body)) == VEC_SELECT)
 	      && (GET_CODE (XEXP (SET_SRC (body), 0)) == MEM));
 
-  /* This is the memory expression that needs to be replaced with
-   *  lvx expression.  */
+
+  /* src_exp is not defined. */
+
+  /*  const_rtx src_exp = XEXP (SET_SRC (body), 0); */
+
+  rtx src_exp = XEXP (SET_SRC (body), 0);
+  rtx memory_address = XEXP (src_exp, 0);
   enum machine_mode mode = GET_MODE (src_exp);
   rtx lvx;
 
-  /* Get rid of the VEC_SELECT operation */
-  SET_SRC (body) = src_exp;
-
   if (dump_file)
     {
-      fprintf (dump_file, "The body expression after eliminating VEC_SELECT\n");
+      fprintf (dump_file, "The original body expression\n");
       print_inline_rtx (dump_file, body, 2);
       fprintf (dump_file, "\n");
       fprintf (dump_file, "The original src_exp before lvx replace is:\n");
@@ -1870,9 +1918,7 @@ replace_swapped_aligned_load (swap_web_entry *insn_entry, rtx swap_insn)
       fprintf (dump_file, "mode is %d\n", mode);
     }
 
-
-  lvx = rs6000_gen_lvx (mode, body);
-
+  lvx = rs6000_gen_lvx (mode, SET_DEST (body), src_exp);
 
 #ifdef LAMEO_SHAMEO_ATTEMPT_TO_USE_CHANGE_ADDRESS
   if (dump_file) {
@@ -1921,7 +1967,6 @@ replace_swapped_aligned_load (swap_web_entry *insn_entry, rtx swap_insn)
 
   set_block_for_insn (new_insn, BLOCK_FOR_INSN (def_insn));
   df_insn_rescan (new_insn);
-
 
   if (dump_file)
     {
