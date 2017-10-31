@@ -456,12 +456,6 @@ quad_aligned_load_p (swap_web_entry *insn_entry, rtx_insn *insn)
   /* note: i was previously not confirming that mem is regp */
   rtx base_reg = XEXP (mem, 0);
 
-  /* kelvin is still working here.  he intends to enforce that
-   *     (REG_P (base_reg) || rs6000_sum_of_two_registers_p (base_reg))
-   * then, over in replace_swapped_aligned_load, he intends to
-   * invoke the 2op version of the expansion if
-   * rs6000_sum_of_two_registers_p (base_reg).  */
-
   if (dump_file)
     {
       fprintf (dump_file, "mem is ");
@@ -501,35 +495,16 @@ quad_aligned_store_p (swap_web_entry *insn_entry, rtx_insn *insn)
       return false;
     }
 
-  /* Confirm that the value to be stored is produced by a swap
-     instruction.  */
-
-  /* FIXME */
-  /* kelvin needs to detect the uses of this insn and needs to prove
-     that the value used here is the result of a swap insn.  */
-  struct df_insn_info *insn_info = DF_INSN_INFO_GET (insn);
-  df_ref use;
-  /* kelvin is expecting two uses here, because this is a swapped
-     store insn.  One of the uses is the address to which we are
-     storing.  The other is the value that we are storing.  I am
-     interested in both.  I want to confirm that the address is aligned
-     in memory.  I want to confirm that the value stored is computed
-     by performing a swap.  */
-  /* by the way, the "use" that represents the address may actually be
-     multiple uses, because this insn may add multiple registers
-     together to obtain the effective address of the store.  */
-  /* i want to borrow some code from const_load_sequence_p .. */
-
   rtx body = PATTERN (insn);
   if (dump_file) {
     fprintf (dump_file, "body is: ");
     print_inline_rtx (dump_file, body, 2);
     fprintf (dump_file, "\n");
   }
-  rtx base_reg = XEXP (SET_DEST (body), 0);
+  rtx dest_address = XEXP (SET_DEST (body), 0);
   if (dump_file) {
-    fprintf (dump_file, "base_reg is: ");
-    print_inline_rtx (dump_file, base_reg, 2);
+    fprintf (dump_file, "dest_address is: ");
+    print_inline_rtx (dump_file, dest_address, 2);
     fprintf (dump_file, "\n");
   }
   rtx swap_reg = XEXP (SET_SRC (body), 0);
@@ -539,13 +514,9 @@ quad_aligned_store_p (swap_web_entry *insn_entry, rtx_insn *insn)
     fprintf (dump_file, "\n");
   }
 
-  /* Unlike the patterns seen in quad_aligned_load_p, we expect
-     base_reg to be either a single register or the sum of two
-     registers.  */
-
   /* If the base address for the memory expression is not represented
      by a single register and is not the sum of two registers, punt.  */
-  if (!REG_P (base_reg) && !rs6000_sum_of_two_registers_p (base_reg))
+  if (!REG_P (dest_address) && !rs6000_sum_of_two_registers_p (dest_address))
     return false;
 
   /* kelvin thinks maybe he should punt if !REG_P (swap_reg) */
@@ -553,10 +524,10 @@ quad_aligned_store_p (swap_web_entry *insn_entry, rtx_insn *insn)
     fprintf (dump_file, "swap_reg is %sREG_P ()\n", REG_P (swap_reg)? "": "!");
   }
 
-  /* We know this is a set to memory.  The use that we are interested
-     in represents the source value to be stored to memory.  In the
-     case that the effective memory address is represented by a sum of
-     registers, there will be a use for each of the registers.  */
+  /* Confirm that the value to be stored is produced by a swap
+     instruction.  */
+  struct df_insn_info *insn_info = DF_INSN_INFO_GET (insn);
+  df_ref use;
   FOR_EACH_INSN_INFO_USE (use, insn_info)
     {
       struct df_link *def_link = DF_REF_CHAIN (use);
@@ -652,14 +623,11 @@ quad_aligned_store_p (swap_web_entry *insn_entry, rtx_insn *insn)
   /* At this point, we know the source data comes from a swap.  The
      remaining question is whether the memory address is aligned.  */
 
-  /* rtx body = PATTERN (insn);
-     single_set (body); didn't work
-  */
   rtx set = single_set (insn);
   if (set)
     {
       rtx dest = SET_DEST (set);
-      if (MEM_P(dest))
+      if (MEM_P (dest))
 	{
 	  if (dump_file)
 	    {
@@ -1748,29 +1716,229 @@ mimic_memory_attributes_and_flags (rtx new_mem_exp, const_rtx original_mem_exp)
   }
 }
 
+/* Generate an rtx expression to represent use of the stvx insn to store
+   the value represented by register SRC_EXP into the memory at address
+   DEST_EXP, with vector mode MODE.  */
+rtx
+rs6000_gen_stvx (enum machine_mode mode, rtx dest_exp, rtx src_exp) {
+  /* replace this swapping-store insn with a stvx insn */
+  /*  see the stvx rtl pattern from vsx.md.  */
+
+  /* insert rs6000_gen_lvx () here, revise it.  */
+  rtx memory_address = XEXP (dest_exp, 0);
+  rtx stvx;
+  
+  if (dump_file)
+    {
+      fprintf (dump_file, "in rs6000_gen_stvx (), dest_exp is\n");
+      print_inline_rtx (dump_file, dest_exp, 2);
+      fprintf (dump_file, "\n");
+      fprintf (dump_file, "memory_address is\n");
+      print_inline_rtx (dump_file, memory_address, 2);
+      fprintf (dump_file, "\n");
+    }
+
+  if (rs6000_sum_of_two_registers_p (memory_address))
+    {
+      rtx op1, op2;
+      op1 = XEXP (memory_address, 0);
+      op2 = XEXP (memory_address, 1);
+      
+      if (dump_file)
+	fprintf (dump_file, "Using the 2op form of stvx\n");
+      
+      if (mode == V16QImode)
+	stvx = gen_altivec_stvx_v16qi_2op (src_exp, op1, op2);
+      else if (mode == V8HImode)
+	stvx = gen_altivec_stvx_v8hi_2op (src_exp, op1, op2);
+#ifdef HAVE_V8HFmode
+      else if (mode == V8HFmode)
+	stvx = gen_altivec_stvx_v8hf_2op (src_exp, op1, op2);
+#endif
+      else if (mode == V4SImode)
+	stvx = gen_altivec_stvx_v4si_2op (src_exp, op1, op2);
+      else if (mode == V4SFmode)
+	stvx = gen_altivec_stvx_v4sf_2op (src_exp, op1, op2);
+      else if (mode == V2DImode)
+	stvx = gen_altivec_stvx_v2di_2op (src_exp, op1, op2);
+      else if (mode == V2DFmode)
+	stvx = gen_altivec_stvx_v2df_2op (src_exp, op1, op2);
+      else if (mode == V1TImode)
+	stvx = gen_altivec_stvx_v1ti_2op (src_exp, op1, op2);
+      else
+	/* KFmode, TFmode, other modes not expected in this context.  */
+	gcc_unreachable ();    
+    }
+  else				/* REG_P (memory_address) */
+    {
+      if (mode == V16QImode)
+	stvx = gen_altivec_stvx_v16qi_1op (src_exp, memory_address);
+      else if (mode == V8HImode)
+	stvx = gen_altivec_stvx_v8hi_1op (src_exp, memory_address);
+#ifdef HAVE_V8HFmode
+      else if (mode == V8HFmode)
+	stvx = gen_altivec_stvx_v8hf_1op (src_exp, memory_address);
+#endif
+      else if (mode == V4SImode)
+	stvx = gen_altivec_stvx_v4si_1op (src_exp, memory_address);
+      else if (mode == V4SFmode)
+	stvx = gen_altivec_stvx_v4sf_1op (src_exp, memory_address);
+      else if (mode == V2DImode)
+	stvx = gen_altivec_stvx_v2di_1op (src_exp, memory_address);
+      else if (mode == V2DFmode)
+	stvx = gen_altivec_stvx_v2df_1op (src_exp, memory_address);
+      else if (mode == V1TImode)
+	stvx = gen_altivec_stvx_v1ti_1op (src_exp, memory_address);
+      else
+	/* KFmode, TFmode, other modes not expected in this context.  */
+	gcc_unreachable ();    
+    }
+
+  /* kelvin may rewrite the following code to use change_address.  As
+     such, we can eliminate the mimic_memory_attributes_and_flags
+     function.  */
+  rtx new_mem_exp = SET_DEST (stvx);
+  mimic_memory_attributes_and_flags (new_mem_exp, dest_exp);
+
+  return stvx;
+}
 
 /* Given that store_insn represents an aligned store-with-swap of a
    swapped value, replace the store with an aligned store (without
    swap) and replace the swap with a copy insn.  */
 static void
-replace_swapped_aligned_store (swap_web_entry *insn_entry, rtx store_insn)
+replace_swapped_aligned_store (swap_web_entry *insn_entry,
+			       rtx_insn *store_insn)
 {
   if (dump_file)
     {
       fprintf (dump_file,
-	       "made it to replace_swapped_aligned_store, insn is:\n");
+	       "made it to replace_swapped_aligned_store, store insn is:\n");
       print_inline_rtx (dump_file, store_insn, 2);
       fprintf (dump_file, "\n");
-      fprintf (dump_file, " insn_entry is %llx\n\n",
-	       (long long unsigned) insn_entry);
     }
-  /* FIXME: not yet implemented */
+
+  unsigned uid = INSN_UID (store_insn);
+  gcc_assert (insn_entry[uid].is_swap && insn_entry[uid].is_store);
+
+  rtx body = PATTERN (store_insn);
+  rtx dest_address = XEXP (SET_DEST (body), 0);
+  rtx swap_reg = XEXP (SET_SRC (body), 0);
+  gcc_assert (REG_P (dest_address)
+	      || rs6000_sum_of_two_registers_p (dest_address));
+
+  /* Find the swap instruction that provides the value to be stored by
+   * this store-with-swap instruction. */
+  struct df_insn_info *insn_info = DF_INSN_INFO_GET (store_insn);
+  df_ref use;
+  rtx_insn *swap_insn;
+  unsigned uid2;
+  FOR_EACH_INSN_INFO_USE (use, insn_info)
+    {
+      struct df_link *def_link = DF_REF_CHAIN (use);
+
+      /* if this is not the definition of the candidate swap register,
+	 then skip it.  I am only interested in the swap insnd.  */
+      if (!rtx_equal_p (DF_REF_REG (use), swap_reg))
+	continue;
+      
+      /* If there is no def or the def is artifical or there are
+	 multiple defs, we should not be here.  */ 
+      gcc_assert (def_link && def_link->ref && !def_link->next
+		  && !DF_REF_IS_ARTIFICIAL (def_link->ref));
+
+      swap_insn = DF_REF_INSN (def_link->ref);
+      uid2 = INSN_UID (swap_insn);
+ 
+      if (dump_file)
+	{
+	  fprintf (dump_file, "Found swap_insn (%s, %s, %s)\n",
+		   insn_entry[uid2].is_load? "is_load": "!is_load",
+		   insn_entry[uid2].is_store? "is_store": "!is_store",
+		   insn_entry[uid2].is_swap? "is_swap": "!is_swap");
+	  print_inline_rtx (dump_file, swap_insn, 2);
+	  fprintf (dump_file, "\n");	  
+	}
+
+      /* If this source value is not a simple swap, we should not be here.  */
+      gcc_assert (insn_entry[uid2].is_swap && !insn_entry[uid2].is_load
+		  && !insn_entry[uid2].is_store);
+
+      /* I've processed the use that I care about, so break out of
+	 this loop.  */
+      break;
+    }
+
+  /* At this point, swap_insn and uid2 represent the swap instruction
+     that feeds the store.  */
+
+  rtx set = single_set (store_insn);
+  gcc_assert (set);
+  rtx dest_exp = SET_DEST (set);
+  rtx src_exp = XEXP (SET_SRC (body), 0);
+  enum machine_mode mode = GET_MODE (dest_exp);
+  gcc_assert (MEM_P (dest_exp));
+  gcc_assert (MEM_ALIGN (dest_exp) >= 128);
+
+  if (dump_file)
+    {
+      fprintf (dump_file, "The original body expression\n");
+      print_inline_rtx (dump_file, body, 2);
+      fprintf (dump_file, "\n");
+      fprintf (dump_file, "The original dest_exp before stvx replace is:\n");
+      print_inline_rtx (dump_file, dest_exp, 2);
+      fprintf (dump_file, "\n");
+      fprintf (dump_file, "The effective address is\n");
+      print_inline_rtx (dump_file, dest_address, 2);
+      fprintf (dump_file, "\n");
+      fprintf (dump_file, "The source expression is\n");
+      print_inline_rtx (dump_file, src_exp, 2);
+      fprintf (dump_file, "\n");
+    }
+
+  /* Replace the copy with a new insn.  */
+  rtx stvx;
+  stvx = rs6000_gen_stvx (mode, dest_exp, src_exp);
+
+  /* The following block of code was copied from replace_swapped_aligned_load,
+     Needs to be integrated into this new context.  */
+  rtx_insn *new_insn = emit_insn_before (stvx, store_insn);
+  rtx new_body = PATTERN (new_insn);
+
+  gcc_assert ((GET_CODE (new_body) == SET)
+	      && (GET_CODE (SET_DEST (new_body)) == MEM));
+
+  set_block_for_insn (new_insn, BLOCK_FOR_INSN (store_insn));
+  df_insn_rescan (new_insn);
+
+  if (dump_file)
+    {
+      unsigned int new_uid = INSN_UID (new_insn);
+      fprintf (dump_file,
+	       "Replacing swapped-store %d with store %d\n", uid, new_uid);
+    }
+
+  df_insn_delete (store_insn);
+  remove_insn (store_insn);
+  store_insn->set_deleted ();
+
+  if (dump_file)
+    {
+      fprintf (dump_file, "The modified stvx insn is\n");
+      print_inline_rtx (dump_file, new_insn, 2);
+      fprintf (dump_file, "\n");
+    }
+
+  /* This code was also copied from replace_swapped_aligned_load and also
+   * needs to be integrated into this new context.  */
+  /* Replace the swap with a copy.  */
+  uid2 = INSN_UID (swap_insn);
+  mark_swaps_for_removal (insn_entry, uid2);
+  replace_swap_with_copy (insn_entry, uid2);
 }
 
-
-/* Generate an rtx expression that corresponds */
-/* arguments should be mode, dest, src_exp */
-/* dest_exp is SET_DEST (body); */
+/* Generate an rtx expression to represent use of the lvx insn to load
+   from memory SRC_EXP into register DEST_EXP with vector mode MODE. */
 rtx
 rs6000_gen_lvx (enum machine_mode mode, rtx dest_exp, rtx src_exp)
 {
