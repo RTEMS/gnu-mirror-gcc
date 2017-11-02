@@ -722,6 +722,7 @@
   [(set_attr "type" "vecstore")
    (set_attr "length" "12")])
 
+;; kelvin fixed this
 (define_split
   [(set (match_operand:VSX_D 0 "memory_operand" "")
         (match_operand:VSX_D 1 "vsx_register_operand" ""))]
@@ -735,6 +736,50 @@
           (match_dup 2)
           (parallel [(const_int 1) (const_int 0)])))]
 {
+  rtx mem = operands[0];
+
+  if (dump_file)
+    fprintf (dump_file, \"splitting V16QI memory store, with alignment %d\n\",
+             MEM_ALIGN (mem));
+
+  if (MEM_ALIGN (mem) >= 128)
+    {
+      rtx mem_address = XEXP (mem, 0);
+      if (dump_file)
+        {
+	  fprintf (dump_file, \"mem expression:\n\");
+	  print_inline_rtx (dump_file, mem, 2);
+	  fprintf (dump_file, \"\n\");
+
+	  fprintf (dump_file, \"memory address\n\");
+	  print_inline_rtx (dump_file, mem_address, 2);
+	  fprintf (dump_file, \"\n\");
+	}
+      enum machine_mode mode = GET_MODE (mem);
+      if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
+	{
+	  if (dump_file)
+	    {
+	      if (dump_file)
+		fprintf (dump_file,
+			 \"memory address is REG_P or sum of 2 registers\n\");
+	      rtx stvx_set_expr =
+		rs6000_gen_stvx (mode, mem, operands[1]);
+	      emit_insn (stvx_set_expr);
+	      DONE;
+	    }
+	  else if (rs6000_quadword_masked_address_p (mem_address))
+	    {
+	      if (dump_file)
+		fprintf (dump_file, "mem address is quad-word-masked addr\n\");
+	      /* This rtl is already in the form that matches stvx instruction,
+		 so leave it alone.  */
+	      DONE;
+	    }
+	  /* Otherwise, fall through to transform into a swapping store.  */
+	}
+    }
+
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[1]) 
                                        : operands[1];
 })
@@ -767,6 +812,7 @@
   [(set_attr "type" "vecstore")
    (set_attr "length" "12")])
 
+;; kelvin fixed this
 (define_split
   [(set (match_operand:VSX_W 0 "memory_operand" "")
         (match_operand:VSX_W 1 "vsx_register_operand" ""))]
@@ -782,6 +828,50 @@
           (parallel [(const_int 2) (const_int 3)
 	             (const_int 0) (const_int 1)])))]
 {
+  rtx mem = operands[0];
+
+  if (dump_file)
+    fprintf (dump_file, \"splitting V16QI memory store, with alignment %d\n\",
+             MEM_ALIGN (mem));
+
+  if (MEM_ALIGN (mem) >= 128)
+    {
+      rtx mem_address = XEXP (mem, 0);
+      if (dump_file)
+        {
+	  fprintf (dump_file, \"mem expression:\n\");
+	  print_inline_rtx (dump_file, mem, 2);
+	  fprintf (dump_file, \"\n\");
+
+	  fprintf (dump_file, \"memory address\n\");
+	  print_inline_rtx (dump_file, mem_address, 2);
+	  fprintf (dump_file, \"\n\");
+	}
+      enum machine_mode mode = GET_MODE (mem);
+      if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
+	{
+	  if (dump_file)
+	    {
+	      if (dump_file)
+		fprintf (dump_file,
+			 \"memory address is REG_P or sum of 2 registers\n\");
+	      rtx stvx_set_expr =
+		rs6000_gen_stvx (mode, mem, operands[1]);
+	      emit_insn (stvx_set_expr);
+	      DONE;
+	    }
+	  else if (rs6000_quadword_masked_address_p (mem_address))
+	    {
+	      if (dump_file)
+		fprintf (dump_file, "mem address is quad-word-masked addr\n\");
+	      /* This rtl is already in the form that matches stvx instruction,
+		 so leave it alone.  */
+	      DONE;
+	    }
+	  /* Otherwise, fall through to transform into a swapping store.  */
+	}
+    }
+
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[1]) 
                                        : operands[1];
 })
@@ -817,6 +907,7 @@
   [(set_attr "type" "vecstore")
    (set_attr "length" "12")])
 
+;; kelvin fixed this
 (define_split
   [(set (match_operand:V8HI 0 "memory_operand" "")
         (match_operand:V8HI 1 "vsx_register_operand" ""))]
@@ -836,6 +927,50 @@
                      (const_int 0) (const_int 1)
                      (const_int 2) (const_int 3)])))]
 {
+  rtx mem = operands[0];
+
+  if (dump_file)
+    fprintf (dump_file, \"splitting V16QI memory store, with alignment %d\n\",
+             MEM_ALIGN (mem));
+
+  if (MEM_ALIGN (mem) >= 128)
+    {
+      rtx mem_address = XEXP (mem, 0);
+      if (dump_file)
+        {
+	  fprintf (dump_file, \"mem expression:\n\");
+	  print_inline_rtx (dump_file, mem, 2);
+	  fprintf (dump_file, \"\n\");
+
+	  fprintf (dump_file, \"memory address\n\");
+	  print_inline_rtx (dump_file, mem_address, 2);
+	  fprintf (dump_file, \"\n\");
+	}
+      enum machine_mode mode = GET_MODE (mem);
+      if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
+	{
+	  if (dump_file)
+	    {
+	      if (dump_file)
+		fprintf (dump_file,
+			 \"memory address is REG_P or sum of 2 registers\n\");
+	      rtx stvx_set_expr =
+		rs6000_gen_stvx (mode, mem, operands[1]);
+	      emit_insn (stvx_set_expr);
+	      DONE;
+	    }
+	  else if (rs6000_quadword_masked_address_p (mem_address))
+	    {
+	      if (dump_file)
+		fprintf (dump_file, "mem address is quad-word-masked addr\n\");
+	      /* This rtl is already in the form that matches stvx instruction,
+		 so leave it alone.  */
+	      DONE;
+	    }
+	  /* Otherwise, fall through to transform into a swapping store.  */
+	}
+    }
+
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[1]) 
                                        : operands[1];
 })
@@ -877,6 +1012,7 @@
   [(set_attr "type" "vecstore")
    (set_attr "length" "12")])
 
+;; kelvin did fix this
 (define_split
   [(set (match_operand:V16QI 0 "memory_operand" "")
         (match_operand:V16QI 1 "vsx_register_operand" ""))]
@@ -904,6 +1040,50 @@
                      (const_int 4) (const_int 5)
                      (const_int 6) (const_int 7)])))]
 {
+  rtx mem = operands[0];
+
+  if (dump_file)
+    fprintf (dump_file, \"splitting V16QI memory store, with alignment %d\n\",
+             MEM_ALIGN (mem));
+
+  if (MEM_ALIGN (mem) >= 128)
+    {
+      rtx mem_address = XEXP (mem, 0);
+      if (dump_file)
+        {
+	  fprintf (dump_file, \"mem expression:\n\");
+	  print_inline_rtx (dump_file, mem, 2);
+	  fprintf (dump_file, \"\n\");
+
+	  fprintf (dump_file, \"memory address\n\");
+	  print_inline_rtx (dump_file, mem_address, 2);
+	  fprintf (dump_file, \"\n\");
+	}
+      enum machine_mode mode = GET_MODE (mem);
+      if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
+	{
+	  if (dump_file)
+	    {
+	      if (dump_file)
+		fprintf (dump_file,
+			 \"memory address is REG_P or sum of 2 registers\n\");
+	      rtx stvx_set_expr =
+		rs6000_gen_stvx (mode, mem, operands[1]);
+	      emit_insn (stvx_set_expr);
+	      DONE;
+	    }
+	  else if (rs6000_quadword_masked_address_p (mem_address))
+	    {
+	      if (dump_file)
+		fprintf (dump_file, "mem address is quad-word-masked addr\n\");
+	      /* This rtl is already in the form that matches stvx instruction,
+		 so leave it alone.  */
+	      DONE;
+	    }
+	  /* Otherwise, fall through to transform into a swapping store.  */
+	}
+    }
+
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[1]) 
                                        : operands[1];
 })

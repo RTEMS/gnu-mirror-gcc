@@ -1831,8 +1831,8 @@ replace_swapped_aligned_store (swap_web_entry *insn_entry,
    * this store-with-swap instruction. */
   struct df_insn_info *insn_info = DF_INSN_INFO_GET (store_insn);
   df_ref use;
-  rtx_insn *swap_insn;
-  unsigned uid2;
+  rtx_insn *swap_insn = NULL;
+  unsigned uid2 = 0;
   FOR_EACH_INSN_INFO_USE (use, insn_info)
     {
       struct df_link *def_link = DF_REF_CHAIN (use);
@@ -1871,7 +1871,7 @@ replace_swapped_aligned_store (swap_web_entry *insn_entry,
 
   /* At this point, swap_insn and uid2 represent the swap instruction
      that feeds the store.  */
-
+  gcc_assert (swap_insn);
   rtx set = single_set (store_insn);
   gcc_assert (set);
   rtx dest_exp = SET_DEST (set);
