@@ -1,0 +1,11 @@
+2017-11-02  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Back port from trunk
+	2017-10-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* c-decl.c (header_for_builtin_fn): Add support for copysign, fma,
+	fmax, fmin, and sqrt _Float<N> and _Float<N>X variants.
+
+2017-11-02   Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Clone branch subversion id 251814

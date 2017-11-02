@@ -1,0 +1,13 @@
+2017-11-02  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Back port from trunk
+	2017-10-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* c-cppbuiltin.c (mode_has_fma): Add support for PowerPC KFmode.
+	(c_cpp_builtins): If a machine has a fast fma _Float<N> and
+	_Float<N>X variant, define __FP_FAST_FMA<N> and/or
+	__FP_FAST_FMA<N>X.
+
+2017-11-02   Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Clone branch subversion id 251814
