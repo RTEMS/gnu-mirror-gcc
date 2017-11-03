@@ -1,5 +1,6 @@
 2017-11-03  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	PR target/82748
 	* config/rs6000/rs6000-builtin.def (BU_FLOAT128_1): Delete
 	float128 helper macros, which are no longer used after deleting
 	the old 'q' built-in functions, and moving the round to odd
