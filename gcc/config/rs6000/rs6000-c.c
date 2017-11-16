@@ -723,6 +723,17 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
       builtin_define ("__builtin_vsx_xvnmsubmsp=__builtin_vsx_xvnmsubsp");
     }
 
+  /* Map the old _Float128 'q' builtins into the new 'f128' builtins.  */
+  if (TARGET_FLOAT128_TYPE)
+    {
+      builtin_define ("__builtin_fabsq=__builtin_fabsf128");
+      builtin_define ("__builtin_copysignq=__builtin_copysignf128");
+      builtin_define ("__builtin_nanq=__builtin_nanf128");
+      builtin_define ("__builtin_nansq=__builtin_nansf128");
+      builtin_define ("__builtin_infq=__builtin_inff128");
+      builtin_define ("__builtin_huge_valq=__builtin_huge_valf128");
+    }
+
   /* Tell users they can use __builtin_bswap{16,64}.  */
   builtin_define ("__HAVE_BSWAP__");
 
@@ -5465,11 +5476,21 @@ rs6000_builtin_type (int id)
   return id < 0 ? build_pointer_type (t) : t;
 }
 
-/* Check whether the type of an argument, T, is compatible with a
-   type ID stored into a struct altivec_builtin_types.  Integer
-   types are considered compatible; otherwise, the language hook
-   lang_hooks.types_compatible_p makes the decision.  */
+/* Check whether the type of an argument, T, is compatible with a type ID
+   stored into a struct altivec_builtin_types.  Integer types are considered
+   compatible; otherwise, the language hook lang_hooks.types_compatible_p makes
+   the decision.  Also allow long double and _Float128 to be compatible if
+   -mabi=ieeelongdouble.  */
 
+static inline bool
+is_float128_p (tree t)
+{
+  return (t == float128_type_node
+	  || (TARGET_IEEEQUAD
+	      && TARGET_LONG_DOUBLE_128
+	      && t == long_double_type_node));
+}
+  
 static inline bool
 rs6000_builtin_type_compatible (tree t, int id)
 {
@@ -5478,6 +5499,9 @@ rs6000_builtin_type_compatible (tree t, int id)
   if (t == error_mark_node)
     return false;
   if (INTEGRAL_TYPE_P (t) && INTEGRAL_TYPE_P (builtin_type))
+    return true;
+  else if (TARGET_IEEEQUAD && TARGET_LONG_DOUBLE_128
+	   && is_float128_p (t) && is_float128_p (builtin_type))
     return true;
   else
     return lang_hooks.types_compatible_p (t, builtin_type);

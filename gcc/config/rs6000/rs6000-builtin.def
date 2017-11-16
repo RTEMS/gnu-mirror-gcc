@@ -681,48 +681,6 @@
 		     | RS6000_BTC_BINARY),				\
 		    CODE_FOR_ ## ICODE)			/* ICODE */
 
-/* IEEE 128-bit floating-point builtins.  */
-#define BU_FLOAT128_2(ENUM, NAME, ATTR, ICODE)                          \
-  RS6000_BUILTIN_2 (MISC_BUILTIN_ ## ENUM,              /* ENUM */      \
-		    "__builtin_" NAME,                  /* NAME */      \
-		    RS6000_BTM_FLOAT128,                /* MASK */      \
-		    (RS6000_BTC_ ## ATTR                /* ATTR */      \
-		     | RS6000_BTC_BINARY),                              \
-		    CODE_FOR_ ## ICODE)                 /* ICODE */
-
-#define BU_FLOAT128_1(ENUM, NAME, ATTR, ICODE)                          \
-  RS6000_BUILTIN_1 (MISC_BUILTIN_ ## ENUM,              /* ENUM */      \
-		    "__builtin_" NAME,                  /* NAME */      \
-		    RS6000_BTM_FLOAT128,                /* MASK */      \
-		    (RS6000_BTC_ ## ATTR                /* ATTR */      \
-		     | RS6000_BTC_UNARY),                               \
-		    CODE_FOR_ ## ICODE)                 /* ICODE */
-
-/* IEEE 128-bit floating-point builtins that need the ISA 3.0 hardware.  */
-#define BU_FLOAT128_1_HW(ENUM, NAME, ATTR, ICODE)                       \
-  RS6000_BUILTIN_1 (MISC_BUILTIN_ ## ENUM,              /* ENUM */      \
-		    "__builtin_" NAME,                  /* NAME */      \
-		    RS6000_BTM_FLOAT128_HW,             /* MASK */      \
-		    (RS6000_BTC_ ## ATTR                /* ATTR */      \
-		     | RS6000_BTC_UNARY),                               \
-		    CODE_FOR_ ## ICODE)                 /* ICODE */
-
-#define BU_FLOAT128_2_HW(ENUM, NAME, ATTR, ICODE)                       \
-  RS6000_BUILTIN_2 (MISC_BUILTIN_ ## ENUM,              /* ENUM */      \
-		    "__builtin_" NAME,                  /* NAME */      \
-		    RS6000_BTM_FLOAT128_HW,             /* MASK */      \
-		    (RS6000_BTC_ ## ATTR                /* ATTR */      \
-		     | RS6000_BTC_BINARY),                              \
-		    CODE_FOR_ ## ICODE)                 /* ICODE */
-
-#define BU_FLOAT128_3_HW(ENUM, NAME, ATTR, ICODE)                       \
-  RS6000_BUILTIN_3 (MISC_BUILTIN_ ## ENUM,              /* ENUM */      \
-		    "__builtin_" NAME,                  /* NAME */      \
-		    RS6000_BTM_FLOAT128_HW,             /* MASK */      \
-		    (RS6000_BTC_ ## ATTR                /* ATTR */      \
-		     | RS6000_BTC_TERNARY),                             \
-		    CODE_FOR_ ## ICODE)                 /* ICODE */
-
 /* Miscellaneous builtins for instructions added in ISA 3.0.  These
    instructions don't require either the DFP or VSX options, just the basic
    ISA 3.0 enablement since they operate on general purpose registers.  */
@@ -971,6 +929,51 @@
 		    (RS6000_BTC_OVERLOADED		/* ATTR */	\
 		     | RS6000_BTC_BINARY),				\
 		    CODE_FOR_nothing)			/* ICODE */
+
+/* Built-in functions for IEEE 128-bit hardware floating point.  IEEE 128-bit
+   hardware requires p9-vector and 64-bit operation.  These functions use just
+   __builtin_ as the prefix.  */
+#define BU_FLOAT128_HW_1(ENUM, NAME, ATTR, ICODE)			\
+  RS6000_BUILTIN_1 (FLOAT128_BUILTIN_ ## ENUM,		/* ENUM */	\
+		    "__builtin_" NAME,			/* NAME */	\
+		    RS6000_BTM_FLOAT128_HW,		/* MASK */	\
+		    (RS6000_BTC_ ## ATTR		/* ATTR */	\
+		     | RS6000_BTC_UNARY),				\
+		    CODE_FOR_ ## ICODE)			/* ICODE */
+
+#define BU_FLOAT128_HW_2(ENUM, NAME, ATTR, ICODE)			\
+  RS6000_BUILTIN_2 (FLOAT128_BUILTIN_ ## ENUM,		/* ENUM */	\
+		    "__builtin_" NAME,			/* NAME */	\
+		    RS6000_BTM_FLOAT128_HW,		/* MASK */	\
+		    (RS6000_BTC_ ## ATTR		/* ATTR */	\
+		     | RS6000_BTC_BINARY),				\
+		    CODE_FOR_ ## ICODE)			/* ICODE */
+
+#define BU_FLOAT128_HW_3(ENUM, NAME, ATTR, ICODE)			\
+  RS6000_BUILTIN_3 (FLOAT128_BUILTIN_ ## ENUM,		/* ENUM */	\
+		    "__builtin_" NAME,			/* NAME */	\
+		    RS6000_BTM_FLOAT128_HW,		/* MASK */	\
+		    (RS6000_BTC_ ## ATTR		/* ATTR */	\
+		     | RS6000_BTC_TERNARY),				\
+		    CODE_FOR_ ## ICODE)			/* ICODE */
+
+/* Built-in functions for IEEE 128-bit hardware floating point.  These
+   functions use __builtin_vsx_ as the prefix.  */
+#define BU_FLOAT128_HW_VSX_1(ENUM, NAME, ATTR, ICODE)			\
+  RS6000_BUILTIN_1 (P9V_BUILTIN_ ## ENUM,		/* ENUM */	\
+		    "__builtin_vsx_" NAME,		/* NAME */	\
+		    RS6000_BTM_FLOAT128_HW,		/* MASK */	\
+		    (RS6000_BTC_ ## ATTR		/* ATTR */	\
+		     | RS6000_BTC_UNARY),				\
+		    CODE_FOR_ ## ICODE)			/* ICODE */
+
+#define BU_FLOAT128_HW_VSX_2(ENUM, NAME, ATTR, ICODE)			\
+  RS6000_BUILTIN_2 (P9V_BUILTIN_ ## ENUM,		/* ENUM */	\
+		    "__builtin_vsx_" NAME,		/* NAME */	\
+		    RS6000_BTM_FLOAT128_HW,		/* MASK */	\
+		    (RS6000_BTC_ ## ATTR		/* ATTR */	\
+		     | RS6000_BTC_BINARY),				\
+		    CODE_FOR_ ## ICODE)			/* ICODE */
 
 #endif
 
@@ -1972,10 +1975,10 @@ BU_P9V_OVERLOAD_3 (RLMI,	"rlmi")
 BU_P9V_64BIT_VSX_1 (VSEEDP,	"scalar_extract_exp",	CONST,	xsxexpdp)
 BU_P9V_64BIT_VSX_1 (VSESDP,	"scalar_extract_sig",	CONST,	xsxsigdp)
 
-BU_P9V_64BIT_VSX_1 (VSEEQP,	"scalar_extract_expq",	CONST,	xsxexpqp)
-BU_P9V_64BIT_VSX_1 (VSESQP,	"scalar_extract_sigq",	CONST,	xsxsigqp)
+BU_FLOAT128_HW_VSX_1 (VSEEQP,	"scalar_extract_expq",	CONST,	xsxexpqp_kf)
+BU_FLOAT128_HW_VSX_1 (VSESQP,	"scalar_extract_sigq",	CONST,	xsxsigqp_kf)
 
-BU_P9V_VSX_1 (VSTDCNQP,	"scalar_test_neg_qp",	CONST,	xststdcnegqp)
+BU_FLOAT128_HW_VSX_1 (VSTDCNQP, "scalar_test_neg_qp",	CONST,	xststdcnegqp_kf)
 BU_P9V_VSX_1 (VSTDCNDP,	"scalar_test_neg_dp",	CONST,	xststdcnegdp)
 BU_P9V_VSX_1 (VSTDCNSP,	"scalar_test_neg_sp",	CONST,	xststdcnegsp)
 
@@ -1991,15 +1994,15 @@ BU_P9V_VSX_1 (XXBRH_V8HI,	"xxbrh_v8hi",	CONST,	p9_xxbrh_v8hi)
 BU_P9V_64BIT_VSX_2 (VSIEDP,	"scalar_insert_exp",	CONST,	xsiexpdp)
 BU_P9V_64BIT_VSX_2 (VSIEDPF,	"scalar_insert_exp_dp",	CONST,	xsiexpdpf)
 
-BU_P9V_64BIT_VSX_2 (VSIEQP,	"scalar_insert_exp_q",	CONST,	xsiexpqp)
-BU_P9V_64BIT_VSX_2 (VSIEQPF,	"scalar_insert_exp_qp",	CONST,	xsiexpqpf)
+BU_FLOAT128_HW_VSX_2 (VSIEQP,	"scalar_insert_exp_q",	CONST,	xsiexpqp_kf)
+BU_FLOAT128_HW_VSX_2 (VSIEQPF,	"scalar_insert_exp_qp",	CONST,	xsiexpqpf_kf)
 
 BU_P9V_VSX_2 (VSCEDPGT,	"scalar_cmp_exp_dp_gt",	CONST,	xscmpexpdp_gt)
 BU_P9V_VSX_2 (VSCEDPLT,	"scalar_cmp_exp_dp_lt",	CONST,	xscmpexpdp_lt)
 BU_P9V_VSX_2 (VSCEDPEQ,	"scalar_cmp_exp_dp_eq",	CONST,	xscmpexpdp_eq)
 BU_P9V_VSX_2 (VSCEDPUO,	"scalar_cmp_exp_dp_unordered",	CONST,	xscmpexpdp_unordered)
 
-BU_P9V_VSX_2 (VSTDCQP,	"scalar_test_data_class_qp",	CONST,	xststdcqp)
+BU_FLOAT128_HW_VSX_2 (VSTDCQP, "scalar_test_data_class_qp",	CONST,	xststdcqp_kf)
 BU_P9V_VSX_2 (VSTDCDP,	"scalar_test_data_class_dp",	CONST,	xststdcdp)
 BU_P9V_VSX_2 (VSTDCSP,	"scalar_test_data_class_sp",	CONST,	xststdcsp)
 
@@ -2071,6 +2074,16 @@ BU_P9V_AV_2 (VEXTUWRX, "vextuwrx",		CONST,	vextuwrx)
 BU_P9V_VSX_2 (VEXTRACT4B,   "vextract4b",	CONST,	vextract4b)
 BU_P9V_VSX_3 (VINSERT4B,    "vinsert4b",	CONST,	vinsert4b)
 BU_P9V_VSX_3 (VINSERT4B_DI, "vinsert4b_di",	CONST,	vinsert4b_di)
+
+/* Hardware IEEE 128-bit floating point round to odd instrucitons added in ISA
+   3.0 (power9).  */
+BU_FLOAT128_HW_1 (SQRTF128_ODD,  "sqrtf128_round_to_odd",  FP, sqrtkf2_odd)
+BU_FLOAT128_HW_1 (TRUNCF128_ODD, "truncf128_round_to_odd", FP, trunckfdf2_odd)
+BU_FLOAT128_HW_2 (ADDF128_ODD,   "addf128_round_to_odd",   FP, addkf3_odd)
+BU_FLOAT128_HW_2 (SUBF128_ODD,   "subf128_round_to_odd",   FP, subkf3_odd)
+BU_FLOAT128_HW_2 (MULF128_ODD,   "mulf128_round_to_odd",   FP, mulkf3_odd)
+BU_FLOAT128_HW_2 (DIVF128_ODD,   "divf128_round_to_odd",   FP, divkf3_odd)
+BU_FLOAT128_HW_3 (FMAF128_ODD,   "fmaf128_round_to_odd",   FP, fmakf4_odd)
 
 /* 3 argument vector functions returning void, treated as SPECIAL,
    added in ISA 3.0 (power9).  */
@@ -2255,23 +2268,6 @@ BU_P9_64BIT_2 (CMPEQB,	"byte_in_set",	CONST,	cmpeqb)
 BU_P9_OVERLOAD_2 (CMPRB,	"byte_in_range")
 BU_P9_OVERLOAD_2 (CMPRB2,	"byte_in_either_range")
 BU_P9_OVERLOAD_2 (CMPEQB,	"byte_in_set")
-
-/* 1 and 2 argument IEEE 128-bit floating-point functions.  These functions use
-   the older 'q' suffix from libquadmath.  The standard built-in functions
-   support fabsf128 and copysignf128, but older code used these 'q' versions,
-   so keep them around.  */
-BU_FLOAT128_1 (FABSQ,		"fabsq",       CONST, abskf2)
-BU_FLOAT128_2 (COPYSIGNQ,	"copysignq",   CONST, copysignkf3)
-
-/* 1, 2, and 3 argument IEEE 128-bit floating point functions that require ISA
-   3.0 hardware.  These functions use the new 'f128' suffix.  */
-BU_FLOAT128_1_HW (SQRTF128_ODD,	 "sqrtf128_round_to_odd",  CONST, sqrtkf2_odd)
-BU_FLOAT128_1_HW (TRUNCF128_ODD, "truncf128_round_to_odd", CONST, trunckfdf2_odd)
-BU_FLOAT128_2_HW (ADDF128_ODD,	 "addf128_round_to_odd",   CONST, addkf3_odd)
-BU_FLOAT128_2_HW (SUBF128_ODD,	 "subf128_round_to_odd",   CONST, subkf3_odd)
-BU_FLOAT128_2_HW (MULF128_ODD,	 "mulf128_round_to_odd",   CONST, mulkf3_odd)
-BU_FLOAT128_2_HW (DIVF128_ODD,	 "divf128_round_to_odd",   CONST, divkf3_odd)
-BU_FLOAT128_3_HW (FMAF128_ODD,	 "fmaf128_round_to_odd",   CONST, fmakf4_odd)
 
 /* 1 argument crypto functions.  */
 BU_CRYPTO_1 (VSBOX,		"vsbox",	  CONST, crypto_vsbox)
@@ -2648,18 +2644,6 @@ BU_SPECIAL_X (RS6000_BUILTIN_CPU_IS, "__builtin_cpu_is",
 
 BU_SPECIAL_X (RS6000_BUILTIN_CPU_SUPPORTS, "__builtin_cpu_supports",
 	      RS6000_BTM_ALWAYS, RS6000_BTC_MISC)
-
-BU_SPECIAL_X (RS6000_BUILTIN_NANQ, "__builtin_nanq",
-	      RS6000_BTM_FLOAT128, RS6000_BTC_CONST)
-
-BU_SPECIAL_X (RS6000_BUILTIN_NANSQ, "__builtin_nansq",
-	      RS6000_BTM_FLOAT128, RS6000_BTC_CONST)
-
-BU_SPECIAL_X (RS6000_BUILTIN_INFQ, "__builtin_infq",
-	      RS6000_BTM_FLOAT128, RS6000_BTC_CONST)
-
-BU_SPECIAL_X (RS6000_BUILTIN_HUGE_VALQ, "__builtin_huge_valq",
-	      RS6000_BTM_FLOAT128, RS6000_BTC_CONST)
 
 /* Darwin CfString builtin.  */
 BU_SPECIAL_X (RS6000_BUILTIN_CFSTRING, "__builtin_cfstring", RS6000_BTM_ALWAYS,

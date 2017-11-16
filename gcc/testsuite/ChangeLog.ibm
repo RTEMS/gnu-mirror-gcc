@@ -1,3 +1,30 @@
+2017-11-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Back port from trunk
+	2017-11-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/bfp/bfp.exp: Look for *.c files, not *.c*
+	files to prevent ~ files from getting recognized.
+	* gcc.target/powerpc/dfp/dfp.exp: Likewise.
+	* gcc.target/powerpc/vsu/vsu.exp: Likewise.
+
+	Back port from trunk
+	2017-11-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/float128-hw4.c: New test.
+
+	Back port from trunk
+	2017-08-14  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+
+	PR target/79845
+	* gcc.target/powerpc/bfp/scalar-extract-exp-4.c: Adjust diagnostic
+	strings.
+	* gcc.target/powerpc/bfp/scalar-extract-sig-4.c: Likewise.
+	* gcc.target/powerpc/bfp/scalar-insert-exp-10.c: Likewise.
+	* gcc.target/powerpc/bfp/scalar-insert-exp-7.c: Likewise.
+	* gcc.target/powerpc/bfp/scalar-test-data-class-11.c: Likewise.
+	* gcc.target/powerpc/bfp/scalar-test-neg-5.c: Likewise.
+
 2017-11-15  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Backport from mainline
