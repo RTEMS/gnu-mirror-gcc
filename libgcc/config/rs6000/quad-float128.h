@@ -30,12 +30,17 @@
 /* quad.h defines the TFtype type by:
    typedef float TFtype __attribute__ ((mode (TF)));
 
-   This define forces it to use KFmode (aka, ieee 128-bit floating point).  */
-#define TF KF
+   This define forces it to use KFmode (aka, ieee 128-bit floating point).
 
-/* We also need TCtype to represent complex ieee 128-bit float for
-   __mulkc3 and __divkc3.  */
-typedef __complex float TCtype __attribute__ ((mode (KC)));
+   When -mabi=ieeelongdouble is used, we no longer have force things to be
+   KFmode.  However, we need to still use the kf names in the emulation.  */
+#ifndef __LONG_DOUBLE_IEEE128__
+#define TF KF
+#endif
+
+/* We need TCtype to represent complex ieee 128-bit float for __mulkc3 and
+   __divkc3.  */
+typedef _Complex _Float128 TCtype;
 
 /* Force the use of the VSX instruction set.  */
 #if defined(_ARCH_PPC) && (!defined(__VSX__) || !defined(__FLOAT128__))

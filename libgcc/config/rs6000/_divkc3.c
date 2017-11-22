@@ -23,21 +23,29 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 /* This is a temporary specialization of code from libgcc/libgcc2.c.  */
 
-typedef float KFtype __attribute__ ((mode (KF)));
-typedef __complex float KCtype __attribute__ ((mode (KC)));
-
-#define COPYSIGN(x,y) __builtin_copysignq (x, y)
-#define INFINITY __builtin_infq ()
-#define FABS __builtin_fabsq
+#define COPYSIGN(x,y) __builtin_copysignf128 (x, y)
+#define INFINITY __builtin_inff128 ()
+#define FABS __builtin_fabsf128
 #define isnan __builtin_isnan
 #define isinf __builtin_isinf
 #define isfinite __builtin_isfinite
 
-KCtype
-__divkc3 (KFtype a, KFtype b, KFtype c, KFtype d)
+#if defined(FLOAT128_HW_INSNS) && !defined(_ARCH_PWR8)
+#define CLONES __attribute__((__target_clones__("default,cpu=power8,cpu=power9")))
+
+#elif defined(FLOAT128_HW_INSNS) && !defined(__FLOAT128_HARDWARE__)
+#define CLONES __attribute__((__target_clones__("default,cpu=power9")))
+
+#else
+#define CLONES
+#endif
+
+CLONES
+_Complex _Float128
+__divkc3 (_Float128 a, _Float128 b, _Float128 c, _Float128 d)
 {
-  KFtype denom, ratio, x, y;
-  KCtype res;
+  _Float128 denom, ratio, x, y;
+  _Complex _Float128 res;
 
   /* ??? We can get better behavior from logarithmic scaling instead of
      the division.  But that would mean starting to link libgcc against

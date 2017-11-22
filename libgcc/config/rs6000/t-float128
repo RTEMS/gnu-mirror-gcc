@@ -25,7 +25,7 @@ fp128_softfp_obj	= $(fp128_softfp_static_obj) $(fp128_softfp_shared_obj)
 # New functions for software emulation
 fp128_ppc_funcs		= floattikf floatuntikf fixkfti fixunskfti \
 			  extendkftf2-sw trunctfkf2-sw \
-			  sfp-exceptions _mulkc3 _divkc3
+			  sfp-exceptions
 
 fp128_ppc_src		= $(addprefix $(srcdir)/config/rs6000/,$(addsuffix \
 				.c,$(fp128_ppc_funcs)))
@@ -33,15 +33,26 @@ fp128_ppc_static_obj	= $(addsuffix $(objext),$(fp128_ppc_funcs))
 fp128_ppc_shared_obj	= $(addsuffix _s$(objext),$(fp128_ppc_funcs))
 fp128_ppc_obj		= $(fp128_ppc_static_obj) $(fp128_ppc_shared_obj)
 
+fp128_complex_funcs	= _mulkc3 _divkc3
+fp128_complex_src	= $(addprefix $(srcdir)/config/rs6000/,$(addsuffix \
+				.c,$(fp128_complex_funcs)))
+fp128_complex_static_obj = $(addsuffix $(objext),$(fp128_complex_funcs))
+fp128_complex_shared_obj = $(addsuffix _s$(objext),$(fp128_complex_funcs))
+fp128_complex_obj	= $(fp128_complex_static_obj) \
+			  $(fp128_complex_shared_obj)
+
 # All functions
 fp128_funcs		= $(fp128_softfp_funcs) $(fp128_ppc_funcs) \
-			  $(fp128_hw_funcs) $(fp128_ifunc_funcs)
+			  $(fp128_hw_funcs) $(fp128_ifunc_funcs) \
+			  $(fp128_complex_funcs)
 
 fp128_src		= $(fp128_softfp_src) $(fp128_ppc_src) \
-			  $(fp128_hw_src) $(fp128_ifunc_src)
+			  $(fp128_hw_src) $(fp128_ifunc_src) \
+			  $(fp128_complex_src)
 
 fp128_obj		= $(fp128_softfp_obj) $(fp128_ppc_obj) \
-			  $(fp128_hw_obj) $(fp128_ifunc_obj)
+			  $(fp128_hw_obj) $(fp128_ifunc_obj) \
+			  $(fp128_complex_obj)
 
 fp128_sed		= $(srcdir)/config/rs6000/float128-sed$(fp128_sed_hw)
 fp128_dep		= $(fp128_sed) $(srcdir)/config/rs6000/t-float128
@@ -57,15 +68,25 @@ fp128_includes		= $(srcdir)/soft-fp/double.h \
 			  $(srcdir)/soft-fp/quad.h \
 			  $(srcdir)/soft-fp/soft-fp.h
 
-# Build the emulator without ISA 3.0 hardware support.
+# Build the emulator without ISA 3.0 hardware support.  However, we need to not
+# do -mno-float128-hardware for the functions that provide complex support
+# (__mulkc3 and __divkc3) since those functions use the target_clones attribute
+# to build ISA 3.0 versions.
+
 FP128_CFLAGS_SW		 = -Wno-type-limits -mvsx -mfloat128 \
 			   -mno-float128-hardware \
 			   -I$(srcdir)/soft-fp \
 			   -I$(srcdir)/config/rs6000 \
 			   $(FLOAT128_HW_INSNS)
 
+FP128_CFLAGS_COMPLEX	 = -Wno-type-limits -mvsx -mfloat128 \
+			   -I$(srcdir)/soft-fp \
+			   -I$(srcdir)/config/rs6000 \
+			   $(FLOAT128_HW_INSNS)
+
 $(fp128_softfp_obj)	 : INTERNAL_CFLAGS += $(FP128_CFLAGS_SW)
 $(fp128_ppc_obj)	 : INTERNAL_CFLAGS += $(FP128_CFLAGS_SW)
+$(fp128_complex_obj)	 : INTERNAL_CFLAGS += $(FP128_CFLAGS_COMPLEX)
 $(fp128_obj)		 : $(fp128_includes)
 $(fp128_obj)		 : $(srcdir)/config/rs6000/quad-float128.h
 

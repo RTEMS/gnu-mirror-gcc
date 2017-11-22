@@ -1,3 +1,69 @@
+2017-11-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR libgcc/83103
+	* config/rs6000/float128-ifunc.c (__addkf3_resolve): Use the
+	correct type for all ifunc resolvers to silence -Wattribute-alias
+	warnings.
+	(__subkf3_resolve): Likewise.
+	(__mulkf3_resolve): Likewise.
+	(__divkf3_resolve): Likewise.
+	(__negkf2_resolve): Likewise.
+	(__eqkf2_resolve): Likewise.
+	(__nekf2_resolve): Likewise.
+	(__gekf2_resolve): Likewise.
+	(__gtkf2_resolve): Likewise.
+	(__lekf2_resolve): Likewise.
+	(__ltkf2_resolve): Likewise.
+	(__unordkf2_resolve): Likewise.
+	(__extendsfkf2_resolve): Likewise.
+	(__extenddfkf2_resolve): Likewise.
+	(__trunckfsf2_resolve): Likewise.
+	(__trunckfdf2_resolve): Likewise.
+	(__fixkfsi_resolve): Likewise.
+	(__fixkfdi_resolve): Likewise.
+	(__fixunskfsi_resolve): Likewise.
+	(__fixunskfdi_resolve): Likewise.
+	(__floatsikf_resolve): Likewise.
+	(__floatdikf_resolve): Likewise.
+	(__floatunsikf_resolve): Likewise.
+	(__floatundikf_resolve): Likewise.
+	(__extendkftf2_resolve): Likewise.
+	(__trunctfkf2_resolve): Likewise.
+	* config/rs6000/t-float128 (fp128_complex_funcs): Split the two
+	functions (__mulkc3 and __divkc3) that provide complex results off
+	from the other functions and do not use the -mno-float128-hardware
+	option when compiling these functions.
+	(fp128_complex_src): Likewise.
+	(fp128_complex_static_obj): Likewise.
+	(fp128_complex_shared_obj): Likewise.
+	(fp128_complex_obj): Likewise.
+	(fp128_funcs): Likewise.
+	(fp128_src): Likewise.
+	(fp128_obj): Likewise.
+	(FP128_CFLAGS_COMPLEX): Likewise.
+	(fp128_complex_obj): Likewise.
+	* config/rs6000/_divkc3.c (KFtype): Delete, use _Float128.
+	(KCtype): Delete, use _Complex _Float128.
+	(COPYSIGN): Use f128 version of the built-in functions.
+	(INFINITY): Likewise.
+	(FABS): Likewise.
+	(CLONES): If we are building ifunc multi-libs for the float128
+	instructions, build target clone multi-libs for _divkc3.
+	(__divkc3): Use _Float128 and _Complex _Float128 types directly.
+	Build target clone versions of the library.
+	* config/rs6000/_mulkc3.c (KFtype): Delete, use _Float128.
+	(KCtype): Delete, use _Complex _Float128.
+	(COPYSIGN): Use f128 version of the built-in functions.
+	(INFINITY): Likewise.
+	(CLONES): If we are building ifunc multi-libs for the float128
+	instructions, build target clone multi-libs for _mulkc3.
+	(__mulkc3): Use _Float128 and _Complex _Float128 types directly.
+	Build target clone versions of the library.
+	* config/rs6000/quad-float128.h (TF): Only define TF->KF if the
+	default type of long double is not IEEE 128-bit floating point.
+	(TCtype): Use _Complex _Float128 to define TCtype instead of using
+	an attribute.
+
 2017-11-21   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 255032
