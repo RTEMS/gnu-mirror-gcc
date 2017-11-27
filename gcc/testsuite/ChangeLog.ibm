@@ -1,6 +1,14 @@
 2017-11-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Back port from trunk
+	2017-11-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR middle_end/82333
+	* gcc.target/powerpc/pr82333.c: New test.
+
+2017-11-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Back port from trunk
 	2017-11-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* gcc.target/powerpc/bfp/bfp.exp: Look for *.c files, not *.c*
