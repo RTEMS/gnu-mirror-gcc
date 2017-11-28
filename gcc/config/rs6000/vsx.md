@@ -437,7 +437,12 @@
 	     \"*vsx_le_perm_load_<mode> for doubles, alignment %d\n\",
 	     MEM_ALIGN (mem));
 
-  if (MEM_ALIGN (mem) >= 128)
+  /* Don't apply the swap optimization if we've already performed register
+     allocation and the hard register destination is not in the altivec
+     range.  */
+  if ((MEM_ALIGN (mem) >= 128)
+      && ((REGNO(operands[0]) >= FIRST_PSEUDO_REGISTER) ||
+          ALTIVEC_REGNO_P (REGNO(operands[0]))))
     {
       rtx mem_address = XEXP (mem, 0);
 
@@ -506,7 +511,12 @@
     fprintf (dump_file, \"*vsx_le_perm_load_<mode> for words, alignment %d\n\",
     	     MEM_ALIGN (mem));
 
-  if (MEM_ALIGN (mem) >= 128)
+  /* Don't apply the swap optimization if we've already performed register
+     allocation and the hard register destination is not in the altivec
+     range.  */
+  if ((MEM_ALIGN (mem) >= 128)
+      && ((REGNO(operands[0]) >= FIRST_PSEUDO_REGISTER) ||
+          ALTIVEC_REGNO_P (REGNO(operands[0]))))
     {
       rtx mem_address = XEXP (mem, 0);
 
@@ -579,7 +589,12 @@
     fprintf (dump_file, \"*vsx_le_perm_load_<mode> for halfs, alignment %d\n\",
     	     MEM_ALIGN (mem));
 
-  if (MEM_ALIGN (mem) >= 128)
+  /* Don't apply the swap optimization if we've already performed register
+     allocation and the hard register destination is not in the altivec
+     range.  */
+  if ((MEM_ALIGN (mem) >= 128)
+      && ((REGNO(operands[0]) >= FIRST_PSEUDO_REGISTER) ||
+          ALTIVEC_REGNO_P (REGNO(operands[0]))))
     {
       rtx mem_address = XEXP (mem, 0);
 
@@ -660,7 +675,12 @@
     fprintf (dump_file, \"*vsx_le_perm_load_<mode> for bytes, alignment %d\n\",
     	     MEM_ALIGN (mem));
 
-  if (MEM_ALIGN (mem) >= 128)
+  /* Don't apply the swap optimization if we've already performed register
+     allocation and the hard register destination is not in the altivec
+     range.  */
+  if ((MEM_ALIGN (mem) >= 128)
+      && ((REGNO(operands[0]) >= FIRST_PSEUDO_REGISTER) ||
+          ALTIVEC_REGNO_P (REGNO(operands[0]))))
     {
       rtx mem_address = XEXP (mem, 0);
 

@@ -568,7 +568,7 @@ search_line_fast (const uchar *s, const uchar *end ATTRIBUTE_UNUSED)
     {
       vc m_nl, m_cr, m_bs, m_qm;
 
-      data = *((const vc *)s);
+      data = __builtin_vec_vsx_ld (0, s);
       s += 16;
 
       m_nl = (vc) __builtin_vec_cmpeq(data, repl_nl);
@@ -2645,6 +2645,20 @@ _cpp_get_fresh_line (cpp_reader *pfile)
     }							\
   while (0)
 
+#ifdef KELVIN_DEBUG
+static FILE *kelvin_lex_trace;
+
+void
+kelvin_trace (const char *msg, struct cpp_buffer *buffer)
+{
+  if (kelvin_lex_trace == NULL)
+    kelvin_lex_trace = fopen ("kelvin-lex-trace", "w");
+
+  fprintf (kelvin_lex_trace, "%s: buffer [%s], current focus @ %ld\n",
+	   msg, buffer->buf, (buffer->cur - buffer->buf));
+}
+#endif
+
 /* Lex a token into pfile->cur_token, which is also incremented, to
    get diagnostics pointing to the correct location.
 
@@ -2712,6 +2726,12 @@ _cpp_lex_direct (cpp_reader *pfile)
       _cpp_process_line_notes (pfile, false);
       result->src_loc = pfile->line_table->highest_line;
     }
+#ifdef KELVIN_DEBUG
+  /* kelvin says this is where we get the next lexical character.
+   * still figuring out how we check for buffer overflow.
+   */
+  kelvin_trace ("b4 switch in cpp_lex_direct", buffer);
+#endif
   c = *buffer->cur++;
 
   if (pfile->forced_token_location_p)

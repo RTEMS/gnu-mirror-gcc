@@ -49,6 +49,11 @@ along with GCC; see the file COPYING3.  If not see
 #endif
 #endif
 
+#define KELVIN_INSTRUMENTS
+#ifdef KELVIN_INSTRUMENTS
+#include "hard-reg-set.h"
+#endif
+
 static void validate_replace_rtx_1 (rtx *, rtx, rtx, rtx_insn *, bool);
 static void validate_replace_src_1 (rtx *, void *);
 static rtx_insn *split_insn (rtx_insn *);
@@ -2309,6 +2314,17 @@ extract_insn (rtx_insn *insn)
 
       insn_extract (insn);
 
+      if (dump_file)
+	{
+	  fprintf (dump_file, "extract_insn (");
+	  print_inline_rtx (dump_file, insn, 2);
+	  fprintf (dump_file, "), memoized as %d\n", icode);
+	  fprintf (dump_file, " n_operands: %d\n", recog_data.n_operands);
+	  fprintf (dump_file, " n_alternatives: %d\n",
+		   recog_data.n_alternatives);
+	  fprintf (dump_file, " n_dups: %d\n", recog_data.n_dups);
+	}
+
       for (i = 0; i < noperands; i++)
 	{
 	  recog_data.constraints[i] = insn_data[icode].operand[i].constraint;
@@ -2317,6 +2333,16 @@ extract_insn (rtx_insn *insn)
 	  /* VOIDmode match_operands gets mode from their real operand.  */
 	  if (recog_data.operand_mode[i] == VOIDmode)
 	    recog_data.operand_mode[i] = GET_MODE (recog_data.operand[i]);
+	  if (dump_file)
+	    {
+	      fprintf (dump_file, " for operand %d:\n", i);
+	      fprintf (dump_file,
+		       "  constraints[i]: %s\n", recog_data.constraints[i]);
+	      fprintf (dump_file,
+		       "  is_operator[i]: %d\n", recog_data.is_operator[i]);
+	      fprintf (dump_file,
+		       "  operand_mode[i]: %d\n", recog_data.operand_mode[i]);
+	    }
 	}
     }
   for (i = 0; i < noperands; i++)
@@ -2542,6 +2568,14 @@ constrain_operands (int strict, alternative_mask alternatives)
   struct funny_match funny_match[MAX_RECOG_OPERANDS];
   int funny_match_index;
 
+  if (dump_file)
+    {
+      fprintf (dump_file, "constrain_operands(%d, %llx)\n",
+	       strict, (unsigned long long int) alternatives);
+      fprintf (dump_file, " n_operands: %d, n_alternatives: %d\n",
+	       recog_data.n_operands, recog_data.n_alternatives);
+    }
+
   which_alternative = 0;
   if (recog_data.n_operands == 0 || recog_data.n_alternatives == 0)
     return 1;
@@ -2558,6 +2592,9 @@ constrain_operands (int strict, alternative_mask alternatives)
       int opno;
       int lose = 0;
       funny_match_index = 0;
+
+      if (dump_file)
+	fprintf (dump_file, "trying out alternative %d\n", which_alternative);
 
       if (!TEST_BIT (alternatives, which_alternative))
 	{
@@ -2579,6 +2616,9 @@ constrain_operands (int strict, alternative_mask alternatives)
 	  int win = 0;
 	  int val;
 	  int len;
+
+	  if (dump_file)
+	    fprintf (dump_file, "examining operand %d\n", opno);
 
 	  earlyclobber[opno] = 0;
 
@@ -2602,6 +2642,12 @@ constrain_operands (int strict, alternative_mask alternatives)
 	     allows anything which matched the pattern.  */
 	  if (*p == 0 || *p == ',')
 	    win = 1;
+
+	  if (dump_file)
+	    {
+	      fprintf (dump_file, " looking at constraint %s\n", p);
+	      fprintf (dump_file, " was constraint empty, win: %d\n", win);
+	    }
 
 	  do
 	    switch (c = *p, len = CONSTRAINT_LEN (c, p), c)
@@ -2669,6 +2715,10 @@ constrain_operands (int strict, alternative_mask alternatives)
 		  if (val != 0)
 		    win = 1;
 
+		  if (dump_file)
+		    fprintf (dump_file,
+			     "digit constraint, val: %d, win: %d\n", val, win);
+
 		  /* If output is *x and input is *--x, arrange later
 		     to change the output to *--x as well, since the
 		     output op is the one that will be printed.  */
@@ -2690,6 +2740,10 @@ constrain_operands (int strict, alternative_mask alternatives)
 		    || (strict_memory_address_p (recog_data.operand_mode[opno],
 						 op)))
 		  win = 1;
+
+		if (dump_file)
+		  fprintf (dump_file, "p constraint, win: %d\n", win);
+
 		break;
 
 		/* No need to check general_operand again;
@@ -2707,9 +2761,18 @@ constrain_operands (int strict, alternative_mask alternatives)
 			    && REGNO (op) >= FIRST_PSEUDO_REGISTER)
 			|| reg_fits_class_p (op, GENERAL_REGS, offset, mode))
 		      win = 1;
+
+		    if (dump_file)
+		      fprintf (dump_file, "g constraint with REG_P, win: %d\n",
+			       win);
 		  }
 		else if (strict < 0 || general_operand (op, mode))
-		  win = 1;
+		  {
+		    win = 1;
+		    if (dump_file)
+		      fprintf (dump_file,
+			       "g constraint with !REG_p, win: %d\n", win);
+		  }
 		break;
 
 	      default:
@@ -2718,6 +2781,19 @@ constrain_operands (int strict, alternative_mask alternatives)
 		  enum reg_class cl = reg_class_for_constraint (cn);
 		  if (cl != NO_REGS)
 		    {
+		      if (dump_file)
+			{
+			  fprintf (dump_file,
+				   "Default constraint cl != NO_REGS\n");
+			  fprintf (dump_file, "REG_P (op): %d\n", REG_P (op));
+			  fprintf (dump_file,
+				   "cn: %d, cl: %d, offset: %d, mode: %d\n",
+				   cn, cl, offset, mode);
+			  fprintf (dump_file,
+				   "reg_fits_class_p () returns %d\n",
+				   reg_fits_class_p (op, cl, offset, mode));
+			}
+
 		      if (strict < 0
 			  || (strict == 0
 			      && REG_P (op)
@@ -2726,11 +2802,19 @@ constrain_operands (int strict, alternative_mask alternatives)
 			  || (REG_P (op)
 			      && reg_fits_class_p (op, cl, offset, mode)))
 		        win = 1;
+		      if (dump_file)
+			fprintf (dump_file,
+				 "default constraint cl != NO_REGS, win: %d\n",
+				 win);
 		    }
 
-		  else if (constraint_satisfied_p (op, cn))
+		  else if (constraint_satisfied_p (op, cn)) {
 		    win = 1;
-
+		    if (dump_file)
+		      fprintf (dump_file,
+			       "default constraint cl == NO_REGS "
+			       " and constraint_satisfied_p, win: %d\n", win);
+		  }
 		  else if (insn_extra_memory_constraint (cn)
 			   /* Every memory operand can be reloaded to fit.  */
 			   && ((strict < 0 && MEM_P (op))
@@ -2744,11 +2828,21 @@ constrain_operands (int strict, alternative_mask alternatives)
 			       /* During reload, accept a pseudo  */
 			       || (reload_in_progress && REG_P (op)
 				   && REGNO (op) >= FIRST_PSEUDO_REGISTER)))
-		    win = 1;
+		    {
+		      win = 1;
+		      if (dump_file)
+			fprintf (dump_file,
+				 "default constraint wins by reload\n");
+		    }
 		  else if (insn_extra_address_constraint (cn)
 			   /* Every address operand can be reloaded to fit.  */
 			   && strict < 0)
-		    win = 1;
+		    {
+		      win = 1;
+		      if (dump_file)
+			fprintf (dump_file,
+				 "default constraint wins by extra addr\n");
+		    }
 		  /* Cater to architectures like IA-64 that define extra memory
 		     constraints without using define_memory_constraint.  */
 		  else if (reload_in_progress
@@ -2758,7 +2852,17 @@ constrain_operands (int strict, alternative_mask alternatives)
 			   && reg_equiv_mem (REGNO (op)) != 0
 			   && constraint_satisfied_p
 			      (reg_equiv_mem (REGNO (op)), cn))
-		    win = 1;
+		    {
+		      win = 1;
+		      if (dump_file)
+			fprintf (dump_file,
+				 "default constraint wins by specialness\n");
+		    }
+		  else
+		    {
+		      if (dump_file)
+			fprintf (dump_file, "default constraint don't win\n");
+		    }
 		  break;
 		}
 	      }
@@ -2769,7 +2873,20 @@ constrain_operands (int strict, alternative_mask alternatives)
 	     this alternative loses.  */
 	  if (! win)
 	    lose = 1;
+
+	  if (dump_file)
+	    {
+	      fprintf (dump_file, "after examining constraints for opno %d\n",
+		       opno);
+	      fprintf (dump_file, " constraints is %s\n", p);
+	      fprintf (dump_file, " win is %d, lose is %d\n", win, lose);
+	    }
 	}
+
+      if (dump_file)
+	fprintf (dump_file, "... might return true if !lose (%d)\n",
+		 lose);
+
       /* This alternative won; the operands are ok.
 	 Change whichever operands this alternative says to change.  */
       if (! lose)
@@ -2801,6 +2918,10 @@ constrain_operands (int strict, alternative_mask alternatives)
 						   recog_data.operand[eopno]))
 		    lose = 1;
 
+	  if (dump_file)
+	    fprintf (dump_file, "... might return true if still !lose (%d)\n",
+		     lose);
+
 	  if (! lose)
 	    {
 	      while (--funny_match_index >= 0)
@@ -2825,7 +2946,11 @@ constrain_operands (int strict, alternative_mask alternatives)
 			  if (strchr (recog_data.constraints[opno], '<') == NULL
 			      && strchr (recog_data.constraints[opno], '>')
 				 == NULL)
-			    return 0;
+			    {
+			      if (dump_file)
+				fprintf (dump_file, " ... fail with <>\n");
+			      return 0;
+			    }
 			  break;
 			default:
 			  break;
@@ -2839,6 +2964,12 @@ constrain_operands (int strict, alternative_mask alternatives)
       which_alternative++;
     }
   while (which_alternative < recog_data.n_alternatives);
+
+  if (dump_file)
+    {
+      fprintf (dump_file, "Failing from constrain_operands, strict is %d\n",
+	       strict);
+    }
 
   which_alternative = -1;
   /* If we are about to reject this, but we are not to test strictly,
@@ -2862,6 +2993,44 @@ reg_fits_class_p (const_rtx operand, reg_class_t cl, int offset,
 
   if (cl == NO_REGS)
     return false;
+
+#ifdef KELVIN_INSTRUMENTS
+  if (dump_file)
+    {
+      fprintf (dump_file, "reg_fits_class_p, regno: %d, offset: %d\n",
+	       regno, offset);
+      fprintf (dump_file, "HARD_REGISTER_NUM_P (regno): %d\n",
+	       HARD_REGISTER_NUM_P (regno));
+      fprintf (dump_file, "HARD_REGISTER_NUM_P (regno + offset): %d\n",
+	       HARD_REGISTER_NUM_P (regno + offset));
+      fprintf (dump_file, "cl: %d\n", cl);
+
+      if (HARD_REGISTER_NUM_P (regno)
+	  && HARD_REGISTER_NUM_P (regno + offset)) {
+
+	fprintf (dump_file, "in_hard_reg_set_p () returns %s because ...\n",
+		 (in_hard_reg_set_p (reg_class_contents[(int) cl], mode,
+				     regno + offset)? "true": "false"));
+	fprintf (dump_file, " regno + offset is %d\n", regno + offset);
+
+
+
+
+	fprintf (dump_file, " TEST_HARD_REG_BIT (regs, regno + offset) is %s\n",
+		 TEST_HARD_REG_BIT (reg_class_contents[(int) cl],
+				    regno + offset)? "true": "false");
+
+	fprintf (dump_file, " end_regno is %d\n", end_hard_regno (mode, regno));
+
+	fprintf (dump_file, " HARD_REGISTER_NUM_P (end_regno - 1) is %s\n",
+		 (HARD_REGISTER_NUM_P (end_hard_regno (mode, regno) - 1)?
+		  "true": "false"));
+
+	instrument_reg_set (dump_file, reg_class_contents[(int) cl],
+			    mode, regno + offset);
+      }
+    }
+#endif
 
   /* Regno must not be a pseudo register.  Offset may be negative.  */
   return (HARD_REGISTER_NUM_P (regno)

@@ -14,12 +14,15 @@ const vector char y = { 0, 1, 2, 3,
 			8, 9, 10, 11,
 			12, 13, 14, 15 };
 
+vector char x, z;
+
 vector char
 foo (void)
 {
   return y;			/* Remove 1 swap and use lvx.  */
 }
 
+vector char
 foo1 (void)
 {
   x = y;			/* Remove 2 redundant swaps here.  */
@@ -114,28 +117,28 @@ main (int argc, char *argv[])
   if (fetched_value[0] != 0 || fetched_value[15] != 15)
     abort ();
 
-  vector char fetched_value = foo1 ();
+  fetched_value = foo1 ();
   if (fetched_value[1] != 1 || fetched_value[14] != 14)
     abort ();
 
-  vector char fetched_value = foo2 ();
+  fetched_value = foo2 ();
   if (fetched_value[2] != 2 || fetched_value[13] != 13)
     abort ();
 
-  vector char fetched_value = foo3 (&x);
+  fetched_value = foo3 (&x);
   if (fetched_value[3] != 3 || fetched_value[12] != 12)
     abort ();
 
   struct bar a_struct;
   a_struct.a_vector = x;	/* Remove 2 redundant swaps.  */
-  vector char fetched_value = foo4 (&a_struct);
+  fetched_value = foo4 (&a_struct);
   if (fetched_value[4] != 4 || fetched_value[11] != 11)
     abort ();
 
   for (int i = 0; i < 16; i++)
-    y[i] = 15 - i;
+    z[i] = 15 - i;
 
-  baz (y);
+  baz (z);
   if (x[0] != 15 || x[15] != 0)
     abort ();
   
