@@ -4335,8 +4335,41 @@ case "${target}" in
 		done
 
 		case "$with_abi" in
-		"" | elfv1 | elfv2 )
+		"" | elfv1 | elfv2)
 			#OK
+			;;
+		ieeelongdouble)
+			tm_defines="${tm_defines} TARGET_IEEEQUAD_DEFAULT=1"
+			case "x${target}:${enable_multilib}" in
+			    xpowerpc64le*:yes)
+				tm_defines="${tm_defines} TARGET_IEEEQUAD_MULTILIB=1"
+				tmake_file="${tmake_file} rs6000/t-ldouble-ieee"
+				;;
+			    xpowerpc64le*:no)
+				tm_defines="${tm_defines} TARGET_IEEEQUAD_MULTILIB=0"
+				;;
+			    *)
+				echo "*** Configuration ${target} cannot change " \
+				    "the long double type to IEEE 128-bit" 1>&2
+				exit 1
+				;;
+			esac
+			;;
+		ibmlongdouble)
+			tm_defines="${tm_defines} TARGET_IEEEQUAD_DEFAULT=0"
+			case "x${target}:${enable_multilib}" in
+			    xpowerpc64le*:yes)
+				tm_defines="${tm_defines} TARGET_IEEEQUAD_MULTILIB=1"
+				tmake_file="${tmake_file} rs6000/t-ldouble-ibm"
+				;;
+			    xpowerpc64le*:no)
+				tm_defines="${tm_defines} TARGET_IEEEQUAD_MULTILIB=0"
+				;;
+			    *)
+				# Ignore setting long double to IBM extended double
+				# on other systems.
+				;;
+			esac
 			;;
 		*)
 			echo "Unknown ABI used in --with-abi=$with_abi"

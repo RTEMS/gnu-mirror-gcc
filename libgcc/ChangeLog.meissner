@@ -1,3 +1,20 @@
+2017-12-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/_divkc3.c: Switch to using soft-fp.h and
+	quad-float128.h include files and use the types that they define,
+	instead of hand-rolling the types.
+	* config/rs6000/_mulkc3.c: Likewise.
+	* config/rs6000/ibm-ldouble.c: If we have __float128/_Float128,
+	use __ieee128 for the IBM extended double type instead of long double.
+	Change all functions.
+	* config/rs6000/quad-float128.h (IBM128_TYPE): Always use
+	__ieee128.
+	(CVT_FLOAT128_TO_IBM128): Use long double instead of __float128 on
+	systems where the default long double is IEEE 128-bit floating
+	point.
+	* config/rs6000/extendkftf2-sw.c (extendkftf2_sw): Likewise.
+	* config/rs6000/trunctfkf2-sw.c (__trunctfkf2_sw): Likewise.
+
 2017-12-11   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 255546

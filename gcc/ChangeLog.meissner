@@ -1,3 +1,19 @@
+2017-12-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config.gcc (powerpc*-*-* | rs6000-*-*): Add support for using
+	--with-abi={ieee,ibm}longdouble to set the default long double
+	type.
+	* config/rs6000/t-ldouble-ieee: New target makefile fragments to
+	build multilibs for long double being IEEE 128-bit floating point
+	or IBM extended double.
+	* config/rs6000/t-ldouble-ibm: Likewise.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): If
+	long double multilibs are bult, do not warn if the user selects
+	the long double type.
+	* config/rs6000/rs6000.h (TARGET_IEEEQUAD_MULTILIB): If not
+	specify, indicate we aren't building multilibs to switch the long
+	double format.
+
 2017-11-17  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	https://gcc.gnu.org/ml/gcc-patches/2017-11/msg01421.html
