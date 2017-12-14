@@ -1,3 +1,7 @@
+2017-12-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 255546.
+
 2017-12-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/_divkc3.c: Switch to using soft-fp.h and
