@@ -60,7 +60,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    other systems, use long double, because __ibm128 might not have been
    created.  */
 #ifdef __FLOAT128__
-#define IBM128_TYPE __ieee128
+#define IBM128_TYPE __ibm128
 #else
 #define IBM128_TYPE long double
 #endif
