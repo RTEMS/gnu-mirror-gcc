@@ -1,3 +1,24 @@
+2017-12-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* configure.ac (--with-long-double-ieee): Add support for a
+	configure switch to change the long double format on PowerPC
+	systems from IBM extended double to IEEE 128-bit floating point.
+	(--with-long-double-multilib): Add support for a configure switch
+	to build both long double IEEE 128-bit floating point and IBM
+	extended double multilibs on PowerPC systems.
+	* configure: Regenerate.
+	* config.gcc (--with-abi=): Undo changes to change the long double
+	defaults via --with-abi=ieeelongdouble.
+	(powerpc*-*-*): Add support for --with-long-double-ieee and
+	--with-long-double-multilib configuration options.
+	* config/rs6000/linux64.h (MULTILIB_DEFAULTS_IEEE): Set the
+	appropriate default long double multilib option if we are building
+	multilibs to switch long double between IEEE 128-bit floating
+	point and IBM extended double.
+	(MULTILIB_DEFAULTS): Likewise.
+	* config/rs6000/t-ldouble-multilib: Add support for multilibs to
+	set the long double type.
+
 2017-12-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config.gcc (powerpc*-*-* | rs6000-*-*): Add support for using

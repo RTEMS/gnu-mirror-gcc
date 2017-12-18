@@ -945,6 +945,8 @@ enable_linker_build_id
 enable_libssp
 enable_default_ssp
 with_long_double_128
+with_long_double_ieee
+with_long_double_multilib
 with_gc
 with_system_zlib
 enable_maintainer_mode
@@ -1738,6 +1740,12 @@ Optional Packages:
   --with-glibc-version=M.N
                           assume GCC used with glibc version M.N or later
   --with-long-double-128  use 128-bit long double by default
+  --with-long-double-ieee
+		  Specify PowerPC long double is IEEE 128-bit
+
+  --with-long-double-multilib
+		  Build PowerPC long double multilib libraries
+
   --with-gc={page,zone}   this option is not supported anymore. It used to
                           choose the garbage collection mechanism to use with
                           the compiler
@@ -18442,7 +18450,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 18445 "configure"
+#line 18453 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -18548,7 +18556,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 18551 "configure"
+#line 18559 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -29184,6 +29192,45 @@ if test x$gcc_cv_target_ldbl128 = xyes; then
 $as_echo "#define TARGET_DEFAULT_LONG_DOUBLE_128 1" >>confdefs.h
 
 fi
+
+# Check if TFmode long double target should use the IBM extended double or IEEE
+# 128-bit floating point formats if long doubles are 128-bits long.  The long
+# double type can only be switched on powerpc64 bit Linux systems where VSX is
+# supported.  Other PowerPC systems do not build the IEEE 128-bit emulator in
+# liggcc.
+
+# Check whether --with-long-double-ieee was given.
+if test "${with_long_double_ieee+set}" = set; then :
+  withval=$with_long_double_ieee;
+case "$target:$with_cpu" in
+  powerpc*-*-linux*:power789 | powerpc*-*-linux*:power1-90-9+ | \
+  powerpc64le-*-linux*:*)
+    :
+    ;;
+  *)
+    as_fn_error "Configure option --with-long-double-ieee is only supported \
+for PowerPC VSX Linux systems" "$LINENO" 5
+    ;;
+esac
+fi
+
+
+
+# Check whether --with-long-double-multilib was given.
+if test "${with_long_double_multilib+set}" = set; then :
+  withval=$with_long_double_multilib;
+case "$target:$with_cpu" in
+  powerpc*-*-linux*:power789 | powerpc*-*-linux*:power1-90-9+ | \
+  powerpc64le-*-linux*:* )
+    :
+    ;;
+  * )
+    as_fn_error "Configure option --with-long-double-multilib is only \
+supported for PowerPC VSX Linux systems" "$LINENO" 5
+    ;;
+esac
+fi
+
 
 # Check if the target LIBC supports exporting the AT_PLATFORM and AT_HWCAP
 # values in the TCB.  Currently, only GLIBC 2.23 and later support this.
