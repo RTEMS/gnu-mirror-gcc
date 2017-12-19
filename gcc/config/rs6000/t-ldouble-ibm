@@ -33,13 +33,17 @@ ibm-crts: xgcc$(exeext)
 		if [ x$$b != x$$x ]; then \
 			rm -f ibm128/$$x; \
 			ln -s $$b ibm128/$$x; \
-			echo "Create ibm128/$$x link"; \
+			echo "Create ibm128/$$x and ./$$x links"; \
+			rm -f ./$$x; \
+			ln -s $$b ./$$x; \
 		else \
 			b=`$CC --print-file-name $$x`; \
 			if [ x$$b != x$$x ]; then \
 				rm -f ibm128/$$x; \
 				ln -s $$b ibm128/$$x; \
-				echo "Create ibm128/$$x link"; \
+				echo "Create ibm128/$$x and ./$$x links"; \
+				rm -f ./$$x; \
+				ln -s $$b ./$$x; \
 			fi; \
 		fi; \
 	done; \
