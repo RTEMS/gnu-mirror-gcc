@@ -34,6 +34,13 @@ ibm-crts: xgcc$(exeext)
 			rm -f ibm128/$$x; \
 			ln -s $$b ibm128/$$x; \
 			echo "Create ibm128/$$x link"; \
+		else \
+			b=`$CC --print-file-name $$x`; \
+			if [ x$$b != x$$x ]; then \
+				rm -f ibm128/$$x; \
+				ln -s $$b ibm128/$$x; \
+				echo "Create ibm128/$$x link"; \
+			fi; \
 		fi; \
 	done; \
 	touch ibm-crts
