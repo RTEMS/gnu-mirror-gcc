@@ -30,21 +30,14 @@ ieee-crts: xgcc$(exeext)
 	@mkdir -p ieee128; \
 	for x in crt1.o crti.o crtn.o; do \
 		b=`./xgcc$(exeext) -B./ --print-file-name $$x`; \
-		if [ x$$b != x$$x ]; then \
-			rm -f ieee128/$$x; \
-			ln -s $$b ieee128/$$x; \
+		if [ x$$b = x$$x ]; then \
+			b=`${CC} --print-file-name $$x`; \
+		fi; \
+		if [ x$$b = x$$x ]; then \
 			echo "Create ieee128/$$x and ./$$x links"; \
-			rm -f ./$$x; \
+			rm -f ieee128/$$x ./$$x; \
+			ln -s $$b ieee128/$$x; \
 			ln -s $$b ./$$x; \
-		else \
-			b=`$CC --print-file-name $$x`; \
-			if [ x$$b != x$$x ]; then \
-				rm -f ieee128/$$x; \
-				ln -s $$b ieee128/$$x; \
-				echo "Create ieee128/$$x and ./$$x links"; \
-				rm -f ./$$x; \
-				ln -s $$b ./$$x; \
-			fi; \
 		fi; \
 	done; \
 	touch ieee-crts
