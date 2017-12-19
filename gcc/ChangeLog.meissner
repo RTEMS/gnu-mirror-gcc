@@ -1,5 +1,13 @@
 2017-12-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config.gcc (powerpc*-*-*): Go back to separate
+	t-ldouble-{ieee,ibm} files.
+	* config/rs6000/t-ldouble-ibm: Likewise.
+	* config/rs6000/t-ldouble-ieee: Likewise.
+	* config/rs6000/t-ldouble-multilib: Likewise.
+
+2017-12-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* configure.ac (--with-long-double-ieee): Add support for a
 	configure switch to change the long double format on PowerPC
 	systems from IBM extended double to IEEE 128-bit floating point.

@@ -4386,14 +4386,17 @@ case "${target}" in
 
 		if test x$with_long_double_ieee = xyes; then
 		    tm_defines="${tm_defines} TARGET_IEEEQUAD_DEFAULT=1"
+		    if test x$with_long_double_multilib = xyes; then
+			tm_defines="${tm_defines} TARGET_IEEEQUAD_MULTILIB=1"
+			tmake_file="${tmake_file} rs6000/t-ldouble-ieee"
+		    fi
 
 		elif test x$with_long_double_ieee = xno; then
 		    tm_defines="${tm_defines} TARGET_IEEEQUAD_DEFAULT=0"
-		fi
-
-		if test x$with_long_double_multilib = xyes; then
-		    tm_defines="${tm_defines} TARGET_IEEEQUAD_MULTILIB=1"
-		    tmake_file="${tmake_file} rs6000/t-ldouble-multilib"
+		    if test x$with_long_double_multilib = xyes; then
+			tm_defines="${tm_defines} TARGET_IEEEQUAD_MULTILIB=1"
+			tmake_file="${tmake_file} rs6000/t-ldouble-ibm"
+		    fi
 		fi
 		;;
 
