@@ -20,24 +20,3 @@
 # IEEE 128-bit floating point
 MULTILIB_OPTIONS	+= mabi=ibmlongdouble
 MULTILIB_DIRNAMES	+= ibm128
-
-# Symlink crt{1,i,n}
-GCC_PASSES		+= ibm-crts
-
-# The CRT files don't care whether long double is IBM extended double or IEEE
-# 128-bit, so use the same crt*.o files for -mabi=ibmlongdouble
-ibm-crts: xgcc$(exeext)
-	mkdir -p ibm128; \
-	for x in crt1.o crti.o crtn.o; do \
-		b=`./xgcc$(exeext) -B./ --print-file-name $$x`; \
-		if [ x$$b = x$$x ]; then \
-			b=`${CC} --print-file-name $$x`; \
-		fi; \
-		if [ x$$b = x$$x ]; then \
-			echo "Create ibm128/$$x and ./$$x links"; \
-			rm -f ibm128/$$x ./$$x; \
-			ln -s $$b ibm128/$$x; \
-			ln -s $$b ./$$x; \
-		fi; \
-	done; \
-	touch ibm-crts
