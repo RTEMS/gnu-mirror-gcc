@@ -33,7 +33,7 @@ ieee-crts: xgcc$(exeext)
 		if [ x$$b != x$$x ]; then \
 			rm -f ieee128/$$x; \
 			ln -s $$b ieee128/$$x; \
-			echo "Create ieee128/$$x link"; \
+			echo "Create ieee128/$$x and ./$$x links"; \
 			rm -f ./$$x; \
 			ln -s $$b ./$$x; \
 		else \
@@ -41,7 +41,7 @@ ieee-crts: xgcc$(exeext)
 			if [ x$$b != x$$x ]; then \
 				rm -f ieee128/$$x; \
 				ln -s $$b ieee128/$$x; \
-				echo "Create ieee128/$$x link"; \
+				echo "Create ieee128/$$x and ./$$x links"; \
 				rm -f ./$$x; \
 				ln -s $$b ./$$x; \
 			fi; \
