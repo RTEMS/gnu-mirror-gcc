@@ -34,12 +34,16 @@ ieee-crts: xgcc$(exeext)
 			rm -f ieee128/$$x; \
 			ln -s $$b ieee128/$$x; \
 			echo "Create ieee128/$$x link"; \
+			rm -f ./$$x; \
+			ln -s $$b ./$$x; \
 		else \
 			b=`$CC --print-file-name $$x`; \
 			if [ x$$b != x$$x ]; then \
 				rm -f ieee128/$$x; \
 				ln -s $$b ieee128/$$x; \
 				echo "Create ieee128/$$x link"; \
+				rm -f ./$$x; \
+				ln -s $$b ./$$x; \
 			fi; \
 		fi; \
 	done; \
