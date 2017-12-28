@@ -1,3 +1,11 @@
+2017-12-28  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config.gcc (powerpc*-*-*): Combine t-ldouble from
+	t-ldouble-{ieee,ibm}.
+	* config/rs6000/t-ldouble: Likewise.
+	* config/rs6000/t-ldouble-ieee: Likewise.
+	* config/rs6000/t-ldouble-ibm: Likewise.
+
 2017-12-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config.gcc (powerpc*-*-*): Go back to separate

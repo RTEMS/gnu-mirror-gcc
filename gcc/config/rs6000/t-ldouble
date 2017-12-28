@@ -18,5 +18,7 @@
 
 # Enable building IEEE 128-bit floating point multilibs on a system that
 # defaults to IBM extended double floating point.
-MULTILIB_OPTIONS	+= mabi=ieeelongdouble
-MULTILIB_DIRNAMES	+= ieee128
+MULTILIB_OPTIONS        += mabi=ibmlongdouble/mabi=ieeelongdouble
+MULTILIB_DIRNAMES       += ibm128 ieee128
+MULTILIB_OSDIRNAMES     += mabi.ibmlongdouble=../lib64 mabi.ieeelongdouble=../lib64 ../lib64
+
