@@ -20,5 +20,5 @@
 # defaults to IBM extended double floating point.
 MULTILIB_OPTIONS        += mabi=ibmlongdouble/mabi=ieeelongdouble
 MULTILIB_DIRNAMES       += ibm128 ieee128
-MULTILIB_OSDIRNAMES     += mabi.ibmlongdouble=../lib64 mabi.ieeelongdouble=../lib64 ../lib64
+MULTILIB_OSDIRNAMES     += mabi.ibmlongdouble=../lib64 mabi.ieeelongdouble=../ieee64 ../lib64
 

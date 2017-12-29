@@ -4602,7 +4602,7 @@ rs6000_option_override_internal (bool global_init_p)
      was built to enable multilibs to switch between the two long double
      types.  */
   if (!global_options_set.x_rs6000_ieeequad)
-    rs6000_ieeequad = TARGET_IEEEQUAD_DEFAULT;
+    rs6000_ieeequad = TARGET_LONG_DOUBLE_128 ? TARGET_IEEEQUAD_DEFAULT : 0;
 
   else if (!TARGET_IEEEQUAD_MULTILIB
 	   && rs6000_ieeequad != TARGET_IEEEQUAD_DEFAULT
@@ -4624,7 +4624,9 @@ rs6000_option_override_internal (bool global_init_p)
      infrastructure (-mfloat128-type) but not enable the actual __float128 type
      unless the user used the explicit -mfloat128.  In GCC 8, we enable both
      the keyword as well as the type.  */
-  TARGET_FLOAT128_TYPE = TARGET_FLOAT128_ENABLE_TYPE && TARGET_VSX;
+  TARGET_FLOAT128_TYPE = (TARGET_FLOAT128_ENABLE_TYPE
+			  && TARGET_VSX
+			  && TARGET_LONG_DOUBLE_128);
 
   /* IEEE 128-bit floating point requires VSX support.  */
   if (TARGET_FLOAT128_KEYWORD)
