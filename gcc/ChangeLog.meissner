@@ -1,7 +1,18 @@
 2017-12-29  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Undo
+	previous change.
+	(is_complex_IBM_long_double): Add explicit checks for 128-bit long
+	double before checking IEEEQUAD and TF/TC modes.
+	(rs6000_complex_function_value): Likewise.
+	* config/rs6000/rs6000.h (FLOAT128_IEEE_P): Likewise.
+	(FLOAT128_IBM_P): Likewise.
+
+2017-12-29  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_option_override_internal): Don't
 	enable _Float128 if -mlong-double-64.
+
 	* config/rs6000/t-ldouble (MULTILIB_OSDIRNAMES): Change IEEE
 	library to ieee64.
 

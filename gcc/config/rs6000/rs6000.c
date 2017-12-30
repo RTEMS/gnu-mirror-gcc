@@ -4602,7 +4602,7 @@ rs6000_option_override_internal (bool global_init_p)
      was built to enable multilibs to switch between the two long double
      types.  */
   if (!global_options_set.x_rs6000_ieeequad)
-    rs6000_ieeequad = TARGET_LONG_DOUBLE_128 ? TARGET_IEEEQUAD_DEFAULT : 0;
+    rs6000_ieeequad = TARGET_IEEEQUAD_DEFAULT;
 
   else if (!TARGET_IEEEQUAD_MULTILIB
 	   && rs6000_ieeequad != TARGET_IEEEQUAD_DEFAULT
@@ -4624,9 +4624,7 @@ rs6000_option_override_internal (bool global_init_p)
      infrastructure (-mfloat128-type) but not enable the actual __float128 type
      unless the user used the explicit -mfloat128.  In GCC 8, we enable both
      the keyword as well as the type.  */
-  TARGET_FLOAT128_TYPE = (TARGET_FLOAT128_ENABLE_TYPE
-			  && TARGET_VSX
-			  && TARGET_LONG_DOUBLE_128);
+  TARGET_FLOAT128_TYPE = TARGET_FLOAT128_ENABLE_TYPE && TARGET_VSX;
 
   /* IEEE 128-bit floating point requires VSX support.  */
   if (TARGET_FLOAT128_KEYWORD)
@@ -11428,7 +11426,9 @@ rs6000_must_pass_in_stack (machine_mode mode, const_tree type)
 static inline bool
 is_complex_IBM_long_double (machine_mode mode)
 {
-  return mode == ICmode || (!TARGET_IEEEQUAD && mode == TCmode);
+  return mode == ICmode || (!TARGET_IEEEQUAD
+			    && TARGET_LONG_DOUBLE_128
+			    && mode == TCmode);
 }
 
 /* Whether ABI_V4 passes MODE args to a function in floating point
@@ -36111,7 +36111,7 @@ rs6000_complex_function_value (machine_mode mode)
 
   if (TARGET_FLOAT128_TYPE
       && (mode == KCmode
-	  || (mode == TCmode && TARGET_IEEEQUAD)))
+	  || (mode == TCmode && TARGET_LONG_DOUBLE_128 && TARGET_IEEEQUAD)))
     regno = ALTIVEC_ARG_RETURN;
 
   else if (FLOAT_MODE_P (mode) && TARGET_HARD_FLOAT)
