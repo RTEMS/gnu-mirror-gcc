@@ -4392,6 +4392,24 @@ case "${target}" in
 			exit 1
 		    fi
 		fi
+
+		# Set up the default long double format.  Only enable the
+		# IEEE/IBM multilibs if the user explicitly set the long double
+		# format and did not do --disable-multilib.
+		if test x$with_long_double_format = xieee; then
+		    tm_defines="${tm_defines} TARGET_IEEEQUAD_DEFAULT=1"
+		    if test x$enable_multilib = xyes; then
+			tm_defines="${tm_defines} TARGET_IEEEQUAD_MULTILIB=1"
+			tmake_file="${tmake_file} rs6000/t-ldouble"
+		    fi
+
+		elif test x$with_long_double_format = xibm; then
+		    tm_defines="${tm_defines} TARGET_IEEEQUAD_DEFAULT=0"
+		    if test x$enable_multilib = xyes; then
+			tm_defines="${tm_defines} TARGET_IEEEQUAD_MULTILIB=1"
+			tmake_file="${tmake_file} rs6000/t-ldouble"
+		    fi
+		fi
 		;;
 
 	s390*-*-*)

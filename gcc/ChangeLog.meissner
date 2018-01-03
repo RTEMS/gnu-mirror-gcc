@@ -1,3 +1,30 @@
+2018-01-03  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* configure.ac (--with-long-double-format): Add support for
+	configuration option to change the default long double format in
+	PowerPC Linux systems.
+	* configure: Regenerate.
+	* config.gcc (powerpc*-linux*-*): Add support for
+	--with-long-double-format={ieee,ibm}.  If the format is explicit
+	set, also set up IBM and IEEE multilibs.
+	* config/rs6000/rs6000.h (FLOAT128_IEEE_P): Explicitly check for
+	128-bit long doubles before checking TFmode or TCmode.
+	(FLOAT128_IBM_P): Likewise.
+	(TARGET_IEEEQUAD_MULTILIB): Set to 0 if not already defined.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): If we
+	have IBM/IEEE multilibs, don't give a warning if the user chagnes
+	the long double format.
+	(is_complex_IBM_long_double): Explicitly check for 128-bit long
+	doubles before checking TCmode.
+	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): If long
+	double is IEEE, define __KC__ and __KF__ to allow floatn.h to be
+	used without modification.
+	* config/rs6000/linux64.h (MULTILIB_DEFAULTS_IEEE): Specify the
+	-mabi={ieee,ibm}longdouble default for multilibs.
+	(MULTILIB_DEFAULTS): Likewise.
+	* config/rs6000/t-ldouble: New file, add IEEE/IBM long double
+	multilibs.
+
 2018-01-02   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 256118
