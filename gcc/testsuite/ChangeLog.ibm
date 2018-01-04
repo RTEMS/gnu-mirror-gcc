@@ -1,3 +1,23 @@
+2018-01-04  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Back port from trunk
+	2018-01-02  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/float128-hw2.c: Add tests for ceilf128,
+	floorf128, truncf128, and roundf128.
+	* gcc.target/powerpc/float128-hw6.c: New tests for _Float128
+	optimizations added in match.pd.
+	* gcc.target/powerpc/float128-hw7.c: Likewise.
+	* gcc.target/powerpc/float128-hw8.c: Likewise.
+	* gcc.target/powerpc/float128-hw9.c: Likewise.
+	* gcc.target/powerpc/float128-hw10.c: Likewise.
+	* gcc.target/powerpc/float128-hw11.c: Likewise.
+
+2018-01-04  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* gcc.target/powerpc/float128-hw5.c: Rework trunk float128-hw5.c
+	not to use optimizations added in GCC 8.
+
 2017-11-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Back port from trunk

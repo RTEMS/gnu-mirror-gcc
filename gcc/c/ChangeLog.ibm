@@ -1,3 +1,11 @@
+2018-01-04  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Back port from trunk
+	2017-12-28  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* c-decl.c (header_for_builtin_fn): Add integer rounding _Float<N>
+	and _Float<N>X built-in functions.
+
 2017-11-02  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Back port from trunk
