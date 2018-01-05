@@ -2,14 +2,20 @@
 /* { dg-do compile { target { powerpc64le-*-* } } } */
 /* { dg-skip-if "do not override -mcpu" { powerpc*-*-* } { "-mcpu=*" } { "-mcpu=power8" } } */
 /* { dg-options "-mcpu=power8 -O3 " } */
-/* { dg-final { scan-assembler-not "xxpermdi" } } */
-/* { dg-final { scan-assembler-not "xxswapd" } } */
+
+/* Previous versions of this test required that the assembler does not
+   contain xxpermdi or xxswapd.  However, with the more sophisticated
+   code generation used today, it is now possible that xxpermdi (aka
+   xxswapd) show up without being part of a lxvd2x or stxvd2x
+   sequence.  */
 
 #include <altivec.h>
 
 extern void abort (void);
 
+vector int x;
 const vector int y = { 0, 1, 2, 3 };
+vector int z;
 
 vector int
 foo (void)
@@ -17,6 +23,7 @@ foo (void)
   return y;			/* Remove 1 swap and use lvx.  */
 }
 
+vector int
 foo1 (void)
 {
   x = y;			/* Remove 2 redundant swaps here.  */
@@ -111,44 +118,44 @@ main (int argc, int *argv[])
   if (fetched_value[0] != 0 || fetched_value[3] != 3)
     abort ();
 
-  vector int fetched_value = foo1 ();
+  fetched_value = foo1 ();
   if (fetched_value[1] != 1 || fetched_value[2] != 2)
     abort ();
 
-  vector int fetched_value = foo2 ();
+  fetched_value = foo2 ();
   if (fetched_value[2] != 2 || fetched_value[1] != 1)
     abort ();
 
-  vector int fetched_value = foo3 (&x);
+  fetched_value = foo3 (&x);
   if (fetched_value[3] != 3 || fetched_value[0] != 0)
     abort ();
 
   struct bar a_struct;
   a_struct.a_vector = x;	/* Remove 2 redundant swaps.  */
-  vector int fetched_value = foo4 (&a_struct);
+  fetched_value = foo4 (&a_struct);
   if (fetched_value[2] != 2 || fetched_value[3] != 3)
     abort ();
 
-  y[0] = 7;
-  y[1] = 6;
-  y[2] = 5;
-  y[3] = 4;
+  z[0] = 7;
+  z[1] = 6;
+  z[2] = 5;
+  z[3] = 4;
 
-  baz (y);
+  baz (z);
   if (x[0] != 7 || x[3] != 4)
     abort ();
-  
+
   vector int source = { 8, 7, 6, 5 };
 
   baz1 (source);
   if (x[3] != 6 || x[2] != 7)
     abort ();
-  
+
   vector int dest;
   baz2 (&dest, source);
   if (dest[0] != 8 || dest[1] != 7)
     abort ();
-  
+
   baz3 (&a_struct, source);
   if (a_struct.a_vector[3] != 5 || a_struct.a_vector[0] != 8)
     abort ();

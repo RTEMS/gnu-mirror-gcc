@@ -7,7 +7,9 @@
 
 extern void abort (void);
 
+vector double x;
 vector double y = { 0.1, 0.2 };
+vector double z;
 
 vector double
 foo (void)
@@ -15,6 +17,7 @@ foo (void)
   return y;			/* Remove 1 swap and use lvx.  */
 }
 
+vector double
 foo1 (void)
 {
   x = y;			/* Remove 2 redundant swaps here.  */
@@ -102,49 +105,49 @@ baz3 (struct bar *bp, vector double v)
   bp->a_vector = v;		/* Remove 1 swap and use stvx.  */
 }
 
-double
+int
 main (double argc, double *argv[])
 {
   vector double fetched_value = foo ();
   if (fetched_value[0] != 0.1 || fetched_value[1] != 0.2)
     abort ();
 
-  vector double fetched_value = foo1 ();
+  fetched_value = foo1 ();
   if (fetched_value[1] != 0.2 || fetched_value[0] != 0.1)
     abort ();
 
-  vector double fetched_value = foo2 ();
+  fetched_value = foo2 ();
   if (fetched_value[0] != 0.1 || fetched_value[1] != 0.2)
     abort ();
 
-  vector double fetched_value = foo3 (&x);
+  fetched_value = foo3 (&x);
   if (fetched_value[1] != 0.2 || fetched_value[0] != 0.1)
     abort ();
 
   struct bar a_struct;
   a_struct.a_vector = x;	/* Remove 2 redundant swaps.  */
-  vector double fetched_value = foo4 (&a_struct);
+  fetched_value = foo4 (&a_struct);
   if (fetched_value[1] != 0.2 || fetched_value[0] != 0.1)
     abort ();
 
-  y[0] = 0.7;
-  y[1] = 0.6;
+  z[0] = 0.7;
+  z[1] = 0.6;
 
-  baz (y);
+  baz (z);
   if (x[0] != 0.7 || x[1] != 0.6)
     abort ();
-  
+
   vector double source = { 0.8, 0.7 };
 
   baz1 (source);
   if (x[0] != 0.8 || x[1] != 0.7)
     abort ();
-  
+
   vector double dest;
   baz2 (&dest, source);
   if (dest[0] != 0.8 || dest[1] != 0.7)
     abort ();
-  
+
   baz3 (&a_struct, source);
   if (a_struct.a_vector[1] != 0.7 || a_struct.a_vector[0] != 0.8)
     abort ();

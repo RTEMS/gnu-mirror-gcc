@@ -7,7 +7,9 @@
 
 extern void abort (void);
 
+vector long long x;
 const vector long long y = { 1024, 2048 };
+vector long long z;
 
 vector long long
 foo (void)
@@ -15,6 +17,7 @@ foo (void)
   return y;			/* Remove 1 swap and use lvx.  */
 }
 
+vector long long
 foo1 (void)
 {
   x = y;			/* Remove 2 redundant swaps here.  */
@@ -102,49 +105,49 @@ baz3 (struct bar *bp, vector long long v)
   bp->a_vector = v;		/* Remove 1 swap and use stvx.  */
 }
 
-long long
+int
 main (long long argc, long long *argv[])
 {
   vector long long fetched_value = foo ();
   if (fetched_value[0] != 1024 || fetched_value[1] != 2048)
     abort ();
 
-  vector long long fetched_value = foo1 ();
+  fetched_value = foo1 ();
   if (fetched_value[1] != 2048 || fetched_value[0] != 1024)
     abort ();
 
-  vector long long fetched_value = foo2 ();
+  fetched_value = foo2 ();
   if (fetched_value[0] != 1024 || fetched_value[1] != 2048)
     abort ();
 
-  vector long long fetched_value = foo3 (&x);
+  fetched_value = foo3 (&x);
   if (fetched_value[1] != 2048 || fetched_value[0] != 1024)
     abort ();
 
   struct bar a_struct;
   a_struct.a_vector = x;	/* Remove 2 redundant swaps.  */
-  vector long long fetched_value = foo4 (&a_struct);
+  fetched_value = foo4 (&a_struct);
   if (fetched_value[1] != 2048 || fetched_value[0] != 1024)
     abort ();
 
-  y[0] = 7096;
-  y[1] = 6048;
+  z[0] = 7096;
+  z[1] = 6048;
 
-  baz (y);
+  baz (z);
   if (x[0] != 7096 || x[1] != 6048)
     abort ();
-  
+
   vector long long source = { 8192, 7096};
 
   baz1 (source);
   if (x[0] != 8192 || x[1] != 7096)
     abort ();
-  
+
   vector long long dest;
   baz2 (&dest, source);
   if (dest[0] != 8192 || dest[1] != 7096)
     abort ();
-  
+
   baz3 (&a_struct, source);
   if (a_struct.a_vector[1] != 7096 || a_struct.a_vector[0] != 8192)
     abort ();

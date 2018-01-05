@@ -395,7 +395,6 @@ quad_aligned_load_p (swap_web_entry *insn_entry, rtx_insn *insn)
       fprintf (dump_file, "made it to quad_aligned_load_p with insn:\n");
       print_inline_rtx (dump_file, insn, 2);
       fprintf (dump_file, "\n");
-      fprintf (dump_file, " insn_entry is %llx\n", (long long) insn_entry);
     }
 
   unsigned uid = INSN_UID (insn);
@@ -483,8 +482,6 @@ quad_aligned_store_p (swap_web_entry *insn_entry, rtx_insn *insn)
       fprintf (dump_file, "made it to quad_aligned_store_p with insn:\n");
       print_inline_rtx (dump_file, insn, 2);
       fprintf (dump_file, "\n");
-      fprintf (dump_file, " insn_entry is %llx\n",
-	       (long long unsigned) insn_entry);
     }
   
   unsigned uid = INSN_UID (insn);
@@ -598,7 +595,7 @@ quad_aligned_store_p (swap_web_entry *insn_entry, rtx_insn *insn)
 		   insn_entry[uid2].is_store? "is_store": "!is_store",
 		   insn_entry[uid2].is_swap? "is_swap": "!is_swap");
 	  print_inline_rtx (dump_file, def_insn, 2);
-	  fprintf (dump_file, "\n");	  
+	  fprintf (dump_file, "\n");
 	}
 
       /* If this source value is not a simple swap, return false */
@@ -1724,7 +1721,6 @@ rs6000_gen_stvx (enum machine_mode mode, rtx dest_exp, rtx src_exp) {
   /* replace this swapping-store insn with a stvx insn */
   /*  see the stvx rtl pattern from vsx.md.  */
 
-  /* insert rs6000_gen_lvx () here, revise it.  */
   rtx memory_address = XEXP (dest_exp, 0);
   rtx stvx;
   
@@ -1767,7 +1763,7 @@ rs6000_gen_stvx (enum machine_mode mode, rtx dest_exp, rtx src_exp) {
 	stvx = gen_altivec_stvx_v1ti_2op (src_exp, op1, op2);
       else
 	/* KFmode, TFmode, other modes not expected in this context.  */
-	gcc_unreachable ();    
+	gcc_unreachable ();
     }
   else				/* REG_P (memory_address) */
     {
@@ -1791,7 +1787,7 @@ rs6000_gen_stvx (enum machine_mode mode, rtx dest_exp, rtx src_exp) {
 	stvx = gen_altivec_stvx_v1ti_1op (src_exp, memory_address);
       else
 	/* KFmode, TFmode, other modes not expected in this context.  */
-	gcc_unreachable ();    
+	gcc_unreachable ();
     }
 
   /* kelvin may rewrite the following code to use change_address.  As
@@ -1857,7 +1853,7 @@ replace_swapped_aligned_store (swap_web_entry *insn_entry,
 		   insn_entry[uid2].is_store? "is_store": "!is_store",
 		   insn_entry[uid2].is_swap? "is_swap": "!is_swap");
 	  print_inline_rtx (dump_file, swap_insn, 2);
-	  fprintf (dump_file, "\n");	  
+	  fprintf (dump_file, "\n");
 	}
 
       /* If this source value is not a simple swap, we should not be here.  */
@@ -1944,16 +1940,16 @@ rs6000_gen_lvx (enum machine_mode mode, rtx dest_exp, rtx src_exp)
 {
   rtx memory_address = XEXP (src_exp, 0);
   rtx lvx;
-  
+
   if (rs6000_sum_of_two_registers_p (memory_address))
     {
       rtx op1, op2;
       op1 = XEXP (memory_address, 0);
       op2 = XEXP (memory_address, 1);
-      
+
       if (dump_file)
 	fprintf (dump_file, "Using the 2op form of lvx\n");
-      
+
       if (mode == V16QImode)
 	lvx = gen_altivec_lvx_v16qi_2op (dest_exp, op1, op2);
       else if (mode == V8HImode)
@@ -2022,8 +2018,6 @@ replace_swapped_aligned_load (swap_web_entry *insn_entry, rtx swap_insn)
 	       "made it to replace_swapped_aligned_load, insn is:\n");
       print_inline_rtx (dump_file, swap_insn, 2);
       fprintf (dump_file, "\n");
-      fprintf (dump_file, " insn_entry is %llx\n\n",
-	       (long long unsigned) insn_entry);
     }
 
   /* Find the load.  */
@@ -2742,7 +2736,6 @@ rs6000_analyze_swaps (function *fun)
 
   /* We're thinking that we need to do some analysis to improve integrity of
      data-flow information, but we're not sure which calls we need to make.
-     
   df_remove_problem (df_chain);
   df_process_deferred_rescans ();
   df_set_flags (DF_RD_PRUNE_DEAD_DEFS);

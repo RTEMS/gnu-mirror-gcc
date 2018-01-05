@@ -432,19 +432,46 @@
 {
   rtx mem = operands[1];
 
-  if (dump_file)
+  if (dump_file) {
     fprintf (dump_file,
 	     \"*vsx_le_perm_load_<mode> for doubles, alignment %d\n\",
 	     MEM_ALIGN (mem));
+    fprintf (dump_file,
+	     \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
+    print_inline_rtx (dump_file, mem, 2);
+    fprintf (dump_file, \"\n\");
 
+    fprintf (dump_file, \"REGNO(operands[0]) is %d\n\", 
+             reg_or_subregno (operands[0]));
+    if (reg_renumber != NULL)
+      fprintf (dump_file, \"reg_renumber[REGNO(operands[0])] is %d\n\",
+	       reg_renumber[REGNO(operands[0])]);
+  }
   /* Don't apply the swap optimization if we've already performed register
      allocation and the hard register destination is not in the altivec
      range.  */
   if ((MEM_ALIGN (mem) >= 128)
-      && ((REGNO(operands[0]) >= FIRST_PSEUDO_REGISTER) ||
-          ALTIVEC_REGNO_P (REGNO(operands[0]))))
+      && ((reg_or_subregno (operands[0]) >= FIRST_PSEUDO_REGISTER)
+	  || ALTIVEC_REGNO_P (reg_or_subregno (operands[0]))))
     {
-      rtx mem_address = XEXP (mem, 0);
+      /* this pattern shows up in several different contexts.
+         I need to parse the comment and the code...  Are they equivalent?
+           (MEM_ALIGN (mem) >= 128) means the optimization might be relevant.
+           (REGNO(operands[0]) >= FIRST_PSEUDO_REGISTER)
+             means operands[0] has not yet been assigned to a
+             physical register - it is a pseudo-register.
+           (ALTIVEC_REGNO_P (REGNO(operands[0])))
+             means operands[0] (which is known by short-circuit evaluation
+             to be a physical register) is in the altivec range.
+       */
+
+       /* kelvin thinks the comment does not match the implementation,
+          the reason being that
+       	   REGNO(operands[0]) >= FIRST_PSEUDO_REGISTER
+	  does not always mean we have not performed register
+          allocation.  My guess is the problem I'm seeing on
+          p8vector-int128.c is that this test succeeds but
+          reg_renumber[pseudo_reg] is > 0 */
 
       if (dump_file)
         {
@@ -453,9 +480,21 @@
 	  print_inline_rtx (dump_file, mem, 2);
 	  fprintf (dump_file, \"\n\");
 
+	  fprintf (dump_file, \"reg_or_subregno (operands[0]) is %d\n\",
+	  	   reg_or_subregno (operands[0]));
+	  if (reg_renumber != NULL)
+ 	    fprintf (dump_file, \"reg_renumber[REGNO(operands[0])] is %d\n\",
+		     reg_renumber[REGNO(operands[0])]);
+        }
+
+      rtx mem_address = XEXP (mem, 0);
+
+      if (dump_file)
+        {
 	  fprintf (dump_file, \"memory address:\n\");
 	  print_inline_rtx (dump_file, mem_address, 2);
 	  fprintf (dump_file, \"\n\");
+
 	}
 
       enum machine_mode mode = GET_MODE (mem);
@@ -480,6 +519,9 @@
         }
       /* Otherwise, fall through to transform into a swapping load.  */
     }
+  if (dump_file)
+    fprintf (dump_file, \"transforming into a swapping load\n\");
+
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[0])
                                        : operands[0];
 }
@@ -515,8 +557,8 @@
      allocation and the hard register destination is not in the altivec
      range.  */
   if ((MEM_ALIGN (mem) >= 128)
-      && ((REGNO(operands[0]) >= FIRST_PSEUDO_REGISTER) ||
-          ALTIVEC_REGNO_P (REGNO(operands[0]))))
+      && ((REGNO(operands[0]) >= FIRST_PSEUDO_REGISTER)
+	  || ALTIVEC_REGNO_P (REGNO(operands[0]))))
     {
       rtx mem_address = XEXP (mem, 0);
 
@@ -593,8 +635,8 @@
      allocation and the hard register destination is not in the altivec
      range.  */
   if ((MEM_ALIGN (mem) >= 128)
-      && ((REGNO(operands[0]) >= FIRST_PSEUDO_REGISTER) ||
-          ALTIVEC_REGNO_P (REGNO(operands[0]))))
+      && ((REGNO(operands[0]) >= FIRST_PSEUDO_REGISTER)
+	  || ALTIVEC_REGNO_P (REGNO(operands[0]))))
     {
       rtx mem_address = XEXP (mem, 0);
 
@@ -679,8 +721,8 @@
      allocation and the hard register destination is not in the altivec
      range.  */
   if ((MEM_ALIGN (mem) >= 128)
-      && ((REGNO(operands[0]) >= FIRST_PSEUDO_REGISTER) ||
-          ALTIVEC_REGNO_P (REGNO(operands[0]))))
+      && ((REGNO(operands[0]) >= FIRST_PSEUDO_REGISTER)
+	  || ALTIVEC_REGNO_P (REGNO(operands[0]))))
     {
       rtx mem_address = XEXP (mem, 0);
 
@@ -759,7 +801,7 @@
   rtx mem = operands[0];
 
   if (dump_file)
-    fprintf (dump_file, \"splitting V16QI memory store, with alignment %d\n\",
+    fprintf (dump_file, \"splitting V2DF or V2DI memory store, with alignment %d\n\",
              MEM_ALIGN (mem));
 
   if (MEM_ALIGN (mem) >= 128)
@@ -779,25 +821,21 @@
       if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
 	{
 	  if (dump_file)
-	    {
-	      if (dump_file)
-		fprintf (dump_file,
-			 \"memory address is REG_P or sum of 2 registers\n\");
-	      rtx stvx_set_expr =
-		rs6000_gen_stvx (mode, mem, operands[1]);
-	      emit_insn (stvx_set_expr);
-	      DONE;
-	    }
-	  else if (rs6000_quadword_masked_address_p (mem_address))
-	    {
-	      if (dump_file)
-		fprintf (dump_file, "mem address is quad-word-masked addr\n\");
-	      /* This rtl is already in the form that matches stvx instruction,
-		 so leave it alone.  */
-	      DONE;
-	    }
-	  /* Otherwise, fall through to transform into a swapping store.  */
+	    fprintf (dump_file,
+		     \"memory address is REG_P or sum of 2 registers\n\");
+	  rtx stvx_set_expr = rs6000_gen_stvx (mode, mem, operands[1]);
+	  emit_insn (stvx_set_expr);
+	  DONE;
 	}
+      else if (rs6000_quadword_masked_address_p (mem_address))
+	{
+	  if (dump_file)
+	    fprintf (dump_file, "mem address is quad-word-masked addr\n\");
+	  /* This rtl is already in the form that matches stvx instruction,
+	     so leave it alone.  */
+	  DONE;
+	}
+      /* Otherwise, fall through to transform into a swapping store.  */
     }
 
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[1]) 
@@ -851,7 +889,7 @@
   rtx mem = operands[0];
 
   if (dump_file)
-    fprintf (dump_file, \"splitting V16QI memory store, with alignment %d\n\",
+    fprintf (dump_file, \"splitting V4SF or V4SI memory store, with alignment %d\n\",
              MEM_ALIGN (mem));
 
   if (MEM_ALIGN (mem) >= 128)
@@ -871,25 +909,21 @@
       if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
 	{
 	  if (dump_file)
-	    {
-	      if (dump_file)
-		fprintf (dump_file,
-			 \"memory address is REG_P or sum of 2 registers\n\");
-	      rtx stvx_set_expr =
-		rs6000_gen_stvx (mode, mem, operands[1]);
-	      emit_insn (stvx_set_expr);
-	      DONE;
-	    }
-	  else if (rs6000_quadword_masked_address_p (mem_address))
-	    {
-	      if (dump_file)
-		fprintf (dump_file, "mem address is quad-word-masked addr\n\");
-	      /* This rtl is already in the form that matches stvx instruction,
-		 so leave it alone.  */
-	      DONE;
-	    }
-	  /* Otherwise, fall through to transform into a swapping store.  */
+	    fprintf (dump_file,
+		     \"memory address is REG_P or sum of 2 registers\n\");
+	  rtx stvx_set_expr = rs6000_gen_stvx (mode, mem, operands[1]);
+	  emit_insn (stvx_set_expr);
+	  DONE;
 	}
+      else if (rs6000_quadword_masked_address_p (mem_address))
+	{
+	  if (dump_file)
+	    fprintf (dump_file, "mem address is quad-word-masked addr\n\");
+	  /* This rtl is already in the form that matches stvx instruction,
+	     so leave it alone.  */
+	  DONE;
+	}
+      /* Otherwise, fall through to transform into a swapping store.  */
     }
 
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[1]) 
@@ -950,7 +984,7 @@
   rtx mem = operands[0];
 
   if (dump_file)
-    fprintf (dump_file, \"splitting V16QI memory store, with alignment %d\n\",
+    fprintf (dump_file, \"splitting V8HI memory store, with alignment %d\n\",
              MEM_ALIGN (mem));
 
   if (MEM_ALIGN (mem) >= 128)
@@ -970,25 +1004,21 @@
       if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
 	{
 	  if (dump_file)
-	    {
-	      if (dump_file)
-		fprintf (dump_file,
-			 \"memory address is REG_P or sum of 2 registers\n\");
-	      rtx stvx_set_expr =
-		rs6000_gen_stvx (mode, mem, operands[1]);
-	      emit_insn (stvx_set_expr);
-	      DONE;
-	    }
-	  else if (rs6000_quadword_masked_address_p (mem_address))
-	    {
-	      if (dump_file)
-		fprintf (dump_file, "mem address is quad-word-masked addr\n\");
-	      /* This rtl is already in the form that matches stvx instruction,
-		 so leave it alone.  */
-	      DONE;
-	    }
-	  /* Otherwise, fall through to transform into a swapping store.  */
+	    fprintf (dump_file,
+		     \"memory address is REG_P or sum of 2 registers\n\");
+	  rtx stvx_set_expr = rs6000_gen_stvx (mode, mem, operands[1]);
+	  emit_insn (stvx_set_expr);
+	  DONE;
 	}
+      else if (rs6000_quadword_masked_address_p (mem_address))
+	{
+	  if (dump_file)
+	    fprintf (dump_file, "mem address is quad-word-masked addr\n\");
+	  /* This rtl is already in the form that matches stvx instruction,
+	     so leave it alone.  */
+	  DONE;
+	}
+      /* Otherwise, fall through to transform into a swapping store.  */
     }
 
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[1]) 
@@ -1083,25 +1113,21 @@
       if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
 	{
 	  if (dump_file)
-	    {
-	      if (dump_file)
-		fprintf (dump_file,
-			 \"memory address is REG_P or sum of 2 registers\n\");
-	      rtx stvx_set_expr =
-		rs6000_gen_stvx (mode, mem, operands[1]);
-	      emit_insn (stvx_set_expr);
-	      DONE;
-	    }
-	  else if (rs6000_quadword_masked_address_p (mem_address))
-	    {
-	      if (dump_file)
-		fprintf (dump_file, "mem address is quad-word-masked addr\n\");
-	      /* This rtl is already in the form that matches stvx instruction,
-		 so leave it alone.  */
-	      DONE;
-	    }
-	  /* Otherwise, fall through to transform into a swapping store.  */
+	    fprintf (dump_file,
+		     \"memory address is REG_P or sum of 2 registers\n\");
+	  rtx stvx_set_expr = rs6000_gen_stvx (mode, mem, operands[1]);
+	  emit_insn (stvx_set_expr);
+	  DONE;
 	}
+      else if (rs6000_quadword_masked_address_p (mem_address))
+	{
+	  if (dump_file)
+	    fprintf (dump_file, "mem address is quad-word-masked addr\n\");
+	  /* This rtl is already in the form that matches stvx instruction,
+	     so leave it alone.  */
+	  DONE;
+	}
+      /* Otherwise, fall through to transform into a swapping store.  */
     }
 
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[1]) 

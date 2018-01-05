@@ -49,7 +49,7 @@ along with GCC; see the file COPYING3.  If not see
 #endif
 #endif
 
-#define KELVIN_INSTRUMENTS
+#undef KELVIN_INSTRUMENTS
 #ifdef KELVIN_INSTRUMENTS
 #include "hard-reg-set.h"
 #endif
@@ -2314,6 +2314,7 @@ extract_insn (rtx_insn *insn)
 
       insn_extract (insn);
 
+#ifdef KELVIN_INSTRUMENTS
       if (dump_file)
 	{
 	  fprintf (dump_file, "extract_insn (");
@@ -2324,7 +2325,7 @@ extract_insn (rtx_insn *insn)
 		   recog_data.n_alternatives);
 	  fprintf (dump_file, " n_dups: %d\n", recog_data.n_dups);
 	}
-
+#endif
       for (i = 0; i < noperands; i++)
 	{
 	  recog_data.constraints[i] = insn_data[icode].operand[i].constraint;
@@ -2333,6 +2334,7 @@ extract_insn (rtx_insn *insn)
 	  /* VOIDmode match_operands gets mode from their real operand.  */
 	  if (recog_data.operand_mode[i] == VOIDmode)
 	    recog_data.operand_mode[i] = GET_MODE (recog_data.operand[i]);
+#ifdef KELVIN_INSTRUMENTS
 	  if (dump_file)
 	    {
 	      fprintf (dump_file, " for operand %d:\n", i);
@@ -2343,6 +2345,7 @@ extract_insn (rtx_insn *insn)
 	      fprintf (dump_file,
 		       "  operand_mode[i]: %d\n", recog_data.operand_mode[i]);
 	    }
+#endif
 	}
     }
   for (i = 0; i < noperands; i++)
@@ -2568,6 +2571,7 @@ constrain_operands (int strict, alternative_mask alternatives)
   struct funny_match funny_match[MAX_RECOG_OPERANDS];
   int funny_match_index;
 
+#ifdef KELVIN_INSTRUMENTS
   if (dump_file)
     {
       fprintf (dump_file, "constrain_operands(%d, %llx)\n",
@@ -2575,6 +2579,7 @@ constrain_operands (int strict, alternative_mask alternatives)
       fprintf (dump_file, " n_operands: %d, n_alternatives: %d\n",
 	       recog_data.n_operands, recog_data.n_alternatives);
     }
+#endif
 
   which_alternative = 0;
   if (recog_data.n_operands == 0 || recog_data.n_alternatives == 0)
@@ -2593,9 +2598,10 @@ constrain_operands (int strict, alternative_mask alternatives)
       int lose = 0;
       funny_match_index = 0;
 
+#ifdef KELVIN_INSTRUMENTS
       if (dump_file)
 	fprintf (dump_file, "trying out alternative %d\n", which_alternative);
-
+#endif
       if (!TEST_BIT (alternatives, which_alternative))
 	{
 	  int i;
@@ -2617,9 +2623,10 @@ constrain_operands (int strict, alternative_mask alternatives)
 	  int val;
 	  int len;
 
+#ifdef KELVIN_INSTRUMENTS
 	  if (dump_file)
 	    fprintf (dump_file, "examining operand %d\n", opno);
-
+#endif
 	  earlyclobber[opno] = 0;
 
 	  /* A unary operator may be accepted by the predicate, but it
@@ -2643,12 +2650,13 @@ constrain_operands (int strict, alternative_mask alternatives)
 	  if (*p == 0 || *p == ',')
 	    win = 1;
 
+#ifdef KELVIN_INSTRUMENTS
 	  if (dump_file)
 	    {
 	      fprintf (dump_file, " looking at constraint %s\n", p);
 	      fprintf (dump_file, " was constraint empty, win: %d\n", win);
 	    }
-
+#endif
 	  do
 	    switch (c = *p, len = CONSTRAINT_LEN (c, p), c)
 	      {
@@ -2715,10 +2723,11 @@ constrain_operands (int strict, alternative_mask alternatives)
 		  if (val != 0)
 		    win = 1;
 
+#ifdef KELVIN_INSTRUMENTS
 		  if (dump_file)
 		    fprintf (dump_file,
 			     "digit constraint, val: %d, win: %d\n", val, win);
-
+#endif
 		  /* If output is *x and input is *--x, arrange later
 		     to change the output to *--x as well, since the
 		     output op is the one that will be printed.  */
@@ -2741,9 +2750,10 @@ constrain_operands (int strict, alternative_mask alternatives)
 						 op)))
 		  win = 1;
 
+#ifdef KELVIN_INSTRUMENTS
 		if (dump_file)
 		  fprintf (dump_file, "p constraint, win: %d\n", win);
-
+#endif
 		break;
 
 		/* No need to check general_operand again;
@@ -2762,17 +2772,23 @@ constrain_operands (int strict, alternative_mask alternatives)
 			|| reg_fits_class_p (op, GENERAL_REGS, offset, mode))
 		      win = 1;
 
+#ifdef KELVIN_INSTRUMENTS
 		    if (dump_file)
 		      fprintf (dump_file, "g constraint with REG_P, win: %d\n",
 			       win);
+#endif
 		  }
 		else if (strict < 0 || general_operand (op, mode))
+#ifdef KELVIN_INSTRUMENTS
 		  {
 		    win = 1;
 		    if (dump_file)
 		      fprintf (dump_file,
 			       "g constraint with !REG_p, win: %d\n", win);
 		  }
+#else
+		  win = 1;
+#endif
 		break;
 
 	      default:
@@ -2781,6 +2797,7 @@ constrain_operands (int strict, alternative_mask alternatives)
 		  enum reg_class cl = reg_class_for_constraint (cn);
 		  if (cl != NO_REGS)
 		    {
+#ifdef KELVIN_INSTRUMENTS
 		      if (dump_file)
 			{
 			  fprintf (dump_file,
@@ -2789,11 +2806,12 @@ constrain_operands (int strict, alternative_mask alternatives)
 			  fprintf (dump_file,
 				   "cn: %d, cl: %d, offset: %d, mode: %d\n",
 				   cn, cl, offset, mode);
-			  fprintf (dump_file,
-				   "reg_fits_class_p () returns %d\n",
-				   reg_fits_class_p (op, cl, offset, mode));
+			  if (REG_P (op))
+			    fprintf (dump_file,
+				     "reg_fits_class_p () returns %d\n",
+				     reg_fits_class_p (op, cl, offset, mode));
 			}
-
+#endif
 		      if (strict < 0
 			  || (strict == 0
 			      && REG_P (op)
@@ -2802,19 +2820,28 @@ constrain_operands (int strict, alternative_mask alternatives)
 			  || (REG_P (op)
 			      && reg_fits_class_p (op, cl, offset, mode)))
 		        win = 1;
+#ifdef KELVIN_INSTRUMENTS
 		      if (dump_file)
 			fprintf (dump_file,
 				 "default constraint cl != NO_REGS, win: %d\n",
 				 win);
+#endif
 		    }
 
-		  else if (constraint_satisfied_p (op, cn)) {
+		  else if (constraint_satisfied_p (op, cn))
+#ifdef KELVIN_INSTRUMENTS
+		    {
+		      win = 1;
+		      if (dump_file)
+			fprintf (dump_file,
+				 "default constraint cl == NO_REGS "
+				 " and constraint_satisfied_p, win: %d\n",
+				 win);
+		    }
+#else
 		    win = 1;
-		    if (dump_file)
-		      fprintf (dump_file,
-			       "default constraint cl == NO_REGS "
-			       " and constraint_satisfied_p, win: %d\n", win);
-		  }
+
+#endif
 		  else if (insn_extra_memory_constraint (cn)
 			   /* Every memory operand can be reloaded to fit.  */
 			   && ((strict < 0 && MEM_P (op))
@@ -2828,20 +2855,26 @@ constrain_operands (int strict, alternative_mask alternatives)
 			       /* During reload, accept a pseudo  */
 			       || (reload_in_progress && REG_P (op)
 				   && REGNO (op) >= FIRST_PSEUDO_REGISTER)))
+#ifdef KELVIN_INSTRUMENTS
 		    {
 		      win = 1;
 		      if (dump_file)
 			fprintf (dump_file,
 				 "default constraint wins by reload\n");
 		    }
+#else
+		    win = 1;
+#endif
 		  else if (insn_extra_address_constraint (cn)
 			   /* Every address operand can be reloaded to fit.  */
 			   && strict < 0)
 		    {
 		      win = 1;
+#ifdef KELVIN_INSTRUMENTS
 		      if (dump_file)
 			fprintf (dump_file,
 				 "default constraint wins by extra addr\n");
+#endif
 		    }
 		  /* Cater to architectures like IA-64 that define extra memory
 		     constraints without using define_memory_constraint.  */
@@ -2852,12 +2885,16 @@ constrain_operands (int strict, alternative_mask alternatives)
 			   && reg_equiv_mem (REGNO (op)) != 0
 			   && constraint_satisfied_p
 			      (reg_equiv_mem (REGNO (op)), cn))
+#ifdef KELVIN_INSTRUMENTS
 		    {
 		      win = 1;
 		      if (dump_file)
 			fprintf (dump_file,
 				 "default constraint wins by specialness\n");
 		    }
+#else
+		    win = 1;
+#endif
 		  else
 		    {
 		      if (dump_file)
@@ -2874,6 +2911,7 @@ constrain_operands (int strict, alternative_mask alternatives)
 	  if (! win)
 	    lose = 1;
 
+#ifdef KELVIN_INSTRUMENTS
 	  if (dump_file)
 	    {
 	      fprintf (dump_file, "after examining constraints for opno %d\n",
@@ -2881,12 +2919,14 @@ constrain_operands (int strict, alternative_mask alternatives)
 	      fprintf (dump_file, " constraints is %s\n", p);
 	      fprintf (dump_file, " win is %d, lose is %d\n", win, lose);
 	    }
+#endif
 	}
 
+#ifdef KELVIN_INSTRUMENTS
       if (dump_file)
 	fprintf (dump_file, "... might return true if !lose (%d)\n",
 		 lose);
-
+#endif
       /* This alternative won; the operands are ok.
 	 Change whichever operands this alternative says to change.  */
       if (! lose)
@@ -2918,10 +2958,11 @@ constrain_operands (int strict, alternative_mask alternatives)
 						   recog_data.operand[eopno]))
 		    lose = 1;
 
+#ifdef KELVIN_INSTRUMENTS
 	  if (dump_file)
 	    fprintf (dump_file, "... might return true if still !lose (%d)\n",
 		     lose);
-
+#endif
 	  if (! lose)
 	    {
 	      while (--funny_match_index >= 0)
@@ -2946,11 +2987,15 @@ constrain_operands (int strict, alternative_mask alternatives)
 			  if (strchr (recog_data.constraints[opno], '<') == NULL
 			      && strchr (recog_data.constraints[opno], '>')
 				 == NULL)
+#ifdef KELVIN_INSTRUMENTS
 			    {
 			      if (dump_file)
 				fprintf (dump_file, " ... fail with <>\n");
 			      return 0;
 			    }
+#else
+			    return 0;
+#endif
 			  break;
 			default:
 			  break;
@@ -2965,12 +3010,13 @@ constrain_operands (int strict, alternative_mask alternatives)
     }
   while (which_alternative < recog_data.n_alternatives);
 
+#ifdef KELVIN_INSTRUMENTS
   if (dump_file)
     {
       fprintf (dump_file, "Failing from constrain_operands, strict is %d\n",
 	       strict);
     }
-
+#endif
   which_alternative = -1;
   /* If we are about to reject this, but we are not to test strictly,
      try a very loose test.  Only return failure if it fails also.  */

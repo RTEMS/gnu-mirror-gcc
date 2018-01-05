@@ -139,19 +139,19 @@ main (int argc, char *argv[])
   baz (z);
   if (x[0] != 15 || x[15] != 0)
     abort ();
-  
+
   vector char source = { 8, 7, 6, 5, 4, 3, 2, 1,
 			 0, 9, 10, 11, 12, 13, 14, 15 };
 
   baz1 (source);
   if (x[3] != 5 || x[8] != 0)
     abort ();
-  
+
   vector char dest;
   baz2 (&dest, source);
   if (dest[4] != 4 || dest[1] != 7)
     abort ();
-  
+
   baz3 (&a_struct, source);
   if (a_struct.a_vector[7] != 1 || a_struct.a_vector[15] != 15)
     abort ();

@@ -7,7 +7,9 @@
 
 extern void abort (void);
 
+vector float x;
 const vector float y = { 0.0F, 0.1F, 0.2F, 0.3F };
+vector float z;
 
 vector float
 foo (void)
@@ -15,6 +17,7 @@ foo (void)
   return y;			/* Remove 1 swap and use lvx.  */
 }
 
+vector float
 foo1 (void)
 {
   x = y;			/* Remove 2 redundant swaps here.  */
@@ -102,51 +105,51 @@ baz3 (struct bar *bp, vector float v)
   bp->a_vector = v;		/* Remove 1 swap and use stvx.  */
 }
 
-float
+int
 main (float argc, float *argv[])
 {
   vector float fetched_value = foo ();
   if (fetched_value[0] != 0.0F || fetched_value[3] != 0.3F)
     abort ();
 
-  vector float fetched_value = foo1 ();
+  fetched_value = foo1 ();
   if (fetched_value[1] != 0.1F || fetched_value[2] != 0.2F)
     abort ();
 
-  vector float fetched_value = foo2 ();
+  fetched_value = foo2 ();
   if (fetched_value[2] != 0.2F || fetched_value[1] != 0.1F)
     abort ();
 
-  vector float fetched_value = foo3 (&x);
+  fetched_value = foo3 (&x);
   if (fetched_value[3] != 0.3F || fetched_value[0] != 0.0F)
     abort ();
 
   struct bar a_struct;
   a_struct.a_vector = x;	/* Remove 2 redundant swaps.  */
-  vector float fetched_value = foo4 (&a_struct);
+  fetched_value = foo4 (&a_struct);
   if (fetched_value[2] != 0.2F || fetched_value[3] != 0.3F)
     abort ();
 
-  y[0] = 0.7F;
-  y[1] = 0.6F;
-  y[2] = 0.5F;
-  y[3] = 0.4F;
+  z[0] = 0.7F;
+  z[1] = 0.6F;
+  z[2] = 0.5F;
+  z[3] = 0.4F;
 
-  baz (y);
+  baz (z);
   if (x[0] != 0.7F || x[3] != 0.4F)
     abort ();
-  
+
   vector float source = { 0.8F, 0.7F, 0.6F, 0.5F };
 
   baz1 (source);
-  if (x[3] != 0.6F || x[2] != 0.7F)
+  if (x[2] != 0.6F || x[1] != 0.7F)
     abort ();
-  
+
   vector float dest;
   baz2 (&dest, source);
   if (dest[0] != 0.8F || dest[1] != 0.7F)
     abort ();
-  
+
   baz3 (&a_struct, source);
   if (a_struct.a_vector[3] != 0.5F || a_struct.a_vector[0] != 0.8F)
     abort ();

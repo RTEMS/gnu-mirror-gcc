@@ -269,6 +269,14 @@ get_elimination (rtx reg)
     = eliminable_reg_rtx[hard_regno];
   lra_assert (self_elim_table.from_rtx != NULL);
   self_elim_table.offset = offset;
+#ifdef KELVIN_DEBUG
+  if (lra_dump_file) {
+    fprintf (lra_dump_file, "setting self_elim_table.offset to %ld for ",
+	     offset);
+    print_inline_rtx (lra_dump_file, reg, 2);
+    fprintf (lra_dump_file, "\n");
+  }
+#endif
   return &self_elim_table;
 }
 
@@ -322,8 +330,9 @@ move_plus_up (rtx x)
 
    If we make full substitution to SP for non-null INSN, add the insn
    sp offset.  */
+
 rtx
-lra_eliminate_regs_1 (rtx_insn *insn, rtx x, machine_mode mem_mode,
+lra_eliminate_regs_1x (rtx_insn *insn, rtx x, machine_mode mem_mode,
 		      bool subst_p, bool update_p,
 		      HOST_WIDE_INT update_sp_offset, bool full_p)
 {
@@ -339,6 +348,24 @@ lra_eliminate_regs_1 (rtx_insn *insn, rtx x, machine_mode mem_mode,
   if (! current_function_decl)
     return x;
 
+#ifdef KELVIN_DEBUG
+  /* this code is causing an ICE in certain regression tests, 
+   *  e.g. dump-noaddr.c
+  if (lra_dump_file) {
+    fprintf (lra_dump_file,
+	     "lra_eliminate_regs_1 (mem_mode: %d, subst_p: %d, update_p: %d",
+	     mem_mode, subst_p, update_p);
+    fprintf (lra_dump_file, ", update_sp_offset: %ld, full_p: %d)\n",
+	     update_sp_offset, full_p);
+    fprintf (lra_dump_file, "insn: ");
+    print_inline_rtx (lra_dump_file, insn, 2);
+    fprintf (lra_dump_file, "\nx: ");
+    print_inline_rtx (lra_dump_file, x, 2);
+    fprintf (lra_dump_file, "\n");
+  }
+  */
+#endif
+  
   switch (code)
     {
     CASE_CONST_ANY:
@@ -360,6 +387,19 @@ lra_eliminate_regs_1 (rtx_insn *insn, rtx x, machine_mode mem_mode,
 	{
 	  rtx to = subst_p ? ep->to_rtx : ep->from_rtx;
 
+#ifdef KELVIN_DEBUG
+	  if (lra_dump_file) {
+	    fprintf (lra_dump_file, "handling REG, to_rtx: ");
+	    print_inline_rtx (lra_dump_file, ep->to_rtx, 2);
+	    fprintf (lra_dump_file, "\nfrom_rtx: ");
+	    print_inline_rtx (lra_dump_file, ep->from_rtx, 2);
+	    fprintf (lra_dump_file, "\nep->offset: %ld\n", ep->offset);
+	    fprintf (lra_dump_file, "stack_pointer_rtx: ");
+	    print_inline_rtx (lra_dump_file, stack_pointer_rtx, 2);
+	    fprintf (lra_dump_file, "\n(insn)->sp_offset: %ld\n",
+		     lra_get_insn_recog_data (insn)->sp_offset);
+	  }
+#endif
 	  if (update_sp_offset != 0)
 	    {
 	      if (ep->to_rtx == stack_pointer_rtx)
@@ -389,7 +429,17 @@ lra_eliminate_regs_1 (rtx_insn *insn, rtx x, machine_mode mem_mode,
 	    {
 	      HOST_WIDE_INT offset;
 	      rtx to = subst_p ? ep->to_rtx : ep->from_rtx;
-
+#ifdef KELVIN_DEBUG
+	      if (lra_dump_file) {
+		fprintf (lra_dump_file, "... handling PLUS\n");
+		fprintf (lra_dump_file, "    ep: ");
+		fprintf (lra_dump_file, "%s eliminate %d to %d (offset=" 
+			 HOST_WIDE_INT_PRINT_DEC
+			 ", prev_offset=" HOST_WIDE_INT_PRINT_DEC ")\n",
+			 ep->can_eliminate ? "Can" : "Can't",
+			 ep->from, ep->to, ep->offset, ep->previous_offset);
+	      }
+#endif
 	      if (! update_p && ! full_p)
 		return gen_rtx_PLUS (Pmode, to, XEXP (x, 1));
 	      
@@ -398,8 +448,25 @@ lra_eliminate_regs_1 (rtx_insn *insn, rtx x, machine_mode mem_mode,
 	      else
 		offset = (update_p
 			  ? ep->offset - ep->previous_offset : ep->offset);
+
+#ifdef KELVIN_DEBUG
+	      if (lra_dump_file) {
+		fprintf (lra_dump_file, " first stage offset: %ld\n", offset);
+		fprintf (lra_dump_file, " stack_pointer_rtx: ");
+		print_inline_rtx (lra_dump_file, stack_pointer_rtx, 2);
+		fprintf (lra_dump_file, "\n");
+		fprintf (lra_dump_file,
+			 "lra_get_insn_recog_data (insn)->sp_offset: %ld\n",
+			 lra_get_insn_recog_data (insn)->sp_offset);
+	      }
+#endif
 	      if (full_p && insn != NULL_RTX && ep->to_rtx == stack_pointer_rtx)
 		offset -= lra_get_insn_recog_data (insn)->sp_offset;
+
+#ifdef KELVIN_DEBUG
+	      if (lra_dump_file)
+		fprintf (lra_dump_file, "reworking sum to %ld\n", offset);
+#endif
 	      if (CONST_INT_P (XEXP (x, 1)) && INTVAL (XEXP (x, 1)) == -offset)
 		return to;
 	      else
@@ -699,6 +766,24 @@ lra_eliminate_regs_1 (rtx_insn *insn, rtx x, machine_mode mem_mode,
   return x;
 }
 
+rtx
+lra_eliminate_regs_1 (rtx_insn *insn, rtx x, machine_mode mem_mode,
+		      bool subst_p, bool update_p,
+		      HOST_WIDE_INT update_sp_offset, bool full_p)
+{
+  rtx result = lra_eliminate_regs_1x (insn, x, mem_mode,
+				      subst_p, update_p,
+				      update_sp_offset, full_p);
+#ifdef KELVIN_DEBUG
+  if (lra_dump_file) {
+    fprintf (lra_dump_file, " returning from lra_eliminate_regs_1 with\n");
+    print_inline_rtx (lra_dump_file, result, 2);
+    fprintf (lra_dump_file, "\n");
+  }
+#endif
+  return result;
+}
+
 /* This function is used externally in subsequent passes of GCC.  It
    always does a full elimination of X.	 */
 rtx
@@ -747,12 +832,33 @@ mark_not_eliminable (rtx x, machine_mode mem_mode)
 	     them.  */
 	  size = PUSH_ROUNDING (size);
 #endif
-	  if (code == PRE_DEC || code == POST_DEC)
+	  if (code == PRE_DEC || code == POST_DEC) {
 	    curr_sp_change -= size;
-	  else if (code == PRE_INC || code == POST_INC)
+#ifdef KELVIN_DEBUG
+	    if (lra_dump_file)
+	      fprintf (lra_dump_file,
+		       "mark_non-eliminable decr by %d to %ld\n",
+		       size, curr_sp_change);
+#endif
+	  }
+	  else if (code == PRE_INC || code == POST_INC) {
 	    curr_sp_change += size;
-	  else if (code == PRE_MODIFY || code == POST_MODIFY)
+#ifdef KELVIN_DEBUG
+	    if (lra_dump_file)
+	      fprintf (lra_dump_file,
+		       "mark_non-eliminable incr by %d to %ld\n",
+		       size, curr_sp_change);
+#endif
+	  }
+	  else if (code == PRE_MODIFY || code == POST_MODIFY) {
 	    curr_sp_change += INTVAL (XEXP (XEXP (x, 1), 1));
+#ifdef KELVIN_DEBUG
+	    if (lra_dump_file)
+	      fprintf (lra_dump_file,
+		       "mark_non-eliminable modify by %ld to %ld\n",
+		       INTVAL (XEXP (XEXP (x, 1), 1)), curr_sp_change);
+#endif
+	  }
 	}
       else if (REG_P (XEXP (x, 0))
 	       && REGNO (XEXP (x, 0)) >= FIRST_PSEUDO_REGISTER)
@@ -805,6 +911,12 @@ mark_not_eliminable (rtx x, machine_mode mem_mode)
 	  && CONST_INT_P (XEXP (SET_SRC (x), 1)))
 	{
 	  curr_sp_change += INTVAL (XEXP (SET_SRC (x), 1));
+#ifdef KELVIN_DEBUG
+	  if (lra_dump_file)
+	    fprintf (lra_dump_file,
+		     "mark_non-eliminable mangle by %ld to %ld\n",
+		     INTVAL (XEXP (SET_SRC (x), 1)), curr_sp_change);
+#endif
 	  return;
 	}
       if (! REG_P (SET_DEST (x))
@@ -1150,6 +1262,7 @@ spill_pseudos (HARD_REG_SET set)
 
   if (hard_reg_set_empty_p (set))
     return;
+#ifdef KELVIN_DEBUG
   if (lra_dump_file != NULL)
     {
       fprintf (lra_dump_file, "	   Spilling non-eliminable hard regs:");
@@ -1158,6 +1271,7 @@ spill_pseudos (HARD_REG_SET set)
 	  fprintf (lra_dump_file, " %d", i);
       fprintf (lra_dump_file, "\n");
     }
+#endif
   bitmap_initialize (&to_process, &reg_obstack);
   for (i = FIRST_PSEUDO_REGISTER; i < max_reg_num (); i++)
     if (lra_reg_info[i].nrefs != 0 && reg_renumber[i] >= 0
@@ -1186,7 +1300,7 @@ spill_pseudos (HARD_REG_SET set)
    insns to INSNS_WITH_CHANGED_OFFSETS containing eliminable hard
    registers whose offsets should be changed.  Return true if any
    elimination offset changed.  */
-static bool
+/*static*/ bool
 update_reg_eliminate (bitmap insns_with_changed_offsets)
 {
   bool prev, result;
@@ -1195,6 +1309,13 @@ update_reg_eliminate (bitmap insns_with_changed_offsets)
 
   targetm.compute_frame_layout ();
 
+#ifdef KELVIN_DEBUG
+  if (lra_dump_file) {
+    fprintf (lra_dump_file,
+	     "update_reg_eliminate after compute_frame_layout\n");
+    print_elim_table (lra_dump_file);
+  }
+#endif
   /* Clear self elimination offsets.  */
   for (ep = reg_eliminate; ep < &reg_eliminate[NUM_ELIMINABLE_REGS]; ep++)
     self_elim_offsets[ep->from] = 0;
@@ -1205,6 +1326,12 @@ update_reg_eliminate (bitmap insns_with_changed_offsets)
       if (elimination_map[ep->from] == ep)
 	ep->previous_offset = ep->offset;
 
+#ifdef KELVIN_DEBUG
+      if (lra_dump_file) {
+	fprintf (lra_dump_file, "A\n");
+	print_elim_table (lra_dump_file);
+      }
+#endif
       prev = ep->prev_can_eliminate;
       setup_can_eliminate (ep, targetm.can_eliminate (ep->from, ep->to));
       if (ep->can_eliminate && ! prev)
@@ -1216,14 +1343,22 @@ update_reg_eliminate (bitmap insns_with_changed_offsets)
 	  setup_can_eliminate (ep, false);
 	  continue;
 	}
+#ifdef KELVIN_DEBUG
+      if (lra_dump_file) {
+	fprintf (lra_dump_file, "B\n");
+	print_elim_table (lra_dump_file);
+      }
+#endif
       if (ep->can_eliminate != prev && elimination_map[ep->from] == ep)
 	{
 	  /* We cannot use this elimination anymore -- find another
 	     one.  */
+#ifdef KELVIN_DEBUG
 	  if (lra_dump_file != NULL)
 	    fprintf (lra_dump_file,
 		     "	Elimination %d to %d is not possible anymore\n",
 		     ep->from, ep->to);
+#endif
 	  /* If after processing RTL we decides that SP can be used as
 	     a result of elimination, it can not be changed.  */
 	  gcc_assert ((ep->to_rtx != stack_pointer_rtx)
@@ -1234,11 +1369,20 @@ update_reg_eliminate (bitmap insns_with_changed_offsets)
 	  for (ep1 = ep + 1; ep1 < &reg_eliminate[NUM_ELIMINABLE_REGS]; ep1++)
 	    if (ep1->can_eliminate && ep1->from == ep->from)
 	      break;
+
+#ifdef KELVIN_DEBUG
+	  if (lra_dump_file) {
+	    fprintf (lra_dump_file, "C\n");
+	    print_elim_table (lra_dump_file);
+	  }
+#endif
 	  if (ep1 < &reg_eliminate[NUM_ELIMINABLE_REGS])
 	    {
+#ifdef KELVIN_DEBUG
 	      if (lra_dump_file != NULL)
 		fprintf (lra_dump_file, "    Using elimination %d to %d now\n",
 			 ep1->from, ep1->to);
+#endif
 	      lra_assert (ep1->previous_offset == 0);
 	      ep1->previous_offset = ep->offset;
 	    }
@@ -1247,9 +1391,11 @@ update_reg_eliminate (bitmap insns_with_changed_offsets)
 	      /* There is no elimination anymore just use the hard
 		 register `from' itself.  Setup self elimination
 		 offset to restore the original offset values.	*/
+#ifdef KELVIN_DEBUG
 	      if (lra_dump_file != NULL)
 		fprintf (lra_dump_file, "    %d is not eliminable at all\n",
 			 ep->from);
+#endif
 	      self_elim_offsets[ep->from] = -ep->offset;
 	      if (ep->offset != 0)
 		bitmap_ior_into (insns_with_changed_offsets,
@@ -1257,8 +1403,28 @@ update_reg_eliminate (bitmap insns_with_changed_offsets)
 	    }
 	}
 
+#ifdef KELVIN_DEBUG
+      if (lra_dump_file) {
+	fprintf (lra_dump_file, "D\n");
+	print_elim_table (lra_dump_file);
+      }
+#endif
       INITIAL_ELIMINATION_OFFSET (ep->from, ep->to, ep->offset);
+
+#ifdef KELVIN_DEBUG
+      if (lra_dump_file) {
+	fprintf (lra_dump_file, "E\n");
+	print_elim_table (lra_dump_file);
+      }
+#endif
     }
+#ifdef KELVIN_DEBUG
+  if (lra_dump_file) {
+    fprintf (lra_dump_file,
+	     "update_reg_eliminate b4 setup_elimination_table\n");
+    print_elim_table (lra_dump_file);
+  }
+#endif
   setup_elimination_map ();
   result = false;
   CLEAR_HARD_REG_SET (temp_hard_reg_set);
@@ -1285,7 +1451,19 @@ update_reg_eliminate (bitmap insns_with_changed_offsets)
       }
   IOR_HARD_REG_SET (lra_no_alloc_regs, temp_hard_reg_set);
   AND_COMPL_HARD_REG_SET (eliminable_regset, temp_hard_reg_set);
+#ifdef KELVIN_DEBUG
+  if (lra_dump_file) {
+    fprintf (lra_dump_file, "update_reg_eliminate b4 spill_pseudos\n");
+    print_elim_table (lra_dump_file);
+  }
+#endif
   spill_pseudos (temp_hard_reg_set);
+#ifdef KELVIN_DEBUG
+  if (lra_dump_file) {
+    fprintf (lra_dump_file, "update_reg_eliminate after spill_pseudos\n");
+    print_elim_table (lra_dump_file);
+  }
+#endif
   return result;
 }
 
@@ -1349,11 +1527,22 @@ init_elimination (void)
   FOR_EACH_BB_FN (bb, cfun)
     {
       curr_sp_change = 0;
+#ifdef KELVIN_DEBUG
+      if (lra_dump_file)
+	fprintf (lra_dump_file,
+		 "init_elimination setting curr_sp_change to 0\n");
+#endif
       stop_to_sp_elimination_p = false;
       FOR_BB_INSNS (bb, insn)
 	if (INSN_P (insn))
 	  {
 	    lra_get_insn_recog_data (insn)->sp_offset = curr_sp_change;
+#ifdef KELVIN_DEBUG
+	    if (lra_dump_file)
+	      fprintf (lra_dump_file,
+		       "init_elimination setting sp_offset to %ld\n",
+		       curr_sp_change);
+#endif
 	    if (NONDEBUG_INSN_P (insn))
 	      {
 		mark_not_eliminable (PATTERN (insn), VOIDmode);
@@ -1370,7 +1559,14 @@ init_elimination (void)
 	    setup_can_eliminate (ep, false);
     }
   setup_elimination_map ();
+#ifdef KELVIN_DEBUG
+  if (lra_dump_file) {
+    fprintf (lra_dump_file, "At end of init_elimination, table is\n");
+    print_elim_table (lra_dump_file);
+  }
+#endif
 }
+
 
 /* Eliminate hard reg given by its location LOC.  */
 void
@@ -1427,10 +1623,23 @@ lra_eliminate (bool final_p, bool first_p)
 
   timevar_push (TV_LRA_ELIMINATE);
 
+#ifdef KELVIN_DEBUG
+  if (lra_dump_file)
+    fprintf (lra_dump_file, "lra_eliminate (%d, %d)\n", final_p, first_p);
+#endif
+
   if (first_p)
     init_elimination ();
 
   bitmap_initialize (&insns_with_changed_offsets, &reg_obstack);
+
+#ifdef KELVIN_DEBUG
+  if (lra_dump_file) {
+    fprintf (lra_dump_file, "In lra_eliminate, after bitmap_initialize\n");
+    print_elim_table (lra_dump_file);
+  }
+#endif
+
   if (final_p)
     {
       if (flag_checking)
@@ -1438,6 +1647,12 @@ lra_eliminate (bool final_p, bool first_p)
 	  update_reg_eliminate (&insns_with_changed_offsets);
 	  gcc_assert (bitmap_empty_p (&insns_with_changed_offsets));
 	}
+#ifdef KELVIN_DEBUG
+      if (lra_dump_file) {
+        fprintf (lra_dump_file, "In middle of lra_eliminate\n");
+        print_elim_table (lra_dump_file);
+      }
+#endif
       /* We change eliminable hard registers in insns so we should do
 	 this for all insns containing any eliminable hard
 	 register.  */
@@ -1448,11 +1663,13 @@ lra_eliminate (bool final_p, bool first_p)
     }
   else if (! update_reg_eliminate (&insns_with_changed_offsets))
     goto lra_eliminate_done;
+#ifdef KELVIN_DEBUG
   if (lra_dump_file != NULL)
     {
       fprintf (lra_dump_file, "New elimination table:\n");
       print_elim_table (lra_dump_file);
     }
+#endif
   EXECUTE_IF_SET_IN_BITMAP (&insns_with_changed_offsets, 0, uid, bi)
     /* A dead insn can be deleted in process_insn_for_elimination.  */
     if (lra_insn_recog_data[uid] != NULL)

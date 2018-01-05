@@ -7,7 +7,9 @@
 
 extern void abort (void);
 
+vector short x;
 const vector short y = { 0, 1, 2, 3, 4, 5, 6, 7 };
+vector short z;
 
 vector short
 foo (void)
@@ -15,6 +17,7 @@ foo (void)
   return y;			/* Remove 1 swap and use lvx.  */
 }
 
+vector short
 foo1 (void)
 {
   x = y;			/* Remove 2 redundant swaps here.  */
@@ -109,42 +112,42 @@ main (int argc, short *argv[])
   if (fetched_value[0] != 0 || fetched_value[7] != 7)
     abort ();
 
-  vector short fetched_value = foo1 ();
+  fetched_value = foo1 ();
   if (fetched_value[1] != 1 || fetched_value[6] != 6)
     abort ();
 
-  vector short fetched_value = foo2 ();
+  fetched_value = foo2 ();
   if (fetched_value[2] != 2 || fetched_value[5] != 5)
     abort ();
 
-  vector short fetched_value = foo3 (&x);
+  fetched_value = foo3 (&x);
   if (fetched_value[3] != 3 || fetched_value[4] != 4)
     abort ();
 
   struct bar a_struct;
   a_struct.a_vector = x;	/* Remove 2 redundant swaps.  */
-  vector short fetched_value = foo4 (&a_struct);
+  fetched_value = foo4 (&a_struct);
   if (fetched_value[4] != 4 || fetched_value[3] != 3)
     abort ();
 
   for (int i = 0; i < 8; i++)
-    y[i] = 7 - i;
+    z[i] = 7 - i;
 
-  baz (y);
+  baz (z);
   if (x[0] != 7 || x[7] != 0)
     abort ();
-  
+
   vector short source = { 8, 7, 6, 5, 4, 3, 2, 1 };
 
   baz1 (source);
   if (x[3] != 5 || x[7] != 1)
     abort ();
-  
+
   vector short dest;
   baz2 (&dest, source);
   if (dest[4] != 4 || dest[1] != 7)
     abort ();
-  
+
   baz3 (&a_struct, source);
   if (a_struct.a_vector[7] != 1 || a_struct.a_vector[5] != 3)
     abort ();
