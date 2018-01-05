@@ -5890,23 +5890,39 @@ fi
 # double type can only be switched on powerpc64 bit Linux systems where VSX is
 # supported.  Other PowerPC systems do not build the IEEE 128-bit emulator in
 # liggcc.
+
+# We don't allow it on big endian systems because it gets complicated to make
+# 32/64-bit multilibs work with ieee/ibm multilibs, In addition, the IEEE
+# emulator is only built if the default cpu is power7 or greater.
+
 AC_ARG_WITH([long-double-format],
   [AS_HELP_STRING([--with-long-double-format={ieee,ibm}]
 		  [Specify whether PowerPC long double uses IEEE or IBM format])],[
-case "$target:$with_cpu:$with_long_double_format" in
-  powerpc*-*-linux*:power[789]:ieee | powerpc*-*-linux*:power[1-9][0-9]+:ieee | \
-  powerpc*-*-linux*:power[789]:ibm | powerpc*-*-linux*:power[1-9][0-9]+:ibm | \
-  powerpc64le-*-linux*:*:ieee | powerpc64le-*-linux*:*:ibm)
-    ;;
-  powerpc*-*-linux*:power[789]:* | powerpc*-*-linux*:power[1-9][0-9]+:* | \
-  powerpc64le-*-linux*:*:*)
-    AC_MSG_ERROR([--with-long-double-format argument should be ibm or ieee])
+case "$with_long_double_format" in
+  ibm | ieee)
+    :
     ;;
   *)
-    AC_MSG_ERROR([Configure option --with-long-double-format is only supported \
-for PowerPC VSX Linux systems])
+    AC_MSG_ERROR([--with-long-double-format argument should be ibm or ieee])
+    with_long_double_format=""
     ;;
-esac],
+esac
+if test x$with_long_double_format != x; then
+  case x"$target" in
+    xpowerpc64le-*-linux*)
+      :
+      ;;
+    *)
+      AC_MSG_ERROR([Configure option --with-long-double-format is only supported \
+for little endian 64-bit PowerPC VSX Linux systems])
+      with_long_double_format=""
+    ;;
+  esac
+fi
+if test x$with_long_double_format != x; then
+  AC_MSG_CHECKING([long-double-format:])
+  AC_MSG_RESULT($with_long_double_format)
+fi],
   [])
 
 # Check if the target LIBC supports exporting the AT_PLATFORM and AT_HWCAP
