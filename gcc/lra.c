@@ -1181,8 +1181,6 @@ lra_update_insn_recog_data (rtx_insn *insn)
     {
       data = lra_get_insn_recog_data (insn);
       /* Initiate or restore SP offset.  */
-      if (lra_dump_file)
-	fprintf (lra_dump_file, "setting sp_offset to %ld\n", sp_offset);
       data->sp_offset = sp_offset;
       return data;
     }
@@ -1815,14 +1813,6 @@ setup_sp_offset (rtx_insn *from, rtx_insn *last)
   rtx_insn *before = next_nonnote_insn_bb (last);
   HOST_WIDE_INT offset = (before == NULL_RTX || ! INSN_P (before)
 			  ? 0 : lra_get_insn_recog_data (before)->sp_offset);
-  if (lra_dump_file) {
-    fprintf (lra_dump_file, "setup_sp_offset with offset: %ld\n", offset);
-    fprintf (lra_dump_file, "from:\n");
-    print_inline_rtx (lra_dump_file, from, 2);
-    fprintf (lra_dump_file, "\nto (inclusive):\n");
-    print_inline_rtx (lra_dump_file, last, 2);
-    fprintf (lra_dump_file, "\n");
-  }
 
   for (rtx_insn *insn = from; insn != NEXT_INSN (last); insn = NEXT_INSN (insn))
     lra_get_insn_recog_data (insn)->sp_offset = offset;

@@ -30,9 +30,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "hash-set.h"
 #include "is-a.h"
 
-#ifdef KELVIN_DEBUG
-static int kelvin_file_no = -1;
-#endif
 
 /* Stubs for GGC referenced through instantiations triggered by hash-map.  */
 void *ggc_internal_cleared_alloc (size_t, void (*)(void *),
@@ -3879,44 +3876,6 @@ public:
   bool parsing_match_operand;
 };
 
-#ifdef KELVIN_DEBUG
-void kelvin_token (const cpp_token *token)
-{
-  if (token->type == CPP_NAME) {
-    write (kelvin_file_no, "CPP_NAME(", 9);
-    const unsigned char *s = CPP_HASHNODE (token->val.node.node)->ident.str;
-    write (kelvin_file_no, s, strlen ((const char *) s));
-    write (kelvin_file_no, ")", 1);
-  } else if (token->type == CPP_STRING) {
-    write (kelvin_file_no, "CPP_STRING(", 11);
-    const unsigned char *s = token->val.str.text;
-    write (kelvin_file_no, s, strlen ((const char *) s));
-    write (kelvin_file_no, ")", 1);
-  } else if (token->type == CPP_NUMBER) {
-    write (kelvin_file_no, "CPP_NUMBER", 10);
-    const unsigned char *s = token->val.str.text;
-    write (kelvin_file_no, s, strlen ((const char *) s));
-    write (kelvin_file_no, ")", 1);
-  } else {
-    const char *name = cpp_type2name (token->type, 0);
-    write (kelvin_file_no, name, strlen (name));
-  }
-}
-
-void
-kelvin_breakpoint_3 (const cpp_token *token)
-{
-  char buffer[32];
-  if (kelvin_file_no < 0)
-    kelvin_file_no = open ("kelvin-genmatch-trace", O_WRONLY | O_CREAT);
-  write (kelvin_file_no, "parser::next: ", 14);
-  kelvin_token (token);
-  sprintf (buffer, "@ %x", token->src_loc);
-  write (kelvin_file_no, buffer, strlen (buffer));
-  write (kelvin_file_no, "\n", 1);
-}
-#endif
-
 /* Lexing helpers.  */
 
 /* Read the next non-whitespace token from R.  */
@@ -3928,28 +3887,10 @@ parser::next ()
   do
     {
       token = cpp_get_token (r);
-#ifdef KELVIN_DEBUG
-      kelvin_breakpoint_3 (token);
-#endif
     }
   while (token->type == CPP_PADDING);
   return token;
 }
-
-#ifdef KELVIN_DEBUG
-void
-kelvin_breakpoint_2 (const cpp_token *token)
-{
-  char buffer[32];
-  if (kelvin_file_no < 0)
-    kelvin_file_no = open ("kelvin-genmatch-trace", O_WRONLY | O_CREAT);
-  write (kelvin_file_no, "parser::peek: ", 14);
-  kelvin_token (token);
-  sprintf (buffer, "@ %x", token->src_loc);
-  write (kelvin_file_no, buffer, strlen (buffer));
-  write (kelvin_file_no, "\n", 1);
-}
-#endif
 
 /* Peek at the next non-whitespace token from R.  */
 
@@ -3961,9 +3902,6 @@ parser::peek (unsigned num)
   do
     {
       token = cpp_peek_token (r, i++);
-#ifdef KELVIN_DEBUG
-      kelvin_breakpoint_2 (token);
-#endif
     }
   while (token->type == CPP_PADDING
 	 || (--num > 0));
@@ -3995,33 +3933,12 @@ parser::peek_ident (const char *id, unsigned num)
   return 0;
 }
 
-#ifdef KELVIN_DEBUG
-void kelvin_breakpoint(enum cpp_ttype tk, const cpp_token *token)
-{
-  char buffer[32];
-  if (kelvin_file_no < 0)
-    kelvin_file_no = open ("kelvin-genmatch-trace", O_WRONLY | O_CREAT);
-
-  write (kelvin_file_no, "parser::expect token: ", 22);
-  kelvin_token (token);
-  sprintf (buffer, "@ %x", token->src_loc);
-  write (kelvin_file_no, buffer, strlen (buffer));
-  write (kelvin_file_no, ", expected: ", 12);
-  const char *name = cpp_type2name (tk, 0);
-  write (kelvin_file_no, name, strlen (name));
-  write (kelvin_file_no, "\n", 1);
-}
-#endif
-
 /* Read the next token from R and assert it is of type TK.  */
 
 const cpp_token *
 parser::expect (enum cpp_ttype tk)
 {
   const cpp_token *token = next ();
-#ifdef KELVIN_DEBUG
-  kelvin_breakpoint (tk, token);
-#endif
   if (token->type != tk)
     fatal_at (token, "expected %s, got %s",
 	      cpp_type2name (tk, 0), cpp_type2name (token->type, 0));

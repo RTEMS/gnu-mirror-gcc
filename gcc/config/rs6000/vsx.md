@@ -432,21 +432,6 @@
 {
   rtx mem = operands[1];
 
-  if (dump_file) {
-    fprintf (dump_file,
-	     \"*vsx_le_perm_load_<mode> for doubles, alignment %d\n\",
-	     MEM_ALIGN (mem));
-    fprintf (dump_file,
-	     \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
-    print_inline_rtx (dump_file, mem, 2);
-    fprintf (dump_file, \"\n\");
-
-    fprintf (dump_file, \"REGNO(operands[0]) is %d\n\", 
-             reg_or_subregno (operands[0]));
-    if (reg_renumber != NULL)
-      fprintf (dump_file, \"reg_renumber[REGNO(operands[0])] is %d\n\",
-	       reg_renumber[REGNO(operands[0])]);
-  }
   /* Don't apply the swap optimization if we've already performed register
      allocation and the hard register destination is not in the altivec
      range.  */
@@ -454,74 +439,24 @@
       && ((reg_or_subregno (operands[0]) >= FIRST_PSEUDO_REGISTER)
 	  || ALTIVEC_REGNO_P (reg_or_subregno (operands[0]))))
     {
-      /* this pattern shows up in several different contexts.
-         I need to parse the comment and the code...  Are they equivalent?
-           (MEM_ALIGN (mem) >= 128) means the optimization might be relevant.
-           (REGNO(operands[0]) >= FIRST_PSEUDO_REGISTER)
-             means operands[0] has not yet been assigned to a
-             physical register - it is a pseudo-register.
-           (ALTIVEC_REGNO_P (REGNO(operands[0])))
-             means operands[0] (which is known by short-circuit evaluation
-             to be a physical register) is in the altivec range.
-       */
-
-       /* kelvin thinks the comment does not match the implementation,
-          the reason being that
-       	   REGNO(operands[0]) >= FIRST_PSEUDO_REGISTER
-	  does not always mean we have not performed register
-          allocation.  My guess is the problem I'm seeing on
-          p8vector-int128.c is that this test succeeds but
-          reg_renumber[pseudo_reg] is > 0 */
-
-      if (dump_file)
-        {
-          fprintf (dump_file,
-		   \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
-	  print_inline_rtx (dump_file, mem, 2);
-	  fprintf (dump_file, \"\n\");
-
-	  fprintf (dump_file, \"reg_or_subregno (operands[0]) is %d\n\",
-	  	   reg_or_subregno (operands[0]));
-	  if (reg_renumber != NULL)
- 	    fprintf (dump_file, \"reg_renumber[REGNO(operands[0])] is %d\n\",
-		     reg_renumber[REGNO(operands[0])]);
-        }
-
       rtx mem_address = XEXP (mem, 0);
-
-      if (dump_file)
-        {
-	  fprintf (dump_file, \"memory address:\n\");
-	  print_inline_rtx (dump_file, mem_address, 2);
-	  fprintf (dump_file, \"\n\");
-
-	}
-
       enum machine_mode mode = GET_MODE (mem);
 
       if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
         {
-	  if (dump_file)
-            fprintf (dump_file,
-	             \"mem_address is REG_P or sum of two registers\n\");
 	  /* Replace the source memory address with masked address.  */
           rtx lvx_set_expr = rs6000_gen_lvx (mode, operands[0], mem);
 	  emit_insn (lvx_set_expr);
 	  DONE;
         }
-      else if (rs6000_quadword_masked_address_p (mem_address)) 
+      else if (rs6000_quadword_masked_address_p (mem_address))
         {
-	  if (dump_file)
-            fprintf (dump_file, \"base_reg is quad-word-masked address\n\");
 	  /* This rtl is already in the form that matches lvx
 	     instruction, so leave it alone.  */
 	  DONE;
         }
       /* Otherwise, fall through to transform into a swapping load.  */
     }
-  if (dump_file)
-    fprintf (dump_file, \"transforming into a swapping load\n\");
-
   operands[2] = can_create_pseudo_p () ? gen_reg_rtx_and_attrs (operands[0])
                                        : operands[0];
 }
@@ -549,10 +484,6 @@
 {
   rtx mem = operands[1];
 
-  if (dump_file)
-    fprintf (dump_file, \"*vsx_le_perm_load_<mode> for words, alignment %d\n\",
-    	     MEM_ALIGN (mem));
-
   /* Don't apply the swap optimization if we've already performed register
      allocation and the hard register destination is not in the altivec
      range.  */
@@ -561,35 +492,17 @@
 	  || ALTIVEC_REGNO_P (REGNO(operands[0]))))
     {
       rtx mem_address = XEXP (mem, 0);
-
-      if (dump_file)
-        {
-	  fprintf (dump_file,
-		   \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
-	  print_inline_rtx (dump_file, mem, 2);
-	  fprintf (dump_file, \"\n\");
-
-	  fprintf (dump_file, \"memory address:\n\");
-	  print_inline_rtx (dump_file, mem_address, 2);
-	  fprintf (dump_file, \"\n\");
-	}
-
       enum machine_mode mode = GET_MODE (mem);
 
       if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
         {
-	  if (dump_file)
-            fprintf (dump_file,
-	             \"mem_address is REG_P or sum of two registers\n\");
 	  /* Replace the source memory address with masked address.  */
           rtx lvx_set_expr = rs6000_gen_lvx (mode, operands[0], mem);
 	  emit_insn (lvx_set_expr);
 	  DONE;
         }
-      else if (rs6000_quadword_masked_address_p (mem_address)) 
+      else if (rs6000_quadword_masked_address_p (mem_address))
         {
-	  if (dump_file)
-            fprintf (dump_file, \"base_reg is quad-word-masked address\n\");
 	  /* This rtl is already in the form that matches lvx
 	     instruction, so leave it alone.  */
 	  DONE;
@@ -627,10 +540,6 @@
 {
   rtx mem = operands[1];
 
-  if (dump_file)
-    fprintf (dump_file, \"*vsx_le_perm_load_<mode> for halfs, alignment %d\n\",
-    	     MEM_ALIGN (mem));
-
   /* Don't apply the swap optimization if we've already performed register
      allocation and the hard register destination is not in the altivec
      range.  */
@@ -639,35 +548,17 @@
 	  || ALTIVEC_REGNO_P (REGNO(operands[0]))))
     {
       rtx mem_address = XEXP (mem, 0);
-
-      if (dump_file)
-        {
-	  fprintf (dump_file,
-		   \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
-	  print_inline_rtx (dump_file, mem, 2);
-	  fprintf (dump_file, \"\n\");
-
-	  fprintf (dump_file, \"memory address:\n\");
-	  print_inline_rtx (dump_file, mem_address, 2);
-	  fprintf (dump_file, \"\n\");
-	}
-
       enum machine_mode mode = GET_MODE (mem);
 
       if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
         {
-	  if (dump_file)
-            fprintf (dump_file,
-	             \"mem_address is REG_P or sum of two registers\n\");
 	  /* Replace the source memory address with masked address.  */
-          rtx lvx_set_expr = rs6000_gen_lvx (mode, operands[0], mem);
+	  rtx lvx_set_expr = rs6000_gen_lvx (mode, operands[0], mem);
 	  emit_insn (lvx_set_expr);
 	  DONE;
         }
-      else if (rs6000_quadword_masked_address_p (mem_address)) 
+      else if (rs6000_quadword_masked_address_p (mem_address))
         {
-	  if (dump_file)
-            fprintf (dump_file, \"base_reg is quad-word-masked address\n\");
 	  /* This rtl is already in the form that matches lvx
 	     instruction, so leave it alone.  */
 	  DONE;
@@ -713,10 +604,6 @@
 {
   rtx mem = operands[1];
 
-  if (dump_file)
-    fprintf (dump_file, \"*vsx_le_perm_load_<mode> for bytes, alignment %d\n\",
-    	     MEM_ALIGN (mem));
-
   /* Don't apply the swap optimization if we've already performed register
      allocation and the hard register destination is not in the altivec
      range.  */
@@ -725,44 +612,17 @@
 	  || ALTIVEC_REGNO_P (REGNO(operands[0]))))
     {
       rtx mem_address = XEXP (mem, 0);
-
-      if (dump_file)
-        {
-	  fprintf (dump_file,
-		   \"split *vsx_le_perm_load_<mode>, looking at mem exp\n\");
-	  print_inline_rtx (dump_file, mem, 2);
-	  fprintf (dump_file, \"\n\");
-
-	  fprintf (dump_file, \"memory address:\n\");
-	  print_inline_rtx (dump_file, mem_address, 2);
-	  fprintf (dump_file, \"\n\");
-	}
-
       enum machine_mode mode = GET_MODE (mem);
 
       if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
         {
-	  if (dump_file)
-            fprintf (dump_file,
-	             \"mem_address is REG_P or sum of two registers\n\");
 	  /* Replace the source memory address with masked address.  */
-          rtx lvx_set_expr = rs6000_gen_lvx (mode, operands[0], mem);
-
-	  if (dump_file) {
-	    fprintf (dump_file, \"lvx_set_expr is\n\");
-	    print_inline_rtx (dump_file, lvx_set_expr, 2);
-	    fprintf (dump_file, \"\nthe source of set is:\n\");
-	    print_inline_rtx (dump_file, SET_SRC (lvx_set_expr), 2);
-	    fprintf (dump_file, \"\n\");
-	  }
-
+	  rtx lvx_set_expr = rs6000_gen_lvx (mode, operands[0], mem);
 	  emit_insn (lvx_set_expr);
 	  DONE;
         }
-      else if (rs6000_quadword_masked_address_p (mem_address)) 
+      else if (rs6000_quadword_masked_address_p (mem_address))
         {
-	  if (dump_file)
-            fprintf (dump_file, \"base_reg is quad-word-masked address\n\");
 	  /* This rtl is already in the form that matches lvx
 	     instruction, so leave it alone.  */
 	  DONE;
@@ -784,7 +644,6 @@
   [(set_attr "type" "vecstore")
    (set_attr "length" "12")])
 
-;; kelvin fixed this
 (define_split
   [(set (match_operand:VSX_D 0 "memory_operand" "")
         (match_operand:VSX_D 1 "vsx_register_operand" ""))]
@@ -800,37 +659,18 @@
 {
   rtx mem = operands[0];
 
-  if (dump_file)
-    fprintf (dump_file, \"splitting V2DF or V2DI memory store, with alignment %d\n\",
-             MEM_ALIGN (mem));
-
   if (MEM_ALIGN (mem) >= 128)
     {
       rtx mem_address = XEXP (mem, 0);
-      if (dump_file)
-        {
-	  fprintf (dump_file, \"mem expression:\n\");
-	  print_inline_rtx (dump_file, mem, 2);
-	  fprintf (dump_file, \"\n\");
-
-	  fprintf (dump_file, \"memory address\n\");
-	  print_inline_rtx (dump_file, mem_address, 2);
-	  fprintf (dump_file, \"\n\");
-	}
       enum machine_mode mode = GET_MODE (mem);
       if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
 	{
-	  if (dump_file)
-	    fprintf (dump_file,
-		     \"memory address is REG_P or sum of 2 registers\n\");
 	  rtx stvx_set_expr = rs6000_gen_stvx (mode, mem, operands[1]);
 	  emit_insn (stvx_set_expr);
 	  DONE;
 	}
       else if (rs6000_quadword_masked_address_p (mem_address))
 	{
-	  if (dump_file)
-	    fprintf (dump_file, "mem address is quad-word-masked addr\n\");
 	  /* This rtl is already in the form that matches stvx instruction,
 	     so leave it alone.  */
 	  DONE;
@@ -870,7 +710,6 @@
   [(set_attr "type" "vecstore")
    (set_attr "length" "12")])
 
-;; kelvin fixed this
 (define_split
   [(set (match_operand:VSX_W 0 "memory_operand" "")
         (match_operand:VSX_W 1 "vsx_register_operand" ""))]
@@ -888,37 +727,18 @@
 {
   rtx mem = operands[0];
 
-  if (dump_file)
-    fprintf (dump_file, \"splitting V4SF or V4SI memory store, with alignment %d\n\",
-             MEM_ALIGN (mem));
-
   if (MEM_ALIGN (mem) >= 128)
     {
       rtx mem_address = XEXP (mem, 0);
-      if (dump_file)
-        {
-	  fprintf (dump_file, \"mem expression:\n\");
-	  print_inline_rtx (dump_file, mem, 2);
-	  fprintf (dump_file, \"\n\");
-
-	  fprintf (dump_file, \"memory address\n\");
-	  print_inline_rtx (dump_file, mem_address, 2);
-	  fprintf (dump_file, \"\n\");
-	}
       enum machine_mode mode = GET_MODE (mem);
       if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
 	{
-	  if (dump_file)
-	    fprintf (dump_file,
-		     \"memory address is REG_P or sum of 2 registers\n\");
 	  rtx stvx_set_expr = rs6000_gen_stvx (mode, mem, operands[1]);
 	  emit_insn (stvx_set_expr);
 	  DONE;
 	}
       else if (rs6000_quadword_masked_address_p (mem_address))
 	{
-	  if (dump_file)
-	    fprintf (dump_file, "mem address is quad-word-masked addr\n\");
 	  /* This rtl is already in the form that matches stvx instruction,
 	     so leave it alone.  */
 	  DONE;
@@ -961,7 +781,6 @@
   [(set_attr "type" "vecstore")
    (set_attr "length" "12")])
 
-;; kelvin fixed this
 (define_split
   [(set (match_operand:V8HI 0 "memory_operand" "")
         (match_operand:V8HI 1 "vsx_register_operand" ""))]
@@ -983,37 +802,18 @@
 {
   rtx mem = operands[0];
 
-  if (dump_file)
-    fprintf (dump_file, \"splitting V8HI memory store, with alignment %d\n\",
-             MEM_ALIGN (mem));
-
   if (MEM_ALIGN (mem) >= 128)
     {
       rtx mem_address = XEXP (mem, 0);
-      if (dump_file)
-        {
-	  fprintf (dump_file, \"mem expression:\n\");
-	  print_inline_rtx (dump_file, mem, 2);
-	  fprintf (dump_file, \"\n\");
-
-	  fprintf (dump_file, \"memory address\n\");
-	  print_inline_rtx (dump_file, mem_address, 2);
-	  fprintf (dump_file, \"\n\");
-	}
       enum machine_mode mode = GET_MODE (mem);
       if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
 	{
-	  if (dump_file)
-	    fprintf (dump_file,
-		     \"memory address is REG_P or sum of 2 registers\n\");
 	  rtx stvx_set_expr = rs6000_gen_stvx (mode, mem, operands[1]);
 	  emit_insn (stvx_set_expr);
 	  DONE;
 	}
       else if (rs6000_quadword_masked_address_p (mem_address))
 	{
-	  if (dump_file)
-	    fprintf (dump_file, "mem address is quad-word-masked addr\n\");
 	  /* This rtl is already in the form that matches stvx instruction,
 	     so leave it alone.  */
 	  DONE;
@@ -1062,7 +862,6 @@
   [(set_attr "type" "vecstore")
    (set_attr "length" "12")])
 
-;; kelvin did fix this
 (define_split
   [(set (match_operand:V16QI 0 "memory_operand" "")
         (match_operand:V16QI 1 "vsx_register_operand" ""))]
@@ -1092,37 +891,18 @@
 {
   rtx mem = operands[0];
 
-  if (dump_file)
-    fprintf (dump_file, \"splitting V16QI memory store, with alignment %d\n\",
-             MEM_ALIGN (mem));
-
   if (MEM_ALIGN (mem) >= 128)
     {
       rtx mem_address = XEXP (mem, 0);
-      if (dump_file)
-        {
-	  fprintf (dump_file, \"mem expression:\n\");
-	  print_inline_rtx (dump_file, mem, 2);
-	  fprintf (dump_file, \"\n\");
-
-	  fprintf (dump_file, \"memory address\n\");
-	  print_inline_rtx (dump_file, mem_address, 2);
-	  fprintf (dump_file, \"\n\");
-	}
       enum machine_mode mode = GET_MODE (mem);
       if (REG_P (mem_address) || rs6000_sum_of_two_registers_p (mem_address))
 	{
-	  if (dump_file)
-	    fprintf (dump_file,
-		     \"memory address is REG_P or sum of 2 registers\n\");
 	  rtx stvx_set_expr = rs6000_gen_stvx (mode, mem, operands[1]);
 	  emit_insn (stvx_set_expr);
 	  DONE;
 	}
       else if (rs6000_quadword_masked_address_p (mem_address))
 	{
-	  if (dump_file)
-	    fprintf (dump_file, "mem address is quad-word-masked addr\n\");
 	  /* This rtl is already in the form that matches stvx instruction,
 	     so leave it alone.  */
 	  DONE;
@@ -4410,63 +4190,6 @@
    (set_attr "type" "veccomplex")])
 
 
-;; kelvin reenabled to get original behavior.  will do some more testing
-;; of unadulterated compiler.
-;;
-;; kelvin disabled the following two optimizations because they are not
-;; working for V16QI on little endian.  Maybe these work on big endian.
-;; not sure...  These two peepholes differ only in the order of the
-;; two operands passed to the load operation.
-;;  Based on expansions of VSX_M and VSm, the instruction selected
-;;  for each vector type is as follows:
-;;
-;; V16QI: "lxvw4x"
-;;  BE memory bytes:    00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
-;;  BE loaded register: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
-;;  (good)
-;;
-;;  LE memory bytes:    00 01 02 03 | 04 05 06 07 | 08 09 0a 0b | 0c 0d 0e 0f
-;;  LE loaded register: 03 02 01 00 | 07 06 05 04 | 0b 0a 09 08 | 0f 0e 0d 0c
-;;  (bad)
-;;
-;;  big endian-load:
-;;  little endian-load:
-;;  
-;; V8HI: "lxvw4x"
-;;  short int array[] =
-;;  { 0x0001, 0x0203, 0x0405, 0x0607, 0x0809, 0x0a0b, 0x0c0d, 0x0e0f };
-;;
-;;  BE memory bytes: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
-;;  big-endian load: 0x0001 0x0203 0x0405 0x0607 0x0809 0x0a0b 0x0c0d 0x0e0f
-;;
-;;  LE memory bytes: 01 00 03 02 05 04 07 06 09 08 0b 0a 0d 0c 0f 0e
-;;  little-endian load: 0x0203 0x0001 0x06070405 0x0a0b0809
-;;  (bad)
-;;
-;; V4SI: "lxvw4x"
-;; int array[] =
-;; { 0x00010203, 0x04050607, 0x08090a0b, 0x0c0d0e0f }
-;;
-;; BE memory bytes: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
-;; BE loaded register: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
-;; 
-;; LE memory bytes: 03 02 01 00 07 06 05 04 0b 0a 09 08 0f 0e 0d 0c
-;; LE loaded register: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
-;;
-;; V4SF: "lxvw4x"
-;; V2DF: "lxvd2x"
-;; V2DI: "lxvd2x"
-;;   DF: "lxdx"
-;;   TF: "lxvd2x"
-;;   KF: "lxvd2x"
-;; V1TI: "lxvd2x"
-;;   TI: "lxvd2x"
-;;
-;; BE memory bytes: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
-;;
-;; LE memory bytes: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
-;;
- 
 ;; Power8 Vector fusion.  The fused ops must be physically adjacent.
 (define_peephole
   [(set (match_operand:P 0 "base_reg_operand" "")
@@ -4475,7 +4198,7 @@
 	(mem:VSX_M (plus:P (match_dup 0)
 			   (match_operand:P 3 "int_reg_operand" ""))))]
   "TARGET_VSX && TARGET_P8_FUSION && !TARGET_P9_VECTOR"
-  "li %0,%1\t\t\t# vector load fusion\;lx<VSX_M:VSm>x %x2,%0,%3";
+  "li %0,%1\t\t\t# vector load fusion\;lx<VSX_M:VSm>x %x2,%0,%3"  
   [(set_attr "length" "8")
    (set_attr "type" "vecload")])
 

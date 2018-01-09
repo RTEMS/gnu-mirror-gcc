@@ -9469,22 +9469,6 @@ rs6000_legitimize_reload_address (rtx x, machine_mode mode,
   bool reg_offset_p = reg_offset_addressing_ok_p (mode);
   bool quad_offset_p = mode_supports_vsx_dform_quad (mode);
 
-  extern FILE *lra_dump_file;
-  FILE *my_dump_file;
-  if (dump_file)
-    my_dump_file = dump_file;
-  else if (lra_dump_file)
-    my_dump_file = lra_dump_file;
-  else
-    my_dump_file = NULL;
-  if (my_dump_file) {
-    fprintf (my_dump_file,
-	     "rs6000_legitimize_reload_address(mode: %d, opnum:%d)\n",
-	     mode, opnum);
-    print_inline_rtx (my_dump_file, x, 2);
-    fprintf (dump_file, "\n");
-  }
-
   /* Nasty hack for vsx_splat_v2df/v2di load from mem, which takes a
      DFmode/DImode MEM.  Ditto for ISA 3.0 vsx_splat_v4sf/v4si.  */
   if (reg_offset_p
@@ -20974,9 +20958,8 @@ rs6000_output_move_128bit (rtx operands[])
 	    return "lxvx %x0,%y1";
 
 	  else if (mode == V16QImode || mode == V8HImode || mode == V4SImode)
-	    {
-	      return "lxvw4x %x0,%y1";
-	    }
+	    return "lxvw4x %x0,%y1";
+
 	  else
 	    return "lxvd2x %x0,%y1";
 	}
@@ -25018,33 +25001,6 @@ rs6000_stack_info (void)
 
   else
     info->push_p = non_fixed_size > (TARGET_32BIT ? 220 : 288);
-
-#ifdef KELVIN_SEES_HANG_HERE
-  /* problem may be that lra_dump_file is non-null, but has been
-     closed by the time we get to pass_thread_prologue_and_epilogue */
-  extern FILE *lra_dump_file, *dump_file;
-  FILE *my_dump_file;
-
-  if (dump_file)
-    my_dump_file = dump_file;
-  else if (lra_dump_file)
-    my_dump_file = lra_dump_file;
-  else
-    my_dump_file = NULL;
-
-  if (my_dump_file) {
-    fprintf (my_dump_file, "... set info->push_p to %d\n", info->push_p);
-    fprintf (my_dump_file,
-	     " TARGET_XCOFF: %d, NO_DEBUG: %d, TARGET_32BIT: %d\n",
-	     TARGET_XCOFF, NO_DEBUG, TARGET_32BIT);
-    fprintf (my_dump_file,
-	     " info->calls_p: %d, DEFAULT_ABI: %d, ABI_V4: %d\n",
-	     info->calls_p, DEFAULT_ABI, ABI_V4);
-    fprintf (my_dump_file,
-	     " non_fixed_size: %ld, frame_pointer_needed: %d, write_symbols: %d\n",
-	     non_fixed_size, frame_pointer_needed, write_symbols);
-  }
-#endif
 
   return info;
 }
@@ -36313,33 +36269,6 @@ rs6000_initial_elimination_offset (int from, int to)
   rs6000_stack_t *info = rs6000_stack_info ();
   HOST_WIDE_INT offset;
 
-  extern FILE *lra_dump_file, *dump_file;
-  FILE *my_dump_file;
-
-  if (dump_file)
-    my_dump_file = dump_file;
-  else if (lra_dump_file)
-    my_dump_file = lra_dump_file;
-  else
-    my_dump_file = NULL;
-
-  if (my_dump_file) {
-    fprintf (my_dump_file, "rs6000_initial_elimination_offset (%d, %d)\n",
-	     from, to);
-    fprintf (my_dump_file, " HARD_FRAME_POINTER_REGNUM: %d, ",
-	     HARD_FRAME_POINTER_REGNUM);
-    fprintf (my_dump_file, "STACK_POINTER_REGNUM: %d\n",
-	     STACK_POINTER_REGNUM);
-    fprintf (my_dump_file, "  info->push_p: %d, info->total_size: %ld\n",
-	     info->push_p, info->total_size);
-    fprintf (my_dump_file, " FRAME_POINTER_REGNUM: %d, ",
-	     FRAME_POINTER_REGNUM);
-    fprintf (my_dump_file, "FRAME_GROWS_DOWNWARD: %d\n",
-	     FRAME_GROWS_DOWNWARD);
-    fprintf (my_dump_file,
-	     "  info->fixed_size: %d, ->vars_size: %ld, ->parm_size: %d\n",
-	     info->fixed_size, info->vars_size, info->parm_size);
-  }
   if (from == HARD_FRAME_POINTER_REGNUM && to == STACK_POINTER_REGNUM)
     offset = info->push_p ? 0 : -info->total_size;
   else if (from == FRAME_POINTER_REGNUM && to == STACK_POINTER_REGNUM)
@@ -36360,9 +36289,6 @@ rs6000_initial_elimination_offset (int from, int to)
     offset = 0;
   else
     gcc_unreachable ();
-
-  if (my_dump_file)
-    fprintf (my_dump_file, "  returning %ld\n", offset);
 
   return offset;
 }

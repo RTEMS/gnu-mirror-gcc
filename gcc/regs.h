@@ -292,23 +292,6 @@ remove_from_hard_reg_set (HARD_REG_SET *regs, machine_mode mode,
     CLEAR_HARD_REG_BIT (*regs, regno);
   while (++regno < end_regno);
 }
-/* kelvin help function */
-static inline void
-instrument_reg_set (FILE *dump_file, const HARD_REG_SET regs,
-		    machine_mode mode, unsigned int regno)
-{
-  unsigned int end_regno;
-
-  if (TEST_HARD_REG_BIT (regs, regno))
-    {
-      end_regno = end_hard_regno (mode, regno);
-      if (HARD_REGISTER_NUM_P (end_regno - 1))
-	while (++regno < end_regno)
-	  fprintf (dump_file,
-		   " TEST_HARD_REG_BIT (regs, %d) is %s\n", regno,
-		   (TEST_HARD_REG_BIT (regs, regno)? "true": "false"));
-    }
-}
 
 /* Return true if REGS contains the whole of (reg:MODE REGNO).  */
 
