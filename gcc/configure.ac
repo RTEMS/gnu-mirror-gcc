@@ -5886,37 +5886,21 @@ if test x$gcc_cv_target_ldbl128 = xyes; then
 fi
 
 # Check if TFmode long double target should use the IBM extended double or IEEE
-# 128-bit floating point formats if long doubles are 128-bits long.  The long
-# double type can only be switched on powerpc64 bit Linux systems where VSX is
-# supported.  Other PowerPC systems do not build the IEEE 128-bit emulator in
-# liggcc.
+# 128-bit floating point formats if long doubles are 128-bits long.
 AC_ARG_WITH([long-double-format],
   [AS_HELP_STRING([--with-long-double-format={ieee,ibm}]
 		  [Specify whether PowerPC long double uses IEEE or IBM format])],[
 case x"$target:$with_long_double_format" in
-  xpowerpc64le-*-linux*:ieee | xpowerpc64le-*-linux*:ibm)
+  xpowerpc*-*-*:ieee | xpowerpc*-*-*:ibm)
     :
     ;;
-  xpowerpc64-*-linux*:ieee | xpowerpc64-*-linux*:*:ibm)
-    # IEEE 128-bit emulationr is only built on 64-bit VSX Linux systems
-    case "$with_cpu" in
-      power7 | power8 | power9 | power1*)
-	:
-	;;
-      *)
-	AC_MSG_ERROR([Configuration option --with-long-double-format is only \
-supported if the default cpu is power7 or newer])
-	with_long_double_format=""
-	;;
-      esac
-      ;;
-  xpowerpc64*-*-linux*:*)
+  xpowerpc*-*-*:*)
     AC_MSG_ERROR([--with-long-double-format argument should be ibm or ieee])
     with_long_double_format=""
     ;;
   *)
     AC_MSG_ERROR([Configure option --with-long-double-format is only supported \
-on 64-bit PowerPC VSX Linux systems])
+on PowerPC systems])
     with_long_double_format=""
     ;;
 esac],
