@@ -10505,6 +10505,22 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       gcc_unreachable ();
     }
 
+#ifdef HAVE_AS_GNU_ATTRIBUTE
+  /* If we use a long double type, set the flags in .gnu_attribute that say
+     what the long double type is.  This is to allow the linker's warning
+     message for the wrong long double to be useful, even if the function does
+     not do a call (for example, doing a 128-bit add on power9 if the long
+     double type is IEEE 128-bit.  Do not set this if __ibm128 or __floa128 are
+     used if they aren't the default long dobule type.  */
+  if (rs6000_gnu_attr
+      && ((HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE || TARGET_64BIT))
+      && ((TARGET_LONG_DOUBLE_128
+	   && (mode == TFmode || mode == TCmode))
+	  || (!TARGET_LONG_DOUBLE_128
+	      && (mode == DFmode || mode == DCmode))))
+    rs6000_passes_float = rs6000_passes_long_double = true;
+#endif
+
   /* See if we need to special case SImode/SFmode SUBREG moves.  */
   if ((mode == SImode || mode == SFmode) && SUBREG_P (source)
       && rs6000_emit_move_si_sf_subreg (dest, source, mode))
@@ -11356,12 +11372,17 @@ init_cumulative_args (CUMULATIVE_ARGS *cum, tree fntype,
 	  if (SCALAR_FLOAT_MODE_P (return_mode))
 	    {
 	      rs6000_passes_float = true;
+	      /* Originally we set the rs6000_passes_long_double flag if
+		 __float128 or __ibm128 were passed, even if they were not the
+		 long double type.  Restrict this just to long double, so that
+		 the linker warning message will signal if the wrong long
+		 double type was used.  */
 	      if ((HAVE_LD_PPC_GNU_ATTR_LONG_DOUBLE || TARGET_64BIT)
-		  && (FLOAT128_IBM_P (return_mode)
-		      || FLOAT128_IEEE_P (return_mode)
-		      || (return_type != NULL
-			  && (TYPE_MAIN_VARIANT (return_type)
-			      == long_double_type_node))))
+		  || return_mode == TFmode
+		  || return_mode == TCmode
+		  || (return_type != NULL
+		      && (TYPE_MAIN_VARIANT (return_type)
+			  == long_double_type_node)))
 		rs6000_passes_long_double = true;
 	    }
 	  if (ALTIVEC_OR_VSX_VECTOR_MODE (return_mode)
