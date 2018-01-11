@@ -1,4 +1,4 @@
-/* { dg-do compile { target { powerpc*-linux-* && lp64 } } } */
+/* { dg-do compile { target { powerpc64*-linux-* && lp64 } } } */
 /* { dg-require-effective-target powerpc_p9vector_ok } */
 /* { dg-options "-O2 -mpower9-vector -mabi=ieeelongdouble -Wno-psabi" } */
 /* { dg-final { scan-assembler "gnu_attribute 4, 13" } } */

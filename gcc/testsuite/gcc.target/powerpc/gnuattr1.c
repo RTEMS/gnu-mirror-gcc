@@ -1,4 +1,4 @@
-/* { dg-do compile { target { powerpc*-linux-* } } } */
+/* { dg-do compile { target { powerpc64*-linux-* } } } */
 /* { dg-require-effective-target powerpc_vsx_ok } */
 /* { dg-options "-O2 -mvsx -mlong-double-64" } */
 /* { dg-final { scan-assembler "gnu_attribute 4, 9" } } */
