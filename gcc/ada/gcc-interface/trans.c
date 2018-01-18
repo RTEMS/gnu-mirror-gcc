@@ -1477,7 +1477,7 @@ Pragma_to_gnu (Node_Id gnat_node)
 	else
 	  option_index = 0;
 
-	set_default_handlers (&handlers);
+	set_default_handlers (&handlers, NULL);
 	control_warning_option (option_index, (int) kind, arg, imply, location,
 				lang_mask, &handlers, &global_options,
 				&global_options_set, global_dc);
@@ -3757,7 +3757,8 @@ Subprogram_Body_to_gnu (Node_Id gnat_node)
     }
 
   /* Set the line number in the decl to correspond to that of the body.  */
-  Sloc_to_locus (Sloc (gnat_node), &locus);
+  if (!Sloc_to_locus (Sloc (gnat_node), &locus))
+    locus = input_location;
   DECL_SOURCE_LOCATION (gnu_subprog_decl) = locus;
 
   /* Initialize the information structure for the function.  */
@@ -4058,8 +4059,6 @@ node_has_volatile_full_access (Node_Id gnat_node)
     case N_Identifier:
     case N_Expanded_Name:
       gnat_entity = Entity (gnat_node);
-      if (Ekind (gnat_entity) != E_Variable)
-	break;
       return Is_Volatile_Full_Access (gnat_entity)
 	     || Is_Volatile_Full_Access (Etype (gnat_entity));
 
@@ -8627,12 +8626,12 @@ process_freeze_entity (Node_Id gnat_node)
   const Entity_Kind kind = Ekind (gnat_entity);
   tree gnu_old, gnu_new;
 
-  /* If this is a package, we need to generate code for the package.  */
+  /* If this is a package, generate code for the package body, if any.  */
   if (kind == E_Package)
     {
-      insert_code_for
-	(Parent (Corresponding_Body
-		 (Parent (Declaration_Node (gnat_entity)))));
+      const Node_Id gnat_decl = Parent (Declaration_Node (gnat_entity));
+      if (Present (Corresponding_Body (gnat_decl)))
+	insert_code_for (Parent (Corresponding_Body (gnat_decl)));
       return;
     }
 
