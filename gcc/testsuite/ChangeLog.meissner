@@ -1,3 +1,10 @@
+2018-01-24  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/81550
+	* gcc.target/powerpc/loop_align.c: Rewrite test so that the loop
+	remains small enough that it tests the alignment of loops
+	specified by the target hook TARGET_ASM_LOOP_ALIGN_MAX_SKIP.
+
 2018-01-24   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 257024
