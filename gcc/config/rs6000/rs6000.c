@@ -2937,7 +2937,6 @@ rs6000_setup_reg_addr_masks (void)
     {
       machine_mode m2 = (machine_mode) m;
       bool complex_p = false;
-      bool small_int_p = (m2 == QImode || m2 == HImode || m2 == SImode);
       size_t msize;
 
       if (COMPLEX_MODE_P (m2))
@@ -2948,72 +2947,59 @@ rs6000_setup_reg_addr_masks (void)
 
       msize = GET_MODE_SIZE (m2);
 
-      /* SDmode is special in that we want to access it only via REG+REG
-	 addressing on power7 and above, since we want to use the LFIWZX and
-	 STFIWZX instructions to load it.  */
-      bool indexed_only_p = (m == SDmode && TARGET_NO_SDMODE_STACK);
-
       any_addr_mask = 0;
       for (rc = FIRST_RELOAD_REG_CLASS; rc <= LAST_RELOAD_REG_CLASS; rc++)
 	{
+	  bool gpr_p = rc == RELOAD_REG_GPR;
+	  bool fpr_p = rc == RELOAD_REG_FPR;
+	  bool vmx_p = rc == RELOAD_REG_VMX;
+
+	  /* SDmode, QImode, HImode, and SImode only have REG+REG addressing
+	     when used in the vector registers.  These modes also do not have
+	     an update form.  */
+	  bool indexed_only_p = ((m2 == SDmode && TARGET_NO_SDMODE_STACK)
+				 || ((fpr_p || vmx_p) && msize <= 4
+				     && INTEGRAL_MODE_P (m2)));
+
 	  addr_mask = 0;
 	  reg = reload_reg_map[rc].reg;
 
 	  /* Can mode values go in the GPR/FPR/Altivec registers?  */
 	  if (reg >= 0 && rs6000_hard_regno_mode_ok_p[m][reg])
 	    {
-	      bool small_int_vsx_p = (small_int_p
-				      && (rc == RELOAD_REG_FPR
-					  || rc == RELOAD_REG_VMX));
-
 	      nregs = rs6000_hard_regno_nregs[m][reg];
 	      addr_mask |= RELOAD_REG_VALID;
 
 	      /* Indicate if the mode takes more than 1 physical register.  If
 		 it takes a single register, indicate it can do REG+REG
-		 addressing.  Small integers in VSX registers can only do
-		 REG+REG addressing.  */
-	      if (small_int_vsx_p)
-		addr_mask |= RELOAD_REG_INDEXED;
-	      else if (nregs > 1 || m == BLKmode || complex_p)
+		 addressing.  */
+	      if (nregs > 1 || m == BLKmode || complex_p)
 		addr_mask |= RELOAD_REG_MULTIPLE;
 	      else
 		addr_mask |= RELOAD_REG_INDEXED;
 
 	      /* Figure out if we can do PRE_INC, PRE_DEC, or PRE_MODIFY
-		 addressing.  If we allow scalars into Altivec registers,
-		 don't allow PRE_INC, PRE_DEC, or PRE_MODIFY.  */
+		 addressing.  If we allow floating point scalars into Altivec
+		 registers, don't allow PRE_INC, PRE_DEC, or PRE_MODIFY.  */
 
 	      if (TARGET_UPDATE
-		  && (rc == RELOAD_REG_GPR || rc == RELOAD_REG_FPR)
+		  && (gpr_p || fpr_p)
 		  && msize <= 8
 		  && !VECTOR_MODE_P (m2)
 		  && !FLOAT128_VECTOR_P (m2)
 		  && !complex_p
-		  && !small_int_vsx_p)
+		  && !indexed_only_p
+		  && (m2 != DFmode || !TARGET_VSX)
+		  && (m2 != SFmode || !TARGET_P8_VECTOR))
 		{
 		  addr_mask |= RELOAD_REG_PRE_INCDEC;
 
 		  /* PRE_MODIFY is more restricted than PRE_INC/PRE_DEC in that
 		     we don't allow PRE_MODIFY for some multi-register
 		     operations.  */
-		  switch (m)
-		    {
-		    default:
-		      addr_mask |= RELOAD_REG_PRE_MODIFY;
-		      break;
-
-		    case E_DImode:
-		      if (TARGET_POWERPC64)
-			addr_mask |= RELOAD_REG_PRE_MODIFY;
-		      break;
-
-		    case E_DFmode:
-		    case E_DDmode:
-		      if (TARGET_DF_INSN)
-			addr_mask |= RELOAD_REG_PRE_MODIFY;
-		      break;
-		    }
+		  if (((addr_mask & RELOAD_REG_MULTIPLE) == 0)
+		      || (!TARGET_POWERPC64 && m2 == DImode))
+		    addr_mask |= RELOAD_REG_PRE_MODIFY;
 		}
 	    }
 
