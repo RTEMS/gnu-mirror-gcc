@@ -1,3 +1,173 @@
+2018-01-20  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/83900
+    * simplify.c (gfc_simplify_matmul): Set return type correctly.
+
+2018-01-19  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/83900
+	* simplify.c (gfc_simplify_matmul): Delete bogus assertion.
+
+2018-01-19  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	Backport of r250734 from mainline
+	PR fortran/80768
+	* check.c (gfc_check_num_images): Fix typo.
+
+2018-01-17  Harald Anlauf  <anlauf@gmx.de>
+
+	Back from mainline
+	PR fortran/83874
+	* decl.c (add_init_expr_to_sym): Do not dereference NULL pointer.
+
+2018-01-13  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	Backport from mainline
+	PR fortran/78814
+	* interface.c (symbol_rank): Check for NULL pointer.
+
+2018-01-10  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	Backport from trunk
+	PR fortran/82367
+	* resolve.c (resolve_allocate_expr): Check for NULL pointer.
+
+2018-01-10 Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	Backport from trunk
+	PR fortran/83093
+	* resolve.c (resolve_charlen): Check the type of cl->length
+	after resolution.
+
+2018-01-10  Steven G. Kargl  <kargl@kgcc.gnu.org>
+
+	Backport r254555 from trunk
+	PR Fortran/82841
+	* simplify.c(gfc_simplify_transfer): Do not dereference a NULL pointer.
+	Unwrap a short line.
+
+2018-01-04  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR Fortran/83679
+	* simplify.c (gfc_simplify_cshift): Restore early return for zero-sized
+	array.  Update Copyright year while here.
+
+2018-01-02  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	Backport from 7-branch
+	PR fortran/83650
+	* simplify.c (gfc_simplify_cshift): Correct contition for
+	negative shifts.
+
+2017-11-13  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backport from trunk
+	PR fortran/82934
+	* trans-stmt.c (gfc_trans_allocate): Remove the gcc_assert on
+	null string length for assumed length typespec and set
+	expr3_esize to NULL_TREE;
+
+2017-11-13  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backport from trunk
+	PR fortran/78619
+	* check.c (same_type_check): Introduce a new argument 'assoc'
+	with default value false. If this is true, use the symbol type
+	spec of BT_PROCEDURE expressions.
+	(gfc_check_associated): Set 'assoc' true in the call to
+	'same_type_check'.
+
+2017-11-06  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from trunk
+	PR fortran/78641
+	* resolve.c (resolve_ordinary_assign): Do not add the _data
+	component for class valued array constructors being assigned
+	to derived type arrays.
+	* trans-array.c (gfc_trans_array_ctor_element): Take the _data
+	of class valued elements for assignment to derived type arrays.
+
+2017-11-06  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from trunk
+	PR fortran/69739
+	* trans-expr.c (gfc_map_intrinsic_function): Return false for
+	bounds without the DIM argument instead of ICEing.
+
+2017-11-01  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/82796
+	* resolve.c (resolve_equivalence): An entity in a common block within
+ 	a module cannot appear in an equivalence statement if the entity is
+	with a pure procedure.
+
+2017-11-03  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backport from 7-branch
+	PR fortran/81735
+	* trans-decl.c (gfc_trans_deferred_vars): Correct case where
+	'tmp' can be used unititialized.
+
+2017-11-01  Andre Vehreschild  <vehre@gcc.gnu.org>
+	Paul Thomas  <pault@gcc.gnu.org>
+
+	Backport from trunk
+	PR fortran/78293
+	* trans-expr.c (gfc_conv_procedure_call): Prepend deallocation
+	of alloctable components to post, rather than adding to
+	se->post.
+	* trans-stmt.c (gfc_trans_allocate): Move deallocation of expr3
+	allocatable components so that all expr3s are visited.
+
+2017-11-01  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backport from trunk
+	PR fortran/80554
+	* decl.c (build_sym): In a submodule allow overriding of host
+	associated symbols from the ancestor module with a new
+	declaration.
+
+2017-11-01  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/80554
+	* gfortran.dg/submodule_29.f08: New test.
+
+2017-10-20  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	Backport from trunk
+	PR fortran/79795
+	* resolve.c (resovle_symbol): Change gcc_assert to
+	sensible error message.
+
+2017-10-19  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backport from trunk
+	PR fortran/79402
+	* resolve.c (fixup_unique_dummy): New function.
+	(gfc_resolve_expr): Call it for dummy variables with a unique
+	symtree name.
+
+2017-10-19  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backport from trunk
+	PR fortran/81048
+	* resolve.c (resolve_symbol): Ensure that derived type array
+	results get default initialization.
+
+2017-10-06  Thomas Koenig <tkoenig@gcc.gnu.org>
+	    Steven G. Kargl <kargl@gcc.gnu.org>
+
+	Backport from trunk
+	* expr.c (gfc_get_full_arrayspec_from_expr): If there is
+	no symtree, set array spec to NULL.
+
+2017-09-02  Janus Weil  <janus@gcc.gnu.org>
+
+	Backport from trunk
+	PR fortran/81770
+	* expr.c (gfc_check_pointer_assign): Improve the check whether pointer
+	may outlive pointer target.
+
 2017-07-04  Release Manager
 
 	* GCC 6.4.0 released.
