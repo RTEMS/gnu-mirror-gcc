@@ -1,3 +1,58 @@
+2018-02-01  Richard Biener  <rguenther@suse.de>
+
+	Backport from mainline
+	2017-11-02  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/82795
+	* gcc.target/i386/pr82795.c: New testcase.
+
+2018-02-01  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	Backport from mainline
+	2018-01-12  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* lib/target-supports.exp (check_effective_target_avx512f): Also
+	check for __builtin_ia32_addsd_round,
+	__builtin_ia32_getmantsd_round.
+	* gcc.target/i386/i386.exp (check_effective_target_avx512f):
+	Remove.
+
+2018-01-31  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc.c-torture/execute/20180131-1.c: New test.
+
+2018-01-29  Alan Modra  <amodra@gmail.com>
+
+	PR target/84033
+	* gcc.target/powerpc/swaps-p8-46.c: New.
+
+2018-01-26  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	Backport from trunk
+	2018-01-26  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* gcc.target/powerpc/safe-indirect-jump-1.c: Build on all targets.
+	Make expected output depend on whether we expect sibcalls or not.
+	* gcc.target/powerpc/safe-indirect-jump-8.c: Delete (merged into
+	safe-indirect-jump-1.c).
+
+	Backport from trunk
+	2018-01-21  Bill Schmidt  <wschmidt@linux.vnet.ibm.com>
+
+	PR target/83946
+	* gcc.target/powerpc/safe-indirect-jump-8.c: Skip for AIX.
+
+2018-01-26  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/82878
+	* g++.dg/cpp0x/pr82878.C: New.
+	* g++.dg/cpp1z/inh-ctor38.C: Check moves too.
+
+2018-01-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/83985
+	* gcc.dg/pr83985.c: New test.
+
 2018-01-25  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Back port from trunk

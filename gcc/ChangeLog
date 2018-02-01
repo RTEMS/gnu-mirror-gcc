@@ -1,3 +1,88 @@
+2018-02-01  Richard Biener  <rguenther@suse.de>
+
+	Backport from mainline
+	2017-11-02  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/82795
+	* tree-if-conv.c (predicate_mem_writes): Remove bogus assert.
+
+2018-01-31  Richard Biener <rguenther@suse.de>
+	    Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	Backport from mainline
+	2018-01-29  Richard Biener <rguenther@suse.de>
+		    Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	PR bootstrap/80867
+	* tree-vect-stmts.c (vectorizable_call): Don't call
+	targetm.vectorize_builtin_md_vectorized_function if callee is
+	NULL.
+
+2018-01-31  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR rtl-optimization/84071
+	* doc/tm.texi.in (WORD_REGISTER_OPERATIONS): Add explicit case.
+	* doc/tm.texi: Regenerate.
+
+2018-01-31  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR rtl-optimization/84071
+	* combine.c (record_dead_and_set_regs_1): Record the source unmodified
+	for a paradoxical SUBREG on a WORD_REGISTER_OPERATIONS target.
+
+2018-01-29  Joseph Myers  <joseph@codesourcery.com>
+
+	Backport from mainline
+	2018-01-24  Joseph Myers  <joseph@codesourcery.com>
+
+	PR target/68467
+	* config/m68k/m68k.c (m68k_promote_function_mode): New function.
+	(TARGET_PROMOTE_FUNCTION_MODE): New macro.
+
+2018-01-29  Uros Bizjak  <ubizjak@gmail.com>
+
+	Backport from mainline
+	2018-01-26  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/81763
+	* config/i386/i386.md (*andndi3_doubleword): Add earlyclobber
+	to (=&r,r,rm) alternative. Add (=r,0,rm) and (=r,r,0) alternatives.
+
+2018-01-29  Alan Modra  <amodra@gmail.com>
+
+	Backport from mainline
+	2018-01-26  Alan Modra  <amodra@gmail.com>
+	PR target/84033
+	* config/rs6000/rs6000.c (rtx_is_swappable_p): Exclude
+	UNSPEC_VBPERMQ.
+
+2018-01-27  H.J. Lu  <hongjiu.lu@intel.com>
+
+	Backport from mainline
+	2018-01-27  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* doc/invoke.texi: Replace -mfunction-return==@var{choice} with
+	-mfunction-return=@var{choice}.
+
+2018-01-27  H.J. Lu  <hongjiu.lu@intel.com>
+
+	Backport from mainline
+	2018-01-23  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR target/83905
+	* config/i386/i386.c (ix86_expand_prologue): Use cost reference
+	of struct ix86_frame.
+	(ix86_expand_epilogue): Likewise.  Add a local variable for
+	the reg_save_offset field in struct ix86_frame.
+
+2018-01-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/83985
+	* dce.c (deletable_insn_p): Return false for separate shrink wrapping
+	REG_CFA_RESTORE insns.
+	(delete_unmarked_insns): Don't ignore separate shrink wrapping
+	REG_CFA_RESTORE insns here.
+
 2018-01-25  Uros Bizjak  <ubizjak@gmail.com>
 
 	Backport from mainline
