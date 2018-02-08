@@ -1,3 +1,12 @@
+2018-02-07  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Back port from trunk
+	2018-02-07  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* doc/install.texi (Configuration): Document the
+	--with-long-double-format={ibm,ieee} PowerPC configuration
+	options.
+
 2018-02-05  Peter Bergner  <bergner@vnet.ibm.com>
 
 	Merge up to 257393.
