@@ -4549,6 +4549,29 @@ rs6000_option_override_internal (bool global_init_p)
 	}
     }
 
+  /* -maddpcis requires basic ISA 3.0 support.  For now also limit it to 64-bit
+      on ELF systems, so we can use the @ha and @l assembler syntax.  */
+  if (TARGET_ADDPCIS)
+    {
+      if (!TARGET_P9_MISC)
+	{
+	  error ("%qs requires %qs", "-maddpcis", "-mpower9-misc");
+	  rs6000_isa_flags &= ~OPTION_MASK_ADDPCIS;
+	}
+      else if (!TARGET_POWERPC64)
+	{
+	  error ("%qs requires 64-bit", "-maddpcis");
+	  rs6000_isa_flags &= ~OPTION_MASK_ADDPCIS;
+	}
+#ifndef OBJECT_FORMAT_ELF
+      else
+	{
+	  error ("%qs is only valid with ELF objects", "-maddpcis");
+	  rs6000_isa_flags &= ~OPTION_MASK_ADDPCIS;
+	}
+#endif
+    }
+
   /* Set -mallow-movmisalign to explicitly on if we have full ISA 2.07
      support. If we only have ISA 2.06 support, and the user did not specify
      the switch, leave it set to -1 so the movmisalign patterns are enabled,
@@ -10769,6 +10792,15 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 
     case E_SImode:
     case E_DImode:
+      /* Use default patern for loading up a label_ref if -maddpicis.  */
+      if (TARGET_ADDPCIS
+	  && REG_P (operands[0])
+	  && GET_CODE (operands[1]) == LABEL_REF)
+	{
+	  emit_insn (gen_rtx_SET (operands[0], operands[1]));
+	  return;
+	}
+
       /* Use default pattern for address of ELF small data */
       if (TARGET_ELF
 	  && mode == Pmode

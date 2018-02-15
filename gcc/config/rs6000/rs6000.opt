@@ -625,3 +625,7 @@ long rs6000_stack_protector_guard_offset = 0
 ;; branches via the CTR.
 mspeculate-indirect-jumps
 Target Undocumented Var(rs6000_speculate_indirect_jumps) Init(1) Save
+
+maddpcis
+Target Undocumented Mask(ADDPCIS) Var(rs6000_isa_flags)
+Enable using the ADDPCIS instruction on ISA 3.0 systems.

@@ -1948,3 +1948,7 @@
 
   return offsettable_nonstrict_memref_p (op);
 })
+
+;; Return true if the operand is a LABEL_REF.
+(define_predicate "label_ref_operand"
+  (match_code "label_ref"))
