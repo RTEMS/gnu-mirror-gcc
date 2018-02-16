@@ -1,3 +1,19 @@
+2018-02-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000-cpus.def (ISA_3_0_MASKS_SERVER): Add
+	-maddpcis to default ISA 3.0 options.
+	(POWERPC_MASKS): Add -maddpcis to PowerPC isa options.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Turn
+	off warning when we are clearing -maddpcis if the option was not
+	explicitly specified.
+	(rs6000_opt_masks): Add -maddpcis to the target pragma and
+	attribute options.
+	* config/rs6000/rs6000.md (movdi_addpcis): Require a base register
+	for result.  Pass label and first value to the addi after
+	splitting.  Split before register allocation.
+	(movdi_addpcis_internal1): Likewise.
+	(movdi_addpcis_internal2): Likewise.
+
 2018-02-15  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.md (UNSPEC_ADDPCIS): New unspec.

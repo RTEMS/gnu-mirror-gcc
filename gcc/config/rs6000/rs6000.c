@@ -4549,24 +4549,28 @@ rs6000_option_override_internal (bool global_init_p)
 	}
     }
 
-  /* -maddpcis requires basic ISA 3.0 support.  For now also limit it to 64-bit
-      on ELF systems, so we can use the @ha and @l assembler syntax.  */
+  /* The -maddpcis option requires basic ISA 3.0 support.  Limit it to 64-bit
+     ELF systems, since we create a temporary label directly in the
+     instructions generated and use the @ha and @l assembler syntax.  */
   if (TARGET_ADDPCIS)
     {
       if (!TARGET_P9_MISC)
 	{
-	  error ("%qs requires %qs", "-maddpcis", "-mpower9-misc");
+	  if (rs6000_isa_flags_explicit & OPTION_MASK_ADDPCIS)
+	    error ("%qs requires %qs", "-maddpcis", "-mpower9-misc");
 	  rs6000_isa_flags &= ~OPTION_MASK_ADDPCIS;
 	}
       else if (!TARGET_POWERPC64)
 	{
-	  error ("%qs requires 64-bit", "-maddpcis");
+	  if (rs6000_isa_flags_explicit & OPTION_MASK_ADDPCIS)
+	    error ("%qs requires 64-bit", "-maddpcis");
 	  rs6000_isa_flags &= ~OPTION_MASK_ADDPCIS;
 	}
 #ifndef OBJECT_FORMAT_ELF
       else
 	{
-	  error ("%qs is only valid with ELF objects", "-maddpcis");
+	  if (rs6000_isa_flags_explicit & OPTION_MASK_ADDPCIS)
+	    error ("%qs is only valid with ELF objects", "-maddpcis");
 	  rs6000_isa_flags &= ~OPTION_MASK_ADDPCIS;
 	}
 #endif
@@ -36699,6 +36703,7 @@ struct rs6000_opt_mask {
 static struct rs6000_opt_mask const rs6000_opt_masks[] =
 {
   { "altivec",			OPTION_MASK_ALTIVEC,		false, true  },
+  { "addpcis",			OPTION_MASK_ADDPCIS,		false, true  },
   { "cmpb",			OPTION_MASK_CMPB,		false, true  },
   { "crypto",			OPTION_MASK_CRYPTO,		false, true  },
   { "direct-move",		OPTION_MASK_DIRECT_MOVE,	false, true  },
