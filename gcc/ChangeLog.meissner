@@ -1,5 +1,17 @@
 2018-02-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/predicates.md (label_ref_operand): Undo last
+	change.
+	* config/rs6000/rs6000.c (rs6000_emit_move): Call movdi_addpcis to
+	load the label addresss rather than using the generic movdi
+	pattern, and splitting.  Go back to using label_ref_operand.
+	* config/rs6000/rs6000.md (movdi_addpcis*): Move to be next to
+	tablejumpdi.  Call label_ref_operand instead of
+	addpc_label_operand. Change the label to be .LADDPC<n>.  Use a
+	syntax that works for nested functions.
+
+2018-02-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/predicates.md (addpcis_label_ref_operand): Rename
 	from label_ref_operand.  Require -maddpcis and the label being
 	local.
