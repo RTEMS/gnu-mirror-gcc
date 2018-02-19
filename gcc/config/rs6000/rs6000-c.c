@@ -36,6 +36,10 @@
 #include "c/c-tree.h"
 
 
+#define KELVIN_VERBOSE
+#ifdef KELVIN_VERBOSE
+extern void dump_polymorphic ();
+#endif
 
 /* Handle the machine specific pragma longcall.  Its syntax is
 
@@ -794,6 +798,10 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
 	    builtin_define ("_XFPU_DP_FULL");
         }
     }
+#ifdef KELVIN_VERBOSE
+  if (TARGET_DEBUG_BUILTIN)
+    dump_polymorphic ();
+#endif
 }
 
 
@@ -6955,3 +6963,163 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
     return error_mark_node;
   }
 }
+
+#ifdef KELVIN_VERBOSE
+
+const char *
+polytype2s (signed char poly_type) {
+  int is_ptr;
+
+  if (poly_type < 0)
+    {
+      poly_type = ~poly_type;
+      is_ptr = 1;
+    }
+  else
+    is_ptr = 0;
+
+  switch (poly_type) {
+  case RS6000_BTI_NOT_OPAQUE:
+    return is_ptr? "not_opaque *": "not_opaque";
+  case RS6000_BTI_opaque_V2SI:
+    return is_ptr? "opaque_v2si *": "opaque_v2si";
+  case RS6000_BTI_opaque_V2SF:
+    return is_ptr? "opaque_v2sf *": "opaque_v2sf";
+  case RS6000_BTI_opaque_p_V2SI:
+    return is_ptr? "opaque_p_v2si *": "opaque_p_v2si";
+  case RS6000_BTI_opaque_V4SI:
+    return is_ptr? "opaque_v4si *": "opaque_v4si";
+  case RS6000_BTI_V16QI:
+    return is_ptr? "vector char *": "vector char";
+  case RS6000_BTI_V1TI:
+    return is_ptr? "vector __int128 *": "vector __int128";
+  case RS6000_BTI_V2SI:
+    return is_ptr? "v2si *": "v2si";
+  case RS6000_BTI_V2SF:
+    return is_ptr? "v2sf *": "v2sf";
+  case RS6000_BTI_V2DI:
+    return is_ptr? "vector long long int *": "vector long long int";
+  case RS6000_BTI_V2DF:
+    return is_ptr? "vector double *": "vector double";
+  case RS6000_BTI_V4HI:
+    return is_ptr? "v4hi *": "v4hi";
+  case RS6000_BTI_V4SI:
+    return is_ptr? "vector int *": "vector int";
+  case RS6000_BTI_V4SF:
+    return is_ptr? "vector float *": "vector float";
+  case RS6000_BTI_V8HI:
+    return is_ptr? "vector short *": "vector short";
+  case RS6000_BTI_unsigned_V16QI:
+    return is_ptr? "vector unsigned char *": "vector unsigned char";
+  case RS6000_BTI_unsigned_V1TI:
+    return is_ptr? "vector unsigned __int128 *": "vector unsigned __int128";
+  case RS6000_BTI_unsigned_V8HI:
+    return is_ptr? "vector unsigned short *": "vector unsigned short";
+  case RS6000_BTI_unsigned_V4SI:
+    return is_ptr? "vector unsigned int *": "vector unsigned int";
+  case RS6000_BTI_unsigned_V2DI:
+    return is_ptr
+      ? "vector unsigned long long int *": "vector unsigned long long int";
+  case RS6000_BTI_bool_char:          /* __bool char */
+    return is_ptr? "bool char *": "bool char";
+  case RS6000_BTI_bool_short:         /* __bool short */
+    return is_ptr? "bool short *": "bool short";
+  case RS6000_BTI_bool_int:           /* __bool int */
+    return is_ptr? "bool int *": "bool int";
+  case RS6000_BTI_bool_long:		 /* __bool long */
+    return is_ptr? "bool long *": "bool long";
+  case RS6000_BTI_pixel:              /* __pixel */
+    return is_ptr? "pixel *": "pixel";
+  case RS6000_BTI_bool_V16QI:         /* __vector bool char */
+    return is_ptr? "vector bool char *": "vector bool char";
+  case RS6000_BTI_bool_V8HI:          /* __vector bool short */
+    return is_ptr? "vector bool short *": "vector bool short";
+  case RS6000_BTI_bool_V4SI:          /* __vector bool int */
+    return is_ptr? "vector bool int *": "vector bool int";
+  case RS6000_BTI_bool_V2DI:          /* __vector bool long */
+    return is_ptr? "vector bool long *": "vector bool long";
+  case RS6000_BTI_pixel_V8HI:         /* __vector __pixel */
+    return is_ptr? "vector pixel *": "vector pixel";
+  case RS6000_BTI_long:	         /* long_integer_type_node */
+    return is_ptr? "long *": "long";
+  case RS6000_BTI_unsigned_long:      /* long_unsigned_type_node */
+    return is_ptr? "unsigned long *": "unsigned long";
+  case RS6000_BTI_long_long:	         /* long_long_integer_type_node */
+    return is_ptr? "long long *": "long long";
+  case RS6000_BTI_unsigned_long_long: /* long_long_unsigned_type_node */
+    return is_ptr? "unsigned long long *": "unsigned long long";
+  case RS6000_BTI_INTQI:	         /* intQI_type_node */
+    return is_ptr? "char *": "char";
+  case RS6000_BTI_UINTQI:		 /* unsigned_intQI_type_node */
+    return is_ptr? "unsigned char *": "unsigned char";
+  case RS6000_BTI_INTHI:	         /* intHI_type_node */
+    return is_ptr? "short *": "short";
+  case RS6000_BTI_UINTHI:		 /* unsigned_intHI_type_node */
+    return is_ptr? "unsigned short *": "unsigned short";
+  case RS6000_BTI_INTSI:		 /* intSI_type_node */
+    return is_ptr? "int *": "int";
+  case RS6000_BTI_UINTSI:		 /* unsigned_intSI_type_node */
+    return is_ptr? "unsigned int *": "unsigned int";
+  case RS6000_BTI_INTDI:		 /* intDI_type_node */
+    return is_ptr? "long long int *": "long long int";
+  case RS6000_BTI_UINTDI:		 /* unsigned_intDI_type_node */
+    return is_ptr? "unsigned long long int *": "unsigned long long int";
+  case RS6000_BTI_INTTI:		 /* intTI_type_node */
+    return is_ptr? "__int128 *": "__int128";
+  case RS6000_BTI_UINTTI:		 /* unsigned_intTI_type_node */
+    return is_ptr? "unsigned __int128 *": "unsigned __int128";
+  case RS6000_BTI_float:	         /* float_type_node */
+    return is_ptr? "float *": "float";
+  case RS6000_BTI_double:	         /* double_type_node */
+    return is_ptr? "double *": "double";
+  case RS6000_BTI_long_double:        /* long_double_type_node */
+    return is_ptr? "long double *": "long double";
+  case RS6000_BTI_dfloat64:		 /* dfloat64_type_node */
+    return is_ptr? "dfloat64 *": "dfloat64";
+  case RS6000_BTI_dfloat128:		 /* dfloat128_type_node */
+    return is_ptr? "__float128 *": "__float128";
+  case RS6000_BTI_void:	         /* void_type_node */
+    return is_ptr? "void *": "void";
+  case RS6000_BTI_ieee128_float:	 /* ieee 128-bit floating point */
+    return is_ptr? "__ieee128 *": "__ieee128";
+  case RS6000_BTI_ibm128_float:	 /* IBM 128-bit floating point */
+    return is_ptr? "__ibm128 *": "__ibm128";
+  case RS6000_BTI_const_str:		 /* pointer to const char * */
+    return is_ptr? "const char **": "const char *";
+  default:
+    return "<unknown_polymorphic_operand_type>";
+  }
+}
+
+void dump_one_polymorphic (const struct altivec_builtin_types *pp) {
+  enum rs6000_builtins fcode = pp->code;
+  const char *name = rs6000_overloaded_builtin_name (fcode);
+
+  /* kelvin may want to look at pp->overloaded_code too, and figure
+     out what function name is associated with that.  */
+
+  fprintf (stderr, "%s %s[%d] (", polytype2s (pp->ret_type), name, pp->code);
+  if (pp->op1)
+    fprintf (stderr, "%s", polytype2s (pp->op1));
+  if (pp->op2)
+    fprintf (stderr, ", %s", polytype2s (pp->op2));
+  if (pp->op3)
+    fprintf (stderr, ", %s", polytype2s (pp->op3));
+  fprintf (stderr, ")\n");
+  fprintf (stderr, "  maps to: %s [%d]\n",
+	   rs6000_overloaded_builtin_name (pp->overloaded_code),
+	   pp->overloaded_code);
+}
+
+
+void
+dump_polymorphic () {
+  extern void dump_one_polymorphic (const struct altivec_builtin_types *pp);
+
+  const struct altivec_builtin_types *pp = altivec_overloaded_builtins;
+  while (pp->code != 0) {
+    dump_one_polymorphic (pp);
+    pp++;
+  }
+}
+#endif

@@ -85,6 +85,11 @@
 /* This file should be included last.  */
 #include "target-def.h"
 
+#define KELVIN_VERBOSE
+#ifdef KELVIN_VERBOSE
+extern void take_a_dump ();
+#endif
+
 #ifndef TARGET_NO_PROTOTYPE
 #define TARGET_NO_PROTOTYPE 0
 #endif
@@ -13898,6 +13903,7 @@ static const struct builtin_description bdesc_htm[] =
 #undef RS6000_BUILTIN_H
 #undef RS6000_BUILTIN_P
 #undef RS6000_BUILTIN_Q
+#undef RS6000_BUILTIN_X
 
 /* Return true if a builtin function is overloaded.  */
 bool
@@ -17265,6 +17271,9 @@ rs6000_init_builtins (void)
 
 #ifdef SUBTARGET_INIT_BUILTINS
   SUBTARGET_INIT_BUILTINS;
+#endif
+#ifdef KELVIN_VERBOSE
+  take_a_dump ();
 #endif
 }
 
@@ -39644,3 +39653,7 @@ rs6000_starting_frame_offset (void)
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 #include "gt-rs6000.h"
+
+#ifdef KELVIN_VERBOSE
+#include "dump-builtins.c"
+#endif
