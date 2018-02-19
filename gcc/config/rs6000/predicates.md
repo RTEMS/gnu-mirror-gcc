@@ -1949,6 +1949,15 @@
   return offsettable_nonstrict_memref_p (op);
 })
 
-;; Return true if the operand is a LABEL_REF.
-(define_predicate "label_ref_operand"
-  (match_code "label_ref"))
+;; Return true if the operand is a LABEL_REF that can be loaded with a
+;; PC-relative load sequence (-maddpcis).  Non-local labels don't work with the
+;; current assembler if the label is in a different section than the ADDPCIS
+;; instruction.
+(define_predicate "addpcis_label_ref_operand"
+  (match_code "label_ref")
+{
+  if (!TARGET_ADDPCIS)
+    return 0;
+
+  return LABEL_REF_NONLOCAL_P (op) == 0;
+})

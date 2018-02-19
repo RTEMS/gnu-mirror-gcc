@@ -10794,17 +10794,17 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 	operands[1] = force_const_mem (mode, operands[1]);
       break;
 
-    case E_SImode:
     case E_DImode:
       /* Use default patern for loading up a label_ref if -maddpicis.  */
-      if (TARGET_ADDPCIS
-	  && REG_P (operands[0])
-	  && GET_CODE (operands[1]) == LABEL_REF)
+      if (TARGET_ADDPCIS && REG_P (operands[0])
+	  && addpcis_label_ref_operand (operands[1], mode))
 	{
 	  emit_insn (gen_rtx_SET (operands[0], operands[1]));
 	  return;
 	}
+      /* Fall through */
 
+    case E_SImode:
       /* Use default pattern for address of ELF small data */
       if (TARGET_ELF
 	  && mode == Pmode
