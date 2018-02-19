@@ -626,6 +626,6 @@ long rs6000_stack_protector_guard_offset = 0
 mspeculate-indirect-jumps
 Target Undocumented Var(rs6000_speculate_indirect_jumps) Init(1) Save
 
-maddpcis
-Target Undocumented Mask(ADDPCIS) Var(rs6000_isa_flags)
-Enable using the ADDPCIS instruction on ISA 3.0 systems.
+madd-pcrel
+Target Undocumented Mask(ADD_PCREL) Var(rs6000_isa_flags)
+Enable using pc-relative ADD instructions if they exist.

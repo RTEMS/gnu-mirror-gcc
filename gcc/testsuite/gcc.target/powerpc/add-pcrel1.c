@@ -1,6 +1,6 @@
 /* { dg-do compile { target { powerpc64*-*-linux* && lp64 } } } */
 /* { dg-require-effective-target powerpc_p9vector_ok } */
-/* { dg-options "-mpower9-misc -O2 -maddpcis" } */
+/* { dg-options "-mpower9-vector -O2 -madd-pcrel" } */
 
 long do_switch (long a, long b)
 {

@@ -1949,7 +1949,19 @@
   return offsettable_nonstrict_memref_p (op);
 })
 
-;; Return true if the operand is a LABEL_REF.
-(define_predicate "label_ref_operand"
-  (match_code "label_ref"))
+;; Return true if the operand is a symbol that can be loaded with ADDPCIS.  We
+;; allow labels and local functions.
+(define_predicate "add_pcrel_operand"
+  (match_code "label_ref,symbol_ref")
+{
+  if (!TARGET_ADD_PCREL)
+    return 0;
+
+  if (GET_CODE (op) == LABEL_REF)
+    return 1;
+
+  return (SYMBOL_REF_FUNCTION_P (op)
+	  && SYMBOL_REF_LOCAL_P (op)
+	  && !SYMBOL_REF_EXTERNAL_P (op));
+})
 

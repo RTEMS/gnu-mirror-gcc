@@ -4549,29 +4549,29 @@ rs6000_option_override_internal (bool global_init_p)
 	}
     }
 
-  /* The -maddpcis option requires basic ISA 3.0 support.  Limit it to 64-bit
-     ELF systems, since we create a temporary label directly in the
-     instructions generated and use the @ha and @l assembler syntax.  */
-  if (TARGET_ADDPCIS)
+  /* The -madd-pcrel option requires ISA 3.0 support.  Limit it to 64-bit ELF
+     systems, since we create a temporary label directly in the instructions
+     generated and use the @ha and @l assembler syntax.  */
+  if (TARGET_ADD_PCREL)
     {
       if (!TARGET_P9_MISC)
 	{
-	  if (rs6000_isa_flags_explicit & OPTION_MASK_ADDPCIS)
-	    error ("%qs requires %qs", "-maddpcis", "-mpower9-misc");
-	  rs6000_isa_flags &= ~OPTION_MASK_ADDPCIS;
+	  if (rs6000_isa_flags_explicit & OPTION_MASK_ADD_PCREL)
+	    error ("%qs requires %qs", "-madd-pcrel", "-mpower9-misc");
+	  rs6000_isa_flags &= ~OPTION_MASK_ADD_PCREL;
 	}
       else if (!TARGET_POWERPC64)
 	{
-	  if (rs6000_isa_flags_explicit & OPTION_MASK_ADDPCIS)
-	    error ("%qs requires 64-bit", "-maddpcis");
-	  rs6000_isa_flags &= ~OPTION_MASK_ADDPCIS;
+	  if (rs6000_isa_flags_explicit & OPTION_MASK_ADD_PCREL)
+	    error ("%qs requires 64-bit", "-madd-pcrel");
+	  rs6000_isa_flags &= ~OPTION_MASK_ADD_PCREL;
 	}
 #ifndef OBJECT_FORMAT_ELF
       else
 	{
-	  if (rs6000_isa_flags_explicit & OPTION_MASK_ADDPCIS)
-	    error ("%qs is only valid with ELF objects", "-maddpcis");
-	  rs6000_isa_flags &= ~OPTION_MASK_ADDPCIS;
+	  if (rs6000_isa_flags_explicit & OPTION_MASK_ADD_PCREL)
+	    error ("%qs is only valid with ELF objects", "-madd-pcrel");
+	  rs6000_isa_flags &= ~OPTION_MASK_ADD_PCREL;
 	}
 #endif
     }
@@ -10795,11 +10795,13 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       break;
 
     case E_DImode:
-      /* Use ADDPCIS to load a local label if we can.  */
-      if (TARGET_ADDPCIS && TARGET_POWERPC64 && REG_P (operands[0])
-	  && GET_CODE (operands[1]) == LABEL_REF)
+      /* Use ADD_PCREL to load a local label or symbol if we can.  */
+      if (TARGET_ADD_PCREL && TARGET_POWERPC64 && REG_P (operands[0])
+	  && (GET_CODE (operands[1]) == LABEL_REF
+	      || GET_CODE (operands[1]) == SYMBOL_REF)
+	  && add_pcrel_operand (operands[1], mode))
 	{
-	  emit_insn (gen_movdi_addpcis (operands[0], operands[1]));
+	  emit_insn (gen_movdi_add_pcrel (operands[0], operands[1]));
 	  return;
 	}
       /* fall through */
@@ -36703,7 +36705,7 @@ struct rs6000_opt_mask {
 static struct rs6000_opt_mask const rs6000_opt_masks[] =
 {
   { "altivec",			OPTION_MASK_ALTIVEC,		false, true  },
-  { "addpcis",			OPTION_MASK_ADDPCIS,		false, true  },
+  { "add_pcrel",		OPTION_MASK_ADD_PCREL,		false, true  },
   { "cmpb",			OPTION_MASK_CMPB,		false, true  },
   { "crypto",			OPTION_MASK_CRYPTO,		false, true  },
   { "direct-move",		OPTION_MASK_DIRECT_MOVE,	false, true  },
