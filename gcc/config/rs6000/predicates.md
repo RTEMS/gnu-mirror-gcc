@@ -1965,3 +1965,10 @@
 	  && !SYMBOL_REF_EXTERNAL_P (op));
 })
 
+;; Return true if the operand is label that can loaded via toc relative
+;; addressing.  Symbols are already handled.
+(define_predicate "toc_label_operand"
+  (match_code "label_ref")
+{
+  return TARGET_CMODEL == CMODEL_MEDIUM;
+})

@@ -1,5 +1,12 @@
 2018-02-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/predicates.md (toc_label_operand): New predicate.
+	* config/rs6000/rs6000.c (rs6000_emit_move): If medium code model,
+	load up label addresses with TOC relative addressing.
+	* config/rs6000/rs6000.md (movdi_toc_label): Likewise.
+
+2018-02-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/predicates.md (add_pcrel_operand): Rename switch
 	to -madd-pcrel.  Change all uses.  Add support for also using
 	ADDPCIS to return the address of a local function.

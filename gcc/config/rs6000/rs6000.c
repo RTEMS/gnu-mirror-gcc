@@ -10795,10 +10795,20 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       break;
 
     case E_DImode:
+      /* If we are using medium code model, we can load up labels directly.
+	 This code is a quick test to see if it works, before going through the
+	 TOCREL support to add LABEL_REFs.  */
+      if (TARGET_CMODEL == CMODEL_MEDIUM && REG_P (operands[0])
+	  && GET_CODE (operands[1]) == LABEL_REF)
+	{
+	  emit_insn (gen_rtx_SET (operands[0], operands[1]));
+	  return;
+	}
+
       /* Use ADD_PCREL to load a local label or symbol if we can.  */
-      if (TARGET_ADD_PCREL && TARGET_POWERPC64 && REG_P (operands[0])
-	  && (GET_CODE (operands[1]) == LABEL_REF
-	      || GET_CODE (operands[1]) == SYMBOL_REF)
+      else if (TARGET_ADD_PCREL && TARGET_POWERPC64 && REG_P (operands[0])
+	       && (GET_CODE (operands[1]) == LABEL_REF
+		   || GET_CODE (operands[1]) == SYMBOL_REF)
 	  && add_pcrel_operand (operands[1], mode))
 	{
 	  emit_insn (gen_movdi_add_pcrel (operands[0], operands[1]));
