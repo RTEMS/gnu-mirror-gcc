@@ -1,3 +1,60 @@
+2018-02-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/t-rs6000 (TM_H): Add rs6000-extra-opts.def.
+	* config/rs6000/rs6000-extra-opts.def: New file.  Move many of the
+	TARGET_<xxx> options that depend on other TARGET_<yyyy> options
+	here.  Map these options into a global array that is calculated at
+	the start of the compiler and when the default options are
+	changed.
+	* config/rs6000/rs6000.h (rs6000_extra_opts_t): New enumeration of
+	the extra opts.
+	(TARGET_LDBRX): Move target options defined in terms of other
+	target options to rs6000-extra-opts.def.
+	(TARGET_FCFID): Likewise.
+	(TARGET_FCTIDZ): Likewise.
+	(TARGET_STFIWX): Likewise.
+	(TARGET_LFIWAX): Likewise.
+	(TARGET_LFIWZX): Likewise.
+	(TARGET_FCFIDS): Likewise.
+	(TARGET_FCFIDU): Likewise.
+	(TARGET_FCFIDUS): Likewise.xe
+	(TARGET_FCTIDUZ): Likewise.
+	(TARGET_FCTIWUZ): Likewise.
+	(TARGET_CTZ): Likewise.
+	(TARGET_EXTSWSLI): Likewise.
+	(TARGET_MADDLD): Likewise.
+	(TARGET_XSCVDPSPN): Likewise.
+	(TARGET_XSCVSPDPN): Likewise.
+	(TARGET_VADDUQM): Likewise.
+	(TARGET_DIRECT_MOVE_128): Likewise.
+	(TARGET_VEXTRACTUB): Likewise.
+	(TARGET_EFFICIENT_OVERLAPPING_UNALIGNED): Likewise.
+	(TARGET_SYNC_HI_QI): Likewise.
+	(TARGET_SYNC_TI): Likewise.
+	(TARGET_MINMAX_SF): Likewise.
+	(TARGET_MINMAX_DF): Likewise.
+	(TARGET_EXTRA_BUILTINS): Likewise.
+	(TARGET_NO_LWSYNC): Likewise.
+	(TARGET_SF_FPR): Likewise.
+	(TARGET_DF_FPR): Likewise.
+	(TARGET_SF_INSN): Likewise.
+	(TARGET_DF_INSN): Likewise.
+	(TARGET_FRES): Likewise.
+	(TARGET_FRE): Likewise.
+	(TARGET_FRSQRTES): Likewise.
+	(TARGET_FRSQRTE): Likewise.
+	(TARGET_TOC_FUSION_INT): Likewise.
+	(TARGET_TOC_FUSION_FP): Likewise.
+	(TARGET_DIRECT_MOVE_64BIT): Likewise.
+	* config/rs6000/rs6000.c (rs6000_extra_opts_data): New global
+	array to simplify extra opts processing.
+	(rs6000_debug_reg_global): If -mdebug=reg, print how many
+	extra_opts are currently defined.
+	(rs6000_extra_opts): New function calculate the value of an option
+	defined in terms of other options while in option processing,
+	otherwise defined to use the rs6000_extra_opts_data array.
+	(rs6000_option_override_internal): Set up the extra options.
+
 2018-02-23   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 257920

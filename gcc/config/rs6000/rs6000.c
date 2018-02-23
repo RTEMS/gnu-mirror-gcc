@@ -239,6 +239,9 @@ static int dbg_cost_ctrl;
 tree rs6000_builtin_types[RS6000_BTI_MAX];
 tree rs6000_builtin_decls[RS6000_BUILTIN_COUNT];
 
+/* Array of options defined in terms of other options.  */
+unsigned char rs6000_extra_opts_data[EXTRA_OPTS_MAX];
+
 /* Flag to say the TOC is initialized */
 int toc_initialized, need_toc_init;
 char toc_label_name[10];
@@ -2910,6 +2913,9 @@ rs6000_debug_reg_global (void)
   fprintf (stderr, DEBUG_FMT_D, "Number of rs6000 builtins",
 	   (int)RS6000_BUILTIN_COUNT);
 
+  fprintf (stderr, DEBUG_FMT_D, "Number of extra_opts",
+	   (int)EXTRA_OPTS_MAX);
+
   fprintf (stderr, DEBUG_FMT_D, "Enable float128 on VSX",
 	   (int)TARGET_FLOAT128_ENABLE_TYPE);
 
@@ -3939,6 +3945,28 @@ rs6000_md_asm_adjust (vec<rtx> &/*outputs*/, vec<rtx> &/*inputs*/,
   SET_HARD_REG_BIT (clobbered_regs, CA_REGNO);
   return NULL;
 }
+
+/* Define the function that returns the value of an option defined in terms of
+   other options.  This is used in rs6000_option_override_internal to set up
+   the rs6000_extra_opts_data array.  We define it as a function to catch
+   references to TARGET_<xxx> in rs6000_option_override_internal.  We redefine
+   it at the end of rs6000_option_override_internal.  */
+#undef  rs6000_extra_opts
+#undef  EXTRA_OPTS_OPTION
+#define EXTRA_OPTS_OPTION(NAME, VALUE) case NAME: return (VALUE);
+
+static bool
+rs6000_extra_opts (rs6000_extra_opts_t opt)
+{
+  switch (opt)
+    {
+#include "rs6000-extra-opts.def"
+    default:
+      gcc_unreachable ();
+    }
+}
+
+#undef EXTRA_OPTS_OPTION
 
 /* Override command line options.
 
@@ -5288,8 +5316,17 @@ rs6000_option_override_internal (bool global_init_p)
     warning (0, "%qs is deprecated and not recommended in any circumstances",
 	     "-mno-speculate-indirect-jumps");
 
+  /* Set up the extra options that are defined in terms of other options.  */
+  for (size_t opt = 0; opt < (size_t)EXTRA_OPTS_MAX; opt++)
+    rs6000_extra_opts_data[opt] = rs6000_extra_opts ((rs6000_extra_opts_t)opt);
+
   return ret;
 }
+
+/* Restore mapping of extra opts to an array.  */
+#undef  rs6000_extra_opts
+#define rs6000_extra_opts(INDEX) rs6000_extra_opts_data[(INDEX)]
+
 
 /* Implement TARGET_OPTION_OVERRIDE.  On the RS/6000 this is used to
    define the target cpu type.  */
