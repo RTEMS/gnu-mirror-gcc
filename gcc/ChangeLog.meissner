@@ -1,3 +1,93 @@
+2018-02-26  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000-extra-opts.def (TARGET_SF_FPR_64BIT): New
+	extra options.
+	(TARGET_DF_FPR_64BIT): Likewise.
+	(TARGET_SF_FPR_32BIT): Likewise.
+	(TARGET_DF_FPR_32BIT): Likewise.
+	(TARGET_SF_FPR_NAN): Likewise.
+	(TARGET_DF_FPR_NAN): Likewise.
+	(TARGET_SF_FPR_NO_NAN): Likewise.
+	(TARGET_DF_FPR_NO_NAN): Likewise.
+	(TARGET_SF_FPR_UPDATE): Likewise.
+	(TARGET_DF_FPR_UPDATE): Likewise.
+	(TARGET_128BIT_FPR): Likewise.
+	(TARGET_IF_IEEE128): Likewise.
+	(TARGET_KF_IEEE128): Likewise.
+	(TARGET_TF_IEEE128): Likewise.
+	(TARGET_IF_IEEE128_HW): Likewise.
+	(TARGET_KF_IEEE128_HW): Likewise.
+	(TARGET_TF_IEEE128_HW): Likewise.
+	(TARGET_IF_IEEE128_SW): Likewise.
+	(TARGET_KF_IEEE128_SW): Likewise.
+	(TARGET_TF_IEEE128_SW): Likewise.
+	(TARGET_IF_IBM128): Likewise.
+	(TARGET_KF_IBM128): Likewise.
+	(TARGET_TF_IBM128): Likewise.
+	* config/rs6000/rs6000.md (FP iterator): Use the new extra ops.
+	(FMA_F iterator): Likewise.
+	(cmp<mode>_fpr): Likewise.
+	(extendsfdf2_fp): Likewise.
+	(extendsfdf2_snan): Likewise.
+	(truncdfsf2_fpr): Likewise.
+	(lfiwax): Likewise.
+	(floatsi<mode>2_lfiwax): Likewise.
+	(lfiwzx): Likewise.
+	(floatunssi<mode>_lfiwzx): Likewise.
+	(floatunssi<mode>_lfiwzx_mem): Likewise.
+	(floatsidf2): Likewise.
+	(floatsidf2_internal): Likewise.
+	(floatunssidf2): Likewise.
+	(fix_trunc<mode>si2_stfiwx): Likewise.
+	(fix_trunc<mode>si2_internal): Likewise.
+	(fix_trunc<mode>di2): Likewise.
+	(fix_trunc<mode>di2_fctidz): Likewise.
+	(fixuns_trunc<mode>di2): Likewise.
+	(fctiwz_<mode>): Likewise.
+	(friz): Likewise.
+	(round32<mode>2_fprs): Likewise.
+	(roundu32<mode>2_fprs): Likewise.
+	(lrintsfsi2): Likewise.
+	(lrint<mode>di2): Likewise.
+	(btrunc<mode>2): Likewise.
+	(ceil<mode>2): Likewise.
+	(floor<mode>2): Likewise.
+	(round<mode>2): Likewise.
+	(xsrdpi<mode>2): Likewise.
+	(lround<mode>di2): Likewise.
+	(floatsisf2): Likewise.
+	(floatdidf2): Likewise.
+	(floatdidf2_mem): Likewise.
+	(floatdisf2): Likewise.
+	(floatdisf2_fcfids): Likewise.
+	(floatdisf2_mem): Likewise.
+	(floatdisf2_internal1): Likewise.
+	(floatdisf2_internal2): Likewise.
+	(floatunsdisf2): Likewise.
+	(floatunsdisf2_fcfidus): Likewise.
+	(floatunsdisf2_mem): Likewise.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_hardfloat32): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(extendsf<mode>2w): Likewise.
+	(trunc<mode>df2): Likewise.
+	(trunc<mode>df2_internal1): Likewise.
+	(trunc<mode>sf2): Likewise.
+	(trunc<mode>sf2_fprs): Likewise.
+	(floatsi<mode>2): Likewise.
+	(fix_trunc_helper<mode>): Likewise.
+	(fix_trunc<mode>si2): Likewise.
+	(fix_trunc<mode>si2_fprs): Likewise.
+	(fix_trunc<mode>si2_internal): Likewise.
+	(abs<mode>2_internal): Likewise.
+	(movsf_update1): Likewise.
+	(movsf_update2): Likewise.
+	(movdf_update1): Likewise.
+	(movdf_update2): Likewise.
+	(cmp<mode>_internal1): Likewise.
+	(cmp<mode>_internal2): Likewise.
+
 2018-02-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/t-rs6000 (TM_H): Add rs6000-extra-opts.def.
