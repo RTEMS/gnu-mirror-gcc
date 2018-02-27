@@ -406,23 +406,6 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
    defined.  */
 #define ASSEMBLER_DIALECT 1
 
-/* Define an enumeration of all of the extra options that are set in terms of
-   other options.  These are set in an array once during the initial option
-   handling.  */
-#undef  EXTRA_OPTS_OPTION
-#define EXTRA_OPTS_OPTION(NAME, VALUE)	NAME,
-
-typedef enum {
-#include "rs6000-extra-opts.def"
-  EXTRA_OPTS_MAX
-} rs6000_extra_opts_t;
-
-extern unsigned char rs6000_extra_opts_data[EXTRA_OPTS_MAX];
-
-#define rs6000_extra_opts(INDEX) rs6000_extra_opts_data[(INDEX)]
-
-#undef EXTRA_OPTS_OPTION
-
 /* Debug support */
 #define MASK_DEBUG_STACK	0x01	/* debug stack applications */
 #define	MASK_DEBUG_ARG		0x02	/* debug argument handling */
@@ -579,12 +562,75 @@ extern int rs6000_vector_align[];
 #define TARGET_LONG_DOUBLE_128 (rs6000_long_double_type_size == 128)
 #define TARGET_IEEEQUAD rs6000_ieeequad
 #define TARGET_ALTIVEC_ABI rs6000_altivec_abi
+#define TARGET_LDBRX (TARGET_POPCNTD || rs6000_cpu == PROCESSOR_CELL)
 
 /* Define as 1 if we support multilibs for switching long double between IEEE
    128-bit floating point and IBM extended double.  */
 #ifndef TARGET_IEEEQUAD_MULTILIB
 #define TARGET_IEEEQUAD_MULTILIB 0
 #endif
+
+/* ISA 2.01 allowed FCFID to be done in 32-bit, previously it was 64-bit only.
+   Enable 32-bit fcfid's on any of the switches for newer ISA machines or
+   XILINX.  */
+#define TARGET_FCFID	(TARGET_POWERPC64				\
+			 || TARGET_PPC_GPOPT	/* 970/power4 */	\
+			 || TARGET_POPCNTB	/* ISA 2.02 */		\
+			 || TARGET_CMPB		/* ISA 2.05 */		\
+			 || TARGET_POPCNTD	/* ISA 2.06 */		\
+			 || TARGET_XILINX_FPU)
+
+#define TARGET_FCTIDZ	TARGET_FCFID
+#define TARGET_STFIWX	TARGET_PPC_GFXOPT
+#define TARGET_LFIWAX	TARGET_CMPB
+#define TARGET_LFIWZX	TARGET_POPCNTD
+#define TARGET_FCFIDS	TARGET_POPCNTD
+#define TARGET_FCFIDU	TARGET_POPCNTD
+#define TARGET_FCFIDUS	TARGET_POPCNTD
+#define TARGET_FCTIDUZ	TARGET_POPCNTD
+#define TARGET_FCTIWUZ	TARGET_POPCNTD
+#define TARGET_CTZ	TARGET_MODULO
+#define TARGET_EXTSWSLI	(TARGET_MODULO && TARGET_POWERPC64)
+#define TARGET_MADDLD	(TARGET_MODULO && TARGET_POWERPC64)
+
+#define TARGET_XSCVDPSPN	(TARGET_DIRECT_MOVE || TARGET_P8_VECTOR)
+#define TARGET_XSCVSPDPN	(TARGET_DIRECT_MOVE || TARGET_P8_VECTOR)
+#define TARGET_VADDUQM		(TARGET_P8_VECTOR && TARGET_POWERPC64)
+#define TARGET_DIRECT_MOVE_128	(TARGET_P9_VECTOR && TARGET_DIRECT_MOVE \
+				 && TARGET_POWERPC64)
+#define TARGET_VEXTRACTUB	(TARGET_P9_VECTOR && TARGET_DIRECT_MOVE \
+				 && TARGET_POWERPC64)
+
+/* Whether we should avoid (SUBREG:SI (REG:SF) and (SUBREG:SF (REG:SI).  */
+#define TARGET_NO_SF_SUBREG	TARGET_DIRECT_MOVE_64BIT
+#define TARGET_ALLOW_SF_SUBREG	(!TARGET_DIRECT_MOVE_64BIT)
+
+/* This wants to be set for p8 and newer.  On p7, overlapping unaligned
+   loads are slow. */
+#define TARGET_EFFICIENT_OVERLAPPING_UNALIGNED TARGET_EFFICIENT_UNALIGNED_VSX
+
+/* Byte/char syncs were added as phased in for ISA 2.06B, but are not present
+   in power7, so conditionalize them on p8 features.  TImode syncs need quad
+   memory support.  */
+#define TARGET_SYNC_HI_QI	(TARGET_QUAD_MEMORY			\
+				 || TARGET_QUAD_MEMORY_ATOMIC		\
+				 || TARGET_DIRECT_MOVE)
+
+#define TARGET_SYNC_TI		TARGET_QUAD_MEMORY_ATOMIC
+
+/* Power7 has both 32-bit load and store integer for the FPRs, so we don't need
+   to allocate the SDmode stack slot to get the value into the proper location
+   in the register.  */
+#define TARGET_NO_SDMODE_STACK	(TARGET_LFIWZX && TARGET_STFIWX && TARGET_DFP)
+
+/* ISA 3.0 has new min/max functions that don't need fast math that are being
+   phased in.  Min/max using FSEL or XSMAXDP/XSMINDP do not return the correct
+   answers if the arguments are not in the normal range.  */
+#define TARGET_MINMAX_SF	(TARGET_SF_FPR && TARGET_PPC_GFXOPT	\
+				 && (TARGET_P9_MINMAX || !flag_trapping_math))
+
+#define TARGET_MINMAX_DF	(TARGET_DF_FPR && TARGET_PPC_GFXOPT	\
+				 && (TARGET_P9_MINMAX || !flag_trapping_math))
 
 /* In switching from using target_flags to using rs6000_isa_flags, the options
    machinery creates OPTION_MASK_<xxx> instead of MASK_<xxx>.  For now map
@@ -644,6 +690,75 @@ extern int rs6000_vector_align[];
 #ifdef TARGET_MODULO
 #define RS6000_BTM_MODULO		OPTION_MASK_MODULO
 #endif
+
+
+/* For power systems, we want to enable Altivec and VSX builtins even if the
+   user did not use -maltivec or -mvsx to allow the builtins to be used inside
+   of #pragma GCC target or the target attribute to change the code level for a
+   given system.  The Paired builtins are only enabled if you configure the
+   compiler for those builtins, and those machines don't support altivec or
+   VSX.  */
+
+#define TARGET_EXTRA_BUILTINS	(!TARGET_PAIRED_FLOAT			 \
+				 && ((TARGET_POWERPC64			 \
+				      || TARGET_PPC_GPOPT /* 970/power4 */ \
+				      || TARGET_POPCNTB	  /* ISA 2.02 */ \
+				      || TARGET_CMPB	  /* ISA 2.05 */ \
+				      || TARGET_POPCNTD	  /* ISA 2.06 */ \
+				      || TARGET_ALTIVEC			 \
+				      || TARGET_VSX			 \
+				      || TARGET_HARD_FLOAT)))
+
+/* E500 cores only support plain "sync", not lwsync.  */
+#define TARGET_NO_LWSYNC (rs6000_cpu == PROCESSOR_PPC8540 \
+			  || rs6000_cpu == PROCESSOR_PPC8548)
+
+
+/* Whether SF/DF operations are supported by the normal floating point unit
+   (or the vector/scalar unit).  */
+#define TARGET_SF_FPR	(TARGET_HARD_FLOAT && TARGET_SINGLE_FLOAT)
+#define TARGET_DF_FPR	(TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT)
+
+/* Whether SF/DF operations are supported by any hardware.  */
+#define TARGET_SF_INSN	TARGET_SF_FPR
+#define TARGET_DF_INSN	TARGET_DF_FPR
+
+/* Which machine supports the various reciprocal estimate instructions.  */
+#define TARGET_FRES	(TARGET_HARD_FLOAT && TARGET_PPC_GFXOPT \
+			 && TARGET_SINGLE_FLOAT)
+
+#define TARGET_FRE	(TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT \
+			 && (TARGET_POPCNTB || VECTOR_UNIT_VSX_P (DFmode)))
+
+#define TARGET_FRSQRTES	(TARGET_HARD_FLOAT && TARGET_POPCNTB \
+			 && TARGET_PPC_GFXOPT && TARGET_SINGLE_FLOAT)
+
+#define TARGET_FRSQRTE	(TARGET_HARD_FLOAT && TARGET_DOUBLE_FLOAT \
+			 && (TARGET_PPC_GFXOPT || VECTOR_UNIT_VSX_P (DFmode)))
+
+/* Conditions to allow TOC fusion for loading/storing integers.  */
+#define TARGET_TOC_FUSION_INT	(TARGET_P8_FUSION			\
+				 && TARGET_TOC_FUSION			\
+				 && (TARGET_CMODEL != CMODEL_SMALL)	\
+				 && TARGET_POWERPC64)
+
+/* Conditions to allow TOC fusion for loading/storing floating point.  */
+#define TARGET_TOC_FUSION_FP	(TARGET_P9_FUSION			\
+				 && TARGET_TOC_FUSION			\
+				 && (TARGET_CMODEL != CMODEL_SMALL)	\
+				 && TARGET_POWERPC64			\
+				 && TARGET_HARD_FLOAT			\
+				 && TARGET_SINGLE_FLOAT			\
+				 && TARGET_DOUBLE_FLOAT)
+
+/* Macro to say whether we can do optimizations where we need to do parts of
+   the calculation in 64-bit GPRs and then is transfered to the vector
+   registers.  Do not allow -maltivec=be for these optimizations, because it
+   adds to the complexity of the code.  */
+#define TARGET_DIRECT_MOVE_64BIT	(TARGET_DIRECT_MOVE		\
+					 && TARGET_P8_VECTOR		\
+					 && TARGET_POWERPC64		\
+					 && (rs6000_altivec_element_order != 2))
 
 /* Whether the various reciprocal divide/square root estimate instructions
    exist, and whether we should automatically generate code for the instruction

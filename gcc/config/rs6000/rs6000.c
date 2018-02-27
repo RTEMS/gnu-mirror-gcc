@@ -239,9 +239,6 @@ static int dbg_cost_ctrl;
 tree rs6000_builtin_types[RS6000_BTI_MAX];
 tree rs6000_builtin_decls[RS6000_BUILTIN_COUNT];
 
-/* Array of options defined in terms of other options.  */
-unsigned char rs6000_extra_opts_data[EXTRA_OPTS_MAX];
-
 /* Flag to say the TOC is initialized */
 int toc_initialized, need_toc_init;
 char toc_label_name[10];
@@ -2913,9 +2910,6 @@ rs6000_debug_reg_global (void)
   fprintf (stderr, DEBUG_FMT_D, "Number of rs6000 builtins",
 	   (int)RS6000_BUILTIN_COUNT);
 
-  fprintf (stderr, DEBUG_FMT_D, "Number of extra_opts",
-	   (int)EXTRA_OPTS_MAX);
-
   fprintf (stderr, DEBUG_FMT_D, "Enable float128 on VSX",
 	   (int)TARGET_FLOAT128_ENABLE_TYPE);
 
@@ -3946,28 +3940,6 @@ rs6000_md_asm_adjust (vec<rtx> &/*outputs*/, vec<rtx> &/*inputs*/,
   return NULL;
 }
 
-/* Define the function that returns the value of an option defined in terms of
-   other options.  This is used in rs6000_option_override_internal to set up
-   the rs6000_extra_opts_data array.  We define it as a function to catch
-   references to TARGET_<xxx> in rs6000_option_override_internal.  We redefine
-   it at the end of rs6000_option_override_internal.  */
-#undef  rs6000_extra_opts
-#undef  EXTRA_OPTS_OPTION
-#define EXTRA_OPTS_OPTION(NAME, VALUE) case NAME: return (VALUE);
-
-static bool
-rs6000_extra_opts (rs6000_extra_opts_t opt)
-{
-  switch (opt)
-    {
-#include "rs6000-extra-opts.def"
-    default:
-      gcc_unreachable ();
-    }
-}
-
-#undef EXTRA_OPTS_OPTION
-
 /* Override command line options.
 
    Combine build-specific configuration information with options
@@ -4055,13 +4027,6 @@ rs6000_option_override_internal (bool global_init_p)
   /* Remember the explicit arguments.  */
   if (global_init_p)
     rs6000_isa_flags_explicit = global_options_set.x_rs6000_isa_flags;
-
-  /* We plan to deprecate the -maltivec=be option.  For now, just
-     issue a warning message.  */
-  if (global_init_p
-      && rs6000_altivec_element_order == 2)
-    warning (0, "%qs command-line option is deprecated",
-	     "-maltivec=be");
 
   /* On 64-bit Darwin, power alignment is ABI-incompatible with some C
      library functions, so warn about it. The flag may be useful for
@@ -4848,6 +4813,25 @@ rs6000_option_override_internal (bool global_init_p)
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
 
+  /* For the E500 family of cores, reset the single/double FP flags to let us
+     check that they remain constant across attributes or pragmas.  */
+
+  switch (rs6000_cpu)
+    {
+    case PROCESSOR_PPC8540:
+    case PROCESSOR_PPC8548:
+    case PROCESSOR_PPCE500MC:
+    case PROCESSOR_PPCE500MC64:
+    case PROCESSOR_PPCE5500:
+    case PROCESSOR_PPCE6500:
+      rs6000_single_float = 0;
+      rs6000_double_float = 0;
+      break;
+
+    default:
+      break;
+    }
+
   if (main_target_opt)
     {
       if (main_target_opt->x_rs6000_single_float != rs6000_single_float)
@@ -5316,17 +5300,8 @@ rs6000_option_override_internal (bool global_init_p)
     warning (0, "%qs is deprecated and not recommended in any circumstances",
 	     "-mno-speculate-indirect-jumps");
 
-  /* Set up the extra options that are defined in terms of other options.  */
-  for (size_t opt = 0; opt < (size_t)EXTRA_OPTS_MAX; opt++)
-    rs6000_extra_opts_data[opt] = rs6000_extra_opts ((rs6000_extra_opts_t)opt);
-
   return ret;
 }
-
-/* Restore mapping of extra opts to an array.  */
-#undef  rs6000_extra_opts
-#define rs6000_extra_opts(INDEX) rs6000_extra_opts_data[(INDEX)]
-
 
 /* Implement TARGET_OPTION_OVERRIDE.  On the RS/6000 this is used to
    define the target cpu type.  */
@@ -8244,12 +8219,6 @@ mem_operand_gpr (rtx op, machine_mode mode)
   unsigned HOST_WIDE_INT offset;
   int extra;
   rtx addr = XEXP (op, 0);
-
-  /* Don't allow altivec type addresses like (mem (and (plus ...))).
-     See PR target/84279.  */
-
-  if (GET_CODE (addr) == AND)
-    return false;
 
   op = address_offset (addr);
   if (op == NULL_RTX)
@@ -15759,7 +15728,8 @@ altivec_expand_builtin (tree exp, rtx target, bool *expandedp)
     case VSX_BUILTIN_VEC_EXT_V1TI:
       return altivec_expand_vec_ext_builtin (exp, target);
 
-    case P9V_BUILTIN_VEC_EXTRACT4B:
+    case P9V_BUILTIN_VEXTRACT4B:
+    case P9V_BUILTIN_VEC_VEXTRACT4B:
       arg1 = CALL_EXPR_ARG (exp, 1);
       STRIP_NOPS (arg1);
 
@@ -15774,7 +15744,9 @@ altivec_expand_builtin (tree exp, rtx target, bool *expandedp)
 	}
       break;
 
-    case P9V_BUILTIN_VEC_INSERT4B:
+    case P9V_BUILTIN_VINSERT4B:
+    case P9V_BUILTIN_VINSERT4B_DI:
+    case P9V_BUILTIN_VEC_VINSERT4B:
       arg2 = CALL_EXPR_ARG (exp, 2);
       STRIP_NOPS (arg2);
 
