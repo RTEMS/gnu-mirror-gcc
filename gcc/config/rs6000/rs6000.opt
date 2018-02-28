@@ -625,3 +625,7 @@ long rs6000_stack_protector_guard_offset = 0
 ;; branches via the CTR.
 mspeculate-indirect-jumps
 Target Undocumented Var(rs6000_speculate_indirect_jumps) Init(1) Save
+
+mcombined-address
+Target Undocumented Mask(COMBINED_ADDRESS) Var(rs6000_isa_flags)
+Combine addressing operations in the compiler.

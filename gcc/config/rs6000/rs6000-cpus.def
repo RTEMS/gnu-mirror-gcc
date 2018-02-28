@@ -104,6 +104,7 @@
 /* Mask of all options to set the default isa flags based on -mcpu=<xxx>.  */
 #define POWERPC_MASKS		(OPTION_MASK_ALTIVEC			\
 				 | OPTION_MASK_CMPB			\
+				 | OPTION_MASK_COMBINED_ADDRESS		\
 				 | OPTION_MASK_CRYPTO			\
 				 | OPTION_MASK_DFP			\
 				 | OPTION_MASK_DIRECT_MOVE		\

@@ -1394,6 +1394,7 @@ static bool rs6000_debug_can_change_mode_class (machine_mode,
 						reg_class_t);
 static bool rs6000_save_toc_in_prologue_p (void);
 static rtx rs6000_internal_arg_pointer (void);
+static void rs6000_conditional_register_usage (void);
 
 rtx (*rs6000_legitimize_reload_address_ptr) (rtx, machine_mode, int, int,
 					     int, int *)
@@ -2222,6 +2223,10 @@ static void
 rs6000_debug_reg_print (int first_regno, int last_regno, const char *reg_name)
 {
   int r, m;
+
+  /* Insure the conditional registers are up to date when printing the debug
+     information.  */
+  rs6000_conditional_register_usage ();
 
   for (r = first_regno; r <= last_regno; ++r)
     {
@@ -4816,6 +4821,39 @@ rs6000_option_override_internal (bool global_init_p)
 #ifdef SUB3TARGET_OVERRIDE_OPTIONS
   SUB3TARGET_OVERRIDE_OPTIONS;
 #endif
+
+
+  /* Only do combined addressing for 64-bit Linux server systems using medium
+     code model.  The -fsplit-stack option is problematical due to it using r12
+     in the prologue.  The large code model can produce addresses that are too
+     large for ADDIS combined with a d-form instruction.  This must be done
+     after SUBSUBTARGET_OVERRIDE_OPTIONS, so that cmodel is set correctly. */
+  if (TARGET_COMBINED_ADDRESS)
+    {
+      if (!TARGET_ELF || !TARGET_VSX || !TARGET_POWERPC64 || flag_split_stack
+	  || TARGET_CMODEL != CMODEL_MEDIUM)
+	{
+	  rs6000_isa_flags &= ~OPTION_MASK_COMBINED_ADDRESS;
+	  if (rs6000_isa_flags_explicit & OPTION_MASK_COMBINED_ADDRESS)
+	    {
+	      if (!TARGET_ELF)
+		error ("%qs is only available on ELF systems",
+		       "-mcombined-address");
+	      else if (TARGET_CMODEL != CMODEL_MEDIUM)
+		error ("%qs requires %qs", "-mcombined-address",
+		       "-mcmodel=medium");
+	      else if (!TARGET_VSX)
+		error ("%qs requires %qs", "-mcombined-address", "-mvsx");
+	      else if (!TARGET_POWERPC64)
+		error ("%qs requires %qs", "-mcombined-address", "-m64");
+	      else if (flag_split_stack)
+		error ("%qs requires %qs", "-mcombined-address",
+		       "-fno-split-stack");
+	      else
+		gcc_unreachable ();
+	    }
+	}
+    }
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
@@ -10028,6 +10066,10 @@ rs6000_conditional_register_usage (void)
   /* Set MQ register fixed (already call_used) so that it will not be
      allocated.  */
   fixed_regs[64] = 1;
+
+  /* Combined addressing reserve GPR12 for use as an address temporary.  */
+  if (TARGET_COMBINED_ADDRESS)
+    fixed_regs[12] = call_used_regs[12] = call_really_used_regs[12] = 1;
 
   /* 64-bit AIX and Linux reserve GPR13 for thread-private data.  */
   if (TARGET_64BIT)
@@ -36646,6 +36688,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
 {
   { "altivec",			OPTION_MASK_ALTIVEC,		false, true  },
   { "cmpb",			OPTION_MASK_CMPB,		false, true  },
+  { "combined-address",		OPTION_MASK_COMBINED_ADDRESS,	false, true  },
   { "crypto",			OPTION_MASK_CRYPTO,		false, true  },
   { "direct-move",		OPTION_MASK_DIRECT_MOVE,	false, true  },
   { "dlmzb",			OPTION_MASK_DLMZB,		false, true  },

@@ -589,6 +589,11 @@ rs6000_target_modify_macros (bool define_p, HOST_WIDE_INT flags,
   if ((flags & OPTION_MASK_FLOAT128_HW) != 0)
     rs6000_define_or_undefine_macro (define_p, "__FLOAT128_HARDWARE__");
 
+  /* OPTION_MASK_COMBINED_ADDRESS is a debug option to not split addresses
+     early.  */
+  if ((flags & OPTION_MASK_COMBINED_ADDRESS) != 0)
+    rs6000_define_or_undefine_macro (define_p, "__COMBINED_ADDRESS__");
+
   /* options from the builtin masks.  */
   /* Note that RS6000_BTM_PAIRED is enabled only if
      TARGET_PAIRED_FLOAT is enabled (e.g. -mpaired).  */
