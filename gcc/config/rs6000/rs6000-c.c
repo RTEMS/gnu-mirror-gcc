@@ -7037,7 +7037,7 @@ polytype2s (signed char poly_type) {
   case RS6000_BTI_bool_V4SI:          /* __vector bool int */
     return is_ptr? "vector bool int *": "vector bool int";
   case RS6000_BTI_bool_V2DI:          /* __vector bool long */
-    return is_ptr? "vector bool long *": "vector bool long";
+    return is_ptr? "vector bool long long *": "vector bool long long";
   case RS6000_BTI_pixel_V8HI:         /* __vector __pixel */
     return is_ptr? "vector pixel *": "vector pixel";
   case RS6000_BTI_long:	         /* long_integer_type_node */
@@ -7091,26 +7091,32 @@ polytype2s (signed char poly_type) {
   }
 }
 
+extern HOST_WIDE_INT rs6000_get_builtin_mask (int);
+extern unsigned int rs6000_get_builtin_attributes (int);
+
 void dump_one_polymorphic (const struct altivec_builtin_types *pp) {
   enum rs6000_builtins fcode = pp->code;
   const char *name = rs6000_overloaded_builtin_name (fcode);
+  HOST_WIDE_INT mask;
+  unsigned int attributes;
 
-  /* kelvin may want to look at pp->overloaded_code too, and figure
-     out what function name is associated with that.  */
+  mask = rs6000_get_builtin_mask (pp->overloaded_code);
+  attributes = rs6000_get_builtin_mask (pp->overloaded_code);
 
-  fprintf (stderr, "%s %s[%d] (", polytype2s (pp->ret_type), name, pp->code);
-  if (pp->op1)
-    fprintf (stderr, "%s", polytype2s (pp->op1));
-  if (pp->op2)
-    fprintf (stderr, ", %s", polytype2s (pp->op2));
-  if (pp->op3)
-    fprintf (stderr, ", %s", polytype2s (pp->op3));
-  fprintf (stderr, ")\n");
-  fprintf (stderr, "  maps to: %s [%d]\n",
-	   rs6000_overloaded_builtin_name (pp->overloaded_code),
-	   pp->overloaded_code);
+  if ((mask & RS6000_BTM_PAIRED) == 0) {
+    fprintf (stderr, "%s %s[%d] (", polytype2s (pp->ret_type), name, pp->code);
+    if (pp->op1)
+      fprintf (stderr, "%s", polytype2s (pp->op1));
+    if (pp->op2)
+      fprintf (stderr, ", %s", polytype2s (pp->op2));
+    if (pp->op3)
+      fprintf (stderr, ", %s", polytype2s (pp->op3));
+    fprintf (stderr, ")\n");
+    fprintf (stderr, "  maps to: %s [%d]\n",
+	     rs6000_overloaded_builtin_name (pp->overloaded_code),
+	     pp->overloaded_code);
+  }
 }
-
 
 void
 dump_polymorphic () {

@@ -87,7 +87,9 @@
 
 #define KELVIN_VERBOSE
 #ifdef KELVIN_VERBOSE
-extern void take_a_dump ();
+#include "dumpfile.h"
+#include "tree-pretty-print.h"
+static void dump_monomorphics ();
 #endif
 
 #ifndef TARGET_NO_PROTOTYPE
@@ -13561,6 +13563,14 @@ def_builtin (const char *name, tree type, enum rs6000_builtins code)
   unsigned classify = rs6000_builtin_info[(int)code].attr;
   const char *attr_string = "";
 
+  static FILE *builtin_file;
+  if (!builtin_file)
+    builtin_file = fopen ("builtin.dump", "w");
+  fprintf (builtin_file, "def_builtin: %s [%d]\n", name, code);
+  /* had TDF_UID */
+  print_generic_expr(builtin_file, type, TDF_VOPS|TDF_MEMSYMS);
+  fprintf (builtin_file, "\n\n");
+
   gcc_assert (name != NULL);
   gcc_assert (IN_RANGE ((int)code, 0, (int)RS6000_BUILTIN_COUNT));
 
@@ -17273,7 +17283,7 @@ rs6000_init_builtins (void)
   SUBTARGET_INIT_BUILTINS;
 #endif
 #ifdef KELVIN_VERBOSE
-  take_a_dump ();
+  dump_monomorphics ();
 #endif
 }
 
@@ -17550,6 +17560,7 @@ altivec_init_builtins (void)
   def_builtin ("__builtin_altivec_lvx", v4si_ftype_long_pcvoid, ALTIVEC_BUILTIN_LVX);
   def_builtin ("__builtin_altivec_lvx_v2df", v2df_ftype_long_pcvoid,
 	       ALTIVEC_BUILTIN_LVX_V2DF);
+  /* TODO: Add support for LVX_V1TI.  */
   def_builtin ("__builtin_altivec_lvx_v2di", v2di_ftype_long_pcvoid,
 	       ALTIVEC_BUILTIN_LVX_V2DI);
   def_builtin ("__builtin_altivec_lvx_v4sf", v4sf_ftype_long_pcvoid,

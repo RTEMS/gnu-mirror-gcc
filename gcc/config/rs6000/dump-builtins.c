@@ -1,4 +1,3 @@
-
 /* Include this into rs6000.c */
 
 #define RS6000_BUILTIN_0(ENUM, NAME, MASK, ATTR, ICODE)
@@ -44,7 +43,7 @@ strcat_length (const char **names, int num_names)
 
 /* Mask to string, return string is valid only until next call to same
    function.  Not thread safe.  */
-const char *
+static const char *
 m2s (HOST_WIDE_INT mask)
 {
   static char buffer [KELVIN_VERBOSE_BUFFER_LEN];
@@ -117,7 +116,7 @@ m2s (HOST_WIDE_INT mask)
   return buffer;
 }
 
-const char *
+static const char *
 a2s (unsigned int attribute)
 {
   static char buffer [KELVIN_VERBOSE_BUFFER_LEN];
@@ -215,27 +214,26 @@ a2s (unsigned int attribute)
   return buffer;
 }
 
-const struct rs6000_builtin_info_type *
-get_type (const char *name)
+static const struct rs6000_builtin_info_type *
+get_type (const int code)
 {
-  const struct rs6000_builtin_info_type *result;
-  int i;
-
-  /* The first entry in the table is not normal, so skip over that.  */
-  result = rs6000_builtin_info + 1;
-  for (i = (sizeof (rs6000_builtin_info)
-	    / sizeof (struct rs6000_builtin_info_type)) - 1; i--; result++) {
-    /*    fprintf (stderr, "get_type(%s), looking at { %s, %d, %lx, %x }\n",
-     *	     name, result->name, result->icode, result->mask,
-     *	     result->attr);
-     */
-    if (!strcmp(result->name, name))
-      return result;
-  }
-  return NULL;
+  return &rs6000_builtin_info[code];
 }
 
-const char *
+HOST_WIDE_INT
+rs6000_get_builtin_mask (const int code)
+{
+  return rs6000_builtin_info[code].mask;
+}
+
+
+unsigned int
+rs6000_get_builtin_attributes (const int code)
+{
+  return rs6000_builtin_info[code].attr;
+}
+
+static const char *
 t2s (machine_mode type) {
   int type_code = (int) type;
   int ptr_flag;
@@ -315,7 +313,7 @@ t2s (machine_mode type) {
     return ptr_flag? "unsigned int *": "unsigned int";
 
   case E_UDQmode:
-    return ptr_flag? "udq_mode *": "udq_mode";
+    return ptr_flag? "unsigned long long int *": "unsigned long long int";
 
   case E_UTQmode:
     return ptr_flag? "utq_mode *": "utq_mode";
@@ -345,10 +343,10 @@ t2s (machine_mode type) {
     return ptr_flag? "uta_mode *": "uta_mode";
 
   case E_SFmode:
-    return ptr_flag? "sf_mode *": "sf_mode";
+    return ptr_flag? "float *": "float";
 
   case E_DFmode:
-    return ptr_flag? "df_mode *": "df_mode";
+    return ptr_flag? "double *": "double";
 
   case E_IFmode:
     return ptr_flag? "__ibm128 *": "__ibm128";
@@ -456,210 +454,17 @@ t2s (machine_mode type) {
     return ptr_flag? "v2tf_mode *": "v2tf_mode";
 
   case MAX_MACHINE_MODE:
-    return ptr_flag? "dynamic_type_mode *": "dynamic_type_mode";
+    return ptr_flag? "compile_time_type *": "compile_time_type";
 
   case MAX_MACHINE_MODE+1:
-    return ptr_flag? "dynamic_vector_type_mode *": "dynamic_vector_type_mode";
+    return ptr_flag? "compile_time_vector_type *": "compile_time_vector_type";
 
   default:
     return ptr_flag? "unknown_mode *": "unknown_mode";
   }
 }
 
-void
-dump_special_table (const char *title,
-		    const struct builtin_description *bidp, int num_entries)
-{
-  machine_mode operand_modes[4];
-
-  unsigned int type_mask, attributes;
-
-  machine_mode tmode, mode0, mode1, mode2;
-
-  fprintf (stderr, "%s [%d]\n", title, num_entries);
-  while (num_entries--) {
-    switch (bidp->code) {
-    case ALTIVEC_BUILTIN_STVX_V2DF:
-    case ALTIVEC_BUILTIN_STVX_V2DI:
-    case ALTIVEC_BUILTIN_STVX_V4SF:
-    case ALTIVEC_BUILTIN_STVX:
-    case ALTIVEC_BUILTIN_STVX_V4SI:
-    case ALTIVEC_BUILTIN_STVX_V8HI:
-    case ALTIVEC_BUILTIN_STVX_V16QI:
-    case ALTIVEC_BUILTIN_STVEBX:
-    case ALTIVEC_BUILTIN_STVEHX:
-    case ALTIVEC_BUILTIN_STVEWX:
-    case ALTIVEC_BUILTIN_STVXL_V2DF:
-    case ALTIVEC_BUILTIN_STVXL_V2DI:
-    case ALTIVEC_BUILTIN_STVXL_V4SF:
-    case ALTIVEC_BUILTIN_STVXL:
-    case ALTIVEC_BUILTIN_STVXL_V4SI:
-    case ALTIVEC_BUILTIN_STVXL_V8HI:
-    case ALTIVEC_BUILTIN_STVXL_V16QI:
-    case ALTIVEC_BUILTIN_STVLX:
-    case ALTIVEC_BUILTIN_STVLXL:
-    case ALTIVEC_BUILTIN_STVRX:
-    case ALTIVEC_BUILTIN_STVRXL:
-    case VSX_BUILTIN_STXVD2X_V1TI:
-    case VSX_BUILTIN_STXVD2X_V2DF:
-    case VSX_BUILTIN_STXVD2X_V2DI:
-    case VSX_BUILTIN_STXVW4X_V4SF:
-    case VSX_BUILTIN_STXVW4X_V4SI:
-    case VSX_BUILTIN_STXVW4X_V8HI:
-    case VSX_BUILTIN_STXVW4X_V16QI:
-    case VSX_BUILTIN_ST_ELEMREV_V1TI:
-    case VSX_BUILTIN_ST_ELEMREV_V2DF:
-    case VSX_BUILTIN_ST_ELEMREV_V2DI:
-    case VSX_BUILTIN_ST_ELEMREV_V4SF:
-    case VSX_BUILTIN_ST_ELEMREV_V4SI:
-    case VSX_BUILTIN_ST_ELEMREV_V8HI:
-    case VSX_BUILTIN_ST_ELEMREV_V16QI:
-      /* Implemented by altivec_expand_stv_builtin */
-      operand_modes[0] = insn_data[bidp->icode].operand[0].mode;
-      operand_modes[1] = insn_data[bidp->icode].operand[1].mode;
-
-      /* These are pointer.  Assume 64-bit target.  */
-      operand_modes[2] = E_DImode;
-      operand_modes[3] = E_DImode;
-
-      type_mask = (unsigned int) RS6000_BTC_TERNARY;
-      break;
-
-    case P9V_BUILTIN_STXVL:
-    case P9V_BUILTIN_XST_LEN_R:
-      /* Implemented by altivec_expand_stv_builtin */
-      operand_modes[0] = insn_data[bidp->icode].operand[0].mode;
-      operand_modes[1] = insn_data[bidp->icode].operand[1].mode;
-      operand_modes[2] = insn_data[bidp->icode].operand[2].mode;
-
-      type_mask = RS6000_BTC_BINARY;
-      break;
-
-    case ALTIVEC_BUILTIN_MFVSCR:
-      operand_modes[0] = insn_data[bidp->icode].operand[0].mode;
-
-      type_mask = RS6000_BTC_SPECIAL;
-      break;
-
-    case ALTIVEC_BUILTIN_MTVSCR:
-      operand_modes[0] = E_VOIDmode;
-      operand_modes[1] = insn_data[bidp->icode].operand[0].mode;
-
-      type_mask = RS6000_BTC_UNARY;
-      break;
-
-    case ALTIVEC_BUILTIN_DSSALL:
-      operand_modes[0] = E_VOIDmode;
-
-      type_mask = RS6000_BTC_SPECIAL;
-      break;
-
-    case ALTIVEC_BUILTIN_DSS:
-      operand_modes[0] = E_VOIDmode;
-      /* 2-bit unsigned literal int */
-      operand_modes[1] = insn_data[bidp->icode].operand[0].mode;
-
-      type_mask = RS6000_BTC_UNARY;
-      break;
-
-    case ALTIVEC_BUILTIN_VEC_INIT_V4SI:
-    case ALTIVEC_BUILTIN_VEC_INIT_V8HI:
-    case ALTIVEC_BUILTIN_VEC_INIT_V16QI:
-    case ALTIVEC_BUILTIN_VEC_INIT_V4SF:
-    case VSX_BUILTIN_VEC_INIT_V2DF:
-    case VSX_BUILTIN_VEC_INIT_V2DI:
-    case VSX_BUILTIN_VEC_INIT_V1TI:
-      /* The operand[0] type is computed at run-time.  */
-      operand_modes[0] = MAX_MACHINE_MODE;
-
-      type_mask = RS6000_BTC_SPECIAL;
-      break;
-
-    case ALTIVEC_BUILTIN_VEC_SET_V4SI:
-    case ALTIVEC_BUILTIN_VEC_SET_V8HI:
-    case ALTIVEC_BUILTIN_VEC_SET_V16QI:
-    case ALTIVEC_BUILTIN_VEC_SET_V4SF:
-    case VSX_BUILTIN_VEC_SET_V2DF:
-    case VSX_BUILTIN_VEC_SET_V2DI:
-    case VSX_BUILTIN_VEC_SET_V1TI:
-      operand_modes[0] = (machine_mode) (MAX_MACHINE_MODE + 1);
-      operand_modes[1] = MAX_MACHINE_MODE;
-      operand_modes[2] = (machine_mode) (MAX_MACHINE_MODE + 1);
-
-      type_mask = RS6000_BTC_BINARY;
-      break;
-
-    case ALTIVEC_BUILTIN_VEC_EXT_V4SI:
-    case ALTIVEC_BUILTIN_VEC_EXT_V8HI:
-    case ALTIVEC_BUILTIN_VEC_EXT_V16QI:
-    case ALTIVEC_BUILTIN_VEC_EXT_V4SF:
-    case VSX_BUILTIN_VEC_EXT_V2DF:
-    case VSX_BUILTIN_VEC_EXT_V2DI:
-    case VSX_BUILTIN_VEC_EXT_V1TI:
-      operand_modes[0] = MAX_MACHINE_MODE;
-      operand_modes[1] = MAX_MACHINE_MODE;
-      operand_modes[2] = MAX_MACHINE_MODE;
-
-      type_mask = RS6000_BTC_BINARY;
-      break;
-
-    default:
-
-      fprintf (stderr, "unrecognized special function: %s\n", bidp->name);
-      break;
-      /* Fall through.  */
-    }
-
-    attributes = type_mask;
-
-    switch (type_mask) {
-    case RS6000_BTC_PREDICATE:
-      /* Two source values plus an integer predicate code.  */
-    case RS6000_BTC_DST:
-      /* Expect ptr operand, int length, const int configuration
-	 operands, with void result.  */
-    case RS6000_BTC_TERNARY:
-      tmode = operand_modes[0];
-      mode0 = operand_modes[1];
-      mode1 = operand_modes[2];
-      mode2 = operand_modes[3];
-      fprintf (stderr, "%s %s (%s, %s, %s): ", t2s (tmode),
-	       bidp->name, t2s (mode0), t2s (mode1), t2s (mode2));
-      break;
-
-    case RS6000_BTC_BINARY:
-      tmode = operand_modes[0];
-      mode0 = operand_modes[1];
-      mode1 = operand_modes[2];
-      fprintf (stderr, "%s %s (%s, %s): ",
-	       t2s (tmode), bidp->name, t2s (mode0), t2s (mode1));
-      break;
-
-    case RS6000_BTC_ABS:	/* single argument, single result */
-    case RS6000_BTC_UNARY:
-      tmode = operand_modes[0];
-      mode0 = operand_modes[1];
-      fprintf (stderr, "%s %s (%s): ",
-	       t2s (tmode), bidp->name, t2s (mode0));
-      break;
-
-    case RS6000_BTC_SPECIAL:
-      /* No args, but still a result type.  */
-      tmode = operand_modes[0];
-      fprintf (stderr, "%s %s (): ", t2s (tmode), bidp->name);
-      break;
-
-    }
-    fprintf (stderr, "icode: %d, code: %d\n", bidp->icode, bidp->code);
-    fprintf (stderr, "  mask: %s\n", m2s (bidp->mask));
-    fprintf (stderr, "  attr: %s\n", a2s (attributes));
-    bidp++;
-  }
-
-  fprintf (stderr, "\n");
-}
-
-void
+static void
 dump_one_table (const char *title,
 		const struct builtin_description *bidp, int num_entries)
 {
@@ -667,14 +472,14 @@ dump_one_table (const char *title,
 
   fprintf (stderr, "%s [%d]\n", title, num_entries);
   while (num_entries--) {
-    unsigned attributes = get_type (bidp->name)->attr;
+    unsigned attributes = get_type (bidp->code)->attr;
     unsigned type_mask = attributes & RS6000_BTC_TYPE_MASK;
+    HOST_WIDE_INT builtin_mask = bidp->mask;
 
-    if ((attributes & RS6000_BTC_OVERLOADED) == 0)
+    if (((builtin_mask & RS6000_BTM_PAIRED) == 0) &&
+	((attributes & RS6000_BTC_OVERLOADED) == 0))
       {
 	switch (type_mask) {
-	case RS6000_BTC_PREDICATE:
-	  /* Two source values plus an integer predicate code.  */
 	case RS6000_BTC_DST:
 	  /* Expect ptr operand, int length, const int configuration
 	     operands, with void result.  */
@@ -685,6 +490,23 @@ dump_one_table (const char *title,
 	  mode2 = insn_data[bidp->icode].operand[3].mode;
 	  fprintf (stderr, "%s %s (%s, %s, %s): ", t2s (tmode),
 		   bidp->name, t2s (mode0), t2s (mode1), t2s (mode2));
+	  break;
+
+	case RS6000_BTC_PREDICATE:
+	  /* An implicit integer predicate code and two source values.  */
+	  if (builtin_mask & RS6000_BTM_PAIRED)
+	    {
+	      /* Special treatment in rs6000.c: paired_init_buitins */
+	      mode0 = E_V2SFmode;
+	      mode1 = E_V2SFmode;
+	    }
+	  else
+	    {
+	      mode0 = insn_data[bidp->icode].operand[1].mode;
+	      mode1 = insn_data[bidp->icode].operand[2].mode;
+	    }
+	  fprintf (stderr, "int %s (int, %s, %s): ",
+		   bidp->name, t2s (mode0), t2s (mode1));
 	  break;
 
 	case RS6000_BTC_BINARY:
@@ -704,10 +526,1096 @@ dump_one_table (const char *title,
 	  break;
 
 	case RS6000_BTC_SPECIAL:
-	  /* No args, but still a result type.  */
-	  tmode = insn_data[bidp->icode].operand[0].mode;
-	  fprintf (stderr, "%s %s (): ", t2s (tmode), bidp->name);
-	  break;
+	  {
+	    machine_mode operand_modes[4];
+	    int num_operands = 0;
+
+	    /* Built-in functions characterized with the
+	       RS6000_BTC_SPECIAL have their type signatures defined
+	       by special code executed during compiler startup rather
+	       than by the standard tables.  */
+
+	    switch (bidp->code) {
+
+	      /* ignore cases associated with RS6000_BTM_PAIRED:
+	       *
+	       *  case PAIRED_BUILTIN_LX:
+	       *    paired_init_builtins: v2sf_ftype_long_pcfloat 
+	       *
+	       *  case PAIRED_BUILTIN_STX:
+	       *    paired_init_builtins: void_ftype_v2sf_long_pcfloat
+	       *
+	       *  case PAIRED_BUILTIN_STX:
+	       *    from paired_expand_stv_builtin
+	       *
+	       *  case PAIRED_BUILTIN_LX:
+	       *    from paired_expand_lv_builtin
+	       */
+
+	    case RS6000_BUILTIN_RECIP:
+	      operand_modes[0] = DFmode;
+	      operand_modes[1] = DFmode;
+	      operand_modes[2] = DFmode;
+	      num_operands = 3;
+	      break;
+
+	    case RS6000_BUILTIN_RECIPF:
+	      operand_modes[0] = SFmode;
+	      operand_modes[1] = SFmode;
+	      operand_modes[2] = SFmode;
+	      num_operands = 3;
+	      break;
+
+	    case RS6000_BUILTIN_RSQRT:
+	      operand_modes[0] = DFmode;
+	      operand_modes[1] = DFmode;
+	      num_operands = 2;
+	      break;
+
+	    case RS6000_BUILTIN_RSQRTF:
+	      operand_modes[0] = SFmode;
+	      operand_modes[1] = SFmode;
+	      num_operands = 2;
+	      break;
+
+	    case POWER7_BUILTIN_BPERMD:
+	      /* -m32, these are SImode */
+	      operand_modes[0] = DImode;
+	      operand_modes[1] = DImode;
+	      operand_modes[2] = DImode;
+	      num_operands = 3;
+	      break;
+
+	    case RS6000_BUILTIN_GET_TB:
+	      operand_modes[0] = E_USQmode;
+	      num_operands = 1;
+	      break;
+
+	    case RS6000_BUILTIN_MFTB:
+	      /* -m32 is SImode */
+	      operand_modes[0] = E_UDQmode;
+	      num_operands = 1;
+	      break;
+
+	    case RS6000_BUILTIN_MFFS:
+	      operand_modes[0] = E_DFmode;
+	      num_operands = 1;
+	      break;
+
+	    case RS6000_BUILTIN_MTFSF:
+	      operand_modes[0] = E_VOIDmode;
+	      operand_modes[0] = E_SImode;
+	      operand_modes[0] = E_DFmode;
+	      num_operands = 3;
+	      break;
+
+	    case RS6000_BUILTIN_CPU_INIT:
+	    case MISC_BUILTIN_SPEC_BARRIER:
+	      operand_modes[0] = E_VOIDmode;
+	      num_operands = 1;
+	      break;
+
+	    case RS6000_BUILTIN_CPU_IS:
+	    case RS6000_BUILTIN_CPU_SUPPORTS:
+	      operand_modes[0] = E_SImode;
+	      operand_modes[1] = ~E_VOIDmode; /* pointer to void */
+	      num_operands = 2;
+	      break;
+
+	    case ALTIVEC_BUILTIN_MTVSCR:
+	      /* altivec_init_builtins: void_ftype_v4si */
+	      operand_modes[0] = E_VOIDmode;
+	      operand_modes[1] = E_V4SImode;
+	      num_operands = 2;
+	      break;
+
+	    case ALTIVEC_BUILTIN_MFVSCR:
+	      /* altivec_init_builtins: v8hi_ftype_void */
+	      operand_modes[0] = E_V8HImode;
+	      num_operands = 1;
+	      break;
+
+	    case ALTIVEC_BUILTIN_DSSALL:
+	      /* altivec_init_builtins: void_ftype_void */
+	      operand_modes[0] = E_VOIDmode;
+	      num_operands = 1;
+	      break;
+
+	    case ALTIVEC_BUILTIN_DSS:
+	      /* altivec_init_builtins: void_ftype_int */
+	      operand_modes[0] = E_VOIDmode;
+	      operand_modes[1] = E_SImode;
+	      num_operands = 2;
+	      break;
+
+	    case ALTIVEC_BUILTIN_LVSL:
+	    case ALTIVEC_BUILTIN_LVSR:
+	    case ALTIVEC_BUILTIN_LVEBX:
+	    case ALTIVEC_BUILTIN_LVXL_V16QI:
+	    case ALTIVEC_BUILTIN_LVX_V16QI:
+	    case ALTIVEC_BUILTIN_VEC_LVSL:
+	    case ALTIVEC_BUILTIN_VEC_LVSR:
+	    case ALTIVEC_BUILTIN_VEC_LVEBX:
+	    case VSX_BUILTIN_LXVW4X_V16QI:
+	    case VSX_BUILTIN_LD_ELEMREV_V16QI:
+	    case ALTIVEC_BUILTIN_LVLX:
+	    case ALTIVEC_BUILTIN_LVLXL:
+	    case ALTIVEC_BUILTIN_LVRX:
+	    case ALTIVEC_BUILTIN_LVRXL:
+	    case ALTIVEC_BUILTIN_VEC_LVLX:
+	    case ALTIVEC_BUILTIN_VEC_LVLXL:
+	    case ALTIVEC_BUILTIN_VEC_LVRX:
+	    case ALTIVEC_BUILTIN_VEC_LVRXL:
+	      /* altivec_init_builtins: v16qi_ftype_long_pcvoid */
+	      operand_modes[0] = E_V16QImode;
+	      /* SImode on -m32 */
+	      operand_modes[1] = E_DImode;
+	      operand_modes[2] = ~E_VOIDmode;
+	      num_operands = 3;
+	      break;
+
+	    case ALTIVEC_BUILTIN_LVEHX:
+	    case ALTIVEC_BUILTIN_LVXL_V8HI:
+	    case ALTIVEC_BUILTIN_LVX_V8HI:
+	    case ALTIVEC_BUILTIN_VEC_LVEHX:
+	    case VSX_BUILTIN_LXVW4X_V8HI:
+	    case VSX_BUILTIN_LD_ELEMREV_V8HI:
+	      /* altivec_init_builtins: v8hi_ftype_long_pcvoid */
+	      operand_modes[0] = E_V8HImode;
+	      /* SImode on -m32 */
+	      operand_modes[1] = E_DImode;
+	      operand_modes[2] = ~E_VOIDmode;
+	      num_operands = 3;
+	      break;
+
+	    case ALTIVEC_BUILTIN_LVEWX:
+	    case ALTIVEC_BUILTIN_LVXL:
+	    case ALTIVEC_BUILTIN_LVXL_V4SI:
+	    case ALTIVEC_BUILTIN_LVX:
+	    case ALTIVEC_BUILTIN_LVX_V4SI:
+	      /* altivec_init_builtins: v4si_ftype_long_pcvoid */
+	      operand_modes[0] = E_V4SImode;
+	      /* SImode on -m32 */
+	      operand_modes[1] = E_DImode;
+	      operand_modes[2] = ~E_VOIDmode;
+	      num_operands = 3;
+	      break;
+
+	    case ALTIVEC_BUILTIN_LVXL_V2DF:
+	    case ALTIVEC_BUILTIN_LVX_V2DF:
+	    case VSX_BUILTIN_LXVD2X_V2DF:
+	    case VSX_BUILTIN_LD_ELEMREV_V2DF:
+	      /* altivec_init_builtins: v2df_ftype_long_pcvoid */
+	      operand_modes[0] = E_V2DFmode;
+	      /* SImode on -m32 */
+	      operand_modes[1] = E_DImode;
+	      operand_modes[2] = ~E_VOIDmode;
+	      num_operands = 3;
+	      break;
+
+	    case ALTIVEC_BUILTIN_LVXL_V2DI:
+	    case ALTIVEC_BUILTIN_LVX_V2DI:
+	    case VSX_BUILTIN_LXVD2X_V2DI:
+	    case VSX_BUILTIN_LD_ELEMREV_V2DI:
+	      /* altivec_init_builtins: v2di_ftype_long_pcvoid */
+	      operand_modes[0] = E_V2DImode;
+	      /* SImode on -m32 */
+	      operand_modes[1] = E_DImode;
+	      operand_modes[2] = ~E_VOIDmode;
+	      num_operands = 3;
+	      break;
+
+	    case ALTIVEC_BUILTIN_LVXL_V4SF:
+	    case ALTIVEC_BUILTIN_LVX_V4SF:
+	    case VSX_BUILTIN_LXVW4X_V4SF:
+	    case VSX_BUILTIN_LD_ELEMREV_V4SF:
+	      /* altivec_init_builtins: v4sf_ftype_long_pcvoid */
+	      operand_modes[0] = E_V4SFmode;
+	      /* SImode on -m32 */
+	      operand_modes[1] = E_DImode;
+	      operand_modes[2] = ~E_VOIDmode;
+	      num_operands = 3;
+	      break;
+
+	    case ALTIVEC_BUILTIN_STVX:
+	    case ALTIVEC_BUILTIN_STVX_V4SI:
+	    case ALTIVEC_BUILTIN_STVEWX:
+	    case ALTIVEC_BUILTIN_STVXL:
+	    case ALTIVEC_BUILTIN_STVXL_V4SI:
+	    case VSX_BUILTIN_STXVW4X_V4SI:
+	    case VSX_BUILTIN_ST_ELEMREV_V4SI:
+	      /* altivec_init_builtins: void_ftype_v4si_long_pvoid */
+	      operand_modes[0] = E_VOIDmode;
+	      operand_modes[1] = E_V4SImode;
+	      /* SImode on -m32 */
+	      operand_modes[2] = E_DImode;
+	      operand_modes[3] = ~E_VOIDmode;
+	      num_operands = 4;
+	      break;
+
+	    case ALTIVEC_BUILTIN_STVX_V2DF:
+	    case ALTIVEC_BUILTIN_STVXL_V2DF:
+	    case VSX_BUILTIN_STXVD2X_V2DF:
+	    case VSX_BUILTIN_ST_ELEMREV_V2DF:
+	      /* altivec_init_builtins: void_ftype_v2df_long_pvoid */
+	      operand_modes[0] = E_VOIDmode;
+	      operand_modes[1] = E_V2DFmode;
+	      /* SImode on -m32 */
+	      operand_modes[2] = E_DImode;
+	      operand_modes[3] = ~E_VOIDmode;
+	      num_operands = 4;
+	      break;
+
+	    case ALTIVEC_BUILTIN_STVX_V2DI:
+	    case ALTIVEC_BUILTIN_STVXL_V2DI:
+	    case VSX_BUILTIN_STXVD2X_V2DI:
+	    case VSX_BUILTIN_ST_ELEMREV_V2DI:
+	      /* altivec_init_builtins: void_ftype_v2di_long_pvoid */
+	      operand_modes[0] = E_VOIDmode;
+	      operand_modes[1] = E_V2DFmode;
+	      /* SImode on -m32 */
+	      operand_modes[2] = E_DImode;
+	      operand_modes[3] = ~E_VOIDmode;
+	      num_operands = 4;
+	      break;
+
+	    case ALTIVEC_BUILTIN_STVX_V4SF:
+	    case ALTIVEC_BUILTIN_STVXL_V4SF:
+	    case VSX_BUILTIN_STXVW4X_V4SF:
+	    case VSX_BUILTIN_ST_ELEMREV_V4SF:
+	      /* altivec_init_builtins: void_ftype_v4sf_long_pvoid */
+	      operand_modes[0] = E_VOIDmode;
+	      operand_modes[1] = E_V4SFmode;
+	      /* SImode on -m32 */
+	      operand_modes[2] = E_DImode;
+	      operand_modes[3] = ~E_VOIDmode;
+	      num_operands = 4;
+	      break;
+
+	    case ALTIVEC_BUILTIN_STVX_V8HI:
+	    case ALTIVEC_BUILTIN_STVXL_V8HI:
+	    case ALTIVEC_BUILTIN_STVEHX:
+	      /* altivec_init_builtins: void_ftype_v8hi_long_pvoid */
+	      operand_modes[0] = E_VOIDmode;
+	      operand_modes[1] = E_V8HImode;
+	      /* SImode on -m32 */
+	      operand_modes[2] = E_DImode;
+	      operand_modes[3] = ~E_VOIDmode;
+	      num_operands = 4;
+	      break;
+
+	    case ALTIVEC_BUILTIN_STVX_V16QI:
+	    case ALTIVEC_BUILTIN_STVXL_V16QI:
+	    case ALTIVEC_BUILTIN_STVEBX:
+	      /* altivec_init_builtins: void_ftype_v16qi_long_pvoid */
+	      operand_modes[0] = E_VOIDmode;
+	      operand_modes[1] = E_V16QImode;
+	      /* SImode on -m32 */
+	      operand_modes[2] = E_DImode;
+	      operand_modes[3] = ~E_VOIDmode;
+	      num_operands = 4;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_LD:
+	    case ALTIVEC_BUILTIN_VEC_LDE:
+	    case ALTIVEC_BUILTIN_VEC_LDL:
+	      /* altivec_init_builtins: opaque_ftype_long_pcvoid */
+
+	      /* opaque apparently stands for "opaque_V4SI", which is
+	       * the result of making an "opaque_vector_type" out of
+	       * an intSI_type_node.  I believe an opaque vector is a
+	       * vector that is known to the back-end, but is not
+	       * known to the target-independent portions of the GCC
+	       * compiler.  Since the type is not known to the GCC
+	       * compiler, the GCC compiler cannot "manipulate" this
+	       * subtree.  */
+	      operand_modes[0] = E_V4SImode;
+	      /* SImode on -m32 */
+	      operand_modes[1] = E_DImode;
+	      /* Methinks pcvoid means "const *void".  I'll ignore
+		 the const qualifier for now.  */
+	      operand_modes[2] = ~E_VOIDmode;
+	      num_operands = 3;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_LVEWX:
+	    case VSX_BUILTIN_LXVW4X_V4SI:
+	    case VSX_BUILTIN_LD_ELEMREV_V4SI:
+	      /* altivec_init_builtins: v4si_ftype_long_pcvoid */
+	      operand_modes[0] = E_V4SImode;
+	      /* SImode on -m32 */
+	      operand_modes[1] = E_DImode;
+	      /* Methinks pcvoid means "const *void".  I'll ignore
+		 the const qualifier for now.  */
+	      operand_modes[2] = ~E_VOIDmode;
+	      num_operands = 3;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_ST:
+	    case ALTIVEC_BUILTIN_VEC_STE:
+	    case ALTIVEC_BUILTIN_VEC_STL:
+	    case ALTIVEC_BUILTIN_VEC_STVEWX:
+	    case ALTIVEC_BUILTIN_VEC_STVEBX:
+	    case ALTIVEC_BUILTIN_VEC_STVEHX:
+	      /* altivec_init_builtins: void_ftype_opaque_long_pvoid */
+
+	      operand_modes[0] = E_VOIDmode;
+	      /* opaque apparently stands for "opaque_V4SI", which is
+	       * the result of making an "opaque_vector_type" out of
+	       * an intSI_type_node.  I believe an opaque vector is a
+	       * vector that is known to the back-end, but is not
+	       * known to the target-independent portions of the GCC
+	       * compiler.  Since the type is not known to the GCC
+	       * compiler, the GCC compiler cannot "manipulate" this
+	       * subtree.  */
+	      operand_modes[1] = E_V4SImode;
+	      /* SImode on -m32 */
+	      operand_modes[2] = E_DImode;
+	      /* Methinks pcvoid means "const *void".  I'll ignore
+		 the const qualifier for now.  */
+	      operand_modes[3] = ~E_VOIDmode;
+	      num_operands = 4;
+	      break;
+
+
+
+
+	    case VSX_BUILTIN_STXVW4X_V8HI:
+	      /* altivec_init_builtins: void_ftype_v8hi_long_pvoid, */
+
+	    case VSX_BUILTIN_STXVW4X_V16QI:
+	      /* altivec_init_builtins: void_ftype_v16qi_long_pvoid, */
+
+
+
+
+
+
+
+
+	    case VSX_BUILTIN_ST_ELEMREV_V1TI:
+	      /* altivec_init_builtins: void_ftype_v1ti_long_pvoid, */
+
+
+
+
+	    case VSX_BUILTIN_ST_ELEMREV_V8HI:
+	      /* altivec_init_builtins: void_ftype_v8hi_long_pvoid, */
+
+	    case VSX_BUILTIN_ST_ELEMREV_V16QI:
+	      /* altivec_init_builtins: void_ftype_v16qi_long_pvoid, */
+
+	    case VSX_BUILTIN_VEC_LD:
+	      /* altivec_init_builtins: opaque_ftype_long_pcvoid, */
+
+	    case VSX_BUILTIN_VEC_ST:
+	      /* altivec_init_builtins: void_ftype_opaque_long_pvoid */
+
+	    case VSX_BUILTIN_VEC_XL:
+	    case VSX_BUILTIN_VEC_XL_BE:
+	      /* altivec_init_builtins: opaque_ftype_long_pcvoid, */
+	      /* altivec_init_builtins: opaque_ftype_long_pcvoid, */
+
+
+	    case VSX_BUILTIN_VEC_XST:
+	    case VSX_BUILTIN_VEC_XST_BE:
+	      /* altivec_init_builtins: void_ftype_opaque_long_pvoid, */
+	      /* altivec_init_builtins: void_ftype_opaque_long_pvoid, */
+
+	    case ALTIVEC_BUILTIN_VEC_STEP:
+	      /* altivec_init_builtins: int_ftype_opaque */
+
+	    case ALTIVEC_BUILTIN_VEC_SLD:
+	    case ALTIVEC_BUILTIN_VEC_INSERT:
+	      /* altivec_init_builtins: opaque_ftype_opaque_opaque_int */
+	      /* altivec_init_builtins: opaque_ftype_opaque_opaque_int */
+
+
+
+	    case ALTIVEC_BUILTIN_VEC_SPLATS:
+	    case ALTIVEC_BUILTIN_VEC_PROMOTE:
+	      /* altivec_init_builtins: opaque_ftype_opaque */
+	      /* altivec_init_builtins: opaque_ftype_opaque */
+
+	    case ALTIVEC_BUILTIN_VEC_SPLAT:
+	    case ALTIVEC_BUILTIN_VEC_EXTRACT:
+	    case ALTIVEC_BUILTIN_VEC_VSPLTW:
+	    case ALTIVEC_BUILTIN_VEC_VSPLTH:
+	    case ALTIVEC_BUILTIN_VEC_VSPLTB:
+	    case ALTIVEC_BUILTIN_VEC_CTF:
+	    case ALTIVEC_BUILTIN_VEC_VCFSX:
+	    case ALTIVEC_BUILTIN_VEC_VCFUX:
+	    case ALTIVEC_BUILTIN_VEC_CTS:
+	    case ALTIVEC_BUILTIN_VEC_CTU:
+	      /* altivec_init_builtins: opaque_ftype_opaque_int */
+	      /* altivec_init_builtins: opaque_ftype_opaque_int */
+	      /* altivec_init_builtins: opaque_ftype_opaque_int */
+	      /* altivec_init_builtins: opaque_ftype_opaque_int */
+	      /* altivec_init_builtins: opaque_ftype_opaque_int */
+	      /* altivec_init_builtins: opaque_ftype_opaque_int */
+	      /* altivec_init_builtins: opaque_ftype_opaque_int */
+	      /* altivec_init_builtins: opaque_ftype_opaque_int */
+	      /* altivec_init_builtins: opaque_ftype_opaque_int */
+	      /* altivec_init_builtins: opaque_ftype_opaque_int */
+
+
+
+	    case ALTIVEC_BUILTIN_VEC_CMPNE:
+	    case ALTIVEC_BUILTIN_VEC_MUL:
+	      /* altivec_init_builtins: opaque_ftype_opaque_opaque */
+	      /* altivec_init_builtins: opaque_ftype_opaque_opaque */
+
+
+	    case ALTIVEC_BUILTIN_VEC_ADDE:
+	    case ALTIVEC_BUILTIN_VEC_ADDEC:
+	    case ALTIVEC_BUILTIN_VEC_SUBE:
+	    case ALTIVEC_BUILTIN_VEC_SUBEC:
+	      /* altivec_init_builtins: opaque_ftype_opaque_opaque_opaque */
+	      /* altivec_init_builtins: opaque_ftype_opaque_opaque_opaque */
+	      /* altivec_init_builtins: opaque_ftype_opaque_opaque_opaque */
+	      /* altivec_init_builtins: opaque_ftype_opaque_opaque_opaque */
+
+
+
+
+
+
+
+	    case P9V_BUILTIN_XST_LEN_R:
+	    case P9V_BUILTIN_STXVL:
+	      /* ONLY AVAILABLE ON P9 */
+	    case ALTIVEC_BUILTIN_VEC_STVLX:
+	    case ALTIVEC_BUILTIN_VEC_STVLXL:
+	    case ALTIVEC_BUILTIN_VEC_STVRX:
+	    case ALTIVEC_BUILTIN_VEC_STVRXL:
+	    case ALTIVEC_BUILTIN_STVLX:
+	    case ALTIVEC_BUILTIN_STVLXL:
+	    case ALTIVEC_BUILTIN_STVRX:
+	    case ALTIVEC_BUILTIN_STVRXL:
+	      /* altivec_init_builtins: void_ftype_v16qi_long_pvoid */
+	      /* altivec_init_builtins: void_ftype_v16qi_long_pvoid */
+	      /* altivec_init_builtins: void_ftype_v16qi_long_pvoid */
+	      /* altivec_init_builtins: void_ftype_v16qi_long_pvoid */
+	      /* altivec_init_builtins: void_ftype_v16qi_long_pvoid */
+	      /* altivec_init_builtins: void_ftype_v16qi_long_pvoid */
+	      /* altivec_init_builtins: void_ftype_v16qi_long_pvoid */
+	      /* altivec_init_builtins: void_ftype_v16qi_long_pvoid */
+	      /* altivec_init_builtins: void_ftype_v16qi_pvoid_long */
+	      /* altivec_init_builtins: void_ftype_v16qi_pvoid_long */
+
+
+
+
+  /* following should all be removed */
+
+
+	    case ALTIVEC_BUILTIN_ST_INTERNAL_16qi:
+	      /* Replaced with CODE_FOR_vector_altivec_store_v16qi.  */
+	    case ALTIVEC_BUILTIN_ST_INTERNAL_8hi:
+	    case ALTIVEC_BUILTIN_ST_INTERNAL_4si:
+	    case ALTIVEC_BUILTIN_ST_INTERNAL_4sf:
+	    case ALTIVEC_BUILTIN_ST_INTERNAL_2df:
+	    case ALTIVEC_BUILTIN_ST_INTERNAL_2di:
+	    case ALTIVEC_BUILTIN_ST_INTERNAL_1ti:
+	      /* Implemented by altivec_expand_st_builtin */
+	      operand_modes[0] = E_VOIDmode;
+	      operand_modes[1] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[2] = (machine_mode) (MAX_MACHINE_MODE + 1);
+
+	      type_mask = (unsigned int) RS6000_BTC_BINARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_LD_INTERNAL_16qi:
+	    case ALTIVEC_BUILTIN_LD_INTERNAL_8hi:
+	    case ALTIVEC_BUILTIN_LD_INTERNAL_4si:
+	    case ALTIVEC_BUILTIN_LD_INTERNAL_4sf:
+	    case ALTIVEC_BUILTIN_LD_INTERNAL_2df:
+	    case ALTIVEC_BUILTIN_LD_INTERNAL_2di:
+	    case ALTIVEC_BUILTIN_LD_INTERNAL_1ti:
+	      /* Implemented by altivec_expand_ld_builtin */
+	      operand_modes[0] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[1] = (machine_mode) (MAX_MACHINE_MODE + 1);
+
+	      type_mask = (unsigned int) RS6000_BTC_UNARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_STVX_V2DF:
+	    case ALTIVEC_BUILTIN_STVX_V2DI:
+	    case ALTIVEC_BUILTIN_STVX_V4SF:
+	    case ALTIVEC_BUILTIN_STVX:
+	    case ALTIVEC_BUILTIN_STVX_V4SI:
+	    case ALTIVEC_BUILTIN_STVX_V8HI:
+	    case ALTIVEC_BUILTIN_STVX_V16QI:
+	    case ALTIVEC_BUILTIN_STVEBX:
+	    case ALTIVEC_BUILTIN_STVEHX:
+	    case ALTIVEC_BUILTIN_STVEWX:
+	    case ALTIVEC_BUILTIN_STVXL_V2DF:
+	    case ALTIVEC_BUILTIN_STVXL_V2DI:
+	    case ALTIVEC_BUILTIN_STVXL_V4SF:
+	    case ALTIVEC_BUILTIN_STVXL:
+	    case ALTIVEC_BUILTIN_STVXL_V4SI:
+	    case ALTIVEC_BUILTIN_STVXL_V8HI:
+	    case ALTIVEC_BUILTIN_STVXL_V16QI:
+	    case ALTIVEC_BUILTIN_STVLX:
+	    case ALTIVEC_BUILTIN_STVLXL:
+	    case ALTIVEC_BUILTIN_STVRX:
+	    case ALTIVEC_BUILTIN_STVRXL:
+	    case VSX_BUILTIN_STXVD2X_V1TI:
+	    case VSX_BUILTIN_STXVD2X_V2DF:
+	    case VSX_BUILTIN_STXVD2X_V2DI:
+	    case VSX_BUILTIN_STXVW4X_V4SF:
+	    case VSX_BUILTIN_STXVW4X_V4SI:
+	    case VSX_BUILTIN_STXVW4X_V8HI:
+	    case VSX_BUILTIN_STXVW4X_V16QI:
+	    case VSX_BUILTIN_ST_ELEMREV_V1TI:
+	    case VSX_BUILTIN_ST_ELEMREV_V2DF:
+	    case VSX_BUILTIN_ST_ELEMREV_V2DI:
+	    case VSX_BUILTIN_ST_ELEMREV_V4SF:
+	    case VSX_BUILTIN_ST_ELEMREV_V4SI:
+	    case VSX_BUILTIN_ST_ELEMREV_V8HI:
+	    case VSX_BUILTIN_ST_ELEMREV_V16QI:
+	    case ALTIVEC_BUILTIN_VEC_STVLX:
+	    case ALTIVEC_BUILTIN_VEC_STVLXL:
+	    case ALTIVEC_BUILTIN_VEC_STVRX:
+	    case ALTIVEC_BUILTIN_VEC_STVRXL:
+
+	      /* Implemented by altivec_expand_stv_builtin */
+	      operand_modes[0] = insn_data[bidp->icode].operand[0].mode;
+	      operand_modes[1] = insn_data[bidp->icode].operand[1].mode;
+
+	      /* These are pointer.  Assume 64-bit target.  */
+	      operand_modes[2] = E_DImode;
+	      operand_modes[3] = E_DImode;
+
+	      type_mask = (unsigned int) RS6000_BTC_TERNARY;
+	      break;
+
+	    case P9V_BUILTIN_STXVL:
+	    case P9V_BUILTIN_XST_LEN_R:
+	      /* Implemented by altivec_expand_stxvl_builtin */
+	      operand_modes[0] = insn_data[bidp->icode].operand[0].mode;
+	      operand_modes[1] = insn_data[bidp->icode].operand[1].mode;
+	      operand_modes[2] = insn_data[bidp->icode].operand[2].mode;
+
+	      type_mask = RS6000_BTC_BINARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_MFVSCR:
+	      operand_modes[0] = insn_data[bidp->icode].operand[0].mode;
+
+	      type_mask = RS6000_BTC_SPECIAL;
+	      break;
+
+	    case ALTIVEC_BUILTIN_MTVSCR:
+	      operand_modes[0] = E_VOIDmode;
+	      operand_modes[1] = insn_data[bidp->icode].operand[0].mode;
+
+	      type_mask = RS6000_BTC_UNARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_DSSALL:
+	      operand_modes[0] = E_VOIDmode;
+
+	      type_mask = RS6000_BTC_SPECIAL;
+	      break;
+
+	    case ALTIVEC_BUILTIN_DSS:
+	      operand_modes[0] = E_VOIDmode;
+	      /* 2-bit unsigned literal int */
+	      operand_modes[1] = insn_data[bidp->icode].operand[0].mode;
+
+	      type_mask = RS6000_BTC_UNARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_INIT_V4SI:
+	    case ALTIVEC_BUILTIN_VEC_INIT_V8HI:
+	    case ALTIVEC_BUILTIN_VEC_INIT_V16QI:
+	    case ALTIVEC_BUILTIN_VEC_INIT_V4SF:
+	    case VSX_BUILTIN_VEC_INIT_V2DF:
+	    case VSX_BUILTIN_VEC_INIT_V2DI:
+	    case VSX_BUILTIN_VEC_INIT_V1TI:
+	      /* The operand[0] type is computed at run-time.  */
+	      operand_modes[0] = MAX_MACHINE_MODE;
+
+	      type_mask = RS6000_BTC_SPECIAL;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_SET_V4SI:
+	    case ALTIVEC_BUILTIN_VEC_SET_V8HI:
+	    case ALTIVEC_BUILTIN_VEC_SET_V16QI:
+	    case ALTIVEC_BUILTIN_VEC_SET_V4SF:
+	    case VSX_BUILTIN_VEC_SET_V2DF:
+	    case VSX_BUILTIN_VEC_SET_V2DI:
+	    case VSX_BUILTIN_VEC_SET_V1TI:
+	      operand_modes[0] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[1] = MAX_MACHINE_MODE;
+	      operand_modes[2] = (machine_mode) (MAX_MACHINE_MODE + 1);
+
+	      type_mask = RS6000_BTC_BINARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_EXT_V4SI:
+	    case ALTIVEC_BUILTIN_VEC_EXT_V8HI:
+	    case ALTIVEC_BUILTIN_VEC_EXT_V16QI:
+	    case ALTIVEC_BUILTIN_VEC_EXT_V4SF:
+	    case VSX_BUILTIN_VEC_EXT_V2DF:
+	    case VSX_BUILTIN_VEC_EXT_V2DI:
+	    case VSX_BUILTIN_VEC_EXT_V1TI:
+	      operand_modes[0] = MAX_MACHINE_MODE;
+	      operand_modes[1] = MAX_MACHINE_MODE;
+	      operand_modes[2] = MAX_MACHINE_MODE;
+
+	      type_mask = RS6000_BTC_BINARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_LVSL:
+	    case ALTIVEC_BUILTIN_LVSR:
+	    case ALTIVEC_BUILTIN_LVEBX:
+	    case ALTIVEC_BUILTIN_LVEHX:
+	    case ALTIVEC_BUILTIN_LVEWX:
+	    case ALTIVEC_BUILTIN_LVXL_V2DF:
+	    case ALTIVEC_BUILTIN_LVXL_V2DI:
+	    case ALTIVEC_BUILTIN_LVXL_V4SF:
+	    case ALTIVEC_BUILTIN_LVXL:
+	    case ALTIVEC_BUILTIN_LVXL_V4SI:
+	    case ALTIVEC_BUILTIN_LVXL_V8HI:
+	    case ALTIVEC_BUILTIN_LVXL_V16QI:
+	    case ALTIVEC_BUILTIN_LVX_V2DF:
+	    case ALTIVEC_BUILTIN_LVX_V1TI:
+	    case ALTIVEC_BUILTIN_LVX_V2DI:
+	    case ALTIVEC_BUILTIN_LVX_V4SF:
+	    case ALTIVEC_BUILTIN_LVX:
+	    case ALTIVEC_BUILTIN_LVX_V4SI:
+	    case ALTIVEC_BUILTIN_LVX_V8HI:
+	    case ALTIVEC_BUILTIN_LVX_V16QI:
+	    case ALTIVEC_BUILTIN_LVLX:
+	    case ALTIVEC_BUILTIN_LVLXL:
+	    case ALTIVEC_BUILTIN_LVRX:
+	    case ALTIVEC_BUILTIN_LVRXL:
+
+	    case VSX_BUILTIN_LXVD2X_V1TI:
+	    case VSX_BUILTIN_LXVD2X_V2DF:
+	    case VSX_BUILTIN_LXVD2X_V2DI:
+	    case VSX_BUILTIN_LXVW4X_V4SF:
+	    case VSX_BUILTIN_LXVW4X_V4SI:
+	    case VSX_BUILTIN_LXVW4X_V8HI:
+	    case VSX_BUILTIN_LXVW4X_V16QI:
+
+	    case VSX_BUILTIN_LD_ELEMREV_V1TI:
+	    case VSX_BUILTIN_LD_ELEMREV_V2DF:
+	    case VSX_BUILTIN_LD_ELEMREV_V2DI:
+	    case VSX_BUILTIN_LD_ELEMREV_V4SF:
+	    case VSX_BUILTIN_LD_ELEMREV_V4SI:
+	    case VSX_BUILTIN_LD_ELEMREV_V8HI:
+	    case VSX_BUILTIN_LD_ELEMREV_V16QI:
+	      /* The V1TI case is not explicitly present with the others in
+		 altivec_expand_lv_builtin, so this case is apparently
+		 handled in the "else" clause.  */
+
+	    case ALTIVEC_BUILTIN_MASK_FOR_LOAD:
+	    case ALTIVEC_BUILTIN_MASK_FOR_STORE:
+	      operand_modes[0] = insn_data[bidp->icode].operand[0].mode;
+	      operand_modes[1] = insn_data[bidp->icode].operand[1].mode;
+
+	      type_mask = RS6000_BTC_UNARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_ADDEC:
+	    case ALTIVEC_BUILTIN_VEC_ADDE:
+	    case ALTIVEC_BUILTIN_VEC_SUBE:
+	    case ALTIVEC_BUILTIN_VEC_SUBEC:
+	      operand_modes[0] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[1] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[2] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[3] = (machine_mode) (MAX_MACHINE_MODE + 1);
+
+	      type_mask = RS6000_BTC_TERNARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_CMPNE:
+	      /* result is vector bool of same size as 2 vector args */
+	      operand_modes[0] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[1] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[2] = (machine_mode) (MAX_MACHINE_MODE + 1);
+
+	      type_mask = RS6000_BTC_BINARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_MUL:
+	      operand_modes[0] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[1] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[2] = (machine_mode) (MAX_MACHINE_MODE + 1);
+
+	      type_mask = RS6000_BTC_BINARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_CTF:
+	    case ALTIVEC_BUILTIN_VEC_CTS:
+	    case ALTIVEC_BUILTIN_VEC_CTU:
+	      operand_modes[0] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[1] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[2] = (machine_mode) E_SImode;
+
+	      type_mask = RS6000_BTC_BINARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_INSERT:
+	      operand_modes[0] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[1] = (machine_mode) MAX_MACHINE_MODE;
+	      operand_modes[2] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[3] = (machine_mode) E_SImode;
+
+	      type_mask = RS6000_BTC_TERNARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_EXTRACT:
+	      operand_modes[0] = (machine_mode) MAX_MACHINE_MODE;
+	      operand_modes[1] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[2] = (machine_mode) E_SImode;
+
+	      type_mask = RS6000_BTC_TERNARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_LDE:
+	    case ALTIVEC_BUILTIN_VEC_LDL:
+	    case ALTIVEC_BUILTIN_VEC_LVSL:
+	    case ALTIVEC_BUILTIN_VEC_LVSR:
+	    case ALTIVEC_BUILTIN_VEC_LVEBX:
+	    case ALTIVEC_BUILTIN_VEC_LVEHX:
+	    case ALTIVEC_BUILTIN_VEC_LVEWX:
+	    case ALTIVEC_BUILTIN_VEC_LVLX:
+	    case ALTIVEC_BUILTIN_VEC_LVLXL:
+	    case ALTIVEC_BUILTIN_VEC_LVRX:
+	    case ALTIVEC_BUILTIN_VEC_LVRXL:
+	      operand_modes[0] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[1] = (machine_mode) E_SImode;
+	      operand_modes[2] = (machine_mode) E_DImode; /* Pmode */
+
+	      type_mask = RS6000_BTC_BINARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_PROMOTE:
+	      operand_modes[0] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[1] = (machine_mode) E_SImode;
+	      operand_modes[2] = (machine_mode) E_SImode;
+
+	      type_mask = RS6000_BTC_BINARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_SPLATS:
+	      operand_modes[0] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[1] = E_SImode;
+
+	      type_mask = RS6000_BTC_UNARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_STEP:
+	      /* This prototype is a bit of a guess */
+	      operand_modes[0] = E_SImode;
+	      operand_modes[1] = (machine_mode) (MAX_MACHINE_MODE + 1);
+
+	      type_mask = RS6000_BTC_UNARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_SLD:
+	      operand_modes[0] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[1] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[2] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[3] = E_SImode;
+
+	      type_mask = RS6000_BTC_TERNARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_SPLAT:
+	      operand_modes[0] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[1] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[2] = E_SImode;
+
+	      type_mask = RS6000_BTC_BINARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_STE:
+	    case ALTIVEC_BUILTIN_VEC_STL:
+	    case ALTIVEC_BUILTIN_VEC_STVEWX:
+	    case ALTIVEC_BUILTIN_VEC_STVEBX:
+	    case ALTIVEC_BUILTIN_VEC_STVEHX:
+	      operand_modes[0] = E_VOIDmode;
+	      operand_modes[1] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[2] = E_SImode;
+	      operand_modes[3] = E_DImode; /* Pmode is DI on 64-bit */
+
+	      type_mask = RS6000_BTC_TERNARY;
+	      break;
+
+	    case ALTIVEC_BUILTIN_VEC_VCFSX:
+	    case ALTIVEC_BUILTIN_VEC_VCFUX:
+	    case ALTIVEC_BUILTIN_VEC_VSPLTW:
+	    case ALTIVEC_BUILTIN_VEC_VSPLTH:
+	    case ALTIVEC_BUILTIN_VEC_VSPLTB:
+	      operand_modes[0] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[1] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[2] = E_SImode;
+
+	      type_mask = RS6000_BTC_BINARY;
+	      break;
+
+	    case VSX_BUILTIN_LXSDX:
+	    case VSX_BUILTIN_LXVDSX:
+	    case VSX_BUILTIN_STXSDX:
+	      operand_modes[0] = (machine_mode) (MAX_MACHINE_MODE + 1);
+	      operand_modes[1] = E_DImode; /* 2 address registers */
+	      operand_modes[2] = E_DImode;
+
+	      /*	      name_qualifier = "not_implemented_"; */
+
+	      type_mask = RS6000_BTC_BINARY;
+	      break;
+
+	    case VSX_BUILTIN_XSABSDP:
+	    case VSX_BUILTIN_XSNABSDP:
+	    case VSX_BUILTIN_XSNEGDP:
+	      operand_modes[0] = E_DFmode;
+	      operand_modes[1] = E_DFmode;
+
+	      /* name_qualifier = "not_implemented_"; */
+
+	      type_mask = RS6000_BTC_UNARY;
+	      break;
+
+
+	    case VSX_BUILTIN_XSADDDP:
+	    case VSX_BUILTIN_XSDIVDP:
+	    case VSX_BUILTIN_XSMULDP:
+	    case VSX_BUILTIN_XSSUBDP:
+	      operand_modes[0] = E_DFmode;
+	      operand_modes[1] = E_DFmode;
+	      operand_modes[2] = E_DFmode;
+
+	      /* name_qualifier = "not_implemented_"; */
+
+	      type_mask = RS6000_BTC_BINARY;
+	      break;
+
+	    case VSX_BUILTIN_XSCMPODP:
+	    case VSX_BUILTIN_XSCMPUDP:
+	      operand_modes[0] = E_CCFPmode;
+	      operand_modes[1] = E_DFmode;
+	      operand_modes[2] = E_DFmode;
+
+	      /* name_qualifier = "not_implemented_"; */
+
+	      type_mask = RS6000_BTC_BINARY;
+	      break;
+
+	    case VSX_BUILTIN_XSCVDPSXDS:
+	    case VSX_BUILTIN_XSCVDPUXDS:
+	      operand_modes[0] = E_DImode;
+	      operand_modes[1] = E_DFmode;
+
+	      /* name_qualifier = "not_implemented_"; */
+
+	      type_mask = RS6000_BTC_UNARY;
+	      break;
+
+	    case VSX_BUILTIN_XSCVDPSXWS:
+	    case VSX_BUILTIN_XSCVDPUXWS:
+	      operand_modes[0] = E_SImode;
+	      operand_modes[1] = E_DFmode;
+
+	      /* name_qualifier = "not_implemented_"; */
+
+	      type_mask = RS6000_BTC_UNARY;
+	      break;
+
+	    case VSX_BUILTIN_XSCVSXDDP:
+	    case VSX_BUILTIN_XSCVUXDDP:
+	      operand_modes[0] = E_DFmode;
+	      operand_modes[1] = E_DImode;
+
+	      /* name_qualifier = "not_implemented_"; */
+
+	      type_mask = RS6000_BTC_UNARY;
+	      break;
+
+	    case VSX_BUILTIN_XSMADDADP:
+	    case VSX_BUILTIN_XSMADDMDP:
+	    case VSX_BUILTIN_XSMSUBADP:
+	    case VSX_BUILTIN_XSMSUBMDP:
+	    case VSX_BUILTIN_XSNMADDADP:
+	    case VSX_BUILTIN_XSNMADDMDP:
+	    case VSX_BUILTIN_XSNMSUBADP:
+	    case VSX_BUILTIN_XSNMSUBMDP:
+	      operand_modes[0] = E_DFmode;
+	      operand_modes[1] = E_DFmode;
+	      operand_modes[2] = E_DFmode;
+	      operand_modes[3] = E_DFmode;
+
+	      /* name_qualifier = "not_implemented_"; */
+
+	      type_mask = RS6000_BTC_TERNARY;
+	      break;
+
+	    case VSX_BUILTIN_XSMOVDP:
+	      /* Can't even find this insn documented, so wild guess as
+		 to intended semantics.  Maybe this is test for overflow
+		 of previous floating point arithmetic?  */
+	      operand_modes[0] = E_CCFPmode;
+
+	      /* name_qualifier = "not_implemented_"; */
+
+	      type_mask = RS6000_BTC_SPECIAL;
+	      break;
+
+	    case MISC_BUILTIN_SPEC_BARRIER:
+	      operand_modes[0] = E_VOIDmode;
+
+	      type_mask = RS6000_BTC_SPECIAL;
+	      break;
+
+	    case POWER7_BUILTIN_BPERMD:
+	    case RS6000_BUILTIN_RECIP:
+	    case RS6000_BUILTIN_RECIPF:
+	      /* rs6000_expand_binop_builtin */
+	      operand_modes[0] = insn_data[bidp->icode].operand[0].mode;
+	      operand_modes[1] = insn_data[bidp->icode].operand[1].mode;
+	      operand_modes[2] = insn_data[bidp->icode].operand[2].mode;
+
+	      type_mask = RS6000_BTC_BINARY;
+	      break;
+
+	    case RS6000_BUILTIN_RSQRTF:
+	    case RS6000_BUILTIN_RSQRT:
+	      /* rs6000_expand_unop_builtin */
+	      operand_modes[0] = insn_data[bidp->icode].operand[0].mode;
+	      operand_modes[1] = insn_data[bidp->icode].operand[1].mode;
+
+	      type_mask = RS6000_BTC_UNARY;
+	      break;
+
+	    case RS6000_BUILTIN_GET_TB:
+	    case RS6000_BUILTIN_MFTB:
+	    case RS6000_BUILTIN_MFFS:
+	      /* rs6000_expand_zeroop_builtin */
+	      operand_modes[0] = insn_data[bidp->icode].operand[0].mode;
+
+	      type_mask = RS6000_BTC_SPECIAL;
+	      break;
+
+	    case RS6000_BUILTIN_MTFSF:
+	      /* rs6000_expand_mtfsf_builtin */
+	      operand_modes[0] = insn_data[bidp->icode].operand[0].mode;
+	      operand_modes[1] = insn_data[bidp->icode].operand[1].mode;
+
+	      type_mask = RS6000_BTC_UNARY;
+	      break;
+
+	    case RS6000_BUILTIN_CPU_INIT:
+	      operand_modes[0] = E_VOIDmode;
+
+	      type_mask = RS6000_BTC_SPECIAL;
+	      break;
+
+
+	    case RS6000_BUILTIN_CPU_IS:
+	    case RS6000_BUILTIN_CPU_SUPPORTS:
+	      /* cpu_expand_builtin */
+	      operand_modes[0] = E_SImode;
+	      operand_modes[1] = E_DImode; /* assume 64-bit pointer to char.  */
+
+	      type_mask = RS6000_BTC_UNARY;
+	      break;
+
+
+	    case RS6000_BUILTIN_CFSTRING:
+	      /* Can only find "old" documentation, that is not very
+		 clear, so I'm guessing on what is intended. This may
+		 have only been supported on Darwin.  */
+	      operand_modes[0] = E_DImode;
+	      operand_modes[1] = E_DImode;
+
+	      type_mask = RS6000_BTC_UNARY;
+	      break;
+
+	    default:
+	      fprintf (stderr,
+		       "unrecognized special function: %s\n", bidp->name);
+	      break;
+	      /* Fall through.  */
+	    }
+	    attributes = type_mask;
+
+	    switch (type_mask) {
+	    case RS6000_BTC_DST:
+	      /* Expect ptr operand, int length, const int configuration
+		 operands, with void result.  */
+	    case RS6000_BTC_TERNARY:
+	      tmode = operand_modes[0];
+	      mode0 = operand_modes[1];
+	      mode1 = operand_modes[2];
+	      mode2 = operand_modes[3];
+	      /*
+	      fprintf (stderr, "%s %s%s (%s, %s, %s): ", t2s (tmode),
+		       name_qualifier, bidp->name,
+		       t2s (mode0), t2s (mode1), t2s (mode2));
+	      */
+	      fprintf (stderr, "%s %s (%s, %s, %s): ", t2s (tmode),
+		       bidp->name, t2s (mode0), t2s (mode1), t2s (mode2));
+	      break;
+
+	    case RS6000_BTC_PREDICATE:
+	      /* An implicit integer predicate code and two source values.  */
+	      tmode = operand_modes[0];
+	      mode0 = operand_modes[1];
+	      mode1 = operand_modes[2];
+	      /*
+	      fprintf (stderr, "%s %s%s (int, %s, %s): ", t2s (tmode),
+		       name_qualifier, bidp->name, t2s (mode0), t2s (mode1));
+	      */
+	      fprintf (stderr, "%s %s (int, %s, %s): ", t2s (tmode),
+		       bidp->name, t2s (mode0), t2s (mode1));
+	      break;
+
+	    case RS6000_BTC_BINARY:
+	      tmode = operand_modes[0];
+	      mode0 = operand_modes[1];
+	      mode1 = operand_modes[2];
+	      /*
+	      fprintf (stderr, "%s %s%s (%s, %s): ", t2s (tmode),
+		       name_qualifier, bidp->name, t2s (mode0), t2s (mode1));
+	      */
+	      fprintf (stderr, "%s %s (%s, %s): ", t2s (tmode),
+		       bidp->name, t2s (mode0), t2s (mode1));
+	      break;
+
+	    case RS6000_BTC_ABS:	/* single argument, single result */
+	    case RS6000_BTC_UNARY:
+	      tmode = operand_modes[0];
+	      mode0 = operand_modes[1];
+	      /*
+	      fprintf (stderr, "%s %s%s (%s): ",
+		       t2s (tmode), name_qualifier, bidp->name, t2s (mode0));
+	      */
+	      fprintf (stderr, "%s %s (%s): ",
+		       t2s (tmode), bidp->name, t2s (mode0));
+	      break;
+
+	    case RS6000_BTC_SPECIAL:
+	      /* No args, but still a result type.  */
+	      tmode = operand_modes[0];
+	      /*
+	      fprintf (stderr, "%s %s%s (): ", t2s (tmode),
+		       name_qualifier, bidp->name);
+	      */
+	      fprintf (stderr, "%s %s (): ", t2s (tmode), bidp->name);
+	      break;
+
+
+	    }
+	    /* No args, but still a result type.  */
+	    tmode = insn_data[bidp->icode].operand[0].mode;
+	    fprintf (stderr, "%s %s (): ", t2s (tmode), bidp->name);
+	    break;
+	  }
 	}
 	fprintf (stderr, "icode: %d, code: %d\n", bidp->icode, bidp->code);
 	fprintf (stderr, "  mask: %s\n", m2s (bidp->mask));
@@ -718,7 +1626,7 @@ dump_one_table (const char *title,
   fprintf (stderr, "\n");
 }
 
-void
+static void
 dump_monomorphics ()
 {
   fprintf (stderr, "\n");
@@ -741,13 +1649,7 @@ dump_monomorphics ()
 		  bdesc_htm, ARRAY_SIZE (bdesc_htm));
   dump_one_table ("Data Stream Touch (cache hinting) functions",
 		  bdesc_dst, ARRAY_SIZE (bdesc_dst));
-  dump_special_table ("Special (non-standard) functions",
+  dump_one_table ("Special (non-standard) functions",
 		  bdesc_special, ARRAY_SIZE (bdesc_special));
 }
 
-void
-take_a_dump ()
-{
-  if (TARGET_DEBUG_BUILTIN)
-    dump_monomorphics ();
-}
