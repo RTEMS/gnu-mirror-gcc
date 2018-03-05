@@ -17283,7 +17283,8 @@ rs6000_init_builtins (void)
   SUBTARGET_INIT_BUILTINS;
 #endif
 #ifdef KELVIN_VERBOSE
-  dump_monomorphics ();
+  if (TARGET_DEBUG_BUILTIN)
+    dump_monomorphics ();
 #endif
 }
 

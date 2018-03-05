@@ -7075,9 +7075,9 @@ polytype2s (signed char poly_type) {
   case RS6000_BTI_long_double:        /* long_double_type_node */
     return is_ptr? "long double *": "long double";
   case RS6000_BTI_dfloat64:		 /* dfloat64_type_node */
-    return is_ptr? "dfloat64 *": "dfloat64";
+    return is_ptr? "_Decimal64 *": "_Decimal64";
   case RS6000_BTI_dfloat128:		 /* dfloat128_type_node */
-    return is_ptr? "__float128 *": "__float128";
+    return is_ptr? "_Decimal128 *": "_Decimal128";
   case RS6000_BTI_void:	         /* void_type_node */
     return is_ptr? "void *": "void";
   case RS6000_BTI_ieee128_float:	 /* ieee 128-bit floating point */
@@ -7098,10 +7098,8 @@ void dump_one_polymorphic (const struct altivec_builtin_types *pp) {
   enum rs6000_builtins fcode = pp->code;
   const char *name = rs6000_overloaded_builtin_name (fcode);
   HOST_WIDE_INT mask;
-  unsigned int attributes;
 
   mask = rs6000_get_builtin_mask (pp->overloaded_code);
-  attributes = rs6000_get_builtin_mask (pp->overloaded_code);
 
   if ((mask & RS6000_BTM_PAIRED) == 0) {
     fprintf (stderr, "%s %s[%d] (", polytype2s (pp->ret_type), name, pp->code);
