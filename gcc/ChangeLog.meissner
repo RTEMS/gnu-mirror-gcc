@@ -1,3 +1,46 @@
+2018-03-07  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (enum rs6000_reg_type): Move the
+	support for simplifing register classes and register types from
+	rs6000.c into rs6000-protos.h, so that functions using reg_addr
+	can be moved to other files than rs6000.c.  Move the parts of
+	reg_addr that contain insn codes to a new structure that is only
+	defined in rs6000.c, because not everything includes insn-codes.
+	Move in the mode_supports* helper functions.
+	(reg_class_to_reg_type): Likewise.
+	(IS_STD_REG_TYPE): Likewise.
+	(IS_FP_VECT_REG_TYPE): Likewise.
+	(enum rs6000_reload_reg_type): Likewise.
+	(addr_mask_type): Likewise.
+	(RELOAD_REG_*): Likewise.
+	(struct rs6000_reg_addr): Likewise.
+	(reg_addr): Likewise.
+	(mode_supports_pre_incdec_p): Likewise.
+	(mode_supports_pred_modify_p): Likewise.
+	(mode_supports_vmx_dform): Likewise.
+	(mode_supports_vsx_dform_quad): Likewise.
+	* config/rs6000/rs6000.c (enum rs6000_reg_type): Likewise.
+	(reg_class_to_reg_type): Likewise.
+	(IS_STD_REG_TYPE): Likewise.
+	(IS_FP_VECT_REG_TYPE): Likewise.
+	(enum rs6000_reload_reg_type): Likewise.
+	(addr_mask_type): Likewise.
+	(RELOAD_REG_*): Likewise.
+	(struct rs6000_reg_addr): Likewise.
+	(reg_addr): Likewise.
+	(mode_supports_pre_incdec_p): Likewise.
+	(mode_supports_pred_modify_p): Likewise.
+	(mode_supports_vmx_dform): Likewise.
+	(mode_supports_vsx_dform_quad): Likewise.
+	(struct rs6000_insn_functions): Move the parts of reg_addr that
+	include insn_codes to this new structure.
+	(rs6000_insns): Likewise.
+	(rs6000_debug_print_mode): Change references to the insn_codes
+	that used to be stored in reg_addr to rs6000_insns.
+	(rs6000_init_hard_regno_mode_ok): Likewise.
+	(rs6000_secondary_reload_direct_move): Likewise.
+	(rs6000_secondary_reload): Likewise.
+
 2018-02-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000-cpus.def (POWERPC_MASKS): Add
