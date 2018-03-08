@@ -291,24 +291,13 @@ is_normal_capture_proxy (tree decl)
   return DECL_NORMAL_CAPTURE_P (val);
 }
 
-/* Returns true iff DECL is a capture proxy for which we can use
-   DECL_CAPTURED_VARIABLE.  In effect, this is a normal proxy other than a
-   nested capture of a function parameter pack.  */
-
-bool
-is_capture_proxy_with_ref (tree var)
-{
-  return (is_normal_capture_proxy (var) && DECL_LANG_SPECIFIC (var)
-	  && DECL_CAPTURED_VARIABLE (var));
-}
-
 /* VAR is a capture proxy created by build_capture_proxy; add it to the
    current function, which is the operator() for the appropriate lambda.  */
 
 void
 insert_capture_proxy (tree var)
 {
-  if (is_capture_proxy_with_ref (var))
+  if (is_normal_capture_proxy (var))
     {
       tree cap = DECL_CAPTURED_VARIABLE (var);
       if (CHECKING_P)
@@ -388,7 +377,7 @@ lambda_proxy_type (tree ref)
    inside the operator(), build a placeholder var for future lookups and
    debugging.  */
 
-tree
+static tree
 build_capture_proxy (tree member, tree init)
 {
   tree var, object, fn, closure, name, lam, type;
@@ -757,21 +746,30 @@ lambda_expr_this_capture (tree lambda, bool add_capture_p)
                                     tlambda,
                                     lambda_stack);
 
-	  if (LAMBDA_EXPR_EXTRA_SCOPE (tlambda)
-	      && TREE_CODE (LAMBDA_EXPR_EXTRA_SCOPE (tlambda)) == FIELD_DECL)
+	  tree closure = LAMBDA_EXPR_CLOSURE (tlambda);
+	  tree containing_function
+	    = decl_function_context (TYPE_NAME (closure));
+
+	  tree ex = LAMBDA_EXPR_EXTRA_SCOPE (tlambda);
+	  if (ex && TREE_CODE (ex) == FIELD_DECL)
 	    {
-	      /* In an NSDMI, we don't have a function to look up the decl in,
-		 but the fake 'this' pointer that we're using for parsing is
-		 in scope_chain.  */
-	      init = scope_chain->x_current_class_ptr;
+	      /* Lambda in an NSDMI.  We don't have a function to look up
+		 'this' in, but we can find (or rebuild) the fake one from
+		 inject_this_parameter.  */
+	      if (!containing_function && !COMPLETE_TYPE_P (closure))
+		/* If we're parsing a lambda in a non-local class,
+		   we can find the fake 'this' in scope_chain.  */
+		init = scope_chain->x_current_class_ptr;
+	      else
+		/* Otherwise it's either gone or buried in
+		   function_context_stack, so make another.  */
+		init = build_this_parm (NULL_TREE, DECL_CONTEXT (ex),
+					TYPE_UNQUALIFIED);
 	      gcc_checking_assert
 		(init && (TREE_TYPE (TREE_TYPE (init))
 			  == current_nonlambda_class_type ()));
 	      break;
 	    }
-
-	  tree closure_decl = TYPE_NAME (LAMBDA_EXPR_CLOSURE (tlambda));
-	  tree containing_function = decl_function_context (closure_decl);
 
 	  if (containing_function == NULL_TREE)
 	    /* We ran out of scopes; there's no 'this' to capture.  */

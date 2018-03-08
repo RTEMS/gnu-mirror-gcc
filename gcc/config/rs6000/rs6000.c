@@ -5312,8 +5312,7 @@ rs6000_loop_align (rtx label)
 	  || rs6000_tune == PROCESSOR_POWER5
 	  || rs6000_tune == PROCESSOR_POWER6
 	  || rs6000_tune == PROCESSOR_POWER7
-	  || rs6000_tune == PROCESSOR_POWER8
-	  || rs6000_tune == PROCESSOR_POWER9))
+	  || rs6000_tune == PROCESSOR_POWER8))
     return 5;
   else
     return align_loops_log;
@@ -17233,7 +17232,7 @@ rs6000_init_builtins (void)
 
   ftype = build_function_type_list (void_type_node, NULL_TREE);
   def_builtin ("__builtin_cpu_init", ftype, RS6000_BUILTIN_CPU_INIT);
-  def_builtin ("__builtin_rs6000_speculation_barrier", ftype,
+  def_builtin ("__builtin_ppc_speculation_barrier", ftype,
 	       MISC_BUILTIN_SPEC_BARRIER);
 
   ftype = build_function_type_list (bool_int_type_node, const_ptr_type_node,
@@ -33243,6 +33242,11 @@ rs6000_elf_in_small_data_p (const_tree decl)
     }
   else
     {
+      /* If we are told not to put readonly data in sdata, then don't.  */
+      if (TREE_READONLY (decl) && rs6000_sdata != SDATA_EABI
+	  && !rs6000_readonly_in_sdata)
+	return false;
+
       HOST_WIDE_INT size = int_size_in_bytes (TREE_TYPE (decl));
 
       if (size > 0

@@ -2757,6 +2757,8 @@ ix86_target_string (HOST_WIDE_INT isa, HOST_WIDE_INT isa2,
     { "-mmpx",		OPTION_MASK_ISA_MPX },
     { "-mvaes",		OPTION_MASK_ISA_VAES },
     { "-mrdpid",	OPTION_MASK_ISA_RDPID },
+    { "-mpconfig",	OPTION_MASK_ISA_PCONFIG },
+    { "-mwbnoinvd",     OPTION_MASK_ISA_WBNOINVD },
     { "-msgx",		OPTION_MASK_ISA_SGX },
     { "-mavx5124vnniw", OPTION_MASK_ISA_AVX5124VNNIW },
     { "-mavx5124fmaps", OPTION_MASK_ISA_AVX5124FMAPS },
@@ -5324,6 +5326,8 @@ ix86_valid_target_attribute_inner_p (tree args, char *p_strings[],
     int mask;
   } attrs[] = {
     /* isa options */
+    IX86_ATTR_ISA ("pconfig",	OPT_mpconfig),
+    IX86_ATTR_ISA ("wbnoinvd",	OPT_mwbnoinvd),
     IX86_ATTR_ISA ("sgx",	OPT_msgx),
     IX86_ATTR_ISA ("avx5124fmaps", OPT_mavx5124fmaps),
     IX86_ATTR_ISA ("avx5124vnniw", OPT_mavx5124vnniw),
@@ -6411,7 +6415,8 @@ ix86_function_ok_for_sibcall (tree decl, tree exp)
 	 function via GOT slot are indirect.  */
       if (!decl
 	  || (bind_global && flag_pic && !flag_plt)
-	  || (TARGET_DLLIMPORT_DECL_ATTRIBUTES && DECL_DLLIMPORT_P (decl)))
+	  || (TARGET_DLLIMPORT_DECL_ATTRIBUTES && DECL_DLLIMPORT_P (decl))
+	  || flag_force_indirect_call)
 	{
 	  /* Check if regparm >= 3 since arg_reg_available is set to
 	     false if regparm == 0.  If regparm is 1 or 2, there is
@@ -6420,7 +6425,7 @@ ix86_function_ok_for_sibcall (tree decl, tree exp)
 	     ??? The symbol indirect call doesn't need a call-clobbered
 	     register.  But we don't know if this is a symbol indirect
 	     call or not here.  */
-	  if (ix86_function_regparm (type, NULL) >= 3
+	  if (ix86_function_regparm (type, decl) >= 3
 	      && !cfun->machine->arg_reg_available)
 	    return false;
 	}
@@ -10812,6 +10817,12 @@ static int indirect_thunks_used;
    by call and return thunks functions with the BND prefix.  */
 static int indirect_thunks_bnd_used;
 
+/* True if return thunk function via CX is needed.  */
+static bool indirect_return_via_cx;
+/* True if return thunk function via CX with the BND prefix is
+   needed.  */
+static bool indirect_return_via_cx_bnd;
+
 #ifndef INDIRECT_LABEL
 # define INDIRECT_LABEL "LIND"
 #endif
@@ -10852,7 +10863,7 @@ indirect_thunk_name (char name[32], unsigned int regno,
 		     enum indirect_thunk_prefix need_prefix,
 		     bool ret_p)
 {
-  if (regno != INVALID_REGNUM && ret_p)
+  if (regno != INVALID_REGNUM && regno != CX_REG && ret_p)
     gcc_unreachable ();
 
   if (USE_HIDDEN_LINKONCE)
@@ -10872,6 +10883,8 @@ indirect_thunk_name (char name[32], unsigned int regno,
       else
 	prefix = "";
 
+      const char *ret = ret_p ? "return" : "indirect";
+
       if (regno != INVALID_REGNUM)
 	{
 	  const char *reg_prefix;
@@ -10879,14 +10892,11 @@ indirect_thunk_name (char name[32], unsigned int regno,
 	    reg_prefix = TARGET_64BIT ? "r" : "e";
 	  else
 	    reg_prefix = "";
-	  sprintf (name, "__x86_indirect_thunk%s_%s%s",
-		   prefix, reg_prefix, reg_names[regno]);
+	  sprintf (name, "__x86_%s_thunk%s_%s%s",
+		   ret, prefix, reg_prefix, reg_names[regno]);
 	}
       else
-	{
-	  const char *ret = ret_p ? "return" : "indirect";
-	  sprintf (name, "__x86_%s_thunk%s", ret, prefix);
-	}
+	sprintf (name, "__x86_%s_thunk%s", ret, prefix);
     }
   else
     {
@@ -11055,9 +11065,23 @@ output_indirect_thunk_function (enum indirect_thunk_prefix need_prefix,
 	ASM_OUTPUT_LABEL (asm_out_file, name);
       }
 
+  /* Create alias for __x86_return_thunk/__x86_return_thunk_bnd or
+     __x86_return_thunk_ecx/__x86_return_thunk_ecx_bnd.  */
+  bool need_alias;
   if (regno == INVALID_REGNUM)
+    need_alias = true;
+  else if (regno == CX_REG)
     {
-      /* Create alias for __x86.return_thunk/__x86.return_thunk_bnd.  */
+      if (need_prefix == indirect_thunk_prefix_bnd)
+	need_alias = indirect_return_via_cx_bnd;
+      else
+	need_alias = indirect_return_via_cx;
+    }
+  else
+    need_alias = false;
+
+  if (need_alias)
+    {
       char alias[32];
 
       indirect_thunk_name (alias, regno, need_prefix, true);
@@ -14683,9 +14707,9 @@ ix86_expand_epilogue (int style)
       if (TARGET_SEH)
 	{
 	  /* Prevent a catch region from being adjacent to the standard
-	     epilogue sequence.  Unfortuantely crtl->uses_eh_lsda nor
-	     several other flags that would be interesting to test are
-	     not yet set up.  */
+	     epilogue sequence.  Unfortunately neither crtl->uses_eh_lsda
+	     nor several other flags that would be interesting to test are
+	     set up yet.  */
 	  if (flag_non_call_exceptions)
 	    emit_insn (gen_nops (const1_rtx));
 	  else
@@ -18724,7 +18748,8 @@ ix86_print_operand (FILE *file, rtx x, int code)
 	 since we can in fact encode that into an immediate.  */
       if (GET_CODE (x) == CONST_VECTOR)
 	{
-	  gcc_assert (x == CONST0_RTX (GET_MODE (x)));
+	  if (x != CONST0_RTX (GET_MODE (x)))
+	    output_operand_lossage ("invalid vector immediate");
 	  x = const0_rtx;
 	}
 
@@ -28979,18 +29004,17 @@ ix86_output_indirect_branch (rtx call_op, const char *xasm,
   else
     ix86_output_indirect_branch_via_push (call_op, xasm, sibcall_p);
 }
-/* Output indirect jump.  CALL_OP is the jump target.  Jump is a
-   function return if RET_P is true.  */
+
+/* Output indirect jump.  CALL_OP is the jump target.  */
 
 const char *
-ix86_output_indirect_jmp (rtx call_op, bool ret_p)
+ix86_output_indirect_jmp (rtx call_op)
 {
   if (cfun->machine->indirect_branch_type != indirect_branch_keep)
     {
-      /* We can't have red-zone if this isn't a function return since
-	 "call" in the indirect thunk pushes the return address onto
-	 stack, destroying red-zone.  */
-      if (!ret_p && ix86_red_zone_size != 0)
+      /* We can't have red-zone since "call" in the indirect thunk
+         pushes the return address onto stack, destroying red-zone.  */
+      if (ix86_red_zone_size != 0)
 	gcc_unreachable ();
 
       ix86_output_indirect_branch (call_op, "%0", true);
@@ -29040,6 +29064,87 @@ ix86_output_function_return (bool long_p)
     return "%!ret";
 
   return "rep%; ret";
+}
+
+/* Output indirect function return.  RET_OP is the function return
+   target.  */
+
+const char *
+ix86_output_indirect_function_return (rtx ret_op)
+{
+  if (cfun->machine->function_return_type != indirect_branch_keep)
+    {
+      char thunk_name[32];
+      enum indirect_thunk_prefix need_prefix
+	= indirect_thunk_need_prefix (current_output_insn);
+      unsigned int regno = REGNO (ret_op);
+      gcc_assert (regno == CX_REG);
+
+      if (cfun->machine->function_return_type
+	  != indirect_branch_thunk_inline)
+	{
+	  bool need_thunk = (cfun->machine->function_return_type
+			     == indirect_branch_thunk);
+	  indirect_thunk_name (thunk_name, regno, need_prefix, true);
+	  if (need_prefix == indirect_thunk_prefix_bnd)
+	    {
+	      if (need_thunk)
+		{
+		  indirect_return_via_cx_bnd = true;
+		  indirect_thunks_bnd_used |= 1 << CX_REG;
+		}
+	      fprintf (asm_out_file, "\tbnd jmp\t%s\n", thunk_name);
+	    }
+	  else
+	    {
+	      if (need_thunk)
+		{
+		  indirect_return_via_cx = true;
+		  indirect_thunks_used |= 1 << CX_REG;
+		}
+	      fprintf (asm_out_file, "\tjmp\t%s\n", thunk_name);
+	    }
+	}
+      else
+	output_indirect_thunk (need_prefix, regno);
+
+      return "";
+    }
+  else
+    return "%!jmp\t%A0";
+}
+
+/* Split simple return with popping POPC bytes from stack to indirect
+   branch with stack adjustment .  */
+
+void
+ix86_split_simple_return_pop_internal (rtx popc)
+{
+  struct machine_function *m = cfun->machine;
+  rtx ecx = gen_rtx_REG (SImode, CX_REG);
+  rtx_insn *insn;
+
+  /* There is no "pascal" calling convention in any 64bit ABI.  */
+  gcc_assert (!TARGET_64BIT);
+
+  insn = emit_insn (gen_pop (ecx));
+  m->fs.cfa_offset -= UNITS_PER_WORD;
+  m->fs.sp_offset -= UNITS_PER_WORD;
+
+  rtx x = plus_constant (Pmode, stack_pointer_rtx, UNITS_PER_WORD);
+  x = gen_rtx_SET (stack_pointer_rtx, x);
+  add_reg_note (insn, REG_CFA_ADJUST_CFA, x);
+  add_reg_note (insn, REG_CFA_REGISTER, gen_rtx_SET (ecx, pc_rtx));
+  RTX_FRAME_RELATED_P (insn) = 1;
+
+  x = gen_rtx_PLUS (Pmode, stack_pointer_rtx, popc);
+  x = gen_rtx_SET (stack_pointer_rtx, x);
+  insn = emit_insn (x);
+  add_reg_note (insn, REG_CFA_ADJUST_CFA, x);
+  RTX_FRAME_RELATED_P (insn) = 1;
+
+  /* Now return address is in ECX.  */
+  emit_jump_insn (gen_simple_return_indirect_internal (ecx));
 }
 
 /* Output the assembly for a call instruction.  */
@@ -29106,6 +29211,14 @@ ix86_output_call_insn (rtx_insn *insn, rtx call_op)
 
       for (i = NEXT_INSN (insn); i ; i = NEXT_INSN (i))
 	{
+	  /* Prevent a catch region from being adjacent to a jump that would
+	     be interpreted as an epilogue sequence by the unwinder.  */
+	  if (JUMP_P(i) && CROSSING_JUMP_P (i))
+	    {
+	      seh_nop_p = true;
+	      break;
+	    }
+	    
 	  /* If we get to another real insn, we don't need the nop.  */
 	  if (INSN_P (i))
 	    break;
@@ -31187,8 +31300,10 @@ BDESC_VERIFYS (IX86_BUILTIN__BDESC_ROUND_ARGS_FIRST,
 	       IX86_BUILTIN__BDESC_ARGS_LAST, 1);
 BDESC_VERIFYS (IX86_BUILTIN__BDESC_ARGS2_FIRST,
 	       IX86_BUILTIN__BDESC_ROUND_ARGS_LAST, 1);
-BDESC_VERIFYS (IX86_BUILTIN__BDESC_MPX_FIRST,
+BDESC_VERIFYS (IX86_BUILTIN__BDESC_SPECIAL_ARGS2_FIRST,
 	       IX86_BUILTIN__BDESC_ARGS2_LAST, 1);
+BDESC_VERIFYS (IX86_BUILTIN__BDESC_MPX_FIRST,
+	       IX86_BUILTIN__BDESC_SPECIAL_ARGS2_LAST, 1);
 BDESC_VERIFYS (IX86_BUILTIN__BDESC_MPX_CONST_FIRST,
 	       IX86_BUILTIN__BDESC_MPX_LAST, 1);
 BDESC_VERIFYS (IX86_BUILTIN__BDESC_MULTI_ARG_FIRST,
@@ -31226,6 +31341,22 @@ ix86_init_mmx_sse_builtins (void)
   BDESC_VERIFYS (IX86_BUILTIN__BDESC_SPECIAL_ARGS_LAST,
 		 IX86_BUILTIN__BDESC_SPECIAL_ARGS_FIRST,
 		 ARRAY_SIZE (bdesc_special_args) - 1);
+
+  /* Add all special builtins with variable number of operands.  */
+  for (i = 0, d = bdesc_special_args2;
+       i < ARRAY_SIZE (bdesc_special_args2);
+       i++, d++)
+    {
+      BDESC_VERIFY (d->code, IX86_BUILTIN__BDESC_SPECIAL_ARGS2_FIRST, i);
+      if (d->name == 0)
+	continue;
+
+      ftype = (enum ix86_builtin_func_type) d->flag;
+      def_builtin2 (d->mask, d->name, ftype, d->code);
+    }
+  BDESC_VERIFYS (IX86_BUILTIN__BDESC_SPECIAL_ARGS2_LAST,
+		 IX86_BUILTIN__BDESC_SPECIAL_ARGS2_FIRST,
+		 ARRAY_SIZE (bdesc_special_args2) - 1);
 
   /* Add all builtins with variable number of operands.  */
   for (i = 0, d = bdesc_args;
@@ -38261,6 +38392,14 @@ rdseed_step:
     {
       i = fcode - IX86_BUILTIN__BDESC_SPECIAL_ARGS_FIRST;
       return ix86_expand_special_args_builtin (bdesc_special_args + i, exp,
+					       target);
+    }
+
+  if (fcode >= IX86_BUILTIN__BDESC_SPECIAL_ARGS2_FIRST
+      && fcode <= IX86_BUILTIN__BDESC_SPECIAL_ARGS2_LAST)
+    {
+      i = fcode - IX86_BUILTIN__BDESC_SPECIAL_ARGS2_FIRST;
+      return ix86_expand_special_args_builtin (bdesc_special_args2 + i, exp,
 					       target);
     }
 

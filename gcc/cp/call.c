@@ -4782,7 +4782,7 @@ build_conditional_expr_1 (location_t loc, tree arg1, tree arg2, tree arg3,
   tree arg3_type;
   tree result = NULL_TREE;
   tree result_type = NULL_TREE;
-  bool is_lvalue = true;
+  bool is_glvalue = true;
   struct z_candidate *candidates = 0;
   struct z_candidate *cand;
   void *p;
@@ -5037,7 +5037,7 @@ build_conditional_expr_1 (location_t loc, tree arg1, tree arg2, tree arg3,
 	  return error_mark_node;
 	}
 
-      is_lvalue = false;
+      is_glvalue = false;
       goto valid_operands;
     }
   /* [expr.cond]
@@ -5155,6 +5155,10 @@ build_conditional_expr_1 (location_t loc, tree arg1, tree arg2, tree arg3,
       && same_type_p (arg2_type, arg3_type))
     {
       result_type = arg2_type;
+      if (processing_template_decl)
+	/* Let lvalue_kind know this was a glvalue.  */
+	result_type = cp_build_reference_type (result_type, xvalue_p (arg2));
+
       arg2 = mark_lvalue_use (arg2);
       arg3 = mark_lvalue_use (arg3);
       goto valid_operands;
@@ -5167,7 +5171,7 @@ build_conditional_expr_1 (location_t loc, tree arg1, tree arg2, tree arg3,
      cv-qualified) class type, overload resolution is used to
      determine the conversions (if any) to be applied to the operands
      (_over.match.oper_, _over.built_).  */
-  is_lvalue = false;
+  is_glvalue = false;
   if (!same_type_p (arg2_type, arg3_type)
       && (CLASS_TYPE_P (arg2_type) || CLASS_TYPE_P (arg3_type)))
     {
@@ -5361,7 +5365,7 @@ build_conditional_expr_1 (location_t loc, tree arg1, tree arg2, tree arg3,
   /* We can't use result_type below, as fold might have returned a
      throw_expr.  */
 
-  if (!is_lvalue)
+  if (!is_glvalue)
     {
       /* Expand both sides into the same slot, hopefully the target of
 	 the ?: expression.  We used to check for TARGET_EXPRs here,
@@ -7580,6 +7584,15 @@ unsafe_copy_elision_p (tree target, tree exp)
   /* build_compound_expr pushes COMPOUND_EXPR inside TARGET_EXPR.  */
   while (TREE_CODE (init) == COMPOUND_EXPR)
     init = TREE_OPERAND (init, 1);
+  if (TREE_CODE (init) == COND_EXPR)
+    {
+      /* We'll end up copying from each of the arms of the COND_EXPR directly
+	 into the target, so look at them. */
+      if (tree op = TREE_OPERAND (init, 1))
+	if (unsafe_copy_elision_p (target, op))
+	  return true;
+      return unsafe_copy_elision_p (target, TREE_OPERAND (init, 2));
+    }
   return (TREE_CODE (init) == AGGR_INIT_EXPR
 	  && !AGGR_INIT_VIA_CTOR_P (init));
 }
@@ -7665,8 +7678,12 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
     deduce_inheriting_ctor (fn);
 
   /* Make =delete work with SFINAE.  */
-  if (DECL_DELETED_FN (fn) && !(complain & tf_error))
-    return error_mark_node;
+  if (DECL_DELETED_FN (fn))
+    {
+      if (complain & tf_error)
+	mark_used (fn);
+      return error_mark_node;
+    }
 
   if (DECL_FUNCTION_MEMBER_P (fn))
     {
@@ -7710,12 +7727,6 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
      conversions.  */
   if (flags & LOOKUP_SPECULATIVE)
     {
-      if (DECL_DELETED_FN (fn))
-	{
-	  if (complain & tf_error)
-	    mark_used (fn);
-	  return error_mark_node;
-	}
       if (cand->viable == 1)
 	return fn;
       else if (!(complain & tf_error))
@@ -8090,7 +8101,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 
       /* [class.copy]: the copy constructor is implicitly defined even if
 	 the implementation elided its use.  */
-      if (!trivial || DECL_DELETED_FN (fn))
+      if (!trivial)
 	{
 	  if (!mark_used (fn, complain) && !(complain & tf_error))
 	    return error_mark_node;
@@ -8121,8 +8132,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
     }
   else if (DECL_ASSIGNMENT_OPERATOR_P (fn)
 	   && DECL_OVERLOADED_OPERATOR_IS (fn, NOP_EXPR)
-	   && trivial_fn_p (fn)
-	   && !DECL_DELETED_FN (fn))
+	   && trivial_fn_p (fn))
     {
       tree to = cp_stabilize_reference
 	(cp_build_fold_indirect_ref (argarray[0]));
@@ -8166,8 +8176,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 
       return val;
     }
-  else if (!DECL_DELETED_FN (fn)
-	   && trivial_fn_p (fn))
+  else if (trivial_fn_p (fn))
     {
       if (DECL_DESTRUCTOR_P (fn))
 	return fold_convert (void_type_node, argarray[0]);

@@ -3060,7 +3060,7 @@ struct GTY(()) lang_decl {
 /* For a non-member friend function, the class (if any) in which this
    friend was defined.  For example, given:
 
-     struct S { friend void f (); };
+     struct S { friend void f () { ... } };
 
    the DECL_FRIEND_CONTEXT for `f' will be `S'.  */
 #define DECL_FRIEND_CONTEXT(NODE)				\
@@ -6463,7 +6463,8 @@ extern void end_specialization			(void);
 extern void begin_explicit_instantiation	(void);
 extern void end_explicit_instantiation		(void);
 extern void check_unqualified_spec_or_inst	(tree, location_t);
-extern tree check_explicit_specialization	(tree, tree, int, int);
+extern tree check_explicit_specialization	(tree, tree, int, int,
+						 tree = NULL_TREE);
 extern int num_template_headers_for_class	(tree);
 extern void check_template_variable		(tree);
 extern tree make_auto				(void);
@@ -6890,12 +6891,10 @@ extern tree lambda_function			(tree);
 extern void apply_deduced_return_type           (tree, tree);
 extern tree add_capture                         (tree, tree, tree, bool, bool);
 extern tree add_default_capture                 (tree, tree, tree);
-extern tree build_capture_proxy			(tree, tree);
 extern void insert_capture_proxy		(tree);
 extern void insert_pending_capture_proxies	(void);
 extern bool is_capture_proxy			(tree);
 extern bool is_normal_capture_proxy             (tree);
-extern bool is_capture_proxy_with_ref           (tree);
 extern void register_capture_members		(tree);
 extern tree lambda_expr_this_capture            (tree, bool);
 extern void maybe_generic_this_capture		(tree, tree);
@@ -7409,8 +7408,10 @@ extern bool is_static_init_expression    (tree);
 extern bool potential_rvalue_constant_expression (tree);
 extern bool require_potential_constant_expression (tree);
 extern bool require_constant_expression (tree);
+extern bool require_rvalue_constant_expression (tree);
 extern bool require_potential_rvalue_constant_expression (tree);
 extern tree cxx_constant_value			(tree, tree = NULL_TREE);
+extern tree cxx_constant_init			(tree, tree = NULL_TREE);
 extern tree maybe_constant_value		(tree, tree = NULL_TREE);
 extern tree maybe_constant_init			(tree, tree = NULL_TREE);
 extern tree fold_non_dependent_expr		(tree);
