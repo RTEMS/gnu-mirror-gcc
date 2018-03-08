@@ -1,5 +1,15 @@
 2018-03-08  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/rs6000-output.c (rs6000_output_move_128bit): Move
+	128-bit output functions to rs6000-output.c from rs6000.c.
+	(rs6000_move_128bit_ok_p): Likewise.
+	(rs6000_split_128bit_ok_p): Likewise.
+	* config/rs6000/rs6000.c (rs6000_output_move_128bit): Likewise.
+	(rs6000_move_128bit_ok_p): Likewise.
+	(rs6000_split_128bit_ok_p): Likewise.
+
+2018-03-08  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	Merge up to 258348.
 	* REVISION: Update subversion id.
 
