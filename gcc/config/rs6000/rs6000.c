@@ -7410,7 +7410,7 @@ rs6000_expand_vector_extract (rtx target, rtx vec, rtx elt)
 }
 
 /* Helper function to return the register number of a RTX.  */
-static inline int
+int
 regno_or_subregno (rtx op)
 {
   if (REG_P (op))

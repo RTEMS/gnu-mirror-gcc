@@ -1,5 +1,23 @@
 2018-03-08  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/rs6000-protos.h (rs6000_output_move_64bit): Add
+	declaration.
+	(regno_or_subregno): Likewise.
+	* config/rs6000/rs6000-output.c (toplevel): Add new include
+	files.
+	(addr_is_xform_p): Helper function to say if an address is
+	x-form.
+	(reg_is_spr_p): Helper function to return if a register is a SPR
+	register.
+	(rs6000_output_move_64bit): New function to return the instruction
+	string to support all 64-bit moves.
+	* config/rs6000/rs6000.c (regno_or_subregno): Make function global
+	instead of static inline.
+	* config/rs6000/rs6000.md (movdi_internal64); Move the output
+	instruction strings to the rs6000_output_move_64bit function.
+
+2018-03-08  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/rs6000-output.c (rs6000_output_move_128bit): Move
 	128-bit output functions to rs6000-output.c from rs6000.c.
 	(rs6000_move_128bit_ok_p): Likewise.
