@@ -195,7 +195,7 @@ rs6000_output_move_64bit (rtx operands[])
 
       else if (src_vmx_p)
 	{
-	  if (TARGET_VSX && addr_is_xform_p (XEXP (src, 0)))
+	  if (TARGET_VSX && addr_is_xform_p (XEXP (dest, 0)))
 	    return "stxsdx %x1,%y0";
 
 	  else if (TARGET_P9_VECTOR)
