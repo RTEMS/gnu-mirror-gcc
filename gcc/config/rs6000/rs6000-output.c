@@ -219,7 +219,7 @@ rs6000_output_move_64bit (rtx operands[])
 
       else if (TARGET_VSX && dest_vsx_p)
 	{
-	  /* We prefer to generate XXSPLTIB/VSPLTISW over XXLXOR/XXLXORC to
+	  /* We prefer to generate XXSPLTIB/VSPLTISW over XXLXOR/XXLORC to
 	     generate 0/-1, because the later can potentially cause a stall if
 	     the previous use of the register did a long operation followed by
 	     a store.  This would cause this insn to wait for the previous
@@ -245,7 +245,7 @@ rs6000_output_move_64bit (rtx operands[])
 	      else if (dest_vmx_p)
 		return "vspltisw %0,-1";
 	      else if (TARGET_P8_VECTOR)
-		return "xxlxorc %x0,%x0,%x0";
+		return "xxlorc %x0,%x0,%x0";
 	      /* XXX: We could generate xxlxor/xxlnor for power7 if
 		 desired.  */
 	    }
