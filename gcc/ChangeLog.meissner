@@ -1,3 +1,11 @@
+2018-03-09  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Move
+	toc-fusion after cmodel set so that it can be enabled by default.
+	Restrict toc-fusion to just medium code model, because large code
+	model can be too far away.  Rework error messages for toc fusion
+	and combined addresses.
+
 2018-03-08  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000-protos.h (rs6000_output_move_64bit): Add

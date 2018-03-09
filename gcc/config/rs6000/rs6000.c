@@ -4453,28 +4453,6 @@ rs6000_option_override_internal (bool global_init_p)
       && optimize >= 3)
     rs6000_isa_flags |= OPTION_MASK_P8_FUSION_SIGN;
 
-  /* TOC fusion requires 64-bit and medium/large code model.  */
-  if (TARGET_TOC_FUSION && !TARGET_POWERPC64)
-    {
-      rs6000_isa_flags &= ~OPTION_MASK_TOC_FUSION;
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION) != 0)
-	warning (0, N_("-mtoc-fusion requires 64-bit"));
-    }
-
-  if (TARGET_TOC_FUSION && (TARGET_CMODEL == CMODEL_SMALL))
-    {
-      rs6000_isa_flags &= ~OPTION_MASK_TOC_FUSION;
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION) != 0)
-	warning (0, N_("-mtoc-fusion requires medium/large code model"));
-    }
-
-  /* Turn on -mtoc-fusion by default if p8-fusion and 64-bit medium/large code
-     model.  */
-  if (TARGET_P8_FUSION && !TARGET_TOC_FUSION && TARGET_POWERPC64
-      && (TARGET_CMODEL != CMODEL_SMALL)
-      && !(rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION))
-    rs6000_isa_flags |= OPTION_MASK_TOC_FUSION;
-
   /* ISA 3.0 vector instructions include ISA 2.07.  */
   if (TARGET_P9_VECTOR && !TARGET_P8_VECTOR)
     {
@@ -4774,32 +4752,69 @@ rs6000_option_override_internal (bool global_init_p)
      in the prologue.  The large code model can produce addresses that are too
      large for ADDIS combined with a d-form instruction.  This must be done
      after SUBSUBTARGET_OVERRIDE_OPTIONS, so that cmodel is set correctly. */
-  if (TARGET_COMBINED_ADDRESS)
+  if (TARGET_COMBINED_ADDRESS
+      && (!TARGET_ELF
+	  || !TARGET_VSX
+	  || !TARGET_POWERPC64
+	  || flag_split_stack
+	  || TARGET_CMODEL != CMODEL_MEDIUM))
     {
-      if (!TARGET_ELF || !TARGET_VSX || !TARGET_POWERPC64 || flag_split_stack
-	  || TARGET_CMODEL != CMODEL_MEDIUM)
+      if (rs6000_isa_flags_explicit & OPTION_MASK_COMBINED_ADDRESS)
 	{
-	  rs6000_isa_flags &= ~OPTION_MASK_COMBINED_ADDRESS;
-	  if (rs6000_isa_flags_explicit & OPTION_MASK_COMBINED_ADDRESS)
-	    {
-	      if (!TARGET_ELF)
-		error ("%qs is only available on ELF systems",
-		       "-mcombined-address");
-	      else if (TARGET_CMODEL != CMODEL_MEDIUM)
-		error ("%qs requires %qs", "-mcombined-address",
-		       "-mcmodel=medium");
-	      else if (!TARGET_VSX)
-		error ("%qs requires %qs", "-mcombined-address", "-mvsx");
-	      else if (!TARGET_POWERPC64)
-		error ("%qs requires %qs", "-mcombined-address", "-m64");
-	      else if (flag_split_stack)
-		error ("%qs requires %qs", "-mcombined-address",
-		       "-fno-split-stack");
-	      else
-		gcc_unreachable ();
-	    }
+	  if (!TARGET_ELF)
+	    error ("%qs is only available on ELF systems",
+		   "-mcombined-address");
+	  else if (TARGET_CMODEL != CMODEL_MEDIUM)
+	    error ("%qs requires %qs", "-mcombined-address",
+		   "-mcmodel=medium");
+	  else if (!TARGET_VSX)
+	    error ("%qs requires %qs", "-mcombined-address", "-mvsx");
+	  else if (!TARGET_POWERPC64)
+	    error ("%qs requires %qs", "-mcombined-address", "-m64");
+	  else if (flag_split_stack)
+	    error ("%qs requires %qs", "-mcombined-address",
+		   "-fno-split-stack");
+	  else
+	    gcc_unreachable ();
 	}
+
+      rs6000_isa_flags &= ~OPTION_MASK_COMBINED_ADDRESS;
     }
+
+  /* TOC fusion requires 64-bit and medium code model.  Like combined
+     addressing, we can't check for toc fusion until after the code model has
+     been set.  */
+  if (TARGET_TOC_FUSION
+      && (!TARGET_POWERPC64
+	  || TARGET_CMODEL != CMODEL_MEDIUM
+	  || TARGET_COMBINED_ADDRESS))
+    {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION) != 0)
+	{
+	  if (!TARGET_POWERPC64)
+	    warning (0, N_("%qs requires 64-bit"), "-mtoc-fusion");
+	  else if (TARGET_CMODEL != CMODEL_MEDIUM)
+	    warning (0, N_("%qs requires %qs"),
+		     "-mtoc-fusion",
+		     "-mcmodel=medium");
+	  else if (TARGET_COMBINED_ADDRESS)
+	    warning (0, N_("%qs requires %qs"),
+		     "-mtoc-fusion",
+		     "-mno-combined-address");
+	  else
+	    gcc_unreachable ();
+	}
+
+      rs6000_isa_flags &= ~OPTION_MASK_TOC_FUSION;
+    }
+
+  /* Turn on -mtoc-fusion by default if p8-fusion and 64-bit medium code
+     model.  */
+  if (TARGET_P8_FUSION && !TARGET_TOC_FUSION && TARGET_POWERPC64
+      && !TARGET_COMBINED_ADDRESS && TARGET_CMODEL == CMODEL_MEDIUM
+      && !(rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION))
+    rs6000_isa_flags |= OPTION_MASK_TOC_FUSION;
+
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
