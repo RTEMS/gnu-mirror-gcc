@@ -2321,8 +2321,7 @@ rs6000_debug_print_mode (ssize_t m)
   else
     spaces += sizeof ("  Upper=y") - 1;
 
-  fuse_extra_p = ((rs6000_insns[m].fusion_gpr_ld != CODE_FOR_nothing)
-		  || reg_addr[m].fused_toc);
+  fuse_extra_p = rs6000_insns[m].fusion_gpr_ld != CODE_FOR_nothing;
   if (!fuse_extra_p)
     {
       for (rc = 0; rc < N_RELOAD_REG; rc++)
@@ -2385,14 +2384,6 @@ rs6000_debug_print_mode (ssize_t m)
 	}
       else
 	spaces += sizeof (" P8gpr") - 1;
-
-      if (reg_addr[m].fused_toc)
-	{
-	  fprintf (stderr, "%*sToc", (spaces + 1), "");
-	  spaces = 0;
-	}
-      else
-	spaces += sizeof (" Toc") - 1;
     }
   else
     spaces += sizeof ("  Fuse: G=ls F=ls v=ls P8gpr Toc") - 1;
@@ -2800,9 +2791,6 @@ rs6000_debug_reg_global (void)
       char options[80];
 
       strcpy (options, (TARGET_P9_FUSION) ? "power9" : "power8");
-      if (TARGET_TOC_FUSION)
-	strcat (options, ", toc");
-
       if (TARGET_P8_FUSION_SIGN)
 	strcat (options, ", sign");
 
@@ -3499,10 +3487,6 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 	}
     }
 
-  /* Setup the modes that support combined addressing.  */
-  if (TARGET_COMBINED_ADDRESS)
-    reg_addr[DImode].combined_addr_p = true;
-
   /* Setup the fusion operations.  */
   if (TARGET_P8_FUSION)
     {
@@ -3613,24 +3597,6 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 	      rs6000_insns[xmode].fusion_addis_st[RELOAD_REG_VMX]
 		= addis_insns[i].store;
 	    }
-	}
-    }
-
-  /* Note which types we support fusing TOC setup plus memory insn.  We only do
-     fused TOCs for medium/large code models.  */
-  if (TARGET_P8_FUSION && TARGET_TOC_FUSION && TARGET_POWERPC64
-      && (TARGET_CMODEL != CMODEL_SMALL))
-    {
-      reg_addr[QImode].fused_toc = true;
-      reg_addr[HImode].fused_toc = true;
-      reg_addr[SImode].fused_toc = true;
-      reg_addr[DImode].fused_toc = true;
-      if (TARGET_HARD_FLOAT)
-	{
-	  if (TARGET_SINGLE_FLOAT)
-	    reg_addr[SFmode].fused_toc = true;
-	  if (TARGET_DOUBLE_FLOAT)
-	    reg_addr[DFmode].fused_toc = true;
 	}
     }
 
@@ -4409,7 +4375,7 @@ rs6000_option_override_internal (bool global_init_p)
 			 & OPTION_MASK_P8_FUSION);
 
   /* Setting additional fusion flags turns on base fusion.  */
-  if (!TARGET_P8_FUSION && (TARGET_P8_FUSION_SIGN || TARGET_TOC_FUSION))
+  if (!TARGET_P8_FUSION && TARGET_P8_FUSION_SIGN)
     {
       if (rs6000_isa_flags_explicit & OPTION_MASK_P8_FUSION)
 	{
@@ -4417,10 +4383,7 @@ rs6000_option_override_internal (bool global_init_p)
 	    error ("%qs requires %qs", "-mpower8-fusion-sign",
 		   "-mpower8-fusion");
 
-	  if (TARGET_TOC_FUSION)
-	    error ("%qs requires %qs", "-mtoc-fusion", "-mpower8-fusion");
-
-	  rs6000_isa_flags &= ~OPTION_MASK_P8_FUSION;
+	  rs6000_isa_flags &= ~OPTION_MASK_P8_FUSION_SIGN;
 	}
       else
 	rs6000_isa_flags |= OPTION_MASK_P8_FUSION;
@@ -4750,17 +4713,20 @@ rs6000_option_override_internal (bool global_init_p)
   SUB3TARGET_OVERRIDE_OPTIONS;
 #endif
 
+
   /* Only do combined addressing for 64-bit Linux server systems using medium
-     code model.  The large code model can produce addresses that are too
-     large for ADDIS combined with a d-form instruction.  This must be done
-     after SUBSUBTARGET_OVERRIDE_OPTIONS, so that cmodel is set correctly. */
+     code model.  The large code model can produce addresses that are too large
+     for ADDIS combined with a d-form instruction.  This must be done after
+     SUBSUBTARGET_OVERRIDE_OPTIONS, so that cmodel is set correctly. */
   if (TARGET_COMBINED_ADDRESS
-      && (!TARGET_VSX || !TARGET_POWERPC64 || flag_split_stack
-	  || TARGET_CMODEL != CMODEL_MEDIUM))
+      && (!TARGET_VSX || !TARGET_POWERPC64 || TARGET_CMODEL != CMODEL_MEDIUM))
     {
       if (rs6000_isa_flags_explicit & OPTION_MASK_COMBINED_ADDRESS)
 	{
-	  if (TARGET_CMODEL != CMODEL_MEDIUM)
+	  if (!TARGET_ELF)
+	    error ("%qs is only available on ELF systems",
+		   "-mcombined-address");
+	  else if (TARGET_CMODEL != CMODEL_MEDIUM)
 	    error ("%qs requires %qs", "-mcombined-address",
 		   "-mcmodel=medium");
 	  else if (!TARGET_VSX)
@@ -4777,27 +4743,6 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_isa_flags &= ~OPTION_MASK_COMBINED_ADDRESS;
     }
 
-  /* TOC fusion requires 64-bit and medium code model.  Like combined
-     addressing, we can't check for toc fusion until after the code model has
-     been set.  */
-  if (TARGET_TOC_FUSION && (!TARGET_POWERPC64 || TARGET_CMODEL != CMODEL_MEDIUM))
-    {
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION) != 0)
-	{
-	  if (!TARGET_POWERPC64)
-	    warning (0, N_("%qs requires 64-bit"), "-mtoc-fusion");
-	  else if (TARGET_CMODEL != CMODEL_MEDIUM)
-	    warning (0, N_("%qs requires %qs"),
-		     "-mtoc-fusion",
-		     "-mcmodel=medium");
-	  else
-	    gcc_unreachable ();
-	}
-
-      rs6000_isa_flags &= ~OPTION_MASK_TOC_FUSION;
-    }
-
-  /* Support -mdebug.  */
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
 
@@ -8630,16 +8575,8 @@ rs6000_legitimate_offset_address_p (machine_mode mode, rtx x,
       break;
     }
 
-  if (reg_addr[mode].combined_addr_p)
-    {
-      offset += 0x80000000UL;
-      return offset < 0x100000000UL - extra;
-    }
-  else
-    {
-      offset += 0x8000;
-      return offset < 0x10000 - extra;
-    }
+  offset += 0x8000;
+  return offset < 0x10000 - extra;
 }
 
 bool
@@ -9833,9 +9770,6 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
 	return 1;
       if (legitimate_constant_pool_address_p (x, mode,
 					     reg_ok_strict || lra_in_progress))
-	return 1;
-      if (reg_addr[mode].fused_toc && GET_CODE (x) == UNSPEC
-	  && XINT (x, 1) == UNSPEC_FUSION_ADDIS)
 	return 1;
     }
 
@@ -19577,24 +19511,22 @@ rs6000_secondary_reload_toc_costs (addr_mask_type addr_mask)
 }
 
 /* Helper function for rs6000_secondary_reload to determine whether the memory
-   address (ADDR) with a given register class (RCLASS), machine mode (MODE)
-   that needs reloading, and whether this is a load or store (IN_P).  Return
-   negative if the memory is not handled by the memory helper functions and to
-   try a different reload method, 0 if no additional instructions are need, and
-   positive to give the extra cost for the memory.  */
+   address (ADDR) with a given register class (RCLASS) and machine mode (MODE)
+   needs reloading.  Return negative if the memory is not handled by the memory
+   helper functions and to try a different reload method, 0 if no additional
+   instructions are need, and positive to give the extra cost for the
+   memory.  */
 
 static int
 rs6000_secondary_reload_memory (rtx addr,
 				enum reg_class rclass,
-				machine_mode mode,
-				bool in_p)
+				machine_mode mode)
 {
   int extra_cost = 0;
   rtx reg, and_arg, plus_arg0, plus_arg1;
   addr_mask_type addr_mask;
   const char *type = NULL;
   const char *fail_msg = NULL;
-  bool combined_addr_p = false;
 
   if (GPR_REG_CLASS_P (rclass))
     addr_mask = reg_addr[mode].addr_mask[RELOAD_REG_GPR];
@@ -19625,13 +19557,6 @@ rs6000_secondary_reload_memory (rtx addr,
 
   else
     addr_mask = 0;
-
-  /* Combined addresses don't support update forms.  */
-  if (reg_addr[mode].combined_addr_p && combined_addr_operand (addr, Pmode))
-    {
-      combined_addr_p = true;
-      addr_mask &= ~(RELOAD_REG_PRE_INCDEC | RELOAD_REG_PRE_MODIFY);
-    }
 
   /* If the register isn't valid in this register class, just return now.  */
   if ((addr_mask & RELOAD_REG_VALID) == 0)
@@ -19788,14 +19713,6 @@ rs6000_secondary_reload_memory (rtx addr,
 	    {
 	      extra_cost = 1;
 	      type = "offset #2";
-	    }
-
-	  /* Possibly convert combined addresses into the appropriate insn that
-	     uses a temporary to form the address.  */
-	  if (combined_addr_p && (rclass != BASE_REGS || !in_p))
-	    {
-	      extra_cost = 1;
-	      type = "combined address";
 	    }
 	}
 
@@ -20109,26 +20026,11 @@ rs6000_secondary_reload (bool in_p,
   enum insn_code icode;
   bool default_p = false;
   bool done_p = false;
-  bool memory_p = false;
-  bool combined_addr_p = false;
 
   /* Allow subreg of memory before/during reload.  */
-  if (MEM_P (x))
-    {
-      memory_p = true;
-      combined_addr_p = (reg_addr[mode].combined_addr_p
-			 && combined_addr_operand (XEXP (x, 0), Pmode));
-    }
-  else if (!reload_completed && GET_CODE (x) == SUBREG
-	   && MEM_P (SUBREG_REG (x)))
-    {
-      memory_p = true;
-      combined_addr_p = (reg_addr[mode].combined_addr_p
-			 && combined_addr_operand (XEXP (SUBREG_REG (x), 0),
-						   Pmode));
-    }
-  else
-    memory_p = combined_addr_p = false;
+  bool memory_p = (MEM_P (x)
+		   || (!reload_completed && GET_CODE (x) == SUBREG
+		       && MEM_P (SUBREG_REG (x))));
 
   sri->icode = CODE_FOR_nothing;
   sri->t_icode = CODE_FOR_nothing;
@@ -20180,11 +20082,10 @@ rs6000_secondary_reload (bool in_p,
     }
 
   /* Handle reload of load/stores if we have reload helper functions.  */
-  if (!done_p && (icode != CODE_FOR_nothing || combined_addr_p) && memory_p)
+  if (!done_p && icode != CODE_FOR_nothing && memory_p)
     {
-      rtx addr = XEXP (x, 0);
-      int extra_cost = rs6000_secondary_reload_memory (addr, rclass, mode,
-						       in_p);
+      int extra_cost = rs6000_secondary_reload_memory (XEXP (x, 0), rclass,
+						       mode);
 
       if (extra_cost >= 0)
 	{
@@ -20192,34 +20093,6 @@ rs6000_secondary_reload (bool in_p,
 	  ret = NO_REGS;
 	  if (extra_cost > 0)
 	    {
-	      /* For combined addresses, use the special combined fusion insns
-		 if they exist.  */
-	      if (combined_addr_p)
-		{
-		  enum rs6000_reload_reg_type rtype;
-
-		  if (rclass == GENERAL_REGS
-		      || (rclass == BASE_REGS && !in_p))
-		    rtype = RELOAD_REG_GPR;
-		  else if (rclass == FLOAT_REGS)
-		    rtype = RELOAD_REG_FPR;
-		  else if (rclass == ALTIVEC_REGS)
-		    rtype = RELOAD_REG_VMX;
-		  else
-		    rtype = RELOAD_REG_ANY;
-
-		  if (rtype != RELOAD_REG_ANY)
-		    {
-		      enum insn_code icode2
-			= (in_p
-			   ? rs6000_insns[mode].fusion_addis_ld[rtype]
-			   : rs6000_insns[mode].fusion_addis_st[rtype]);
-
-		      if (icode2 != CODE_FOR_nothing)
-			icode = icode2;
-		    }
-		}
-
 	      sri->extra_cost = extra_cost;
 	      sri->icode = icode;
 	    }
@@ -36602,7 +36475,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "recip-precision",		OPTION_MASK_RECIP_PRECISION,	false, true  },
   { "save-toc-indirect",	OPTION_MASK_SAVE_TOC_INDIRECT,	false, true  },
   { "string",			0,				false, true  },
-  { "toc-fusion",		OPTION_MASK_TOC_FUSION,		false, true  },
   { "update",			OPTION_MASK_NO_UPDATE,		true , true  },
   { "vsx",			OPTION_MASK_VSX,		false, true  },
 #ifdef OPTION_MASK_64BIT
@@ -38803,26 +38675,6 @@ fusion_wrap_memory_address (rtx old_mem)
   return replace_equiv_address_nv (old_mem, new_addr, false);
 }
 
-/* Given a large integer, split it into hi/lo parts.  */
-static void
-large_address_split_int (unsigned HOST_WIDE_INT value,
-			 unsigned HOST_WIDE_INT *p_hi,
-			 unsigned HOST_WIDE_INT *p_lo)
-{
-  unsigned HOST_WIDE_INT value_hi = value & ~HOST_WIDE_INT_C (0xffffU);
-  unsigned HOST_WIDE_INT value_lo = value & HOST_WIDE_INT_C (0xffffU);
-
-  if (value_lo & 0x8000U)
-    {
-      value_lo |= ~(HOST_WIDE_INT_C (0xffffU));
-      value_hi += HOST_WIDE_INT_C (0x10000U);
-    }
-
-  *p_hi = value_hi;
-  *p_lo = value_lo;
-  return;
-}
-
 /* Given an address, convert it into the addis and load offset parts.  Addresses
    created during the peephole2 process look like:
 	(lo_sum (high (unspec [(sym)] UNSPEC_TOCREL))
@@ -38840,13 +38692,6 @@ fusion_split_address (rtx addr, rtx *p_hi, rtx *p_lo)
     {
       lo = XVECEXP (addr, 0, 0);
       hi = gen_rtx_HIGH (Pmode, lo);
-    }
-  else if (GET_CODE (addr) == PLUS && CONST_INT_P (XEXP (addr, 1)))
-    {
-      unsigned HOST_WIDE_INT value_hi, value_lo;
-      large_address_split_int (UINTVAL (XEXP (addr, 1)), &value_hi, &value_lo);
-      hi = gen_rtx_PLUS (Pmode, XEXP (addr, 0), GEN_INT (value_hi));
-      lo = GEN_INT (value_lo);
     }
   else if (GET_CODE (addr) == PLUS || GET_CODE (addr) == LO_SUM)
     {
@@ -38913,113 +38758,6 @@ emit_fusion_gpr_load (rtx target, rtx mem)
 
     default:
       fatal_insn ("Bad GPR fusion", gen_rtx_SET (target, mem));
-    }
-
-  /* Emit the addis instruction.  */
-  emit_fusion_addis (target, addis_value);
-
-  /* Emit the D-form load instruction.  */
-  emit_fusion_load_store (target, target, load_offset, load_str);
-
-  return "";
-}
-
-/* Given a combined address, convert it into the addis and load offset
-   parts.  */
-
-static void
-combined_address_split (rtx addr, rtx *p_hi, rtx *p_lo)
-{
-  if (GET_CODE (addr) == PLUS)
-    {
-      rtx op0 = XEXP (addr, 0);
-      rtx op1 = XEXP (addr, 1);
-      unsigned HOST_WIDE_INT value_hi, value_lo;
-
-      gcc_assert (REG_P (op0) || SUBREG_P (op0));
-      gcc_assert (CONST_INT_P (op1));
-
-      large_address_split_int (UINTVAL (op1), &value_hi, &value_lo);
-      *p_hi = gen_rtx_PLUS (Pmode, op0, GEN_INT (value_hi));
-      *p_lo = GEN_INT (value_lo);
-    }
-  else if (CONST_INT_P (addr))
-    {
-      unsigned HOST_WIDE_INT value_hi, value_lo;
-      large_address_split_int (INTVAL (addr), &value_hi, &value_lo);
-      *p_hi = GEN_INT (value_hi);
-      *p_lo = GEN_INT (value_lo);
-    }
-  else
-    gcc_unreachable ();
-}
-
-/* Return a string to fuse an addis instruction with a gpr load to the same
-   register that we loaded up the addis instruction.
-
-   The code is complicated, so we call output_asm_insn directly, and just
-   return "".  */
-
-const char *
-emit_combined_address_gpr_load (rtx target, rtx mem)
-{
-  rtx addis_value;
-  rtx addr;
-  rtx load_offset;
-  const char *load_str = NULL;
-  machine_mode mode;
-  bool sign_ext_p = false;
-  bool zero_ext_p = false;
-
-  if (GET_CODE (mem) == ZERO_EXTEND)
-    {
-      mem = XEXP (mem, 0);
-      zero_ext_p = true;
-    }
-  else if (GET_CODE (mem) == SIGN_EXTEND)
-    {
-      mem = XEXP (mem, 0);
-      sign_ext_p = true;
-    }
-
-  gcc_assert (REG_P (target) && MEM_P (mem));
-
-  addr = XEXP (mem, 0);
-  combined_address_split (addr, &addis_value, &load_offset);
-
-  /* Now emit the load instruction to the same register.  */
-  mode = GET_MODE (mem);
-  switch (mode)
-    {
-    case E_QImode:
-      gcc_assert (!sign_ext_p);
-      load_str = "lbz";
-      break;
-
-    case E_HImode:
-      load_str = sign_ext_p ? "lha" : "lhz";
-      break;
-
-    case E_SFmode:
-      gcc_assert (!sign_ext_p && !zero_ext_p);
-      load_str = "lwz";
-      break;
-
-    case E_SImode:
-      load_str = sign_ext_p ? "lwa" : "lwz";
-      break;
-
-    case E_DFmode:
-      gcc_assert (!sign_ext_p && !zero_ext_p);
-      /* fall through  */
-
-    case E_DImode:
-      gcc_assert (TARGET_POWERPC64);
-      load_str = "ld";
-      break;
-
-    default:
-      fatal_insn ("Bad GPR combined address", gen_rtx_SET (target, mem));
     }
 
   /* Emit the addis instruction.  */

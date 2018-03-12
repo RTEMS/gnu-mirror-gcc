@@ -101,7 +101,6 @@ extern void expand_fusion_gpr_load (rtx *);
 extern void emit_fusion_addis (rtx, rtx);
 extern void emit_fusion_load_store (rtx, rtx, rtx, const char *);
 extern const char *emit_fusion_gpr_load (rtx, rtx);
-extern const char *emit_combined_address_gpr_load (rtx, rtx);
 extern bool fusion_p9_p (rtx, rtx, rtx, rtx);
 extern void expand_fusion_p9_load (rtx *);
 extern void expand_fusion_p9_store (rtx *);
@@ -317,10 +316,9 @@ typedef unsigned char addr_mask_type;
 
 /* Register type masks based on the type, of valid addressing modes.  */
 struct rs6000_reg_addr {
-  addr_mask_type addr_mask[(int)N_RELOAD_REG]; /* Valid address masks.  */
-  unsigned char scalar_in_vmx_p	: 1;	/* Scalar value can go in VMX.  */
-  unsigned char fused_toc	: 1;	/* Mode supports TOC fusion.  */
-  unsigned char combined_addr_p	: 1;	/* Mode supports combined addresses.  */
+  addr_mask_type addr_mask[(int)N_RELOAD_REG];	/* Valid address masks.  */
+  unsigned char scalar_in_vmx_p : 1;		/* Scalar can go in VMX.  */
+  unsigned char combined_addr_p : 1;		/* Combined address allowed.  */
 };
 
 extern struct rs6000_reg_addr reg_addr[];

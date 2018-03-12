@@ -161,10 +161,7 @@
   "Memory operand suitable for power9 fusion load/stores"
   (match_operand 0 "fusion_addis_mem_combo_load"))
 
-;; Fusion gpr load.
-(define_memory_constraint "wG"
-  "Memory operand suitable for TOC fusion memory references"
-  (match_operand 0 "toc_fusion_mem_wrapped"))
+;; wG was Fusion gpr load that was never fully implemented.
 
 (define_register_constraint "wH" "rs6000_constraints[RS6000_CONSTRAINT_wH]"
   "Altivec register to hold 32-bit integers or NO_REGS.")
