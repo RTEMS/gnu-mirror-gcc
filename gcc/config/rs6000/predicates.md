@@ -1948,3 +1948,44 @@
 
   return offsettable_nonstrict_memref_p (op);
 })
+
+
+;; Match a combined address that cannot be represented in a single instruction.
+(define_predicate "combined_addr_operand"
+  (match_code "plus,const_int")
+{
+  if (mode != Pmode || !TARGET_COMBINED_ADDRESS)
+    return false;
+
+  if (GET_CODE (op) == PLUS)
+    {
+      if (!base_reg_operand (XEXP (op, 0), mode))
+	return false;
+
+      op = XEXP (op, 1);
+    }
+
+  if (CONST_INT_P (op))
+    {
+      if (satisfies_constraint_I (op))	/* bottom 16 bits.  */
+	return false;
+      if (satisfies_constraint_L (op))	/* 16 bits out of 32 bits.  */
+	return false;
+
+      unsigned HOST_WIDE_INT uvalue = UINTVAL (op);
+      return (uvalue + 0x80000000UL) < 0x100000000UL;
+    }
+
+  return false;
+})
+
+;; Match a memory operation that uses a combined address.
+(define_predicate "combined_mem_operand"
+  (match_code "mem")
+{
+  if (!reg_addr[mode].combined_addr_p)
+    return false;
+
+  return combined_addr_operand (XEXP (op, 0), Pmode);
+})
+

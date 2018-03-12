@@ -40,6 +40,7 @@ extern int num_insns_constant_wide (HOST_WIDE_INT);
 extern int small_data_operand (rtx, machine_mode);
 extern bool mem_operand_gpr (rtx, machine_mode);
 extern bool mem_operand_ds_form (rtx, machine_mode);
+extern bool mem_operand_no_combined (rtx, machine_mode);
 extern bool toc_relative_expr_p (const_rtx, bool, const_rtx *, const_rtx *);
 extern void validate_condition_mode (enum rtx_code, machine_mode);
 extern bool legitimate_constant_pool_address_p (const_rtx, machine_mode,
@@ -90,6 +91,7 @@ extern bool rs6000_is_valid_2insn_and (rtx, machine_mode);
 extern void rs6000_emit_2insn_and (machine_mode, rtx *, bool, int);
 extern int registers_ok_for_quad_peep (rtx, rtx);
 extern int mems_ok_for_quad_peep (rtx, rtx);
+extern bool rs6000_valid_move_p (rtx, rtx);
 extern bool gpr_or_gpr_p (rtx, rtx);
 extern bool direct_move_p (rtx, rtx);
 extern bool quad_address_p (rtx, machine_mode, bool);
@@ -99,6 +101,7 @@ extern void expand_fusion_gpr_load (rtx *);
 extern void emit_fusion_addis (rtx, rtx);
 extern void emit_fusion_load_store (rtx, rtx, rtx, const char *);
 extern const char *emit_fusion_gpr_load (rtx, rtx);
+extern const char *emit_combined_address_gpr_load (rtx, rtx);
 extern bool fusion_p9_p (rtx, rtx, rtx, rtx);
 extern void expand_fusion_p9_load (rtx *);
 extern void expand_fusion_p9_store (rtx *);
@@ -315,8 +318,9 @@ typedef unsigned char addr_mask_type;
 /* Register type masks based on the type, of valid addressing modes.  */
 struct rs6000_reg_addr {
   addr_mask_type addr_mask[(int)N_RELOAD_REG]; /* Valid address masks.  */
-  bool scalar_in_vmx_p;			/* Scalar value can go in VMX.  */
-  bool fused_toc;			/* Mode supports TOC fusion.  */
+  unsigned char scalar_in_vmx_p	: 1;	/* Scalar value can go in VMX.  */
+  unsigned char fused_toc	: 1;	/* Mode supports TOC fusion.  */
+  unsigned char combined_addr_p	: 1;	/* Mode supports combined addresses.  */
 };
 
 extern struct rs6000_reg_addr reg_addr[];

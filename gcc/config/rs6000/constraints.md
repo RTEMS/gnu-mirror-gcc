@@ -143,6 +143,10 @@
        (and (match_test "TARGET_P8_VECTOR")
 	    (match_operand 0 "s5bit_cint_operand"))))
 
+(define_memory_constraint "wC"
+  "memory which uses a combined address"
+  (match_operand 0 "combined_mem_operand"))
+
 (define_constraint "wD"
   "Int constant that is the element number of the 64-bit scalar in a vector."
   (and (match_code "const_int")
@@ -185,6 +189,12 @@
   "Match vector constant with all 1's if the XXLORC instruction is available"
   (and (match_test "TARGET_P8_VECTOR")
        (match_operand 0 "all_ones_constant")))
+
+;; Like "m", but do not include a combined address
+(define_memory_constraint "wN"
+  "Memory operation that does not include a combined address"
+  (and (match_code "mem")
+       (match_test "mem_operand_no_combined (op, mode)")))
 
 ;; ISA 3.0 vector d-form addresses
 (define_memory_constraint "wO"

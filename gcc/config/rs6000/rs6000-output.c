@@ -168,6 +168,13 @@ rs6000_output_move_64bit (rtx operands[])
   /* Loads.  */
   else if (dest_regno >= 0 && MEM_P (src))
     {
+      if (reg_addr[mode].combined_addr_p
+	  && combined_mem_operand (src, mode))
+	{
+	  gcc_assert (dest_gpr_p && dest_regno != 0);
+	  return emit_combined_address_gpr_load (dest, src);
+	}
+
       if (dest_gpr_p)
 	return TARGET_POWERPC64 ? "ld%U1%X1 %0,%1" : "#";
 

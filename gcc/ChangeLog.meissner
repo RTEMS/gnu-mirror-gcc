@@ -1,3 +1,50 @@
+2018-03-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/constraints.md (wC): New constraint for combined
+	addresses.
+	(wN): New constraint to replace 'm' for d-form addresses with
+	16-bit operand.
+	* config/rs6000/predicates.md (combined_addr_operand): New
+	predicates for addresses and memory operations that are combined,
+	where a single address might generate 2 instructions.
+	(combined_mem_operand): Likewise.
+	* config/rs6000/rs6000-protos.h (mem_operand_d_form): Add
+	declaration.
+	(rs6000_valid_move_p): Likewise.
+	(emit_combined_address_gpr_load): Likewise.
+	(struct rs6000_reg_addr): Make scalar_in_vmx_p and fused_toc bit
+	fields.  Add combined_addr_p.
+	* config/rs6000/rs6000-output.c (rs6000_output_move_64bit): Add
+	support for combined addresses.
+	* config/rs6000/rs6000.c (rs6000_init_hard_regno_mode_ok): If
+	-mcombined-address, note that DImode can be a combined address.
+	Allow -mcombined-addresss and fusion operations.
+	(rs6000_option_override_internal): Simplify combined address
+	checks.  Move toc-fusion tests after setting up cmodel, but don't
+	turn on toc fusion by default.
+	(rs6000_valid_move_p): Valid moves, don't allow combined addresses
+	after register allocation, except for loads of base registers.
+	(mem_operand_gpr): Don't allow combined addresses.
+	(mem_operand_ds_form): Likewise.
+	(mem_operand_d_form): New predicate for valid memory addresses
+	that don't include combined addresses.
+	(rs6000_legitimate_offset_address_p): If the mode allows combine
+	addresses, increase the range that an offset address can support.
+	(rs6000_conditional_register_usage): Don't mark r12 as being fixed
+	with -mcombined-address.
+	(rs6000_secondary_reload_memory): Add initial support for combined
+	addresses.  Know that for loads of base registers, we can reuse
+	the register being loaded to avoid needing a temporary.
+	(rs6000_secondary_reload): Likewise.
+	(large_address_split_int): New insns to support combined
+	addresses.
+	(combined_address_split): Likewise.
+	(emit_combined_address_gpr_load): Likewise.
+	* config/rs6000/rs6000.md (movdi_internal32): Add support for
+	loading memory addresses with combined addresses into base
+	registers.  Change 'm' constraint to 'wN'.
+	(movdi_internal64): Likewise.
+
 2018-03-09  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_option_override_internal): Move
