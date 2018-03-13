@@ -1,3 +1,40 @@
+2018-03-13  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (addr_mask_type): Change to
+	unsigned short to add more bits.
+	(RELOAD_REG_DS_OFFSET): New address mask bit to say the address is
+	a DS address (bottom 2 bits are 0).
+	(move_supports_pre_incdec_p):  Add reload register type optional
+	argument.
+	(mode_supports_pre_modify_p): Likewise.
+	(mode_supports_d_form): New helper function to say if D-form
+	addresses are allowed.
+	(mode_supports_ds_form): New helper function to say if DS-form
+	addresses are allowed.
+	(mode_supports_dq_form): Rename from mode_supports_vsx_dform_quad.
+	(mode_supports_vsx_dform_quad): Likewise.
+	(mode_supports_x_form): New helper function to say if indexed
+	addresses are allowed.
+	* config/rs6000/rs6000-output.c (rs6000_output_move_128bit): Use
+	mode_supports_dq_form instead of mode_supports_vsx_dform_quad.
+	* config/rs6000/rs6000.c (rs6000_debug_addr_mask): Print out if
+	the mode needs DS-form offset addresses.
+	(rs6000_setup_reg_addr_masks): Mark which modes need DS-form
+	addreesses.  Restrict paired loads/stores to x-form if -mpaired.
+	(quad_address_p): Use mode_supports_dq_form instead of
+	mode_supports_vsx_dform_quad.
+	(offsettable_ok_by_alignment): Likewise.
+	(rs6000_secondary_reload_inner): Likewise.
+	(rs6000_preferred_reload_class): Likewise.
+	(reg_offset_addressing_ok_p): Delete, use mode_supports_d_form
+	instead.  Change callers.
+	(rs6000_legitimate_offset_address_p): Use mode_supports_d_form,
+	mode_supports_ds_form, mode_supports_dq_form helper functions.  If
+	the mode needs DS addresses, don't allow offsets of 0..3.  Delete
+	tests of scalars for VECTOR_MEM_VSX_P.
+	(rs6000_legitimize_reload_address): Use mode_supports_d_form,
+	mode_supports_dq_form helper functions.
+
 2018-03-12  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/constraints.md (wG): Delete toc fusion support.

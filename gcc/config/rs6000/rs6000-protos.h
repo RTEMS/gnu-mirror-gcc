@@ -303,40 +303,41 @@ enum rs6000_reload_reg_type {
 /* Mask bits for each register class, indexed per mode.  Historically the
    compiler has been more restrictive which types can do PRE_MODIFY instead of
    PRE_INC and PRE_DEC, so keep track of sepaate bits for these two.  */
-typedef unsigned char addr_mask_type;
+typedef unsigned short addr_mask_type;
 
-#define RELOAD_REG_VALID	0x01	/* Mode valid in register..  */
-#define RELOAD_REG_MULTIPLE	0x02	/* Mode takes multiple registers.  */
-#define RELOAD_REG_INDEXED	0x04	/* Reg+reg addressing.  */
-#define RELOAD_REG_OFFSET	0x08	/* Reg+offset addressing. */
-#define RELOAD_REG_PRE_INCDEC	0x10	/* PRE_INC/PRE_DEC valid.  */
-#define RELOAD_REG_PRE_MODIFY	0x20	/* PRE_MODIFY valid.  */
-#define RELOAD_REG_AND_M16	0x40	/* AND -16 addressing.  */
-#define RELOAD_REG_QUAD_OFFSET	0x80	/* quad offset is limited.  */
+#define RELOAD_REG_VALID	0x001	/* Mode valid in register..  */
+#define RELOAD_REG_MULTIPLE	0x002	/* Mode takes multiple registers.  */
+#define RELOAD_REG_INDEXED	0x004	/* Reg+reg addressing.  */
+#define RELOAD_REG_OFFSET	0x008	/* Reg+offset addressing. */
+#define RELOAD_REG_PRE_INCDEC	0x010	/* PRE_INC/PRE_DEC valid.  */
+#define RELOAD_REG_PRE_MODIFY	0x020	/* PRE_MODIFY valid.  */
+#define RELOAD_REG_AND_M16	0x040	/* AND -16 addressing.  */
+#define RELOAD_REG_QUAD_OFFSET	0x080	/* Bottom 4 bits must be 0.  */
+#define RELOAD_REG_DS_OFFSET	0x100	/* Bottom 2 bits must be 0.  */
 
 /* Register type masks based on the type, of valid addressing modes.  */
 struct rs6000_reg_addr {
   addr_mask_type addr_mask[(int)N_RELOAD_REG];	/* Valid address masks.  */
-  unsigned char scalar_in_vmx_p : 1;		/* Scalar can go in VMX.  */
-  unsigned char combined_addr_p : 1;		/* Combined address allowed.  */
+  unsigned char scalar_in_vmx_p	: 1;		/* Scalar can go in VMX.  */
+  unsigned char combined_addr_p	: 1;		/* Combined address allowed.  */
 };
 
 extern struct rs6000_reg_addr reg_addr[];
 
 /* Helper function to say whether a mode supports PRE_INC or PRE_DEC.  */
 static inline bool
-mode_supports_pre_incdec_p (machine_mode mode)
+mode_supports_pre_incdec_p (machine_mode mode,
+			    enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
 {
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_PRE_INCDEC)
-	  != 0);
+  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_PRE_INCDEC) != 0);
 }
 
 /* Helper function to say whether a mode supports PRE_MODIFY.  */
 static inline bool
-mode_supports_pre_modify_p (machine_mode mode)
+mode_supports_pre_modify_p (machine_mode mode,
+			    enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
 {
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_PRE_MODIFY)
-	  != 0);
+  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_PRE_MODIFY) != 0);
 }
 
 /* Return true if we have D-form addressing in altivec registers.  */
@@ -346,14 +347,38 @@ mode_supports_vmx_dform (machine_mode mode)
   return ((reg_addr[mode].addr_mask[RELOAD_REG_VMX] & RELOAD_REG_OFFSET) != 0);
 }
 
-/* Return true if we have D-form addressing in VSX registers.  This addressing
-   is more limited than normal d-form addressing in that the offset must be
-   aligned on a 16-byte boundary.  */
+/* Return true if we have offset addressing (d-form).  The offset may be 12 bit
+   (dq-form), 14 bits (ds-form), or 16 (d-form) bits.  */
 static inline bool
-mode_supports_vsx_dform_quad (machine_mode mode)
+mode_supports_d_form (machine_mode mode,
+		      enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
 {
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_QUAD_OFFSET)
-	  != 0);
+  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_OFFSET) != 0);
+}
+
+/* Return true if we have DS-form addressing in any registers where the bottom
+   2 bits must be 0 (i.e. LD, ST, etc.).  */
+static inline bool
+mode_supports_ds_form (machine_mode mode,
+		       enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
+{
+  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_DS_OFFSET) != 0);
+}
+
+/* Return true if we have DQ-form addressing.  The bottom 4 bits must be 0.  */
+static inline bool
+mode_supports_dq_form (machine_mode mode,
+		       enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
+{
+  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_QUAD_OFFSET) != 0);
+}
+
+/* Return true if we have indexed addressing (x-form).  */
+static inline bool
+mode_supports_x_form (machine_mode mode,
+		      enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
+{
+  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_INDEXED) != 0);
 }
 
 #endif  /* rs6000-protos.h */

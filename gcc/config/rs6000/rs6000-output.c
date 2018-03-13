@@ -352,7 +352,7 @@ rs6000_output_move_128bit (rtx operands[])
 
       else if (TARGET_VSX && dest_vsx_p)
 	{
-	  if (mode_supports_vsx_dform_quad (mode)
+	  if (mode_supports_dq_form (mode)
 	      && quad_address_p (XEXP (src, 0), mode, true))
 	    return "lxv %x0,%1";
 
@@ -390,7 +390,7 @@ rs6000_output_move_128bit (rtx operands[])
 
       else if (TARGET_VSX && src_vsx_p)
 	{
-	  if (mode_supports_vsx_dform_quad (mode)
+	  if (mode_supports_dq_form (mode)
 	      && quad_address_p (XEXP (dest, 0), mode, true))
 	    return "stxv %x1,%0";
 
