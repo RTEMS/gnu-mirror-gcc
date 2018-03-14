@@ -2968,9 +2968,12 @@ rs6000_setup_reg_addr_masks (void)
 	    }
 
 	  /* LD and STD are DS-form instructions, which must have the bottom 2
-	     bits be 0.  */
+	     bits be 0.  However, since DFmode is primarily used in the
+	     floating point/vector registers, don't restrict the offsets in ISA
+	     2.xx.  */
 	  if (rc == RELOAD_REG_GPR && msize == 8 && TARGET_POWERPC64
-	      && (addr_mask & RELOAD_REG_OFFSET) != 0)
+	      && (addr_mask & RELOAD_REG_OFFSET) != 0
+	      && INTEGRAL_MODE_P (m2))
 	    addr_mask |= RELOAD_REG_DS_OFFSET;
 
 	  /* ISA 3.0 LXSD, LXSSP, STXSD, STXSSP altivec load/store instructions
