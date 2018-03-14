@@ -1990,6 +1990,7 @@ can_combine_p (rtx_insn *insn, rtx_insn *i3, rtx_insn *pred ATTRIBUTE_UNUSED,
 	       && (reg_used_between_p (dest, succ2, i3)
 		   || reg_used_between_p (dest, succ, succ2)))
 	      || (!succ2 && succ && reg_used_between_p (dest, succ, i3))
+	      || (!succ2 && !succ && reg_used_between_p (dest, insn, i3))
 	      || (succ
 		  /* SUCC and SUCC2 can be split halves from a PARALLEL; in
 		     that case SUCC is not in the insn stream, so use SUCC2
@@ -14776,6 +14777,9 @@ distribute_links (struct insn_link *links)
 	     || GET_CODE (reg) == STRICT_LOW_PART
 	     || GET_CODE (reg) == SUBREG)
 	reg = XEXP (reg, 0);
+
+      if (reg == pc_rtx)
+	continue;
 
       /* A LOG_LINK is defined as being placed on the first insn that uses
 	 a register and points to the insn that sets the register.  Start

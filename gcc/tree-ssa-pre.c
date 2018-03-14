@@ -484,10 +484,6 @@ typedef struct bb_bitmap_sets
   /* True if we have visited this block during ANTIC calculation.  */
   unsigned int visited : 1;
 
-  /* True if we have visited this block after all successors have been
-     visited this way.  */
-  unsigned int visited_with_visited_succs : 1;
-
   /* True when the block contains a call that might not return.  */
   unsigned int contains_may_not_return_call : 1;
 } *bb_value_sets_t;
@@ -501,8 +497,6 @@ typedef struct bb_bitmap_sets
 #define NEW_SETS(BB)	((bb_value_sets_t) ((BB)->aux))->new_sets
 #define EXPR_DIES(BB)	((bb_value_sets_t) ((BB)->aux))->expr_dies
 #define BB_VISITED(BB)	((bb_value_sets_t) ((BB)->aux))->visited
-#define BB_VISITED_WITH_VISITED_SUCCS(BB) \
-    ((bb_value_sets_t) ((BB)->aux))->visited_with_visited_succs
 #define BB_MAY_NOTRETURN(BB) ((bb_value_sets_t) ((BB)->aux))->contains_may_not_return_call
 #define BB_LIVE_VOP_ON_EXIT(BB) ((bb_value_sets_t) ((BB)->aux))->vop_on_exit
 
@@ -1226,9 +1220,10 @@ static inline pre_expr
 find_leader_in_sets (unsigned int val, bitmap_set_t set1, bitmap_set_t set2,
 		     bitmap_set_t set3 = NULL)
 {
-  pre_expr result;
+  pre_expr result = NULL;
 
-  result = bitmap_find_leader (set1, val);
+  if (set1)
+    result = bitmap_find_leader (set1, val);
   if (!result && set2)
     result = bitmap_find_leader (set2, val);
   if (!result && set3)
@@ -1332,14 +1327,15 @@ get_representative_for (const pre_expr e, basic_block b = NULL)
 
 
 static pre_expr
-phi_translate (pre_expr expr, bitmap_set_t set1, bitmap_set_t set2, edge e);
+phi_translate (bitmap_set_t, pre_expr, bitmap_set_t, bitmap_set_t, edge);
 
 /* Translate EXPR using phis in PHIBLOCK, so that it has the values of
    the phis in PRED.  Return NULL if we can't find a leader for each part
    of the translated expression.  */
 
 static pre_expr
-phi_translate_1 (pre_expr expr, bitmap_set_t set1, bitmap_set_t set2, edge e)
+phi_translate_1 (bitmap_set_t dest,
+		 pre_expr expr, bitmap_set_t set1, bitmap_set_t set2, edge e)
 {
   basic_block pred = e->src;
   basic_block phiblock = e->dest;
@@ -1363,10 +1359,11 @@ phi_translate_1 (pre_expr expr, bitmap_set_t set1, bitmap_set_t set2, edge e)
                 pre_expr leader, result;
 		unsigned int op_val_id = VN_INFO (newnary->op[i])->value_id;
 		leader = find_leader_in_sets (op_val_id, set1, set2);
-		result = phi_translate (leader, set1, set2, e);
+		result = phi_translate (dest, leader, set1, set2, e);
 		if (result && result != leader)
-		  /* Force a leader as well as we are simplifying this
-		     expression.  */
+		  /* If op has a leader in the sets we translate make
+		     sure to use the value of the translated expression.
+		     We might need a new representative for that.  */
 		  newnary->op[i] = get_representative_for (result, pred);
 		else if (!result)
 		  return NULL;
@@ -1399,7 +1396,12 @@ phi_translate_1 (pre_expr expr, bitmap_set_t set1, bitmap_set_t set2, edge e)
 		    else
 		      {
 			unsigned value_id = get_expr_value_id (constant);
-			constant = find_leader_in_sets (value_id, set1, set2,
+			/* We want a leader in ANTIC_OUT or AVAIL_OUT here.
+			   dest has what we computed into ANTIC_OUT sofar
+			   so pick from that - since topological sorting
+			   by sorted_array_from_bitmap_set isn't perfect
+			   we may lose some cases here.  */
+			constant = find_leader_in_sets (value_id, dest,
 							AVAIL_OUT (pred));
 			if (constant)
 			  return constant;
@@ -1485,7 +1487,7 @@ phi_translate_1 (pre_expr expr, bitmap_set_t set1, bitmap_set_t set2, edge e)
 		  }
 		op_val_id = VN_INFO (op[n])->value_id;
 		leader = find_leader_in_sets (op_val_id, set1, set2);
-		opresult = phi_translate (leader, set1, set2, e);
+		opresult = phi_translate (dest, leader, set1, set2, e);
 		if (opresult && opresult != leader)
 		  {
 		    tree name = get_representative_for (opresult);
@@ -1635,7 +1637,8 @@ phi_translate_1 (pre_expr expr, bitmap_set_t set1, bitmap_set_t set2, edge e)
 /* Wrapper around phi_translate_1 providing caching functionality.  */
 
 static pre_expr
-phi_translate (pre_expr expr, bitmap_set_t set1, bitmap_set_t set2, edge e)
+phi_translate (bitmap_set_t dest, pre_expr expr,
+	       bitmap_set_t set1, bitmap_set_t set2, edge e)
 {
   expr_pred_trans_t slot = NULL;
   pre_expr phitrans;
@@ -1661,7 +1664,7 @@ phi_translate (pre_expr expr, bitmap_set_t set1, bitmap_set_t set2, edge e)
     }
 
   /* Translate.  */
-  phitrans = phi_translate_1 (expr, set1, set2, e);
+  phitrans = phi_translate_1 (dest, expr, set1, set2, e);
 
   if (slot)
     {
@@ -1698,7 +1701,7 @@ phi_translate_set (bitmap_set_t dest, bitmap_set_t set, edge e)
   FOR_EACH_VEC_ELT (exprs, i, expr)
     {
       pre_expr translated;
-      translated = phi_translate (expr, set, NULL, e);
+      translated = phi_translate (dest, expr, set, NULL, e);
       if (!translated)
 	continue;
 
@@ -2038,8 +2041,6 @@ compute_antic_aux (basic_block block, bool block_has_abnormal_pred_edge)
     {
       e = single_succ_edge (block);
       gcc_assert (BB_VISITED (e->dest));
-      BB_VISITED_WITH_VISITED_SUCCS (block)
-	= BB_VISITED_WITH_VISITED_SUCCS (e->dest);
       phi_translate_set (ANTIC_OUT, ANTIC_IN (e->dest), e);
     }
   /* If we have multiple successors, we take the intersection of all of
@@ -2050,7 +2051,6 @@ compute_antic_aux (basic_block block, bool block_has_abnormal_pred_edge)
       size_t i;
       edge first = NULL;
 
-      BB_VISITED_WITH_VISITED_SUCCS (block) = true;
       auto_vec<edge> worklist (EDGE_COUNT (block->succs));
       FOR_EACH_EDGE (e, ei, block->succs)
 	{
@@ -2069,8 +2069,6 @@ compute_antic_aux (basic_block block, bool block_has_abnormal_pred_edge)
 		fprintf (dump_file, "ANTIC_IN is MAX on %d->%d\n",
 			 e->src->index, e->dest->index);
 	    }
-	  BB_VISITED_WITH_VISITED_SUCCS (block)
-	    &= BB_VISITED_WITH_VISITED_SUCCS (e->dest);
 	}
 
       /* Of multiple successors we have to have visited one already
@@ -2145,20 +2143,37 @@ compute_antic_aux (basic_block block, bool block_has_abnormal_pred_edge)
   /* clean (ANTIC_IN (block)) is defered to after the iteration converged
      because it can cause non-convergence, see for example PR81181.  */
 
-  if (!bitmap_set_equal (old, ANTIC_IN (block)))
+  /* Intersect ANTIC_IN with the old ANTIC_IN.  This is required until
+     we properly represent the maximum expression set, thus not prune
+     values without expressions during the iteration.  */
+  if (was_visited
+      && bitmap_and_into (&ANTIC_IN (block)->values, &old->values))
     {
-      changed = true;
-      /* After the initial value set computation the value set may
-         only shrink during the iteration.  */
-      if (was_visited && BB_VISITED_WITH_VISITED_SUCCS (block) && flag_checking)
+      if (dump_file && (dump_flags & TDF_DETAILS))
+	fprintf (dump_file, "warning: intersecting with old ANTIC_IN "
+		 "shrinks the set\n");
+      /* Prune expressions not in the value set.  */
+      bitmap_iterator bi;
+      unsigned int i;
+      unsigned int to_clear = -1U;
+      FOR_EACH_EXPR_ID_IN_SET (ANTIC_IN (block), i, bi)
 	{
-	  bitmap_iterator bi;
-	  unsigned int i;
-	  EXECUTE_IF_AND_COMPL_IN_BITMAP (&ANTIC_IN (block)->values,
-					  &old->values, 0, i, bi)
-	    gcc_unreachable ();
+	  if (to_clear != -1U)
+	    {
+	      bitmap_clear_bit (&ANTIC_IN (block)->expressions, to_clear);
+	      to_clear = -1U;
+	    }
+	  pre_expr expr = expression_for_id (i);
+	  unsigned int value_id = get_expr_value_id (expr);
+	  if (!bitmap_bit_p (&ANTIC_IN (block)->values, value_id))
+	    to_clear = i;
 	}
+      if (to_clear != -1U)
+	bitmap_clear_bit (&ANTIC_IN (block)->expressions, to_clear);
     }
+
+  if (!bitmap_set_equal (old, ANTIC_IN (block)))
+    changed = true;
 
  maybe_dump_sets:
   if (dump_file && (dump_flags & TDF_DETAILS))
@@ -2329,7 +2344,6 @@ compute_antic (void)
   FOR_ALL_BB_FN (block, cfun)
     {
       BB_VISITED (block) = 0;
-      BB_VISITED_WITH_VISITED_SUCCS (block) = 0;
 
       FOR_EACH_EDGE (e, ei, block->preds)
 	if (e->flags & EDGE_ABNORMAL)
@@ -2346,7 +2360,6 @@ compute_antic (void)
 
   /* At the exit block we anticipate nothing.  */
   BB_VISITED (EXIT_BLOCK_PTR_FOR_FN (cfun)) = 1;
-  BB_VISITED_WITH_VISITED_SUCCS (EXIT_BLOCK_PTR_FOR_FN (cfun)) = 1;
 
   /* For ANTIC computation we need a postorder that also guarantees that
      a block with a single successor is visited after its successor.
@@ -3199,7 +3212,7 @@ do_pre_regular_insertion (basic_block block, basic_block dom)
 	      gcc_assert (!(pred->flags & EDGE_FAKE));
 	      bprime = pred->src;
 	      /* We are looking at ANTIC_OUT of bprime.  */
-	      eprime = phi_translate (expr, ANTIC_IN (block), NULL, pred);
+	      eprime = phi_translate (NULL, expr, ANTIC_IN (block), NULL, pred);
 
 	      /* eprime will generally only be NULL if the
 		 value of the expression, translated
@@ -3354,7 +3367,7 @@ do_pre_partial_partial_insertion (basic_block block, basic_block dom)
 	         and so not come across fake pred edges.  */
 	      gcc_assert (!(pred->flags & EDGE_FAKE));
 	      bprime = pred->src;
-	      eprime = phi_translate (expr, ANTIC_IN (block),
+	      eprime = phi_translate (NULL, expr, ANTIC_IN (block),
 				      PA_IN (block), pred);
 
 	      /* eprime will generally only be NULL if the

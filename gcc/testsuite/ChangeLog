@@ -1,3 +1,301 @@
+gcc/testsuite/ChangeLog:
+
+2018-03-14  Carl Love  <cel@us.ibm.com>
+
+	* gcc.target/powerpc/builtins-7-runnable.c: New test file.
+
+2018-03-14  Martin Liska  <mliska@suse.cz>
+
+	PR ipa/8480
+	* g++.dg/lto/pr84805_0.C: New test.
+	* g++.dg/lto/pr84805_1.C: New test.
+	* g++.dg/lto/pr84805_2.C: New test.
+
+2018-03-14  David Malcolm  <dmalcolm@redhat.com>
+
+	PR c/84852
+	* gcc.dg/fixits-pr84852-1.c: New test.
+	* gcc.dg/fixits-pr84852-2.c: New test.
+
+2018-03-14  Thomas Preud'homme  <thomas.preudhomme@arm.com>
+
+	* lib/scanasm.exp (scan-assembler-times): Move FAIL debug info into a
+	separate verbose message.
+	* lib/scandump.exp (scan-dump-times): Likewise.
+
+2018-03-14  Julia Koval  <julia.koval@intel.com>
+
+	* g++.dg/ext/mv16.C: Split up icelake on icelake client and icelake
+	server.
+	* gcc.target/i386/funcspec-56.inc: Ditto.
+
+2018-03-14  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* gcc.target/aarch64/sve/mul_highpart_1_run.c: Restrict to
+	aarch64_sve_hw.
+
+2018-03-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/83392
+	* c-c++-common/ubsan/ptr-overflow-sanitization-1.c: Adjust expected
+	check count from 17 to 14.
+
+	PR target/84844
+	* gcc.target/i386/pr84844.c: New test.
+
+2018-03-14  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/84830
+	* gcc.dg/torture/pr84830.c: New testcase.
+
+2018-03-14  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/84596
+	* g++.dg/cpp0x/static_assert15.C: New test.
+
+2018-03-13  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/61775
+	* gfortran.dg/pr61775.f90: New test.
+
+2018-03-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/84843
+	* g++.dg/ext/pr84843-1.C: New test.
+	* g++.dg/ext/pr84843-2.C: New test.
+
+2018-03-13  David Pagan  <dave.pagan@oracle.com>
+
+	PR c/46921
+	* gcc.dg/pr46921.c: New test.
+
+2018-03-13  Martin Sebor  <msebor@redhat.com>
+
+	PR tree-optimization/84725
+	* c-c++-common/Wstringop-truncation-4.c: New test.
+	* c-c++-common/attr-nonstring-5.c: New test.
+
+2018-03-13  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* gcc.target/aarch64/sve/unpack_fcvt_signed_1.c: Expect zips rather
+	than unpacks.
+	* gcc.target/aarch64/sve/unpack_fcvt_unsigned_1.c: Likewise.
+	* gcc.target/aarch64/sve/unpack_float_1.c: Likewise.
+
+2018-03-13  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* gcc.target/aarch64/sve/tls_1.c: New test.
+	* gcc.target/aarch64/sve/tls_2.C: Likewise.
+
+2018-03-13  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* gcc.target/aarch64/sve/mul_highpart_1.c: New test.
+	* gcc.target/aarch64/sve/mul_highpart_1_run.c: Likewise.
+
+2018-03-13  Martin Liska  <mliska@suse.cz>
+
+	PR ipa/84658.
+	* g++.dg/ipa/pr84658.C: New test.
+
+2018-03-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/84834
+	* gcc.dg/pr84834.c: New test.
+
+	PR target/84827
+	* gcc.target/i386/pr84827.c: New test.
+
+	PR target/84828
+	* g++.dg/ext/pr84828.C: New test.
+
+	PR target/84786
+	* gcc.target/i386/avx512f-pr84786-1.c: New test.
+	* gcc.target/i386/avx512f-pr84786-2.c: New test.
+
+	PR c++/84808
+	* g++.dg/cpp1y/constexpr-84808.C: New test.
+
+	PR c++/84704
+	* g++.dg/debug/pr84704.C: New test.
+
+2018-03-12  Renlin Li  <renlin.li@arm.com>
+
+	* gcc.target/aarch64/movi_hf.c: New.
+	* gcc.target/aarch64/f16_mov_immediate_1.c: Update.
+	* gcc.target/aarch64/f16_mov_immediate_2.c: Update.
+
+2018-03-12  Martin Sebor  <msebor@redhat.com>
+
+	PR tree-optimization/83456
+	* c-c++-common/Wrestrict-2.c: Remove test cases.
+	* c-c++-common/Wrestrict.c: Same.
+	* gcc.dg/Wrestrict-12.c: New test.
+	* gcc.dg/Wrestrict-14.c: New test.
+
+2018-03-12  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* g++.dg/pr84821.C: New test.
+
+2018-03-12  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* gcc.dg/pr84799.c: New test.
+
+2018-03-12  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/84803
+	* gcc.dg/torture/pr84803.c: New testcase.
+
+2018-03-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/84813
+	* g++.dg/debug/pr84813.C: New test.
+
+2018-03-11  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/84546
+	* gfortran.dg/unlimited_polymorphic_29.f90: New test.
+
+2018-03-11  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/83939
+	* gfortran.dg/pr83939.f90
+
+2018-03-11  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/66128
+	* gfortran.dg/zero_sized_9.f90: New test.
+
+2018-03-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/58150
+	* g++.dg/debug/dwarf2/enum2.C: New test.
+
+2018-03-10  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/84734
+	* gfortran.dg/pr84734.f90: New test.
+
+2018-03-10  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/prot3.adb: New test.
+	* gnat.dg/prot3_pkg.ad[sb]: New helper.
+
+2018-03-09  Jason Merrill  <jason@redhat.com>
+	    Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/71169
+	PR c++/71832
+	* g++.dg/cpp0x/pr71169.C: New.
+	* g++.dg/cpp0x/pr71169-2.C: Likewise.
+	* g++.dg/cpp0x/pr71832.C: Likewise.
+
+2018-03-09  Peter Bergner  <bergner@vnet.ibm.com>
+
+	PR target/83969
+	* gcc.target/powerpc/pr83969.c: New test.
+
+2018-03-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/84772
+	* gcc.dg/pr84772.c: New test.
+
+	PR c++/84076
+	* g++.dg/warn/Wformat-2.C: New test.
+
+	PR c++/84767
+	* g++.dg/ext/vla18.C: New test.
+
+2018-03-09  Martin Sebor  <msebor@redhat.com>
+
+	PR tree-optimization/84526
+	* gcc.dg/Wrestrict-10.c: New test.
+	* gcc.dg/Wrestrict-11.c: New test.
+
+2018-03-09  Alexandre Oliva <aoliva@redhat.com>
+
+	PR rtl-optimization/84682
+	* gcc.dg/torture/pr84682-1.c: New.
+	* gcc.dg/torture/pr84682-2.c: New.
+	* gcc.dg/torture/pr84682-3.c: New.
+
+2018-03-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/84724
+	* g++.dg/ext/pr84724.C: New test.
+
+2018-03-09  Vladimir Makarov  <vmakarov@redhat.com>
+
+	PR target/83712
+	* gcc.target/arm/pr83712.c: New.
+
+2018-03-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/84775
+	* gcc.dg/torture/pr84775.c: New testcase.
+
+2018-03-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/84404
+	* gcc.dg/graphite/pr84404.c: Only compile on pthread effective
+	targets.
+
+2018-03-09  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc.c-torture/compile/20180309-1.c: New test.
+
+2018-03-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/80598
+	* g++.dg/warn/Wunused-function4.C: New test.
+
+	PR inline-asm/84742
+	* gcc.target/i386/pr84742-1.c: New test.
+	* gcc.target/i386/pr84742-2.c: New test.
+
+2018-03-08  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/84748
+	* gcc.c-torture/execute/pr84748.c: New test.
+
+2018-03-08  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/84552
+	* gcc.dg/graphite/pr84552.c: New testcase.
+
+2018-03-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/84178
+	* gcc.dg/torture/pr84178-2.c: New testcase.
+
+2018-03-08  David Malcolm  <dmalcolm@redhat.com>
+
+	PR tree-optimization/84178
+	* gcc.c-torture/compile/pr84178-1.c: New test.
+
+2018-03-08  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* lib/target-supports.exp: Do not return zero from a ifunc
+	function.
+
+2018-03-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/84746
+	* gcc.dg/torture/pr84746.c: New testcase.
+
+
+2018-03-08  Alexandre Oliva <aoliva@redhat.com>
+	PR debug/84404
+	PR debug/84408
+	* gcc.dg/graphite/pr84404.c: New.
+
+2018-03-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/84740
+	* gcc.dg/torture/pr84740.c: New test.
+
+	PR tree-optimization/84739
+	* gcc.dg/pr84739.c: New test.
+
 2018-03-07  Martin Sebor  <msebor@redhat.com>
 
 	PR tree-optimization/83519
