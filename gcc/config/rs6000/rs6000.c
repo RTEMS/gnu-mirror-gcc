@@ -3074,7 +3074,6 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
   gcc_assert ((int)CODE_FOR_nothing == 0);
   memset ((void *) &reg_addr[0], '\0', sizeof (reg_addr));
   memset ((void *) &rs6000_insns, '\0', sizeof (rs6000_insns));
-  memset ((void *) &rs6000_insns, '\0', sizeof (rs6000_insns));
 
   gcc_assert ((int)NO_REGS == 0);
   memset ((void *) &rs6000_constraints[0], '\0', sizeof (rs6000_constraints));
@@ -20047,7 +20046,7 @@ rs6000_secondary_reload (bool in_p,
      point register, unless we have D-form addressing.  Also make sure that
      non-zero constants use a FPR.  */
   if (!done_p && reg_addr[mode].scalar_in_vmx_p
-      && !mode_supports_vmx_dform (mode)
+      && !mode_supports_d_form (mode, RELOAD_REG_VMX)
       && (rclass == VSX_REGS || rclass == ALTIVEC_REGS)
       && (memory_p || (GET_CODE (x) == CONST_DOUBLE)))
     {
@@ -20610,7 +20609,7 @@ rs6000_preferred_reload_class (rtx x, enum reg_class rclass)
 	}
 
       /* D-form addressing can easily reload the value.  */
-      if (mode_supports_vmx_dform (mode)
+      if (mode_supports_d_form (mode, RELOAD_REG_VMX)
 	  || mode_supports_dq_form (mode))
 	return rclass;
 
@@ -20767,7 +20766,7 @@ rs6000_secondary_reload_class (enum reg_class rclass, machine_mode mode,
      instead of reloading the secondary memory address for Altivec moves.  */
   if (TARGET_VSX
       && GET_MODE_SIZE (mode) < 16
-      && !mode_supports_vmx_dform (mode)
+      && !mode_supports_d_form (mode, RELOAD_REG_VMX)
       && (((rclass == GENERAL_REGS || rclass == BASE_REGS)
            && (regno >= 0 && ALTIVEC_REGNO_P (regno)))
           || ((rclass == VSX_REGS || rclass == ALTIVEC_REGS)

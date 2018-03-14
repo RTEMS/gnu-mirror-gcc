@@ -340,13 +340,6 @@ mode_supports_pre_modify_p (machine_mode mode,
   return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_PRE_MODIFY) != 0);
 }
 
-/* Return true if we have D-form addressing in altivec registers.  */
-static inline bool
-mode_supports_vmx_dform (machine_mode mode)
-{
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_VMX] & RELOAD_REG_OFFSET) != 0);
-}
-
 /* Return true if we have offset addressing (d-form).  The offset may be 12 bit
    (dq-form), 14 bits (ds-form), or 16 (d-form) bits.  */
 static inline bool

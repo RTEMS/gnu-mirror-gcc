@@ -1,5 +1,16 @@
 2018-03-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/rs6000-protos.h (mode_supports_vmx_dform):
+	Delete.
+	* config/rs6000/rs6000.c (rs6000_init_hard_regno_mode_ok): Delete
+	duplicate memset.
+	(rs6000_secondary_reload): Use mode_supports_d_form with
+	RELOAD_REG_VMX instead of calling mode_supports_vmx_dform.
+	(rs6000_preferred_reload_class): Likewise.
+	(rs6000_secondary_reload_class): Likewise.
+
+2018-03-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	Merge up to 258530.
 	* REVISION: Update subversion id.
 
