@@ -1,3 +1,41 @@
+2018-03-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/84773
+	PR libstdc++/83662
+	* crossconfig.m4: Check for aligned_alloc etc. on freebsd and mingw32.
+	* configure: Regenerate.
+	* include/c_global/cstdlib [_GLIBCXX_HAVE_ALIGNED_ALLOC]
+	(aligned_alloc): Add using-declaration.
+	* testsuite/18_support/aligned_alloc/aligned_alloc.cc: New test.
+
+2018-03-09  François Dumont  <fdumont@gcc.gnu.org>
+
+	* python/libstdcxx/v6/printers.py (build_libstdcxx_dictionary):
+	Fix std::_Fwd_list_iterator and std::_Fwd_list_const_iterator printers
+	registration.
+
+2018-03-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/84769
+	* include/std/variant (get<_Tp, _Types...>, get_if<_Tp, _Types...>):
+	Qualify calls to get<_Np, Types...> and get_if<_Np, _Types...>.
+
+	src/filesystem/ops.cc (create_dir): Pass error_code to is_directory.
+	src/filesystem/std-ops.cc (create_dir): Likewise.
+
+2018-03-08  François Dumont  <fdumont@gcc.gnu.org>
+
+	* python/libstdcxx/v6/printers.py (NodeIteratorPrinter): New.
+	(StdListIteratorPrinter): Inherit from latter.
+	(StdFwdListIteratorPrinter): New, inherit from latter.
+	(StdDebugIteratorPrinter.to_string): Use non-debug iterator printer
+	when iterator has no associated container.
+	(build_libstdcxx_dictionary): Add __gnu_cxx::_Fwd_list_iterator and
+	__gnu_cxx::_Fwd_list_const_iterator printers. Remove __norm namespace
+	registrations.
+	* testsuite/libstdc++-prettyprinters/debug.cc: Adapt.
+	* testsuite/libstdc++-prettyprinters/debug_cxx11.cc: Adapt.
+
 2018-03-06  Ville Voutilainen  <ville.voutilainen@gmail.com>
 
 	PR libstdc++/84601

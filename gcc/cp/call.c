@@ -103,7 +103,7 @@ struct conversion {
      being bound to an rvalue expression.  If KIND is ck_rvalue,
      true when we are treating an lvalue as an rvalue (12.8p33).  If
      KIND is ck_base, always false.  If ck_identity, we will be
-     binding a reference directly.  */
+     binding a reference directly or decaying to a pointer.  */
   BOOL_BITFIELD rvaluedness_matches_p: 1;
   BOOL_BITFIELD check_narrowing: 1;
   /* The type of the expression resulting from the conversion.  */
@@ -1139,6 +1139,8 @@ standard_conversion (tree to, tree from, tree expr, bool c_cast_p,
     {
       from = type_decays_to (from);
       fcode = TREE_CODE (from);
+      /* Tell convert_like_real that we're using the address.  */
+      conv->rvaluedness_matches_p = true;
       conv = build_conv (ck_lvalue, from, conv);
     }
   /* Wrapping a ck_rvalue around a class prvalue (as a result of using
@@ -7209,7 +7211,7 @@ convert_arg_to_ellipsis (tree arg, tsubst_flags_t complain)
 		     "passing objects of non-trivially-copyable "
 		     "type %q#T through %<...%> is conditionally supported",
 		     arg_type);
-	  return cp_build_addr_expr (arg, complain);
+	  return build1 (ADDR_EXPR, build_reference_type (arg_type), arg);
 	}
       /* Build up a real lvalue-to-rvalue conversion in case the
 	 copy constructor is trivial but not callable.  */
@@ -7634,6 +7636,10 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 
       if (undeduced_auto_decl (fn))
 	mark_used (fn, complain);
+      else
+	/* Otherwise set TREE_USED for the benefit of -Wunused-function.
+	   See PR80598.  */
+	TREE_USED (fn) = 1;
 
       return_type = TREE_TYPE (TREE_TYPE (fn));
       nargs = vec_safe_length (args);
@@ -8014,7 +8020,15 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
       tree *fargs = (!nargs ? argarray
 			    : (tree *) alloca (nargs * sizeof (tree)));
       for (j = 0; j < nargs; j++)
-	fargs[j] = maybe_constant_value (argarray[j]);
+	{
+	  /* For -Wformat undo the implicit passing by hidden reference
+	     done by convert_arg_to_ellipsis.  */
+	  if (TREE_CODE (argarray[j]) == ADDR_EXPR
+	      && TREE_CODE (TREE_TYPE (argarray[j])) == REFERENCE_TYPE)
+	    fargs[j] = TREE_OPERAND (argarray[j], 0);
+	  else
+	    fargs[j] = maybe_constant_value (argarray[j]);
+	}
 
       warned_p = check_function_arguments (input_location, fn, TREE_TYPE (fn),
 					   nargs, fargs, NULL);

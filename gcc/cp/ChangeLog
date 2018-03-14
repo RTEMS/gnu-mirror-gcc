@@ -1,3 +1,125 @@
+2018-03-14  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/84596
+	* semantics.c (finish_static_assert): Check
+	instantiation_dependent_expression_p instead of
+	{type,value}_dependent_expression_p.
+
+2018-03-13  Paolo Carlini  <paolo.carlini@oracle.com>
+	    Jason Merrill  <jason@redhat.com>
+
+	PR c++/82336 - link error with list-init default argument.
+	* decl.c (check_default_argument): Unshare an initializer list.
+
+2018-03-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/84843
+	* decl.c (duplicate_decls): For redefinition of built-in, use error
+	and return error_mark_node.  For redeclaration, return error_mark_node
+	rather than olddecl if !flag_permissive.
+
+2018-03-13  Jason Merrill  <jason@redhat.com>
+
+	PR c++/82565 - ICE with concepts and generic lambda.
+	* pt.c (instantiate_decl): Clear fn_context for lambdas.
+
+2018-03-13  Jason Merrill  <jason@redhat.com>
+
+	PR c++/84720 - ICE with rvalue ref non-type argument.
+	* pt.c (convert_nontype_argument): Handle rvalue references.
+
+	PR c++/84839 - ICE with decltype of parameter pack.
+	* pt.c (tsubst_pack_expansion): Set cp_unevaluated_operand while
+	instantiating dummy parms.
+
+	* parser.c (cp_parser_simple_type_specifier): Pedwarn about auto
+	parameter even without -Wpedantic.
+
+	PR c++/84798 - ICE with auto in abstract function declarator.
+	* parser.c (cp_parser_parameter_declaration_clause): Check
+	parser->default_arg_ok_p.
+
+2018-03-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/84808
+	* constexpr.c (find_array_ctor_elt): Don't use elt reference after
+	first potential CONSTRUCTOR_ELTS reallocation.  Convert dindex to
+	sizetype.  Formatting fixes.
+
+2018-03-12  Jason Merrill  <jason@redhat.com>
+
+	PR c++/84355 - ICE with deduction for member class template.
+	* pt.c (tsubst) [TEMPLATE_TYPE_PARM]: Always substitute into
+	CLASS_PLACEHOLDER_TEMPLATE.
+
+	PR c++/84802 - ICE capturing uninstantiated class.
+	* lambda.c (build_capture_proxy): Call complete_type.
+
+2018-03-09  Jason Merrill  <jason@redhat.com>
+
+	PR c++/84770 - ICE with typedef and parameter pack.
+	* pt.c (verify_unstripped_args_1): Split out from
+	verify_unstripped_args.
+
+	PR c++/84785 - ICE with alias template and default targs.
+	* pt.c (type_unification_real): Set processing_template_decl if
+	saw_undeduced == 1.
+
+	PR c++/84752 - ICE with capture of constexpr array.
+	* call.c (standard_conversion): Set rvaluedness_matches_p on the
+	identity conversion under ck_lvalue.
+
+2018-03-09  Jason Merrill  <jason@redhat.com>
+	    Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/71169
+	PR c++/71832
+	* pt.c (any_erroneous_template_args_p): New.
+	* cp-tree.h (any_erroneous_template_args_p): Declare it.
+	* parser.c (cp_parser_class_specifier_1): Use it.
+
+2018-03-09  Jason Merrill  <jason@redhat.com>
+
+	PR c++/84726 - unnecessary capture of constant vars.
+	* cp-tree.h (LAMBDA_CAPTURE_EXPLICIT_P)
+	(LAMBDA_EXPR_CAPTURE_OPTIMIZED): New.
+	* expr.c (mark_use): Set LAMBDA_EXPR_CAPTURE_OPTIMIZED.
+	* lambda.c (is_constant_capture_proxy)
+	(current_lambda_expr, var_to_maybe_prune, mark_const_cap_r)
+	(prune_lambda_captures): New.
+	(finish_lambda_function): Call prune_lambda_captures.
+
+2018-03-09  Jason Merrill  <jason@redhat.com>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/84076
+	* call.c (convert_arg_to_ellipsis): Instead of cp_build_addr_expr
+	build ADDR_EXPR with REFERENCE_TYPE.
+	(build_over_call): For purposes of check_function_arguments, if
+	argarray[j] is ADDR_EXPR with REFERENCE_TYPE created above, use
+	its operand rather than the argument itself.
+
+2018-03-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/84724
+	* decl.c (duplicate_decls): Don't override __* prefixed builtins
+	except for __[^b]*_chk, instead issue permerror and for -fpermissive
+	also a note and return olddecl.
+
+2018-03-09  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/84733
+	* name-lookup.c (do_pushdecl_with_scope): Only clear
+	current_function_decl when pushing a non-class (i.e. namespace)
+	scope.
+
+2018-03-08  Jason Merrill  <jason@redhat.com>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/80598
+	* call.c (build_over_call): In templates set TREE_USED (first_fn) when
+	not calling mark_used for the benefit of -Wunused-function warning.
+
 2018-03-06  Jason Merrill  <jason@redhat.com>
 
 	* lambda.c (is_capture_proxy_with_ref): Remove.
