@@ -1,5 +1,19 @@
 2018-03-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config.gcc (powerpc*-*-*): Add rs6000-output.o to extra_objs.
+	* config/rs6000/t-rs6000 (rs6000-output.o): Add build rule.
+	* config/rs6000/rs6000.c (rs6000_output_move_128bit): Move to
+	rs6000-output.c.
+	(rs6000_move_128bit_ok_p): Likewise.
+	(rs6000_split_128bit_ok_p): Likewise.
+	* config/rs6000/rs6000-output.c (rs6000_output_move_128bit):
+	Likewise.
+	to rs6000-output.c.
+	(rs6000_move_128bit_ok_p): Likewise.
+	(rs6000_split_128bit_ok_p): Likewise.
+
+2018-03-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/rs6000-protos.h (regno_or_subregno): Add
 	declaration.
 	(enum rs6000_reg_type): Move the basic reg_addr support from
@@ -14,15 +28,7 @@
 	(enum rs6000_reload_reg_type): Likwise.
 	(struct rs6000_reg_addr): Likwise.
 	(reg_addr): Likwise.
-	(RELOAD_REG_VALID): Likewise.
-	(RELOAD_REG_MULTIPLE): Likewise.
-	(RELOAD_REG_INDEXED): Likewise.
-	(RELOAD_REG_OFFSET): Likewise.
-	(RELOAD_REG_PRE_INCDEC): Likewise.
-	(RELOAD_REG_PRE_MODIFY): Likewise.
-	(RELOAD_REG_AND_M16): Likewise.
-	(RELOAD_REG_QUAD_OFFSET): Likewise.
-	(RELOAD_REG_DS_OFFSET): Likewise.
+	(RELOAD_REG_*): Likewise.
 	(mode_supports_pre_incdec_p): Move the mode supports helper
 	functions to rs6000-protos.h.  Add an optional argument to use a
 	particular reload register class instead of RELOAD_REG_ANY.
@@ -44,13 +50,7 @@
 	(reg_addr): Make global.
 	(RELOAD_REG_VALID): Move basic reg_addr support to
 	rs6000-protos.h.
-	(RELOAD_REG_MULTIPLE): Likewise.
-	(RELOAD_REG_INDEXED): Likewise.
-	(RELOAD_REG_OFFSET): Likewise.
-	(RELOAD_REG_PRE_INCDEC): Likewise.
-	(RELOAD_REG_PRE_MODIFY): Likewise.
-	(RELOAD_REG_AND_M16): Likewise.
-	(RELOAD_REG_QUAD_OFFSET): Likewise.
+	(RELOAD_REG_*): Likewise.
 	(struct rs6000_insn_functions): New structure that includes the
 	parts of the old reg_addr structure that did not move to
 	rs6000-protos.h because it contains insn codes.
