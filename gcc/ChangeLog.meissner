@@ -1,5 +1,101 @@
 2018-03-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/rs6000-protos.h (regno_or_subregno): Add
+	declaration.
+	(enum rs6000_reg_type): Move the basic reg_addr support from
+	rs6000.c to rs6000-protos.h, except for the parts that store
+	insn_code's for the register allocator to allow future patches to
+	move parts of rs6000.c to other files.  Change the bool flags to
+	bit-fields.  Add a flag to indicate the mode/reload register class
+	uses DS-form (14-bit offset) addresses.
+	(reg_class_to_reg_type): Likwise.
+	(IS_STD_REG_TYPE): Likwise.
+	(IS_FP_VECT_REG_TYPE): Likwise.
+	(enum rs6000_reload_reg_type): Likwise.
+	(struct rs6000_reg_addr): Likwise.
+	(reg_addr): Likwise.
+	(RELOAD_REG_VALID): Likewise.
+	(RELOAD_REG_MULTIPLE): Likewise.
+	(RELOAD_REG_INDEXED): Likewise.
+	(RELOAD_REG_OFFSET): Likewise.
+	(RELOAD_REG_PRE_INCDEC): Likewise.
+	(RELOAD_REG_PRE_MODIFY): Likewise.
+	(RELOAD_REG_AND_M16): Likewise.
+	(RELOAD_REG_QUAD_OFFSET): Likewise.
+	(RELOAD_REG_DS_OFFSET): Likewise.
+	(mode_supports_pre_incdec_p): Move the mode supports helper
+	functions to rs6000-protos.h.  Add an optional argument to use a
+	particular reload register class instead of RELOAD_REG_ANY.
+	Rename mode_supports_vsx_dform_quad -> mode_supports_dq_form.  Add
+	mode_supports_ds_form for DS-form addresses.  Add
+	mode_supports_x_form for X-form (indexed) addresses.
+	(mode_supports_pre_modify_p): Likewise.
+	(mode_supports_d_form): Likewise.
+	(mode_supports_ds_form): Likewise.
+	(mode_supports_dq_form): Likewise.
+	(mode_supports_x_form): Likewise.
+	* config/rs6000/rs6000.c (enum rs6000_reg_type): Move basic
+	reg_addr support to rs6000-protos.h.
+	(IS_STD_REG_TYPE): Likewise.
+	(IS_FP_VECT_REG_TYPE): Likewise.
+	(enum rs6000_reload_reg_typ): Likewise.
+	(reg_class_to_reg_type): Make global.
+	(addr_mask_type): Move basic reg_addr support to rs6000-protos.h.
+	(reg_addr): Make global.
+	(RELOAD_REG_VALID): Move basic reg_addr support to
+	rs6000-protos.h.
+	(RELOAD_REG_MULTIPLE): Likewise.
+	(RELOAD_REG_INDEXED): Likewise.
+	(RELOAD_REG_OFFSET): Likewise.
+	(RELOAD_REG_PRE_INCDEC): Likewise.
+	(RELOAD_REG_PRE_MODIFY): Likewise.
+	(RELOAD_REG_AND_M16): Likewise.
+	(RELOAD_REG_QUAD_OFFSET): Likewise.
+	(struct rs6000_insn_functions): New structure that includes the
+	parts of the old reg_addr structure that did not move to
+	rs6000-protos.h because it contains insn codes.
+	(rs6000_insns): Likewise.
+	(mode_supports_pre_modify_p): Move to rs6000-protos.h.
+	(mode_supports_pre_modify_p): Likewise.
+	(mode_supports_vmx_dform): Likewise.
+	(mode_supports_vsx_dform_quad): Likewise.
+	(rs6000_conditional_register_usage): Add forward declaration.
+	(rs6000_debug_addr_mask): Print whether the mode/reload register
+	class uses DS-form memory instructions.
+	(rs6000_debug_print_mode): Call rs6000_conditional_register_usage
+	in order to print the status of the registers properly.  Use
+	rs6000_insns instead of reg_addr for the insn code elements.
+	(rs6000_setup_reg_addr_masks): Simplify the code to set whether a
+	mode uses multiple registers or provides indexed mode.  Don't
+	allow update addresses on modes that only support indexed mode.
+	Note that DI/SI in 64-bit use DS-form addresses as well as ISA 3.0
+	scalar altivec offset references.
+	(rs6000_init_hard_regno_mode_ok): Clear rs6000_insns.  Change to
+	use rs6000_insns instead of reg_addr for saving the insn codes for
+	secondary reload and fusion support.
+	(regno_or_subregno): Make global.
+	(quad_address_p): Rename mode_supports_vsx_dform_quad to
+	mode_supports_dq_form.
+	(reg_offset_addressing_ok_p): Likewise.
+	(offsettable_ok_by_alignment): Likewise.
+	(rs6000_legitimate_offset_address_p): Likewise.
+	(legitimate_lo_sum_address_p): Likewise.
+	(rs6000_legitimize_address): Likewise.
+	(rs6000_legitimize_reload_address): Likewise.
+	(rs6000_legitimate_address_p): Likewise.
+	(rs6000_secondary_reload_direct_move): Use rs6000_insns to pick up
+	secondary reload and fusion insn codes instead of reg_addr.
+	(rs6000_secondary_reload): Likewise.
+	(rs6000_secondary_reload_inner): Rename
+	mode_supports_vsx_dform_quad to mode_supports_dq_form.  Use
+	mode_supports_d_form with RELOAD_REG_VMX instead of calling
+	mode_supports_vmx_dform.
+	(rs6000_preferred_reload_class): Likewise.
+	(rs6000_secondary_reload_class): Likewise.
+	(rs6000_output_move_128bit): Likewise.
+
+2018-03-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	Merge up to 258530.
 	* REVISION: Update subversion id.
 

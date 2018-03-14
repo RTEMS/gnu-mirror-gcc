@@ -61,6 +61,7 @@ extern void paired_expand_vector_init (rtx, rtx);
 extern void rs6000_expand_vector_set (rtx, rtx, int);
 extern void rs6000_expand_vector_extract (rtx, rtx, rtx);
 extern void rs6000_split_vec_extract_var (rtx, rtx, rtx, rtx, rtx);
+extern int regno_or_subregno (rtx);
 extern rtx rs6000_adjust_vec_address (rtx, rtx, rtx, rtx, machine_mode);
 extern void rs6000_split_v4si_init (rtx []);
 extern void altivec_expand_vec_perm_le (rtx op[4]);
@@ -257,5 +258,117 @@ extern bool rs6000_sum_of_two_registers_p (const_rtx expr);
 extern bool rs6000_quadword_masked_address_p (const_rtx exp);
 extern rtx rs6000_gen_lvx (enum machine_mode, rtx, rtx);
 extern rtx rs6000_gen_stvx (enum machine_mode, rtx, rtx);
+
+
+/* Simplfy register classes into simpler classifications.  We assume
+   GPR_REG_TYPE - FPR_REG_TYPE are ordered so that we can use a simple range
+   check for standard register classes (gpr/floating/altivec/vsx) and
+   floating/vector classes (float/altivec/vsx).  */
+
+enum rs6000_reg_type {
+  NO_REG_TYPE,
+  PSEUDO_REG_TYPE,
+  GPR_REG_TYPE,
+  VSX_REG_TYPE,
+  ALTIVEC_REG_TYPE,
+  FPR_REG_TYPE,
+  SPR_REG_TYPE,
+  CR_REG_TYPE
+};
+
+/* Map register class to register type.  */
+extern enum rs6000_reg_type reg_class_to_reg_type[];
+
+/* First/last register type for the 'normal' register types (i.e. general
+   purpose, floating point, altivec, and VSX registers).  */
+#define IS_STD_REG_TYPE(RTYPE) IN_RANGE(RTYPE, GPR_REG_TYPE, FPR_REG_TYPE)
+
+#define IS_FP_VECT_REG_TYPE(RTYPE) IN_RANGE(RTYPE, VSX_REG_TYPE, FPR_REG_TYPE)
+
+/* Register classes we care about in secondary reload or go if legitimate
+   address.  We only need to worry about GPR, FPR, and Altivec registers here,
+   along an ANY field that is the OR of the 3 register classes.  */
+
+enum rs6000_reload_reg_type {
+  RELOAD_REG_GPR,			/* General purpose registers.  */
+  RELOAD_REG_FPR,			/* Traditional floating point regs.  */
+  RELOAD_REG_VMX,			/* Altivec (VMX) registers.  */
+  RELOAD_REG_ANY,			/* OR of GPR, FPR, Altivec masks.  */
+  N_RELOAD_REG
+};
+
+/* Mask bits for each register class, indexed per mode.  Historically the
+   compiler has been more restrictive which types can do PRE_MODIFY instead of
+   PRE_INC and PRE_DEC, so keep track of sepaate bits for these two.  */
+typedef unsigned short addr_mask_type;
+
+#define RELOAD_REG_VALID	0x001	/* Mode valid in register..  */
+#define RELOAD_REG_MULTIPLE	0x002	/* Mode takes multiple registers.  */
+#define RELOAD_REG_INDEXED	0x004	/* Reg+reg addressing.  */
+#define RELOAD_REG_OFFSET	0x008	/* Reg+offset addressing. */
+#define RELOAD_REG_PRE_INCDEC	0x010	/* PRE_INC/PRE_DEC valid.  */
+#define RELOAD_REG_PRE_MODIFY	0x020	/* PRE_MODIFY valid.  */
+#define RELOAD_REG_AND_M16	0x040	/* AND -16 addressing.  */
+#define RELOAD_REG_QUAD_OFFSET	0x080	/* Bottom 4 bits must be 0.  */
+#define RELOAD_REG_DS_OFFSET	0x100	/* Bottom 2 bits must be 0.  */
+
+/* Register type masks based on the type, of valid addressing modes.  */
+struct rs6000_reg_addr {
+  addr_mask_type addr_mask[(int)N_RELOAD_REG];	/* Valid address masks.  */
+  unsigned char scalar_in_vmx_p	: 1;		/* Scalar can go in VMX.  */
+  unsigned char fused_toc	: 1;		/* Mode supports TOC fusion.  */
+};
+
+extern struct rs6000_reg_addr reg_addr[];
+
+/* Helper function to say whether a mode supports PRE_INC or PRE_DEC.  */
+static inline bool
+mode_supports_pre_incdec_p (machine_mode mode,
+			    enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
+{
+  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_PRE_INCDEC) != 0);
+}
+
+/* Helper function to say whether a mode supports PRE_MODIFY.  */
+static inline bool
+mode_supports_pre_modify_p (machine_mode mode,
+			    enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
+{
+  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_PRE_MODIFY) != 0);
+}
+
+/* Return true if we have offset addressing (d-form).  The offset may be 12 bit
+   (dq-form), 14 bits (ds-form), or 16 (d-form) bits.  */
+static inline bool
+mode_supports_d_form (machine_mode mode,
+		      enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
+{
+  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_OFFSET) != 0);
+}
+
+/* Return true if we have DS-form addressing in any registers where the bottom
+   2 bits must be 0 (i.e. LD, ST, etc.).  */
+static inline bool
+mode_supports_ds_form (machine_mode mode,
+		       enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
+{
+  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_DS_OFFSET) != 0);
+}
+
+/* Return true if we have DQ-form addressing.  The bottom 4 bits must be 0.  */
+static inline bool
+mode_supports_dq_form (machine_mode mode,
+		       enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
+{
+  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_QUAD_OFFSET) != 0);
+}
+
+/* Return true if we have indexed addressing (x-form).  */
+static inline bool
+mode_supports_x_form (machine_mode mode,
+		      enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
+{
+  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_INDEXED) != 0);
+}
 
 #endif  /* rs6000-protos.h */
