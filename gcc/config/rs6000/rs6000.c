@@ -2974,7 +2974,7 @@ rs6000_setup_reg_addr_masks (void)
 		    }
 		  else if (rc == RELOAD_REG_VMX && TARGET_P9_VECTOR)
 		    {
-		      /* LXV/STXV use DQ-form addresses LXSD/LXSSP/STXSD/STXSSP
+		      /* LXV/STXV use DQ-form addresses, LXSD/LXSSP/STXSD/STXSSP
 			 use DS-form addresses. */
 		      addr_mask |= RELOAD_REG_OFFSET;
 		      if (msize == 16
