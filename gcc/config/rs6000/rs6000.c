@@ -8006,7 +8006,8 @@ rs6000_valid_move_p (rtx dest, rtx src)
       if (!MEM_P (src))
 	return true;
 
-      if (!TARGET_COMBINED_ADDRESS || can_create_pseudo_p ())
+      if (!reg_addr[ GET_MODE (dest) ].combined_addr_p
+	  || can_create_pseudo_p ())
 	return true;
 
       if (!combined_addr_operand (XEXP (src, 0), Pmode))
@@ -8019,18 +8020,19 @@ rs6000_valid_move_p (rtx dest, rtx src)
       return IN_RANGE (r, FIRST_GPR_REGNO+1, LAST_GPR_REGNO);
     }
 
-    if (MEM_P (dest))
-      {
-	if (!REG_P (src))
-	  return false;
+  if (MEM_P (dest))
+    {
+      if (!REG_P (src))
+	return false;
 
-	if (!TARGET_COMBINED_ADDRESS || can_create_pseudo_p ())
-	  return true;
+      if (!reg_addr[ GET_MODE (dest) ].combined_addr_p
+	  || can_create_pseudo_p ())
+	return true;
 
-	return !combined_addr_operand (XEXP (src, 0), Pmode);
-      }
+      return !combined_addr_operand (XEXP (src, 0), Pmode);
+    }
 	
-    return false;
+  return false;
 }
 
 /* Return true if either operand is a general purpose register.  */
