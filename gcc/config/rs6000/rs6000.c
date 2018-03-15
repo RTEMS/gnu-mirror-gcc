@@ -2945,13 +2945,18 @@ rs6000_setup_reg_addr_masks (void)
 
 	  /* GPR and FPR registers can do REG+OFFSET addressing, except
 	     possibly for SDmode.  ISA 3.0 (i.e. power9) adds D-form addressing
-	     for 64-bit scalars and 32-bit SFmode to altivec registers.  */
+	     for 64-bit scalars and 32-bit SFmode to altivec registers.
+
+	     64-bit GPR offset memory references and Altivec offset memory
+	     references use DS-mode offsets where the bottom 2 bits are 0.
+
+	     128-bit vector offset memory references use DQ-mode offsets where
+	     the bottom 4 bits are 0.  */
 	  if ((addr_mask != 0) && !indexed_only_p)
 	    {
 	      if (rc == RELOAD_REG_GPR)
 		{
-		  /* LD/STD on 64-bit use DS-form addresses (bottom 2 bits
-		     are 0).  */
+		  /* LD/STD on 64-bit use DS-form addresses.  */
 		  addr_mask |= RELOAD_REG_OFFSET;
 		  if (msize >= 8 && TARGET_POWERPC64)
 		    addr_mask |= RELOAD_REG_DS_OFFSET;
@@ -2960,8 +2965,7 @@ rs6000_setup_reg_addr_masks (void)
 		{
 		  if (rc == RELOAD_REG_FPR)
 		    {
-		      /* LXV/STXV use DQ-form addresses (bottom 4 bits
-			 are 0).  */
+		      /* LXV/STXV use DQ-form addresses.  */
 		      addr_mask |= RELOAD_REG_OFFSET;
 		      if (msize == 16
 			  && (addr_mask & RELOAD_REG_MULTIPLE) == 0
@@ -2970,9 +2974,8 @@ rs6000_setup_reg_addr_masks (void)
 		    }
 		  else if (rc == RELOAD_REG_VMX && TARGET_P9_VECTOR)
 		    {
-		      /* LXV/STXV use DQ-form addresses (bottom 4 bits
-			 are 0).  LXSD/LXSSP/STXSD/STXSSP use DS-form
-			 addresses. */
+		      /* LXV/STXV use DQ-form addresses LXSD/LXSSP/STXSD/STXSSP
+			 use DS-form addresses. */
 		      addr_mask |= RELOAD_REG_OFFSET;
 		      if (msize == 16
 			  && (addr_mask & RELOAD_REG_MULTIPLE) == 0)
