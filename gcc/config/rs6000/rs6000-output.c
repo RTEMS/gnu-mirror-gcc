@@ -47,6 +47,215 @@
 #include "tm-constrs.h"
 
 
+/* Return whether an address is an x-form (reg or reg+reg) address.  This is
+   used when we know the instruction is not a traditional GPR or FPR
+   load/store, so check to make sure auto increment is not present in the
+   address.  */
+inline static bool
+addr_is_xform_p (rtx addr)
+{
+  gcc_assert (GET_RTX_CLASS (GET_CODE (addr)) != RTX_AUTOINC);
+
+  if (REG_P (addr) || SUBREG_P (addr))
+    return true;
+
+  if (GET_CODE (addr) != PLUS)
+    return false;
+
+  rtx op1 = XEXP (addr, 1);
+  return REG_P (op1) || SUBREG_P (op1);
+}
+
+/* Return whether a register is a SPR.  */
+inline static bool
+reg_is_spr_p (rtx reg)
+{
+  if (!REG_P (reg))
+    return false;
+
+  enum reg_class rclass = REGNO_REG_CLASS (REGNO (reg));
+  return reg_class_to_reg_type[(int)rclass] == SPR_REG_TYPE;
+}
+
+
+/* Return a string to do a move operation of 64 bits of data.  */
+
+const char *
+rs6000_output_move_64bit (rtx operands[])
+{
+  rtx dest = operands[0];
+  rtx src = operands[1];
+  machine_mode mode = GET_MODE (dest);
+  int dest_regno;
+  int src_regno;
+  bool dest_gpr_p, dest_fp_p, dest_vmx_p, dest_vsx_p;
+  bool src_gpr_p, src_fp_p, src_vmx_p, src_vsx_p;
+
+  if (REG_P (dest) || SUBREG_P (dest))
+    {
+      dest_regno = regno_or_subregno (dest);
+      dest_gpr_p = INT_REGNO_P (dest_regno);
+      dest_fp_p = FP_REGNO_P (dest_regno);
+      dest_vmx_p = ALTIVEC_REGNO_P (dest_regno);
+      dest_vsx_p = dest_fp_p | dest_vmx_p;
+    }
+  else
+    {
+      dest_regno = -1;
+      dest_gpr_p = dest_fp_p = dest_vmx_p = dest_vsx_p = false;
+    }
+
+  if (REG_P (src) || SUBREG_P (src))
+    {
+      src_regno = regno_or_subregno (src);
+      src_gpr_p = INT_REGNO_P (src_regno);
+      src_fp_p = FP_REGNO_P (src_regno);
+      src_vmx_p = ALTIVEC_REGNO_P (src_regno);
+      src_vsx_p = src_fp_p | src_vmx_p;
+    }
+  else
+    {
+      src_regno = -1;
+      src_gpr_p = src_fp_p = src_vmx_p = src_vsx_p = false;
+    }
+
+  /* Register moves.  */
+  if (dest_regno >= 0 && src_regno >= 0)
+    {
+      /* Moves to GPRs.  */
+      if (dest_gpr_p)
+	{
+	  if (!TARGET_POWERPC64)
+	    return "#";
+
+	  else if (src_gpr_p)
+	    return "mr %0,%1";
+
+	  else if (TARGET_DIRECT_MOVE && src_vsx_p)
+	    return "mfvsrd %0,%x1";
+
+	  else if (TARGET_MFPGPR && src_fp_p)
+	    return "mftgpr %0,%1";
+
+	  else if (reg_is_spr_p (src))
+	    return "mf%1 %0";
+	}
+
+      /* Moves to vector/floating point registers.  */
+      else if (dest_vsx_p)
+	{
+	  if (dest_fp_p && src_fp_p)
+	    return "fmr %0,%1";
+
+	  else if (TARGET_VSX && src_vsx_p)
+	    return "xxlor %x0,%x1,%x1";
+
+	  else if (TARGET_POWERPC64 && src_gpr_p)
+	    {
+	      if (TARGET_DIRECT_MOVE)
+		return "mtvsrd %x0,%1";
+
+	      else if (TARGET_MFPGPR && dest_fp_p)
+		return "mffgpr %0,%1";
+	    }
+	}
+
+      /* Moves to SPRs.  */
+      else if (reg_is_spr_p (dest))
+	return "mt%0 %1";
+    }
+
+  /* Loads.  */
+  else if (dest_regno >= 0 && MEM_P (src))
+    {
+      if (dest_gpr_p)
+	return TARGET_POWERPC64 ? "ld%U1%X1 %0,%1" : "#";
+
+      else if (dest_fp_p)
+	return "lfd%U1%X1 %0,%1";
+
+      else if (dest_vmx_p)
+	{
+	  if (TARGET_VSX && addr_is_xform_p (XEXP (src, 0)))
+	    return "lxsdx %x0,%y1";
+
+	  else if (TARGET_P9_VECTOR)
+	    return "lxsd %0,%1";
+	}
+    }
+
+  /* Stores.  */
+  else if (src_regno >= 0 && MEM_P (dest))
+    {
+      if (src_gpr_p)
+	return TARGET_POWERPC64 ? "std%U0%X0 %1,%0" : "#";
+
+      else if (src_fp_p)
+	return "stfd%U0%X0 %1,%0";
+
+      else if (src_vmx_p)
+	{
+	  if (TARGET_VSX && addr_is_xform_p (XEXP (dest, 0)))
+	    return "stxsdx %x1,%y0";
+
+	  else if (TARGET_P9_VECTOR)
+	    return "stxsd %1,%0";
+	}
+    }
+
+  /* Constants.  */
+  else if (dest_regno >= 0 && CONSTANT_P (src))
+    {
+      if (dest_gpr_p)
+	{
+	  if (satisfies_constraint_I (src))
+	    return "li %0,%1";
+
+	  if (satisfies_constraint_L (src))
+	    return "lis %0,%v1";
+
+	  return "#";
+	}
+
+      else if (TARGET_VSX && dest_vsx_p)
+	{
+	  /* We prefer to generate XXSPLTIB/VSPLTISW over XXLXOR/XXLORC to
+	     generate 0/-1, because the later can potentially cause a stall if
+	     the previous use of the register did a long operation followed by
+	     a store.  This would cause this insn to wait for the previous
+	     operation to finish, even though it doesn't use any of the bits in
+	     the previous value.  */
+	  if (src == CONST0_RTX (mode))
+	    {
+	      /* Note 0.0 is not all zeros in IBM decimal format.  */
+	      gcc_assert (mode != DDmode);
+
+	      if (TARGET_P9_VECTOR)
+		return "xxspltib %x0,0";
+	      else if (dest_vmx_p)
+		return "vspltisw %0,0";
+	      else
+		return "xxlxor %x0,%x0,%x0";
+	    }
+	  else if (GET_MODE_CLASS (mode) == MODE_INT
+		   && src == CONSTM1_RTX (mode))
+	    {
+	      if (TARGET_P9_VECTOR)
+		return "xxspltib %x0,255";
+	      else if (dest_vmx_p)
+		return "vspltisw %0,-1";
+	      else if (TARGET_P8_VECTOR)
+		return "xxlorc %x0,%x0,%x0";
+	      /* XXX: We could generate xxlxor/xxlnor for power7 if
+		 desired.  */
+	    }
+	}
+    }
+
+  fatal_insn ("Bad 64-bit move", gen_rtx_SET (dest, src));
+}
+
+
 /* Return a string to do a move operation of 128 bits of data.  */
 
 const char *

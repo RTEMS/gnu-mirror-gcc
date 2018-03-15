@@ -1,3 +1,28 @@
+https://gcc.gnu.org/ml/gcc-patches/2018-03/msg00769.html
+2018-03-15  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000-protos.h (rs6000_output_move_64bit): Add
+	declaration.
+	(rs6000_valid_move_p): Likewise.
+	* config/rs6000/rs6000-output.c (addr_is_xform_p): New helper
+	function to return if an addresses uses X-form (reg+reg).
+	(reg_is_spr_p): New helper function to determine if a register is
+	a SPR.
+	(rs6000_output_move_64bit): New function to return the proper
+	instruction to do a 64-bit move.
+	* config/rs6000/rs6000.c (rs6000_setup_reg_addr_masks): Rework
+	setting offset addresses to assume multi-register values have the
+	proper offset bits set.  Do not enable Altivec & -16 on
+	mult-reigster moves.
+	(rs6000_valid_move_p): New function to validate moves.
+	(reg_offset_addressing_ok_p): Add check if the mode and register
+	class support offstable instructions.
+	* config/rs6000/rs6000.md (movdi_internal32): Move instruction
+	literals to rs6000_otuput_move_64bit.  Check move validity with
+	rs6000_move_valid_p.
+	(movdi_internal64): Likewise.
+
+https://gcc.gnu.org/ml/gcc-patches/2018-03/msg00740.html
 2018-03-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config.gcc (powerpc*-*-*): Add rs6000-output.o to extra_objs.
@@ -12,6 +37,7 @@
 	(rs6000_move_128bit_ok_p): Likewise.
 	(rs6000_split_128bit_ok_p): Likewise.
 
+https://gcc.gnu.org/ml/gcc-patches/2018-03/msg00683.html
 2018-03-14  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000-protos.h (regno_or_subregno): Add

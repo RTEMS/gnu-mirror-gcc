@@ -2957,49 +2957,52 @@ rs6000_setup_reg_addr_masks (void)
 
 	  /* GPR and FPR registers can do REG+OFFSET addressing, except
 	     possibly for SDmode.  ISA 3.0 (i.e. power9) adds D-form addressing
-	     for 64-bit scalars and 32-bit SFmode to altivec registers.  */
-	  if ((addr_mask != 0) && !indexed_only_p
-	      && msize <= 8
-	      && (rc == RELOAD_REG_GPR
-		  || ((msize == 8 || m2 == SFmode)
-		      && (rc == RELOAD_REG_FPR
-			  || (rc == RELOAD_REG_VMX && TARGET_P9_VECTOR)))))
-	    addr_mask |= RELOAD_REG_OFFSET;
+	     for 64-bit scalars and 32-bit SFmode to altivec registers.
 
-	  /* VSX registers can do REG+OFFSET addresssing if ISA 3.0
-	     instructions are enabled.  The offset for 128-bit VSX registers is
-	     only 12-bits.  While GPRs can handle the full offset range, VSX
-	     registers can only handle the restricted range.  */
-	  else if ((addr_mask != 0) && !indexed_only_p
-		   && msize == 16 && TARGET_P9_VECTOR
-		   && (ALTIVEC_OR_VSX_VECTOR_MODE (m2)
-		       || (m2 == TImode && TARGET_VSX)))
+	     64-bit GPR offset memory references and Altivec offset memory
+	     references use DS-mode offsets where the bottom 2 bits are 0.
+
+	     128-bit vector offset memory references use DQ-mode offsets where
+	     the bottom 4 bits are 0.  */
+	  if ((addr_mask != 0) && !indexed_only_p)
 	    {
-	      addr_mask |= RELOAD_REG_OFFSET;
-	      if (rc == RELOAD_REG_FPR || rc == RELOAD_REG_VMX)
-		addr_mask |= RELOAD_REG_QUAD_OFFSET;
+	      if (rc == RELOAD_REG_GPR)
+		{
+		  /* LD/STD on 64-bit use DS-form addresses.  */
+		  addr_mask |= RELOAD_REG_OFFSET;
+		  if (msize >= 8 && TARGET_POWERPC64)
+		    addr_mask |= RELOAD_REG_DS_OFFSET;
+		}
+	      else if (msize >= 8 || m == E_SFmode)
+		{
+		  if (rc == RELOAD_REG_FPR)
+		    {
+		      /* LXV/STXV use DQ-form addresses.  */
+		      addr_mask |= RELOAD_REG_OFFSET;
+		      if (msize == 16
+			  && (addr_mask & RELOAD_REG_MULTIPLE) == 0
+			  && TARGET_P9_VECTOR)
+			addr_mask |= RELOAD_REG_QUAD_OFFSET;
+		    }
+		  else if (rc == RELOAD_REG_VMX && TARGET_P9_VECTOR)
+		    {
+		      /* LXV/STXV use DQ-form addresses, LXSD/LXSSP/STXSD/STXSSP
+			 use DS-form addresses. */
+		      addr_mask |= RELOAD_REG_OFFSET;
+		      if (msize == 16
+			  && (addr_mask & RELOAD_REG_MULTIPLE) == 0)
+			addr_mask |= RELOAD_REG_QUAD_OFFSET;
+		      else
+			addr_mask |= RELOAD_REG_DS_OFFSET;
+		    }
+		}
 	    }
-
-	  /* LD and STD are DS-form instructions, which must have the bottom 2
-	     bits be 0.  However, since DFmode is primarily used in the
-	     floating point/vector registers, don't restrict the offsets in ISA
-	     2.xx.  */
-	  if (rc == RELOAD_REG_GPR && msize == 8 && TARGET_POWERPC64
-	      && (addr_mask & RELOAD_REG_OFFSET) != 0
-	      && INTEGRAL_MODE_P (m2))
-	    addr_mask |= RELOAD_REG_DS_OFFSET;
-
-	  /* ISA 3.0 LXSD, LXSSP, STXSD, STXSSP altivec load/store instructions
-	     are DS-FORM.  */
-	  else if (rc == RELOAD_REG_VMX && TARGET_P9_VECTOR
-		   && (addr_mask & RELOAD_REG_OFFSET) != 0
-		   && (msize == 8 ||  m2 == SFmode))
-	    addr_mask |= RELOAD_REG_DS_OFFSET;
 
 	  /* VMX registers can do (REG & -16) and ((REG+REG) & -16)
 	     addressing on 128-bit types.  */
 	  if (rc == RELOAD_REG_VMX && msize == 16
-	      && (addr_mask & RELOAD_REG_VALID) != 0)
+	      && ((addr_mask & (RELOAD_REG_VALID
+				| RELOAD_REG_MULTIPLE)) == RELOAD_REG_VALID))
 	    addr_mask |= RELOAD_REG_AND_M16;
 
 	  reg_addr[m].addr_mask[rc] = addr_mask;
@@ -8007,6 +8010,26 @@ small_data_operand (rtx op ATTRIBUTE_UNUSED,
 #endif
 }
 
+/* Return true if a move is valid.  */
+
+bool
+rs6000_valid_move_p (rtx dest, rtx src)
+{
+  if (SUBREG_P (dest))
+    dest = SUBREG_REG (dest);
+
+  if (SUBREG_P (src))
+    src = SUBREG_REG (src);
+
+  if (REG_P (dest))
+    return true;
+
+  if (MEM_P (dest) && REG_P (src))
+    return true;
+
+  return false;
+}
+
 /* Return true if either operand is a general purpose register.  */
 
 bool
@@ -8239,6 +8262,9 @@ mem_operand_ds_form (rtx op, machine_mode mode)
 static bool
 reg_offset_addressing_ok_p (machine_mode mode)
 {
+  if (!mode_supports_d_form (mode))
+    return false;
+
   switch (mode)
     {
     case E_V16QImode:
