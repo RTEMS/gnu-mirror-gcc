@@ -2989,8 +2989,8 @@ rs6000_setup_reg_addr_masks (void)
 	  /* VMX registers can do (REG & -16) and ((REG+REG) & -16)
 	     addressing on 128-bit types.  */
 	  if (rc == RELOAD_REG_VMX && msize == 16
-	      && (addr_mask & (RELOAD_REG_VALID
-			       | RELOAD_REG_MULTIPLE) == RELOAD_REG_VALID))
+	      && ((addr_mask & (RELOAD_REG_VALID
+				| RELOAD_REG_MULTIPLE)) == RELOAD_REG_VALID))
 	    addr_mask |= RELOAD_REG_AND_M16;
 
 	  reg_addr[m].addr_mask[rc] = addr_mask;
