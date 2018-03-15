@@ -8284,6 +8284,9 @@ mem_operand_no_combined (rtx op, machine_mode mode)
 static bool
 reg_offset_addressing_ok_p (machine_mode mode)
 {
+  if (!mode_supports_d_form (mode))
+    return false;
+
   switch (mode)
     {
     case E_V16QImode:
