@@ -1314,7 +1314,6 @@ static bool rs6000_debug_can_change_mode_class (machine_mode,
 						reg_class_t);
 static bool rs6000_save_toc_in_prologue_p (void);
 static rtx rs6000_internal_arg_pointer (void);
-static void rs6000_conditional_register_usage (void);
 
 rtx (*rs6000_legitimize_reload_address_ptr) (rtx, machine_mode, int, int,
 					     int, int *)
@@ -2143,10 +2142,6 @@ static void
 rs6000_debug_reg_print (int first_regno, int last_regno, const char *reg_name)
 {
   int r, m;
-
-  /* Insure the conditional registers are up to date when printing the debug
-     information.  */
-  rs6000_conditional_register_usage ();
 
   for (r = first_regno; r <= last_regno; ++r)
     {

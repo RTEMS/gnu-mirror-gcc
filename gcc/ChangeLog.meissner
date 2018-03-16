@@ -1,3 +1,9 @@
+https://gcc.gnu.org/ml/gcc-patches/2018-03/msg00826.html
+2018-03-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_debug_reg_print): Eliminate call
+	to rs6000_conditional_register_usage.
+
 https://gcc.gnu.org/ml/gcc-patches/2018-03/msg00804.html
 2018-03-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
