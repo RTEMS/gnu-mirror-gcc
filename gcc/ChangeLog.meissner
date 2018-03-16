@@ -1,3 +1,17 @@
+https://gcc.gnu.org/ml/gcc-patches/2018-03/msg00804.html
+2018-03-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000-output.c (rs6000_output_move_64bit): Deal
+	with SPR<-SPR where the register is the same.
+	* config/rs6000/rs6000.md (mov<mode>_hardfloat32): Add comments
+	and spacing to allow easier understanding of which constraints are
+	used for which alternative.  Use rs6000_valid_move_p to validate
+	the move.  Use rs6000_output_move_64bit to print out the correct
+	instruction.
+	(mov<mode>_softfloat32): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(mov<mode>_softfloat64): Likewise.
+
 https://gcc.gnu.org/ml/gcc-patches/2018-03/msg00769.html
 2018-03-15  Michael Meissner  <meissner@linux.vnet.ibm.com>
 

@@ -162,7 +162,13 @@ rs6000_output_move_64bit (rtx operands[])
 
       /* Moves to SPRs.  */
       else if (reg_is_spr_p (dest))
-	return "mt%0 %1";
+	{
+	  if (src_gpr_p)
+	    return "mt%0 %1";
+
+	  else if (dest_regno == src_regno)
+	    return "nop";
+	}
     }
 
   /* Loads.  */
