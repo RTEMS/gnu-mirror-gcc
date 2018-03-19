@@ -7990,7 +7990,7 @@ small_data_operand (rtx op ATTRIBUTE_UNUSED,
 bool
 rs6000_valid_move_p (rtx dest, rtx src)
 {
-  /* Assume SUBREG's of MEM before register allocation will eventual be
+  /* Assume SUBREG's of MEM before register allocation will eventually be
      allocated to registers.  */
   if (SUBREG_P (dest))
     {
