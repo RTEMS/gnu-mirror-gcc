@@ -7990,11 +7990,21 @@ small_data_operand (rtx op ATTRIBUTE_UNUSED,
 bool
 rs6000_valid_move_p (rtx dest, rtx src)
 {
+  /* Assume SUBREG's of MEM before register allocation will eventual be
+     allocated to registers.  */
   if (SUBREG_P (dest))
-    dest = SUBREG_REG (dest);
+    {
+      dest = SUBREG_REG (dest);
+      if (MEM_P (dest))
+	return !reload_completed;
+    }
 
   if (SUBREG_P (src))
-    src = SUBREG_REG (src);
+    {
+      src = SUBREG_REG (src);
+      if (MEM_P (src))
+	return !reload_completed;
+    }
 
   if (REG_P (dest))
     {
