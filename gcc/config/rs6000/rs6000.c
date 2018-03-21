@@ -553,11 +553,14 @@ mode_supports_pre_modify_p (machine_mode mode)
 	  != 0);
 }
 
-/* Return true if we have D-form addressing in altivec registers.  */
+/* Return true if we have D-form addressing (register+offset) in either a
+   specific reload register class or whether some reload register class
+   supports d-form addressing.  */
 static inline bool
-mode_supports_vmx_dform (machine_mode mode)
+mode_supports_d_form (machine_mode mode,
+		      enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
 {
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_VMX] & RELOAD_REG_OFFSET) != 0);
+  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_OFFSET) != 0);
 }
 
 /* Return true if we have D-form addressing in VSX registers.  This addressing
@@ -20081,7 +20084,7 @@ rs6000_secondary_reload (bool in_p,
      point register, unless we have D-form addressing.  Also make sure that
      non-zero constants use a FPR.  */
   if (!done_p && reg_addr[mode].scalar_in_vmx_p
-      && !mode_supports_vmx_dform (mode)
+      && !mode_supports_d_form (mode, RELOAD_REG_VMX)
       && (rclass == VSX_REGS || rclass == ALTIVEC_REGS)
       && (memory_p || (GET_CODE (x) == CONST_DOUBLE)))
     {
@@ -20644,7 +20647,7 @@ rs6000_preferred_reload_class (rtx x, enum reg_class rclass)
 	}
 
       /* D-form addressing can easily reload the value.  */
-      if (mode_supports_vmx_dform (mode)
+      if (mode_supports_d_form (mode, RELOAD_REG_VMX)
 	  || mode_supports_dq_form (mode))
 	return rclass;
 
@@ -20801,7 +20804,7 @@ rs6000_secondary_reload_class (enum reg_class rclass, machine_mode mode,
      instead of reloading the secondary memory address for Altivec moves.  */
   if (TARGET_VSX
       && GET_MODE_SIZE (mode) < 16
-      && !mode_supports_vmx_dform (mode)
+      && !mode_supports_d_form (mode, RELOAD_REG_VMX)
       && (((rclass == GENERAL_REGS || rclass == BASE_REGS)
            && (regno >= 0 && ALTIVEC_REGNO_P (regno)))
           || ((rclass == VSX_REGS || rclass == ALTIVEC_REGS)
