@@ -1,5 +1,19 @@
 2018-03-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/rs6000.c (addr_mask_type): Make unsigned short
+	instead of unsigned char.
+	(RELOAD_REG_DS_OFFSET): Add new mask bit to say the mode uses
+	DS-form addresses.
+	(mode_supports_ds_form): New helper function to return if a mode
+	uses DS-form addresses.
+	(rs6000_debug_addr_mask): Print which modes support ds-form
+	addresses if -mdebug=reg.
+	(rs6000_setup_reg_addr_masks): Note that 64-bit GPR memory
+	references and 32/64-bit memory references in Altivec registers
+	use DS-form instructions.
+
+2018-03-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/rs6000.c (mode_supports_pre_incdec_p): Add
 	additional argument to specify the reload register class to use,
 	defaulting to RELOAD_REG_ANY.
