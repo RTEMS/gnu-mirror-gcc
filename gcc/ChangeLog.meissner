@@ -1,5 +1,13 @@
 2018-03-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Move
+	toc fusion support after the Linux port has set the default code
+	model.  Do not enable it by default.  If either -mtoc-fusion or
+	-mpower8-fusion-sign is used with -mno-power8-fusion, clear the
+	two fusion/sign bits.
+
+2018-03-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/rs6000.md (mov<mode>_softfloat, FMOVE32):
 	Reformat alternatives and attributes so it is easier to identify
 	which constraints/attributes go with which instruction.
