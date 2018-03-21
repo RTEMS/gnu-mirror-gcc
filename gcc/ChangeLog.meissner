@@ -1,5 +1,11 @@
 2018-03-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/rs6000.md (mov<mode>_hardfloat32, FMOVE64):
+	Reformat alternatives and attributes so it is easier to identify
+	which constraints/attributes go with which instruction.
+
+2018-03-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/rs6000.c (addr_mask_type): Make unsigned short
 	instead of unsigned char.
 	(RELOAD_REG_DS_OFFSET): Add new mask bit to say the mode uses
