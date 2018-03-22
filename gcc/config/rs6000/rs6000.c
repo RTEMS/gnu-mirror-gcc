@@ -503,17 +503,16 @@ static const struct reload_reg_map_type reload_reg_map[N_RELOAD_REG] = {
 /* Mask bits for each register class, indexed per mode.  Historically the
    compiler has been more restrictive which types can do PRE_MODIFY instead of
    PRE_INC and PRE_DEC, so keep track of sepaate bits for these two.  */
-typedef unsigned short addr_mask_type;
+typedef unsigned char addr_mask_type;
 
-#define RELOAD_REG_VALID	0x001	/* Mode valid in register..  */
-#define RELOAD_REG_MULTIPLE	0x002	/* Mode takes multiple registers.  */
-#define RELOAD_REG_INDEXED	0x004	/* Reg+reg addressing.  */
-#define RELOAD_REG_OFFSET	0x008	/* Reg+offset addressing. */
-#define RELOAD_REG_PRE_INCDEC	0x010	/* PRE_INC/PRE_DEC valid.  */
-#define RELOAD_REG_PRE_MODIFY	0x020	/* PRE_MODIFY valid.  */
-#define RELOAD_REG_AND_M16	0x040	/* AND -16 addressing.  */
-#define RELOAD_REG_QUAD_OFFSET	0x080	/* quad offset is limited.  */
-#define RELOAD_REG_DS_OFFSET	0x080	/* DS offset is used.  */
+#define RELOAD_REG_VALID	0x01	/* Mode valid in register..  */
+#define RELOAD_REG_MULTIPLE	0x02	/* Mode takes multiple registers.  */
+#define RELOAD_REG_INDEXED	0x04	/* Reg+reg addressing.  */
+#define RELOAD_REG_OFFSET	0x08	/* Reg+offset addressing. */
+#define RELOAD_REG_PRE_INCDEC	0x10	/* PRE_INC/PRE_DEC valid.  */
+#define RELOAD_REG_PRE_MODIFY	0x20	/* PRE_MODIFY valid.  */
+#define RELOAD_REG_AND_M16	0x40	/* AND -16 addressing.  */
+#define RELOAD_REG_QUAD_OFFSET	0x80	/* quad offset is limited.  */
 
 /* Register type masks based on the type, of valid addressing modes.  */
 struct rs6000_reg_addr {
@@ -564,16 +563,6 @@ mode_supports_d_form (machine_mode mode,
 		      enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
 {
   return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_OFFSET) != 0);
-}
-
-/* Return true if we have DS-form addressing in a given reload register class
-   or if some reload register class supports it.  DS-form addressing must have
-   the bottom 2 bits set to 0.  */
-static inline bool
-mode_supports_ds_form (machine_mode mode,
-		       enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
-{
-  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_DS_OFFSET) != 0);
 }
 
 /* Return true if we have DQ-form addressing in a given reload register class
@@ -2360,8 +2349,6 @@ rs6000_debug_addr_mask (addr_mask_type mask, bool keep_spaces)
 
   if ((mask & RELOAD_REG_QUAD_OFFSET) != 0)
     *p++ = 'O';
-  else if ((mask & RELOAD_REG_DS_OFFSET) != 0)
-    *p++ = 'D';
   else if ((mask & RELOAD_REG_OFFSET) != 0)
     *p++ = 'o';
   else if (keep_spaces)
@@ -3048,45 +3035,27 @@ rs6000_setup_reg_addr_masks (void)
 
 	  /* GPR and FPR registers can do REG+OFFSET addressing, except
 	     possibly for SDmode.  ISA 3.0 (i.e. power9) adds D-form addressing
-	     for 64-bit scalars and 32-bit SFmode to altivec registers.
+	     for 64-bit scalars and 32-bit SFmode to altivec registers.  */
+	  if ((addr_mask != 0) && !indexed_only_p
+	      && msize <= 8
+	      && (rc == RELOAD_REG_GPR
+		  || ((msize == 8 || m2 == SFmode)
+		      && (rc == RELOAD_REG_FPR
+			  || (rc == RELOAD_REG_VMX && TARGET_P9_VECTOR)))))
+	    addr_mask |= RELOAD_REG_OFFSET;
 
-	     64-bit GPR offset memory references and Altivec offset memory
-	     references use DS-mode offsets where the bottom 2 bits are 0.
-
-	     128-bit vector offset memory references use DQ-mode offsets where
-	     the bottom 4 bits are 0.  */
-	  if ((addr_mask != 0) && !indexed_only_p)
+	  /* VSX registers can do REG+OFFSET addresssing if ISA 3.0
+	     instructions are enabled.  The offset for 128-bit VSX registers is
+	     only 12-bits.  While GPRs can handle the full offset range, VSX
+	     registers can only handle the restricted range.  */
+	  else if ((addr_mask != 0) && !indexed_only_p
+		   && msize == 16 && TARGET_P9_VECTOR
+		   && (ALTIVEC_OR_VSX_VECTOR_MODE (m2)
+		       || (m2 == TImode && TARGET_VSX)))
 	    {
-	      if (rc == RELOAD_REG_GPR)
-		{
-		  /* LD/STD on 64-bit use DS-form addresses.  */
-		  addr_mask |= RELOAD_REG_OFFSET;
-		  if (msize >= 8 && TARGET_POWERPC64)
-		    addr_mask |= RELOAD_REG_DS_OFFSET;
-		}
-	      else if (msize >= 8 || m == E_SFmode)
-		{
-		  if (rc == RELOAD_REG_FPR)
-		    {
-		      /* LXV/STXV use DQ-form addresses.  */
-		      addr_mask |= RELOAD_REG_OFFSET;
-		      if (msize == 16
-			  && (addr_mask & RELOAD_REG_MULTIPLE) == 0
-			  && TARGET_P9_VECTOR)
-			addr_mask |= RELOAD_REG_QUAD_OFFSET;
-		    }
-		  else if (rc == RELOAD_REG_VMX && TARGET_P9_VECTOR)
-		    {
-		      /* LXV/STXV use DQ-form addresses, LXSD/LXSSP/STXSD/STXSSP
-			 use DS-form addresses. */
-		      addr_mask |= RELOAD_REG_OFFSET;
-		      if (msize == 16
-			  && (addr_mask & RELOAD_REG_MULTIPLE) == 0)
-			addr_mask |= RELOAD_REG_QUAD_OFFSET;
-		      else
-			addr_mask |= RELOAD_REG_DS_OFFSET;
-		    }
-		}
+	      addr_mask |= RELOAD_REG_OFFSET;
+	      if (rc == RELOAD_REG_FPR || rc == RELOAD_REG_VMX)
+		addr_mask |= RELOAD_REG_QUAD_OFFSET;
 	    }
 
 	  /* VMX registers can do (REG & -16) and ((REG+REG) & -16)
@@ -4502,8 +4471,7 @@ rs6000_option_override_internal (bool global_init_p)
 	  if (TARGET_TOC_FUSION)
 	    error ("%qs requires %qs", "-mtoc-fusion", "-mpower8-fusion");
 
-	  rs6000_isa_flags &= ~(OPTION_MASK_P8_FUSION_SIGN
-				| OPTION_MASK_TOC_FUSION);
+	  rs6000_isa_flags &= ~OPTION_MASK_P8_FUSION;
 	}
       else
 	rs6000_isa_flags |= OPTION_MASK_P8_FUSION;
@@ -4539,6 +4507,28 @@ rs6000_option_override_internal (bool global_init_p)
       && optimize_function_for_speed_p (cfun)
       && optimize >= 3)
     rs6000_isa_flags |= OPTION_MASK_P8_FUSION_SIGN;
+
+  /* TOC fusion requires 64-bit and medium/large code model.  */
+  if (TARGET_TOC_FUSION && !TARGET_POWERPC64)
+    {
+      rs6000_isa_flags &= ~OPTION_MASK_TOC_FUSION;
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION) != 0)
+	warning (0, N_("-mtoc-fusion requires 64-bit"));
+    }
+
+  if (TARGET_TOC_FUSION && (TARGET_CMODEL == CMODEL_SMALL))
+    {
+      rs6000_isa_flags &= ~OPTION_MASK_TOC_FUSION;
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION) != 0)
+	warning (0, N_("-mtoc-fusion requires medium/large code model"));
+    }
+
+  /* Turn on -mtoc-fusion by default if p8-fusion and 64-bit medium/large code
+     model.  */
+  if (TARGET_P8_FUSION && !TARGET_TOC_FUSION && TARGET_POWERPC64
+      && (TARGET_CMODEL != CMODEL_SMALL)
+      && !(rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION))
+    rs6000_isa_flags |= OPTION_MASK_TOC_FUSION;
 
   /* ISA 3.0 vector instructions include ISA 2.07.  */
   if (TARGET_P9_VECTOR && !TARGET_P8_VECTOR)
@@ -4832,24 +4822,6 @@ rs6000_option_override_internal (bool global_init_p)
 #ifdef SUB3TARGET_OVERRIDE_OPTIONS
   SUB3TARGET_OVERRIDE_OPTIONS;
 #endif
-
-  /* TOC fusion requires 64-bit and medium code model.  This test has to be
-     after the SUBTARGET_OVERRIDE_OPTIONS, since medium code model is set
-     there.  Large code model can have offsets bigger than ADDIS/ADDI can
-     handle.  */
-  if (TARGET_TOC_FUSION && !TARGET_POWERPC64)
-    {
-      rs6000_isa_flags &= ~OPTION_MASK_TOC_FUSION;
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION) != 0)
-	warning (0, N_("-mtoc-fusion requires 64-bit"));
-    }
-
-  if (TARGET_TOC_FUSION && (TARGET_CMODEL != CMODEL_MEDIUM))
-    {
-      rs6000_isa_flags &= ~OPTION_MASK_TOC_FUSION;
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION) != 0)
-	warning (0, N_("-mtoc-fusion requires medium code model"));
-    }
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
