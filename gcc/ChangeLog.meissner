@@ -1,3 +1,15 @@
+<ext-addr.rev2-patch11b>
+2018-03-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (addr_mask_type): Grow mask to 16 bits.
+	(RELOAD_REG_DS_OFFSET): New mask for DS-form addresses.
+	(mode_supports_ds_form): New helper function to return if a reload
+	register class uses DS-form addresses.
+	(rs6000_debug_addr_mask): Print if we have DS-form addresses.
+	(rs6000_setup_reg_addr_masks): Note which reload register classes
+	use DS-form addresses.
+
+<ext-addr.rev2-patch10b>
 2018-03-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_option_override_internal): Move
@@ -6,36 +18,42 @@
 	-mpower8-fusion-sign is used with -mno-power8-fusion, clear the
 	two fusion/sign bits.
 
+<ext-addr.rev2-patch09b>
 2018-03-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.md (mov<mode>_softfloat, FMOVE32):
 	Reformat alternatives and attributes so it is easier to identify
 	which constraints/attributes go with which instruction.
 
+<ext-addr.rev2-patch08b>
 2018-03-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.md (mov<mode>_softfloat64, FMOVE64):
 	Reformat alternatives and attributes so it is easier to identify
 	which constraints/attributes go with which instruction.
 
+<ext-addr.rev2-patch07b>
 2018-03-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.md (mov<mode>_hardfloat64, FMOVE64):
 	Reformat alternatives and attributes so it is easier to identify
 	which constraints/attributes go with which instruction.
 
+<ext-addr.rev2-patch06b>
 2018-03-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.md (mov<mode>_softfloat32, FMOVE64):
 	Reformat alternatives and attributes so it is easier to identify
 	which constraints/attributes go with which instruction.
 
+<ext-addr.rev2-patch05b>
 2018-03-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.md (mov<mode>_hardfloat32, FMOVE64):
 	Reformat alternatives and attributes so it is easier to identify
 	which constraints/attributes go with which instruction.
 
+<ext-addr.rev2-patch04b>
 2018-03-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.c (mode_supports_pre_incdec_p): Add
@@ -44,6 +62,7 @@
 	(mode_supports_pre_modify_p): Likewise.
 	(mode_supports_dq_form): Likewise.
 
+<ext-addr.rev2-patch03b>
 2018-03-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.c (mode_supports_d_form): Rename
@@ -54,12 +73,14 @@
 	(rs6000_preferred_reload_class): Likewise.
 	(rs6000_secondary_reload_class): Likewise.
 
+<ext-addr.rev2-patch02b>
 2018-03-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.c (mode_supports_vmx_dform): Move these
 	functions to be next to the other mode_supports functions.
 	(mode_supports_dq_form): Likewise.
 
+<ext-addr.rev2-patch01b>
 2018-03-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.c (mode_supports_dq_form): Rename

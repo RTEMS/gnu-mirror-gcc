@@ -503,16 +503,17 @@ static const struct reload_reg_map_type reload_reg_map[N_RELOAD_REG] = {
 /* Mask bits for each register class, indexed per mode.  Historically the
    compiler has been more restrictive which types can do PRE_MODIFY instead of
    PRE_INC and PRE_DEC, so keep track of sepaate bits for these two.  */
-typedef unsigned char addr_mask_type;
+typedef unsigned short addr_mask_type;
 
-#define RELOAD_REG_VALID	0x01	/* Mode valid in register..  */
-#define RELOAD_REG_MULTIPLE	0x02	/* Mode takes multiple registers.  */
-#define RELOAD_REG_INDEXED	0x04	/* Reg+reg addressing.  */
-#define RELOAD_REG_OFFSET	0x08	/* Reg+offset addressing. */
-#define RELOAD_REG_PRE_INCDEC	0x10	/* PRE_INC/PRE_DEC valid.  */
-#define RELOAD_REG_PRE_MODIFY	0x20	/* PRE_MODIFY valid.  */
-#define RELOAD_REG_AND_M16	0x40	/* AND -16 addressing.  */
-#define RELOAD_REG_QUAD_OFFSET	0x80	/* quad offset is limited.  */
+#define RELOAD_REG_VALID	0x001	/* Mode valid in register..  */
+#define RELOAD_REG_MULTIPLE	0x002	/* Mode takes multiple registers.  */
+#define RELOAD_REG_INDEXED	0x004	/* Reg+reg addressing.  */
+#define RELOAD_REG_OFFSET	0x008	/* Reg+offset addressing. */
+#define RELOAD_REG_PRE_INCDEC	0x010	/* PRE_INC/PRE_DEC valid.  */
+#define RELOAD_REG_PRE_MODIFY	0x020	/* PRE_MODIFY valid.  */
+#define RELOAD_REG_AND_M16	0x040	/* AND -16 addressing.  */
+#define RELOAD_REG_QUAD_OFFSET	0x080	/* quad offset is limited.  */
+#define RELOAD_REG_DS_OFFSET	0x100	/* DS-form (bottom 2 bits 0).  */
 
 /* Register type masks based on the type, of valid addressing modes.  */
 struct rs6000_reg_addr {
@@ -563,6 +564,16 @@ mode_supports_d_form (machine_mode mode,
 		      enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
 {
   return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_OFFSET) != 0);
+}
+
+/* Return true if we have DS-form addressing in a given reload register class
+   or if some reload register class supports it.  DS-form addressing must have
+   the bottom 2 bits set to 0.  */
+static inline bool
+mode_supports_ds_form (machine_mode mode,
+		       enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
+{
+  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_DS_OFFSET) != 0);
 }
 
 /* Return true if we have DQ-form addressing in a given reload register class
@@ -2349,6 +2360,8 @@ rs6000_debug_addr_mask (addr_mask_type mask, bool keep_spaces)
 
   if ((mask & RELOAD_REG_QUAD_OFFSET) != 0)
     *p++ = 'O';
+  else if ((mask & RELOAD_REG_DS_OFFSET) != 0)
+    *p++ = 'O';
   else if ((mask & RELOAD_REG_OFFSET) != 0)
     *p++ = 'o';
   else if (keep_spaces)
@@ -3035,27 +3048,40 @@ rs6000_setup_reg_addr_masks (void)
 
 	  /* GPR and FPR registers can do REG+OFFSET addressing, except
 	     possibly for SDmode.  ISA 3.0 (i.e. power9) adds D-form addressing
-	     for 64-bit scalars and 32-bit SFmode to altivec registers.  */
-	  if ((addr_mask != 0) && !indexed_only_p
-	      && msize <= 8
-	      && (rc == RELOAD_REG_GPR
-		  || ((msize == 8 || m2 == SFmode)
-		      && (rc == RELOAD_REG_FPR
-			  || (rc == RELOAD_REG_VMX && TARGET_P9_VECTOR)))))
-	    addr_mask |= RELOAD_REG_OFFSET;
+	     for 64-bit scalars and 32-bit SFmode to altivec registers.
 
-	  /* VSX registers can do REG+OFFSET addresssing if ISA 3.0
-	     instructions are enabled.  The offset for 128-bit VSX registers is
-	     only 12-bits.  While GPRs can handle the full offset range, VSX
-	     registers can only handle the restricted range.  */
-	  else if ((addr_mask != 0) && !indexed_only_p
-		   && msize == 16 && TARGET_P9_VECTOR
-		   && (ALTIVEC_OR_VSX_VECTOR_MODE (m2)
-		       || (m2 == TImode && TARGET_VSX)))
+	     64-bit GPR and ISA 3.0 D-form use DS-form addressing with the
+	     bottom 2 bits set to 0.  */
+	  if ((addr_mask != 0) && !indexed_only_p)
 	    {
-	      addr_mask |= RELOAD_REG_OFFSET;
-	      if (rc == RELOAD_REG_FPR || rc == RELOAD_REG_VMX)
-		addr_mask |= RELOAD_REG_QUAD_OFFSET;
+	      if (msize <= 8 && rc == RELOAD_REG_GPR)
+		{
+		  if (msize == 8)
+		    addr_mask |= RELOAD_REG_OFFSET | RELOAD_REG_DS_OFFSET;
+		  else
+		    addr_mask |= RELOAD_REG_OFFSET;
+		}
+	      else if (msize == 8 || m2 == SFmode)
+		{
+		  if  (rc == RELOAD_REG_FPR)
+		    addr_mask |= RELOAD_REG_OFFSET;
+		  else if (rc == RELOAD_REG_VMX && TARGET_P9_VECTOR)
+		    addr_mask |= RELOAD_REG_OFFSET | RELOAD_REG_DS_OFFSET;
+		}
+
+	      /* VSX registers can do REG+OFFSET addresssing if ISA 3.0
+		 instructions are enabled.  The offset for 128-bit VSX
+		 registers is only 12-bits.  While GPRs use DS offsets for
+		 64-bit, VSX registers can only handle the DQ offsets.  */
+	      else if (msize == 16 && TARGET_P9_VECTOR
+		       && (ALTIVEC_OR_VSX_VECTOR_MODE (m2)
+			   || (m2 == TImode && TARGET_VSX)))
+		{
+		  if (rc == RELOAD_REG_GPR)
+		    addr_mask |= RELOAD_REG_OFFSET | RELOAD_REG_DS_OFFSET;
+		  else
+		    addr_mask |= RELOAD_REG_OFFSET | RELOAD_REG_QUAD_OFFSET;
+		}
 	    }
 
 	  /* VMX registers can do (REG & -16) and ((REG+REG) & -16)
