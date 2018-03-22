@@ -1,3 +1,91 @@
+<ext-addr.rev2-patch10b>
+2018-03-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Move
+	toc fusion support after the Linux port has set the default code
+	model.  Do not enable it by default.  If either -mtoc-fusion or
+	-mpower8-fusion-sign is used with -mno-power8-fusion, clear the
+	toc fusion/sign bits.
+
+<ext-addr.rev2-patch09b>
+2018-03-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.md (mov<mode>_softfloat, FMOVE32):
+	Reformat alternatives and attributes so it is easier to identify
+	which constraints/attributes go with which instruction.
+
+<ext-addr.rev2-patch08b>
+2018-03-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.md (mov<mode>_softfloat64, FMOVE64):
+	Reformat alternatives and attributes so it is easier to identify
+	which constraints/attributes go with which instruction.
+
+<ext-addr.rev2-patch07b>
+2018-03-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.md (mov<mode>_hardfloat64, FMOVE64):
+	Reformat alternatives and attributes so it is easier to identify
+	which constraints/attributes go with which instruction.
+
+<ext-addr.rev2-patch06b>
+2018-03-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.md (mov<mode>_softfloat32, FMOVE64):
+	Reformat alternatives and attributes so it is easier to identify
+	which constraints/attributes go with which instruction.
+
+<ext-addr.rev2-patch05b>
+2018-03-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.md (mov<mode>_hardfloat32, FMOVE64):
+	Reformat alternatives and attributes so it is easier to identify
+	which constraints/attributes go with which instruction.
+
+<ext-addr.rev2-patch04b>
+2018-03-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (mode_supports_pre_incdec_p): Add
+	additional argument to specify the reload register class to use,
+	defaulting to RELOAD_REG_ANY.
+	(mode_supports_pre_modify_p): Likewise.
+	(mode_supports_dq_form): Likewise.
+
+<ext-addr.rev2-patch03b>
+2018-03-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (mode_supports_d_form): Rename
+	mode_supports_vmx_dform to mode_supports_d_form.  Add an optional
+	argument to say which reload register class to use.  Change all
+	callers to pass in the RELOAD_REG_VMX class explicitly.
+	(rs6000_secondary_reload): Likewise.
+	(rs6000_preferred_reload_class): Likewise.
+	(rs6000_secondary_reload_class): Likewise.
+
+<ext-addr.rev2-patch02b>
+2018-03-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (mode_supports_vmx_dform): Move these
+	functions to be next to the other mode_supports functions.
+	(mode_supports_dq_form): Likewise.
+
+<ext-addr.rev2-patch01b>
+2018-03-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (mode_supports_dq_form): Rename
+	mode_supports_vsx_dform_quad to mode_supports_dq_form.
+	(mode_supports_vsx_dform_quad): Likewise.
+	(quad_address_p): Likewise.
+	(reg_offset_addressing_ok_p): Likewise.
+	(offsettable_ok_by_alignment): Likewise.
+	(rs6000_legitimate_offset_address_p): Likewise.
+	(legitimate_lo_sum_address_p): Likewise.
+	(rs6000_legitimize_address): Likewise.
+	(rs6000_legitimize_reload_address): Likewise.
+	(rs6000_secondary_reload_inner): Likewise.
+	(rs6000_preferred_reload_class): Likewise.
+	(rs6000_output_move_128bit): Likewise.
+
 2018-03-22   Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	Clone branch subversion id 258717
