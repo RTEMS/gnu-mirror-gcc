@@ -1,3 +1,14 @@
+<ext-addr.rev2-patch11b>
+2018-03-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (addr_mask_type): Grow mask to 16 bits.
+	(RELOAD_REG_DS_OFFSET): New mask for DS-form addresses.
+	(mode_supports_ds_form): New helper function to return if a reload
+	register class uses DS-form addresses.
+	(rs6000_debug_addr_mask): Print if we have DS-form addresses.
+	(rs6000_setup_reg_addr_masks): Note which reload register classes
+	use DS-form addresses.
+
 <ext-addr.rev2-patch10b>
 2018-03-21  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
