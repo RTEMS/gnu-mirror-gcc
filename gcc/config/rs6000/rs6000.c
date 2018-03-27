@@ -522,15 +522,6 @@ struct rs6000_reg_addr {
   enum insn_code reload_fpr_gpr;	/* INSN to move from FPR to GPR.  */
   enum insn_code reload_gpr_vsx;	/* INSN to move from GPR to VSX.  */
   enum insn_code reload_vsx_gpr;	/* INSN to move from VSX to GPR.  */
-  enum insn_code fusion_gpr_ld;		/* INSN for fusing gpr ADDIS/loads.  */
-					/* INSNs for fusing addi with loads
-					   or stores for each reg. class.  */					   
-  enum insn_code fusion_addi_ld[(int)N_RELOAD_REG];
-  enum insn_code fusion_addi_st[(int)N_RELOAD_REG];
-					/* INSNs for fusing addis with loads
-					   or stores for each reg. class.  */					   
-  enum insn_code fusion_addis_ld[(int)N_RELOAD_REG];
-  enum insn_code fusion_addis_st[(int)N_RELOAD_REG];
   addr_mask_type addr_mask[(int)N_RELOAD_REG]; /* Valid address masks.  */
   bool scalar_in_vmx_p;			/* Scalar value can go in VMX.  */
   bool fused_toc;			/* Mode supports TOC fusion.  */
@@ -2393,7 +2384,6 @@ rs6000_debug_print_mode (ssize_t m)
 {
   ssize_t rc;
   int spaces = 0;
-  bool fuse_extra_p;
 
   fprintf (stderr, "Mode: %-5s", GET_MODE_NAME (m));
   for (rc = 0; rc < N_RELOAD_REG; rc++)
@@ -2415,82 +2405,6 @@ rs6000_debug_print_mode (ssize_t m)
     }
   else
     spaces += sizeof ("  Upper=y") - 1;
-
-  fuse_extra_p = ((reg_addr[m].fusion_gpr_ld != CODE_FOR_nothing)
-		  || reg_addr[m].fused_toc);
-  if (!fuse_extra_p)
-    {
-      for (rc = 0; rc < N_RELOAD_REG; rc++)
-	{
-	  if (rc != RELOAD_REG_ANY)
-	    {
-	      if (reg_addr[m].fusion_addi_ld[rc]     != CODE_FOR_nothing
-		  || reg_addr[m].fusion_addi_ld[rc]  != CODE_FOR_nothing
-		  || reg_addr[m].fusion_addi_st[rc]  != CODE_FOR_nothing
-		  || reg_addr[m].fusion_addis_ld[rc] != CODE_FOR_nothing
-		  || reg_addr[m].fusion_addis_st[rc] != CODE_FOR_nothing)
-		{
-		  fuse_extra_p = true;
-		  break;
-		}
-	    }
-	}
-    }
-
-  if (fuse_extra_p)
-    {
-      fprintf (stderr, "%*s  Fuse:", spaces, "");
-      spaces = 0;
-
-      for (rc = 0; rc < N_RELOAD_REG; rc++)
-	{
-	  if (rc != RELOAD_REG_ANY)
-	    {
-	      char load, store;
-
-	      if (reg_addr[m].fusion_addis_ld[rc] != CODE_FOR_nothing)
-		load = 'l';
-	      else if (reg_addr[m].fusion_addi_ld[rc] != CODE_FOR_nothing)
-		load = 'L';
-	      else
-		load = '-';
-
-	      if (reg_addr[m].fusion_addis_st[rc] != CODE_FOR_nothing)
-		store = 's';
-	      else if (reg_addr[m].fusion_addi_st[rc] != CODE_FOR_nothing)
-		store = 'S';
-	      else
-		store = '-';
-
-	      if (load == '-' && store == '-')
-		spaces += 5;
-	      else
-		{
-		  fprintf (stderr, "%*s%c=%c%c", (spaces + 1), "",
-			   reload_reg_map[rc].name[0], load, store);
-		  spaces = 0;
-		}
-	    }
-	}
-
-      if (reg_addr[m].fusion_gpr_ld != CODE_FOR_nothing)
-	{
-	  fprintf (stderr, "%*sP8gpr", (spaces + 1), "");
-	  spaces = 0;
-	}
-      else
-	spaces += sizeof (" P8gpr") - 1;
-
-      if (reg_addr[m].fused_toc)
-	{
-	  fprintf (stderr, "%*sToc", (spaces + 1), "");
-	  spaces = 0;
-	}
-      else
-	spaces += sizeof (" Toc") - 1;
-    }
-  else
-    spaces += sizeof ("  Fuse: G=ls F=ls v=ls P8gpr Toc") - 1;
 
   if (rs6000_vector_unit[m] != VECTOR_NONE
       || rs6000_vector_mem[m] != VECTOR_NONE)
@@ -3576,119 +3490,6 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 	    {
 	      reg_addr[HImode].scalar_in_vmx_p = true;
 	      reg_addr[QImode].scalar_in_vmx_p = true;
-	    }
-	}
-    }
-
-  /* Setup the fusion operations.  */
-  if (TARGET_P8_FUSION)
-    {
-      reg_addr[QImode].fusion_gpr_ld = CODE_FOR_fusion_gpr_load_qi;
-      reg_addr[HImode].fusion_gpr_ld = CODE_FOR_fusion_gpr_load_hi;
-      reg_addr[SImode].fusion_gpr_ld = CODE_FOR_fusion_gpr_load_si;
-      if (TARGET_64BIT)
-	reg_addr[DImode].fusion_gpr_ld = CODE_FOR_fusion_gpr_load_di;
-    }
-
-  if (TARGET_P9_FUSION)
-    {
-      struct fuse_insns {
-	enum machine_mode mode;			/* mode of the fused type.  */
-	enum machine_mode pmode;		/* pointer mode.  */
-	enum rs6000_reload_reg_type rtype;	/* register type.  */
-	enum insn_code load;			/* load insn.  */
-	enum insn_code store;			/* store insn.  */
-      };
-
-      static const struct fuse_insns addis_insns[] = {
-	{ E_SFmode, E_DImode, RELOAD_REG_FPR,
-	  CODE_FOR_fusion_vsx_di_sf_load,
-	  CODE_FOR_fusion_vsx_di_sf_store },
-
-	{ E_SFmode, E_SImode, RELOAD_REG_FPR,
-	  CODE_FOR_fusion_vsx_si_sf_load,
-	  CODE_FOR_fusion_vsx_si_sf_store },
-
-	{ E_DFmode, E_DImode, RELOAD_REG_FPR,
-	  CODE_FOR_fusion_vsx_di_df_load,
-	  CODE_FOR_fusion_vsx_di_df_store },
-
-	{ E_DFmode, E_SImode, RELOAD_REG_FPR,
-	  CODE_FOR_fusion_vsx_si_df_load,
-	  CODE_FOR_fusion_vsx_si_df_store },
-
-	{ E_DImode, E_DImode, RELOAD_REG_FPR,
-	  CODE_FOR_fusion_vsx_di_di_load,
-	  CODE_FOR_fusion_vsx_di_di_store },
-
-	{ E_DImode, E_SImode, RELOAD_REG_FPR,
-	  CODE_FOR_fusion_vsx_si_di_load,
-	  CODE_FOR_fusion_vsx_si_di_store },
-
-	{ E_QImode, E_DImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_di_qi_load,
-	  CODE_FOR_fusion_gpr_di_qi_store },
-
-	{ E_QImode, E_SImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_si_qi_load,
-	  CODE_FOR_fusion_gpr_si_qi_store },
-
-	{ E_HImode, E_DImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_di_hi_load,
-	  CODE_FOR_fusion_gpr_di_hi_store },
-
-	{ E_HImode, E_SImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_si_hi_load,
-	  CODE_FOR_fusion_gpr_si_hi_store },
-
-	{ E_SImode, E_DImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_di_si_load,
-	  CODE_FOR_fusion_gpr_di_si_store },
-
-	{ E_SImode, E_SImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_si_si_load,
-	  CODE_FOR_fusion_gpr_si_si_store },
-
-	{ E_SFmode, E_DImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_di_sf_load,
-	  CODE_FOR_fusion_gpr_di_sf_store },
-
-	{ E_SFmode, E_SImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_si_sf_load,
-	  CODE_FOR_fusion_gpr_si_sf_store },
-
-	{ E_DImode, E_DImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_di_di_load,
-	  CODE_FOR_fusion_gpr_di_di_store },
-
-	{ E_DFmode, E_DImode, RELOAD_REG_GPR,
-	  CODE_FOR_fusion_gpr_di_df_load,
-	  CODE_FOR_fusion_gpr_di_df_store },
-      };
-
-      machine_mode cur_pmode = Pmode;
-      size_t i;
-
-      for (i = 0; i < ARRAY_SIZE (addis_insns); i++)
-	{
-	  machine_mode xmode = addis_insns[i].mode;
-	  enum rs6000_reload_reg_type rtype = addis_insns[i].rtype;
-
-	  if (addis_insns[i].pmode != cur_pmode)
-	    continue;
-
-	  if (rtype == RELOAD_REG_FPR && !TARGET_HARD_FLOAT)
-	    continue;
-
-	  reg_addr[xmode].fusion_addis_ld[rtype] = addis_insns[i].load;
-	  reg_addr[xmode].fusion_addis_st[rtype] = addis_insns[i].store;
-
-	  if (rtype == RELOAD_REG_FPR && TARGET_P9_VECTOR)
-	    {
-	      reg_addr[xmode].fusion_addis_ld[RELOAD_REG_VMX]
-		= addis_insns[i].load;
-	      reg_addr[xmode].fusion_addis_st[RELOAD_REG_VMX]
-		= addis_insns[i].store;
 	    }
 	}
     }
