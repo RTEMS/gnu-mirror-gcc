@@ -88,6 +88,7 @@ extern bool rs6000_is_valid_2insn_and (rtx, machine_mode);
 extern void rs6000_emit_2insn_and (machine_mode, rtx *, bool, int);
 extern int registers_ok_for_quad_peep (rtx, rtx);
 extern int mems_ok_for_quad_peep (rtx, rtx);
+extern bool move_valid_p (rtx, rtx, machine_mode);
 extern bool gpr_or_gpr_p (rtx, rtx);
 extern bool direct_move_p (rtx, rtx);
 extern bool quad_address_p (rtx, machine_mode, bool);
@@ -102,6 +103,7 @@ extern void expand_fusion_p9_load (rtx *);
 extern void expand_fusion_p9_store (rtx *);
 extern const char *emit_fusion_p9_load (rtx, rtx, rtx);
 extern const char *emit_fusion_p9_store (rtx, rtx, rtx);
+extern bool large_addr_operand (rtx, machine_mode);
 extern rtx fusion_wrap_memory_address (rtx);
 extern enum reg_class (*rs6000_preferred_reload_class_ptr) (rtx,
 							    enum reg_class);

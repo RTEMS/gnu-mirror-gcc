@@ -1,5 +1,38 @@
 2018-03-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/constraints.md (wC): New constraint for large
+	addresses.
+	* config/rs6000/predicates.md (large_mem_operand): New predicate
+	for large addresses.
+	* config/rs6000/rs6000.opt (-mlarge-address): New switch to enable
+	for large addresses.
+	* config/rs6000/rs6000.c (struct rs6000_reg_addr): Add large
+	address flag.
+	(int_is_32bit): New helper function to say whether an integer is
+	32-bits.
+	(split_large_integer): New function, split a 32-bit integer into
+	ADDIS and ADDI/memory parts.
+	(rs6000_debug_print_mode): Print if the mode accepts large
+	addresses.
+	(rs6000_init_hard_regno_mode_ok): Mark that DImode supports large
+	addresses.
+	(move_valid_p): New function to validate move insns.  Don't allow
+	naked large addresses after register allocation.
+	(rs6000_legitimate_address_p): Allow large addresses.
+	(print_operand): Use %M<n> and %m<n> for printing large
+	addresses.
+	(rs6000_opt_masks): Add -mlarge-address.
+	(large_addr_operand): Return true if the operand is a large
+	address.
+	* config/rs6000/rs6000.md (UNSPEC_LARGE_ADDRESS): New unspec.
+	(movdi_internal32): Use move_valid_p.
+	(movdi_internal64): Likewise.
+	(movdi splitters): Add initial support for large addresses.
+	(large_movdi_load): New insn for large address load.
+	(large_movdi_store): New insn for large address store.
+
+2018-03-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/rs6000.c (struct rs6000_reg_addr): Eliminate
 	unused insn code fields that were originally meant for adding
 	fusion operations.

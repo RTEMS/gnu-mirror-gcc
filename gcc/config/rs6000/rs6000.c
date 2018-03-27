@@ -525,6 +525,7 @@ struct rs6000_reg_addr {
   addr_mask_type addr_mask[(int)N_RELOAD_REG]; /* Valid address masks.  */
   bool scalar_in_vmx_p;			/* Scalar value can go in VMX.  */
   bool fused_toc;			/* Mode supports TOC fusion.  */
+  bool large_address_p;			/* Mode supports large addresses. */
 };
 
 static struct rs6000_reg_addr reg_addr[NUM_MACHINE_MODES];
@@ -2023,6 +2024,35 @@ rs6000_cpu_name_lookup (const char *name)
 }
 
 
+/* Return true if an integer constant can be generated with ADDIS and ADDI.  */
+
+static inline bool
+int_is_32bit (unsigned HOST_WIDE_INT v)
+{
+  return ((v + HOST_WIDE_INT_C (0x80000000U)) < HOST_WIDE_INT_C (0x100000000U));
+}
+
+/* Given a large integer, split it into parts for ADDIS and ADDI.  */
+
+static HOST_WIDE_INT
+split_large_integer (HOST_WIDE_INT value, bool hi_p)
+{
+  HOST_WIDE_INT lo, hi;
+
+  gcc_assert (int_is_32bit (value));
+
+  lo = value & HOST_WIDE_INT_C (0xffff);
+  hi = value & ~HOST_WIDE_INT_C (0xffff);
+  if (lo & HOST_WIDE_INT_C (0x8000U))
+    {
+      lo |= ~HOST_WIDE_INT_C (0xffff);
+      hi += HOST_WIDE_INT_C (0x10000);
+      gcc_assert (int_is_32bit (hi));
+    }
+
+  return hi_p ? hi : lo;
+}
+
 /* Return number of consecutive hard regs needed starting at reg REGNO
    to hold something of mode MODE.
    This is ordinarily the length in words of a value of mode MODE
@@ -2390,11 +2420,25 @@ rs6000_debug_print_mode (ssize_t m)
     fprintf (stderr, " %s: %s", reload_reg_map[rc].name,
 	     rs6000_debug_addr_mask (reg_addr[m].addr_mask[rc], true));
 
+  if (TARGET_LARGE_ADDRESS)
+    {
+      if (reg_addr[m].large_address_p)
+	{
+	  fprintf (stderr, "%*s  Large-addr", spaces, "");
+	  spaces = 0;
+	}
+      else
+	spaces += sizeof ("  Large-addr") - 1;
+    }
+
   if ((reg_addr[m].reload_store != CODE_FOR_nothing)
       || (reg_addr[m].reload_load != CODE_FOR_nothing))
-    fprintf (stderr, "  Reload=%c%c",
-	     (reg_addr[m].reload_store != CODE_FOR_nothing) ? 's' : '*',
-	     (reg_addr[m].reload_load != CODE_FOR_nothing) ? 'l' : '*');
+    {
+      fprintf (stderr, "%*s  Reload=%c%c", spaces, "",
+	       (reg_addr[m].reload_store != CODE_FOR_nothing) ? 's' : '*',
+	       (reg_addr[m].reload_load != CODE_FOR_nothing) ? 'l' : '*');
+      spaces = 0;
+    }
   else
     spaces += sizeof ("  Reload=sl") - 1;
 
@@ -3511,6 +3555,12 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 	    reg_addr[DFmode].fused_toc = true;
 	}
     }
+
+  /* Note which types support large addresses.  At the moment, only support
+     DImode on 64-bit with medium code model.  */
+  if (TARGET_LARGE_ADDRESS && TARGET_POWERPC64
+      && TARGET_CMODEL == CMODEL_MEDIUM)
+    reg_addr[DImode].large_address_p = true;
 
   /* Precalculate HARD_REGNO_NREGS.  */
   for (r = 0; r < FIRST_PSEUDO_REGISTER; ++r)
@@ -7867,6 +7917,28 @@ small_data_operand (rtx op ATTRIBUTE_UNUSED,
 #endif
 }
 
+/* Return true if the operands are valid for a standard move.  We don't allow
+   large address moves after register allocation in the standard MOV insn.
+   Instead such moves should be done through an insn that has a base register
+   as a temporary.  */
+
+bool
+move_valid_p (rtx dest, rtx src, machine_mode mode)
+{
+  if (!gpc_reg_operand (dest, mode) && !gpc_reg_operand (src, mode))
+    return false;
+
+  if (!reg_addr[mode].large_address_p || can_create_pseudo_p ())
+    return true;
+
+  if (MEM_P (dest))
+    return !large_addr_operand (XEXP (dest, 0), mode);
+  else if (MEM_P (src))
+    return !large_addr_operand (XEXP (src, 0), mode);
+  else
+    return true;
+}
+
 /* Return true if either operand is a general purpose register.  */
 
 bool
@@ -9607,6 +9679,8 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
 	return 1;
       if (reg_addr[mode].fused_toc && GET_CODE (x) == UNSPEC
 	  && XINT (x, 1) == UNSPEC_FUSION_ADDIS)
+	return 1;
+      if (reg_addr[mode].large_address_p && large_addr_operand (x, mode))
 	return 1;
     }
 
@@ -21119,6 +21193,8 @@ print_operand (FILE *file, rtx x, int code)
 {
   int i;
   unsigned HOST_WIDE_INT uval;
+  HOST_WIDE_INT val;
+  rtx addr;
 
   switch (code)
     {
@@ -21286,6 +21362,54 @@ print_operand (FILE *file, rtx x, int code)
 		     reg_names[SMALL_DATA_REG]);
 	}
       return;
+
+    case 'M':
+      /* Print the upper part of a large address formed with ADDIS and
+	 12/14/16-bit memory offset in a d-form instruction.  Include the
+	 register or R0 depending on the address.  */
+      gcc_assert (large_mem_operand (x, GET_MODE (x)));
+      addr = XEXP (x, 0);
+      if (CONST_INT_P (addr))
+	{
+	  val = split_large_integer (INTVAL (addr), true);
+	  fprintf (file, "%s," HOST_WIDE_INT_PRINT_HEX,
+		   reg_names[FIRST_GPR_REGNO],
+		   (val >> 16) & 0xffff);
+	}
+      else if (GET_CODE (addr) == PLUS
+	       && REG_P (XEXP (addr, 0))
+	       && CONST_INT_P (XEXP (addr, 1)))
+	{
+	  val = split_large_integer (INTVAL (XEXP (addr, 1)), true);
+	  fprintf (file, "%s," HOST_WIDE_INT_PRINT_HEX,
+		   reg_names[REGNO (XEXP (addr, 0))],
+		   (val >> 16) & 0xffff);
+	}
+      else
+	gcc_unreachable ();
+      return;
+
+    case 'm':
+      /* Print the lower part of a large address formed with ADDIS and
+	 12/14/16-bit memory offset in a d-form instruction.  */
+      gcc_assert (large_mem_operand (x, GET_MODE (x)));
+      addr = XEXP (x, 0);
+      if (CONST_INT_P (addr))
+	{
+	  val = split_large_integer (INTVAL (addr), false);
+	  fprintf (file, HOST_WIDE_INT_PRINT_HEX, val & 0xffff);
+	}
+      else if (GET_CODE (addr) == PLUS
+	       && REG_P (XEXP (addr, 0))
+	       && CONST_INT_P (XEXP (addr, 1)))
+	{
+	  val = split_large_integer (INTVAL (XEXP (addr, 1)), false);
+	  fprintf (file, HOST_WIDE_INT_PRINT_HEX, val & 0xffff);
+	}
+      else
+	gcc_unreachable ();
+      return;
+
 
     case 'N': /* Unused */
       /* Write the number of elements in the vector times 4.  */
@@ -36490,6 +36614,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "hard-dfp",			OPTION_MASK_DFP,		false, true  },
   { "htm",			OPTION_MASK_HTM,		false, true  },
   { "isel",			OPTION_MASK_ISEL,		false, true  },
+  { "large-address",		OPTION_MASK_LARGE_ADDRESS,	false, true  },
   { "mfcrf",			OPTION_MASK_MFCRF,		false, true  },
   { "mfpgpr",			OPTION_MASK_MFPGPR,		false, true  },
   { "modulo",			OPTION_MASK_MODULO,		false, true  },
@@ -38718,7 +38843,9 @@ fusion_wrap_memory_address (rtx old_mem)
 		(unspec [(...)] UNSPEC_TOCREL))
 
    Addresses created via toc fusion look like:
-	(unspec [(unspec [(...)] UNSPEC_TOCREL)] UNSPEC_FUSION_ADDIS))  */
+	(unspec [(unspec [(...)] UNSPEC_TOCREL)] UNSPEC_FUSION_ADDIS))
+
+   Large addresses have the regular address.  */
 
 static void
 fusion_split_address (rtx addr, rtx *p_hi, rtx *p_lo)
@@ -39161,6 +39288,44 @@ emit_fusion_p9_store (rtx mem, rtx reg, rtx tmp_reg)
 
   return "";
 }
+
+/* Large address support.  */
+/* Return if an address is a valid large address.  */
+
+bool
+large_addr_operand (rtx addr, machine_mode mode)
+{
+  if (!reg_addr[mode].large_address_p)
+    return false;
+
+  if (GET_CODE (addr) == PLUS)
+    {
+      if (!base_reg_operand (XEXP (addr, 0), Pmode))
+	return false;
+
+      addr = XEXP (addr, 1);
+    }
+
+  if (CONST_INT_P (addr))
+    {
+      if (satisfies_constraint_I (addr))	/* bottom 16 bits.  */
+	return false;
+      if (satisfies_constraint_L (addr))	/* 16 bits out of 32 bits.  */
+	return false;
+
+      unsigned HOST_WIDE_INT value = UINTVAL (addr);
+
+      /* For 64-bit addresses and for SFmode, limit any integer to DS-form addresses.  */
+      if ((value & 3) != 0 && (GET_MODE_SIZE (mode) == 8 || mode == SFmode))
+	return false;
+
+      return int_is_32bit (value);
+    }
+
+  return false;
+}
+
+
 
 #ifdef RS6000_GLIBC_ATOMIC_FENV
 /* Function declarations for rs6000_atomic_assign_expand_fenv.  */
