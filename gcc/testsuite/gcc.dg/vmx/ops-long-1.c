@@ -9,8 +9,8 @@
 #include <altivec.h>
 #include <stdlib.h>
 extern int *var_int;
-extern long int * *var_long_ptr;
-extern unsigned long int * *var_unsigned_long_ptr;
+extern long * *var_long_ptr;
+extern unsigned long * *var_unsigned_long_ptr;
 extern long long int * *var_long_long_ptr;
 extern unsigned long long int * *var_unsigned_long_long_ptr;
 extern vector signed int * *var_vec_s32_ptr;
