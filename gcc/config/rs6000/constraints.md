@@ -190,6 +190,10 @@
   (and (match_test "TARGET_P8_VECTOR")
        (match_operand 0 "all_ones_constant")))
 
+(define_memory_constraint "wN"
+  "Memory constraint that is not large"
+  (match_operand 0 "memory_operand_not_large"))
+
 ;; ISA 3.0 vector d-form addresses
 (define_memory_constraint "wO"
   "Memory operand suitable for the ISA 3.0 vector d-form instructions."

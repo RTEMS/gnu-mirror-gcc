@@ -1,5 +1,109 @@
 2018-03-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/constraints.md (wN): New constraint not to allow
+	large memory addresses.
+	* config/rs6000/predicates.md (memory_operand_not_large): New
+	predicate not to allow large memory addresses.
+	(reg_or_mem_operand): Call it.
+	(fusion_offsettable_mem_operand): Likewise.
+	(large_mem_operand): Change large_address_operand to
+	large_address_operand.
+	* config/rs6000/rs6000-protos.h (large_address_valid): Likewise.
+	(rs6000_init_hard_regno_mode_ok): Add SF/DF support to large
+	addresses.
+	(move_valid_p): Change large_address_operand to
+	large_address_operand.
+	(rs6000_legitimate_address_p): Likewise.
+	(large_address_valid): Likewise.
+	(mem_operand_gpr): Don't allow large addresses.
+	(mem_operand_ds_form): Likewise.
+	(print_operand): Print %m<n> value as negative if needed.
+	* config/rs6000/rs6000.md (LARGE*): Add mode iterators and mode
+	attributes to support large addresses.
+	(large address splitters): Move large address support before the
+	moves.  Add SF/DF to large address support.
+	(large_mov<mode>_load): New patterns to do large address loads.
+	(large_mov<mode>_store): New patterns to do large address stores.
+	(ptrm mode attribute): Change m constraint to wN.
+	(zero_extendsi<mode>2): Likewise.
+	(extendsfdf2_fpr): Likewise.
+	(floatdidf2_mem): Likewise.
+	(floatunsdidf2_mem): Likewise.
+	(floatdisf2_mem): Likewise.
+	(floatunsdisf2_mem): Likewise.
+	(movsi_internal1): Likewise.
+	(movsi_internal1_single): Likewise.
+	(movsi_from_sf): Likewise.
+	(movdi_from_sf_zero_ext): Likewise.
+	(movsi_from_df): Likewise.
+	(mov<mode>_internal, QHI iterator): Likewise.
+	(movcc_internal1): Likewise.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_softfloat): Likewise.
+	(movsf_from_si): Likewise.
+	(mov<mode>_hardfloat32, FMOVE64 iterator): Likewise.
+	(mov<mode>_hardfloat64, FMOVE64 iterator): Likewise.
+	(mov<mode>_64bit_dm): Likewise.
+	(movtd_64bit_nodm): Likewise.
+	(mov<mode>_32bit): Likewise.
+	(extenddf<mode>2_fprs): Likewise.
+	(movdi_internal32): Likewise.
+	(movdi_internal64): Likewise.
+	(stack_protect_testsi): Likewise.
+	(<bd>_<mode>): Likewise.
+	(<bd>tf_<mode>): Likewise.
+	(unpack<mode>_dm): Likewise.
+	(bswap<mode>2_extenddi): Call memory_operand_not_large instead of
+	memory_operand.
+	(bswaphi2_extendsi): Likewise.
+	(bswap<mode>2_load): Likewise.
+	(bswap<mode>2_store): Likewise.
+	(bswapdi2_load): Likewise.
+	(bswapdi2_store): Likewise.
+	(ashdi3_extswsli_dot): Likewise.
+	(ashdi3_extswsli_dot2): Likewise.
+	(signbit<mode>2_dm_mem): Likewise.
+	(fix<uns>_trunc<SFDF:mode><QHSI:mode>2_mem): Likewise.
+	(floatdidf2_mem): Likewise.
+	(UNSPEC_MOVSI_GOT splitter): Likewise.
+	(save_stack_nonlocal): Likewise.
+	(restore_stack_nonlocal): Likewise.
+	(call_indirect_aix<mode>): Likewise.
+	(call_indirect_aix<mode>_nospec): Likewise.
+	(call_value_indirect_aix<mode>): Likewise.
+	(call_value_indirect_aix<mode>_nospec): Likewise.
+	(probe_stack_<mode>): Likewise.
+	(stack_protect_set): Likewise.
+	(stack_protect_setsi): Likewise.
+	(stack_protect_setdi): Likewise.
+	(stack_protect_test): Likewise.
+	(stack_protect_testsi): Likewise.
+	(stack_protect_testdi): Likewise.
+	(crsave): Likewise.
+	(stmw_operation): Likewise.
+	(any_parallel_operand): Likewise.
+	(save_gpregs_<mode>_r12): Likewise.
+	(save_gpregs_<mode>_r1): Likewise.
+	(save_fpregs_<mode>_r11): Likewise.
+	(save_fpregs_<mode>_r12): Likewise.
+	(save_fpregs_<mode>_r1): Likewise.
+	(lmw): Likewise.
+	(restore_gpregs_<mode>_r11): Likewise.
+	(restore_gpregs_<mode>_r12): Likewise.
+	(restore_gpregs_<mode>_r1): Likewise.
+	(return_and_restore_gpregs_<mode>_r11): Likewise.
+	(return_and_restore_gpregs_<mode>_r12): Likewise.
+	(return_and_restore_gpregs_<mode>_r1): Likewise.
+	(return_and_restore_fpregs_<mode>_r11): Likewise.
+	(return_and_restore_fpregs_<mode>_r12): Likewise.
+	(return_and_restore_fpregs_<mode>_r1): Likewise.
+	(return_and_restore_fpregs_aix_<mode>_r11): Likewise.
+	(return_and_restore_fpregs_aix_<mode>_r1): Likewise.
+	(fix<uns>_trunc<IEEE128:mode><QHSI:mode>2_mem): Likewise.
+
+2018-03-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/constraints.md (wC): New constraint for large
 	addresses.
 	* config/rs6000/predicates.md (large_mem_operand): New predicate

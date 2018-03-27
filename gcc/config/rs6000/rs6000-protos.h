@@ -103,7 +103,7 @@ extern void expand_fusion_p9_load (rtx *);
 extern void expand_fusion_p9_store (rtx *);
 extern const char *emit_fusion_p9_load (rtx, rtx, rtx);
 extern const char *emit_fusion_p9_store (rtx, rtx, rtx);
-extern bool large_addr_operand (rtx, machine_mode);
+extern bool large_address_valid (rtx, machine_mode);
 extern rtx fusion_wrap_memory_address (rtx);
 extern enum reg_class (*rs6000_preferred_reload_class_ptr) (rtx,
 							    enum reg_class);

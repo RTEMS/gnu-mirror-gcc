@@ -3558,9 +3558,13 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 
   /* Note which types support large addresses.  At the moment, only support
      DImode on 64-bit with medium code model.  */
-  if (TARGET_LARGE_ADDRESS && TARGET_POWERPC64
+  if (TARGET_LARGE_ADDRESS && TARGET_POWERPC64 && TARGET_VSX
       && TARGET_CMODEL == CMODEL_MEDIUM)
-    reg_addr[DImode].large_address_p = true;
+    {
+      reg_addr[DImode].large_address_p = true;
+      reg_addr[SFmode].large_address_p = true;
+      reg_addr[DFmode].large_address_p = true;
+    }
 
   /* Precalculate HARD_REGNO_NREGS.  */
   for (r = 0; r < FIRST_PSEUDO_REGISTER; ++r)
@@ -7932,9 +7936,9 @@ move_valid_p (rtx dest, rtx src, machine_mode mode)
     return true;
 
   if (MEM_P (dest))
-    return !large_addr_operand (XEXP (dest, 0), mode);
+    return !large_address_valid (XEXP (dest, 0), mode);
   else if (MEM_P (src))
-    return !large_addr_operand (XEXP (src, 0), mode);
+    return !large_address_valid (XEXP (src, 0), mode);
   else
     return true;
 }
@@ -8113,6 +8117,9 @@ mem_operand_gpr (rtx op, machine_mode mode)
   if (!rs6000_offsettable_memref_p (op, mode, false))
     return false;
 
+  if (large_address_valid (addr, mode))
+    return false;
+
   op = address_offset (addr);
   if (op == NULL_RTX)
     return true;
@@ -8142,6 +8149,9 @@ mem_operand_ds_form (rtx op, machine_mode mode)
   unsigned HOST_WIDE_INT offset;
   int extra;
   rtx addr = XEXP (op, 0);
+
+  if (large_address_valid (addr, mode))
+    return false;
 
   if (!offsettable_address_p (false, mode, addr))
     return false;
@@ -9680,7 +9690,7 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
       if (reg_addr[mode].fused_toc && GET_CODE (x) == UNSPEC
 	  && XINT (x, 1) == UNSPEC_FUSION_ADDIS)
 	return 1;
-      if (reg_addr[mode].large_address_p && large_addr_operand (x, mode))
+      if (reg_addr[mode].large_address_p && large_address_valid (x, mode))
 	return 1;
     }
 
@@ -21404,7 +21414,10 @@ print_operand (FILE *file, rtx x, int code)
 	       && CONST_INT_P (XEXP (addr, 1)))
 	{
 	  val = split_large_integer (INTVAL (XEXP (addr, 1)), false);
-	  fprintf (file, HOST_WIDE_INT_PRINT_HEX, val & 0xffff);
+	  if (val < 0)
+	    fprintf (file, HOST_WIDE_INT_PRINT_DEC, val);
+	  else
+	    fprintf (file, HOST_WIDE_INT_PRINT_HEX, val & 0xffff);
 	}
       else
 	gcc_unreachable ();
@@ -39293,7 +39306,7 @@ emit_fusion_p9_store (rtx mem, rtx reg, rtx tmp_reg)
 /* Return if an address is a valid large address.  */
 
 bool
-large_addr_operand (rtx addr, machine_mode mode)
+large_address_valid (rtx addr, machine_mode mode)
 {
   if (!reg_addr[mode].large_address_p)
     return false;
