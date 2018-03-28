@@ -1,5 +1,32 @@
 2018-03-28  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/predicates.md (large_mem_operand): New predicate
+	to recognize large addresses.
+	* config/rs6000/rs6000-protos.h (move_valid_p): Add declaration.
+	(large_address_valid): Likewise.
+	(split_large_address): Likewise.
+	* config/rs6000/rs6000.opt (-mlarge-address): New switch.
+	* config/rs6000/rs6000.c (struct rs6000_reg_addr): Add boolean to
+	say large addresses are supported.
+	(rs6000_debug_print_mode): Print if a mode supports large
+	addresses.
+	(rs6000_init_hard_regno_mode_ok): Mark that DImode supports large
+	addresses.
+	(move_valid_p): Return if normal move insns are valid.
+	(int_is_32bit): Return true if an integer constant is 32-bits.
+	(split_large_integer): Split 32-bit constants into two parts that
+	can be set with ADDIS and ADDI.
+	(rs6000_opt_masks): Add -mlarge-address.
+	(large_address_valid): New function, return if large addresses are
+	valid.
+	(split_large_address): New function, split a large address into
+	smaller pieces.
+	* config/rs6000/rs6000.md (movdi_internal32): Call move_valid_p to
+	validate the move.
+	(movdi_internal64): Likewise.
+
+2018-03-28  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/constraints.md: Delete changes, other than the
 	changes in ext-addr.
 	* config/rs6000/predicates.md: Likewise.

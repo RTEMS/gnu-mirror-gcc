@@ -1948,3 +1948,11 @@
 
   return offsettable_nonstrict_memref_p (op);
 })
+
+
+;; Match a memory operation that uses a large address.
+(define_predicate "large_mem_operand"
+  (match_code "mem")
+{
+  return large_address_valid (XEXP (op, 0), mode);
+})

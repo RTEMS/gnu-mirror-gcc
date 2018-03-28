@@ -525,6 +525,7 @@ struct rs6000_reg_addr {
   addr_mask_type addr_mask[(int)N_RELOAD_REG]; /* Valid address masks.  */
   bool scalar_in_vmx_p;			/* Scalar value can go in VMX.  */
   bool fused_toc;			/* Mode supports TOC fusion.  */
+  bool large_address_p;			/* Mode supports large addresses.  */
 };
 
 static struct rs6000_reg_addr reg_addr[NUM_MACHINE_MODES];
@@ -2390,11 +2391,25 @@ rs6000_debug_print_mode (ssize_t m)
     fprintf (stderr, " %s: %s", reload_reg_map[rc].name,
 	     rs6000_debug_addr_mask (reg_addr[m].addr_mask[rc], true));
 
+  if (TARGET_LARGE_ADDRESS)
+    {
+      if (reg_addr[m].large_address_p)
+	{
+	  fprintf (stderr, "%*s  Large-addr", spaces, "");
+	  spaces = 0;
+	}
+      else
+	spaces += sizeof ("  Large-addr") - 1;
+    }
+
   if ((reg_addr[m].reload_store != CODE_FOR_nothing)
       || (reg_addr[m].reload_load != CODE_FOR_nothing))
-    fprintf (stderr, "  Reload=%c%c",
-	     (reg_addr[m].reload_store != CODE_FOR_nothing) ? 's' : '*',
-	     (reg_addr[m].reload_load != CODE_FOR_nothing) ? 'l' : '*');
+    {
+      fprintf (stderr, "%*s  Reload=%c%c", spaces, "",
+	       (reg_addr[m].reload_store != CODE_FOR_nothing) ? 's' : '*',
+	       (reg_addr[m].reload_load != CODE_FOR_nothing) ? 'l' : '*');
+      spaces = 0;
+    }
   else
     spaces += sizeof ("  Reload=sl") - 1;
 
@@ -3510,6 +3525,14 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 	  if (TARGET_DOUBLE_FLOAT)
 	    reg_addr[DFmode].fused_toc = true;
 	}
+    }
+
+  /* Note which types support large addresses.  At the moment, only support
+     DImode on 64-bit with medium code model.  */
+  if (TARGET_LARGE_ADDRESS && TARGET_POWERPC64 && TARGET_VSX
+      && TARGET_CMODEL == CMODEL_MEDIUM)
+    {
+      reg_addr[DImode].large_address_p = true;
     }
 
   /* Precalculate HARD_REGNO_NREGS.  */
@@ -7865,6 +7888,17 @@ small_data_operand (rtx op ATTRIBUTE_UNUSED,
 #else
   return 0;
 #endif
+}
+
+/* Return true if the operands are valid for a standard move.  */
+
+bool
+move_valid_p (rtx dest, rtx src, machine_mode mode)
+{
+  if (!gpc_reg_operand (dest, mode) && !gpc_reg_operand (src, mode))
+    return false;
+
+  return true;
 }
 
 /* Return true if either operand is a general purpose register.  */
@@ -21072,6 +21106,36 @@ rs6000_init_machine_status (void)
   stack_info.reload_completed = 0;
   return ggc_cleared_alloc<machine_function> ();
 }
+
+/* Return true if an integer constant can be generated with ADDIS and ADDI.  */
+
+static inline bool
+int_is_32bit (unsigned HOST_WIDE_INT v)
+{
+  return ((v + HOST_WIDE_INT_C (0x80000000U)) < HOST_WIDE_INT_C (0x100000000U));
+}
+
+/* Given a large integer, split it into parts for ADDIS and ADDI.  */
+
+static HOST_WIDE_INT
+split_large_integer (HOST_WIDE_INT value, bool hi_p)
+{
+  HOST_WIDE_INT lo, hi;
+
+  gcc_assert (int_is_32bit (value));
+
+  lo = value & HOST_WIDE_INT_C (0xffff);
+  hi = value & ~HOST_WIDE_INT_C (0xffff);
+  if (lo & HOST_WIDE_INT_C (0x8000U))
+    {
+      lo |= ~HOST_WIDE_INT_C (0xffff);
+      hi += HOST_WIDE_INT_C (0x10000);
+      gcc_assert (int_is_32bit (hi));
+    }
+
+  return hi_p ? hi : lo;
+}
+
 
 #define INT_P(X) (GET_CODE (X) == CONST_INT && GET_MODE (X) == VOIDmode)
 
@@ -36490,6 +36554,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "hard-dfp",			OPTION_MASK_DFP,		false, true  },
   { "htm",			OPTION_MASK_HTM,		false, true  },
   { "isel",			OPTION_MASK_ISEL,		false, true  },
+  { "large-address",		OPTION_MASK_LARGE_ADDRESS,	false, true  },
   { "mfcrf",			OPTION_MASK_MFCRF,		false, true  },
   { "mfpgpr",			OPTION_MASK_MFPGPR,		false, true  },
   { "modulo",			OPTION_MASK_MODULO,		false, true  },
@@ -39162,6 +39227,81 @@ emit_fusion_p9_store (rtx mem, rtx reg, rtx tmp_reg)
   return "";
 }
 
+
+/* Large address support.  */
+/* Return if an address is a valid large address.  */
+
+bool
+large_address_valid (rtx addr, machine_mode mode)
+{
+  if (!reg_addr[mode].large_address_p)
+    return false;
+
+  if (GET_CODE (addr) == PLUS)
+    {
+      if (!base_reg_operand (XEXP (addr, 0), Pmode))
+	return false;
+
+      addr = XEXP (addr, 1);
+    }
+
+  if (CONST_INT_P (addr))
+    {
+      if (satisfies_constraint_I (addr))	/* bottom 16 bits.  */
+	return false;
+      if (satisfies_constraint_L (addr))	/* 16 bits out of 32 bits.  */
+	return false;
+
+      unsigned HOST_WIDE_INT value = UINTVAL (addr);
+
+      /* For 64-bit addresses and for SFmode, limit any integer to DS-form addresses.  */
+      if ((value & 3) != 0 && (GET_MODE_SIZE (mode) == 8 || mode == SFmode))
+	return false;
+
+      return int_is_32bit (value);
+    }
+
+  return false;
+}
+
+/* Split a large address into two insns, one to set the upper bits, and the
+   other to set the lower bits.  Emit the first insn, and return the second
+   insn that can be used as an address.  */
+
+rtx
+split_large_address (rtx addr, rtx tmp_reg)
+{
+  HOST_WIDE_INT value;
+  rtx hi, lo;
+  enum rtx_code rcode = PLUS;
+
+  if (CONST_INT_P (addr))
+    {
+      value = INTVAL (addr);
+      hi = GEN_INT (split_large_integer (value, true));
+      lo = GEN_INT (split_large_integer (value, false));
+    }
+  else if (GET_CODE (addr) == PLUS)
+    {
+      rtx op0 = XEXP (addr, 0);
+      rtx op1 = XEXP (addr, 1);
+
+      if ((REG_P (op0) || SUBREG_P (op0)) && CONST_INT_P (op1))
+	{
+	  value = INTVAL (op1);
+	  hi = gen_rtx_PLUS (Pmode, op0,
+			     GEN_INT (split_large_integer (value, true)));
+	  lo = GEN_INT (split_large_integer (value, false));
+	}
+    }
+  else
+    gcc_unreachable ();
+
+  emit_insn (gen_rtx_SET (tmp_reg, hi));
+  return gen_rtx_fmt_ee (rcode, Pmode, tmp_reg, lo);
+}
+
+
 #ifdef RS6000_GLIBC_ATOMIC_FENV
 /* Function declarations for rs6000_atomic_assign_expand_fenv.  */
 static tree atomic_hold_decl, atomic_clear_decl, atomic_update_decl;
