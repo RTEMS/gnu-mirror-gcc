@@ -192,9 +192,8 @@
 
 (define_memory_constraint "wN"
   "Memory operand that is not a large address"
-  (ior (match_test "!TARGET_LARGE_ADDRESS")
-       (and (match_operand 0 "memory_operand")
-	    (not (match_operand 0 "large_mem_operand")))))
+   (and (match_operand 0 "memory_operand")
+	(not (match_operand 0 "large_mem_operand"))))
 
 ;; ISA 3.0 vector d-form addresses
 (define_memory_constraint "wO"
