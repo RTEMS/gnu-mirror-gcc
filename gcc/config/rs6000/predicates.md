@@ -779,15 +779,6 @@
        (match_test "SCALAR_FLOAT_MODE_P (mode)
 		    && op == CONST0_RTX (mode)")))
 
-
-;; Match a memory operand that is not large.
-(define_predicate "memory_operand_not_large"
-  (match_code "mem")
-{
-  return (memory_operand (op, mode)
-          && !large_address_valid (XEXP (op, 0), mode));
-})
-
 ;; Return 1 if the operand is in volatile memory.  Note that during the
 ;; RTL generation phase, memory_operand does not return TRUE for volatile
 ;; memory references.  So this function allows us to recognize volatile
@@ -981,7 +972,7 @@
 
 ;; Return 1 if the operand is a general non-special register or memory operand.
 (define_predicate "reg_or_mem_operand"
-  (ior (match_operand 0 "memory_operand_not_large")
+  (ior (match_operand 0 "memory_operand")
        (and (match_code "mem")
 	    (match_test "macho_lo_sum_memory_operand (op, mode)"))
        (match_operand 0 "volatile_mem_operand")
@@ -1952,16 +1943,8 @@
       mode = GET_MODE (op);
     }
 
-  if (!memory_operand_not_large (op, mode))
+  if (!memory_operand (op, mode))
     return 0;
 
   return offsettable_nonstrict_memref_p (op);
-})
-
-
-;; Match a memory operation that uses a large address.
-(define_predicate "large_mem_operand"
-  (match_code "mem")
-{
-  return large_address_valid (XEXP (op, 0), mode);
 })
