@@ -1,5 +1,31 @@
 2018-03-28  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/constraints.md (wC): New constraint for large
+	addresses.
+	(wN): Likewise.
+	* config/rs6000/rs6000.c (struct rs6000_reg_addr): Add fields for
+	the insn to create the large address load/store wrapper.
+	(rs6000_debug_print_mode): Print whether we have large address
+	load/store wrappers.
+	(rs6000_init_hard_regno_mode_ok): Set the large address load/store
+	wrappers for DImode.
+	(move_valid_p): Don't allow large addresses in normal moves.
+	(rs6000_legitimate_address_p): Recognize large addresses before
+	register allocation.
+	(rs6000_emit_move): Convert large addresses into a separate insn
+	that can possibly add a scratch register.
+	(print_operand): Add %M<n> and %m<n> for printing the upper and
+	lower parts of large addresses.
+	* config/rs6000/rs6000.md (UNSPEC_LARGE_ADDRESS): New unspec.
+	(LARGE*): New mode iterators and attributes to support large
+	addresses.
+	(large_mov<mode>_load): Large address load insns.
+	(large_mov<mode>_store): Large address store insns.
+	(movdi_internal32): Add support for large addresses.
+	(movdi_internal64): Likewise.
+
+2018-03-28  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/predicates.md (large_mem_operand): New predicate
 	to recognize large addresses.
 	* config/rs6000/rs6000-protos.h (move_valid_p): Add declaration.

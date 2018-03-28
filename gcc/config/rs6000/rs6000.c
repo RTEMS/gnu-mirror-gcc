@@ -522,6 +522,8 @@ struct rs6000_reg_addr {
   enum insn_code reload_fpr_gpr;	/* INSN to move from FPR to GPR.  */
   enum insn_code reload_gpr_vsx;	/* INSN to move from GPR to VSX.  */
   enum insn_code reload_vsx_gpr;	/* INSN to move from VSX to GPR.  */
+  enum insn_code large_addr_load;	/* Large address load insn. */
+  enum insn_code large_addr_store;	/* Large address store insn. */
   addr_mask_type addr_mask[(int)N_RELOAD_REG]; /* Valid address masks.  */
   bool scalar_in_vmx_p;			/* Scalar value can go in VMX.  */
   bool fused_toc;			/* Mode supports TOC fusion.  */
@@ -2395,11 +2397,14 @@ rs6000_debug_print_mode (ssize_t m)
     {
       if (reg_addr[m].large_address_p)
 	{
-	  fprintf (stderr, "%*s  Large-addr", spaces, "");
+	  char s = reg_addr[m].large_addr_store != CODE_FOR_nothing ? 's' : '*';
+	  char l = reg_addr[m].large_addr_load != CODE_FOR_nothing ? 'l' : '*';
+
+	  fprintf (stderr, "%*s  Large-addr=%c%c", spaces, "", s, l);
 	  spaces = 0;
 	}
       else
-	spaces += sizeof ("  Large-addr") - 1;
+	spaces += sizeof ("  Large-addr=sl") - 1;
     }
 
   if ((reg_addr[m].reload_store != CODE_FOR_nothing)
@@ -3533,6 +3538,8 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
       && TARGET_CMODEL == CMODEL_MEDIUM)
     {
       reg_addr[DImode].large_address_p = true;
+      reg_addr[DImode].large_addr_load = CODE_FOR_large_movdi_load;
+      reg_addr[DImode].large_addr_store = CODE_FOR_large_movdi_store;
     }
 
   /* Precalculate HARD_REGNO_NREGS.  */
@@ -7890,7 +7897,10 @@ small_data_operand (rtx op ATTRIBUTE_UNUSED,
 #endif
 }
 
-/* Return true if the operands are valid for a standard move.  */
+/* Return true if the operands are valid for a standard move.  We don't allow
+   large address moves after register allocation in the standard MOV insn.
+   Instead such moves should be done through an insn that has a base register
+   as a temporary.  */
 
 bool
 move_valid_p (rtx dest, rtx src, machine_mode mode)
@@ -7898,7 +7908,15 @@ move_valid_p (rtx dest, rtx src, machine_mode mode)
   if (!gpc_reg_operand (dest, mode) && !gpc_reg_operand (src, mode))
     return false;
 
-  return true;
+  if (!reg_addr[mode].large_address_p || can_create_pseudo_p ())
+    return true;
+
+  if (MEM_P (dest))
+    return !large_address_valid (XEXP (dest, 0), mode);
+  else if (MEM_P (src))
+    return !large_address_valid (XEXP (src, 0), mode);
+  else
+    return true;
 }
 
 /* Return true if either operand is a general purpose register.  */
@@ -9642,6 +9660,12 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
       if (reg_addr[mode].fused_toc && GET_CODE (x) == UNSPEC
 	  && XINT (x, 1) == UNSPEC_FUSION_ADDIS)
 	return 1;
+
+      /* We allow large addresses before register allocation for normal memory.
+	 After register allocation, they should be using the special insns that
+	 can allocate a scratch register.  */
+      if (reg_addr[mode].large_address_p && large_address_valid (x, mode))
+	return !reg_ok_strict;
     }
 
   /* For TImode, if we have TImode in VSX registers, only allow register
@@ -10385,6 +10409,39 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
   if ((mode == SImode || mode == SFmode) && SUBREG_P (source)
       && rs6000_emit_move_si_sf_subreg (dest, source, mode))
     return;
+
+  /* See if we need to special case large addresses.  We can only do this
+     before register allocation, because the large address support might need
+     temporary scratch registers.  */
+  if (reg_addr[mode].large_address_p && can_create_pseudo_p ())
+    {
+      rtx pat;
+
+      if (MEM_P (dest) && large_address_valid (XEXP (dest, 0), mode)
+	  && reg_addr[mode].large_addr_store != CODE_FOR_nothing)
+	{
+	  if (!gpc_reg_operand (source, mode))
+	    operands[1] = source = force_reg (mode, source);
+
+	  pat = GEN_FCN (reg_addr[mode].large_addr_store) (dest, source);
+	  if (pat)
+	    {
+	      emit_insn (pat);
+	      return;
+	    }
+	}
+
+      else if (MEM_P (source) && large_address_valid (XEXP (source, 0), mode)
+	       && reg_addr[mode].large_addr_load != CODE_FOR_nothing)
+	{
+	  rtx pat = GEN_FCN (reg_addr[mode].large_addr_load) (dest, source);
+	  if (pat)
+	    {
+	      emit_insn (pat);
+	      return;
+	    }
+	}
+    }
 
   /* Check if GCC is setting up a block move that will end up using FP
      registers as temporaries.  We must make sure this is acceptable.  */
@@ -21183,6 +21240,8 @@ print_operand (FILE *file, rtx x, int code)
 {
   int i;
   unsigned HOST_WIDE_INT uval;
+  HOST_WIDE_INT val;
+  rtx addr;
 
   switch (code)
     {
@@ -21350,6 +21409,60 @@ print_operand (FILE *file, rtx x, int code)
 		     reg_names[SMALL_DATA_REG]);
 	}
       return;
+
+    case 'M':
+      /* Print the upper part of a large address formed with ADDIS and
+	 12/14/16-bit memory offset in a d-form instruction.  Include the
+	 register or R0 depending on the address.  */
+      gcc_assert (large_mem_operand (x, GET_MODE (x)));
+      addr = XEXP (x, 0);
+      if (CONST_INT_P (addr))
+	{
+	  val = split_large_integer (INTVAL (addr), true);
+	  fprintf (file, "%s," HOST_WIDE_INT_PRINT_HEX,
+		   reg_names[FIRST_GPR_REGNO],
+		   (val >> 16) & 0xffff);
+	}
+      else if (GET_CODE (addr) == PLUS
+	       && REG_P (XEXP (addr, 0))
+	       && CONST_INT_P (XEXP (addr, 1)))
+	{
+	  val = split_large_integer (INTVAL (XEXP (addr, 1)), true);
+	  fprintf (file, "%s," HOST_WIDE_INT_PRINT_HEX,
+		   reg_names[REGNO (XEXP (addr, 0))],
+		   (val >> 16) & 0xffff);
+	}
+      else
+	gcc_unreachable ();
+      return;
+
+    case 'm':
+      /* Print the lower part of a large address formed with ADDIS and
+	 12/14/16-bit memory offset in a d-form instruction.  */
+      gcc_assert (large_mem_operand (x, GET_MODE (x)));
+      addr = XEXP (x, 0);
+      if (CONST_INT_P (addr))
+	{
+	  val = split_large_integer (INTVAL (addr), false);
+	  if (val < 0)
+	    fprintf (file, HOST_WIDE_INT_PRINT_DEC, val);
+	  else
+	    fprintf (file, HOST_WIDE_INT_PRINT_HEX, val & 0xffff);
+	}
+      else if (GET_CODE (addr) == PLUS
+	       && REG_P (XEXP (addr, 0))
+	       && CONST_INT_P (XEXP (addr, 1)))
+	{
+	  val = split_large_integer (INTVAL (XEXP (addr, 1)), false);
+	  if (val < 0)
+	    fprintf (file, HOST_WIDE_INT_PRINT_DEC, val);
+	  else
+	    fprintf (file, HOST_WIDE_INT_PRINT_HEX, val & 0xffff);
+	}
+      else
+	gcc_unreachable ();
+      return;
+
 
     case 'N': /* Unused */
       /* Write the number of elements in the vector times 4.  */
