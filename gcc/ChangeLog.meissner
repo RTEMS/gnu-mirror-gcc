@@ -2,6 +2,7 @@
 
 	* config/rs6000/rs6000.c (rs6000_emit_move): Move large address
 	test after we've eliminated memory to memory moves.
+	(split_large_address): Add a gcc_unreachable call.
 
 2018-03-28  Michael Meissner  <meissner@linux.vnet.ibm.com>
 

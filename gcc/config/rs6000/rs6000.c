@@ -39411,6 +39411,8 @@ split_large_address (rtx addr, rtx tmp_reg)
 			     GEN_INT (split_large_integer (value, true)));
 	  lo = GEN_INT (split_large_integer (value, false));
 	}
+      else
+	gcc_unreachable ();
     }
   else
     gcc_unreachable ();
