@@ -10410,39 +10410,6 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       && rs6000_emit_move_si_sf_subreg (dest, source, mode))
     return;
 
-  /* See if we need to special case large addresses.  We can only do this
-     before register allocation, because the large address support might need
-     temporary scratch registers.  */
-  if (reg_addr[mode].large_address_p && can_create_pseudo_p ())
-    {
-      rtx pat;
-
-      if (MEM_P (dest) && large_address_valid (XEXP (dest, 0), mode)
-	  && reg_addr[mode].large_addr_store != CODE_FOR_nothing)
-	{
-	  if (!gpc_reg_operand (source, mode))
-	    operands[1] = source = force_reg (mode, source);
-
-	  pat = GEN_FCN (reg_addr[mode].large_addr_store) (dest, source);
-	  if (pat)
-	    {
-	      emit_insn (pat);
-	      return;
-	    }
-	}
-
-      else if (MEM_P (source) && large_address_valid (XEXP (source, 0), mode)
-	       && reg_addr[mode].large_addr_load != CODE_FOR_nothing)
-	{
-	  rtx pat = GEN_FCN (reg_addr[mode].large_addr_load) (dest, source);
-	  if (pat)
-	    {
-	      emit_insn (pat);
-	      return;
-	    }
-	}
-    }
-
   /* Check if GCC is setting up a block move that will end up using FP
      registers as temporaries.  We must make sure this is acceptable.  */
   if (GET_CODE (operands[0]) == MEM
@@ -10621,6 +10588,44 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       else
 	gcc_unreachable();
       return;
+    }
+
+  /* See if we need to special case large addresses.  We can only do this
+     before register allocation, because the large address support might need
+     temporary scratch registers.  */
+  if (reg_addr[mode].large_address_p && can_create_pseudo_p ())
+    {
+      if (MEM_P (operands[0]))
+	{
+	  enum insn_code icode = reg_addr[mode].large_addr_store;
+
+	  if (icode != CODE_FOR_nothing
+	      && large_address_valid (XEXP (operands[0], 0), mode))
+	    {
+	      rtx pat = GEN_FCN (icode) (operands[0], operands[1]);
+	      if (pat)
+		{
+		  emit_insn (pat);
+		  return;
+		}
+	    }
+	}
+
+      else if (MEM_P (source))
+	{
+	  enum insn_code icode = reg_addr[mode].large_addr_load;
+
+	  if (icode != CODE_FOR_nothing
+	      && large_address_valid (XEXP (operands[1], 0), mode))
+	    {
+	      rtx pat = GEN_FCN (icode) (operands[0], operands[1]);
+	      if (pat)
+		{
+		  emit_insn (pat);
+		  return;
+		}
+	    }
+	}
     }
 
   /* FIXME:  In the long term, this switch statement should go away
