@@ -25525,7 +25525,7 @@ create_TOC_reference (rtx symbol, rtx largetoc_reg)
 
   tocreg = gen_rtx_REG (Pmode, TOC_REGISTER);
   tocrel = gen_rtx_UNSPEC (Pmode, gen_rtvec (2, symbol, tocreg), UNSPEC_TOCREL);
-  if (TARGET_CMODEL == CMODEL_SMALL || can_create_pseudo_p ())
+  if (TARGET_CMODEL == CMODEL_SMALL || (can_create_pseudo_p () && !TARGET_TOC_BREAKOUT))
     return tocrel;
 
   hi = gen_rtx_HIGH (Pmode, copy_rtx (tocrel));
