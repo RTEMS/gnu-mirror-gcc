@@ -25525,7 +25525,7 @@ create_TOC_reference (rtx symbol, rtx largetoc_reg)
 
   tocreg = gen_rtx_REG (Pmode, TOC_REGISTER);
   tocrel = gen_rtx_UNSPEC (Pmode, gen_rtvec (2, symbol, tocreg), UNSPEC_TOCREL);
-  if (TARGET_CMODEL == CMODEL_SMALL || (can_create_pseudo_p () && !TARGET_TOC_BREAKOUT))
+  if (TARGET_CMODEL == CMODEL_SMALL || can_create_pseudo_p ())
     return tocrel;
 
   hi = gen_rtx_HIGH (Pmode, copy_rtx (tocrel));
@@ -39733,6 +39733,59 @@ rs6000_starting_frame_offset (void)
     return 0;
   return RS6000_STARTING_FRAME_OFFSET;
 }
+
+/* Split TOC memory for -mtoc-breakout.
+
+   Normally we generate a separate TOC reference for each memory reference.
+   Register allocation then splits this into ADDIS and the memory operation.
+   This can result in a number of extra ADDIS's if there are multiple
+   references to different static variables or constant pool entries.
+
+   I.e. before register allocation:
+	(set (reg r1) (mem (plus (unspec [] UNSPEC_TOCREL) (const_int 16))))
+	(set (reg r2) (mem (plus (unspec [] UNSPEC_TOCREL) (const_int 24))))
+
+   Register allocation would generate:
+	(set (reg t1) (high (plus (unspec [] UNSPEC_TOCREL) (const_int 16))))
+	(set (reg r1) (mem (lo_sum (reg t1),
+				   (unspec [] UNSPEC_TOCREL) (const_int 16))))
+	(set (reg t2) (high (plus (unspec [] UNSPEC_TOCREL) (const_int 24))))
+	(set (reg r2) (mem (lo_sum (reg t2),
+				   (unspec [] UNSPEC_TOCREL) (const_int 24))))
+
+  Instead, move the TOC base pointer to a GPR and use it as a base register.
+  Then add a peephole2 to convert a single ADDIS/ADDI + memory back into
+  ADDIS + memory.
+
+	(set (reg t1) (unspec [] UNSPEC_TOCREL))
+	(set (reg r1) (mem (plus (reg t1 (const_int 16))))
+	(set (reg r2) (mem (plus (reg t2 (const_int 24))))  */
+
+void
+split_toc_memory (rtx dest, rtx src)
+{
+  rtx mem = MEM_P (dest) ? dest : src;
+  rtx tmp = gen_reg_rtx (Pmode);
+  rtx addr = XEXP (mem, 0);
+  const_rtx tocrel_base, tocrel_offset;
+  rtx new_addr, new_mem, base, offset;
+
+  if (!toc_relative_expr_p (addr, false, &tocrel_base, &tocrel_offset))
+    gcc_unreachable ();
+
+  offset = const_cast<rtx> (tocrel_offset);
+  base = const_cast<rtx> (tocrel_base);
+  new_addr = (offset != const0_rtx) ? gen_rtx_PLUS (DImode, tmp, offset) : tmp;
+  new_mem = change_address (mem, GET_MODE (mem), new_addr);
+
+  emit_insn (gen_rtx_SET (tmp, base));
+
+  if (MEM_P (dest))
+    emit_insn (gen_rtx_SET (new_mem, src));
+  else
+    emit_insn (gen_rtx_SET (dest, new_mem));
+}
+
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

@@ -223,6 +223,7 @@ extern void rs6000_asm_output_dwarf_pcrel (FILE *file, int size,
 					   const char *label);
 extern void rs6000_asm_output_dwarf_datarel (FILE *file, int size,
 					     const char *label);
+extern void split_toc_memory (rtx, rtx);
 
 /* Declare functions in rs6000-c.c */
 
