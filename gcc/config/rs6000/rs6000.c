@@ -21330,8 +21330,6 @@ print_operand_large_address_lower (FILE *file, rtx x)
       offset = INTVAL (op1);
       if (REG_P (op0))
 	{
-	  fprintf (file, "%s,", reg_names[REGNO (op0)]);
-
 	  lower = split_large_integer (offset, false);
 	  if (lower < 0)
 	    fprintf (file, HOST_WIDE_INT_PRINT_DEC, lower);
