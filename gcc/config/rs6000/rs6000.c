@@ -21311,7 +21311,8 @@ print_toc_lower (FILE *file, rtx unspec, HOST_WIDE_INT offset)
 }
 
 /* Print the lower part of a large address formed with ADDIS and 12/14/16-bit
-   memory offset in a d-form instruction (print_operand %m handling).  */
+   memory offset in a d-form instruction (print_operand %m handling).  Unlike
+   %M processing, we do not print the index register.  */
 
 static void
 print_operand_large_address_lower (FILE *file, rtx x)
