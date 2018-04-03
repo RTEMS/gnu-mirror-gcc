@@ -104,6 +104,8 @@ extern void expand_fusion_p9_store (rtx *);
 extern const char *emit_fusion_p9_load (rtx, rtx, rtx);
 extern const char *emit_fusion_p9_store (rtx, rtx, rtx);
 extern rtx fusion_wrap_memory_address (rtx);
+extern bool emit_large_address_load (rtx, rtx, machine_mode);
+extern bool emit_large_address_store (rtx, rtx, machine_mode);
 extern bool large_address_valid (rtx, machine_mode);
 extern rtx split_large_address (rtx, rtx);
 extern enum reg_class (*rs6000_preferred_reload_class_ptr) (rtx,
@@ -223,7 +225,6 @@ extern void rs6000_asm_output_dwarf_pcrel (FILE *file, int size,
 					   const char *label);
 extern void rs6000_asm_output_dwarf_datarel (FILE *file, int size,
 					     const char *label);
-extern void split_toc_memory (rtx, rtx);
 
 /* Declare functions in rs6000-c.c */
 

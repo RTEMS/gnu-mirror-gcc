@@ -7913,8 +7913,10 @@ move_valid_p (rtx dest, rtx src, machine_mode mode)
 
   if (MEM_P (dest))
     return !large_address_valid (XEXP (dest, 0), mode);
+
   else if (MEM_P (src))
     return !large_address_valid (XEXP (src, 0), mode);
+
   else
     return true;
 }
@@ -10595,37 +10597,17 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
      temporary scratch registers.  */
   if (reg_addr[mode].large_address_p && can_create_pseudo_p ())
     {
-      if (MEM_P (operands[0]))
-	{
-	  enum insn_code icode = reg_addr[mode].large_addr_store;
+      if (MEM_P (operands[0])
+	  && reg_addr[mode].large_addr_store != CODE_FOR_nothing
+	  && large_address_valid (XEXP (operands[0], 0), mode)
+	  && emit_large_address_store (operands[0], operands[1], mode))
+	return;
 
-	  if (icode != CODE_FOR_nothing
-	      && large_address_valid (XEXP (operands[0], 0), mode))
-	    {
-	      rtx pat = GEN_FCN (icode) (operands[0], operands[1]);
-	      if (pat)
-		{
-		  emit_insn (pat);
-		  return;
-		}
-	    }
-	}
-
-      else if (MEM_P (source))
-	{
-	  enum insn_code icode = reg_addr[mode].large_addr_load;
-
-	  if (icode != CODE_FOR_nothing
-	      && large_address_valid (XEXP (operands[1], 0), mode))
-	    {
-	      rtx pat = GEN_FCN (icode) (operands[0], operands[1]);
-	      if (pat)
-		{
-		  emit_insn (pat);
-		  return;
-		}
-	    }
-	}
+      if (MEM_P (operands[1])
+	  && reg_addr[mode].large_addr_load != CODE_FOR_nothing
+	  && large_address_valid (XEXP (operands[1], 0), mode)
+	  && emit_large_address_load (operands[0], operands[1], mode))
+	return;
     }
 
   /* FIXME:  In the long term, this switch statement should go away
@@ -21230,6 +21212,149 @@ rs6000_output_function_entry (FILE *file, const char *fname)
   RS6000_OUTPUT_BASENAME (file, fname);
 }
 
+/* Print the upper part of a TOC reference.  */
+
+static void
+print_toc_upper (FILE *file, rtx unspec, HOST_WIDE_INT offset)
+{
+  rtx sym_ref = XVECEXP (unspec, 0, 0);		/* SYMBOL_REF.  */
+  rtx toc_reg = XVECEXP (unspec, 0, 1);		/* TOC register.  */
+
+  if (TARGET_ELF)
+    {
+      fprintf (file, "%s,", reg_names[REGNO (toc_reg)]);
+      output_addr_const (file, sym_ref);
+      if (offset)
+	fprintf (file, "%s" HOST_WIDE_INT_PRINT_DEC,
+		 offset < 0 ? "" : "+",
+		 offset);
+
+      fputs ("@toc@ha", file);
+    }
+
+  else if (TARGET_XCOFF)
+    {
+      output_addr_const (file, sym_ref);
+      if (offset)
+	fprintf (file, "%s" HOST_WIDE_INT_PRINT_DEC,
+		 offset < 0 ? "" : "+",
+		 offset);
+
+      fprintf (file, "@u(%s)", reg_names[REGNO (toc_reg)]);
+    }
+
+  else
+    gcc_unreachable ();
+
+  return;
+}
+
+/* Print the upper part of a large address formed with ADDIS and 12/14/16-bit
+   memory offset in a d-form instruction (print_operand %M handling).  Include
+   the register or R0 depending on the address.  */
+
+static void
+print_operand_large_address_upper (FILE *file, rtx x)
+{
+  rtx addr;
+  HOST_WIDE_INT offset, upper;
+
+  gcc_assert (large_mem_operand (x, GET_MODE (x)));
+  addr = XEXP (x, 0);
+
+  if (GET_CODE (addr) == PLUS && CONST_INT_P (XEXP (addr, 1)))
+    {
+      rtx op0 = XEXP (addr, 0);
+      rtx op1 = XEXP (addr, 1);
+
+      offset = INTVAL (op1);
+      if (REG_P (op0))
+	{
+	  upper = split_large_integer (offset, true);
+	  fprintf (file, "%s," HOST_WIDE_INT_PRINT_HEX,
+		   reg_names[REGNO (op0)], (upper >> 16) & 0xffff);
+	}
+
+      else if (GET_CODE (op0) == UNSPEC && XINT (op0, 1) == UNSPEC_TOCREL)
+	print_toc_upper (file, op0, offset);
+
+      else
+	fatal_insn ("bad address for %%M", addr);
+    }
+
+  else if (GET_CODE (addr) == UNSPEC && XINT (addr, 1) == UNSPEC_TOCREL)
+    print_toc_upper (file, addr, 0);
+
+  else
+    fatal_insn ("bad memory for %%M", x);
+
+  return;
+}
+
+/* Print the low part of a TOC symbol reference.  */
+
+static void
+print_toc_lower (FILE *file, rtx unspec, HOST_WIDE_INT offset)
+{
+  /* Print out the symbol ref.  */
+  output_addr_const (file, XVECEXP (unspec, 0, 0));
+
+  if (offset)
+    fprintf (file, "%s" HOST_WIDE_INT_PRINT_DEC, offset < 0 ? "" : "+", offset);
+
+  if (TARGET_ELF)
+    fputs ("@toc@l", file);
+  else if (TARGET_XCOFF)
+    fputs ("@l", file);
+  else
+    gcc_unreachable ();
+}
+
+/* Print the lower part of a large address formed with ADDIS and 12/14/16-bit
+   memory offset in a d-form instruction (print_operand %m handling).  */
+
+static void
+print_operand_large_address_lower (FILE *file, rtx x)
+{
+  rtx addr;
+  HOST_WIDE_INT offset, lower;
+
+  gcc_assert (large_mem_operand (x, GET_MODE (x)));
+  addr = XEXP (x, 0);
+
+  if (GET_CODE (addr) == PLUS && CONST_INT_P (XEXP (addr, 1)))
+    {
+      rtx op0 = XEXP (addr, 0);
+      rtx op1 = XEXP (addr, 1);
+
+      offset = INTVAL (op1);
+      if (REG_P (op0))
+	{
+	  fprintf (file, "%s,", reg_names[REGNO (op0)]);
+
+	  lower = split_large_integer (offset, false);
+	  if (lower < 0)
+	    fprintf (file, HOST_WIDE_INT_PRINT_DEC, lower);
+	  else
+	    fprintf (file, HOST_WIDE_INT_PRINT_HEX, lower & 0xffff);
+	}
+
+      else if (GET_CODE (op0) == UNSPEC && XINT (op0, 1) == UNSPEC_TOCREL)
+	print_toc_lower (file, op0, offset);
+
+      else
+	fatal_insn ("bad address for %%m", addr);
+    }
+
+  else if (GET_CODE (addr) == UNSPEC && XINT (addr, 1) == UNSPEC_TOCREL)
+    print_toc_lower (file, addr, 0);
+
+  else
+    fatal_insn ("bad memory for %%m", x);
+
+  return;
+}
+
 /* Print an operand.  Recognize special options, documented below.  */
 
 #if TARGET_ELF
@@ -21245,8 +21370,6 @@ print_operand (FILE *file, rtx x, int code)
 {
   int i;
   unsigned HOST_WIDE_INT uval;
-  HOST_WIDE_INT val;
-  rtx addr;
 
   switch (code)
     {
@@ -21419,55 +21542,14 @@ print_operand (FILE *file, rtx x, int code)
       /* Print the upper part of a large address formed with ADDIS and
 	 12/14/16-bit memory offset in a d-form instruction.  Include the
 	 register or R0 depending on the address.  */
-      gcc_assert (large_mem_operand (x, GET_MODE (x)));
-      addr = XEXP (x, 0);
-      if (CONST_INT_P (addr))
-	{
-	  val = split_large_integer (INTVAL (addr), true);
-	  fprintf (file, "%s," HOST_WIDE_INT_PRINT_HEX,
-		   reg_names[FIRST_GPR_REGNO],
-		   (val >> 16) & 0xffff);
-	}
-      else if (GET_CODE (addr) == PLUS
-	       && REG_P (XEXP (addr, 0))
-	       && CONST_INT_P (XEXP (addr, 1)))
-	{
-	  val = split_large_integer (INTVAL (XEXP (addr, 1)), true);
-	  fprintf (file, "%s," HOST_WIDE_INT_PRINT_HEX,
-		   reg_names[REGNO (XEXP (addr, 0))],
-		   (val >> 16) & 0xffff);
-	}
-      else
-	gcc_unreachable ();
+      print_operand_large_address_upper (file, x);
       return;
 
     case 'm':
       /* Print the lower part of a large address formed with ADDIS and
 	 12/14/16-bit memory offset in a d-form instruction.  */
-      gcc_assert (large_mem_operand (x, GET_MODE (x)));
-      addr = XEXP (x, 0);
-      if (CONST_INT_P (addr))
-	{
-	  val = split_large_integer (INTVAL (addr), false);
-	  if (val < 0)
-	    fprintf (file, HOST_WIDE_INT_PRINT_DEC, val);
-	  else
-	    fprintf (file, HOST_WIDE_INT_PRINT_HEX, val & 0xffff);
-	}
-      else if (GET_CODE (addr) == PLUS
-	       && REG_P (XEXP (addr, 0))
-	       && CONST_INT_P (XEXP (addr, 1)))
-	{
-	  val = split_large_integer (INTVAL (XEXP (addr, 1)), false);
-	  if (val < 0)
-	    fprintf (file, HOST_WIDE_INT_PRINT_DEC, val);
-	  else
-	    fprintf (file, HOST_WIDE_INT_PRINT_HEX, val & 0xffff);
-	}
-      else
-	gcc_unreachable ();
+      print_operand_large_address_lower (file, x);
       return;
-
 
     case 'N': /* Unused */
       /* Write the number of elements in the vector times 4.  */
@@ -39346,7 +39428,120 @@ emit_fusion_p9_store (rtx mem, rtx reg, rtx tmp_reg)
 }
 
 
+/* Split TOC memory for -mtoc-breakout.
+
+   Normally we generate a separate TOC reference for each memory reference.
+   Register allocation then splits this into ADDIS and the memory operation.
+   This can result in a number of extra ADDIS's if there are multiple
+   references to different static variables or constant pool entries.
+
+   I.e. before register allocation:
+	(set (reg r1) (mem (plus (unspec [] UNSPEC_TOCREL) (const_int 16))))
+	(set (reg r2) (mem (plus (unspec [] UNSPEC_TOCREL) (const_int 24))))
+
+   Register allocation would generate:
+	(set (reg t1) (high (plus (unspec [] UNSPEC_TOCREL) (const_int 16))))
+	(set (reg r1) (mem (lo_sum (reg t1),
+				   (unspec [] UNSPEC_TOCREL) (const_int 16))))
+	(set (reg t2) (high (plus (unspec [] UNSPEC_TOCREL) (const_int 24))))
+	(set (reg r2) (mem (lo_sum (reg t2),
+				   (unspec [] UNSPEC_TOCREL) (const_int 24))))
+
+  Instead, move the TOC base pointer to a GPR and use it as a base register.
+  Then add a peephole2 to convert a single ADDIS/ADDI + memory back into
+  ADDIS + memory.
+
+	(set (reg t1) (unspec [] UNSPEC_TOCREL))
+	(set (reg r1) (mem (plus (reg t1 (const_int 16))))
+	(set (reg r2) (mem (plus (reg t2 (const_int 24))))  */
+
+static void
+split_toc_memory (rtx dest, rtx src)
+{
+  bool store_p = MEM_P (dest);
+  rtx mem = store_p ? dest : src;
+  rtx tmp = gen_reg_rtx (Pmode);
+  rtx addr = XEXP (mem, 0);
+  const_rtx tocrel_base, tocrel_offset;
+  rtx new_addr, new_mem, base, offset;
+
+  if (!toc_relative_expr_p (addr, false, &tocrel_base, &tocrel_offset))
+    gcc_unreachable ();
+
+  offset = CONST_CAST_RTX (tocrel_offset);
+  base = CONST_CAST_RTX (tocrel_base);
+  new_addr = (offset != const0_rtx) ? gen_rtx_PLUS (DImode, tmp, offset) : tmp;
+  new_mem = change_address (mem, GET_MODE (mem), new_addr);
+
+  emit_insn (gen_rtx_SET (tmp, base));
+
+  if (store_p)
+    emit_insn (gen_rtx_SET (new_mem, src));
+  else
+    emit_insn (gen_rtx_SET (dest, new_mem));
+}
+
+
 /* Large address support.  */
+
+/* Emit an insn to load a register from a large address.  Return TRUE if it was
+   successful.  */
+
+bool
+emit_large_address_load (rtx dest, rtx src, machine_mode mode)
+{
+  enum insn_code icode = reg_addr[mode].large_addr_load;
+
+  gcc_assert (MEM_P (src));
+  if (TARGET_TOC_BREAKOUT && small_toc_ref (XEXP (src, 0), mode))
+    {
+      split_toc_memory (dest, src);
+      return true;
+    }
+
+  if (icode != CODE_FOR_nothing && large_address_valid (XEXP (src, 0), mode))
+    {
+      rtx pat = GEN_FCN (icode) (dest, src);
+      if (pat)
+	{
+	  rtx insn = emit_insn (pat);
+	  add_reg_note (insn, REG_EQUAL, copy_rtx (src));
+	  return true;
+	}
+    }
+
+  return false;
+}
+
+/* Emit an insn to store a register to a large address.  Return TRUE if it was
+   successful.  */
+
+bool
+emit_large_address_store (rtx dest, rtx src, machine_mode mode)
+{
+  enum insn_code icode = reg_addr[mode].large_addr_store;
+
+  gcc_assert (MEM_P (dest));
+
+  if (TARGET_TOC_BREAKOUT && small_toc_ref (XEXP (dest, 0), mode))
+    {
+      split_toc_memory (dest, src);
+      return true;
+    }
+
+  if (icode != CODE_FOR_nothing && large_address_valid (XEXP (dest, 0), mode))
+    {
+      rtx pat = GEN_FCN (icode) (dest, src);
+      if (pat)
+	{
+	  emit_insn (pat);
+	  return true;
+	}
+    }
+
+  return false;
+}
+
 /* Return if an address is a valid large address.  */
 
 bool
@@ -39355,22 +39550,26 @@ large_address_valid (rtx addr, machine_mode mode)
   if (!reg_addr[mode].large_address_p)
     return false;
 
-  if (GET_CODE (addr) == PLUS)
+  if (GET_CODE (addr) == PLUS && CONST_INT_P (XEXP (addr, 1)))
     {
-      if (!base_reg_operand (XEXP (addr, 0), Pmode))
+      rtx op0 = XEXP (addr, 0);
+      rtx op1 = XEXP (addr, 1);
+
+      if (GET_CODE (op0) == UNSPEC
+	  && XINT (op0, 1) == UNSPEC_TOCREL
+	  && CONST_INT_P (op1)
+	  && int_is_32bit (UINTVAL (op1)))
+	return true;
+
+      if (!base_reg_operand (op0, Pmode))
 	return false;
 
-      addr = XEXP (addr, 1);
-    }
-
-  if (CONST_INT_P (addr))
-    {
-      if (satisfies_constraint_I (addr))	/* bottom 16 bits.  */
+      if (satisfies_constraint_I (op1))		/* bottom 16 bits.  */
 	return false;
-      if (satisfies_constraint_L (addr))	/* 16 bits out of 32 bits.  */
+      if (satisfies_constraint_L (op1))		/* 16 bits out of 32 bits.  */
 	return false;
 
-      unsigned HOST_WIDE_INT value = UINTVAL (addr);
+      unsigned HOST_WIDE_INT value = UINTVAL (op1);
 
       /* For 64-bit addresses and for SFmode, limit any integer to DS-form addresses.  */
       if ((value & 3) != 0 && (GET_MODE_SIZE (mode) == 8 || mode == SFmode))
@@ -39378,6 +39577,9 @@ large_address_valid (rtx addr, machine_mode mode)
 
       return int_is_32bit (value);
     }
+
+  else if (GET_CODE (addr) == UNSPEC && XINT (addr, 1) == UNSPEC_TOCREL)
+    return true;
 
   return false;
 }
@@ -39393,24 +39595,35 @@ split_large_address (rtx addr, rtx tmp_reg)
   rtx hi, lo;
   enum rtx_code rcode = PLUS;
 
-  if (CONST_INT_P (addr))
+  if (GET_CODE (addr) == UNSPEC && XINT (addr, 1) == UNSPEC_TOCREL)
     {
-      value = INTVAL (addr);
-      hi = GEN_INT (split_large_integer (value, true));
-      lo = GEN_INT (split_large_integer (value, false));
+      hi = gen_rtx_HIGH (Pmode, addr);
+      lo = addr;
+      rcode = LO_SUM;
     }
+
   else if (GET_CODE (addr) == PLUS)
     {
       rtx op0 = XEXP (addr, 0);
       rtx op1 = XEXP (addr, 1);
 
-      if ((REG_P (op0) || SUBREG_P (op0)) && CONST_INT_P (op1))
+      gcc_assert (CONST_INT_P (op1) && int_is_32bit (UINTVAL (op1)));
+
+      if (REG_P (op0))
 	{
 	  value = INTVAL (op1);
 	  hi = gen_rtx_PLUS (Pmode, op0,
 			     GEN_INT (split_large_integer (value, true)));
 	  lo = GEN_INT (split_large_integer (value, false));
 	}
+
+      else if (GET_CODE (op0) == UNSPEC && XINT (op0, 1) == UNSPEC_TOCREL)
+	{
+	  hi = gen_rtx_HIGH (Pmode, addr);
+	  lo = addr;
+	  rcode = LO_SUM;
+	}
+
       else
 	gcc_unreachable ();
     }
@@ -39733,59 +39946,6 @@ rs6000_starting_frame_offset (void)
     return 0;
   return RS6000_STARTING_FRAME_OFFSET;
 }
-
-/* Split TOC memory for -mtoc-breakout.
-
-   Normally we generate a separate TOC reference for each memory reference.
-   Register allocation then splits this into ADDIS and the memory operation.
-   This can result in a number of extra ADDIS's if there are multiple
-   references to different static variables or constant pool entries.
-
-   I.e. before register allocation:
-	(set (reg r1) (mem (plus (unspec [] UNSPEC_TOCREL) (const_int 16))))
-	(set (reg r2) (mem (plus (unspec [] UNSPEC_TOCREL) (const_int 24))))
-
-   Register allocation would generate:
-	(set (reg t1) (high (plus (unspec [] UNSPEC_TOCREL) (const_int 16))))
-	(set (reg r1) (mem (lo_sum (reg t1),
-				   (unspec [] UNSPEC_TOCREL) (const_int 16))))
-	(set (reg t2) (high (plus (unspec [] UNSPEC_TOCREL) (const_int 24))))
-	(set (reg r2) (mem (lo_sum (reg t2),
-				   (unspec [] UNSPEC_TOCREL) (const_int 24))))
-
-  Instead, move the TOC base pointer to a GPR and use it as a base register.
-  Then add a peephole2 to convert a single ADDIS/ADDI + memory back into
-  ADDIS + memory.
-
-	(set (reg t1) (unspec [] UNSPEC_TOCREL))
-	(set (reg r1) (mem (plus (reg t1 (const_int 16))))
-	(set (reg r2) (mem (plus (reg t2 (const_int 24))))  */
-
-void
-split_toc_memory (rtx dest, rtx src)
-{
-  rtx mem = MEM_P (dest) ? dest : src;
-  rtx tmp = gen_reg_rtx (Pmode);
-  rtx addr = XEXP (mem, 0);
-  const_rtx tocrel_base, tocrel_offset;
-  rtx new_addr, new_mem, base, offset;
-
-  if (!toc_relative_expr_p (addr, false, &tocrel_base, &tocrel_offset))
-    gcc_unreachable ();
-
-  offset = const_cast<rtx> (tocrel_offset);
-  base = const_cast<rtx> (tocrel_base);
-  new_addr = (offset != const0_rtx) ? gen_rtx_PLUS (DImode, tmp, offset) : tmp;
-  new_mem = change_address (mem, GET_MODE (mem), new_addr);
-
-  emit_insn (gen_rtx_SET (tmp, base));
-
-  if (MEM_P (dest))
-    emit_insn (gen_rtx_SET (new_mem, src));
-  else
-    emit_insn (gen_rtx_SET (dest, new_mem));
-}
-
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

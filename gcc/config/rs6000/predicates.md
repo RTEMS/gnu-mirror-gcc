@@ -1956,10 +1956,3 @@
 {
   return large_address_valid (XEXP (op, 0), mode);
 })
-
-;; Match a memory operand address that is a TOC reference
-(define_predicate "toc_mem_operand"
-  (match_code "mem")
-{
-  return small_toc_ref (XEXP (op, 0), Pmode);
-})

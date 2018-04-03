@@ -1,3 +1,31 @@
+2018-04-03  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/predicates.md (toc_mem_operand): Delete.
+	* config/rs6000/rs6000-protos.h (emit_large_address_load): New
+	declaration.
+	(emit_large_address_store): Likewise.
+	(split_toc_memory): Delete.
+	* config/rs6000/rs6000.c (rs6000_emit_move): Call
+	emit_large_address_{load,store} to rewrite large addresses.
+	(print_toc_upper): Move print_operand %M, %m code to separate
+	functions.  Add support for TOC addresses.  Drop support for
+	constant int memory addresses.
+	(print_operand_large_address_upper): Likewise.
+	(print_toc_lower ): Likewise.
+	(print_operand_large_address_lower): Likewise.
+	(print_operand): Likewise.
+	(split_toc_memory): Make static, call it from the large address
+	load/store  functions.
+	(emit_large_address_load): New functions to emit the appropriate
+	pattern for loads and stores with large addresses.
+	(emit_large_address_store): Likewise.
+	(large_address_valid): Don't allow constant int addresses.  Do
+	allow TOC references.
+	(split_large_address): Likewise.
+	* config/rs6000/rs6000.md (large address splitters): Rework TOC
+	breakout splitters to do both large address and toc breakout
+	splitters.
+
 2018-04-02  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/predicates.md (toc_mem_operand): New predicate.
