@@ -271,7 +271,7 @@ t2s (machine_mode type) {
     return ptr_flag? "bi_mode *": "bi_mode";
 
   case E_QImode:
-    return ptr_flag? "char *": "char";
+    return ptr_flag? "signed char *": "signed char";
 
   case E_HImode:
     return ptr_flag? "short *": "short";
@@ -358,13 +358,13 @@ t2s (machine_mode type) {
     return ptr_flag? "tf_mode *": "tf_mode";
 
   case E_SDmode:
-    return ptr_flag? "sd_mode *": "sd_mode";
+    return ptr_flag? "_Decimal32 *": "_Decimal32";
 
   case E_DDmode:
-    return ptr_flag? "dd_mode *": "dd_mode";
+    return ptr_flag? "_Decimal64 *": "_Decimal64";
 
   case E_TDmode:
-    return ptr_flag? "td_mode *": "td_mode";
+    return ptr_flag? "_Decimal128 *": "_Decimal128";
 
   case E_CQImode:
     return ptr_flag? "cqi_mode *": "cqi_mode";
@@ -400,7 +400,7 @@ t2s (machine_mode type) {
     return ptr_flag? "v2si_mode *": "v2si_mode";
 
   case E_V16QImode:
-    return ptr_flag? "vector char *": "vector char";
+    return ptr_flag? "vector signed char *": "vector signed char";
 
   case E_V8HImode:
     return ptr_flag? "vector short *": "vector short";
@@ -470,10 +470,6 @@ dump_special_table (const char *title,
 {
   machine_mode tmode, mode0, mode1, mode2;
 
-  /* The first entry in the special table is a sentinel value */
-  num_entries--;
-  bidp++;
-
   fprintf (stderr, "%s [%d]\n", title, num_entries);
   while (num_entries--) {
     unsigned attributes = get_type (bidp->code)->attr;
@@ -494,7 +490,7 @@ dump_special_table (const char *title,
 	switch (bidp->code) {
 
 	  /* Ignore cases associated with RS6000_BTM_PAIRED.  We won't
-	   * documenet these as they are scheduled for deprecation.
+	   * document these as they are scheduled for deprecation.
 	   *
 	   *  case PAIRED_BUILTIN_LX:
 	   *    paired_init_builtins: v2sf_ftype_long_pcfloat
@@ -1377,68 +1373,74 @@ dump_special_table (const char *title,
 	  num_operands = 2;
 	  break;
 
-
 	case ALTIVEC_BUILTIN_ST_INTERNAL_16qi:
 	  /* See rs6000.c: altivec_expand_st_builtin */
 	  insn_data_entry = &insn_data[CODE_FOR_vector_altivec_store_v16qi];
-	  operand_modes[0] = insn_data_entry->operand[0].mode;
-	  operand_modes[1] = insn_data_entry->operand[1].mode;
+	  operand_modes[0] = E_VOIDmode;
+	  operand_modes[1] = (machine_mode) ~insn_data_entry->operand[0].mode;
+	  operand_modes[2] = insn_data_entry->operand[1].mode;
 
-	  num_operands = 2;
+	  num_operands = 3;
 	  break;
 
 	case ALTIVEC_BUILTIN_ST_INTERNAL_8hi:
 	  /* See rs6000.c: altivec_expand_st_builtin */
 	  insn_data_entry = &insn_data[CODE_FOR_vector_altivec_store_v8hi];
-	  operand_modes[0] = insn_data_entry->operand[0].mode;
-	  operand_modes[1] = insn_data_entry->operand[1].mode;
+	  operand_modes[0] = E_VOIDmode;
+	  operand_modes[1] = (machine_mode) ~insn_data_entry->operand[0].mode;
+	  operand_modes[2] = insn_data_entry->operand[1].mode;
 
-	  num_operands = 2;
+	  num_operands = 3;
 	  break;
 
 	case ALTIVEC_BUILTIN_ST_INTERNAL_4si:
 	  /* See rs6000.c: altivec_expand_st_builtin */
 	  insn_data_entry = &insn_data[CODE_FOR_vector_altivec_store_v4si];
-	  operand_modes[0] = insn_data_entry->operand[0].mode;
-	  operand_modes[1] = insn_data_entry->operand[1].mode;
+	  operand_modes[0] = E_VOIDmode;
+	  operand_modes[1] = (machine_mode) ~insn_data_entry->operand[0].mode;
+	  operand_modes[2] = insn_data_entry->operand[1].mode;
 
-	  num_operands = 2;
+	  num_operands = 3;
 	  break;
 
 	case ALTIVEC_BUILTIN_ST_INTERNAL_4sf:
 	  /* See rs6000.c: altivec_expand_st_builtin */
 	  insn_data_entry = &insn_data[CODE_FOR_vector_altivec_store_v4sf];
-	  operand_modes[0] = insn_data_entry->operand[0].mode;
-	  operand_modes[1] = insn_data_entry->operand[1].mode;
+	  operand_modes[0] = E_VOIDmode;
+	  operand_modes[1] = (machine_mode) ~insn_data_entry->operand[0].mode;
+	  operand_modes[2] = insn_data_entry->operand[1].mode;
 
-	  num_operands = 2;
+	  num_operands = 3;
 	  break;
 
 	case ALTIVEC_BUILTIN_ST_INTERNAL_2df:
 	  /* See rs6000.c: altivec_expand_st_builtin */
 	  insn_data_entry = &insn_data[CODE_FOR_vector_altivec_store_v2df];
-	  operand_modes[0] = insn_data_entry->operand[0].mode;
-	  operand_modes[1] = insn_data_entry->operand[1].mode;
+	  operand_modes[0] = E_VOIDmode;
+	  operand_modes[1] = (machine_mode) ~insn_data_entry->operand[0].mode;
+	  operand_modes[2] = insn_data_entry->operand[1].mode;
 
-	  num_operands = 2;
+	  num_operands = 3;
 	  break;
 
 	case ALTIVEC_BUILTIN_ST_INTERNAL_2di:
 	  /* See rs6000.c: altivec_expand_st_builtin */
 	  insn_data_entry = &insn_data[CODE_FOR_vector_altivec_store_v2di];
-	  operand_modes[0] = insn_data_entry->operand[0].mode;
-	  operand_modes[1] = insn_data_entry->operand[1].mode;
+	  operand_modes[0] = E_VOIDmode;
+	  operand_modes[1] = (machine_mode) ~insn_data_entry->operand[0].mode;
+	  operand_modes[2] = insn_data_entry->operand[1].mode;
 
-	  num_operands = 2;
+	  num_operands = 3;
 	  break;
 
 	case ALTIVEC_BUILTIN_ST_INTERNAL_1ti:
 	  /* See rs6000.c: altivec_expand_st_builtin */
 	  insn_data_entry = &insn_data[CODE_FOR_vector_altivec_store_v1ti];
-	  operand_modes[0] = insn_data_entry->operand[0].mode;
-	  operand_modes[1] = insn_data_entry->operand[1].mode;
+	  operand_modes[0] = E_VOIDmode;
+	  operand_modes[1] = (machine_mode) ~insn_data_entry->operand[0].mode;
+	  operand_modes[2] = insn_data_entry->operand[1].mode;
 
-	  num_operands = 2;
+	  num_operands = 3;
 	  break;
 
 	default:
@@ -1506,7 +1508,7 @@ dump_special_table (const char *title,
 
 	default:
 	  fprintf (stderr,
-		   "void %s (void: bad_no_args_for_special_builtin): ",
+		   "void %s (void bad_no_args_for_special_builtin): ",
 		   bidp->name);
 	  break;
 
@@ -1517,6 +1519,11 @@ dump_special_table (const char *title,
       }
     bidp++;
   }
+  /* An extra bit of hackery.  */
+  fprintf (stderr, "void ad_hoc_hack (void): ");
+  fprintf (stderr, "icode: %d, code: %d\n", 0, -1);
+  fprintf (stderr, "  mask: %s\n", m2s (RS6000_BTM_ALTIVEC));
+  fprintf (stderr, "  attr: %s\n", a2s (RS6000_BTC_SPECIAL));
   fprintf (stderr, "\n");
 }
 
@@ -1619,7 +1626,9 @@ dump_monomorphics ()
 		  bdesc_htm, ARRAY_SIZE (bdesc_htm));
   dump_one_table ("Data Stream Touch (cache hinting) functions",
 		  bdesc_dst, ARRAY_SIZE (bdesc_dst));
+  /* The first entry in the bdesc_special table is a sentinel, so
+     start with the second entry.  */
   dump_special_table ("Special (non-standard) functions",
-		      bdesc_special, ARRAY_SIZE (bdesc_special));
+		      &bdesc_special[1], ARRAY_SIZE (bdesc_special) - 1);
 }
 

@@ -38,7 +38,7 @@
 
 #define KELVIN_VERBOSE
 #ifdef KELVIN_VERBOSE
-extern void dump_polymorphic ();
+static void dump_polymorphic ();
 #endif
 
 /* Handle the machine specific pragma longcall.  Its syntax is
@@ -1415,28 +1415,40 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_bool_V4SI, RS6000_BTI_V4SF, RS6000_BTI_V4SF, 0 },
   { ALTIVEC_BUILTIN_VEC_VCMPGTSW, ALTIVEC_BUILTIN_VCMPGTSW,
     RS6000_BTI_bool_V4SI, RS6000_BTI_V4SI, RS6000_BTI_V4SI, 0 },
+  /* Extraneous line redundant with line above.
   { ALTIVEC_BUILTIN_VEC_VCMPGTSW, ALTIVEC_BUILTIN_VCMPGTSW,
     RS6000_BTI_bool_V4SI, RS6000_BTI_V4SI, RS6000_BTI_V4SI, 0 },
+  */
   { ALTIVEC_BUILTIN_VEC_VCMPGTUW, ALTIVEC_BUILTIN_VCMPGTUW,
     RS6000_BTI_bool_V4SI, RS6000_BTI_unsigned_V4SI, RS6000_BTI_unsigned_V4SI, 0 },
+  /* Extraneous line redundant with line above.
   { ALTIVEC_BUILTIN_VEC_VCMPGTUW, ALTIVEC_BUILTIN_VCMPGTUW,
     RS6000_BTI_bool_V4SI, RS6000_BTI_unsigned_V4SI, RS6000_BTI_unsigned_V4SI, 0 },
+  */
   { ALTIVEC_BUILTIN_VEC_VCMPGTSH, ALTIVEC_BUILTIN_VCMPGTSH,
     RS6000_BTI_bool_V8HI, RS6000_BTI_V8HI, RS6000_BTI_V8HI, 0 },
+  /* Extraneous line redundant with line above.
   { ALTIVEC_BUILTIN_VEC_VCMPGTSH, ALTIVEC_BUILTIN_VCMPGTSH,
     RS6000_BTI_bool_V8HI, RS6000_BTI_V8HI, RS6000_BTI_V8HI, 0 },
+  */
   { ALTIVEC_BUILTIN_VEC_VCMPGTUH, ALTIVEC_BUILTIN_VCMPGTUH,
     RS6000_BTI_bool_V8HI, RS6000_BTI_unsigned_V8HI, RS6000_BTI_unsigned_V8HI, 0 },
+  /* Extraneous line redundant with line above.
   { ALTIVEC_BUILTIN_VEC_VCMPGTUH, ALTIVEC_BUILTIN_VCMPGTUH,
     RS6000_BTI_bool_V8HI, RS6000_BTI_unsigned_V8HI, RS6000_BTI_unsigned_V8HI, 0 },
+  */
   { ALTIVEC_BUILTIN_VEC_VCMPGTSB, ALTIVEC_BUILTIN_VCMPGTSB,
     RS6000_BTI_bool_V16QI, RS6000_BTI_V16QI, RS6000_BTI_V16QI, 0 },
+  /*
   { ALTIVEC_BUILTIN_VEC_VCMPGTSB, ALTIVEC_BUILTIN_VCMPGTSB,
     RS6000_BTI_bool_V16QI, RS6000_BTI_V16QI, RS6000_BTI_V16QI, 0 },
+  */
   { ALTIVEC_BUILTIN_VEC_VCMPGTUB, ALTIVEC_BUILTIN_VCMPGTUB,
     RS6000_BTI_bool_V16QI, RS6000_BTI_unsigned_V16QI, RS6000_BTI_unsigned_V16QI, 0 },
+  /*
   { ALTIVEC_BUILTIN_VEC_VCMPGTUB, ALTIVEC_BUILTIN_VCMPGTUB,
     RS6000_BTI_bool_V16QI, RS6000_BTI_unsigned_V16QI, RS6000_BTI_unsigned_V16QI, 0 },
+  */
   { ALTIVEC_BUILTIN_VEC_CMPLE, ALTIVEC_BUILTIN_VCMPGEFP,
     RS6000_BTI_bool_V4SI, RS6000_BTI_V4SF, RS6000_BTI_V4SF, 0 },
   { ALTIVEC_BUILTIN_VEC_CMPLE, VSX_BUILTIN_XVCMPGEDP,
@@ -4223,8 +4235,6 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
   { VSX_BUILTIN_VEC_LD, VSX_BUILTIN_LXVD2X_V2DI,
     RS6000_BTI_V2DI, RS6000_BTI_INTSI, ~RS6000_BTI_long_long, 0 },
   { VSX_BUILTIN_VEC_LD, VSX_BUILTIN_LXVD2X_V2DI,
-    RS6000_BTI_V2DI, RS6000_BTI_INTSI, ~RS6000_BTI_long_long, 0 },
-  { VSX_BUILTIN_VEC_LD, VSX_BUILTIN_LXVD2X_V2DI,
     RS6000_BTI_unsigned_V1TI, RS6000_BTI_INTSI, ~RS6000_BTI_UINTTI, 0 },
   { VSX_BUILTIN_VEC_LD, VSX_BUILTIN_LXVD2X_V2DI,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_INTSI,
@@ -5591,8 +5601,6 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_unsigned_V4SI, 0 },
   { P8V_BUILTIN_VEC_VMRGOW, P8V_BUILTIN_VMRGOW_V4SI,
     RS6000_BTI_bool_V4SI, RS6000_BTI_bool_V4SI, RS6000_BTI_bool_V4SI, 0 },
-  { P8V_BUILTIN_VEC_VMRGOW, P8V_BUILTIN_VMRGOW_V2DI,
-    RS6000_BTI_V2DI, RS6000_BTI_V2DI, RS6000_BTI_V2DI, 0 },
   { P8V_BUILTIN_VEC_VMRGOW, P8V_BUILTIN_VMRGOW_V2DI,
     RS6000_BTI_V2DI, RS6000_BTI_V2DI, RS6000_BTI_V2DI, 0 },
   { P8V_BUILTIN_VEC_VMRGOW, P8V_BUILTIN_VMRGOW_V2DI,
@@ -6990,7 +6998,7 @@ polytype2s (signed char poly_type) {
   case RS6000_BTI_opaque_V4SI:
     return is_ptr? "opaque_v4si *": "opaque_v4si";
   case RS6000_BTI_V16QI:
-    return is_ptr? "vector char *": "vector char";
+    return is_ptr? "vector signed char *": "vector signed char";
   case RS6000_BTI_V1TI:
     return is_ptr? "vector __int128 *": "vector __int128";
   case RS6000_BTI_V2SI:
@@ -7027,7 +7035,7 @@ polytype2s (signed char poly_type) {
   case RS6000_BTI_bool_int:           /* __bool int */
     return is_ptr? "bool int *": "bool int";
   case RS6000_BTI_bool_long:		 /* __bool long */
-    return is_ptr? "bool long *": "bool long";
+    return is_ptr? "bool long int *": "bool long int";
   case RS6000_BTI_pixel:              /* __pixel */
     return is_ptr? "pixel *": "pixel";
   case RS6000_BTI_bool_V16QI:         /* __vector bool char */
@@ -7037,7 +7045,7 @@ polytype2s (signed char poly_type) {
   case RS6000_BTI_bool_V4SI:          /* __vector bool int */
     return is_ptr? "vector bool int *": "vector bool int";
   case RS6000_BTI_bool_V2DI:          /* __vector bool long */
-    return is_ptr? "vector bool long long *": "vector bool long long";
+    return is_ptr? "vector bool long long int *": "vector bool long long int";
   case RS6000_BTI_pixel_V8HI:         /* __vector __pixel */
     return is_ptr? "vector pixel *": "vector pixel";
   case RS6000_BTI_long:	         /* long_integer_type_node */
@@ -7045,11 +7053,11 @@ polytype2s (signed char poly_type) {
   case RS6000_BTI_unsigned_long:      /* long_unsigned_type_node */
     return is_ptr? "unsigned long *": "unsigned long";
   case RS6000_BTI_long_long:	         /* long_long_integer_type_node */
-    return is_ptr? "long long *": "long long";
+    return is_ptr? "long long int *": "long long int";
   case RS6000_BTI_unsigned_long_long: /* long_long_unsigned_type_node */
-    return is_ptr? "unsigned long long *": "unsigned long long";
+    return is_ptr? "unsigned long long int *": "unsigned long long int";
   case RS6000_BTI_INTQI:	         /* intQI_type_node */
-    return is_ptr? "char *": "char";
+    return is_ptr? "signed char *": "signed char";
   case RS6000_BTI_UINTQI:		 /* unsigned_intQI_type_node */
     return is_ptr? "unsigned char *": "unsigned char";
   case RS6000_BTI_INTHI:	         /* intHI_type_node */
@@ -7081,11 +7089,11 @@ polytype2s (signed char poly_type) {
   case RS6000_BTI_void:	         /* void_type_node */
     return is_ptr? "void *": "void";
   case RS6000_BTI_ieee128_float:	 /* ieee 128-bit floating point */
-    return is_ptr? "__ieee128 *": "__ieee128";
+    return is_ptr? "__float128 *": "__float128";
   case RS6000_BTI_ibm128_float:	 /* IBM 128-bit floating point */
     return is_ptr? "__ibm128 *": "__ibm128";
   case RS6000_BTI_const_str:		 /* pointer to const char * */
-    return is_ptr? "const char **": "const char *";
+    return is_ptr? "const signed char **": "const signed char *";
   default:
     return "<unknown_polymorphic_operand_type>";
   }
@@ -7094,12 +7102,15 @@ polytype2s (signed char poly_type) {
 extern HOST_WIDE_INT rs6000_get_builtin_mask (int);
 extern unsigned int rs6000_get_builtin_attributes (int);
 
-void dump_one_polymorphic (const struct altivec_builtin_types *pp) {
-  enum rs6000_builtins fcode = pp->code;
-  const char *name = rs6000_overloaded_builtin_name (fcode);
-  HOST_WIDE_INT mask;
 
-  mask = rs6000_get_builtin_mask (pp->overloaded_code);
+static void
+dump_named_polymorphic (const char *name,
+			const struct altivec_builtin_types *pp) {
+  HOST_WIDE_INT mask;
+  if (pp->overloaded_code > 0)
+    mask = rs6000_get_builtin_mask (pp->overloaded_code);
+  else
+    mask = 0;
 
   if ((mask & RS6000_BTM_PAIRED) == 0) {
     fprintf (stderr, "%s %s[%d] (", polytype2s (pp->ret_type), name, pp->code);
@@ -7110,20 +7121,547 @@ void dump_one_polymorphic (const struct altivec_builtin_types *pp) {
     if (pp->op3)
       fprintf (stderr, ", %s", polytype2s (pp->op3));
     fprintf (stderr, ")\n");
-    fprintf (stderr, "  maps to: %s [%d]\n",
-	     rs6000_overloaded_builtin_name (pp->overloaded_code),
-	     pp->overloaded_code);
+    if (pp->overloaded_code > 0)
+      fprintf (stderr, "  maps to: %s [%d]\n",
+	       rs6000_overloaded_builtin_name (pp->overloaded_code),
+	       pp->overloaded_code);
+    else
+      fprintf (stderr, "  maps to: ad_hoc_hack [-1]\n");
   }
 }
 
-void
+static void
+dump_one_polymorphic (const struct altivec_builtin_types *pp) {
+  enum rs6000_builtins fcode = pp->code;
+  const char *name = rs6000_overloaded_builtin_name (fcode);
+
+  dump_named_polymorphic (name, pp);
+
+  /* In a few rare caes, we need to process alias names..  */
+  if (fcode == VSX_BUILTIN_VEC_LD)
+    dump_named_polymorphic ("__builtin_vec_vsx_ld", pp);
+  else if (fcode == VSX_BUILTIN_VEC_ST)
+    dump_named_polymorphic ("__builtin_vec_vsx_st", pp);
+
+}
+
+static void
+dump_exceptionals () {
+
+  struct altivec_builtin_types desc;
+
+  /* vec_mul ABI says:
+   *  vector signed char vec_mul (vector signed char, vector signed char)
+   *  vector unsigned char vec_mul (vector unsigned char, vector unsigned char)
+   *  vector signed short vec_mul (vector signed short, vector signed short)
+   *  vector unsigned short
+   *    vec_mul (vector unsigned short, vector unsigned short)
+   *  vector signed int vec_mul (vector signed int, vector signed int)
+   *  vector unsigned int vec_mul (vector unsigned int, vector unsigned int)
+   *  vector signed long long
+   *    vec_mul (vector signed long long, vector signed long long)
+   *  vector unsigned long long
+   *    vec_mul (vector unsigned long long, vector unsigned long long)
+   *  vector float vec_mul (vector float, vector float)
+   *  vector double vec_mul (vector double, vector double)
+   *
+   * Testing on p7, p8, and p9 confirms all of the above, plus
+   *  vector signed __int128 vec_mul (vector signed __int128,
+   *                                  vector signed __int128)
+   *  vector unsigned __int128 vec_mul (vector unsigned __int128,
+   *                                    vector unsigned __int128)
+   */
+  desc.code = ALTIVEC_BUILTIN_VEC_MUL;
+  desc.overloaded_code = (rs6000_builtins) 0;
+  desc.op3 = 0;
+
+  desc.ret_type = desc.op1 = desc.op2 = RS6000_BTI_V16QI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = RS6000_BTI_unsigned_V16QI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = RS6000_BTI_V8HI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = RS6000_BTI_unsigned_V8HI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = RS6000_BTI_V4SI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = RS6000_BTI_unsigned_V4SI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = RS6000_BTI_V2DI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = RS6000_BTI_unsigned_V2DI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = RS6000_BTI_V1TI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = RS6000_BTI_unsigned_V1TI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = RS6000_BTI_V4SF;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = RS6000_BTI_V2DF;
+  dump_one_polymorphic (&desc);
+
+  /* vec_addec ABI says:
+   *  vector signed int
+   *  vec_addec (vector signed int, vector signed int, vector signed int)
+   *  vector unsigned int
+   *  vec_addec (vector unsigned int, vector unsigned int, vector unsigned int)
+   *  vector signed __int128
+   *  vec_addec (vector signed __int128,
+   *             vector signed __int128, vector signed __int128)
+   *  vector unsigned __int128
+   *  vec_addec (vector unsigned __int128,
+   *             vector unsigned __int128, vector unsigned __int128)
+   *
+   * Testing on p7, p8, and p9 confirms all of the above.
+   */
+  desc.code = ALTIVEC_BUILTIN_VEC_ADDEC;
+  desc.overloaded_code = (rs6000_builtins) 0;
+
+  desc.ret_type = desc.op1 = desc.op2 = desc.op3 = RS6000_BTI_V4SI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = desc.op3 = RS6000_BTI_unsigned_V4SI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = desc.op3 = RS6000_BTI_V1TI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = desc.op3 = RS6000_BTI_unsigned_V1TI;
+  dump_one_polymorphic (&desc);
+
+  /* vec_subec ABI says:
+   *  vector signed int
+   *  vec_subec (vector signed int, vector signed int, vector signed int)
+   *  vector unsigned int
+   *  vec_subec (vector unsigned int, vector unsigned int, vector unsigned int)
+   *  vector signed __int128
+   *  vec_subec (vector signed __int128,
+   *             vector signed __int128, vector signed __int128)
+   *  vector unsigned __int128
+   *  vec_subec (vector unsigned __int128,
+   *             vector unsigned __int128, vector unsigned __int128)
+   *
+   * Testing on p7, p8, and p9 confirms all of the above.
+   */
+  desc.code = ALTIVEC_BUILTIN_VEC_SUBEC;
+  desc.overloaded_code = (rs6000_builtins) 0;
+
+  desc.ret_type = desc.op1 = desc.op2 = desc.op3 = RS6000_BTI_V4SI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = desc.op3 = RS6000_BTI_unsigned_V4SI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = desc.op3 = RS6000_BTI_V1TI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = desc.op3 = RS6000_BTI_unsigned_V1TI;
+  dump_one_polymorphic (&desc);
+
+  /* vec_adde ABI says:
+   *  vector signed int
+   *  vec_adde (vector signed int, vector signed int, vector signed int)
+   *  vector unsigned int
+   *  vec_adde (vector unsigned int, vector unsigned int, vector unsigned int)
+   *  vector signed __int128
+   *  vec_adde (vector signed __int128,
+   *            vector signed __int128, vector signed __int128)
+   *  vector unsigned __int128
+   *  vec_adde (vector unsigned __int128,
+   *            vector unsigned __int128, vector unsigned __int128)
+   *
+   * Testing on p7, p8, and p9 confirms all of the above.
+   */
+  desc.code = ALTIVEC_BUILTIN_VEC_ADDE;
+  desc.overloaded_code = (rs6000_builtins) 0;
+
+  desc.ret_type = desc.op1 = desc.op2 = desc.op3 = RS6000_BTI_V4SI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = desc.op3 = RS6000_BTI_unsigned_V4SI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = desc.op3 = RS6000_BTI_V1TI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = desc.op3 = RS6000_BTI_unsigned_V1TI;
+  dump_one_polymorphic (&desc);
+
+  /* vec_sube ABI says:
+   *  vector signed int
+   *  vec_sube (vector signed int, vector signed int, vector signed int)
+   *  vector unsigned int
+   *  vec_sube (vector unsigned int, vector unsigned int, vector unsigned int)
+   *  vector signed __int128
+   *  vec_sube (vector signed __int128,
+   *            vector signed __int128, vector signed __int128)
+   *  vector unsigned __int128
+   *  vec_sube (vector unsigned __int128,
+   *            vector unsigned __int128, vector unsigned __int128)
+   *
+   * Testing on p7, p8, and p9 confirms all of the above.
+   */
+  desc.code = ALTIVEC_BUILTIN_VEC_SUBE;
+  desc.overloaded_code = (rs6000_builtins) 0;
+
+  desc.ret_type = desc.op1 = desc.op2 = desc.op3 = RS6000_BTI_V4SI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = desc.op3 = RS6000_BTI_unsigned_V4SI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = desc.op3 = RS6000_BTI_V1TI;
+  dump_one_polymorphic (&desc);
+  desc.ret_type = desc.op1 = desc.op2 = desc.op3 = RS6000_BTI_unsigned_V1TI;
+  dump_one_polymorphic (&desc);
+
+  /* vec_splats ABI says:
+   *  vector signed __int128 vec_splats (signed __int128)
+   *  vector unsigned __int128 vec_splats (unsigned __int128)
+   *  vector signed long long int vec_splats (long long int)
+   *  vector unsigned long long int vec_splats (unsigned long long int)
+   *  vector signed int vec_splats (signed int)
+   *  vector unsigned int vec_splats (unsigned int)
+   *  vector signed short vec_splats (signed short)
+   *  vector unsigned short vec_splats (unsigned short)
+   *  vector signed char vec_splats (signed char)
+   *  vector unsigned char vec_splats (unsigned char)
+   *  vector float vec_splats (float)
+   *  vector double vec_splats (double)
+   *
+   * Testing on p7, p8, and p9 confirms all of the above.
+   */
+  desc.code = ALTIVEC_BUILTIN_VEC_SPLATS;
+  desc.overloaded_code = (rs6000_builtins) 0;
+  desc.op2 = desc.op3 = 0;
+
+  desc.ret_type = RS6000_BTI_V16QI;
+  desc.op1 = RS6000_BTI_INTQI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_unsigned_V16QI;
+  desc.op1 = RS6000_BTI_UINTQI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_V8HI;
+  desc.op1 = RS6000_BTI_INTHI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_unsigned_V8HI;
+  desc.op1 = RS6000_BTI_UINTHI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_V4SI;
+  desc.op1 = RS6000_BTI_INTSI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_unsigned_V4SI;
+  desc.op1 = RS6000_BTI_UINTSI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_V2DI;
+  desc.op1 = RS6000_BTI_INTDI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_unsigned_V2DI;
+  desc.op1 = RS6000_BTI_UINTDI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_V1TI;
+  desc.op1 = RS6000_BTI_INTTI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_unsigned_V1TI;
+  desc.op1 = RS6000_BTI_UINTTI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_V4SF;
+  desc.op1 = RS6000_BTI_float;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_V2DF;
+  desc.op1 = RS6000_BTI_double;
+  dump_one_polymorphic (&desc);
+
+  /* vec_promote ABI says:
+   *  vector signed __int128 vec_promote (signed __int128, int)
+   *  vector unsigned __int128 vec_promote (unsigned __int128, int)
+   *  vector signed long long int vec_promote (long long int, int)
+   *  vector unsigned long long int vec_promote (unsigned long long int, int)
+   *  vector signed int vec_promote (signed int, int)
+   *  vector unsigned int vec_promote (unsigned int, int)
+   *  vector signed short vec_promote (signed short, int)
+   *  vector unsigned short vec_promote (unsigned short, int)
+   *  vector signed char vec_promote (signed char, int)
+   *  vector unsigned char vec_promote (unsigned char, int)
+   *  vector float vec_promote (float, int)
+   *  vector double vec_promote (double, int)
+   *
+   * Testing on p7, p8, and p9 confirms all of the above.
+   */
+  desc.code = ALTIVEC_BUILTIN_VEC_PROMOTE;
+  desc.overloaded_code = (rs6000_builtins) 0;
+  desc.op2 = RS6000_BTI_INTSI;
+  desc.op3 = 0;
+
+  desc.ret_type = RS6000_BTI_V16QI;
+  desc.op1 = RS6000_BTI_INTQI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_unsigned_V16QI;
+  desc.op1 = RS6000_BTI_UINTQI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_V8HI;
+  desc.op1 = RS6000_BTI_INTHI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_unsigned_V8HI;
+  desc.op1 = RS6000_BTI_UINTHI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_V4SI;
+  desc.op1 = RS6000_BTI_INTSI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_unsigned_V4SI;
+  desc.op1 = RS6000_BTI_UINTSI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_V2DI;
+  desc.op1 = RS6000_BTI_INTDI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_unsigned_V2DI;
+  desc.op1 = RS6000_BTI_UINTDI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_V1TI;
+  desc.op1 = RS6000_BTI_INTTI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_unsigned_V1TI;
+  desc.op1 = RS6000_BTI_UINTTI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_V4SF;
+  desc.op1 = RS6000_BTI_float;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = RS6000_BTI_V2DF;
+  desc.op1 = RS6000_BTI_double;
+  dump_one_polymorphic (&desc);
+
+  /* vec_extract ABI says:
+   *  signed __int128 vec_promote (vector signed __int128, int)
+   *  signed long long int vec_promote (vector long long int, int)
+   *  signed int vec_promote (vector signed int, int)
+   *  signed short vec_promote (vector signed short, int)
+   *  signed char vec_promote (vector signed char, int)
+   *  float vec_promote (vector float, int)
+   *  double vec_promote (vector double, int)
+   *
+   * Testing on p7, p8, and p9 confirms all of the above, plus the following:
+   *  unsigned __int128 vec_promote (vector unsigned __int128, int)
+   *  unsigned long long int vec_promote (vector unsigned long long int, int)
+   *  unsigned int vec_promote (vector unsigned int, int)
+   *  unsigned short vec_promote (vector unsigned short, int)
+   *  unsigned char vec_promote (vector unsigned char, int)
+   */
+  desc.code = ALTIVEC_BUILTIN_VEC_EXTRACT;
+  desc.overloaded_code = (rs6000_builtins) 0;
+  desc.op2 = RS6000_BTI_INTSI;
+  desc.op3 = 0;
+
+  desc.op1 = RS6000_BTI_V16QI;
+  desc.ret_type = RS6000_BTI_INTQI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_unsigned_V16QI;
+  desc.ret_type = RS6000_BTI_UINTQI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_V8HI;
+  desc.ret_type = RS6000_BTI_INTHI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_unsigned_V8HI;
+  desc.ret_type = RS6000_BTI_UINTHI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_V4SI;
+  desc.ret_type = RS6000_BTI_INTSI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_unsigned_V4SI;
+  desc.ret_type = RS6000_BTI_UINTSI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_V2DI;
+  desc.ret_type = RS6000_BTI_INTDI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_unsigned_V2DI;
+  desc.ret_type = RS6000_BTI_UINTDI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_V1TI;
+  desc.ret_type = RS6000_BTI_INTTI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_unsigned_V1TI;
+  desc.ret_type = RS6000_BTI_UINTTI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_V4SF;
+  desc.ret_type = RS6000_BTI_float;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_V2DF;
+  desc.ret_type = RS6000_BTI_double;
+  dump_one_polymorphic (&desc);
+
+  /* vec_insert ABI is difficult to find.
+   * Testing on p7, p8, and p9 confirms all of the following:
+   *
+   *  vector signed __int128 vec_insert (signed __int128,
+   *                                      vector signed __int128, int)
+   *  vector unsigned __int128 vec_insert (unsigned __int128,
+   *                                        vector unsigned __int128, int)
+   *  vector signed long long int vec_insert (signed long long int,
+   *                                           vector signed long long int,
+   *                                           int)
+   *  vector unsigned long long int vec_insert (unsigned long long int,
+   *                                             vector unsigned long long int,
+   *                                             int)
+   *  vector signed int vec_insert (signed int, vector signed int, int)
+   *  vector unsigned int vec_insert (unsigned int, vector unsigned int, int)
+   *  vector signed short vec_insert (signed short, vector signed short, int)
+   *  vector unsigned short vec_insert (unsigned short,
+   *                                    vector unsigned short, int)
+   *  vector signed char vec_insert (signed char, vector signed char, int)
+   *  vector unsigned char vec_insert (unsigned char,
+   *                                    vector unsigned char, int)
+   *  vector float vec_insert (float, vector float, int)
+   *  vector double vec_insert (double, vector double, int)
+   */
+  desc.code = ALTIVEC_BUILTIN_VEC_INSERT;
+  desc.overloaded_code = (rs6000_builtins) 0;
+  desc.op3 = RS6000_BTI_INTSI;
+
+  desc.ret_type = desc.op2 = RS6000_BTI_V16QI;
+  desc.op1 = RS6000_BTI_INTQI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = desc.op2 = RS6000_BTI_unsigned_V16QI;
+  desc.op1 = RS6000_BTI_UINTQI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = desc.op2 = RS6000_BTI_V8HI;
+  desc.op1 = RS6000_BTI_INTHI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = desc.op2 = RS6000_BTI_unsigned_V8HI;
+  desc.op1 = RS6000_BTI_UINTHI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = desc.op2 = RS6000_BTI_V4SI;
+  desc.op1 = RS6000_BTI_INTSI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = desc.op2 = RS6000_BTI_unsigned_V4SI;
+  desc.op1 = RS6000_BTI_UINTSI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = desc.op2 = RS6000_BTI_V2DI;
+  desc.op1 = RS6000_BTI_INTDI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = desc.op2 = RS6000_BTI_unsigned_V2DI;
+  desc.op1 = RS6000_BTI_UINTDI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = desc.op2 = RS6000_BTI_V1TI;
+  desc.op1 = RS6000_BTI_INTTI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = desc.op2 = RS6000_BTI_unsigned_V1TI;
+  desc.op1 = RS6000_BTI_UINTTI;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = desc.op2 = RS6000_BTI_V4SF;
+  desc.op1 = RS6000_BTI_float;
+  dump_one_polymorphic (&desc);
+
+  desc.ret_type = desc.op2 = RS6000_BTI_V2DF;
+  desc.op1 = RS6000_BTI_double;
+  dump_one_polymorphic (&desc);
+
+  /* vec_step is a compile-time constant expression.
+   * Testing on p7, p8, and p9 confirms all of the following:
+   *
+   *  int vec_step (vector signed __int128)
+   *  int vec_step (vector unsigned __int128)
+   *  int vec_step (vector signed long long int)
+   *  int vec_step (vector unsigned long long int)
+   *  int vec_step (vector signed int)
+   *  int vec_step (vector unsigned int)
+   *  int vec_step (vector signed short)
+   *  int vec_step (vector unsigned short)
+   *  int vec_step (vector signed char)
+   *  int vec_step (vector unsigned char)
+   *  int vec_step (vector float)
+   *  int vec_step (vector double)
+   */
+  desc.code = ALTIVEC_BUILTIN_VEC_STEP;
+  desc.overloaded_code = (rs6000_builtins) 0;
+  desc.ret_type = RS6000_BTI_INTSI;
+
+  desc.op1 = RS6000_BTI_V16QI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_unsigned_V16QI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_V8HI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_unsigned_V8HI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_V4SI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_unsigned_V4SI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_V2DI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_unsigned_V2DI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_V1TI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_unsigned_V1TI;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_V4SF;
+  dump_one_polymorphic (&desc);
+
+  desc.op1 = RS6000_BTI_V2DF;
+  dump_one_polymorphic (&desc);
+}
+
+static void
 dump_polymorphic () {
   extern void dump_one_polymorphic (const struct altivec_builtin_types *pp);
 
   const struct altivec_builtin_types *pp = altivec_overloaded_builtins;
+  const struct altivec_builtin_types *oldpp = NULL;
   while (pp->code != 0) {
+    if ((oldpp != NULL) && (oldpp->code == pp->code)
+	&& (oldpp->overloaded_code == pp->overloaded_code)
+	&& (oldpp->ret_type == pp->ret_type)
+	&& (oldpp->op1 == pp->op1)
+	&& (oldpp->op2 == pp->op2)
+	&& (oldpp->op3 == pp->op3))
+      fprintf (stderr, "*** WARNING! *** redundant repetition of entry.\n");
+
     dump_one_polymorphic (pp);
+    oldpp = pp;
     pp++;
   }
+  dump_exceptionals ();
 }
 #endif
