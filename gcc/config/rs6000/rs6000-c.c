@@ -6994,8 +6994,9 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
 	    /* An error message making reference to the name of the
 	       non-overloaded function has already been issued.  Add
 	       clarification of the previous message.  */
-	    fprintf (stderr, "builtin %s requires builtin %s\n",
-		     name, internal_name);
+	    rich_location richloc (line_table, input_location);
+	    inform (&richloc, "builtin %qs requires builtin %qs",
+		    name, internal_name);
 	  }
 	else
 	  error ("builtin function %qs not supported in this compiler "
