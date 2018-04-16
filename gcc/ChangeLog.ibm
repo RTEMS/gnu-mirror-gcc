@@ -1,3 +1,17 @@
+2018-04-15  Bill Schmidt  <wschmidt@linux.ibm.com>
+
+	* config/rs6000/emmintrin.h (_mm_cvtpd_epi32): Replace vector with
+	__vector.
+	(_mm_cvtpd_ps): Likewise.
+	(_mm_cvttpd_epi32): Likewise.
+	* config/rs6000/mmintrin.h (_mm_unpacklo_pi8): Likewise.
+	* config/rs6000/xmmintrin.h: Avoid collisions with vector, pixel,
+	bool for strict-ANSI compiles.
+	(_mm_max_pi16): Replace bool with __bool.
+	(_mm_max_pu8): Likewise.
+	(_mm_min_pi16): Likewise.
+	(_mm_min_pu8): Likewise.
+
 2018-04-09  Peter Bergner  <bergner@vnet.ibm.com>
 
 	Merge up to 259244.
