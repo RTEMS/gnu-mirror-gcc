@@ -1245,15 +1245,26 @@ get_proc_name (const char *name, gfc_symbol **result, bool module_fcn_entry)
 		       "from a previous declaration",  name);
     }
 
-    if (sym && !sym->gfc_new
-	&& sym->attr.flavor != FL_UNKNOWN
-	&& sym->attr.referenced == 0 && sym->attr.subroutine == 1
-	&& gfc_state_stack->state == COMP_CONTAINS
-	&& gfc_state_stack->previous->state == COMP_SUBROUTINE)
-    {
-	gfc_error_now ("Procedure %qs at %C is already defined at %L",
-		       name, &sym->declared_at);
-    }
+  /* C1246 (R1225) MODULE shall appear only in the function-stmt or
+     subroutine-stmt of a module subprogram or of a nonabstract interface
+     body that is declared in the scoping unit of a module or submodule.  */
+  if (sym->attr.external
+      && (sym->attr.subroutine || sym->attr.function)
+      && sym->attr.if_source == IFSRC_IFBODY
+      && !current_attr.module_procedure
+      && sym->attr.proc == PROC_MODULE
+      && gfc_state_stack->state == COMP_CONTAINS)
+    gfc_error_now ("Procedure %qs defined in interface body at %L "
+		   "clashes with internal procedure defined at %C",
+		    name, &sym->declared_at);
+
+  if (sym && !sym->gfc_new
+      && sym->attr.flavor != FL_UNKNOWN
+      && sym->attr.referenced == 0 && sym->attr.subroutine == 1
+      && gfc_state_stack->state == COMP_CONTAINS
+      && gfc_state_stack->previous->state == COMP_SUBROUTINE)
+    gfc_error_now ("Procedure %qs at %C is already defined at %L",
+		    name, &sym->declared_at);
 
   if (gfc_current_ns->parent == NULL || *result == NULL)
     return rc;
@@ -2242,7 +2253,9 @@ check_function_name (char *name)
 	  && strcmp (block->result->name, "ppr@") != 0
 	  && strcmp (block->name, name) == 0)
 	{
-	  gfc_error ("Function name %qs not allowed at %C", name);
+	  gfc_error ("RESULT variable %qs at %L prohibits FUNCTION name %qs at %C "
+		     "from appearing in a specification statement",
+		     block->result->name, &block->result->declared_at, name);
 	  return false;
 	}
     }
@@ -2409,6 +2422,33 @@ variable_decl (int elem)
 	      gfc_error ("Explicit shaped array with nonconstant bounds at %C");
 	      m = MATCH_ERROR;
 	      goto cleanup;
+	    }
+	}
+      if (as->type == AS_EXPLICIT)
+	{
+	  for (int i = 0; i < as->rank; i++)
+	    {
+	      gfc_expr *e, *n;
+	      e = as->lower[i];
+	      if (e->expr_type != EXPR_CONSTANT)
+		{
+		  n = gfc_copy_expr (e);
+		  gfc_simplify_expr (n, 1);
+		  if (n->expr_type == EXPR_CONSTANT)
+		    gfc_replace_expr (e, n);
+		  else
+		    gfc_free_expr (n);
+		}
+	      e = as->upper[i];
+	      if (e->expr_type != EXPR_CONSTANT)
+		{
+		  n = gfc_copy_expr (e);
+		  gfc_simplify_expr (n, 1);
+		  if (n->expr_type == EXPR_CONSTANT)
+		    gfc_replace_expr (e, n);
+		  else
+		    gfc_free_expr (n);
+		}
 	    }
 	}
     }
@@ -9091,6 +9131,7 @@ match
 gfc_match_volatile (void)
 {
   gfc_symbol *sym;
+  char *name;
   match m;
 
   if (!gfc_notify_std (GFC_STD_F2003, "VOLATILE statement at %C"))
@@ -9112,6 +9153,10 @@ gfc_match_volatile (void)
       switch (m)
 	{
 	case MATCH_YES:
+	  name = XCNEWVAR (char, strlen (sym->name) + 1);
+	  strcpy (name, sym->name);
+	  if (!check_function_name (name))
+	    return MATCH_ERROR;
 	  /* F2008, C560+C561. VOLATILE for host-/use-associated variable or
 	     for variable in a BLOCK which is defined outside of the BLOCK.  */
 	  if (sym->ns != gfc_current_ns && sym->attr.codimension)
@@ -9150,6 +9195,7 @@ match
 gfc_match_asynchronous (void)
 {
   gfc_symbol *sym;
+  char *name;
   match m;
 
   if (!gfc_notify_std (GFC_STD_F2003, "ASYNCHRONOUS statement at %C"))
@@ -9171,6 +9217,10 @@ gfc_match_asynchronous (void)
       switch (m)
 	{
 	case MATCH_YES:
+	  name = XCNEWVAR (char, strlen (sym->name) + 1);
+	  strcpy (name, sym->name);
+	  if (!check_function_name (name))
+	    return MATCH_ERROR;
 	  if (!gfc_add_asynchronous (&sym->attr, sym->name, &gfc_current_locus))
 	    return MATCH_ERROR;
 	  goto next_item;

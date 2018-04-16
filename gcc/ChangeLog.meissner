@@ -1,3 +1,13 @@
+2018-04-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 259400.
+	* REVISION: Update subversion id.
+
+2018-04-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	Merge up to 259400.
+	* REVISION: Update subversion id.
+
 2018-03-27  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.c (struct rs6000_reg_addr): Eliminate
