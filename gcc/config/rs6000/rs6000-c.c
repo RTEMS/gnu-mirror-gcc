@@ -642,8 +642,7 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
 	  cpp_get_callbacks (pfile)->macro_to_expand = rs6000_macro_to_expand;
 	}
     }
-  if (!TARGET_HARD_FLOAT
-      || (TARGET_HARD_FLOAT && !TARGET_DOUBLE_FLOAT))
+  if (!TARGET_HARD_FLOAT || !TARGET_DOUBLE_FLOAT)
     builtin_define ("_SOFT_DOUBLE");
   /* Used by lwarx/stwcx. errata work-around.  */
   if (rs6000_cpu == PROCESSOR_PPC405)
@@ -1562,6 +1561,15 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
   { VSX_BUILTIN_VEC_FLOATO, VSX_BUILTIN_UNS_FLOATO_V2DI,
     RS6000_BTI_V4SF, RS6000_BTI_unsigned_V2DI, 0, 0 },
 
+  { ALTIVEC_BUILTIN_VEC_LD, ALTIVEC_BUILTIN_LVX_V1TI,
+    RS6000_BTI_V1TI, RS6000_BTI_INTSI, ~RS6000_BTI_V1TI, 0 },
+  { ALTIVEC_BUILTIN_VEC_LD, ALTIVEC_BUILTIN_LVX_V1TI,
+    RS6000_BTI_unsigned_V1TI, RS6000_BTI_INTSI, ~RS6000_BTI_unsigned_V1TI, 0 },
+  { ALTIVEC_BUILTIN_VEC_LD, ALTIVEC_BUILTIN_LVX_V1TI,
+    RS6000_BTI_V1TI, RS6000_BTI_INTSI, ~RS6000_BTI_INTTI, 0 },
+  { ALTIVEC_BUILTIN_VEC_LD, ALTIVEC_BUILTIN_LVX_V1TI,
+    RS6000_BTI_unsigned_V1TI, RS6000_BTI_INTSI, ~RS6000_BTI_UINTTI, 0 },
+
   { ALTIVEC_BUILTIN_VEC_LD, ALTIVEC_BUILTIN_LVX_V2DF,
     RS6000_BTI_V2DF, RS6000_BTI_INTSI, ~RS6000_BTI_V2DF, 0 },
   { ALTIVEC_BUILTIN_VEC_LD, ALTIVEC_BUILTIN_LVX_V2DI,
@@ -1647,26 +1655,44 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_V16QI, RS6000_BTI_INTSI, ~RS6000_BTI_INTQI, 0 },
   { ALTIVEC_BUILTIN_VEC_LVEBX, ALTIVEC_BUILTIN_LVEBX,
     RS6000_BTI_unsigned_V16QI, RS6000_BTI_INTSI, ~RS6000_BTI_UINTQI, 0 },
+
+  /*     vector float vec_ldl (int, vector float *);
+         vector float vec_ldl (int, float *); */
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V4SF,
     RS6000_BTI_V4SF, RS6000_BTI_INTSI, ~RS6000_BTI_V4SF, 0 },
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V4SF,
     RS6000_BTI_V4SF, RS6000_BTI_INTSI, ~RS6000_BTI_float, 0 },
+
+  /*     vector bool int vec_ldl (int, vector bool int *);
+         vector bool int vec_ldl (int, bool int *);
+              vector int vec_ldl (int, vector int *);
+              vector int vec_ldl (int, int *);
+     vector unsigned int vec_ldl (int, vector unsigned int *);
+     vector unsigned int vec_ldl (int, unsigned int *); */
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V4SI,
     RS6000_BTI_bool_V4SI, RS6000_BTI_INTSI, ~RS6000_BTI_bool_V4SI, 0 },
+  { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V4SI,
+    RS6000_BTI_bool_V4SI, RS6000_BTI_INTSI, ~RS6000_BTI_bool_int, 0 },
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V4SI,
     RS6000_BTI_V4SI, RS6000_BTI_INTSI, ~RS6000_BTI_V4SI, 0 },
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V4SI,
     RS6000_BTI_V4SI, RS6000_BTI_INTSI, ~RS6000_BTI_INTSI, 0 },
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V4SI,
-    RS6000_BTI_V4SI, RS6000_BTI_INTSI, ~RS6000_BTI_long, 0 },
-  { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V4SI,
     RS6000_BTI_unsigned_V4SI, RS6000_BTI_INTSI, ~RS6000_BTI_unsigned_V4SI, 0 },
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V4SI,
     RS6000_BTI_unsigned_V4SI, RS6000_BTI_INTSI, ~RS6000_BTI_UINTSI, 0 },
-  { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V4SI,
-    RS6000_BTI_unsigned_V4SI, RS6000_BTI_INTSI, ~RS6000_BTI_unsigned_long, 0 },
+
+  /*     vector bool short vec_ldl (int, vector bool short *);
+         vector bool short vec_ldl (int, bool short *);
+              vector pixel vec_ldl (int, vector pixel *);
+              vector short vec_ldl (int, vector short *);
+              vector short vec_ldl (int, short *);
+     vector unsigned short vec_ldl (int, vector unsigned short *);
+     vector unsigned short vec_ldl (int, unsigned short *); */
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V8HI,
     RS6000_BTI_bool_V8HI, RS6000_BTI_INTSI, ~RS6000_BTI_bool_V8HI, 0 },
+  { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V8HI,
+    RS6000_BTI_bool_V8HI, RS6000_BTI_INTSI, ~RS6000_BTI_bool_short, 0 },
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V8HI,
     RS6000_BTI_pixel_V8HI, RS6000_BTI_INTSI, ~RS6000_BTI_pixel_V8HI, 0 },
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V8HI,
@@ -1677,8 +1703,17 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_unsigned_V8HI, RS6000_BTI_INTSI, ~RS6000_BTI_unsigned_V8HI, 0 },
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V8HI,
     RS6000_BTI_unsigned_V8HI, RS6000_BTI_INTSI, ~RS6000_BTI_UINTHI, 0 },
+
+  /*     vector bool char vec_ldl (int, vector bool char *);
+         vector bool char vec_ldl (int, bool char *);
+              vector char vec_ldl (int, vector char *);
+              vector char vec_ldl (int, char *);
+     vector unsigned char vec_ldl (int, vector unsigned char *);
+     vector unsigned char vec_ldl (int, unsigned char *); */
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V16QI,
     RS6000_BTI_bool_V16QI, RS6000_BTI_INTSI, ~RS6000_BTI_bool_V16QI, 0 },
+  { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V16QI,
+    RS6000_BTI_bool_V16QI, RS6000_BTI_INTSI, ~RS6000_BTI_bool_char, 0 },
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V16QI,
     RS6000_BTI_V16QI, RS6000_BTI_INTSI, ~RS6000_BTI_V16QI, 0 },
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V16QI,
@@ -1688,15 +1723,35 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     ~RS6000_BTI_unsigned_V16QI, 0 },
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V16QI,
     RS6000_BTI_unsigned_V16QI, RS6000_BTI_INTSI, ~RS6000_BTI_UINTQI, 0 },
+
+  /*     vector double vec_ldl (int, vector double *);
+         vector double vec_ldl (int, double *); */
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V2DF,
     RS6000_BTI_V2DF, RS6000_BTI_INTSI, ~RS6000_BTI_V2DF, 0 },
+  { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V2DF,
+    RS6000_BTI_V2DF, RS6000_BTI_INTSI, ~RS6000_BTI_double, 0 },
+
+  /*          vector long long vec_ldl (int, vector long long *);
+              vector long long vec_ldl (int, long long *);
+     vector unsigned long long vec_ldl (int, vector unsigned long long *);
+     vector unsigned long long vec_ldl (int, unsigned long long *);
+         vector bool long long vec_ldl (int, vector bool long long *);
+         vector bool long long vec_ldl (int, bool long long *); */
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V2DI,
     RS6000_BTI_V2DI, RS6000_BTI_INTSI, ~RS6000_BTI_V2DI, 0 },
+  { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V2DI,
+    RS6000_BTI_V2DI, RS6000_BTI_INTSI, ~RS6000_BTI_long_long, 0 },
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V2DI,
     RS6000_BTI_unsigned_V2DI, RS6000_BTI_INTSI,
     ~RS6000_BTI_unsigned_V2DI, 0 },
   { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V2DI,
+    RS6000_BTI_unsigned_V2DI, RS6000_BTI_INTSI,
+    ~RS6000_BTI_unsigned_long_long, 0 },
+  { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V2DI,
     RS6000_BTI_bool_V2DI, RS6000_BTI_INTSI, ~RS6000_BTI_bool_V2DI, 0 },
+  { ALTIVEC_BUILTIN_VEC_LDL, ALTIVEC_BUILTIN_LVXL_V2DI,
+    RS6000_BTI_bool_V2DI, RS6000_BTI_INTSI, ~RS6000_BTI_bool_long_long, 0 },
+
   { ALTIVEC_BUILTIN_VEC_LVSL, ALTIVEC_BUILTIN_LVSL,
     RS6000_BTI_unsigned_V16QI, RS6000_BTI_INTSI, ~RS6000_BTI_UINTQI, 0 },
   { ALTIVEC_BUILTIN_VEC_LVSL, ALTIVEC_BUILTIN_LVSL,
