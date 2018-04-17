@@ -143,6 +143,10 @@
        (and (match_test "TARGET_P8_VECTOR")
 	    (match_operand 0 "s5bit_cint_operand"))))
 
+(define_memory_constraint "wC"
+  "Large address memory operand"
+  (match_operand 0 "large_mem_operand"))
+
 (define_constraint "wD"
   "Int constant that is the element number of the 64-bit scalar in a vector."
   (and (match_code "const_int")
@@ -185,6 +189,11 @@
   "Match vector constant with all 1's if the XXLORC instruction is available"
   (and (match_test "TARGET_P8_VECTOR")
        (match_operand 0 "all_ones_constant")))
+
+(define_memory_constraint "wN"
+  "Memory operand that is not a large address"
+  (and (match_operand 0 "memory_operand")
+       (not (match_operand 0 "large_mem_operand"))))
 
 ;; ISA 3.0 vector d-form addresses
 (define_memory_constraint "wO"

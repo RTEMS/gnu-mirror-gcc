@@ -245,6 +245,14 @@
   (and (match_code "const_int")
        (match_test "INTVAL (op) >= 0 && INTVAL (op) <= 1023")))
 
+;; Return 1 if op is a signed 32-bit constant integer.
+(define_predicate "s32bit_cint_operand"
+  (match_code "const_int")
+{
+  unsigned HOST_WIDE_INT v = UINTVAL (op);
+  return ((v + HOST_WIDE_INT_C (0x80000000U)) < HOST_WIDE_INT_C (0x100000000U));
+})
+
 ;; Return 1 if op is a constant integer that can fit in a D field.
 (define_predicate "short_cint_operand"
   (and (match_code "const_int")
@@ -1947,4 +1955,23 @@
     return 0;
 
   return offsettable_nonstrict_memref_p (op);
+})
+
+
+;; Match a memory operation that uses a large address.
+(define_predicate "large_mem_operand"
+  (match_code "mem")
+{
+  return large_address_valid (XEXP (op, 0), mode);
+})
+
+;; Match a memory operand that might be large or normal.  After register
+;; allocation, memory_operand will not return true for large addresses.
+(define_predicate "large_or_normal_mem_operand"
+  (match_code "mem")
+{
+  if (TARGET_LARGE_ADDRESS && large_address_valid (XEXP (op, 0), mode))
+    return true;
+
+  return memory_operand (op, mode);
 })

@@ -1,3 +1,71 @@
+2018-04-17  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/constraints.md (wC): New constraints for large
+	address and explicitly not large address.
+	(wN): Likewise.
+	* config/rs6000/predicates.md (s32bit_cint_operand): New predicate
+	for signed 32-bit integer constant.
+	(large_mem_operand): New predicate for memory with a large
+	address.
+	(large_or_normal_mem_operand): New predicate for memory with
+	normal or large adresses.
+	* config/rs6000/rs6000.opt (-mlarge-address): New switch, enable
+	large address support.
+	* config/rs6000/rs6000.c (struct rs6000_reg_addr): Add fields for
+	functions to do large address loads and stores.  Add boolean to
+	say whether a mode supports large addresses.
+	(rs6000_debug_print_mode): Print large address support if
+	-mdebug=reg.
+	(rs6000_init_hard_regno_mode_ok): Enable large address support for
+	DImode.
+	(rs6000_option_override_internal): The -mlarge-address option is
+	only valid on 64-bit medium code model.
+	(move_valid_p): New function to validate whether a move insn is
+	valid.
+	(rs6000_legitimate_address_p): Allow large addresses before
+	register allocation.
+	(rs6000_emit_move): If the mode supports large addresses, call the
+	appropriate function to do large addresses that add a base
+	register temporary to load the upper bits.
+	(rs6000_secondary_reload_memory): Add support for large
+	addresses.
+	(rs6000_secondary_reload_inner): Likewise.
+	(int_is_32bit): New function to say if an integer constant is
+	32-bits.
+	(split_large_integer): New function that given a large address,
+	split off the upper bits, and return a D/DS/DQ-form offset to use
+	for the lower bits.
+	(print_toc_upper): New functions to print the upper and lower
+	parts of a large address.
+	(print_operand_large_address_upper): Likewise.
+	(print_toc_lower): Likewise.
+	(print_operand_large_address_lower): Likewise.
+	(print_operand): Add %m<n> and %M<n> to print the lower and upper
+	parts of a large address.
+	(rs6000_opt_masks): Add -mlarge-address.
+	(emit_large_address_load): Emit a large address load or store.
+	(emit_large_address_store): Likewise.
+	(large_address_valid): Return true if an address is a large
+	address.
+	(split_large_address): Split a large address, emitting the upper
+	part, and returning the lower part to use in the new memory
+	operand.
+	* config/rs6000/rs6000.md (UNSPEC_LADDRESS): New unspec.
+	(LADDR*): New mode iterators and attributes to support large
+	addresses.
+	(large_mov<mode>_load): New insns to load from or store to a large
+	address.
+	(large_mov<mode>_store): Likewise.
+	(large address splitter): Add splitter in case a large address
+	store is generated to use large_mov<mode>_store.
+	(movdi_internal32): Use move_valid_p to validate the move.
+	(movdi_internal64): Use move_valid_p to validate the move.  Add
+	support for loads using power8 fusion, which require the load be
+	done to a base register.  Use wN to make sure large address stores
+	are not handled here.
+	(high_plus_int): New insn, recognize using HIGH to set the high
+	bits of an address with a large integer constant.
+
 2018-04-16  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/constraints.md: Undo all changes, start back with

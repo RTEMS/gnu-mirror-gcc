@@ -624,3 +624,7 @@ long rs6000_stack_protector_guard_offset = 0
 ;; branches via the CTR.
 mspeculate-indirect-jumps
 Target Undocumented Var(rs6000_speculate_indirect_jumps) Init(1) Save
+
+mlarge-address
+Target Undocumented Mask(LARGE_ADDRESS) Var(rs6000_isa_flags)
+Add support for large addresses.
