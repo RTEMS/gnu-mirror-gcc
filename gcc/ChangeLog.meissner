@@ -1,5 +1,17 @@
 2018-04-17  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_secondary_reload): Use the
+	rs6000_secondary_reload_gpr function to reload large addresses.
+	(rs6000_secondary_reload_gpr): Likewise.
+	* config/rs6000/rs6000.md (floatdidf2_mem): Protect DImode to
+	floating point conversion functions from memory against large
+	addresses.  Also add ISA 3.0 d-form memory support.
+	(floatunsdidf2_mem): Likewise.
+	(floatdisf2_mem): Likewise.
+	(floatunsdisf2_mem): Likewise.
+
+2018-04-17  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/constraints.md (wC): New constraints for large
 	address and explicitly not large address.
 	(wN): Likewise.

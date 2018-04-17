@@ -19968,6 +19968,28 @@ rs6000_secondary_reload (bool in_p,
       done_p = true;
     }
 
+  /* See if we should use the GPR reload helper for large addresses.  If we are
+     loading to a base register, we don't need a reload, since the base
+     register can be used for the upper bits.  */
+  if (!done_p && icode == CODE_FOR_nothing && memory_p && TARGET_POWERPC64
+      && reg_addr[mode].large_address_p
+      && reg_class_to_reg_type[(int)rclass] == GPR_REG_TYPE
+      && GET_MODE_SIZE (mode) <= UNITS_PER_WORD
+      && large_address_valid (XEXP (x, 0), mode))
+    {
+      done_p = true;
+      default_p = false;
+      ret = NO_REGS;
+
+      if (rclass != BASE_REGS || !in_p)
+	{
+	  sri->extra_cost = 1;
+	  sri->icode = (in_p
+			? CODE_FOR_reload_di_load
+			: CODE_FOR_reload_di_store);
+	}
+    }
+
   /* Handle reload of load/stores if we have reload helper functions.  */
   if (!done_p && icode != CODE_FOR_nothing && memory_p)
     {
@@ -20392,6 +20414,8 @@ rs6000_secondary_reload_gpr (rtx reg, rtx mem, rtx scratch, bool store_p)
   enum reg_class rclass;
   rtx addr;
   rtx scratch_or_premodify = scratch;
+  rtx new_mem;
+  machine_mode mode = GET_MODE (reg);
 
   if (TARGET_DEBUG_ADDR)
     {
@@ -20432,9 +20456,16 @@ rs6000_secondary_reload_gpr (rtx reg, rtx mem, rtx scratch, bool store_p)
     }
   gcc_assert (GET_CODE (addr) == PLUS || GET_CODE (addr) == LO_SUM);
 
-  rs6000_emit_move (scratch_or_premodify, addr, Pmode);
+  /* Add support for large addresses.  */
+  if (reg_addr[mode].large_address_p && large_address_valid (addr, mode))
+    new_mem = split_large_address (addr, scratch_or_premodify);
+  else
+    {
+      rs6000_emit_move (scratch_or_premodify, addr, Pmode);
+      new_mem = scratch_or_premodify;
+    }
 
-  mem = replace_equiv_address_nv (mem, scratch_or_premodify);
+  mem = replace_equiv_address_nv (mem, new_mem);
 
   /* Now create the move.  */
   if (store_p)
