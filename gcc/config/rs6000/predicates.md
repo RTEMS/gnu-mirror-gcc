@@ -1967,7 +1967,7 @@
 
 ;; Match a memory operand that might be large or normal.  After register
 ;; allocation, memory_operand will not return true for large addresses.
-(define_predicate "large_or_normal_mem_operand"
+(define_predicate "any_mem_operand"
   (match_code "mem")
 {
   if (TARGET_LARGE_ADDRESS && large_address_valid (XEXP (op, 0), mode))

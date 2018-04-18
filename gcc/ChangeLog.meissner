@@ -1,3 +1,44 @@
+2018-04-18  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/predicates (any_mem_operand): Rename from
+	large_or_normal_mem_operand.
+	* config/rs6000/rs6000.c (rs6000_emit_move): Only create large
+	address load/store insns if power9 fusion.  Explicitly allocate
+	the scratch register.
+	(large_address_valid): Rework validating TOC addresses.
+	* config/rs6000/rs6000.md (UNSPEC_LADDR_LOAD): Use two different
+	unspecs for load/store.
+	(UNSPEC_LADDR_STORE): Likewise.
+	(UNSPEC_LADDRESS): Likewise.
+	(FP_CVT_P): New code attribute to say whether we have signed or
+	unsigned fp conversion.
+	(LADDR): Delete, not used after rework.
+	(LADDR_I): Likewise.
+	(LADDR_{G,F,V}REG): Likewise.
+	(LADDR_{G,F,V}MEM): Likewise.
+	(LADDR_{G,F,V}LOAD): Add QI, HI, SI versions.
+	(LADDR_{G,F,V}STORE): Likewise.
+	(large_mov<mode>_load, QHSI iterator): Add QI, HI, SI versions
+	that only load/store GPRs.  At present, this is not yet called.
+	(large_mov<mode>_store, QHSI iterator): Likewise.
+	(large_movdi_load): Make DImode load either GPRs or vector
+	registers.  Remove splitting if not power9 fusion.
+	(large_movdi_store): Likewise.
+	(large_mov<mode>_load, SFDF iterator): Add SF, DF versions that
+	only load/store vector registers.  At present, this is not
+	called.
+	(large_mov<mode>_store, SFDF iterator): Likewise.
+	(movDI splitter for large addresses): Delete splitter.
+	(floatunsdidf2): Combine floatunsdidf2 expander and insn.
+	(floatunsdidf2_fcfidu): Likewise.
+	(floatdidf2_mem): Combine all DI->SF/DF, signed/unsigned
+	conversions from memory into one insn.  Add support for large
+	addresses.
+	(float<uns>di<mode>2_mem): Likewise.
+	(floatunsdidf2_mem): Likewise.
+	(floatdisf2_mem): Likewise.
+	(floatunsdisf2_mem): Likewise.
+
 2018-04-17  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_secondary_reload): Use the

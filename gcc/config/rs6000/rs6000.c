@@ -10630,10 +10630,11 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       return;
     }
 
-  /* See if we need to special case large addresses.  We can only do this
-     before register allocation, because the large address support might need
-     temporary scratch registers.  */
-  if (reg_addr[mode].large_address_p && can_create_pseudo_p ())
+  /* See if we need to special case large addresses when using power9 fusion.
+     We can only do this before register allocation, because the large address
+     support might need temporary scratch registers.  */
+  if (reg_addr[mode].large_address_p && TARGET_P9_FUSION
+      && can_create_pseudo_p ())
     {
       if (MEM_P (operands[0])
 	  && reg_addr[mode].large_addr_store != CODE_FOR_nothing
@@ -39424,7 +39425,7 @@ emit_large_address_load (rtx dest, rtx src, machine_mode mode)
   gcc_assert (MEM_P (src));
   if (icode != CODE_FOR_nothing && large_address_valid (XEXP (src, 0), mode))
     {
-      rtx pat = GEN_FCN (icode) (dest, src);
+      rtx pat = GEN_FCN (icode) (dest, src, gen_reg_rtx (DImode));
       if (pat)
 	{
 	  rtx insn = emit_insn (pat);
@@ -39447,7 +39448,7 @@ emit_large_address_store (rtx dest, rtx src, machine_mode mode)
   gcc_assert (MEM_P (dest));
   if (icode != CODE_FOR_nothing && large_address_valid (XEXP (dest, 0), mode))
     {
-      rtx pat = GEN_FCN (icode) (dest, src);
+      rtx pat = GEN_FCN (icode) (dest, src, gen_reg_rtx (DImode));
       if (pat)
 	{
 	  emit_insn (pat);
@@ -39473,19 +39474,24 @@ large_address_valid (rtx addr, machine_mode mode)
 
       if (GET_CODE (op0) == UNSPEC
 	  && XINT (op0, 1) == UNSPEC_TOCREL
-	  && CONST_INT_P (op1)
-	  && int_is_32bit (UINTVAL (op1)))
-	return true;
+	  && CONST_INT_P (op1))
+	;
 
-      if (!base_reg_operand (op0, Pmode))
-	return false;
+      else
+	{
+	  if (!base_reg_operand (op0, Pmode))
+	    return false;
 
-      if (satisfies_constraint_I (op1))		/* bottom 16 bits.  */
-	return false;
-      if (satisfies_constraint_L (op1))		/* 16 bits out of 32 bits.  */
-	return false;
+	  if (satisfies_constraint_I (op1))	/* bottom 16 bits.  */
+	    return false;
+	  if (satisfies_constraint_L (op1))	/* 16 bits out of 32 bits.  */
+	    return false;
+	}
 
       unsigned HOST_WIDE_INT value = UINTVAL (op1);
+
+      if (!int_is_32bit (value))
+	return false;
 
       /* For addresses to 128-bit types, limit any integer offset to support
 	 DQ-form loads or stores.  For addresses to 64-bit types and for
@@ -39496,8 +39502,8 @@ large_address_valid (rtx addr, machine_mode mode)
 	return false;
       else if ((value & 3) != 0 && (GET_MODE_SIZE (mode) == 8 || mode == SFmode))
 	return false;
-
-      return int_is_32bit (value);
+      else
+	return true;
     }
 
   else if (GET_CODE (addr) == UNSPEC && XINT (addr, 1) == UNSPEC_TOCREL)
