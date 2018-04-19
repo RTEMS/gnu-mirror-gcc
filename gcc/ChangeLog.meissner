@@ -1,5 +1,26 @@
 2018-04-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_init_hard_regno_mode_ok): Enable
+	large address load functions.
+	(move_valid_p): Don't int large address loads no longer use the
+	default mov insn.
+	(mem_operand_gpr): Don't allow large addresses.
+	(mem_operand_ds_form): Likewise.
+	(rs6000_emit_move): Don't split large address moves here, instead
+	do it via the first split pass.
+	(emit_large_address_load): Don't allocate scratch register here.
+	Don't emit an address note.
+	(emit_large_address_store): Likewise.
+	* config/rs6000/rs6000.md (LADDR*): Rework the large address
+	support to operate via define_splits rather than creating the load
+	or store during rs6000_emit_move.  Specialize patterns into short
+	ints, DImode, and SF/FP modes.
+	(float<uns>di<mode>2_mem): Call gen_large_movdi_load_fp instead of
+	gen_large_movdi_load.
+	(movdi_internal64): Undo changes that handled large address loads.
+
+2018-04-19  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/rs6000.md (movdi_internal64): Reorder loads, so
 	the normal load comes before the large memory load.
 

@@ -3540,6 +3540,7 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
       && TARGET_CMODEL == CMODEL_MEDIUM)
     {
       reg_addr[DImode].large_address_p = true;
+      reg_addr[DImode].large_addr_load = CODE_FOR_large_movdi_load;
       reg_addr[DImode].large_addr_store = CODE_FOR_large_movdi_store;
     }
 
@@ -7919,8 +7920,7 @@ small_data_operand (rtx op ATTRIBUTE_UNUSED,
 /* Return true if the operands are valid for a standard move.  We don't allow
    large address moves after register allocation in the standard MOV insn.
    Instead such moves should be done through an insn that has a base register
-   as a temporary.  Special case power8 fusion loads to GPRs, and allow them
-   directly.  */
+   as a temporary.  */
 
 bool
 move_valid_p (rtx dest, rtx src, machine_mode mode)
@@ -7935,17 +7935,7 @@ move_valid_p (rtx dest, rtx src, machine_mode mode)
     return !large_address_valid (XEXP (dest, 0), mode);
 
   else if (MEM_P (src))
-    {
-      if (!large_address_valid (XEXP (src, 0), mode))
-	return true;
-
-      if (REG_P (dest) && GET_MODE_SIZE (mode) <= 8
-	  && ((REGNO (dest) >= FIRST_PSEUDO_REGISTER)
-	      || IN_RANGE (REGNO (dest), FIRST_GPR_REGNO+1, LAST_GPR_REGNO)))
-	return true;
-
-      return false;
-    }
+    return !large_address_valid (XEXP (src, 0), mode);
 
   else
     return true;
@@ -8121,6 +8111,11 @@ mem_operand_gpr (rtx op, machine_mode mode)
   int extra;
   rtx addr = XEXP (op, 0);
 
+  /* Don't recognize large addresses, here.  Instead use, the dedicated
+     patterns.  */
+  if (large_address_valid (addr, mode))
+    return false;
+
   /* Don't allow non-offsettable addresses.  See PRs 83969 and 84279.  */
   if (!rs6000_offsettable_memref_p (op, mode, false))
     return false;
@@ -8154,6 +8149,11 @@ mem_operand_ds_form (rtx op, machine_mode mode)
   unsigned HOST_WIDE_INT offset;
   int extra;
   rtx addr = XEXP (op, 0);
+
+  /* Don't recognize large addresses, here.  Instead use, the dedicated
+     patterns.  */
+  if (large_address_valid (addr, mode))
+    return false;
 
   if (!offsettable_address_p (false, mode, addr))
     return false;
@@ -10628,25 +10628,6 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       else
 	gcc_unreachable();
       return;
-    }
-
-  /* See if we need to special case large addresses when using power9 fusion.
-     We can only do this before register allocation, because the large address
-     support might need temporary scratch registers.  */
-  if (reg_addr[mode].large_address_p && TARGET_P9_FUSION
-      && can_create_pseudo_p ())
-    {
-      if (MEM_P (operands[0])
-	  && reg_addr[mode].large_addr_store != CODE_FOR_nothing
-	  && large_address_valid (XEXP (operands[0], 0), mode)
-	  && emit_large_address_store (operands[0], operands[1], mode))
-	return;
-
-      if (MEM_P (operands[1])
-	  && reg_addr[mode].large_addr_load != CODE_FOR_nothing
-	  && large_address_valid (XEXP (operands[1], 0), mode)
-	  && emit_large_address_load (operands[0], operands[1], mode))
-	return;
     }
 
   /* FIXME:  In the long term, this switch statement should go away
@@ -39425,11 +39406,10 @@ emit_large_address_load (rtx dest, rtx src, machine_mode mode)
   gcc_assert (MEM_P (src));
   if (icode != CODE_FOR_nothing && large_address_valid (XEXP (src, 0), mode))
     {
-      rtx pat = GEN_FCN (icode) (dest, src, gen_reg_rtx (DImode));
+      rtx pat = GEN_FCN (icode) (dest, src);
       if (pat)
 	{
-	  rtx insn = emit_insn (pat);
-	  add_reg_note (insn, REG_EQUAL, copy_rtx (src));
+	  emit_insn (pat);
 	  return true;
 	}
     }
@@ -39448,7 +39428,7 @@ emit_large_address_store (rtx dest, rtx src, machine_mode mode)
   gcc_assert (MEM_P (dest));
   if (icode != CODE_FOR_nothing && large_address_valid (XEXP (dest, 0), mode))
     {
-      rtx pat = GEN_FCN (icode) (dest, src, gen_reg_rtx (DImode));
+      rtx pat = GEN_FCN (icode) (dest, src);
       if (pat)
 	{
 	  emit_insn (pat);
