@@ -1519,6 +1519,12 @@ dump_special_table (const char *title,
       }
     bidp++;
   }
+  fprintf (stderr, "\n");
+}
+
+static void
+dump_one_more_special ()
+{
   /* An extra bit of hackery.  */
   fprintf (stderr, "void ad_hoc_hack (void): ");
   fprintf (stderr, "icode: %d, code: %d\n", 0, -1);
@@ -1630,5 +1636,6 @@ dump_monomorphics ()
      start with the second entry.  */
   dump_special_table ("Special (non-standard) functions",
 		      &bdesc_special[1], ARRAY_SIZE (bdesc_special) - 1);
+  dump_one_more_special ();
 }
 

@@ -7605,6 +7605,7 @@ dump_exceptionals () {
   desc.code = ALTIVEC_BUILTIN_VEC_STEP;
   desc.overloaded_code = (rs6000_builtins) 0;
   desc.ret_type = RS6000_BTI_INTSI;
+  desc.op2 = desc.op3 = 0;
 
   desc.op1 = RS6000_BTI_V16QI;
   dump_one_polymorphic (&desc);
