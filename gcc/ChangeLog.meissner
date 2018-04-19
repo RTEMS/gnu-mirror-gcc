@@ -2,8 +2,8 @@
 
 	* config/rs6000/rs6000.c (rs6000_init_hard_regno_mode_ok): Enable
 	large address load functions.
-	(move_valid_p): Don't int large address loads no longer use the
-	default mov insn.
+	(move_valid_p): Int large address loads no longer use the default
+	mov insn.
 	(mem_operand_gpr): Don't allow large addresses.
 	(mem_operand_ds_form): Likewise.
 	(rs6000_emit_move): Don't split large address moves here, instead
