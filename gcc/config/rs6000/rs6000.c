@@ -39455,7 +39455,11 @@ large_address_valid (rtx addr, machine_mode mode)
       if (GET_CODE (op0) == UNSPEC
 	  && XINT (op0, 1) == UNSPEC_TOCREL
 	  && CONST_INT_P (op1))
-	;
+	{
+	  bool strict_p = !can_create_pseudo_p ();
+	  if (!rs6000_legitimate_offset_address_p (mode, addr, strict_p, false))
+	    return false;
+	}
 
       else
 	{
@@ -39487,7 +39491,13 @@ large_address_valid (rtx addr, machine_mode mode)
     }
 
   else if (GET_CODE (addr) == UNSPEC && XINT (addr, 1) == UNSPEC_TOCREL)
-    return true;
+    {
+      bool strict_p = !can_create_pseudo_p ();
+      if (!rs6000_legitimate_offset_address_p (mode, addr, strict_p, false))
+	return false;
+
+      return true;
+    }
 
   return false;
 }
