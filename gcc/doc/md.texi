@@ -3160,9 +3160,6 @@ Vector constant that can be loaded with the XXSPLTIB instruction.
 @item wF
 Memory operand suitable for power9 fusion load/stores.
 
-@item wG
-Memory operand suitable for TOC fusion memory references.
-
 @item wH
 Altivec register if @option{-mvsx-small-integer}.
 

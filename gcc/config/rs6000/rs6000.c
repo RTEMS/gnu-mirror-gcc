@@ -526,7 +526,6 @@ struct rs6000_reg_addr {
   enum insn_code large_addr_store;	/* Large address store insn. */
   addr_mask_type addr_mask[(int)N_RELOAD_REG]; /* Valid address masks.  */
   bool scalar_in_vmx_p;			/* Scalar value can go in VMX.  */
-  bool fused_toc;			/* Mode supports TOC fusion.  */
   bool large_address_p;			/* Mode supports large addresses.  */
 };
 
@@ -2829,9 +2828,6 @@ rs6000_debug_reg_global (void)
       char options[80];
 
       strcpy (options, (TARGET_P9_FUSION) ? "power9" : "power8");
-      if (TARGET_TOC_FUSION)
-	strcat (options, ", toc");
-
       if (TARGET_P8_FUSION_SIGN)
 	strcat (options, ", sign");
 
@@ -3511,24 +3507,6 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 	      reg_addr[HImode].scalar_in_vmx_p = true;
 	      reg_addr[QImode].scalar_in_vmx_p = true;
 	    }
-	}
-    }
-
-  /* Note which types we support fusing TOC setup plus memory insn.  We only do
-     fused TOCs for medium/large code models.  */
-  if (TARGET_P8_FUSION && TARGET_TOC_FUSION && TARGET_POWERPC64
-      && (TARGET_CMODEL != CMODEL_SMALL))
-    {
-      reg_addr[QImode].fused_toc = true;
-      reg_addr[HImode].fused_toc = true;
-      reg_addr[SImode].fused_toc = true;
-      reg_addr[DImode].fused_toc = true;
-      if (TARGET_HARD_FLOAT)
-	{
-	  if (TARGET_SINGLE_FLOAT)
-	    reg_addr[SFmode].fused_toc = true;
-	  if (TARGET_DOUBLE_FLOAT)
-	    reg_addr[DFmode].fused_toc = true;
 	}
     }
 
@@ -4320,19 +4298,14 @@ rs6000_option_override_internal (bool global_init_p)
 			 & OPTION_MASK_P8_FUSION);
 
   /* Setting additional fusion flags turns on base fusion.  */
-  if (!TARGET_P8_FUSION && (TARGET_P8_FUSION_SIGN || TARGET_TOC_FUSION))
+  if (!TARGET_P8_FUSION && TARGET_P8_FUSION_SIGN)
     {
       if (rs6000_isa_flags_explicit & OPTION_MASK_P8_FUSION)
 	{
-	  if (TARGET_P8_FUSION_SIGN)
-	    error ("%qs requires %qs", "-mpower8-fusion-sign",
-		   "-mpower8-fusion");
+	  error ("%qs requires %qs", "-mpower8-fusion-sign",
+		 "-mpower8-fusion");
 
-	  if (TARGET_TOC_FUSION)
-	    error ("%qs requires %qs", "-mtoc-fusion", "-mpower8-fusion");
-
-	  rs6000_isa_flags &= ~(OPTION_MASK_P8_FUSION_SIGN
-				| OPTION_MASK_TOC_FUSION);
+	  rs6000_isa_flags &= ~OPTION_MASK_P8_FUSION_SIGN;
 	}
       else
 	rs6000_isa_flags |= OPTION_MASK_P8_FUSION;
@@ -4661,24 +4634,6 @@ rs6000_option_override_internal (bool global_init_p)
 #ifdef SUB3TARGET_OVERRIDE_OPTIONS
   SUB3TARGET_OVERRIDE_OPTIONS;
 #endif
-
-  /* TOC fusion requires 64-bit and medium code model.  This test has to be
-     after the SUBTARGET_OVERRIDE_OPTIONS, since medium code model is set
-     there.  Large code model can have offsets bigger than ADDIS/ADDI can
-     handle.  */
-  if (TARGET_TOC_FUSION && !TARGET_POWERPC64)
-    {
-      rs6000_isa_flags &= ~OPTION_MASK_TOC_FUSION;
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION) != 0)
-	warning (0, N_("-mtoc-fusion requires 64-bit"));
-    }
-
-  if (TARGET_TOC_FUSION && (TARGET_CMODEL != CMODEL_MEDIUM))
-    {
-      rs6000_isa_flags &= ~OPTION_MASK_TOC_FUSION;
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_TOC_FUSION) != 0)
-	warning (0, N_("-mtoc-fusion requires medium code model"));
-    }
 
   /* Only allow -mlarge-address for 64-bit medium code model.  */
   if (TARGET_LARGE_ADDRESS)
@@ -9688,9 +9643,6 @@ rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict)
 	return 1;
       if (legitimate_constant_pool_address_p (x, mode,
 					     reg_ok_strict || lra_in_progress))
-	return 1;
-      if (reg_addr[mode].fused_toc && GET_CODE (x) == UNSPEC
-	  && XINT (x, 1) == UNSPEC_FUSION_ADDIS)
 	return 1;
 
       /* We allow large addresses before register allocation for normal memory.
@@ -36763,7 +36715,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "recip-precision",		OPTION_MASK_RECIP_PRECISION,	false, true  },
   { "save-toc-indirect",	OPTION_MASK_SAVE_TOC_INDIRECT,	false, true  },
   { "string",			0,				false, true  },
-  { "toc-fusion",		OPTION_MASK_TOC_FUSION,		false, true  },
   { "update",			OPTION_MASK_NO_UPDATE,		true , true  },
   { "vsx",			OPTION_MASK_VSX,		false, true  },
 #ifdef OPTION_MASK_64BIT

@@ -1,3 +1,30 @@
+2018-04-23  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (wG constraint): Delete TOC fusion
+	support (in favor of -mlarge-address).
+	* config/rs6000/predicates.md (toc_fusion_or_p9_reg_operand):
+	Rename toc_fusion_or_p9_reg_operand to p9_fusion_reg_operand.
+	(p9_fusion_reg_operand): Likewise.
+	(toc_fusion_mem_raw): Delete, remove TOC fusion support.
+	(toc_fusion_mem_wrapped): Likewise.
+	* config/rs6000/rs6000-cpus.def (POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.opt (-mtoc-fusion): Likewise.
+	* config/rs6000/rs6000.c (struct rs6000_reg_addr): Likewise.
+	(rs6000_debug_reg_global): Likewise.
+	(rs6000_init_hard_regno_mode_ok): Likewise.
+	(rs6000_option_override_internal): Likewise.
+	(rs6000_legitimate_address_p): Likewise.
+	(rs6000_opt_masks): Likewise.
+	* config/rs6000/rs6000.h (TARGET_TOC_FUSION_INT): Likewise.
+	(TARGET_TOC_FUSION_FP): Likewise.
+	* config/rs6000/rs6000.md (toc fusion splitters): Likewise.
+	(toc_fusionload_<mode>): Likewise.
+	(toc_fusionload_di): Likewise.
+	(fusion_gpr_load_<mode>): Rename toc_fusion_or_p9_reg_operand to
+	p9_fusion_reg_operand.
+	(fusion peephole2): Likewise.
+	* doc/md.texi (PowerPC constraints): Delete wG documentation.
+
 2018-04-20  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (large_address_valid): Validate large
