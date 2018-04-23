@@ -1,3 +1,56 @@
+2018-04-20  Peter Bergner  <bergner@vnet.ibm.com>
+
+	Backport from mainline
+	2018-03-09  Peter Bergner  <bergner@vnet.ibm.com>
+
+	PR target/83969
+	* config/rs6000/rs6000.c (rs6000_offsettable_memref_p): New prototype.
+	Add strict argument and use it.
+	(rs6000_split_multireg_move): Update for new strict argument.
+	(mem_operand_gpr): Disallow all non-offsettable addresses.
+	* config/rs6000/rs6000.md (*movdi_internal64): Use YZ constraint.
+
+2018-04-18  Thomas Preud'homme  <thomas.preudhomme@arm.com>
+
+	Backport from mainline
+	2018-04-11  Thomas Preud'homme  <thomas.preudhomme@arm.com>
+
+	PR target/85261
+	* config/arm/arm-builtins.c (arm_expand_builtin): Force input operand
+	into register.
+
+2018-04-12  Andreas Krebbel  <krebbel@linux.vnet.ibm.com>
+
+	Backport from mainline
+	2018-04-12  Andreas Krebbel  <krebbel@linux.vnet.ibm.com>
+
+	* config/s390/s390.c (s390_output_indirect_thunk_function): Check
+	also for flag_dwarf2_cfi_asm.
+
+2018-04-11  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/alpha/alpha.md (stack_probe_internal): Rename
+	from "probe_stack".  Update all callers.
+
+2018-04-11  Thomas Preud'homme  <thomas.preudhomme@arm.com>
+
+	Backport from mainline
+	2018-04-04  Thomas Preud'homme  <thomas.preudhomme@arm.com>
+
+	PR target/85203
+	* config/arm/arm-builtins.c (arm_expand_builtin): Change
+	expansion to perform a bitwise AND of the argument followed by a
+	boolean negation of the result.
+
+2018-04-10  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	Backport from mainline
+	2018-03-08  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	PR target/84748
+	* config/aarch64/aarch64.md (*compare_cstore<mode>_insn): Mark pattern
+	as clobbering CC_REGNUM.
+
 2018-04-06  Eric Botcazou  <ebotcazou@adacore.com>
 
 	PR target/85196
