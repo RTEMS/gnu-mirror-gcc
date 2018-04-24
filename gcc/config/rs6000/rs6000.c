@@ -38615,7 +38615,7 @@ fusion_gpr_load_p (rtx addis_reg,	/* register set via addis.  */
   if (!base_reg_operand (addis_reg, GET_MODE (addis_reg)))
     return false;
 
-  if (!base_reg_operand (target, mode));
+  if (!base_reg_operand (target, mode))
     return false;
 
   if (!fusion_gpr_addis (addis_value, GET_MODE (addis_value)))
