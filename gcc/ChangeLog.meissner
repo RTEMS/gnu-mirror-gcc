@@ -1,5 +1,10 @@
 2018-04-23  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (fusion_gpr_load_p): Don't match if large
+	addressing is enabled for the mode being loaded.
+
+2018-04-23  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/constraints.md (wG constraint): Delete TOC fusion
 	support (in favor of -mlarge-address).
 	* config/rs6000/predicates.md (toc_fusion_or_p9_reg_operand):
@@ -15,6 +20,7 @@
 	(rs6000_option_override_internal): Likewise.
 	(rs6000_legitimate_address_p): Likewise.
 	(rs6000_opt_masks): Likewise.
+
 	* config/rs6000/rs6000.h (TARGET_TOC_FUSION_INT): Likewise.
 	(TARGET_TOC_FUSION_FP): Likewise.
 	* config/rs6000/rs6000.md (toc fusion splitters): Likewise.

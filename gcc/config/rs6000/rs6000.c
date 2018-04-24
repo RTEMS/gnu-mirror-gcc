@@ -38605,12 +38605,17 @@ fusion_gpr_load_p (rtx addis_reg,	/* register set via addis.  */
 {
   rtx addr;
   rtx base_reg;
+  machine_mode mode = GET_MODE (target);
+
+  /* Don't do the peephole for modes that support large addressing.  */
+  if (reg_addr[mode].large_address_p)
+    return false;
 
   /* Validate arguments.  */
   if (!base_reg_operand (addis_reg, GET_MODE (addis_reg)))
     return false;
 
-  if (!base_reg_operand (target, GET_MODE (target)))
+  if (!base_reg_operand (target, mode));
     return false;
 
   if (!fusion_gpr_addis (addis_value, GET_MODE (addis_value)))
