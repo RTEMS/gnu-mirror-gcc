@@ -1261,8 +1261,8 @@ See RS/6000 and PowerPC Options.
 -msse4a  -m3dnow  -m3dnowa  -mpopcnt  -mabm  -mbmi  -mtbm  -mfma4  -mxop @gol
 -mlzcnt  -mbmi2  -mfxsr  -mxsave  -mxsaveopt  -mrtm  -mlwp  -mmpx  @gol
 -mmwaitx  -mclzero  -mpku  -mthreads -mgfni  -mvaes  @gol
--mcet -mibt -mshstk -mforce-indirect-call -mavx512vbmi2 @gol
--mvpclmulqdq -mavx512bitalg -mavx512vpopcntdq @gol
+-mshstk -mforce-indirect-call -mavx512vbmi2 @gol
+-mvpclmulqdq -mavx512bitalg -mmovdiri -mmovdir64b -mavx512vpopcntdq @gol
 -mms-bitfields  -mno-align-stringops  -minline-all-stringops @gol
 -minline-stringops-dynamically  -mstringop-strategy=@var{alg} @gol
 -mmemcpy-strategy=@var{strategy}  -mmemset-strategy=@var{strategy} @gol
@@ -4783,7 +4783,7 @@ For C++, a function without return type always produces a diagnostic
 message, even when @option{-Wno-return-type} is specified.  The only
 exceptions are @code{main} and functions defined in system headers.
 
-This warning is enabled by @option{-Wall}.
+This warning is enabled by default for C++ and is enabled by @option{-Wall}.
 
 @item -Wshift-count-negative
 @opindex Wshift-count-negative
@@ -7652,6 +7652,7 @@ by @option{-O2} and also turns on the following optimization flags:
 -ftree-loop-distribution @gol
 -ftree-loop-distribute-patterns @gol
 -floop-interchange @gol
+-floop-unroll-and-jam @gol
 -fsplit-paths @gol
 -ftree-slp-vectorize @gol
 -fvect-cost-model @gol
@@ -11828,14 +11829,17 @@ function.  The value @code{full} is an alias for specifying both
 @code{branch} and @code{return}. The value @code{none} turns off
 instrumentation.
 
+The macro @code{__CET__} is defined when @option{-fcf-protection} is
+used.  The first bit of @code{__CET__} is set to 1 for the value
+@code{branch} and the second bit of @code{__CET__} is set to 1 for
+the @code{return}.
+
 You can also use the @code{nocf_check} attribute to identify
 which functions and calls should be skipped from instrumentation
 (@pxref{Function Attributes}).
 
 Currently the x86 GNU/Linux target provides an implementation based
-on Intel Control-flow Enforcement Technology (CET).  Instrumentation
-for x86 is controlled by target-specific options @option{-mcet},
-@option{-mibt} and @option{-mshstk} (@pxref{x86 Options}).
+on Intel Control-flow Enforcement Technology (CET).
 
 @item -fstack-protector
 @opindex fstack-protector
@@ -27296,9 +27300,6 @@ preferred alignment to @option{-mpreferred-stack-boundary=2}.
 @itemx -mpku
 @opindex mpku
 @need 200
-@itemx -mcet
-@opindex mcet
-@need 200
 @itemx -mavx512vbmi2
 @opindex mavx512vbmi2
 @need 200
@@ -27314,6 +27315,12 @@ preferred alignment to @option{-mpreferred-stack-boundary=2}.
 @itemx -mavx512bitalg
 @opindex mavx512bitalg
 @need 200
+@itemx -mmovdiri
+@opindex mmovdiri
+@need 200
+@itemx -mmovdir64b
+@opindex mmovdir64b
+@need 200
 @itemx -mavx512vpopcntdq
 @opindex mavx512vpopcntdq
 These switches enable the use of instructions in the MMX, SSE,
@@ -27321,8 +27328,8 @@ SSE2, SSE3, SSSE3, SSE4.1, AVX, AVX2, AVX512F, AVX512PF, AVX512ER, AVX512CD,
 SHA, AES, PCLMUL, FSGSBASE, RDRND, F16C, FMA, SSE4A, FMA4, XOP, LWP, ABM,
 AVX512VL, AVX512BW, AVX512DQ, AVX512IFMA, AVX512VBMI, BMI, BMI2, VAES,
 FXSR, XSAVE, XSAVEOPT, LZCNT, RTM, MPX, MWAITX, PKU, IBT, SHSTK, AVX512VBMI2,
-GFNI, VPCLMULQDQ, AVX512BITALG, AVX512VPOPCNTDQ3DNow!@: or enhanced 3DNow!@:
-extended instruction sets.
+GFNI, VPCLMULQDQ, AVX512BITALG, MOVDIRI, MOVDIR64B,
+AVX512VPOPCNTDQ3DNow!@: or enhanced 3DNow!@: extended instruction sets.
 Each has a corresponding @option{-mno-} option to disable use of these
 instructions.
 
@@ -27343,13 +27350,6 @@ perform run-time CPU detection must compile separate files for each
 supported architecture, using the appropriate flags.  In particular,
 the file containing the CPU detection code should be compiled without
 these options.
-
-The @option{-mcet} option turns on the @option{-mibt} and @option{-mshstk}
-options.  The @option{-mibt} option enables indirect branch tracking support
-and the @option{-mshstk} option enables shadow stack support from
-Intel Control-flow Enforcement Technology (CET).  The compiler also provides
-a number of built-in functions for fine-grained control in a CET-based
-application.  See @xref{x86 Built-in Functions}, for more information.
 
 @item -mdump-tune-features
 @opindex mdump-tune-features
@@ -27443,23 +27443,10 @@ see @ref{Other Builtins} for details.
 This option enables use of the @code{movbe} instruction to implement
 @code{__builtin_bswap32} and @code{__builtin_bswap64}.
 
-@item -mibt
-@opindex mibt
-This option tells the compiler to use indirect branch tracking support
-(for indirect calls and jumps) from x86 Control-flow Enforcement
-Technology (CET).  The option has effect only if the
-@option{-fcf-protection=full} or @option{-fcf-protection=branch} option
-is specified. The option @option{-mibt} is on by default when the
-@code{-mcet} option is specified.
-
 @item -mshstk
 @opindex mshstk
-This option tells the compiler to use shadow stack support (return
-address tracking) from x86 Control-flow Enforcement Technology (CET).
-The option has effect only if the @option{-fcf-protection=full} or
-@option{-fcf-protection=return} option is specified.  The option
-@option{-mshstk} is on by default when the @option{-mcet} option is
-specified.
+The @option{-mshstk} option enables shadow stack built-in functions
+from x86 Control-flow Enforcement Technology (CET).
 
 @item -mcrc32
 @opindex mcrc32

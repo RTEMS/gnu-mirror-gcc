@@ -2701,7 +2701,7 @@ public:
   /* opt_pass methods: */
   virtual bool gate (function *)
     {
-      return ((flag_cf_protection & CF_BRANCH) && TARGET_IBT);
+      return ((flag_cf_protection & CF_BRANCH));
     }
 
   virtual unsigned int execute (function *)
@@ -2766,11 +2766,11 @@ ix86_target_string (HOST_WIDE_INT isa, HOST_WIDE_INT isa2,
     { "-msgx",		OPTION_MASK_ISA_SGX },
     { "-mavx5124vnniw", OPTION_MASK_ISA_AVX5124VNNIW },
     { "-mavx5124fmaps", OPTION_MASK_ISA_AVX5124FMAPS },
-    { "-mibt",		OPTION_MASK_ISA_IBT },
     { "-mhle",		OPTION_MASK_ISA_HLE },
     { "-mmovbe",	OPTION_MASK_ISA_MOVBE },
     { "-mclzero",	OPTION_MASK_ISA_CLZERO },
-    { "-mmwaitx",	OPTION_MASK_ISA_MWAITX }
+    { "-mmwaitx",	OPTION_MASK_ISA_MWAITX },
+    { "-mmovdir64b",	OPTION_MASK_ISA_MOVDIR64B }
   };
   static struct ix86_target_opts isa_opts[] =
   {
@@ -2833,7 +2833,8 @@ ix86_target_string (HOST_WIDE_INT isa, HOST_WIDE_INT isa2,
     { "-mlwp",		OPTION_MASK_ISA_LWP },
     { "-mfxsr",		OPTION_MASK_ISA_FXSR },
     { "-mclwb",		OPTION_MASK_ISA_CLWB },
-    { "-mshstk",	OPTION_MASK_ISA_SHSTK }
+    { "-mshstk",	OPTION_MASK_ISA_SHSTK },
+    { "-mmovdiri",	OPTION_MASK_ISA_MOVDIRI }
   };
 
   /* Flag options.  */
@@ -4931,49 +4932,9 @@ ix86_option_override_internal (bool main_args_p,
     target_option_default_node = target_option_current_node
       = build_target_option_node (opts);
 
-  /* Do not support control flow instrumentation if CET is not enabled.  */
-  cf_protection_level cf_protection
-    = (cf_protection_level) (opts->x_flag_cf_protection & ~CF_SET);
-  if (cf_protection != CF_NONE)
-    {
-      switch (cf_protection)
-	{
-	case CF_BRANCH:
-	  if (! TARGET_IBT_P (opts->x_ix86_isa_flags2))
-	    {
-	      error ("%<-fcf-protection=branch%> requires Intel CET "
-		     "support. Use -mcet or -mibt option to enable CET");
-	      flag_cf_protection = CF_NONE;
-	      return false;
-	    }
-	  break;
-	case CF_RETURN:
-	  if (! TARGET_SHSTK_P (opts->x_ix86_isa_flags))
-	    {
-	      error ("%<-fcf-protection=return%> requires Intel CET "
-		     "support. Use -mcet or -mshstk option to enable CET");
-	      flag_cf_protection = CF_NONE;
-	      return false;
-	    }
-	  break;
-	case CF_FULL:
-	  if (   ! TARGET_IBT_P (opts->x_ix86_isa_flags2)
-		 || ! TARGET_SHSTK_P (opts->x_ix86_isa_flags))
-	    {
-	      error ("%<-fcf-protection=full%> requires Intel CET "
-		     "support. Use -mcet or both of -mibt and "
-		     "-mshstk options to enable CET");
-	      flag_cf_protection = CF_NONE;
-	      return false;
-	    }
-	  break;
-	default:
-	  gcc_unreachable ();
-	}
-
-      opts->x_flag_cf_protection =
-	(cf_protection_level) (cf_protection | CF_SET);
-    }
+  if (opts->x_flag_cf_protection != CF_NONE)
+    opts->x_flag_cf_protection =
+      (cf_protection_level) (opts->x_flag_cf_protection | CF_SET);
 
   if (ix86_tune_features [X86_TUNE_AVOID_128FMA_CHAINS])
     maybe_set_param_value (PARAM_AVOID_FMA_MAX_BITS, 128,
@@ -5415,10 +5376,11 @@ ix86_valid_target_attribute_inner_p (tree args, char *p_strings[],
     IX86_ATTR_ISA ("clwb",	OPT_mclwb),
     IX86_ATTR_ISA ("rdpid",	OPT_mrdpid),
     IX86_ATTR_ISA ("gfni",	OPT_mgfni),
-    IX86_ATTR_ISA ("ibt",	OPT_mibt),
     IX86_ATTR_ISA ("shstk",	OPT_mshstk),
     IX86_ATTR_ISA ("vaes",	OPT_mvaes),
     IX86_ATTR_ISA ("vpclmulqdq", OPT_mvpclmulqdq),
+    IX86_ATTR_ISA ("movdiri", OPT_mmovdiri),
+    IX86_ATTR_ISA ("movdir64b", OPT_mmovdir64b),
 
     /* enum options */
     IX86_ATTR_ENUM ("fpmath=",	OPT_mfpmath_),
@@ -15265,7 +15227,16 @@ ix86_expand_split_stack_prologue (void)
      instruction--we need control flow to continue at the subsequent
      label.  Therefore, we use an unspec.  */
   gcc_assert (crtl->args.pops_args < 65536);
-  emit_insn (gen_split_stack_return (GEN_INT (crtl->args.pops_args)));
+  rtx_insn *ret_insn
+    = emit_insn (gen_split_stack_return (GEN_INT (crtl->args.pops_args)));
+
+  if ((flag_cf_protection & CF_BRANCH))
+    {
+      /* Insert ENDBR since __morestack will jump back here via indirect
+	 call.  */
+      rtx cet_eb = gen_nop_endbr ();
+      emit_insn_after (cet_eb, ret_insn);
+    }
 
   /* If we are in 64-bit mode and this function uses a static chain,
      we saved %r10 in %rax before calling _morestack.  */
@@ -30399,7 +30370,7 @@ ix86_trampoline_init (rtx m_tramp, tree fndecl, rtx chain_value)
   rtx mem, fnaddr;
   int opcode;
   int offset = 0;
-  bool need_endbr = (flag_cf_protection & CF_BRANCH) && TARGET_IBT;
+  bool need_endbr = (flag_cf_protection & CF_BRANCH);
 
   fnaddr = XEXP (DECL_RTL (fndecl), 0);
 
@@ -31963,14 +31934,20 @@ ix86_init_mmx_sse_builtins (void)
 	       IX86_BUILTIN_SBB64);
 
   /* Read/write FLAGS.  */
-  def_builtin (0, "__builtin_ia32_readeflags_u32",
-               UNSIGNED_FTYPE_VOID, IX86_BUILTIN_READ_FLAGS);
-  def_builtin (OPTION_MASK_ISA_64BIT, "__builtin_ia32_readeflags_u64",
-               UINT64_FTYPE_VOID, IX86_BUILTIN_READ_FLAGS);
-  def_builtin (0, "__builtin_ia32_writeeflags_u32",
-               VOID_FTYPE_UNSIGNED, IX86_BUILTIN_WRITE_FLAGS);
-  def_builtin (OPTION_MASK_ISA_64BIT, "__builtin_ia32_writeeflags_u64",
-               VOID_FTYPE_UINT64, IX86_BUILTIN_WRITE_FLAGS);
+  if (TARGET_64BIT)
+    {
+      def_builtin (OPTION_MASK_ISA_64BIT, "__builtin_ia32_readeflags_u64",
+		   UINT64_FTYPE_VOID, IX86_BUILTIN_READ_FLAGS);
+      def_builtin (OPTION_MASK_ISA_64BIT, "__builtin_ia32_writeeflags_u64",
+		   VOID_FTYPE_UINT64, IX86_BUILTIN_WRITE_FLAGS);
+    }
+  else
+    {
+      def_builtin (0, "__builtin_ia32_readeflags_u32",
+		   UNSIGNED_FTYPE_VOID, IX86_BUILTIN_READ_FLAGS);
+      def_builtin (0, "__builtin_ia32_writeeflags_u32",
+		   VOID_FTYPE_UNSIGNED, IX86_BUILTIN_WRITE_FLAGS);
+    }
 
   /* CLFLUSHOPT.  */
   def_builtin (OPTION_MASK_ISA_CLFLUSHOPT, "__builtin_ia32_clflushopt",
@@ -35988,6 +35965,7 @@ ix86_expand_special_args_builtin (const struct builtin_description *d,
     case VOID_FTYPE_PDOUBLE_V2DF:
     case VOID_FTYPE_PLONGLONG_LONGLONG:
     case VOID_FTYPE_PULONGLONG_ULONGLONG:
+    case VOID_FTYPE_PUNSIGNED_UNSIGNED:
     case VOID_FTYPE_PINT_INT:
       nargs = 1;
       klass = store;
@@ -36017,6 +35995,12 @@ ix86_expand_special_args_builtin (const struct builtin_description *d,
 	  break;
 	}
       break;
+    case VOID_FTYPE_PVOID_PCVOID:
+	nargs = 1;
+	klass = store;
+	memory = 0;
+
+	break;
     case V4SF_FTYPE_V4SF_PCV2SF:
     case V2DF_FTYPE_V2DF_PCDOUBLE:
       nargs = 2;
@@ -37156,6 +37140,27 @@ ix86_expand_builtin (tree exp, rtx target, rtx subtarget,
 
       emit_move_insn (target, op0);
       return target;
+
+    case IX86_BUILTIN_MOVDIR64B:
+
+      arg0 = CALL_EXPR_ARG (exp, 0);
+      arg1 = CALL_EXPR_ARG (exp, 1);
+      op0 = expand_normal (arg0);
+      op1 = expand_normal (arg1);
+
+      op0 = ix86_zero_extend_to_Pmode (op0);
+      if (!address_operand (op1, VOIDmode))
+      {
+	op1 = convert_memory_address (Pmode, op1);
+	op1 = copy_addr_to_reg (op1);
+      }
+      op1 = gen_rtx_MEM (XImode, op1);
+
+      insn = (TARGET_64BIT
+		? gen_movdir64b_di (op0, op1)
+		: gen_movdir64b_si (op0, op1));
+      emit_insn (insn);
+      return 0;
 
     case IX86_BUILTIN_FXSAVE:
     case IX86_BUILTIN_FXRSTOR:
@@ -41757,7 +41762,7 @@ x86_output_mi_thunk (FILE *file, tree, HOST_WIDE_INT delta,
   emit_note (NOTE_INSN_PROLOGUE_END);
 
   /* CET is enabled, insert EB instruction.  */
-  if ((flag_cf_protection & CF_BRANCH) && TARGET_IBT)
+  if ((flag_cf_protection & CF_BRANCH))
     emit_insn (gen_nop_endbr ());
 
   /* If VCALL_OFFSET, we'll need THIS in a register.  Might as well
@@ -43198,7 +43203,7 @@ ix86_expand_vector_init_one_var (bool mmx_ok, machine_mode mode,
       else
 	{
 	  var = convert_modes (HImode, QImode, var, true);
-	  x = gen_int_mode (INTVAL (x) << 8, HImode);
+	  x = gen_int_mode (UINTVAL (x) << 8, HImode);
 	}
       if (x != const0_rtx)
 	var = expand_simple_binop (HImode, IOR, var, x, var,
@@ -49757,7 +49762,7 @@ ix86_bnd_prefixed_insn_p (rtx insn)
 static bool
 ix86_notrack_prefixed_insn_p (rtx insn)
 {
-  if (!insn || !((flag_cf_protection & CF_BRANCH) && TARGET_IBT))
+  if (!insn || !((flag_cf_protection & CF_BRANCH)))
     return false;
 
   if (CALL_P (insn))
@@ -50554,8 +50559,9 @@ ix86_add_stmt_cost (void *data, int count, enum vect_cost_for_stmt kind,
      construction cost by the number of elements involved.  */
   if (kind == vec_construct
       && stmt_info
-      && stmt_info->type == load_vec_info_type
-      && stmt_info->memory_access_type == VMAT_ELEMENTWISE)
+      && STMT_VINFO_TYPE (stmt_info) == load_vec_info_type
+      && STMT_VINFO_MEMORY_ACCESS_TYPE (stmt_info) == VMAT_ELEMENTWISE
+      && TREE_CODE (DR_STEP (STMT_VINFO_DATA_REF (stmt_info))) != INTEGER_CST)
     {
       stmt_cost = ix86_builtin_vectorization_cost (kind, vectype, misalign);
       stmt_cost *= TYPE_VECTOR_SUBPARTS (vectype);
