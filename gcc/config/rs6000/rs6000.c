@@ -39433,11 +39433,7 @@ large_address_valid (rtx addr, machine_mode mode)
       if (GET_CODE (op0) == UNSPEC
 	  && XINT (op0, 1) == UNSPEC_TOCREL
 	  && CONST_INT_P (op1))
-	{
-	  bool strict_p = !can_create_pseudo_p ();
-	  if (!rs6000_legitimate_offset_address_p (mode, addr, strict_p, false))
-	    return false;
-	}
+	;
 
       else
 	{
@@ -39455,9 +39451,12 @@ large_address_valid (rtx addr, machine_mode mode)
       if (!int_is_32bit (value))
 	return false;
 
-      /* For addresses to 128-bit types, limit any integer offset to support
-	 DQ-form loads or stores.  For addresses to 64-bit types and for
-	 SFmode, limit any integer offset to support DS-form loads or stores.
+      /* Limit any integer offset to support DQ-form loads or stores for
+	 128-bit type.
+
+	 Limit any integer offset to support DS-form loads or stores for 64-bit
+	 types and for SFmode.
+
 	 If the address doesn't match, the compiler will use slower machine
 	 independent methods of loading up the address.  */
       if ((value & 15) != 0 && GET_MODE_SIZE (mode) == 16)
@@ -39469,13 +39468,7 @@ large_address_valid (rtx addr, machine_mode mode)
     }
 
   else if (GET_CODE (addr) == UNSPEC && XINT (addr, 1) == UNSPEC_TOCREL)
-    {
-      bool strict_p = !can_create_pseudo_p ();
-      if (!rs6000_legitimate_offset_address_p (mode, addr, strict_p, false))
-	return false;
-
-      return true;
-    }
+    return true;
 
   return false;
 }
