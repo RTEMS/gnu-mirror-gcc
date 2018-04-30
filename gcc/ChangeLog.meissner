@@ -1,5 +1,33 @@
 2018-04-30  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000-protos.h (output_large_address_load_store):
+	Add declaration.
+	* config/rs6000/rs6000.c (rs6000_init_hard_regno_mode_ok): Add
+	support for SFmode/DFmode to use large addresses.
+	(print_toc_upper): Delete %m, %M support from print_operand, and
+	associated functions.
+	(print_operand_large_address_upper) Likewise.
+	(print_toc_lower) Likewise.
+	(print_operand_large_address_lower) Likewise.
+	(print_operand) Likewise.
+	(split_large_address_internal): Split large address splitting into
+	two functions.
+	(split_large_address): Likewise.
+	(output_large_address_load_store): New function to output the two
+	instructions that make up a large address load/store.
+	* config/rs6000/rs6000.md (LADDR): Add support for SFmode/DFmode
+	to use large addresses.
+	(LADDR_FLOAD): Fix typo.
+	(large_mov<mode>_load): Change all large address load/stores to
+	use output_large_address_load_store instead of using %m/%M.
+	(large_mov<mode>_store): Likewise.
+	(extendsfdf2): Add support for SFmode/DFmode to use large
+	addresses.
+	(large_extendsfdf): Likewise.
+	(extendsfdf2_fpr): Likewise.
+
+2018-04-30  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (large_address_valid): Make sure TOC
 	reference is appropriately aligned.
 

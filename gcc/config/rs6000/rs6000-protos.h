@@ -108,6 +108,7 @@ extern bool emit_large_address_load (rtx, rtx, machine_mode);
 extern bool emit_large_address_store (rtx, rtx, machine_mode);
 extern bool large_address_valid (rtx, machine_mode);
 extern rtx split_large_address (rtx, rtx);
+extern void output_large_address_load_store (rtx, rtx, rtx, const char *);
 extern enum reg_class (*rs6000_preferred_reload_class_ptr) (rtx,
 							    enum reg_class);
 extern enum reg_class (*rs6000_secondary_reload_class_ptr) (enum reg_class,

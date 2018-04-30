@@ -3520,6 +3520,14 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
       reg_addr[DImode].large_address_p = true;
       reg_addr[DImode].large_addr_load = CODE_FOR_large_movdi_load;
       reg_addr[DImode].large_addr_store = CODE_FOR_large_movdi_store;
+
+      reg_addr[DFmode].large_address_p = true;
+      reg_addr[DFmode].large_addr_load = CODE_FOR_large_movdf_load;
+      reg_addr[DFmode].large_addr_store = CODE_FOR_large_movdf_store;
+
+      reg_addr[SFmode].large_address_p = true;
+      reg_addr[SFmode].large_addr_load = CODE_FOR_large_movsf_load;
+      reg_addr[SFmode].large_addr_store = CODE_FOR_large_movsf_store;
     }
 
   /* Precalculate HARD_REGNO_NREGS.  */
@@ -21178,148 +21186,6 @@ rs6000_output_function_entry (FILE *file, const char *fname)
   RS6000_OUTPUT_BASENAME (file, fname);
 }
 
-/* Print the upper part of a TOC reference.  */
-
-static void
-print_toc_upper (FILE *file, rtx unspec, HOST_WIDE_INT offset)
-{
-  rtx sym_ref = XVECEXP (unspec, 0, 0);		/* SYMBOL_REF.  */
-  rtx toc_reg = XVECEXP (unspec, 0, 1);		/* TOC register.  */
-
-  if (TARGET_ELF)
-    {
-      fprintf (file, "%s,", reg_names[REGNO (toc_reg)]);
-      output_addr_const (file, sym_ref);
-      if (offset)
-	fprintf (file, "%s" HOST_WIDE_INT_PRINT_DEC,
-		 offset < 0 ? "" : "+",
-		 offset);
-
-      fputs ("@toc@ha", file);
-    }
-
-  else if (TARGET_XCOFF)
-    {
-      output_addr_const (file, sym_ref);
-      if (offset)
-	fprintf (file, "%s" HOST_WIDE_INT_PRINT_DEC,
-		 offset < 0 ? "" : "+",
-		 offset);
-
-      fprintf (file, "@u(%s)", reg_names[REGNO (toc_reg)]);
-    }
-
-  else
-    gcc_unreachable ();
-
-  return;
-}
-
-/* Print the upper part of a large address formed with ADDIS and 12/14/16-bit
-   memory offset in a d-form instruction (print_operand %M handling).  Include
-   the register or R0 depending on the address.  */
-
-static void
-print_operand_large_address_upper (FILE *file, rtx x)
-{
-  rtx addr;
-  HOST_WIDE_INT offset, upper;
-
-  gcc_assert (large_mem_operand (x, GET_MODE (x)));
-  addr = XEXP (x, 0);
-
-  if (GET_CODE (addr) == PLUS && CONST_INT_P (XEXP (addr, 1)))
-    {
-      rtx op0 = XEXP (addr, 0);
-      rtx op1 = XEXP (addr, 1);
-
-      offset = INTVAL (op1);
-      if (REG_P (op0))
-	{
-	  upper = split_large_integer (offset, true);
-	  fprintf (file, "%s," HOST_WIDE_INT_PRINT_HEX,
-		   reg_names[REGNO (op0)], (upper >> 16) & 0xffff);
-	}
-
-      else if (GET_CODE (op0) == UNSPEC && XINT (op0, 1) == UNSPEC_TOCREL)
-	print_toc_upper (file, op0, offset);
-
-      else
-	fatal_insn ("bad address for %%M", addr);
-    }
-
-  else if (GET_CODE (addr) == UNSPEC && XINT (addr, 1) == UNSPEC_TOCREL)
-    print_toc_upper (file, addr, 0);
-
-  else
-    fatal_insn ("bad memory for %%M", x);
-
-  return;
-}
-
-/* Print the low part of a TOC symbol reference.  */
-
-static void
-print_toc_lower (FILE *file, rtx unspec, HOST_WIDE_INT offset)
-{
-  /* Print out the symbol ref.  */
-  output_addr_const (file, XVECEXP (unspec, 0, 0));
-
-  if (offset)
-    fprintf (file, "%s" HOST_WIDE_INT_PRINT_DEC, offset < 0 ? "" : "+", offset);
-
-  if (TARGET_ELF)
-    fputs ("@toc@l", file);
-  else if (TARGET_XCOFF)
-    fputs ("@l", file);
-  else
-    gcc_unreachable ();
-}
-
-/* Print the lower part of a large address formed with ADDIS and 12/14/16-bit
-   memory offset in a d-form instruction (print_operand %m handling).  Unlike
-   %M processing, we do not print the index register.  */
-
-static void
-print_operand_large_address_lower (FILE *file, rtx x)
-{
-  rtx addr;
-  HOST_WIDE_INT offset, lower;
-
-  gcc_assert (large_mem_operand (x, GET_MODE (x)));
-  addr = XEXP (x, 0);
-
-  if (GET_CODE (addr) == PLUS && CONST_INT_P (XEXP (addr, 1)))
-    {
-      rtx op0 = XEXP (addr, 0);
-      rtx op1 = XEXP (addr, 1);
-
-      offset = INTVAL (op1);
-      if (REG_P (op0))
-	{
-	  lower = split_large_integer (offset, false);
-	  if (lower < 0)
-	    fprintf (file, HOST_WIDE_INT_PRINT_DEC, lower);
-	  else
-	    fprintf (file, HOST_WIDE_INT_PRINT_HEX, lower & 0xffff);
-	}
-
-      else if (GET_CODE (op0) == UNSPEC && XINT (op0, 1) == UNSPEC_TOCREL)
-	print_toc_lower (file, op0, offset);
-
-      else
-	fatal_insn ("bad address for %%m", addr);
-    }
-
-  else if (GET_CODE (addr) == UNSPEC && XINT (addr, 1) == UNSPEC_TOCREL)
-    print_toc_lower (file, addr, 0);
-
-  else
-    fatal_insn ("bad memory for %%m", x);
-
-  return;
-}
-
 /* Print an operand.  Recognize special options, documented below.  */
 
 #if TARGET_ELF
@@ -21501,19 +21367,6 @@ print_operand (FILE *file, rtx x, int code)
 	    fprintf (file, "@%s(%s)", SMALL_DATA_RELOC,
 		     reg_names[SMALL_DATA_REG]);
 	}
-      return;
-
-    case 'M':
-      /* Print the upper part of a large address formed with ADDIS and
-	 12/14/16-bit memory offset in a d-form instruction.  Include the
-	 register or R0 depending on the address.  */
-      print_operand_large_address_upper (file, x);
-      return;
-
-    case 'm':
-      /* Print the lower part of a large address formed with ADDIS and
-	 12/14/16-bit memory offset in a d-form instruction.  */
-      print_operand_large_address_lower (file, x);
       return;
 
     case 'N': /* Unused */
@@ -39474,16 +39327,15 @@ large_address_valid (rtx addr, machine_mode mode)
   return false;
 }
 
-/* Split a large address into two insns, one to set the upper bits, and the
-   other to set the lower bits.  Emit the first insn, and return the second
-   insn that can be used as an address.  */
+/* Helper function to split_large_address to return the upper and lower parts
+   of a large address.  */
 
-rtx
-split_large_address (rtx addr, rtx tmp_reg)
+static enum rtx_code
+split_large_address_internal (rtx addr, rtx *p_hi, rtx *p_lo)
 {
   HOST_WIDE_INT value;
   rtx hi, lo;
-  enum rtx_code rcode = PLUS;
+  enum rtx_code rcode;
 
   if (GET_CODE (addr) == UNSPEC && XINT (addr, 1) == UNSPEC_TOCREL)
     {
@@ -39505,6 +39357,7 @@ split_large_address (rtx addr, rtx tmp_reg)
 	  hi = gen_rtx_PLUS (Pmode, op0,
 			     GEN_INT (split_large_integer (value, true)));
 	  lo = GEN_INT (split_large_integer (value, false));
+	  rcode = PLUS;
 	}
 
       else if (GET_CODE (op0) == UNSPEC && XINT (op0, 1) == UNSPEC_TOCREL)
@@ -39520,8 +39373,47 @@ split_large_address (rtx addr, rtx tmp_reg)
   else
     gcc_unreachable ();
 
+  *p_hi = hi;
+  *p_lo = lo;
+  return rcode;
+}
+
+/* Split a large address into two insns, one to set the upper bits, and the
+   other to set the lower bits.  Emit the first insn, and return the second
+   insn that can be used as an address.  */
+
+rtx
+split_large_address (rtx addr, rtx tmp_reg)
+{
+  rtx hi, lo;
+  enum rtx_code rcode = split_large_address_internal (addr, &hi, &lo);
+
   emit_insn (gen_rtx_SET (tmp_reg, hi));
   return gen_rtx_fmt_ee (rcode, Pmode, tmp_reg, lo);
+}
+
+/* Output the instructions to implement a large address load/store using a
+   scratch register to build a partial address.  */
+
+void
+output_large_address_load_store (rtx reg,
+				 rtx mem,
+				 rtx tmp_reg,
+				 const char *mnemonic)
+{
+  rtx hi, lo, addr;
+
+  gcc_assert (REG_P (reg) && MEM_P (mem));
+
+  addr = XEXP (mem, 0);
+  (void) split_large_address_internal (addr, &hi, &lo);
+
+  /* Emit the addis instruction.  */
+  emit_fusion_addis (tmp_reg, hi);
+
+  /* Emit the D-form load instruction.  */
+  emit_fusion_load_store (reg, tmp_reg, lo, mnemonic);
+  return;
 }
 
 
