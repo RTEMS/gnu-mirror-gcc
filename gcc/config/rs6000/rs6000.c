@@ -39433,7 +39433,10 @@ large_address_valid (rtx addr, machine_mode mode)
       if (GET_CODE (op0) == UNSPEC
 	  && XINT (op0, 1) == UNSPEC_TOCREL
 	  && CONST_INT_P (op1))
-	;
+	{
+	  if (!legitimate_constant_pool_address_p (addr, mode, false))
+	    return false;
+	}
 
       else
 	{
@@ -39441,8 +39444,6 @@ large_address_valid (rtx addr, machine_mode mode)
 	    return false;
 
 	  if (satisfies_constraint_I (op1))	/* bottom 16 bits.  */
-	    return false;
-	  if (satisfies_constraint_L (op1))	/* 16 bits out of 32 bits.  */
 	    return false;
 	}
 
@@ -39468,7 +39469,7 @@ large_address_valid (rtx addr, machine_mode mode)
     }
 
   else if (GET_CODE (addr) == UNSPEC && XINT (addr, 1) == UNSPEC_TOCREL)
-    return true;
+    return legitimate_constant_pool_address_p (addr, mode, false);
 
   return false;
 }
