@@ -7888,7 +7888,21 @@ small_data_operand (rtx op ATTRIBUTE_UNUSED,
 bool
 move_valid_p (rtx dest, rtx src, machine_mode mode)
 {
-  if (!gpc_reg_operand (dest, mode) && !gpc_reg_operand (src, mode))
+  /* We need to special case moving SFmode SUBREG's to prevent SUBREGs from
+     being used to move SFmode values to/from GPRs without conversion.  The
+     normal gpc_reg_operand will not allow SUBREG of SFmode, so use
+     register_operand in this case.  */
+  if (!TARGET_ALLOW_SF_SUBREG && mode == SFmode
+      && (SUBREG_P (dest) || SUBREG_P (src)))
+    {
+      if (!register_operand (dest, mode) && !register_operand (src, mode))
+	return false;
+
+      if (!valid_sf_si_move (dest, src, SFmode))
+	return false;
+    }
+
+  else if (!gpc_reg_operand (dest, mode) && !gpc_reg_operand (src, mode))
     return false;
 
   if (!reg_addr[mode].large_address_p || can_create_pseudo_p ())
