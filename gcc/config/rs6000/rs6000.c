@@ -38499,6 +38499,15 @@ fusion_gpr_load_p (rtx addis_reg,	/* register set via addis.  */
   rtx addr;
   rtx base_reg;
   machine_mode mode = GET_MODE (target);
+  machine_mode inner_mode = mode;
+
+  if (GET_CODE (mem) == ZERO_EXTEND || GET_CODE (mem) == SIGN_EXTEND)
+    inner_mode = GET_MODE (XEXP (mem, 0));
+
+  /* If large addresses are enabled, in theory we don't need the peephole.
+     Turn off the peephole for the types that support large addresses.  */
+  if (reg_addr[inner_mode].large_address_p)
+    return false;
 
   /* Validate arguments.  */
   if (!base_reg_operand (addis_reg, GET_MODE (addis_reg)))
@@ -38894,6 +38903,16 @@ fusion_p9_p (rtx addis_reg,		/* register set via addis.  */
 {
   rtx addr, mem, offset;
   machine_mode mode = GET_MODE (src);
+  machine_mode inner_mode = mode;
+
+  if (GET_CODE (src) == ZERO_EXTEND || GET_CODE (src) == SIGN_EXTEND
+      || GET_CODE (src) == FLOAT_EXTEND)
+    inner_mode = GET_MODE (XEXP (src, 0));
+
+  /* If large addresses are enabled, in theory we don't need the peephole.
+     Turn off the peephole for the types that support large addresses.  */
+  if (reg_addr[inner_mode].large_address_p)
+    return false;
 
   /* Validate arguments.  */
   if (!base_reg_operand (addis_reg, GET_MODE (addis_reg)))
