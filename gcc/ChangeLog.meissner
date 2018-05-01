@@ -1,5 +1,16 @@
 2018-04-30  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (movsf_hardfloat): Add support for
+	SFmode and DFmode to use large addresses.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_softfloat): Likewise.
+	(mov<mode>_hardfloat32): Likewise.
+	(mov<mode>_softfloat32): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(mov<mode>_softfloat64): Likewise.
+
+2018-04-30  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000-protos.h (output_large_address_load_store):
 	Add declaration.
 	* config/rs6000/rs6000.c (rs6000_init_hard_regno_mode_ok): Add
