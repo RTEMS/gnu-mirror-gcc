@@ -3287,17 +3287,42 @@
 ;; Optimize storing a single scalar element that is the right location to
 ;; memory
 (define_insn "*vsx_extract_<mode>_store"
-  [(set (match_operand:<VS_scalar> 0 "memory_operand" "=m,Z,wY")
+  [(set (match_operand:<VS_scalar> 0 "any_mem_operand" "=wN,Z,wY,wC,wC")
 	(vec_select:<VS_scalar>
-	 (match_operand:VSX_D 1 "register_operand" "d,wv,wb")
-	 (parallel [(match_operand:QI 2 "vsx_scalar_64bit" "wD,wD,wD")])))]
-  "VECTOR_MEM_VSX_P (<MODE>mode)"
-  "@
-   stfd%U0%X0 %1,%0
-   stxsd%U0x %x1,%y0
-   stxsd %1,%0"
+	 (match_operand:VSX_D 1 "register_operand" "d,wv,wb,d,wb")
+	 (parallel [(match_operand:QI 2 "vsx_scalar_64bit" "wD,wD,wD,wD,wD")])))
+   (clobber (match_scratch:DI 3 "=X,X,X,b,b"))]
+  "VECTOR_MEM_VSX_P (<MODE>mode)
+   && ((TARGET_LARGE_ADDRESS && TARGET_POWERPC64)
+       || !large_mem_operand (operands[0], <VS_scalar>mode))"
+{
+  const char *ret;
+  switch (which_alternative)
+    {
+    case 0: ret = "stfd%U0%X0 %1,%0";	break;
+    case 1: ret = "stxsd%U0x %x1,%y0";	break;
+    case 2: ret = "stxsd %1,%0";	break;
+
+    case 3:
+    case 4:
+      {
+	rtx mem = operands[0];
+	rtx reg = gen_rtx_REG (<VS_scalar>mode, REGNO (operands[1]));
+	rtx tmp = operands[3];
+	const char *store = (which_alternative == 3) ? "stfd" : "stxsd";
+
+	output_large_address_load_store (reg, mem, tmp, store);
+	ret = "";
+	break;
+      }
+
+    default: gcc_unreachable ();
+    }
+
+  return ret;
+}
   [(set_attr "type" "fpstore")
-   (set_attr "length" "4")])
+   (set_attr "length" "4,4,4,8,8")])
 
 ;; Variable V2DI/V2DF extract shift
 (define_insn "vsx_vslo_<mode>"
