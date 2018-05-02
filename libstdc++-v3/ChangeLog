@@ -1,3 +1,57 @@
+2018-05-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/68197
+	* include/bits/ios_base.h (ios_base::iword, ios_base::pword): Cast
+	indices to unsigned.
+	* src/c++11/ios.cc (ios_base::_M_grow_words): Treat negative indices
+	as failure. Refactor error handling.
+	* testsuite/27_io/ios_base/storage/68197.cc: New.
+
+	PR libstdc++/57997
+	PR libstdc++/83860
+	* include/bits/gslice_array.h (gslice_array): Define default
+	constructor as deleted, as per C++11 standard.
+	* include/bits/mask_array.h (mask_array): Likewise.
+	* include/bits/slice_array.h (slice_array): Likewise.
+	* include/bits/valarray_after.h (_GBase, _GClos, _IBase, _IClos): Move
+	to namespace __detail.
+	(_GBase::_M_expr, _IBase::_M_expr): Use _ValArrayRef for type of data
+	members.
+	* include/bits/valarray_before.h (_ValArrayRef): New helper for type
+	of data members in closure objects.
+	(_FunBase, _ValFunClos, _RefFunClos, _UnBase, _UnClos, _BinBase)
+	(_BinBase2, _BinBase1, _BinClos, _SBase, _SClos): Move to namespace
+	__detail.
+	(_FunBase::_M_expr, _UnBase::_M_expr, _BinBase::_M_expr1)
+	(_BinBase::_M_expr2, _BinBase2::_M_expr1, _BinBase1::_M_expr2)
+	(_SBase::_M_expr): Use _ValArrayRef for type of data members.
+	* include/std/valarray (_UnClos, _BinClos, _SClos, _GClos, _IClos)
+	(_ValFunClos, _RefFunClos): Move to namespace __detail and add
+	using-declarations to namespace std.
+	* testsuite/26_numerics/valarray/83860.cc: New.
+
+	* testsuite/backward/strstream_move.cc: Remove duplicate function
+	call.
+
+	PR libstdc++/69608
+	* include/backward/strstream (strstreambuf): Define move constructor
+	and move assignment operator.
+	(istrstream, ostrstream, strstream): Likewise.
+	* testsuite/backward/strstream_move.cc: New.
+
+2018-05-01  Tulio Magno Quites Machado Filho  <tuliom@linux.vnet.ibm.com>
+
+	PR libstdc++/84654
+	* acinclude.m4: Set ENABLE_FLOAT128 instead of _GLIBCXX_USE_FLOAT128.
+	* config.h.in: Remove references to _GLIBCXX_USE_FLOAT128.
+	* configure: Regenerate.
+	* include/Makefile.am: Replace the value of _GLIBCXX_USE_FLOAT128
+	based on ENABLE_FLOAT128.
+	* include/Makefile.in: Regenerate.
+	* include/bits/c++config: Define _GLIBCXX_USE_FLOAT128.
+	[!defined(__FLOAT128__) && !defined(__SIZEOF_FLOAT128__)]: Undefine
+	_GLIBCXX_USE_FLOAT128.
+
 2018-04-24  H.J. Lu  <hongjiu.lu@intel.com>
 
 	* configure: Regenerated.

@@ -1,3 +1,13 @@
+2018-05-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	Merge up to 259854.
+	* REVISION: Update subversion id.
+
+2018-05-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	Merge up to 259854.
+	* REVISION: Update subversion id.
+
 2018-05-01  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (fusion_gpr_load_p): Turn off peephole
