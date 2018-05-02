@@ -1,3 +1,34 @@
+2018-05-02  Jakub Jelinek  <jakub@redhat.com>
+
+	* BASE-VER: Set to 8.1.1.
+
+2018-05-02  Release Manager
+
+	* GCC 8.1.0 released.
+
+2018-05-02  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	PR tree-optimization/85586
+	* tree-vect-data-refs.c (vect_analyze_data_ref_dependence): Only
+	exit early for statements in the same group if the accesses are
+	not strided.
+
+2018-05-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR web/85578
+	* doc/install.texi2html: Replace _002d with - and _002a with * in
+	generated html files using sed.
+
+2018-04-27  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/85549
+	* ipa-cp.c (find_aggregate_values_for_callers_subset): Make sure
+	the jump function allows for passing through aggregate values.
+
+2018-04-27  Jeff Law  <law@redhat.com>
+
+	* config.gcc: Mark tile* targets as deprecated/obsolete.
+
 2018-04-27  Jakub Jelinek  <jakub@redhat.com>
 
 	PR tree-optimization/85529
