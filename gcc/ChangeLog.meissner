@@ -1,5 +1,41 @@
 2018-05-02  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (zero_extendqi<mode>2): Change 'm'
+	constraints to 'wN'.  Add calls to move_valid_p for the move
+	insns, and !large_mem_operand for the extended operands.
+	(zero_extendhi<mode>2): Likewise.
+	(zero_extendsi<mode>2): Likewise.
+	(extendhi<mode>2): Likewise.
+	(ashdi3_extswsli): Likewise.
+	(ashdi3_extswsli_dot): Likewise.
+	(ashdi3_extswsli_dot2): Likewise.
+	(extendsfdf2_fpr): Likewise.
+	(fixuns_trunc<mode>si2_stfiwx): Likewise.
+	(fix_trunc<mode>si2): Likewise.
+	(movsi_internal1): Likewise.
+	(movsi_internal1_single): Likewise.
+	(movsi_from_sf): Likewise.
+	(movdi_from_sf_zero_ext): Likewise.
+	(mov<mode>_internal, QHI interator): Likewise.
+	(movsf_hardfloat): Likewise.
+	(mov<mode>_softfloat): Likewise.
+	(movsf_from_si): Likewise.
+	(mov<mode>_hardfloat32): Likewise.
+	(mov<mode>_64bit_dm): Likewise.
+	(movtd_64bit_nodm): Likewise.
+	(mov<mode>_32bit): Likewise.
+	(extenddf<mode>2_vsx): Likewise.
+	(movdi_internal32): Likewise.
+	(movdi_internal64): Likewise.
+	(probe_stack_address): Likewise.
+	(stack_protect_set): Likewise.
+	(stack_protect_testsi): Likewise.
+	(<bd>_<mode>): Likewise.
+	(<bd>tf_<mode>): Likewise.
+	(prologue_movesi_from_cr): Likewise.
+	(stmw_operation): Likewise.
+	(unpack<mode>_dm): Likewise.
+
 	Merge up to 259854.
 	* REVISION: Update subversion id.
 
