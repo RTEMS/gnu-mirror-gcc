@@ -1,5 +1,15 @@
 2018-05-02  Michael Meissner  <meissner@linux.ibm.com>
 
+	Merge up to 259859.
+	* REVISION: Update subversion id.
+
+2018-05-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	Merge up to 259859.
+	* REVISION: Update subversion id.
+
+2018-05-02  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.md (zero_extendqi<mode>2): Change 'm'
 	constraints to 'wN'.  Add calls to move_valid_p for the move
 	insns, and !large_mem_operand for the extended operands.
