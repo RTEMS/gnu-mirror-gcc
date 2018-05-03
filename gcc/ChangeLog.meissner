@@ -1,5 +1,11 @@
 2018-05-03  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
+	* config/rs6000/rs6000.md (mov<mode>_hardfloat32, FMOVE64):
+	Reformat alternatives and attributes so it is easier to identify
+	which constraints/attributes go with which instruction.
+
+2018-05-03  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
 	* config/rs6000/rs6000.c (mode_supports_pre_incdec_p): Add
 	additional argument to specify the reload register class to use,
 	defaulting to RELOAD_REG_ANY.
