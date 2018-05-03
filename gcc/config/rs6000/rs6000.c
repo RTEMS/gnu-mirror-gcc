@@ -553,6 +553,23 @@ mode_supports_pre_modify_p (machine_mode mode)
 	  != 0);
 }
 
+/* Return true if we have D-form addressing in altivec registers.  */
+static inline bool
+mode_supports_vmx_dform (machine_mode mode)
+{
+  return ((reg_addr[mode].addr_mask[RELOAD_REG_VMX] & RELOAD_REG_OFFSET) != 0);
+}
+
+/* Return true if we have D-form addressing in VSX registers.  This addressing
+   is more limited than normal d-form addressing in that the offset must be
+   aligned on a 16-byte boundary.  */
+static inline bool
+mode_supports_dq_form (machine_mode mode)
+{
+  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_QUAD_OFFSET)
+	  != 0);
+}
+
 /* Given that there exists at least one variable that is set (produced)
    by OUT_INSN and read (consumed) by IN_INSN, return true iff
    IN_INSN represents one or more memory store operations and none of
@@ -636,23 +653,6 @@ rs6000_store_data_bypass_p (rtx_insn *out_insn, rtx_insn *in_insn)
 	}
     }
   return store_data_bypass_p (out_insn, in_insn);
-}
-
-/* Return true if we have D-form addressing in altivec registers.  */
-static inline bool
-mode_supports_vmx_dform (machine_mode mode)
-{
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_VMX] & RELOAD_REG_OFFSET) != 0);
-}
-
-/* Return true if we have D-form addressing in VSX registers.  This addressing
-   is more limited than normal d-form addressing in that the offset must be
-   aligned on a 16-byte boundary.  */
-static inline bool
-mode_supports_dq_form (machine_mode mode)
-{
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_QUAD_OFFSET)
-	  != 0);
 }
 
 
