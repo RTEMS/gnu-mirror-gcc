@@ -537,20 +537,22 @@ struct rs6000_reg_addr {
 
 static struct rs6000_reg_addr reg_addr[NUM_MACHINE_MODES];
 
-/* Helper function to say whether a mode supports PRE_INC or PRE_DEC.  */
+/* Helper function to say whether a mode supports PRE_INC or PRE_DEC in a given
+   reload register class or if some reload register class supports it.  */
 static inline bool
-mode_supports_pre_incdec_p (machine_mode mode)
+mode_supports_pre_incdec_p (machine_mode mode,
+			    enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
 {
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_PRE_INCDEC)
-	  != 0);
+  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_PRE_INCDEC) != 0);
 }
 
-/* Helper function to say whether a mode supports PRE_MODIFY.  */
+/* Helper function to say whether a mode supports PRE_MODIFY in a given
+   reload register class or if some reload register class supports it..  */
 static inline bool
-mode_supports_pre_modify_p (machine_mode mode)
+mode_supports_pre_modify_p (machine_mode mode,
+			    enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
 {
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_PRE_MODIFY)
-	  != 0);
+  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_PRE_MODIFY) != 0);
 }
 
 /* Return true if we have D-form addressing (register+offset) in either a
@@ -563,14 +565,14 @@ mode_supports_d_form (machine_mode mode,
   return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_OFFSET) != 0);
 }
 
-/* Return true if we have D-form addressing in VSX registers.  This addressing
-   is more limited than normal d-form addressing in that the offset must be
-   aligned on a 16-byte boundary.  */
+/* Return true if we have DQ-form addressing in a given reload register class
+   or if some reload register class supports it.  DQ-form addressing must have
+   the bottom 4 bits set to 0.  */
 static inline bool
-mode_supports_dq_form (machine_mode mode)
+mode_supports_dq_form (machine_mode mode,
+		       enum rs6000_reload_reg_type rt = RELOAD_REG_ANY)
 {
-  return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_QUAD_OFFSET)
-	  != 0);
+  return ((reg_addr[mode].addr_mask[rt] & RELOAD_REG_QUAD_OFFSET) != 0);
 }
 
 /* Given that there exists at least one variable that is set (produced)
