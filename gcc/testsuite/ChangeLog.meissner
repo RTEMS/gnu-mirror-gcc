@@ -1,3 +1,11 @@
+2018-05-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/85657
+	* gcc.target/powerpc/pr85657-1.c: New tests.
+	* gcc.target/powerpc/pr85657-2.c: Likewise.
+	* gcc.target/powerpc/pr85657-3.c: Likewise.
+	* g++.dg/pr85657: Likewise.
+
 2018-05-04   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 259952

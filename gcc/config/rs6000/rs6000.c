@@ -16496,35 +16496,28 @@ rs6000_init_builtins (void)
      floating point, we need make sure the type is non-zero or else self-test
      fails during bootstrap.
 
-     We don't register a built-in type for __ibm128 if the type is the same as
-     long double.  Instead we add a #define for __ibm128 in
-     rs6000_cpu_cpp_builtins to long double.
+     Always create __ibm128 as a separate type, even if the current long double
+     format is IBM extended double.
 
      For IEEE 128-bit floating point, always create the type __ieee128.  If the
      user used -mfloat128, rs6000-c.c will create a define from __float128 to
      __ieee128.  */
-  if (TARGET_LONG_DOUBLE_128 && FLOAT128_IEEE_P (TFmode))
+  if (TARGET_FLOAT128_TYPE)
     {
       ibm128_float_type_node = make_node (REAL_TYPE);
       TYPE_PRECISION (ibm128_float_type_node) = 128;
       SET_TYPE_MODE (ibm128_float_type_node, IFmode);
       layout_type (ibm128_float_type_node);
-
       lang_hooks.types.register_builtin_type (ibm128_float_type_node,
 					      "__ibm128");
-    }
-  else
-    ibm128_float_type_node = long_double_type_node;
 
-  if (TARGET_FLOAT128_TYPE)
-    {
       ieee128_float_type_node = float128_type_node;
       lang_hooks.types.register_builtin_type (ieee128_float_type_node,
 					      "__ieee128");
     }
 
   else
-    ieee128_float_type_node = long_double_type_node;
+    ieee128_float_type_node = ibm128_float_type_node = long_double_type_node;
 
   /* Initialize the modes for builtin_function_type, mapping a machine mode to
      tree type node.  */
@@ -32277,14 +32270,11 @@ rs6000_mangle_type (const_tree type)
       if (type == ieee128_float_type_node)
 	return "U10__float128";
 
-      if (TARGET_LONG_DOUBLE_128)
-	{
-	  if (type == long_double_type_node)
-	    return (TARGET_IEEEQUAD) ? "U10__float128" : "g";
+      if (type == ibm128_float_type_node)
+	return "u8__ibm128";
 
-	  if (type == ibm128_float_type_node)
-	    return "g";
-	}
+      if (TARGET_LONG_DOUBLE_128 && type == long_double_type_node)
+	return (TARGET_IEEEQUAD) ? "U10__float128" : "g";
     }
 
   /* Mangle IBM extended float long double as `g' (__float128) on

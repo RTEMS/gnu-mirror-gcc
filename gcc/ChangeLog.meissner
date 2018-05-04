@@ -1,3 +1,20 @@
+2018-05-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/85657
+	* config/rs6000/rs6000-builtin.def (PACK_IF): Add pack and unpack
+	functions for __ibm128.
+	(UNPACK_IF): Likewose.
+	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): Do not
+	define __ibm128 to be long double if the long double type is IBM
+	extended double.
+	* config/rs6000/rs6000.c (rs6000_init_builtins): Create a unique
+	__ibm128 type, even if the current long double format is IBM
+	extended double.
+	(rs6000_mangle_type): Mangle the explicit __ibm128 type as
+	u9__ibm128.
+	* doc/extend.texi (PowerPC built-in functions): Document the pack
+	and unpack functions for long double and __ibm128.
+
 2018-05-04   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 259952
