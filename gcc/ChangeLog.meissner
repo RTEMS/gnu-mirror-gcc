@@ -1,5 +1,14 @@
 2018-05-09  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_init_hard_regno_mode_ok): Enable
+	large address support for QI/HI/SImode.
+	* config/rs6000/rs6000.md (LADDR): Likewise.
+	(large_mov<mode>_loadu_di): Sign/zero extend of large addresses.
+	(large_mov<mode>_loads_di): Likewise.
+	(splitters of sign/zero extend of large address): Likewise.
+
+2018-05-09  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_option_override_internal): Set
 	-mlarge-address by default if we have p8 fusion.
 

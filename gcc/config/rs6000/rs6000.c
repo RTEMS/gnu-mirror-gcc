@@ -3483,24 +3483,33 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 	}
     }
 
-  /* Note which types support large addresses.  At the moment, only support
-     DImode on 64-bit with medium code model.  For loads, force loading into a
-     base register, and using that register to hold the upper bits (power8
-     fusion).  */
+  /* Note which types support large addresses.  */
   if (TARGET_LARGE_ADDRESS && TARGET_POWERPC64 && TARGET_VSX
       && TARGET_CMODEL == CMODEL_MEDIUM)
     {
+      reg_addr[QImode].large_address_p = true;
+      reg_addr[QImode].large_addr_load = CODE_FOR_large_movqi_load;
+      reg_addr[QImode].large_addr_store = CODE_FOR_large_movqi_store;
+
+      reg_addr[HImode].large_address_p = true;
+      reg_addr[HImode].large_addr_load = CODE_FOR_large_movhi_load;
+      reg_addr[HImode].large_addr_store = CODE_FOR_large_movhi_store;
+
+      reg_addr[SImode].large_address_p = true;
+      reg_addr[SImode].large_addr_load = CODE_FOR_large_movsi_load;
+      reg_addr[SImode].large_addr_store = CODE_FOR_large_movsi_store;
+
       reg_addr[DImode].large_address_p = true;
       reg_addr[DImode].large_addr_load = CODE_FOR_large_movdi_load;
       reg_addr[DImode].large_addr_store = CODE_FOR_large_movdi_store;
 
-      reg_addr[DFmode].large_address_p = true;
-      reg_addr[DFmode].large_addr_load = CODE_FOR_large_movdf_load;
-      reg_addr[DFmode].large_addr_store = CODE_FOR_large_movdf_store;
-
       reg_addr[SFmode].large_address_p = true;
       reg_addr[SFmode].large_addr_load = CODE_FOR_large_movsf_load;
       reg_addr[SFmode].large_addr_store = CODE_FOR_large_movsf_store;
+
+      reg_addr[DFmode].large_address_p = true;
+      reg_addr[DFmode].large_addr_load = CODE_FOR_large_movdf_load;
+      reg_addr[DFmode].large_addr_store = CODE_FOR_large_movdf_store;
     }
 
   /* Precalculate HARD_REGNO_NREGS.  */
