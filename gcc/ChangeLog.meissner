@@ -1,5 +1,9 @@
 2018-05-09  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (floatdidf2): Fix up merge errors.
+	(floatunsdidf2): Likewise.
+	(float<uns>di<mode>2_mem): Likewise.
+
 	Merge up to 260087.
 	* REVISION: Update subversion id.
 
