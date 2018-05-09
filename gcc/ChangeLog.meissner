@@ -1,5 +1,11 @@
 2018-05-09  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.md (large address load splitter): Don't
+	split load/store if we don't have p9 fusion.
+	(large address store splitter): Likewise.
+
+2018-05-09  Michael Meissner  <meissner@linux.ibm.com>
+
 	* config/rs6000/rs6000.c (rs6000_init_hard_regno_mode_ok): Enable
 	large address support for QI/HI/SImode.
 	* config/rs6000/rs6000.md (LADDR): Likewise.
