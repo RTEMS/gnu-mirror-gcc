@@ -4613,20 +4613,26 @@ rs6000_option_override_internal (bool global_init_p)
   SUB3TARGET_OVERRIDE_OPTIONS;
 #endif
 
-  /* Only allow -mlarge-address for 64-bit medium code model.  */
-  if (TARGET_LARGE_ADDRESS)
+  /* Don't allow -mlarge-address in 32-bit mode, or small code model.  Disallow
+     it in large code model at present, because addresses might not be within
+     32-bits of the TOC address.  Enable it by default on systems with at least
+     load fusion by default.  This test has to be after the subtarget options
+     are set in order to use medium code model.  */
+  if (TARGET_POWERPC64 && TARGET_CMODEL == CMODEL_MEDIUM)
     {
-      if (!TARGET_POWERPC64 || (TARGET_CMODEL != CMODEL_MEDIUM))
+      if (!TARGET_LARGE_ADDRESS && TARGET_P8_FUSION
+	  && !(rs6000_isa_flags_explicit & OPTION_MASK_LARGE_ADDRESS))
+	rs6000_isa_flags |= OPTION_MASK_LARGE_ADDRESS;
+    }
+  else if (TARGET_LARGE_ADDRESS)
+    {
+      rs6000_isa_flags &= ~OPTION_MASK_LARGE_ADDRESS;
+      if (rs6000_isa_flags_explicit & OPTION_MASK_LARGE_ADDRESS)
 	{
-	  rs6000_isa_flags &= ~OPTION_MASK_LARGE_ADDRESS;
-	  if (rs6000_isa_flags_explicit & OPTION_MASK_LARGE_ADDRESS)
-	    {
-	      if (!TARGET_POWERPC64)
-		error ("%qs requires 64-bit code.", "-mlarge-address");
-	      else
-		error ("%qs requires %qs", "-mlarge-address",
-		       "-mcmodel=medium");
-	    }
+	  if (!TARGET_POWERPC64)
+	    error ("%qs requires 64-bit code.", "-mlarge-address");
+	  else
+	    error ("%qs requires %qs", "-mlarge-address", "-mcmodel=medium");
 	}
     }
 

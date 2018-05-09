@@ -1,5 +1,8 @@
 2018-05-09  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Set
+	-mlarge-address by default if we have p8 fusion.
+
 	* doc/md.texi (Machine Constraints): Document wC and wN
 	constraints.
 
