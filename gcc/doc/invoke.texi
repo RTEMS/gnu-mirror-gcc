@@ -193,10 +193,9 @@ in the following sections.
 @gccoptlist{-fabi-version=@var{n}  -fno-access-control @gol
 -faligned-new=@var{n}  -fargs-in-order=@var{n}  -fcheck-new @gol
 -fconstexpr-depth=@var{n}  -fconstexpr-loop-limit=@var{n} @gol
--ffriend-injection @gol
 -fno-elide-constructors @gol
 -fno-enforce-eh-specs @gol
--ffor-scope  -fno-for-scope  -fno-gnu-keywords @gol
+-fno-gnu-keywords @gol
 -fno-implicit-templates @gol
 -fno-implicit-inline-templates @gol
 -fno-implement-inlines  -fms-extensions @gol
@@ -1066,7 +1065,6 @@ See RS/6000 and PowerPC Options.
 -m64  -m32  -mxl-compat  -mno-xl-compat  -mpe @gol
 -malign-power  -malign-natural @gol
 -msoft-float  -mhard-float  -mmultiple  -mno-multiple @gol
--msingle-float  -mdouble-float  -msimple-fpu @gol
 -mupdate  -mno-update @gol
 -mavoid-indexed-addresses  -mno-avoid-indexed-addresses @gol
 -mfused-madd  -mno-fused-madd  -mbit-align  -mno-bit-align @gol
@@ -2448,18 +2446,6 @@ originally proposed semantics for the C++11 standard, but was not part
 of the final standard, so it is disabled by default.  This option is
 deprecated, and may be removed in a future version of G++.
 
-@item -ffriend-injection
-@opindex ffriend-injection
-Inject friend functions into the enclosing namespace, so that they are
-visible outside the scope of the class in which they are declared.
-Friend functions were documented to work this way in the old Annotated
-C++ Reference Manual.  
-However, in ISO C++ a friend function that is not declared
-in an enclosing scope can only be found using argument dependent
-lookup.  GCC defaults to the standard behavior.
-
-This option is deprecated and will be removed.
-
 @item -fno-elide-constructors
 @opindex fno-elide-constructors
 The C++ standard allows an implementation to omit creating a temporary
@@ -2503,21 +2489,6 @@ another TU), they can avoid this overhead with the
 On targets that support symbol aliases, the default is
 @option{-fextern-tls-init}.  On targets that do not support symbol
 aliases, the default is @option{-fno-extern-tls-init}.
-
-@item -ffor-scope
-@itemx -fno-for-scope
-@opindex ffor-scope
-@opindex fno-for-scope
-If @option{-ffor-scope} is specified, the scope of variables declared in
-a @i{for-init-statement} is limited to the @code{for} loop itself,
-as specified by the C++ standard.
-If @option{-fno-for-scope} is specified, the scope of variables declared in
-a @i{for-init-statement} extends to the end of the enclosing scope,
-as was the case in old versions of G++, and other (traditional)
-implementations of C++.
-
-This option is deprecated and the associated non-standard
-functionality will be removed.
 
 @item -fno-gnu-keywords
 @opindex fno-gnu-keywords
@@ -23353,8 +23324,8 @@ following options:
 
 @gccoptlist{-maltivec  -mfprnd  -mhard-float  -mmfcrf  -mmultiple @gol
 -mpopcntb -mpopcntd  -mpowerpc64 @gol
--mpowerpc-gpopt  -mpowerpc-gfxopt  -msingle-float -mdouble-float @gol
--msimple-fpu  -mmulhw  -mdlmzb  -mmfpgpr -mvsx @gol
+-mpowerpc-gpopt  -mpowerpc-gfxopt @gol
+-mmulhw  -mdlmzb  -mmfpgpr -mvsx @gol
 -mcrypto -mhtm -mpower8-fusion -mpower8-vector @gol
 -mquad-memory -mquad-memory-atomic -mfloat128 -mfloat128-hardware}
 
@@ -23672,30 +23643,6 @@ is not supported.
 Generate code that does not use (uses) the floating-point register set.
 Software floating-point emulation is provided if you use the
 @option{-msoft-float} option, and pass the option to GCC when linking.
-
-@item -msingle-float
-@itemx -mdouble-float
-@opindex msingle-float
-@opindex mdouble-float
-Generate code for single- or double-precision floating-point operations.
-@option{-mdouble-float} implies @option{-msingle-float}.
-
-@item -msimple-fpu
-@opindex msimple-fpu
-Do not generate @code{sqrt} and @code{div} instructions for hardware
-floating-point unit.
-
-@item -mfpu=@var{name}
-@opindex mfpu
-Specify type of floating-point unit.  Valid values for @var{name} are
-@samp{sp_lite} (equivalent to @option{-msingle-float -msimple-fpu}),
-@samp{dp_lite} (equivalent to @option{-mdouble-float -msimple-fpu}),
-@samp{sp_full} (equivalent to @option{-msingle-float}),
-and @samp{dp_full} (equivalent to @option{-mdouble-float}).
-
-@item -mxilinx-fpu
-@opindex mxilinx-fpu
-Perform optimizations for the floating-point unit on Xilinx PPC 405/440.
 
 @item -mmultiple
 @itemx -mno-multiple
@@ -26550,6 +26497,11 @@ instruction set support.
 @item silvermont
 Intel Silvermont CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3, SSSE3,
 SSE4.1, SSE4.2, POPCNT, AES, PCLMUL and RDRND instruction set support.
+
+@item goldmont
+Intel Goldmont CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3, SSSE3,
+SSE4.1, SSE4.2, POPCNT, AES, PCLMUL, RDRND, XSAVE, XSAVEOPT and FSGSBASE
+instruction set support.
 
 @item knl
 Intel Knight's Landing CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3,

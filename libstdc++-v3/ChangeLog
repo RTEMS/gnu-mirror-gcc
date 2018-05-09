@@ -1,3 +1,176 @@
+2018-05-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/std_function.h (_Base_manager::_M_get_pointer):
+	Use constexpr if in C++17 mode.
+	(_Base_manager::_M_clone(_Any_data&, const _Any_data&, true_type)):
+	Copy from const object.
+	* testsuite/20_util/function/cons/non_copyconstructible.cc: New.
+
+2018-05-08  François Dumont  <fdumont@gcc.gnu.org>
+
+	* src/c++11/debug.cc [_GLIBCXX_HAVE_EXECINFO_H]: Include execinfo.h.
+	[_GLIBCXX_HAVE_EXECINFO_H](_Error_formatter::_M_error): Render
+	backtrace.
+
+	* include/debug/macros.h (__glibcxx_check_valid_range_at): New.
+	* include/debug/functions.h (__check_valid_range): Use latter.
+	* include/debug/macros.h (__glibcxx_check_valid_constructor_range): New,
+	use latter.
+	* include/debug/deque
+	(deque::deque<_Iter>(_Iter, _Iter, const _Alloc&)): Use latter.
+	* include/debug/forward_list
+	(forward_list::forward_list<_Iter>(_Iter, _Iter, const _Alloc&)):
+	Likewise.
+	* include/debug/list
+	(list::list<_Iter>(_Iter, _Iter, const _Alloc&)): Likewise.
+	* include/debug/list
+	(list::list<_Iter>(_Iter, _Iter, const _Alloc&)): Likewise.
+	* include/debug/map.h
+	(map::map<_Iter>(_Iter, _Iter, const _Alloc&)): Likewise.
+	(map::map<_Iter>(_Iter, _Iter, const _Compare&, const _Alloc&)):
+	Likewise.
+	* include/debug/multimap.h
+	(multimap::multimap<_Iter>(_Iter, _Iter, const _Alloc&)): Likewise.
+	(multimap::multimap<_Iter>(_Iter, _Iter, const _Compare&,
+	const _Alloc&)): Likewise.
+	* include/debug/set.h
+	(set::set<_Iter>(_Iter, _Iter, const _Alloc&)): Likewise.
+	(set::set<_Iter>(_Iter, _Iter, const _Compare&, const _Alloc&)):
+	Likewise.
+	* include/debug/multiset.h
+	(multiset::multiset<_Iter>(_Iter, _Iter, const _Alloc&)): Likewise.
+	(multiset::multiset<_Iter>(_Iter, _Iter, const _Compare&,
+	const _Alloc&)): Likewise.
+	* include/debug/string
+	(basic_string::basic_string<_Iter>(_Iter, _Iter, const _Alloc&)):
+	Likewise.
+	* include/debug/unordered_map
+	(unordered_map::unordered_map<_Iter>(_Iter, _Iter, const _Alloc&)):
+	Likewise.
+	(unordered_multimap::unordered_multimap<_Iter>(_Iter, _Iter,
+	const _Alloc&)): Likewise.
+	* include/debug/unordered_set
+	(unordered_set::unordered_set<_Iter>(_Iter, _Iter, const _Alloc&)):
+	Likewise.
+	(unordered_multiset::unordered_multiset<_Iter>(_Iter, _Iter,
+	const _Alloc&)): Likewise.
+	* include/debug/vector
+	(vector::vector<_Iter>(_Iter, _Iter, const _Alloc&)): Use latter.
+
+	* include/debug/formatter.h (_Error_formatter::_M_function): New.
+	(_Error_formatter(const char*, unsigned int)): Adapt.
+	(_Error_formatter::_M_at): Rename in...
+	(_Error_formatter::_S_at): ...that and adapt.
+	* include/debug/macros.h (_GLIBCXX_DEBUG_VERIFY_AT_F): New.
+	(_GLIBCXX_DEBUG_VERIFY_AT, _GLIBCXX_DEBUG_VERIFY): Adapt.
+	* src/c++11/debug.cc (_Error_formatter::_M_error): Render _M_function
+	when available.
+
+2018-05-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/regex_automaton.h (_NFA_base::_M_paren_stack, _NFA):
+	Use normal std::vector even in Debug Mode.
+
+	PR libstdc++/85672
+	* include/Makefile.am [!ENABLE_FLOAT128]: Change c++config.h entry
+	to #undef _GLIBCXX_USE_FLOAT128 instead of defining it to zero.
+	* include/Makefile.in: Regenerate.
+	* include/bits/c++config (_GLIBCXX_USE_FLOAT128): Move definition
+	within conditional block.
+
+2018-05-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/using.xml (table.cmd_options): Document that the
+	C++17 Filesystem implementation also needs -lstdc++fs.
+
+	PR libstdc++/85671
+	* include/bits/fs_path.h (operator/): Permit copy elision.
+	* include/experimental/bits/fs_path.h (operator/): Likewise.
+
+2018-05-07  Edward Smith-Rowland  <3dw4rd@verizon.net>
+
+	Moar PR libstdc++/80506
+	* include/bits/random.tcc (gamma_distribution::__generate_impl()):
+	Fix magic number used in loop condition.
+
+2018-05-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/85642 fix is_nothrow_default_constructible<optional<T>>
+	* include/std/optional (_Optional_payload): Add noexcept to default
+	constructor. Re-indent.
+	(_Optional_payload<_Tp, true, true, true>): Likewise. Add noexcept to
+	constructor for copying disengaged payloads.
+	(_Optional_payload<_Tp, true, false, true>): Likewise.
+	(_Optional_payload<_Tp, true, true, false>): Likewise.
+	(_Optional_payload<_Tp, true, false, false>): Likewise.
+	* testsuite/20_util/optional/cons/85642.cc: New.
+	* testsuite/20_util/optional/cons/value_neg.cc: Adjust dg-error lines.
+
+2018-05-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/82644
+	* include/tr1/cmath [__STRICT_ANSI__] (hypergf, hypergl, hyperg): Use
+	inline definitions instead of using-declarations.
+	[__STRICT_ANSI__] (conf_hypergf, conf_hypergl, conf_hyperg): Likewise.
+	* testsuite/tr1/5_numerical_facilities/special_functions/
+	07_conf_hyperg/compile_cxx17.cc: New.
+	* testsuite/tr1/5_numerical_facilities/special_functions/
+	17_hyperg/compile_cxx17.cc: New.
+
+	PR libstdc++/84769
+	* include/std/variant (visit): Qualify std::get call.
+
+	PR libstdc++/85632 use uintmax_t for arithmetic
+	* src/filesystem/ops.cc (experimental::filesystem::space): Perform
+	arithmetic in result type.
+	* src/filesystem/std-ops.cc (filesystem::space): Likewise.
+	* testsuite/27_io/filesystem/operations/space.cc: Check total capacity
+	is greater than free space.
+	* testsuite/experimental/filesystem/operations/space.cc: New.
+
+	* testsuite/20_util/remove_cvref/requirements/alias_decl.cc: New.
+	* testsuite/20_util/remove_cvref/requirements/explicit_instantiation.cc:
+	New.
+	* testsuite/20_util/remove_cvref/value.cc: New.
+	* testsuite/20_util/remove_cvref/value_ext.cc: New.
+
+	PR libstdc++/84087 LWG DR 2268 basic_string default arguments
+	* include/bits/basic_string.h [_GLIBCXX_USE_CXX11_ABI=1]
+	(append(const basic_string&, size_type, size_type)
+	(assign(const basic_string&, size_type, size_type)
+	(insert(size_type, const basic_string&, size_type, size_type)
+	(replace(size_type,size_type,const basic_string&,size_type,size_type)
+	(compare(size_type,size_type,constbasic_string&,size_type,size_type)):
+	Add default arguments (LWG 2268).
+	[_GLIBCXX_USE_CXX11_ABI=0]
+	(append(const basic_string&, size_type, size_type)
+	(assign(const basic_string&, size_type, size_type)
+	(insert(size_type, const basic_string&, size_type, size_type)
+	(replace(size_type,size_type,const basic_string&,size_type,size_type)
+	(compare(size_type,size_type,constbasic_string&,size_type,size_type)):
+	Likewise.
+	* testsuite/21_strings/basic_string/dr2268.cc: New test.
+
+	PR libstdc++/84535
+	* include/std/thread (thread::__not_same): New SFINAE helper.
+	(thread::thread(_Callable&&, _Args&&...)): Add SFINAE constraint that
+	first argument is not a std::thread. Add static assertion to check
+	INVOKE expression is valid.
+	(thread::thread(thread&), thread::thread(const thread&&)): Remove.
+	(thread::_Invoke::_M_invoke, thread::_Invoke::operator()): Use
+	__invoke_result for return types and remove exception specifications.
+	* testsuite/30_threads/thread/cons/84535.cc: New.
+
+	* include/std/future (__async_result_of): Use __invoke_result instead
+	of result_of.
+
+	* include/std/any (any_cast): Use __remove_cvref_t.
+	* include/std/tuple (__make_tuple): Likewise.
+	* include/std/type_traits (__remove_cvref_t): Define.
+	(__result_of_memobj, __result_of_memfun): Use __remove_cvref_t.
+	[__cplusplus > 201703L] (remove_cvref, remove_cvref_t): Define.
+	* include/std/variant (__erased_hash): Use __remove_cvref_t.
+
 2018-05-02  François Dumont  <fdumont@gcc.gnu.org>
 
 	* include/bits/deque.tcc (deque<>::_M_assign_aux): Cast to void to

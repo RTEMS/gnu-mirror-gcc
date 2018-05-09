@@ -1,3 +1,92 @@
+2018-05-09  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/85713
+	Revert:
+	2018-05-08  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/84588
+	* parser.c (cp_parser_parameter_declaration_list): When the
+	entire parameter-declaration-list is erroneous maybe call
+	abort_fully_implicit_template.
+
+2018-05-08  Jason Merrill  <jason@redhat.com>
+
+	PR c++/85706 - class deduction under decltype
+	* pt.c (for_each_template_parm_r): Handle DECLTYPE_TYPE.  Clear
+	*walk_subtrees whether or not we walked into the operand.
+	(type_uses_auto): Only look at deduced contexts.
+
+2018-05-08  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/84588
+	* parser.c (cp_parser_parameter_declaration_list): When the
+	entire parameter-declaration-list is erroneous maybe call
+	abort_fully_implicit_template.
+
+2018-05-08  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/85695
+	* semantics.c (finish_if_stmt_cond): See through typedefs.
+
+2018-05-07  Jason Merrill  <jason@redhat.com>
+
+	PR c++/85646 - lambda visibility.
+	* decl2.c (determine_visibility): Don't mess with template arguments
+	from the containing scope.
+	(vague_linkage_p): Check DECL_ABSTRACT_P before looking at a 'tor
+	thunk.
+
+2018-05-07  Nathan Sidwell  <nathan@acm.org>
+
+	Remove fno-for-scope
+	* cp-tree.h (DECL_ERROR_REPORTED, DECL_DEAD_FOR_LOCAL)
+	(DECL_HAS_SHADOWED_FOR_VAR_P, DECL_SHADOWED_FOR_VAR)
+	(SET_DECL_SHADOWED_FOR_VAR): Delete.
+	(decl_shadowed_for_var_lookup, decl_shadowed_for_var_insert)
+	(check_for_out_of_scope_variable, init_shadowed_var_for_decl):
+	Don't declare.
+	* name-lookup.h (struct cp_binding_level): Remove
+	dead_vars_from_for field.
+	* cp-lang.c (cp_init_ts): Delete.
+	(LANG_HOOKS_INIT_TS): Override to cp_common_init_ts.
+	* cp-objcp-common.c (shadowed_var_for_decl): Delete.
+	(decl_shadowed_for_var_lookup, decl_shadowed_for_var_insert)
+	(init_shadowed_var_for_decl): Delete.
+	* decl.c (poplevel): Remove shadowed for var handling.
+	(cxx_init_decl_processing): Remove -ffor-scope deprecation.
+	* name-lookup.c (find_local_binding): Remove shadowed for var
+	handling.
+	(check_local_shadow): Likewise.
+	(check_for_out_of_scope_variable): Delete.
+	* parser.c (cp_parser_primary_expression): Remove shadowed for var
+	handling.
+	* pt.c (tsubst_decl): Remove DECL_DEAD_FOR_LOCAL setting.
+	* semantics.c (begin_for_scope): Always have a scope.
+	(begin_for_stmt, finish_for_stmt): Remove ARM-for scope handling.
+	(begin_range_for_stmt, finish_id_expression): Likewise.
+
+2018-05-07  Jason Merrill  <jason@redhat.com>
+
+	PR c++/85618 - ICE with initialized VLA.
+	* tree.c (vla_type_p): New.
+	* typeck2.c (store_init_value, split_nonconstant_init_1): Check it
+	rather than array_of_runtime_bound_p.
+
+2018-05-05  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	* cvt.c (ocp_convert): Early handle the special case of a
+	null_ptr_cst_p expr converted to a NULLPTR_TYPE_P type.
+
+2018-05-03  Jason Merrill  <jason@redhat.com>
+
+	PR c++/85600 - virtual delete failure.
+	* init.c (build_delete): Always save_expr when deleting.
+
+2018-05-03  Nathan Sidwell  <nathan@acm.org>
+
+	* decl.c (cxx_init_decl_processing): Remove flag_friend_injection.
+	* name-lookup.c (do_pushdecl): Likewise.
+
 2018-05-02  Paolo Carlini  <paolo.carlini@oracle.com>
 	    Jason Merrill  <jason@redhat.com>
 

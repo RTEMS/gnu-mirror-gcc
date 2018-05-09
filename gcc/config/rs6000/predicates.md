@@ -619,9 +619,7 @@
     return 0;
 
   /* Consider all constants with -msoft-float to be easy.  */
-  if ((TARGET_SOFT_FLOAT
-      || (TARGET_HARD_FLOAT && (TARGET_SINGLE_FLOAT && ! TARGET_DOUBLE_FLOAT)))
-      && mode != DImode)
+  if (TARGET_SOFT_FLOAT && mode != DImode)
     return 1;
 
   /* 0.0D is not all zero bits.  */
@@ -1814,7 +1812,7 @@
        DFmode in 32-bit if -msoft-float since it splits into two separate
        instructions.  */
     case E_DFmode:
-      if ((!TARGET_POWERPC64 && !TARGET_DF_FPR) || !TARGET_P9_FUSION)
+      if ((!TARGET_POWERPC64 && !TARGET_HARD_FLOAT) || !TARGET_P9_FUSION)
 	return 0;
       break;
 
@@ -1874,7 +1872,7 @@
        into two separate instructions.  Do allow fusion if we have hardware
        floating point.  */
     case E_DFmode:
-      if (!TARGET_POWERPC64 && !TARGET_DF_FPR)
+      if (!TARGET_POWERPC64 && !TARGET_HARD_FLOAT)
 	return 0;
       break;
 
