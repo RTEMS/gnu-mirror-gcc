@@ -1,5 +1,8 @@
 2018-05-09  Michael Meissner  <meissner@linux.ibm.com>
 
+	* doc/md.texi (Machine Constraints): Document wC and wN
+	constraints.
+
 	* config/rs6000/rs6000.md (floatdidf2): Fix up merge errors.
 	(floatunsdidf2): Likewise.
 	(float<uns>di<mode>2_mem): Likewise.

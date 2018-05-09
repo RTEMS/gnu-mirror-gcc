@@ -3151,6 +3151,9 @@ Address base register if 64-bit instructions are enabled or NO_REGS.
 @item wB
 Signed 5-bit constant integer that can be loaded into an altivec register.
 
+@item wC
+Memory operand is a large address.
+
 @item wD
 Int constant that is the element number of the 64-bit scalar in a vector.
 
@@ -3178,6 +3181,9 @@ targets.
 
 @item wM
 Match vector constant with all 1's if the XXLORC instruction is available.
+
+@item wN
+Memmory operand is not a large address.
 
 @item wO
 A memory operand suitable for the ISA 3.0 vector d-form instructions.
