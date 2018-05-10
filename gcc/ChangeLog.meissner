@@ -1,5 +1,19 @@
 2018-05-10  Michael Meissner  <meissner@linux.ibm.com>
 
+	* config/rs6000/predicates.md (large_mem_operand): Move higher in
+	predicates.md.
+	(any_mem_operand): Likewise.
+	(reg_or_any_mem_operand): New predicate, like reg_or_mem_operand,
+	but allow large addresses.
+	* config/rs6000/rs6000.md (ashdi3_extswsli): Split extswsli into
+	two parts, one just doing a register operation, and the other
+	loading the value from memory.  Add large memory support.
+	(ashdi3_extswsli_mem): Likewise.
+	(ashdi3_extswsli_dot): Likewise.
+	(ashdi3_extswsli_dot_mem): Likewise.
+	(ashdi3_extswsli_dot2): Likewise.
+	(ashdi3_extswsli_dot2_mem): Likewise.
+
 	* config/rs6000/rs6000.c (split_large_integer): Properly sign
 	extend hi integer.
 

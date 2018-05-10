@@ -911,6 +911,24 @@
 		    || (GET_CODE (XEXP (op, 0)) == PRE_MODIFY
 			&& indexed_address (XEXP (XEXP (op, 0), 1), mode))))"))
 
+;; Match a memory operation that uses a large address.
+(define_predicate "large_mem_operand"
+  (match_code "mem")
+{
+  return large_address_valid (XEXP (op, 0), mode);
+})
+
+;; Match a memory operand that might be large or normal.  After register
+;; allocation, memory_operand will not return true for large addresses.
+(define_predicate "any_mem_operand"
+  (match_code "mem")
+{
+  if (TARGET_LARGE_ADDRESS && large_address_valid (XEXP (op, 0), mode))
+    return true;
+
+  return memory_operand (op, mode);
+})
+
 ;; Return 1 if the operand is either a non-special register or can be used
 ;; as the operand of a `mode' add insn.
 (define_predicate "add_operand"
@@ -978,6 +996,11 @@
 	    (match_test "macho_lo_sum_memory_operand (op, mode)"))
        (match_operand 0 "volatile_mem_operand")
        (match_operand 0 "gpc_reg_operand")))
+
+;; Like reg_or_mem_operand, but allow large addresses
+(define_predicate "reg_or_any_mem_operand"
+  (ior (match_operand 0 "reg_or_mem_operand")
+       (match_operand 0 "large_mem_operand")))
 
 ;; Return 1 if the operand is CONST_DOUBLE 0, register or memory operand.
 (define_predicate "zero_reg_mem_operand"
@@ -1919,23 +1942,4 @@
     return 0;
 
   return offsettable_nonstrict_memref_p (op);
-})
-
-
-;; Match a memory operation that uses a large address.
-(define_predicate "large_mem_operand"
-  (match_code "mem")
-{
-  return large_address_valid (XEXP (op, 0), mode);
-})
-
-;; Match a memory operand that might be large or normal.  After register
-;; allocation, memory_operand will not return true for large addresses.
-(define_predicate "any_mem_operand"
-  (match_code "mem")
-{
-  if (TARGET_LARGE_ADDRESS && large_address_valid (XEXP (op, 0), mode))
-    return true;
-
-  return memory_operand (op, mode);
 })
