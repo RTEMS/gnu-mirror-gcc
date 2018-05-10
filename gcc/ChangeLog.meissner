@@ -1,3 +1,8 @@
+2018-05-10  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (split_large_integer): Properly sign
+	extend hi integer.
+
 2018-05-09  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.md (large address load splitter): Don't

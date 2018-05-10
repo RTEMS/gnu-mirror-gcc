@@ -20521,6 +20521,8 @@ split_large_integer (HOST_WIDE_INT value, bool hi_p)
     {
       lo |= ~HOST_WIDE_INT_C (0xffff);
       hi += HOST_WIDE_INT_C (0x10000);
+      if (hi & HOST_WIDE_INT_C (0x80000000U))
+	hi |= ~HOST_WIDE_INT_C (0xffffffffU);
       gcc_assert (int_is_32bit (hi));
     }
 
