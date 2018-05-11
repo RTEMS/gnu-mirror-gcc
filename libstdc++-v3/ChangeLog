@@ -1,3 +1,68 @@
+2018-05-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/faq.xml: Link to C++17 status. Add note to outdated answer.
+	* doc/xml/manual/debug_mode.xml: Add array and forward_list to list
+	of C++11 containers with Debug Mode support.
+	* doc/xml/manual/using.xml: Document Dual ABI for ios_base::failure.
+	* doc/html/*: Regenerate.
+
+2018-05-10  Jason Merrill  <jason@redhat.com>
+
+	* include/bits/regex_compiler.h (_S_cache_size): Change from
+	function to variable.
+
+2018-05-10  Edward Smith-Rowland  <3dw4rd@verizon.net>
+
+	PR libstdc++/83140 - assoc_legendre returns negated value when m is odd
+	* include/tr1/legendre_function.tcc (__assoc_legendre_p): Add __phase
+	argument defaulted to +1.  Doxy comments on same.
+	* testsuite/special_functions/02_assoc_legendre/
+	check_value.cc: Regen.
+	* testsuite/tr1/5_numerical_facilities/special_functions/
+	02_assoc_legendre/check_value.cc: Regen.
+
+2018-05-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/85729
+	* include/bits/c++config.h (__replacement_assert): Add linkage
+	specification.
+	* include/bits/std_abs.h: Add comment to closing brace of block.
+	* include/c_global/cstddef: Add linkage specification.
+	* include/c_global/cstring: Likewise.
+	* include/c_global/cwchar: Likewise.
+
+2018-05-09  François Dumont  <fdumont@gcc.gnu.org>
+
+	* include/debug/safe_iterator.h (_Safe_iterator<>::_M_constant()):
+	Rename in...
+	(_Safe_iterator<>::_S_constant()): ...that.
+	* include/debug/safe_local_iterator.h
+	(_Safe_local_iterator<>::_M_constant()): Rename in...
+	(_Safe_local_iterator<>::_S_constant()): ...that.
+	* include/debug/formatter.h: Remove bits/cpp_type_traits.h include.
+	(_Iterator_state::__rbegin): New.
+	(_Iterator_state::__rmiddle): New.
+	(_Iterator_state::__rend): New.
+	(_Parameter::_Parameter(const _Safe_iterator<>&, const char*,
+	_Is_iterator)): Use _Safe_iterator<>::_S_constant. Grab normal underlying
+	iterator type.
+	(_Parameter::_Parameter(const _Safe_local_iterator<>&, const char*,
+	_Is_iterator)): Likewise.
+	(_Parameter::_S_reverse_state(_Iterator_state)): New.
+	(_Parameter(__gnu_cxx::__normal_iterator<> const&, const char*,
+	_Is_iterator)): New.
+	(_Parameter(std::reverse_iterator<> const&, const char*,
+	_Is_iterator)): New.
+	(_Parameter(std::reverse_iterator<_Safe_iterator<>> const&,
+	const char*, _Is_iterator)): New.
+	(_Parameter(std::move_iterator<> const&, const char*, _Is_iterator):
+	New.
+	(_Parameter(std::move_iterator<_Safe_iterator<>> const&, const char*,
+	_Is_iterator)): New.
+	* testsuite/24_iterators/move_iterator/debug_neg.cc: New.
+	* testsuite/24_iterators/normal_iterator/debug_neg.cc: New.
+	* testsuite/24_iterators/reverse_iterator/debug_neg.cc: New.
+
 2018-05-09  Jonathan Wakely  <jwakely@redhat.com>
 
 	* include/bits/std_function.h (_Base_manager::_M_get_pointer):

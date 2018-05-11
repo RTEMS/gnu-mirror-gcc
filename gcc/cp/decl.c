@@ -3756,7 +3756,7 @@ make_typename_type (tree context, tree name, enum tag_types tag_type,
   if (TREE_CODE (name) == TEMPLATE_DECL)
     {
       if (complain & tf_error)
-	error ("%qD used without template parameters", name);
+	error ("%qD used without template arguments", name);
       return error_mark_node;
     }
   gcc_assert (identifier_p (name));
@@ -6803,24 +6803,18 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
       && (DECL_INITIAL (decl) || init))
     DECL_INITIALIZED_IN_CLASS_P (decl) = 1;
 
+  /* Do auto deduction unless decl is a function or an uninstantiated
+     template specialization.  */
   if (TREE_CODE (decl) != FUNCTION_DECL
+      && !(init == NULL_TREE
+	   && DECL_LANG_SPECIFIC (decl)
+	   && DECL_TEMPLATE_INSTANTIATION (decl)
+	   && !DECL_TEMPLATE_INSTANTIATED (decl))
       && (auto_node = type_uses_auto (type)))
     {
       tree d_init;
       if (init == NULL_TREE)
-	{
-	  if (DECL_LANG_SPECIFIC (decl)
-	      && DECL_TEMPLATE_INSTANTIATION (decl)
-	      && !DECL_TEMPLATE_INSTANTIATED (decl))
-	    {
-	      /* init is null because we're deferring instantiating the
-		 initializer until we need it.  Well, we need it now.  */
-	      instantiate_decl (decl, /*defer_ok*/true, /*expl*/false);
-	      return;
-	    }
-
-	  gcc_assert (CLASS_PLACEHOLDER_TEMPLATE (auto_node));
-	}
+	gcc_assert (CLASS_PLACEHOLDER_TEMPLATE (auto_node));
       d_init = init;
       if (d_init)
 	{
@@ -9368,6 +9362,7 @@ check_static_variable_definition (tree decl, tree type)
      in check_initializer.  Similarly for inline static data members.  */
   if (DECL_P (decl)
       && (DECL_DECLARED_CONSTEXPR_P (decl)
+	  || undeduced_auto_decl (decl)
 	  || DECL_VAR_DECLARED_INLINE_P (decl)))
     return 0;
   else if (cxx_dialect >= cxx11 && !INTEGRAL_OR_ENUMERATION_TYPE_P (type))

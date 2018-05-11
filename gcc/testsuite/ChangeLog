@@ -1,3 +1,118 @@
+2018-05-11  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85542
+	* gfortran.dg/pr85542.f90: New test.
+
+2018-05-11  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/85655
+	* g++.dg/lto/pr85655_0.C: New test.
+
+2018-05-11  Sebastian Peryt  <sebastian.peryt@intel.com>
+
+	* gcc.target/i386/tpause-1.c: New test.
+	* gcc.target/i386/umonitor-1.c: New test.
+
+2018-05-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/85696
+	* c-c++-common/gomp/pr85696.c: New test.
+
+2018-05-11  Allan Sandfeld Jensen  <allan.jensen@qt.io>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/85692
+	* gcc.target/i386/pr85692.c: New test.
+
+2018-05-11  Martin Liska  <mliska@suse.cz>
+
+        PR sanitizer/85556
+	* c-c++-common/ubsan/attrib-6.c: New test.
+
+2018-05-10  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85687
+	* gfortran.dg/pr85687.f90: new test.
+
+2018-05-10  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85521
+	* gfortran.dg/pr85521_1.f90: New test.
+	* gfortran.dg/pr85521_2.f90: New test.
+
+2018-05-10  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/70870
+	* gfortran.dg/pr70870_1.f90: New test.
+
+2018-05-10  Uros Bizjak  <ubizjak@gmail.com>
+
+	* gcc.target/i386/xgetsetbv.c: Check also variable arguments.
+
+2018-05-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/85662
+	* g++.dg/ext/offsetof2.C: New test.
+
+2018-05-10  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/68846
+	* gfortran.dg/temporary_3.f90 : New test.
+
+	PR fortran/70864
+	* gfortran.dg/temporary_2.f90 : New test.
+
+2018-05-10  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* gcc.dg/vmx/extract-be-order.c: Delete testcase.
+	* gcc.dg/vmx/extract-vsx-be-order.c: Delete testcase.
+	* gcc.dg/vmx/insert-be-order.c: Delete testcase.
+	* gcc.dg/vmx/insert-vsx-be-order.c: Delete testcase.
+	* gcc.dg/vmx/ld-be-order.c: Delete testcase.
+	* gcc.dg/vmx/ld-vsx-be-order.c: Delete testcase.
+	* gcc.dg/vmx/lde-be-order.c: Delete testcase.
+	* gcc.dg/vmx/ldl-be-order.c: Delete testcase.
+	* gcc.dg/vmx/ldl-vsx-be-order.c: Delete testcase.
+	* gcc.dg/vmx/merge-be-order.c: Delete testcase.
+	* gcc.dg/vmx/merge-vsx-be-order.c: Delete testcase.
+	* gcc.dg/vmx/mult-even-odd-be-order.c: Delete testcase.
+	* gcc.dg/vmx/pack-be-order.c: Delete testcase.
+	* gcc.dg/vmx/perm-be-order.c: Delete testcase.
+	* gcc.dg/vmx/splat-be-order.c: Delete testcase.
+	* gcc.dg/vmx/splat-vsx-be-order.c: Delete testcase.
+	* gcc.dg/vmx/st-be-order.c: Delete testcase.
+	* gcc.dg/vmx/st-vsx-be-order.c: Delete testcase.
+	* gcc.dg/vmx/ste-be-order.c: Delete testcase.
+	* gcc.dg/vmx/stl-be-order.c: Delete testcase.
+	* gcc.dg/vmx/stl-vsx-be-order.c: Delete testcase.
+	* gcc.dg/vmx/sum2s-be-order.c: Delete testcase.
+	* gcc.dg/vmx/unpack-be-order.c: Delete testcase.
+	* gcc.dg/vmx/vsums-be-order.c: Delete testcase.
+	* gcc.target/powerpc/vec-setup-be-double.c: Delete testcase.
+	* gcc.target/powerpc/vec-setup-be-long.c: Delete testcase.
+	* gcc.target/powerpc/vec-setup.h: Remove -maltivec=be support.
+
+2018-05-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/85699
+	* gcc.dg/nextafter-1.c (NO_LONG_DOUBLE): Define if not defined.  Use
+	!NO_LONG_DOUBLE instead of __LDBL_MANT_DIG__ != 106.
+	* gcc.dg/nextafter-2.c: Include stdlib.h.  For glibc < 2.24 define
+	NO_LONG_DOUBLE to 1 before including nextafter-1.c.
+
+2018-05-10  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* g++.dg/tls/pr85400.C: New test.
+
+2018-05-09  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/85713
+	* g++.dg/cpp1y/lambda-generic-85713.C: New.
+
+2018-05-09  Carl Love  <cel@us.ibm.com>
+
+	* gcc.target/powerpc/builtins-8-runnable.c: New builtin test file.
+
 2018-05-09  Paolo Carlini  <paolo.carlini@oracle.com>
 
 	PR c++/85713
@@ -159,7 +274,7 @@
 
 2018-05-06  Andrew Sadek  <andrew.sadek.se@gmail.com>
 
-	* gcc.target/microblaze/others/picdtr.c: Add test for 
+	* gcc.target/microblaze/others/picdtr.c: Add test for
 	 -fPIE -mpic-data-is-text-relative.
 
 2018-05-06  Andre Vehreschild  <vehre@gcc.gnu.org>

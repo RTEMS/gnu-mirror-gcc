@@ -1,3 +1,32 @@
+2018-05-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/85696
+	* c-omp.c (c_omp_predetermined_sharing): Return
+	OMP_CLAUSE_DEFAULT_SHARED for artificial vars with integral type.
+
+2018-05-11  Martin Liska  <mliska@suse.cz>
+
+        PR sanitizer/85556
+	* c-attribs.c (handle_no_sanitize_attribute): Iterate all
+	TREE_LIST values.
+
+2018-05-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/85662
+	* c-common.h (fold_offsetof_1): Removed.
+	(fold_offsetof): Add TYPE argument defaulted to size_type_node and
+	CTX argument defaulted to ERROR_MARK.
+	* c-common.c (fold_offsetof_1): Renamed to ...
+	(fold_offsetof): ... this.  Remove wrapper function.  Add TYPE
+	argument, convert the pointer constant to TYPE and use size_binop
+	with PLUS_EXPR instead of fold_build_pointer_plus if type is not
+	a pointer type.  Adjust recursive calls.
+
+2018-05-10  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR c++/85400
+	* c-attribs.c (handle_visibility_attribute): Do not set no_add_attrs.
+
 2018-05-07  Nathan Sidwell  <nathan@acm.org>
 
 	* c.opt (ffor-scope): Remove functionality, issue warning.

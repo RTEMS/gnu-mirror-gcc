@@ -1,3 +1,13 @@
+2018-05-11  Michael Meissner  <meissner@linux.ibm.com>
+
+	Merge up to 260184.
+	* REVISION: Update subversion id.
+
+2018-05-11  Michael Meissner  <meissner@linux.ibm.com>
+
+	Merge up to 260184.
+	* REVISION: Update subversion id.
+
 2018-05-10  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/predicates.md (large_mem_operand): Move higher in

@@ -370,6 +370,15 @@ build_base_path (enum tree_code code,
       goto indout;
     }
 
+  if (!COMPLETE_TYPE_P (probe))
+    {
+      if (complain & tf_error)
+	error ("cannot convert from %qT to base class %qT because %qT is "
+	       "incomplete", BINFO_TYPE (d_binfo), BINFO_TYPE (binfo),
+	       BINFO_TYPE (d_binfo));
+      return error_mark_node;
+    }
+
   /* If we're in an NSDMI, we don't have the full constructor context yet
      that we need for converting to a virtual base, so just build a stub
      CONVERT_EXPR and expand it later in bot_replace.  */
@@ -5017,7 +5026,7 @@ vbase_has_user_provided_move_assign (tree type)
     for (ovl_iterator iter (get_class_binding_direct
 			    (type, assign_op_identifier));
 	 iter; ++iter)
-      if (!DECL_ARTIFICIAL (*iter) && move_fn_p (*iter))
+      if (user_provided_p (*iter) && move_fn_p (*iter))
 	return true;
 
   /* Do any of its bases?  */

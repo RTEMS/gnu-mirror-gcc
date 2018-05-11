@@ -1,3 +1,57 @@
+2018-05-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/85696
+	* cp-tree.h (cxx_omp_predetermined_sharing_1): New prototype.
+	* cp-gimplify.c (cxx_omp_predetermined_sharing): New wrapper around
+	cxx_omp_predetermined_sharing_1.  Rename old function to ...
+	(cxx_omp_predetermined_sharing_1): ... this.
+	* semantics.c (finish_omp_clauses): Use cxx_omp_predetermined_sharing_1
+	instead of cxx_omp_predetermined_sharing.
+
+2018-05-10  Jason Merrill  <jason@redhat.com>
+
+	* decl.c (cp_finish_decl): Don't instantiate auto variable.
+	(check_static_variable_definition): Allow auto.
+	* constexpr.c (ensure_literal_type_for_constexpr_object): Likewise.
+
+	* cp-tree.h (DECL_CONSTRUCTOR_P): Use DECL_CXX_CONSTRUCTOR_P.
+	(DECL_DESTRUCTOR_P): Use DECL_CXX_DESTRUCTOR_P.
+
+	Core issue 2310 - conversion to base of incomplete type.
+	* class.c (build_base_path): Check COMPLETE_TYPE_P for source type.
+
+	CWG 2267 - list-initialization of reference temporary
+	* call.c (reference_binding): List-initializing a reference
+	temporary is copy-list-initialization.
+
+	* parser.c (cp_parser_class_head): Use num_template_headers_for_class.
+
+	* pt.c (instantiate_decl): Make sure we aren't trying to do a nested
+	instantiation in template context.
+
+	* class.c (vbase_has_user_provided_move_assign): Use
+	user_provided_p.
+
+	* lambda.c (lambda_expr_this_capture): Improve logic.
+
+	* decl.c (make_typename_type): s/parameters/arguments/.
+	* parser.c (cp_parser_nested_name_specifier_opt): Likewise.
+	* pt.c (make_pack_expansion): Correct error message.
+
+2018-05-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/85662
+	* cp-gimplify.c (cp_fold): Use fold_offsetof rather than
+	fold_offsetof_1, pass TREE_TYPE (x) as TYPE to it and drop the
+	fold_convert.
+
+2018-05-10  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR c++/85400
+	* decl2.c (adjust_var_decl_tls_model): New static function.
+	(comdat_linkage): Call it on a variable.
+	(maybe_make_one_only): Likewise.
+
 2018-05-09  Paolo Carlini  <paolo.carlini@oracle.com>
 
 	PR c++/85713
