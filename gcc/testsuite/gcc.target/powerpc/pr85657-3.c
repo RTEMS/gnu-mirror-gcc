@@ -2,7 +2,7 @@
 /* { dg-require-effective-target ppc_float128_sw } */
 /* { dg-options "-mvsx -mfloat128 -O2 -mabi=ieeelongdouble -Wno-psabi" } */
 
-/* PR 85657 -- test __builtin_pack_ieee128 and __builtin_unpack_ieee128.  */
+/* PR 85657 -- test __builtin_pack_ibm128 and __builtin_unpack_ibm128.  */
 
 __ibm128
 pack (double a, double b)
