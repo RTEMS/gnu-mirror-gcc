@@ -1,3 +1,737 @@
+2018-05-15  Richard Biener  <rguenther@suse.de>
+
+	* tree-ssa-dse.c (dse_classify_store): Remove use_stmt parameter,
+	add by_clobber_p one.  Change algorithm to collect all defs
+	representing uses we need to walk and try reducing them to
+	a single one before failing.
+	(dse_dom_walker::dse_optimize_stmt): Adjust.
+
+2018-05-13  Mark Wielaard  <mark@klomp.org>
+
+	* dwarf2out.c (dwarf_OP): Handle DW_OP_addrx and DW_OP_constx.
+	(size_of_loc_descr): Likewise.
+	(output_loc_operands): Likewise.
+	(output_loc_operands_raw): Likewise.
+	(dw_addr_op): Use dwarf_OP () for DW_OP_constx and DW_OP_addrx.
+	(resolve_addr_in_expr): Handle DW_OP_addrx and DW_OP_constx.
+	(hash_loc_operands): Likewise.
+	(compare_loc_operands): Likewise.
+
+2018-05-14  Mark Wielaard  <mark@klomp.org>
+
+	* dwarf2out.c (count_index_addrs): New function.
+	(dwarf2out_finish): Use count_index_addrs to calculate addrs_length.
+
+2018-05-15  Prathamesh Kulkarni  <prathamesh.kulkarni@linaro.org>
+
+	PR tree-optimization/83648
+	* ipa-pure-const.c (malloc_candidate_p): Allow function with NULL
+	return value as malloc candidate.
+
+2018-05-15  Prathamesh Kulkarni  <prathamesh.kulkarni@linaro.org>
+
+	PR ipa/85734
+	* ipa-pure-const.c (warn_function_malloc): Pass value of known_finite param
+	as true in call to suggest_attribute.
+
+2018-05-14  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* doc/invoke.texi (RS/6000 and PowerPC Options): Delete @itemx for
+	-mreadonly-in-sdata.
+
+2018-05-14  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* config/aarch64/aarch64-simd.md (*aarch64_crypto_aese_fused):
+	New pattern.
+	(aarch64_crypto_aesd_fused): Likewise.
+
+2018-05-14  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	* config/aarch64/aarch64.md (mov<mode>): Remove '*' in alternatives.
+	(movsi_aarch64): Likewise.
+	(load_pairsi): Likewise.
+	(load_pairdi): Likewise.
+	(store_pairsi): Likewise.
+	(store_pairdi): Likewise.
+	(load_pairsf): Likewise.
+	(load_pairdf): Likewise.
+	(store_pairsf): Likewise.
+	(store_pairdf): Likewise.
+	(zero_extend): Likewise.
+	(trunc): Swap alternatives.
+	(fcvt_target): Add '?' to prefer w over r.
+
+2018-05-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/85756
+	* config/i386/i386.md: Disallow non-commutative arithmetics in
+	last twpeephole for mem {+,-,&,|,^}= x; mem != 0 after cmpelim
+	optimization.  Use COMMUTATIVE_ARITH_P test rather than != MINUS
+	in the peephole2 before it.
+
+2018-05-14  Sebastian Peryt  <sebastian.peryt@intel.com>
+
+	* common/config/i386/i386-common.c (OPTION_MASK_ISA_CLDEMOTE_SET,
+	OPTION_MASK_ISA_CLDEMOTE_UNSET): New defines.
+	(ix86_handle_option): Handle -mcldemote.
+	* config.gcc: New header.
+	* config/i386/cldemoteintrin.h: New file.
+	* config/i386/cpuid.h (bit_CLDEMOTE): New bit.
+	* config/i386/driver-i386.c (host_detect_local_cpu): Detect
+	-mcldemote.
+	* config/i386/i386-c.c (ix86_target_macros_internal): Handle
+	OPTION_MASK_ISA_CLDEMOTE.
+	* config/i386/i386.c (ix86_target_string): Add -mcldemote.
+	(ix86_valid_target_attribute_inner_p): Ditto.
+	(enum ix86_builtins): Add IX86_BUILTIN_CLDEMOTE.
+	(ix86_init_mmx_sse_builtins): Define __builtin_ia32_cldemote.
+	(ix86_expand_builtin): Expand IX86_BUILTIN_CLDEMOTE.
+	* config/i386/i386.h (TARGET_CLDEMOTE, TARGET_CLDEMOTE_P): New.
+	* config/i386/i386.md (UNSPECV_CLDEMOTE): New.
+	(cldemote): New.
+	* config/i386/i386.opt: Add -mcldemote.
+	* config/i386/x86intrin.h: New header.
+	* doc/invoke.texi: Add -mcldemote.
+
+2018-05-14  Richard Biener  <rguenther@suse.de>
+
+	* doc/match-and-simplify.texi: Adjust :s documentation.
+
+2018-05-14  Alexander Monakov  <amonakov@ispras.ru>
+
+	* sort.cc (REORDER_23): Pass the type for the temporaries instead of
+	intended memcpy size.
+	(REORDER_45): Likewise.
+
+2018-05-13  Alexander Monakov  <amonakov@ispras.ru>
+
+	* sort.cc: New file.
+	* system.h [!CHECKING_P] (qsort): Redirect to gcc_qsort.
+	* vec.c (qsort_chk): Use gcc_qsort.
+	* Makefile.in (OBJS-libcommon): Add sort.o.
+	(build/sort.o): New target.  Use it...
+	(BUILD_RTL): ... here, and...
+	(build/gencfn-macros): ... here, and...
+	(build/genmatch): ... here.
+
+2018-05-13  Kito Cheng  <kito.cheng@gmail.com>
+	    Chung-Ju Wu  <jasonwucj@gmail.com>
+
+	* config.gcc (nds32*-*-*): Check that n15 is valid to --with-cpu.
+	* config/nds32/nds32-graywolf.md: New file.
+	* config/nds32/nds32-opts.h (nds32_cpu_type): Add CPU_GRAYWOLF.
+	* config/nds32/nds32-pipelines-auxiliary.c: Implementation for n15
+	pipeline.
+	* config/nds32/nds32-protos.h: More declarations for n15 pipeline.
+	* config/nds32/nds32-utils.c: More implementations for n15 pipeline.
+	* config/nds32/nds32.md (pipeline_model): Add graywolf.
+	* config/nds32/nds32.opt (mcpu): Support n15 pipeline cpus.
+	* config/nds32/pipelines.md: Include n15 settings.
+
+2018-05-13  Kito Cheng  <kito.cheng@gmail.com>
+	    Chung-Ju Wu  <jasonwucj@gmail.com>
+
+	* config.gcc (nds32*-*-*): Check that n12/n13 are valid to --with-cpu.
+	* config/nds32/nds32-n13.md: New file.
+	* config/nds32/nds32-opts.h (nds32_cpu_type): Add CPU_N12 and CPU_N13.
+	* config/nds32/nds32-pipelines-auxiliary.c: Implementation for n12/n13
+	pipeline.
+	* config/nds32/nds32-protos.h: More declarations for n12/n13 pipeline.
+	* config/nds32/nds32.md (pipeline_model): Add n13.
+	* config/nds32/nds32.opt (mcpu): Support n12/n13 pipeline cpus.
+	* config/nds32/pipelines.md: Include n13 settings.
+
+2018-05-13  Kito Cheng  <kito.cheng@gmail.com>
+	    Chung-Ju Wu  <jasonwucj@gmail.com>
+
+	* config.gcc (nds32*-*-*): Check that n10/d10 are valid to --with-cpu.
+	* config/nds32/nds32-n10.md: New file.
+	* config/nds32/nds32-opts.h (nds32_cpu_type): Add CPU_N10.
+	* config/nds32/nds32-pipelines-auxiliary.c: Implementation for n10
+	pipeline.
+	* config/nds32/nds32-protos.h: More declarations for n10 pipeline.
+	* config/nds32/nds32-utils.c: More implementations for n10 pipeline.
+	* config/nds32/nds32.md (pipeline_model): Add n10.
+	* config/nds32/nds32.opt (mcpu): Support n10 pipeline cpus.
+	* config/nds32/pipelines.md: Include n10 settings.
+
+2018-05-13  Monk Chiang  <sh.chiang04@gmail.com>
+	    Kito Cheng  <kito.cheng@gmail.com>
+	    Chung-Ju Wu  <jasonwucj@gmail.com>
+
+	* config.gcc (nds32be-*-*): Handle --with-ext-dsp.
+	* config/nds32/constants.md (unspec_element, unspec_volatile_element):
+	Add enum values for DSP extension instructions.
+	* config/nds32/constraints.md (Iu06, IU06, CVp5, CVs5, CVs2, CVhi):
+	New constraints.
+	* config/nds32/iterators.md (shifts, shiftrt, sat_plus, all_plus,
+	sat_minus, all_minus, plus_minus, extend, sumax, sumin, sumin_max):
+	New code iterators.
+	(su, zs, uk, opcode, add_rsub, add_sub): New code attributes.
+	* config/nds32/nds32-dspext.md: New file for DSP implementation.
+	* config/nds32/nds32-intrinsic.c: Implementation of DSP extension.
+	* config/nds32/nds32-intrinsic.md: Likewise.
+	* config/nds32/nds32_intrinsic.h: Likewise.
+	* config/nds32/nds32-md-auxiliary.c: Likewise.
+	* config/nds32/nds32-memory-manipulation.c: Consider DSP extension.
+	* config/nds32/nds32-predicates.c (const_vector_to_hwint): New.
+	(nds32_valid_CVp5_p, nds32_valid_CVs5_p): New.
+	(nds32_valid_CVs2_p, nds32_valid_CVhi_p): New.
+	* config/nds32/nds32-protos.h: New declarations for DSP extension.
+	* config/nds32/nds32-utils.c (extract_mac_non_acc_rtx): New case
+	TYPE_DMAC in switch statement.
+	* config/nds32/nds32.c: New checking and implementation for DSP
+	extension instructions.
+	* config/nds32/nds32.h: Likewise.
+	* config/nds32/nds32.md: Likewise.
+	* config/nds32/nds32.opt (mhw-abs, mext-dsp): New options.
+	* config/nds32/predicates.md: Implement new predicates for DSP
+	extension.
+
+2018-05-11  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.md (mov<mode>_softfloat, FMOVE32):
+	Reformat alternatives and attributes so it is easier to identify
+	which constraints/attributes go with which instruction.
+	(mov<mode>_hardfloat32, FMOVE64): Likewise.
+	(mov<mode>_softfloat32, FMOVE64): Likewise.
+	(mov<mode>_hardfloat64, FMOVE64): Likewise.
+	(mov<mode>_softfloat64, FMOVE64): Likewise.
+
+2018-05-11  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	* doc/extend.texi (PowerPC Built-in Functions): Rename this
+	subsection.
+	(Basic PowerPC Built-in Functions): The new name of the
+	subsection previously known as "PowerPC Built-in Functions".
+	(Basic PowerPC Built-in Functions Available on all Configurations):
+	New subsubsection.
+	(Basic PowerPC Built-in Functions Available on ISA 2.05): Likewise.
+	(Basic PowerPC Built-in Functions Available on ISA 2.06): Likewise.
+	(Basic PowerPC Built-in Functions Available on ISA 2.07): Likewise.
+	(Basic PowerPC Built-in Functions Available on ISA 3.0): Likewise.
+
+2018-05-11  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/85655
+	* ipa-cp.c (intersect_with_plats): Check that the lattice contains
+	single const.
+
+2018-05-11  Richard Earnshaw  <rearnsha@arm.com>
+
+	PR target/85733
+	* config/arm/arm-cpus.in (fgroup ARMv6m): Add be8 feature.
+
+2018-05-11  Sebastian Peryt  <sebastian.peryt@intel.com>
+
+	* common/config/i386/i386-common.c (OPTION_MASK_ISA_WAITPKG_SET,
+	OPTION_MASK_ISA_WAITPKG_UNSET): New defines.
+	(ix86_handle_option): Handle -mwaitpkg.
+	* config.gcc: New header.
+	* config/i386/cpuid.h (bit_WAITPKG): New bit.
+	* config/i386/driver-i386.c (host_detect_local_cpu): Detect -mwaitpkg.
+	* config/i386/i386-builtin-types.def ((UINT8, UNSIGNED, UINT64)): New
+	function type.
+	* config/i386/i386-c.c (ix86_target_macros_internal): Handle
+	OPTION_MASK_ISA_WAITPKG.
+	* config/i386/i386.c (ix86_target_string): Add -mwaitpkg.
+	(ix86_option_override_internal): Add PTA_WAITPKG.
+	(ix86_valid_target_attribute_inner_p): Add -mwaitpkg.
+	(enum ix86_builtins): Add IX86_BUILTIN_UMONITOR, IX86_BUILTIN_UMWAIT,
+	IX86_BUILTIN_TPAUSE.
+	(ix86_init_mmx_sse_builtins): Define __builtin_ia32_umonitor,
+	__builtin_ia32_umwait and __builtin_ia32_tpause.
+	(ix86_expand_builtin): Expand IX86_BUILTIN_UMONITOR,
+	IX86_BUILTIN_UMWAIT, IX86_BUILTIN_TPAUSE.
+	* config/i386/i386.h (TARGET_WAITPKG, TARGET_WAITPKG_P): New.
+	* config/i386/i386.md (UNSPECV_UMWAIT, UNSPECV_UMONITOR,
+	UNSPECV_TPAUSE): New.
+	(umwait, umwait_rex64, umonitor_<mode>, tpause, tpause_rex64): New.
+	* config/i386/i386.opt: Add -mwaitpkg.
+	* config/i386/waitpkgintrin.h: New file.
+	* config/i386/x86intrin.h: New header.
+	* doc/invoke.texi: Add -mwaitpkg.
+
+2018-05-11  Richard Earnshaw  <rearnsha@arm.com>
+
+	PR target/85606
+	* config/arm/arm-cpus.in: Add comment that ARMv6-m and ARMv6S-m are now
+	equivalent.
+	(cortex-m0): Use armv6s-m isa.
+	(cortex-m0plus): Likewise.
+	(cortex-m1): Likewise.
+	(cortex-m0.small-multiply): Likewise.
+	(cortex-m0plus.small-multiply): Likewise.
+	(cortex-m1.small-multiply): Likewise.
+
+2018-05-11  Allan Sandfeld Jensen  <allan.jensen@qt.io>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/85692
+	* tree-ssa-forwprop.c (simplify_vector_constructor): Try two
+	source permute as well.
+
+2018-05-11  Martin Liska  <mliska@suse.cz>
+
+        PR sanitizer/85556
+	* doc/extend.texi: Document LLVM style format for no_sanitize
+	attribute.
+
+2018-05-10  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* config/rs6000/rs6000.c (mode_supports_dq_form): Rename
+	mode_supports_vsx_dform_quad to mode_supports_dq_form.
+	(mode_supports_vsx_dform_quad): Likewise.
+	(mode_supports_vmx_dform): Move these functions to be next to the
+	other mode_supports functions.
+	(mode_supports_dq_form): Likewise.
+	(quad_address_p): Change calls of mode_supports_vsx_dform_quad to
+	mode_supports_dq_form.
+	(reg_offset_addressing_ok_p): Likewise.
+	(offsettable_ok_by_alignment): Likewise.
+	(rs6000_legitimate_offset_address_p): Likewise.
+	(legitimate_lo_sum_address_p): Likewise.
+	(rs6000_legitimize_address): Likewise.
+	(rs6000_legitimize_reload_address): Likewise.
+	(rs6000_secondary_reload_inner): Likewise.
+	(rs6000_preferred_reload_class): Likewise.
+	(rs6000_output_move_128bit): Likewise.
+
+2018-05-10  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.c (ix86_expand_builtin) <case IX86_BUILTIN_RDPID>:
+	Generate SImode target register for null target.
+	<case IX86_BUILTIN_XGETBV>: Ditto.
+	<case IX86_BUILTIN_XSETBV>: Optimize LSHIFTRT generation.
+	* config/i386/xsaveintrin.h (_xgetbv): Add missing return.
+
+2018-05-10  Carl Love  <cel@us.ibm.com>
+
+	* config/rs6000/rs6000.md (prefetch): Generate ISA 2.06 instructions
+	dcbtt and dcbtstt if operands[2] is 0.
+
+2018-05-10  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/85693
+	* config/i386/sse.md (usadv64qi): New expander.
+
+2018-05-10  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* config/rs6000/altivec.md (altivec_vmrghb, altivec_vmrghh,
+	altivec_vmrghw, altivec_vmrglb, altivec_vmrglh, altivec_vmrglw): Remove
+	-maltivec=be support.
+	(vec_widen_umult_even_v16qi, vec_widen_smult_even_v16qi,
+	vec_widen_umult_even_v8hi, vec_widen_smult_even_v8hi,
+	vec_widen_umult_even_v4si, vec_widen_smult_even_v4si,
+	vec_widen_umult_odd_v16qi, vec_widen_smult_odd_v16qi,
+	vec_widen_umult_odd_v8hi, vec_widen_smult_odd_v8hi,
+	vec_widen_umult_odd_v4si, vec_widen_smult_odd_v4si, altivec_vpkpx,
+	altivec_vpks<VI_char>ss, altivec_vpks<VI_char>us,
+	altivec_vpku<VI_char>us, altivec_vpku<VI_char>um, altivec_vsum2sws,
+	altivec_vsumsws): Adjust.
+	(altivec_vspltb *altivec_vspltb_internal, altivec_vsplth,
+	*altivec_vsplth_internal, altivec_vspltw, *altivec_vspltw_internal,
+	altivec_vspltsf, *altivec_vspltsf_internal): Remove -maltivec=be
+	support.
+	(altivec_vperm_<mode>, altivec_vperm_<mode>_uns,
+	altivec_vupkhs<VU_char>, altivec_vupkls<VU_char>, altivec_vupkhpx,
+	altivec_vupklpx, altivec_lvsl, altivec_lvsr): Adjust.
+	(altivec_lve<VI_char>x): Delete expand.
+	(*altivec_lve<VI_char>x_internal): Rename to...
+	(altivec_lve<VI_char>x): ... this.
+	(altivec_lvxl_<mode>): Delete expand.
+	(*altivec_lvxl_<mode>_internal): Rename to ...
+	(altivec_lvxl_<mode>): ... this.
+	(altivec_stvxl_<mode>): Delete expand.
+	(*altivec_stvxl_<mode>_internal): Rename to ...
+	(altivec_stvxl_<mode>): ... this.
+	(altivec_stve<VI_char>x): Delete expand.
+	(*altivec_stve<VI_char>x_internal): Rename to ...
+	(altivec_stve<VI_char>x): ... this.
+	(doublee<mode>2, unsdoubleev4si2, doubleo<mode>2, unsdoubleov4si2,
+	doubleh<mode>2, unsdoublehv4si2, doublel<mode>2, unsdoublelv4si2,
+	reduc_plus_scal_<mode>): Adjust.
+	* config/rs6000/rs6000-c.c (rs6000_target_modify_macros): Adjust
+	comment.
+	(rs6000_cpu_cpp_builtins): Adjust.
+	(altivec_resolve_overloaded_builtin): Remove -maltivec=be support.
+	* config/rs6000/rs6000-protos.h (altivec_expand_lvx_be,
+	altivec_expand_stvx_be, altivec_expand_stvex_be): Delete.
+	* config/rs6000/rs6000.c (rs6000_option_override_internal): Remove
+	-maltivec=be support.
+	(rs6000_split_vec_extract_var): Adjust.
+	(rs6000_split_v4si_init): Adjust.
+	(swap_selector_for_mode): Delete.
+	(altivec_expand_lvx_be, altivec_expand_stvx_be,
+	altivec_expand_stvex_be): Delete.
+	(altivec_expand_lv_builtin, altivec_expand_stv_builtin): Remove
+	-maltivec=be support.
+	(rs6000_gimple_fold_builtin): Ditto.
+	(rs6000_generate_float2_double_code, rs6000_generate_float2_code):
+	Adjust.
+	* config/rs6000/rs6000.h (VECTOR_ELT_ORDER_BIG): Delete.
+	(TARGET_DIRECT_MOVE_64BIT): Adjust.
+	* config/rs6000/rs6000.md (split for extendsidi2 for vectors): Adjust.
+	* config/rs6000/rs6000.opt (maltivec=le, maltivec=be): Delete.
+	* config/rs6000/vsx.md (floate<mode>, unsfloatev2di, floato<mode>,
+	unsfloatov2di, vsignedo_v2df, vsignede_v2df, vunsignedo_v2df,
+	vunsignede_v2df, vsx_extract_<mode>_p9, *vsx_extract_si,
+	*vsx_extract_<mode>_p8, *vsx_extract_si_<uns>float_df,
+	*vsx_extract_si_<uns>float_<mode>, vsx_set_<mode>_p9, vsx_set_v4sf_p9,
+	*vsx_insert_extract_v4sf_p9, *vsx_insert_extract_v4sf_p9_2, and an
+	anonymous split): Adjust.
+	(vsx_mergel_<mode>, vsx_mergeh_<mode>): Remove -maltivec=be support.
+	(vsx_xxspltd_<mode>, extract4b, insert4b): Adjust.
+
+2018-05-10  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* configure.ac (gcc_gxx_include_dir_add_sysroot): Set it to 1 only
+	when --with-gxx-include-dir is also specified.
+	* configure: Regenerate.
+
+2018-05-09  Jim Wilson  <jimw@sifive.com>
+
+	PR target/84797
+	* config.gcc (riscv*-*-*): Handle --with-multilib-list.
+	* config/riscv/t-withmultilib: New.
+	* config/riscv/withmultilib.h: New.
+	* doc/install.texi: Document RISC-V --with-multilib-list support.
+
+2018-05-09  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-slp.c (vect_bb_slp_scalar_cost): Fill a cost
+	vector.
+	(vect_bb_vectorization_profitable_p): Adjust.  Compute
+	actual scalar cost using the cost vector and the add_stmt_cost
+	machinery.
+
+2018-05-09  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR rtl-optimization/85645
+	* config/rs6000/rs6000.c (rs6000_emit_prologue_components): Put a SET
+	in the REG_CFA_REGISTER note for LR, don't leave it empty.
+
+2018-05-09  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR rtl-optimization/85645
+	* shrink-wrap.c (spread_components): Return a boolean saying if
+	anything was changed.
+	(try_shrink_wrapping_separate): Iterate spread_components until
+	nothing changes anymore.
+
+2018-05-09  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR rtl-optimization/85645
+	* regrename.c (build_def_use): Also kill the chains that include the
+	destination of a REG_CFA_REGISTER note.
+
+2018-05-09  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	PR rtl-optimization/85645
+	*  regcprop.c (copyprop_hardreg_forward_1): Don't propagate into an
+	insn that has a REG_CFA_REGISTER note.
+
+2018-05-09  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* cfgexpand.c (expand_clobber): New function.
+	(expand_gimple_stmt_1): Use it.
+	* tree-vect-stmts.c (vect_clobber_variable): New function,
+	split out from...
+	(vectorizable_simd_clone_call): ...here.
+	(vectorizable_store): Emit a clobber either side of an
+	IFN_STORE_LANES sequence.
+	(vectorizable_load): Emit a clobber after an IFN_LOAD_LANES sequence.
+
+2018-05-09  Tom de Vries  <tom@codesourcery.com>
+
+	PR target/85626
+	* config/nvptx/nvptx.md (define_insn "trap", define_insn "trap_if_true")
+	(define_insn "trap_if_false"): Add exit after trap.
+
+2018-05-09  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR rtl-optimization/85638
+	* bb-reorder.c: Include common/common-target.h.
+	(create_forwarder_block): New function extracted from...
+	(fix_up_crossing_landing_pad): ...here.  Rename into...
+	(dw2_fix_up_crossing_landing_pad): ...this.
+	(sjlj_fix_up_crossing_landing_pad): New function.
+	(find_rarely_executed_basic_blocks_and_crossing_edges): In SJLJ mode,
+	call sjlj_fix_up_crossing_landing_pad if there are incoming EH edges
+	from both partitions and exit the loop after one iteration.
+
+2018-05-08  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	Revert:
+	* doc/extend.texi (PowerPC Built-in Functions): Rename this
+	subsection.
+	(Basic PowerPC Built-in Functions): The new name of the
+	subsection previously known as "PowerPC Built-in Functions".
+	(Basic PowerPC Built-in Functions Available on all Configurations):
+	New subsubsection.
+	(Basic PowerPC Built-in Functions Available on ISA 2.05): New
+	subsubsection.
+	(Basic PowerPC Built-in Functions Available on ISA 2.06): New
+	subsubsection.
+	(Basic PowerPC Built-in Functions Available on ISA 2.07): New
+	subsubsection.
+	(Basic PowerPC Built-in Functions Available on ISA 3.0): New
+	subsubsection.
+
+2018-05-08  Jim Wilson  <jimw@sifive.com>
+
+	* config/riscv/linux.h (MUSL_ABI_SUFFIX): Delete unnecessary backslash.
+	(LD_EMUL_SUFFIX): New.
+	(LINK_SPEC): Use it.
+
+2018-05-08  Kelvin Nilsen  <kelvin@gcc.gnu.org>
+
+	* doc/extend.texi (PowerPC Built-in Functions): Rename this
+	subsection.
+	(Basic PowerPC Built-in Functions): The new name of the
+	subsection previously known as "PowerPC Built-in Functions".
+	(Basic PowerPC Built-in Functions Available on all Configurations):
+	New subsubsection.
+	(Basic PowerPC Built-in Functions Available on ISA 2.05): New
+	subsubsection.
+	(Basic PowerPC Built-in Functions Available on ISA 2.06): New
+	subsubsection.
+	(Basic PowerPC Built-in Functions Available on ISA 2.07): New
+	subsubsection.
+	(Basic PowerPC Built-in Functions Available on ISA 3.0): New
+	subsubsection.
+
+2018-05-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/85683
+	* config/i386/i386.md: Add peepholes for mem {+,-,&,|,^}= x; mem != 0
+	after cmpelim optimization.
+
+2018-05-08  Olga Makhotina  <olga.makhotina@intel.com>
+
+	* config.gcc: Support "goldmont".
+	* config/i386/driver-i386.c (host_detect_local_cpu): Detect "goldmont".
+	* config/i386/i386-c.c (ix86_target_macros_internal): Handle
+	PROCESSOR_GOLDMONT.
+	* config/i386/i386.c (m_GOLDMONT): Define.
+	(processor_target_table): Add "goldmont".
+	(PTA_GOLDMONT): Define.
+	(ix86_lea_outperforms): Add TARGET_GOLDMONT.
+	(get_builtin_code_for_version): Handle PROCESSOR_GOLDMONT.
+	(fold_builtin_cpu): Add M_INTEL_GOLDMONT.
+	(fold_builtin_cpu): Add "goldmont".
+	(ix86_add_stmt_cost): Add TARGET_GOLDMONT.
+	(ix86_option_override_internal): Add "goldmont".
+	* config/i386/i386.h (processor_costs): Define TARGET_GOLDMONT.
+	(processor_type): Add PROCESSOR_GOLDMONT.
+	* config/i386/i386.md: Add CPU "glm".
+	* config/i386/glm.md: New file.
+	* config/i386/x86-tune.def: Add m_GOLDMONT.
+	* doc/invoke.texi: Add goldmont as x86 -march=/-mtune= CPU type.
+
+2018-05-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/85572
+	* config/i386/i386.c (ix86_expand_sse2_abs): Handle E_V2DImode and
+	E_V4DImode.
+	* config/i386/sse.md (abs<mode>2): Use VI_AVX2 iterator instead of
+	VI1248_AVX512VL_AVX512BW.  Handle V2DImode and V4DImode if not
+	TARGET_AVX512VL using ix86_expand_sse2_abs.  Formatting fixes.
+
+	PR target/85317
+	* config/i386/i386.c (ix86_fold_builtin): Handle
+	IX86_BUILTIN_{,P}MOVMSK{PS,PD,B}{,128,256}.
+
+	PR target/85480
+	* config/i386/sse.md (ssequaterinsnmode): New mode attribute.
+	(*<extract_type>_vinsert<shuffletype><extract_suf>_0): New pattern.
+
+2018-05-08  Richard Earnshaw  <rearnsha@arm.com>
+
+	PR target/85658
+	* config/arm/parsecpu.awk (check_cpu): Fix operator precedence.
+	(check_arch): Likewise.
+	(check_fpu): Return the result rather than printing it.
+	(end arch): Fix operator precedence.
+	(end cpu): Likewise.
+	(END): Print the result from check_fpu.
+
+2018-05-08  Richard Sandiford  <richard.sandiford@linaro.org>
+	    Alan Hayward  <alan.hayward@arm.com>
+	    David Sherwood  <david.sherwood@arm.com>
+
+	* config/aarch64/aarch64-sve.md (*pred_cmp<cmp_op><mode>_combine)
+	(*pred_cmp<cmp_op><mode>, *fcm<cmp_op><mode>_and_combine)
+	(*fcmuo<mode>_and_combine, *fcm<cmp_op><mode>_and)
+	(*fcmuo<mode>_and): New patterns.
+
+2018-05-08  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* config/aarch64/iterators.md (UNSPEC_COND_LO, UNSPEC_COND_LS)
+	(UNSPEC_COND_HI, UNSPEC_COND_HS, UNSPEC_COND_UO): Delete.
+	(SVE_INT_CMP, SVE_FP_CMP): New code iterators.
+	(cmp_op, sve_imm_con): New code attributes.
+	(SVE_COND_INT_CMP, imm_con): Delete.
+	(cmp_op): Remove above unspecs from int attribute.
+	* config/aarch64/aarch64-sve.md (*vec_cmp<cmp_op>_<mode>): Rename
+	to...
+	(*cmp<cmp_op><mode>): ...this.  Use UNSPEC_MERGE_PTRUE instead of
+	comparison-specific unspecs.
+	(*vec_cmp<cmp_op>_<mode>_ptest): Rename to...
+	(*cmp<cmp_op><mode>_ptest): ...this and adjust likewise.
+	(*vec_cmp<cmp_op>_<mode>_cc): Rename to...
+	(*cmp<cmp_op><mode>_cc): ...this and adjust likewise.
+	(*vec_fcm<cmp_op><mode>): Rename to...
+	(*fcm<cmp_op><mode>): ...this and adjust likewise.
+	(*vec_fcmuo<mode>): Rename to...
+	(*fcmuo<mode>): ...this and adjust likewise.
+	(*pred_fcm<cmp_op><mode>): New pattern.
+	* config/aarch64/aarch64.c (aarch64_emit_unop, aarch64_emit_binop)
+	(aarch64_emit_sve_ptrue_op, aarch64_emit_sve_ptrue_op_cc): New
+	functions.
+	(aarch64_unspec_cond_code): Remove handling of LTU, GTU, LEU, GEU
+	and UNORDERED.
+	(aarch64_gen_unspec_cond, aarch64_emit_unspec_cond): Delete.
+	(aarch64_emit_sve_predicated_cond): New function.
+	(aarch64_expand_sve_vec_cmp_int): Use aarch64_emit_sve_ptrue_op_cc.
+	(aarch64_emit_unspec_cond_or): Replace with...
+	(aarch64_emit_sve_or_conds): ...this new function.  Use
+	aarch64_emit_sve_ptrue_op for the individual comparisons and
+	aarch64_emit_binop to OR them together.
+	(aarch64_emit_inverted_unspec_cond): Replace with...
+	(aarch64_emit_sve_inverted_cond): ...this new function.  Use
+	aarch64_emit_sve_ptrue_op for the comparison and
+	aarch64_emit_unop to invert the result.
+	(aarch64_expand_sve_vec_cmp_float): Update after the above
+	changes.  Use aarch64_emit_sve_ptrue_op for native comparisons.
+
+2018-05-07  Nathan Sidwell  <nathan@acm.org>
+
+	* doc/invoke.texi (C++ Dialect Options): Remove -ffor-scope.
+	* doc/extend.texi (Deprecated Features): Remove -fno-for-scope
+	(Backwards Compatibility): Likewise.
+
+2018-05-07  Luis Machado  <luis.machado@linaro.org>
+
+	PR bootstrap/85681
+	Revert:
+	2018-05-07  Luis Machado  <luis.machado@linaro.org>
+
+	* config/aarch64/aarch64-protos.h (cpu_prefetch_tune)
+	<prefetch_dynamic_strides>: New const bool field.
+	* config/aarch64/aarch64.c (generic_prefetch_tune): Update to include
+	prefetch_dynamic_strides.
+	(exynosm1_prefetch_tune): Likewise.
+	(thunderxt88_prefetch_tune): Likewise.
+	(thunderx_prefetch_tune): Likewise.
+	(thunderx2t99_prefetch_tune): Likewise.
+	(qdf24xx_prefetch_tune): Likewise. Set prefetch_dynamic_strides to false.
+	(aarch64_override_options_internal): Update to set
+	PARAM_PREFETCH_DYNAMIC_STRIDES.
+	* doc/invoke.texi (prefetch-dynamic-strides): Document new option.
+	* params.def (PARAM_PREFETCH_DYNAMIC_STRIDES): New.
+	* params.h (PARAM_PREFETCH_DYNAMIC_STRIDES): Define.
+	* tree-ssa-loop-prefetch.c (should_issue_prefetch_p): Account for
+	prefetch-dynamic-strides setting.
+
+	2018-05-07  Luis Machado  <luis.machado@linaro.org>
+
+	* config/aarch64/aarch64-protos.h (cpu_prefetch_tune)
+	<minimum_stride>: New const int field.
+	* config/aarch64/aarch64.c (generic_prefetch_tune): Update to include
+	minimum_stride field.
+	(exynosm1_prefetch_tune): Likewise.
+	(thunderxt88_prefetch_tune): Likewise.
+	(thunderx_prefetch_tune): Likewise.
+	(thunderx2t99_prefetch_tune): Likewise.
+	(qdf24xx_prefetch_tune): Likewise. Set minimum_stride to 2048.
+	(aarch64_override_options_internal): Update to set
+	PARAM_PREFETCH_MINIMUM_STRIDE.
+	* doc/invoke.texi (prefetch-minimum-stride): Document new option.
+	* params.def (PARAM_PREFETCH_MINIMUM_STRIDE): New.
+	* params.h (PARAM_PREFETCH_MINIMUM_STRIDE): Define.
+	* tree-ssa-loop-prefetch.c (should_issue_prefetch_p): Return false if
+	stride is constant and is below the minimum stride threshold.
+
+2018-05-07  Luis Machado  <luis.machado@linaro.org>
+
+	* config/aarch64/aarch64.c (qdf24xx_prefetch_tune) <l2_cache_size>: Set
+	to 512.
+
+2018-05-07  Luis Machado  <luis.machado@linaro.org>
+
+	* config/aarch64/aarch64-protos.h (cpu_prefetch_tune)
+	<prefetch_dynamic_strides>: New const bool field.
+	* config/aarch64/aarch64.c (generic_prefetch_tune): Update to include
+	prefetch_dynamic_strides.
+	(exynosm1_prefetch_tune): Likewise.
+	(thunderxt88_prefetch_tune): Likewise.
+	(thunderx_prefetch_tune): Likewise.
+	(thunderx2t99_prefetch_tune): Likewise.
+	(qdf24xx_prefetch_tune): Likewise. Set prefetch_dynamic_strides to false.
+	(aarch64_override_options_internal): Update to set
+	PARAM_PREFETCH_DYNAMIC_STRIDES.
+	* doc/invoke.texi (prefetch-dynamic-strides): Document new option.
+	* params.def (PARAM_PREFETCH_DYNAMIC_STRIDES): New.
+	* params.h (PARAM_PREFETCH_DYNAMIC_STRIDES): Define.
+	* tree-ssa-loop-prefetch.c (should_issue_prefetch_p): Account for
+	prefetch-dynamic-strides setting.
+
+2018-05-07  Luis Machado  <luis.machado@linaro.org>
+
+	* config/aarch64/aarch64-protos.h (cpu_prefetch_tune)
+	<minimum_stride>: New const int field.
+	* config/aarch64/aarch64.c (generic_prefetch_tune): Update to include
+	minimum_stride field.
+	(exynosm1_prefetch_tune): Likewise.
+	(thunderxt88_prefetch_tune): Likewise.
+	(thunderx_prefetch_tune): Likewise.
+	(thunderx2t99_prefetch_tune): Likewise.
+	(qdf24xx_prefetch_tune): Likewise. Set minimum_stride to 2048.
+	(aarch64_override_options_internal): Update to set
+	PARAM_PREFETCH_MINIMUM_STRIDE.
+	* doc/invoke.texi (prefetch-minimum-stride): Document new option.
+	* params.def (PARAM_PREFETCH_MINIMUM_STRIDE): New.
+	* params.h (PARAM_PREFETCH_MINIMUM_STRIDE): Define.
+	* tree-ssa-loop-prefetch.c (should_issue_prefetch_p): Return false if
+	stride is constant and is below the minimum stride threshold.
+
+2018-05-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/85659
+	* cfgexpand.c (expand_asm_stmt): Don't create a temporary if
+	the type is addressable.  Don't force op into register if it has
+	BLKmode.
+
+2018-05-05  Roland McGrath  <mcgrathr@google.com>
+
+	PR other/77609
+	* varasm.c (default_section_type_flags): Set SECTION_NOTYPE for
+	any section for which we don't know a specific type it should have,
+	regardless of name.  Previously this was done only for the exact
+	names ".init_array", ".fini_array", and ".preinit_array".
+	(default_elf_asm_named_section): Add comment about
+	relationship with default_section_type_flags and SECTION_NOTYPE.
+	(get_section): Don't consider it a type conflict if one side has
+	SECTION_NOTYPE and the other doesn't, as long as neither has the
+	SECTION_BSS et al used in the default_section_type_flags logic.
+
+2018-05-05  Tom de Vries  <tom@codesourcery.com>
+
+	PR target/85653
+	* config/nvptx/nvptx.c (WORKAROUND_PTXJIT_BUG_3): Define.
+	(workaround_barsyncs): New function.
+	(nvptx_reorg): Use workaround_barsyncs.
+	* config/nvptx/nvptx.md (define_c_enum "unspecv"): Add UNSPECV_MEMBAR.
+	(define_expand "nvptx_membar_cta"): New define_expand.
+	(define_insn "*nvptx_membar_cta"): New insn.
+
+2018-05-04  Pekka Jääskeläinen  <pekka.jaaskelainen@parmance.com>
+
+	* brig-builtins.def: Add consts to ptrs etc. in BRIG builtin defs.
+	To improve optimization opportunities.
+	* builtin-types.def: The new needed builtin types for the above.
+
 2018-05-04  Richard Biener  <rguenther@suse.de>
 
 	* bb-reorder.c (sanitize_hot_paths): Release hot_bbs_to_check.

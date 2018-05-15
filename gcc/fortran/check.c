@@ -3306,18 +3306,10 @@ gfc_check_minloc_maxloc (gfc_actual_arglist *ap)
     {
       if (!type_check (b, 4, BT_LOGICAL) || !scalar_check (b,4))
 	return false;
-
-      /* TODO: Remove this once BACK is actually implemented.  */
-      if (b->expr_type != EXPR_CONSTANT || b->value.logical != 0)
-	{
-	  gfc_error ("BACK argument to %qs intrinsic not yet "
-		     "implemented", gfc_current_intrinsic);
-	  return false;
-	}
     }
   else
     {
-      b = gfc_get_logical_expr (gfc_default_logical_kind, NULL, 0);
+      b = gfc_get_logical_expr (gfc_logical_4_kind, NULL, 0);
       ap->next->next->next->next->expr = b;
     }
 
@@ -3894,8 +3886,11 @@ gfc_check_rank (gfc_expr *a)
 		  ? a->value.function.esym->result->attr.pointer
 		  : a->symtree->n.sym->result->attr.pointer;
 
-  if (a->expr_type == EXPR_OP || a->expr_type == EXPR_NULL
-      || a->expr_type == EXPR_COMPCALL|| a->expr_type == EXPR_PPC
+  if (a->expr_type == EXPR_OP
+      || a->expr_type == EXPR_NULL
+      || a->expr_type == EXPR_COMPCALL
+      || a->expr_type == EXPR_PPC
+      || a->ts.type == BT_PROCEDURE
       || !is_variable)
     {
       gfc_error ("The argument of the RANK intrinsic at %L must be a data "

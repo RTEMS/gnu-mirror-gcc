@@ -1,3 +1,95 @@
+2018-05-13  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/63529
+	* gfortran.texi: Clarify documentation for Cray pointer and
+	assumed-sized array.
+
+2018-05-13  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/85742
+	* trans-types.c (gfc_get_dtype_rank_type): Reorder evaluation
+	of 'size'. If the element type is a pointer use the size of the
+	TREE_TYPE of the type, unless it is VOID_TYPE. In this latter
+	case, set the size to zero.
+
+2018-05-13  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	* gfortran.h: Remove prototype.
+	* symbol.c (gfc_new_undo_checkpoint): Remove unused function.
+
+2018-05-11  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85542
+	* expr.c (check_inquiry): Avoid NULL pointer dereference.
+
+2018-05-10  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85687
+	* check.c (gfc_check_rank): Check that the argument is a data object.
+
+2018-05-10  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85521
+	* array.c (gfc_resolve_character_array_constructor): Substrings
+	with upper bound smaller than lower bound are zero length strings.
+
+2018-05-10  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/70870
+	* data.c (gfc_assign_data_value): Check that a data object does
+	not also have default initialization.
+
+2018-05-10  Marek Polacek  <polacek@redhat.com>
+
+	PR fortran/85735
+	* options.c (gfc_post_options): Set main_input_filename.
+
+2018-05-10  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/54613
+	* intrinsic.texi: Document BACK for MINLOC and MAXLOC.
+
+2018-05-10  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/68846
+	PR fortran/70864
+	* resolve.c (get_temp_from_expr): The temporary must not have
+	dummy or intent attributes.
+
+2018-05-08  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/54613
+	* check.c (gfc_check_minmaxloc): Remove error for BACK not being
+	implemented.  Use gfc_logical_4_kind for BACK.
+	* simplify.c (min_max_choose): Add optional argument back_val.
+	Handle it.
+	(simplify_minmaxloc_to_scalar): Add argument back_val. Pass
+	back_val to min_max_choose.
+	(simplify_minmaxloc_to_nodim): Likewise.
+	(simplify_minmaxloc_to_array): Likewise.
+	(gfc_simplify_minmaxloc): Add argument back, handle it.
+	Pass back_val to specific simplification functions.
+	(gfc_simplify_minloc): Remove ATTRIBUTE_UNUSED from argument back,
+	pass it on to gfc_simplify_minmaxloc.
+	(gfc_simplify_maxloc): Likewise.
+	* trans-intrinsic.c (gfc_conv_intrinsic_minmaxloc): Adjust
+	comment. If BACK is true, use greater or equal (or lesser or
+	equal) insteal of greater (or lesser). Mark the condition of
+	having found a value which exceeds the limit as unlikely.
+
+2018-05-07  Jeff Law  <law@redhat.comg>
+
+	* scanner.c (preprocessor_line): Call linemap_add after a line
+	directive that changes the current filename.
+
+2018-05-06  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/85507
+	* dependency.c (gfc_dep_resolver): Revert looking at coarray dimension
+	introduced by r259385.
+	* trans-intrinsic.c (conv_caf_send): Always report a dependency for
+	same variables in coarray assignments.
+
 2018-05-02  Tom de Vries  <tom@codesourcery.com>
 
 	PR libgomp/82428

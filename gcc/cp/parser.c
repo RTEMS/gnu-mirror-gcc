@@ -5585,27 +5585,10 @@ cp_parser_primary_expression (cp_parser *parser,
 	    if (parser->local_variables_forbidden_p
 		&& local_variable_p (decl))
 	      {
-		/* It might be that we only found DECL because we are
-		   trying to be generous with pre-ISO scoping rules.
-		   For example, consider:
-
-		     int i;
-		     void g() {
-		       for (int i = 0; i < 10; ++i) {}
-		       extern void f(int j = i);
-		     }
-
-		   Here, name look up will originally find the out
-		   of scope `i'.  We need to issue a warning message,
-		   but then use the global `i'.  */
-		decl = check_for_out_of_scope_variable (decl);
-		if (local_variable_p (decl))
-		  {
-		    error_at (id_expr_token->location,
-			      "local variable %qD may not appear in this context",
-			      decl.get_value ());
-		    return error_mark_node;
-		  }
+		error_at (id_expr_token->location,
+			  "local variable %qD may not appear in this context",
+			  decl.get_value ());
+		return error_mark_node;
 	      }
 	  }
 
@@ -6363,7 +6346,7 @@ cp_parser_nested_name_specifier_opt (cp_parser *parser,
 						    token->location);
 		      if (TREE_CODE (decl) == TEMPLATE_DECL)
 			error_at (token->location,
-				  "%qD used without template parameters",
+				  "%qD used without template arguments",
 				  decl);
 		      else if (ambiguous_decls)
 			{
@@ -10580,11 +10563,7 @@ cp_parser_lambda_declarator_opt (cp_parser* parser, tree lambda_expr)
     void *p;
 
     clear_decl_specs (&return_type_specs);
-    if (return_type)
-      return_type_specs.type = return_type;
-    else
-      /* Maybe we will deduce the return type later.  */
-      return_type_specs.type = make_auto ();
+    return_type_specs.type = make_auto ();
 
     if (lambda_specs.locations[ds_constexpr])
       {
@@ -10610,6 +10589,8 @@ cp_parser_lambda_declarator_opt (cp_parser* parser, tree lambda_expr)
                                        /*late_return_type=*/NULL_TREE,
                                        /*requires_clause*/NULL_TREE);
     declarator->id_loc = LAMBDA_EXPR_LOCATION (lambda_expr);
+    if (return_type)
+      declarator->u.function.late_return_type = return_type;
 
     fco = grokmethod (&return_type_specs,
 		      declarator,
@@ -10620,8 +10601,6 @@ cp_parser_lambda_declarator_opt (cp_parser* parser, tree lambda_expr)
 	DECL_ARTIFICIAL (fco) = 1;
 	/* Give the object parameter a different name.  */
 	DECL_NAME (DECL_ARGUMENTS (fco)) = get_identifier ("__closure");
-	if (return_type)
-	  TYPE_HAS_LATE_RETURN_TYPE (TREE_TYPE (fco)) = 1;
       }
     if (template_param_list)
       {
@@ -22947,20 +22926,7 @@ cp_parser_class_head (cp_parser* parser,
       /* Otherwise, count the number of templates used in TYPE and its
 	 containing scopes.  */
       else
-	{
-	  tree scope;
-
-	  for (scope = TREE_TYPE (type);
-	       scope && TREE_CODE (scope) != NAMESPACE_DECL;
-	       scope = get_containing_scope (scope))
-	    if (TYPE_P (scope)
-		&& CLASS_TYPE_P (scope)
-		&& CLASSTYPE_TEMPLATE_INFO (scope)
-		&& PRIMARY_TEMPLATE_P (CLASSTYPE_TI_TEMPLATE (scope))
-		&& (!CLASSTYPE_TEMPLATE_SPECIALIZATION (scope)
-		    || uses_template_parms (CLASSTYPE_TI_ARGS (scope))))
-	      ++num_templates;
-	}
+	num_templates = num_template_headers_for_class (TREE_TYPE (type));
     }
   /* Otherwise, the identifier is optional.  */
   else
@@ -34984,7 +34950,7 @@ cp_parser_omp_for_loop_init (cp_parser *parser,
 	      init = cp_parser_assignment_expression (parser);
 
 	    non_class:
-	      if (TREE_CODE (TREE_TYPE (decl)) == REFERENCE_TYPE)
+	      if (TYPE_REF_P (TREE_TYPE (decl)))
 		init = error_mark_node;
 	      else
 		cp_finish_decl (decl, NULL_TREE,
@@ -37447,7 +37413,7 @@ static bool
 cp_parser_omp_declare_reduction_exprs (tree fndecl, cp_parser *parser)
 {
   tree type = TREE_VALUE (TYPE_ARG_TYPES (TREE_TYPE (fndecl)));
-  gcc_assert (TREE_CODE (type) == REFERENCE_TYPE);
+  gcc_assert (TYPE_REF_P (type));
   type = TREE_TYPE (type);
   tree omp_out = build_lang_decl (VAR_DECL, get_identifier ("omp_out"), type);
   DECL_ARTIFICIAL (omp_out) = 1;
@@ -37686,7 +37652,7 @@ cp_parser_omp_declare_reduction (cp_parser *parser, cp_token *pragma_tok,
 	       || TREE_CODE (type) == ARRAY_TYPE)
 	error_at (loc, "function or array type %qT in "
 		       "%<#pragma omp declare reduction%>", type);
-      else if (TREE_CODE (type) == REFERENCE_TYPE)
+      else if (TYPE_REF_P (type))
 	error_at (loc, "reference type %qT in "
 		       "%<#pragma omp declare reduction%>", type);
       else if (TYPE_QUALS_NO_ADDR_SPACE (type))

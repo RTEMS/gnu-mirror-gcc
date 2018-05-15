@@ -65,7 +65,7 @@ lvalue_kind (const_tree ref)
     return lvalue_kind (TREE_OPERAND (ref, 0));
 
   if (TREE_TYPE (ref)
-      && TREE_CODE (TREE_TYPE (ref)) == REFERENCE_TYPE)
+      && TYPE_REF_P (TREE_TYPE (ref)))
     {
       /* unnamed rvalue references are rvalues */
       if (TYPE_REF_IS_RVALUE (TREE_TYPE (ref))
@@ -1051,8 +1051,10 @@ build_array_of_n_type (tree elt, int n)
   return build_cplus_array_type (elt, build_index_type (size_int (n - 1)));
 }
 
-/* True iff T is an N3639 array of runtime bound (VLA).  These were
-   approved for C++14 but then removed.  */
+/* True iff T is an N3639 array of runtime bound (VLA).  These were approved
+   for C++14 but then removed.  This should only be used for N3639
+   specifically; code wondering more generally if something is a VLA should use
+   vla_type_p.  */
 
 bool
 array_of_runtime_bound_p (tree t)
@@ -1069,6 +1071,23 @@ array_of_runtime_bound_p (tree t)
 	  || (!value_dependent_expression_p (max) && !TREE_CONSTANT (max)));
 }
 
+/* True iff T is a variable length array.  */
+
+bool
+vla_type_p (tree t)
+{
+  for (; t && TREE_CODE (t) == ARRAY_TYPE;
+       t = TREE_TYPE (t))
+    if (tree dom = TYPE_DOMAIN (t))
+      {
+	tree max = TYPE_MAX_VALUE (dom);
+	if (!potential_rvalue_constant_expression (max)
+	    || (!value_dependent_expression_p (max) && !TREE_CONSTANT (max)))
+	  return true;
+      }
+  return false;
+}
+
 /* Return a reference type node referring to TO_TYPE.  If RVAL is
    true, return an rvalue reference type, otherwise return an lvalue
    reference type.  If a type node exists, reuse it, otherwise create
@@ -1081,7 +1100,7 @@ cp_build_reference_type (tree to_type, bool rval)
   if (to_type == error_mark_node)
     return error_mark_node;
 
-  if (TREE_CODE (to_type) == REFERENCE_TYPE)
+  if (TYPE_REF_P (to_type))
     {
       rval = rval && TYPE_REF_IS_RVALUE (to_type);
       to_type = TREE_TYPE (to_type);
@@ -1129,7 +1148,7 @@ tree
 move (tree expr)
 {
   tree type = TREE_TYPE (expr);
-  gcc_assert (TREE_CODE (type) != REFERENCE_TYPE);
+  gcc_assert (!TYPE_REF_P (type));
   type = cp_build_reference_type (type, /*rval*/true);
   return build_static_cast (type, expr, tf_warning_or_error);
 }
@@ -1241,11 +1260,11 @@ cp_build_qualified_type_real (tree type,
      [dcl.ref], [dcl.fct].  This used to be an error, but as of DR 295
      (in CD1) we always ignore extra cv-quals on functions.  */
   if (type_quals & (TYPE_QUAL_CONST | TYPE_QUAL_VOLATILE)
-      && (TREE_CODE (type) == REFERENCE_TYPE
+      && (TYPE_REF_P (type)
 	  || TREE_CODE (type) == FUNCTION_TYPE
 	  || TREE_CODE (type) == METHOD_TYPE))
     {
-      if (TREE_CODE (type) == REFERENCE_TYPE)
+      if (TYPE_REF_P (type))
 	bad_quals |= type_quals & (TYPE_QUAL_CONST | TYPE_QUAL_VOLATILE);
       type_quals &= ~(TYPE_QUAL_CONST | TYPE_QUAL_VOLATILE);
     }
@@ -1279,15 +1298,6 @@ cp_build_qualified_type_real (tree type,
 
   /* Retrieve (or create) the appropriately qualified variant.  */
   result = build_qualified_type (type, type_quals);
-
-  /* Preserve exception specs and ref-qualifier since build_qualified_type
-     doesn't know about them.  */
-  if (TREE_CODE (result) == FUNCTION_TYPE
-      || TREE_CODE (result) == METHOD_TYPE)
-    {
-      result = build_exception_variant (result, TYPE_RAISES_EXCEPTIONS (type));
-      result = build_ref_qualified_type (result, type_memfn_rqual (type));
-    }
 
   return result;
 }
@@ -1516,22 +1526,16 @@ strip_typedefs (tree t, bool *remove_attributes)
 	    result =
 	      build_method_type_directly (class_type, type,
 					  TREE_CHAIN (arg_types));
-	    result
-	      = build_ref_qualified_type (result, type_memfn_rqual (t));
 	  }
 	else
 	  {
-	    result = build_function_type (type,
-					  arg_types);
-	    result = apply_memfn_quals (result,
-					type_memfn_quals (t),
-					type_memfn_rqual (t));
+	    result = build_function_type (type, arg_types);
+	    result = apply_memfn_quals (result, type_memfn_quals (t));
 	  }
 
-	if (canon_spec)
-	  result = build_exception_variant (result, canon_spec);
-	if (TYPE_HAS_LATE_RETURN_TYPE (t))
-	  TYPE_HAS_LATE_RETURN_TYPE (result) = 1;
+	result = build_cp_fntype_variant (result,
+					  type_memfn_rqual (t), canon_spec,
+					  TYPE_HAS_LATE_RETURN_TYPE (t));
       }
       break;
     case TYPENAME_TYPE:
@@ -2074,17 +2078,19 @@ build_qualified_name (tree type, tree scope, tree name, bool template_p)
   return t;
 }
 
-/* Like check_qualified_type, but also check ref-qualifier and exception
-   specification.  */
+/* Like check_qualified_type, but also check ref-qualifier, exception
+   specification, and whether the return type was specified after the
+   parameters.  */
 
 static bool
 cp_check_qualified_type (const_tree cand, const_tree base, int type_quals,
-			 cp_ref_qualifier rqual, tree raises)
+			 cp_ref_qualifier rqual, tree raises, bool late)
 {
   return (TYPE_QUALS (cand) == type_quals
 	  && check_base_type (cand, base)
 	  && comp_except_specs (raises, TYPE_RAISES_EXCEPTIONS (cand),
 				ce_exact)
+	  && TYPE_HAS_LATE_RETURN_TYPE (cand) == late
 	  && type_memfn_rqual (cand) == rqual);
 }
 
@@ -2093,46 +2099,9 @@ cp_check_qualified_type (const_tree cand, const_tree base, int type_quals,
 tree
 build_ref_qualified_type (tree type, cp_ref_qualifier rqual)
 {
-  tree t;
-
-  if (rqual == type_memfn_rqual (type))
-    return type;
-
-  int type_quals = TYPE_QUALS (type);
   tree raises = TYPE_RAISES_EXCEPTIONS (type);
-  for (t = TYPE_MAIN_VARIANT (type); t; t = TYPE_NEXT_VARIANT (t))
-    if (cp_check_qualified_type (t, type, type_quals, rqual, raises))
-      return t;
-
-  t = build_variant_type_copy (type);
-  switch (rqual)
-    {
-    case REF_QUAL_RVALUE:
-      FUNCTION_RVALUE_QUALIFIED (t) = 1;
-      FUNCTION_REF_QUALIFIED (t) = 1;
-      break;
-    case REF_QUAL_LVALUE:
-      FUNCTION_RVALUE_QUALIFIED (t) = 0;
-      FUNCTION_REF_QUALIFIED (t) = 1;
-      break;
-    default:
-      FUNCTION_REF_QUALIFIED (t) = 0;
-      break;
-    }
-
-  if (TYPE_STRUCTURAL_EQUALITY_P (type))
-    /* Propagate structural equality. */
-    SET_TYPE_STRUCTURAL_EQUALITY (t);
-  else if (TYPE_CANONICAL (type) != type)
-    /* Build the underlying canonical type, since it is different
-       from TYPE. */
-    TYPE_CANONICAL (t) = build_ref_qualified_type (TYPE_CANONICAL (type),
-						   rqual);
-  else
-    /* T is its own canonical type. */
-    TYPE_CANONICAL (t) = t;
-
-  return t;
+  bool late = TYPE_HAS_LATE_RETURN_TYPE (type);
+  return build_cp_fntype_variant (type, rqual, raises, late);
 }
 
 /* Cache of free ovl nodes.  Uses OVL_FUNCTION for chaining.  */
@@ -2637,47 +2606,66 @@ canonical_eh_spec (tree raises)
     return NULL_TREE;
 }
 
+tree
+build_cp_fntype_variant (tree type, cp_ref_qualifier rqual,
+			 tree raises, bool late)
+{
+  cp_cv_quals type_quals = TYPE_QUALS (type);
+
+  if (cp_check_qualified_type (type, type, type_quals, rqual, raises, late))
+    return type;
+
+  tree v = TYPE_MAIN_VARIANT (type);
+  for (; v; v = TYPE_NEXT_VARIANT (v))
+    if (cp_check_qualified_type (v, type, type_quals, rqual, raises, late))
+      return v;
+
+  /* Need to build a new variant.  */
+  v = build_variant_type_copy (type);
+  TYPE_RAISES_EXCEPTIONS (v) = raises;
+  TYPE_HAS_LATE_RETURN_TYPE (v) = late;
+  switch (rqual)
+    {
+    case REF_QUAL_RVALUE:
+      FUNCTION_RVALUE_QUALIFIED (v) = 1;
+      FUNCTION_REF_QUALIFIED (v) = 1;
+      break;
+    case REF_QUAL_LVALUE:
+      FUNCTION_RVALUE_QUALIFIED (v) = 0;
+      FUNCTION_REF_QUALIFIED (v) = 1;
+      break;
+    default:
+      FUNCTION_REF_QUALIFIED (v) = 0;
+      break;
+    }
+
+  /* Canonicalize the exception specification.  */
+  tree cr = flag_noexcept_type ? canonical_eh_spec (raises) : NULL_TREE;
+
+  if (TYPE_STRUCTURAL_EQUALITY_P (type))
+    /* Propagate structural equality. */
+    SET_TYPE_STRUCTURAL_EQUALITY (v);
+  else if (TYPE_CANONICAL (type) != type || cr != raises || late)
+    /* Build the underlying canonical type, since it is different
+       from TYPE. */
+    TYPE_CANONICAL (v) = build_cp_fntype_variant (TYPE_CANONICAL (type),
+						  rqual, cr, false);
+  else
+    /* T is its own canonical type. */
+    TYPE_CANONICAL (v) = v;
+
+  return v;
+}
+
 /* Build the FUNCTION_TYPE or METHOD_TYPE which may throw exceptions
    listed in RAISES.  */
 
 tree
 build_exception_variant (tree type, tree raises)
 {
-  tree v;
-  int type_quals;
-
-  if (comp_except_specs (raises, TYPE_RAISES_EXCEPTIONS (type), ce_exact))
-    return type;
-
-  type_quals = TYPE_QUALS (type);
   cp_ref_qualifier rqual = type_memfn_rqual (type);
-  for (v = TYPE_MAIN_VARIANT (type); v; v = TYPE_NEXT_VARIANT (v))
-    if (cp_check_qualified_type (v, type, type_quals, rqual, raises))
-      return v;
-
-  /* Need to build a new variant.  */
-  v = build_variant_type_copy (type);
-  TYPE_RAISES_EXCEPTIONS (v) = raises;
-
-  if (!flag_noexcept_type)
-    /* The exception-specification is not part of the canonical type.  */
-    return v;
-
-  /* Canonicalize the exception specification.  */
-  tree cr = canonical_eh_spec (raises);
-
-  if (TYPE_STRUCTURAL_EQUALITY_P (type))
-    /* Propagate structural equality. */
-    SET_TYPE_STRUCTURAL_EQUALITY (v);
-  else if (TYPE_CANONICAL (type) != type || cr != raises)
-    /* Build the underlying canonical type, since it is different
-       from TYPE. */
-    TYPE_CANONICAL (v) = build_exception_variant (TYPE_CANONICAL (type), cr);
-  else
-    /* T is its own canonical type. */
-    TYPE_CANONICAL (v) = v;
-
-  return v;
+  bool late = TYPE_HAS_LATE_RETURN_TYPE (type);
+  return build_cp_fntype_variant (type, rqual, raises, late);
 }
 
 /* Given a TEMPLATE_TEMPLATE_PARM node T, create a new
@@ -4717,12 +4705,7 @@ cp_build_type_attribute_variant (tree type, tree attributes)
   new_type = build_type_attribute_variant (type, attributes);
   if (TREE_CODE (new_type) == FUNCTION_TYPE
       || TREE_CODE (new_type) == METHOD_TYPE)
-    {
-      new_type = build_exception_variant (new_type,
-					  TYPE_RAISES_EXCEPTIONS (type));
-      new_type = build_ref_qualified_type (new_type,
-					   type_memfn_rqual (type));
-    }
+    gcc_checking_assert (cxx_type_hash_eq (type, new_type));
 
   /* Making a new main variant of a class type is broken.  */
   gcc_assert (!CLASS_TYPE_P (type) || new_type == type);
@@ -4741,6 +4724,8 @@ cxx_type_hash_eq (const_tree typea, const_tree typeb)
 
   if (type_memfn_rqual (typea) != type_memfn_rqual (typeb))
     return false;
+  if (TYPE_HAS_LATE_RETURN_TYPE (typea) != TYPE_HAS_LATE_RETURN_TYPE (typeb))
+    return false;
   return comp_except_specs (TYPE_RAISES_EXCEPTIONS (typea),
 			    TYPE_RAISES_EXCEPTIONS (typeb), ce_exact);
 }
@@ -4753,10 +4738,9 @@ cxx_copy_lang_qualifiers (const_tree typea, const_tree typeb)
 {
   tree type = CONST_CAST_TREE (typea);
   if (TREE_CODE (type) == FUNCTION_TYPE || TREE_CODE (type) == METHOD_TYPE)
-    {
-      type = build_exception_variant (type, TYPE_RAISES_EXCEPTIONS (typeb));
-      type = build_ref_qualified_type (type, type_memfn_rqual (typeb));
-    }
+    type = build_cp_fntype_variant (type, type_memfn_rqual (typeb),
+				    TYPE_RAISES_EXCEPTIONS (typeb),
+				    TYPE_HAS_LATE_RETURN_TYPE (typeb));
   return type;
 }
 
@@ -5028,8 +5012,7 @@ decl_linkage (tree decl)
 
   /* maybe_thunk_body clears TREE_PUBLIC on the maybe-in-charge 'tor variants,
      check one of the "clones" for the real linkage.  */
-  if ((DECL_MAYBE_IN_CHARGE_DESTRUCTOR_P (decl)
-       || DECL_MAYBE_IN_CHARGE_CONSTRUCTOR_P (decl))
+  if (DECL_MAYBE_IN_CHARGE_CDTOR_P (decl)
       && DECL_CHAIN (decl)
       && DECL_CLONED_FUNCTION_P (DECL_CHAIN (decl)))
     return decl_linkage (DECL_CHAIN (decl));
@@ -5107,7 +5090,7 @@ stabilize_expr (tree exp, tree* initp)
     }
   /* There are no expressions with REFERENCE_TYPE, but there can be call
      arguments with such a type; just treat it as a pointer.  */
-  else if (TREE_CODE (TREE_TYPE (exp)) == REFERENCE_TYPE
+  else if (TYPE_REF_P (TREE_TYPE (exp))
 	   || SCALAR_TYPE_P (TREE_TYPE (exp))
 	   || !glvalue_p (exp))
     {
@@ -5268,7 +5251,7 @@ stabilize_init (tree init, tree *initp)
 	{
 	  tree type = TREE_TYPE (ce->value);
 	  tree subinit;
-	  if (TREE_CODE (type) == REFERENCE_TYPE
+	  if (TYPE_REF_P (type)
 	      || SCALAR_TYPE_P (type))
 	    ce->value = stabilize_expr (ce->value, &subinit);
 	  else if (!stabilize_init (ce->value, &subinit))

@@ -1,4 +1,339 @@
-2018-05-04 Carl Love  <cel@us.ibm.com>
+2018-05-15  Richard Biener  <rguenther@suse.de>
+
+	* gcc.dg/tree-ssa/ssa-dse-31.c: New testcase.
+
+2018-05-15  Prathamesh Kulkarni  <prathamesh.kulkarni@linaro.org>
+
+	PR tree-optimization/83648
+	* gcc.dg/tree-ssa/pr83648.c: New test.
+	* gcc.dg/tree-ssa/pr83648-2.c: Likewise.
+
+2018-05-14  Prathamesh Kulkarni  <prathamesh.kulkarni@linaro.org>
+
+	PR ipa/85734
+	* gcc.dg/ipa/pr85734.c: New test.
+
+2018-05-14  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR target/85756
+	* gnat.dg/opt70.adb: New test.
+	* gnat.dg/opt70_pkg.ad[sb]: New helper.
+
+2018-05-14  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* gcc.target/aarch64/crypto-fuse-1.c: New test.
+	* gcc.target/aarch64/crypto-fuse-2.c: Likewise.
+
+2018-05-14  Wilco Dijkstra  <wdijkstr@arm.com>
+
+	* gcc.target/aarch64/vmov_n_1.c: Update test.
+	* gcc.target/aarch64/vfp-1.c: Update test.
+
+2018-05-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/85756
+	* gcc.c-torture/execute/pr85756.c: New test.
+
+2018-05-14  Sebastian Peryt  <sebastian.peryt@intel.com>
+
+	* gcc.target/i386/cldemote-1.c: New test.
+
+2018-05-13  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/85742
+	* gfortran.dg/assumed_type_9.f90 : New test.
+
+2018-05-11  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85542
+	* gfortran.dg/pr85542.f90: New test.
+
+2018-05-11  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/85655
+	* g++.dg/lto/pr85655_0.C: New test.
+
+2018-05-11  Sebastian Peryt  <sebastian.peryt@intel.com>
+
+	* gcc.target/i386/tpause-1.c: New test.
+	* gcc.target/i386/umonitor-1.c: New test.
+
+2018-05-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/85696
+	* c-c++-common/gomp/pr85696.c: New test.
+
+2018-05-11  Allan Sandfeld Jensen  <allan.jensen@qt.io>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/85692
+	* gcc.target/i386/pr85692.c: New test.
+
+2018-05-11  Martin Liska  <mliska@suse.cz>
+
+        PR sanitizer/85556
+	* c-c++-common/ubsan/attrib-6.c: New test.
+
+2018-05-10  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85687
+	* gfortran.dg/pr85687.f90: new test.
+
+2018-05-10  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/85521
+	* gfortran.dg/pr85521_1.f90: New test.
+	* gfortran.dg/pr85521_2.f90: New test.
+
+2018-05-10  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/70870
+	* gfortran.dg/pr70870_1.f90: New test.
+
+2018-05-10  Uros Bizjak  <ubizjak@gmail.com>
+
+	* gcc.target/i386/xgetsetbv.c: Check also variable arguments.
+
+2018-05-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/85662
+	* g++.dg/ext/offsetof2.C: New test.
+
+2018-05-10  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/68846
+	* gfortran.dg/temporary_3.f90 : New test.
+
+	PR fortran/70864
+	* gfortran.dg/temporary_2.f90 : New test.
+
+2018-05-10  Segher Boessenkool  <segher@kernel.crashing.org>
+
+	* gcc.dg/vmx/extract-be-order.c: Delete testcase.
+	* gcc.dg/vmx/extract-vsx-be-order.c: Delete testcase.
+	* gcc.dg/vmx/insert-be-order.c: Delete testcase.
+	* gcc.dg/vmx/insert-vsx-be-order.c: Delete testcase.
+	* gcc.dg/vmx/ld-be-order.c: Delete testcase.
+	* gcc.dg/vmx/ld-vsx-be-order.c: Delete testcase.
+	* gcc.dg/vmx/lde-be-order.c: Delete testcase.
+	* gcc.dg/vmx/ldl-be-order.c: Delete testcase.
+	* gcc.dg/vmx/ldl-vsx-be-order.c: Delete testcase.
+	* gcc.dg/vmx/merge-be-order.c: Delete testcase.
+	* gcc.dg/vmx/merge-vsx-be-order.c: Delete testcase.
+	* gcc.dg/vmx/mult-even-odd-be-order.c: Delete testcase.
+	* gcc.dg/vmx/pack-be-order.c: Delete testcase.
+	* gcc.dg/vmx/perm-be-order.c: Delete testcase.
+	* gcc.dg/vmx/splat-be-order.c: Delete testcase.
+	* gcc.dg/vmx/splat-vsx-be-order.c: Delete testcase.
+	* gcc.dg/vmx/st-be-order.c: Delete testcase.
+	* gcc.dg/vmx/st-vsx-be-order.c: Delete testcase.
+	* gcc.dg/vmx/ste-be-order.c: Delete testcase.
+	* gcc.dg/vmx/stl-be-order.c: Delete testcase.
+	* gcc.dg/vmx/stl-vsx-be-order.c: Delete testcase.
+	* gcc.dg/vmx/sum2s-be-order.c: Delete testcase.
+	* gcc.dg/vmx/unpack-be-order.c: Delete testcase.
+	* gcc.dg/vmx/vsums-be-order.c: Delete testcase.
+	* gcc.target/powerpc/vec-setup-be-double.c: Delete testcase.
+	* gcc.target/powerpc/vec-setup-be-long.c: Delete testcase.
+	* gcc.target/powerpc/vec-setup.h: Remove -maltivec=be support.
+
+2018-05-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/85699
+	* gcc.dg/nextafter-1.c (NO_LONG_DOUBLE): Define if not defined.  Use
+	!NO_LONG_DOUBLE instead of __LDBL_MANT_DIG__ != 106.
+	* gcc.dg/nextafter-2.c: Include stdlib.h.  For glibc < 2.24 define
+	NO_LONG_DOUBLE to 1 before including nextafter-1.c.
+
+2018-05-10  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* g++.dg/tls/pr85400.C: New test.
+
+2018-05-09  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/85713
+	* g++.dg/cpp1y/lambda-generic-85713.C: New.
+
+2018-05-09  Carl Love  <cel@us.ibm.com>
+
+	* gcc.target/powerpc/builtins-8-runnable.c: New builtin test file.
+
+2018-05-09  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/85713
+	Revert:
+	2018-05-08  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/84588
+	* g++.dg/cpp1y/pr84588.C: New.
+
+2018-05-09  Andreas Schwab  <schwab@suse.de>
+
+	* gcc.target/aarch64/sve/vcond_6.c: Add missing brace.
+
+2018-05-09  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* gcc.target/aarch64/store_lane_spill_1.c: New test.
+	* gcc.target/aarch64/sve/store_lane_spill_1.c: Likewise.
+
+2018-05-08  Carl Love  <cel@us.ibm.com>
+	* gcc.target/powerpc/builtins-8-p9-runnable.c: Add new test file.
+
+2018-05-08  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/84588
+	* g++.dg/cpp1y/pr84588.C: New.
+
+2018-05-08  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/85695
+	* g++.dg/cpp1z/constexpr-if22.C: New test.
+
+2018-05-08  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/85693
+	* gcc.target/i386/pr85693.c: New test.
+
+2018-05-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/85683
+	* gcc.target/i386/pr49095.c: Add -masm=att to dg-options.  Add
+	scan-assembler-times checking that except for [fh]*xor other functions
+	don't use any load instructions.
+
+2018-05-08  Olga Makhotina  <olga.makhotina@intel.com>
+
+	* gcc.target/i386/builtin_target.c: Test goldmont.
+	* gcc.target/i386/funcspec-56.inc: Tests for arch=goldmont and
+	arch=silvermont.
+
+2018-05-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/85572
+	* g++.dg/other/sse2-pr85572-1.C: New test.
+	* g++.dg/other/sse2-pr85572-2.C: New test.
+	* g++.dg/other/sse4-pr85572-1.C: New test.
+	* g++.dg/other/avx2-pr85572-1.C: New test.
+
+	PR target/85317
+	* gcc.target/i386/pr85317.c: New test.
+	* gcc.target/i386/avx2-vpmovmskb-2.c (avx2_test): Add asm volatile
+	optimization barrier to avoid optimizing away the expected insn.
+
+	PR target/85480
+	* gcc.target/i386/avx512dq-pr85480-1.c: New test.
+	* gcc.target/i386/avx512dq-pr85480-2.c: New test.
+
+2018-05-08  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* g++.dg/other/sve_const_pred_1.C: Rename to...
+	* g++.target/aarch64/sve/const_pred_1.C: ...this.  Remove aarch64
+	target selectors and explicit -march options.
+	* g++.dg/other/sve_const_pred_2.C: Rename to...
+	* g++.target/aarch64/sve/const_pred_2.C: ...this and adjust likewise.
+	* g++.dg/other/sve_const_pred_3.C: Rename to...
+	* g++.target/aarch64/sve/const_pred_3.C: ...this and adjust likewise.
+	* g++.dg/other/sve_const_pred_4.C: Rename to...
+	* g++.target/aarch64/sve/const_pred_4.C: ...this and adjust likewise.
+	* g++.dg/other/sve_tls_2.C: Rename to...
+	* g++.target/aarch64/sve/tls_2.C: ...this and adjust likewise.
+	* g++.dg/other/sve_vcond_1.C: Rename to...
+	* g++.target/aarch64/sve/vcond_1.C: ...this and adjust likewise.
+	* g++.dg/other/sve_vcond_1_run.C: Rename to...
+	* g++.target/aarch64/sve/vcond_1_run.C: ...this and adjust likewise.
+
+2018-05-08  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	PR testsuite/85586
+	* gcc.dg/vect/pr85586.c: Restrict LOOP VECTORIZED test to
+	!vect_no_align.
+
+2018-05-08  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/57429
+	* g++.dg/cpp0x/deleted14.C: New.
+
+2018-05-08  Richard Sandiford  <richard.sandiford@linaro.org>
+	    Alan Hayward  <alan.hayward@arm.com>
+	    David Sherwood  <david.sherwood@arm.com>
+
+	* gcc.target/aarch64/sve/vcond_6.c: Do not expect any ANDs.
+	XFAIL the BIC test.
+	* gcc.target/aarch64/sve/vcond_7.c: New test.
+	* gcc.target/aarch64/sve/vcond_7_run.c: Likewise.
+
+2018-05-08  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/70563
+	* g++.dg/cpp0x/sfinae62.C: New.
+
+2018-05-08  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* gcc.target/aarch64/sve/vcond_6.c (LOOP): Unconditionally
+	load from src[i].
+
+2018-05-08  Paolo Carlini  <paolo.carlini@oracle.com>
+
+	PR c++/80691
+	* g++.dg/cpp0x/narrowing1.C: New.
+
+2018-05-08  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/85588
+	* gcc.dg/torture/pr85574.c: Rename to...
+	* gcc.dg/torture/pr85588.c: ... this.
+
+2018-05-08  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/54613
+	* gfortran.dg/minmaxloc_12.f90: New test case.
+	* gfortran.dg/minmaxloc_13.f90: New test case.
+
+2018-05-07  Nathan Sidwell  <nathan@acm.org>
+
+	* g++.dg/cpp0x/range-for10.C: Delete.
+	* g++.dg/ext/forscope1.C: Delete.
+	* g++.dg/ext/forscope2.C: Delete.
+	* g++.dg/template/for1.C: Delete.
+
+2018-05-07  Jeff Law  <law@redhat.com>
+
+	* gfortran.dg/linefile.f90: New test.
+
+2018-05-07  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	* gcc.dg/nextafter-2.c: Add c99_runtime effective target
+	and options.
+
+2018-05-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/85659
+	* g++.dg/ext/asm14.C: New test.
+	* g++.dg/ext/asm15.C: New test.
+	* g++.dg/ext/asm16.C: New test.
+
+2018-05-06  Michael Eager  <eager@eagercon.com>
+
+	* gcc.target/microblaze/others/picdtr.c: Correct option
+	 -fPIE -mpic-data-is-text-relative.
+
+2018-05-06  Andrew Sadek  <andrew.sadek.se@gmail.com>
+
+	* gcc.target/microblaze/others/picdtr.c: Add test for
+	 -fPIE -mpic-data-is-text-relative.
+
+2018-05-06  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/85507
+	* gfortran.dg/coarray_dependency_1.f90: New test.
+	* gfortran.dg/coarray_lib_comm_1.f90: Fix counting caf-expressions.
+
+2018-05-04  Pekka Jääskeläinen  <pekka.jaaskelainen@parmance.com>
+
+	* testsuite/brig.dg/test/gimple/smoke_test.hsail: Fix the test
+	to match the currently produced gimple.
+
+2018-05-04  Carl Love  <cel@us.ibm.com>
 	* gcc.target/powerpc/vsx-vector-6.h (foo): Add test for vec_max,
 	vec_trunc.
 	* gcc.target/powerpc/vsx-vector-6-le.c (dg-final): Update xvcmpeqdp,

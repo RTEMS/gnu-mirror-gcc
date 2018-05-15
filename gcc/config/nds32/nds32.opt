@@ -90,6 +90,10 @@ mcmov
 Target Report Mask(CMOV)
 Generate conditional move instructions.
 
+mhw-abs
+Target Report Mask(HW_ABS)
+Generate hardware abs instructions.
+
 mext-perf
 Target Report Mask(EXT_PERF)
 Generate performance extension instructions.
@@ -101,6 +105,10 @@ Generate performance extension version 2 instructions.
 mext-string
 Target Report Mask(EXT_STRING)
 Generate string extension instructions.
+
+mext-dsp
+Target Report Mask(EXT_DSP)
+Generate DSP extension instructions.
 
 mv3push
 Target Report Mask(V3PUSH)
@@ -235,6 +243,99 @@ EnumValue
 Enum(nds32_cpu_type) String(n968a) Value(CPU_N9)
 
 EnumValue
+Enum(nds32_cpu_type) String(n10) Value(CPU_N10)
+
+EnumValue
+Enum(nds32_cpu_type) String(n1033) Value(CPU_N10)
+
+EnumValue
+Enum(nds32_cpu_type) String(n1033a) Value(CPU_N10)
+
+EnumValue
+Enum(nds32_cpu_type) String(n1033-fpu) Value(CPU_N10)
+
+EnumValue
+Enum(nds32_cpu_type) String(n1033-spu) Value(CPU_N10)
+
+EnumValue
+Enum(nds32_cpu_type) String(n1068) Value(CPU_N10)
+
+EnumValue
+Enum(nds32_cpu_type) String(n1068a) Value(CPU_N10)
+
+EnumValue
+Enum(nds32_cpu_type) String(n1068-fpu) Value(CPU_N10)
+
+EnumValue
+Enum(nds32_cpu_type) String(n1068a-fpu) Value(CPU_N10)
+
+EnumValue
+Enum(nds32_cpu_type) String(n1068-spu) Value(CPU_N10)
+
+EnumValue
+Enum(nds32_cpu_type) String(n1068a-spu) Value(CPU_N10)
+
+EnumValue
+Enum(nds32_cpu_type) String(d10) Value(CPU_N10)
+
+EnumValue
+Enum(nds32_cpu_type) String(d1088) Value(CPU_N10)
+
+EnumValue
+Enum(nds32_cpu_type) String(d1088-fpu) Value(CPU_N10)
+
+EnumValue
+Enum(nds32_cpu_type) String(d1088-spu) Value(CPU_N10)
+
+EnumValue
+Enum(nds32_cpu_type) Undocumented String(graywolf) Value(CPU_GRAYWOLF)
+
+EnumValue
+Enum(nds32_cpu_type) String(n15) Value(CPU_GRAYWOLF)
+
+EnumValue
+Enum(nds32_cpu_type) String(d15) Value(CPU_GRAYWOLF)
+
+EnumValue
+Enum(nds32_cpu_type) String(n15s) Value(CPU_GRAYWOLF)
+
+EnumValue
+Enum(nds32_cpu_type) String(d15s) Value(CPU_GRAYWOLF)
+
+EnumValue
+Enum(nds32_cpu_type) String(n15f) Value(CPU_GRAYWOLF)
+
+EnumValue
+Enum(nds32_cpu_type) String(d15f) Value(CPU_GRAYWOLF)
+
+EnumValue
+Enum(nds32_cpu_type) String(n12) Value(CPU_N12)
+
+EnumValue
+Enum(nds32_cpu_type) String(n1213) Value(CPU_N12)
+
+EnumValue
+Enum(nds32_cpu_type) String(n1233) Value(CPU_N12)
+
+EnumValue
+Enum(nds32_cpu_type) String(n1233-fpu) Value(CPU_N12)
+
+EnumValue
+Enum(nds32_cpu_type) String(n1233-spu) Value(CPU_N12)
+
+EnumValue
+Enum(nds32_cpu_type) String(n13) Value(CPU_N13)
+
+EnumValue
+Enum(nds32_cpu_type) String(n1337) Value(CPU_N13)
+
+EnumValue
+Enum(nds32_cpu_type) String(n1337-fpu) Value(CPU_N13)
+
+EnumValue
+Enum(nds32_cpu_type) String(n1337-spu) Value(CPU_N13)
+
+EnumValue
 Enum(nds32_cpu_type) String(simple) Value(CPU_SIMPLE)
 
 mconfig-fpu=
@@ -320,6 +421,10 @@ Generate single-precision floating-point instructions.
 mext-fpu-dp
 Target Report Mask(FPU_DOUBLE)
 Generate double-precision floating-point instructions.
+
+mforce-no-ext-dsp
+Target Undocumented Report Mask(FORCE_NO_EXT_DSP)
+Force disable hardware loop, even use -mext-dsp.
 
 malways-save-lp
 Target Var(flag_always_save_lp) Init(0)
