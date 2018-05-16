@@ -21691,9 +21691,16 @@ rs6000_expand_float128_convert (rtx dest, rtx src, bool unsigned_p)
   else
     gcc_unreachable ();
 
-  /* Handle conversion between TFmode/KFmode.  */
+  /* Handle conversion between TFmode/KFmode/IFmode.  */
   if (do_move)
-    emit_move_insn (dest, gen_lowpart (dest_mode, src));
+    {
+      enum rtx_code cvt = (((int) dest_mode > (int) src_mode)
+			   ? FLOAT_EXTEND
+			   : FLOAT_TRUNCATE);
+
+      rtx cvt_rtx = gen_rtx_fmt_e (cvt, dest_mode, src);
+      emit_insn (gen_rtx_SET (dest, cvt_rtx));
+    }
 
   /* Handle conversion if we have hardware support.  */
   else if (TARGET_FLOAT128_HW && hw_convert)
