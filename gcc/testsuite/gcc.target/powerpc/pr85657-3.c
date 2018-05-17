@@ -1,50 +1,82 @@
-/* { dg-do compile { target { powerpc*-*-linux* } } } */
+/* { dg-do run { target { powerpc*-*-linux* } } } */
 /* { dg-require-effective-target ppc_float128_sw } */
-/* { dg-options "-mvsx -mfloat128 -O2 -mabi=ieeelongdouble -Wno-psabi" } */
+/* { dg-require-effective-target vsx_hw } */
+/* { dg-options "-mvsx -O2" } */
 
-/* PR 85657 -- test __builtin_pack_ibm128 and __builtin_unpack_ibm128.  */
+/* PR 85657 -- make __ibm128 a full type.  */
 
+__attribute__ ((__noinline__))
+__float128
+ibm128_to_float128 (__ibm128 a)
+{
+  return (__float128)a + 1.0q;
+}
+
+__attribute__ ((__noinline__))
+__float128
+ldouble_to_float128 (long double a)
+{
+  return (__float128)a + 1.0q;
+}
+
+__attribute__ ((__noinline__))
 __ibm128
-pack (double a, double b)
+float128_to_ibm128 (__float128 a)
 {
-  return __builtin_pack_ibm128 (a, b);
+  return (__ibm128)a + (__ibm128)1.0;
 }
 
-double
-unpack0 (__ibm128 a)
-{
-  return __builtin_unpack_ibm128 (a, 0);
-}
-
-double
-unpack1 (__ibm128 a)
-{
-  return __builtin_unpack_ibm128 (a, 1);
-}
-
-void
-unpack (__ibm128 a, double *p, double *q)
-{
-  *p = __builtin_unpack_ibm128 (a, 0);
-  *q = __builtin_unpack_ibm128 (a, 1);
-}
-
-/* The _add variants are to use different input/output registers to make sure
-   that actual code is generated.  */
+__attribute__ ((__noinline__))
 __ibm128
-pack_add (__ibm128 x, double a, double b)
+ldouble_to_ibm128 (long double a)
 {
-  return __builtin_pack_ibm128 (a, b) + x;
+  return (__ibm128)a + (__ibm128)1.0;
 }
 
-double
-unpack0_add (double x, __ibm128 a)
+__attribute__ ((__noinline__))
+long double
+ibm128_to_ldouble (__ibm128 a)
 {
-  return __builtin_unpack_ibm128 (a, 0) + x;
+  return (long double)a + 1.0L;
 }
 
-double
-unpack1_add (double x, __ibm128 a)
+__attribute__ ((__noinline__))
+long double
+float128_to_ldouble (__float128 a)
 {
-  return __builtin_unpack_ibm128 (a, 1) + x;
+  return (long double)a + 1.0L;
+}
+
+volatile __float128 f128 = 1.25Q;
+volatile __ibm128 i128 = (__ibm128)3.5L;
+volatile long double ld = 4.75L;
+
+volatile double f128_p1 = 2.25;
+volatile double i128_p1 = 4.5;
+volatile double ld_p1   = 5.75;
+
+extern void abort (void);
+
+int
+main (void)
+{
+  if (((double) float128_to_ldouble (f128)) != f128_p1)
+    abort ();
+
+  if (((double) float128_to_ibm128 (f128)) != f128_p1)
+    abort ();
+
+  if (((double) ibm128_to_ldouble (i128)) != i128_p1)
+    abort ();
+
+  if (((double) ibm128_to_float128 (i128)) != i128_p1)
+    abort ();
+
+  if (((double) ldouble_to_ibm128 (ld)) != ld_p1)
+    abort ();
+
+  if (((double) ldouble_to_float128 (ld)) != ld_p1)
+    abort ();
+
+  return 0;
 }
