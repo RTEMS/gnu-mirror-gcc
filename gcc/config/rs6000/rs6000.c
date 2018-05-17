@@ -21583,13 +21583,7 @@ rs6000_expand_float128_convert (rtx dest, rtx src, bool unsigned_p)
 	  break;
 
 	case E_KFmode:
-	  do_move = true;
-	  break;
-
 	case E_IFmode:
-	  cvt = sext_optab;
-	  break;
-
 	case E_TFmode:
 	  if (FLOAT128_IBM_P (src_mode))
 	    cvt = sext_optab;
@@ -21651,13 +21645,7 @@ rs6000_expand_float128_convert (rtx dest, rtx src, bool unsigned_p)
 	  break;
 
 	case E_KFmode:
-	  do_move = true;
-	  break;
-
 	case E_IFmode:
-	  cvt = trunc_optab;
-	  break;
-
 	case E_TFmode:
 	  if (FLOAT128_IBM_P (dest_mode))
 	    cvt = trunc_optab;
@@ -21716,6 +21704,7 @@ rs6000_expand_float128_convert (rtx dest, rtx src, bool unsigned_p)
     {
       libfunc = convert_optab_libfunc (cvt, dest_mode, src_mode);
       gcc_assert (libfunc != NULL_RTX);
+
       dest2 = emit_library_call_value (libfunc, dest, LCT_CONST, dest_mode,
 				       src, src_mode);
 
