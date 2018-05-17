@@ -17856,13 +17856,13 @@ init_float128_ieee (machine_mode mode)
       set_conv_libfunc (trunc_optab, SFmode, mode, "__trunckfsf2");
       set_conv_libfunc (trunc_optab, DFmode, mode, "__trunckfdf2");
 
-      set_conv_libfunc (sext_optab, mode, IFmode, "__extendtfkf2");
+      set_conv_libfunc (sext_optab, mode, IFmode, "__trunctfkf2");
       if (mode != TFmode && FLOAT128_IBM_P (TFmode))
-	set_conv_libfunc (sext_optab, mode, TFmode, "__extendtfkf2");
+	set_conv_libfunc (sext_optab, mode, TFmode, "__trunctfkf2");
 
-      set_conv_libfunc (trunc_optab, IFmode, mode, "__trunckftf2");
+      set_conv_libfunc (trunc_optab, IFmode, mode, "__extendkftf2");
       if (mode != TFmode && FLOAT128_IBM_P (TFmode))
-	set_conv_libfunc (trunc_optab, TFmode, mode, "__trunckftf2");
+	set_conv_libfunc (trunc_optab, TFmode, mode, "__extendkftf2");
 
       set_conv_libfunc (sext_optab, mode, SDmode, "__dpd_extendsdkf2");
       set_conv_libfunc (sext_optab, mode, DDmode, "__dpd_extendddkf2");
@@ -21583,7 +21583,13 @@ rs6000_expand_float128_convert (rtx dest, rtx src, bool unsigned_p)
 	  break;
 
 	case E_KFmode:
+	  do_move = true;
+	  break;
+
 	case E_IFmode:
+	  cvt = sext_optab;
+	  break;
+
 	case E_TFmode:
 	  if (FLOAT128_IBM_P (src_mode))
 	    cvt = sext_optab;
@@ -21645,7 +21651,13 @@ rs6000_expand_float128_convert (rtx dest, rtx src, bool unsigned_p)
 	  break;
 
 	case E_KFmode:
+	  do_move = true;
+	  break;
+
 	case E_IFmode:
+	  cvt = trunc_optab;
+	  break;
+
 	case E_TFmode:
 	  if (FLOAT128_IBM_P (dest_mode))
 	    cvt = trunc_optab;
@@ -21693,14 +21705,7 @@ rs6000_expand_float128_convert (rtx dest, rtx src, bool unsigned_p)
 
   /* Handle conversion between TFmode/KFmode/IFmode.  */
   if (do_move)
-    {
-      enum rtx_code cvt = (((int) dest_mode > (int) src_mode)
-			   ? FLOAT_EXTEND
-			   : FLOAT_TRUNCATE);
-
-      rtx cvt_rtx = gen_rtx_fmt_e (cvt, dest_mode, src);
-      emit_insn (gen_rtx_SET (dest, cvt_rtx));
-    }
+    emit_insn (gen_rtx_SET (dest, gen_rtx_FLOAT_EXTEND (dest_mode, src)));
 
   /* Handle conversion if we have hardware support.  */
   else if (TARGET_FLOAT128_HW && hw_convert)
@@ -21711,7 +21716,6 @@ rs6000_expand_float128_convert (rtx dest, rtx src, bool unsigned_p)
     {
       libfunc = convert_optab_libfunc (cvt, dest_mode, src_mode);
       gcc_assert (libfunc != NULL_RTX);
-
       dest2 = emit_library_call_value (libfunc, dest, LCT_CONST, dest_mode,
 				       src, src_mode);
 

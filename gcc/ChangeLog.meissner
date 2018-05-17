@@ -1,3 +1,26 @@
+2018-05-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.c (init_float128_ibm): Update conversion
+	to/from IBM extended double to IEEE 128-bit.
+	(rs6000_expand_float128_convert): Break KFmode/IFmode/TFmode into
+	separate switch statements.  Do not use gen_lowpart to convert
+	between 128-bit types with the same representation, use explicit
+	FLOAT_EXTEND insns.
+	* config/rs6000/rs6000.md (extend<mode>tf2): Undo some previous
+	changes, going back to the original code.
+	(extendiftf2): Likewise.
+	(extend<mode>tf2_internal): Likewise.
+	(extendifkf2): Likewise.
+	(extendifkf2): Likewise.
+	(extendtfkf2): Likewise.
+	(trunctf<mode>2): Likewise.
+	(trunciftf2): Likewise.
+	(extend<mode>tf2_internal): Likewise.
+	(truncifkf2): Likewise.
+	(extendtf<mode>2_internal): Likewise.
+	(extendkftf2): Likewise.
+	(trunctfkf2): Likewise.
+
 2018-05-15  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (rs6000_expand_float128_convert): Do not
