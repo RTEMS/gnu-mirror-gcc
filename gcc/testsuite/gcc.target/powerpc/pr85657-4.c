@@ -11,7 +11,8 @@ pack (double dummy, double a, double b)
   return __builtin_pack_ibm128 (a, b);
 }
 
-/* { dg-final { scan-assembler     {\mfmr\|xxlor\M} } } */
+/* { dg-final { scan-assembler     {\m(fmr|xxlor)\M} } } */
 /* { dg-final { scan-assembler-not {\mbl\M} } } */
-/* { dg-final { scan-assembler-not {\mstfd\|stfdx\|stxsd\|stxsdx\M} } } */
-/* { dg-final { scan-assembler-not {\mmtvsrd\|mfvsrd\M} } } */
+/* { dg-final { scan-assembler-not {\(mstfd|stxsd)x?\M} } } */
+/* { dg-final { scan-assembler-not {\m(lfd|lxsd)x?\M} } } */
+/* { dg-final { scan-assembler-not {\(mmtvsrd|mfvsrd)\M} } } */

@@ -18,8 +18,8 @@ unpack1 (double dummy, __ibm128 x)
   return __builtin_unpack_ibm128 (x, 1);
 }
 
-/* { dg-final { scan-assembler-times {\mfmr\|xxlor\M} 2 } } */
+/* { dg-final { scan-assembler-times {\(mfmr|xxlor)\M} 2 } } */
 /* { dg-final { scan-assembler-not   {\mbl\M} } } */
-/* { dg-final { scan-assembler-not   {\mstfd\|stfdx\|stxsd\|stxsdx\M} } } */
-/* { dg-final { scan-assembler-not   {\mlfd\|lfdx\|lxsd\|lxsdx\M} } } */
-/* { dg-final { scan-assembler-not   {\mmtvsrd\|mfvsrd\M} } } */
+/* { dg-final { scan-assembler-not   {\(mstfd|stxsd)x?\M} } } */
+/* { dg-final { scan-assembler-not   {\m(lfd|lxsd)x?\M} } } */
+/* { dg-final { scan-assembler-not   {\(mmtvsrd|mfvsrd)\M} } } */
