@@ -47,9 +47,9 @@ float128_to_ldouble (__float128 a)
   return (long double)a + 1.0L;
 }
 
-volatile __float128 f128 = 1.25Q;
-volatile __ibm128 i128 = (__ibm128)3.5L;
-volatile long double ld = 4.75L;
+volatile __float128  f128 = 1.25Q;
+volatile __ibm128    i128 = (__ibm128)3.5L;
+volatile long double ld   = 4.75L;
 
 volatile double f128_p1 = 2.25;
 volatile double i128_p1 = 4.5;
