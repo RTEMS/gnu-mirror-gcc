@@ -5,8 +5,6 @@
 	* gcc.target/powerpc/pr85657-4.c: Test __builtin_pack_ibm128.
 	* gcc.target/powerpc/pr85657-5.c: Test __builtin_unpack_ibm128.
 
-	* g++.dg/pr85657.C: Delete for now.
-
 2018-05-15  Michael Meissner  <meissner@linux.ibm.com>
 
 	Merge up to 260267.
