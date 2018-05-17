@@ -1,3 +1,7 @@
+2018-05-17  Michael Meissner  <meissner@linux.ibm.com>
+
+	* g++.dg/pr85657.C: Delete for now.
+
 2018-05-15  Michael Meissner  <meissner@linux.ibm.com>
 
 	Merge up to 260267.
@@ -8,7 +12,7 @@
 	* gcc.target/powerpc/pr85657-1.c: New tests.
 	* gcc.target/powerpc/pr85657-2.c: Likewise.
 	* gcc.target/powerpc/pr85657-3.c: Likewise.
-	* g++.dg/pr85657: Likewise.
+	* g++.dg/pr85657.C: Likewise.
 
 2018-05-04   Michael Meissner  <meissner@linux.ibm.com>
 
