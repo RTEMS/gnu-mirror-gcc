@@ -1,3 +1,8 @@
+2018-05-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/85657
+	* gcc.target/powerpc/pr85657-6.c: New test.
+
 2018-05-17  Michael Meissner  <meissner@linux.ibm.com>
 
 	* gcc.target/powerpc/pr85657-3.c: Rework pr85657-1.c test to be
