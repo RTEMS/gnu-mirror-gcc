@@ -13,6 +13,6 @@ pack (double dummy, double a, double b)
 
 /* { dg-final { scan-assembler     {\m(fmr|xxlor)\M} } } */
 /* { dg-final { scan-assembler-not {\mbl\M} } } */
-/* { dg-final { scan-assembler-not {\m(mstfd|stxsd)x?\M} } } */
+/* { dg-final { scan-assembler-not {\m(stfd|stxsd)x?\M} } } */
 /* { dg-final { scan-assembler-not {\m(lfd|lxsd)x?\M} } } */
-/* { dg-final { scan-assembler-not {\m(mmtvsrd|mfvsrd)\M} } } */
+/* { dg-final { scan-assembler-not {\m(mtvsrd|mfvsrd)\M} } } */
