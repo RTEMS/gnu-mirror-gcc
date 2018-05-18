@@ -9,11 +9,11 @@ long double
 pack (double a, double b)
 {
   /* Should just generate some moves.  */
-  return __builtin_pack_longdouble (a, b); /* dg-error "builtin function '__builtin_pack_longdouble' */
+  return __builtin_pack_longdouble (a, b); /* { dg-error "builtin function '__builtin_pack_longdouble' } */
 }
 
 double
 unpack0 (long double x)
 {
-  return __builtin_unpack_longdouble (x, 0); /* dg-error "builtin function '__builtin_unpack_longdouble' */
+  return __builtin_unpack_longdouble (x, 0); /* { dg-error "builtin function '__builtin_unpack_longdouble' } */
 }
