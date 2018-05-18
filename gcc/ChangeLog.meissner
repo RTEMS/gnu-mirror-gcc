@@ -1,3 +1,16 @@
+2018-05-18  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-builtin.def (BU_IBM128_2): New helper
+	macro.
+	(PACK_IF): Use BU_IBM128_2 instead of BU_LDBL128_2.
+	(UNPACK_IF): Likewise.
+	* config/rs6000/rs6000.c (rs6000_builtin_mask_calculate):
+	RS6000_BTM_LDBL128 requires long double to 128-bit IBM extended
+	double.
+	(rs6000_invalid_builtin): Add error message if long double is IEEE
+	128-bit floating point.
+	* config/rs6000/rs6000.h (RS6000_BTM_LDBL128): Update comment.
+
 2018-05-17  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/rs6000.c (init_float128_ibm): Update conversion
