@@ -1,3 +1,13 @@
+2018-05-22  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/85657
+	* gcc.target/powerpc/pr85657-4.c: New tests for pack/unpack
+	__ibm128 builtin functions, and whether an appropriate error
+	message is generate if the long double pack/unpack are used when
+	long double is IEEE 128.
+	* gcc.target/powerpc/pr85657-5.c: Likewise.
+	* gcc.target/powerpc/pr85657-6.c: Likewise.
+
 2018-05-22   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 260548

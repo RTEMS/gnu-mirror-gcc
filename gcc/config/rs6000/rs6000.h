@@ -2452,7 +2452,7 @@ extern int frame_pointer_needed;
 #define RS6000_BTM_CELL		MASK_FPRND	/* Target is cell powerpc.  */
 #define RS6000_BTM_DFP		MASK_DFP	/* Decimal floating point.  */
 #define RS6000_BTM_HARD_FLOAT	MASK_SOFT_FLOAT	/* Hardware floating point.  */
-#define RS6000_BTM_LDBL128	MASK_MULTIPLE	/* 128-bit long double.  */
+#define RS6000_BTM_LDBL128	MASK_MULTIPLE	/* 128-bit IBM long double.  */
 #define RS6000_BTM_64BIT	MASK_64BIT	/* 64-bit addressing.  */
 #define RS6000_BTM_POWERPC64	MASK_POWERPC64	/* 64-bit registers.  */
 #define RS6000_BTM_FLOAT128	MASK_FLOAT128_KEYWORD /* IEEE 128-bit float.  */

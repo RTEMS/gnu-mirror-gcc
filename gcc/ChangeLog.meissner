@@ -1,3 +1,21 @@
+2018-05-22  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/85657
+	* config/rs6000/rs6000-builtin.def (BU_IBM128_2): New helper macro
+	for __builtin_{,un}pack_ibm128.
+	(PACK_IF): Declare __builtin_{,un}pack_ibm128.
+	(UNPACK_IF): Likewise.
+	* config/rs6000/rs6000.c (rs6000_builtin_mask_calculate): The mask
+	for long double builtins (RS6000_BTM_LDBL128) requires that long
+	double is IBM extended double.
+	(rs6000_invalid_builtin): Add a new error message if the long
+	double {,un}pack builtins are used when long double is IEEE
+	128-bit floating point.
+	* config/rs6000/rs6000.h (RS6000_BTM_LDBL128): Update comment.
+	* doc/extend.texi (PowerPC builtins): Update documention for
+	__builtin_{,un}pack_longdouble.  Add documentation for
+	__builtin_{,un}pack_ibm128.
+
 2018-05-22   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch subversion id 260548
