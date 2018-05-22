@@ -1,3 +1,29 @@
+2018-05-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	PR target/85358
+	* target.def (default_widening_p): New target hook to say whether
+	default widening between modes should be done.
+	* targhooks.h (hook_bool_mode_mode_bool_true): New declaration.
+	* targhooks.c (hook_bool_mode_mode_bool_true): New default target
+	hook.
+	* optabs.c (expand_binop): Before doing default widening, check
+	whether the backend allows the widening.
+	(expand_twoval_unop): Likewise.
+	(expand_twoval_binop): Likewise.
+	(widen_leading): Likewise.
+	(widen_bswap): Likewise.
+	(expand_unop): Likewise.
+	* cse.c (cse_insn): Likewise.
+	* combine.c (simplify_comparison): Likewise.
+	* var-tracking.c (prepare_call_arguments): Likewise.
+	* config/rs6000/rs6000.c (TARGET_DEFAULT_WIDENING_P): Define
+	target hook to prevent IBM extended double and IEEE 128-bit
+	floating point from being converted to each by default.
+	(rs6000_default_widening_p): Likewise.
+	* doc/tm.texi (TARGET_DEFAULT_WIDENING_P): Document the new
+	default widening hook.
+	* doc/tm.texi.in (TARGET_DEFAULT_WIDENING_P): Likewise.
+
 2018-05-22  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/85657

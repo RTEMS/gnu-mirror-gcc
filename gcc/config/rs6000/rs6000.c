@@ -1973,6 +1973,9 @@ static const struct attribute_spec rs6000_attribute_table[] =
 
 #undef TARGET_STARTING_FRAME_OFFSET
 #define TARGET_STARTING_FRAME_OFFSET rs6000_starting_frame_offset
+
+#undef TARGET_DEFAULT_WIDENING_P
+#define TARGET_DEFAULT_WIDENING_P rs6000_default_widening_p
 
 
 /* Processor table.  */
@@ -16500,6 +16503,29 @@ rs6000_init_builtins (void)
 #ifdef SUBTARGET_INIT_BUILTINS
   SUBTARGET_INIT_BUILTINS;
 #endif
+}
+
+/* Return true if FROM_MODE can be widened to TO_MODE automatically.  UNSIGNEDP
+   says the conversion is unsigned.
+
+   On PowerPC, don't allow IBM extended double to widen to an IEEE 128-bit
+   floating point value or vice versa.  */
+
+static bool
+rs6000_default_widening_p (machine_mode from_mode,
+			   machine_mode to_mode,
+			   bool unsignedp ATTRIBUTE_UNUSED)
+{
+  if (!TARGET_FLOAT128_TYPE)
+    return true;
+
+  if (FLOAT128_IEEE_P (from_mode) && FLOAT128_IBM_P (to_mode))
+    return false;
+
+  if (FLOAT128_IBM_P (from_mode) && FLOAT128_IEEE_P (to_mode))
+    return false;
+
+  return true;
 }
 
 /* Returns the rs6000 builtin decl for CODE.  */

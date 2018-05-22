@@ -4885,6 +4885,9 @@ cse_insn (rtx_insn *insn)
 	      if (GET_MODE_PRECISION (wider_mode) > BITS_PER_WORD)
 		break;
 
+	      if (!targetm.default_widening_p (mode, wider_mode, false))
+		continue;
+
 	      struct table_elt *const_elt
 		= lookup (src_const, HASH (src_const, wider_mode), wider_mode);
 
@@ -4923,6 +4926,9 @@ cse_insn (rtx_insn *insn)
 	      scalar_int_mode tmode = tmode_iter.require ();
 	      if (GET_MODE_SIZE (tmode) > UNITS_PER_WORD)
 		break;
+
+	      if (!targetm.default_widening_p (mode, tmode, false))
+		continue;
 
 	      rtx inner = gen_lowpart (tmode, XEXP (src, 0));
 	      struct table_elt *larger_elt;
@@ -4978,6 +4984,9 @@ cse_insn (rtx_insn *insn)
 	      scalar_int_mode tmode = tmode_iter.require ();
 	      if (GET_MODE_SIZE (tmode) > UNITS_PER_WORD)
 		break;
+
+	      if (!targetm.default_widening_p (mode, tmode, false))
+		continue;
 
 	      PUT_MODE (memory_extend_rtx, tmode);
 	      larger_elt = lookup (memory_extend_rtx,
