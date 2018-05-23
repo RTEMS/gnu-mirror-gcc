@@ -1284,15 +1284,14 @@ expand_binop (machine_mode mode, optab binoptab, rtx op0, rtx op1,
     FOR_EACH_WIDER_MODE (wider_mode, mode)
       {
 	machine_mode next_mode;
-	if ((optab_handler (binoptab, wider_mode) != CODE_FOR_nothing
-	     || (binoptab == smul_optab
-		 && GET_MODE_WIDER_MODE (wider_mode).exists (&next_mode)
-		 && (find_widening_optab_handler ((unsignedp
-						   ? umul_widen_optab
-						   : smul_widen_optab),
-						  next_mode, mode)
-		     != CODE_FOR_nothing)))
-	    && targetm.default_widening_p (mode, wider_mode, unsignedp))
+	if (optab_handler (binoptab, wider_mode) != CODE_FOR_nothing
+	    || (binoptab == smul_optab
+		&& GET_MODE_WIDER_MODE (wider_mode).exists (&next_mode)
+		&& (find_widening_optab_handler ((unsignedp
+						  ? umul_widen_optab
+						  : smul_widen_optab),
+						 next_mode, mode)
+		    != CODE_FOR_nothing)))
 	  {
 	    rtx xop0 = op0, xop1 = op1;
 	    int no_extend = 0;
@@ -1835,10 +1834,9 @@ expand_binop (machine_mode mode, optab binoptab, rtx op0, rtx op1,
       gcc_assert (!convert_optab_p (binoptab));
       FOR_EACH_WIDER_MODE (wider_mode, mode)
 	{
-	  if ((optab_handler (binoptab, wider_mode)
-	       || (methods == OPTAB_LIB
-		   && optab_libfunc (binoptab, wider_mode)))
-	      && targetm.default_widening_p (mode, wider_mode, unsignedp))
+	  if (optab_handler (binoptab, wider_mode)
+	      || (methods == OPTAB_LIB
+		  && optab_libfunc (binoptab, wider_mode)))
 	    {
 	      rtx xop0 = op0, xop1 = op1;
 	      int no_extend = 0;
@@ -1991,8 +1989,7 @@ expand_twoval_unop (optab unoptab, rtx op0, rtx targ0, rtx targ1,
     {
       FOR_EACH_WIDER_MODE (wider_mode, mode)
 	{
-	  if (optab_handler (unoptab, wider_mode) != CODE_FOR_nothing
-	      && targetm.default_widening_p (mode, wider_mode, unsignedp))
+	  if (optab_handler (unoptab, wider_mode) != CODE_FOR_nothing)
 	    {
 	      rtx t0 = gen_reg_rtx (wider_mode);
 	      rtx t1 = gen_reg_rtx (wider_mode);
@@ -2073,8 +2070,7 @@ expand_twoval_binop (optab binoptab, rtx op0, rtx op1, rtx targ0, rtx targ1,
     {
       FOR_EACH_WIDER_MODE (wider_mode, mode)
 	{
-	  if (optab_handler (binoptab, wider_mode) != CODE_FOR_nothing
-	      && targetm.default_widening_p (mode, wider_mode, unsignedp))
+	  if (optab_handler (binoptab, wider_mode) != CODE_FOR_nothing)
 	    {
 	      rtx t0 = gen_reg_rtx (wider_mode);
 	      rtx t1 = gen_reg_rtx (wider_mode);
@@ -2173,9 +2169,7 @@ widen_leading (scalar_int_mode mode, rtx op0, rtx target, optab unoptab)
   FOR_EACH_WIDER_MODE (wider_mode_iter, mode)
     {
       scalar_int_mode wider_mode = wider_mode_iter.require ();
-      bool unsignedp = unoptab != clrsb_optab;
-      if (optab_handler (unoptab, wider_mode) != CODE_FOR_nothing
-	  && targetm.default_widening_p (mode, wider_mode, unsignedp))
+      if (optab_handler (unoptab, wider_mode) != CODE_FOR_nothing)
 	{
 	  rtx xop0, temp;
 	  rtx_insn *last;
@@ -2184,8 +2178,10 @@ widen_leading (scalar_int_mode mode, rtx op0, rtx target, optab unoptab)
 
 	  if (target == 0)
 	    target = gen_reg_rtx (mode);
-	  xop0 = widen_operand (op0, wider_mode, mode, unsignedp, false);
-	  temp = expand_unop (wider_mode, unoptab, xop0, NULL_RTX, unsignedp);
+	  xop0 = widen_operand (op0, wider_mode, mode,
+				unoptab != clrsb_optab, false);
+	  temp = expand_unop (wider_mode, unoptab, xop0, NULL_RTX,
+			      unoptab != clrsb_optab);
 	  if (temp != 0)
 	    temp = expand_binop
 	      (wider_mode, sub_optab, temp,
@@ -2337,12 +2333,9 @@ widen_bswap (scalar_int_mode mode, rtx op0, rtx target)
   opt_scalar_int_mode wider_mode_iter;
 
   FOR_EACH_WIDER_MODE (wider_mode_iter, mode)
-    {
-      machine_mode wider_mode = wider_mode_iter.require ();
-      if (optab_handler (bswap_optab, wider_mode) != CODE_FOR_nothing
-	  && targetm.default_widening_p (mode, wider_mode, true))
-	break;
-    }
+    if (optab_handler (bswap_optab, wider_mode_iter.require ())
+	!= CODE_FOR_nothing)
+      break;
 
   if (!wider_mode_iter.exists ())
     return NULL_RTX;
@@ -2872,8 +2865,7 @@ expand_unop (machine_mode mode, optab unoptab, rtx op0, rtx target,
   if (CLASS_HAS_WIDER_MODES_P (mclass))
     FOR_EACH_WIDER_MODE (wider_mode, mode)
       {
-	if (optab_handler (unoptab, wider_mode) != CODE_FOR_nothing
-	    && targetm.default_widening_p (mode, wider_mode, unsignedp))
+	if (optab_handler (unoptab, wider_mode) != CODE_FOR_nothing)
 	  {
 	    rtx xop0 = op0;
 	    rtx_insn *last = get_last_insn ();
@@ -3040,9 +3032,8 @@ expand_unop (machine_mode mode, optab unoptab, rtx op0, rtx target,
     {
       FOR_EACH_WIDER_MODE (wider_mode, mode)
 	{
-	  if ((optab_handler (unoptab, wider_mode) != CODE_FOR_nothing
-	       || optab_libfunc (unoptab, wider_mode))
-	      && targetm.default_widening_p (mode, wider_mode, unsignedp))
+	  if (optab_handler (unoptab, wider_mode) != CODE_FOR_nothing
+	      || optab_libfunc (unoptab, wider_mode))
 	    {
 	      rtx xop0 = op0;
 	      rtx_insn *last = get_last_insn ();

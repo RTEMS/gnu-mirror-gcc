@@ -3498,13 +3498,6 @@ If this hook allows @code{val} to have a scalar mode, then\n\
  hook_bool_mode_uhwi_false)
 
 DEFHOOK
-(default_widening_p,
- "Return true if GCC can automatically widen from @var{from_mode} to\n\
-@var{to_mode}.  Conversions are unsigned if @var{unsigned_p} is true.",
- bool, (machine_mode, machine_mode, bool),
- hook_bool_mode_mode_bool_true)
-
-DEFHOOK
 (libgcc_floating_mode_supported_p,
  "Define this to return nonzero if libgcc provides support for the \n\
 floating-point mode @var{mode}, which is known to pass \n\

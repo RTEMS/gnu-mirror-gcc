@@ -1,3 +1,16 @@
+2018-05-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
+
+	* target.def: Undo changes, start new patch series.
+	* targhooks.h: Likewise.
+	* targhooks.c: Likewise.
+	* optabs.c: Likewise.
+	* cse.c: Likewise.
+	* combine.c: Likewise.
+	* var-tracking.c: Likewise.
+	* config/rs6000/rs6000.c: Likewise.
+	* doc/tm.texi: Likewise.
+	* doc/tm.texi.in: Likewise.
+
 2018-05-22  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	PR target/85358

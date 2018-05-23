@@ -289,6 +289,5 @@ extern enum flt_eval_method
 default_excess_precision (enum excess_precision_type ATTRIBUTE_UNUSED);
 extern bool default_stack_clash_protection_final_dynamic_probe (rtx);
 extern void default_select_early_remat_modes (sbitmap);
-extern bool hook_bool_mode_mode_bool_true (machine_mode, machine_mode, bool);
 
 #endif /* GCC_TARGHOOKS_H */

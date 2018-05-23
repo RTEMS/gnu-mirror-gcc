@@ -12965,9 +12965,6 @@ simplify_comparison (enum rtx_code code, rtx *pop0, rtx *pop1)
 				  || (nonzero_bits (op1, tmode)
 				      & ~GET_MODE_MASK (mode)) == 0)));
 
-	    if (!targetm.default_widening_p (mode, tmode, zero_extended))
-	      continue;
-
 	    if (zero_extended
 		|| ((num_sign_bit_copies (op0, tmode)
 		     > (unsigned int) (GET_MODE_PRECISION (tmode)

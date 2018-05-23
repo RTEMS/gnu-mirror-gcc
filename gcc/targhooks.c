@@ -2345,12 +2345,4 @@ default_select_early_remat_modes (sbitmap)
 {
 }
 
-bool
-hook_bool_mode_mode_bool_true (machine_mode from_mode ATTRIBUTE_UNUSED,
-			       machine_mode to_mode ATTRIBUTE_UNUSED,
-			       bool unsigned_p ATTRIBUTE_UNUSED)
-{
-  return true;
-}
-
 #include "gt-targhooks.h"
