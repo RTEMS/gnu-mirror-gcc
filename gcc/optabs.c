@@ -2181,7 +2181,6 @@ widen_leading (scalar_int_mode mode, rtx op0, rtx target, optab unoptab)
   FOR_EACH_WIDER_MODE (wider_mode_iter, mode)
     {
       scalar_int_mode wider_mode = wider_mode_iter.require ();
-      bool unsignedp = unoptab != clrsb_optab;
       if (optab_handler (unoptab, wider_mode) != CODE_FOR_nothing)
 	{
 	  rtx xop0, temp;
@@ -2191,8 +2190,10 @@ widen_leading (scalar_int_mode mode, rtx op0, rtx target, optab unoptab)
 
 	  if (target == 0)
 	    target = gen_reg_rtx (mode);
-	  xop0 = widen_operand (op0, wider_mode, mode, unsignedp, false);
-	  temp = expand_unop (wider_mode, unoptab, xop0, NULL_RTX, unsignedp);
+	  xop0 = widen_operand (op0, wider_mode, mode,
+				unoptab != clrsb_optab, false);
+	  temp = expand_unop (wider_mode, unoptab, xop0, NULL_RTX,
+			      unoptab != clrsb_optab);
 	  if (temp != 0)
 	    temp = expand_binop
 	      (wider_mode, sub_optab, temp,
@@ -2344,11 +2345,9 @@ widen_bswap (scalar_int_mode mode, rtx op0, rtx target)
   opt_scalar_int_mode wider_mode_iter;
 
   FOR_EACH_WIDER_MODE (wider_mode_iter, mode)
-    {
-      machine_mode wider_mode = wider_mode_iter.require ();
-      if (optab_handler (bswap_optab, wider_mode) != CODE_FOR_nothing)
-	break;
-    }
+    if (optab_handler (bswap_optab, wider_mode_iter.require ())
+	!= CODE_FOR_nothing)
+      break;
 
   if (!wider_mode_iter.exists ())
     return NULL_RTX;
