@@ -3498,6 +3498,17 @@ If this hook allows @code{val} to have a scalar mode, then\n\
  hook_bool_mode_uhwi_false)
 
 DEFHOOK
+(default_fp_widening_p,
+ "Return true if GCC can automatically widen @var{mode} to @var{wider_mode}\n\
+if @var{wider_mode} supports an operation in hardware but @var{mode} does\n\
+not.  Both modes are scalar floating point modes.  The default hook always\n\
+returns true.  This hook should be used if all values in @var{mode} cannont\n\
+be represented in @var{wider_mode}, or the rounding characteristics are\n\
+different between the two modes.",
+ bool, (machine_mode wider_mode, machine_mode mode),
+ hook_bool_mode_mode_true)
+
+DEFHOOK
 (libgcc_floating_mode_supported_p,
  "Define this to return nonzero if libgcc provides support for the \n\
 floating-point mode @var{mode}, which is known to pass \n\

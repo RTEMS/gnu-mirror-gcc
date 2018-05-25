@@ -1,3 +1,21 @@
+2018-05-25  Michael Meissner  <meissner@linux.ibm.com>
+
+	PR target/85358
+	* target.def (default_fp_widening_p): New target hook to automatic
+	widening betwen two floating point modes.
+	* optabs.c (expand_binop): Do not automatically widen a binary or
+	unary scalar floating point op if the backend says that the
+	widening should not occur.
+	(expand_twoval_binop): Likewise.
+	(expand_unop): Likewise.
+	* config/rs6000/rs6000.c (TARGET_DEFAULT_FP_WIDENING_P): Define.
+	(rs6000_default_fp_widening_p): New target hook to prevent
+	automatic widening between IEEE 128-bit floating point and IBM
+	extended double floating point.
+	* doc/tm.texi (Target Hooks): Document new target hook
+	default_fp_widening_p.
+	* doc/tm.texi.in (Target Hooks): Likewise.
+
 2018-05-23  Michael Meissner  <meissner@linux.vnet.ibm.com>
 
 	* target.def: Undo changes, start new patch series.
